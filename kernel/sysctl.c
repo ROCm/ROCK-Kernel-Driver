@@ -649,6 +649,30 @@ static ctl_table kern_table[] = {
 		.extra1		= &min_ngroups,
 		.extra2		= &max_ngroups,
 	},
+	{
+		.ctl_name	= KERN_MAXTIMESLICE, 
+		.procname	= "max-timeslice",
+		.data		=  &max_timeslice,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{
+		.ctl_name	= KERN_MINTIMESLICE, 
+		.procname	= "min-timeslice",
+		.data		= &min_timeslice,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{
+		.ctl_name	= KERN_HZ, 
+		.procname	= "HZ",
+		.data		= &__HZ,
+		.maxlen		= sizeof(int),
+		.mode		= 0444,
+		.proc_handler	= &proc_dointvec,
+	},
 	{ .ctl_name = 0 }
 };
 
@@ -898,30 +922,6 @@ static ctl_table fs_table[] = {
 		.data		= &aio_max_nr,
 		.maxlen		= sizeof(aio_max_nr),
 		.mode		= 0644,
-		.proc_handler	= &proc_dointvec,
-	},
-	{
-		.ctl_name	= KERN_MAXTIMESLICE, 
-		.procname	= "max-timeslice",
-		.data		=  &max_timeslice,
-		.maxlen		= sizeof(int),
-		.mode		= 0644,
-		.proc_handler	= &proc_dointvec,
-	},
-	{
-		.ctl_name	= KERN_MINTIMESLICE, 
-		.procname	= "min-timeslice",
-		.data		= &min_timeslice,
-		.maxlen		= sizeof(int),
-		.mode		= 0644,
-		.proc_handler	= &proc_dointvec,
-	},
-	{
-		.ctl_name	= KERN_HZ, 
-		.procname	= "HZ",
-		.data		= &__HZ,
-		.maxlen		= sizeof(int),
-		.mode		= 0444,
 		.proc_handler	= &proc_dointvec,
 	},
 	{ .ctl_name = 0 }
