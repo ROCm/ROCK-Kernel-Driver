@@ -860,6 +860,8 @@ static int netdev_open(struct net_device *dev)
 	/* Set the chip to poll every N*320nsec. */
 	writeb(100, ioaddr + RxDMAPollPeriod);
 	writeb(127, ioaddr + TxDMAPollPeriod);
+	/* Fix DFE-580TX packet drop issue */
+	writeb(0x01, ioaddr + DebugCtrl1);
 	netif_start_queue(dev);
 
 	writew(StatsEnable | RxEnable | TxEnable, ioaddr + MACCtrl1);
@@ -967,7 +969,8 @@ static void tx_timeout(struct net_device *dev)
 
 	dev->trans_start = jiffies;
 	np->stats.tx_errors++;
-	netif_wake_queue(dev);
+	if (!netif_queue_stopped(dev))
+		netif_wake_queue(dev);
 }
 
 
@@ -1116,6 +1119,7 @@ static void intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 	struct netdev_private *np;
 	long ioaddr;
 	int boguscnt = max_interrupt_work;
+	int hw_frame_id;
 
 	ioaddr = dev->base_addr;
 	np = dev->priv;
@@ -1174,10 +1178,14 @@ static void intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 			}
 		}
 		spin_lock(&np->lock);
+		hw_frame_id = readb(ioaddr + TxFrameId);
 		for (; np->cur_tx - np->dirty_tx > 0; np->dirty_tx++) {
 			int entry = np->dirty_tx % TX_RING_SIZE;
 			struct sk_buff *skb;
-			if (!(np->tx_ring[entry].status & 0x00010000))
+			int sw_frame_id;
+			sw_frame_id = (np->tx_ring[entry].status >> 2) & 0xff;
+			
+			if (sw_frame_id == hw_frame_id)
 				break;
 			skb = np->tx_skbuff[entry];
 			/* Free the original skb. */
