@@ -305,7 +305,7 @@ config RIO
 	help
 	  This is a driver for the Specialix RIO, a smart serial card which
 	  drives an outboard box that can support up to 128 ports.  Product
-	  information is at <http://www.sphinxcst.co.uk/perle/multi.htm>.
+	  information is at <http://www.perle.com/support/documentation.html#multiport>.
 	  There are both ISA and PCI versions.
 
 config RIO_OLDPCI
@@ -415,7 +415,7 @@ config IT8172_SCR0
 	  Say Y here to support smart-card reader 0 (SCR0) on the Integrated
 	  Technology Express, Inc. ITE8172 SBC.  Vendor page at
 	  <http://www.ite.com.tw/ia/brief_it8172bsp.htm>; picture of the
-	  board at <http://www.mvista.com/allies/semiconductor/ite.html>.
+	  board at <http://www.mvista.com/partners/semiconductor/ite.html>.
 
 config IT8172_SCR1
 	bool "Enable Smart Card Reader 1 Support "
@@ -424,7 +424,7 @@ config IT8172_SCR1
 	  Say Y here to support smart-card reader 1 (SCR1) on the Integrated
 	  Technology Express, Inc. ITE8172 SBC.  Vendor page at
 	  <http://www.ite.com.tw/ia/brief_it8172bsp.htm>; picture of the
-	  board at <http://www.mvista.com/allies/semiconductor/ite.html>.
+	  board at <http://www.mvista.com/partners/semiconductor/ite.html>.
 
 config A2232
 	tristate "Commodore A2232 serial support (EXPERIMENTAL)"

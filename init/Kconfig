@@ -83,13 +83,12 @@ config SYSVIPC
 	  exchange information. It is generally considered to be a good thing,
 	  and some programs won't run unless you say Y here. In particular, if
 	  you want to run the DOS emulator dosemu under Linux (read the
-	  DOSEMU-HOWTO, available from
-	  <http://www.tldp.org/docs.html#howto>), you'll need to say Y
-	  here.
+	  DOSEMU-HOWTO, available from <http://www.tldp.org/docs.html#howto>),
+	  you'll need to say Y here.
 
 	  You can find documentation about IPC with "info ipc" and also in
 	  section 6.4 of the Linux Programmer's Guide, available from
-	  <http://www.tldp.org/docs.html#guide>.
+	  <http://www.tldp.org/guides.html>.
 
 config BSD_PROCESS_ACCT
 	bool "BSD Process Accounting"
