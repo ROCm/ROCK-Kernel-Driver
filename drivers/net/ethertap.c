@@ -33,7 +33,6 @@
  *	Index to functions.
  */
 
-int	    ethertap_probe(struct net_device *dev);
 static int  ethertap_open(struct net_device *dev);
 static int  ethertap_start_xmit(struct sk_buff *skb, struct net_device *dev);
 static int  ethertap_close(struct net_device *dev);
@@ -45,7 +44,11 @@ static void set_multicast_list(struct net_device *dev);
 
 static int ethertap_debug;
 
-static struct net_device *tap_map[32];	/* Returns the tap device for a given netlink */
+static int max_taps = 1;
+MODULE_PARM(max_taps, "i");
+MODULE_PARM_DESC(max_taps,"Max number of ethernet tap devices");
+
+static struct net_device **tap_map;	/* Returns the tap device for a given netlink */
 
 /*
  *	Board-specific info in dev->priv.
@@ -64,23 +67,27 @@ struct net_local
  *	To call this a probe is a bit misleading, however for real
  *	hardware it would have to check what was present.
  */
- 
-int __init ethertap_probe(struct net_device *dev)
+static int  __init ethertap_probe(int unit)
 {
+	struct net_device *dev;
+	int err = -ENOMEM;
+
+	dev = alloc_netdev(sizeof(struct net_local), "tap%d",
+			   ether_setup);
+
+	if (!dev)
+		goto out;
+
 	SET_MODULE_OWNER(dev);
+
+	sprintf(dev->name, "tap%d", unit);
+	dev->base_addr = unit + NETLINK_TAPBASE;
+
+	netdev_boot_setup_check(dev);
 
 	memcpy(dev->dev_addr, "\xFE\xFD\x00\x00\x00\x00", 6);
 	if (dev->mem_start & 0xf)
 		ethertap_debug = dev->mem_start & 0x7;
-
-	/*
-	 *	Initialize the device structure.
-	 */
-
-	dev->priv = kmalloc(sizeof(struct net_local), GFP_KERNEL);
-	if (dev->priv == NULL)
-		return -ENOMEM;
-	memset(dev->priv, 0, sizeof(struct net_local));
 
 	/*
 	 *	The tap specific entries in the device structure.
@@ -94,17 +101,19 @@ int __init ethertap_probe(struct net_device *dev)
 	dev->set_multicast_list = set_multicast_list;
 #endif
 
-	/*
-	 *	Setup the generic properties
-	 */
-
-	ether_setup(dev);
-
 	dev->tx_queue_len = 0;
 	dev->flags|=IFF_NOARP;
-	tap_map[dev->base_addr]=dev;
 
+	err = register_netdev(dev);
+	if (err)
+		goto out1;
+
+	tap_map[unit]=dev;
 	return 0;
+out1:
+	kfree(dev);
+out:
+	return err;
 }
 
 /*
@@ -116,11 +125,12 @@ static int ethertap_open(struct net_device *dev)
 	struct net_local *lp = (struct net_local*)dev->priv;
 
 	if (ethertap_debug > 2)
-		printk("%s: Doing ethertap_open()...", dev->name);
+		printk(KERN_DEBUG "%s: Doing ethertap_open()...", dev->name);
 
 	lp->nl = netlink_kernel_create(dev->base_addr, ethertap_rx);
 	if (lp->nl == NULL)
 		return -ENOBUFS;
+
 	netif_start_queue(dev);
 	return 0;
 }
@@ -302,7 +312,7 @@ static void ethertap_rx(struct sock *sk, int len)
 	}
 
 	if (ethertap_debug > 3)
-		printk("%s: ethertap_rx()\n", dev->name);
+		printk(KERN_DEBUG "%s: ethertap_rx()\n", dev->name);
 
 	while ((skb = skb_dequeue(&sk->sk_receive_queue)) != NULL)
 		ethertap_rx_skb(skb, dev);
@@ -314,7 +324,7 @@ static int ethertap_close(struct net_device *dev)
 	struct sock *sk = lp->nl;
 
 	if (ethertap_debug > 2)
-		printk("%s: Shutting down.\n", dev->name);
+		printk(KERN_DEBUG "%s: Shutting down.\n", dev->name);
 
 	netif_stop_queue(dev);
 
@@ -332,45 +342,49 @@ static struct net_device_stats *ethertap_get_stats(struct net_device *dev)
 	return &lp->stats;
 }
 
-#ifdef MODULE
 
-static int unit;
-MODULE_PARM(unit,"i");
-MODULE_PARM_DESC(unit,"Ethertap device number");
-
-static struct net_device dev_ethertap =
+int __init ethertap_init(void)
 {
-	.name		=	" ",
-	.init		=	 ethertap_probe
-};
+	int i, err = 0;
 
-int init_module(void)
-{
-	dev_ethertap.base_addr=unit+NETLINK_TAPBASE;
-	sprintf(dev_ethertap.name,"tap%d",unit);
-	if (dev_get(dev_ethertap.name))
-	{
-		printk(KERN_INFO "%s already loaded.\n", dev_ethertap.name);
-		return -EBUSY;
+	/* netlink can only hande 16 entries unless modified */
+	if (max_taps > MAX_LINKS - NETLINK_TAPBASE)
+		return -E2BIG;
+
+	tap_map = kmalloc(sizeof(struct net_device *)*max_taps, GFP_KERNEL);
+	if (!tap_map)
+		return -ENOMEM;
+
+	for (i = 0; i < max_taps; i++) {
+		err = ethertap_probe(i);
+		if (err) {
+			while (--i > 0) {
+				unregister_netdev(tap_map[i]);
+				free_netdev(tap_map[i]);
+			}
+			break;
+		}
 	}
-	if (register_netdev(&dev_ethertap) != 0)
-		return -EIO;
-	return 0;
+	if (err)
+		kfree(tap_map);
+	return err;
 }
+module_init(ethertap_init);
 
-void cleanup_module(void)
+void __exit ethertap_cleanup(void)
 {
-	tap_map[dev_ethertap.base_addr]=NULL;
-	unregister_netdev(&dev_ethertap);
+	int i;
 
-	/*
-	 *	Free up the private structure.
-	 */
-
-	kfree(dev_ethertap.priv);
-	dev_ethertap.priv = NULL;	/* gets re-allocated by ethertap_probe */
+	for (i = 0; i < max_taps; i++) {
+		struct net_device *dev = tap_map[i];
+		if (dev) {
+			tap_map[i] = NULL;
+			unregister_netdev(dev);
+			free_netdev(dev);
+		}
+	}
+	kfree(tap_map);
 }
+module_exit(ethertap_cleanup);
 
-#endif /* MODULE */
 MODULE_LICENSE("GPL");
-
