@@ -666,9 +666,7 @@ static void neigh_timer_handler(unsigned long arg)
 	struct neighbour *neigh = (struct neighbour *)arg;
 	unsigned state;
 
-	int refcnt;
-
-	write_lock_bh(&neigh->lock);
+	write_lock(&neigh->lock);
 	now = jiffies;
 	next = now + HZ;
 	
@@ -678,13 +676,7 @@ static void neigh_timer_handler(unsigned long arg)
 #ifndef CONFIG_SMP
 		printk(KERN_WARNING "neigh: timer & !nud_in_timer\n");
 #endif
-		write_unlock_bh(&neigh->lock);
-		refcnt = atomic_read(&neigh->refcnt) - 1;
-		neigh_release(neigh);
-		NEIGH_PRINTK3(KERN_DEBUG 
-				"%s(): => state=%s, refcnt=%d\n",
-				__FUNCTION__, neigh_state(state), refcnt);
-		return;
+		goto out;
 	}
 
 #ifdef CONFIG_IPV6_NDISC_NEW
@@ -716,17 +708,10 @@ static void neigh_timer_handler(unsigned long arg)
 #else
 	if ((state & NUD_VALID) &&
 	    now - neigh->confirmed < neigh->parms->reachable_time) {
-		state = neigh->nud_state = NUD_REACHABLE;
+		neigh->nud_state = NUD_REACHABLE;
 		NEIGH_PRINTK2("neigh %p is still alive.\n", neigh);
 		neigh_connect(neigh);
-		refcnt = atomic_read(&neigh->refcnt) - 1;
-		write_unlock_bh(&neigh->lock);
-		neigh_release(neigh);
-		NEIGH_PRINTK3(KERN_DEBUG 
-				"%s(): => state=%s, refcnt=%d\n",
-				__FUNCTION__, 
-				neigh_state(state), refcnt);
-		return;
+		goto out;
 	}
 	if (state == NUD_DELAY) {
 		NEIGH_PRINTK2("neigh %p is probed.\n", neigh);
@@ -742,14 +727,9 @@ static void neigh_timer_handler(unsigned long arg)
 	    atomic_read(&neigh->probes) >= neigh_max_probes(neigh)) {
 		struct sk_buff *skb;
 
-#ifdef CONFIG_IPV6_NDISC_NEW
-		neigh->updated = now;
-#endif
-		state = neigh->nud_state = NUD_FAILED;
+		neigh->nud_state = NUD_FAILED;
 
-#ifdef CONFIG_IPV6_NDISC_NEW
-		del_timer(&neigh->timer);	/* release neigh later */
-#endif
+		neigh->updated = now;
 		neigh->tbl->stats.res_failed++;
 		NEIGH_PRINTK2("neigh %p is failed.\n", neigh);
 
@@ -760,67 +740,52 @@ static void neigh_timer_handler(unsigned long arg)
 		 */
 		while (neigh->nud_state == NUD_FAILED &&
 		       (skb = __skb_dequeue(&neigh->arp_queue)) != NULL) {
-			write_unlock_bh(&neigh->lock);
+			write_unlock(&neigh->lock);
 			neigh->ops->error_report(neigh, skb);
-			write_lock_bh(&neigh->lock);
+			write_lock(&neigh->lock);
 		}
 		skb_queue_purge(&neigh->arp_queue);
 #ifdef CONFIG_ARPD
 		if (neigh->parms->app_probes) {
-			write_unlock_bh(&neigh->lock);
+			write_unlock(&neigh->lock);
 			neigh_app_notify(neigh);
-		} else
+			write_lock(&neigh->lock);
+		}
 #endif
-		refcnt = atomic_read(&neigh->refcnt) - 1;
-		write_unlock_bh(&neigh->lock);
-
-		neigh_release(neigh);
-
-		NEIGH_PRINTK3(KERN_DEBUG 
-				"%s(): => state=%s, refcnt=%d\n",
-				__FUNCTION__, 
-				neigh_state(state), refcnt);
-
-		return;
+		goto out;
 	}
 
 #ifdef CONFIG_IPV6_NDISC_NEW
-	if (neigh->nud_state & NUD_IN_TIMER) {
-		neigh_hold(neigh);
-		if (time_before(next, jiffies + HZ/2))
-			next = jiffies + HZ/2;
-		mod_timer(&neigh->timer, next);
-		if (neigh->nud_state&(NUD_INCOMPLETE|NUD_PROBE)) {
-			write_unlock_bh(&neigh->lock);
-			neigh->ops->solicit(neigh, skb_peek(&neigh->arp_queue));
-			atomic_inc(&neigh->probes);
-		} else {
-			write_unlock_bh(&neigh->lock);
-		}
-	} else {
-		del_timer(&neigh->timer);
-		write_unlock_bh(&neigh->lock);
+	neigh_hold(neigh);
+	if (time_before(next, jiffies + HZ/2))
+		next = jiffies + HZ/2;
+	mod_timer(&neigh->timer, next);
+	if (neigh->nud_state & (NUD_INCOMPLETE|NUD_PROBE)) {
+		struct sk_buff *skb;
+
+		if ((skb = skb_peek(&neigh->arp_queue)) != NULL)
+			skb_get(skb);
+		write_unlock(&neigh->lock);
+		neigh->ops->solicit(neigh, skb);
+		atomic_inc(&neigh->probes);
+		if (skb)
+			kfree_skb(skb);
+		goto out_no_unlock;
 	}
-	refcnt = atomic_read(&neigh->refcnt) - 1;
-	state = neigh->nud_state;
-	neigh_release(neigh);
 #else
 	neigh->timer.expires = now + neigh->parms->retrans_time;
 	add_timer(&neigh->timer);
-
-	refcnt = atomic_read(&neigh->refcnt);
-	state = neigh->nud_state;
-	write_unlock_bh(&neigh->lock);
+	write_unlock(&neigh->lock);
 
 	neigh->ops->solicit(neigh, skb_peek(&neigh->arp_queue));
 	atomic_inc(&neigh->probes);
-#endif
-	NEIGH_PRINTK3(KERN_DEBUG 
-			"%s(): => state=%s, refcnt=%d\n",
-			__FUNCTION__, 
-			neigh_state(state), refcnt);
-
 	return;
+#endif
+
+out:
+	write_unlock(&neigh->lock);
+out_no_unlock:
+	neigh_release(neigh);
 }
 
 int __neigh_event_send(struct neighbour *neigh, struct sk_buff *skb)
