@@ -705,14 +705,14 @@ MRPROPER_DIRS += \
 
 # clean - Delete all intermediate files
 #
-clean-dirs += $(ALL_SUBDIRS) Documentation/DocBook scripts
-
-$(addprefix _clean_,$(clean-dirs)):
+clean-dirs += $(addprefix, _clean_,$(ALL_SUBDIRS) Documentation/DocBook scripts)
+.PHONY: $(clean-dirs) clean archclean mrproper archmrproper distclean
+$(clean-dirs):
 	$(Q)$(MAKE) $(clean)=$(patsubst _clean_%,%,$@)
 
 quiet_cmd_rmclean = RM  $$(CLEAN_FILES)
 cmd_rmclean	  = rm -f $(CLEAN_FILES)
-clean: archclean $(addprefix _clean_,$(clean-dirs))
+clean: archclean $(clean-dirs)
 	$(call cmd,rmclean)
 	@find . $(RCS_FIND_IGNORE) \
 	 	\( -name '*.[oas]' -o -name '*.ko' -o -name '.*.cmd' \
