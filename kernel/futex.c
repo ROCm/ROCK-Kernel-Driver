@@ -32,7 +32,8 @@
 #include <linux/fs.h>
 #include <linux/futex.h>
 #include <linux/highmem.h>
-#include <asm/atomic.h>
+#include <linux/time.h>
+#include <asm/uaccess.h>
 
 /* These mutexes are a very simple counter: the winner is the one who
    decrements from 1 to 0.  The counter starts at 1 when the lock is
@@ -68,22 +69,27 @@ static inline struct list_head *hash_futex(struct page *page,
 	return &futex_queues[hash_long(h, FUTEX_HASHBITS)];
 }
 
-static inline void wake_one_waiter(struct list_head *head,
-				   struct page *page,
-				   unsigned int offset)
+static int futex_wake(struct list_head *head,
+		      struct page *page,
+		      unsigned int offset,
+		      int num)
 {
-	struct list_head *i;
+	struct list_head *i, *next;
+	int num_woken = 0;
 
 	spin_lock(&futex_lock);
-	list_for_each(i, head) {
+	list_for_each_safe(i, next, head) {
 		struct futex_q *this = list_entry(i, struct futex_q, list);
 
 		if (this->page == page && this->offset == offset) {
+			list_del_init(i);
 			wake_up_process(this->task);
-			break;
+			num_woken++;
+			if (num_woken >= num) break;
 		}
 	}
 	spin_unlock(&futex_lock);
+	return num_woken;
 }
 
 /* Add at end to avoid starvation */
@@ -101,11 +107,17 @@ static inline void queue_me(struct list_head *head,
 	spin_unlock(&futex_lock);
 }
 
-static inline void unqueue_me(struct futex_q *q)
+/* Return 1 if we were still queued (ie. 0 means we were woken) */
+static inline int unqueue_me(struct futex_q *q)
 {
+	int ret = 0;
 	spin_lock(&futex_lock);
-	list_del(&q->list);
+	if (!list_empty(&q->list)) {
+		list_del(&q->list);
+		ret = 1;
+	}
 	spin_unlock(&futex_lock);
+	return ret;
 }
 
 /* Get kernel address of the user page and pin it. */
@@ -129,74 +141,65 @@ static struct page *pin_page(unsigned long page_start)
 	return page;
 }
 
-/* Try to decrement the user count to zero. */
-static int decrement_to_zero(struct page *page, unsigned int offset)
+static int futex_wait(struct list_head *head,
+		      struct page *page,
+		      int offset,
+		      int val,
+		      int *uaddr,
+		      unsigned long time)
 {
-	atomic_t *count;
+	int curval;
+	struct futex_q q;
 	int ret = 0;
 
-	count = kmap(page) + offset;
-	/* If we take the semaphore from 1 to 0, it's ours.  If it's
-           zero, decrement anyway, to indicate we are waiting.  If
-           it's negative, don't decrement so we don't wrap... */
-	if (atomic_read(count) >= 0 && atomic_dec_and_test(count))
-		ret = 1;
-	kunmap(page);
+	set_current_state(TASK_INTERRUPTIBLE);
+	queue_me(head, &q, page, offset);
+
+	/* Page is pinned, can't fail */
+	if (get_user(curval, uaddr) != 0)
+		BUG();
+
+	if (curval != val) {
+		ret = -EWOULDBLOCK;
+		set_current_state(TASK_RUNNING);
+		goto out;
+	}
+	time = schedule_timeout(time);
+	if (time == 0) {
+		ret = -ETIMEDOUT;
+		goto out;
+	}
+	if (signal_pending(current)) {
+		ret = -EINTR;
+		goto out;
+	}
+ out:
+	/* Were we woken up anyway? */
+	if (!unqueue_me(&q))
+		return 0;
 	return ret;
 }
 
-/* Simplified from arch/ppc/kernel/semaphore.c: Paul M. is a genius. */
-static int futex_down(struct list_head *head, struct page *page, int offset)
-{
-	int retval = 0;
-	struct futex_q q;
-
-	current->state = TASK_INTERRUPTIBLE;
-	queue_me(head, &q, page, offset);
-
-	while (!decrement_to_zero(page, offset)) {
-		if (signal_pending(current)) {
-			retval = -EINTR;
-			break;
-		}
-		schedule();
-		current->state = TASK_INTERRUPTIBLE;
-	}
-	current->state = TASK_RUNNING;
-	unqueue_me(&q);
-	/* If we were signalled, we might have just been woken: we
-	   must wake another one.  Otherwise we need to wake someone
-	   else (if they are waiting) so they drop the count below 0,
-	   and when we "up" in userspace, we know there is a
-	   waiter. */
-	wake_one_waiter(head, page, offset);
-	return retval;
-}
-
-static int futex_up(struct list_head *head, struct page *page, int offset)
-{
-	atomic_t *count;
-
-	count = kmap(page) + offset;
-	atomic_set(count, 1);
-	smp_wmb();
-	kunmap(page);
-	wake_one_waiter(head, page, offset);
-	return 0;
-}
-
-asmlinkage int sys_futex(void *uaddr, int op)
+asmlinkage int sys_futex(void *uaddr, int op, int val, struct timespec *utime)
 {
 	int ret;
 	unsigned long pos_in_page;
 	struct list_head *head;
 	struct page *page;
+	unsigned long time = MAX_SCHEDULE_TIMEOUT;
+
+	if (utime) {
+		struct timespec t;
+		if (copy_from_user(&t, utime, sizeof(t)) != 0)
+			return -EFAULT;
+		time = timespec_to_jiffies(&t) + 1;
+	}
 
 	pos_in_page = ((unsigned long)uaddr) % PAGE_SIZE;
 
 	/* Must be "naturally" aligned, and not on page boundary. */
-	if ((pos_in_page % __alignof__(atomic_t)) != 0
-	    || pos_in_page + sizeof(atomic_t) > PAGE_SIZE)
+	if ((pos_in_page % __alignof__(int)) != 0
+	    || pos_in_page + sizeof(int) > PAGE_SIZE)
 		return -EINVAL;
 
 	/* Simpler if it doesn't vanish underneath us. */
@@ -206,13 +209,12 @@ asmlinkage int sys_futex(void *uaddr, int op)
 
 	head = hash_futex(page, pos_in_page);
 	switch (op) {
-	case FUTEX_UP:
-		ret = futex_up(head, page, pos_in_page);
+	case FUTEX_WAIT:
+		ret = futex_wait(head, page, pos_in_page, val, uaddr, time);
 		break;
-	case FUTEX_DOWN:
-		ret = futex_down(head, page, pos_in_page);
+	case FUTEX_WAKE:
+		ret = futex_wake(head, page, pos_in_page, val);
 		break;
-	/* Add other lock types here... */
 	default:
 		ret = -EINVAL;
 	}
