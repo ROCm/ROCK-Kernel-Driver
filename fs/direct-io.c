@@ -920,6 +920,8 @@ direct_io_worker(int rw, struct kiocb *iocb, struct inode *inode,
 	ssize_t ret = 0;
 	ssize_t ret2;
 	size_t bytes;
+	size_t bytes_todo;
+	loff_t isize;
 
 	dio->bio = NULL;
 	dio->inode = inode;
@@ -959,16 +961,26 @@ direct_io_worker(int rw, struct kiocb *iocb, struct inode *inode,
 	dio->waiter = NULL;
 
 	dio->pages_in_io = 0;
+	bytes_todo = 0;
 	for (seg = 0; seg < nr_segs; seg++) {
 		user_addr = (unsigned long)iov[seg].iov_base;
 		dio->pages_in_io +=
 			((user_addr+iov[seg].iov_len +PAGE_SIZE-1)/PAGE_SIZE
 				- user_addr/PAGE_SIZE);
+		bytes_todo += iov[seg].iov_len;
 	}
 
-	for (seg = 0; seg < nr_segs; seg++) {
+	isize = i_size_read(inode);
+	if (bytes_todo > (isize - offset))
+		bytes_todo = isize - offset;
+
+	for (seg = 0; seg < nr_segs && bytes_todo; seg++) {
 		user_addr = (unsigned long)iov[seg].iov_base;
-		dio->size += bytes = iov[seg].iov_len;
+		bytes = iov[seg].iov_len;
+		if (bytes > bytes_todo)
+			bytes = bytes_todo;
+		bytes_todo -= bytes;
+		dio->size += bytes;
 
 		/* Index into the first page of the first block */
 		dio->first_block_in_page = (user_addr & ~PAGE_MASK) >> blkbits;
@@ -989,7 +1001,7 @@ direct_io_worker(int rw, struct kiocb *iocb, struct inode *inode,
 	
 		ret = do_direct_IO(dio);
 
-		dio->result += iov[seg].iov_len -
+		dio->result += bytes -
 			((dio->final_block_in_request - dio->block_in_file) <<
 					blkbits);
 
