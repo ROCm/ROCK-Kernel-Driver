@@ -118,7 +118,7 @@ enum hfsc_class_flags
 
 struct hfsc_class
 {
-	u32	classid;	/* class id */
+	u32		classid;	/* class id */
 	unsigned int	refcnt;		/* usage count */
 
 	struct tc_stats	stats;		/* generic statistics */
@@ -138,28 +138,28 @@ struct hfsc_class
 	struct list_head hlist;		/* hash list member */
 	struct list_head dlist;		/* drop list member */
 
-	u64	cl_total;	/* total work in bytes */
-	u64	cl_cumul;	/* cumulative work in bytes done by
+	u64	cl_total;		/* total work in bytes */
+	u64	cl_cumul;		/* cumulative work in bytes done by
 					   real-time criteria */
 
-	u64 	cl_d;		/* deadline*/
-	u64 	cl_e;		/* eligible time */
-	u64	cl_vt;		/* virtual time */
-	u64	cl_f;		/* time when this class will fit for
+	u64 	cl_d;			/* deadline*/
+	u64 	cl_e;			/* eligible time */
+	u64	cl_vt;			/* virtual time */
+	u64	cl_f;			/* time when this class will fit for
 					   link-sharing, max(myf, cfmin) */
-	u64	cl_myf;		/* my fit-time (calculated from this
+	u64	cl_myf;			/* my fit-time (calculated from this
 					   class's own upperlimit curve) */
-	u64	cl_myfadj;	/* my fit-time adjustment (to cancel
+	u64	cl_myfadj;		/* my fit-time adjustment (to cancel
 					   history dependence) */
-	u64	cl_cfmin;	/* earliest children's fit-time (used
+	u64	cl_cfmin;		/* earliest children's fit-time (used
 					   with cl_myf to obtain cl_f) */
-	u64	cl_cvtmin;	/* minimal virtual time among the
+	u64	cl_cvtmin;		/* minimal virtual time among the
 					   children fit for link-sharing
 					   (monotonic within a period) */
-	u64	cl_vtadj;	/* intra-period cumulative vt
+	u64	cl_vtadj;		/* intra-period cumulative vt
 					   adjustment */
-	u64	cl_vtoff;	/* inter-period cumulative vt offset */
-	u64	cl_cvtmax;	/* max child's vt in the last period */
+	u64	cl_vtoff;		/* inter-period cumulative vt offset */
+	u64	cl_cvtmax;		/* max child's vt in the last period */
 
 	struct internal_sc cl_rsc;	/* internal real-time service curve */
 	struct internal_sc cl_fsc;	/* internal fair service curve */
@@ -179,8 +179,7 @@ struct hfsc_class
 
 struct hfsc_sched
 {
-	u16	defcls;			/* default class id */
-
+	u16	defcls;				/* default class id */
 	struct hfsc_class root;			/* root class */
 	struct hfsc_class *last_xmit;		/* class that transmitted last
 						   packet (for requeueing) */
@@ -566,8 +565,7 @@ sc2isc(struct tc_service_curve *sc, struct internal_sc *isc)
  * service curve starting at (x, y).
  */
 static void
-rtsc_init(struct runtime_sc *rtsc, struct internal_sc *isc, u64 x,
-                                                            u64 y)
+rtsc_init(struct runtime_sc *rtsc, struct internal_sc *isc, u64 x, u64 y)
 {
 	rtsc->x	   = x;
 	rtsc->y    = y;
@@ -626,8 +624,7 @@ rtsc_x2y(struct runtime_sc *rtsc, u64 x)
  * runtime service curve and the service curve starting at (x, y).
  */
 static void
-rtsc_min(struct runtime_sc *rtsc, struct internal_sc *isc, u64 x,
-                                                           u64 y)
+rtsc_min(struct runtime_sc *rtsc, struct internal_sc *isc, u64 x, u64 y)
 {
 	u64 y1, y2, dx, dy;
 	u32 dsm;
