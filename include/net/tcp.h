@@ -505,9 +505,8 @@ static __inline__ int tcp_sk_listen_hashfn(struct sock *sk)
 # define TCP_TW_RECYCLE_TICK (12+2-TCP_TW_RECYCLE_SLOTS_LOG)
 #endif
 
-#define BICTCP_1_OVER_BETA	8	/*
-					 * Fast recovery
-					 * multiplicative decrease factor
+#define BICTCP_BETA_SCALE    1024	/* Scale factor beta calculation
+					 * max_cwnd = snd_cwnd * beta
 					 */
 #define BICTCP_MAX_INCREMENT 32		/*
 					 * Limit on the amount of
@@ -606,6 +605,7 @@ extern int sysctl_tcp_nometrics_save;
 extern int sysctl_tcp_bic;
 extern int sysctl_tcp_bic_fast_convergence;
 extern int sysctl_tcp_bic_low_window;
+extern int sysctl_tcp_bic_beta;
 extern int sysctl_tcp_moderate_rcvbuf;
 extern int sysctl_tcp_tso_win_divisor;
 
@@ -1244,15 +1244,16 @@ static inline __u32 tcp_recalc_ssthresh(struct tcp_sock *tp)
 	if (tcp_is_bic(tp)) {
 		if (sysctl_tcp_bic_fast_convergence &&
 		    tp->snd_cwnd < tp->bictcp.last_max_cwnd)
-			tp->bictcp.last_max_cwnd
-				= (tp->snd_cwnd * (2*BICTCP_1_OVER_BETA-1))
-				/ (BICTCP_1_OVER_BETA/2);
+			tp->bictcp.last_max_cwnd = (tp->snd_cwnd * 
+						    (BICTCP_BETA_SCALE
+						     + sysctl_tcp_bic_beta))
+				/ (2 * BICTCP_BETA_SCALE);
 		else
 			tp->bictcp.last_max_cwnd = tp->snd_cwnd;
 
 		if (tp->snd_cwnd > sysctl_tcp_bic_low_window)
-			return max(tp->snd_cwnd - (tp->snd_cwnd/BICTCP_1_OVER_BETA),
-				   2U);
+			return max((tp->snd_cwnd * sysctl_tcp_bic_beta)
+				   / BICTCP_BETA_SCALE, 2U);
 	}
 
 	return max(tp->snd_cwnd >> 1U, 2U);
