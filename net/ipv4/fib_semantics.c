@@ -45,12 +45,12 @@
 
 #define FSprintk(a...)
 
-static struct fib_info 	*fib_info_list;
+static struct list_head fib_info_list = LIST_HEAD_INIT(fib_info_list);
 static rwlock_t fib_info_lock = RW_LOCK_UNLOCKED;
 int fib_info_cnt;
 
 #define for_fib_info() { struct fib_info *fi; \
-	for (fi = fib_info_list; fi; fi = fi->fib_next)
+	list_for_each_entry(fi, &fib_info_list, fib_list)
 
 #define endfor_fib_info() }
 
@@ -156,12 +156,7 @@ void fib_release_info(struct fib_info *fi)
 {
 	write_lock(&fib_info_lock);
 	if (fi && --fi->fib_treeref == 0) {
-		if (fi->fib_next)
-			fi->fib_next->fib_prev = fi->fib_prev;
-		if (fi->fib_prev)
-			fi->fib_prev->fib_next = fi->fib_next;
-		if (fi == fib_info_list)
-			fib_info_list = fi->fib_next;
+		list_del(&fi->fib_list);
 		fi->fib_dead = 1;
 		fib_info_put(fi);
 	}
@@ -581,11 +576,7 @@ link_it:
 	fi->fib_treeref++;
 	atomic_inc(&fi->fib_clntref);
 	write_lock(&fib_info_lock);
-	fi->fib_next = fib_info_list;
-	fi->fib_prev = NULL;
-	if (fib_info_list)
-		fib_info_list->fib_prev = fi;
-	fib_info_list = fi;
+	list_add(&fi->fib_list, &fib_info_list);
 	write_unlock(&fib_info_lock);
 	return fi;
 

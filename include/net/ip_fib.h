@@ -62,8 +62,7 @@ struct fib_nh
 
 struct fib_info
 {
-	struct fib_info		*fib_next;
-	struct fib_info		*fib_prev;
+	struct list_head	fib_list;
 	int			fib_treeref;
 	atomic_t		fib_clntref;
 	int			fib_dead;
