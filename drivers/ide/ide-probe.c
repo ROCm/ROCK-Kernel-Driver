@@ -633,7 +633,7 @@ static void save_match(struct ata_channel *hwif, struct ata_channel *new,
 static int init_irq(struct ata_channel *ch)
 {
 	unsigned long flags;
-	unsigned int index;
+	int i;
 	ide_hwgroup_t *hwgroup;
 	ide_hwgroup_t *new_hwgroup;
 	struct ata_channel *match = NULL;
@@ -650,8 +650,9 @@ static int init_irq(struct ata_channel *ch)
 	/*
 	 * Group up with any other channels that share our irq(s).
 	 */
-	for (index = 0; index < MAX_HWIFS; index++) {
-		struct ata_channel *h = &ide_hwifs[index];
+	for (i = 0; i < MAX_HWIFS; ++i) {
+		struct ata_channel *h = &ide_hwifs[i];
+
 		if (h->hwgroup) {  /* scan only initialized channels */
 			if (ch->irq == h->irq) {
 				ch->sharing_irq = h->sharing_irq = 1;
@@ -682,7 +683,6 @@ static int init_irq(struct ata_channel *ch)
 			return 1;
 		}
 		memset(hwgroup, 0, sizeof(ide_hwgroup_t));
-		hwgroup->hwif     = ch->next = ch;
 		hwgroup->rq       = NULL;
 		hwgroup->handler  = NULL;
 		hwgroup->drive    = NULL;
@@ -716,14 +716,12 @@ static int init_irq(struct ata_channel *ch)
 	}
 
 	/*
-	 * Everything is okay, so link us into the hwgroup.
+	 * Everything is okay.
 	 */
 	ch->hwgroup = hwgroup;
-	ch->next = hwgroup->hwif->next;
-	hwgroup->hwif->next = ch;
 
-	for (index = 0; index < MAX_DRIVES; ++index) {
-		struct ata_device *drive = &ch->drives[index];
+	for (i = 0; i < MAX_DRIVES; ++i) {
+		struct ata_device *drive = &ch->drives[i];
 
 		if (!drive->present)
 			continue;
@@ -735,12 +733,6 @@ static int init_irq(struct ata_channel *ch)
 		hwgroup->drive->next = drive;
 
 		init_device_queue(drive);
-	}
-	if (!hwgroup->hwif) {
-		hwgroup->hwif = hwgroup->drive->channel;
-#ifdef DEBUG
-		printk("%s : Adding missed channel to hwgroup!!\n", ch->name);
-#endif
 	}
 	spin_unlock_irqrestore(&ide_lock, flags);
 
@@ -762,6 +754,7 @@ static int init_irq(struct ata_channel *ch)
 		printk(" (%sed with %s)",
 			ch->sharing_irq ? "shar" : "serializ", match->name);
 	printk("\n");
+
 	return 0;
 }
 
@@ -885,7 +878,7 @@ static int hwif_init(struct ata_channel *hwif)
 		printk("%s: probed IRQ %d failed, using default.\n",
 			hwif->name, hwif->irq);
 	}
-	
+
 	init_gendisk(hwif);
 	blk_dev[hwif->major].data = hwif;
 	blk_dev[hwif->major].queue = ide_get_queue;
@@ -898,7 +891,7 @@ int ideprobe_init (void)
 {
 	unsigned int index;
 	int probe[MAX_HWIFS];
-	
+
 	memset(probe, 0, MAX_HWIFS * sizeof(int));
 	for (index = 0; index < MAX_HWIFS; ++index)
 		probe[index] = !ide_hwifs[index].present;

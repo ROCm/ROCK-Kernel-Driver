@@ -27,7 +27,9 @@ volatile struct baboon *baboon;
 
 void baboon_irq(int, void *, struct pt_regs *);
 
+#if 0
 extern int macide_ack_intr(struct ata_channel *);
+#endif
 
 /*
  * Baboon initialization.
