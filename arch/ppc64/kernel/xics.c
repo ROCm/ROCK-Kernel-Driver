@@ -239,31 +239,35 @@ xics_get_irq(struct pt_regs *regs)
 	return irq;
 }
 
+struct xics_ipi_struct {
+	volatile unsigned long value;
+} ____cacheline_aligned;
+
+extern struct xics_ipi_struct xics_ipi_message[NR_CPUS] __cacheline_aligned;
 
 #ifdef CONFIG_SMP
 void xics_ipi_action(int irq, void *dev_id, struct pt_regs *regs)
 {
-	extern volatile unsigned long xics_ipi_message[];
 	int cpu = smp_processor_id();
 
 	ops->qirr_info(cpu, 0xff);
-	while (xics_ipi_message[cpu]) {
-		if (test_and_clear_bit(PPC_MSG_CALL_FUNCTION, &xics_ipi_message[cpu])) {
+	while (xics_ipi_message[cpu].value) {
+		if (test_and_clear_bit(PPC_MSG_CALL_FUNCTION, &xics_ipi_message[cpu].value)) {
 			mb();
 			smp_message_recv(PPC_MSG_CALL_FUNCTION, regs);
 		}
-		if (test_and_clear_bit(PPC_MSG_RESCHEDULE, &xics_ipi_message[cpu])) {
+		if (test_and_clear_bit(PPC_MSG_RESCHEDULE, &xics_ipi_message[cpu].value)) {
 			mb();
 			smp_message_recv(PPC_MSG_RESCHEDULE, regs);
 		}
 #if 0
-		if (test_and_clear_bit(PPC_MSG_MIGRATE_TASK, &xics_ipi_message[cpu])) {
+		if (test_and_clear_bit(PPC_MSG_MIGRATE_TASK, &xics_ipi_message[cpu].value)) {
 			mb();
 			smp_message_recv(PPC_MSG_MIGRATE_TASK, regs);
 		}
 #endif
 #ifdef CONFIG_XMON
-		if (test_and_clear_bit(PPC_MSG_XMON_BREAK, &xics_ipi_message[cpu])) {
+		if (test_and_clear_bit(PPC_MSG_XMON_BREAK, &xics_ipi_message[cpu].value)) {
 			mb();
 			smp_message_recv(PPC_MSG_XMON_BREAK, regs);
 		}

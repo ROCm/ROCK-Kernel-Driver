@@ -86,7 +86,11 @@ void xics_cause_IPI(int cpu);
 /*
  * XICS only has a single IPI, so encode the messages per CPU
  */
-volatile unsigned long xics_ipi_message[NR_CPUS] = {0};
+struct xics_ipi_struct {
+	        volatile unsigned long value;
+} ____cacheline_aligned;
+
+struct xics_ipi_struct xics_ipi_message[NR_CPUS] __cacheline_aligned;
 
 #define smp_message_pass(t,m,d,w) ppc_md.smp_message_pass((t),(m),(d),(w))
 
@@ -322,10 +326,10 @@ smp_xics_message_pass(int target, int msg, unsigned long data, int wait)
 		if (target == MSG_ALL || target == i
 		    || (target == MSG_ALL_BUT_SELF
 			&& i != smp_processor_id())) {
-			set_bit(msg, &xics_ipi_message[i]);
+			set_bit(msg, &xics_ipi_message[i].value);
 			mb();
 			xics_cause_IPI(i);
-			}
+		}
 	}
 }
 
@@ -389,17 +393,6 @@ void smp_message_recv(int msg, struct pt_regs *regs)
 
 void smp_send_reschedule(int cpu)
 {
-	/*
-	 * This is only used if `cpu' is running an idle task,
-	 * so it will reschedule itself anyway...
-	 *
-	 * This isn't the case anymore since the other CPU could be
-	 * sleeping and won't reschedule until the next interrupt (such
-	 * as the timer).
-	 *  -- Cort
-	 */
-	/* This is only used if `cpu' is running an idle task,
-	   so it will reschedule itself anyway... */
 	smp_message_pass(cpu, PPC_MSG_RESCHEDULE, 0, 0);
 }
 
