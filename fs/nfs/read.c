@@ -118,12 +118,8 @@ nfs_readpage_sync(struct file *file, struct inode *inode, struct page *page)
 			break;
 	} while (count);
 
-	if (count) {
-		char *kaddr = kmap(page);
-		memset(kaddr + offset, 0, count);
-		kunmap(page);
-	}
-	flush_dcache_page(page);
+	if (count)
+		memclear_highpage_flush(page, offset, count);
 	SetPageUptodate(page);
 	if (PageError(page))
 		ClearPageError(page);
@@ -272,12 +268,9 @@ nfs_readpage_result(struct rpc_task *task, unsigned int count, int eof)
 
 		if (task->tk_status >= 0) {
 			if (count < PAGE_CACHE_SIZE) {
-				char *p = kmap(page);
-
-				if (count < req->wb_bytes)
-					memset(p + req->wb_offset + count, 0,
+				memclear_highpage_flush(page,
+							req->wb_offset + count,
 							req->wb_bytes - count);
-				kunmap(page);
 
 				if (eof ||
 				    ((fattr->valid & NFS_ATTR_FATTR) &&
@@ -293,7 +286,6 @@ nfs_readpage_result(struct rpc_task *task, unsigned int count, int eof)
 			}
 		} else
 			SetPageError(page);
-		flush_dcache_page(page);
 		unlock_page(page);
 
 		dprintk("NFS: read (%s/%Ld %d@%Ld)\n",

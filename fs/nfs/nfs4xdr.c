@@ -1410,7 +1410,7 @@ decode_readdir(struct xdr_stream *xdr, struct rpc_rqst *req, struct nfs4_readdir
 	struct page	*page = *rcvbuf->pages;
 	struct iovec	*iov = rcvbuf->head;
 	unsigned int	nr, pglen = rcvbuf->page_len;
-	uint32_t	*end, *entry, *p;
+	uint32_t	*end, *entry, *p, *kaddr;
 	uint32_t	len, attrlen, word;
 	int 		i, hdrlen, recvd, status;
 
@@ -1434,7 +1434,7 @@ decode_readdir(struct xdr_stream *xdr, struct rpc_rqst *req, struct nfs4_readdir
 		pglen = recvd;
 
 	BUG_ON(pglen + readdir->rd_pgbase > PAGE_CACHE_SIZE);
-	p   = (uint32_t *) kmap(page);
+	kaddr = p = (uint32_t *) kmap_atomic(page, KM_USER0);
 	end = (uint32_t *) ((char *)p + pglen + readdir->rd_pgbase);
 	entry = p;
 	for (nr = 0; *p++; nr++) {
@@ -1480,7 +1480,7 @@ decode_readdir(struct xdr_stream *xdr, struct rpc_rqst *req, struct nfs4_readdir
 	if (!nr && (entry[0] != 0 || entry[1] == 0))
 		goto short_pkt;
 out:	
-	kunmap(page);
+	kunmap_atomic(kaddr, KM_USER0);
 	return 0;
 short_pkt:
 	entry[0] = entry[1] = 0;
@@ -1491,7 +1491,7 @@ short_pkt:
 	}
 	goto out;
 err_unmap:
-	kunmap(page);
+	kunmap_atomic(kaddr, KM_USER0);
 	return -errno_NFSERR_IO;
 }
 
@@ -1522,18 +1522,18 @@ decode_readlink(struct xdr_stream *xdr, struct rpc_rqst *req, struct nfs4_readli
 	 * and and null-terminate the text (the VFS expects
 	 * null-termination).
 	 */
-	strlen = (uint32_t *) kmap(rcvbuf->pages[0]);
+	strlen = (uint32_t *) kmap_atomic(rcvbuf->pages[0], KM_USER0);
 	len = ntohl(*strlen);
 	if (len > PAGE_CACHE_SIZE - 5) {
 		printk(KERN_WARNING "nfs: server returned giant symlink!\n");
-		kunmap(rcvbuf->pages[0]);
+		kunmap_atomic(strlen, KM_USER0);
 		return -EIO;
 	}
 	*strlen = len;
 
 	string = (char *)(strlen + 1);
 	string[len] = '\0';
-	kunmap(rcvbuf->pages[0]);
+	kunmap_atomic(strlen, KM_USER0);
 	return 0;
 }
 

@@ -306,6 +306,7 @@ xdr_partial_copy_from_skb(struct xdr_buf *xdr, unsigned int base,
 				len = pglen;
 			ret = copy_actor(desc, kaddr, len);
 		}
+		flush_dcache_page(*ppage);
 		kunmap_atomic(kaddr, KM_SKB_SUNRPC_DATA);
 		if (ret != len || !desc->count)
 			return;

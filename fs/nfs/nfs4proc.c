@@ -447,7 +447,7 @@ nfs4_setup_readdir(struct nfs4_compound *cp, u64 cookie, u32 *verifier,
 	 * when talking to the server, we always send cookie 0
 	 * instead of 1 or 2.
 	 */
-	start = p = (u32 *)kmap(*pages);
+	start = p = (u32 *)kmap_atomic(*pages, KM_USER0);
 	
 	if (cookie == 0) {
 		*p++ = xdr_one;                                  /* next */
@@ -475,7 +475,7 @@ nfs4_setup_readdir(struct nfs4_compound *cp, u64 cookie, u32 *verifier,
 
 	readdir->rd_pgbase = (char *)p - (char *)start;
 	readdir->rd_count -= readdir->rd_pgbase;
-	kunmap(*pages);
+	kunmap_atomic(start, KM_USER0);
 }
 
 static void
