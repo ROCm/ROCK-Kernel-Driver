@@ -293,6 +293,7 @@ acpi_remove_address_space_handler (
 
 acpi_status
 acpi_install_gpe_handler (
+	acpi_handle                     gpe_device,
 	u32                             gpe_number,
 	u32                             type,
 	acpi_gpe_handler                handler,
@@ -309,30 +310,50 @@ acpi_release_global_lock (
 
 acpi_status
 acpi_remove_gpe_handler (
+	acpi_handle                     gpe_device,
 	u32                             gpe_number,
 	acpi_gpe_handler                handler);
 
 acpi_status
 acpi_enable_event (
-	u32                             acpi_event,
-	u32                             type,
+	u32                             event,
 	u32                             flags);
 
 acpi_status
 acpi_disable_event (
-	u32                             acpi_event,
-	u32                             type,
+	u32                             event,
 	u32                             flags);
 
 acpi_status
 acpi_clear_event (
-	u32                             acpi_event,
-	u32                             type);
+	u32                             event);
 
 acpi_status
 acpi_get_event_status (
-	u32                             acpi_event,
-	u32                             type,
+	u32                             event,
+	acpi_event_status               *event_status);
+
+acpi_status
+acpi_enable_gpe (
+	acpi_handle                     gpe_device,
+	u32                             gpe_number,
+	u32                             flags);
+
+acpi_status
+acpi_disable_gpe (
+	acpi_handle                     gpe_device,
+	u32                             gpe_number,
+	u32                             flags);
+
+acpi_status
+acpi_clear_gpe (
+	acpi_handle                     gpe_device,
+	u32                             gpe_number);
+
+acpi_status
+acpi_get_gpe_status (
+	acpi_handle                     gpe_device,
+	u32                             gpe_number,
 	acpi_event_status               *event_status);
 
 /*
