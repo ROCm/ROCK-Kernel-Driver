@@ -1450,7 +1450,6 @@ static void idetape_output_buffers (ide_drive_t *drive, idetape_pc_t *pc, unsign
 	}
 }
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
 static void idetape_update_buffers (idetape_pc_t *pc)
 {
 	struct bio *bio = pc->bio;
@@ -1475,7 +1474,6 @@ static void idetape_update_buffers (idetape_pc_t *pc)
 	}
 	pc->bio = bio;
 }
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 
 /*
  *	idetape_next_pc_storage returns a pointer to a place in which we can
@@ -1580,7 +1578,6 @@ static void idetape_analyze_error (ide_drive_t *drive, idetape_request_sense_res
 		ide_stall_queue(drive, HZ / 2);
 		return;
 	}
-#ifdef CONFIG_BLK_DEV_IDEDMA
 
 	/*
 	 *	Correct pc->actually_transferred by asking the tape.
@@ -1589,7 +1586,7 @@ static void idetape_analyze_error (ide_drive_t *drive, idetape_request_sense_res
 		pc->actually_transferred = pc->request_transfer - tape->tape_block_size * ntohl(get_unaligned(&result->information));
 		idetape_update_buffers(pc);
 	}
-#endif /* CONFIG_BLK_DEV_IDEDMA */
+
 	if (pc->c[0] == IDETAPE_READ_CMD && result->filemark) {
 		pc->error = IDETAPE_ERROR_FILEMARK;
 		set_bit(PC_ABORT, &pc->flags);
@@ -1982,7 +1979,6 @@ static ide_startstop_t idetape_pc_intr (ide_drive_t *drive)
 	/* Clear the interrupt */
 	status.all = HWIF(drive)->INB(IDE_STATUS_REG);
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
 	if (test_bit(PC_DMA_IN_PROGRESS, &pc->flags)) {
 		if (HWIF(drive)->ide_dma_end(drive)) {
 			/*
@@ -2006,7 +2002,6 @@ static ide_startstop_t idetape_pc_intr (ide_drive_t *drive)
 			printk(KERN_INFO "ide-tape: DMA finished\n");
 #endif /* IDETAPE_DEBUG_LOG */
 	}
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 
 	/* No more interrupts */
 	if (!status.b.drq) {
@@ -2061,7 +2056,6 @@ static ide_startstop_t idetape_pc_intr (ide_drive_t *drive)
 			tape->failed_pc = NULL;
 		return pc->callback(drive);	/* Command finished - Call the callback function */
 	}
-#ifdef CONFIG_BLK_DEV_IDEDMA
 	if (test_and_clear_bit(PC_DMA_IN_PROGRESS, &pc->flags)) {
 		printk(KERN_ERR "ide-tape: The tape wants to issue more "
 				"interrupts in DMA mode\n");
@@ -2069,7 +2063,6 @@ static ide_startstop_t idetape_pc_intr (ide_drive_t *drive)
 		(void) HWIF(drive)->ide_dma_off(drive);
 		return ide_do_reset(drive);
 	}
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 	bcount.b.high = IN_BYTE(IDE_BCOUNTH_REG);	/* Get the number of bytes to transfer */
 	bcount.b.low  = IN_BYTE(IDE_BCOUNTL_REG);	/* on this interrupt */
 	ireason.all   = IN_BYTE(IDE_IREASON_REG);
@@ -2264,7 +2257,6 @@ static ide_startstop_t idetape_issue_packet_command (ide_drive_t *drive, idetape
 	pc->current_position = pc->buffer;
 	bcount.all = pc->request_transfer;	/* Request to transfer the entire buffer at once */
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
 	if (test_and_clear_bit(PC_DMA_ERROR, &pc->flags)) {
 		printk(KERN_WARNING "ide-tape: DMA disabled, "
 				"reverting to PIO\n");
@@ -2276,7 +2268,6 @@ static ide_startstop_t idetape_issue_packet_command (ide_drive_t *drive, idetape
 		else
 			dma_ok = !HWIF(drive)->ide_dma_read(drive);
 	}
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 
 	if (IDE_CONTROL_REG)
 		OUT_BYTE(drive->ctl, IDE_CONTROL_REG);
@@ -2284,12 +2275,10 @@ static ide_startstop_t idetape_issue_packet_command (ide_drive_t *drive, idetape
 	OUT_BYTE(bcount.b.high,     IDE_BCOUNTH_REG);
 	OUT_BYTE(bcount.b.low,      IDE_BCOUNTL_REG);
 	OUT_BYTE(drive->select.all, IDE_SELECT_REG);
-#ifdef CONFIG_BLK_DEV_IDEDMA
 	if (dma_ok) {			/* Begin DMA, if necessary */
 		set_bit(PC_DMA_IN_PROGRESS, &pc->flags);
 		(void) (HWIF(drive)->ide_dma_begin(drive));
 	}
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 	if (test_bit(IDETAPE_DRQ_INTERRUPT, &tape->flags)) {
 		if (HWGROUP(drive)->handler != NULL)	/* paranoia check */
 			BUG();
