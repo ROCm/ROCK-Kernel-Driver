@@ -726,18 +726,6 @@ static void ohci_stop (struct usb_hcd *hcd)
 
 #if	defined(CONFIG_USB_SUSPEND) || defined(CONFIG_PM)
 
-static void mark_children_gone (struct usb_device *dev)
-{
-	unsigned i;
-
-	for (i = 0; i < dev->maxchild; i++) {
-		if (dev->children [i] == 0)
-			continue;
-		dev->children [i]->state = USB_STATE_NOTATTACHED;
-		mark_children_gone (dev->children [i]);
-	}
-}
-
 static int hc_restart (struct ohci_hcd *ohci)
 {
 	int temp;
@@ -751,7 +739,7 @@ static int hc_restart (struct ohci_hcd *ohci)
 	 */ 
 	spin_lock_irq(&ohci->lock);
 	disable (ohci);
-	mark_children_gone (ohci->hcd.self.root_hub);
+	usb_set_device_state (ohci->hcd.self.root_hub, USB_STATE_NOTATTACHED);
 	if (!list_empty (&ohci->pending))
 		ohci_dbg(ohci, "abort schedule...\n");
 	list_for_each_entry (priv, &ohci->pending, pending) {

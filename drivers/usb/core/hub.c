@@ -910,7 +910,7 @@ static int locktree(struct usb_device *udev)
 }
 
 /**
- * usb_set_device_state - change a device's current state (usbcore-internal)
+ * usb_set_device_state - change a device's current state (usbcore, hcds)
  * @udev: pointer to device whose state should be changed
  * @new_state: new state value to be stored
  *
@@ -941,6 +941,7 @@ void usb_set_device_state(struct usb_device *udev,
 		recursively_mark_NOTATTACHED(udev);
 	spin_unlock_irqrestore(&device_state_lock, flags);
 }
+EXPORT_SYMBOL(usb_set_device_state);
 
 
 static void choose_address(struct usb_device *udev)
