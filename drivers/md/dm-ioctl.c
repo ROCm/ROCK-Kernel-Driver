@@ -238,6 +238,7 @@ void __hash_remove(struct hash_cell *hc)
 	list_del(&hc->name_list);
 	unregister_with_devfs(hc);
 	dm_put(hc->md);
+	free_cell(hc);
 }
 
 void dm_hash_remove_all(void)
