@@ -479,7 +479,7 @@ static int ntfs_write_block(struct writeback_control *wbc, struct page *page)
 	vol = ni->vol;
 
 	ntfs_debug("Entering for inode %li, attribute type 0x%x, page index "
-			"0x%lx.\n", vi->i_ino, ni->type, page->index);
+			"0x%lx.", vi->i_ino, ni->type, page->index);
 
 	BUG_ON(!NInoNonResident(ni));
 	BUG_ON(NInoMstProtected(ni));

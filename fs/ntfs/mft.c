@@ -429,3 +429,390 @@ unm_err_out:
 		ntfs_clear_extent_inode(ni);
 	return m;
 }
+
+#ifdef NTFS_RW
+
+static const char *ntfs_please_email = "Please email "
+		"linux-ntfs-dev@lists.sourceforge.net and say that you saw "
+		"this message.  Thank you.";
+
+/**
+ * sync_mft_mirror_umount - synchronise an mft record to the mft mirror
+ * @ni:		ntfs inode whose mft record to synchronize
+ * @m:		mapped, mst protected (extent) mft record to synchronize
+ *
+ * Write the mapped, mst protected (extent) mft record @m described by the
+ * (regular or extent) ntfs inode @ni to the mft mirror ($MFTMirr) bypassing
+ * the page cache and the $MFTMirr inode itself.
+ *
+ * This function is only for use at umount time when the mft mirror inode has
+ * already been disposed off.  We BUG() if we are called while the mft mirror
+ * inode is still attached to the volume.
+ *
+ * On success return 0.  On error return -errno.
+ *
+ * NOTE:  This function is not implemented yet as I am not convinced it can
+ * actually be triggered considering the sequence of commits we do in super.c::
+ * ntfs_put_super().  But just in case we provide this place holder as the
+ * alternative would be either to BUG() or to get a NULL pointer dereference
+ * and Oops.
+ */
+static int sync_mft_mirror_umount(ntfs_inode *ni, MFT_RECORD *m)
+{
+	ntfs_volume *vol = ni->vol;
+
+	BUG_ON(vol->mftmirr_ino);
+	ntfs_error(vol->sb, "Umount time mft mirror syncing is not "
+			"implemented yet.  %s", ntfs_please_email);
+	return -EOPNOTSUPP;
+}
+
+/**
+ * sync_mft_mirror - synchronize an mft record to the mft mirror
+ * @ni:		ntfs inode whose mft record to synchronize
+ * @m:		mapped, mst protected (extent) mft record to synchronize
+ * @sync:	if true, wait for i/o completion
+ *
+ * Write the mapped, mst protected (extent) mft record @m described by the
+ * (regular or extent) ntfs inode @ni to the mft mirror ($MFTMirr).
+ *
+ * On success return 0.  On error return -errno and set the volume errors flag
+ * in the ntfs_volume to which @ni belongs.
+ *
+ * NOTE:  We always perform synchronous i/o and ignore the @sync parameter.
+ *
+ * TODO:  If @sync is false, want to do truly asynchronous i/o, i.e. just
+ * schedule i/o via ->writepage or do it via kntfsd or whatever.
+ */
+static int sync_mft_mirror(ntfs_inode *ni, MFT_RECORD *m, int sync)
+{
+	ntfs_volume *vol = ni->vol;
+	struct page *page;
+	unsigned int blocksize = vol->sb->s_blocksize;
+	int max_bhs = vol->mft_record_size / blocksize;
+	struct buffer_head *bhs[max_bhs];
+	struct buffer_head *bh, *head;
+	u8 *kmirr;
+	unsigned int block_start, block_end, m_start, m_end;
+	int i_bhs, nr_bhs, err = 0;
+
+	ntfs_debug("Entering for inode 0x%lx.", ni->mft_no);
+	BUG_ON(!max_bhs);
+	if (unlikely(!vol->mftmirr_ino)) {
+		/* This could happen during umount... */
+		err = sync_mft_mirror_umount(ni, m);
+		if (likely(!err))
+			return err;
+		goto err_out;
+	}
+	/* Get the page containing the mirror copy of the mft record @m. */
+	page = ntfs_map_page(vol->mftmirr_ino->i_mapping, ni->mft_no >>
+			(PAGE_CACHE_SHIFT - vol->mft_record_size_bits));
+	if (unlikely(IS_ERR(page))) {
+		ntfs_error(vol->sb, "Failed to map mft mirror page.");
+		err = PTR_ERR(page);
+		goto err_out;
+	}
+	/*
+	 * Exclusion against other writers.   This should never be a problem
+	 * since the page in which the mft record @m resides is also locked and
+	 * hence any other writers would be held up there but it is better to
+	 * make sure no one is writing from elsewhere.
+	 */
+	lock_page(page);
+	/* The address in the page of the mirror copy of the mft record @m. */
+	kmirr = page_address(page) + ((ni->mft_no << vol->mft_record_size_bits)
+			& ~PAGE_CACHE_MASK);
+	/* Copy the mst protected mft record to the mirror. */
+	memcpy(kmirr, m, vol->mft_record_size);
+	/* Make sure we have mapped buffers. */
+	if (!page_has_buffers(page)) {
+no_buffers_err_out:
+		ntfs_error(vol->sb, "Writing mft mirror records without "
+				"existing buffers is not implemented yet.  %s",
+				ntfs_please_email);
+		err = -EOPNOTSUPP;
+		goto unlock_err_out;
+	}
+	bh = head = page_buffers(page);
+	if (!bh)
+		goto no_buffers_err_out;
+	nr_bhs = 0;
+	block_start = 0;
+	m_start = kmirr - (u8*)page_address(page);
+	m_end = m_start + vol->mft_record_size;
+	do {
+		block_end = block_start + blocksize;
+		/*
+		 * If the buffer is outside the mft record, just skip it,
+		 * clearing it if it is dirty to make sure it is not written
+		 * out.  It should never be marked dirty but better be safe.
+		 */
+		if ((block_end <= m_start) || (block_start >= m_end)) {
+			if (buffer_dirty(bh)) {
+				ntfs_warning(vol->sb, "Clearing dirty mft "
+						"record page buffer.  %s",
+						ntfs_please_email);
+				clear_buffer_dirty(bh);
+			}
+			continue;
+		}
+		if (!buffer_mapped(bh)) {
+			ntfs_error(vol->sb, "Writing mft mirror records "
+					"without existing mapped buffers is "
+					"not implemented yet.  %s",
+					ntfs_please_email);
+			err = -EOPNOTSUPP;
+			continue;
+		}
+		if (!buffer_uptodate(bh)) {
+			ntfs_error(vol->sb, "Writing mft mirror records "
+					"without existing uptodate buffers is "
+					"not implemented yet.  %s",
+					ntfs_please_email);
+			err = -EOPNOTSUPP;
+			continue;
+		}
+		BUG_ON(!nr_bhs && (m_start != block_start));
+		BUG_ON(nr_bhs >= max_bhs);
+		bhs[nr_bhs++] = bh;
+		BUG_ON((nr_bhs >= max_bhs) && (m_end != block_end));
+	} while (block_start = block_end, (bh = bh->b_this_page) != head);
+	if (likely(!err)) {
+		/* Lock buffers and start synchronous write i/o on them. */
+		for (i_bhs = 0; i_bhs < nr_bhs; i_bhs++) {
+			struct buffer_head *tbh = bhs[i_bhs];
+
+			if (unlikely(test_set_buffer_locked(tbh)))
+				BUG();
+			BUG_ON(!buffer_uptodate(tbh));
+			if (buffer_dirty(tbh))
+				clear_buffer_dirty(tbh);
+			get_bh(tbh);
+			tbh->b_end_io = end_buffer_write_sync;
+			submit_bh(WRITE, tbh);
+		}
+		/* Wait on i/o completion of buffers. */
+		for (i_bhs = 0; i_bhs < nr_bhs; i_bhs++) {
+			struct buffer_head *tbh = bhs[i_bhs];
+
+			wait_on_buffer(tbh);
+			if (unlikely(!buffer_uptodate(tbh))) {
+				err = -EIO;
+				/*
+				 * Set the buffer uptodate so the page & buffer
+				 * states don't become out of sync.
+				 */
+				if (PageUptodate(page))
+					set_buffer_uptodate(tbh);
+			}
+		}
+	} else /* if (unlikely(err)) */ {
+		/* Clean the buffers. */
+		for (i_bhs = 0; i_bhs < nr_bhs; i_bhs++)
+			clear_buffer_dirty(bhs[i_bhs]);
+	}
+unlock_err_out:
+	/* Current state: all buffers are clean, unlocked, and uptodate. */
+	/* Remove the mst protection fixups again. */
+	post_write_mst_fixup((NTFS_RECORD*)kmirr);
+	flush_dcache_page(page);
+	unlock_page(page);
+	ntfs_unmap_page(page);
+	if (unlikely(err)) {
+		/* I/O error during writing.  This is really bad! */
+		ntfs_error(vol->sb, "I/O error while writing mft mirror "
+				"record 0x%lx!  You should unmount the volume "
+				"and run chkdsk or ntfsfix.", ni->mft_no);
+		goto err_out;
+	}
+	ntfs_debug("Done.");
+	return 0;
+err_out:
+	ntfs_error(vol->sb, "Failed to synchronize $MFTMirr (error code %i).  "
+			"Volume will be left marked dirty on umount.  Run "
+			"ntfsfix on the partition after umounting to correct "
+			"this.", -err);
+	/* We don't want to clear the dirty bit on umount. */
+	NVolSetErrors(vol);
+	return err;
+}
+
+/**
+ * write_mft_record_nolock - write out a mapped (extent) mft record
+ * @ni:		ntfs inode describing the mapped (extent) mft record
+ * @m:		mapped (extent) mft record to write
+ * @sync:	if true, wait for i/o completion
+ *
+ * Write the mapped (extent) mft record @m described by the (regular or extent)
+ * ntfs inode @ni to backing store.  If the mft record @m has a counterpart in
+ * the mft mirror, that is also updated.
+ *
+ * On success, clean the mft record and return 0.  On error, leave the mft
+ * record dirty and return -errno.  The caller should call make_bad_inode() on
+ * the base inode to ensure no more access happens to this inode.  We do not do
+ * it here as the caller may want to finish writing other extent mft records
+ * first to minimize on-disk metadata inconsistencies.
+ *
+ * NOTE:  We always perform synchronous i/o and ignore the @sync parameter.
+ * However, if the mft record has a counterpart in the mft mirror and @sync is
+ * true, we write the mft record, wait for i/o completion, and only then write
+ * the mft mirror copy.  This ensures that if the system crashes either the mft
+ * or the mft mirror will contain a self-consistent mft record @m.  If @sync is
+ * false on the other hand, we start i/o on both and then wait for completion
+ * on them.  This provides a speedup but no longer guarantees that you will end
+ * up with a self-consistent mft record in the case of a crash but if you asked
+ * for asynchronous writing you probably do not care about that anyway.
+ *
+ * TODO:  If @sync is false, want to do truly asynchronous i/o, i.e. just
+ * schedule i/o via ->writepage or do it via kntfsd or whatever.
+ */
+int write_mft_record_nolock(ntfs_inode *ni, MFT_RECORD *m, int sync)
+{
+	ntfs_volume *vol = ni->vol;
+	struct page *page = ni->page;
+	unsigned int blocksize = vol->sb->s_blocksize;
+	int max_bhs = vol->mft_record_size / blocksize;
+	struct buffer_head *bhs[max_bhs];
+	struct buffer_head *bh, *head;
+	unsigned int block_start, block_end, m_start, m_end;
+	int i_bhs, nr_bhs, err = 0;
+
+	ntfs_debug("Entering for inode 0x%lx.", ni->mft_no);
+	BUG_ON(NInoAttr(ni));
+	BUG_ON(!max_bhs);
+	BUG_ON(!page);
+	BUG_ON(!PageLocked(page));
+	/*
+	 * If the ntfs_inode is clean no need to do anything.  If it is dirty,
+	 * mark it as clean now so that it can be redirtied later on if needed.
+	 * There is no danger of races as as long as the caller is holding the
+	 * locks for the mft record @m and the page it is in.
+	 */
+	if (!NInoTestClearDirty(ni))
+		goto done;
+	/* Make sure we have mapped buffers. */
+	if (!page_has_buffers(page)) {
+no_buffers_err_out:
+		ntfs_error(vol->sb, "Writing mft records without existing "
+				"buffers is not implemented yet.  %s",
+				ntfs_please_email);
+		err = -EOPNOTSUPP;
+		goto err_out;
+	}
+	bh = head = page_buffers(page);
+	if (!bh)
+		goto no_buffers_err_out;
+	nr_bhs = 0;
+	block_start = 0;
+	m_start = ni->page_ofs;
+	m_end = m_start + vol->mft_record_size;
+	do {
+		block_end = block_start + blocksize;
+		/*
+		 * If the buffer is outside the mft record, just skip it,
+		 * clearing it if it is dirty to make sure it is not written
+		 * out.  It should never be marked dirty but better be safe.
+		 */
+		if ((block_end <= m_start) || (block_start >= m_end)) {
+			if (buffer_dirty(bh)) {
+				ntfs_warning(vol->sb, "Clearing dirty mft "
+						"record page buffer.  %s",
+						ntfs_please_email);
+				clear_buffer_dirty(bh);
+			}
+			continue;
+		}
+		if (!buffer_mapped(bh)) {
+			ntfs_error(vol->sb, "Writing mft records without "
+					"existing mapped buffers is not "
+					"implemented yet.  %s",
+					ntfs_please_email);
+			err = -EOPNOTSUPP;
+			continue;
+		}
+		if (!buffer_uptodate(bh)) {
+			ntfs_error(vol->sb, "Writing mft records without "
+					"existing uptodate buffers is not "
+					"implemented yet.  %s",
+					ntfs_please_email);
+			err = -EOPNOTSUPP;
+			continue;
+		}
+		BUG_ON(!nr_bhs && (m_start != block_start));
+		BUG_ON(nr_bhs >= max_bhs);
+		bhs[nr_bhs++] = bh;
+		BUG_ON((nr_bhs >= max_bhs) && (m_end != block_end));
+	} while (block_start = block_end, (bh = bh->b_this_page) != head);
+	if (unlikely(err))
+		goto cleanup_out;
+	/* Apply the mst protection fixups. */
+	err = pre_write_mst_fixup((NTFS_RECORD*)m, vol->mft_record_size);
+	if (err) {
+		ntfs_error(vol->sb, "Failed to apply mst fixups!");
+		goto cleanup_out;
+	}
+	flush_dcache_mft_record_page(ni);
+	/* Lock buffers and start synchronous write i/o on them. */
+	for (i_bhs = 0; i_bhs < nr_bhs; i_bhs++) {
+		struct buffer_head *tbh = bhs[i_bhs];
+
+		if (unlikely(test_set_buffer_locked(tbh)))
+			BUG();
+		BUG_ON(!buffer_uptodate(tbh));
+		if (buffer_dirty(tbh))
+			clear_buffer_dirty(tbh);
+		get_bh(tbh);
+		tbh->b_end_io = end_buffer_write_sync;
+		submit_bh(WRITE, tbh);
+	}
+	/* Synchronize the mft mirror now if not @sync. */
+	if (!sync && ni->mft_no < vol->mftmirr_size)
+		sync_mft_mirror(ni, m, sync);
+	/* Wait on i/o completion of buffers. */
+	for (i_bhs = 0; i_bhs < nr_bhs; i_bhs++) {
+		struct buffer_head *tbh = bhs[i_bhs];
+
+		wait_on_buffer(tbh);
+		if (unlikely(!buffer_uptodate(tbh))) {
+			err = -EIO;
+			/*
+			 * Set the buffer uptodate so the page & buffer states
+			 * don't become out of sync.
+			 */
+			if (PageUptodate(page))
+				set_buffer_uptodate(tbh);
+		}
+	}
+	/* If @sync, now synchronize the mft mirror. */
+	if (sync && ni->mft_no < vol->mftmirr_size)
+		sync_mft_mirror(ni, m, sync);
+	/* Remove the mst protection fixups again. */
+	post_write_mst_fixup((NTFS_RECORD*)m);
+	flush_dcache_mft_record_page(ni);
+	if (unlikely(err)) {
+		/* I/O error during writing.  This is really bad! */
+		ntfs_error(vol->sb, "I/O error while writing mft record "
+				"0x%lx!  Marking base inode as bad.  You "
+				"should unmount the volume and run chkdsk.",
+				ni->mft_no);
+		goto err_out;
+	}
+done:
+	ntfs_debug("Done.");
+	return 0;
+cleanup_out:
+	/* Clean the buffers. */
+	for (i_bhs = 0; i_bhs < nr_bhs; i_bhs++)
+		clear_buffer_dirty(bhs[i_bhs]);
+err_out:
+	/*
+	 * Current state: all buffers are clean, unlocked, and uptodate.
+	 * The caller should mark the base inode as bad so that no more i/o
+	 * happens.  ->clear_inode() will still be invoked so all extent inodes
+	 * and other allocated memory will be freed.
+	 */
+	return err;
+}
+
+#endif /* NTFS_RW */

@@ -433,7 +433,7 @@ do_next_tag:
 	goto do_next_tag;
 
 return_overflow:
-	ntfs_error(NULL, "Failed. Returning -EOVERFLOW.\n");
+	ntfs_error(NULL, "Failed. Returning -EOVERFLOW.");
 	goto return_error;
 }
 
@@ -851,7 +851,7 @@ lock_retry_remap:
 		if (err) {
 			ntfs_error(vol->sb, "ntfs_decompress() failed in inode "
 					"0x%lx with error code %i. Skipping "
-					"this compression block.\n",
+					"this compression block.",
 					ni->mft_no, -err);
 			/* Release the unfinished pages. */
 			for (; prev_cur_page < cur_page; prev_cur_page++) {

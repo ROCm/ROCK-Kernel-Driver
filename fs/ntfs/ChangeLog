@@ -24,6 +24,21 @@ ToDo:
 	  OTOH, perhaps i_sem, which is held accross generic_file_write is
 	  sufficient for synchronisation here. We then just need to make sure
 	  ntfs_readpage/writepage/truncate interoperate properly with us.
+	- Implement mft.c::sync_mft_mirror_umount().  We currently will just
+	  leave the volume dirty on umount if the final iput(vol->mft_ino)
+	  causes a write of any mirrored mft records due to the mft mirror
+	  inode having been discarded already.  Whether this can actually ever
+	  happen is unclear however so it is worth waiting until someone hits
+	  the problem.
+
+2.1.13 - WIP.
+
+	- Implement writing of mft records (fs/ntfs/mft.[hc]), which includes
+	  keeping the mft mirror in sync with the mft when mirrored mft records
+	  are written.  The functions are write_mft_record{,_nolock}().  The
+	  implementation is quite rudimentary for now with lots of things not
+	  implemented yet but I am not sure any of them can actually occur so
+	  I will wait for people to hit each one and only then implement it.
 
 2.1.12 - Fix the second fix to the decompression engine and some cleanups.
 
