@@ -244,6 +244,7 @@ nlm4svc_proc_test_msg(struct svc_rqst *rqstp, struct nlm_args *argp,
 	u32		stat;
 
 	dprintk("lockd: TEST_MSG      called\n");
+	memset(&res, 0, sizeof(res));
 
 	if ((stat = nlm4svc_proc_test(rqstp, argp, &res)) == 0)
 		stat = nlm4svc_callback(rqstp, NLMPROC_TEST_RES, &res);
@@ -258,6 +259,7 @@ nlm4svc_proc_lock_msg(struct svc_rqst *rqstp, struct nlm_args *argp,
 	u32		stat;
 
 	dprintk("lockd: LOCK_MSG      called\n");
+	memset(&res, 0, sizeof(res));
 
 	if ((stat = nlm4svc_proc_lock(rqstp, argp, &res)) == 0)
 		stat = nlm4svc_callback(rqstp, NLMPROC_LOCK_RES, &res);
@@ -272,6 +274,7 @@ nlm4svc_proc_cancel_msg(struct svc_rqst *rqstp, struct nlm_args *argp,
 	u32		stat;
 
 	dprintk("lockd: CANCEL_MSG    called\n");
+	memset(&res, 0, sizeof(res));
 
 	if ((stat = nlm4svc_proc_cancel(rqstp, argp, &res)) == 0)
 		stat = nlm4svc_callback(rqstp, NLMPROC_CANCEL_RES, &res);
@@ -286,6 +289,7 @@ nlm4svc_proc_unlock_msg(struct svc_rqst *rqstp, struct nlm_args *argp,
 	u32		stat;
 
 	dprintk("lockd: UNLOCK_MSG    called\n");
+	memset(&res, 0, sizeof(res));
 
 	if ((stat = nlm4svc_proc_unlock(rqstp, argp, &res)) == 0)
 		stat = nlm4svc_callback(rqstp, NLMPROC_UNLOCK_RES, &res);
@@ -300,6 +304,7 @@ nlm4svc_proc_granted_msg(struct svc_rqst *rqstp, struct nlm_args *argp,
 	u32		stat;
 
 	dprintk("lockd: GRANTED_MSG   called\n");
+	memset(&res, 0, sizeof(res));
 
 	if ((stat = nlm4svc_proc_granted(rqstp, argp, &res)) == 0)
 		stat = nlm4svc_callback(rqstp, NLMPROC_GRANTED_RES, &res);
