@@ -426,8 +426,10 @@ void input_register_device(struct input_dev *dev)
 	init_timer(&dev->timer);
 	dev->timer.data = (long) dev;
 	dev->timer.function = input_repeat_key;
-	dev->rep[REP_DELAY] = HZ/4;
-	dev->rep[REP_PERIOD] = HZ/33;
+	if (!dev->rep[REP_DELAY])
+		dev->rep[REP_DELAY] = HZ/4;
+	if (!dev->rep[REP_PERIOD])
+		dev->rep[REP_PERIOD] = HZ/33;
 
 	INIT_LIST_HEAD(&dev->h_list);
 	list_add_tail(&dev->node, &input_dev_list);
