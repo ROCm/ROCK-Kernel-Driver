@@ -602,8 +602,8 @@ static void shrink_slab(int total_scanned, int gfp_mask)
  * request.
  */
 static int
-shrink_caches(struct zone *classzone, int priority,
-		int *total_scanned, int gfp_mask, const int nr_pages)
+shrink_caches(struct zone *classzone, int priority, int *total_scanned,
+		int gfp_mask, const int nr_pages, int order)
 {
 	struct zone *first_classzone;
 	struct zone *zone;
@@ -616,7 +616,7 @@ shrink_caches(struct zone *classzone, int priority,
 		int to_reclaim;
 
 		to_reclaim = zone->pages_high - zone->free_pages;
-		if (to_reclaim < 0)
+		if (order == 0 && to_reclaim < 0)
 			continue;	/* zone has enough memory */
 
 		to_reclaim = min(to_reclaim, SWAP_CLUSTER_MAX);
@@ -670,7 +670,8 @@ try_to_free_pages(struct zone *classzone,
 		int total_scanned = 0;
 
 		nr_reclaimed += shrink_caches(classzone, priority,
-					&total_scanned, gfp_mask, nr_pages);
+					&total_scanned, gfp_mask,
+					nr_pages, order);
 		if (nr_reclaimed >= nr_pages)
 			return 1;
 		if (total_scanned == 0)
