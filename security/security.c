@@ -18,7 +18,7 @@
 #include <linux/sched.h>
 #include <linux/security.h>
 
-#define SECURITY_SCAFFOLD_VERSION	"1.0.0"
+#define SECURITY_FRAMEWORK_VERSION	"1.0.0"
 
 /* things that live in dummy.c */
 extern struct security_operations dummy_security_ops;
@@ -49,13 +49,13 @@ static void __init do_security_initcalls(void)
 }
 
 /**
- * security_scaffolding_startup - initializes the security scaffolding framework
+ * security_init - initializes the security framework
  *
  * This should be called early in the kernel initialization sequence.
  */
-int __init security_scaffolding_startup (void)
+int __init security_init(void)
 {
-	printk (KERN_INFO "Security Scaffold v" SECURITY_SCAFFOLD_VERSION
+	printk (KERN_INFO "Security Framework v" SECURITY_FRAMEWORK_VERSION
 		" initialized\n");
 
 	if (verify (&dummy_security_ops)) {
