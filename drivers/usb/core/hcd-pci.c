@@ -279,6 +279,7 @@ EXPORT_SYMBOL (usb_hcd_pci_remove);
 /**
  * usb_hcd_pci_suspend - power management suspend of a PCI-based HCD
  * @dev: USB Host Controller being suspended
+ * @state: state that the controller is going into
  *
  * Store this function in the HCD's struct pci_driver as suspend().
  */
