@@ -42,11 +42,7 @@
 #include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/isapnp.h>
-#include <linux/pnp.h>
 #include <asm/io.h>
-
-LIST_HEAD(isapnp_cards);
-LIST_HEAD(isapnp_devices);
 
 #if 0
 #define ISAPNP_REGION_OK
@@ -106,6 +102,8 @@ static int isapnp_detected;
 /* some prototypes */
 
 static int isapnp_config_prepare(struct pnp_dev *dev);
+extern struct pnp_protocol isapnp_card_protocol;
+extern struct pnp_protocol isapnp_protocol;
 
 static inline void write_data(unsigned char x)
 {
@@ -521,7 +519,7 @@ static void __init isapnp_add_port_resource(struct pnp_dev *dev,
 	port->max = (tmp[4] << 8) | tmp[3];
 	port->align = tmp[5];
 	port->size = tmp[6];
-	port->flags = tmp[0] ? ISAPNP_PORT_FLAG_16BITADDR : 0;
+	port->flags = tmp[0] ? PNP_PORT_FLAG_16BITADDR : 0;
 	pnp_add_port_resource(dev,depnum,port);
 	return;
 }
@@ -543,7 +541,7 @@ static void __init isapnp_add_fixed_port_resource(struct pnp_dev *dev,
 	port->min = port->max = (tmp[1] << 8) | tmp[0];
 	port->size = tmp[2];
 	port->align = 0;
-	port->flags = ISAPNP_PORT_FLAG_FIXED;
+	port->flags = PNP_PORT_FLAG_FIXED;
 	pnp_add_port_resource(dev,depnum,port);
 	return;
 }
@@ -686,7 +684,7 @@ static int __init isapnp_create_device(struct pnp_card *card,
 		case _STAG_STARTDEP:
 			if (size > 1)
 				goto __skip;
-			dependent = 0x100 | ISAPNP_RES_PRIORITY_ACCEPTABLE;
+			dependent = 0x100 | PNP_RES_PRIORITY_ACCEPTABLE;
 			if (size > 0) {
 				isapnp_peek(tmp, size);
 				dependent = 0x100 | tmp[0];
@@ -891,7 +889,7 @@ static int __init isapnp_build_device_list(void)
 		if (isapnp_checksum_value != 0x00)
 			printk(KERN_ERR "isapnp: checksum for device %i is not valid (0x%x)\n", csn, isapnp_checksum_value);
 		card->checksum = isapnp_checksum_value;
-		card->protocol = &isapnp_protocol;
+		card->protocol = &isapnp_card_protocol;
 		pnpc_add_card(card);
 	}
 	return 0;
@@ -903,7 +901,12 @@ static int __init isapnp_build_device_list(void)
 
 int isapnp_present(void)
 {
-	return !list_empty(&isapnp_devices);
+	struct pnp_card *card;
+	pnp_for_each_card(card) {
+		if (card->protocol == &isapnp_card_protocol)
+			return 1;
+	}
+	return 0;
 }
 
 int isapnp_cfg_begin(int csn, int logdev)
@@ -970,24 +973,11 @@ static int isapnp_config_prepare(struct pnp_dev *dev)
 	return 0;
 }
 
-void isapnp_resource_change(struct resource *resource,
-			    unsigned long start,
-			    unsigned long size)
-{
-	if (resource == NULL)
-		return;
-	resource->flags &= ~IORESOURCE_AUTO;
-	resource->start = start;
-	resource->end = start + size - 1;
-}
-
 /*
  *  Inititialization.
  */
 
 
-EXPORT_SYMBOL(isapnp_cards);
-EXPORT_SYMBOL(isapnp_devices);
 EXPORT_SYMBOL(isapnp_present);
 EXPORT_SYMBOL(isapnp_cfg_begin);
 EXPORT_SYMBOL(isapnp_cfg_end);
@@ -999,7 +989,6 @@ EXPORT_SYMBOL(isapnp_write_word);
 EXPORT_SYMBOL(isapnp_write_dword);
 EXPORT_SYMBOL(isapnp_wake);
 EXPORT_SYMBOL(isapnp_device);
-EXPORT_SYMBOL(isapnp_resource_change);
 
 static int isapnp_get_resources(struct pnp_dev *dev)
 {
@@ -1053,8 +1042,15 @@ static int isapnp_disable_resources(struct pnp_dev *dev)
 	return 0;
 }
 
+struct pnp_protocol isapnp_card_protocol = {
+	.name	= "ISA Plug and Play - card",
+	.get	= NULL,
+	.set	= NULL,
+	.disable = NULL,
+};
+
 struct pnp_protocol isapnp_protocol = {
-	.name	= "ISA Plug and Play",
+	.name	= "ISA Plug and Play - device",
 	.get	= isapnp_get_resources,
 	.set	= isapnp_set_resources,
 	.disable = isapnp_disable_resources,
@@ -1064,6 +1060,7 @@ int __init isapnp_init(void)
 {
 	int cards;
 	struct pnp_card *card;
+	struct pnp_dev *dev;
 
 	if (isapnp_disable) {
 		isapnp_detected = 0;
@@ -1083,6 +1080,9 @@ int __init isapnp_init(void)
 #endif
 		return -EBUSY;
 	}
+
+	if(pnp_register_protocol(&isapnp_card_protocol)<0)
+		return -EBUSY;
 
 	if(pnp_register_protocol(&isapnp_protocol)<0)
 		return -EBUSY;
@@ -1126,13 +1126,11 @@ int __init isapnp_init(void)
 	protocol_for_each_card(&isapnp_protocol,card) {
 		cards++;
 		if (isapnp_verbose) {
-			struct list_head *devlist;
 			printk(KERN_INFO "isapnp: Card '%s'\n", card->name[0]?card->name:"Unknown");
 			if (isapnp_verbose < 2)
 				continue;
-			for (devlist = card->devices.next; devlist != &card->devices; devlist = devlist->next) {
-				struct pci_dev *dev = pci_dev_b(devlist);
-				printk(KERN_INFO "isapnp:   Device '%s'\n", dev->dev.name[0]?card->name:"Unknown");
+			pnp_card_for_each_dev(card,dev) {
+				printk(KERN_INFO "isapnp:   Device '%s'\n", dev->name[0]?dev->name:"Unknown");
 			}
 		}
 	}

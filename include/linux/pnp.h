@@ -51,11 +51,15 @@ struct pnp_card {
 
 #define global_to_pnp_card(n) list_entry(n, struct pnp_card, global_list)
 #define protocol_to_pnp_card(n) list_entry(n, struct pnp_card, protocol_list)
-#define to_pnp_card(n) list_entry(n, struct pnp_card, dev)
+#define to_pnp_card(n) container_of(n, struct pnp_card, dev)
 #define pnp_for_each_card(card) \
-	for(dev = global_to_pnp_card(pnp_cards.next); \
-	dev != global_to_pnp_card(&cards); \
-	dev = global_to_pnp_card(card>global_list.next))
+	for((card) = global_to_pnp_card(pnp_cards.next); \
+	(card) != global_to_pnp_card(&pnp_cards); \
+	(card) = global_to_pnp_card((card)->global_list.next))
+#define pnp_card_for_each_dev(card,dev) \
+	for((dev) = card_to_pnp_dev((card)->devices.next); \
+	(dev) != card_to_pnp_dev(&(card)->devices); \
+	(dev) = card_to_pnp_dev((dev)->card_list.next))
 
 static inline void *pnpc_get_drvdata (struct pnp_card *pcard)
 {
