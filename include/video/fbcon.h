@@ -141,6 +141,8 @@ extern int set_all_vcs(int fbidx, struct fb_ops *fb,
 	(((s) >> ((p)->bgshift)) & 0x0f)
 #define	attr_bgcol_ec(p,conp) \
 	((conp) ? (((conp)->vc_video_erase_char >> ((p)->bgshift)) & 0x0f) : 0)
+#define attr_fgcol_ec(p,vc) \
+	((vc) ? (((vc)->vc_video_erase_char >> ((p)->fgshift)) & 0x0f) : 0)
 
 /* Monochrome */
 #define attr_bold(p,s) \
