@@ -767,6 +767,7 @@ static struct tty_operations acm_ops = {
 
 static int __init acm_init(void)
 {
+	int retval;
 	acm_tty_driver = alloc_tty_driver(ACM_TTY_MINORS);
 	if (!acm_tty_driver)
 		return -ENOMEM;
@@ -783,15 +784,17 @@ static int __init acm_init(void)
 	acm_tty_driver->init_termios.c_cflag = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
 	tty_set_operations(acm_tty_driver, &acm_ops);
 
-	if (tty_register_driver(acm_tty_driver)) {
+	retval = tty_register_driver(acm_tty_driver);
+	if (retval) {
 		put_tty_driver(acm_tty_driver);
-		return -1;
+		return retval;
 	}
 
-	if (usb_register(&acm_driver) < 0) {
+	retval = usb_register(&acm_driver);
+	if (retval) {
 		tty_unregister_driver(acm_tty_driver);
 		put_tty_driver(acm_tty_driver);
-		return -1;
+		return retval;
 	}
 
 	info(DRIVER_VERSION ":" DRIVER_DESC);
