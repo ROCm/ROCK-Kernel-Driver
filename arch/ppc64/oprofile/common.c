@@ -52,17 +52,10 @@ static int op_ppc64_setup(void)
 
 static void op_ppc64_shutdown(void)
 {
-	/*
-	 * We need to be sure we have cleared all pending exceptions before
-	 * removing the interrupt handler. For the moment we play it safe and
-	 * leave it in
-	 */
-#if 0
 	mb();
 
 	/* Remove our interrupt handler. We may be removing this module. */
 	perf_irq = save_perf_irq;
-#endif
 }
 
 static void op_ppc64_cpu_start(void *dummy)
