@@ -220,10 +220,6 @@ static LIST_HEAD(_pages_jobs);
 
 static int __init jobs_init(void)
 {
-	INIT_LIST_HEAD(&_complete_jobs);
-	INIT_LIST_HEAD(&_io_jobs);
-	INIT_LIST_HEAD(&_pages_jobs);
-
 	_job_cache = kmem_cache_create("kcopyd-jobs",
 				       sizeof(struct kcopyd_job),
 				       __alignof__(struct kcopyd_job),
