@@ -3128,7 +3128,7 @@ xlog_state_ticket_alloc(xlog_t *log)
 	 * The kmem_zalloc may sleep, so we shouldn't be holding the
 	 * global lock.  XXXmiken: may want to use zone allocator.
 	 */
-	buf = (xfs_caddr_t) kmem_zalloc(NBPP, 0);
+	buf = (xfs_caddr_t) kmem_zalloc(NBPP, KM_SLEEP);
 
 	s = LOG_LOCK(log);
 
