@@ -564,6 +564,7 @@ extern void pci_remove_bus_device(struct pci_dev *dev);
 /* Generic PCI functions exported to card drivers */
 
 struct pci_dev *pci_find_device (unsigned int vendor, unsigned int device, const struct pci_dev *from);
+struct pci_dev *pci_find_device_reverse (unsigned int vendor, unsigned int device, const struct pci_dev *from);
 struct pci_dev *pci_find_subsys (unsigned int vendor, unsigned int device,
 				 unsigned int ss_vendor, unsigned int ss_device,
 				 const struct pci_dev *from);
