@@ -54,16 +54,17 @@ static void __exit br_deinit(void)
 #endif
 	unregister_netdevice_notifier(&br_device_notifier);
 	brioctl_set(NULL);
-	br_handle_frame_hook = NULL;
+
+	br_cleanup_bridges();
+
+	synchronize_net();
 
 #if defined(CONFIG_ATM_LANE) || defined(CONFIG_ATM_LANE_MODULE)
 	br_fdb_get_hook = NULL;
 	br_fdb_put_hook = NULL;
 #endif
 
-	br_cleanup_bridges();
-
-	synchronize_net();
+	br_handle_frame_hook = NULL;
 }
 
 EXPORT_SYMBOL(br_should_route_hook);
