@@ -551,7 +551,7 @@ static void snd_es1370_codec_write(ak4531_t *ak4531,
 {
 	ensoniq_t *ensoniq = snd_magic_cast(ensoniq_t, ak4531->private_data, return);
 	unsigned long flags;
-	signed long end_time = jiffies + HZ / 10;
+	unsigned long end_time = jiffies + HZ / 10;
 
 #if 0
 	printk("CODEC WRITE: reg = 0x%x, val = 0x%x (0x%x), creg = 0x%x\n", reg, val, ES_1370_CODEC_WRITE(reg, val), ES_REG(ensoniq, 1370_CODEC));
@@ -568,7 +568,7 @@ static void snd_es1370_codec_write(ak4531_t *ak4531,
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule_timeout(1);
 #endif
-	} while ((signed long)(end_time - jiffies) > 0);
+	} while (time_after(end_time, jiffies));
 	snd_printk("codec write timeout, status = 0x%x\n", inl(ES_REG(ensoniq, STATUS)));
 }
 

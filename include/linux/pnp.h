@@ -274,12 +274,31 @@ struct pnp_fixup {
 #define pnp_can_configure(dev)	((!(dev)->active) && ((dev)->config_mode & PNP_CONFIG_AUTO) && \
 				 ((dev)->capabilities & PNP_CONFIGURABLE))
 
+#ifdef CONFIG_ISAPNP
+extern struct pnp_protocol isapnp_protocol;
+#define pnp_device_is_isapnp(dev) ((dev)->protocol == (&isapnp_protocol))
+#else
+#define pnp_device_is_isapnp(dev) 0
+#endif
+
+#ifdef CONFIG_PNPBIOS
+extern struct pnp_protocol pnpbios_protocol;
+#define pnp_device_is_pnpbios(dev) ((dev)->protocol == (&pnpbios_protocol))
+#else
+#define pnp_device_is_pnpbios(dev) 0
+#endif
+
+
 /* status */
 #define PNP_READY		0x0000
 #define PNP_ATTACHED		0x0001
 #define PNP_BUSY		0x0002
 #define PNP_FAULTY		0x0004
 
+/* isapnp specific macros */
+
+#define isapnp_card_number(dev)	((dev)->card ? (dev)->card->number : -1)
+#define isapnp_csn_number(dev)  ((dev)->number)
 
 /*
  * Driver Management

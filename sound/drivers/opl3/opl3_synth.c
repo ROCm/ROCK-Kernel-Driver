@@ -220,9 +220,6 @@ void snd_opl3_reset(opl3_t * opl3)
 		opl3->command(opl3, opl3_reg, 0x00);	/* Note off */
 	}
 
-	if (opl3->hardware >= OPL3_HW_OPL3)
-		opl3->command(opl3, OPL3_RIGHT | OPL3_REG_MODE, 0x00);	/* Enter OPL2 mode */
-
 	opl3->max_voices = MAX_OPL2_VOICES;
 	opl3->fm_mode = SNDRV_DM_FM_MODE_OPL2;
 
@@ -426,14 +423,9 @@ static int snd_opl3_set_mode(opl3_t * opl3, int mode)
 	if ((mode == SNDRV_DM_FM_MODE_OPL3) && (opl3->hardware < OPL3_HW_OPL3))
 		return -EINVAL;
 
-	if (mode == SNDRV_DM_FM_MODE_OPL3) {
-		opl3->command(opl3, OPL3_RIGHT | OPL3_REG_MODE, OPL3_OPL3_ENABLE);	/* Enter OPL3 mode */
-		opl3->fm_mode = SNDRV_DM_FM_MODE_OPL3;
+	opl3->fm_mode = mode;
+	if (opl3->hardware >= OPL3_HW_OPL3)
 		opl3->command(opl3, OPL3_RIGHT | OPL3_REG_CONNECTION_SELECT, 0x00);	/* Clear 4-op connections */
-	} else {
-		opl3->command(opl3, OPL3_RIGHT | OPL3_REG_MODE, 0x00);		/* Enter OPL2 mode */
-		opl3->fm_mode = SNDRV_DM_FM_MODE_OPL2;
-	}
 
 	return 0;
 }

@@ -29,11 +29,7 @@
 #include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/slab.h>
-#ifndef LINUX_ISAPNP_H
-#include <linux/isapnp.h>
-#define isapnp_card pci_bus
-#define isapnp_dev pci_dev
-#endif
+#include <linux/pnp.h>
 #include <sound/core.h>
 #ifdef CS4231
 #include <sound/cs4231.h>
@@ -47,6 +43,11 @@
 #endif	/* CS4231 */
 #include <sound/mpu401.h>
 #include <sound/opl3.h>
+#ifdef USE_OPL4
+#ifndef OPTi93X
+#include "opl4.h" /* <sound/opl4.h> */
+#endif
+#endif
 #define SNDRV_LEGACY_FIND_FREE_IRQ
 #define SNDRV_LEGACY_FIND_FREE_DMA
 #define SNDRV_GET_ID
@@ -267,23 +268,16 @@ struct _snd_opti9xx {
 	long mpu_port;
 	int mpu_irq;
 
-#if defined(OPTi93X)
-	opti93x_t *opti93x;
-#elif defined(CS4231)
-	cs4231_t *cs4231;
-#else
-	ad1848_t *ad1848;
-#endif	/* AD1848 */
-	snd_rawmidi_t *rmidi;
-#ifdef __ISAPNP__
-	struct isapnp_dev *dev;
-	struct isapnp_dev *devmpu;
-#endif	/* __ISAPNP__ */
+#ifdef CONFIG_PNP
+	struct pnp_dev *dev;
+	struct pnp_dev *devmpu;
+#endif	/* CONFIG_PNP */
 };
 
-static snd_card_t *snd_opti9xx_card = SNDRV_DEFAULT_PTR1;
+static int snd_opti9xx_first_hit = 1;
+static snd_card_t *snd_opti9xx_legacy = SNDRV_DEFAULT_PTR1;
 
-#ifdef __ISAPNP__
+#ifdef CONFIG_PNP
 
 #define ISAPNP_OPTI9XX(_va, _vb, _vc, _device, _fa, _fb, _fc, _audio, _mpu401) \
 	{ \
@@ -292,22 +286,22 @@ static snd_card_t *snd_opti9xx_card = SNDRV_DEFAULT_PTR1;
 			ISAPNP_DEVICE_ID(_fa, _fb, _fc, _mpu401), } \
 	}
 
-static struct isapnp_card_id snd_card_opti9xx_pnpids[] = {
+static struct pnp_card_device_id snd_opti9xx_pnpids[] = {
 #ifndef OPTi93X
 	/* OPTi 82C924 */
-	ISAPNP_OPTI9XX('O','P','T',0x0924,'O','P','T',0x0000,0x0002),
+	{ .id = "OPT0924", .devs = { { "OPT0000" }, { "OPT0002" } }, .driver_data = 0x0924 },
 	/* OPTi 82C925 */
-	ISAPNP_OPTI9XX('O','P','T',0x0925,'O','P','T',0x9250,0x0002),
+	{ .id = "OPT0925", .devs = { { "OPT9250" }, { "OPT0002" } }, .driver_data = 0x0925 },
 #else
 	/* OPTi 82C931/3 */
-	ISAPNP_OPTI9XX('O','P','T',0x0931,'O','P','T',0x9310,0x0002),
+	{ .id = "OPT0931", .devs = { { "OPT9310" }, { "OPT0002" } }, .driver_data = 0x0931 },
 #endif	/* OPTi93X */
-	{ ISAPNP_CARD_END, }
+	{ .id = "" }
 };
 
-ISAPNP_CARD_TABLE(snd_card_opti9xx_pnpids);
+MODULE_DEVICE_TABLE(pnp_card, snd_opti9xx_pnpids);
 
-#endif	/* __ISAPNP__ */
+#endif	/* CONFIG_PNP */
 
 #ifdef OPTi93X
 #define DRIVER_NAME	"snd-card-opti93x"
@@ -326,14 +320,14 @@ static char * snd_opti9xx_names[] = {
 static long snd_legacy_find_free_ioport(long *port_table, long size)
 {
 	while (*port_table != -1) {
-		if (request_region(*port_table, size, "opti92x-ad1848"))
+		if (!check_region(*port_table, size))
 			return *port_table;
 		port_table++;
 	}
-	return SNDRV_AUTO_PORT;
+	return -1;
 }
 
-static int __init snd_opti9xx_init(opti9xx_t *chip, unsigned short hardware)
+static int __devinit snd_opti9xx_init(opti9xx_t *chip, unsigned short hardware)
 {
 	static int opti9xx_mc_size[] = {7, 7, 10, 10, 2, 2, 2};
 
@@ -478,7 +472,7 @@ static void snd_opti9xx_write(opti9xx_t *chip, unsigned char reg,
 		(snd_opti9xx_read(chip, reg) & ~(mask)) | ((value) & (mask)))
 
 
-static int __init snd_opti9xx_configure(opti9xx_t *chip)
+static int __devinit snd_opti9xx_configure(opti9xx_t *chip)
 {
 	unsigned char wss_base_bits;
 	unsigned char irq_bits;
@@ -1669,7 +1663,7 @@ int snd_opti93x_mixer(opti93x_t *chip)
 
 #endif /* OPTi93X */
 
-static int __init snd_card_opti9xx_detect(snd_card_t *card, opti9xx_t *chip)
+static int __devinit snd_card_opti9xx_detect(snd_card_t *card, opti9xx_t *chip)
 {
 	int i, err;
 
@@ -1715,112 +1709,100 @@ static int __init snd_card_opti9xx_detect(snd_card_t *card, opti9xx_t *chip)
 	return -ENODEV;
 }
 
-#ifdef __ISAPNP__
-static int __init snd_card_opti9xx_isapnp(opti9xx_t *chip)
+#ifdef CONFIG_PNP
+static int __devinit snd_card_opti9xx_pnp(opti9xx_t *chip, struct pnp_card_link *card,
+					  const struct pnp_card_device_id *pid)
 {
-	struct isapnp_dev *pdev = NULL;
-	const struct isapnp_card_id *pid = snd_card_opti9xx_pnpids-1;
-	static struct isapnp_card *card = NULL;
+	struct pnp_dev *pdev;
+	struct pnp_resource_table *cfg = kmalloc(sizeof(*cfg), GFP_KERNEL);
+	int err;
 
-      __again:
-	while (1) {
-		pid++;
-		if (pid->card_vendor == 0)
-			return -ENODEV;
-		if ((card = isapnp_find_card(pid->card_vendor, pid->card_device, card)))
-			break;
+	chip->dev = pnp_request_card_device(card, pid->devs[0].id, NULL);
+	if (chip->dev == NULL) {
+		kfree(cfg);
+		return -EBUSY;
 	}
-	if (card == NULL)
-		return -ENODEV;
-
-	chip->dev = isapnp_find_dev(card, pid->devs[0].vendor, pid->devs[0].function, NULL);
-	if (chip->dev == NULL)
-		goto __again;
-
-	chip->devmpu = isapnp_find_dev(card, pid->devs[1].vendor, pid->devs[1].function, NULL);
+	chip->devmpu = pnp_request_card_device(card, pid->devs[1].id, NULL);
 
 	pdev = chip->dev;
-	if (pdev->prepare(pdev) < 0)
-		return -EAGAIN;
+	pnp_init_resource_table(cfg);
 
 #ifdef OPTi93X
 	if (port != SNDRV_AUTO_PORT)
-		isapnp_resource_change(&pdev->resource[0], port + 4, 4);
+		pnp_resource_change(&cfg->port_resource[0], port + 4, 4);
 #else
-	if ((pid->card_device != ISAPNP_DEVICE(0x0924)) && (port != SNDRV_AUTO_PORT))
-		isapnp_resource_change(&pdev->resource[1], port, 4);
+	if (pid->driver_data != 0x0924 && port != SNDRV_AUTO_PORT)
+		pnp_resource_change(&cfg->port_resource[1], port, 4);
 #endif	/* OPTi93X */
 	if (irq != SNDRV_AUTO_IRQ)
-		isapnp_resource_change(&pdev->irq_resource[0], irq, 1);
+		pnp_resource_change(&cfg->irq_resource[0], irq, 1);
 	if (dma1 != SNDRV_AUTO_DMA)
-		isapnp_resource_change(&pdev->dma_resource[0], dma1, 1);
+		pnp_resource_change(&cfg->dma_resource[0], dma1, 1);
 #if defined(CS4231) || defined(OPTi93X)
 	if (dma2 != SNDRV_AUTO_DMA)
-		isapnp_resource_change(&pdev->dma_resource[1], dma2, 1);
+		pnp_resource_change(&cfg->dma_resource[1], dma2, 1);
 #endif	/* CS4231 || OPTi93X */
 	if (fm_port != SNDRV_AUTO_PORT)
-		isapnp_resource_change(&pdev->resource[1], fm_port, 4);
+		pnp_resource_change(&cfg->port_resource[1], fm_port, 4);
 
-	if (pdev->activate(pdev) < 0) {
-		snd_printk("AUDIO isapnp configure failure\n");
-		return -EBUSY;
+	if (pnp_manual_config_dev(pdev, cfg, 0) < 0)
+		snd_printk(KERN_ERR "AUDIO the requested resources are invalid, using auto config\n");
+	err = pnp_activate_dev(pdev);
+	if (err < 0) {
+		snd_printk(KERN_ERR "AUDIO pnp configure failure\n");
+		kfree(cfg);
+		return err;
 	}
 
 #ifdef OPTi93X
-	port = pdev->resource[0].start - 4;
-	fm_port = pdev->resource[1].start;
+	port = pnp_port_start(pdev, 0) - 4;
+	fm_port = pnp_port_start(pdev, 1);
 #else
-	if (pid->card_device != ISAPNP_DEVICE(0x0924))
-		port = pdev->resource[1].start;
-	fm_port = pdev->resource[2].start;
+	if (pid->driver_data != 0x0924)
+		port = pnp_port_start(pdev, 1);
+	fm_port = pnp_port_start(pdev, 2);
 #endif	/* OPTi93X */
-	irq = pdev->irq_resource[0].start;
-	dma1 = pdev->dma_resource[0].start;
+	irq = pnp_irq(pdev, 0);
+	dma1 = pnp_dma(pdev, 0);
 #if defined(CS4231) || defined(OPTi93X)
-	dma2 = pdev->dma_resource[1].start;
+	dma2 = pnp_dma(pdev, 1);
 #endif	/* CS4231 || OPTi93X */
 
 	pdev = chip->devmpu;
-	if (pdev == NULL || pdev->prepare(pdev) < 0) {
-		mpu_port = -1;
-		chip->devmpu = NULL;
-		return pid->card_device;
+	if (pdev) {
+		pnp_init_resource_table(cfg);
+
+		if (mpu_port != SNDRV_AUTO_PORT)
+			pnp_resource_change(&cfg->port_resource[0], mpu_port, 2);
+		if (mpu_irq != SNDRV_AUTO_IRQ)
+			pnp_resource_change(&cfg->irq_resource[0], mpu_irq, 1);
+
+		if (pnp_manual_config_dev(pdev, cfg, 0) < 0)
+			snd_printk(KERN_ERR "AUDIO the requested resources are invalid, using auto config\n");
+		err = pnp_activate_dev(pdev);
+		if (err < 0) {
+			snd_printk(KERN_ERR "AUDIO pnp configure failure\n");
+			mpu_port = -1;
+			chip->devmpu = NULL;
+		} else {
+			mpu_port = pnp_port_start(pdev, 0);
+			mpu_irq = pnp_irq(pdev, 0);
+		}
 	}
-
-	if (mpu_port != SNDRV_AUTO_PORT)
-		isapnp_resource_change(&pdev->resource[0], mpu_port, 2);
-	if (mpu_irq != SNDRV_AUTO_IRQ)
-		isapnp_resource_change(&pdev->irq_resource[0], mpu_irq, 1);
-
-	if (pdev->activate(pdev) < 0) {
-		snd_printk("MPU-401 isapnp configure failure\n");
-		mpu_port = -1;
-		chip->devmpu = NULL;
-	} else {
-		mpu_port = pdev->resource[0].start;
-		mpu_irq = pdev->irq_resource[0].start;
-	}
-	return pid->card_device;
+	kfree(cfg);
+	return pid->driver_data;
 }
-
-static void snd_card_opti9xx_deactivate(opti9xx_t *chip)
-{
-	if (chip->dev)
-		chip->dev->deactivate(chip->dev);
-	if (chip->devmpu)
-		chip->devmpu->deactivate(chip->devmpu);
-}
-#endif	/* __ISAPNP__ */
+#endif	/* CONFIG_PNP */
 
 #if 0
-static int __init snd_card_opti9xx_resources(struct snd_card_opti9xx *chip,
-					     snd_card_t *card)
+static int __devinit snd_card_opti9xx_resources(struct snd_card_opti9xx *chip,
+						snd_card_t *card)
 {
 	int error, i, pnp = 0;
 
-#ifdef __ISAPNP__
+#ifdef CONFIG_PNP
 	pnp = chip->dev != NULL;
-#endif	/* __ISAPNP__ */
+#endif	/* CONFIG_PNP */
 
 #ifndef OPTi93X
 	if (chip->chip->hardware == OPTi9XX_HW_82C928)
@@ -1914,13 +1896,6 @@ static void snd_card_opti9xx_free(snd_card_t *card)
 	opti9xx_t *chip = (opti9xx_t *)card->private_data;
         
 	if (chip) {
-#ifdef __ISAPNP__
-		snd_card_opti9xx_deactivate(chip);
-#endif	/* __ISAPNP__ */
-		if (chip->wss_base != SNDRV_AUTO_PORT)
-			release_region(chip->wss_base, 4);
-		if (chip->mpu_port != SNDRV_AUTO_PORT)
-			release_region(chip->mpu_port, 2);
 		if (chip->res_mc_base) {
 			release_resource(chip->res_mc_base);
 			kfree_nocheck(chip->res_mc_base);
@@ -1928,7 +1903,8 @@ static void snd_card_opti9xx_free(snd_card_t *card)
 	}
 }
 
-static int __init snd_card_opti9xx_probe(void)
+static int __devinit snd_card_opti9xx_probe(struct pnp_card_link *pcard,
+					    const struct pnp_card_device_id *pid)
 {
 	static long possible_ports[] = {0x530, 0xe80, 0xf40, 0x604, -1};
 	static long possible_mpu_ports[] = {0x300, 0x310, 0x320, 0x330, -1};
@@ -1956,36 +1932,28 @@ static int __init snd_card_opti9xx_probe(void)
 	snd_pcm_t *pcm;
 	snd_rawmidi_t *rmidi;
 	snd_hwdep_t *synth;
-#ifdef __ISAPNP__
+#ifdef CONFIG_PNP
 	int hw;
-#endif	/* __ISAPNP__ */
+#endif	/* CONFIG_PNP */
 
+	if (pcard && !snd_opti9xx_first_hit)
+		return -EBUSY;
 	if (!(card = snd_card_new(index, id, THIS_MODULE,
 				  sizeof(opti9xx_t))))
 		return -ENOMEM;
 	card->private_free = snd_card_opti9xx_free;
 	chip = (opti9xx_t *)card->private_data;
 
-	chip->wss_base = port;
-	chip->fm_port = fm_port;
-	chip->mpu_port = mpu_port;
-	chip->irq = irq;
-	chip->mpu_irq = mpu_irq;
-	chip->dma1 = dma1;
-#if defined(CS4231) || defined(OPTi93X)
-	chip->dma2 = dma2;
-#endif
-
-#ifdef __ISAPNP__
-	if (isapnp && (hw = snd_card_opti9xx_isapnp(chip)) > 0) {
+#ifdef CONFIG_PNP
+	if (isapnp && (hw = snd_card_opti9xx_pnp(chip, pcard, pid)) > 0) {
 		switch (hw) {
-		case ISAPNP_DEVICE(0x0924):
+		case 0x0924:
 			hw = OPTi9XX_HW_82C924;
 			break;
-		case ISAPNP_DEVICE(0x0925):
+		case 0x0925:
 			hw = OPTi9XX_HW_82C925;
 			break;
-		case ISAPNP_DEVICE(0x0931):
+		case 0x0931:
 			hw = OPTi9XX_HW_82C931;
 			break;
 		default:
@@ -2000,32 +1968,42 @@ static int __init snd_card_opti9xx_probe(void)
 		if (hw <= OPTi9XX_HW_82C930)
 			chip->mc_base -= 0x80;
 	} else {
-#endif	/* __ISAPNP__ */
+#endif	/* CONFIG_PNP */
 		if ((error = snd_card_opti9xx_detect(card, chip)) < 0) {
 			snd_card_free(card);
 			return error;
 		}
-#ifdef __ISAPNP__
+#ifdef CONFIG_PNP
 	}
-#endif	/* __ISAPNP__ */
+#endif	/* CONFIG_PNP */
 
 	if ((chip->res_mc_base = request_region(chip->mc_base, chip->mc_base_size, "OPTi9xx MC")) == NULL) {
 		snd_card_free(card);
 		return -ENOMEM;
 	}
 
-#ifdef __ISAPNP__
+	chip->wss_base = port;
+	chip->fm_port = fm_port;
+	chip->mpu_port = mpu_port;
+	chip->irq = irq;
+	chip->mpu_irq = mpu_irq;
+	chip->dma1 = dma1;
+#if defined(CS4231) || defined(OPTi93X)
+	chip->dma2 = dma2;
+#endif
+
+#ifdef CONFIG_PNP
 	if (!isapnp) {
 #endif
 	if (chip->wss_base == SNDRV_AUTO_PORT) {
-		if ((chip->wss_base = snd_legacy_find_free_ioport(possible_ports, 4)) == SNDRV_AUTO_PORT) {
+		if ((chip->wss_base = snd_legacy_find_free_ioport(possible_ports, 4)) < 0) {
 			snd_card_free(card);
 			snd_printk("unable to find a free WSS port\n");
 			return -EBUSY;
 		}
 	}
 	if (chip->mpu_port == SNDRV_AUTO_PORT) {
-		if ((chip->mpu_port = snd_legacy_find_free_ioport(possible_mpu_ports, 2)) == SNDRV_AUTO_PORT) {
+		if ((chip->mpu_port = snd_legacy_find_free_ioport(possible_mpu_ports, 2)) < 0) {
 			snd_card_free(card);
 			snd_printk("unable to find a free MPU401 port\n");
 			return -EBUSY;
@@ -2062,7 +2040,7 @@ static int __init snd_card_opti9xx_probe(void)
         }
 #endif
 
-#ifdef __ISAPNP__
+#ifdef CONFIG_PNP
 	}
 #endif
 
@@ -2131,14 +2109,35 @@ static int __init snd_card_opti9xx_probe(void)
 			snd_printk("no MPU-401 device at 0x%lx?\n", chip->mpu_port);
 
 	if (chip->fm_port > 0) {
-		opl3_t *opl3;
-		if (snd_opl3_create(card,
-				    chip->fm_port,
-				    chip->fm_port + 2,
-				    OPL3_HW_AUTO, 0, &opl3) < 0) {
+		opl3_t *opl3 = NULL;
+#ifdef USE_OPL4
+#ifndef OPTi93X
+		if (chip->hardware == OPTi9XX_HW_82C928 ||
+		    chip->hardware == OPTi9XX_HW_82C929 ||
+		    chip->hardware == OPTi9XX_HW_82C924) {
+			opl4_t *opl4;
+			/* assume we have an OPL4 */
+			snd_opti9xx_write_mask(chip, OPTi9XX_MC_REG(2),
+					       0x20, 0x20);
+			if (snd_opl4_create(card,
+					    chip->fm_port,
+					    chip->fm_port - 8,
+					    2, &opl3, &opl4) < 0) {
+				/* no luck, use OPL3 instead */
+				snd_opti9xx_write_mask(chip, OPTi9XX_MC_REG(2),
+						       0x00, 0x20);
+			}
+		}
+#endif	/* !OPTi93X */
+#endif
+		if (!opl3 && snd_opl3_create(card,
+					     chip->fm_port,
+					     chip->fm_port + 2,
+					     OPL3_HW_AUTO, 0, &opl3) < 0) {
 			snd_printk("no OPL device at 0x%lx-0x%lx\n",
-				chip->fm_port, chip->fm_port + 4 - 1);
-		} else {
+				   chip->fm_port, chip->fm_port + 4 - 1);
+		}
+		if (opl3) {
 			if ((error = snd_opl3_timer_new(opl3,
 #ifdef CS4231
 							1, 2)) < 0) {
@@ -2170,15 +2169,39 @@ static int __init snd_card_opti9xx_probe(void)
 		snd_card_free(card);
 		return error;
 	}
-	snd_opti9xx_card = card;
+	snd_opti9xx_first_hit = 0;
+	if (pcard)
+		pnp_set_card_drvdata(pcard, card);
+	else
+		snd_opti9xx_legacy = card;
 	return 0;
 }
 
+#ifdef CONFIG_PNP
+static void __devexit snd_opti9xx_pnp_remove(struct pnp_card_link * pcard)
+{
+	snd_card_t *card = (snd_card_t *) pnp_get_card_drvdata(pcard);
+
+	snd_card_disconnect(card);
+	snd_card_free_in_thread(card);
+	snd_opti9xx_first_hit = 0;
+}
+
+static struct pnp_card_driver opti9xx_pnpc_driver = {
+	.flags		= PNP_DRIVER_RES_DISABLE,
+	.name		= "opti9xx",
+	.id_table	= snd_opti9xx_pnpids,
+	.probe		= snd_card_opti9xx_probe,
+	.remove		= __devexit_p(snd_opti9xx_pnp_remove),
+};
+#endif
+
 static int __init alsa_card_opti9xx_init(void)
 {
-	int error;
+	int cards, error;
 
-	if ((error = snd_card_opti9xx_probe())) {
+	cards = pnp_register_card_driver(&opti9xx_pnpc_driver);
+	if (cards == 0 && (error = snd_card_opti9xx_probe(NULL, NULL)) < 0) {
 #ifdef MODULE
 #ifdef OPTi93X
 		printk(KERN_ERR "no OPTi 82C93x soundcard found\n");
@@ -2193,8 +2216,11 @@ static int __init alsa_card_opti9xx_init(void)
 
 static void __exit alsa_card_opti9xx_exit(void)
 {
-	if (snd_opti9xx_card)
-		snd_card_free(snd_opti9xx_card);
+#ifdef CONFIG_PNP
+	pnp_unregister_card_driver(&opti9xx_pnpc_driver);
+#endif
+	if (snd_opti9xx_legacy)
+		snd_card_free(snd_opti9xx_legacy);
 }
 
 module_init(alsa_card_opti9xx_init)
@@ -2227,7 +2253,7 @@ static int __init alsa_card_opti9xx_setup(char *str)
 	       get_option(&str,&dma2) == 2
 #endif
 	       );
-#ifdef __ISAPNP__
+#ifdef CONFIG_PNP
 	if (pnp != INT_MAX)
 		isapnp = pnp;
 #endif

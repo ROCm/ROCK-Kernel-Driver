@@ -112,25 +112,30 @@ static int __devinit snd_card_ymfpci_probe(struct pci_dev *pci,
 	}
 
 	legacy_ctrl = 0;
-	legacy_ctrl2 = 0x0800;	/* SMOD = 01 */
+	legacy_ctrl2 = 0x0800;	/* SBEN = 0, SMOD = 01, LAD = 0 */
 
 	if (pci_id->device >= 0x0010) { /* YMF 744/754 */
-		if (fm_port[dev] < 0)
-			fm_port[dev] = pci_resource_start(pci, 1);
-		else if (check_region(fm_port[dev], 4))
-			fm_port[dev] = -1;
-		if (fm_port[dev] >= 0) {
-			legacy_ctrl |= 2;
+		if (fm_port[dev] < 0) {
+			// fm_port[dev] = pci_resource_start(pci, 1);
+			u16 addr;
+			pci_read_config_word(pci, PCIR_DSXG_FMBASE, &addr);
+			fm_port[dev] = addr;
+		}
+		if (fm_port[dev] >= 0 &&
+		    (chip->fm_res = request_region(fm_port[dev], 4, "YMFPCI OPL3")) != NULL) {
+			legacy_ctrl |= YMFPCI_LEGACY_FMEN;
 			pci_write_config_word(pci, PCIR_DSXG_FMBASE, fm_port[dev]);
 		}
-		if (mpu_port[dev] < 0)
-			mpu_port[dev] = pci_resource_start(pci, 1) + 0x20;
-		else if (check_region(mpu_port[dev], 2))
-			mpu_port[dev] = -1;
-		if (mpu_port[dev] >= 0) {
-			legacy_ctrl |= 8;
+		if (mpu_port[dev] < 0) {
+			// mpu_port[dev] = pci_resource_start(pci, 1) + 0x20;
+			u16 addr;
+			pci_read_config_word(pci, PCIR_DSXG_MPU401BASE, &addr);
+			mpu_port[dev] = addr;
+		}
+		if (mpu_port[dev] >= 0 &&
+		    (chip->mpu_res = request_region(mpu_port[dev], 2, "YMFPCI MPU401")) != NULL) {
+			legacy_ctrl |= YMFPCI_LEGACY_MEN;
 			pci_write_config_word(pci, PCIR_DSXG_MPU401BASE, mpu_port[dev]);
-			//snd_printd("MPU401 supported on 0x%lx\n", mpu_port[dev]);
 		}
 	} else {
 		switch (fm_port[dev]) {
@@ -140,10 +145,11 @@ static int __devinit snd_card_ymfpci_probe(struct pci_dev *pci,
 		case 0x3a8: legacy_ctrl2 |= 3; break;
 		default: fm_port[dev] = -1; break;
 		}
-		if (fm_port[dev] > 0 && check_region(fm_port[dev], 4) == 0)
-			legacy_ctrl |= 2;
-		else {
-			legacy_ctrl2 &= ~3;
+		if (fm_port[dev] > 0 &&
+		    (chip->fm_res = request_region(fm_port[dev], 4, "YMFPCI OPL3")) != NULL) {
+			legacy_ctrl |= YMFPCI_LEGACY_FMEN;
+		} else {
+			legacy_ctrl2 &= ~YMFPCI_LEGACY2_FMIO;
 			fm_port[dev] = -1;
 		}
 		switch (mpu_port[dev]) {
@@ -153,23 +159,20 @@ static int __devinit snd_card_ymfpci_probe(struct pci_dev *pci,
 		case 0x334: legacy_ctrl2 |= 3 << 4; break;
 		default: mpu_port[dev] = -1; break;
 		}
-		if (mpu_port[dev] > 0 && check_region(mpu_port[dev], 2) == 0) {
-			//snd_printd("MPU401 supported on 0x%lx\n", mpu_port[dev]);
-			legacy_ctrl |= 8;
+		if (mpu_port[dev] > 0 &&
+		    (chip->mpu_res = request_region(mpu_port[dev], 2, "YMFPCI MPU401")) != NULL) {
+			legacy_ctrl |= YMFPCI_LEGACY_MEN;
 		} else {
-			legacy_ctrl2 &= ~(3 << 4);
+			legacy_ctrl2 &= ~YMFPCI_LEGACY2_MPUIO;
 			mpu_port[dev] = -1;
 		}
 	}
-	if (mpu_port[dev] > 0) {
-		// this bit is for legacy mpu irqs
-		// legacy_ctrl |= 0x10; /* MPU401 irq enable */
-		legacy_ctrl2 |= 1 << 15; /* IMOD */
+	if (chip->mpu_res) {
+		legacy_ctrl |= YMFPCI_LEGACY_MIEN; /* FIXME: do we need this? */
+		legacy_ctrl2 |= YMFPCI_LEGACY2_IMOD;
 	}
 	pci_read_config_word(pci, PCIR_DSXG_LEGACY, &old_legacy_ctrl);
-	//snd_printdd("legacy_ctrl = 0x%x\n", legacy_ctrl);
 	pci_write_config_word(pci, PCIR_DSXG_LEGACY, legacy_ctrl);
-	//snd_printdd("legacy_ctrl2 = 0x%x\n", legacy_ctrl2);
 	pci_write_config_word(pci, PCIR_DSXG_ELEGACY, legacy_ctrl2);
 	if ((err = snd_ymfpci_create(card, pci,
 				     old_legacy_ctrl,
@@ -197,25 +200,22 @@ static int __devinit snd_card_ymfpci_probe(struct pci_dev *pci,
 		snd_card_free(card);
 		return err;
 	}
-	if (mpu_port[dev] > 0) {
+	if (chip->mpu_res) {
 		if ((err = snd_mpu401_uart_new(card, 0, MPU401_HW_YMFPCI,
-					       mpu_port[dev], 0,
+					       mpu_port[dev], 1,
 					       pci->irq, 0, &chip->rawmidi)) < 0) {
 			printk(KERN_WARNING "ymfpci: cannot initialize MPU401 at 0x%lx, skipping...\n", mpu_port[dev]);
-			mpu_port[dev] = 0;
-			// only for legacy mpu irqs
-			// legacy_ctrl &= ~0x10; /* disable MPU401 irq */
-			// pci_write_config_word(pci, PCIR_DSXG_LEGACY, legacy_ctrl);
+			legacy_ctrl &= ~YMFPCI_LEGACY_MIEN; /* disable MPU401 irq */
+			pci_write_config_word(pci, PCIR_DSXG_LEGACY, legacy_ctrl);
 		}
 	}
-	if (fm_port[dev] > 0) {
+	if (chip->fm_res) {
 		if ((err = snd_opl3_create(card,
 					   fm_port[dev],
 					   fm_port[dev] + 2,
-					   OPL3_HW_OPL3, 0, &opl3)) < 0) {
+					   OPL3_HW_OPL3, 1, &opl3)) < 0) {
 			printk(KERN_WARNING "ymfpci: cannot initialize FM OPL3 at 0x%lx, skipping...\n", fm_port[dev]);
-			fm_port[dev] = 0;
-			legacy_ctrl &= ~2;
+			legacy_ctrl &= ~YMFPCI_LEGACY_FMEN;
 			pci_write_config_word(pci, PCIR_DSXG_LEGACY, legacy_ctrl);
 		} else if ((err = snd_opl3_hwdep_new(opl3, 0, 1, NULL)) < 0) {
 			snd_card_free(card);

@@ -63,6 +63,8 @@ extern snd_pcm_ops_t snd_cs46xx_playback_rear_ops;
 extern snd_pcm_ops_t snd_cs46xx_playback_indirect_rear_ops;
 extern snd_pcm_ops_t snd_cs46xx_playback_iec958_ops;
 extern snd_pcm_ops_t snd_cs46xx_playback_indirect_iec958_ops;
+extern snd_pcm_ops_t snd_cs46xx_playback_clfe_ops;
+extern snd_pcm_ops_t snd_cs46xx_playback_indirect_clfe_ops;
 
 
 /*

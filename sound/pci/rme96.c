@@ -1226,7 +1226,7 @@ snd_rme96_playback_spdif_open(snd_pcm_substream_t *substream)
 	snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_PERIOD_BYTES, &hw_constraints_period_bytes);
 
 	rme96->wcreg_spdif_stream = rme96->wcreg_spdif;
-	rme96->spdif_ctl->access &= ~SNDRV_CTL_ELEM_ACCESS_INACTIVE;
+	rme96->spdif_ctl->vd[0].access &= ~SNDRV_CTL_ELEM_ACCESS_INACTIVE;
 	snd_ctl_notify(rme96->card, SNDRV_CTL_EVENT_MASK_VALUE |
 		       SNDRV_CTL_EVENT_MASK_INFO, &rme96->spdif_ctl->id);
 	return 0;
@@ -1361,7 +1361,7 @@ snd_rme96_playback_close(snd_pcm_substream_t *substream)
 	spdif = (rme96->wcreg & RME96_WCR_ADAT) == 0;
 	spin_unlock_irqrestore(&rme96->lock, flags);
 	if (spdif) {
-		rme96->spdif_ctl->access |= SNDRV_CTL_ELEM_ACCESS_INACTIVE;
+		rme96->spdif_ctl->vd[0].access |= SNDRV_CTL_ELEM_ACCESS_INACTIVE;
 		snd_ctl_notify(rme96->card, SNDRV_CTL_EVENT_MASK_VALUE |
 			       SNDRV_CTL_EVENT_MASK_INFO, &rme96->spdif_ctl->id);
 	}

@@ -52,6 +52,18 @@ typedef struct awacs_amp {
 #endif /* PMAC_AMP_AVAIL */
 
 
+static void snd_pmac_screamer_wait(pmac_t *chip)
+{
+	long timeout = 2000;
+	while (!(in_le32(&chip->awacs->codec_stat) & MASK_VALID)) {
+		mdelay(1);
+		if (! --timeout) {
+			snd_printd("snd_pmac_screamer_wait timeout\n");
+			break;
+		}
+	}
+}
+
 /*
  * write AWACS register
  */
@@ -60,13 +72,15 @@ snd_pmac_awacs_write(pmac_t *chip, int val)
 {
 	long timeout = 5000000;
 
+	if (chip->model == PMAC_SCREAMER)
+		snd_pmac_screamer_wait(chip);
+	out_le32(&chip->awacs->codec_ctrl, val | (chip->subframe << 22));
 	while (in_le32(&chip->awacs->codec_ctrl) & MASK_NEWECMD) {
 		if (! --timeout) {
 			snd_printd("snd_pmac_awacs_write timeout\n");
 			break;
 		}
 	}
-	out_le32(&chip->awacs->codec_ctrl, val | (chip->subframe << 22));
 }
 
 static void
@@ -101,11 +115,14 @@ static void screamer_recalibrate(pmac_t *chip, int can_schedule)
 	/* Sorry for the horrible delays... I hope to get that improved
 	 * by making the whole PM process asynchronous in a future version
 	 */
-	do_mdelay(750, can_schedule);
+	snd_pmac_awacs_write_noreg(chip, 1, chip->awacs_reg[1]);
+	if (chip->manufacturer == 0x1)
+		/* delay for broken crystal part */
+		do_mdelay(750, can_schedule);
 	snd_pmac_awacs_write_noreg(chip, 1,
 				   chip->awacs_reg[1] | MASK_RECALIBRATE | MASK_CMUTE | MASK_AMUTE);
-	do_mdelay(1000, can_schedule);
 	snd_pmac_awacs_write_noreg(chip, 1, chip->awacs_reg[1]);
+	snd_pmac_awacs_write_noreg(chip, 6, chip->awacs_reg[6]);
 }
 
 #else
@@ -626,12 +643,8 @@ static void awacs_restore_all_regs(pmac_t *chip, int can_schedule)
 	snd_pmac_awacs_write_noreg(chip, 4, chip->awacs_reg[4]);
 	if (chip->model == PMAC_SCREAMER) {
 		snd_pmac_awacs_write_noreg(chip, 5, chip->awacs_reg[5]);
-		do_mdelay(100, can_schedule);
 		snd_pmac_awacs_write_noreg(chip, 6, chip->awacs_reg[6]);
-		mdelay(2);
-		snd_pmac_awacs_write_noreg(chip, 1, chip->awacs_reg[1]);
 		snd_pmac_awacs_write_noreg(chip, 7, chip->awacs_reg[7]);
-		snd_pmac_awacs_write_noreg(chip, 0, chip->awacs_reg[0]);
 	}
 }
 
@@ -639,6 +652,11 @@ static void awacs_restore_all_regs(pmac_t *chip, int can_schedule)
 static void snd_pmac_awacs_resume(pmac_t *chip)
 {
 	awacs_restore_all_regs(chip, 0);
+	if (chip->model == PMAC_SCREAMER) {
+		/* reset power bits in reg 6 */
+		mdelay(5);
+		snd_pmac_awacs_write_noreg(chip, 6, chip->awacs_reg[6]);
+	}
 	screamer_recalibrate(chip, 0);
 #ifdef PMAC_AMP_AVAIL
 	if (chip->mixer_data) {
@@ -748,6 +766,7 @@ snd_pmac_awacs_init(pmac_t *chip)
 	}
 
 	awacs_restore_all_regs(chip, 1);
+	chip->manufacturer = (in_le32(&chip->awacs->codec_stat) >> 8) & 0xf;
 	screamer_recalibrate(chip, 1);
 
 	chip->revision = (in_le32(&chip->awacs->codec_stat) >> 12) & 0xf;

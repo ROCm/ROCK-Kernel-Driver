@@ -102,9 +102,9 @@ MODULE_DEVICE_TABLE(pnp_card, snd_dt019x_pnpids);
 #define DRIVER_NAME	"snd-card-dt019x"
 
 
-static int __init snd_card_dt019x_isapnp(int dev, struct snd_card_dt019x *acard,
-							   struct pnp_card_link *card,
-							   const struct pnp_card_device_id *pid)
+static int __devinit snd_card_dt019x_pnp(int dev, struct snd_card_dt019x *acard,
+					 struct pnp_card_link *card,
+					 const struct pnp_card_device_id *pid)
 {
 	struct pnp_dev *pdev;
 	struct pnp_resource_table * cfg = kmalloc(sizeof(struct pnp_resource_table), GFP_KERNEL);
@@ -133,10 +133,10 @@ static int __init snd_card_dt019x_isapnp(int dev, struct snd_card_dt019x *acard,
 		pnp_resource_change(&cfg->irq_resource[0], irq[dev], 1);
 
 	if ((pnp_manual_config_dev(pdev, cfg, 0)) < 0)
-		printk(KERN_ERR PFX "DT-019X AUDIO the requested resources are invalid, using auto config\n");
+		snd_printk(KERN_ERR PFX "DT-019X AUDIO the requested resources are invalid, using auto config\n");
 	err = pnp_activate_dev(pdev);
 	if (err < 0) {
-		printk(KERN_ERR PFX "DT-019X AUDIO pnp configure failure\n");
+		snd_printk(KERN_ERR PFX "DT-019X AUDIO pnp configure failure\n");
 		kfree(cfg);
 		return err;
 	}
@@ -155,11 +155,11 @@ static int __init snd_card_dt019x_isapnp(int dev, struct snd_card_dt019x *acard,
 			pnp_resource_change(&cfg->port_resource[0], mpu_port[dev], 2);
 		if (mpu_irq[dev] != SNDRV_AUTO_IRQ)
 			pnp_resource_change(&cfg->irq_resource[0], mpu_irq[dev], 1);
-			if ((pnp_manual_config_dev(pdev, cfg, 0)) < 0)
-			printk(KERN_ERR PFX "DT-019X MPU401 the requested resources are invalid, using auto config\n");
-			err = pnp_activate_dev(pdev);
-			if (err < 0)
-				goto __mpu_error;
+		if ((pnp_manual_config_dev(pdev, cfg, 0)) < 0)
+			snd_printk(KERN_ERR PFX "DT-019X MPU401 the requested resources are invalid, using auto config\n");
+		err = pnp_activate_dev(pdev);
+		if (err < 0)
+			goto __mpu_error;
 		mpu_port[dev] = pnp_port_start(pdev, 0);
 		mpu_irq[dev] = pnp_irq(pdev, 0);
 		snd_printdd("dt019x: found MPU-401: port=0x%lx, irq=0x%lx\n",
@@ -168,7 +168,7 @@ static int __init snd_card_dt019x_isapnp(int dev, struct snd_card_dt019x *acard,
 		__mpu_error:
 		if (pdev) {
 			pnp_release_card_device(pdev);
-			printk(KERN_ERR PFX "DT-019X MPU401 pnp configure failure, skipping\n");
+			snd_printk(KERN_ERR PFX "DT-019X MPU401 pnp configure failure, skipping\n");
 		}
 		acard->devmpu = NULL;
 		mpu_port[dev] = -1;
@@ -180,7 +180,7 @@ static int __init snd_card_dt019x_isapnp(int dev, struct snd_card_dt019x *acard,
 		if (fm_port[dev] != SNDRV_AUTO_PORT)
 			pnp_resource_change(&cfg->port_resource[0], fm_port[dev], 4);
 		if ((pnp_manual_config_dev(pdev, cfg, 0)) < 0)
-			printk(KERN_ERR PFX "DT-019X OPL3 the requested resources are invalid, using auto config\n");
+			snd_printk(KERN_ERR PFX "DT-019X OPL3 the requested resources are invalid, using auto config\n");
 		err = pnp_activate_dev(pdev);
 		if (err < 0)
 			goto __fm_error;
@@ -190,7 +190,7 @@ static int __init snd_card_dt019x_isapnp(int dev, struct snd_card_dt019x *acard,
 		__fm_error:
 		if (pdev) {
 			pnp_release_card_device(pdev);
-			printk(KERN_ERR PFX "DT-019X OPL3 pnp configure failure, skipping\n");
+			snd_printk(KERN_ERR PFX "DT-019X OPL3 pnp configure failure, skipping\n");
 		}
 		acard->devopl = NULL;
 		fm_port[dev] = -1;
@@ -200,7 +200,7 @@ static int __init snd_card_dt019x_isapnp(int dev, struct snd_card_dt019x *acard,
 	return 0;
 }
 
-static int __init snd_card_dt019x_probe(int dev, struct pnp_card_link *pcard, const struct pnp_card_device_id *pid)
+static int __devinit snd_card_dt019x_probe(int dev, struct pnp_card_link *pcard, const struct pnp_card_device_id *pid)
 {
 	int error;
 	sb_t *chip;
@@ -213,7 +213,7 @@ static int __init snd_card_dt019x_probe(int dev, struct pnp_card_link *pcard, co
 		return -ENOMEM;
 	acard = (struct snd_card_dt019x *)card->private_data;
 
-	if ((error = snd_card_dt019x_isapnp(dev, acard, pcard, pid))) {
+	if ((error = snd_card_dt019x_pnp(dev, acard, pcard, pid))) {
 		snd_card_free(card);
 		return error;
 	}
@@ -246,8 +246,7 @@ static int __init snd_card_dt019x_probe(int dev, struct pnp_card_link *pcard, co
 					mpu_irq[dev],
 					SA_INTERRUPT,
 					NULL) < 0)
-			printk(KERN_ERR PFX "no MPU-401 device at 0x%lx ?\n",
-				mpu_port[dev]);
+			snd_printk(KERN_ERR PFX "no MPU-401 device at 0x%lx ?\n", mpu_port[dev]);
 	}
 
 	if (fm_port[dev] > 0) {
@@ -255,8 +254,8 @@ static int __init snd_card_dt019x_probe(int dev, struct pnp_card_link *pcard, co
 				    fm_port[dev],
 				    fm_port[dev] + 2,
 				    OPL3_HW_AUTO, 0, &opl3) < 0) {
-			printk(KERN_ERR PFX "no OPL device at 0x%lx-0x%lx ?\n",
-				fm_port[dev], fm_port[dev] + 2);
+			snd_printk(KERN_ERR PFX "no OPL device at 0x%lx-0x%lx ?\n",
+				   fm_port[dev], fm_port[dev] + 2);
 		} else {
 			if ((error = snd_opl3_timer_new(opl3, 0, 1)) < 0) {
 				snd_card_free(card);
@@ -282,8 +281,8 @@ static int __init snd_card_dt019x_probe(int dev, struct pnp_card_link *pcard, co
 	return 0;
 }
 
-static int __init snd_dt019x_pnp_probe(struct pnp_card_link *card,
-					    const struct pnp_card_device_id *pid)
+static int __devinit snd_dt019x_pnp_probe(struct pnp_card_link *card,
+					  const struct pnp_card_device_id *pid)
 {
 	static int dev;
 	int res;
@@ -323,7 +322,7 @@ static int __init alsa_card_dt019x_init(void)
 
 #ifdef MODULE
 	if (!cards)
-		printk(KERN_ERR "no DT-019X / ALS-007 based soundcards found\n");
+		snd_printk(KERN_ERR "no DT-019X / ALS-007 based soundcards found\n");
 #endif
 	return cards ? 0 : -ENODEV;
 }

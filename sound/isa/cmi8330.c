@@ -46,11 +46,7 @@
 #include <sound/driver.h>
 #include <linux/init.h>
 #include <linux/slab.h>
-#ifndef LINUX_ISAPNP_H
-#include <linux/isapnp.h>
-#define isapnp_card pci_bus
-#define isapnp_dev pci_dev
-#endif
+#include <linux/pnp.h>
 #include <sound/core.h>
 #include <sound/ad1848.h>
 #include <sound/sb.h>
@@ -73,7 +69,7 @@ MODULE_DEVICES("{{C-Media,CMI8330,isapnp:{CMI0001,@@@0001,@X@0001}}}");
 static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_ISAPNP;
-#ifdef __ISAPNP__
+#ifdef CONFIG_PNP
 static int isapnp[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 1};
 #endif
 static long sbport[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;
@@ -93,9 +89,9 @@ MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(enable, "Enable CMI8330 soundcard.");
 MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
-#ifdef __ISAPNP__
+#ifdef CONFIG_PNP
 MODULE_PARM(isapnp, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(isapnp, "ISA PnP detection for specified soundcard.");
+MODULE_PARM_DESC(isapnp, "PnP detection for specified soundcard.");
 MODULE_PARM_SYNTAX(isapnp, SNDRV_ISAPNP_DESC);
 #endif
 
@@ -156,9 +152,9 @@ static unsigned char snd_cmi8330_image[((CMI8330_CDINGAIN)-16) + 1] =
 typedef int (*snd_pcm_open_callback_t)(snd_pcm_substream_t *);
 
 struct snd_cmi8330 {
-#ifdef __ISAPNP__
-	struct isapnp_dev *cap;
-	struct isapnp_dev *play;
+#ifdef CONFIG_PNP
+	struct pnp_dev *cap;
+	struct pnp_dev *play;
 #endif
 	snd_card_t *card;
 	ad1848_t *wss;
@@ -172,27 +168,16 @@ struct snd_cmi8330 {
 	} streams[2];
 };
 
-static snd_card_t *snd_cmi8330_cards[SNDRV_CARDS] = SNDRV_DEFAULT_PTR;
+static snd_card_t *snd_cmi8330_legacy[SNDRV_CARDS] = SNDRV_DEFAULT_PTR;
 
-#ifdef __ISAPNP__
+#ifdef CONFIG_PNP
 
-static struct isapnp_card *snd_cmi8330_isapnp_cards[SNDRV_CARDS] __devinitdata = SNDRV_DEFAULT_PTR;
-static const struct isapnp_card_id *snd_cmi8330_isapnp_id[SNDRV_CARDS] __devinitdata = SNDRV_DEFAULT_PTR;
-
-#define ISAPNP_CMI8330(_va, _vb, _vc, _device, _audio1, _audio2) \
-	{ \
-		ISAPNP_CARD_ID(_va, _vb, _vc, _device), \
-		.devs = { ISAPNP_DEVICE_ID('@', '@', '@', _audio1), \
-			  ISAPNP_DEVICE_ID('@', 'X', '@', _audio2), } \
-	}
-
-static struct isapnp_card_id snd_cmi8330_pnpids[] __devinitdata =
-{
-	ISAPNP_CMI8330('C','M','I',0x0001,0x0001,0x0001),
-	{ ISAPNP_CARD_END, }
+static struct pnp_card_device_id snd_cmi8330_pnpids[] __devinitdata = {
+	{ .id = "CMI0001", .devs = { { "@@@0001" }, { "@X@0001" } } },
+	{ .id = "" }
 };
 
-ISAPNP_CARD_TABLE(snd_cmi8330_pnpids);
+MODULE_DEVICE_TABLE(pnp_card, snd_cmi8330_pnpids);
 
 #endif
 
@@ -258,7 +243,7 @@ static unsigned char cmi8330_sb_init_values[][2] __initdata = {
 };
 
 
-static int __init cmi8330_add_sb_mixers(sb_t *chip)
+static int __devinit cmi8330_add_sb_mixers(sb_t *chip)
 {
 	int idx, err;
 	unsigned long flags;
@@ -283,7 +268,7 @@ static int __init cmi8330_add_sb_mixers(sb_t *chip)
 }
 #endif
 
-static int __init snd_cmi8330_mixer(snd_card_t *card, struct snd_cmi8330 *acard)
+static int __devinit snd_cmi8330_mixer(snd_card_t *card, struct snd_cmi8330 *acard)
 {
 	unsigned int idx;
 	int err;
@@ -302,81 +287,77 @@ static int __init snd_cmi8330_mixer(snd_card_t *card, struct snd_cmi8330 *acard)
 	return 0;
 }
 
-#ifdef __ISAPNP__
-static int __init snd_cmi8330_isapnp(int dev, struct snd_cmi8330 *acard)
+#ifdef CONFIG_PNP
+static int __devinit snd_cmi8330_pnp(int dev, struct snd_cmi8330 *acard,
+				     struct pnp_card_link *card,
+				     const struct pnp_card_device_id *id)
 {
-	const struct isapnp_card_id *id = snd_cmi8330_isapnp_id[dev];
-	struct isapnp_card *card = snd_cmi8330_isapnp_cards[dev];
-	struct isapnp_dev *pdev;
+	struct pnp_dev *pdev;
+	struct pnp_resource_table * cfg = kmalloc(GFP_ATOMIC, sizeof(struct pnp_resource_table));
+	int err;
 
-	acard->cap = isapnp_find_dev(card, id->devs[0].vendor, id->devs[0].function, NULL);
-	if (acard->cap->active) {
-		acard->cap = NULL;
+	acard->cap = pnp_request_card_device(card, id->devs[0].id, NULL);
+	if (acard->cap == NULL) {
+		kfree(cfg);
 		return -EBUSY;
 	}
-	acard->play = isapnp_find_dev(card, id->devs[1].vendor, id->devs[1].function, NULL);
-	if (acard->play->active) {
-		acard->cap = acard->play = NULL;
+	acard->play = pnp_request_card_device(card, id->devs[1].id, NULL);
+	if (acard->play == NULL) {
+		kfree(cfg);
 		return -EBUSY;
 	}
 
 	pdev = acard->cap;
-	if (pdev->prepare(pdev)<0)
-		return -EAGAIN;
+	pnp_init_resource_table(cfg);
 	/* allocate AD1848 resources */
 	if (wssport[dev] != SNDRV_AUTO_PORT)
-		isapnp_resource_change(&pdev->resource[0], wssport[dev], 8);
+		pnp_resource_change(&cfg->port_resource[0], wssport[dev], 8);
 	if (wssdma[dev] != SNDRV_AUTO_DMA)
-		isapnp_resource_change(&pdev->dma_resource[0], wssdma[dev], 1);
+		pnp_resource_change(&cfg->dma_resource[0], wssdma[dev], 1);
 	if (wssirq[dev] != SNDRV_AUTO_IRQ)
-		isapnp_resource_change(&pdev->irq_resource[0], wssirq[dev], 1);
+		pnp_resource_change(&cfg->irq_resource[0], wssirq[dev], 1);
 
-	if (pdev->activate(pdev)<0) {
-		snd_printk("(AD1848) PnP configure failure\n");
+	err = pnp_manual_config_dev(pdev, cfg, 0);
+	if (err < 0)
+		snd_printk(KERN_ERR "CMI8330/C3D (AD1848) PnP manual resources are invalid, using auto config\n");
+	err = pnp_activate_dev(pdev);
+	if (err < 0) {
+		snd_printk(KERN_ERR "CMI8330/C3D (AD1848) PnP configure failure\n");
+		kfree(cfg);
 		return -EBUSY;
 	}
-	wssport[dev] = pdev->resource[0].start;
-	wssdma[dev] = pdev->dma_resource[0].start;
-	wssirq[dev] = pdev->irq_resource[0].start;
+	wssport[dev] = pnp_port_start(pdev, 0);
+	wssdma[dev] = pnp_dma(pdev, 0);
+	wssirq[dev] = pnp_irq(pdev, 0);
 
 	/* allocate SB16 resources */
 	pdev = acard->play;
-	if (pdev->prepare(pdev)<0) {
-		acard->cap->deactivate(acard->cap);
-		return -EAGAIN;
-	}
+	pnp_init_resource_table(cfg);
 	if (sbport[dev] != SNDRV_AUTO_PORT)
-		isapnp_resource_change(&pdev->resource[0], sbport[dev], 16);
+		pnp_resource_change(&cfg->port_resource[0], sbport[dev], 16);
 	if (sbdma8[dev] != SNDRV_AUTO_DMA)
-		isapnp_resource_change(&pdev->dma_resource[0], sbdma8[dev], 1);
+		pnp_resource_change(&cfg->dma_resource[0], sbdma8[dev], 1);
 	if (sbdma16[dev] != SNDRV_AUTO_DMA)
-		isapnp_resource_change(&pdev->dma_resource[1], sbdma16[dev], 1);
+		pnp_resource_change(&cfg->dma_resource[1], sbdma16[dev], 1);
 	if (sbirq[dev] != SNDRV_AUTO_IRQ)
-		isapnp_resource_change(&pdev->irq_resource[0], sbirq[dev], 1);
+		pnp_resource_change(&cfg->irq_resource[0], sbirq[dev], 1);
 
-	if (pdev->activate(pdev)<0) {
-		snd_printk("CMI8330/C3D (SB16) PnP configure failure\n");
-		acard->cap->deactivate(acard->cap);
+	err = pnp_manual_config_dev(pdev, cfg, 0);
+	if (err < 0)
+		snd_printk(KERN_ERR "CMI8330/C3D (SB16) PnP manual resources are invalid, using auto config\n");
+	err = pnp_activate_dev(pdev);
+	if (err < 0) {
+		snd_printk(KERN_ERR "CMI8330/C3D (SB16) PnP configure failure\n");
+		kfree(cfg);
 		return -EBUSY;
 	}
-	sbport[dev] = pdev->resource[0].start;
-	sbdma8[dev] = pdev->dma_resource[0].start;
-	sbdma16[dev] = pdev->dma_resource[1].start;
-	sbirq[dev] = pdev->irq_resource[0].start;
+	sbport[dev] = pnp_port_start(pdev, 0);
+	sbdma8[dev] = pnp_dma(pdev, 0);
+	sbdma16[dev] = pnp_dma(pdev, 1);
+	sbirq[dev] = pnp_irq(pdev, 0);
 
+	kfree(cfg);
 	return 0;
-}
-
-static void snd_cmi8330_deactivate(struct snd_cmi8330 *acard)
-{
-	if (acard->cap) {
-		acard->cap->deactivate(acard->cap);
-		acard->cap = NULL;
-	}
-	if (acard->play) {
-		acard->play->deactivate(acard->play);
-		acard->play = NULL;
-	}
 }
 #endif
 
@@ -424,7 +405,7 @@ static void snd_cmi8330_pcm_free(snd_pcm_t *pcm)
 	snd_pcm_lib_preallocate_free_for_all(pcm);
 }
 
-static int __init snd_cmi8330_pcm(snd_card_t *card, struct snd_cmi8330 *chip)
+static int __devinit snd_cmi8330_pcm(snd_card_t *card, struct snd_cmi8330 *chip)
 {
 	snd_pcm_t *pcm;
 	const snd_pcm_ops_t *ops;
@@ -467,25 +448,16 @@ static int __init snd_cmi8330_pcm(snd_card_t *card, struct snd_cmi8330 *chip)
 /*
  */
 
-static void snd_cmi8330_free(snd_card_t *card)
-{
-	struct snd_cmi8330 *acard = (struct snd_cmi8330 *)card->private_data;
-
-	if (acard) {
-#ifdef __ISAPNP__
-		snd_cmi8330_deactivate(acard);
-#endif
-	}
-}
-
-static int __init snd_cmi8330_probe(int dev)
+static int __devinit snd_cmi8330_probe(int dev,
+				       struct pnp_card_link *pcard,
+				       const struct pnp_card_device_id *pid)
 {
 	snd_card_t *card;
 	struct snd_cmi8330 *acard;
 	unsigned long flags;
 	int i, err;
 
-#ifdef __ISAPNP__
+#ifdef CONFIG_PNP
 	if (!isapnp[dev]) {
 #endif
 		if (wssport[dev] == SNDRV_AUTO_PORT) {
@@ -496,7 +468,7 @@ static int __init snd_cmi8330_probe(int dev)
 			snd_printk("specify sbport\n");
 			return -EINVAL;
 		}
-#ifdef __ISAPNP__
+#ifdef CONFIG_PNP
 	}
 #endif
 	card = snd_card_new(index[dev], id[dev], THIS_MODULE,
@@ -507,10 +479,9 @@ static int __init snd_cmi8330_probe(int dev)
 	}
 	acard = (struct snd_cmi8330 *)card->private_data;
 	acard->card = card;
-	card->private_free = snd_cmi8330_free;
 
-#ifdef __ISAPNP__
-	if (isapnp[dev] && (err = snd_cmi8330_isapnp(dev, acard)) < 0) {
+#ifdef CONFIG_PNP
+	if (isapnp[dev] && (err = snd_cmi8330_pnp(dev, acard, pcard, pid)) < 0) {
 		snd_printk("PnP detection failed\n");
 		snd_card_free(card);
 		return err;
@@ -580,21 +551,16 @@ static int __init snd_cmi8330_probe(int dev)
 		return err;
 	}
 
-	snd_cmi8330_cards[dev] = card;
+	if (pcard)
+		pnp_set_card_drvdata(pcard, card);
+	else
+		snd_cmi8330_legacy[dev] = card;
 	return 0;
 }
 
-static void __exit alsa_card_cmi8330_exit(void)
-{
-	int i;
-
-	for (i = 0; i < SNDRV_CARDS; i++)
-		snd_card_free(snd_cmi8330_cards[i]);
-}
-
-#ifdef __ISAPNP__
-static int __init snd_cmi8330_isapnp_detect(struct isapnp_card *card,
-                                            const struct isapnp_card_id *id)
+#ifdef CONFIG_PNP
+static int __devinit snd_cmi8330_pnp_detect(struct pnp_card_link *card,
+					    const struct pnp_card_device_id *id)
 {
 	static int dev;
 	int res;
@@ -602,9 +568,7 @@ static int __init snd_cmi8330_isapnp_detect(struct isapnp_card *card,
 	for ( ; dev < SNDRV_CARDS; dev++) {
 		if (!enable[dev] || !isapnp[dev])
 			continue;
-		snd_cmi8330_isapnp_cards[dev] = card;
-		snd_cmi8330_isapnp_id[dev] = id;
-		res = snd_cmi8330_probe(dev);
+		res = snd_cmi8330_probe(dev, card, id);
 		if (res < 0)
 			return res;
 		dev++;
@@ -612,7 +576,23 @@ static int __init snd_cmi8330_isapnp_detect(struct isapnp_card *card,
 	}
 	return -ENODEV;
 }
-#endif /* __ISAPNP__ */
+
+static void __devexit snd_cmi8330_pnp_remove(struct pnp_card_link * pcard)
+{
+	snd_card_t *card = (snd_card_t *) pnp_get_card_drvdata(pcard);
+
+	snd_card_disconnect(card);
+	snd_card_free_in_thread(card);
+}
+
+static struct pnp_card_driver cmi8330_pnpc_driver = {
+	.flags = PNP_DRIVER_RES_DISABLE,
+	.name = "cmi8330",
+	.id_table = snd_cmi8330_pnpids,
+	.probe = snd_cmi8330_pnp_detect,
+	.remove = __devexit_p(snd_cmi8330_pnp_remove),
+};
+#endif /* CONFIG_PNP */
 
 static int __init alsa_card_cmi8330_init(void)
 {
@@ -621,24 +601,36 @@ static int __init alsa_card_cmi8330_init(void)
 	for (dev = 0; dev < SNDRV_CARDS; dev++) {
 		if (!enable[dev])
 			continue;
-#ifdef __ISAPNP__
+#ifdef CONFIG_PNP
 		if (isapnp[dev])
 			continue;
 #endif
-		if (snd_cmi8330_probe(dev) >= 0)
+		if (snd_cmi8330_probe(dev, NULL, NULL) >= 0)
 			cards++;
 	}
-#ifdef __ISAPNP__
-	cards += isapnp_probe_cards(snd_cmi8330_pnpids, snd_cmi8330_isapnp_detect);
+#ifdef CONFIG_PNP
+	cards += pnp_register_card_driver(&cmi8330_pnpc_driver);
 #endif
 
 	if (!cards) {
 #ifdef MODULE
-		printk(KERN_ERR "CMI8330 not found or device busy\n");
+		snd_printk(KERN_ERR "CMI8330 not found or device busy\n");
 #endif
 		return -ENODEV;
 	}
 	return 0;
+}
+
+static void __exit alsa_card_cmi8330_exit(void)
+{
+	int i;
+
+#ifdef CONFIG_PNP
+	/* PnP cards first */
+	pnp_unregister_card_driver(&cmi8330_pnpc_driver);
+#endif
+	for (i = 0; i < SNDRV_CARDS; i++)
+		snd_card_free(snd_cmi8330_legacy[i]);
 }
 
 module_init(alsa_card_cmi8330_init)
@@ -670,7 +662,7 @@ static int __init alsa_card_cmi8330_setup(char *str)
 	       get_option(&str,(int *)&wssport[nr_dev]) == 2 &&
 	       get_option(&str,&wssirq[nr_dev]) == 2 &&
 	       get_option(&str,&wssdma[nr_dev]) == 2);
-#ifdef __ISAPNP__
+#ifdef CONFIG_PNP
 	if (pnp != INT_MAX)
 		isapnp[nr_dev] = pnp;
 #endif

@@ -124,6 +124,14 @@ static int __devinit snd_card_cs46xx_probe(struct pci_dev *pci,
 		snd_card_free(card);
 		return err;
 	}
+#ifdef CONFIG_SND_CS46XX_NEW_DSP
+	if (chip->nr_ac97_codecs ==2) {
+		if ((err = snd_cs46xx_pcm_center_lfe(chip,3,NULL)) < 0) {
+			snd_card_free(card);
+			return err;
+		}
+	}
+#endif
 	if ((err = snd_cs46xx_midi(chip, 0, NULL)) < 0) {
 		snd_card_free(card);
 		return err;

@@ -534,7 +534,7 @@ static void snd_cs4281_delay(unsigned int delay, int can_schedule)
 {
 	if (delay > 999) {
 		if (can_schedule) {
-			signed long end_time;
+			unsigned long end_time;
 			delay = (delay * HZ) / 1000000;
 			if (delay < 1)
 				delay = 1;
@@ -542,7 +542,7 @@ static void snd_cs4281_delay(unsigned int delay, int can_schedule)
 			do {
 				set_current_state(TASK_UNINTERRUPTIBLE);
 				schedule_timeout(1);
-			} while (end_time - (signed long)jiffies >= 0);
+			} while (time_after_eq(end_time, jiffies));
 		} else {
 			delay += 999;
 			delay /= 1000;
