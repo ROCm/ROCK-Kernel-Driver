@@ -679,6 +679,7 @@ static int copy_to_user_tmpl(struct xfrm_policy *xp, struct sk_buff *skb)
 		up->reqid = kp->reqid;
 		up->mode = kp->mode;
 		up->share = kp->share;
+		up->family = xp->family;
 		up->optional = kp->optional;
 		up->aalgos = kp->aalgos;
 		up->ealgos = kp->ealgos;

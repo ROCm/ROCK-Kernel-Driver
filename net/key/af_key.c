@@ -1780,6 +1780,7 @@ static void pfkey_xfrm_policy2msg(struct sk_buff *skb, struct xfrm_policy *xp, i
 	}
 	pol->sadb_x_policy_dir = dir+1;
 	pol->sadb_x_policy_id = xp->index;
+	pol->sadb_x_policy_priority = xp->priority;
 
 	for (i=0; i<xp->xfrm_nr; i++) {
 		struct sadb_x_ipsecrequest *rq;
@@ -1872,6 +1873,7 @@ static int pfkey_spdadd(struct sock *sk, struct sk_buff *skb, struct sadb_msg *h
 
 	xp->action = (pol->sadb_x_policy_type == IPSEC_POLICY_DISCARD ?
 		      XFRM_POLICY_BLOCK : XFRM_POLICY_ALLOW);
+	xp->priority = pol->sadb_x_policy_priority;
 
 	sa = ext_hdrs[SADB_EXT_ADDRESS_SRC-1], 
 	xp->family = pfkey_sadb_addr2xfrm_addr(sa, &xp->selector.saddr);
