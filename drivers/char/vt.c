@@ -2666,7 +2666,7 @@ static void __init con_init_devfs (void)
 	int i;
 
 	for (i = 0; i < console_driver.num; i++)
-		tty_register_device (&console_driver, i);
+		tty_register_device (&console_driver, i, NULL);
 }
 
 /*

@@ -1426,8 +1426,8 @@ int __init dz_init(void)
 		printk("ttyS%02d at 0x%08x (irq = %d)\n", info->line,
 		       info->port, SERIAL);
 
-		tty_register_device(&serial_driver, info->line);
-		tty_register_device(&callout_driver, info->line);
+		tty_register_device(&serial_driver, info->line, NULL);
+		tty_register_device(&callout_driver, info->line, NULL);
 	}
 
 	/* Reset the chip */

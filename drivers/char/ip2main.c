@@ -902,10 +902,10 @@ ip2_loadmain(int *iop, int *irqp, unsigned char *firmware, int firmsize)
 				    {
 				        tty_register_device(&ip2_tty_driver,
 					    j + ABS_BIGGEST_BOX *
-						    (box+i*ABS_MAX_BOXES));
+						    (box+i*ABS_MAX_BOXES), NULL);
 				            tty_register_device(&ip2_callout_driver,
 					    j + ABS_BIGGEST_BOX *
-						    (box+i*ABS_MAX_BOXES));
+						    (box+i*ABS_MAX_BOXES), NULL);
 			    	    }
 			        }
 			    }
