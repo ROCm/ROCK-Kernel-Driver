@@ -27,9 +27,7 @@
 #include <asm/tlbflush.h>
 
 static struct saved_context saved_context;
-unsigned long saved_context_eax, saved_context_ebx, saved_context_ecx, saved_context_edx;
-unsigned long saved_context_esp, saved_context_ebp, saved_context_esi, saved_context_edi;
-unsigned long saved_context_eflags;
+static void fix_processor_context(void);
 
 extern void enable_sep_cpu(void *);
 
@@ -107,7 +105,7 @@ void restore_processor_state(void)
 	do_fpu_end();
 }
 
-void fix_processor_context(void)
+static void fix_processor_context(void)
 {
 	int cpu = smp_processor_id();
 	struct tss_struct * t = init_tss + cpu;
