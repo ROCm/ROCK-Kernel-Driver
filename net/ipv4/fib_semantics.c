@@ -83,23 +83,62 @@ static struct
 {
 	int	error;
 	u8	scope;
-} fib_props[RTA_MAX+1] = {
-        { 0, RT_SCOPE_NOWHERE},		/* RTN_UNSPEC */
-	{ 0, RT_SCOPE_UNIVERSE},	/* RTN_UNICAST */
-	{ 0, RT_SCOPE_HOST},		/* RTN_LOCAL */
-	{ 0, RT_SCOPE_LINK},		/* RTN_BROADCAST */
-	{ 0, RT_SCOPE_LINK},		/* RTN_ANYCAST */
-	{ 0, RT_SCOPE_UNIVERSE},	/* RTN_MULTICAST */
-	{ -EINVAL, RT_SCOPE_UNIVERSE},	/* RTN_BLACKHOLE */
-	{ -EHOSTUNREACH, RT_SCOPE_UNIVERSE},/* RTN_UNREACHABLE */
-	{ -EACCES, RT_SCOPE_UNIVERSE},	/* RTN_PROHIBIT */
-	{ -EAGAIN, RT_SCOPE_UNIVERSE},	/* RTN_THROW */
+} fib_props[RTA_MAX + 1] = {
+        {
+		.error	= 0,
+		.scope	= RT_SCOPE_NOWHERE,
+	},	/* RTN_UNSPEC */
+	{
+		.error	= 0,
+		.scope	= RT_SCOPE_UNIVERSE,
+	},	/* RTN_UNICAST */
+	{
+		.error	= 0,
+		.scope	= RT_SCOPE_HOST,
+	},	/* RTN_LOCAL */
+	{
+		.error	= 0,
+		.scope	= RT_SCOPE_LINK,
+	},	/* RTN_BROADCAST */
+	{
+		.error	= 0,
+		.scope	= RT_SCOPE_LINK,
+	},	/* RTN_ANYCAST */
+	{
+		.error	= 0,
+		.scope	= RT_SCOPE_UNIVERSE,
+	},	/* RTN_MULTICAST */
+	{
+		.error	= -EINVAL,
+		.scope	= RT_SCOPE_UNIVERSE,
+	},	/* RTN_BLACKHOLE */
+	{
+		.error	= -EHOSTUNREACH,
+		.scope	= RT_SCOPE_UNIVERSE,
+	},	/* RTN_UNREACHABLE */
+	{
+		.error	= -EACCES,
+		.scope	= RT_SCOPE_UNIVERSE,
+	},	/* RTN_PROHIBIT */
+	{
+		.error	= -EAGAIN,
+		.scope	= RT_SCOPE_UNIVERSE,
+	},	/* RTN_THROW */
 #ifdef CONFIG_IP_ROUTE_NAT
-	{ 0, RT_SCOPE_HOST},		/* RTN_NAT */
+	{
+		.error	= 0,
+		.scope	= RT_SCOPE_HOST,
+	},	/* RTN_NAT */
 #else
-	{ -EINVAL, RT_SCOPE_NOWHERE},	/* RTN_NAT */
+	{
+		.error	= -EINVAL,
+		.scope	= RT_SCOPE_NOWHERE,
+	},	/* RTN_NAT */
 #endif
-	{ -EINVAL, RT_SCOPE_NOWHERE}	/* RTN_XRESOLVE */
+	{
+		.error	= -EINVAL,
+		.scope	= RT_SCOPE_NOWHERE,
+	},	/* RTN_XRESOLVE */
 };
 
 
