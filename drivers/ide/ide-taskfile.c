@@ -698,7 +698,10 @@ ide_startstop_t pre_task_out_intr (ide_drive_t *drive, struct request *rq)
 	if (!drive->unmask)
 		local_irq_disable();
 
-	return task_out_intr(drive);
+	ide_set_handler(drive, &task_out_intr, WAIT_WORSTCASE, NULL);
+	task_sectors(drive, rq, 1, IDE_PIO_OUT);
+
+	return ide_started;
 }
 EXPORT_SYMBOL(pre_task_out_intr);
 
@@ -762,7 +765,10 @@ ide_startstop_t pre_task_mulout_intr (ide_drive_t *drive, struct request *rq)
 	if (!drive->unmask)
 		local_irq_disable();
 
-	return task_mulout_intr(drive);
+	ide_set_handler(drive, &task_mulout_intr, WAIT_WORSTCASE, NULL);
+	task_multi_sectors(drive, rq, IDE_PIO_OUT);
+
+	return ide_started;
 }
 EXPORT_SYMBOL(pre_task_mulout_intr);
 
