@@ -414,8 +414,8 @@ ENTRY(cpu_gdt_table)
 	.quad 0x0000000000000000	/* 0x0b reserved */
 	.quad 0x0000000000000000	/* 0x13 reserved */
 	.quad 0x0000000000000000	/* 0x1b reserved */
-	.quad 0x00cffa000000ffff	/* 0x23 user 4GB code at 0x00000000 */
-	.quad 0x00cff2000000ffff	/* 0x2b user 4GB data at 0x00000000 */
+	.quad 0x0000000000000000	/* 0x20 unused */
+	.quad 0x0000000000000000	/* 0x28 unused */
 	.quad 0x0000000000000000	/* 0x33 TLS entry 1 */
 	.quad 0x0000000000000000	/* 0x3b TLS entry 2 */
 	.quad 0x0000000000000000	/* 0x43 TLS entry 3 */
@@ -425,22 +425,25 @@ ENTRY(cpu_gdt_table)
 
 	.quad 0x00cf9a000000ffff	/* 0x60 kernel 4GB code at 0x00000000 */
 	.quad 0x00cf92000000ffff	/* 0x68 kernel 4GB data at 0x00000000 */
-	.quad 0x0000000000000000	/* 0x70 TSS descriptor */
-	.quad 0x0000000000000000	/* 0x78 LDT descriptor */
+	.quad 0x00cffa000000ffff	/* 0x73 user 4GB code at 0x00000000 */
+	.quad 0x00cff2000000ffff	/* 0x7b user 4GB data at 0x00000000 */
+
+	.quad 0x0000000000000000	/* 0x80 TSS descriptor */
+	.quad 0x0000000000000000	/* 0x88 LDT descriptor */
 
 	/* Segments used for calling PnP BIOS */
-	.quad 0x00c09a0000000000	/* 0x80 32-bit code */
-	.quad 0x00809a0000000000	/* 0x88 16-bit code */
-	.quad 0x0080920000000000	/* 0x90 16-bit data */
-	.quad 0x0080920000000000	/* 0x98 16-bit data */
+	.quad 0x00c09a0000000000	/* 0x90 32-bit code */
+	.quad 0x00809a0000000000	/* 0x98 16-bit code */
 	.quad 0x0080920000000000	/* 0xa0 16-bit data */
+	.quad 0x0080920000000000	/* 0xa8 16-bit data */
+	.quad 0x0080920000000000	/* 0xb0 16-bit data */
 	/*
 	 * The APM segments have byte granularity and their bases
 	 * and limits are set at run time.
 	 */
-	.quad 0x00409a0000000000	/* 0xa8 APM CS    code */
-	.quad 0x00009a0000000000	/* 0xb0 APM CS 16 code (16 bit) */
-	.quad 0x0040920000000000	/* 0xb8 APM DS    data */
+	.quad 0x00409a0000000000	/* 0xb8 APM CS    code */
+	.quad 0x00009a0000000000	/* 0xc0 APM CS 16 code (16 bit) */
+	.quad 0x0040920000000000	/* 0xc8 APM DS    data */
 
 #if CONFIG_SMP
 	.fill (NR_CPUS-1)*GDT_ENTRIES,8,0 /* other CPU's GDT */
