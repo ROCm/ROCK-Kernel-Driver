@@ -7,8 +7,6 @@ O_TARGET     := core.o
 
 export-objs  := sound.o pcm.o pcm_lib.o rawmidi.o timer.o rtctimer.o hwdep.o
 
-list-multi   := snd.o snd-pcm.o snd-rawmidi.o snd-timer.o snd-rtctimer.o snd-hwdep.o
-
 snd-objs     := sound.o init.o isadma.o memory.o info.o control.o misc.o \
                 device.o wrappers.o
 ifeq ($(CONFIG_SND_OSSEMUL),y)
@@ -114,21 +112,3 @@ ifeq ($(CONFIG_SND_SB16_CSP),y)
 endif
 
 include $(TOPDIR)/Rules.make
-
-snd.o: $(snd-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-objs)
-
-snd-pcm.o: $(snd-pcm-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-pcm-objs)
-
-snd-rawmidi.o: $(snd-rawmidi-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-rawmidi-objs)
-
-snd-timer.o: $(snd-timer-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-timer-objs)
-
-snd-rtctimer.o: $(snd-rtctimer-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-rtctimer-objs)
-
-snd-hwdep.o: $(snd-hwdep-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-hwdep-objs)

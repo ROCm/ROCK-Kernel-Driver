@@ -5,8 +5,6 @@
 
 O_TARGET     := _emu10k1.o
 
-list-multi   := snd-emu10k1.o snd-emu10k1-synth.o
-
 export-objs  := emu10k1_main.o
 
 snd-emu10k1-objs := emu10k1.o emu10k1_main.o \
@@ -21,9 +19,3 @@ ifeq ($(subst m,y,$(CONFIG_SND_SEQUENCER)),y)
 endif
 
 include $(TOPDIR)/Rules.make
-
-snd-emu10k1.o: $(snd-emu10k1-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-emu10k1-objs)
-
-snd-emu10k1-synth.o: $(snd-emu10k1-synth-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-emu10k1-synth-objs)

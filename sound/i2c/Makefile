@@ -5,8 +5,6 @@
 
 O_TARGET     := _i2c.o
 
-list-multi   := snd-i2c.o snd-cs8427.o snd-tea6330t.o
-
 export-objs  := i2c.o cs8427.o tea6330t.o
 
 snd-i2c-objs := i2c.o
@@ -18,12 +16,3 @@ obj-$(CONFIG_SND_INTERWAVE_STB) += snd-tea6330t.o snd-i2c.o
 obj-$(CONFIG_SND_ICE1712) += snd-cs8427.o snd-i2c.o
 
 include $(TOPDIR)/Rules.make
-
-snd-i2c.o: $(snd-i2c-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-i2c-objs)
-
-snd-cs8427.o: $(snd-cs8427-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-cs8427-objs)
-
-snd-tea6330t.o: $(snd-tea6330t-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-tea6330t-objs)
