@@ -100,16 +100,24 @@ struct agp_bridge_driver sis_driver = {
 struct agp_device_ids sis_agp_device_ids[] __initdata =
 {
 	{
-		.device_id	= PCI_DEVICE_ID_SI_740,
-		.chipset_name	= "740",
+		.device_id	= PCI_DEVICE_ID_SI_530,
+		.chipset_name	= "530",
 	},
 	{
-		.device_id	= PCI_DEVICE_ID_SI_650,
-		.chipset_name	= "650",
+		.device_id	= PCI_DEVICE_ID_SI_540,
+		.chipset_name	= "540",
 	},
 	{
-		.device_id  = PCI_DEVICE_ID_SI_651,
-		.chipset_name   = "651",
+		.device_id	= PCI_DEVICE_ID_SI_550,
+		.chipset_name	= "550",
+	},
+	{
+		.device_id	= PCI_DEVICE_ID_SI_620,
+		.chipset_name	= "620",
+	},
+	{
+		.device_id	= PCI_DEVICE_ID_SI_630,
+		.chipset_name	= "630",
 	},
 	{
 		.device_id	= PCI_DEVICE_ID_SI_645,
@@ -120,40 +128,32 @@ struct agp_device_ids sis_agp_device_ids[] __initdata =
 		.chipset_name	= "646",
 	},
 	{
-		.device_id	= PCI_DEVICE_ID_SI_735,
-		.chipset_name	= "735",
+		.device_id	= PCI_DEVICE_ID_SI_650,
+		.chipset_name	= "650",
 	},
 	{
-		.device_id	= PCI_DEVICE_ID_SI_745,
-		.chipset_name	= "745",
+		.device_id  = PCI_DEVICE_ID_SI_651,
+		.chipset_name   = "651",
+	},
+	{
+		.device_id	= PCI_DEVICE_ID_SI_655,
+		.chipset_name	= "655",
 	},
 	{
 		.device_id	= PCI_DEVICE_ID_SI_730,
 		.chipset_name	= "730",
 	},
 	{
-		.device_id	= PCI_DEVICE_ID_SI_630,
-		.chipset_name	= "630",
+		.device_id	= PCI_DEVICE_ID_SI_735,
+		.chipset_name	= "735",
 	},
 	{
-		.device_id	= PCI_DEVICE_ID_SI_540,
-		.chipset_name	= "540",
+		.device_id	= PCI_DEVICE_ID_SI_740,
+		.chipset_name	= "740",
 	},
 	{
-		.device_id	= PCI_DEVICE_ID_SI_620,
-		.chipset_name	= "620",
-	},
-	{
-		.device_id	= PCI_DEVICE_ID_SI_530,
-		.chipset_name	= "530",
-	},
-	{
-		.device_id	= PCI_DEVICE_ID_SI_550,
-		.chipset_name	= "550",
-	},
-	{
-		.device_id	= PCI_DEVICE_ID_SI_655,
-		.chipset_name	= "655",
+		.device_id	= PCI_DEVICE_ID_SI_745,
+		.chipset_name	= "745",
 	},
 	{ }, /* dummy final entry, always present */
 };
