@@ -68,7 +68,7 @@ struct hci_uart {
 };
 
 /* HCI_UART flag bits */
-#define HCI_UART_PROTO_SET		0x00
+#define HCI_UART_PROTO_SET		0
 
 /* TX states  */
 #define HCI_UART_SENDING		1
