@@ -75,6 +75,8 @@ IR_KEYTAB_TYPE ir_codes_rc5_tv[IR_KEYTAB_SIZE] = {
 	[ 0x35 ] = KEY_PLAY,            // play
 	[ 0x36 ] = KEY_STOP,            // stop
 	[ 0x37 ] = KEY_RECORD,          // recording
+	[ 0x3c ] = KEY_TEXT,            // teletext submode (Japan: 12)
+	[ 0x3d ] = KEY_SUSPEND,         // system standby
 
 #if 0 /* FIXME */
 	[ 0x0a ] = KEY_RESERVED,        // 1/2/3 digits (japan: 10)
@@ -106,8 +108,6 @@ IR_KEYTAB_TYPE ir_codes_rc5_tv[IR_KEYTAB_SIZE] = {
 	[ 0x39 ] = KEY_RESERVED,        // external 2
 	[ 0x3a ] = KEY_RESERVED,        // PIP display mode
 	[ 0x3b ] = KEY_RESERVED,        // view data mode / advance
-	[ 0x3c ] = KEY_RESERVED,        // teletext submode (Japan: 12)
-	[ 0x3d ] = KEY_RESERVED,        // system standby
 	[ 0x3e ] = KEY_RESERVED,        // crispener on/off
 	[ 0x3f ] = KEY_RESERVED,        // system select
 #endif

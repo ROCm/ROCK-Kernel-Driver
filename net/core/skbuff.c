@@ -1263,6 +1263,81 @@ void skb_add_mtu(int mtu)
 }
 #endif
 
+static void inline skb_split_inside_header(struct sk_buff *skb,
+					   struct sk_buff* skb1,
+					   const u32 len, const int pos)
+{
+	int i;
+
+	memcpy(skb_put(skb1, pos - len), skb->data + len, pos - len);
+
+	/* And move data appendix as is. */
+	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++)
+		skb_shinfo(skb1)->frags[i] = skb_shinfo(skb)->frags[i];
+
+	skb_shinfo(skb1)->nr_frags = skb_shinfo(skb)->nr_frags;
+	skb_shinfo(skb)->nr_frags  = 0;
+	skb1->data_len		   = skb->data_len;
+	skb1->len		   += skb1->data_len;
+	skb->data_len		   = 0;
+	skb->len		   = len;
+	skb->tail		   = skb->data + len;
+}
+
+static void inline skb_split_no_header(struct sk_buff *skb,
+				       struct sk_buff* skb1,
+				       const u32 len, int pos)
+{
+	int i, k = 0;
+	const int nfrags = skb_shinfo(skb)->nr_frags;
+
+	skb_shinfo(skb)->nr_frags = 0;
+	skb1->len		  = skb1->data_len = skb->len - len;
+	skb->len		  = len;
+	skb->data_len		  = len - pos;
+
+	for (i = 0; i < nfrags; i++) {
+		int size = skb_shinfo(skb)->frags[i].size;
+
+		if (pos + size > len) {
+			skb_shinfo(skb1)->frags[k] = skb_shinfo(skb)->frags[i];
+
+			if (pos < len) {
+				/* Split frag.
+				 * We have to variants in this case:
+				 * 1. Move all the frag to the second
+				 *    part, if it is possible. F.e.
+				 *    this approach is mandatory for TUX,
+				 *    where splitting is expensive.
+				 * 2. Split is accurately. We make this.
+				 */
+				get_page(skb_shinfo(skb)->frags[i].page);
+				skb_shinfo(skb1)->frags[0].page_offset += len - pos;
+				skb_shinfo(skb1)->frags[0].size -= len - pos;
+				skb_shinfo(skb)->frags[i].size	= len - pos;
+				skb_shinfo(skb)->nr_frags++;
+			}
+			k++;
+		} else
+			skb_shinfo(skb)->nr_frags++;
+		pos += size;
+	}
+	skb_shinfo(skb1)->nr_frags = k;
+}
+
+/**
+ * skb_split - Split fragmented skb to two parts at length len.
+ */
+void skb_split(struct sk_buff *skb, struct sk_buff *skb1, const u32 len)
+{
+	int pos = skb_headlen(skb);
+
+	if (len < pos)	/* Split line is inside header. */
+		skb_split_inside_header(skb, skb1, len, pos);
+	else		/* Second chunk has no header, nothing to copy. */
+		skb_split_no_header(skb, skb1, len, pos);
+}
+
 void __init skb_init(void)
 {
 	skbuff_head_cache = kmem_cache_create("skbuff_head_cache",
@@ -1300,3 +1375,4 @@ EXPORT_SYMBOL(skb_queue_head);
 EXPORT_SYMBOL(skb_queue_tail);
 EXPORT_SYMBOL(skb_unlink);
 EXPORT_SYMBOL(skb_append);
+EXPORT_SYMBOL(skb_split);

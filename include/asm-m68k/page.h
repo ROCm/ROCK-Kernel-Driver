@@ -52,15 +52,13 @@ static inline void copy_page(void *to, void *from)
 
 static inline void clear_page(void *page)
 {
-	unsigned long data, tmp;
-	void *sp = page;
+	unsigned long tmp;
+	unsigned long *sp = page;
 
-	data = 0;
-
-	*((unsigned long *)(page))++ = 0;
-	*((unsigned long *)(page))++ = 0;
-	*((unsigned long *)(page))++ = 0;
-	*((unsigned long *)(page))++ = 0;
+	*sp++ = 0;
+	*sp++ = 0;
+	*sp++ = 0;
+	*sp++ = 0;
 
 	__asm__ __volatile__("1:\t"
 			     ".chip 68040\n\t"
@@ -69,8 +67,8 @@ static inline void clear_page(void *page)
 			     "subqw  #8,%2\n\t"
 			     "subqw  #8,%2\n\t"
 			     "dbra   %1,1b\n\t"
-			     : "=a" (page), "=d" (tmp)
-			     : "a" (sp), "0" (page),
+			     : "=a" (sp), "=d" (tmp)
+			     : "a" (page), "0" (sp),
 			       "1" ((PAGE_SIZE - 16) / 16 - 1));
 }
 

@@ -20,6 +20,7 @@
 #include <linux/security.h>
 #include <linux/pagemap.h>
 #include <linux/cdev.h>
+#include <linux/bootmem.h>
 
 /*
  * This is needed for the following functions:
@@ -1345,54 +1346,29 @@ __setup("ihash_entries=", set_ihash_entries);
 /*
  * Initialize the waitqueues and inode hash table.
  */
+void __init inode_init_early(void)
+{
+	int loop;
+
+	inode_hashtable =
+		alloc_large_system_hash("Inode-cache",
+					sizeof(struct hlist_head),
+					ihash_entries,
+					14,
+					0,
+					&i_hash_shift,
+					&i_hash_mask);
+
+	for (loop = 0; loop < (1 << i_hash_shift); loop++)
+		INIT_HLIST_HEAD(&inode_hashtable[loop]);
+}
+
 void __init inode_init(unsigned long mempages)
 {
-	struct hlist_head *head;
-	unsigned long order;
-	unsigned int nr_hash;
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(i_wait_queue_heads); i++)
 		init_waitqueue_head(&i_wait_queue_heads[i].wqh);
-
-	if (!ihash_entries)
-		ihash_entries = PAGE_SHIFT < 14 ?
-				mempages >> (14 - PAGE_SHIFT) :
-				mempages << (PAGE_SHIFT - 14);
-
-	ihash_entries *= sizeof(struct hlist_head);
-	for (order = 0; ((1UL << order) << PAGE_SHIFT) < ihash_entries; order++)
-		;
-
-	do {
-		unsigned long tmp;
-
-		nr_hash = (1UL << order) * PAGE_SIZE /
-			sizeof(struct hlist_head);
-		i_hash_mask = (nr_hash - 1);
-
-		tmp = nr_hash;
-		i_hash_shift = 0;
-		while ((tmp >>= 1UL) != 0UL)
-			i_hash_shift++;
-
-		inode_hashtable = (struct hlist_head *)
-			__get_free_pages(GFP_ATOMIC, order);
-	} while (inode_hashtable == NULL && --order >= 0);
-
-	printk("Inode-cache hash table entries: %d (order: %ld, %ld bytes)\n",
-			nr_hash, order, (PAGE_SIZE << order));
-
-	if (!inode_hashtable)
-		panic("Failed to allocate inode hash table\n");
-
-	head = inode_hashtable;
-	i = nr_hash;
-	do {
-		INIT_HLIST_HEAD(head);
-		head++;
-		i--;
-	} while (i);
 
 	/* inode slab cache */
 	inode_cachep = kmem_cache_create("inode_cache", sizeof(struct inode),

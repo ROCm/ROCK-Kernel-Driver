@@ -114,7 +114,10 @@ vbi_buffer_queue(struct file *file, struct videobuf_buffer *vb)
 	dprintk("queue %p\n",vb);
 	buf->vb.state = STATE_QUEUED;
 	list_add_tail(&buf->vb.queue,&btv->vcapture);
-	bttv_set_dma(btv,0x0c,1);
+	if (NULL == btv->cvbi) {
+		fh->btv->curr.irqflags |= 4;
+		bttv_set_dma(btv,0x0c,fh->btv->curr.irqflags);
+	}
 }
 
 static void vbi_buffer_release(struct file *file, struct videobuf_buffer *vb)

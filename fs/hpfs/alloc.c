@@ -79,11 +79,11 @@ static secno alloc_in_bmp(struct super_block *s, secno near, unsigned n, unsigne
 	} else {
 		if (!(bmp = hpfs_map_dnode_bitmap(s, &qbh))) goto uls;
 	}
-	/*if (!tstbits(bmp, nr + n, n + forward)) {
+	if (!tstbits(bmp, nr, n + forward)) {
 		ret = bs + nr;
 		goto rt;
 	}
-	if (!tstbits(bmp, nr + 2*n, n + forward)) {
+	/*if (!tstbits(bmp, nr + n, n + forward)) {
 		ret = bs + nr + n;
 		goto rt;
 	}*/
@@ -103,9 +103,11 @@ static secno alloc_in_bmp(struct super_block *s, secno near, unsigned n, unsigne
 		goto rt;
 	}
 	nr >>= 5;
-	for (i = nr + 1; i != nr; i++, i &= 0x1ff) {
-		if (!bmp[i]) continue;
-		if (n + forward >= 0x3f && bmp[i] != -1) continue;
+	/*for (i = nr + 1; i != nr; i++, i &= 0x1ff) {*/
+	i = nr;
+	do {
+		if (!bmp[i]) goto cont;
+		if (n + forward >= 0x3f && bmp[i] != -1) goto cont;
 		q = i<<5;
 		if (i > 0) {
 			unsigned k = bmp[i-1];
@@ -123,7 +125,9 @@ static secno alloc_in_bmp(struct super_block *s, secno near, unsigned n, unsigne
 			ret = bs + q;
 			goto rt;
 		}
-	}
+		cont:
+		i++, i &= 0x1ff;
+	} while (i != nr);
 	rt:
 	if (ret) {
 		if (hpfs_sb(s)->sb_chk && ((ret >> 14) != (bs >> 14) || (bmp[(ret & 0x3fff) >> 5] | ~(((1 << n) - 1) << (ret & 0x1f))) != 0xffffffff)) {
@@ -152,46 +156,57 @@ static secno alloc_in_bmp(struct super_block *s, secno near, unsigned n, unsigne
 secno hpfs_alloc_sector(struct super_block *s, secno near, unsigned n, int forward, int lock)
 {
 	secno sec;
-	unsigned i;
+	int i;
 	unsigned n_bmps;
 	struct hpfs_sb_info *sbi = hpfs_sb(s);
-	int b = sbi->sb_c_bitmap;
 	int f_p = 0;
+	int near_bmp;
 	if (forward < 0) {
 		forward = -forward;
 		f_p = 1;
 	}
 	if (lock) hpfs_lock_creation(s);
-	if (near && near < sbi->sb_fs_size)
+	n_bmps = (sbi->sb_fs_size + 0x4000 - 1) >> 14;
+	if (near && near < sbi->sb_fs_size) {
 		if ((sec = alloc_in_bmp(s, near, n, f_p ? forward : forward/4))) goto ret;
+		near_bmp = near >> 14;
+	} else near_bmp = n_bmps / 2;
+	/*
 	if (b != -1) {
 		if ((sec = alloc_in_bmp(s, b<<14, n, f_p ? forward : forward/2))) {
 			b &= 0x0fffffff;
 			goto ret;
 		}
 		if (b > 0x10000000) if ((sec = alloc_in_bmp(s, (b&0xfffffff)<<14, n, f_p ? forward : 0))) goto ret;
-	}	
-	n_bmps = (sbi->sb_fs_size + 0x4000 - 1) >> 14;
-	for (i = 0; i < n_bmps / 2; i++) {
-		if ((sec = alloc_in_bmp(s, (n_bmps/2+i) << 14, n, forward))) {
-			sbi->sb_c_bitmap = n_bmps/2+i;
+	*/
+	if (!f_p) if (forward > sbi->sb_max_fwd_alloc) forward = sbi->sb_max_fwd_alloc;
+	less_fwd:
+	for (i = 0; i < n_bmps; i++) {
+		if (near_bmp+i < n_bmps && ((sec = alloc_in_bmp(s, (near_bmp+i) << 14, n, forward)))) {
+			sbi->sb_c_bitmap = near_bmp+i;
 			goto ret;
 		}	
-		if ((sec = alloc_in_bmp(s, (n_bmps/2-i-1) << 14, n, forward))) {
-			sbi->sb_c_bitmap = n_bmps/2-i-1;
+		if (!forward) {
+			if (near_bmp-i-1 >= 0 && ((sec = alloc_in_bmp(s, (near_bmp-i-1) << 14, n, forward)))) {
+				sbi->sb_c_bitmap = near_bmp-i-1;
+				goto ret;
+			}
+		} else {
+			if (near_bmp+i >= n_bmps && ((sec = alloc_in_bmp(s, (near_bmp+i-n_bmps) << 14, n, forward)))) {
+				sbi->sb_c_bitmap = near_bmp+i-n_bmps;
+				goto ret;
+			}
+		}
+		if (i == 1 && sbi->sb_c_bitmap != -1 && ((sec = alloc_in_bmp(s, (sbi->sb_c_bitmap) << 14, n, forward)))) {
 			goto ret;
 		}
 	}
-	if ((sec = alloc_in_bmp(s, (n_bmps-1) << 14, n, forward))) {
-		sbi->sb_c_bitmap = n_bmps-1;
-		goto ret;
-	}
 	if (!f_p) {
-		for (i = 0; i < n_bmps; i++)
-			if ((sec = alloc_in_bmp(s, i << 14, n, 0))) {
-				sbi->sb_c_bitmap = 0x10000000 + i;
-				goto ret;
-			}
+		if (forward) {
+			sbi->sb_max_fwd_alloc = forward * 3 / 4;
+			forward /= 2;
+			goto less_fwd;
+		}
 	}
 	sec = 0;
 	ret:
@@ -262,6 +277,7 @@ void hpfs_free_sectors(struct super_block *s, secno sec, unsigned n)
 {
 	struct quad_buffer_head qbh;
 	unsigned *bmp;
+	struct hpfs_sb_info *sbi = hpfs_sb(s);
 	/*printk("2 - ");*/
 	if (!n) return;
 	if (sec < 0x12) {
@@ -269,6 +285,8 @@ void hpfs_free_sectors(struct super_block *s, secno sec, unsigned n)
 		return;
 	}
 	lock_super(s);
+	sbi->sb_max_fwd_alloc += n > 0xffff ? 0xffff : n;
+	if (sbi->sb_max_fwd_alloc > 0xffffff) sbi->sb_max_fwd_alloc = 0xffffff;
 	new_map:
 	if (!(bmp = hpfs_map_bitmap(s, sec >> 14, &qbh, "free"))) {
 		unlock_super(s);
@@ -321,7 +339,7 @@ int hpfs_check_free_dnodes(struct super_block *s, int n)
 	}
 	hpfs_brelse4(&qbh);
 	i = 0;
-	if (hpfs_sb(s)->sb_c_bitmap != -1 ) {
+	if (hpfs_sb(s)->sb_c_bitmap != -1) {
 		bmp = hpfs_map_bitmap(s, b, &qbh, "chkdn1");
 		goto chk_bmp;
 	}

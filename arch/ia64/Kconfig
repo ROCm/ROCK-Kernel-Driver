@@ -149,20 +149,6 @@ config IA64_L1_CACHE_SHIFT
 	default "6" if ITANIUM
 
 # align cache-sensitive data to 64 bytes
-config MCKINLEY_ASTEP_SPECIFIC
-	bool "McKinley A-step specific code"
-	depends on MCKINLEY
-	help
-	  Select this option to build a kernel for an IA-64 McKinley prototype
-	  system with any A-stepping CPU.
-
-config MCKINLEY_A0_SPECIFIC
-	bool "McKinley A0/A1-step specific code"
-	depends on MCKINLEY_ASTEP_SPECIFIC
-	help
-	  Select this option to build a kernel for an IA-64 McKinley prototype
-	  system with an A0 or A1 stepping CPU.
-
 config NUMA
 	bool "NUMA support"
 	depends on !IA64_HP_SIM

@@ -151,7 +151,7 @@ The parameters are:
     if writes are to be given higher priority than reads, but reads are to be
     as efficient as possible when there are no writes. Generally though, it
     should be some multiple of read_expire.
-   
+
 * write_expire, and
 * write_batch_expire are equivalent to the above, for writes.
 

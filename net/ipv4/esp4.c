@@ -49,18 +49,23 @@ int esp_output(struct sk_buff **pskb)
 	}
 
 	spin_lock_bh(&x->lock);
-	err = xfrm_check_output(x, *pskb, AF_INET);
+	err = xfrm_state_check(x, *pskb);
 	if (err)
 		goto error;
-	err = -ENOMEM;
 
-	/* Strip IP header in transport mode. Save it. */
-	if (!x->props.mode) {
+	if (x->props.mode) {
+		err = xfrm4_tunnel_check_size(*pskb);
+		if (err)
+			goto error;
+	} else {
+		/* Strip IP header in transport mode. Save it. */
 		iph = (*pskb)->nh.iph;
 		memcpy(&tmp_iph, iph, iph->ihl*4);
 		__skb_pull(*pskb, iph->ihl*4);
 	}
 	/* Now skb is pure payload to encrypt */
+
+	err = -ENOMEM;
 
 	/* Round to block size */
 	clen = (*pskb)->len;

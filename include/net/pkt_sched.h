@@ -11,6 +11,7 @@
 #include <linux/netdevice.h>
 #include <linux/types.h>
 #include <linux/pkt_sched.h>
+#include <linux/rcupdate.h>
 #include <net/pkt_cls.h>
 
 #ifdef CONFIG_X86_TSC
@@ -92,6 +93,7 @@ struct Qdisc
 	struct net_device	*dev;
 
 	struct tc_stats		stats;
+	struct rcu_head 	q_rcu;
 	int			(*reshape_fail)(struct sk_buff *skb, struct Qdisc *q);
 
 	/* This field is deprecated, but it is still used by CBQ

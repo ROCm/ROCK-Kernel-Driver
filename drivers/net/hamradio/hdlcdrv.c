@@ -588,6 +588,8 @@ static int hdlcdrv_close(struct net_device *dev)
 		return -EINVAL;
 	s = (struct hdlcdrv_state *)dev->priv;
 
+	netif_stop_queue(dev);
+
 	if (s->ops && s->ops->close)
 		i = s->ops->close(dev);
 	if (s->skb)

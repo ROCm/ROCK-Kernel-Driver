@@ -57,8 +57,6 @@ unsigned long init_pg_tables_end __initdata = ~0UL;
 
 int disable_pse __initdata = 0;
 
-static inline char * __init machine_specific_memory_setup(void);
-
 /*
  * Machine setup..
  */
@@ -659,14 +657,6 @@ static inline void copy_edd(void)
  * It does not work on many machines.
  */
 #define LOWMEMSIZE()	(0x9f000)
-
-static void __init setup_memory_region(void)
-{
-	char *who = machine_specific_memory_setup();
-	printk(KERN_INFO "BIOS-provided physical RAM map:\n");
-	print_memory_map(who);
-} /* setup_memory_region */
-
 
 static void __init parse_cmdline_early (char ** cmdline_p)
 {
@@ -1270,6 +1260,8 @@ static int __init noreplacement_setup(char *s)
 
 __setup("noreplacement", noreplacement_setup); 
 
+static char * __init machine_specific_memory_setup(void);
+
 /*
  * Determine if we were loaded by an EFI loader.  If so, then we have also been
  * passed the efi memmap, systab, etc., so we should use these data structures
@@ -1320,8 +1312,10 @@ void __init setup_arch(char **cmdline_p)
 	ARCH_SETUP
 	if (efi_enabled)
 		efi_init();
-	else
-		setup_memory_region();
+	else {
+		printk(KERN_INFO "BIOS-provided physical RAM map:\n");
+		print_memory_map(machine_specific_memory_setup());
+	}
 
 	copy_edd();
 

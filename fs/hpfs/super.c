@@ -542,6 +542,7 @@ static int hpfs_fill_super(struct super_block *s, void *options, int silent)
 	sbi->sb_was_error = 0;
 	sbi->sb_cp_table = NULL;
 	sbi->sb_c_bitmap = -1;
+	sbi->sb_max_fwd_alloc = 0xffffff;
 	
 	/* Load bitmap directory */
 	if (!(sbi->sb_bmp_dir = hpfs_load_bitmap_directory(s, superblock->bitmaps)))

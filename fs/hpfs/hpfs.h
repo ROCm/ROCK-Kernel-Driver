@@ -408,7 +408,7 @@ struct fnode
   unsigned file_size;			/* file length, bytes */
   unsigned n_needea;			/* number of EA's with NEEDEA set */
   char user_id[16];			/* unused */
-  unsigned ea_offs;			/* offset from start of fnode
+  unsigned short ea_offs;		/* offset from start of fnode
 					   to first fnode-resident ea */
   char dasd_limit_treshhold;
   char dasd_limit_delta;

@@ -20,11 +20,23 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/delay.h>
+#include <linux/sched.h>
 #include <linux/interrupt.h>
 #include <linux/input.h>
 
 #include "saa7134-reg.h"
 #include "saa7134.h"
+
+static unsigned int disable_ir = 0;
+MODULE_PARM(disable_ir,"i");
+MODULE_PARM_DESC(disable_ir,"disable infrared remote support");
+
+static unsigned int ir_debug = 0;
+MODULE_PARM(ir_debug,"i");
+MODULE_PARM_DESC(ir_debug,"enable debug messages [IR]");
+
+#define dprintk(fmt, arg...)	if (ir_debug) \
+	printk(KERN_DEBUG "%s/ir: " fmt, dev->name , ## arg)
 
 /* ---------------------------------------------------------------------- */
 
@@ -156,6 +168,47 @@ static IR_KEYTAB_TYPE eztv_codes[IR_KEYTAB_SIZE] = {
         [ 33 ] = KEY_KPDOT,          // . (decimal dot)
 };
 
+static IR_KEYTAB_TYPE avacssmart_codes[IR_KEYTAB_SIZE] = {
+        [ 30 ] = KEY_POWER,		// power
+	[ 28 ] = KEY_SEARCH,		// scan
+        [  7 ] = KEY_SELECT,		// source
+
+	[ 22 ] = KEY_VOLUMEUP,
+	[ 20 ] = KEY_VOLUMEDOWN,
+        [ 31 ] = KEY_CHANNELUP,
+	[ 23 ] = KEY_CHANNELDOWN,
+	[ 24 ] = KEY_MUTE,
+
+	[  2 ] = KEY_KP0,
+        [  1 ] = KEY_KP1,
+        [ 11 ] = KEY_KP2,
+        [ 27 ] = KEY_KP3,
+        [  5 ] = KEY_KP4,
+        [  9 ] = KEY_KP5,
+        [ 21 ] = KEY_KP6,
+	[  6 ] = KEY_KP7,
+        [ 10 ] = KEY_KP8,
+	[ 18 ] = KEY_KP9,
+	[ 16 ] = KEY_KPDOT,
+
+	[  3 ] = KEY_TUNER,		// tv/fm
+        [  4 ] = KEY_REWIND,		// fm tuning left or function left
+        [ 12 ] = KEY_FORWARD,		// fm tuning right or function right
+
+	[  0 ] = KEY_RECORD,
+        [  8 ] = KEY_STOP,
+        [ 17 ] = KEY_PLAY,
+
+	[ 25 ] = KEY_ZOOM,
+	[ 14 ] = KEY_MENU,		// function
+	[ 19 ] = KEY_AGAIN,		// recall
+	[ 29 ] = KEY_RESTART,		// reset
+
+// FIXME
+	[ 13 ] = KEY_F21,		// mts
+        [ 15 ] = KEY_F22,		// min
+	[ 26 ] = KEY_F23,		// freeze
+};
 /* ---------------------------------------------------------------------- */
 
 static int build_key(struct saa7134_dev *dev)
@@ -175,8 +228,8 @@ static int build_key(struct saa7134_dev *dev)
         }
 
  	data = ir_extract_bits(gpio, ir->mask_keycode);
-	printk("%s: build_key gpio=0x%x mask=0x%x data=%d\n",
-	       dev->name, gpio, ir->mask_keycode, data);
+	dprintk("build_key gpio=0x%x mask=0x%x data=%d\n",
+		gpio, ir->mask_keycode, data);
 
 	if ((ir->mask_keydown  &&  (0 != (gpio & ir->mask_keydown))) ||
 	    (ir->mask_keyup    &&  (0 == (gpio & ir->mask_keyup)))) {
@@ -218,9 +271,12 @@ int saa7134_input_init1(struct saa7134_dev *dev)
 	int polling      = 0;
 	int ir_type      = IR_TYPE_OTHER;
 
-	/* detect & configure */
 	if (!dev->has_remote)
 		return -ENODEV;
+	if (disable_ir)
+		return -ENODEV;
+
+	/* detect & configure */
 	switch (dev->board) {
 	case SAA7134_BOARD_FLYVIDEO2000:
 	case SAA7134_BOARD_FLYVIDEO3000:
@@ -241,6 +297,12 @@ int saa7134_input_init1(struct saa7134_dev *dev)
                 mask_keyup   = 0x000002;
 		polling      = 50; // ms
                 break;
+	case SAA7134_BOARD_AVACSSMARTTV:
+	        ir_codes     = avacssmart_codes;
+		mask_keycode = 0x00001F;
+		mask_keyup   = 0x000020;
+		polling      = 50; // ms
+		break;
 	}
 	if (NULL == ir_codes) {
 		printk("%s: Oops: IR config error [card=%d]\n",

@@ -77,6 +77,56 @@ static IR_KEYTAB_TYPE ir_codes_pv951[IR_KEYTAB_SIZE] = {
 	[ 15 ] = KEY_SELECT, 		// SOURCE
 	[ 10 ] = KEY_KPPLUS,		// +100
 	[ 20 ] = KEY_KPEQUAL,		// SYNC
+	[ 28 ] = KEY_MEDIA,             // PC/TV
+};
+
+static IR_KEYTAB_TYPE ir_codes_purpletv[IR_KEYTAB_SIZE] = {
+	[ 0x3  ] = KEY_POWER,
+	[ 0x6f ] = KEY_MUTE,
+	[ 0x10 ] = KEY_BACKSPACE,	// Recall
+
+	[ 0x11 ] = KEY_KP0,
+	[ 0x4  ] = KEY_KP1,
+	[ 0x5  ] = KEY_KP2,
+	[ 0x6  ] = KEY_KP3,
+	[ 0x8  ] = KEY_KP4,
+	[ 0x9  ] = KEY_KP5,
+	[ 0xa  ] = KEY_KP6,
+	[ 0xc  ] = KEY_KP7,
+	[ 0xd  ] = KEY_KP8,
+	[ 0xe  ] = KEY_KP9,
+	[ 0x12 ] = KEY_KPDOT,		// 100+
+
+	[ 0x7  ] = KEY_VOLUMEUP,
+	[ 0xb  ] = KEY_VOLUMEDOWN,
+	[ 0x1a ] = KEY_KPPLUS,
+	[ 0x18 ] = KEY_KPMINUS,
+	[ 0x15 ] = KEY_UP,
+	[ 0x1d ] = KEY_DOWN,
+	[ 0xf  ] = KEY_CHANNELUP,
+	[ 0x13 ] = KEY_CHANNELDOWN,
+	[ 0x48 ] = KEY_ZOOM,
+
+	[ 0x1b ] = KEY_VIDEO,		// Video source
+#if 0
+	[ 0x1f ] = KEY_S,       	// Snapshot
+#endif
+	[ 0x49 ] = KEY_LANGUAGE,	// MTS Select
+	[ 0x19 ] = KEY_SEARCH,		// Auto Scan
+
+	[ 0x4b ] = KEY_RECORD,
+	[ 0x46 ] = KEY_PLAY,
+	[ 0x45 ] = KEY_PAUSE,   	// Pause
+	[ 0x44 ] = KEY_STOP,
+#if 0
+	[ 0x43 ] = KEY_T,    		// Time Shift
+	[ 0x47 ] = KEY_Y,    		// Time Shift OFF
+	[ 0x4a ] = KEY_O,    		// TOP
+	[ 0x17 ] = KEY_F,    		// SURF CH
+#endif
+	[ 0x40 ] = KEY_FORWARD,   	// Forward ?
+	[ 0x42 ] = KEY_REWIND,   	// Backward ?
+
 };
 
 struct IR;
@@ -202,11 +252,33 @@ static int get_key_knc1(struct IR *ir, u32 *ir_key, u32 *ir_raw)
 	return 1;
 }
 
+static int get_key_purpletv(struct IR *ir, u32 *ir_key, u32 *ir_raw)
+{
+        unsigned char b;
+
+	/* poll IR chip */
+	if (1 != i2c_master_recv(&ir->c,&b,1)) {
+		dprintk(1,"read error\n");
+		return -EIO;
+	}
+
+	/* no button press */
+	if (b==0)
+		return 0;
+
+	/* repeating */
+	if (b & 0x80)
+		return 1;
+
+	*ir_key = b;
+	*ir_raw = b;
+	return 1;
+}
 /* ----------------------------------------------------------------------- */
 
 static void ir_key_poll(struct IR *ir)
 {
-	u32 ir_key, ir_raw;
+	static u32 ir_key, ir_raw;
 	int rc;
 
 	dprintk(2,"ir_poll_key\n");
@@ -300,6 +372,12 @@ static int ir_attach(struct i2c_adapter *adap, int addr,
 		ir_type     = IR_TYPE_OTHER;
 		ir_codes    = ir_codes_empty;
 		break;
+	case 0x7a:
+		name        = "Purple TV";
+		ir->get_key = get_key_purpletv;
+		ir_type     = IR_TYPE_OTHER;
+		ir_codes    = ir_codes_purpletv;
+		break;
 	default:
 		/* shouldn't happen */
 		printk(DEVNAME ": Huh? unknown i2c address (0x%02x)?\n",addr);
@@ -320,7 +398,8 @@ static int ir_attach(struct i2c_adapter *adap, int addr,
 	ir->input.name       = ir->c.name;
 	ir->input.phys       = ir->phys;
 	input_register_device(&ir->input);
-	printk(DEVNAME ": %s detected at %s\n",ir->input.name,ir->input.phys);
+	printk(DEVNAME ": %s detected at %s [%s]\n",
+	       ir->input.name,ir->input.phys,adap->name);
 	       
 	/* start polling via eventd */
 	INIT_WORK(&ir->work, ir_work, ir);
@@ -361,22 +440,33 @@ static int ir_probe(struct i2c_adapter *adap)
 	   That's why we probe 0x1a (~0x34) first. CB 
 	*/
 	
-	static const int probe[] = { 0x1a, 0x18, 0x4b, 0x64, 0x30, -1};
+	static const int probe_bttv[] = { 0x1a, 0x18, 0x4b, 0x64, 0x30, -1};
+	static const int probe_saa7134[] = { 0x7a, -1};
+	const int *probe = NULL;
 	struct i2c_client c; char buf; int i,rc;
 
-	if (adap->id == (I2C_ALGO_BIT | I2C_HW_B_BT848)) {
-		memset(&c,0,sizeof(c));
-		c.adapter = adap;
-		for (i = 0; -1 != probe[i]; i++) {
-			c.addr = probe[i];
-			rc = i2c_master_recv(&c,&buf,1);
-			dprintk(1,"probe 0x%02x @ %s: %s\n",
-				probe[i], adap->name, 
-				(1 == rc) ? "yes" : "no");
-			if (1 == rc) {
-				ir_attach(adap,probe[i],0,0);
-				break;
-			}
+	switch (adap->id) {
+	case I2C_ALGO_BIT | I2C_HW_B_BT848:
+		probe = probe_bttv;
+		break;
+	case I2C_ALGO_SAA7134:
+		probe = probe_saa7134;
+		break;
+	}
+	if (NULL == probe)
+		return 0;
+
+	memset(&c,0,sizeof(c));
+	c.adapter = adap;
+	for (i = 0; -1 != probe[i]; i++) {
+		c.addr = probe[i];
+		rc = i2c_master_recv(&c,&buf,1);
+		dprintk(1,"probe 0x%02x @ %s: %s\n",
+			probe[i], adap->name,
+			(1 == rc) ? "yes" : "no");
+		if (1 == rc) {
+			ir_attach(adap,probe[i],0,0);
+			break;
 		}
 	}
 	return 0;

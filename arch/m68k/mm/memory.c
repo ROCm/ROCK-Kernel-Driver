@@ -54,7 +54,7 @@ void __init init_pointer_table(unsigned long ptable)
 
 	/* unreserve the page so it's possible to free that page */
 	PD_PAGE(dp)->flags &= ~(1 << PG_reserved);
-	atomic_set(&PD_PAGE(dp)->count, 1);
+	set_page_count(PD_PAGE(dp), 1);
 
 	return;
 }

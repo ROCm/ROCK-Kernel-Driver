@@ -374,6 +374,8 @@ static u32 add_index(tid_t tid, struct inode *ip, s64 bn, int slot)
 		return index;
 	}
 	if (index == (MAX_INLINE_DIRTABLE_ENTRY + 1)) {
+		struct dir_table_slot temp_table[12];
+
 		/*
 		 * It's time to move the inline table to an external
 		 * page and begin to build the xtree
@@ -385,7 +387,6 @@ static u32 add_index(tid_t tid, struct inode *ip, s64 bn, int slot)
 		 * Save the table, we're going to overwrite it with the
 		 * xtree root
 		 */
-		struct dir_table_slot temp_table[12];
 		memcpy(temp_table, &jfs_ip->i_dirtable, sizeof(temp_table));
 
 		/*

@@ -531,6 +531,16 @@ int xfrm_state_check_space(struct xfrm_state *x, struct sk_buff *skb)
 	return 0;
 }
 
+int xfrm_state_check(struct xfrm_state *x, struct sk_buff *skb)
+{
+	int err = xfrm_state_check_expire(x);
+	if (err < 0)
+		goto err;
+	err = xfrm_state_check_space(x, skb);
+err:
+	return err;
+}
+
 struct xfrm_state *
 xfrm_state_lookup(xfrm_address_t *daddr, u32 spi, u8 proto,
 		  unsigned short family)

@@ -426,7 +426,7 @@ asmlinkage int arm_syscall(int no, struct pt_regs *regs)
 
 	/*
 	 * Flush a region from virtual address 'r0' to virtual address 'r1'
-	 * _inclusive_.  There is no alignment requirement on either address;
+	 * _exclusive_.  There is no alignment requirement on either address;
 	 * user space does not need to know the hardware cache layout.
 	 *
 	 * r2 contains flags.  It should ALWAYS be passed as ZERO until it

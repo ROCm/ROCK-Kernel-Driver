@@ -248,7 +248,7 @@ config WANXL
 
 config WANXL_BUILD_FIRMWARE
 	bool "rebuild wanXL firmware"
-	depends on WANXL
+	depends on WANXL && !PREVENT_FIRMWARE_BUILD
 	help
 	  Allows you to rebuild firmware run by the QUICC processor.
 	  It requires as68k, ld68k and hexdump programs.

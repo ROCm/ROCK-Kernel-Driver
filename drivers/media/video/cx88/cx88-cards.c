@@ -99,6 +99,10 @@ struct cx88_board cx88_boards[] = {
 		.input          = {{
 			.type   = CX88_VMUX_TELEVISION,
 			.vmux   = 0,
+                        .gpio0  = 0x000003ff,
+                        .gpio1  = 0x000000ff,
+                        .gpio2  = 0x000000ff,
+                        .gpio3  = 0x00000000,
 		},{
 			.type   = CX88_VMUX_COMPOSITE1,
 			.vmux   = 1,
@@ -111,6 +115,7 @@ struct cx88_board cx88_boards[] = {
         [CX88_BOARD_WINFAST2000XP] = {
                 .name           = "Leadtek Winfast 2000XP Expert",
                 .tuner_type     = 44,
+		.needs_tda9887  = 1,
                 .input          = {{
                         .type   = CX88_VMUX_TELEVISION,
                         .vmux   = 0,
@@ -149,22 +154,33 @@ struct cx88_board cx88_boards[] = {
 			.vmux   = 0,
 		}},
 	},
-	[CX88_BOARD_MSI_TVANYWHERE] = {
+	[CX88_BOARD_MSI_TVANYWHERE_MASTER] = {
+		//added gpio values thanks to Torsten Seeboth
+		//values for PAL from DScaler
 		.name           = "MSI TV-@nywhere Master",
 		.tuner_type     = 33,
+		.needs_tda9887	= 1,
 		.input          = {{
 			.type   = CX88_VMUX_TELEVISION,
 			.vmux   = 0,
+			.gpio0  = 0x000040bf,
+			.gpio1  = 0x000080c0,
+			.gpio2  = 0x0000ff40,
+                   	.gpio3  = 0x00000000,
 		},{
                         .type   = CX88_VMUX_COMPOSITE1,
                         .vmux   = 1,
-		},{
-			 // temporarly for testing ...
-                        .type   = CX88_VMUX_COMPOSITE2,
-                        .vmux   = 2,
+			.gpio0  = 0x000040bf,
+			.gpio1  = 0x000080c0,
+			.gpio2  = 0x0000ff40,
+			.gpio3  = 0x00000000,
 		},{
                         .type   = CX88_VMUX_SVIDEO,
                         .vmux   = 2,
+			.gpio0  = 0x000040bf,
+			.gpio1  = 0x000080c0,
+			.gpio2  = 0x0000ff40,
+			.gpio3  = 0x00000000,
                 }},
                 .radio = {
                         .type   = CX88_RADIO,
@@ -199,8 +215,97 @@ struct cx88_board cx88_boards[] = {
                         .type   = CX88_RADIO,
                 },
         },
-
-
+	[CX88_BOARD_IODATA_GVVCP3PCI] = {
+ 		.name		= "IODATA GV-VCP3/PCI",
+		.tuner_type     = TUNER_ABSENT,
+		.needs_tda9887  = 0,
+ 		.input          = {{
+ 			.type   = CX88_VMUX_COMPOSITE1,
+ 			.vmux   = 0,
+ 		},{
+ 			.type   = CX88_VMUX_COMPOSITE2,
+ 			.vmux   = 1,
+ 		},{
+ 			.type   = CX88_VMUX_SVIDEO,
+ 			.vmux   = 2,
+ 		}},
+ 	},
+	[CX88_BOARD_PROLINK_PLAYTVPVR] = {
+                .name           = "Prolink PlayTV PVR",
+                .tuner_type     = 43,
+		.needs_tda9887	= 1,
+		.input          = {{
+			.type   = CX88_VMUX_TELEVISION,
+			.vmux   = 0,
+			.gpio0  = 0xff00,
+		},{
+			.type   = CX88_VMUX_COMPOSITE1,
+			.vmux   = 1,
+			.gpio0  = 0xff03,
+		},{
+			.type   = CX88_VMUX_SVIDEO,
+			.vmux   = 2,
+			.gpio0  = 0xff03,
+		}},
+		.radio = {
+			.type   = CX88_RADIO,
+			.gpio0  = 0xff00,
+		},
+	},
+	[CX88_BOARD_ASUS_PVR_416] = {
+		.name		= "ASUS PVR-416",
+		.tuner_type     = 43,
+                .needs_tda9887  = 1,
+		.input          = {{
+			.type   = CX88_VMUX_TELEVISION,
+			.vmux   = 0,
+			.gpio0  = 0x0000fde6,
+			.gpio1  = 0x00000000, // possibly for mpeg data
+			.gpio2  = 0x000000e9,
+                   	.gpio3  = 0x00000000,
+ 		},{
+			.type   = CX88_VMUX_SVIDEO,
+			.vmux   = 2,
+			.gpio0  = 0x0000fde6, // 0x0000fda6 L,R RCA audio in?
+			.gpio1  = 0x00000000, // possibly for mpeg data
+			.gpio2  = 0x000000e9,
+                   	.gpio3  = 0x00000000,
+		}},
+                .radio = {
+                        .type   = CX88_RADIO,
+			.gpio0  = 0x0000fde2,
+			.gpio1  = 0x00000000,
+			.gpio2  = 0x000000e9,
+                   	.gpio3  = 0x00000000,
+                },
+	},
+	[CX88_BOARD_MSI_TVANYWHERE] = {
+		.name           = "MSI TV-@nywhere",
+		.tuner_type     = 33,
+		.needs_tda9887  = 1,
+		.input          = {{
+			.type   = CX88_VMUX_TELEVISION,
+			.vmux   = 0,
+			.gpio0  = 0x00000fbf,
+			.gpio1  = 0x000000c0,
+			.gpio2  = 0x0000fc08,
+			.gpio3  = 0x00000000,
+		},{
+  			.type   = CX88_VMUX_COMPOSITE1,
+  			.vmux   = 1,
+			.gpio0  = 0x00000fbf,
+			.gpio1  = 0x000000c0,
+			.gpio2  = 0x0000fc68,
+			.gpio3  = 0x00000000,
+		},{
+  			.type   = CX88_VMUX_SVIDEO,
+  			.vmux   = 2,
+			.gpio0  = 0x00000fbf,
+			.gpio1  = 0x000000c0,
+			.gpio2  = 0x0000fc68,
+			.gpio3  = 0x00000000,
+  		}},
+	},
 };
 const unsigned int cx88_bcount = ARRAY_SIZE(cx88_boards);
 
@@ -242,6 +347,10 @@ struct cx88_subid cx88_subids[] = {
                 .card      = CX88_BOARD_WINFAST_DV2000,
         },{
                 .subvendor = 0x107d,
+                .subdevice = 0x663b,
+                .card      = CX88_BOARD_LEADTEK_PVR2000,
+        },{
+                .subvendor = 0x107d,
                 .subdevice = 0x663C,
                 .card      = CX88_BOARD_LEADTEK_PVR2000,
         },{
@@ -251,11 +360,18 @@ struct cx88_subid cx88_subids[] = {
 	},{
 		.subvendor = 0x1462,
 		.subdevice = 0x8606,
-		.card      = CX88_BOARD_MSI_TVANYWHERE,
-	}
+		.card      = CX88_BOARD_MSI_TVANYWHERE_MASTER,
+	},{
+ 		.subvendor = 0x10fc,
+ 		.subdevice = 0xd003,
+ 		.card      = CX88_BOARD_IODATA_GVVCP3PCI,
+	},{
+ 		.subvendor = 0x1043,
+ 		.subdevice = 0x4823,  /* with mpeg encoder */
+ 		.card      = CX88_BOARD_ASUS_PVR_416,
+ 	}
 };
 const unsigned int cx88_idcount = ARRAY_SIZE(cx88_subids);
-
 
 /* ----------------------------------------------------------------------- */
 /* some leadtek specific stuff                                             */
@@ -386,20 +502,22 @@ static struct {
 	[ 0x02 ] = { .id   = TUNER_ABSENT,
 		     .name = "PAL_B" },
 	[ 0x03 ] = { .id   = TUNER_ABSENT,
-		     .name = "BAL_I" },
+		     .name = "PAL_I" },
 	[ 0x04 ] = { .id   = TUNER_ABSENT,
 		     .name = "PAL_D" },
 	[ 0x05 ] = { .id   = TUNER_ABSENT,
 		     .name = "SECAM" },
 
-	[ 0x10 ] = { .id   = TUNER_ABSENT, .fm = 1, 
+	[ 0x10 ] = { .id   = TUNER_ABSENT,
+		     .fm   = 1,
 		     .name = "TEMIC_4049" },
 	[ 0x11 ] = { .id   = TUNER_TEMIC_4136FY5,
 		     .name = "TEMIC_4136" },
 	[ 0x12 ] = { .id   = TUNER_ABSENT,
 		     .name = "TEMIC_4146" },
 
-	[ 0x20 ] = { .id   = TUNER_PHILIPS_FQ1216ME, .fm = 1,
+	[ 0x20 ] = { .id   = TUNER_PHILIPS_FQ1216ME,
+		     .fm   = 1,
 		     .name = "PHILIPS_FQ1216_MK3" },
 	[ 0x21 ] = { .id   = TUNER_ABSENT, .fm = 1,
 		     .name = "PHILIPS_FQ1236_MK3" },
@@ -454,7 +572,33 @@ i2c_eeprom(struct i2c_client *c, unsigned char *eedata, int len)
 	return 0;
 }
 
-void __devinit cx88_card_setup(struct cx8800_dev *dev)
+void cx88_card_list(struct cx8800_dev *dev)
+{
+	int i;
+
+	if (0 == dev->pci->subsystem_vendor &&
+	    0 == dev->pci->subsystem_device) {
+		printk("%s: Your board has no valid PCI Subsystem ID and thus can't\n"
+		       "%s: be autodetected.  Please pass card=<n> insmod option to\n"
+		       "%s: workaround that.  Redirect complaints to the vendor of\n"
+		       "%s: the TV card.  Best regards,\n"
+		       "%s:         -- tux\n",
+		       dev->name,dev->name,dev->name,dev->name,dev->name);
+	} else {
+		printk("%s: Your board isn't known (yet) to the driver.  You can\n"
+		       "%s: try to pick one of the existing card configs via\n"
+		       "%s: card=<n> insmod option.  Updating to the latest\n"
+		       "%s: version might help as well.\n",
+		       dev->name,dev->name,dev->name,dev->name);
+	}
+	printk("%s: Here is a list of valid choices for the card=<n> insmod option:\n",
+	       dev->name);
+	for (i = 0; i < cx88_bcount; i++)
+		printk("%s:    card=%d -> %s\n",
+		       dev->name, i, cx88_boards[i].name);
+}
+
+void cx88_card_setup(struct cx8800_dev *dev)
 {
 	static u8 eeprom[128];
 		
@@ -474,6 +618,9 @@ void __devinit cx88_card_setup(struct cx8800_dev *dev)
 			i2c_eeprom(&dev->i2c_client,eeprom,sizeof(eeprom));
 		leadtek_eeprom(dev,eeprom);
 		break;
+        case CX88_BOARD_ASUS_PVR_416:
+		dev->has_radio = 1;
+                break;
 	}
 }
 
@@ -483,6 +630,7 @@ EXPORT_SYMBOL(cx88_boards);
 EXPORT_SYMBOL(cx88_bcount);
 EXPORT_SYMBOL(cx88_subids);
 EXPORT_SYMBOL(cx88_idcount);
+EXPORT_SYMBOL(cx88_card_list);
 EXPORT_SYMBOL(cx88_card_setup);
 
 /*

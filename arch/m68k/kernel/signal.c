@@ -228,8 +228,8 @@ static inline int restore_fpu_state(struct sigcontext *sc)
 		goto out;
 
 	    __asm__ volatile (".chip 68k/68881\n\t"
-			      "fmovemx %0,%/fp0-%/fp1\n\t"
-			      "fmoveml %1,%/fpcr/%/fpsr/%/fpiar\n\t"
+			      "fmovemx %0,%%fp0-%%fp1\n\t"
+			      "fmoveml %1,%%fpcr/%%fpsr/%%fpiar\n\t"
 			      ".chip 68k"
 			      : /* no outputs */
 			      : "m" (*sc->sc_fpregs), "m" (*sc->sc_fpcntl));
@@ -258,7 +258,7 @@ static inline int rt_restore_fpu_state(struct ucontext *uc)
 	if (FPU_IS_EMU) {
 		/* restore fpu control register */
 		if (__copy_from_user(current->thread.fpcntl,
-				&uc->uc_mcontext.fpregs.f_pcr, 12))
+				uc->uc_mcontext.fpregs.f_fpcntl, 12))
 			goto out;
 		/* restore all other fpu register */
 		if (__copy_from_user(current->thread.fp,
@@ -298,12 +298,12 @@ static inline int rt_restore_fpu_state(struct ucontext *uc)
 				     sizeof(fpregs)))
 			goto out;
 		__asm__ volatile (".chip 68k/68881\n\t"
-				  "fmovemx %0,%/fp0-%/fp7\n\t"
-				  "fmoveml %1,%/fpcr/%/fpsr/%/fpiar\n\t"
+				  "fmovemx %0,%%fp0-%%fp7\n\t"
+				  "fmoveml %1,%%fpcr/%%fpsr/%%fpiar\n\t"
 				  ".chip 68k"
 				  : /* no outputs */
 				  : "m" (*fpregs.f_fpregs),
-				    "m" (fpregs.f_pcr));
+				    "m" (*fpregs.f_fpcntl));
 	}
 	if (context_size &&
 	    __copy_from_user(fpstate + 4, (long *)&uc->uc_fpstate + 1,
@@ -586,12 +586,12 @@ static inline void save_fpu_state(struct sigcontext *sc, struct pt_regs *regs)
 				sc->sc_fpstate[0x38] |= 1 << 3;
 		}
 		__asm__ volatile (".chip 68k/68881\n\t"
-				  "fmovemx %/fp0-%/fp1,%0\n\t"
-				  "fmoveml %/fpcr/%/fpsr/%/fpiar,%1\n\t"
+				  "fmovemx %%fp0-%%fp1,%0\n\t"
+				  "fmoveml %%fpcr/%%fpsr/%%fpiar,%1\n\t"
 				  ".chip 68k"
-				  : /* no outputs */
-				  : "m" (*sc->sc_fpregs),
-				    "m" (*sc->sc_fpcntl)
+				  : "=m" (*sc->sc_fpregs),
+				    "=m" (*sc->sc_fpcntl)
+				  : /* no inputs */
 				  : "memory");
 	}
 }
@@ -604,7 +604,7 @@ static inline int rt_save_fpu_state(struct ucontext *uc, struct pt_regs *regs)
 
 	if (FPU_IS_EMU) {
 		/* save fpu control register */
-		err |= copy_to_user(&uc->uc_mcontext.fpregs.f_pcr,
+		err |= copy_to_user(uc->uc_mcontext.fpregs.f_fpcntl,
 				current->thread.fpcntl, 12);
 		/* save all other fpu register */
 		err |= copy_to_user(uc->uc_mcontext.fpregs.f_fpregs,
@@ -631,12 +631,12 @@ static inline int rt_save_fpu_state(struct ucontext *uc, struct pt_regs *regs)
 				fpstate[0x38] |= 1 << 3;
 		}
 		__asm__ volatile (".chip 68k/68881\n\t"
-				  "fmovemx %/fp0-%/fp7,%0\n\t"
-				  "fmoveml %/fpcr/%/fpsr/%/fpiar,%1\n\t"
+				  "fmovemx %%fp0-%%fp7,%0\n\t"
+				  "fmoveml %%fpcr/%%fpsr/%%fpiar,%1\n\t"
 				  ".chip 68k"
-				  : /* no outputs */
-				  : "m" (*fpregs.f_fpregs),
-				    "m" (fpregs.f_pcr)
+				  : "=m" (*fpregs.f_fpregs),
+				    "=m" (*fpregs.f_fpcntl)
+				  : /* no inputs */
 				  : "memory");
 		err |= copy_to_user(&uc->uc_mcontext.fpregs, &fpregs,
 				    sizeof(fpregs));

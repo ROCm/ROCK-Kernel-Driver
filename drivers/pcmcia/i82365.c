@@ -65,7 +65,6 @@
 #include "cirrus.h"
 #include "vg468.h"
 #include "ricoh.h"
-#include "o2micro.h"
 
 #ifdef DEBUG
 static const char version[] =

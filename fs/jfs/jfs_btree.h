@@ -147,7 +147,7 @@ static inline void BT_STACK_DUMP(struct btstack *btstack)
 	printk("btstack dump:\n");
 	for (i = 0; i < MAXTREEHEIGHT; i++)
 		printk(KERN_ERR "bn = %Lx, index = %d\n",
-		       btstack->stack[i].bn,
+		       (long long)btstack->stack[i].bn,
 		       btstack->stack[i].index);
 }
 
