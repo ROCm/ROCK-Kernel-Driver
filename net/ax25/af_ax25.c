@@ -83,25 +83,24 @@ static void ax25_free_sock(struct sock *sk)
 static void ax25_remove_socket(ax25_cb *ax25)
 {
 	ax25_cb *s;
-	unsigned long flags;
 
-	spin_lock_irqsave(&ax25_list_lock, flags);
+	spin_lock_bh(&ax25_list_lock);
 	if ((s = ax25_list) == ax25) {
 		ax25_list = s->next;
-		spin_unlock_irqrestore(&ax25_list_lock, flags);
+		spin_unlock_bh(&ax25_list_lock);
 		return;
 	}
 
 	while (s != NULL && s->next != NULL) {
 		if (s->next == ax25) {
 			s->next = ax25->next;
-			spin_unlock_irqrestore(&ax25_list_lock, flags);
+			spin_unlock_bh(&ax25_list_lock);
 			return;
 		}
 
 		s = s->next;
 	}
-	spin_unlock_irqrestore(&ax25_list_lock, flags);
+	spin_unlock_bh(&ax25_list_lock);
 }
 
 /*
@@ -109,21 +108,20 @@ static void ax25_remove_socket(ax25_cb *ax25)
  */
 static void ax25_kill_by_device(struct net_device *dev)
 {
-	unsigned long flags;
 	ax25_dev *ax25_dev;
 	ax25_cb *s;
 
 	if ((ax25_dev = ax25_dev_ax25dev(dev)) == NULL)
 		return;
 
-	spin_lock_irqsave(&ax25_list_lock, flags);
+	spin_lock_bh(&ax25_list_lock);
 	for (s = ax25_list; s != NULL; s = s->next) {
 		if (s->ax25_dev == ax25_dev) {
 			s->ax25_dev = NULL;
 			ax25_disconnect(s, ENETUNREACH);
 		}
 	}
-	spin_unlock_irqrestore(&ax25_list_lock, flags);
+	spin_unlock_bh(&ax25_list_lock);
 }
 
 /*
@@ -159,12 +157,10 @@ static int ax25_device_event(struct notifier_block *this, unsigned long event,
  */
 void ax25_insert_socket(ax25_cb *ax25)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&ax25_list_lock, flags);
+	spin_lock_bh(&ax25_list_lock);
 	ax25->next = ax25_list;
 	ax25_list  = ax25;
-	spin_unlock_irqrestore(&ax25_list_lock, flags);
+	spin_unlock_bh(&ax25_list_lock);
 }
 
 /*
@@ -174,23 +170,22 @@ void ax25_insert_socket(ax25_cb *ax25)
 struct sock *ax25_find_listener(ax25_address *addr, int digi,
 	struct net_device *dev, int type)
 {
-	unsigned long flags;
 	ax25_cb *s;
 
-	spin_lock_irqsave(&ax25_list_lock, flags);
+	spin_lock_bh(&ax25_list_lock);
 	for (s = ax25_list; s != NULL; s = s->next) {
 		if ((s->iamdigi && !digi) || (!s->iamdigi && digi))
 			continue;
 		if (s->sk != NULL && ax25cmp(&s->source_addr, addr) == 0 && s->sk->type == type && s->sk->state == TCP_LISTEN) {
 			/* If device is null we match any device */
 			if (s->ax25_dev == NULL || s->ax25_dev->dev == dev) {
-				spin_unlock_irqrestore(&ax25_list_lock, flags);
+				spin_unlock_bh(&ax25_list_lock);
 
 				return s->sk;
 			}
 		}
 	}
-	spin_unlock_irqrestore(&ax25_list_lock, flags);
+	spin_unlock_bh(&ax25_list_lock);
 
 	return NULL;
 }
@@ -202,10 +197,9 @@ struct sock *ax25_get_socket(ax25_address *my_addr, ax25_address *dest_addr,
 	int type)
 {
 	struct sock *sk = NULL;
-	unsigned long flags;
 	ax25_cb *s;
 
-	spin_lock_irqsave(&ax25_list_lock, flags);
+	spin_lock_bh(&ax25_list_lock);
 	for (s = ax25_list; s != NULL; s = s->next) {
 		if (s->sk != NULL && ax25cmp(&s->source_addr, my_addr) == 0 && ax25cmp(&s->dest_addr, dest_addr) == 0 && s->sk->type == type) {
 			sk = s->sk;
@@ -215,7 +209,7 @@ struct sock *ax25_get_socket(ax25_address *my_addr, ax25_address *dest_addr,
 	}
 
 out:
-	spin_unlock_irqrestore(&ax25_list_lock, flags);
+	spin_unlock_bh(&ax25_list_lock);
 
 	return NULL;
 }
@@ -228,9 +222,8 @@ ax25_cb *ax25_find_cb(ax25_address *src_addr, ax25_address *dest_addr,
 	ax25_digi *digi, struct net_device *dev)
 {
 	ax25_cb *s;
-	unsigned long flags;
 
-	spin_lock_irqsave(&ax25_list_lock, flags);
+	spin_lock_bh(&ax25_list_lock);
 	for (s = ax25_list; s != NULL; s = s->next) {
 		if (s->sk != NULL && s->sk->type != SOCK_SEQPACKET)
 			continue;
@@ -246,12 +239,12 @@ ax25_cb *ax25_find_cb(ax25_address *src_addr, ax25_address *dest_addr,
 				if (s->digipeat != NULL && s->digipeat->ndigi != 0)
 					continue;
 			}
-			spin_unlock_irqrestore(&ax25_list_lock, flags);
+			spin_unlock_bh(&ax25_list_lock);
 
 			return s;
 		}
 	}
-	spin_unlock_irqrestore(&ax25_list_lock, flags);
+	spin_unlock_bh(&ax25_list_lock);
 
 	return NULL;
 }
@@ -261,11 +254,10 @@ ax25_cb *ax25_find_cb(ax25_address *src_addr, ax25_address *dest_addr,
  */
 struct sock *ax25_addr_match(ax25_address *addr)
 {
-	unsigned long flags;
 	struct sock *sk = NULL;
 	ax25_cb *s;
 
-	spin_lock_irqsave(&ax25_list_lock, flags);
+	spin_lock_bh(&ax25_list_lock);
 	for (s = ax25_list; s != NULL; s = s->next) {
 		if (s->sk != NULL && ax25cmp(&s->source_addr, addr) == 0 &&
 		    s->sk->type == SOCK_RAW) {
@@ -274,7 +266,7 @@ struct sock *ax25_addr_match(ax25_address *addr)
 			break;
 		}
 	}
-	spin_unlock_irqrestore(&ax25_list_lock, flags);
+	spin_unlock_bh(&ax25_list_lock);
 
 	return sk;
 }
@@ -320,7 +312,6 @@ static void ax25_destroy_timer(unsigned long data)
 void ax25_destroy_socket(ax25_cb *ax25)
 {
 	struct sk_buff *skb;
-	unsigned long flags;
 
 	ax25_remove_socket(ax25);
 
@@ -1847,14 +1838,13 @@ static int ax25_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 
 static int ax25_get_info(char *buffer, char **start, off_t offset, int length)
 {
-	unsigned long flags;
 	ax25_cb *ax25;
 	int k;
 	int len = 0;
 	off_t pos = 0;
 	off_t begin = 0;
 
-	spin_lock_irqsave(&ax25_list_lock, flags);
+	spin_lock_bh(&ax25_list_lock);
 
 	/*
 	 * New format:
@@ -1909,7 +1899,7 @@ static int ax25_get_info(char *buffer, char **start, off_t offset, int length)
 			break;
 	}
 
-	spin_unlock_irqrestore(&ax25_list_lock, flags);
+	spin_unlock_bh(&ax25_list_lock);
 
 	*start = buffer + (offset - begin);
 	len   -= (offset - begin);

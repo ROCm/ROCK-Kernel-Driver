@@ -56,7 +56,6 @@ static int nr_add_node(ax25_address *nr, const char *mnemonic, ax25_address *ax2
 	struct nr_node  *nr_node;
 	struct nr_neigh *nr_neigh;
 	struct nr_route nr_route;
-	unsigned long flags;
 	int i, found;
 
 	if (nr_dev_get(nr) != NULL)	/* Can't add routes to ourself */
@@ -114,10 +113,10 @@ static int nr_add_node(ax25_address *nr, const char *mnemonic, ax25_address *ax2
 			memcpy(nr_neigh->digipeat, ax25_digi, sizeof(ax25_digi));
 		}
 
-		spin_lock_irqsave(&nr_neigh_lock, flags);
+		spin_lock_bh(&nr_neigh_lock);
 		nr_neigh->next = nr_neigh_list;
 		nr_neigh_list  = nr_neigh;
-		spin_unlock_irqrestore(&nr_neigh_lock, flags);
+		spin_unlock_bh(&nr_neigh_lock);
 	}
 
 	if (quality != 0 && ax25cmp(nr, ax25) == 0 && !nr_neigh->locked)
@@ -137,10 +136,10 @@ static int nr_add_node(ax25_address *nr, const char *mnemonic, ax25_address *ax2
 		nr_node->routes[0].obs_count = obs_count;
 		nr_node->routes[0].neighbour = nr_neigh;
 
-		spin_lock_irqsave(&nr_node_lock, flags);
+		spin_lock_bh(&nr_node_lock);
 		nr_node->next = nr_node_list;
 		nr_node_list  = nr_node;
-		spin_unlock_irqrestore(&nr_node_lock, flags);
+		spin_unlock_bh(&nr_node_lock);
 
 		nr_neigh->count++;
 
@@ -250,12 +249,11 @@ static int nr_add_node(ax25_address *nr, const char *mnemonic, ax25_address *ax2
 static void nr_remove_node(struct nr_node *nr_node)
 {
 	struct nr_node *s;
-	unsigned long flags;
 
-	spin_lock_irqsave(&nr_node_lock, flags);
+	spin_lock_bh(&nr_node_lock);
 	if ((s = nr_node_list) == nr_node) {
 		nr_node_list = nr_node->next;
-		spin_unlock_irqrestore(&nr_node_lock, flags);
+		spin_unlock_bh(&nr_node_lock);
 		kfree(nr_node);
 		return;
 	}
@@ -263,7 +261,7 @@ static void nr_remove_node(struct nr_node *nr_node)
 	while (s != NULL && s->next != NULL) {
 		if (s->next == nr_node) {
 			s->next = nr_node->next;
-			spin_unlock_irqrestore(&nr_node_lock, flags);
+			spin_unlock_bh(&nr_node_lock);
 			kfree(nr_node);
 			return;
 		}
@@ -271,18 +269,17 @@ static void nr_remove_node(struct nr_node *nr_node)
 		s = s->next;
 	}
 
-	spin_unlock_irqrestore(&nr_node_lock, flags);
+	spin_unlock_bh(&nr_node_lock);
 }
 
 static void nr_remove_neigh(struct nr_neigh *nr_neigh)
 {
 	struct nr_neigh *s;
-	unsigned long flags;
 
-	spin_lock_irqsave(&nr_neigh_lock, flags);
+	spin_lock_bh(&nr_neigh_lock);
 	if ((s = nr_neigh_list) == nr_neigh) {
 		nr_neigh_list = nr_neigh->next;
-		spin_unlock_irqrestore(&nr_neigh_lock, flags);
+		spin_unlock_bh(&nr_neigh_lock);
 		if (nr_neigh->digipeat != NULL)
 			kfree(nr_neigh->digipeat);
 		kfree(nr_neigh);
@@ -292,7 +289,7 @@ static void nr_remove_neigh(struct nr_neigh *nr_neigh)
 	while (s != NULL && s->next != NULL) {
 		if (s->next == nr_neigh) {
 			s->next = nr_neigh->next;
-			spin_unlock_irqrestore(&nr_neigh_lock, flags);
+			spin_unlock_bh(&nr_neigh_lock);
 			if (nr_neigh->digipeat != NULL)
 				kfree(nr_neigh->digipeat);
 			kfree(nr_neigh);
@@ -301,7 +298,7 @@ static void nr_remove_neigh(struct nr_neigh *nr_neigh)
 
 		s = s->next;
 	}
-	spin_unlock_irqrestore(&nr_neigh_lock, flags);
+	spin_unlock_bh(&nr_neigh_lock);
 }
 
 /*
@@ -363,7 +360,6 @@ static int nr_del_node(ax25_address *callsign, ax25_address *neighbour, struct n
 static int nr_add_neigh(ax25_address *callsign, ax25_digi *ax25_digi, struct net_device *dev, unsigned int quality)
 {
 	struct nr_neigh *nr_neigh;
-	unsigned long flags;
 
 	for (nr_neigh = nr_neigh_list; nr_neigh != NULL; nr_neigh = nr_neigh->next) {
 		if (ax25cmp(callsign, &nr_neigh->callsign) == 0 && nr_neigh->dev == dev) {
@@ -394,10 +390,10 @@ static int nr_add_neigh(ax25_address *callsign, ax25_digi *ax25_digi, struct net
 		memcpy(nr_neigh->digipeat, ax25_digi, sizeof(ax25_digi));
 	}
 
-	spin_lock_irqsave(&nr_neigh_lock, flags);
+	spin_lock_bh(&nr_neigh_lock);
 	nr_neigh->next = nr_neigh_list;
 	nr_neigh_list  = nr_neigh;
-	spin_unlock_irqrestore(&nr_neigh_lock, flags);
+	spin_unlock_bh(&nr_neigh_lock);
 
 	return 0;
 }
@@ -738,13 +734,12 @@ int nr_route_frame(struct sk_buff *skb, ax25_cb *ax25)
 int nr_nodes_get_info(char *buffer, char **start, off_t offset, int length)
 {
 	struct nr_node *nr_node;
-	unsigned long flags;
 	int len     = 0;
 	off_t pos   = 0;
 	off_t begin = 0;
 	int i;
 
-	spin_lock_irqsave(&nr_node_lock, flags);
+	spin_lock_bh(&nr_node_lock);
 	len += sprintf(buffer, "callsign  mnemonic w n qual obs neigh qual obs neigh qual obs neigh\n");
 
 	for (nr_node = nr_node_list; nr_node != NULL; nr_node = nr_node->next) {
@@ -773,7 +768,7 @@ int nr_nodes_get_info(char *buffer, char **start, off_t offset, int length)
 		if (pos > offset + length)
 			break;
 	}
-	spin_unlock_irqrestore(&nr_node_lock, flags);
+	spin_unlock_bh(&nr_node_lock);
 
 	*start = buffer + (offset - begin);
 	len   -= (offset - begin);
@@ -786,13 +781,12 @@ int nr_nodes_get_info(char *buffer, char **start, off_t offset, int length)
 int nr_neigh_get_info(char *buffer, char **start, off_t offset, int length)
 {
 	struct nr_neigh *nr_neigh;
-	unsigned long flags;
 	int len     = 0;
 	off_t pos   = 0;
 	off_t begin = 0;
 	int i;
 
-	spin_lock_irqsave(&nr_neigh_lock, flags);
+	spin_lock_bh(&nr_neigh_lock);
 	len += sprintf(buffer, "addr  callsign  dev  qual lock count failed digipeaters\n");
 
 	for (nr_neigh = nr_neigh_list; nr_neigh != NULL; nr_neigh = nr_neigh->next) {
@@ -823,7 +817,7 @@ int nr_neigh_get_info(char *buffer, char **start, off_t offset, int length)
 			break;
 	}
 
-	spin_unlock_irqrestore(&nr_neigh_lock, flags);
+	spin_unlock_bh(&nr_neigh_lock);
 
 	*start = buffer + (offset - begin);
 	len   -= (offset - begin);

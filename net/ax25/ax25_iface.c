@@ -109,17 +109,16 @@ void ax25_protocol_release(unsigned int pid)
 int ax25_linkfail_register(void (*func)(ax25_cb *, int))
 {
 	struct linkfail_struct *linkfail;
-	unsigned long flags;
 
 	if ((linkfail = kmalloc(sizeof(*linkfail), GFP_ATOMIC)) == NULL)
 		return 0;
 
 	linkfail->func = func;
 
-	spin_lock_irqsave(&linkfail_lock, flags);
+	spin_lock_bh(&linkfail_lock);
 	linkfail->next = linkfail_list;
 	linkfail_list  = linkfail;
-	spin_unlock_irqrestore(&linkfail_lock, flags);
+	spin_unlock_bh(&linkfail_lock);
 
 	return 1;
 }
@@ -127,16 +126,15 @@ int ax25_linkfail_register(void (*func)(ax25_cb *, int))
 void ax25_linkfail_release(void (*func)(ax25_cb *, int))
 {
 	struct linkfail_struct *s, *linkfail;
-	unsigned long flags;
 
-	spin_lock_irqsave(&linkfail_lock, flags);
+	spin_lock_bh(&linkfail_lock);
 	linkfail = linkfail_list;
 	if (linkfail == NULL)
 		return;
 
 	if (linkfail->func == func) {
 		linkfail_list = linkfail->next;
-		spin_unlock_irqrestore(&linkfail_lock, flags);
+		spin_unlock_bh(&linkfail_lock);
 		kfree(linkfail);
 		return;
 	}
@@ -145,20 +143,19 @@ void ax25_linkfail_release(void (*func)(ax25_cb *, int))
 		if (linkfail->next->func == func) {
 			s = linkfail->next;
 			linkfail->next = linkfail->next->next;
-			spin_unlock_irqrestore(&linkfail_lock, flags);
+			spin_unlock_bh(&linkfail_lock);
 			kfree(s);
 			return;
 		}
 
 		linkfail = linkfail->next;
 	}
-	spin_unlock_irqrestore(&linkfail_lock, flags);
+	spin_unlock_bh(&linkfail_lock);
 }
 
 int ax25_listen_register(ax25_address *callsign, struct net_device *dev)
 {
 	struct listen_struct *listen;
-	unsigned long flags;
 
 	if (ax25_listen_mine(callsign, dev))
 		return 0;
@@ -169,10 +166,10 @@ int ax25_listen_register(ax25_address *callsign, struct net_device *dev)
 	listen->callsign = *callsign;
 	listen->dev      = dev;
 
-	spin_lock_irqsave(&listen_lock, flags);
+	spin_lock_bh(&listen_lock);
 	listen->next = listen_list;
 	listen_list  = listen;
-	spin_unlock_irqrestore(&listen_lock, flags);
+	spin_unlock_bh(&listen_lock);
 
 	return 1;
 }
@@ -180,16 +177,15 @@ int ax25_listen_register(ax25_address *callsign, struct net_device *dev)
 void ax25_listen_release(ax25_address *callsign, struct net_device *dev)
 {
 	struct listen_struct *s, *listen;
-	unsigned long flags;
 
-	spin_lock_irqsave(&listen_lock, flags);
+	spin_lock_bh(&listen_lock);
 	listen = listen_list;
 	if (listen == NULL)
 		return;
 
 	if (ax25cmp(&listen->callsign, callsign) == 0 && listen->dev == dev) {
 		listen_list = listen->next;
-		spin_unlock_irqrestore(&listen_lock, flags);
+		spin_unlock_bh(&listen_lock);
 		kfree(listen);
 		return;
 	}
@@ -198,14 +194,14 @@ void ax25_listen_release(ax25_address *callsign, struct net_device *dev)
 		if (ax25cmp(&listen->next->callsign, callsign) == 0 && listen->next->dev == dev) {
 			s = listen->next;
 			listen->next = listen->next->next;
-			spin_unlock_irqrestore(&listen_lock, flags);
+			spin_unlock_bh(&listen_lock);
 			kfree(s);
 			return;
 		}
 
 		listen = listen->next;
 	}
-	spin_unlock_irqrestore(&listen_lock, flags);
+	spin_unlock_bh(&listen_lock);
 }
 
 int (*ax25_protocol_function(unsigned int pid))(struct sk_buff *, ax25_cb *)
@@ -227,13 +223,12 @@ int (*ax25_protocol_function(unsigned int pid))(struct sk_buff *, ax25_cb *)
 int ax25_listen_mine(ax25_address *callsign, struct net_device *dev)
 {
 	struct listen_struct *listen;
-	unsigned long flags;
 
-	spin_lock_irqsave(&listen_lock, flags);
+	spin_lock_bh(&listen_lock);
 	for (listen = listen_list; listen != NULL; listen = listen->next)
 		if (ax25cmp(&listen->callsign, callsign) == 0 && (listen->dev == dev || listen->dev == NULL))
 			return 1;
-	spin_unlock_irqrestore(&listen_lock, flags);
+	spin_unlock_bh(&listen_lock);
 
 	return 0;
 }
@@ -241,12 +236,11 @@ int ax25_listen_mine(ax25_address *callsign, struct net_device *dev)
 void ax25_link_failed(ax25_cb *ax25, int reason)
 {
 	struct linkfail_struct *linkfail;
-	unsigned long flags;
 
-	spin_lock_irqsave(&linkfail_lock, flags);
+	spin_lock_bh(&linkfail_lock);
 	for (linkfail = linkfail_list; linkfail != NULL; linkfail = linkfail->next)
 		(linkfail->func)(ax25, reason);
-	spin_unlock_irqrestore(&linkfail_lock, flags);
+	spin_unlock_bh(&linkfail_lock);
 }
 
 int ax25_protocol_is_registered(unsigned int pid)

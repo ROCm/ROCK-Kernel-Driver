@@ -73,7 +73,6 @@ void ax25_ds_set_timer(ax25_dev *ax25_dev)
 static void ax25_ds_timeout(unsigned long arg)
 {
 	ax25_dev *ax25_dev = (struct ax25_dev *) arg;
-	unsigned long flags;
 	ax25_cb *ax25;
 
 	if (ax25_dev == NULL || !ax25_dev->dama.slave)
@@ -84,7 +83,7 @@ static void ax25_ds_timeout(unsigned long arg)
 		return;
 	}
 
-	spin_lock_irqsave(&ax25_list_lock, flags);
+	spin_lock_bh(&ax25_list_lock);
 	for (ax25=ax25_list; ax25 != NULL; ax25 = ax25->next) {
 		if (ax25->ax25_dev != ax25_dev || !(ax25->condition & AX25_COND_DAMA_MODE))
 			continue;
@@ -92,7 +91,7 @@ static void ax25_ds_timeout(unsigned long arg)
 		ax25_send_control(ax25, AX25_DISC, AX25_POLLON, AX25_COMMAND);
 		ax25_disconnect(ax25, ETIMEDOUT);
 	}
-	spin_unlock_irqrestore(&ax25_list_lock, flags);
+	spin_unlock_bh(&ax25_list_lock);
 
 	ax25_dev_dama_off(ax25_dev);
 }

@@ -39,7 +39,6 @@ void ax25_ds_nr_error_recovery(ax25_cb *ax25)
  */
 void ax25_ds_enquiry_response(ax25_cb *ax25)
 {
-	unsigned long flags;
 	ax25_cb *ax25o;
 
 	/* Please note that neither DK4EG´s nor DG2FEF´s
@@ -80,7 +79,7 @@ void ax25_ds_enquiry_response(ax25_cb *ax25)
 	ax25_start_t3timer(ax25);
 	ax25_ds_set_timer(ax25->ax25_dev);
 
-	spin_lock_irqsave(&ax25_list_lock, flags);
+	spin_lock_bh(&ax25_list_lock);
 	for (ax25o = ax25_list; ax25o != NULL; ax25o = ax25o->next) {
 		if (ax25o == ax25)
 			continue;
@@ -106,7 +105,7 @@ void ax25_ds_enquiry_response(ax25_cb *ax25)
 		if (ax25o->state != AX25_STATE_0)
 			ax25_start_t3timer(ax25o);
 	}
-	spin_unlock_irqrestore(&ax25_list_lock, flags);
+	spin_unlock_bh(&ax25_list_lock);
 }
 
 void ax25_ds_establish_data_link(ax25_cb *ax25)
@@ -159,17 +158,16 @@ static void ax25_kiss_cmd(ax25_dev *ax25_dev, unsigned char cmd, unsigned char p
  */
 static int ax25_check_dama_slave(ax25_dev *ax25_dev)
 {
-	unsigned long flags;
 	ax25_cb *ax25;
 	int res = 0;
 
-	spin_lock_irqsave(&ax25_list_lock, flags);
+	spin_lock_bh(&ax25_list_lock);
 	for (ax25 = ax25_list; ax25 != NULL ; ax25 = ax25->next)
 		if (ax25->ax25_dev == ax25_dev && (ax25->condition & AX25_COND_DAMA_MODE) && ax25->state > AX25_STATE_1) {
 			res = 1;
 			break;
 		}
-	spin_unlock_irqrestore(&ax25_list_lock, flags);
+	spin_unlock_bh(&ax25_list_lock);
 
 	return res;
 }

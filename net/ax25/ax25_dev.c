@@ -37,15 +37,14 @@ spinlock_t ax25_dev_lock = SPIN_LOCK_UNLOCKED;
 ax25_dev *ax25_dev_ax25dev(struct net_device *dev)
 {
 	ax25_dev *ax25_dev, *res = NULL;
-	unsigned long flags;
 
-	spin_lock_irqsave(&ax25_dev_lock, flags);
+	spin_lock_bh(&ax25_dev_lock);
 	for (ax25_dev = ax25_dev_list; ax25_dev != NULL; ax25_dev = ax25_dev->next)
 		if (ax25_dev->dev == dev) {
 			res = ax25_dev;
 			break;
 		}
-	spin_unlock_irqrestore(&ax25_dev_lock, flags);
+	spin_unlock_bh(&ax25_dev_lock);
 
 	return res;
 }
@@ -53,14 +52,13 @@ ax25_dev *ax25_dev_ax25dev(struct net_device *dev)
 ax25_dev *ax25_addr_ax25dev(ax25_address *addr)
 {
 	ax25_dev *ax25_dev, *res = NULL;
-	unsigned long flags;
 
-	spin_lock_irqsave(&ax25_dev_lock, flags);
+	spin_lock_bh(&ax25_dev_lock);
 	for (ax25_dev = ax25_dev_list; ax25_dev != NULL; ax25_dev = ax25_dev->next)
 		if (ax25cmp(addr, (ax25_address *)ax25_dev->dev->dev_addr) == 0) {
 			res = ax25_dev;
 		}
-	spin_unlock_irqrestore(&ax25_dev_lock, flags);
+	spin_unlock_bh(&ax25_dev_lock);
 
 	return res;
 }
@@ -72,7 +70,6 @@ ax25_dev *ax25_addr_ax25dev(ax25_address *addr)
 void ax25_dev_device_up(struct net_device *dev)
 {
 	ax25_dev *ax25_dev;
-	unsigned long flags;
 
 	if ((ax25_dev = kmalloc(sizeof(*ax25_dev), GFP_ATOMIC)) == NULL) {
 		printk(KERN_ERR "AX.25: ax25_dev_device_up - out of memory\n");
@@ -101,10 +98,10 @@ void ax25_dev_device_up(struct net_device *dev)
 	ax25_dev->values[AX25_VALUES_PROTOCOL]  = AX25_DEF_PROTOCOL;
 	ax25_dev->values[AX25_VALUES_DS_TIMEOUT]= AX25_DEF_DS_TIMEOUT;
 
-	spin_lock_irqsave(&ax25_dev_lock, flags);
+	spin_lock_bh(&ax25_dev_lock);
 	ax25_dev->next = ax25_dev_list;
 	ax25_dev_list  = ax25_dev;
-	spin_unlock_irqrestore(&ax25_dev_lock, flags);
+	spin_unlock_bh(&ax25_dev_lock);
 
 	ax25_register_sysctl();
 }
@@ -112,14 +109,13 @@ void ax25_dev_device_up(struct net_device *dev)
 void ax25_dev_device_down(struct net_device *dev)
 {
 	ax25_dev *s, *ax25_dev;
-	unsigned long flags;
 
 	if ((ax25_dev = ax25_dev_ax25dev(dev)) == NULL)
 		return;
 
 	ax25_unregister_sysctl();
 
-	spin_lock_irqsave(&ax25_dev_lock, flags);
+	spin_lock_bh(&ax25_dev_lock);
 
 #ifdef CONFIG_AX25_DAMA_SLAVE
 	ax25_ds_del_timer(ax25_dev);
@@ -134,7 +130,7 @@ void ax25_dev_device_down(struct net_device *dev)
 
 	if ((s = ax25_dev_list) == ax25_dev) {
 		ax25_dev_list = s->next;
-		spin_unlock_irqrestore(&ax25_dev_lock, flags);
+		spin_unlock_bh(&ax25_dev_lock);
 		kfree(ax25_dev);
 		ax25_register_sysctl();
 		return;
@@ -143,7 +139,7 @@ void ax25_dev_device_down(struct net_device *dev)
 	while (s != NULL && s->next != NULL) {
 		if (s->next == ax25_dev) {
 			s->next = ax25_dev->next;
-			spin_unlock_irqrestore(&ax25_dev_lock, flags);
+			spin_unlock_bh(&ax25_dev_lock);
 			kfree(ax25_dev);
 			ax25_register_sysctl();
 			return;
@@ -151,7 +147,7 @@ void ax25_dev_device_down(struct net_device *dev)
 
 		s = s->next;
 	}
-	spin_unlock_irqrestore(&ax25_dev_lock, flags);
+	spin_unlock_bh(&ax25_dev_lock);
 
 	ax25_register_sysctl();
 }
@@ -204,9 +200,8 @@ struct net_device *ax25_fwd_dev(struct net_device *dev)
 void __exit ax25_dev_free(void)
 {
 	ax25_dev *s, *ax25_dev;
-	unsigned long flags;
 
-	spin_lock_irqsave(&ax25_dev_lock, flags);
+	spin_lock_bh(&ax25_dev_lock);
 	ax25_dev = ax25_dev_list;
 	while (ax25_dev != NULL) {
 		s        = ax25_dev;
@@ -215,5 +210,5 @@ void __exit ax25_dev_free(void)
 		kfree(s);
 	}
 	ax25_dev_list = NULL;
-	spin_unlock_irqrestore(&ax25_dev_lock, flags);
+	spin_unlock_bh(&ax25_dev_lock);
 }

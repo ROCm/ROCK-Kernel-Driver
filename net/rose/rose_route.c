@@ -58,11 +58,10 @@ static int rose_add_node(struct rose_route_struct *rose_route,
 {
 	struct rose_node  *rose_node, *rose_tmpn, *rose_tmpp;
 	struct rose_neigh *rose_neigh;
-	unsigned long flags;
 	int i, res = 0;
 
-	spin_lock_irqsave(&rose_node_list_lock, flags);
-	spin_lock_irqsave(&rose_neigh_list_lock, flags);
+	spin_lock_bh(&rose_node_list_lock);
+	spin_lock_bh(&rose_neigh_list_lock);
 
 	rose_node = rose_node_list;
 	while (rose_node != NULL) {
@@ -193,8 +192,8 @@ static int rose_add_node(struct rose_route_struct *rose_route,
 	}
 
 out:
-	spin_unlock_irqrestore(&rose_neigh_list_lock, flags);
-	spin_unlock_irqrestore(&rose_node_list_lock, flags);
+	spin_unlock_bh(&rose_neigh_list_lock);
+	spin_unlock_bh(&rose_node_list_lock);
 
 	return res;
 }
@@ -204,10 +203,9 @@ out:
  */
 static void rose_remove_node(struct rose_node *rose_node)
 {
-	unsigned long flags;
 	struct rose_node *s;
 
-	spin_lock_irqsave(&rose_node_list_lock, flags);
+	spin_lock_bh(&rose_node_list_lock);
 	if ((s = rose_node_list) == rose_node) {
 		rose_node_list = rose_node->next;
 		kfree(rose_node);
@@ -231,18 +229,17 @@ static void rose_remove_node(struct rose_node *rose_node)
 static void rose_remove_neigh(struct rose_neigh *rose_neigh)
 {
 	struct rose_neigh *s;
-	unsigned long flags;
 
 	rose_stop_ftimer(rose_neigh);
 	rose_stop_t0timer(rose_neigh);
 
 	skb_queue_purge(&rose_neigh->queue);
 
-	spin_lock_irqsave(&rose_neigh_list_lock, flags);
+	spin_lock_bh(&rose_neigh_list_lock);
 
 	if ((s = rose_neigh_list) == rose_neigh) {
 		rose_neigh_list = rose_neigh->next;
-		spin_unlock_irqrestore(&rose_neigh_list_lock, flags);
+		spin_unlock_bh(&rose_neigh_list_lock);
 		if (rose_neigh->digipeat != NULL)
 			kfree(rose_neigh->digipeat);
 		kfree(rose_neigh);
@@ -252,7 +249,7 @@ static void rose_remove_neigh(struct rose_neigh *rose_neigh)
 	while (s != NULL && s->next != NULL) {
 		if (s->next == rose_neigh) {
 			s->next = rose_neigh->next;
-			spin_unlock_irqrestore(&rose_neigh_list_lock, flags);
+			spin_unlock_bh(&rose_neigh_list_lock);
 			if (rose_neigh->digipeat != NULL)
 				kfree(rose_neigh->digipeat);
 			kfree(rose_neigh);
@@ -261,7 +258,7 @@ static void rose_remove_neigh(struct rose_neigh *rose_neigh)
 
 		s = s->next;
 	}
-	spin_unlock_irqrestore(&rose_neigh_list_lock, flags);
+	spin_unlock_bh(&rose_neigh_list_lock);
 }
 
 /*
@@ -303,11 +300,10 @@ static int rose_del_node(struct rose_route_struct *rose_route,
 {
 	struct rose_node  *rose_node;
 	struct rose_neigh *rose_neigh;
-	unsigned long flags;
 	int i, err = 0;
 
-	spin_lock_irqsave(&rose_node_list_lock, flags);
-	spin_lock_irqsave(&rose_neigh_list_lock, flags);
+	spin_lock_bh(&rose_node_list_lock);
+	spin_lock_bh(&rose_neigh_list_lock);
 
 	rose_node = rose_node_list;
 	while (rose_node != NULL) {
@@ -365,8 +361,8 @@ static int rose_del_node(struct rose_route_struct *rose_route,
 	err = -EINVAL;
 
 out:
-	spin_unlock_irqrestore(&rose_neigh_list_lock, flags);
-	spin_unlock_irqrestore(&rose_node_list_lock, flags);
+	spin_unlock_bh(&rose_neigh_list_lock);
+	spin_unlock_bh(&rose_node_list_lock);
 
 	return err;
 }
@@ -376,8 +372,6 @@ out:
  */
 int rose_add_loopback_neigh(void)
 {
-	unsigned long flags;
-
 	if ((rose_loopback_neigh = kmalloc(sizeof(struct rose_neigh), GFP_ATOMIC)) == NULL)
 		return -ENOMEM;
 
@@ -397,10 +391,10 @@ int rose_add_loopback_neigh(void)
 	init_timer(&rose_loopback_neigh->ftimer);
 	init_timer(&rose_loopback_neigh->t0timer);
 
-	spin_lock_irqsave(&rose_neigh_list_lock, flags);
+	spin_lock_bh(&rose_neigh_list_lock);
 	rose_loopback_neigh->next = rose_neigh_list;
 	rose_neigh_list           = rose_loopback_neigh;
-	spin_unlock_irqrestore(&rose_neigh_list_lock, flags);
+	spin_unlock_bh(&rose_neigh_list_lock);
 
 	return 0;
 }
@@ -411,10 +405,9 @@ int rose_add_loopback_neigh(void)
 int rose_add_loopback_node(rose_address *address)
 {
 	struct rose_node *rose_node;
-	unsigned long flags;
 	unsigned int err = 0;
 
-	spin_lock_irqsave(&rose_node_list_lock, flags);
+	spin_lock_bh(&rose_node_list_lock);
 
 	rose_node = rose_node_list;
 	while (rose_node != NULL) {
@@ -446,7 +439,7 @@ int rose_add_loopback_node(rose_address *address)
 	rose_loopback_neigh->count++;
 
 out:
-	spin_unlock_irqrestore(&rose_node_list_lock, flags);
+	spin_unlock_bh(&rose_node_list_lock);
 
 	return 0;
 }
@@ -457,9 +450,8 @@ out:
 void rose_del_loopback_node(rose_address *address)
 {
 	struct rose_node *rose_node;
-	unsigned long flags;
 
-	spin_lock_irqsave(&rose_node_list_lock, flags);
+	spin_lock_bh(&rose_node_list_lock);
 
 	rose_node = rose_node_list;
 	while (rose_node != NULL) {
@@ -478,7 +470,7 @@ void rose_del_loopback_node(rose_address *address)
 	rose_loopback_neigh->count--;
 
 out:
-	spin_unlock_irqrestore(&rose_node_list_lock, flags);
+	spin_unlock_bh(&rose_node_list_lock);
 }
 
 /*
@@ -488,11 +480,10 @@ void rose_rt_device_down(struct net_device *dev)
 {
 	struct rose_neigh *s, *rose_neigh;
 	struct rose_node  *t, *rose_node;
-	unsigned long flags;
 	int i;
 
-	spin_lock_irqsave(&rose_node_list_lock, flags);
-	spin_lock_irqsave(&rose_neigh_list_lock, flags);
+	spin_lock_bh(&rose_node_list_lock);
+	spin_lock_bh(&rose_neigh_list_lock);
 	rose_neigh = rose_neigh_list;
 	while (rose_neigh != NULL) {
 		s          = rose_neigh;
@@ -529,8 +520,8 @@ void rose_rt_device_down(struct net_device *dev)
 
 		rose_remove_neigh(s);
 	}
-	spin_unlock_irqrestore(&rose_neigh_list_lock, flags);
-	spin_unlock_irqrestore(&rose_node_list_lock, flags);
+	spin_unlock_bh(&rose_neigh_list_lock);
+	spin_unlock_bh(&rose_node_list_lock);
 }
 
 #if 0 /* Currently unused */
@@ -540,9 +531,8 @@ void rose_rt_device_down(struct net_device *dev)
 void rose_route_device_down(struct net_device *dev)
 {
 	struct rose_route *s, *rose_route;
-	unsigned long flags;
 
-	spin_lock_irqsave(&rose_route_list_lock, flags);
+	spin_lock_bh(&rose_route_list_lock);
 	rose_route = rose_route_list;
 	while (rose_route != NULL) {
 		s          = rose_route;
@@ -551,7 +541,7 @@ void rose_route_device_down(struct net_device *dev)
 		if (s->neigh1->dev == dev || s->neigh2->dev == dev)
 			rose_remove_route(s);
 	}
-	spin_unlock_irqrestore(&rose_route_list_lock, flags);
+	spin_unlock_bh(&rose_route_list_lock);
 }
 #endif
 
@@ -564,10 +554,9 @@ static int rose_clear_routes(void)
 {
 	struct rose_neigh *s, *rose_neigh;
 	struct rose_node  *t, *rose_node;
-	unsigned long flags;
 
-	spin_lock_irqsave(&rose_node_list_lock, flags);
-	spin_lock_irqsave(&rose_neigh_list_lock, flags);
+	spin_lock_bh(&rose_node_list_lock);
+	spin_lock_bh(&rose_neigh_list_lock);
 
 	rose_neigh = rose_neigh_list;
 	rose_node  = rose_node_list;
@@ -589,8 +578,8 @@ static int rose_clear_routes(void)
 		}
 	}
 
-	spin_unlock_irqrestore(&rose_neigh_list_lock, flags);
-	spin_unlock_irqrestore(&rose_node_list_lock, flags);
+	spin_unlock_bh(&rose_neigh_list_lock);
+	spin_unlock_bh(&rose_node_list_lock);
 
 	return 0;
 }
@@ -686,11 +675,10 @@ struct rose_neigh *rose_get_neigh(rose_address *addr, unsigned char *cause,
 {
 	struct rose_neigh *res = NULL;
 	struct rose_node *node;
-	unsigned long flags;
 	int failed = 0;
 	int i;
 
-	spin_lock_irqsave(&rose_node_list_lock, flags);
+	spin_lock_bh(&rose_node_list_lock);
 	for (node = rose_node_list; node != NULL; node = node->next) {
 		if (rosecmpm(addr, &node->address, node->mask) == 0) {
 			for (i = 0; i < node->count; i++) {
@@ -713,7 +701,7 @@ struct rose_neigh *rose_get_neigh(rose_address *addr, unsigned char *cause,
 	}
 
 out:
-	spin_unlock_irqrestore(&rose_node_list_lock, flags);
+	spin_unlock_bh(&rose_node_list_lock);
 
 	return res;
 }
@@ -766,7 +754,6 @@ int rose_rt_ioctl(unsigned int cmd, void *arg)
 static void rose_del_route_by_neigh(struct rose_neigh *rose_neigh)
 {
 	struct rose_route *rose_route, *s;
-	unsigned long flags;
 
 	rose_neigh->restarted = 0;
 
@@ -775,7 +762,7 @@ static void rose_del_route_by_neigh(struct rose_neigh *rose_neigh)
 
 	skb_queue_purge(&rose_neigh->queue);
 
-	spin_lock_irqsave(&rose_route_list_lock, flags);
+	spin_lock_bh(&rose_route_list_lock);
 
 	rose_route = rose_route_list;
 
@@ -803,7 +790,7 @@ static void rose_del_route_by_neigh(struct rose_neigh *rose_neigh)
 
 		rose_route = rose_route->next;
 	}
-	spin_unlock_irqrestore(&rose_route_list_lock, flags);
+	spin_unlock_bh(&rose_route_list_lock);
 }
 
 /*
@@ -814,9 +801,8 @@ static void rose_del_route_by_neigh(struct rose_neigh *rose_neigh)
 void rose_link_failed(ax25_cb *ax25, int reason)
 {
 	struct rose_neigh *rose_neigh;
-	unsigned long flags;
 
-	spin_lock_irqsave(&rose_neigh_list_lock, flags);
+	spin_lock_bh(&rose_neigh_list_lock);
 	rose_neigh = rose_neigh_list;
 	while (rose_neigh != NULL) {
 		if (rose_neigh->ax25 == ax25)
@@ -830,7 +816,7 @@ void rose_link_failed(ax25_cb *ax25, int reason)
 		rose_del_route_by_neigh(rose_neigh);
 		rose_kill_by_neigh(rose_neigh);
 	}
-	spin_unlock_irqrestore(&rose_neigh_list_lock, flags);
+	spin_unlock_bh(&rose_neigh_list_lock);
 }
 
 /*
@@ -863,7 +849,6 @@ int rose_route_frame(struct sk_buff *skb, ax25_cb *ax25)
 	unsigned int lci, new_lci;
 	unsigned char cause, diagnostic;
 	struct net_device *dev;
-	unsigned long flags;
 	int len, res = 0;
 
 #if 0
@@ -876,9 +861,9 @@ int rose_route_frame(struct sk_buff *skb, ax25_cb *ax25)
 	src_addr  = (rose_address *)(skb->data + 9);
 	dest_addr = (rose_address *)(skb->data + 4);
 
-	spin_lock_irqsave(&rose_node_list_lock, flags);
-	spin_lock_irqsave(&rose_neigh_list_lock, flags);
-	spin_lock_irqsave(&rose_route_list_lock, flags);
+	spin_lock_bh(&rose_node_list_lock);
+	spin_lock_bh(&rose_neigh_list_lock);
+	spin_lock_bh(&rose_route_list_lock);
 
 	rose_neigh = rose_neigh_list;
 	while (rose_neigh != NULL) {
@@ -1073,9 +1058,9 @@ int rose_route_frame(struct sk_buff *skb, ax25_cb *ax25)
 	res = 1;
 
 out:
-	spin_unlock_irqrestore(&rose_route_list_lock, flags);
-	spin_unlock_irqrestore(&rose_neigh_list_lock, flags);
-	spin_unlock_irqrestore(&rose_node_list_lock, flags);
+	spin_unlock_bh(&rose_route_list_lock);
+	spin_unlock_bh(&rose_neigh_list_lock);
+	spin_unlock_bh(&rose_node_list_lock);
 
 	return res;
 }
@@ -1083,13 +1068,12 @@ out:
 int rose_nodes_get_info(char *buffer, char **start, off_t offset, int length)
 {
 	struct rose_node *rose_node;
-	unsigned long flags;
 	int len     = 0;
 	off_t pos   = 0;
 	off_t begin = 0;
 	int i;
 
-	spin_lock_irqsave(&rose_neigh_list_lock, flags);
+	spin_lock_bh(&rose_neigh_list_lock);
 
 	len += sprintf(buffer, "address    mask n neigh neigh neigh\n");
 
@@ -1121,7 +1105,7 @@ int rose_nodes_get_info(char *buffer, char **start, off_t offset, int length)
 		if (pos > offset + length)
 			break;
 	}
-	spin_unlock_irqrestore(&rose_neigh_list_lock, flags);
+	spin_unlock_bh(&rose_neigh_list_lock);
 
 	*start = buffer + (offset - begin);
 	len   -= (offset - begin);
@@ -1135,13 +1119,12 @@ int rose_nodes_get_info(char *buffer, char **start, off_t offset, int length)
 int rose_neigh_get_info(char *buffer, char **start, off_t offset, int length)
 {
 	struct rose_neigh *rose_neigh;
-	unsigned long flags;
 	int len     = 0;
 	off_t pos   = 0;
 	off_t begin = 0;
 	int i;
 
-	spin_lock_irqsave(&rose_neigh_list_lock, flags);
+	spin_lock_bh(&rose_neigh_list_lock);
 
 	len += sprintf(buffer, "addr  callsign  dev  count use mode restart  t0  tf digipeaters\n");
 
@@ -1177,7 +1160,7 @@ int rose_neigh_get_info(char *buffer, char **start, off_t offset, int length)
 		/* } */
 	}
 
-	spin_unlock_irqrestore(&rose_neigh_list_lock, flags);
+	spin_unlock_bh(&rose_neigh_list_lock);
 
 	*start = buffer + (offset - begin);
 	len   -= (offset - begin);
@@ -1191,12 +1174,11 @@ int rose_neigh_get_info(char *buffer, char **start, off_t offset, int length)
 int rose_routes_get_info(char *buffer, char **start, off_t offset, int length)
 {
 	struct rose_route *rose_route;
-	unsigned long flags;
 	int len     = 0;
 	off_t pos   = 0;
 	off_t begin = 0;
 
-	spin_lock_irqsave(&rose_route_list_lock, flags);
+	spin_lock_bh(&rose_route_list_lock);
 
 	len += sprintf(buffer, "lci  address     callsign   neigh  <-> lci  address     callsign   neigh\n");
 
@@ -1232,7 +1214,7 @@ int rose_routes_get_info(char *buffer, char **start, off_t offset, int length)
 			break;
 	}
 
-	spin_unlock_irqrestore(&rose_route_list_lock, flags);
+	spin_unlock_bh(&rose_route_list_lock);
 
 	*start = buffer + (offset - begin);
 	len   -= (offset - begin);

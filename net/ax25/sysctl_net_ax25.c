@@ -104,11 +104,10 @@ static const ctl_table ax25_param_table[] = {
 
 void ax25_register_sysctl(void)
 {
-	unsigned long flags;
 	ax25_dev *ax25_dev;
 	int n, k;
 
-	spin_lock_irqsave(&ax25_dev_lock, flags);
+	spin_lock_bh(&ax25_dev_lock);
 	for (ax25_table_size = sizeof(ctl_table), ax25_dev = ax25_dev_list; ax25_dev != NULL; ax25_dev = ax25_dev->next)
 		ax25_table_size += sizeof(ctl_table);
 
@@ -123,7 +122,7 @@ void ax25_register_sysctl(void)
 			while (n--)
 				kfree(ax25_table[n].child);
 			kfree(ax25_table);
-			spin_unlock_irqrestore(&ax25_dev_lock, flags);
+			spin_unlock_bh(&ax25_dev_lock);
 			return;
 		}
 		memcpy(child, ax25_param_table, sizeof(ax25_param_table));
@@ -149,7 +148,7 @@ void ax25_register_sysctl(void)
 
 		n++;
 	}
-	spin_unlock_irqrestore(&ax25_dev_lock, flags);
+	spin_unlock_bh(&ax25_dev_lock);
 
 	ax25_dir_table[0].child = ax25_table;
 

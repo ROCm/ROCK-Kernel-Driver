@@ -160,25 +160,24 @@ decmod:	MOD_DEC_USE_COUNT;
 static void rose_remove_socket(struct sock *sk)
 {
 	struct sock *s;
-	unsigned long flags;
 
-	spin_lock_irqsave(&rose_list_lock, flags);
+	spin_lock_bh(&rose_list_lock);
 	if ((s = rose_list) == sk) {
 		rose_list = s->next;
-		spin_unlock_irqrestore(&rose_list_lock, flags);
+		spin_unlock_bh(&rose_list_lock);
 		return;
 	}
 
 	while (s != NULL && s->next != NULL) {
 		if (s->next == sk) {
 			s->next = sk->next;
-			spin_unlock_irqrestore(&rose_list_lock, flags);
+			spin_unlock_bh(&rose_list_lock);
 			return;
 		}
 
 		s = s->next;
 	}
-	spin_unlock_irqrestore(&rose_list_lock, flags);
+	spin_unlock_bh(&rose_list_lock);
 }
 
 /*
@@ -187,10 +186,9 @@ static void rose_remove_socket(struct sock *sk)
  */
 void rose_kill_by_neigh(struct rose_neigh *neigh)
 {
-	unsigned long flags;
 	struct sock *s;
 
-	spin_lock_irqsave(&rose_list_lock, flags);
+	spin_lock_bh(&rose_list_lock);
 	for (s = rose_list; s != NULL; s = s->next) {
 		rose_cb *rose = rose_sk(s);
 
@@ -200,7 +198,7 @@ void rose_kill_by_neigh(struct rose_neigh *neigh)
 			rose->neighbour = NULL;
 		}
 	}
-	spin_unlock_irqrestore(&rose_list_lock, flags);
+	spin_unlock_bh(&rose_list_lock);
 }
 
 /*
@@ -208,10 +206,9 @@ void rose_kill_by_neigh(struct rose_neigh *neigh)
  */
 static void rose_kill_by_device(struct net_device *dev)
 {
-	unsigned long flags;
 	struct sock *s;
 
-	spin_lock_irqsave(&rose_list_lock, flags);
+	spin_lock_bh(&rose_list_lock);
 	for (s = rose_list; s != NULL; s = s->next) {
 		rose_cb *rose = rose_sk(s);
 
@@ -221,7 +218,7 @@ static void rose_kill_by_device(struct net_device *dev)
 			rose->device = NULL;
 		}
 	}
-	spin_unlock_irqrestore(&rose_list_lock, flags);
+	spin_unlock_bh(&rose_list_lock);
 }
 
 /*
@@ -253,12 +250,11 @@ static int rose_device_event(struct notifier_block *this, unsigned long event,
  */
 static void rose_insert_socket(struct sock *sk)
 {
-	unsigned long flags;
 
-	spin_lock_irqsave(&rose_list_lock, flags);
+	spin_lock_bh(&rose_list_lock);
 	sk->next  = rose_list;
 	rose_list = sk;
-	spin_unlock_irqrestore(&rose_list_lock, flags);
+	spin_unlock_bh(&rose_list_lock);
 }
 
 /*
@@ -267,17 +263,16 @@ static void rose_insert_socket(struct sock *sk)
  */
 static struct sock *rose_find_listener(rose_address *addr, ax25_address *call)
 {
-	unsigned long flags;
 	struct sock *s;
 
-	spin_lock_irqsave(&rose_list_lock, flags);
+	spin_lock_bh(&rose_list_lock);
 	for (s = rose_list; s != NULL; s = s->next) {
 		rose_cb *rose = rose_sk(s);
 
 		if (!rosecmp(&rose->source_addr, addr) &&
 		    !ax25cmp(&rose->source_call, call) &&
 		    !rose->source_ndigis && s->state == TCP_LISTEN) {
-			spin_unlock_irqrestore(&rose_list_lock, flags);
+			spin_unlock_bh(&rose_list_lock);
 			return s;
 		}
 	}
@@ -288,11 +283,11 @@ static struct sock *rose_find_listener(rose_address *addr, ax25_address *call)
 		if (!rosecmp(&rose->source_addr, addr) &&
 		    !ax25cmp(&rose->source_call, &null_ax25_address) &&
 		    s->state == TCP_LISTEN) {
-			spin_unlock_irqrestore(&rose_list_lock, flags);
+			spin_unlock_bh(&rose_list_lock);
 			return s;
 		}
 	}
-	spin_unlock_irqrestore(&rose_list_lock, flags);
+	spin_unlock_bh(&rose_list_lock);
 
 	return NULL;
 }
@@ -302,19 +297,18 @@ static struct sock *rose_find_listener(rose_address *addr, ax25_address *call)
  */
 struct sock *rose_find_socket(unsigned int lci, struct rose_neigh *neigh)
 {
-	unsigned long flags;
 	struct sock *s;
 
-	spin_lock_irqsave(&rose_list_lock, flags);
+	spin_lock_bh(&rose_list_lock);
 	for (s = rose_list; s != NULL; s = s->next) {
 		rose_cb *rose = rose_sk(s);
 
 		if (rose->lci == lci && rose->neighbour == neigh) {
-			spin_unlock_irqrestore(&rose_list_lock, flags);
+			spin_unlock_bh(&rose_list_lock);
 			return s;
 		}
 	}
-	spin_unlock_irqrestore(&rose_list_lock, flags);
+	spin_unlock_bh(&rose_list_lock);
 
 	return NULL;
 }
@@ -1362,7 +1356,6 @@ static int rose_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 
 static int rose_get_info(char *buffer, char **start, off_t offset, int length)
 {
-	unsigned long flags;
 	struct sock *s;
 	struct net_device *dev;
 	const char *devname, *callsign;
@@ -1370,7 +1363,7 @@ static int rose_get_info(char *buffer, char **start, off_t offset, int length)
 	off_t pos = 0;
 	off_t begin = 0;
 
-	spin_lock_irqsave(&rose_list_lock, flags);
+	spin_lock_bh(&rose_list_lock);
 
 	len += sprintf(buffer, "dest_addr  dest_call src_addr   src_call  dev   lci neigh st vs vr va   t  t1  t2  t3  hb    idle Snd-Q Rcv-Q inode\n");
 
@@ -1422,7 +1415,7 @@ static int rose_get_info(char *buffer, char **start, off_t offset, int length)
 		if (pos > offset + length)
 			break;
 	}
-	spin_unlock_irqrestore(&rose_list_lock, flags);
+	spin_unlock_bh(&rose_list_lock);
 
 	*start = buffer + (offset - begin);
 	len   -= (offset - begin);

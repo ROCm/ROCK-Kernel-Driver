@@ -99,27 +99,26 @@ decmod:	MOD_DEC_USE_COUNT;
 static void nr_remove_socket(struct sock *sk)
 {
 	struct sock *s;
-	unsigned long flags;
 
-	spin_lock_irqsave(&nr_list_lock, flags);
+	spin_lock_bh(&nr_list_lock);
 
 	if ((s = nr_list) == sk) {
 		nr_list = s->next;
-		spin_unlock_irqrestore(&nr_list_lock, flags);
+		spin_unlock_bh(&nr_list_lock);
 		return;
 	}
 
 	while (s != NULL && s->next != NULL) {
 		if (s->next == sk) {
 			s->next = sk->next;
-			spin_unlock_irqrestore(&nr_list_lock, flags);
+			spin_unlock_bh(&nr_list_lock);
 			return;
 		}
 
 		s = s->next;
 	}
 
-	spin_unlock_irqrestore(&nr_list_lock, flags);
+	spin_unlock_bh(&nr_list_lock);
 }
 
 /*
@@ -127,15 +126,14 @@ static void nr_remove_socket(struct sock *sk)
  */
 static void nr_kill_by_device(struct net_device *dev)
 {
-	unsigned long flags;
 	struct sock *s;
 
-	spin_lock_irqsave(&nr_list_lock, flags);
+	spin_lock_bh(&nr_list_lock);
 	for (s = nr_list; s != NULL; s = s->next) {
 		if (nr_sk(s)->device == dev)
 			nr_disconnect(s, ENETUNREACH);
 	}
-	spin_unlock_irqrestore(&nr_list_lock, flags);
+	spin_unlock_bh(&nr_list_lock);
 }
 
 /*
@@ -159,12 +157,10 @@ static int nr_device_event(struct notifier_block *this, unsigned long event, voi
  */
 static void nr_insert_socket(struct sock *sk)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&nr_list_lock, flags);
+	spin_lock_bh(&nr_list_lock);
 	sk->next = nr_list;
 	nr_list  = sk;
-	spin_unlock_irqrestore(&nr_list_lock, flags);
+	spin_unlock_bh(&nr_list_lock);
 }
 
 /*
@@ -173,18 +169,17 @@ static void nr_insert_socket(struct sock *sk)
  */
 static struct sock *nr_find_listener(ax25_address *addr)
 {
-	unsigned long flags;
 	struct sock *s;
 
-	spin_lock_irqsave(&nr_list_lock, flags);
+	spin_lock_bh(&nr_list_lock);
 	for (s = nr_list; s != NULL; s = s->next) {
 		if (!ax25cmp(&nr_sk(s)->source_addr, addr) &&
 		    s->state == TCP_LISTEN) {
-			spin_unlock_irqrestore(&nr_list_lock, flags);
+			spin_unlock_bh(&nr_list_lock);
 			return s;
 		}
 	}
-	spin_unlock_irqrestore(&nr_list_lock, flags);
+	spin_unlock_bh(&nr_list_lock);
 
 	return NULL;
 }
@@ -195,18 +190,17 @@ static struct sock *nr_find_listener(ax25_address *addr)
 static struct sock *nr_find_socket(unsigned char index, unsigned char id)
 {
 	struct sock *s;
-	unsigned long flags;
 
-	spin_lock_irqsave(&nr_list_lock, flags);
+	spin_lock_bh(&nr_list_lock);
 	for (s = nr_list; s != NULL; s = s->next) {
 		nr_cb *nr = nr_sk(s);
 		
 		if (nr->my_index == index && nr->my_id == id) {
-			spin_unlock_irqrestore(&nr_list_lock, flags);
+			spin_unlock_bh(&nr_list_lock);
 			return s;
 		}
 	}
-	spin_unlock_irqrestore(&nr_list_lock, flags);
+	spin_unlock_bh(&nr_list_lock);
 
 	return NULL;
 }
@@ -217,20 +211,19 @@ static struct sock *nr_find_socket(unsigned char index, unsigned char id)
 static struct sock *nr_find_peer(unsigned char index, unsigned char id,
 	ax25_address *dest)
 {
-	unsigned long flags;
 	struct sock *s;
 
-	spin_lock_irqsave(&nr_list_lock, flags);
+	spin_lock_bh(&nr_list_lock);
 	for (s = nr_list; s != NULL; s = s->next) {
 		nr_cb *nr = nr_sk(s);
 		
 		if (nr->your_index == index && nr->your_id == id &&
 		    !ax25cmp(&nr->dest_addr, dest)) {
-			spin_unlock_irqrestore(&nr_list_lock, flags);
+			spin_unlock_bh(&nr_list_lock);
 			return s;
 		}
 	}
-	spin_unlock_irqrestore(&nr_list_lock, flags);
+	spin_unlock_bh(&nr_list_lock);
 
 	return NULL;
 }
@@ -1164,7 +1157,6 @@ static int nr_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 
 static int nr_get_info(char *buffer, char **start, off_t offset, int length)
 {
-	unsigned long flags;
 	struct sock *s;
 	struct net_device *dev;
 	const char *devname;
@@ -1172,7 +1164,7 @@ static int nr_get_info(char *buffer, char **start, off_t offset, int length)
 	off_t pos = 0;
 	off_t begin = 0;
 
-	spin_lock_irqsave(&nr_list_lock, flags);
+	spin_lock_bh(&nr_list_lock);
 
 	len += sprintf(buffer, "user_addr dest_node src_node  dev    my  your  st  vs  vr  va    t1     t2     t4      idle   n2  wnd Snd-Q Rcv-Q inode\n");
 
@@ -1225,7 +1217,7 @@ static int nr_get_info(char *buffer, char **start, off_t offset, int length)
 			break;
 	}
 
-	spin_unlock_irqrestore(&nr_list_lock, flags);
+	spin_unlock_bh(&nr_list_lock);
 
 	*start = buffer + (offset - begin);
 	len   -= (offset - begin);

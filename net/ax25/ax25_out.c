@@ -115,7 +115,6 @@ void ax25_output(ax25_cb *ax25, int paclen, struct sk_buff *skb)
 	struct sk_buff *skbn;
 	unsigned char *p;
 	int frontlen, len, fragno, ka9qfrag, first = 1;
-	long flags;
 
 	if ((skb->len - 1) > paclen) {
 		if (*skb->data == AX25_P_TEXT) {
@@ -132,9 +131,9 @@ void ax25_output(ax25_cb *ax25, int paclen, struct sk_buff *skb)
 		frontlen = skb_headroom(skb);	/* Address space + CTRL */
 
 		while (skb->len > 0) {
-			spin_lock_irqsave(&ax25_frag_lock, flags);
+			spin_lock_bh(&ax25_frag_lock);
 			if ((skbn = alloc_skb(paclen + 2 + frontlen, GFP_ATOMIC)) == NULL) {
-				spin_unlock_irqrestore(&ax25_frag_lock, flags);
+				spin_unlock_bh(&ax25_frag_lock);
 				printk(KERN_CRIT "AX.25: ax25_output - out of memory\n");
 				return;
 			}
@@ -142,7 +141,7 @@ void ax25_output(ax25_cb *ax25, int paclen, struct sk_buff *skb)
 			if (skb->sk != NULL)
 				skb_set_owner_w(skbn, skb->sk);
 
-			spin_unlock_irqrestore(&ax25_frag_lock, flags);
+			spin_unlock_bh(&ax25_frag_lock);
 
 			len = (paclen > skb->len) ? skb->len : paclen;
 
