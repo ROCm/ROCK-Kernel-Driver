@@ -135,7 +135,7 @@ static void e100_non_tx_background(unsigned long);
 
 /* Global Data structures and variables */
 char e100_copyright[] __devinitdata = "Copyright (c) 2002 Intel Corporation";
-char e100_driver_version[]="2.1.29-k1";
+char e100_driver_version[]="2.1.29-k2";
 const char *e100_full_driver_name = "Intel(R) PRO/100 Network Driver";
 char e100_short_driver_name[] = "e100";
 static int e100nics = 0;
@@ -1431,6 +1431,7 @@ e100_setup_tcb_pool(tcb_t *head, unsigned int qlen, struct e100_private *bdp)
 	u32 next_phys;		/* the next phys addr */
 	u16 txcommand = CB_S_BIT | CB_TX_SF_BIT;
 
+	bdp->tx_count = 0;
 	if (bdp->flags & USE_IPCB) {
 		txcommand |= CB_IPCB_TRANSMIT | CB_CID_DEFAULT;
 	} else if (bdp->flags & IS_BACHELOR) {
@@ -1876,10 +1877,8 @@ e100intr(int irq, void *dev_inst, struct pt_regs *regs)
 		bdp->drv_stats.rx_intr_pkts += e100_rx_srv(bdp);
 
 	/* clean up after tx'ed packets */
-	if (intr_status & (SCB_STATUS_ACK_CNA | SCB_STATUS_ACK_CX)) {
-		bdp->tx_count = 0;	/* restart tx interrupt batch count */
+	if (intr_status & (SCB_STATUS_ACK_CNA | SCB_STATUS_ACK_CX))
 		e100_tx_srv(bdp);
-	}
 
 	e100_set_intr_mask(bdp);
 }
@@ -2187,11 +2186,12 @@ e100_prepare_xmit_buff(struct e100_private *bdp, struct sk_buff *skb)
 	tcb->tcb_thrshld = bdp->tx_thld;
 	tcb->tcb_hdr.cb_cmd |= __constant_cpu_to_le16(CB_S_BIT);
 
-	/* set the I bit on the modulo tcbs, so we will get an interrupt * to
-	 * clean things up */
-	if (!(++bdp->tx_count % TX_FRAME_CNT)) {
+	/* Set I (Interrupt) bit on every (TX_FRAME_CNT)th packet */
+	if (!(++bdp->tx_count % TX_FRAME_CNT))
 		tcb->tcb_hdr.cb_cmd |= __constant_cpu_to_le16(CB_I_BIT);
-	}
+	else
+		/* Clear I bit on other packets */
+		tcb->tcb_hdr.cb_cmd &= ~__constant_cpu_to_le16(CB_I_BIT);
 
 	tcb->tcb_skb = skb;
 
