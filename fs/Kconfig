@@ -531,8 +531,8 @@ config JFFS2_FS
 	  levelling, compression and support for hard links. You cannot use
 	  this on normal block devices, only on 'MTD' devices.
 
-	  Further information should be made available soon at
-	  <http://sources.redhat.com/jffs2/>.
+	  Further information on the design and implementation of JFFS2 is
+	  available at <http://sources.redhat.com/jffs2/>.
 
 config JFFS2_FS_DEBUG
 	int "JFFS2 debugging verbosity (0 = quiet, 2 = noisy)"
@@ -554,6 +554,19 @@ config JFFS2_FS_DEBUG
 config JFFS2_FS_NAND
 	bool "JFFS2 support for NAND flash (EXPERIMENTAL)"
 	depends on JFFS2_FS && EXPERIMENTAL
+	default n
+	---help---
+	  This enables the experimental support for NAND flash in JFFS2. NAND
+	  is a newer type of flash chip design than the traditional NOR flash,
+	  with higher density but a handful of characteristics which make it
+	  more interesting for the file system to use. Support for NAND flash
+	  is not yet complete and may corrupt data. For further information,
+	  including a link to the mailing list where details of the remaining
+	  work to be completed for NAND flash support can be found, see the 
+	  JFFS2 web site at <http://sources.redhat.com/jffs2>.
+
+	  Say 'N' unless you have NAND flash and you are willing to test and
+	  develop JFFS2 support for it.
 
 config CRAMFS
 	tristate "Compressed ROM file system support"
