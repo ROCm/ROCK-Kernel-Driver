@@ -292,6 +292,9 @@ running once the system is up.
 
 	devfs=		[DEVFS]
 			See Documentation/filesystems/devfs/boot-options.
+
+	dhash_entries=	[KNL]
+			Set number of hash buckets for dentry cache.
  
 	digi=		[HW,SERIAL]
 			IO parameters + enable/disable command.
@@ -441,6 +444,9 @@ running once the system is up.
 	idle=		[HW]
 			Format: idle=poll or idle=halt
  
+	ihash_entries=	[KNL]
+			Set number of hash buckets for inode cache.
+
 	in2000=		[HW,SCSI]
 			See header of drivers/scsi/in2000.c.
 
@@ -890,6 +896,9 @@ running once the system is up.
 
 	resume=		[SWSUSP] Specify the partition device for software suspension
 
+	rhash_entries=	[KNL,NET]
+			Set number of hash buckets for route cache
+
 	riscom8=	[HW,SERIAL]
 			Format: <io_board1>[,<io_board2>[,...<io_boardN>]]
 
@@ -1151,6 +1160,9 @@ running once the system is up.
 	tgfx=		[HW,JOY] TurboGraFX parallel port interface
 	tgfx_2=		See Documentation/input/joystick-parport.txt.
 	tgfx_3=
+
+	thash_entries=	[KNL,NET]
+			Set number of hash buckets for TCP connection
 
 	tipar=		[HW]
 			See header of drivers/char/tipar.c.
