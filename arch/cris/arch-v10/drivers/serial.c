@@ -1,4 +1,4 @@
-/* $Id: serial.c,v 1.20 2004/05/24 12:00:20 starvik Exp $
+/* $Id: serial.c,v 1.25 2004/09/29 10:33:49 starvik Exp $
  *
  * Serial port driver for the ETRAX 100LX chip
  *
@@ -7,6 +7,20 @@
  *    Many, many authors. Based once upon a time on serial.c for 16x50.
  *
  * $Log: serial.c,v $
+ * Revision 1.25  2004/09/29 10:33:49  starvik
+ * Resolved a dealock when printing debug from kernel.
+ *
+ * Revision 1.24  2004/08/27 23:25:59  johana
+ * rs_set_termios() must call change_speed() if c_iflag has changed or
+ * automatic XOFF handling will be enabled and transmitter will stop
+ * if 0x13 is received.
+ *
+ * Revision 1.23  2004/08/24 06:57:13  starvik
+ * More whitespace cleanup
+ *
+ * Revision 1.22  2004/08/24 06:12:20  starvik
+ * Whitespace cleanup
+ *
  * Revision 1.20  2004/05/24 12:00:20  starvik
  * Big merge of stuff from Linux 2.4 (e.g. manual mode for the serial port).
  *
@@ -409,7 +423,7 @@
  *
  */
 
-static char *serial_version = "$Revision: 1.20 $";
+static char *serial_version = "$Revision: 1.25 $";
 
 #include <linux/config.h>
 #include <linux/version.h>
@@ -435,7 +449,7 @@ static char *serial_version = "$Revision: 1.20 $";
 #include <asm/irq.h>
 #include <asm/system.h>
 #include <asm/segment.h>
-#include <linux/bitops.h>
+#include <asm/bitops.h>
 #include <linux/delay.h>
 
 #include <asm/arch/svinto.h>
@@ -577,12 +591,12 @@ unsigned long timer_data_to_ns(unsigned long timer_data);
 static void change_speed(struct e100_serial *info);
 static void rs_throttle(struct tty_struct * tty);
 static void rs_wait_until_sent(struct tty_struct *tty, int timeout);
-static int rs_write(struct tty_struct * tty,
+static int rs_write(struct tty_struct * tty, int from_user,
                     const unsigned char *buf, int count);
-extern _INLINE_ int rs_raw_write(struct tty_struct * tty,
+extern _INLINE_ int rs_raw_write(struct tty_struct * tty, int from_user,
                             const unsigned char *buf, int count);
 #ifdef CONFIG_ETRAX_RS485
-static int e100_write_rs485(struct tty_struct * tty,
+static int e100_write_rs485(struct tty_struct * tty, int from_user,
                             const unsigned char *buf, int count);
 #endif
 static int get_lsr_info(struct e100_serial * info, unsigned int *value);
@@ -1786,7 +1800,7 @@ e100_enable_rs485(struct tty_struct *tty,struct rs485_control *r)
 }
 
 static int
-e100_write_rs485(struct tty_struct *tty,
+e100_write_rs485(struct tty_struct *tty, int from_user,
                  const unsigned char *buf, int count)
 {
 	struct e100_serial * info = (struct e100_serial *)tty->driver_data;
@@ -1799,7 +1813,7 @@ e100_write_rs485(struct tty_struct *tty,
 	 */
 	info->rs485.enabled = 1;
 	/* rs_write now deals with RS485 if enabled */
-	count = rs_write(tty, buf, count);
+	count = rs_write(tty, from_user, buf, count);
 	info->rs485.enabled = old_enabled;
 	return count;
 }
@@ -3614,7 +3628,7 @@ rs_flush_chars(struct tty_struct *tty)
 }
 
 extern _INLINE_ int
-rs_raw_write(struct tty_struct * tty,
+rs_raw_write(struct tty_struct * tty, int from_user,
 	  const unsigned char *buf, int count)
 {
 	int	c, ret = 0;
@@ -3649,25 +3663,60 @@ rs_raw_write(struct tty_struct * tty,
 	 * atomic operation... this could perhaps be avoided by more clever
 	 * design.
 	 */
-	cli();	
-	while (1) {
-		c = CIRC_SPACE_TO_END(info->xmit.head,
-				      info->xmit.tail,
-				      SERIAL_XMIT_SIZE);
+	if (from_user) {
+		down(&tmp_buf_sem);
+		while (1) {
+			int c1;
+			c = CIRC_SPACE_TO_END(info->xmit.head,
+					      info->xmit.tail,
+					      SERIAL_XMIT_SIZE);
+			if (count < c)
+				c = count;
+			if (c <= 0)
+				break;
 
-		if (count < c)
-			c = count;
-		if (c <= 0)
-			break;
+			c -= copy_from_user(tmp_buf, buf, c);
+			if (!c) {
+				if (!ret)
+					ret = -EFAULT;
+				break;
+			}
+			cli();
+			c1 = CIRC_SPACE_TO_END(info->xmit.head,
+					       info->xmit.tail,
+					       SERIAL_XMIT_SIZE);
+			if (c1 < c)
+				c = c1;
+			memcpy(info->xmit.buf + info->xmit.head, tmp_buf, c);
+			info->xmit.head = ((info->xmit.head + c) &
+					   (SERIAL_XMIT_SIZE-1));
+			restore_flags(flags);
+			buf += c;
+			count -= c;
+			ret += c;
+		}
+		up(&tmp_buf_sem);
+	} else {
+		cli();
+		while (count) {
+			c = CIRC_SPACE_TO_END(info->xmit.head,
+					      info->xmit.tail,
+					      SERIAL_XMIT_SIZE);
+
+			if (count < c)
+				c = count;
+			if (c <= 0)
+				break;
 		
-		memcpy(info->xmit.buf + info->xmit.head, buf, c);
-		info->xmit.head = (info->xmit.head + c) &
-			(SERIAL_XMIT_SIZE-1);
-		buf += c;
-		count -= c;
-		ret += c;
+			memcpy(info->xmit.buf + info->xmit.head, buf, c);
+			info->xmit.head = (info->xmit.head + c) &
+				(SERIAL_XMIT_SIZE-1);
+			buf += c;
+			count -= c;
+			ret += c;
+		}
+		restore_flags(flags);
 	}
-	restore_flags(flags);
 	
 	/* enable transmitter if not running, unless the tty is stopped
 	 * this does not need IRQ protection since if tr_running == 0
@@ -3686,7 +3735,7 @@ rs_raw_write(struct tty_struct * tty,
 } /* raw_raw_write() */
 
 static int 
-rs_write(struct tty_struct * tty,
+rs_write(struct tty_struct * tty, int from_user,
 	 const unsigned char *buf, int count)
 {
 #if defined(CONFIG_ETRAX_RS485)
@@ -3715,7 +3764,7 @@ rs_write(struct tty_struct * tty,
 	}
 #endif /* CONFIG_ETRAX_RS485 */
 
-	count = rs_raw_write(tty, buf, count);
+	count = rs_raw_write(tty, from_user, buf, count);
 
 #if defined(CONFIG_ETRAX_RS485)
 	if (info->rs485.enabled)
@@ -3945,12 +3994,12 @@ set_serial_info(struct e100_serial *info,
 	
 	if (info->count > 1)
 		return -EBUSY;
-	
+
 	/*
 	 * OK, past this point, all the error checking has been done.
 	 * At this point, we start making changes.....
 	 */
-	
+
 	info->baud_base = new_serial.baud_base;
 	info->flags = ((info->flags & ~ASYNC_FLAGS) |
 		       (new_serial.flags & ASYNC_FLAGS));
@@ -4217,7 +4266,8 @@ rs_set_termios(struct tty_struct *tty, struct termios *old_termios)
 {
 	struct e100_serial *info = (struct e100_serial *)tty->driver_data;
 
-	if (tty->termios->c_cflag == old_termios->c_cflag)
+	if (tty->termios->c_cflag == old_termios->c_cflag &&
+	    tty->termios->c_iflag == old_termios->c_iflag)
 		return;
 
 	change_speed(info);
@@ -4241,6 +4291,7 @@ extern debugport_write_function debug_write_function;
 static int rs_debug_write_function(int i, const char *buf, unsigned int len)
 {
 	int cnt;
+	int written = 0;
         struct tty_struct *tty;
         static int recurse_cnt = 0;
 
@@ -4252,14 +4303,17 @@ static int rs_debug_write_function(int i, const char *buf, unsigned int len)
 
 		local_irq_save(flags);
 		recurse_cnt++;
+		local_irq_restore(flags);
                 do {
-                        cnt = rs_write(tty, 0, buf, len);
+                        cnt = rs_write(tty, 0, buf + written, len);
                         if (cnt >= 0) {
+				written += cnt;
                                 buf += cnt;
                                 len -= cnt;
                         } else
                                 len = cnt;
                 } while(len > 0);
+		local_irq_save(flags);
 		recurse_cnt--;
 		local_irq_restore(flags);
                 return 1;
