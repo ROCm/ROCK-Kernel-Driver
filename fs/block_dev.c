@@ -322,6 +322,7 @@ struct block_device *bdget(dev_t dev)
 			atomic_set(&new_bdev->bd_count,1);
 			new_bdev->bd_dev = dev;
 			new_bdev->bd_op = NULL;
+			new_bdev->bd_queue = NULL;
 			new_bdev->bd_contains = NULL;
 			new_bdev->bd_inode = inode;
 			inode->i_mode = S_IFBLK;
@@ -607,6 +608,7 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 	}
 	bdev->bd_inode->i_size = blkdev_size(dev);
 	if (!bdev->bd_openers) {
+		struct blk_dev_struct *p = blk_dev + major(dev);
 		unsigned bsize = bdev_hardsect_size(bdev);
 		while (bsize < PAGE_CACHE_SIZE) {
 			if (bdev->bd_inode->i_size & bsize)
@@ -615,6 +617,10 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 		}
 		bdev->bd_block_size = bsize;
 		bdev->bd_inode->i_blkbits = blksize_bits(bsize);
+		if (p->queue)
+			bdev->bd_queue =  p->queue(dev);
+		else
+			bdev->bd_queue = &p->request_queue;
 	}
 	bdev->bd_openers++;
 	unlock_kernel();
@@ -624,6 +630,7 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 out2:
 	if (!bdev->bd_openers) {
 		bdev->bd_op = NULL;
+		bdev->bd_queue = NULL;
 		bdev->bd_inode->i_data.backing_dev_info = &default_backing_dev_info;
 		if (bdev != bdev->bd_contains) {
 			blkdev_put(bdev->bd_contains, BDEV_RAW);
@@ -698,6 +705,7 @@ int blkdev_put(struct block_device *bdev, int kind)
 		__MOD_DEC_USE_COUNT(bdev->bd_op->owner);
 	if (!bdev->bd_openers) {
 		bdev->bd_op = NULL;
+		bdev->bd_queue = NULL;
 		bdev->bd_inode->i_data.backing_dev_info = &default_backing_dev_info;
 		if (bdev != bdev->bd_contains) {
 			blkdev_put(bdev->bd_contains, BDEV_RAW);

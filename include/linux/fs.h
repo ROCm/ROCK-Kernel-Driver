@@ -341,6 +341,7 @@ struct block_device {
 	dev_t			bd_dev;  /* not a kdev_t - it's a search key */
 	int			bd_openers;
 	const struct block_device_operations *bd_op;
+	struct request_queue	*bd_queue;
 	struct semaphore	bd_sem;	/* open/close mutex */
 	struct list_head	bd_inodes;
 	void *			bd_holder;

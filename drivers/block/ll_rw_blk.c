@@ -92,12 +92,7 @@ int blk_nohighio = 0;
  **/
 inline request_queue_t *bdev_get_queue(struct block_device *bdev)
 {
-	kdev_t dev = to_kdev_t(bdev->bd_dev);
-	struct blk_dev_struct *p = blk_dev + major(dev);
-	if (p->queue)
-		return p->queue(dev);
-	else
-		return &blk_dev[major(dev)].request_queue;
+	return bdev->bd_queue;
 }
 
 /**
