@@ -127,6 +127,14 @@
 #define AC97_CSR_SPECF_DATA	0x6e	/* Special Feature Data */
 #define AC97_CSR_BDI_STATUS	0x7a	/* BDI Status */
 
+/* specific - Conexant */
+#define AC97_CXR_AUDIO_MISC	0x5c
+#define AC97_CXR_SPDIFEN	(1<<3)
+#define AC97_CXR_COPYRGT	(1<<2)
+#define AC97_CXR_SPDIF_MASK	(3<<0)
+#define AC97_CXR_SPDIF_PCM	0x0
+#define AC97_CXR_SPDIF_AC3	0x2
+
 /* ac97->scaps */
 #define AC97_SCAP_SURROUND_DAC	(1<<0)	/* surround L&R DACs are present */
 #define AC97_SCAP_CENTER_LFE_DAC (1<<1)	/* center and LFE DACs are present */
@@ -135,6 +143,7 @@
 #define AC97_HAS_PC_BEEP	(1<<0)	/* force PC Speaker usage */
 #define AC97_AD_MULTI		(1<<1)	/* Analog Devices - multi codecs */
 #define AC97_CS_SPDIF		(1<<2)	/* Cirrus Logic uses funky SPDIF */
+#define AC97_CX_SPDIF		(1<<3)	/* Conexant's spdif interface */
 
 /*
 

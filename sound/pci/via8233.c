@@ -364,7 +364,7 @@ static void snd_via8233_setup_periods(via8233_t *chip, viadev_t *viadev,
 		outb(fmt, chip->port + VIA_REG_MULTPLAY_FORMAT);
 		/* set sample number to slot 3, 4, 7, 8, 6, 9 */
 		switch (runtime->channels) {
-		case 1: slots = (1<<0); break;
+		case 1: slots = (1<<0) | (1<<4); break;
 		case 2: slots = (1<<0) | (2<<4); break;
 		case 4: slots = (1<<0) | (2<<4) | (3<<8) | (4<<12); break;
 		case 6: slots = (1<<0) | (2<<4) | (5<<8) | (6<<12) | (3<<16) | (4<<20); break;

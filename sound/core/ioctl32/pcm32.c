@@ -55,7 +55,9 @@ struct sndrv_interval32 {
 struct sndrv_pcm_hw_params32 {
 	u32 flags;
 	struct sndrv_mask masks[SNDRV_PCM_HW_PARAM_LAST_MASK - SNDRV_PCM_HW_PARAM_FIRST_MASK + 1]; /* this must be identical */
+	struct sndrv_mask mres[5];	/* reserved masks */
 	struct sndrv_interval32 intervals[SNDRV_PCM_HW_PARAM_LAST_INTERVAL - SNDRV_PCM_HW_PARAM_FIRST_INTERVAL + 1];
+	struct sndrv_interval ires[9];	/* reserved intervals */
 	u32 rmask;
 	u32 cmask;
 	u32 info;

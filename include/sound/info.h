@@ -151,8 +151,8 @@ static inline int snd_info_done(void) { return 0; }
 
 static inline int snd_info_get_line(snd_info_buffer_t * buffer, char *line, int len) { return 0; }
 static inline char *snd_info_get_str(char *dest, char *src, int len) { return NULL; }
-static inline snd_info_entry_t *snd_info_create_module_entry(struct module * module, const char *name) { return NULL; }
-static inline snd_info_entry_t *snd_info_create_card_entry(snd_card_t * card, const char *name) { return NULL; }
+static inline snd_info_entry_t *snd_info_create_module_entry(struct module * module, const char *name, snd_info_entry_t *parent) { return NULL; }
+static inline snd_info_entry_t *snd_info_create_card_entry(snd_card_t * card, const char *name, snd_info_entry_t *parent) { return NULL; }
 static inline void snd_info_free_entry(snd_info_entry_t * entry) { ; }
 static inline snd_info_entry_t *snd_info_create_device(const char *name,
 						       unsigned int number,
