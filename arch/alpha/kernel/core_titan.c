@@ -5,6 +5,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/pci.h>
@@ -564,6 +565,8 @@ titan_iounmap(unsigned long addr)
 	if (addr) return vfree((void *)(PAGE_MASK & addr)); 
 }
 
+EXPORT_SYMBOL(titan_ioremap);
+EXPORT_SYMBOL(titan_iounmap);
 
 /*
  * AGP GART Support
