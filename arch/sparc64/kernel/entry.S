@@ -26,7 +26,7 @@
 
 #define curptr      g6
 
-#define NR_SYSCALLS 267      /* Each OS is different... */
+#define NR_SYSCALLS 268      /* Each OS is different... */
 
 	.text
 	.align		32

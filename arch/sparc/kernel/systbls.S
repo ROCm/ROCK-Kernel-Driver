@@ -72,7 +72,7 @@ sys_call_table:
 /*250*/	.long sparc_mremap, sys_sysctl, sys_getsid, sys_fdatasync, sys_nfsservctl
 /*255*/	.long sys_nis_syscall, sys_clock_settime, sys_clock_gettime, sys_clock_getres, sys_clock_nanosleep
 /*260*/	.long sys_sched_getaffinity, sys_sched_setaffinity, sys_timer_settime, sys_timer_gettime, sys_timer_getoverrun
-/*265*/	.long sys_timer_delete, sys_timer_create, sys_nis_syscall
+/*265*/	.long sys_timer_delete, sys_timer_create, sys_nis_syscall, sys_nis_syscall
 
 #ifdef CONFIG_SUNOS_EMUL
 	/* Now the SunOS syscall table. */
@@ -171,6 +171,6 @@ sunos_sys_table:
 	.long sunos_nosys
 /*260*/	.long sunos_nosys, sunos_nosys, sunos_nosys
 	.long sunos_nosys, sunos_nosys, sunos_nosys
-	.long sunos_nosys, sunos_nosys
+	.long sunos_nosys, sunos_nosys, sunos_nosys
 
 #endif
