@@ -347,8 +347,9 @@ CFLAGS 		:= -Wall -Wstrict-prototypes -Wno-trigraphs \
 	  	   -fno-strict-aliasing -fno-common
 AFLAGS		:= -D__ASSEMBLY__
 
-ifneq ($(UNSUPPORTED_MODULES),)
-CFLAGS		+= -DUNSUPPORTED_MODULES=$(UNSUPPORTED_MODULES)
+# Warn about unsupported modules in kernels built inside Autobuild
+ifneq ($(wildcard /.buildenv),)
+CFLAGS		+= -DUNSUPPORTED_MODULES=1
 endif
 
 export	VERSION PATCHLEVEL SUBLEVEL EXTRAVERSION LOCALVERSION KERNELRELEASE \
