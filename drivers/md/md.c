@@ -56,11 +56,8 @@
 #include <linux/blk.h>
 
 #define DEBUG 0
-#if DEBUG
-# define dprintk(x...) printk(x)
-#else
-# define dprintk(x...) do { } while(0)
-#endif
+#define dprintk(x...) ((void)(DEBUG && printk(x)))
+
 
 #ifndef MODULE
 static void autostart_arrays (void);
@@ -2593,7 +2590,7 @@ static void md_recover_arrays(void)
 void md_error(mddev_t *mddev, mdk_rdev_t *rdev)
 {
 	dprintk("md_error dev:(%d:%d), rdev:(%d:%d), (caller: %p,%p,%p,%p).\n",
-		MD_MAJOR,mdidx(mddev),MAJOR(bdev->bd_dev),MINOR(bdev->bd_dev),
+		MD_MAJOR,mdidx(mddev),MAJOR(rdev->bdev->bd_dev),MINOR(rdev->bdev->bd_dev),
 		__builtin_return_address(0),__builtin_return_address(1),
 		__builtin_return_address(2),__builtin_return_address(3));
 

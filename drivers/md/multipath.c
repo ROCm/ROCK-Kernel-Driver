@@ -37,20 +37,6 @@
 #define	NR_RESERVED_BUFS	32
 
 
-/*
- * The following can be used to debug the driver
- */
-#define MULTIPATH_DEBUG	0
-
-#if MULTIPATH_DEBUG
-#define PRINTK(x...)   printk(x)
-#define inline
-#define __inline__
-#else
-#define PRINTK(x...)  do { } while (0)
-#endif
-
-
 static mdk_personality_t multipath_personality;
 static spinlock_t retry_list_lock = SPIN_LOCK_UNLOCKED;
 struct multipath_bh *multipath_retry_list = NULL, **multipath_retry_tail;
