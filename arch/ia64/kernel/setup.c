@@ -280,6 +280,29 @@ setup_serial_legacy (void)
 }
 #endif
 
+/**
+ * early_console_setup - setup debugging console
+ *
+ * Consoles started here require little enough setup that we can start using
+ * them very early in the boot process, either right after the machine
+ * vector initialization, or even before if the drivers can detect their hw.
+ *
+ * Returns non-zero if a console couldn't be setup.
+ */
+static int __init
+early_console_setup (void)
+{
+#ifdef CONFIG_SGI_L1_SERIAL_CONSOLE
+	{
+		extern int sn_serial_console_early_setup(void);
+		if(!sn_serial_console_early_setup())
+			return 0;
+	}
+#endif
+
+	return -1;
+}
+
 void __init
 setup_arch (char **cmdline_p)
 {
@@ -296,6 +319,10 @@ setup_arch (char **cmdline_p)
 #ifdef CONFIG_IA64_GENERIC
 	machvec_init(acpi_get_sysname());
 #endif
+
+	/* If we register an early console, allow CPU 0 to printk */
+	if (!early_console_setup())
+		cpu_set(smp_processor_id(), cpu_online_map);
 
 #ifdef CONFIG_ACPI_BOOT
 	/* Initialize the ACPI boot-time table parser */
