@@ -7,7 +7,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999-2001
  *
- * $Revision: 1.123 $
+ * $Revision: 1.127 $
  */
 
 #include <linux/config.h>
@@ -1003,7 +1003,7 @@ dasd_int_handler(struct ccw_device *cdev, unsigned long intparm,
 #ifdef ERP_DEBUG
 		/* dump sense data */
 		if (device->discipline && device->discipline->dump_sense)
-			device->discipline->dump_sense(device, cqr);
+			device->discipline->dump_sense(device, cqr, irb);
 #endif
 		switch (era) {
 		case dasd_era_fatal:
@@ -1782,9 +1782,19 @@ dasd_generic_set_online (struct ccw_device *cdev,
 	if (IS_ERR(device))
 		return PTR_ERR(device);
 
-	if (device->use_diag_flag)
+	if (device->use_diag_flag) {
+	  	if (!dasd_diag_discipline_pointer) {
+		        printk (KERN_WARNING
+				"dasd_generic couldn't online device %s "
+				"- discipline DIAG not available\n", 
+				cdev->dev.bus_id);
+			dasd_delete_device(device);
+			return -ENODEV;
+		}
 		discipline = dasd_diag_discipline_pointer;
+	}
 	device->discipline = discipline;
+
 	rc = discipline->check_device(device);
 	if (rc) {
 		printk (KERN_WARNING

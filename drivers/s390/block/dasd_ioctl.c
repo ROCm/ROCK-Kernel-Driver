@@ -248,6 +248,16 @@ dasd_format(struct dasd_device * device, struct format_data_t * fdata)
 		      fdata->start_unit,
 		      fdata->stop_unit, fdata->blksize, fdata->intensity);
 
+	/* Since dasdfmt keeps the device open after it was disabled,
+	 * there still exists an inode for this device. We must update i_blkbits,
+	 * otherwise we might get errors when enabling the device later.
+	 */
+	if (fdata->start_unit == 0) {
+		struct block_device *bdev = bdget_disk(device->gdp, 0);
+		bdev->bd_inode->i_blkbits = blksize_bits(fdata->blksize);
+		bdput(bdev);
+	}
+
 	while (fdata->start_unit <= fdata->stop_unit) {
 		cqr = device->discipline->format_device(device, fdata);
 		if (IS_ERR(cqr))
