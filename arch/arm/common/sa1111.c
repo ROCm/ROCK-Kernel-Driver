@@ -35,6 +35,10 @@
 
 #include <asm/hardware/sa1111.h>
 
+#ifdef CONFIG_ARCH_PXA
+#include <asm/arch/pxa-regs.h>
+#endif
+
 extern void __init sa1110_mb_enable(void);
 
 /*

@@ -841,17 +841,17 @@ xfs_setattr(
 			if (vap->va_xflags & XFS_XFLAG_NODUMP)
 				di_flags |= XFS_DIFLAG_NODUMP;
 			if ((ip->i_d.di_mode & S_IFMT) == S_IFDIR) {
-				if (vap->va_xflags & XFS_XFLAG_REALTIME) {
-					ip->i_iocore.io_flags |= XFS_IOCORE_RT;
-					di_flags |= XFS_DIFLAG_REALTIME;
-				}
 				if (vap->va_xflags & XFS_XFLAG_RTINHERIT)
 					di_flags |= XFS_DIFLAG_RTINHERIT;
 				if (vap->va_xflags & XFS_XFLAG_NOSYMLINKS)
 					di_flags |= XFS_DIFLAG_NOSYMLINKS;
 			} else {
-				if (!(vap->va_xflags & XFS_XFLAG_REALTIME))
+				if (vap->va_xflags & XFS_XFLAG_REALTIME) {
+					di_flags |= XFS_DIFLAG_REALTIME;
+					ip->i_iocore.io_flags |= XFS_IOCORE_RT;
+				} else {
 					ip->i_iocore.io_flags &= ~XFS_IOCORE_RT;
+				}
 			}
 			ip->i_d.di_flags = di_flags;
 		}

@@ -407,13 +407,13 @@ void hpte_init_native(void)
 		model = get_property(root, "model", NULL);
 		if (!strcmp(model, "CHRP IBM,9076-N81")) {
 			of_node_put(root);
-			return;
+			goto bail;
 		}
 		of_node_put(root);
 	}
 #endif /* CONFIG_PPC_PSERIES */
 
 	ppc_md.flush_hash_range = native_flush_hash_range;
-
+ bail:
 	htab_finish_init();
 }
