@@ -1,5 +1,5 @@
 /*
- * $Id: psmouse.c,v 1.16 2002/01/26 19:20:36 vojtech Exp $
+ * $Id: psmouse.c,v 1.18 2002/03/13 10:03:43 vojtech Exp $
  *
  *  Copyright (c) 1999-2001 Vojtech Pavlik
  */
@@ -31,7 +31,6 @@
 #include <linux/input.h>
 #include <linux/serio.h>
 #include <linux/init.h>
-#include <linux/tqueue.h>
 
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
 MODULE_DESCRIPTION("PS/2 mouse driver");
@@ -201,7 +200,7 @@ static void psmouse_interrupt(struct serio *serio, unsigned char data, unsigned 
 		return;
 	}
 
-	if (psmouse->pktcnt && jiffies - psmouse->last > 2) {
+	if (psmouse->pktcnt && time_after(jiffies, psmouse->last + HZ/20)) {
 		printk(KERN_WARNING "psmouse.c: Lost synchronization, throwing %d bytes away.\n", psmouse->pktcnt);
 		psmouse->pktcnt = 0;
 	}
@@ -230,7 +229,7 @@ static void psmouse_interrupt(struct serio *serio, unsigned char data, unsigned 
 
 static int psmouse_sendbyte(struct psmouse *psmouse, unsigned char byte)
 {
-	int timeout = 1000; /* 10 msec */
+	int timeout = 10000; /* 100 msec */
 	psmouse->ack = 0;
 	psmouse->acking = 1;
 
@@ -247,7 +246,7 @@ static int psmouse_sendbyte(struct psmouse *psmouse, unsigned char byte)
 
 static int psmouse_command(struct psmouse *psmouse, unsigned char *param, int command)
 {
-	int timeout = 100000; /* 100 msec */
+	int timeout = 500000; /* 500 msec */
 	int send = (command >> 12) & 0xf;
 	int receive = (command >> 8) & 0xf;
 	int i;
