@@ -573,9 +573,9 @@ static inline off_t lseek(int fd, off_t off, int whence)
 	return sys_lseek(fd, off, whence);
 }
 
-static inline long _exit(int value)
+static inline void _exit(int value)
 {
-	return sys_exit(value);
+	sys_exit(value);
 }
 
 #define exit(x) _exit(x)

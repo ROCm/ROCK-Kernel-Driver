@@ -500,7 +500,7 @@ sg_classify(struct scatterlist *sg, struct scatterlist *end, int virt_ok)
 /* Given a scatterlist leader, choose an allocation method and fill
    in the blanks.  */
 
-static inline int
+static int
 sg_fill(struct scatterlist *leader, struct scatterlist *end,
 	struct scatterlist *out, struct pci_iommu_arena *arena,
 	dma_addr_t max_dma, int dac_allowed)
