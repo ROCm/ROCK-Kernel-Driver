@@ -377,22 +377,22 @@ static __inline__ unsigned tcp_v6_synq_hash(struct in6_addr *raddr, u16 rport)
 }
 
 static struct open_request *tcp_v6_search_req(struct tcp_opt *tp,
-					      struct ipv6hdr *ip6h,
-					      struct tcphdr *th,
-					      int iif,
-					      struct open_request ***prevp)
+					      struct open_request ***prevp,
+					      __u16 rport,
+					      struct in6_addr *raddr,
+					      struct in6_addr *laddr,
+					      int iif)
 {
 	struct tcp_listen_opt *lopt = tp->listen_opt;
 	struct open_request *req, **prev;  
-	__u16 rport = th->source;
 
-	for (prev = &lopt->syn_table[tcp_v6_synq_hash(&ip6h->saddr, rport)];
+	for (prev = &lopt->syn_table[tcp_v6_synq_hash(raddr, rport)];
 	     (req = *prev) != NULL;
 	     prev = &req->dl_next) {
 		if (req->rmt_port == rport &&
 		    req->class->family == AF_INET6 &&
-		    !ipv6_addr_cmp(&req->af.v6_req.rmt_addr, &ip6h->saddr) &&
-		    !ipv6_addr_cmp(&req->af.v6_req.loc_addr, &ip6h->daddr) &&
+		    !ipv6_addr_cmp(&req->af.v6_req.rmt_addr, raddr) &&
+		    !ipv6_addr_cmp(&req->af.v6_req.loc_addr, laddr) &&
 		    (!req->af.v6_req.iif || req->af.v6_req.iif == iif)) {
 			BUG_TRAP(req->sk == NULL);
 			*prevp = prev;
@@ -708,8 +708,6 @@ void tcp_v6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 		int type, int code, int offset, __u32 info)
 {
 	struct ipv6hdr *hdr = (struct ipv6hdr*)skb->data;
-	struct in6_addr *saddr = &hdr->saddr;
-	struct in6_addr *daddr = &hdr->daddr;
 	struct tcphdr *th = (struct tcphdr *)(skb->data+offset);
 	struct ipv6_pinfo *np;
 	struct sock *sk;
@@ -717,7 +715,7 @@ void tcp_v6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 	struct tcp_opt *tp; 
 	__u32 seq;
 
-	sk = tcp_v6_lookup(daddr, th->dest, saddr, th->source, skb->dev->ifindex);
+	sk = tcp_v6_lookup(&hdr->daddr, th->dest, &hdr->saddr, th->source, skb->dev->ifindex);
 
 	if (sk == NULL) {
 		ICMP6_INC_STATS_BH(Icmp6InErrors);
@@ -790,15 +788,12 @@ void tcp_v6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 	/* Might be for an open_request */
 	switch (sk->state) {
 		struct open_request *req, **prev;
-		struct ipv6hdr hd;
 	case TCP_LISTEN:
 		if (sk->lock.users)
 			goto out;
 
-		/* Grrrr - fix this later. */
-		ipv6_addr_copy(&hd.saddr, saddr);
-		ipv6_addr_copy(&hd.daddr, daddr); 
-		req = tcp_v6_search_req(tp, &hd, th, tcp_v6_iif(skb), &prev);
+		req = tcp_v6_search_req(tp, &prev, th->dest, &hdr->daddr,
+					&hdr->saddr, tcp_v6_iif(skb));
 		if (!req)
 			goto out;
 
@@ -1107,7 +1102,8 @@ static struct sock *tcp_v6_hnd_req(struct sock *sk,struct sk_buff *skb)
 	struct sock *nsk;
 
 	/* Find possible connection requests. */
-	req = tcp_v6_search_req(tp, skb->nh.ipv6h, th, tcp_v6_iif(skb), &prev);
+	req = tcp_v6_search_req(tp, &prev, th->source, &skb->nh.ipv6h->saddr,
+				&skb->nh.ipv6h->daddr, tcp_v6_iif(skb));
 	if (req)
 		return tcp_check_req(sk, skb, req, prev);
 
