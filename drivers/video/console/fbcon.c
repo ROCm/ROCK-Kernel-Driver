@@ -294,13 +294,16 @@ __setup("fbcon=", fb_console_setup);
  *	Maps a virtual console @unit to a frame buffer device
  *	@newidx.
  */
-void set_con2fb_map(int unit, int newidx)
+int set_con2fb_map(int unit, int newidx)
 {
 	struct vc_data *vc = vc_cons[unit].d;
 
+	if (!vc)
+		return -ENODEV;
 	con2fb_map[unit] = newidx;
 	fbcon_is_default = (vc->vc_sw == &fb_con) ? 1 : 0;
 	take_over_console(&fb_con, unit, unit, fbcon_is_default);
+	return 0;
 }
 
 /*
@@ -1045,6 +1048,11 @@ static void fbcon_cursor(struct vc_data *vc, int mode)
 			cursor.image.height = vc->vc_font.height;
 			cursor.image.width = vc->vc_font.width;
 			cursor.set |= FB_CUR_SETSIZE;
+		}
+
+		if (info->cursor.hot.x || info->cursor.hot.y) {
+			cursor.hot.x = cursor.hot.y = 0;
+			cursor.set |= FB_CUR_SETHOT;
 		}
 
 		if ((cursor.set & FB_CUR_SETSIZE) || ((vc->vc_cursor_type & 0x0f) != p->cursor_shape)) {
