@@ -423,7 +423,13 @@ sys_call_table:
 	.quad sys_io_cancel
 	.quad sys_ni_syscall			/* 403, sys_alloc_hugepages */
 	.quad sys_ni_syscall			/* 404, sys_free_hugepages */
-	.quad sys_exit_group
+	.quad sys_exit_group			/* 405 */
+	.quad sys_lookup_dcookie
+	.quad sys_epoll_create
+	.quad sys_epoll_ctl
+	.quad sys_epoll_wait
+	.quad sys_remap_file_pages		/* 410 */
+	.quad sys_set_tid_address
 
 	.size sys_call_table, . - sys_call_table
 	.type sys_call_table, @object
