@@ -96,6 +96,10 @@
 # define __attribute_const__	/* unimplemented */
 #endif
 
+#ifndef noinline
+#define noinline
+#endif
+
 /* Optimization barrier */
 #ifndef barrier
 # define barrier() __memory_barrier()

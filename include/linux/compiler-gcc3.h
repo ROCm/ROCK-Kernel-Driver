@@ -21,3 +21,7 @@
 
 #define __attribute_pure__	__attribute__((pure))
 #define __attribute_const__	__attribute__((__const__))
+
+#if __GNUC_MINOR__ >= 1
+#define  noinline __attribute__((noinline))
+#endif
