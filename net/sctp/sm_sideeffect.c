@@ -844,6 +844,7 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 	unsigned long timeout;
 	struct sctp_transport *t;
 	sctp_sackhdr_t sackh;
+	int local_cork = 0;
 
 	if (SCTP_EVENT_T_TIMEOUT != event_type)
 		chunk = (struct sctp_chunk *) event_arg;
@@ -863,6 +864,10 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 
 		case SCTP_CMD_NEW_ASOC:
 			/* Register a new association.  */
+			if (local_cork) {
+				sctp_outq_uncork(&asoc->outqueue); 
+				local_cork = 0;
+			}
 			asoc = cmd->obj.ptr;
 			/* Register with the endpoint.  */
 			sctp_endpoint_add_asoc(ep, asoc);
@@ -877,7 +882,11 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 		       sctp_outq_teardown(&asoc->outqueue);
 		       break;
 
-		case SCTP_CMD_DELETE_TCB:
+		case SCTP_CMD_DELETE_TCB:			
+			if (local_cork) {
+				sctp_outq_uncork(&asoc->outqueue);
+				local_cork = 0;
+			}
 			/* Delete the current association.  */
 			sctp_cmd_delete_tcb(commands, asoc);
 			asoc = NULL;
@@ -981,9 +990,13 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 			break;
 
 		case SCTP_CMD_REPLY:
+			/* If an caller has not already corked, do cork. */
+			if (!asoc->outqueue.cork) {
+				sctp_outq_cork(&asoc->outqueue);
+				local_cork = 1;
+			}
 			/* Send a chunk to our peer.  */
-			error = sctp_outq_tail(&asoc->outqueue,
-					       cmd->obj.ptr);
+			error = sctp_outq_tail(&asoc->outqueue, cmd->obj.ptr);
 			break;
 
 		case SCTP_CMD_SEND_PKT:
@@ -1001,7 +1014,8 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 
 		case SCTP_CMD_TRANSMIT:
 			/* Kick start transmission. */
-			error = sctp_outq_flush(&asoc->outqueue, 0);
+			error = sctp_outq_uncork(&asoc->outqueue);
+			local_cork = 0;
 			break;
 
 		case SCTP_CMD_ECN_CE:
@@ -1172,13 +1186,15 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 			break;
 		};
 		if (error)
-			return error;
+			break;
 	}
 
+out:
+	if (local_cork)
+		sctp_outq_uncork(&asoc->outqueue);
 	return error;
-
 nomem:
 	error = -ENOMEM;
-	return error;
+	goto out;
 }
 

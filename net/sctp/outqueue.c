@@ -230,6 +230,7 @@ void sctp_outq_init(struct sctp_association *asoc, struct sctp_outq *q)
 
 	q->outstanding_bytes = 0;
 	q->empty = 1;
+	q->cork  = 0;
 
 	q->malloced = 0;
 	q->out_qlen = 0;
@@ -365,7 +366,8 @@ int sctp_outq_tail(struct sctp_outq *q, struct sctp_chunk *chunk)
 	if (error < 0)
 		return error;
 
-	error = sctp_outq_flush(q, 0);
+	if (!q->cork)
+		error = sctp_outq_flush(q, 0);
 
 	return error;
 }
@@ -816,8 +818,19 @@ err:
 	return NULL;
 }
 
+/* Cork the outqueue so queued chunks are really queued. */
+int sctp_outq_uncork(struct sctp_outq *q)
+{
+	int error = 0;
+	if (q->cork) {
+		q->cork = 0;
+		error = sctp_outq_flush(q, 0);
+	}
+	return error;
+}
+
 /*
- * sctp_outq_flush - Try to flush an outqueue.
+ * Try to flush an outqueue.
  *
  * Description: Send everything in q which we legally can, subject to
  * congestion limitations.

@@ -963,11 +963,14 @@ struct sctp_outq {
 	/* How many unackd bytes do we have in-flight?  */
 	__u32 outstanding_bytes;
 
+	/* Corked? */
+	char cork;
+
 	/* Is this structure empty?  */
-	int empty;
+	char empty;
 
 	/* Are we kfree()able? */
-	int malloced;
+	char malloced;
 };
 
 struct sctp_outq *sctp_outq_new(struct sctp_association *);
@@ -985,10 +988,16 @@ int sctp_outq_set_output_handlers(struct sctp_outq *,
 				  sctp_outq_ohandler_t build,
 				  sctp_outq_ohandler_force_t force);
 void sctp_outq_restart(struct sctp_outq *);
+
 void sctp_retransmit(struct sctp_outq *, struct sctp_transport *,
 		     sctp_retransmit_reason_t);
 void sctp_retransmit_mark(struct sctp_outq *, struct sctp_transport *, __u8);
-
+int sctp_outq_uncork(struct sctp_outq *);
+/* Uncork and flush an outqueue.  */
+static inline void sctp_outq_cork(struct sctp_outq *q)
+{
+	q->cork = 1;
+}
 
 /* These bind address data fields common between endpoints and associations */
 struct sctp_bind_addr {
@@ -1393,7 +1402,6 @@ struct sctp_association {
 	/* The largest timeout or RTO value to use in attempting an INIT */
 	__u16 max_init_timeo;
 
-
 	int timeouts[SCTP_NUM_TIMEOUT_TYPES];
 	struct timer_list timers[SCTP_NUM_TIMEOUT_TYPES];
 
@@ -1494,9 +1502,6 @@ struct sctp_association {
 	 */
 	struct sctp_ulpq ulpq;
 
-	/* Need to send an ECNE Chunk? */
-	int need_ecne;
-
 	/* Last TSN that caused an ECNE Chunk to be sent.  */
 	__u32 last_ecne_tsn;
 
@@ -1509,9 +1514,6 @@ struct sctp_association {
 	/* Number of seconds of idle time before an association is closed.  */
 	__u32 autoclose;
 
-	/* Name for debugging output... */
-	char *debug_name;
-
 	/* These are to support
 	 * "SCTP Extensions for Dynamic Reconfiguration of IP Addresses
 	 *  and Enforcement of Flow and Message Limits"
@@ -1519,8 +1521,7 @@ struct sctp_association {
 	 * or "ADDIP" for short.
 	 */
 
-	/* Is the ADDIP extension enabled for this association? */
-	int addip_enable;
+
 
 	/* ADDIP Section 4.1.1 Congestion Control of ASCONF Chunks
 	 *
@@ -1605,8 +1606,14 @@ struct sctp_association {
 	 */
 	__u32 addip_serial;
 
+	/* Is the ADDIP extension enabled for this association? */
+	char addip_enable;
+
+	/* Need to send an ECNE Chunk? */
+	char need_ecne;
+
 	/* Is it a temporary association? */ 
-	__u8 temp;
+	char temp;
 };
 
 

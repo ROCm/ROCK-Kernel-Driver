@@ -328,7 +328,7 @@ struct sctp_ulpevent *sctp_ulpevent_make_remote_error(
 
 	ch = (sctp_errhdr_t *)(chunk->skb->data);
 	cause = ch->cause;
-	elen = ntohs(ch->length) - sizeof(sctp_errhdr_t);
+	elen = WORD_ROUND(ntohs(ch->length)) - sizeof(sctp_errhdr_t);
 
 	/* Pull off the ERROR header.  */
 	skb_pull(chunk->skb, sizeof(sctp_errhdr_t));
@@ -336,10 +336,8 @@ struct sctp_ulpevent *sctp_ulpevent_make_remote_error(
 	/* Copy the skb to a new skb with room for us to prepend
 	 * notification with.
 	 */
-	skb = skb_copy_expand(chunk->skb,
-			      sizeof(struct sctp_remote_error), /* headroom */
-			      0,                                /* tailroom */
-			      gfp);
+	skb = skb_copy_expand(chunk->skb, sizeof(struct sctp_remote_error), 
+			      0, gfp);
 
 	/* Pull off the rest of the cause TLV from the chunk.  */
 	skb_pull(chunk->skb, elen);

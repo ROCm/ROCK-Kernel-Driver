@@ -891,8 +891,7 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 	}
 
 	if (asoc) {
-		SCTP_DEBUG_PRINTK("Just looked up association: "
-				  "%s. \n", asoc->debug_name);
+		SCTP_DEBUG_PRINTK("Just looked up association: %p.\n", asoc);
 
 		/* We cannot send a message on a TCP-style SCTP_SS_ESTABLISHED
 		 * socket that has an association in CLOSED state. This can
@@ -1092,6 +1091,7 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 		sctp_primitive_SEND(asoc, chunk);
 		SCTP_DEBUG_PRINTK("We sent primitively.\n");
 	}
+
 	sctp_datamsg_free(datamsg);
 	err = msg_len;
 
