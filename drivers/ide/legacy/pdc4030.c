@@ -147,8 +147,6 @@ int pdc4030_identify(ide_drive_t *drive)
 	return pdc4030_cmd(drive, PROMISE_IDENTIFY);
 }
 
-int enable_promise_support;
-
 /*
  * setup_pdc4030()
  * Completes the setup of a Promise DC4030 controller card, once found.
@@ -296,27 +294,24 @@ int __init detect_pdc4030(ide_hwif_t *hwif)
 	}
 }
 
-
-int __init ide_probe_for_pdc4030(void)
+int __init pdc4030_init(void)
 {
 	unsigned int	index;
 	ide_hwif_t	*hwif;
 
-#ifndef MODULE
-	if (enable_promise_support == 0)
-		return 0;
-#endif
-
 	for (index = 0; index < MAX_HWIFS; index++) {
 		hwif = &ide_hwifs[index];
-		if (hwif->chipset == ide_unknown && detect_pdc4030(hwif))
-			return setup_pdc4030(hwif);
+		if (hwif->chipset == ide_unknown && detect_pdc4030(hwif)) {
+			if (!setup_pdc4030(hwif))
+				return -ENODEV;
+			return 0;
+		}
 	}
-
-	return 0;
+	return -ENODEV;
 }
 
-static void __exit release_pdc4030(ide_hwif_t *hwif, ide_hwif_t *mate)
+#ifdef MODULE
+static void __exit pdc4030_release_hwif(ide_hwif_t *hwif)
 {
 	hwif->chipset = ide_unknown;
 	hwif->selectproc = NULL;
@@ -327,71 +322,23 @@ static void __exit release_pdc4030(ide_hwif_t *hwif, ide_hwif_t *mate)
 	hwif->drives[1].keep_settings = 0;
 	hwif->drives[0].noprobe = 0;
 	hwif->drives[1].noprobe = 0;
-
-	if (mate != NULL) {
-		mate->chipset = ide_unknown;
-		mate->selectproc = NULL;
-		mate->serialized = 0;
-		mate->drives[0].io_32bit = 0;
-		mate->drives[1].io_32bit = 0;
-		mate->drives[0].keep_settings = 0;
-		mate->drives[1].keep_settings = 0;
-		mate->drives[0].noprobe = 0;
-		mate->drives[1].noprobe = 0;
-	}
 }
 
-#ifndef MODULE
-/*
- * init_pdc4030:
- *
- * called by ide.c when parsing command line
- */
-
-void __init init_pdc4030(void)
+static void __exit pdc4030_exit(void)
 {
-	enable_promise_support = 1;
+	unsigned int index;
+
+	for (index = 0; index < MAX_HWIFS; index++)
+		pdc4030_release_hwif(&ide_hwifs[index]);
 }
 
-#else
+module_init(pdc4030_init);
+module_exit(pdc4030_exit);
+#endif
 
 MODULE_AUTHOR("Peter Denison");
 MODULE_DESCRIPTION("Support of Promise 4030 VLB series IDE chipsets");
 MODULE_LICENSE("GPL");
-
-static int __init pdc4030_mod_init(void)
-{
-	if (enable_promise_support == 0)
-		enable_promise_support = 1;
-
-	if (!ide_probe_for_pdc4030())
-		return -ENODEV;
-        return 0;
-}
-module_init(pdc4030_mod_init);
-
-static void __exit pdc4030_mod_exit(void)
-{
-	unsigned int    index;
-	ide_hwif_t      *hwif;
-
-	if (enable_promise_support == 0)
-		return;
- 
-	for (index = 0; index < MAX_HWIFS; index++) {
-		hwif = &ide_hwifs[index];
-		if (hwif->chipset == ide_pdc4030) {
-			ide_hwif_t *mate = &ide_hwifs[hwif->index+1];
-			if (mate->chipset == ide_pdc4030)
-				release_pdc4030(hwif, mate);
-			else
-				release_pdc4030(hwif, NULL);
-                }
-        }
-	enable_promise_support = 0;
-}
-module_exit(pdc4030_mod_exit);
-#endif
 
 /*
  * promise_read_intr() is the handler for disk read/multread interrupts
