@@ -64,11 +64,12 @@ static inline struct proc_dir_entry *rpc_proc_register(struct rpc_stat *s) { ret
 static inline void rpc_proc_unregister(const char *p) {}
 static inline void rpc_proc_zero(struct rpc_program *p) {}
 
-static inline struct proc_dir_entry *svc_proc_register(struct svc_stat *s
-						       struct file_operations *) { return NULL; }
+static inline struct proc_dir_entry *svc_proc_register(struct svc_stat *s,
+						       struct file_operations *f) { return NULL; }
 static inline void svc_proc_unregister(const char *p) {}
 
-static inline void svc_seq_show(struct seq_file *, const struct svc_stat *) {}
+static inline void svc_seq_show(struct seq_file *seq,
+				const struct svc_stat *st) {}
 
 #define proc_net_rpc NULL
 
