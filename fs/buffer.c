@@ -2449,7 +2449,7 @@ void ll_rw_block(int rw, int nr, struct buffer_head *bhs[])
 			}
 		} else {
 			if (!buffer_uptodate(bh)) {
-				submit_bh(READ, bh);
+				submit_bh(rw, bh);
 				continue;
 			}
 		}
