@@ -3593,13 +3593,21 @@ static int checksetup(struct aha152x_setup *setup)
 	if (i == ARRAY_SIZE(ports))
 		return 0;
 
+	if ( request_region(setup->io_port, IO_RANGE, "aha152x")==0 ) {
+		printk(KERN_ERR "aha152x: io port 0x%x busy.\n", setup->io_port);
+		return 0;
+	}
+
 	if( aha152x_porttest(setup->io_port) ) {
 		setup->tc1550=0;
 	} else if( tc1550_porttest(setup->io_port) ) {
 		setup->tc1550=1;
 	} else {
+		release_region(setup->io_port, IO_RANGE);
 		return 0;
 	}
+
+	release_region(setup->io_port, IO_RANGE);
 
 	if ((setup->irq < IRQ_MIN) || (setup->irq > IRQ_MAX))
 		return 0;
@@ -3840,45 +3848,42 @@ static int __init aha152x_init(void)
 			if ((setup_count == 1) && (setup[0].io_port == ports[i]))
 				continue;
 
+			if ( request_region(ports[i], IO_RANGE, "aha152x")==0 ) {
+				printk(KERN_ERR "aha152x: io port 0x%x busy.\n", ports[i]);
+				continue;
+			}
+
 			if (aha152x_porttest(ports[i])) {
-				ok++;
-				setup[setup_count].io_port = ports[i];
 				setup[setup_count].tc1550  = 0;
 
 				conf.cf_port =
 				    (GETPORT(ports[i] + O_PORTA) << 8) + GETPORT(ports[i] + O_PORTB);
-
-				setup[setup_count].irq = IRQ_MIN + conf.cf_irq;
-				setup[setup_count].scsiid = conf.cf_id;
-				setup[setup_count].reconnect = conf.cf_tardisc;
-				setup[setup_count].parity = !conf.cf_parity;
-				setup[setup_count].synchronous = conf.cf_syncneg;
-				setup[setup_count].delay = DELAY_DEFAULT;
-				setup[setup_count].ext_trans = 0;
-#if defined(AHA152X_DEBUG)
-				setup[setup_count].debug = DEBUG_DEFAULT;
-#endif
-				setup_count++;
 			} else if (tc1550_porttest(ports[i])) {
-				ok++;
-				setup[setup_count].io_port = ports[i];
 				setup[setup_count].tc1550  = 1;
 
 				conf.cf_port =
-				    (GETPORT(ports[i] + O_PORTA) << 8) + GETPORT(ports[i] + O_PORTB);
-
-				setup[setup_count].irq = IRQ_MIN + conf.cf_irq;
-				setup[setup_count].scsiid = conf.cf_id;
-				setup[setup_count].reconnect = conf.cf_tardisc;
-				setup[setup_count].parity = !conf.cf_parity;
-				setup[setup_count].synchronous = conf.cf_syncneg;
-				setup[setup_count].delay = DELAY_DEFAULT;
-				setup[setup_count].ext_trans = 0;
-#if defined(AHA152X_DEBUG)
-				setup[setup_count].debug = DEBUG_DEFAULT;
-#endif
-				setup_count++;
+				    (GETPORT(ports[i] + O_TC_PORTA) << 8) + GETPORT(ports[i] + O_TC_PORTB);
+			} else {
+				release_region(ports[i], IO_RANGE);
+				continue;
 			}
+
+			release_region(ports[i], IO_RANGE);
+
+			ok++;
+			setup[setup_count].io_port = ports[i];
+			setup[setup_count].irq = IRQ_MIN + conf.cf_irq;
+			setup[setup_count].scsiid = conf.cf_id;
+			setup[setup_count].reconnect = conf.cf_tardisc;
+			setup[setup_count].parity = !conf.cf_parity;
+			setup[setup_count].synchronous = conf.cf_syncneg;
+			setup[setup_count].delay = DELAY_DEFAULT;
+			setup[setup_count].ext_trans = 0;
+#if defined(AHA152X_DEBUG)
+			setup[setup_count].debug = DEBUG_DEFAULT;
+#endif
+			setup_count++;
+
 		}
 
 		if (ok)
