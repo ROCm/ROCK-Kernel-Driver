@@ -1,5 +1,5 @@
 /*
- * $Id: netiucv.c,v 1.53 2004/05/07 14:29:37 mschwide Exp $
+ * $Id: netiucv.c,v 1.54 2004/05/28 08:04:14 braunu Exp $
  *
  * IUCV network driver
  *
@@ -30,7 +30,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * RELEASE-TAG: IUCV network driver $Revision: 1.53 $
+ * RELEASE-TAG: IUCV network driver $Revision: 1.54 $
  *
  */
 
@@ -60,7 +60,6 @@
 #include <asm/io.h>
 #include <asm/bitops.h>
 #include <asm/uaccess.h>
-#include <asm/ebcdic.h>
 
 #include "iucv.h"
 #include "fsm.h"
@@ -167,10 +166,10 @@ static __inline__ int netiucv_test_and_set_busy(struct net_device *dev)
 }
 
 static __u8 iucv_host[8] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
-//static __u8 iucvMagic[16] = {
-//	0xF0, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40,
-//	0xF0, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40
-//};
+static __u8 iucvMagic[16] = {
+	0xF0, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40,
+	0xF0, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40
+};
 
 /**
  * This mask means the 16-byte IUCV "magic" and the origin userid must
@@ -769,18 +768,10 @@ conn_action_start(fsm_instance *fi, int event, void *arg)
 	struct iucv_event *ev = (struct iucv_event *)arg;
 	struct iucv_connection *conn = ev->conn;
 	__u16 msglimit;
-	int rc, len;
-	__u8 iucvMagic[16] = {
-	0xF0, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40,
-        0xF0, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40
-	};
+	int rc;
 
 	pr_debug("%s() called\n", __FUNCTION__);
 
-	len = (IFNAMSIZ < sizeof(conn->netdev->name)) ?
-		IFNAMSIZ : sizeof(conn->netdev->name);
-	memcpy(iucvMagic, conn->netdev->name, len);
-	ASCEBC (iucvMagic, len);
 	if (conn->handle == 0) {
 		conn->handle =
 			iucv_register_program(iucvMagic, conn->userid, mask,
@@ -1958,7 +1949,7 @@ static struct device_driver netiucv_driver = {
 static void
 netiucv_banner(void)
 {
-	char vbuf[] = "$Revision: 1.53 $";
+	char vbuf[] = "$Revision: 1.54 $";
 	char *version = vbuf;
 
 	if ((version = strchr(version, ':'))) {

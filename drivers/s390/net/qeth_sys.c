@@ -1,6 +1,6 @@
 /*
  *
- * linux/drivers/s390/net/qeth_sys.c ($Revision: 1.30 $)
+ * linux/drivers/s390/net/qeth_sys.c ($Revision: 1.32 $)
  *
  * Linux on zSeries OSA Express and HiperSockets support
  * This file contains code related to sysfs.
@@ -20,7 +20,7 @@
 #include "qeth_mpc.h"
 #include "qeth_fs.h"
 
-const char *VERSION_QETH_SYS_C = "$Revision: 1.30 $";
+const char *VERSION_QETH_SYS_C = "$Revision: 1.32 $";
 
 /*****************************************************************************/
 /*                                                                           */
@@ -1447,14 +1447,16 @@ qeth_driver_notifier_register_store(struct device_driver *ddrv, const char *buf,
 {
 	int rc;
 	int signum;
-	char *tmp;
+	char *tmp, *tmp2;
 
 	tmp = strsep((char **) &buf, "\n");
-	if (!strcmp(tmp, "unregister")){
-		return qeth_notifier_unregister(current);
+	if (!strncmp(tmp, "unregister", 10)){
+		if ((rc = qeth_notifier_unregister(current)))
+			return rc;
+		return count;
 	}
 
-	signum = simple_strtoul(buf, &tmp, 10);
+	signum = simple_strtoul(tmp, &tmp2, 10);
 	if ((signum < 0) || (signum > 32)){
 		PRINT_WARN("Signal number %d is out of range\n", signum);
 		return -EINVAL;
@@ -1465,7 +1467,7 @@ qeth_driver_notifier_register_store(struct device_driver *ddrv, const char *buf,
 	return count;
 }
 
-static DRIVER_ATTR(notifier_register, 0644, 0,
+static DRIVER_ATTR(notifier_register, 0200, 0,
 		   qeth_driver_notifier_register_store);
 
 int
