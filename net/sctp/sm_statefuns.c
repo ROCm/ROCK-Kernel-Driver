@@ -4511,14 +4511,6 @@ struct sctp_packet *sctp_ootb_pkt_new(const struct sctp_association *asoc,
 			vtag = ntohl(init->init_hdr.init_tag);
 			break;
 		}
-		case SCTP_CID_COOKIE_ECHO:
-		{
-			sctp_signed_cookie_t *cookie;
-
-			cookie = chunk->subh.cookie_hdr;
-			vtag = cookie->c.peer_vtag;
-			break;
-		}
 		default:	
 			vtag = ntohl(chunk->sctp_hdr->vtag);
 			break;
@@ -4572,6 +4564,12 @@ void sctp_send_stale_cookie_err(const struct sctp_endpoint *ep,
 	if (err_chunk) {
 		packet = sctp_ootb_pkt_new(asoc, chunk);
 		if (packet) {
+			sctp_signed_cookie_t *cookie;
+
+			/* Override the OOTB vtag from the cookie. */
+			cookie = chunk->subh.cookie_hdr;
+			packet->vtag = cookie->c.peer_vtag;
+			
 			/* Set the skb to the belonging sock for accounting. */
 			err_chunk->skb->sk = ep->base.sk;
 			sctp_packet_append_chunk(packet, err_chunk);
