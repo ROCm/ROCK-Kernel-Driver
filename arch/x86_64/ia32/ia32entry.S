@@ -76,6 +76,7 @@ cstar_do_call:
 	IA32_ARG_FIXUP 1
 	call *ia32_sys_call_table(,%rax,8)
 	.globl cstar_sysret
+	/* label must directly follow call */
 cstar_sysret:	
 	movq %rax,RAX-ARGOFFSET(%rsp)
 	GET_THREAD_INFO(%r10)
@@ -130,7 +131,7 @@ ENTRY(ia32_syscall)
 	pushq %rax
 	cld
 	/* note the registers are not zero extended to the sf.
-	   this could be a problem */
+	   this could be a problem. */
 	SAVE_ARGS
 	GET_THREAD_INFO(%r10)
 	bt $TIF_SYSCALL_TRACE,threadinfo_flags(%r10)
@@ -190,6 +191,8 @@ ENTRY(ia32_ptregs_common)
 	call *%rax
 	movq %r15, %r11
 	RESTORE_REST
+	cmpq $cstar_sysret,%r11
+	je   int_ret_from_sys_call /* misbalances the call/ret stack. sorry */
 	pushq %r11
 	ret
 
@@ -202,7 +205,7 @@ ia32_sys_call_table:
 	.quad stub32_fork
 	.quad sys_read
 	.quad sys_write
-	.quad sys_open		/* 5 */
+	.quad sys32_open		/* 5 */
 	.quad sys_close
 	.quad sys32_waitpid
 	.quad sys_creat
@@ -320,13 +323,13 @@ ia32_sys_call_table:
 	.quad stub32_clone		/* 120 */
 	.quad sys_setdomainname
 	.quad sys_uname
-	.quad sys_modify_ldt
+	.quad sys32_modify_ldt
 	.quad sys32_adjtimex
 	.quad sys32_mprotect		/* 125 */
 	.quad sys32_sigprocmask
 	.quad sys32_module_warning	/* create_module */
-	.quad sys32_module_warning	/* init_module */
-	.quad sys32_module_warning	/* delete module */
+	.quad sys_init_module
+	.quad sys_delete_module
 	.quad sys32_module_warning	/* 130  get_kernel_syms */
 	.quad ni_syscall	/* quotactl */ 
 	.quad sys_getpgid
@@ -444,8 +447,8 @@ ia32_sys_call_table:
 	.quad sys_get_thread_area
 	.quad sys32_io_setup
 	.quad sys_io_destroy
-	.quad sys_io_getevents
-	.quad sys_io_submit
+	.quad sys32_io_getevents
+	.quad sys32_io_submit
 	.quad sys_io_cancel
 	.quad sys_ni_syscall /* 250 alloc_huge_pages */
 	.quad sys_ni_syscall /* free_huge_pages */

@@ -87,8 +87,9 @@ int printk_address(unsigned long address)
 	const char *symname;
 	char *modname;
 	char *delim = ":"; 
+	char namebuf[128];
 
-	symname = kallsyms_lookup(address, &symsize, &offset, &modname); 
+	symname = kallsyms_lookup(address, &symsize, &offset, &modname, namebuf); 
 	if (!symname) 
 		return printk("[<%016lx>]", address);
 	if (!modname) 

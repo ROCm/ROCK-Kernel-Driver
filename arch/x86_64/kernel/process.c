@@ -534,43 +534,45 @@ unsigned long get_wchan(struct task_struct *p)
 int sys_arch_prctl(int code, unsigned long addr)
 { 
 	int ret = 0; 
-	unsigned long tmp; 
 
 	switch (code) { 
 	case ARCH_SET_GS:
 		if (addr >= TASK_SIZE) 
 			return -EPERM; 
-		load_gs_index(0);
-		current->thread.gsindex = 0;
+		get_cpu();
+		load_gs_index(__USER_LONGBASE);
+		current->thread.gsindex = __USER_LONGBASE;
 		current->thread.gs = addr;
 		ret = checking_wrmsrl(MSR_KERNEL_GS_BASE, addr); 
+		put_cpu();
 		break;
 	case ARCH_SET_FS:
 		/* Not strictly needed for fs, but do it for symmetry
 		   with gs */
 		if (addr >= TASK_SIZE)
 			return -EPERM; 
-		asm volatile("movl %0,%%fs" :: "r" (0));
-		current->thread.fsindex = 0;
+		get_cpu();
+		asm volatile("movl %0,%%fs" :: "r" (__USER_LONGBASE));
+		current->thread.fsindex = __USER_LONGBASE;
 		current->thread.fs = addr;
 		ret = checking_wrmsrl(MSR_FS_BASE, addr); 
+		put_cpu();
 		break;
 
 		/* Returned value may not be correct when the user changed fs/gs */ 
 	case ARCH_GET_FS:
-		rdmsrl(MSR_FS_BASE, tmp);
-		ret = put_user(tmp, (unsigned long *)addr); 
+		ret = put_user(current->thread.fs, (unsigned long *)addr); 
 		break; 
 
 	case ARCH_GET_GS: 
-		rdmsrl(MSR_KERNEL_GS_BASE, tmp); 
-		ret = put_user(tmp, (unsigned long *)addr); 
+		ret = put_user(current->thread.gs, (unsigned long *)addr); 
 		break;
 
 	default:
 		ret = -EINVAL;
 		break;
 	} 
+
 	return ret;	
 } 
 
@@ -657,6 +659,7 @@ asmlinkage int sys_set_thread_area(struct user_desc *u_info)
 #define GET_LIMIT_PAGES(desc)	(((desc)->b >> 23) & 1)
 #define GET_PRESENT(desc)	(((desc)->b >> 15) & 1)
 #define GET_USEABLE(desc)	(((desc)->b >> 20) & 1)
+#define GET_LONGMODE(desc)	(((desc)->b >> 21) & 1)
 
 asmlinkage int sys_get_thread_area(struct user_desc *u_info)
 {
@@ -681,6 +684,7 @@ asmlinkage int sys_get_thread_area(struct user_desc *u_info)
 	info.limit_in_pages = GET_LIMIT_PAGES(desc);
 	info.seg_not_present = !GET_PRESENT(desc);
 	info.useable = GET_USEABLE(desc);
+	info.lm = GET_LONGMODE(desc);
 
 	if (copy_to_user(u_info, &info, sizeof(info)))
 		return -EFAULT;

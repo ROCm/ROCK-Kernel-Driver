@@ -151,7 +151,6 @@ static void __init map_vsyscall(void)
 
 static int __init vsyscall_init(void)
 {
-	printk("VSYSCALL: consistency checks...");
 	if ((unsigned long) &vgettimeofday != VSYSCALL_ADDR(__NR_vgettimeofday))
 		panic("vgettimeofday link addr broken");
 	if ((unsigned long) &vtime != VSYSCALL_ADDR(__NR_vtime))
@@ -159,9 +158,7 @@ static int __init vsyscall_init(void)
 	if (VSYSCALL_ADDR(0) != __fix_to_virt(VSYSCALL_FIRST_PAGE))
 		panic("fixmap first vsyscall %lx should be %lx", __fix_to_virt(VSYSCALL_FIRST_PAGE),
 		      VSYSCALL_ADDR(0));
-	printk("passed...mapping...");
 	map_vsyscall();
-	printk("done.\n");
 
 	return 0;
 }

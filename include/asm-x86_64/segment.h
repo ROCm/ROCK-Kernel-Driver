@@ -6,6 +6,8 @@
 
 #define __KERNEL32_CS   0x38
 
+#define __USER_LONGBASE	((GDT_ENTRY_LONGBASE * 8)  | 3)
+
 /* 
  * we cannot use the same code segment descriptor for user and kernel
  * even not in the long flat model, because of different DPL /kkeil 
@@ -23,6 +25,7 @@
 #define GDT_ENTRY_LDT 10
 #define GDT_ENTRY_TLS_MIN 11
 #define GDT_ENTRY_TLS_MAX 13
+#define GDT_ENTRY_LONGBASE 14
 
 #define GDT_ENTRY_TLS_ENTRIES 3
 

@@ -365,7 +365,8 @@ ENTRY(cpu_gdt_table)
 	.quad	0,0			/* TSS */
 	.quad	0			/* LDT */
 	.quad   0,0,0			/* three TLS descriptors */ 
-	.quad	0,0			/* pad to cache line boundary */
+	.quad	0x00cff2000000ffff	/* dummy descriptor for long base */
+	.quad	0			/* pad to cache line boundary */
 gdt_end:	
 	.globl gdt_end
 

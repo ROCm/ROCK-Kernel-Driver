@@ -503,7 +503,7 @@ int agp_generic_create_gatt_table(void)
 	for (page = virt_to_page(table); page <= virt_to_page(table_end); page++)
 		SetPageReserved(page);
 
-	agp_bridge.gatt_table_real = (unsigned long *) table;
+	agp_bridge.gatt_table_real = (u32 *) table;
 	agp_gatt_table = (void *)table; 
 	CACHE_FLUSH();
 	agp_bridge.gatt_table = ioremap_nocache(virt_to_phys(table),
@@ -520,6 +520,7 @@ int agp_generic_create_gatt_table(void)
 	}
 	agp_bridge.gatt_bus_addr = virt_to_phys(agp_bridge.gatt_table_real);
 
+	/* AK: bogus, should encode addresses > 4GB */
 	for (i = 0; i < num_entries; i++)
 		agp_bridge.gatt_table[i] = (unsigned long) agp_bridge.scratch_page;
 
@@ -620,6 +621,7 @@ int agp_generic_insert_memory(agp_memory * mem, off_t pg_start, int type)
 		return -EINVAL;
 	}
 
+	/* AK: could wrap */
 	if ((pg_start + mem->page_count) > num_entries)
 		return -EINVAL;
 
@@ -652,6 +654,8 @@ int agp_generic_remove_memory(agp_memory * mem, off_t pg_start, int type)
 		/* The generic routines know nothing of memory types */
 		return -EINVAL;
 	}
+
+	/* AK: bogus, should encode addresses > 4GB */
 	for (i = pg_start; i < (mem->page_count + pg_start); i++) {
 		agp_bridge.gatt_table[i] =
 		    (unsigned long) agp_bridge.scratch_page;

@@ -799,11 +799,6 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	printk("CPU%d: ", 0);
 	print_cpu_info(&cpu_data[0]);
 
-	/*
-	 * We have the boot CPU online for sure.
-	 */
-	set_bit(0, &cpu_online_map);
-	set_bit(0, &cpu_callout_map);
 	x86_apicid_to_cpu[boot_cpu_id] = 0;
 	x86_cpu_to_apicid[0] = boot_cpu_id;
 	current_thread_info()->cpu = 0;

@@ -261,6 +261,8 @@ static void elf32_init(struct pt_regs *regs)
 	regs->rax = 0;
 	regs->rbx = 0; 
 	regs->rbp = 0; 
+	regs->r8 = regs->r9 = regs->r10 = regs->r11 = regs->r12 =
+		regs->r13 = regs->r14 = regs->r15 = 0; 
     me->thread.fs = 0; 
 	me->thread.gs = 0;
 	me->thread.fsindex = 0; 

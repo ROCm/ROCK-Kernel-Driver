@@ -8,6 +8,12 @@
  * removed now).
  */ 
 
+/*
+ * On x86-64 the AGP driver needs to be initialized early by the IOMMU 
+ * code.  When you use this driver as a template for a new K8 AGP bridge
+ * driver don't forget to change arch/x86_64/kernel/pci-gart.c too -AK.
+ */
+
 #include <linux/module.h>
 #include <linux/pci.h>
 #include <linux/init.h>
@@ -56,7 +62,8 @@ static int x86_64_insert_memory(agp_memory * mem, off_t pg_start, int type)
 		return -EINVAL;
 
 	/* Make sure we can fit the range in the gatt table. */
-	if ((pg_start + mem->page_count) > num_entries)
+	/* FIXME: could wrap */
+	if (((unsigned long)pg_start + mem->page_count) > num_entries)
 		return -EINVAL;
 
 	j = pg_start;
@@ -505,7 +512,7 @@ static struct __initdata pci_driver agp_amdk8_pci_driver = {
 	.probe		= agp_amdk8_probe,
 };
 
-static int __init agp_amdk8_init(void)
+int __init agp_amdk8_init(void)
 {
 	int ret_val;
 
@@ -524,8 +531,12 @@ static void __exit agp_amdk8_cleanup(void)
 	pci_unregister_driver(&agp_amdk8_pci_driver);
 }
 
+/* On x86-64 the PCI driver needs to initialize this driver early
+   for the IOMMU, so it has to be called via a backdoor. */
+#ifndef CONFIG_GART_IOMMU
 module_init(agp_amdk8_init);
 module_exit(agp_amdk8_cleanup);
+#endif
 
 MODULE_AUTHOR("Dave Jones <davej@codemonkey.org.uk>");
 MODULE_LICENSE("GPL and additional rights");

@@ -57,30 +57,32 @@ drivers-$(CONFIG_PCI)			+= arch/x86_64/pci/
 # FIXME: is drivers- right ?
 drivers-$(CONFIG_OPROFILE)		+= arch/x86_64/oprofile/
 
-boot := arch/x86_64/boot
+makeboot =$(Q)$(MAKE) -f scripts/Makefile.build obj=arch/x86_64/boot $(1)
 
 .PHONY: zImage bzImage compressed zlilo bzlilo zdisk bzdisk install \
-	archclean
+		clean archclean archmrproper
 
 BOOTIMAGE=arch/x86_64/boot/bzImage
 zImage zlilo zdisk: BOOTIMAGE=arch/x86_64/boot/zImage
 
 zImage bzImage: vmlinux
-	$(Q)$(MAKE) $(build)=$(boot) $(BOOTIMAGE)
+	$(call makeboot,$(BOOTIMAGE))
 
 compressed: zImage
 
 zlilo bzlilo: vmlinux
-	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(BOOTIMAGE) zlilo
+	$(call makeboot,BOOTIMAGE=$(BOOTIMAGE) zlilo)
 
 zdisk bzdisk: vmlinux
-	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(BOOTIMAGE) zdisk
+	$(call makeboot,BOOTIMAGE=$(BOOTIMAGE) zdisk)
 
 install: vmlinux
-	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(BOOTIMAGE) install
+	$(call makeboot,BOOTIMAGE=$(BOOTIMAGE) install)
 
 archclean:
-	$(Q)$(MAKE) $(clean)=$(boot)
+	$(Q)$(MAKE) $(clean)=arch/i386/boot
+
+archmrproper:
 
 prepare: include/asm-$(ARCH)/offset.h
 
@@ -104,3 +106,4 @@ define archhelp
   echo  '                  (distribution) /sbin/installkernel or'
   echo  '        	  install to $$(INSTALL_PATH) and run lilo'
 endef
+

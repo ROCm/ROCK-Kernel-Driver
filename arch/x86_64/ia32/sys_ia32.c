@@ -65,6 +65,7 @@
 #include <asm/semaphore.h>
 #include <asm/ipc.h>
 #include <asm/atomic.h>
+#include <asm/ldt.h>
 
 #include <net/scm.h>
 #include <net/sock.h>
@@ -85,6 +86,11 @@
 #define low2highuid(uid) ((uid) == (u16)-1) ? (uid_t)-1 : (uid_t)(uid)
 #define low2highgid(gid) ((gid) == (u16)-1) ? (gid_t)-1 : (gid_t)(gid)
 extern int overflowuid,overflowgid; 
+
+
+extern asmlinkage long sys_newstat(char * filename, struct stat * statbuf);
+extern asmlinkage long sys_newlstat(char * filename, struct stat * statbuf);
+extern asmlinkage long sys_newfstat(unsigned int fd, struct stat * statbuf);
 
 
 extern asmlinkage long sys_newstat(char * filename, struct stat * statbuf);
@@ -228,19 +234,12 @@ sys32_mmap(struct mmap_arg_struct *arg)
 	if (a.prot & PROT_READ) 
 		a.prot |= PROT_EXEC; 
 
-	a.flags |= MAP_32BIT;
-
 	mm = current->mm; 
 	down_write(&mm->mmap_sem); 
 	retval = do_mmap_pgoff(file, a.addr, a.len, a.prot, a.flags, a.offset>>PAGE_SHIFT);
 	if (file)
 		fput(file);
 
-	/* Cannot wrap */
-	if (retval+a.len >= IA32_PAGE_OFFSET && (long)retval > 0) { 
-		do_munmap(mm, retval, a.len); 
-		retval = -ENOMEM; 
-	} 
 	up_write(&mm->mmap_sem); 
 
 	return retval;
@@ -478,6 +477,8 @@ put_tv32(struct compat_timeval *o, struct timeval *i)
 	} 
 	return err; 
 }
+
+extern int do_setitimer(int which, struct itimerval *, struct itimerval *);
 
 asmlinkage long
 sys32_alarm(unsigned int seconds)
@@ -1638,6 +1639,31 @@ sys32_sendfile(int out_fd, int in_fd, compat_off_t *offset, s32 count)
 	return ret;
 }
 
+extern asmlinkage long sys_modify_ldt(int func, void *ptr, 
+				      unsigned long bytecount);
+
+asmlinkage long sys32_modify_ldt(int func, void *ptr, unsigned long bytecount)
+{
+	long ret;
+	if (func == 0x1 || func == 0x11) { 
+		struct user_desc info;
+		mm_segment_t old_fs = get_fs();
+		if (bytecount != sizeof(struct user_desc))
+			return -EINVAL;
+		if (copy_from_user(&info, ptr, sizeof(struct user_desc)))
+			return -EFAULT;
+		/* lm bit was undefined in the 32bit ABI and programs
+		   give it random values. Force it to zero here. */
+		info.lm = 0; 
+		set_fs(KERNEL_DS);
+		ret = sys_modify_ldt(func, &info, bytecount);
+		set_fs(old_fs);
+	}  else { 
+		ret = sys_modify_ldt(func, ptr, bytecount); 
+	}
+	return ret;
+}
+
 /* Handle adjtimex compatability. */
 
 struct timex32 {
@@ -1733,14 +1759,8 @@ asmlinkage long sys32_mmap2(unsigned long addr, unsigned long len,
 		prot |= PROT_EXEC;
 
 	down_write(&mm->mmap_sem);
-	error = do_mmap_pgoff(file, addr, len, prot, flags|MAP_32BIT, pgoff);
+	error = do_mmap_pgoff(file, addr, len, prot, flags, pgoff);
 	up_write(&mm->mmap_sem);
-
-	/* cannot wrap */
-	if (error+len >= IA32_PAGE_OFFSET && (long)error >= 0) { 
-		do_munmap(mm, error, len); 
-		error = -ENOMEM; 
-	} 
 
 	if (file)
 		fput(file);
@@ -2086,54 +2106,6 @@ static int nfs_exp32_trans(struct nfsctl_arg *karg, struct nfsctl_arg32 *arg32)
 	return err;
 }
 
-static int nfs_uud32_trans(struct nfsctl_arg *karg, struct nfsctl_arg32 *arg32)
-{
-	u32 uaddr;
-	int i;
-	int err;
-
-	memset(karg, 0, sizeof(*karg));
-	if(get_user(karg->ca_version, &arg32->ca32_version))
-		return -EFAULT;
-	karg->ca_umap.ug_ident = (char *)get_zeroed_page(GFP_USER);
-	if(!karg->ca_umap.ug_ident)
-		return -ENOMEM;
-	err = get_user(uaddr, &arg32->ca32_umap.ug32_ident);
-	if(strncpy_from_user(karg->ca_umap.ug_ident,
-			     (char *)A(uaddr), PAGE_SIZE) <= 0)
-		return -EFAULT;
-	err |= __get_user(karg->ca_umap.ug_uidbase,
-		      &arg32->ca32_umap.ug32_uidbase);
-	err |= __get_user(karg->ca_umap.ug_uidlen,
-		      &arg32->ca32_umap.ug32_uidlen);
-	err |= __get_user(uaddr, &arg32->ca32_umap.ug32_udimap);
-	if (err)
-		return -EFAULT;
-	karg->ca_umap.ug_udimap = kmalloc((sizeof(uid_t) * karg->ca_umap.ug_uidlen),
-					  GFP_USER);
-	if(!karg->ca_umap.ug_udimap)
-		return -ENOMEM;
-	for(i = 0; i < karg->ca_umap.ug_uidlen; i++)
-		err |= __get_user(karg->ca_umap.ug_udimap[i],
-			      &(((compat_pid_t *)A(uaddr))[i]));
-	err |= __get_user(karg->ca_umap.ug_gidbase,
-		      &arg32->ca32_umap.ug32_gidbase);
-	err |= __get_user(karg->ca_umap.ug_uidlen,
-		      &arg32->ca32_umap.ug32_gidlen);
-	err |= __get_user(uaddr, &arg32->ca32_umap.ug32_gdimap);
-	if (err)
-		return -EFAULT;
-	karg->ca_umap.ug_gdimap = kmalloc((sizeof(gid_t) * karg->ca_umap.ug_uidlen),
-					  GFP_USER);
-	if(!karg->ca_umap.ug_gdimap)
-		return -ENOMEM;
-	for(i = 0; i < karg->ca_umap.ug_gidlen; i++)
-		err |= __get_user(karg->ca_umap.ug_gdimap[i],
-			      &(((compat_gid_t *)A(uaddr))[i]));
-
-	return err;
-}
-
 static int nfs_getfh32_trans(struct nfsctl_arg *karg, struct nfsctl_arg32 *arg32)
 {
 	int err;
@@ -2222,10 +2194,6 @@ long asmlinkage sys32_nfsservctl(int cmd, struct nfsctl_arg32 *arg32, union nfsc
 	case NFSCTL_UNEXPORT:
 		err = nfs_exp32_trans(karg, arg32);
 		break;
-	/* This one is unimplemented, be we're ready for it. */
-	case NFSCTL_UGIDUPDATE:
-		err = nfs_uud32_trans(karg, arg32);
-		break;
 	case NFSCTL_GETFH:
 		err = nfs_getfh32_trans(karg, arg32);
 		break;
@@ -2282,7 +2250,7 @@ long sys32_module_warning(void)
 { 
 	static long warn_time = -(60*HZ); 
 	if (time_before(warn_time + 60*HZ,jiffies) && strcmp(current->comm,"klogd")) { 
-		printk(KERN_INFO "%s: 32bit modutils not supported on 64bit kernel\n",
+		printk(KERN_INFO "%s: 32bit 2.4.x modutils not supported on 64bit kernel\n",
 		       current->comm);
 		warn_time = jiffies;
 	} 
@@ -2410,7 +2378,64 @@ long sys32_io_submit(aio_context_t ctx_id, unsigned long nr,
 	return err;		
 }
 
-/* XXX aio getevents */
+extern asmlinkage long sys_io_getevents(aio_context_t ctx_id,
+					  long min_nr,
+					  long nr,
+					  struct io_event *events,
+					  struct timespec *timeout);
+
+asmlinkage long sys32_io_getevents(aio_context_t ctx_id,
+				 unsigned long min_nr,
+				 unsigned long nr,
+				 struct io_event *events,
+				 struct compat_timespec *timeout)
+{ 	
+	long ret;
+	mm_segment_t oldfs; 
+	struct timespec t32;
+	/* Harden against bogus ptrace */
+	if (nr >= 0xffffffff || 
+	    !access_ok(VERIFY_WRITE, events, nr * sizeof(struct io_event)))
+		return -EFAULT;
+	if (timeout && 
+	    (get_user(t32.tv_sec, &timeout->tv_sec)  || 
+	     __get_user(t32.tv_nsec, &timeout->tv_nsec)))
+		return -EFAULT; 
+	oldfs = get_fs();
+	set_fs(KERNEL_DS); 
+	ret = sys_io_getevents(ctx_id,min_nr,nr,events,timeout ? &t32 : NULL); 
+	set_fs(oldfs); 
+	if (timeout && 
+	    (__put_user(t32.tv_sec, &timeout->tv_sec) || 
+	     __put_user(t32.tv_nsec, &timeout->tv_nsec)))
+		return -EFAULT; 		
+	return ret;
+} 
+
+asmlinkage long sys32_open(const char * filename, int flags, int mode)
+{
+	char * tmp;
+	int fd, error;
+
+	/* don't force O_LARGEFILE */
+	tmp = getname(filename);
+	fd = PTR_ERR(tmp);
+	if (!IS_ERR(tmp)) {
+		fd = get_unused_fd();
+		if (fd >= 0) {
+			struct file *f = filp_open(tmp, flags, mode);
+			error = PTR_ERR(f);
+			if (unlikely(IS_ERR(f))) {
+				put_unused_fd(fd); 
+				fd = error;
+			} else
+				fd_install(fd, f);
+		}
+		putname(tmp);
+	}
+	return fd;
+}
+
 
 long sys32_vm86_warning(void)
 { 
