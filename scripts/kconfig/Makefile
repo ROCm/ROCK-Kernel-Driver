@@ -38,7 +38,12 @@ allmodconfig: $(obj)/conf
 	$< -m arch/$(ARCH)/Kconfig
 
 defconfig: $(obj)/conf
+ifeq ($(KBUILD_DEFCONFIG),)
 	$< -d arch/$(ARCH)/Kconfig
+else
+	@echo *** Default configuration is based on '$(KBUILD_DEFCONFIG)'
+	$(Q)$< -D arch/$(ARCH)/configs/$(KBUILD_DEFCONFIG) arch/$(ARCH)/Kconfig
+endif
 
 %_defconfig: $(obj)/conf
 	$(Q)$< -D arch/$(ARCH)/configs/$@ arch/$(ARCH)/Kconfig
