@@ -12,6 +12,7 @@
 
 static int cachesize_override __initdata = -1;
 static int disable_x86_fxsr __initdata = 0;
+static int disable_x86_serial_nr __initdata = 1;
 
 struct cpu_dev * cpu_devs[X86_VENDOR_NUM] = {};
 
@@ -249,6 +250,31 @@ void __init generic_identify(struct cpuinfo_x86 * c)
 	}
 }
 
+static void __init squash_the_stupid_serial_number(struct cpuinfo_x86 *c)
+{
+	if (cpu_has(c, X86_FEATURE_PN) && disable_x86_serial_nr ) {
+		/* Disable processor serial number */
+		unsigned long lo,hi;
+		rdmsr(MSR_IA32_BBL_CR_CTL,lo,hi);
+		lo |= 0x200000;
+		wrmsr(MSR_IA32_BBL_CR_CTL,lo,hi);
+		printk(KERN_NOTICE "CPU serial number disabled.\n");
+		clear_bit(X86_FEATURE_PN, c->x86_capability);
+
+		/* Disabling the serial number may affect the cpuid level */
+		c->cpuid_level = cpuid_eax(0);
+	}
+}
+
+static int __init x86_serial_nr_setup(char *s)
+{
+	disable_x86_serial_nr = 0;
+	return 1;
+}
+__setup("serialnumber", x86_serial_nr_setup);
+
+
+
 /*
  * This does the hard work of actually picking apart the CPU stuff...
  */
@@ -297,6 +323,9 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 	 */
 	if (this_cpu->c_init)
 		this_cpu->c_init(c);
+
+	/* Disable the PN if appropriate */
+	squash_the_stupid_serial_number(c);
 
 	printk(KERN_DEBUG "CPU: After vendor init, caps: %08lx %08lx %08lx %08lx\n",
 	       c->x86_capability[0],
