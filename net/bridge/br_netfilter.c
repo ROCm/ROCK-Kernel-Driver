@@ -348,10 +348,9 @@ static unsigned int br_nf_forward(unsigned int hook, struct sk_buff **pskb,
 	if (skb->pkt_type == PACKET_OTHERHOST) {
 		skb->pkt_type = PACKET_HOST;
 		nf_bridge->mask |= BRNF_PKT_TYPE;
-		/* The physdev module checks on this */
-		nf_bridge->mask |= BRNF_BRIDGED;
 	}
 
+	nf_bridge->mask |= BRNF_BRIDGED; /* The physdev module checks on this */
 	nf_bridge->physoutdev = skb->dev;
 
 	NF_HOOK(PF_INET, NF_IP_FORWARD, skb, bridge_parent(nf_bridge->physindev),
