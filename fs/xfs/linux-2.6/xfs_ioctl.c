@@ -499,7 +499,7 @@ xfs_attrmulti_by_handle(
 	xfs_fsop_attrmulti_handlereq_t am_hreq;
 	struct inode		*inode;
 	vnode_t			*vp;
-	int			i, size;
+	unsigned int		i, size;
 
 	error = xfs_vget_fsop_handlereq(mp, parinode, CAP_SYS_ADMIN, arg,
 					sizeof(xfs_fsop_attrmulti_handlereq_t),
@@ -509,6 +509,11 @@ xfs_attrmulti_by_handle(
 		return -error;
 
 	size = am_hreq.opcount * sizeof(attr_multiop_t);
+	if (!size || size > 16 * PAGE_SIZE) {
+		VN_RELE(vp);
+		return -XFS_ERROR(E2BIG);
+	}
+
 	ops = (xfs_attr_multiop_t *)kmalloc(size, GFP_KERNEL);
 	if (!ops) {
 		VN_RELE(vp);

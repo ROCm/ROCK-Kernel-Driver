@@ -182,10 +182,6 @@ typedef struct xfs_ihash {
 	uint			ih_version;
 } xfs_ihash_t;
 
-/*
- * Inode hashing and hash bucket locking.
- */
-#define XFS_BUCKETS(mp) (37*(mp)->m_sb.sb_agcount-1)
 #define XFS_IHASH(mp,ino) ((mp)->m_ihash + (((uint)(ino)) % (mp)->m_ihsize))
 
 /*
@@ -193,7 +189,6 @@ typedef struct xfs_ihash {
  * find inodes that share a cluster and can be flushed to disk at the same
  * time.
  */
-
 typedef struct xfs_chashlist {
 	struct xfs_chashlist	*chl_next;
 	struct xfs_inode	*chl_ip;
@@ -206,6 +201,8 @@ typedef struct xfs_chash {
 	xfs_chashlist_t		*ch_list;
 	lock_t			ch_lock;
 } xfs_chash_t;
+
+#define XFS_CHASH(mp,blk) ((mp)->m_chash + (((uint)blk) % (mp)->m_chsize))
 
 
 /*
@@ -448,12 +445,6 @@ xfs_inode_t *xfs_bhvtoi(struct bhv_desc *bhvp);
 #endif
 
 #define BHV_IS_XFS(bdp)		(BHV_OPS(bdp) == &xfs_vnodeops)
-
-/*
- * Pick the inode cluster hash bucket
- * (m_chash is the same size as m_ihash)
- */
-#define XFS_CHASH(mp,blk) ((mp)->m_chash + (((uint)blk) % (mp)->m_chsize))
 
 /*
  * For multiple groups support: if S_ISGID bit is set in the parent

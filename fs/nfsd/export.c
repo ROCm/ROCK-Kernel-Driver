@@ -305,11 +305,6 @@ void svc_export_request(struct cache_detail *cd,
 
 static struct svc_export *svc_export_lookup(struct svc_export *, int);
 
-extern struct dentry *
-find_exported_dentry(struct super_block *sb, void *obj, void *parent,
-		     int (*acceptable)(void *context, struct dentry *de),
-		     void *context);
-
 static int check_export(struct inode *inode, int flags)
 {
 
