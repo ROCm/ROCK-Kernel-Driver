@@ -612,7 +612,7 @@ NCR_700_scsi_done(struct NCR_700_Host_Parameters *hostdata,
 		free_slot(slot, hostdata);
 #ifdef NCR_700_DEBUG
 		if(NCR_700_get_depth(SCp->device) == 0 ||
-		   NCR_700_get_depth(SCp->device) > NCR_700_MAX_TAGS)
+		   NCR_700_get_depth(SCp->device) > SCp->device->queue_depth)
 			printk(KERN_ERR "Invalid depth in NCR_700_scsi_done(): %d\n",
 			       NCR_700_get_depth(SCp->device));
 #endif /* NCR_700_DEBUG */
@@ -1732,7 +1732,7 @@ NCR_700_queuecommand(Scsi_Cmnd *SCp, void (*done)(Scsi_Cmnd *))
 		       NCR_700_get_depth(SCp->device)));
 		return SCSI_MLQUEUE_DEVICE_BUSY;
 	}
-	if(NCR_700_get_depth(SCp->device) >= NCR_700_MAX_TAGS) {
+	if(NCR_700_get_depth(SCp->device) >= SCp->device->queue_depth) {
 		DEBUG((KERN_ERR "scsi%d (%d:%d) has max tag depth %d\n",
 		       SCp->device->host->host_no, SCp->device->id, SCp->device->lun,
 		       NCR_700_get_depth(SCp->device)));
@@ -1765,7 +1765,7 @@ NCR_700_queuecommand(Scsi_Cmnd *SCp, void (*done)(Scsi_Cmnd *))
 		 * NOTE: There is a danger here: the mid layer supports
 		 * tag queuing per LUN.  We only support it per PUN because
 		 * of potential reselection issues */
-		scsi_activate_tcq(SCp->device, NCR_700_MAX_TAGS);
+		scsi_activate_tcq(SCp->device, NCR_700_DEFAULT_TAGS);
 	}
 
 	if(blk_rq_tagged(SCp->request)

@@ -714,6 +714,7 @@ mpt_register(MPT_CALLBACK cbfunc, MPT_DRIVER_CLASS dclass)
 			MptCallbacks[i] = cbfunc;
 			MptDriverClass[i] = dclass;
 			MptEvHandlers[i] = NULL;
+			MptDeviceDriverHandlers[i] = NULL;
 			last_drv_idx = i;
 			if (cbfunc != mpt_base_reply) {
 				mpt_inc_use_count();
@@ -838,11 +839,28 @@ mpt_reset_deregister(int cb_idx)
 int
 mpt_device_driver_register(struct mpt_pci_driver * dd_cbfunc, int cb_idx)
 {
-	if (cb_idx < 1 || cb_idx >= MPT_MAX_PROTOCOL_DRIVERS)
-		return -1;
+	MPT_ADAPTER	*ioc;
+	int 		error=0;
+
+	if (cb_idx < 1 || cb_idx >= MPT_MAX_PROTOCOL_DRIVERS) {
+		error= -EINVAL;
+		return error;
+	}
 
 	MptDeviceDriverHandlers[cb_idx] = dd_cbfunc;
-	return 0;
+
+	/* call per pci device probe entry point */
+	for(ioc = mpt_adapter_find_first(); ioc != NULL;
+	  ioc = mpt_adapter_find_next(ioc)) {
+		if(dd_cbfunc->probe) {
+			error = dd_cbfunc->probe(ioc->pcidev,
+			  ioc->pcidev->driver->id_table);
+			if(error != 0)
+				return error;
+  		}
+	 }
+
+	return error;
 }
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
@@ -1502,9 +1520,14 @@ mptbase_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 				ioc->name, r);
 	}
 
-	if(r != 0 )
+	if(r != 0 ) {
+		Q_DEL_ITEM(ioc);
+		mpt_adapters[ioc->id] = NULL;
+		free_irq(ioc->pci_irq, ioc);
+		iounmap(mem);
+		kfree(ioc);
 		return r;
-
+	}
 
 	/* call per device driver probe entry point */
 	for(ii=0; ii<MPT_MAX_PROTOCOL_DRIVERS; ii++) {

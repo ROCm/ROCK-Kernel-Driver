@@ -46,12 +46,6 @@ static void dma_mmu_release_scsi_one (struct NCR_ESP *esp, Scsi_Cmnd *sp);
 static void dma_mmu_release_scsi_sgl (struct NCR_ESP *esp, Scsi_Cmnd *sp);
 static void dma_advance_sg (Scsi_Cmnd *sp);
 
-static volatile unsigned char cmd_buffer[16];
-                                /* This is where all commands are put
-                                 * before they are trasfered to the ESP chip
-                                 * via PIO.
-                                 */
-
 /* Detecting ESP chips on the machine.  This is the simple and easy
  * version.
  */
@@ -101,14 +95,8 @@ int sun3x_esp_detect(Scsi_Host_Template *tpnt)
 	esp->eregs = (struct ESP_regs *)(SUN3X_ESP_BASE);
 	esp->dregs = (void *)SUN3X_ESP_DMA;
 
-#if 0
-  	esp->esp_command = (volatile unsigned char *)cmd_buffer;
- 	esp->esp_command_dvma = dvma_map((unsigned long)cmd_buffer,
- 					 sizeof (cmd_buffer));
-#else
 	esp->esp_command = (volatile unsigned char *)dvma_malloc(DVMA_PAGE_SIZE);
 	esp->esp_command_dvma = dvma_vtob((unsigned long)esp->esp_command);
-#endif
 
 	esp->irq = 2;
 	if (request_irq(esp->irq, esp_intr, SA_INTERRUPT, 
@@ -373,29 +361,6 @@ static void dma_advance_sg (Scsi_Cmnd *sp)
 {
     sp->SCp.ptr = (char *)((unsigned long)sp->SCp.buffer->dvma_address);
 }
-
-
-static int esp_slave_alloc(Scsi_Device *SDptr)
-{
-	struct esp_device *esp_dev =
-		kmalloc(sizeof(struct esp_device), GFP_ATOMIC);
-
-	if (!esp_dev)
-		return -ENOMEM;
-	memset(esp_dev, 0, sizeof(struct esp_device));
-	SDptr->hostdata = esp_dev;
-	return 0;
-}
-
-static void esp_slave_destroy(Scsi_Device *SDptr)
-{
-	struct NCR_ESP *esp = (struct NCR_ESP *) SDptr->host->hostdata;
-
-	esp->targets_present &= ~(1 << SDptr->id);
-	kfree(SDptr->hostdata);
-	SDptr->hostdata = NULL;
-}
-
 
 static int sun3x_esp_release(struct Scsi_Host *instance)
 {
