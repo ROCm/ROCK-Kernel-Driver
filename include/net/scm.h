@@ -2,6 +2,7 @@
 #define __LINUX_NET_SCM_H
 
 #include <linux/limits.h>
+#include <linux/net.h>
 
 /* Well, we should have at least one descriptor open
  * to accept passed FDs 8)

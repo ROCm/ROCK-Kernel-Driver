@@ -102,7 +102,7 @@ sys32_mount_wrapper:
 	llgtr	%r4,%r4			# char *
 	llgfr	%r5,%r5			# unsigned long
 	llgtr	%r6,%r6			# void *
-	jg	sys32_mount		# branch to system call
+	jg	compat_sys_mount	# branch to system call
 
 	.globl  sys32_oldumount_wrapper 
 sys32_oldumount_wrapper:
