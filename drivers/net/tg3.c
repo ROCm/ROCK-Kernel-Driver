@@ -1104,6 +1104,8 @@ static void tg3_link_report(struct tg3 *tp)
 static void tg3_setup_flow_control(struct tg3 *tp, u32 local_adv, u32 remote_adv)
 {
 	u32 new_tg3_flags = 0;
+	u32 old_rx_mode = tp->rx_mode;
+	u32 old_tx_mode = tp->tx_mode;
 
 	if (local_adv & ADVERTISE_PAUSE_CAP) {
 		if (local_adv & ADVERTISE_PAUSE_ASYM) {
@@ -1134,10 +1136,18 @@ static void tg3_setup_flow_control(struct tg3 *tp, u32 local_adv, u32 remote_adv
 	else
 		tp->rx_mode &= ~RX_MODE_FLOW_CTRL_ENABLE;
 
+	if (old_rx_mode != tp->rx_mode) {
+		tw32_f(MAC_RX_MODE, tp->rx_mode);
+	}
+	
 	if (new_tg3_flags & TG3_FLAG_TX_PAUSE)
 		tp->tx_mode |= TX_MODE_FLOW_CTRL_ENABLE;
 	else
 		tp->tx_mode &= ~TX_MODE_FLOW_CTRL_ENABLE;
+
+	if (old_tx_mode != tp->tx_mode) {
+		tw32_f(MAC_TX_MODE, tp->tx_mode);
+	}
 }
 
 static void tg3_aux_stat_to_speed_duplex(struct tg3 *tp, u32 val, u16 *speed, u8 *duplex)
