@@ -524,6 +524,54 @@ static snd_kcontrol_new_t vx_control_audio_src = {
 };
 
 /*
+ * clock mode selection
+ */
+static int vx_clock_mode_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo)
+{
+	static char *texts[3] = {
+		"Auto", "Internal", "External"
+	};
+
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_ENUMERATED;
+	uinfo->count = 1;
+	uinfo->value.enumerated.items = 3;
+	if (uinfo->value.enumerated.item > 2)
+		uinfo->value.enumerated.item = 2;
+	strcpy(uinfo->value.enumerated.name,
+	       texts[uinfo->value.enumerated.item]);
+	return 0;
+}
+
+static int vx_clock_mode_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
+{
+	vx_core_t *chip = snd_kcontrol_chip(kcontrol);
+	ucontrol->value.enumerated.item[0] = chip->clock_mode;
+	return 0;
+}
+
+static int vx_clock_mode_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
+{
+	vx_core_t *chip = snd_kcontrol_chip(kcontrol);
+	down(&chip->mixer_mutex);
+	if (chip->clock_mode != ucontrol->value.enumerated.item[0]) {
+		chip->clock_mode = ucontrol->value.enumerated.item[0];
+		vx_set_clock(chip, chip->freq);
+		up(&chip->mixer_mutex);
+		return 1;
+	}
+	up(&chip->mixer_mutex);
+	return 0;
+}
+
+static snd_kcontrol_new_t vx_control_clock_mode = {
+	.iface =	SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name =		"Clock Mode",
+	.info =		vx_clock_mode_info,
+	.get =		vx_clock_mode_get,
+	.put =		vx_clock_mode_put,
+};
+
+/*
  * Audio Gain
  */
 static int vx_audio_gain_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo)
@@ -912,6 +960,9 @@ int snd_vx_mixer_new(vx_core_t *chip)
 
 	/* Audio source */
 	if ((err = snd_ctl_add(card, snd_ctl_new1(&vx_control_audio_src, chip))) < 0)
+		return err;
+	/* clock mode */
+	if ((err = snd_ctl_add(card, snd_ctl_new1(&vx_control_clock_mode, chip))) < 0)
 		return err;
 	/* IEC958 controls */
 	if ((err = snd_ctl_add(card, snd_ctl_new1(&vx_control_iec958_mask, chip))) < 0)

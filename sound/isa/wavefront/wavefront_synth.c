@@ -1961,6 +1961,12 @@ wavefront_download_firmware (snd_wavefront_t *dev, char *path)
 			break;
 		}
 
+		if (section_length < 0 || section_length > WF_SECTION_MAX) {
+			snd_printk ("invalid firmware section length %d\n",
+				    section_length);
+			goto failure;
+		}
+
 		if (sys_read (fd, section, section_length) != section_length) {
 			snd_printk ("firmware section "
 				"read error.\n");
