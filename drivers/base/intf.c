@@ -37,7 +37,7 @@ int interface_register(struct device_interface * intf)
 	struct device_class * cls = intf->devclass;
 
 	if (cls) {
-		pr_debug("register interface '%s' with class '%s\n",
+		pr_debug("register interface '%s' with class '%s'\n",
 			 intf->name,cls->name);
 		kobject_init(&intf->kobj);
 		strncpy(intf->kobj.name,intf->name,KOBJ_NAME_LEN);
