@@ -143,7 +143,7 @@ static int ohci_hub_suspend (struct usb_hcd *hcd)
 	(void) readl (&ohci->regs->control);
 
 	/* no resumes until devices finish suspending */
-	ohci->next_statechange = jiffies + MSEC_TO_JIFFIES (5);
+	ohci->next_statechange = jiffies + msecs_to_jiffies (5);
 
 succeed:
 	/* it's not USB_STATE_SUSPENDED unless access to this
@@ -262,7 +262,7 @@ static int ohci_hub_resume (struct usb_hcd *hcd)
 	root->dev.power.power_state = 0;
 
 	/* keep it alive for ~5x suspend + resume costs */
-	ohci->next_statechange = jiffies + MSEC_TO_JIFFIES (250);
+	ohci->next_statechange = jiffies + msecs_to_jiffies (250);
 
 	/* maybe turn schedules back on */
 	enables = 0;

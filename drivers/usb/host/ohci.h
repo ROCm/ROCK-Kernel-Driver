@@ -397,12 +397,10 @@ static inline void disable (struct ohci_hcd *ohci)
 	ohci->hcd.state = USB_STATE_HALT;
 }
 
-#define	MSEC_TO_JIFFIES(msec) ((HZ * (msec) + 999) / 1000)
-
-static inline void msec_delay(int msec)
+static inline void msec_delay(unsigned msec)
 {
 	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(MSEC_TO_JIFFIES(msec));
+	schedule_timeout(msecs_to_jiffies(msec));
 }
 
 #define	FI			0x2edf		/* 12000 bits per frame (-1) */

@@ -769,7 +769,7 @@ static irqreturn_t ehci_irq (struct usb_hcd *hcd, struct pt_regs *regs)
 			 * and make khubd collect PORT_STAT_C_SUSPEND to
 			 * stop that signaling.
 			 */
-			ehci->reset_done [i] = jiffies + MSEC_TO_JIFFIES (20);
+			ehci->reset_done [i] = jiffies + msecs_to_jiffies (20);
 			mod_timer (&ehci->hcd.rh_timer,
 					ehci->reset_done [i] + 1);
 			ehci_dbg (ehci, "port %d remote wakeup\n", i + 1);
