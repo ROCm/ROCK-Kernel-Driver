@@ -51,6 +51,7 @@ acpi_table_print_srat_entry (
 	switch (header->type) {
 
 	case ACPI_SRAT_PROCESSOR_AFFINITY:
+#ifdef ACPI_DEBUG_OUTPUT
 	{
 		struct acpi_table_processor_affinity *p =
 			(struct acpi_table_processor_affinity*) header;
@@ -58,9 +59,11 @@ acpi_table_print_srat_entry (
 		       p->apic_id, p->lsapic_eid, p->proximity_domain,
 		       p->flags.enabled?"enabled":"disabled"));
 	}
+#endif /* ACPI_DEBUG_OUTPUT */
 		break;
 
 	case ACPI_SRAT_MEMORY_AFFINITY:
+#ifdef ACPI_DEBUG_OUTPUT
 	{
 		struct acpi_table_memory_affinity *p =
 			(struct acpi_table_memory_affinity*) header;
@@ -70,6 +73,7 @@ acpi_table_print_srat_entry (
 		       p->flags.enabled ? "enabled" : "disabled",
 		       p->flags.hot_pluggable ? " hot-pluggable" : ""));
 	}
+#endif /* ACPI_DEBUG_OUTPUT */
 		break;
 
 	default:
@@ -94,8 +98,6 @@ acpi_parse_slit (unsigned long phys_addr, unsigned long size)
 	/* downcast just for %llu vs %lu for i386/ia64  */
 	localities = (u32) slit->localities;
 
-	printk(KERN_INFO PREFIX "SLIT localities %ux%u\n", localities, localities);
-
 	acpi_numa_slit_init(slit);
 
 	return 0;
@@ -103,7 +105,9 @@ acpi_parse_slit (unsigned long phys_addr, unsigned long size)
 
 
 static int __init
-acpi_parse_processor_affinity (acpi_table_entry_header *header)
+acpi_parse_processor_affinity (
+	acpi_table_entry_header *header,
+	const unsigned long end)
 {
 	struct acpi_table_processor_affinity *processor_affinity;
 
@@ -121,7 +125,9 @@ acpi_parse_processor_affinity (acpi_table_entry_header *header)
 
 
 static int __init
-acpi_parse_memory_affinity (acpi_table_entry_header *header)
+acpi_parse_memory_affinity (
+	acpi_table_entry_header *header,
+	const unsigned long end)
 {
 	struct acpi_table_memory_affinity *memory_affinity;
 
@@ -147,8 +153,6 @@ acpi_parse_srat (unsigned long phys_addr, unsigned long size)
 		return -EINVAL;
 
 	srat = (struct acpi_table_srat *) __va(phys_addr);
-
-	printk(KERN_INFO PREFIX "SRAT revision %d\n", srat->table_revision);
 
 	return 0;
 }

@@ -4,6 +4,7 @@
 
 #include <linux/proc_fs.h>
 #include <linux/init.h>
+#include <linux/moduleparam.h>
 #include <asm/uaccess.h>
 #include <acpi/acpi_drivers.h>
 
@@ -12,6 +13,81 @@ ACPI_MODULE_NAME		("debug")
 
 #define ACPI_SYSTEM_FILE_DEBUG_LAYER	"debug_layer"
 #define ACPI_SYSTEM_FILE_DEBUG_LEVEL	"debug_level"
+
+#ifdef MODULE_PARAM_PREFIX
+#undef MODULE_PARAM_PREFIX
+#endif
+
+#define MODULE_PARAM_PREFIX
+module_param(acpi_dbg_layer, uint, 0400);
+module_param(acpi_dbg_level, uint, 0400);
+
+struct acpi_dlayer {
+	const char *name;
+	unsigned long value;
+};
+struct acpi_dlevel {
+	const char *name;
+	unsigned long value;
+};
+#define ACPI_DEBUG_INIT(v)	{ .name = #v, .value = v }
+
+const struct acpi_dlayer acpi_debug_layers[] =
+{
+	ACPI_DEBUG_INIT(ACPI_UTILITIES),
+	ACPI_DEBUG_INIT(ACPI_HARDWARE),
+	ACPI_DEBUG_INIT(ACPI_EVENTS),
+	ACPI_DEBUG_INIT(ACPI_TABLES),
+	ACPI_DEBUG_INIT(ACPI_NAMESPACE),
+	ACPI_DEBUG_INIT(ACPI_PARSER),
+	ACPI_DEBUG_INIT(ACPI_DISPATCHER),
+	ACPI_DEBUG_INIT(ACPI_EXECUTER),
+	ACPI_DEBUG_INIT(ACPI_RESOURCES),
+	ACPI_DEBUG_INIT(ACPI_CA_DEBUGGER),
+	ACPI_DEBUG_INIT(ACPI_OS_SERVICES),
+	ACPI_DEBUG_INIT(ACPI_CA_DISASSEMBLER),
+	ACPI_DEBUG_INIT(ACPI_COMPILER),
+	ACPI_DEBUG_INIT(ACPI_TOOLS),
+};
+
+const struct acpi_dlevel acpi_debug_levels[] =
+{
+	ACPI_DEBUG_INIT(ACPI_LV_ERROR),
+	ACPI_DEBUG_INIT(ACPI_LV_WARN),
+	ACPI_DEBUG_INIT(ACPI_LV_INIT),
+	ACPI_DEBUG_INIT(ACPI_LV_DEBUG_OBJECT),
+	ACPI_DEBUG_INIT(ACPI_LV_INFO),
+
+	ACPI_DEBUG_INIT(ACPI_LV_INIT_NAMES),
+	ACPI_DEBUG_INIT(ACPI_LV_PARSE),
+	ACPI_DEBUG_INIT(ACPI_LV_LOAD),
+	ACPI_DEBUG_INIT(ACPI_LV_DISPATCH),
+	ACPI_DEBUG_INIT(ACPI_LV_EXEC),
+	ACPI_DEBUG_INIT(ACPI_LV_NAMES),
+	ACPI_DEBUG_INIT(ACPI_LV_OPREGION),
+	ACPI_DEBUG_INIT(ACPI_LV_BFIELD),
+	ACPI_DEBUG_INIT(ACPI_LV_TABLES),
+	ACPI_DEBUG_INIT(ACPI_LV_VALUES),
+	ACPI_DEBUG_INIT(ACPI_LV_OBJECTS),
+	ACPI_DEBUG_INIT(ACPI_LV_RESOURCES),
+	ACPI_DEBUG_INIT(ACPI_LV_USER_REQUESTS),
+	ACPI_DEBUG_INIT(ACPI_LV_PACKAGE),
+
+	ACPI_DEBUG_INIT(ACPI_LV_ALLOCATIONS),
+	ACPI_DEBUG_INIT(ACPI_LV_FUNCTIONS),
+	ACPI_DEBUG_INIT(ACPI_LV_OPTIMIZATIONS),
+
+	ACPI_DEBUG_INIT(ACPI_LV_MUTEX),
+	ACPI_DEBUG_INIT(ACPI_LV_THREADS),
+	ACPI_DEBUG_INIT(ACPI_LV_IO),
+	ACPI_DEBUG_INIT(ACPI_LV_INTERRUPTS),
+
+	ACPI_DEBUG_INIT(ACPI_LV_AML_DISASSEMBLE),
+	ACPI_DEBUG_INIT(ACPI_LV_VERBOSE_INFO),
+	ACPI_DEBUG_INIT(ACPI_LV_FULL_TABLES),
+	ACPI_DEBUG_INIT(ACPI_LV_EVENTS),             
+};
+#define NUM_OF(v)	( sizeof(v)/sizeof(v[0]) )
 
 static int
 acpi_system_read_debug (
@@ -24,16 +100,41 @@ acpi_system_read_debug (
 {
 	char			*p = page;
 	int 			size = 0;
+	int			i;
 
 	if (off != 0)
 		goto end;
 
+	p += sprintf(p, "%-25s\tHex        SET\n", "Description");
+
 	switch ((unsigned long) data) {
 	case 0:
-		p += sprintf(p, "0x%08x\n", acpi_dbg_layer);
+		for (i = 0; i < NUM_OF(acpi_debug_layers); i++) {
+			p += sprintf(p, "%-25s\t0x%08lX [%c]\n",
+				acpi_debug_layers[i].name,
+				acpi_debug_layers[i].value,
+				(acpi_dbg_layer & acpi_debug_layers[i].value) ?
+				'*' : ' ');
+		}
+		p += sprintf(p, "%-25s\t0x%08X [%c]\n", "ACPI_ALL_DRIVERS",
+			ACPI_ALL_DRIVERS,
+			(acpi_dbg_layer & ACPI_ALL_DRIVERS) == ACPI_ALL_DRIVERS?
+			'*' : (acpi_dbg_layer & ACPI_ALL_DRIVERS) == 0 ?
+			' ' : '-');
+		p += sprintf(p,
+			"--\ndebug_layer = 0x%08X (* = enabled, - = partial)\n",
+			acpi_dbg_layer);
 		break;
 	case 1:
-		p += sprintf(p, "0x%08x\n", acpi_dbg_level);
+		for (i = 0; i < NUM_OF(acpi_debug_levels); i++) {
+			p += sprintf(p, "%-25s\t0x%08lX [%c]\n",
+				acpi_debug_levels[i].name,
+				acpi_debug_levels[i].value,
+				(acpi_dbg_level & acpi_debug_levels[i].value) ?
+				'*' : ' ');
+		}
+		p += sprintf(p, "--\ndebug_level = 0x%08X (* = enabled)\n",
+				acpi_dbg_level);
 		break;
 	default:
 		p += sprintf(p, "Invalid debug option\n");
