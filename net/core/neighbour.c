@@ -254,18 +254,20 @@ static struct neighbour *neigh_alloc(struct neigh_table *tbl)
 {
 	struct neighbour *n = NULL;
 	unsigned long now = jiffies;
+	int entries;
 
-	if (tbl->entries > tbl->gc_thresh3 ||
-	    (tbl->entries > tbl->gc_thresh2 &&
+	entries = atomic_inc_return(&tbl->entries) - 1;
+	if (entries >= tbl->gc_thresh3 ||
+	    (entries >= tbl->gc_thresh2 &&
 	     time_after(now, tbl->last_flush + 5 * HZ))) {
 		if (!neigh_forced_gc(tbl) &&
-		    tbl->entries > tbl->gc_thresh3)
-			goto out;
+		    entries >= tbl->gc_thresh3)
+			goto out_entries;
 	}
 
 	n = kmem_cache_alloc(tbl->kmem_cachep, SLAB_ATOMIC);
 	if (!n)
-		goto out;
+		goto out_entries;
 
 	memset(n, 0, tbl->entry_size);
 
@@ -281,12 +283,15 @@ static struct neighbour *neigh_alloc(struct neigh_table *tbl)
 
 	NEIGH_CACHE_STAT_INC(tbl, allocs);
 	neigh_glbl_allocs++;
-	tbl->entries++;
 	n->tbl		  = tbl;
 	atomic_set(&n->refcnt, 1);
 	n->dead		  = 1;
 out:
 	return n;
+
+out_entries:
+	atomic_dec(&tbl->entries);
+	goto out;
 }
 
 static struct neighbour **neigh_hash_alloc(unsigned int entries)
@@ -427,7 +432,7 @@ struct neighbour *neigh_create(struct neigh_table *tbl, const void *pkey,
 
 	write_lock_bh(&tbl->lock);
 
-	if (tbl->entries > (tbl->hash_mask + 1))
+	if (atomic_read(&tbl->entries) > (tbl->hash_mask + 1))
 		neigh_hash_grow(tbl, (tbl->hash_mask + 1) << 1);
 
 	hash_val = tbl->hash(pkey, dev) & tbl->hash_mask;
@@ -608,7 +613,7 @@ void neigh_destroy(struct neighbour *neigh)
 	NEIGH_PRINTK2("neigh %p is destroyed.\n", neigh);
 
 	neigh_glbl_allocs--;
-	neigh->tbl->entries--;
+	atomic_dec(&neigh->tbl->entries);
 	kmem_cache_free(neigh->tbl->kmem_cachep, neigh);
 }
 
@@ -1394,7 +1399,7 @@ int neigh_table_clear(struct neigh_table *tbl)
 	del_timer_sync(&tbl->proxy_timer);
 	pneigh_queue_purge(&tbl->proxy_queue);
 	neigh_ifdown(tbl, NULL);
-	if (tbl->entries)
+	if (atomic_read(&tbl->entries))
 		printk(KERN_CRIT "neighbour leakage\n");
 	write_lock(&neigh_tbl_lock);
 	for (tp = &neigh_tables; *tp; tp = &(*tp)->next) {
@@ -1951,7 +1956,7 @@ static int neigh_stat_seq_show(struct seq_file *seq, void *v)
 
 	seq_printf(seq, "%08x  %08lx %08lx %08lx  %08lx %08lx  %08lx  "
 			"%08lx %08lx  %08lx %08lx\n",
-		   tbl->entries,
+		   atomic_read(&tbl->entries),
 
 		   st->allocs,
 		   st->destroys,
