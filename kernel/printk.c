@@ -841,7 +841,7 @@ static void early_printk_uart(const char *str, size_t len)
 # endif /* CONFIG_IA64_EARLY_PRINTK_UART */
 
 #ifdef CONFIG_IA64_EARLY_PRINTK_SGI_SN
-extern int sn_sal_console_out(const char *str, int len);
+extern int early_printk_sn_sal(const char *str, int len);
 #endif
 
 void early_printk(const char *str, size_t len)
@@ -853,7 +853,7 @@ void early_printk(const char *str, size_t len)
 	early_printk_vga(str, len);
 #endif
 #ifdef CONFIG_IA64_EARLY_PRINTK_SGI_SN
- 	sn_sal_console_out(str, len);
+ 	early_printk_sn_sal(str, len);
 #endif
 }
 

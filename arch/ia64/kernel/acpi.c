@@ -454,6 +454,12 @@ acpi_numa_arch_fixup (void)
 {
 	int i, j, node_from, node_to;
 
+	/* If there's no SRAT, fix the phys_id */
+	if (srat_num_cpus == 0) {
+		node_cpuid[0].phys_id = hard_smp_processor_id();
+		return;
+	}
+
 	/* calculate total number of nodes in system from PXM bitmap */
 	numnodes = 0;		/* init total nodes in system */
 
@@ -614,6 +620,12 @@ acpi_boot_init (void)
 
 	smp_build_cpu_map();
 # ifdef CONFIG_NUMA
+	if (srat_num_cpus == 0) {
+		int cpu, i = 1;
+		for (cpu = 0; cpu < smp_boot_data.cpu_count; cpu++)
+			if (smp_boot_data.cpu_phys_id[cpu] != hard_smp_processor_id())
+				node_cpuid[i++].phys_id = smp_boot_data.cpu_phys_id[cpu];
+	}
 	build_cpu_to_node_map();
 # endif
 #endif

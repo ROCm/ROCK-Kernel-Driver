@@ -65,7 +65,6 @@ static const char __module_cat(name,__LINE__)[]				  \
 
 #define MODULE_GENERIC_TABLE(gtype,name)		\
 extern const struct gtype##_id __mod_##gtype##_table	\
-  __attribute_used__					\
   __attribute__ ((unused, alias(__stringify(name))))
 
 #define THIS_MODULE (&__this_module)

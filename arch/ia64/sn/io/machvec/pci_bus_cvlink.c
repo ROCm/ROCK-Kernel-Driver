@@ -867,6 +867,9 @@ sn_pci_init (void)
 	int i = 0;
 	struct pci_controller *controller;
 
+	if (!ia64_platform_is("sn2"))
+	    return 0;
+
 	/*
 	 * set pci_raw_ops, etc.
 	 */
