@@ -363,8 +363,9 @@ tcp_frto - BOOLEAN
 	rather than intermediate router congestion.
 
 somaxconn - INTEGER
-	Limit of TCP listen backlog, known in userspace as SOMAXCONN.
-	Defaults to 128
+	Limit of socket listen() backlog, known in userspace as SOMAXCONN.
+	Defaults to 128.  See also tcp_max_syn_backlog for additional tuning
+	for TCP sockets.
 
 IP Variables:
 
