@@ -87,6 +87,12 @@ extern dma_addr_t pci_map_page(struct pci_dev *hwdev, struct page *page,
 extern void pci_unmap_page(struct pci_dev *hwdev,
 			dma_addr_t dma_address, size_t size, int direction);
 
+/* map_page and map_single cannot fail */
+static inline int pci_dma_mapping_error(dma_addr_t dma_addr)
+{
+	return 0;
+}
+
 /* Map a set of buffers described by scatterlist in streaming
  * mode for DMA.  This is the scather-gather version of the
  * above pci_map_single interface.  Here the scatter gather list
