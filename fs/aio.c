@@ -1658,7 +1658,7 @@ asmlinkage long sys_io_cancel(aio_context_t ctx_id, struct iocb *iocb,
 				ret = -EFAULT;
 		}
 	} else
-		printk(KERN_DEBUG "iocb has no cancel operation\n");
+		printk(KERN_DEBUG "iocb has no cancel operation [%p: %s(%u)]\n", kiocb, current->comm, current->pid);
 
 	put_ioctx(ctx);
 
