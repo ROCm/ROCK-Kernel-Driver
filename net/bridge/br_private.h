@@ -166,7 +166,7 @@ extern void br_get_port_ifindices(struct net_bridge *br,
 			   int *ifindices);
 
 /* br_input.c */
-extern void br_handle_frame(struct sk_buff *skb);
+extern int br_handle_frame(struct sk_buff *skb);
 
 /* br_ioctl.c */
 extern void br_call_ioctl_atomic(void (*fn)(void));

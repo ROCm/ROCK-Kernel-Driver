@@ -1,0 +1,105 @@
+CONFIG_BRIDGE_EBT
+  ebtables is an extendable frame filtering system for the Linux
+  Ethernet bridge. Its usage and implementation is very similar to that
+  of iptables.
+  The difference is that ebtables works on the Link Layer, while iptables
+  works on the Network Layer. ebtables can filter all frames that come
+  into contact with a logical bridge device.
+  Apart from filtering, ebtables also allows MAC source and destination
+  alterations (we call it MAC SNAT and MAC DNAT) and also provides
+  functionality for making Linux a brouter.
+
+  If you want to compile it as a module, say M here and read
+  <file:Documentation/modules.txt>.  If unsure, say `N'.
+
+CONFIG_BRIDGE_EBT_T_FILTER
+  The ebtables filter table is used to define frame filtering rules at
+  local input, forwarding and local output. See the man page for
+  ebtables(8).
+
+  If you want to compile it as a module, say M here and read
+  <file:Documentation/modules.txt>.  If unsure, say `N'.
+
+CONFIG_BRIDGE_EBT_T_NAT
+  The ebtables nat table is used to define rules that alter the MAC
+  source address (MAC SNAT) or the MAC destination address (MAC DNAT).
+  See the man page for ebtables(8).
+
+  If you want to compile it as a module, say M here and read
+  <file:Documentation/modules.txt>.  If unsure, say `N'.
+
+CONFIG_BRIDGE_EBT_BROUTE
+  The ebtables broute table is used to define rules that decide between
+  bridging and routing frames, giving Linux the functionality of a
+  brouter. See the man page for ebtables(8) and examples on the ebtables
+  website.
+
+  If you want to compile it as a module, say M here and read
+  <file:Documentation/modules.txt>.  If unsure, say `N'.
+
+CONFIG_BRIDGE_EBT_LOG
+  This option adds the log target, that you can use in any rule in
+  any ebtables table. It records the frame header to the syslog.
+
+  If you want to compile it as a module, say M here and read
+  <file:Documentation/modules.txt>.  If unsure, say `N'.
+
+CONFIG_BRIDGE_EBT_IPF
+  This option adds the IP match, which allows basic IP header field
+  filtering.
+
+  If you want to compile it as a module, say M here and read
+  <file:Documentation/modules.txt>.  If unsure, say `N'.
+
+CONFIG_BRIDGE_EBT_ARPF
+  This option adds the ARP match, which allows ARP and RARP header field
+  filtering.
+
+  If you want to compile it as a module, say M here and read
+  <file:Documentation/modules.txt>.  If unsure, say `N'.
+
+CONFIG_BRIDGE_EBT_VLANF
+  This option adds the 802.1Q vlan match, which allows the filtering of
+  802.1Q vlan fields.
+
+  If you want to compile it as a module, say M here and read
+  <file:Documentation/modules.txt>.  If unsure, say `N'.
+
+CONFIG_BRIDGE_EBT_MARKF
+  This option adds the mark match, which allows matching frames based on
+  the 'nfmark' value in the frame. This can be set by the mark target.
+  This value is the same as the one used in the iptables mark match and
+  target.
+
+  If you want to compile it as a module, say M here and read
+  <file:Documentation/modules.txt>.  If unsure, say `N'.
+
+CONFIG_BRIDGE_EBT_SNAT
+  This option adds the MAC SNAT target, which allows altering the MAC
+  source address of frames.
+
+  If you want to compile it as a module, say M here and read
+  <file:Documentation/modules.txt>.  If unsure, say `N'.
+
+CONFIG_BRIDGE_EBT_DNAT
+  This option adds the MAC DNAT target, which allows altering the MAC
+  destination address of frames.
+
+  If you want to compile it as a module, say M here and read
+  <file:Documentation/modules.txt>.  If unsure, say `N'.
+
+CONFIG_BRIDGE_EBT_REDIRECT
+  This option adds the MAC redirect target, which allows altering the MAC
+  destination address of a frame to that of the device it arrived on.
+
+  If you want to compile it as a module, say M here and read
+  <file:Documentation/modules.txt>.  If unsure, say `N'.
+
+CONFIG_BRIDGE_EBT_MARK_T
+  This option adds the mark target, which allows marking frames by
+  setting the 'nfmark' value in the frame.
+  This value is the same as the one used in the iptables mark match and
+  target.
+
+  If you want to compile it as a module, say M here and read
+  <file:Documentation/modules.txt>.  If unsure, say `N'.
