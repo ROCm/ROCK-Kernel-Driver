@@ -515,7 +515,8 @@ ctc_tty_write(struct tty_struct *tty, int from_user, const u_char * buf, int cou
 		}
 		skb_reserve(skb, skb_res);
 		if (from_user)
-			copy_from_user(skb_put(skb, c), buf, c);
+			copy_from_user(skb_put(skb, c),
+					(const u_char __user *)buf, c);
 		else
 			memcpy(skb_put(skb, c), buf, c);
 		skb_queue_tail(&info->tx_queue, skb);
@@ -640,7 +641,7 @@ ctc_tty_unthrottle(struct tty_struct *tty)
  *          allows RS485 driver to be written in user space.
  */
 static int
-ctc_tty_get_lsr_info(ctc_tty_info * info, uint * value)
+ctc_tty_get_lsr_info(ctc_tty_info * info, uint __user *value)
 {
 	u_char status;
 	uint result;
@@ -650,7 +651,7 @@ ctc_tty_get_lsr_info(ctc_tty_info * info, uint * value)
 	status = info->lsr;
 	spin_unlock_irqrestore(&ctc_tty_lock, flags);
 	result = ((status & UART_LSR_TEMT) ? TIOCSER_TEMT : 0);
-	put_user(result, (uint *) value);
+	put_user(result, value);
 	return 0;
 }
 
@@ -743,14 +744,14 @@ ctc_tty_ioctl(struct tty_struct *tty, struct file *file,
 			printk(KERN_DEBUG "%s%d ioctl TIOCGSOFTCAR\n", CTC_TTY_NAME,
 			       info->line);
 #endif
-			error = put_user(C_CLOCAL(tty) ? 1 : 0, (ulong *) arg);
+			error = put_user(C_CLOCAL(tty) ? 1 : 0, (ulong __user *) arg);
 			return error;
 		case TIOCSSOFTCAR:
 #ifdef CTC_DEBUG_MODEM_IOCTL
 			printk(KERN_DEBUG "%s%d ioctl TIOCSSOFTCAR\n", CTC_TTY_NAME,
 			       info->line);
 #endif
-			error = get_user(arg, (ulong *) arg);
+			error = get_user(arg, (ulong __user *) arg);
 			if (error)
 				return error;
 			tty->termios->c_cflag =
@@ -762,11 +763,11 @@ ctc_tty_ioctl(struct tty_struct *tty, struct file *file,
 			printk(KERN_DEBUG "%s%d ioctl TIOCSERGETLSR\n", CTC_TTY_NAME,
 			       info->line);
 #endif
-			error = verify_area(VERIFY_WRITE, (void *) arg, sizeof(uint));
+			error = verify_area(VERIFY_WRITE, (void __user *) arg, sizeof(uint));
 			if (error)
 				return error;
 			else
-				return ctc_tty_get_lsr_info(info, (uint *) arg);
+				return ctc_tty_get_lsr_info(info, (uint __user *) arg);
 		default:
 #ifdef CTC_DEBUG_MODEM_IOCTL
 			printk(KERN_DEBUG "UNKNOWN ioctl 0x%08x on %s%d\n", cmd,

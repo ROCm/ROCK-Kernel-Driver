@@ -885,7 +885,7 @@ tape_34xx_ioctl(struct tape_device *device, unsigned int cmd, unsigned long arg)
 	if (cmd == TAPE390_DISPLAY) {
 		struct display_struct disp;
 
-		if (copy_from_user(&disp, (char *) arg, sizeof(disp)) != 0)
+		if (copy_from_user(&disp, (char __user *) arg, sizeof(disp)) != 0)
 			return -EFAULT;
 
 		return tape_std_display(device, &disp);

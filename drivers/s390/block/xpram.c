@@ -155,7 +155,7 @@ static int xpram_page_in (unsigned long page_addr, unsigned int xpage_index)
 {
 	int cc;
 
-	__asm__ __volatile(
+	__asm__ __volatile__ (
 		"   lhi   %0,2\n"  /* return unused cc 2 if pgin traps */
 		"   .insn rre,0xb22e0000,%1,%2\n"  /* pgin %1,%2 */
                 "0: ipm   %0\n"
@@ -203,7 +203,7 @@ static long xpram_page_out (unsigned long page_addr, unsigned int xpage_index)
 {
 	int cc;
 
-	__asm__ __volatile(
+	__asm__ __volatile__ (
 		"   lhi   %0,2\n"  /* return unused cc 2 if pgout traps */
 		"   .insn rre,0xb22f0000,%1,%2\n"  /* pgout %1,%2 */
                 "0: ipm   %0\n"
@@ -332,16 +332,16 @@ fail:
 static int xpram_ioctl (struct inode *inode, struct file *filp,
 		 unsigned int cmd, unsigned long arg)
 {
-	struct hd_geometry *geo;
+	struct hd_geometry __user *geo;
 	unsigned long size;
- 	if (cmd != HDIO_GETGEO)
+	if (cmd != HDIO_GETGEO)
 		return -EINVAL;
 	/*
 	 * get geometry: we have to fake one...  trim the size to a
 	 * multiple of 64 (32k): tell we have 16 sectors, 4 heads,
 	 * whatever cylinders. Tell also that data starts at sector. 4.
 	 */
-	geo = (struct hd_geometry *) arg;
+	geo = (struct hd_geometry __user *) arg;
 	size = (xpram_pages * 8) & ~0x3f;
 	put_user(size >> 6, &geo->cylinders);
 	put_user(4, &geo->heads);
