@@ -615,15 +615,15 @@ MODULE_DEVICE_TABLE(pci, snd_hdsp_ids);
 /* prototypes */
 static int __devinit snd_hdsp_create_alsa_devices(snd_card_t *card, hdsp_t *hdsp);
 static int __devinit snd_hdsp_create_pcm(snd_card_t *card, hdsp_t *hdsp);
-static inline int snd_hdsp_enable_io (hdsp_t *hdsp);
-static inline void snd_hdsp_initialize_midi_flush (hdsp_t *hdsp);
-static inline void snd_hdsp_initialize_channels (hdsp_t *hdsp);
-static inline int hdsp_fifo_wait(hdsp_t *hdsp, int count, int timeout);
+static int snd_hdsp_enable_io (hdsp_t *hdsp);
+static void snd_hdsp_initialize_midi_flush (hdsp_t *hdsp);
+static void snd_hdsp_initialize_channels (hdsp_t *hdsp);
+static int hdsp_fifo_wait(hdsp_t *hdsp, int count, int timeout);
 static int hdsp_autosync_ref(hdsp_t *hdsp);
 static int snd_hdsp_set_defaults(hdsp_t *hdsp);
-static inline void snd_hdsp_9652_enable_mixer (hdsp_t *hdsp);
+static void snd_hdsp_9652_enable_mixer (hdsp_t *hdsp);
 
-static inline int hdsp_playback_to_output_key (hdsp_t *hdsp, int in, int out)
+static int hdsp_playback_to_output_key (hdsp_t *hdsp, int in, int out)
 {
 	switch (hdsp->firmware_rev) {
 	case 0xa:
@@ -636,7 +636,7 @@ static inline int hdsp_playback_to_output_key (hdsp_t *hdsp, int in, int out)
 	}
 }
 
-static inline int hdsp_input_to_output_key (hdsp_t *hdsp, int in, int out)
+static int hdsp_input_to_output_key (hdsp_t *hdsp, int in, int out)
 {
 	switch (hdsp->firmware_rev) {
 	case 0xa:
@@ -649,17 +649,17 @@ static inline int hdsp_input_to_output_key (hdsp_t *hdsp, int in, int out)
 	}
 }
 
-static inline void hdsp_write(hdsp_t *hdsp, int reg, int val)
+static void hdsp_write(hdsp_t *hdsp, int reg, int val)
 {
 	writel(val, hdsp->iobase + reg);
 }
 
-static inline unsigned int hdsp_read(hdsp_t *hdsp, int reg)
+static unsigned int hdsp_read(hdsp_t *hdsp, int reg)
 {
 	return readl (hdsp->iobase + reg);
 }
 
-static inline int hdsp_check_for_iobox (hdsp_t *hdsp)
+static int hdsp_check_for_iobox (hdsp_t *hdsp)
 {
 
 	if (hdsp->io_type == H9652 || hdsp->io_type == H9632) return 0;
@@ -732,7 +732,7 @@ static int snd_hdsp_load_firmware_from_cache(hdsp_t *hdsp) {
 	return 0;
 }
 
-static inline int hdsp_get_iobox_version (hdsp_t *hdsp)
+static int hdsp_get_iobox_version (hdsp_t *hdsp)
 {
 	int err;
 	
@@ -775,7 +775,7 @@ static inline int hdsp_get_iobox_version (hdsp_t *hdsp)
 }
 
 
-static inline int hdsp_check_for_firmware (hdsp_t *hdsp)
+static int hdsp_check_for_firmware (hdsp_t *hdsp)
 {
 	if (hdsp->io_type == H9652 || hdsp->io_type == H9632) return 0;
 	if ((hdsp_read (hdsp, HDSP_statusRegister) & HDSP_DllError) != 0) {
@@ -787,7 +787,7 @@ static inline int hdsp_check_for_firmware (hdsp_t *hdsp)
 }
 
 
-static inline int hdsp_fifo_wait(hdsp_t *hdsp, int count, int timeout)
+static int hdsp_fifo_wait(hdsp_t *hdsp, int count, int timeout)
 {    
 	int i;
 
@@ -812,7 +812,7 @@ static inline int hdsp_fifo_wait(hdsp_t *hdsp, int count, int timeout)
 	return -1;
 }
 
-static inline int hdsp_read_gain (hdsp_t *hdsp, unsigned int addr)
+static int hdsp_read_gain (hdsp_t *hdsp, unsigned int addr)
 {
 	if (addr >= HDSP_MATRIX_MIXER_SIZE) {
 		return 0;
@@ -820,7 +820,7 @@ static inline int hdsp_read_gain (hdsp_t *hdsp, unsigned int addr)
 	return hdsp->mixer_matrix[addr];
 }
 
-static inline int hdsp_write_gain(hdsp_t *hdsp, unsigned int addr, unsigned short data)
+static int hdsp_write_gain(hdsp_t *hdsp, unsigned int addr, unsigned short data)
 {
 	unsigned int ad;
 
@@ -883,7 +883,7 @@ static inline int hdsp_write_gain(hdsp_t *hdsp, unsigned int addr, unsigned shor
 	return 0;
 }
 
-static inline int snd_hdsp_use_is_exclusive(hdsp_t *hdsp)
+static int snd_hdsp_use_is_exclusive(hdsp_t *hdsp)
 {
 	unsigned long flags;
 	int ret = 1;
@@ -897,7 +897,7 @@ static inline int snd_hdsp_use_is_exclusive(hdsp_t *hdsp)
 	return ret;
 }
 
-static inline int hdsp_external_sample_rate (hdsp_t *hdsp)
+static int hdsp_external_sample_rate (hdsp_t *hdsp)
 {
 	unsigned int status2 = hdsp_read(hdsp, HDSP_status2Register);
 	unsigned int rate_bits = status2 & HDSP_systemFrequencyMask;
@@ -914,7 +914,7 @@ static inline int hdsp_external_sample_rate (hdsp_t *hdsp)
 	}
 }
 
-static inline int hdsp_spdif_sample_rate(hdsp_t *hdsp)
+static int hdsp_spdif_sample_rate(hdsp_t *hdsp)
 {
 	unsigned int status = hdsp_read(hdsp, HDSP_statusRegister);
 	unsigned int rate_bits = (status & HDSP_spdifFrequencyMask);
@@ -946,7 +946,7 @@ static inline int hdsp_spdif_sample_rate(hdsp_t *hdsp)
 	return 0;
 }
 
-static inline void hdsp_compute_period_size(hdsp_t *hdsp)
+static void hdsp_compute_period_size(hdsp_t *hdsp)
 {
 	hdsp->period_bytes = 1 << ((hdsp_decode_latency(hdsp->control_register) + 8));
 }
@@ -968,24 +968,24 @@ static snd_pcm_uframes_t hdsp_hw_pointer(hdsp_t *hdsp)
 	return position;
 }
 
-static inline void hdsp_reset_hw_pointer(hdsp_t *hdsp)
+static void hdsp_reset_hw_pointer(hdsp_t *hdsp)
 {
 	hdsp_write (hdsp, HDSP_resetPointer, 0);
 }
 
-static inline void hdsp_start_audio(hdsp_t *s)
+static void hdsp_start_audio(hdsp_t *s)
 {
 	s->control_register |= (HDSP_AudioInterruptEnable | HDSP_Start);
 	hdsp_write(s, HDSP_controlRegister, s->control_register);
 }
 
-static inline void hdsp_stop_audio(hdsp_t *s)
+static void hdsp_stop_audio(hdsp_t *s)
 {
 	s->control_register &= ~(HDSP_Start | HDSP_AudioInterruptEnable);
 	hdsp_write(s, HDSP_controlRegister, s->control_register);
 }
 
-static inline void hdsp_silence_playback(hdsp_t *hdsp)
+static void hdsp_silence_playback(hdsp_t *hdsp)
 {
 	memset(hdsp->playback_buffer, 0, HDSP_DMA_AREA_BYTES);
 }
@@ -1230,7 +1230,7 @@ static int hdsp_set_passthru(hdsp_t *hdsp, int onoff)
    MIDI
   ----------------------------------------------------------------------------*/
 
-static inline unsigned char snd_hdsp_midi_read_byte (hdsp_t *hdsp, int id)
+static unsigned char snd_hdsp_midi_read_byte (hdsp_t *hdsp, int id)
 {
 	/* the hardware already does the relevant bit-mask with 0xff */
 	if (id) {
@@ -1240,7 +1240,7 @@ static inline unsigned char snd_hdsp_midi_read_byte (hdsp_t *hdsp, int id)
 	}
 }
 
-static inline void snd_hdsp_midi_write_byte (hdsp_t *hdsp, int id, int val)
+static void snd_hdsp_midi_write_byte (hdsp_t *hdsp, int id, int val)
 {
 	/* the hardware already does the relevant bit-mask with 0xff */
 	if (id) {
@@ -1250,7 +1250,7 @@ static inline void snd_hdsp_midi_write_byte (hdsp_t *hdsp, int id, int val)
 	}
 }
 
-static inline int snd_hdsp_midi_input_available (hdsp_t *hdsp, int id)
+static int snd_hdsp_midi_input_available (hdsp_t *hdsp, int id)
 {
 	if (id) {
 		return (hdsp_read(hdsp, HDSP_midiStatusIn1) & 0xff);
@@ -1259,7 +1259,7 @@ static inline int snd_hdsp_midi_input_available (hdsp_t *hdsp, int id)
 	}
 }
 
-static inline int snd_hdsp_midi_output_possible (hdsp_t *hdsp, int id)
+static int snd_hdsp_midi_output_possible (hdsp_t *hdsp, int id)
 {
 	int fifo_bytes_used;
 
@@ -1276,7 +1276,7 @@ static inline int snd_hdsp_midi_output_possible (hdsp_t *hdsp, int id)
 	}
 }
 
-static inline void snd_hdsp_flush_midi_input (hdsp_t *hdsp, int id)
+static void snd_hdsp_flush_midi_input (hdsp_t *hdsp, int id)
 {
 	while (snd_hdsp_midi_input_available (hdsp, id)) {
 		snd_hdsp_midi_read_byte (hdsp, id);
@@ -4824,19 +4824,13 @@ static int __devinit snd_hdsp_create_pcm(snd_card_t *card,
 	return 0;
 }
 
-static inline void snd_hdsp_9652_enable_mixer (hdsp_t *hdsp)
+static void snd_hdsp_9652_enable_mixer (hdsp_t *hdsp)
 {
         hdsp->control2_register |= HDSP_9652_ENABLE_MIXER;
 	hdsp_write (hdsp, HDSP_control2Reg, hdsp->control2_register);
 }
 
-static inline void snd_hdsp_9652_disable_mixer (hdsp_t *hdsp)
-{
-        hdsp->control2_register &= ~HDSP_9652_ENABLE_MIXER;
-	hdsp_write (hdsp, HDSP_control2Reg, hdsp->control2_register);
-}
-
-static inline int snd_hdsp_enable_io (hdsp_t *hdsp)
+static int snd_hdsp_enable_io (hdsp_t *hdsp)
 {
 	int i;
 	
@@ -4852,7 +4846,7 @@ static inline int snd_hdsp_enable_io (hdsp_t *hdsp)
 	return 0;
 }
 
-static inline void snd_hdsp_initialize_channels(hdsp_t *hdsp)
+static void snd_hdsp_initialize_channels(hdsp_t *hdsp)
 {
 	int status, aebi_channels, aebo_channels;
 	
@@ -4895,7 +4889,7 @@ static inline void snd_hdsp_initialize_channels(hdsp_t *hdsp)
 	}
 }
 
-static inline void snd_hdsp_initialize_midi_flush (hdsp_t *hdsp)
+static void snd_hdsp_initialize_midi_flush (hdsp_t *hdsp)
 {
 	snd_hdsp_flush_midi_input (hdsp, 0);
 	snd_hdsp_flush_midi_input (hdsp, 1);
