@@ -106,8 +106,9 @@ static struct usb_device_id blacklist_ids[] = {
 	/* ISSC Bluetooth Adapter v3.1 */
 	{ USB_DEVICE(0x1131, 0x1001), .driver_info = HCI_RESET },
 
-	/* Digianswer device */
+	/* Digianswer devices */
 	{ USB_DEVICE(0x08fd, 0x0001), .driver_info = HCI_DIGIANSWER },
+	{ USB_DEVICE(0x08fd, 0x0002), .driver_info = HCI_IGNORE },
 
 	/* RTX Telecom based adapter with buggy SCO support */
 	{ USB_DEVICE(0x0400, 0x0807), .driver_info = HCI_BROKEN_ISOC },
@@ -861,9 +862,9 @@ int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	husb->intr_in_ep  = intr_in_ep;
 
 	if (id->driver_info & HCI_DIGIANSWER)
-		husb->ctrl_req = HCI_DIGI_REQ;
+		husb->ctrl_req = USB_TYPE_VENDOR;
 	else
-		husb->ctrl_req = HCI_CTRL_REQ;
+		husb->ctrl_req = USB_TYPE_CLASS;
 
 	/* Find isochronous endpoints that we can use */
 	size = 0; 
