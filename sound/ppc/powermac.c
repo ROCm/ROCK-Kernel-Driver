@@ -30,8 +30,7 @@
 #define CHIP_NAME "PMac"
 
 MODULE_DESCRIPTION("PowerMac");
-MODULE_CLASSES("{sound}");
-MODULE_DEVICES("{{Apple,PowerMac}}");
+MODULE_SUPPORTED_DEVICE("{{Apple,PowerMac}}");
 MODULE_LICENSE("GPL");
 
 static int index = SNDRV_DEFAULT_IDX1;		/* Index 0-MAX */
@@ -43,17 +42,13 @@ static int enable_beep = 1;
 
 module_param(index, int, 0444);
 MODULE_PARM_DESC(index, "Index value for " CHIP_NAME " soundchip.");
-MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 module_param(id, charp, 0444);
 MODULE_PARM_DESC(id, "ID string for " CHIP_NAME " soundchip.");
-MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 /* module_param(enable, bool, 0444);
    MODULE_PARM_DESC(enable, "Enable this soundchip.");
-   MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC); */
 #ifdef PMAC_SUPPORT_PCM_BEEP
 module_param(enable_beep, bool, 0444);
 MODULE_PARM_DESC(enable_beep, "Enable beep using PCM.");
-MODULE_PARM_SYNTAX(enable_beep, SNDRV_ENABLED "," SNDRV_BOOLEAN_TRUE_DESC);
 #endif
 
 

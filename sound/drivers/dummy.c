@@ -34,8 +34,7 @@
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("Dummy soundcard (/dev/null)");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
-MODULE_DEVICES("{{ALSA,Dummy soundcard}}");
+MODULE_SUPPORTED_DEVICE("{{ALSA,Dummy soundcard}}");
 
 #define MAX_PCM_DEVICES		4
 #define MAX_PCM_SUBSTREAMS	16
@@ -133,22 +132,16 @@ static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for dummy soundcard.");
-MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for dummy soundcard.");
-MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable this dummy soundcard.");
-MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 module_param_array(pcm_devs, int, boot_devs, 0444);
 MODULE_PARM_DESC(pcm_devs, "PCM devices # (0-4) for dummy driver.");
-MODULE_PARM_SYNTAX(pcm_devs, SNDRV_ENABLED ",allows:{{0,4}},default:1,dialog:list");
 module_param_array(pcm_substreams, int, boot_devs, 0444);
 MODULE_PARM_DESC(pcm_substreams, "PCM substreams # (1-16) for dummy driver.");
-MODULE_PARM_SYNTAX(pcm_substreams, SNDRV_ENABLED ",allows:{{1,16}},default:8,dialog:list");
 //module_param_array(midi_devs, int, boot_devs, 0444);
 //MODULE_PARM_DESC(midi_devs, "MIDI devices # (0-2) for dummy driver.");
-//MODULE_PARM_SYNTAX(midi_devs, SNDRV_ENABLED ",allows:{{0,2}},default:8,dialog:list");
 
 #define MIXER_ADDR_MASTER	0
 #define MIXER_ADDR_LINE		1

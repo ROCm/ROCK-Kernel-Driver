@@ -80,8 +80,7 @@
 MODULE_AUTHOR("Laurent Canet <canetl@esiee.fr>");
 MODULE_DESCRIPTION("ALSA Harmony sound driver");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
-MODULE_DEVICES("{{ALSA,Harmony soundcard}}");
+MODULE_SUPPORTED_DEVICE("{{ALSA,Harmony soundcard}}");
 
 #undef DEBUG
 #ifdef DEBUG
@@ -138,13 +137,10 @@ static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for Sun CS4231 soundcard.");
-MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for Sun CS4231 soundcard.");
-MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable Sun CS4231 soundcard.");
-MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 
 /* Register offset (from base hpa) */
 #define REG_ID		0x00

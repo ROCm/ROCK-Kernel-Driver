@@ -21,7 +21,7 @@
  *                              merged HAL layer (patches from Brian)
  */
 
-/* $Id: sa11xx-uda1341.c,v 1.16 2004/06/29 16:14:21 tiwai Exp $ */
+/* $Id: sa11xx-uda1341.c,v 1.17 2004/07/01 08:33:41 tiwai Exp $ */
 
 /***************************************************************************************************
 *
@@ -108,8 +108,7 @@
 MODULE_AUTHOR("Tomas Kasparek <tomas.kasparek@seznam.cz>");
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("SA1100/SA1111 + UDA1341TS driver for ALSA");
-MODULE_CLASSES("{sound}");
-MODULE_DEVICES("{{UDA1341,iPAQ H3600 UDA1341TS}}");
+MODULE_SUPPORTED_DEVICE("{{UDA1341,iPAQ H3600 UDA1341TS}}");
 
 static char *id = NULL;	/* ID for this card */
 

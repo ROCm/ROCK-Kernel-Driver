@@ -39,13 +39,11 @@
 MODULE_AUTHOR("Clemens Ladisch <clemens@ladisch.de>");
 MODULE_DESCRIPTION("OPL4 wavetable synth driver");
 MODULE_LICENSE("Dual BSD/GPL");
-MODULE_CLASSES("{sound}");
 
 int volume_boost = 8;
 
 module_param(volume_boost, int, 0644);
 MODULE_PARM_DESC(volume_boost, "Additional volume for OPL4 wavetable sounds.");
-MODULE_PARM_SYNTAX(volume_boost, "default:8");
 
 static int snd_opl4_seq_use_inc(opl4_t *opl4)
 {

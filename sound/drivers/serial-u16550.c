@@ -46,8 +46,7 @@
 
 MODULE_DESCRIPTION("MIDI serial u16550");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
-MODULE_DEVICES("{{ALSA, MIDI serial u16550}}");
+MODULE_SUPPORTED_DEVICE("{{ALSA, MIDI serial u16550}}");
 
 #define SNDRV_SERIAL_SOUNDCANVAS 0 /* Roland Soundcanvas; F5 NN selects part */
 #define SNDRV_SERIAL_MS124T 1      /* Midiator MS-124T */
@@ -81,38 +80,27 @@ static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for Serial MIDI.");
-MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for Serial MIDI.");
-MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable UART16550A chip.");
-MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 module_param_array(port, long, boot_devs, 0444);
 MODULE_PARM_DESC(port, "Port # for UART16550A chip.");
-MODULE_PARM_SYNTAX(port, SNDRV_PORT12_DESC);
 module_param_array(irq, int, boot_devs, 0444);
 MODULE_PARM_DESC(irq, "IRQ # for UART16550A chip.");
-MODULE_PARM_SYNTAX(irq, SNDRV_IRQ_DESC);
 module_param_array(speed, int, boot_devs, 0444);
 MODULE_PARM_DESC(speed, "Speed in bauds.");
-MODULE_PARM_SYNTAX(speed, SNDRV_ENABLED ",allows:{9600,19200,38400,57600,115200},dialog:list");
 module_param_array(base, int, boot_devs, 0444);
 MODULE_PARM_DESC(base, "Base for divisor in bauds.");
-MODULE_PARM_SYNTAX(base, SNDRV_ENABLED ",allows:{57600,115200,230400,460800},dialog:list");
 module_param_array(outs, int, boot_devs, 0444);
 MODULE_PARM_DESC(outs, "Number of MIDI outputs.");
 module_param_array(ins, int, boot_devs, 0444);
 MODULE_PARM_DESC(ins, "Number of MIDI inputs.");
 module_param_array(droponfull, bool, boot_devs, 0444);
 MODULE_PARM_DESC(droponfull, "Flag to enable drop-on-full buffer mode");
-MODULE_PARM_SYNTAX(droponfull, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
 
-MODULE_PARM_SYNTAX(outs, SNDRV_ENABLED ",allows:{{1,16}},dialog:list");
-MODULE_PARM_SYNTAX(ins, SNDRV_ENABLED ",allows:{{1,16}},dialog:list");
 module_param_array(adaptor, int, boot_devs, 0444);
 MODULE_PARM_DESC(adaptor, "Type of adaptor.");
-MODULE_PARM_SYNTAX(adaptor, SNDRV_ENABLED ",allows:{{0=Soundcanvas,1=MS-124T,2=MS-124W S/A,3=MS-124W M/B,4=Generic}},dialog:list");
 
 /*#define SNDRV_SERIAL_MS124W_MB_NOCOMBO 1*/  /* Address outs as 0-3 instead of bitmap */
 

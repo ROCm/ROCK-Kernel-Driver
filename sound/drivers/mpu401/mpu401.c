@@ -42,7 +42,6 @@
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("MPU-401 UART");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
 
 static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
@@ -56,24 +55,18 @@ static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for MPU-401 device.");
-MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for MPU-401 device.");
-MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable MPU-401 device.");
-MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 #ifdef USE_ACPI_PNP
 module_param_array(acpipnp, bool, boot_devs, 0444);
 MODULE_PARM_DESC(acpipnp, "ACPI PnP detection for MPU-401 device.");
-MODULE_PARM_SYNTAX(acpipnp, SNDRV_ENABLED "," SNDRV_BOOLEAN_TRUE_DESC);
 #endif
 module_param_array(port, long, boot_devs, 0444);
 MODULE_PARM_DESC(port, "Port # for MPU-401 device.");
-MODULE_PARM_SYNTAX(port, SNDRV_PORT12_DESC);
 module_param_array(irq, int, boot_devs, 0444);
 MODULE_PARM_DESC(irq, "IRQ # for MPU-401 device.");
-MODULE_PARM_SYNTAX(irq, SNDRV_IRQ_DESC);
 
 #ifndef CONFIG_ACPI_BUS
 struct acpi_device;

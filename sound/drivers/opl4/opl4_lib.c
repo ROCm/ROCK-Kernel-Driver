@@ -26,7 +26,6 @@
 MODULE_AUTHOR("Clemens Ladisch <clemens@ladisch.de>");
 MODULE_DESCRIPTION("OPL4 driver");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
 
 static void inline snd_opl4_wait(opl4_t *opl4)
 {

@@ -17,7 +17,7 @@
  * 2002-05-12   Tomas Kasparek  another code cleanup
  */
 
-/* $Id: uda1341.c,v 1.11 2004/06/29 16:14:23 tiwai Exp $ */
+/* $Id: uda1341.c,v 1.12 2004/07/01 08:33:42 tiwai Exp $ */
 
 #include <sound/driver.h>
 #include <linux/module.h>
@@ -820,8 +820,7 @@ module_exit(uda1341_exit);
 MODULE_AUTHOR("Tomas Kasparek <tomas.kasparek@seznam.cz>");
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Philips UDA1341 CODEC driver for ALSA");
-MODULE_CLASSES("{sound}");
-MODULE_DEVICES("{{UDA1341,UDA1341TS}}");
+MODULE_SUPPORTED_DEVICE("{{UDA1341,UDA1341TS}}");
 
 EXPORT_SYMBOL(snd_chip_uda1341_mixer_new);
 
