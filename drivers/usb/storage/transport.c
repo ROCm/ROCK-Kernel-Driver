@@ -809,15 +809,19 @@ int usb_stor_CBI_transport(Scsi_Cmnd *srb, struct us_data *us)
 	}
 
 	/* If not UFI, we interpret the data as a result code 
-	 * The first byte should always be a 0x0
-	 * The second byte & 0x0F should be 0x0 for good, otherwise error 
+	 * The first byte should always be a 0x0.
+	 *
+	 * Some bogus devices don't follow that rule.  They stuff the ASC
+	 * into the first byte -- so if it's non-zero, call it a failure.
 	 */
 	if (us->iobuf[0]) {
-		US_DEBUGP("CBI IRQ data showed reserved bType %d\n",
+		US_DEBUGP("CBI IRQ data showed reserved bType 0x%x\n",
 				us->iobuf[0]);
-		return USB_STOR_TRANSPORT_ERROR;
+		goto Failed;
+
 	}
 
+	/* The second byte & 0x0F should be 0x0 for good, otherwise error */
 	switch (us->iobuf[1] & 0x0F) {
 		case 0x00: 
 			return USB_STOR_TRANSPORT_GOOD;
