@@ -246,14 +246,36 @@ struct agp_bridge_driver amd_8151_driver = {
 	.agp_destroy_page	= agp_generic_destroy_page,
 };
 
+
+#ifdef CONFIG_SMP
+static int cache_nbs (void)
+{
+	struct pci_dev *loop_dev = NULL;
+	int i = 0;
+
+	/* cache pci_devs of northbridges. */
+	while ((loop_dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, loop_dev)) != NULL) {
+		if (loop_dev->bus->number == 0 &&
+		    PCI_FUNC(loop_dev->devfn) == 3 &&
+		    PCI_SLOT(loop_dev->devfn) >= 24 &&
+		    PCI_SLOT(loop_dev->devfn) <= 31) {
+			hammers[i++] = loop_dev;
+			nr_garts = i;
+			if (i == MAX_HAMMER_GARTS)
+				return -1;
+		}
+	}
+	return 0;
+}
+#endif
+
+
 static int __init agp_amdk8_probe(struct pci_dev *pdev,
 				  const struct pci_device_id *ent)
 {
 	struct agp_bridge_data *bridge;
-	struct pci_dev *loop_dev = NULL;
 	u8 rev_id;
 	u8 cap_ptr;
-	int i = 0;
 	char *revstring="  ";
 
 	cap_ptr = pci_find_capability(pdev, PCI_CAP_ID_AGP);
@@ -303,24 +325,29 @@ static int __init agp_amdk8_probe(struct pci_dev *pdev,
 	/* Fill in the mode register */
 	pci_read_config_dword(pdev, bridge->capndx+PCI_AGP_STATUS, &bridge->mode);
 
-	/* cache pci_devs of northbridges. */
+#ifdef CONFIG_SMP
+	if (cache_nbs() == -1) {
+		agp_put_bridge(bridge);
+		return -ENOMEM;
+	}
+#else
+	{
+	struct pci_dev *loop_dev = NULL;
 	while ((loop_dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, loop_dev)) != NULL) {
 		if (loop_dev->bus->number == 0 &&
-		    PCI_FUNC(loop_dev->devfn) == 3 &&
-		    PCI_SLOT(loop_dev->devfn) >=24 &&
-		    PCI_SLOT(loop_dev->devfn) <=31) {
-			hammers[i++] = loop_dev;
-			nr_garts = i;
-			if (i == MAX_HAMMER_GARTS)
-				goto out_free;
+		    PCI_SLOT(loop_dev->devfn) == 24 &&
+		    PCI_FUNC(loop_dev->devfn) == 3) {
+			/* For UP, we only care about the first GART. */
+			hammers[0] = loop_dev;
+			nr_garts = 1;
+			break;
 		}
 	}
+	}
+#endif
 
 	pci_set_drvdata(pdev, bridge);
 	return agp_add_bridge(bridge);
-out_free:
-	agp_put_bridge(bridge);
-	return -ENOMEM;
 }
 
 static void __devexit agp_amdk8_remove(struct pci_dev *pdev)
