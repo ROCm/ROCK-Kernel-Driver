@@ -163,27 +163,27 @@ struct expansion_card {
 	struct resource		resource[ECARD_NUM_RESOURCES];
 
 	/* Public data */
-	volatile unsigned char *irqaddr;	/* address of IRQ register	*/
-	volatile unsigned char *fiqaddr;	/* address of FIQ register	*/
-	unsigned char		irqmask;	/* IRQ mask			*/
-	unsigned char		fiqmask;	/* FIQ mask			*/
-	unsigned char  		claimed;	/* Card claimed?		*/
+	volatile unsigned char *irqaddr;     /* address of IRQ register */
+	volatile unsigned char *fiqaddr;     /* address of FIQ register */
+	unsigned char		irqmask;     /* IRQ mask */
+	unsigned char		fiqmask;     /* FIQ mask */
+	unsigned char  		claimed;     /* Card claimed? */
 
-	void			*irq_data;	/* Data for use for IRQ by card	*/
-	void			*fiq_data;	/* Data for use for FIQ by card	*/
-	const expansioncard_ops_t *ops;		/* Enable/Disable Ops for card	*/
+	void			*irq_data;   /* Data for use for IRQ by card */
+	void			*fiq_data;   /* Data for use for FIQ by card */
+	const expansioncard_ops_t *ops;	     /* Enable/Disable Ops for card */
 
-	CONST unsigned int	slot_no;	/* Slot number			*/
-	CONST unsigned int	dma;		/* DMA number (for request_dma)	*/
-	CONST unsigned int	irq;		/* IRQ number (for request_irq)	*/
-	CONST unsigned int	fiq;		/* FIQ number (for request_irq)	*/
-	CONST card_type_t	type;		/* Type of card			*/
-	CONST struct in_ecid	cid;		/* Card Identification		*/
+	CONST unsigned int	slot_no;     /* Slot number */
+	CONST unsigned int	dma;         /* DMA number (for request_dma) */
+	CONST unsigned int	irq;         /* IRQ number (for request_irq) */
+	CONST unsigned int	fiq;         /* FIQ number (for request_irq) */
+	CONST card_type_t	type;        /* Type of card */
+	CONST struct in_ecid	cid;         /* Card Identification */
 
 	/* Private internal data */
-	const char		*card_desc;	/* Card description		*/
-	CONST unsigned int	podaddr;	/* Base Linux address for card	*/
-	CONST loader_t		loader;		/* loader program */
+	const char		*card_desc;  /* Card description */
+	CONST unsigned int	podaddr;     /* Base Linux address for card */
+	CONST loader_t		loader;      /* loader program */
 	u64			dma_mask;
 };
 
