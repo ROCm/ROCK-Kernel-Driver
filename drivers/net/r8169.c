@@ -633,8 +633,9 @@ rtl8169_init_board(struct pci_dev *pdev, struct net_device **dev_out,
 	void *ioaddr = NULL;
 	struct net_device *dev;
 	struct rtl8169_private *tp;
-	int rc, i;
 	unsigned long mmio_start, mmio_end, mmio_flags, mmio_len;
+	int rc, i, acpi_idle_state = 0, pm_cap;
+
 
 	assert(pdev != NULL);
 	assert(ioaddr_out != NULL);
@@ -655,8 +656,22 @@ rtl8169_init_board(struct pci_dev *pdev, struct net_device **dev_out,
 
 	// enable device (incl. PCI PM wakeup and hotplug setup)
 	rc = pci_enable_device(pdev);
-	if (rc)
+	if (rc) {
+		printk(KERN_ERR PFX "%s: unable to enable device\n", pdev->slot_name);
 		goto err_out;
+	}
+
+	/* save power state before pci_enable_device overwrites it */
+	pm_cap = pci_find_capability(pdev, PCI_CAP_ID_PM);
+	if (pm_cap) {
+		u16 pwr_command;
+
+		pci_read_config_word(pdev, pm_cap + PCI_PM_CTRL, &pwr_command);
+		acpi_idle_state = pwr_command & PCI_PM_CTRL_STATE_MASK;
+	} else {
+		printk(KERN_ERR PFX "Cannot find PowerManagement capability, aborting.\n");
+		goto err_out_free_res;
+	}
 
 	mmio_start = pci_resource_start(pdev, 1);
 	mmio_end = pci_resource_end(pdev, 1);
@@ -678,8 +693,10 @@ rtl8169_init_board(struct pci_dev *pdev, struct net_device **dev_out,
 	}
 
 	rc = pci_request_regions(pdev, dev->name);
-	if (rc)
+	if (rc) {
+		printk(KERN_ERR PFX "%s: Could not request regions.\n", pdev->slot_name);
 		goto err_out_disable;
+	}
 
 	// enable PCI bus-mastering
 	pci_set_master(pdev);
@@ -939,6 +956,49 @@ rtl8169_remove_one(struct pci_dev *pdev)
 	free_netdev(dev);
 	pci_set_drvdata(pdev, NULL);
 }
+
+#ifdef CONFIG_PM
+
+static int rtl8169_suspend(struct pci_dev *pdev, u32 state)
+{
+	struct net_device *dev = pci_get_drvdata(pdev);
+	struct rtl8169_private *tp = dev->priv;
+	void *ioaddr = tp->mmio_addr;
+	unsigned long flags;
+
+	if (!netif_running(dev))
+		return 0;
+	
+	netif_device_detach(dev);
+	netif_stop_queue(dev);
+	spin_lock_irqsave(&tp->lock, flags);
+
+	/* Disable interrupts, stop Rx and Tx */
+	RTL_W16(IntrMask, 0);
+	RTL_W8(ChipCmd, 0);
+		
+	/* Update the error counts. */
+	tp->stats.rx_missed_errors += RTL_R32(RxMissed);
+	RTL_W32(RxMissed, 0);
+	spin_unlock_irqrestore(&tp->lock, flags);
+	
+	return 0;
+}
+
+static int rtl8169_resume(struct pci_dev *pdev)
+{
+	struct net_device *dev = pci_get_drvdata(pdev);
+
+	if (!netif_running(dev))
+	    return 0;
+
+	netif_device_attach(dev);
+	rtl8169_hw_start(dev);
+
+	return 0;
+}
+                                                                                
+#endif /* CONFIG_PM */
 
 static int
 rtl8169_open(struct net_device *dev)
@@ -1570,8 +1630,10 @@ static struct pci_driver rtl8169_pci_driver = {
 	.id_table	= rtl8169_pci_tbl,
 	.probe		= rtl8169_init_one,
 	.remove		= __devexit_p(rtl8169_remove_one),
-	.suspend	= NULL,
-	.resume		= NULL,
+#ifdef CONFIG_PM
+	.suspend	= rtl8169_suspend,
+	.resume		= rtl8169_resume,
+#endif
 };
 
 static int __init
