@@ -231,15 +231,16 @@ static ssize_t
 sysfs_write_file(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
 {
 	struct sysfs_buffer * buffer = file->private_data;
+	ssize_t len;
 
 	down(&buffer->sem);
-	count = fill_write_buffer(buffer,buf,count);
-	if (count > 0)
-		count = flush_write_buffer(file->f_dentry,buffer,count);
-	if (count > 0)
-		*ppos += count;
+	len = fill_write_buffer(buffer, buf, count);
+	if (len > 0)
+		len = flush_write_buffer(file->f_dentry, buffer, len);
+	if (len > 0)
+		*ppos += len;
 	up(&buffer->sem);
-	return count;
+	return len;
 }
 
 static int check_perm(struct inode * inode, struct file * file)
