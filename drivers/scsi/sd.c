@@ -42,6 +42,7 @@
 #include <linux/genhd.h>
 #include <linux/hdreg.h>
 #include <linux/errno.h>
+#include <linux/idr.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
 #include <linux/blkdev.h>
@@ -62,12 +63,18 @@
 
 #include "scsi_logging.h"
 
-
 /*
- * Remaining dev_t-handling stuff
+ * More than enough for everybody ;)  The huge number of majors
+ * is a leftover from 16bit dev_t days, we don't really need that
+ * much numberspace.
  */
 #define SD_MAJORS	16
-#define SD_DISKS	32768	/* anything between 256 and 262144 */
+
+/*
+ * This is limited by the naming scheme enforced in sd_probe,
+ * add another character to it if you really need more disks.
+ */
+#define SD_MAX_DISKS	(((26 * 26) + 26 + 1) * 26)
 
 /*
  * Time out in seconds for disks and Magneto-opticals (which are slower).
@@ -96,8 +103,7 @@ struct scsi_disk {
 	unsigned	RCD : 1;	/* state of disk RCD bit, unused */
 };
 
-
-static unsigned long sd_index_bits[SD_DISKS / BITS_PER_LONG];
+static DEFINE_IDR(sd_index_idr);
 static spinlock_t sd_index_lock = SPIN_LOCK_UNLOCKED;
 
 /* This semaphore is used to mediate the 0->1 reference get in the
@@ -128,7 +134,8 @@ static struct scsi_driver sd_template = {
 	.init_command		= sd_init_command,
 };
 
-/* Device no to disk mapping:
+/*
+ * Device no to disk mapping:
  * 
  *       major         disc2     disc  p1
  *   |............|.............|....|....| <- dev_t
@@ -141,7 +148,6 @@ static struct scsi_driver sd_template = {
  * As we stay compatible with our numbering scheme, we can reuse 
  * the well-know SCSI majors 8, 65--71, 136--143.
  */
-
 static int sd_major(int major_idx)
 {
 	switch (major_idx) {
@@ -156,14 +162,6 @@ static int sd_major(int major_idx)
 		return 0;	/* shut up gcc */
 	}
 }
-
-static unsigned int make_sd_dev(unsigned int sd_nr, unsigned int part)
-{
-	return  (part & 0xf) | ((sd_nr & 0xf) << 4) |
-		(sd_major((sd_nr & 0xf0) >> 4) << 20) | (sd_nr & 0xfff00);
-}
-
-/* reverse mapping dev -> (sd_nr, part) not currently needed */
 
 #define to_scsi_disk(obj) container_of(obj,struct scsi_disk,kref)
 
@@ -1347,7 +1345,7 @@ static int sd_probe(struct device *dev)
 	struct scsi_disk *sdkp;
 	struct gendisk *gd;
 	u32 index;
-	int error, devno;
+	int error;
 
 	error = -ENODEV;
 	if ((sdp->type != TYPE_DISK) && (sdp->type != TYPE_MOD))
@@ -1364,25 +1362,21 @@ static int sd_probe(struct device *dev)
 	memset (sdkp, 0, sizeof(*sdkp));
 	kref_init(&sdkp->kref, scsi_disk_release);
 
-	/* Note: We can accomodate 64 partitions, but the genhd code
-	 * assumes partitions allocate consecutive minors, which they don't.
-	 * So for now stay with max 16 partitions and leave two spare bits. 
-	 * Later, we may change the genhd code and the alloc_disk() call
-	 * and the ->minors assignment here. 	KG, 2004-02-10
-	 */ 
 	gd = alloc_disk(16);
 	if (!gd)
 		goto out_free;
 
-	spin_lock(&sd_index_lock);
-	index = find_first_zero_bit(sd_index_bits, SD_DISKS);
-	if (index == SD_DISKS) {
-		spin_unlock(&sd_index_lock);
-		error = -EBUSY;
+	if (!idr_pre_get(&sd_index_idr, GFP_KERNEL))
 		goto out_put;
-	}
-	__set_bit(index, sd_index_bits);
+
+	spin_lock(&sd_index_lock);
+	error = idr_get_new(&sd_index_idr, NULL, &index);
 	spin_unlock(&sd_index_lock);
+
+	if (index >= SD_MAX_DISKS)
+		error = -EBUSY;
+	if (error)
+		goto out_put;
 
 	sdkp->device = sdp;
 	sdkp->driver = &sd_template;
@@ -1397,15 +1391,14 @@ static int sd_probe(struct device *dev)
 			sdp->timeout = SD_MOD_TIMEOUT;
 	}
 
-	devno = make_sd_dev(index, 0);
-	gd->major = MAJOR(devno);
-	gd->first_minor = MINOR(devno);
+	gd->major = sd_major((index & 0xf0) >> 4);
+	gd->first_minor = ((index & 0xf) << 4) | (index & 0xfff00);
 	gd->minors = 16;
 	gd->fops = &sd_fops;
 
 	if (index < 26) {
 		sprintf(gd->disk_name, "sd%c", 'a' + index % 26);
-	} else if (index < (26*27)) {
+	} else if (index < (26 + 1) * 26) {
 		sprintf(gd->disk_name, "sd%c%c",
 			'a' + index / 26 - 1,'a' + index % 26);
 	} else {
@@ -1485,7 +1478,7 @@ static void scsi_disk_release(struct kref *kref)
 	struct gendisk *disk = sdkp->disk;
 	
 	spin_lock(&sd_index_lock);
-	clear_bit(sdkp->index, sd_index_bits);
+	idr_remove(&sd_index_idr, sdkp->index);
 	spin_unlock(&sd_index_lock);
 
 	disk->private_data = NULL;
