@@ -130,7 +130,7 @@ update_latch_status(struct hotplug_slot *hotplug_slot, u8 value)
 		return -EINVAL;
 	memcpy(&info, hotplug_slot->info, sizeof(struct hotplug_slot_info));
 	info.latch_status = value;
-	return pci_hp_change_slot_info(hotplug_slot->name, &info);
+	return pci_hp_change_slot_info(hotplug_slot, &info);
 }
 
 static int
@@ -142,7 +142,7 @@ update_adapter_status(struct hotplug_slot *hotplug_slot, u8 value)
 		return -EINVAL;
 	memcpy(&info, hotplug_slot->info, sizeof(struct hotplug_slot_info));
 	info.adapter_status = value;
-	return pci_hp_change_slot_info(hotplug_slot->name, &info);
+	return pci_hp_change_slot_info(hotplug_slot, &info);
 }
 
 static int

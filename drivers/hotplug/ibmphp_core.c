@@ -686,7 +686,6 @@ static int validate (struct slot *slot_cur, int opn)
 int ibmphp_update_slot_info (struct slot *slot_cur)
 {
 	struct hotplug_slot_info *info;
-	char buffer[30];
 	int rc;
 	u8 bus_speed;
 	u8 mode;
@@ -697,7 +696,6 @@ int ibmphp_update_slot_info (struct slot *slot_cur)
 		return -ENOMEM;
 	}
         
-	strncpy (buffer, slot_cur->hotplug_slot->name, 30);
 	info->power_status = SLOT_PWRGD (slot_cur->status);
 	info->attention_status = SLOT_ATTN (slot_cur->status, slot_cur->ext_status);
 	info->latch_status = SLOT_LATCH (slot_cur->status);
@@ -735,7 +733,7 @@ int ibmphp_update_slot_info (struct slot *slot_cur)
 	info->max_bus_speed = slot_cur->hotplug_slot->info->max_bus_speed;
 	// To do: bus_names 
 	
-	rc = pci_hp_change_slot_info (buffer, info);
+	rc = pci_hp_change_slot_info (slot_cur->hotplug_slot, info);
 	kfree (info);
 	return rc;
 }

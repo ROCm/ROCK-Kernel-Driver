@@ -529,16 +529,16 @@ int pci_hp_deregister (struct hotplug_slot *slot)
 
 /**
  * pci_hp_change_slot_info - changes the slot's information structure in the core
- * @name: the name of the slot whose info has changed
+ * @slot: pointer to the slot whose info has changed
  * @info: pointer to the info copy into the slot's info structure
  *
- * A slot with @name must have been registered with the pci 
+ * @slot must have been registered with the pci 
  * hotplug subsystem previously with a call to pci_hp_register().
  *
  * Returns 0 if successful, anything else for an error.
  * Not supported by sysfs now.
  */
-int pci_hp_change_slot_info (const char *name, struct hotplug_slot_info *info)
+int pci_hp_change_slot_info (struct hotplug_slot *slot, struct hotplug_slot_info *info)
 {
 	return 0;
 }

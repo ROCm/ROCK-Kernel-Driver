@@ -1767,19 +1767,17 @@ void cpqhp_event_stop_thread (void)
 static int update_slot_info (struct controller *ctrl, struct slot *slot)
 {
 	struct hotplug_slot_info *info;
-	char buffer[SLOT_NAME_SIZE];
 	int result;
 
 	info = kmalloc (sizeof (struct hotplug_slot_info), GFP_KERNEL);
 	if (!info)
 		return -ENOMEM;
 
-	make_slot_name (&buffer[0], SLOT_NAME_SIZE, slot);
 	info->power_status = get_slot_enabled(ctrl, slot);
 	info->attention_status = cpq_get_attention_status(ctrl, slot);
 	info->latch_status = cpq_get_latch_status(ctrl, slot);
 	info->adapter_status = get_presence_status(ctrl, slot);
-	result = pci_hp_change_slot_info(buffer, info);
+	result = pci_hp_change_slot_info(slot->hotplug_slot, info);
 	kfree (info);
 	return result;
 }
