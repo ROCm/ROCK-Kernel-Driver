@@ -39,7 +39,7 @@ struct list_head {
 } while (0)
 
 /*
- * Insert a new entry between two known consecutive entries. 
+ * Insert a new entry between two known consecutive entries.
  *
  * This is only for internal list manipulation where we know
  * the prev/next entries already!
@@ -81,14 +81,13 @@ static inline void list_add_tail(struct list_head *new, struct list_head *head)
 }
 
 /*
- * Insert a new entry between two known consecutive entries. 
+ * Insert a new entry between two known consecutive entries.
  *
  * This is only for internal list manipulation where we know
  * the prev/next entries already!
  */
-static __inline__ void __list_add_rcu(struct list_head * new,
-	struct list_head * prev,
-	struct list_head * next)
+static inline void __list_add_rcu(struct list_head * new,
+		struct list_head * prev, struct list_head * next)
 {
 	new->next = next;
 	new->prev = prev;
@@ -113,7 +112,7 @@ static __inline__ void __list_add_rcu(struct list_head * new,
  * the _rcu list-traversal primitives, such as
  * list_for_each_entry_rcu().
  */
-static __inline__ void list_add_rcu(struct list_head *new, struct list_head *head)
+static inline void list_add_rcu(struct list_head *new, struct list_head *head)
 {
 	__list_add_rcu(new, head, head->next);
 }
@@ -134,7 +133,8 @@ static __inline__ void list_add_rcu(struct list_head *new, struct list_head *hea
  * the _rcu list-traversal primitives, such as
  * list_for_each_entry_rcu().
  */
-static __inline__ void list_add_tail_rcu(struct list_head *new, struct list_head *head)
+static inline void list_add_tail_rcu(struct list_head *new,
+					struct list_head *head)
 {
 	__list_add_rcu(new, head->prev, head);
 }
@@ -169,11 +169,11 @@ static inline void list_del(struct list_head *entry)
  * list_del_rcu - deletes entry from list without re-initialization
  * @entry: the element to delete from the list.
  *
- * Note: list_empty on entry does not return true after this, 
+ * Note: list_empty on entry does not return true after this,
  * the entry is in an undefined state. It is useful for RCU based
  * lockfree traversal.
  *
- * In particular, it means that we can not poison the forward 
+ * In particular, it means that we can not poison the forward
  * pointers that may still be used for walking the list.
  *
  * The caller must take whatever precautions are necessary
@@ -202,7 +202,7 @@ static inline void list_del_rcu(struct list_head *entry)
 static inline void list_del_init(struct list_head *entry)
 {
 	__list_del(entry->prev, entry->next);
-	INIT_LIST_HEAD(entry); 
+	INIT_LIST_HEAD(entry);
 }
 
 /**
@@ -335,7 +335,7 @@ static inline void list_splice_init(struct list_head *list,
 #define list_for_each_prev(pos, head) \
 	for (pos = (head)->prev, prefetch(pos->prev); pos != (head); \
         	pos = pos->prev, prefetch(pos->prev))
-        	
+
 /**
  * list_for_each_safe	-	iterate over a list safe against removal of list entry
  * @pos:	the &struct list_head to use as a loop counter.
@@ -421,11 +421,11 @@ static inline void list_splice_init(struct list_head *list,
 #define list_for_each_rcu(pos, head) \
 	for (pos = (head)->next, prefetch(pos->next); pos != (head); \
         	pos = pos->next, ({ smp_read_barrier_depends(); 0;}), prefetch(pos->next))
-        	
+
 #define __list_for_each_rcu(pos, head) \
 	for (pos = (head)->next; pos != (head); \
         	pos = pos->next, ({ smp_read_barrier_depends(); 0;}))
-        	
+
 /**
  * list_for_each_safe_rcu	-	iterate over an rcu-protected list safe
  *					against removal of list entry
@@ -461,7 +461,7 @@ static inline void list_splice_init(struct list_head *list,
 
 
 /**
- * list_for_each_continue_rcu	-	iterate over an rcu-protected list 
+ * list_for_each_continue_rcu	-	iterate over an rcu-protected list
  *			continuing after existing point.
  * @pos:	the &struct list_head to use as a loop counter.
  * @head:	the head for your list.
@@ -474,46 +474,46 @@ static inline void list_splice_init(struct list_head *list,
 	for ((pos) = (pos)->next, prefetch((pos)->next); (pos) != (head); \
         	(pos) = (pos)->next, ({ smp_read_barrier_depends(); 0;}), prefetch((pos)->next))
 
-/* 
- * Double linked lists with a single pointer list head. 
- * Mostly useful for hash tables where the two pointer list head is 
+/*
+ * Double linked lists with a single pointer list head.
+ * Mostly useful for hash tables where the two pointer list head is
  * too wasteful.
  * You lose the ability to access the tail in O(1).
- */ 
+ */
 
-struct hlist_head { 
-	struct hlist_node *first; 
-}; 
+struct hlist_head {
+	struct hlist_node *first;
+};
 
-struct hlist_node { 
-	struct hlist_node *next, **pprev; 
-}; 
+struct hlist_node {
+	struct hlist_node *next, **pprev;
+};
 
-#define HLIST_HEAD_INIT { .first = NULL } 
+#define HLIST_HEAD_INIT { .first = NULL }
 #define HLIST_HEAD(name) struct hlist_head name = {  .first = NULL }
-#define INIT_HLIST_HEAD(ptr) ((ptr)->first = NULL) 
+#define INIT_HLIST_HEAD(ptr) ((ptr)->first = NULL)
 #define INIT_HLIST_NODE(ptr) ((ptr)->next = NULL, (ptr)->pprev = NULL)
 
-static __inline__ int hlist_unhashed(const struct hlist_node *h) 
-{ 
+static inline int hlist_unhashed(const struct hlist_node *h)
+{
 	return !h->pprev;
-} 
+}
 
-static __inline__ int hlist_empty(const struct hlist_head *h) 
-{ 
+static inline int hlist_empty(const struct hlist_head *h)
+{
 	return !h->first;
-} 
+}
 
-static __inline__ void __hlist_del(struct hlist_node *n) 
+static inline void __hlist_del(struct hlist_node *n)
 {
 	struct hlist_node *next = n->next;
 	struct hlist_node **pprev = n->pprev;
-	*pprev = next;  
-	if (next) 
+	*pprev = next;
+	if (next)
 		next->pprev = pprev;
-}  
+}
 
-static __inline__ void hlist_del(struct hlist_node *n)
+static inline void hlist_del(struct hlist_node *n)
 {
 	__hlist_del(n);
 	n->next = LIST_POISON1;
@@ -524,7 +524,7 @@ static __inline__ void hlist_del(struct hlist_node *n)
  * hlist_del_rcu - deletes entry from hash list without re-initialization
  * @n: the element to delete from the hash list.
  *
- * Note: list_unhashed() on entry does not return true after this, 
+ * Note: list_unhashed() on entry does not return true after this,
  * the entry is in an undefined state. It is useful for RCU based
  * lockfree traversal.
  *
@@ -545,25 +545,25 @@ static inline void hlist_del_rcu(struct hlist_node *n)
 	n->pprev = LIST_POISON2;
 }
 
-static __inline__ void hlist_del_init(struct hlist_node *n) 
+static inline void hlist_del_init(struct hlist_node *n)
 {
 	if (n->pprev)  {
 		__hlist_del(n);
 		INIT_HLIST_NODE(n);
 	}
-}  
+}
 
 #define hlist_del_rcu_init hlist_del_init
 
-static __inline__ void hlist_add_head(struct hlist_node *n, struct hlist_head *h) 
-{ 
+static inline void hlist_add_head(struct hlist_node *n, struct hlist_head *h)
+{
 	struct hlist_node *first = h->first;
-	n->next = first; 
-	if (first) 
+	n->next = first;
+	if (first)
 		first->pprev = &n->next;
-	h->first = n; 
-	n->pprev = &h->first; 
-} 
+	h->first = n;
+	n->pprev = &h->first;
+}
 
 
 /**
@@ -585,28 +585,30 @@ static __inline__ void hlist_add_head(struct hlist_node *n, struct hlist_head *h
  *
  * OK, so why don't we have an hlist_for_each_entry_rcu()???
  */
-static __inline__ void hlist_add_head_rcu(struct hlist_node *n, struct hlist_head *h) 
-{ 
+static inline void hlist_add_head_rcu(struct hlist_node *n,
+					struct hlist_head *h)
+{
 	struct hlist_node *first = h->first;
 	n->next = first;
-	n->pprev = &h->first; 
+	n->pprev = &h->first;
 	smp_wmb();
-	if (first) 
+	if (first)
 		first->pprev = &n->next;
-	h->first = n; 
-} 
+	h->first = n;
+}
 
 /* next must be != NULL */
-static __inline__ void hlist_add_before(struct hlist_node *n, struct hlist_node *next)
+static inline void hlist_add_before(struct hlist_node *n,
+					struct hlist_node *next)
 {
 	n->pprev = next->pprev;
-	n->next = next; 
-	next->pprev = &n->next; 
+	n->next = next;
+	next->pprev = &n->next;
 	*(n->pprev) = n;
 }
 
-static __inline__ void hlist_add_after(struct hlist_node *n,
-				       struct hlist_node *next)
+static inline void hlist_add_after(struct hlist_node *n,
+					struct hlist_node *next)
 {
 	next->next	= n->next;
 	*(next->pprev)	= n;
@@ -618,7 +620,7 @@ static __inline__ void hlist_add_after(struct hlist_node *n,
 /* Cannot easily do prefetch unfortunately */
 #define hlist_for_each(pos, head) \
 	for (pos = (head)->first; pos && ({ prefetch(pos->next); 1; }); \
-	     pos = pos->next) 
+	     pos = pos->next)
 
 #define hlist_for_each_safe(pos, n, head) \
 	for (pos = (head)->first; n = pos ? pos->next : 0, pos; \
