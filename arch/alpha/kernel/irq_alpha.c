@@ -37,14 +37,13 @@ void (*perf_irq)(unsigned long, struct pt_regs *) = dummy_perf;
  */
 
 asmlinkage void 
-do_entInt(unsigned long type, unsigned long vector, unsigned long la_ptr,
-	  unsigned long a3, unsigned long a4, unsigned long a5,
-	  struct pt_regs regs)
+do_entInt(unsigned long type, unsigned long vector,
+	  unsigned long la_ptr, struct pt_regs *regs)
 {
 	switch (type) {
 	case 0:
 #ifdef CONFIG_SMP
-		handle_ipi(&regs);
+		handle_ipi(regs);
 		return;
 #else
 		irq_err_count++;
@@ -56,32 +55,32 @@ do_entInt(unsigned long type, unsigned long vector, unsigned long la_ptr,
 #ifdef CONFIG_SMP
 	  {
 		long cpu;
-		smp_percpu_timer_interrupt(&regs);
+		smp_percpu_timer_interrupt(regs);
 		cpu = smp_processor_id();
 		if (cpu != boot_cpuid) {
 		        kstat_cpu(cpu).irqs[RTC_IRQ]++;
 		} else {
-			handle_irq(RTC_IRQ, &regs);
+			handle_irq(RTC_IRQ, regs);
 		}
 	  }
 #else
-		handle_irq(RTC_IRQ, &regs);
+		handle_irq(RTC_IRQ, regs);
 #endif
 		return;
 	case 2:
-		alpha_mv.machine_check(vector, la_ptr, &regs);
+		alpha_mv.machine_check(vector, la_ptr, regs);
 		return;
 	case 3:
-		alpha_mv.device_interrupt(vector, &regs);
+		alpha_mv.device_interrupt(vector, regs);
 		return;
 	case 4:
-		perf_irq(vector, &regs);
+		perf_irq(vector, regs);
 		return;
 	default:
 		printk(KERN_CRIT "Hardware intr %ld %lx? Huh?\n",
 		       type, vector);
 	}
-	printk("PC = %016lx PS=%04lx\n", regs.pc, regs.ps);
+	printk(KERN_CRIT "PC = %016lx PS=%04lx\n", regs->pc, regs->ps);
 }
 
 void __init
@@ -96,10 +95,8 @@ common_init_isa_dma(void)
 void __init
 init_IRQ(void)
 {
-	/* Uh, this really MUST come first, just in case
-	 * the platform init_irq() causes interrupts/mchecks
-	 * (as is the case with RAWHIDE, at least).
-	 */
+	/* Just in case the platform init_irq() causes interrupts/mchecks
+	   (as is the case with RAWHIDE, at least).  */
 	wrent(entInt, 0);
 
 	alpha_mv.init_irq();
