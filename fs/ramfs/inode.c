@@ -166,9 +166,7 @@ static int ramfs_link(struct dentry *old_dentry, struct inode * dir, struct dent
 {
 	struct inode *inode = old_dentry->d_inode;
 
-	lock_kernel();
 	inode->i_nlink++;
-	unlock_kernel();
 	atomic_inc(&inode->i_count);	/* New dentry reference */
 	dget(dentry);		/* Extra pinning count for the created dentry */
 	d_instantiate(dentry, inode);
@@ -219,9 +217,7 @@ static int ramfs_unlink(struct inode * dir, struct dentry *dentry)
 	if (ramfs_empty(dentry)) {
 		struct inode *inode = dentry->d_inode;
 
-		lock_kernel();
 		inode->i_nlink--;
-		unlock_kernel();
 		dput(dentry);			/* Undo the count from "create" - this does all the work */
 		retval = 0;
 	}

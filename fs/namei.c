@@ -1614,8 +1614,10 @@ int vfs_link(struct dentry *old_dentry, struct inode *dir, struct dentry *new_de
 	if (S_ISDIR(old_dentry->d_inode->i_mode))
 		return -EPERM;
 
+	down(&old_dentry->d_inode->i_sem);
 	DQUOT_INIT(dir);
 	error = dir->i_op->link(old_dentry, dir, new_dentry);
+	up(&old_dentry->d_inode->i_sem);
 	if (!error)
 		inode_dir_notify(dir, DN_CREATE);
 	return error;

@@ -11,17 +11,13 @@
 
 static inline void inc_count(struct inode *inode)
 {
-	lock_kernel();
 	inode->i_nlink++;
-	unlock_kernel();
 	mark_inode_dirty(inode);
 }
 
 static inline void dec_count(struct inode *inode)
 {
-	lock_kernel();
 	inode->i_nlink--;
-	unlock_kernel();
 	mark_inode_dirty(inode);
 }
 
@@ -136,15 +132,11 @@ static int minix_link(struct dentry * old_dentry, struct inode * dir,
 {
 	struct inode *inode = old_dentry->d_inode;
 
-	lock_kernel();
-	if (inode->i_nlink >= inode->i_sb->u.minix_sb.s_link_max) {
-		unlock_kernel();
+	if (inode->i_nlink >= inode->i_sb->u.minix_sb.s_link_max)
 		return -EMLINK;
-	}
 
 	inode->i_ctime = CURRENT_TIME;
 	inc_count(inode);
-	unlock_kernel();
 	atomic_inc(&inode->i_count);
 	return add_nondir(dentry, inode);
 }
@@ -265,11 +257,8 @@ static int minix_rename(struct inode * old_dir, struct dentry *old_dentry,
 		inc_count(old_inode);
 		minix_set_link(new_de, new_page, old_inode);
 		new_inode->i_ctime = CURRENT_TIME;
-		if (dir_de) {
-			lock_kernel();
+		if (dir_de)
 			new_inode->i_nlink--;
-			unlock_kernel();
-		}
 		dec_count(new_inode);
 	} else {
 		if (dir_de) {

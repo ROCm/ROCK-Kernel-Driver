@@ -92,3 +92,9 @@ exactly what needs to be protected.
 
 check for ->link() target not being a directory is done by callers.  Feel
 free to drop it...
+
+---
+[informational]
+
+->link() callers hold ->i_sem on the object we are linking to.  Some of your
+problems might be over...

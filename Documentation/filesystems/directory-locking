@@ -14,7 +14,13 @@ locks victim and calls the method.
 the parent, finds source and target, if target already exists - locks it
 and then calls the method.
 
-5) cross-directory rename.  The trickiest in the whole bunch.  Locking
+5) link creation.  Locking rules:
+	* lock parent
+	* check that source is not a directory
+	* lock source
+	* call the method.
+
+6) cross-directory rename.  The trickiest in the whole bunch.  Locking
 rules:
 	* lock the filesystem
 	* lock parents in "ancestors first" order.
@@ -39,7 +45,7 @@ objects - A < B iff A is an ancestor of B.
 
 	That ordering can change.  However, the following is true:
 
-(1) if operation different from cross-directory rename holds lock on A and
+(1) if object removal or non-cross-directory rename holds lock on A and
     attempts to acquire lock on B, A will remain the parent of B until we
     acquire the lock on B.  (Proof: only cross-directory rename can change
     the parent of object and it would have to lock the parent).
@@ -49,11 +55,19 @@ objects - A < B iff A is an ancestor of B.
     renames will be blocked on filesystem lock and we don't start changing
     the order until we had acquired all locks).
 
+(3) any operation holds at most one lock on non-directory object and
+    that lock is acquired after all other locks.  (Proof: see descriptions
+    of operations).
+
 	Now consider the minimal deadlock.  Each process is blocked on
 attempt to acquire some lock and already holds at least one lock.  Let's
 consider the set of contended locks.  First of all, filesystem lock is
 not contended, since any process blocked on it is not holding any locks.
 Thus all processes are blocked on ->i_sem.
+
+	Non-directory objects are not contended due to (3).  Thus link
+creation can't be a part of deadlock - it can't be blocked on source
+and it means that it doesn't hold any locks.
 
 	Any contended object is either held by cross-directory rename or
 has a child that is also contended.  Indeed, suppose that it is held by

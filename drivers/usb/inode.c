@@ -216,9 +216,7 @@ static int usbfs_link (struct dentry *old_dentry, struct inode *dir,
 {
 	struct inode *inode = old_dentry->d_inode;
 
-	lock_kernel();
 	inode->i_nlink++;
-	unlock_kernel();
 	atomic_inc(&inode->i_count);
  	dget(dentry);
 	d_instantiate(dentry, inode);
@@ -255,9 +253,7 @@ static int usbfs_unlink (struct inode *dir, struct dentry *dentry)
 	if (usbfs_empty(dentry)) {
 		struct inode *inode = dentry->d_inode;
 
-		lock_kernel();
 		inode->i_nlink--;
-		unlock_kernel();
 		dput(dentry);
 		error = 0;
 	}

@@ -1022,9 +1022,7 @@ static int shmem_link(struct dentry *old_dentry, struct inode * dir, struct dent
 	struct inode *inode = old_dentry->d_inode;
 
 	inode->i_ctime = dir->i_ctime = dir->i_mtime = CURRENT_TIME;
-	lock_kernel();
 	inode->i_nlink++;
-	unlock_kernel();
 	atomic_inc(&inode->i_count);	/* New dentry reference */
 	dget(dentry);		/* Extra pinning count for the created dentry */
 	d_instantiate(dentry, inode);
@@ -1068,9 +1066,7 @@ static int shmem_unlink(struct inode * dir, struct dentry *dentry)
 {
 	struct inode *inode = dentry->d_inode;
 	inode->i_ctime = dir->i_ctime = dir->i_mtime = CURRENT_TIME;
-	lock_kernel();
 	inode->i_nlink--;
-	unlock_kernel();
 	dput(dentry);	/* Undo the count from "create" - this does all the work */
 	return 0;
 }
