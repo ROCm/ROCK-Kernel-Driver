@@ -16,7 +16,6 @@
 #include <asm/ppcdebug.h>
 #include <asm/a.out.h>
 #endif
-#include <asm/pgtable.h>
 #include <asm/ptrace.h>
 #include <asm/types.h>
 
@@ -621,8 +620,7 @@ extern struct task_struct *last_task_used_math;
 
 #ifdef __KERNEL__
 /* 64-bit user address space is 41-bits (2TBs user VM) */
-/* Subtract PGDIR_SIZE to work around a bug in free_pgtables */ 
-#define TASK_SIZE_USER64 (0x0000020000000000UL - PGDIR_SIZE)
+#define TASK_SIZE_USER64 (0x0000020000000000UL)
 
 /* 
  * 32-bit user address space is 4GB - 1 page 
