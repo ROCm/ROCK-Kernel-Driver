@@ -1,7 +1,7 @@
 /*
  *   fs/cifs/transport.c
  *
- *   Copyright (C) International Business Machines  Corp., 2002,2003
+ *   Copyright (C) International Business Machines  Corp., 2002,2004
  *   Author(s): Steve French (sfrench@us.ibm.com)
  *
  *   This library is free software; you can redistribute it and/or modify
@@ -29,7 +29,7 @@
 #include "cifsglob.h"
 #include "cifsproto.h"
 #include "cifs_debug.h"
-
+  
 extern kmem_cache_t *cifs_mid_cachep;
 extern kmem_cache_t *cifs_oplock_cachep;
 
@@ -236,7 +236,8 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 
 	timeout = wait_event_interruptible_timeout(ses->server->response_q,
 				(midQ->midState & MID_RESPONSE_RECEIVED) || 
-				(ses->server->tcpStatus != CifsGood),
+				((ses->server->tcpStatus != CifsGood) &&
+				 (ses->server->tcpStatus != CifsNew)),
 				timeout);
 	if (signal_pending(current)) {
 		cFYI(1, ("CIFS: caught signal"));
@@ -259,11 +260,13 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 				}
 			}
 
-			if(midQ->midState == MID_RETRY_NEEDED) {
-				rc = -EAGAIN;
-				cFYI(1,("marking request for retry"));
-			} else {
-				rc = -EIO;
+			if (rc != -EHOSTDOWN) {
+				if(midQ->midState == MID_RETRY_NEEDED) {
+					rc = -EAGAIN;
+					cFYI(1,("marking request for retry"));
+				} else {
+					rc = -EIO;
+				}
 			}
 			spin_unlock(&GlobalMid_Lock);
 			DeleteMidQEntry(midQ);
