@@ -695,9 +695,7 @@ void arp_send(int type, int ptype, u32 dest_ip,
 
 static void parp_redo(struct sk_buff *skb)
 {
-#ifdef CONFIG_NETFILTER_DEBUG
-	skb->nf_debug = 0;
-#endif
+	nf_reset(skb);
 	arp_rcv(skb, skb->dev, NULL);
 }
 
