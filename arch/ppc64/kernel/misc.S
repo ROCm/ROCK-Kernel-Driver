@@ -551,7 +551,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_rmdir		/* 40 */
 	.llong .sys_dup
 	.llong .sys_pipe
-	.llong .sys32_times
+	.llong .compat_sys_times
 	.llong .sys_ni_syscall		/* old prof syscall */
 	.llong .sys_brk			/* 45 */
 	.llong .sys_setgid
@@ -614,9 +614,9 @@ _GLOBAL(sys_call_table32)
 	.llong .sys32_syslog
 	.llong .compat_sys_setitimer
 	.llong .compat_sys_getitimer		/* 105 */
-	.llong .sys32_newstat
-	.llong .sys32_newlstat
-	.llong .sys32_newfstat
+	.llong .compat_sys_newstat
+	.llong .compat_sys_newlstat
+	.llong .compat_sys_newfstat
 	.llong .sys_uname
 	.llong .sys_ni_syscall		/* 110 old iopl syscall */
 	.llong .sys_vhangup

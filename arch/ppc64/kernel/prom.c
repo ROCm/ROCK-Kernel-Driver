@@ -1265,14 +1265,14 @@ check_display(unsigned long mem)
 					   RELOC(default_colors)[i*3+2]) != 0)
 				break;
 
-#ifdef CONFIG_FB
+#ifdef CONFIG_FRAMEBUFFER_CONSOLE
 		for (i = 0; i < LINUX_LOGO_COLORS; i++)
 			if (prom_set_color(ih, i + 32,
 					   RELOC(linux_logo_red)[i],
 					   RELOC(linux_logo_green)[i],
 					   RELOC(linux_logo_blue)[i]) != 0)
 				break;
-#endif /* CONFIG_FB */
+#endif /* CONFIG_FRAMEBUFFER_CONSOLE */
 
 		/*
 		 * If this display is the device that OF is using for stdout,
