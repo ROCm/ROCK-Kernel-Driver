@@ -313,7 +313,7 @@ extern inline void sync_core(void)
 #define ARCH_HAS_PREFETCH
 static inline void prefetch(void *x) 
 { 
-	asm volatile("2: prefetchnta %0\n1:\t" 
+	asm volatile("2: prefetcht0 %0\n1:\t" 
 		    ".section __ex_table,\"a\"\n\t"
 		    "  .align 8\n\t"
 		    "  .quad  2b,1b\n\t"

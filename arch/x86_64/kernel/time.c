@@ -24,6 +24,7 @@
 #include <linux/module.h>
 #include <linux/device.h>
 #include <linux/bcd.h>
+#include <asm/pgtable.h>
 #include <asm/vsyscall.h>
 #include <asm/timex.h>
 #ifdef CONFIG_X86_LOCAL_APIC
@@ -35,40 +36,60 @@ u64 jiffies_64 = INITIAL_JIFFIES;
 extern int using_apic_timer;
 
 spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
+spinlock_t i8253_lock = SPIN_LOCK_UNLOCKED;
 
 extern int using_apic_timer;
 extern void smp_local_timer_interrupt(struct pt_regs * regs);
+
+#undef HPET_HACK_ENABLE_DANGEROUS
 
 
 unsigned int cpu_khz;					/* TSC clocks / usec, not used here */
 unsigned long hpet_period;				/* fsecs / HPET clock */
 unsigned long hpet_tick;				/* HPET clocks / interrupt */
-int hpet_report_lost_ticks;				/* command line option */
+unsigned long vxtime_hz = 1193182;
+int report_lost_ticks;				/* command line option */
 
-struct hpet_data __hpet __section_hpet;			/* address, quotient, trigger, hz */
+struct vxtime_data __vxtime __section_vxtime;	/* for vsyscalls */
 
 volatile unsigned long __jiffies __section_jiffies = INITIAL_JIFFIES;
 unsigned long __wall_jiffies __section_wall_jiffies = INITIAL_JIFFIES;
 struct timespec __xtime __section_xtime;
 struct timezone __sys_tz __section_sys_tz;
 
+static inline void rdtscll_sync(unsigned long *tsc)
+{
+#ifdef CONFIG_SMP
+	sync_core();
+#endif
+	rdtscll(*tsc);
+}
+
 /*
  * do_gettimeoffset() returns microseconds since last timer interrupt was
  * triggered by hardware. A memory read of HPET is slower than a register read
  * of TSC, but much more reliable. It's also synchronized to the timer
  * interrupt. Note that do_gettimeoffset() may return more than hpet_tick, if a
- * timer interrupt has happened already, but hpet.trigger wasn't updated yet.
+ * timer interrupt has happened already, but vxtime.trigger wasn't updated yet.
  * This is not a problem, because jiffies hasn't updated either. They are bound
  * together by xtime_lock.
          */
 
-inline unsigned int do_gettimeoffset(void)
+static inline unsigned int do_gettimeoffset_tsc(void)
 {
 	unsigned long t;
-	sync_core();
-	rdtscll(t);	
-	return (t  - hpet.last_tsc) * (1000000L / HZ) / hpet.ticks + hpet.offset;
+	unsigned long x;
+	rdtscll_sync(&t);
+	x = ((t - vxtime.last_tsc) * vxtime.tsc_quot) >> 32;
+	return x;
 }
+
+static inline unsigned int do_gettimeoffset_hpet(void)
+{
+	return ((hpet_readl(HPET_COUNTER) - vxtime.last) * vxtime.quot) >> 32;
+}
+
+unsigned int (*do_gettimeoffset)(void) = do_gettimeoffset_tsc;
 
 /*
  * This version of gettimeofday() has microsecond resolution and better than
@@ -87,7 +108,8 @@ void do_gettimeofday(struct timeval *tv)
 		sec = xtime.tv_sec;
 		usec = xtime.tv_nsec / 1000;
 
-		t = (jiffies - wall_jiffies) * (1000000L / HZ) + do_gettimeoffset();
+		t = (jiffies - wall_jiffies) * (1000000L / HZ) +
+			do_gettimeoffset();
 		usec += t;
 
 	} while (read_seqretry(&xtime_lock, seq));
@@ -107,7 +129,7 @@ void do_settimeofday(struct timeval *tv)
 	write_seqlock_irq(&xtime_lock);
 
 	tv->tv_usec -= do_gettimeoffset() +
-		(jiffies - wall_jiffies) * tick_usec;
+		(jiffies - wall_jiffies) * (USEC_PER_SEC/HZ);
 
 	while (tv->tv_usec < 0) {
 		tv->tv_usec += 1000000;
@@ -178,8 +200,8 @@ static void set_rtc_mmss(unsigned long nowtime)
 		CMOS_WRITE(real_seconds, RTC_SECONDS);
 		CMOS_WRITE(real_minutes, RTC_MINUTES);
 	} else
-		printk(KERN_WARNING "time.c: can't update CMOS clock from %d to %d\n",
-		       cmos_minutes, real_minutes);
+		printk(KERN_WARNING "time.c: can't update CMOS clock "
+		       "from %d to %d\n", cmos_minutes, real_minutes);
 
 /*
  * The following flags have to be released exactly in this order, otherwise the
@@ -198,6 +220,8 @@ static void set_rtc_mmss(unsigned long nowtime)
 static irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	static unsigned long rtc_update = 0;
+	unsigned long tsc, lost = 0;
+	int delay, offset = 0;
 
 /*
  * Here we are in the timer irq handler. We have irqs locally disabled (so we
@@ -208,17 +232,53 @@ static irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	write_seqlock(&xtime_lock);
 
-	{
-		unsigned long t;
+	if (vxtime.hpet_address) {
+		offset = hpet_readl(HPET_T0_CMP) - hpet_tick;
+		delay = hpet_readl(HPET_COUNTER) - offset;
+	} else {
+		spin_lock(&i8253_lock);
+		outb_p(0x00, 0x43);
+		delay = inb_p(0x40);
+		delay |= inb(0x40) << 8;
+		spin_unlock(&i8253_lock);
+		delay = LATCH - 1 - delay;
+	}
 
-		sync_core();
-		rdtscll(t);
-		hpet.offset = (t  - hpet.last_tsc) * (1000000L / HZ) / hpet.ticks + hpet.offset - 1000000L / HZ;
-		if (hpet.offset >= 1000000L / HZ)
-			hpet.offset = 0;
-		hpet.ticks = min_t(long, max_t(long, (t  - hpet.last_tsc) * (1000000L / HZ) / (1000000L / HZ - hpet.offset),
-				cpu_khz * 1000/HZ * 15 / 16), cpu_khz * 1000/HZ * 16 / 15); 
-		hpet.last_tsc = t;
+	rdtscll_sync(&tsc);
+
+	if (vxtime.mode == VXTIME_HPET) {
+		if (offset - vxtime.last > hpet_tick) {
+			lost = (offset - vxtime.last) / hpet_tick - 1;
+		}
+
+		vxtime.last = offset;
+	} else {
+		offset = (((tsc - vxtime.last_tsc) *
+			   vxtime.tsc_quot) >> 32) - (USEC_PER_SEC / HZ);
+
+		if (offset < 0)
+			offset = 0;
+
+		if (offset > (USEC_PER_SEC / HZ)) {
+			lost = offset / (USEC_PER_SEC / HZ);
+			offset %= (USEC_PER_SEC / HZ);
+		}
+
+		vxtime.last_tsc = tsc - vxtime.quot * delay / vxtime.tsc_quot;
+
+		if ((((tsc - vxtime.last_tsc) *
+		      vxtime.tsc_quot) >> 32) < offset)
+			vxtime.last_tsc = tsc -
+				(((long) offset << 32) / vxtime.tsc_quot) - 1;
+	}
+
+	if (lost) {
+		if (report_lost_ticks)
+			printk(KERN_WARNING "time.c: Lost %ld timer "
+			       "tick(s)! (rip %016lx)\n",
+			       (offset - vxtime.last) / hpet_tick - 1,
+			       regs->rip);
+		jiffies += lost;
 	}
 
 /*
@@ -244,7 +304,7 @@ static irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
  * If we have an externally synchronized Linux clock, then update CMOS clock
  * accordingly every ~11 minutes. set_rtc_mmss() will be called in the jiffy
  * closest to exactly 500 ms before the next second. If the update fails, we
- * don'tcare, as it'll be updated on the next turn, and the problem (time way
+ * don't care, as it'll be updated on the next turn, and the problem (time way
  * off) isn't likely to go away much sooner anyway.
  */
 
@@ -263,6 +323,7 @@ unsigned long get_cmos_time(void)
 {
 	unsigned int timeout, year, mon, day, hour, min, sec;
 	unsigned char last, this;
+	unsigned long flags;
 
 /*
  * The Linux interpretation of the CMOS clock register contents: When the
@@ -272,7 +333,7 @@ unsigned long get_cmos_time(void)
  * standard 8.3 MHz ISA bus.
  */
 
-	spin_lock(&rtc_lock); 
+	spin_lock_irqsave(&rtc_lock, flags);
 
 	timeout = 1000000;
 	last = this = 0;
@@ -295,7 +356,7 @@ unsigned long get_cmos_time(void)
 		mon = CMOS_READ(RTC_MONTH);
 		year = CMOS_READ(RTC_YEAR);
 
-	spin_unlock(&rtc_lock);
+	spin_unlock_irqrestore(&rtc_lock, flags);
 
 /*
  * We know that x86-64 always uses BCD format, no need to check the config
@@ -326,6 +387,32 @@ unsigned long get_cmos_time(void)
 
 #define TICK_COUNT 100000000
 
+static unsigned int __init hpet_calibrate_tsc(void)
+{
+	int tsc_start, hpet_start;
+	int tsc_now, hpet_now;
+	unsigned long flags;
+
+	local_irq_save(flags);
+	local_irq_disable();
+
+	hpet_start = hpet_readl(HPET_COUNTER);
+	rdtscl(tsc_start);
+
+	do {
+		local_irq_disable();
+		hpet_now = hpet_readl(HPET_COUNTER);
+		sync_core();
+		rdtscl(tsc_now);
+		local_irq_restore(flags);
+	} while ((tsc_now - tsc_start) < TICK_COUNT &&
+		 (hpet_now - hpet_start) < TICK_COUNT);
+
+	return (tsc_now - tsc_start) * 1000000000L
+		/ ((hpet_now - hpet_start) * hpet_period / 1000);
+}
+
+
 /*
  * pit_calibrate_tsc() uses the speaker output (channel 2) of
  * the PIT. This is better than using the timer interrupt output,
@@ -339,10 +426,9 @@ static unsigned int __init pit_calibrate_tsc(void)
 	unsigned long start, end;
 	unsigned long flags;
 
-	outb((inb(0x61) & ~0x02) | 0x01, 0x61);
+	spin_lock_irqsave(&i8253_lock, flags);
 
-	local_irq_save(flags);
-	local_irq_disable();
+	outb((inb(0x61) & ~0x02) | 0x01, 0x61);
 
 	outb(0xb0, 0x43);
 	outb((1193182 / (1000 / 50)) & 0xff, 0x42);
@@ -353,42 +439,146 @@ static unsigned int __init pit_calibrate_tsc(void)
 	sync_core();
 	rdtscll(end);
 
-
-	local_irq_restore(flags);
+	spin_unlock_irqrestore(&i8253_lock, flags);
 	
 	return (end - start) / 50;
 }
 
+static int hpet_init(void)
+{
+	unsigned int cfg, id;
+
+	if (!vxtime.hpet_address)
+		return -1;
+	set_fixmap_nocache(FIX_HPET_BASE, vxtime.hpet_address);
+
+/*
+ * Read the period, compute tick and quotient.
+ */
+
+	id = hpet_readl(HPET_ID);
+
+	if (!(id & HPET_ID_VENDOR) || !(id & HPET_ID_NUMBER) ||
+	    !(id & HPET_ID_LEGSUP))
+		return -1;
+
+	hpet_period = hpet_readl(HPET_PERIOD);
+	if (hpet_period < 100000 || hpet_period > 100000000)
+		return -1;
+
+	hpet_tick = (1000000000L * (USEC_PER_SEC / HZ) + hpet_period / 2) /
+		hpet_period;
+
+/*
+ * Stop the timers and reset the main counter.
+ */
+
+	cfg = hpet_readl(HPET_CFG);
+	cfg &= ~(HPET_CFG_ENABLE | HPET_CFG_LEGACY);
+	hpet_writel(cfg, HPET_CFG);
+	hpet_writel(0, HPET_COUNTER);
+	hpet_writel(0, HPET_COUNTER + 4);
+
+/*
+ * Set up timer 0, as periodic with first interrupt to happen at hpet_tick,
+ * and period also hpet_tick.
+ */
+
+	hpet_writel(HPET_T0_ENABLE | HPET_T0_PERIODIC | HPET_T0_SETVAL |
+		    HPET_T0_32BIT, HPET_T0_CFG);
+	hpet_writel(hpet_tick, HPET_T0_CMP);
+	hpet_writel(hpet_tick, HPET_T0_CMP);
+
+/*
+ * Go!
+ */
+
+	cfg |= HPET_CFG_ENABLE | HPET_CFG_LEGACY;
+	hpet_writel(cfg, HPET_CFG);
+
+	return 0;
+}
+
 void __init pit_init(void)
 {
+	unsigned long flags;
+
+	spin_lock_irqsave(&i8253_lock, flags);
 	outb_p(0x34, 0x43);		/* binary, mode 2, LSB/MSB, ch 0 */
 	outb_p(LATCH & 0xff, 0x40);	/* LSB */
 	outb_p(LATCH >> 8, 0x40);	/* MSB */
+	spin_unlock_irqrestore(&i8253_lock, flags);
 }
 
 int __init time_setup(char *str)
 {
-	hpet_report_lost_ticks = 1;
+	report_lost_ticks = 1;
 	return 1;
 }
 
-static struct irqaction irq0 = { timer_interrupt, SA_INTERRUPT, 0, "timer", NULL, NULL};
+static struct irqaction irq0 = {
+	timer_interrupt, SA_INTERRUPT, 0, "timer", NULL, NULL
+};
 
 extern void __init config_acpi_tables(void);
 
 void __init time_init(void)
 {
+	char *timename;
+
+#ifdef HPET_HACK_ENABLE_DANGEROUS
+        if (!vxtime.hpet_address) {
+		printk(KERN_WARNING "time.c: WARNING: Enabling HPET base "
+		       "manually!\n");
+                outl(0x800038a0, 0xcf8);
+                outl(0xff000001, 0xcfc);
+                outl(0x800038a0, 0xcf8);
+                hpet_address = inl(0xcfc) & 0xfffffffe;
+		printk(KERN_WARNING "time.c: WARNING: Enabled HPET "
+		       "at %#lx.\n", hpet_address);
+        }
+#endif
+
 	xtime.tv_sec = get_cmos_time();
 	xtime.tv_nsec = 0;
 
+	if (!hpet_init()) {
+                vxtime_hz = (1000000000000000L + hpet_period / 2) /
+			hpet_period;
+		cpu_khz = hpet_calibrate_tsc();
+		timename = "HPET";
+	} else {
 	pit_init();
-	printk(KERN_INFO "time.c: Using 1.1931816 MHz PIT timer.\n");
 	cpu_khz = pit_calibrate_tsc();
+		timename = "PIT";
+	}
+
+	printk(KERN_INFO "time.c: Using %ld.%06ld MHz %s timer.\n",
+	       vxtime_hz / 1000000, vxtime_hz % 1000000, timename);
 	printk(KERN_INFO "time.c: Detected %d.%03d MHz processor.\n",
 		cpu_khz / 1000, cpu_khz % 1000);
-	hpet.ticks = cpu_khz * (1000 / HZ);
-	rdtscll(hpet.last_tsc);
+	vxtime.mode = VXTIME_TSC;
+	vxtime.quot = (1000000L << 32) / vxtime_hz;
+	vxtime.tsc_quot = (1000L << 32) / cpu_khz;
+	vxtime.hz = vxtime_hz;
+	rdtscll_sync(&vxtime.last_tsc);
 	setup_irq(0, &irq0);
+}
+
+void __init time_init_smp(void)
+{
+	char *timetype;
+
+	if (vxtime.hpet_address) {
+		timetype = "HPET";
+		vxtime.last = hpet_readl(HPET_T0_CMP) - hpet_tick;
+		vxtime.mode = VXTIME_HPET;
+		do_gettimeoffset = do_gettimeoffset_hpet;
+	} else {
+		timetype = "PIT/TSC";
+		vxtime.mode = VXTIME_TSC;
+	}
+	printk(KERN_INFO "time.c: Using %s based timekeeping.\n", timetype);
 }
 
 __setup("report_lost_ticks", time_setup);

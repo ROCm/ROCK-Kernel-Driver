@@ -15,7 +15,7 @@ enum vsyscall_num {
 
 #ifdef __KERNEL__
 
-#define __section_hpet __attribute__ ((unused, __section__ (".hpet"), aligned(16)))
+#define __section_vxtime __attribute__ ((unused, __section__ (".vxtime"), aligned(16)))
 #define __section_wall_jiffies __attribute__ ((unused, __section__ (".wall_jiffies"), aligned(16)))
 #define __section_jiffies __attribute__ ((unused, __section__ (".jiffies"), aligned(16)))
 #define __section_sys_tz __attribute__ ((unused, __section__ (".sys_tz"), aligned(16)))
@@ -23,22 +23,24 @@ enum vsyscall_num {
 #define __section_xtime __attribute__ ((unused, __section__ (".xtime"), aligned(16)))
 #define __section_xtime_lock __attribute__ ((unused, __section__ (".xtime_lock"), aligned(L1_CACHE_BYTES)))
 
+#define VXTIME_TSC	1
+#define VXTIME_HPET	2
 
-struct hpet_data {
-	long address;		/* base address */
+struct vxtime_data {
+	long hpet_address;	/* HPET base address */
 	unsigned long hz;	/* HPET clocks / sec */
-	int trigger;		/* value at last interrupt */
 	int last;
-	int offset;
 	unsigned long last_tsc;
-	long ticks;
+	long quot;
+	long tsc_quot;
+	int mode;
 };
 
 #define hpet_readl(a)           readl(fix_to_virt(FIX_HPET_BASE) + a)
 #define hpet_writel(d,a)        writel(d, fix_to_virt(FIX_HPET_BASE) + a)
 
 /* vsyscall space (readonly) */
-extern struct hpet_data __hpet;
+extern struct vxtime_data __vxtime;
 extern struct timespec __xtime;
 extern volatile unsigned long __jiffies;
 extern unsigned long __wall_jiffies;
@@ -46,7 +48,7 @@ extern struct timezone __sys_tz;
 extern seqlock_t __xtime_lock;
 
 /* kernel space (writeable) */
-extern struct hpet_data hpet;
+extern struct vxtime_data vxtime;
 extern unsigned long wall_jiffies;
 extern struct timezone sys_tz;
 extern int sysctl_vsyscall;

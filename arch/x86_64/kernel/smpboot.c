@@ -67,6 +67,8 @@ struct cpuinfo_x86 cpu_data[NR_CPUS] __cacheline_aligned;
 /* Set when the idlers are all forked */
 int smp_threads_ready;
 
+extern void time_init_smp(void);
+
 /*
  * Trampoline 80x86 program as an array.
  */
@@ -760,7 +762,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 		if (APIC_init_uniprocessor())
 			printk(KERN_NOTICE "Local APIC not detected."
 					   " Using dummy APIC emulation.\n");
-		return;
+		goto smp_done;
 	}
 
 	/*
@@ -784,7 +786,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 		cpu_online_map = phys_cpu_present_map = 1;
 		phys_cpu_present_map = 1;
 		disable_apic = 1;
-		return;
+		goto smp_done;
 	}
 
 	verify_local_APIC();
@@ -799,7 +801,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 		cpu_online_map = phys_cpu_present_map = 1;
 		phys_cpu_present_map = 1;
 		disable_apic = 1;
-		return;
+		goto smp_done;
 	}
 
 	connect_bsp_APIC();
@@ -883,6 +885,9 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	 */
 	if (cpu_has_tsc && cpucount)
 		synchronize_tsc_bp();
+
+ smp_done:
+	time_init_smp();
 }
 
 /* These are wrappers to interface to the new boot process.  Someone
