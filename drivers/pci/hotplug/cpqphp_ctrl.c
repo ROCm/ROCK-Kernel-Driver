@@ -714,7 +714,7 @@ static struct pci_resource *get_max_resource(struct pci_resource **head, u32 siz
 			continue;
 
 		/* Now take it out of the list */
-		temp = (struct pci_resource*) *head;
+		temp = *head;
 		if (temp == max) {
 			*head = max->next;
 		} else {
@@ -726,11 +726,10 @@ static struct pci_resource *get_max_resource(struct pci_resource **head, u32 siz
 		}
 
 		max->next = NULL;
-		return max;
+		break;
 	}
 
-	/* If we get here, we couldn't find one */
-	return NULL;
+	return max;
 }
 
 
@@ -755,10 +754,10 @@ static struct pci_resource *get_resource(struct pci_resource **head, u32 size)
 	if (!(*head))
 		return NULL;
 
-	if ( cpqhp_resource_sort_and_combine(head) )
+	if (cpqhp_resource_sort_and_combine(head))
 		return NULL;
 
-	if ( sort_by_size(head) )
+	if (sort_by_size(head))
 		return NULL;
 
 	for (node = *head; node; node = node->next) {
@@ -1293,7 +1292,7 @@ static u8 set_controller_speed(struct controller *ctrl, u8 adapter_speed, u8 hp_
  * If board isn't same, turns it back off.
  *
  */
-static u32 board_replaced(struct pci_func * func, struct controller * ctrl)
+static u32 board_replaced(struct pci_func *func, struct controller *ctrl)
 {
 	u8 hp_slot;
 	u8 temp_byte;
@@ -1488,7 +1487,7 @@ static u32 board_replaced(struct pci_func * func, struct controller * ctrl)
  * Configures board
  *
  */
-static u32 board_added(struct pci_func * func, struct controller * ctrl)
+static u32 board_added(struct pci_func *func, struct controller *ctrl)
 {
 	u8 hp_slot;
 	u8 temp_byte;
@@ -2007,7 +2006,7 @@ static void interrupt_event_handler(struct controller *ctrl)
  * Handles all pending events and exits.
  *
  */
-void cpqhp_pushbutton_thread (unsigned long slot)
+void cpqhp_pushbutton_thread(unsigned long slot)
 {
 	u8 hp_slot;
 	u8 device;
@@ -2020,7 +2019,7 @@ void cpqhp_pushbutton_thread (unsigned long slot)
 
 	device = p_slot->device;
 
-	if (is_slot_enabled (ctrl, hp_slot)) {
+	if (is_slot_enabled(ctrl, hp_slot)) {
 		p_slot->state = POWEROFF_STATE;
 		/* power Down board */
 		func = cpqhp_slot_find(p_slot->bus, p_slot->device, 0);
@@ -2056,8 +2055,8 @@ void cpqhp_pushbutton_thread (unsigned long slot)
 
 		if (func != NULL && ctrl != NULL) {
 			if (cpqhp_process_SI(ctrl, func) != 0) {
-				amber_LED_on (ctrl, hp_slot);
-				green_LED_off (ctrl, hp_slot);
+				amber_LED_on(ctrl, hp_slot);
+				green_LED_off(ctrl, hp_slot);
 				
 				set_SOGO(ctrl);
 
@@ -2073,7 +2072,7 @@ void cpqhp_pushbutton_thread (unsigned long slot)
 }
 
 
-int cpqhp_process_SI (struct controller *ctrl, struct pci_func *func)
+int cpqhp_process_SI(struct controller *ctrl, struct pci_func *func)
 {
 	u8 device, hp_slot;
 	u16 temp_word;
@@ -2171,7 +2170,7 @@ int cpqhp_process_SI (struct controller *ctrl, struct pci_func *func)
 }
 
 
-int cpqhp_process_SS (struct controller *ctrl, struct pci_func *func)
+int cpqhp_process_SS(struct controller *ctrl, struct pci_func *func)
 {
 	u8 device, class_code, header_type, BCR;
 	u8 index = 0;
@@ -2362,7 +2361,7 @@ int cpqhp_hardware_test(struct controller *ctrl, int test_num)
  * Returns 0 if success
  *
  */
-static u32 configure_new_device (struct controller * ctrl, struct pci_func * func,
+static u32 configure_new_device(struct controller *ctrl, struct pci_func *func,
 				 u8 behind_bridge, struct resource_lists * resources)
 {
 	u8 temp_byte, function, max_functions, stop_it;
