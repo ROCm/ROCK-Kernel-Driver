@@ -2941,6 +2941,16 @@ out_unlock:
 	return retval;
 }
 
+/*
+ * Represents all cpu's present in the system
+ * In systems capable of hotplug, this map could dynamically grow
+ * as new cpu's are detected in the system via any platform specific
+ * method, such as ACPI for e.g.
+ */
+
+cpumask_t cpu_present_map;
+EXPORT_SYMBOL(cpu_present_map);
+
 /**
  * sys_sched_getaffinity - get the cpu affinity of a process
  * @pid: pid of the process
