@@ -1174,7 +1174,7 @@ acpi_system_remove_fs (
 
 /* Simple wrapper calling power down function. */
 static void acpi_sysrq_power_off(int key, struct pt_regs *pt_regs,
-	struct kbd_struct *kbd, struct tty_struct *tty)
+				 struct tty_struct *tty)
 {
 	acpi_power_off();
 }
