@@ -196,8 +196,6 @@ pci_fixup_bus_sysdata_list(struct list_head *bus_list)
 {
 	struct list_head *ln;
 	struct pci_bus *bus;
-	struct pci_controller *phb;
-	int newnum;
 
 	for (ln=bus_list->next; ln != bus_list; ln=ln->next) {
 		bus = pci_bus_b(ln);
