@@ -160,14 +160,12 @@ printk("proc_iget: using deleted entry %s, count=%d\n", de->name, atomic_read(&d
 			inode->i_nlink = de->nlink;
 		if (de->owner)
 			__MOD_INC_USE_COUNT(de->owner);
-		if (S_ISBLK(de->mode)||S_ISCHR(de->mode)||S_ISFIFO(de->mode))
+		if (de->proc_iops)
+			inode->i_op = de->proc_iops;
+		if (de->proc_fops)
+			inode->i_fop = de->proc_fops;
+		else if (S_ISBLK(de->mode)||S_ISCHR(de->mode)||S_ISFIFO(de->mode))
 			init_special_inode(inode,de->mode,kdev_t_to_nr(de->rdev));
-		else {
-			if (de->proc_iops)
-				inode->i_op = de->proc_iops;
-			if (de->proc_fops)
-				inode->i_fop = de->proc_fops;
-		}
 	}
 
 out:

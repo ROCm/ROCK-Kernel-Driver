@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.walnut_setup.c 1.8 10/18/01 11:16:28 trini
+ * BK Id: SCCS/s.walnut_setup.c 1.10 11/13/01 21:26:07 paulus
  */
 /*
  *
@@ -23,6 +23,7 @@
 #include <linux/param.h>
 #include <linux/string.h>
 #include <linux/blk.h>
+#include <linux/seq_file.h>
 
 #include <asm/processor.h>
 #include <asm/board.h>
@@ -101,8 +102,7 @@ walnut_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	/* Initialize machine-dependency vectors */
 
 	ppc_md.setup_arch	 	= walnut_setup_arch;
-	ppc_md.setup_residual	 	= walnut_setup_residual;
-	ppc_md.get_cpuinfo	 	= NULL;
+	ppc_md.show_percpuinfo	 	= walnut_show_percpuinfo;
 	ppc_md.irq_cannonicalize 	= NULL;
 	ppc_md.init_IRQ		 	= walnut_init_IRQ;
 	ppc_md.get_irq		 	= walnut_get_irq;
@@ -136,7 +136,7 @@ walnut_setup_arch(void)
 }
 
 /*
- * int walnut_setup_residual()
+ * int walnut_show_percpuinfo()
  *
  * Description:
  *   This routine pretty-prints the platform's internal CPU and bus clock
@@ -154,18 +154,16 @@ walnut_setup_arch(void)
  *   on error.
  */
 int
-walnut_setup_residual(char *buffer)
+walnut_show_percpuinfo(struct seq_file *m)
 {
-	int len = 0;
 	bd_t *bp = (bd_t *)__res;
 
-	len += sprintf(len + buffer,
-		       "clock\t\t: %dMHz\n"
-		       "bus clock\t\t: %dMHz\n",
-		       bp->bi_intfreq / 1000000,
-		       bp->bi_busfreq / 1000000);
+	seq_printf(m, "clock\t\t: %dMHz\n"
+		   "bus clock\t\t: %dMHz\n",
+		   bp->bi_intfreq / 1000000,
+		   bp->bi_busfreq / 1000000);
 
-	return (len);
+	return 0;
 }
 
 /*

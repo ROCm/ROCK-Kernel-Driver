@@ -66,7 +66,7 @@ static LIST_HEAD(anon_hash_chain); /* for inodes with NULL i_sb */
  * NOTE! You also have to own the lock if you change
  * the i_state of an inode while it is in use..
  */
-spinlock_t inode_lock = SPIN_LOCK_UNLOCKED;
+static spinlock_t inode_lock = SPIN_LOCK_UNLOCKED;
 
 /*
  * Statistics gathering..

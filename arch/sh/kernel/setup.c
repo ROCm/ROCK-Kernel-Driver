@@ -31,6 +31,7 @@
 #include <linux/bootmem.h>
 #include <linux/console.h>
 #include <linux/ctype.h>
+#include <linux/seq_file.h>
 #include <asm/processor.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
@@ -517,24 +518,22 @@ struct sh_machine_vector* __init get_mv_byname(const char* name)
  *	Get CPU information for use by the procfs.
  */
 #ifdef CONFIG_PROC_FS
-int get_cpuinfo(char *buffer)
+static int show_cpuinfo(struct seq_file *m, void *v)
 {
-	char *p = buffer;
-
 #if defined(__sh3__)
-	p += sprintf(p,"cpu family\t: SH-3\n"
-		       "cache size\t: 8K-byte\n");
+	seq_printf(m, "cpu family\t: SH-3\n"
+		      "cache size\t: 8K-byte\n");
 #elif defined(__SH4__)
-	p += sprintf(p,"cpu family\t: SH-4\n"
-		       "cache size\t: 8K-byte/16K-byte\n");
+	seq_printf(m, "cpu family\t: SH-4\n"
+		      "cache size\t: 8K-byte/16K-byte\n");
 #endif
-	p += sprintf(p, "bogomips\t: %lu.%02lu\n\n",
+	seq_printf(m, "bogomips\t: %lu.%02lu\n\n",
 		     loops_per_jiffy/(500000/HZ),
 		     (loops_per_jiffy/(5000/HZ)) % 100);
-	p += sprintf(p, "Machine: %s\n", sh_mv.mv_name);
+	seq_printf(m, "Machine: %s\n", sh_mv.mv_name);
 
 #define PRINT_CLOCK(name, value) \
-	p += sprintf(p, name " clock: %d.%02dMHz\n", \
+	seq_printf(m, name " clock: %d.%02dMHz\n", \
 		     ((value) / 1000000), ((value) % 1000000)/10000)
 	
 	PRINT_CLOCK("CPU", boot_cpu_data.cpu_clock);
@@ -544,6 +543,24 @@ int get_cpuinfo(char *buffer)
 #endif
 	PRINT_CLOCK("Peripheral module", boot_cpu_data.module_clock);
 
-	return p - buffer;
+	return 0;
 }
+
+static void *c_start(struct seq_file *m, loff_t *pos)
+{
+	return (void*)(*pos == 0);
+}
+static void *c_next(struct seq_file *m, void *v, loff_t *pos)
+{
+	return NULL;
+}
+static void c_stop(struct seq_file *m, void *v)
+{
+}
+struct seq_operations cpuinfo_op = {
+	start:	c_start,
+	next:	c_next,
+	stop:	c_stop,
+	show:	show_cpuinfo,
+};
 #endif

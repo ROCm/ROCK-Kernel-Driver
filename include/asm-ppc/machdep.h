@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.machdep.h 1.23 10/18/01 11:16:28 trini
+ * BK Id: SCCS/s.machdep.h 1.25 11/13/01 21:26:07 paulus
  */
 #ifdef __KERNEL__
 #ifndef _PPC_MACHDEP_H
@@ -14,13 +14,13 @@
 struct pt_regs;
 struct pci_bus;	
 struct pci_dev;
+struct seq_file;
 
 struct machdep_calls {
 	void		(*setup_arch)(void);
 	/* Optional, may be NULL. */
-	int		(*setup_residual)(char *buffer);
-	/* Optional, may be NULL. */
-	int		(*get_cpuinfo)(char *buffer);
+	int		(*show_cpuinfo)(struct seq_file *m);
+	int		(*show_percpuinfo)(struct seq_file *m, int i);
 	/* Optional, may be NULL. */
 	unsigned int	(*irq_cannonicalize)(unsigned int irq);
 	void		(*init_IRQ)(void);

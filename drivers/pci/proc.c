@@ -11,6 +11,7 @@
 #include <linux/pci.h>
 #include <linux/proc_fs.h>
 #include <linux/init.h>
+#include <linux/seq_file.h>
 
 #include <asm/uaccess.h>
 #include <asm/byteorder.h>
@@ -302,52 +303,71 @@ static struct file_operations proc_bus_pci_operations = {
 #define LONG_FORMAT "\t%16lx"
 #endif
 
-static int
-get_pci_dev_info(char *buf, char **start, off_t pos, int count)
+/* iterator */
+static void *pci_seq_start(struct seq_file *m, loff_t *pos)
 {
-	const struct pci_dev *dev;
-	off_t at = 0;
-	int len, i, cnt;
+	struct list_head *p = &pci_devices;
+	loff_t n = *pos;
 
-	cnt = 0;
-	pci_for_each_dev(dev) {
-		const struct pci_driver *drv = pci_dev_driver(dev);
-		len = sprintf(buf, "%02x%02x\t%04x%04x\t%x",
+	/* XXX: surely we need some locking for traversing the list? */
+	while (n--) {
+		p = p->next;
+		if (p == &pci_devices)
+			return NULL;
+	}
+	return p;
+}
+static void *pci_seq_next(struct seq_file *m, void *v, loff_t *pos)
+{
+	struct list_head *p = v;
+	(*pos)++;
+	return p->next != &pci_devices ? p->next : NULL;
+}
+static void pci_seq_stop(struct seq_file *m, void *v)
+{
+	/* release whatever locks we need */
+}
+
+static int show_device(struct seq_file *m, void *v)
+{
+	struct list_head *p = v;
+	const struct pci_dev *dev;
+	const struct pci_driver *drv;
+	int i;
+
+	if (p == &pci_devices)
+		return 0;
+
+	dev = pci_dev_g(p);
+	drv = pci_dev_driver(dev);
+	seq_printf(m, "%02x%02x\t%04x%04x\t%x",
 			dev->bus->number,
 			dev->devfn,
 			dev->vendor,
 			dev->device,
 			dev->irq);
-		/* Here should be 7 and not PCI_NUM_RESOURCES as we need to preserve compatibility */
-		for(i=0; i<7; i++)
-			len += sprintf(buf+len, LONG_FORMAT,
-				       dev->resource[i].start | (dev->resource[i].flags & PCI_REGION_FLAG_MASK));
-		for(i=0; i<7; i++)
-			len += sprintf(buf+len, LONG_FORMAT, dev->resource[i].start < dev->resource[i].end ?
-				       dev->resource[i].end - dev->resource[i].start + 1 : 0);
-		buf[len++] = '\t';
-		if (drv)
-			len += sprintf(buf+len, "%s", drv->name);
-		buf[len++] = '\n';
-		at += len;
-		if (at >= pos) {
-			if (!*start) {
-				*start = buf + (pos - (at - len));
-				cnt = at - pos;
-			} else
-				cnt += len;
-			buf += len;
-			if (cnt >= count)
-				/*
-				 * proc_file_read() gives us 1KB of slack so it's OK if the
-				 * above printfs write a little beyond the buffer end (we
-				 * never write more than 1KB beyond the buffer end).
-				 */
-				break;
-		}
-	}
-	return (count > cnt) ? cnt : count;
+	/* Here should be 7 and not PCI_NUM_RESOURCES as we need to preserve compatibility */
+	for(i=0; i<7; i++)
+		seq_printf(m, LONG_FORMAT,
+			dev->resource[i].start |
+			(dev->resource[i].flags & PCI_REGION_FLAG_MASK));
+	for(i=0; i<7; i++)
+		seq_printf(m, LONG_FORMAT,
+			dev->resource[i].start < dev->resource[i].end ?
+			dev->resource[i].end - dev->resource[i].start + 1 : 0);
+	seq_putc(m, '\t');
+	if (drv)
+		seq_printf(m, "%s", drv->name);
+	seq_putc(m, '\n');
+	return 0;
 }
+
+static struct seq_operations proc_bus_pci_devices_op = {
+	start:	pci_seq_start,
+	next:	pci_seq_next,
+	stop:	pci_seq_stop,
+	show:	show_device
+};
 
 static struct proc_dir_entry *proc_bus_pci_dir;
 
@@ -388,10 +408,10 @@ int pci_proc_detach_device(struct pci_dev *dev)
 
 int pci_proc_attach_bus(struct pci_bus* bus)
 {
-	struct proc_dir_entry *de;
-	char name[16];
+	struct proc_dir_entry *de = bus->procdir;
 
-	if (!(de = bus->procdir)) {
+	if (!de) {
+		char name[16];
 		sprintf(name, "%02x", bus->number);
 		de = bus->procdir = proc_mkdir(name, proc_bus_pci_dir);
 		if (!de)
@@ -402,11 +422,9 @@ int pci_proc_attach_bus(struct pci_bus* bus)
 
 int pci_proc_detach_bus(struct pci_bus* bus)
 {
-	struct proc_dir_entry *de;
-
-	if (!(de = bus->procdir)) {
+	struct proc_dir_entry *de = bus->procdir;
+	if (de)
 		remove_proc_entry(de->name, proc_bus_pci_dir);
-	}
 	return 0;
 }
 
@@ -421,54 +439,56 @@ int pci_proc_detach_bus(struct pci_bus* bus)
  * The configuration string is stored starting at buf[len].  If the
  * string would exceed the size of the buffer (SIZE), 0 is returned.
  */
-static int sprint_dev_config(struct pci_dev *dev, char *buf, int size)
+static int show_dev_config(struct seq_file *m, void *v)
 {
+	struct list_head *p = v;
+	struct pci_dev *dev;
+	struct pci_driver *drv;
 	u32 class_rev;
 	unsigned char latency, min_gnt, max_lat, *class;
-	int reg, len = 0;
+	int reg;
+
+	if (p == &pci_devices) {
+		seq_puts(m, "PCI devices found:\n");
+		return 0;
+	}
+
+	dev = pci_dev_g(p);
+	drv = pci_dev_driver(dev);
 
 	pci_read_config_dword(dev, PCI_CLASS_REVISION, &class_rev);
 	pci_read_config_byte (dev, PCI_LATENCY_TIMER, &latency);
 	pci_read_config_byte (dev, PCI_MIN_GNT, &min_gnt);
 	pci_read_config_byte (dev, PCI_MAX_LAT, &max_lat);
-	if (len + 160 > size)
-		return -1;
-	len += sprintf(buf + len, "  Bus %2d, device %3d, function %2d:\n",
-		       dev->bus->number, PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn));
+	seq_printf(m, "  Bus %2d, device %3d, function %2d:\n",
+	       dev->bus->number, PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn));
 	class = pci_class_name(class_rev >> 16);
 	if (class)
-		len += sprintf(buf+len, "    %s", class);
+		seq_printf(m, "    %s", class);
 	else
-		len += sprintf(buf+len, "    Class %04x", class_rev >> 16);
-	len += sprintf(buf+len, ": %s (rev %d).\n", dev->name, class_rev & 0xff);
+		seq_printf(m, "    Class %04x", class_rev >> 16);
+	seq_printf(m, ": %s (rev %d).\n", dev->name, class_rev & 0xff);
 
-	if (dev->irq) {
-		if (len + 40 > size)
-			return -1;
-		len += sprintf(buf + len, "      IRQ %d.\n", dev->irq);
-	}
+	if (dev->irq)
+		seq_printf(m, "      IRQ %d.\n", dev->irq);
 
 	if (latency || min_gnt || max_lat) {
-		if (len + 80 > size)
-			return -1;
-		len += sprintf(buf + len, "      Master Capable.  ");
+		seq_printf(m, "      Master Capable.  ");
 		if (latency)
-		  len += sprintf(buf + len, "Latency=%d.  ", latency);
+			seq_printf(m, "Latency=%d.  ", latency);
 		else
-		  len += sprintf(buf + len, "No bursts.  ");
+			seq_puts(m, "No bursts.  ");
 		if (min_gnt)
-		  len += sprintf(buf + len, "Min Gnt=%d.", min_gnt);
+			seq_printf(m, "Min Gnt=%d.", min_gnt);
 		if (max_lat)
-		  len += sprintf(buf + len, "Max Lat=%d.", max_lat);
-		len += sprintf(buf + len, "\n");
+			seq_printf(m, "Max Lat=%d.", max_lat);
+		seq_putc(m, '\n');
 	}
 
 	for (reg = 0; reg < 6; reg++) {
 		struct resource *res = dev->resource + reg;
 		unsigned long base, end, flags;
 
-		if (len + 40 > size)
-			return -1;
 		base = res->start;
 		end = res->end;
 		flags = res->flags;
@@ -476,9 +496,8 @@ static int sprint_dev_config(struct pci_dev *dev, char *buf, int size)
 			continue;
 
 		if (flags & PCI_BASE_ADDRESS_SPACE_IO) {
-			len += sprintf(buf + len,
-				       "      I/O at 0x%lx [0x%lx].\n",
-				       base, end);
+			seq_printf(m, "      I/O at 0x%lx [0x%lx].\n",
+				base, end);
 		} else {
 			const char *pref, *type = "unknown";
 
@@ -494,65 +513,58 @@ static int sprint_dev_config(struct pci_dev *dev, char *buf, int size)
 			      case PCI_BASE_ADDRESS_MEM_TYPE_64:
 				type = "64 bit"; break;
 			}
-			len += sprintf(buf + len,
-				       "      %srefetchable %s memory at "
+			seq_printf(m, "      %srefetchable %s memory at "
 				       "0x%lx [0x%lx].\n", pref, type,
 				       base,
 				       end);
 		}
 	}
-
-	return len;
+	return 0;
 }
 
-/*
- * Return list of PCI devices as a character string for /proc/pci.
- * BUF is a buffer that is PAGE_SIZE bytes long.
- */
-static int pci_read_proc(char *buf, char **start, off_t off,
-				int count, int *eof, void *data)
+static struct seq_operations proc_pci_op = {
+	start:	pci_seq_start,
+	next:	pci_seq_next,
+	stop:	pci_seq_stop,
+	show:	show_dev_config
+};
+
+static int proc_bus_pci_dev_open(struct inode *inode, struct file *file)
 {
-	int nprinted, len, begin = 0;
-	struct pci_dev *dev;
-
-	len = sprintf(buf, "PCI devices found:\n");
-
-	*eof = 1;
-	pci_for_each_dev(dev) {
-		nprinted = sprint_dev_config(dev, buf + len, PAGE_SIZE - len);
-		if (nprinted < 0) {
-			*eof = 0;
-			break;
-		}
-		len += nprinted;
-		if (len+begin < off) {
-			begin += len;
-			len = 0;
-		}
-		if (len+begin >= off+count)
-			break;
-	}
-	off -= begin;
-	*start = buf + off;
-	len -= off;
-	if (len>count)
-		len = count;
-	if (len<0)
-		len = 0;
-	return len;
+	return seq_open(file, &proc_bus_pci_devices_op);
 }
+static struct file_operations proc_bus_pci_dev_operations = {
+	open:		proc_bus_pci_dev_open,
+	read:		seq_read,
+	llseek:		seq_lseek,
+	release:	seq_release,
+};
+static int proc_pci_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &proc_pci_op);
+}
+static struct file_operations proc_pci_operations = {
+	open:		proc_pci_open,
+	read:		seq_read,
+	llseek:		seq_lseek,
+	release:	seq_release,
+};
 
 static int __init pci_proc_init(void)
 {
 	if (pci_present()) {
+		struct proc_dir_entry *entry;
 		struct pci_dev *dev;
 		proc_bus_pci_dir = proc_mkdir("pci", proc_bus);
-		create_proc_info_entry("devices", 0, proc_bus_pci_dir,
-					get_pci_dev_info);
+		entry = create_proc_entry("devices", 0, proc_bus_pci_dir);
+		if (entry)
+			entry->proc_fops = &proc_bus_pci_dev_operations;
 		pci_for_each_dev(dev) {
 			pci_proc_attach_device(dev);
 		}
-		create_proc_read_entry("pci", 0, NULL, pci_read_proc, NULL);
+		entry = create_proc_entry("pci", 0, NULL);
+		if (entry)
+			entry->proc_fops = &proc_pci_operations;
 	}
 	return 0;
 }

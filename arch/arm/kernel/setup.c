@@ -1,7 +1,7 @@
 /*
  *  linux/arch/arm/kernel/setup.c
  *
- *  Copyright (C) 1995-2000 Russell King
+ *  Copyright (C) 1995-2001 Russell King
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -16,6 +16,7 @@
 #include <linux/blk.h>
 #include <linux/console.h>
 #include <linux/bootmem.h>
+#include <linux/seq_file.h>
 #include <linux/init.h>
 
 #include <asm/elf.h>
@@ -532,58 +533,53 @@ static const char *hwcap_str[] = {
 	NULL
 };
 
-/*
- * get_cpuinfo - Get information on one CPU for use by the procfs.
- *
- *	Prints info on the next CPU into buffer.  Beware, doesn't check for
- *	buffer overflow.  Current implementation of procfs assumes that the
- *	resulting data is <= 1K.
- *
- * Args:
- *	buffer	-- you guessed it, the data buffer
- *	cpu_np	-- Input: next cpu to get (start at 0).  Output: Updated.
- *
- *	Returns number of bytes written to buffer.
- */
-
-int get_cpuinfo(char *buffer, unsigned *cpu_np)
+static int c_show(struct seq_file *m, void *v)
 {
-	char *p = buffer;
-	unsigned n;
 	int i;
 
- 	/* No SMP at the moment, so just toggle 0/1 */
-	n = *cpu_np;
-	*cpu_np = 1;
-	if (n != 0) {
-		return (0);
-	}
+	seq_printf(m, "Processor\t: %s %s rev %d (%s)\n",
+		   proc_info.manufacturer, proc_info.cpu_name,
+		   (int)processor_id & 15, elf_platform);
 
-	p += sprintf(p, "Processor\t: %s %s rev %d (%s)\n",
-		     proc_info.manufacturer, proc_info.cpu_name,
-		     (int)processor_id & 15, elf_platform);
-
-	p += sprintf(p, "BogoMIPS\t: %lu.%02lu\n",
-		     loops_per_jiffy / (500000/HZ),
-		     (loops_per_jiffy / (5000/HZ)) % 100);
+	seq_printf(m, "BogoMIPS\t: %lu.%02lu\n",
+		   loops_per_jiffy / (500000/HZ),
+		   (loops_per_jiffy / (5000/HZ)) % 100);
 
 	/* dump out the processor features */
-	p += sprintf(p, "Features\t: ");
+	seq_puts(m, "Features\t: ");
 
 	for (i = 0; hwcap_str[i]; i++)
 		if (elf_hwcap & (1 << i))
-			p += sprintf(p, "%s ", hwcap_str[i]);
+			seq_printf(m, "%s ", hwcap_str[i]);
 
-	p += sprintf(p, "\n\n");
+	seq_puts(m, "\n\n");
 
-	p += sprintf(p, "Hardware\t: %s\n", machine_name);
+	seq_printf(m, "Hardware\t: %s\n", machine_name);
+	seq_printf(m, "Revision\t: %04x\n", system_rev);
+	seq_printf(m, "Serial\t\t: %08x%08x\n",
+		   system_serial_high, system_serial_low);
 
-	p += sprintf(p, "Revision\t: %04x\n",
-		     system_rev);
-
-	p += sprintf(p, "Serial\t\t: %08x%08x\n",
-		     system_serial_high,
-		     system_serial_low);
-
-	return p - buffer;
+	return 0;
 }
+
+static void *c_start(struct seq_file *m, loff_t *pos)
+{
+	return *pos < 1 ? (void *)1 : NULL;
+}
+
+static void *c_next(struct seq_file *m, void *v, loff_t *pos)
+{
+	++*pos;
+	return NULL;
+}
+
+static void c_stop(struct seq_file *m, void *v)
+{
+}
+
+struct seq_operations cpuinfo_op = {
+	start:	c_start,
+	next:	c_next,
+	stop:	c_stop,
+	show:	c_show
+};

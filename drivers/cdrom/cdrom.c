@@ -2625,7 +2625,8 @@ static int __init cdrom_init(void)
 #ifdef CONFIG_SYSCTL
 	cdrom_sysctl_register();
 #endif
-	devfs_handle = devfs_mk_dir(NULL, "cdroms", NULL);
+	if (!devfs_handle)
+		devfs_handle = devfs_mk_dir(NULL, "cdroms", NULL);
 	return 0;
 }
 

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.m8260_setup.c 1.28 10/18/01 11:16:28 trini
+ * BK Id: SCCS/s.m8260_setup.c 1.30 11/13/01 21:26:07 paulus
  */
 /*
  *  linux/arch/ppc/kernel/setup.c
@@ -34,6 +34,7 @@
 #include <linux/blk.h>
 #include <linux/ioport.h>
 #include <linux/ide.h>
+#include <linux/seq_file.h>
 
 #include <asm/mmu.h>
 #include <asm/processor.h>
@@ -144,21 +145,20 @@ m8260_halt(void)
 
 
 static int
-m8260_setup_residual(char *buffer)
+m8260_show_percpuinfo(struct seq_file *m, int i)
 {
-        int     len = 0;
 	bd_t	*bp;
 
 	bp = (bd_t *)__res;
 			
-	len += sprintf(len+buffer,"core clock\t: %d MHz\n"
-		       "CPM  clock\t: %d MHz\n"
-		       "bus  clock\t: %d MHz\n",
-		       bp->bi_intfreq / 1000000,
-		       bp->bi_cpmfreq / 1000000,
-		       bp->bi_busfreq / 1000000);
+	seq_printf(m, "core clock\t: %d MHz\n"
+		   "CPM  clock\t: %d MHz\n"
+		   "bus  clock\t: %d MHz\n",
+		   bp->bi_intfreq / 1000000,
+		   bp->bi_cpmfreq / 1000000,
+		   bp->bi_busfreq / 1000000);
 
-	return len;
+	return 0;
 }
 
 /* Initialize the internal interrupt controller.  The number of
@@ -240,8 +240,7 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	}
 
 	ppc_md.setup_arch		= m8260_setup_arch;
-	ppc_md.setup_residual		= m8260_setup_residual;
-	ppc_md.get_cpuinfo		= NULL;
+	ppc_md.show_percpuinfo		= m8260_show_percpuinfo;
 	ppc_md.irq_cannonicalize	= NULL;
 	ppc_md.init_IRQ			= m8260_init_IRQ;
 	ppc_md.get_irq			= m8260_get_irq;

@@ -519,6 +519,14 @@ static struct file_operations proc_mounts_operations = {
 
 struct proc_dir_entry *proc_root_kcore;
 
+static void create_seq_entry(char *name, mode_t mode, struct file_operations *f)
+{
+	struct proc_dir_entry *entry;
+	entry = create_proc_entry(name, mode, NULL);
+	if (entry)
+		entry->proc_fops = f;
+}
+
 void __init proc_misc_init(void)
 {
 	struct proc_dir_entry *entry;
@@ -568,16 +576,10 @@ void __init proc_misc_init(void)
 	entry = create_proc_entry("kmsg", S_IRUSR, &proc_root);
 	if (entry)
 		entry->proc_fops = &proc_kmsg_operations;
-	entry = create_proc_entry("mounts", 0, NULL);
-	if (entry)
-		entry->proc_fops = &proc_mounts_operations;
-	entry = create_proc_entry("cpuinfo", 0, NULL);
-	if (entry)
-		entry->proc_fops = &proc_cpuinfo_operations;
+	create_seq_entry("mounts", 0, &proc_mounts_operations);
+	create_seq_entry("cpuinfo", 0, &proc_cpuinfo_operations);
 #ifdef CONFIG_MODULES
-	entry = create_proc_entry("ksyms", 0, NULL);
-	if (entry)
-		entry->proc_fops = &proc_ksyms_operations;
+	create_seq_entry("ksyms", 0, &proc_ksyms_operations);
 #endif
 	proc_root_kcore = create_proc_entry("kcore", S_IRUSR, NULL);
 	if (proc_root_kcore) {

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.apus_setup.c 1.22 10/18/01 11:16:27 trini
+ * BK Id: SCCS/s.apus_setup.c 1.24 11/13/01 21:26:07 paulus
  */
 /*
  *  linux/arch/ppc/kernel/apus_setup.c
@@ -25,6 +25,7 @@
 #include <linux/hdreg.h>
 #include <linux/blk.h>
 #include <linux/pci.h>
+#include <linux/seq_file.h>
 
 #ifdef CONFIG_APUS
 #include <asm/logging.h>
@@ -263,24 +264,20 @@ void __init apus_setup_arch(void)
 }
 
 int
-apus_get_cpuinfo(char *buffer)
+apus_show_cpuinfo(struct seq_file *m)
 {
-#ifdef CONFIG_APUS
 	extern int __map_without_bats;
 	extern unsigned long powerup_PCI_present;
-	int len;
 
-	len = sprintf(buffer, "machine\t\t: Amiga\n");
-	len += sprintf(buffer+len, "bus speed\t: %d%s", __bus_speed,
-		       (__speed_test_failed) ? " [failed]\n" : "\n");
-	len += sprintf(buffer+len, "using BATs\t: %s\n",
-		       (__map_without_bats) ? "No" : "Yes");
-	len += sprintf(buffer+len, "ram speed\t: %dns\n", 
-		       (__60nsram) ? 60 : 70);
-	len += sprintf(buffer+len, "PCI bridge\t: %s\n",
-		       (powerup_PCI_present) ? "Yes" : "No");
-	return len;
-#endif
+	seq_printf(m, "machine\t\t: Amiga\n");
+	seq_printf(m, "bus speed\t: %d%s", __bus_speed,
+		   (__speed_test_failed) ? " [failed]\n" : "\n");
+	seq_printf(m, "using BATs\t: %s\n",
+		   (__map_without_bats) ? "No" : "Yes");
+	seq_printf(m, "ram speed\t: %dns\n", (__60nsram) ? 60 : 70);
+	seq_printf(m, "PCI bridge\t: %s\n",
+		   (powerup_PCI_present) ? "Yes" : "No");
+	return 0;
 }
 
 static void get_current_tb(unsigned long long *time)
@@ -1069,8 +1066,7 @@ void platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ISA_DMA_THRESHOLD = 0x00ffffff;
 
 	ppc_md.setup_arch     = apus_setup_arch;
-	ppc_md.setup_residual = NULL;
-	ppc_md.get_cpuinfo    = apus_get_cpuinfo;
+	ppc_md.show_cpuinfo   = apus_show_cpuinfo;
 	ppc_md.irq_cannonicalize = apus_irq_cannonicalize;
 	ppc_md.init_IRQ       = apus_init_IRQ;
 	ppc_md.get_irq        = apus_get_irq;

@@ -24,7 +24,6 @@
 #include <linux/major.h>
 #include <linux/fs.h>
 #include <linux/console.h>
-#include <linux/irq.h>
 
 #include <asm/io.h>
 #include <asm/uaccess.h>

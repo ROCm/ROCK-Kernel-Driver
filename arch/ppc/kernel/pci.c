@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.pci.c 1.31 11/01/01 12:24:55 trini
+ * BK Id: SCCS/s.pci.c 1.35 11/13/01 08:19:57 trini
  */
 /*
  * Common pmac/prep/chrp pci routines. -- Cort
@@ -44,6 +44,7 @@ void pcibios_make_OF_bus_map(void);
 
 static void pcibios_fixup_resources(struct pci_dev* dev);
 static void fixup_broken_pcnet32(struct pci_dev* dev);
+static void fixup_rev1_53c810(struct pci_dev* dev);
 #ifdef CONFIG_ALL_PPC
 static void pcibios_fixup_cardbus(struct pci_dev* dev);
 static u8* pci_to_OF_bus_map;
@@ -60,14 +61,28 @@ struct pci_controller** hose_tail = &hose_head;
 static int pci_bus_count;
 
 struct pci_fixup pcibios_fixups[] = {
-	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_TRIDENT,	PCI_ANY_ID,		fixup_broken_pcnet32 },
-	{ PCI_FIXUP_HEADER,	PCI_ANY_ID,		PCI_ANY_ID,		pcibios_fixup_resources },
+	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_TRIDENT,	PCI_ANY_ID,			fixup_broken_pcnet32 },
+	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_NCR,	PCI_DEVICE_ID_NCR_53C810,	fixup_rev1_53c810 },
+	{ PCI_FIXUP_HEADER,	PCI_ANY_ID,		PCI_ANY_ID,			pcibios_fixup_resources },
 #ifdef CONFIG_ALL_PPC
 	/* We should add per-machine fixup support in xxx_setup.c or xxx_pci.c */
-	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_TI, 	PCI_DEVICE_ID_TI_1211, 	pcibios_fixup_cardbus }, 
+	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_TI,	PCI_DEVICE_ID_TI_1211,		pcibios_fixup_cardbus }, 
 #endif /* CONFIG_ALL_PPC */
  	{ 0 }
 };
+
+static void
+fixup_rev1_53c810(struct pci_dev* dev)
+{
+	/* rev 1 ncr53c810 chips don't set the class at all which means
+	 * they don't get their resources remapped. Fix that here.
+	 */
+
+	if ((dev->class == PCI_CLASS_NOT_DEFINED)) {
+		printk("NCR 53c810 rev 1 detected, setting PCI class.\n");
+		dev->class = PCI_CLASS_STORAGE_SCSI;
+	}
+}
 
 static void
 fixup_broken_pcnet32(struct pci_dev* dev)

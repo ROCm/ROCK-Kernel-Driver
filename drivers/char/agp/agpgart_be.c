@@ -1462,7 +1462,7 @@ static void intel_8xx_tlbflush(agp_memory * mem)
   pci_read_config_dword(agp_bridge.dev, INTEL_AGPCTRL, &temp);
   pci_write_config_dword(agp_bridge.dev, INTEL_AGPCTRL, temp & ~(1 << 7));
   pci_read_config_dword(agp_bridge.dev, INTEL_AGPCTRL, &temp);
-  pci_write_config_dword(agp_bridge.dev, INTEL_AGPCTRL, temp & (1 << 7));
+  pci_write_config_dword(agp_bridge.dev, INTEL_AGPCTRL, temp | (1 << 7));
 }
 
 

@@ -535,6 +535,12 @@ M:	Remy.Card@linux.org
 L:	linux-kernel@vger.kernel.org
 S:	Maintained
 
+EXT3 FILE SYSTEM
+P:	Remy Card, Stephen Tweedie
+M:	sct@redhat.com, akpm@zip.com.au, adilger@turbolinux.com
+L:	ext3-users@redhat.com
+S:	Maintained
+
 FARSYNC SYNCHRONOUS DRIVER
 P:	Bob Dunlop
 M:	rjd@xyzzy.clara.co.uk
@@ -1038,7 +1044,7 @@ S:	Maintained
 
 NETWORK DEVICE DRIVERS
 P:	Andrew Morton
-M:	andrewm@uow.edu.au
+M:	akpm@zip.com.au
 P:	Jeff Garzik
 M:	jgarzik@mandrakesoft.com
 L:	linux-net@vger.kernel.org

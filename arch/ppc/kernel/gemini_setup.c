@@ -24,6 +24,7 @@
 #include <linux/major.h>
 #include <linux/blk.h>
 #include <linux/console.h>
+#include <linux/seq_file.h>
 
 #include <asm/system.h>
 #include <asm/pgtable.h>
@@ -82,9 +83,8 @@ prom_init(void)
 }
 
 int
-gemini_get_cpuinfo(char *buffer)
+gemini_show_cpuinfo(struct seq_file *m)
 {
-	int len;
 	unsigned char reg, rev;
 	char *family;
 	unsigned int type;
@@ -100,22 +100,20 @@ gemini_get_cpuinfo(char *buffer)
 
 	reg = readb(GEMINI_BECO);
 
-	len = sprintf( buffer, "machine\t\t: Gemini %s%d, rev %c, eco %d\n", 
-		       family, type, (rev + 'A'), (reg & 0xf));
+	seq_printf(m, "machine\t\t: Gemini %s%d, rev %c, eco %d\n", 
+		   family, type, (rev + 'A'), (reg & 0xf));
 
-	len = sprintf(buffer, "board\t\t: Gemini %s", family);
+	seq_printf(m, "board\t\t: Gemini %s", family);
 	if (type > 9)
-		len += sprintf(buffer+len, "%c", (type - 10) + 'A');
+		seq_printf(m, "%c", (type - 10) + 'A');
 	else
-		len += sprintf(buffer+len, "%d", type);
+		seq_printf(m, "%d", type);
 
-	len += sprintf(buffer+len, ", rev %c, eco %d\n",
-		       (rev + 'A'), (reg & 0xf));
+	seq_printf(m, ", rev %c, eco %d\n", (rev + 'A'), (reg & 0xf));
 
-	len += sprintf(buffer+len, "clock\t\t: %dMhz\n", 
-		       gemini_get_clock_speed());
+	seq_printf(m, "clock\t\t: %dMhz\n", gemini_get_clock_speed());
 
-	return len;
+	return 0;
 }
 
 static u_char gemini_openpic_initsenses[] = {
@@ -150,11 +148,12 @@ extern char cmd_line[];
 void
 gemini_heartbeat(void)
 {
-	/* We only want to do this on 1 CPU */
-	if ( smp_processor_id() )
-		return;
 	static unsigned long led = GEMINI_LEDBASE+(4*8);
 	static char direction = 8;
+
+	/* We only want to do this on 1 CPU */
+	if (smp_processor_id())
+		return;
 	*(char *)led = 0;
 	if ( (led + direction) > (GEMINI_LEDBASE+(7*8)) ||
 	     (led + direction) < (GEMINI_LEDBASE+(4*8)) )
@@ -551,8 +550,7 @@ void __init platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 #endif
 
 	ppc_md.setup_arch = gemini_setup_arch;
-	ppc_md.setup_residual = NULL;
-	ppc_md.get_cpuinfo = gemini_get_cpuinfo;
+	ppc_md.show_cpuinfo = gemini_show_cpuinfo;
 	ppc_md.irq_cannonicalize = NULL;
 	ppc_md.init_IRQ = gemini_init_IRQ;
 	ppc_md.get_irq = openpic_get_irq;

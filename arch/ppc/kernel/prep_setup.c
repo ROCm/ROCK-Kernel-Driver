@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.prep_setup.c 1.41 10/18/01 11:16:28 trini
+ * BK Id: SCCS/s.prep_setup.c 1.44 11/13/01 21:26:07 paulus
  */
 /*
  *  linux/arch/ppc/kernel/setup.c
@@ -40,6 +40,7 @@
 #include <linux/timex.h>
 #include <linux/pci.h>
 #include <linux/ide.h>
+#include <linux/seq_file.h>
 
 #include <asm/sections.h>
 #include <asm/mmu.h>
@@ -122,107 +123,107 @@ EXPORT_SYMBOL(ppc_cs4232_dma2);
 #endif
 
 static int __prep
-prep_get_cpuinfo(char *buffer)
+prep_show_cpuinfo(struct seq_file *m)
 {
 	extern char *Motherboard_map_name;
-	int len;
+	int cachew;
 #ifdef CONFIG_PREP_RESIDUAL
 	int i;
 #endif
 
-#ifdef CONFIG_SMP
-#define CD(X)		(cpu_data[n].X)
-#else
-#define CD(X) (X)
-#endif
+	seq_printf(m, "machine\t\t: PReP %s\n", Motherboard_map_name);
 
-	len = sprintf(buffer,"machine\t\t: PReP %s\n",Motherboard_map_name);
-
-	
-	switch ( _prep_type )
-	{
+	switch ( _prep_type ) {
 	case _PREP_IBM:
-		if ((*(unsigned char *)0x8000080c) & (1<<6))
-			len += sprintf(buffer+len,"Upgrade CPU\n");
-		len += sprintf(buffer+len,"L2\t\t: ");
-		if ((*(unsigned char *)0x8000080c) & (1<<7))
-		{
-			len += sprintf(buffer+len,"not present\n");
+		cachew = inw(0x80c);
+		if (cachew & (1<<6))
+			seq_printf(m, "Upgrade CPU\n");
+		seq_printf(m, "L2\t\t: ");
+		if (cachew & (1<<7)) {
+			seq_printf(m, "not present\n");
 			goto no_l2;
 		}
-		len += sprintf(buffer+len,"%sKb,",
-				(((*(unsigned char *)0x8000080d)>>2)&1)
-					? "512" : "256");
-		len += sprintf(buffer+len,"%ssync\n",
-				((*(unsigned char *)0x8000080d)>>7) ? "" : "a");
+		seq_printf(m, "%sKb,", (cachew & (1 << 10))? "512" : "256");
+		seq_printf(m, "%ssync\n", (cachew & (1 << 15))? "" : "a");
 		break;
 	case _PREP_Motorola:
-		len += sprintf(buffer+len,"L2\t\t: ");
-		switch(*((unsigned char *)CACHECRBA) & L2CACHE_MASK)
-		{
+		cachew = *((unsigned char *)CACHECRBA);
+		seq_printf(m, "L2\t\t: ");
+		switch (cachew & L2CACHE_MASK) {
 		case L2CACHE_512KB:
-			len += sprintf(buffer+len,"512Kb");
+			seq_printf(m, "512Kb");
 			break;
 		case L2CACHE_256KB:
-			len += sprintf(buffer+len,"256Kb");
+			seq_printf(m, "256Kb");
 			break;
 		case L2CACHE_1MB:
-			len += sprintf(buffer+len,"1MB");
+			seq_printf(m, "1MB");
 			break;
 		case L2CACHE_NONE:
-			len += sprintf(buffer+len,"none\n");
+			seq_printf(m, "none\n");
 			goto no_l2;
 			break;
 		default:
-			len += sprintf(buffer+len, "%x\n",
-					*((unsigned char *)CACHECRBA));
+			seq_printf(m, "%x\n", cachew);
 		}
 		
-		len += sprintf(buffer+len,",parity %s",
-				(*((unsigned char *)CACHECRBA) & L2CACHE_PARITY)
-				? "enabled" : "disabled");
+		seq_printf(m, ", parity %s",
+			   (cachew & L2CACHE_PARITY)? "enabled" : "disabled");
 
-		len += sprintf(buffer+len, " SRAM:");
+		seq_printf(m, " SRAM:");
 		
-		switch ( ((*((unsigned char *)CACHECRBA) & 0xf0) >> 4) & ~(0x3) )
-		{
-		case 1: len += sprintf(buffer+len,
-					"synchronous,parity,flow-through\n");
+		switch ( ((cachew & 0xf0) >> 4) & ~(0x3) ) {
+		case 1: seq_printf(m, "synchronous,parity,flow-through\n");
 			break;
-		case 2: len += sprintf(buffer+len,"asynchronous,no parity\n");
+		case 2: seq_printf(m, "asynchronous,no parity\n");
 			break;
-		case 3: len += sprintf(buffer+len,"asynchronous,parity\n");
+		case 3: seq_printf(m, "asynchronous,parity\n");
 			break;
-		default:len += sprintf(buffer+len,
-					"synchronous,pipelined,no parity\n");
+		default:seq_printf(m, "synchronous,pipelined,no parity\n");
 			break;
 		}
 		break;
 	default:
 		break;
 	}
-	
-	
+
 no_l2:
-#ifndef CONFIG_PREP_RESIDUAL
-	return len;
-#else	
-	if ( res->ResidualLength == 0 )
-		return len;
-	
-	/* print info about SIMMs */
-	len += sprintf(buffer+len,"simms\t\t: ");
-	for ( i = 0 ; (res->ActualNumMemories) && (i < MAX_MEMS) ; i++ )
-	{
-		if ( res->Memories[i].SIMMSize != 0 )
-			len += sprintf(buffer+len,"%d:%ldM ", i,
+#ifdef CONFIG_PREP_RESIDUAL
+	if (res->ResidualLength == 0) {
+		/* print info about SIMMs */
+		seq_printf(m, "simms\t\t: ");
+		for (i = 0; (res->ActualNumMemories) && (i < MAX_MEMS); i++) {
+			if (res->Memories[i].SIMMSize != 0)
+				seq_printf(m, "%d:%ldM ", i,
 					(res->Memories[i].SIMMSize > 1024) ? 
 					res->Memories[i].SIMMSize>>20 : 
 					res->Memories[i].SIMMSize);
+		}
+		seq_printf(m, "\n");
 	}
-	len += sprintf(buffer+len,"\n");
-	return len;
 #endif
+
+	return 0;
+}
+
+static int __prep
+prep_show_percpuinfo(struct seq_file *m, int i)
+{
+	int len = 0;
+
+	/* PREP's without residual data will give incorrect values here */
+	seq_printf(m, "clock\t\t: ");
+#ifdef CONFIG_PREP_RESIDUAL	
+	if (res->ResidualLength)
+		seq_printf(m, "%ldMHz\n",
+			   (res->VitalProductData.ProcessorHz > 1024) ?
+			   res->VitalProductData.ProcessorHz>>20 :
+			   res->VitalProductData.ProcessorHz);
+	else
+#endif /* CONFIG_PREP_RESIDUAL */
+		seq_printf(m, "???\n");
+
+	return 0;
 }
 
 static void __init
@@ -628,26 +629,6 @@ prep_power_off(void)
 	}
 }
 
-static int __prep
-prep_setup_residual(char *buffer)
-{
-	int len = 0;
-
-	/* PREP's without residual data will give incorrect values here */
-	len += sprintf(len+buffer, "clock\t\t: ");
-#ifdef CONFIG_PREP_RESIDUAL	
-	if ( res->ResidualLength )
-		len += sprintf(len+buffer, "%ldMHz\n",
-			 (res->VitalProductData.ProcessorHz > 1024) ?
-			 res->VitalProductData.ProcessorHz>>20 :
-			res->VitalProductData.ProcessorHz);
-	else
-#endif /* CONFIG_PREP_RESIDUAL */
-		len += sprintf(len+buffer, "???\n");
-
-	return len;
-}
-
 static unsigned int __prep
 prep_irq_cannonicalize(u_int irq)
 {
@@ -852,11 +833,8 @@ prep_init(unsigned long r3, unsigned long r4, unsigned long r5,
 		unsigned long r6, unsigned long r7)
 {
 #ifdef CONFIG_PREP_RESIDUAL	
-	RESIDUAL *old_res = (RESIDUAL *)(r3 + KERNELBASE);
-
 	/* make a copy of residual data */
-	if ( r3 )
-	{
+	if ( r3 ) {
 		memcpy((void *)res,(void *)(r3+KERNELBASE),
 			 sizeof(RESIDUAL));
 	}
@@ -900,8 +878,8 @@ prep_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	}
 
 	ppc_md.setup_arch     = prep_setup_arch;
-	ppc_md.setup_residual = prep_setup_residual;
-	ppc_md.get_cpuinfo    = prep_get_cpuinfo;
+	ppc_md.show_percpuinfo = prep_show_percpuinfo;
+	ppc_md.show_cpuinfo   = prep_show_cpuinfo;
 	ppc_md.irq_cannonicalize = prep_irq_cannonicalize;
 	ppc_md.init_IRQ       = prep_init_IRQ;
 	/* this gets changed later on if we have an OpenPIC -- Cort */

@@ -109,12 +109,12 @@ typedef struct __wait_queue_head wait_queue_head_t;
 	} while (0)
 #define WQ_CHECK_LIST_HEAD(list) 						\
 	do {									\
-		if (!list->next || !list->prev)					\
+		if (!(list)->next || !(list)->prev)				\
 			WQ_BUG();						\
 	} while(0)
 #define WQ_NOTE_WAKER(tsk)							\
 	do {									\
-		tsk->__waker = (long)__builtin_return_address(0);		\
+		(tsk)->__waker = (long)__builtin_return_address(0);		\
 	} while (0)
 #else
 #define WQ_BUG()

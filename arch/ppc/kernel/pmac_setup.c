@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.pmac_setup.c 1.41 10/18/01 11:16:28 trini
+ * BK Id: SCCS/s.pmac_setup.c 1.43 11/13/01 21:26:07 paulus
  */
 /*
  *  linux/arch/ppc/kernel/setup.c
@@ -49,6 +49,7 @@
 #include <linux/adb.h>
 #include <linux/cuda.h>
 #include <linux/pmu.h>
+#include <linux/seq_file.h>
 
 #include <asm/processor.h>
 #include <asm/sections.h>
@@ -157,36 +158,56 @@ core99_init_l2(void)
 }
 #endif /* CONFIG_SMP */
 
-int __pmac
-pmac_get_cpuinfo(char *buffer)
+/*
+ * Assume here that all clock rates are the same in a
+ * smp system.  -- Cort
+ */
+int __openfirmware
+of_show_percpuinfo(struct seq_file *m, int i)
 {
-	int len;
+	struct device_node *cpu_node;
+	int *fp, s;
+			
+	cpu_node = find_type_devices("cpu");
+	if (!cpu_node)
+		return 0;
+	for (s = 0; s < i && cpu_node->next; s++)
+		cpu_node = cpu_node->next;
+	fp = (int *) get_property(cpu_node, "clock-frequency", NULL);
+	if (fp)
+		seq_printf(m, "clock\t\t: %dMHz\n", *fp / 1000000);
+	return 0;
+}
+
+int __pmac
+pmac_show_cpuinfo(struct seq_file *m)
+{
 	struct device_node *np;
 	char *pp;
 	int plen;
 
 	/* find motherboard type */
-	len = sprintf(buffer, "machine\t\t: ");
+	seq_printf(m, "machine\t\t: ");
 	np = find_devices("device-tree");
 	if (np != NULL) {
 		pp = (char *) get_property(np, "model", NULL);
 		if (pp != NULL)
-			len += sprintf(buffer+len, "%s\n", pp);
+			seq_printf(m, "%s\n", pp);
 		else
-			len += sprintf(buffer+len, "PowerMac\n");
+			seq_printf(m, "PowerMac\n");
 		pp = (char *) get_property(np, "compatible", &plen);
 		if (pp != NULL) {
-			len += sprintf(buffer+len, "motherboard\t:");
+			seq_printf(m, "motherboard\t:");
 			while (plen > 0) {
 				int l = strlen(pp) + 1;
-				len += sprintf(buffer+len, " %s", pp);
+				seq_printf(m, " %s", pp);
 				plen -= l;
 				pp += l;
 			}
-			buffer[len++] = '\n';
+			seq_printf(m, "\n");
 		}
 	} else
-		len += sprintf(buffer+len, "PowerMac\n");
+		seq_printf(m, "PowerMac\n");
 
 	/* find l2 cache info */
 	np = find_devices("l2-cache");
@@ -197,22 +218,21 @@ pmac_get_cpuinfo(char *buffer)
 			get_property(np, "i-cache-size", NULL);
 		unsigned int *dc = (unsigned int *)
 			get_property(np, "d-cache-size", NULL);
-		len += sprintf(buffer+len, "L2 cache\t:");
+		seq_printf(m, "L2 cache\t:");
 		has_l2cache = 1;
 		if (get_property(np, "cache-unified", NULL) != 0 && dc) {
-			len += sprintf(buffer+len, " %dK unified", *dc / 1024);
+			seq_printf(m, " %dK unified", *dc / 1024);
 		} else {
 			if (ic)
-				len += sprintf(buffer+len, " %dK instruction",
-					       *ic / 1024);
+				seq_printf(m, " %dK instruction", *ic / 1024);
 			if (dc)
-				len += sprintf(buffer+len, "%s %dK data",
-					       (ic? " +": ""), *dc / 1024);
+				seq_printf(m, "%s %dK data",
+					   (ic? " +": ""), *dc / 1024);
 		}
 		pp = get_property(np, "ram-type", NULL);
 		if (pp)
-			len += sprintf(buffer+len, " %s", pp);
-		buffer[len++] = '\n';
+			seq_printf(m, " %s", pp);
+		seq_printf(m, "\n");
 	}
 
 	/* find ram info */
@@ -227,8 +247,7 @@ pmac_get_cpuinfo(char *buffer)
 
 			for (n /= sizeof(struct reg_property); n > 0; --n)
 				total += (reg++)->size;
-			len += sprintf(buffer+len, "memory\t\t: %luMB\n",
-				       total >> 20);
+			seq_printf(m, "memory\t\t: %luMB\n", total >> 20);
 		}
 	}
 
@@ -240,16 +259,16 @@ pmac_get_cpuinfo(char *buffer)
 		unsigned int *l2cr = (unsigned int *)
 			get_property(np, "l2cr-value", NULL);
 		if (l2cr != 0) {
-			len += sprintf(buffer+len, "l2cr override\t: 0x%x\n", *l2cr);
+			seq_printf(m, "l2cr override\t: 0x%x\n", *l2cr);
 		}
 	}
 	
 	/* Indicate newworld/oldworld */
-	len += sprintf(buffer+len, "pmac-generation\t: %s\n",
-		pmac_newworld ? "NewWorld" : "OldWorld");		
+	seq_printf(m, "pmac-generation\t: %s\n",
+		   pmac_newworld ? "NewWorld" : "OldWorld");
 	
 
-	return len;
+	return 0;
 }
 
 #ifdef CONFIG_SCSI
@@ -765,8 +784,8 @@ pmac_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	DMA_MODE_WRITE = 2;
 
 	ppc_md.setup_arch     = pmac_setup_arch;
-	ppc_md.setup_residual = NULL;
-	ppc_md.get_cpuinfo    = pmac_get_cpuinfo;
+	ppc_md.show_cpuinfo   = pmac_show_cpuinfo;
+	ppc_md.show_percpuinfo = of_show_percpuinfo;
 	ppc_md.irq_cannonicalize = NULL;
 	ppc_md.init_IRQ       = pmac_pic_init;
 	ppc_md.get_irq        = pmac_get_irq; /* Changed later on ... */

@@ -1,4 +1,4 @@
-# BK Id: SCCS/s.config.in 1.43 10/16/01 15:18:50 trini
+# BK Id: SCCS/s.config.in 1.45 11/08/01 07:57:40 paulus
 #
 # For a description of the syntax of this configuration file,
 # see Documentation/kbuild/config-language.txt.
@@ -6,6 +6,7 @@
 define_bool CONFIG_UID16 n
 define_bool CONFIG_RWSEM_GENERIC_SPINLOCK n
 define_bool CONFIG_RWSEM_XCHGADD_ALGORITHM y
+define_bool CONFIG_HAVE_DEC_LOCK y
 
 mainmenu_name "Linux/PowerPC Kernel Configuration"
 

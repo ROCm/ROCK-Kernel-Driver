@@ -73,13 +73,13 @@ ssize_t seq_read(struct file *file, char *buf, size_t size, loff_t *ppos)
 		buf += n;
 		copied += n;
 		if (!m->count)
-			(*ppos)++;
+			m->index++;
 		if (!size)
 			goto Done;
 	}
 	/* we need at least one record in buffer */
 	while (1) {
-		pos = *ppos;
+		pos = m->index;
 		p = m->op->start(m, &pos);
 		err = PTR_ERR(p);
 		if (!p || IS_ERR(p))
@@ -125,10 +125,12 @@ Fill:
 		m->from = n;
 	else
 		pos++;
-	*ppos = pos;
+	m->index = pos;
 Done:
 	if (!copied)
 		copied = err;
+	else
+		*ppos += copied;
 	up(&m->sem);
 	return copied;
 Enomem:
@@ -137,6 +139,54 @@ Enomem:
 Efault:
 	err = -EFAULT;
 	goto Done;
+}
+
+static int traverse(struct seq_file *m, loff_t offset)
+{
+	loff_t pos = 0;
+	int error = 0;
+	void *p;
+
+	m->index = 0;
+	m->count = m->from = 0;
+	if (!offset)
+		return 0;
+	if (!m->buf) {
+		m->buf = kmalloc(m->size = PAGE_SIZE, GFP_KERNEL);
+		if (!m->buf)
+			return -ENOMEM;
+	}
+	p = m->op->start(m, &m->index);
+	while (p) {
+		error = PTR_ERR(p);
+		if (IS_ERR(p))
+			break;
+		error = m->op->show(m, p);
+		if (error)
+			break;
+		if (m->count == m->size)
+			goto Eoverflow;
+		if (pos + m->count > offset) {
+			m->from = offset - pos;
+			m->count -= m->from;
+			break;
+		}
+		pos += m->count;
+		m->count = 0;
+		if (pos == offset) {
+			m->index++;
+			break;
+		}
+		p = m->op->next(m, p, &m->index);
+	}
+	m->op->stop(m, p);
+	return error;
+
+Eoverflow:
+	m->op->stop(m, p);
+	kfree(m->buf);
+	m->buf = kmalloc(m->size <<= 1, GFP_KERNEL);
+	return !m->buf ? -ENOMEM : -EAGAIN;
 }
 
 /**
@@ -157,11 +207,19 @@ loff_t seq_lseek(struct file *file, loff_t offset, int origin)
 		case 0:
 			if (offset < 0)
 				break;
-			if (offset != file->f_pos) {
-				file->f_pos = offset;
-				m->count = 0;
-			}
 			retval = offset;
+			if (offset != file->f_pos) {
+				while ((retval=traverse(m, offset)) == -EAGAIN)
+					;
+				if (retval) {
+					/* with extreme perjudice... */
+					file->f_pos = 0;
+					m->index = 0;
+					m->count = 0;
+				} else {
+					retval = file->f_pos = offset;
+				}
+			}
 	}
 	up(&m->sem);
 	return retval;

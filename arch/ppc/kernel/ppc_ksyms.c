@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.ppc_ksyms.c 1.57 10/16/01 15:58:42 trini
+ * BK Id: SCCS/s.ppc_ksyms.c 1.59 11/04/01 22:58:20 paulus
  */
 #include <linux/config.h>
 #include <linux/module.h>
@@ -58,6 +58,7 @@
 /* Tell string.h we don't want memcpy etc. as cpp defines */
 #define EXPORT_SYMTAB_STROPS
 
+extern void ppc_generic_ide_fix_driveid(struct hd_driveid *id);
 extern void transfer_to_handler(void);
 extern void syscall_trace(void);
 extern void do_IRQ(struct pt_regs *regs);
@@ -167,6 +168,7 @@ EXPORT_SYMBOL(iopa);
 EXPORT_SYMBOL(mm_ptov);
 
 EXPORT_SYMBOL(ppc_ide_md);
+EXPORT_SYMBOL(ppc_generic_ide_fix_driveid);
 
 #ifdef CONFIG_PCI
 EXPORT_SYMBOL_NOVERS(isa_io_base);

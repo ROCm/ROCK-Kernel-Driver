@@ -1064,8 +1064,6 @@ show_cpuinfo(struct seq_file *f, void *slot)
 	char *sysvariation_name;
 	int nr_processors;
 
-	if (!cpu)
-		return 1;
 	cpu_index = (unsigned) (cpu->type - 1);
 	cpu_name = "Unknown";
 	if (cpu_index < N(cpu_names))

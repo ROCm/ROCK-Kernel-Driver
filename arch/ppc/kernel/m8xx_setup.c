@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.m8xx_setup.c 1.38 10/18/01 11:16:28 trini
+ * BK Id: SCCS/s.m8xx_setup.c 1.40 11/13/01 21:26:07 paulus
  *
  *  linux/arch/ppc/kernel/setup.c
  *
@@ -33,6 +33,7 @@
 #include <linux/blk.h>
 #include <linux/ioport.h>
 #include <linux/bootmem.h>
+#include <linux/seq_file.h>
 
 #include <asm/mmu.h>
 #include <asm/processor.h>
@@ -240,19 +241,18 @@ m8xx_halt(void)
 
 
 static int
-m8xx_setup_residual(char *buffer)
+m8xx_show_percpuinfo(struct seq_file *m, int i)
 {
-        int     len = 0;
 	bd_t	*bp;
 
 	bp = (bd_t *)__res;
 			
-	len += sprintf(len+buffer,"clock\t\t: %ldMHz\n"
-		       "bus clock\t: %ldMHz\n",
-		       bp->bi_intfreq / 1000000,
-		       bp->bi_busfreq / 1000000);
+	seq_printf(m, "clock\t\t: %ldMHz\n"
+		   "bus clock\t: %ldMHz\n",
+		   bp->bi_intfreq / 1000000,
+		   bp->bi_busfreq / 1000000);
 
-	return len;
+	return 0;
 }
 
 /* Initialize the internal interrupt controller.  The number of
@@ -372,8 +372,7 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	}
 
 	ppc_md.setup_arch		= m8xx_setup_arch;
-	ppc_md.setup_residual		= m8xx_setup_residual;
-	ppc_md.get_cpuinfo		= NULL;
+	ppc_md.show_percpuinfo		= m8xx_show_percpuinfo;
 	ppc_md.irq_cannonicalize	= NULL;
 	ppc_md.init_IRQ			= m8xx_init_IRQ;
 	ppc_md.get_irq			= m8xx_get_irq;
