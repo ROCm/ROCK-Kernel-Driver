@@ -31,7 +31,7 @@ unsigned char llc_station_mac_sa[ETH_ALEN];
  *
  *	Allocates and initializes sap.
  */
-struct llc_sap *llc_sap_alloc(void)
+static struct llc_sap *llc_sap_alloc(void)
 {
 	struct llc_sap *sap = kmalloc(sizeof(*sap), GFP_ATOMIC);
 
@@ -50,7 +50,7 @@ struct llc_sap *llc_sap_alloc(void)
  *
  *	Adds a sap to the LLC's station sap list.
  */
-void llc_add_sap(struct llc_sap *sap)
+static void llc_add_sap(struct llc_sap *sap)
 {
 	write_lock_bh(&llc_sap_list_lock);
 	list_add_tail(&sap->node, &llc_sap_list);
@@ -63,7 +63,7 @@ void llc_add_sap(struct llc_sap *sap)
  *
  *	Removes a sap to the LLC's station sap list.
  */
-void llc_del_sap(struct llc_sap *sap)
+static void llc_del_sap(struct llc_sap *sap)
 {
 	write_lock_bh(&llc_sap_list_lock);
 	list_del(&sap->node);
@@ -169,7 +169,6 @@ module_exit(llc_exit);
 
 EXPORT_SYMBOL(llc_station_mac_sa);
 EXPORT_SYMBOL(llc_sap_list);
-EXPORT_SYMBOL(llc_sap_list_lock);
 EXPORT_SYMBOL(llc_sap_find);
 EXPORT_SYMBOL(llc_sap_open);
 EXPORT_SYMBOL(llc_sap_close);
