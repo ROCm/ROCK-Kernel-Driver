@@ -1,5 +1,5 @@
 /*
- *  acpi_ec.c - ACPI Embedded Controller Driver ($Revision: 35 $)
+ *  acpi_ec.c - ACPI Embedded Controller Driver ($Revision: 38 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -62,15 +62,15 @@ static int acpi_ec_start (struct acpi_device *device);
 static int acpi_ec_stop (struct acpi_device *device, int type);
 
 static struct acpi_driver acpi_ec_driver = {
-	name:			ACPI_EC_DRIVER_NAME,
-	class:			ACPI_EC_CLASS,
-	ids:			ACPI_EC_HID,
-	ops:			{
-					add:	acpi_ec_add,
-					remove:	acpi_ec_remove,
-					start:	acpi_ec_start,
-					stop:	acpi_ec_stop,
-				},
+	.name =		ACPI_EC_DRIVER_NAME,
+	.class =	ACPI_EC_CLASS,
+	.ids =		ACPI_EC_HID,
+	.ops =		{
+				.add =		acpi_ec_add,
+				.remove =	acpi_ec_remove,
+				.start =	acpi_ec_start,
+				.stop =		acpi_ec_stop,
+			},
 };
 
 struct acpi_ec {
@@ -398,7 +398,7 @@ acpi_ec_space_handler (
 {
 	int			result = 0;
 	struct acpi_ec		*ec = NULL;
-	u32          		tmp = 0;
+	u32			temp = 0;
 
 	ACPI_FUNCTION_TRACE("acpi_ec_space_handler");
 
@@ -409,8 +409,8 @@ acpi_ec_space_handler (
 
 	switch (function) {
 	case ACPI_READ:
-		result = acpi_ec_read(ec, (u8) address, &tmp);
-		*value = (acpi_integer) tmp;
+		result = acpi_ec_read(ec, (u8) address, &temp);
+		*value = (acpi_integer) temp;
 		break;
 	case ACPI_WRITE:
 		result = acpi_ec_write(ec, (u8) address, (u8) *value);

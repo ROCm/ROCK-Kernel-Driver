@@ -1,5 +1,5 @@
 /*
- *  acpi_power.c - ACPI Bus Power Management ($Revision: 38 $)
+ *  acpi_power.c - ACPI Bus Power Management ($Revision: 39 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -43,13 +43,13 @@ int acpi_power_add (struct acpi_device *device);
 int acpi_power_remove (struct acpi_device *device, int type);
 
 static struct acpi_driver acpi_power_driver = {
-	name:			ACPI_POWER_DRIVER_NAME,
-	class:			ACPI_POWER_CLASS,
-	ids:			ACPI_POWER_HID,
-	ops:			{
-					add:	acpi_power_add,
-					remove:	acpi_power_remove,
-				},
+	.name =		ACPI_POWER_DRIVER_NAME,
+	.class =	ACPI_POWER_CLASS,
+	.ids =		ACPI_POWER_HID,
+	.ops =		{
+				.add =		acpi_power_add,
+				.remove =	acpi_power_remove,
+			},
 };
 
 struct acpi_power_resource

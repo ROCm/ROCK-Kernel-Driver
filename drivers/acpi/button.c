@@ -1,5 +1,5 @@
 /*
- *  acpi_button.c - ACPI Button Driver ($Revision: 29 $)
+ *  acpi_button.c - ACPI Button Driver ($Revision: 30 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -47,13 +47,13 @@ int acpi_button_add (struct acpi_device *device);
 int acpi_button_remove (struct acpi_device *device, int type);
 
 static struct acpi_driver acpi_button_driver = {
-	name:			ACPI_BUTTON_DRIVER_NAME,
-	class:			ACPI_BUTTON_CLASS,
-	ids:			"ACPI_FPB,ACPI_FSB,PNP0C0D,PNP0C0C,PNP0C0E",
-	ops:			{
-					add:	acpi_button_add,
-					remove:	acpi_button_remove,
-				},
+	.name =		ACPI_BUTTON_DRIVER_NAME,
+	.class =	ACPI_BUTTON_CLASS,
+	.ids =		"ACPI_FPB,ACPI_FSB,PNP0C0D,PNP0C0C,PNP0C0E",
+	.ops =		{
+				.add =		acpi_button_add,
+				.remove =	acpi_button_remove,
+			},
 };
 
 struct acpi_button {

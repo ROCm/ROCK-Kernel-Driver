@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tbrsdt - ACPI RSDT table utilities
- *              $Revision: 1 $
+ *              $Revision: 2 $
  *
  *****************************************************************************/
 
@@ -270,12 +270,6 @@ acpi_tb_get_table_rsdt (
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
 	}
-
-	/*
-	 * Valid RSDT signature, verify the checksum.  If it fails, just
-	 * print a warning and ignore it.
-	 */
-	status = acpi_tb_verify_table_checksum (table_info.pointer);
 
 	/* Get the number of tables defined in the RSDT or XSDT */
 

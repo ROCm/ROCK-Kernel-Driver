@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dsutils - Dispatcher utilities
- *              $Revision: 93 $
+ *              $Revision: 94 $
  *
  ******************************************************************************/
 
@@ -35,6 +35,7 @@
 #define _COMPONENT          ACPI_DISPATCHER
 	 ACPI_MODULE_NAME    ("dsutils")
 
+#ifndef ACPI_NO_METHOD_EXECUTION
 
 /*******************************************************************************
  *
@@ -233,6 +234,47 @@ acpi_ds_delete_result_if_not_used (
 
 	return_VOID;
 }
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_ds_resolve_operands
+ *
+ * PARAMETERS:  Walk_state          - Current walk state with operands on stack
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Resolve all operands to their values.  Used to prepare
+ *              arguments to a control method invocation (a call from one
+ *              method to another.)
+ *
+ ******************************************************************************/
+
+acpi_status
+acpi_ds_resolve_operands (
+	acpi_walk_state         *walk_state)
+{
+	u32                     i;
+	acpi_status             status = AE_OK;
+
+
+	ACPI_FUNCTION_TRACE_PTR ("Ds_resolve_operands", walk_state);
+
+
+	/*
+	 * Attempt to resolve each of the valid operands
+	 * Method arguments are passed by value, not by reference
+	 */
+	for (i = 0; i < walk_state->num_operands; i++) {
+		status = acpi_ex_resolve_to_value (&walk_state->operands[i], walk_state);
+		if (ACPI_FAILURE (status)) {
+			break;
+		}
+	}
+
+	return_ACPI_STATUS (status);
+}
+#endif
 
 
 /*******************************************************************************
@@ -514,43 +556,4 @@ cleanup:
 	return_ACPI_STATUS (status);
 }
 
-
-/*******************************************************************************
- *
- * FUNCTION:    Acpi_ds_resolve_operands
- *
- * PARAMETERS:  Walk_state          - Current walk state with operands on stack
- *
- * RETURN:      Status
- *
- * DESCRIPTION: Resolve all operands to their values.  Used to prepare
- *              arguments to a control method invocation (a call from one
- *              method to another.)
- *
- ******************************************************************************/
-
-acpi_status
-acpi_ds_resolve_operands (
-	acpi_walk_state         *walk_state)
-{
-	u32                     i;
-	acpi_status             status = AE_OK;
-
-
-	ACPI_FUNCTION_TRACE_PTR ("Ds_resolve_operands", walk_state);
-
-
-	/*
-	 * Attempt to resolve each of the valid operands
-	 * Method arguments are passed by value, not by reference
-	 */
-	for (i = 0; i < walk_state->num_operands; i++) {
-		status = acpi_ex_resolve_to_value (&walk_state->operands[i], walk_state);
-		if (ACPI_FAILURE (status)) {
-			break;
-		}
-	}
-
-	return_ACPI_STATUS (status);
-}
 

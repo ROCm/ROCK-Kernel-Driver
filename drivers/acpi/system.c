@@ -1,5 +1,5 @@
 /*
- *  acpi_system.c - ACPI System Driver ($Revision: 60 $)
+ *  acpi_system.c - ACPI System Driver ($Revision: 63 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -63,13 +63,13 @@ static int acpi_system_add (struct acpi_device *device);
 static int acpi_system_remove (struct acpi_device *device, int type);
 
 static struct acpi_driver acpi_system_driver = {
-	name:			ACPI_SYSTEM_DRIVER_NAME,
-	class:			ACPI_SYSTEM_CLASS,
-	ids:			ACPI_SYSTEM_HID,
-	ops:			{
-					add:	acpi_system_add,
-					remove:	acpi_system_remove
-				},
+	.name =		ACPI_SYSTEM_DRIVER_NAME,
+	.class =	ACPI_SYSTEM_CLASS,
+	.ids =		ACPI_SYSTEM_HID,
+	.ops =		{
+				.add =		acpi_system_add,
+				.remove =	acpi_system_remove
+			},
 };
 
 struct acpi_system
@@ -383,10 +383,10 @@ static unsigned int acpi_system_poll_event(struct file *file, poll_table *wait);
 
 
 static struct file_operations acpi_system_event_ops = {
-	open:		acpi_system_open_event,
-	read:		acpi_system_read_event,
-	release:	acpi_system_close_event,
-	poll:		acpi_system_poll_event,
+	.open =		acpi_system_open_event,
+	.read =		acpi_system_read_event,
+	.release =	acpi_system_close_event,
+	.poll =		acpi_system_poll_event,
 };
 
 static int
@@ -479,7 +479,7 @@ acpi_system_poll_event(
 static ssize_t acpi_system_read_dsdt (struct file*, char*, size_t, loff_t*);
 
 static struct file_operations acpi_system_dsdt_ops = {
-	read:			acpi_system_read_dsdt,
+	.read =			acpi_system_read_dsdt,
 };
 
 static ssize_t
@@ -522,7 +522,7 @@ acpi_system_read_dsdt (
 static ssize_t acpi_system_read_fadt (struct file*, char*, size_t, loff_t*);
 
 static struct file_operations acpi_system_fadt_ops = {
-	read:			acpi_system_read_fadt,
+	.read =			acpi_system_read_fadt,
 };
 
 static ssize_t
@@ -1165,15 +1165,15 @@ acpi_system_remove_fs (
 
 /* Simple wrapper calling power down function. */
 static void acpi_sysrq_power_off(int key, struct pt_regs *pt_regs,
-				 struct tty_struct *tty)
+	struct tty_struct *tty)
 {
 	acpi_power_off();
 }
 
 struct sysrq_key_op sysrq_acpi_poweroff_op = {
-	handler:	&acpi_sysrq_power_off,
-	help_msg:	"Off",
-	action_msg:	"Power Off\n"
+	.handler =	&acpi_sysrq_power_off,
+	.help_msg =	"Off",
+	.action_msg =	"Power Off\n"
 };
 
 #endif  /* CONFIG_MAGIC_SYSRQ */

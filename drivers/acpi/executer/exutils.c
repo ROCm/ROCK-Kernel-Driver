@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exutils - interpreter/scanner utilities
- *              $Revision: 100 $
+ *              $Revision: 102 $
  *
  *****************************************************************************/
 
@@ -49,6 +49,34 @@
 #define _COMPONENT          ACPI_EXECUTER
 	 ACPI_MODULE_NAME    ("exutils")
 
+
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_ex_validate_object_type
+ *
+ * PARAMETERS:  Type            Object type to validate
+ *
+ * DESCRIPTION: Determine if a type is a valid ACPI object type
+ *
+ ******************************************************************************/
+
+u8
+acpi_ex_validate_object_type (
+	acpi_object_type        type)
+{
+
+	ACPI_FUNCTION_ENTRY ();
+
+
+	if ((type > ACPI_TYPE_MAX && type < INTERNAL_TYPE_BEGIN) ||
+		(type > INTERNAL_TYPE_MAX)) {
+		return (FALSE);
+	}
+
+	return (TRUE);
+}
+
+#ifndef ACPI_NO_METHOD_EXECUTION
 
 /*******************************************************************************
  *
@@ -113,33 +141,6 @@ acpi_ex_exit_interpreter (void)
 	}
 
 	return_VOID;
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    Acpi_ex_validate_object_type
- *
- * PARAMETERS:  Type            Object type to validate
- *
- * DESCRIPTION: Determine if a type is a valid ACPI object type
- *
- ******************************************************************************/
-
-u8
-acpi_ex_validate_object_type (
-	acpi_object_type        type)
-{
-
-	ACPI_FUNCTION_ENTRY ();
-
-
-	if ((type > ACPI_TYPE_MAX && type < INTERNAL_TYPE_BEGIN) ||
-		(type > INTERNAL_TYPE_MAX)) {
-		return (FALSE);
-	}
-
-	return (TRUE);
 }
 
 
@@ -263,6 +264,8 @@ acpi_ex_release_global_lock (
 			ACPI_REPORT_ERROR (("Could not release ACPI Global Lock\n"));
 		}
 	}
+
+	return_VOID;
 }
 
 
@@ -378,4 +381,4 @@ acpi_ex_unsigned_integer_to_string (
 	}
 }
 
-
+#endif
