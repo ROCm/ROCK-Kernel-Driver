@@ -13,7 +13,7 @@
 extern struct sn_irq_info **sn_irq;
 
 #define SN_PCIDEV_INFO(pci_dev) \
-        ((struct pcidev_info *)((pci_dev)->sysdata))
+        ((struct pcidev_info *)(pci_dev)->sysdata)
 
 /*
  * Given a pci_bus, return the sn pcibus_bussoft struct.  Note that
@@ -47,5 +47,8 @@ struct pcidev_info {
 
 	struct sn_irq_info	*pdi_sn_irq_info;
 };
+
+extern void sn_irq_fixup(struct pci_dev *pci_dev,
+			 struct sn_irq_info *sn_irq_info);
 
 #endif				/* _ASM_IA64_SN_PCI_PCIDEV_H */

@@ -27,7 +27,7 @@ void *sn_io_addr(unsigned long port)
 	if (!IS_RUNNING_ON_SIMULATOR()) {
 		/* On sn2, legacy I/O ports don't point at anything */
 		if (port < (64 * 1024))
-			return 0;
+			return NULL;
 		return ((void *)(port | __IA64_UNCACHED_OFFSET));
 	} else {
 		/* but the simulator uses them... */
@@ -41,9 +41,8 @@ void *sn_io_addr(unsigned long port)
 		 */
 		if ((port >= 0x1f0 && port <= 0x1f7) ||
 		    port == 0x3f6 || port == 0x3f7) {
-			io_base =
-			    (0xc000000fcc000000 |
-			     ((unsigned long)get_nasid() << 38));
+			io_base = (0xc000000fcc000000UL |
+				   ((unsigned long)get_nasid() << 38));
 			addr = io_base | ((port >> 2) << 12) | (port & 0xfff);
 		} else {
 			addr = __ia64_get_io_port_base() | ((port >> 2) << 2);
@@ -69,11 +68,10 @@ EXPORT_SYMBOL(sn_io_addr);
  */
 void sn_mmiob(void)
 {
-	while ((((volatile unsigned long)(*pda->
-					  pio_write_status_addr)) &
+	while ((((volatile unsigned long)(*pda->pio_write_status_addr)) &
 		SH_PIO_WRITE_STATUS_0_PENDING_WRITE_COUNT_MASK) !=
 	       SH_PIO_WRITE_STATUS_0_PENDING_WRITE_COUNT_MASK)
-		udelay(1);
+		cpu_relax();
 }
 
 EXPORT_SYMBOL(sn_mmiob);

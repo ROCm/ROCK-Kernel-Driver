@@ -119,6 +119,14 @@ static int __devinit cpu_to_phys_group(int cpu)
  */
 static DEFINE_PER_CPU(struct sched_domain, node_domains);
 static struct sched_group *sched_group_nodes[MAX_NUMNODES];
+
+static DEFINE_PER_CPU(struct sched_domain, allnodes_domains);
+static struct sched_group sched_group_allnodes[MAX_NUMNODES];
+
+static int __devinit cpu_to_allnodes_group(int cpu)
+{
+	return cpu_to_node(cpu);
+}
 #endif
 
 /*
@@ -149,9 +157,21 @@ void __devinit arch_init_sched_domains(void)
 		cpus_and(nodemask, nodemask, cpu_default_map);
 
 #ifdef CONFIG_NUMA
+		if (num_online_cpus()
+				> SD_NODES_PER_DOMAIN*cpus_weight(nodemask)) {
+			sd = &per_cpu(allnodes_domains, i);
+			*sd = SD_ALLNODES_INIT;
+			sd->span = cpu_default_map;
+			group = cpu_to_allnodes_group(i);
+			sd->groups = &sched_group_allnodes[group];
+			p = sd;
+		} else
+			p = NULL;
+
 		sd = &per_cpu(node_domains, i);
 		*sd = SD_NODE_INIT;
 		sd->span = sched_domain_node_span(node);
+		sd->parent = p;
 		cpus_and(sd->span, sd->span, cpu_default_map);
 #endif
 
@@ -201,6 +221,9 @@ void __devinit arch_init_sched_domains(void)
 	}
 
 #ifdef CONFIG_NUMA
+	init_sched_build_groups(sched_group_allnodes, cpu_default_map,
+				&cpu_to_allnodes_group);
+
 	for (i = 0; i < MAX_NUMNODES; i++) {
 		/* Set up node groups */
 		struct sched_group *sg, *prev;
@@ -282,6 +305,15 @@ void __devinit arch_init_sched_domains(void)
 		power = SCHED_LOAD_SCALE + SCHED_LOAD_SCALE *
 				(cpus_weight(sd->groups->cpumask)-1) / 10;
 		sd->groups->cpu_power = power;
+
+#ifdef CONFIG_NUMA
+		sd = &per_cpu(allnodes_domains, i);
+		if (sd->groups) {
+			power = SCHED_LOAD_SCALE + SCHED_LOAD_SCALE *
+				(cpus_weight(sd->groups->cpumask)-1) / 10;
+			sd->groups->cpu_power = power;
+		}
+#endif
 	}
 
 #ifdef CONFIG_NUMA

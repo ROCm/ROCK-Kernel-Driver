@@ -200,8 +200,6 @@ static void sn_pci_fixup_slot(struct pci_dev *dev)
 	struct sn_irq_info *sn_irq_info;
 	struct pci_dev *host_pci_dev;
 	int status = 0;
-	extern void sn_irq_fixup(struct pci_dev *pci_dev,
-				 struct sn_irq_info *sn_irq_info);
 
 	SN_PCIDEV_INFO(dev) = kmalloc(sizeof(struct pcidev_info), GFP_KERNEL);
 	if (SN_PCIDEV_INFO(dev) <= 0)

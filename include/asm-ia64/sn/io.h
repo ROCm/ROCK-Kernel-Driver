@@ -129,44 +129,44 @@ ___sn_outl (unsigned int val, unsigned long port)
  */
 
 static inline unsigned char
-___sn_readb (void *addr)
+___sn_readb (const volatile void __iomem *addr)
 {
 	unsigned char val;
 
-	val = *(volatile unsigned char *)addr;
+	val = *(volatile unsigned char __force *)addr;
 	__sn_mf_a();
 	sn_dma_flush((unsigned long)addr);
         return val;
 }
 
 static inline unsigned short
-___sn_readw (void *addr)
+___sn_readw (const volatile void __iomem *addr)
 {
 	unsigned short val;
 
-	val = *(volatile unsigned short *)addr;
+	val = *(volatile unsigned short __force *)addr;
 	__sn_mf_a();
 	sn_dma_flush((unsigned long)addr);
         return val;
 }
 
 static inline unsigned int
-___sn_readl (void *addr)
+___sn_readl (const volatile void __iomem *addr)
 {
 	unsigned int val;
 
-	val = *(volatile unsigned int *) addr;
+	val = *(volatile unsigned int __force *)addr;
 	__sn_mf_a();
 	sn_dma_flush((unsigned long)addr);
         return val;
 }
 
 static inline unsigned long
-___sn_readq (void *addr)
+___sn_readq (const volatile void __iomem *addr)
 {
 	unsigned long val;
 
-	val = *(volatile unsigned long *) addr;
+	val = *(volatile unsigned long __force *)addr;
 	__sn_mf_a();
 	sn_dma_flush((unsigned long)addr);
         return val;
@@ -215,27 +215,27 @@ sn_inl_fast (unsigned long port)
 }
 
 static inline unsigned char
-___sn_readb_relaxed (void *addr)
+___sn_readb_relaxed (const volatile void __iomem *addr)
 {
-	return *(volatile unsigned char *)addr;
+	return *(volatile unsigned char __force *)addr;
 }
 
 static inline unsigned short
-___sn_readw_relaxed (void *addr)
+___sn_readw_relaxed (const volatile void __iomem *addr)
 {
-	return *(volatile unsigned short *)addr;
+	return *(volatile unsigned short __force *)addr;
 }
 
 static inline unsigned int
-___sn_readl_relaxed (void *addr)
+___sn_readl_relaxed (const volatile void __iomem *addr)
 {
-	return *(volatile unsigned int *) addr;
+	return *(volatile unsigned int __force *) addr;
 }
 
 static inline unsigned long
-___sn_readq_relaxed (void *addr)
+___sn_readq_relaxed (const volatile void __iomem *addr)
 {
-	return *(volatile unsigned long *) addr;
+	return *(volatile unsigned long __force *) addr;
 }
 
 struct pci_dev;
