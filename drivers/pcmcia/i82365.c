@@ -91,7 +91,6 @@ static inline int _check_irq(int irq, int flags)
 
 /* Parameters that can be set with 'insmod' */
 
-#ifdef CONFIG_ISA
 /* Default base address for i82365sl and other ISA chips */
 static int i365_base = 0x3e0;
 /* Should we probe at 0x3e2 for an extra ISA controller? */
@@ -103,7 +102,6 @@ static u_int irq_mask = 0xffff;
 static int irq_list[16] = { -1 };
 /* The card status change interrupt -- 0 means autoselect */
 static int cs_irq = 0;
-#endif
 
 /* Probe for safe interrupts? */
 static int do_scan = 1;
@@ -122,14 +120,11 @@ static int setup_time = -1;
 static int cmd_time = -1;
 static int recov_time = -1;
 
-#ifdef CONFIG_ISA
 /* Vadem options */
 static int async_clock = -1;
 static int cable_mode = -1;
 static int wakeup = 0;
-#endif
 
-#ifdef CONFIG_ISA
 MODULE_PARM(i365_base, "i");
 MODULE_PARM(ignore, "i");
 MODULE_PARM(extra_sockets, "i");
@@ -139,7 +134,6 @@ MODULE_PARM(cs_irq, "i");
 MODULE_PARM(async_clock, "i");
 MODULE_PARM(cable_mode, "i");
 MODULE_PARM(wakeup, "i");
-#endif
 
 MODULE_PARM(do_scan, "i");
 MODULE_PARM(poll_interval, "i");
@@ -192,15 +186,10 @@ static socket_info_t socket[8] = {
 /* Default ISA interrupt mask */
 #define I365_MASK	0xdeb8	/* irq 15,14,12,11,10,9,7,5,4,3 */
 
-#ifdef CONFIG_ISA
 static int grab_irq;
 static spinlock_t isa_lock = SPIN_LOCK_UNLOCKED;
 #define ISA_LOCK(n, f) spin_lock_irqsave(&isa_lock, f)
 #define ISA_UNLOCK(n, f) spin_unlock_irqrestore(&isa_lock, f)
-#else
-#define ISA_LOCK(n, f) do { } while (0)
-#define ISA_UNLOCK(n, f) do { } while (0)
-#endif
 
 static struct timer_list poll_timer;
 
@@ -211,13 +200,11 @@ static struct timer_list poll_timer;
 		  PCI_COMMAND_MASTER|PCI_COMMAND_WAIT)
 
 /* These definitions must match the pcic table! */
-#ifdef CONFIG_ISA
 typedef enum pcic_id {
     IS_I82365A, IS_I82365B, IS_I82365DF,
     IS_IBM, IS_RF5Cx96, IS_VLSI, IS_VG468, IS_VG469,
     IS_PD6710, IS_PD672X, IS_VT83C469,
 } pcic_id;
-#endif
 
 /* Flags for classifying groups of controllers */
 #define IS_VADEM	0x0001
@@ -239,7 +226,6 @@ typedef struct pcic_t {
 } pcic_t;
 
 static pcic_t pcic[] = {
-#ifdef CONFIG_ISA
     { "Intel i82365sl A step", 0 },
     { "Intel i82365sl B step", 0 },
     { "Intel i82365sl DF", IS_DF_PWR },
@@ -251,7 +237,6 @@ static pcic_t pcic[] = {
     { "Cirrus PD6710", IS_CIRRUS },
     { "Cirrus PD672x", IS_CIRRUS },
     { "VIA VT83C469", IS_CIRRUS|IS_VIA },
-#endif
 };
 
 #define PCIC_COUNT	(sizeof(pcic)/sizeof(pcic_t))
@@ -423,8 +408,6 @@ static u_int __init cirrus_set_opts(u_short s, char *buf)
     
 ======================================================================*/
 
-#ifdef CONFIG_ISA
-
 static void vg46x_get_state(u_short s)
 {
     vg46x_state_t *p = &socket[s].state.vg46x;
@@ -466,9 +449,6 @@ static u_int __init vg46x_set_opts(u_short s, char *buf)
     return 0xffff;
 }
 
-#endif
-
-
 /*======================================================================
 
     Generic routines to get and set controller options
@@ -480,10 +460,8 @@ static void get_bridge_state(u_short s)
     socket_info_t *t = &socket[s];
     if (t->flags & IS_CIRRUS)
 	cirrus_get_state(s);
-#ifdef CONFIG_ISA
     else if (t->flags & IS_VADEM)
 	vg46x_get_state(s);
-#endif
 }
 
 static void set_bridge_state(u_short s)
@@ -496,10 +474,8 @@ static void set_bridge_state(u_short s)
 	i365_set(s, I365_GENCTL, 0x00);
     }
     i365_bflip(s, I365_INTCTL, I365_INTR_ENA, t->intr);
-#ifdef CONFIG_ISA
     if (t->flags & IS_VADEM)
 	vg46x_set_state(s);
-#endif
 }
 
 static u_int __init set_bridge_opts(u_short s, u_short ns)
@@ -517,10 +493,8 @@ static u_int __init set_bridge_opts(u_short s, u_short ns)
 	get_bridge_state(i);
 	if (socket[i].flags & IS_CIRRUS)
 	    m = cirrus_set_opts(i, buf);
-#ifdef CONFIG_ISA
 	else if (socket[i].flags & IS_VADEM)
 	    m = vg46x_set_opts(i, buf);
-#endif
 	set_bridge_state(i);
 	printk(KERN_INFO "    host opts [%d]:%s\n", i,
 	       (*buf) ? buf : " none");
@@ -573,7 +547,6 @@ static u_int __init test_irq(u_short sock, int irq)
     return (irq_hits != 1);
 }
 
-#ifdef CONFIG_ISA
 
 static u_int __init isa_scan(u_short sock, u_int mask0)
 {
@@ -619,7 +592,6 @@ static u_int __init isa_scan(u_short sock, u_int mask0)
     return mask1;
 }
 
-#endif /* CONFIG_ISA */
 
 /*====================================================================*/
 
@@ -632,7 +604,6 @@ static int to_cycles(int ns)
 
 /*====================================================================*/
 
-#ifdef CONFIG_ISA
 
 static int __init identify(u_short port, u_short sock)
 {
@@ -693,8 +664,6 @@ static int __init identify(u_short port, u_short sock)
     return type;
 } /* identify */
 
-#endif
-
 /*======================================================================
 
     See if a card is present, powered up, in IO mode, and already
@@ -750,23 +719,17 @@ static void __init add_pcic(int ns, int type)
 	       t->ioaddr, t->psock*0x40);
     printk(", %d socket%s\n", ns, ((ns > 1) ? "s" : ""));
 
-#ifdef CONFIG_ISA
     /* Set host options, build basic interrupt mask */
     if (irq_list[0] == -1)
 	mask = irq_mask;
     else
 	for (i = mask = 0; i < 16; i++)
 	    mask |= (1<<irq_list[i]);
-#endif
     mask &= I365_MASK & set_bridge_opts(base, ns);
-#ifdef CONFIG_ISA
     /* Scan for ISA interrupts */
     mask = isa_scan(base, mask);
-#else
     printk(KERN_INFO "    PCI card interrupts,");
-#endif
         
-#ifdef CONFIG_ISA
     /* Poll if only two interrupts available */
     if (!use_pci && !poll_interval) {
 	u_int tmp = (mask & 0xff20);
@@ -788,7 +751,6 @@ static void __init add_pcic(int ns, int type)
 	    printk(" status change on irq %d\n", cs_irq);
 	}
     }
-#endif
     
     if (!use_pci && !isa_irq) {
 	if (poll_interval == 0)
@@ -811,7 +773,6 @@ static void __init add_pcic(int ns, int type)
 
 /*====================================================================*/
 
-#ifdef CONFIG_ISA
 
 #ifdef CONFIG_PNP
 static struct isapnp_device_id id_table[] __initdata = {
@@ -904,7 +865,6 @@ static void __init isa_probe(void)
     }
 }
 
-#endif
 
 /*====================================================================*/
 
@@ -942,9 +902,7 @@ static irqreturn_t pcic_interrupt(int irq, void *dev,
 {
     int i, j, csc;
     u_int events, active;
-#ifdef CONFIG_ISA
     u_long flags = 0;
-#endif
     int handled = 0;
 
     DEBUG(4, "i82365: pcic_interrupt(%d)\n", irq);
@@ -1052,7 +1010,6 @@ static int i365_get_status(u_short sock, u_int *value)
     *value |= (status & I365_CS_READY) ? SS_READY : 0;
     *value |= (status & I365_CS_POWERON) ? SS_POWERON : 0;
 
-#ifdef CONFIG_ISA
     if (socket[sock].type == IS_VG469) {
 	status = i365_get(sock, VG469_VSENSE);
 	if (socket[sock].psock & 1) {
@@ -1063,7 +1020,6 @@ static int i365_get_status(u_short sock, u_int *value)
 	    *value |= (status & VG469_VSENSE_A_VS2) ? 0 : SS_XVCARD;
 	}
     }
-#endif
     
     DEBUG(1, "i82365: GetStatus(%d) = %#4.4x\n", sock, *value);
     return 0;
@@ -1355,9 +1311,7 @@ static int proc_read_exca(char *buf, char **start, off_t pos,
     char *p = buf;
     int i, top;
     
-#ifdef CONFIG_ISA
     u_long flags = 0;
-#endif
     ISA_LOCK(sock, flags);
     top = 0x40;
     for (i = 0; i < top; i += 4) {
@@ -1402,15 +1356,8 @@ static void pcic_proc_remove(u_short sock)
 
 /*====================================================================*/
 
-/*
- * The locking is rather broken. Why do we only lock for ISA, not for
- * all other cases? If there are reasons to lock, we should lock. Not
- * this silly conditional.
- *
- * Plan: make it bug-for-bug compatible with the old stuff, and clean
- * it up when the infrastructure is done.
- */
-#ifdef CONFIG_ISA
+/* this is horribly ugly... proper locking needs to be done here at 
+ * some time... */
 #define LOCKED(x) do { \
 	int retval; \
 	unsigned long flags; \
@@ -1419,9 +1366,6 @@ static void pcic_proc_remove(u_short sock)
 	spin_unlock_irqrestore(&isa_lock, flags); \
 	return retval; \
 } while (0)
-#else
-#define LOCKED(x) return x
-#endif
 	
 
 static int pcic_get_status(struct pcmcia_socket *s, u_int *value)
@@ -1547,9 +1491,7 @@ static int __init init_i82365(void)
     printk(KERN_INFO "Intel PCIC probe: ");
     sockets = 0;
 
-#ifdef CONFIG_ISA
     isa_probe();
-#endif
 
     if (sockets == 0) {
 	printk("not found.\n");
@@ -1560,10 +1502,8 @@ static int __init init_i82365(void)
     platform_device_register(&i82365_device);
 
     /* Set up interrupt handler(s) */
-#ifdef CONFIG_ISA
     if (grab_irq != 0)
 	request_irq(cs_irq, pcic_interrupt, 0, "i82365", pcic_interrupt);
-#endif
     
     /* register sockets with the pcmcia core */
     for (i = 0; i < sockets; i++) {
@@ -1603,16 +1543,14 @@ static void __exit exit_i82365(void)
     platform_device_unregister(&i82365_device);
     if (poll_interval != 0)
 	del_timer_sync(&poll_timer);
-#ifdef CONFIG_ISA
     if (grab_irq != 0)
 	free_irq(cs_irq, pcic_interrupt);
-#endif
     for (i = 0; i < sockets; i++) {
 	/* Turn off all interrupt sources! */
 	i365_set(i, I365_CSCINT, 0);
 	release_region(socket[i].ioaddr, 2);
     }
-#if defined(CONFIG_ISA) && defined(__ISAPNP__)
+#ifdef __ISAPNP__
     if (i82365_pnpdev)
     		pnp_disable_dev(i82365_pnpdev);
 #endif

@@ -63,7 +63,7 @@ config I82092
 
 config I82365
 	tristate "i82365 compatible bridge support"
-	depends on PCMCIA
+	depends on PCMCIA && ISA
 	help
 	  Say Y here to include support for ISA-bus PCMCIA host bridges that
 	  are register compatible with the Intel i82365.  These are found on
