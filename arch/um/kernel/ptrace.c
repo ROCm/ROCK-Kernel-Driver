@@ -16,6 +16,7 @@
 #include "asm/uaccess.h"
 #include "kern_util.h"
 #include "ptrace_user.h"
+#include "skas_ptrace.h"
 
 /*
  * Called by kernel/ptrace.c when detaching..

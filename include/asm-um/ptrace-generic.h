@@ -21,7 +21,6 @@
 #undef instruction_pointer
 
 #include "sysdep/ptrace.h"
-#include "skas_ptrace.h"
 
 struct pt_regs {
 	union uml_pt_regs regs;

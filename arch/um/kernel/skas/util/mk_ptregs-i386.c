@@ -13,9 +13,9 @@ int main(int argc, char **argv)
 	printf("#define __SKAS_PT_REGS_\n");
 	printf("\n");
 	printf("#define HOST_FRAME_SIZE %d\n", FRAME_SIZE);
-	printf("#define HOST_FP_SIZE %d\n", 
+	printf("#define HOST_FP_SIZE %d\n",
 	       sizeof(struct user_i387_struct) / sizeof(unsigned long));
-	printf("#define HOST_XFP_SIZE %d\n", 
+	printf("#define HOST_XFP_SIZE %d\n",
 	       sizeof(struct user_fxsr_struct) / sizeof(unsigned long));
 
 	PRINT_REG("IP", EIP);

@@ -5,10 +5,10 @@
 #
 
 lib-y = bitops.o bugs.o csum-partial.o fault.o mem.o memcpy.o \
-	ptrace.o semaphore.o sigcontext.o signal.o syscalls.o \
-	sysrq.o thunk.o
+	ptrace.o ptrace_user.o semaphore.o sigcontext.o signal.o \
+	syscalls.o sysrq.o thunk.o
 
-USER_OBJS := sigcontext.o
+USER_OBJS := ptrace_user.o sigcontext.o
 USER_OBJS := $(foreach file,$(USER_OBJS),$(obj)/$(file))
 
 SYMLINKS = bitops.c csum-copy.S csum-partial.c csum-wrappers.c memcpy.S \
