@@ -134,13 +134,13 @@ static int filldir(void * __buf, const char * name, int namlen, loff_t offset,
 		return -EINVAL;
 	dirent = buf->previous;
 	if (dirent)
-		put_user(offset, &dirent->d_off);
+		__put_user(offset, &dirent->d_off);
 	dirent = buf->current_dir;
 	buf->previous = dirent;
-	put_user(ino, &dirent->d_ino);
-	put_user(reclen, &dirent->d_reclen);
+	__put_user(ino, &dirent->d_ino);
+	__put_user(reclen, &dirent->d_reclen);
 	copy_to_user(dirent->d_name, name, namlen);
-	put_user(0, dirent->d_name + namlen);
+	__put_user(0, dirent->d_name + namlen);
 	((char *) dirent) += reclen;
 	buf->current_dir = dirent;
 	buf->count -= reclen;
@@ -153,6 +153,10 @@ asmlinkage long sys_getdents(unsigned int fd, void * dirent, unsigned int count)
 	struct linux_dirent * lastdirent;
 	struct getdents_callback buf;
 	int error;
+
+	error = -EFAULT;
+	if (!access_ok(VERIFY_WRITE, dirent, count))
+		goto out;
 
 	error = -EBADF;
 	file = fget(fd);
@@ -211,12 +215,10 @@ static int filldir64(void * __buf, const char * name, int namlen, loff_t offset,
 	if (reclen > buf->count)
 		return -EINVAL;
 	dirent = buf->previous;
-	if (dirent)
+	if (dirent) {
 		if (__put_user(offset, &dirent->d_off))
 			goto efault;
-	else
-		if (__put_user(0, &dirent->d_off))
-			goto efault;
+	}
 	dirent = buf->current_dir;
 	buf->previous = dirent;
 	if (__put_user(ino, &dirent->d_ino))
