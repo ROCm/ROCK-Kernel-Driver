@@ -33,7 +33,7 @@
  Knowing this helps avoid response buffer allocations and copy in some cases */
 #define SMB_COM_CREATE_DIRECTORY      0x00 /* trivial response */
 #define SMB_COM_DELETE_DIRECTORY      0x01 /* trivial response */
-#define SMB_COM_CLOSE                 0x04 /* trivial rsp, timestamp ignored */
+#define SMB_COM_CLOSE                 0x04 /* triv req/rsp, timestamp ignored */
 #define SMB_COM_DELETE                0x06 /* trivial response */
 #define SMB_COM_RENAME                0x07 /* trivial response */
 #define SMB_COM_LOCKING_ANDX          0x24 /* trivial response */

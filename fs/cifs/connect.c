@@ -507,7 +507,7 @@ cifs_kcalloc(size_t size, int type)
 }
 
 static int
-cifs_parse_mount_options(char *options, const char *devname, struct smb_vol *vol)
+cifs_parse_mount_options(char *options, const char *devname,struct smb_vol *vol)
 {
 	char *value;
 	char *data;
