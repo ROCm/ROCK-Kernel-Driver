@@ -64,17 +64,15 @@ typedef struct pio_clocks_s {
 	u8	time_8;		/* clocks for 8bit (0xF0=Active/data, 0x0F=Recovery) */
 } pio_clocks_t;
 
-extern void init_setup_cy82c693(struct pci_dev *, ide_pci_device_t *);
 extern unsigned int init_chipset_cy82c693(struct pci_dev *, const char *);
 extern void init_hwif_cy82c693(ide_hwif_t *);
 extern void init_dma_cy82c693(ide_hwif_t *, unsigned long);
 
 static ide_pci_device_t cy82c693_chipsets[] __initdata = {
-	{
+	{	/* 0 */
 		vendor:		PCI_VENDOR_ID_CONTAQ,
 		device:		PCI_DEVICE_ID_CONTAQ_82C693,
 		name:		"CY82C693",
-		init_setup:	init_setup_cy82c693,
 		init_chipset:	init_chipset_cy82c693,
 		init_iops:	NULL,
 		init_hwif:	init_hwif_cy82c693,

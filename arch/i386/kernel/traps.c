@@ -189,6 +189,14 @@ void show_stack(unsigned long * esp)
 	show_trace(esp);
 }
 
+/*
+ * The architecture-independent dump_stack generator
+ */
+void dump_stack(void)
+{
+	show_stack(0);
+}
+
 void show_registers(struct pt_regs *regs)
 {
 	int i;

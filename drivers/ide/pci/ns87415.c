@@ -1,5 +1,5 @@
 /*
- * linux/drivers/ide/ns87415.c		Version 1.01  Mar. 18, 2000
+ * linux/drivers/ide/ns87415.c		Version 2.00  Sep. 10, 2002
  *
  * Copyright (C) 1997-1998	Mark Lord <mlord@pobox.com>
  * Copyright (C) 1998		Eddie C. Dost <ecd@skynet.be>
@@ -9,6 +9,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/timer.h>
@@ -229,26 +230,55 @@ static void __init init_dma_ns87415 (ide_hwif_t *hwif, unsigned long dmabase)
 
 extern void ide_setup_pci_device(struct pci_dev *, ide_pci_device_t *);
 
-static void __init init_setup_ns87415 (struct pci_dev *dev, ide_pci_device_t *d)
+static int __devinit ns87415_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
+	ide_pci_device_t *d = &ns87415_chipsets[id->driver_data];
+	if (dev->device != d->device)
+		BUG();
 	ide_setup_pci_device(dev, d);
-}
-
-int __init ns87415_scan_pcidev (struct pci_dev *dev)
-{
-	ide_pci_device_t *d;
-
-	if (dev->vendor != PCI_VENDOR_ID_NS)
-		return 0;
-
-	for (d = ns87415_chipsets; d && d->vendor && d->device; ++d) {
-		if (((d->vendor == dev->vendor) &&
-		     (d->device == dev->device)) &&
-		    (d->init_setup)) {
-			d->init_setup(dev, d);
-			return 1;
-		}
-	}
 	return 0;
 }
 
+/**
+ *	ns87415_remove_one	-	called with an NS87415 is unplugged
+ *	@dev: the device that was removed
+ *
+ *	Disconnect an NS87415 device that has been unplugged either by hotplug
+ *	or by a more civilized notification scheme. Not yet supported.
+ */
+ 
+static void ns87415_remove_one(struct pci_dev *dev)
+{
+	panic("NS87415 removal not yet supported");
+}
+
+static struct pci_device_id ns87415_pci_tbl[] __devinitdata = {
+	{ PCI_VENDOR_ID_NS, PCI_DEVICE_ID_NS_87415, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{ 0, },
+};
+
+static struct pci_driver driver = {
+	name:		"NS87415IDE",
+	id_table:	ns87415_pci_tbl,
+	probe:		ns87415_init_one,
+	remove:		__devexit_p(ns87415_remove_one),
+};
+
+static int ns87415_ide_init(void)
+{
+	return ide_pci_register_driver(&driver);
+}
+
+static void ns87415_ide_exit(void)
+{
+	ide_pci_unregister_driver(&driver);
+}
+
+module_init(ns87415_ide_init);
+module_exit(ns87415_ide_exit);
+
+MODULE_AUTHOR("Mark Lord, Eddie Dost, Andre Hedrick");
+MODULE_DESCRIPTION("PCI driver module for NS87415 IDE");
+MODULE_LICENSE("GPL");
+
+EXPORT_NO_SYMBOLS;

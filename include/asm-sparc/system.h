@@ -56,6 +56,17 @@ extern unsigned long empty_zero_page;
 extern struct linux_romvec *romvec;
 #define halt() romvec->pv_halt()
 
+extern void sun_do_break(void);
+extern int serial_console;
+extern int stop_a_enabled;
+
+static __inline__ int con_is_present(void)
+{
+	return serial_console ? 0 : 1;
+}
+
+extern struct pt_regs *kbd_pt_regs;
+
 /* When a context switch happens we must flush all user windows so that
  * the windows of the current process are flushed onto its stack. This
  * way the windows are all clean for the next process and the stack
@@ -113,6 +124,7 @@ extern void fpsave(unsigned long *fpregs, unsigned long *fsr,
 	"restore; restore; restore; restore; restore; restore; restore"); \
 } while(0)
 #define finish_arch_switch(rq, next)	do{ }while(0)
+#define task_running(rq, p)		((rq)->curr == (p))
 
 	/* Much care has gone into this code, do not touch it.
 	 *
@@ -263,6 +275,15 @@ extern __inline__ unsigned long read_psr_and_cli(void)
 #define local_irq_save(flags)	((flags) = read_psr_and_cli())
 #define local_irq_restore(flags)	setipl((flags))
 
+/* On sparc32 IRQ flags are the PSR register in the PSR_PIL
+ * field.
+ */
+#define irqs_disabled()		\
+({	unsigned long flags;	\
+	local_save_flags(flags);\
+	(flags & PSR_PIL) != 0;	\
+})
+
 #ifdef CONFIG_SMP
 
 extern unsigned char global_irq_holder;
@@ -282,9 +303,6 @@ extern void __global_restore_flags(unsigned long flags);
 
 #define cli() local_irq_disable()
 #define sti() local_irq_enable()
-#define save_flags(x) local_save_flags(x)
-#define restore_flags(x) local_irq_restore(x)
-#define save_and_cli(x) local_irq_save(x)
 
 #endif
 

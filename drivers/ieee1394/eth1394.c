@@ -77,7 +77,7 @@
 	printk(KERN_ERR fmt, ## args)
 
 static char version[] __devinitdata =
-	"eth1394.c:v0.50 15/Jul/01 Ben Collins <bcollins@debian.org>";
+	"$Rev: 546 $ Ben Collins <bcollins@debian.org>";
 
 /* Our ieee1394 highlevel driver */
 #define ETHER1394_DRIVER_NAME "ether1394"
@@ -99,6 +99,7 @@ static int hdr_type_len[] = {
 
 MODULE_AUTHOR("Ben Collins (bcollins@debian.org)");
 MODULE_DESCRIPTION("IEEE 1394 IPv4 Driver (IPv4-over-1394 as per RFC 2734)");
+MODULE_LICENSE("GPL");
 
 /* Find our host_info struct for a given host pointer. Must be called
  * under spinlock.  */
@@ -276,7 +277,7 @@ static inline void ether1394_register_limits (int nodeid, unsigned char max_rec,
 
 static void ether1394_reset_priv (struct net_device *dev, int set_mtu)
 {
-	int flags;
+	unsigned long flags;
 	struct eth1394_priv *priv = (struct eth1394_priv *)dev->priv;
 	int phy_id = priv->host->node_id & NODE_MASK;
 
@@ -477,7 +478,7 @@ static inline unsigned short ether1394_parse_encap (struct sk_buff *skb, struct 
 	 * use of some of the fields, since they tell us a little bit
 	 * about the sending machine.  */
 	if (hdr->uf.ether_type == __constant_htons (ETH_P_ARP)) {
-		int flags;
+		unsigned long flags;
 		u16 phy_id = srcid & NODE_MASK;
 		struct eth1394_priv *priv =
 			(struct eth1394_priv *)dev->priv;
@@ -525,7 +526,7 @@ static int ether1394_write (struct hpsb_host *host, int srcid, int destid,
 {
 	struct sk_buff *skb;
 	char *buf = (char *)data;
-	int flags;
+	unsigned long flags;
 	struct net_device *dev = ether1394_find_dev (host);
 	struct eth1394_priv *priv;
 
@@ -596,7 +597,7 @@ static void hpsb_write_sched (void *__ptask)
 	struct sk_buff *skb = ptask->skb;
 	struct net_device *dev = ptask->skb->dev;
 	struct eth1394_priv *priv = (struct eth1394_priv *)dev->priv;
-	int flags;
+        unsigned long flags;
 
 	/* Statistics */
 	spin_lock_irqsave (&priv->lock, flags);
@@ -627,7 +628,8 @@ static int ether1394_tx (struct sk_buff *skb, struct net_device *dev)
 	int kmflags = in_interrupt () ? GFP_ATOMIC : GFP_KERNEL;
 	struct ethhdr *eth;
 	struct eth1394_priv *priv = (struct eth1394_priv *)dev->priv;
-	int proto, flags;
+	int proto;
+	unsigned long flags;
 	nodeid_t dest_node;
 	u64 addr;
 	struct packet_task *ptask = NULL;
@@ -702,14 +704,14 @@ fail:
 
 /* Function for incoming 1394 packets */
 static struct hpsb_address_ops addr_ops = {
-	write:		ether1394_write,
+	.write =	ether1394_write,
 };
 
 /* Ieee1394 highlevel driver functions */
 static struct hpsb_highlevel_ops hl_ops = {
-	add_host:	ether1394_add_host,
-	remove_host:	ether1394_remove_host,
-	host_reset:	ether1394_host_reset,
+	.add_host =	ether1394_add_host,
+	.remove_host =	ether1394_remove_host,
+	.host_reset =	ether1394_host_reset,
 };
 
 static int __init ether1394_init_module (void)

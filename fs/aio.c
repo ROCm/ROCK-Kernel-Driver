@@ -30,10 +30,11 @@
 #include <linux/compiler.h>
 #include <linux/brlock.h>
 #include <linux/module.h>
+#include <linux/tqueue.h>
+#include <linux/highmem.h>
 
 #include <asm/kmap_types.h>
 #include <asm/uaccess.h>
-#include <linux/highmem.h>
 
 #if DEBUG > 1
 #define dprintk		printk
@@ -304,8 +305,23 @@ void wait_for_all_aios(struct kioctx *ctx)
 		schedule();
 		set_task_state(tsk, TASK_UNINTERRUPTIBLE);
 	}
-	set_task_state(tsk, TASK_RUNNING);
+	__set_task_state(tsk, TASK_RUNNING);
 	remove_wait_queue(&ctx->wait, &wait);
+}
+
+/* wait_on_sync_kiocb:
+ *	Waits on the given sync kiocb to complete.
+ */
+ssize_t wait_on_sync_kiocb(struct kiocb *iocb)
+{
+	while (iocb->ki_users) {
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		if (!iocb->ki_users)
+			break;
+		schedule();
+	}
+	__set_current_state(TASK_RUNNING);
+	return iocb->ki_user_data;
 }
 
 /* exit_aio: called when the last user of mm goes away.  At this point, 
@@ -516,12 +532,35 @@ static inline struct kioctx *lookup_ioctx(unsigned long ctx_id)
 int aio_complete(struct kiocb *iocb, long res, long res2)
 {
 	struct kioctx	*ctx = iocb->ki_ctx;
-	struct aio_ring_info	*info = &ctx->ring_info;
+	struct aio_ring_info	*info;
 	struct aio_ring	*ring;
 	struct io_event	*event;
 	unsigned long	flags;
 	unsigned long	tail;
 	int		ret;
+
+	/* Special case handling for sync iocbs: events go directly
+	 * into the iocb for fast handling.  Note that this will not 
+	 * work if we allow sync kiocbs to be cancelled. in which
+	 * case the usage count checks will have to move under ctx_lock
+	 * for all cases.
+	 */
+	if (ctx == &ctx->mm->default_kioctx) {
+		int ret;
+
+		iocb->ki_user_data = res;
+		if (iocb->ki_users == 1) {
+			iocb->ki_users = 0;
+			return 1;
+		}
+		spin_lock_irq(&ctx->ctx_lock);
+		iocb->ki_users--;
+		ret = (0 == iocb->ki_users);
+		spin_unlock_irq(&ctx->ctx_lock);
+		return 0;
+	}
+
+	info = &ctx->ring_info;
 
 	/* add a completion event to the ring buffer.
 	 * must be done holding ctx->ctx_lock to prevent

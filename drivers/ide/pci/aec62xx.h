@@ -99,7 +99,7 @@ static void init_hwif_aec62xx(ide_hwif_t *);
 static void init_dma_aec62xx(ide_hwif_t *, unsigned long);
 
 static ide_pci_device_t aec62xx_chipsets[] __initdata = {
-	{
+	{	/* 0 */
 		vendor:		PCI_VENDOR_ID_ARTOP,
 		device:		PCI_DEVICE_ID_ARTOP_ATP850UF,
 		name:		"AEC6210",
@@ -113,7 +113,7 @@ static ide_pci_device_t aec62xx_chipsets[] __initdata = {
 		enablebits:	{{0x4a,0x02,0x02}, {0x4a,0x04,0x04}},
 		bootable:	OFF_BOARD,
 		extra:		0,
-	},{
+	},{	/* 1 */
 		vendor:		PCI_VENDOR_ID_ARTOP,
 		device:		PCI_DEVICE_ID_ARTOP_ATP860,
 		name:		"AEC6260",
@@ -127,7 +127,7 @@ static ide_pci_device_t aec62xx_chipsets[] __initdata = {
 		enablebits:	{{0x00,0x00,0x00}, {0x00,0x00,0x00}},
 		bootable:	OFF_BOARD,
 		extra:		0,
-	},{
+	},{	/* 2 */
 		vendor:		PCI_VENDOR_ID_ARTOP,
 		device:		PCI_DEVICE_ID_ARTOP_ATP860R,
 		name:		"AEC6260R",
@@ -141,7 +141,7 @@ static ide_pci_device_t aec62xx_chipsets[] __initdata = {
 		enablebits:	{{0x4a,0x02,0x02}, {0x4a,0x04,0x04}},
 		bootable:	NEVER_BOARD,
 		extra:		0,
-	},{
+	},{	/* 3 */
 		vendor:		PCI_VENDOR_ID_ARTOP,
 		device:		PCI_DEVICE_ID_ARTOP_ATP865,
 		name:		"AEC6X80",
@@ -155,7 +155,7 @@ static ide_pci_device_t aec62xx_chipsets[] __initdata = {
 		enablebits:	{{0x00,0x00,0x00}, {0x00,0x00,0x00}},
 		bootable:	OFF_BOARD,
 		extra:		0,
-	},{
+	},{	/* 4 */
 		vendor:		PCI_VENDOR_ID_ARTOP,
 		device:		PCI_DEVICE_ID_ARTOP_ATP865R,
 		name:		"AEC6X80R",
@@ -169,11 +169,6 @@ static ide_pci_device_t aec62xx_chipsets[] __initdata = {
 		enablebits:	{{0x4a,0x02,0x02}, {0x4a,0x04,0x04}},
 		bootable:	OFF_BOARD,
 		extra:		0,
-	},{
-		vendor:		0,
-		device:		0,
-		channels:	0,
-		bootable:	EOL,
 	}
 };
 

@@ -56,6 +56,7 @@ o  modutils               2.4.2                   # insmod -V
 o  e2fsprogs              1.25                    # tune2fs
 o  jfsutils               1.0.14                  # fsck.jfs -V
 o  reiserfsprogs          3.x.1b                  # reiserfsck 2>&1|grep reiserfsprogs
+o  xfsprogs               2.1.0                   # xfs_db -V
 o  pcmcia-cs              3.1.21                  # cardmgr -V
 o  PPP                    2.4.0                   # pppd --version
 o  isdn4k-utils           3.1pre1                 # isdnctrl 2>&1|grep version
@@ -181,6 +182,17 @@ The reiserfsprogs package should be used for reiserfs-3.6.x
 (Linux kernels 2.4.x). It is a combined package and contains working
 versions of mkreiserfs, resize_reiserfs, debugreiserfs and
 reiserfsck. These utils work on both i386 and alpha platforms.
+
+Xfsprogs
+--------
+
+The latest version of xfsprogs contains mkfs.xfs, xfs_db, and the
+xfs_repair utilities, among others, for the XFS filesystem.  It is
+architecture independent and any version from 2.0.0 onward should
+work correctly with this version of the XFS kernel code.  For the new
+(v2) log format that has better support for stripe-size aligning on
+LVM and MD devices at least xfsprogs 2.1.0 is needed.
+
 
 Pcmcia-cs
 ---------
@@ -315,6 +327,10 @@ o  <http://oss.software.ibm.com/jfs>
 Reiserfsprogs
 -------------
 o  <ftp://ftp.namesys.com/pub/reiserfsprogs/reiserfsprogs-3.x.1b.tar.gz>
+
+Xfsprogs
+--------
+o  <ftp://oss.sgi.com/projects/xfs/download/cmd_tars/xfsprogs-2.1.0.src.tar.gz>
 
 LVM toolset
 -----------

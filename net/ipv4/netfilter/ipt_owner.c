@@ -14,12 +14,12 @@
 static int
 match_comm(const struct sk_buff *skb, const char *comm)
 {
-	struct task_struct *p;
+	struct task_struct *g, *p;
 	struct files_struct *files;
 	int i;
 
 	read_lock(&tasklist_lock);
-	for_each_task(p) {
+	do_each_thread(g, p) {
 		if(strncmp(p->comm, comm, sizeof(p->comm)))
 			continue;
 
@@ -38,7 +38,7 @@ match_comm(const struct sk_buff *skb, const char *comm)
 			read_unlock(&files->file_lock);
 		}
 		task_unlock(p);
-	}
+	} while_each_thread(g, p);
 	read_unlock(&tasklist_lock);
 	return 0;
 }
@@ -77,12 +77,12 @@ out:
 static int
 match_sid(const struct sk_buff *skb, pid_t sid)
 {
-	struct task_struct *p;
+	struct task_struct *g, *p;
 	struct file *file = skb->sk->socket->file;
 	int i, found=0;
 
 	read_lock(&tasklist_lock);
-	for_each_task(p) {
+	do_each_thread(g, p) {
 		struct files_struct *files;
 		if (p->session != sid)
 			continue;
@@ -100,9 +100,10 @@ match_sid(const struct sk_buff *skb, pid_t sid)
 			read_unlock(&files->file_lock);
 		}
 		task_unlock(p);
-		if(found)
-			break;
-	}
+		if (found)
+			goto out;
+	} while_each_thread(g, p);
+out:
 	read_unlock(&tasklist_lock);
 
 	return found;

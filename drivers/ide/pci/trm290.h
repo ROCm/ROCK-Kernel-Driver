@@ -5,15 +5,13 @@
 #include <linux/pci.h>
 #include <linux/ide.h>
 
-extern void init_setup_trm290(struct pci_dev *, ide_pci_device_t *);
 extern void init_hwif_trm290(ide_hwif_t *);
 
 static ide_pci_device_t trm290_chipsets[] __initdata = {
-	{
+	{	/* 0 */
 		vendor:		PCI_VENDOR_ID_TEKRAM,
 		device:		PCI_DEVICE_ID_TEKRAM_DC290,
 		name:		"TRM290",
-		init_setup:	init_setup_trm290,
 		init_chipset:	NULL,
 		init_iops:	NULL,
 		init_hwif:	init_hwif_trm290,

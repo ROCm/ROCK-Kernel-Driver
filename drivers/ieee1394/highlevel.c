@@ -139,7 +139,7 @@ void hpsb_listen_channel(struct hpsb_highlevel *hl, struct hpsb_host *host,
         }
 
         if (host->iso_listen_count[channel]++ == 0) {
-                host->ops->devctl(host, ISO_LISTEN_CHANNEL, channel);
+                host->driver->devctl(host, ISO_LISTEN_CHANNEL, channel);
         }
 }
 
@@ -152,7 +152,7 @@ void hpsb_unlisten_channel(struct hpsb_highlevel *hl, struct hpsb_host *host,
         }
 
         if (--host->iso_listen_count[channel] == 0) {
-                host->ops->devctl(host, ISO_UNLISTEN_CHANNEL, channel);
+                host->driver->devctl(host, ISO_UNLISTEN_CHANNEL, channel);
         }
 }
 

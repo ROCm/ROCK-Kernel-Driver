@@ -320,6 +320,7 @@
 #include <linux/blk.h>
 #include <linux/smp_lock.h>
 #include <linux/init.h>
+#include <linux/blk.h>
 #include <asm/current.h>
 #include <asm/uaccess.h>
 #include <asm/io.h>
@@ -349,7 +350,7 @@
 #include "sbp2.h"
 
 static char version[] __devinitdata =
-	"$Rev: 507 $ James Goodwin <jamesg@filanet.com>";
+	"$Rev: 545 $ James Goodwin <jamesg@filanet.com>";
 
 /*
  * Module load parameter definitions
@@ -421,16 +422,25 @@ MODULE_PARM(sbp2_exclusive_login,"i");
 MODULE_PARM_DESC(sbp2_exclusive_login, "Exclusive login to sbp2 device (default = 1)");
 static int sbp2_exclusive_login = 1;
 
+/*
+ * SCSI inquiry hack for really badly behaved sbp2 devices. Turn this on if your sbp2 device
+ * is not properly handling the SCSI inquiry command. This hack makes the inquiry look more
+ * like a typical MS Windows inquiry.
+ */
+MODULE_PARM(sbp2_force_inquiry_hack,"i");
+MODULE_PARM_DESC(sbp2_force_inquiry_hack, "Force SCSI inquiry hack (default = 0)");
+static int sbp2_force_inquiry_hack = 0;
+
 
 /*
  * Export information about protocols/devices supported by this driver.
  */
 static struct ieee1394_device_id sbp2_id_table[] = {
 	{
-		match_flags:  IEEE1394_MATCH_SPECIFIER_ID |
+		.match_flags =IEEE1394_MATCH_SPECIFIER_ID |
 		              IEEE1394_MATCH_VERSION,
-		specifier_id: SBP2_UNIT_SPEC_ID_ENTRY & 0xffffff,
-		version:      SBP2_SW_VERSION_ENTRY & 0xffffff
+		.specifier_id = SBP2_UNIT_SPEC_ID_ENTRY & 0xffffff,
+		.version =    SBP2_SW_VERSION_ENTRY & 0xffffff
 	},
 	{ }
 };
@@ -505,14 +515,6 @@ static spinlock_t sbp2_host_info_lock = SPIN_LOCK_UNLOCKED;
 #endif
 
 /*
- * SCSI inquiry hack for really badly behaved sbp2 devices. Turn this on if your sbp2 device
- * is not properly handling the SCSI inquiry command. This hack makes the inquiry look more 
- * like a typical MS Windows inquiry.
- */
-
-/* #define SBP2_FORCE_36_BYTE_INQUIRY */
-
-/*
  * Globals
  */
 
@@ -525,29 +527,35 @@ static LIST_HEAD(sbp2_host_info_list);
 static struct hpsb_highlevel *sbp2_hl_handle = NULL;
 
 static struct hpsb_highlevel_ops sbp2_hl_ops = {
-	add_host:	sbp2_add_host,
-	remove_host:	sbp2_remove_host,
+	.add_host =	sbp2_add_host,
+	.remove_host =	sbp2_remove_host,
 };
 
 static struct hpsb_address_ops sbp2_ops = {
-	write: sbp2_handle_status_write
+	.write = sbp2_handle_status_write
 };
 
 #ifdef CONFIG_IEEE1394_SBP2_PHYS_DMA
 static struct hpsb_address_ops sbp2_physdma_ops = {
-        read: sbp2_handle_physdma_read,
-        write: sbp2_handle_physdma_write,
+        .read = sbp2_handle_physdma_read,
+        .write = sbp2_handle_physdma_write,
 };
 #endif
 
 static struct hpsb_protocol_driver sbp2_driver = {
-	name:		"SBP2 Driver",
-	id_table: 	sbp2_id_table,
-	probe: 		sbp2_probe,
-	disconnect: 	sbp2_disconnect,
-	update: 	sbp2_update
+	.name =		"SBP2 Driver",
+	.id_table = 	sbp2_id_table,
+	.probe = 		sbp2_probe,
+	.disconnect = 	sbp2_disconnect,
+	.update = 	sbp2_update
 };
 
+/* List of device firmware's that require a forced 36 byte inquiry. Note
+ * the final 0x0 needs to be there for denoting end of list.  */
+static u32 sbp2_broken_inquiry_list[] = {
+	0x00002800,	/* Stefan Richter <richtest@bauwesen.tu-cottbus.de> */
+	0x0
+};
 
 /**************************************
  * General utility functions
@@ -1903,25 +1911,56 @@ static void sbp2_parse_unit_directory(struct scsi_id_instance_data *scsi_id)
 			break;
 
 		case SBP2_FIRMWARE_REVISION_KEY:
-			/*
-			 * Firmware revision (used to find broken
-			 * devices). If the vendor id is 0xa0b8
-			 * (Symbios vendor id), then we have a
-			 * bridge with 128KB max transfer size
-			 * limitation.
-			 */
+			/* Firmware revision */
 			scsi_id->sbp2_firmware_revision
 				= CONFIG_ROM_VALUE(ud->quadlets[i]);
 			SBP2_DEBUG("sbp2_firmware_revision = %x",
 				   (unsigned int) scsi_id->sbp2_firmware_revision);
-			if ((scsi_id->sbp2_firmware_revision & 0xffff00) ==
-			    SBP2_128KB_BROKEN_FIRMWARE) {
-				SBP2_WARN("warning: Bridge chipset supports 128KB max transfer size");
-			}
 			break;
 
 		default:
 			break;
+		}
+	}
+
+	/* This is the start of our broken device checking. We try to hack
+	 * around oddities and known defects.  */
+	scsi_id->workarounds = 0x0;
+
+	/* If the vendor id is 0xa0b8 (Symbios vendor id), then we have a
+	 * bridge with 128KB max transfer size limitation. For sanity, we
+	 * only voice this when the current sbp2_max_sectors setting
+	 * exceeds the 128k limit. By default, that is not the case.
+	 *
+	 * It would be really nice if we could detect this before the scsi
+	 * host gets initialized. That way we can down-force the
+	 * sbp2_max_sectors to account for it. That is not currently
+	 * possible.  */
+	if ((scsi_id->sbp2_firmware_revision & 0xffff00) ==
+			SBP2_128KB_BROKEN_FIRMWARE &&
+			(sbp2_max_sectors * 512) > (128 * 1024)) {
+		SBP2_WARN("Node " NODE_BUS_FMT ": Bridge only supports 128KB max transfer size.",
+				NODE_BUS_ARGS(scsi_id->ne->nodeid));
+		SBP2_WARN("WARNING: Current sbp2_max_sectors setting is larger than 128KB (%d sectors)!",
+				sbp2_max_sectors);
+		scsi_id->workarounds |= SBP2_BREAKAGE_128K_MAX_TRANSFER;
+	}
+
+	/* Check for a blacklisted set of devices that require us to force
+	 * a 36 byte host inquiry. This can be overriden as a module param
+	 * (to force all hosts).
+	 *
+	 * XXX If this does not detect your firmware as being defective,
+	 * but using the sbp2_force_inquiry_hack allows your device to
+	 * work, please submit the value of your firmware revision to the
+	 * linux1394-devel mailing list.  */
+	for (i = 0; sbp2_broken_inquiry_list[i]; i++) {
+		if ((scsi_id->sbp2_firmware_revision & 0xffff00) ==
+				sbp2_broken_inquiry_list[i]) {
+			SBP2_WARN("Node " NODE_BUS_FMT ": Using 36byte inquiry workaround",
+					NODE_BUS_ARGS(scsi_id->ne->nodeid));
+			scsi_id->workarounds |= SBP2_BREAKAGE_INQUIRY_HACK;
+			break; // No need to continue.
 		}
 	}
 }
@@ -2400,11 +2439,10 @@ static int sbp2_send_command(struct sbp2scsi_host_info *hi, struct scsi_id_insta
 	 * reject this inquiry command. Fix the request_bufflen. 
 	 */
 	if (*cmd == INQUIRY) {
-#ifdef SBP2_FORCE_36_BYTE_INQUIRY
-		request_bufflen = cmd[4] = 0x24;
-#else
-		request_bufflen = cmd[4];
-#endif
+		if (sbp2_force_inquiry_hack || scsi_id->workarounds & SBP2_BREAKAGE_INQUIRY_HACK)
+			request_bufflen = cmd[4] = 0x24;
+		else
+			request_bufflen = cmd[4];
 	}
 
 	/*
@@ -3096,7 +3134,11 @@ static int sbp2scsi_reset (Scsi_Cmnd *SCpnt)
 /*
  * Called by scsi stack to get bios parameters (used by fdisk, and at boot).
  */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,28)
+static int sbp2scsi_biosparam (Scsi_Disk *disk, kdev_t dev, int geom[]) 
+#else
 static int sbp2scsi_biosparam (Scsi_Disk *disk, struct block_device *dev, int geom[]) 
+#endif
 {
 	int heads, sectors, cylinders;
 
@@ -3132,7 +3174,14 @@ static int sbp2scsi_detect (Scsi_Host_Template *tpnt)
 	 * host controller currently registered, and for each of those
 	 * we register a scsi host with the scsi stack.
 	 */
+	
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+	spin_unlock_irq(&io_request_lock);
 	sbp2_init();
+	spin_lock_irq(&io_request_lock);
+#else
+	sbp2_init();
+#endif
 
 	/* We return the number of hosts registered. */
 	return scsi_driver_template.present;
@@ -3178,23 +3227,23 @@ MODULE_LICENSE("GPL");
 
 /* SCSI host template */
 static Scsi_Host_Template scsi_driver_template = {
-	name:			"IEEE-1394 SBP-2 protocol driver",
-	info:			sbp2scsi_info,
-	detect:			sbp2scsi_detect,
-	queuecommand:		sbp2scsi_queuecommand,
-	eh_abort_handler:	sbp2scsi_abort,
-	eh_device_reset_handler:sbp2scsi_reset,
-	eh_bus_reset_handler:	sbp2scsi_reset,
-	eh_host_reset_handler:	sbp2scsi_reset,
-	bios_param:		sbp2scsi_biosparam,
-	this_id:		-1,
-	sg_tablesize:		SBP2_MAX_SG_ELEMENTS,
-	use_clustering:		SBP2_CLUSTERING,
+	.name =			"IEEE-1394 SBP-2 protocol driver",
+	.info =			sbp2scsi_info,
+	.detect =		sbp2scsi_detect,
+	.queuecommand =		sbp2scsi_queuecommand,
+	.eh_abort_handler =	sbp2scsi_abort,
+	.eh_device_reset_handler =sbp2scsi_reset,
+	.eh_bus_reset_handler =	sbp2scsi_reset,
+	.eh_host_reset_handler =sbp2scsi_reset,
+	.bios_param =		sbp2scsi_biosparam,
+	.this_id =		-1,
+	.sg_tablesize =		SBP2_MAX_SG_ELEMENTS,
+	.use_clustering =	SBP2_CLUSTERING,
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	use_new_eh_code:	TRUE,
+	.use_new_eh_code =	TRUE,
 #endif
-	emulated:		1,
-	proc_name:	SBP2_DEVICE_NAME,
+	.emulated =		1,
+	.proc_name =	SBP2_DEVICE_NAME,
 };
 
 static int sbp2_module_init(void)

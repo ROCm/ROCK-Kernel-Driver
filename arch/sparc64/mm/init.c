@@ -1515,14 +1515,6 @@ void __init paging_init(void)
 	pages_avail = 0;
 	last_valid_pfn = end_pfn = bootmem_init(&pages_avail);
 
-#ifdef CONFIG_SUN_SERIAL
-	/* This does not logically belong here, but we need to
-	 * call it at the moment we are able to use the bootmem
-	 * allocator.
-	 */
-	sun_serial_setup();
-#endif
-
 	/* Inherit non-locked OBP mappings. */
 	inherit_prom_mappings();
 	

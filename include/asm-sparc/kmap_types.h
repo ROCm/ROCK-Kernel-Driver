@@ -11,6 +11,8 @@ enum km_type {
 	KM_BIO_DST_IRQ,
 	KM_PTE0,
 	KM_PTE1,
+	KM_IRQ0,
+	KM_IRQ1,
 	KM_TYPE_NR
 };
 

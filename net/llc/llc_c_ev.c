@@ -241,9 +241,8 @@ int llc_conn_ev_rx_i_cmd_pbit_set_x_inval_ns(struct sock *sk,
 	u16 rc = !LLC_PDU_IS_CMD(pdu) && !LLC_PDU_TYPE_IS_I(pdu) && ns != vr &&
 		 llc_util_ns_inside_rx_window(ns, vr, llc_sk(sk)->rw) ? 0 : 1;
 	if (!rc)
-		dprintk(KERN_WARNING "rx_i_cmd_p_bit_set_x_inval_ns matched,"
-			"state = %d, ns = %d, vr = %d\n",
-			llc_sk(sk)->state, ns, vr);
+		dprintk("%s: matched, state=%d, ns=%d, vr=%d\n",
+			__FUNCTION__, llc_sk(sk)->state, ns, vr);
 	return rc;
 }
 
@@ -317,9 +316,8 @@ int llc_conn_ev_rx_i_rsp_fbit_set_x_inval_ns(struct sock *sk,
 	u16 rc = !LLC_PDU_IS_RSP(pdu) && !LLC_PDU_TYPE_IS_I(pdu) && ns != vr &&
 		 llc_util_ns_inside_rx_window(ns, vr, llc_sk(sk)->rw) ? 0 : 1;
 	if (!rc)
-		dprintk(KERN_WARNING "conn_ev_rx_i_rsp_fbit_set_x_inval_ns "
-			"matched : state = %d, ns = %d, vr = %d\n",
-			llc_sk(sk)->state, ns, vr);
+		dprintk("%s: matched, state=%d, ns=%d, vr=%d\n",
+			__FUNCTION__, llc_sk(sk)->state, ns, vr);
 	return rc;
 }
 
@@ -584,9 +582,8 @@ int llc_conn_ev_rx_zzz_cmd_pbit_set_x_inval_nr(struct sock *sk,
 	if (!LLC_PDU_IS_CMD(pdu) &&
 	    (!LLC_PDU_TYPE_IS_I(pdu) || !LLC_PDU_TYPE_IS_S(pdu)) &&
 	    nr != vs && llc_util_nr_inside_tx_window(sk, nr)) {
-		dprintk(KERN_ERR "conn_ev_rx_zzz_cmd_inv_nr matched, state = "
-				 "%d, vs = %d, nr = %d\n",
-				 llc_sk(sk)->state, vs, nr);
+		dprintk("%s: matched, state=%d, vs=%d, nr=%d\n",
+			__FUNCTION__, llc_sk(sk)->state, vs, nr);
 		rc = 0;
 	}
 	return rc;
@@ -604,9 +601,8 @@ int llc_conn_ev_rx_zzz_rsp_fbit_set_x_inval_nr(struct sock *sk,
 	    (!LLC_PDU_TYPE_IS_I(pdu) || !LLC_PDU_TYPE_IS_S(pdu)) &&
 	    nr != vs && llc_util_nr_inside_tx_window(sk, nr)) {
 		rc = 0;
-		dprintk(KERN_ERR "conn_ev_rx_zzz_fbit_set_x_inval_nr matched, "
-				 "state = %d, vs = %d, nr = %d\n",
-			llc_sk(sk)->state, vs, nr);
+		dprintk("%s: matched, state=%d, vs=%d, nr=%d\n",
+			__FUNCTION__, llc_sk(sk)->state, vs, nr);
 	}
 	return rc;
 }

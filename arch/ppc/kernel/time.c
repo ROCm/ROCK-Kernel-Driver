@@ -193,7 +193,7 @@ void timer_interrupt(struct pt_regs * regs)
 		 */
 		if ( ppc_md.set_rtc_time && (time_status & STA_UNSYNC) == 0 &&
 		     xtime.tv_sec - last_rtc_update >= 659 &&
-		     abs(xtime.tv_usec - (1000000-1000000/HZ)) < 500000/HZ &&
+		     abs((xtime.tv_nsec / 1000) - (1000000-1000000/HZ)) < 500000/HZ &&
 		     jiffies - wall_jiffies == 1) {
 		  	if (ppc_md.set_rtc_time(xtime.tv_sec+1 + time_offset) == 0)
 				last_rtc_update = xtime.tv_sec+1;
@@ -228,7 +228,7 @@ void do_gettimeofday(struct timeval *tv)
 
 	read_lock_irqsave(&xtime_lock, flags);
 	sec = xtime.tv_sec;
-	usec = xtime.tv_usec;
+	usec = (xtime.tv_nsec / 1000);
 #ifdef CONFIG_PPC_ISERIES
 	delta = tb_ticks_per_jiffy - ( next_jiffy_update_tb[0] - get_tb64() );
 #else
@@ -285,7 +285,7 @@ void do_settimeofday(struct timeval *tv)
 		new_sec--; 
 		new_usec += 1000000;
 	}
-	xtime.tv_usec = new_usec;
+	xtime.tv_nsec = (new_usec * 1000);
 	xtime.tv_sec = new_sec;
 
 	/* In case of a large backwards jump in time with NTP, we want the 
@@ -344,7 +344,7 @@ void __init time_init(void)
 		write_lock_irqsave(&xtime_lock, flags);
 		xtime.tv_sec = sec;
 		last_jiffy_stamp(0) = tb_last_stamp = stamp;
-		xtime.tv_usec = 0;
+		xtime.tv_nsec = 0;
 		/* No update now, we just read the time from the RTC ! */
 		last_rtc_update = xtime.tv_sec;
 		write_unlock_irqrestore(&xtime_lock, flags);

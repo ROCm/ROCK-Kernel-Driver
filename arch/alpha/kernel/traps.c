@@ -171,6 +171,11 @@ void show_stack(unsigned long *sp)
 	dik_show_trace(sp);
 }
 
+void dump_stack(void)
+{
+	show_stack(NULL);
+}
+
 void
 die_if_kernel(char * str, struct pt_regs *regs, long err, unsigned long *r9_15)
 {

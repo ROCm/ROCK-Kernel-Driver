@@ -2001,7 +2001,6 @@ extern void sparc_context_init(int);
 extern unsigned long end;
 extern unsigned long bootmem_init(unsigned long *pages_avail);
 extern unsigned long last_valid_pfn;
-extern void sun_serial_setup(void);
 
 void __init sun4c_paging_init(void)
 {
@@ -2017,12 +2016,6 @@ void __init sun4c_paging_init(void)
 	pages_avail = 0;
 	last_valid_pfn = bootmem_init(&pages_avail);
 	end_pfn = last_valid_pfn;
-
-	/* This does not logically belong here, but we need to
-	 * call it at the moment we are able to use the bootmem
-	 * allocator.
-	 */
-	sun_serial_setup();
 
 	sun4c_probe_mmu();
 	invalid_segment = (num_segmaps - 1);

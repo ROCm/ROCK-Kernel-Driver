@@ -1508,7 +1508,6 @@ again:
 			req->biotail->bi_next = bio;
 			req->biotail = bio;
 			req->nr_sectors = req->hard_nr_sectors += nr_sectors;
-			elv_merge_cleanup(q, req, nr_sectors);
 			drive_stat_acct(req, nr_sectors, 0);
 			attempt_back_merge(q, req);
 			goto out;
@@ -1532,7 +1531,6 @@ again:
 			req->hard_cur_sectors = cur_nr_sectors;
 			req->sector = req->hard_sector = sector;
 			req->nr_sectors = req->hard_nr_sectors += nr_sectors;
-			elv_merge_cleanup(q, req, nr_sectors);
 			drive_stat_acct(req, nr_sectors, 0);
 			attempt_front_merge(q, req);
 			goto out;

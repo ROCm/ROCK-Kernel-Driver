@@ -13,11 +13,13 @@
 #include <linux/slab.h>
 #include <linux/compiler.h>
 #include <linux/fs.h>
+#include <linux/aio.h>
 #include <linux/kernel_stat.h>
 #include <linux/mm.h>
 #include <linux/mman.h>
 #include <linux/pagemap.h>
 #include <linux/file.h>
+#include <linux/uio.h>
 #include <linux/iobuf.h>
 #include <linux/hash.h>
 #include <linux/writeback.h>
@@ -1121,14 +1123,19 @@ success:
  * This is the "read()" routine for all filesystems
  * that can use the page cache directly.
  */
-ssize_t
-generic_file_read(struct file *filp, char *buf, size_t count, loff_t *ppos)
+static ssize_t
+__generic_file_aio_read(struct kiocb *iocb, const struct iovec *iov,
+		unsigned long nr_segs, loff_t *ppos)
 {
+	struct file *filp = iocb->ki_filp;
 	ssize_t retval;
+	unsigned long seg;
+	size_t count = iov_length(iov, nr_segs);
 
 	if ((ssize_t) count < 0)
 		return -EINVAL;
 
+	/* coalesce the iovecs and go direct-to-BIO for O_DIRECT */
 	if (filp->f_flags & O_DIRECT) {
 		loff_t pos = *ppos, size;
 		struct address_space *mapping;
@@ -1141,10 +1148,13 @@ generic_file_read(struct file *filp, char *buf, size_t count, loff_t *ppos)
 			goto out; /* skip atime */
 		size = inode->i_size;
 		if (pos < size) {
-			if (pos + count > size)
+			if (pos + count > size) {
 				count = size - pos;
-			retval = generic_file_direct_IO(READ, inode,
-							buf, pos, count);
+				nr_segs = iov_shorten((struct iovec *)iov,
+							nr_segs, count);
+			}
+			retval = generic_file_direct_IO(READ, inode, 
+					iov, pos, nr_segs);
 			if (retval > 0)
 				*ppos = pos + retval;
 		}
@@ -1152,25 +1162,54 @@ generic_file_read(struct file *filp, char *buf, size_t count, loff_t *ppos)
 		goto out;
 	}
 
-	retval = -EFAULT;
-	if (access_ok(VERIFY_WRITE, buf, count)) {
-		retval = 0;
+	for (seg = 0; seg < nr_segs; seg++) {
+		if (!access_ok(VERIFY_WRITE,iov[seg].iov_base,iov[seg].iov_len))
+			return -EFAULT;
+	}
 
-		if (count) {
+	retval = 0;
+	if (count) {
+		for (seg = 0; seg < nr_segs; seg++) {
 			read_descriptor_t desc;
 
 			desc.written = 0;
-			desc.count = count;
-			desc.buf = buf;
+			desc.buf = iov[seg].iov_base;
+			desc.count = iov[seg].iov_len;
+			if (desc.count == 0)
+				continue;
 			desc.error = 0;
 			do_generic_file_read(filp,ppos,&desc,file_read_actor);
-			retval = desc.written;
-			if (!retval)
+			retval += desc.written;
+			if (!retval) {
 				retval = desc.error;
+				break;
+			}
 		}
 	}
 out:
 	return retval;
+}
+
+ssize_t
+generic_file_aio_read(struct kiocb *iocb, char *buf, size_t count, loff_t *ppos)
+{
+	struct iovec local_iov = { .iov_base = buf, .iov_len = count };
+
+	return __generic_file_aio_read(iocb, &local_iov, 1, ppos);
+}
+
+ssize_t
+generic_file_read(struct file *filp, char *buf, size_t count, loff_t *ppos)
+{
+	struct iovec local_iov = { .iov_base = buf, .iov_len = count };
+	struct kiocb kiocb;
+	ssize_t ret;
+
+	init_sync_kiocb(&kiocb, filp);
+	ret = __generic_file_aio_read(&kiocb, &local_iov, 1, ppos);
+	if (-EIOCBQUEUED == ret)
+		ret = wait_on_sync_kiocb(&kiocb);
+	return ret;
 }
 
 static int file_send_actor(read_descriptor_t * desc, struct page *page, unsigned long offset, unsigned long size)
@@ -1926,11 +1965,14 @@ filemap_copy_from_user(struct page *page, unsigned long offset,
  * it for writing by marking it dirty.
  *							okir@monad.swb.de
  */
-ssize_t generic_file_write_nolock(struct file *file, const char *buf,
-				  size_t count, loff_t *ppos)
+ssize_t
+generic_file_write_nolock(struct file *file, const struct iovec *iov,
+				unsigned long nr_segs, loff_t *ppos)
 {
 	struct address_space * mapping = file->f_dentry->d_inode->i_mapping;
 	struct address_space_operations *a_ops = mapping->a_ops;
+	const size_t ocount = iov_length(iov, nr_segs);
+	size_t count =	ocount;
 	struct inode 	*inode = mapping->host;
 	unsigned long	limit = current->rlim[RLIMIT_FSIZE].rlim_cur;
 	long		status = 0;
@@ -1942,12 +1984,19 @@ ssize_t generic_file_write_nolock(struct file *file, const char *buf,
 	unsigned	bytes;
 	time_t		time_now;
 	struct pagevec	lru_pvec;
+	struct iovec	*cur_iov;
+	unsigned	iov_bytes;	/* Cumulative count to the end of the
+					   current iovec */
+	unsigned long	seg;
+	char		*buf;
 
 	if (unlikely((ssize_t)count < 0))
 		return -EINVAL;
 
-	if (unlikely(!access_ok(VERIFY_READ, buf, count)))
-		return -EFAULT;
+	for (seg = 0; seg < nr_segs; seg++) {
+		if (!access_ok(VERIFY_READ,iov[seg].iov_base,iov[seg].iov_len))
+			return -EFAULT;
+	}
 
 	pos = *ppos;
 	if (unlikely(pos < 0))
@@ -2045,9 +2094,13 @@ ssize_t generic_file_write_nolock(struct file *file, const char *buf,
 		mark_inode_dirty_sync(inode);
 	}
 
+	/* coalesce the iovecs and go direct-to-BIO for O_DIRECT */
 	if (unlikely(file->f_flags & O_DIRECT)) {
-		written = generic_file_direct_IO(WRITE, inode,
-						(char *)buf, pos, count);
+		if (count != ocount)
+			nr_segs = iov_shorten((struct iovec *)iov,
+						nr_segs, count);
+		written = generic_file_direct_IO(WRITE, inode, 
+					iov, pos, nr_segs);
 		if (written > 0) {
 			loff_t end = pos + written;
 			if (end > inode->i_size && !S_ISBLK(inode->i_mode)) {
@@ -2065,6 +2118,9 @@ ssize_t generic_file_write_nolock(struct file *file, const char *buf,
 		goto out_status;
 	}
 
+	cur_iov = (struct iovec *)iov;
+	iov_bytes = cur_iov->iov_len;
+	buf = cur_iov->iov_base;
 	do {
 		unsigned long index;
 		unsigned long offset;
@@ -2075,6 +2131,8 @@ ssize_t generic_file_write_nolock(struct file *file, const char *buf,
 		bytes = PAGE_CACHE_SIZE - offset;
 		if (bytes > count)
 			bytes = count;
+		if (bytes + written > iov_bytes)
+			bytes = iov_bytes - written;
 
 		/*
 		 * Bring in the user page that we will copy from _first_.
@@ -2084,7 +2142,7 @@ ssize_t generic_file_write_nolock(struct file *file, const char *buf,
 		 */
 		fault_in_pages_readable(buf, bytes);
 
-		page = __grab_cache_page(mapping, index, &cached_page, &lru_pvec);
+		page = __grab_cache_page(mapping,index,&cached_page,&lru_pvec);
 		if (!page) {
 			status = -ENOMEM;
 			break;
@@ -2115,6 +2173,11 @@ ssize_t generic_file_write_nolock(struct file *file, const char *buf,
 				count -= status;
 				pos += status;
 				buf += status;
+				if (written == iov_bytes && count) {
+					cur_iov++;
+					iov_bytes += cur_iov->iov_len;
+					buf = cur_iov->iov_base;
+				}
 			}
 		}
 		if (!PageReferenced(page))
@@ -2151,10 +2214,36 @@ ssize_t generic_file_write(struct file *file, const char *buf,
 {
 	struct inode	*inode = file->f_dentry->d_inode->i_mapping->host;
 	int		err;
+	struct iovec local_iov = { .iov_base = (void *)buf, .iov_len = count };
 
 	down(&inode->i_sem);
-	err = generic_file_write_nolock(file, buf, count, ppos);
+	err = generic_file_write_nolock(file, &local_iov, 1, ppos);
 	up(&inode->i_sem);
 
 	return err;
+}
+
+ssize_t generic_file_readv(struct file *filp, const struct iovec *iov,
+			unsigned long nr_segs, loff_t *ppos)
+{
+	struct kiocb kiocb;
+	ssize_t ret;
+
+	init_sync_kiocb(&kiocb, filp);
+	ret = __generic_file_aio_read(&kiocb, iov, nr_segs, ppos);
+	if (-EIOCBQUEUED == ret)
+		ret = wait_on_sync_kiocb(&kiocb);
+	return ret;
+}
+
+ssize_t generic_file_writev(struct file *file, const struct iovec *iov,
+			unsigned long nr_segs, loff_t * ppos) 
+{
+	struct inode *inode = file->f_dentry->d_inode;
+	ssize_t ret;
+
+	down(&inode->i_sem);
+	ret = generic_file_write_nolock(file, iov, nr_segs, ppos);
+	up(&inode->i_sem);
+	return ret;
 }

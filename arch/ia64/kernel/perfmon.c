@@ -2345,22 +2345,19 @@ static int
 check_task_state(struct task_struct *task)
 {
 	int ret = 0;
-#ifdef CONFIG_SMP
+
 	/* We must wait until the state has been completely
 	 * saved. There can be situations where the reader arrives before
 	 * after the task is marked as STOPPED but before pfm_save_regs()
 	 * is completed.
 	 */
-	if (task->state != TASK_ZOMBIE && task->state != TASK_STOPPED) return -EBUSY;
-	DBprintk(("before wait_task_inactive [%d] state %ld\n", task->pid, task->state));
-	wait_task_inactive(task);
-	DBprintk(("after wait_task_inactive [%d] state %ld\n", task->pid, task->state));
-#else
 	if (task->state != TASK_ZOMBIE && task->state != TASK_STOPPED) {
 		DBprintk(("warning [%d] not in stable state %ld\n", task->pid, task->state));
 		ret = -EBUSY;
 	}
-#endif
+	DBprintk(("before wait_task_inactive [%d] state %ld\n", task->pid, task->state));
+	wait_task_inactive(task);
+	DBprintk(("after wait_task_inactive [%d] state %ld\n", task->pid, task->state));
 	return ret;
 }
 

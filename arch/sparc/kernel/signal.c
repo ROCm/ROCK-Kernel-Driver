@@ -38,11 +38,6 @@ extern void fpload(unsigned long *fpregs, unsigned long *fsr);
 asmlinkage int do_signal(sigset_t *oldset, struct pt_regs * regs,
 			 unsigned long orig_o0, int restart_syscall);
 
-/* This turned off for production... */
-/* #define DEBUG_SIGNALS 1 */
-/* #define DEBUG_SIGNALS_TRACE 1 */
-/* #define DEBUG_SIGNALS_MAPS 1 */
-
 /* Signal frames: the original one (compatible with SunOS):
  *
  * Set up a signal frame... Make the stack look the way SunOS
@@ -470,12 +465,6 @@ setup_frame(struct sigaction *sa, struct pt_regs *regs, int signr, sigset_t *old
 	synchronize_user_stack();
 	sframep = (struct signal_sframe *)get_sigframe(sa, regs, SF_ALIGNEDSZ);
 	if (invalid_frame_pointer (sframep, sizeof(*sframep))){
-#ifdef DEBUG_SIGNALS /* fills up the console logs during crashme runs, yuck... */
-		printk("%s [%d]: User has trashed signal stack\n",
-		       current->comm, current->pid);
-		printk("Sigstack ptr %p handler at pc<%08lx> for sig<%d>\n",
-		       sframep, pc, signr);
-#endif
 		/* Don't change signal code and address, so that
 		 * post mortem debuggers can have a look.
 		 */
@@ -635,13 +624,8 @@ new_setup_frame(struct k_sigaction *ka, struct pt_regs *regs,
 	if (invalid_frame_pointer (sf, sigframe_size))
 		goto sigill_and_return;
 
-	if (current->thread.w_saved != 0) {
-#ifdef DEBUG_SIGNALS 
-		printk ("%s [%d]: Invalid user stack frame for "
-			"signal delivery.\n", current->comm, current->pid);
-#endif
+	if (current->thread.w_saved != 0)
 		goto sigill_and_return;
-	}
 
 	/* 2. Save the current process state */
 	err = __copy_to_user(&sf->info.si_regs, regs, sizeof (struct pt_regs));
@@ -795,12 +779,8 @@ setup_svr4_frame(struct sigaction *sa, unsigned long pc, unsigned long npc,
 	synchronize_user_stack();
 	sfp = (svr4_signal_frame_t *) get_sigframe(sa, regs, SVR4_SF_ALIGNED + REGWIN_SZ);
 
-	if (invalid_frame_pointer (sfp, sizeof (*sfp))){
-#ifdef DEBUG_SIGNALS
-		printk ("Invalid stack frame\n");
-#endif
+	if (invalid_frame_pointer (sfp, sizeof (*sfp)))
 		goto sigill_and_return;
-	}
 
 	/* Start with a clean frame pointer and fill it */
 	err = __clear_user(sfp, sizeof (*sfp));
@@ -883,9 +863,6 @@ setup_svr4_frame(struct sigaction *sa, unsigned long pc, unsigned long npc,
 	regs->pc = (unsigned long) sa->sa_handler;
 	regs->npc = (regs->pc + 4);
 
-#ifdef DEBUG_SIGNALS
-	printk ("Solaris-frame: %x %x\n", (int) regs->pc, (int) regs->npc);
-#endif
 	/* Arguments passed to signal handler */
 	if (regs->u_regs [14]){
 		struct reg_window *rw = (struct reg_window *) regs->u_regs [14];
@@ -1090,61 +1067,6 @@ static inline void syscall_restart(unsigned long orig_i0, struct pt_regs *regs,
 	}
 }
 
-#ifdef DEBUG_SIGNALS_MAPS
-
-#define MAPS_LINE_FORMAT	  "%08lx-%08lx %s %08lx %02x:%02x %lu "
-
-static inline void read_maps (void)
-{
-	struct vm_area_struct * map, * next;
-	char * buffer;
-	ssize_t i;
-
-	buffer = (char*)__get_free_page(GFP_KERNEL);
-	if (!buffer)
-		return;
-
-	for (map = current->mm->mmap ; map ; map = next ) {
-		/* produce the next line */
-		char *line;
-		char str[5], *cp = str;
-		int flags;
-		dev_t dev;
-		unsigned long ino;
-
-		/*
-		 * Get the next vma now (but it won't be used if we sleep).
-		 */
-		next = map->vm_next;
-		flags = map->vm_flags;
-
-		*cp++ = flags & VM_READ ? 'r' : '-';
-		*cp++ = flags & VM_WRITE ? 'w' : '-';
-		*cp++ = flags & VM_EXEC ? 'x' : '-';
-		*cp++ = flags & VM_MAYSHARE ? 's' : 'p';
-		*cp++ = 0;
-
-		dev = 0;
-		ino = 0;
-		if (map->vm_file != NULL) {
-			dev = map->vm_file->f_dentry->d_inode->i_dev;
-			ino = map->vm_file->f_dentry->d_inode->i_ino;
-			line = d_path(map->vm_file->f_dentry,
-				      map->vm_file->f_vfsmnt,
-				      buffer, PAGE_SIZE);
-		}
-		printk(MAPS_LINE_FORMAT, map->vm_start, map->vm_end, str, map->vm_pgoff << PAGE_SHIFT,
-			      MAJOR(dev), MINOR(dev), ino);
-		if (map->vm_file != NULL)
-			printk("%s\n", line);
-		else
-			printk("\n");
-	}
-	free_page((unsigned long)buffer);
-	return;
-}
-#endif
-
 /* Note that 'init' is a special process: it doesn't get signals it doesn't
  * want to handle. Thus you cannot kill init even with a SIGKILL even by
  * mistake.
@@ -1152,7 +1074,6 @@ static inline void read_maps (void)
 asmlinkage int do_signal(sigset_t *oldset, struct pt_regs * regs,
 			 unsigned long orig_i0, int restart_syscall)
 {
-	unsigned long signr;
 	struct k_sigaction *ka;
 	siginfo_t info;
 
@@ -1171,9 +1092,21 @@ asmlinkage int do_signal(sigset_t *oldset, struct pt_regs * regs,
 		oldset = &current->blocked;
 
 	for (;;) {
-		spin_lock_irq(&current->sigmask_lock);
-		signr = dequeue_signal(&current->blocked, &info);
-		spin_unlock_irq(&current->sigmask_lock);
+		sigset_t *mask = &current->blocked;
+		unsigned long signr = 0;
+
+		local_irq_disable();
+		if (current->sig->shared_pending.head) {
+			spin_lock(&current->sig->siglock);
+			signr = dequeue_signal(&current->sig->shared_pending, mask, &info);
+			spin_unlock(&current->sig->siglock);
+		}
+		if (!signr) {
+			spin_lock(&current->sigmask_lock);
+			signr = dequeue_signal(&current->pending, mask, &info);
+			spin_unlock(&current->sigmask_lock);
+		}
+		local_irq_enable();
 
 		if (!signr)
 			break;
@@ -1193,7 +1126,7 @@ asmlinkage int do_signal(sigset_t *oldset, struct pt_regs * regs,
 				restart_syscall = 0;
 			}
 			current->exit_code = signr;
-			current->state = TASK_STOPPED;
+			set_current_state(TASK_STOPPED);
 
 			/* This happens to be SMP safe so no need to
 			 * grab master kernel lock even in this case.
@@ -1254,52 +1187,27 @@ asmlinkage int do_signal(sigset_t *oldset, struct pt_regs * regs,
 				if (is_orphaned_pgrp(current->pgrp))
 					continue;
 
-			case SIGSTOP:
-				if (current->ptrace & PT_PTRACED)
-					continue;
-				current->state = TASK_STOPPED;
+			case SIGSTOP: {
+				struct signal_struct *sig;
+				set_current_state(TASK_STOPPED);
 				current->exit_code = signr;
-
-				/* notify_parent() is SMP safe */
-				if(!(current->parent->sig->action[SIGCHLD-1].sa.sa_flags &
-				     SA_NOCLDSTOP))
+				sig = current->parent->sig;
+				if (sig && !(sig->action[SIGCHLD-1].sa.sa_flags &
+				      SA_NOCLDSTOP))
 					notify_parent(current, SIGCHLD);
 				schedule();
 				continue;
+			}
 
 			case SIGQUIT: case SIGILL: case SIGTRAP:
 			case SIGABRT: case SIGFPE: case SIGSEGV:
 			case SIGBUS: case SIGSYS: case SIGXCPU: case SIGXFSZ:
 				if (do_coredump(signr, regs))
 					exit_code |= 0x80;
-#ifdef DEBUG_SIGNALS
-				/* Very useful to debug dynamic linker problems */
-				printk ("Sig %ld going for %s[%d]...\n", signr, current->comm, current->pid);
-				show_regs (regs);
-#ifdef DEBUG_SIGNALS_TRACE
-				{
-					struct reg_window *rw = (struct reg_window *)regs->u_regs[UREG_FP];
-					unsigned int ins[8];
+				/* FALLTHRU */
 
-					while (rw &&
-					       !(((unsigned long) rw) & 0x3)) {
-						copy_from_user(ins, &rw->ins[0], sizeof(ins));
-						printk("Caller[%08x](%08x,%08x,%08x,%08x,%08x,%08x)\n", ins[7], ins[0], ins[1], ins[2], ins[3], ins[4], ins[5]);
-						rw = (struct reg_window *)(unsigned long)ins[6];
-					}
-				}
-#endif
-#ifdef DEBUG_SIGNALS_MAPS
-				printk("Maps:\n");
-				read_maps();
-#endif
-#endif
-				/* fall through */
 			default:
-				sigaddset(&current->pending.signal, signr);
-				recalc_sigpending();
-				current->flags |= PF_SIGNALED;
-				do_exit(exit_code);
+				sig_exit(signr, exit_code, &info);
 				/* NOT REACHED */
 			}
 		}

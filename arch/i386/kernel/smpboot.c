@@ -445,6 +445,11 @@ int __init start_secondary(void *unused)
 	while (!test_bit(smp_processor_id(), &smp_commenced_mask))
 		rep_nop();
 	setup_secondary_APIC_clock();
+	if (nmi_watchdog == NMI_IO_APIC) {
+		disable_8259A_irq(0);
+		enable_NMI_through_LVT0(NULL);
+		enable_8259A_irq(0);
+	}
 	enable_APIC_timer();
 	/*
 	 * low-memory mappings have been cleared, flush them from

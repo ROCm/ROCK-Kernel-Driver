@@ -110,7 +110,6 @@ int cpu_idle(void)
 extern char reboot_command [];
 
 extern void (*prom_palette)(int);
-extern int serial_console;
 extern void (*prom_keyboard)(void);
 
 void machine_halt(void)

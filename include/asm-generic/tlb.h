@@ -21,7 +21,7 @@
  * and page free order so much..
  */
 #ifdef CONFIG_SMP
-  #define FREE_PTE_NR	507
+  #define FREE_PTE_NR	506
   #define tlb_fast_mode(tlb) ((tlb)->nr == ~0U)
 #else
   #define FREE_PTE_NR	1
@@ -40,8 +40,6 @@ typedef struct free_pte_ctx {
 	unsigned int		fullmm; /* non-zero means full mm flush */
 	unsigned long		freed;
 	struct page *		pages[FREE_PTE_NR];
-	unsigned long		flushes;/* stats: count avoided flushes */
-	unsigned long		avoided_flushes;
 } mmu_gather_t;
 
 /* Users of the generic TLB shootdown code must declare this storage space. */
@@ -67,17 +65,10 @@ static inline mmu_gather_t *tlb_gather_mmu(struct mm_struct *mm, unsigned int fu
 
 static inline void tlb_flush_mmu(mmu_gather_t *tlb, unsigned long start, unsigned long end)
 {
-	unsigned long nr;
-
-	if (!tlb->need_flush) {
-		tlb->avoided_flushes++;
+	if (!tlb->need_flush)
 		return;
-	}
 	tlb->need_flush = 0;
-	tlb->flushes++;
-
 	tlb_flush(tlb);
-	nr = tlb->nr;
 	if (!tlb_fast_mode(tlb)) {
 		free_pages_and_swap_cache(tlb->pages, tlb->nr);
 		tlb->nr = 0;

@@ -19,6 +19,7 @@ obj-$(CONFIG_BLK_DEV_Q40IDE)		+= q40ide.o
 
 obj-$(CONFIG_BLK_DEV_IDECS)		+= ide-cs.o
 
+# Last of all
 obj-$(CONFIG_BLK_DEV_HD)		+= hd.o
 
 EXTRA_CFLAGS	:= -I../

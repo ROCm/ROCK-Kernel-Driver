@@ -44,6 +44,8 @@ unsigned long mstk48t02_regs = 0UL;
 unsigned long ds1287_regs = 0UL;
 #endif
 
+extern unsigned long wall_jiffies;
+
 u64 jiffies_64;
 
 static unsigned long mstk48t08_regs = 0UL;
@@ -61,6 +63,8 @@ unsigned long timer_tick_offset;
 unsigned long timer_tick_compare;
 unsigned long timer_ticks_per_usec_quotient;
 
+#define TICK_SIZE (tick_nsec / 1000)
+
 static __inline__ void timer_check_rtc(void)
 {
 	/* last time the cmos clock got updated */
@@ -69,8 +73,8 @@ static __inline__ void timer_check_rtc(void)
 	/* Determine when to update the Mostek clock. */
 	if ((time_status & STA_UNSYNC) == 0 &&
 	    xtime.tv_sec > last_rtc_update + 660 &&
-	    xtime.tv_usec >= 500000 - ((unsigned) tick) / 2 &&
-	    xtime.tv_usec <= 500000 + ((unsigned) tick) / 2) {
+	    (xtime.tv_nsec / 1000) >= 500000 - ((unsigned) TICK_SIZE) / 2 &&
+	    (xtime.tv_nsec / 1000) <= 500000 + ((unsigned) TICK_SIZE) / 2) {
 		if (set_rtc_mmss(xtime.tv_sec) == 0)
 			last_rtc_update = xtime.tv_sec;
 		else
@@ -390,7 +394,7 @@ static void __init set_system_time(void)
 	}
 
 	xtime.tv_sec = mktime(year, mon, day, hour, min, sec);
-	xtime.tv_usec = 0;
+	xtime.tv_nsec = 0;
 
 	if (mregs) {
 		tmp = mostek_read(mregs + MOSTEK_CREG);
@@ -428,7 +432,7 @@ void __init clock_probe(void)
 			(unsigned int) (long) &unix_tod);
 		prom_feval(obp_gettod);
 		xtime.tv_sec = unix_tod;
-		xtime.tv_usec = 0;
+		xtime.tv_nsec = 0;
 		return;
 	}
 
@@ -658,20 +662,56 @@ void do_settimeofday(struct timeval *tv)
 		return;
 
 	write_lock_irq(&xtime_lock);
-
+	/*
+	 * This is revolting. We need to set "xtime" correctly. However, the
+	 * value in this location is the value at the most recent update of
+	 * wall time.  Discover what correction gettimeofday() would have
+	 * made, and then undo it!
+	 */
 	tv->tv_usec -= do_gettimeoffset();
-	if(tv->tv_usec < 0) {
+	tv->tv_usec -= (jiffies - wall_jiffies) * (1000000 / HZ);
+
+	while (tv->tv_usec < 0) {
 		tv->tv_usec += 1000000;
 		tv->tv_sec--;
 	}
 
-	xtime = *tv;
+	xtime.tv_sec = tv->tv_sec;
+	xtime.tv_nsec = (tv->tv_usec * 1000);
 	time_adjust = 0;		/* stop active adjtime() */
 	time_status |= STA_UNSYNC;
 	time_maxerror = NTP_PHASE_LIMIT;
 	time_esterror = NTP_PHASE_LIMIT;
-
 	write_unlock_irq(&xtime_lock);
+}
+
+/* Ok, my cute asm atomicity trick doesn't work anymore.
+ * There are just too many variables that need to be protected
+ * now (both members of xtime, wall_jiffies, et al.)
+ */
+void do_gettimeofday(struct timeval *tv)
+{
+	unsigned long flags;
+	unsigned long usec, sec;
+
+	read_lock_irqsave(&xtime_lock, flags);
+	usec = do_gettimeoffset();
+	{
+		unsigned long lost = jiffies - wall_jiffies;
+		if (lost)
+			usec += lost * (1000000 / HZ);
+	}
+	sec = xtime.tv_sec;
+	usec += (xtime.tv_nsec / 1000);
+	read_unlock_irqrestore(&xtime_lock, flags);
+
+	while (usec >= 1000000) {
+		usec -= 1000000;
+		sec++;
+	}
+
+	tv->tv_sec = sec;
+	tv->tv_usec = usec;
 }
 
 static int set_rtc_mmss(unsigned long nowtime)

@@ -31,17 +31,15 @@ static ide_pci_host_proc_t hpt34x_procs[] __initdata = {
 };
 #endif  /* defined(DISPLAY_HPT34X_TIMINGS) && defined(CONFIG_PROC_FS) */
 
-static void init_setup_hpt34x(struct pci_dev *, ide_pci_device_t *);
 static unsigned int init_chipset_hpt34x(struct pci_dev *, const char *);
 static void init_hwif_hpt34x(ide_hwif_t *);
 static void init_dma_hpt34x(ide_hwif_t *, unsigned long);
 
 static ide_pci_device_t hpt34x_chipsets[] __initdata = {
-	{
+	{	/* 0 */
 		vendor:		PCI_VENDOR_ID_TTI,
 		device:		PCI_DEVICE_ID_TTI_HPT343,
 		name:		"HPT34X",
-		init_setup:	init_setup_hpt34x,
 		init_chipset:	init_chipset_hpt34x,
 		init_iops:	NULL,
 		init_hwif:	init_hwif_hpt34x,

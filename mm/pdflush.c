@@ -202,8 +202,7 @@ int pdflush_operation(void (*fn)(unsigned long), unsigned long arg0)
 
 static void start_one_pdflush_thread(void)
 {
-	kernel_thread(pdflush, NULL,
-			CLONE_FS | CLONE_FILES | CLONE_SIGNAL);
+	kernel_thread(pdflush, NULL, CLONE_KERNEL);
 }
 
 static int __init pdflush_init(void)

@@ -40,6 +40,8 @@
 #define __NO_VERSION__
 #include <linux/module.h>
 #include <linux/namei.h>
+#include <linux/proc_fs.h>
+#include <linux/ptrace.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgalloc.h>
@@ -493,53 +495,183 @@ static int exec_mmap(struct mm_struct *mm)
 	return 0;
 }
 
+static struct dentry *clean_proc_dentry(struct task_struct *p)
+{
+	struct dentry *proc_dentry = p->proc_dentry;
+
+	if (proc_dentry) {
+		spin_lock(&dcache_lock);
+		if (!list_empty(&proc_dentry->d_hash)) {
+			dget_locked(proc_dentry);
+			list_del_init(&proc_dentry->d_hash);
+		} else
+			proc_dentry = NULL;
+		spin_unlock(&dcache_lock);
+	}
+	return proc_dentry;
+}
+
+static inline void put_proc_dentry(struct dentry *dentry)
+{
+	if (dentry) {
+		shrink_dcache_parent(dentry);
+		dput(dentry);
+	}
+}
+
 /*
  * This function makes sure the current process has its own signal table,
  * so that flush_signal_handlers can later reset the handlers without
  * disturbing other processes.  (Other processes might share the signal
- * table via the CLONE_SIGNAL option to clone().)
+ * table via the CLONE_SIGHAND option to clone().)
  */
- 
-static inline int make_private_signals(void)
+static inline int de_thread(struct signal_struct *oldsig)
 {
-	struct signal_struct * newsig;
-
-	remove_thread_group(current, current->sig);
+	struct signal_struct *newsig;
+	int count;
 
 	if (atomic_read(&current->sig->count) <= 1)
 		return 0;
+
 	newsig = kmem_cache_alloc(sigact_cachep, GFP_KERNEL);
-	if (newsig == NULL)
+	if (!newsig)
 		return -ENOMEM;
+
+	if (list_empty(&current->thread_group))
+		goto out;
+	/*
+	 * Kill all other threads in the thread group:
+	 */
+	spin_lock_irq(&oldsig->siglock);
+	if (oldsig->group_exit) {
+		/*
+		 * Another group action in progress, just
+		 * return so that the signal is processed.
+		 */
+		spin_unlock_irq(&oldsig->siglock);
+		kmem_cache_free(sigact_cachep, newsig);
+		return -EAGAIN;
+	}
+	oldsig->group_exit = 1;
+	__broadcast_thread_group(current, SIGKILL);
+
+	/*
+	 * Account for the thread group leader hanging around:
+	 */
+	count = 2;
+	if (current->pid == current->tgid)
+		count = 1;
+	while (atomic_read(&oldsig->count) > count) {
+		oldsig->group_exit_task = current;
+		current->state = TASK_UNINTERRUPTIBLE;
+		spin_unlock_irq(&oldsig->siglock);
+		schedule();
+		spin_lock_irq(&oldsig->siglock);
+		if (oldsig->group_exit_task)
+			BUG();
+	}
+	spin_unlock_irq(&oldsig->siglock);
+
+	/*
+	 * At this point all other threads have exited, all we have to
+	 * do is to wait for the thread group leader to become inactive,
+	 * and to assume its PID:
+	 */
+	if (current->pid != current->tgid) {
+		struct task_struct *leader = current->group_leader, *parent;
+		struct dentry *proc_dentry1, *proc_dentry2;
+		unsigned long state, ptrace;
+
+		/*
+		 * Wait for the thread group leader to be a zombie.
+		 * It should already be zombie at this point, most
+		 * of the time.
+		 */
+		while (leader->state != TASK_ZOMBIE)
+			yield();
+
+		write_lock_irq(&tasklist_lock);
+		proc_dentry1 = clean_proc_dentry(current);
+		proc_dentry2 = clean_proc_dentry(leader);
+
+		if (leader->tgid != current->tgid)
+			BUG();
+		if (current->pid == current->tgid)
+			BUG();
+		/*
+		 * An exec() starts a new thread group with the
+		 * TGID of the previous thread group. Rehash the
+		 * two threads with a switched PID, and release
+		 * the former thread group leader:
+		 */
+		ptrace = leader->ptrace;
+		parent = leader->parent;
+
+		ptrace_unlink(leader);
+		ptrace_unlink(current);
+		unhash_pid(current);
+		unhash_pid(leader);
+		remove_parent(current);
+		remove_parent(leader);
+		/*
+		 * Split up the last two remaining members of the
+		 * thread group:
+		 */
+		list_del_init(&leader->thread_group);
+
+		leader->pid = leader->tgid = current->pid;
+		current->pid = current->tgid;
+		current->parent = current->real_parent = leader->real_parent;
+		leader->parent = leader->real_parent = child_reaper;
+		current->exit_signal = SIGCHLD;
+
+		add_parent(current, current->parent);
+		add_parent(leader, leader->parent);
+		if (ptrace) {
+			current->ptrace = ptrace;
+			__ptrace_link(current, parent);
+		}
+		hash_pid(current);
+		hash_pid(leader);
+		
+		list_add_tail(&current->tasks, &init_task.tasks);
+		state = leader->state;
+		write_unlock_irq(&tasklist_lock);
+
+		if (state != TASK_ZOMBIE)
+			BUG();
+		release_task(leader);
+
+		put_proc_dentry(proc_dentry1);
+		put_proc_dentry(proc_dentry2);
+        }
+
+out:
 	spin_lock_init(&newsig->siglock);
 	atomic_set(&newsig->count, 1);
 	newsig->group_exit = 0;
 	newsig->group_exit_code = 0;
-	init_completion(&newsig->group_exit_done);
+	newsig->group_exit_task = NULL;
 	memcpy(newsig->action, current->sig->action, sizeof(newsig->action));
 	init_sigpending(&newsig->shared_pending);
 
+	remove_thread_group(current, current->sig);
 	spin_lock_irq(&current->sigmask_lock);
 	current->sig = newsig;
+	init_sigpending(&current->pending);
+	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
+
+	if (atomic_dec_and_test(&oldsig->count))
+		kmem_cache_free(sigact_cachep, oldsig);
+
+	if (!list_empty(&current->thread_group))
+		BUG();
+	if (current->tgid != current->pid)
+		BUG();
 	return 0;
 }
 	
-/*
- * If make_private_signals() made a copy of the signal table, decrement the
- * refcount of the original table, and free it if necessary.
- * We don't do that in make_private_signals() so that we can back off
- * in flush_old_exec() if an error occurs after calling make_private_signals().
- */
-
-static inline void release_old_signals(struct signal_struct * oldsig)
-{
-	if (current->sig == oldsig)
-		return;
-	if (atomic_dec_and_test(&oldsig->count))
-		kmem_cache_free(sigact_cachep, oldsig);
-}
-
 /*
  * These functions flushes out all traces of the currently running executable
  * so that a new one can be started
@@ -573,44 +705,27 @@ static inline void flush_old_files(struct files_struct * files)
 	write_unlock(&files->file_lock);
 }
 
-/*
- * An execve() will automatically "de-thread" the process.
- * - if a master thread (PID==TGID) is doing this, then all subsidiary threads
- *   will be killed (otherwise there will end up being two independent thread
- *   groups with the same TGID).
- * - if a subsidary thread is doing this, then it just leaves the thread group
- */
-static void de_thread(struct task_struct *tsk)
-{
-	if (!list_empty(&tsk->thread_group))
-		BUG();
-	/* An exec() starts a new thread group: */
-	tsk->tgid = tsk->pid;
-}
-
 int flush_old_exec(struct linux_binprm * bprm)
 {
 	char * name;
 	int i, ch, retval;
-	struct signal_struct * oldsig;
-
-	/*
-	 * Make sure we have a private signal table
-	 */
-	oldsig = current->sig;
-	retval = make_private_signals();
-	if (retval) goto flush_failed;
+	struct signal_struct * oldsig = current->sig;
 
 	/* 
 	 * Release all of the old mmap stuff
 	 */
 	retval = exec_mmap(bprm->mm);
-	if (retval) goto mmap_failed;
+	if (retval)
+		goto mmap_failed;
+	/*
+	 * Make sure we have a private signal table and that
+	 * we are unassociated from the previous thread group.
+	 */
+	retval = de_thread(oldsig);
+	if (retval)
+		goto flush_failed;
 
 	/* This is the point of no return */
-	de_thread(current);
-
-	release_old_signals(oldsig);
 
 	current->sas_ss_sp = current->sas_ss_size = 0;
 

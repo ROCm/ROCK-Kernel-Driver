@@ -1,5 +1,5 @@
 /*
- * linux/drivers/ide/pdcadma.c		Version 0.01	June 21, 2001
+ * linux/drivers/ide/pdcadma.c		Version 0.05	Sept 10, 2002
  *
  * Copyright (C) 1999-2000		Andre Hedrick <andre@linux-ide.org>
  * May be copied or modified under the terms of the GNU General Public License
@@ -127,26 +127,55 @@ static void __init init_dma_pdcadma (ide_hwif_t *hwif, unsigned long dmabase)
 
 extern void ide_setup_pci_device(struct pci_dev *, ide_pci_device_t *);
 
-static void __init init_setup_pdcadma (struct pci_dev *dev, ide_pci_device_t *d)
+static int __devinit pdcadma_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
+	ide_pci_device_t *d = &pdcadma_chipsets[id->driver_data];
+	if (dev->device != d->device)
+		BUG();
 	ide_setup_pci_device(dev, d);
+	return 1;
 }
 
-int __init pdcadma_scan_pcidev (struct pci_dev *dev)
+/**
+ *	pdcadma_remove_one	-	called when a PDCADMA is unplugged
+ *	@dev: the device that was removed
+ *
+ *	Disconnect a PDCADMA device that has been unplugged either by hotplug
+ *	or by a more civilized notification scheme. Not yet supported.
+ */
+ 
+static void pdcadma_remove_one(struct pci_dev *dev)
 {
-	ide_pci_device_t *d;
-
-	if (dev->vendor != PCI_VENDOR_ID_PDC)
-		return 0;
-
-	for (d = pdcadma_chipsets; d && d->vendor && d->device; ++d) {
-		if (((d->vendor == dev->vendor) &&
-		     (d->device == dev->device)) &&
-		    (d->init_setup)) {
-			d->init_setup(dev, d);
-			return 1;
-		}
-	}
-	return 0;
+	panic("PDCADMA removal not yet supported");
 }
 
+static struct pci_device_id pdcadma_pci_tbl[] __devinitdata = {
+	{ PCI_VENDOR_ID_PDC, PCI_DEVICE_ID_PDC_1841, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{ 0, },
+};
+
+static struct pci_driver driver = {
+	name:		"PDCADMA-IDE",
+	id_table:	pdcadma_pci_tbl,
+	probe:		pdcadma_init_one,
+	remove:		__devexit_p(pdcadma_remove_one),
+};
+
+static int pdcadma_ide_init(void)
+{
+	return ide_pci_register_driver(&driver);
+}
+
+static void pdcadma_ide_exit(void)
+{
+	ide_pci_unregister_driver(&driver);
+}
+
+module_init(pdcadma_ide_init);
+module_exit(pdcadma_ide_exit);
+
+MODULE_AUTHOR("Andre Hedrick");
+MODULE_DESCRIPTION("PCI driver module for PDCADMA IDE");
+MODULE_LICENSE("GPL");
+
+EXPORT_NO_SYMBOLS;

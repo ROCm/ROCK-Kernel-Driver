@@ -116,10 +116,10 @@ static int badness(struct task_struct *p)
 static struct task_struct * select_bad_process(void)
 {
 	int maxpoints = 0;
-	struct task_struct *p = NULL;
+	struct task_struct *g, *p;
 	struct task_struct *chosen = NULL;
 
-	for_each_task(p) {
+	do_each_thread(g, p)
 		if (p->pid) {
 			int points = badness(p);
 			if (points > maxpoints) {
@@ -127,7 +127,7 @@ static struct task_struct * select_bad_process(void)
 				maxpoints = points;
 			}
 		}
-	}
+	while_each_thread(g, p);
 	return chosen;
 }
 
@@ -166,7 +166,7 @@ void oom_kill_task(struct task_struct *p)
  */
 static void oom_kill(void)
 {
-	struct task_struct *p, *q;
+	struct task_struct *g, *p, *q;
 	
 	read_lock(&tasklist_lock);
 	p = select_bad_process();
@@ -176,9 +176,11 @@ static void oom_kill(void)
 		panic("Out of memory and no killable processes...\n");
 
 	/* kill all processes that share the ->mm (i.e. all threads) */
-	for_each_task(q) {
-		if(q->mm == p->mm) oom_kill_task(q);
-	}
+	do_each_thread(g, q)
+		if (q->mm == p->mm)
+			oom_kill_task(q);
+	while_each_thread(g, q);
+
 	read_unlock(&tasklist_lock);
 
 	/*

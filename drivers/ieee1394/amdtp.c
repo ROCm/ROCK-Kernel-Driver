@@ -32,7 +32,7 @@
  * That is outside the scope of this driver, and furthermore it is not
  * really standardized yet.
  *
- * The Audio and Music Data Tranmission Protocol is avaiable at
+ * The Audio and Music Data Tranmission Protocol is available at
  *
  *     http://www.1394ta.org/Download/Technology/Specifications/2001/AM20Final-jf2.pdf
  *
@@ -45,8 +45,6 @@
  *   packets.
  *
  * - Fix DMA stop after bus reset!
- *
- * - Implement poll.
  *
  * - Clean up iso context handling in ohci1394.
  *
@@ -75,6 +73,7 @@
 #include <linux/wait.h>
 #include <linux/pci.h>
 #include <linux/interrupt.h>
+#include <linux/poll.h>
 #include <asm/uaccess.h>
 #include <asm/atomic.h>
 
@@ -89,9 +88,13 @@
 
 #define FMT_AMDTP 0x10
 #define FDF_AM824 0x00
-#define FDF_SFC_32KHZ  0x00 /* 32kHz */
-#define FDF_SFC_44K1HZ 0x01 /* 44.1kHz */
-#define FDF_SFC_48KHZ  0x02 /* 44.1kHz */
+#define FDF_SFC_32KHZ   0x00
+#define FDF_SFC_44K1HZ  0x01
+#define FDF_SFC_48KHZ   0x02
+#define FDF_SFC_88K2HZ  0x03
+#define FDF_SFC_96KHZ   0x04
+#define FDF_SFC_176K4HZ 0x05
+#define FDF_SFC_192KHZ  0x06
 
 struct descriptor_block {
 	struct output_more_immediate {
@@ -113,15 +116,70 @@ struct descriptor_block {
 struct packet {
 	struct descriptor_block *db;
 	dma_addr_t db_bus;
-	quadlet_t *payload;
+	struct iso_packet *payload;
 	dma_addr_t payload_bus;
 };
+
+#include <asm/byteorder.h>
+
+#if defined __BIG_ENDIAN_BITFIELD
+
+struct iso_packet {
+	/* First quadlet */
+	unsigned int dbs      : 8;
+	unsigned int eoh0     : 2;
+	unsigned int sid      : 6;
+
+	unsigned int dbc      : 8;
+	unsigned int fn       : 2;
+	unsigned int qpc      : 3;
+	unsigned int sph      : 1;
+	unsigned int reserved : 2;
+
+	/* Second quadlet */
+	unsigned int fdf      : 8;
+	unsigned int eoh1     : 2;
+	unsigned int fmt      : 6;
+
+	unsigned int syt      : 16;
+
+        quadlet_t data[0];
+};
+
+#elif defined __LITTLE_ENDIAN_BITFIELD
+
+struct iso_packet {
+	/* First quadlet */
+	unsigned int sid      : 6;
+	unsigned int eoh0     : 2;
+	unsigned int dbs      : 8;
+
+	unsigned int reserved : 2;
+	unsigned int sph      : 1;
+	unsigned int qpc      : 3;
+	unsigned int fn       : 2;
+	unsigned int dbc      : 8;
+
+	/* Second quadlet */
+	unsigned int fmt      : 6;
+	unsigned int eoh1     : 2;
+	unsigned int fdf      : 8;
+
+	unsigned int syt      : 16;
+
+	quadlet_t data[0];
+};
+
+#else
+
+#error Unknown bitfield type
+
+#endif
 
 struct fraction {
 	int integer;
 	int numerator;
 	int denominator;
-	int counter;
 };
 
 #define PACKET_LIST_SIZE 256
@@ -148,6 +206,8 @@ struct stream {
 	int rate;
 	int dimension;
 	int fdf;
+	int mode;
+	int sample_format;
 	struct cmp_pcr *opcr;
 
 	/* Input samples are copied here. */
@@ -157,7 +217,7 @@ struct stream {
 	unsigned char dbc;
 	struct packet_list *current_packet_list;
 	int current_packet;
-	struct fraction packet_size_fraction;
+	struct fraction ready_samples, samples_per_cycle;
 
 	/* We use these to generate control bits when we are packing
 	 * iec958 data.
@@ -176,8 +236,7 @@ struct stream {
 	 * written back in the dma programs.
 	 */
 	atomic_t cycle_count, cycle_count2;
-	int cycle_offset;
-	struct fraction syt_fraction;
+	struct fraction cycle_offset, ticks_per_syt_offset;
 	int syt_interval;
 	int stale_count;
 
@@ -192,7 +251,7 @@ struct stream {
 	struct list_head free_packet_lists;
         wait_queue_head_t packet_list_wait;
 	spinlock_t packet_list_lock;
-	int iso_context;
+	struct ohci1394_iso_tasklet iso_tasklet;
 	struct pci_pool *descriptor_pool, *packet_pool;
 
 	/* Streams at a host controller are chained through this field. */
@@ -220,23 +279,6 @@ static spinlock_t host_list_lock = SPIN_LOCK_UNLOCKED;
 #define OHCI1394_CONTEXT_DEAD        0x00000800
 #define OHCI1394_CONTEXT_ACTIVE      0x00000400
 
-static inline int ohci1394_alloc_it_ctx(struct ti_ohci *ohci)
-{
-	int i;
-
-	for (i = 0; i < ohci->nb_iso_xmit_ctx; i++)
-		if (!test_and_set_bit(i, &ohci->it_ctx_usage))
-			return i;
-
-	return -EBUSY;
-}
-	
-static inline void ohci1394_free_it_ctx(struct ti_ohci *ohci, int ctx)
-{
-	clear_bit(ctx, &ohci->it_ctx_usage);
-}
-
-
 void ohci1394_start_it_ctx(struct ti_ohci *ohci, int ctx,
 			   dma_addr_t first_cmd, int z, int cycle_match)
 {
@@ -255,7 +297,7 @@ void ohci1394_wake_it_ctx(struct ti_ohci *ohci, int ctx)
 		  OHCI1394_CONTEXT_WAKE);
 }
 
-void ohci1394_stop_it_ctx(struct ti_ohci *ohci, int ctx)
+void ohci1394_stop_it_ctx(struct ti_ohci *ohci, int ctx, int synchronous)
 {
 	u32 control;
 	int wait;
@@ -265,13 +307,15 @@ void ohci1394_stop_it_ctx(struct ti_ohci *ohci, int ctx)
 		  OHCI1394_CONTEXT_RUN);
 	wmb();
 
-	for (wait = 0; wait < 5; wait++) {
-		control = reg_read(ohci, OHCI1394_IsoXmitContextControlSet + ctx * 16);
-		if ((control & OHCI1394_CONTEXT_ACTIVE) == 0)
-			break;
-
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(1);
+	if (synchronous) {
+		for (wait = 0; wait < 5; wait++) {
+			control = reg_read(ohci, OHCI1394_IsoXmitContextControlSet + ctx * 16);
+			if ((control & OHCI1394_CONTEXT_ACTIVE) == 0)
+				break;
+			
+			set_current_state(TASK_INTERRUPTIBLE);
+			schedule_timeout(1);
+		}
 	}
 }
 
@@ -297,6 +341,27 @@ static struct packet_list *stream_get_free_packet_list(struct stream *s)
 	return pl;
 }
 
+static void stream_start_dma(struct stream *s, struct packet_list *pl)
+{
+	u32 syt_cycle, cycle_count, start_cycle;
+
+	cycle_count = reg_read(s->host->host->hostdata,
+			       OHCI1394_IsochronousCycleTimer) >> 12;
+	syt_cycle = (pl->last_cycle_count - PACKET_LIST_SIZE + 1) & 0x0f;
+
+	/* We program the DMA controller to start transmission at
+	 * least 17 cycles from now - this happens when the lower four
+	 * bits of cycle_count is 0x0f and syt_cycle is 0, in this
+	 * case the start cycle is cycle_count - 15 + 32. */
+	start_cycle = (cycle_count & ~0x0f) + 32 + syt_cycle;
+	if ((start_cycle & 0x1fff) >= 8000)
+		start_cycle = start_cycle - 8000 + 0x2000;
+
+	ohci1394_start_it_ctx(s->host->ohci, s->iso_tasklet.context,
+			      pl->packets[0].db_bus, 3,
+			      start_cycle & 0x7fff);
+}
+
 static void stream_put_dma_packet_list(struct stream *s,
 				       struct packet_list *pl)
 {
@@ -315,26 +380,16 @@ static void stream_put_dma_packet_list(struct stream *s,
 	if (pl->link.prev != &s->dma_packet_lists) {
 		struct packet *last = &prev->packets[PACKET_LIST_SIZE - 1];
 		last->db->payload_desc.branch = pl->packets[0].db_bus | 3;
-		ohci1394_wake_it_ctx(s->host->ohci, s->iso_context);
+		last->db->header_desc.skip = pl->packets[0].db_bus | 3;
+		ohci1394_wake_it_ctx(s->host->ohci, s->iso_tasklet.context);
 	}
-	else {
-		u32 syt, cycle_count;
-
-		cycle_count = reg_read(s->host->host->hostdata,
-				       OHCI1394_IsochronousCycleTimer) >> 12;
-		syt = (pl->packets[0].payload[1] >> 12) & 0x0f;
-		cycle_count = (cycle_count & ~0x0f) + 32 + syt;
-		if ((cycle_count & 0x1fff) >= 8000)
-			cycle_count = cycle_count - 8000 + 0x2000;
-
-		ohci1394_start_it_ctx(s->host->ohci, s->iso_context,
-				      pl->packets[0].db_bus, 3,
-				      cycle_count & 0x7fff);
-	}
+	else
+		stream_start_dma(s, pl);
 }
 
-static void stream_shift_packet_lists(struct stream *s)
+static void stream_shift_packet_lists(unsigned long l)
 {
+	struct stream *s = (struct stream *) l;
 	struct packet_list *pl;
 	struct packet *last;
 	int diff;
@@ -430,36 +485,42 @@ static void fraction_init(struct fraction *f, int numerator, int denominator)
 	f->integer = numerator / denominator;
 	f->numerator = numerator % denominator;
 	f->denominator = denominator;
-	f->counter = 0;
 }
 
-static int fraction_next_size(struct fraction *f)
+static __inline__ void fraction_add(struct fraction *dst,
+				    struct fraction *src1,
+				    struct fraction *src2)
 {
-	return f->integer + ((f->counter + f->numerator) / f->denominator);
+	/* assert: src1->denominator == src2->denominator */
+
+	int sum, denom;
+
+	/* We use these two local variables to allow gcc to optimize
+	 * the division and the modulo into only one division. */
+
+	sum = src1->numerator + src2->numerator;
+	denom = src1->denominator;
+	dst->integer = src1->integer + src2->integer + sum / denom;
+	dst->numerator = sum % denom;
+	dst->denominator = denom;
 }
 
-static void fraction_inc(struct fraction *f)
+static __inline__ void fraction_sub_int(struct fraction *dst,
+					struct fraction *src, int integer)
 {
-	f->counter = (f->counter + f->numerator) % f->denominator;
+	dst->integer = src->integer - integer;
+	dst->numerator = src->numerator;
+	dst->denominator = src->denominator;
 }
 
-static void amdtp_irq_handler(int card, quadlet_t isoRecvIntEvent,
-			      quadlet_t isoXmitIntEvent, void *data)
+static __inline__ int fraction_floor(struct fraction *frac)
 {
-	struct amdtp_host *host = data;
-	struct list_head *lh;
-	struct stream *s = NULL;
+	return frac->integer;
+}
 
-	spin_lock(&host->stream_list_lock);
-	list_for_each(lh, &host->stream_list) {
-		s = list_entry(lh, struct stream, link);
-		if (isoXmitIntEvent & (1 << s->iso_context))
-			break;
-	}
-	spin_unlock(&host->stream_list_lock);
-
-	if (s != NULL)
-		stream_shift_packet_lists(s);
+static __inline__ int fraction_ceil(struct fraction *frac)
+{
+	return frac->integer + (frac->numerator > 0 ? 1 : 0);
 }
 
 void packet_initialize(struct packet *p, struct packet *next)
@@ -473,18 +534,19 @@ void packet_initialize(struct packet *p, struct packet *next)
 
 	p->db->header_desc.control =
 		DMA_CTL_OUTPUT_MORE | DMA_CTL_IMMEDIATE | 8;
-	p->db->header_desc.skip = 0;
 
 	if (next) {
 		p->db->payload_desc.control = 
 			DMA_CTL_OUTPUT_LAST | DMA_CTL_BRANCH;
 		p->db->payload_desc.branch = next->db_bus | 3;
+		p->db->header_desc.skip = next->db_bus | 3;
 	}
 	else {
 		p->db->payload_desc.control = 
 			DMA_CTL_OUTPUT_LAST | DMA_CTL_BRANCH |
 			DMA_CTL_UPDATE | DMA_CTL_IRQ;
 		p->db->payload_desc.branch = 0;
+		p->db->header_desc.skip = 0;
 	}
 	p->db->payload_desc.data_address = p->payload_bus;
 	p->db->payload_desc.status = 0;
@@ -633,53 +695,13 @@ static u32 get_header_bits(struct stream *s, int sub_frame, u32 sample)
 	}
 }
 
-
-static void fill_packet(struct stream *s, struct packet *packet, int nevents)
+static void fill_payload_le16(struct stream *s, quadlet_t *data, int nevents)
 {
-	int size, node_id, i, j;
-	quadlet_t *event;
+	quadlet_t *event, sample, bits;
 	unsigned char *p;
-	u32 control, sample, bits;
-	int syt_index, syt, next;
+	int i, j;
 
-	size = (nevents * s->dimension + 2) * sizeof(quadlet_t);
-	node_id = s->host->host->node_id & 0x3f;
-
-	/* Update DMA descriptors */
-	packet->db->payload_desc.status = 0;
-	control = packet->db->payload_desc.control & 0xffff0000;
-	packet->db->payload_desc.control = control | size;
-
-	/* Fill IEEE1394 headers */
-	packet->db->header_desc.header[0] =
-		(SPEED_100 << 16) | (0x01 << 14) | 
-		(s->iso_channel << 8) | (TCODE_ISO_DATA << 4);
-	packet->db->header_desc.header[1] = size << 16;
-	
-	/* Fill cip header */
-	syt_index = s->dbc & (s->syt_interval - 1);
-	if (syt_index == 0 || syt_index + nevents > s->syt_interval) {
-		syt = ((atomic_read(&s->cycle_count) << 12) | 
-		       s->cycle_offset) & 0xffff;
-		next = fraction_next_size(&s->syt_fraction) + s->cycle_offset;
-		/* This next addition should be modulo 8000 (0x1f40),
-		 * but we only use the lower 4 bits of cycle_count, so
-		 * we dont need the modulo. */
-		atomic_add(next / 3072, &s->cycle_count);
-		s->cycle_offset = next % 3072;
-		fraction_inc(&s->syt_fraction);
-	}
-	else {
-		syt = 0xffff;
-		next = 0;
-	}
-	atomic_inc(&s->cycle_count2);
-
-	packet->payload[0] = cpu_to_be32((node_id << 24) | (s->dimension << 16) | s->dbc);
-	packet->payload[1] = cpu_to_be32((1 << 31) | (FMT_AMDTP << 24) | (s->fdf << 16) | syt);
-
-	/* Fill payload */
-	for (i = 0, event = &packet->payload[2]; i < nevents; i++) {
+	for (i = 0, event = data; i < nevents; i++) {
 
 		for (j = 0; j < s->dimension; j++) {
 			p = buffer_get_bytes(s->input, 2);
@@ -692,6 +714,66 @@ static void fill_packet(struct stream *s, struct packet *packet, int nevents)
 		if (++s->iec958_frame_count == 192)
 			s->iec958_frame_count = 0;
 	}
+}
+
+static void fill_packet(struct stream *s, struct packet *packet, int nevents)
+{
+	int syt_index, syt, size;
+	u32 control;
+
+	size = (nevents * s->dimension + 2) * sizeof(quadlet_t);
+
+	/* Update DMA descriptors */
+	packet->db->payload_desc.status = 0;
+	control = packet->db->payload_desc.control & 0xffff0000;
+	packet->db->payload_desc.control = control | size;
+
+	/* Fill IEEE1394 headers */
+	packet->db->header_desc.header[0] =
+		(SPEED_100 << 16) | (0x01 << 14) | 
+		(s->iso_channel << 8) | (TCODE_ISO_DATA << 4);
+	packet->db->header_desc.header[1] = size << 16;
+	
+	/* Calculate synchronization timestamp (syt). First we
+	 * determine syt_index, that is, the index in the packet of
+	 * the sample for which the timestamp is valid. */
+	syt_index = (s->syt_interval - s->dbc) & (s->syt_interval - 1);
+	if (syt_index < nevents) {
+		syt = ((atomic_read(&s->cycle_count) << 12) | 
+		       s->cycle_offset.integer) & 0xffff;
+		fraction_add(&s->cycle_offset, 
+			     &s->cycle_offset, &s->ticks_per_syt_offset);
+
+		/* This next addition should be modulo 8000 (0x1f40),
+		 * but we only use the lower 4 bits of cycle_count, so
+		 * we dont need the modulo. */
+		atomic_add(s->cycle_offset.integer / 3072, &s->cycle_count);
+		s->cycle_offset.integer %= 3072;
+	}
+	else
+		syt = 0xffff;
+
+	atomic_inc(&s->cycle_count2);
+	
+	/* Fill cip header */
+	packet->payload->eoh0 = 0;
+	packet->payload->sid = s->host->host->node_id & 0x3f;
+	packet->payload->dbs = s->dimension;
+	packet->payload->fn = 0;
+	packet->payload->qpc = 0;
+	packet->payload->sph = 0;
+	packet->payload->reserved = 0;
+	packet->payload->dbc = s->dbc;
+	packet->payload->eoh1 = 2;
+	packet->payload->fmt = FMT_AMDTP;
+	packet->payload->fdf = s->fdf;
+	packet->payload->syt = cpu_to_be16(syt);
+
+	switch (s->sample_format) {
+	case AMDTP_INPUT_LE16:
+		fill_payload_le16(s, packet->payload->data, nevents);
+		break;
+	}
 
 	s->dbc += nevents;
 }
@@ -700,13 +782,44 @@ static void stream_flush(struct stream *s)
 {
 	struct packet *p;
 	int nevents;
+	struct fraction next;
 
-	while (nevents = fraction_next_size(&s->packet_size_fraction),
-	       p = stream_current_packet(s),
-	       nevents * s->dimension * 2 <= s->input->length && p != NULL) {
+	/* The AMDTP specifies two transmission modes: blocking and
+	 * non-blocking.  In blocking mode you always transfer
+	 * syt_interval or zero samples, whereas in non-blocking mode
+	 * you send as many samples as you have available at transfer
+	 * time.
+	 *
+	 * The fraction samples_per_cycle specifies the number of
+	 * samples that become available per cycle.  We add this to
+	 * the fraction ready_samples, which specifies the number of
+	 * leftover samples from the previous transmission.  The sum,
+	 * stored in the fraction next, specifies the number of
+	 * samples available for transmission, and from this we
+	 * determine the number of samples to actually transmit.
+	 */
+
+	while (1) {
+		fraction_add(&next, &s->ready_samples, &s->samples_per_cycle);
+		if (s->mode == AMDTP_MODE_BLOCKING) {
+			if (fraction_floor(&next) >= s->syt_interval)
+				nevents = s->syt_interval;
+			else
+				nevents = 0;
+		}
+		else
+			nevents = fraction_floor(&next);
+
+		p = stream_current_packet(s);
+		if (s->input->length < nevents * s->dimension * 2 || p == NULL)
+			break;
+
 		fill_packet(s, p, nevents);
-		fraction_inc(&s->packet_size_fraction);
 		stream_queue_packet(s);
+
+		/* Now that we have successfully queued the packet for
+		 * transmission, we update the fraction ready_samples. */
+		fraction_sub_int(&s->ready_samples, &next, nevents);
 	}
 }
 
@@ -714,9 +827,10 @@ static int stream_alloc_packet_lists(struct stream *s)
 {
 	int max_nevents, max_packet_size, i;
 
-	max_nevents = s->packet_size_fraction.integer;
-	if (s->packet_size_fraction.numerator > 0)
-		max_nevents++;
+	if (s->mode == AMDTP_MODE_BLOCKING)
+		max_nevents = s->syt_interval;
+	else
+		max_nevents = fraction_ceil(&s->samples_per_cycle);
 
 	max_packet_size = max_nevents * s->dimension * 4 + 8;
 	s->packet_pool = pci_pool_create("packet pool", s->host->ohci->dev,
@@ -763,15 +877,20 @@ static void plug_update(struct cmp_pcr *plug, void *data)
 		  plug->p2p_count, plug->channel);
 	s->iso_channel = plug->channel;
 	if (plug->p2p_count > 0) {
-		/* start streaming */
+		struct packet_list *pl;
+
+		pl = list_entry(s->dma_packet_lists.next, struct packet_list, link);
+		stream_start_dma(s, pl);
 	}
 	else {
-		/* stop streaming */
+		ohci1394_stop_it_ctx(s->host->ohci, s->iso_tasklet.context, 0);
 	}
 }
 
 static int stream_configure(struct stream *s, int cmd, struct amdtp_ioctl *cfg)
 {
+	const int transfer_delay = 9000;
+
 	if (cfg->format <= AMDTP_FORMAT_IEC958_AC3)
 		s->format = cfg->format;
 	else
@@ -782,32 +901,59 @@ static int stream_configure(struct stream *s, int cmd, struct amdtp_ioctl *cfg)
 		s->syt_interval = 8;
 		s->fdf = FDF_SFC_32KHZ;
 		s->iec958_rate_code = 0x0c;
-		s->rate = cfg->rate;
 		break;
 	case 44100:
 		s->syt_interval = 8;
 		s->fdf = FDF_SFC_44K1HZ;
 		s->iec958_rate_code = 0x00;
-		s->rate = cfg->rate;
 		break;
 	case 48000:
 		s->syt_interval = 8;
 		s->fdf = FDF_SFC_48KHZ;
 		s->iec958_rate_code = 0x04;
-		s->rate = cfg->rate;
 		break;
+	case 88200:
+		s->syt_interval = 16;
+		s->fdf = FDF_SFC_88K2HZ;
+		s->iec958_rate_code = 0x00;
+		break;
+	case 96000:
+		s->syt_interval = 16;
+		s->fdf = FDF_SFC_96KHZ;
+		s->iec958_rate_code = 0x00;
+		break;
+	case 176400:
+		s->syt_interval = 32;
+		s->fdf = FDF_SFC_176K4HZ;
+		s->iec958_rate_code = 0x00;
+		break;
+	case 192000:
+		s->syt_interval = 32;
+		s->fdf = FDF_SFC_192KHZ;
+		s->iec958_rate_code = 0x00;
+		break;
+
 	default:
 		return -EINVAL;
 	}
 
-	fraction_init(&s->packet_size_fraction, s->rate, 8000);
+	s->rate = cfg->rate;
+	fraction_init(&s->samples_per_cycle, s->rate, 8000);
+	fraction_init(&s->ready_samples, 0, 8000);
 
-	/* The syt_fraction is initialized to the number of ticks
-	 * between syt_interval events.  The number of ticks per
+	/* The ticks_per_syt_offset is initialized to the number of
+	 * ticks between syt_interval events.  The number of ticks per
 	 * second is 24.576e6, so the number of ticks between
 	 * syt_interval events is 24.576e6 * syt_interval / rate.
 	 */
-	fraction_init(&s->syt_fraction, 24576000 * s->syt_interval, s->rate);
+	fraction_init(&s->ticks_per_syt_offset,
+		      24576000 * s->syt_interval, s->rate);
+	fraction_init(&s->cycle_offset, (transfer_delay % 3072) * s->rate, s->rate);
+	atomic_set(&s->cycle_count, transfer_delay / 3072);
+	atomic_set(&s->cycle_count2, 0);
+
+	s->mode = cfg->mode;
+	s->sample_format = AMDTP_INPUT_LE16;
 
 	/* When using the AM824 raw subformat we can stream signals of
 	 * any dimension.  The IEC958 subformat, however, only
@@ -858,7 +1004,6 @@ struct stream *stream_alloc(struct amdtp_host *host)
 {
 	struct stream *s;
 	unsigned long flags;
-	const int transfer_delay = 8651; /* approx 352 us */
 
         s = kmalloc(sizeof(struct stream), SLAB_KERNEL);
         if (s == NULL)
@@ -872,10 +1017,6 @@ struct stream *stream_alloc(struct amdtp_host *host)
 		kfree(s);
 		return NULL;
 	}
-
-	s->cycle_offset = transfer_delay % 3072;
-	atomic_set(&s->cycle_count, transfer_delay / 3072);
-	atomic_set(&s->cycle_count2, 0);
 
 	s->descriptor_pool = pci_pool_create("descriptor pool", host->ohci->dev,
 					     sizeof(struct descriptor_block),
@@ -892,8 +1033,11 @@ struct stream *stream_alloc(struct amdtp_host *host)
         init_waitqueue_head(&s->packet_list_wait);
         spin_lock_init(&s->packet_list_lock);
 
-	s->iso_context = ohci1394_alloc_it_ctx(host->ohci);
-	if (s->iso_context < 0) {
+	ohci1394_init_iso_tasklet(&s->iso_tasklet, OHCI_ISO_TRANSMIT,
+				  stream_shift_packet_lists,
+				  (unsigned long) s);
+
+	if (ohci1394_register_iso_tasklet(host->ohci, &s->iso_tasklet) < 0) {
 		pci_pool_destroy(s->descriptor_pool);
 		kfree(s->input);
 		kfree(s);
@@ -920,8 +1064,8 @@ void stream_free(struct stream *s)
 	wait_event_interruptible(s->packet_list_wait, 
 				 list_empty(&s->dma_packet_lists));
 
-	ohci1394_stop_it_ctx(s->host->ohci, s->iso_context);
-	ohci1394_free_it_ctx(s->host->ohci, s->iso_context);
+	ohci1394_stop_it_ctx(s->host->ohci, s->iso_tasklet.context, 1);
+	ohci1394_unregister_iso_tasklet(s->host->ohci, &s->iso_tasklet);
 
 	if (s->opcr != NULL)
 		cmp_unregister_opcr(s->host->host, s->opcr);
@@ -969,8 +1113,13 @@ static ssize_t amdtp_write(struct file *file, const char *buffer, size_t count,
 		
 		stream_flush(s);
 		
-		if (s->current_packet_list == NULL &&
-		    wait_event_interruptible(s->packet_list_wait, 
+		if (s->current_packet_list != NULL)
+			continue;
+
+		if (file->f_flags & O_NONBLOCK)
+			return i + length > 0 ? i + length : -EAGAIN;
+
+		if (wait_event_interruptible(s->packet_list_wait, 
 					     !list_empty(&s->free_packet_lists)))
 			return -EINTR;
 	}
@@ -983,7 +1132,6 @@ static int amdtp_ioctl(struct inode *inode, struct file *file,
 {
 	struct stream *s = file->private_data;
 	struct amdtp_ioctl cfg;
-	int new;
 
 	switch(cmd)
 	{
@@ -994,21 +1142,21 @@ static int amdtp_ioctl(struct inode *inode, struct file *file,
 		else 
 			return stream_configure(s, cmd, &cfg);
 
-	case AMDTP_IOC_PING:
-		HPSB_INFO("ping: offsetting timpestamps %ld ticks", arg);
-		new = s->cycle_offset + arg;
-		s->cycle_offset = new % 3072;
-		atomic_add(new / 3072, &s->cycle_count);
-		return 0;
-
-	case AMDTP_IOC_ZAP:
-		while (MOD_IN_USE)
-			MOD_DEC_USE_COUNT;
-		return 0;
-
 	default:
 		return -EINVAL;
 	}
+}
+
+static unsigned int amdtp_poll(struct file *file, poll_table *pt)
+{
+	struct stream *s = file->private_data;
+
+	poll_wait(file, &s->packet_list_wait, pt);
+
+	if (!list_empty(&s->free_packet_lists))
+		return POLLOUT | POLLWRNORM;
+	else
+		return 0;
 }
 
 static int amdtp_open(struct inode *inode, struct file *file)
@@ -1044,11 +1192,12 @@ static int amdtp_release(struct inode *inode, struct file *file)
 
 static struct file_operations amdtp_fops =
 {
-	owner:		THIS_MODULE,
-	write:		amdtp_write,
-	ioctl:		amdtp_ioctl,
-	open:		amdtp_open,
-	release:	amdtp_release
+	.owner =	THIS_MODULE,
+	.write =	amdtp_write,
+	.poll =		amdtp_poll,
+	.ioctl =	amdtp_ioctl,
+	.open =		amdtp_open,
+	.release =	amdtp_release
 };
 
 /* IEEE1394 Subsystem functions */
@@ -1057,7 +1206,8 @@ static void amdtp_add_host(struct hpsb_host *host)
 {
 	struct amdtp_host *ah;
 
-	/* FIXME: check it's an ohci host. */
+	if (strcmp(host->driver->name, OHCI1394_DRIVER_NAME) != 0)
+		return;
 
 	ah = kmalloc(sizeof *ah, SLAB_KERNEL);
 	ah->host = host;
@@ -1068,8 +1218,6 @@ static void amdtp_add_host(struct hpsb_host *host)
 	spin_lock_irq(&host_list_lock);
 	list_add_tail(&ah->link, &host_list);
 	spin_unlock_irq(&host_list_lock);
-
-	ohci1394_hook_irq(ah->ohci, amdtp_irq_handler, ah);
 }
 
 static void amdtp_remove_host(struct hpsb_host *host)
@@ -1088,7 +1236,6 @@ static void amdtp_remove_host(struct hpsb_host *host)
 	
 	if (lh != &host_list) {
 		ah = list_entry(lh, struct amdtp_host, link);
-		ohci1394_unhook_irq(ah->ohci, amdtp_irq_handler, ah);
 		kfree(ah);
 	}
 	else
@@ -1096,8 +1243,8 @@ static void amdtp_remove_host(struct hpsb_host *host)
 }
 
 static struct hpsb_highlevel_ops amdtp_highlevel_ops = {
-	add_host:	amdtp_add_host,
-	remove_host:	amdtp_remove_host,
+	.add_host =	amdtp_add_host,
+	.remove_host =	amdtp_remove_host,
 };
 
 /* Module interface */

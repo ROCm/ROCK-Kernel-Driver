@@ -204,14 +204,14 @@ void refrigerator(unsigned long flag)
 int freeze_processes(void)
 {
 	int todo, start_time;
-	struct task_struct *p;
+	struct task_struct *g, *p;
 	
 	printk( "Stopping tasks: " );
 	start_time = jiffies;
 	do {
 		todo = 0;
 		read_lock(&tasklist_lock);
-		for_each_task(p) {
+		do_each_thread(g, p) {
 			unsigned long flags;
 			INTERESTING(p);
 			if (p->flags & PF_FROZEN)
@@ -224,7 +224,7 @@ int freeze_processes(void)
 			signal_wake_up(p);
 			spin_unlock_irqrestore(&p->sigmask_lock, flags);
 			todo++;
-		}
+		} while_each_thread(g, p);
 		read_unlock(&tasklist_lock);
 		yield();
 		if (time_after(jiffies, start_time + TIMEOUT)) {
@@ -240,18 +240,19 @@ int freeze_processes(void)
 
 void thaw_processes(void)
 {
-	struct task_struct *p;
+	struct task_struct *g, *p;
 
 	printk( "Restarting tasks..." );
 	read_lock(&tasklist_lock);
-	for_each_task(p) {
+	do_each_thread(g, p) {
 		INTERESTING(p);
 		
 		if (p->flags & PF_FROZEN) p->flags &= ~PF_FROZEN;
 		else
 			printk(KERN_INFO " Strange, %s not stopped\n", p->comm );
 		wake_up_process(p);
-	}
+	} while_each_thread(g, p);
+
 	read_unlock(&tasklist_lock);
 	printk( " done\n" );
 	MDELAY(500);

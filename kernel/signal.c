@@ -73,12 +73,21 @@ int max_queued_signals = 1024;
 ----------------------------------------------------------
 */
 
+/* Some systems do not have a SIGSTKFLT and the kernel never
+ * generates such signals anyways.
+ */
+#ifdef SIGSTKFLT
+#define M_SIGSTKFLT	M(SIGSTKFLT)
+#else
+#define M_SIGSTKFLT	0
+#endif
+
 #define M(sig) (1UL << (sig))
 
 #define SIG_USER_SPECIFIC_MASK (\
 	M(SIGILL)    |  M(SIGTRAP)   |  M(SIGABRT)   |  M(SIGBUS)    | \
 	M(SIGFPE)    |  M(SIGSEGV)   |  M(SIGPIPE)   |  M(SIGXFSZ)   | \
-	M(SIGPROF)   |  M(SIGSYS)    |  M(SIGSTKFLT) |  M(SIGCONT)   )
+	M(SIGPROF)   |  M(SIGSYS)    |  M_SIGSTKFLT |  M(SIGCONT)   )
 
 #define SIG_USER_LOAD_BALANCE_MASK (\
         M(SIGHUP)    |  M(SIGINT)    |  M(SIGQUIT)   |  M(SIGUSR1)   | \
@@ -95,7 +104,7 @@ int max_queued_signals = 1024;
 	M(SIGKILL)   |  M(SIGUSR1)   |  M(SIGSEGV)   |  M(SIGUSR2)   | \
 	M(SIGPIPE)   |  M(SIGALRM)   |  M(SIGTERM)   |  M(SIGXCPU)   | \
 	M(SIGXFSZ)   |  M(SIGVTALRM) |  M(SIGPROF)   |  M(SIGPOLL)   | \
-	M(SIGSYS)    |  M(SIGSTKFLT) |  M(SIGPWR)    |  M(SIGCONT)   | \
+	M(SIGSYS)    |  M_SIGSTKFLT  |  M(SIGPWR)    |  M(SIGCONT)   | \
         M(SIGSTOP)   |  M(SIGTSTP)   |  M(SIGTTIN)   |  M(SIGTTOU)   )
 
 #define SIG_KERNEL_ONLY_MASK (\
@@ -109,14 +118,18 @@ int max_queued_signals = 1024;
 #define T(sig, mask) \
 	((1UL << (sig)) & mask)
 
-#define sig_user_specific(sig)		T(sig, SIG_USER_SPECIFIC_MASK)
+#define sig_user_specific(sig) \
+		(((sig) < SIGRTMIN)  && T(sig, SIG_USER_SPECIFIC_MASK))
 #define sig_user_load_balance(sig) \
-		(T(sig, SIG_USER_LOAD_BALANCE_MASK) || ((sig) >= SIGRTMIN))
-#define sig_kernel_specific(sig)	T(sig, SIG_KERNEL_SPECIFIC_MASK)
+		(((sig) >= SIGRTMIN) || T(sig, SIG_USER_LOAD_BALANCE_MASK))
+#define sig_kernel_specific(sig) \
+		(((sig) < SIGRTMIN)  && T(sig, SIG_KERNEL_SPECIFIC_MASK))
 #define sig_kernel_broadcast(sig) \
-		(T(sig, SIG_KERNEL_BROADCAST_MASK) || ((sig) >= SIGRTMIN))
-#define sig_kernel_only(sig)		T(sig, SIG_KERNEL_ONLY_MASK)
-#define sig_kernel_coredump(sig)	T(sig, SIG_KERNEL_COREDUMP_MASK)
+		(((sig) >= SIGRTMIN) || T(sig, SIG_KERNEL_BROADCAST_MASK))
+#define sig_kernel_only(sig) \
+		(((sig) < SIGRTMIN)  && T(sig, SIG_KERNEL_ONLY_MASK))
+#define sig_kernel_coredump(sig) \
+		(((sig) < SIGRTMIN)  && T(sig, SIG_KERNEL_COREDUMP_MASK))
 
 #define sig_user_defined(t, sig) \
 	(((t)->sig->action[(sig)-1].sa.sa_handler != SIG_DFL) &&	\
@@ -251,23 +264,6 @@ void __exit_sighand(struct task_struct *tsk)
 	if (!atomic_read(&sig->count))
 		BUG();
 	spin_lock(&sig->siglock);
-	/*
-	 * Do not let the thread group leader exit until all other
-	 * threads are done:
-	 */
-	while (!list_empty(&current->thread_group) &&
-			current->tgid == current->pid &&
-			atomic_read(&sig->count) > 1) {
-
-		spin_unlock(&sig->siglock);
-		write_unlock_irq(&tasklist_lock);
-
-		wait_for_completion(&sig->group_exit_done);
-
-		write_lock_irq(&tasklist_lock);
-		spin_lock(&sig->siglock);
-	}
-
 	spin_lock(&tsk->sigmask_lock);
 	tsk->sig = NULL;
 	if (atomic_dec_and_test(&sig->count)) {
@@ -276,11 +272,34 @@ void __exit_sighand(struct task_struct *tsk)
 		flush_sigqueue(&sig->shared_pending);
 		kmem_cache_free(sigact_cachep, sig);
 	} else {
-		if (!list_empty(&current->thread_group) &&
-					atomic_read(&sig->count) == 1)
-			complete(&sig->group_exit_done);
-		__remove_thread_group(tsk, sig);
-		spin_unlock(&sig->siglock);
+		struct task_struct *leader = tsk->group_leader;
+
+		/*
+		 * If there is any task waiting for the group exit
+		 * then notify it:
+		 */
+		if (sig->group_exit_task && atomic_read(&sig->count) <= 2) {
+			wake_up_process(sig->group_exit_task);
+			sig->group_exit_task = NULL;
+		}
+		/*
+		 * If we are the last non-leader member of the thread
+		 * group, and the leader is zombie, then notify the
+		 * group leader's parent process.
+		 *
+		 * (subtle: here we also rely on the fact that if we are the
+		 *  thread group leader then we are not zombied yet.)
+		 */
+		if (atomic_read(&sig->count) == 1 &&
+					leader->state == TASK_ZOMBIE) {
+
+			__remove_thread_group(tsk, sig);
+			spin_unlock(&sig->siglock);
+			do_notify_parent(leader, leader->exit_signal);
+		} else {
+			__remove_thread_group(tsk, sig);
+			spin_unlock(&sig->siglock);
+		}
 	}
 	clear_tsk_thread_flag(tsk,TIF_SIGPENDING);
 	flush_sigqueue(&tsk->pending);
@@ -929,8 +948,8 @@ int __kill_pg_info(int sig, struct siginfo *info, pid_t pgrp)
 		struct task_struct *p;
 
 		retval = -ESRCH;
-		for_each_task(p) {
-			if (p->pgrp == pgrp && thread_group_leader(p)) {
+		for_each_process(p) {
+			if (p->pgrp == pgrp) {
 				int err = send_sig_info(sig, info, p);
 				if (retval)
 					retval = err;
@@ -967,7 +986,7 @@ kill_sl_info(int sig, struct siginfo *info, pid_t sess)
 
 		retval = -ESRCH;
 		read_lock(&tasklist_lock);
-		for_each_task(p) {
+		for_each_process(p) {
 			if (p->leader && p->session == sess) {
 				int err = send_sig_info(sig, info, p);
 				if (retval)
@@ -1011,8 +1030,8 @@ static int kill_something_info(int sig, struct siginfo *info, int pid)
 		struct task_struct * p;
 
 		read_lock(&tasklist_lock);
-		for_each_task(p) {
-			if (p->pid > 1 && p != current && thread_group_leader(p)) {
+		for_each_process(p) {
+			if (p->pid > 1 && p != current) {
 				int err = send_sig_info(sig, info, p);
 				++count;
 				if (err != -EPERM)
@@ -1096,6 +1115,8 @@ void do_notify_parent(struct task_struct *tsk, int sig)
 	struct siginfo info;
 	int why, status;
 
+	if (!tsk->ptrace && delay_group_leader(tsk))
+		return;
 	if (sig == -1)
 		BUG();
 
