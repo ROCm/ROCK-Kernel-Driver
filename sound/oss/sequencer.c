@@ -15,7 +15,7 @@
  * Alan Cox	   : reformatted and fixed a pair of null pointer bugs
  */
 #include <linux/kmod.h>
-
+#include <linux/spinlock.h>
 #define SEQUENCER_C
 #include "sound_config.h"
 
@@ -28,6 +28,7 @@ static int      pending_timer = -1;	/* For timer change operation */
 extern unsigned long seq_time;
 
 static int      obsolete_api_used = 0;
+static spinlock_t lock=SPIN_LOCK_UNLOCKED;
 
 /*
  * Local counts for number of synth and MIDI devices. These are initialized
@@ -95,37 +96,38 @@ int sequencer_read(int dev, struct file *file, char *buf, int count)
 
 	ev_len = seq_mode == SEQ_1 ? 4 : 8;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&lock,flags);
 
 	if (!iqlen)
 	{
+		spin_unlock_irqrestore(&lock,flags);
  		if (file->f_flags & O_NONBLOCK) {
-  			restore_flags(flags);
   			return -EAGAIN;
   		}
 
  		interruptible_sleep_on_timeout(&midi_sleeper,
 					       pre_event_timeout);
+		spin_lock_irqsave(&lock,flags);
 		if (!iqlen)
 		{
-			restore_flags(flags);
+			spin_unlock_irqrestore(&lock,flags);
 			return 0;
 		}
 	}
 	while (iqlen && c >= ev_len)
 	{
 		char *fixit = (char *) &iqueue[iqhead * IEV_SZ];
+		spin_unlock_irqrestore(&lock,flags);
 		if (copy_to_user(&(buf)[p], fixit, ev_len))
-			goto out;
+			return count - c;
 		p += ev_len;
 		c -= ev_len;
 
+		spin_lock_irqsave(&lock,flags);
 		iqhead = (iqhead + 1) % SEQ_MAX_QUEUE;
 		iqlen--;
 	}
-out:
-	restore_flags(flags);
+	spin_unlock_irqrestore(&lock,flags);
 	return count - c;
 }
 
@@ -152,13 +154,12 @@ void seq_copy_to_input(unsigned char *event_rec, int len)
 	if (iqlen >= (SEQ_MAX_QUEUE - 1))
 		return;		/* Overflow */
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&lock,flags);
 	memcpy(&iqueue[iqtail * IEV_SZ], event_rec, len);
 	iqlen++;
 	iqtail = (iqtail + 1) % SEQ_MAX_QUEUE;
 	wake_up(&midi_sleeper);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&lock,flags);
 }
 
 static void sequencer_midi_input(int dev, unsigned char data)
@@ -869,19 +870,19 @@ static int play_event(unsigned char *q)
 	return 0;
 }
 
+/* called also as timer in irq context */
 static void seq_startplay(void)
 {
-	unsigned long flags;
 	int this_one, action;
+	unsigned long flags;
 
 	while (qlen > 0)
 	{
 
-		save_flags(flags);
-		cli();
+		spin_lock_irqsave(&lock,flags);
 		qhead = ((this_one = qhead) + 1) % SEQ_MAX_QUEUE;
 		qlen--;
-		restore_flags(flags);
+		spin_unlock_irqrestore(&lock,flags);
 
 		seq_playing = 1;
 
@@ -947,7 +948,6 @@ int sequencer_open(int dev, struct file *file)
 {
 	int retval, mode, i;
 	int level, tmp;
-	unsigned long flags;
 
 	if (!sequencer_ok)
 		sequencer_init();
@@ -979,16 +979,12 @@ int sequencer_open(int dev, struct file *file)
 			return -ENXIO;
 		}
 	}
-	save_flags(flags);
-	cli();
 	if (sequencer_busy)
 	{
-		restore_flags(flags);
 		return -EBUSY;
 	}
 	sequencer_busy = 1;
 	obsolete_api_used = 0;
-	restore_flags(flags);
 
 	max_mididev = num_midis;
 	max_synthdev = num_synths;
@@ -1203,16 +1199,11 @@ void sequencer_release(int dev, struct file *file)
 
 static int seq_sync(void)
 {
-	unsigned long flags;
-
 	if (qlen && !seq_playing && !signal_pending(current))
 		seq_startplay();
 
-	save_flags(flags);
-	cli();
  	if (qlen > 0)
  		interruptible_sleep_on_timeout(&seq_sleeper, HZ);
-	restore_flags(flags);
 	return qlen;
 }
 
@@ -1233,13 +1224,12 @@ static void midi_outc(int dev, unsigned char data)
 
 	n = 3 * HZ;		/* Timeout */
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&lock,flags);
  	while (n && !midi_devs[dev]->outputc(dev, data)) {
  		interruptible_sleep_on_timeout(&seq_sleeper, HZ/25);
   		n--;
   	}
-	restore_flags(flags);
+	spin_unlock_irqrestore(&lock,flags);
 }
 
 static void seq_reset(void)
@@ -1308,14 +1298,13 @@ static void seq_reset(void)
 
 	seq_playing = 0;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&lock,flags);
 
 	if (waitqueue_active(&seq_sleeper)) {
 		/*      printk( "Sequencer Warning: Unexpected sleeping process - Waking up\n"); */
 		wake_up(&seq_sleeper);
 	}
-	restore_flags(flags);
+	spin_unlock_irqrestore(&lock,flags);
 }
 
 static void seq_panic(void)
@@ -1499,10 +1488,9 @@ int sequencer_ioctl(int dev, struct file *file, unsigned int cmd, caddr_t arg)
 		case SNDCTL_SEQ_OUTOFBAND:
 			if (copy_from_user(&event_rec, arg, sizeof(event_rec)))
 				return -EFAULT;
-			save_flags(flags);
-			cli();
+			spin_lock_irqsave(&lock,flags);
 			play_event(event_rec.arr);
-			restore_flags(flags);
+			spin_unlock_irqrestore(&lock,flags);
 			return 0;
 
 		case SNDCTL_MIDI_INFO:
@@ -1554,8 +1542,7 @@ unsigned int sequencer_poll(int dev, struct file *file, poll_table * wait)
 
 	dev = dev >> 4;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&lock,flags);
 	/* input */
 	poll_wait(file, &midi_sleeper, wait);
 	if (iqlen)
@@ -1565,7 +1552,7 @@ unsigned int sequencer_poll(int dev, struct file *file, poll_table * wait)
 	poll_wait(file, &seq_sleeper, wait);
 	if ((SEQ_MAX_QUEUE - qlen) >= output_threshold)
 		mask |= POLLOUT | POLLWRNORM;
-	restore_flags(flags);
+	spin_unlock_irqrestore(&lock,flags);
 	return mask;
 }
 
