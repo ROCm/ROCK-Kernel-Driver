@@ -64,7 +64,7 @@ extern int			nfs_stat_to_errno(int);
 #define NFS3_readdirargs_sz	(NFS3_fh_sz+2)
 #define NFS3_commitargs_sz	(NFS3_fh_sz+3)
 #define NFS3_getaclargs_sz	(NFS3_fh_sz+1)
-#define NFS3_setaclargs_sz	(NFS3_fh_sz+1)
+#define NFS3_setaclargs_sz	(NFS3_fh_sz+1+2*(2+5*3))
 
 #define NFS3_attrstat_sz	(1+NFS3_fattr_sz)
 #define NFS3_wccstat_sz		(1+NFS3_wcc_data_sz)
@@ -81,7 +81,6 @@ extern int			nfs_stat_to_errno(int);
 #define NFS3_fsinfores_sz	(1+NFS3_post_op_attr_sz+12)
 #define NFS3_pathconfres_sz	(1+NFS3_post_op_attr_sz+6)
 #define NFS3_commitres_sz	(1+NFS3_wcc_data_sz+2)
-				/* (leave room for two 5-entry acls:) */
 #define NFS3_getaclres_sz	(1+NFS3_post_op_attr_sz+1+2*(2+5*3))
 #define NFS3_setaclres_sz	(1+NFS3_post_op_attr_sz)
 
