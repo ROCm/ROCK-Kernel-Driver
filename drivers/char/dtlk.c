@@ -176,10 +176,6 @@ static ssize_t dtlk_write(struct file *file, const char __user *buf,
 	}
 #endif
 
-	/* Can't seek (pwrite) on the DoubleTalk.  */
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
-
 	if (iminor(file->f_dentry->d_inode) != DTLK_MINOR)
 		return -EINVAL;
 
@@ -304,7 +300,7 @@ static int dtlk_open(struct inode *inode, struct file *file)
 	case DTLK_MINOR:
 		if (dtlk_busy)
 			return -EBUSY;
-		return 0;
+		return nonseekable_open(inode, file);
 
 	default:
 		return -ENXIO;

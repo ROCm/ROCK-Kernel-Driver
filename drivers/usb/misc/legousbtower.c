@@ -344,6 +344,7 @@ static int tower_open (struct inode *inode, struct file *file)
 
 	dbg(2, "%s: enter", __FUNCTION__);
 
+	nonseekable_open(inode, file);
 	subminor = iminor(inode);
 
 	down (&disconnect_sem);

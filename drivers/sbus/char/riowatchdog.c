@@ -116,6 +116,7 @@ static void riowd_starttimer(void)
 
 static int riowd_open(struct inode *inode, struct file *filp)
 {
+	nonseekable_open(inode, filp);
 	return 0;
 }
 
@@ -184,9 +185,6 @@ static int riowd_ioctl(struct inode *inode, struct file *filp,
 
 static ssize_t riowd_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
 {
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
-
 	if (count) {
 		riowd_pingtimer();
 		return 1;

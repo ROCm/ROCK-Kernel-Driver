@@ -56,8 +56,6 @@ extern int piranha_simulator;
  *	ioctls.
  */
 
-static loff_t rtc_llseek(struct file *file, loff_t offset, int origin);
-
 static ssize_t rtc_read(struct file *file, char *buf,
 			size_t count, loff_t *ppos);
 
@@ -80,11 +78,6 @@ static const unsigned char days_in_mo[] =
 /*
  *	Now all the various file operations that we export.
  */
-
-static loff_t rtc_llseek(struct file *file, loff_t offset, int origin)
-{
-	return -ESPIPE;
-}
 
 static ssize_t rtc_read(struct file *file, char *buf,
 			size_t count, loff_t *ppos)
@@ -171,6 +164,7 @@ static int rtc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 static int rtc_open(struct inode *inode, struct file *file)
 {
+	nonseekable_open(inode, file);
 	return 0;
 }
 
@@ -184,7 +178,7 @@ static int rtc_release(struct inode *inode, struct file *file)
  */
 static struct file_operations rtc_fops = {
 	.owner =	THIS_MODULE,
-	.llseek =	rtc_llseek,
+	.llseek =	no_llseek,
 	.read =		rtc_read,
 	.ioctl =	rtc_ioctl,
 	.open =		rtc_open,

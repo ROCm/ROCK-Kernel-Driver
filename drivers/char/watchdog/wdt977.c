@@ -240,7 +240,7 @@ static int wdt977_open(struct inode *inode, struct file *file)
 		__module_get(THIS_MODULE);
 
 	wdt977_start();
-	return 0;
+	return nonseekable_open(inode, file);
 }
 
 static int wdt977_release(struct inode *inode, struct file *file)
@@ -275,10 +275,6 @@ static int wdt977_release(struct inode *inode, struct file *file)
 
 static ssize_t wdt977_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 {
-	/* Can't seek (pwrite) on this device  */
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
-
 	if (count) {
 		if (!nowayout) {
 			size_t i;

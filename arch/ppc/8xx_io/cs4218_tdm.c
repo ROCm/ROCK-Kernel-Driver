@@ -1619,7 +1619,7 @@ static ssize_t sound_copy_translate_read(const u_char *userPtr,
 static int mixer_open(struct inode *inode, struct file *file)
 {
 	mixer.busy = 1;
-	return 0;
+	return nonseekable_open(inode, file);
 }
 
 
@@ -2105,7 +2105,7 @@ static int sq_open(struct inode *inode, struct file *file)
 		sound_set_format(AFMT_MU_LAW);
 	}
 
-	return 0;
+	return nonseekable_open(inode, file);
 
 err_out_nobusy:
 	if (file->f_mode & FMODE_WRITE) {
@@ -2404,7 +2404,7 @@ static int state_open(struct inode *inode, struct file *file)
 	len += sprintf(buffer+len, "\tsq.active = %d sq.syncing = %d\n",
 		       sq.active, sq.syncing);
 	state.len = len;
-	return 0;
+	return nonseekable_open(inode, file);
 }
 
 

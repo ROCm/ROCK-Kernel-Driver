@@ -646,9 +646,6 @@ static ssize_t usb_midi_read(struct file *file, char __user *buffer, size_t coun
 	ssize_t ret;
 	DECLARE_WAITQUEUE(wait, current);
 
-	if ( ppos != &file->f_pos ) {
-		return -ESPIPE;
-	}
 	if ( !access_ok(VERIFY_READ, buffer, count) ) {
 		return -EFAULT;
 	}
@@ -728,9 +725,6 @@ static ssize_t usb_midi_write(struct file *file, const char __user *buffer, size
 	ssize_t ret;
 	unsigned long int flags;
 
-	if ( ppos != &file->f_pos ) {
-		return -ESPIPE;
-	}
 	if ( !access_ok(VERIFY_READ, buffer, count) ) {
 		return -EFAULT;
 	}
@@ -920,7 +914,7 @@ static int usb_midi_open(struct inode *inode, struct file *file)
 	printk(KERN_INFO "usb-midi: Open Succeeded. minor= %d.\n", minor);
 #endif
 
-	return 0; /** Success. **/
+	return nonseekable_open(inode, file); /** Success. **/
 }
 
 

@@ -32,9 +32,6 @@ static ssize_t scx200_gpio_write(struct file *file, const char __user *data,
 	unsigned m = iminor(file->f_dentry->d_inode);
 	size_t i;
 
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
-
 	for (i = 0; i < len; ++i) {
 		char c;
 		if (get_user(c, data+i))
@@ -83,9 +80,6 @@ static ssize_t scx200_gpio_read(struct file *file, char __user *buf,
 	unsigned m = iminor(file->f_dentry->d_inode);
 	int value;
 
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
-
 	value = scx200_gpio_get(m);
 	if (put_user(value ? '1' : '0', buf))
 		return -EFAULT;
@@ -98,7 +92,7 @@ static int scx200_gpio_open(struct inode *inode, struct file *file)
 	unsigned m = iminor(inode);
 	if (m > 63)
 		return -EINVAL;
-	return 0;
+	return nonseekable_open(inode, file);
 }
 
 static int scx200_gpio_release(struct inode *inode, struct file *file)

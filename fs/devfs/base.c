@@ -857,12 +857,14 @@ static int devfsd_close(struct inode *inode, struct file *file);
 static ssize_t stat_read(struct file *file, char __user *buf, size_t len,
 			 loff_t * ppos);
 static struct file_operations stat_fops = {
+	.open = nonseekable_open,
 	.read = stat_read,
 };
 #endif
 
 /*  Devfs daemon file operations  */
 static struct file_operations devfsd_fops = {
+	.open = nonseekable_open,
 	.read = devfsd_read,
 	.ioctl = devfsd_ioctl,
 	.release = devfsd_close,
@@ -2574,9 +2576,6 @@ static ssize_t devfsd_read(struct file *file, char __user *buf, size_t len,
 	struct devfsd_notify_struct *info = fs_info->devfsd_info;
 	DECLARE_WAITQUEUE(wait, current);
 
-	/*  Can't seek (pread) on this device  */
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
 	/*  Verify the task has grabbed the queue  */
 	if (fs_info->devfsd_task != current)
 		return -EPERM;
@@ -2763,9 +2762,6 @@ static ssize_t stat_read(struct file *file, char __user *buf, size_t len,
 
 	num = sprintf(txt, "Number of entries: %u  number of bytes: %u\n",
 		      stat_num_entries, stat_num_bytes) + 1;
-	/*  Can't seek (pread) on this device  */
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
 	if (*ppos >= num)
 		return 0;
 	if (*ppos + len > num)
