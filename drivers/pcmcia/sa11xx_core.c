@@ -69,6 +69,8 @@ static struct sa1100_pcmcia_socket sa1100_pcmcia_socket[SA1100_PCMCIA_MAX_SOCK];
 
 #define PCMCIA_SOCKET(x)	(sa1100_pcmcia_socket + (x))
 
+#define to_sa1100_socket(x)	container_of(x, struct sa1100_pcmcia_socket, socket)
+
 /*
  * sa1100_pcmcia_default_mecr_timing
  * ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -226,9 +228,9 @@ sa1100_pcmcia_config_skt(struct sa1100_pcmcia_socket *skt, socket_state_t *state
  *
  * Returns: 0
  */
-static int sa1100_pcmcia_sock_init(unsigned int sock)
+static int sa1100_pcmcia_sock_init(struct pcmcia_socket *sock)
 {
-	struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(sock);
+	struct sa1100_pcmcia_socket *skt = to_sa1100_socket(sock);
 
 	DEBUG(2, "%s(): initializing socket %u\n", __FUNCTION__, skt->nr);
 
@@ -248,9 +250,9 @@ static int sa1100_pcmcia_sock_init(unsigned int sock)
  *
  * Returns: 0
  */
-static int sa1100_pcmcia_suspend(unsigned int sock)
+static int sa1100_pcmcia_suspend(struct pcmcia_socket *sock)
 {
-	struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(sock);
+	struct sa1100_pcmcia_socket *skt = to_sa1100_socket(sock);
 	int ret;
 
 	DEBUG(2, "%s(): suspending socket %u\n", __FUNCTION__, skt->nr);
@@ -348,11 +350,11 @@ static irqreturn_t sa1100_pcmcia_interrupt(int irq, void *dev, struct pt_regs *r
  * Returns: 0
  */
 static int
-sa1100_pcmcia_register_callback(unsigned int sock,
+sa1100_pcmcia_register_callback(struct pcmcia_socket *sock,
 				void (*handler)(void *, unsigned int),
 				void *info)
 {
-	struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(sock);
+	struct sa1100_pcmcia_socket *skt = to_sa1100_socket(sock);
 
 	if (handler) {
 		if (!try_module_get(skt->ops->owner))
@@ -392,9 +394,9 @@ sa1100_pcmcia_register_callback(unsigned int sock,
  * Return value is irrelevant; the pcmcia subsystem ignores it.
  */
 static int
-sa1100_pcmcia_inquire_socket(unsigned int sock, socket_cap_t *cap)
+sa1100_pcmcia_inquire_socket(struct pcmcia_socket *sock, socket_cap_t *cap)
 {
-	struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(sock);
+	struct sa1100_pcmcia_socket *skt = to_sa1100_socket(sock);
 	int ret = -1;
 
 	if (skt) {
@@ -430,9 +432,9 @@ sa1100_pcmcia_inquire_socket(unsigned int sock, socket_cap_t *cap)
  * Returns: 0
  */
 static int
-sa1100_pcmcia_get_status(unsigned int sock, unsigned int *status)
+sa1100_pcmcia_get_status(struct pcmcia_socket *sock, unsigned int *status)
 {
-	struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(sock);
+	struct sa1100_pcmcia_socket *skt = to_sa1100_socket(sock);
 
 	skt->status = sa1100_pcmcia_skt_state(skt);
 	*status = skt->status;
@@ -450,9 +452,9 @@ sa1100_pcmcia_get_status(unsigned int sock, unsigned int *status)
  * Returns: 0
  */
 static int
-sa1100_pcmcia_get_socket(unsigned int sock, socket_state_t *state)
+sa1100_pcmcia_get_socket(struct pcmcia_socket *sock, socket_state_t *state)
 {
-  struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(sock);
+  struct sa1100_pcmcia_socket *skt = to_sa1100_socket(sock);
 
   DEBUG(2, "%s() for sock %u\n", __FUNCTION__, skt->nr);
 
@@ -472,9 +474,9 @@ sa1100_pcmcia_get_socket(unsigned int sock, socket_state_t *state)
  * Returns: 0
  */
 static int
-sa1100_pcmcia_set_socket(unsigned int sock, socket_state_t *state)
+sa1100_pcmcia_set_socket(struct pcmcia_socket *sock, socket_state_t *state)
 {
-  struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(sock);
+  struct sa1100_pcmcia_socket *skt = to_sa1100_socket(sock);
 
   DEBUG(2, "%s() for sock %u\n", __FUNCTION__, skt->nr);
 
@@ -508,9 +510,9 @@ sa1100_pcmcia_set_socket(unsigned int sock, socket_state_t *state)
  * Returns: 0 on success, -1 on error
  */
 static int
-sa1100_pcmcia_set_io_map(unsigned int sock, struct pccard_io_map *map)
+sa1100_pcmcia_set_io_map(struct pcmcia_socket *sock, struct pccard_io_map *map)
 {
-	struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(sock);
+	struct sa1100_pcmcia_socket *skt = to_sa1100_socket(sock);
 	unsigned short speed = map->speed;
 
 	DEBUG(2, "%s() for sock %u\n", __FUNCTION__, skt->nr);
@@ -564,9 +566,9 @@ sa1100_pcmcia_set_io_map(unsigned int sock, struct pccard_io_map *map)
  * Returns: 0 on success, -1 on error
  */
 static int
-sa1100_pcmcia_set_mem_map(unsigned int sock, struct pccard_mem_map *map)
+sa1100_pcmcia_set_mem_map(struct pcmcia_socket *sock, struct pccard_mem_map *map)
 {
-	struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(sock);
+	struct sa1100_pcmcia_socket *skt = to_sa1100_socket(sock);
 	struct resource *res;
 	unsigned short speed = map->speed;
 
@@ -708,7 +710,7 @@ sa1100_pcmcia_proc_status(char *buf, char **start, off_t pos,
  * Returns: 0 on success, -1 on error
  */
 static void
-sa1100_pcmcia_proc_setup(unsigned int sock, struct proc_dir_entry *base)
+sa1100_pcmcia_proc_setup(struct pcmcia_socket *sock, struct proc_dir_entry *base)
 {
 	struct proc_dir_entry *entry;
 
@@ -717,7 +719,7 @@ sa1100_pcmcia_proc_setup(unsigned int sock, struct proc_dir_entry *base)
 		return;
 	}
 	entry->read_proc = sa1100_pcmcia_proc_status;
-	entry->data = PCMCIA_SOCKET(sock);
+	entry->data = to_sa1100_socket(sock);
 }
 #else
 #define sa1100_pcmcia_proc_setup	NULL
