@@ -423,7 +423,7 @@ static int sctp_outq_flush_rtx(struct sctp_outq *q, sctp_packet_t *pkt,
 				*start_timer = 1;
 
 			/* Stop sending DATA as there is no more room
-			 * at the reciever.
+			 * at the receiver.
 			 */
 			list_add(lchunk, lqueue);
 			lchunk = NULL;

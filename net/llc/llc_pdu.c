@@ -203,7 +203,7 @@ void llc_pdu_init_as_xid_cmd(struct sk_buff *skb, u8 svcs_supported,
 	xid_info	 = (struct llc_xid_info *)(((u8 *)&pdu->ctrl_1) + 1);
 	xid_info->fmt_id = LLC_XID_FMT_ID;	/* 0x81 */
 	xid_info->type	 = svcs_supported;
-	xid_info->rw	 = rx_window << 1;	/* size of recieve window */
+	xid_info->rw	 = rx_window << 1;	/* size of receive window */
 	skb_put(skb, 3);
 }
 

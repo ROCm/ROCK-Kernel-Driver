@@ -1949,7 +1949,7 @@ e100_rx_srv(struct e100_private *bdp)
 		/* to allow manipulation with current skb we need to unlink it */
 		list_del(&(rx_struct->list_elem));
 
-		/* do not free & unmap badly recieved packet.
+		/* do not free & unmap badly received packet.
 		 * move it to the end of skb list for reuse */
 		if (!(rfd_status & RFD_STATUS_OK)) {
 			e100_add_skb_to_end(bdp, rx_struct);

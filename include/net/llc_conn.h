@@ -61,7 +61,7 @@ struct llc_opt {
 	u8		    inc_cntr;
 	u8		    dec_cntr;
 	u8		    connect_step;
-	u8		    last_nr;	   /* NR of last pdu recieved */
+	u8		    last_nr;	   /* NR of last pdu received */
 	u32		    rx_pdu_hdr;	   /* used for saving header of last pdu
 					      received and caused sending FRMR.
 					      Used for resending FRMR */

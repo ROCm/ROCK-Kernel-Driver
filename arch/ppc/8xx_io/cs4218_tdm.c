@@ -2495,7 +2495,7 @@ int __init tdm8xx_sound_init(void)
 	cp->cp_simode &= ~0x00000fff;
 
 	/* Enable common receive/transmit clock pins, use IDL format.
-	 * Sync on falling edge, transmit rising clock, recieve falling
+	 * Sync on falling edge, transmit rising clock, receive falling
 	 * clock, delay 1 bit on both Tx and Rx.  Common Tx/Rx clocks and
 	 * sync.
 	 * Connect SMC2 to TSA.

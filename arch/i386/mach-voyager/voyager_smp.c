@@ -1453,7 +1453,7 @@ smp_intr_init(void)
 }
 
 /* send a CPI at level cpi to a set of cpus in cpuset (set 1 bit per
- * processor to recieve CPI */
+ * processor to receive CPI */
 static void
 send_CPI(__u32 cpuset, __u8 cpi)
 {
