@@ -2698,7 +2698,7 @@ int journal_mark_dirty(struct reiserfs_transaction_handle *th, struct super_bloc
   ** a dirty or journal_dirty or locked buffer to be logged, as some changes
   ** could get to disk too early.  NOT GOOD.
   */
-  if (!prepared || buffer_locked(bh) || buffer_dirty(bh)) {
+  if (!prepared || buffer_dirty(bh)) {
     printk("journal-1777: buffer %llu bad state %cPREPARED %cLOCKED %cDIRTY %cJDIRTY_WAIT\n", (unsigned long long)bh->b_blocknr, prepared ? ' ' : '!', 
                             buffer_locked(bh) ? ' ' : '!',
 			    buffer_dirty(bh) ? ' ' : '!',
