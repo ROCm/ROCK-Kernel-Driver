@@ -411,18 +411,20 @@ out:
 	return state;
 }
 
-void
-nfs4_put_open_state(struct nfs4_state *state)
+static void
+__nfs4_put_open_state(struct nfs4_state *state)
 {
 	struct inode *inode = state->inode;
 	struct nfs4_state_owner *owner = state->owner;
 	int status = 0;
 
-	if (!atomic_dec_and_lock(&state->count, &inode->i_lock))
+	if (!atomic_dec_and_lock(&state->count, &inode->i_lock)) {
+		up(&owner->so_sema);
 		return;
-	list_del(&state->inode_states);
+	}
+	if (!list_empty(&state->inode_states))
+		list_del(&state->inode_states);
 	spin_unlock(&inode->i_lock);
-	down(&owner->so_sema);
 	list_del(&state->open_states);
 	if (state->state != 0) {
 		do {
@@ -437,6 +439,13 @@ nfs4_put_open_state(struct nfs4_state *state)
 	up(&owner->so_sema);
 	nfs4_free_open_state(state);
 	nfs4_put_state_owner(owner);
+}
+
+void
+nfs4_put_open_state(struct nfs4_state *state)
+{
+	down(&state->owner->so_sema);
+	__nfs4_put_open_state(state);
 }
 
 void
@@ -479,8 +488,7 @@ nfs4_close_state(struct nfs4_state *state, mode_t mode)
 		status = nfs4_handle_error(NFS_SERVER(inode), status);
 		down(&owner->so_sema);
 	} while (!status);
-	up(&owner->so_sema);
-	nfs4_put_open_state(state);
+	__nfs4_put_open_state(state);
 }
 
 /*

@@ -1407,8 +1407,8 @@ static void nfs4_clear_inode(struct inode *inode)
 				inode->i_sb->s_id,
 				(long long)NFS_FILEID(inode),
 				state);
-		list_del(&state->inode_states);
-		nfs4_put_open_state(state);
+		BUG_ON(atomic_read(&state->count) != 1);
+		nfs4_close_state(state, state->state);
 	}
 	/* Now call standard NFS clear_inode() code */
 	nfs_clear_inode(inode);
