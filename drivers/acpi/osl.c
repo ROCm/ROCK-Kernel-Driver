@@ -71,6 +71,7 @@ static int acpi_irq_irq = 0;
 static OSD_HANDLER acpi_irq_handler = NULL;
 static void *acpi_irq_context = NULL;
 
+extern struct pci_ops *pci_root_ops;
 
 acpi_status
 acpi_os_initialize(void)
@@ -80,7 +81,7 @@ acpi_os_initialize(void)
 	 * it while walking the namespace (bus 0 and root bridges w/ _BBNs).
 	 */
 #ifdef CONFIG_ACPI_PCI
-	if (!pci_config_read || !pci_config_write) {
+	if (!pci_root_ops) {
 		printk(KERN_ERR PREFIX "Access to PCI configuration space unavailable\n");
 		return AE_NULL_ENTRY;
 	}
@@ -438,26 +439,30 @@ acpi_os_read_pci_configuration (
 	u32                     width)
 {
 	int			result = 0;
+	int			size = 0;
+	struct pci_bus		bus;
+
 	if (!value)
 		return AE_BAD_PARAMETER;
 
-	switch (width)
-	{
+	switch (width) {
 	case 8:
-		result = pci_config_read(pci_id->segment, pci_id->bus,
-			pci_id->device, pci_id->function, reg, 1, value);
+		size = 1;
 		break;
 	case 16:
-		result = pci_config_read(pci_id->segment, pci_id->bus,
-			pci_id->device, pci_id->function, reg, 2, value);
+		size = 2;
 		break;
 	case 32:
-		result = pci_config_read(pci_id->segment, pci_id->bus,
-			pci_id->device, pci_id->function, reg, 4, value);
+		size = 4;
 		break;
 	default:
 		BUG();
 	}
+
+	bus.number = pci_id->bus;
+	result = pci_root_ops->read(&bus, PCI_DEVFN(pci_id->device,
+						    pci_id->function),
+				    reg, size, value);
 
 	return (result ? AE_ERROR : AE_OK);
 }
@@ -470,25 +475,27 @@ acpi_os_write_pci_configuration (
 	u32                     width)
 {
 	int			result = 0;
+	int			size = 0;
+	struct pci_bus		bus;
 
-	switch (width)
-	{
+	switch (width) {
 	case 8:
-		result = pci_config_write(pci_id->segment, pci_id->bus,
-			pci_id->device, pci_id->function, reg, 1, value);
+		size = 1;
 		break;
 	case 16:
-		result = pci_config_write(pci_id->segment, pci_id->bus,
-			pci_id->device, pci_id->function, reg, 2, value);
+		size = 2;
 		break;
 	case 32:
-		result = pci_config_write(pci_id->segment, pci_id->bus,
-			pci_id->device, pci_id->function, reg, 4, value);
+		size = 4;
 		break;
 	default:
 		BUG();
 	}
 
+	bus.number = pci_id->bus;
+	result = pci_root_ops->write(&bus, PCI_DEVFN(pci_id->device,
+						     pci_id->function),
+				     reg, size, value);
 	return (result ? AE_ERROR : AE_OK);
 }
 

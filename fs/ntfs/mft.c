@@ -98,7 +98,7 @@ int format_mft_record(ntfs_inode *ni, MFT_RECORD *mft_rec)
 }
 
 /**
- * From fs/ntfs/aops.c
+ * ntfs_readpage - external declaration, function is in fs/ntfs/aops.c
  */
 extern int ntfs_readpage(struct file *, struct page *);
 
@@ -109,12 +109,9 @@ extern int ntfs_readpage(struct file *, struct page *);
  * ntfs_map_page() in map_mft_record_page().
  */
 struct address_space_operations ntfs_mft_aops = {
-	.writepage	= NULL,			/* Write dirty page to disk. */
 	.readpage	= ntfs_readpage,	/* Fill page with data. */
 	.sync_page	= block_sync_page,	/* Currently, just unplugs the
 						   disk request queue. */
-	.prepare_write	= NULL,			/* . */
-	.commit_write	= NULL,			/* . */
 };
 
 /**
@@ -176,8 +173,8 @@ err_out:
  * First, take the mrec_lock semaphore. We might now be sleeping, while waiting
  * for the semaphore if it was already locked by someone else.
  *
- * The page of the record is first mapped using map_mft_record_page() before
- * being returned to the caller.
+ * The page of the record is mapped using map_mft_record_page() before being
+ * returned to the caller.
  *
  * This in turn uses ntfs_map_page() to get the page containing the wanted mft
  * record (it in turn calls read_cache_page() which reads it in from disk if

@@ -568,8 +568,19 @@ asmlinkage int sparc_do_fork(unsigned long clone_flags,
 			     struct pt_regs *regs,
 			     unsigned long stack_size)
 {
-	struct task_struct *p = do_fork(clone_flags, stack_start,
-					regs, stack_size);
+	struct task_struct *p;
+	unsigned long tid_ptr = 0;
+
+	clone_flags &= ~CLONE_IDLETASK;
+
+	if (clone_flags & (CLONE_SETTID | CLONE_CLEARTID)) {
+		tid_ptr = regs->u_regs[UREG_G2];
+		if (test_thread_flag(TIF_32BIT))
+			tid_ptr &= 0xffffffff;
+	}
+
+	p = do_fork(clone_flags, stack_start,
+		    regs, stack_size, (int *) tid_ptr);
 
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
@@ -648,19 +659,6 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long sp,
 
 	/* Set the second return value for the parent. */
 	regs->u_regs[UREG_I1] = 0;
-
-	if (!(clone_flags & (CLONE_SETTID | CLONE_CLEARTID)))
-		return 0;
-
-	if (t->flags & _TIF_32BIT)
-		t->kregs->u_regs[UREG_G2] &= 0xffffffff;
-
-	if (clone_flags & CLONE_SETTID)
-		if (put_user(p->pid, (int *)t->kregs->u_regs[UREG_G2]))
-			return -EFAULT;
-
-	if (clone_flags & CLONE_CLEARTID)
-		p->user_tid = (int *) t->kregs->u_regs[UREG_G2];
 
 	return 0;
 }

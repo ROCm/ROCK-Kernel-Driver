@@ -1595,7 +1595,7 @@ int sctp_process_param(sctp_association_t *asoc, sctpParam_t param,
 
 	case SCTP_PARAM_STATE_COOKIE:
 		asoc->peer.cookie_len =
-			ntohs(param.p->length) =
+			ntohs(param.p->length) -
 			sizeof(sctp_paramhdr_t);
 		asoc->peer.cookie = param.cookie->body;
 		break;
