@@ -29,6 +29,8 @@
 #include <asm/processor.h>
 #include <asm/page.h>
 #include <asm/mmu.h>
+#include <asm/naca.h>
+#include <asm/systemcfg.h>
 #include <asm/ppc_asm.h>
 #include <asm/offsets.h>
 #include <asm/bug.h>
@@ -49,8 +51,9 @@
  * 0x0100 - 0x2fff : pSeries Interrupt prologs
  * 0x3000 - 0x3fff : Interrupt support
  * 0x4000 - 0x4fff : NACA
- * 0x5000 - 0x5fff : Initial segment table
+ * 0x5000 - 0x5fff : SystemCfg
  * 0x6000          : iSeries and common interrupt prologs
+ * 0x9000 - 0x9fff : Initial segment table
  */
 
 /*
@@ -362,11 +365,11 @@ __start_interrupts:
 	STD_EXCEPTION_PSERIES( 0x1300, InstructionBreakpoint )
 
 	/* Space for the naca.  Architected to be located at real address
-	 * 0x4000.  Various tools rely on this location being fixed.
+	 * NACA_PHYS_ADDR.  Various tools rely on this location being fixed.
 	 * The first dword of the naca is required by iSeries LPAR to
 	 * point to itVpdAreas.  On pSeries native, this value is not used.
 	 */
-	. = 0x4000
+	. = NACA_PHYS_ADDR
 	.globl __end_interrupts
 	.globl __start_naca
 __end_interrupts:
@@ -380,21 +383,14 @@ __start_naca:
 	.llong 0x0
 	.llong paca
 
-	/*
-	 * Space for the initial segment table
-	 * For LPAR, the hypervisor must fill in at least one entry
-	 * before we get control (with relocate on)
-	 */
-	. = 0x5000
+	. = SYSTEMCFG_PHYS_ADDR
 	.globl __end_naca
-	.globl __start_stab
+	.globl __start_systemcfg
 __end_naca:
-__start_stab:
-
-
-	. = 0x6000
-	.globl __end_stab
-__end_stab:
+__start_systemcfg:
+	. = (SYSTEMCFG_PHYS_ADDR + PAGE_SIZE)
+	.globl __end_systemcfg
+__end_systemcfg:
 
 #ifdef CONFIG_PPC_ISERIES
 	/*
@@ -408,7 +404,7 @@ __end_stab:
 
 	.llong	1		/* # ESIDs to be mapped by hypervisor         */
 	.llong	1		/* # memory ranges to be mapped by hypervisor */
-	.llong	5		/* Page # of segment table within load area   */
+	.llong	STAB0_PAGE	/* Page # of segment table within load area   */
 	.llong	0		/* Reserved */
 	.llong  0		/* Reserved */
 	.llong  0		/* Reserved */
@@ -528,6 +524,20 @@ SystemReset_FWNMI:
 	.globl MachineCheck_FWNMI
 MachineCheck_FWNMI:
 	EXCEPTION_PROLOG_PSERIES(0x200, MachineCheck_common)
+
+	/*
+	 * Space for the initial segment table
+	 * For LPAR, the hypervisor must fill in at least one entry
+	 * before we get control (with relocate on)
+	 */
+	. = STAB0_PHYS_ADDR
+	.globl __start_stab
+__start_stab:
+
+	. = (STAB0_PHYS_ADDR + PAGE_SIZE)
+	.globl __end_stab
+__end_stab:
+
 
 /*** Common interrupt handlers ***/
 
@@ -1252,9 +1262,12 @@ _GLOBAL(__start_initialization_iSeries)
 	addi	r2,r2,0x4000
 	addi	r2,r2,0x4000
 
+	LOADADDR(r9,systemcfg)
+	SET_REG_TO_CONST(r4, SYSTEMCFG_VIRT_ADDR)
+	std	r4,0(r9)		/* set the systemcfg pointer */
+
 	LOADADDR(r9,naca)
-	SET_REG_TO_CONST(r4, KERNELBASE)
-	addi	r4,r4,0x4000
+	SET_REG_TO_CONST(r4, NACA_VIRT_ADDR)
 	std	r4,0(r9)		/* set the naca pointer */
 
 	/* Get the pointer to the segment table */
@@ -1285,13 +1298,18 @@ _GLOBAL(__start_initialization_pSeries)
 	/* Relocate the TOC from a virt addr to a real addr */
 	sub	r2,r2,r3
 
+	/* setup the systemcfg pointer which is needed by prom_init       */
+	LOADADDR(r9,systemcfg)
+	sub	r9,r9,r3                /* addr of the variable systemcfg */
+	SET_REG_TO_CONST(r4, SYSTEMCFG_VIRT_ADDR)
+	sub	r4,r4,r3
+	std	r4,0(r9)		/* set the value of systemcfg     */
+
 	/* setup the naca pointer which is needed by prom_init            */
 	LOADADDR(r9,naca)
 	sub	r9,r9,r3                /* addr of the variable naca      */
-
-	SET_REG_TO_CONST(r4, KERNELBASE)
+	SET_REG_TO_CONST(r4, NACA_VIRT_ADDR)
 	sub	r4,r4,r3
-	addi	r4,r4,0x4000
 	std	r4,0(r9)		/* set the value of naca          */
 
 	/* DRENG / PPPBBB Fix the following comment!!! -Peter */
@@ -1567,8 +1585,8 @@ _GLOBAL(__secondary_start)
 	sc				/* HvCall_setASR */
 #else
 	/* set the ASR */
-	addi	r3,0,0x4000     /* r3 = ptr to naca */
-	lhz   	r3,PLATFORM(r3) /* r3 = platform flags */
+	li	r3,SYSTEMCFG_PHYS_ADDR	/* r3 = ptr to systemcfg  */
+	lwz   	r3,PLATFORM(r3)		/* r3 = platform flags */
 	cmpldi 	r3,PLATFORM_PSERIES_LPAR
 	bne   	98f
 	mfspr	r3,PVR
@@ -1647,10 +1665,16 @@ _STATIC(start_here_pSeries)
 	bl	.reloc_offset
 	mr	r26,r3
 
+	/* setup the systemcfg pointer which is needed by *tab_initialize  */
+	LOADADDR(r6,systemcfg)
+	sub	r6,r6,r26                /* addr of the variable systemcfg */
+	li	r27,SYSTEMCFG_PHYS_ADDR
+	std	r27,0(r6)	 	 /* set the value of systemcfg     */
+
 	/* setup the naca pointer which is needed by *tab_initialize       */
 	LOADADDR(r6,naca)
 	sub	r6,r6,r26                /* addr of the variable naca      */
-	li	r27,0x4000
+	li	r27,NACA_PHYS_ADDR
 	std	r27,0(r6)	 	 /* set the value of naca          */
 
 #ifdef CONFIG_HMT
@@ -1714,15 +1738,12 @@ _STATIC(start_here_pSeries)
 	sub	r13,r13,r26		/* convert to physical addr         */
 
 	mtspr	SPRG3,r13		/* PPPBBB: Temp... -Peter */
-	li	r3,0x5000
-	std	r3,PACASTABREAL(r13)
-	LOADADDR(r24, __start_stab)
-	std	r24,PACASTABVIRT(r13)
+	ld	r3,PACASTABREAL(r13)
 	ori	r4,r3,1			/* turn on valid bit                */
 	
 	/* set the ASR */
-	addi	r3,0,0x4000     /* r3 = ptr to naca */
-	lhz   	r3,PLATFORM(r3) /* r3 = platform flags */
+	li	r3,SYSTEMCFG_PHYS_ADDR	/* r3 = ptr to systemcfg */
+	lwz   	r3,PLATFORM(r3)		/* r3 = platform flags */
 	cmpldi 	r3,PLATFORM_PSERIES_LPAR
 	bne   	98f
 	mfspr	r3,PVR
@@ -1746,8 +1767,8 @@ _STATIC(start_here_pSeries)
 	bl	.stab_initialize
 	bl	.htab_initialize
 
-	addi  r3,0,0x4000     /* r3 = ptr to naca */
-	lhz   r3,PLATFORM(r3) /* r3 = platform flags */
+	li	r3,SYSTEMCFG_PHYS_ADDR	/* r3 = ptr to systemcfg */
+	lwz	r3,PLATFORM(r3)		/* r3 = platform flags */
 	cmpldi r3,PLATFORM_PSERIES
 	bne    98f
 	LOADADDR(r6,_SDR1)		/* Only if NOT LPAR */
@@ -1796,11 +1817,14 @@ _STATIC(start_here_common)
 	addi    r2,r2,0x4000
 	addi    r2,r2,0x4000
 
-	/* setup the naca pointer                                         */
-	LOADADDR(r9,naca)
+	/* setup the systemcfg pointer */
+	LOADADDR(r9,systemcfg)
+	SET_REG_TO_CONST(r8, SYSTEMCFG_VIRT_ADDR)
+	std	r8,0(r9)
 
-	SET_REG_TO_CONST(r8, KERNELBASE)
-	addi	r8,r8,0x4000
+	/* setup the naca pointer */
+	LOADADDR(r9,naca)
+	SET_REG_TO_CONST(r8, NACA_VIRT_ADDR)
 	std	r8,0(r9)		/* set the value of the naca ptr  */
 
 	LOADADDR(r26, boot_cpuid)
@@ -1951,7 +1975,7 @@ ioremap_dir:
 hardware_int_paca0:
 	.space	8*4096
 
-/* 1 page segment table per cpu (max 48) */
+/* 1 page segment table per cpu (max 48, cpu0 allocated at STAB0_PHYS_ADDR) */
 	.globl	stab_array
 stab_array:
         .space	4096 * 48

@@ -453,7 +453,7 @@ insert_bpts()
 	int i;
 	struct bpt *bp;
 
-	if (naca->platform != PLATFORM_PSERIES)
+	if (systemcfg->platform != PLATFORM_PSERIES)
 		return;
 	bp = bpts;
 	for (i = 0; i < NBPTS; ++i, ++bp) {
@@ -484,7 +484,7 @@ remove_bpts()
 	struct bpt *bp;
 	unsigned instr;
 
-	if (naca->platform != PLATFORM_PSERIES)
+	if (systemcfg->platform != PLATFORM_PSERIES)
 		return;
 	if (!__is_processor(PV_POWER4) && !__is_processor(PV_POWER4p)) {
 		set_dabr(0);

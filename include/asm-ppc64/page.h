@@ -14,13 +14,30 @@
 
 /* PAGE_SHIFT determines the page size */
 #define PAGE_SHIFT	12
-#define PAGE_SIZE	(1UL << PAGE_SHIFT)
+#ifndef __ASSEMBLY__
+# define PAGE_SIZE	(1UL << PAGE_SHIFT)
+#else
+# define PAGE_SIZE	(1 << PAGE_SHIFT)
+#endif
 #define PAGE_MASK	(~(PAGE_SIZE-1))
 #define PAGE_OFFSET_MASK (PAGE_SIZE-1)
 
 #define SID_SHIFT       28
 #define SID_MASK        0xfffffffff
 #define GET_ESID(x)     (((x) >> SID_SHIFT) & SID_MASK)
+
+/* align addr on a size boundary - adjust address up/down if needed */
+#define _ALIGN_UP(addr,size)	(((addr)+((size)-1))&(~((size)-1)))
+#define _ALIGN_DOWN(addr,size)	((addr)&(~((size)-1)))
+
+/* align addr on a size boundary - adjust address up if needed */
+#define _ALIGN(addr,size)     _ALIGN_UP(addr,size)
+
+/* to align the pointer to the (next) double word boundary */
+#define DOUBLEWORD_ALIGN(addr)	_ALIGN(addr,sizeof(unsigned long))
+
+/* to align the pointer to the (next) page boundary */
+#define PAGE_ALIGN(addr)	_ALIGN(addr, PAGE_SIZE)
 
 #ifdef __KERNEL__
 #ifndef __ASSEMBLY__
@@ -37,7 +54,7 @@ static __inline__ void clear_page(void *addr)
 {
 	unsigned long lines, line_size;
 
-	line_size = naca->dCacheL1LineSize; 
+	line_size = systemcfg->dCacheL1LineSize; 
 	lines = naca->dCacheL1LinesPerPage;
 
 	__asm__ __volatile__(
@@ -113,19 +130,6 @@ static inline int get_order(unsigned long size)
 #define __pa(x) ((unsigned long)(x)-PAGE_OFFSET)
 
 #endif /* __ASSEMBLY__ */
-
-/* align addr on a size boundary - adjust address up/down if needed */
-#define _ALIGN_UP(addr,size)	(((addr)+((size)-1))&(~((size)-1)))
-#define _ALIGN_DOWN(addr,size)	((addr)&(~((size)-1)))
-
-/* align addr on a size boundary - adjust address up if needed */
-#define _ALIGN(addr,size)     _ALIGN_UP(addr,size)
-
-/* to align the pointer to the (next) double word boundary */
-#define DOUBLEWORD_ALIGN(addr)	_ALIGN(addr,sizeof(unsigned long))
-
-/* to align the pointer to the (next) page boundary */
-#define PAGE_ALIGN(addr)	_ALIGN(addr, PAGE_SIZE)
 
 #ifdef MODULE
 #define __page_aligned __attribute__((__aligned__(PAGE_SIZE)))

@@ -166,8 +166,6 @@ extern void rtas_restart(char *cmd);
 extern void rtas_power_off(void);
 extern void rtas_halt(void);
 
-extern struct proc_dir_entry *rtas_proc_dir;
-
 /* Some RTAS ops require a data buffer and that buffer must be < 4G.
  * Rather than having a memory allocator, just use this buffer
  * (get the lock first), make the RTAS call.  Copy the data instead

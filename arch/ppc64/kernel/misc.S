@@ -170,12 +170,14 @@ _GLOBAL(flush_icache_range)
  */
 	LOADADDR(r10,naca)		/* Get Naca address */
 	ld	r10,0(r10)
-	lhz	r7,DCACHEL1LINESIZE(r10)	/* Get cache line size */
+	LOADADDR(r11,systemcfg)		/* Get systemcfg address */
+	ld	r11,0(r11)
+	lwz	r7,DCACHEL1LINESIZE(r11)/* Get cache line size */
 	addi	r5,r7,-1
 	andc	r6,r3,r5		/* round low to line bdy */
 	subf	r8,r6,r4		/* compute length */
 	add	r8,r8,r5		/* ensure we get enough */
-	lhz	r9,DCACHEL1LOGLINESIZE(r10)	/* Get log-2 of cache line size */
+	lwz	r9,DCACHEL1LOGLINESIZE(r10)	/* Get log-2 of cache line size */
 	srw.	r8,r8,r9		/* compute line count */
 	beqlr				/* nothing to do? */
 	mtctr	r8
@@ -186,12 +188,12 @@ _GLOBAL(flush_icache_range)
 
 /* Now invalidate the instruction cache */
 	
-	lhz	r7,ICACHEL1LINESIZE(r10)	/* Get Icache line size */
+	lwz	r7,ICACHEL1LINESIZE(r11)	/* Get Icache line size */
 	addi	r5,r7,-1
 	andc	r6,r3,r5		/* round low to line bdy */
 	subf	r8,r6,r4		/* compute length */
 	add	r8,r8,r5
-	lhz	r9,ICACHEL1LOGLINESIZE(r10)	/* Get log-2 of Icache line size */
+	lwz	r9,ICACHEL1LOGLINESIZE(r10)	/* Get log-2 of Icache line size */
 	srw.	r8,r8,r9		/* compute line count */
 	beqlr				/* nothing to do? */
 	mtctr	r8
@@ -217,12 +219,14 @@ _GLOBAL(flush_dcache_range)
  */
 	LOADADDR(r10,naca)		/* Get Naca address */
 	ld	r10,0(r10)
-	lhz	r7,DCACHEL1LINESIZE(r10)	/* Get dcache line size */
+	LOADADDR(r11,systemcfg)		/* Get systemcfg address */
+	ld	r11,0(r11)
+	lwz	r7,DCACHEL1LINESIZE(r11)	/* Get dcache line size */
 	addi	r5,r7,-1
 	andc	r6,r3,r5		/* round low to line bdy */
 	subf	r8,r6,r4		/* compute length */
 	add	r8,r8,r5		/* ensure we get enough */
-	lhz	r9,DCACHEL1LOGLINESIZE(r10)	/* Get log-2 of dcache line size */
+	lwz	r9,DCACHEL1LOGLINESIZE(r10)	/* Get log-2 of dcache line size */
 	srw.	r8,r8,r9		/* compute line count */
 	beqlr				/* nothing to do? */
 	mtctr	r8
@@ -249,9 +253,11 @@ _GLOBAL(__flush_dcache_icache)
 /* Flush the dcache */
 	LOADADDR(r7,naca)
 	ld	r7,0(r7)
+	LOADADDR(r8,systemcfg)			/* Get systemcfg address */
+	ld	r8,0(r8)
 	clrrdi	r3,r3,12           	    /* Page align */
-	lhz	r4,DCACHEL1LINESPERPAGE(r7)	/* Get # dcache lines per page */
-	lhz	r5,DCACHEL1LINESIZE(r7)		/* Get dcache line size */
+	lwz	r4,DCACHEL1LINESPERPAGE(r7)	/* Get # dcache lines per page */
+	lwz	r5,DCACHEL1LINESIZE(r8)		/* Get dcache line size */
 	mr	r6,r3
 	mtctr	r4
 0:	dcbst	0,r6
@@ -261,8 +267,8 @@ _GLOBAL(__flush_dcache_icache)
 
 /* Now invalidate the icache */	
 
-	lhz	r4,ICACHEL1LINESPERPAGE(r7)	/* Get # icache lines per page */
-	lhz	r5,ICACHEL1LINESIZE(r7)		/* Get icache line size */
+	lwz	r4,ICACHEL1LINESPERPAGE(r7)	/* Get # icache lines per page */
+	lwz	r5,ICACHEL1LINESIZE(r8)		/* Get icache line size */
 	mtctr	r4
 1:	icbi	0,r3
 	add	r3,r3,r5
