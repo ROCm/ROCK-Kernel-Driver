@@ -503,6 +503,7 @@ enum led_state_e {
 #define IS_BACHELOR        0x00000010	/* set if 82558 or newer board */
 #define IS_ICH             0x00000020
 #define DF_SPEED_FORCED    0x00000040	/* set if speed is forced */
+#define LED_IS_ON	   0x00000080	/* LED is turned ON by the driver */
 
 typedef struct net_device_stats net_dev_stats_t;
 
@@ -909,7 +910,6 @@ struct ethtool_lpbk_data{
 };
 #endif
 
-
 struct e100_private {
 	u32 flags;		/* board management flags */
 	u32 tx_per_underrun;	/* number of good tx frames per underrun */
@@ -998,8 +998,11 @@ struct e100_private {
 	u32 wolopts;
 	u16 ip_lbytes;
 #endif
-#ifdef ETHTOOL_TEST
-struct ethtool_lpbk_data loopback;
+#ifdef ETHTOOL_TEST 
+	struct ethtool_lpbk_data loopback;
+#endif
+#ifdef ETHTOOL_PHYS_ID
+	struct timer_list blink_timer;	/* led blink timer id */
 #endif
 
 #ifdef CONFIG_PM

@@ -795,6 +795,11 @@ P:	Tigran Aivazian
 M:	tigran@veritas.com
 S:	Maintained
 
+INTEL PRO/100 ETHERNET SUPPORT
+P:	Scott Feldman
+M:	scott.feldman@intel.com
+S:	Supported
+
 INTEL PRO/1000 GIGABIT ETHERNET SUPPORT
 P:	Chris Leech
 M:	christopher.leech@intel.com
