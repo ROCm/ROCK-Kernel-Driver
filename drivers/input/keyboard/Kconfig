@@ -29,6 +29,17 @@ config KEYBOARD_ATKBD
 	  To compile this driver as a module, choose M here: the
 	  module will be called atkbd.
 
+config KEYBOARD_POSFILTER
+	bool "Point-of-sale Keyboard support (supported only through SLRS)"
+	depends on INPUT && INPUT_KEYBOARD && KEYBOARD_ATKBD
+	help
+	  Say Y here if you want to enable the Point-of-sale keyboard
+	  extensions.  This is not normally turned on and is not supported
+	  for general use.  This option should only be turned on for 
+	  SLRS (SuSE Linux Retail Solutions).
+
+	  If unsure, say N.
+
 config KEYBOARD_SUNKBD
 	tristate "Sun Type 4 and Type 5 keyboard support"
 	depends on INPUT && INPUT_KEYBOARD

@@ -17,6 +17,12 @@
  * converter.
  */
 
+/*
+ * Added optional scancode filtering, used in keyboards which
+ * (incompatibly) extend the standard PS/2 specification.
+ * Thanh Ngo <thanhngo@us.ibm.com> Sept 01, 2004
+ */
+
 #include <linux/delay.h>
 #include <linux/module.h>
 #include <linux/moduleparam.h>
@@ -228,6 +234,69 @@ struct atkbd_work {
 };
 
 
+// CONFIG_KEYBOARD_POSFILTER typically is not defined.  It is a point-of-sale
+// compile switch defined in Kconfig.
+#ifdef CONFIG_KEYBOARD_POSFILTER
+// Should this be moved to Kconfig.  Not sure of the ramification
+#define CONFIG_KEYBOARD_POSFILTER_MAXFILTERS		1
+struct pc_keyb_filter {
+	int (*filter_scancode)( unsigned char *scancode );
+	int (*write_data)( unsigned char *data, unsigned int length, unsigned int *xferred, unsigned int retries, unsigned int timeout );
+};
+int register_pc_keyb_filter( struct pc_keyb_filter *filter );
+void unregister_pc_keyb_filter( struct pc_keyb_filter *filter );
+static int send_data_buffer( unsigned char *buffer, unsigned int len, unsigned int *xferred, unsigned int retries, unsigned int timeout );
+
+// Use an array (instead of a linked list) to save time in_interrupt()
+static struct pc_keyb_filter *filters[CONFIG_KEYBOARD_POSFILTER_MAXFILTERS];
+static int num_filters = 0;
+
+static spinlock_t pc_keyb_filter_lock = SPIN_LOCK_UNLOCKED;
+
+int register_pc_keyb_filter( struct pc_keyb_filter *filter )
+{
+    printk(KERN_DEBUG "atkbd.c: enter register_pc_keyb_filter()\n");
+	int retval = 0;
+
+	unsigned long flags;
+    spin_lock_irqsave(&pc_keyb_filter_lock, flags);
+	if (CONFIG_KEYBOARD_POSFILTER_MAXFILTERS > num_filters) {
+		filters[num_filters++] = filter;
+		filter->write_data = send_data_buffer;
+	} else {
+		retval = -EDQUOT;
+	}
+	spin_unlock_irqrestore(&pc_keyb_filter_lock, flags);
+    
+    printk(KERN_DEBUG "atkbd.c: exit register_pc_keyb_filter()\n");
+    return retval;
+}
+
+void unregister_pc_keyb_filter( struct pc_keyb_filter *filter )
+{
+    printk(KERN_DEBUG "atkbd.c: enter unregister_pc_keyb_filter()\n");
+	unsigned long flags;
+	int i, found = 0;
+
+	spin_lock_irqsave(&pc_keyb_filter_lock, flags);
+	filter->write_data = NULL;
+	for (i=0; i<num_filters; i++) {
+		if (filters[i] == filter)
+			found = 1;
+		if (found && i+1<CONFIG_KEYBOARD_POSFILTER_MAXFILTERS)
+			filters[i] = filters[i+1];
+	}
+	if (found)
+		filters[num_filters--] = NULL;
+	spin_unlock_irqrestore(&pc_keyb_filter_lock, flags);
+    printk(KERN_DEBUG "atkbd.c: exit unregister_pc_keyb_filter()\n");
+}
+
+EXPORT_SYMBOL(register_pc_keyb_filter);
+EXPORT_SYMBOL(unregister_pc_keyb_filter);
+
+#endif /* CONFIG_KEYBOARD_POSFILTER */
+
 static void atkbd_report_key(struct input_dev *dev, struct pt_regs *regs, int code, int value)
 {
 	input_regs(dev, regs);
@@ -255,6 +324,22 @@ static irqreturn_t atkbd_interrupt(struct serio *serio, unsigned char data,
 #ifdef ATKBD_DEBUG
 	printk(KERN_DEBUG "atkbd.c: Received %02x flags %02x\n", data, flags);
 #endif
+#ifdef CONFIG_KEYBOARD_POSFILTER
+    int i;
+    spin_lock(&pc_keyb_filter_lock);
+    for(i=0; i<num_filters;i++) {
+        if(filters[i]->filter_scancode(&data)) {
+            spin_unlock(&pc_keyb_filter_lock);
+            goto out;
+        }
+    }
+    spin_unlock(&pc_keyb_filter_lock);
+    code = data;
+    #ifdef ATKBD_DEBUG
+       printk(KERN_DEBUG "atkbd.c:atkbd_interrupt()- code=0x%x, atkbd->keycode[code]=0x%x\n", code, atkbd->keycode[code]);
+    #endif
+
+#endif /* CONFIG_KEYBOARD_POSFILTER */  
 
 #if !defined(__i386__) && !defined (__x86_64__)
 	if ((flags & (SERIO_FRAME | SERIO_PARITY)) && (~flags & SERIO_TIMEOUT) && !atkbd->resend && atkbd->write) {
@@ -452,6 +537,22 @@ static int atkbd_sendbyte(struct atkbd *atkbd, unsigned char byte)
 	clear_bit(ATKBD_FLAG_ACK, &atkbd->flags);
 	return -atkbd->nak;
 }
+
+#ifdef CONFIG_KEYBOARD_POSFILTER
+struct atkbd *gAtkbd;       
+static int send_data_buffer( unsigned char *buffer, unsigned int len, unsigned int *xferred, unsigned int retries, unsigned int timeout )
+{
+    struct atkbd *atkbd = gAtkbd;
+    int i;
+	for (i=0; i<len; i++) {
+        // send byte, wait for ack
+        if (atkbd_sendbyte(atkbd, buffer[i])) {
+            printk(KERN_DEBUG "atkbd.c: send_data_buffer()-error!\n");
+        }
+    }
+    return 0;
+}
+#endif /* CONFIG_KEYBOARD_POSFILTER */
 
 /*
  * atkbd_command() sends a command, and its parameters to the keyboard,
@@ -930,11 +1031,36 @@ static void atkbd_connect(struct serio *serio, struct serio_driver *drv)
 		if (atkbd->keycode[i] && atkbd->keycode[i] < ATKBD_SPECIAL)
 			set_bit(atkbd->keycode[i], atkbd->dev.keybit);
 
+#ifdef CONFIG_KEYBOARD_POSFILTER
+    atkbd->keycode[0x72] = 0x72; atkbd->keycode[0xf2] = 0xf2;   // POS key 135
+    atkbd->keycode[0x63] = 0x63; atkbd->keycode[0xe3] = 0xe3;   // POS key 124
+    atkbd->keycode[0x74] = 0x74; atkbd->keycode[0xf4] = 0xf4;   // POS key 125
+    atkbd->keycode[0x75] = 0x75; atkbd->keycode[0xf5] = 0xf5;   // POS key 126
+    atkbd->keycode[0x76] = 0x76; atkbd->keycode[0xf6] = 0xf6;   // POS key 127
+    atkbd->keycode[0x59] = 0x59; atkbd->keycode[0xd9] = 0xd9;   // POS key 128
+    atkbd->keycode[0x6a] = 0x6a; atkbd->keycode[0xea] = 0xea;   // POS key 077
+    atkbd->keycode[0x6b] = 0x6b; atkbd->keycode[0xeb] = 0xeb;   // POS key 078
+    atkbd->keycode[0x6c] = 0x6c; atkbd->keycode[0xec] = 0xec;   // POS key 082
+    atkbd->keycode[0x6d] = 0x6d; atkbd->keycode[0xed] = 0xed;   // POS key 087
+    atkbd->keycode[0x6e] = 0x6e; atkbd->keycode[0xee] = 0xee;   // POS key 088
+    atkbd->keycode[0x6f] = 0x6f; atkbd->keycode[0xef] = 0xef;   // POS key 090
+    atkbd->keycode[0x78] = 0x78; atkbd->keycode[0xf8] = 0xf8;   // POS key 095
+    atkbd->keycode[0x65] = 0x65; atkbd->keycode[0xe5] = 0xe5;   // POS key 100
+    atkbd->keycode[0x7a] = 0x7a; atkbd->keycode[0xfa] = 0xfa;   // POS key 105
+    atkbd->keycode[0x7e] = 0x7e; atkbd->keycode[0xfe] = 0xfe;   // POS key 106
+    atkbd->keycode[0x5f] = 0x5f; atkbd->keycode[0xdf] = 0xdf;   // POS key 107
+    atkbd->keycode[0x71] = 0x71; atkbd->keycode[0xf1] = 0xf1;   // POS key 108
+    atkbd->keycode[0x77] = 0x77; atkbd->keycode[0xf7] = 0xf7;   // POS key 099
+#endif /* CONFIG_KEYBOARD_POSFILTER */  
 	input_register_device(&atkbd->dev);
 
 	set_bit(ATKBD_FLAG_ENABLED, &atkbd->flags);
 
 	printk(KERN_INFO "input: %s on %s\n", atkbd->name, serio->phys);
+    
+#ifdef CONFIG_KEYBOARD_POSFILTER
+    gAtkbd = atkbd;  
+#endif /* CONFIG_KEYBOARD_POSFILTER */  
 }
 
 /*
