@@ -138,13 +138,13 @@ void sctp_outq_init(sctp_association_t *asoc, struct sctp_outq *q)
 }
 
 /* Free the outqueue structure and any related pending chunks.
- * FIXME: Add SEND_FAILED support.
  */
 void sctp_outq_teardown(struct sctp_outq *q)
 {
 	struct sctp_transport *transport;
 	struct list_head *lchunk, *pos, *temp;
 	sctp_chunk_t *chunk;
+	struct sctp_ulpevent *ev;
 
 	/* Throw away unacknowledged chunks. */
 	list_for_each(pos, &q->asoc->peer.transport_addr_list) {
@@ -152,6 +152,14 @@ void sctp_outq_teardown(struct sctp_outq *q)
 		while ((lchunk = sctp_list_dequeue(&transport->transmitted))) {
 			chunk = list_entry(lchunk, sctp_chunk_t,
 					   transmitted_list);
+
+			/* Generate a SEND FAILED event. */
+			ev = sctp_ulpevent_make_send_failed(q->asoc,
+					chunk, SCTP_DATA_SENT,
+					q->error, GFP_ATOMIC);
+			if (ev)
+				sctp_ulpq_tail_event(&q->asoc->ulpq, ev);
+
 			sctp_free_chunk(chunk);
 		}
 	}
@@ -171,8 +179,19 @@ void sctp_outq_teardown(struct sctp_outq *q)
 	}
 
 	/* Throw away any leftover data chunks. */
-	while ((chunk = sctp_outq_dequeue_data(q)))
+	while ((chunk = sctp_outq_dequeue_data(q))) {
+
+		/* Generate a SEND FAILED event. */
+		ev = sctp_ulpevent_make_send_failed(q->asoc,
+				chunk, SCTP_DATA_UNSENT,
+				q->error, GFP_ATOMIC);
+		if (ev)
+			sctp_ulpq_tail_event(&q->asoc->ulpq, ev);
+
 		sctp_free_chunk(chunk);
+	}
+
+	q->error = 0;
 
 	/* Throw away any leftover control chunks. */
 	while ((chunk = (sctp_chunk_t *) skb_dequeue(&q->control)))
@@ -357,7 +376,7 @@ void sctp_retransmit(struct sctp_outq *q, struct sctp_transport *transport,
 	__u8 fast_retransmit = 0;
 
 	switch(reason) {
-	case SCTP_RETRANSMIT_T3_RTX:
+	case SCTP_RTXR_T3_RTX:
 		sctp_transport_lower_cwnd(transport, SCTP_LOWER_CWND_T3_RTX);
 		/* Update the retran path if the T3-rtx timer has expired for
 		 * the current retran path.
@@ -365,10 +384,11 @@ void sctp_retransmit(struct sctp_outq *q, struct sctp_transport *transport,
 		if (transport == transport->asoc->peer.retran_path)
 			sctp_assoc_update_retran_path(transport->asoc);
 		break;
-	case SCTP_RETRANSMIT_FAST_RTX:
+	case SCTP_RTXR_FAST_RTX:
 		sctp_transport_lower_cwnd(transport, SCTP_LOWER_CWND_FAST_RTX);
 		fast_retransmit = 1;
 		break;
+	case SCTP_RTXR_PMTUD:
 	default:
 		break;
 	}
@@ -876,7 +896,7 @@ int sctp_outq_flush(struct sctp_outq *q, int rtx_timeout)
 		start_timer = 0;
 		queue = &q->out;
 
-		while (chunk = sctp_outq_dequeue_data(q)) {
+		while ((chunk = sctp_outq_dequeue_data(q))) {
 			/* RFC 2960 6.5 Every DATA chunk MUST carry a valid
 			 * stream identifier.
 			 */
@@ -1570,7 +1590,7 @@ static void sctp_check_transmitted(struct sctp_outq *q,
 
 	if (transport) {
 		if (do_fast_retransmit)
-			sctp_retransmit(q, transport, SCTP_RETRANSMIT_FAST_RTX);
+			sctp_retransmit(q, transport, SCTP_RTXR_FAST_RTX);
 
 		SCTP_DEBUG_PRINTK("%s: transport: %p, cwnd: %d, "
 				  "ssthresh: %d, flight_size: %d, pba: %d\n",

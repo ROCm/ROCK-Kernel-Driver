@@ -130,7 +130,7 @@ extern struct sctp_pf *sctp_get_pf_specific(sa_family_t family);
 extern int sctp_register_pf(struct sctp_pf *, sa_family_t);
 
 /*
- * sctp_socket.c
+ * sctp/socket.c
  */
 extern int sctp_backlog_rcv(struct sock *sk, struct sk_buff *skb);
 extern int sctp_inet_listen(struct socket *sock, int backlog);
@@ -139,7 +139,7 @@ extern unsigned int sctp_poll(struct file *file, struct socket *sock,
 		poll_table *wait);
 
 /*
- * sctp_primitive.c
+ * sctp/primitive.c
  */
 extern int sctp_primitive_ASSOCIATE(sctp_association_t *, void *arg);
 extern int sctp_primitive_SHUTDOWN(sctp_association_t *, void *arg);
@@ -148,14 +148,14 @@ extern int sctp_primitive_SEND(sctp_association_t *, void *arg);
 extern int sctp_primitive_REQUESTHEARTBEAT(sctp_association_t *, void *arg);
 
 /*
- * sctp_crc32c.c
+ * sctp/crc32c.c
  */
 extern __u32 sctp_start_cksum(__u8 *ptr, __u16 count);
 extern __u32 sctp_update_cksum(__u8 *ptr, __u16 count, __u32 cksum);
 extern __u32 sctp_end_cksum(__u32 cksum);
 
 /*
- * sctp_input.c
+ * sctp/input.c
  */
 extern int sctp_rcv(struct sk_buff *skb);
 extern void sctp_v4_err(struct sk_buff *skb, u32 info);
@@ -170,9 +170,16 @@ extern void __sctp_unhash_endpoint(sctp_endpoint_t *);
 extern sctp_association_t *__sctp_lookup_association(const union sctp_addr *,
 						     const union sctp_addr *,
 						     struct sctp_transport **);
-
+extern struct sock *sctp_err_lookup(int family, struct sk_buff *,
+				    struct sctphdr *, struct sctp_endpoint **, 
+				    struct sctp_association **, 
+				    struct sctp_transport **);
+extern void sctp_err_finish(struct sock *, struct sctp_endpoint *, 
+			    struct sctp_association *);
+extern void sctp_icmp_frag_needed(struct sock *, struct sctp_association *,
+				  struct sctp_transport *t, __u32 pmtu);
 /*
- * sctp_hashdriver.c
+ * sctp/hashdriver.c
  */
 extern void sctp_hash_digest(const char *secret, const int secret_len,
 			     const char *text, const int text_len,
@@ -184,9 +191,7 @@ extern void sctp_hash_digest(const char *secret, const int secret_len,
 
 
 #ifdef TEST_FRAME
-
 #include <test_frame.h>
-
 #else
 
 /* spin lock wrappers. */
@@ -194,28 +199,28 @@ extern void sctp_hash_digest(const char *secret, const int secret_len,
 #define sctp_spin_unlock_irqrestore(lock, flags)  \
        spin_unlock_irqrestore(lock, flags)
 #define sctp_local_bh_disable() local_bh_disable()
-#define sctp_local_bh_enable() local_bh_enable()
-#define sctp_spin_lock(lock) spin_lock(lock)
-#define sctp_spin_unlock(lock) spin_unlock(lock)
-#define sctp_write_lock(lock) write_lock(lock)
+#define sctp_local_bh_enable()  local_bh_enable()
+#define sctp_spin_lock(lock)    spin_lock(lock)
+#define sctp_spin_unlock(lock)  spin_unlock(lock)
+#define sctp_write_lock(lock)   write_lock(lock)
 #define sctp_write_unlock(lock) write_unlock(lock)
-#define sctp_read_lock(lock) read_lock(lock)
-#define sctp_read_unlock(lock) read_unlock(lock)
+#define sctp_read_lock(lock)    read_lock(lock)
+#define sctp_read_unlock(lock)  read_unlock(lock)
 
 /* sock lock wrappers. */
-#define sctp_lock_sock(sk) lock_sock(sk)
-#define sctp_release_sock(sk) release_sock(sk)
-#define sctp_bh_lock_sock(sk) bh_lock_sock(sk)
-#define sctp_bh_unlock_sock(sk) bh_unlock_sock(sk)
-#define SCTP_SOCK_SLEEP_PRE(sk) SOCK_SLEEP_PRE(sk)
+#define sctp_lock_sock(sk)       lock_sock(sk)
+#define sctp_release_sock(sk)    release_sock(sk)
+#define sctp_bh_lock_sock(sk)    bh_lock_sock(sk)
+#define sctp_bh_unlock_sock(sk)  bh_unlock_sock(sk)
+#define SCTP_SOCK_SLEEP_PRE(sk)  SOCK_SLEEP_PRE(sk)
 #define SCTP_SOCK_SLEEP_POST(sk) SOCK_SLEEP_POST(sk)
 
 /* SCTP SNMP MIB stats handlers */
 DECLARE_SNMP_STAT(struct sctp_mib, sctp_statistics);
-#define SCTP_INC_STATS(field)		SNMP_INC_STATS(sctp_statistics, field)
-#define SCTP_INC_STATS_BH(field)	SNMP_INC_STATS_BH(sctp_statistics, field)
-#define SCTP_INC_STATS_USER(field)	SNMP_INC_STATS_USER(sctp_statistics, field)
-#define SCTP_DEC_STATS(field)		SNMP_DEC_STATS(sctp_statistics, field)
+#define SCTP_INC_STATS(field)      SNMP_INC_STATS(sctp_statistics, field)
+#define SCTP_INC_STATS_BH(field)   SNMP_INC_STATS_BH(sctp_statistics, field)
+#define SCTP_INC_STATS_USER(field) SNMP_INC_STATS_USER(sctp_statistics, field)
+#define SCTP_DEC_STATS(field)      SNMP_DEC_STATS(sctp_statistics, field)
 
 /* Determine if this is a valid kernel address.  */
 static inline int sctp_is_valid_kaddr(unsigned long addr)
@@ -312,7 +317,6 @@ static inline void sctp_sysctl_register(void) { return; }
 static inline void sctp_sysctl_unregister(void) { return; }
 #endif
 
-
 /* Size of Supported Address Parameter for 'x' address types. */
 #define SCTP_SAT_LEN(x) (sizeof(struct sctp_paramhdr) + (x) * sizeof(__u16))
 
@@ -320,19 +324,15 @@ static inline void sctp_sysctl_unregister(void) { return; }
 
 extern int sctp_v6_init(void);
 extern void sctp_v6_exit(void);
-static inline int sctp_ipv6_addr_type(const struct in6_addr *addr)
-{
-	return ipv6_addr_type((struct in6_addr*) addr);
-}
+extern void sctp_v6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
+			int type, int code, int offset, __u32 info);
 
-#else /* #ifdef defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE) */
+#else /* #ifdef defined(CONFIG_IPV6) */
 
-#define sctp_ipv6_addr_type(a) 0
 static inline int sctp_v6_init(void) { return 0; }
 static inline void sctp_v6_exit(void) { return; }
 
-#endif /* #ifdef defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE) */
-
+#endif /* #if defined(CONFIG_IPV6) */
 
 /* Map an association to an assoc_id. */
 static inline sctp_assoc_t sctp_assoc2id(const sctp_association_t *asoc)
@@ -356,7 +356,7 @@ for (pos = (head)->next;\
 static inline void sctp_skb_list_tail(struct sk_buff_head *list,
 				      struct sk_buff_head *head)
 {
-	int flags __attribute__ ((unused));
+	unsigned long flags;
 
 	sctp_spin_lock_irqsave(&head->lock, flags);
 	sctp_spin_lock(&list->lock);
@@ -488,21 +488,24 @@ static inline struct sctp_protocol *sctp_get_protocol(void)
 /* Convert from an IP version number to an Address Family symbol.  */
 static inline int ipver2af(__u8 ipver)
 {
-	int family;
-
 	switch (ipver) {
 	case 4:
-		family = AF_INET;
-		break;
+	        return  AF_INET;
 	case 6:
-		family = AF_INET6;
-		break;
+		return AF_INET6;
 	default:
-		family = 0;
-		break;
+		return 0;
 	};
+}
 
-	return family;
+/* Perform some sanity checks. */
+static inline int sctp_sanity_check(void)
+{
+	SCTP_ASSERT(sizeof(struct sctp_ulpevent) <= 
+		    sizeof(((struct sk_buff *)0)->cb),
+		    "SCTP: ulpevent does not fit in skb!\n", return 0);
+	
+	return 1;
 }
 
 /* Warning: The following hash functions assume a power of two 'size'. */
@@ -546,7 +549,7 @@ struct sctp_sock {
 	struct sock	  sk;
 #if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
 	struct ipv6_pinfo *pinet6;
-#endif /* CONFIG_IPV6 || CONFIG_IPV6_MODULE */
+#endif /* CONFIG_IPV6 */
 	struct inet_opt	  inet;
 	struct sctp_opt	  sctp;
 };
@@ -559,7 +562,7 @@ struct sctp6_sock {
 	struct sctp_opt	  sctp;
 	struct ipv6_pinfo inet6;
 };
-#endif /* CONFIG_IPV6 || CONFIG_IPV6_MODULE */
+#endif /* CONFIG_IPV6 */
 
 #define sctp_sk(__sk) (&((struct sctp_sock *)__sk)->sctp)
 

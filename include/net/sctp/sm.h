@@ -197,15 +197,14 @@ sctp_state_fn_t sctp_addip_do_asconf;
 sctp_state_fn_t sctp_addip_do_asconf_ack;
 
 /* Prototypes for utility support functions.  */
-__u8 sctp_get_chunk_type(sctp_chunk_t *chunk);
+__u8 sctp_get_chunk_type(struct sctp_chunk *chunk);
 sctp_sm_table_entry_t *sctp_sm_lookup_event(sctp_event_t event_type,
 					    sctp_state_t state,
 					    sctp_subtype_t event_subtype);
-
-time_t timeval_sub(struct timeval *, struct timeval *);
-sctp_association_t *sctp_make_temp_asoc(const sctp_endpoint_t *,
-					sctp_chunk_t *,
-					const int priority);
+int sctp_chunk_iif(const struct sctp_chunk *);
+struct sctp_association *sctp_make_temp_asoc(const struct sctp_endpoint *,
+					     struct sctp_chunk *,
+					     int gfp);
 __u32 sctp_generate_verification_tag(void);
 void sctp_populate_tie_tags(__u8 *cookie, __u32 curTag, __u32 hisTag);
 
@@ -344,7 +343,7 @@ __u32 sctp_generate_tsn(const sctp_endpoint_t *);
 
 /* 4th level prototypes */
 void sctp_param2sockaddr(union sctp_addr *addr, sctp_addr_param_t *,
-			 __u16 port);
+			 __u16 port, int iif);
 int sctp_addr2sockaddr(const union sctp_params, union sctp_addr *);
 int sockaddr2sctp_addr(const union sctp_addr *, sctp_addr_param_t *);
 

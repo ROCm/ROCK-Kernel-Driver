@@ -196,11 +196,13 @@ sctp_xmit_t sctp_packet_append_chunk(struct sctp_packet *packet,
 {
 	sctp_xmit_t retval = SCTP_XMIT_OK;
 	__u16 chunk_len = WORD_ROUND(ntohs(chunk->chunk_hdr->length));
-	size_t psize = packet->size;
+	size_t psize;
 	size_t pmtu;
 	int too_big;
 
 	retval = sctp_packet_bundle_sack(packet, chunk);
+	psize = packet->size;
+
 	if (retval != SCTP_XMIT_OK)
 		goto finish;
 		
@@ -251,6 +253,8 @@ append:
 	 */
 	if (sctp_chunk_is_data(chunk)) {
 		retval = sctp_packet_append_data(packet, chunk);
+		/* Disallow SACK bundling after DATA. */
+		packet->has_sack = 1;
 		if (SCTP_XMIT_OK != retval)
 			goto finish;
 	} else if (SCTP_CID_COOKIE_ECHO == chunk->chunk_hdr->type)
