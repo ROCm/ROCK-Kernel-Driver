@@ -422,6 +422,7 @@ unsigned long do_mmap_pgoff(struct file * file, unsigned long addr,
 {
 	struct mm_struct * mm = current->mm;
 	struct vm_area_struct * vma, * prev;
+	struct inode *inode = NULL;
 	unsigned int vm_flags;
 	int correct_wcount = 0;
 	int error;
@@ -469,17 +470,18 @@ unsigned long do_mmap_pgoff(struct file * file, unsigned long addr,
 	}
 
 	if (file) {
+		inode = file->f_dentry->d_inode;
 		switch (flags & MAP_TYPE) {
 		case MAP_SHARED:
 			if ((prot & PROT_WRITE) && !(file->f_mode & FMODE_WRITE))
 				return -EACCES;
 
 			/* Make sure we don't allow writing to an append-only file.. */
-			if (IS_APPEND(file->f_dentry->d_inode) && (file->f_mode & FMODE_WRITE))
+			if (IS_APPEND(inode) && (file->f_mode & FMODE_WRITE))
 				return -EACCES;
 
 			/* make sure there are no mandatory locks on the file. */
-			if (locks_verify_locked(file->f_dentry->d_inode))
+			if (locks_verify_locked(inode))
 				return -EAGAIN;
 
 			vm_flags |= VM_SHARED | VM_MAYSHARE;
@@ -603,7 +605,7 @@ munmap_back:
 
 	vma_link(mm, vma, prev, rb_link, rb_parent);
 	if (correct_wcount)
-		atomic_inc(&file->f_dentry->d_inode->i_writecount);
+		atomic_inc(&inode->i_writecount);
 
 out:	
 	mm->total_vm += len >> PAGE_SHIFT;
@@ -615,7 +617,7 @@ out:
 
 unmap_and_free_vma:
 	if (correct_wcount)
-		atomic_inc(&file->f_dentry->d_inode->i_writecount);
+		atomic_inc(&inode->i_writecount);
 	vma->vm_file = NULL;
 	fput(file);
 
@@ -755,9 +757,66 @@ struct vm_area_struct * find_vma_prev(struct mm_struct * mm, unsigned long addr,
 	return prev ? prev->vm_next : vma;
 }
 
+#ifdef ARCH_STACK_GROWSUP
 /*
- * vma is the first one with  address < vma->vm_end,
- * and even address < vma->vm_start. Have to extend vma.
+ * vma is the first one with address > vma->vm_end.  Have to extend vma.
+ */
+int expand_stack(struct vm_area_struct * vma, unsigned long address)
+{
+	unsigned long grow;
+
+	if (!(vma->vm_flags & VM_GROWSUP))
+		return -EFAULT;
+
+	/*
+	 * vma->vm_start/vm_end cannot change under us because the caller
+	 * is required to hold the mmap_sem in read mode. We need to get
+	 * the spinlock only before relocating the vma range ourself.
+	 */
+	address += 4 + PAGE_SIZE - 1;
+	address &= PAGE_MASK;
+ 	spin_lock(&vma->vm_mm->page_table_lock);
+	grow = (address - vma->vm_end) >> PAGE_SHIFT;
+
+	/* Overcommit.. */
+	if (!vm_enough_memory(grow)) {
+		spin_unlock(&vma->vm_mm->page_table_lock);
+		return -ENOMEM;
+	}
+	
+	if (address - vma->vm_start > current->rlim[RLIMIT_STACK].rlim_cur ||
+			((vma->vm_mm->total_vm + grow) << PAGE_SHIFT) >
+			current->rlim[RLIMIT_AS].rlim_cur) {
+		spin_unlock(&vma->vm_mm->page_table_lock);
+		vm_unacct_memory(grow);
+		return -ENOMEM;
+	}
+	vma->vm_end = address;
+	vma->vm_mm->total_vm += grow;
+	if (vma->vm_flags & VM_LOCKED)
+		vma->vm_mm->locked_vm += grow;
+	spin_unlock(&vma->vm_mm->page_table_lock);
+	return 0;
+}
+
+struct vm_area_struct * find_extend_vma(struct mm_struct * mm, unsigned long addr)
+{
+	struct vm_area_struct *vma, *prev;
+
+	addr &= PAGE_MASK;
+	vma = find_vma_prev(mm, addr, &prev);
+	if (vma && (vma->vm_start <= addr))
+		return vma;
+	if (!prev || expand_stack(prev, addr))
+		return NULL;
+	if (prev->vm_flags & VM_LOCKED) {
+		make_pages_present(addr, prev->vm_end);
+	}
+	return prev;
+}
+#else
+/*
+ * vma is the first one with address < vma->vm_start.  Have to extend vma.
  */
 int expand_stack(struct vm_area_struct * vma, unsigned long address)
 {
@@ -765,7 +824,7 @@ int expand_stack(struct vm_area_struct * vma, unsigned long address)
 
 	/*
 	 * vma->vm_start/vm_end cannot change under us because the caller
-	 * is required to hold the mmap_sem in write mode. We need to get
+	 * is required to hold the mmap_sem in read mode. We need to get
 	 * the spinlock only before relocating the vma range ourself.
 	 */
 	address &= PAGE_MASK;
@@ -773,7 +832,7 @@ int expand_stack(struct vm_area_struct * vma, unsigned long address)
 	grow = (vma->vm_start - address) >> PAGE_SHIFT;
 
 	/* Overcommit.. */
-	if(!vm_enough_memory(grow)) {
+	if (!vm_enough_memory(grow)) {
 		spin_unlock(&vma->vm_mm->page_table_lock);
 		return -ENOMEM;
 	}
@@ -794,23 +853,6 @@ int expand_stack(struct vm_area_struct * vma, unsigned long address)
 	return 0;
 }
 
-#ifdef ARCH_STACK_GROWSUP
-struct vm_area_struct * find_extend_vma(struct mm_struct * mm, unsigned long addr)
-{
-	struct vm_area_struct *vma, *prev;
-
-	addr &= PAGE_MASK;
-	vma = find_vma_prev(mm, addr, &prev);
-	if (vma && (vma->vm_start <= addr))
-		return vma;
-	if (!prev || expand_stack(prev, addr))
-		return NULL;
-	if (prev->vm_flags & VM_LOCKED) {
-		make_pages_present(addr, prev->vm_end);
-	}
-	return prev;
-}
-#else
 struct vm_area_struct * find_extend_vma(struct mm_struct * mm, unsigned long addr)
 {
 	struct vm_area_struct * vma;
