@@ -209,7 +209,7 @@ static int file_capable (struct inode * inode, long block)
   pathrelse(path) ;
   reiserfs_update_sd(th, inode) ;
   journal_end(th, s, len) ;
-  journal_begin(th, s, len) ;
+  journal_begin(th, s, JOURNAL_PER_BALANCE_CNT * 6) ;
   reiserfs_update_inode_transaction(inode) ;
 }
 

@@ -1757,7 +1757,7 @@ void reiserfs_do_truncate (struct reiserfs_transaction_handle *th,
 	  reiserfs_update_sd(th, p_s_inode) ;
 
 	  journal_end(th, p_s_inode->i_sb, orig_len_alloc) ;
-	  journal_begin(th, p_s_inode->i_sb, orig_len_alloc) ;
+	  journal_begin(th, p_s_inode->i_sb, JOURNAL_PER_BALANCE_CNT * 6) ;
 	  reiserfs_update_inode_transaction(p_s_inode) ;
 	}
     } while ( n_file_size > ROUND_UP (n_new_file_size) &&
