@@ -29,9 +29,6 @@ static int force_probe = EISA_FORCE_PROBE_DEFAULT;
 static struct platform_device eisa_root_dev = {
 	.name = "eisa",
 	.id   = 0,
-	.dev  = {
-		.name = "Virtual EISA Bridge",
-	},
 };
 
 static struct eisa_root_device eisa_bus_root = {
