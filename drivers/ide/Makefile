@@ -9,18 +9,8 @@
 #
 export-objs := ide-iops.o ide-taskfile.o ide-proc.o ide.o ide-probe.o ide-dma.o ide-lib.o setup-pci.o
 
-all-subdirs	:= arm legacy pci ppc
-mod-subdirs	:= arm legacy pci ppc
-
-obj-y		:=
-obj-m		:=
-ide-obj-y	:=
-
-subdir-$(CONFIG_BLK_DEV_IDEPCI)	+= pci
-subdir-$(CONFIG_BLK_DEV_IDE) += legacy ppc arm pci
-
 # First come modules that register themselves with the core
-obj-y		+=	pci/idedriver-pci.o
+obj-$(CONFIG_BLK_DEV_IDEPCI)		+= pci/
 
 # Core IDE code - must come before legacy
 
@@ -35,13 +25,9 @@ obj-$(CONFIG_BLK_DEV_IDEDMA_PCI)	+= ide-dma.o
 obj-$(CONFIG_BLK_DEV_ISAPNP)		+= ide-pnp.o
 
 ifeq ($(CONFIG_BLK_DEV_IDE),y)
-obj-$(CONFIG_PROC_FS)                  += ide-proc.o
+obj-$(CONFIG_PROC_FS)			+= ide-proc.o
 endif
 
-ifeq ($(CONFIG_BLK_DEV_IDE),y)
-  obj-y		+= legacy/idedriver-legacy.o
-  obj-y		+= ppc/idedriver-ppc.o
-  obj-y		+= arm/idedriver-arm.o
-endif
+obj-$(CONFIG_BLK_DEV_IDE)		+= legacy/ ppc/ arm/
 
 include $(TOPDIR)/Rules.make

@@ -1,9 +1,4 @@
 
-O_TARGET := idedriver-legacy.o
-
-obj-y		:=
-obj-m		:=
-
 obj-$(CONFIG_BLK_DEV_ALI14XX)		+= ali14xx.o
 obj-$(CONFIG_BLK_DEV_DTC2278)		+= dtc2278.o
 obj-$(CONFIG_BLK_DEV_HT6560B)		+= ht6560b.o
