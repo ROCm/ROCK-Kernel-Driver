@@ -1325,7 +1325,7 @@ static int ext3_writepage(struct page *page)
 out_fail:
 	
 	unlock_kernel();
-	SetPageDirty(page);
+	set_page_dirty(page);
 	unlock_page(page);
 	return ret;
 }

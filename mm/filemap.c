@@ -425,6 +425,9 @@ void invalidate_inode_pages2(struct address_space * mapping)
  *  - activate the page so that the page stealer
  *    doesn't try to write it out over and over
  *    again.
+ *
+ * NOTE!  The livelock in fdatasync went away, due to io_pages.
+ * So this function can now call set_page_dirty().
  */
 int fail_writepage(struct page *page)
 {

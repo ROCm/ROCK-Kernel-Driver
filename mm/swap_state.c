@@ -220,8 +220,16 @@ int move_from_swap_cache(struct page *page, unsigned long index,
 		page->flags &= ~(1 << PG_uptodate | 1 << PG_error |
 				 1 << PG_referenced | 1 << PG_arch_1 |
 				 1 << PG_checked);
+		/*
+		 * ___add_to_page_cache puts the page on ->clean_pages,
+		 * but it's dirty.  If it's on ->clean_pages, it will basically
+		 * never get written out.
+		 */
 		SetPageDirty(page);
 		___add_to_page_cache(page, mapping, index);
+		/* fix that up */
+		list_del(&page->list);
+		list_add(&page->list, &mapping->dirty_pages);
 	}
 
 	write_unlock(&mapping->page_lock);
