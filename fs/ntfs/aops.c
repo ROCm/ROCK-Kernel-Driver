@@ -385,7 +385,7 @@ int ntfs_readpage(struct file *file, struct page *page)
 	else
 		base_ni = ni->_INE(base_ntfs_ino);
 
-	/* Map, pin and lock the mft record. */
+	/* Map, pin, and lock the mft record. */
 	mrec = map_mft_record(base_ni);
 	if (unlikely(IS_ERR(mrec))) {
 		err = PTR_ERR(mrec);

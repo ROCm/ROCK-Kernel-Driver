@@ -139,8 +139,8 @@ static struct dentry *ntfs_lookup(struct inode *dir_ino, struct dentry *dent)
 			dent_inode = ERR_PTR(-EIO);
 		} else
 			ntfs_error(vol->sb, "ntfs_iget(0x%lx) failed with "
-				   "error code %li.", dent_ino,
-				   PTR_ERR(dent_inode));
+					"error code %li.", dent_ino,
+					PTR_ERR(dent_inode));
 		if (name)
 			kfree(name);
 		/* Return the error code. */

@@ -176,8 +176,8 @@ err_out:
  * First, take the mrec_lock semaphore. We might now be sleeping, while waiting
  * for the semaphore if it was already locked by someone else.
  *
- * The page of the record is first mapped using map_mft_record_page() before
- * being returned to the caller.
+ * The page of the record is mapped using map_mft_record_page() before being
+ * returned to the caller.
  *
  * This in turn uses ntfs_map_page() to get the page containing the wanted mft
  * record (it in turn calls read_cache_page() which reads it in from disk if
