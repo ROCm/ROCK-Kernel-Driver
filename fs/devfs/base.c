@@ -650,6 +650,8 @@
   v1.21
     20021013   Richard Gooch <rgooch@atnf.csiro.au>
 	       Removed DEVFS_ FL_AUTO_OWNER.
+	       Switched lingering structure field initialiser to ISO C.
+	       Added locking when updating FCB flags.
   v1.22
 */
 #include <linux/types.h>
@@ -781,6 +783,7 @@ struct fcb_type  /*  File, char, block type  */
 	struct device_type device;
     }
     u;
+    spinlock_t lock;            /*  Lock for changes                         */
     unsigned char aopen_notify:1;
     unsigned char removable:1;  /*  Belongs in device_type, but save space   */
     unsigned char open:1;       /*  Not entirely correct                     */
@@ -862,7 +865,7 @@ struct fs_info                  /*  This structure is for the mounted devfs  */
     wait_queue_head_t revalidate_wait_queue;  /*  Wake when devfsd sleeps    */
 };
 
-static struct fs_info fs_info = {devfsd_buffer_lock: SPIN_LOCK_UNLOCKED};
+static struct fs_info fs_info = {.devfsd_buffer_lock = SPIN_LOCK_UNLOCKED};
 static kmem_cache_t *devfsd_buf_cache;
 #ifdef CONFIG_DEVFS_DEBUG
 static unsigned int devfs_debug_init __initdata = DEBUG_NONE;
@@ -1013,6 +1016,8 @@ static struct devfs_entry *_devfs_alloc_entry (const char *name,
     memset (new, 0, sizeof *new + namelen);  /*  Will set '\0' on name  */
     new->mode = mode;
     if ( S_ISDIR (mode) ) rwlock_init (&new->u.dir.lock);
+    else if ( S_ISREG (mode) || S_ISCHR (mode) || S_ISBLK (mode) )
+	spin_lock_init (&new->u.fcb.lock);
     atomic_set (&new->refcount, 1);
     spin_lock (&counter_lock);
     new->inode.ino = inode_counter++;
@@ -1900,7 +1905,7 @@ void devfs_find_and_unregister (devfs_handle_t dir, const char *name,
 					  type, traverse_symlinks);
     devfs_unregister (de);
     devfs_put (de);
-}
+}   /*  End Function devfs_find_and_unregister  */
 
 
 /**
@@ -1944,7 +1949,9 @@ int devfs_set_flags (devfs_handle_t de, unsigned int flags)
     de->hide = (flags & DEVFS_FL_HIDE) ? TRUE : FALSE;
     if ( S_ISCHR (de->mode) || S_ISBLK (de->mode) || S_ISREG (de->mode) )
     {
+	spin_lock (&de->u.fcb.lock);
 	de->u.fcb.aopen_notify = (flags & DEVFS_FL_AOPEN_NOTIFY) ? TRUE:FALSE;
+	spin_unlock (&de->u.fcb.lock);
     }
     return 0;
 }   /*  End Function devfs_set_flags  */
@@ -2720,8 +2727,11 @@ static int devfs_open (struct inode *inode, struct file *file)
     }
     if (err < 0) return err;
     /*  Open was successful  */
-    if (df->open) return 0;
-    df->open = TRUE;  /*  This is the first open  */
+    spin_lock (&df->lock);
+    err = df->open;
+    if (!err) df->open = TRUE;  /*  Was not already open    */
+    spin_unlock (&df->lock);
+    if (err) return 0;          /*  Was already open        */
     if ( df->aopen_notify && !is_devfsd_or_child (fs_info) )
 	devfsd_notify_de (de, DEVFSD_NOTIFY_ASYNC_OPEN, inode->i_mode,
 			  current->euid, current->egid, fs_info, 0);
@@ -2801,6 +2811,7 @@ static struct dentry_operations devfs_wait_dops =
 
 static int devfs_d_delete (struct dentry *dentry)
 {
+    int was_open;
     struct inode *inode = dentry->d_inode;
     struct devfs_entry *de;
     struct fs_info *fs_info;
@@ -2819,8 +2830,11 @@ static int devfs_d_delete (struct dentry *dentry)
     if (de == NULL) return 0;
     if ( !S_ISCHR (de->mode) && !S_ISBLK (de->mode) && !S_ISREG (de->mode) )
 	return 0;
-    if (!de->u.fcb.open) return 0;
-    de->u.fcb.open = FALSE;
+    spin_lock (&de->u.fcb.lock);
+    was_open = de->u.fcb.open;
+    if (was_open) de->u.fcb.open = FALSE;
+    spin_unlock (&de->u.fcb.lock);
+    if (!was_open) return 0;
     if (de->u.fcb.aopen_notify)
 	devfsd_notify_de (de, DEVFSD_NOTIFY_CLOSE, inode->i_mode,
 			  current->euid, current->egid, fs_info, 1);
