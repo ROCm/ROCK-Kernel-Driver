@@ -737,11 +737,26 @@ static struct icmp6_err {
 	int err;
 	int fatal;
 } tab_unreach[] = {
-	{ ENETUNREACH,	0},	/* NOROUTE		*/
-	{ EACCES,	1},	/* ADM_PROHIBITED	*/
-	{ EHOSTUNREACH,	0},	/* Was NOT_NEIGHBOUR, now reserved */
-	{ EHOSTUNREACH,	0},	/* ADDR_UNREACH		*/
-	{ ECONNREFUSED,	1},	/* PORT_UNREACH		*/
+	{	/* NOROUTE */
+		.err	= ENETUNREACH,
+		.fatal	= 0,
+	},
+	{	/* ADM_PROHIBITED */
+		.err	= EACCES,
+		.fatal	= 1,
+	},
+	{	/* Was NOT_NEIGHBOUR, now reserved */
+		.err	= EHOSTUNREACH,
+		.fatal	= 0,
+	},
+	{	/* ADDR_UNREACH	*/
+		.err	= EHOSTUNREACH,
+		.fatal	= 0,
+	},
+	{	/* PORT_UNREACH	*/
+		.err	= ECONNREFUSED,
+		.fatal	= 1,
+	},
 };
 
 int icmpv6_err_convert(int type, int code, int *err)

@@ -54,10 +54,9 @@
  *	It MUST NOT touch skb->h.
  */
 
-struct tlvtype_proc
-{
+struct tlvtype_proc {
 	int	type;
-	int	(*func) (struct sk_buff *, int offset);
+	int	(*func)(struct sk_buff *skb, int offset);
 };
 
 /*********************
@@ -175,8 +174,7 @@ static int ipv6_destopt_rcv(struct sk_buff **skbp, unsigned int *nhoffp)
 	return -1;
 }
 
-static struct inet6_protocol destopt_protocol =
-{
+static struct inet6_protocol destopt_protocol = {
 	.handler	=	ipv6_destopt_rcv,
 	.flags		=	INET6_PROTO_NOPOLICY,
 };
@@ -199,8 +197,7 @@ static int ipv6_nodata_rcv(struct sk_buff **skbp, unsigned int *nhoffp)
 	return 0;
 }
 
-static struct inet6_protocol nodata_protocol =
-{
+static struct inet6_protocol nodata_protocol = {
 	.handler	=	ipv6_nodata_rcv,
 	.flags		=	INET6_PROTO_NOPOLICY,
 };
@@ -328,8 +325,7 @@ looped_back:
 	return -1;
 }
 
-static struct inet6_protocol rthdr_protocol =
-{
+static struct inet6_protocol rthdr_protocol = {
 	.handler	=	ipv6_rthdr_rcv,
 	.flags		=	INET6_PROTO_NOPOLICY,
 };
@@ -462,9 +458,15 @@ drop:
 }
 
 static struct tlvtype_proc tlvprochopopt_lst[] = {
-	{IPV6_TLV_ROUTERALERT,	ipv6_hop_ra},
-	{IPV6_TLV_JUMBO,	ipv6_hop_jumbo},
-	{-1,			NULL}
+	{
+		.type	= IPV6_TLV_ROUTERALERT,
+		.func	= ipv6_hop_ra,
+	},
+	{
+		.type	= IPV6_TLV_JUMBO,
+		.func	= ipv6_hop_jumbo,
+	},
+	{ -1, }
 };
 
 int ipv6_parse_hopopts(struct sk_buff *skb, int nhoff)

@@ -91,12 +91,13 @@ static struct fib6_node * fib6_repair_tree(struct fib6_node *fn);
  *	result of redirects, path MTU changes, etc.
  */
 
-static __u32	rt_sernum	= 0;
+static __u32 rt_sernum;
 
 static struct timer_list ip6_fib_timer = TIMER_INITIALIZER(fib6_run_gc, 0, 0);
 
 static struct fib6_walker_t fib6_walker_list = {
-	&fib6_walker_list, &fib6_walker_list, 
+	.prev	= &fib6_walker_list,
+	.next	= &fib6_walker_list, 
 };
 
 #define FOR_WALKERS(w) for ((w)=fib6_walker_list.next; (w) != &fib6_walker_list; (w)=(w)->next)
