@@ -41,7 +41,7 @@ static inline unsigned long __node_to_cpu_mask(int node)
 
 	for(cpu = 0; cpu < NR_CPUS; cpu++)
 		if (numa_cpu_lookup_table[cpu] == node)
-			mask |= 1 << cpu;
+			mask |= 1UL << cpu;
 
 	return mask;
 }
