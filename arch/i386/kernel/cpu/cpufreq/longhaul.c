@@ -458,7 +458,7 @@ static int __init longhaul_cpu_init (struct cpufreq_policy *policy)
 	return 0;
 }
 
-static int longhaul_cpu_exit(struct cpufreq_policy *policy)
+static int __exit longhaul_cpu_exit(struct cpufreq_policy *policy)
 {
 	cpufreq_frequency_table_put_attr(policy->cpu);
 	return 0;
