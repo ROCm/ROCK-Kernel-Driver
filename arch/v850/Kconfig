@@ -1,0 +1,488 @@
+#############################################################################
+#
+# For a description of the syntax of this configuration file,
+# see Documentation/kbuild/config-language.txt.
+#
+#############################################################################
+
+mainmenu "uClinux/v850 (w/o MMU) Kernel Configuration"
+
+config MMU
+       	bool
+	default n
+config SWAP
+	bool
+	default n
+config UID16
+	bool
+	default n
+config RWSEM_GENERIC_SPINLOCK
+	bool
+	default y
+config RWSEM_XCHGADD_ALGORITHM
+	bool
+	default n
+
+# Turn off some random 386 crap that can affect device config
+config ISA
+	bool
+	default n
+config ISAPNP
+	bool
+	default n
+config EISA
+	bool
+	default n
+config MCA
+	bool
+	default n
+
+
+#############################################################################
+#### v850-specific config
+
+# Define the architecture
+config V850
+	bool
+	default y
+
+menu "Processor type and features"
+
+   choice
+	  prompt "Platform"
+	  default GDB
+      config RTE_CB_MA1
+      	     bool "RTE-V850E/MA1-CB"
+      config RTE_CB_NB85E
+      	     bool "RTE-V850E/NB85E-CB"
+      config V850E_SIM
+      	     bool "GDB"
+      config V850E2_SIM85E2C
+      	     bool "sim85e2c"
+      config V850E2_FPGA85E2C
+      	     bool "NA85E2C-FPGA"
+      config V850E2_ANNA
+      	     bool "Anna"
+   endchoice
+
+
+   #### V850E processor-specific config
+
+   # All CPUs currently supported use the v850e architecture
+   config V850E
+   	  bool
+	  default y
+
+   # The RTE-V850E/MA1-CB is the only type of V850E/MA1 platform we
+   # currently support
+   config V850E_MA1
+   	  bool
+	  depends RTE_CB_MA1
+	  default y
+   # Similarly for the RTE-V850E/MA1-CB - V850E/TEG
+   config V850E_TEG
+   	  bool
+	  depends RTE_CB_NB85E
+	  default y
+
+   # NB85E processor core
+   config V850E_NB85E
+   	  bool
+	  depends V850E_MA1 || V850E_TEG
+	  default y
+
+   config V850E_MA1_HIGHRES_TIMER
+   	  bool "High resolution timer support"
+  	  depends V850E_MA1
+
+
+   #### V850E2 processor-specific config
+
+   # V850E2 processors
+   config V850E2
+   	  bool
+	  depends V850E2_SIM85E2C || V850E2_FPGA85E2C || V850E2_ANNA
+	  default y
+
+   # Processors based on the NA85E2A core
+   config V850E2_NA85E2A
+   	  bool
+	  depends V850E2_ANNA
+	  default y
+
+   # Processors based on the NA85E2C core
+   config V850E2_NA85E2C
+   	  bool
+	  depends V850E2_SIM85E2C || V850E2_FPGA85E2C
+	  default y
+
+
+   #### RTE-CB platform-specific config
+
+   # Boards in the RTE-x-CB series
+   config RTE_CB
+   	  bool
+	  depends RTE_CB_MA1 || RTE_CB_NB85E
+	  default y
+
+   # Currently, we only support RTE-CB boards using the Multi debugger
+   config RTE_CB_MULTI
+   	  bool
+	  depends RTE_CB
+	  default y
+
+   config RTE_CB_MA1_KSRAM
+   	  bool "Kernel in SRAM (limits size of kernel)"
+	  depends RTE_CB_MA1 && RTE_CB_MULTI
+	  default n
+
+   config RTE_MB_A_PCI
+   	  bool "Mother-A PCI support"
+	  depends RTE_CB
+	  default y
+
+   # The GBUS is used to talk to the RTE-MOTHER-A board
+   config RTE_GBUS_INT
+   	  bool
+	  depends RTE_MB_A_PCI
+	  default y
+
+   # The only PCI bus we support is on the RTE-MOTHER-A board
+   config PCI
+   	  bool
+	  default y if RTE_MB_A_PCI
+
+
+   #### Misc config
+
+   config ROM_KERNEL
+   	  bool "Kernel in ROM"
+	  depends V850E2_ANNA || (RTE_CB && !RTE_CB_MULTI)
+
+   # Some platforms pre-zero memory, in which case the kernel doesn't need to
+   config ZERO_BSS
+   	  bool
+	  depends !V850E2_SIM85E2C
+	  default y
+
+   # The crappy-ass zone allocator requires that the start of allocatable
+   # memory be aligned to the largest possible allocation.
+   config FORCE_MAX_ZONEORDER
+   	  int
+	  default 8 if V850E2_SIM85E2C || V850E2_FPGA85E2C
+
+   config TIME_BOOTUP
+   	  bool "Time bootup"
+	  depends V850E_MA1_HIGHRES_TIMER
+
+   config RESET_GUARD
+   	  bool "Reset Guard"
+
+   config LARGE_ALLOCS
+	  bool "Allow allocating large blocks (> 1MB) of memory"
+	  help
+	     Allow the slab memory allocator to keep chains for very large
+	     memory sizes - upto 32MB. You may need this if your system has
+	     a lot of RAM, and you need to able to allocate very large
+	     contiguous chunks. If unsure, say N.
+
+endmenu
+
+
+#############################################################################
+
+source init/Kconfig
+
+#############################################################################
+
+menu "Bus options (PCI, PCMCIA, EISA, MCA, ISA)"
+
+#    config PCI
+# 	   bool "PCI support"
+# 	   help
+# 	     Support for PCI bus.
+
+source "drivers/pci/Kconfig"
+
+config HOTPLUG
+	bool "Support for hot-pluggable device"
+	  ---help---
+	  Say Y here if you want to plug devices into your computer while
+	  the system is running, and be able to use them quickly.  In many
+	  cases, the devices can likewise be unplugged at any time too.
+
+	  One well known example of this is PCMCIA- or PC-cards, credit-card
+	  size devices such as network cards, modems or hard drives which are
+	  plugged into slots found on all modern laptop computers.  Another
+	  example, used on modern desktops as well as laptops, is USB.
+
+	  Enable HOTPLUG and KMOD, and build a modular kernel.  Get agent
+	  software (at <http://linux-hotplug.sourceforge.net/>) and install it.
+	  Then your kernel will automatically call out to a user mode "policy
+	  agent" (/sbin/hotplug) to load modules and set up software needed
+	  to use devices as you hotplug them.
+
+source "drivers/pcmcia/Kconfig"
+
+source "drivers/hotplug/Kconfig"
+
+endmenu
+
+menu "Executable file formats"
+
+config KCORE_AOUT
+	bool
+	default y
+
+config KCORE_ELF
+	default y
+
+config BINFMT_FLAT
+	tristate "Kernel support for flat binaries"
+	help
+	  Support uClinux FLAT format binaries.
+
+config BINFMT_ZFLAT
+	bool "  Enable ZFLAT support"
+	depends on BINFMT_FLAT
+	help
+	  Support FLAT format compressed binaries
+
+endmenu
+
+#############################################################################
+
+source drivers/mtd/Kconfig
+
+source drivers/parport/Kconfig
+
+#source drivers/pnp/Kconfig
+
+source drivers/block/Kconfig
+
+#############################################################################
+
+menu "Disk device support"
+
+config IDE
+       tristate "ATA/ATAPI/MFM/RLL device support"
+       ---help---
+	 If you say Y here, your kernel will be able to manage low cost mass
+	 storage units such as ATA/(E)IDE and ATAPI units. The most common
+	 cases are IDE hard drives and ATAPI CD-ROM drives.
+
+	 It only makes sense to choose this option if your board actually
+	 has an IDE interface. If unsure, say N.
+
+source "drivers/ide/Kconfig"
+
+config SCSI
+	tristate "SCSI device support"
+	help
+	  If you want to use a SCSI hard disk, SCSI tape drive, SCSI CD-ROM or
+	  any other SCSI device under Linux, say Y and make sure that you know
+	  the name of your SCSI host adapter (the card inside your computer
+	  that "speaks" the SCSI protocol, also called SCSI controller),
+	  because you will be asked for it.
+
+source "drivers/scsi/Kconfig"
+
+endmenu
+
+#############################################################################
+
+
+source "drivers/md/Kconfig"
+
+source "drivers/message/fusion/Kconfig"
+
+source "drivers/ieee1394/Kconfig"
+
+source "drivers/message/i2o/Kconfig"
+
+source "net/Kconfig"
+
+
+menu "Network device support"
+	depends on NET
+
+config NETDEVICES
+	bool "Network device support"
+	---help---
+	  You can say N here if you don't intend to connect your Linux box to
+	  any other computer at all or if all your connections will be over a
+	  telephone line with a modem either via UUCP (UUCP is a protocol to
+	  forward mail and news between unix hosts over telephone lines; read
+	  the UUCP-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>) or dialing up a shell
+	  account or a BBS, even using term (term is a program which gives you
+	  almost full Internet connectivity if you have a regular dial up
+	  shell account on some Internet connected Unix computer. Read
+	  <http://www.bart.nl/~patrickr/term-howto/Term-HOWTO.html>).
+
+	  You'll have to say Y if your computer contains a network card that
+	  you want to use under Linux (make sure you know its name because you
+	  will be asked for it and read the Ethernet-HOWTO (especially if you
+	  plan to use more than one network card under Linux)) or if you want
+	  to use SLIP (Serial Line Internet Protocol is the protocol used to
+	  send Internet traffic over telephone lines or null modem cables) or
+	  CSLIP (compressed SLIP) or PPP (Point to Point Protocol, a better
+	  and newer replacement for SLIP) or PLIP (Parallel Line Internet
+	  Protocol is mainly used to create a mini network by connecting the
+	  parallel ports of two local machines) or AX.25/KISS (protocol for
+	  sending Internet traffic over amateur radio links).
+
+	  Make sure to read the NET-3-HOWTO. Eventually, you will have to read
+	  Olaf Kirch's excellent and free book "Network Administrator's
+	  Guide", to be found in <http://www.linuxdoc.org/docs.html#guide>. If
+	  unsure, say Y.
+
+source "drivers/net/Kconfig"
+
+source "drivers/atm/Kconfig"
+
+endmenu
+
+source "net/ax25/Kconfig"
+
+source "net/irda/Kconfig"
+
+source "drivers/isdn/Kconfig"
+
+#source "drivers/telephony/Kconfig"
+
+#
+# input before char - char/joystick depends on it. As does USB.
+#
+source "drivers/input/Kconfig"
+
+source "drivers/char/Kconfig"
+
+#source drivers/misc/Config.in
+source "drivers/media/Kconfig"
+
+source "fs/Kconfig"
+
+
+menu "Console drivers"
+	depends on VT
+
+config VGA_CONSOLE
+	bool "VGA text console"
+	help
+	  Saying Y here will allow you to use Linux in text mode through a
+	  display that complies with the generic VGA standard. Virtually
+	  everyone wants that.
+
+	  The program SVGATextMode can be used to utilize SVGA video cards to
+	  their full potential in text mode. Download it from
+	  <ftp://ibiblio.org/pub/Linux/utils/console/>.
+
+	  If unsure, say N.
+
+config VIDEO_SELECT
+	bool "Video mode selection support"
+	---help---
+	  This enables support for text mode selection on kernel startup. If
+	  you want to take advantage of some high-resolution text mode your
+	  card's BIOS offers, but the traditional Linux utilities like
+	  SVGATextMode don't, you can say Y here and set the mode using the
+	  "vga=" option from your boot loader (lilo or loadlin) or set
+	  "vga=ask" which brings up a video mode menu on kernel startup. (Try
+	  "man bootparam" or see the documentation of your boot loader about
+	  how to pass options to the kernel.)
+
+	  Read the file <file:Documentation/svga.txt> for more information
+	  about the Video mode selection support. If unsure, say N.
+
+source "drivers/video/Kconfig"
+
+endmenu
+
+
+menu "Sound"
+
+config SOUND
+	tristate "Sound card support"
+	---help---
+	  If you have a sound card in your computer, i.e. if it can say more
+	  than an occasional beep, say Y.  Be sure to have all the information
+	  about your sound card and its configuration down (I/O port,
+	  interrupt and DMA channel), because you will be asked for it.
+
+	  You want to read the Sound-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>. General information about
+	  the modular sound system is contained in the files
+	  <file:Documentation/sound/Introduction>.  The file
+	  <file:Documentation/sound/README.OSS> contains some slightly
+	  outdated but still useful information as well.
+
+	  If you have a PnP sound card and you want to configure it at boot
+	  time using the ISA PnP tools (read
+	  <http://www.roestock.demon.co.uk/isapnptools/>), then you need to
+	  compile the sound card support as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want)
+	  and load that module after the PnP configuration is finished.  To do
+	  this, say M here and read <file:Documentation/modules.txt> as well
+	  as <file:Documentation/sound/README.modules>; the module will be
+	  called soundcore.o.
+
+	  I'm told that even without a sound card, you can make your computer
+	  say more than an occasional beep, by programming the PC speaker.
+	  Kernel patches and supporting utilities to do that are in the pcsp
+	  package, available at <ftp://ftp.infradead.org/pub/pcsp/>.
+
+source "sound/Kconfig"
+
+endmenu
+
+source "drivers/usb/Kconfig"
+
+source "net/bluetooth/Kconfig"
+
+
+menu "Kernel hacking"
+
+config FULLDEBUG
+	bool "Full Symbolic/Source Debugging support"
+	help
+	  Enable debuging symbols on kernel build.
+
+config MAGIC_SYSRQ
+	bool "Magic SysRq key"
+	help
+	  Enables console device to interprent special characters as
+	  commands to dump state information.
+
+config HIGHPROFILE
+	bool "Use fast second timer for profiling"
+	help
+	  Use a fast secondary clock to produce profiling information.
+
+config DUMPTOFLASH
+	bool "Panic/Dump to FLASH"
+	depends on COLDFIRE
+	help
+	  Dump any panic of trap output into a flash memory segment
+	  for later analysis.
+
+config NO_KERNEL_MSG
+	bool "Suppress Kernel BUG Messages"
+	help
+	  Do not output any debug BUG messages within the kernel.
+
+config BDM_DISABLE
+	bool "Disable BDM signals"
+	depends on (EXPERIMENTAL && COLDFIRE)
+	help
+	  Disable the CPU's BDM signals.
+
+endmenu
+
+source "security/Kconfig"
+
+source "crypto/Kconfig"
+
+source "lib/Kconfig"
+
+#############################################################################
