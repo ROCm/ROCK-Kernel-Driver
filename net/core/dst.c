@@ -29,7 +29,9 @@
  * 4) All operations modify state, so a spinlock is used.
  */
 static struct dst_entry 	*dst_garbage_list;
+#if RT_CACHE_DEBUG >= 2 
 static atomic_t			 dst_total = ATOMIC_INIT(0);
+#endif
 static spinlock_t		 dst_lock = SPIN_LOCK_UNLOCKED;
 
 static unsigned long dst_gc_timer_expires;
@@ -108,7 +110,9 @@ void * dst_alloc(struct dst_ops * ops)
 	dst->lastuse = jiffies;
 	dst->input = dst_discard;
 	dst->output = dst_blackhole;
+#if RT_CACHE_DEBUG >= 2 
 	atomic_inc(&dst_total);
+#endif
 	atomic_inc(&ops->entries);
 	return dst;
 }
@@ -158,7 +162,9 @@ void dst_destroy(struct dst_entry * dst)
 		dst->ops->destroy(dst);
 	if (dst->dev)
 		dev_put(dst->dev);
+#if RT_CACHE_DEBUG >= 2 
 	atomic_dec(&dst_total);
+#endif
 	kmem_cache_free(dst->ops->kmem_cachep, dst);
 }
 
