@@ -1402,17 +1402,22 @@ static void
 rtl8169_rx_interrupt(struct net_device *dev, struct rtl8169_private *tp,
 		     void *ioaddr)
 {
-	int cur_rx, delta;
+	unsigned long cur_rx, rx_left;
+	int delta;
 
 	assert(dev != NULL);
 	assert(tp != NULL);
 	assert(ioaddr != NULL);
 
-	cur_rx = tp->cur_rx % NUM_RX_DESC;
+	cur_rx = tp->cur_rx;
+	rx_left = NUM_RX_DESC + tp->dirty_rx - cur_rx;
 
-	while (!(le32_to_cpu(tp->RxDescArray[cur_rx].status) & OWNbit)) {
-		u32 status = le32_to_cpu(tp->RxDescArray[cur_rx].status);
+	while (rx_left > 0) {
+		int entry = cur_rx % NUM_RX_DESC;
+		u32 status = le32_to_cpu(tp->RxDescArray[entry].status);
 
+		if (status & OWNbit)
+			break;
 		if (status & RxRES) {
 			printk(KERN_INFO "%s: Rx ERROR!!!\n", dev->name);
 			tp->stats.rx_errors++;
@@ -1421,8 +1426,8 @@ rtl8169_rx_interrupt(struct net_device *dev, struct rtl8169_private *tp,
 			if (status & RxCRC)
 				tp->stats.rx_crc_errors++;
 		} else {
-			struct RxDesc *desc = tp->RxDescArray + cur_rx;
-			struct sk_buff *skb = tp->Rx_skbuff[cur_rx];
+			struct RxDesc *desc = tp->RxDescArray + entry;
+			struct sk_buff *skb = tp->Rx_skbuff[entry];
 			int pkt_size = (status & 0x00001FFF) - 4;
 
 			pci_dma_sync_single(tp->pci_dev,
@@ -1434,7 +1439,7 @@ rtl8169_rx_interrupt(struct net_device *dev, struct rtl8169_private *tp,
 						 le32_to_cpu(desc->buf_addr),
 						 RX_BUF_SIZE,
 						 PCI_DMA_FROMDEVICE);
-				tp->Rx_skbuff[cur_rx] = NULL;
+				tp->Rx_skbuff[entry] = NULL;
 			}
 
 			skb_put(skb, pkt_size);
@@ -1446,9 +1451,11 @@ rtl8169_rx_interrupt(struct net_device *dev, struct rtl8169_private *tp,
 			tp->stats.rx_packets++;
 		}
 		
-		tp->cur_rx++; 
-		cur_rx = tp->cur_rx % NUM_RX_DESC;
+		cur_rx++; 
+		rx_left--;
 	}
+
+	tp->cur_rx = cur_rx;
 
 	delta = rtl8169_rx_fill(tp, dev, tp->dirty_rx, tp->cur_rx);
 	if (delta > 0)
