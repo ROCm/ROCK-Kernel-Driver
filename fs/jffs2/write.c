@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: write.c,v 1.85 2004/07/13 08:58:25 dwmw2 Exp $
+ * $Id: write.c,v 1.86 2004/11/13 10:44:26 dedekind Exp $
  *
  */
 
@@ -213,8 +213,10 @@ struct jffs2_full_dnode *jffs2_write_dnode(struct jffs2_sb_info *c, struct jffs2
 	jffs2_add_physical_node_ref(c, raw);
 
 	/* Link into per-inode list */
+	spin_lock(&c->erase_completion_lock);
 	raw->next_in_ino = f->inocache->nodes;
 	f->inocache->nodes = raw;
+	spin_unlock(&c->erase_completion_lock);
 
 	D1(printk(KERN_DEBUG "jffs2_write_dnode wrote node at 0x%08x(%d) with dsize 0x%x, csize 0x%x, node_crc 0x%08x, data_crc 0x%08x, totlen 0x%08x\n",
 		  flash_ofs, ref_flags(raw), je32_to_cpu(ri->dsize), 
@@ -333,8 +335,10 @@ struct jffs2_full_dirent *jffs2_write_dirent(struct jffs2_sb_info *c, struct jff
 	raw->flash_offset |= REF_PRISTINE;
 	jffs2_add_physical_node_ref(c, raw);
 
+	spin_lock(&c->erase_completion_lock);
 	raw->next_in_ino = f->inocache->nodes;
 	f->inocache->nodes = raw;
+	spin_unlock(&c->erase_completion_lock);
 
 	if (retried) {
 		ACCT_SANITY_CHECK(c,NULL);
