@@ -120,7 +120,7 @@ struct device_driver {
 
 	int	(*probe)	(struct device * dev);
 	int 	(*remove)	(struct device * dev);
-
+	void	(*shutdown)	(struct device * dev);
 	int	(*suspend)	(struct device * dev, u32 state, u32 level);
 	int	(*resume)	(struct device * dev, u32 level);
 
@@ -360,6 +360,11 @@ extern void device_remove_file(struct device * dev, struct device_attribute * at
 extern int (*platform_notify)(struct device * dev);
 
 extern int (*platform_notify_remove)(struct device * dev);
+
+static inline int device_present(struct device * dev)
+{
+	return (dev && dev->present == 1);
+}
 
 /* device and bus locking helpers.
  *
