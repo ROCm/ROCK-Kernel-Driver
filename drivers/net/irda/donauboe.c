@@ -1825,26 +1825,26 @@ toshoboe_wakeup (struct pci_dev *pci_dev)
   return 0;
 }
 
-static struct pci_driver toshoboe_pci_driver = {
-  name		: "toshoboe",
-  id_table	: toshoboe_pci_tbl,
-  probe		: toshoboe_open,
-  remove	: toshoboe_close,
-  suspend	: toshoboe_gotosleep,
-  resume	: toshoboe_wakeup 
+static struct pci_driver donauboe_pci_driver = {
+	.name		= "donauboe",
+	.id_table	= toshoboe_pci_tbl,
+	.probe		= toshoboe_open,
+	.remove		= toshoboe_close,
+	.suspend	= toshoboe_gotosleep,
+	.resume		= toshoboe_wakeup 
 };
 
-int __init
-toshoboe_init (void)
+static int __init
+donauboe_init (void)
 {
-  return pci_module_init(&toshoboe_pci_driver);
+  return pci_module_init(&donauboe_pci_driver);
 }
 
-STATIC void __exit
-toshoboe_cleanup (void)
+static void __exit
+donauboe_cleanup (void)
 {
-  pci_unregister_driver(&toshoboe_pci_driver);
+  pci_unregister_driver(&donauboe_pci_driver);
 }
 
-module_init(toshoboe_init);
-module_exit(toshoboe_cleanup);
+module_init(donauboe_init);
+module_exit(donauboe_cleanup);

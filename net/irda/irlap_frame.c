@@ -1280,6 +1280,20 @@ int irlap_driver_rcv(struct sk_buff *skb, struct net_device *dev,
 		return -1;
 	}
 
+	/* We are no longer an "old" protocol, so we need to handle
+	 * share and non linear skbs. This should never happen, so
+	 * we don't need to be clever about it. Jean II */
+	if ((skb = skb_share_check(skb, GFP_ATOMIC)) == NULL) {
+		ERROR("%s: can't clone shared skb!\n", __FUNCTION__);
+		return -1;
+	}
+	if (skb_is_nonlinear(skb))
+		if (skb_linearize(skb, GFP_ATOMIC) != 0) {
+			ERROR("%s: can't linearize skb!\n", __FUNCTION__);
+			dev_kfree_skb(skb);
+			return -1;
+		}
+
 	/* Check if frame is large enough for parsing */
 	if (skb->len < 2) {
 		ERROR("%s: frame to short!\n", __FUNCTION__);
