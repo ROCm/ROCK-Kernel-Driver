@@ -1075,8 +1075,8 @@ static int pin_2_irq(int idx, int apic, int pin)
 			 */
 			if (platform_rename_gsi)
 				irq = platform_rename_gsi(apic, irq);
-			break;
 #endif
+			break;
 		}
 		default:
 		{
