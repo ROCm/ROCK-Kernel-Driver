@@ -1166,10 +1166,17 @@ int usb_set_configuration(struct usb_device *dev, int configuration)
 				 dev->bus->busnum, dev->devpath,
 				 configuration,
 				 alt->desc.bInterfaceNumber);
+		}
+ 
+		/* all interfaces are initialized, we can now
+		 * register them
+		 */
+		for (i = 0; i < cp->desc.bNumInterfaces; ++i) {
+			struct usb_interface *intf = cp->interface[i];
 			dev_dbg (&dev->dev,
 				"registering %s (config #%d, interface %d)\n",
 				intf->dev.bus_id, configuration,
-				alt->desc.bInterfaceNumber);
+				intf->cur_altsetting->desc.bInterfaceNumber);
 			device_add (&intf->dev);
 			usb_create_driverfs_intf_files (intf);
 		}
