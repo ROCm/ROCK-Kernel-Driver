@@ -222,7 +222,7 @@ dump_version(char *page, unsigned long *fit)
 {
 	int nentries;
 	int fentry;
-	unsigned long qw;
+	unsigned long qw = 0;
 	int len;
 	nasid_t nasid = NASID_GET(fit);
 

@@ -61,6 +61,7 @@
 
 #define  SN_SAL_SYSCTL_IOBRICK_PCI_OP		   0x02000042	// reentrant
 #define	 SN_SAL_IROUTER_OP			   0x02000043
+#define  SN_SAL_HWPERF_OP			   0x02000050   // lock
 
 /*
  * Service-specific constants
@@ -841,6 +842,23 @@ ia64_sn_irtr_init(nasid_t nasid, void *buf, int len)
 	struct ia64_sal_retval rv;
 	SAL_CALL_REENTRANT(rv, SN_SAL_IROUTER_OP, SAL_IROUTER_INIT,
 			   (u64) nasid, (u64) buf, (u64) len, 0, 0, 0);
+	return (int) rv.status;
+}
+
+/*
+ * This is the access point to the Altix PROM hardware performance
+ * and status monitoring interface. For info on using this, see
+ * include/asm-ia64/sn/sn2/sn_hwperf.h
+ */
+static inline int
+ia64_sn_hwperf_op(nasid_t nasid, u64 opcode, u64 a0, u64 a1, u64 a2,
+                  u64 a3, u64 a4, int *v0)
+{
+	struct ia64_sal_retval rv;
+	SAL_CALL_NOLOCK(rv, SN_SAL_HWPERF_OP, (u64)nasid,
+		opcode, a0, a1, a2, a3, a4);
+	if (v0)
+		*v0 = (int) rv.v0;
 	return (int) rv.status;
 }
 
