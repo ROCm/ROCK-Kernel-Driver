@@ -308,23 +308,23 @@ enum RTL8169_register_content {
 };
 
 enum _DescStatusBit {
-	OWNbit = 0x80000000,
-	EORbit = 0x40000000,
-	FSbit = 0x20000000,
-	LSbit = 0x10000000,
+	DescOwn		= (1 << 31), /* Descriptor is owned by NIC */
+	RingEnd		= (1 << 30), /* End of descriptor ring */
+	FirstFrag	= (1 << 29), /* First segment of a packet */
+	LastFrag	= (1 << 28), /* Final segment of a packet */
 };
 
 #define RsvdMask	0x3fffc000
 
 struct TxDesc {
-	u32 status;
-	u32 vlan_tag;
+	u32 opts1;
+	u32 opts2;
 	u64 addr;
 };
 
 struct RxDesc {
-	u32 status;
-	u32 vlan_tag;
+	u32 opts1;
+	u32 opts2;
 	u64 addr;
 };
 
@@ -1381,7 +1381,7 @@ rtl8169_hw_start(struct net_device *dev)
 static inline void rtl8169_make_unusable_by_asic(struct RxDesc *desc)
 {
 	desc->addr = 0x0badbadbadbadbadull;
-	desc->status &= ~cpu_to_le32(OWNbit | RsvdMask);
+	desc->opts1 &= ~cpu_to_le32(DescOwn | RsvdMask);
 }
 
 static void rtl8169_free_rx_skb(struct rtl8169_private *tp,
@@ -1398,14 +1398,14 @@ static void rtl8169_free_rx_skb(struct rtl8169_private *tp,
 
 static inline void rtl8169_return_to_asic(struct RxDesc *desc, int rx_buf_sz)
 {
-	desc->status |= cpu_to_le32(OWNbit + rx_buf_sz);
+	desc->opts1 |= cpu_to_le32(DescOwn + rx_buf_sz);
 }
 
 static inline void rtl8169_give_to_asic(struct RxDesc *desc, dma_addr_t mapping,
 					int rx_buf_sz)
 {
 	desc->addr = cpu_to_le64(mapping);
-	desc->status |= cpu_to_le32(OWNbit + rx_buf_sz);
+	desc->opts1 |= cpu_to_le32(DescOwn + rx_buf_sz);
 }
 
 static int rtl8169_alloc_rx_skb(struct pci_dev *pdev, struct sk_buff **sk_buff,
@@ -1469,7 +1469,7 @@ static u32 rtl8169_rx_fill(struct rtl8169_private *tp, struct net_device *dev,
 
 static inline void rtl8169_mark_as_last_descriptor(struct RxDesc *desc)
 {
-	desc->status |= cpu_to_le32(EORbit);
+	desc->opts1 |= cpu_to_le32(RingEnd);
 }
 
 static int rtl8169_init_ring(struct net_device *dev)
@@ -1565,7 +1565,7 @@ rtl8169_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		len = ETH_ZLEN;
 	}
 	
-	if (!(le32_to_cpu(tp->TxDescArray[entry].status) & OWNbit)) {
+	if (!(le32_to_cpu(tp->TxDescArray[entry].opts1) & DescOwn)) {
 		dma_addr_t mapping;
 		u32 status;
 
@@ -1576,9 +1576,9 @@ rtl8169_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		tp->TxDescArray[entry].addr = cpu_to_le64(mapping);
 
 		/* anti gcc 2.95.3 bugware */
-		status = OWNbit | FSbit | LSbit | len |
-			 (EORbit * !((entry + 1) % NUM_TX_DESC));
-		tp->TxDescArray[entry].status = cpu_to_le32(status);
+		status = DescOwn | FirstFrag | LastFrag | len |
+			 (RingEnd * !((entry + 1) % NUM_TX_DESC));
+		tp->TxDescArray[entry].opts1 = cpu_to_le32(status);
 			
 		RTL_W8(TxPoll, 0x40);	//set polling bit
 
@@ -1628,8 +1628,8 @@ rtl8169_tx_interrupt(struct net_device *dev, struct rtl8169_private *tp,
 		u32 status;
 
 		rmb();
-		status = le32_to_cpu(tp->TxDescArray[entry].status);
-		if (status & OWNbit)
+		status = le32_to_cpu(tp->TxDescArray[entry].opts1);
+		if (status & DescOwn)
 			break;
 
 		/* FIXME: is it really accurate for TxErr ? */
@@ -1692,9 +1692,9 @@ rtl8169_rx_interrupt(struct net_device *dev, struct rtl8169_private *tp,
 		u32 status;
 
 		rmb();
-		status = le32_to_cpu(tp->RxDescArray[entry].status);
+		status = le32_to_cpu(tp->RxDescArray[entry].opts1);
 
-		if (status & OWNbit)
+		if (status & DescOwn)
 			break;
 		if (status & RxRES) {
 			printk(KERN_INFO "%s: Rx ERROR!!!\n", dev->name);
