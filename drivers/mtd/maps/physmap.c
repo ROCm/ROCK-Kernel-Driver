@@ -1,5 +1,5 @@
 /*
- * $Id: physmap.c,v 1.27 2003/05/21 12:45:19 dwmw2 Exp $
+ * $Id: physmap.c,v 1.29 2003/05/29 09:24:10 dwmw2 Exp $
  *
  * Normal mappings of chips in physical memory
  */
@@ -8,6 +8,7 @@
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
+#include <linux/slab.h>
 #include <asm/io.h>
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/map.h>
@@ -59,7 +60,7 @@ static struct mtd_partition physmap_partitions[] = {
 };
 
 #define NUM_PARTITIONS	(sizeof(physmap_partitions)/sizeof(struct mtd_partition))
-const char *part_probes = {"cmdlinepart", "RedBoot", NULL};
+const char *part_probes[] = {"cmdlinepart", "RedBoot", NULL};
 
 #endif /* CONFIG_MTD_PARTITIONS */
 
