@@ -1539,8 +1539,8 @@ static void llc_ui_conf_conn(struct llc_prim_if_block *prim)
 {
 	struct llc_prim_conn *prim_data = &prim->data->conn;
 	struct llc_opt *llc_core = llc_sk(prim_data->sk);
-	struct llc_ui_opt *llc_ui = llc_ui_sk(prim_data->sk);
 	struct sock* sk = llc_core->handler;
+	struct llc_ui_opt *llc_ui = llc_ui_sk(sk);
 
 	if (!sk)
 		goto out;

@@ -330,7 +330,7 @@ static int llc_conn_req_handler(struct llc_prim_if_block *prim)
 
 	memcpy(laddr.mac, sdev->dev_addr, sizeof(laddr.mac));
 	laddr.lsap = prim->data->conn.saddr.lsap;
-	memcpy(daddr.mac, ddev->dev_addr, sizeof(daddr.mac));
+	memcpy(daddr.mac, prim->data->conn.daddr.mac, sizeof(daddr.mac));
 	daddr.lsap = prim->data->conn.daddr.lsap;
 	sk = llc_find_sock(sap, &daddr, &laddr);
 	if (sk) {
