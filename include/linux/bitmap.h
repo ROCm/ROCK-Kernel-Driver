@@ -98,6 +98,9 @@ extern int bitmap_scnprintf(char *buf, unsigned int len,
 			const unsigned long *src, int nbits);
 extern int bitmap_parse(const char __user *ubuf, unsigned int ulen,
 			unsigned long *dst, int nbits);
+extern int bitmap_find_free_region(unsigned long *bitmap, int bits, int order);
+extern void bitmap_release_region(unsigned long *bitmap, int pos, int order);
+extern int bitmap_allocate_region(unsigned long *bitmap, int pos, int order);
 
 #define BITMAP_LAST_WORD_MASK(nbits)					\
 (									\

@@ -408,3 +408,79 @@ int bitmap_parse(const char __user *ubuf, unsigned int ubuflen,
 	return 0;
 }
 EXPORT_SYMBOL(bitmap_parse);
+
+/**
+ *	bitmap_find_free_region - find a contiguous aligned mem region
+ *	@bitmap: an array of unsigned longs corresponding to the bitmap
+ *	@bits: number of bits in the bitmap
+ *	@order: region size to find (size is actually 1<<order)
+ *
+ * This is used to allocate a memory region from a bitmap.  The idea is
+ * that the region has to be 1<<order sized and 1<<order aligned (this
+ * makes the search algorithm much faster).
+ *
+ * The region is marked as set bits in the bitmap if a free one is
+ * found.
+ *
+ * Returns either beginning of region or negative error
+ */
+int bitmap_find_free_region(unsigned long *bitmap, int bits, int order)
+{
+	unsigned long mask;
+	int pages = 1 << order;
+	int i;
+
+	if(pages > BITS_PER_LONG)
+		return -EINVAL;
+
+	/* make a mask of the order */
+	mask = (1ul << (pages - 1));
+	mask += mask - 1;
+
+	/* run up the bitmap pages bits at a time */
+	for (i = 0; i < bits; i += pages) {
+		int index = BITS_TO_LONGS(i);
+		int offset = i - (index * BITS_PER_LONG);
+		if((bitmap[index] & (mask << offset)) == 0) {
+			/* set region in bimap */
+			bitmap[index] |= (mask << offset);
+			return i;
+		}
+	}
+	return -ENOMEM;
+}
+EXPORT_SYMBOL(bitmap_find_free_region);
+
+/**
+ *	bitmap_release_region - release allocated bitmap region
+ *	@bitmap: a pointer to the bitmap
+ *	@pos: the beginning of the region
+ *	@order: the order of the bits to release (number is 1<<order)
+ *
+ * This is the complement to __bitmap_find_free_region and releases
+ * the found region (by clearing it in the bitmap).
+ */
+void bitmap_release_region(unsigned long *bitmap, int pos, int order)
+{
+	int pages = 1 << order;
+	unsigned long mask = (1ul << (pages - 1));
+	int index = BITS_TO_LONGS(pos);
+	int offset = pos - (index * BITS_PER_LONG);
+	mask += mask - 1;
+	bitmap[index] &= ~(mask << offset);
+}
+EXPORT_SYMBOL(bitmap_release_region);
+
+int bitmap_allocate_region(unsigned long *bitmap, int pos, int order)
+{
+	int pages = 1 << order;
+	unsigned long mask = (1ul << (pages - 1));
+	int index = BITS_TO_LONGS(pos);
+	int offset = pos - (index * BITS_PER_LONG);
+	mask += mask - 1;
+	if (bitmap[index] & (mask << offset))
+		return -EBUSY;
+	bitmap[index] |= (mask << offset);
+	return 0;
+}
+EXPORT_SYMBOL(bitmap_allocate_region);
