@@ -325,7 +325,6 @@ struct address_space {
 	spinlock_t		tree_lock;	/* and spinlock protecting it */
 	struct list_head	clean_pages;	/* list of clean pages */
 	struct list_head	locked_pages;	/* list of locked pages */
-	struct list_head	io_pages;	/* being prepared for I/O */
 	unsigned long		nrpages;	/* number of total pages */
 	struct address_space_operations *a_ops;	/* methods */
 	struct list_head	i_mmap;		/* list of private mappings */
