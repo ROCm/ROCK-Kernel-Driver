@@ -28,9 +28,34 @@
 #include <scsi/scsi.h>
 #include "scsi.h"
 #include "hosts.h"
+#include "sd.h"
 #include <linux/libata.h>
 
 #include "libata.h"
+
+
+/**
+ *	ata_std_bios_param - generic bios head/sector/cylinder calculator
+ *	    used by sd. Most BIOSes nowadays expect a XXX/255/16  (CHS) 
+ *	    mapping. Some situations may arise where the disk is not 
+ *	    bootable if this is not used.
+ *
+ *	LOCKING:
+ *
+ *	RETURNS:
+ *
+ */
+int ata_std_bios_param(Disk * disk,	/* SCSI disk */
+		       kdev_t dev,	/* Device major, minor */
+		  int *ip /* Heads, sectors, cylinders in that order */ )
+{
+	ip[0] = 255;
+	ip[1] = 63;
+	ip[2] = disk->capacity / (ip[0] * ip[1]);
+
+	return 0;
+}
+
 
 struct ata_queued_cmd *ata_scsi_qc_new(struct ata_port *ap,
 				       struct ata_device *dev,
