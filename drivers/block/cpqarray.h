@@ -118,7 +118,7 @@ struct ctlr_info {
 	unsigned int misc_tflags;
 };
 
-#define IDA_LOCK(i)	(&hba[i]->queue)
+#define IDA_LOCK(i)	(&hba[i]->lock)
 
 #endif
 
