@@ -1250,6 +1250,31 @@ out:
 		status = nfserr_reclaim_bad;
 	return status;
 }
+
+static int
+nfs4_check_open(struct nfs4_file *fp, struct nfs4_stateowner *sop, struct nfsd4_open *open, struct nfs4_stateid **stpp)
+{
+	struct nfs4_stateid *local;
+	int status = nfserr_share_denied;
+
+	list_for_each_entry(local, &fp->fi_perfile, st_perfile) {
+		/* have we seen this open owner */
+		if (local->st_stateowner == sop) {
+			*stpp = local;
+			continue;
+		}
+		/* ignore lock owners */
+		if (local->st_stateowner->so_is_open_owner == 0)
+			continue;
+		/* check for conflicting share reservations */
+		if (!test_share(local, open))
+			goto out;
+	}
+	status = 0;
+out:
+	return status;
+}
+
 /*
  * called with nfs4_lock_state() held.
  */
@@ -1261,7 +1286,7 @@ nfsd4_process_open2(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nf
 	struct nfs4_file *fp = NULL;
 	struct inode *ino;
 	unsigned int fi_hashval;
-	struct nfs4_stateid *stq, *stp = NULL;
+	struct nfs4_stateid *stp = NULL;
 	int status;
 
 	status = nfserr_resource;
@@ -1273,24 +1298,16 @@ nfsd4_process_open2(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nf
 	status = nfserr_inval;
 	if (!TEST_ACCESS(open->op_share_access) || !TEST_DENY(open->op_share_deny))
 		goto out;
-
+	/*
+	 * Lookup file; if found, lookup stateid and check open request;
+	 * not found, create
+	 */
 	fi_hashval = file_hashval(ino);
 	if (find_file(fi_hashval, ino, &fp)) {
-		/* Search for conflicting share reservations */
-		status = nfserr_share_denied;
-		list_for_each_entry(stq, &fp->fi_perfile, st_perfile) {
-			if (stq->st_stateowner == sop) {
-				stp = stq;
-				continue;
-			}
-			/* ignore lock owners */
-			if (stq->st_stateowner->so_is_open_owner == 0)
-				continue;
-			if (!test_share(stq,open))	
-				goto out;
-		}
+		status = nfs4_check_open(fp, sop, open, &stp);
+		if (status)
+			goto out;
 	} else {
-	/* No nfs4_file found; allocate and init a new one */
 		status = nfserr_resource;
 		if ((fp = alloc_init_file(fi_hashval, ino)) == NULL)
 			goto out;
