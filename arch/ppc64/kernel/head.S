@@ -1588,6 +1588,7 @@ _STATIC(load_up_altivec)
 	li	r10,THREAD_VSCR
 	stw	r4,THREAD_USED_VR(r5)
 	lvx	vr0,r10,r5
+	mtvscr	vr0
 	REST_32VRS(0,r4,r5)
 #ifndef CONFIG_SMP
 	/* Update last_task_used_math to 'current' */
