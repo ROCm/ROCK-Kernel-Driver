@@ -66,7 +66,7 @@ irq_desc_t irq_desc[NR_IRQS] __cacheline_aligned = {
 		.lock = SPIN_LOCK_UNLOCKED
 	}
 };
-	
+
 int ppc_spurious_interrupts = 0;
 unsigned long lpEvent_count = 0;
 
@@ -183,6 +183,7 @@ do_free_irq(int irq, void* dev_id)
 	return -ENOENT;
 }
 
+
 int request_irq(unsigned int irq,
 	irqreturn_t (*handler)(int, void *, struct pt_regs *),
 	unsigned long irqflags, const char * devname, void *dev_id)
@@ -195,25 +196,25 @@ int request_irq(unsigned int irq,
 	if (!handler)
 		/* We could implement really free_irq() instead of that... */
 		return do_free_irq(irq, dev_id);
-	
+
 	action = (struct irqaction *)
 		kmalloc(sizeof(struct irqaction), GFP_KERNEL);
 	if (!action) {
 		printk(KERN_ERR "kmalloc() failed for irq %d !\n", irq);
 		return -ENOMEM;
 	}
-	
+
 	action->handler = handler;
-	action->flags = irqflags;					
+	action->flags = irqflags;
 	action->mask = 0;
 	action->name = devname;
 	action->dev_id = dev_id;
 	action->next = NULL;
-	
+
 	retval = setup_irq(irq, action);
 	if (retval)
 		kfree(action);
-		
+
 	return 0;
 }
 
@@ -342,13 +343,13 @@ int show_interrupts(struct seq_file *p, void *v)
 		action = irq_desc[i].action;
 		if (!action || !action->handler)
 			goto skip;
-		seq_printf(p, "%3d: ", i);		
+		seq_printf(p, "%3d: ", i);
 #ifdef CONFIG_SMP
 		for (j = 0; j < NR_CPUS; j++) {
 			if (cpu_online(j))
 				seq_printf(p, "%10u ", kstat_cpu(j).irqs[i]);
 		}
-#else		
+#else
 		seq_printf(p, "%10u ", kstat_irqs(i));
 #endif /* CONFIG_SMP */
 		if (irq_desc[i].handler)		
@@ -670,7 +671,7 @@ void __init init_IRQ(void)
 		return;
 
 	once++;
-	
+
 	ppc_md.init_IRQ();
 }
 
@@ -699,6 +700,7 @@ static int irq_affinity_write_proc (struct file *file, const char *buffer,
 {
 	int irq = (long)data, full_count = count, err;
 	cpumask_t new_value, tmp;
+	cpumask_t allcpus = CPU_MASK_ALL;
 
 	if (!irq_desc[irq].handler->set_affinity)
 		return -EIO;
@@ -706,6 +708,14 @@ static int irq_affinity_write_proc (struct file *file, const char *buffer,
 	err = cpumask_parse(buffer, count, new_value);
 	if (err)
 		return err;
+
+	/*
+	 * We check for CPU_MASK_ALL in xics to send irqs to all cpus.
+	 * In some cases CPU_MASK_ALL is smaller than the cpumask (eg
+	 * NR_CPUS == 32 and cpumask is a long), so we mask it here to
+	 * be consistent.
+	 */
+	cpus_and(new_value, new_value, allcpus);
 
 	/*
 	 * Do not allow disabling IRQs completely - it's a too easy
