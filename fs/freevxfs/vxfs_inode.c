@@ -243,9 +243,12 @@ vxfs_iinit(struct inode *ip, struct vxfs_inode_info *vip)
 	ip->i_nlink = vip->vii_nlink;
 	ip->i_size = vip->vii_size;
 
-	ip->i_atime = vip->vii_atime;
-	ip->i_ctime = vip->vii_ctime;
-	ip->i_mtime = vip->vii_mtime;
+	ip->i_atime.tv_sec = vip->vii_atime;
+	ip->i_ctime.tv_sec = vip->vii_ctime;
+	ip->i_mtime.tv_sec = vip->vii_mtime;
+	ip->i_atime.tv_nsec = 0;
+	ip->i_ctime.tv_nsec = 0;
+	ip->i_mtime.tv_nsec = 0;
 
 	ip->i_blksize = PAGE_SIZE;
 	ip->i_blocks = vip->vii_blocks;

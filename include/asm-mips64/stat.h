@@ -74,18 +74,20 @@ struct stat {
 	 * but we don't have it under Linux.
 	 */
 	unsigned int	st_atime;
-	unsigned int	reserved0;	/* Reserved for st_atime expansion  */
+	unsigned int	st_atime_nsec;
 
 	unsigned int	st_mtime;
-	unsigned int	reserved1;	/* Reserved for st_mtime expansion  */
+	unsigned int	st_mtime_nsec;
 
 	unsigned int	st_ctime;
-	unsigned int	reserved2;	/* Reserved for st_ctime expansion  */
+	unsigned int	st_ctime_nsec;
 
 	unsigned int	st_blksize;
 	unsigned int	st_pad2;
 
 	unsigned long	st_blocks;
 };
+
+#define STAT_HAVE_NSEC 1
 
 #endif /* _ASM_STAT_H */

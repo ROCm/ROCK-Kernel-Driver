@@ -330,9 +330,9 @@ nfsd4_decode_fattr(struct nfsd4_compoundargs *argp, u32 *bmval, struct iattr *ia
 			READ32(dummy32);
 			if (dummy32)
 				return nfserr_inval;
-			READ32(iattr->ia_atime);
-			READ32(dummy32);
-			if (dummy32 >= (u32)1000000000)
+			READ32(iattr->ia_atime.tv_sec);
+			READ32(iattr->ia_atime.tv_nsec);
+			if (iattr->ia_atime.tv_nsec >= (u32)1000000000)
 				return nfserr_inval;
 			iattr->ia_valid |= (ATTR_ATIME | ATTR_ATIME_SET);
 			break;
@@ -351,9 +351,9 @@ nfsd4_decode_fattr(struct nfsd4_compoundargs *argp, u32 *bmval, struct iattr *ia
 		READ32(dummy32);
 		if (dummy32)
 			return nfserr_inval;
-		READ32(iattr->ia_ctime);
-		READ32(dummy32);
-		if (dummy32 >= (u32)1000000000)
+		READ32(iattr->ia_ctime.tv_sec);
+		READ32(iattr->ia_ctime.tv_nsec);
+		if (iattr->ia_ctime.tv_nsec >= (u32)1000000000)
 			return nfserr_inval;
 		iattr->ia_valid |= ATTR_CTIME;
 	}
@@ -370,9 +370,9 @@ nfsd4_decode_fattr(struct nfsd4_compoundargs *argp, u32 *bmval, struct iattr *ia
 			READ32(dummy32);
 			if (dummy32)
 				return nfserr_inval;
-			READ32(iattr->ia_mtime);
-			READ32(dummy32);
-			if (dummy32 >= (u32)1000000000)
+			READ32(iattr->ia_mtime.tv_sec);
+			READ32(iattr->ia_mtime.tv_nsec);
+			if (iattr->ia_mtime.tv_nsec >= (u32)1000000000)
 				return nfserr_inval;
 			iattr->ia_valid |= (ATTR_MTIME | ATTR_MTIME_SET);
 			break;
@@ -1071,7 +1071,7 @@ nfsd4_encode_fattr(struct svc_fh *fhp, struct svc_export *exp,
 		if ((buflen -= 8) < 0)
 			goto out_resource;
 		WRITE32(stat.size);
-		WRITE32(stat.mtime);
+		WRITE32(stat.mtime.tv_sec); /* AK: nsec dropped? */
 	}
 	if (bmval0 & FATTR4_WORD0_SIZE) {
 		if ((buflen -= 8) < 0)
@@ -1263,8 +1263,8 @@ nfsd4_encode_fattr(struct svc_fh *fhp, struct svc_export *exp,
 		if ((buflen -= 12) < 0)
 			goto out_resource;
 		WRITE32(0);
-		WRITE32(stat.atime);
-		WRITE32(0);
+		WRITE32(stat.atime.tv_sec);
+		WRITE32(stat.atime.tv_nsec);
 	}
 	if (bmval1 & FATTR4_WORD1_TIME_DELTA) {
 		if ((buflen -= 12) < 0)
@@ -1277,15 +1277,15 @@ nfsd4_encode_fattr(struct svc_fh *fhp, struct svc_export *exp,
 		if ((buflen -= 12) < 0)
 			goto out_resource;
 		WRITE32(0);
-		WRITE32(stat.ctime);
-		WRITE32(0);
+		WRITE32(stat.ctime.tv_sec);
+		WRITE32(stat.ctime.tv_nsec);
 	}
 	if (bmval1 & FATTR4_WORD1_TIME_MODIFY) {
 		if ((buflen -= 12) < 0)
 			goto out_resource;
 		WRITE32(0);
-		WRITE32(stat.mtime);
-		WRITE32(0);
+		WRITE32(stat.mtime.tv_sec);
+		WRITE32(stat.mtime.tv_nsec);
 	}
 
 	*attrlenp = htonl((char *)p - (char *)attrlenp - 4);

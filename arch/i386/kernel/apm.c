@@ -1221,8 +1221,10 @@ out:
 
 static void set_time(void)
 {
-	if (got_clock_diff)	/* Must know time zone in order to set clock */
-		CURRENT_TIME = get_cmos_time() + clock_cmos_diff;
+	if (got_clock_diff) {	/* Must know time zone in order to set clock */
+		xtime.tv_sec = get_cmos_time() + clock_cmos_diff;
+		xtime.tv_nsec = 0; 
+	} 
 }
 
 static void get_time_diff(void)
@@ -1232,7 +1234,7 @@ static void get_time_diff(void)
 	 * Estimate time zone so that set_time can update the clock
 	 */
 	clock_cmos_diff = -get_cmos_time();
-	clock_cmos_diff += CURRENT_TIME;
+	clock_cmos_diff += get_seconds();
 	got_clock_diff = 1;
 #endif
 }

@@ -6,6 +6,7 @@
 #include <linux/fcntl.h>
 #include <linux/unistd.h>
 #include <linux/delay.h>
+#include <linux/string.h>
 
 static void __init error(char *x)
 {

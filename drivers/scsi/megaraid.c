@@ -494,6 +494,7 @@
 #include <linux/workqueue.h>
 #include <linux/interrupt.h>
 #include <linux/mm.h>
+#include <linux/string.h>
 #include <asm/pgtable.h>
 
 #include <linux/sched.h>

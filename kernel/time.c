@@ -57,7 +57,7 @@ asmlinkage long sys_time(int * tloc)
 
 	/* SMP: This is fairly trivial. We grab CURRENT_TIME and 
 	   stuff it to user space. No side effects */
-	i = CURRENT_TIME;
+	i = get_seconds();
 	if (tloc) {
 		if (put_user(i,tloc))
 			i = -EFAULT;
@@ -404,4 +404,14 @@ asmlinkage long sys_adjtimex(struct timex *txc_p)
 		return -EFAULT;
 	ret = do_adjtimex(&txc);
 	return copy_to_user(txc_p, &txc, sizeof(struct timex)) ? -EFAULT : ret;
+}
+
+struct timespec current_kernel_time(void)
+{
+        struct timespec now;
+        unsigned long flags;
+        read_lock_irqsave(&xtime_lock,flags);
+	now = xtime;
+        read_unlock_irqrestore(&xtime_lock,flags);
+	return now; 
 }

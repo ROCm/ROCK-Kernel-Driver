@@ -333,8 +333,11 @@ static void set_dates(struct hfs_cat_entry *entry, struct inode *inode,
 	tmp = hfs_h_to_mtime(dates[1]);
 	if (entry->modify_date != tmp) {
 		entry->modify_date = tmp;
-		inode->i_ctime = inode->i_atime = inode->i_mtime = 
+		inode->i_ctime.tv_sec = inode->i_atime.tv_sec = inode->i_mtime.tv_sec = 
 			hfs_h_to_utime(dates[1]);
+		inode->i_ctime.tv_nsec = 0;
+		inode->i_mtime.tv_nsec = 0;
+		inode->i_atime.tv_nsec = 0;
 		hfs_cat_mark_dirty(entry);
 	}
 	tmp = hfs_h_to_mtime(dates[2]);

@@ -885,9 +885,12 @@ static void init_inode (struct inode * inode, struct path * path)
 	inode->i_uid   = sd_v1_uid(sd);
 	inode->i_gid   = sd_v1_gid(sd);
 	inode->i_size  = sd_v1_size(sd);
-	inode->i_atime = sd_v1_atime(sd);
-	inode->i_mtime = sd_v1_mtime(sd);
-	inode->i_ctime = sd_v1_ctime(sd);
+	inode->i_atime.tv_sec = sd_v1_atime(sd);
+	inode->i_mtime.tv_sec = sd_v1_mtime(sd);
+	inode->i_ctime.tv_sec = sd_v1_ctime(sd);
+	inode->i_atime.tv_nsec = 0;
+	inode->i_ctime.tv_nsec = 0;
+	inode->i_mtime.tv_nsec = 0;
 
 	inode->i_blocks = sd_v1_blocks(sd);
 	inode->i_generation = le32_to_cpu (INODE_PKEY (inode)->k_dir_id);
@@ -914,9 +917,12 @@ static void init_inode (struct inode * inode, struct path * path)
 	inode->i_uid    = sd_v2_uid(sd);
 	inode->i_size   = sd_v2_size(sd);
 	inode->i_gid    = sd_v2_gid(sd);
-	inode->i_mtime  = sd_v2_mtime(sd);
-	inode->i_atime  = sd_v2_atime(sd);
-	inode->i_ctime  = sd_v2_ctime(sd);
+	inode->i_mtime.tv_sec  = sd_v2_mtime(sd);
+	inode->i_atime.tv_sec = sd_v2_atime(sd);
+	inode->i_ctime.tv_sec  = sd_v2_ctime(sd);
+	inode->i_ctime.tv_nsec = 0;
+	inode->i_mtime.tv_nsec = 0;
+	inode->i_atime.tv_nsec = 0;
 	inode->i_blocks = sd_v2_blocks(sd);
         rdev            = sd_v2_rdev(sd);
 	if( S_ISCHR( inode -> i_mode ) || S_ISBLK( inode -> i_mode ) )
@@ -960,9 +966,9 @@ static void inode2sd (void * sd, struct inode * inode)
     set_sd_v2_uid(sd_v2, inode->i_uid );
     set_sd_v2_size(sd_v2, inode->i_size );
     set_sd_v2_gid(sd_v2, inode->i_gid );
-    set_sd_v2_mtime(sd_v2, inode->i_mtime );
-    set_sd_v2_atime(sd_v2, inode->i_atime );
-    set_sd_v2_ctime(sd_v2, inode->i_ctime );
+    set_sd_v2_mtime(sd_v2, inode->i_mtime.tv_sec );
+    set_sd_v2_atime(sd_v2, inode->i_atime.tv_sec );
+    set_sd_v2_ctime(sd_v2, inode->i_ctime.tv_sec );
     set_sd_v2_blocks(sd_v2, inode->i_blocks );
     if (S_ISCHR(inode->i_mode) || S_ISBLK(inode->i_mode)) {
         set_sd_v2_rdev(sd_v2, kdev_t_to_nr(inode->i_rdev) );
@@ -984,9 +990,9 @@ static void inode2sd_v1 (void * sd, struct inode * inode)
     set_sd_v1_gid(sd_v1, inode->i_gid );
     set_sd_v1_nlink(sd_v1, inode->i_nlink );
     set_sd_v1_size(sd_v1, inode->i_size );
-    set_sd_v1_atime(sd_v1, inode->i_atime );
-    set_sd_v1_ctime(sd_v1, inode->i_ctime );
-    set_sd_v1_mtime(sd_v1, inode->i_mtime );
+    set_sd_v1_atime(sd_v1, inode->i_atime.tv_sec );
+    set_sd_v1_ctime(sd_v1, inode->i_ctime.tv_sec );
+    set_sd_v1_mtime(sd_v1, inode->i_mtime.tv_sec );
 
     if (S_ISCHR(inode->i_mode) || S_ISBLK(inode->i_mode))
         set_sd_v1_rdev(sd_v1, kdev_t_to_nr(inode->i_rdev) );

@@ -625,7 +625,7 @@ xfs_trans_dqresv(
 				 * If timer or warnings has expired,
 				 * return EDQUOT
 				 */
-				if ((btimer != 0 && CURRENT_TIME > btimer) ||
+				if ((btimer != 0 && get_seconds() > btimer) ||
 				    (!INT_ISZERO(dqp->q_core.d_bwarns, ARCH_CONVERT) &&
 				     INT_GET(dqp->q_core.d_bwarns, ARCH_CONVERT) >=
 				     XFS_QI_BWARNLIMIT(dqp->q_mount))) {
@@ -648,7 +648,7 @@ xfs_trans_dqresv(
 				 * return EDQUOT
 				 */
 				if ((!INT_ISZERO(dqp->q_core.d_itimer, ARCH_CONVERT) &&
-				     CURRENT_TIME > INT_GET(dqp->q_core.d_itimer, ARCH_CONVERT)) ||
+				     get_seconds() > INT_GET(dqp->q_core.d_itimer, ARCH_CONVERT)) ||
 				    (!INT_ISZERO(dqp->q_core.d_iwarns, ARCH_CONVERT) &&
 				     INT_GET(dqp->q_core.d_iwarns, ARCH_CONVERT) >=
 				     XFS_QI_IWARNLIMIT(dqp->q_mount))) {

@@ -271,9 +271,10 @@ adfs_iget(struct super_block *sb, struct object_info *obj)
 	ADFS_I(inode)->stamped	  = ((obj->loadaddr & 0xfff00000) == 0xfff00000);
 
 	inode->i_mode	 = adfs_atts2mode(sb, inode);
-	inode->i_mtime	 =
-	inode->i_atime	 =
-	inode->i_ctime	 = adfs_adfs2unix_time(inode);
+	inode->i_mtime.tv_sec	 =
+	inode->i_atime.tv_sec	 =
+	inode->i_ctime.tv_sec	 = adfs_adfs2unix_time(inode);
+	inode->i_mtime.tv_nsec = inode->i_ctime.tv_nsec = inode->i_atime.tv_nsec = 0;
 
 	if (S_ISDIR(inode->i_mode)) {
 		inode->i_op	= &adfs_dir_inode_operations;
@@ -327,7 +328,7 @@ adfs_notify_change(struct dentry *dentry, struct iattr *attr)
 
 	if (ia_valid & ATTR_MTIME) {
 		inode->i_mtime = attr->ia_mtime;
-		adfs_unix2adfs_time(inode, attr->ia_mtime);
+		adfs_unix2adfs_time(inode, attr->ia_mtime.tv_sec);
 	}
 	/*
 	 * FIXME: should we make these == to i_mtime since we don't

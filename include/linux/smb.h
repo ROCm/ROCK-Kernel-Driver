@@ -85,9 +85,9 @@ struct smb_fattr {
 	gid_t		f_gid;
 	dev_t		f_rdev;
 	loff_t		f_size;
-	time_t		f_atime;
-	time_t		f_mtime;
-	time_t		f_ctime;
+	struct timespec	f_atime;
+	struct timespec f_mtime;
+	struct timespec f_ctime;
 	unsigned long	f_blksize;
 	unsigned long	f_blocks;
 	int		f_unix;

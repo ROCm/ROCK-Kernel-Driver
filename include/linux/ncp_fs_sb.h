@@ -10,6 +10,7 @@
 
 #include <linux/types.h>
 #include <linux/ncp_mount.h>
+#include <linux/net.h>
 
 #ifdef __KERNEL__
 

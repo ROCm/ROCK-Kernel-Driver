@@ -752,7 +752,7 @@ int fat_new_dir(struct inode *dir, struct inode *parent, int is_vfat)
 		return PTR_ERR(bh);
 
 	/* zeroed out, so... */
-	fat_date_unix2dos(dir->i_mtime,&time,&date);
+	fat_date_unix2dos(dir->i_mtime.tv_sec,&time,&date);
 	de = (struct msdos_dir_entry*)&bh->b_data[0];
 	memcpy(de[0].name,MSDOS_DOT,MSDOS_NAME);
 	memcpy(de[1].name,MSDOS_DOTDOT,MSDOS_NAME);

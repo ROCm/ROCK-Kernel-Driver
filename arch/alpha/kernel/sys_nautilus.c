@@ -107,7 +107,6 @@ static void
 naut_sys_machine_check(unsigned long vector, unsigned long la_ptr,
 		       struct pt_regs *regs)
 {
-	printk("xtime %lx\n", CURRENT_TIME);
 	printk("PC %lx RA %lx\n", regs->pc, regs->r26);
 	irongate_pci_clr_err();
 }

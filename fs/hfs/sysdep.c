@@ -99,9 +99,9 @@ static int hfs_revalidate_dentry(struct dentry *dentry, int flags)
 	lock_kernel();
 	if (inode && 
 	    (diff = (hfs_to_utc(0) - HFS_I(inode)->tz_secondswest))) {
-		inode->i_ctime += diff;
-		inode->i_atime += diff;
-		inode->i_mtime += diff;
+		inode->i_ctime.tv_sec += diff;
+		inode->i_atime.tv_sec += diff;
+		inode->i_mtime.tv_sec += diff;
 		HFS_I(inode)->tz_secondswest += diff;
 	}
 	unlock_kernel();

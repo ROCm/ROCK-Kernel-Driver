@@ -122,7 +122,7 @@ int notify_change(struct dentry * dentry, struct iattr * attr)
 	struct inode *inode = dentry->d_inode;
 	mode_t mode = inode->i_mode;
 	int error;
-	time_t now = CURRENT_TIME;
+	struct timespec now = CURRENT_TIME;
 	unsigned int ia_valid = attr->ia_valid;
 
 	if (!inode)

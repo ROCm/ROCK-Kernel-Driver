@@ -212,7 +212,7 @@ xdr_encode_sattr(u32 *p, struct iattr *attr)
 	}
 	if (attr->ia_valid & ATTR_ATIME_SET) {
 		*p++ = xdr_two;
-		p = xdr_encode_time(p, attr->ia_atime);
+		p = xdr_encode_time(p, attr->ia_atime.tv_sec);
 	} else if (attr->ia_valid & ATTR_ATIME) {
 		*p++ = xdr_one;
 	} else {
@@ -220,7 +220,7 @@ xdr_encode_sattr(u32 *p, struct iattr *attr)
 	}
 	if (attr->ia_valid & ATTR_MTIME_SET) {
 		*p++ = xdr_two;
-		p = xdr_encode_time(p, attr->ia_mtime);
+		p = xdr_encode_time(p, attr->ia_mtime.tv_sec);
 	} else if (attr->ia_valid & ATTR_MTIME) {
 		*p++ = xdr_one;
 	} else {

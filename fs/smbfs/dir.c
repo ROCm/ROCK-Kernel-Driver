@@ -12,6 +12,7 @@
 #include <linux/kernel.h>
 #include <linux/smp_lock.h>
 #include <linux/ctype.h>
+#include <linux/net.h>
 
 #include <linux/smb_fs.h>
 #include <linux/smb_mount.h>
@@ -511,7 +512,7 @@ smb_create(struct inode *dir, struct dentry *dentry, int mode)
 
 	lock_kernel();
 	smb_invalid_dir_cache(dir);
-	error = smb_proc_create(dentry, 0, CURRENT_TIME, &fileid);
+	error = smb_proc_create(dentry, 0, get_seconds(), &fileid);
 	if (!error) {
 		if (server->opt.capabilities & SMB_CAP_UNIX) {
 			/* Set attributes for new file */

@@ -968,7 +968,6 @@ static int reiserfs_link (struct dentry * old_dentry, struct inode * dir, struct
     int windex ;
     struct reiserfs_transaction_handle th ;
     int jbegin_count = JOURNAL_PER_BALANCE_CNT * 3; 
-    time_t ctime;
 
     reiserfs_write_lock(dir->i_sb);
     if (inode->i_nlink >= REISERFS_LINK_MAX) {
@@ -995,8 +994,7 @@ static int reiserfs_link (struct dentry * old_dentry, struct inode * dir, struct
     }
 
     inode->i_nlink++;
-    ctime = CURRENT_TIME;
-    inode->i_ctime = ctime;
+    inode->i_ctime = CURRENT_TIME;
     reiserfs_update_sd (&th, inode);
 
     atomic_inc(&inode->i_count) ;
@@ -1069,8 +1067,6 @@ static int reiserfs_rename (struct inode * old_dir, struct dentry *old_dentry,
     struct reiserfs_transaction_handle th ;
     int jbegin_count ; 
     umode_t old_inode_mode;
-    time_t ctime;
-
 
     /* two balancings: old name removal, new name insertion or "save" link,
        stat data updates: old directory and new directory and maybe block
@@ -1238,7 +1234,7 @@ static int reiserfs_rename (struct inode * old_dir, struct dentry *old_dentry,
 
     mark_de_hidden (old_de.de_deh + old_de.de_entry_num);
     journal_mark_dirty (&th, old_dir->i_sb, old_de.de_bh);
-    old_dir->i_ctime = old_dir->i_mtime = CURRENT_TIME;
+    old_dir->i_ctime = old_dir->i_mtime = 
     new_dir->i_ctime = new_dir->i_mtime = CURRENT_TIME;
 
     if (new_dentry_inode) {
@@ -1248,8 +1244,7 @@ static int reiserfs_rename (struct inode * old_dir, struct dentry *old_dentry,
 	} else {
 	    new_dentry_inode->i_nlink--;
 	}
-	ctime = CURRENT_TIME;
-	new_dentry_inode->i_ctime = ctime;
+	new_dentry_inode->i_ctime = new_dir->i_ctime;
     }
 
     if (S_ISDIR(old_inode_mode)) {

@@ -475,18 +475,15 @@ linvfs_setattr(
 	}
 	if (ia_valid & ATTR_ATIME) {
 		vattr.va_mask |= AT_ATIME;
-		vattr.va_atime.tv_sec = attr->ia_atime;
-		vattr.va_atime.tv_nsec = 0;
+		vattr.va_atime = attr->ia_atime;
 	}
 	if (ia_valid & ATTR_MTIME) {
 		vattr.va_mask |= AT_MTIME;
-		vattr.va_mtime.tv_sec = attr->ia_mtime;
-		vattr.va_mtime.tv_nsec = 0;
+		vattr.va_mtime = attr->ia_mtime;
 	}
 	if (ia_valid & ATTR_CTIME) {
 		vattr.va_mask |= AT_CTIME;
-		vattr.va_ctime.tv_sec = attr->ia_ctime;
-		vattr.va_ctime.tv_nsec = 0;
+		vattr.va_ctime = attr->ia_ctime;
 	}
 	if (ia_valid & ATTR_MODE) {
 		vattr.va_mask |= AT_MODE;

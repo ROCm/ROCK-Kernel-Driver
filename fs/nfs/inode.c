@@ -693,10 +693,12 @@ __nfs_fhget(struct super_block *sb, struct nfs_fh *fh, struct nfs_fattr *fattr)
 
 		NFS_READTIME(inode) = fattr->timestamp;
 		NFS_CACHE_CTIME(inode) = fattr->ctime;
-		inode->i_ctime = nfs_time_to_secs(fattr->ctime);
-		inode->i_atime = new_atime;
+		inode->i_ctime.tv_sec = nfs_time_to_secs(fattr->ctime);
+		inode->i_ctime.tv_nsec = nfs_time_to_nsecs(fattr->ctime);
+		inode->i_atime.tv_sec = new_atime;
 		NFS_CACHE_MTIME(inode) = new_mtime;
-		inode->i_mtime = nfs_time_to_secs(new_mtime);
+		inode->i_mtime.tv_sec = nfs_time_to_secs(new_mtime);
+		inode->i_mtime.tv_nsec = nfs_time_to_nsecs(new_mtime);
 		NFS_MTIME_UPDATE(inode) = fattr->timestamp;
 		NFS_CACHE_ISIZE(inode) = new_size;
 		if (fattr->valid & NFS_ATTR_FATTR_V4)
@@ -991,7 +993,7 @@ __nfs_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
 {
 	__u64		new_size, new_mtime;
 	loff_t		new_isize;
-	time_t		new_atime;
+	struct timespec	new_atime;
 	int		invalid = 0;
 
 	dfprintk(VFS, "NFS: refresh_inode(%s/%ld ct=%d info=0x%x)\n",
@@ -1019,7 +1021,8 @@ __nfs_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
 	new_size = fattr->size;
  	new_isize = nfs_size_to_loff_t(fattr->size);
 
-	new_atime = nfs_time_to_secs(fattr->atime);
+	new_atime.tv_sec = nfs_time_to_secs(fattr->atime);
+	new_atime.tv_nsec = nfs_time_to_nsecs(fattr->atime);
 	/* Avoid races */
 	if (nfs_fattr_obsolete(inode, fattr))
 		goto out_nochange;
@@ -1084,7 +1087,8 @@ __nfs_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
 		new_isize = inode->i_size;
 
 	NFS_CACHE_CTIME(inode) = fattr->ctime;
-	inode->i_ctime = nfs_time_to_secs(fattr->ctime);
+	inode->i_ctime.tv_sec = nfs_time_to_secs(fattr->ctime);
+	inode->i_ctime.tv_nsec = nfs_time_to_nsecs(fattr->ctime);
 
 	inode->i_atime = new_atime;
 
@@ -1092,7 +1096,8 @@ __nfs_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
 		if (invalid)
 			NFS_MTIME_UPDATE(inode) = fattr->timestamp;
 		NFS_CACHE_MTIME(inode) = new_mtime;
-		inode->i_mtime = nfs_time_to_secs(new_mtime);
+		inode->i_mtime.tv_sec = nfs_time_to_secs(new_mtime);
+		inode->i_mtime.tv_nsec = nfs_time_to_nsecs(new_mtime);
 	}
 
 	NFS_CACHE_ISIZE(inode) = new_size;
@@ -1141,7 +1146,7 @@ __nfs_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
 
 	return 0;
  out_nochange:
-	if (new_atime - inode->i_atime > 0)
+	if (!timespec_equal(&new_atime, &inode->i_atime))
 		inode->i_atime = new_atime;
 	return 0;
  out_changed:

@@ -14,6 +14,7 @@
 #include <linux/version.h>
 #include <linux/slab.h>
 #include <linux/buffer_head.h>
+#include <linux/string.h>
 
 #include "befs.h"
 #include "datastream.h"

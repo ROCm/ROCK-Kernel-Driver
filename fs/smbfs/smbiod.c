@@ -19,6 +19,7 @@
 #include <linux/dcache.h>
 #include <linux/smp_lock.h>
 #include <linux/module.h>
+#include <linux/net.h>
 #include <net/ip.h>
 
 #include <linux/smb_fs.h>

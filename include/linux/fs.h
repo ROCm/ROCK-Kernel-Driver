@@ -18,16 +18,13 @@
 #include <linux/dcache.h>
 #include <linux/stat.h>
 #include <linux/cache.h>
-#include <linux/stddef.h>
-#include <linux/string.h>
 #include <linux/radix-tree.h>
-#include <linux/bitops.h>
-
 #include <asm/atomic.h>
 
-struct poll_table_struct;
 struct iovec;
 struct nameidata;
+struct pipe_inode_info;
+struct poll_table_struct;
 struct vm_area_struct;
 struct vfsmount;
 
@@ -220,9 +217,6 @@ typedef int (get_blocks_t)(struct inode *inode, sector_t iblock,
 			unsigned long max_blocks,
 			struct buffer_head *bh_result, int create);
 
-#include <linux/pipe_fs_i.h>
-/* #include <linux/umsdos_fs_i.h> */
-
 /*
  * Attribute flags.  These should be or-ed together to figure out what
  * has been changed!
@@ -256,9 +250,9 @@ struct iattr {
 	uid_t		ia_uid;
 	gid_t		ia_gid;
 	loff_t		ia_size;
-	time_t		ia_atime;
-	time_t		ia_mtime;
-	time_t		ia_ctime;
+	struct timespec	ia_atime;
+	struct timespec	ia_mtime;
+	struct timespec	ia_ctime;
 	unsigned int	ia_attr_flags;
 };
 
@@ -375,9 +369,9 @@ struct inode {
 	gid_t			i_gid;
 	kdev_t			i_rdev;
 	loff_t			i_size;
-	time_t			i_atime;
-	time_t			i_mtime;
-	time_t			i_ctime;
+	struct timespec		i_atime;
+	struct timespec		i_mtime;
+	struct timespec		i_ctime;
 	unsigned int		i_blkbits;
 	unsigned long		i_blksize;
 	unsigned long		i_blocks;
@@ -415,8 +409,6 @@ struct inode {
 
 /* will die */
 #include <linux/coda_fs_i.h>
-#include <linux/ext3_fs_i.h>
-#include <linux/efs_fs_i.h>
 
 struct fown_struct {
 	rwlock_t lock;          /* protects pid, uid, euid fields */
@@ -587,7 +579,7 @@ extern void posix_block_lock(struct file_lock *, struct file_lock *);
 extern void posix_unblock_lock(struct file *, struct file_lock *);
 extern int posix_locks_deadlock(struct file_lock *, struct file_lock *);
 extern int __get_lease(struct inode *inode, unsigned int flags);
-extern time_t lease_get_mtime(struct inode *);
+extern void lease_get_mtime(struct inode *, struct timespec *time);
 extern int lock_may_read(struct inode *, loff_t start, unsigned long count);
 extern int lock_may_write(struct inode *, loff_t start, unsigned long count);
 
@@ -1328,6 +1320,8 @@ extern unsigned int real_root_dev;
 
 extern int inode_change_ok(struct inode *, struct iattr *);
 extern int inode_setattr(struct inode *, struct iattr *);
+
+extern void inode_update_time(struct inode *inode, int ctime_too);
 
 static inline ino_t parent_ino(struct dentry *dentry)
 {

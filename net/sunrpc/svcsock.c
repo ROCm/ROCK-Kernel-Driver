@@ -1109,7 +1109,7 @@ svc_recv(struct svc_serv *serv, struct svc_rqst *rqstp, long timeout)
 		 * 6 minutes
 		 *   http://www.connectathon.org/talks96/nfstcp.pdf 
 		 */
-		if (CURRENT_TIME - svsk->sk_lastrecv < 6*60
+		if (get_seconds() - svsk->sk_lastrecv < 6*60
 		    || test_bit(SK_BUSY, &svsk->sk_flags))
 			svsk = NULL;
 	}
@@ -1159,7 +1159,7 @@ svc_recv(struct svc_serv *serv, struct svc_rqst *rqstp, long timeout)
 		svc_sock_release(rqstp);
 		return -EAGAIN;
 	}
-	svsk->sk_lastrecv = CURRENT_TIME;
+	svsk->sk_lastrecv = get_seconds();
 	if (test_bit(SK_TEMP, &svsk->sk_flags)) {
 		/* push active sockets to end of list */
 		spin_lock_bh(&serv->sv_lock);
@@ -1246,7 +1246,7 @@ svc_setup_socket(struct svc_serv *serv, struct socket *sock,
 	svsk->sk_odata = inet->data_ready;
 	svsk->sk_owspace = inet->write_space;
 	svsk->sk_server = serv;
-	svsk->sk_lastrecv = CURRENT_TIME;
+	svsk->sk_lastrecv = get_seconds();
 	INIT_LIST_HEAD(&svsk->sk_deferred);
 	sema_init(&svsk->sk_sem, 1);
 
