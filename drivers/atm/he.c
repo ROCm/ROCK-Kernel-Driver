@@ -1007,6 +1007,7 @@ he_start(struct atm_dev *dev)
 {
 	struct he_dev *he_dev;
 	struct pci_dev *pci_dev;
+	unsigned long mbase;
 
 	u16 command;
 	u32 gen_cntl_0, host_cntl, lb_swap;
@@ -1019,8 +1020,8 @@ he_start(struct atm_dev *dev)
 	he_dev = HE_DEV(dev);
 	pci_dev = he_dev->pci_dev;
 
-	he_dev->membase = pci_dev->resource[0].start;
-	HPRINTK("membase = 0x%lx  irq = %d.\n", he_dev->membase, pci_dev->irq);
+	mbase = pci_dev->resource[0].start;
+	HPRINTK("membase = 0x%p  irq = %d.\n", he_dev->membase, pci_dev->irq);
 
 	/*
 	 * pci bus controller initialization 
@@ -1080,7 +1081,7 @@ he_start(struct atm_dev *dev)
 			hprintk("can't set latency timer to %d\n", timer);
 	}
 
-	if (!(he_dev->membase = (unsigned long) ioremap(he_dev->membase, HE_REGMAP_SIZE))) {
+	if (!(he_dev->membase = ioremap(mbase, HE_REGMAP_SIZE))) {
 		hprintk("can't set up page mapping\n");
 		return -EINVAL;
 	}

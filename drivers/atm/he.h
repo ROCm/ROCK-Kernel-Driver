@@ -265,7 +265,7 @@ struct he_cs_stper
 struct he_dev {
 	unsigned int number;
 	unsigned int irq;
-	unsigned long membase;
+	void __iomem *membase;
 
 	char prod_id[30];
 	char mac_addr[6];

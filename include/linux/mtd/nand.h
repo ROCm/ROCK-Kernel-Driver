@@ -269,8 +269,8 @@ typedef enum {
  */
  
 struct nand_chip {
-	unsigned long 	IO_ADDR_R;
-	unsigned long 	IO_ADDR_W;
+	void __iomem * 	IO_ADDR_R;
+	void __iomem * 	IO_ADDR_W;
 	
 	u_char		(*read_byte)(struct mtd_info *mtd);
 	void		(*write_byte)(struct mtd_info *mtd, u_char byte);

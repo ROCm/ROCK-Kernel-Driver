@@ -43,7 +43,7 @@ struct ctlr_info
 	char	firm_ver[4]; // Firmware version 
 	struct pci_dev *pdev;
 	__u32	board_id;
-	unsigned long vaddr;
+	void __iomem *vaddr;
 	unsigned long paddr;
 	unsigned long io_mem_addr;
 	unsigned long io_mem_length;

@@ -48,7 +48,7 @@ struct ichxrom_map_info {
 	char mtd_name[MTD_DEV_NAME_LENGTH];
 };
 
-static inline unsigned long addr(struct map_info *map, unsigned long ofs)
+static inline void __iomem * addr(struct map_info *map, unsigned long ofs)
 {
 	unsigned long offset;
 	offset = ((8*1024*1024) - map->size) + ofs;

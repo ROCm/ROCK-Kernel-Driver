@@ -106,10 +106,10 @@ static u_int32_t clocktab[] =
 
 
 #define NICSTAR_REG_WRITE(bs, reg, val) \
-	while ( readl(bs + STAT) & 0x0200 ) ; \
-	writel((val),(base)+(reg))
+	while ( readl((void __iomem *)bs + STAT) & 0x0200 ) ; \
+	writel((val),(void __iomem *)(base)+(reg))
 #define NICSTAR_REG_READ(bs, reg) \
-	readl((base)+(reg))
+	readl((void __iomem *)(base)+(reg))
 #define NICSTAR_REG_GENERAL_PURPOSE GP
 
 /*
@@ -162,7 +162,7 @@ nicstar_read_eprom_status( virt_addr_t base )
  */
  
 static u_int8_t 
-read_eprom_byte(u_int32_t base, u_int8_t offset)
+read_eprom_byte(void __iomem *base, u_int8_t offset)
 {
    u_int32_t val = 0;
    int i,j=0;

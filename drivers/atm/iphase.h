@@ -1006,8 +1006,8 @@ typedef struct iadev_t {
 	u32 *reass_reg;			/* base pointer to reassemble engine  
 						internal registers */  
 	u32 *ram;			/* base pointer to SAR RAM */  
-	unsigned int seg_ram;  
-	unsigned int reass_ram;  
+	void __iomem *seg_ram;
+	void __iomem *reass_ram;
 	struct dle_q tx_dle_q;  
 	struct free_desc_q *tx_free_desc_qhead;  
 	struct sk_buff_head tx_dma_q, tx_backlog;  
@@ -1019,7 +1019,7 @@ typedef struct iadev_t {
 	struct cpcs_trailer_desc *tx_buf;
         u16 num_tx_desc, tx_buf_sz, rate_limit;
         u32 tx_cell_cnt, tx_pkt_cnt;
-        u32 MAIN_VC_TABLE_ADDR, EXT_VC_TABLE_ADDR, ABR_SCHED_TABLE_ADDR;
+        void __iomem *MAIN_VC_TABLE_ADDR, *EXT_VC_TABLE_ADDR, *ABR_SCHED_TABLE_ADDR;
 	struct dle_q rx_dle_q;  
 	struct free_desc_q *rx_free_desc_qhead;  
 	struct sk_buff_head rx_dma_q;  

@@ -92,7 +92,7 @@ static int __init init_physmap(void)
 		return 0;
 	}
 
-	iounmap(physmap_map.virt);
+	iounmap((void *)physmap_map.virt);
 	return -ENXIO;
 }
 
@@ -112,7 +112,7 @@ static void __exit cleanup_physmap(void)
 #endif
 	map_destroy(mymtd);
 
-	iounmap(physmap_map.virt);
+	iounmap((void *)physmap_map.virt);
 	physmap_map.virt = 0;
 }
 

@@ -165,9 +165,9 @@ waitfor_idle(struct idt77252_dev *card)
 {
 	u32 stat;
 
-	stat = readl(SAR_REG_STAT);
+	stat = readl((void __iomem *)SAR_REG_STAT);
 	while (stat & SAR_STAT_CMDBZ)
-		stat = readl(SAR_REG_STAT);
+		stat = readl((void __iomem *)SAR_REG_STAT);
 }
 
 static u32
@@ -177,9 +177,9 @@ read_sram(struct idt77252_dev *card, unsigned long addr)
 	u32 value;
 
 	spin_lock_irqsave(&card->cmd_lock, flags);
-	writel(SAR_CMD_READ_SRAM | (addr << 2), SAR_REG_CMD);
+	writel(SAR_CMD_READ_SRAM | (addr << 2), (void __iomem *)SAR_REG_CMD);
 	waitfor_idle(card);
-	value = readl(SAR_REG_DR0);
+	value = readl((void __iomem *)SAR_REG_DR0);
 	spin_unlock_irqrestore(&card->cmd_lock, flags);
 	return value;
 }
@@ -199,8 +199,8 @@ write_sram(struct idt77252_dev *card, unsigned long addr, u32 value)
 	}
 
 	spin_lock_irqsave(&card->cmd_lock, flags);
-	writel(value, SAR_REG_DR0);
-	writel(SAR_CMD_WRITE_SRAM | (addr << 2), SAR_REG_CMD);
+	writel(value, (void __iomem *)SAR_REG_DR0);
+	writel(SAR_CMD_WRITE_SRAM | (addr << 2), (void __iomem *)SAR_REG_CMD);
 	waitfor_idle(card);
 	spin_unlock_irqrestore(&card->cmd_lock, flags);
 }
@@ -218,9 +218,9 @@ read_utility(void *dev, unsigned long ubus_addr)
 	}
 
 	spin_lock_irqsave(&card->cmd_lock, flags);
-	writel(SAR_CMD_READ_UTILITY + ubus_addr, SAR_REG_CMD);
+	writel(SAR_CMD_READ_UTILITY + ubus_addr, (void __iomem *)SAR_REG_CMD);
 	waitfor_idle(card);
-	value = readl(SAR_REG_DR0);
+	value = readl((void __iomem *)SAR_REG_DR0);
 	spin_unlock_irqrestore(&card->cmd_lock, flags);
 	return value;
 }
@@ -237,8 +237,8 @@ write_utility(void *dev, unsigned long ubus_addr, u8 value)
 	}
 
 	spin_lock_irqsave(&card->cmd_lock, flags);
-	writel((u32) value, SAR_REG_DR0);
-	writel(SAR_CMD_WRITE_UTILITY + ubus_addr, SAR_REG_CMD);
+	writel((u32) value, (void __iomem *)SAR_REG_DR0);
+	writel(SAR_CMD_WRITE_UTILITY + ubus_addr, (void __iomem *)SAR_REG_CMD);
 	waitfor_idle(card);
 	spin_unlock_irqrestore(&card->cmd_lock, flags);
 }
@@ -374,7 +374,7 @@ idt77252_write_gp(struct idt77252_dev *card, u32 value)
 
 	spin_lock_irqsave(&card->cmd_lock, flags);
 	waitfor_idle(card);
-	writel(value, SAR_REG_GP);
+	writel(value, (void __iomem *)SAR_REG_GP);
 	spin_unlock_irqrestore(&card->cmd_lock, flags);
 }
 
@@ -738,7 +738,7 @@ push_on_scq(struct idt77252_dev *card, struct vc_map *vc, struct sk_buff *skb)
 			if (vc->lacr < vc->init_er) {
 				vc->lacr = vc->init_er;
 				writel(TCMDQ_LACR | (vc->lacr << 16) |
-				       vc->index, SAR_REG_TCMDQ);
+				       vc->index, (void __iomem *)SAR_REG_TCMDQ);
 			}
 		}
 	}
@@ -767,7 +767,7 @@ push_on_scq(struct idt77252_dev *card, struct vc_map *vc, struct sk_buff *skb)
 
 	if (test_and_clear_bit(VCF_IDLE, &vc->flags)) {
 		writel(TCMDQ_START_LACR | (vc->lacr << 16) | vc->index,
-		       SAR_REG_TCMDQ);
+		       (void __iomem *)SAR_REG_TCMDQ);
 	}
 
 	TXPRINTK("%d entries in SCQ used (push).\n", atomic_read(&scq->used));
@@ -990,8 +990,8 @@ init_rsq(struct idt77252_dev *card)
 		rsqe->word_4 = 0;
 
 	writel((unsigned long) card->rsq.last - (unsigned long) card->rsq.base,
-	       SAR_REG_RSQH);
-	writel(card->rsq.paddr, SAR_REG_RSQB);
+	       (void __iomem *)SAR_REG_RSQH);
+	writel(card->rsq.paddr, (void __iomem *)SAR_REG_RSQB);
 
 	IPRINTK("%s: RSQ base at 0x%lx (0x%x).\n", card->name,
 		(unsigned long) card->rsq.base,
@@ -1242,7 +1242,7 @@ idt77252_rx(struct idt77252_dev *card)
 	} while (le32_to_cpu(rsqe->word_4) & SAR_RSQE_VALID);
 
 	writel((unsigned long) card->rsq.next - (unsigned long) card->rsq.base,
-	       SAR_REG_RSQH);
+	       (void __iomem *)SAR_REG_RSQH);
 }
 
 static void
@@ -1264,7 +1264,7 @@ idt77252_rx_raw(struct idt77252_dev *card)
 		return;
 
 	head = IDT77252_PRV_PADDR(queue) + (queue->data - queue->head - 16);
-	tail = readl(SAR_REG_RAWCT);
+	tail = readl((void __iomem *)SAR_REG_RAWCT);
 
 	pci_dma_sync_single(card->pcidev, IDT77252_PRV_PADDR(queue),
 			    queue->end - queue->head - 16, PCI_DMA_FROMDEVICE);
@@ -1399,9 +1399,9 @@ init_tsq(struct idt77252_dev *card)
 	for (tsqe = card->tsq.base; tsqe <= card->tsq.last; tsqe++)
 		tsqe->word_2 = cpu_to_le32(SAR_TSQE_INVALID);
 
-	writel(card->tsq.paddr, SAR_REG_TSQB);
+	writel(card->tsq.paddr, (void __iomem *)SAR_REG_TSQB);
 	writel((unsigned long) card->tsq.next - (unsigned long) card->tsq.base,
-	       SAR_REG_TSQH);
+	       (void __iomem *)SAR_REG_TSQH);
 
 	return 0;
 }
@@ -1532,11 +1532,11 @@ idt77252_tx(struct idt77252_dev *card)
 	} while (!(stat & SAR_TSQE_INVALID));
 
 	writel((unsigned long)card->tsq.next - (unsigned long)card->tsq.base,
-	       SAR_REG_TSQH);
+	       (void __iomem *)SAR_REG_TSQH);
 
 	XPRINTK("idt77252_tx-after writel%d: TSQ head = 0x%x, tail = 0x%x, next = 0x%p.\n",
-		card->index, readl(SAR_REG_TSQH),
-		readl(SAR_REG_TSQT), card->tsq.next);
+		card->index, readl((void __iomem *)SAR_REG_TSQH),
+		readl((void __iomem *)SAR_REG_TSQT), card->tsq.next);
 }
 
 
@@ -1557,7 +1557,7 @@ tst_timer(unsigned long data)
 	if (test_bit(TST_SWITCH_WAIT, &card->tst_state)) {
 		jump = base + card->tst_size - 2;
 
-		pc = readl(SAR_REG_NOW) >> 2;
+		pc = readl((void __iomem *)SAR_REG_NOW) >> 2;
 		if ((pc ^ idle) & ~(card->tst_size - 1)) {
 			mod_timer(&card->tst_timer, jiffies + 1);
 			goto out;
@@ -1799,13 +1799,13 @@ set_tct(struct idt77252_dev *card, struct vc_map *vc)
 static __inline__ int
 idt77252_fbq_level(struct idt77252_dev *card, int queue)
 {
-	return (readl(SAR_REG_STAT) >> (16 + (queue << 2))) & 0x0f;
+	return (readl((void __iomem *)SAR_REG_STAT) >> (16 + (queue << 2))) & 0x0f;
 }
 
 static __inline__ int
 idt77252_fbq_full(struct idt77252_dev *card, int queue)
 {
-	return (readl(SAR_REG_STAT) >> (16 + (queue << 2))) == 0x0f;
+	return (readl((void __iomem *)SAR_REG_STAT) >> (16 + (queue << 2))) == 0x0f;
 }
 
 static int
@@ -2124,7 +2124,7 @@ idt77252_est_timer(unsigned long data)
 
 	if (lacr != vc->lacr) {
 		vc->lacr = lacr;
-		writel(TCMDQ_LACR|(vc->lacr << 16)|vc->index, SAR_REG_TCMDQ);
+		writel(TCMDQ_LACR|(vc->lacr << 16)|vc->index, (void __iomem *)SAR_REG_TCMDQ);
 	}
 
 	est->timer.expires = jiffies + ((HZ / 4) << est->interval);
@@ -2320,7 +2320,7 @@ idt77252_init_tx(struct idt77252_dev *card, struct vc_map *vc,
 			}
 
 			clear_bit(VCF_IDLE, &vc->flags);
-			writel(TCMDQ_START | vc->index, SAR_REG_TCMDQ);
+			writel(TCMDQ_START | vc->index, (void __iomem *)SAR_REG_TCMDQ);
 			break;
 
 		case SCHED_UBR:
@@ -2397,7 +2397,7 @@ idt77252_init_rx(struct idt77252_dev *card, struct vc_map *vc,
 	write_sram(card, addr, rcte);
 
 	spin_lock_irqsave(&card->cmd_lock, flags);
-	writel(SAR_CMD_OPEN_CONNECTION | (addr << 2), SAR_REG_CMD);
+	writel(SAR_CMD_OPEN_CONNECTION | (addr << 2), (void __iomem *)SAR_REG_CMD);
 	waitfor_idle(card);
 	spin_unlock_irqrestore(&card->cmd_lock, flags);
 
@@ -2538,7 +2538,7 @@ idt77252_close(struct atm_vcc *vcc)
 		addr = card->rct_base + vc->index * SAR_SRAM_RCT_SIZE;
 
 		spin_lock_irqsave(&card->cmd_lock, flags);
-		writel(SAR_CMD_CLOSE_CONNECTION | (addr << 2), SAR_REG_CMD);
+		writel(SAR_CMD_CLOSE_CONNECTION | (addr << 2), (void __iomem *)SAR_REG_CMD);
 		waitfor_idle(card);
 		spin_unlock_irqrestore(&card->cmd_lock, flags);
 
@@ -2576,7 +2576,7 @@ done:
 			printk("%s: SCQ drain timeout: %u used\n",
 			       card->name, atomic_read(&vc->scq->used));
 
-		writel(TCMDQ_HALT | vc->index, SAR_REG_TCMDQ);
+		writel(TCMDQ_HALT | vc->index, (void __iomem *)SAR_REG_TCMDQ);
 		clear_scd(card, vc->scq, vc->class);
 
 		if (vc->class == SCHED_CBR) {
@@ -2622,7 +2622,7 @@ idt77252_change_qos(struct atm_vcc *vcc, struct atm_qos *qos, int flags)
 
 				if (!test_bit(VCF_IDLE, &vc->flags)) {
 					writel(TCMDQ_LACR | (vc->lacr << 16) |
-					       vc->index, SAR_REG_TCMDQ);
+					       vc->index, (void __iomem *)SAR_REG_TCMDQ);
 				}
 				break;
 
@@ -2729,9 +2729,9 @@ idt77252_collect_stat(struct idt77252_dev *card)
 {
 	u32 cdc, vpec, icc;
 
-	cdc = readl(SAR_REG_CDC);
-	vpec = readl(SAR_REG_VPEC);
-	icc = readl(SAR_REG_ICC);
+	cdc = readl((void __iomem *)SAR_REG_CDC);
+	vpec = readl((void __iomem *)SAR_REG_VPEC);
+	icc = readl((void __iomem *)SAR_REG_ICC);
 
 #ifdef	NOTDEF
 	printk("%s:", card->name);
@@ -2782,7 +2782,7 @@ idt77252_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
 	struct idt77252_dev *card = dev_id;
 	u32 stat;
 
-	stat = readl(SAR_REG_STAT) & 0xffff;
+	stat = readl((void __iomem *)SAR_REG_STAT) & 0xffff;
 	if (!stat)	/* no interrupt for us */
 		return IRQ_NONE;
 
@@ -2791,7 +2791,7 @@ idt77252_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
 		goto out;
 	}
 
-	writel(stat, SAR_REG_STAT);	/* reset interrupt */
+	writel(stat, (void __iomem *)SAR_REG_STAT);	/* reset interrupt */
 
 	if (stat & SAR_STAT_TSIF) {	/* entry written to TSQ  */
 		INTPRINTK("%s: TSIF\n", card->name);
@@ -2847,7 +2847,7 @@ idt77252_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
 	if (stat & (SAR_STAT_FBQ0A | SAR_STAT_FBQ1A |
 		    SAR_STAT_FBQ2A | SAR_STAT_FBQ3A)) {
 
-		writel(readl(SAR_REG_CFG) & ~(SAR_CFG_FBIE), SAR_REG_CFG);
+		writel(readl((void __iomem *)SAR_REG_CFG) & ~(SAR_CFG_FBIE), (void __iomem *)SAR_REG_CFG);
 
 		INTPRINTK("%s: FBQA: %04x\n", card->name, stat);
 
@@ -2876,7 +2876,7 @@ idt77252_softint(void *dev_id)
 	int done;
 
 	for (done = 1; ; done = 1) {
-		stat = readl(SAR_REG_STAT) >> 16;
+		stat = readl((void __iomem *)SAR_REG_STAT) >> 16;
 
 		if ((stat & 0x0f) < SAR_FBQ0_HIGH) {
 			add_rx_skb(card, 0, SAR_FB_SIZE_0, 32);
@@ -2905,7 +2905,7 @@ idt77252_softint(void *dev_id)
 			break;
 	}
 
-	writel(readl(SAR_REG_CFG) | SAR_CFG_FBIE, SAR_REG_CFG);
+	writel(readl((void __iomem *)SAR_REG_CFG) | SAR_CFG_FBIE, (void __iomem *)SAR_REG_CFG);
 }
 
 
@@ -2945,7 +2945,7 @@ open_card_oam(struct idt77252_dev *card)
 
 			spin_lock_irqsave(&card->cmd_lock, flags);
 			writel(SAR_CMD_OPEN_CONNECTION | (addr << 2),
-			       SAR_REG_CMD);
+			       (void __iomem *)SAR_REG_CMD);
 			waitfor_idle(card);
 			spin_unlock_irqrestore(&card->cmd_lock, flags);
 		}
@@ -2972,7 +2972,7 @@ close_card_oam(struct idt77252_dev *card)
 
 			spin_lock_irqsave(&card->cmd_lock, flags);
 			writel(SAR_CMD_CLOSE_CONNECTION | (addr << 2),
-			       SAR_REG_CMD);
+			       (void __iomem *)SAR_REG_CMD);
 			waitfor_idle(card);
 			spin_unlock_irqrestore(&card->cmd_lock, flags);
 
@@ -3023,7 +3023,7 @@ open_card_ubr0(struct idt77252_dev *card)
 	write_sram(card, card->tct_base + 7, TCT_FLAG_UBR);
 
 	clear_bit(VCF_IDLE, &vc->flags);
-	writel(TCMDQ_START | 0, SAR_REG_TCMDQ);
+	writel(TCMDQ_START | 0, (void __iomem *)SAR_REG_TCMDQ);
 	return 0;
 }
 
@@ -3055,7 +3055,7 @@ idt77252_dev_open(struct idt77252_dev *card)
 	conf |= SAR_CFG_VPECA;
 #endif
 
-	writel(readl(SAR_REG_CFG) | conf, SAR_REG_CFG);
+	writel(readl((void __iomem *)SAR_REG_CFG) | conf, (void __iomem *)SAR_REG_CFG);
 
 	if (open_card_oam(card)) {
 		printk("%s: Error initializing OAM.\n", card->name);
@@ -3091,7 +3091,7 @@ idt77252_dev_close(struct atm_dev *dev)
 	    SAR_CFG_TXSFI	/* interrupt on TSQ almost full  */
 	    ;
 
-	writel(readl(SAR_REG_CFG) & ~(conf), SAR_REG_CFG);
+	writel(readl((void __iomem *)SAR_REG_CFG) & ~(conf), (void __iomem *)SAR_REG_CFG);
 
 	DIPRINTK("%s: closed IDT77252 ABR SAR.\n", card->name);
 }
@@ -3116,7 +3116,7 @@ deinit_card(struct idt77252_dev *card)
 	}
 	DIPRINTK("idt77252: deinitialize card %u\n", card->index);
 
-	writel(0, SAR_REG_CFG);
+	writel(0, (void __iomem *)SAR_REG_CFG);
 
 	if (card->atmdev)
 		atm_dev_deregister(card->atmdev);
@@ -3164,7 +3164,7 @@ deinit_card(struct idt77252_dev *card)
 
 	for (i = 0; i < 4; i++) {
 		if (card->fbq[i])
-			iounmap((void *) card->fbq[i]);
+			iounmap((void __iomem *) card->fbq[i]);
 	}
 
 	if (card->membase)
@@ -3247,13 +3247,13 @@ init_sram(struct idt77252_dev *card)
 	}
 
 	writel((SAR_FBQ0_LOW << 28) | 0x00000000 | 0x00000000 |
-	       (SAR_FB_SIZE_0 / 48), SAR_REG_FBQS0);
+	       (SAR_FB_SIZE_0 / 48), (void __iomem *)SAR_REG_FBQS0);
 	writel((SAR_FBQ1_LOW << 28) | 0x00000000 | 0x00000000 |
-	       (SAR_FB_SIZE_1 / 48), SAR_REG_FBQS1);
+	       (SAR_FB_SIZE_1 / 48), (void __iomem *)SAR_REG_FBQS1);
 	writel((SAR_FBQ2_LOW << 28) | 0x00000000 | 0x00000000 |
-	       (SAR_FB_SIZE_2 / 48), SAR_REG_FBQS2);
+	       (SAR_FB_SIZE_2 / 48), (void __iomem *)SAR_REG_FBQS2);
 	writel((SAR_FBQ3_LOW << 28) | 0x00000000 | 0x00000000 |
-	       (SAR_FB_SIZE_3 / 48), SAR_REG_FBQS3);
+	       (SAR_FB_SIZE_3 / 48), (void __iomem *)SAR_REG_FBQS3);
 
 	/* Initialize rate table  */
 	for (i = 0; i < 256; i++) {
@@ -3289,7 +3289,7 @@ init_sram(struct idt77252_dev *card)
 #endif
 
 	IPRINTK("%s: initialize rate table ...\n", card->name);
-	writel(card->rt_base << 2, SAR_REG_RTBL);
+	writel(card->rt_base << 2, (void __iomem *)SAR_REG_RTBL);
 
 	/* Initialize TSTs */
 	IPRINTK("%s: initialize TST ...\n", card->name);
@@ -3309,16 +3309,16 @@ init_sram(struct idt77252_dev *card)
 	idt77252_sram_write_errors = 0;
 
 	card->tst_index = 0;
-	writel(card->tst[0] << 2, SAR_REG_TSTB);
+	writel(card->tst[0] << 2, (void __iomem *)SAR_REG_TSTB);
 
 	/* Initialize ABRSTD and Receive FIFO */
 	IPRINTK("%s: initialize ABRSTD ...\n", card->name);
 	writel(card->abrst_size | (card->abrst_base << 2),
-	       SAR_REG_ABRSTD);
+	       (void __iomem *)SAR_REG_ABRSTD);
 
 	IPRINTK("%s: initialize receive fifo ...\n", card->name);
 	writel(card->fifo_size | (card->fifo_base << 2),
-	       SAR_REG_RXFD);
+	       (void __iomem *)SAR_REG_RXFD);
 
 	IPRINTK("%s: SRAM initialization complete.\n", card->name);
 	return 0;
@@ -3382,9 +3382,9 @@ init_card(struct atm_dev *dev)
 		}
 	}
 	/* Reset Timer register */
-	if (readl(SAR_REG_STAT) & SAR_STAT_TMROF) {
+	if (readl((void __iomem *)SAR_REG_STAT) & SAR_STAT_TMROF) {
 		printk("%s: resetting timer overflow.\n", card->name);
-		writel(SAR_STAT_TMROF, SAR_REG_STAT);
+		writel(SAR_STAT_TMROF, (void __iomem *)SAR_REG_STAT);
 	}
 	IPRINTK("%s: Request IRQ ... ", card->name);
 	if (request_irq(pcidev->irq, idt77252_interrupt, SA_INTERRUPT|SA_SHIRQ,
@@ -3431,7 +3431,7 @@ init_card(struct atm_dev *dev)
 		break;
 	}
 
-	writel(readl(SAR_REG_CFG) | conf, SAR_REG_CFG);
+	writel(readl((void __iomem *)SAR_REG_CFG) | conf, (void __iomem *)SAR_REG_CFG);
 
 	if (init_sram(card) < 0)
 		return -1;
@@ -3464,10 +3464,10 @@ init_card(struct atm_dev *dev)
 	}
 
 	IPRINTK("%s: Setting VPI/VCI mask to zero.\n", card->name);
-	writel(0, SAR_REG_VPM);
+	writel(0, (void __iomem *)SAR_REG_VPM);
 
 	/* Little Endian Order   */
-	writel(0, SAR_REG_GP);
+	writel(0, (void __iomem *)SAR_REG_GP);
 
 	/* Initialize RAW Cell Handle Register  */
 	card->raw_cell_hnd = pci_alloc_consistent(card->pcidev, 2 * sizeof(u32),
@@ -3478,7 +3478,7 @@ init_card(struct atm_dev *dev)
 		return -1;
 	}
 	memset(card->raw_cell_hnd, 0, 2 * sizeof(u32));
-	writel(card->raw_cell_paddr, SAR_REG_RAWHND);
+	writel(card->raw_cell_paddr, (void __iomem *)SAR_REG_RAWHND);
 	IPRINTK("%s: raw cell handle is at 0x%p.\n", card->name,
 		card->raw_cell_hnd);
 
@@ -3591,7 +3591,7 @@ init_card(struct atm_dev *dev)
 	 */
 
 	/* Set Maximum Deficit Count for now. */
-	writel(0xffff, SAR_REG_MDFCT);
+	writel(0xffff, (void __iomem *)SAR_REG_MDFCT);
 
 	set_bit(IDT77252_BIT_INIT, &card->flags);
 
@@ -3640,9 +3640,9 @@ idt77252_preset(struct idt77252_dev *card)
 /*****************************************************************/
 
 	/* Software reset */
-	writel(SAR_CFG_SWRST, SAR_REG_CFG);
+	writel(SAR_CFG_SWRST, (void __iomem *)SAR_REG_CFG);
 	mdelay(1);
-	writel(0, SAR_REG_CFG);
+	writel(0, (void __iomem *)SAR_REG_CFG);
 
 	IPRINTK("%s: Software resetted.\n", card->name);
 	return 0;
@@ -3654,15 +3654,15 @@ probe_sram(struct idt77252_dev *card)
 {
 	u32 data, addr;
 
-	writel(0, SAR_REG_DR0);
-	writel(SAR_CMD_WRITE_SRAM | (0 << 2), SAR_REG_CMD);
+	writel(0, (void __iomem *)SAR_REG_DR0);
+	writel(SAR_CMD_WRITE_SRAM | (0 << 2), (void __iomem *)SAR_REG_CMD);
 
 	for (addr = 0x4000; addr < 0x80000; addr += 0x4000) {
-		writel(0xdeadbeef, SAR_REG_DR0);
-		writel(SAR_CMD_WRITE_SRAM | (addr << 2), SAR_REG_CMD);
+		writel(0xdeadbeef, (void __iomem *)SAR_REG_DR0);
+		writel(SAR_CMD_WRITE_SRAM | (addr << 2), (void __iomem *)SAR_REG_CMD);
 
-		writel(SAR_CMD_READ_SRAM | (0 << 2), SAR_REG_CMD);
-		data = readl(SAR_REG_DR0);
+		writel(SAR_CMD_READ_SRAM | (0 << 2), (void __iomem *)SAR_REG_CMD);
+		data = readl((void __iomem *)SAR_REG_DR0);
 
 		if (data != 0)
 			break;
@@ -3756,7 +3756,7 @@ idt77252_init_one(struct pci_dev *pcidev, const struct pci_device_id *id)
 	card->sramsize = probe_sram(card);
 
 	for (i = 0; i < 4; i++) {
-		card->fbq[i] = (unsigned long)
+		card->fbq[i] = 
 			    ioremap(srambase | 0x200000 | (i << 18), 4);
 		if (!card->fbq[i]) {
 			printk("%s: can't ioremap() FBQ%d\n", card->name, i);

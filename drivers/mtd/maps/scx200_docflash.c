@@ -180,7 +180,7 @@ int __init init_scx200_docflash(void)
 	simple_map_init(&scx200_docflash_map);
 
 	scx200_docflash_map.phys = docmem.start;
-	scx200_docflash_map.virt = (unsigned long)ioremap(docmem.start, scx200_docflash_map.size);
+	scx200_docflash_map.virt = ioremap(docmem.start, scx200_docflash_map.size);
 	if (!scx200_docflash_map.virt) {
 		printk(KERN_ERR NAME ": failed to ioremap the flash\n");
 		release_resource(&docmem);

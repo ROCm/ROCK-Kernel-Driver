@@ -49,7 +49,7 @@ always fail.  So we don't do it.  I just hope it doesn't break anything.
 #define WINDOW_LENGTH (1 << WINDOW_SHIFT)
 /* The bits for the offset into the window. */
 #define WINDOW_MASK (WINDOW_LENGTH-1)
-#define PAGE_IO 0x22
+#define PAGE_IO (void __iomem *)0x22
 #define PAGE_IO_SIZE 2
 
 static volatile int page_in_window = -1; // Current page in window.

@@ -84,7 +84,7 @@ separate MTD devices.
 // Globals
 
 static volatile int page_in_window = -1; // Current page in window.
-static unsigned long iomapadr;
+static void __iomem * iomapadr;
 static spinlock_t sbc_gxx_spin = SPIN_LOCK_UNLOCKED;
 
 /* partition_info gives details on the logical partitions that the split the 
@@ -195,7 +195,7 @@ static void cleanup_sbc_gxx(void)
 
 int __init init_sbc_gxx(void)
 {
-  	iomapadr = (unsigned long)ioremap(WINDOW_START, WINDOW_LENGTH);
+  	iomapadr = ioremap(WINDOW_START, WINDOW_LENGTH);
 	if (!iomapadr) {
 		printk( KERN_ERR"%s: failed to ioremap memory region\n",
 			sbc_gxx_map.name );

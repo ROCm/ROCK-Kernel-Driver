@@ -18,7 +18,7 @@
 #include <linux/mtd/partitions.h>
 
 
-#define WINDOW_ADDR 0xbf000000
+#define WINDOW_ADDR (void __iomem *)0xbf000000
 #define WINDOW_SIZE 0x00400000
 
 /* 

@@ -403,7 +403,7 @@ static int __init init_dnpc(void)
 	printk(KERN_NOTICE "DIL/Net %s flash: 0x%lx at 0x%lx\n", 
 		is_dnp ? "DNPC" : "ADNP", dnpc_map.size, dnpc_map.phys);
 
-	dnpc_map.virt = (unsigned long)ioremap_nocache(dnpc_map.phys, dnpc_map.size);
+	dnpc_map.virt = ioremap_nocache(dnpc_map.phys, dnpc_map.size);
 
 	dnpc_map_flash(dnpc_map.phys, dnpc_map.size);
 

@@ -1010,7 +1010,8 @@ static struct atm_dev *ia_boards = NULL;
 void desc_dbg(IADEV *iadev) {
 
   u_short tcq_wr_ptr, tcq_st_ptr, tcq_ed_ptr;
-  u32 tmp, i;
+  u32 i;
+  void __iomem *tmp;
   // regval = readl((u32)ia_cmds->maddr);
   tcq_wr_ptr =  readw(iadev->seg_reg+TCQ_WR_PTR);
   printk("B_tcq_wr = 0x%x desc = %d last desc = %d\n",
@@ -1024,7 +1025,7 @@ void desc_dbg(IADEV *iadev) {
   i = 0;
   while (tcq_st_ptr != tcq_ed_ptr) {
       tmp = iadev->seg_ram+tcq_st_ptr;
-      printk("TCQ slot %d desc = %d  Addr = 0x%x\n", i++, readw(tmp), tmp);
+      printk("TCQ slot %d desc = %d  Addr = %p\n", i++, readw(tmp), tmp);
       tcq_st_ptr += 2;
   }
   for(i=0; i <iadev->num_tx_desc; i++)
@@ -2034,26 +2035,26 @@ static int tx_init(struct atm_dev *dev)
 #if 1  /* for 1K VC board, CBR_PTR_BASE is 0 */
         writew(0,iadev->seg_reg+CBR_PTR_BASE);
 #else /* Charlie's logic is wrong ? */
-        tmp16 = (iadev->seg_ram+CBR_SCHED_TABLE*iadev->memSize)>>17;
+        tmp16 = (u_short) (iadev->seg_ram+CBR_SCHED_TABLE*iadev->memSize)>>17;
         IF_INIT(printk("cbr_ptr_base = 0x%x ", tmp16);)
         writew(tmp16,iadev->seg_reg+CBR_PTR_BASE);
 #endif
 
         IF_INIT(printk("value in register = 0x%x\n",
                                    readw(iadev->seg_reg+CBR_PTR_BASE));)
-        tmp16 = (CBR_SCHED_TABLE*iadev->memSize) >> 1;
+        tmp16 = (u_short) (CBR_SCHED_TABLE*iadev->memSize) >> 1;
         writew(tmp16, iadev->seg_reg+CBR_TAB_BEG);
         IF_INIT(printk("cbr_tab_beg = 0x%x in reg = 0x%x \n", tmp16,
                                         readw(iadev->seg_reg+CBR_TAB_BEG));)
         writew(tmp16, iadev->seg_reg+CBR_TAB_END+1); // CBR_PTR;
-        tmp16 = (CBR_SCHED_TABLE*iadev->memSize + iadev->num_vc*6 - 2) >> 1;
+        tmp16 = (u_short) (CBR_SCHED_TABLE*iadev->memSize + iadev->num_vc*6 - 2) >> 1;
         writew(tmp16, iadev->seg_reg+CBR_TAB_END);
-        IF_INIT(printk("iadev->seg_reg = 0x%x CBR_PTR_BASE = 0x%x\n",
+        IF_INIT(printk("iadev->seg_reg = 0x%p CBR_PTR_BASE = 0x%x\n",
                (u32)iadev->seg_reg, readw(iadev->seg_reg+CBR_PTR_BASE));)
         IF_INIT(printk("CBR_TAB_BEG = 0x%x, CBR_TAB_END = 0x%x, CBR_PTR = 0x%x\n",
           readw(iadev->seg_reg+CBR_TAB_BEG), readw(iadev->seg_reg+CBR_TAB_END),
           readw(iadev->seg_reg+CBR_TAB_END+1));)
-        tmp16 = (iadev->seg_ram+CBR_SCHED_TABLE*iadev->memSize);
+        tmp16 = (u_short) (iadev->seg_ram+CBR_SCHED_TABLE*iadev->memSize);
 
         /* Initialize the CBR Schedualing Table */
         memset((caddr_t)(iadev->seg_ram+CBR_SCHED_TABLE*iadev->memSize), 

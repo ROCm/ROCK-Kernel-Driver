@@ -62,7 +62,7 @@
 #define SCB2_WINDOW	0x00100000
 
 
-static void *scb2_ioaddr;
+static void __iomem *scb2_ioaddr;
 static struct mtd_info *scb2_mtd;
 struct map_info scb2_map = {
 	.name =      "SCB2 BIOS Flash",
@@ -163,7 +163,7 @@ scb2_flash_probe(struct pci_dev *dev, const struct pci_device_id *ent)
 	}
 
 	scb2_map.phys = SCB2_ADDR;
-	scb2_map.virt = (unsigned long)scb2_ioaddr;
+	scb2_map.virt = scb2_ioaddr;
 	scb2_map.size = SCB2_WINDOW;
 
 	simple_map_init(&scb2_map);
