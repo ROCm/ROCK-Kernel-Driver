@@ -149,19 +149,25 @@ smb_send(struct socket *ssocket, struct smb_hdr *smb_buffer,
 
 	temp_fs = get_fs();	/* we must turn off socket api parm checking */
 	set_fs(get_ds());
-	rc = sock_sendmsg(ssocket, &smb_msg, smb_buf_length + 4);
-	while((rc == -ENOSPC) || (rc == -EAGAIN)) {
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(HZ/2);
+	while(iov.iov_len > 0) {
 		rc = sock_sendmsg(ssocket, &smb_msg, smb_buf_length + 4);
+		if ((rc == -ENOSPC) || (rc == -EAGAIN)) {
+			set_current_state(TASK_INTERRUPTIBLE);
+			schedule_timeout(HZ/2);
+			continue;
+		}
+		if (rc < 0) 
+			break;
+		iov.iov_base += rc;
+		iov.iov_len -= rc;
 	}
 	set_fs(temp_fs);
 
 	if (rc < 0) {
-		cERROR(1,
-		       ("Error %d sending data on socket to server.", rc));
-	} else
+		cERROR(1,("Error %d sending data on socket to server.", rc));
+	} else {
 		rc = 0;
+	}
 
 	return rc;
 }
@@ -239,7 +245,7 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 		but we still give response a change to complete */
 		if(midQ->midState & MID_REQUEST_SUBMITTED) {
 			set_current_state(TASK_UNINTERRUPTIBLE);
-			timeout = schedule_timeout(2 * HZ);
+			timeout = sleep_on_timeout(&ses->server->response_q,2 * HZ);
 		}
 	} else { /* using normal timeout */
 		/* timeout = wait_event_interruptible_timeout(ses->server->response_q,
@@ -250,44 +256,38 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 		/* Can not allow user interrupts- wreaks havoc with performance */
 		if(midQ->midState & MID_REQUEST_SUBMITTED) {
 			set_current_state(TASK_UNINTERRUPTIBLE);
-			timeout = schedule_timeout(timeout);
+			timeout = sleep_on_timeout(&ses->server->response_q,timeout);
 		}
 	}
-	if (signal_pending(current)) {
-		if (midQ->resp_buf == NULL)
-			rc = -EINTR; /* BB are we supposed to return -ERESTARTSYS ? */
-		DeleteMidQEntry(midQ);
-		return rc; /* why bother returning an error if it succeeded */
-	} else {  /* BB spinlock protect this against races with demux thread */
-		spin_lock(&GlobalMid_Lock);
-		if (midQ->resp_buf) {
-			spin_unlock(&GlobalMid_Lock);
-			receive_len =
-			    be32_to_cpu(midQ->resp_buf->smb_buf_length);
-		} else {
-			cFYI(1,("No response buffer"));
-			if(midQ->midState == MID_REQUEST_SUBMITTED) {
-				if(ses->server->tcpStatus == CifsExiting)
-					rc = -EHOSTDOWN;
-				else {
-					ses->server->tcpStatus = CifsNeedReconnect;
-					midQ->midState = MID_RETRY_NEEDED;
-				}
+    
+	spin_lock(&GlobalMid_Lock);
+	if (midQ->resp_buf) {
+		spin_unlock(&GlobalMid_Lock);
+		receive_len = be32_to_cpu(midQ->resp_buf->smb_buf_length);
+	} else {
+		cERROR(1,("No response buffer"));
+		if(midQ->midState == MID_REQUEST_SUBMITTED) {
+			if(ses->server->tcpStatus == CifsExiting)
+				rc = -EHOSTDOWN;
+			else {
+				ses->server->tcpStatus = CifsNeedReconnect;
+				midQ->midState = MID_RETRY_NEEDED;
 			}
+		}
 
-			if (rc != -EHOSTDOWN) {
-				if(midQ->midState == MID_RETRY_NEEDED) {
-					rc = -EAGAIN;
-					cFYI(1,("marking request for retry"));
-				} else {
-					rc = -EIO;
-				}
+		if (rc != -EHOSTDOWN) {
+			if(midQ->midState == MID_RETRY_NEEDED) {
+				rc = -EAGAIN;
+				cFYI(1,("marking request for retry"));
+			} else {
+				rc = -EIO;
 			}
-			spin_unlock(&GlobalMid_Lock);
-			DeleteMidQEntry(midQ);
-			return rc;
 		}
+		spin_unlock(&GlobalMid_Lock);
+		DeleteMidQEntry(midQ);
+		return rc;
 	}
+  
 
 	if (receive_len > CIFS_MAX_MSGSIZE + MAX_CIFS_HDR_SIZE) {
 		cERROR(1,

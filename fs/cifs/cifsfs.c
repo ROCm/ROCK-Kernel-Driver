@@ -672,8 +672,10 @@ static int cifs_oplock_thread(void * dummyarg)
 				/* down(&inode->i_sem);*/
 				if (S_ISREG(inode->i_mode)) {
 					rc = filemap_fdatawrite(inode->i_mapping);
-					if(CIFS_I(inode)->clientCanCacheRead == 0)
+					if(CIFS_I(inode)->clientCanCacheRead == 0) {
+						filemap_fdatawait(inode->i_mapping);
 						invalidate_remote_inode(inode);
+					}
 				} else
 					rc = 0;
 				/* up(&inode->i_sem);*/
@@ -772,6 +774,6 @@ exit_cifs(void)
 MODULE_AUTHOR("Steve French <sfrench@us.ibm.com>");
 MODULE_LICENSE("GPL");		/* combination of LGPL + GPL source behaves as GPL */
 MODULE_DESCRIPTION
-    ("VFS to access servers complying with the SNIA CIFS Specification e.g. Samba and Windows");
+    ("VFS to access servers complying with the SNIA CIFS Specification e.g. Samba and Windows Revision: 1.11");
 module_init(init_cifs)
 module_exit(exit_cifs)
