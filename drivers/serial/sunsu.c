@@ -1309,7 +1309,7 @@ static int __init sunsu_kbd_ms_init(struct uart_sunsu_port *up, int channel)
 #ifdef CONFIG_SERIO
 	up->serio = serio = kmalloc(sizeof(struct serio), GFP_KERNEL);
 	if (serio) {
-		memset(serio, 0, sizeof(serio));
+		memset(serio, 0, sizeof(*serio));
 
 		serio->port_data = up;
 
