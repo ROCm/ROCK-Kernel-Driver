@@ -364,6 +364,47 @@
 #define _PC_SDR		_SA1111( 0x1028 )
 #define _PC_SSR		_SA1111( 0x102c )
 
+#define SA1111_GPIO	0x1000
+
+#define SA1111_GPIO_PADDR	(0x000)
+#define SA1111_GPIO_PADRR	(0x004)
+#define SA1111_GPIO_PADWR	(0x004)
+#define SA1111_GPIO_PASDR	(0x008)
+#define SA1111_GPIO_PASSR	(0x00c)
+#define SA1111_GPIO_PBDDR	(0x010)
+#define SA1111_GPIO_PBDRR	(0x014)
+#define SA1111_GPIO_PBDWR	(0x014)
+#define SA1111_GPIO_PBSDR	(0x018)
+#define SA1111_GPIO_PBSSR	(0x01c)
+#define SA1111_GPIO_PCDDR	(0x020)
+#define SA1111_GPIO_PCDRR	(0x024)
+#define SA1111_GPIO_PCDWR	(0x024)
+#define SA1111_GPIO_PCSDR	(0x028)
+#define SA1111_GPIO_PCSSR	(0x02c)
+
+#define GPIO_A0		(1 << 0)
+#define GPIO_A1		(1 << 1)
+#define GPIO_A2		(1 << 2)
+#define GPIO_A3		(1 << 3)
+
+#define GPIO_B0		(1 << 8)
+#define GPIO_B1		(1 << 9)
+#define GPIO_B2		(1 << 10)
+#define GPIO_B3		(1 << 11)
+#define GPIO_B4		(1 << 12)
+#define GPIO_B5		(1 << 13)
+#define GPIO_B6		(1 << 14)
+#define GPIO_B7		(1 << 15)
+
+#define GPIO_C0		(1 << 16)
+#define GPIO_C1		(1 << 17)
+#define GPIO_C2		(1 << 18)
+#define GPIO_C3		(1 << 19)
+#define GPIO_C4		(1 << 20)
+#define GPIO_C5		(1 << 21)
+#define GPIO_C6		(1 << 22)
+#define GPIO_C7		(1 << 23)
+
 #define PA_DDR		__CCREG(0x1000)
 #define PA_DRR		__CCREG(0x1004)
 #define PA_DWR		__CCREG(0x1004)
@@ -569,5 +610,9 @@ int sa1111_check_dma_bug(dma_addr_t addr);
 
 int sa1111_driver_register(struct sa1111_driver *);
 void sa1111_driver_unregister(struct sa1111_driver *);
+
+void sa1111_set_io_dir(struct sa1111_dev *sadev, unsigned int bits, unsigned int dir, unsigned int sleep_dir);
+void sa1111_set_io(struct sa1111_dev *sadev, unsigned int bits, unsigned int v);
+void sa1111_set_sleep_io(struct sa1111_dev *sadev, unsigned int bits, unsigned int v);
 
 #endif  /* _ASM_ARCH_SA1111 */
