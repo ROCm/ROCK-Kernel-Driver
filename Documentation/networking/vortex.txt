@@ -117,6 +117,12 @@ options=N1,N2,N3,...
   will force full-duplex 100base-TX, rather than allowing the usual
   autonegotiation.
 
+global_options=N
+
+  Sets the `options' parameter for all 3c59x NICs in the machine. 
+  Entries in the `options' array above will override any setting of
+  this.
+
 full_duplex=N1,N2,N3...
 
   Similar to bit 9 of 'options'.  Forces the corresponding card into
@@ -125,6 +131,11 @@ full_duplex=N1,N2,N3...
 
   In fact, please don't use this at all! You're better off getting
   autonegotiation working properly.
+
+global_full_duplex=N1
+
+  Sets full duplex mode for all 3c59x NICs in the machine.  Entries
+  in the `full_duplex' array above will override any setting of this.
 
 flow_ctrl=N1,N2,N3...
 
@@ -211,6 +222,12 @@ enable_wol=N1,N2,N3,...
   Becker's `ether-wake' application may be used to wake suspended
   machines.
 
+  Also enables the NIC's power management support.
+
+global_enable_wol=N
+
+  Sets enable_wol mode for all 3c59x NICs in the machine.  Entries in
+  the `enable_wol' array above will override any setting of this.
 
 Media selection
 ---------------
