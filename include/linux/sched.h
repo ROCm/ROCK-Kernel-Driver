@@ -600,7 +600,24 @@ struct task_struct {
 	struct key *process_keyring;	/* keyring private to this process (CLONE_THREAD) */
 	struct key *thread_keyring;	/* keyring private to this thread */
 #endif
-	unsigned short used_math;
+/*
+ * All archs should support atomic ops with
+ * 1 byte granularity.
+ */
+	unsigned char memdie;
+/*
+ * Must be changed atomically so it shouldn't be
+ * be a shareable bitflag.
+ */
+	unsigned char used_math;
+/*
+ * OOM kill score adjustment (bit shift).
+ * Cannot live together with used_math since
+ * used_math and oomkilladj can be changed at the
+ * same time, so they would race if they're in the
+ * same atomic block.
+ */
+	short oomkilladj;
 	char comm[16];
 /* file system info */
 	int link_count, total_link_count;
@@ -703,8 +720,7 @@ do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
 #define PF_DUMPCORE	0x00000200	/* dumped core */
 #define PF_SIGNALED	0x00000400	/* killed by a signal */
 #define PF_MEMALLOC	0x00000800	/* Allocating memory */
-#define PF_MEMDIE	0x00001000	/* Killed for out-of-memory */
-#define PF_FLUSHER	0x00002000	/* responsible for disk writeback */
+#define PF_FLUSHER	0x00001000	/* responsible for disk writeback */
 
 #define PF_FREEZE	0x00004000	/* this task should be frozen for suspend */
 #define PF_NOFREEZE	0x00008000	/* this thread should not be frozen */
