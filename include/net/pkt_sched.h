@@ -1,12 +1,6 @@
 #ifndef __NET_PKT_SCHED_H
 #define __NET_PKT_SCHED_H
 
-#define PSCHED_GETTIMEOFDAY	1
-#define PSCHED_JIFFIES 		2
-#define PSCHED_CPU 		3
-
-#define PSCHED_CLOCK_SOURCE	PSCHED_JIFFIES
-
 #include <linux/config.h>
 #include <linux/netdevice.h>
 #include <linux/types.h>
@@ -179,25 +173,19 @@ __cls_set_class(unsigned long *clp, unsigned long cl)
    The reason is that, when it is not the same thing as
    gettimeofday, it returns invalid timestamp, which is
    not updated, when net_bh is active.
-
-   So, use PSCHED_CLOCK_SOURCE = PSCHED_CPU on alpha and pentiums
-   with rtdsc. And PSCHED_JIFFIES on all other architectures, including [34]86
-   and pentiums without rtdsc.
-   You can use PSCHED_GETTIMEOFDAY on another architectures,
-   which have fast and precise clock source, but it is too expensive.
  */
 
 /* General note about internal clock.
 
    Any clock source returns time intervals, measured in units
-   close to 1usec. With source PSCHED_GETTIMEOFDAY it is precisely
+   close to 1usec. With source CONFIG_NET_SCH_CLK_GETTIMEOFDAY it is precisely
    microseconds, otherwise something close but different chosen to minimize
    arithmetic cost. Ratio usec/internal untis in form nominator/denominator
    may be read from /proc/net/psched.
  */
 
 
-#if PSCHED_CLOCK_SOURCE == PSCHED_GETTIMEOFDAY
+#ifdef CONFIG_NET_SCH_CLK_GETTIMEOFDAY
 
 typedef struct timeval	psched_time_t;
 typedef long		psched_tdiff_t;
@@ -206,12 +194,12 @@ typedef long		psched_tdiff_t;
 #define PSCHED_US2JIFFIE(usecs) (((usecs)+(1000000/HZ-1))/(1000000/HZ))
 #define PSCHED_JIFFIE2US(delay) ((delay)*(1000000/HZ))
 
-#else /* PSCHED_CLOCK_SOURCE != PSCHED_GETTIMEOFDAY */
+#else /* !CONFIG_NET_SCH_CLK_GETTIMEOFDAY */
 
 typedef u64	psched_time_t;
 typedef long	psched_tdiff_t;
 
-#if PSCHED_CLOCK_SOURCE == PSCHED_JIFFIES
+#ifdef CONFIG_NET_SCH_CLK_JIFFIES
 
 #if HZ < 96
 #define PSCHED_JSCALE 14
@@ -229,7 +217,8 @@ typedef long	psched_tdiff_t;
 #define PSCHED_US2JIFFIE(delay) (((delay)+(1<<PSCHED_JSCALE)-1)>>PSCHED_JSCALE)
 #define PSCHED_JIFFIE2US(delay) ((delay)<<PSCHED_JSCALE)
 
-#elif PSCHED_CLOCK_SOURCE == PSCHED_CPU
+#endif /* CONFIG_NET_SCH_CLK_JIFFIES */
+#ifdef CONFIG_NET_SCH_CLK_CPU
 #include <asm/timex.h>
 
 extern psched_tdiff_t psched_clock_per_hz;
@@ -252,11 +241,11 @@ do {									\
 #define PSCHED_US2JIFFIE(delay) (((delay)+psched_clock_per_hz-1)/psched_clock_per_hz)
 #define PSCHED_JIFFIE2US(delay) ((delay)*psched_clock_per_hz)
 
-#endif /* PSCHED_CLOCK_SOURCE == PSCHED_JIFFIES */
+#endif /* CONFIG_NET_SCH_CLK_CPU */
 
-#endif /* PSCHED_CLOCK_SOURCE == PSCHED_GETTIMEOFDAY */
+#endif /* !CONFIG_NET_SCH_CLK_GETTIMEOFDAY */
 
-#if PSCHED_CLOCK_SOURCE == PSCHED_GETTIMEOFDAY
+#ifdef CONFIG_NET_SCH_CLK_GETTIMEOFDAY
 #define PSCHED_TDIFF(tv1, tv2) \
 ({ \
 	   int __delta_sec = (tv1).tv_sec - (tv2).tv_sec; \
@@ -320,7 +309,7 @@ extern int psched_tod_diff(int delta_sec, int bound);
 
 #define	PSCHED_AUDIT_TDIFF(t) ({ if ((t) > 2000000) (t) = 2000000; })
 
-#else
+#else /* !CONFIG_NET_SCH_CLK_GETTIMEOFDAY */
 
 #define PSCHED_TDIFF(tv1, tv2) (long)((tv1) - (tv2))
 #define PSCHED_TDIFF_SAFE(tv1, tv2, bound) \
@@ -334,7 +323,7 @@ extern int psched_tod_diff(int delta_sec, int bound);
 #define PSCHED_IS_PASTPERFECT(t)	((t) == 0)
 #define	PSCHED_AUDIT_TDIFF(t)
 
-#endif
+#endif /* !CONFIG_NET_SCH_CLK_GETTIMEOFDAY */
 
 struct tcf_police
 {

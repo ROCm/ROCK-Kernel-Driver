@@ -856,8 +856,13 @@ static void htb_charge_class(struct htb_sched *q,struct htb_class *cl,
 			if (net_ratelimit())
 				printk(KERN_ERR "HTB: bad diff in charge, cl=%X diff=%lX now=%Lu then=%Lu j=%lu\n",
 				       cl->classid, diff,
+#ifdef CONFIG_NET_SCH_CLK_GETTIMEOFDAY
+				       q->now.tv_sec * 1000000ULL + q->now.tv_usec,
+				       cl->t_c.tv_sec * 1000000ULL + cl->t_c.tv_usec,
+#else
 				       (unsigned long long) q->now,
 				       (unsigned long long) cl->t_c,
+#endif
 				       q->jiffies);
 			diff = 1000;
 		}
@@ -927,8 +932,13 @@ static long htb_do_events(struct htb_sched *q,int level)
 			if (net_ratelimit())
 				printk(KERN_ERR "HTB: bad diff in events, cl=%X diff=%lX now=%Lu then=%Lu j=%lu\n",
 				       cl->classid, diff,
+#ifdef CONFIG_NET_SCH_CLK_GETTIMEOFDAY
+				       q->now.tv_sec * 1000000ULL + q->now.tv_usec,
+				       cl->t_c.tv_sec * 1000000ULL + cl->t_c.tv_usec,
+#else
 				       (unsigned long long) q->now,
 				       (unsigned long long) cl->t_c,
+#endif
 				       q->jiffies);
 			diff = 1000;
 		}

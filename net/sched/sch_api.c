@@ -1088,7 +1088,7 @@ static struct file_operations psched_fops = {
 };	
 #endif
 
-#if PSCHED_CLOCK_SOURCE == PSCHED_GETTIMEOFDAY
+#ifdef CONFIG_NET_SCH_CLK_GETTIMEOFDAY
 int psched_tod_diff(int delta_sec, int bound)
 {
 	int delta;
@@ -1103,7 +1103,7 @@ int psched_tod_diff(int delta_sec, int bound)
 EXPORT_SYMBOL(psched_tod_diff);
 #endif
 
-#if PSCHED_CLOCK_SOURCE == PSCHED_CPU
+#ifdef CONFIG_NET_SCH_CLK_CPU
 psched_tdiff_t psched_clock_per_hz;
 int psched_clock_scale;
 EXPORT_SYMBOL(psched_clock_per_hz);
@@ -1169,10 +1169,10 @@ static int __init pktsched_init(void)
 {
 	struct rtnetlink_link *link_p;
 
-#if PSCHED_CLOCK_SOURCE == PSCHED_CPU
+#ifdef CONFIG_NET_SCH_CLK_CPU
 	if (psched_calibrate_clock() < 0)
 		return -1;
-#elif PSCHED_CLOCK_SOURCE == PSCHED_JIFFIES
+#elif defined(CONFIG_NET_SCH_CLK_JIFFIES)
 	psched_tick_per_us = HZ<<PSCHED_JSCALE;
 	psched_us_per_tick = 1000000;
 #endif
