@@ -781,7 +781,8 @@ static void uhci_dec_fsbr(struct uhci_hcd *uhci, struct urb *urb)
 /*
  * Map status to standard result codes
  *
- * <status> is (td->status & 0xFE0000) [a.k.a. uhci_status_bits(td->status)]
+ * <status> is (td->status & 0xF60000) [a.k.a. uhci_status_bits(td->status)]
+ * Note: status does not include the TD_CTRL_NAK bit.
  * <dir_out> is True for output TDs and False for input TDs.
  */
 static int uhci_map_status(int status, int dir_out)
@@ -792,22 +793,18 @@ static int uhci_map_status(int status, int dir_out)
 		return -EPROTO;
 	if (status & TD_CTRL_CRCTIMEO) {		/* CRC/Timeout */
 		if (dir_out)
-			return -ETIMEDOUT;
+			return -EPROTO;
 		else
 			return -EILSEQ;
 	}
-	if (status & TD_CTRL_NAK)			/* NAK */
-		return -ETIMEDOUT;
 	if (status & TD_CTRL_BABBLE)			/* Babble */
 		return -EOVERFLOW;
 	if (status & TD_CTRL_DBUFERR)			/* Buffer error */
 		return -ENOSR;
 	if (status & TD_CTRL_STALLED)			/* Stalled */
 		return -EPIPE;
-	if (status & TD_CTRL_ACTIVE)			/* Active */
-		return 0;
-
-	return -EINVAL;
+	WARN_ON(status & TD_CTRL_ACTIVE);		/* Active */
+	return 0;
 }
 
 /*
@@ -832,7 +829,7 @@ static int uhci_submit_control(struct uhci_hcd *uhci, struct urb *urb, struct ur
 		status |= TD_CTRL_LS;
 
 	/*
-	 * Build the TD for the control request
+	 * Build the TD for the control request setup packet
 	 */
 	td = uhci_alloc_td(uhci, urb->dev);
 	if (!td)
@@ -990,13 +987,13 @@ static int uhci_result_control(struct uhci_hcd *uhci, struct urb *urb)
 
 	if (urbp->short_control_packet) {
 		tmp = head->prev;
-		goto status_phase;
+		goto status_stage;
 	}
 
 	tmp = head->next;
 	td = list_entry(tmp, struct uhci_td, list);
 
-	/* The first TD is the SETUP phase, check the status, but skip */
+	/* The first TD is the SETUP stage, check the status, but skip */
 	/*  the count */
 	status = uhci_status_bits(td_status(td));
 	if (status & TD_CTRL_ACTIVE)
@@ -1037,10 +1034,10 @@ static int uhci_result_control(struct uhci_hcd *uhci, struct urb *urb)
 		}
 	}
 
-status_phase:
+status_stage:
 	td = list_entry(tmp, struct uhci_td, list);
 
-	/* Control status phase */
+	/* Control status stage */
 	status = td_status(td);
 
 #ifdef I_HAVE_BUGGY_APC_BACKUPS
@@ -1053,10 +1050,11 @@ status_phase:
 		return 0;
 #endif
 
+	status = uhci_status_bits(status);
 	if (status & TD_CTRL_ACTIVE)
 		return -EINPROGRESS;
 
-	if (uhci_status_bits(status))
+	if (status)
 		goto td_error;
 
 	return 0;
@@ -1273,12 +1271,6 @@ static inline int uhci_submit_interrupt(struct uhci_hcd *uhci, struct urb *urb, 
 }
 
 /*
- * Bulk and interrupt use common result
- */
-#define uhci_result_bulk uhci_result_common
-#define uhci_result_interrupt uhci_result_common
-
-/*
  * Isochronous transfers
  */
 static int isochronous_find_limits(struct uhci_hcd *uhci, struct urb *urb, unsigned int *start, unsigned int *end)
@@ -1403,7 +1395,8 @@ static int uhci_result_isochronous(struct uhci_hcd *uhci, struct urb *urb)
 		urb->iso_frame_desc[i].actual_length = actlength;
 		urb->actual_length += actlength;
 
-		status = uhci_map_status(uhci_status_bits(td_status(td)), usb_pipeout(urb->pipe));
+		status = uhci_map_status(uhci_status_bits(td_status(td)),
+				usb_pipeout(urb->pipe));
 		urb->iso_frame_desc[i].status = status;
 		if (status) {
 			urb->error_count++;
@@ -1508,12 +1501,9 @@ static int uhci_urb_enqueue(struct usb_hcd *hcd, struct urb *urb, int mem_flags)
 		struct urb_priv *urbp = urb->hcpriv;
 
 		list_del_init(&urbp->urb_list);
-		spin_unlock_irqrestore(&uhci->urb_list_lock, flags);
-		uhci_destroy_urb_priv (uhci, urb);
-
-		return ret;
-	}
-	ret = 0;
+		uhci_destroy_urb_priv(uhci, urb);
+	} else
+		ret = 0;
 
 out:
 	spin_unlock_irqrestore(&uhci->urb_list_lock, flags);
@@ -1541,11 +1531,9 @@ static void uhci_transfer_result(struct uhci_hcd *uhci, struct urb *urb)
 	case PIPE_CONTROL:
 		ret = uhci_result_control(uhci, urb);
 		break;
-	case PIPE_INTERRUPT:
-		ret = uhci_result_interrupt(uhci, urb);
-		break;
 	case PIPE_BULK:
-		ret = uhci_result_bulk(uhci, urb);
+	case PIPE_INTERRUPT:
+		ret = uhci_result_common(uhci, urb);
 		break;
 	case PIPE_ISOCHRONOUS:
 		ret = uhci_result_isochronous(uhci, urb);
@@ -1649,10 +1637,12 @@ static int uhci_urb_dequeue(struct usb_hcd *hcd, struct urb *urb)
 {
 	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
 	unsigned long flags;
-	struct urb_priv *urbp = urb->hcpriv;
+	struct urb_priv *urbp;
 
 	spin_lock_irqsave(&uhci->urb_list_lock, flags);
-
+	urbp = urb->hcpriv;
+	if (!urbp)			/* URB was never linked! */
+		goto done;
 	list_del_init(&urbp->urb_list);
 
 	uhci_unlink_generic(uhci, urb);
@@ -1665,6 +1655,7 @@ static int uhci_urb_dequeue(struct usb_hcd *hcd, struct urb *urb)
 	list_add_tail(&urbp->urb_list, &uhci->urb_remove_list);
 
 	spin_unlock(&uhci->urb_remove_list_lock);
+done:
 	spin_unlock_irqrestore(&uhci->urb_list_lock, flags);
 	return 0;
 }
@@ -1861,17 +1852,12 @@ static void uhci_finish_completion(struct usb_hcd *hcd, struct pt_regs *regs)
 
 static void uhci_remove_pending_urbps(struct uhci_hcd *uhci)
 {
-	struct list_head *tmp, *head;
-
 	spin_lock(&uhci->urb_remove_list_lock);
-	head = &uhci->urb_remove_list;
-	tmp = head->next;
-	while (tmp != head) {
-		struct urb_priv *urbp = list_entry(tmp, struct urb_priv, urb_list);
+	spin_lock(&uhci->complete_list_lock);
 
-		tmp = tmp->next;
-		uhci_moveto_complete(uhci, urbp);
-	}
+	/* Splice the urb_remove_list onto the end of the complete_list */
+	list_splice_init(&uhci->urb_remove_list, uhci->complete_list.prev);
+	spin_unlock(&uhci->complete_list_lock);
 	spin_unlock(&uhci->urb_remove_list_lock);
 }
 
@@ -2471,9 +2457,16 @@ static int uhci_resume(struct usb_hcd *hcd)
 
 	pci_set_master(to_pci_dev(uhci_dev(uhci)));
 
-	if (uhci->state == UHCI_SUSPENDED)
+	if (uhci->state == UHCI_SUSPENDED) {
+
+		/*
+		 * Some systems clear the Interrupt Enable register during
+		 * PM suspend/resume, so reinitialize it.
+		 */
+		outw(USBINTR_TIMEOUT | USBINTR_RESUME | USBINTR_IOC |
+				USBINTR_SP, uhci->io_addr + USBINTR);
 		uhci->resume_detect = 1;
-	else {
+	} else {
 		reset_hc(uhci);
 		start_hc(uhci);
 	}

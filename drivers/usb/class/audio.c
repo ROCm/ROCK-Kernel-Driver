@@ -3,7 +3,7 @@
 /*
  *	audio.c  --  USB Audio Class driver
  *
- *	Copyright (C) 1999, 2000, 2001
+ *	Copyright (C) 1999, 2000, 2001, 2003, 2004
  *	    Alan Cox (alan@lxorguk.ukuu.org.uk)
  *	    Thomas Sailer (sailer@ife.ee.ethz.ch)
  *
@@ -101,6 +101,8 @@
  *              Fix SNDCTL_DSP_STEREO API violation
  * 2003-04-08:	Oliver Neukum (oliver@neukum.name):
  *		Setting a configuration is done by usbcore and must not be overridden
+ * 2004-02-27:  Workaround for broken synch descriptors
+ * 
  */
 
 /*
@@ -1542,12 +1544,13 @@ static int set_format_in(struct usb_audiodev *as)
 		    alts->endpoint[1].desc.bmAttributes != 0x01 ||
 		    alts->endpoint[1].desc.bSynchAddress != 0 ||
 		    alts->endpoint[1].desc.bEndpointAddress != (alts->endpoint[0].desc.bSynchAddress & 0x7f)) {
-			printk(KERN_ERR "usbaudio: device %d interface %d altsetting %d invalid synch pipe\n",
+			printk(KERN_WARNING "usbaudio: device %d interface %d altsetting %d claims adaptive in "
+			       "but has invalid synch pipe; treating as asynchronous in\n",
 			       dev->devnum, u->interface, fmt->altsetting);
-			return -1;
+		} else {
+			u->syncpipe = usb_sndisocpipe(dev, alts->endpoint[1].desc.bEndpointAddress & 0xf);
+			u->syncinterval = alts->endpoint[1].desc.bRefresh;
 		}
-		u->syncpipe = usb_sndisocpipe(dev, alts->endpoint[1].desc.bEndpointAddress & 0xf);
-		u->syncinterval = alts->endpoint[1].desc.bRefresh;
 	}
 	if (d->srate < fmt->sratelo)
 		d->srate = fmt->sratelo;
@@ -1637,12 +1640,13 @@ static int set_format_out(struct usb_audiodev *as)
 		    alts->endpoint[1].desc.bmAttributes != 0x01 ||
 		    alts->endpoint[1].desc.bSynchAddress != 0 ||
 		    alts->endpoint[1].desc.bEndpointAddress != (alts->endpoint[0].desc.bSynchAddress | 0x80)) {
-			printk(KERN_ERR "usbaudio: device %d interface %d altsetting %d invalid synch pipe\n",
+			printk(KERN_WARNING "usbaudio: device %d interface %d altsetting %d claims asynch out "
+			       "but has invalid synch pipe; treating as adaptive out\n",
 			       dev->devnum, u->interface, fmt->altsetting);
-			return -1;
+		} else {
+			u->syncpipe = usb_rcvisocpipe(dev, alts->endpoint[1].desc.bEndpointAddress & 0xf);
+			u->syncinterval = alts->endpoint[1].desc.bRefresh;
 		}
-		u->syncpipe = usb_rcvisocpipe(dev, alts->endpoint[1].desc.bEndpointAddress & 0xf);
-		u->syncinterval = alts->endpoint[1].desc.bRefresh;
 	}
 	if (d->srate < fmt->sratelo)
 		d->srate = fmt->sratelo;

@@ -783,14 +783,20 @@ void usb_disable_endpoint(struct usb_device *dev, unsigned int epaddr)
  */
 void usb_disable_interface(struct usb_device *dev, struct usb_interface *intf)
 {
-	struct usb_host_interface *hintf =
-			&intf->altsetting[intf->act_altsetting];
+	struct usb_host_interface *alt = intf->cur_altsetting;
 	int i;
 
-	for (i = 0; i < hintf->desc.bNumEndpoints; ++i) {
+	for (i = 0; i < alt->desc.bNumEndpoints; ++i) {
 		usb_disable_endpoint(dev,
-				hintf->endpoint[i].desc.bEndpointAddress);
+				alt->endpoint[i].desc.bEndpointAddress);
 	}
+}
+
+static void release_interface(struct device *dev)
+{
+	struct usb_interface *interface = to_usb_interface(dev);
+
+	complete(interface->released);
 }
 
 /*
@@ -822,12 +828,16 @@ void usb_disable_device(struct usb_device *dev, int skip_ep0)
 	if (dev->actconfig) {
 		for (i = 0; i < dev->actconfig->desc.bNumInterfaces; i++) {
 			struct usb_interface	*interface;
+			struct completion	intf_completion;
 
 			/* remove this interface */
 			interface = dev->actconfig->interface[i];
 			dev_dbg (&dev->dev, "unregistering interface %s\n",
 				interface->dev.bus_id);
-			device_del(&interface->dev);
+			init_completion (&intf_completion);
+			interface->released = &intf_completion;
+			device_unregister (&interface->dev);
+			wait_for_completion (&intf_completion);
 		}
 		dev->actconfig = 0;
 		if (dev->state == USB_STATE_CONFIGURED)
@@ -876,12 +886,11 @@ void usb_enable_endpoint(struct usb_device *dev,
 void usb_enable_interface(struct usb_device *dev,
 		struct usb_interface *intf)
 {
-	struct usb_host_interface *hintf =
-			&intf->altsetting[intf->act_altsetting];
+	struct usb_host_interface *alt = intf->cur_altsetting;
 	int i;
 
-	for (i = 0; i < hintf->desc.bNumEndpoints; ++i)
-		usb_enable_endpoint(dev, &hintf->endpoint[i].desc);
+	for (i = 0; i < alt->desc.bNumEndpoints; ++i)
+		usb_enable_endpoint(dev, &alt->endpoint[i].desc);
 }
 
 /**
@@ -920,6 +929,7 @@ void usb_enable_interface(struct usb_device *dev,
 int usb_set_interface(struct usb_device *dev, int interface, int alternate)
 {
 	struct usb_interface *iface;
+	struct usb_host_interface *alt;
 	int ret;
 	int manual = 0;
 
@@ -929,14 +939,15 @@ int usb_set_interface(struct usb_device *dev, int interface, int alternate)
 		return -EINVAL;
 	}
 
-	if (alternate < 0 || alternate >= iface->num_altsetting)
+	alt = usb_altnum_to_altsetting(iface, alternate);
+	if (!alt) {
+		warn("selecting invalid altsetting %d", alternate);
 		return -EINVAL;
+	}
 
 	ret = usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
 				   USB_REQ_SET_INTERFACE, USB_RECIP_INTERFACE,
-				   iface->altsetting[alternate]
-				   	.desc.bAlternateSetting,
-				   interface, NULL, 0, HZ * 5);
+				   alternate, interface, NULL, 0, HZ * 5);
 
 	/* 9.4.10 says devices don't need this and are free to STALL the
 	 * request if the interface only has one alternate setting.
@@ -957,7 +968,7 @@ int usb_set_interface(struct usb_device *dev, int interface, int alternate)
 	/* prevent submissions using previous endpoint settings */
 	usb_disable_interface(dev, iface);
 
-	iface->act_altsetting = alternate;
+	iface->cur_altsetting = alt;
 
 	/* If the interface only has one altsetting and the device didn't
 	 * accept the request, we attempt to carry out the equivalent action
@@ -965,13 +976,11 @@ int usb_set_interface(struct usb_device *dev, int interface, int alternate)
 	 * new altsetting.
 	 */
 	if (manual) {
-		struct usb_host_interface *iface_as =
-				&iface->altsetting[alternate];
 		int i;
 
-		for (i = 0; i < iface_as->desc.bNumEndpoints; i++) {
+		for (i = 0; i < alt->desc.bNumEndpoints; i++) {
 			unsigned int epaddr =
-				iface_as->endpoint[i].desc.bEndpointAddress;
+				alt->endpoint[i].desc.bEndpointAddress;
 			unsigned int pipe =
 	__create_pipe(dev, USB_ENDPOINT_NUMBER_MASK & epaddr)
 	| (usb_endpoint_out(epaddr) ? USB_DIR_OUT : USB_DIR_IN);
@@ -1045,8 +1054,19 @@ int usb_reset_configuration(struct usb_device *dev)
 	/* re-init hc/hcd interface/endpoint state */
 	for (i = 0; i < config->desc.bNumInterfaces; i++) {
 		struct usb_interface *intf = config->interface[i];
+		struct usb_host_interface *alt;
 
-		intf->act_altsetting = 0;
+		alt = usb_altnum_to_altsetting(intf, 0);
+
+		/* No altsetting 0?  We'll assume the first altsetting.
+		 * We could use a GetInterface call, but if a device is
+		 * so non-compliant that it doesn't have altsetting 0
+		 * then I wouldn't trust its reply anyway.
+		 */
+		if (!alt)
+			alt = &intf->altsetting[0];
+
+		intf->cur_altsetting = alt;
 		usb_enable_interface(dev, intf);
 	}
 	return 0;
@@ -1135,25 +1155,34 @@ int usb_set_configuration(struct usb_device *dev, int configuration)
 		 */
 		for (i = 0; i < cp->desc.bNumInterfaces; ++i) {
 			struct usb_interface *intf = cp->interface[i];
-			struct usb_interface_descriptor *desc;
+			struct usb_host_interface *alt;
 
-			intf->act_altsetting = 0;
-			desc = &intf->altsetting [0].desc;
+			alt = usb_altnum_to_altsetting(intf, 0);
+
+			/* No altsetting 0?  We'll assume the first altsetting.
+			 * We could use a GetInterface call, but if a device is
+			 * so non-compliant that it doesn't have altsetting 0
+			 * then I wouldn't trust its reply anyway.
+			 */
+			if (!alt)
+				alt = &intf->altsetting[0];
+
+			intf->cur_altsetting = alt;
 			usb_enable_interface(dev, intf);
-
 			intf->dev.parent = &dev->dev;
 			intf->dev.driver = NULL;
 			intf->dev.bus = &usb_bus_type;
 			intf->dev.dma_mask = dev->dev.dma_mask;
+			intf->dev.release = release_interface;
 			sprintf (&intf->dev.bus_id[0], "%d-%s:%d.%d",
 				 dev->bus->busnum, dev->devpath,
 				 configuration,
-				 desc->bInterfaceNumber);
+				 alt->desc.bInterfaceNumber);
 			dev_dbg (&dev->dev,
 				"registering %s (config #%d, interface %d)\n",
 				intf->dev.bus_id, configuration,
-				desc->bInterfaceNumber);
-			device_add (&intf->dev);
+				alt->desc.bInterfaceNumber);
+			device_register (&intf->dev);
 			usb_create_driverfs_intf_files (intf);
 		}
 	}

@@ -166,13 +166,9 @@ void usb_create_driverfs_dev_files (struct usb_device *udev)
 static ssize_t								\
 show_##field (struct device *dev, char *buf)				\
 {									\
-	struct usb_interface *intf;					\
-	int alt;							\
+	struct usb_interface *intf = to_usb_interface (dev);		\
 									\
-	intf = to_usb_interface (dev);					\
-	alt = intf->act_altsetting;					\
-									\
-	return sprintf (buf, format_string, intf->altsetting[alt].desc.field); \
+	return sprintf (buf, format_string, intf->cur_altsetting->desc.field); \
 }									\
 static DEVICE_ATTR(field, S_IRUGO, show_##field, NULL);
 

@@ -72,14 +72,11 @@ struct usb_host_interface {
 
 /**
  * struct usb_interface - what usb device drivers talk to
- * @altsetting: array of interface descriptors, one for each alternate
+ * @altsetting: array of interface structures, one for each alternate
  * 	setting that may be selected.  Each one includes a set of
- * 	endpoint configurations and will be in numberic order,
- * 	0..num_altsetting.
+ * 	endpoint configurations.  They will be in no particular order.
  * @num_altsetting: number of altsettings defined.
- * @act_altsetting: index of current altsetting.  this number is always
- *	less than num_altsetting.  after the device is configured, each
- *	interface uses its default setting of zero.
+ * @cur_altsetting: the current altsetting.
  * @driver: the USB driver that is bound to this interface.
  * @minor: the minor number assigned to this interface, if this
  *	interface is bound to a driver that uses the USB major number.
@@ -89,6 +86,8 @@ struct usb_host_interface {
  *	number from the USB core by calling usb_register_dev().
  * @dev: driver model's view of this device
  * @class_dev: driver model's class view of this device.
+ * @released: wait for the interface to be released when changing
+ *	configurations.
  *
  * USB device drivers attach to interfaces on a physical device.  Each
  * interface encapsulates a single high level function, such as feeding
@@ -102,26 +101,33 @@ struct usb_host_interface {
  * calls such as dev_get_drvdata() on the dev member of this structure.
  *
  * Each interface may have alternate settings.  The initial configuration
- * of a device sets the first of these, but the device driver can change
+ * of a device sets altsetting 0, but the device driver can change
  * that setting using usb_set_interface().  Alternate settings are often
  * used to control the the use of periodic endpoints, such as by having
  * different endpoints use different amounts of reserved USB bandwidth.
  * All standards-conformant USB devices that use isochronous endpoints
  * will use them in non-default settings.
+ *
+ * The USB specification says that alternate setting numbers must run from
+ * 0 to one less than the total number of alternate settings.  But some
+ * devices manage to mess this up, and the structures aren't necessarily
+ * stored in numerical order anyhow.  Use usb_altnum_to_altsetting() to
+ * look up an alternate setting in the altsetting array based on its number.
  */
 struct usb_interface {
-	/* array of alternate settings for this interface.
-	 * these will be in numeric order, 0..num_altsettting
-	 */
+	/* array of alternate settings for this interface,
+	 * stored in no particular order */
 	struct usb_host_interface *altsetting;
 
-	unsigned act_altsetting;	/* active alternate setting */
+	struct usb_host_interface *cur_altsetting;	/* the currently
+					 * active alternate setting */
 	unsigned num_altsetting;	/* number of alternate settings */
 
 	struct usb_driver *driver;	/* driver */
 	int minor;			/* minor number this interface is bound to */
 	struct device dev;		/* interface specific device info */
 	struct class_device *class_dev;
+	struct completion *released;	/* wait for release */
 };
 #define	to_usb_interface(d) container_of(d, struct usb_interface, dev)
 #define	interface_to_usbdev(intf) \
@@ -140,19 +146,43 @@ static inline void usb_set_intfdata (struct usb_interface *intf, void *data)
 /* this maximum is arbitrary */
 #define USB_MAXINTERFACES	32
 
-/* USB_DT_CONFIG: Configuration descriptor information.
+/**
+ * struct usb_host_config - representation of a device's configuration
+ * @desc: the device's configuration descriptor.
+ * @interface: array of usb_interface structures, one for each interface
+ *	in the configuration.  The number of interfaces is stored in
+ *	desc.bNumInterfaces.
+ * @extra: pointer to buffer containing all extra descriptors associated
+ *	with this configuration (those preceding the first interface
+ *	descriptor).
+ * @extralen: length of the extra descriptors buffer.
  *
- * USB_DT_OTHER_SPEED_CONFIG is the same descriptor, except that the
- * descriptor type is different.  Highspeed-capable devices can look
- * different depending on what speed they're currently running.  Only
- * devices with a USB_DT_DEVICE_QUALIFIER have an OTHER_SPEED_CONFIG.
+ * USB devices may have multiple configurations, but only one can be active
+ * at any time.  Each encapsulates a different operational environment;
+ * for example, a dual-speed device would have separate configurations for
+ * full-speed and high-speed operation.  The number of configurations
+ * available is stored in the device descriptor as bNumConfigurations.
+ *
+ * A configuration can contain multiple interfaces.  Each corresponds to
+ * a different function of the USB device, and all are available whenever
+ * the configuration is active.  The USB standard says that interfaces
+ * are supposed to be numbered from 0 to desc.bNumInterfaces-1, but a lot
+ * of devices get this wrong.  In addition, the interface array is not
+ * guaranteed to be sorted in numerical order.  Use usb_ifnum_to_if() to
+ * look up an interface entry based on its number.
+ *
+ * Device drivers should not attempt to activate configurations.  The choice
+ * of which configuration to install is a policy decision based on such
+ * considerations as available power, functionality provided, and the user's
+ * desires (expressed through hotplug scripts).  However, drivers can call
+ * usb_reset_configuration() to reinitialize the current configuration and
+ * all its interfaces.
  */
 struct usb_host_config {
 	struct usb_config_descriptor	desc;
 
-	/* the interfaces associated with this configuration
-	 * these will be in numeric order, 0..desc.bNumInterfaces
-	 */
+	/* the interfaces associated with this configuration,
+	 * stored in no particular order */
 	struct usb_interface *interface[USB_MAXINTERFACES];
 
 	unsigned char *extra;   /* Extra descriptors */
@@ -294,8 +324,12 @@ extern void usb_driver_release_interface(struct usb_driver *driver,
 const struct usb_device_id *usb_match_id(struct usb_interface *interface,
 					 const struct usb_device_id *id);
 
-extern struct usb_interface *usb_find_interface(struct usb_driver *drv, int minor);
-extern struct usb_interface *usb_ifnum_to_if(struct usb_device *dev, unsigned ifnum);
+extern struct usb_interface *usb_find_interface(struct usb_driver *drv,
+		int minor);
+extern struct usb_interface *usb_ifnum_to_if(struct usb_device *dev,
+		unsigned ifnum);
+extern struct usb_host_interface *usb_altnum_to_altsetting(
+		struct usb_interface *intf, unsigned int altnum);
 
 
 /**

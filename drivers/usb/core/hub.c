@@ -560,7 +560,7 @@ static int hub_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	struct usb_hub *hub;
 	unsigned long flags;
 
-	desc = intf->altsetting + intf->act_altsetting;
+	desc = intf->cur_altsetting;
 	dev = interface_to_usbdev(intf);
 
 	/* Some hubs have a subclass of 1, which AFAICT according to the */
@@ -1344,15 +1344,15 @@ int usb_physical_reset_device(struct usb_device *dev)
 
 	for (i = 0; i < dev->actconfig->desc.bNumInterfaces; i++) {
 		struct usb_interface *intf = dev->actconfig->interface[i];
-		struct usb_interface_descriptor *as;
+		struct usb_interface_descriptor *desc;
 
-		as = &intf->altsetting[intf->act_altsetting].desc;
-		ret = usb_set_interface(dev, as->bInterfaceNumber,
-			as->bAlternateSetting);
+		desc = &intf->cur_altsetting->desc;
+		ret = usb_set_interface(dev, desc->bInterfaceNumber,
+			desc->bAlternateSetting);
 		if (ret < 0) {
 			err("failed to set active alternate setting "
 				"for dev %s interface %d (error=%d)",
-				dev->devpath, i, ret);
+				dev->devpath, desc->bInterfaceNumber, ret);
 			return ret;
 		}
 	}

@@ -1445,7 +1445,7 @@ static void hid_free_buffers(struct usb_device *dev, struct hid_device *hid)
 
 static struct hid_device *usb_hid_configure(struct usb_interface *intf)
 {
-	struct usb_host_interface *interface = intf->altsetting + intf->act_altsetting;
+	struct usb_host_interface *interface = intf->cur_altsetting;
 	struct usb_device *dev = interface_to_usbdev (intf);
 	struct hid_descriptor *hdesc;
 	struct hid_device *hid;

@@ -690,7 +690,7 @@ int usb_gadget_unregister_driver (struct usb_gadget_driver *driver);
 /**
  * struct usb_string - wraps a C string and its USB id
  * @id:the (nonzero) ID for this string
- * @s:the string, in ISO-8859/1 characters
+ * @s:the string, in UTF-8 encoding
  *
  * If you're using usb_gadget_get_string(), use this to wrap a string
  * together with its ID.
@@ -716,6 +716,17 @@ struct usb_gadget_strings {
 /* put descriptor for string with that id into buf (buflen >= 256) */
 int usb_gadget_get_string (struct usb_gadget_strings *table, int id, u8 *buf);
 
+/*-------------------------------------------------------------------------*/
+
+/* utility to simplify managing config descriptors */
+
+/* write vector of descriptors into buffer */
+int usb_descriptor_fillbuf(void *, unsigned,
+		const struct usb_descriptor_header **);
+
+/* build config descriptor from single descriptor vector */
+int usb_gadget_config_buf(const struct usb_config_descriptor *config,
+	void *buf, unsigned buflen, const struct usb_descriptor_header **desc);
 
 #endif  /* __KERNEL__ */
 

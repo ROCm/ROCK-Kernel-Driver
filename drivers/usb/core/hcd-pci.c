@@ -147,8 +147,12 @@ clean_2:
 	hcd->driver = driver;
 	hcd->description = driver->description;
 	hcd->self.bus_name = pci_name(dev);
+#ifdef CONFIG_PCI_NAMES
+	hcd->product_desc = dev->pretty_name;
+#else
 	if (hcd->product_desc == NULL)
 		hcd->product_desc = "USB Host Controller";
+#endif
 	hcd->self.controller = &dev->dev;
 
 	if ((retval = hcd_buffer_create (hcd)) != 0) {

@@ -607,6 +607,25 @@ fs_sink_desc = {
 	.wMaxPacketSize =	__constant_cpu_to_le16 (64),
 };
 
+static const struct usb_descriptor_header *fs_function [] = {
+#ifdef DEV_CONFIG_CDC
+	/* "cdc" mode descriptors */
+	(struct usb_descriptor_header *) &control_intf,
+	(struct usb_descriptor_header *) &header_desc,
+	(struct usb_descriptor_header *) &union_desc,
+	(struct usb_descriptor_header *) &ether_desc,
+#ifdef	EP_STATUS_NUM
+	(struct usb_descriptor_header *) &fs_status_desc,
+#endif
+	(struct usb_descriptor_header *) &data_nop_intf,
+#endif /* DEV_CONFIG_CDC */
+	/* minimalist core */
+	(struct usb_descriptor_header *) &data_intf,
+	(struct usb_descriptor_header *) &fs_source_desc,
+	(struct usb_descriptor_header *) &fs_sink_desc,
+	0,
+};
+
 #ifdef	HIGHSPEED
 
 /*
@@ -660,6 +679,25 @@ dev_qualifier = {
 	.bNumConfigurations =	1,
 };
 
+static const struct usb_descriptor_header *hs_function [] = {
+#ifdef DEV_CONFIG_CDC
+	/* "cdc" mode descriptors */
+	(struct usb_descriptor_header *) &control_intf,
+	(struct usb_descriptor_header *) &header_desc,
+	(struct usb_descriptor_header *) &union_desc,
+	(struct usb_descriptor_header *) &ether_desc,
+#ifdef	EP_STATUS_NUM
+	(struct usb_descriptor_header *) &hs_status_desc,
+#endif
+	(struct usb_descriptor_header *) &data_nop_intf,
+#endif /* DEV_CONFIG_CDC */
+	/* minimalist core */
+	(struct usb_descriptor_header *) &data_intf,
+	(struct usb_descriptor_header *) &hs_source_desc,
+	(struct usb_descriptor_header *) &hs_sink_desc,
+	0,
+};
+
 
 /* maxpacket and other transfer characteristics vary by speed. */
 #define ep_desc(g,hs,fs) (((g)->speed==USB_SPEED_HIGH)?(hs):(fs))
@@ -704,86 +742,25 @@ static struct usb_gadget_strings	stringtab = {
 static int
 config_buf (enum usb_device_speed speed, u8 *buf, u8 type, unsigned index)
 {
-	const unsigned	config_len = USB_DT_CONFIG_SIZE
-#ifdef DEV_CONFIG_CDC
-				+ 2 * USB_DT_INTERFACE_SIZE
-				+ sizeof header_desc
-				+ sizeof union_desc
-				+ sizeof ether_desc
-#ifdef	EP_STATUS_NUM
-				+ USB_DT_ENDPOINT_SIZE
-#endif
-#endif /* DEV_CONFIG_CDC */
-				+ USB_DT_INTERFACE_SIZE
-				+ 2 * USB_DT_ENDPOINT_SIZE;
-
+	int				len;
+	const struct usb_descriptor_header **function = fs_function;
 #ifdef HIGHSPEED
-	int		hs;
+	int				hs = (speed == USB_SPEED_HIGH);
+
+	if (type == USB_DT_OTHER_SPEED_CONFIG)
+		hs = !hs;
+	if (hs)
+		function = hs_function;
 #endif
+
 	/* a single configuration must always be index 0 */
 	if (index > 0)
 		return -EINVAL;
-	if (config_len > USB_BUFSIZ)
-		return -EDOM;
-
-	/* config (or other speed config) */
-	memcpy (buf, &eth_config, USB_DT_CONFIG_SIZE);
-	buf [1] = type;
-	((struct usb_config_descriptor *) buf)->wTotalLength
-		= __constant_cpu_to_le16 (config_len);
-	buf += USB_DT_CONFIG_SIZE;
-#ifdef	HIGHSPEED
-	hs = (speed == USB_SPEED_HIGH);
-	if (type == USB_DT_OTHER_SPEED_CONFIG)
-		hs = !hs;
-#endif
-
-#ifdef DEV_CONFIG_CDC
-	/* control interface, class descriptors, optional status endpoint */
-	memcpy (buf, &control_intf, USB_DT_INTERFACE_SIZE);
-	buf += USB_DT_INTERFACE_SIZE;
-
-	memcpy (buf, &header_desc, sizeof header_desc);
-	buf += sizeof header_desc;
-	memcpy (buf, &union_desc, sizeof union_desc);
-	buf += sizeof union_desc;
-	memcpy (buf, &ether_desc, sizeof ether_desc);
-	buf += sizeof ether_desc;
-
-#ifdef	EP_STATUS_NUM
-#ifdef	HIGHSPEED
-	if (hs)
-		memcpy (buf, &hs_status_desc, USB_DT_ENDPOINT_SIZE);
-	else
-#endif	/* HIGHSPEED */
-		memcpy (buf, &fs_status_desc, USB_DT_ENDPOINT_SIZE);
-	buf += USB_DT_ENDPOINT_SIZE;
-#endif	/* EP_STATUS_NUM */
-
-	/* default data altsetting has no endpoints */
-	memcpy (buf, &data_nop_intf, USB_DT_INTERFACE_SIZE);
-	buf += USB_DT_INTERFACE_SIZE;
-#endif /* DEV_CONFIG_CDC */
-
-	/* the "real" data interface has two endpoints */
-	memcpy (buf, &data_intf, USB_DT_INTERFACE_SIZE);
-	buf += USB_DT_INTERFACE_SIZE;
-#ifdef HIGHSPEED
-	if (hs) {
-		memcpy (buf, &hs_source_desc, USB_DT_ENDPOINT_SIZE);
-		buf += USB_DT_ENDPOINT_SIZE;
-		memcpy (buf, &hs_sink_desc, USB_DT_ENDPOINT_SIZE);
-		buf += USB_DT_ENDPOINT_SIZE;
-	} else
-#endif
-	{
-		memcpy (buf, &fs_source_desc, USB_DT_ENDPOINT_SIZE);
-		buf += USB_DT_ENDPOINT_SIZE;
-		memcpy (buf, &fs_sink_desc, USB_DT_ENDPOINT_SIZE);
-		buf += USB_DT_ENDPOINT_SIZE;
-	}
-
-	return config_len;
+	len = usb_gadget_config_buf (&eth_config, buf, USB_BUFSIZ, function);
+	if (len < 0)
+		return len;
+	((struct usb_config_descriptor *) buf)->bDescriptorType = type;
+	return len;
 }
 
 /*-------------------------------------------------------------------------*/
