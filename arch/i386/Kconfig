@@ -456,11 +456,6 @@ config NR_CPUS
 	  This is purely to save memory - each supported CPU adds
 	  approximately eight kilobytes to the kernel image.
 
-config CLUSTERED_APIC
-	bool
-	depends on X86_NUMAQ || X86_SUMMIT
-	default y
-
 # Common NUMA Features
 config NUMA
 	bool "Numa Memory Allocation Support"

@@ -10,6 +10,7 @@
 #endif
 
 #define no_balance_irq (0)
+#define esr_disable (0)
 
 #define APIC_BROADCAST_ID      0x0F
 #define check_apicid_used(bitmap, apicid) (bitmap & (1 << apicid))
@@ -53,6 +54,11 @@ static inline int multi_timer_check(int apic, int irq)
 	return 0;
 }
 
+static inline int apicid_to_node(int logical_apicid)
+{
+	return 0;
+}
+
 static inline int cpu_present_to_apicid(int mps_cpu)
 {
 	return  mps_cpu;
@@ -73,10 +79,13 @@ static inline int mpc_apic_id(struct mpc_config_processor *m, int quad)
 	return (m->mpc_apicid);
 }
 
-#define WAKE_SECONDARY_VIA_INIT
-
 static inline void setup_portio_remap(void)
 {
+}
+
+static inline int check_phys_apicid_present(int boot_cpu_physical_apicid)
+{
+	return test_bit(boot_cpu_physical_apicid, &phys_cpu_present_map);
 }
 
 #endif /* __ASM_MACH_APIC_H */

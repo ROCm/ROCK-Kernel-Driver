@@ -3,6 +3,8 @@
 
 extern int x86_summit;
 
+#define esr_disable (1)
+
 #define XAPIC_DEST_CPUS_MASK    0x0Fu
 #define XAPIC_DEST_CLUSTER_MASK 0xF0u
 
@@ -32,6 +34,11 @@ static inline void clustered_apic_check(void)
 		(x86_summit ? "Summit" : "Flat"), nr_ioapics);
 }
 
+static inline int apicid_to_node(int logical_apicid)
+{
+	return (logical_apicid >> 5);          /* 2 clusterids per CEC */
+}
+
 static inline int cpu_present_to_apicid(int mps_cpu)
 {
 	if (x86_summit)
@@ -54,10 +61,13 @@ static inline unsigned long apicid_to_phys_cpu_present(int apicid)
 		return (1ul << apicid);
 }
 
-#define WAKE_SECONDARY_VIA_INIT
-
 static inline void setup_portio_remap(void)
 {
+}
+
+static inline int check_phys_apicid_present(int boot_cpu_physical_apicid)
+{
+	return (1);
 }
 
 #endif /* __ASM_MACH_APIC_H */

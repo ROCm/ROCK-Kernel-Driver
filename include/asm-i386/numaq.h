@@ -28,8 +28,6 @@
 
 #ifdef CONFIG_X86_NUMAQ
 
-#include <asm/smpboot.h>
-
 /*
  * for now assume that 64Gb is max amount of RAM for whole system
  *    64Gb / 4096bytes/page = 16777216 pages
