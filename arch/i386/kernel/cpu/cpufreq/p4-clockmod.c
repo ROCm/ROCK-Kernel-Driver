@@ -1,5 +1,6 @@
 /*
  *	Pentium 4/Xeon CPU on demand clock modulation/speed scaling
+ *	(C) 2002 - 2003 Dominik Brodowski <linux@brodo.de>
  *	(C) 2002 Zwane Mwaikambo <zwane@commfireservices.com>
  *	(C) 2002 Arjan van de Ven <arjanv@redhat.com>
  *	(C) 2002 Tora T. Engstad
@@ -45,11 +46,10 @@ enum {
 #define DC_ENTRIES	8
 
 
-static int has_N44_O17_errata;
+static int has_N44_O17_errata[NR_CPUS];
 static int stock_freq;
-MODULE_PARM(stock_freq, "i");
 
-static struct cpufreq_driver *cpufreq_p4_driver;
+static struct cpufreq_driver p4clockmod_driver;
 
 
 static int cpufreq_p4_setdc(unsigned int cpu, unsigned int newstate)
@@ -107,17 +107,17 @@ static int cpufreq_p4_setdc(unsigned int cpu, unsigned int newstate)
 
 	rdmsr(MSR_IA32_THERM_STATUS, l, h);
 	if (l & 0x01)
-		printk(KERN_DEBUG PFX "CPU#%d currently thermal throttled\n", cpu);
+//		printk(KERN_DEBUG PFX "CPU#%d currently thermal throttled\n", cpu);
 
-	if (has_N44_O17_errata && (newstate == DC_25PT || newstate == DC_DFLT))
+	if (has_N44_O17_errata[cpu] && (newstate == DC_25PT || newstate == DC_DFLT))
 		newstate = DC_38PT;
 
 	rdmsr(MSR_IA32_THERM_CONTROL, l, h);
 	if (newstate == DC_DISABLE) {
-		printk(KERN_INFO PFX "CPU#%d disabling modulation\n", cpu);
+//		printk(KERN_INFO PFX "CPU#%d disabling modulation\n", cpu);
 		wrmsr(MSR_IA32_THERM_CONTROL, l & ~(1<<4), h);
 	} else {
-		printk(KERN_INFO PFX "CPU#%d setting duty cycle to %d%%\n", cpu, ((125 * newstate) / 10));
+//		printk(KERN_INFO PFX "CPU#%d setting duty cycle to %d%%\n", cpu, ((125 * newstate) / 10));
 		/* bits 63 - 5	: reserved 
 		 * bit  4	: enable/disable
 		 * bits 3-1	: duty cycle
@@ -155,14 +155,16 @@ static struct cpufreq_frequency_table p4clockmod_table[] = {
 };
 
 
-static int cpufreq_p4_setpolicy(struct cpufreq_policy *policy)
+static int cpufreq_p4_target(struct cpufreq_policy *policy,
+			     unsigned int target_freq,
+			     unsigned int relation)
 {
 	unsigned int    newstate = DC_RESV;
 
-	if (cpufreq_frequency_table_setpolicy(policy, &p4clockmod_table[0], &newstate))
+	if (cpufreq_frequency_table_target(policy, &p4clockmod_table[0], target_freq, relation, &newstate))
 		return -EINVAL;
 
-	cpufreq_p4_setdc(policy->cpu, newstate);
+	cpufreq_p4_setdc(policy->cpu, p4clockmod_table[newstate].index);
 
 	return 0;
 }
@@ -174,13 +176,76 @@ static int cpufreq_p4_verify(struct cpufreq_policy *policy)
 }
 
 
+static int cpufreq_p4_cpu_init(struct cpufreq_policy *policy)
+{
+	struct cpuinfo_x86 *c = &cpu_data[policy->cpu];
+	int cpuid = 0;
+	unsigned int i;
+
+	/* capability check */
+	if (c->x86_vendor != X86_VENDOR_INTEL)
+		return -ENODEV;
+	if (!test_bit(X86_FEATURE_ACPI, c->x86_capability) ||
+	    !test_bit(X86_FEATURE_ACC, c->x86_capability))
+		return -ENODEV;
+	
+	/* Errata workaround */
+	cpuid = (c->x86 << 8) | (c->x86_model << 4) | c->x86_mask;
+	switch (cpuid) {
+	case 0x0f07:
+	case 0x0f0a:
+	case 0x0f11:
+	case 0x0f12:
+		has_N44_O17_errata[policy->cpu] = 1;
+	}
+	
+	/* get frequency */
+	if (!stock_freq) {
+		if (cpu_khz)
+			stock_freq = cpu_khz;
+		else {
+			printk(KERN_INFO PFX "unknown core frequency - please use module parameter 'stock_freq'\n");
+			return -EINVAL;
+		}
+	}
+
+	/* table init */
+	for (i=1; (p4clockmod_table[i].frequency != CPUFREQ_TABLE_END); i++) {
+		if ((i<2) && (has_N44_O17_errata[policy->cpu]))
+			p4clockmod_table[i].frequency = CPUFREQ_ENTRY_INVALID;
+		else
+			p4clockmod_table[i].frequency = (stock_freq * i)/8;
+	}
+	
+	/* cpuinfo and default policy values */
+	policy->policy = CPUFREQ_POLICY_PERFORMANCE;
+	policy->cpuinfo.transition_latency = 1000;
+#ifdef CONFIG_CPU_FREQ_24_API
+	p4clockmod_driver.cpu_cur_freq[policy->cpu] = stock_freq;
+#endif
+
+	return cpufreq_frequency_table_cpuinfo(policy, &p4clockmod_table[0]);
+}
+
+
+static int cpufreq_p4_cpu_exit(struct cpufreq_policy *policy)
+{
+	return cpufreq_p4_setdc(policy->cpu, DC_DISABLE);
+}
+
+
+static struct cpufreq_driver p4clockmod_driver = {
+	.verify 	= cpufreq_p4_verify,
+	.target		= cpufreq_p4_target,
+	.init		= cpufreq_p4_cpu_init,
+	.exit		= cpufreq_p4_cpu_exit,
+	.name		= "p4-clockmod",
+};
+
+
 static int __init cpufreq_p4_init(void)
 {	
 	struct cpuinfo_x86 *c = cpu_data;
-	int cpuid;
-	int ret;
-	struct cpufreq_driver *driver;
-	unsigned int i;
 
 	/*
 	 * THERM_CONTROL is architectural for IA32 now, so 
@@ -193,93 +258,19 @@ static int __init cpufreq_p4_init(void)
 		!test_bit(X86_FEATURE_ACC, c->x86_capability))
 		return -ENODEV;
 
-	/* Errata workarounds */
-	cpuid = (c->x86 << 8) | (c->x86_model << 4) | c->x86_mask;
-	switch (cpuid) {
-		case 0x0f07:
-		case 0x0f0a:
-		case 0x0f11:
-		case 0x0f12:
-			has_N44_O17_errata = 1;
-		default:
-			break;
-	}
-
 	printk(KERN_INFO PFX "P4/Xeon(TM) CPU On-Demand Clock Modulation available\n");
 
-	if (!stock_freq) {
-		if (cpu_khz)
-			stock_freq = cpu_khz;
-		else {
-			printk(KERN_INFO PFX "unknown core frequency - please use module parameter 'stock_freq'\n");
-			return -EINVAL;
-		}
-	}
-
-	driver = kmalloc(sizeof(struct cpufreq_driver) +
-			 NR_CPUS * sizeof(struct cpufreq_policy), GFP_KERNEL);
-	if (!driver)
-		return -ENOMEM;
-	memset(driver, 0, sizeof(struct cpufreq_driver) +
-			NR_CPUS * sizeof(struct cpufreq_policy));
-
-	driver->policy = (struct cpufreq_policy *) (driver + 1);
-
-	/* table init */
-	for (i=1; (p4clockmod_table[i].frequency != CPUFREQ_TABLE_END); i++) {
-		if ((i<2) && (has_N44_O17_errata))
-			p4clockmod_table[i].frequency = CPUFREQ_ENTRY_INVALID;
-		else
-			p4clockmod_table[i].frequency = (stock_freq * i)/8;
-	}
-	
-
-#ifdef CONFIG_CPU_FREQ_24_API
-	for (i=0;i<NR_CPUS;i++) {
-		driver->cpu_cur_freq[i] = stock_freq;
-	}
-#endif
-
-	driver->verify        = &cpufreq_p4_verify;
-	driver->setpolicy     = &cpufreq_p4_setpolicy;
-	strncpy(driver->name, "p4-clockmod", CPUFREQ_NAME_LEN);
-
-	for (i=0;i<NR_CPUS;i++) {
-		driver->policy[i].cpu    = i;
-		ret = cpufreq_frequency_table_cpuinfo(&driver->policy[i], &p4clockmod_table[0]);
-		if (ret) {
-			kfree(driver);
-			return ret;
-		}
-		driver->policy[i].policy = CPUFREQ_POLICY_PERFORMANCE;
-		driver->policy[i].cpuinfo.transition_latency = CPUFREQ_ETERNAL;
-	}
-
-	cpufreq_p4_driver = driver;
-	
-	ret = cpufreq_register(driver);
-	if (ret) {
-		cpufreq_p4_driver = NULL;
-		kfree(driver);
-	}
-
-	return ret;
+	return cpufreq_register_driver(&p4clockmod_driver);
 }
 
 
 static void __exit cpufreq_p4_exit(void)
 {
-	unsigned int i;
-
-	if (cpufreq_p4_driver) {
-		for (i=0; i<NR_CPUS; i++) {
-			if (cpu_online(i)) 
-				cpufreq_p4_setdc(i, DC_DISABLE);
-		}
-		cpufreq_unregister();
-		kfree(cpufreq_p4_driver);
-	}
+	cpufreq_unregister_driver(&p4clockmod_driver);
 }
+
+
+MODULE_PARM(stock_freq, "i");
 
 MODULE_AUTHOR ("Zwane Mwaikambo <zwane@commfireservices.com>");
 MODULE_DESCRIPTION ("cpufreq driver for Pentium(TM) 4/Xeon(TM)");

@@ -582,6 +582,7 @@ alpha_switch_to:
 	lda	$8, 0x3fff
 	bsr	$1, undo_switch_stack
 	bic	$sp, $8, $8
+	mov	$17, $0
 	ret
 .end alpha_switch_to
 
