@@ -306,6 +306,8 @@ extern void set_bh_page(struct buffer_head *bh, struct page *page, unsigned long
 #include <linux/ncp_fs_i.h>
 #include <linux/proc_fs_i.h>
 #include <linux/usbdev_fs_i.h>
+#include <linux/jffs2_fs_i.h>
+#include <linux/cramfs_fs_sb.h>
 
 /*
  * Attribute flags.  These should be or-ed together to figure out what
@@ -481,6 +483,7 @@ struct inode {
 		struct proc_inode_info		proc_i;
 		struct socket			socket_i;
 		struct usbdev_inode_info        usbdev_i;
+		struct jffs2_inode_info		jffs2_i;
 		void				*generic_ip;
 	} u;
 };
@@ -658,6 +661,7 @@ struct quota_mount_options
 #include <linux/ncp_fs_sb.h>
 #include <linux/usbdev_fs_sb.h>
 #include <linux/cramfs_fs_sb.h>
+#include <linux/jffs2_fs_sb.h>
 
 extern struct list_head super_blocks;
 extern spinlock_t sb_lock;
@@ -713,6 +717,7 @@ struct super_block {
 		struct udf_sb_info	udf_sb;
 		struct ncp_sb_info	ncpfs_sb;
 		struct usbdev_sb_info   usbdevfs_sb;
+		struct jffs2_sb_info	jffs2_sb;
 		struct cramfs_sb_info	cramfs_sb;
 		void			*generic_sbp;
 	} u;

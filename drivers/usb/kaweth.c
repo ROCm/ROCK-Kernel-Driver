@@ -101,6 +101,7 @@
 
 MODULE_AUTHOR("Michael Zappe <zapman@interlan.net>, Stephane Alnet <stephane@u-picardie.fr> and Brad Hards <bhards@bigpond.net.au>");
 MODULE_DESCRIPTION("KL5USB101 USB Ethernet driver");
+MODULE_LICENSE("GPL");
 
 static void *kaweth_probe(
             struct usb_device *dev,             /* the device */

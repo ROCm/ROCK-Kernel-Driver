@@ -140,7 +140,7 @@
  * Yet, they all live within the same IO space.
  */
 
-#ifndef __i386__
+#if !defined(__i386__) && !defined(__x86_64__)
 
 #ifndef MULTIPLE_PAD_SIZES
 
@@ -232,7 +232,7 @@ struct ESP_regs {
 
 #endif
 
-#else /* !defined __i386__ */
+#else /* !defined(__i386__) && !defined(__x86_64__) */
 
 #define esp_write(__reg, __val) outb((__val), (__reg))
 #define esp_read(__reg) inb((__reg))
@@ -267,7 +267,7 @@ struct ESP_regs {
 #define esp_fgrnd   io_addr + 15 /* rw  Data base for fifo             0x3c  */
 };
 
-#endif /* !defined(__i386__) */
+#endif /* !defined(__i386__) && !defined(__x86_64__) */
 
 /* Various revisions of the ESP board. */
 enum esp_rev {

@@ -555,19 +555,20 @@ static struct xor_block_template xor_block_p5_mmx = {
 		: "memory")
 
 #define OFFS(x)		"16*("#x")"
-#define	PF0(x)		"	prefetcht0  "OFFS(x)"(%1)   ;\n"
-#define LD(x,y)		"       movaps   "OFFS(x)"(%1), %%xmm"#y"   ;\n"
-#define ST(x,y)		"       movaps %%xmm"#y",   "OFFS(x)"(%1)   ;\n"
-#define PF1(x)		"	prefetchnta "OFFS(x)"(%2)   ;\n"
-#define PF2(x)		"	prefetchnta "OFFS(x)"(%3)   ;\n"
-#define PF3(x)		"	prefetchnta "OFFS(x)"(%4)   ;\n"
-#define PF4(x)		"	prefetchnta "OFFS(x)"(%5)   ;\n"
-#define PF5(x)		"	prefetchnta "OFFS(x)"(%6)   ;\n"
-#define XO1(x,y)	"       xorps   "OFFS(x)"(%2), %%xmm"#y"   ;\n"
-#define XO2(x,y)	"       xorps   "OFFS(x)"(%3), %%xmm"#y"   ;\n"
-#define XO3(x,y)	"       xorps   "OFFS(x)"(%4), %%xmm"#y"   ;\n"
-#define XO4(x,y)	"       xorps   "OFFS(x)"(%5), %%xmm"#y"   ;\n"
-#define XO5(x,y)	"       xorps   "OFFS(x)"(%6), %%xmm"#y"   ;\n"
+#define PF_OFFS(x)	"256+16*("#x")"
+#define	PF0(x)		"	prefetchnta "PF_OFFS(x)"(%1)		;\n"
+#define LD(x,y)		"       movaps   "OFFS(x)"(%1), %%xmm"#y"	;\n"
+#define ST(x,y)		"       movaps %%xmm"#y",   "OFFS(x)"(%1)	;\n"
+#define PF1(x)		"	prefetchnta "PF_OFFS(x)"(%2)		;\n"
+#define PF2(x)		"	prefetchnta "PF_OFFS(x)"(%3)		;\n"
+#define PF3(x)		"	prefetchnta "PF_OFFS(x)"(%4)		;\n"
+#define PF4(x)		"	prefetchnta "PF_OFFS(x)"(%5)		;\n"
+#define PF5(x)		"	prefetchnta "PF_OFFS(x)"(%6)		;\n"
+#define XO1(x,y)	"       xorps   "OFFS(x)"(%2), %%xmm"#y"	;\n"
+#define XO2(x,y)	"       xorps   "OFFS(x)"(%3), %%xmm"#y"	;\n"
+#define XO3(x,y)	"       xorps   "OFFS(x)"(%4), %%xmm"#y"	;\n"
+#define XO4(x,y)	"       xorps   "OFFS(x)"(%5), %%xmm"#y"	;\n"
+#define XO5(x,y)	"       xorps   "OFFS(x)"(%6), %%xmm"#y"	;\n"
 
 
 static void

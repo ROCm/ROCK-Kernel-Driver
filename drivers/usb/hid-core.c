@@ -1281,10 +1281,10 @@ static struct usb_driver hid_driver = {
 
 static int __init hid_init(void)
 {
-	usb_register(&hid_driver);
 #ifdef CONFIG_USB_HIDDEV
 	hiddev_init();
 #endif
+	usb_register(&hid_driver);
 	info(DRIVER_VERSION " " DRIVER_AUTHOR);
 	info(DRIVER_DESC);
 

@@ -1,3 +1,6 @@
+#ifndef PWC_IOCTL_H
+#define PWC_IOCTL_H
+
 /* (C) 2001 Nemosoft Unv.    webcam@smcc.demon.nl
    
    This program is free software; you can redistribute it and/or modify
@@ -15,8 +18,11 @@
    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 
-#ifndef PWC_IOCTL_H
-#define PWC_IOCTL_H
+/*
+   Changes
+   2001/08/03  Alvarado   Added ioctl constants to access methods for 
+                          changing white balance and red/blue gains
+ */
 
 /* These are private ioctl() commands, specific for the Philips webcams.
    They contain functions not found in other webcams, and settings not
@@ -46,6 +52,30 @@
 #define PWC_FPS_SNAPSHOT	0x00400000
 
 
+/* pwc_whitebalance.mode values */
+#define PWC_WB_INDOOR		0
+#define PWC_WB_OUTDOOR		1
+#define PWC_WB_FL		2
+#define PWC_WB_MANUAL		3
+#define PWC_WB_AUTO		4
+
+/* Used with VIDIOCPWC[SG]AWB (Auto White Balance). 
+   Set mode to one of the PWC_WB_* values above.
+   *red and *blue are the respective gains of these colour components inside 
+   the camera; range 0..65535
+   When mode == PWC_WB_MANUAL, manual_red and manual_blue are set or read; 
+   otherwise undefined.
+   read_red and read_blue are read-only.
+*/   
+   
+struct pwc_whitebalance
+{
+	int mode;
+	int manual_red, manual_blue;	/* R/W */
+	int read_red, read_blue;	/* R/O */
+};
+
+
  /* Restore user settings */
 #define VIDIOCPWCRUSER		_IO('v', 192)
  /* Save user settings */
@@ -71,5 +101,15 @@
 #define VIDIOCPWCGAGC		_IOR('v', 200, int)
  /* Set shutter speed; int < 0 = auto; >= 0 = fixed, range 0..65535 */
 #define VIDIOCPWCSSHUTTER	_IOW('v', 201, int)
+
+ /* Color compensation (Auto White Balance) */
+#define VIDIOCPWCSAWB           _IOW('v', 202, struct pwc_whitebalance)
+#define VIDIOCPWCGAWB           _IOR('v', 202, struct pwc_whitebalance)
+
+ /* Turn LED on/off ; int range 0..65535 */
+#define VIDIOCPWCSLED           _IOW('v', 205, int)
+
+ /* Get state of LED; int range 0..65535 */
+#define VIDIOCPWCGLED           _IOR('v', 205, int)
 
 #endif

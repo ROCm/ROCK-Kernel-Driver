@@ -1111,8 +1111,8 @@ void get_swaphandle_info(swp_entry_t entry, unsigned long *offset,
 }
 
 /*
- * Kernel_lock protects against swap device deletion. Don't grab an extra
- * reference on the swaphandle, it doesn't matter if it becomes unused.
+ * Kernel_lock protects against swap device deletion. Grab an extra
+ * reference on the swaphandle so that it dos not become unused.
  */
 int valid_swaphandles(swp_entry_t entry, unsigned long *offset)
 {
@@ -1123,6 +1123,7 @@ int valid_swaphandles(swp_entry_t entry, unsigned long *offset)
 	*offset = SWP_OFFSET(entry);
 	toff = *offset = (*offset >> page_cluster) << page_cluster;
 
+	swap_device_lock(swapdev);
 	do {
 		/* Don't read-ahead past the end of the swap area */
 		if (toff >= swapdev->max)
@@ -1132,8 +1133,10 @@ int valid_swaphandles(swp_entry_t entry, unsigned long *offset)
 			break;
 		if (swapdev->swap_map[toff] == SWAP_MAP_BAD)
 			break;
+		swapdev->swap_map[toff]++;
 		toff++;
 		ret++;
 	} while (--i);
+	swap_device_unlock(swapdev);
 	return ret;
 }

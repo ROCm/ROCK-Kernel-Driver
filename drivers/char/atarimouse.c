@@ -133,3 +133,4 @@ static void __exit atari_mouse_cleanup (void)
 module_init(atari_mouse_init);
 module_exit(atari_mouse_cleanup);
 
+MODULE_LICENSE("GPL");

@@ -11,6 +11,7 @@ obj-$(CONFIG_USB_SERIAL_VISOR)			+= visor.o
 obj-$(CONFIG_USB_SERIAL_WHITEHEAT)		+= whiteheat.o
 obj-$(CONFIG_USB_SERIAL_FTDI_SIO)		+= ftdi_sio.o
 obj-$(CONFIG_USB_SERIAL_KEYSPAN_PDA)		+= keyspan_pda.o
+obj-$(CONFIG_USB_SERIAL_XIRCOM)			+= keyspan_pda.o
 obj-$(CONFIG_USB_SERIAL_KEYSPAN)		+= keyspan.o
 obj-$(CONFIG_USB_SERIAL_OMNINET)		+= omninet.o
 obj-$(CONFIG_USB_SERIAL_DIGI_ACCELEPORT)	+= digi_acceleport.o

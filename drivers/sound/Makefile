@@ -63,15 +63,17 @@ obj-$(CONFIG_SOUND_SONICVIBES)	+= sonicvibes.o
 obj-$(CONFIG_SOUND_CMPCI)	+= cmpci.o
 obj-$(CONFIG_SOUND_ES1370)	+= es1370.o
 obj-$(CONFIG_SOUND_ES1371)	+= es1371.o ac97_codec.o
+obj-$(CONFIG_SOUND_VRC5477)	+= nec_vrc5477.o ac97_codec.o
 obj-$(CONFIG_SOUND_ESSSOLO1)	+= esssolo1.o
 obj-$(CONFIG_SOUND_FUSION)	+= cs46xx.o ac97_codec.o
 obj-$(CONFIG_SOUND_MAESTRO)	+= maestro.o
 obj-$(CONFIG_SOUND_MAESTRO3)	+= maestro3.o ac97_codec.o
 obj-$(CONFIG_SOUND_TRIDENT)	+= trident.o ac97_codec.o
-obj-$(CONFIG_SOUND_RME96XX)	+= rme96xx.o
-obj-$(CONFIG_SOUND_BT878)	+= btaudio.o
-
 obj-$(CONFIG_SOUND_EMU10K1)	+= ac97_codec.o
+obj-$(CONFIG_SOUND_RME96XX)     += rme96xx.o
+obj-$(CONFIG_SOUND_BT878)	+= btaudio.o
+obj-$(CONFIG_SOUND_EMU10K1)	+= ac97_codec.o
+
 ifeq ($(CONFIG_MIDI_EMU10K1),y)
   obj-$(CONFIG_SOUND_EMU10K1)	+= sound.o
 endif

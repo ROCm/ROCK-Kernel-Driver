@@ -272,8 +272,12 @@ static inline int free_pte(pte_t pte)
 		 * free_page() used to be able to clear swap cache
 		 * entries.  We may now have to do it manually.  
 		 */
-		if (pte_dirty(pte) && page->mapping)
-			set_page_dirty(page);
+		if (page->mapping) {
+			if (pte_dirty(pte))
+				set_page_dirty(page);
+			if (pte_young(pte))
+				mark_page_accessed(page);
+		}
 		free_page_and_swap_cache(page);
 		return 1;
 	}
@@ -1069,19 +1073,23 @@ void swapin_readahead(swp_entry_t entry)
 	unsigned long offset;
 
 	/*
-	 * Get the number of handles we should do readahead io to.
+	 * Get the number of handles we should do readahead io to. Also,
+	 * grab temporary references on them, releasing them as io completes.
 	 */
 	num = valid_swaphandles(entry, &offset);
 	for (i = 0; i < num; offset++, i++) {
 		/* Don't block on I/O for read-ahead */
-		if (atomic_read(&nr_async_pages) >=
-		    pager_daemon.swap_cluster << page_cluster)
+		if (atomic_read(&nr_async_pages) >= pager_daemon.swap_cluster
+				* (1 << page_cluster)) {
+			while (i++ < num)
+				swap_free(SWP_ENTRY(SWP_TYPE(entry), offset++));
 			break;
+		}
 		/* Ok, do the async read-ahead now */
 		new_page = read_swap_cache_async(SWP_ENTRY(SWP_TYPE(entry), offset));
-		if (!new_page)
-			break;
-		page_cache_release(new_page);
+		if (new_page != NULL)
+			page_cache_release(new_page);
+		swap_free(SWP_ENTRY(SWP_TYPE(entry), offset));
 	}
 	return;
 }
@@ -1112,7 +1120,6 @@ static int do_swap_page(struct mm_struct * mm,
 			 */
 			return pte_same(*page_table, orig_pte) ? -1 : 1;
 		}
-		SetPageReferenced(page);
 	}
 
 	/*

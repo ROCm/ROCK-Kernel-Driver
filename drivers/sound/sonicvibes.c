@@ -118,25 +118,10 @@
 #include <linux/wrapper.h>
 #include <asm/uaccess.h>
 #include <asm/hardirq.h>
+#include <linux/gameport.h>
 
 #include "dm.h"
 
-#if defined(CONFIG_INPUT_ANALOG) || defined(CONFIG_INPUT_ANALOG_MODULE)
-#include <linux/gameport.h>
-#else
-struct gameport {
-	int io;
-	int size;
-};
-
-extern inline void gameport_register_port(struct gameport *gameport)
-{
-}
-
-extern inline void gameport_unregister_port(struct gameport *gameport)
-{
-}
-#endif
 
 /* --------------------------------------------------------------------- */
 

@@ -39,6 +39,7 @@
 #include <linux/init.h>
 #include <linux/input.h>
 #include <linux/gameport.h>
+#include <asm/timex.h>
 
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
 MODULE_DESCRIPTION("Analog joystick and gamepad driver for Linux");
@@ -136,27 +137,25 @@ struct analog_port {
  */
 
 #ifdef __i386__
-#ifdef CONFIG_X86_TSC
-#define GET_TIME(x)	__asm__ __volatile__ ( "rdtsc" : "=a" (x) : : "dx" )
+#define TSC_PRESENT	(test_bit(X86_FEATURE_TSC, &boot_cpu_data.x86_capability))
+#define GET_TIME(x)	do { if (TSC_PRESENT) rdtscl(x); else outb(0, 0x43); x = inb(0x40); x |= inb(0x40) << 8; } while (0)
+#define DELTA(x,y)	(TSC_PRESENT?((y)-(x)):((x)-(y)+((x)<(y)?1193180L/HZ:0)))
+#define TIME_NAME	(TSC_PRESENT?"TSC":"PIT")
+#elif __x86_64__
+#define GET_TIME(x)	rdtscl(x)
 #define DELTA(x,y)	((y)-(x))
-#define TIME_NAME "TSC"
-#else
-#define GET_TIME(x)	do { outb(0, 0x43); x = inb(0x40); x |= inb(0x40) << 8; } while (0)
-#define DELTA(x,y)	((x)-(y)+((x)<(y)?1193180L/HZ:0))
-#define TIME_NAME "PIT"
-#endif
+#define TIME_NAME	"TSC"
 #elif __alpha__
-#define GET_TIME(x)	__asm__ __volatile__ ( "rpcc %0" : "=r" (x) )
+#define GET_TIME(x)	get_cycles(x)
 #define DELTA(x,y)	((y)-(x))
-#define TIME_NAME "PCC"
-#endif
-
-#ifndef GET_TIME
+#define TIME_NAME	"PCC"
+#else
 #define FAKE_TIME
 static unsigned long analog_faketime = 0;
 #define GET_TIME(x)     do { x = analog_faketime++; } while(0)
 #define DELTA(x,y)	((y)-(x))
-#define TIME_NAME "Unreliable"
+#define TIME_NAME	"Unreliable"
+#warning Precise timer not defined for this architecture.
 #endif
 
 /*
@@ -498,7 +497,7 @@ static void analog_init_device(struct analog_port *port, struct analog *analog, 
 	if (port->cooked)
 		printk(" [ADC port]\n");
 	else
-		printk(" ["TIME_NAME" timer, %d %sHz clock, %d ns res]\n",
+		printk(" [%s timer, %d %sHz clock, %d ns res]\n", TIME_NAME,
 		port->speed > 10000 ? (port->speed + 800) / 1000 : port->speed,
 		port->speed > 10000 ? "M" : "k", (port->loop * 1000000) / port->speed);
 }

@@ -24,6 +24,7 @@
 #include <linux/spinlock.h>
 #include <linux/videodev.h>
 #include <linux/wait.h>
+#include <linux/smp_lock.h>
 
 #include <asm/semaphore.h>
 #include <asm/errno.h>
@@ -33,9 +34,10 @@
 #define PWC_MAGIC 0x89DC10ABUL
 #undef PWC_MAGIC
 
-/* Debugging info on/off */
+/* Turn some debugging options on/off */
 #define PWC_DEBUG 0
 
+/* Trace certain actions in the driver */
 #define TRACE_MODULE	0x0001
 #define TRACE_PROBE	0x0002
 #define TRACE_OPEN	0x0004
@@ -58,8 +60,8 @@
 
 /* Version block */
 #define PWC_MAJOR	8
-#define PWC_MINOR	1
-#define PWC_VERSION 	"8.1"
+#define PWC_MINOR	2
+#define PWC_VERSION 	"8.2"
 #define PWC_NAME 	"pwc"
 
 /* Turn certain features on/off */
@@ -184,6 +186,7 @@ struct pwc_device
    void *image_data;			/* total buffer, which is subdivided into ... */
    void *image_ptr[MAX_IMAGES];		/* ...several images... */
    int fill_image;			/* ...which are rotated. */
+   int len_per_image;			/* length per image */
    int image_read_pos;			/* In case we read data in pieces, keep track of were we are in the imagebuffer */
    int image_used[MAX_IMAGES];		/* For MCAPTURE and SYNC */
 

@@ -49,7 +49,7 @@
 #include "debug.h"
 #include "transport.h"
 
-#include <linux/malloc.h>
+#include <linux/slab.h>
 
 /*
  * kernel thread actions

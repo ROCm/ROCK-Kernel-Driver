@@ -202,7 +202,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 			break;
 
 		tmp = 0;  /* Default return condition */
-		if(addr < 17*sizeof(long))
+		if(addr < FRAME_SIZE*sizeof(long))
 			tmp = getreg(child, addr);
 		if(addr >= (long) &dummy->u_debugreg[0] &&
 		   addr <= (long) &dummy->u_debugreg[7]){
@@ -229,7 +229,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 		    addr > sizeof(struct user) - 3)
 			break;
 
-		if (addr < 17*sizeof(long)) {
+		if (addr < FRAME_SIZE*sizeof(long)) {
 			ret = putreg(child, addr, data);
 			break;
 		}
@@ -342,11 +342,11 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 	}
 
 	case PTRACE_GETREGS: { /* Get all gp regs from the child. */
-	  	if (!access_ok(VERIFY_WRITE, (unsigned *)data, 17*sizeof(long))) {
+	  	if (!access_ok(VERIFY_WRITE, (unsigned *)data, FRAME_SIZE*sizeof(long))) {
 			ret = -EIO;
 			break;
 		}
-		for ( i = 0; i < 17*sizeof(long); i += sizeof(long) ) {
+		for ( i = 0; i < FRAME_SIZE*sizeof(long); i += sizeof(long) ) {
 			__put_user(getreg(child, i),(unsigned long *) data);
 			data += sizeof(long);
 		}
@@ -356,11 +356,11 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 
 	case PTRACE_SETREGS: { /* Set all gp regs in the child. */
 		unsigned long tmp;
-	  	if (!access_ok(VERIFY_READ, (unsigned *)data, 17*sizeof(long))) {
+	  	if (!access_ok(VERIFY_READ, (unsigned *)data, FRAME_SIZE*sizeof(long))) {
 			ret = -EIO;
 			break;
 		}
-		for ( i = 0; i < 17*sizeof(long); i += sizeof(long) ) {
+		for ( i = 0; i < FRAME_SIZE*sizeof(long); i += sizeof(long) ) {
 			__get_user(tmp, (unsigned long *) data);
 			putreg(child, i, tmp);
 			data += sizeof(long);

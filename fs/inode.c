@@ -15,6 +15,7 @@
 #include <linux/cache.h>
 #include <linux/swap.h>
 #include <linux/swapctl.h>
+#include <linux/prefetch.h>
 
 /*
  * New inode.c implementation.
@@ -125,8 +126,9 @@ static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
 /**
  *	__mark_inode_dirty -	internal function
  *	@inode: inode to mark
- *
- *	Mark an inode as dirty. Callers should use mark_inode_dirty.
+ *	@flags: what kind of dirty (i.e. I_DIRTY_SYNC)
+ *	Mark an inode as dirty. Callers should use mark_inode_dirty or
+ *  	mark_inode_dirty_sync.
  */
  
 void __mark_inode_dirty(struct inode *inode, int flags)
@@ -405,8 +407,6 @@ static void try_to_sync_unused_inodes(void)
 	spin_lock(&sb_lock);
 	sb = sb_entry(super_blocks.next);
 	for (; sb != sb_entry(&super_blocks); sb = sb_entry(sb->s_list.next)) {
-		if (!sb->s_dev)
-			continue;
 		spin_unlock(&sb_lock);
 		if (!try_to_sync_unused_list(&sb->s_dirty))
 			return;
@@ -435,7 +435,7 @@ void write_inode_now(struct inode *inode, int sync)
 		spin_unlock(&inode_lock);
 	}
 	else
-		printk("write_inode_now: no super block\n");
+		printk(KERN_ERR "write_inode_now: no super block\n");
 }
 
 /**
@@ -805,6 +805,8 @@ struct inode * get_empty_inode(void)
 	static unsigned long last_ino;
 	struct inode * inode;
 
+	spin_lock_prefetch(&inode_lock);
+	
 	inode = alloc_inode();
 	if (inode)
 	{

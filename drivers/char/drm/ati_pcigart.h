@@ -148,7 +148,7 @@ int DRM(ati_pcigart_init)( drm_device_t *dev,
 
 	ret = 1;
 
-#if __i386__
+#if defined(__i386__) || defined(__x86_64__)
 	asm volatile ( "wbinvd" ::: "memory" );
 #else
 	mb();

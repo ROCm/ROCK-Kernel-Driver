@@ -67,7 +67,7 @@ static int rx_copybreak = 100;
 	ToDo: Non-Intel setting could be better.
 */
 
-#if defined(__alpha__)
+#if defined(__alpha__) || defined(__ia64__) || defined(__x86_64__)
 static int csr0 = 0x01A00000 | 0xE000;
 #elif defined(__powerpc__)
 static int csr0 = 0x01B00000 | 0x8000;

@@ -91,22 +91,22 @@ extern struct gendisk *get_gendisk(kdev_t dev);
 
 struct solaris_x86_slice {
 	ushort	s_tag;			/* ID tag of partition */
-	ushort	s_flag;			/* permision flags */
-	daddr_t s_start;		/* start sector no of partition */
-	long	s_size;			/* # of blocks in partition */
+	ushort	s_flag;			/* permission flags */
+	unsigned int s_start;		/* start sector no of partition */
+	unsigned int s_size;		/* # of blocks in partition */
 };
 
 struct solaris_x86_vtoc {
-		unsigned long v_bootinfo[3];	/* info needed by mboot (unsupported) */
-	unsigned long v_sanity;		/* to verify vtoc sanity */
-	unsigned long v_version;	/* layout version */
+	unsigned int v_bootinfo[3];	/* info needed by mboot (unsupported) */
+	unsigned int v_sanity;		/* to verify vtoc sanity */
+	unsigned int v_version;		/* layout version */
 	char	v_volume[8];		/* volume name */
 	ushort	v_sectorsz;		/* sector size in bytes */
 	ushort	v_nparts;		/* number of partitions */
-	unsigned long v_reserved[10];	/* free space */
+	unsigned int v_reserved[10];	/* free space */
 	struct solaris_x86_slice
 		v_slice[SOLARIS_X86_NUMSLICE]; /* slice headers */
-	time_t	timestamp[SOLARIS_X86_NUMSLICE]; /* timestamp (unsupported) */
+	unsigned int timestamp[SOLARIS_X86_NUMSLICE]; /* timestamp (unsupported) */
 	char	v_asciilabel[128];	/* for compatibility */
 };
 

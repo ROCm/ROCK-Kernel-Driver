@@ -492,7 +492,7 @@ static int netlink_send_peer(ipq_queue_element_t *e)
 
 #define RCV_SKB_FAIL(err) do { netlink_ack(skb, nlh, (err)); return; } while (0);
 
-extern __inline__ void netlink_receive_user_skb(struct sk_buff *skb)
+static __inline__ void netlink_receive_user_skb(struct sk_buff *skb)
 {
 	int status, type;
 	struct nlmsghdr *nlh;
@@ -647,6 +647,7 @@ static int ipq_get_info(char *buffer, char **start, off_t offset, int length)
 static int __init init(void)
 {
 	int status = 0;
+	struct proc_dir_entry *proc;
 	
 	nfnl = netlink_kernel_create(NETLINK_FIREWALL, netlink_receive_user_sk);
 	if (nfnl == NULL) {
@@ -662,8 +663,14 @@ static int __init init(void)
 		sock_release(nfnl->socket);
 		return status;
 	}
+	proc = proc_net_create(IPQ_PROC_FS_NAME, 0, ipq_get_info);
+	if (proc) proc->owner = THIS_MODULE;
+	else {
+		ipq_destroy_queue(nlq);
+		sock_release(nfnl->socket);
+		return -ENOMEM;
+	}
 	register_netdevice_notifier(&ipq_dev_notifier);
-	proc_net_create(IPQ_PROC_FS_NAME, 0, ipq_get_info);
 	ipq_sysctl_header = register_sysctl_table(ipq_root_table, 0);
 	return status;
 }

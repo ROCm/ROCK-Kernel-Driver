@@ -62,7 +62,7 @@ static int gameport_number;
 
 static int gameport_measure_speed(struct gameport *gameport)
 {
-#ifdef __i386__
+#if defined(__i386__) || defined(__x86_64__)
 
 #define GET_TIME(x)     do { outb(0, 0x43); x = inb(0x40); x |= inb(0x40) << 8; } while (0)
 #define DELTA(x,y)      ((y)-(x)+((y)<(x)?1193180L/HZ:0))

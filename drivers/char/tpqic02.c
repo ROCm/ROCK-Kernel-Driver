@@ -772,10 +772,11 @@ static int rdstatus(char *stp, unsigned size, char qcmd)
 static int get_status(volatile struct tpstatus *stp)
 {
 	int stat = rdstatus((char *) stp, TPSTATSIZE, QCMD_RD_STAT);
-#ifdef __i386__
+#if defined(__i386__) || defined (__x86_64__)
 	byte_swap_w(&(stp->dec));
 	byte_swap_w(&(stp->urc));
 #else
+#warning Undefined architecture
 	/* should probably swap status bytes #definition */
 #endif
 	return stat;

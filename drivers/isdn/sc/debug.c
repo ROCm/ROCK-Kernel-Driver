@@ -26,8 +26,7 @@
  *     +1 (416) 297-6433 Facsimile
  */
 #include <linux/kernel.h>
-
-inline char *strcpy(char *, const char *);
+#include <linux/string.h>
 
 int dbg_level = 0;
 static char dbg_funcname[255];
@@ -45,19 +44,6 @@ void dbg_func(char *func)
 	strcpy(dbg_funcname, func);
 	if(dbg_level)
 		printk("--> Entering function %s\n", dbg_funcname);
-}
-
-inline char *strcpy(char *dest, const char *src)
-{
-	char *i = dest;
-	char *j = (char *) src;
-
-	while(*j) {
-		*i = *j;
-		i++; j++;
-	}
-	*(++i) = 0;
-	return dest;
 }
 
 inline void pullphone(char *dn, char *str)

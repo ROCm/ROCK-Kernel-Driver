@@ -201,3 +201,13 @@ if [ "$CONFIG_SOUND_OSS" = "y" -o "$CONFIG_SOUND_OSS" = "m" ]; then
 fi
 
 dep_tristate '  TV card (bt848) mixer support' CONFIG_SOUND_TVMIXER $CONFIG_SOUND $CONFIG_I2C
+
+# A cross directory dependence. The sound modules will need gameport.o compiled in,
+# but it resides in the drivers/char/joystick directory. This define_tristate takes
+# care of that. --Vojtech
+
+if [ "$CONFIG_INPUT_GAMEPORT" != "n" ]; then
+  if [ "$CONFIG_SOUND_ESSSOLO1" = "y" -o "$CONFIG_SOUND_ES1370" = "y" -o "$CONFIG_SOUND_ES1371" = "y" -o "$CONFIG_SOUND_SONICVIBES" = "y" ]; then
+    define_tristate CONFIG_INPUT_GAMEPORT y
+  fi
+fi

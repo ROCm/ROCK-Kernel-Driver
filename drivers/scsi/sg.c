@@ -645,6 +645,7 @@ static int sg_common_write(Sg_fd * sfp, Sg_request * srp,
     Scsi_Request        * SRpnt;
     Sg_device           * sdp = sfp->parentdp;
     sg_io_hdr_t         * hp = &srp->header;
+    request_queue_t	* q;
 
     srp->data.cmd_opcode = cmnd[0];  /* hold opcode of command */
     hp->status = 0;
@@ -680,6 +681,7 @@ static int sg_common_write(Sg_fd * sfp, Sg_request * srp,
     }
 
     srp->my_cmdp = SRpnt;
+    q = &SRpnt->sr_device->request_queue;
     SRpnt->sr_request.rq_dev = sdp->i_rdev;
     SRpnt->sr_request.rq_status = RQ_ACTIVE;
     SRpnt->sr_sense_buffer[0] = 0;
@@ -715,7 +717,7 @@ static int sg_common_write(Sg_fd * sfp, Sg_request * srp,
 		(void *)SRpnt->sr_buffer, hp->dxfer_len,
 		sg_cmd_done_bh, timeout, SG_DEFAULT_RETRIES);
     /* dxfer_len overwrites SRpnt->sr_bufflen, hence need for b_malloc_len */
-    generic_unplug_device(&SRpnt->sr_device->request_queue);
+    generic_unplug_device(q);
     return 0;
 }
 

@@ -952,7 +952,7 @@ static void init_registers(struct net_device *dev)
 	} else {
 		i |= 0xE000;
 	}
-#elif defined(__powerpc__) || defined(__i386__) || defined(__alpha) || defined(__ia64__)
+#elif defined(__powerpc__) || defined(__i386__) || defined(__alpha__) || defined(__ia64__) || defined(__x86_64__)
 	i |= 0xE000;
 #elif defined(__sparc__)
 	i |= 0x4800;

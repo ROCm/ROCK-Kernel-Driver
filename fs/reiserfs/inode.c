@@ -1139,7 +1139,7 @@ struct inode * reiserfs_iget (struct super_block * s, struct cpu_key * key)
     args.objectid = key->on_disk_key.k_dir_id ;
     inode = iget4 (s, key->on_disk_key.k_objectid, 0, (void *)(&args));
     if (!inode) 
-      return inode ;
+	return ERR_PTR(-ENOMEM) ;
 
     if (comp_short_keys (INODE_PKEY (inode), key) || is_bad_inode (inode)) {
 	/* either due to i/o error or a stale NFS handle */
@@ -1184,7 +1184,7 @@ struct dentry *reiserfs_fh_to_dentry(struct super_block *sb, __u32 *data,
 	    key.on_disk_key.k_objectid = data[0] ;
 	    key.on_disk_key.k_dir_id = data[1] ;
 	    inode = reiserfs_iget(sb, &key) ;
-	    if (inode && (fhtype == 3 || fhtype >= 5) &&
+	    if (inode && !IS_ERR(inode) && (fhtype == 3 || fhtype >= 5) &&
 		data[2] != inode->i_generation) {
 		    iput(inode) ;
 		    inode = NULL ;
@@ -1193,13 +1193,15 @@ struct dentry *reiserfs_fh_to_dentry(struct super_block *sb, __u32 *data,
 	    key.on_disk_key.k_objectid = data[fhtype>=5?3:2] ;
 	    key.on_disk_key.k_dir_id = data[fhtype>=5?4:3] ;
 	    inode = reiserfs_iget(sb, &key) ;
-	    if (inode && fhtype == 6 &&
+	    if (inode && !IS_ERR(inode) && fhtype == 6 &&
 		data[5] != inode->i_generation) {
 		    iput(inode) ;
 		    inode = NULL ;
 	    }
     }
 out:
+    if (IS_ERR(inode))
+	return ERR_PTR(PTR_ERR(inode));
     if (!inode)
         return ERR_PTR(-ESTALE) ;
 

@@ -593,7 +593,7 @@ fb_mmap(struct file *file, struct vm_area_struct * vma)
 	pgprot_val(vma->vm_page_prot) |= _PAGE_NO_CACHE|_PAGE_GUARDED;
 #elif defined(__alpha__)
 	/* Caching is off in the I/O space quadrant by design.  */
-#elif defined(__i386__)
+#elif defined(__i386__) || defined(__x86_64__)
 	if (boot_cpu_data.x86 > 3)
 		pgprot_val(vma->vm_page_prot) |= _PAGE_PCD;
 #elif defined(__mips__)

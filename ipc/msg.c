@@ -613,7 +613,7 @@ int inline pipelined_send(struct msg_queue* msq, struct msg_msg* msg)
 				wake_up_process(msr->r_tsk);
 			} else {
 				msr->r_msg = msg;
-				msq->q_lspid = msr->r_tsk->pid;
+				msq->q_lrpid = msr->r_tsk->pid;
 				msq->q_rtime = CURRENT_TIME;
 				wake_up_process(msr->r_tsk);
 				return 1;
@@ -683,6 +683,9 @@ retry:
 		goto retry;
 	}
 
+	msq->q_lspid = current->pid;
+	msq->q_stime = CURRENT_TIME;
+
 	if(!pipelined_send(msq,msg)) {
 		/* noone is waiting for this message, enqueue it */
 		list_add_tail(&msg->m_list,&msq->q_messages);
@@ -694,8 +697,6 @@ retry:
 	
 	err = 0;
 	msg = NULL;
-	msq->q_lspid = current->pid;
-	msq->q_stime = CURRENT_TIME;
 
 out_unlock_free:
 	msg_unlock(msqid);
@@ -742,6 +743,10 @@ asmlinkage long sys_msgrcv (int msqid, struct msgbuf *msgp, size_t msgsz,
 	if(msq==NULL)
 		return -EINVAL;
 retry:
+	err = -EIDRM;
+	if (msg_checkid(msq,msqid))
+		goto out_unlock;
+
 	err=-EACCES;
 	if (ipcperms (&msq->q_perm, S_IRUGO))
 		goto out_unlock;

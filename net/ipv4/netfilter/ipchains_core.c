@@ -74,6 +74,7 @@
 #include <linux/sched.h>
 #include <linux/string.h>
 #include <linux/errno.h>
+#include <linux/module.h>
 
 #include <linux/socket.h>
 #include <linux/sockios.h>
@@ -1706,10 +1707,9 @@ struct firewall_ops ipfw_ops=
 
 int ipfw_init_or_cleanup(int init)
 {
+	struct proc_dir_entry *proc;
 	int ret = 0;
 	unsigned long flags;
-
-	FWC_WRITE_LOCK_IRQ(&ip_fw_lock, flags);
 
 	if (!init) goto cleanup;
 
@@ -1727,17 +1727,24 @@ int ipfw_init_or_cleanup(int init)
 	if (ret < 0)
 		goto cleanup_netlink;
 
-	proc_net_create(IP_FW_PROC_CHAINS, S_IFREG | S_IRUSR | S_IWUSR, ip_chain_procinfo);
-	proc_net_create(IP_FW_PROC_CHAIN_NAMES, S_IFREG | S_IRUSR | S_IWUSR, ip_chain_name_procinfo);
+	proc = proc_net_create(IP_FW_PROC_CHAINS, S_IFREG | S_IRUSR | S_IWUSR,
+			       ip_chain_procinfo);
+	if (proc) proc->owner = THIS_MODULE;
+	proc = proc_net_create(IP_FW_PROC_CHAIN_NAMES,
+			       S_IFREG | S_IRUSR | S_IWUSR,
+			       ip_chain_name_procinfo);
+	if (proc) proc->owner = THIS_MODULE;
 
 	IP_FW_INPUT_CHAIN = ip_init_chain(IP_FW_LABEL_INPUT, 1, FW_ACCEPT);
 	IP_FW_FORWARD_CHAIN = ip_init_chain(IP_FW_LABEL_FORWARD, 1, FW_ACCEPT);
 	IP_FW_OUTPUT_CHAIN = ip_init_chain(IP_FW_LABEL_OUTPUT, 1, FW_ACCEPT);
 
-	FWC_WRITE_UNLOCK_IRQ(&ip_fw_lock, flags);
 	return ret;
 
  cleanup:
+	unregister_firewall(PF_INET, &ipfw_ops);
+
+	FWC_WRITE_LOCK_IRQ(&ip_fw_lock, flags);
 	while (ip_fw_chains) {
 		struct ip_chain *next = ip_fw_chains->next;
 
@@ -1745,11 +1752,10 @@ int ipfw_init_or_cleanup(int init)
 		kfree(ip_fw_chains);
 		ip_fw_chains = next;
 	}
+	FWC_WRITE_UNLOCK_IRQ(&ip_fw_lock, flags);
 
 	proc_net_remove(IP_FW_PROC_CHAINS);
 	proc_net_remove(IP_FW_PROC_CHAIN_NAMES);
-
-	unregister_firewall(PF_INET, &ipfw_ops);
 
  cleanup_netlink:
 #if defined(CONFIG_NETLINK_DEV) || defined(CONFIG_NETLINK_DEV_MODULE)
@@ -1757,6 +1763,5 @@ int ipfw_init_or_cleanup(int init)
 
  cleanup_nothing:
 #endif
-	FWC_WRITE_UNLOCK_IRQ(&ip_fw_lock, flags);
 	return ret;
 }

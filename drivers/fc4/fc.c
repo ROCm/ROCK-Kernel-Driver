@@ -1155,14 +1155,3 @@ int fc_do_prli(fc_channel *fc, unsigned char alpa)
 	kfree(p);
 	return status;
 }
-
-#ifdef MODULE
-int init_module(void)
-{
-	return 0;
-}
-
-void cleanup_module(void)
-{
-}
-#endif

@@ -148,3 +148,4 @@ static void __exit atixl_cleanup (void)
 module_init(atixl_busmouse_init);
 module_exit(atixl_cleanup);
 
+MODULE_LICENSE("GPL");

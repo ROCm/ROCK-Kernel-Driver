@@ -32,8 +32,6 @@
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
 
-extern long sys_call_table[];
-
 static int	nfsctl_svc(struct nfsctl_svc *data);
 static int	nfsctl_addclient(struct nfsctl_client *data);
 static int	nfsctl_delclient(struct nfsctl_client *data);

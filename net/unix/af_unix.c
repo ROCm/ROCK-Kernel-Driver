@@ -1845,7 +1845,7 @@ static inline void unix_sysctl_register(void) {}
 static inline void unix_sysctl_unregister(void) {}
 #endif
 
-static const char banner[] __initdata = KERN_INFO "NET4: Unix domain sockets 1.0/SMP for Linux NET4.0.\n";
+static char banner[] __initdata = KERN_INFO "NET4: Unix domain sockets 1.0/SMP for Linux NET4.0.\n";
 
 static int __init af_unix_init(void)
 {

@@ -422,12 +422,11 @@ static int autofs_root_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 static inline int autofs_get_set_timeout(struct autofs_sb_info *sbi,
 					 unsigned long *p)
 {
-	int rv;
 	unsigned long ntimeout;
 
-	if ( (rv = get_user(ntimeout, p)) ||
-	     (rv = put_user(sbi->exp_timeout/HZ, p)) )
-		return rv;
+	if (get_user(ntimeout, p) ||
+	    put_user(sbi->exp_timeout / HZ, p))
+		return -EFAULT;
 
 	if ( ntimeout > ULONG_MAX/HZ )
 		sbi->exp_timeout = 0;

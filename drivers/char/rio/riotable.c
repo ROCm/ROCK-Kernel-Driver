@@ -445,7 +445,7 @@ struct rio_info *	p;
 	int Next = 0;
 	struct Map *MapP;
 	struct Host *HostP;
-	int oldspl;
+	long oldspl;
 
 	disable(oldspl);		/* strange but true! */
  

@@ -3103,6 +3103,7 @@ module_exit(edgeport_exit);
 /* Module information */
 MODULE_AUTHOR( DRIVER_AUTHOR );
 MODULE_DESCRIPTION( DRIVER_DESC );
+MODULE_LICENSE("GPL");
 
 MODULE_PARM(debug, "i");
 MODULE_PARM_DESC(debug, "Debug enabled or not");

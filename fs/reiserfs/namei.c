@@ -374,7 +374,7 @@ struct dentry * reiserfs_lookup (struct inode * dir, struct dentry * dentry)
     pathrelse (&path_to_entry);
     if (retval == NAME_FOUND) {
 	inode = reiserfs_iget (dir->i_sb, (struct cpu_key *)&(de.de_dir_id));
-	if (!inode) {
+	if (!inode || IS_ERR(inode)) {
 	    return ERR_PTR(-EACCES);
         }
     }

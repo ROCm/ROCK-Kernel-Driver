@@ -44,7 +44,8 @@ const char *dss1_revision = "$Revision: 2.30.6.1 $";
 static unsigned char new_invoke_id(struct PStack *p)
 {
 	unsigned char retval;
-	int flags,i;
+	long flags;
+	int i;
   
 	i = 32; /* maximum search depth */
 
@@ -72,7 +73,7 @@ static unsigned char new_invoke_id(struct PStack *p)
 /* free a used invoke id */
 /*************************/
 static void free_invoke_id(struct PStack *p, unsigned char id)
-{ int flags;
+{ long flags;
 
   if (!id) return; /* 0 = invalid value */
 

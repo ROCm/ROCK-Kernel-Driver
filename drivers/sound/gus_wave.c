@@ -1952,7 +1952,7 @@ static void guswave_hw_control(int dev, unsigned char *event_rec)
 	int voice, cmd;
 	unsigned short p1, p2;
 	unsigned int plong;
-	unsigned flags;
+	unsigned long flags;
 
 	cmd = event_rec[2];
 	voice = event_rec[3];

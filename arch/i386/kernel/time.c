@@ -178,6 +178,15 @@ static unsigned long do_slow_gettimeoffset(void)
  	jiffies_t = jiffies;
 
 	count |= inb_p(0x40) << 8;
+	
+        /* VIA686a test code... reset the latch if count > max + 1 */
+        if (count > LATCH) {
+                outb_p(0x34, 0x43);
+                outb_p(LATCH & 0xff, 0x40);
+                outb(LATCH >> 8, 0x40);
+                count = LATCH - 1;
+        }
+	
 	spin_unlock(&i8253_lock);
 
 	/*

@@ -16,17 +16,17 @@ CR10 (CCR)			lazy FPU saving*
 CR11				as specified by ABI
 CR14 (interruption vector)	initialized to fault_vector
 CR15 (EIEM)			initialized to all ones*
-CR16 (Interval Timer)		timer interrupt
+CR16 (Interval Timer)		read for cycle count/write starts Interval Tmr
 CR17-CR22			interruption parameters
-CR23 (EIRR)			read for pending interrupts
+CR23 (EIRR)			read for pending interrupts/write clears bits
 CR24 (TR 0)			Kernel Space Page Directory Pointer
 CR25 (TR 1)			User   Space Page Directory Pointer
-CR26 (TR 2)
-CR27 (TR 3)
-CR28 (TR 4)			used by interruption handlers
-CR29 (TR 5)			used by interruption handlers
+CR26 (TR 2)			not used
+CR27 (TR 3)			Thread descriptor pointer
+CR28 (TR 4)			not used
+CR29 (TR 5)			not used
 CR30 (TR 6)			current / 0
-CR31 (TR 7)			used by interruption handlers
+CR31 (TR 7)			Temporary register, used in various places
 
 	Space Registers (kernel mode)
 

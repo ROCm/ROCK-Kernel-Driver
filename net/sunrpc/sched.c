@@ -1059,17 +1059,13 @@ rpciod(void *ptr)
 	rpciod_pid = current->pid;
 	up(&rpciod_running);
 
-	exit_fs(current);
-	exit_files(current);
-	exit_mm(current);
+	daemonize();
 
 	spin_lock_irq(&current->sigmask_lock);
 	siginitsetinv(&current->blocked, sigmask(SIGKILL));
 	recalc_sigpending(current);
 	spin_unlock_irq(&current->sigmask_lock);
 
-	current->session = 1;
-	current->pgrp = 1;
 	strcpy(current->comm, "rpciod");
 
 	current->flags |= PF_MEMALLOC;

@@ -106,7 +106,7 @@ static char *hga_type_name;
 
 /* Global locks */
 
-spinlock_t hga_reg_lock = SPIN_LOCK_UNLOCKED;
+static spinlock_t hga_reg_lock = SPIN_LOCK_UNLOCKED;
 
 /* Framebuffer driver structures */
 

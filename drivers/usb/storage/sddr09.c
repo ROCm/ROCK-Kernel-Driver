@@ -965,7 +965,7 @@ int sddr09_transport(Scsi_Cmnd *srb, struct us_data *us)
 				(info->pageshift + info->blockshift) ) ) {
 
 			US_DEBUGP("Error: Requested LBA %04X exceeds maximum "
-			  "block %04X\n", lba,
+			  "block %04lX\n", lba,
 			  (info->capacity >> (info->pageshift + info->blockshift))-1);
 
 			// FIXME: sense buffer?

@@ -18,7 +18,7 @@
 #define EFL 14
 #define UESP 15
 #define SS   16
-
+#define FRAME_SIZE 17
 
 /* this struct defines the way the registers are stored on the 
    stack during a system call. */

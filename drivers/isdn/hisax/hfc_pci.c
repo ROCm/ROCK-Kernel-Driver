@@ -84,7 +84,7 @@ static const PCI_ENTRY id_list[] =
 void
 release_io_hfcpci(struct IsdnCardState *cs)
 {
-	int flags;
+	long flags;
 
 	save_flags(flags);
 	cli();
@@ -299,7 +299,8 @@ hfcpci_empty_fifo(struct BCState *bcs, bzfifo_type * bz, u_char * bdata, int cou
 	u_char *ptr, *ptr1, new_f2;
 	struct sk_buff *skb;
 	struct IsdnCardState *cs = bcs->cs;
-	int flags, total, maxlen, new_z2;
+	long flags;
+	int total, maxlen, new_z2;
 	z_type *zp;
 
 	save_flags(flags);
@@ -633,7 +634,8 @@ static void
 hfcpci_fill_fifo(struct BCState *bcs)
 {
 	struct IsdnCardState *cs = bcs->cs;
-	int flags, maxlen, fcnt;
+	long flags;
+	int maxlen, fcnt;
 	int count, new_z1;
 	bzfifo_type *bz;
 	u_char *bdata;
@@ -810,7 +812,7 @@ dch_nt_l2l1(struct PStack *st, int pr, void *arg)
 static int
 hfcpci_auxcmd(struct IsdnCardState *cs, isdn_ctrl * ic)
 {
-	int flags;
+	long flags;
 	int i = *(unsigned int *) ic->parm.num;
 
 	if ((ic->arg == 98) &&
@@ -1160,7 +1162,7 @@ HFCPCI_l1hw(struct PStack *st, int pr, void *arg)
 {
 	struct IsdnCardState *cs = (struct IsdnCardState *) st->l1.hardware;
 	struct sk_buff *skb = arg;
-	int flags;
+	long flags;
 
 	switch (pr) {
 		case (PH_DATA | REQUEST):
@@ -1314,7 +1316,8 @@ void
 mode_hfcpci(struct BCState *bcs, int mode, int bc)
 {
 	struct IsdnCardState *cs = bcs->cs;
-	int flags, fifo2;
+	long flags;
+	int fifo2;
 
 	if (cs->debug & L1_DEB_HSCX)
 		debugl1(cs, "HFCPCI bchannel mode %d bchan %d/%d",
@@ -1548,7 +1551,7 @@ setstack_2b(struct PStack *st, struct BCState *bcs)
 static void
 hfcpci_bh(struct IsdnCardState *cs)
 {
-	int flags;
+	long flags;
 /*      struct PStack *stptr;
  */
 	if (!cs)

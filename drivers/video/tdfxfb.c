@@ -529,7 +529,7 @@ static int  nomtrr = 0;
 #endif
 static int  nohwcursor = 0;
 static char __initdata fontname[40] = { 0 };
-static const char *mode_option __initdata = NULL;
+static char *mode_option __initdata = NULL;
 
 /* ------------------------------------------------------------------------- 
  *                      Hardware-specific funcions

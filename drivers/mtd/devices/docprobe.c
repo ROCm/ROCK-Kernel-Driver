@@ -70,7 +70,7 @@ MODULE_PARM(doc_config_location, "l");
 
 
 static unsigned long __initdata doc_locations[] = {
-#if defined (__alpha__) || defined(__i386__)
+#if defined (__alpha__) || defined(__i386__) || defined(__x86_64__)
 #ifdef CONFIG_MTD_DOCPROBE_HIGH
 	0xfffc8000, 0xfffca000, 0xfffcc000, 0xfffce000, 
 	0xfffd0000, 0xfffd2000, 0xfffd4000, 0xfffd6000,

@@ -58,7 +58,7 @@
 
 #endif
 
-#if defined(__i386__)
+#if defined(__i386__) || defined(__x86_64__)
 #define USE_MEMCPY
 #endif
 

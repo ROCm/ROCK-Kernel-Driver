@@ -41,7 +41,7 @@
 
 #include <linux/sched.h>
 #include <linux/errno.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/hdreg.h>
 #include <linux/ide.h>
 

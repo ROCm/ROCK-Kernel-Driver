@@ -2743,7 +2743,7 @@ void console_setup(char *str, int *ints)
  * Of course, once the console has been registered, we had better ensure
  * that serial167_init() doesn't leave the chip non-functional.
  *
- * The console_lock must be held when we get here.
+ * The console must be locked when we get here.
  */
 
 void serial167_console_write(struct console *co, const char *str, unsigned count)

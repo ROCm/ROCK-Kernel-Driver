@@ -22,6 +22,7 @@ export-objs    := fbmem.o fbcmap.o fbcon.o fbmon.o modedb.o \
 obj-$(CONFIG_DUMMY_CONSOLE)       += dummycon.o
 obj-$(CONFIG_SGI_NEWPORT_CONSOLE) += newport_con.o
 obj-$(CONFIG_PROM_CONSOLE)        += promcon.o promcon_tbl.o
+obj-$(CONFIG_STI_CONSOLE)         += sticon.o sticon-bmode.o sticore.o
 obj-$(CONFIG_VGA_CONSOLE)         += vgacon.o
 obj-$(CONFIG_MDA_CONSOLE)         += mdacon.o
 
@@ -47,6 +48,7 @@ obj-$(CONFIG_FB_APOLLO)           += dnfb.o
 obj-$(CONFIG_FB_Q40)              += q40fb.o
 obj-$(CONFIG_FB_ATARI)            += atafb.o
 obj-$(CONFIG_FB_ATY128)           += aty128fb.o
+obj-$(CONFIG_FB_RADEON)		  += radeonfb.o
 obj-$(CONFIG_FB_IGA)              += igafb.o
 obj-$(CONFIG_FB_CONTROL)          += controlfb.o
 obj-$(CONFIG_FB_PLATINUM)         += platinumfb.o
@@ -77,6 +79,12 @@ obj-$(CONFIG_FB_TCX)              += tcxfb.o sbusfb.o
 obj-$(CONFIG_FB_CGFOURTEEN)       += cgfourteenfb.o sbusfb.o
 obj-$(CONFIG_FB_P9100)            += p9100fb.o sbusfb.o
 obj-$(CONFIG_FB_LEO)              += leofb.o sbusfb.o
+obj-$(CONFIG_FB_STI)	          += stifb.o sticore.o fbgen.o
+obj-$(CONFIG_FB_PMAG_BA)          += pmag-ba-fb.o
+obj-$(CONFIG_FB_PMAGB_B)          += pmagb-b-fb.o
+obj-$(CONFIG_FB_MAXINE)           += maxinefb.o
+obj-$(CONFIG_FB_TX3912)           += tx3912fb.o
+
 
 subdir-$(CONFIG_FB_MATROX)	  += matrox
 ifeq ($(CONFIG_FB_MATROX),y)
@@ -106,6 +114,7 @@ obj-$(CONFIG_FB_VIRTUAL)          += vfb.o
 obj-$(CONFIG_FB_HIT)              += hitfb.o fbgen.o
 obj-$(CONFIG_FB_E1355)            += epson1355fb.o fbgen.o
 obj-$(CONFIG_FB_PVR2)             += pvr2fb.o
+obj-$(CONFIG_FB_VOODOO1)          += sstfb.o
 
 # Generic Low Level Drivers
 
@@ -125,6 +134,7 @@ obj-$(CONFIG_FBCON_MAC)           += fbcon-mac.o
 obj-$(CONFIG_FBCON_MFB)           += fbcon-mfb.o
 obj-$(CONFIG_FBCON_VGA)           += fbcon-vga.o
 obj-$(CONFIG_FBCON_HGA)           += fbcon-hga.o
+obj-$(CONFIG_FBCON_STI)           += fbcon-sti.o
 
 include $(TOPDIR)/Rules.make
 
@@ -140,3 +150,4 @@ promcon_tbl.c: prom.uni ../char/conmakehash
 	    -e 's/dfont\(_uni.*\]\)/promfont\1 __initdata/' > promcon_tbl.c
 
 promcon_tbl.o: promcon_tbl.c $(TOPDIR)/include/linux/types.h
+

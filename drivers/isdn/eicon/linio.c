@@ -683,7 +683,7 @@ void UxFree(void *ptr)
 	kfree(ptr);
 }
 
-int UxCardLock(ux_diva_card_t *card)
+long UxCardLock(ux_diva_card_t *card)
 {
 	unsigned long flags;
 
@@ -695,7 +695,7 @@ int UxCardLock(ux_diva_card_t *card)
 	
 }
 
-void UxCardUnlock(ux_diva_card_t *card, int ipl)
+void UxCardUnlock(ux_diva_card_t *card, long ipl)
 {
 	//spin_unlock_irqrestore(&diva_lock, ipl);
 

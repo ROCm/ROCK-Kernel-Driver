@@ -83,6 +83,7 @@ static struct usb_device_id pegasus_ids[] = {
 
 MODULE_AUTHOR( DRIVER_AUTHOR );
 MODULE_DESCRIPTION( DRIVER_DESC );
+MODULE_LICENSE("GPL");
 MODULE_PARM(loopback, "i");
 MODULE_PARM(mii_mode, "i");
 MODULE_PARM_DESC(loopback, "Enable MAC loopback mode (bit 0)");

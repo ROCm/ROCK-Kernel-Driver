@@ -179,6 +179,8 @@ extern unsigned long swap_cache_find_success;
 
 extern spinlock_t pagemap_lru_lock;
 
+extern void FASTCALL(mark_page_accessed(struct page *));
+
 /*
  * Page aging defines.
  * Since we do exponential decay of the page age, we
@@ -202,6 +204,8 @@ extern spinlock_t pagemap_lru_lock;
 #define add_page_to_active_list(page) { \
 	DEBUG_ADD_PAGE \
 	ZERO_PAGE_BUG \
+	page->age = 0; \
+	ClearPageReferenced(page); \
 	SetPageActive(page); \
 	list_add(&(page)->lru, &active_list); \
 	nr_active_pages++; \

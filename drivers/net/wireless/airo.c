@@ -1228,7 +1228,7 @@ static void airo_interrupt ( int irq, void* dev_id, struct pt_regs *regs) {
 	/* Check to see if there is something to receive */
 	if ( status & EV_RX  ) {
 		struct sk_buff *skb = NULL;
-		int flags;
+		long flags;
 		u16 fc, len, hdrlen = 0;
 		struct {
 			u16 status, len;
@@ -1559,7 +1559,7 @@ static u16 issuecommand(struct airo_info *ai, Cmd *pCmd, Resp *pRsp) {
         // Im really paranoid about letting it run forever!
 	int max_tries = 600000;  
         int rc = SUCCESS;
-	int flags;
+	long flags;
 
 	spin_lock_irqsave(&ai->cmd_lock, flags);
 	OUT4500(ai, PARAM0, pCmd->parm0);
@@ -1664,7 +1664,7 @@ static int aux_bap_read(struct airo_info *ai, u16 *pu16Dst,
 	u16 next;
 	int words;
 	int i;
-	int flags;
+	long flags;
 
 	spin_lock_irqsave(&ai->aux_lock, flags);
 	page = IN4500(ai, SWS0+whichbap);
@@ -1738,7 +1738,7 @@ static int PC4500_accessrid(struct airo_info *ai, u16 rid, u16 accmd)
 static int PC4500_readrid(struct airo_info *ai, u16 rid, void *pBuf, int len)
 {
 	u16 status;
-        int flags;
+        long flags;
         int rc = SUCCESS;
 
 	spin_lock_irqsave(&ai->bap1_lock, flags);
@@ -1780,7 +1780,7 @@ static int PC4500_writerid(struct airo_info *ai, u16 rid,
 			   const void *pBuf, int len)
 {
 	u16 status;
-        int flags;
+        long flags;
 	int rc = SUCCESS;
 
 	spin_lock_irqsave(&ai->bap1_lock, flags);
@@ -1810,7 +1810,7 @@ static u16 transmit_allocate(struct airo_info *ai, int lenPayload)
 	Resp rsp;
 	u16 txFid;
 	u16 txControl;
-        int flags;
+        long flags;
 
 	cmd.cmd = CMD_ALLOCATETX;
 	cmd.parm0 = lenPayload;

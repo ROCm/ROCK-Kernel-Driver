@@ -808,6 +808,7 @@ const static struct vendor_product mts_supported_products[] =
 	{ "ScanMaker V6USL",	mts_sup_unknown},
 	{ "ScanMaker V6USL",	mts_sup_unknown},
 	{ "Scanmaker V6UL",	mts_sup_unknown},
+	{ "Scanmaker V6UPL",	mts_sup_alpha},
 };
 
 /* The entries of microtek_table must correspond, line-by-line to
@@ -823,6 +824,7 @@ static struct usb_device_id mts_usb_ids [] =
 	{ USB_DEVICE(0x5da, 0x00a3) },
 	{ USB_DEVICE(0x5da, 0x80a3) },
 	{ USB_DEVICE(0x5da, 0x80ac) },
+	{ USB_DEVICE(0x5da, 0x00b6) },
 	{ }						/* Terminating entry */
 };
 
@@ -1062,4 +1064,5 @@ module_exit(microtek_drv_exit);
 
 MODULE_AUTHOR( DRIVER_AUTHOR );
 MODULE_DESCRIPTION( DRIVER_DESC );
+MODULE_LICENSE("GPL");
 

@@ -47,6 +47,8 @@ static int reboot_count = NUM_PRESSES_REBOOT; /* Number of presses to reboot */
  * Because callbacks can be unregistered at random the list can become
  * fragmented, so we need to search through the list until we find the first
  * free entry.
+ *
+ * FIXME: Has anyone spotted any locking functions int his code recently ??
  */
 
 int button_add_callback (void (*callback) (void), int count)
@@ -236,6 +238,9 @@ static void __exit nwbutton_exit (void)
 	misc_deregister (&button_misc_device);
 }
 
+
+MODULE_AUTHOR("Alex Holden");
+MODULE_LICENSE("GPL");
 EXPORT_NO_SYMBOLS;
 
 module_init(nwbutton_init);

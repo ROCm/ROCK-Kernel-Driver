@@ -584,6 +584,7 @@ nfserrno (int errno)
 		{ nfserr_dquot, -EDQUOT },
 #endif
 		{ nfserr_stale, -ESTALE },
+		{ nfserr_dropit, -ENOMEM },
 		{ -1, -EIO }
 	};
 	int	i;

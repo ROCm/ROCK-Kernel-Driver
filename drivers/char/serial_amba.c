@@ -1881,7 +1881,7 @@ static int ambauart_console_read(struct console *co, const char *s, u_int count)
  *	Print a string to the serial port trying not to disturb
  *	any possible real use of the port...
  *
- *	The console_lock must be held when we get here.
+ *	The console must be locked when we get here.
  */
 static void ambauart_console_write(struct console *co, const char *s, u_int count)
 {

@@ -543,8 +543,7 @@ static int radeon_do_engine_reset( drm_device_t *dev )
 						RADEON_SOFT_RESET_RE |
 						RADEON_SOFT_RESET_PP |
 						RADEON_SOFT_RESET_E2 |
-						RADEON_SOFT_RESET_RB |
-						RADEON_SOFT_RESET_HDP ) );
+						RADEON_SOFT_RESET_RB ) );
 	RADEON_READ( RADEON_RBBM_SOFT_RESET );
 	RADEON_WRITE( RADEON_RBBM_SOFT_RESET, ( rbbm_soft_reset &
 						~( RADEON_SOFT_RESET_CP |
@@ -553,8 +552,7 @@ static int radeon_do_engine_reset( drm_device_t *dev )
 						   RADEON_SOFT_RESET_RE |
 						   RADEON_SOFT_RESET_PP |
 						   RADEON_SOFT_RESET_E2 |
-						   RADEON_SOFT_RESET_RB |
-						   RADEON_SOFT_RESET_HDP ) ) );
+						   RADEON_SOFT_RESET_RB ) ) );
 	RADEON_READ( RADEON_RBBM_SOFT_RESET );
 
 

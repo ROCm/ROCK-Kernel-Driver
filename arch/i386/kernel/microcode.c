@@ -126,6 +126,7 @@ static int __init microcode_init(void)
 		printk(KERN_ERR "microcode: failed to devfs_register()\n");
 		goto out;
 	}
+	error = 0;
 	printk(KERN_INFO 
 		"IA-32 Microcode Update Driver: v%s <tigran@veritas.com>\n", 
 		MICROCODE_VERSION);

@@ -283,7 +283,7 @@
 #  define FALSE 0
 #endif
 
-#if defined(__powerpc__) || defined(__i386__)
+#if defined(__powerpc__) || defined(__i386__) || defined(__x86_64__)
 #  define MMAPIO
 #endif
 

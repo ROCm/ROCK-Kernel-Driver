@@ -226,6 +226,7 @@ static struct nf_hook_ops ip_conntrack_local_in_ops
 
 static int init_or_cleanup(int init)
 {
+	struct proc_dir_entry *proc;
 	int ret = 0;
 
 	if (!init) goto cleanup;
@@ -234,11 +235,14 @@ static int init_or_cleanup(int init)
 	if (ret < 0)
 		goto cleanup_nothing;
 
-	proc_net_create("ip_conntrack",0,list_conntracks);
+	proc = proc_net_create("ip_conntrack",0,list_conntracks);
+	if (!proc) goto cleanup_init;
+	proc->owner = THIS_MODULE;
+
 	ret = nf_register_hook(&ip_conntrack_in_ops);
 	if (ret < 0) {
 		printk("ip_conntrack: can't register in hook.\n");
-		goto cleanup_init;
+		goto cleanup_proc;
 	}
 	ret = nf_register_hook(&ip_conntrack_local_out_ops);
 	if (ret < 0) {
@@ -266,8 +270,9 @@ static int init_or_cleanup(int init)
 	nf_unregister_hook(&ip_conntrack_local_out_ops);
  cleanup_inops:
 	nf_unregister_hook(&ip_conntrack_in_ops);
- cleanup_init:
+ cleanup_proc:
 	proc_net_remove("ip_conntrack");
+ cleanup_init:
 	ip_conntrack_cleanup();
  cleanup_nothing:
 	return ret;

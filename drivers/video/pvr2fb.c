@@ -51,7 +51,7 @@
 #include <linux/string.h>
 #include <linux/mm.h>
 #include <linux/tty.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/delay.h>
 #include <linux/config.h>
 #include <linux/interrupt.h>
@@ -299,7 +299,7 @@ static struct fb_videomode pvr2_modedb[] __initdata = {
 #define DEFMODE_VGA	2
 
 static int defmode = DEFMODE_NTSC;
-static const char *mode_option __initdata = NULL;
+static char *mode_option __initdata = NULL;
 
 /* Get the fixed part of the display */
 
@@ -1165,6 +1165,7 @@ int __init pvr2fb_setup(char *options)
 #endif
 
 #ifdef MODULE
+MODULE_LICENSE("GPL");
 module_init(pvr2fb_init);
 #endif
 module_exit(pvr2fb_exit);

@@ -70,7 +70,7 @@ static int __init divert_init(void)
 /* Module deinit code */
 /**********************/
 static void __exit divert_exit(void)
-{ int flags;
+{ long flags;
   int i;
 
   save_flags(flags);

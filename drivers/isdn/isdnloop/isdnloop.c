@@ -323,7 +323,7 @@ isdnloop_polldchan(unsigned long data)
 	int left;
 	u_char c;
 	int ch;
-	int flags;
+	unsigned long flags;
 	u_char *p;
 	isdn_ctrl cmd;
 

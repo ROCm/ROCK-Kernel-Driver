@@ -1,5 +1,5 @@
 /*
- * USB Keyspan PDA Converter driver
+ * USB Keyspan PDA / Xircom / Entregra Converter driver
  *
  * Copyright (c) 1999 - 2001 Greg Kroah-Hartman	<greg@kroah.com>
  * Copyright (c) 1999, 2000 Brian Warner	<warner@lothar.com>
@@ -12,6 +12,14 @@
  *
  * See Documentation/usb/usb-serial.txt for more information on using this driver
  * 
+ * (09/07/2001) gkh
+ *	cleaned up the Xircom support.  Added ids for Entregra device which is
+ *	the same as the Xircom device.  Enabled the code to be compiled for
+ *	either Xircom or Keyspan devices.
+ *
+ * (08/11/2001) Cristian M. Craciunescu
+ *	support for Xircom PGSDB9
+ *
  * (05/31/2001) gkh
  *	switched from using spinlock to a semaphore, which fixes lots of problems.
  *
@@ -88,13 +96,32 @@ struct ezusb_hex_record {
 	__u8 data[16];
 };
 
+/* make a simple define to handle if we are compiling keyspan_pda or xircom support */
+#if defined(CONFIG_USB_SERIAL_KEYSPAN_PDA) || defined(CONFIG_USB_SERIAL_KEYSPAN_PDA_MODULE)
+	#define KEYSPAN
+#else
+	#undef KEYSPAN
+#endif
+#if defined(CONFIG_USB_SERIAL_XIRCOM) || defined(CONFIG_USB_SERIAL_XIRCOM_MODULE)
+	#define XIRCOM
+#else
+	#undef XIRCOM
+#endif
+
+#ifdef KEYSPAN
 #include "keyspan_pda_fw.h"
+#endif
+
+#ifdef XIRCOM
+#include "xircom_pgs_fw.h"
+#endif
+
 #include "usb-serial.h"
 
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v1.0.0"
+#define DRIVER_VERSION "v1.1"
 #define DRIVER_AUTHOR "Brian Warner <warner@lothar.com>"
 #define DRIVER_DESC "USB Keyspan PDA Converter driver"
 
@@ -105,12 +132,25 @@ struct keyspan_pda_private {
 	struct tq_struct	unthrottle_task;
 };
 
+
 #define KEYSPAN_VENDOR_ID		0x06cd
 #define KEYSPAN_PDA_FAKE_ID		0x0103
 #define KEYSPAN_PDA_ID			0x0104 /* no clue */
 
+/* For Xircom PGSDB9 and older Entregra version of the same device */
+#define XIRCOM_VENDOR_ID		0x085a
+#define XIRCOM_FAKE_ID			0x8027
+#define ENTREGRA_VENDOR_ID		0x1645
+#define ENTREGRA_FAKE_ID		0x8093
+
 static __devinitdata struct usb_device_id id_table_combined [] = {
+#ifdef KEYSPAN
 	{ USB_DEVICE(KEYSPAN_VENDOR_ID, KEYSPAN_PDA_FAKE_ID) },
+#endif
+#ifdef XIRCOM
+	{ USB_DEVICE(XIRCOM_VENDOR_ID, XIRCOM_FAKE_ID) },
+	{ USB_DEVICE(ENTREGRA_VENDOR_ID, ENTREGRA_FAKE_ID) },
+#endif
 	{ USB_DEVICE(KEYSPAN_VENDOR_ID, KEYSPAN_PDA_ID) },
 	{ }						/* Terminating entry */
 };
@@ -122,10 +162,24 @@ static __devinitdata struct usb_device_id id_table_std [] = {
 	{ }						/* Terminating entry */
 };
 
+#ifdef KEYSPAN
 static __devinitdata struct usb_device_id id_table_fake [] = {
 	{ USB_DEVICE(KEYSPAN_VENDOR_ID, KEYSPAN_PDA_FAKE_ID) },
 	{ }						/* Terminating entry */
 };
+#endif
+
+#ifdef XIRCOM
+static __devinitdata struct usb_device_id id_table_fake_xircom [] = {
+        { USB_DEVICE(XIRCOM_VENDOR_ID, XIRCOM_FAKE_ID) },
+        { }                                             
+};
+
+static __devinitdata struct usb_device_id id_table_fake_entregra [] = {
+        { USB_DEVICE(ENTREGRA_VENDOR_ID, ENTREGRA_FAKE_ID) },
+        { }                                             
+};
+#endif
 
 static void keyspan_pda_wakeup_write( struct usb_serial_port *port )
 {
@@ -709,12 +763,25 @@ static void keyspan_pda_close(struct usb_serial_port *port, struct file *filp)
 static int keyspan_pda_fake_startup (struct usb_serial *serial)
 {
 	int response;
-	const struct ezusb_hex_record *record;
+	const struct ezusb_hex_record *record = NULL;
 
 	/* download the firmware here ... */
 	response = ezusb_set_reset(serial, 1);
 
-	record = &keyspan_pda_firmware[0];
+#ifdef KEYSPAN
+	if (serial->dev->descriptor.idVendor == KEYSPAN_VENDOR_ID)
+		record = &keyspan_pda_firmware[0];
+#endif
+#ifdef XIRCOM
+	if ((serial->dev->descriptor.idVendor == XIRCOM_VENDOR_ID) ||
+	    (serial->dev->descriptor.idVendor == ENTREGRA_VENDOR_ID))
+		record = &xircom_pgs_firmware[0];
+#endif
+	if (record == NULL) {
+		err(__FUNCTION__": unknown vendor, aborting.");
+		return -ENODEV;
+	}
+
 	while(record->address != 0xffff) {
 		response = ezusb_writememory(serial, record->address,
 					     (unsigned char *)record->data,
@@ -770,7 +837,8 @@ static void keyspan_pda_shutdown (struct usb_serial *serial)
 	kfree(serial->port[0].private);
 }
 
-struct usb_serial_device_type keyspan_pda_fake_device = {
+#ifdef KEYSPAN
+static struct usb_serial_device_type keyspan_pda_fake_device = {
 	name:			"Keyspan PDA - (prerenumeration)",
 	id_table:		id_table_fake,
 	needs_interrupt_in:	DONT_CARE,
@@ -782,8 +850,37 @@ struct usb_serial_device_type keyspan_pda_fake_device = {
 	num_ports:		1,
 	startup:		keyspan_pda_fake_startup,
 };
+#endif
 
-struct usb_serial_device_type keyspan_pda_device = {
+#ifdef XIRCOM
+static struct usb_serial_device_type xircom_pgs_fake_device = {
+        name:                   "Xircom PGS - (prerenumeration)",
+        id_table:               id_table_fake_xircom,
+        needs_interrupt_in:     DONT_CARE,
+        needs_bulk_in:          DONT_CARE,
+        needs_bulk_out:         DONT_CARE,
+        num_interrupt_in:       NUM_DONT_CARE,
+        num_bulk_in:            NUM_DONT_CARE,
+        num_bulk_out:           NUM_DONT_CARE,
+        num_ports:              1,
+        startup:                keyspan_pda_fake_startup,
+};
+
+static struct usb_serial_device_type entregra_pgs_fake_device = {
+        name:                   "Entregra PGS - (prerenumeration)",
+        id_table:               id_table_fake_entregra,
+        needs_interrupt_in:     DONT_CARE,
+        needs_bulk_in:          DONT_CARE,
+        needs_bulk_out:         DONT_CARE,
+        num_interrupt_in:       NUM_DONT_CARE,
+        num_bulk_in:            NUM_DONT_CARE,
+        num_bulk_out:           NUM_DONT_CARE,
+        num_ports:              1,
+        startup:                keyspan_pda_fake_startup,
+};
+#endif
+
+static struct usb_serial_device_type keyspan_pda_device = {
 	name:			"Keyspan PDA",
 	id_table:		id_table_std,
 	needs_interrupt_in:	MUST_HAVE,
@@ -812,17 +909,29 @@ struct usb_serial_device_type keyspan_pda_device = {
 
 static int __init keyspan_pda_init (void)
 {
-	usb_serial_register (&keyspan_pda_fake_device);
 	usb_serial_register (&keyspan_pda_device);
-	info(DRIVER_VERSION ":" DRIVER_DESC);
+#ifdef KEYSPAN
+	usb_serial_register (&keyspan_pda_fake_device);
+#endif
+#ifdef XIRCOM
+	usb_serial_register (&xircom_pgs_fake_device);
+	usb_serial_register (&entregra_pgs_fake_device);
+#endif
+	info(DRIVER_DESC " " DRIVER_VERSION);
 	return 0;
 }
 
 
 static void __exit keyspan_pda_exit (void)
 {
-	usb_serial_deregister (&keyspan_pda_fake_device);
 	usb_serial_deregister (&keyspan_pda_device);
+#ifdef KEYSPAN
+	usb_serial_deregister (&keyspan_pda_fake_device);
+#endif
+#ifdef XIRCOM
+	usb_serial_deregister (&entregra_pgs_fake_device);
+	usb_serial_deregister (&xircom_pgs_fake_device);
+#endif
 }
 
 
@@ -831,6 +940,7 @@ module_exit(keyspan_pda_exit);
 
 MODULE_AUTHOR( DRIVER_AUTHOR );
 MODULE_DESCRIPTION( DRIVER_DESC );
+MODULE_LICENSE("GPL");
 
 MODULE_PARM(debug, "i");
 MODULE_PARM_DESC(debug, "Debug enabled or not");

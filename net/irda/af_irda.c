@@ -2107,7 +2107,12 @@ static int irda_getsockopt(struct socket *sock, int level, int optname,
 		offset = sizeof(struct irda_device_list) - 
 			sizeof(struct irda_device_info);
 
-		/* Copy the list itself */
+		/* Copy the list itself - watch for overflow */
+		if(list.len > 2048)
+		{
+			err = -EINVAL;
+			goto bed;
+		}
 		total = offset + (list.len * sizeof(struct irda_device_info));
 		if (total > len)
 			total = len;
@@ -2117,7 +2122,7 @@ static int irda_getsockopt(struct socket *sock, int level, int optname,
 		/* Write total number of bytes used back to client */
 		if (put_user(total, optlen))
 			err = -EFAULT;
-
+bed:
 		/* Free up our buffer */
 		kfree(discoveries);
 		if (err)

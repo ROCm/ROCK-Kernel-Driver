@@ -567,6 +567,7 @@ module_init(pl2303_init);
 module_exit(pl2303_exit);
 
 MODULE_DESCRIPTION(DRIVER_DESC);
+MODULE_LICENSE("GPL");
 
 MODULE_PARM(debug, "i");
 MODULE_PARM_DESC(debug, "Debug enabled or not");

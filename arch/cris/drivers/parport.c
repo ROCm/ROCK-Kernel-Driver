@@ -23,7 +23,7 @@
 #include <linux/major.h>
 #include <linux/sched.h>
 
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/interrupt.h>
 
 #include <asm/setup.h>

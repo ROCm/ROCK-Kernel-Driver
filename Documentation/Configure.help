@@ -2581,7 +2581,7 @@ CONFIG_AGP_VIA
 AMD Irongate support
 CONFIG_AGP_AMD
   This option gives you AGP support for the GLX component of the
-  XFree86 4.x on AMD Irongate chipset.
+  XFree86 4.x on AMD Irongate and 761 chipsets.
 
   For the moment, you should probably say N, unless you want to test
   the GLX component for XFree86 3.3.6, which can be downloaded from
@@ -11249,6 +11249,17 @@ CONFIG_USB_SERIAL_KEYSPAN_PDA
   inserted in and removed from the running kernel whenever you want).
   The module will be called keyspan_pda.o. If you want to compile it 
   as a module, say M here and read Documentation/modules.txt.
+
+USB Xircom / Entregra Single Port Serial Driver
+CONFIG_USB_SERIAL_XIRCOM
+  Say Y here if you want to use a Xircom or Entregra single port USB to
+  serial converter device.  This driver makes use of firmware
+  developed from scratch by Brian Warner.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called keyspan_pda.o. If you want to compile it
+  as a module, say M here and read <file:Documentation/modules.txt>.
 
 USB Keyspan USA-xxx Serial Driver
 CONFIG_USB_SERIAL_KEYSPAN

@@ -187,7 +187,7 @@ typedef struct page {
  * Various page->flags bits:
  *
  * PG_reserved is set for special pages, which can never be swapped
- * out. Some of them might not even exist (eg. empty_bad_page)...
+ * out. Some of them might not even exist (eg empty_bad_page)...
  *
  * Multiple processes may "see" the same page. E.g. for untouched
  * mappings of /dev/null, all processes see the same page full of
@@ -210,8 +210,8 @@ typedef struct page {
  * The following discussion applies only to them.
  *
  * A page may belong to an inode's memory mapping. In this case,
- * page->mapping is the pointer to the inode, and page->offset is the
- * file offset of the page (not necessarily a multiple of PAGE_SIZE).
+ * page->mapping is the pointer to the inode, and page->index is the
+ * file offset of the page, in units of PAGE_CACHE_SIZE.
  *
  * A page may have buffers allocated to it. In this case,
  * page->buffers is a circular list of these buffer heads. Else,
@@ -226,7 +226,7 @@ typedef struct page {
  * using the page->list list_head. These fields are also used for
  * freelist managemet (when page->count==0).
  *
- * There is also a hash table mapping (inode,offset) to the page
+ * There is also a hash table mapping (mapping,index) to the page
  * in memory if present. The lists for this hash table use the fields
  * page->next_hash and page->pprev_hash.
  *
@@ -245,7 +245,7 @@ typedef struct page {
  *
  * For choosing which pages to swap out, inode pages carry a
  * PG_referenced bit, which is set any time the system accesses
- * that page through the (inode,offset) hash table. This referenced
+ * that page through the (mapping,index) hash table. This referenced
  * bit, together with the referenced bit in the page tables, is used
  * to manipulate page->age and move the page across the active,
  * inactive_dirty and inactive_clean lists.
@@ -260,7 +260,7 @@ typedef struct page {
  * PG_error is set to indicate that an I/O error occurred on this page.
  *
  * PG_arch_1 is an architecture specific page state bit.  The generic
- * code guarentees that this bit is cleared for a page when it first
+ * code guarantees that this bit is cleared for a page when it first
  * is entered into the page cache.
  *
  * PG_highmem pages are not permanently mapped into the kernel virtual

@@ -717,6 +717,10 @@ static void add_timer_randomness(struct timer_rand_state *state, unsigned num)
 	} else {
 		time = jiffies;
 	}
+#elif defined (__x86_64__)
+	__u32 high;
+	rdtsc(time, high);
+	num ^= high;
 #else
 	time = jiffies;
 #endif

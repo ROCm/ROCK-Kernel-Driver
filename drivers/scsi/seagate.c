@@ -129,6 +129,10 @@
 #error Please use -DCONTROLLER=SEAGATE or -DCONTROLLER=FD to override controller type
 #endif
 
+#ifndef __i386__
+#undef SEAGATE_USE_ASM
+#endif
+
 /*
 	Thanks to Brian Antoine for the example code in his Messy-Loss ST-01
 		driver, and Mitsugu Suzuki for information on the ST-01

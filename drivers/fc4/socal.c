@@ -673,14 +673,10 @@ static inline void socal_init(struct sbus_dev *sdev, int no)
 	     (long)socals, (long)socal_intr, (long)socal_hw_enque))
 	if (version_printed++ == 0)
 		printk (version);
-#ifdef MODULE
-	s->port[0].fc.module = &__this_module;
-	s->port[1].fc.module = &__this_module;
-#else
-	s->port[0].fc.module = NULL;
-	s->port[1].fc.module = NULL;
-#endif
-	                                	
+
+	s->port[0].fc.module = THIS_MODULE;
+	s->port[1].fc.module = THIS_MODULE;
+                                	
 	s->next = socals;
 	socals = s;
 	s->port[0].fc.dev = sdev;
@@ -850,11 +846,7 @@ static inline void socal_init(struct sbus_dev *sdev, int no)
 	SOD(("Enabled SOCAL\n"))
 }
 
-#ifndef MODULE
-int __init socal_probe(void)
-#else
-int init_module(void)
-#endif
+static int __init socal_probe(void)
 {
 	struct sbus_bus *sbus;
 	struct sbus_dev *sdev = 0;
@@ -880,10 +872,7 @@ int init_module(void)
 	return 0;
 }
 
-EXPORT_NO_SYMBOLS;
-
-#ifdef MODULE
-void cleanup_module(void)
+static void __exit socal_cleanup(void)
 {
 	struct socal *s;
 	int irq;
@@ -910,4 +899,8 @@ void cleanup_module(void)
 				     s->req_cpu, s->req_dvma);
 	}
 }
-#endif
+
+EXPORT_NO_SYMBOLS;
+
+module_init(socal_probe);
+module_exit(socal_cleanup);

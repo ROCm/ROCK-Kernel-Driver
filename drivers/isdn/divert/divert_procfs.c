@@ -50,7 +50,7 @@ void
 put_info_buffer(char *cp)
 {
 	struct divert_info *ib;
-	int flags;
+	long flags;
 
 	if (if_used <= 0)
 		return;
@@ -145,7 +145,7 @@ isdn_divert_poll(struct file *file, poll_table * wait)
 static int
 isdn_divert_open(struct inode *ino, struct file *filep)
 {
-	int flags;
+	long flags;
 
 	lock_kernel();
 	save_flags(flags);
@@ -168,7 +168,7 @@ static int
 isdn_divert_close(struct inode *ino, struct file *filep)
 {
 	struct divert_info *inf;
-	int flags;
+	long flags;
 
 	lock_kernel();
 	save_flags(flags);
@@ -198,7 +198,8 @@ isdn_divert_ioctl(struct inode *inode, struct file *file,
 		  uint cmd, ulong arg)
 {
 	divert_ioctl dioctl;
-	int i, flags;
+	int i;
+	long flags;
 	divert_rule *rulep;
 	char *cp;
 

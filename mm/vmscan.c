@@ -97,7 +97,7 @@ static void try_to_swap_out(struct mm_struct * mm, struct vm_area_struct* vma, u
 
 	/* Don't look at this pte if it's been accessed recently. */
 	if (ptep_test_and_clear_young(page_table)) {
-		age_page_up(page);
+		mark_page_accessed(page);
 		return;
 	}
 
@@ -127,7 +127,7 @@ set_swap_pte:
 		set_pte(page_table, swp_entry_to_pte(entry));
 drop_pte:
 		mm->rss--;
-		if (!page->age)
+		if (!PageReferenced(page))
 			deactivate_page(page);
 		UnlockPage(page);
 		page_cache_release(page);
@@ -406,18 +406,24 @@ struct page * reclaim_page(zone_t * zone)
 			continue;
 		}
 
-		/* Page is or was in use?  Move it to the active list. */
-		if (PageReferenced(page) || (!page->buffers && page_count(page) > 1)) {
-			del_page_from_inactive_clean_list(page);
-			add_page_to_active_list(page);
-			page->age = PAGE_AGE_START;
-			continue;
+		/* Page is referenced? Clear and move to the head of the list.. */
+		if (PageTestandClearReferenced(page)) {
+			list_del(page_lru);
+			list_add(page_lru, &zone->inactive_clean_list);
 		}
 
 		/* The page is dirty, or locked, move to inactive_dirty list. */
 		if (page->buffers || PageDirty(page) || TryLockPage(page)) {
 			del_page_from_inactive_clean_list(page);
 			add_page_to_inactive_dirty_list(page);
+			continue;
+		}
+
+		/* Page is in use?  Move it to the active list. */
+		if (page_count(page) > 1) {
+			UnlockPage(page);
+			del_page_from_inactive_clean_list(page);
+			add_page_to_active_list(page);
 			continue;
 		}
 
@@ -503,12 +509,16 @@ int page_launder(int gfp_mask, int sync)
 			continue;
 		}
 
-		/* Page is or was in use?  Move it to the active list. */
-		if (PageReferenced(page) || (!page->buffers && page_count(page) > 1) ||
-				page_ramdisk(page)) {
+		/* Page is referenced? Clear and move to the head of the list.. */
+		if (PageTestandClearReferenced(page)) {
+			list_del(page_lru);
+			list_add(page_lru, &inactive_dirty_list);
+		}
+
+		/* Page is in use?  Move it to the active list. */
+		if ((!page->buffers && page_count(page) > 1) || page_ramdisk(page)) {
 			del_page_from_inactive_dirty_list(page);
 			add_page_to_active_list(page);
-			page->age = PAGE_AGE_START;
 			continue;
 		}
 
@@ -711,8 +721,7 @@ static int refill_inactive_scan(unsigned int priority)
 			 *
 			 * SUBTLE: we can have buffer pages with count 1.
 			 */
-			if (page->age == 0 && page_count(page) <=
-						(page->buffers ? 2 : 1)) {
+			if (page_count(page) <=	(page->buffers ? 2 : 1)) {
 				deactivate_page_nolock(page);
 				page_active = 0;
 			} else {

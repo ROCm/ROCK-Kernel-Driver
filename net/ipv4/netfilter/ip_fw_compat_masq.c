@@ -14,6 +14,7 @@
 #include <linux/inetdevice.h>
 #include <linux/proc_fs.h>
 #include <linux/version.h>
+#include <linux/module.h>
 #include <net/route.h>
 
 #define ASSERT_READ_LOCK(x) MUST_BE_READ_LOCKED(&ip_conntrack_lock)
@@ -302,13 +303,22 @@ masq_procinfo(char *buffer, char **start, off_t offset, int length)
 int __init masq_init(void)
 {
 	int ret;
+	struct proc_dir_entry *proc;
 
 	ret = ip_conntrack_init();
 	if (ret == 0) {
 		ret = ip_nat_init();
-		if (ret == 0)
-			proc_net_create("ip_masquerade", 0, masq_procinfo);
-		else
+		if (ret == 0) {
+			proc = proc_net_create("ip_masquerade",
+					       0, masq_procinfo);
+			if (proc)
+				proc->owner = THIS_MODULE;
+			else {
+				ip_nat_cleanup();
+				ip_conntrack_cleanup();
+				ret = -ENOMEM;
+			}
+		} else
 			ip_conntrack_cleanup();
 	}
 

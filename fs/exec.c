@@ -350,6 +350,8 @@ struct file *open_exec(const char *name)
 		if (!(nd.mnt->mnt_flags & MNT_NOEXEC) &&
 		    S_ISREG(inode->i_mode)) {
 			int err = permission(inode, MAY_EXEC);
+			if (!err && !(inode->i_mode & 0111))
+				err = -EACCES;
 			file = ERR_PTR(err);
 			if (!err) {
 				file = dentry_open(nd.dentry, nd.mnt, O_RDONLY);

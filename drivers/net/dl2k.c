@@ -470,7 +470,7 @@ start_xmit (struct sk_buff *skb, struct net_device *dev)
 	unsigned entry;
 	u32 ioaddr;
 	int tx_shift;
-	unsigned flags;
+	unsigned long flags;
 
 	ioaddr = dev->base_addr;
 	entry = np->cur_tx % TX_RING_SIZE;

@@ -565,14 +565,10 @@ static inline void soc_init(struct sbus_dev *sdev, int no)
 	     (long)socs, (long)soc_intr, (long)soc_hw_enque))	
 	if (version_printed++ == 0)
 		printk (version);
-#ifdef MODULE
-	s->port[0].fc.module = &__this_module;
-	s->port[1].fc.module = &__this_module;
-#else
-	s->port[0].fc.module = NULL;
-	s->port[1].fc.module = NULL;
-#endif
-	                                	
+
+	s->port[0].fc.module = THIS_MODULE;
+	s->port[1].fc.module = THIS_MODULE;
+
 	s->next = socs;
 	socs = s;
 	s->port[0].fc.dev = sdev;
@@ -713,11 +709,7 @@ static inline void soc_init(struct sbus_dev *sdev, int no)
 	SOD(("Enabled SOC\n"))
 }
 
-#ifndef MODULE
-int __init soc_probe(void)
-#else
-int init_module(void)
-#endif
+static int __init soc_probe(void)
 {
 	struct sbus_bus *sbus;
 	struct sbus_dev *sdev = 0;
@@ -741,10 +733,7 @@ int init_module(void)
 	return 0;
 }
 
-EXPORT_NO_SYMBOLS;
-
-#ifdef MODULE
-void cleanup_module(void)
+static void __exit sco_cleanup(void)
 {
 	struct soc *s;
 	int irq;
@@ -770,4 +759,8 @@ void cleanup_module(void)
 				     s->req_cpu, s->req_dvma);
 	}
 }
-#endif
+
+EXPORT_NO_SYMBOLS;
+
+module_init(soc_probe);
+module_exit(soc_cleanup);

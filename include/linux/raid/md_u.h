@@ -35,6 +35,7 @@
 #define PROTECT_ARRAY		_IO (MD_MAJOR, 0x27)
 #define HOT_ADD_DISK		_IO (MD_MAJOR, 0x28)
 #define SET_DISK_FAULTY		_IO (MD_MAJOR, 0x29)
+#define HOT_GENERATE_ERROR	_IO (MD_MAJOR, 0x2a)
 
 /* usage */
 #define RUN_ARRAY		_IOW (MD_MAJOR, 0x30, mdu_param_t)

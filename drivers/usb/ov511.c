@@ -156,6 +156,7 @@ MODULE_PARM(video_nr,"i");
 
 MODULE_AUTHOR( DRIVER_AUTHOR );
 MODULE_DESCRIPTION( DRIVER_DESC );
+MODULE_LICENSE("GPL");
 
 static struct usb_driver ov511_driver;
 

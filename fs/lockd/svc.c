@@ -76,9 +76,8 @@ lockd(struct svc_rqst *rqstp)
 	nlmsvc_pid = current->pid;
 	up(&lockd_start);
 
-	exit_mm(current);
-	current->session = 1;
-	current->pgrp = 1;
+	daemonize();
+	reparent_to_init();
 	sprintf(current->comm, "lockd");
 
 	/* Process request with signals blocked.  */
@@ -89,12 +88,6 @@ lockd(struct svc_rqst *rqstp)
 
 	/* kick rpciod */
 	rpciod_up();
-
-	/*
-	 * N.B. current do_fork() doesn't like NULL task->files,
-	 * so we defer closing files until forking rpciod.
-	 */
-	exit_files(current);
 
 	dprintk("NFS locking service started (ver " LOCKD_VERSION ").\n");
 
@@ -127,6 +120,16 @@ lockd(struct svc_rqst *rqstp)
 			spin_lock_irq(&current->sigmask_lock);
 			flush_signals(current);
 			spin_unlock_irq(&current->sigmask_lock);
+			if (nlmsvc_ops) {
+				nlmsvc_ops->detach();
+#ifdef RPC_DEBUG
+				nlmsvc_grace_period = 10 * HZ;
+#else
+				nlmsvc_grace_period += 5 * nlm_timeout * HZ;
+
+#endif
+				grace_period_expire = nlmsvc_grace_period + jiffies;
+			}
 		}
 
 		/*
@@ -144,13 +147,14 @@ lockd(struct svc_rqst *rqstp)
 		 * Find a socket with data available and call its
 		 * recvfrom routine.
 		 */
-		if ((err = svc_recv(serv, rqstp, timeout)) == -EAGAIN)
+		if ((err = svc_recv(serv, rqstp, timeout)) == -EAGAIN
+			|| err == -EINTR
+			)
 			continue;
 		if (err < 0) {
-			if (err != -EINTR)
-				printk(KERN_WARNING
-					"lockd: terminating on error %d\n",
-					-err);
+			printk(KERN_WARNING
+			       "lockd: terminating on error %d\n",
+			       -err);
 			break;
 		}
 
@@ -180,6 +184,8 @@ lockd(struct svc_rqst *rqstp)
 	 * shutting down the hosts and clearing the slot.
 	 */
 	if (!nlmsvc_pid || current->pid == nlmsvc_pid) {
+		if (nlmsvc_ops)
+			nlmsvc_ops->detach();
 		nlm_shutdown_hosts();
 		nlmsvc_pid = 0;
 	} else

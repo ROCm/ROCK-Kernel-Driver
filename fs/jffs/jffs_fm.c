@@ -631,11 +631,11 @@ jffs_flash_erasable_size(struct mtd_info *mtd, __u32 offset, __u32 size)
 		return -1;
 	}
 	else if (offset > mtd->size) {
-		printk(KERN_WARNING "jffs_flash_erasable_size given offset off the end of device (%x > %lx)\n", offset, mtd->size);
+		printk(KERN_WARNING "jffs_flash_erasable_size given offset off the end of device (%x > %x)\n", offset, mtd->size);
 		return -2;
 	}
 	else if (offset + size > mtd->size) {
-		printk(KERN_WARNING "jffs_flash_erasable_size() given length which runs off the end of device (ofs %x + len %x = %x, > %lx)\n", offset,size, offset+size, mtd->size);
+		printk(KERN_WARNING "jffs_flash_erasable_size() given length which runs off the end of device (ofs %x + len %x = %x, > %x)\n", offset,size, offset+size, mtd->size);
 		return -3;
 	}
 

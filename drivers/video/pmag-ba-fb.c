@@ -13,7 +13,7 @@
  *      DECstation related code Copyright (C) 1999, 2000, 2001 by
  *      Michael Engel <engel@unix-ag.org>, 
  *      Karsten Merker <merker@linuxtag.org> and
- *	Harald Koerfgen <harald@unix-ag.org>.
+ *	Harald Koerfgen.
  *      This file is subject to the terms and conditions of the GNU General
  *      Public License.  See the file COPYING in the main directory of this
  *      archive for more details.
@@ -27,7 +27,7 @@
 #include <linux/timer.h>
 #include <linux/mm.h>
 #include <linux/tty.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/fb.h>
@@ -429,3 +429,5 @@ int __init pmagbafb_setup(char *options)
 {
 	return 0;
 }
+
+MODULE_LICENSE("GPL");

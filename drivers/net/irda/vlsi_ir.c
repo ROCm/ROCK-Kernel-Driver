@@ -728,7 +728,7 @@ static void vlsi_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 	u8		irintr;
 	int 		boguscount = 20;
 	int		no_speed_check = 0;
-	unsigned	flags;
+	unsigned long	flags;
 
 
 	iobase = ndev->base_addr;

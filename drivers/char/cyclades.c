@@ -5819,3 +5819,4 @@ cy_setup(char *str, int *ints)
 } /* cy_setup */
 #endif /* MODULE */
 
+MODULE_LICENSE("GPL");

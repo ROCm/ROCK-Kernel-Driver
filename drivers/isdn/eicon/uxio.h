@@ -75,8 +75,8 @@ void	UxCardHandleFree(ux_diva_card_t *card);
  * Lock and unlock access to a card
  */
 
-int		UxCardLock(ux_diva_card_t *card);
-void	UxCardUnlock(ux_diva_card_t *card, int ipl);
+long		UxCardLock(ux_diva_card_t *card);
+void	UxCardUnlock(ux_diva_card_t *card, long ipl);
 
 /*
  * Set the mapping address for PCI cards

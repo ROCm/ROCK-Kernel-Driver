@@ -606,6 +606,11 @@ asmlinkage long sys_shmat (int shmid, char *shmaddr, int shmflg, ulong *raddr)
 	shp = shm_lock(shmid);
 	if(shp == NULL)
 		return -EINVAL;
+	err = shm_checkid(shp,shmid);
+	if (err) {
+		shm_unlock(shmid);
+		return err;
+	}
 	if (ipcperms(&shp->shm_perm, acc_mode)) {
 		shm_unlock(shmid);
 		return -EACCES;

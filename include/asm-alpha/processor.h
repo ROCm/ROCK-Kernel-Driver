@@ -7,6 +7,8 @@
 #ifndef __ASM_ALPHA_PROCESSOR_H
 #define __ASM_ALPHA_PROCESSOR_H
 
+#include <linux/personality.h>	/* for ADDR_LIMIT_32BIT */
+
 /*
  * Returns current instruction pointer ("program counter").
  */

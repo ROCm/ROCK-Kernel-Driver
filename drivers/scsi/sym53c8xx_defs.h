@@ -455,7 +455,7 @@
  *  We want to be paranoid for ppc and ia64. :)
  */
 
-#if	defined	__i386__
+#if	defined(__i386__) || defined(__x86_64__)
 #define MEMORY_BARRIER()	do { ; } while(0)
 #elif	defined	__powerpc__
 #define MEMORY_BARRIER()	__asm__ volatile("eieio; sync" : : : "memory")

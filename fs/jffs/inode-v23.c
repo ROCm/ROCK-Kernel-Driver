@@ -327,6 +327,7 @@ jffs_new_inode(const struct inode * dir, struct jffs_raw_inode *raw_inode,
 	struct super_block * sb;
 	struct inode * inode;
 	struct jffs_control *c;
+	struct jffs_file *f;
 
 	sb = dir->i_sb;
 	inode = new_inode(sb);
@@ -350,8 +351,10 @@ jffs_new_inode(const struct inode * dir, struct jffs_raw_inode *raw_inode,
 	inode->i_blksize = PAGE_SIZE;
 	inode->i_blocks = (inode->i_size + 511) >> 9;
 	inode->i_version = 0;
-	inode->u.generic_ip = (void *)jffs_find_file(c, raw_inode->ino);
 
+	f = jffs_find_file(c, raw_inode->ino);
+
+	inode->u.generic_ip = (void *)f;
 	insert_inode_hash(inode);
 
 	return inode;
@@ -577,10 +580,13 @@ jffs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		filp->f_pos++;
 	}
 	f = ((struct jffs_file *)inode->u.generic_ip)->children;
-	for (j = 2; (j < filp->f_pos) && f; j++) {
-	        f = f->sibling_next;
+
+	j=2;
+	while(f && (f->deleted || j++ < filp->f_pos )) {
+		f = f->sibling_next;
 	}
-	for (; f ; f = f->sibling_next) {
+
+	while (f) {
 		D3(printk("jffs_readdir(): \"%s\" ino: %u\n",
 			  (f->name ? f->name : ""), f->ino));
 		if (filldir(dirent, f->name, f->nsize,
@@ -590,6 +596,9 @@ jffs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 			return 0;
 		}
 		filp->f_pos++;
+		do {
+			f = f->sibling_next;
+		} while(f && f->deleted);
 	}
 	D3(printk (KERN_NOTICE "readdir(): up biglock\n"));
 	up(&c->fmc->biglock);
@@ -929,11 +938,15 @@ jffs_remove(struct inode *dir, struct dentry *dentry, int type)
 	}
 
 	if (S_ISDIR(type)) {
-		if (del_f->children) {
-			result = -ENOTEMPTY;
-			goto jffs_remove_end;
+		struct jffs_file *child = del_f->children;
+		while(child) {
+			if( !child->deleted ) {
+				result = -ENOTEMPTY;
+				goto jffs_remove_end;
+			}
+			child = child->sibling_next;
 		}
-	}
+	}            
 	else if (S_ISDIR(del_f->mode)) {
 		D(printk("jffs_remove(): node is a directory "
 			 "but it shouldn't be.\n"));
@@ -1000,9 +1013,6 @@ jffs_remove(struct inode *dir, struct dentry *dentry, int type)
 	dir->i_ctime = dir->i_mtime = CURRENT_TIME;
 	mark_inode_dirty(dir);
 	inode->i_nlink--;
-	if (inode->i_nlink == 0) {
-		inode->u.generic_ip = 0;
-	}
 	inode->i_ctime = dir->i_ctime;
 	mark_inode_dirty(inode);
 
@@ -1321,11 +1331,10 @@ jffs_file_write(struct file *filp, const char *buf, size_t count,
 	struct jffs_node *node;
 	struct dentry *dentry = filp->f_dentry;
 	struct inode *inode = dentry->d_inode;
-	unsigned char *vbuf;
 	int recoverable = 0;
 	size_t written = 0;
 	__u32 thiscount = count;
-	loff_t pos;
+	loff_t pos = *ppos;
 	int err;
 
 	inode = filp->f_dentry->d_inode;
@@ -1334,20 +1343,13 @@ jffs_file_write(struct file *filp, const char *buf, size_t count,
 		  "filp: 0x%p, buf: 0x%p, count: %d\n",
 		  inode, inode->i_ino, filp, buf, count));
 
-	err = filp->f_error;
-	if (err) {
-		filp->f_error = 0;
-		return err;
-	}
-
-	down(&inode->i_sem);
-
+#if 0
 	if (inode->i_sb->s_flags & MS_RDONLY) {
 		D(printk("jffs_file_write(): MS_RDONLY\n"));
 		err = -EROFS;
 		goto out_isem;
 	}
-
+#endif
 	err = -EINVAL;
 
 	if (!S_ISREG(inode->i_mode)) {
@@ -1364,24 +1366,16 @@ jffs_file_write(struct file *filp, const char *buf, size_t count,
 
 	c = f->c;
 
-	if (filp->f_flags & O_APPEND)
-		pos = inode->i_size;
-	else
-		pos = *ppos;
+	/*
+	 * This will never trigger with sane page sizes.  leave it in anyway,
+	 * since I'm thinking about how to merge larger writes (the current idea
+	 * is to poke a thread that does the actual I/O and starts by doing a
+	 * down(&inode->i_sem).  then we would need to get the page cache pages
+	 * and have a list of I/O requests and do write-merging here.
+	 * -- prumpf
+	 */
 	
-	if (pos < 0) {
-		goto out_isem;
-	}
-	
-	thiscount = min_t(unsigned int,
-			c->fmc->max_chunk_size - sizeof(struct jffs_raw_inode),
-			count);
-
-	if (!(vbuf = kmalloc(thiscount, GFP_KERNEL))) {
-		D(printk("jffs_file_write(): failed to allocate bounce buffer. Fix me to use page cache\n"));
-		err = -ENOMEM;
-		goto out_isem;
-	}
+	thiscount = min(c->fmc->max_chunk_size - sizeof(struct jffs_raw_inode), count);
 
 	D3(printk (KERN_NOTICE "file_write(): down biglock\n"));
 	down(&c->fmc->biglock);
@@ -1393,17 +1387,6 @@ jffs_file_write(struct file *filp, const char *buf, size_t count,
 	 * <_Anarchy_> posix and reality are not interconnected on this issue
 	 */
 	while (count) {
-
-		/* FIXME: This is entirely gratuitous use of bounce buffers.
-		   Get a clue and use the page cache. 
-		   /me wanders off to get a crash course on Linux VFS
-		   dwmw2
-		*/
-		if (copy_from_user(vbuf, buf, thiscount)) {
-			err = -EFAULT;
-			goto out;
-		}
-		
 		/* Things are going to be written so we could allocate and
 		   initialize the necessary data structures now.  */
 		if (!(node = (struct jffs_node *) kmalloc(sizeof(struct jffs_node),
@@ -1459,10 +1442,11 @@ jffs_file_write(struct file *filp, const char *buf, size_t count,
 		   smaller node than we were expecting. There's no need for it 
 		   to waste the space at the end of the flash just because it's 
 		   a little smaller than what we asked for. But that's a whole
-		   new can of worms which I'm not going to open this week. dwmw2.
+		   new can of worms which I'm not going to open this week.
+		   -- dwmw2.
 		*/
 		if ((err = jffs_write_node(c, node, &raw_inode, f->name,
-					   (const unsigned char *)vbuf,
+					   (const unsigned char *)buf,
 					   recoverable, f)) < 0) {
 			D(printk("jffs_file_write(): jffs_write_node() failed.\n"));
 			kfree(node);
@@ -1482,15 +1466,11 @@ jffs_file_write(struct file *filp, const char *buf, size_t count,
 
 		D3(printk("jffs_file_write(): new f_pos %ld.\n", (long)pos));
 
-		thiscount = min_t(unsigned int,
-			c->fmc->max_chunk_size - sizeof(struct jffs_raw_inode),
-			count);
+		thiscount = min_t(unsigned int, c->fmc->max_chunk_size - sizeof(struct jffs_raw_inode), count);
 	}
  out:
 	D3(printk (KERN_NOTICE "file_write(): up biglock\n"));
 	up(&c->fmc->biglock);
-	*ppos = pos;
-	kfree(vbuf);
 
 	/* Fix things in the real inode.  */
 	if (pos > inode->i_size) {
@@ -1502,15 +1482,28 @@ jffs_file_write(struct file *filp, const char *buf, size_t count,
 	invalidate_inode_pages(inode);
 
  out_isem:
-	up(&inode->i_sem);
-	
-	/* What if there was an error, _and_ we've written some data. */
-	if (written)
-		return written;
-	else
-		return err;
+	return err;
 } /* jffs_file_write()  */
 
+static ssize_t
+jffs_prepare_write(struct file *filp, struct page *page,
+		   unsigned from, unsigned to)
+{
+	/* FIXME: we should detect some error conditions here */
+	
+	return 0;
+} /* jffs_prepare_write() */
+
+static ssize_t
+jffs_commit_write(struct file *filp, struct page *page,
+		  unsigned from, unsigned to)
+{
+	void *addr = page_address(page) + from;
+	/* XXX: PAGE_CACHE_SHIFT or PAGE_SHIFT */
+	loff_t pos = (page->index<<PAGE_CACHE_SHIFT) + from;
+	
+	return jffs_file_write(filp, addr, to-from, &pos);
+} /* jffs_commit_write() */
 
 /* This is our ioctl() routine.  */
 static int
@@ -1578,6 +1571,8 @@ jffs_ioctl(struct inode *inode, struct file *filp, unsigned int cmd,
 
 static struct address_space_operations jffs_address_operations = {
 	readpage: jffs_readpage,
+	prepare_write: jffs_prepare_write,
+	commit_write: jffs_commit_write,
 };
 
 static int jffs_fsync(struct file *f, struct dentry *d, int datasync)
@@ -1591,10 +1586,12 @@ static int jffs_fsync(struct file *f, struct dentry *d, int datasync)
 
 static struct file_operations jffs_file_operations =
 {
+	llseek:	generic_file_llseek,  /* llseek */
 	read:  generic_file_read,    /* read */
-	write: jffs_file_write,      /* write */
+	write: generic_file_write,   /* write */
 	ioctl: jffs_ioctl,           /* ioctl */
 	mmap:  generic_file_mmap,    /* mmap */
+	open:  generic_file_open,
 	fsync: jffs_fsync,
 };
 
@@ -1682,6 +1679,7 @@ jffs_read_inode(struct inode *inode)
 		jffs_read_data(f, (char *)&rdev, 0, sizeof(kdev_t));
 		init_special_inode(inode, inode->i_mode, kdev_t_to_nr(rdev));
 	}
+
 	D3(printk (KERN_NOTICE "read_inode(): up biglock\n"));
 	up(&c->fmc->biglock);
 }
@@ -1690,13 +1688,23 @@ jffs_read_inode(struct inode *inode)
 void
 jffs_delete_inode(struct inode *inode)
 {
-	D3(printk("jffs_delete_inode(): inode->i_ino == %lu\n",
+	struct jffs_file *f;
+	struct jffs_control *c;
+	D1(printk("jffs_delete_inode(): inode->i_ino == %lu\n",
 		  inode->i_ino));
 
 	lock_kernel();
+
 	inode->i_size = 0;
 	inode->i_blocks = 0;
+	inode->u.generic_ip = 0;
 	clear_inode(inode);
+	if (inode->i_nlink == 0) {
+		c = (struct jffs_control *) inode->i_sb->u.generic_sbp;
+		f = (struct jffs_file *) jffs_find_file (c, inode->i_ino);
+		jffs_possibly_delete_file(f);
+	}
+
 	unlock_kernel();
 }
 
@@ -1725,6 +1733,9 @@ static DECLARE_FSTYPE_DEV(jffs_fs_type, "jffs", jffs_read_super);
 static int __init
 init_jffs_fs(void)
 {
+	printk("JFFS version "
+	       JFFS_VERSION_STRING
+	       ", (C) 1999, 2000  Axis Communications AB\n");
 	return register_filesystem(&jffs_fs_type);
 }
 

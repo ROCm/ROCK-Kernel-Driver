@@ -136,6 +136,7 @@ CONFIG_BLK_DEV_FD=y
 # CONFIG_MD_RAID0 is not set
 # CONFIG_MD_RAID1 is not set
 # CONFIG_MD_RAID5 is not set
+# CONFIG_MD_MULTIPATH is not set
 # CONFIG_BLK_DEV_LVM is not set
 
 #

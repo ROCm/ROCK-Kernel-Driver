@@ -73,7 +73,7 @@ static u_char ccd_sp_irqtab[16] = {
 /******************************/
 static inline void
 Write_hfc(struct IsdnCardState *cs, u_char regnum, u_char val)
-{       register int flags;
+{       long flags;
 
         save_flags(flags);
 	cli();
@@ -84,8 +84,8 @@ Write_hfc(struct IsdnCardState *cs, u_char regnum, u_char val)
 
 static inline u_char
 Read_hfc(struct IsdnCardState *cs, u_char regnum)
-{       register int flags;
-        register u_char ret; 
+{       long flags;
+        u_char ret; 
 
         save_flags(flags);
 	cli();
@@ -101,7 +101,7 @@ Read_hfc(struct IsdnCardState *cs, u_char regnum)
 /**************************************************/
 static void
 fifo_select(struct IsdnCardState *cs, u_char fifo)
-{       int flags;
+{       long flags;
 
         if (fifo == cs->hw.hfcsx.last_fifo) 
 	  return; /* still valid */
@@ -123,7 +123,7 @@ fifo_select(struct IsdnCardState *cs, u_char fifo)
 /******************************************/
 static void
 reset_fifo(struct IsdnCardState *cs, u_char fifo)
-{       int flags;
+{       long flags;
 
         save_flags(flags); 
 	cli();
@@ -337,7 +337,7 @@ read_fifo(struct IsdnCardState *cs, u_char fifo, int trans_max)
 void
 release_io_hfcsx(struct IsdnCardState *cs)
 {
-	int flags;
+	long flags;
 
 	save_flags(flags);
 	cli();
@@ -599,7 +599,7 @@ static void
 hfcsx_fill_fifo(struct BCState *bcs)
 {
 	struct IsdnCardState *cs = bcs->cs;
-	int flags;
+	long flags;
 
 	if (!bcs->tx_skb)
 		return;
@@ -670,7 +670,7 @@ dch_nt_l2l1(struct PStack *st, int pr, void *arg)
 static int
 hfcsx_auxcmd(struct IsdnCardState *cs, isdn_ctrl * ic)
 {
-	int flags;
+	long flags;
 	int i = *(unsigned int *) ic->parm.num;
 
 	if ((ic->arg == 98) &&
@@ -729,7 +729,7 @@ hfcsx_auxcmd(struct IsdnCardState *cs, isdn_ctrl * ic)
 static void
 receive_emsg(struct IsdnCardState *cs)
 {
-	int flags;
+	long flags;
 	int count = 5;
 	u_char *ptr;
 	struct sk_buff *skb;
@@ -961,7 +961,7 @@ HFCSX_l1hw(struct PStack *st, int pr, void *arg)
 {
 	struct IsdnCardState *cs = (struct IsdnCardState *) st->l1.hardware;
 	struct sk_buff *skb = arg;
-	int flags;
+	long flags;
 
 	switch (pr) {
 		case (PH_DATA | REQUEST):
@@ -1115,7 +1115,8 @@ void
 mode_hfcsx(struct BCState *bcs, int mode, int bc)
 {
 	struct IsdnCardState *cs = bcs->cs;
-	int flags, fifo2;
+	long flags;
+	int fifo2;
 
 	if (cs->debug & L1_DEB_HSCX)
 		debugl1(cs, "HFCSX bchannel mode %d bchan %d/%d",
@@ -1338,7 +1339,7 @@ setstack_2b(struct PStack *st, struct BCState *bcs)
 static void
 hfcsx_bh(struct IsdnCardState *cs)
 {
-	int flags;
+	long flags;
 /*      struct PStack *stptr;
  */
 	if (!cs)
@@ -1478,7 +1479,7 @@ setup_hfcsx(struct IsdnCard *card)
 {
 	struct IsdnCardState *cs = card->cs;
 	char tmp[64];
-	int flags;
+	long flags;
 
 	strcpy(tmp, hfcsx_revision);
 	printk(KERN_INFO "HiSax: HFC-SX driver Rev. %s\n", HiSax_getrev(tmp));

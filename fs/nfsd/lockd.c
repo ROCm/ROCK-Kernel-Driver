@@ -32,8 +32,10 @@ nlm_fopen(struct svc_rqst *rqstp, struct nfs_fh *f, struct file *filp)
 	fh.fh_export = NULL;
 
 	nfserr = nfsd_open(rqstp, &fh, S_IFREG, MAY_LOCK, filp);
-	if (!nfserr)
+	if (!nfserr) {
 		dget(filp->f_dentry);
+		mntget(filp->f_vfsmnt);
+	}
 	fh_put(&fh);
  	/* nlm and nfsd don't share error codes.
 	 * we invent: 0 = no error
@@ -55,6 +57,7 @@ nlm_fclose(struct file *filp)
 {
 	nfsd_close(filp);
 	dput(filp->f_dentry);
+	mntput(filp->f_vfsmnt);
 }
 
 struct nlmsvc_binding		nfsd_nlm_ops = {

@@ -848,6 +848,7 @@ static void __exit dabusb_cleanup (void)
 
 MODULE_AUTHOR( DRIVER_AUTHOR );
 MODULE_DESCRIPTION( DRIVER_DESC );
+MODULE_LICENSE("GPL");
 
 MODULE_PARM (buffers, "i");
 MODULE_PARM_DESC (buffers, "Number of buffers (default=256)");

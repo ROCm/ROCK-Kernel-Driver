@@ -52,7 +52,7 @@
 
 #include <linux/sched.h>
 #include <linux/errno.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 
 /***********************************************************************
  * Helper routines

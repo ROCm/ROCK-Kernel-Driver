@@ -81,11 +81,12 @@
 #include <linux/sched.h>
 #include <linux/errno.h>
 #include <linux/init.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 
 /* Some informational data */
 MODULE_AUTHOR("Matthew Dharm <mdharm-usb@one-eyed-alien.net>");
 MODULE_DESCRIPTION("USB Mass Storage driver for Linux");
+MODULE_LICENSE("GPL");
 
 /*
  * Per device data

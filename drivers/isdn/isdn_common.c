@@ -280,7 +280,7 @@ isdn_timer_funct(ulong dummy)
 	}
 	if (tf) 
 	{
-		int flags;
+		long flags;
 
 		save_flags(flags);
 		cli();
@@ -292,7 +292,8 @@ isdn_timer_funct(ulong dummy)
 void
 isdn_timer_ctrl(int tf, int onoff)
 {
-	int flags, old_tflags;
+	long flags;
+	int old_tflags;
 
 	save_flags(flags);
 	cli();
@@ -2396,7 +2397,7 @@ static int __init isdn_init(void)
  */
 static void __exit isdn_exit(void)
 {
-	int flags;
+	long flags;
 	int i;
 
 #ifdef CONFIG_ISDN_PPP

@@ -2361,7 +2361,8 @@ static int devfs_notify_change (struct dentry *dentry, struct iattr *iattr)
     if (de == NULL) return -ENODEV;
     retval = inode_change_ok (inode, iattr);
     if (retval != 0) return retval;
-    inode_setattr (inode, iattr);
+    retval = inode_setattr (inode, iattr);
+    if (retval != 0) return retval;
     if ( iattr->ia_valid & (ATTR_MODE | ATTR_UID | ATTR_GID) )
 	devfsd_notify_one (de, DEVFSD_NOTIFY_CHANGE, inode->i_mode,
 			   inode->i_uid, inode->i_gid, fs_info);

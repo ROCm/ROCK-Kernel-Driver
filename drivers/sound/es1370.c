@@ -163,23 +163,7 @@
 #include <linux/spinlock.h>
 #include <asm/uaccess.h>
 #include <asm/hardirq.h>
-
-#if defined(CONFIG_INPUT_ANALOG) || defined(CONFIG_INPUT_ANALOG_MODULE)
 #include <linux/gameport.h>
-#else
-struct gameport {
-	int io;
-	int size;
-};
-
-extern inline void gameport_register_port(struct gameport *gameport)
-{
-}
-
-extern inline void gameport_unregister_port(struct gameport *gameport)
-{
-}
-#endif
 
 /* --------------------------------------------------------------------- */
 
@@ -1240,7 +1224,7 @@ static ssize_t es1370_write(struct file *file, const char *buffer, size_t count,
 {
 	struct es1370_state *s = (struct es1370_state *)file->private_data;
 	DECLARE_WAITQUEUE(wait, current);
-	ssize_t ret;
+	ssize_t ret = 0;
 	unsigned long flags;
 	unsigned swptr;
 	int cnt;

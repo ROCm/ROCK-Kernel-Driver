@@ -268,6 +268,12 @@ nfsd_dispatch(struct svc_rqst *rqstp, u32 *statp)
 
 	/* Now call the procedure handler, and encode NFS status. */
 	nfserr = proc->pc_func(rqstp, rqstp->rq_argp, rqstp->rq_resp);
+	if (nfserr == nfserr_dropit) {
+		dprintk("nfsd: Dropping request due to malloc failure!\n");
+		nfsd_cache_update(rqstp, RC_NOCACHE, NULL);
+		return 0;
+	}
+		
 	if (rqstp->rq_proc != 0)
 		svc_putlong(&rqstp->rq_resbuf, nfserr);
 

@@ -1,7 +1,7 @@
 VERSION = 2
 PATCHLEVEL = 4
 SUBLEVEL = 10
-EXTRAVERSION =-pre9
+EXTRAVERSION =-pre10
 
 KERNELRELEASE=$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)
 
@@ -146,6 +146,7 @@ DRIVERS-$(CONFIG_WAN) += drivers/net/wan/wan.o
 DRIVERS-$(CONFIG_ARCNET) += drivers/net/arcnet/arcnetdrv.o
 DRIVERS-$(CONFIG_ATM) += drivers/atm/atm.o
 DRIVERS-$(CONFIG_IDE) += drivers/ide/idedriver.o
+DRIVERS-$(CONFIG_FC4) += drivers/fc4/fc4.a
 DRIVERS-$(CONFIG_SCSI) += drivers/scsi/scsidrv.o
 DRIVERS-$(CONFIG_FUSION_BOOT) += drivers/message/fusion/fusion.o
 DRIVERS-$(CONFIG_IEEE1394) += drivers/ieee1394/ieee1394drv.o

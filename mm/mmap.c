@@ -337,6 +337,9 @@ unsigned long do_mmap_pgoff(struct file * file, unsigned long addr, unsigned lon
 	vma->vm_raend = 0;
 
 	if (file) {
+		error = -EINVAL;
+		if (vm_flags & (VM_GROWSDOWN|VM_GROWSUP))
+			goto free_vma;
 		if (vm_flags & VM_DENYWRITE) {
 			error = deny_write_access(file);
 			if (error)

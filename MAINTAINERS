@@ -780,6 +780,13 @@ L:	jffs-dev@axis.com
 W:	http://www.developer.axis.com/software/jffs/
 S:	Maintained
 
+JOURNALLING FLASH FILE SYSTEM V2 (JFFS2)
+P:	David Woodhouse
+M:	dwmw2@infradead.org
+L:	jffs-dev@axis.com
+W:	http://sources.redhat.com/jffs2/
+S:	Maintained
+
 JOYSTICK DRIVER
 P:	Vojtech Pavlik
 M:	vojtech@suse.cz
@@ -1268,6 +1275,9 @@ S:	Maintained
 SOFTWARE RAID (Multiple Disks) SUPPORT
 P:	Ingo Molnar
 M:	mingo@redhat.com
+P:	Neil Brown
+M:	neilb@cse.unsw.edu.au
+L:	linux-raid@vger.kernel.org
 S:	Maintained
 
 SONIC NETWORK DRIVER

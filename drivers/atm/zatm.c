@@ -52,6 +52,12 @@
 #define DPRINTK(format,args...)
 #endif
 
+#ifndef __i386__
+#ifdef CONFIG_ATM_ZATM_EXACT_TS
+#warning Precise timestamping only available on i386 platform
+#undef CONFIG_ATM_ZATM_EXACT_TS
+#endif
+#endif
 
 #ifndef CONFIG_ATM_ZATM_DEBUG
 

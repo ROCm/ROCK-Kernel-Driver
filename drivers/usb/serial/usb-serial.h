@@ -153,12 +153,22 @@ extern int  usb_serial_register(struct usb_serial_device_type *new_device);
 extern void usb_serial_deregister(struct usb_serial_device_type *device);
 
 /* determine if we should include the EzUSB loader functions */
-#if defined(CONFIG_USB_SERIAL_KEYSPAN_PDA) || defined(CONFIG_USB_SERIAL_WHITEHEAT) || defined(CONFIG_USB_SERIAL_KEYSPAN) || defined(CONFIG_USB_SERIAL_KEYSPAN_PDA_MODULE) || defined(CONFIG_USB_SERIAL_WHITEHEAT_MODULE) || defined(CONFIG_USB_SERIAL_KEYSPAN_MODULE)
-	#define	USES_EZUSB_FUNCTIONS
-	extern int ezusb_writememory (struct usb_serial *serial, int address, unsigned char *data, int length, __u8 bRequest);
-	extern int ezusb_set_reset (struct usb_serial *serial, unsigned char reset_bit);
-#else
-	#undef 	USES_EZUSB_FUNCTIONS
+#undef USES_EZUSB_FUNCTIONS
+#if defined(CONFIG_USB_SERIAL_KEYSPAN_PDA) || defined(CONFIG_USB_SERIAL_KEYSPAN_PDA_MODULE)
+	#define USES_EZUSB_FUNCTIONS
+#endif
+#if defined(CONFIG_USB_SERIAL_XIRCOM) || defined(CONFIG_USB_SERIAL_XIRCOM_MODULE)
+	#define USES_EZUSB_FUNCTIONS
+#endif
+#if defined(CONFIG_USB_SERIAL_KEYSPAN) || defined(CONFIG_USB_SERIAL_KEYSPAN_MODULE)
+	#define USES_EZUSB_FUNCTIONS
+#endif
+#if defined(CONFIG_USB_SERIAL_WHITEHEAT) || defined(CONFIG_USB_SERIAL_WHITEHEAT_MODULE)
+	#define USES_EZUSB_FUNCTIONS
+#endif
+#ifdef USES_EZUSB_FUNCTIONS
+extern int ezusb_writememory (struct usb_serial *serial, int address, unsigned char *data, int length, __u8 bRequest);
+extern int ezusb_set_reset (struct usb_serial *serial, unsigned char reset_bit);
 #endif
 
 

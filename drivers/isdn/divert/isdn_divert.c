@@ -67,7 +67,7 @@ static unsigned char extern_wait_max = 4; /* maximum wait in s for external proc
 /* timer callback function */
 /***************************/
 static void deflect_timer_expire(ulong arg)
-{ int flags;
+{ long flags;
   struct call_struc *cs = (struct call_struc *) arg;
 
   save_flags(flags);
@@ -125,7 +125,8 @@ static void deflect_timer_expire(ulong arg)
 int cf_command(int drvid, int mode, 
                u_char proc, char *msn, 
                u_char service, char *fwd_nr, ulong *procid)
-{ int retval,msnlen,flags;
+{ long flags;
+  int retval,msnlen;
   int fwd_len;
   char *p,*ielenp,tmp[60];
   struct call_struc *cs;
@@ -220,7 +221,7 @@ int cf_command(int drvid, int mode,
 int deflect_extern_action(u_char cmd, ulong callid, char *to_nr)
 { struct call_struc *cs;
   isdn_ctrl ic;
-  int flags;
+  long flags;
   int i;
 
   if ((cmd & 0x7F) > 2) return(-EINVAL); /* invalid command */
@@ -291,7 +292,7 @@ int deflect_extern_action(u_char cmd, ulong callid, char *to_nr)
 /********************************/
 int insertrule(int idx, divert_rule *newrule)
 { struct deflect_struc *ds,*ds1=NULL;
-  int flags;
+  long flags;
 
   if (!(ds = (struct deflect_struc *) kmalloc(sizeof(struct deflect_struc), 
                                               GFP_KERNEL))) 
@@ -337,7 +338,7 @@ int insertrule(int idx, divert_rule *newrule)
 /***********************************/
 int deleterule(int idx)
 { struct deflect_struc *ds,*ds1;
-  int flags;
+  long flags;
   
   if (idx < 0) 
    { save_flags(flags);
@@ -405,7 +406,7 @@ divert_rule *getruleptr(int idx)
 /*************************************************/
 int isdn_divert_icall(isdn_ctrl *ic)
 { int retval = 0;
-  int flags;
+  long flags;
   struct call_struc *cs = NULL; 
   struct deflect_struc *dv;
   char *p,*p1;
@@ -557,7 +558,7 @@ int isdn_divert_icall(isdn_ctrl *ic)
 
 void deleteprocs(void)
 { struct call_struc *cs, *cs1; 
-  int flags;
+  long flags;
 
   save_flags(flags);
   cli();
@@ -714,7 +715,8 @@ int interrogate_success(isdn_ctrl *ic, struct call_struc *cs)
 /*********************************************/
 int prot_stat_callback(isdn_ctrl *ic)
 { struct call_struc *cs, *cs1;
-  int i,flags;
+  int i;
+  long flags;
 
   cs = divert_head; /* start of list */
   cs1 = NULL;
@@ -805,7 +807,8 @@ int prot_stat_callback(isdn_ctrl *ic)
 /***************************/
 int isdn_divert_stat_callback(isdn_ctrl *ic)
 { struct call_struc *cs, *cs1;
-  int flags, retval;
+  long flags;
+  int retval;
 
   retval = -1;
   cs = divert_head; /* start of list */

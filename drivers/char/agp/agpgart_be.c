@@ -65,7 +65,7 @@ static int agp_try_unsupported __initdata = 0;
 
 static inline void flush_cache(void)
 {
-#if defined(__i386__)
+#if defined(__i386__) || defined(__x86_64__)
 	asm volatile ("wbinvd":::"memory");
 #elif defined(__alpha__) || defined(__ia64__) || defined(__sparc__)
 	/* ??? I wonder if we'll really need to flush caches, or if the
@@ -385,9 +385,9 @@ int agp_unbind_memory(agp_memory * curr)
 /* 
  * Driver routines - start
  * Currently this module supports the following chipsets:
- * i810, 440lx, 440bx, 440gx, i840, i850, via vp3, via mvp3, via kx133, 
- * via kt133, amd irongate, ALi M1541, and generic support for the SiS 
- * chipsets.
+ * i810, i815, 440lx, 440bx, 440gx, i840, i850, via vp3, via mvp3,
+ * via kx133, via kt133, amd irongate, amd 761, ALi M1541, and generic
+ * support for the SiS chipsets.
  */
 
 /* Generic Agp routines - Start */
@@ -2895,6 +2895,12 @@ static struct {
 		"AMD",
 		"Irongate",
 		amd_irongate_setup },
+	{ PCI_DEVICE_ID_AMD_761_0,
+		PCI_VENDOR_ID_AMD,
+		AMD_761,
+		"AMD",
+		"761",
+		amd_irongate_setup },
 	{ 0,
 		PCI_VENDOR_ID_AMD,
 		AMD_GENERIC,
@@ -2922,7 +2928,6 @@ static struct {
 		"Intel",
 		"440GX",
 		intel_generic_setup },
-	/* could we add support for PCI_DEVICE_ID_INTEL_815_1 too ? */
 	{ PCI_DEVICE_ID_INTEL_815_0,
 		PCI_VENDOR_ID_INTEL,
 		INTEL_I815,

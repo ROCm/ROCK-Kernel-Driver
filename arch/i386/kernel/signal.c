@@ -666,13 +666,16 @@ int do_signal(struct pt_regs *regs, sigset_t *oldset)
 					continue;
 				/* FALLTHRU */
 
-			case SIGSTOP:
+			case SIGSTOP: {
+				struct signal_struct *sig;
 				current->state = TASK_STOPPED;
 				current->exit_code = signr;
-				if (!(current->p_pptr->sig->action[SIGCHLD-1].sa.sa_flags & SA_NOCLDSTOP))
+				sig = current->p_pptr->sig;
+				if (sig && !(sig->action[SIGCHLD-1].sa.sa_flags & SA_NOCLDSTOP))
 					notify_parent(current, SIGCHLD);
 				schedule();
 				continue;
+			}
 
 			case SIGQUIT: case SIGILL: case SIGTRAP:
 			case SIGABRT: case SIGFPE: case SIGSEGV:

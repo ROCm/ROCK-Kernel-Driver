@@ -43,7 +43,7 @@
 /* select machine configuration */
 #if defined(CONFIG_ATARI)
 #define MACH ATARI
-#elif defined(__i386__) || defined(__arm__) /* and others?? */
+#elif defined(__i386__) || defined(__x86_64__) || defined(__arm__) /* and others?? */
 #define MACH PC
 #else
 #error Cannot build nvram driver for this machine configuration.

@@ -15,6 +15,10 @@
  *
  * See Documentation/usb/usb-serial.txt for more information on using this driver
  * 
+ * (09/13/2001) gkh
+ *	Moved generic driver initialize after we have registered with the USB
+ *	core.  Thanks to Randy Dunlap for pointing this problem out.
+ *
  * (07/03/2001) gkh
  *	Fixed module paramater size.  Thanks to John Brockmeyer for the pointer.
  *	Fixed vendor and product getting defined through the MODULE_PARM macro
@@ -1426,14 +1430,6 @@ int usb_serial_init(void)
 		return -1;
 	}
 
-#ifdef CONFIG_USB_SERIAL_GENERIC
-	generic_device_ids[0].idVendor = vendor;
-	generic_device_ids[0].idProduct = product;
-	generic_device_ids[0].match_flags = USB_DEVICE_ID_MATCH_VENDOR | USB_DEVICE_ID_MATCH_PRODUCT;
-	/* register our generic driver with ourselves */
-	usb_serial_register (&generic_device);
-#endif
-	
 	/* register the USB driver */
 	result = usb_register(&usb_serial_driver);
 	if (result < 0) {
@@ -1441,6 +1437,14 @@ int usb_serial_init(void)
 		err("usb_register failed for the usb-serial driver. Error number %d", result);
 		return -1;
 	}
+
+#ifdef CONFIG_USB_SERIAL_GENERIC
+	generic_device_ids[0].idVendor = vendor;
+	generic_device_ids[0].idProduct = product;
+	generic_device_ids[0].match_flags = USB_DEVICE_ID_MATCH_VENDOR | USB_DEVICE_ID_MATCH_PRODUCT;
+	/* register our generic driver with ourselves */
+	usb_serial_register (&generic_device);
+#endif
 
 	info(DRIVER_DESC " " DRIVER_VERSION);
 
@@ -1512,6 +1516,7 @@ EXPORT_SYMBOL(usb_serial_deregister);
 /* Module information */
 MODULE_AUTHOR( DRIVER_AUTHOR );
 MODULE_DESCRIPTION( DRIVER_DESC );
+MODULE_LICENSE("GPL");
 
 MODULE_PARM(debug, "i");
 MODULE_PARM_DESC(debug, "Debug enabled or not");
@@ -1523,4 +1528,3 @@ MODULE_PARM_DESC(vendor, "User specified USB idVendor");
 MODULE_PARM(product, "h");
 MODULE_PARM_DESC(product, "User specified USB idProduct");
 #endif
-

@@ -27,12 +27,14 @@
 /* 000 */
 #define md__get_free_pages(x,y) __get_free_pages(x,y)
 
-#ifdef __i386__
+#if defined(__i386__) || defined(__x86_64__)
 /* 001 */
 static __inline__ int md_cpu_has_mmx(void)
 {
 	return test_bit(X86_FEATURE_MMX,  &boot_cpu_data.x86_capability);
 }
+#else
+#define md_cpu_has_mmx(x)	(0)
 #endif
 
 /* 002 */

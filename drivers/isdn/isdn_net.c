@@ -583,7 +583,7 @@ isdn_net_dial(void)
 	isdn_net_dev *p = dev->netdev;
 	int anymore = 0;
 	int i;
-	int flags;
+	ulong flags;
 	isdn_ctrl cmd;
 
 	while (p) {
@@ -2792,7 +2792,7 @@ isdn_net_setcfg(isdn_net_ioctl_cfg * cfg)
 			chidx = lp->pre_channel;
 		}
 		if (cfg->exclusive > 0) {
-			int flags;
+			ulong flags;
 
 			/* If binding is exclusive, try to grab the channel */
 			save_flags(flags);
@@ -3048,7 +3048,7 @@ isdn_net_delphone(isdn_net_ioctl_phone * phone)
 	int inout = phone->outgoing & 1;
 	isdn_net_phone *n;
 	isdn_net_phone *m;
-	int flags;
+	ulong flags;
 
 	if (p) {
 		save_flags(flags);
@@ -3084,7 +3084,7 @@ isdn_net_rmallphone(isdn_net_dev * p)
 {
 	isdn_net_phone *n;
 	isdn_net_phone *m;
-	int flags;
+	ulong flags;
 	int i;
 
 	save_flags(flags);
@@ -3133,7 +3133,7 @@ isdn_net_force_hangup(char *name)
 static int
 isdn_net_realrm(isdn_net_dev * p, isdn_net_dev * q)
 {
-	int flags;
+	ulong flags;
 
 	save_flags(flags);
 	cli();
@@ -3219,7 +3219,7 @@ isdn_net_rm(char *name)
 int
 isdn_net_rmall(void)
 {
-	int flags;
+	ulong flags;
 	int ret;
 
 	/* Walk through netdev-chain */

@@ -1565,3 +1565,4 @@ module_exit (usbnet_exit);
 
 MODULE_AUTHOR ("David Brownell <dbrownell@users.sourceforge.net>");
 MODULE_DESCRIPTION ("USB Host-to-Host Link Drivers (Belkin, Linux, NetChip, Prolific, ...)");
+MODULE_LICENSE("GPL");

@@ -102,6 +102,7 @@ inside:
 		for_each_task(p) {
 			if(p->pid == last_pid	||
 			   p->pgrp == last_pid	||
+			   p->tgid == last_pid	||
 			   p->session == last_pid) {
 				if(++last_pid >= next_safe) {
 					if(last_pid & 0xffff8000)

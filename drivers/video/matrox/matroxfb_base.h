@@ -102,7 +102,7 @@
 
 #endif /* MATROXFB_DEBUG */
 
-#ifndef __i386__
+#if !defined(__i386__) && !defined(__x86_64__)
 #ifndef ioremap_nocache
 #define ioremap_nocache(X,Y) ioremap(X,Y)
 #endif
@@ -117,7 +117,7 @@
 /* I benchmarked PII/350MHz with G200... MEMCPY, MEMCPYTOIO and WRITEL are on same speed ( <2% diff) */
 /* so that means that G200 speed (or AGP speed?) is our limit... I do not have benchmark to test, how */
 /* much of PCI bandwidth is used during transfers... */
-#if defined(__i386__)
+#if defined(__i386__) || defined(__x86_64__)
 #define MEMCPYTOIO_MEMCPY
 #else
 #define MEMCPYTOIO_WRITEL
