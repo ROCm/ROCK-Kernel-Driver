@@ -388,11 +388,15 @@ UNUSUAL_DEV(  0x059f, 0xa601, 0x0200, 0x0200,
 		"USB Hard Disk",
 		US_SC_RBC, US_PR_CB, NULL, 0 ), 
 
-/* Submitted by Jol Bourquard <numlock@freesurf.ch> */
+/* Submitted by Joel Bourquard <numlock@freesurf.ch>
+ * Some versions of this device need the SubClass and Protocol overrides
+ * while others don't.
+ */
 UNUSUAL_DEV(  0x05ab, 0x0060, 0x1104, 0x1110,
 		"In-System",
 		"PyroGate External CD-ROM Enclosure (FCD-523)",
-		US_SC_SCSI, US_PR_BULK, NULL, 0 ),
+		US_SC_SCSI, US_PR_BULK, NULL,
+		US_FL_NEED_OVERRIDE ),
 
 #ifdef CONFIG_USB_STORAGE_ISD200
 UNUSUAL_DEV(  0x05ab, 0x0031, 0x0100, 0x0110,
