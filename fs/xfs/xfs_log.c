@@ -1020,7 +1020,6 @@ xlog_bdstrat_cb(struct xfs_buf *bp)
  *
  * If the filesystem blocksize is too large, we may need to choose a
  * larger size since the directory code currently logs entire blocks.
- * XXXmiken XXXcurtis
  */
 
 STATIC void
@@ -1035,7 +1034,7 @@ xlog_get_iclog_buffer_size(xfs_mount_t	*mp,
 	 * When logbufs == 0, someone has disabled the log from the FSTAB
 	 * file.  This is not a documented feature.  We need to set xlog_debug
 	 * to zero (this deactivates the log) and set xlog_target to the
-	 * appropriate dev_t.  Only one filesystem may be affected as such
+	 * appropriate device.  Only one filesystem may be affected as such
 	 * since this is just a performance hack to test what we might be able
 	 * to get if the log were not present.
 	 */
@@ -1063,9 +1062,9 @@ xlog_get_iclog_buffer_size(xfs_mount_t	*mp,
 			log->l_iclog_bufs = mp->m_logbufs;
 
 #if defined(DEBUG) || defined(XLOG_NOLOG)
-		/* We are reactivating a filesystem after it was active */
+		/* We are reactivating a filesystem after it was inactive */
 		if (log->l_targ == xlog_target) {
-			xlog_target = 1; /* XXX(hch): WTF? */
+			xlog_target = NULL;
 			xlog_debug = 1;
 		}
 #endif
