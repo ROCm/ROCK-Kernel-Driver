@@ -130,11 +130,13 @@ struct pt_regs {
 	unsigned long ar_fpsr;		/* floating point status (preserved) */
 	unsigned long r15;		/* scratch */
 
+	/* The remaining registers are NOT saved for system calls.  */
+
 	unsigned long r14;		/* scratch */
 	unsigned long r2;		/* scratch */
 	unsigned long r3;		/* scratch */
-	/* The following registers are saved by SAVE_REST: */
 
+	/* The following registers are saved by SAVE_REST: */
 	unsigned long r16;		/* scratch */
 	unsigned long r17;		/* scratch */
 	unsigned long r18;		/* scratch */
@@ -155,8 +157,7 @@ struct pt_regs {
 	unsigned long ar_ccv;		/* compare/exchange value (scratch) */
 
 	/*
-	 * Floating point registers that the kernel considers
-	 * scratch:
+	 * Floating point registers that the kernel considers scratch:
 	 */
 	struct ia64_fpreg f6;		/* scratch */
 	struct ia64_fpreg f7;		/* scratch */

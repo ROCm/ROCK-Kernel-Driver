@@ -29,8 +29,6 @@
 #include <asm/perfmon.h>
 #endif
 
-#define offsetof(type,field)    ((unsigned long) &((type *) 0)->field)
-
 /*
  * Bits in the PSR that we allow ptrace() to change:
  *	be, up, ac, mfl, mfh (the user mask; five bits total)

@@ -110,7 +110,7 @@ show_regs (struct pt_regs *regs)
 	printk("f8  : %05lx%016lx f9  : %05lx%016lx\n",
 	       regs->f8.u.bits[1], regs->f8.u.bits[0],
 	       regs->f9.u.bits[1], regs->f9.u.bits[0]);
-	printk("f10  : %05lx%016lx f11  : %05lx%016lx\n",
+	printk("f10 : %05lx%016lx f11 : %05lx%016lx\n",
 	       regs->f10.u.bits[1], regs->f10.u.bits[0],
 	       regs->f11.u.bits[1], regs->f11.u.bits[0]);
 

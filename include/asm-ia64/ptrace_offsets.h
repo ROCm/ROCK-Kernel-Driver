@@ -2,8 +2,8 @@
 #define _ASM_IA64_PTRACE_OFFSETS_H
 
 /*
- * Copyright (C) 1999 Hewlett-Packard Co
- * Copyright (C) 1999 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 1999, 2003 Hewlett-Packard Co
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 /*
  * The "uarea" that can be accessed via PEEKUSER and POKEUSER is a
@@ -14,20 +14,16 @@
  *		unsigned long nat_bits;
  *		unsigned long empty1;
  *		struct ia64_fpreg f2;			// f2-f5
- *			.
- *			.
+ *			:
  *		struct ia64_fpreg f5;
  *		struct ia64_fpreg f10;			// f10-f31
- *			.
- *			.
+ *			:
  *		struct ia64_fpreg f31;
  *		unsigned long r4;			// r4-r7
- *			.
- *			.
+ *			:
  *		unsigned long r7;
  *		unsigned long b1;			// b1-b5
- *			.
- *			.
+ *			:
  *		unsigned long b5;
  *		unsigned long ar_ec;
  *		unsigned long ar_lc;
@@ -55,8 +51,7 @@
  *		unsigned long r10;
  *		unsigned long r11;
  *		unsigned long r16;
- *			.
- *			.
+ *			:
  *		unsigned long r31;
  *		unsigned long ar_ccv;
  *		unsigned long ar_fpsr;

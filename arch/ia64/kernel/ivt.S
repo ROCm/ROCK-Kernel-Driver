@@ -1,7 +1,7 @@
 /*
  * arch/ia64/kernel/ivt.S
  *
- * Copyright (C) 1998-2001 Hewlett-Packard Co
+ * Copyright (C) 1998-2001, 2003 Hewlett-Packard Co
  *	Stephane Eranian <eranian@hpl.hp.com>
  *	David Mosberger <davidm@hpl.hp.com>
  * Copyright (C) 2000, 2002-2003 Intel Co
@@ -637,52 +637,49 @@ END(daccess_bit)
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x2c00 Entry 11 (size 64 bundles) Break instruction (33)
 ENTRY(break_fault)
-
-/* System call entry/exit only saves/restores part of pt_regs, i.e. no scratch registers
- * are saved/restored except r15 which contains syscall number and needs to be saved in the
- * entry. This optimization is based on the assumption that applications only call glibc
- * system call interface which doesn't use scratch registers after break into kernel.
- * Registers saved/restored during system call entry/exit are listed as follows:
- *
- *   Registers to be saved & restored:
- *	CR registers: cr_ipsr, cr_iip, cr_ifs
- *	AR registers: ar_unat, ar_pfs, ar_rsc, ar_rnat, ar_bspstore, ar_fpsr
- * 	others: pr, b0, loadrs, r1, r12, r13, r15
- *   Registers to be restored only:
- * 	r8~r11: output value from the system call.
- *
- * During system call exit, scratch registers (including r15) are modified/cleared to
- * prevent leaking bits from kernel to user level.
- */
+	/*
+	 * The streamlined system call entry/exit paths only save/restore the initial part
+	 * of pt_regs.  This implies that the callers of system-calls must adhere to the
+	 * normal procedure calling conventions.
+	 *
+	 *   Registers to be saved & restored:
+	 *	CR registers: cr.ipsr, cr.iip, cr.ifs
+	 *	AR registers: ar.unat, ar.pfs, ar.rsc, ar.rnat, ar.bspstore, ar.fpsr
+	 * 	others: pr, b0, loadrs, r1, r12, r13, r15
+	 *   Registers to be restored only:
+	 * 	r8-r11: output value from the system call.
+	 *
+	 * During system call exit, scratch registers (including r15) are modified/cleared
+	 * to prevent leaking bits from kernel to user level.
+	 */
 	DBG_FAULT(11)
-	mov r16=cr.iim
-	mov r17=__IA64_BREAK_SYSCALL
-	mov r31=pr		// prepare to save predicates
+	mov r16=IA64_KR(CURRENT)		// r16 = current (physical); 12 cycle read lat.
+	mov r17=cr.iim
+	mov r18=__IA64_BREAK_SYSCALL
+	mov r21=ar.fpsr
+	mov r29=cr.ipsr
+	mov r20=r1
+	mov r25=ar.unat
+	mov r27=ar.rsc
+	mov r26=ar.pfs
+	mov r28=cr.iip
+	mov r31=pr				// prepare to save predicates
 	;;
-	cmp.eq p0,p7=r16,r17	// is this a system call? (p7 <- false, if so)
+	adds r16=IA64_TASK_THREAD_ON_USTACK_OFFSET,r16
+	cmp.eq p0,p7=r18,r17			// is this a system call? (p7 <- false, if so)
 (p7)	br.cond.spnt non_syscall
 	;;
-	mov r21=ar.fpsr;
-	mov rCRIPSR=cr.ipsr;
-	mov rR1=r1;
-	mov rARUNAT=ar.unat;
-	mov rARRSC=ar.rsc;
-	mov rARPFS=ar.pfs;
-	mov rCRIIP=cr.iip;
-	mov r1=IA64_KR(CURRENT);                /* r1 = current (physical) */
+	ld1 r17=[r16]				// load current->thread.on_ustack flag
+	st1 [r16]=r0				// clear current->thread.on_ustack flag
+	adds r1=-IA64_TASK_THREAD_ON_USTACK_OFFSET,r16	// set r1 for MINSTATE_START_SAVE_MIN_VIRT
+	// switch from user to kernel RBS:
 	;;
-	adds r16=IA64_TASK_THREAD_ON_USTACK_OFFSET,r1;
+	invala
+	cmp.eq pKStk,pUStk=r0,r17		// are we in kernel mode already?
 	;;
-	ld1 r17=[r16];                          /* load current->thread.on_ustack flag */
-	st1 [r16]=r0;                           /* clear current->thread.on_ustack flag */
-	/* switch from user to kernel RBS: */
-	;;
-	invala;
-	cmp.eq pKStk,pUStk=r0,r17;              /* are we in kernel mode already? (psr.cpl==0) */
-	;;
-	mov rCRIFS=r0
+	mov r30=r0
 	MINSTATE_START_SAVE_MIN_VIRT
-	br.call.sptk.many b7=break_fault_setup
+	br.call.sptk.many b7=setup_syscall_via_break
 	;;
 	mov r3=255
 	adds r15=-1024,r15			// r15 contains the syscall number---subtract 1024
@@ -724,7 +721,6 @@ ENTRY(break_fault)
 	st8 [r16]=r18				// store new value for cr.isr
 
 (p8)	br.call.sptk.many b6=b6			// ignore this return addr
-
 	br.cond.sptk ia64_trace_syscall
 	// NOT REACHED
 END(break_fault)
@@ -748,7 +744,7 @@ ENTRY(interrupt)
 	mov out0=cr.ivr		// pass cr.ivr as first arg
 	add out1=16,sp		// pass pointer to pt_regs as second arg
 	;;
-	srlz.d			// make  sure we see the effect of cr.ivr
+	srlz.d			// make sure we see the effect of cr.ivr
 	movl r14=ia64_leave_kernel
 	;;
 	mov rp=r14
@@ -772,67 +768,71 @@ END(interrupt)
 	 * there happens to be space here that would go unused otherwise.  If this
 	 * fault ever gets "unreserved", simply moved the following code to a more
 	 * suitable spot...
+	 *
+	 * setup_syscall_via_break() is a separate subroutine so that it can
+	 *	allocate stacked registers so it can safely demine any
+	 *	potential NaT values from the input registers.
 	 */
-ENTRY(break_fault_setup)
+ENTRY(setup_syscall_via_break)
 	alloc r19=ar.pfs,8,0,0,0
 	tnat.nz p8,p0=in0
-	add r16=PT(CR_IPSR),r1  /* initialize first base pointer */
-        ;;
-	st8 [r16]=rCRIPSR,16;   /* save cr.ipsr */
-	adds r17=PT(CR_IIP),r1;  /* initialize second base pointer */
+	add r16=PT(CR_IPSR),r1	/* initialize first base pointer */
+	;;
+	st8 [r16]=r29,16	/* save cr.ipsr */
+	adds r17=PT(CR_IIP),r1	/* initialize second base pointer */
 	;;
 (p8)	mov in0=-1
 	tnat.nz p9,p0=in1
-	st8 [r17]=rCRIIP,16;    /* save cr.iip */
-	mov rCRIIP=b0;
-(pKStk) mov r18=r0;             /* make sure r18 isn't NaT */
+	st8 [r17]=r28,16	/* save cr.iip */
+	mov r28=b0
+(pKStk)	mov r18=r0		/* make sure r18 isn't NaT */
 	;;
 (p9)	mov in1=-1
 	tnat.nz p10,p0=in2
-	st8 [r16]=rCRIFS,16;    /* save cr.ifs */
-	st8 [r17]=rARUNAT,16;   /* save ar.unat */
-(pUStk) sub r18=r18,rKRBS;      /* r18=RSE.ndirty*8 */
+	st8 [r16]=r30,16	/* save cr.ifs */
+	st8 [r17]=r25,16	/* save ar.unat */
+(pUStk) sub r18=r18,r22		/* r18=RSE.ndirty*8 */
 	;;
-	st8 [r16]=rARPFS,16;    /* save ar.pfs */
-	st8 [r17]=rARRSC,16;    /* save ar.rsc */
-	tbit.nz p15,p0=rCRIPSR,IA64_PSR_I_BIT
-	;;                      /* avoid RAW on r16 & r17 */
+	st8 [r16]=r26,16	/* save ar.pfs */
+	st8 [r17]=r27,16	/* save ar.rsc */
+	tbit.nz p15,p0=r29,IA64_PSR_I_BIT
+	;;			/* avoid RAW on r16 & r17 */
 (p10)	mov in2=-1
 	nop.f 0
 	tnat.nz p11,p0=in3
-(pKStk) adds r16=16,r16;        /* skip over ar_rnat field */
-(pKStk) adds r17=16,r17;        /* skip over ar_bspstore field */
-	shl r18=r18,16;         /* compute ar.rsc to be used for "loadrs" */
+(pKStk) adds r16=16,r16		/* skip over ar_rnat field */
+(pKStk) adds r17=16,r17		/* skip over ar_bspstore field */
+	shl r18=r18,16		/* compute ar.rsc to be used for "loadrs" */
 	;;
 (p11)	mov in3=-1
 	tnat.nz p12,p0=in4
-(pUStk) st8 [r16]=rARRNAT,16;   /* save ar.rnat */
-(pUStk) st8 [r17]=rARBSPSTORE,16;       /* save ar.bspstore */
+(pUStk) st8 [r16]=r24,16		/* save ar.rnat */
+(pUStk) st8 [r17]=r23,16		/* save ar.bspstore */
 	;;
 (p12)	mov in4=-1
 	tnat.nz p13,p0=in5
-	st8 [r16]=rARPR,16;     /* save predicates */
-	st8 [r17]=rCRIIP,16;   /* save b0 */
-	dep r14=-1,r0,61,3;
+	st8 [r16]=r31,16		/* save predicates */
+	st8 [r17]=r28,16		/* save b0 */
+	dep r14=-1,r0,61,3
 	;;
-	st8 [r16]=r18,16;       /* save ar.rsc value for "loadrs" */
-	st8.spill [r17]=rR1,16; /* save original r1 */
-	adds r2=IA64_PT_REGS_R16_OFFSET,r1;
+	st8 [r16]=r18,16		/* save ar.rsc value for "loadrs" */
+	st8.spill [r17]=r20,16		/* save original r1 */
+	adds r2=IA64_PT_REGS_R16_OFFSET,r1
 	;;
 (p13)	mov in5=-1
 	tnat.nz p14,p0=in6
-.mem.offset 0,0;                st8.spill [r16]=r12,16;
-.mem.offset 8,0;                st8.spill [r17]=r13,16;
-	cmp.eq pNonSys,pSys=r0,r0       /* initialize pSys=0, pNonSys=1 */
+.mem.offset 0,0; st8.spill [r16]=r12,16
+.mem.offset 8,0; st8.spill [r17]=r13,16
+	cmp.eq pNonSys,pSys=r0,r0	/* initialize pSys=0, pNonSys=1 */
 	;;
 (p14)	mov in6=-1
 	tnat.nz p8,p0=in7
-.mem.offset 0,0;                st8 [r16]=r21,16;    /* ar.fpsr */
-.mem.offset 8,0;                st8.spill [r17]=r15,16;
-	adds r12=-16,r1;        /* switch to kernel memory stack (with 16 bytes of scratch) */
+.mem.offset 0,0; st8 [r16]=r21,16	/* ar.fpsr */
+.mem.offset 8,0; st8.spill [r17]=r15,16
+	adds r12=-16,r1		/* switch to kernel memory stack (with 16 bytes of scratch) */
 	;;
-	mov r13=IA64_KR(CURRENT);       /* establish `current' */
-	movl r1=__gp;           /* establish kernel global pointer */
+	mov r13=IA64_KR(CURRENT)	/* establish `current' */
+	movl r1=__gp			/* establish kernel global pointer */
 	;;
 	MINSTATE_END_SAVE_MIN_VIRT
 
@@ -842,14 +842,14 @@ ENTRY(break_fault_setup)
 	movl r17=FPSR_DEFAULT
 	adds r8=(IA64_PT_REGS_R8_OFFSET-IA64_PT_REGS_R16_OFFSET),r2
 	;;
-	srlz.i                                  // guarantee that interruption collection is on
-	cmp.eq pSys,pNonSys=r0,r0               // set pSys=1, pNonSys=0
+	srlz.i					// guarantee that interruption collection is on
+	cmp.eq pSys,pNonSys=r0,r0		// set pSys=1, pNonSys=0
 (p9)	mov r15=-1
-(p15)	ssm psr.i               // restore psr.i
+(p15)	ssm psr.i			// restore psr.i
 	mov.m ar.fpsr=r17
-	stf8 [r8]=f1            // ensure pt_regs.r8 != 0 (see handle_syscall_error)
+	stf8 [r8]=f1			// ensure pt_regs.r8 != 0 (see handle_syscall_error)
 	br.ret.sptk.many b7
-END(break_fault_setup)
+END(setup_syscall_via_break)
 
 	.org ia64_ivt+0x3c00
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -1458,12 +1458,12 @@ ENTRY(dispatch_to_ia32_handler)
 	srlz.i					// guarantee that interruption collection is on
 	;;
 (p15)	ssm psr.i
-	adds r3=8,r2            // Base pointer for SAVE_REST
+	adds r3=8,r2		// Base pointer for SAVE_REST
 	;;
 	SAVE_REST
 	;;
 	mov r15=0x80
-	shr r14=r14,16          // Get interrupt number
+	shr r14=r14,16		// Get interrupt number
 	;;
 	cmp.ne p6,p0=r14,r15
 (p6)	br.call.dpnt.many b6=non_ia32_syscall
