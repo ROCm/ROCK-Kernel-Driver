@@ -48,7 +48,7 @@ static __inline__ void __arch_decomp_setup(unsigned long arch_id)
 	/*
 	 * Coyote only has UART2 connected
 	 */
-	if (__machine_arch_type == MACH_TYPE_ADI_COYOTE)
+	if (machine_is_adi_coyote())
 		uart_base = (volatile u32*) IXP4XX_UART2_BASE_PHYS;
 	else
 		uart_base = (volatile u32*) IXP4XX_UART1_BASE_PHYS;
