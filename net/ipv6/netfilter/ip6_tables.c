@@ -1534,23 +1534,31 @@ port_match(u_int16_t min, u_int16_t max, u_int16_t port, int invert)
 
 static int
 tcp_find_option(u_int8_t option,
-		const struct tcphdr *tcp,
-		u_int16_t datalen,
+		const struct sk_buff *skb,
+		unsigned int optoff,
+		unsigned int optlen,
 		int invert,
 		int *hotdrop)
 {
-	unsigned int i = sizeof(struct tcphdr);
-	const u_int8_t *opt = (u_int8_t *)tcp;
+	/* tcp.doff is only 4 bits, ie. max 15 * 4 bytes */
+	char opt[60 - sizeof(struct tcphdr)];
+	unsigned int i;
 
 	duprintf("tcp_match: finding option\n");
-	/* If we don't have the whole header, drop packet. */
-	if (tcp->doff * 4 < sizeof(struct tcphdr) ||
-	    tcp->doff * 4 > datalen) {
+
+	/* Drop if it has a bad data offset */
+	if (optlen > sizeof(opt)) {
 		*hotdrop = 1;
 		return 0;
 	}
 
-	while (i < tcp->doff * 4) {
+	/* If we don't have the whole header, drop packet. */
+	if (skb_copy_bits(skb, optoff, opt, optlen) < 0) {
+		*hotdrop = 1;
+		return 0;
+	}
+
+	for (i = 0; i < optlen; ) {
 		if (opt[i] == option) return !invert;
 		if (opt[i] < 2) i++;
 		else i += opt[i+1]?:1;
@@ -1569,23 +1577,34 @@ tcp_match(const struct sk_buff *skb,
 	  u_int16_t datalen,
 	  int *hotdrop)
 {
-	const struct tcphdr *tcp;
+	struct tcphdr tcph;
 	const struct ip6t_tcp *tcpinfo = matchinfo;
 	int tcpoff;
 	u8 nexthdr = skb->nh.ipv6h->nexthdr;
 
-	/* To quote Alan:
+	if (offset) {
+		/* To quote Alan:
 
-	   Don't allow a fragment of TCP 8 bytes in. Nobody normal
-	   causes this. Its a cracker trying to break in by doing a
-	   flag overwrite to pass the direction checks.
-	*/
-
-	if (offset == 1) {
-		duprintf("Dropping evil TCP offset=1 frag.\n");
-		*hotdrop = 1;
+		   Don't allow a fragment of TCP 8 bytes in. Nobody normal
+		   causes this. Its a cracker trying to break in by doing a
+		   flag overwrite to pass the direction checks.
+		*/
+		if (offset == 1) {
+			duprintf("Dropping evil TCP offset=1 frag.\n");
+			*hotdrop = 1;
+		}
+		/* Must not be a fragment. */
 		return 0;
-	} else if (offset == 0 && datalen < sizeof(struct tcphdr)) {
+	}
+
+	tcpoff = (u8*)(skb->nh.ipv6h+1) - skb->data;
+	tcpoff = ipv6_skip_exthdr(skb, tcpoff, &nexthdr, skb->len - tcpoff);
+	if (tcpoff < 0 || tcpoff > skb->len || nexthdr != IPPROTO_TCP)
+		return 0;
+
+#define FWINVTCP(bool,invflg) ((bool) ^ !!(tcpinfo->invflags & invflg))
+
+	if (skb_copy_bits(skb, tcpoff, &tcph, sizeof(tcph)) < 0) {
 		/* We've been asked to examine this packet, and we
 		   can't.  Hence, no choice but to drop. */
 		duprintf("Dropping evil TCP offset=0 tinygram.\n");
@@ -1609,29 +1628,26 @@ tcp_match(const struct sk_buff *skb,
 		return 0;
 	}
 
-	tcp = (struct tcphdr *)(skb->data + tcpoff);
-
-	/* FIXME: Try tcp doff >> packet len against various stacks --RR */
-
-#define FWINVTCP(bool,invflg) ((bool) ^ !!(tcpinfo->invflags & invflg))
-
-	/* Must not be a fragment. */
-	return !offset
-		&& port_match(tcpinfo->spts[0], tcpinfo->spts[1],
-			      ntohs(tcp->source),
-			      !!(tcpinfo->invflags & IP6T_TCP_INV_SRCPT))
-		&& port_match(tcpinfo->dpts[0], tcpinfo->dpts[1],
-			      ntohs(tcp->dest),
-			      !!(tcpinfo->invflags & IP6T_TCP_INV_DSTPT))
-		&& FWINVTCP((((unsigned char *)tcp)[13]
-			     & tcpinfo->flg_mask)
-			    == tcpinfo->flg_cmp,
-			    IP6T_TCP_INV_FLAGS)
-		&& (!tcpinfo->option
-		    || tcp_find_option(tcpinfo->option, tcp, datalen,
-				       tcpinfo->invflags
-				       & IP6T_TCP_INV_OPTION,
-				       hotdrop));
+	if (!port_match(tcpinfo->spts[0], tcpinfo->spts[1],
+			ntohs(tcph.source),
+			!!(tcpinfo->invflags & IP6T_TCP_INV_SRCPT)))
+		return 0;
+	if (!port_match(tcpinfo->dpts[0], tcpinfo->dpts[1],
+			ntohs(tcph.dest),
+			!!(tcpinfo->invflags & IP6T_TCP_INV_DSTPT)))
+		return 0;
+	if (!FWINVTCP((((unsigned char *)&tcph)[13] & tcpinfo->flg_mask)
+		      == tcpinfo->flg_cmp,
+		      IP6T_TCP_INV_FLAGS))
+		return 0;
+	if (tcpinfo->option &&
+	    !tcp_find_option(tcpinfo->option, skb,
+			     tcpoff + sizeof(tcph),
+			     tcph.doff*4 - sizeof(tcph),
+			     tcpinfo->invflags & IP6T_TCP_INV_OPTION,
+			     hotdrop))
+		return 0;
+	return 1;
 }
 
 /* Called when user tries to insert an entry of this type. */
@@ -1661,12 +1677,21 @@ udp_match(const struct sk_buff *skb,
 	  u_int16_t datalen,
 	  int *hotdrop)
 {
-	const struct udphdr *udp;
+	struct udphdr udph;
 	const struct ip6t_udp *udpinfo = matchinfo;
 	int udpoff;
 	u8 nexthdr = skb->nh.ipv6h->nexthdr;
 
-	if (offset == 0 && datalen < sizeof(struct udphdr)) {
+	/* Must not be a fragment. */
+	if (offset)
+		return 0;
+
+	udpoff = (u8*)(skb->nh.ipv6h+1) - skb->data;
+	udpoff = ipv6_skip_exthdr(skb, udpoff, &nexthdr, skb->len - udpoff);
+	if (udpoff < 0 || udpoff > skb->len || nexthdr != IPPROTO_UDP)
+		return 0;
+
+	if (skb_copy_bits(skb, udpoff, &udph, sizeof(udph)) < 0) {
 		/* We've been asked to examine this packet, and we
 		   can't.  Hence, no choice but to drop. */
 		duprintf("Dropping evil UDP tinygram.\n");
@@ -1689,15 +1714,11 @@ udp_match(const struct sk_buff *skb,
 		return 0;
 	}
 
-	udp = (struct udphdr *)(skb->data + udpoff);
-
-	/* Must not be a fragment. */
-	return !offset
-		&& port_match(udpinfo->spts[0], udpinfo->spts[1],
-			      ntohs(udp->source),
-			      !!(udpinfo->invflags & IP6T_UDP_INV_SRCPT))
+	return port_match(udpinfo->spts[0], udpinfo->spts[1],
+			  ntohs(udph.source),
+			  !!(udpinfo->invflags & IP6T_UDP_INV_SRCPT))
 		&& port_match(udpinfo->dpts[0], udpinfo->dpts[1],
-			      ntohs(udp->dest),
+			      ntohs(udph.dest),
 			      !!(udpinfo->invflags & IP6T_UDP_INV_DSTPT));
 }
 

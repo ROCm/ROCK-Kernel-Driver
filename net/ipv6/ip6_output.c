@@ -149,7 +149,9 @@ int ip6_output(struct sk_buff **pskb)
 {
 	struct sk_buff *skb = *pskb;
 
-	if ((skb->len > dst_pmtu(skb->dst) || skb_shinfo(skb)->frag_list))
+	if ((skb->len > dst_pmtu(skb->dst)
+	     || (skb->dst->flags & DST_FRAGHDR)
+	     || skb_shinfo(skb)->frag_list))
 		return ip6_fragment(pskb, ip6_output2);
 	else
 		return ip6_output2(pskb);
@@ -269,8 +271,6 @@ int ip6_xmit(struct sock *sk, struct sk_buff *skb, struct flowi *fl,
 		return NF_HOOK(PF_INET6, NF_IP6_LOCAL_OUT, skb, NULL, dst->dev, ip6_maybe_reroute);
 	}
 
-	if (net_ratelimit())
-		printk(KERN_DEBUG "IPv6: sending pkt_too_big to self\n");
 	skb->dev = dst->dev;
 	icmpv6_send(skb, ICMPV6_PKT_TOOBIG, 0, mtu, skb->dev);
 	IP6_INC_STATS(IPSTATS_MIB_FRAGFAILS);
@@ -870,7 +870,6 @@ int ip6_append_data(struct sock *sk, int getfrag(void *from, char *to, int offse
 	hh_len = LL_RESERVED_SPACE(rt->u.dst.dev);
 
 	fragheaderlen = sizeof(struct ipv6hdr) + (opt ? opt->opt_nflen : 0);
-	maxfraglen = ((mtu - fragheaderlen) & ~7) + fragheaderlen - sizeof(struct frag_hdr);
 
 	if (mtu <= sizeof(struct ipv6hdr) + IPV6_MAXPLEN) {
 		if (inet->cork.length + length > sizeof(struct ipv6hdr) + IPV6_MAXPLEN - fragheaderlen) {
@@ -878,6 +877,11 @@ int ip6_append_data(struct sock *sk, int getfrag(void *from, char *to, int offse
 			return -EMSGSIZE;
 		}
 	}
+
+	if (fragheaderlen + inet->cork.length + length <= mtu)
+		maxfraglen = mtu;
+	else
+		maxfraglen = ((mtu - fragheaderlen) & ~7) + fragheaderlen - sizeof(struct frag_hdr);
 
 	inet->cork.length += length;
 
@@ -890,8 +894,10 @@ int ip6_append_data(struct sock *sk, int getfrag(void *from, char *to, int offse
 			unsigned int datalen;
 			unsigned int fraglen;
 			unsigned int alloclen;
+			struct sk_buff *skb_prev;
 			BUG_TRAP(copy == 0);
 alloc_new_skb:
+			skb_prev = skb;
 			datalen = maxfraglen - fragheaderlen;
 			if (datalen > length)
 				datalen = length;
@@ -900,7 +906,15 @@ alloc_new_skb:
 			    !(rt->u.dst.dev->features&NETIF_F_SG))
 				alloclen = maxfraglen;
 			else
-				alloclen = fraglen;
+				alloclen = datalen + fragheaderlen;
+
+			/* The last fragment gets additional space at tail.
+			 * Note, with MSG_MORE we overallocate on fragments,
+			 * because we have no idea what fragment will be
+			 * the last.
+			 */
+			if (datalen == length)
+				alloclen += rt->u.dst.trailer_len;
 			alloclen += sizeof(struct frag_hdr);
 			if (transhdrlen) {
 				skb = sock_alloc_send_skb(sk,

@@ -196,4 +196,7 @@ struct in6_flowlabel_req
  * MCAST_MSFILTER		48
  */
 
+/* Netfilter */
+#define IPV6_NF_ORIGINAL_DST 80
+
 #endif

@@ -17,6 +17,10 @@ config IPV6_PRIVACY
 
 	  See <file:Documentation/networking/ip-sysctl.txt> for details.
 
+config IPV6_NDISC_NEW
+	bool
+	default y
+
 config INET6_AH
 	tristate "IPv6: AH transformation"
 	depends on IPV6

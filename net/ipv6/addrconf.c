@@ -35,6 +35,9 @@
  *	YOSHIFUJI Hideaki @USAGI	:	ARCnet support
  *	YOSHIFUJI Hideaki @USAGI	:	convert /proc/net/if_inet6 to
  *						seq_file.
+ *	YOSHIFUJI Hideaki @USAGI	:	improved source address
+ *						selection; consider scope,
+ *						status etc.
  */
 
 #include <linux/config.h>
@@ -142,6 +145,8 @@ static int ipv6_chk_same_addr(const struct in6_addr *addr, struct net_device *de
 
 static struct notifier_block *inet6addr_chain;
 
+static u32 ipv6_addrselect_label_lookup(const struct in6_addr *addr, int ifindex);
+
 struct ipv6_devconf ipv6_devconf = {
 	.forwarding		= 0,
 	.hop_limit		= IPV6_DEFAULT_HOPLIMIT,
@@ -149,7 +154,7 @@ struct ipv6_devconf ipv6_devconf = {
 	.accept_ra		= 1,
 	.accept_redirects	= 1,
 	.autoconf		= 1,
-	.force_mld_version	= 0,
+	.force_mld_version	= 1,
 	.dad_transmits		= 1,
 	.rtr_solicits		= MAX_RTR_SOLICITATIONS,
 	.rtr_solicit_interval	= RTR_SOLICITATION_INTERVAL,
@@ -185,33 +190,44 @@ static struct ipv6_devconf ipv6_devconf_dflt = {
 	.max_addresses		= IPV6_MAX_ADDRESSES,
 };
 
-/* IPv6 Wildcard Address and Loopback Address defined by RFC2553 */
+/* IPv6 Wildcard Address and Loopback Address defined by RFC3493 */
 const struct in6_addr in6addr_any = IN6ADDR_ANY_INIT;
 const struct in6_addr in6addr_loopback = IN6ADDR_LOOPBACK_INIT;
 
-int ipv6_addr_type(const struct in6_addr *addr)
+int __ipv6_addr_type(const struct in6_addr *addr)
 {
 	int type;
 	u32 st;
 
 	st = addr->s6_addr32[0];
 
-	if ((st & htonl(0xFF000000)) == htonl(0xFF000000)) {
-		type = IPV6_ADDR_MULTICAST;
+	/* Consider all addresses with the first three bits different of
+	   000 and 111 as unicasts.
+	 */
+	if ((st & htonl(0xE0000000)) != htonl(0x00000000) &&
+	    (st & htonl(0xE0000000)) != htonl(0xE0000000))
+		return (IPV6_ADDR_UNICAST | 
+			IPV6_ADDR_SCOPE_GLOBAL<<16);
 
-		switch((st & htonl(0x00FF0000))) {
-			case __constant_htonl(0x00010000):
+	if ((st & htonl(0xFF000000)) == htonl(0xFF000000)) {
+		/* multicast */
+		/* addr-select 3.1 */
+		int type = IPV6_ADDR_MC_SCOPE(addr)<<16;
+
+		switch(type) {
+			case IPV6_ADDR_SCOPE_NODELOCAL<<16:
 				type |= IPV6_ADDR_LOOPBACK;
 				break;
 
-			case __constant_htonl(0x00020000):
+			case IPV6_ADDR_SCOPE_LINKLOCAL<<16:
 				type |= IPV6_ADDR_LINKLOCAL;
 				break;
 
-			case __constant_htonl(0x00050000):
+			case IPV6_ADDR_SCOPE_SITELOCAL<<16:
 				type |= IPV6_ADDR_SITELOCAL;
 				break;
 		};
+		type |= IPV6_ADDR_MULTICAST;
 		return type;
 	}
 
@@ -225,10 +241,12 @@ int ipv6_addr_type(const struct in6_addr *addr)
 		return type;
 	
 	if ((st & htonl(0xFFC00000)) == htonl(0xFE800000))
-		return (IPV6_ADDR_LINKLOCAL | type);
+		return (IPV6_ADDR_LINKLOCAL | IPV6_ADDR_UNICAST | 
+			IPV6_ADDR_SCOPE_LINKLOCAL<<16);		/* addr-select 3.1 */
 
 	if ((st & htonl(0xFFC00000)) == htonl(0xFEC00000))
-		return (IPV6_ADDR_SITELOCAL | type);
+		return (IPV6_ADDR_SITELOCAL | IPV6_ADDR_UNICAST |
+			IPV6_ADDR_SCOPE_SITELOCAL<<16);		/* addr-select 3.1 */
 
 	if ((addr->s6_addr32[0] | addr->s6_addr32[1]) == 0) {
 		if (addr->s6_addr32[2] == 0) {
@@ -236,24 +254,50 @@ int ipv6_addr_type(const struct in6_addr *addr)
 				return IPV6_ADDR_ANY;
 
 			if (addr->s6_addr32[3] == htonl(0x00000001))
-				return (IPV6_ADDR_LOOPBACK | type);
+				return (IPV6_ADDR_LOOPBACK | IPV6_ADDR_UNICAST |
+					IPV6_ADDR_SCOPE_LINKLOCAL<<16);	/* addr-select 3.4 */
 
-			return (IPV6_ADDR_COMPATv4 | type);
+			return (IPV6_ADDR_COMPATv4 | IPV6_ADDR_UNICAST |
+				IPV6_ADDR_SCOPE_GLOBAL<<16);	/* addr-select 3.3 */
 		}
 
 		if (addr->s6_addr32[2] == htonl(0x0000ffff))
-			return IPV6_ADDR_MAPPED;
+			return (IPV6_ADDR_MAPPED | 
+				IPV6_ADDR_SCOPE_GLOBAL<<16);	/* addr-select 3.3 */
 	}
 
-	st &= htonl(0xFF000000);
-	if (st == 0)
-		return IPV6_ADDR_RESERVED;
-	st &= htonl(0xFE000000);
-	if (st == htonl(0x02000000))
-		return IPV6_ADDR_RESERVED;	/* for NSAP */
-	if (st == htonl(0x04000000))
-		return IPV6_ADDR_RESERVED;	/* for IPX */
-	return type;
+	return (IPV6_ADDR_RESERVED | 
+		IPV6_ADDR_SCOPE_GLOBAL<<16);	/* addr-select 3.4 */
+}
+
+/* find 1st bit in difference between the 2 addrs */
+static inline int addr_diff(const void *__a1, const void *__a2, int addrlen)
+{
+	/* find 1st bit in difference between the 2 addrs.
+	 * bit may be an invalid value,
+	 * but if it is >= plen, the value is ignored in any case.
+	 */
+	const u32 *a1 = __a1;
+	const u32 *a2 = __a2;
+	int i;
+
+	addrlen >>= 2;
+	for (i = 0; i < addrlen; i++) {
+		u32 xb = a1[i] ^ a2[i];
+		if (xb) {
+			int j = 31;
+			xb = ntohl(xb);
+			while ((xb & (1 << j)) == 0)
+				j--;
+			return (i * 32 + 31 - j);
+		}
+	}
+	return addrlen<<5;
+}
+
+static inline int ipv6_addr_diff(const struct in6_addr *a1, const struct in6_addr *a2)
+{
+	 return addr_diff(a1->s6_addr, a2->s6_addr, sizeof(struct in6_addr));
 }
 
 static void addrconf_del_timer(struct inet6_ifaddr *ifp)
@@ -720,161 +764,217 @@ out:
 }
 #endif
 
+
 /*
  *	Choose an appropriate source address
+ *	draft-ietf-ipv6-default-addr-select-09.txt
  *	should do:
  *	i)	get an address with an appropriate scope
  *	ii)	see if there is a specific route for the destination and use
  *		an address of the attached interface 
  *	iii)	don't use deprecated addresses
  */
-static int inline ipv6_saddr_pref(const struct inet6_ifaddr *ifp, u8 invpref)
+#define IPV6_SADDRSELECT_SELF		0x01
+#define IPV6_SADDRSELECT_PREFERRED	0x02
+#define IPV6_SADDRSELECT_HOME		0x04
+#define IPV6_SADDRSELECT_PUBLIC		0x08
+#define IPV6_SADDRSELECT_INTERFACE	0x10
+#define IPV6_SADDRSELECT_LABEL		0x20
+
+struct addrselect_attrs {
+	struct inet6_ifaddr *ifp;
+	u16	flags;
+	s16	matchlen;
+	u8	scope;
+};
+
+static int __inline__ ipv6_addrselect_preferred(int type)
 {
-	int pref;
-	pref = ifp->flags&IFA_F_DEPRECATED ? 0 : 2;
-#ifdef CONFIG_IPV6_PRIVACY
-	pref |= (ifp->flags^invpref)&IFA_F_TEMPORARY ? 0 : 1;
-#endif
-	return pref;
+	/* section 3.3, 3.4 */
+	if (type&(IPV6_ADDR_MAPPED|IPV6_ADDR_COMPATv4|
+		  IPV6_ADDR_LOOPBACK|IPV6_ADDR_RESERVED))
+		return 1;
+	return 0;
 }
 
-#ifdef CONFIG_IPV6_PRIVACY
-#define IPV6_GET_SADDR_MAXSCORE(score)	((score) == 3)
-#else
-#define IPV6_GET_SADDR_MAXSCORE(score)	(score)
-#endif
-
-int ipv6_dev_get_saddr(struct net_device *dev,
-		   struct in6_addr *daddr, struct in6_addr *saddr, int onlink)
+int ipv6_dev_get_saddr(struct net_device *daddr_dev,
+		       struct in6_addr *daddr, struct in6_addr *saddr)
 {
-	struct inet6_ifaddr *ifp = NULL;
-	struct inet6_ifaddr *match = NULL;
+	int daddr_type, daddr_scope;
+	u32 daddr_label;
+	struct inet6_ifaddr *ifp0, *ifp = NULL;
+	struct net_device *dev;
 	struct inet6_dev *idev;
-	int scope;
+
 	int err;
-	int hiscore = -1, score;
-
-	if (!onlink)
-		scope = ipv6_addr_scope(daddr);
-	else
-		scope = IFA_LINK;
-
-	/*
-	 *	known dev
-	 *	search dev and walk through dev addresses
-	 */
-
-	if (dev) {
-		if (dev->flags & IFF_LOOPBACK)
-			scope = IFA_HOST;
-
-		read_lock(&addrconf_lock);
-		idev = __in6_dev_get(dev);
-		if (idev) {
-			read_lock_bh(&idev->lock);
-			for (ifp=idev->addr_list; ifp; ifp=ifp->if_next) {
-				if (ifp->scope == scope) {
-					if (ifp->flags&IFA_F_TENTATIVE)
-						continue;
-#ifdef CONFIG_IPV6_PRIVACY
-					score = ipv6_saddr_pref(ifp, idev->cnf.use_tempaddr > 1 ? IFA_F_TEMPORARY : 0);
-#else
-					score = ipv6_saddr_pref(ifp, 0);
+	int update;
+	struct addrselect_attrs candidate = {NULL,0,0,0};
+#if defined(CONFIG_IPV6_PRIVACY)
+	u16 invpref = 0;
 #endif
-					if (score <= hiscore)
-						continue;
 
-					if (match)
-						in6_ifa_put(match);
-					match = ifp;
-					hiscore = score;
-					in6_ifa_hold(ifp);
+#ifdef CONFIG_IPV6_PRIVACY
+	if (ipv6_devconf.use_tempaddr > 1)
+		invpref |= IPV6_SADDRSELECT_PUBLIC;
+#endif
 
-					if (IPV6_GET_SADDR_MAXSCORE(score)) {
-						read_unlock_bh(&idev->lock);
-						read_unlock(&addrconf_lock);
-						goto out;
-					}
-				}
-			}
-			read_unlock_bh(&idev->lock);
-		}
-		read_unlock(&addrconf_lock);
-	}
-
-	if (scope == IFA_LINK)
-		goto out;
-
-	/*
-	 *	dev == NULL or search failed for specified dev
-	 */
+	daddr_type = __ipv6_addr_type(daddr);
+	daddr_scope = __ipv6_addr_src_scope(daddr_type);
+	daddr_label = ipv6_addrselect_label_lookup(daddr, 
+						   daddr_dev?daddr_dev->ifindex:0);
 
 	read_lock(&dev_base_lock);
 	read_lock(&addrconf_lock);
 	for (dev = dev_base; dev; dev=dev->next) {
+		/* Rule 0: Candidate Source Address (section 4)
+		 *  - multicast and link-local destination address,
+		 *    the set of candidate source address MUST only
+		 *    include addresses assigned to interfaces
+		 *    belonging to the same link as the outgoing
+		 *    interface.
+		 * (- For site-local destination addresses, the
+		 *    set of candidate source addresses MUST only
+		 *    include addresses assigned to interfaces
+		 *    belonging to the same site as the outgoing
+		 *    interface.)
+		 */
+		if ((daddr_type&IPV6_ADDR_MULTICAST ||
+		     daddr_scope <= IPV6_ADDR_SCOPE_LINKLOCAL) &&
+		    daddr_dev && dev != daddr_dev)
+			continue;
+
 		idev = __in6_dev_get(dev);
-		if (idev) {
-			read_lock_bh(&idev->lock);
-			for (ifp=idev->addr_list; ifp; ifp=ifp->if_next) {
-				if (ifp->scope == scope) {
-					if (ifp->flags&IFA_F_TENTATIVE)
-						continue;
-#ifdef CONFIG_IPV6_PRIVACY
-					score = ipv6_saddr_pref(ifp, idev->cnf.use_tempaddr > 1 ? IFA_F_TEMPORARY : 0);
-#else
-					score = ipv6_saddr_pref(ifp, 0);
-#endif
-					if (score <= hiscore)
-						continue;
+		if (!idev)
+			continue;
 
-					if (match)
-						in6_ifa_put(match);
-					match = ifp;
-					hiscore = score;
-					in6_ifa_hold(ifp);
+		read_lock_bh(&idev->lock);
+		ifp0 = idev->addr_list;
+		for (ifp=ifp0; ifp; ifp=ifp->if_next) {
+			struct addrselect_attrs temp = {NULL,0,0,0};
+			int addr_type;
+			update = 0;
 
-					if (IPV6_GET_SADDR_MAXSCORE(score)) {
-						read_unlock_bh(&idev->lock);
-						goto out_unlock_base;
-					}
+			/* Rule 0: Candidate Source Address (section 4)
+			 *  - In any case, anycast addresses, multicast
+			 *    addresses, and the unspecified address MUST
+			 *    NOT be included in a candidate set.
+			 */
+			addr_type = __ipv6_addr_type(&ifp->addr);
+			if (addr_type == IPV6_ADDR_ANY ||
+			    addr_type&IPV6_ADDR_MULTICAST)
+				continue;
+
+			/* Rule 1: Prefer same address */
+			if (ipv6_addr_cmp(&ifp->addr, daddr) == 0)
+				temp.flags |= IPV6_SADDRSELECT_SELF;
+			if ((temp.flags^candidate.flags)&IPV6_SADDRSELECT_SELF) {
+				update = temp.flags&IPV6_SADDRSELECT_SELF;
+				if (!update) {
+					continue;
 				}
 			}
-			read_unlock_bh(&idev->lock);
-		}
-	}
 
-out_unlock_base:
+			/* Rule 2: Prefer appropriate scope */
+			temp.scope = __ipv6_addr_src_scope(addr_type);
+			if (!update) {
+				update = temp.scope - candidate.scope;
+				if (update > 0) {
+					update = candidate.scope < daddr_scope ? 1 : -1;
+				} else if (update < 0) {
+					update = temp.scope < daddr_scope ? -1 : 1;
+				}
+				if (update < 0) {
+					continue;
+				}
+			}
+
+			/* Rule 3: Avoid deprecated address */
+			if (ipv6_addrselect_preferred(addr_type) ||
+			    !(ifp->flags & IFA_F_DEPRECATED))
+				temp.flags |= IPV6_SADDRSELECT_PREFERRED;
+			if (!update && (temp.flags^candidate.flags)&IPV6_SADDRSELECT_PREFERRED) {
+				update = temp.flags&IPV6_SADDRSELECT_PREFERRED;
+				if (!update) {
+					continue;
+				}
+			}
+
+			/* XXX: Rule 4: Prefer home address */
+
+			/* Rule 5: Prefer outgoing interface */
+			if (daddr_dev == NULL || daddr_dev == dev)
+				temp.flags |= IPV6_SADDRSELECT_INTERFACE;
+			if (!update && (temp.flags^candidate.flags)&IPV6_SADDRSELECT_INTERFACE) {
+				update = temp.flags&IPV6_SADDRSELECT_INTERFACE;
+				if (!update) {
+					continue;
+				}
+			}
+
+			/* XXX: Rule 6: Prefer matching label */
+			if (ipv6_addrselect_label_lookup(&ifp->addr, dev->ifindex) == daddr_label)
+				temp.flags |= IPV6_SADDRSELECT_LABEL;
+			if (!update && (temp.flags^candidate.flags)&IPV6_SADDRSELECT_LABEL) {
+				update = temp.flags&IPV6_SADDRSELECT_LABEL;
+				if (!update) {
+					continue;
+				}
+			}
+
+			/* XXX: Rule 7: Prefer public address */
+#ifdef CONFIG_IPV6_PRIVACY
+			if (!(ifp->flags & IFA_F_TEMPORARY))
+				temp.flags |= IPV6_SADDRSELECT_PUBLIC;
+			if (!update && (temp.flags^candidate.flags)&IPV6_SADDRSELECT_PUBLIC) {
+				update = (temp.flags^invpref)&IPV6_SADDRSELECT_PUBLIC;
+				if (!update) {
+					continue;
+				}
+			}
+#endif
+
+			/* Rule 8: Use longest matching prefix */
+			temp.matchlen = ipv6_addr_diff(&ifp->addr, daddr);
+			if (!update) {
+				update = temp.matchlen - candidate.matchlen;
+				if (update < 0) {
+					continue;
+				}
+			}
+
+			/* Final Rule */
+			if (!update && candidate.ifp) {
+				continue;
+			}
+
+			/* update candidate */
+			temp.ifp = ifp;
+			in6_ifa_hold(ifp);
+			if (candidate.ifp)
+				in6_ifa_put(candidate.ifp);
+			candidate = temp;
+		}
+		read_unlock_bh(&idev->lock);
+	}
 	read_unlock(&addrconf_lock);
 	read_unlock(&dev_base_lock);
 
-out:
-	err = -EADDRNOTAVAIL;
-	if (match) {
-		ipv6_addr_copy(saddr, &match->addr);
+	if (candidate.ifp) {
+		ipv6_addr_copy(saddr, &candidate.ifp->addr);
+		in6_ifa_put(candidate.ifp);
 		err = 0;
-		in6_ifa_put(match);
+	} else {
+		err = -EADDRNOTAVAIL;
 	}
-
 	return err;
 }
-
 
 int ipv6_get_saddr(struct dst_entry *dst,
 		   struct in6_addr *daddr, struct in6_addr *saddr)
 {
-	struct rt6_info *rt;
-	struct net_device *dev = NULL;
-	int onlink;
-
-	rt = (struct rt6_info *) dst;
-	if (rt)
-		dev = rt->rt6i_dev;
-
-	onlink = (rt && (rt->rt6i_flags & RTF_ALLONLINK));
-
-	return ipv6_dev_get_saddr(dev, daddr, saddr, onlink);
+	return ipv6_dev_get_saddr(dst ? ((struct rt6_info *)dst)->rt6i_dev : NULL,
+				  daddr, saddr);
 }
-
 
 int ipv6_get_lladdr(struct net_device *dev, struct in6_addr *addr)
 {
@@ -966,6 +1066,70 @@ struct inet6_ifaddr * ipv6_get_ifaddr(struct in6_addr *addr, struct net_device *
 	return ifp;
 }
 
+/* address selection: default policy label */
+/* XXX: user level configuration */
+static struct ipv6_addrselect_label {
+	struct in6_addr addr;
+	u16	plen;
+	u32	ifindex;
+	u32	label;
+} ipv6_addrselect_label_table[] = {
+	/* ::1/128, label = 0 */
+	{
+		.addr = IN6ADDR_LOOPBACK_INIT,
+		.plen = 128,
+		.label = 0,
+	},
+	/* ::/0, label = 1 */
+	{
+		.addr = IN6ADDR_ANY_INIT,
+		.plen = 0,
+		.label = 1,
+	},
+	/* 2002::/16, label = 2 */
+	{
+		.addr = {{{ 0x20, 0x02 }}},
+		.plen = 16,
+		.label = 2,
+	},
+	/* ::/96, label = 3 */
+	{
+		.plen = 96,
+		.label = 3,
+	},
+	/* ::ffff:0:0/96, label = 4 */
+	{
+		.addr = {{{ [10] = 0xff, [11] = 0xff }}},
+		.plen = 96,
+		.label = 4,
+	},
+	/* sentinel */
+	{
+		.label = 0xffffffff,
+	}
+};
+
+static u32 ipv6_addrselect_label_lookup(const struct in6_addr *addr, 
+					int ifindex)
+{
+	struct ipv6_addrselect_label *p;
+	int plen, matchlen = -1;
+	u32 label = 0xffffffff;
+
+	for (p = ipv6_addrselect_label_table;
+	     p->label != 0xffffffff;
+	     p++) {
+		if (ifindex && p->ifindex && ifindex != p->ifindex)
+			continue;
+		plen = ipv6_addr_diff(addr, &p->addr);
+		if (plen < p->plen || plen < matchlen)
+			continue;
+		matchlen = plen;
+		label = p->label;
+	}
+	return label;
+}
+
 int ipv6_rcv_saddr_equal(const struct sock *sk, const struct sock *sk2)
 {
 	const struct in6_addr *sk_rcv_saddr6 = &inet6_sk(sk)->rcv_saddr;
@@ -981,18 +1145,18 @@ int ipv6_rcv_saddr_equal(const struct sock *sk, const struct sock *sk2)
 		return 1;
 
 	if (addr_type2 == IPV6_ADDR_ANY &&
-	    !(sk2_ipv6only && addr_type == IPV6_ADDR_MAPPED))
+	    !(sk2_ipv6only && (addr_type & IPV6_ADDR_MAPPED)))
 		return 1;
 
 	if (addr_type == IPV6_ADDR_ANY &&
-	    !(sk_ipv6only && addr_type2 == IPV6_ADDR_MAPPED))
+	    !(sk_ipv6only && (addr_type2 & IPV6_ADDR_MAPPED)))
 		return 1;
 
 	if (sk2_rcv_saddr6 &&
 	    !ipv6_addr_cmp(sk_rcv_saddr6, sk2_rcv_saddr6))
 		return 1;
 
-	if (addr_type == IPV6_ADDR_MAPPED &&
+	if ((addr_type & IPV6_ADDR_MAPPED) &&
 	    !sk2_ipv6only &&
 	    (!sk2_rcv_saddr || !sk_rcv_saddr || sk_rcv_saddr == sk2_rcv_saddr))
 		return 1;
@@ -2420,28 +2584,33 @@ restart:
 				}
 #ifdef CONFIG_IPV6_PRIVACY
 			} else if ((ifp->flags&IFA_F_TEMPORARY) &&
-				   !(ifp->flags&IFA_F_TENTATIVE)) {
-				if (age >= ifp->prefered_lft - regen_advance) {
-					struct inet6_ifaddr *ifpub = ifp->ifpub;
-					if (time_before(ifp->tstamp + ifp->prefered_lft * HZ, next))
-						next = ifp->tstamp + ifp->prefered_lft * HZ;
-					if (!ifp->regen_count && ifpub) {
-						ifp->regen_count++;
-						in6_ifa_hold(ifp);
-						in6_ifa_hold(ifpub);
-						spin_unlock(&ifp->lock);
-						write_unlock(&addrconf_hash_lock);
-						ipv6_create_tempaddr(ifpub, ifp);
-						in6_ifa_put(ifpub);
-						in6_ifa_put(ifp);
-						goto restart;
-					}
-				} else if (time_before(ifp->tstamp + ifp->prefered_lft * HZ - regen_advance * HZ, next))
-					next = ifp->tstamp + ifp->prefered_lft * HZ - regen_advance * HZ;
-				spin_unlock(&ifp->lock);
+				   !(ifp->flags&IFA_F_TENTATIVE) &&
+				   age >= ifp->prefered_lft - regen_advance) {
+				struct inet6_ifaddr *ifpub = ifp->ifpub;
+				if (time_before(ifp->tstamp + ifp->prefered_lft * HZ, next))
+					next = ifp->tstamp + ifp->prefered_lft * HZ;
+				if (!ifp->regen_count && ifpub) {
+					ifp->regen_count++;
+					in6_ifa_hold(ifp);
+					in6_ifa_hold(ifpub);
+					spin_unlock(&ifp->lock);
+					write_unlock(&addrconf_hash_lock);
+					ipv6_create_tempaddr(ifpub, ifp);
+					in6_ifa_put(ifpub);
+					in6_ifa_put(ifp);
+					goto restart;
+				} else {
+					spin_unlock(&ifp->lock);
+				}
 #endif
 			} else {
 				/* ifp->prefered_lft <= ifp->valid_lft */
+#ifdef CONFIG_IPV6_PRIVACY
+				if (ifp->flags&IFA_F_TEMPORARY) {
+					if (time_before(ifp->tstamp + ifp->prefered_lft * HZ - regen_advance * HZ, next))
+						next = ifp->tstamp + ifp->prefered_lft * HZ - regen_advance * HZ;
+				} else
+#endif
 				if (time_before(ifp->tstamp + ifp->prefered_lft * HZ, next))
 					next = ifp->tstamp + ifp->prefered_lft * HZ;
 				spin_unlock(&ifp->lock);
@@ -2497,6 +2666,7 @@ inet6_rtm_newaddr(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 			return -EINVAL;
 		pfx = RTA_DATA(rta[IFA_LOCAL-1]);
 	}
+
 	if (pfx == NULL)
 		return -EINVAL;
 
@@ -3380,10 +3550,20 @@ void __init addrconf_init(void)
 	register_netdevice_notifier(&ipv6_dev_notf);
 
 #ifdef CONFIG_IPV6_PRIVACY
-	md5_tfm = crypto_alloc_tfm("md5", 0);
-	if (unlikely(md5_tfm == NULL))
+	struct crypto_tfm *tfm = crypto_alloc_tfm("md5", 0);
+	if (likely(tfm != NULL)) {
+		spin_lock(&md5_tfm_lock);
+		if (likely(md5_tfm == NULL)) {
+			md5_tfm = tfm;
+			spin_unlock(&md5_tfm_lock);
+		} else {
+			spin_unlock(&md5_tfm_lock);
+			crypto_free_tfm(tfm);
+		}
+	} else {
 		printk(KERN_WARNING
 			"failed to load transform for md5\n");
+	}
 #endif
 
 	addrconf_verify(0);
@@ -3401,6 +3581,9 @@ void __exit addrconf_cleanup(void)
  	struct inet6_dev *idev;
  	struct inet6_ifaddr *ifa;
 	int i;
+#ifdef CONFIG_IPV6_PRIVACY
+	struct crypto_tfm *tfm;
+#endif
 
 	unregister_netdevice_notifier(&ipv6_dev_notf);
 
@@ -3446,10 +3629,12 @@ void __exit addrconf_cleanup(void)
 	rtnl_unlock();
 
 #ifdef CONFIG_IPV6_PRIVACY
-	if (likely(md5_tfm != NULL)) {
-		crypto_free_tfm(md5_tfm);
-		md5_tfm = NULL;
-	}
+	spin_lock(&md5_tfm_lock);
+	tfm = md5_tfm;
+	md5_tfm = NULL;
+	spin_unlock(&md5_tfm_lock);
+	if (likely(tfm))
+		crypto_free_tfm(tfm);
 #endif
 
 #ifdef CONFIG_PROC_FS

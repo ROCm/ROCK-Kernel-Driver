@@ -30,13 +30,18 @@
 #include <net/sock.h>
 #include <linux/rtnetlink.h>
 
+#ifdef CONFIG_IPV6_NDISC_DEBUG
+#define NEIGH_DEBUG 3
+#else
 #define NEIGH_DEBUG 1
+#endif
 
 #define NEIGH_PRINTK(x...) printk(x)
 #define NEIGH_NOPRINTK(x...) do { ; } while(0)
 #define NEIGH_PRINTK0 NEIGH_PRINTK
 #define NEIGH_PRINTK1 NEIGH_NOPRINTK
 #define NEIGH_PRINTK2 NEIGH_NOPRINTK
+#define NEIGH_PRINTK3 NEIGH_NOPRINTK
 
 #if NEIGH_DEBUG >= 1
 #undef NEIGH_PRINTK1
@@ -46,11 +51,12 @@
 #undef NEIGH_PRINTK2
 #define NEIGH_PRINTK2 NEIGH_PRINTK
 #endif
+#if NEIGH_DEBUG >= 3
+#undef NEIGH_PRINTK3
+#define NEIGH_PRINTK3 NEIGH_PRINTK
+#endif
 
 static void neigh_timer_handler(unsigned long arg);
-#ifdef CONFIG_ARPD
-static void neigh_app_notify(struct neighbour *n);
-#endif
 static int pneigh_ifdown(struct neigh_table *tbl, struct net_device *dev);
 void neigh_changeaddr(struct neigh_table *tbl, struct net_device *dev);
 
@@ -389,10 +395,11 @@ struct pneigh_entry * pneigh_lookup(struct neigh_table *tbl, const void *pkey,
 	if (!creat)
 		goto out;
 
-	n = kmalloc(sizeof(*n) + key_len, GFP_KERNEL);
+	n = kmalloc(sizeof(*n) + key_len, pneigh_alloc_flag());
 	if (!n)
 		goto out;
 
+	pneigh_refcnt_init(n);
 	memcpy(n->key, pkey, key_len);
 	n->dev = dev;
 
@@ -426,6 +433,9 @@ int pneigh_delete(struct neigh_table *tbl, const void *pkey,
 	for (np = &tbl->phash_buckets[hash_val]; (n = *np) != NULL;
 	     np = &n->next) {
 		if (!memcmp(n->key, pkey, key_len) && n->dev == dev) {
+			if (!pneigh_refcnt_dec_and_test(n)) {
+				return 0;
+			}
 			write_lock_bh(&tbl->lock);
 			*np = n->next;
 			write_unlock_bh(&tbl->lock);
@@ -536,6 +546,7 @@ static void neigh_connect(struct neighbour *neigh)
 		hh->hh_output = neigh->ops->hh_output;
 }
 
+#ifndef CONFIG_IPV6_NDISC_NEW
 /*
    Transitions NUD_STALE <-> NUD_REACHABLE do not occur
    when fast path is built: we have no timers associated with
@@ -569,6 +580,7 @@ static void neigh_sync(struct neighbour *n)
 		}
 	}
 }
+#endif
 
 static void neigh_periodic_timer(unsigned long arg)
 {
@@ -619,11 +631,13 @@ static void neigh_periodic_timer(unsigned long arg)
 				continue;
 			}
 
+#ifndef CONFIG_IPV6_NDISC_NEW
 			if (n->nud_state & NUD_REACHABLE &&
 			    now - n->confirmed > n->parms->reachable_time) {
 				n->nud_state = NUD_STALE;
 				neigh_suspect(n);
 			}
+#endif
 			write_unlock(&n->lock);
 
 next_elt:
@@ -648,13 +662,14 @@ static __inline__ int neigh_max_probes(struct neighbour *n)
 
 static void neigh_timer_handler(unsigned long arg)
 {
-	unsigned long now = jiffies;
+	unsigned long now, next;
 	struct neighbour *neigh = (struct neighbour *)arg;
 	unsigned state;
-	int notify = 0;
 
 	write_lock(&neigh->lock);
-
+	now = jiffies;
+	next = now + HZ;
+	
 	state = neigh->nud_state;
 
 	if (!(state & NUD_IN_TIMER)) {
@@ -664,6 +679,34 @@ static void neigh_timer_handler(unsigned long arg)
 		goto out;
 	}
 
+#ifdef CONFIG_IPV6_NDISC_NEW
+	if (state & NUD_REACHABLE) {
+		if (now - neigh->confirmed < neigh->parms->reachable_time) {
+			next = neigh->confirmed + neigh->parms->reachable_time;
+		} else if (now - neigh->used <= neigh->parms->delay_probe_time) {
+			neigh->nud_state = NUD_DELAY;
+			neigh_suspect(neigh);
+			next = now + neigh->parms->delay_probe_time;
+		} else {
+			neigh->nud_state = NUD_STALE;
+			neigh_suspect(neigh);
+			goto out;
+		}
+	} else if (state & NUD_DELAY) {
+		if (now - neigh->confirmed <= neigh->parms->delay_probe_time) {
+			neigh->nud_state = NUD_REACHABLE;
+			neigh_connect(neigh);
+			next = neigh->confirmed + neigh->parms->reachable_time;
+		} else {
+			neigh->nud_state = NUD_PROBE;
+			atomic_set(&neigh->probes, 0);
+			next = now + neigh->parms->retrans_time;
+		}
+	} else {
+		/* PROBE,INCOMPLETE */
+		next = now + neigh->parms->retrans_time;
+	}
+#else
 	if ((state & NUD_VALID) &&
 	    now - neigh->confirmed < neigh->parms->reachable_time) {
 		neigh->nud_state = NUD_REACHABLE;
@@ -676,12 +719,18 @@ static void neigh_timer_handler(unsigned long arg)
 		neigh->nud_state = NUD_PROBE;
 		atomic_set(&neigh->probes, 0);
 	}
+#endif
 
-	if (atomic_read(&neigh->probes) >= neigh_max_probes(neigh)) {
+	if (
+#ifdef CONFIG_IPV6_NDISC_NEW
+	    (neigh->nud_state & (NUD_INCOMPLETE | NUD_PROBE)) &&
+#endif
+	    atomic_read(&neigh->probes) >= neigh_max_probes(neigh)) {
 		struct sk_buff *skb;
 
 		neigh->nud_state = NUD_FAILED;
-		notify = 1;
+
+		neigh->updated = now;
 		neigh->tbl->stats.res_failed++;
 		NEIGH_PRINTK2("neigh %p is failed.\n", neigh);
 
@@ -697,9 +746,34 @@ static void neigh_timer_handler(unsigned long arg)
 			write_lock(&neigh->lock);
 		}
 		skb_queue_purge(&neigh->arp_queue);
+#ifdef CONFIG_ARPD
+		if (neigh->parms->app_probes) {
+			write_unlock(&neigh->lock);
+			neigh_app_notify(neigh);
+			write_lock(&neigh->lock);
+		}
+#endif
 		goto out;
 	}
 
+#ifdef CONFIG_IPV6_NDISC_NEW
+	neigh_hold(neigh);
+	if (time_before(next, jiffies + HZ/2))
+		next = jiffies + HZ/2;
+	mod_timer(&neigh->timer, next);
+	if (neigh->nud_state & (NUD_INCOMPLETE|NUD_PROBE)) {
+		struct sk_buff *skb;
+
+		if ((skb = skb_peek(&neigh->arp_queue)) != NULL)
+			skb_get(skb);
+		write_unlock(&neigh->lock);
+		neigh->ops->solicit(neigh, skb);
+		atomic_inc(&neigh->probes);
+		if (skb)
+			kfree_skb(skb);
+		goto out_no_unlock;
+	}
+#else
 	neigh->timer.expires = now + neigh->parms->retrans_time;
 	add_timer(&neigh->timer);
 	write_unlock(&neigh->lock);
@@ -707,47 +781,58 @@ static void neigh_timer_handler(unsigned long arg)
 	neigh->ops->solicit(neigh, skb_peek(&neigh->arp_queue));
 	atomic_inc(&neigh->probes);
 	return;
+#endif
 
 out:
 	write_unlock(&neigh->lock);
-#ifdef CONFIG_ARPD
-	if (notify && neigh->parms->app_probes)
-		neigh_app_notify(neigh);
-#endif
+out_no_unlock:
 	neigh_release(neigh);
 }
 
 int __neigh_event_send(struct neighbour *neigh, struct sk_buff *skb)
 {
-	int rc;
+	int rc = 0;
+	unsigned long now = jiffies;
+	
+	NEIGH_PRINTK3(KERN_DEBUG 
+			"%s(neigh=%p, skb=%p): %s\n",
+			__FUNCTION__, 
+			neigh, skb, neigh_state(neigh->nud_state));
 
-	write_lock_bh(&neigh->lock);
-
-	rc = 0;
 	if (neigh->nud_state & (NUD_CONNECTED | NUD_DELAY | NUD_PROBE))
-		goto out_unlock_bh;
+		goto out;
 
 	if (!(neigh->nud_state & (NUD_STALE | NUD_INCOMPLETE))) {
 		if (neigh->parms->mcast_probes + neigh->parms->app_probes) {
 			atomic_set(&neigh->probes, neigh->parms->ucast_probes);
 			neigh->nud_state     = NUD_INCOMPLETE;
 			neigh_hold(neigh);
-			neigh->timer.expires = jiffies +
+#ifdef CONFIG_IPV6_NDISC_NEW
+			neigh->timer.expires = now;
+#else
+			neigh->timer.expires = now +
 					       neigh->parms->retrans_time;
+#endif
 			add_timer(&neigh->timer);
+#ifndef CONFIG_IPV6_NDISC_NEW
 			write_unlock_bh(&neigh->lock);
 			neigh->ops->solicit(neigh, skb);
 			atomic_inc(&neigh->probes);
 			write_lock_bh(&neigh->lock);
+#endif
 		} else {
 			neigh->nud_state = NUD_FAILED;
-			write_unlock_bh(&neigh->lock);
-
-			if (skb)
-				kfree_skb(skb);
-			return 1;
+			return -1;
 		}
 	}
+#ifdef CONFIG_IPV6_NDISC_NEW
+	else if (neigh->nud_state == NUD_STALE) {
+		neigh_hold(neigh);
+		neigh->nud_state = NUD_DELAY;
+		neigh->timer.expires = now + neigh->parms->delay_probe_time;
+		add_timer(&neigh->timer);
+	}
+#endif
 
 	if (neigh->nud_state == NUD_INCOMPLETE) {
 		if (skb) {
@@ -761,16 +846,18 @@ int __neigh_event_send(struct neighbour *neigh, struct sk_buff *skb)
 			__skb_queue_tail(&neigh->arp_queue, skb);
 		}
 		rc = 1;
-	} else if (neigh->nud_state == NUD_STALE) {
+	}
+#ifndef CONFIG_IPV6_NDISC_NEW
+	else if (neigh->nud_state == NUD_STALE) {
 		NEIGH_PRINTK2("neigh %p is delayed.\n", neigh);
 		neigh_hold(neigh);
 		neigh->nud_state = NUD_DELAY;
-		neigh->timer.expires = jiffies + neigh->parms->delay_probe_time;
+		neigh->timer.expires = now + neigh->parms->delay_probe_time;
 		add_timer(&neigh->timer);
 		rc = 0;
 	}
-out_unlock_bh:
-	write_unlock_bh(&neigh->lock);
+#endif
+out:
 	return rc;
 }
 
@@ -794,32 +881,57 @@ static __inline__ void neigh_update_hhs(struct neighbour *neigh)
 /* Generic update routine.
    -- lladdr is new lladdr or NULL, if it is not supplied.
    -- new    is new state.
-   -- override == 1 allows to override existing lladdr, if it is different.
-   -- arp == 0 means that the change is administrative.
+   -- flags  specifies details of update
 
    Caller MUST hold reference count on the entry.
+   __neigh_update() is called under write_lock_bh().
+
  */
 
-int neigh_update(struct neighbour *neigh, const u8 *lladdr, u8 new,
-		 int override, int arp)
+int __neigh_update(struct neighbour *neigh, const u8 *lladdr, u8 new, u32 flags)
 {
 	u8 old;
 	int err;
-#ifdef CONFIG_ARPD
 	int notify = 0;
-#endif
 	struct net_device *dev;
+#ifdef CONFIG_IPV6_NDISC_NEW
+	unsigned long now = jiffies;
+	int hold = 0;
+	int update_isrouter = 0;
 
-	write_lock_bh(&neigh->lock);
+	NEIGH_PRINTK3(KERN_DEBUG
+			"%s(neigh=%p, lladdr=%p, new=%u, flags=%08x): %s\n",
+			__FUNCTION__,
+			neigh, lladdr, new, flags, neigh_state(neigh->nud_state));
+	
+	if (!neigh) {
+		NEIGH_PRINTK1(KERN_WARNING "__neigh_update(): neigh==NULL\n");
+		return -EINVAL;
+	}
 
+	old = neigh->nud_state;
+#endif /* CONFIG_IPV6_NDISC_NEW */
+
+#ifndef CONFIG_IPV6_NDISC_NEW
 	dev    = neigh->dev;
 	old    = neigh->nud_state;
 	err    = -EPERM;
+#else /* CONFIG_IPV6_NDISC_NEW */
+	dev = neigh->dev;
+	if (!dev) {
+		NEIGH_PRINTK1(KERN_WARNING "__neigh_update(): neigh->dev==NULL\n");
+		return -EINVAL;
+	}
+#endif /* CONFIG_IPV6_NDISC_NEW */
 
-	if (arp && (old & (NUD_NOARP | NUD_PERMANENT)))
+	err = -EPERM;
+	if (!(flags & NEIGH_UPDATE_F_ADMIN) && (old & (NUD_NOARP | NUD_PERMANENT)))
 		goto out;
 
 	if (!(new & NUD_VALID)) {
+#ifdef CONFIG_IPV6_NDISC_NEW
+		/* NONE,INCOMPLETE,FAILED */
+#endif /* CONFIG_IPV6_NDISC_NEW */
 		neigh_del_timer(neigh);
 		if (old & NUD_CONNECTED)
 			neigh_suspect(neigh);
@@ -844,8 +956,10 @@ int neigh_update(struct neighbour *neigh, const u8 *lladdr, u8 new,
 		if (old & NUD_VALID) {
 			if (!memcmp(lladdr, neigh->ha, dev->addr_len))
 				lladdr = neigh->ha;
-			else if (!override)
+#ifndef CONFIG_IPV6_NDISC_NEW
+			else if (!(flags & NEIGH_UPDATE_F_OVERRIDE))
 				goto out;
+#endif /* not CONFIG_IPV6_NDISC_NEW */
 		}
 	} else {
 		/* No address is supplied; if we know something,
@@ -857,28 +971,93 @@ int neigh_update(struct neighbour *neigh, const u8 *lladdr, u8 new,
 		lladdr = neigh->ha;
 	}
 
+#ifndef CONFIG_IPV6_NDISC_NEW
 	neigh_sync(neigh);
 	old = neigh->nud_state;
 	if (new & NUD_CONNECTED)
 		neigh->confirmed = jiffies;
 	neigh->updated = jiffies;
 
+#endif /* not CONFIG_IPV6_NDISC_NEW */
 	/* If entry was valid and address is not changed,
 	   do not change entry state, if new one is STALE.
 	 */
 	err = 0;
+#ifndef CONFIG_IPV6_NDISC_NEW
 	if ((old & NUD_VALID) && lladdr == neigh->ha &&
 	    (new == old || (new == NUD_STALE && (old & NUD_CONNECTED))))
 		goto out;
+#else /* CONFIG_IPV6_NDISC_NEW */
+	if (old & NUD_VALID) {
+		if (lladdr != neigh->ha &&
+		    !(flags & NEIGH_UPDATE_F_OVERRIDE)) {
+			if ((flags & NEIGH_UPDATE_F_SUSPECT_CONNECTED) &&
+			    (old & NUD_CONNECTED)) {
+				new = NUD_STALE;
+				lladdr = neigh->ha;
+			} else {
+				goto out;
+			}
+		} else {
+			if ((flags & NEIGH_UPDATE_F_REUSEADDR) &&
+			    new == old)
+				lladdr = neigh->ha;
+			else if (lladdr == neigh->ha && new == NUD_STALE) {
+				if ((flags & NEIGH_UPDATE_F_REUSESUSPECTSTATE) ||
+				    (old & NUD_CONNECTED))
+					new = old;
+			}
+			update_isrouter = flags & NEIGH_UPDATE_F_OVERRIDE_VALID_ISROUTER;
+		}
+	} else {
+		/* INCOMPLETE */
+		update_isrouter = flags&NEIGH_UPDATE_F_SETUP_ISROUTER;
+	}
+#endif /* CONFIG_IPV6_NDISC_NEW */
 
+#ifndef CONFIG_IPV6_NDISC_NEW
 	neigh_del_timer(neigh);
 	neigh->nud_state = new;
+#else /* CONFIG_IPV6_NDISC_NEW */
+	if (new != old) {
+		if (new & NUD_IN_TIMER) {
+			unsigned long next = now;
+			switch(new) {
+			case NUD_REACHABLE:
+				next += neigh->parms->reachable_time;
+				break;
+			default:;
+				/*XXX*/
+			}
+			if (old & NUD_IN_TIMER) {
+				mod_timer(&neigh->timer, next);
+			} else {
+				neigh_hold(neigh);
+				neigh->timer.expires = next;
+				add_timer(&neigh->timer);
+			}
+		} else {
+			neigh_del_timer(neigh);
+		}
+		neigh->nud_state = new;
+	}
+	if ((new != old || lladdr != neigh->ha) &&
+	    new & NUD_CONNECTED)
+		neigh->confirmed = now;
+#endif /* CONFIG_IPV6_NDISC_NEW */
 	if (lladdr != neigh->ha) {
+#ifdef CONFIG_IPV6_NDISC_NEW
+		neigh->updated = now;
+#endif /* CONFIG_IPV6_NDISC_NEW */
 		memcpy(&neigh->ha, lladdr, dev->addr_len);
 		neigh_update_hhs(neigh);
 		if (!(new & NUD_CONNECTED))
+#ifndef CONFIG_IPV6_NDISC_NEW
 			neigh->confirmed = jiffies -
 				      (neigh->parms->base_reachable_time << 1);
+#else /* CONFIG_IPV6_NDISC_NEW */
+			neigh->confirmed = now - (neigh->parms->base_reachable_time<<1);
+#endif /* CONFIG_IPV6_NDISC_NEW */
 #ifdef CONFIG_ARPD
 		notify = 1;
 #endif
@@ -893,6 +1072,13 @@ int neigh_update(struct neighbour *neigh, const u8 *lladdr, u8 new,
 		struct sk_buff *skb;
 
 		/* Again: avoid dead loop if something went wrong */
+#ifdef CONFIG_IPV6_NDISC_NEW
+		neigh_hold(neigh);	/* don't release neigh while processing */
+		hold = 1;
+
+		if (new&NUD_VALID)
+			notify = 1;
+#endif /* CONFIG_IPV6_NDISC_NEW */
 
 		while (neigh->nud_state & NUD_VALID &&
 		       (skb = __skb_dequeue(&neigh->arp_queue)) != NULL) {
@@ -907,20 +1093,65 @@ int neigh_update(struct neighbour *neigh, const u8 *lladdr, u8 new,
 		skb_queue_purge(&neigh->arp_queue);
 	}
 out:
-	write_unlock_bh(&neigh->lock);
+#ifdef CONFIG_IPV6_NDISC_NEW
+	if (update_isrouter) {
+		neigh->flags = (flags & NEIGH_UPDATE_F_ISROUTER) ?
+				(neigh->flags | NTF_ROUTER) :
+				(neigh->flags & ~NTF_ROUTER);
+	}
+
+	if (hold)
+		neigh_release(neigh);
+#endif /* CONFIG_IPV6_NDISC_NEW */
+
+	NEIGH_PRINTK3(KERN_DEBUG
+			"%s() => %s\n",
+			__FUNCTION__,
+			neigh_state(neigh->nud_state));
+
+	return err ? err : notify;
+}
+
+int neigh_update(struct neighbour *neigh, const u8 *lladdr, u8 new,
+		 int override, int arp)
+{
+	int update;
+
+	NEIGH_PRINTK3(KERN_DEBUG
+			"%s(neigh=%p, lladdr=%p, new=%u, override=%d, arp=%d): %s\n",
+			__FUNCTION__, 
+			neigh, lladdr, new, override, arp,
+			neigh_state(neigh->nud_state));
+
+	neigh_hold(neigh);
+	write_lock_bh(&neigh->lock);
+	update = __neigh_update(neigh, lladdr, new, 
+				(override ? NEIGH_UPDATE_F_OVERRIDE : 0) |
+				(arp ? 0 : NEIGH_UPDATE_F_ADMIN));
 #ifdef CONFIG_ARPD
-	if (notify && neigh->parms->app_probes)
+	if (update > 0 && neigh->parms->app_probes) {
+		write_unlock_bh(&neigh->lock);
 		neigh_app_notify(neigh);
+	} else
 #endif
-	return err;
+	write_unlock_bh(&neigh->lock);
+	neigh_release(neigh);	/*XXX: may invalidate neigh... */
+	return update >= 0 ? 0 : update;
 }
 
 struct neighbour *neigh_event_ns(struct neigh_table *tbl,
 				 u8 *lladdr, void *saddr,
 				 struct net_device *dev)
 {
-	struct neighbour *neigh = __neigh_lookup(tbl, saddr, dev,
-						 lladdr || !dev->addr_len);
+	struct neighbour *neigh;
+
+	NEIGH_PRINTK3(KERN_DEBUG
+			"%s(tbl=%p, lladdr=%p, saddr=%p, dev=%p)\n",
+			__FUNCTION__, 
+			tbl, lladdr, saddr, dev);
+
+	neigh = __neigh_lookup(tbl, saddr, dev,
+			       lladdr || !dev->addr_len);
 	if (neigh)
 		neigh_update(neigh, lladdr, NUD_STALE, 1, 1);
 	return neigh;
@@ -1457,7 +1688,7 @@ void neigh_app_ns(struct neighbour *n)
 	netlink_broadcast(rtnl, skb, 0, RTMGRP_NEIGH, GFP_ATOMIC);
 }
 
-static void neigh_app_notify(struct neighbour *n)
+void neigh_app_notify(struct neighbour *n)
 {
 	struct nlmsghdr *nlh;
 	int size = NLMSG_SPACE(sizeof(struct ndmsg) + 256);
@@ -1739,6 +1970,7 @@ EXPORT_SYMBOL(neigh_rand_reach_time);
 EXPORT_SYMBOL(neigh_resolve_output);
 EXPORT_SYMBOL(neigh_table_clear);
 EXPORT_SYMBOL(neigh_table_init);
+EXPORT_SYMBOL(__neigh_update);
 EXPORT_SYMBOL(neigh_update);
 EXPORT_SYMBOL(neigh_update_hhs);
 EXPORT_SYMBOL(pneigh_enqueue);
@@ -1746,6 +1978,7 @@ EXPORT_SYMBOL(pneigh_lookup);
 
 #ifdef CONFIG_ARPD
 EXPORT_SYMBOL(neigh_app_ns);
+EXPORT_SYMBOL(neigh_app_notify);
 #endif
 #ifdef CONFIG_SYSCTL
 EXPORT_SYMBOL(neigh_sysctl_register);

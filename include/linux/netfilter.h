@@ -180,6 +180,10 @@ extern inline struct arpt_target *
 arpt_find_target_lock(const char *name, int *error, struct semaphore *mutex);
 extern void (*ip_ct_attach)(struct sk_buff *, struct nf_ct_info *);
 
+#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
+extern void (*ip6_ct_attach)(struct sk_buff *, struct nf_ct_info *);
+#endif
+
 #ifdef CONFIG_NETFILTER_DEBUG
 extern void nf_dump_skb(int pf, struct sk_buff *skb);
 #endif
