@@ -31,19 +31,19 @@
 /*
  * max time before a read is submitted.
  */
-#define default_read_expire (HZ / 20)
+#define default_read_expire (HZ / 8)
 
 /*
  * ditto for writes, these limits are not hard, even
  * if the disk is capable of satisfying them.
  */
-#define default_write_expire (HZ / 5)
+#define default_write_expire (HZ / 4)
 
 /*
  * read_batch_expire describes how long we will allow a stream of reads to
  * persist before looking to see whether it is time to switch over to writes.
  */
-#define default_read_batch_expire (HZ / 5)
+#define default_read_batch_expire (HZ / 4)
 
 /*
  * write_batch_expire describes how long we want a stream of writes to run for.
@@ -51,7 +51,7 @@
  * See, the problem is: we can send a lot of writes to disk cache / TCQ in
  * a short amount of time...
  */
-#define default_write_batch_expire (HZ / 20)
+#define default_write_batch_expire (HZ / 16)
 
 /*
  * max time we may wait to anticipate a read (default around 6ms)
@@ -426,6 +426,8 @@ as_find_arq_rb(struct as_data *ad, sector_t sector, int data_dir)
 				 * for a request.
 				 */
 
+#define BACK_PENALTY	2
+
 /*
  * as_choose_req selects the preferred one of two requests of the same data_dir
  * ignoring time - eg. timeouts, which is the job of as_dispatch_request
@@ -459,7 +461,7 @@ as_choose_req(struct as_data *ad, struct as_rq *arq1, struct as_rq *arq2)
 	if (s1 >= last)
 		d1 = s1 - last;
 	else if (s1+maxback >= last)
-		d1 = (last - s1)*2;
+		d1 = (last - s1)*BACK_PENALTY;
 	else {
 		r1_wrap = 1;
 		d1 = 0; /* shut up, gcc */
@@ -468,7 +470,7 @@ as_choose_req(struct as_data *ad, struct as_rq *arq1, struct as_rq *arq2)
 	if (s2 >= last)
 		d2 = s2 - last;
 	else if (s2+maxback >= last)
-		d2 = (last - s2)*2;
+		d2 = (last - s2)*BACK_PENALTY;
 	else {
 		r2_wrap = 1;
 		d2 = 0;
@@ -657,7 +659,6 @@ static int as_close_req(struct as_data *ad, struct as_rq *arq)
 	return (last - (delta>>1) <= next) && (next <= last + delta);
 }
 
-static void as_update_thinktime(struct as_data *ad, struct as_io_context *aic, unsigned long ttime);
 /*
  * as_can_break_anticipation returns true if we have been anticipating this
  * request.
@@ -682,20 +683,6 @@ static int as_can_break_anticipation(struct as_data *ad, struct as_rq *arq)
 
 	if (arq && ioc == arq->io_context) {
 		/* request from same process */
-		return 1;
-	}
-
-	if (arq && arq->is_sync == REQ_SYNC && as_close_req(ad, arq)) {
-		/* close request */
-		struct as_io_context *aic = ioc->aic;
-		if (aic) {
-			unsigned long thinktime;
-			spin_lock(&aic->lock);
-			thinktime = jiffies - aic->last_end_request;
-			aic->last_end_request = jiffies;
-			as_update_thinktime(ad, aic, thinktime);
-			spin_unlock(&aic->lock);
-		}
 		return 1;
 	}
 
@@ -728,6 +715,22 @@ static int as_can_break_anticipation(struct as_data *ad, struct as_rq *arq)
 		return 1;
 	}
 
+	if (arq && arq->is_sync == REQ_SYNC && as_close_req(ad, arq)) {
+		/*
+		 * Found a close request that is not one of ours.
+		 *
+		 * This makes close requests from another process reset
+		 * our thinktime delay. Is generally useful when there are
+		 * two or more cooperating processes working in the same
+		 * area.
+		 */
+		spin_lock(&aic->lock);
+		aic->last_end_request = jiffies;
+		spin_unlock(&aic->lock);
+		return 1;
+	}
+
+
 	if (aic->ttime_samples == 0) {
 		if (ad->new_ttime_mean > ad->antic_expire)
 			return 1;
@@ -751,13 +754,13 @@ static int as_can_break_anticipation(struct as_data *ad, struct as_rq *arq)
 		 * Process has just started IO. Use past statistics to
 		 * guage success possibility
 		 */
-		if (ad->new_seek_mean/2 > s) {
+		if (ad->new_seek_mean > s) {
 			/* this request is better than what we're expecting */
 			return 1;
 		}
 
 	} else {
-		if (aic->seek_mean/2 > s) {
+		if (aic->seek_mean > s) {
 			/* this request is better than what we're expecting */
 			return 1;
 		}
