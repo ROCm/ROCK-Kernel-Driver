@@ -1534,6 +1534,10 @@ nfsd4_open_confirm(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfs
 	dprintk("NFSD: nfsd4_open_confirm on file %.*s\n",
 			(int)current_fh->fh_dentry->d_name.len,
 			current_fh->fh_dentry->d_name.name);
+
+	if ((status = fh_verify(rqstp, current_fh, S_IFREG, 0)))
+		goto out;
+
 	oc->oc_stateowner = NULL;
 	nfs4_lock_state();
 
