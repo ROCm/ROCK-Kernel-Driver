@@ -50,7 +50,7 @@ static int raw_open(struct inode *inode, struct file *filp)
 		filp->f_op = &raw_ctl_fops;
 		return 0;
 	}
-	
+
 	down(&raw_mutex);
 
 	/*
@@ -100,7 +100,7 @@ static int raw_release(struct inode *inode, struct file *filp)
 		inode->i_mapping->backing_dev_info = &default_backing_dev_info;
 	}
 	up(&raw_mutex);
-	
+
 	bd_release(bdev);
 	blkdev_put(bdev, BDEV_RAW);
 	return 0;
@@ -122,27 +122,28 @@ raw_ioctl(struct inode *inode, struct file *filp,
  * Deal with ioctls against the raw-device control interface, to bind
  * and unbind other raw devices.
  */
-static int
-raw_ctl_ioctl(struct inode *inode, struct file *filp,
-		unsigned int command, unsigned long arg)
+static int raw_ctl_ioctl(struct inode *inode, struct file *filp,
+			unsigned int command, unsigned long arg)
 {
 	struct raw_config_request rq;
 	struct raw_device_data *rawdev;
-	int err;
-	
+	int err = 0;
+
 	switch (command) {
 	case RAW_SETBIND:
 	case RAW_GETBIND:
 
 		/* First, find out which raw minor we want */
 
-		err = -EFAULT;
-		if (copy_from_user(&rq, (void *) arg, sizeof(rq)))
+		if (copy_from_user(&rq, (void *) arg, sizeof(rq))) {
+			err = -EFAULT;
 			goto out;
-		
-		err = -EINVAL;
-		if (rq.raw_minor < 0 || rq.raw_minor >= MAX_RAW_MINORS)
+		}
+
+		if (rq.raw_minor < 0 || rq.raw_minor >= MAX_RAW_MINORS) {
+			err = -EINVAL;
 			goto out;
+		}
 		rawdev = &raw_devices[rq.raw_minor];
 
 		if (command == RAW_SETBIND) {
@@ -152,9 +153,10 @@ raw_ctl_ioctl(struct inode *inode, struct file *filp,
 			 * This is like making block devices, so demand the
 			 * same capability
 			 */
-			err = -EPERM;
-			if (!capable(CAP_SYS_ADMIN))
+			if (!capable(CAP_SYS_ADMIN)) {
+				err = -EPERM;
 				goto out;
+			}
 
 			/*
 			 * For now, we don't need to check that the underlying
@@ -163,17 +165,18 @@ raw_ctl_ioctl(struct inode *inode, struct file *filp,
 			 * major/minor numbers make sense.
 			 */
 
-			err = -EINVAL;
 			dev = MKDEV(rq.block_major, rq.block_minor);
 			if ((rq.block_major == 0 && rq.block_minor != 0) ||
-			    MAJOR(dev) != rq.block_major ||
-			    MINOR(dev) != rq.block_minor)
+					MAJOR(dev) != rq.block_major ||
+					MINOR(dev) != rq.block_minor) {
+				err = -EINVAL;
 				goto out;
-			
+			}
+
 			down(&raw_mutex);
-			err = -EBUSY;
 			if (rawdev->inuse) {
 				up(&raw_mutex);
+				err = -EBUSY;
 				goto out;
 			}
 			if (rawdev->binding) {
@@ -185,7 +188,10 @@ raw_ctl_ioctl(struct inode *inode, struct file *filp,
 				rawdev->binding = NULL;
 			} else {
 				rawdev->binding = bdget(dev);
-				MOD_INC_USE_COUNT;
+				if (rawdev->binding == NULL)
+					err = -ENOMEM;
+				else
+					try_module_get(THIS_MODULE);
 			}
 			up(&raw_mutex);
 		} else {
@@ -200,13 +206,12 @@ raw_ctl_ioctl(struct inode *inode, struct file *filp,
 				rq.block_major = rq.block_minor = 0;
 			}
 			up(&raw_mutex);
-			err = -EFAULT;
-			if (copy_to_user((void *)arg, &rq, sizeof(rq)))
+			if (copy_to_user((void *)arg, &rq, sizeof(rq))) {
+				err = -EFAULT;
 				goto out;
+			}
 		}
-		err = 0;
 		break;
-		
 	default:
 		err = -EINVAL;
 		break;
