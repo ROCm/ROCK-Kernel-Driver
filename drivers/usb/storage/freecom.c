@@ -128,7 +128,7 @@ freecom_readdata (Scsi_Cmnd *srb, struct us_data *us,
         result = usb_stor_bulk_msg (us, fxfr, opipe,
                         FCM_PACKET_LENGTH, &partial);
         if (result != USB_STOR_XFER_GOOD) {
-                US_DEBUGP ("Freecom readdata xpot failure: r=%d, p=%d\n",
+                US_DEBUGP ("Freecom readdata xport failure: r=%d, p=%d\n",
                                 result, partial);
                 return USB_STOR_TRANSPORT_ERROR;
         }
@@ -164,7 +164,7 @@ freecom_writedata (Scsi_Cmnd *srb, struct us_data *us,
         result = usb_stor_bulk_msg (us, fxfr, opipe,
                         FCM_PACKET_LENGTH, &partial);
         if (result != USB_STOR_XFER_GOOD) {
-                US_DEBUGP ("Freecom writedata xpot failure: r=%d, p=%d\n",
+                US_DEBUGP ("Freecom writedata xport failure: r=%d, p=%d\n",
                                 result, partial);
                 return USB_STOR_TRANSPORT_ERROR;
         }

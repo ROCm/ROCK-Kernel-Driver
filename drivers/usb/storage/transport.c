@@ -657,7 +657,7 @@ int usb_stor_bulk_transfer_sglist(struct us_data *us, unsigned int pipe,
 
 	/* initialize the scatter-gather request block */
 	US_DEBUGP("usb_stor_bulk_transfer_sglist(): xfer %d bytes, "
-			"%d entires\n", length, num_sg);
+			"%d entries\n", length, num_sg);
 	result = usb_sg_init(us->current_sg, us->pusb_dev, pipe, 0,
 			sg, num_sg, length, SLAB_NOIO);
 	if (result) {
@@ -679,26 +679,27 @@ int usb_stor_bulk_transfer_sglist(struct us_data *us, unsigned int pipe,
 		}
 	}
 
+	/* wait for the completion of the transfer */
 	usb_sg_wait(us->current_sg);
 	clear_bit(US_FLIDX_CANCEL_SG, &us->flags);
 
 	result = us->current_sg->status;
 	partial = us->current_sg->bytes;
-	US_DEBUGP("usb_sg_wait() returned %d xferrerd %d/%d\n",
+	US_DEBUGP("usb_sg_wait() returned %d xferred %d/%d\n",
 			result, partial, length);
 	if (act_len)
 		*act_len = partial;
 
 	/* if we stall, we need to clear it before we go on */
 	if (result == -EPIPE) {
-		US_DEBUGP("clearing endpoint halt for pipe 0x%x,"
+		US_DEBUGP("clearing endpoint halt for pipe 0x%x, "
 				"stalled at %d bytes\n", pipe, partial);
 		if (usb_stor_clear_halt(us, pipe) < 0)
 			return USB_STOR_XFER_ERROR;
 		return USB_STOR_XFER_STALLED;
 	}
 
-	/* NAK - that means we've tried this a few times already */
+	/* NAK - that means we've retried this a few times already */
 	if (result == -ETIMEDOUT) {
 		US_DEBUGP("-- device NAKed\n");
 		return USB_STOR_XFER_ERROR;
@@ -726,10 +727,10 @@ int usb_stor_bulk_transfer_sglist(struct us_data *us, unsigned int pipe,
  * Transfer an entire SCSI command's worth of data payload over the bulk
  * pipe.
  *
- * Nore that this uses the usb_stor_bulk_transfer_buf() and
+ * Nore that this uses usb_stor_bulk_transfer_buf() and
  * usb_stor_bulk_transfer_sglist() to achieve its goals --
  * this function simply determines whether we're going to use
- * scatter-gather or not, and acts apropriately.
+ * scatter-gather or not, and acts appropriately.
  */
 int usb_stor_bulk_transfer_sg(struct us_data* us, unsigned int pipe,
 		char *buf, unsigned int length_left, int use_sg, int *residual)
