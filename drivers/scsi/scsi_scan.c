@@ -1872,7 +1872,7 @@ int scsi_add_single_device(uint host, uint channel, uint id, uint lun)
 	if (!shost)
 		return -ENODEV;
 	sdev = scsi_find_device(shost, channel, id, lun);
-	if (!sdev)
+	if (sdev)
 		goto out;
 
 	error = -ENOMEM;
