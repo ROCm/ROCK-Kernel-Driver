@@ -23,7 +23,7 @@
 #include <linux/signal.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
-#include <linux/types.h>
+#include <linux/module.h>
 #include <linux/a.out.h>
 #include <linux/user.h>
 #include <linux/string.h>
@@ -816,15 +816,71 @@ asmlinkage void buserr_c(struct frame *fp)
 
 
 int kstack_depth_to_print = 48;
+extern struct module kernel_module;
 
-/* MODULE_RANGE is a guess of how much space is likely to be
-   vmalloced.  */
-#define MODULE_RANGE (8*1024*1024)
+static inline int kernel_text_address(unsigned long addr)
+{
+	struct module *mod;
+	int retval = 0;
+	extern char _stext, _etext;
+
+	if (addr >= (unsigned long) &_stext &&
+	    addr <= (unsigned long) &_etext)
+		return 1;
+
+#ifdef CONFIG_MODULES
+	for (mod = module_list; mod != &kernel_module; mod = mod->next) {
+		/* mod_bound tests for addr being inside the vmalloc'ed
+		 * module area. Of course it'd be better to test only
+		 * for the .text subset... */
+		if (mod_bound(addr, 0, mod)) {
+			retval = 1;
+			break;
+		}
+	}
+#endif
+
+	return retval;
+}
+
+void show_trace(unsigned long *stack)
+{
+	unsigned long *endstack;
+	unsigned long addr;
+	int i;
+
+	printk("Call Trace:");
+	addr = (unsigned long)stack + THREAD_SIZE - 1;
+	endstack = (unsigned long *)(addr & -THREAD_SIZE);
+	i = 0;
+	while (stack + 1 <= endstack) {
+		addr = *stack++;
+		/*
+		 * If the address is either in the text segment of the
+		 * kernel, or in the region which contains vmalloc'ed
+		 * memory, it *may* be the address of a calling
+		 * routine; if so, print it so that someone tracing
+		 * down the cause of the crash will be able to figure
+		 * out the call path that was taken.
+		 */
+		if (kernel_text_address(addr)) {
+			if (i % 4 == 0)
+				printk("\n       ");
+			printk(" [<%08lx>]", addr);
+			i++;
+		}
+	}
+	printk("\n");
+}
+
+void show_trace_task(struct task_struct *tsk)
+{
+	show_trace((unsigned long *)tsk->thread.esp0);
+}
 
 static void dump_stack(struct frame *fp)
 {
-	unsigned long *stack, *endstack, addr, module_start, module_end;
-	extern char _start, _etext;
+	unsigned long *stack, *endstack, addr;
 	int i;
 
 	addr = (unsigned long)&fp->un;
@@ -881,7 +937,7 @@ static void dump_stack(struct frame *fp)
 	}
 
 	stack = (unsigned long *)addr;
-	endstack = (unsigned long *)PAGE_ALIGN(addr);
+	endstack = (unsigned long *)((addr + THREAD_SIZE - 1) & -THREAD_SIZE);
 
 	printk("Stack from %08lx:", (unsigned long)stack);
 	for (i = 0; i < kstack_depth_to_print; i++) {
@@ -891,32 +947,10 @@ static void dump_stack(struct frame *fp)
 			printk("\n       ");
 		printk(" %08lx", *stack++);
 	}
+	printk("\n");
+	show_trace((unsigned long *)addr);
 
-	printk ("\nCall Trace:");
-	stack = (unsigned long *) addr;
-	i = 0;
-	module_start = VMALLOC_START;
-	module_end = module_start + MODULE_RANGE;
-	while (stack + 1 <= endstack) {
-		addr = *stack++;
-		/*
-		 * If the address is either in the text segment of the
-		 * kernel, or in the region which contains vmalloc'ed
-		 * memory, it *may* be the address of a calling
-		 * routine; if so, print it so that someone tracing
-		 * down the cause of the crash will be able to figure
-		 * out the call path that was taken.
-		 */
-		if (((addr >= (unsigned long) &_start) &&
-		     (addr <= (unsigned long) &_etext)) ||
-		    ((addr >= module_start) && (addr <= module_end))) {
-			if (i % 4 == 0)
-				printk("\n       ");
-			printk(" [<%08lx>]", addr);
-			i++;
-		}
-	}
-	printk("\nCode: ");
+	printk("Code: ");
 	for (i = 0; i < 10; i++)
 		printk("%04x ", 0xffff & ((short *) fp->ptregs.pc)[i]);
 	printk ("\n");
