@@ -1002,6 +1002,28 @@ static int sa1100_probe_subdev(struct sa_subdev_info *subdev)
 	return ret;
 }
 
+static struct mtd_partition *parsed_parts;
+
+static void sa1100_destroy(struct mtd_info *mtd)
+{
+	int i;
+
+	if (mtd) {
+		del_mtd_partitions(mtd);
+
+#ifdef CONFIG_MTD_CONCAT
+		if (mtd != sa[i].mtd)
+			mtd_concat_destroy(mtd);
+#endif
+	}
+
+	if (parsed_parts)
+		kfree(parsed_parts);
+
+	for (i = NR_SUBMTD; i >= 0; i--)
+		sa1100_destroy_subdev(&sa[i]);
+}
+
 static int __init sa1100_setup_mtd(struct sa_subdev_info *sa, int nr, struct mtd_info **rmtd)
 {
 	struct mtd_info *cdev[nr];
@@ -1056,28 +1078,10 @@ static int __init sa1100_setup_mtd(struct sa_subdev_info *sa, int nr, struct mtd
 	/*
 	 * If we failed, clean up.
 	 */
-	if (ret) {
-		do {
-			sa1100_destroy_subdev(&sa[i]);
-		} while (i-- > 0);
-	}
+	if (ret)
+		sa1100_destroy(NULL);
 
 	return ret;
-}
-
-static void __exit sa1100_destroy_mtd(struct sa_subdev_info *sa, struct mtd_info *mtd)
-{
-	int i;
-
-	del_mtd_partitions(mtd);
-
-#ifdef CONFIG_MTD_CONCAT
-	if (mtd != sa[0].mtd)
-		mtd_concat_destroy(mtd);
-#endif
-
-	for (i = NR_SUBMTD; i >= 0; i--)
-		sa1100_destroy_subdev(&sa[i]);
 }
 
 static int __init sa1100_locate_flash(void)
@@ -1256,7 +1260,6 @@ static int __init sa1100_locate_flash(void)
 	return nr;
 }
 
-static struct mtd_partition *parsed_parts;
 const char *part_probes[] = { "cmdlinepart", "RedBoot", NULL };
 
 static void __init sa1100_locate_partitions(struct mtd_info *mtd)
@@ -1297,12 +1300,6 @@ static void __init sa1100_locate_partitions(struct mtd_info *mtd)
 	/* Always succeeds. */
 }
 
-static void __exit sa1100_destroy_partitions(void)
-{
-	if (parsed_parts)
-		kfree(parsed_parts);
-}
-
 static struct mtd_info *mymtd;
 
 static int __init sa1100_mtd_probe(struct device *dev)
@@ -1323,8 +1320,7 @@ static int __init sa1100_mtd_probe(struct device *dev)
 
 static int __exit sa1100_mtd_remove(struct device *dev)
 {
-	sa1100_destroy_mtd(info, mymtd);
-	sa1100_destroy_partitions();
+	sa1100_destroy(mymtd);
 	return 0;
 }
 
