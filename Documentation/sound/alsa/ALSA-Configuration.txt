@@ -571,6 +571,7 @@ Module parameters
                         * Hoontech SoundTrack DSP 24
                         * Hoontech SoundTrack DSP 24 Value
                         * Hoontech SoundTrack DSP 24 Media 7.1
+                        * Digigram VX442
 
     omni	- Omni I/O support for MidiMan M-Audio Delta44/66
 
