@@ -44,6 +44,11 @@ void stab_initialize(unsigned long stab)
 		/* Invalidate the entire SLB & all the ERATS */
 #ifdef CONFIG_PPC_ISERIES
 		asm volatile("isync; slbia; isync":::"memory");
+		/*
+		 * The hypervisor loads SLB entry 0, but we need to increment
+		 * next_round_robin to avoid overwriting it
+		 */
+		get_paca()->xStab_data.next_round_robin = 1;
 #else
 		asm volatile("isync":::"memory");
 		asm volatile("slbmte  %0,%0"::"r" (0) : "memory");
