@@ -370,7 +370,7 @@ tiglusb_probe (struct usb_interface *intf,
 	up (&s->mutex);
 	dbg ("bound to interface");
 
-	devfs_mk_cdev(MAJOR(TIUSB_MAJOR, TIUSB_MINOR + s->minor),
+	devfs_mk_cdev(MKDEV(TIUSB_MAJOR, TIUSB_MINOR) + s->minor,
 			S_IFCHR | S_IRUGO | S_IWUGO,
 			"ticables/usb/%d", s->minor);
 
