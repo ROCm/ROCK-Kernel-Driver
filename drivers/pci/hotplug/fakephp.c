@@ -1,9 +1,9 @@
 /*
  * Fake PCI Hot Plug Controller Driver
  *
- * Copyright (c) 2003 Greg Kroah-Hartman <greg@kroah.com>
- * Copyright (c) 2003 IBM Corp.
- * Copyright (c) 2003 Rolf Eike Beer <eike-kernel@sf-tec.de>
+ * Copyright (C) 2003 Greg Kroah-Hartman <greg@kroah.com>
+ * Copyright (C) 2003 IBM Corp.
+ * Copyright (C) 2003 Rolf Eike Beer <eike-kernel@sf-tec.de>
  *
  * Based on ideas and code from:
  * 	Vladimir Kondratiev <vladimir.kondratiev@intel.com>

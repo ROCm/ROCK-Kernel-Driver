@@ -1,9 +1,9 @@
 /*
  * CompactPCI Hot Plug Core Functions
  *
- * Copyright (c) 2002 SOMA Networks, Inc.
- * Copyright (c) 2001 Greg Kroah-Hartman (greg@kroah.com)
- * Copyright (c) 2001 IBM Corp.
+ * Copyright (C) 2002 SOMA Networks, Inc.
+ * Copyright (C) 2001 Greg Kroah-Hartman (greg@kroah.com)
+ * Copyright (C) 2001 IBM Corp.
  *
  * All rights reserved.
  *

@@ -3,8 +3,8 @@
  *
  * Written By: Irene Zubarev, IBM Corporation
  *
- * Copyright (c) 2001 Greg Kroah-Hartman (greg@kroah.com)
- * Copyright (c) 2001,2002 IBM Corp.
+ * Copyright (C) 2001 Greg Kroah-Hartman (greg@kroah.com)
+ * Copyright (C) 2001,2002 IBM Corp.
  *
  * All rights reserved.
  *

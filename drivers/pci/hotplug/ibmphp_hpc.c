@@ -3,7 +3,7 @@
  *
  * Written By: Jyoti Shah, IBM Corporation
  *
- * Copyright (c) 2001-2003 IBM Corp.
+ * Copyright (C) 2001-2003 IBM Corp.
  *
  * All rights reserved.
  *

@@ -3,8 +3,8 @@
  *
  * Written By: Chuck Cole, Jyoti Shah, Tong Yu, Irene Zubarev, IBM Corporation
  *
- * Copyright (c) 2001,2003 Greg Kroah-Hartman (greg@kroah.com)
- * Copyright (c) 2001-2003 IBM Corp.
+ * Copyright (C) 2001,2003 Greg Kroah-Hartman (greg@kroah.com)
+ * Copyright (C) 2001-2003 IBM Corp.
  *
  * All rights reserved.
  *
