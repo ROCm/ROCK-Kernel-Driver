@@ -1838,7 +1838,7 @@ aic7xxx_print_sequencer(struct aic7xxx_host *p, int downloaded)
  * Description:
  *   Return a string describing the driver.
  *-F*************************************************************************/
-const char *
+static const char *
 aic7xxx_info(struct Scsi_Host *dooh)
 {
   static char buffer[256];
