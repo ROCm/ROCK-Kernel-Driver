@@ -90,7 +90,7 @@ int mac_indicate(struct sk_buff *skb, struct net_device *dev,
 	if (!skb)
 		goto out;
 	fix_up_incoming_skb(skb);
-	pdu = (struct llc_pdu_sn *)skb->nh.raw;
+	pdu = llc_pdu_sn_hdr(skb);
 	if (!pdu->dsap) { /* NULL DSAP, refer to station */
 		if (llc_pdu_router(NULL, NULL, skb, 0))
 			goto drop;
@@ -202,7 +202,7 @@ static void fix_up_incoming_skb(struct sk_buff *skb)
 int llc_pdu_router(struct llc_sap *sap, struct sock* sk,
 		   struct sk_buff *skb, u8 type)
 {
-	struct llc_pdu_sn *pdu = (struct llc_pdu_sn *)skb->nh.raw;
+	struct llc_pdu_sn *pdu = llc_pdu_sn_hdr(skb);
 	int rc = 0;
 
 	if (!pdu->dsap) {

@@ -51,8 +51,6 @@ static struct llc_station_state_trans *
 static int llc_rtn_all_conns(struct llc_sap *sap);
 
 static struct llc_station llc_main_station;	/* only one of its kind */
-struct llc_prim_if_block llc_ind_prim, llc_cfm_prim;
-static union llc_u_prim_data llc_ind_data_prim, llc_cfm_data_prim;
 
 /**
  *	llc_sap_alloc - allocates and initializes sap.
@@ -70,6 +68,8 @@ struct llc_sap *llc_sap_alloc(void)
 		spin_lock_init(&sap->sk_list.lock);
 		INIT_LIST_HEAD(&sap->sk_list.list);
 		skb_queue_head_init(&sap->mac_pdu_q);
+		sap->llc_ind_prim.data = &sap->llc_ind_data_prim;
+		sap->llc_cfm_prim.data = &sap->llc_cfm_data_prim;
 	}
 	return sap;
 }
@@ -618,8 +618,6 @@ static int __init llc_init(void)
 	ev->type	= LLC_STATION_EV_TYPE_SIMPLE;
 	ev->data.a.ev	= LLC_STATION_EV_ENABLE_WITHOUT_DUP_ADDR_CHECK;
 	rc = llc_station_next_state(&llc_main_station, ev);
-	llc_ind_prim.data = &llc_ind_data_prim;
-	llc_cfm_prim.data = &llc_cfm_data_prim;
 	proc_net_create("802.2", 0, llc_proc_get_info);
 	llc_ui_init();
 	dev_add_pack(&llc_packet_type);
