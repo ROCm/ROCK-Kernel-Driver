@@ -372,21 +372,18 @@ static int cciss_open(struct inode *inode, struct file *filep)
 
 	if (ctlr > MAX_CTLR || hba[ctlr] == NULL)
 		return -ENXIO;
-
-	if (!suser() && hba[ctlr]->sizes[minor(inode->i_rdev)] == 0)
-		return -ENXIO;
-
 	/*
 	 * Root is allowed to open raw volume zero even if its not configured
 	 * so array config can still work.  I don't think I really like this,
 	 * but I'm already using way to many device nodes to claim another one
 	 * for "raw controller".
 	 */
-	if (suser()
-		&& (hba[ctlr]->sizes[minor(inode->i_rdev)] == 0) 
-		&& (minor(inode->i_rdev)!= 0))
-		return -ENXIO;
-
+	if (hba[ctlr]->sizes[minor(inode->i_rdev)] == 0) {
+		if (minor(inode->i_rdev) != 0)
+			return -ENXIO;
+		if (!capable(CAP_SYS_ADMIN))
+			return -EPERM;
+	}
 	hba[ctlr]->drv[dsk].usage_count++;
 	hba[ctlr]->usage_count++;
 	return 0;
