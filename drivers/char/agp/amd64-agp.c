@@ -279,7 +279,7 @@ static int __init aperture_valid(u64 aper, u32 size)
 
 	   Maybe better to use pci_assign_resource/pci_enable_device instead trusting
 	   the bridges? */
-	if (!not_first_call && request_mem_region(aper, size, "aperture") < 0) { 
+	if (!not_first_call && !request_mem_region(aper, size, "aperture")) { 
 		printk(KERN_ERR PFX "Aperture conflicts with PCI mapping.\n"); 
 		return 0;
 	}
