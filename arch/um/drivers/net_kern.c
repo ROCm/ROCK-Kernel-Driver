@@ -319,8 +319,6 @@ static int eth_configure(struct uml_net *device, int n)
 	dev->br_port = 0;
  	dev->mem_start = 0;
  	dev->mem_end = 0;
- 	dev->rmem_start = 0;
- 	dev->rmem_end = 0;
 
 	rtnl_lock();
 	err = register_netdevice(dev);
