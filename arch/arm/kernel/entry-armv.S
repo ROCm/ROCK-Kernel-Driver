@@ -1657,6 +1657,8 @@ __stubs_end:
 ENTRY(__trap_init)
 		stmfd	sp!, {r4 - r6, lr}
 
+		mov	r0, #0xff000000
+		orr	r0, r0, #0x00ff0000		@ high vectors position
 		adr	r1, .LCvectors			@ set up the vectors
 		ldmia	r1, {r1, r2, r3, r4, r5, r6, ip, lr}
 		stmia	r0, {r1, r2, r3, r4, r5, r6, ip, lr}

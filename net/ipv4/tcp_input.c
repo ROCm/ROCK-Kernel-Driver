@@ -3029,7 +3029,7 @@ void tcp_parse_options(struct sk_buff *skb, struct tcp_opt *tp, int estab)
 							if(tp->snd_wscale > 14) {
 								if(net_ratelimit())
 									printk(KERN_INFO "tcp_parse_options: Illegal window "
-									       "scaling value %d >14 received.",
+									       "scaling value %d >14 received.\n",
 									       tp->snd_wscale);
 								tp->snd_wscale = 14;
 							}

@@ -122,7 +122,7 @@ static void pxamci_setup_data(struct pxamci_host *host, struct mmc_data *data)
 	unsigned int nob = data->blocks;
 	unsigned int timeout;
 	u32 dcmd;
-	int i, len;
+	int i;
 
 	host->data = data;
 
@@ -375,15 +375,14 @@ static void pxamci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 		if (CLOCKRATE / clk > ios->clock)
 			clk <<= 1;
 		host->clkrt = fls(clk) - 1;
+		pxa_set_cken(CKEN12_MMC, 1);
 
 		/*
 		 * we write clkrt on the next command
 		 */
-	} else if (readl(host->base + MMC_STAT) & STAT_CLK_EN) {
-		/*
-		 * Ensure that the clock is off.
-		 */
-		writel(STOP_CLOCK, host->base + MMC_STRPCL);
+	} else {
+		pxamci_stop_clock(host);
+		pxa_set_cken(CKEN12_MMC, 0);
 	}
 
 	if (host->power_mode != ios->power_mode) {
@@ -505,8 +504,6 @@ static int pxamci_probe(struct device *dev)
 	if (host->pdata && host->pdata->init)
 		host->pdata->init(dev, pxamci_detect_irq, mmc);
 
-	pxa_set_cken(CKEN12_MMC, 1);
-
 	mmc_add_host(mmc);
 
 	return 0;
@@ -545,8 +542,6 @@ static int pxamci_remove(struct device *dev)
 		       END_CMD_RES|PRG_DONE|DATA_TRAN_DONE,
 		       host->base + MMC_I_MASK);
 
-		pxa_set_cken(CKEN12_MMC, 0);
-
 		DRCMRRXMMC = 0;
 		DRCMRTXMMC = 0;
 
@@ -554,8 +549,6 @@ static int pxamci_remove(struct device *dev)
 		pxa_free_dma(host->dma);
 		iounmap(host->base);
 		dma_free_coherent(dev, PAGE_SIZE, host->sg_cpu, host->sg_dma);
-
-		pxa_set_cken(CKEN12_MMC, 0);
 
 		release_resource(host->res);
 

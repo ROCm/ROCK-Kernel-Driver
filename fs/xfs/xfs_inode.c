@@ -1163,7 +1163,8 @@ xfs_ialloc(
 	 * This is because we're setting fields here we need
 	 * to prevent others from looking at until we're done.
 	 */
-	error = xfs_trans_iget(tp->t_mountp, tp, ino, XFS_ILOCK_EXCL, &ip);
+	error = xfs_trans_iget(tp->t_mountp, tp, ino,
+			IGET_CREATE, XFS_ILOCK_EXCL, &ip);
 	if (error != 0) {
 		return error;
 	}

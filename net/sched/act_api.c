@@ -418,6 +418,7 @@ bad_ret:
 
 int tcf_action_copy_stats (struct sk_buff *skb,struct tc_action *a)
 {
+	int err;
 	struct gnet_dump d;
 	struct tcf_act_hdr *h = a->priv;
 	
@@ -428,7 +429,14 @@ int tcf_action_copy_stats (struct sk_buff *skb,struct tc_action *a)
 	if (NULL == h)
 		goto errout;
 
-	if (gnet_stats_start_copy(skb, TCA_ACT_STATS, h->stats_lock, &d) < 0)
+	if (a->type == TCA_OLD_COMPAT)
+		err = gnet_stats_start_copy_compat(skb, TCA_ACT_STATS,
+			TCA_STATS, TCA_XSTATS, h->stats_lock, &d);
+	else
+		err = gnet_stats_start_copy(skb, TCA_ACT_STATS,
+			h->stats_lock, &d);
+
+	if (err < 0)
 		goto errout;
 
 	if (NULL != a->ops && NULL != a->ops->get_stats)
