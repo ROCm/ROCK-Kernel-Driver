@@ -281,21 +281,17 @@ static struct IRQ_TABLE iirqs[]={
   {Q40_IRQ_KEYB_MASK,Q40_IRQ_KEYBOARD},
   {0,0}};
 #endif
-static struct IRQ_TABLE eirqs[]={
-  {Q40_IRQ3_MASK,3},                   /* ser 1 */
-  {Q40_IRQ4_MASK,4},                   /* ser 2 */
-  {Q40_IRQ14_MASK,14},                 /* IDE 1 */
-  {Q40_IRQ15_MASK,15},                 /* IDE 2 */
-  {Q40_IRQ6_MASK,6},                   /* floppy, handled elsewhere */
-  {Q40_IRQ7_MASK,7},                   /* par */
-
-  {Q40_IRQ5_MASK,5},
-  {Q40_IRQ10_MASK,10},
-
-
-
-
-  {0,0}};
+static struct IRQ_TABLE eirqs[] = {
+  { .mask = Q40_IRQ3_MASK,	.irq = 3 },	/* ser 1 */
+  { .mask = Q40_IRQ4_MASK,	.irq = 4 },	/* ser 2 */
+  { .mask = Q40_IRQ14_MASK,	.irq = 14 },	/* IDE 1 */
+  { .mask = Q40_IRQ15_MASK,	.irq = 15 },	/* IDE 2 */
+  { .mask = Q40_IRQ6_MASK,	.irq = 6 },	/* floppy, handled elsewhere */
+  { .mask = Q40_IRQ7_MASK,	.irq = 7 },	/* par */
+  { .mask = Q40_IRQ5_MASK,	.irq = 5 },
+  { .mask = Q40_IRQ10_MASK,	.irq = 10 },
+  {0,0}
+};
 
 /* complain only this many times about spurious ints : */
 static int ccleirq=60;    /* ISA dev IRQ's*/
