@@ -78,11 +78,11 @@ fail:
 }
 
 struct address_space_operations affs_symlink_aops = {
-	readpage:	affs_symlink_readpage,
+	.readpage	= affs_symlink_readpage,
 };
 
 struct inode_operations affs_symlink_inode_operations = {
-	readlink:	page_readlink,
-	follow_link:	page_follow_link,
-	setattr:	affs_notify_change,
+	.readlink	= page_readlink,
+	.follow_link	= page_follow_link,
+	.setattr	= affs_notify_change,
 };

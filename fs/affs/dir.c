@@ -28,24 +28,24 @@
 static int affs_readdir(struct file *, void *, filldir_t);
 
 struct file_operations affs_dir_operations = {
-	read:		generic_read_dir,
-	readdir:	affs_readdir,
-	fsync:		file_fsync,
+	.read		= generic_read_dir,
+	.readdir	= affs_readdir,
+	.fsync		= file_fsync,
 };
 
 /*
  * directories can handle most operations...
  */
 struct inode_operations affs_dir_inode_operations = {
-	create:		affs_create,
-	lookup:		affs_lookup,
-	link:		affs_link,
-	unlink:		affs_unlink,
-	symlink:	affs_symlink,
-	mkdir:		affs_mkdir,
-	rmdir:		affs_rmdir,
-	rename:		affs_rename,
-	setattr:	affs_notify_change,
+	.create		= affs_create,
+	.lookup		= affs_lookup,
+	.link		= affs_link,
+	.unlink		= affs_unlink,
+	.symlink	= affs_symlink,
+	.mkdir		= affs_mkdir,
+	.rmdir		= affs_rmdir,
+	.rename		= affs_rename,
+	.setattr	= affs_notify_change,
 };
 
 static int

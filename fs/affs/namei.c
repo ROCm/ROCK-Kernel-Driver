@@ -33,13 +33,13 @@ static int	 affs_intl_hash_dentry(struct dentry *, struct qstr *);
 static int       affs_intl_compare_dentry(struct dentry *, struct qstr *, struct qstr *);
 
 struct dentry_operations affs_dentry_operations = {
-	d_hash:		affs_hash_dentry,
-	d_compare:	affs_compare_dentry,
+	.d_hash		= affs_hash_dentry,
+	.d_compare	= affs_compare_dentry,
 };
 
 struct dentry_operations affs_intl_dentry_operations = {
-	d_hash:		affs_intl_hash_dentry,
-	d_compare:	affs_intl_compare_dentry,
+	.d_hash		= affs_intl_hash_dentry,
+	.d_compare	= affs_intl_compare_dentry,
 };
 
 

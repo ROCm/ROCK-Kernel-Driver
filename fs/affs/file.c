@@ -44,19 +44,19 @@ static int affs_file_open(struct inode *inode, struct file *filp);
 static int affs_file_release(struct inode *inode, struct file *filp);
 
 struct file_operations affs_file_operations = {
-	llseek:		generic_file_llseek,
-	read:		generic_file_read,
-	write:		affs_file_write,
-	mmap:		generic_file_mmap,
-	open:		affs_file_open,
-	release:	affs_file_release,
-	fsync:		file_fsync,
-	sendfile:	generic_file_sendfile,
+	.llseek		= generic_file_llseek,
+	.read		= generic_file_read,
+	.write		= affs_file_write,
+	.mmap		= generic_file_mmap,
+	.open		= affs_file_open,
+	.release	= affs_file_release,
+	.fsync		= file_fsync,
+	.sendfile	= generic_file_sendfile,
 };
 
 struct inode_operations affs_file_inode_operations = {
-	truncate:	affs_truncate,
-	setattr:	affs_notify_change,
+	.truncate	= affs_truncate,
+	.setattr	= affs_notify_change,
 };
 
 static int
@@ -428,12 +428,12 @@ static sector_t _affs_bmap(struct address_space *mapping, sector_t block)
 	return generic_block_bmap(mapping,block,affs_get_block);
 }
 struct address_space_operations affs_aops = {
-	readpage: affs_readpage,
-	writepage: affs_writepage,
-	sync_page: block_sync_page,
-	prepare_write: affs_prepare_write,
-	commit_write: generic_commit_write,
-	bmap: _affs_bmap
+	.readpage = affs_readpage,
+	.writepage = affs_writepage,
+	.sync_page = block_sync_page,
+	.prepare_write = affs_prepare_write,
+	.commit_write = generic_commit_write,
+	.bmap = _affs_bmap
 };
 
 static inline struct buffer_head *
@@ -795,11 +795,11 @@ out:
 }
 
 struct address_space_operations affs_aops_ofs = {
-	readpage: affs_readpage_ofs,
+	.readpage = affs_readpage_ofs,
 	//writepage: affs_writepage_ofs,
 	//sync_page: affs_sync_page_ofs,
-	prepare_write: affs_prepare_write_ofs,
-	commit_write: affs_commit_write_ofs
+	.prepare_write = affs_prepare_write_ofs,
+	.commit_write = affs_commit_write_ofs
 };
 
 /* Free any preallocated blocks. */
