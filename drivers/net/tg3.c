@@ -678,6 +678,18 @@ static int tg3_phy_reset(struct tg3 *tp, int force)
 		return err;
 
 out:
+	if (tp->tg3_flags2 & TG3_FLG2_PHY_ADC_BUG) {
+		tg3_writephy(tp, MII_TG3_AUX_CTRL, 0x0c00);
+		tg3_writephy(tp, MII_TG3_DSP_ADDRESS, 0x201f);
+		tg3_writephy(tp, MII_TG3_DSP_RW_PORT, 0x2aaa);
+		tg3_writephy(tp, MII_TG3_DSP_ADDRESS, 0x000a);
+		tg3_writephy(tp, MII_TG3_DSP_RW_PORT, 0x0323);
+		tg3_writephy(tp, MII_TG3_AUX_CTRL, 0x0400);
+	}
+	if (tp->tg3_flags2 & TG3_FLG2_PHY_5704_A0_BUG) {
+		tg3_writephy(tp, 0x1c, 0x8d68);
+		tg3_writephy(tp, 0x1c, 0x8d68);
+	}
 	tg3_phy_set_wirespeed(tp);
 	return 0;
 }
@@ -6905,6 +6917,12 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 	     (tp->pci_chip_rev_id != CHIPREV_ID_5705_A1)))
 		tp->tg3_flags2 |= TG3_FLG2_NO_ETH_WIRE_SPEED;
 
+	if (GET_CHIP_REV(tp->pci_chip_rev_id) == CHIPREV_5703_AX ||
+	    GET_CHIP_REV(tp->pci_chip_rev_id) == CHIPREV_5704_AX)
+		tp->tg3_flags2 |= TG3_FLG2_PHY_ADC_BUG;
+	if (tp->pci_chip_rev_id == CHIPREV_ID_5704_A0)
+		tp->tg3_flags2 |= TG3_FLG2_PHY_5704_A0_BUG;
+
 	/* Only 5701 and later support tagged irq status mode.
 	 * Also, 5788 chips cannot use tagged irq status.
 	 *
@@ -7407,8 +7425,8 @@ static int __devinit tg3_test_dma(struct tg3 *tp)
 		for (i = 0; i < TEST_BUFFER_SIZE / sizeof(u32); i++) {
 			u32 val;
 			tg3_read_mem(tp, 0x2100 + (i*4), &val);
-			if (val != p[i]) {
-				printk( KERN_ERR "  tg3_test_dma()  Card buffer currupted on write! (%d != %d)\n", val, i);
+			if (le32_to_cpu(val) != p[i]) {
+				printk(KERN_ERR "  tg3_test_dma()  Card buffer corrupted on write! (%d != %d)\n", val, i);
 				/* ret = -ENODEV here? */
 			}
 			p[i] = 0;

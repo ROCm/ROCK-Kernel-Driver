@@ -129,6 +129,9 @@
 #define   CHIPREV_5700_BX		 0x71
 #define   CHIPREV_5700_CX		 0x72
 #define   CHIPREV_5701_AX		 0x00
+#define   CHIPREV_5703_AX		 0x10
+#define   CHIPREV_5704_AX		 0x20
+#define   CHIPREV_5704_BX		 0x21
 #define  GET_METAL_REV(CHIP_REV_ID)	((CHIP_REV_ID) & 0xff)
 #define   METAL_REV_A0			 0x00
 #define   METAL_REV_A1			 0x01
@@ -1924,6 +1927,8 @@ struct tg3 {
 #define TG3_FLG2_IS_5788		0x00000008
 #define TG3_FLG2_MAX_RXPEND_64		0x00000010
 #define TG3_FLG2_TSO_CAPABLE		0x00000020
+#define TG3_FLG2_PHY_ADC_BUG		0x00000040
+#define TG3_FLG2_PHY_5704_A0_BUG	0x00000080
 
 	u32				split_mode_max_reqs;
 #define SPLIT_MODE_5704_MAX_REQ		3
