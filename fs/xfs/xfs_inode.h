@@ -192,9 +192,7 @@ typedef struct xfs_chashlist {
 	struct xfs_inode	*chl_ip;
 	xfs_daddr_t		chl_blkno;	/* starting block number of
 						 * the cluster */
-#ifdef DEBUG
-	struct xfs_buf		*chl_buf;	/* debug: the inode buffer */
-#endif
+	struct xfs_buf		*chl_buf;	/* the inode buffer */
 } xfs_chashlist_t;
 
 typedef struct xfs_chash {

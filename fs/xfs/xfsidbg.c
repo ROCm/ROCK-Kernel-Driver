@@ -4883,13 +4883,8 @@ xfsidbg_xchashlist(xfs_chashlist_t *chl)
 	xfs_inode_t	*ip;
 
 	while (chl != NULL) {
-#ifdef DEBUG
-		kdb_printf("hashlist inode 0x%p blkno %Ld buf 0x%p",
-		       chl->chl_ip, chl->chl_blkno, chl->chl_buf);
-#else
-		kdb_printf("hashlist inode 0x%p blkno %lld",
-		       chl->chl_ip, (long long) chl->chl_blkno);
-#endif
+		kdb_printf("hashlist inode 0x%p blkno %lld buf 0x%p",
+		       chl->chl_ip, (long long) chl->chl_blkno, chl->chl_buf);
 
 		kdb_printf("\n");
 

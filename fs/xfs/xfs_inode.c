@@ -3003,9 +3003,7 @@ xfs_iflush(
 	 * see if other inodes can be gathered into this write
 	 */
 
-#ifdef DEBUG
-	ip->i_chash->chl_buf = bp;		/* inode clustering debug */
-#endif
+	ip->i_chash->chl_buf = bp;
 
 	ch = XFS_CHASH(mp, ip->i_blkno);
 	s = mutex_spinlock(&ch->ch_lock);

@@ -794,8 +794,9 @@ xfs_log_move_tail(xfs_mount_t	*mp,
 		do {
 			ASSERT(tic->t_flags & XLOG_TIC_PERM_RESERV);
 
-			if (free_bytes < tic->t_unit_res)
+			if (free_bytes < tic->t_unit_res && tail_lsn != 1)
 				break;
+			tail_lsn = 0;
 			free_bytes -= tic->t_unit_res;
 			sv_signal(&tic->t_sema);
 			tic = tic->t_next;
@@ -814,8 +815,9 @@ xfs_log_move_tail(xfs_mount_t	*mp,
 				need_bytes = tic->t_unit_res*tic->t_cnt;
 			else
 				need_bytes = tic->t_unit_res;
-			if (free_bytes < need_bytes)
+			if (free_bytes < need_bytes && tail_lsn != 1)
 				break;
+			tail_lsn = 0;
 			free_bytes -= need_bytes;
 			sv_signal(&tic->t_sema);
 			tic = tic->t_next;
