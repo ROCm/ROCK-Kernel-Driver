@@ -23,12 +23,12 @@
  */
 
 
-#include "acpi.h"
-#include "acevents.h"
-#include "acnamesp.h"
-#include "acparser.h"
-#include "acdispat.h"
-#include "acdebug.h"
+#include <acpi/acpi.h>
+#include <acpi/acevents.h>
+#include <acpi/acnamesp.h>
+#include <acpi/acparser.h>
+#include <acpi/acdispat.h>
+#include <acpi/acdebug.h>
 
 #define _COMPONENT          ACPI_UTILITIES
 	 ACPI_MODULE_NAME    ("utxface")
