@@ -74,7 +74,7 @@ int cifs_sign_smb(struct smb_hdr * cifs_pdu, struct cifsSesInfo * ses,
 
 	rc = cifs_calculate_signature(cifs_pdu, ses->mac_signing_key,smb_signature);
 	if(rc)
-                memset(cifs_pdu->Signature.SecuritySignature, 0, 8);
+		memset(cifs_pdu->Signature.SecuritySignature, 0, 8);
 	else
 		memcpy(cifs_pdu->Signature.SecuritySignature, smb_signature, 8);
 
@@ -88,15 +88,15 @@ int cifs_verify_signature(struct smb_hdr * cifs_pdu, const char * mac_key,
 	char server_response_sig[8];
 	char what_we_think_sig_should_be[20];
 
-        if((cifs_pdu == NULL) || (mac_key == NULL))
-                return -EINVAL;
+	if((cifs_pdu == NULL) || (mac_key == NULL))
+		return -EINVAL;
 
 	if (cifs_pdu->Command == SMB_COM_NEGOTIATE)
 		return 0;
 
 	if (cifs_pdu->Command == SMB_COM_LOCKING_ANDX) {
 		struct smb_com_lock_req * pSMB = (struct smb_com_lock_req *)cifs_pdu;
-	        if(pSMB->LockType & LOCKING_ANDX_OPLOCK_RELEASE)
+	    if(pSMB->LockType & LOCKING_ANDX_OPLOCK_RELEASE)
 			return 0;
 	}
 
@@ -113,10 +113,10 @@ int cifs_verify_signature(struct smb_hdr * cifs_pdu, const char * mac_key,
 		its signature against what the server sent */
 	memcpy(server_response_sig,cifs_pdu->Signature.SecuritySignature,8);
 
-        cifs_pdu->Signature.Sequence.SequenceNumber = expected_sequence_number;
-        cifs_pdu->Signature.Sequence.Reserved = 0;
+	cifs_pdu->Signature.Sequence.SequenceNumber = expected_sequence_number;
+	cifs_pdu->Signature.Sequence.Reserved = 0;
 
-        rc = cifs_calculate_signature(cifs_pdu, mac_key,
+	rc = cifs_calculate_signature(cifs_pdu, mac_key,
 		what_we_think_sig_should_be);
 
 	if(rc)
@@ -167,19 +167,19 @@ int CalcNTLMv2_partial_mac_key(struct cifsSesInfo * ses, struct nls_table * nls_
 		return -EINVAL;
   
 	ucase_buf = kmalloc((MAX_USERNAME_SIZE+1), GFP_KERNEL);
-        unicode_buf = kmalloc((MAX_USERNAME_SIZE+1)*4, GFP_KERNEL);
+	unicode_buf = kmalloc((MAX_USERNAME_SIZE+1)*4, GFP_KERNEL);
    
 	for(i=0;i<user_name_len;i++)
 		ucase_buf[i] = nls_info->charset2upper[(int)ses->userName[i]];
 	ucase_buf[i] = 0;
-        user_name_len = cifs_strtoUCS(unicode_buf, ucase_buf, MAX_USERNAME_SIZE*2, nls_info);
+	user_name_len = cifs_strtoUCS(unicode_buf, ucase_buf, MAX_USERNAME_SIZE*2, nls_info);
 	unicode_buf[user_name_len] = 0;
 	user_name_len++;
 
-        for(i=0;i<dom_name_len;i++)
-                ucase_buf[i] = nls_info->charset2upper[(int)ses->domainName[i]];
-        ucase_buf[i] = 0;
-        dom_name_len = cifs_strtoUCS(unicode_buf+user_name_len, ucase_buf, MAX_USERNAME_SIZE*2, nls_info);
+	for(i=0;i<dom_name_len;i++)
+		ucase_buf[i] = nls_info->charset2upper[(int)ses->domainName[i]];
+	ucase_buf[i] = 0;
+	dom_name_len = cifs_strtoUCS(unicode_buf+user_name_len, ucase_buf, MAX_USERNAME_SIZE*2, nls_info);
 
 	unicode_buf[user_name_len + dom_name_len] = 0;
 	hmac_md5_update((const unsigned char *) unicode_buf,
@@ -199,7 +199,6 @@ void CalcNTLMv2_response(const struct cifsSesInfo * ses,char * v2_session_respon
 
 	hmac_md5_update(ses->server->cryptKey,8,&context);
 /*	hmac_md5_update(v2_session_response+16)client thing,8,&context); */ /* BB fix */
-
 
 	hmac_md5_final(v2_session_response,&context);
 }

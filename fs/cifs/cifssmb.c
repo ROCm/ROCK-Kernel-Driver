@@ -562,8 +562,14 @@ openRetry:
 	}
 	pSMB->DesiredAccess = cpu_to_le32(access_flags);
 	pSMB->AllocationSize = 0;
-	pSMB->FileAttributes = ATTR_NORMAL;	/* XP does not handle ATTR_POSIX_SEMANTICS */
-	/*if ((omode & S_IWUGO) == 0)
+	pSMB->FileAttributes = ATTR_NORMAL;
+	/* XP does not handle ATTR_POSIX_SEMANTICS */
+	/* but it helps speed up case sensitive checks for other
+	servers such as Samba */
+	if (tcon->ses->capabilities & CAP_UNIX)
+		pSMB->FileAttributes |= ATTR_POSIX_SEMANTICS;
+
+	/* if ((omode & S_IWUGO) == 0)
 		pSMB->FileAttributes |= ATTR_READONLY;*/
 	/*  Above line causes problems due to vfs splitting create into two
 		pieces - need to set mode after file created not while it is

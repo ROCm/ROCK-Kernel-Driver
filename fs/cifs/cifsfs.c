@@ -631,19 +631,24 @@ static int cifs_oplock_thread(void * dummyarg)
 			oplock_item = list_entry(GlobalOplock_Q.next, 
 				struct oplock_q_entry, qhead);
 			if(oplock_item) {
+				cFYI(1,("found oplock item to write out")); 
 				pTcon = oplock_item->tcon;
 				inode = oplock_item->pinode;
 				netfid = oplock_item->netfid;
 				spin_unlock(&GlobalMid_Lock);
 				DeleteOplockQEntry(oplock_item);
-				down(&inode->i_sem);
+				/* can not grab inode sem here since it would
+				deadlock when oplock received on delete 
+				since vfs_unlink holds the i_sem across
+				the call */
+				/* down(&inode->i_sem);*/
 				if (S_ISREG(inode->i_mode)) {
 					rc = filemap_fdatawrite(inode->i_mapping);
 					if(CIFS_I(inode)->clientCanCacheRead == 0)
 						invalidate_remote_inode(inode);
 				} else
 					rc = 0;
-				up(&inode->i_sem);
+				/* up(&inode->i_sem);*/
 				if (rc)
 					CIFS_I(inode)->write_behind_rc = rc;
 				cFYI(1,("Oplock flush inode %p rc %d",inode,rc));
