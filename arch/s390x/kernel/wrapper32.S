@@ -1112,6 +1112,8 @@ sys32_fstat64_wrapper:
 sys32_futex_wrapper:
 	llgtr	%r2,%r2			# void *
 	lgfr	%r3,%r3			# int
+	lgfr	%r4,%r4			# int
+	llgtr	%r5,%r5			# struct timespec *
 	jg	sys_futex		# branch to system call
 
 	.globl	sys32_setxattr_wrapper

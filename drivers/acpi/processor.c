@@ -2060,8 +2060,9 @@ acpi_processor_get_info (
 		return_VALUE(-EINVAL);
 
 #ifdef CONFIG_SMP
-	if (smp_num_cpus > 1)
-		errata.smp = smp_num_cpus;
+	/* FIXME: What should this be? -- RR */
+	if (num_online_cpus() > 1)
+		errata.smp = num_online_cpus();
 #endif
 
 	acpi_processor_errata(pr);

@@ -26,29 +26,56 @@
  * The maximum number of pages to writeout in a single bdflush/kupdate
  * operation.  We do this so we don't hold I_LOCK against an inode for
  * enormous amounts of time, which would block a userspace task which has
- * been forced to throttle against that inode.
+ * been forced to throttle against that inode.  Also, the code reevaluates
+ * the dirty each time it has written this many pages.
  */
 #define MAX_WRITEBACK_PAGES	1024
 
 /*
- * Memory thresholds, in percentages
- * FIXME: expose these via /proc or whatever.
+ * After a CPU has dirtied this many pages, balance_dirty_pages_ratelimited
+ * will look to see if it needs to force writeback or throttling.  Probably
+ * should be scaled by memory size.
+ */
+#define RATELIMIT_PAGES		1000
+
+/*
+ * When balance_dirty_pages decides that the caller needs to perform some
+ * non-background writeback, this is how many pages it will attempt to write.
+ * It should be somewhat larger than RATELIMIT_PAGES to ensure that reasonably
+ * large amounts of I/O are submitted.
+ */
+#define SYNC_WRITEBACK_PAGES	1500
+
+
+/*
+ * Dirty memory thresholds, in percentages
  */
 
 /*
  * Start background writeback (via pdflush) at this level
  */
-static int dirty_background_ratio = 40;
+int dirty_background_ratio = 40;
 
 /*
  * The generator of dirty data starts async writeback at this level
  */
-static int dirty_async_ratio = 50;
+int dirty_async_ratio = 50;
 
 /*
  * The generator of dirty data performs sync writeout at this level
  */
-static int dirty_sync_ratio = 60;
+int dirty_sync_ratio = 60;
+
+/*
+ * The interval between `kupdate'-style writebacks.
+ */
+int dirty_writeback_centisecs = 5 * 100;
+
+/*
+ * The largest amount of time for which data is allowed to remain dirty
+ */
+int dirty_expire_centisecs = 30 * 100;
+
 
 static void background_writeout(unsigned long _min_pages);
 
@@ -84,12 +111,12 @@ void balance_dirty_pages(struct address_space *mapping)
 	sync_thresh = (dirty_sync_ratio * tot) / 100;
 
 	if (dirty_and_writeback > sync_thresh) {
-		int nr_to_write = 1500;
+		int nr_to_write = SYNC_WRITEBACK_PAGES;
 
 		writeback_unlocked_inodes(&nr_to_write, WB_SYNC_LAST, NULL);
 		get_page_state(&ps);
 	} else if (dirty_and_writeback > async_thresh) {
-		int nr_to_write = 1500;
+		int nr_to_write = SYNC_WRITEBACK_PAGES;
 
 		writeback_unlocked_inodes(&nr_to_write, WB_SYNC_NONE, NULL);
 		get_page_state(&ps);
@@ -118,7 +145,7 @@ void balance_dirty_pages_ratelimited(struct address_space *mapping)
 	int cpu;
 
 	cpu = get_cpu();
-	if (ratelimits[cpu].count++ >= 1000) {
+	if (ratelimits[cpu].count++ >= RATELIMIT_PAGES) {
 		ratelimits[cpu].count = 0;
 		put_cpu();
 		balance_dirty_pages(mapping);
@@ -162,17 +189,6 @@ void wakeup_bdflush(void)
 	pdflush_operation(background_writeout, ps.nr_dirty);
 }
 
-/*
- * The interval between `kupdate'-style writebacks.
- *
- * Traditional kupdate writes back data which is 30-35 seconds old.
- * This one does that, but it also writes back just 1/6th of the dirty
- * data.  This is to avoid great I/O storms.
- *
- * We chunk the writes up and yield, to permit any throttled page-allocators
- * to perform their I/O against a large file.
- */
-static int wb_writeback_jifs = 5 * HZ;
 static struct timer_list wb_timer;
 
 /*
@@ -183,9 +199,9 @@ static struct timer_list wb_timer;
  * just walks the superblock inode list, writing back any inodes which are
  * older than a specific point in time.
  *
- * Try to run once per wb_writeback_jifs jiffies.  But if a writeback event
- * takes longer than a wb_writeback_jifs interval, then leave a one-second
- * gap.
+ * Try to run once per dirty_writeback_centisecs.  But if a writeback event
+ * takes longer than a dirty_writeback_centisecs interval, then leave a
+ * one-second gap.
  *
  * older_than_this takes precedence over nr_to_write.  So we'll only write back
  * all dirty pages if they are all attached to "old" mappings.
@@ -201,9 +217,9 @@ static void wb_kupdate(unsigned long arg)
 	sync_supers();
 	get_page_state(&ps);
 
-	oldest_jif = jiffies - 30*HZ;
+	oldest_jif = jiffies - (dirty_expire_centisecs * HZ) / 100;
 	start_jif = jiffies;
-	next_jif = start_jif + wb_writeback_jifs;
+	next_jif = start_jif + (dirty_writeback_centisecs * HZ) / 100;
 	nr_to_write = ps.nr_dirty;
 	writeback_unlocked_inodes(&nr_to_write, WB_SYNC_NONE, &oldest_jif);
 	blk_run_queues();
@@ -223,7 +239,7 @@ static void wb_timer_fn(unsigned long unused)
 static int __init wb_timer_init(void)
 {
 	init_timer(&wb_timer);
-	wb_timer.expires = jiffies + wb_writeback_jifs;
+	wb_timer.expires = jiffies + (dirty_writeback_centisecs * HZ) / 100;
 	wb_timer.data = 0;
 	wb_timer.function = wb_timer_fn;
 	add_timer(&wb_timer);

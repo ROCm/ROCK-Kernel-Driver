@@ -56,6 +56,3 @@ archclean:
 	$(MAKE) -C arch/$(ARCH)/kernel clean
 
 archmrproper:
-
-archdep:
-	@$(MAKEBOOT) dep

@@ -15,6 +15,7 @@
 
 #include <linux/config.h>
 #include <linux/kernel.h>
+#include <linux/bitops.h>
 
 #ifdef CONFIG_SMP
 
@@ -44,11 +45,22 @@ extern void smp_local_timer_interrupt(struct pt_regs *);
 #define NO_PROC_ID		0xFF            /* No processor magic marker */
 #define PROC_CHANGE_PENALTY	20
 
-/* 1 to 1 mapping on PPC -- Cort */
-#define cpu_logical_map(cpu) (cpu)
-#define cpu_number_map(x) (x)
-
 #define smp_processor_id() (current_thread_info()->cpu)
+
+#define cpu_online(cpu) (cpu_online_map & (1<<(cpu)))
+
+extern inline unsigned int num_online_cpus(void)
+{
+	return hweight32(cpu_online_map);
+}
+
+extern inline int any_online_cpu(unsigned int mask)
+{
+	if (mask & cpu_online_map)
+		return __ffs(mask & cpu_online_map);
+
+	return -1;
+}
 
 extern int smp_hw_index[];
 #define hard_smp_processor_id() (smp_hw_index[smp_processor_id()])

@@ -55,8 +55,8 @@ static int fold_prot_inuse(struct proto *proto)
 	int res = 0;
 	int cpu;
 
-	for (cpu=0; cpu<smp_num_cpus; cpu++)
-		res += proto->stats[cpu_logical_map(cpu)].inuse;
+	for (cpu=0; cpu<NR_CPUS; cpu++)
+		res += proto->stats[cpu].inuse;
 
 	return res;
 }
@@ -103,9 +103,9 @@ static unsigned long fold_field(unsigned long *begin, int sz, int nr)
 
 	sz /= sizeof(unsigned long);
 
-	for (i=0; i<smp_num_cpus; i++) {
-		res += begin[2*cpu_logical_map(i)*sz + nr];
-		res += begin[(2*cpu_logical_map(i)+1)*sz + nr];
+	for (i=0; i<NR_CPUS; i++) {
+		res += begin[2*i*sz + nr];
+		res += begin[(2*i+1)*sz + nr];
 	}
 	return res;
 }

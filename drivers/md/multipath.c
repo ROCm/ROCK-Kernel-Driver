@@ -23,6 +23,7 @@
 #include <linux/slab.h>
 #include <linux/spinlock.h>
 #include <linux/raid/multipath.h>
+#include <linux/bio.h>
 #include <linux/buffer_head.h>
 #include <asm/atomic.h>
 
@@ -243,27 +244,19 @@ static int multipath_read_balance (multipath_conf_t *conf)
 	return 0;
 }
 
-static int multipath_make_request (mddev_t *mddev, int rw, struct bio * bio)
+static int multipath_make_request (request_queue_t *q, struct bio * bio)
 {
+	mddev_t *mddev = q->queuedata;
 	multipath_conf_t *conf = mddev_to_conf(mddev);
 	struct bio *real_bio;
 	struct multipath_bh * mp_bh;
 	struct multipath_info *multipath;
 
-/*
- * make_request() can abort the operation when READA is being
- * used and no empty request is available.
- *
- * Currently, just replace the command with READ/WRITE.
- */
-	if (rw == READA)
-		rw = READ;
-
 	mp_bh = multipath_alloc_mpbh (conf);
 
 	mp_bh->master_bio = bio;
 	mp_bh->mddev = mddev;
-	mp_bh->cmd = rw;
+	mp_bh->cmd = bio_data_dir(bio);
 
 	/*
 	 * read balancing logic:
@@ -272,7 +265,7 @@ static int multipath_make_request (mddev_t *mddev, int rw, struct bio * bio)
 
 	real_bio = bio_clone(bio, GFP_NOIO);
 	real_bio->bi_bdev = multipath->bdev;
-	real_bio->bi_rw = rw;
+	real_bio->bi_rw = bio_data_dir(bio);
 	real_bio->bi_end_io = multipath_end_request;
 	real_bio->bi_private = mp_bh;
 	mp_bh->bio = real_bio;
@@ -707,7 +700,6 @@ static void multipathd (void *data)
 		mddev = mp_bh->mddev;
 		if (mddev->sb_dirty) {
 			printk(KERN_INFO "dirty sb detected, updating.\n");
-			mddev->sb_dirty = 0;
 			md_update_sb(mddev);
 		}
 		bio = mp_bh->bio;

@@ -48,6 +48,8 @@
 #include "proto.h"
 #include "irq_impl.h"
 
+u64 jiffies_64;
+
 extern rwlock_t xtime_lock;
 extern unsigned long wall_jiffies;	/* kernel/timer.c */
 

@@ -78,5 +78,3 @@ install:
 archclean:
 
 archmrproper:
-
-archdep:

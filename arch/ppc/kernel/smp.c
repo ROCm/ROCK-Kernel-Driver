@@ -42,7 +42,6 @@
 
 int smp_threads_ready;
 volatile int smp_commenced;
-int smp_num_cpus = 1;
 int smp_tb_synchronized;
 struct cpuinfo_PPC cpu_data[NR_CPUS];
 struct klock_info_struct klock_info = { KLOCK_CLEAR, 0 };
@@ -68,7 +67,6 @@ volatile unsigned long __initdata tb_offset = 0;
 int start_secondary(void *);
 extern int cpu_idle(void *unused);
 void smp_call_function_interrupt(void);
-void smp_message_pass(int target, int msg, unsigned long data, int wait);
 static int __smp_call_function(void (*func) (void *info), void *info,
 			       int wait, int target);
 
@@ -174,7 +172,6 @@ static void stop_this_cpu(void *dummy)
 void smp_send_stop(void)
 {
 	smp_call_function(stop_this_cpu, NULL, 1, 0);
-	smp_num_cpus = 1;
 }
 
 /*
@@ -212,7 +209,9 @@ int smp_call_function(void (*func) (void *info), void *info, int nonatomic,
  * hardware interrupt handler or from a bottom half handler.
  */
 {
-	if (smp_num_cpus <= 1)
+	/* FIXME: get cpu lock with hotplug cpus, or change this to
+           bitmask. --RR */
+	if (num_online_cpus() <= 1)
 		return 0;
 	return __smp_call_function(func, info, wait, MSG_ALL_BUT_SELF);
 }
@@ -226,9 +225,9 @@ static int __smp_call_function(void (*func) (void *info), void *info,
 	int ncpus = 1;
 
 	if (target == MSG_ALL_BUT_SELF)
-		ncpus = smp_num_cpus - 1;
+		ncpus = num_online_cpus() - 1;
 	else if (target == MSG_ALL)
-		ncpus = smp_num_cpus;
+		ncpus = num_online_cpus();
 
 	data.func = func;
 	data.info = info;
@@ -298,7 +297,6 @@ void __init smp_boot_cpus(void)
 	struct task_struct *p;
 
 	printk("Entering SMP Mode...\n");
-	smp_num_cpus = 1;
         smp_store_cpu_info(0);
 	cpu_online_map = 1UL;
 
@@ -375,7 +373,6 @@ void __init smp_boot_cpus(void)
 			sprintf(buf, "found cpu %d", i);
 			if (ppc_md.progress) ppc_md.progress(buf, 0x350+i);
 			printk("Processor %d found.\n", i);
-			smp_num_cpus++;
 		} else {
 			char buf[32];
 			sprintf(buf, "didn't find cpu %d", i);
@@ -387,7 +384,8 @@ void __init smp_boot_cpus(void)
 	/* Setup CPU 0 last (important) */
 	smp_ops->setup_cpu(0);
 	
-	if (smp_num_cpus < 2)
+	/* FIXME: Not with hotplug CPUS --RR */
+	if (num_online_cpus() < 2)
 		smp_tb_synchronized = 1;
 }
 
@@ -413,7 +411,7 @@ void __init smp_software_tb_sync(int cpu)
 	for (pass = 2; pass < 2+PASSES; pass++){
 		if (cpu == 0){
 			mb();
-			for (i = j = 1; i < smp_num_cpus; i++, j++){
+			for (i = j = 1; i < NR_CPUS; i++, j++){
 				/* skip stuck cpus */
 				while (!cpu_callin_map[j])
 					++j;
@@ -487,7 +485,8 @@ void __init smp_commence(void)
 	 *
 	 * NOTE2: this code doesn't seem to work on > 2 cpus. -- paulus/BenH
 	 */
-	if (!smp_tb_synchronized && smp_num_cpus == 2) {
+	/* FIXME: This doesn't work with hotplug CPUs --RR */
+	if (!smp_tb_synchronized && num_online_cpus() == 2) {
 		unsigned long flags;
 		__save_and_cli(flags);	
 		smp_software_tb_sync(0);
@@ -501,24 +500,18 @@ void __init smp_callin(void)
 	
         smp_store_cpu_info(cpu);
 	set_dec(tb_ticks_per_jiffy);
+	/* Set online before we acknowledge. */
+	set_bit(cpu, &cpu_online_map);
+	wmb();
 	cpu_callin_map[cpu] = 1;
 
 	smp_ops->setup_cpu(cpu);
 
-	/*
-	 * This cpu is now "online".  Only set them online
-	 * before they enter the loop below since write access
-	 * to the below variable is _not_ guaranteed to be
-	 * atomic.
-	 *   -- Cort <cort@fsmlabs.com>
-	 */
-	cpu_online_map |= 1UL << smp_processor_id();
-	
 	while (!smp_commenced)
 		barrier();
 
 	/* see smp_commence for more info */
-	if (!smp_tb_synchronized && smp_num_cpus == 2) {
+	if (!smp_tb_synchronized && num_online_cpus() == 2) {
 		smp_software_tb_sync(cpu);
 	}
 	__sti();

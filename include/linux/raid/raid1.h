@@ -33,8 +33,7 @@ struct r1_private_data_s {
 	int			working_disks;
 	int			last_used;
 	sector_t		next_seq_sect;
-	mdk_thread_t		*thread, *resync_thread;
-	int			resync_mirrors;
+	mdk_thread_t		*thread;
 	mirror_info_t		*spare;
 	spinlock_t		device_lock;
 

@@ -195,29 +195,25 @@ endif
 MAKEBOOT	 =$(MAKE) -C arch/$(ARCH)/boot
 MAKETOOLS	 =$(MAKE) -C arch/$(ARCH)/tools
 
-# The following is a hack to get 'constants.h' up
-# to date before starting compilation
-
-$(patsubst %,_dir_%, $(SUBDIRS)): maketools
-$(patsubst %,_modsubdir_%,$(MOD_DIRS)): maketools
-
 #	Update machine arch and proc symlinks if something which affects
 #	them changed.  We use .arch and .proc to indicate when they were
 #	updated last, otherwise make uses the target directory mtime.
 
 include/asm-arm/.arch: $(wildcard include/config/arch/*.h)
-	@echo 'Making asm-arm/arch -> asm-arm/arch-$(INCDIR) symlink'
+	@echo '  Making asm-arm/arch -> asm-arm/arch-$(INCDIR) symlink'
 	@rm -f include/asm-arm/arch
 	@ln -sf arch-$(INCDIR) include/asm-arm/arch
 	@touch $@
 
 include/asm-arm/.proc: $(wildcard include/config/cpu/32.h) $(wildcard include/config/cpu/26.h)
-	@echo 'Making asm-arm/proc -> asm-arm/proc-$(PROCESSOR) symlink'
+	@echo '  Making asm-arm/proc -> asm-arm/proc-$(PROCESSOR) symlink'
 	@rm -f include/asm-arm/proc
 	@ln -sf proc-$(PROCESSOR) include/asm-arm/proc
 	@touch $@
 
-.hdepend: include/asm-arm/.arch include/asm-arm/.proc
+prepare: include/asm-arm/.arch include/asm-arm/.proc \
+	 include/asm-arm/constants.h
+	@$(MAKETOOLS)
 
 vmlinux: arch/arm/vmlinux.lds
 
@@ -234,7 +230,6 @@ CLEAN_FILES	+= \
 	arch/arm/vmlinux.lds
 
 MRPROPER_FILES	+= \
-	arch/arm/tools/constants.h* \
 	include/asm-arm/arch include/asm-arm/.arch \
 	include/asm-arm/proc include/asm-arm/.proc \
 	include/asm-arm/constants.h* \
@@ -247,13 +242,9 @@ archmrproper: FORCE
 archclean: FORCE
 	@$(MAKEBOOT) clean
 
-archdep: FORCE
-	@$(MAKETOOLS) dep
-	@$(MAKEBOOT) dep
-
 # we need version.h
 maketools: include/linux/version.h FORCE
-	@$(MAKETOOLS) all
+	@$(MAKETOOLS)
 
 # My testing targets (that short circuit a few dependencies)
 zImg:;	@$(MAKEBOOT) zImage
@@ -277,3 +268,13 @@ bp:;	@$(MAKEBOOT) bootpImage
 	  echo "$$CFG does not exist"; \
 	fi; \
 	)
+
+arch/$(ARCH)/kernel/asm-offsets.s: include/asm include/linux/version.h \
+				   include/config/MARKER
+
+include/asm-$(ARCH)/constants.h.tmp: arch/$(ARCH)/kernel/asm-offsets.s
+	@$(generate-asm-offsets.h) < $< > $@
+
+include/asm-$(ARCH)/constants.h: include/asm-$(ARCH)/constants.h.tmp
+	@echo -n '  Generating $@'
+	@$(update-if-changed)

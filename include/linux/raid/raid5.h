@@ -3,6 +3,7 @@
 
 #include <linux/raid/md.h>
 #include <linux/raid/xor.h>
+#include <linux/bio.h>
 
 /*
  *
@@ -176,7 +177,7 @@ struct stripe_head {
  * is put on a "delayed" queue until there are no stripes currently
  * in a pre-read phase.  Further, if the "delayed" queue is empty when
  * a stripe is put on it then we "plug" the queue and do not process it
- * until an unplg call is made. (the tq_disk list is run).
+ * until an unplug call is made. (blk_run_queues is run).
  *
  * When preread is initiated on a stripe, we set PREREAD_ACTIVE and add
  * it to the count of prereading stripes.
@@ -204,12 +205,11 @@ struct disk_info {
 struct raid5_private_data {
 	struct stripe_head	**stripe_hashtbl;
 	mddev_t			*mddev;
-	mdk_thread_t		*thread, *resync_thread;
+	mdk_thread_t		*thread;
 	struct disk_info	disks[MD_SB_DISKS];
 	struct disk_info	*spare;
 	int			chunk_size, level, algorithm;
 	int			raid_disks, working_disks, failed_disks;
-	int			resync_parity;
 	int			max_nr_stripes;
 
 	struct list_head	handle_list; /* stripes needing handling */
@@ -228,9 +228,6 @@ struct raid5_private_data {
 							 * waiting for 25% to be free
 							 */        
 	spinlock_t		device_lock;
-
-	int			plugged;
-	struct tq_struct	plug_tq;
 };
 
 typedef struct raid5_private_data raid5_conf_t;

@@ -1,6 +1,6 @@
 /*
    linear.c : Multiple Devices driver for Linux
-              Copyright (C) 1994-96 Marc ZYNGIER
+	      Copyright (C) 1994-96 Marc ZYNGIER
 	      <zyngier@ufr-info-p7.ibp.fr> or
 	      <maz@gloups.fdn.fr>
 
@@ -20,7 +20,7 @@
 
 #include <linux/raid/md.h>
 #include <linux/slab.h>
-
+#include <linux/bio.h>
 #include <linux/raid/linear.h>
 
 #define MAJOR_NR MD_MAJOR
@@ -33,39 +33,45 @@ static int linear_run (mddev_t *mddev)
 	linear_conf_t *conf;
 	struct linear_hash *table;
 	mdk_rdev_t *rdev;
-	int size, i, j, nb_zone;
+	int size, i, nb_zone, cnt;
 	unsigned int curr_offset;
+	struct list_head *tmp;
 
 	MOD_INC_USE_COUNT;
 
 	conf = kmalloc (sizeof (*conf), GFP_KERNEL);
 	if (!conf)
 		goto out;
+	memset(conf, 0, sizeof(*conf));
 	mddev->private = conf;
 
-	if (md_check_ordering(mddev)) {
-		printk("linear: disks are not ordered, aborting!\n");
-		goto out;
-	}
 	/*
 	 * Find the smallest device.
 	 */
 
 	conf->smallest = NULL;
-	curr_offset = 0;
-	ITERATE_RDEV_ORDERED(mddev,rdev,j) {
+	cnt = 0;
+	ITERATE_RDEV(mddev,rdev,tmp) {
+		int j = rdev->sb->this_disk.raid_disk;
 		dev_info_t *disk = conf->disks + j;
+
+		if (j < 0 || j > mddev->sb->raid_disks || disk->bdev) {
+			printk("linear: disk numbering problem. Aborting!\n");
+			goto out;
+		}
 
 		disk->dev = rdev->dev;
 		disk->bdev = rdev->bdev;
 		atomic_inc(&rdev->bdev->bd_count);
 		disk->size = rdev->size;
-		disk->offset = curr_offset;
-
-		curr_offset += disk->size;
 
 		if (!conf->smallest || (disk->size < conf->smallest->size))
 			conf->smallest = disk;
+		cnt++;
+	}
+	if (cnt != mddev->sb->raid_disks) {
+		printk("linear: not enough drives present. Aborting!\n");
+		goto out;
 	}
 
 	nb_zone = conf->nr_zones =
@@ -81,10 +87,13 @@ static int linear_run (mddev_t *mddev)
 	 * Here we generate the linear hash table
 	 */
 	table = conf->hash_table;
-	i = 0;
 	size = 0;
-	for (j = 0; j < mddev->nb_dev; j++) {
-		dev_info_t *disk = conf->disks + j;
+	curr_offset = 0;
+	for (i = 0; i < cnt; i++) {
+		dev_info_t *disk = conf->disks + i;
+
+		disk->offset = curr_offset;
+		curr_offset += disk->size;
 
 		if (size < 0) {
 			table[-1].dev1 = disk;
@@ -130,12 +139,13 @@ static int linear_stop (mddev_t *mddev)
 	return 0;
 }
 
-static int linear_make_request (mddev_t *mddev, int rw, struct bio *bio)
+static int linear_make_request (request_queue_t *q, struct bio *bio)
 {
-        linear_conf_t *conf = mddev_to_conf(mddev);
-        struct linear_hash *hash;
-        dev_info_t *tmp_dev;
-        long block;
+	mddev_t *mddev = q->queuedata;
+	linear_conf_t *conf = mddev_to_conf(mddev);
+	struct linear_hash *hash;
+	dev_info_t *tmp_dev;
+	long block;
 
 	block = bio->bi_sector >> 1;
 	hash = conf->hash_table + (block / conf->smallest->size);
@@ -186,7 +196,7 @@ static int linear_status (char *page, mddev_t *mddev)
 	}
 	sz += sprintf(page+sz, "\n");
 #endif
-	sz += sprintf(page+sz, " %dk rounding", mddev->param.chunk_size/1024);
+	sz += sprintf(page+sz, " %dk rounding", mddev->sb->chunk_size/1024);
 	return sz;
 }
 

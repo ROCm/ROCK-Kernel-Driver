@@ -903,7 +903,7 @@ pfx_is_sane(struct task_struct *task, pfarg_context_t *pfx)
 		 * and it must be a valid CPU
 		 */
 		cpu = ffs(pfx->ctx_cpu_mask);
-		if (cpu > smp_num_cpus) {
+		if (!cpu_online(cpu)) {
 			DBprintk(("CPU%d is not online\n", cpu));
 			return -EINVAL;
 		}

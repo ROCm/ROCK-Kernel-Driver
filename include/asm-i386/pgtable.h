@@ -237,6 +237,9 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 #define pmd_page(pmd) \
 	(mem_map + (pmd_val(pmd) >> PAGE_SHIFT))
 
+#define pmd_large(pmd) \
+	((pmd_val(pmd) & (_PAGE_PSE|_PAGE_PRESENT)) == (_PAGE_PSE|_PAGE_PRESENT))
+
 /* to find an entry in a page-table-directory. */
 #define pgd_index(address) ((address >> PGDIR_SHIFT) & (PTRS_PER_PGD-1))
 

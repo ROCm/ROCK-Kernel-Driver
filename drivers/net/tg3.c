@@ -52,8 +52,8 @@
 
 #define DRV_MODULE_NAME		"tg3"
 #define PFX DRV_MODULE_NAME	": "
-#define DRV_MODULE_VERSION	"0.98"
-#define DRV_MODULE_RELDATE	"Mar 28, 2002"
+#define DRV_MODULE_VERSION	"0.99"
+#define DRV_MODULE_RELDATE	"Jun 11, 2002"
 
 #define TG3_DEF_MAC_MODE	0
 #define TG3_DEF_RX_MODE		0
@@ -971,7 +971,9 @@ static int tg3_setup_copper_phy(struct tg3 *tp)
 
 	tw32(MAC_MODE, tp->mac_mode);
 
-	if (tp->tg3_flags & TG3_FLAG_USE_LINKCHG_REG) {
+	if (tp->tg3_flags &
+	    (TG3_FLAG_USE_LINKCHG_REG |
+	     TG3_FLAG_POLL_SERDES)) {
 		/* Polled via timer. */
 		tw32(MAC_EVENT, 0);
 	} else {
@@ -1065,6 +1067,7 @@ struct tg3_fiber_aneginfo {
 #define ANEG_TIMER_ENAB	2
 #define ANEG_FAILED	-1
 
+#define ANEG_STATE_SETTLE_TIME	10000
 
 static int tg3_fiber_aneg_smachine(struct tg3 *tp,
 				   struct tg3_fiber_aneginfo *ap)
@@ -1093,8 +1096,10 @@ static int tg3_fiber_aneg_smachine(struct tg3 *tp,
 			ap->ability_match = 0;
 			ap->ability_match_count = 0;
 		} else {
-			if (++ap->ability_match_count > 1)
+			if (++ap->ability_match_count > 1) {
 				ap->ability_match = 1;
+				ap->ability_match_cfg = rx_cfg_reg;
+			}
 		}
 		if (rx_cfg_reg & ANEG_CFG_ACK)
 			ap->ack_match = 1;
@@ -1151,10 +1156,11 @@ static int tg3_fiber_aneg_smachine(struct tg3 *tp,
 		/* fallthru */
 	case ANEG_STATE_RESTART:
 		delta = ap->cur_time - ap->link_time;
-		if (delta > 100000)
+		if (delta > ANEG_STATE_SETTLE_TIME) {
 			ap->state = ANEG_STATE_ABILITY_DETECT_INIT;
-		else
+		} else {
 			ret = ANEG_TIMER_ENAB;
+		}
 		break;
 
 	case ANEG_STATE_DISABLE_LINK_OK:
@@ -1167,12 +1173,14 @@ static int tg3_fiber_aneg_smachine(struct tg3 *tp,
 		tw32(MAC_TX_AUTO_NEG, ap->txconfig);
 		tp->mac_mode |= MAC_MODE_SEND_CONFIGS;
 		tw32(MAC_MODE, tp->mac_mode);
+
 		ap->state = ANEG_STATE_ABILITY_DETECT;
 		break;
 
 	case ANEG_STATE_ABILITY_DETECT:
-		if (ap->ability_match != 0 && ap->rxconfig != 0)
+		if (ap->ability_match != 0 && ap->rxconfig != 0) {
 			ap->state = ANEG_STATE_ACK_DETECT_INIT;
+		}
 		break;
 
 	case ANEG_STATE_ACK_DETECT_INIT:
@@ -1180,16 +1188,18 @@ static int tg3_fiber_aneg_smachine(struct tg3 *tp,
 		tw32(MAC_TX_AUTO_NEG, ap->txconfig);
 		tp->mac_mode |= MAC_MODE_SEND_CONFIGS;
 		tw32(MAC_MODE, tp->mac_mode);
+
 		ap->state = ANEG_STATE_ACK_DETECT;
 
 		/* fallthru */
 	case ANEG_STATE_ACK_DETECT:
 		if (ap->ack_match != 0) {
 			if ((ap->rxconfig & ~ANEG_CFG_ACK) ==
-			    (ap->ability_match_cfg & ~ANEG_CFG_ACK))
+			    (ap->ability_match_cfg & ~ANEG_CFG_ACK)) {
 				ap->state = ANEG_STATE_COMPLETE_ACK_INIT;
-			else
+			} else {
 				ap->state = ANEG_STATE_AN_ENABLE;
+			}
 		} else if (ap->ability_match != 0 &&
 			   ap->rxconfig == 0) {
 			ap->state = ANEG_STATE_AN_ENABLE;
@@ -1245,15 +1255,16 @@ static int tg3_fiber_aneg_smachine(struct tg3 *tp,
 			break;
 		}
 		delta = ap->cur_time - ap->link_time;
-		if (delta > 100000) {
+		if (delta > ANEG_STATE_SETTLE_TIME) {
 			if (!(ap->flags & (MR_LP_ADV_NEXT_PAGE))) {
 				ap->state = ANEG_STATE_IDLE_DETECT_INIT;
 			} else {
-				if ((ap->txconfig & 0x0080) == 0 &&
-				    !(ap->flags & MR_NP_RX))
+				if ((ap->txconfig & ANEG_CFG_NP) == 0 &&
+				    !(ap->flags & MR_NP_RX)) {
 					ap->state = ANEG_STATE_IDLE_DETECT_INIT;
-				else
+				} else {
 					ret = ANEG_FAILED;
+				}
 			}
 		}
 		break;
@@ -1262,6 +1273,7 @@ static int tg3_fiber_aneg_smachine(struct tg3 *tp,
 		ap->link_time = ap->cur_time;
 		tp->mac_mode &= ~MAC_MODE_SEND_CONFIGS;
 		tw32(MAC_MODE, tp->mac_mode);
+
 		ap->state = ANEG_STATE_IDLE_DETECT;
 		ret = ANEG_TIMER_ENAB;
 		break;
@@ -1273,7 +1285,7 @@ static int tg3_fiber_aneg_smachine(struct tg3 *tp,
 			break;
 		}
 		delta = ap->cur_time - ap->link_time;
-		if (delta > 100000) {
+		if (delta > ANEG_STATE_SETTLE_TIME) {
 			/* XXX another gem from the Broadcom driver :( */
 			ap->state = ANEG_STATE_LINK_OK;
 		}
@@ -1302,8 +1314,17 @@ static int tg3_fiber_aneg_smachine(struct tg3 *tp,
 
 static int tg3_setup_fiber_phy(struct tg3 *tp)
 {
+	u32 orig_pause_cfg;
+	u16 orig_active_speed;
+	u8 orig_active_duplex;
 	int current_link_up;
 	int i;
+
+	orig_pause_cfg =
+		(tp->tg3_flags & (TG3_FLAG_RX_PAUSE |
+				  TG3_FLAG_TX_PAUSE));
+	orig_active_speed = tp->link_config.active_speed;
+	orig_active_duplex = tp->link_config.active_duplex;
 
 	tp->mac_mode &= ~(MAC_MODE_PORT_MODE_MASK | MAC_MODE_HALF_DUPLEX);
 	tp->mac_mode |= MAC_MODE_PORT_MODE_TBI;
@@ -1317,7 +1338,7 @@ static int tg3_setup_fiber_phy(struct tg3 *tp)
 		tg3_writephy(tp, 0x16, 0x8007);
 
 		/* SW reset */
-		tg3_writephy(tp, 0x00, 0x8000);
+		tg3_writephy(tp, MII_BMCR, BMCR_RESET);
 
 		/* Wait for reset to complete. */
 		/* XXX schedule_timeout() ... */
@@ -1353,53 +1374,51 @@ static int tg3_setup_fiber_phy(struct tg3 *tp)
 		tg3_writephy(tp, 0x10, 0x8011);
 	}
 
-	/* Enable link change interrupt. */
-	tw32(MAC_EVENT, MAC_EVENT_LNKSTATE_CHANGED);
+	/* Enable link change interrupt unless serdes polling.  */
+	if (!(tp->tg3_flags & TG3_FLAG_POLL_SERDES))
+		tw32(MAC_EVENT, MAC_EVENT_LNKSTATE_CHANGED);
+	else
+		tw32(MAC_EVENT, 0);
 
 	current_link_up = 0;
 	if (tr32(MAC_STATUS) & MAC_STATUS_PCS_SYNCED) {
-		if (tp->link_config.autoneg == AUTONEG_ENABLE) {
+		if (tp->link_config.autoneg == AUTONEG_ENABLE &&
+		    !(tp->tg3_flags & TG3_FLAG_GOT_SERDES_FLOWCTL)) {
 			struct tg3_fiber_aneginfo aninfo;
 			int status = ANEG_FAILED;
+			unsigned int tick;
+			u32 tmp;
 
 			memset(&aninfo, 0, sizeof(aninfo));
 			aninfo.flags |= (MR_AN_ENABLE);
 
-			for (i = 0; i < 6; i++) {
-				unsigned int tick;
-				u32 tmp;
+			tw32(MAC_TX_AUTO_NEG, 0);
 
-				tw32(MAC_TX_AUTO_NEG, 0);
+			tmp = tp->mac_mode & ~MAC_MODE_PORT_MODE_MASK;
+			tw32(MAC_MODE, tmp | MAC_MODE_PORT_MODE_GMII);
+			udelay(20);
 
-				tmp = tp->mac_mode & ~MAC_MODE_PORT_MODE_MASK;
-				tw32(MAC_MODE, tmp | MAC_MODE_PORT_MODE_GMII);
-				udelay(20);
+			tw32(MAC_MODE, tp->mac_mode | MAC_MODE_SEND_CONFIGS);
 
-				tw32(MAC_MODE, tp->mac_mode | MAC_MODE_SEND_CONFIGS);
-
-				aninfo.state = ANEG_STATE_UNKNOWN;
-				aninfo.cur_time = 0;
-				tick = 0;
-				while (++tick < 95000) {
-					status = tg3_fiber_aneg_smachine(tp, &aninfo);
-					if (status == ANEG_DONE ||
-					    status == ANEG_FAILED)
-						break;
-
-					udelay(1);
-				}
+			aninfo.state = ANEG_STATE_UNKNOWN;
+			aninfo.cur_time = 0;
+			tick = 0;
+			while (++tick < 195000) {
+				status = tg3_fiber_aneg_smachine(tp, &aninfo);
 				if (status == ANEG_DONE ||
 				    status == ANEG_FAILED)
 					break;
+
+				udelay(1);
 			}
 
 			tp->mac_mode &= ~MAC_MODE_SEND_CONFIGS;
 			tw32(MAC_MODE, tp->mac_mode);
 
 			if (status == ANEG_DONE &&
-			    (aninfo.flags & MR_AN_COMPLETE) &&
-			    (aninfo.flags & MR_LINK_OK) &&
-			    (aninfo.flags & MR_LP_ADV_FULL_DUPLEX)) {
+			    (aninfo.flags &
+			     (MR_AN_COMPLETE | MR_LINK_OK |
+			      MR_LP_ADV_FULL_DUPLEX))) {
 				u32 local_adv, remote_adv;
 
 				local_adv = ADVERTISE_PAUSE_CAP;
@@ -1411,6 +1430,8 @@ static int tg3_setup_fiber_phy(struct tg3 *tp)
 
 				tg3_setup_flow_control(tp, local_adv, remote_adv);
 
+				tp->tg3_flags |=
+					TG3_FLAG_GOT_SERDES_FLOWCTL;
 				current_link_up = 1;
 			}
 			for (i = 0; i < 60; i++) {
@@ -1424,6 +1445,10 @@ static int tg3_setup_fiber_phy(struct tg3 *tp)
 				     (MAC_STATUS_SYNC_CHANGED |
 				      MAC_STATUS_CFG_CHANGED)) == 0)
 					break;
+			}
+			if (current_link_up == 0 &&
+			    (tr32(MAC_STATUS) & MAC_STATUS_PCS_SYNCED)) {
+				current_link_up = 1;
 			}
 		} else {
 			/* Forcing 1000FD link up. */
@@ -1439,11 +1464,12 @@ static int tg3_setup_fiber_phy(struct tg3 *tp)
 		 (tp->hw_status->status & ~SD_STATUS_LINK_CHG));
 
 	for (i = 0; i < 100; i++) {
+		udelay(20);
 		tw32(MAC_STATUS,
 		     (MAC_STATUS_SYNC_CHANGED |
 		      MAC_STATUS_CFG_CHANGED));
-		udelay(5);
 
+		udelay(20);
 		if ((tr32(MAC_STATUS) &
 		     (MAC_STATUS_SYNC_CHANGED |
 		      MAC_STATUS_CFG_CHANGED)) == 0)
@@ -1467,6 +1493,14 @@ static int tg3_setup_fiber_phy(struct tg3 *tp)
 		else
 			netif_carrier_off(tp->dev);
 		tg3_link_report(tp);
+	} else {
+		u32 now_pause_cfg =
+			tp->tg3_flags & (TG3_FLAG_RX_PAUSE |
+					 TG3_FLAG_TX_PAUSE);
+		if (orig_pause_cfg != now_pause_cfg ||
+		    orig_active_speed != tp->link_config.active_speed ||
+		    orig_active_duplex != tp->link_config.active_duplex)
+			tg3_link_report(tp);
 	}
 
 	if ((tr32(MAC_STATUS) & MAC_STATUS_PCS_SYNCED) == 0) {
@@ -1644,7 +1678,7 @@ static int tg3_alloc_rx_skb(struct tg3 *tp, u32 opaque_key,
  * tg3_alloc_rx_skb for full details.
  */
 static void tg3_recycle_rx(struct tg3 *tp, u32 opaque_key,
-			   int src_idx, int dest_idx_unmasked)
+			   int src_idx, u32 dest_idx_unmasked)
 {
 	struct tg3_rx_buffer_desc *src_desc, *dest_desc;
 	struct ring_info *src_map, *dest_map;
@@ -1965,7 +1999,9 @@ static void tg3_interrupt_main_work(struct tg3 *tp)
 	struct tg3_hw_status *sblk = tp->hw_status;
 	int did_pkts;
 
-	if (!(tp->tg3_flags & TG3_FLAG_USE_LINKCHG_REG)) {
+	if (!(tp->tg3_flags &
+	      (TG3_FLAG_USE_LINKCHG_REG |
+	       TG3_FLAG_POLL_SERDES))) {
 		if (sblk->status & SD_STATUS_LINK_CHG) {
 			sblk->status = SD_STATUS_UPDATED |
 				(sblk->status & ~SD_STATUS_LINK_CHG);
@@ -2838,7 +2874,7 @@ err_out:
 	return -ENOMEM;
 }
 
-#define MAX_WAIT_CNT 10000
+#define MAX_WAIT_CNT 1000
 
 /* To stop a block, clear the enable bit and poll till it
  * clears.  tp->lock is held.
@@ -3807,6 +3843,26 @@ static void tg3_timer(unsigned long __opaque)
 
 			if (phy_event)
 				tg3_setup_phy(tp);
+		} else if (tp->tg3_flags & TG3_FLAG_POLL_SERDES) {
+			u32 mac_stat = tr32(MAC_STATUS);
+			int need_setup = 0;
+
+			if (netif_carrier_ok(tp->dev) &&
+			    (mac_stat & MAC_STATUS_LNKSTATE_CHANGED)) {
+				need_setup = 1;
+			}
+			if (! netif_carrier_ok(tp->dev) &&
+			    (mac_stat & MAC_STATUS_PCS_SYNCED)) {
+				need_setup = 1;
+			}
+			if (need_setup) {
+				tw32(MAC_MODE,
+				     (tp->mac_mode &
+				      ~MAC_MODE_PORT_MODE_MASK));
+				udelay(40);
+				tw32(MAC_MODE, tp->mac_mode);
+				tg3_setup_phy(tp);
+			}
 		}
 
 		tp->timer_counter = tp->timer_multiplier;
@@ -4162,7 +4218,10 @@ static int tg3_close(struct net_device *dev)
 
 	tg3_halt(tp);
 	tg3_free_rings(tp);
-	tp->tg3_flags &= ~TG3_FLAG_INIT_COMPLETE;
+	tp->tg3_flags &=
+		~(TG3_FLAG_INIT_COMPLETE |
+		  TG3_FLAG_GOT_SERDES_FLOWCTL);
+	netif_carrier_off(tp->dev);
 
 	spin_unlock_irq(&tp->lock);
 
@@ -5731,6 +5790,12 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 		tp->tg3_flags |= (TG3_FLAG_USE_MI_INTERRUPT |
 				  TG3_FLAG_USE_LINKCHG_REG);
 	}
+
+	/* For all SERDES we poll the MAC status register. */
+	if (tp->phy_id == PHY_ID_SERDES)
+		tp->tg3_flags |= TG3_FLAG_POLL_SERDES;
+	else
+		tp->tg3_flags &= ~TG3_FLAG_POLL_SERDES;
 
 	/* 5700 BX chips need to have their TX producer index mailboxes
 	 * written twice to workaround a bug.

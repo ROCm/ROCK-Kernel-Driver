@@ -913,16 +913,6 @@ int bmap(struct inode * inode, int block)
 	return res;
 }
 
-static inline void do_atime_update(struct inode *inode)
-{
-	unsigned long time = CURRENT_TIME;
-	if (inode->i_atime != time) {
-		inode->i_atime = time;
-		mark_inode_dirty_sync(inode);
-	}
-}
-
-
 /**
  *	update_atime	-	update the access time
  *	@inode: inode accessed
@@ -932,15 +922,19 @@ static inline void do_atime_update(struct inode *inode)
  *	as well as the "noatime" flag and inode specific "noatime" markers.
  */
  
-void update_atime (struct inode *inode)
+void update_atime(struct inode *inode)
 {
 	if (inode->i_atime == CURRENT_TIME)
 		return;
-	if ( IS_NOATIME (inode) ) return;
-	if ( IS_NODIRATIME (inode) && S_ISDIR (inode->i_mode) ) return;
-	if ( IS_RDONLY (inode) ) return;
-	do_atime_update(inode);
-}   /*  End Function update_atime  */
+	if (IS_NOATIME(inode))
+		return;
+	if (IS_NODIRATIME(inode) && S_ISDIR(inode->i_mode))
+		return;
+	if (IS_RDONLY(inode))
+		return;
+	inode->i_atime = CURRENT_TIME;
+	mark_inode_dirty_sync(inode);
+}
 
 int inode_needs_sync(struct inode *inode)
 {

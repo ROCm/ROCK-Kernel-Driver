@@ -2177,7 +2177,7 @@ static int __init fbcon_show_logo( void )
     if (p->fb_info->fbops->fb_rasterimg)
     	p->fb_info->fbops->fb_rasterimg(p->fb_info, 1);
 
-    for (x = 0; x < smp_num_cpus * (LOGO_W + 8) &&
+    for (x = 0; x < num_online_cpus() * (LOGO_W + 8) &&
     	 x < p->var.xres - (LOGO_W + 8); x += (LOGO_W + 8)) {
     	 
 #if defined(CONFIG_FBCON_CFB16) || defined(CONFIG_FBCON_CFB24) || \

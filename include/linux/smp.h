@@ -57,8 +57,6 @@ extern int smp_call_function (void (*func) (void *info), void *info,
  */
 extern int smp_threads_ready;
 
-extern int smp_num_cpus;
-
 extern volatile unsigned long smp_msg_data;
 extern volatile int smp_src_cpu;
 extern volatile int smp_msg_id;
@@ -79,19 +77,18 @@ extern volatile int smp_msg_id;
  *	These macros fold the SMP functionality into a single CPU system
  */
  
-#define smp_num_cpus				1
 #define smp_processor_id()			0
 #define hard_smp_processor_id()			0
 #define smp_threads_ready			1
 #ifndef CONFIG_PREEMPT
 #define kernel_lock()
 #endif
-#define cpu_logical_map(cpu)			0
-#define cpu_number_map(cpu)			0
 #define smp_call_function(func,info,retry,wait)	({ 0; })
-#define cpu_online_map				1
 static inline void smp_send_reschedule(int cpu) { }
 static inline void smp_send_reschedule_all(void) { }
+#define cpu_online_map				1
+#define cpu_online(cpu)				1
+#define num_online_cpus()			1
 #define __per_cpu_data
 #define per_cpu(var, cpu)			var
 #define this_cpu(var)				var

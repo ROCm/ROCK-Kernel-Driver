@@ -110,6 +110,9 @@ static inline int queue_task(struct tq_struct *bh_pointer, task_queue *bh_list)
 	return ret;
 }
 
+/* Schedule a tq to run in process context */
+extern int schedule_task(struct tq_struct *task);
+
 /*
  * Call all "bottom halfs" on a given list.
  */

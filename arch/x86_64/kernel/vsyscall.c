@@ -47,7 +47,7 @@
 
 #define __vsyscall(nr) __attribute__ ((unused,__section__(".vsyscall_" #nr)))
 
-#define NO_VSYSCALL 1
+//#define NO_VSYSCALL 1
 
 #ifdef NO_VSYSCALL
 #include <asm/unistd.h>

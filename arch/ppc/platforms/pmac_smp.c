@@ -282,7 +282,7 @@ psurge_smp_message_recv(struct pt_regs *regs)
 	/* clear interrupt */
 	psurge_clr_ipi(cpu);
 
-	if (smp_num_cpus < 2)
+	if (num_online_cpus() < 2)
 		return;
 
 	/* make sure there is a message there */
@@ -302,10 +302,12 @@ smp_psurge_message_pass(int target, int msg, unsigned long data, int wait)
 {
 	int i;
 
-	if (smp_num_cpus < 2)
+	if (num_online_cpus() < 2)
 		return;
 
-	for (i = 0; i < smp_num_cpus; i++) {
+	for (i = 0; i < NR_CPUS; i++) {
+		if (!cpu_online(i))
+			continue;
 		if (target == MSG_ALL
 		    || (target == MSG_ALL_BUT_SELF && i != smp_processor_id())
 		    || target == i) {
@@ -497,7 +499,7 @@ smp_psurge_setup_cpu(int cpu_nr)
 {
 
 	if (cpu_nr == 0) {
-		if (smp_num_cpus < 2)
+		if (num_online_cpus() < 2)
 			return;
 		/* reset the entry point so if we get another intr we won't
 		 * try to startup again */

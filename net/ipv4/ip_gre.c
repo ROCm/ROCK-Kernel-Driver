@@ -120,11 +120,13 @@ static int ipgre_tunnel_init(struct net_device *dev);
 static int ipgre_fb_tunnel_init(struct net_device *dev);
 
 static struct net_device ipgre_fb_tunnel_dev = {
-	"gre0", 0x0, 0x0, 0x0, 0x0, 0, 0, 0, 0, 0, NULL, ipgre_fb_tunnel_init,
+	name:	"gre0",
+	init:	ipgre_fb_tunnel_init
 };
 
 static struct ip_tunnel ipgre_fb_tunnel = {
-	NULL, &ipgre_fb_tunnel_dev, {0, }, 0, 0, 0, 0, 0, 0, 0, {"gre0", }
+	dev:	&ipgre_fb_tunnel_dev,
+	parms:	{ name: "gre0" }
 };
 
 /* Tunnel hash table */

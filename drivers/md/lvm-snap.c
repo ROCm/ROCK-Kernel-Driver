@@ -224,7 +224,7 @@ static inline void invalidate_snap_cache(unsigned long start, unsigned long nr,
 
 	for (i = 0; i < nr; i++)
 	{
-		bh = get_hash_table(dev, start++, blksize);
+		bh = find_get_block(dev, start++, blksize);
 		if (bh)
 			bforget(bh);
 	}

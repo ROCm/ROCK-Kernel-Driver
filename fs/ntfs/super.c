@@ -1615,7 +1615,7 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	if (vol->cluster_size <= 4096 && !ntfs_nr_compression_users++) {
 		result = allocate_compression_buffers();
 		if (result) {
-			ntfs_error(NULL, "Failed to allocate per CPU buffers "
+			ntfs_error(NULL, "Failed to allocate buffers "
 					"for compression engine.");
 			ntfs_nr_compression_users--;
 			up(&ntfs_lock);

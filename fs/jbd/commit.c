@@ -659,6 +659,20 @@ skip_commit:
 		 * there's no point in keeping a checkpoint record for
 		 * it. */
 		bh = jh2bh(jh);
+
+		/* A buffer which has been freed while still being
+		 * journaled by a previous transaction may end up still
+		 * being dirty here, but we want to avoid writing back
+		 * that buffer in the future now that the last use has
+		 * been committed.  That's not only a performance gain,
+		 * it also stops aliasing problems if the buffer is left
+		 * behind for writeback and gets reallocated for another
+		 * use in a different page. */
+		if (buffer_freed(bh)) {
+			clear_buffer_freed(bh);
+			clear_buffer_jbddirty(bh);
+		}
+			
 		if (buffer_jdirty(bh)) {
 			JBUFFER_TRACE(jh, "add to new checkpointing trans");
 			__journal_insert_checkpoint(jh, commit_transaction);
