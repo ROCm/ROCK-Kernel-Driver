@@ -51,7 +51,7 @@
 
 #include "scsi_debug.h"
 
-static const char * scsi_debug_version_str = "Version: 1.65 (20021119)";
+static const char * scsi_debug_version_str = "Version: 1.66 (20021205)";
 
 #ifndef SCSI_CMD_READ_16
 #define SCSI_CMD_READ_16 0x88
@@ -397,7 +397,7 @@ int scsi_debug_queuecommand(struct scsi_cmnd * SCpnt, done_funct_t done)
 		if ((errsts = check_reset(SCpnt, devip)))
 			break;
 		mk_sense_buffer(devip, ILLEGAL_REQUEST, 0x20, 0, 14);
-		errsts = (COMMAND_COMPLETE << 8) | (CHECK_CONDITION << 1);
+		errsts = (DRIVER_SENSE << 24) | (CHECK_CONDITION << 1);
 		break;
 	}
 	return schedule_resp(SCpnt, devip, done, errsts, scsi_debug_delay);
@@ -417,7 +417,7 @@ static int check_reset(struct scsi_cmnd * SCpnt, struct sdebug_dev_info * devip)
 	if (devip->reset) {
 		devip->reset = 0;
 		mk_sense_buffer(devip, UNIT_ATTENTION, 0x29, 0, 14);
-		return (COMMAND_COMPLETE << 8) | (CHECK_CONDITION << 1);
+		return (DRIVER_SENSE << 24) | (CHECK_CONDITION << 1);
 	}
 	return 0;
 }
@@ -478,7 +478,7 @@ static int resp_inquiry(unsigned char * cmd, int target, unsigned char * buff,
 	arr[0] = pq_pdt;
 	if (0x2 & cmd[1]) {  /* CMDDT bit set */
 		mk_sense_buffer(devip, ILLEGAL_REQUEST, 0x24, 0, 14);
-		return (COMMAND_COMPLETE << 8) | (CHECK_CONDITION << 1);
+		return (DRIVER_SENSE << 24) | (CHECK_CONDITION << 1);
 	} else if (0x1 & cmd[1]) {  /* EVPD bit set */
 		int dev_id_num, len;
 		char dev_id_str[6];
@@ -503,7 +503,7 @@ static int resp_inquiry(unsigned char * cmd, int target, unsigned char * buff,
 		} else {
 			/* Illegal request, invalid field in cdb */
 			mk_sense_buffer(devip, ILLEGAL_REQUEST, 0x24, 0, 14);
-			return (COMMAND_COMPLETE << 8) | (CHECK_CONDITION << 1);
+			return (DRIVER_SENSE << 24) | (CHECK_CONDITION << 1);
 		}
 		memcpy(buff, arr, min_len); 
 		return 0;
@@ -616,7 +616,7 @@ static int resp_mode_sense(unsigned char * cmd, int target,
 	memset(arr, 0, SDEBUG_MAX_MSENSE_SZ);
 	if (0x3 == pcontrol) {  /* Saving values not supported */
 		mk_sense_buffer(devip, ILLEGAL_REQUEST, 0x39, 0, 14);
-		return (COMMAND_COMPLETE << 8) | (CHECK_CONDITION << 1);
+		return (DRIVER_SENSE << 24) | (CHECK_CONDITION << 1);
 	}
 	dev_spec = DEV_READONLY(target) ? 0x80 : 0x0;
 	if (msense_6) {
@@ -659,7 +659,7 @@ static int resp_mode_sense(unsigned char * cmd, int target,
 		break;
 	default:
 		mk_sense_buffer(devip, ILLEGAL_REQUEST, 0x24, 0, 14);
-		return (COMMAND_COMPLETE << 8) | (CHECK_CONDITION << 1);
+		return (DRIVER_SENSE << 24) | (CHECK_CONDITION << 1);
 	}
 	if (msense_6)
 		arr[0] = offset - 1;
@@ -683,14 +683,14 @@ static int resp_read(struct scsi_cmnd * SCpnt, int upper_blk, int block,
 
 	if (upper_blk || (block + num > sdebug_capacity)) {
 		mk_sense_buffer(devip, ILLEGAL_REQUEST, 0x21, 0, 14);
-		return (COMMAND_COMPLETE << 8) | (CHECK_CONDITION << 1);
+		return (DRIVER_SENSE << 24) | (CHECK_CONDITION << 1);
 	}
 	if ((SCSI_DEBUG_OPT_MEDIUM_ERR & scsi_debug_opts) &&
 	    (block >= OPT_MEDIUM_ERR_ADDR) && 
 	    (block < (OPT_MEDIUM_ERR_ADDR + num))) {
 		mk_sense_buffer(devip, MEDIUM_ERROR, 0x11, 0, 14);
 		/* claim unrecoverable read error */
-		return (COMMAND_COMPLETE << 8) | (CHECK_CONDITION << 1);
+		return (DRIVER_SENSE << 24) | (CHECK_CONDITION << 1);
 	}
 	read_lock_irqsave(&atomic_rw, iflags);
         sgcount = 0;
@@ -732,7 +732,7 @@ static int resp_write(struct scsi_cmnd * SCpnt, int upper_blk, int block,
 
 	if (upper_blk || (block + num > sdebug_capacity)) {
 		mk_sense_buffer(devip, ILLEGAL_REQUEST, 0x21, 0, 14);
-		return (COMMAND_COMPLETE << 8) | (CHECK_CONDITION << 1);
+		return (DRIVER_SENSE << 24) | (CHECK_CONDITION << 1);
 	}
 
 	write_lock_irqsave(&atomic_rw, iflags);
@@ -773,7 +773,7 @@ static int resp_report_luns(unsigned char * cmd, unsigned char * buff,
 	alloc_len = cmd[9] + (cmd[8] << 8) + (cmd[7] << 16) + (cmd[6] << 24);
 	if ((alloc_len < 16) || (select_report > 2)) {
 		mk_sense_buffer(devip, ILLEGAL_REQUEST, 0x24, 0, 14);
-		return (COMMAND_COMPLETE << 8) | (CHECK_CONDITION << 1);
+		return (DRIVER_SENSE << 24) | (CHECK_CONDITION << 1);
 	}
 	if (bufflen > 3) {
 		lun_cnt = min((int)(bufflen / sizeof(ScsiLun)),
