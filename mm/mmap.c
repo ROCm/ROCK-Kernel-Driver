@@ -781,6 +781,8 @@ static void free_pgtables(mmu_gather_t *tlb, struct vm_area_struct *prev,
 		break;
 	}
 no_mmaps:
+	if (last < first)	/* needed for arches with discontiguous pgd indices */
+		return;
 	/*
 	 * If the PGD bits are not consecutive in the virtual address, the
 	 * old method of shifting the VA >> by PGDIR_SHIFT doesn't work.
