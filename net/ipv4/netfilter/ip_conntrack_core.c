@@ -967,23 +967,28 @@ int ip_conntrack_expect_related(struct ip_conntrack *related_to,
 		   related_to->expecting >= related_to->helper->max_expected) {
 		struct list_head *cur_item;
 		/* old == NULL */
-	    	if (net_ratelimit())
-		    	printk(KERN_WARNING 
-		    	       "ip_conntrack: max number of expected "
-			       "connections %i of %s reached for "
-			       "%u.%u.%u.%u->%u.%u.%u.%u%s\n",
-		    	       related_to->helper->max_expected, 
-		    	       related_to->helper->name,
-		    	       NIPQUAD(related_to->tuplehash[IP_CT_DIR_ORIGINAL].tuple.src.ip),
-		    	       NIPQUAD(related_to->tuplehash[IP_CT_DIR_ORIGINAL].tuple.dst.ip),
-		    	       related_to->helper->flags & IP_CT_HELPER_F_REUSE_EXPECT ?
-		    	       ", reusing" : "");
 		if (!(related_to->helper->flags & 
 		      IP_CT_HELPER_F_REUSE_EXPECT)) {
 			WRITE_UNLOCK(&ip_conntrack_lock);
+ 		    	if (net_ratelimit())
+ 			    	printk(KERN_WARNING
+				       "ip_conntrack: max number of expected "
+				       "connections %i of %s reached for "
+				       "%u.%u.%u.%u->%u.%u.%u.%u\n",
+				       related_to->helper->max_expected,
+				       related_to->helper->name,
+ 		    	       	       NIPQUAD(related_to->tuplehash[IP_CT_DIR_ORIGINAL].tuple.src.ip),
+ 		    	       	       NIPQUAD(related_to->tuplehash[IP_CT_DIR_ORIGINAL].tuple.dst.ip));
 			return -EPERM;
 		}
-
+		DEBUGP("ip_conntrack: max number of expected "
+		       "connections %i of %s reached for "
+		       "%u.%u.%u.%u->%u.%u.%u.%u, reusing\n",
+ 		       related_to->helper->max_expected,
+		       related_to->helper->name,
+		       NIPQUAD(related_to->tuplehash[IP_CT_DIR_ORIGINAL].tuple.src.ip),
+		       NIPQUAD(related_to->tuplehash[IP_CT_DIR_ORIGINAL].tuple.dst.ip));
+ 
 		/* choose the the oldest expectation to evict */
 		list_for_each(cur_item, &related_to->sibling_list) { 
 			struct ip_conntrack_expect *cur;

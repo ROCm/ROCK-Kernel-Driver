@@ -206,6 +206,8 @@ SHA256 algorithm contributors:
 
 AES algorithm contributors:
   Alexander Kjeldaas
+  Herbert Valerio Riedel
+  Kyle McMartin
   Adam J. Richter
 
 Please send any credits updates or corrections to:

@@ -200,9 +200,9 @@ static int find_pattern(const char *data, size_t dlen,
 
 		DEBUGP("ftp: string mismatch\n");
 		for (i = 0; i < plen; i++) {
-			DEBUGFTP("ftp:char %u `%c'(%u) vs `%c'(%u)\n",
-				 i, data[i], data[i],
-				 pattern[i], pattern[i]);
+			DEBUGP("ftp:char %u `%c'(%u) vs `%c'(%u)\n",
+				i, data[i], data[i],
+				pattern[i], pattern[i]);
 		}
 #endif
 		return 0;
