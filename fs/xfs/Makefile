@@ -61,9 +61,14 @@ xfs-$(CONFIG_XFS_QUOTA)		+= $(addprefix quota/, \
 				   xfs_qm_syscalls.o \
 				   xfs_qm_bhv.o \
 				   xfs_qm.o)
-
 ifeq ($(CONFIG_XFS_QUOTA),y)
 xfs-$(CONFIG_PROC_FS)		+= quota/xfs_qm_stats.o
+else
+xfs-y				+= xfs_qmops.o
+endif
+
+ifneq ($(CONFIG_XFS_DMAPI),y)
+xfs-y				+= xfs_dmops.o
 endif
 
 xfs-$(CONFIG_XFS_RT)		+= xfs_rtalloc.o
@@ -150,8 +155,4 @@ xfs-y				+= $(addprefix support/, \
 				   uuid.o)
 
 xfs-$(CONFIG_XFS_TRACE)		+= support/ktrace.o
-
-# Quota and DMAPI stubs
-xfs-y				+= xfs_dmops.o \
-				   xfs_qmops.o
 
