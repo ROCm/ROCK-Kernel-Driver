@@ -227,3 +227,4 @@ EXPORT_SYMBOL(debugger_fault_handler);
 #endif
 
 EXPORT_SYMBOL(tb_ticks_per_usec);
+EXPORT_SYMBOL(paca);
