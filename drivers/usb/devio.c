@@ -527,40 +527,40 @@ static int proc_control(struct dev_state *ps, void *arg)
 
 	if (copy_from_user(&ctrl, (void *)arg, sizeof(ctrl)))
 		return -EFAULT;
-	if ((ret = check_ctrlrecip(ps, ctrl.requesttype, ctrl.index)))
+	if ((ret = check_ctrlrecip(ps, ctrl.bRequestType, ctrl.wIndex)))
 		return ret;
-	if (ctrl.length > PAGE_SIZE)
+	if (ctrl.wLength > PAGE_SIZE)
 		return -EINVAL;
 	if (!(tbuf = (unsigned char *)__get_free_page(GFP_KERNEL)))
 		return -ENOMEM;
 	tmo = (ctrl.timeout * HZ + 999) / 1000;
-	if (ctrl.requesttype & 0x80) {
-		if (ctrl.length && !access_ok(VERIFY_WRITE, ctrl.data, ctrl.length)) {
+	if (ctrl.bRequestType & 0x80) {
+		if (ctrl.wLength && !access_ok(VERIFY_WRITE, ctrl.data, ctrl.wLength)) {
 			free_page((unsigned long)tbuf);
 			return -EINVAL;
 		}
-		i = usb_control_msg(dev, usb_rcvctrlpipe(dev, 0), ctrl.request, ctrl.requesttype,
-				       ctrl.value, ctrl.index, tbuf, ctrl.length, tmo);
-		if ((i > 0) && ctrl.length) {
-			if (copy_to_user(ctrl.data, tbuf, ctrl.length)) {
+		i = usb_control_msg(dev, usb_rcvctrlpipe(dev, 0), ctrl.bRequest, ctrl.bRequestType,
+				       ctrl.wValue, ctrl.wIndex, tbuf, ctrl.wLength, tmo);
+		if ((i > 0) && ctrl.wLength) {
+			if (copy_to_user(ctrl.data, tbuf, ctrl.wLength)) {
 				free_page((unsigned long)tbuf);
 				return -EFAULT;
 			}
 		}
 	} else {
-		if (ctrl.length) {
-			if (copy_from_user(tbuf, ctrl.data, ctrl.length)) {
+		if (ctrl.wLength) {
+			if (copy_from_user(tbuf, ctrl.data, ctrl.wLength)) {
 				free_page((unsigned long)tbuf);
 				return -EFAULT;
 			}
 		}
-		i = usb_control_msg(dev, usb_sndctrlpipe(dev, 0), ctrl.request, ctrl.requesttype,
-				       ctrl.value, ctrl.index, tbuf, ctrl.length, tmo);
+		i = usb_control_msg(dev, usb_sndctrlpipe(dev, 0), ctrl.bRequest, ctrl.bRequestType,
+				       ctrl.wValue, ctrl.wIndex, tbuf, ctrl.wLength, tmo);
 	}
 	free_page((unsigned long)tbuf);
 	if (i<0) {
 		printk(KERN_DEBUG "usbdevfs: USBDEVFS_CONTROL failed dev %d rqt %u rq %u len %u ret %d\n", 
-		       dev->devnum, ctrl.requesttype, ctrl.request, ctrl.length, i);
+		       dev->devnum, ctrl.bRequestType, ctrl.bRequest, ctrl.wLength, i);
 	}
 	return i;
 }
@@ -757,7 +757,7 @@ static int proc_submiturb(struct dev_state *ps, void *arg)
 	struct usbdevfs_iso_packet_desc *isopkt = NULL;
 	struct usb_endpoint_descriptor *ep_desc;
 	struct async *as;
-	devrequest *dr = NULL;
+	struct usb_ctrlrequest *dr = NULL;
 	unsigned int u, totlen, isofrmlen;
 	int ret;
 
@@ -787,23 +787,23 @@ static int proc_submiturb(struct dev_state *ps, void *arg)
 		/* min 8 byte setup packet, max arbitrary */
 		if (uurb.buffer_length < 8 || uurb.buffer_length > PAGE_SIZE)
 			return -EINVAL;
-		if (!(dr = kmalloc(sizeof(devrequest), GFP_KERNEL)))
+		if (!(dr = kmalloc(sizeof(struct usb_ctrlrequest), GFP_KERNEL)))
 			return -ENOMEM;
 		if (copy_from_user(dr, (unsigned char*)uurb.buffer, 8)) {
 			kfree(dr);
 			return -EFAULT;
 		}
-		if (uurb.buffer_length < (le16_to_cpup(&dr->length) + 8)) {
+		if (uurb.buffer_length < (le16_to_cpup(&dr->wLength) + 8)) {
 			kfree(dr);
 			return -EINVAL;
 		}
-		if ((ret = check_ctrlrecip(ps, dr->requesttype, le16_to_cpup(&dr->index)))) {
+		if ((ret = check_ctrlrecip(ps, dr->bRequestType, le16_to_cpup(&dr->wIndex)))) {
 			kfree(dr);
 			return ret;
 		}
-		uurb.endpoint = (uurb.endpoint & ~USB_ENDPOINT_DIR_MASK) | (dr->requesttype & USB_ENDPOINT_DIR_MASK);
+		uurb.endpoint = (uurb.endpoint & ~USB_ENDPOINT_DIR_MASK) | (dr->bRequestType & USB_ENDPOINT_DIR_MASK);
 		uurb.number_of_packets = 0;
-		uurb.buffer_length = le16_to_cpup(&dr->length);
+		uurb.buffer_length = le16_to_cpup(&dr->wLength);
 		uurb.buffer += 8;
 		if (!access_ok((uurb.endpoint & USB_DIR_IN) ?  VERIFY_WRITE : VERIFY_READ, uurb.buffer, uurb.buffer_length)) {
 			kfree(dr);

@@ -15,21 +15,22 @@ extern spinlock_t kernel_flag;
 /*
  * Release global kernel lock and global interrupt lock
  */
-#define release_kernel_lock(task, cpu) \
-do { \
-	if (task->lock_depth >= 0) \
-		spin_unlock(&kernel_flag); \
-	release_irqlock(cpu); \
-	__sti(); \
+#define release_kernel_lock(task, cpu)		\
+do {						\
+	if (unlikely(task->lock_depth >= 0)) {	\
+		spin_unlock(&kernel_flag);	\
+		release_irqlock(cpu);		\
+		__sti();			\
+	}					\
 } while (0)
 
 /*
  * Re-acquire the kernel lock
  */
-#define reacquire_kernel_lock(task) \
-do { \
-	if (task->lock_depth >= 0) \
-		spin_lock(&kernel_flag); \
+#define reacquire_kernel_lock(task)		\
+do {						\
+	if (unlikely(task->lock_depth >= 0))	\
+		spin_lock(&kernel_flag);	\
 } while (0)
 
 

@@ -179,7 +179,7 @@ struct usb_bluetooth {
 	
 	__u8			control_out_bInterfaceNum;
 	struct urb *		control_urb_pool[NUM_CONTROL_URBS];
-	devrequest		dr[NUM_CONTROL_URBS];
+	struct usb_ctrlrequest	dr[NUM_CONTROL_URBS];
 
 	unsigned char *		interrupt_in_buffer;
 	struct urb *		interrupt_in_urb;
@@ -288,7 +288,7 @@ static inline struct usb_bluetooth *get_bluetooth_by_minor (int minor)
 static int bluetooth_ctrl_msg (struct usb_bluetooth *bluetooth, int request, int value, const unsigned char *buf, int len)
 {
 	struct urb *urb = NULL;
-	devrequest *dr = NULL;
+	struct usb_ctrlrequest *dr = NULL;
 	int i;
 	int status;
 
@@ -325,11 +325,11 @@ static int bluetooth_ctrl_msg (struct usb_bluetooth *bluetooth, int request, int
 	}
 	memcpy (urb->transfer_buffer, buf, len);
 
-	dr->requesttype = BLUETOOTH_CONTROL_REQUEST_TYPE;
-	dr->request = request;
-	dr->value = cpu_to_le16((u16) value);
-	dr->index = cpu_to_le16((u16) bluetooth->control_out_bInterfaceNum);
-	dr->length = cpu_to_le16((u16) len);
+	dr->bRequestType= BLUETOOTH_CONTROL_REQUEST_TYPE;
+	dr->bRequest = request;
+	dr->wValue = cpu_to_le16((u16) value);
+	dr->wIndex = cpu_to_le16((u16) bluetooth->control_out_bInterfaceNum);
+	dr->wLength = cpu_to_le16((u16) len);
 	
 	FILL_CONTROL_URB (urb, bluetooth->dev, usb_sndctrlpipe(bluetooth->dev, 0),
 			  (unsigned char*)dr, urb->transfer_buffer, len, bluetooth_ctrl_callback, bluetooth);

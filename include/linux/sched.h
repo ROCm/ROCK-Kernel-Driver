@@ -72,8 +72,9 @@ extern unsigned long avenrun[];		/* Load averages */
 #define CT_TO_SECS(x)	((x) / HZ)
 #define CT_TO_USECS(x)	(((x) % HZ) * 1000000/HZ)
 
-extern int nr_running, nr_threads;
+extern int nr_threads;
 extern int last_pid;
+extern unsigned long nr_running(void);
 
 #include <linux/fs.h>
 #include <linux/time.h>
@@ -116,12 +117,6 @@ extern int last_pid;
 #define SCHED_FIFO		1
 #define SCHED_RR		2
 
-/*
- * This is an additional bit set when we want to
- * yield the CPU for one re-schedule..
- */
-#define SCHED_YIELD		0x10
-
 struct sched_param {
 	int sched_priority;
 };
@@ -139,7 +134,6 @@ struct completion;
  * a separate lock).
  */
 extern rwlock_t tasklist_lock;
-extern spinlock_t runqueue_lock;
 extern spinlock_t mmlist_lock;
 
 extern void sched_init(void);
@@ -151,6 +145,7 @@ extern void update_process_times(int user);
 extern void update_one_process(struct task_struct *p, unsigned long user,
 			       unsigned long system, int cpu);
 extern void expire_task(struct task_struct *p);
+extern void idle_tick(void);
 
 #define	MAX_SCHEDULE_TIMEOUT	LONG_MAX
 extern signed long FASTCALL(schedule_timeout(signed long timeout));
@@ -280,6 +275,9 @@ struct user_struct {
 extern struct user_struct root_user;
 #define INIT_USER (&root_user)
 
+typedef struct task_struct task_t;
+typedef struct prio_array prio_array_t;
+
 struct task_struct {
 	/*
 	 * offsets of these are hardcoded elsewhere - touch with care
@@ -297,37 +295,30 @@ struct task_struct {
 
 	int lock_depth;		/* Lock depth */
 
-/*
- * offset 32 begins here on 32-bit platforms. We keep
- * all fields in a single cacheline that are needed for
- * the goodness() loop in schedule().
- */
-	unsigned long dyn_prio;
-	long nice;
+	/*
+	 * offset 32 begins here on 32-bit platforms.
+	 */
+	unsigned int cpu;
+	int prio;
+	long __nice;
+	list_t run_list;
+	prio_array_t *array;
+
+	unsigned int time_slice;
+	unsigned long sleep_timestamp, run_timestamp;
+
+	#define SLEEP_HIST_SIZE 4
+	int sleep_hist[SLEEP_HIST_SIZE];
+	int sleep_idx;
+
 	unsigned long policy;
-	struct mm_struct *mm;
-	int processor;
-	/*
-	 * cpus_runnable is ~0 if the process is not running on any
-	 * CPU. It's (1 << cpu) if it's running on a CPU. This mask
-	 * is updated under the runqueue lock.
-	 *
-	 * To determine whether a process might run on a CPU, this
-	 * mask is AND-ed with cpus_allowed.
-	 */
-	unsigned long cpus_runnable, cpus_allowed;
-	/*
-	 * (only the 'next' pointer fits into the cacheline, but
-	 * that's just fine.)
-	 */
-	struct list_head run_list;
-	long time_slice;
-	/* recalculation loop checkpoint */
-	unsigned long rcl_last;
+	unsigned long cpus_allowed;
 
 	struct task_struct *next_task, *prev_task;
-	struct mm_struct *active_mm;
+
+	struct mm_struct *mm, *active_mm;
 	struct list_head local_pages;
+
 	unsigned int allocation_order, nr_local_pages;
 
 /* task state */
@@ -452,11 +443,66 @@ struct task_struct {
  */
 #define _STK_LIM	(8*1024*1024)
 
-#define MAX_DYNPRIO	40
-#define DEF_TSLICE	(6 * HZ / 100)
-#define MAX_TSLICE	(20 * HZ / 100)
-#define DEF_NICE	(0)
+/*
+ * RT priorites go from 0 to 99, but internally we max
+ * them out at 128 to make it easier to search the
+ * scheduler bitmap.
+ */
+#define MAX_RT_PRIO	128
+/*
+ * The lower the priority of a process, the more likely it is
+ * to run. Priority of a process goes from 0 to 167. The 0-99
+ * priority range is allocated to RT tasks, the 128-167 range
+ * is for SCHED_OTHER tasks.
+ */
+#define MAX_PRIO	(MAX_RT_PRIO+40)
+#define DEF_USER_NICE	0
 
+/*
+ * Scales user-nice values [ -20 ... 0 ... 19 ]
+ * to static priority [ 24 ... 63 (MAX_PRIO-1) ]
+ *
+ * User-nice value of -20 == static priority 24, and
+ * user-nice value 19 == static priority 63. The lower
+ * the priority value, the higher the task's priority.
+ *
+ * Note that while static priority cannot go below 24,
+ * the priority of a process can go as low as 0.
+ */
+#define NICE_TO_PRIO(n)	(MAX_PRIO-1 + (n) - 19)
+
+#define DEF_PRIO NICE_TO_PRIO(DEF_USER_NICE)
+
+/*
+ * Default timeslice is 90 msecs, maximum is 150 msecs.
+ * Minimum timeslice is 20 msecs.
+ */
+#define MIN_TIMESLICE	( 20 * HZ / 1000)
+#define MAX_TIMESLICE	(150 * HZ / 1000)
+
+#define USER_PRIO(p) ((p)-MAX_RT_PRIO)
+#define MAX_USER_PRIO (USER_PRIO(MAX_PRIO))
+
+/*
+ * PRIO_TO_TIMESLICE scales priority values [ 100 ... 139  ]
+ * to initial time slice values [ MAX_TIMESLICE (150 msec) ... 2 ]
+ *
+ * The higher a process's priority, the bigger timeslices
+ * it gets during one round of execution. But even the lowest
+ * priority process gets MIN_TIMESLICE worth of execution time.
+ */
+#define PRIO_TO_TIMESLICE(p) \
+	((( (MAX_USER_PRIO-1-USER_PRIO(p))*(MAX_TIMESLICE-MIN_TIMESLICE) + \
+		MAX_USER_PRIO-1) / MAX_USER_PRIO) + MIN_TIMESLICE)
+
+#define RT_PRIO_TO_TIMESLICE(p) \
+	((( (MAX_RT_PRIO-(p)-1)*(MAX_TIMESLICE-MIN_TIMESLICE) + \
+			MAX_RT_PRIO-1) / MAX_RT_PRIO) + MIN_TIMESLICE)
+
+extern void set_cpus_allowed(task_t *p, unsigned long new_mask);
+extern void set_user_nice(task_t *p, long nice);
+asmlinkage long sys_sched_yield(void);
+#define yield() sys_sched_yield()
 
 /*
  * The default (Linux) execution domain.
@@ -475,16 +521,13 @@ extern struct exec_domain	default_exec_domain;
     addr_limit:		KERNEL_DS,					\
     exec_domain:	&default_exec_domain,				\
     lock_depth:		-1,						\
-    dyn_prio:		0,					\
-    nice:		DEF_NICE,					\
+    __nice:		DEF_USER_NICE,					\
     policy:		SCHED_OTHER,					\
+    cpus_allowed:	-1,						\
     mm:			NULL,						\
     active_mm:		&init_mm,					\
-    cpus_runnable:	-1,						\
-    cpus_allowed:	-1,						\
-    run_list:		{ NULL, NULL },			\
-    rcl_last:		0,					\
-    time_slice:		DEF_TSLICE,					\
+    run_list:		LIST_HEAD_INIT(tsk.run_list),			\
+    time_slice:		PRIO_TO_TIMESLICE(DEF_PRIO),			\
     next_task:		&tsk,						\
     prev_task:		&tsk,						\
     p_opptr:		&tsk,						\
@@ -560,19 +603,6 @@ static inline struct task_struct *find_task_by_pid(int pid)
 	return p;
 }
 
-#define task_has_cpu(tsk) ((tsk)->cpus_runnable != ~0UL)
-
-static inline void task_set_cpu(struct task_struct *tsk, unsigned int cpu)
-{
-	tsk->processor = cpu;
-	tsk->cpus_runnable = 1UL << cpu;
-}
-
-static inline void task_release_cpu(struct task_struct *tsk)
-{
-	tsk->cpus_runnable = ~0UL;
-}
-
 /* per-UID process charging. */
 extern struct user_struct * alloc_uid(uid_t);
 extern void free_uid(struct user_struct *);
@@ -600,6 +630,7 @@ extern void FASTCALL(interruptible_sleep_on(wait_queue_head_t *q));
 extern long FASTCALL(interruptible_sleep_on_timeout(wait_queue_head_t *q,
 						    signed long timeout));
 extern int FASTCALL(wake_up_process(struct task_struct * tsk));
+extern void FASTCALL(wake_up_forked_process(struct task_struct * tsk));
 
 #define wake_up(x)			__wake_up((x),TASK_UNINTERRUPTIBLE | TASK_INTERRUPTIBLE, 1)
 #define wake_up_nr(x, nr)		__wake_up((x),TASK_UNINTERRUPTIBLE | TASK_INTERRUPTIBLE, nr)
@@ -794,6 +825,7 @@ extern void exit_sighand(struct task_struct *);
 
 extern void reparent_to_init(void);
 extern void daemonize(void);
+extern task_t *child_reaper;
 
 extern int do_execve(char *, char **, char **, struct pt_regs *);
 extern int do_fork(unsigned long, unsigned long, struct pt_regs *, unsigned long);
@@ -801,6 +833,9 @@ extern int do_fork(unsigned long, unsigned long, struct pt_regs *, unsigned long
 extern void FASTCALL(add_wait_queue(wait_queue_head_t *q, wait_queue_t * wait));
 extern void FASTCALL(add_wait_queue_exclusive(wait_queue_head_t *q, wait_queue_t * wait));
 extern void FASTCALL(remove_wait_queue(wait_queue_head_t *q, wait_queue_t * wait));
+
+extern void wait_task_inactive(task_t * p);
+extern void kick_if_running(task_t * p);
 
 #define __wait_event(wq, condition) 					\
 do {									\
@@ -882,21 +917,8 @@ do {									\
 #define next_thread(p) \
 	list_entry((p)->thread_group.next, struct task_struct, thread_group)
 
-static inline void del_from_runqueue(struct task_struct * p)
-{
-	nr_running--;
-	list_del(&p->run_list);
-	p->run_list.next = NULL;
-}
-
-static inline int task_on_runqueue(struct task_struct *p)
-{
-	return (p->run_list.next != NULL);
-}
-
 static inline void unhash_process(struct task_struct *p)
 {
-	if (task_on_runqueue(p)) BUG();
 	write_lock_irq(&tasklist_lock);
 	nr_threads--;
 	unhash_pid(p);

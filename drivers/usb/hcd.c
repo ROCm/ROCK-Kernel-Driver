@@ -268,16 +268,16 @@ static int rh_string (
 /* Root hub control transfers execute synchronously */
 static int rh_call_control (struct usb_hcd *hcd, struct urb *urb)
 {
-	devrequest	*cmd = (devrequest *) urb->setup_packet;
+	struct usb_ctrlrequest *cmd = (struct usb_ctrlrequest *) urb->setup_packet;
  	u16		typeReq, wValue, wIndex, wLength;
 	const u8	*bufp = 0;
 	u8		*ubuf = urb->transfer_buffer;
 	int		len = 0;
 
-	typeReq  = (cmd->requesttype << 8) | cmd->request;
-	wValue   = le16_to_cpu (cmd->value);
-	wIndex   = le16_to_cpu (cmd->index);
-	wLength  = le16_to_cpu (cmd->length);
+	typeReq  = (cmd->bRequestType << 8) | cmd->bRequest;
+	wValue   = le16_to_cpu (cmd->wValue);
+	wIndex   = le16_to_cpu (cmd->wIndex);
+	wLength  = le16_to_cpu (cmd->wLength);
 
 	if (wLength > urb->transfer_buffer_length)
 		goto error;

@@ -28,19 +28,33 @@ static int setsize(unsigned long capacity, unsigned int *cyls, unsigned int *hds
 
 unsigned char *scsi_bios_ptable(kdev_t dev)
 {
+	struct block_device *bdev;
 	unsigned char *res = kmalloc(66, GFP_KERNEL);
 	kdev_t rdev = mk_kdev(major(dev), minor(dev) & ~0x0f);
 
 	if (res) {
-		struct buffer_head *bh = bread(rdev, 0, block_size(rdev));
-		if (bh) {
-			memcpy(res, bh->b_data + 0x1be, 66);
-		} else {
-			kfree(res);
-			res = NULL;
-		}
+		struct buffer_head *bh;
+		int err;
+
+		bdev = bdget(kdev_t_to_nr(rdev));
+		if (!bdev)
+			goto fail;
+		err = blkdev_get(bdev, FMODE_READ, 0, BDEV_FILE);
+		if (err)
+			goto fail;
+		bh = __bread(bdev, 0, block_size(rdev));
+		if (!bh)
+			goto fail2;
+		memcpy(res, bh->b_data + 0x1be, 66);
+		brelse(bh);
+		blkdev_put(bdev, BDEV_FILE);
 	}
 	return res;
+fail2:
+	blkdev_put(bdev, BDEV_FILE);
+fail:
+	kfree(res);
+	return NULL;
 }
 
 /*

@@ -117,13 +117,26 @@ static __inline__ void wait_ms(unsigned int ms)
 		mdelay(ms);
 }
 
-typedef struct {
-	__u8 requesttype;
-	__u8 request;
-	__u16 value;
-	__u16 index;
-	__u16 length;
-} devrequest __attribute__ ((packed));
+/**
+ * struct usb_ctrlrequest - structure used to make USB device control requests easier to create and decode
+ * @bRequestType: matches the USB bmRequestType field
+ * @bRequest: matches the USB bRequest field
+ * @wValue: matches the USB wValue field
+ * @wIndex: matches the USB wIndex field
+ * @wLength: matches the USB wLength field
+ *
+ * This structure is used to send control requests to a USB device.  It matches
+ * the different fields of the USB 2.0 Spec section 9.3, table 9-2.  See the
+ * USB spec for a fuller description of the different fields, and what they are
+ * used for.
+ */
+struct usb_ctrlrequest {
+	__u8 bRequestType;
+	__u8 bRequest;
+	__u16 wValue;
+	__u16 wIndex;
+	__u16 wLength;
+} __attribute__ ((packed));
 
 /*
  * USB device number allocation bitmap. There's one bitmap

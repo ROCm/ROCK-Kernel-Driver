@@ -33,6 +33,9 @@ dep_tristate '  OHCI (Compaq, iMacs, OPTi, SiS, ALi, ...) support' CONFIG_USB_OH
 comment 'USB Device Class drivers'
 dep_tristate '  USB Audio support' CONFIG_USB_AUDIO $CONFIG_USB $CONFIG_SOUND
 dep_tristate '  USB Bluetooth support (EXPERIMENTAL)' CONFIG_USB_BLUETOOTH $CONFIG_USB $CONFIG_EXPERIMENTAL
+if [ "$CONFIG_SCSI" = "n" ]; then
+   comment '  SCSI support is needed for USB Storage'
+fi
 dep_tristate '  USB Mass Storage support' CONFIG_USB_STORAGE $CONFIG_USB $CONFIG_SCSI
    dep_mbool '    USB Mass Storage verbose debug' CONFIG_USB_STORAGE_DEBUG $CONFIG_USB_STORAGE
    dep_mbool '    Datafab MDCFE-B Compact Flash Reader support' CONFIG_USB_STORAGE_DATAFAB $CONFIG_USB_STORAGE $CONFIG_EXPERIMENTAL
@@ -96,5 +99,6 @@ source drivers/usb/serial/Config.in
 
 comment 'USB Miscellaneous drivers'
 dep_tristate '  USB Diamond Rio500 support (EXPERIMENTAL)' CONFIG_USB_RIO500 $CONFIG_USB $CONFIG_EXPERIMENTAL
+dep_tristate '  USB Auerswald ISDN support (EXPERIMENTAL)' CONFIG_USB_AUERSWALD $CONFIG_USB $CONFIG_EXPERIMENTAL
 
 endmenu

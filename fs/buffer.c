@@ -334,8 +334,9 @@ int fsync_super(struct super_block *sb)
 	return sync_buffers(dev, 1);
 }
 
-int fsync_no_super(kdev_t dev)
+int fsync_no_super(struct block_device *bdev)
 {
+	kdev_t dev = to_kdev_t(bdev->bd_dev);
 	sync_buffers(dev, 0);
 	return sync_buffers(dev, 1);
 }
@@ -733,9 +734,7 @@ static void free_more_memory(void)
 	wakeup_bdflush();
 	try_to_free_pages(zone, GFP_NOFS, 0);
 	run_task_queue(&tq_disk);
-	current->policy |= SCHED_YIELD;
-	__set_current_state(TASK_RUNNING);
-	schedule();
+	yield();
 }
 
 void init_buffer(struct buffer_head *bh, bh_end_io_t *handler, void *private)
@@ -1023,8 +1022,9 @@ void invalidate_inode_buffers(struct inode *inode)
  * 14.02.92: changed it to sync dirty buffers a bit: better performance
  * when the filesystem starts to get full of dirty blocks (I hope).
  */
-struct buffer_head * getblk(kdev_t dev, sector_t block, int size)
+struct buffer_head * __getblk(struct block_device *bdev, sector_t block, int size)
 {
+	kdev_t dev = to_kdev_t(bdev->bd_dev);
 	for (;;) {
 		struct buffer_head * bh;
 
@@ -1176,11 +1176,10 @@ void __bforget(struct buffer_head * buf)
  *	Reads a specified block, and returns buffer head that
  *	contains it. It returns NULL if the block was unreadable.
  */
-struct buffer_head * bread(kdev_t dev, int block, int size)
+struct buffer_head * __bread(struct block_device *bdev, int block, int size)
 {
-	struct buffer_head * bh;
+	struct buffer_head * bh = __getblk(bdev, block, size);
 
-	bh = getblk(dev, block, size);
 	touch_buffer(bh);
 	if (buffer_uptodate(bh))
 		return bh;

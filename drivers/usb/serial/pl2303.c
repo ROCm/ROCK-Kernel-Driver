@@ -116,6 +116,7 @@ static void pl2303_shutdown (struct usb_serial *serial);
 
 /* All of the device info needed for the PL2303 SIO serial converter */
 static struct usb_serial_device_type pl2303_device = {
+	owner:			THIS_MODULE,
 	name:			"PL-2303",
 	id_table:		id_table,
 	num_interrupt_in:	NUM_DONT_CARE,
@@ -369,7 +370,6 @@ static int pl2303_open (struct usb_serial_port *port, struct file *filp)
 	down (&port->sem);
 
 	++port->open_count;
-	MOD_INC_USE_COUNT;
 
 	if (port->open_count == 1) {
 #define FISH(a,b,c,d)									\
@@ -480,7 +480,6 @@ static void pl2303_close (struct usb_serial_port *port, struct file *filp)
 	}
 
 	up (&port->sem);
-	MOD_DEC_USE_COUNT;
 }
 
 static int set_modem_info (struct usb_serial_port *port, unsigned int cmd, unsigned int *value)

@@ -32,10 +32,11 @@ struct kernel_stat {
 	unsigned int ipackets, opackets;
 	unsigned int ierrors, oerrors;
 	unsigned int collisions;
-	unsigned int context_swtch;
 };
 
 extern struct kernel_stat kstat;
+
+extern unsigned long nr_context_switches(void);
 
 #if !defined(CONFIG_ARCH_S390)
 /*

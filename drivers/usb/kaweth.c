@@ -110,8 +110,8 @@ static void *kaweth_probe(
 	);
 static void kaweth_disconnect(struct usb_device *dev, void *ptr);
 int kaweth_internal_control_msg(struct usb_device *usb_dev, unsigned int pipe,
-				devrequest *cmd, void *data, int len,
-				int timeout);
+				struct usb_ctrlrequest *cmd, void *data,
+				int len, int timeout);
 
 /****************************************************************
  *     usb_device_id
@@ -229,7 +229,7 @@ static int kaweth_control(struct kaweth_device *kaweth,
 			  __u16 size, 
 			  int timeout)
 {
-	devrequest *dr;
+	struct usb_ctrlrequest *dr;
 
 	kaweth_dbg("kaweth_control()");
 
@@ -238,20 +238,19 @@ static int kaweth_control(struct kaweth_device *kaweth,
 		return -EBUSY;
 	}
 
-	dr = kmalloc(sizeof(devrequest), 
+	dr = kmalloc(sizeof(struct usb_ctrlrequest), 
                      in_interrupt() ? GFP_ATOMIC : GFP_KERNEL);
 
-	if(!dr)
-	{
+	if (!dr) {
 		kaweth_dbg("kmalloc() failed");
 		return -ENOMEM;
 	}
 	
-	dr->requesttype = requesttype;
-	dr->request = request;
-	dr->value = cpu_to_le16p(&value);
-	dr->index = cpu_to_le16p(&index);
-	dr->length = cpu_to_le16p(&size);
+	dr->bRequestType= requesttype;
+	dr->bRequest = request;
+	dr->wValue = cpu_to_le16p(&value);
+	dr->wIndex = cpu_to_le16p(&index);
+	dr->wLength = cpu_to_le16p(&size);
 
 	return kaweth_internal_control_msg(kaweth->dev,
 					pipe,
@@ -1015,7 +1014,8 @@ static int usb_start_wait_urb(urb_t *urb, int timeout, int* actual_length)
 /*-------------------------------------------------------------------*/
 // returns status (negative) or length (positive)
 int kaweth_internal_control_msg(struct usb_device *usb_dev, unsigned int pipe,
-                            devrequest *cmd,  void *data, int len, int timeout)
+                            struct usb_ctrlrequest *cmd, void *data, int len,
+			    int timeout)
 {
         urb_t *urb;
         int retv;

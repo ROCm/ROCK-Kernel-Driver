@@ -1200,8 +1200,7 @@ static char  prepare_for_delete_or_cut(
 #endif
 
 		run_task_queue(&tq_disk);
-		current->policy |= SCHED_YIELD;
-		schedule();
+		yield();
 	    }
 	    /* This loop can be optimized. */
 	} while ( (*p_n_removed < n_unfm_number || need_research) &&

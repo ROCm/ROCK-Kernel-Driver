@@ -385,19 +385,19 @@ int usb_stor_control_msg(struct us_data *us, unsigned int pipe,
 {
 	struct completion urb_done;
 	int status;
-	devrequest *dr;
+	struct usb_ctrlrequest *dr;
 
 	/* allocate the device request structure */
-	dr = kmalloc(sizeof(devrequest), GFP_NOIO);
+	dr = kmalloc(sizeof(struct usb_ctrlrequest), GFP_NOIO);
 	if (!dr)
 		return -ENOMEM;
 
 	/* fill in the structure */
-	dr->requesttype = requesttype;
-	dr->request = request;
-	dr->value = cpu_to_le16(value);
-	dr->index = cpu_to_le16(index);
-	dr->length = cpu_to_le16(size);
+	dr->bRequestType = requesttype;
+	dr->bRequest = request;
+	dr->wValue = cpu_to_le16(value);
+	dr->wIndex = cpu_to_le16(index);
+	dr->wLength = cpu_to_le16(size);
 
 	/* set up data structures for the wakeup system */
 	init_completion(&urb_done);

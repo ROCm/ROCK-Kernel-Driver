@@ -38,7 +38,7 @@
 struct hci_usb {
 	struct usb_device 	*udev;
 
-	devrequest		dev_req;
+	struct usb_ctrlrequest	dev_req;
 	struct urb 		*ctrl_urb;
 	struct urb		*intr_urb;
 	struct urb		*read_urb;

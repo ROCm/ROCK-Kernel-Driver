@@ -137,8 +137,7 @@ oom:
 	if (!journal_oom_retry)
 		return -ENOMEM;
 	jbd_debug(1, "ENOMEM in " __FUNCTION__ ", retrying.\n");
-	current->policy |= SCHED_YIELD;
-	schedule();
+	yield();
 	goto repeat;
 }
 
@@ -291,7 +290,7 @@ int journal_revoke(handle_t *handle, unsigned long blocknr,
 		return -EINVAL;
 	}
 
-	dev = journal->j_fs_dev;
+	dev = to_kdev_t(journal->j_fs_dev->bd_dev);
 	bh = bh_in;
 
 	if (!bh) {

@@ -312,18 +312,9 @@ static void __init smp_init(void)
 	/* Get other processors into their bootup holding patterns. */
 	smp_boot_cpus();
 	wait_init_idle = cpu_online_map;
-	clear_bit(current->processor, &wait_init_idle); /* Don't wait on me! */
 
 	smp_threads_ready=1;
 	smp_commence();
-
-	/* Wait for the other cpus to set up their idle processes */
-	printk("Waiting on wait_init_idle (map = 0x%lx)\n", wait_init_idle);
-	while (wait_init_idle) {
-		cpu_relax();
-		barrier();
-	}
-	printk("All processors have done init_idle\n");
 }
 
 #endif
@@ -339,7 +330,7 @@ static void rest_init(void)
 {
 	kernel_thread(init, NULL, CLONE_FS | CLONE_FILES | CLONE_SIGNAL);
 	unlock_kernel();
-	current->need_resched = 1;
+	init_idle();	/* This will also wait for all other CPUs */
  	cpu_idle();
 } 
 

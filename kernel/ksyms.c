@@ -191,12 +191,12 @@ EXPORT_SYMBOL(notify_change);
 EXPORT_SYMBOL(set_blocksize);
 EXPORT_SYMBOL(sb_set_blocksize);
 EXPORT_SYMBOL(sb_min_blocksize);
-EXPORT_SYMBOL(getblk);
+EXPORT_SYMBOL(__getblk);
 EXPORT_SYMBOL(cdget);
 EXPORT_SYMBOL(cdput);
 EXPORT_SYMBOL(bdget);
 EXPORT_SYMBOL(bdput);
-EXPORT_SYMBOL(bread);
+EXPORT_SYMBOL(__bread);
 EXPORT_SYMBOL(__brelse);
 EXPORT_SYMBOL(__bforget);
 EXPORT_SYMBOL(ll_rw_block);
@@ -441,6 +441,8 @@ EXPORT_SYMBOL(interruptible_sleep_on);
 EXPORT_SYMBOL(interruptible_sleep_on_timeout);
 EXPORT_SYMBOL(schedule);
 EXPORT_SYMBOL(schedule_timeout);
+EXPORT_SYMBOL(sys_sched_yield);
+EXPORT_SYMBOL(set_user_nice);
 EXPORT_SYMBOL(jiffies);
 EXPORT_SYMBOL(xtime);
 EXPORT_SYMBOL(do_gettimeofday);
@@ -452,6 +454,7 @@ EXPORT_SYMBOL(loops_per_jiffy);
 
 EXPORT_SYMBOL(kstat);
 EXPORT_SYMBOL(nr_running);
+EXPORT_SYMBOL(nr_context_switches);
 
 /* misc */
 EXPORT_SYMBOL(panic);

@@ -96,8 +96,7 @@ nfs_create_request(struct file *file, struct inode *inode,
 			continue;
 		if (signalled() && (server->flags & NFS_MOUNT_INTR))
 			return ERR_PTR(-ERESTARTSYS);
-		current->policy = SCHED_YIELD;
-		schedule();
+		yield();
 	}
 
 	/* Initialize the request struct. Initially, we assume a

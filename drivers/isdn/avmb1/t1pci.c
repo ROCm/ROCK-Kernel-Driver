@@ -33,7 +33,7 @@ static char *revision = "$Revision: 1.1.4.1.2.1 $";
 
 /* ------------------------------------------------------------- */
 
-static struct pci_device_id t1pci_pci_tbl[] __initdata = {
+static struct pci_device_id t1pci_pci_tbl[] __devinitdata = {
 	{ PCI_VENDOR_ID_AVM, PCI_DEVICE_ID_AVM_T1, PCI_ANY_ID, PCI_ANY_ID },
 	{ }				/* Terminating entry */
 };
@@ -225,27 +225,63 @@ static struct capi_driver t1pci_driver = {
     add_card: 0, /* no add_card function */
 };
 
-static int ncards = 0;
+/* ------------------------------------------------------------- */
+
+static int __devinit t1pci_probe(struct pci_dev *dev,
+				 const struct pci_device_id *ent)
+{
+	struct capi_driver *driver = &t1pci_driver;
+	struct capicardparams param;
+	int retval;
+
+	if (pci_enable_device(dev) < 0) {
+		printk(KERN_ERR	"%s: failed to enable AVM-T1-PCI\n",
+		       driver->name);
+		return -ENODEV;
+	}
+	pci_set_master(dev);
+
+	param.port = pci_resource_start(dev, 1);
+	param.irq = dev->irq;
+	param.membase = pci_resource_start(dev, 0);
+
+	printk(KERN_INFO
+	       "%s: PCI BIOS reports AVM-T1-PCI at i/o %#x, irq %d, mem %#x\n",
+	       driver->name, param.port, param.irq, param.membase);
+
+	retval = t1pci_add_card(driver, &param, dev);
+	if (retval != 0) {
+		printk(KERN_ERR
+		       "%s: no AVM-T1-PCI at i/o %#x, irq %d detected, mem %#x\n",
+		       driver->name, param.port, param.irq, param.membase);
+		return -ENODEV;
+	}
+	return 0;
+}
+
+static struct pci_driver t1pci_pci_driver = {
+       name:           "t1pci",
+       id_table:       t1pci_pci_tbl,
+       probe:          t1pci_probe,
+};
 
 static int __init t1pci_init(void)
 {
 	struct capi_driver *driver = &t1pci_driver;
-	struct pci_dev *dev = NULL;
 	char *p;
-	int retval;
+	int ncards;
 
 	MOD_INC_USE_COUNT;
 
 	if ((p = strchr(revision, ':')) != 0 && p[1]) {
-		strncpy(driver->revision, p + 2, sizeof(driver->revision));
-		driver->revision[sizeof(driver->revision)-1] = 0;
+		strncpy(driver->revision, p + 2, sizeof(driver->revision) - 1);
 		if ((p = strchr(driver->revision, '$')) != 0 && p > driver->revision)
 			*(p-1) = 0;
 	}
 
 	printk(KERN_INFO "%s: revision %s\n", driver->name, driver->revision);
 
-        di = attach_capi_driver(driver);
+        di = attach_capi_driver(&t1pci_driver);
 	if (!di) {
 		printk(KERN_ERR "%s: failed to attach capi_driver\n",
 				driver->name);
@@ -253,32 +289,7 @@ static int __init t1pci_init(void)
 		return -EIO;
 	}
 
-	while ((dev = pci_find_device(PCI_VENDOR_ID_AVM, PCI_DEVICE_ID_AVM_T1, dev))) {
-		struct capicardparams param;
-
-		if (pci_enable_device(dev) < 0) {
-		        printk(KERN_ERR	"%s: failed to enable AVM-T1-PCI\n",
-			       driver->name);
-			continue;
-		}
-		pci_set_master(dev);
-
-		param.port = pci_resource_start(dev, 1);
- 		param.irq = dev->irq;
-		param.membase = pci_resource_start(dev, 0);
-
-		printk(KERN_INFO
-			"%s: PCI BIOS reports AVM-T1-PCI at i/o %#x, irq %d, mem %#x\n",
-			driver->name, param.port, param.irq, param.membase);
-		retval = t1pci_add_card(driver, &param, dev);
-		if (retval != 0) {
-		        printk(KERN_ERR
-			"%s: no AVM-T1-PCI at i/o %#x, irq %d detected, mem %#x\n",
-			driver->name, param.port, param.irq, param.membase);
-			continue;
-		}
-		ncards++;
-	}
+	ncards = pci_register_driver(&t1pci_pci_driver);
 	if (ncards) {
 		printk(KERN_INFO "%s: %d T1-PCI card(s) detected\n",
 				driver->name, ncards);
@@ -286,6 +297,7 @@ static int __init t1pci_init(void)
 		return 0;
 	}
 	printk(KERN_ERR "%s: NO T1-PCI card detected\n", driver->name);
+	pci_unregister_driver(&t1pci_pci_driver);
 	detach_capi_driver(&t1pci_driver);
 	MOD_DEC_USE_COUNT;
 	return -ENODEV;
@@ -293,7 +305,8 @@ static int __init t1pci_init(void)
 
 static void __exit t1pci_exit(void)
 {
-    detach_capi_driver(&t1pci_driver);
+	pci_unregister_driver(&t1pci_pci_driver);
+	detach_capi_driver(&t1pci_driver);
 }
 
 module_init(t1pci_init);

@@ -1905,7 +1905,7 @@ static int rh_submit_urb (urb_t * urb)
 	struct usb_device * usb_dev = urb->dev;
 	ohci_t * ohci = usb_dev->bus->hcpriv;
 	unsigned int pipe = urb->pipe;
-	devrequest * cmd = (devrequest *) urb->setup_packet;
+	struct usb_ctrlrequest * cmd = (struct usb_ctrlrequest *) urb->setup_packet;
 	void * data = urb->transfer_buffer;
 	int leni = urb->transfer_buffer_length;
 	int len = 0;
@@ -1929,10 +1929,10 @@ static int rh_submit_urb (urb_t * urb)
 		return 0;
 	}
 
-	bmRType_bReq  = cmd->requesttype | (cmd->request << 8);
-	wValue        = le16_to_cpu (cmd->value);
-	wIndex        = le16_to_cpu (cmd->index);
-	wLength       = le16_to_cpu (cmd->length);
+	bmRType_bReq  = cmd->bRequestType | (cmd->bRequest << 8);
+	wValue        = le16_to_cpu (cmd->wValue);
+	wIndex        = le16_to_cpu (cmd->wIndex);
+	wLength       = le16_to_cpu (cmd->wLength);
 
 	switch (bmRType_bReq) {
 	/* Request Destination:

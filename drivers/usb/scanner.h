@@ -230,7 +230,7 @@ MODULE_DEVICE_TABLE (usb, scanner_device_ids);
 #define SCANNER_IOCTL_VENDOR _IOR('U', 0x20, int)
 #define SCANNER_IOCTL_PRODUCT _IOR('U', 0x21, int)
 /* send/recv a control message to the scanner */
-#define SCANNER_IOCTL_CTRLMSG _IOWR('U', 0x22, devrequest )
+#define SCANNER_IOCTL_CTRLMSG _IOWR('U', 0x22, struct usb_ctrlrequest)
 
 
 #define SCN_MAX_MNR 16		/* We're allocated 16 minors */

@@ -13514,6 +13514,16 @@ CONFIG_USB_RIO500
   The module will be called rio500.o. If you want to compile it as
   a module, say M here and read <file:Documentation/modules.txt>.
 
+USB Auerswald ISDN device support
+CONFIG_USB_AUERSWALD
+  Say Y here if you want to connect an Auerswald USB ISDN Device
+  to your computer's USB port.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called auerswald.o. If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt>.
+
 D-Link DSB-R100 FM radio support
 CONFIG_USB_DSBR
   Say Y here if you want to connect this type of radio to your

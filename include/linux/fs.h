@@ -1216,7 +1216,7 @@ extern int sync_buffers(kdev_t, int);
 extern void sync_dev(kdev_t);
 extern int fsync_dev(kdev_t);
 extern int fsync_super(struct super_block *);
-extern int fsync_no_super(kdev_t);
+extern int fsync_no_super(struct block_device *);
 extern void sync_inodes_sb(struct super_block *);
 extern int osync_inode_buffers(struct inode *);
 extern int osync_inode_data_buffers(struct inode *);
@@ -1358,7 +1358,20 @@ extern void remove_inode_hash(struct inode *);
 extern struct file * get_empty_filp(void);
 extern void file_move(struct file *f, struct list_head *list);
 extern struct buffer_head * get_hash_table(kdev_t, sector_t, int);
-extern struct buffer_head * getblk(kdev_t, sector_t, int);
+extern struct buffer_head * __getblk(struct block_device *, sector_t, int);
+static inline struct buffer_head * getblk(kdev_t dev, sector_t block, int size)
+{
+	struct block_device *bdev;
+	struct buffer_head *bh;
+	bdev = bdget(kdev_t_to_nr(dev));
+	if (!bdev) {
+		printk("No block device for %s\n", bdevname(dev));
+		BUG();
+	}
+	bh = __getblk(bdev, block, size);
+	atomic_dec(&bdev->bd_count);
+	return bh;
+}
 extern void ll_rw_block(int, int, struct buffer_head * bh[]);
 extern int submit_bh(int, struct buffer_head *);
 struct bio;
@@ -1379,14 +1392,27 @@ static inline void bforget(struct buffer_head *buf)
 extern int set_blocksize(kdev_t, int);
 extern int sb_set_blocksize(struct super_block *, int);
 extern int sb_min_blocksize(struct super_block *, int);
-extern struct buffer_head * bread(kdev_t, int, int);
+extern struct buffer_head * __bread(struct block_device *, int, int);
+static inline struct buffer_head * bread(kdev_t dev, int block, int size)
+{
+	struct block_device *bdev;
+	struct buffer_head *bh;
+	bdev = bdget(kdev_t_to_nr(dev));
+	if (!bdev) {
+		printk("No block device for %s\n", bdevname(dev));
+		BUG();
+	}
+	bh = __bread(bdev, block, size);
+	atomic_dec(&bdev->bd_count);
+	return bh;
+}
 static inline struct buffer_head * sb_bread(struct super_block *sb, int block)
 {
-	return bread(sb->s_dev, block, sb->s_blocksize);
+	return __bread(sb->s_bdev, block, sb->s_blocksize);
 }
 static inline struct buffer_head * sb_getblk(struct super_block *sb, int block)
 {
-	return getblk(sb->s_dev, block, sb->s_blocksize);
+	return __getblk(sb->s_bdev, block, sb->s_blocksize);
 }
 static inline struct buffer_head * sb_get_hash_table(struct super_block *sb, int block)
 {

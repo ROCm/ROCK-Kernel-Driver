@@ -138,9 +138,37 @@ static struct usb_skel		*minor_table[MAX_DEVICES];
 /* lock to protect the minor_table structure */
 static DECLARE_MUTEX (minor_table_mutex);
 
-/* file operations needed when we register this driver */
+/*
+ * File operations needed when we register this driver.
+ * This assumes that this driver NEEDS file operations,
+ * of course, which means that the driver is expected
+ * to have a node in the /dev directory. If the USB
+ * device were for a network interface then the driver
+ * would use "struct net_driver" instead, and a serial
+ * device would use "struct tty_driver". 
+ */
 static struct file_operations skel_fops = {
+	/*
+	 * The owner field is part of the module-locking
+	 * mechanism. The idea is that the kernel knows
+	 * which module to increment the use-counter of
+	 * BEFORE it calls the device's open() function.
+	 * This also means that the kernel can decrement
+	 * the use-counter again before calling release()
+	 * or should the open() function fail.
+	 *
+	 * Not all device structures have an "owner" field
+	 * yet. "struct file_operations" and "struct net_device"
+	 * do, while "struct tty_driver" does not. If the struct
+	 * has an "owner" field, then initialize it to the value
+	 * THIS_MODULE and the kernel will handle all module
+	 * locking for you automatically. Otherwise, you must
+	 * increment the use-counter in the open() function
+	 * and decrement it again in the release() function
+	 * yourself.
+	 */
 	owner:		THIS_MODULE,
+
 	read:		skel_read,
 	write:		skel_write,
 	ioctl:		skel_ioctl,
@@ -215,7 +243,11 @@ static int skel_open (struct inode *inode, struct file *file)
 		return -ENODEV;
 	}
 
-	/* increment our usage count for the module */
+	/* Increment our usage count for the module.
+	 * This is redundant here, because "struct file_operations"
+	 * has an "owner" field. This line is included here soley as
+	 * a reference for drivers using lesser structures... ;-)
+	 */
 	MOD_INC_USE_COUNT;
 
 	/* lock our minor table and get our local data for this minor */
@@ -278,8 +310,8 @@ static int skel_release (struct inode *inode, struct file *file)
 		/* the device was unplugged before the file was released */
 		up (&dev->sem);
 		skel_delete (dev);
-		MOD_DEC_USE_COUNT;
 		up (&minor_table_mutex);
+		MOD_DEC_USE_COUNT;
 		return 0;
 	}
 

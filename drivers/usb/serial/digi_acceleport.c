@@ -501,6 +501,7 @@ MODULE_DEVICE_TABLE (usb, id_table_combined);
 /* device info needed for the Digi serial converter */
 
 static struct usb_serial_device_type digi_acceleport_2_device = {
+	owner:				THIS_MODULE,
 	name:				"Digi USB",
 	id_table:			id_table_2,
 	num_interrupt_in:		0,
@@ -524,6 +525,7 @@ static struct usb_serial_device_type digi_acceleport_2_device = {
 };
 
 static struct usb_serial_device_type digi_acceleport_4_device = {
+	owner:				THIS_MODULE,
 	name:				"Digi USB",
 	id_table:			id_table_4,
 	num_interrupt_in:		0,
@@ -603,7 +605,6 @@ static void digi_wakeup_write_lock( struct usb_serial_port *port )
 	spin_lock_irqsave( &priv->dp_port_lock, flags );
 	digi_wakeup_write( port );
 	spin_unlock_irqrestore( &priv->dp_port_lock, flags );
-	MOD_DEC_USE_COUNT;
 }
 
 static void digi_wakeup_write( struct usb_serial_port *port )
@@ -1410,9 +1411,7 @@ dbg( "digi_write_bulk_callback: TOP, urb->status=%d", urb->status );
 
 	/* also queue up a wakeup at scheduler time, in case we */
 	/* lost the race in write_chan(). */
-	MOD_INC_USE_COUNT;
-	if (schedule_task(&priv->dp_wakeup_task) == 0)
-		MOD_DEC_USE_COUNT;
+	schedule_task(&priv->dp_wakeup_task);
 
 	spin_unlock( &priv->dp_port_lock );
 
@@ -1493,7 +1492,6 @@ dbg( "digi_open: TOP: port=%d, open_count=%d", priv->dp_port_num, port->open_cou
 
 	/* inc module use count before sleeping to wait for closes */
 	++port->open_count;
-	MOD_INC_USE_COUNT;
 
 	/* wait for a close in progress to finish */
 	while( priv->dp_in_close ) {
@@ -1502,7 +1500,6 @@ dbg( "digi_open: TOP: port=%d, open_count=%d", priv->dp_port_num, port->open_cou
 			&priv->dp_port_lock, flags );
 		if( signal_pending(current) ) {
 			--port->open_count;
-			MOD_DEC_USE_COUNT;
 			return( -EINTR );
 		}
 		spin_lock_irqsave( &priv->dp_port_lock, flags );
@@ -1562,7 +1559,6 @@ dbg( "digi_close: TOP: port=%d, open_count=%d", priv->dp_port_num, port->open_co
 	spin_lock_irqsave( &priv->dp_port_lock, flags );
 	if( port->open_count > 1 ) {
 		--port->open_count;
-		MOD_DEC_USE_COUNT;
 		spin_unlock_irqrestore( &priv->dp_port_lock, flags );
 		return;
 	} else if( port->open_count <= 0 ) {
@@ -1642,7 +1638,6 @@ dbg( "digi_close: TOP: port=%d, open_count=%d", priv->dp_port_num, port->open_co
 	priv->dp_write_urb_in_use = 0;
 	priv->dp_in_close = 0;
 	--port->open_count;
-	MOD_DEC_USE_COUNT;
 	wake_up_interruptible( &priv->dp_close_wait );
 	spin_unlock_irqrestore( &priv->dp_port_lock, flags );
 
@@ -1787,7 +1782,6 @@ dbg( "digi_shutdown: TOP, in_interrupt()=%d", in_interrupt() );
 		priv = serial->port[i].private;
 		spin_lock_irqsave( &priv->dp_port_lock, flags );
 		while( serial->port[i].open_count > 0 ) {
-			MOD_DEC_USE_COUNT;
 			--serial->port[i].open_count;
 		}
 		spin_unlock_irqrestore( &priv->dp_port_lock, flags );

@@ -41,9 +41,9 @@ static void usb_next_ctrl_msg(struct urb *urb,
 		(unsigned char *)&ctrl->msg_fifo.data[r_index];
 	
 	DBG(1,"request=0x%02x,value=0x%04x,index=%x",
-	    ((struct ctrl_msg *)urb->setup_packet)->dr.request,
-	    ((struct ctrl_msg *)urb->setup_packet)->dr.value,
-	    ((struct ctrl_msg *)urb->setup_packet)->dr.index);
+	    ((struct ctrl_msg *)urb->setup_packet)->dr.bRequest,
+	    ((struct ctrl_msg *)urb->setup_packet)->dr.wValue,
+	    ((struct ctrl_msg *)urb->setup_packet)->dr.wIndex);
 
 	// Prepare the URB
 	urb->dev = adapter->usb_dev;
@@ -69,11 +69,11 @@ void usb_ctrl_msg(struct st5481_adapter *adapter,
 	}
 	ctrl_msg = &ctrl->msg_fifo.data[w_index]; 
    
-	ctrl_msg->dr.requesttype = requesttype;
-	ctrl_msg->dr.request = request;
-	ctrl_msg->dr.value = cpu_to_le16p(&value);
-	ctrl_msg->dr.index = cpu_to_le16p(&index);
-	ctrl_msg->dr.length = 0;
+	ctrl_msg->dr.bRequestType = requesttype;
+	ctrl_msg->dr.bRequest = request;
+	ctrl_msg->dr.wValue = cpu_to_le16p(&value);
+	ctrl_msg->dr.wIndex = cpu_to_le16p(&index);
+	ctrl_msg->dr.wLength = 0;
 	ctrl_msg->complete = complete;
 	ctrl_msg->context = context;
 
@@ -140,17 +140,17 @@ static void usb_ctrl_complete(struct urb *urb)
 
 	ctrl_msg = (struct ctrl_msg *)urb->setup_packet;
 	
-	if (ctrl_msg->dr.request == USB_REQ_CLEAR_FEATURE) {
+	if (ctrl_msg->dr.bRequest == USB_REQ_CLEAR_FEATURE) {
 	        /* Special case handling for pipe reset */
-		le16_to_cpus(&ctrl_msg->dr.index);
+		le16_to_cpus(&ctrl_msg->dr.wIndex);
 		usb_endpoint_running(adapter->usb_dev,
-				     ctrl_msg->dr.index & ~USB_DIR_IN, 
-				     (ctrl_msg->dr.index & USB_DIR_IN) == 0);
+				     ctrl_msg->dr.wIndex & ~USB_DIR_IN, 
+				     (ctrl_msg->dr.wIndex & USB_DIR_IN) == 0);
 
 		/* toggle is reset on clear */
 		usb_settoggle(adapter->usb_dev, 
-			      ctrl_msg->dr.index & ~USB_DIR_IN, 
-			      (ctrl_msg->dr.index & USB_DIR_IN) == 0,
+			      ctrl_msg->dr.wIndex & ~USB_DIR_IN, 
+			      (ctrl_msg->dr.wIndex & USB_DIR_IN) == 0,
 			      0);
 
 
@@ -560,7 +560,7 @@ void st5481_release_in(struct st5481_in *in)
  */
 int st5481_isoc_flatten(struct urb *urb)
 {
-	piso_packet_descriptor_t pipd,pend;
+	iso_packet_descriptor_t *pipd,*pend;
 	unsigned char *src,*dst;
 	unsigned int len;
 	

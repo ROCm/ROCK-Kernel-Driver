@@ -31,20 +31,7 @@ int ptrace_check_attach(struct task_struct *child, int kill)
 		if (child->state != TASK_STOPPED)
 			return -ESRCH;
 #ifdef CONFIG_SMP
-		/* Make sure the child gets off its CPU.. */
-		for (;;) {
-			task_lock(child);
-			if (!task_has_cpu(child))
-				break;
-			task_unlock(child);
-			do {
-				if (child->state != TASK_STOPPED)
-					return -ESRCH;
-				barrier();
-				cpu_relax();
-			} while (task_has_cpu(child));
-		}
-		task_unlock(child);
+		wait_task_inactive(child);
 #endif		
 	}
 

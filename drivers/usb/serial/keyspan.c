@@ -877,8 +877,6 @@ static int keyspan_open (struct usb_serial_port *port, struct file *filp)
 	
 	dbg("keyspan_open called for port%d.\n", port->number); 
 
-	MOD_INC_USE_COUNT;
-
 	down (&port->sem);
 	already_active = port->open_count;
 	++port->open_count;
@@ -960,8 +958,6 @@ static void keyspan_close(struct usb_serial_port *port, struct file *filp)
 		port->tty = 0;
 	}
 	up (&port->sem);
-
-	MOD_DEC_USE_COUNT;
 }
 
 
@@ -1789,7 +1785,6 @@ static void keyspan_shutdown (struct usb_serial *serial)
 		port = &serial->port[i];
 		while (port->open_count > 0) {
 			--port->open_count;
-			MOD_DEC_USE_COUNT;
 		}
 		kfree(port->private);
 	}

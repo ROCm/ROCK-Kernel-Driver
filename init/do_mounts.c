@@ -760,10 +760,8 @@ static void __init handle_initrd(void)
 
 	pid = kernel_thread(do_linuxrc, "/linuxrc", SIGCHLD);
 	if (pid > 0) {
-		while (pid != wait(&i)) {
-			current->policy |= SCHED_YIELD;
-			schedule();
-		}
+		while (pid != wait(&i))
+			yield();
 	}
 
 	sys_mount("..", ".", NULL, MS_MOVE, NULL);

@@ -475,10 +475,8 @@ void dev_deactivate(struct net_device *dev)
 
 	dev_watchdog_down(dev);
 
-	while (test_bit(__LINK_STATE_SCHED, &dev->state)) {
-		current->policy |= SCHED_YIELD;
-		schedule();
-	}
+	while (test_bit(__LINK_STATE_SCHED, &dev->state))
+		yield();
 
 	spin_unlock_wait(&dev->xmit_lock);
 }

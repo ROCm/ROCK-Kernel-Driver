@@ -46,9 +46,7 @@ void wait_buffer_until_released (const struct buffer_head * bh)
 			buffer_journal_dirty(bh) ? ' ' : '!');
     }
     run_task_queue(&tq_disk);
-    current->policy |= SCHED_YIELD;
-	/* current->dyn_prio = 0; */
-    schedule();
+    yield();
   }
   if (repeat_counter > 30000000) {
     reiserfs_warning("vs-3051: done waiting, ignore vs-3050 messages for (%b)\n", bh) ;
@@ -67,11 +65,11 @@ void wait_buffer_until_released (const struct buffer_head * bh)
 struct buffer_head  * reiserfs_bread (struct super_block *super, int n_block) 
 {
     struct buffer_head  *result;
-    PROC_EXP( unsigned int ctx_switches = kstat.context_swtch );
+    PROC_EXP( unsigned int ctx_switches = nr_context_switches() );
 
     result = sb_bread(super, n_block);
     PROC_INFO_INC( super, breads );
-    PROC_EXP( if( kstat.context_swtch != ctx_switches ) 
+    PROC_EXP( if( nr_context_switches() != ctx_switches )
 	      PROC_INFO_INC( super, bread_miss ) );
     return result;
 }
@@ -148,9 +146,7 @@ static int get_new_buffer_near_blocknr(
       if ( ! (++repeat_counter % 10000) )
 	printk("get_new_buffer(%u): counter(%d) too big", current->pid, repeat_counter);
 #endif
-
-      current->time_slice = 0;
-      schedule();
+      yield();
     }
 
 #ifdef CONFIG_REISERFS_CHECK

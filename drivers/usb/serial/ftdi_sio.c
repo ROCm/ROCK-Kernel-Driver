@@ -174,6 +174,7 @@ static void ftdi_sio_break_ctl		(struct usb_serial_port *port, int break_state )
    which share common code */ 
 
 static struct usb_serial_device_type ftdi_sio_device = {
+	owner:			THIS_MODULE,
 	name:			"FTDI SIO",
 	id_table:		id_table_sio,
 	num_interrupt_in:	0,
@@ -318,7 +319,6 @@ static int  ftdi_sio_open (struct usb_serial_port *port, struct file *filp)
 
 	down (&port->sem);
 	
-	MOD_INC_USE_COUNT;
 	++port->open_count;
 
 	if (port->open_count == 1){
@@ -411,7 +411,6 @@ static void ftdi_sio_close (struct usb_serial_port *port, struct file *filp)
 	}
 
 	up (&port->sem);
-	MOD_DEC_USE_COUNT;
 
 } /* ftdi_sio_close */
 

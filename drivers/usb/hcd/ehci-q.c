@@ -362,7 +362,7 @@ scrub:
 		/* SETUP for control urb? */
 		if (unlikely (QTD_PID (token) == 2))
 			pci_unmap_single (ehci->hcd.pdev,
-				qtd->buf_dma, sizeof (devrequest),
+				qtd->buf_dma, sizeof (struct usb_ctrlrequest),
 				PCI_DMA_TODEVICE);
 
 		/* another queued urb? */
@@ -443,13 +443,13 @@ qh_urb_transaction (
 		qtd->buf_dma = pci_map_single (
 					ehci->hcd.pdev,
 					urb->setup_packet,
-					sizeof (devrequest),
+					sizeof (struct usb_ctrlrequest),
 					PCI_DMA_TODEVICE);
 		if (unlikely (!qtd->buf_dma))
 			goto cleanup;
 
 		/* SETUP pid */
-		qtd_fill (qtd, qtd->buf_dma, sizeof (devrequest),
+		qtd_fill (qtd, qtd->buf_dma, sizeof (struct usb_ctrlrequest),
 			token | (2 /* "setup" */ << 8));
 
 		/* ... and always at least one more pid */

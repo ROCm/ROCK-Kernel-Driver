@@ -445,8 +445,7 @@ static void locks_wake_up_blocks(struct file_lock *blocker, unsigned int wait)
 			/* Let the blocked process remove waiter from the
 			 * block list when it gets scheduled.
 			 */
-			current->policy |= SCHED_YIELD;
-			schedule();
+			yield();
 		} else {
 			/* Remove waiter from the block list, because by the
 			 * time it wakes up blocker won't exist any more.

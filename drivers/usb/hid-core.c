@@ -987,7 +987,7 @@ int hid_find_field(struct hid_device *hid, unsigned int type, unsigned int code,
 
 static int hid_submit_out(struct hid_device *hid)
 {
-	hid->urbout.transfer_buffer_length = le16_to_cpup(&hid->out[hid->outtail].dr.length);
+	hid->urbout.transfer_buffer_length = le16_to_cpup(&hid->out[hid->outtail].dr.wLength);
 	hid->urbout.transfer_buffer = hid->out[hid->outtail].buffer;
 	hid->urbout.setup_packet = (void *) &(hid->out[hid->outtail].dr);
 	hid->urbout.dev = hid->dev;
@@ -1017,8 +1017,8 @@ void hid_write_report(struct hid_device *hid, struct hid_report *report)
 {
 	hid_output_report(report, hid->out[hid->outhead].buffer);
 
-	hid->out[hid->outhead].dr.value = cpu_to_le16(0x200 | report->id);
-	hid->out[hid->outhead].dr.length = cpu_to_le16((report->size + 7) >> 3);
+	hid->out[hid->outhead].dr.wValue = cpu_to_le16(0x200 | report->id);
+	hid->out[hid->outhead].dr.wLength = cpu_to_le16((report->size + 7) >> 3);
 
 	hid->outhead = (hid->outhead + 1) & (HID_CONTROL_FIFO_SIZE - 1);
 
@@ -1179,9 +1179,9 @@ static struct hid_device *usb_hid_configure(struct usb_device *dev, int ifnum)
 	hid->ifnum = interface->bInterfaceNumber;
 
 	for (n = 0; n < HID_CONTROL_FIFO_SIZE; n++) {
-		hid->out[n].dr.requesttype = USB_TYPE_CLASS | USB_RECIP_INTERFACE;
-		hid->out[n].dr.request = HID_REQ_SET_REPORT;
-		hid->out[n].dr.index = cpu_to_le16(hid->ifnum);
+		hid->out[n].dr.bRequestType = USB_TYPE_CLASS | USB_RECIP_INTERFACE;
+		hid->out[n].dr.bRequest = HID_REQ_SET_REPORT;
+		hid->out[n].dr.wIndex = cpu_to_le16(hid->ifnum);
 	}
 
 	hid->name[0] = 0;

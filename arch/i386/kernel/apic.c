@@ -792,8 +792,7 @@ void setup_APIC_timer(void * data)
 	 */
 
 	slice = clocks / (smp_num_cpus+1);
-	printk("cpu: %d, clocks: %d, slice: %d\n",
-		smp_processor_id(), clocks, slice);
+	printk("cpu: %d, clocks: %d, slice: %d\n", smp_processor_id(), clocks, slice);
 
 	/*
 	 * Wait for IRQ0's slice:
@@ -816,8 +815,7 @@ void setup_APIC_timer(void * data)
 
 	__setup_APIC_LVTT(clocks);
 
-	printk("CPU%d<T0:%d,T1:%d,D:%d,S:%d,C:%d>\n",
-			smp_processor_id(), t0, t1, delta, slice, clocks);
+	printk("CPU%d<T0:%d,T1:%d,D:%d,S:%d,C:%d>\n", smp_processor_id(), t0, t1, delta, slice, clocks);
 
 	__restore_flags(flags);
 }

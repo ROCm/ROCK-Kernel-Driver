@@ -114,6 +114,7 @@ static __devinitdata struct usb_device_id id_table [] = {
 MODULE_DEVICE_TABLE (usb, id_table);
 
 static struct usb_serial_device_type empeg_device = {
+	owner:			THIS_MODULE,
 	name:			"Empeg",
 	id_table:		id_table,
 	num_interrupt_in:	0,
@@ -159,7 +160,6 @@ static int empeg_open (struct usb_serial_port *port, struct file *filp)
 	down (&port->sem);
 
 	++port->open_count;
-	MOD_INC_USE_COUNT;
 
 	if (port->open_count == 1) {
 
@@ -224,8 +224,6 @@ static void empeg_close (struct usb_serial_port *port, struct file * filp)
 
 	/* Uncomment the following line if you want to see some statistics in your syslog */
 	/* info ("Bytes In = %d  Bytes Out = %d", bytes_in, bytes_out); */
-
-	MOD_DEC_USE_COUNT;
 }
 
 

@@ -123,9 +123,6 @@ static void poll_idle (void)
 void cpu_idle (void)
 {
 	/* endless idle loop with no priority at all */
-	init_idle();
-	current->nice = 20;
-
 	while (1) {
 		void (*idle)(void) = pm_idle;
 		if (!idle)

@@ -449,6 +449,7 @@ static __devinitdata struct usb_device_id keyspan_usa49w_ids[] = {
 
     /* Structs for the devices, pre and post renumeration. */
 static struct usb_serial_device_type keyspan_usa18x_pre_device = {
+	owner:			THIS_MODULE,
 	name:			"Keyspan USA18X - (without firmware)",
 	id_table:		keyspan_usa18x_pre_ids,
 	num_interrupt_in:	NUM_DONT_CARE,
@@ -459,6 +460,7 @@ static struct usb_serial_device_type keyspan_usa18x_pre_device = {
 };
 
 static struct usb_serial_device_type keyspan_usa19_pre_device = {
+	owner:			THIS_MODULE,
 	name:			"Keyspan USA19 - (without firmware)",
 	id_table:		keyspan_usa19_pre_ids,
 	num_interrupt_in:	NUM_DONT_CARE,
@@ -470,6 +472,7 @@ static struct usb_serial_device_type keyspan_usa19_pre_device = {
 
 
 static struct usb_serial_device_type keyspan_usa19w_pre_device = {
+	owner:			THIS_MODULE,
 	name:			"Keyspan USA19W - (without firmware)",
 	id_table:		keyspan_usa19w_pre_ids,
 	num_interrupt_in:	NUM_DONT_CARE,
@@ -481,6 +484,7 @@ static struct usb_serial_device_type keyspan_usa19w_pre_device = {
 
 
 static struct usb_serial_device_type keyspan_usa28_pre_device = {
+	owner:			THIS_MODULE,
 	name:			"Keyspan USA28 - (without firmware)",
 	id_table:		keyspan_usa28_pre_ids,
 	num_interrupt_in:	NUM_DONT_CARE,
@@ -491,6 +495,7 @@ static struct usb_serial_device_type keyspan_usa28_pre_device = {
 };
 
 static struct usb_serial_device_type keyspan_usa28x_pre_device = {
+	owner:			THIS_MODULE,
 	name:			"Keyspan USA28X - (without firmware)",
 	id_table:		keyspan_usa28x_pre_ids,
 	num_interrupt_in:	NUM_DONT_CARE,
@@ -501,6 +506,7 @@ static struct usb_serial_device_type keyspan_usa28x_pre_device = {
 };
 
 static struct usb_serial_device_type keyspan_usa28xa_pre_device = {
+	owner:			THIS_MODULE,
 	name:			"Keyspan USA28XA - (without firmware)",
 	id_table:		keyspan_usa28xa_pre_ids,
 	num_interrupt_in:	NUM_DONT_CARE,
@@ -511,6 +517,7 @@ static struct usb_serial_device_type keyspan_usa28xa_pre_device = {
 };
 
 static struct usb_serial_device_type keyspan_usa28xb_pre_device = {
+	owner:			THIS_MODULE,
 	name:			"Keyspan USA28XB - (without firmware)",
 	id_table:		keyspan_usa28xb_pre_ids,
 	num_interrupt_in:	NUM_DONT_CARE,
@@ -521,6 +528,7 @@ static struct usb_serial_device_type keyspan_usa28xb_pre_device = {
 };
 
 static struct usb_serial_device_type keyspan_usa49w_pre_device = {
+	owner:			THIS_MODULE,
 	name:			"Keyspan USA49W - (without firmware)",
 	id_table:		keyspan_usa49w_pre_ids,
 	num_interrupt_in:	NUM_DONT_CARE,
@@ -531,6 +539,7 @@ static struct usb_serial_device_type keyspan_usa49w_pre_device = {
 };
 
 static struct usb_serial_device_type keyspan_usa18x_device = {
+	owner:			THIS_MODULE,
 	name:			"Keyspan USA18X",
 	id_table:		keyspan_usa18x_ids,
 	num_interrupt_in:	NUM_DONT_CARE,
@@ -554,6 +563,7 @@ static struct usb_serial_device_type keyspan_usa18x_device = {
 };
 
 static struct usb_serial_device_type keyspan_usa19_device = {
+	owner:			THIS_MODULE,
 	name:			"Keyspan USA19",
 	id_table:		keyspan_usa19_ids,
 	num_interrupt_in:	NUM_DONT_CARE,
@@ -578,6 +588,7 @@ static struct usb_serial_device_type keyspan_usa19_device = {
 
 
 static struct usb_serial_device_type keyspan_usa19w_device = {
+	owner:			THIS_MODULE,
 	name:			"Keyspan USA19W",
 	id_table:		keyspan_usa19w_ids,
 	num_interrupt_in:	NUM_DONT_CARE,
@@ -602,6 +613,7 @@ static struct usb_serial_device_type keyspan_usa19w_device = {
 
 
 static struct usb_serial_device_type keyspan_usa28_device = {
+	owner:			THIS_MODULE,
 	name:			"Keyspan USA28",
 	id_table:		keyspan_usa28_ids,
 	num_interrupt_in:	NUM_DONT_CARE,
@@ -617,6 +629,7 @@ static struct usb_serial_device_type keyspan_usa28_device = {
 
 
 static struct usb_serial_device_type keyspan_usa28x_device = {
+	owner:			THIS_MODULE,
 	name:			"Keyspan USA28X/XB",
 	id_table:		keyspan_usa28x_ids,
 	num_interrupt_in:	NUM_DONT_CARE,
@@ -641,6 +654,7 @@ static struct usb_serial_device_type keyspan_usa28x_device = {
 };
 
 static struct usb_serial_device_type keyspan_usa28xa_device = {
+	owner:			THIS_MODULE,
 	name:			"Keyspan USA28XA",
 	id_table:		keyspan_usa28xa_ids,
 	num_interrupt_in:	NUM_DONT_CARE,
@@ -665,6 +679,7 @@ static struct usb_serial_device_type keyspan_usa28xa_device = {
 };
 
 static struct usb_serial_device_type keyspan_usa49w_device = {
+	owner:			THIS_MODULE,
 	name:			"Keyspan USA49W",
 	id_table:		keyspan_usa49w_ids,
 	num_interrupt_in:	NUM_DONT_CARE,

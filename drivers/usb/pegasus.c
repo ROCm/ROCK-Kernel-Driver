@@ -142,11 +142,11 @@ static int get_registers(pegasus_t *pegasus, __u16 indx, __u16 size, void *data)
 	remove_wait_queue(&pegasus->ctrl_wait, &wait);
 	set_current_state(TASK_RUNNING);
 
-	pegasus->dr.requesttype = PEGASUS_REQT_READ;
-	pegasus->dr.request = PEGASUS_REQ_GET_REGS;
-	pegasus->dr.value = cpu_to_le16 (0);
-	pegasus->dr.index = cpu_to_le16p(&indx);
-	pegasus->dr.length = cpu_to_le16p(&size);
+	pegasus->dr.bRequestType = PEGASUS_REQT_READ;
+	pegasus->dr.bRequest = PEGASUS_REQ_GET_REGS;
+	pegasus->dr.wValue = cpu_to_le16 (0);
+	pegasus->dr.wIndex = cpu_to_le16p(&indx);
+	pegasus->dr.wLength = cpu_to_le16p(&size);
 	pegasus->ctrl_urb.transfer_buffer_length = size;
 
 	FILL_CONTROL_URB( &pegasus->ctrl_urb, pegasus->usb,
@@ -192,11 +192,11 @@ static int set_registers(pegasus_t *pegasus, __u16 indx, __u16 size, void *data)
 	remove_wait_queue(&pegasus->ctrl_wait, &wait);
 	set_current_state(TASK_RUNNING);
 
-	pegasus->dr.requesttype = PEGASUS_REQT_WRITE;
-	pegasus->dr.request = PEGASUS_REQ_SET_REGS;
-	pegasus->dr.value = cpu_to_le16 (0);
-	pegasus->dr.index = cpu_to_le16p( &indx );
-	pegasus->dr.length = cpu_to_le16p( &size );
+	pegasus->dr.bRequestType = PEGASUS_REQT_WRITE;
+	pegasus->dr.bRequest = PEGASUS_REQ_SET_REGS;
+	pegasus->dr.wValue = cpu_to_le16 (0);
+	pegasus->dr.wIndex = cpu_to_le16p( &indx );
+	pegasus->dr.wLength = cpu_to_le16p( &size );
 	pegasus->ctrl_urb.transfer_buffer_length = size;
 
 	FILL_CONTROL_URB( &pegasus->ctrl_urb, pegasus->usb,
@@ -242,11 +242,11 @@ static int set_register( pegasus_t *pegasus, __u16 indx, __u8 data )
 	remove_wait_queue(&pegasus->ctrl_wait, &wait);
 	set_current_state(TASK_RUNNING);
 
-	pegasus->dr.requesttype = PEGASUS_REQT_WRITE;
-	pegasus->dr.request = PEGASUS_REQ_SET_REG;
-	pegasus->dr.value = cpu_to_le16p( &dat);
-	pegasus->dr.index = cpu_to_le16p( &indx );
-	pegasus->dr.length = cpu_to_le16( 1 );
+	pegasus->dr.bRequestType = PEGASUS_REQT_WRITE;
+	pegasus->dr.bRequest = PEGASUS_REQ_SET_REG;
+	pegasus->dr.wValue = cpu_to_le16p( &dat);
+	pegasus->dr.wIndex = cpu_to_le16p( &indx );
+	pegasus->dr.wLength = cpu_to_le16( 1 );
 	pegasus->ctrl_urb.transfer_buffer_length = 1;
 
 	FILL_CONTROL_URB( &pegasus->ctrl_urb, pegasus->usb,
@@ -275,11 +275,11 @@ static int update_eth_regs_async( pegasus_t *pegasus )
 {
 	int	ret;
 
-	pegasus->dr.requesttype = PEGASUS_REQT_WRITE;
-	pegasus->dr.request = PEGASUS_REQ_SET_REGS;
-	pegasus->dr.value = 0;
-	pegasus->dr.index =  cpu_to_le16(EthCtrl0);
-	pegasus->dr.length = cpu_to_le16(3);
+	pegasus->dr.bRequestType = PEGASUS_REQT_WRITE;
+	pegasus->dr.bRequest = PEGASUS_REQ_SET_REGS;
+	pegasus->dr.wValue = 0;
+	pegasus->dr.wIndex =  cpu_to_le16(EthCtrl0);
+	pegasus->dr.wLength = cpu_to_le16(3);
 	pegasus->ctrl_urb.transfer_buffer_length = 3;
 
 	FILL_CONTROL_URB( &pegasus->ctrl_urb, pegasus->usb,

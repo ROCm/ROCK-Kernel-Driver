@@ -133,6 +133,7 @@ static int  whiteheat_real_startup	(struct usb_serial *serial);
 static void whiteheat_real_shutdown	(struct usb_serial *serial);
 
 static struct usb_serial_device_type whiteheat_fake_device = {
+	owner:			THIS_MODULE,
 	name:			"Connect Tech - WhiteHEAT - (prerenumeration)",
 	id_table:		id_table_prerenumeration,
 	num_interrupt_in:	NUM_DONT_CARE,
@@ -143,6 +144,7 @@ static struct usb_serial_device_type whiteheat_fake_device = {
 };
 
 static struct usb_serial_device_type whiteheat_device = {
+	owner:			THIS_MODULE,
 	name:			"Connect Tech - WhiteHEAT",
 	id_table:		id_table_std,
 	num_interrupt_in:	NUM_DONT_CARE,
@@ -307,7 +309,6 @@ static int whiteheat_open (struct usb_serial_port *port, struct file *filp)
 	down (&port->sem);
 
 	++port->open_count;
-	MOD_INC_USE_COUNT;
 	
 	if (port->open_count == 1) {
 		/* set up some stuff for our command port */
@@ -359,7 +360,6 @@ static int whiteheat_open (struct usb_serial_port *port, struct file *filp)
 
 error_exit:
 	--port->open_count;
-	MOD_DEC_USE_COUNT;
 
 	dbg(__FUNCTION__ " - error_exit");
 	up (&port->sem);
@@ -391,7 +391,6 @@ static void whiteheat_close(struct usb_serial_port *port, struct file * filp)
 		usb_unlink_urb (port->read_urb);
 		port->open_count = 0;
 	}
-	MOD_DEC_USE_COUNT;
 	up (&port->sem);
 }
 

@@ -825,6 +825,7 @@ CONFIG_USB_STORAGE=y
 # USB Miscellaneous drivers
 #
 # CONFIG_USB_RIO500 is not set
+# CONFIG_USB_AUERSWALD is not set
 
 #
 # Kernel hacking

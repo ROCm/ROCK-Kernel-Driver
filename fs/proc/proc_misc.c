@@ -84,11 +84,11 @@ static int loadavg_read_proc(char *page, char **start, off_t off,
 	a = avenrun[0] + (FIXED_1/200);
 	b = avenrun[1] + (FIXED_1/200);
 	c = avenrun[2] + (FIXED_1/200);
-	len = sprintf(page,"%d.%02d %d.%02d %d.%02d %d/%d %d\n",
+	len = sprintf(page,"%d.%02d %d.%02d %d.%02d %ld/%d %d\n",
 		LOAD_INT(a), LOAD_FRAC(a),
 		LOAD_INT(b), LOAD_FRAC(b),
 		LOAD_INT(c), LOAD_FRAC(c),
-		nr_running, nr_threads, last_pid);
+		nr_running(), nr_threads, last_pid);
 	return proc_calc_metrics(page, start, off, count, eof, len);
 }
 
@@ -100,7 +100,7 @@ static int uptime_read_proc(char *page, char **start, off_t off,
 	int len;
 
 	uptime = jiffies;
-	idle = init_tasks[0]->times.tms_utime + init_tasks[0]->times.tms_stime;
+	idle = init_task.times.tms_utime + init_task.times.tms_stime;
 
 	/* The formula for the fraction parts really is ((t * 100) / HZ) % 100, but
 	   that would overflow about every five days at HZ == 100.
@@ -291,10 +291,10 @@ static int kstat_read_proc(char *page, char **start, off_t off,
 	}
 
 	len += sprintf(page + len,
-		"\nctxt %u\n"
+		"\nctxt %lu\n"
 		"btime %lu\n"
 		"processes %lu\n",
-		kstat.context_swtch,
+		nr_context_switches(),
 		xtime.tv_sec - jif / HZ,
 		total_forks);
 

@@ -279,7 +279,6 @@ static int mwave_ioctl(struct inode *inode, struct file *file,
 			pDrvData->IPCs[ipcnum].bIsHere = FALSE;
 			pDrvData->IPCs[ipcnum].bIsEnabled = TRUE;
 	#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
-			current->nice = -20;	/* boost to provide priority timing */
 	#else
 			current->priority = 0x28;	/* boost to provide priority timing */
 	#endif

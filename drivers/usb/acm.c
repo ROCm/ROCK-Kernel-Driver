@@ -184,7 +184,7 @@ static int acm_ctrl_msg(struct acm *acm, int request, int value, void *buf, int 
 static void acm_ctrl_irq(struct urb *urb)
 {
 	struct acm *acm = urb->context;
-	devrequest *dr = urb->transfer_buffer;
+	struct usb_ctrlrequest *dr = urb->transfer_buffer;
 	unsigned char *data = (unsigned char *)(dr + 1);
 	int newctrl;
 
@@ -195,7 +195,7 @@ static void acm_ctrl_irq(struct urb *urb)
 		return;
 	}
 
-	switch (dr->request) {
+	switch (dr->bRequest) {
 
 		case ACM_IRQ_NETWORK:
 
@@ -223,7 +223,7 @@ static void acm_ctrl_irq(struct urb *urb)
 
 		default:
 			dbg("unknown control event received: request %d index %d len %d data0 %d data1 %d",
-				dr->request, dr->index, dr->length, data[0], data[1]);
+				dr->bRequest, dr->wIndex, dr->wLength, data[0], data[1]);
 			return;
 	}
 }

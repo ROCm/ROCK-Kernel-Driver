@@ -2941,8 +2941,6 @@ int md_thread(void * arg)
 	 * bdflush, otherwise bdflush will deadlock if there are too
 	 * many dirty RAID5 blocks.
 	 */
-	current->policy = SCHED_OTHER;
-	current->nice = -20;
 	unlock_kernel();
 
 	complete(thread->event);
@@ -3390,11 +3388,6 @@ recheck:
 	       "(but not more than %d KB/sec) for reconstruction.\n",
 	       sysctl_speed_limit_max);
 
-	/*
-	 * Resync has low priority.
-	 */
-	current->nice = 19;
-
 	is_mddev_idle(mddev); /* this also initializes IO event counters */
 	for (m = 0; m < SYNC_MARKS; m++) {
 		mark[m] = jiffies;
@@ -3471,16 +3464,13 @@ recheck:
 		currspeed = (j-mddev->resync_mark_cnt)/2/((jiffies-mddev->resync_mark)/HZ +1) +1;
 
 		if (currspeed > sysctl_speed_limit_min) {
-			current->nice = 19;
-
 			if ((currspeed > sysctl_speed_limit_max) ||
 					!is_mddev_idle(mddev)) {
 				current->state = TASK_INTERRUPTIBLE;
 				schedule_timeout(HZ/4);
 				goto repeat;
 			}
-		} else
-			current->nice = -20;
+		}
 	}
 	printk(KERN_INFO "md: md%d: sync done.\n",mdidx(mddev));
 	err = 0;

@@ -527,6 +527,16 @@ S: 14509 NE 39th Street #1096
 S: Bellevue, Washington 98007
 S: USA
 
+N: Christopher L. Cheney
+E: ccheney@debian.org
+E: ccheney@cheney.cx
+W: http://www.cheney.cx
+P: 1024D/8E384AF2 2D31 1927 87D7 1F24 9FF9  1BC5 D106 5AB3 8E38 4AF2
+D: Vista Imaging usb webcam driver
+S: 314 Prince of Wales
+S: Conroe, TX 77304
+S: USA
+
 N: Stuart Cheshire
 E: cheshire@cs.stanford.edu
 D: Author of Starmode Radio IP (STRIP) driver
@@ -1946,9 +1956,10 @@ S: 64289 Darmstadt
 S: Germany 
 
 N: Mark W. McClelland
-E: mwm@i.am
+E: mmcclell@bigfoot.com
 E: mark@alpha.dyndns.org
 W: http://alpha.dyndns.org/ov511/
+P: 1024D/357375CC 317C 58AC 1B39 2AB0 AB96  EB38 0B6F 731F 3573 75CC
 D: OV511 driver
 S: (address available on request)
 S: USA
@@ -2106,6 +2117,10 @@ D: Wacom Intuos USB Support
 S: 22 Seaview St
 S: Fullarton 5063
 S: South Australia
+
+N. Wolfgang Muees
+E: wmues@nexgo.de
+D: Auerswald USB driver
 
 N: Ian A. Murdock
 E: imurdock@gnu.ai.mit.edu

@@ -1596,7 +1596,7 @@ S:	Maintained
 
 USB OV511 DRIVER
 P:     Mark McClelland
-M:     mwm@i.am
+M:     mmcclell@bigfoot.com
 L:     linux-usb-users@lists.sourceforge.net
 L:     linux-usb-devel@lists.sourceforge.net
 W:     http://alpha.dyndns.org/ov511/
@@ -1653,6 +1653,13 @@ M:	linux-usb@sii.li
 L:	linux-usb-users@lists.sourceforge.net
 L:	linux-usb-devel@lists.sourceforge.net
 S:	Supported
+
+USB AUERSWALD DRIVER
+P:	Wolfgang Muees
+M:	wmues@nexgo.de
+L:	linux-usb-users@lists.sourceforge.net
+L:	linux-usb-devel@lists.sourceforge.net
+S:	Maintained
 
 USB SERIAL EMPEG EMPEG-CAR MARK I/II DRIVER
 P:	Gary Brubaker

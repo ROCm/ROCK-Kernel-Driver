@@ -281,7 +281,7 @@
  * 0.4.7  11/28/2001
  *    - Fixed typo in Documentation/scanner.txt.  Thanks to
  *      Karel <karel.vervaeke@pandora.be> for pointing it out.
- *    - Added ID's for a Memorex 6136u. Thanks to =C1lvaro Gaspar de
+ *    - Added ID's for a Memorex 6136u. Thanks to Álvaro Gaspar de
  *      Valenzuela" <agaspard@utsi.edu>.
  *    - Added ID's for Agfa e25.  Thanks to Heinrich 
  *      Rust <Heinrich.Rust@gmx.de>.  Also reported to work with
@@ -746,8 +746,8 @@ ioctl_scanner(struct inode *inode, struct file *file,
  	case SCANNER_IOCTL_CTRLMSG:
  	{
  		struct ctrlmsg_ioctl {
- 			devrequest	req;
- 			void		*data;
+ 			struct usb_ctrlrequest	req;
+ 			void			*data;
  		} cmsg;
  		int pipe, nb, ret;
  		unsigned char buf[64];
@@ -755,12 +755,12 @@ ioctl_scanner(struct inode *inode, struct file *file,
  		if (copy_from_user(&cmsg, (void *)arg, sizeof(cmsg)))
  			return -EFAULT;
 
- 		nb = le16_to_cpup(&cmsg.req.length);
+ 		nb = le16_to_cpup(&cmsg.req.wLength);
 
  		if (nb > sizeof(buf))
  			return -EINVAL;
 
- 		if ((cmsg.req.requesttype & 0x80) == 0) {
+ 		if ((cmsg.req.bRequestType & 0x80) == 0) {
  			pipe = usb_sndctrlpipe(dev, 0);
  			if (nb > 0 && copy_from_user(buf, cmsg.data, nb))
  				return -EFAULT;
@@ -768,10 +768,10 @@ ioctl_scanner(struct inode *inode, struct file *file,
  			pipe = usb_rcvctrlpipe(dev, 0);
 		}
 
- 		ret = usb_control_msg(dev, pipe, cmsg.req.request,
- 				      cmsg.req.requesttype,
- 				      le16_to_cpup(&cmsg.req.value),
- 				      le16_to_cpup(&cmsg.req.index),
+ 		ret = usb_control_msg(dev, pipe, cmsg.req.bRequest,
+ 				      cmsg.req.bRequestType,
+ 				      le16_to_cpup(&cmsg.req.wValue),
+ 				      le16_to_cpup(&cmsg.req.wIndex),
  				      buf, nb, HZ);
 
  		if (ret < 0) {
@@ -779,7 +779,7 @@ ioctl_scanner(struct inode *inode, struct file *file,
  			return -EIO;
  		}
 
- 		if (nb > 0 && (cmsg.req.requesttype & 0x80) && copy_to_user(cmsg.data, buf, nb))
+ 		if (nb > 0 && (cmsg.req.bRequestType & 0x80) && copy_to_user(cmsg.data, buf, nb))
  			return -EFAULT;
 
  		return 0;

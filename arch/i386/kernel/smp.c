@@ -105,7 +105,7 @@
 /* The 'big kernel lock' */
 spinlock_t kernel_flag __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 
-struct tlb_state cpu_tlbstate[NR_CPUS] = {[0 ... NR_CPUS-1] = { &init_mm, 0 }};
+struct tlb_state cpu_tlbstate[NR_CPUS] __cacheline_aligned = {[0 ... NR_CPUS-1] = { &init_mm, 0, }};
 
 /*
  * the following functions deal with sending IPIs between CPUs.
@@ -490,10 +490,20 @@ void flush_tlb_all(void)
  * it goes straight through and wastes no time serializing
  * anything. Worst case is that we lose a reschedule ...
  */
-
 void smp_send_reschedule(int cpu)
 {
 	send_IPI_mask(1 << cpu, RESCHEDULE_VECTOR);
+}
+
+/*
+ * this function sends a reschedule IPI to all (other) CPUs.
+ * This should only be used if some 'global' task became runnable,
+ * such as a RT task, that must be handled now. The first CPU
+ * that manages to grab the task will run it.
+ */
+void smp_send_reschedule_all(void)
+{
+	send_IPI_allbutself(RESCHEDULE_VECTOR);
 }
 
 /*

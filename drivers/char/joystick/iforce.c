@@ -134,7 +134,7 @@ struct iforce {
 #ifdef IFORCE_USB
 	struct usb_device *usbdev;	/* USB transfer */
 	struct urb irq, out, ctrl;
-	devrequest dr;
+	struct usb_ctrlrequest dr;
 #endif
 					/* Force Feedback */
 	wait_queue_head_t wait;
@@ -283,7 +283,7 @@ static int get_id_packet(struct iforce *iforce, char *packet)
 #ifdef IFORCE_USB
 		case IFORCE_USB:
 
-			iforce->dr.request = packet[0];
+			iforce->dr.bRequest = packet[0];
 			iforce->ctrl.dev = iforce->usbdev;
 
 			set_current_state(TASK_INTERRUPTIBLE);
@@ -1027,9 +1027,9 @@ static void *iforce_usb_probe(struct usb_device *dev, unsigned int ifnum,
 	iforce->bus = IFORCE_USB;
 	iforce->usbdev = dev;
 
-	iforce->dr.requesttype = USB_TYPE_VENDOR | USB_DIR_IN | USB_RECIP_INTERFACE;
-	iforce->dr.index = 0;
-	iforce->dr.length = 16;
+	iforce->dr.bRequestType = USB_TYPE_VENDOR | USB_DIR_IN | USB_RECIP_INTERFACE;
+	iforce->dr.wIndex = 0;
+	iforce->dr.wLength = 16;
 
 	FILL_INT_URB(&iforce->irq, dev, usb_rcvintpipe(dev, epirq->bEndpointAddress),
 			iforce->data, 16, iforce_usb_irq, iforce, epirq->bInterval);

@@ -283,7 +283,7 @@ void nmi_watchdog_tick (struct pt_regs * regs)
 			 * to get a message out.
 			 */
 			bust_spinlocks(1);
-			printk("NMI Watchdog detected LOCKUP on CPU%d, registers:\n", cpu);
+			printk("NMI Watchdog detected LOCKUP on CPU%d, eip %08lx, registers:\n", cpu, regs->eip);
 			show_registers(regs);
 			printk("console shuts up ...\n");
 			console_silent();

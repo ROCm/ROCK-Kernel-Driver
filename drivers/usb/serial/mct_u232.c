@@ -144,6 +144,7 @@ MODULE_DEVICE_TABLE (usb, id_table_combined);
 
 
 static struct usb_serial_device_type mct_u232_device = {
+	owner:		     THIS_MODULE,
 	name:		     "Magic Control Technology USB-RS232",
 	id_table:	     id_table_combined,
 	num_interrupt_in:    2,
@@ -343,7 +344,6 @@ static int  mct_u232_open (struct usb_serial_port *port, struct file *filp)
 	down (&port->sem);
 	
 	++port->open_count;
-	MOD_INC_USE_COUNT;
 
 	if (port->open_count == 1) {
 		/* Compensate for a hardware bug: although the Sitecom U232-P25
@@ -423,7 +423,6 @@ static void mct_u232_close (struct usb_serial_port *port, struct file *filp)
 	}
 	
 	up (&port->sem);
-	MOD_DEC_USE_COUNT;
 } /* mct_u232_close */
 
 

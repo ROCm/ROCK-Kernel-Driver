@@ -224,6 +224,7 @@ struct tlb_state
 {
 	struct mm_struct *active_mm;
 	int state;
+	char __cacheline_padding[24];
 };
 extern struct tlb_state cpu_tlbstate[NR_CPUS];
 

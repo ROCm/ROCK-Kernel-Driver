@@ -478,12 +478,9 @@ static inline void signal_wake_up(struct task_struct *t)
 	 * process of changing - but no harm is done by that
 	 * other than doing an extra (lightweight) IPI interrupt.
 	 */
-	spin_lock(&runqueue_lock);
-	if (task_has_cpu(t) && t->processor != smp_processor_id())
-		smp_send_reschedule(t->processor);
-	spin_unlock(&runqueue_lock);
-#endif /* CONFIG_SMP */
-
+	if ((t->state == TASK_RUNNING) && (t->cpu != smp_processor_id()))
+		kick_if_running(t);
+#endif
 	if (t->state & TASK_INTERRUPTIBLE) {
 		wake_up_process(t);
 		return;

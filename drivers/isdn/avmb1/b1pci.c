@@ -30,7 +30,7 @@ static char *revision = "$Revision: 1.1.4.1.2.1 $";
 
 /* ------------------------------------------------------------- */
 
-static struct pci_device_id b1pci_pci_tbl[] __initdata = {
+static struct pci_device_id b1pci_pci_tbl[] __devinitdata = {
 	{ PCI_VENDOR_ID_AVM, PCI_DEVICE_ID_AVM_B1, PCI_ANY_ID, PCI_ANY_ID },
 	{ }				/* Terminating entry */
 };
@@ -404,7 +404,8 @@ static struct capi_driver b1pciv4_driver = {
 
 static int ncards = 0;
 
-static int add_card(struct pci_dev *dev)
+static int __devinit b1pci_probe(struct pci_dev *dev,
+				 const struct pci_device_id *ent)
 {
 	struct capi_driver *driver = &b1pci_driver;
 	struct capicardparams param;
@@ -456,13 +457,18 @@ static int add_card(struct pci_dev *dev)
 	return retval;
 }
 
+static struct pci_driver b1pci_pci_driver = {
+	name:		"b1pci",
+	id_table:	b1pci_pci_tbl,
+	probe:		b1pci_probe,
+};
+
 static int __init b1pci_init(void)
 {
 	struct capi_driver *driver = &b1pci_driver;
 #ifdef CONFIG_ISDN_DRV_AVMB1_B1PCIV4
 	struct capi_driver *driverv4 = &b1pciv4_driver;
 #endif
-	struct pci_dev *dev = NULL;
 	char *p;
 
 	MOD_INC_USE_COUNT;
@@ -505,10 +511,7 @@ static int __init b1pci_init(void)
 	}
 #endif
 
-	while ((dev = pci_find_device(PCI_VENDOR_ID_AVM, PCI_DEVICE_ID_AVM_B1, dev))) {
-		if (add_card(dev) == 0)
-			ncards++;
-	}
+	ncards = pci_register_driver(&b1pci_pci_driver);
 	if (ncards) {
 		printk(KERN_INFO "%s: %d B1-PCI card(s) detected\n",
 				driver->name, ncards);
@@ -516,6 +519,7 @@ static int __init b1pci_init(void)
 		return 0;
 	}
 	printk(KERN_ERR "%s: NO B1-PCI card detected\n", driver->name);
+	pci_unregister_driver(&b1pci_pci_driver);
 	detach_capi_driver(driver);
 #ifdef CONFIG_ISDN_DRV_AVMB1_B1PCIV4
 	detach_capi_driver(driverv4);
@@ -526,9 +530,10 @@ static int __init b1pci_init(void)
 
 static void __exit b1pci_exit(void)
 {
-    detach_capi_driver(&b1pci_driver);
+	pci_unregister_driver(&b1pci_pci_driver);
+	detach_capi_driver(&b1pci_driver);
 #ifdef CONFIG_ISDN_DRV_AVMB1_B1PCIV4
-    detach_capi_driver(&b1pciv4_driver);
+	detach_capi_driver(&b1pciv4_driver);
 #endif
 }
 

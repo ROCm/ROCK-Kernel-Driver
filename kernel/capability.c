@@ -8,6 +8,8 @@
 #include <linux/mm.h>
 #include <asm/uaccess.h>
 
+unsigned securebits = SECUREBITS_DEFAULT; /* systemwide security settings */
+
 kernel_cap_t cap_bset = CAP_INIT_EFF_SET;
 
 /* Note: never hold tasklist_lock while spinning for this one */

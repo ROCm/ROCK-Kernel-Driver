@@ -40,11 +40,11 @@
 /* usbdevfs ioctl codes */
 
 struct usbdevfs_ctrltransfer {
-	__u8 requesttype;
-	__u8 request;
-	__u16 value;
-	__u16 index;
-	__u16 length;
+	__u8 bRequestType;
+	__u8 bRequest;
+	__u16 wValue;
+	__u16 wIndex;
+	__u16 wLength;
 	__u32 timeout;  /* in milliseconds */
  	void *data;
 };

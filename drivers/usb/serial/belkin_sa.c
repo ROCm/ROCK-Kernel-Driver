@@ -119,6 +119,7 @@ MODULE_DEVICE_TABLE (usb, id_table_combined);
 
 /* All of the device info needed for the serial converters */
 static struct usb_serial_device_type belkin_device = {
+	owner:			THIS_MODULE,
 	name:			"Belkin / Peracom / GoHubs USB Serial Adapter",
 	id_table:		id_table_combined,
 	num_interrupt_in:	1,
@@ -209,7 +210,6 @@ static int  belkin_sa_open (struct usb_serial_port *port, struct file *filp)
 	down (&port->sem);
 	
 	++port->open_count;
-	MOD_INC_USE_COUNT;
 	
 	if (port->open_count == 1) {
 		/*Start reading from the device*/
@@ -264,7 +264,6 @@ static void belkin_sa_close (struct usb_serial_port *port, struct file *filp)
 	}
 	
 	up (&port->sem);
-	MOD_DEC_USE_COUNT;
 } /* belkin_sa_close */
 
 

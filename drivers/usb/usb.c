@@ -1287,7 +1287,7 @@ static int usb_start_wait_urb(urb_t *urb, int timeout, int* actual_length)
 /*-------------------------------------------------------------------*/
 // returns status (negative) or length (positive)
 int usb_internal_control_msg(struct usb_device *usb_dev, unsigned int pipe, 
-			    devrequest *cmd,  void *data, int len, int timeout)
+			    struct usb_ctrlrequest *cmd,  void *data, int len, int timeout)
 {
 	urb_t *urb;
 	int retv;
@@ -1331,17 +1331,17 @@ int usb_internal_control_msg(struct usb_device *usb_dev, unsigned int pipe,
 int usb_control_msg(struct usb_device *dev, unsigned int pipe, __u8 request, __u8 requesttype,
 			 __u16 value, __u16 index, void *data, __u16 size, int timeout)
 {
-	devrequest *dr = kmalloc(sizeof(devrequest), GFP_KERNEL);
+	struct usb_ctrlrequest *dr = kmalloc(sizeof(struct usb_ctrlrequest), GFP_KERNEL);
 	int ret;
 	
 	if (!dr)
 		return -ENOMEM;
 
-	dr->requesttype = requesttype;
-	dr->request = request;
-	dr->value = cpu_to_le16p(&value);
-	dr->index = cpu_to_le16p(&index);
-	dr->length = cpu_to_le16p(&size);
+	dr->bRequestType= requesttype;
+	dr->bRequest = request;
+	dr->wValue = cpu_to_le16p(&value);
+	dr->wIndex = cpu_to_le16p(&index);
+	dr->wLength = cpu_to_le16p(&size);
 
 	//dbg("usb_control_msg");	
 
@@ -1535,6 +1535,9 @@ static int usb_parse_interface(struct usb_interface *interface, unsigned char *b
 		}
 
 		ifp = interface->altsetting + interface->num_altsetting;
+		ifp->endpoint = NULL;
+		ifp->extra = NULL;
+		ifp->extralen = 0;
 		interface->num_altsetting++;
 
 		memcpy(ifp, buffer, USB_DT_INTERFACE_SIZE);
@@ -1576,10 +1579,7 @@ static int usb_parse_interface(struct usb_interface *interface, unsigned char *b
 		/* Copy any unknown descriptors into a storage area for */
 		/*  drivers to later parse */
 		len = (int)(buffer - begin);
-		if (!len) {
-			ifp->extra = NULL;
-			ifp->extralen = 0;
-		} else {
+		if (len) {
 			ifp->extra = kmalloc(len, GFP_KERNEL);
 
 			if (!ifp->extra) {

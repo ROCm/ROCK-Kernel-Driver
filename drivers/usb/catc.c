@@ -159,7 +159,7 @@ struct catc {
 	u8 rx_buf[RX_MAX_BURST * (PKT_SZ + 2)];
 	u8 irq_buf[2];
 	u8 ctrl_buf[64];
-	devrequest ctrl_dr;
+	struct usb_ctrlrequest ctrl_dr;
 
 	struct timer_list timer;
 	u8 stats_buf[8];
@@ -383,14 +383,14 @@ static void catc_ctrl_run(struct catc *catc)
 	struct ctrl_queue *q = catc->ctrl_queue + catc->ctrl_tail;
 	struct usb_device *usbdev = catc->usbdev;
 	struct urb *urb = &catc->ctrl_urb;
-	devrequest *dr = &catc->ctrl_dr;
+	struct usb_ctrlrequest *dr = &catc->ctrl_dr;
 	int status;
 
-	dr->request = q->request;
-	dr->requesttype = 0x40 | q->dir;
-	dr->value = cpu_to_le16(q->value);
-	dr->index = cpu_to_le16(q->index);
-	dr->length = cpu_to_le16(q->len);
+	dr->bRequest = q->request;
+	dr->bRequestType = 0x40 | q->dir;
+	dr->wValue = cpu_to_le16(q->value);
+	dr->wIndex = cpu_to_le16(q->index);
+	dr->wLength = cpu_to_le16(q->len);
 
         urb->pipe = q->dir ? usb_rcvctrlpipe(usbdev, 0) : usb_sndctrlpipe(usbdev, 0);
 	urb->transfer_buffer_length = q->len;

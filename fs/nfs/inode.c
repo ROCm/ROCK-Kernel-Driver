@@ -1107,9 +1107,6 @@ __nfs_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
  		inode->i_blocks = fattr->du.nfs2.blocks;
  		inode->i_blksize = fattr->du.nfs2.blocksize;
  	}
- 	inode->i_rdev = NODEV;
- 	if (S_ISCHR(inode->i_mode) || S_ISBLK(inode->i_mode))
- 		inode->i_rdev = to_kdev_t(fattr->rdev);
  
 	/* Update attrtimeo value */
 	if (!invalid && time_after(jiffies, NFS_ATTRTIMEO_UPDATE(inode)+NFS_ATTRTIMEO(inode))) {

@@ -564,10 +564,8 @@ retry:
 				      addr->hash)) {
 		write_unlock(&unix_table_lock);
 		/* Sanity yield. It is unusual case, but yet... */
-		if (!(ordernum&0xFF)) {
-			current->policy |= SCHED_YIELD;
-			schedule();
-		}
+		if (!(ordernum&0xFF))
+			yield();
 		goto retry;
 	}
 	addr->hash ^= sk->type;

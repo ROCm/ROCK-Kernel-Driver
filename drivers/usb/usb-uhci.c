@@ -1085,7 +1085,7 @@ _static void uhci_urb_dma_sync(uhci_t *s, urb_t *urb, urb_priv_t *urb_priv)
 {
 	if (urb_priv->setup_packet_dma)
 		pci_dma_sync_single(s->uhci_pci, urb_priv->setup_packet_dma,
-				    sizeof(devrequest), PCI_DMA_TODEVICE);
+				    sizeof(struct usb_ctrlrequest), PCI_DMA_TODEVICE);
 
 	if (urb_priv->transfer_buffer_dma)
 		pci_dma_sync_single(s->uhci_pci, urb_priv->transfer_buffer_dma,
@@ -1099,7 +1099,7 @@ _static void uhci_urb_dma_unmap(uhci_t *s, urb_t *urb, urb_priv_t *urb_priv)
 {
 	if (urb_priv->setup_packet_dma) {
 		pci_unmap_single(s->uhci_pci, urb_priv->setup_packet_dma,
-				 sizeof(devrequest), PCI_DMA_TODEVICE);
+				 sizeof(struct usb_ctrlrequest), PCI_DMA_TODEVICE);
 		urb_priv->setup_packet_dma = 0;
 	}
 	if (urb_priv->transfer_buffer_dma) {
@@ -1678,7 +1678,7 @@ _static int uhci_submit_urb (urb_t *urb)
 	
 	if (type == PIPE_CONTROL)
 		urb_priv->setup_packet_dma = pci_map_single(s->uhci_pci, urb->setup_packet,
-							    sizeof(devrequest), PCI_DMA_TODEVICE);
+							    sizeof(struct usb_ctrlrequest), PCI_DMA_TODEVICE);
 
 	if (urb->transfer_buffer_length)
 		urb_priv->transfer_buffer_dma = pci_map_single(s->uhci_pci,
@@ -1963,7 +1963,7 @@ _static int rh_submit_urb (urb_t *urb)
 	struct usb_device *usb_dev = urb->dev;
 	uhci_t *uhci = usb_dev->bus->hcpriv;
 	unsigned int pipe = urb->pipe;
-	devrequest *cmd = (devrequest *) urb->setup_packet;
+	struct usb_ctrlrequest *cmd = (struct usb_ctrlrequest *) urb->setup_packet;
 	void *data = urb->transfer_buffer;
 	int leni = urb->transfer_buffer_length;
 	int len = 0;
@@ -1989,10 +1989,10 @@ _static int rh_submit_urb (urb_t *urb)
 	}
 
 
-	bmRType_bReq = cmd->requesttype | cmd->request << 8;
-	wValue = le16_to_cpu (cmd->value);
-	wIndex = le16_to_cpu (cmd->index);
-	wLength = le16_to_cpu (cmd->length);
+	bmRType_bReq = cmd->bRequestType | cmd->bRequest << 8;
+	wValue = le16_to_cpu (cmd->wValue);
+	wIndex = le16_to_cpu (cmd->wIndex);
+	wLength = le16_to_cpu (cmd->wLength);
 
 	for (i = 0; i < 8; i++)
 		uhci->rh.c_p_r[i] = 0;

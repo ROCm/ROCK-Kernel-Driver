@@ -77,6 +77,7 @@ static __devinitdata struct usb_device_id id_table [] = {
 MODULE_DEVICE_TABLE (usb, id_table);
 
 static struct usb_serial_device_type cyberjack_device = {
+	owner:			THIS_MODULE,
 	name:			"Reiner SCT Cyberjack USB card reader",
 	id_table:		id_table,
 	num_interrupt_in:	1,
@@ -148,8 +149,6 @@ static int  cyberjack_open (struct usb_serial_port *port, struct file *filp)
 	if (port_paranoia_check (port, __FUNCTION__))
 		return -ENODEV;
 
-	MOD_INC_USE_COUNT;
-
 	dbg(__FUNCTION__ " - port %d", port->number);
 
 	down (&port->sem);
@@ -204,7 +203,6 @@ static void cyberjack_close (struct usb_serial_port *port, struct file *filp)
 	}
 
 	up (&port->sem);
-	MOD_DEC_USE_COUNT;
 }
 
 static int cyberjack_write (struct usb_serial_port *port, int from_user, const unsigned char *buf, int count)

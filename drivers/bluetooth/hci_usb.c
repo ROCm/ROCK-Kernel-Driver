@@ -437,18 +437,18 @@ resubmit:
 static int hci_usb_ctrl_msg(struct hci_usb *husb, struct sk_buff *skb)
 {
 	struct urb *urb = husb->ctrl_urb;
-	devrequest *dr  = &husb->dev_req;
+	struct usb_ctrlrequest *dr  = &husb->dev_req;
 	int pipe, status;
 
 	DBG("%s len %d", husb->hdev.name, skb->len);
 
 	pipe = usb_sndctrlpipe(husb->udev, 0);
 
-	dr->requesttype = HCI_CTRL_REQ;
-	dr->request = 0;
-	dr->index   = 0;
-	dr->value   = 0;
-	dr->length  = cpu_to_le16(skb->len);
+	dr->bRequestType = HCI_CTRL_REQ;
+	dr->bRequest = 0;
+	dr->wIndex   = 0;
+	dr->wValue   = 0;
+	dr->wLength  = cpu_to_le16(skb->len);
 
 	FILL_CONTROL_URB(urb, husb->udev, pipe, (void*)dr, skb->data, skb->len,
 	                 hci_usb_ctrl, skb);

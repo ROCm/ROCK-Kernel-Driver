@@ -38,9 +38,9 @@ static char *revision = "$Revision: 1.1.4.1.2.1 $";
 
 static int suppress_pollack;
 
-static struct pci_device_id c4_pci_tbl[] __initdata = {
-	{ PCI_VENDOR_ID_DEC,PCI_DEVICE_ID_DEC_21285, PCI_VENDOR_ID_AVM, PCI_DEVICE_ID_AVM_C4 },
-	{ PCI_VENDOR_ID_DEC,PCI_DEVICE_ID_DEC_21285, PCI_VENDOR_ID_AVM, PCI_DEVICE_ID_AVM_C2 },
+static struct pci_device_id c4_pci_tbl[] __devinitdata = {
+	{ PCI_VENDOR_ID_DEC, PCI_DEVICE_ID_DEC_21285, PCI_VENDOR_ID_AVM, PCI_DEVICE_ID_AVM_C4, 4 },
+	{ PCI_VENDOR_ID_DEC, PCI_DEVICE_ID_DEC_21285, PCI_VENDOR_ID_AVM, PCI_DEVICE_ID_AVM_C2, 2 },
 	{ }			/* Terminating entry */
 };
 
@@ -1284,8 +1284,6 @@ static struct capi_driver c4_driver = {
     add_card: 0, /* no add_card function */
 };
 
-static int ncards = 0;
-
 static int c4_attach_driver (struct capi_driver * driver)
 {
 	char *p;
@@ -1308,46 +1306,49 @@ static int c4_attach_driver (struct capi_driver * driver)
 	return 0;
 }
 
-static int __init search_cards(struct capi_driver * driver,
-				int pci_id, int nr)
+static int __devinit c4_probe(struct pci_dev *dev,
+			      const struct pci_device_id *ent)
 {
-	struct pci_dev *	dev	= NULL;
-	int			retval	= 0;
+	int nr = ent->driver_data;
+	struct capi_driver *driver = (nr == 2) ? &c2_driver : &c4_driver;
+	int retval = 0;
+	struct capicardparams param;
 
-	while ((dev = pci_find_subsys(
-			PCI_VENDOR_ID_DEC, PCI_DEVICE_ID_DEC_21285,
-			PCI_VENDOR_ID_AVM, pci_id, dev))) {
-		struct capicardparams param;
-
-		if (pci_enable_device(dev) < 0) {
-		        printk(KERN_ERR "%s: failed to enable AVM-C%d\n",
-			       driver->name, nr);
-			continue;
-		}
-		pci_set_master(dev);
-
-		param.port = pci_resource_start(dev, 1);
-		param.irq = dev->irq;
-		param.membase = pci_resource_start(dev, 0);
-  
-		printk(KERN_INFO
-			"%s: PCI BIOS reports AVM-C%d at i/o %#x, irq %d, mem %#x\n",
-			driver->name, nr, param.port, param.irq, param.membase);
-		retval = c4_add_card(driver, &param, dev, nr);
-		if (retval != 0) {
-		        printk(KERN_ERR
-			"%s: no AVM-C%d at i/o %#x, irq %d detected, mem %#x\n",
-			driver->name, nr, param.port, param.irq, param.membase);
-			continue;
-		}
-		ncards++;
+	if (pci_enable_device(dev) < 0) {
+		printk(KERN_ERR "%s: failed to enable AVM-C%d\n",
+		       driver->name, nr);
+		return -ENODEV;
 	}
-	return retval;
+	pci_set_master(dev);
+
+	param.port = pci_resource_start(dev, 1);
+	param.irq = dev->irq;
+	param.membase = pci_resource_start(dev, 0);
+	
+	printk(KERN_INFO
+	       "%s: PCI BIOS reports AVM-C%d at i/o %#x, irq %d, mem %#x\n",
+	       driver->name, nr, param.port, param.irq, param.membase);
+	
+	retval = c4_add_card(driver, &param, dev, nr);
+	if (retval != 0) {
+		printk(KERN_ERR
+		       "%s: no AVM-C%d at i/o %#x, irq %d detected, mem %#x\n",
+		       driver->name, nr, param.port, param.irq, param.membase);
+		return -ENODEV;
+	}
+	return 0;
 }
+
+static struct pci_driver c4_pci_driver = {
+       name:           "c4",
+       id_table:       c4_pci_tbl,
+       probe:          c4_probe,
+};
 
 static int __init c4_init(void)
 {
 	int retval;
+	int ncards;
 
 	MOD_INC_USE_COUNT;
 
@@ -1363,21 +1364,7 @@ static int __init c4_init(void)
 		return retval;
 	}
 
-	retval = search_cards(&c4_driver, PCI_DEVICE_ID_AVM_C4, 4);
-	if (retval && ncards == 0) {
-    		detach_capi_driver(&c2_driver);
-    		detach_capi_driver(&c4_driver);
-		MOD_DEC_USE_COUNT;
-		return retval;
-	}
-	retval = search_cards(&c2_driver, PCI_DEVICE_ID_AVM_C2, 2);
-	if (retval && ncards == 0) {
-    		detach_capi_driver(&c2_driver);
-    		detach_capi_driver(&c4_driver);
-		MOD_DEC_USE_COUNT;
-		return retval;
-	}
-
+	ncards = pci_register_driver(&c4_pci_driver);
 	if (ncards) {
 		printk(KERN_INFO "%s: %d C4/C2 card(s) detected\n",
 				c4_driver.name, ncards);
@@ -1385,6 +1372,7 @@ static int __init c4_init(void)
 		return 0;
 	}
 	printk(KERN_ERR "%s: NO C4/C2 card detected\n", c4_driver.name);
+	pci_unregister_driver(&c4_pci_driver);
 	detach_capi_driver(&c4_driver);
 	detach_capi_driver(&c2_driver);
 	MOD_DEC_USE_COUNT;
@@ -1393,8 +1381,9 @@ static int __init c4_init(void)
 
 static void __exit c4_exit(void)
 {
-    detach_capi_driver(&c2_driver);
-    detach_capi_driver(&c4_driver);
+	pci_unregister_driver(&c4_pci_driver);
+	detach_capi_driver(&c2_driver);
+	detach_capi_driver(&c4_driver);
 }
 
 module_init(c4_init);

@@ -150,8 +150,7 @@ static void net_family_write_lock(void)
 	while (atomic_read(&net_family_lockct) != 0) {
 		spin_unlock(&net_family_lock);
 
-		current->policy |= SCHED_YIELD;
-		schedule();
+		yield();
 
 		spin_lock(&net_family_lock);
 	}

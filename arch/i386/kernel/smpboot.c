@@ -308,14 +308,14 @@ static void __init synchronize_tsc_bp (void)
 			if (tsc_values[i] < avg)
 				realdelta = -realdelta;
 
-			printk("BIOS BUG: CPU#%d improperly initialized, has %ld usecs TSC skew! FIXED.\n",
-				i, realdelta);
+			printk("BIOS BUG: CPU#%d improperly initialized, has %ld usecs TSC skew! FIXED.\n", i, realdelta);
 		}
 
 		sum += delta;
 	}
 	if (!buggy)
 		printk("passed.\n");
+		;
 }
 
 static void __init synchronize_tsc_ap (void)
@@ -365,7 +365,7 @@ void __init smp_callin(void)
 	 * (This works even if the APIC is not enabled.)
 	 */
 	phys_id = GET_APIC_ID(apic_read(APIC_ID));
-	cpuid = current->processor;
+	cpuid = smp_processor_id();
 	if (test_and_set_bit(cpuid, &cpu_online_map)) {
 		printk("huh, phys CPU#%d, CPU#%d already present??\n",
 					phys_id, cpuid);
@@ -471,6 +471,7 @@ int __init start_secondary(void *unused)
 	 */
 	local_flush_tlb();
 
+	init_idle();
 	return cpu_idle();
 }
 
@@ -803,16 +804,13 @@ static void __init do_boot_cpu (int apicid)
 	if (!idle)
 		panic("No idle process for CPU %d", cpu);
 
-	idle->processor = cpu;
-	idle->cpus_runnable = 1 << cpu; /* we schedule the first task manually */
+	idle->cpu = cpu;
 
 	map_cpu_to_boot_apicid(cpu, apicid);
 
 	idle->thread.eip = (unsigned long) start_secondary;
 
-	del_from_runqueue(idle);
 	unhash_process(idle);
-	init_tasks[cpu] = idle;
 
 	/* start_eip had better be page-aligned! */
 	start_eip = setup_trampoline();
@@ -1020,8 +1018,7 @@ void __init smp_boot_cpus(void)
 	map_cpu_to_boot_apicid(0, boot_cpu_apicid);
 
 	global_irq_holder = 0;
-	current->processor = 0;
-	init_idle();
+	current->cpu = 0;
 	smp_tune_scheduling();
 
 	/*

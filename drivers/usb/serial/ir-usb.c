@@ -91,6 +91,7 @@ MODULE_DEVICE_TABLE (usb, id_table);
 
 
 struct usb_serial_device_type ir_device = {
+	owner:			THIS_MODULE,
 	name:			"IR Dongle",
 	id_table:		id_table,
 	num_interrupt_in:	1,
@@ -204,7 +205,6 @@ static int ir_open (struct usb_serial_port *port, struct file *filp)
 	down (&port->sem);
 	
 	++port->open_count;
-	MOD_INC_USE_COUNT;
 	
 	if (port->open_count == 1) {
 		if (buffer_size) {
@@ -270,7 +270,6 @@ static void ir_close (struct usb_serial_port *port, struct file * filp)
 
 	}
 	up (&port->sem);
-	MOD_DEC_USE_COUNT;
 }
 
 static int ir_write (struct usb_serial_port *port, int from_user, const unsigned char *buf, int count)

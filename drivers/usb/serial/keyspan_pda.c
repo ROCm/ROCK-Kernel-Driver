@@ -193,7 +193,6 @@ static void keyspan_pda_wakeup_write( struct usb_serial_port *port )
 	/* wake up other tty processes */
 	wake_up_interruptible( &tty->write_wait );
 	/* For 2.2.16 backport -- wake_up_interruptible( &tty->poll_wait ); */
-	MOD_DEC_USE_COUNT;
 }
 
 static void keyspan_pda_request_unthrottle( struct usb_serial *serial )
@@ -212,7 +211,6 @@ static void keyspan_pda_request_unthrottle( struct usb_serial *serial )
 			     NULL,
 			     0,
 			     2*HZ);
-	MOD_DEC_USE_COUNT;
 }
 
 
@@ -261,9 +259,7 @@ static void keyspan_pda_rx_interrupt (struct urb *urb)
 			tty = serial->port[0].tty;
 			priv->tx_throttled = 0;
 			/* queue up a wakeup at scheduler time */
-			MOD_INC_USE_COUNT;
-			if (schedule_task(&priv->wakeup_task) == 0)
-				MOD_DEC_USE_COUNT;
+			schedule_task(&priv->wakeup_task);
 			break;
 		default:
 			break;
@@ -602,9 +598,7 @@ static int keyspan_pda_write(struct usb_serial_port *port, int from_user,
 
 	if (request_unthrottle) {
 		priv->tx_throttled = 1; /* block writers */
-		MOD_INC_USE_COUNT;
-		if (schedule_task(&priv->unthrottle_task) == 0)
-			MOD_DEC_USE_COUNT;
+		schedule_task(&priv->unthrottle_task);
 	}
 
 	rc = count;
@@ -631,9 +625,7 @@ static void keyspan_pda_write_bulk_callback (struct urb *urb)
 	}
 	
 	/* queue up a wakeup at scheduler time */
-	MOD_INC_USE_COUNT;
-	if (schedule_task(&priv->wakeup_task) == 0)
-		MOD_DEC_USE_COUNT;
+	schedule_task(&priv->wakeup_task);
 }
 
 
@@ -672,7 +664,6 @@ static int keyspan_pda_open (struct usb_serial_port *port, struct file *filp)
 
 	down (&port->sem);
 
-	MOD_INC_USE_COUNT;
 	++port->open_count;
 
 	if (port->open_count == 1) {
@@ -721,7 +712,6 @@ static int keyspan_pda_open (struct usb_serial_port *port, struct file *filp)
 	return rc;
 error:
 	--port->open_count;
-	MOD_DEC_USE_COUNT;
 	up (&port->sem);
 	return rc;
 }
@@ -749,7 +739,6 @@ static void keyspan_pda_close(struct usb_serial_port *port, struct file *filp)
 	}
 
 	up (&port->sem);
-	MOD_DEC_USE_COUNT;
 }
 
 

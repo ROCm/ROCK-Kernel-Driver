@@ -74,7 +74,7 @@ struct usb_kbd {
 	unsigned char new[8];
 	unsigned char old[8];
 	struct urb irq, led;
-	devrequest dr;
+	struct usb_ctrlrequest dr;
 	unsigned char leds, newleds;
 	char name[128];
 	int open;
@@ -218,11 +218,11 @@ static void *usb_kbd_probe(struct usb_device *dev, unsigned int ifnum,
 	FILL_INT_URB(&kbd->irq, dev, pipe, kbd->new, maxp > 8 ? 8 : maxp,
 		usb_kbd_irq, kbd, endpoint->bInterval);
 
-	kbd->dr.requesttype = USB_TYPE_CLASS | USB_RECIP_INTERFACE;
-	kbd->dr.request = HID_REQ_SET_REPORT;
-	kbd->dr.value = 0x200;
-	kbd->dr.index = interface->bInterfaceNumber;
-	kbd->dr.length = 1;
+	kbd->dr.bRequestType = USB_TYPE_CLASS | USB_RECIP_INTERFACE;
+	kbd->dr.bRequest = HID_REQ_SET_REPORT;
+	kbd->dr.wValue = 0x200;
+	kbd->dr.wIndex = interface->bInterfaceNumber;
+	kbd->dr.wLength = 1;
 
 	kbd->dev.name = kbd->name;
 	kbd->dev.idbus = BUS_USB;

@@ -772,8 +772,7 @@ rpc_allocate(unsigned int flags, unsigned int size)
 		}
 		if (flags & RPC_TASK_ASYNC)
 			return NULL;
-		current->policy |= SCHED_YIELD;
-		schedule();
+		yield();
 	} while (!signalled());
 
 	return NULL;
@@ -1114,8 +1113,7 @@ rpciod_killall(void)
 		__rpc_schedule();
 		if (all_tasks) {
 			dprintk("rpciod_killall: waiting for tasks to exit\n");
-			current->policy |= SCHED_YIELD;
-			schedule();
+			yield();
 		}
 	}
 
@@ -1185,8 +1183,7 @@ rpciod_down(void)
 	 * wait briefly before checking the process id.
 	 */
 	current->sigpending = 0;
-	current->policy |= SCHED_YIELD;
-	schedule();
+	yield();
 	/*
 	 * Display a message if we're going to wait longer.
 	 */

@@ -106,8 +106,10 @@ static int jffs2_garbage_collect_thread(void *_c)
 
         sprintf(current->comm, "jffs2_gcd_mtd%d", c->mtd->index);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
 	/* FIXME in the 2.2 backport */
 	current->nice = 10;
+#endif
 
 	for (;;) {
 		spin_lock_irq(&current->sigmask_lock);

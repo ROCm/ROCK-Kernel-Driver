@@ -54,12 +54,12 @@ int journal_no_write[2];
  * amount of time.  This is for crash/recovery testing.
  */
 
-static void make_rdonly(kdev_t dev, int *no_write)
+static void make_rdonly(struct block_device *bdev, int *no_write)
 {
-	if (kdev_val(dev)) {
+	if (bdev) {
 		printk(KERN_WARNING "Turning device %s read-only\n", 
-		       bdevname(dev));
-		*no_write = 0xdead0000 + kdev_val(dev);
+		       bdevname(to_kdev_t(bdev->bd_dev)));
+		*no_write = 0xdead0000 + bdev->bd_dev;
 	}
 }
 
@@ -67,7 +67,7 @@ static void turn_fs_readonly(unsigned long arg)
 {
 	struct super_block *sb = (struct super_block *)arg;
 
-	make_rdonly(sb->s_dev, &journal_no_write[0]);
+	make_rdonly(sb->s_bdev, &journal_no_write[0]);
 	make_rdonly(EXT3_SB(sb)->s_journal->j_dev, &journal_no_write[1]);
 	wake_up(&EXT3_SB(sb)->ro_wait_queue);
 }
@@ -400,7 +400,6 @@ void ext3_put_super (struct super_block * sb)
 {
 	struct ext3_sb_info *sbi = EXT3_SB(sb);
 	struct ext3_super_block *es = sbi->s_es;
-	kdev_t j_dev = sbi->s_journal->j_dev;
 	int i;
 
 	journal_destroy(sbi->s_journal);
@@ -429,15 +428,15 @@ void ext3_put_super (struct super_block * sb)
 		dump_orphan_list(sb, sbi);
 	J_ASSERT(list_empty(&sbi->s_orphan));
 
-	invalidate_buffers(sb->s_dev);
-	if (!kdev_same(j_dev, sb->s_dev)) {
+	invalidate_bdev(sb->s_bdev, 0);
+	if (sbi->journal_bdev != sb->s_bdev) {
 		/*
 		 * Invalidate the journal device's buffers.  We don't want them
 		 * floating about in memory - the physical journal device may
 		 * hotswapped, and it breaks the `ro-after' testing code.
 		 */
-		fsync_no_super(j_dev);
-		invalidate_buffers(j_dev);
+		fsync_no_super(sbi->journal_bdev);
+		invalidate_bdev(sbi->journal_bdev, 0);
 		ext3_blkdev_remove(sbi);
 	}
 	clear_ro_after(sb);
@@ -715,7 +714,7 @@ static int ext3_setup_super(struct super_block *sb, struct ext3_super_block *es,
 				sb->s_id);
 	if (EXT3_SB(sb)->s_journal->j_inode == NULL) {
 		printk("external journal on %s\n",
-				bdevname(EXT3_SB(sb)->s_journal->j_dev));
+		    bdevname(to_kdev_t(EXT3_SB(sb)->s_journal->j_dev->bd_dev)));
 	} else {
 		printk("internal journal\n");
 	}
@@ -1284,7 +1283,7 @@ static journal_t *ext3_get_dev_journal(struct super_block *sb,
 	sb_block = EXT3_MIN_BLOCK_SIZE / blocksize;
 	offset = EXT3_MIN_BLOCK_SIZE % blocksize;
 	set_blocksize(j_dev, blocksize);
-	if (!(bh = bread(j_dev, sb_block, blocksize))) {
+	if (!(bh = __bread(bdev, sb_block, blocksize))) {
 		printk(KERN_ERR "EXT3-fs: couldn't read superblock of "
 		       "external journal\n");
 		goto out_bdev;
@@ -1310,7 +1309,7 @@ static journal_t *ext3_get_dev_journal(struct super_block *sb,
 	start = sb_block + 1;
 	brelse(bh);	/* we're done with the superblock */
 
-	journal = journal_init_dev(j_dev, sb->s_dev,
+	journal = journal_init_dev(bdev, sb->s_bdev,
 					start, len, blocksize);
 	if (!journal) {
 		printk(KERN_ERR "EXT3-fs: failed to create device journal\n");

@@ -627,7 +627,6 @@ int blkdev_open(struct inode * inode, struct file * filp)
 int blkdev_put(struct block_device *bdev, int kind)
 {
 	int ret = 0;
-	kdev_t rdev = to_kdev_t(bdev->bd_dev); /* this should become bdev */
 	struct inode *bd_inode = bdev->bd_inode;
 
 	down(&bdev->bd_sem);
@@ -635,7 +634,7 @@ int blkdev_put(struct block_device *bdev, int kind)
 	if (kind == BDEV_FILE)
 		__block_fsync(bd_inode);
 	else if (kind == BDEV_FS)
-		fsync_no_super(rdev);
+		fsync_no_super(bdev);
 	if (!--bdev->bd_openers)
 		kill_bdev(bdev);
 	if (bdev->bd_op->release)

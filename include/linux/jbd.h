@@ -482,13 +482,13 @@ struct journal_s
 
 	/* Device, blocksize and starting block offset for the location
 	 * where we store the journal. */
-	kdev_t			j_dev;
+	struct block_device *	j_dev;
 	int			j_blocksize;
 	unsigned int		j_blk_offset;
 
 	/* Device which holds the client fs.  For internal journal this
 	 * will be equal to j_dev. */
-	kdev_t			j_fs_dev;
+	struct block_device *	j_fs_dev;
 
 	/* Total maximum capacity of the journal region on disk. */
 	unsigned int		j_maxlen;
@@ -649,7 +649,8 @@ extern int	 journal_flush (journal_t *);
 extern void	 journal_lock_updates (journal_t *);
 extern void	 journal_unlock_updates (journal_t *);
 
-extern journal_t * journal_init_dev(kdev_t dev, kdev_t fs_dev,
+extern journal_t * journal_init_dev(struct block_device *bdev,
+				struct block_device *fs_dev,
 				int start, int len, int bsize);
 extern journal_t * journal_init_inode (struct inode *);
 extern int	   journal_update_format (journal_t *);

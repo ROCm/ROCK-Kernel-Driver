@@ -75,6 +75,14 @@ static __inline__ void clear_bit(int nr, volatile void * addr)
 		:"=m" (ADDR)
 		:"Ir" (nr));
 }
+
+static __inline__ void __clear_bit(int nr, volatile void * addr)
+{
+	__asm__ __volatile__(
+		"btrl %1,%0"
+		:"=m" (ADDR)
+		:"Ir" (nr));
+}
 #define smp_mb__before_clear_bit()	barrier()
 #define smp_mb__after_clear_bit()	barrier()
 

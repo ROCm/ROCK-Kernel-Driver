@@ -367,7 +367,7 @@ struct hid_report_enum {
 #define HID_CONTROL_FIFO_SIZE	8
 
 struct hid_control_fifo {
-	devrequest dr;
+	struct usb_ctrlrequest dr;
 	char buffer[HID_BUFFER_SIZE];
 };
 

@@ -394,9 +394,7 @@ rebalance:
 		return NULL;
 
 	/* Yield for kswapd, and try again */
-	current->policy |= SCHED_YIELD;
-	__set_current_state(TASK_RUNNING);
-	schedule();
+	yield();
 	goto rebalance;
 }
 

@@ -460,8 +460,7 @@ int journal_write_metadata_buffer(transaction_t *transaction,
 			printk (KERN_NOTICE __FUNCTION__
 				": ENOMEM at get_unused_buffer_head, "
 				"trying again.\n");
-			current->policy |= SCHED_YIELD;
-			schedule();
+			yield();
 		}
 	} while (!new_bh);
 	/* keep subsequent assertions sane */
@@ -476,7 +475,7 @@ int journal_write_metadata_buffer(transaction_t *transaction,
 
 	new_jh->b_transaction = NULL;
 	new_bh->b_size = jh2bh(jh_in)->b_size;
-	new_bh->b_dev = transaction->t_journal->j_dev;
+	new_bh->b_dev = to_kdev_t(transaction->t_journal->j_dev->bd_dev);
 	new_bh->b_blocknr = blocknr;
 	new_bh->b_state |= (1 << BH_Mapped) | (1 << BH_Dirty);
 
@@ -640,7 +639,8 @@ int journal_bmap(journal_t *journal, unsigned long blocknr,
 			printk (KERN_ALERT __FUNCTION__ 
 				": journal block not found "
 				"at offset %lu on %s\n",
-				blocknr, bdevname(journal->j_dev));
+				blocknr,
+				bdevname(to_kdev_t(journal->j_dev->bd_dev)));
 			err = -EIO;
 			__journal_abort_soft(journal, err);
 		}
@@ -667,7 +667,7 @@ struct journal_head * journal_get_descriptor_buffer(journal_t *journal)
 	if (err)
 		return NULL;
 
-	bh = getblk(journal->j_dev, blocknr, journal->j_blocksize);
+	bh = __getblk(journal->j_dev, blocknr, journal->j_blocksize);
 	bh->b_state |= (1 << BH_Dirty);
 	BUFFER_TRACE(bh, "return this buffer");
 	return journal_add_journal_head(bh);
@@ -736,7 +736,8 @@ fail:
  * must have all data blocks preallocated.
  */
 
-journal_t * journal_init_dev(kdev_t dev, kdev_t fs_dev,
+journal_t * journal_init_dev(struct block_device *bdev,
+			struct block_device *fs_dev,
 			int start, int len, int blocksize)
 {
 	journal_t *journal = journal_init_common();
@@ -745,13 +746,13 @@ journal_t * journal_init_dev(kdev_t dev, kdev_t fs_dev,
 	if (!journal)
 		return NULL;
 
-	journal->j_dev = dev;
+	journal->j_dev = bdev;
 	journal->j_fs_dev = fs_dev;
 	journal->j_blk_offset = start;
 	journal->j_maxlen = len;
 	journal->j_blocksize = blocksize;
 
-	bh = getblk(journal->j_dev, start, journal->j_blocksize);
+	bh = __getblk(journal->j_dev, start, journal->j_blocksize);
 	J_ASSERT(bh != NULL);
 	journal->j_sb_buffer = bh;
 	journal->j_superblock = (journal_superblock_t *)bh->b_data;
@@ -769,8 +770,7 @@ journal_t * journal_init_inode (struct inode *inode)
 	if (!journal)
 		return NULL;
 
-	journal->j_dev = inode->i_dev;
-	journal->j_fs_dev = inode->i_dev;
+	journal->j_dev = journal->j_fs_dev = inode->i_sb->s_bdev;
 	journal->j_inode = inode;
 	jbd_debug(1,
 		  "journal %p: inode %s/%ld, size %Ld, bits %d, blksize %ld\n",
@@ -790,7 +790,7 @@ journal_t * journal_init_inode (struct inode *inode)
 		return NULL;
 	}
 	
-	bh = getblk(journal->j_dev, blocknr, journal->j_blocksize);
+	bh = __getblk(journal->j_dev, blocknr, journal->j_blocksize);
 	J_ASSERT(bh != NULL);
 	journal->j_sb_buffer = bh;
 	journal->j_superblock = (journal_superblock_t *)bh->b_data;
@@ -883,17 +883,18 @@ int journal_create (journal_t *journal)
 		err = journal_bmap(journal, i, &blocknr);
 		if (err)
 			return err;
-		bh = getblk(journal->j_dev, blocknr, journal->j_blocksize);
-		wait_on_buffer(bh);
+		bh = __getblk(journal->j_dev, blocknr, journal->j_blocksize);
+		lock_buffer(bh);
 		memset (bh->b_data, 0, journal->j_blocksize);
 		BUFFER_TRACE(bh, "marking dirty");
 		mark_buffer_dirty(bh);
 		BUFFER_TRACE(bh, "marking uptodate");
 		mark_buffer_uptodate(bh, 1);
+		unlock_buffer(bh);
 		__brelse(bh);
 	}
 
-	sync_dev(journal->j_dev);
+	fsync_dev(to_kdev_t(journal->j_dev->bd_dev));
 	jbd_debug(1, "JBD: journal cleared.\n");
 
 	/* OK, fill in the initial static fields in the new superblock */
@@ -1357,14 +1358,14 @@ int journal_wipe (journal_t *journal, int write)
 
 const char * journal_dev_name(journal_t *journal)
 {
-	kdev_t dev;
+	struct block_device *bdev;
 
 	if (journal->j_inode)
-		dev = journal->j_inode->i_dev;
+		bdev = journal->j_inode->i_sb->s_bdev;
 	else
-		dev = journal->j_dev;
+		bdev = journal->j_dev;
 
-	return bdevname(dev);
+	return bdevname(to_kdev_t(bdev->bd_dev));
 }
 
 /*
@@ -1539,8 +1540,7 @@ void * __jbd_kmalloc (char *where, size_t size, int flags, int retry)
 			last_warning = jiffies;
 		}
 		
-		current->policy |= SCHED_YIELD;
-		schedule();
+		yield();
 	}
 }
 
@@ -1598,8 +1598,7 @@ static struct journal_head *journal_alloc_journal_head(void)
 			last_warning = jiffies;
 		}
 		while (ret == 0) {
-			current->policy |= SCHED_YIELD;
-			schedule();
+			yield();
 			ret = kmem_cache_alloc(journal_head_cache, GFP_NOFS);
 		}
 	}

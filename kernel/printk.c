@@ -25,6 +25,7 @@
 #include <linux/module.h>
 #include <linux/interrupt.h>			/* For in_interrupt() */
 #include <linux/config.h>
+#include <linux/delay.h>
 
 #include <asm/uaccess.h>
 
