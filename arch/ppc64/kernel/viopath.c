@@ -85,7 +85,7 @@ static void handleMonitorEvent(struct HvLpEvent *event);
 struct doneAllocParms_t {
 	struct semaphore *sem;
 	int number;
-	volatile unsigned long *wait_atomic;
+	atomic_t *wait_atomic;
 	int used_wait_atomic;
 };
 
@@ -531,7 +531,7 @@ static void viopath_donealloc(void *parm, int number)
 
 	parmsp->number = number;
 	if (parmsp->used_wait_atomic)
-		*(parmsp->wait_atomic) = 0;
+		atomic_set(parmsp->wait_atomic, 0);
 	else
 		up(parmsp->sem);
 }
@@ -540,10 +540,11 @@ static int allocateEvents(HvLpIndex remoteLp, int numEvents)
 {
 	struct doneAllocParms_t parms;
 	DECLARE_MUTEX_LOCKED(Semaphore);
-	volatile unsigned long wait_atomic = 1;
+	atomic_t wait_atomic;
 
 	if (in_atomic()) {
 		parms.used_wait_atomic = 1;
+		atomic_set(&wait_atomic, 1);
 		parms.wait_atomic = &wait_atomic;
 	} else {
 		parms.used_wait_atomic = 0;
@@ -552,7 +553,7 @@ static int allocateEvents(HvLpIndex remoteLp, int numEvents)
 	mf_allocateLpEvents(remoteLp, HvLpEvent_Type_VirtualIo, 250,	/* It would be nice to put a real number here! */
 			    numEvents, &viopath_donealloc, &parms);
 	if (in_atomic()) {
-		while (wait_atomic)
+		while (atomic_read(&wait_atomic))
 			mb();
 	} else
 		down(&Semaphore);
@@ -656,6 +657,7 @@ int viopath_close(HvLpIndex remoteLp, int subtype, int numReq)
 
 	spin_unlock_irqrestore(&statuslock, flags);
 
+	doneAllocParms.used_wait_atomic = 0;
 	doneAllocParms.sem = &Semaphore;
 	mf_deallocateLpEvents(remoteLp, HvLpEvent_Type_VirtualIo,
 			      numReq, &viopath_donealloc, &doneAllocParms);
