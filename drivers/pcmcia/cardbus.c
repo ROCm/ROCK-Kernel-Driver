@@ -291,7 +291,7 @@ int cb_alloc(socket_info_t * s)
 		/* We need to assign resources for expansion ROM. */
 		for (r = 0; r < 7; r++) {
 			struct resource *res = dev->resource + r;
-			if (!res->start && res->end)
+			if (res->flags)
 				pci_assign_resource(dev, r);
 		}
 
