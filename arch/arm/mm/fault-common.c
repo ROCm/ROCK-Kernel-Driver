@@ -25,6 +25,7 @@
 
 #include <asm/system.h>
 #include <asm/pgtable.h>
+#include <asm/uaccess.h>
 
 #include "fault.h"
 
@@ -103,20 +104,11 @@ static void
 __do_kernel_fault(struct mm_struct *mm, unsigned long addr, unsigned int fsr,
 		  struct pt_regs *regs)
 {
-	const struct exception_table_entry *fixup;
-
 	/*
 	 * Are we prepared to handle this kernel fault?
 	 */
-	fixup = search_exception_tables(instruction_pointer(regs));
-	if (fixup) {
-#ifdef DEBUG
-		printk(KERN_DEBUG "%s: Exception at [<%lx>] addr=%lx (fixup: %lx)\n",
-			current->comm, regs->ARM_pc, addr, fixup->fixup);
-#endif
-		regs->ARM_pc = fixup->fixup;
+	if (fixup_exception(regs))
 		return;
-	}
 
 	/*
 	 * No handler, we'll have to terminate things with extreme prejudice.

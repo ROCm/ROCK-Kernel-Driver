@@ -342,7 +342,7 @@ static void __init clps711x_guess_lcd_params(struct fb_info *info)
 	 * CLPS7110 - no on-board SRAM
 	 * EP7212   - 38400 bytes
 	 */
-	if (size < 38400) {
+	if (size <= 38400) {
 		printk(KERN_INFO "CLPS711xFB: could use on-board SRAM?\n");
 	}
 

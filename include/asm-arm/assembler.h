@@ -26,3 +26,13 @@
 #define push            lsr
 #define byte(x)         ((3-x)*8)
 #endif
+
+/*
+ * Data preload for architectures that support it
+ */
+#if __LINUX_ARM_ARCH__ >= 5
+#define PLD(code...)	code
+#else
+#define PLD(code...)
+#endif
+

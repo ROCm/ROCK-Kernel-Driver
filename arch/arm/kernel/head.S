@@ -205,18 +205,6 @@ __create_page_tables:
 	add	r3, r3, #1 << 20
 	str	r3, [r0], #4			@ KERNEL + 3MB
 
-	/*
-	 * Ensure that the first section of RAM is present.
-	 * we assume that:
-	 *  1. the RAM is aligned to a 32MB boundary
-	 *  2. the kernel is executing in the same 32MB chunk
-	 *     as the start of RAM.
-	 */
-	bic	r0, r0, #0x01f00000 >> 18	@ round down
-	and	r2, r5, #0xfe000000		@ round down
-	add	r3, r8, r2			@ flags + rambase
-	str	r3, [r0]
-
 	bic	r8, r8, #0x0c			@ turn off cacheable
 						@ and bufferable bits
 #ifdef CONFIG_DEBUG_LL

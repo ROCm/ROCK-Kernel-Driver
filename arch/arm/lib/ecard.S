@@ -6,19 +6,17 @@
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
+ *
+ * 27/03/03 Ian Molton Clean up CONFIG_CPU
+ *
  */
-#include <linux/config.h> /* for CONFIG_CPU_nn */
 #include <linux/linkage.h>
 #include <asm/assembler.h>
 #include <asm/hardware.h>
 
-#ifdef CONFIG_CPU_26
-#define CPSR2SPSR(rt)
-#else
 #define CPSR2SPSR(rt) \
 		mrs	rt, cpsr; \
 		msr	spsr, rt
-#endif
 
 @ Purpose: call an expansion card loader to read bytes.
 @ Proto  : char read_loader(int offset, char *card_base, char *loader);

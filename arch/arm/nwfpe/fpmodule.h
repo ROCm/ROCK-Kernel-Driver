@@ -17,21 +17,15 @@
     You should have received a copy of the GNU General Public License
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+
+    27/03/03 Ian Molton Clean up CONFIG_CPU
 */
 
 #ifndef __FPMODULE_H__
 #define __FPMODULE_H__
 
-#include <linux/config.h>
-
-#ifdef CONFIG_CPU_32
 #define REG_ORIG_R0	17
 #define REG_CPSR	16
-#else
-#define REG_ORIG_R0	16
-#define REG_CPSR	15
-#endif
-
 #define REG_PC		15
 #define REG_LR		14
 #define REG_SP		13

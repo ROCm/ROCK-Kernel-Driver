@@ -1,5 +1,5 @@
 /*
- * linux/include/asm/arch-iop310/iop310.h
+ * linux/include/asm/arch-iop3xx/iop310.h
  *
  * Intel IOP310 Compainion Chip definitions
  *

@@ -7,6 +7,7 @@ extern int sa1111_pcmcia_configure_socket(struct sa1100_pcmcia_socket *, const s
 extern void sa1111_pcmcia_socket_init(struct sa1100_pcmcia_socket *);
 extern void sa1111_pcmcia_socket_suspend(struct sa1100_pcmcia_socket *);
 
+extern int pcmcia_badge4_init(struct device *);
 extern int pcmcia_jornada720_init(struct device *);
 extern int pcmcia_neponset_init(struct device *);
 

@@ -60,6 +60,7 @@ static struct sa1111_dev usb_dev = {
 	},
 	.skpcr_mask	= SKPCR_UCLKEN,
 	.devid		= SA1111_DEVID_USB,
+	.dma_mask	= 0xffffffffLL,
 	.irq = {
 		IRQ_USBPWR,
 		IRQ_HCIM,
@@ -494,6 +495,7 @@ sa1111_init_one_child(struct sa1111 *sachip, struct sa1111_dev *sadev, unsigned 
 
 	sadev->dev.parent = sachip->dev;
 	sadev->dev.bus    = &sa1111_bus_type;
+	sadev->dev.dma_mask = &sadev->dma_mask;
 	sadev->res.start  = sachip->res.start + offset;
 	sadev->res.end    = sadev->res.start + 511;
 	sadev->res.name   = sadev->dev.name;

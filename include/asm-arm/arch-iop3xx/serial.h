@@ -1,5 +1,5 @@
 /*
- * include/asm-arm/arch-iop310/serial.h
+ * include/asm-arm/arch-iop3xx/serial.h
  */
 #include <linux/config.h>
 

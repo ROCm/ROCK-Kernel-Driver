@@ -188,7 +188,6 @@ void show_regs(struct pt_regs * regs)
 		processor_modes[processor_mode(regs)],
 		thumb_mode(regs) ? " (T)" : "",
 		get_fs() == get_ds() ? "kernel" : "user");
-#if defined(CONFIG_CPU_32)
 	{
 		unsigned int ctrl, transbase, dac;
 		  __asm__ (
@@ -199,7 +198,6 @@ void show_regs(struct pt_regs * regs)
 		printk("Control: %04X  Table: %08X  DAC: %08X\n",
 		  	ctrl, transbase, dac);
 	}
-#endif
 }
 
 void show_fpregs(struct user_fp *regs)
@@ -237,18 +235,9 @@ void show_fpregs(struct user_fp *regs)
 static unsigned long *thread_info_head;
 static unsigned int nr_thread_info;
 
-#ifdef CONFIG_CPU_32
 #define EXTRA_TASK_STRUCT	4
 #define ll_alloc_task_struct() ((struct thread_info *) __get_free_pages(GFP_KERNEL,1))
 #define ll_free_task_struct(p) free_pages((unsigned long)(p),1)
-#else
-extern unsigned long get_page_8k(int priority);
-extern void free_page_8k(unsigned long page);
-
-#define EXTRA_TASK_STRUCT	0
-#define ll_alloc_task_struct()	((struct task_struct *)get_page_8k(GFP_KERNEL))
-#define ll_free_task_struct(p)  free_page_8k((unsigned long)(p))
-#endif
 
 struct thread_info *alloc_thread_info(void)
 {

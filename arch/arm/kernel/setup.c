@@ -113,7 +113,6 @@ static struct resource io_res[] = {
 #define lp1 io_res[1]
 #define lp2 io_res[2]
 
-#ifdef CONFIG_CPU_32
 static const char *cache_types[16] = {
 	"write-through",
 	"write-back",
@@ -230,10 +229,6 @@ static void __init dump_cpu_info(void)
 		}
 	}
 }
-
-#else
-#define dump_cpu_info() do { } while (0)
-#endif
 
 int cpu_architecture(void)
 {
@@ -768,7 +763,6 @@ static int c_show(struct seq_file *m, void *v)
 	}
 	seq_printf(m, "CPU revision\t: %d\n", processor_id & 15);
 
-#ifdef CONFIG_CPU_32
 	{
 		unsigned int cache_info;
 
@@ -791,7 +785,6 @@ static int c_show(struct seq_file *m, void *v)
 			}
 		}
 	}
-#endif
 
 	seq_puts(m, "\n");
 

@@ -1,5 +1,5 @@
 /*
- * arch/arm/mach-iop310/iop310-pci.c
+ * arch/arm/mach-iop3xx/iop310-pci.c
  *
  * PCI support for the Intel IOP310 chipset
  *

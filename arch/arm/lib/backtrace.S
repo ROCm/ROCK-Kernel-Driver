@@ -6,6 +6,9 @@
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
+ *
+ * 27/03/03 Ian Molton Clean up CONFIG_CPU
+ *
  */
 #include <linux/config.h>
 #include <linux/linkage.h>
@@ -31,13 +34,9 @@ ENTRY(c_backtrace)
 #else
 
 		stmfd	sp!, {r4 - r8, lr}	@ Save an extra register so we have a location...
-#ifdef CONFIG_CPU_32
 		tst	r1, #0x10		@ 26 or 32-bit?
 		moveq	mask, #0xfc000003
 		movne	mask, #0
-#else
-		mov	mask, #0xfc000003
-#endif
 		tst	mask, r0
 		movne	r0, #0
 		movs	frame, r0
