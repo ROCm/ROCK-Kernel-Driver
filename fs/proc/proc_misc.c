@@ -412,7 +412,7 @@ static int kstat_read_proc(char *page, char **start, off_t off,
 	}
 	len += sprintf(page + len, "intr %u", sum);
 
-#if !defined(CONFIG_ARCH_S390) && !defined(CONFIG_PPC64)
+#if !defined(CONFIG_ARCH_S390) && !defined(CONFIG_PPC64) && !defined(CONFIG_ALPHA)
 	for (i = 0 ; i < NR_IRQS ; i++)
 		len += sprintf(page + len, " %u", kstat_irqs(i));
 #endif
