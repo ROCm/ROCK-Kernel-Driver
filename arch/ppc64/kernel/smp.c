@@ -465,7 +465,7 @@ static inline void look_for_more_cpus(void)
 		       maxcpus);
 
 	/* Make those cpus (which might appear later) possible too. */
-	if ((naca->smt_state == SMT_ON) || (naca->smt_state == SMT_DYNAMIC)) {
+	if ((cur_cpu_spec->cpu_features & CPU_FTR_SMT) && ((naca->smt_state == SMT_ON) || (naca->smt_state == SMT_DYNAMIC))) {
 		maxcpus *= 2;
 	}
 	for (i = 0; i < maxcpus; i++)
