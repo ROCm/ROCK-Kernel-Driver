@@ -566,7 +566,7 @@ static struct vm_operations_struct pfm_vm_ops={
 
 
 #define pfm_wait_task_inactive(t)	wait_task_inactive(t)
-#define pfm_get_cpu_var(v)		__get_cpu_var(v)
+#define pfm_get_cpu_var(v)		__ia64_per_cpu_var(v)
 #define pfm_get_cpu_data(a,b)		per_cpu(a, b)
 typedef	irqreturn_t	pfm_irq_handler_t;
 #define PFM_IRQ_HANDLER_RET(v)	do {  \
