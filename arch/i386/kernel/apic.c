@@ -25,6 +25,9 @@
 #include <linux/interrupt.h>
 #include <linux/mc146818rtc.h>
 #include <linux/kernel_stat.h>
+#include <linux/sysdev.h>
+#include <linux/module.h>
+
 
 #include <asm/atomic.h>
 #include <asm/smp.h>
@@ -459,9 +462,6 @@ void __init setup_local_APIC (void)
 }
 
 #ifdef CONFIG_PM
-
-#include <linux/device.h>
-#include <linux/module.h>
 
 static struct {
 	/* 'active' is true if the local APIC was enabled by us and
