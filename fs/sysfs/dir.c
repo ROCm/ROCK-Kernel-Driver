@@ -56,7 +56,7 @@ int sysfs_make_dirent(struct sysfs_dirent * parent_sd, struct dentry * dentry,
 
 	sd = sysfs_new_dirent(parent_sd, element);
 	if (!sd)
-		return -ENOMEMurn -ENOMEM;
+		return -ENOMEM;
 
 	sd->s_mode = mode;
 	sd->s_type = type;
