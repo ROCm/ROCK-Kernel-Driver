@@ -553,4 +553,5 @@ dep_bool '    Kernel low-level debugging messages via UART2' CONFIG_DEBUG_CLPS71
 endmenu
 
 source security/Config.in
+source crypto/Config.in
 source lib/Config.in
