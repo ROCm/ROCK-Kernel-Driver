@@ -593,18 +593,8 @@ static int sx_probe(struct specialix_board *bp)
 
 static inline void sx_mark_event(struct specialix_port * port, int event)
 {
-	/* 
-	 * I'm not quite happy with current scheme all serial
-	 * drivers use their own BH routine.
-	 * It seems this easily can be done with one BH routine
-	 * serving for all serial drivers.
-	 * For now I must introduce another one - SPECIALIX_BH.
-	 * Still hope this will be changed in near future.
-	 * -- Dmitry.
-	 */
 	set_bit(event, &port->event);
-	queue_task(&port->tqueue, &tq_specialix);
-	mark_bh(SPECIALIX_BH);
+	schedule_work(&port->tqueue);
 }
 
 
@@ -689,7 +679,7 @@ static inline void sx_receive_exc(struct specialix_board * bp)
 	
 	*tty->flip.char_buf_ptr++ = ch;
 	tty->flip.count++;
-	queue_task(&tty->flip.tqueue, &tq_timer);
+	schedule_delayed_work(&tty->flip.work, 1);
 }
 
 
@@ -720,7 +710,7 @@ static inline void sx_receive(struct specialix_board * bp)
 		*tty->flip.flag_buf_ptr++ = 0;
 		tty->flip.count++;
 	}
-	queue_task(&tty->flip.tqueue, &tq_timer);
+	schedule_delayed_work(&tty->flip.work, 1);
 }
 
 
@@ -824,7 +814,7 @@ static inline void sx_check_modem(struct specialix_board * bp)
 #ifdef SPECIALIX_DEBUG
 			printk ( "Sending HUP.\n");
 #endif
-			schedule_task(&port->tqueue_hangup);
+			schedule_work(&port->tqueue_hangup);
 		}
 	}
 	
@@ -2067,11 +2057,11 @@ static void sx_start(struct tty_struct * tty)
 
 
 /*
- * This routine is called from the scheduler tqueue when the interrupt
+ * This routine is called from the work-queue when the interrupt
  * routine has signalled that a hangup has occurred.  The path of
  * hangup processing is:
  *
- * 	serial interrupt routine -> (scheduler tqueue) ->
+ * 	serial interrupt routine -> (workqueue) ->
  * 	do_sx_hangup() -> tty->hangup() -> sx_hangup()
  * 
  */
@@ -2129,12 +2119,6 @@ static void sx_set_termios(struct tty_struct * tty, struct termios * old_termios
 }
 
 
-static void do_specialix_bh(void)
-{
-	 run_task_queue(&tq_specialix);
-}
-
-
 static void do_softint(void *private_)
 {
 	struct specialix_port	*port = (struct specialix_port *) private_;
@@ -2185,7 +2169,6 @@ static int sx_init_drivers(void)
 		put_tty_driver(specialix_driver);
 		return 1;
 	}
-	init_bh(SPECIALIX_BH, do_specialix_bh);
 	specialix_driver->owner = THIS_MODULE;
 	specialix_driver->name = "ttyW";
 	specialix_driver->major = SPECIALIX_NORMAL_MAJOR;
@@ -2207,10 +2190,8 @@ static int sx_init_drivers(void)
 	memset(sx_port, 0, sizeof(sx_port));
 	for (i = 0; i < SX_NPORT * SX_NBOARD; i++) {
 		sx_port[i].magic = SPECIALIX_MAGIC;
-		sx_port[i].tqueue.routine = do_softint;
-		sx_port[i].tqueue.data = &sx_port[i];
-		sx_port[i].tqueue_hangup.routine = do_sx_hangup;
-		sx_port[i].tqueue_hangup.data = &sx_port[i];
+		INIT_WORK(&sx_port[i].tqueue, do_softint, &sx_port[i]);
+		INIT_WORK(&sx_port[i].tqueue_hangup, do_sx_hangup, &sx_port[i]);
 		sx_port[i].close_delay = 50 * HZ/100;
 		sx_port[i].closing_wait = 3000 * HZ/100;
 		init_waitqueue_head(&sx_port[i].open_wait);
