@@ -123,23 +123,21 @@ static int svwks_ratemask(struct ata_device *drive)
 	return map;
 }
 
-static int svwks_tune_chipset(struct ata_device *drive, byte speed)
+static int svwks_tune_chipset(struct ata_device *drive, u8 speed)
 {
 	static u8 dma_modes[]	= { 0x77, 0x21, 0x20 };
 	static u8 pio_modes[]	= { 0x5d, 0x47, 0x34, 0x22, 0x20 };
 
-	struct ata_channel *hwif = drive->channel;
-	struct pci_dev *dev	= hwif->pci_dev;
-	byte unit		= (drive->select.b.unit & 0x01);
-	byte csb5		= (dev->device == PCI_DEVICE_ID_SERVERWORKS_CSB5IDE) ? 1 : 0;
+	struct ata_channel *ch = drive->channel;
+	struct pci_dev *dev = ch->pci_dev;
+	u8 unit = drive->select.b.unit & 0x01;
+	u8 drive_pci, drive_pci2;
+	u8 drive_pci3 = ch->unit ? 0x57 : 0x56;
 
-	byte drive_pci, drive_pci2;
-	byte drive_pci3	= hwif->unit ? 0x57 : 0x56;
+	u8 ultra_enable, ultra_timing, dma_timing, pio_timing;
+	u16 csb5_pio;
 
-	byte ultra_enable, ultra_timing, dma_timing, pio_timing;
-	unsigned short csb5_pio;
-
-	byte pio = ata_timing_mode(drive, XFER_PIO | XFER_EPIO) - XFER_PIO_0;
+	u8 pio = ata_timing_mode(drive, XFER_PIO | XFER_EPIO) - XFER_PIO_0;
 
         switch (drive->dn) {
 		case 0: drive_pci = 0x41; break;
@@ -213,7 +211,8 @@ static int svwks_tune_chipset(struct ata_device *drive, byte speed)
 #endif
 
 	pci_write_config_byte(dev, drive_pci, pio_timing);
-	if (csb5)
+
+	if (dev->device == PCI_DEVICE_ID_SERVERWORKS_CSB5IDE)
 		pci_write_config_word(dev, 0x4A, csb5_pio);
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
@@ -221,29 +220,20 @@ static int svwks_tune_chipset(struct ata_device *drive, byte speed)
 	pci_write_config_byte(dev, drive_pci3, ultra_timing);
 	pci_write_config_byte(dev, 0x54, ultra_enable);
 #endif
-	drive->current_speed = speed;
 
 	return ide_config_drive_speed(drive, speed);
 }
 
-static void svwks_tune_drive(struct ata_device *drive, byte pio)
+static void svwks_tune_drive(struct ata_device *drive, u8 pio)
 {
-	byte speed;
-	switch(pio) {
-		case 4:		speed = XFER_PIO_4;break;
-		case 3:		speed = XFER_PIO_3;break;
-		case 2:		speed = XFER_PIO_2;break;
-		case 1:		speed = XFER_PIO_1;break;
-		default:	speed = XFER_PIO_0;break;
-	}
-	(void) svwks_tune_chipset(drive, speed);
+	(void) svwks_tune_chipset(drive, XFER_PIO_0 + min_t(u8, pio, 4));
 }
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
 static int config_chipset_for_dma(struct ata_device *drive)
 {
 	int map;
-	byte mode;
+	u8 mode;
 
 	/* FIXME: check SWDMA modes --bkz */
 	map = XFER_MWDMA | svwks_ratemask(drive);
@@ -354,7 +344,7 @@ static int svwks_udma_stop(struct ata_device *drive)
 static unsigned int __init svwks_init_chipset(struct pci_dev *dev)
 {
 	unsigned int reg;
-	byte btr;
+	u8 btr;
 
 	/* save revision id to determine DMA capability */
 	pci_read_config_byte(dev, PCI_REVISION_ID, &svwks_revision);
@@ -404,8 +394,7 @@ static unsigned int __init svwks_init_chipset(struct pci_dev *dev)
 static unsigned int __init ata66_svwks_dell(struct ata_channel *hwif)
 {
 	struct pci_dev *dev = hwif->pci_dev;
-	if (dev->subsystem_vendor == PCI_VENDOR_ID_DELL &&
-	    dev->vendor	== PCI_VENDOR_ID_SERVERWORKS &&
+	if (dev->vendor == PCI_VENDOR_ID_SERVERWORKS &&
 	    (dev->device == PCI_DEVICE_ID_SERVERWORKS_CSB5IDE ||
 	     dev->device == PCI_DEVICE_ID_SERVERWORKS_CSB6IDE))
 		return ((1 << (hwif->unit + 14)) &
@@ -422,8 +411,7 @@ static unsigned int __init ata66_svwks_dell(struct ata_channel *hwif)
 static unsigned int __init ata66_svwks_cobalt(struct ata_channel *hwif)
 {
 	struct pci_dev *dev = hwif->pci_dev;
-	if (dev->subsystem_vendor == PCI_VENDOR_ID_SUN &&
-	    dev->vendor	== PCI_VENDOR_ID_SERVERWORKS &&
+	if (dev->vendor == PCI_VENDOR_ID_SERVERWORKS &&
 	    dev->device == PCI_DEVICE_ID_SERVERWORKS_CSB5IDE)
 		return ((1 << (hwif->unit + 14)) &
 			dev->subsystem_device) ? 1 : 0;
@@ -501,9 +489,8 @@ int __init init_svwks(void)
 {
 	int i;
 
-	for (i = 0; i < ARRAY_SIZE(chipsets); ++i) {
+	for (i = 0; i < ARRAY_SIZE(chipsets); ++i)
 		ata_register_chipset(&chipsets[i]);
-	}
 
         return 0;
 }

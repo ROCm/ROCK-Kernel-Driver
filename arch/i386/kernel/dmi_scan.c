@@ -185,28 +185,6 @@ struct dmi_blacklist
 #define NO_MATCH	{ NONE, NULL}
 #define MATCH(a,b)	{ a, b }
 
-/*
- *	We have problems with IDE DMA on some platforms. In paticular the
- *	KT7 series. On these it seems the newer BIOS has fixed them. The
- *	rule needs to be improved to match specific BIOS revisions with
- *	corruption problems
- */ 
- 
-#if 0
-static __init int disable_ide_dma(struct dmi_blacklist *d)
-{
-#ifdef CONFIG_BLK_DEV_IDE
-	extern int noautodma;
-	if(noautodma == 0)
-	{
-		noautodma = 1;
-		printk(KERN_INFO "%s series board detected. Disabling IDE DMA.\n", d->ident);
-	}
-#endif	
-	return 0;
-}
-#endif
-
 /* 
  * Reboot options and system auto-detection code provided by
  * Dell Computer Corporation so their systems "just work". :-)
@@ -511,12 +489,6 @@ static __init int print_if_true(struct dmi_blacklist *d)
  */
  
 static __initdata struct dmi_blacklist dmi_blacklist[]={
-#if 0
-	{ disable_ide_dma, "KT7", {	/* Overbroad right now - kill DMA on problem KT7 boards */
-			MATCH(DMI_PRODUCT_NAME, "KT7-RAID"),
-			NO_MATCH, NO_MATCH, NO_MATCH
-			} },
-#endif			
 	{ broken_ps2_resume, "Dell Latitude C600", {	/* Handle problems with APM on the C600 */
 			MATCH(DMI_SYS_VENDOR, "Dell"),
 			MATCH(DMI_PRODUCT_NAME, "Latitude C600"),

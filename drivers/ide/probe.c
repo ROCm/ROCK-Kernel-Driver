@@ -339,6 +339,8 @@ int ide_config_drive_speed(struct ata_device *drive, byte speed)
 		ata_irq_enable(drive, 1);
 	udelay(1);
 
+	/* FIXME: use ata_status_poll()  --bkz */
+
 	ata_busy_poll(drive, WAIT_CMD);
 
 	/*
@@ -394,6 +396,8 @@ int ide_config_drive_speed(struct ata_device *drive, byte speed)
 		case XFER_SW_DMA_0: drive->id->dma_1word |= 0x0101; break;
 		default: break;
 	}
+
+	drive->current_speed = speed;
 
 	return error;
 }

@@ -53,6 +53,7 @@ static void ali15x3_tune_drive(struct ata_device *drive, byte pio)
 
 	t = ata_timing_data(pio);
 
+	/* FIXME: use generic ata-timing library  --bkz */
 	s_time = t->setup;
 	a_time = t->active;
 	if ((s_clc = (s_time * system_bus_speed + 999999) / 1000000) >= 8)
@@ -170,8 +171,6 @@ static int ali15x3_tune_chipset(struct ata_device *drive, byte speed)
 		}
 	}
 #endif /* CONFIG_BLK_DEV_IDEDMA */
-
-	drive->current_speed = speed;
 
 	return ide_config_drive_speed(drive, speed);
 }
