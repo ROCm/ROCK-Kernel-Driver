@@ -248,12 +248,8 @@ e1000_up(struct e1000_adapter *adapter)
 	e1000_alloc_rx_buffers(adapter);
 
 	if(request_irq(netdev->irq, &e1000_intr, SA_SHIRQ | SA_SAMPLE_RANDOM,
-		       netdev->name, netdev)) {
-		e1000_reset_hw(&adapter->hw);
-		e1000_free_tx_resources(adapter);
-		e1000_free_rx_resources(adapter);
+		       netdev->name, netdev))
 		return -1;
-	}
 
 	mod_timer(&adapter->watchdog_timer, jiffies);
 	e1000_irq_enable(adapter);
