@@ -22,11 +22,11 @@
 extern u32 pm_disk_mode;
 extern struct pm_ops * pm_ops;
 
-extern int swsusp_save(void);
-extern int swsusp_write(void);
-extern int swsusp_read(void);
-extern int swsusp_restore(void);
-extern int swsusp_free(void);
+extern int pmdisk_save(void);
+extern int pmdisk_write(void);
+extern int pmdisk_read(void);
+extern int pmdisk_restore(void);
+extern int pmdisk_free(void);
 
 extern long sys_sync(void);
 
@@ -146,7 +146,7 @@ static int prepare(void)
  *
  *	If we're going through the firmware, then get it over with quickly.
  *
- *	If not, then call swsusp to do it's thing, then figure out how
+ *	If not, then call pmdis to do it's thing, then figure out how
  *	to power down the system.
  */
 
@@ -163,7 +163,7 @@ int pm_suspend_disk(void)
 
 	pr_debug("PM: snapshotting memory.\n");
 	in_suspend = 1;
-	if ((error = swsusp_save()))
+	if ((error = pmdisk_save()))
 		goto Done;
 
 	if (in_suspend) {
@@ -175,14 +175,14 @@ int pm_suspend_disk(void)
 		mb();
 		barrier();
 
-		error = swsusp_write();
+		error = pmdisk_write();
 		if (!error) {
 			error = power_down(pm_disk_mode);
 			pr_debug("PM: Power down failed.\n");
 		}
 	} else
 		pr_debug("PM: Image restored successfully.\n");
-	swsusp_free();
+	pmdisk_free();
  Done:
 	finish();
 	return error;
@@ -193,7 +193,7 @@ int pm_suspend_disk(void)
  *	pm_resume - Resume from a saved image.
  *
  *	Called as a late_initcall (so all devices are discovered and
- *	initialized), we call swsusp to see if we have a saved image or not.
+ *	initialized), we call pmdisk to see if we have a saved image or not.
  *	If so, we quiesce devices, the restore the saved image. We will
  *	return above (in pm_suspend_disk() ) if everything goes well.
  *	Otherwise, we fail gracefully and return to the normally
@@ -205,9 +205,9 @@ static int pm_resume(void)
 {
 	int error;
 
-	pr_debug("PM: Reading swsusp image.\n");
+	pr_debug("PM: Reading pmdisk image.\n");
 
-	if ((error = swsusp_read()))
+	if ((error = pmdisk_read()))
 		goto Done;
 
 	pr_debug("PM: Preparing system for restore.\n");
@@ -229,11 +229,11 @@ static int pm_resume(void)
 	mdelay(1000);
 
 	pr_debug("PM: Restoring saved image.\n");
-	swsusp_restore();
+	pmdisk_restore();
 	pr_debug("PM: Restore failed, recovering.n");
 	finish();
  Free:
-	swsusp_free();
+	pmdisk_free();
  Done:
 	pr_debug("PM: Resume from disk failed.\n");
 	return 0;
