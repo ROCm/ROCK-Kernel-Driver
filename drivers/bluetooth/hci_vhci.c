@@ -84,8 +84,6 @@ static void hci_vhci_destruct(struct hci_dev *hdev)
 
 	vhci = (struct hci_vhci_struct *) hdev->driver_data;
 	kfree(vhci);
-
-	MOD_DEC_USE_COUNT;
 }
 
 static int hci_vhci_send_frame(struct sk_buff *skb)
@@ -288,11 +286,12 @@ static int hci_vhci_chr_open(struct inode *inode, struct file * file)
 	hdev->send  = hci_vhci_send_frame;
 	hdev->destruct = hci_vhci_destruct;
 
+	hdev->owner = THIS_MODULE;
+	
 	if (hci_register_dev(hdev) < 0) {
 		kfree(hci_vhci);
 		return -EBUSY;
 	}
-	MOD_INC_USE_COUNT;
 
 	file->private_data = hci_vhci;
 	return 0;   

@@ -207,18 +207,15 @@ static int hci_usb_open(struct hci_dev *hdev)
 	if (test_and_set_bit(HCI_RUNNING, &hdev->flags))
 		return 0;
 
-	MOD_INC_USE_COUNT;
-
 	write_lock_irqsave(&husb->completion_lock, flags);
 
 	err = hci_usb_enable_intr(husb);
 	if (!err) {
 		for (i = 0; i < HCI_MAX_BULK_RX; i++)
 			hci_usb_rx_submit(husb, NULL);
-	} else {
+	} else
 		clear_bit(HCI_RUNNING, &hdev->flags);
-		MOD_DEC_USE_COUNT;
-	}
+	
 
 	write_unlock_irqrestore(&husb->completion_lock, flags);
 	return err;
@@ -271,8 +268,6 @@ static int hci_usb_close(struct hci_dev *hdev)
 	hci_usb_flush(hdev);
 
 	write_unlock_irqrestore(&husb->completion_lock, flags);
-
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -758,6 +753,8 @@ int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	hdev->send  = hci_usb_send_frame;
 	hdev->destruct = hci_usb_destruct;
 
+	hdev->owner = THIS_MODULE;
+	
 	if (hci_register_dev(hdev) < 0) {
 		BT_ERR("Can't register HCI device");
 		goto probe_error;

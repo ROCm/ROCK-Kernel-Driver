@@ -218,8 +218,7 @@ struct hci_dev *hci_get_route(bdaddr_t *dst, bdaddr_t *src)
 	read_lock_bh(&hci_dev_list_lock);
 
 	list_for_each(p, &hci_dev_list) {
-		struct hci_dev *d;
-		d = list_entry(p, struct hci_dev, list);
+		struct hci_dev *d = list_entry(p, struct hci_dev, list);
 		
 		if (!test_bit(HCI_UP, &d->flags))
 			continue;
@@ -241,7 +240,7 @@ struct hci_dev *hci_get_route(bdaddr_t *dst, bdaddr_t *src)
 	}
 
 	if (hdev)
-		hci_dev_hold(hdev);
+		hdev = hci_dev_hold(hdev);
 
 	read_unlock_bh(&hci_dev_list_lock);
 	return hdev;

@@ -593,6 +593,8 @@ int bt3c_open(bt3c_info_t *info)
 	hdev->destruct = bt3c_hci_destruct;
 	hdev->ioctl = bt3c_hci_ioctl;
 
+	hdev->owner = THIS_MODULE;
+	
 	if (hci_register_dev(hdev) < 0) {
 		printk(KERN_WARNING "bt3c_cs: Can't register HCI device %s.\n", hdev->name);
 		return -ENODEV;
@@ -835,8 +837,6 @@ found_port:
 		goto failed;
 	}
 
-	MOD_INC_USE_COUNT;
-
 	if (bt3c_open(info) != 0)
 		goto failed;
 
@@ -861,8 +861,6 @@ void bt3c_release(u_long arg)
 
 	if (link->state & DEV_PRESENT)
 		bt3c_close(info);
-
-	MOD_DEC_USE_COUNT;
 
 	link->dev = NULL;
 

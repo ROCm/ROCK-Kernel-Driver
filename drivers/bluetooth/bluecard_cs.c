@@ -789,6 +789,8 @@ int bluecard_open(bluecard_info_t *info)
 	hdev->destruct = bluecard_hci_destruct;
 	hdev->ioctl = bluecard_hci_ioctl;
 
+	hdev->owner = THIS_MODULE;
+	
 	if (hci_register_dev(hdev) < 0) {
 		printk(KERN_WARNING "bluecard_cs: Can't register HCI device %s.\n", hdev->name);
 		return -ENODEV;
@@ -1002,8 +1004,6 @@ void bluecard_config(dev_link_t *link)
 		goto failed;
 	}
 
-	MOD_INC_USE_COUNT;
-
 	if (bluecard_open(info) != 0)
 		goto failed;
 
@@ -1028,8 +1028,6 @@ void bluecard_release(u_long arg)
 
 	if (link->state & DEV_PRESENT)
 		bluecard_close(info);
-
-	MOD_DEC_USE_COUNT;
 
 	link->dev = NULL;
 
