@@ -104,7 +104,7 @@ void show_trace(struct task_struct *task, unsigned long * stack)
 #ifdef CONFIG_KALLSYMS
 	printk("\n");
 #endif
-	while (((long) stack & (THREAD_SIZE-4)) != 0) {
+	while (!kstack_end(stack)) {
 		addr = *stack++;
 		if (kernel_text_address(addr)) {
 			printk(" [<%08lx>] ", addr);
@@ -138,7 +138,7 @@ void show_stack(struct task_struct *task, unsigned long *esp)
 
 	stack = esp;
 	for(i = 0; i < kstack_depth_to_print; i++) {
-		if (((long) stack & (THREAD_SIZE-4)) == 0)
+		if (kstack_end(stack))
 			break;
 		if (i && ((i % 8) == 0))
 			printk("\n       ");

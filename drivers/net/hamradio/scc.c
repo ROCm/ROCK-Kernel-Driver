@@ -1762,7 +1762,7 @@ static int scc_net_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 
 #ifndef SCC_DONT_CHECK
 
-			if(request_region(scc->ctrl, 1, "scc-probe"))
+			if(request_region(hwcfg.ctrl_a, 1, "scc-probe"))
 			{
 				disable_irq(hwcfg.irq);
 				Outb(hwcfg.ctrl_a, 0);
@@ -1774,7 +1774,7 @@ static int scc_net_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 				if (InReg(hwcfg.ctrl_a,R13) != 0x55)
 					found = 0;
 				enable_irq(hwcfg.irq);
-				release_region(scc->ctrl, 1);
+				release_region(hwcfg.ctrl_a, 1);
 			}
 			else
 				found = 0;

@@ -55,6 +55,16 @@ config BRIDGE_EBT_802_3
 
 	  To compile it as a module, choose M here.  If unsure, say N.
 
+config BRIDGE_EBT_AMONG
+	tristate "ebt: among filter support"
+	depends on BRIDGE_NF_EBTABLES
+	help
+	  This option adds the among match, which allows matching the MAC source
+	  and/or destination address on a list of addresses. Optionally,
+	  MAC/IP address pairs can be matched, f.e. for anti-spoofing rules.
+
+	  To compile it as a module, choose M here.  If unsure, say N.
+
 config BRIDGE_EBT_ARP
 	tristate "ebt: ARP filter support"
 	depends on BRIDGE_NF_EBTABLES

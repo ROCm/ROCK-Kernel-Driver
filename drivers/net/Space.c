@@ -433,17 +433,15 @@ void __init probe_old_netdevs(void)
 	
 #ifdef CONFIG_SBNI
 	for (num = 0; num < 8; ++num)
-		if (sbni_probe(num))
-			break;
+		sbni_probe(num);
 #endif
 #ifdef CONFIG_TR
 	for (num = 0; num < 8; ++num)
-		if (trif_probe(num))
-			break;
+		trif_probe(num);
 #endif
 	for (num = 0; num < 8; ++num)
-		if (ethif_probe(num))
-			break;
+		ethif_probe(num);
+
 #ifdef CONFIG_COPS
 	cops_probe(0);
 	cops_probe(1);

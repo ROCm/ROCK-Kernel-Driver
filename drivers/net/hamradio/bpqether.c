@@ -196,12 +196,8 @@ static int bpq_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_ty
 	eth = (struct ethhdr *)skb->mac.raw;
 
 	if (!(bpq->acpt_addr[0] & 0x01) &&
-	    memcmp(eth->h_source, bpq->acpt_addr, ETH_ALEN)) {
-		if (net_ratelimit())
-			printk(KERN_DEBUG "bpqether: wrong dest %s\n",
-			       bpq_print_ethaddr(eth->h_source));
+	    memcmp(eth->h_source, bpq->acpt_addr, ETH_ALEN))
 		goto drop_unlock;
-	}
 
 	if (skb_cow(skb, sizeof(struct ethhdr)))
 		goto drop_unlock;

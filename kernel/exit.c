@@ -273,12 +273,33 @@ int allow_signal(int sig)
 
 	spin_lock_irq(&current->sighand->siglock);
 	sigdelset(&current->blocked, sig);
+	if (!current->mm) {
+		/* Kernel threads handle their own signals.
+		   Let the signal code know it'll be handled, so
+		   that they don't get converted to SIGKILL or
+		   just silently dropped */
+		current->sighand->action[(sig)-1].sa.sa_handler = (void *)2;
+	}
 	recalc_sigpending();
 	spin_unlock_irq(&current->sighand->siglock);
 	return 0;
 }
 
 EXPORT_SYMBOL(allow_signal);
+
+int disallow_signal(int sig)
+{
+	if (sig < 1 || sig > _NSIG)
+		return -EINVAL;
+
+	spin_lock_irq(&current->sighand->siglock);
+	sigaddset(&current->blocked, sig);
+	recalc_sigpending();
+	spin_unlock_irq(&current->sighand->siglock);
+	return 0;
+}
+
+EXPORT_SYMBOL(disallow_signal);
 
 /*
  *	Put all the gunge required to become a kernel thread without

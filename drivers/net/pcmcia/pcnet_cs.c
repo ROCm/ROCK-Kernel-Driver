@@ -681,10 +681,6 @@ static void pcnet_config(dev_link_t *link)
     } else {
 	dev->if_port = 0;
     }
-    if (register_netdev(dev) != 0) {
-	printk(KERN_NOTICE "pcnet_cs: register_netdev() failed\n");
-	goto failed;
-    }
 
     hw_info = get_hwinfo(link);
     if (hw_info == NULL)
@@ -699,7 +695,6 @@ static void pcnet_config(dev_link_t *link)
     if (hw_info == NULL) {
 	printk(KERN_NOTICE "pcnet_cs: unable to read hardware net"
 	       " address for io base %#3lx\n", dev->base_addr);
-	unregister_netdev(dev);
 	goto failed;
     }
 
@@ -733,8 +728,6 @@ static void pcnet_config(dev_link_t *link)
     ei_status.word16 = 1;
     ei_status.reset_8390 = &pcnet_reset_8390;
 
-    strcpy(info->node.dev_name, dev->name);
-    link->dev = &info->node;
     SET_ETHTOOL_OPS(dev, &netdev_ethtool_ops);
 
     if (info->flags & (IS_DL10019|IS_DL10022)) {
@@ -743,6 +736,21 @@ static void pcnet_config(dev_link_t *link)
 	mii_phy_probe(dev);
 	if ((id == 0x30) && !info->pna_phy && (info->eth_phy == 4))
 	    info->eth_phy = 0;
+    }
+
+    link->dev = &info->node;
+    link->state &= ~DEV_CONFIG_PENDING;
+
+    if (register_netdev(dev) != 0) {
+	printk(KERN_NOTICE "pcnet_cs: register_netdev() failed\n");
+	link->dev = NULL;
+	goto failed;
+    }
+
+    strcpy(info->node.dev_name, dev->name);
+
+    if (info->flags & (IS_DL10019|IS_DL10022)) {
+	u_char id = inb(dev->base_addr + 0x1a);
 	printk(KERN_INFO "%s: NE2000 (DL100%d rev %02x): ",
 	       dev->name, ((info->flags & IS_DL10022) ? 22 : 19), id);
 	if (info->pna_phy)
@@ -758,7 +766,6 @@ static void pcnet_config(dev_link_t *link)
     printk(" hw_addr ");
     for (i = 0; i < 6; i++)
 	printk("%02X%s", dev->dev_addr[i], ((i<5) ? ":" : "\n"));
-    link->state &= ~DEV_CONFIG_PENDING;
     return;
 
 cs_failed:
