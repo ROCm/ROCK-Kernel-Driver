@@ -420,7 +420,12 @@ ia32_do_mmap (struct file *file, unsigned long addr, unsigned long len, int prot
 		return addr;
 
 	if (len > IA32_PAGE_OFFSET || addr > IA32_PAGE_OFFSET - len)
+	{
+		if (flags & MAP_FIXED)
+			return -ENOMEM;
+		else
 		return -EINVAL;
+	}
 
 	if (OFFSET4K(offset))
 		return -EINVAL;
