@@ -516,6 +516,9 @@ prom_initialize_naca(unsigned long mem)
 	return mem;
 }
 
+#ifdef CONFIG_PMAC_DART
+static int dart_force_on;
+#endif
 
 static unsigned long __init
 prom_initialize_lmb(unsigned long mem)
@@ -539,10 +542,12 @@ prom_initialize_lmb(unsigned long mem)
 		prom_print(opt);
 		prom_print(RELOC("\n"));
 		opt += 6;
-		while(*opt && *opt == ' ')
+		while (*opt && *opt == ' ')
 			opt++;
 		if (!strncmp(opt, RELOC("off"), 3))
 			nodart = 1;
+		else if (!strncmp(opt, RELOC("on"), 2))
+			RELOC(dart_force_on) = 1;
 	}
 #else
 	nodart = 1;
@@ -763,8 +768,10 @@ void prom_initialize_dart_table(void)
 	extern unsigned long dart_tablebase;
 	extern unsigned long dart_tablesize;
 
-	/* Only reserve DART space if machine has more than 2Gb of RAM */
-	if (lmb_end_of_DRAM() <= 0x80000000ull)
+	/* Only reserve DART space if machine has more than 2GB of RAM
+	 * or if requested with iommu=on on cmdline.
+	 */
+	if (lmb_end_of_DRAM() <= 0x80000000ull && !RELOC(dart_force_on))
 		return;
 
 	/* 512 pages is max DART tablesize. */
