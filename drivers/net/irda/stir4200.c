@@ -1041,52 +1041,6 @@ static struct net_device_stats *stir_net_get_stats(struct net_device *dev)
 }
 
 /*
- *    Parse the various endpoints and find the one we need.
- *
- * The endpoint are the pipes used to communicate with the USB device.
- * The spec defines 2 endpoints of type bulk transfer, one in, and one out.
- * These are used to pass frames back and forth with the dongle.
- */
-static int stir_setup_usb(struct stir_cb *stir, struct usb_interface *intf)
-{
-	struct usb_device *usbdev = interface_to_usbdev(intf);
-	const struct usb_host_interface *interface = intf->cur_altsetting;
-	const struct usb_endpoint_descriptor *ep_in = NULL;
-	const struct usb_endpoint_descriptor *ep_out = NULL;
-	int i;
-
-	if (interface->desc.bNumEndpoints != 2) {
-		WARNING("%s: expected two endpoints\n", __FUNCTION__);
-		return -ENODEV;
-	}
-
-	for(i = 0; i < interface->desc.bNumEndpoints; i++) {
-		const struct usb_endpoint_descriptor *ep
-			= &interface->endpoint[i].desc;
-
-		if ((ep->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK)
-		    == USB_ENDPOINT_XFER_BULK) {
-			/* We need to find an IN and an OUT */
-			if ((ep->bEndpointAddress & USB_ENDPOINT_DIR_MASK) == USB_DIR_IN)
-				ep_in = ep;
-			else
-				ep_out = ep;
-		} else
-			WARNING("%s: unknown endpoint type 0x%x\n",
-				__FUNCTION__, ep->bmAttributes);
-	}
-
-	if (!ep_in || !ep_out)
-		return -EIO;
-
-	stir->tx_bulkpipe = usb_sndbulkpipe(usbdev,
-			    ep_out->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK);
-	stir->rx_intpipe = usb_rcvintpipe(usbdev,
-			    ep_in->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK);
-	return 0;
-}
-
-/*
  * This routine is called by the USB subsystem for each new device
  * in the system. We need to check if the device is ours, and in
  * this case start handling it.
