@@ -35,3 +35,17 @@
 	ldr	\rd, [\rd, #TI_TASK]
 	ldr	\rd, [\rd, #TSK_ACTIVE_MM]
 	.endm
+
+/*
+ * mmid - get context id from mm pointer (mm->context.id)
+ */
+	.macro	mmid, rd, rn
+	ldr	\rd, [\rn, #MM_CONTEXT_ID]
+	.endm
+
+/*
+ * mask_asid - mask the ASID from the context ID
+ */
+	.macro	asid, rd, rn
+	and	\rd, \rn, #255
+	.endm
