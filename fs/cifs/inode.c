@@ -277,9 +277,6 @@ cifs_get_inode_info(struct inode **pinode, const unsigned char *search_path,
 		inode->i_blocks =
 	                (inode->i_blksize - 1 + pfindData->AllocationSize) >> inode->i_blkbits;
 
-		cFYI(1,
-		     (" Size %ld and blocks %ld ",
-		      (unsigned long) inode->i_size, inode->i_blocks));
 		inode->i_nlink = le32_to_cpu(pfindData->NumberOfLinks);
 
 		/* BB fill in uid and gid here? with help from winbind? 
@@ -543,13 +540,13 @@ cifs_revalidate(struct dentry *direntry)
 	      direntry->d_inode->i_count.counter, direntry,
 	      direntry->d_time, jiffies));
 
+
 	cifsInode = CIFS_I(direntry->d_inode);
 	/* BB add check - do not need to revalidate oplocked files */
 
-	if (time_before(jiffies, cifsInode->time + HZ)) {
+	if (time_before(jiffies, cifsInode->time + HZ) && lookupCacheEnabled) {
 	    if((S_ISREG(direntry->d_inode->i_mode) == 0) || 
-			(direntry->d_inode->i_nlink == 1) || 
-			(lookupCacheEnabled == 0)) {
+			(direntry->d_inode->i_nlink == 1)) {  
 			if (full_path)
 				kfree(full_path);
 			FreeXid(xid);

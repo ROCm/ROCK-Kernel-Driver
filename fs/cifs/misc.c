@@ -55,6 +55,8 @@ void
 _FreeXid(unsigned int xid)
 {
 	write_lock(&GlobalMid_Lock);
+	/* if(GlobalTotalActiveXid == 0)
+		BUG(); */
 	GlobalTotalActiveXid--;
 	write_unlock(&GlobalMid_Lock);
 }
