@@ -1154,8 +1154,6 @@
 
 /* permedia3 -specific definitions */
 #define PM3_SCALE_TO_CLOCK(pr, fe, po) ((2 * PM3_REF_CLOCK * fe) / (pr * (1 << (po))))
-#define PICOS2KHZ(a) (1000000000UL/(a))
-#define KHZ2PICOS(a) (1000000000UL/(a))
 
 /* in case it's not in linux/pci.h */
 #ifndef PCI_DEVICE_ID_3DLABS_PERMEDIA3
