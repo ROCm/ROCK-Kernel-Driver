@@ -300,7 +300,6 @@ static void mce_checkregs (void *info)
 
 static void do_mce_timer(void *data)
 { 
-	mce_checkregs(NULL);
 	smp_call_function (mce_checkregs, NULL, 1, 1);
 } 
 
