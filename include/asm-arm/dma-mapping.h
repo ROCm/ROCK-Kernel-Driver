@@ -107,6 +107,23 @@ dma_free_coherent(struct device *dev, size_t size, void *cpu_addr,
 }
 
 /**
+ * dma_alloc_writecombine - allocate writecombining memory for DMA
+ * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
+ * @size: required memory size
+ * @handle: bus-specific DMA address
+ *
+ * Allocate some uncached, buffered memory for a device for
+ * performing DMA.  This function allocates pages, and will
+ * return the CPU-viewed address, and sets @handle to be the
+ * device-viewed address.
+ */
+extern void *
+dma_alloc_writecombine(struct device *dev, size_t size, dma_addr_t *handle, int gfp);
+
+#define dma_free_writecombine(dev,size,cpu_addr,handle) \
+	dma_free_coherent(dev,size,cpu_addr,handle)
+
+/**
  * dma_map_single - map a single buffer for streaming DMA
  * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
  * @cpu_addr: CPU direct mapped address of buffer

@@ -227,6 +227,20 @@ dma_alloc_coherent(struct device *dev, size_t size, dma_addr_t *handle, int gfp)
 EXPORT_SYMBOL(dma_alloc_coherent);
 
 /*
+ * Allocate a writecombining region, in much the same way as
+ * dma_alloc_coherent above.
+ */
+void *
+dma_alloc_writecombine(struct device *dev, size_t size, dma_addr_t *handle, int gfp)
+{
+	if (dev == NULL || *dev->dma_mask != 0xffffffff)
+		gfp |= GFP_DMA;
+
+	return consistent_alloc(gfp, size, handle, PTE_BUFFERABLE);
+}
+EXPORT_SYMBOL(dma_alloc_writecombine);
+
+/*
  * free a page as defined by the above mapping.
  */
 void consistent_free(void *vaddr, size_t size, dma_addr_t handle)
