@@ -49,22 +49,22 @@ static int vfat_revalidate(struct dentry *dentry, int);
 
 static struct dentry_operations vfat_dentry_ops[4] = {
 	{
-		d_hash:		vfat_hashi,
-		d_compare:	vfat_cmpi,
+		.d_hash		= vfat_hashi,
+		.d_compare	= vfat_cmpi,
 	},
 	{
-		d_revalidate:	vfat_revalidate,
-		d_hash:		vfat_hashi,
-		d_compare:	vfat_cmpi,
+		.d_revalidate	= vfat_revalidate,
+		.d_hash		= vfat_hashi,
+		.d_compare	= vfat_cmpi,
 	},
 	{
-		d_hash:		vfat_hash,
-		d_compare:	vfat_cmp,
+		.d_hash		= vfat_hash,
+		.d_compare	= vfat_cmp,
 	},
 	{
-		d_revalidate:	vfat_revalidate,
-		d_hash:		vfat_hash,
-		d_compare:	vfat_cmp,
+		.d_revalidate	= vfat_revalidate,
+		.d_hash		= vfat_hash,
+		.d_compare	= vfat_cmp,
 	}
 };
 
@@ -1269,13 +1269,13 @@ rename_done:
 
 /* Public inode operations for the VFAT fs */
 struct inode_operations vfat_dir_inode_operations = {
-	create:		vfat_create,
-	lookup:		vfat_lookup,
-	unlink:		vfat_unlink,
-	mkdir:		vfat_mkdir,
-	rmdir:		vfat_rmdir,
-	rename:		vfat_rename,
-	setattr:	fat_notify_change,
+	.create		= vfat_create,
+	.lookup		= vfat_lookup,
+	.unlink		= vfat_unlink,
+	.mkdir		= vfat_mkdir,
+	.rmdir		= vfat_rmdir,
+	.rename		= vfat_rename,
+	.setattr	= fat_notify_change,
 };
 
 int vfat_fill_super(struct super_block *sb, void *data, int silent)
