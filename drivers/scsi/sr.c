@@ -147,7 +147,7 @@ static inline struct scsi_cd *scsi_cd_get(struct gendisk *disk)
 	goto out;
 
  out_put:
-	kref_put(&cd->kref);
+	kref_put(&cd->kref, sr_kref_release);
  out_null:
 	cd = NULL;
  out:
@@ -159,7 +159,7 @@ static inline void scsi_cd_put(struct scsi_cd *cd)
 {
 	down(&sr_ref_sem);
 	scsi_device_put(cd->device);
-	kref_put(&cd->kref);
+	kref_put(&cd->kref, sr_kref_release);
 	up(&sr_ref_sem);
 }
 
@@ -576,7 +576,7 @@ static int sr_probe(struct device *dev)
 		goto fail;
 	memset(cd, 0, sizeof(*cd));
 
-	kref_init(&cd->kref, sr_kref_release);
+	kref_init(&cd->kref);
 
 	disk = alloc_disk(1);
 	if (!disk)
@@ -937,7 +937,7 @@ static int sr_remove(struct device *dev)
 	del_gendisk(cd->disk);
 
 	down(&sr_ref_sem);
-	kref_put(&cd->kref);
+	kref_put(&cd->kref, sr_kref_release);
 	up(&sr_ref_sem);
 
 	return 0;
