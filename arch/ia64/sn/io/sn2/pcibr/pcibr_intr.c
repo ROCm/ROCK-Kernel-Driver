@@ -10,7 +10,6 @@
 #include <linux/module.h>
 #include <asm/sn/sgi.h>
 #include <asm/sn/arch.h>
-#include <asm/sn/iograph.h>
 #include <asm/sn/pci/pciio.h>
 #include <asm/sn/pci/pcibr.h>
 #include <asm/sn/pci/pcibr_private.h>

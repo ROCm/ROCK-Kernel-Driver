@@ -27,7 +27,6 @@
 #include <asm/hw_irq.h>
 #include <asm/sn/types.h>
 #include <asm/sn/sgi.h>
-#include <asm/sn/iograph.h>
 #include <asm/sn/hcl.h>
 #include <asm/sn/labelcl.h>
 #include <asm/sn/io.h>

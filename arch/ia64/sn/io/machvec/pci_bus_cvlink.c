@@ -9,7 +9,6 @@
 #include <linux/vmalloc.h>
 #include <linux/slab.h>
 #include <asm/sn/sgi.h>
-#include <asm/sn/iograph.h>
 #include <asm/sn/pci/pci_bus_cvlink.h>
 #include <asm/sn/sn_cpuid.h>
 #include <asm/sn/simulator.h>

@@ -16,6 +16,7 @@
 
 #include <linux/pci.h>
 
+#include <asm/uaccess.h>
 #include <asm/sn/sgi.h>
 #include <asm/io.h>
 #include <asm/sn/iograph.h>
