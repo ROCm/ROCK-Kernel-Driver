@@ -866,14 +866,11 @@ void usb_disconnect(struct usb_device **pdev)
 }
 
 /**
- * usb_connect - connects a new device during enumeration (usbcore-internal)
- * @dev: partially enumerated device
+ * usb_connect - pick device address (usbcore-internal)
+ * @dev: newly detected device (in DEFAULT state)
  *
- * Connect a new USB device. This basically just initializes
- * the USB device information and sets up the topology - it's
- * up to the low-level driver to reset the port and actually
- * do the setup (the upper levels don't know how to do that).
- *
+ * Picks a device address.  It's up to the hub (or root hub) driver
+ * to handle and manage enumeration, starting from the DEFAULT state.
  * Only hub drivers (including virtual root hub drivers for host
  * controllers) should ever call this.
  */
@@ -983,7 +980,7 @@ static void set_device_description (struct usb_device *dev)
 }
 
 /*
- * By the time we get here, the device has gotten a new device ID
+ * By the time we get here, we chose a new device address
  * and is in the default state. We need to identify the thing and
  * get the ball rolling..
  *

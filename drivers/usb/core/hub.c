@@ -135,8 +135,7 @@ static void hub_irq(struct urb *urb, struct pt_regs *regs)
 
 	default:		/* presumably an error */
 		/* Cause a hub reset after 10 consecutive errors */
-		dbg("hub '%s' status %d for interrupt transfer",
-			urb->dev->devpath, urb->status);
+		dev_dbg (&hub->intf->dev, "transfer --> %d\n", urb->status);
 		if ((++hub->nerrors < 10) || hub->error)
 			goto resubmit;
 		hub->error = urb->status;
@@ -158,10 +157,10 @@ static void hub_irq(struct urb *urb, struct pt_regs *regs)
 	spin_unlock_irqrestore(&hub_event_lock, flags);
 
 resubmit:
-	if ((status = usb_submit_urb (hub->urb, GFP_ATOMIC)) != 0)
-		err ("hub '%s-%s' status %d for interrupt resubmit",
-			urb->dev->bus->bus_name, urb->dev->devpath,
-			status);
+	if ((status = usb_submit_urb (hub->urb, GFP_ATOMIC)) != 0
+			/* ENODEV means we raced disconnect() */
+			&& status != -ENODEV)
+		dev_err (&hub->intf->dev, "resubmit --> %d\n", urb->status);
 }
 
 /* USB 2.0 spec Section 11.24.2.3 */
@@ -652,8 +651,9 @@ static int usb_hub_port_status(struct usb_device *hub, int port,
 	if (portsts) {
 		ret = usb_get_port_status(hub, port + 1, portsts);
 		if (ret < 0)
-			err("%s(%s-%s) failed (err = %d)", __FUNCTION__,
-				hub->bus->bus_name, hub->devpath, ret);
+			dev_err (hubdev (hub),
+				"%s failed (err = %d)\n", __FUNCTION__,
+				ret);
 		else {
 			*status = le16_to_cpu(portsts->wPortStatus);
 			*change = le16_to_cpu(portsts->wPortChange); 
@@ -759,8 +759,8 @@ void usb_hub_port_disable(struct usb_device *hub, int port)
 
 	ret = usb_clear_port_feature(hub, port + 1, USB_PORT_FEAT_ENABLE);
 	if (ret)
-		err("cannot disable port %d of hub %s (err = %d)",
-			port + 1, hub->devpath, ret);
+		dev_err(hubdev(hub), "cannot disable port %d (err = %d)\n",
+			port + 1, ret);
 }
 
 /* USB 2.0 spec, 7.1.7.3 / fig 7-29:
@@ -983,12 +983,12 @@ static void usb_hub_events(void)
 		spin_unlock_irqrestore(&hub_event_lock, flags);
 
 		if (hub->error) {
-			dbg("resetting hub %s for error %d",
-				dev->devpath, hub->error);
+			dev_dbg (&hub->intf->dev, "resetting for error %d\n",
+				hub->error);
 
 			if (usb_hub_reset(hub)) {
-				err("error resetting hub %s - disconnecting",
-					dev->devpath);
+				dev_dbg (&hub->intf->dev,
+					"can't reset; disconnecting\n");
 				up(&hub->khubd_sem);
 				usb_hub_disconnect(dev);
 				continue;
@@ -1022,33 +1022,37 @@ static void usb_hub_events(void)
 				if (!(portstatus & USB_PORT_STAT_ENABLE)
 				    && (portstatus & USB_PORT_STAT_CONNECTION)
 				    && (dev->children[i])) {
-					err("already running hub %s port %i "
+					dev_err (&hub->intf->dev,
+					    "port %i "
 					    "disabled by hub (EMI?), "
 					    "re-enabling...",
-						dev->devpath, i + 1);
+						i + 1);
 					usb_hub_port_connect_change(hub,
 						i, portstatus, portchange);
 				}
 			}
 
 			if (portchange & USB_PORT_STAT_C_SUSPEND) {
-				dbg("hub %s port %d suspend change",
-					dev->devpath, i + 1);
+				dev_dbg (&hub->intf->dev,
+					"suspend change on port %d\n",
+					i + 1);
 				usb_clear_port_feature(dev,
 					i + 1,  USB_PORT_FEAT_C_SUSPEND);
 			}
 			
 			if (portchange & USB_PORT_STAT_C_OVERCURRENT) {
-				err("hub %s port %d over-current change",
-					dev->devpath, i + 1);
+				dev_err (&hub->intf->dev,
+					"over-current change on port %d\n",
+					i + 1);
 				usb_clear_port_feature(dev,
 					i + 1, USB_PORT_FEAT_C_OVER_CURRENT);
 				usb_hub_power_on(hub);
 			}
 
 			if (portchange & USB_PORT_STAT_C_RESET) {
-				dbg("hub %s port %d reset change",
-					dev->devpath, i + 1);
+				dev_dbg (&hub->intf->dev,
+					"reset change on port %d\n",
+					i + 1);
 				usb_clear_port_feature(dev,
 					i + 1, USB_PORT_FEAT_C_RESET);
 			}
@@ -1056,16 +1060,16 @@ static void usb_hub_events(void)
 
 		/* deal with hub status changes */
 		if (usb_get_hub_status(dev, &hubsts) < 0)
-			err("get_hub_status %s failed", dev->devpath);
+			dev_err (&hub->intf->dev, "get_hub_status failed\n");
 		else {
 			hubstatus = le16_to_cpup(&hubsts.wHubStatus);
 			hubchange = le16_to_cpup(&hubsts.wHubChange);
 			if (hubchange & HUB_CHANGE_LOCAL_POWER) {
-				dbg("hub %s power change", dev->devpath);
+				dev_dbg (&hub->intf->dev, "power change\n");
 				usb_clear_hub_feature(dev, C_HUB_LOCAL_POWER);
 			}
 			if (hubchange & HUB_CHANGE_OVERCURRENT) {
-				dbg("hub %s overcurrent change", dev->devpath);
+				dev_dbg (&hub->intf->dev, "overcurrent change\n");
 				wait_ms(500);	/* Cool down */
 				usb_clear_hub_feature(dev, C_HUB_OVER_CURRENT);
                         	usb_hub_power_on(hub);
