@@ -106,7 +106,6 @@ int esp_output(struct sk_buff **pskb)
 				udpdata32 = (u32*)(uh+1);
 				udpdata32[0] = udpdata32[1] = 0;
 				esph = (struct ip_esp_hdr*)(udpdata32+2);
-				alen += 2;
 				top_iph->protocol = IPPROTO_UDP;
 				break;
 			default:
@@ -149,7 +148,6 @@ int esp_output(struct sk_buff **pskb)
 				udpdata32 = (u32*)(uh+1);
 				udpdata32[0] = udpdata32[1] = 0;
 				esph = (struct ip_esp_hdr*)(udpdata32+2);
-				alen += 2;
 				top_iph->protocol = IPPROTO_UDP;
 				break;
 			default:
