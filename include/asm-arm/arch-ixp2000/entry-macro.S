@@ -19,11 +19,6 @@
 		orr	\base, \base, #0x0000a000
 		orr	\base, \base, #0x08
 		ldr	\irqstat, [\base]         @ get interrupts
-		mov	\tmp, #IXP2000_VALID_IRQ_MASK & 0xff000000
-		orr	\tmp, \tmp, #IXP2000_VALID_IRQ_MASK & 0x00ff0000
-		orr	\tmp, \tmp, #IXP2000_VALID_IRQ_MASK & 0x0000ff00
-		orr	\tmp, \tmp, #IXP2000_VALID_IRQ_MASK & 0x000000ff
-		and	\irqstat, \irqstat, \tmp
 
 		cmp	\irqstat, #0
 		beq	1001f
