@@ -80,21 +80,6 @@ module_param_named(max_luns, max_scsi_luns, int, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(max_luns,
 		 "last scsi LUN (should be between 1 and 2^32-1)");
 
-static int scsi_sparselun;
-module_param_named(sparselun, scsi_sparselun, int, S_IRUGO|S_IWUSR);
-MODULE_PARM_DESC(sparselun,
-		 "Assume sparse LUNs for all SCSI devices");
-
-static int scsi_largelun;
-module_param_named(largelun, scsi_largelun, int, S_IRUGO|S_IWUSR);
-MODULE_PARM_DESC(largelun,
-		 "Assume all SCSI-2 devs support more than 8 LUNs");
-
-static unsigned int max_scsi_sparseluns;
-module_param_named(max_sparseluns, max_scsi_sparseluns, int, S_IRUGO|S_IWUSR);
-MODULE_PARM_DESC(max_sparseluns,
-		 "Limit LUNs for scanning sparse LUN devices");
-
 /*
  * max_scsi_report_luns: the maximum number of LUNS that will be
  * returned from the REPORT LUNS command. 8 times this value must
@@ -141,56 +126,6 @@ module_param_named(inq_timeout, scsi_inq_timeout, int, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(inq_timeout, 
 		 "Timeout (in seconds) waiting for devices to answer INQUIRY."
 		 " Default is 6. Some non-compliant devices need more.");
-
-#define MAX_LLUN_BLKLEN 8
-static int llun_blklst[3*MAX_LLUN_BLKLEN] = {
-	-1, -1, -1, -1, -1, -1,
-	-1, -1, -1, -1, -1, -1,
-	-1, -1, -1, -1, -1, -1,
-	-1, -1, -1, -1, -1, -1 };
-
-MODULE_PARM(llun_blklst, "3-24i");
-MODULE_PARM_DESC(llun_blklst, "SCSI-2 devs (C,B,T) that need LARGELUN|SPARSELUN support");
-
-static int __init llun_blklst_setup(char *str)
-{
-	unsigned int tmp;
-	int i = 0;
-	do {
-		int rc;
-		if (get_option(&str, &tmp) == 2)
-			llun_blklst[i++] = tmp;
-		else 
-			break;
-		if (get_option(&str, &tmp) == 2)
-			llun_blklst[i++] = tmp;
-		else 
-			break;
-		if ((rc = get_option(&str, &tmp)) >= 1)
-			llun_blklst[i++] = tmp;
-		if (rc != 2)
-			break;
-	} while (1);
-	return i;
-}
-__setup("llun_blklst=", llun_blklst_setup);
-
-static inline int is_on_llun_blklst (int hostno, int channel, int target)
-{
-	int i;
-	for (i = 0; i < MAX_LLUN_BLKLEN; ++i) {
-		if (llun_blklst[i*3] == -1)
-			break;
-		if (llun_blklst[i*3+0] == hostno  &&
-		    llun_blklst[i*3+1] == channel &&
-		    llun_blklst[i*3+2] == target) {
-			printk (KERN_DEBUG "Found c%ib%it%i on llun_blklst\n",
-				hostno, channel, target);
-			return 1;
-		}
-	}
-	return 0;
-}
 
 /**
  * scsi_unlock_floptical - unlock device via a special MODE SENSE command
@@ -897,10 +832,8 @@ static void scsi_sequential_lun_scan(struct Scsi_Host *shost, uint channel,
 	 * override the other settings, and scan all of them. Normally,
 	 * SCSI-3 devices should be scanned via the REPORT LUNS.
 	 */
-	if (bflags & BLIST_SPARSELUN || scsi_sparselun || 
-	    is_on_llun_blklst(shost->host_no, channel, id)) {
-		max_dev_lun = min(shost->max_lun, max_scsi_sparseluns? 
-				  max_scsi_sparseluns: max_scsi_luns);
+	if (bflags & BLIST_SPARSELUN) {
+		max_dev_lun = shost->max_lun;
 		sparse_lun = 1;
 	} else
 		sparse_lun = 0;
@@ -944,8 +877,7 @@ static void scsi_sequential_lun_scan(struct Scsi_Host *shost, uint channel,
 	 * Do not scan SCSI-2 or lower device past LUN 7, unless
 	 * BLIST_LARGELUN.
 	 */
-	if (scsi_level < SCSI_3 && !(bflags & BLIST_LARGELUN) && !scsi_largelun &&
-	    !is_on_llun_blklst(shost->host_no, channel, id))
+	if (scsi_level < SCSI_3 && !(bflags & BLIST_LARGELUN))
 		max_dev_lun = min(8U, max_dev_lun);
 
 	/*
