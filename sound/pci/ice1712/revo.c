@@ -69,7 +69,8 @@ static void revo_set_rate_val(akm4xxx_t *ak, unsigned int rate)
 	tmp = snd_akm4xxx_get(ak, 0, reg);
 	tmp &= ~(0x03 << shift);
 	tmp |= dfs << shift;
-	snd_akm4xxx_write(ak, 0, reg, tmp);
+	// snd_akm4xxx_write(ak, 0, reg, tmp);
+	snd_akm4xxx_set(ak, 0, reg, tmp); /* the value is written in reset(0) */
 	snd_akm4xxx_reset(ak, 0);
 }
 
@@ -134,7 +135,7 @@ static int __devinit revo_init(ice1712_t *ice)
 	}
 
 	/* second stage of initialization, analog parts and others */
-	ak = ice->akm = kmalloc(sizeof(akm4xxx_t) * 2, GFP_KERNEL);
+	ak = ice->akm = snd_kcalloc(sizeof(akm4xxx_t) * 2, GFP_KERNEL);
 	if (! ak)
 		return -ENOMEM;
 	ice->akm_codecs = 2;
