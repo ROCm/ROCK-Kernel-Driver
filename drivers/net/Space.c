@@ -60,7 +60,7 @@ extern struct net_device *el1_probe(int unit);
 extern struct net_device *wavelan_probe(int unit);
 extern struct net_device *arlan_probe(int unit);
 extern struct net_device *el16_probe(int unit);
-extern int elmc_probe(struct net_device *);
+extern struct net_device *elmc_probe(int unit);
 extern struct net_device *skmca_probe(int unit);
 extern struct net_device *elplus_probe(int unit);
 extern int ac3200_probe(struct net_device *);
@@ -181,13 +181,13 @@ static struct devprobe mca_probes[] __initdata = {
 #ifdef CONFIG_NE2_MCA
 	{ne2_probe, 0},
 #endif
-#ifdef CONFIG_ELMC		/* 3c523 */
-	{elmc_probe, 0},
-#endif
 	{NULL, 0},
 };
 
 static struct devprobe2 mca_probes2[] __initdata = {
+#ifdef CONFIG_ELMC		/* 3c523 */
+	{elmc_probe, 0},
+#endif
 #ifdef CONFIG_ELMC_II		/* 3c527 */
 	{mc32_probe, 0},
 #endif
