@@ -105,9 +105,9 @@ snd_seq_oss_readq_puts(seq_oss_readq_t *q, int dev, unsigned char *data, int len
 	evrec_t rec;
 	int result;
 
+	memset(&rec, 0, sizeof(rec));
 	rec.c[0] = SEQ_MIDIPUTC;
 	rec.c[2] = dev;
-	rec.c[3] = 0;
 
 	while (len-- > 0) {
 		rec.c[1] = *data++;
@@ -133,7 +133,7 @@ snd_seq_oss_readq_put_event(seq_oss_readq_t *q, evrec_t *ev)
 		return -ENOMEM;
 	}
 
-	memcpy(&q->q[q->tail], ev, ev_length(ev));
+	memcpy(&q->q[q->tail], ev, sizeof(*ev));
 	q->tail = (q->tail + 1) % q->maxlen;
 	q->qlen++;
 
@@ -214,6 +214,7 @@ snd_seq_oss_readq_put_timestamp(seq_oss_readq_t *q, unsigned long curt, int seq_
 {
 	if (curt != q->input_time) {
 		evrec_t rec;
+		memset(&rec, 0, sizeof(rec));
 		switch (seq_mode) {
 		case SNDRV_SEQ_OSS_MODE_SYNTH:
 			rec.echo = (curt << 8) | SEQ_WAIT;
