@@ -1025,19 +1025,6 @@ void __flush_dcache_range(unsigned long start, unsigned long end)
 	}
 }
 
-void __flush_cache_all(void)
-{
-	/* Cheetah should be fine here too. */
-	if (tlb_type == spitfire) {
-		unsigned long va;
-
-		flushw_all();
-		for (va =  0; va < (PAGE_SIZE << 1); va += 32)
-			spitfire_put_icache_tag(va, 0x0);
-		__asm__ __volatile__("flush %g6");
-	}
-}
-
 /* If not locked, zap it. */
 void __flush_tlb_all(void)
 {

@@ -62,6 +62,14 @@ struct ip_conntrack_tuple
 	} dst;
 };
 
+/* This is optimized opposed to a memset of the whole structure.  Everything we
+ * really care about is the  source/destination unions */
+#define IP_CT_TUPLE_U_BLANK(tuple) 				\
+	do {							\
+		(tuple)->src.u.all = 0;				\
+		(tuple)->dst.u.all = 0;				\
+	} while (0)
+
 enum ip_conntrack_dir
 {
 	IP_CT_DIR_ORIGINAL,

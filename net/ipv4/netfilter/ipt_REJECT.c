@@ -40,16 +40,17 @@ static void connection_attach(struct sk_buff *new_skb, struct nf_ct_info *nfct)
 	}
 }
 
-static inline struct rtable *route_reverse(struct sk_buff *skb, int local)
+static inline struct rtable *route_reverse(struct sk_buff *skb, int hook)
 {
 	struct iphdr *iph = skb->nh.iph;
 	struct dst_entry *odst;
 	struct flowi fl = {};
 	struct rtable *rt;
 
-	if (local) {
+	if (hook != NF_IP_FORWARD) {
 		fl.nl_u.ip4_u.daddr = iph->saddr;
-		fl.nl_u.ip4_u.saddr = iph->daddr;
+		if (hook == NF_IP_LOCAL_IN)
+			fl.nl_u.ip4_u.saddr = iph->daddr;
 		fl.nl_u.ip4_u.tos = RT_TOS(iph->tos);
 
 		if (ip_route_output_key(&rt, &fl) != 0)
@@ -81,7 +82,7 @@ static inline struct rtable *route_reverse(struct sk_buff *skb, int local)
 }
 
 /* Send RST reply */
-static void send_reset(struct sk_buff *oldskb, int local)
+static void send_reset(struct sk_buff *oldskb, int hook)
 {
 	struct sk_buff *nskb;
 	struct tcphdr otcph, *tcph;
@@ -104,7 +105,7 @@ static void send_reset(struct sk_buff *oldskb, int local)
 		return;
 
 	/* FIXME: Check checksum --RR */
-	if ((rt = route_reverse(oldskb, local)) == NULL)
+	if ((rt = route_reverse(oldskb, hook)) == NULL)
 		return;
 
 	hh_len = (rt->u.dst.dev->hard_header_len + 15)&~15;
@@ -390,7 +391,7 @@ static unsigned int reject(struct sk_buff **pskb,
 		send_unreach(*pskb, ICMP_PKT_FILTERED);
 		break;
 	case IPT_TCP_RESET:
-		send_reset(*pskb, hooknum == NF_IP_LOCAL_IN);
+		send_reset(*pskb, hooknum);
 	case IPT_ICMP_ECHOREPLY:
 		/* Doesn't happen. */
 		break;
