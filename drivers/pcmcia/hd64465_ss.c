@@ -599,21 +599,6 @@ static int hs_set_socket(unsigned int sock, socket_state_t *state)
 
 /*============================================================*/
 
-static int hs_get_io_map(unsigned int sock, struct pccard_io_map *io)
-{
-    	hs_socket_t *sp = &hs_sockets[sock];
-	int map = io->map;
-
-    	DPRINTK("hs_get_io_map(%d, %d)\n", sock, map);
-	if (map >= MAX_IO_WIN)
-	    return -EINVAL;
-	
-	*io = sp->io_maps[map];
-	return 0;
-}
-
-/*============================================================*/
-
 static int hs_set_io_map(unsigned int sock, struct pccard_io_map *io)
 {
     	hs_socket_t *sp = &hs_sockets[sock];
@@ -691,21 +676,6 @@ static int hs_set_io_map(unsigned int sock, struct pccard_io_map *io)
 	}
 	
 	*sio = *io;
-	return 0;
-}
-
-/*============================================================*/
-
-static int hs_get_mem_map(unsigned int sock, struct pccard_mem_map *mem)
-{
-    	hs_socket_t *sp = &hs_sockets[sock];
-	int map = mem->map;
-
-    	DPRINTK("hs_get_mem_map(%d, %d)\n", sock, map);
-	if (map >= MAX_WIN)
-	    return -EINVAL;
-	
-	*mem = sp->mem_maps[map];
 	return 0;
 }
 
@@ -894,9 +864,7 @@ static struct pccard_operations hs_operations = {
 	.get_status		= hs_get_status,
 	.get_socket		= hs_get_socket,
 	.set_socket		= hs_set_socket,
-	.get_io_map		= hs_get_io_map,
 	.set_io_map		= hs_set_io_map,
-	.get_mem_map		= hs_get_mem_map,
 	.set_mem_map		= hs_set_mem_map,
 	.proc_setup		= hs_proc_setup,
 };

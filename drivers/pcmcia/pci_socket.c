@@ -105,30 +105,12 @@ static int pci_set_socket(unsigned int sock, socket_state_t *state)
 	return -EINVAL;
 }
 
-static int pci_get_io_map(unsigned int sock, struct pccard_io_map *io)
-{
-	pci_socket_t *socket = pci_socket_array + sock;
-
-	if (socket->op && socket->op->get_io_map)
-		return socket->op->get_io_map(socket, io);
-	return -EINVAL;
-}
-
 static int pci_set_io_map(unsigned int sock, struct pccard_io_map *io)
 {
 	pci_socket_t *socket = pci_socket_array + sock;
 
 	if (socket->op && socket->op->set_io_map)
 		return socket->op->set_io_map(socket, io);
-	return -EINVAL;
-}
-
-static int pci_get_mem_map(unsigned int sock, struct pccard_mem_map *mem)
-{
-	pci_socket_t *socket = pci_socket_array + sock;
-
-	if (socket->op && socket->op->get_mem_map)
-		return socket->op->get_mem_map(socket, mem);
 	return -EINVAL;
 }
 
@@ -158,9 +140,7 @@ static struct pccard_operations pci_socket_operations = {
 	.get_status		= pci_get_status,
 	.get_socket		= pci_get_socket,
 	.set_socket		= pci_set_socket,
-	.get_io_map		= pci_get_io_map,
 	.set_io_map		= pci_set_io_map,
-	.get_mem_map		= pci_get_mem_map,
 	.set_mem_map		= pci_set_mem_map,
 	.proc_setup		= pci_proc_setup,
 };

@@ -134,9 +134,7 @@ struct pccard_operations {
 	int (*get_status)(unsigned int sock, u_int *value);
 	int (*get_socket)(unsigned int sock, socket_state_t *state);
 	int (*set_socket)(unsigned int sock, socket_state_t *state);
-	int (*get_io_map)(unsigned int sock, struct pccard_io_map *io);
 	int (*set_io_map)(unsigned int sock, struct pccard_io_map *io);
-	int (*get_mem_map)(unsigned int sock, struct pccard_mem_map *mem);
 	int (*set_mem_map)(unsigned int sock, struct pccard_mem_map *mem);
 	void (*proc_setup)(unsigned int sock, struct proc_dir_entry *base);
 };

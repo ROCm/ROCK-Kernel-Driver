@@ -170,9 +170,7 @@ static struct pci_socket_ops ricoh_ops = {
 	yenta_get_status,
 	yenta_get_socket,
 	yenta_set_socket,
-	yenta_get_io_map,
 	yenta_set_io_map,
-	yenta_get_mem_map,
 	yenta_set_mem_map,
 	yenta_proc_setup
 };
