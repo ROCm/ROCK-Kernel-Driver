@@ -35,10 +35,6 @@ MODULE_LICENSE("GPL");
 
 /* ------------------------------------------------------------- */
 
-static struct capi_driver_interface *di;
-
-/* ------------------------------------------------------------- */
-
 static void b1pcmcia_remove_ctr(struct capi_ctr *ctrl)
 {
 	avmctrl_info *cinfo = (avmctrl_info *)(ctrl->driverdata);
@@ -48,7 +44,7 @@ static void b1pcmcia_remove_ctr(struct capi_ctr *ctrl)
 	b1_reset(port);
 	b1_reset(port);
 
-	di->detach_ctr(ctrl);
+	detach_capi_ctr(ctrl);
 	free_irq(card->irq, card);
 	b1_free_card(card);
 
@@ -103,7 +99,7 @@ static int b1pcmcia_add_card(struct capi_driver *driver,
 	b1_reset(card->port);
 	b1_getrevision(card);
 
-	cinfo->capi_ctrl = di->attach_ctr(driver, card->name, cinfo);
+	cinfo->capi_ctrl = attach_capi_ctr(driver, card->name, cinfo);
 	if (!cinfo->capi_ctrl) {
 		printk(KERN_ERR "%s: attach controller failed.\n",
 				driver->name);
@@ -227,13 +223,8 @@ static int __init b1pcmcia_init(void)
 
 	printk(KERN_INFO "%s: revision %s\n", driver->name, driver->revision);
 
-        di = attach_capi_driver(driver);
+        attach_capi_driver(driver);
 
-	if (!di) {
-		printk(KERN_ERR "%s: failed to attach capi_driver\n",
-				driver->name);
-		retval = -EIO;
-	}
 	MOD_DEC_USE_COUNT;
 	return retval;
 }

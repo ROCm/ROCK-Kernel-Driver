@@ -980,7 +980,7 @@ static void controllercb_resume_output(struct capi_ctr *card)
 
 
 struct capi_ctr *
-drivercb_attach_ctr(struct capi_driver *driver, char *name, void *driverdata)
+attach_capi_ctr(struct capi_driver *driver, char *name, void *driverdata)
 {
 	struct capi_ctr *card;
 	int i;
@@ -1026,7 +1026,9 @@ drivercb_attach_ctr(struct capi_driver *driver, char *name, void *driverdata)
 	return card;
 }
 
-static int drivercb_detach_ctr(struct capi_ctr *card)
+EXPORT_SYMBOL(attach_capi_ctr);
+
+int detach_capi_ctr(struct capi_ctr *card)
 {
 	struct capi_driver *driver = card->driver;
 
@@ -1048,6 +1050,8 @@ static int drivercb_detach_ctr(struct capi_ctr *card)
 			card->cnr, card->name);
 	return 0;
 }
+
+EXPORT_SYMBOL(detach_capi_ctr);
 
 /* ------------------------------------------------------------- */
 
@@ -1071,17 +1075,14 @@ static int driver_read_proc(char *page, char **start, off_t off,
 
 /* ------------------------------------------------------------- */
 
-static struct capi_driver_interface di = {
-    drivercb_attach_ctr,
-    drivercb_detach_ctr,
-};
-
-struct capi_driver_interface *attach_capi_driver(struct capi_driver *driver)
+void attach_capi_driver(struct capi_driver *driver)
 {
 	INIT_LIST_HEAD(&driver->contr_head);
+
 	spin_lock(&drivers_lock);
 	list_add_tail(&driver->driver_list, &drivers);
 	spin_unlock(&drivers_lock);
+
 	printk(KERN_NOTICE "kcapi: driver %s attached\n", driver->name);
 	sprintf(driver->procfn, "capi/drivers/%s", driver->name);
 	driver->procent = create_proc_entry(driver->procfn, 0, 0);
@@ -1095,8 +1096,9 @@ struct capi_driver_interface *attach_capi_driver(struct capi_driver *driver)
 	   }
 	   driver->procent->data = driver;
 	}
-	return &di;
 }
+
+EXPORT_SYMBOL(attach_capi_driver);
 
 void detach_capi_driver(struct capi_driver *driver)
 {
@@ -1110,6 +1112,8 @@ void detach_capi_driver(struct capi_driver *driver)
 	   driver->procent = 0;
 	}
 }
+
+EXPORT_SYMBOL(detach_capi_driver);
 
 /* ------------------------------------------------------------- */
 /* -------- CAPI2.0 Interface ---------------------------------- */
@@ -1627,6 +1631,8 @@ struct capi_interface *attach_capi_interface(struct capi_interface_user *userp)
 	return &avmb1_interface;
 }
 
+EXPORT_SYMBOL(attach_capi_interface);
+
 int detach_capi_interface(struct capi_interface_user *userp)
 {
 	spin_lock(&users_lock);
@@ -1635,14 +1641,11 @@ int detach_capi_interface(struct capi_interface_user *userp)
 	return 0;
 }
 
+EXPORT_SYMBOL(detach_capi_interface);
+
 /* ------------------------------------------------------------- */
 /* -------- Init & Cleanup ------------------------------------- */
 /* ------------------------------------------------------------- */
-
-EXPORT_SYMBOL(attach_capi_interface);
-EXPORT_SYMBOL(detach_capi_interface);
-EXPORT_SYMBOL(attach_capi_driver);
-EXPORT_SYMBOL(detach_capi_driver);
 
 /*
  * init / exit functions

@@ -52,10 +52,6 @@ MODULE_PARM(suppress_pollack, "0-1i");
 
 /* ------------------------------------------------------------- */
 
-static struct capi_driver_interface *di;
-
-/* ------------------------------------------------------------- */
-
 static void c4_dispatch_tx(avmcard *card);
 
 /* ------------------------------------------------------------- */
@@ -912,7 +908,7 @@ static void c4_remove_ctr(struct capi_ctr *ctrl)
         for (i=0; i < 4; i++) {
 		cinfo = &card->ctrlinfo[i];
 		if (cinfo->capi_ctrl) {
-			di->detach_ctr(cinfo->capi_ctrl);
+			detach_capi_ctr(cinfo->capi_ctrl);
 			cinfo->capi_ctrl = NULL;
 		}
 	}
@@ -1162,13 +1158,13 @@ static int c4_add_card(struct capi_driver *driver,
 
 	for (i=0; i < nr_controllers ; i++) {
 		cinfo = &card->ctrlinfo[i];
-		cinfo->capi_ctrl = di->attach_ctr(driver, card->name, cinfo);
+		cinfo->capi_ctrl = attach_capi_ctr(driver, card->name, cinfo);
 		if (!cinfo->capi_ctrl) {
 			printk(KERN_ERR "%s: attach controller failed (%d).\n",
 					driver->name, i);
 			for (i--; i >= 0; i--) {
 				cinfo = &card->ctrlinfo[i];
-				di->detach_ctr(cinfo->capi_ctrl);
+				detach_capi_ctr(cinfo->capi_ctrl);
 			}
 			goto err_free_irq;
 		}
@@ -1247,13 +1243,7 @@ static int c4_attach_driver (struct capi_driver * driver)
 
 	printk(KERN_INFO "%s: revision %s\n", driver->name, driver->revision);
 
-        di = attach_capi_driver(driver);
-	if (!di) {
-		printk(KERN_ERR "%s: failed to attach capi_driver\n",
-				driver->name);
-		MOD_DEC_USE_COUNT;
-		return -ENODEV;
-	}
+        attach_capi_driver(driver);
 	return 0;
 }
 

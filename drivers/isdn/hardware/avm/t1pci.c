@@ -45,10 +45,6 @@ MODULE_LICENSE("GPL");
 
 /* ------------------------------------------------------------- */
 
-static struct capi_driver_interface *di;
-
-/* ------------------------------------------------------------- */
-
 static int t1pci_add_card(struct capi_driver *driver,
                           struct capicardparams *p,
 	                  struct pci_dev *dev)
@@ -119,7 +115,7 @@ static int t1pci_add_card(struct capi_driver *driver,
 		goto err_unmap;
 	}
 
-	cinfo->capi_ctrl = di->attach_ctr(driver, card->name, cinfo);
+	cinfo->capi_ctrl = attach_capi_ctr(driver, card->name, cinfo);
 	if (!cinfo->capi_ctrl) {
 		printk(KERN_ERR "%s: attach controller failed.\n", driver->name);
 		retval = -EBUSY;
@@ -157,7 +153,7 @@ static void t1pci_remove_ctr(struct capi_ctr *ctrl)
 
  	b1dma_reset(card);
 
-	di->detach_ctr(ctrl);
+	detach_capi_ctr(ctrl);
 	free_irq(card->irq, card);
 	iounmap(card->mbase);
 	release_region(card->port, AVMB1_PORTLEN);
@@ -262,13 +258,7 @@ static int __init t1pci_init(void)
 
 	printk(KERN_INFO "%s: revision %s\n", driver->name, driver->revision);
 
-        di = attach_capi_driver(&t1pci_driver);
-	if (!di) {
-		printk(KERN_ERR "%s: failed to attach capi_driver\n",
-				driver->name);
-		MOD_DEC_USE_COUNT;
-		return -EIO;
-	}
+        attach_capi_driver(&t1pci_driver);
 
 	ncards = pci_register_driver(&t1pci_pci_driver);
 	if (ncards) {

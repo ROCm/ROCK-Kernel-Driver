@@ -75,11 +75,6 @@ struct capi_ctr {
         char procfn[128];
 };
 
-struct capi_driver_interface {
-    struct capi_ctr *(*attach_ctr)(struct capi_driver *driver, char *name, void *data);
-    int (*detach_ctr)(struct capi_ctr *);
-};
-
 struct capi_driver {
 	struct module *owner;
 	char name[32];				/* driver name */
@@ -108,7 +103,10 @@ struct capi_driver {
 	char procfn[128];
 };
 
-struct capi_driver_interface *attach_capi_driver(struct capi_driver *driver);
+void attach_capi_driver(struct capi_driver *driver);
 void detach_capi_driver(struct capi_driver *driver);
+
+struct capi_ctr *attach_capi_ctr(struct capi_driver *driver, char *name, void *data);
+int detach_capi_ctr(struct capi_ctr *);
 
 #endif				/* __CAPILLI_H__ */

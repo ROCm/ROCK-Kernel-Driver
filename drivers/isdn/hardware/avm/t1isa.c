@@ -35,10 +35,6 @@ MODULE_LICENSE("GPL");
 
 /* ------------------------------------------------------------- */
 
-static struct capi_driver_interface *di;
-
-/* ------------------------------------------------------------- */
-
 static int hema_irq_table[16] =
 {0,
  0,
@@ -331,7 +327,7 @@ static void t1isa_remove_ctr(struct capi_ctr *ctrl)
 	b1_reset(port);
 	t1_reset(port);
 
-	di->detach_ctr(ctrl);
+	detach_capi_ctr(ctrl);
 	free_irq(card->irq, card);
 	release_region(card->port, AVMB1_PORTLEN);
 	b1_free_card(card);
@@ -412,7 +408,7 @@ static int t1isa_add_card(struct capi_driver *driver, struct capicardparams *p)
 	t1_disable_irq(card->port);
 	b1_reset(card->port);
 
-	cinfo->capi_ctrl = di->attach_ctr(driver, card->name, cinfo);
+	cinfo->capi_ctrl = attach_capi_ctr(driver, card->name, cinfo);
 	if (!cinfo->capi_ctrl) {
 		printk(KERN_ERR "%s: attach controller failed.\n",
 				driver->name);
@@ -517,13 +513,7 @@ static int __init t1isa_init(void)
 
 	printk(KERN_INFO "%s: revision %s\n", driver->name, driver->revision);
 
-        di = attach_capi_driver(driver);
-
-	if (!di) {
-		printk(KERN_ERR "%s: failed to attach capi_driver\n",
-				driver->name);
-		retval = -EIO;
-	}
+        attach_capi_driver(driver);
 
 	MOD_DEC_USE_COUNT;
 	return retval;
