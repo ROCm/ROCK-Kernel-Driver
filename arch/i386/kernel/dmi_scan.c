@@ -443,27 +443,6 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 
 	{ NULL, }
 };
-	
-	
-/*
- *	Walk the blacklist table running matching functions until someone 
- *	returns 1 or we hit the end.
- */
- 
-
-static __init void dmi_check_blacklist(void)
-{
-#ifdef	CONFIG_ACPI_BOOT
-	if (dmi_ident[DMI_BIOS_DATE]) { 
-		char *s = strrchr(dmi_ident[DMI_BIOS_DATE], '/'); 
- 		if (s && !acpi_force)
- 			acpi_bios_year(s+1);
-	}
-#endif
- 	dmi_check_system(dmi_blacklist);
-}
-
-	
 
 /*
  *	Process a DMI table entry. Right now all we care about are the BIOS
@@ -521,7 +500,7 @@ void __init dmi_scan_machine(void)
 {
 	int err = dmi_iterate(dmi_decode);
 	if(err == 0)
-		dmi_check_blacklist();
+ 		dmi_check_system(dmi_blacklist);
 	else
 		printk(KERN_INFO "DMI not present.\n");
 }
