@@ -124,7 +124,7 @@ void start_userspace(int cpu)
 		panic("start_userspace : expected SIGSTOP, got status = %d",
 		      status);
 
-	if (ptrace(PTRACE_SETOPTIONS, pid, NULL, (void *)PTRACE_O_TRACESYSGOOD) < 0)
+	if (ptrace(PTRACE_OLDSETOPTIONS, pid, NULL, (void *)PTRACE_O_TRACESYSGOOD) < 0)
 		panic("start_userspace : PTRACE_SETOPTIONS failed, errno=%d\n",
 		      errno);
 

@@ -105,7 +105,7 @@ config SBPCD
 
 config MCD
 	tristate "Mitsumi (standard) [no XA/Multisession] CDROM support"
-	depends on CD_NO_IDESCSI
+	depends on CD_NO_IDESCSI && BROKEN
 	---help---
 	  This is the older of the two drivers for the older Mitsumi models
 	  LU-005, FX-001 and FX-001D. This is not the right driver for the

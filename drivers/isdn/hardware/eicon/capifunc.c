@@ -1,4 +1,4 @@
-/* $Id: capifunc.c,v 1.61.4.5 2004/08/27 20:10:12 armin Exp $
+/* $Id: capifunc.c,v 1.61.4.7 2005/02/11 19:40:25 armin Exp $
  *
  * ISDN interface module for Eicon active cards DIVA.
  * CAPI Interface common functions
@@ -64,7 +64,7 @@ extern void DIVA_DIDD_Read(DESCRIPTOR *, int);
  */
 static void no_printf(unsigned char *, ...);
 #include "debuglib.c"
-void xlog(char *x, ...)
+static void xlog(char *x, ...)
 {
 #ifndef DIVA_NO_DEBUGLIB
 	va_list ap;
@@ -157,7 +157,7 @@ static int find_free_id(void)
 	while (num < MAX_DESCRIPTORS) {
 		a = &adapter[num];
 		if (!a->Id)
-				break;
+			break;
 		num++;
 	}
 	return(num + 1);
@@ -353,7 +353,7 @@ static void clean_adapter(int id, struct list_head *free_mem_q)
 	if (k == 0) {
 		if (li_config_table) {
 			list_add((struct list_head *)li_config_table, free_mem_q);
-		li_config_table = NULL;
+			li_config_table = NULL;
 		}
 	} else {
 		if (a->li_base < k) {
@@ -1212,7 +1212,7 @@ int DIVA_INIT_FUNCTION init_capifunc(void)
 void DIVA_EXIT_FUNCTION finit_capifunc(void)
 {
 	do_api_remove_start();
-		    divacapi_disconnect_didd();
+	divacapi_disconnect_didd();
 	divacapi_remove_cards();
 	remove_main_structs();
 	diva_os_destroy_spin_lock(&api_lock, "capifunc");

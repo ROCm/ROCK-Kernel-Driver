@@ -81,13 +81,8 @@ struct adapter_s {
 /*------------------------------------------------------------------*/
 void pr_out(ADAPTER * a);
 byte pr_dpc(ADAPTER * a);
-byte pr_test_int(ADAPTER * a);
-void pr_clear_int(ADAPTER * a);
-void scom_out(ADAPTER * a);
-byte scom_dpc(ADAPTER * a);
 byte scom_test_int(ADAPTER * a);
 void scom_clear_int(ADAPTER * a);
-void quadro_clear_int(ADAPTER * a);
 /*------------------------------------------------------------------*/
 /* OS specific functions used by IDI common code                    */
 /*------------------------------------------------------------------*/
