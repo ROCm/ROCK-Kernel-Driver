@@ -104,8 +104,10 @@ static unsigned int dly_drop(struct Qdisc *sch)
 static struct sk_buff *dly_dequeue(struct Qdisc *sch)
 {
 	struct dly_sched_data *q = (struct dly_sched_data *)sch->data;
-	struct sk_buff *skb = q->qdisc->dequeue(q->qdisc);
+	struct sk_buff *skb;
 
+ retry:
+	skb = q->qdisc->dequeue(q->qdisc);
 	if (skb) {
 		struct dly_skb_cb *cb = (struct dly_skb_cb *)skb->cb;
 		psched_time_t now;
@@ -120,6 +122,12 @@ static struct sk_buff *dly_dequeue(struct Qdisc *sch)
 			return skb;
 		}
 
+		if (q->qdisc->ops->requeue(skb, q->qdisc) != NET_XMIT_SUCCESS) {
+			sch->q.qlen--;
+			sch->stats.drops++;
+			goto retry;
+		}
+
 		if (!netif_queue_stopped(sch->dev)) {
 			long delay = PSCHED_US2JIFFIE(diff);
 			if (delay <= 0)
@@ -127,10 +135,6 @@ static struct sk_buff *dly_dequeue(struct Qdisc *sch)
 			mod_timer(&q->timer, jiffies+delay);
 		}
 
-		if (q->qdisc->ops->requeue(skb, q->qdisc) != NET_XMIT_SUCCESS) {
-			sch->q.qlen--;
-			sch->stats.drops++;
-		}
 		sch->flags |= TCQ_F_THROTTLED;
 	}
 	return NULL;
