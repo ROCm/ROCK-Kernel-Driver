@@ -1728,10 +1728,9 @@ static int wl3501_set_scan(struct net_device *dev, struct iw_request_info *info,
 			   union iwreq_data *wrqu, char *extra)
 {
 	/*
-	 * FIXME: trigger scanning, for now we just get the results of the
-	 * normal scanning already done
+	 * FIXME: trigger scanning with a reset, yes, I'm lazy
 	 */
-	return 0;
+	return wl3501_reset(dev);
 }
 
 static int wl3501_get_scan(struct net_device *dev, struct iw_request_info *info,
