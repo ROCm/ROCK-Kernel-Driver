@@ -105,7 +105,7 @@ static int __devinit tpam_probe(struct pci_dev *dev, const struct pci_device_id 
 	memset((char *)card, 0, sizeof(tpam_card));
 
 	card->irq = dev->irq;
-	card->lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&card->lock);
 	sprintf(card->interface.id, "%s%d", id, cards_num);
 
 	/* request interrupt */
