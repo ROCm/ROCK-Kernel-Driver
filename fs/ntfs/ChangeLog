@@ -59,6 +59,12 @@ ToDo/Notes:
 	- Move the typedefs for runlist_element and runlist from types.h to
 	  runlist.h and fix resulting include errors.
 	- Remove unused {__,}format_mft_record() from fs/ntfs/mft.c.
+	- Modify fs/ntfs/mft.c::__mark_mft_record_dirty() to use the helper
+	  mark_ntfs_record_dirty() which also changes the behaviour in that we
+	  now set the buffers belonging to the mft record dirty as well as the
+	  page itself.
+	- Update fs/ntfs/mft.c::write_mft_record_nolock() and sync_mft_mirror()
+	  to cope with the fact that there now are dirty buffers in mft pages.
 
 2.1.20 - Fix two stupid bugs introduced in 2.1.18 release.
 

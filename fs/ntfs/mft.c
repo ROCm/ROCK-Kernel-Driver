@@ -407,19 +407,11 @@ unm_err_out:
  */
 void __mark_mft_record_dirty(ntfs_inode *ni)
 {
-	struct page *page = ni->page;
 	ntfs_inode *base_ni;
 
 	ntfs_debug("Entering for inode 0x%lx.", ni->mft_no);
-	BUG_ON(!page);
 	BUG_ON(NInoAttr(ni));
-
-	/*
-	 * Set the page containing the mft record dirty.  This also marks the
-	 * $MFT inode dirty (I_DIRTY_PAGES).
-	 */
-	__set_page_dirty_nobuffers(page);
-
+	mark_ntfs_record_dirty(ni, ni->page, ni->page_ofs);
 	/* Determine the base vfs inode and mark it dirty, too. */
 	down(&ni->extent_lock);
 	if (likely(ni->nr_extents >= 0))
@@ -541,20 +533,9 @@ no_buffers_err_out:
 	m_end = m_start + vol->mft_record_size;
 	do {
 		block_end = block_start + blocksize;
-		/*
-		 * If the buffer is outside the mft record, just skip it,
-		 * clearing it if it is dirty to make sure it is not written
-		 * out.  It should never be marked dirty but better be safe.
-		 */
-		if ((block_end <= m_start) || (block_start >= m_end)) {
-			if (buffer_dirty(bh)) {
-				ntfs_warning(vol->sb, "Clearing dirty mft "
-						"record page buffer.  %s",
-						ntfs_please_email);
-				clear_buffer_dirty(bh);
-			}
+		/* If the buffer is outside the mft record, skip it. */
+		if ((block_end <= m_start) || (block_start >= m_end))
 			continue;
-		}
 		if (!buffer_mapped(bh)) {
 			ntfs_error(vol->sb, "Writing mft mirror records "
 					"without existing mapped buffers is "
@@ -706,20 +687,9 @@ no_buffers_err_out:
 	m_end = m_start + vol->mft_record_size;
 	do {
 		block_end = block_start + blocksize;
-		/*
-		 * If the buffer is outside the mft record, just skip it,
-		 * clearing it if it is dirty to make sure it is not written
-		 * out.  It should never be marked dirty but better be safe.
-		 */
-		if ((block_end <= m_start) || (block_start >= m_end)) {
-			if (buffer_dirty(bh)) {
-				ntfs_warning(vol->sb, "Clearing dirty mft "
-						"record page buffer.  %s",
-						ntfs_please_email);
-				clear_buffer_dirty(bh);
-			}
+		/* If the buffer is outside the mft record, skip it. */
+		if ((block_end <= m_start) || (block_start >= m_end))
 			continue;
-		}
 		if (!buffer_mapped(bh)) {
 			ntfs_error(vol->sb, "Writing mft records without "
 					"existing mapped buffers is not "
