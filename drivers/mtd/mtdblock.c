@@ -14,6 +14,7 @@
 #include <linux/buffer_head.h>
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/compatmac.h>
+#include <linux/buffer_head.h>
 
 #define MAJOR_NR MTD_BLOCK_MAJOR
 #define DEVICE_NAME "mtdblock"
@@ -23,6 +24,10 @@
 
 #ifdef CONFIG_DEVFS_FS
 #include <linux/devfs_fs_kernel.h>
+static devfs_handle_t devfs_dir_handle = NULL;
+static devfs_handle_t devfs_rw_handle[MAX_MTD_DEVICES];
+#endif
+
 static void mtd_notify_add(struct mtd_info* mtd);
 static void mtd_notify_remove(struct mtd_info* mtd);
 static struct mtd_notifier notifier = {
@@ -30,9 +35,6 @@ static struct mtd_notifier notifier = {
         mtd_notify_remove,
         NULL
 };
-static devfs_handle_t devfs_dir_handle = NULL;
-static devfs_handle_t devfs_rw_handle[MAX_MTD_DEVICES];
-#endif
 
 static struct mtdblk_dev {
 	struct mtd_info *mtd; /* Locked */
@@ -42,8 +44,9 @@ static struct mtdblk_dev {
 	unsigned long cache_offset;
 	unsigned int cache_size;
 	enum { STATE_EMPTY, STATE_CLEAN, STATE_DIRTY } cache_state;
-	struct gendisk *disk;
 } *mtdblks[MAX_MTD_DEVICES];
+
+static struct gendisk *mtddisk[MAX_MTD_DEVICES];
 
 static spinlock_t mtdblks_lock;
 
@@ -295,7 +298,7 @@ static int mtdblock_open(struct inode *inode, struct file *file)
 	spin_unlock(&mtdblks_lock);
 
 	mtdblk = kmalloc(sizeof(struct mtdblk_dev), GFP_KERNEL);
-	disk = alloc_disk(1);
+	disk = mtddisk[dev];
 	if (!mtdblk || !disk)
 		goto Enomem;
 	memset(mtdblk, 0, sizeof(*mtdblk));
@@ -311,11 +314,6 @@ static int mtdblock_open(struct inode *inode, struct file *file)
 		if (!mtdblk->cache_data)
 			goto Enomem;
 	}
-	disk->major = MAJOR_NR;
-	disk->first_minor = dev;
-	disk->fops = &mtd_fops;
-	sprintf(disk->disk_name, "mtd%d", dev);
-	mtdblk->disk = disk;
 
 	/* OK, we've created a new one. Add it to the list. */
 
@@ -328,13 +326,10 @@ static int mtdblock_open(struct inode *inode, struct file *file)
 		put_mtd_device(mtdblk->mtd);
 		vfree(mtdblk->cache_data);
 		kfree(mtdblk);
-		put_disk(disk);
 		return 0;
 	}
 
 	mtdblks[dev] = mtdblk;
-	set_capacity(disk, mtdblk->mtd->size/512);
-	add_disk(disk);
 	set_device_ro (inode->i_rdev, !(mtdblk->mtd->flags & MTD_WRITEABLE));
 
 	spin_unlock(&mtdblks_lock);
@@ -344,7 +339,6 @@ static int mtdblock_open(struct inode *inode, struct file *file)
 	return 0;
 Enomem:
 	put_mtd_device(mtd);
-	put_disk(disk);
 	kfree(mtdblk);
 	return -ENOMEM;
 }
@@ -370,8 +364,6 @@ static release_t mtdblock_release(struct inode *inode, struct file *file)
 		/* It was the last usage. Free the device */
 		mtdblks[dev] = NULL;
 		spin_unlock(&mtdblks_lock);
-		del_gendisk(mtdblk->disk);
-		put_disk(mtdblk->disk);
 		if (mtdblk->mtd->sync)
 			mtdblk->mtd->sync(mtdblk->mtd);
 		put_mtd_device(mtdblk->mtd);
@@ -394,18 +386,15 @@ static release_t mtdblock_release(struct inode *inode, struct file *file)
  * The head of our request queue is considered active so there is no need 
  * to dequeue requests before we are done.
  */
+static struct request_queue mtd_queue;
 static void handle_mtdblock_request(void)
 {
-	struct request *req;
 	struct mtdblk_dev *mtdblk;
 	unsigned int res;
 
-	for (;;) {
-		if (blk_queue_empty(QUEUE))
-			return;
-
-		req = CURRENT;
-		spin_unlock_irq(QUEUE->queue_lock);
+	while (!blk_queue_empty(&mtd_queue)) {
+		struct request *req = elv_next_request(&mtd_queue);
+		spin_unlock_irq(mtd_queue.queue_lock);
 		mtdblk = mtdblks[minor(req->rq_dev)];
 		res = 0;
 
@@ -419,7 +408,8 @@ static void handle_mtdblock_request(void)
 			goto end_req;
 
 		// Handle the request
-		switch (rq_data_dir(CURRENT)) {
+		switch (rq_data_dir(req))
+		{
 			int err;
 
 			case READ:
@@ -449,7 +439,7 @@ static void handle_mtdblock_request(void)
 		}
 
 end_req:
-		spin_lock_irq(QUEUE->queue_lock);
+		spin_lock_irq(mtd_queue.queue_lock);
 		if (!end_that_request_first(req, res, req->hard_cur_sectors)) {
 			blkdev_dequeue_request(req);
 			end_that_request_last(req);
@@ -479,16 +469,16 @@ int mtdblock_thread(void *dummy)
 	while (!leaving) {
 		add_wait_queue(&thr_wq, &wait);
 		set_current_state(TASK_INTERRUPTIBLE);
-		spin_lock_irq(QUEUE->queue_lock);
-		if (blk_queue_empty(QUEUE) || blk_queue_plugged(QUEUE)) {
-			spin_unlock_irq(QUEUE->queue_lock);
+		spin_lock_irq(mtd_queue.queue_lock);
+		if (blk_queue_empty(&mtd_queue) || blk_queue_plugged(&mtd_queue)) {
+			spin_unlock_irq(mtd_queue.queue_lock);
 			schedule();
 			remove_wait_queue(&thr_wq, &wait); 
 		} else {
 			remove_wait_queue(&thr_wq, &wait); 
 			set_current_state(TASK_RUNNING);
 			handle_mtdblock_request();
-			spin_unlock_irq(QUEUE->queue_lock);
+			spin_unlock_irq(mtd_queue.queue_lock);
 		}
 	}
 
@@ -533,28 +523,43 @@ static int mtdblock_ioctl(struct inode * inode, struct file * file,
 
 static struct block_device_operations mtd_fops = 
 {
-	owner: THIS_MODULE,
-	open: mtdblock_open,
-	release: mtdblock_release,
-	ioctl: mtdblock_ioctl
+	.owner		= THIS_MODULE,
+	.open		= mtdblock_open,
+	.release	= mtdblock_release,
+	.ioctl		= mtdblock_ioctl
 };
 
-#ifdef CONFIG_DEVFS_FS
 /* Notification that a new device has been added. Create the devfs entry for
  * it. */
 
 static void mtd_notify_add(struct mtd_info* mtd)
 {
+	struct gendisk *disk;
         char name[8];
 
         if (!mtd || mtd->type == MTD_ABSENT)
                 return;
 
+#ifdef CONFIG_DEVFS_FS
         sprintf(name, "%d", mtd->index);
         devfs_rw_handle[mtd->index] = devfs_register(devfs_dir_handle, name,
                         DEVFS_FL_DEFAULT, MTD_BLOCK_MAJOR, mtd->index,
                         S_IFBLK | S_IRUGO | S_IWUGO,
                         &mtd_fops, NULL);
+#endif
+
+	disk = alloc_disk(1);
+	if (disk) {
+		disk->major = MAJOR_NR;
+		disk->first_minor = mtd->index;
+		disk->fops = &mtd_fops;
+		sprintf(disk->disk_name, "mtd%d", mtd->index);
+
+		mtddisk[mtd->index] = disk;
+		set_capacity(disk, mtd->size / 512);
+		disk->queue = &mtd_queue;
+		add_disk(disk);
+	}
 }
 
 static void mtd_notify_remove(struct mtd_info* mtd)
@@ -562,9 +567,16 @@ static void mtd_notify_remove(struct mtd_info* mtd)
         if (!mtd || mtd->type == MTD_ABSENT)
                 return;
 
+#ifdef CONFIG_DEVFS_FS
         devfs_unregister(devfs_rw_handle[mtd->index]);
-}
 #endif
+
+        if (mtddisk[mtd->index]) {
+		del_gendisk(mtddisk[mtd->index]);
+        	put_disk(mtddisk[mtd->index]);
+        	mtddisk[mtd->index] = NULL;
+        }
+}
 
 static spinlock_t mtddev_lock = SPIN_LOCK_UNLOCKED;
 
@@ -578,11 +590,11 @@ int __init init_mtdblock(void)
 	}
 #ifdef CONFIG_DEVFS_FS
 	devfs_dir_handle = devfs_mk_dir(NULL, DEVICE_NAME, NULL);
-	register_mtd_user(&notifier);
 #endif
+	register_mtd_user(&notifier);
 	
 	init_waitqueue_head(&thr_wq);
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), &mtdblock_request, &mtddev_lock);
+	blk_init_queue(&mtd_queue, &mtdblock_request, &mtddev_lock);
 	kernel_thread (mtdblock_thread, NULL, CLONE_FS|CLONE_FILES|CLONE_SIGHAND);
 	return 0;
 }
@@ -592,12 +604,12 @@ static void __exit cleanup_mtdblock(void)
 	leaving = 1;
 	wake_up(&thr_wq);
 	down(&thread_sem);
-#ifdef CONFIG_DEVFS_FS
 	unregister_mtd_user(&notifier);
+#ifdef CONFIG_DEVFS_FS
 	devfs_unregister(devfs_dir_handle);
 #endif
 	unregister_blkdev(MAJOR_NR,DEVICE_NAME);
-	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
+	blk_cleanup_queue(&mtd_queue);
 }
 
 module_init(init_mtdblock);
