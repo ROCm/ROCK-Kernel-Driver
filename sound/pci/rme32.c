@@ -1970,16 +1970,14 @@ snd_rme32_probe(struct pci_dev *pci, const struct pci_device_id *pci_id)
 	snd_card_t *card;
 	int err;
 
-	for (; dev < SNDRV_CARDS; dev++) {
-		if (!enable[dev]) {
-			dev++;
-			return -ENOENT;
-		}
-		break;
-	}
 	if (dev >= SNDRV_CARDS) {
 		return -ENODEV;
 	}
+	if (!enable[dev]) {
+		dev++;
+		return -ENOENT;
+	}
+
 	if ((card = snd_card_new(index[dev], id[dev], THIS_MODULE,
 				 sizeof(rme32_t))) == NULL)
 		return -ENOMEM;

@@ -47,7 +47,7 @@
 
 
 #define DEFINE_ALSA_IOCTL(type) \
-static int _snd_ioctl32_##type(unsigned int fd, unsigned int cmd, unsigned long arg, struct file *file, unsigned int native_ctl)\
+static inline int _snd_ioctl32_##type(unsigned int fd, unsigned int cmd, unsigned long arg, struct file *file, unsigned int native_ctl)\
 {\
 	struct sndrv_##type##32 data32;\
 	struct sndrv_##type data;\
@@ -72,7 +72,7 @@ static int _snd_ioctl32_##type(unsigned int fd, unsigned int cmd, unsigned long 
 }
 
 #define DEFINE_ALSA_IOCTL_BIG(type) \
-static int _snd_ioctl32_##type(unsigned int fd, unsigned int cmd, unsigned long arg, struct file *file, unsigned int native_ctl)\
+static inline int _snd_ioctl32_##type(unsigned int fd, unsigned int cmd, unsigned long arg, struct file *file, unsigned int native_ctl)\
 {\
 	struct sndrv_##type##32 *data32;\
 	struct sndrv_##type *data;\

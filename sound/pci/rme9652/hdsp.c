@@ -935,9 +935,7 @@ static snd_pcm_uframes_t hdsp_hw_pointer(hdsp_t *hdsp)
 	}
 
 	position &= HDSP_BufferPositionMask;
-	position /= 4;
-	position -= 32;
-	position &= (HDSP_CHANNEL_BUFFER_SAMPLES-1);
+	position &= (hdsp->period_bytes/2) - 1;
 	return position;
 }
 

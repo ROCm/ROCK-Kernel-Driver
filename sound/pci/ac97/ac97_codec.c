@@ -123,7 +123,7 @@ static const ac97_codec_id_t snd_ac97_codec_ids[] = {
 { 0x434d4983, 0xffffffff, "CMI9761",		patch_cm9761,	NULL },
 { 0x43525900, 0xfffffff8, "CS4297",		NULL,		NULL },
 { 0x43525910, 0xfffffff8, "CS4297A",		patch_cirrus_spdif,	NULL },
-{ 0x43525920, 0xfffffff8, "CS4294/4298",	NULL,		NULL },
+{ 0x43525920, 0xfffffff8, "CS4298",		patch_cirrus_spdif,		NULL },
 { 0x43525928, 0xfffffff8, "CS4294",		NULL,		NULL },
 { 0x43525930, 0xfffffff8, "CS4299",		patch_cirrus_cs4299,	NULL },
 { 0x43525948, 0xfffffff8, "CS4201",		NULL,		NULL },
@@ -2064,8 +2064,11 @@ int snd_ac97_mixer(ac97_bus_t *bus, ac97_template_t *template, ac97_t **rac97)
 		ac97->addr = (ac97->ext_id & AC97_EI_ADDR_MASK) >> AC97_EI_ADDR_SHIFT;
 	else
 		ac97->addr = (ac97->ext_mid & AC97_MEI_ADDR_MASK) >> AC97_MEI_ADDR_SHIFT;
-	if (ac97->ext_id & 0x0189)	/* L/R, MIC, SDAC, LDAC VRA support */
-		snd_ac97_write_cache(ac97, AC97_EXTENDED_STATUS, ac97->ext_id & 0x0189);
+	if (ac97->ext_id & 0x0189) {	/* L/R, MIC, SDAC, LDAC VRA support */
+		reg = snd_ac97_read(ac97, AC97_EXTENDED_STATUS);
+		reg |= ac97->ext_id & 0x0189;
+		snd_ac97_write_cache(ac97, AC97_EXTENDED_STATUS, reg);
+	}
 	if ((ac97->ext_id & AC97_EI_DRA) && bus->dra) {
 		/* Intel controllers require double rate data to be put in
 		 * slots 7+8, so let's hope the codec supports it. */
