@@ -435,7 +435,7 @@ static int atkbd_command(struct atkbd *atkbd, unsigned char *param, int command)
 	atkbd->cmdcnt = receive;
 
 	if (command == ATKBD_CMD_RESET_BAT)
-		timeout = 2000000; /* 2 sec */
+		timeout = 4000000; /* 4 sec */
 
 	if (receive && param)
 		for (i = 0; i < receive; i++)
