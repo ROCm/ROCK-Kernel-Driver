@@ -609,14 +609,23 @@ $(vmlinux-dirs): prepare-all scripts
 # A multi level approach is used. prepare1 is updated first, then prepare0.
 # prepare-all is the collection point for the prepare targets.
 
-.PHONY: prepare-all prepare prepare0 prepare1
+.PHONY: prepare-all prepare prepare0 prepare1 prepare2
+
+# prepare 2 generate Makefile to be placed in output directory, if
+# using a seperate output directory. This allows convinient use
+# of make in output directory
+prepare2:
+	$(Q)if [ ! $(srctree) -ef $(objtree) ]; then \
+	$(CONFIG_SHELL) $(srctree)/scripts/mkmakefile $(srctree) $(objtree) \
+	> $(objtree)/Makefile; \
+	fi 
 
 # prepare1 is used to check if we are building in a separate output directory,
 # and if so do:
 # 1) Check that make has not been executed in the kernel src $(srctree)
 # 2) Create the include2 directory, used for the second asm symlink
 
-prepare1:
+prepare1: prepare2
 ifneq ($(KBUILD_SRC),)
 	@echo '  Using $(srctree) as source for kernel'
 	$(Q)if [ -h $(srctree)/include/asm -o -f $(srctree)/.config ]; then \
@@ -724,6 +733,12 @@ modules: $(vmlinux-dirs) $(if $(KBUILD_BUILTIN),vmlinux)
 modules_prepare: prepare-all scripts
 
 # Target to install modules
+# Modules are pr. default installed in /lib/modules/$(KERNELRELEASE)/...
+# Within this directory create two symlinks:
+# build => link to the directory containing the output files of the kernel build
+# source => link to the directory containing the source for the kernel
+# source and build are equal except for the case when the kernel is build using
+# a separate output directory
 .PHONY: modules_install
 modules_install: _modinst_ _modinst_post
 
@@ -735,9 +750,13 @@ _modinst_:
 		sleep 1; \
 	fi
 	@rm -rf $(MODLIB)/kernel
-	@rm -f $(MODLIB)/build
+	@rm -f $(MODLIB)/source
 	@mkdir -p $(MODLIB)/kernel
-	@ln -s $(TOPDIR) $(MODLIB)/build
+	@ln -s $(srctree) $(MODLIB)/source
+	@if [ ! $(objtree) -ef  $(MODLIB)/build ]; then \
+		rm -f $(MODLIB)/build ; \
+		ln -s $(objtree) $(MODLIB)/build ; \
+	fi
 	$(Q)$(MAKE) -rR -f $(srctree)/scripts/Makefile.modinst
 
 # If System.map exists, run depmod.  This deliberately does not have a
