@@ -291,6 +291,101 @@ needs_val:
 	return FALSE;
 }
 
+#ifdef NTFS_RW
+
+/**
+ * ntfs_write_volume_flags - write new flags to the volume information flags
+ * @vol:	ntfs volume on which to modify the flags
+ * @flags:	new flags value for the volume information flags
+ *
+ * Internal function.  You probably want to use ntfs_{set,clear}_volume_flags()
+ * instead (see below).
+ *
+ * Replace the volume information flags on the volume @vol with the value
+ * supplied in @flags.  Note, this overwrites the volume information flags, so
+ * make sure to combine the flags you want to modify with the old flags and use
+ * the result when calling ntfs_write_volume_flags().
+ *
+ * Return 0 on success and -errno on error.
+ */
+static int ntfs_write_volume_flags(ntfs_volume *vol, const VOLUME_FLAGS flags)
+{
+	ntfs_inode *ni = NTFS_I(vol->vol_ino);
+	MFT_RECORD *m;
+	VOLUME_INFORMATION *vi;
+	attr_search_context *ctx;
+	int err;
+
+	ntfs_debug("Entering, old flags = 0x%x, new flags = 0x%x.",
+			vol->vol_flags, flags);
+	if (vol->vol_flags == flags)
+		goto done;
+	BUG_ON(!ni);
+	m = map_mft_record(ni);
+	if (IS_ERR(m)) {
+		err = PTR_ERR(m);
+		goto err_out;
+	}
+	ctx = get_attr_search_ctx(ni, m);
+	if (!ctx) {
+		err = -ENOMEM;
+		goto put_unm_err_out;
+	}
+	if (!lookup_attr(AT_VOLUME_INFORMATION, NULL, 0, 0, 0, NULL, 0, ctx)) {
+		err = -EIO;
+		goto put_unm_err_out;
+	}
+	vi = (VOLUME_INFORMATION*)((u8*)ctx->attr +
+			le16_to_cpu(ctx->attr->data.resident.value_offset));
+	vol->vol_flags = vi->flags = flags;
+	flush_dcache_mft_record_page(ctx->ntfs_ino);
+	mark_mft_record_dirty(ctx->ntfs_ino);
+	put_attr_search_ctx(ctx);
+	unmap_mft_record(ni);
+done:
+	ntfs_debug("Done.");
+	return 0;
+put_unm_err_out:
+	if (ctx)
+		put_attr_search_ctx(ctx);
+	unmap_mft_record(ni);
+err_out:
+	ntfs_error(vol->sb, "Failed with error code %i.", -err);
+	return err;
+}
+
+/**
+ * ntfs_set_volume_flags - set bits in the volume information flags
+ * @vol:	ntfs volume on which to modify the flags
+ * @flags:	flags to set on the volume
+ *
+ * Set the bits in @flags in the volume information flags on the volume @vol.
+ *
+ * Return 0 on success and -errno on error.
+ */
+static inline int ntfs_set_volume_flags(ntfs_volume *vol, VOLUME_FLAGS flags)
+{
+	flags &= VOLUME_FLAGS_MASK;
+	return ntfs_write_volume_flags(vol, vol->vol_flags | flags);
+}
+
+/**
+ * ntfs_clear_volume_flags - clear bits in the volume information flags
+ * @vol:	ntfs volume on which to modify the flags
+ * @flags:	flags to clear on the volume
+ *
+ * Clear the bits in @flags in the volume information flags on the volume @vol.
+ *
+ * Return 0 on success and -errno on error.
+ */
+static inline int ntfs_clear_volume_flags(ntfs_volume *vol, VOLUME_FLAGS flags)
+{
+	flags &= VOLUME_FLAGS_MASK;
+	return ntfs_write_volume_flags(vol, vol->vol_flags & ~flags);
+}
+
+#endif /* NTFS_RW */
+
 /**
  * ntfs_remount - change the mount options of a mounted ntfs filesystem
  * @sb:		superblock of mounted ntfs filesystem

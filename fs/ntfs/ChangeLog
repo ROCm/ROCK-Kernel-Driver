@@ -68,6 +68,8 @@ ToDo:
 	  alowing the VM to do with the page as it pleases.  Also, at umount
 	  time, now only throw away dirty mft (meta)data pages if dirty inodes
 	  are present and ask the user to email us if they see this happening.
+	- Add functions ntfs_{clear,set}_volume_flags(), to modify the volume
+	  information flags (fs/ntfs/super.c).
 
 2.1.12 - Fix the second fix to the decompression engine and some cleanups.
 
