@@ -704,6 +704,74 @@ void eeh_remove_device(struct pci_dev *dev)
 }
 EXPORT_SYMBOL(eeh_remove_device);
 
+unsigned int fastcall ioread8(void __iomem *addr)
+{
+	return readb(addr);
+}
+unsigned int fastcall ioread16(void __iomem *addr)
+{
+	return readw(addr);
+}
+unsigned int fastcall ioread32(void __iomem *addr)
+{
+	return readl(addr);
+}
+
+void fastcall iowrite8(u8 val, void __iomem *addr)
+{
+	writeb(val, addr);
+}
+void fastcall iowrite16(u16 val, void __iomem *addr)
+{
+	writew(val, addr);
+}
+void fastcall iowrite32(u32 val, void __iomem *addr)
+{
+	writel(val, addr);
+}
+
+void __iomem *ioport_map(unsigned long port, unsigned int len)
+{
+	if (_IO_IS_VALID(port))
+		return NULL;
+	return (void __iomem *) IO_ADDR_TO_TOKEN(port+pci_io_base);
+}
+
+void ioport_unmap(void __iomem *addr)
+{
+	/* Nothing to do */
+}
+
+void __iomem *pci_iomap(struct pci_dev *dev, int bar, unsigned long max)
+{
+	unsigned long start = pci_resource_start(dev, bar);
+	unsigned long len = pci_resource_len(dev, bar);
+	unsigned long flags = pci_resource_flags(dev, bar);
+
+	if (!len)
+		return NULL;
+	if (max && len > max)
+		len = max;
+	if (flags & IORESOURCE_IO)
+		return ioport_map(start, len);
+	if (flags & IORESOURCE_MEM) {
+		void __iomem *vaddr = (void __iomem *) start;
+		if (dev  && eeh_subsystem_enabled) {
+			struct device_node *dn = pci_device_to_OF_node(dev);
+			if (dn && !(dn->eeh_mode & EEH_MODE_NOCHECK))
+				return (void __iomem *) IO_ADDR_TO_TOKEN(vaddr);
+		}
+		return vaddr;
+	}
+	/* What? */
+	return NULL;
+}
+
+void pci_iounmap(struct pci_dev *dev, void __iomem *addr)
+{
+	/* Nothing to do */
+}
+
 /*
  * If EEH is implemented, find the PCI device using given phys addr
  * and check to see if eeh failure checking is disabled.
