@@ -5631,6 +5631,7 @@ pfm_proc_show_header(struct seq_file *m)
  		pfm_sessions.pfs_ptrace_use_dbregs);
 
   	UNLOCK_PFS(flags);
+
 	spin_lock(&pfm_buffer_fmt_lock);
 
 	list_for_each(pos, &pfm_buffer_fmt_list) {
@@ -5661,6 +5662,8 @@ pfm_proc_show_header(struct seq_file *m)
 static int
 pfm_proc_show(struct seq_file *m, void *v)
 {
+	unsigned long psr;
+	unsigned int i;
 	int cpu;
 
 	if (v == PFM_PROC_SHOW_HEADER) {
@@ -5701,6 +5704,27 @@ pfm_proc_show(struct seq_file *m, void *v)
 		cpu, pfm_get_cpu_data(pmu_ctx, cpu),
 		cpu, pfm_get_cpu_data(pmu_activation_number, cpu));
 
+	if (num_online_cpus() == 1 && pfm_sysctl.debug > 0) {
+
+		psr = pfm_get_psr();
+
+		ia64_srlz_d();
+
+		seq_printf(m, 
+			"CPU%-2d psr                 : 0x%lx\n"
+			"CPU%-2d pmc0                : 0x%lx\n", 
+			cpu, psr,
+			cpu, ia64_get_pmc(0));
+
+		for (i=0; PMC_IS_LAST(i) == 0;  i++) {
+			if (PMC_IS_COUNTING(i) == 0) continue;
+   			seq_printf(m, 
+				"CPU%-2d pmc%u                : 0x%lx\n"
+   				"CPU%-2d pmd%u                : 0x%lx\n", 
+				cpu, i, ia64_get_pmc(i),
+				cpu, i, ia64_get_pmd(i));
+  		}
+	}
 	return 0;
 }
 
