@@ -182,14 +182,7 @@ EXPORT_SYMBOL(open_bdev_excl);
 EXPORT_SYMBOL(close_bdev_excl);
 EXPORT_SYMBOL(open_by_devnum);
 EXPORT_SYMBOL(blockdev_direct_IO);
-EXPORT_SYMBOL(generic_file_read);
-EXPORT_SYMBOL(generic_file_sendfile);
-EXPORT_SYMBOL(do_generic_mapping_read);
 EXPORT_SYMBOL(file_ra_state_init);
-EXPORT_SYMBOL(generic_file_write);
-EXPORT_SYMBOL(generic_file_write_nolock);
-EXPORT_SYMBOL(generic_file_mmap);
-EXPORT_SYMBOL(generic_file_readonly_mmap);
 EXPORT_SYMBOL(generic_ro_fops);
 EXPORT_SYMBOL(get_unused_fd);
 EXPORT_SYMBOL(vfs_read);
@@ -212,12 +205,6 @@ EXPORT_SYMBOL(no_llseek);
 EXPORT_SYMBOL(poll_initwait);
 EXPORT_SYMBOL(poll_freewait);
 EXPORT_SYMBOL(ROOT_DEV);
-EXPORT_SYMBOL(find_get_page);
-EXPORT_SYMBOL(find_lock_page);
-EXPORT_SYMBOL(find_trylock_page);
-EXPORT_SYMBOL(find_or_create_page);
-EXPORT_SYMBOL(grab_cache_page_nowait);
-EXPORT_SYMBOL(read_cache_page);
 EXPORT_SYMBOL(read_cache_pages);
 EXPORT_SYMBOL(mark_page_accessed);
 EXPORT_SYMBOL(vfs_readdir);
@@ -242,13 +229,7 @@ EXPORT_SYMBOL(do_select);
 /* for stackable file systems (lofs, wrapfs, cryptfs, etc.) */
 EXPORT_SYMBOL(default_llseek);
 EXPORT_SYMBOL(dentry_open);
-#ifdef CONFIG_MMU
-EXPORT_SYMBOL(filemap_nopage);
-#endif
-EXPORT_SYMBOL(filemap_fdatawrite);
-EXPORT_SYMBOL(filemap_fdatawait);
 EXPORT_SYMBOL(lock_page);
-EXPORT_SYMBOL(unlock_page);
 
 /* device registration */
 EXPORT_SYMBOL(register_blkdev);
@@ -264,9 +245,6 @@ EXPORT_SYMBOL(blkdev_get);
 EXPORT_SYMBOL(blkdev_put);
 EXPORT_SYMBOL(ioctl_by_bdev);
 EXPORT_SYMBOL(read_dev_sector);
-EXPORT_SYMBOL_GPL(generic_file_direct_IO);
-EXPORT_SYMBOL(generic_file_readv);
-EXPORT_SYMBOL(generic_file_writev);
 EXPORT_SYMBOL(iov_shorten);
 EXPORT_SYMBOL_GPL(default_backing_dev_info);
 
@@ -368,7 +346,6 @@ EXPORT_SYMBOL(get_jiffies_64);
 EXPORT_SYMBOL(loops_per_jiffy);
 #endif
 
-
 /* misc */
 EXPORT_SYMBOL(panic);
 EXPORT_SYMBOL(panic_notifier_list);
@@ -431,7 +408,6 @@ EXPORT_SYMBOL(make_bad_inode);
 EXPORT_SYMBOL(is_bad_inode);
 EXPORT_SYMBOL(__inode_dir_notify);
 EXPORT_SYMBOL(generic_osync_inode);
-EXPORT_SYMBOL(remove_suid);
 
 #ifdef CONFIG_UID16
 EXPORT_SYMBOL(overflowuid);
