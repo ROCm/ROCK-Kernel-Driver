@@ -271,7 +271,7 @@ static int amdtco_notify_sys(struct notifier_block *this, unsigned long code, vo
 
 static struct notifier_block amdtco_notifier =
 {
-	notifier_call:	amdtco_notify_sys
+	.notifier_call = amdtco_notify_sys
 };
 
 static struct file_operations amdtco_fops =
