@@ -109,8 +109,6 @@ int DRM(agp_acquire)(struct inode *inode, struct file *filp,
 		return -EBUSY;
 	if (!drm_agp->acquire)
 		return -EINVAL;
-	if ( dev->agp->cant_use_aperture )
-		return -EINVAL;
 	if ((retcode = drm_agp->acquire()))
 		return retcode;
 	dev->agp->acquired = 1;

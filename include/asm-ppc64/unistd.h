@@ -439,6 +439,7 @@ static inline _syscall3(int, execve, __const__ char *, file, char **, argv,
 #define __ARCH_WANT_SYS_OLDUMOUNT
 #define __ARCH_WANT_SYS_SIGPENDING
 #define __ARCH_WANT_SYS_SIGPROCMASK
+#define __ARCH_WANT_SYS_RT_SIGACTION
 
 unsigned long sys_mmap(unsigned long addr, size_t len, unsigned long prot,
 		       unsigned long flags, unsigned long fd, off_t offset);

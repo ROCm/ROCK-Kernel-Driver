@@ -542,6 +542,15 @@ config EST8260
 	  <http://www.windriver.com/>, but the EST8260 cannot be found on it
 	  and has probably been discontinued or rebadged.
 
+config SBC82xx
+	bool "SBC82xx"
+	---help---
+	  SBC PowerQUICC II, single-board computer with MPC82xx CPU
+	  Manufacturer: Wind River Systems, Inc.
+	  Date of Release: May 2003
+	  End of Life: -
+	  URL: <http://www.windriver.com/>
+
 config SBS8260
 	bool "SBS8260"
 
@@ -575,7 +584,7 @@ config EMBEDDEDBOOT
 config 8260
 	bool "MPC8260 CPM Support" if WILLOW
 	depends on 6xx
-	default y if TQM8260 || RPXSUPER || EST8260 || SBS8260
+	default y if TQM8260 || RPXSUPER || EST8260 || SBS8260 || SBC82xx
 	help
 	  The MPC8260 CPM (Communications Processor Module) is a typical
 	  embedded CPU made by Motorola.  Selecting this option means that

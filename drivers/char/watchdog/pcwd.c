@@ -70,7 +70,7 @@
 #include <asm/uaccess.h>
 #include <asm/io.h>
 
-#define WD_VER                  "1.16 (03/27/2004)"
+#define WD_VER                  "1.16 (06/12/2004)"
 #define PFX			"pcwd: "
 
 /*
@@ -299,10 +299,11 @@ static int pcwd_stop(void)
 	return 0;
 }
 
-static void pcwd_keepalive(void)
+static int pcwd_keepalive(void)
 {
 	/* user land ping */
 	next_heartbeat = jiffies + (heartbeat * HZ);
+	return 0;
 }
 
 static int pcwd_set_heartbeat(int t)
@@ -404,6 +405,7 @@ static int pcwd_ioctl(struct inode *inode, struct file *file,
 	int status;
 	int temperature;
 	int new_heartbeat;
+	int __user *argp = (int __user *)arg;
 	static struct watchdog_info ident = {
 		.options =		WDIOF_OVERHEAT |
 					WDIOF_CARDRESET |
@@ -419,27 +421,27 @@ static int pcwd_ioctl(struct inode *inode, struct file *file,
 		return -ENOIOCTLCMD;
 
 	case WDIOC_GETSUPPORT:
-		if(copy_to_user((void*)arg, &ident, sizeof(ident)))
+		if(copy_to_user(argp, &ident, sizeof(ident)))
 			return -EFAULT;
 		return 0;
 
 	case WDIOC_GETSTATUS:
 		pcwd_get_status(&status);
-		return put_user(status, (int *) arg);
+		return put_user(status, argp);
 
 	case WDIOC_GETBOOTSTATUS:
-		return put_user(initial_status, (int *) arg);
+		return put_user(initial_status, argp);
 
 	case WDIOC_GETTEMP:
 		if (pcwd_get_temperature(&temperature))
 			return -EFAULT;
 
-		return put_user(temperature, (int *) arg);
+		return put_user(temperature, argp);
 
 	case WDIOC_SETOPTIONS:
 		if (revision == PCWD_REVISION_C)
 		{
-			if(copy_from_user(&rv, (int*) arg, sizeof(int)))
+			if(copy_from_user(&rv, argp, sizeof(int)))
 				return -EFAULT;
 
 			if (rv & WDIOS_DISABLECARD)
@@ -464,7 +466,7 @@ static int pcwd_ioctl(struct inode *inode, struct file *file,
 		return 0;
 
 	case WDIOC_SETTIMEOUT:
-		if (get_user(new_heartbeat, (int *) arg))
+		if (get_user(new_heartbeat, argp))
 			return -EFAULT;
 
 		if (pcwd_set_heartbeat(new_heartbeat))
@@ -474,13 +476,13 @@ static int pcwd_ioctl(struct inode *inode, struct file *file,
 		/* Fall */
 
 	case WDIOC_GETTIMEOUT:
-		return put_user(heartbeat, (int *)arg);
+		return put_user(heartbeat, argp);
 	}
 
 	return 0;
 }
 
-static ssize_t pcwd_write(struct file *file, const char *buf, size_t len,
+static ssize_t pcwd_write(struct file *file, const char __user *buf, size_t len,
 			  loff_t *ppos)
 {
 	/*  Can't seek (pwrite) on this device  */
@@ -528,12 +530,12 @@ static int pcwd_close(struct inode *inode, struct file *file)
 {
 	if (expect_close == 42) {
 		pcwd_stop();
-		atomic_inc( &open_allowed );
 	} else {
 		printk(KERN_CRIT PFX "Unexpected close, not stopping watchdog!\n");
 		pcwd_keepalive();
 	}
 	expect_close = 0;
+	atomic_inc( &open_allowed );
 	return 0;
 }
 
@@ -541,7 +543,7 @@ static int pcwd_close(struct inode *inode, struct file *file)
  *	/dev/temperature handling
  */
 
-static ssize_t pcwd_temp_read(struct file *file, char *buf, size_t count,
+static ssize_t pcwd_temp_read(struct file *file, char __user *buf, size_t count,
 			 loff_t *ppos)
 {
 	int temperature;

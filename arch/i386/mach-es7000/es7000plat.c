@@ -50,7 +50,6 @@ struct mip_reg		*mip_reg;
 struct mip_reg		*host_reg;
 int 			mip_port;
 unsigned long		mip_addr, host_addr;
-extern int (*platform_rename_gsi)();
 
 static int __init
 es7000_rename_gsi(int ioapic, int gsi)
@@ -134,7 +133,6 @@ parse_unisys_oem (char *oemptr, int oem_entries)
 	}
 
 	if (success < 2) {
-		printk("\nNo ES7000 found.\n");
 		es7000_plat = 0;
 	} else {
 		printk("\nEnabling ES7000 specific features...\n");

@@ -291,6 +291,101 @@ needs_val:
 	return FALSE;
 }
 
+#ifdef NTFS_RW
+
+/**
+ * ntfs_write_volume_flags - write new flags to the volume information flags
+ * @vol:	ntfs volume on which to modify the flags
+ * @flags:	new flags value for the volume information flags
+ *
+ * Internal function.  You probably want to use ntfs_{set,clear}_volume_flags()
+ * instead (see below).
+ *
+ * Replace the volume information flags on the volume @vol with the value
+ * supplied in @flags.  Note, this overwrites the volume information flags, so
+ * make sure to combine the flags you want to modify with the old flags and use
+ * the result when calling ntfs_write_volume_flags().
+ *
+ * Return 0 on success and -errno on error.
+ */
+static int ntfs_write_volume_flags(ntfs_volume *vol, const VOLUME_FLAGS flags)
+{
+	ntfs_inode *ni = NTFS_I(vol->vol_ino);
+	MFT_RECORD *m;
+	VOLUME_INFORMATION *vi;
+	attr_search_context *ctx;
+	int err;
+
+	ntfs_debug("Entering, old flags = 0x%x, new flags = 0x%x.",
+			vol->vol_flags, flags);
+	if (vol->vol_flags == flags)
+		goto done;
+	BUG_ON(!ni);
+	m = map_mft_record(ni);
+	if (IS_ERR(m)) {
+		err = PTR_ERR(m);
+		goto err_out;
+	}
+	ctx = get_attr_search_ctx(ni, m);
+	if (!ctx) {
+		err = -ENOMEM;
+		goto put_unm_err_out;
+	}
+	if (!lookup_attr(AT_VOLUME_INFORMATION, NULL, 0, 0, 0, NULL, 0, ctx)) {
+		err = -EIO;
+		goto put_unm_err_out;
+	}
+	vi = (VOLUME_INFORMATION*)((u8*)ctx->attr +
+			le16_to_cpu(ctx->attr->data.resident.value_offset));
+	vol->vol_flags = vi->flags = flags;
+	flush_dcache_mft_record_page(ctx->ntfs_ino);
+	mark_mft_record_dirty(ctx->ntfs_ino);
+	put_attr_search_ctx(ctx);
+	unmap_mft_record(ni);
+done:
+	ntfs_debug("Done.");
+	return 0;
+put_unm_err_out:
+	if (ctx)
+		put_attr_search_ctx(ctx);
+	unmap_mft_record(ni);
+err_out:
+	ntfs_error(vol->sb, "Failed with error code %i.", -err);
+	return err;
+}
+
+/**
+ * ntfs_set_volume_flags - set bits in the volume information flags
+ * @vol:	ntfs volume on which to modify the flags
+ * @flags:	flags to set on the volume
+ *
+ * Set the bits in @flags in the volume information flags on the volume @vol.
+ *
+ * Return 0 on success and -errno on error.
+ */
+static inline int ntfs_set_volume_flags(ntfs_volume *vol, VOLUME_FLAGS flags)
+{
+	flags &= VOLUME_FLAGS_MASK;
+	return ntfs_write_volume_flags(vol, vol->vol_flags | flags);
+}
+
+/**
+ * ntfs_clear_volume_flags - clear bits in the volume information flags
+ * @vol:	ntfs volume on which to modify the flags
+ * @flags:	flags to clear on the volume
+ *
+ * Clear the bits in @flags in the volume information flags on the volume @vol.
+ *
+ * Return 0 on success and -errno on error.
+ */
+static inline int ntfs_clear_volume_flags(ntfs_volume *vol, VOLUME_FLAGS flags)
+{
+	flags &= VOLUME_FLAGS_MASK;
+	return ntfs_write_volume_flags(vol, vol->vol_flags & ~flags);
+}
+
+#endif /* NTFS_RW */
+
 /**
  * ntfs_remount - change the mount options of a mounted ntfs filesystem
  * @sb:		superblock of mounted ntfs filesystem
@@ -316,14 +411,24 @@ static int ntfs_remount(struct super_block *sb, int *flags, char *opt)
 	 * For the read-write compiled driver, if we are remounting read-write,
 	 * make sure there are no volume errors and that no unsupported volume
 	 * flags are set.  Also, empty the logfile journal as it would become
-	 * stale as soon as something is written to the volume.
+	 * stale as soon as something is written to the volume and mark the
+	 * volume dirty so that chkdsk is run if the volume is not umounted
+	 * cleanly.
+	 *
+	 * When remounting read-only, mark the volume clean if no volume errors
+	 * have occured.
 	 */
 	if ((sb->s_flags & MS_RDONLY) && !(*flags & MS_RDONLY)) {
 		static const char *es = ".  Cannot remount read-write.";
 
+		/* Remounting read-write. */
 		if (NVolErrors(vol)) {
 			ntfs_error(sb, "Volume has errors and is read-only%s",
 					es);
+			return -EROFS;
+		}
+		if (vol->vol_flags & VOLUME_IS_DIRTY) {
+			ntfs_error(sb, "Volume is dirty and read-only%s", es);
 			return -EROFS;
 		}
 		if (vol->vol_flags & VOLUME_MUST_MOUNT_RO_MASK) {
@@ -331,15 +436,47 @@ static int ntfs_remount(struct super_block *sb, int *flags, char *opt)
 					"is read-only%s", es);
 			return -EROFS;
 		}
+		if (ntfs_set_volume_flags(vol, VOLUME_IS_DIRTY)) {
+			ntfs_error(sb, "Failed to set dirty bit in volume "
+					"information flags%s", es);
+			return -EROFS;
+		}
+#if 0
+		// TODO: Enable this code once we start modifying anything that
+		//	 is different between NTFS 1.2 and 3.x...
+		/* Set NT4 compatibility flag on newer NTFS version volumes. */
+		if ((vol->major_ver > 1)) {
+			if (ntfs_set_volume_flags(vol, VOLUME_MOUNTED_ON_NT4)) {
+				ntfs_error(sb, "Failed to set NT4 "
+						"compatibility flag%s", es);
+				NVolSetErrors(vol);
+				return -EROFS;
+			}
+		}
+#endif
 		if (!ntfs_empty_logfile(vol->logfile_ino)) {
 			ntfs_error(sb, "Failed to empty journal $LogFile%s",
 					es);
 			NVolSetErrors(vol);
 			return -EROFS;
 		}
+	} else if (!(sb->s_flags & MS_RDONLY) && (*flags & MS_RDONLY)) {
+		/* Remounting read-only. */
+		if (!NVolErrors(vol)) {
+			if (ntfs_clear_volume_flags(vol, VOLUME_IS_DIRTY))
+				ntfs_warning(sb, "Failed to clear dirty bit "
+						"in volume information "
+						"flags.  Run chkdsk.");
+		}
 	}
 	// TODO:  For now we enforce no atime and dir atime updates as they are
 	// not implemented.
+	if ((sb->s_flags & MS_NOATIME) && !(*flags & MS_NOATIME))
+		ntfs_warning(sb, "Atime updates are not implemented yet.  "
+				"Leaving them disabled.");
+	else if ((sb->s_flags & MS_NODIRATIME) && !(*flags & MS_NODIRATIME))
+		ntfs_warning(sb, "Directory atime updates are not implemented "
+				"yet.  Leaving them disabled.");
 	*flags |= MS_NOATIME | MS_NODIRATIME;
 #endif /* ! NTFS_RW */
 
@@ -763,7 +900,7 @@ static BOOL load_and_init_mft_mirror(ntfs_volume *vol)
 	/* The $MFTMirr, like the $MFT is multi sector transfer protected. */
 	NInoSetMstProtected(tmp_ni);
 	/*
-	 * Set up our little cheat allowing us to reuse the async io
+	 * Set up our little cheat allowing us to reuse the async read io
 	 * completion handler for directories.
 	 */
 	tmp_ni->itype.index.block_size = vol->mft_record_size;
@@ -1131,7 +1268,7 @@ get_ctx_vol_failed:
 			le32_to_cpu(ctx->attr->data.resident.value_length) >
 			(u8*)ctx->attr + le32_to_cpu(ctx->attr->length))
 		goto err_put_vol;
-	/* Setup volume flags and version. */
+	/* Copy the volume flags and version to the ntfs_volume structure. */
 	vol->vol_flags = vi->flags;
 	vol->major_ver = vi->major_ver;
 	vol->minor_ver = vi->minor_ver;
@@ -1142,9 +1279,12 @@ get_ctx_vol_failed:
 #ifdef NTFS_RW
 	/* Make sure that no unsupported volume flags are set. */
 	if (vol->vol_flags & VOLUME_MUST_MOUNT_RO_MASK) {
-		static const char *es1 = "Volume has unsupported flags set ";
+		static const char *es1a = "Volume is dirty";
+		static const char *es1b = "Volume has unsupported flags set";
 		static const char *es2 = ".  Run chkdsk and mount in Windows.";
-
+		const char *es1;
+		
+		es1 = vol->vol_flags & VOLUME_IS_DIRTY ? es1a : es1b;
 		/* If a read-write mount, convert it to a read-only mount. */
 		if (!(sb->s_flags & MS_RDONLY)) {
 			if (!(vol->on_errors & (ON_ERRORS_REMOUNT_RO |
@@ -1171,10 +1311,12 @@ get_ctx_vol_failed:
 	 */
 	if (!load_and_check_logfile(vol) ||
 			!ntfs_is_logfile_clean(vol->logfile_ino)) {
-		static const char *es1 = "Failed to load $LogFile";
-		static const char *es2 = "$LogFile is not clean";
-		static const char *es3 = ".  Mount in Windows.";
+		static const char *es1a = "Failed to load $LogFile";
+		static const char *es1b = "$LogFile is not clean";
+		static const char *es2 = ".  Mount in Windows.";
+		const char *es1;
 
+		es1 = !vol->logfile_ino ? es1a : es1b;
 		/* If a read-write mount, convert it to a read-only mount. */
 		if (!(sb->s_flags & MS_RDONLY)) {
 			if (!(vol->on_errors & (ON_ERRORS_REMOUNT_RO |
@@ -1182,21 +1324,66 @@ get_ctx_vol_failed:
 				ntfs_error(sb, "%s and neither on_errors="
 						"continue nor on_errors="
 						"remount-ro was specified%s",
-						!vol->logfile_ino ? es1 : es2,
-						es3);
+						es1, es2);
 				goto iput_logfile_err_out;
 			}
 			sb->s_flags |= MS_RDONLY | MS_NOATIME | MS_NODIRATIME;
-			ntfs_error(sb, "%s.  Mounting read-only%s",
-					!vol->logfile_ino ? es1 : es2, es3);
+			ntfs_error(sb, "%s.  Mounting read-only%s", es1, es2);
 		} else
 			ntfs_warning(sb, "%s.  Will not be able to remount "
-					"read-write%s",
-					!vol->logfile_ino ? es1 : es2, es3);
+					"read-write%s", es1, es2);
 		/* This will prevent a read-write remount. */
 		NVolSetErrors(vol);
-	/* If a read-write mount, empty the logfile. */
-	} else if (!(sb->s_flags & MS_RDONLY) &&
+	}
+	/* If (still) a read-write mount, mark the volume dirty. */
+	if (!(sb->s_flags & MS_RDONLY) &&
+			ntfs_set_volume_flags(vol, VOLUME_IS_DIRTY)) {
+		static const char *es1 = "Failed to set dirty bit in volume "
+				"information flags";
+		static const char *es2 = ".  Run chkdsk.";
+
+		/* Convert to a read-only mount. */
+		if (!(vol->on_errors & (ON_ERRORS_REMOUNT_RO |
+				ON_ERRORS_CONTINUE))) {
+			ntfs_error(sb, "%s and neither on_errors=continue nor "
+					"on_errors=remount-ro was specified%s",
+					es1, es2);
+			goto iput_logfile_err_out;
+		}
+		ntfs_error(sb, "%s.  Mounting read-only%s", es1, es2);
+		sb->s_flags |= MS_RDONLY | MS_NOATIME | MS_NODIRATIME;
+		/*
+		 * Do not set NVolErrors() because ntfs_remount() might manage
+		 * to set the dirty flag in which case all would be well.
+		 */
+	}
+#if 0
+	// TODO: Enable this code once we start modifying anything that is
+	//	 different between NTFS 1.2 and 3.x...
+	/*
+	 * If (still) a read-write mount, set the NT4 compatibility flag on
+	 * newer NTFS version volumes.
+	 */
+	if (!(sb->s_flags & MS_RDONLY) && (vol->major_ver > 1) &&
+			ntfs_set_volume_flags(vol, VOLUME_MOUNTED_ON_NT4)) {
+		static const char *es1 = "Failed to set NT4 compatibility flag";
+		static const char *es2 = ".  Run chkdsk.";
+
+		/* Convert to a read-only mount. */
+		if (!(vol->on_errors & (ON_ERRORS_REMOUNT_RO |
+				ON_ERRORS_CONTINUE))) {
+			ntfs_error(sb, "%s and neither on_errors=continue nor "
+					"on_errors=remount-ro was specified%s",
+					es1, es2);
+			goto iput_logfile_err_out;
+		}
+		ntfs_error(sb, "%s.  Mounting read-only%s", es1, es2);
+		sb->s_flags |= MS_RDONLY | MS_NOATIME | MS_NODIRATIME;
+		NVolSetErrors(vol);
+	}
+#endif
+	/* If (still) a read-write mount, empty the logfile. */
+	if (!(sb->s_flags & MS_RDONLY) &&
 			!ntfs_empty_logfile(vol->logfile_ino)) {
 		static const char *es1 = "Failed to empty $LogFile";
 		static const char *es2 = ".  Mount in Windows.";
@@ -1209,12 +1396,11 @@ get_ctx_vol_failed:
 					es1, es2);
 			goto iput_logfile_err_out;
 		}
-		sb->s_flags |= MS_RDONLY | MS_NOATIME | MS_NODIRATIME;
 		ntfs_error(sb, "%s.  Mounting read-only%s", es1, es2);
-		/* This will prevent a read-write remount. */
+		sb->s_flags |= MS_RDONLY | MS_NOATIME | MS_NODIRATIME;
 		NVolSetErrors(vol);
 	}
-#endif
+#endif /* NTFS_RW */
 	/*
 	 * Get the inode for the attribute definitions file and parse the
 	 * attribute definitions.
@@ -1289,18 +1475,69 @@ iput_mirr_err_out:
 
 /**
  * ntfs_put_super - called by the vfs to unmount a volume
- * @vfs_sb:	vfs superblock of volume to unmount
+ * @sb:		vfs superblock of volume to unmount
  *
  * ntfs_put_super() is called by the VFS (from fs/super.c::do_umount()) when
  * the volume is being unmounted (umount system call has been invoked) and it
  * releases all inodes and memory belonging to the NTFS specific part of the
  * super block.
  */
-static void ntfs_put_super(struct super_block *vfs_sb)
+static void ntfs_put_super(struct super_block *sb)
 {
-	ntfs_volume *vol = NTFS_SB(vfs_sb);
+	ntfs_volume *vol = NTFS_SB(sb);
 
 	ntfs_debug("Entering.");
+#ifdef NTFS_RW
+	/*
+	 * Commit all inodes while they are still open in case some of them
+	 * cause others to be dirtied.
+	 */
+	ntfs_commit_inode(vol->vol_ino);
+
+	/* NTFS 3.0+ specific. */
+	if (vol->major_ver >= 3) {
+		if (vol->secure_ino)
+			ntfs_commit_inode(vol->secure_ino);
+	}
+
+	ntfs_commit_inode(vol->root_ino);
+
+	down_write(&vol->lcnbmp_lock);
+	ntfs_commit_inode(vol->lcnbmp_ino);
+	up_write(&vol->lcnbmp_lock);
+
+	down_write(&vol->mftbmp_lock);
+	ntfs_commit_inode(vol->mftbmp_ino);
+	up_write(&vol->mftbmp_lock);
+
+	if (vol->logfile_ino)
+		ntfs_commit_inode(vol->logfile_ino);
+
+	if (vol->mftmirr_ino)
+		ntfs_commit_inode(vol->mftmirr_ino);
+	ntfs_commit_inode(vol->mft_ino);
+
+	/*
+	 * If a read-write mount and no volume errors have occured, mark the
+	 * volume clean.  Also, re-commit all affected inodes.
+	 */
+	if (!(sb->s_flags & MS_RDONLY)) {
+		if (!NVolErrors(vol)) {
+			if (ntfs_clear_volume_flags(vol, VOLUME_IS_DIRTY))
+				ntfs_warning(sb, "Failed to clear dirty bit "
+						"in volume information "
+						"flags.  Run chkdsk.");
+			ntfs_commit_inode(vol->vol_ino);
+			ntfs_commit_inode(vol->root_ino);
+			if (vol->mftmirr_ino)
+				ntfs_commit_inode(vol->mftmirr_ino);
+			ntfs_commit_inode(vol->mft_ino);
+		} else {
+			ntfs_warning(sb, "Volume has errors.  Leaving volume "
+					"marked dirty.  Run chkdsk.");
+		}
+	}
+#endif /* NTFS_RW */
 
 	iput(vol->vol_ino);
 	vol->vol_ino = NULL;
@@ -1331,10 +1568,46 @@ static void ntfs_put_super(struct super_block *vfs_sb)
 		iput(vol->logfile_ino);
 		vol->logfile_ino = NULL;
 	}
-
 	if (vol->mftmirr_ino) {
+		/* Re-commit the mft mirror and mft just in case. */
+		ntfs_commit_inode(vol->mftmirr_ino);
+		ntfs_commit_inode(vol->mft_ino);
 		iput(vol->mftmirr_ino);
 		vol->mftmirr_ino = NULL;
+	}
+	/*
+	 * If any dirty inodes are left, throw away all mft data page cache
+	 * pages to allow a clean umount.  This should never happen any more
+	 * due to mft.c::ntfs_mft_writepage() cleaning all the dirty pages as
+	 * the underlying mft records are written out and cleaned.  If it does,
+	 * happen anyway, we want to know...
+	 */
+	ntfs_commit_inode(vol->mft_ino);
+	write_inode_now(vol->mft_ino, 1);
+	if (!list_empty(&sb->s_dirty)) {
+		const char *s1, *s2;
+
+		down(&vol->mft_ino->i_sem);
+		truncate_inode_pages(vol->mft_ino->i_mapping, 0);
+		up(&vol->mft_ino->i_sem);
+		write_inode_now(vol->mft_ino, 1);
+		if (!list_empty(&sb->s_dirty)) {
+			static const char *_s1 = "inodes";
+			static const char *_s2 = "";
+			s1 = _s1;
+			s2 = _s2;
+		} else {
+			static const char *_s1 = "mft pages";
+			static const char *_s2 = "They have been thrown "
+					"away.  ";
+			s1 = _s1;
+			s2 = _s2;
+		}
+		ntfs_error(sb, "Dirty %s found at umount time.  %sYou should "
+				"run chkdsk.  Please email "
+				"linux-ntfs-dev@lists.sourceforge.net and say "
+				"that you saw this message.  Thank you.", s1,
+				s2);
 	}
 #endif /* NTFS_RW */
 
@@ -1344,7 +1617,7 @@ static void ntfs_put_super(struct super_block *vfs_sb)
 	vol->upcase_len = 0;
 	/*
 	 * Decrease the number of mounts and destroy the global default upcase
-	 * table if necessary. Also decrease the number of upcase users if we
+	 * table if necessary.  Also decrease the number of upcase users if we
 	 * are a user.
 	 */
 	down(&ntfs_lock);
@@ -1368,7 +1641,7 @@ static void ntfs_put_super(struct super_block *vfs_sb)
 		unload_nls(vol->nls_map);
 		vol->nls_map = NULL;
 	}
-	vfs_sb->s_fs_info = NULL;
+	sb->s_fs_info = NULL;
 	kfree(vol);
 	return;
 }
@@ -1629,8 +1902,8 @@ struct super_operations ntfs_sops = {
 #ifdef NTFS_RW
 	//.dirty_inode	= NULL,			/* VFS: Called from
 	//					   __mark_inode_dirty(). */
-	//.write_inode	= NULL,			/* VFS: Write dirty inode to
-	//					   disk. */
+	.write_inode	= ntfs_write_inode,	/* VFS: Write dirty inode to
+						   disk. */
 	//.drop_inode	= NULL,			/* VFS: Called just after the
 	//					   inode reference count has
 	//					   been decreased to zero.
@@ -1719,8 +1992,12 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 #ifndef NTFS_RW
 	sb->s_flags |= MS_RDONLY | MS_NOATIME | MS_NODIRATIME;
 #else
-	// TODO:  For now we enforce no atime and dir atime updates as they are
-	// not implemented.
+	if (!(sb->s_flags & MS_NOATIME))
+		ntfs_warning(sb, "Atime updates are not implemented yet.  "
+				"Disabling them.");
+	else if (!(sb->s_flags & MS_NODIRATIME))
+		ntfs_warning(sb, "Directory atime updates are not implemented "
+				"yet.  Disabling them.");
 	sb->s_flags |= MS_NOATIME | MS_NODIRATIME;
 #endif
 	/* Allocate a new ntfs_volume and place it in sb->s_fs_info. */

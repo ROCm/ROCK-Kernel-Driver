@@ -1,4 +1,4 @@
-ToDo:
+ToDo/Notes:
 	- Find and fix bugs.
 	- Either invalidate quotas or update the quota charges on NTFS 3.x
 	  volumes with quota tracking enabled ($Quota).
@@ -11,8 +11,10 @@ ToDo:
 	  pages as nothing can dirty a page other than ourselves. Should this
 	  change, we will really need to roll our own ->set_page_dirty().
 	- Implement sops->dirty_inode() to implement {a,m,c}time updates and
-	  such things.
-	- Implement sops->write_inode().
+	  such things.  This should probably just flag the ntfs inode such that
+	  sops->write_inode(), i.e. ntfs_write_inode(), will copy the times
+	  when it is invoked rather than having to update the mft record
+	  every time.
 	- In between ntfs_prepare/commit_write, need exclusion between
 	  simultaneous file extensions. Need perhaps an NInoResizeUnderway()
 	  flag which we can set in ntfs_prepare_write() and clear again in
@@ -24,6 +26,87 @@ ToDo:
 	  OTOH, perhaps i_sem, which is held accross generic_file_write is
 	  sufficient for synchronisation here. We then just need to make sure
 	  ntfs_readpage/writepage/truncate interoperate properly with us.
+	- Implement mft.c::sync_mft_mirror_umount().  We currently will just
+	  leave the volume dirty on umount if the final iput(vol->mft_ino)
+	  causes a write of any mirrored mft records due to the mft mirror
+	  inode having been discarded already.  Whether this can actually ever
+	  happen is unclear however so it is worth waiting until someone hits
+	  the problem.
+	- Enable the code for setting the NT4 compatibility flag when we start
+	  making NTFS 1.2 specific modifications.
+
+2.1.14 - Fix an NFSd caused deadlock reported by several users.
+
+	- Modify fs/ntfs/ntfs_readdir() to copy the index root attribute value
+	  to a buffer so that we can put the search context and unmap the mft
+	  record before calling the filldir() callback.  We need to do this
+	  because of NFSd which calls ->lookup() from its filldir callback()
+	  and this causes NTFS to deadlock as ntfs_lookup() maps the mft record
+	  of the directory and since ntfs_readdir() has got it mapped already
+	  ntfs_lookup() deadlocks.
+
+2.1.13 - Enable overwriting of resident files and housekeeping of system files.
+
+	- Implement writing of mft records (fs/ntfs/mft.[hc]), which includes
+	  keeping the mft mirror in sync with the mft when mirrored mft records
+	  are written.  The functions are write_mft_record{,_nolock}().  The
+	  implementation is quite rudimentary for now with lots of things not
+	  implemented yet but I am not sure any of them can actually occur so
+	  I will wait for people to hit each one and only then implement it.
+	- Commit open system inodes at umount time.  This should make it
+	  virtually impossible for sync_mft_mirror_umount() to ever be needed.
+	- Implement ->write_inode (fs/ntfs/inode.c::ntfs_write_inode()) for the
+	  ntfs super operations.  This gives us inode writing via the VFS inode
+	  dirty code paths.  Note:  Access time updates are not implemented yet.
+	- Implement fs/ntfs/mft.[hc]::{,__}mark_mft_record_dirty() and make
+	  fs/ntfs/aops.c::ntfs_writepage() and ntfs_commit_write() use it, thus
+	  finally enabling resident file overwrite!  (-8  This also includes a
+	  placeholder for ->writepage (ntfs_mft_writepage()), which for now
+	  just redirties the page and returns.  Also, at umount time, we for
+	  now throw away all mft data page cache pages after the last call to
+	  ntfs_commit_inode() in the hope that all inodes will have been
+	  written out by then and hence no dirty (meta)data will be lost.  We
+	  also check for this case and emit an error message telling the user
+	  to run chkdsk.
+	- Use set_page_writeback() and end_page_writeback() in the resident
+	  attribute code path of fs/ntfs/aops.c::ntfs_writepage() otherwise
+	  the radix-tree tag PAGECACHE_TAG_DIRTY remains set even though the
+	  page is clean.
+	- Implement ntfs_mft_writepage() so it now checks if any of the mft
+	  records in the page are dirty and if so redirties the page and
+	  returns.  Otherwise it just returns (after doing set_page_writeback(),
+	  unlock_page(), end_page_writeback() or the radix-tree tag
+	  PAGECACHE_TAG_DIRTY remains set even though the page is clean), thus
+	  alowing the VM to do with the page as it pleases.  Also, at umount
+	  time, now only throw away dirty mft (meta)data pages if dirty inodes
+	  are present and ask the user to email us if they see this happening.
+	- Add functions ntfs_{clear,set}_volume_flags(), to modify the volume
+	  information flags (fs/ntfs/super.c).
+	- Mark the volume dirty when (re)mounting read-write and mark it clean
+	  when unmounting or remounting read-only.  If any volume errors are
+	  found, the volume is left marked dirty to force chkdsk to run.
+	- Add code to set the NT4 compatibility flag when (re)mounting
+	  read-write for newer NTFS versions but leave it commented out for now
+	  since we do not make any modifications that are NTFS 1.2 specific yet
+	  and since setting this flag breaks Captive-NTFS which is not nice.
+	  This code must be enabled once we start writing NTFS 1.2 specific
+	  changes otherwise Windows NTFS driver might crash / cause corruption.
+
+2.1.12 - Fix the second fix to the decompression engine and some cleanups.
+
+	- Add a new address space operations struct, ntfs_mst_aops, for mst
+	  protected attributes.  This is because the default ntfs_aops do not
+	  make sense with mst protected data and were they to write anything to
+	  such an attribute they would cause data corruption so we provide
+	  ntfs_mst_aops which does not have any write related operations set.
+	- Cleanup dirty ntfs inode handling (fs/ntfs/inode.[hc]) which also
+	  includes an adapted ntfs_commit_inode() and an implementation of
+	  ntfs_write_inode() which for now just cleans dirty inodes without
+	  writing them (it does emit a warning that this is happening).
+	- Undo the second decompression engine fix (see 2.1.9 release ChangeLog
+	  entry) as it was only fixing a theoretical bug but at the same time
+	  it badly broke the handling of sparse and uncompressed compression
+	  blocks.
 
 2.1.11 - Driver internal cleanups.
 

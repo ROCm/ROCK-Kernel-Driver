@@ -1893,7 +1893,7 @@ static struct ethtool_ops sis900_ethtool_ops = {
 static int mii_ioctl(struct net_device *net_dev, struct ifreq *rq, int cmd)
 {
 	struct sis900_private *sis_priv = net_dev->priv;
-	struct mii_ioctl_data *data = (struct mii_ioctl_data *)&rq->ifr_data;
+	struct mii_ioctl_data *data = if_mii(rq);
 
 	switch(cmd) {
 	case SIOCGMIIPHY:		/* Get address of MII PHY in use. */

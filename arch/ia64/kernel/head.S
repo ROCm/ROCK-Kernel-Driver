@@ -815,6 +815,42 @@ GLOBAL_ENTRY(ia64_delay_loop)
 	br.ret.sptk.many rp
 END(ia64_delay_loop)
 
+/*
+ * Return a CPU-local timestamp in nano-seconds.  This timestamp is
+ * NOT synchronized across CPUs its return value must never be
+ * compared against the values returned on another CPU.  The usage in
+ * kernel/sched.c ensures that.
+ *
+ * The return-value of sched_clock() is NOT supposed to wrap-around.
+ * If it did, it would cause some scheduling hiccups (at the worst).
+ * Fortunately, with a 64-bit cycle-counter ticking at 100GHz, even
+ * that would happen only once every 5+ years.
+ *
+ * The code below basically calculates:
+ *
+ *   (ia64_get_itc() * local_cpu_data->nsec_per_cyc) >> IA64_NSEC_PER_CYC_SHIFT
+ *
+ * except that the multiplication and the shift are done with 128-bit
+ * intermediate precision so that we can produce a full 64-bit result.
+ */
+GLOBAL_ENTRY(sched_clock)
+	addl r8=THIS_CPU(cpu_info) + IA64_CPUINFO_NSEC_PER_CYC_OFFSET,r0
+	mov.m r9=ar.itc		// fetch cycle-counter				(35 cyc)
+	;;
+	ldf8 f8=[r8]
+	;;
+	setf.sig f9=r9		// certain to stall, so issue it _after_ ldf8...
+	;;
+	xmpy.lu f10=f9,f8	// calculate low 64 bits of 128-bit product	(4 cyc)
+	xmpy.hu f11=f9,f8	// calculate high 64 bits of 128-bit product
+	;;
+	getf.sig r8=f10		//						(5 cyc)
+	getf.sig r9=f11
+	;;
+	shrp r8=r9,r8,IA64_NSEC_PER_CYC_SHIFT
+	br.ret.sptk.many rp
+END(sched_clock)
+
 GLOBAL_ENTRY(start_kernel_thread)
 	.prologue
 	.save rp, r0				// this is the end of the call-chain

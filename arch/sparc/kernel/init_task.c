@@ -22,6 +22,6 @@ EXPORT_SYMBOL(init_task);
  * in etrap.S which assumes it.
  */
 union thread_union init_thread_union
-	__attribute__((section (".text")))
+	__attribute__((section (".text,#alloc")))
 	__attribute__((aligned (THREAD_SIZE)))
 	= { INIT_THREAD_INFO(init_task) };

@@ -30,6 +30,8 @@
 #include "cifs_debug.h"
 #include "cifs_fs_sb.h"
 
+extern int is_size_safe_to_change(struct cifsInodeInfo *);
+
 int
 cifs_get_inode_info_unix(struct inode **pinode,
 			 const unsigned char *search_path,
@@ -42,9 +44,6 @@ cifs_get_inode_info_unix(struct inode **pinode,
 	struct inode *inode;
 	struct cifs_sb_info *cifs_sb = CIFS_SB(sb);
 	char *tmp_path;
-
-/* BB add caching check so we do not go to server to overwrite inode info to cached file
-	where the local file sizes are correct and the server info is stale  BB */
 
 	xid = GetXid();
 
@@ -125,13 +124,29 @@ cifs_get_inode_info_unix(struct inode **pinode,
 		inode->i_nlink = le64_to_cpu(findData.Nlinks);
 		findData.NumOfBytes = le64_to_cpu(findData.NumOfBytes);
 		findData.EndOfFile = le64_to_cpu(findData.EndOfFile);
-		i_size_write(inode,findData.EndOfFile);
+
+		if(is_size_safe_to_change(cifsInfo)) {
+		/* can not safely change the file size here if the 
+		   client is writing to it due to potential races */
+
+			i_size_write(inode,findData.EndOfFile);
 /* blksize needs to be multiple of two. So safer to default to blksize
 	and blkbits set in superblock so 2**blkbits and blksize will match */
 /*		inode->i_blksize =
 		    (pTcon->ses->server->maxBuf - MAX_CIFS_HDR_SIZE) & 0xFFFFFE00;*/
-		inode->i_blocks = 
-	                (inode->i_blksize - 1 + findData.NumOfBytes) >> inode->i_blkbits;
+
+		/* This seems incredibly stupid but it turns out that
+		i_blocks is not related to (i_size / i_blksize), instead a
+		size of 512 is required to be used for calculating num blocks */
+		 
+
+/*		inode->i_blocks = 
+	                (inode->i_blksize - 1 + findData.NumOfBytes) >> inode->i_blkbits;*/
+
+		/* 512 bytes (2**9) is the fake blocksize that must be used */
+		/* for this calculation */
+			inode->i_blocks = (512 - 1 + findData.NumOfBytes) >> 9;
+		}
 
 		if (findData.NumOfBytes < findData.EndOfFile)
 			cFYI(1, ("Server inconsistency Error: it says allocation size less than end of file "));
@@ -273,10 +288,18 @@ cifs_get_inode_info(struct inode **pinode, const unsigned char *search_path,
 				inode->i_mode &= ~(S_IWUGO);
    /* BB add code here - validate if device or weird share or device type? */
 		}
-		i_size_write(inode,le64_to_cpu(pfindData->EndOfFile));
+		if(is_size_safe_to_change(cifsInfo)) {
+		/* can not safely change the file size here if the 
+		client is writing to it due to potential races */
+
+			i_size_write(inode,le64_to_cpu(pfindData->EndOfFile));
+
+		/* 512 bytes (2**9) is the fake blocksize that must be used */
+		/* for this calculation */
+			inode->i_blocks = (512 - 1 + pfindData->AllocationSize)
+				 >> 9;
+		}
 		pfindData->AllocationSize = le64_to_cpu(pfindData->AllocationSize);
-		inode->i_blocks =
-			(inode->i_blksize - 1 + pfindData->AllocationSize) >> inode->i_blkbits;
 
 		inode->i_nlink = le32_to_cpu(pfindData->NumberOfLinks);
 
@@ -556,9 +579,38 @@ cifs_rename(struct inode *source_inode, struct dentry *source_direntry,
 	rc = CIFSSMBRename(xid, pTcon, fromName, toName,
 			   cifs_sb_source->local_nls);
 	if(rc == -EEXIST) {
-		cifs_unlink(target_inode, target_direntry);
-		rc = CIFSSMBRename(xid, pTcon, fromName, toName,
-				   cifs_sb_source->local_nls);
+		/* check if they are the same file 
+		because rename of hardlinked files is a noop */
+		FILE_UNIX_BASIC_INFO * info_buf_source;
+		FILE_UNIX_BASIC_INFO * info_buf_target;
+
+		info_buf_source = 
+			kmalloc(2 * sizeof(FILE_UNIX_BASIC_INFO),GFP_KERNEL);
+		if(info_buf_source != NULL) {
+			info_buf_target = info_buf_source+1;
+			rc = CIFSSMBUnixQPathInfo(xid, pTcon, fromName, 
+				info_buf_source, cifs_sb_source->local_nls);
+			if(rc == 0) {
+				rc = CIFSSMBUnixQPathInfo(xid,pTcon,toName,
+						info_buf_target,
+						cifs_sb_target->local_nls);
+			}
+			if((rc == 0) && 
+				(info_buf_source->UniqueId == 
+				 info_buf_target->UniqueId)) {
+			/* do not rename since the files are hardlinked 
+			   which is a noop */
+			} else {
+			/* we either can not tell the files are hardlinked
+			(as with Windows servers) or files are not hardlinked 
+			so delete the target manually before renaming to
+			follow POSIX rather than Windows semantics */
+				cifs_unlink(target_inode, target_direntry);
+				rc = CIFSSMBRename(xid, pTcon, fromName, toName,
+					cifs_sb_source->local_nls);
+			}
+			kfree(info_buf_source);
+		} /* if we can not get memory just leave rc as EEXIST */
 	}
 
 	if((rc == -EIO)||(rc == -EEXIST)) {

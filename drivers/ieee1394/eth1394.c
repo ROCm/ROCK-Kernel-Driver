@@ -89,7 +89,7 @@
 #define TRACE() printk(KERN_ERR "%s:%s[%d] ---- TRACE\n", driver_name, __FUNCTION__, __LINE__)
 
 static char version[] __devinitdata =
-	"$Rev: 1198 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 1224 $ Ben Collins <bcollins@debian.org>";
 
 struct fragment_info {
 	struct list_head list;
@@ -191,7 +191,7 @@ static int ether1394_tx(struct sk_buff *skb, struct net_device *dev);
 static void ether1394_iso(struct hpsb_iso *iso);
 
 static int ether1394_do_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd);
-static int ether1394_ethtool_ioctl(struct net_device *dev, void *useraddr);
+static int ether1394_ethtool_ioctl(struct net_device *dev, void __user *useraddr);
 
 static int ether1394_write(struct hpsb_host *host, int srcid, int destid,
 			   quadlet_t *data, u64 addr, size_t len, u16 flags);
@@ -1770,7 +1770,7 @@ static int ether1394_do_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd
 {
 	switch(cmd) {
 		case SIOCETHTOOL:
-			return ether1394_ethtool_ioctl(dev, (void *) ifr->ifr_data);
+			return ether1394_ethtool_ioctl(dev, ifr->ifr_data);
 
 		case SIOCGMIIPHY:		/* Get address of MII PHY in use. */
 		case SIOCGMIIREG:		/* Read MII PHY register. */
@@ -1782,18 +1782,18 @@ static int ether1394_do_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd
 	return 0;
 }
 
-static int ether1394_ethtool_ioctl(struct net_device *dev, void *useraddr)
+static int ether1394_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
 {
 	u32 ethcmd;
 
-	if (get_user(ethcmd, (u32 *)useraddr))
+	if (get_user(ethcmd, (u32 __user *)useraddr))
 		return -EFAULT;
 
 	switch (ethcmd) {
 		case ETHTOOL_GDRVINFO: {
 			struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
 			strcpy (info.driver, driver_name);
-			strcpy (info.version, "$Rev: 1198 $");
+			strcpy (info.version, "$Rev: 1224 $");
 			/* FIXME XXX provide sane businfo */
 			strcpy (info.bus_info, "ieee1394");
 			if (copy_to_user (useraddr, &info, sizeof (info)))

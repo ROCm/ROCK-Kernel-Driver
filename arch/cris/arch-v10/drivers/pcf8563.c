@@ -15,7 +15,7 @@
  *
  * Author: Tobias Anderberg <tobiasa@axis.com>.
  *
- * $Id: pcf8563.c,v 1.1 2002/12/12 08:27:26 starvik Exp $
+ * $Id: pcf8563.c,v 1.4 2004/05/28 09:26:59 starvik Exp $
  */
 
 #include <linux/config.h>
@@ -28,6 +28,7 @@
 #include <linux/fs.h>
 #include <linux/ioctl.h>
 #include <linux/delay.h>
+#include <linux/bcd.h>
 
 #include <asm/uaccess.h>
 #include <asm/system.h>
@@ -39,7 +40,7 @@
 #define PCF8563_MAJOR 121		/* Local major number. */
 #define DEVICE_NAME "rtc"		/* Name which is registered in /proc/devices. */
 #define PCF8563_NAME "PCF8563"
-#define DRIVER_VERSION "$Revision: 1.1 $"
+#define DRIVER_VERSION "$Revision: 1.4 $"
 
 /* I2C bus slave registers. */
 #define RTC_I2C_READ		0xa3
@@ -85,7 +86,12 @@ pcf8563_readreg(int reg)
 void
 pcf8563_writereg(int reg, unsigned char val) 
 {
-	i2c_writereg(RTC_I2C_WRITE,reg,val);
+#ifdef CONFIG_ETRAX_RTC_READONLY
+	if (reg == RTC_CONTROL1 || (reg >= RTC_SECONDS && reg <= RTC_YEAR))
+		return;
+#endif
+
+	rtc_write(reg, val);
 }
 
 void
@@ -120,6 +126,9 @@ int __init
 pcf8563_init(void)
 {
 	unsigned char ret;
+
+	i2c_init();
+
 	/*
 	 * First of all we need to reset the chip. This is done by
 	 * clearing control1, control2 and clk freq, clear the 
@@ -152,14 +161,6 @@ pcf8563_init(void)
 	
 	if (rtc_write(RTC_WEEKDAY_ALARM, 0x00) < 0)
 		goto err;
-
-	if (register_chrdev(PCF8563_MAJOR, DEVICE_NAME, &pcf8563_fops) < 0) {
-		printk(KERN_INFO "%s: Unable to get major numer %d for RTC device.\n", 
-		       PCF8563_NAME, PCF8563_MAJOR);
-		return -1;
-	}
-
-	printk(KERN_INFO "%s Real-Time Clock Driver, %s\n", PCF8563_NAME, DRIVER_VERSION);
         
 	/* Check for low voltage, and warn about it.. */
 	if (rtc_read(RTC_SECONDS) & 0x80)
@@ -210,9 +211,11 @@ pcf8563_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, unsigned
 			break;
 		case RTC_SET_TIME:
 			{
+#ifdef CONFIG_ETRAX_RTC_READONLY
+				return -EPERM;
+#else
 				int leap;
 				int century;
-				unsigned long flags;
 				struct rtc_time tm;
 
 				memset(&tm, 0, sizeof (struct rtc_time));
@@ -256,8 +259,35 @@ pcf8563_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, unsigned
 				rtc_write(RTC_SECONDS, tm.tm_sec);
 
 				return 0;
+#endif /* !CONFIG_ETRAX_RTC_READONLY */
 			}
-			break;
+
+		case RTC_VLOW_RD:
+		{
+			int vl_bit = 0;
+
+			if (rtc_read(RTC_SECONDS) & 0x80) {
+				vl_bit = 1;
+				printk(KERN_WARNING "%s: RTC Voltage Low - reliable "
+				       "date/time information is no longer guaranteed!\n",
+				       PCF8563_NAME);
+			}
+			if (copy_to_user((int *) arg, &vl_bit, sizeof(int)))
+				return -EFAULT;
+
+			return 0;
+		}
+
+		case RTC_VLOW_SET:
+		{
+			/* Clear the VL bit in the seconds register */
+			int ret = rtc_read(RTC_SECONDS);
+
+			rtc_write(RTC_SECONDS, (ret & 0x7F));
+
+			return 0;
+		}
+
 		default:
 				return -ENOTTY;
 	}
@@ -265,5 +295,19 @@ pcf8563_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, unsigned
 	return 0;
 }
 
-module_init(pcf8563_init);
+static int __init
+pcf8563_register(void)
+{
+	pcf8563_init();
+	if (register_chrdev(PCF8563_MAJOR, DEVICE_NAME, &pcf8563_fops) < 0) {
+		printk(KERN_INFO "%s: Unable to get major numer %d for RTC device.\n",
+		       PCF8563_NAME, PCF8563_MAJOR);
+		return -1;
+	}
+
+	printk(KERN_INFO "%s Real-Time Clock Driver, %s\n", PCF8563_NAME, DRIVER_VERSION);
+        return 0;
+}
+
+module_init(pcf8563_register);
 module_exit(pcf8563_exit);

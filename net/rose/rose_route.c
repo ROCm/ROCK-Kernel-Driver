@@ -710,7 +710,7 @@ out:
 /*
  *	Handle the ioctls that control the routing functions.
  */
-int rose_rt_ioctl(unsigned int cmd, void *arg)
+int rose_rt_ioctl(unsigned int cmd, void __user *arg)
 {
 	struct rose_route_struct rose_route;
 	struct net_device *dev;

@@ -19,8 +19,10 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/device.h>
+#include <linux/delay.h>
 
 #include <asm/hardware.h>
+#include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
 
@@ -36,14 +38,14 @@ extern int omap_gpio_init(void);
 
 /* Only FPGA needs to be mapped here. All others are done with ioremap */
 static struct map_desc innovator1510_io_desc[] __initdata = {
-{ OMAP1510P1_FPGA_BASE, OMAP1510P1_FPGA_START, OMAP1510P1_FPGA_SIZE,
+{ OMAP1510_FPGA_BASE, OMAP1510_FPGA_START, OMAP1510_FPGA_SIZE,
 	MT_DEVICE },
 };
 
 static struct resource innovator1510_smc91x_resources[] = {
 	[0] = {
-		.start	= OMAP1510P1_FPGA_ETHR_START,	/* Physical */
-		.end	= OMAP1510P1_FPGA_ETHR_START + 16,
+		.start	= OMAP1510_FPGA_ETHR_START,	/* Physical */
+		.end	= OMAP1510_FPGA_ETHR_START + 16,
 		.flags	= IORESOURCE_MEM,
 	},
 	[1] = {
@@ -132,12 +134,13 @@ static void __init innovator_map_io(void)
 #ifdef CONFIG_ARCH_OMAP1510
 	if (cpu_is_omap1510()) {
 		iotable_init(innovator1510_io_desc, ARRAY_SIZE(innovator1510_io_desc));
+		udelay(10);	/* Delay needed for FPGA */
 
 		/* Dump the Innovator FPGA rev early - useful info for support. */
 		printk("Innovator FPGA Rev %d.%d Board Rev %d\n",
-		       fpga_read(OMAP1510P1_FPGA_REV_HIGH),
-		       fpga_read(OMAP1510P1_FPGA_REV_LOW),
-		       fpga_read(OMAP1510P1_FPGA_BOARD_REV));
+		       fpga_read(OMAP1510_FPGA_REV_HIGH),
+		       fpga_read(OMAP1510_FPGA_REV_LOW),
+		       fpga_read(OMAP1510_FPGA_BOARD_REV));
 	}
 #endif
 #ifdef CONFIG_ARCH_OMAP1610

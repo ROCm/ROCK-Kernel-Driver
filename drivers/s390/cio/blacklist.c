@@ -308,7 +308,7 @@ static int cio_ignore_read (char *page, char **start, off_t off,
 	return len;
 }
 
-static int cio_ignore_write (struct file *file, const char *user_buf,
+static int cio_ignore_write(struct file *file, const char __user *user_buf,
 			     unsigned long user_len, void *data)
 {
 	char *buf;

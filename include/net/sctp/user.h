@@ -559,7 +559,7 @@ struct sctp_status {
 struct sctp_getaddrs {
 	sctp_assoc_t            assoc_id;
 	int			addr_num;
-	struct sockaddr		*addrs;
+	struct sockaddr		__user *addrs;
 };
 
 /* These are bit fields for msghdr->msg_flags.  See section 5.1.  */

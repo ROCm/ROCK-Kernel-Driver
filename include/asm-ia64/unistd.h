@@ -258,6 +258,7 @@
 #define __NR_mq_notify			1266
 #define __NR_mq_getsetattr		1267
 #define __NR_kexec_load			1268
+#define __NR_vserver			1269
 
 #ifdef __KERNEL__
 
@@ -274,6 +275,7 @@
 # define __ARCH_WANT_SYS_OLDUMOUNT
 # define __ARCH_WANT_SYS_SIGPENDING
 # define __ARCH_WANT_SYS_SIGPROCMASK
+# define __ARCH_WANT_SYS_RT_SIGACTION
 #endif
 
 #if !defined(__ASSEMBLY__) && !defined(ASSEMBLER)

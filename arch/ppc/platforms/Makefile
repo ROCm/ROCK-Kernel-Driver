@@ -45,6 +45,7 @@ obj-$(CONFIG_PPLUS)		+= pplus.o
 obj-$(CONFIG_PRPMC750)		+= prpmc750.o
 obj-$(CONFIG_PRPMC800)		+= prpmc800.o
 obj-$(CONFIG_SANDPOINT)		+= sandpoint.o
+obj-$(CONFIG_SBC82xx)		+= sbc82xx.o
 obj-$(CONFIG_SPRUCE)		+= spruce.o
 
 ifeq ($(CONFIG_SMP),y)

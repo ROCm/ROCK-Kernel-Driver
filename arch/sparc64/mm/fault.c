@@ -207,14 +207,21 @@ outret:
 	return insn;
 }
 
-static void do_fault_siginfo(int code, int sig, unsigned long address)
+extern unsigned long compute_effective_address(struct pt_regs *, unsigned int, unsigned int);
+
+static void do_fault_siginfo(int code, int sig, struct pt_regs *regs,
+			     unsigned int insn, int fault_code)
 {
 	siginfo_t info;
 
 	info.si_code = code;
 	info.si_signo = sig;
 	info.si_errno = 0;
-	info.si_addr = (void *) address;
+	if (fault_code & FAULT_CODE_ITLB)
+		info.si_addr = (void *) regs->tpc;
+	else
+		info.si_addr = (void *)
+			compute_effective_address(regs, insn, 0);
 	info.si_trapno = 0;
 	force_sig_info(sig, &info, current);
 }
@@ -295,7 +302,7 @@ static void do_kernel_fault(struct pt_regs *regs, int si_code, int fault_code,
 		/* The si_code was set to make clear whether
 		 * this was a SEGV_MAPERR or SEGV_ACCERR fault.
 		 */
-		do_fault_siginfo(si_code, SIGSEGV, address);
+		do_fault_siginfo(si_code, SIGSEGV, regs, insn, fault_code);
 		return;
 	}
 
@@ -471,7 +478,7 @@ do_sigbus:
 	 * Send a sigbus, regardless of whether we were in kernel
 	 * or user mode.
 	 */
-	do_fault_siginfo(BUS_ADRERR, SIGBUS, address);
+	do_fault_siginfo(BUS_ADRERR, SIGBUS, regs, insn, fault_code);
 
 	/* Kernel mode? Handle exceptions or die */
 	if (regs->tstate & TSTATE_PRIV)

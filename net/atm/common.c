@@ -509,7 +509,7 @@ int vcc_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *m,
 	struct atm_vcc *vcc;
 	struct sk_buff *skb;
 	int eff,error;
-	const void *buff;
+	const void __user *buff;
 	int size;
 
 	lock_sock(sk);
@@ -676,7 +676,7 @@ static int check_qos(struct atm_qos *qos)
 }
 
 int vcc_setsockopt(struct socket *sock, int level, int optname,
-		   char *optval, int optlen)
+		   char __user *optval, int optlen)
 {
 	struct atm_vcc *vcc;
 	unsigned long value;
@@ -704,7 +704,7 @@ int vcc_setsockopt(struct socket *sock, int level, int optname,
 				return 0;
 			}
 		case SO_SETCLP:
-			if (get_user(value,(unsigned long *) optval))
+			if (get_user(value,(unsigned long __user *)optval))
 				return -EFAULT;
 			if (value) vcc->atm_options |= ATM_ATMOPT_CLP;
 			else vcc->atm_options &= ~ATM_ATMOPT_CLP;
@@ -719,7 +719,7 @@ int vcc_setsockopt(struct socket *sock, int level, int optname,
 
 
 int vcc_getsockopt(struct socket *sock, int level, int optname,
-		   char *optval, int *optlen)
+		   char __user *optval, int __user *optlen)
 {
 	struct atm_vcc *vcc;
 	int len;
@@ -738,7 +738,7 @@ int vcc_getsockopt(struct socket *sock, int level, int optname,
 			    -EFAULT : 0;
 		case SO_SETCLP:
 			return put_user(vcc->atm_options & ATM_ATMOPT_CLP ? 1 :
-			  0,(unsigned long *) optval) ? -EFAULT : 0;
+			  0,(unsigned long __user *)optval) ? -EFAULT : 0;
 		case SO_ATMPVC:
 			{
 				struct sockaddr_atmpvc pvc;

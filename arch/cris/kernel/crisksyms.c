@@ -10,7 +10,7 @@
 #include <linux/kernel.h>
 #include <linux/string.h>
 #include <linux/tty.h>
- 
+
 #include <asm/semaphore.h>
 #include <asm/processor.h>
 #include <asm/uaccess.h>
@@ -20,6 +20,7 @@
 #include <asm/delay.h>
 #include <asm/irq.h>
 #include <asm/pgtable.h>
+#include <asm/fasttimer.h>
 
 extern void dump_thread(struct pt_regs *, struct user *);
 extern unsigned long get_cmos_time(void);
@@ -93,4 +94,11 @@ extern void * memcpy(void *, const void *, __kernel_size_t);
 EXPORT_SYMBOL_NOVERS(memcpy);
 EXPORT_SYMBOL_NOVERS(memset);
 
+#ifdef CONFIG_ETRAX_FAST_TIMER
+/* Fast timer functions */
+EXPORT_SYMBOL(fast_timer_list);
+EXPORT_SYMBOL(start_one_shot_timer);
+EXPORT_SYMBOL(del_fast_timer);
+EXPORT_SYMBOL(schedule_usleep);
+#endif
 

@@ -72,8 +72,12 @@ struct omap_driver {
  * Device ID numbers for bus types
  */
 #define OMAP_OCP_DEVID_USB	0
+
+#define OMAP_TIPB_DEVID_OHCI	0
 #define OMAP_TIPB_DEVID_LCD	1
 #define OMAP_TIPB_DEVID_MMC	2
+#define OMAP_TIPB_DEVID_OTG	3
+#define OMAP_TIPB_DEVID_UDC	4
 
 /*
  * Virtual bus definitions for OMAP

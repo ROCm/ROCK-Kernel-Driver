@@ -386,7 +386,7 @@ isdn_all_eaz(int di, int ch)
  * Begin of a CAPI like LL<->HL interface, currently used only for 
  * supplementary service (CAPI 2.0 part III)
  */
-#include <linux/isdn//capicmd.h>
+#include <linux/isdn/capicmd.h>
 
 int
 isdn_capi_rec_hl_msg(capi_msg *cm) {

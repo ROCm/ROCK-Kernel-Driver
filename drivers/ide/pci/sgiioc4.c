@@ -757,8 +757,6 @@ pci_init_sgiioc4(struct pci_dev *dev, ide_pci_device_t * d)
 static ide_pci_device_t sgiioc4_chipsets[] __devinitdata = {
 	{
 	 /* Channel 0 */
-	 .vendor = PCI_VENDOR_ID_SGI,
-	 .device = PCI_DEVICE_ID_SGI_IOC4,
 	 .name = "SGIIOC4",
 	 .init_hwif = ide_init_sgiioc4,
 	 .init_dma = ide_dma_sgiioc4,
@@ -772,16 +770,7 @@ static ide_pci_device_t sgiioc4_chipsets[] __devinitdata = {
 static int __devinit
 sgiioc4_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
-	ide_pci_device_t *d = &sgiioc4_chipsets[id->driver_data];
-	if (dev->device != d->device) {
-		printk(KERN_ERR "Error in %s(dev 0x%p | id 0x%p )\n",
-		       __FUNCTION__, (void *) dev, (void *) id);
-		BUG();
-	}
-
-	if (pci_init_sgiioc4(dev, d))
-		return 0;
-
+	pci_init_sgiioc4(dev, &sgiioc4_chipsets[id->driver_data]);
 	return 0;
 }
 

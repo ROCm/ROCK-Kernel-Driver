@@ -6,7 +6,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.57 $
+ * $Revision: 1.58 $
  */
 
 #ifndef DASD_INT_H
@@ -260,12 +260,7 @@ struct dasd_discipline {
 	int (*fill_info) (struct dasd_device *, struct dasd_information2_t *);
 };
 
-extern struct dasd_discipline dasd_diag_discipline;
-#ifdef CONFIG_DASD_DIAG
-#define dasd_diag_discipline_pointer (&dasd_diag_discipline)
-#else
-#define dasd_diag_discipline_pointer (0)
-#endif
+extern struct dasd_discipline *dasd_diag_discipline_pointer;
 
 struct dasd_device {
 	/* Block device stuff. */

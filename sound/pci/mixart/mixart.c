@@ -1154,7 +1154,7 @@ static long long snd_mixart_BA1_llseek(snd_info_entry_t *entry,
   mixart_BA0 proc interface for BAR 0 - read callback
  */
 static long snd_mixart_BA0_read(snd_info_entry_t *entry, void *file_private_data,
-				struct file *file, char *buf, long count)
+				struct file *file, char __user *buf, long count)
 {
 	mixart_mgr_t *mgr = snd_magic_cast(mixart_mgr_t, entry->private_data, return -ENXIO);
 
@@ -1173,7 +1173,7 @@ static long snd_mixart_BA0_read(snd_info_entry_t *entry, void *file_private_data
   mixart_BA1 proc interface for BAR 1 - read callback
  */
 static long snd_mixart_BA1_read(snd_info_entry_t *entry, void *file_private_data,
-				struct file *file, char *buf, long count)
+				struct file *file, char __user *buf, long count)
 {
 	mixart_mgr_t *mgr = snd_magic_cast(mixart_mgr_t, entry->private_data, return -ENXIO);
 

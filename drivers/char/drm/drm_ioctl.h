@@ -142,6 +142,13 @@ DRM(set_busid)(drm_device_t *dev)
 	snprintf(dev->unique, dev->unique_len, "pci:%04x:%02x:%02x.%d",
 		dev->pci_domain, dev->pci_bus, dev->pci_slot, dev->pci_func);
 
+	dev->devname = DRM(alloc)(strlen(dev->name) + dev->unique_len + 2,
+				DRM_MEM_DRIVER);
+	if (dev->devname == NULL)
+		return ENOMEM;
+
+	sprintf(dev->devname, "%s@%s", dev->name, dev->unique);
+
 	return 0;
 }
 

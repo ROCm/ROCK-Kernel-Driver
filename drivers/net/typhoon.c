@@ -1162,7 +1162,7 @@ typhoon_ethtool_sset(struct typhoon *tp, struct ethtool_cmd *cmd)
 }
 
 static inline int
-typhoon_ethtool_ioctl(struct net_device *dev, void *useraddr)
+typhoon_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
 {
 	struct typhoon *tp = (struct typhoon *) dev->priv;
 	u32 ethcmd;
@@ -1237,7 +1237,7 @@ typhoon_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
 	switch (cmd) {
 	case SIOCETHTOOL:
-		return typhoon_ethtool_ioctl(dev, (void *) ifr->ifr_data);
+		return typhoon_ethtool_ioctl(dev, ifr->ifr_data);
 	default:
 		break;
 	}

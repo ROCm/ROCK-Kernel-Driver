@@ -165,7 +165,7 @@ static int br_nf_pre_routing_finish_bridge(struct sk_buff *skb)
 		skb_pull(skb, VLAN_HLEN);
 		skb->nh.raw += VLAN_HLEN;
 	}
-	skb->dst->output(skb);
+	skb->dst->output(&skb);
 	return 0;
 }
 
@@ -800,7 +800,7 @@ static struct nf_hook_ops br_nf_ops[] = {
 #ifdef CONFIG_SYSCTL
 static
 int brnf_sysctl_call_tables(ctl_table *ctl, int write, struct file * filp,
-			void *buffer, size_t *lenp)
+			void __user *buffer, size_t *lenp)
 {
 	int ret;
 

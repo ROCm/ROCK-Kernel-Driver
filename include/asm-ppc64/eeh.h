@@ -47,16 +47,16 @@ void *eeh_ioremap(unsigned long addr, void *vaddr);
 void __init pci_addr_cache_build(void);
 
 /**
- * eeh_add_device - perform EEH initialization for the indicated pci device
- * @dev: pci device for which to set up EEH
+ * eeh_add_device_early
+ * eeh_add_device_late
  *
- * This routine can be used to perform EEH initialization for PCI
- * devices that were added after system boot (e.g. hotplug, dlpar).
- * Whether this actually enables EEH or not for this device depends
- * on the type of the device, on earlier boot command-line
- * arguments & etc.
+ * Perform eeh initialization for devices added after boot.
+ * Call eeh_add_device_early before doing any i/o to the
+ * device (including config space i/o).  Call eeh_add_device_late
+ * to finish the eeh setup for this device.
  */
-void eeh_add_device(struct pci_dev *);
+void eeh_add_device_early(struct device_node *);
+void eeh_add_device_late(struct pci_dev *);
 
 /**
  * eeh_remove_device - undo EEH setup for the indicated pci device

@@ -34,7 +34,7 @@
 #include <linux/interrupt.h>
 #include <linux/sched.h>
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 #include <linux/libata.h>
 #include <asm/io.h>
 #include "sata_promise.h"
@@ -826,14 +826,14 @@ out:
 
 static void pdc_tf_load_mmio(struct ata_port *ap, struct ata_taskfile *tf)
 {
-	if (tf->protocol == ATA_PROT_PIO)
+	if (tf->protocol != ATA_PROT_DMA)
 		ata_tf_load_mmio(ap, tf);
 }
 
 
 static void pdc_exec_command_mmio(struct ata_port *ap, struct ata_taskfile *tf)
 {
-	if (tf->protocol == ATA_PROT_PIO)
+	if (tf->protocol != ATA_PROT_DMA)
 		ata_exec_command_mmio(ap, tf);
 }
 

@@ -72,6 +72,8 @@ extern void iounmap(void *addr);
 
 #define IO_SPACE_LIMIT 0xffff
 #define inb(x) (0)
+#define inw(x) (0)
+#define inl(x) (0)
 #define outb(x,y)
 #define outw(x,y)
 #define outl(x,y)

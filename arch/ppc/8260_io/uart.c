@@ -475,7 +475,7 @@ static _INLINE_ void receive_chars(ser_info_t *info, struct pt_regs *regs)
 			if (break_pressed && info->line == sercons.index) {
 				if (ch != 0 && time_before(jiffies,
 							break_pressed + HZ*5)) {
-					handle_sysrq(ch, regs, NULL, NULL);
+					handle_sysrq(ch, regs, NULL);
 					break_pressed = 0;
 					goto ignore_char;
 				} else

@@ -1,4 +1,4 @@
-/* $Id: old_checksum.c,v 1.2 2002/11/05 06:45:12 starvik Exp $
+/* $Id: old_checksum.c,v 1.3 2003/10/27 08:04:32 starvik Exp $
  *
  * INET		An implementation of the TCP/IP protocol suite for the LINUX
  *		operating system.  INET is implemented using the  BSD Socket
@@ -76,7 +76,7 @@ unsigned int csum_partial(const unsigned char * buff, int len, unsigned int sum)
     sum += *((unsigned short *)buff)++;
   }
   if(endMarker - buff > 0) {
-    sum += *buff;                 /* add extra byte separately */
+    sum += *buff;                 /* add extra byte seperately */
   }
   BITOFF;
   return(sum);

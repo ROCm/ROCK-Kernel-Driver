@@ -867,7 +867,7 @@ int radeonfb_pci_suspend(struct pci_dev *pdev, u32 state)
 	}
 
 	/* Blank display and LCD */
-	radeonfb_blank(VESA_POWERDOWN+1, info);
+	radeonfb_blank(VESA_POWERDOWN, info);
 
 	/* Sleep */
 	rinfo->asleep = 1;

@@ -366,15 +366,15 @@ static void hci_inq_req(struct hci_dev *hdev, unsigned long opt)
 	hci_send_cmd(hdev, OGF_LINK_CTL, OCF_INQUIRY, sizeof(cp), &cp);
 }
 
-int hci_inquiry(unsigned long arg)
+int hci_inquiry(void __user *arg)
 {
+	__u8 __user *ptr = arg;
 	struct hci_inquiry_req ir;
 	struct hci_dev *hdev;
 	int err = 0, do_inquiry = 0, max_rsp;
 	long timeo;
-	__u8 *buf, *ptr;
+	__u8 *buf;
 
-	ptr = (void *) arg;
 	if (copy_from_user(&ir, ptr, sizeof(ir)))
 		return -EFAULT;
 
@@ -616,13 +616,13 @@ int hci_dev_reset_stat(__u16 dev)
 	return ret;
 }
 
-int hci_dev_cmd(unsigned int cmd, unsigned long arg)
+int hci_dev_cmd(unsigned int cmd, void __user *arg)
 {
 	struct hci_dev *hdev;
 	struct hci_dev_req dr;
 	int err = 0;
 
-	if (copy_from_user(&dr, (void *) arg, sizeof(dr)))
+	if (copy_from_user(&dr, arg, sizeof(dr)))
 		return -EFAULT;
 
 	if (!(hdev = hci_dev_get(dr.dev_id)))
@@ -685,7 +685,7 @@ int hci_dev_cmd(unsigned int cmd, unsigned long arg)
 	return err;
 }
 
-int hci_get_dev_list(unsigned long arg)
+int hci_get_dev_list(void __user *arg)
 {
 	struct hci_dev_list_req *dl;
 	struct hci_dev_req *dr;
@@ -693,7 +693,7 @@ int hci_get_dev_list(unsigned long arg)
 	int n = 0, size, err;
 	__u16 dev_num;
 
-	if (get_user(dev_num, (__u16 *) arg))
+	if (get_user(dev_num, (__u16 __user *) arg))
 		return -EFAULT;
 
 	if (!dev_num || dev_num > (PAGE_SIZE * 2) / sizeof(*dr))
@@ -720,19 +720,19 @@ int hci_get_dev_list(unsigned long arg)
 	dl->dev_num = n;
 	size = sizeof(*dl) + n * sizeof(*dr);
 
-	err = copy_to_user((void *) arg, dl, size);
+	err = copy_to_user(arg, dl, size);
 	kfree(dl);
 
 	return err ? -EFAULT : 0;
 }
 
-int hci_get_dev_info(unsigned long arg)
+int hci_get_dev_info(void __user *arg)
 {
 	struct hci_dev *hdev;
 	struct hci_dev_info di;
 	int err = 0;
 
-	if (copy_from_user(&di, (void *) arg, sizeof(di)))
+	if (copy_from_user(&di, arg, sizeof(di)))
 		return -EFAULT;
 
 	if (!(hdev = hci_dev_get(di.dev_id)))
@@ -753,7 +753,7 @@ int hci_get_dev_info(unsigned long arg)
 	memcpy(&di.stat, &hdev->stat, sizeof(di.stat));
 	memcpy(&di.features, &hdev->features, sizeof(di.features));
 
-	if (copy_to_user((void *) arg, &di, sizeof(di)))
+	if (copy_to_user(arg, &di, sizeof(di)))
 		err = -EFAULT;
 
 	hci_dev_put(hdev);

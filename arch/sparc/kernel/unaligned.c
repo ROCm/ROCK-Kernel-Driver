@@ -137,8 +137,8 @@ static inline unsigned long *fetch_reg_addr(unsigned int reg, struct pt_regs *re
 	return &win->locals[reg - 16];
 }
 
-static inline unsigned long compute_effective_address(struct pt_regs *regs,
-						      unsigned int insn)
+static unsigned long compute_effective_address(struct pt_regs *regs,
+					       unsigned int insn)
 {
 	unsigned int rs1 = (insn >> 14) & 0x1f;
 	unsigned int rs2 = insn & 0x1f;
@@ -153,8 +153,8 @@ static inline unsigned long compute_effective_address(struct pt_regs *regs,
 	}
 }
 
-static inline unsigned long safe_compute_effective_address(struct pt_regs *regs,
-							   unsigned int insn)
+unsigned long safe_compute_effective_address(struct pt_regs *regs,
+					     unsigned int insn)
 {
 	unsigned int rs1 = (insn >> 14) & 0x1f;
 	unsigned int rs2 = insn & 0x1f;

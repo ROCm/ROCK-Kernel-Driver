@@ -128,13 +128,14 @@ static void dbg_kfree(void * v, int line) {
  */
 
 static int wanrouter_device_setup(struct wan_device *wandev,
-				  wandev_conf_t *u_conf);
+				  wandev_conf_t __user *u_conf);
 static int wanrouter_device_stat(struct wan_device *wandev,
-				 wandev_stat_t *u_stat);
+				 wandev_stat_t __user *u_stat);
 static int wanrouter_device_shutdown(struct wan_device *wandev);
 static int wanrouter_device_new_if(struct wan_device *wandev,
-				   wanif_conf_t *u_conf);
-static int wanrouter_device_del_if(struct wan_device *wandev, char *u_name);
+				   wanif_conf_t __user *u_conf);
+static int wanrouter_device_del_if(struct wan_device *wandev,
+				   char __user *u_name);
 
 /*
  *	Miscellaneous
@@ -410,6 +411,7 @@ int wanrouter_ioctl(struct inode *inode, struct file *file,
 	int err = 0;
 	struct proc_dir_entry *dent;
 	struct wan_device *wandev;
+	void __user *data = (void __user *)arg;
 
 	if (!capable(CAP_NET_ADMIN))
 		return -EPERM;
@@ -427,7 +429,7 @@ int wanrouter_ioctl(struct inode *inode, struct file *file,
 
 	switch (cmd) {
 	case ROUTER_SETUP:
-		err = wanrouter_device_setup(wandev, (void*)arg);
+		err = wanrouter_device_setup(wandev, data);
 		break;
 
 	case ROUTER_DOWN:
@@ -435,15 +437,15 @@ int wanrouter_ioctl(struct inode *inode, struct file *file,
 		break;
 
 	case ROUTER_STAT:
-		err = wanrouter_device_stat(wandev, (void*)arg);
+		err = wanrouter_device_stat(wandev, data);
 		break;
 
 	case ROUTER_IFNEW:
-		err = wanrouter_device_new_if(wandev, (void*)arg);
+		err = wanrouter_device_new_if(wandev, data);
 		break;
 
 	case ROUTER_IFDEL:
-		err = wanrouter_device_del_if(wandev, (void*)arg);
+		err = wanrouter_device_del_if(wandev, data);
 		break;
 
 	case ROUTER_IFSTAT:
@@ -472,7 +474,7 @@ int wanrouter_ioctl(struct inode *inode, struct file *file,
  */
 
 static int wanrouter_device_setup(struct wan_device *wandev,
-				  wandev_conf_t *u_conf)
+				  wandev_conf_t __user *u_conf)
 {
 	void *data = NULL;
 	wandev_conf_t *conf;
@@ -583,7 +585,7 @@ static int wanrouter_device_shutdown(struct wan_device *wandev)
  */
 
 static int wanrouter_device_stat(struct wan_device *wandev,
-				 wandev_stat_t *u_stat)
+				 wandev_stat_t __user *u_stat)
 {
 	wandev_stat_t stat;
 
@@ -614,7 +616,7 @@ static int wanrouter_device_stat(struct wan_device *wandev,
  */
 
 static int wanrouter_device_new_if(struct wan_device *wandev,
-				   wanif_conf_t *u_conf)
+				   wanif_conf_t __user *u_conf)
 {
 	wanif_conf_t *cnf;
 	struct net_device *dev = NULL;
@@ -740,7 +742,7 @@ out:
  *	 o copy configuration data to kernel address space
  */
 
-static int wanrouter_device_del_if(struct wan_device *wandev, char *u_name)
+static int wanrouter_device_del_if(struct wan_device *wandev, char __user *u_name)
 {
 	char name[WAN_IFNAME_SZ + 1];
         int err = 0;

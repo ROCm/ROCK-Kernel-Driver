@@ -250,7 +250,7 @@ static loff_t nvram_llseek(struct file *file,loff_t offset, int origin )
 }
 
 static ssize_t
-nvram_read(struct file *file, char *buf, size_t count, loff_t *ppos)
+nvram_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 {
 	unsigned char contents[NVRAM_BYTES];
 	unsigned i = *ppos;
@@ -279,7 +279,7 @@ nvram_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 }
 
 static ssize_t
-nvram_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
+nvram_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
 {
 	unsigned char contents[NVRAM_BYTES];
 	unsigned i = *ppos;

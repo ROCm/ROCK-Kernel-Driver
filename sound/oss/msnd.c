@@ -139,12 +139,9 @@ void msnd_fifo_make_empty(msnd_fifo *f)
 	f->len = f->tail = f->head = 0;
 }
 
-int msnd_fifo_write(msnd_fifo *f, const char *buf, size_t len, int user)
+int msnd_fifo_write(msnd_fifo *f, const char *buf, size_t len)
 {
 	int count = 0;
-
-	if (f->len == f->n)
-		return 0;
 
 	while ((count < len) && (f->len != f->n)) {
 
@@ -161,11 +158,7 @@ int msnd_fifo_write(msnd_fifo *f, const char *buf, size_t len, int user)
 				nwritten = len - count;
 		}
 
-		if (user) {
-			if (copy_from_user(f->data + f->tail, buf, nwritten))
-				return -EFAULT;
-		} else
-			isa_memcpy_fromio(f->data + f->tail, (unsigned long) buf, nwritten);
+		isa_memcpy_fromio(f->data + f->tail, (unsigned long) buf, nwritten);
 
 		count += nwritten;
 		buf += nwritten;
@@ -177,12 +170,9 @@ int msnd_fifo_write(msnd_fifo *f, const char *buf, size_t len, int user)
 	return count;
 }
 
-int msnd_fifo_read(msnd_fifo *f, char *buf, size_t len, int user)
+int msnd_fifo_read(msnd_fifo *f, char *buf, size_t len)
 {
 	int count = 0;
-
-	if (f->len == 0)
-		return f->len;
 
 	while ((count < len) && (f->len > 0)) {
 
@@ -199,11 +189,7 @@ int msnd_fifo_read(msnd_fifo *f, char *buf, size_t len, int user)
 				nread = len - count;
 		}
 
-		if (user) {
-			if (copy_to_user(buf, f->data + f->head, nread))
-				return -EFAULT;
-		} else
-			isa_memcpy_toio((unsigned long) buf, f->data + f->head, nread);
+		isa_memcpy_toio((unsigned long) buf, f->data + f->head, nread);
 
 		count += nread;
 		buf += nread;

@@ -77,8 +77,6 @@ static void __init init_hwif_generic (ide_hwif_t *hwif)
 
 	if ((dev->class >> 8) == PCI_CLASS_STORAGE_IDE) {
 		ide_pci_device_t *unknown = unknown_chipset;
-//		unknown->vendor = dev->vendor;
-//		unknown->device = dev->device;
 		init_setup_unknown(dev, unknown);
 		return 1;
 	}
@@ -99,15 +97,13 @@ static int __devinit generic_init_one(struct pci_dev *dev, const struct pci_devi
 	ide_pci_device_t *d = &generic_chipsets[id->driver_data];
 	u16 command;
 
-	if (dev->device != d->device)
-		BUG();
-	if ((d->vendor == PCI_VENDOR_ID_UMC) &&
-	    (d->device == PCI_DEVICE_ID_UMC_UM8886A) &&
+	if (dev->vendor == PCI_VENDOR_ID_UMC &&
+	    dev->device == PCI_DEVICE_ID_UMC_UM8886A &&
 	    (!(PCI_FUNC(dev->devfn) & 1)))
 		return 1; /* UM8886A/BF pair */
 
-	if ((d->vendor == PCI_VENDOR_ID_OPTI) &&
-	    (d->device == PCI_DEVICE_ID_OPTI_82C558) &&
+	if (dev->vendor == PCI_VENDOR_ID_OPTI &&
+	    dev->device == PCI_DEVICE_ID_OPTI_82C558 &&
 	    (!(PCI_FUNC(dev->devfn) & 1)))
 		return 1;
 

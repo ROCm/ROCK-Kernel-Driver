@@ -49,7 +49,7 @@
 
 /* Module and version information */
 #define WATCHDOG_VERSION "1.00"
-#define WATCHDOG_DATE "13/03/2004"
+#define WATCHDOG_DATE "12 Jun 2004"
 #define WATCHDOG_DRIVER_NAME "PCI-PC Watchdog"
 #define WATCHDOG_NAME "pcwd_pci"
 #define PFX WATCHDOG_NAME ": "
@@ -73,7 +73,7 @@
 #define WD_PCI_TTRP             0x04	/* Temperature Trip status */
 
 /* according to documentation max. time to process a command for the pci
-   watchdog card is 100 ms, so we give it 150 ms to do it's job */
+ * watchdog card is 100 ms, so we give it 150 ms to do it's job */
 #define PCI_COMMAND_TIMEOUT	150
 
 /* Watchdog's internal commands */
@@ -404,8 +404,8 @@ static int pcipcwd_release(struct inode *inode, struct file *file)
 		printk(KERN_CRIT PFX "Unexpected close, not stopping watchdog!\n");
 		pcipcwd_keepalive();
 	}
-	clear_bit(0, &is_active);
 	expect_release = 0;
+	clear_bit(0, &is_active);
 	return 0;
 }
 
@@ -585,14 +585,11 @@ static int __devinit pcipcwd_card_init(struct pci_dev *pdev,
 		printk(KERN_INFO PFX "No previous trip detected - Cold boot or reset\n");
 
 	/* Check that the heartbeat value is within it's range ; if not reset to the default */
-	if (heartbeat < 1 || heartbeat > 0xFFFF) {
-		heartbeat = WATCHDOG_HEARTBEAT;
+	if (pcipcwd_set_heartbeat(heartbeat)) {
+		pcipcwd_set_heartbeat(WATCHDOG_HEARTBEAT);
 		printk(KERN_INFO PFX "heartbeat value must be 0<heartbeat<65536, using %d\n",
-			heartbeat);
+			WATCHDOG_HEARTBEAT);
 	}
-
-	/* Calculate the watchdog's heartbeat */
-	pcipcwd_set_heartbeat(heartbeat);
 
 	ret = register_reboot_notifier(&pcipcwd_notifier);
 	if (ret != 0) {
@@ -601,20 +598,20 @@ static int __devinit pcipcwd_card_init(struct pci_dev *pdev,
 		goto err_out_release_region;
 	}
 
-	ret = misc_register(&pcipcwd_miscdev);
-	if (ret != 0) {
-		printk(KERN_ERR PFX "cannot register miscdev on minor=%d (err=%d)\n",
-			WATCHDOG_MINOR, ret);
-		goto err_out_unregister_reboot;
-	}
-
 	if (pcipcwd_private.supports_temp) {
 		ret = misc_register(&pcipcwd_temp_miscdev);
 		if (ret != 0) {
 			printk(KERN_ERR PFX "cannot register miscdev on minor=%d (err=%d)\n",
 				TEMP_MINOR, ret);
-			goto err_out_misc_deregister;
+			goto err_out_unregister_reboot;
 		}
+	}
+
+	ret = misc_register(&pcipcwd_miscdev);
+	if (ret != 0) {
+		printk(KERN_ERR PFX "cannot register miscdev on minor=%d (err=%d)\n",
+			WATCHDOG_MINOR, ret);
+		goto err_out_misc_deregister;
 	}
 
 	printk(KERN_INFO PFX "initialized. heartbeat=%d sec (nowayout=%d)\n",
@@ -623,7 +620,8 @@ static int __devinit pcipcwd_card_init(struct pci_dev *pdev,
 	return 0;
 
 err_out_misc_deregister:
-	misc_deregister(&pcipcwd_miscdev);
+	if (pcipcwd_private.supports_temp)
+		misc_deregister(&pcipcwd_temp_miscdev);
 err_out_unregister_reboot:
 	unregister_reboot_notifier(&pcipcwd_notifier);
 err_out_release_region:
@@ -640,9 +638,9 @@ static void __devexit pcipcwd_card_exit(struct pci_dev *pdev)
 		pcipcwd_stop();
 
 	/* Deregister */
+	misc_deregister(&pcipcwd_miscdev);
 	if (pcipcwd_private.supports_temp)
 		misc_deregister(&pcipcwd_temp_miscdev);
-	misc_deregister(&pcipcwd_miscdev);
 	unregister_reboot_notifier(&pcipcwd_notifier);
 	pci_release_regions(pdev);
 	pci_disable_device(pdev);

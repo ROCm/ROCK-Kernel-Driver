@@ -425,8 +425,6 @@ static void init_dma_hpt366(ide_hwif_t *, unsigned long);
 
 static ide_pci_device_t hpt366_chipsets[] __devinitdata = {
 	{	/* 0 */
-		.vendor		= PCI_VENDOR_ID_TTI,
-		.device		= PCI_DEVICE_ID_TTI_HPT366,
 		.name		= "HPT366",
 		.init_setup	= init_setup_hpt366,
 		.init_chipset	= init_chipset_hpt366,
@@ -437,8 +435,6 @@ static ide_pci_device_t hpt366_chipsets[] __devinitdata = {
 		.bootable	= OFF_BOARD,
 		.extra		= 240
 	},{	/* 1 */
-		.vendor		= PCI_VENDOR_ID_TTI,
-		.device		= PCI_DEVICE_ID_TTI_HPT372,
 		.name		= "HPT372A",
 		.init_setup	= init_setup_hpt37x,
 		.init_chipset	= init_chipset_hpt366,
@@ -448,8 +444,6 @@ static ide_pci_device_t hpt366_chipsets[] __devinitdata = {
 		.autodma	= AUTODMA,
 		.bootable	= OFF_BOARD,
 	},{	/* 2 */
-		.vendor		= PCI_VENDOR_ID_TTI,
-		.device		= PCI_DEVICE_ID_TTI_HPT302,
 		.name		= "HPT302",
 		.init_setup	= init_setup_hpt37x,
 		.init_chipset	= init_chipset_hpt366,
@@ -459,8 +453,6 @@ static ide_pci_device_t hpt366_chipsets[] __devinitdata = {
 		.autodma	= AUTODMA,
 		.bootable	= OFF_BOARD,
 	},{	/* 3 */
-		.vendor		= PCI_VENDOR_ID_TTI,
-		.device		= PCI_DEVICE_ID_TTI_HPT371,
 		.name		= "HPT371",
 		.init_setup	= init_setup_hpt37x,
 		.init_chipset	= init_chipset_hpt366,
@@ -470,8 +462,6 @@ static ide_pci_device_t hpt366_chipsets[] __devinitdata = {
 		.autodma	= AUTODMA,
 		.bootable	= OFF_BOARD,
 	},{	/* 4 */
-		.vendor		= PCI_VENDOR_ID_TTI,
-		.device		= PCI_DEVICE_ID_TTI_HPT374,
 		.name		= "HPT374",
 		.init_setup	= init_setup_hpt374,
 		.init_chipset	= init_chipset_hpt366,

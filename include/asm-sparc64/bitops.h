@@ -204,43 +204,7 @@ static __inline__ unsigned int hweight8(unsigned int w)
  * @offset: The bitnumber to start searching at
  * @size: The maximum size to search
  */
-static __inline__ unsigned long find_next_bit(unsigned long *addr, unsigned long size, unsigned long offset)
-{
-	unsigned long *p = addr + (offset >> 6);
-	unsigned long result = offset & ~63UL;
-	unsigned long tmp;
-
-	if (offset >= size)
-		return size;
-	size -= result;
-	offset &= 63UL;
-	if (offset) {
-		tmp = *(p++);
-		tmp &= (~0UL << offset);
-		if (size < 64)
-			goto found_first;
-		if (tmp)
-			goto found_middle;
-		size -= 64;
-		result += 64;
-	}
-	while (size & ~63UL) {
-		if ((tmp = *(p++)))
-			goto found_middle;
-		result += 64;
-		size -= 64;
-	}
-	if (!size)
-		return result;
-	tmp = *p;
-
-found_first:
-	tmp &= (~0UL >> (64 - size));
-	if (tmp == 0UL)        /* Are any bits set? */
-		return result + size; /* Nope. */
-found_middle:
-	return result + __ffs(tmp);
-}
+extern unsigned long find_next_bit(unsigned long *, unsigned long, unsigned long);
 
 /**
  * find_first_bit - find the first set bit in a memory region
@@ -258,43 +222,7 @@ found_middle:
  * on Linus's ALPHA routines, which are pretty portable BTW.
  */
 
-static __inline__ unsigned long find_next_zero_bit(unsigned long *addr, unsigned long size, unsigned long offset)
-{
-	unsigned long *p = addr + (offset >> 6);
-	unsigned long result = offset & ~63UL;
-	unsigned long tmp;
-
-	if (offset >= size)
-		return size;
-	size -= result;
-	offset &= 63UL;
-	if (offset) {
-		tmp = *(p++);
-		tmp |= ~0UL >> (64-offset);
-		if (size < 64)
-			goto found_first;
-		if (~tmp)
-			goto found_middle;
-		size -= 64;
-		result += 64;
-	}
-	while (size & ~63UL) {
-		if (~(tmp = *(p++)))
-			goto found_middle;
-		result += 64;
-		size -= 64;
-	}
-	if (!size)
-		return result;
-	tmp = *p;
-
-found_first:
-	tmp |= ~0UL << size;
-	if (tmp == ~0UL)        /* Are any bits zero? */
-		return result + size; /* Nope. */
-found_middle:
-	return result + ffz(tmp);
-}
+extern unsigned long find_next_zero_bit(unsigned long *, unsigned long, unsigned long);
 
 #define find_first_zero_bit(addr, size) \
         find_next_zero_bit((addr), (size), 0)
@@ -320,42 +248,7 @@ static __inline__ int test_le_bit(int nr, __const__ unsigned long * addr)
 #define find_first_zero_le_bit(addr, size) \
         find_next_zero_le_bit((addr), (size), 0)
 
-static __inline__ unsigned long find_next_zero_le_bit(unsigned long *addr, unsigned long size, unsigned long offset)
-{
-	unsigned long *p = addr + (offset >> 6);
-	unsigned long result = offset & ~63UL;
-	unsigned long tmp;
-
-	if (offset >= size)
-		return size;
-	size -= result;
-	offset &= 63UL;
-	if(offset) {
-		tmp = __swab64p(p++);
-		tmp |= (~0UL >> (64-offset));
-		if(size < 64)
-			goto found_first;
-		if(~tmp)
-			goto found_middle;
-		size -= 64;
-		result += 64;
-	}
-	while(size & ~63) {
-		if(~(tmp = __swab64p(p++)))
-			goto found_middle;
-		result += 64;
-		size -= 64;
-	}
-	if(!size)
-		return result;
-	tmp = __swab64p(p);
-found_first:
-	tmp |= (~0UL << size);
-	if (tmp == ~0UL)        /* Are any bits zero? */
-		return result + size; /* Nope. */
-found_middle:
-	return result + ffz(tmp);
-}
+extern unsigned long find_next_zero_le_bit(unsigned long *, unsigned long, unsigned long);
 
 #ifdef __KERNEL__
 

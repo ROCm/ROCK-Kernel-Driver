@@ -493,7 +493,7 @@ gss_pipe_downcall(struct file *filp, const char *src, size_t mlen)
 		spin_unlock(&gss_auth->lock);
 	rpc_release_client(clnt);
 	kfree(obj.data);
-	dprintk("RPC:      gss_pipe_downcall returning length %u\n", mlen);
+	dprintk("RPC:      gss_pipe_downcall returning length %Zu\n", mlen);
 	return mlen;
 err:
 	if (ctx)

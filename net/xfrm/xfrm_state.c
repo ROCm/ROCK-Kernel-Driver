@@ -231,7 +231,6 @@ static void __xfrm_state_delete(struct xfrm_state *x)
 
 void xfrm_state_delete(struct xfrm_state *x)
 {
-	xfrm_state_delete_tunnel(x);
 	spin_lock_bh(&x->lock);
 	__xfrm_state_delete(x);
 	spin_unlock_bh(&x->lock);

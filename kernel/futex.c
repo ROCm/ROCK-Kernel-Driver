@@ -38,6 +38,7 @@
 #include <linux/futex.h>
 #include <linux/mount.h>
 #include <linux/pagemap.h>
+#include <linux/syscalls.h>
 
 #define FUTEX_HASHBITS 8
 
@@ -96,6 +97,7 @@ struct futex_q {
  */
 struct futex_hash_bucket {
        spinlock_t              lock;
+       unsigned int	    nqueued;
        struct list_head       chain;
 };
 
@@ -318,13 +320,14 @@ out:
  * physical page.
  */
 static int futex_requeue(unsigned long uaddr1, unsigned long uaddr2,
-				int nr_wake, int nr_requeue)
+			 int nr_wake, int nr_requeue, int *valp)
 {
 	union futex_key key1, key2;
 	struct futex_hash_bucket *bh1, *bh2;
 	struct list_head *head1;
 	struct futex_q *this, *next;
 	int ret, drop_count = 0;
+	unsigned int nqueued;
 
 	down_read(&current->mm->mmap_sem);
 
@@ -338,11 +341,40 @@ static int futex_requeue(unsigned long uaddr1, unsigned long uaddr2,
 	bh1 = hash_futex(&key1);
 	bh2 = hash_futex(&key2);
 
+	nqueued = bh1->nqueued;
+	if (likely(valp != NULL)) {
+		int curval;
+
+		/* In order to avoid doing get_user while
+		   holding bh1->lock and bh2->lock, nqueued
+		   (monotonically increasing field) must be first
+		   read, then *uaddr1 fetched from userland and
+		   after acquiring lock nqueued field compared with
+		   the stored value.  The smp_mb () below
+		   makes sure that bh1->nqueued is read from memory
+		   before *uaddr1.  */
+		smp_mb();
+
+		if (get_user(curval, (int __user *)uaddr1) != 0) {
+			ret = -EFAULT;
+			goto out;
+		}
+		if (curval != *valp) {
+			ret = -EAGAIN;
+			goto out;
+		}
+	}
+
 	if (bh1 < bh2)
 		spin_lock(&bh1->lock);
 	spin_lock(&bh2->lock);
 	if (bh1 > bh2)
 		spin_lock(&bh1->lock);
+
+	if (unlikely(nqueued != bh1->nqueued && valp != NULL)) {
+		ret = -EAGAIN;
+		goto out_unlock;
+	}
 
 	head1 = &bh1->chain;
 	list_for_each_entry_safe(this, next, head1, list) {
@@ -365,6 +397,7 @@ static int futex_requeue(unsigned long uaddr1, unsigned long uaddr2,
 		}
 	}
 
+out_unlock:
 	spin_unlock(&bh1->lock);
 	if (bh1 != bh2)
 		spin_unlock(&bh2->lock);
@@ -398,6 +431,7 @@ static void queue_me(struct futex_q *q, int fd, struct file *filp)
 	q->lock_ptr = &bh->lock;
 
 	spin_lock(&bh->lock);
+	bh->nqueued++;
 	list_add_tail(&q->list, &bh->chain);
 	spin_unlock(&bh->lock);
 }
@@ -625,7 +659,7 @@ out:
 }
 
 long do_futex(unsigned long uaddr, int op, int val, unsigned long timeout,
-		unsigned long uaddr2, int val2)
+		unsigned long uaddr2, int val2, int val3)
 {
 	int ret;
 
@@ -641,7 +675,10 @@ long do_futex(unsigned long uaddr, int op, int val, unsigned long timeout,
 		ret = futex_fd(uaddr, val);
 		break;
 	case FUTEX_REQUEUE:
-		ret = futex_requeue(uaddr, uaddr2, val, val2);
+		ret = futex_requeue(uaddr, uaddr2, val, val2, NULL);
+		break;
+	case FUTEX_CMP_REQUEUE:
+		ret = futex_requeue(uaddr, uaddr2, val, val2, &val3);
 		break;
 	default:
 		ret = -ENOSYS;
@@ -651,7 +688,8 @@ long do_futex(unsigned long uaddr, int op, int val, unsigned long timeout,
 
 
 asmlinkage long sys_futex(u32 __user *uaddr, int op, int val,
-			  struct timespec __user *utime, u32 __user *uaddr2)
+			  struct timespec __user *utime, u32 __user *uaddr2,
+			  int val3)
 {
 	struct timespec t;
 	unsigned long timeout = MAX_SCHEDULE_TIMEOUT;
@@ -665,11 +703,11 @@ asmlinkage long sys_futex(u32 __user *uaddr, int op, int val,
 	/*
 	 * requeue parameter in 'utime' if op == FUTEX_REQUEUE.
 	 */
-	if (op == FUTEX_REQUEUE)
+	if (op >= FUTEX_REQUEUE)
 		val2 = (int) (long) utime;
 
 	return do_futex((unsigned long)uaddr, op, val, timeout,
-			(unsigned long)uaddr2, val2);
+			(unsigned long)uaddr2, val2, val3);
 }
 
 static struct super_block *

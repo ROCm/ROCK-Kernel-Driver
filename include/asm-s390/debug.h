@@ -91,7 +91,8 @@ typedef int (debug_prolog_proc_t) (debug_info_t* id,
 				   char* out_buf);
 typedef int (debug_input_proc_t) (debug_info_t* id,
 				  struct debug_view* view,
-				  struct file* file, const char* user_buf,
+				  struct file* file,
+				  const char __user *user_buf,
 				  size_t in_buf_size, loff_t* offset);
 
 int debug_dflt_header_fn(debug_info_t* id, struct debug_view* view,
@@ -232,26 +233,6 @@ int debug_unregister_view(debug_info_t* id, struct debug_view* view);
 #define PRINT_WARN(x...) printk ( KERN_DEBUG PRINTK_HEADER x )
 #define PRINT_ERR(x...) printk ( KERN_DEBUG PRINTK_HEADER x )
 #define PRINT_FATAL(x...) printk ( KERN_DEBUG PRINTK_HEADER x )
-#endif				/* DASD_DEBUG */
-
-#if DASD_DEBUG > 4
-#define INTERNAL_ERROR(x...) PRINT_FATAL ( INTERNAL_ERRMSG ( x ) )
-#elif DASD_DEBUG > 2
-#define INTERNAL_ERROR(x...) PRINT_ERR ( INTERNAL_ERRMSG ( x ) )
-#elif DASD_DEBUG > 0
-#define INTERNAL_ERROR(x...) PRINT_WARN ( INTERNAL_ERRMSG ( x ) )
-#else
-#define INTERNAL_ERROR(x...)
-#endif				/* DASD_DEBUG */
-
-#if DASD_DEBUG > 5
-#define INTERNAL_CHECK(x...) PRINT_FATAL ( INTERNAL_CHKMSG ( x ) )
-#elif DASD_DEBUG > 3
-#define INTERNAL_CHECK(x...) PRINT_ERR ( INTERNAL_CHKMSG ( x ) )
-#elif DASD_DEBUG > 1
-#define INTERNAL_CHECK(x...) PRINT_WARN ( INTERNAL_CHKMSG ( x ) )
-#else
-#define INTERNAL_CHECK(x...)
 #endif				/* DASD_DEBUG */
 
 #undef DEBUG_MALLOC

@@ -3,6 +3,9 @@
  *
  * Modified from board-generic.c
  *
+ * Original OMAP730 support by Jean Pihet <j-pihet@ti.com>
+ * Updated for 2.6 by Kevin Hilman <kjh@hilman.org>
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
@@ -13,6 +16,7 @@
 #include <linux/device.h>
 
 #include <asm/hardware.h>
+#include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
 
@@ -102,7 +106,7 @@ static void __init omap_perseus2_map_io(void)
 }
 
 MACHINE_START(OMAP_PERSEUS2, "OMAP730 Perseus2")
-	MAINTAINER("Kevin Hilman <k-hilman@ti.com>")
+	MAINTAINER("Kevin Hilman <kjh@hilman.org>")
 	BOOT_MEM(0x10000000, 0xfff00000, 0xfef00000)
 	BOOT_PARAMS(0x10000100)
 	MAPIO(omap_perseus2_map_io)

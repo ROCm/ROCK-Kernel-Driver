@@ -1347,7 +1347,7 @@ static int ip_vs_zero_all(void)
 
 static int
 proc_do_defense_mode(ctl_table *table, int write, struct file * filp,
-		     void *buffer, size_t *lenp)
+		     void __user *buffer, size_t *lenp)
 {
 	int *valp = table->data;
 	int val = *valp;
@@ -1370,7 +1370,7 @@ proc_do_defense_mode(ctl_table *table, int write, struct file * filp,
 
 static int
 proc_do_sync_threshold(ctl_table *table, int write, struct file *filp,
-		       void *buffer, size_t *lenp)
+		       void __user *buffer, size_t *lenp)
 {
 	int *valp = table->data;
 	int val[2];

@@ -1011,7 +1011,7 @@ wavefront_send_sample (wavefront_patch_info *header,
 
 	UINT16 sample_short;
 	UINT32 length;
-	UINT16 *data_end = 0;
+	UINT16 __user *data_end = 0;
 	unsigned int i;
 	const int max_blksize = 4096/2;
 	unsigned int written;
@@ -1024,11 +1024,11 @@ wavefront_send_sample (wavefront_patch_info *header,
 	int initial_skip = 0;
 
 	DPRINT (WF_DEBUG_LOAD_PATCH, "sample %sdownload for slot %d, "
-				      "type %d, %d bytes from 0x%x\n",
+				      "type %d, %d bytes from %p\n",
 				      header->size ? "" : "header ", 
 				      header->number, header->subkey,
 				      header->size,
-				      (int) header->dataptr);
+				      header->dataptr);
 
 	if (header->number == WAVEFRONT_FIND_FREE_SAMPLE_SLOT) {
 		int x;
@@ -1688,8 +1688,7 @@ wavefront_load_patch (const char __user *addr)
 
 	case WF_ST_MULTISAMPLE:
 
-		if (copy_from_user((unsigned char *) &header.hdr.s,
-				   (unsigned char *) header.hdrptr,
+		if (copy_from_user(&header.hdr.s, header.hdrptr,
 				   sizeof(wavefront_multisample)))
 			return -EFAULT;
 
@@ -1698,32 +1697,28 @@ wavefront_load_patch (const char __user *addr)
 
 	case WF_ST_ALIAS:
 
-		if (copy_from_user((unsigned char *) &header.hdr.a,
-				   (unsigned char *) header.hdrptr,
+		if (copy_from_user(&header.hdr.a, header.hdrptr,
 				   sizeof (wavefront_alias)))
 			return -EFAULT;
 
 		return wavefront_send_alias (&header);
 
 	case WF_ST_DRUM:
-		if (copy_from_user((unsigned char *) &header.hdr.d, 
-				   (unsigned char *) header.hdrptr,
+		if (copy_from_user(&header.hdr.d, header.hdrptr,
 				   sizeof (wavefront_drum)))
 			return -EFAULT;
 
 		return wavefront_send_drum (&header);
 
 	case WF_ST_PATCH:
-		if (copy_from_user((unsigned char *) &header.hdr.p, 
-				   (unsigned char *) header.hdrptr,
+		if (copy_from_user(&header.hdr.p, header.hdrptr,
 				   sizeof (wavefront_patch)))
 			return -EFAULT;
 
 		return wavefront_send_patch (&header);
 
 	case WF_ST_PROGRAM:
-		if (copy_from_user((unsigned char *) &header.hdr.pr, 
-				   (unsigned char *) header.hdrptr,
+		if (copy_from_user(&header.hdr.pr, header.hdrptr,
 				   sizeof (wavefront_program)))
 			return -EFAULT;
 
@@ -3002,7 +2997,7 @@ wffx_ioctl (wavefront_fx_info *r)
 				return -(EINVAL);
 			}
 			if (copy_from_user(page_data,
-					   (unsigned char *)r->data[3],
+					   (unsigned char __user *)r->data[3],
 					   r->data[2]))
 				return -EFAULT;
 			pd = page_data;

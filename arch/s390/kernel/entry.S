@@ -24,7 +24,8 @@
  * Stack layout for the system_call stack entry.
  * The first few entries are identical to the user_regs_struct.
  */
-SP_PTREGS    =  STACK_FRAME_OVERHEAD 
+SP_PTREGS    =  STACK_FRAME_OVERHEAD
+SP_ARGS      =  STACK_FRAME_OVERHEAD + __PT_ARGS
 SP_PSW       =  STACK_FRAME_OVERHEAD + __PT_PSW
 SP_R0        =  STACK_FRAME_OVERHEAD + __PT_GPRS
 SP_R1        =  STACK_FRAME_OVERHEAD + __PT_GPRS + 4
@@ -47,7 +48,8 @@ SP_ILC       =  STACK_FRAME_OVERHEAD + __PT_ILC
 SP_TRAP      =  STACK_FRAME_OVERHEAD + __PT_TRAP
 SP_SIZE      =  STACK_FRAME_OVERHEAD + __PT_SIZE
 
-_TIF_WORK_SVC = (_TIF_SIGPENDING | _TIF_NEED_RESCHED | _TIF_RESTART_SVC)
+_TIF_WORK_SVC = (_TIF_SIGPENDING | _TIF_NEED_RESCHED | \
+		 _TIF_RESTART_SVC | _TIF_SINGLE_STEP )
 _TIF_WORK_INT = (_TIF_SIGPENDING | _TIF_NEED_RESCHED)
 
 #define BASED(name) name-system_call(%r13)
@@ -229,13 +231,16 @@ system_call:
 	lh	%r7,0x8a	  # get svc number from lowcore
 sysc_enter:
         GET_THREAD_INFO           # load pointer to task_struct to R9
+sysc_do_svc:
 	sla	%r7,2             # *4 and test for svc 0
-	bnz	BASED(sysc_do_restart)  # svc number > 0
+	bnz	BASED(sysc_nr_ok) # svc number > 0
 	# svc 0: system call number in %r1
 	cl	%r1,BASED(.Lnr_syscalls)
-	bnl	BASED(sysc_do_restart)
+	bnl	BASED(sysc_nr_ok)
 	lr	%r7,%r1           # copy svc number to %r7
 	sla	%r7,2             # *4
+sysc_nr_ok:
+	mvc	SP_ARGS(4,%r15),SP_R7(%r15)
 sysc_do_restart:
 	tm	__TI_flags+3(%r9),(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT)
         l       %r8,sys_call_table-system_call(%r7,%r13) # get system call addr.
@@ -262,7 +267,6 @@ sysc_work_loop:
 	bz	BASED(sysc_leave)      # there is no work to do
 #
 # One of the work bits is on. Find out which one.
-# Checked are: _TIF_SIGPENDING and _TIF_NEED_RESCHED
 #
 sysc_work:
 	tm	__TI_flags+3(%r9),_TIF_NEED_RESCHED
@@ -271,6 +275,8 @@ sysc_work:
 	bo	BASED(sysc_sigpending)
 	tm	__TI_flags+3(%r9),_TIF_RESTART_SVC
 	bo	BASED(sysc_restart)
+	tm	__TI_flags+3(%r9),_TIF_SINGLE_STEP
+	bo	BASED(sysc_singlestep)
 	b	BASED(sysc_leave)
 
 #
@@ -303,6 +309,17 @@ sysc_restart:
 	mvc	SP_R2(4,%r15),SP_ORIG_R2(%r15) # restore first argument
 	lm	%r2,%r6,SP_R2(%r15)    # load svc arguments
 	b	BASED(sysc_do_restart) # restart svc
+
+#
+# _TIF_SINGLE_STEP is set, call do_debugger_trap
+#
+sysc_singlestep:
+	ni	__TI_flags+3(%r9),255-_TIF_SINGLE_STEP # clear TIF_SINGLE_STEP
+	mvi	SP_TRAP+1(%r15),0x28	# set trap indication to pgm check
+	la	%r2,SP_PTREGS(%r15)	# address of register-save area
+	l	%r1,BASED(.Lhandle_per)	# load adr. of per handler
+	la	%r14,BASED(sysc_return)	# load adr. of system return
+	br	%r1			# branch to do_debugger_trap
 
 __critical_end:
 
@@ -495,71 +512,15 @@ pgm_per_only:
 #
 pgm_svcper:
 	SAVE_ALL __LC_SVC_OLD_PSW,__LC_SAVE_AREA,1
-	lh	%r7,0x8a	  # get svc number from lowcore
-        GET_THREAD_INFO           # load pointer to task_struct to R9
+	lh	%r7,0x8a		# get svc number from lowcore
+	GET_THREAD_INFO			# load pointer to task_struct to R9
 	l	%r1,__TI_task(%r9)
 	mvc	__THREAD_per+__PER_atmid(2,%r1),__LC_PER_ATMID
 	mvc	__THREAD_per+__PER_address(4,%r1),__LC_PER_ADDRESS
 	mvc	__THREAD_per+__PER_access_id(1,%r1),__LC_PER_ACCESS_ID
-        stosm   24(%r15),0x03     # reenable interrupts
-        sla     %r7,2             # *4 and test for svc 0
-	bnz	BASED(pgm_svcstd) # svc number > 0 ?
-	# svc 0: system call number in %r1
-	cl	%r1,BASED(.Lnr_syscalls)
-	bnl	BASED(pgm_svcstd)
-	lr	%r7,%r1           # copy svc number to %r7
-	sla	%r7,2             # *4
-pgm_svcstd:
-	tm	__TI_flags+3(%r9),(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT)
-        l       %r8,sys_call_table-system_call(%r7,%r13) # get system call addr.
-        bnz     BASED(pgm_tracesys)
-        basr    %r14,%r8          # call sys_xxxx
-        st      %r2,SP_R2(%r15)   # store return value (change R2 on stack)
-                                  # ATTENTION: check sys_execve_glue before
-                                  # changing anything here !!
-
-pgm_svcret:
-	tm	__TI_flags+3(%r9),_TIF_SIGPENDING
-	bno	BASED(pgm_svcper_nosig)
-	la	%r2,SP_PTREGS(%r15) # load pt_regs
-	sr	%r3,%r3		  # clear *oldset
-	l	%r1,BASED(.Ldo_signal)
-	basr	%r14,%r1	  # call do_signal
-	
-pgm_svcper_nosig:
-        mvi     SP_TRAP+3(%r15),0x28     # set trap indication to pgm check
-	la      %r2,SP_PTREGS(15)        # address of register-save area
-        l       %r1,BASED(.Lhandle_per)  # load adr. of per handler
-        la      %r14,BASED(sysc_return)  # load adr. of system return
-        br      %r1                      # branch to do_debugger_trap
-#
-# call trace before and after sys_call
-#
-pgm_tracesys:
-        l       %r1,BASED(.Ltrace)
-	la	%r2,SP_PTREGS(%r15)    # load pt_regs
-	la	%r3,0
-	srl	%r7,2
-	st	%r7,SP_R2(%r15)
-        basr    %r14,%r1
-	clc	SP_R2(4,%r15),BASED(.Lnr_syscalls)
-	bnl	BASED(pgm_svc_nogo)
-	l	%r7,SP_R2(%r15)   # strace changed the syscall
-	sll     %r7,2
-	l	%r8,sys_call_table-system_call(%r7,%r13)
-pgm_svc_go:
-	lm      %r3,%r6,SP_R3(%r15)
-	l       %r2,SP_ORIG_R2(%r15)
-        basr    %r14,%r8          # call sys_xxx
-        st      %r2,SP_R2(%r15)   # store return value
-pgm_svc_nogo:
-	tm	__TI_flags+3(%r9),(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT)
-        bz      BASED(pgm_svcret)
-        l       %r1,BASED(.Ltrace)
-	la	%r2,SP_PTREGS(%r15)    # load pt_regs
-	la	%r3,1
-	la	%r14,BASED(pgm_svcret)
-        br      %r1
+	oi	__TI_flags+3(%r9),_TIF_SINGLE_STEP # set TIF_SINGLE_STEP
+	stosm	24(%r15),0x03		# reenable interrupts
+	b	BASED(sysc_do_svc)
 
 /*
  * IO interrupt handler routine

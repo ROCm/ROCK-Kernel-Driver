@@ -145,10 +145,8 @@ int ipv6_recv_error(struct sock *sk, struct msghdr *msg, int len)
 			  (struct in6_addr *)(skb->nh.raw + serr->addr_offset));
 			if (np->sndflow)
 				sin->sin6_flowinfo = *(u32*)(skb->nh.raw + serr->addr_offset - 24) & IPV6_FLOWINFO_MASK;
-			if (ipv6_addr_type(&sin->sin6_addr) & IPV6_ADDR_LINKLOCAL) {
-				struct inet6_skb_parm *opt = (struct inet6_skb_parm *) skb->cb;
-				sin->sin6_scope_id = opt->iif;
-			}
+			if (ipv6_addr_type(&sin->sin6_addr) & IPV6_ADDR_LINKLOCAL)
+				sin->sin6_scope_id = IP6CB(skb)->iif;
 		} else {
 			ipv6_addr_set(&sin->sin6_addr, 0, 0,
 				      htonl(0xffff),
@@ -167,10 +165,8 @@ int ipv6_recv_error(struct sock *sk, struct msghdr *msg, int len)
 			ipv6_addr_copy(&sin->sin6_addr, &skb->nh.ipv6h->saddr);
 			if (np->rxopt.all)
 				datagram_recv_ctl(sk, msg, skb);
-			if (ipv6_addr_type(&sin->sin6_addr) & IPV6_ADDR_LINKLOCAL) {
-				struct inet6_skb_parm *opt = (struct inet6_skb_parm *) skb->cb;
-				sin->sin6_scope_id = opt->iif;
-			}
+			if (ipv6_addr_type(&sin->sin6_addr) & IPV6_ADDR_LINKLOCAL)
+				sin->sin6_scope_id = IP6CB(skb)->iif;
 		} else {
 			struct inet_opt *inet = inet_sk(sk);
 
@@ -211,7 +207,7 @@ out:
 int datagram_recv_ctl(struct sock *sk, struct msghdr *msg, struct sk_buff *skb)
 {
 	struct ipv6_pinfo *np = inet6_sk(sk);
-	struct inet6_skb_parm *opt = (struct inet6_skb_parm *) skb->cb;
+	struct inet6_skb_parm *opt = IP6CB(skb);
 
 	if (np->rxopt.bits.rxinfo) {
 		struct in6_pktinfo src_info;

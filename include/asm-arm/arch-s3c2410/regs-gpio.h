@@ -574,12 +574,7 @@
 #define S3C2410_EINFLT2	   S3C2410_GPIOREG(0x9C)
 #define S3C2410_EINFLT3	   S3C2410_GPIOREG(0xA0)
 
-/* mask: 0=enable, 1=disable
- * 1 bit EINT, 4=EINT4, 23=EINT23
- * EINT0,1,2,3 are not handled here.
-*/
-#define S3C2410_EINTMASK   S3C2410_GPIOREG(0xA4)
-#define S3C2410_EINTPEND   S3C2410_GPIOREG(0xA8)
+/* removed EINTxxxx defs from here, not meant for this */
 
 /* GSTATUS have miscellaneous information in them
  *

@@ -48,7 +48,7 @@ static unsigned int snd_seq_gf1_size(unsigned int size, unsigned int format)
 
 static int snd_seq_gf1_copy_wave_from_stream(snd_gf1_ops_t *ops,
 					     gf1_instrument_t *ip,
-					     char **data,
+					     char __user **data,
 					     long *len,
 					     int atomic)
 {
@@ -141,7 +141,8 @@ static void snd_seq_gf1_instr_free(snd_gf1_ops_t *ops,
 }
 
 static int snd_seq_gf1_put(void *private_data, snd_seq_kinstr_t *instr,
-			   char *instr_data, long len, int atomic, int cmd)
+			   char __user *instr_data, long len, int atomic,
+			   int cmd)
 {
 	snd_gf1_ops_t *ops = (snd_gf1_ops_t *)private_data;
 	gf1_instrument_t *ip;
@@ -192,7 +193,7 @@ static int snd_seq_gf1_put(void *private_data, snd_seq_kinstr_t *instr,
 
 static int snd_seq_gf1_copy_wave_to_stream(snd_gf1_ops_t *ops,
 					   gf1_instrument_t *ip,
-					   char **data,
+					   char __user **data,
 					   long *len,
 					   int atomic)
 {
@@ -253,7 +254,8 @@ static int snd_seq_gf1_copy_wave_to_stream(snd_gf1_ops_t *ops,
 }
 
 static int snd_seq_gf1_get(void *private_data, snd_seq_kinstr_t *instr,
-			   char *instr_data, long len, int atomic, int cmd)
+			   char __user *instr_data, long len, int atomic,
+			   int cmd)
 {
 	snd_gf1_ops_t *ops = (snd_gf1_ops_t *)private_data;
 	gf1_instrument_t *ip;

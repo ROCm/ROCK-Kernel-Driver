@@ -134,7 +134,7 @@ typedef struct hdlc_device_struct {
 			int dce_pvc_count;
 
 			struct timer_list timer;
-			int last_poll;
+			unsigned long last_poll;
 			int reliable;
 			int dce_changed;
 			int request;
@@ -149,8 +149,9 @@ typedef struct hdlc_device_struct {
 			cisco_proto settings;
 
 			struct timer_list timer;
-			int last_poll;
+			unsigned long last_poll;
 			int up;
+			int request_sent;
 			u32 txseq; /* TX sequence number */
 			u32 rxseq; /* RX sequence number */
 		}cisco;

@@ -274,6 +274,7 @@ cond_syscall(compat_sys_mq_getsetattr)
 cond_syscall(sys_mbind)
 cond_syscall(sys_get_mempolicy)
 cond_syscall(sys_set_mempolicy)
+cond_syscall(compat_get_mempolicy)
 
 /* arch-specific weak syscall entries */
 cond_syscall(sys_pciconfig_read)

@@ -1008,7 +1008,7 @@ int ip_mroute_getsockopt(struct sock *sk,int optname,char __user *optval,int __u
  *	The IP multicast ioctl support routines.
  */
  
-int ipmr_ioctl(struct sock *sk, int cmd, unsigned long arg)
+int ipmr_ioctl(struct sock *sk, int cmd, void __user *arg)
 {
 	struct sioc_sg_req sr;
 	struct sioc_vif_req vr;
@@ -1018,7 +1018,7 @@ int ipmr_ioctl(struct sock *sk, int cmd, unsigned long arg)
 	switch(cmd)
 	{
 		case SIOCGETVIFCNT:
-			if (copy_from_user(&vr,(void *)arg,sizeof(vr)))
+			if (copy_from_user(&vr,arg,sizeof(vr)))
 				return -EFAULT; 
 			if(vr.vifi>=maxvif)
 				return -EINVAL;
@@ -1031,14 +1031,14 @@ int ipmr_ioctl(struct sock *sk, int cmd, unsigned long arg)
 				vr.obytes=vif->bytes_out;
 				read_unlock(&mrt_lock);
 
-				if (copy_to_user((void *)arg,&vr,sizeof(vr)))
+				if (copy_to_user(arg,&vr,sizeof(vr)))
 					return -EFAULT;
 				return 0;
 			}
 			read_unlock(&mrt_lock);
 			return -EADDRNOTAVAIL;
 		case SIOCGETSGCNT:
-			if (copy_from_user(&sr,(void *)arg,sizeof(sr)))
+			if (copy_from_user(&sr,arg,sizeof(sr)))
 				return -EFAULT;
 
 			read_lock(&mrt_lock);
@@ -1049,7 +1049,7 @@ int ipmr_ioctl(struct sock *sk, int cmd, unsigned long arg)
 				sr.wrong_if = c->mfc_un.res.wrong_if;
 				read_unlock(&mrt_lock);
 
-				if (copy_to_user((void *)arg,&sr,sizeof(sr)))
+				if (copy_to_user(arg,&sr,sizeof(sr)))
 					return -EFAULT;
 				return 0;
 			}
@@ -1115,7 +1115,7 @@ static inline int ipmr_forward_finish(struct sk_buff *skb)
 {
 	struct ip_options * opt	= &(IPCB(skb)->opt);
 
-	IP_INC_STATS_BH(IpForwDatagrams);
+	IP_INC_STATS_BH(OutForwDatagrams);
 
 	if (unlikely(opt->optlen))
 		ip_forward_options(skb);
@@ -1178,7 +1178,7 @@ static void ipmr_queue_xmit(struct sk_buff *skb, struct mfc_cache *c, int vifi)
 		   to blackhole.
 		 */
 
-		IP_INC_STATS_BH(IpFragFails);
+		IP_INC_STATS_BH(FragFails);
 		ip_rt_put(rt);
 		goto out_free;
 	}

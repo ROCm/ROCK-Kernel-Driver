@@ -133,12 +133,16 @@ struct page_state {
 	unsigned long allocstall;	/* direct reclaim calls */
 
 	unsigned long pgrotated;	/* pages rotated to tail of the LRU */
-} ____cacheline_aligned;
+};
 
 DECLARE_PER_CPU(struct page_state, page_states);
 
 extern void get_page_state(struct page_state *ret);
 extern void get_full_page_state(struct page_state *ret);
+extern unsigned long __read_page_state(unsigned offset);
+
+#define read_page_state(member) \
+	__read_page_state(offsetof(struct page_state, member))
 
 #define mod_page_state(member, delta)					\
 	do {								\

@@ -774,7 +774,7 @@ lec_pop(struct atm_vcc *vcc, struct sk_buff *skb)
 }
 
 int 
-lec_vcc_attach(struct atm_vcc *vcc, void *arg)
+lec_vcc_attach(struct atm_vcc *vcc, void __user *arg)
 {
 	struct lec_vcc_priv *vpriv;
         int bytes_left;
@@ -1161,7 +1161,7 @@ static int lane_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 			err = lec_mcast_attach(vcc, (int) arg);
 			break;
 		case ATMLEC_DATA:
-			err = lec_vcc_attach(vcc, (void *) arg);
+			err = lec_vcc_attach(vcc, (void __user *) arg);
 			break;
 	}
 

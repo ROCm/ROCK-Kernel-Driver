@@ -409,10 +409,8 @@ static int rawv6_recvmsg(struct kiocb *iocb, struct sock *sk,
 		ipv6_addr_copy(&sin6->sin6_addr, &skb->nh.ipv6h->saddr);
 		sin6->sin6_flowinfo = 0;
 		sin6->sin6_scope_id = 0;
-		if (ipv6_addr_type(&sin6->sin6_addr) & IPV6_ADDR_LINKLOCAL) {
-			struct inet6_skb_parm *opt = (struct inet6_skb_parm *) skb->cb;
-			sin6->sin6_scope_id = opt->iif;
-		}
+		if (ipv6_addr_type(&sin6->sin6_addr) & IPV6_ADDR_LINKLOCAL)
+			sin6->sin6_scope_id = IP6CB(skb)->iif;
 	}
 
 	sock_recv_timestamp(msg, sk, skb);
@@ -535,7 +533,7 @@ static int rawv6_send_hdrinc(struct sock *sk, void *from, int length,
 	if (err)
 		goto error_fault;
 
-	IP6_INC_STATS(Ip6OutRequests);		
+	IP6_INC_STATS(OutRequests);		
 	err = NF_HOOK(PF_INET6, NF_IP6_LOCAL_OUT, skb, NULL, rt->u.dst.dev,
 		      dst_output);
 	if (err > 0)
@@ -549,7 +547,7 @@ error_fault:
 	err = -EFAULT;
 	kfree_skb(skb);
 error:
-	IP6_INC_STATS(Ip6OutDiscards);
+	IP6_INC_STATS(OutDiscards);
 	return err; 
 }
 static int rawv6_sendmsg(struct kiocb *iocb, struct sock *sk,

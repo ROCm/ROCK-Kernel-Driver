@@ -61,6 +61,7 @@
 
 #include <linux/mempolicy.h>
 #include <linux/mm.h>
+#include <linux/highmem.h>
 #include <linux/hugetlb.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>

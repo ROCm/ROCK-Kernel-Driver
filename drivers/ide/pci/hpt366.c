@@ -795,7 +795,7 @@ static int hpt370_busproc(ide_drive_t * drive, int state)
 	return 0;
 }
 
-static int __init init_hpt37x(struct pci_dev *dev)
+static int __devinit init_hpt37x(struct pci_dev *dev)
 {
 	int adjust, i;
 	u16 freq;
@@ -923,7 +923,7 @@ init_hpt37X_done:
 	return 0;
 }
 
-static int __init init_hpt366 (struct pci_dev *dev)
+static int __devinit init_hpt366(struct pci_dev *dev)
 {
 	u32 reg1	= 0;
 	u8 drive_fast	= 0;
@@ -958,7 +958,7 @@ static int __init init_hpt366 (struct pci_dev *dev)
 	return 0;
 }
 
-static unsigned int __init init_chipset_hpt366 (struct pci_dev *dev, const char *name)
+static unsigned int __devinit init_chipset_hpt366(struct pci_dev *dev, const char *name)
 {
 	int ret = 0;
 	u8 test = 0;
@@ -1004,7 +1004,7 @@ static unsigned int __init init_chipset_hpt366 (struct pci_dev *dev, const char 
 	return dev->irq;
 }
 
-static void __init init_hwif_hpt366 (ide_hwif_t *hwif)
+static void __devinit init_hwif_hpt366(ide_hwif_t *hwif)
 {
 	struct pci_dev *dev		= hwif->pci_dev;
 	u8 ata66 = 0, regmask		= (hwif->channel) ? 0x01 : 0x02;
@@ -1116,7 +1116,7 @@ static void __init init_hwif_hpt366 (ide_hwif_t *hwif)
 	hwif->drives[1].autodma = hwif->autodma;
 }
 
-static void __init init_dma_hpt366 (ide_hwif_t *hwif, unsigned long dmabase)
+static void __devinit init_dma_hpt366(ide_hwif_t *hwif, unsigned long dmabase)
 {
 	u8 masterdma	= 0, slavedma = 0;
 	u8 dma_new	= 0, dma_old = 0;
@@ -1151,7 +1151,7 @@ static void __init init_dma_hpt366 (ide_hwif_t *hwif, unsigned long dmabase)
 	ide_setup_dma(hwif, dmabase, 8);
 }
 
-static void __init init_setup_hpt374 (struct pci_dev *dev, ide_pci_device_t *d)
+static void __devinit init_setup_hpt374(struct pci_dev *dev, ide_pci_device_t *d)
 {
 	struct pci_dev *findev = NULL;
 
@@ -1176,12 +1176,12 @@ static void __init init_setup_hpt374 (struct pci_dev *dev, ide_pci_device_t *d)
 	ide_setup_pci_device(dev, d);
 }
 
-static void __init init_setup_hpt37x (struct pci_dev *dev, ide_pci_device_t *d)
+static void __devinit init_setup_hpt37x(struct pci_dev *dev, ide_pci_device_t *d)
 {
 	ide_setup_pci_device(dev, d);
 }
 
-static void __init init_setup_hpt366 (struct pci_dev *dev, ide_pci_device_t *d)
+static void __devinit init_setup_hpt366(struct pci_dev *dev, ide_pci_device_t *d)
 {
 	struct pci_dev *findev = NULL;
 	u8 pin1 = 0, pin2 = 0;
@@ -1241,8 +1241,6 @@ static int __devinit hpt366_init_one(struct pci_dev *dev, const struct pci_devic
 {
 	ide_pci_device_t *d = &hpt366_chipsets[id->driver_data];
 
-	if (dev->device != d->device)
-		BUG();
 	d->init_setup(dev, d);
 	return 0;
 }

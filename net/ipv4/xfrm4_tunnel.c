@@ -33,8 +33,9 @@ out:
 	return ret;
 }
 
-static int ipip_output(struct sk_buff *skb)
+static int ipip_output(struct sk_buff **pskb)
 {
+	struct sk_buff *skb = *pskb;
 	struct dst_entry *dst = skb->dst;
 	struct xfrm_state *x = dst->xfrm;
 	struct iphdr *iph, *top_iph;

@@ -65,8 +65,6 @@ static void init_hwif_cmd64x(ide_hwif_t *);
 
 static ide_pci_device_t cmd64x_chipsets[] __devinitdata = {
 	{	/* 0 */
-		.vendor		= PCI_VENDOR_ID_CMD,
-		.device		= PCI_DEVICE_ID_CMD_643,
 		.name		= "CMD643",
 		.init_chipset	= init_chipset_cmd64x,
 		.init_hwif	= init_hwif_cmd64x,
@@ -74,8 +72,6 @@ static ide_pci_device_t cmd64x_chipsets[] __devinitdata = {
 		.autodma	= AUTODMA,
 		.bootable	= ON_BOARD,
 	},{	/* 1 */
-		.vendor		= PCI_VENDOR_ID_CMD,
-		.device		= PCI_DEVICE_ID_CMD_646,
 		.name		= "CMD646",
 		.init_chipset	= init_chipset_cmd64x,
 		.init_hwif	= init_hwif_cmd64x,
@@ -84,8 +80,6 @@ static ide_pci_device_t cmd64x_chipsets[] __devinitdata = {
 		.enablebits	= {{0x00,0x00,0x00}, {0x51,0x80,0x80}},
 		.bootable	= ON_BOARD,
 	},{	/* 2 */
-		.vendor		= PCI_VENDOR_ID_CMD,
-		.device	= PCI_DEVICE_ID_CMD_648,
 		.name		= "CMD648",
 		.init_chipset	= init_chipset_cmd64x,
 		.init_hwif	= init_hwif_cmd64x,
@@ -93,8 +87,6 @@ static ide_pci_device_t cmd64x_chipsets[] __devinitdata = {
 		.autodma	= AUTODMA,
 		.bootable	= ON_BOARD,
 	},{
-		.vendor		= PCI_VENDOR_ID_CMD,
-		.device		= PCI_DEVICE_ID_CMD_649,
 		.name		= "CMD649",
 		.init_chipset	= init_chipset_cmd64x,
 		.init_hwif	= init_hwif_cmd64x,

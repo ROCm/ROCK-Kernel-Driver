@@ -37,10 +37,10 @@ typedef struct { volatile u32 offset[4096]; } __regbase;
 # define __REGP(x)	((__regbase *)((x)&~4095))->offset[((x)&4095)>>2]
 # define __REG(x)	__REGP(io_p2v(x))
 typedef struct { volatile u16 offset[4096]; } __regbase16;
-# define __REGP16(x)	((__regbase16 *)((x)&~4095))->offset[((x)&4095)>>2]
+# define __REGP16(x)	((__regbase16 *)((x)&~4095))->offset[((x)&4095)>>1]
 # define __REG16(x)	__REGP16(io_p2v(x))
 typedef struct { volatile u8 offset[4096]; } __regbase8;
-# define __REGP8(x)	((__regbase8 *)((x)&~4095))->offset[((x)&4095)>>2]
+# define __REGP8(x)	((__regbase8 *)((x)&~4095))->offset[(x)&4095]
 # define __REG8(x)	__REGP8(io_p2v(x))
 #endif
 

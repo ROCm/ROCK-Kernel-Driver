@@ -163,7 +163,7 @@ dump_altivec(struct pt_regs *regs, elf_vrregset_t *vrregs)
 void
 enable_kernel_altivec(void)
 {
-	WARN_ON(current_thread_info()->preempt_count == 0 && !irqs_disabled());
+	WARN_ON(preemptible());
 
 #ifdef CONFIG_SMP
 	if (current->thread.regs && (current->thread.regs->msr & MSR_VEC))
@@ -180,7 +180,7 @@ EXPORT_SYMBOL(enable_kernel_altivec);
 void
 enable_kernel_fp(void)
 {
-	WARN_ON(current_thread_info()->preempt_count == 0 && !irqs_disabled());
+	WARN_ON(preemptible());
 
 #ifdef CONFIG_SMP
 	if (current->thread.regs && (current->thread.regs->msr & MSR_FP))

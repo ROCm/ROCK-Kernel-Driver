@@ -191,7 +191,7 @@ static void snd_emu10k1_proc_acode_read(snd_info_entry_t *entry,
 #define TOTAL_SIZE_CODE		(0x200*8)
 
 static long snd_emu10k1_fx8010_read(snd_info_entry_t *entry, void *file_private_data,
-				    struct file *file, char *buf, long count)
+				    struct file *file, char __user *buf, long count)
 {
 	long size;
 	emu10k1_t *emu = snd_magic_cast(emu10k1_t, entry->private_data, return -ENXIO);

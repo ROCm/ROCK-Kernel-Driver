@@ -1962,8 +1962,6 @@ int ext3_orphan_del(handle_t *handle, struct inode *inode)
 		goto out_brelse;
 	NEXT_ORPHAN(inode) = 0;
 	err = ext3_mark_iloc_dirty(handle, inode, &iloc);
-	if (err)
-		goto out_brelse;
 
 out_err:
 	ext3_std_error(inode->i_sb, err);
@@ -2264,11 +2262,15 @@ static int ext3_rename (struct inode * old_dir, struct dentry *old_dentry,
 	/*
 	 * ok, that's it
 	 */
-	retval = ext3_delete_entry(handle, old_dir, old_de, old_bh);
-	if (retval == -ENOENT) {
-		/*
-		 * old_de could have moved out from under us.
-		 */
+	if (le32_to_cpu(old_de->inode) != old_inode->i_ino ||
+	    old_de->name_len != old_dentry->d_name.len ||
+	    strncmp(old_de->name, old_dentry->d_name.name, old_de->name_len) ||
+	    (retval = ext3_delete_entry(handle, old_dir,
+					old_de, old_bh)) == -ENOENT) {
+		/* old_de could have moved from under us during htree split, so
+		 * make sure that we are deleting the right entry.  We might
+		 * also be pointing to a stale entry in the unused part of
+		 * old_bh so just checking inum and the name isn't enough. */
 		struct buffer_head *old_bh2;
 		struct ext3_dir_entry_2 *old_de2;
 

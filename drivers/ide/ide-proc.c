@@ -233,27 +233,6 @@ static int proc_ide_write_config(struct file *file, const char __user *buffer,
 			}
 #endif	/* CONFIG_BLK_DEV_IDEPCI */
 		} else {	/* not pci */
-#if !defined(__mc68000__) && !defined(CONFIG_APUS)
-
-/*
-* Geert Uytterhoeven
-*
-* unless you can explain me what it really does.
-* On m68k, we don't have outw() and outl() yet,
-* and I need a good reason to implement it.
-* 
-* BTW, IMHO the main remaining portability problem with the IDE driver 
-* is that it mixes IO (ioport) and MMIO (iomem) access on different platforms.
-* 
-* I think all accesses should be done using
-* 
-*     ide_in[bwl](ide_device_instance, offset)
-*     ide_out[bwl](ide_device_instance, value, offset)
-* 
-* so the architecture specific code can #define ide_{in,out}[bwl] to the
-* appropriate function.
-* 
-*/
 			switch (r->size) {
 				case 1:	hwif->OUTB(val, reg);
 					break;
@@ -262,7 +241,6 @@ static int proc_ide_write_config(struct file *file, const char __user *buffer,
 				case 4:	hwif->OUTL(val, reg);
 					break;
 			}
-#endif /* !__mc68000__ && !CONFIG_APUS */
 		}
 	}
 	spin_unlock_irqrestore(&ide_lock, flags);
@@ -280,7 +258,7 @@ parse_error:
 	goto out1;
 }
 
-int proc_ide_read_config
+static int proc_ide_read_config
 	(char *page, char **start, off_t off, int count, int *eof, void *data)
 {
 	char		*out = page;
@@ -317,8 +295,6 @@ int proc_ide_read_config
 	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
 }
 
-EXPORT_SYMBOL(proc_ide_read_config);
-
 static int proc_ide_read_imodel
 	(char *page, char **start, off_t off, int count, int *eof, void *data)
 {
@@ -352,9 +328,7 @@ static int proc_ide_read_imodel
 	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
 }
 
-EXPORT_SYMBOL(proc_ide_read_imodel);
-
-int proc_ide_read_mate
+static int proc_ide_read_mate
 	(char *page, char **start, off_t off, int count, int *eof, void *data)
 {
 	ide_hwif_t	*hwif = (ide_hwif_t *) data;
@@ -367,9 +341,7 @@ int proc_ide_read_mate
 	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
 }
 
-EXPORT_SYMBOL(proc_ide_read_mate);
-
-int proc_ide_read_channel
+static int proc_ide_read_channel
 	(char *page, char **start, off_t off, int count, int *eof, void *data)
 {
 	ide_hwif_t	*hwif = (ide_hwif_t *) data;
@@ -381,9 +353,7 @@ int proc_ide_read_channel
 	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
 }
 
-EXPORT_SYMBOL(proc_ide_read_channel);
-
-int proc_ide_read_identify
+static int proc_ide_read_identify
 	(char *page, char **start, off_t off, int count, int *eof, void *data)
 {
 	ide_drive_t	*drive = (ide_drive_t *)data;
@@ -425,9 +395,7 @@ int proc_ide_read_identify
 	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
 }
 
-EXPORT_SYMBOL(proc_ide_read_identify);
-
-int proc_ide_read_settings
+static int proc_ide_read_settings
 	(char *page, char **start, off_t off, int count, int *eof, void *data)
 {
 	ide_drive_t	*drive = (ide_drive_t *) data;
@@ -459,12 +427,10 @@ int proc_ide_read_settings
 	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
 }
 
-EXPORT_SYMBOL(proc_ide_read_settings);
-
 #define MAX_LEN	30
 
-int proc_ide_write_settings(struct file *file, const char __user *buffer,
-			    unsigned long count, void *data)
+static int proc_ide_write_settings(struct file *file, const char __user *buffer,
+				   unsigned long count, void *data)
 {
 	ide_drive_t	*drive = (ide_drive_t *) data;
 	char		name[MAX_LEN + 1];
@@ -555,8 +521,6 @@ parse_error:
 	return -EINVAL;
 }
 
-EXPORT_SYMBOL(proc_ide_write_settings);
-
 int proc_ide_read_capacity
 	(char *page, char **start, off_t off, int count, int *eof, void *data)
 {
@@ -567,8 +531,6 @@ int proc_ide_read_capacity
 		      (long long) (DRIVER(drive)->capacity(drive)));
 	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
 }
-
-EXPORT_SYMBOL(proc_ide_read_capacity);
 
 int proc_ide_read_geometry
 	(char *page, char **start, off_t off, int count, int *eof, void *data)
@@ -588,7 +550,7 @@ int proc_ide_read_geometry
 
 EXPORT_SYMBOL(proc_ide_read_geometry);
 
-int proc_ide_read_dmodel
+static int proc_ide_read_dmodel
 	(char *page, char **start, off_t off, int count, int *eof, void *data)
 {
 	ide_drive_t	*drive = (ide_drive_t *) data;
@@ -600,9 +562,7 @@ int proc_ide_read_dmodel
 	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
 }
 
-EXPORT_SYMBOL(proc_ide_read_dmodel);
-
-int proc_ide_read_driver
+static int proc_ide_read_driver
 	(char *page, char **start, off_t off, int count, int *eof, void *data)
 {
 	ide_drive_t	*drive = (ide_drive_t *) data;
@@ -614,9 +574,7 @@ int proc_ide_read_driver
 	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
 }
 
-EXPORT_SYMBOL(proc_ide_read_driver);
-
-int proc_ide_write_driver
+static int proc_ide_write_driver
 	(struct file *file, const char __user *buffer, unsigned long count, void *data)
 {
 	ide_drive_t	*drive = (ide_drive_t *) data;
@@ -634,9 +592,7 @@ int proc_ide_write_driver
 	return count;
 }
 
-EXPORT_SYMBOL(proc_ide_write_driver);
-
-int proc_ide_read_media
+static int proc_ide_read_media
 	(char *page, char **start, off_t off, int count, int *eof, void *data)
 {
 	ide_drive_t	*drive = (ide_drive_t *) data;
@@ -659,8 +615,6 @@ int proc_ide_read_media
 	len = strlen(media);
 	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
 }
-
-EXPORT_SYMBOL(proc_ide_read_media);
 
 static ide_proc_entry_t generic_drive_entries[] = {
 	{ "driver",	S_IFREG|S_IRUGO,	proc_ide_read_driver,	proc_ide_write_driver },
@@ -688,8 +642,6 @@ void ide_add_proc_entries(struct proc_dir_entry *dir, ide_proc_entry_t *p, void 
 	}
 }
 
-EXPORT_SYMBOL(ide_add_proc_entries);
-
 void ide_remove_proc_entries(struct proc_dir_entry *dir, ide_proc_entry_t *p)
 {
 	if (!dir || !p)
@@ -700,9 +652,7 @@ void ide_remove_proc_entries(struct proc_dir_entry *dir, ide_proc_entry_t *p)
 	}
 }
 
-EXPORT_SYMBOL(ide_remove_proc_entries);
-
-void create_proc_ide_drives(ide_hwif_t *hwif)
+static void create_proc_ide_drives(ide_hwif_t *hwif)
 {
 	int	d;
 	struct proc_dir_entry *ent;
@@ -726,9 +676,7 @@ void create_proc_ide_drives(ide_hwif_t *hwif)
 	}
 }
 
-EXPORT_SYMBOL(create_proc_ide_drives);
-
-void destroy_proc_ide_device(ide_hwif_t *hwif, ide_drive_t *drive)
+static void destroy_proc_ide_device(ide_hwif_t *hwif, ide_drive_t *drive)
 {
 	ide_driver_t *driver = drive->driver;
 
@@ -741,8 +689,6 @@ void destroy_proc_ide_device(ide_hwif_t *hwif, ide_drive_t *drive)
 	}
 }
 
-EXPORT_SYMBOL(destroy_proc_ide_device);
-
 void destroy_proc_ide_drives(ide_hwif_t *hwif)
 {
 	int	d;
@@ -753,8 +699,6 @@ void destroy_proc_ide_drives(ide_hwif_t *hwif)
 			destroy_proc_ide_device(hwif, drive);
 	}
 }
-
-EXPORT_SYMBOL(destroy_proc_ide_drives);
 
 static ide_proc_entry_t hwif_entries[] = {
 	{ "channel",	S_IFREG|S_IRUGO,	proc_ide_read_channel,	NULL },
@@ -843,13 +787,9 @@ void proc_ide_create(void)
 		entry->proc_fops = &ide_drivers_operations;
 }
 
-EXPORT_SYMBOL(proc_ide_create);
-
 void proc_ide_destroy(void)
 {
 	remove_proc_entry("ide/drivers", proc_ide_root);
 	destroy_proc_ide_interfaces();
 	remove_proc_entry("ide", 0);
 }
-
-EXPORT_SYMBOL(proc_ide_destroy);

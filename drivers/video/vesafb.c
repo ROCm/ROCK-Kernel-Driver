@@ -207,7 +207,7 @@ int __init vesafb_setup(char *options)
 			mtrr=1;
 		else if (! strcmp(this_opt, "nomtrr"))
 			mtrr=0;
-		else if (! strncmp(this_opt, "vram=", 5))
+		else if (! strncmp(this_opt, "vram:", 5))
 			vram = simple_strtoul(this_opt+5, NULL, 0);
 	}
 	return 0;

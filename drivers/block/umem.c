@@ -833,7 +833,7 @@ static int mm_ioctl(struct inode *i, struct file *f, unsigned int cmd, unsigned 
 		geo.start     = get_start_sect(i->i_bdev);
 		geo.cylinders = size / (geo.heads * geo.sectors);
 
-		if (copy_to_user((void *) arg, &geo, sizeof(geo)))
+		if (copy_to_user((void __user *) arg, &geo, sizeof(geo)))
 			return -EFAULT;
 		return 0;
 	}

@@ -19,6 +19,7 @@
 #include <linux/delay.h>
 #include <linux/pci.h>
 #include <linux/moduleparam.h>
+#include <linux/suspend.h>
 #include <asm/atomic.h>
 
 #include "ieee1394_types.h"
@@ -1474,10 +1475,19 @@ static int nodemgr_host_thread(void *__hi)
 
 	/* Sit and wait for a signal to probe the nodes on the bus. This
 	 * happens when we get a bus reset. */
-	while (!down_interruptible(&hi->reset_sem) &&
-	       !down_interruptible(&nodemgr_serialize)) {
+	while (1) {
 		unsigned int generation = 0;
 		int i;
+
+		if (down_interruptible(&hi->reset_sem) ||
+		    down_interruptible(&nodemgr_serialize)) {
+			if (current->flags & PF_FREEZE) {
+				refrigerator(0);
+				continue;
+			}
+			printk("NodeMgr: received unexpected signal?!\n" );
+			break;
+		}
 
 		if (hi->kill_me)
 			break;

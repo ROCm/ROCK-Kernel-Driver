@@ -2154,17 +2154,17 @@ static int snd_seq_do_ioctl(client_t *client, unsigned int cmd, void __user *arg
 	switch (cmd) {
 	case SNDRV_SEQ_IOCTL_PVERSION:
 		/* return sequencer version number */
-		return put_user(SNDRV_SEQ_VERSION, (int *)arg) ? -EFAULT : 0;
+		return put_user(SNDRV_SEQ_VERSION, (int __user *)arg) ? -EFAULT : 0;
 	case SNDRV_SEQ_IOCTL_CLIENT_ID:
 		/* return the id of this client */
-		return put_user(client->number, (int *)arg) ? -EFAULT : 0;
+		return put_user(client->number, (int __user *)arg) ? -EFAULT : 0;
 	}
 
 	if (! arg)
 		return -EFAULT;
 	for (p = ioctl_tables; p->cmd; p++) {
 		if (p->cmd == cmd)
-			return p->func(client, (void __user *) arg);
+			return p->func(client, arg);
 	}
 	snd_printd("seq unknown ioctl() 0x%x (type='%c', number=0x%2x)\n",
 		   cmd, _IOC_TYPE(cmd), _IOC_NR(cmd));
@@ -2348,7 +2348,7 @@ int snd_seq_kernel_client_dispatch(int client, snd_seq_event_t * ev,
  * exported, called by kernel clients to perform same functions as with
  * userland ioctl() 
  */
-int snd_seq_kernel_client_ctl(int clientid, unsigned int cmd, void __user *arg)
+int snd_seq_kernel_client_ctl(int clientid, unsigned int cmd, void *arg)
 {
 	client_t *client;
 	mm_segment_t fs;

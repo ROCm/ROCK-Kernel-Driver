@@ -1,4 +1,4 @@
-/* $Id: time.c,v 1.9 2003/07/04 08:27:52 starvik Exp $
+/* $Id: time.c,v 1.14 2004/06/01 05:38:11 starvik Exp $
  *
  *  linux/arch/cris/kernel/time.c
  *
@@ -29,6 +29,7 @@
 #include <linux/jiffies.h>
 #include <linux/bcd.h>
 #include <linux/timex.h>
+#include <linux/init.h>
 
 u64 jiffies_64 = INITIAL_JIFFIES;
 
@@ -39,6 +40,8 @@ int have_rtc;  /* used to remember if we have an RTC or not */;
 #define TICK_SIZE tick
 
 extern unsigned long wall_jiffies;
+extern unsigned long loops_per_jiffy; /* init/main.c */
+unsigned long loops_per_usec;
 
 extern unsigned long do_slow_gettimeoffset(void);
 static unsigned long (*do_gettimeoffset)(void) = do_slow_gettimeoffset;
@@ -62,6 +65,15 @@ void do_gettimeofday(struct timeval *tv)
 		if (lost)
 			usec += lost * (1000000 / HZ);
 	}
+
+        /*
+	 * If time_adjust is negative then NTP is slowing the clock
+	 * so make sure not to go into next possible interval.
+	 * Better to lose some accuracy than have time go backwards..
+	 */
+	if (unlikely(time_adjust < 0) && usec > tickadj)
+		usec = tickadj;
+
 	sec = xtime.tv_sec;
 	usec += xtime.tv_nsec / 1000;
 	local_irq_restore(flags);
@@ -79,35 +91,33 @@ EXPORT_SYMBOL(do_gettimeofday);
 
 int do_settimeofday(struct timespec *tv)
 {
-	unsigned long flags;
+	time_t wtm_sec, sec = tv->tv_sec;
+	long wtm_nsec, nsec = tv->tv_nsec;
 
-        if ((unsigned long)tv->tv_nsec >= NSEC_PER_SEC)
+	if ((unsigned long)tv->tv_nsec >= NSEC_PER_SEC)
 		return -EINVAL;
 
-	local_irq_save(flags);
-	local_irq_disable();
-
-	/* This is revolting. We need to set the xtime.tv_usec
-	 * correctly. However, the value in this location is
-	 * is value at the last tick.
-	 * Discover what correction gettimeofday
-	 * would have done, and then undo it!
+	write_seqlock_irq(&xtime_lock);
+	/*
+	 * This is revolting. We need to set "xtime" correctly. However, the
+	 * value in this location is the value at the most recent update of
+	 * wall time.  Discover what correction gettimeofday() would have
+	 * made, and then undo it!
 	 */
-	tv->tv_nsec -= do_gettimeoffset() * 1000;
-        tv->tv_nsec -= (jiffies - wall_jiffies) * TICK_NSEC;
+	nsec -= do_gettimeoffset() * NSEC_PER_USEC;
+	nsec -= (jiffies - wall_jiffies) * TICK_NSEC;
 
-	while (tv->tv_nsec < 0) {
-		tv->tv_nsec += NSEC_PER_SEC;
-		tv->tv_sec--;
-	}
-	xtime.tv_sec = tv->tv_sec;
-	xtime.tv_nsec = tv->tv_nsec;
+	wtm_sec  = wall_to_monotonic.tv_sec + (xtime.tv_sec - sec);
+	wtm_nsec = wall_to_monotonic.tv_nsec + (xtime.tv_nsec - nsec);
+
+	set_normalized_timespec(&xtime, sec, nsec);
+	set_normalized_timespec(&wall_to_monotonic, wtm_sec, wtm_nsec);
+
 	time_adjust = 0;		/* stop active adjtime() */
 	time_status |= STA_UNSYNC;
-	time_state = TIME_ERROR;	/* p. 24, (a) */
 	time_maxerror = NTP_PHASE_LIMIT;
 	time_esterror = NTP_PHASE_LIMIT;
-	local_irq_restore(flags);
+	write_sequnlock_irq(&xtime_lock);
 	clock_was_set();
 	return 0;
 }
@@ -125,7 +135,7 @@ int set_rtc_mmss(unsigned long nowtime)
 	int retval = 0;
 	int real_seconds, real_minutes, cmos_minutes;
 
-	printk("set_rtc_mmss(%lu)\n", nowtime);
+	printk(KERN_DEBUG "set_rtc_mmss(%lu)\n", nowtime);
 
 	if(!have_rtc)
 		return 0;
@@ -174,7 +184,8 @@ get_cmos_time(void)
 	mon = CMOS_READ(RTC_MONTH);
 	year = CMOS_READ(RTC_YEAR);
 
-	printk("rtc: sec 0x%x min 0x%x hour 0x%x day 0x%x mon 0x%x year 0x%x\n", 
+	printk(KERN_DEBUG
+	       "rtc: sec 0x%x min 0x%x hour 0x%x day 0x%x mon 0x%x year 0x%x\n",
 	       sec, min, hour, day, mon, year);
 
 	BCD_TO_BIN(sec);
@@ -202,3 +213,20 @@ update_xtime_from_cmos(void)
 		xtime.tv_nsec = 0;
 	}
 }
+
+/*
+ * Scheduler clock - returns current time in nanosec units.
+ */
+unsigned long long sched_clock(void)
+{
+	return (unsigned long long)jiffies * (1000000000 / HZ);
+}
+
+static int
+__init init_udelay(void)
+{
+	loops_per_usec = (loops_per_jiffy * HZ) / 1000000;
+	return 0;
+}
+
+__initcall(init_udelay);

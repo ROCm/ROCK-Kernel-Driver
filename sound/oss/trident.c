@@ -497,7 +497,8 @@ static void ali_setup_spdif_in(struct trident_card *card);
 static void ali_disable_spdif_in(struct trident_card *card);
 static void ali_disable_special_channel(struct trident_card *card, int ch);
 static void ali_setup_spdif_out(struct trident_card *card, int flag);
-static int ali_write_5_1(struct trident_state *state, const char *buffer, 
+static int ali_write_5_1(struct trident_state *state,
+			 const char __user *buffer, 
 			 int cnt_for_multi_channel, unsigned int *copy_count, 
 			 unsigned int *state_cnt);
 static int ali_allocate_other_states_resources(struct trident_state *state, 
@@ -1861,7 +1862,7 @@ trident_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 /* to be copied to the user's buffer.  it is filled by the dma machine and */ 
 /* drained by this loop. */
 static ssize_t
-trident_read(struct file *file, char *buffer, size_t count, loff_t * ppos)
+trident_read(struct file *file, char __user *buffer, size_t count, loff_t * ppos)
 {
 	struct trident_state *state = (struct trident_state *)file->private_data;
 	struct dmabuf *dmabuf = &state->dmabuf;
@@ -1976,7 +1977,7 @@ out:
    the soundcard.  it is drained by the dma machine and filled by this loop. */
 
 static ssize_t
-trident_write(struct file *file, const char *buffer, size_t count, loff_t * ppos)
+trident_write(struct file *file, const char __user *buffer, size_t count, loff_t * ppos)
 {
 	struct trident_state *state = (struct trident_state *)file->private_data;
 	struct dmabuf *dmabuf = &state->dmabuf;
@@ -2247,8 +2248,9 @@ trident_ioctl(struct inode *inode, struct file *file,
 	audio_buf_info abinfo;
 	count_info cinfo;
 	int val, mapped, ret = 0;
-
 	struct trident_card *card = state->card;
+	void __user *argp = (void __user *)arg;
+	int __user *p = argp;
 
 	VALIDATE_STATE(state);
 
@@ -2256,11 +2258,11 @@ trident_ioctl(struct inode *inode, struct file *file,
 	mapped = ((file->f_mode & (FMODE_WRITE | FMODE_READ)) && dmabuf->mapped);
 
 	pr_debug("trident: trident_ioctl, command = %2d, arg = 0x%08x\n",
-		 _IOC_NR(cmd), arg ? *(int *) arg : 0);
+		 _IOC_NR(cmd), arg ? *p : 0);
 
 	switch (cmd) {
 	case OSS_GETVERSION:
-		ret = put_user(SOUND_VERSION, (int *) arg);
+		ret = put_user(SOUND_VERSION, p);
 		break;
 
 	case SNDCTL_DSP_RESET:
@@ -2287,7 +2289,7 @@ trident_ioctl(struct inode *inode, struct file *file,
 		break;
 
 	case SNDCTL_DSP_SPEED:	/* set smaple rate */
-		if (get_user(val, (int *) arg)) {
+		if (get_user(val, p)) {
 			ret = -EFAULT;
 			break;
 		}
@@ -2307,11 +2309,11 @@ trident_ioctl(struct inode *inode, struct file *file,
 				spin_unlock_irqrestore(&state->card->lock, flags);
 			}
 		}
-		ret = put_user(dmabuf->rate, (int *) arg);
+		ret = put_user(dmabuf->rate, p);
 		break;
 
 	case SNDCTL_DSP_STEREO:	/* set stereo or mono channel */
-		if (get_user(val, (int *) arg)) {
+		if (get_user(val, p)) {
 			ret = -EFAULT;
 			break;
 		}
@@ -2342,14 +2344,14 @@ trident_ioctl(struct inode *inode, struct file *file,
 			if ((val = prog_dmabuf_playback(state)))
 				ret = val;
 			else
-				ret = put_user(dmabuf->fragsize, (int *) arg);
+				ret = put_user(dmabuf->fragsize, p);
 			break;
 		}
 		if (file->f_mode & FMODE_READ) {
 			if ((val = prog_dmabuf_record(state)))
 				ret = val;
 			else
-				ret = put_user(dmabuf->fragsize, (int *) arg);
+				ret = put_user(dmabuf->fragsize, p);
 			break;
 		}
 		/* neither READ nor WRITE? is this even possible? */
@@ -2359,11 +2361,11 @@ trident_ioctl(struct inode *inode, struct file *file,
 
 	case SNDCTL_DSP_GETFMTS: /* Returns a mask of supported sample format */
 		ret = put_user(AFMT_S16_LE | AFMT_U16_LE | AFMT_S8 | 
-			       AFMT_U8, (int *) arg);
+			       AFMT_U8, p);
 		break;
 
 	case SNDCTL_DSP_SETFMT:	/* Select sample format */
-		if (get_user(val, (int *) arg)) {
+		if (get_user(val, p)) {
 			ret = -EFAULT;
 			break;
 		}
@@ -2390,11 +2392,11 @@ trident_ioctl(struct inode *inode, struct file *file,
 		}
 		unlock_set_fmt(state);
 		ret = put_user((dmabuf->fmt & TRIDENT_FMT_16BIT) ? AFMT_S16_LE : 
-			       AFMT_U8, (int *) arg);
+			       AFMT_U8, p);
 		break;
 
 	case SNDCTL_DSP_CHANNELS:
-		if (get_user(val, (int *) arg)) {
+		if (get_user(val, p)) {
 			ret = -EFAULT;
 			break;
 		}
@@ -2458,7 +2460,7 @@ trident_ioctl(struct inode *inode, struct file *file,
 			}
 			unlock_set_fmt(state);
 		}
-		ret = put_user(val, (int *) arg);
+		ret = put_user(val, p);
 		break;
 
 	case SNDCTL_DSP_POST:
@@ -2470,7 +2472,7 @@ trident_ioctl(struct inode *inode, struct file *file,
 			ret = -EINVAL;
 			break;
 		}
-		if (get_user(val, (int *) arg)) {
+		if (get_user(val, p)) {
 			ret = -EFAULT;
 			break;
 		}
@@ -2482,7 +2484,7 @@ trident_ioctl(struct inode *inode, struct file *file,
 		break;
 
 	case SNDCTL_DSP_SETFRAGMENT:
-		if (get_user(val, (int *) arg)) {
+		if (get_user(val, p)) {
 			ret = -EFAULT;
 			break;
 		}
@@ -2514,7 +2516,7 @@ trident_ioctl(struct inode *inode, struct file *file,
 		abinfo.fragstotal = dmabuf->numfrag;
 		abinfo.fragments = abinfo.bytes >> dmabuf->fragshift;
 		spin_unlock_irqrestore(&state->card->lock, flags);
-		ret = copy_to_user((void *) arg, &abinfo, sizeof (abinfo)) ? 
+		ret = copy_to_user(argp, &abinfo, sizeof (abinfo)) ? 
 			-EFAULT : 0;
 		break;
 
@@ -2534,7 +2536,7 @@ trident_ioctl(struct inode *inode, struct file *file,
 		abinfo.fragstotal = dmabuf->numfrag;
 		abinfo.fragments = abinfo.bytes >> dmabuf->fragshift;
 		spin_unlock_irqrestore(&state->card->lock, flags);
-		ret = copy_to_user((void *) arg, &abinfo, sizeof (abinfo)) ? 
+		ret = copy_to_user(argp, &abinfo, sizeof (abinfo)) ? 
 			-EFAULT : 0;
 		break;
 
@@ -2544,7 +2546,7 @@ trident_ioctl(struct inode *inode, struct file *file,
 
 	case SNDCTL_DSP_GETCAPS:
 		ret = put_user(DSP_CAP_REALTIME | DSP_CAP_TRIGGER | 
-			       DSP_CAP_MMAP | DSP_CAP_BIND, (int *) arg);
+			       DSP_CAP_MMAP | DSP_CAP_BIND, p);
 		break;
 
 	case SNDCTL_DSP_GETTRIGGER:
@@ -2553,11 +2555,11 @@ trident_ioctl(struct inode *inode, struct file *file,
 			val |= PCM_ENABLE_INPUT;
 		if ((file->f_mode & FMODE_WRITE) && dmabuf->enable)
 			val |= PCM_ENABLE_OUTPUT;
-		ret = put_user(val, (int *) arg);
+		ret = put_user(val, p);
 		break;
 
 	case SNDCTL_DSP_SETTRIGGER:
-		if (get_user(val, (int *) arg)) {
+		if (get_user(val, p)) {
 			ret = -EFAULT;
 			break;
 		}
@@ -2599,7 +2601,7 @@ trident_ioctl(struct inode *inode, struct file *file,
 		if (dmabuf->mapped)
 			dmabuf->count &= dmabuf->fragsize - 1;
 		spin_unlock_irqrestore(&state->card->lock, flags);
-		ret = copy_to_user((void *) arg, &cinfo, sizeof (cinfo)) ? 
+		ret = copy_to_user(argp, &cinfo, sizeof (cinfo)) ? 
 			-EFAULT : 0;
 		break;
 
@@ -2622,7 +2624,7 @@ trident_ioctl(struct inode *inode, struct file *file,
 		if (dmabuf->mapped)
 			dmabuf->count &= dmabuf->fragsize - 1;
 		spin_unlock_irqrestore(&state->card->lock, flags);
-		ret = copy_to_user((void *) arg, &cinfo, sizeof (cinfo)) ? 
+		ret = copy_to_user(argp, &cinfo, sizeof (cinfo)) ? 
 			-EFAULT : 0;
 		break;
 
@@ -2643,26 +2645,26 @@ trident_ioctl(struct inode *inode, struct file *file,
 		trident_update_ptr(state);
 		val = dmabuf->count;
 		spin_unlock_irqrestore(&state->card->lock, flags);
-		ret = put_user(val, (int *) arg);
+		ret = put_user(val, p);
 		break;
 
 	case SOUND_PCM_READ_RATE:
-		ret = put_user(dmabuf->rate, (int *) arg);
+		ret = put_user(dmabuf->rate, p);
 		break;
 
 	case SOUND_PCM_READ_CHANNELS:
 		ret = put_user((dmabuf->fmt & TRIDENT_FMT_STEREO) ? 2 : 1, 
-			       (int *) arg);
+			       p);
 		break;
 
 	case SOUND_PCM_READ_BITS:
 		ret = put_user((dmabuf->fmt & TRIDENT_FMT_16BIT) ? AFMT_S16_LE : 
-			       AFMT_U8, (int *) arg);
+			       AFMT_U8, p);
 		break;
 
 	case SNDCTL_DSP_GETCHANNELMASK:
 		ret = put_user(DSP_BIND_FRONT | DSP_BIND_SURR | 
-			       DSP_BIND_CENTER_LFE,  (int *) arg);
+			       DSP_BIND_CENTER_LFE,  p);
 		break;
 
 	case SNDCTL_DSP_BIND_CHANNEL:
@@ -2671,7 +2673,7 @@ trident_ioctl(struct inode *inode, struct file *file,
 			break;
 		}
 
-		if (get_user(val, (int *) arg)) {
+		if (get_user(val, p)) {
 			ret = -EFAULT;
 			break;
 		}
@@ -2688,7 +2690,7 @@ trident_ioctl(struct inode *inode, struct file *file,
 							      SRC_ENABLE);
 			dmabuf->channel->attribute |= mask2attr[ffs(val)];
 		}
-		ret = put_user(val, (int *) arg);
+		ret = put_user(val, p);
 		break;
 
 	case SNDCTL_DSP_MAPINBUF:
@@ -3878,14 +3880,14 @@ depend on a master state's DMA, and changing the counters of the master
 state DMA is protected by a spinlock.
 */
 static int
-ali_write_5_1(struct trident_state *state, const char *buf, 
+ali_write_5_1(struct trident_state *state, const char __user *buf, 
 	      int cnt_for_multi_channel, unsigned int *copy_count, 
 	      unsigned int *state_cnt)
 {
 
 	struct dmabuf *dmabuf = &state->dmabuf;
 	struct dmabuf *dmabuf_temp;
-	const char *buffer = buf;
+	const char __user *buffer = buf;
 	unsigned swptr, other_dma_nums, sample_s;
 	unsigned int i, loop;
 
@@ -4018,7 +4020,7 @@ ali_free_other_states_resources(struct trident_state *state)
 
 struct proc_dir_entry *res;
 static int
-ali_write_proc(struct file *file, const char *buffer, unsigned long count, void *data)
+ali_write_proc(struct file *file, const char __user *buffer, unsigned long count, void *data)
 {
 	struct trident_card *card = (struct trident_card *) data;
 	unsigned long flags;

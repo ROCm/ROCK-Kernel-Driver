@@ -18,8 +18,6 @@ static void init_hwif_hpt34x(ide_hwif_t *);
 
 static ide_pci_device_t hpt34x_chipsets[] __devinitdata = {
 	{	/* 0 */
-		.vendor		= PCI_VENDOR_ID_TTI,
-		.device		= PCI_DEVICE_ID_TTI_HPT343,
 		.name		= "HPT34X",
 		.init_chipset	= init_chipset_hpt34x,
 		.init_hwif	= init_hwif_hpt34x,

@@ -144,11 +144,11 @@ static int ipv6_clear_mutable_options(struct sk_buff *skb, u16 *nh_offset, int d
 	return nexthdr;
 }
 
-int ah6_output(struct sk_buff *skb)
+int ah6_output(struct sk_buff **pskb)
 {
 	int err;
 	int hdr_len = sizeof(struct ipv6hdr);
-	struct dst_entry *dst = skb->dst;
+	struct dst_entry *dst = (*pskb)->dst;
 	struct xfrm_state *x  = dst->xfrm;
 	struct ipv6hdr *iph = NULL;
 	struct ip_auth_hdr *ah;
@@ -156,54 +156,55 @@ int ah6_output(struct sk_buff *skb)
 	u16 nh_offset = 0;
 	u8 nexthdr;
 
-	if (skb->ip_summed == CHECKSUM_HW && skb_checksum_help(skb) == NULL) {
-		err = -EINVAL;
-		goto error_nolock;
+	if ((*pskb)->ip_summed == CHECKSUM_HW) {
+		err = skb_checksum_help(pskb, 0);
+		if (err)
+			goto error_nolock;
 	}
 
 	spin_lock_bh(&x->lock);
-	err = xfrm_check_output(x, skb, AF_INET6);
+	err = xfrm_check_output(x, *pskb, AF_INET6);
 	if (err)
 		goto error;
 
 	if (x->props.mode) {
-		iph = skb->nh.ipv6h;
-		skb->nh.ipv6h = (struct ipv6hdr*)skb_push(skb, x->props.header_len);
-		skb->nh.ipv6h->version = 6;
-		skb->nh.ipv6h->payload_len = htons(skb->len - sizeof(struct ipv6hdr));
-		skb->nh.ipv6h->nexthdr = IPPROTO_AH;
-		ipv6_addr_copy(&skb->nh.ipv6h->saddr,
+		iph = (*pskb)->nh.ipv6h;
+		(*pskb)->nh.ipv6h = (struct ipv6hdr*)skb_push(*pskb, x->props.header_len);
+		(*pskb)->nh.ipv6h->version = 6;
+		(*pskb)->nh.ipv6h->payload_len = htons((*pskb)->len - sizeof(struct ipv6hdr));
+		(*pskb)->nh.ipv6h->nexthdr = IPPROTO_AH;
+		ipv6_addr_copy(&(*pskb)->nh.ipv6h->saddr,
 			       (struct in6_addr *) &x->props.saddr);
-		ipv6_addr_copy(&skb->nh.ipv6h->daddr,
+		ipv6_addr_copy(&(*pskb)->nh.ipv6h->daddr,
 			       (struct in6_addr *) &x->id.daddr);
-		ah = (struct ip_auth_hdr*)(skb->nh.ipv6h+1);
+		ah = (struct ip_auth_hdr*)((*pskb)->nh.ipv6h+1);
 		ah->nexthdr = IPPROTO_IPV6;
 	} else {
-		hdr_len = skb->h.raw - skb->nh.raw;
+		hdr_len = (*pskb)->h.raw - (*pskb)->nh.raw;
 		iph = kmalloc(hdr_len, GFP_ATOMIC);
 		if (!iph) {
 			err = -ENOMEM;
 			goto error;
 		}
-		memcpy(iph, skb->data, hdr_len);
-		skb->nh.ipv6h = (struct ipv6hdr*)skb_push(skb, x->props.header_len);
-		memcpy(skb->nh.ipv6h, iph, hdr_len);
-		nexthdr = ipv6_clear_mutable_options(skb, &nh_offset, XFRM_POLICY_OUT);
+		memcpy(iph, (*pskb)->data, hdr_len);
+		(*pskb)->nh.ipv6h = (struct ipv6hdr*)skb_push(*pskb, x->props.header_len);
+		memcpy((*pskb)->nh.ipv6h, iph, hdr_len);
+		nexthdr = ipv6_clear_mutable_options(*pskb, &nh_offset, XFRM_POLICY_OUT);
 		if (nexthdr == 0)
 			goto error_free_iph;
 
-		skb->nh.raw[nh_offset] = IPPROTO_AH;
-		skb->nh.ipv6h->payload_len = htons(skb->len - sizeof(struct ipv6hdr));
-		ah = (struct ip_auth_hdr*)(skb->nh.raw+hdr_len);
-		skb->h.raw = (unsigned char*) ah;
+		(*pskb)->nh.raw[nh_offset] = IPPROTO_AH;
+		(*pskb)->nh.ipv6h->payload_len = htons((*pskb)->len - sizeof(struct ipv6hdr));
+		ah = (struct ip_auth_hdr*)((*pskb)->nh.raw+hdr_len);
+		(*pskb)->h.raw = (unsigned char*) ah;
 		ah->nexthdr = nexthdr;
 	}
 
-	skb->nh.ipv6h->priority    = 0;
-	skb->nh.ipv6h->flow_lbl[0] = 0;
-	skb->nh.ipv6h->flow_lbl[1] = 0;
-	skb->nh.ipv6h->flow_lbl[2] = 0;
-	skb->nh.ipv6h->hop_limit    = 0;
+	(*pskb)->nh.ipv6h->priority    = 0;
+	(*pskb)->nh.ipv6h->flow_lbl[0] = 0;
+	(*pskb)->nh.ipv6h->flow_lbl[1] = 0;
+	(*pskb)->nh.ipv6h->flow_lbl[2] = 0;
+	(*pskb)->nh.ipv6h->hop_limit    = 0;
 
 	ahp = x->data;
 	ah->hdrlen  = (XFRM_ALIGN8(sizeof(struct ipv6_auth_hdr) + 
@@ -212,29 +213,29 @@ int ah6_output(struct sk_buff *skb)
 	ah->reserved = 0;
 	ah->spi = x->id.spi;
 	ah->seq_no = htonl(++x->replay.oseq);
-	ahp->icv(ahp, skb, ah->auth_data);
+	ahp->icv(ahp, *pskb, ah->auth_data);
 
 	if (x->props.mode) {
-		skb->nh.ipv6h->hop_limit   = iph->hop_limit;
-		skb->nh.ipv6h->priority    = iph->priority; 	
-		skb->nh.ipv6h->flow_lbl[0] = iph->flow_lbl[0];
-		skb->nh.ipv6h->flow_lbl[1] = iph->flow_lbl[1];
-		skb->nh.ipv6h->flow_lbl[2] = iph->flow_lbl[2];
+		(*pskb)->nh.ipv6h->hop_limit   = iph->hop_limit;
+		(*pskb)->nh.ipv6h->priority    = iph->priority; 	
+		(*pskb)->nh.ipv6h->flow_lbl[0] = iph->flow_lbl[0];
+		(*pskb)->nh.ipv6h->flow_lbl[1] = iph->flow_lbl[1];
+		(*pskb)->nh.ipv6h->flow_lbl[2] = iph->flow_lbl[2];
 		if (x->props.flags & XFRM_STATE_NOECN)
-			IP6_ECN_clear(skb->nh.ipv6h);
+			IP6_ECN_clear((*pskb)->nh.ipv6h);
 	} else {
-		memcpy(skb->nh.ipv6h, iph, hdr_len);
-		skb->nh.raw[nh_offset] = IPPROTO_AH;
-		skb->nh.ipv6h->payload_len = htons(skb->len - sizeof(struct ipv6hdr));
+		memcpy((*pskb)->nh.ipv6h, iph, hdr_len);
+		(*pskb)->nh.raw[nh_offset] = IPPROTO_AH;
+		(*pskb)->nh.ipv6h->payload_len = htons((*pskb)->len - sizeof(struct ipv6hdr));
 		kfree (iph);
 	}
 
-	skb->nh.raw = skb->data;
+	(*pskb)->nh.raw = (*pskb)->data;
 
-	x->curlft.bytes += skb->len;
+	x->curlft.bytes += (*pskb)->len;
 	x->curlft.packets++;
 	spin_unlock_bh(&x->lock);
-	if ((skb->dst = dst_pop(dst)) == NULL) {
+	if (((*pskb)->dst = dst_pop(dst)) == NULL) {
 		err = -EHOSTUNREACH;
 		goto error_nolock;
 	}
@@ -244,7 +245,7 @@ error_free_iph:
 error:
 	spin_unlock_bh(&x->lock);
 error_nolock:
-	kfree_skb(skb);
+	kfree_skb(*pskb);
 	return err;
 }
 
@@ -362,7 +363,7 @@ void ah6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 	struct ip_auth_hdr *ah = (struct ip_auth_hdr*)(skb->data+offset);
 	struct xfrm_state *x;
 
-	if (type != ICMPV6_DEST_UNREACH ||
+	if (type != ICMPV6_DEST_UNREACH &&
 	    type != ICMPV6_PKT_TOOBIG)
 		return;
 

@@ -93,6 +93,7 @@ typedef enum {
 	SCTP_CMD_PROCESS_OPERR,  /* Process an ERROR chunk. */
 	SCTP_CMD_REPORT_FWDTSN,	 /* Report new cumulative TSN Ack. */
 	SCTP_CMD_PROCESS_FWDTSN, /* Skips were reported, so process further. */
+	SCTP_CMD_CLEAR_INIT_TAG, /* Clears association peer's inittag. */
 	SCTP_CMD_LAST
 } sctp_verb_t;
 

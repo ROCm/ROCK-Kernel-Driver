@@ -212,6 +212,7 @@ static int dsp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	LPDAQD lpDAQ, lpDARQ;
         audio_buf_info abinfo;
 	unsigned long flags;
+	int __user *p = (int __user *)arg;
 
 	lpDAQ = dev.base + DAPQ_DATA_BUFF;
 	lpDARQ = dev.base + DARQ_DATA_BUFF;
@@ -238,7 +239,7 @@ static int dsp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
                 abinfo.fragstotal = dev.DAPF.n / abinfo.fragsize;
                 abinfo.fragments = abinfo.bytes / abinfo.fragsize;
 		spin_unlock_irqrestore(&dev.lock, flags);
-		return copy_to_user((void *)arg, &abinfo, sizeof(abinfo)) ? -EFAULT : 0;
+		return copy_to_user((void __user *)arg, &abinfo, sizeof(abinfo)) ? -EFAULT : 0;
 
 	case SNDCTL_DSP_GETISPACE:
 		if (!(file->f_mode & FMODE_READ))
@@ -249,7 +250,7 @@ static int dsp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
                 abinfo.fragstotal = dev.DARF.n / abinfo.fragsize;
                 abinfo.fragments = abinfo.bytes / abinfo.fragsize;
 		spin_unlock_irqrestore(&dev.lock, flags);
-		return copy_to_user((void *)arg, &abinfo, sizeof(abinfo)) ? -EFAULT : 0;
+		return copy_to_user((void __user *)arg, &abinfo, sizeof(abinfo)) ? -EFAULT : 0;
 
 	case SNDCTL_DSP_RESET:
 		dev.nresets = 0;
@@ -262,18 +263,18 @@ static int dsp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 	case SNDCTL_DSP_GETBLKSIZE:
 		tmp = dsp_get_frag_size();
-		if (put_user(tmp, (int *)arg))
+		if (put_user(tmp, p))
                         return -EFAULT;
 		return 0;
 
 	case SNDCTL_DSP_GETFMTS:
 		val = AFMT_S16_LE | AFMT_U8;
-		if (put_user(val, (int *)arg))
+		if (put_user(val, p))
 			return -EFAULT;
 		return 0;
 
 	case SNDCTL_DSP_SETFMT:
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 
 		if (file->f_mode & FMODE_WRITE)
@@ -285,7 +286,7 @@ static int dsp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 				? dev.rec_sample_size
 				: dsp_set_format(file, val);
 
-		if (put_user(data, (int *)arg))
+		if (put_user(data, p))
 			return -EFAULT;
 		return 0;
 
@@ -299,12 +300,12 @@ static int dsp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 	case SNDCTL_DSP_GETCAPS:
 		val = DSP_CAP_DUPLEX | DSP_CAP_BATCH;
-		if (put_user(val, (int *)arg))
+		if (put_user(val, p))
 			return -EFAULT;
 		return 0;
 
 	case SNDCTL_DSP_SPEED:
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 
 		if (val < 8000)
@@ -326,13 +327,13 @@ static int dsp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		if (file->f_mode & FMODE_READ)
 			dev.rec_sample_rate = data;
 
-		if (put_user(data, (int *)arg))
+		if (put_user(data, p))
 			return -EFAULT;
 		return 0;
 
 	case SNDCTL_DSP_CHANNELS:
 	case SNDCTL_DSP_STEREO:
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 
 		if (cmd == SNDCTL_DSP_CHANNELS) {
@@ -369,7 +370,7 @@ static int dsp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		if (file->f_mode & FMODE_READ)
 			dev.rec_channels = data;
 
-		if (put_user(val, (int *)arg))
+		if (put_user(val, p))
 			return -EFAULT;
 		return 0;
 	}
@@ -565,13 +566,13 @@ static int mixer_ioctl(unsigned int cmd, unsigned long arg)
 		mixer_info info;
 		set_mixer_info();
 		info.modify_counter = dev.mixer_mod_count;
-		if (copy_to_user((void *)arg, &info, sizeof(info)))
+		if (copy_to_user((void __user *)arg, &info, sizeof(info)))
 			return -EFAULT;
 		return 0;
 	} else if (cmd == SOUND_OLD_MIXER_INFO) {
 		_old_mixer_info info;
 		set_mixer_info();
-		if (copy_to_user((void *)arg, &info, sizeof(info)))
+		if (copy_to_user((void __user *)arg, &info, sizeof(info)))
 			return -EFAULT;
 		return 0;
 	} else if (cmd == SOUND_MIXER_PRIVATE1) {
@@ -584,19 +585,19 @@ static int mixer_ioctl(unsigned int cmd, unsigned long arg)
 		if (_SIOC_DIR(cmd) & _SIOC_WRITE) {
 			switch (cmd & 0xff) {
 			case SOUND_MIXER_RECSRC:
-				if (get_user(val, (int *)arg))
+				if (get_user(val, (int __user *)arg))
 					return -EFAULT;
 				val = set_recsrc(val);
 				break;
 
 			default:
-				if (get_user(val, (int *)arg))
+				if (get_user(val, (int __user *)arg))
 					return -EFAULT;
 				val = mixer_set(cmd & 0xff, val);
 				break;
 			}
 			++dev.mixer_mod_count;
-			return put_user(val, (int *)arg);
+			return put_user(val, (int __user *)arg);
 		} else {
 			switch (cmd & 0xff) {
 			case SOUND_MIXER_RECSRC:
@@ -638,7 +639,7 @@ static int mixer_ioctl(unsigned int cmd, unsigned long arg)
 			}
 		}
 
-		return put_user(val, (int *)arg); 
+		return put_user(val, (int __user *)arg); 
 	}
 
 	return -EINVAL;
@@ -650,7 +651,7 @@ static int dev_ioctl(struct inode *inode, struct file *file, unsigned int cmd, u
 
 	if (cmd == OSS_GETVERSION) {
 		int sound_version = SOUND_VERSION;
-		return put_user(sound_version, (int *)arg);
+		return put_user(sound_version, (int __user *)arg);
 	}
 
 	if (minor == dev.dsp_minor)
@@ -809,7 +810,7 @@ static int dev_release(struct inode *inode, struct file *file)
 
 static __inline__ int pack_DARQ_to_DARF(register int bank)
 {
-	register int size, n, timeout = 3;
+	register int size, timeout = 3;
 	register WORD wTmp;
 	LPDAQD DAQD;
 
@@ -830,13 +831,10 @@ static __inline__ int pack_DARQ_to_DARF(register int bank)
 	/* Read data from the head (unprotected bank 1 access okay
            since this is only called inside an interrupt) */
 	outb(HPBLKSEL_1, dev.io + HP_BLKS);
-	if ((n = msnd_fifo_write(
+	msnd_fifo_write(
 		&dev.DARF,
 		(char *)(dev.base + bank * DAR_BUFF_SIZE),
-		size, 0)) <= 0) {
-		outb(HPBLKSEL_0, dev.io + HP_BLKS);
-		return n;
-	}
+		size);
 	outb(HPBLKSEL_0, dev.io + HP_BLKS);
 
 	return 1;
@@ -858,21 +856,16 @@ static __inline__ int pack_DAPF_to_DAPQ(register int start)
 		if (protect) {
 			/* Critical section: protect fifo in non-interrupt */
 			spin_lock_irqsave(&dev.lock, flags);
-			if ((n = msnd_fifo_read(
+			n = msnd_fifo_read(
 				&dev.DAPF,
 				(char *)(dev.base + bank_num * DAP_BUFF_SIZE),
-				DAP_BUFF_SIZE, 0)) < 0) {
-				spin_unlock_irqrestore(&dev.lock, flags);
-				return n;
-			}
+				DAP_BUFF_SIZE);
 			spin_unlock_irqrestore(&dev.lock, flags);
 		} else {
-			if ((n = msnd_fifo_read(
+			n = msnd_fifo_read(
 				&dev.DAPF,
 				(char *)(dev.base + bank_num * DAP_BUFF_SIZE),
-				DAP_BUFF_SIZE, 0)) < 0) {
-				return n;
-			}
+				DAP_BUFF_SIZE);
 		}
 		if (!n)
 			break;
@@ -896,24 +889,35 @@ static __inline__ int pack_DAPF_to_DAPQ(register int start)
 	return nbanks;
 }
 
-static int dsp_read(char *buf, size_t len)
+static int dsp_read(char __user *buf, size_t len)
 {
 	int count = len;
+	char *page = (char *)__get_free_page(PAGE_SIZE);
+
+	if (!page)
+		return -ENOMEM;
 
 	while (count > 0) {
-		int n;
+		int n, k;
 		unsigned long flags;
+
+		k = PAGE_SIZE;
+		if (k > count)
+			k = count;
 
 		/* Critical section: protect fifo in non-interrupt */
 		spin_lock_irqsave(&dev.lock, flags);
-		if ((n = msnd_fifo_read(&dev.DARF, buf, count, 1)) < 0) {
-			printk(KERN_WARNING LOGNAME ": FIFO read error\n");
-			spin_unlock_irqrestore(&dev.lock, flags);
-			return n;
-		}
+		n = msnd_fifo_read(&dev.DARF, page, k);
 		spin_unlock_irqrestore(&dev.lock, flags);
+		if (copy_to_user(buf, page, n)) {
+			free_page((unsigned long)page);
+			return -EFAULT;
+		}
 		buf += n;
 		count -= n;
+
+		if (n == k && count)
+			continue;
 
 		if (!test_bit(F_READING, &dev.flags) && dev.mode & FMODE_READ) {
 			dev.last_recbank = -1;
@@ -921,8 +925,10 @@ static int dsp_read(char *buf, size_t len)
 				set_bit(F_READING, &dev.flags);
 		}
 
-		if (dev.rec_ndelay)
+		if (dev.rec_ndelay) {
+			free_page((unsigned long)page);
 			return count == len ? -EAGAIN : len - count;
+		}
 
 		if (count > 0) {
 			set_bit(F_READBLOCK, &dev.flags);
@@ -931,32 +937,46 @@ static int dsp_read(char *buf, size_t len)
 				get_rec_delay_jiffies(DAR_BUFF_SIZE)))
 				clear_bit(F_READING, &dev.flags);
 			clear_bit(F_READBLOCK, &dev.flags);
-			if (signal_pending(current))
+			if (signal_pending(current)) {
+				free_page((unsigned long)page);
 				return -EINTR;
+			}
 		}
 	}
-
+	free_page((unsigned long)page);
 	return len - count;
 }
 
-static int dsp_write(const char *buf, size_t len)
+static int dsp_write(const char __user *buf, size_t len)
 {
 	int count = len;
+	char *page = (char *)__get_free_page(GFP_KERNEL);
+
+	if (!page)
+		return -ENOMEM;
 
 	while (count > 0) {
-		int n;
+		int n, k;
 		unsigned long flags;
+
+		k = PAGE_SIZE;
+		if (k > count)
+			k = count;
+
+		if (copy_from_user(page, buf, k)) {
+			free_page((unsigned long)page);
+			return -EFAULT;
+		}
 
 		/* Critical section: protect fifo in non-interrupt */
 		spin_lock_irqsave(&dev.lock, flags);
-		if ((n = msnd_fifo_write(&dev.DAPF, buf, count, 1)) < 0) {
-			printk(KERN_WARNING LOGNAME ": FIFO write error\n");
-			spin_unlock_irqrestore(&dev.lock, flags);
-			return n;
-		}
+		n = msnd_fifo_write(&dev.DAPF, page, k);
 		spin_unlock_irqrestore(&dev.lock, flags);
 		buf += n;
 		count -= n;
+
+		if (count && n == k)
+			continue;
 
 		if (!test_bit(F_WRITING, &dev.flags) && (dev.mode & FMODE_WRITE)) {
 			dev.last_playbank = -1;
@@ -964,8 +984,10 @@ static int dsp_write(const char *buf, size_t len)
 				set_bit(F_WRITING, &dev.flags);
 		}
 
-		if (dev.play_ndelay)
+		if (dev.play_ndelay) {
+			free_page((unsigned long)page);
 			return count == len ? -EAGAIN : len - count;
+		}
 
 		if (count > 0) {
 			set_bit(F_WRITEBLOCK, &dev.flags);
@@ -973,15 +995,18 @@ static int dsp_write(const char *buf, size_t len)
 				&dev.writeblock,
 				get_play_delay_jiffies(DAP_BUFF_SIZE));
 			clear_bit(F_WRITEBLOCK, &dev.flags);
-			if (signal_pending(current))
+			if (signal_pending(current)) {
+				free_page((unsigned long)page);
 				return -EINTR;
+			}
 		}
 	}
 
+	free_page((unsigned long)page);
 	return len - count;
 }
 
-static ssize_t dev_read(struct file *file, char *buf, size_t count, loff_t *off)
+static ssize_t dev_read(struct file *file, char __user *buf, size_t count, loff_t *off)
 {
 	int minor = iminor(file->f_dentry->d_inode);
 	if (minor == dev.dsp_minor)
@@ -990,7 +1015,7 @@ static ssize_t dev_read(struct file *file, char *buf, size_t count, loff_t *off)
 		return -EINVAL;
 }
 
-static ssize_t dev_write(struct file *file, const char *buf, size_t count, loff_t *off)
+static ssize_t dev_write(struct file *file, const char __user *buf, size_t count, loff_t *off)
 {
 	int minor = iminor(file->f_dentry->d_inode);
 	if (minor == dev.dsp_minor)

@@ -177,6 +177,8 @@ static int tcp_packet(struct ip_conntrack *conntrack,
 
 	if (skb_copy_bits(skb, skb->nh.iph->ihl * 4, &tcph, sizeof(tcph)) != 0)
 		return -1;
+	if (skb->len < skb->nh.iph->ihl * 4 + tcph.doff * 4)
+		return -1;
 
 	/* If only reply is a RST, we can consider ourselves not to
 	   have an established connection: this is a fairly common

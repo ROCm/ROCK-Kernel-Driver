@@ -1,7 +1,7 @@
-/*  $Header: /var/lib/cvs/prism54-ng/ksrc/islpci_eth.c,v 1.27 2004/01/30 16:24:00 ajfa Exp $
+/*
  *  
  *  Copyright (C) 2002 Intersil Americas Inc.
- *
+ *  Copyright (C) 2004 Aurelien Alleaume <slts@free.fr>
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2 of the License
@@ -24,10 +24,12 @@
 #include <linux/delay.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
+#include <linux/if_arp.h>
 
 #include "isl_38xx.h"
 #include "islpci_eth.h"
 #include "islpci_mgt.h"
+#include "oid_mgt.h"
 
 /******************************************************************************
     Network Interface functions
@@ -246,6 +248,69 @@ islpci_eth_transmit(struct sk_buff *skb, struct net_device *ndev)
 	return err;
 }
 
+static inline int
+islpci_monitor_rx(islpci_private *priv, struct sk_buff **skb)
+{
+	/* The card reports full 802.11 packets but with a 20 bytes
+	 * header and without the FCS. But there a is a bit that
+	 * indicates if the packet is corrupted :-) */
+	struct rfmon_header *hdr = (struct rfmon_header *) (*skb)->data;
+	if (hdr->flags & 0x01)
+		/* This one is bad. Drop it ! */
+		return -1;
+	if (priv->ndev->type == ARPHRD_IEEE80211_PRISM) {
+		struct avs_80211_1_header *avs;
+		/* extract the relevant data from the header */
+		u32 clock = hdr->clock;
+		u8 rate = hdr->rate;
+		u16 freq = be16_to_cpu(hdr->freq);
+		u8 rssi = hdr->rssi;
+
+		skb_pull(*skb, sizeof (struct rfmon_header));
+
+		if (skb_headroom(*skb) < sizeof (struct avs_80211_1_header)) {
+			struct sk_buff *newskb = skb_copy_expand(*skb,
+								 sizeof (struct
+									 avs_80211_1_header),
+								 0, GFP_ATOMIC);
+			if (newskb) {
+				kfree_skb(*skb);
+				*skb = newskb;
+			} else
+				return -1;
+			/* This behavior is not very subtile... */
+		}
+
+		/* make room for the new header and fill it. */
+		avs =
+		    (struct avs_80211_1_header *) skb_push(*skb,
+							   sizeof (struct
+								   avs_80211_1_header));
+
+		avs->version = htonl(P80211CAPTURE_VERSION);
+		avs->length = htonl(sizeof (struct avs_80211_1_header));
+		avs->mactime = __cpu_to_be64(clock);
+		avs->hosttime = __cpu_to_be64(jiffies);
+		avs->phytype = htonl(6);	/*OFDM: 6 for (g), 8 for (a) */
+		avs->channel = htonl(channel_of_freq(freq));
+		avs->datarate = htonl(rate * 5);
+		avs->antenna = htonl(0);	/*unknown */
+		avs->priority = htonl(0);	/*unknown */
+		avs->ssi_type = htonl(2);	/*2: dBm, 3: raw RSSI */
+		avs->ssi_signal = htonl(rssi);
+		avs->ssi_noise = htonl(priv->local_iwstatistics.qual.noise);	/*better than 'undefined', I assume */
+		avs->preamble = htonl(0);	/*unknown */
+		avs->encoding = htonl(0);	/*unknown */
+	} else
+		skb_pull(*skb, sizeof (struct rfmon_header));
+
+	(*skb)->protocol = htons(ETH_P_802_2);
+	(*skb)->mac.raw = (*skb)->data;
+	(*skb)->pkt_type = PACKET_OTHERHOST;
+
+	return 0;
+}
+
 int
 islpci_eth_receive(islpci_private *priv)
 {
@@ -266,7 +331,8 @@ islpci_eth_receive(islpci_private *priv)
 	index = priv->free_data_rx % ISL38XX_CB_RX_QSIZE;
 	size = le16_to_cpu(control_block->rx_data_low[index].size);
 	skb = priv->data_low_rx[index];
-	offset = ((unsigned long) le32_to_cpu(control_block->rx_data_low[index].address) -
+	offset = ((unsigned long)
+		  le32_to_cpu(control_block->rx_data_low[index].address) -
 		  (unsigned long) skb->data) & 3;
 
 #if VERBOSE > SHOW_ERROR_MESSAGES
@@ -314,29 +380,32 @@ islpci_eth_receive(islpci_private *priv)
 	/* do some additional sk_buff and network layer parameters */
 	skb->dev = ndev;
 
-	/* take care of monitor mode */
-	if (priv->iw_mode == IW_MODE_MONITOR) {
-		/* The card reports full 802.11 packets but with a 20 bytes
-		 * header and without the FCS. But there a is a bit that
-		 * indicates if the packet is corrupted :-) */
-		/* int i; */
-		if (skb->data[8] & 0x01){
-			/* This one is bad. Drop it !*/
-			discard = 1;
-			/* printk("BAD\n");*/
-		}
-		/*
-		for(i=0;i<50;i++)
-			printk("%2.2X:",skb->data[i]);
-		printk("\n");
-		*/		
-		skb_pull(skb, 20);
-		skb->protocol = htons(ETH_P_802_2);
-		skb->mac.raw = skb->data;
-		skb->pkt_type = PACKET_OTHERHOST;
-	} else
-		skb->protocol = eth_type_trans(skb, ndev);
+	/* take care of monitor mode and spy monitoring. */
+	if (priv->iw_mode == IW_MODE_MONITOR)
+		discard = islpci_monitor_rx(priv, &skb);
+	else {
+		if (skb->data[2 * ETH_ALEN] == 0) {
+			/* The packet has a rx_annex. Read it for spy monitoring, Then
+			 * remove it, while keeping the 2 leading MAC addr.
+			 */
+			struct iw_quality wstats;
+			struct rx_annex_header *annex =
+			    (struct rx_annex_header *) skb->data;
+			wstats.level = annex->rfmon.rssi;
+			/* The noise value can be a bit outdated if nobody's 
+			 * reading wireless stats... */
+			wstats.noise = priv->local_iwstatistics.qual.noise;
+			wstats.qual = wstats.level - wstats.noise;
+			wstats.updated = 0x07;
+			/* Update spy records */
+			wireless_spy_update(ndev, annex->addr2, &wstats);
 
+			memcpy(skb->data + sizeof (struct rfmon_header),
+			       skb->data, 2 * ETH_ALEN);
+			skb_pull(skb, sizeof (struct rfmon_header));
+		}
+		skb->protocol = eth_type_trans(skb, ndev);
+	}
 	skb->ip_summed = CHECKSUM_NONE;
 	priv->statistics.rx_packets++;
 	priv->statistics.rx_bytes += size;
@@ -351,8 +420,7 @@ islpci_eth_receive(islpci_private *priv)
 	if (discard) {
 		dev_kfree_skb(skb);
 		skb = NULL;
-	}
-	else
+	} else
 		netif_rx(skb);
 
 	/* increment the read index for the rx data low queue */
@@ -403,7 +471,7 @@ islpci_eth_receive(islpci_private *priv)
 		wmb();
 
 		/* increment the driver read pointer */
-		add_le32p((u32 *) & control_block->
+		add_le32p((u32 *) &control_block->
 			  driver_curr_frag[ISL38XX_CB_RX_DATA_LQ], 1);
 	}
 
@@ -411,6 +479,15 @@ islpci_eth_receive(islpci_private *priv)
 	islpci_trigger(priv);
 
 	return 0;
+}
+
+void
+islpci_do_reset_and_wake(void *data)
+{
+       islpci_private *priv = (islpci_private *) data;
+       islpci_reset(priv, 1);
+       netif_wake_queue(priv->ndev);
+       priv->reset_task_pending = 0;
 }
 
 void
@@ -422,13 +499,11 @@ islpci_eth_tx_timeout(struct net_device *ndev)
 	/* increment the transmit error counter */
 	statistics->tx_errors++;
 
-#if 0
-	/* don't do this here! we are not allowed to sleep since we are in interrupt context */
-	if (islpci_reset(priv))
-		printk(KERN_ERR "%s: error on TX timeout card reset!\n",
-		       ndev->name);
-#endif
+	if (!priv->reset_task_pending) {
+		priv->reset_task_pending = 1;
+		netif_stop_queue(ndev);
+		schedule_work(&priv->reset_task);
+	}
 
-	/* netif_wake_queue(ndev); */
 	return;
 }

@@ -51,7 +51,7 @@
 #define DRIVER_DATE		"20020828"
 
 #define DRIVER_MAJOR		1
-#define DRIVER_MINOR		10
+#define DRIVER_MINOR		11
 #define DRIVER_PATCHLEVEL	0
 
 /* Interface history:
@@ -84,6 +84,8 @@
  * 1.10- Add SETPARAM ioctl; first parameter to set is FB_LOCATION, which
  *       clients use to tell the DRM where they think the framebuffer is 
  *       located in the card's address space
+ * 1.11- Add packet R200_EMIT_RB3D_BLENDCOLOR to support GL_EXT_blend_color
+ *       and GL_EXT_blend_[func|equation]_separate on r200
  */
 #define DRIVER_IOCTLS							     \
  [DRM_IOCTL_NR(DRM_IOCTL_DMA)]               = { radeon_cp_buffers,  1, 0 }, \

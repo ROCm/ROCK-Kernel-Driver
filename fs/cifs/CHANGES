@@ -1,3 +1,20 @@
+Version 1.18
+------------
+Do not rename hardlinked files (since that should be a noop). Flush
+cached write behind data when reopening a file after session abend,
+except when already in write. Grab per socket sem during reconnect 
+to avoid oops in sendmsg if overlapping with reconnect.
+
+
+Version 1.17
+------------
+Update number of blocks in file so du command is happier (in Linux a fake
+blocksize of 512 is required for calculating number of blocks in inode).
+Fix prepare write of partial pages to read in data from server if possible.
+Fix race on tcpStatus field between unmount and reconnection code, causing
+cifsd process sometimes to hang around forever. Improve out of memory
+checks in cifs_filldir
+
 Version 1.16
 ------------
 Fix incorrect file size in file handle based setattr on big endian hardware.

@@ -648,7 +648,7 @@ static void tcp_listen_stop (struct sock *sk)
 		local_bh_enable();
 		sock_put(child);
 
-		tcp_acceptq_removed(sk);
+		sk_acceptq_removed(sk);
 		tcp_openreq_fastfree(req);
 	}
 	BUG_TRAP(!sk->sk_ack_backlog);
@@ -1296,18 +1296,6 @@ static int tcp_recv_urg(struct sock *sk, long timeo,
 	return -EAGAIN;
 }
 
-/*
- *	Release a skb if it is no longer needed. This routine
- *	must be called with interrupts disabled or with the
- *	socket locked so that the sk_buff queue operation is ok.
- */
-
-static inline void tcp_eat_skb(struct sock *sk, struct sk_buff *skb)
-{
-	__skb_unlink(skb, &sk->sk_receive_queue);
-	__kfree_skb(skb);
-}
-
 /* Clean up the receive buffer for full frames taken by the user,
  * then send an ACK if necessary.  COPIED is the number of bytes
  * tcp_recvmsg has given to the user so far, it speeds up the
@@ -1366,31 +1354,6 @@ static void cleanup_rbuf(struct sock *sk, int copied)
 	}
 	if (time_to_ack)
 		tcp_send_ack(sk);
-}
-
-/* Now socket state including sk->sk_err is changed only under lock,
- * hence we may omit checks after joining wait queue.
- * We check receive queue before schedule() only as optimization;
- * it is very likely that release_sock() added new data.
- */
-
-static long tcp_data_wait(struct sock *sk, long timeo)
-{
-	DEFINE_WAIT(wait);
-
-	prepare_to_wait(sk->sk_sleep, &wait, TASK_INTERRUPTIBLE);
-
-	set_bit(SOCK_ASYNC_WAITDATA, &sk->sk_socket->flags);
-	release_sock(sk);
-
-	if (skb_queue_empty(&sk->sk_receive_queue))
-		timeo = schedule_timeout(timeo);
-
-	lock_sock(sk);
-	clear_bit(SOCK_ASYNC_WAITDATA, &sk->sk_socket->flags);
-
-	finish_wait(sk->sk_sleep, &wait);
-	return timeo;
 }
 
 static void tcp_prequeue_process(struct sock *sk)
@@ -1473,11 +1436,11 @@ int tcp_read_sock(struct sock *sk, read_descriptor_t *desc,
 				break;
 		}
 		if (skb->h.th->fin) {
-			tcp_eat_skb(sk, skb);
+			sk_eat_skb(sk, skb);
 			++seq;
 			break;
 		}
-		tcp_eat_skb(sk, skb);
+		sk_eat_skb(sk, skb);
 		if (!desc->count)
 			break;
 	}
@@ -1672,9 +1635,8 @@ int tcp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 			/* Do not sleep, just process backlog. */
 			release_sock(sk);
 			lock_sock(sk);
-		} else {
-			timeo = tcp_data_wait(sk, timeo);
-		}
+		} else
+			sk_wait_data(sk, &timeo);
 
 		if (user_recv) {
 			int chunk;
@@ -1758,14 +1720,14 @@ skip_copy:
 		if (skb->h.th->fin)
 			goto found_fin_ok;
 		if (!(flags & MSG_PEEK))
-			tcp_eat_skb(sk, skb);
+			sk_eat_skb(sk, skb);
 		continue;
 
 	found_fin_ok:
 		/* Process the FIN. */
 		++*seq;
 		if (!(flags & MSG_PEEK))
-			tcp_eat_skb(sk, skb);
+			sk_eat_skb(sk, skb);
 		break;
 	} while (len > 0);
 
@@ -2263,7 +2225,7 @@ struct sock *tcp_accept(struct sock *sk, int flags, int *err)
 		tp->accept_queue_tail = NULL;
 
  	newsk = req->sk;
-	tcp_acceptq_removed(sk);
+	sk_acceptq_removed(sk);
 	tcp_openreq_fastfree(req);
 	BUG_TRAP(newsk->sk_state != TCP_SYN_RECV);
 	release_sock(sk);
@@ -2498,56 +2460,11 @@ int tcp_getsockopt(struct sock *sk, int level, int optname, char __user *optval,
 		break;
 	case TCP_INFO: {
 		struct tcp_info info;
-		u32 now = tcp_time_stamp;
 
 		if (get_user(len, optlen))
 			return -EFAULT;
-		info.tcpi_state = sk->sk_state;
-		info.tcpi_ca_state = tp->ca_state;
-		info.tcpi_retransmits = tp->retransmits;
-		info.tcpi_probes = tp->probes_out;
-		info.tcpi_backoff = tp->backoff;
-		info.tcpi_options = 0;
-		if (tp->tstamp_ok)
-			info.tcpi_options |= TCPI_OPT_TIMESTAMPS;
-		if (tp->sack_ok)
-			info.tcpi_options |= TCPI_OPT_SACK;
-		if (tp->wscale_ok) {
-			info.tcpi_options |= TCPI_OPT_WSCALE;
-			info.tcpi_snd_wscale = tp->snd_wscale;
-			info.tcpi_rcv_wscale = tp->rcv_wscale;
-		} else {
-			info.tcpi_snd_wscale = 0;
-			info.tcpi_rcv_wscale = 0;
-		}
-		if (tp->ecn_flags & TCP_ECN_OK)
-			info.tcpi_options |= TCPI_OPT_ECN;
 
-		info.tcpi_rto = (1000000 * tp->rto) / HZ;
-		info.tcpi_ato = (1000000 * tp->ack.ato) / HZ;
-		info.tcpi_snd_mss = tp->mss_cache_std;
-		info.tcpi_rcv_mss = tp->ack.rcv_mss;
-
-		info.tcpi_unacked = tp->packets_out;
-		info.tcpi_sacked = tp->sacked_out;
-		info.tcpi_lost = tp->lost_out;
-		info.tcpi_retrans = tp->retrans_out;
-		info.tcpi_fackets = tp->fackets_out;
-
-		info.tcpi_last_data_sent = ((now - tp->lsndtime) * 1000) / HZ;
-		info.tcpi_last_ack_sent = 0;
-		info.tcpi_last_data_recv = ((now -
-					     tp->ack.lrcvtime) * 1000) / HZ;
-		info.tcpi_last_ack_recv = ((now - tp->rcv_tstamp) * 1000) / HZ;
-
-		info.tcpi_pmtu = tp->pmtu_cookie;
-		info.tcpi_rcv_ssthresh = tp->rcv_ssthresh;
-		info.tcpi_rtt = ((1000000 * tp->srtt) / HZ) >> 3;
-		info.tcpi_rttvar = ((1000000 * tp->mdev) / HZ) >> 2;
-		info.tcpi_snd_ssthresh = tp->snd_ssthresh;
-		info.tcpi_snd_cwnd = tp->snd_cwnd;
-		info.tcpi_advmss = tp->advmss;
-		info.tcpi_reordering = tp->reordering;
+		tcp_get_info(sk, &info);
 
 		len = min_t(unsigned int, len, sizeof(info));
 		if (put_user(len, optlen))

@@ -738,7 +738,7 @@ extern void FASTCALL(wake_up_forked_process(struct task_struct * tsk));
  static inline void kick_process(struct task_struct *tsk) { }
  static inline void wake_up_forked_thread(struct task_struct * tsk)
  {
-	return wake_up_forked_process(tsk);
+	wake_up_forked_process(tsk);
  }
 #endif
 extern void FASTCALL(sched_fork(task_t * p));

@@ -16,6 +16,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/compiler.h>
 #include <linux/errno.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>
@@ -292,12 +293,12 @@ asmlinkage long sys_clone(struct pt_regs regs)
 {
         unsigned long clone_flags;
         unsigned long newsp;
-	int *parent_tidptr, *child_tidptr;
+	int __user *parent_tidptr, *child_tidptr;
 
         clone_flags = regs.gprs[3];
         newsp = regs.orig_gpr2;
-	parent_tidptr = (int *) regs.gprs[4];
-	child_tidptr = (int *) regs.gprs[5];
+	parent_tidptr = (int __user *) regs.gprs[4];
+	child_tidptr = (int __user *) regs.gprs[5];
         if (!newsp)
                 newsp = regs.gprs[15];
         return do_fork(clone_flags & ~CLONE_IDLETASK, newsp, &regs, 0,
@@ -328,12 +329,12 @@ asmlinkage long sys_execve(struct pt_regs regs)
         int error;
         char * filename;
 
-        filename = getname((char *) regs.orig_gpr2);
+        filename = getname((char __user *) regs.orig_gpr2);
         error = PTR_ERR(filename);
         if (IS_ERR(filename))
                 goto out;
-        error = do_execve(filename, (char **) regs.gprs[3],
-			  (char **) regs.gprs[4], &regs);
+        error = do_execve(filename, (char __user * __user *) regs.gprs[3],
+			  (char __user * __user *) regs.gprs[4], &regs);
 	if (error == 0) {
 		current->ptrace &= ~PT_DTRACE;
 		current->thread.fp_regs.fpc = 0;

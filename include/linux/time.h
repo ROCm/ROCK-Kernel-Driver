@@ -184,7 +184,7 @@ struct timezone {
  * Avoid unnecessary multiplications/divisions in the
  * two most common HZ cases:
  */
-static inline unsigned int jiffies_to_msecs(unsigned long j)
+static inline unsigned int jiffies_to_msecs(const unsigned long j)
 {
 #if HZ <= 1000 && !(1000 % HZ)
 	return (1000 / HZ) * j;
@@ -194,7 +194,7 @@ static inline unsigned int jiffies_to_msecs(unsigned long j)
 	return (j * 1000) / HZ;
 #endif
 }
-static inline unsigned long msecs_to_jiffies(unsigned int m)
+static inline unsigned long msecs_to_jiffies(const unsigned int m)
 {
 #if HZ <= 1000 && !(1000 % HZ)
 	return (m + (1000 / HZ) - 1) / (1000 / HZ);
@@ -217,7 +217,7 @@ static inline unsigned long msecs_to_jiffies(unsigned int m)
  * value to a scaled second value.
  */
 static __inline__ unsigned long
-timespec_to_jiffies(struct timespec *value)
+timespec_to_jiffies(const struct timespec *value)
 {
 	unsigned long sec = value->tv_sec;
 	long nsec = value->tv_nsec + TICK_NSEC - 1;
@@ -233,7 +233,7 @@ timespec_to_jiffies(struct timespec *value)
 }
 
 static __inline__ void
-jiffies_to_timespec(unsigned long jiffies, struct timespec *value)
+jiffies_to_timespec(const unsigned long jiffies, struct timespec *value)
 {
 	/*
 	 * Convert jiffies to nanoseconds and separate with
@@ -256,7 +256,7 @@ jiffies_to_timespec(unsigned long jiffies, struct timespec *value)
  * instruction above the way it was done above.
  */
 static __inline__ unsigned long
-timeval_to_jiffies(struct timeval *value)
+timeval_to_jiffies(const struct timeval *value)
 {
 	unsigned long sec = value->tv_sec;
 	long usec = value->tv_usec;
@@ -271,7 +271,7 @@ timeval_to_jiffies(struct timeval *value)
 }
 
 static __inline__ void
-jiffies_to_timeval(unsigned long jiffies, struct timeval *value)
+jiffies_to_timeval(const unsigned long jiffies, struct timeval *value)
 {
 	/*
 	 * Convert jiffies to nanoseconds and separate with

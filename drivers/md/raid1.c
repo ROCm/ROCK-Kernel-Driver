@@ -42,16 +42,17 @@ static void unplug_slaves(mddev_t *mddev);
 
 static void * r1bio_pool_alloc(int gfp_flags, void *data)
 {
-	mddev_t *mddev = data;
+	struct pool_info *pi = data;
 	r1bio_t *r1_bio;
 
 	/* allocate a r1bio with room for raid_disks entries in the bios array */
-	r1_bio = kmalloc(sizeof(r1bio_t) + sizeof(struct bio*)*mddev->raid_disks,
+	r1_bio = kmalloc(sizeof(r1bio_t) + sizeof(struct bio*)*pi->raid_disks,
 			 gfp_flags);
 	if (r1_bio)
-		memset(r1_bio, 0, sizeof(*r1_bio) + sizeof(struct bio*)*mddev->raid_disks);
+		memset(r1_bio, 0, sizeof(*r1_bio) +
+			       sizeof(struct bio*) * pi->raid_disks);
 	else
-		unplug_slaves(mddev);
+		unplug_slaves(pi->mddev);
 
 	return r1_bio;
 }
@@ -69,22 +70,22 @@ static void r1bio_pool_free(void *r1_bio, void *data)
 
 static void * r1buf_pool_alloc(int gfp_flags, void *data)
 {
-	conf_t *conf = data;
+	struct pool_info *pi = data;
 	struct page *page;
 	r1bio_t *r1_bio;
 	struct bio *bio;
 	int i, j;
 
-	r1_bio = r1bio_pool_alloc(gfp_flags, conf->mddev);
+	r1_bio = r1bio_pool_alloc(gfp_flags, pi);
 	if (!r1_bio) {
-		unplug_slaves(conf->mddev);
+		unplug_slaves(pi->mddev);
 		return NULL;
 	}
 
 	/*
 	 * Allocate bios : 1 for reading, n-1 for writing
 	 */
-	for (j = conf->raid_disks ; j-- ; ) {
+	for (j = pi->raid_disks ; j-- ; ) {
 		bio = bio_alloc(gfp_flags, RESYNC_PAGES);
 		if (!bio)
 			goto out_free_bio;
@@ -111,16 +112,16 @@ out_free_pages:
 	for ( ; i > 0 ; i--)
 		__free_page(bio->bi_io_vec[i-1].bv_page);
 out_free_bio:
-	while ( ++j < conf->raid_disks )
+	while ( ++j < pi->raid_disks )
 		bio_put(r1_bio->bios[j]);
-	r1bio_pool_free(r1_bio, conf->mddev);
+	r1bio_pool_free(r1_bio, data);
 	return NULL;
 }
 
 static void r1buf_pool_free(void *__r1_bio, void *data)
 {
+	struct pool_info *pi = data;
 	int i;
-	conf_t *conf = data;
 	r1bio_t *r1bio = __r1_bio;
 	struct bio *bio = r1bio->bios[0];
 
@@ -128,10 +129,10 @@ static void r1buf_pool_free(void *__r1_bio, void *data)
 		__free_page(bio->bi_io_vec[i].bv_page);
 		bio->bi_io_vec[i].bv_page = NULL;
 	}
-	for (i=0 ; i < conf->raid_disks; i++)
+	for (i=0 ; i < pi->raid_disks; i++)
 		bio_put(r1bio->bios[i]);
 
-	r1bio_pool_free(r1bio, conf->mddev);
+	r1bio_pool_free(r1bio, data);
 }
 
 static void put_all_bios(conf_t *conf, r1bio_t *r1_bio)
@@ -296,7 +297,7 @@ static int raid1_end_read_request(struct bio *bio, unsigned int bytes_done, int 
 		reschedule_retry(r1_bio);
 	}
 
-	atomic_dec(&conf->mirrors[mirror].rdev->nr_pending);
+	rdev_dec_pending(conf->mirrors[mirror].rdev, conf->mddev);
 	return 0;
 }
 
@@ -343,7 +344,7 @@ static int raid1_end_write_request(struct bio *bio, unsigned int bytes_done, int
 		raid_end_bio_io(r1_bio);
 	}
 
-	atomic_dec(&conf->mirrors[mirror].rdev->nr_pending);
+	rdev_dec_pending(conf->mirrors[mirror].rdev, conf->mddev);
 	return 0;
 }
 
@@ -510,7 +511,7 @@ static int make_request(request_queue_t *q, struct bio * bio)
 	mirror_info_t *mirror;
 	r1bio_t *r1_bio;
 	struct bio *read_bio;
-	int i, disks = conf->raid_disks;
+	int i, disks;
 
 	/*
 	 * Register the new request and wait if the reconstruction
@@ -570,6 +571,7 @@ static int make_request(request_queue_t *q, struct bio * bio)
 	 * inc refcount on their rdev.  Record them by setting
 	 * bios[x] to bio
 	 */
+	disks = conf->raid_disks;
 	spin_lock_irq(&conf->device_lock);
 	for (i = 0;  i < disks; i++) {
 		if (conf->mirrors[i].rdev &&
@@ -805,7 +807,7 @@ static int end_sync_read(struct bio *bio, unsigned int bytes_done, int error)
 			 conf->mirrors[r1_bio->read_disk].rdev);
 	else
 		set_bit(R1BIO_Uptodate, &r1_bio->state);
-	atomic_dec(&conf->mirrors[r1_bio->read_disk].rdev->nr_pending);
+	rdev_dec_pending(conf->mirrors[r1_bio->read_disk].rdev, conf->mddev);
 	reschedule_retry(r1_bio);
 	return 0;
 }
@@ -835,7 +837,7 @@ static int end_sync_write(struct bio *bio, unsigned int bytes_done, int error)
 		md_done_sync(mddev, r1_bio->sectors, uptodate);
 		put_buf(r1_bio);
 	}
-	atomic_dec(&conf->mirrors[mirror].rdev->nr_pending);
+	rdev_dec_pending(conf->mirrors[mirror].rdev, mddev);
 	return 0;
 }
 
@@ -953,7 +955,8 @@ static int init_resync(conf_t *conf)
 	buffs = RESYNC_WINDOW / RESYNC_BLOCK_SIZE;
 	if (conf->r1buf_pool)
 		BUG();
-	conf->r1buf_pool = mempool_create(buffs, r1buf_pool_alloc, r1buf_pool_free, conf);
+	conf->r1buf_pool = mempool_create(buffs, r1buf_pool_alloc, r1buf_pool_free,
+					  conf->poolinfo);
 	if (!conf->r1buf_pool)
 		return -ENOMEM;
 	conf->next_resync = 0;
@@ -979,6 +982,7 @@ static int sync_request(mddev_t *mddev, sector_t sector_nr, int go_faster)
 	sector_t max_sector, nr_sectors;
 	int disk;
 	int i;
+	int write_targets = 0;
 
 	if (!conf->r1buf_pool)
 		if (init_resync(conf))
@@ -1055,12 +1059,24 @@ static int sync_request(mddev_t *mddev, sector_t sector_nr, int go_faster)
 			    sector_nr + RESYNC_SECTORS > mddev->recovery_cp)) {
 			bio->bi_rw = WRITE;
 			bio->bi_end_io = end_sync_write;
+			write_targets ++;
 		} else
 			continue;
 		bio->bi_sector = sector_nr + conf->mirrors[i].rdev->data_offset;
 		bio->bi_bdev = conf->mirrors[i].rdev->bdev;
 		bio->bi_private = r1_bio;
 	}
+	if (write_targets == 0) {
+		/* There is nowhere to write, so all non-sync
+		 * drives must be failed - so we are finished
+		 */
+		int rv = max_sector - sector_nr;
+		md_done_sync(mddev, rv, 1);
+		put_buf(r1_bio);
+		atomic_dec(&conf->mirrors[disk].rdev->nr_pending);
+		return rv;
+	}
+
 	nr_sectors = 0;
 	do {
 		struct page *page;
@@ -1123,28 +1139,28 @@ static int run(mddev_t *mddev)
 	 */
 	conf = kmalloc(sizeof(conf_t), GFP_KERNEL);
 	mddev->private = conf;
-	if (!conf) {
-		printk(KERN_ERR "raid1: couldn't allocate memory for %s\n",
-			mdname(mddev));
-		goto out;
-	}
+	if (!conf)
+		goto out_no_mem;
+
 	memset(conf, 0, sizeof(*conf));
 	conf->mirrors = kmalloc(sizeof(struct mirror_info)*mddev->raid_disks, 
 				 GFP_KERNEL);
-	if (!conf->mirrors) {
-		printk(KERN_ERR "raid1: couldn't allocate memory for %s\n",
-		       mdname(mddev));
-		goto out_free_conf;
-	}
+	if (!conf->mirrors)
+		goto out_no_mem;
+
 	memset(conf->mirrors, 0, sizeof(struct mirror_info)*mddev->raid_disks);
 
+	conf->poolinfo = kmalloc(sizeof(*conf->poolinfo), GFP_KERNEL);
+	if (!conf->poolinfo)
+		goto out_no_mem;
+	conf->poolinfo->mddev = mddev;
+	conf->poolinfo->raid_disks = mddev->raid_disks;
 	conf->r1bio_pool = mempool_create(NR_RAID1_BIOS, r1bio_pool_alloc,
-						r1bio_pool_free, mddev);
-	if (!conf->r1bio_pool) {
-		printk(KERN_ERR "raid1: couldn't allocate memory for %s\n", 
-			mdname(mddev));
-		goto out_free_conf;
-	}
+					  r1bio_pool_free,
+					  conf->poolinfo);
+	if (!conf->r1bio_pool)
+		goto out_no_mem;
+
 	mddev->queue->unplug_fn = raid1_unplug;
 
 
@@ -1230,13 +1246,21 @@ static int run(mddev_t *mddev)
 
 	return 0;
 
+out_no_mem:
+	printk(KERN_ERR "raid1: couldn't allocate memory for %s\n",
+	       mdname(mddev));
+
 out_free_conf:
-	if (conf->r1bio_pool)
-		mempool_destroy(conf->r1bio_pool);
-	if (conf->mirrors)
-		kfree(conf->mirrors);
-	kfree(conf);
-	mddev->private = NULL;
+	if (conf) {
+		if (conf->r1bio_pool)
+			mempool_destroy(conf->r1bio_pool);
+		if (conf->mirrors)
+			kfree(conf->mirrors);
+		if (conf->poolinfo)
+			kfree(conf->poolinfo);
+		kfree(conf);
+		mddev->private = NULL;
+	}
 out:
 	return -EIO;
 }
@@ -1251,10 +1275,107 @@ static int stop(mddev_t *mddev)
 		mempool_destroy(conf->r1bio_pool);
 	if (conf->mirrors)
 		kfree(conf->mirrors);
+	if (conf->poolinfo)
+		kfree(conf->poolinfo);
 	kfree(conf);
 	mddev->private = NULL;
 	return 0;
 }
+
+static int raid1_resize(mddev_t *mddev, sector_t sectors)
+{
+	/* no resync is happening, and there is enough space
+	 * on all devices, so we can resize.
+	 * We need to make sure resync covers any new space.
+	 * If the array is shrinking we should possibly wait until
+	 * any io in the removed space completes, but it hardly seems
+	 * worth it.
+	 */
+	mddev->array_size = sectors>>1;
+	set_capacity(mddev->gendisk, mddev->array_size << 1);
+	mddev->changed = 1;
+	if (mddev->array_size > mddev->size && mddev->recovery_cp == MaxSector) {
+		mddev->recovery_cp = mddev->size << 1;
+		set_bit(MD_RECOVERY_NEEDED, &mddev->recovery);
+	}
+	mddev->size = mddev->array_size;
+	return 0;
+}
+
+static int raid1_reshape(mddev_t *mddev, int raid_disks)
+{
+	/* We need to:
+	 * 1/ resize the r1bio_pool
+	 * 2/ resize conf->mirrors
+	 *
+	 * We allocate a new r1bio_pool if we can.
+	 * Then raise a device barrier and wait until all IO stops.
+	 * Then resize conf->mirrors and swap in the new r1bio pool.
+	 */
+	mempool_t *newpool, *oldpool;
+	struct pool_info *newpoolinfo;
+	mirror_info_t *newmirrors;
+	conf_t *conf = mddev_to_conf(mddev);
+
+	int d;
+
+	for (d= raid_disks; d < conf->raid_disks; d++)
+		if (conf->mirrors[d].rdev)
+			return -EBUSY;
+
+	newpoolinfo = kmalloc(sizeof(newpoolinfo), GFP_KERNEL);
+	if (!newpoolinfo)
+		return -ENOMEM;
+	newpoolinfo->mddev = mddev;
+	newpoolinfo->raid_disks = raid_disks;
+
+	newpool = mempool_create(NR_RAID1_BIOS, r1bio_pool_alloc,
+				 r1bio_pool_free, newpoolinfo);
+	if (!newpool) {
+		kfree(newpoolinfo);
+		return -ENOMEM;
+	}
+	newmirrors = kmalloc(sizeof(struct mirror_info) * raid_disks, GFP_KERNEL);
+	if (!newmirrors) {
+		kfree(newpoolinfo);
+		mempool_destroy(newpool);
+		return -ENOMEM;
+	}
+	memset(newmirrors, 0, sizeof(struct mirror_info)*raid_disks);
+
+	spin_lock_irq(&conf->resync_lock);
+	conf->barrier++;
+	wait_event_lock_irq(conf->wait_idle, !conf->nr_pending,
+			    conf->resync_lock, unplug_slaves(mddev));
+	spin_unlock_irq(&conf->resync_lock);
+
+	/* ok, everything is stopped */
+	oldpool = conf->r1bio_pool;
+	conf->r1bio_pool = newpool;
+	for (d=0; d < raid_disks && d < conf->raid_disks; d++)
+		newmirrors[d] = conf->mirrors[d];
+	kfree(conf->mirrors);
+	conf->mirrors = newmirrors;
+	kfree(conf->poolinfo);
+	conf->poolinfo = newpoolinfo;
+
+	mddev->degraded += (raid_disks - conf->raid_disks);
+	conf->raid_disks = mddev->raid_disks = raid_disks;
+
+	spin_lock_irq(&conf->resync_lock);
+	conf->barrier--;
+	spin_unlock_irq(&conf->resync_lock);
+	wake_up(&conf->wait_resume);
+	wake_up(&conf->wait_idle);
+
+
+	set_bit(MD_RECOVERY_NEEDED, &mddev->recovery);
+	md_wakeup_thread(mddev->thread);
+
+	mempool_destroy(oldpool);
+	return 0;
+}
+
 
 static mdk_personality_t raid1_personality =
 {
@@ -1269,6 +1390,8 @@ static mdk_personality_t raid1_personality =
 	.hot_remove_disk= raid1_remove_disk,
 	.spare_active	= raid1_spare_active,
 	.sync_request	= sync_request,
+	.resize		= raid1_resize,
+	.reshape	= raid1_reshape,
 };
 
 static int __init raid_init(void)

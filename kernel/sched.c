@@ -762,6 +762,13 @@ static int try_to_wake_up(task_t * p, unsigned int state, int sync)
 	load = source_load(cpu);
 	this_load = target_load(this_cpu);
 
+	/*
+	 * If sync wakeup then subtract the (maximum possible) effect of
+	 * the currently running task from the load of the current CPU:
+	 */
+	if (sync)
+		this_load -= SCHED_LOAD_SCALE;
+
 	/* Don't pull the task off an idle CPU to a busy one */
 	if (load < SCHED_LOAD_SCALE/2 && this_load > SCHED_LOAD_SCALE/2)
 		goto out_set_cpu;
@@ -1663,11 +1670,8 @@ static runqueue_t *find_busiest_queue(struct sched_group *group)
  * tasks if there is an imbalance.
  *
  * Called with this_rq unlocked.
- *
- * This function is marked noinline to work around a compiler
- * bug with gcc 3.3.3-hammer on x86-64.
  */
-static int noinline load_balance(int this_cpu, runqueue_t *this_rq,
+static int load_balance(int this_cpu, runqueue_t *this_rq,
 			struct sched_domain *sd, enum idle_type idle)
 {
 	struct sched_group *group;
@@ -1684,6 +1688,11 @@ static int noinline load_balance(int this_cpu, runqueue_t *this_rq,
 	busiest = find_busiest_queue(group);
 	if (!busiest)
 		goto out_balanced;
+	/*
+	 * This should be "impossible", but since load
+	 * balancing is inherently racy and statistical,
+	 * it could happen in theory.
+	 */
 	if (unlikely(busiest == this_rq)) {
 		WARN_ON(1);
 		goto out_balanced;
@@ -1847,6 +1856,15 @@ static void active_load_balance(runqueue_t *busiest, int busiest_cpu)
  		}
 
 		rq = cpu_rq(push_cpu);
+
+		/*
+		 * This condition is "impossible", but since load
+		 * balancing is inherently a bit racy and statistical,
+		 * it can trigger.. Reported by Bjorn Helgaas on a
+		 * 128-cpu setup.
+		 */
+		if (unlikely(busiest == rq))
+			goto next_group;
 		double_lock_balance(busiest, rq);
 		move_tasks(rq, push_cpu, busiest, 1, sd, IDLE);
 		spin_unlock(&rq->lock);

@@ -21,9 +21,10 @@ static ssize_t node_read_cpumap(struct sys_device * dev, char * buf)
 	cpumask_t mask = node_dev->cpumap;
 	int len;
 
-	/* FIXME - someone should pass us a buffer size (count) or
-	 * use seq_file or something to avoid buffer overrun risk. */
-	len = cpumask_scnprintf(buf, 99 /* XXX FIXME */, mask);
+	/* 2004/06/03: buf currently PAGE_SIZE, need > 1 char per 4 bits. */
+	BUILD_BUG_ON(NR_CPUS/4 > PAGE_SIZE/2);
+
+	len = cpumask_scnprintf(buf, PAGE_SIZE-1, mask);
 	len += sprintf(buf + len, "\n");
 	return len;
 }

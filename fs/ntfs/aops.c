@@ -478,8 +478,8 @@ static int ntfs_write_block(struct writeback_control *wbc, struct page *page)
 	ni = NTFS_I(vi);
 	vol = ni->vol;
 
-	ntfs_debug("Entering for inode %li, attribute type 0x%x, page index "
-			"0x%lx.\n", vi->i_ino, ni->type, page->index);
+	ntfs_debug("Entering for inode 0x%lx, attribute type 0x%x, page index "
+			"0x%lx.", vi->i_ino, ni->type, page->index);
 
 	BUG_ON(!NInoNonResident(ni));
 	BUG_ON(NInoMstProtected(ni));
@@ -778,9 +778,8 @@ lock_retry_remap:
  *
  * For resident attributes, OTOH, ntfs_writepage() writes the @page by copying
  * the data to the mft record (which at this stage is most likely in memory).
- * Thus, in this case, I/O is synchronous, as even if the mft record is not
- * cached at this point in time, we need to wait for it to be read in before we
- * can do the copy.
+ * The mft record is then marked dirty and written out asynchronously via the
+ * vfs inode dirty code path.
  *
  * Note the caller clears the page dirty flag before calling ntfs_writepage().
  *
@@ -875,16 +874,6 @@ static int ntfs_writepage(struct page *page, struct writeback_control *wbc)
 	BUG_ON(page_has_buffers(page));
 	BUG_ON(!PageUptodate(page));
 
-	// TODO: Consider using PageWriteback() + unlock_page() in 2.5 once the
-	// "VM fiddling has ended". Note, don't forget to replace all the
-	// unlock_page() calls further below with end_page_writeback() ones.
-	// FIXME: Make sure it is ok to SetPageError() on unlocked page under
-	// writeback before doing the change!
-#if 0
-	set_page_writeback(page);
-	unlock_page(page);
-#endif
-
 	if (!NInoAttr(ni))
 		base_ni = ni;
 	else
@@ -935,6 +924,14 @@ static int ntfs_writepage(struct page *page, struct writeback_control *wbc)
 		bytes = PAGE_CACHE_SIZE;
 
 	/*
+	 * Keep the VM happy.  This must be done otherwise the radix-tree tag
+	 * PAGECACHE_TAG_DIRTY remains set even though the page is clean.
+	 */
+	BUG_ON(PageWriteback(page));
+	set_page_writeback(page);
+	unlock_page(page);
+
+	/*
 	 * Here, we don't need to zero the out of bounds area everytime because
 	 * the below memcpy() already takes care of the mmap-at-end-of-file
 	 * requirements. If the file is converted to a non-resident one, then
@@ -948,7 +945,10 @@ static int ntfs_writepage(struct page *page, struct writeback_control *wbc)
 	 * expose data to userspace/disk which should never have been exposed.
 	 *
 	 * FIXME: Ensure that i_size increases do the zeroing/overwriting and
-	 * if we cannot guarantee that, then enable the zeroing below.
+	 * if we cannot guarantee that, then enable the zeroing below.  If the
+	 * zeroing below is enabled, we MUST move the unlock_page() from above
+	 * to after the kunmap_atomic(), i.e. just before the
+	 * end_page_writeback().
 	 */
 
 	kaddr = kmap_atomic(page, KM_USER0);
@@ -966,11 +966,10 @@ static int ntfs_writepage(struct page *page, struct writeback_control *wbc)
 #endif
 	kunmap_atomic(kaddr, KM_USER0);
 
-	unlock_page(page);
+	end_page_writeback(page);
 
-	// TODO: Mark mft record dirty so it gets written back.
-	ntfs_error(vi->i_sb, "Writing to resident files is not supported yet. "
-			"Wrote to memory only...");
+	/* Mark the mft record dirty, so it gets written back. */
+	mark_mft_record_dirty(ctx->ntfs_ino);
 
 	put_attr_search_ctx(ctx);
 	unmap_mft_record(base_ni);
@@ -1022,7 +1021,7 @@ static int ntfs_prepare_nonresident_write(struct page *page,
 	ni = NTFS_I(vi);
 	vol = ni->vol;
 
-	ntfs_debug("Entering for inode %li, attribute type 0x%x, page index "
+	ntfs_debug("Entering for inode 0x%lx, attribute type 0x%x, page index "
 			"0x%lx, from = %u, to = %u.", vi->i_ino, ni->type,
 			page->index, from, to);
 
@@ -1379,7 +1378,7 @@ static int ntfs_prepare_write(struct file *file, struct page *page,
 	struct inode *vi = page->mapping->host;
 	ntfs_inode   *ni = NTFS_I(vi);
 
-	ntfs_debug("Entering for inode %li, attribute type 0x%x, page index "
+	ntfs_debug("Entering for inode 0x%lx, attribute type 0x%x, page index "
 			"0x%lx, from = %u, to = %u.", vi->i_ino, ni->type,
 			page->index, from, to);
 
@@ -1487,7 +1486,7 @@ static int ntfs_commit_nonresident_write(struct page *page,
 
 	vi = page->mapping->host;
 
-	ntfs_debug("Entering for inode %li, attribute type 0x%x, page index "
+	ntfs_debug("Entering for inode 0x%lx, attribute type 0x%x, page index "
 			"0x%lx, from = %u, to = %u.", vi->i_ino,
 			NTFS_I(vi)->type, page->index, from, to);
 
@@ -1583,7 +1582,7 @@ static int ntfs_commit_write(struct file *file, struct page *page,
 	vi = page->mapping->host;
 	ni = NTFS_I(vi);
 
-	ntfs_debug("Entering for inode %li, attribute type 0x%x, page index "
+	ntfs_debug("Entering for inode 0x%lx, attribute type 0x%x, page index "
 			"0x%lx, from = %u, to = %u.", vi->i_ino, ni->type,
 			page->index, from, to);
 
@@ -1734,9 +1733,8 @@ static int ntfs_commit_write(struct file *file, struct page *page,
 	}
 	kunmap_atomic(kaddr, KM_USER0);
 
-	// TODO: Mark mft record dirty so it gets written back.
-	ntfs_error(vi->i_sb, "Writing to resident files is not supported yet. "
-			"Wrote to memory only...");
+	/* Mark the mft record dirty, so it gets written back. */
+	mark_mft_record_dirty(ctx->ntfs_ino);
 
 	put_attr_search_ctx(ctx);
 	unmap_mft_record(base_ni);
@@ -1788,3 +1786,12 @@ struct address_space_operations ntfs_aops = {
 #endif
 };
 
+/**
+ * ntfs_mst_aops - general address space operations for mst protecteed inodes
+ *		   and attributes
+ */
+struct address_space_operations ntfs_mst_aops = {
+	.readpage	= ntfs_readpage,	/* Fill page with data. */
+	.sync_page	= block_sync_page,	/* Currently, just unplugs the
+						   disk request queue. */
+};

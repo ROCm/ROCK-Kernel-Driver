@@ -9,8 +9,8 @@ ifdef CONFIG_4xx
 EXTRA_AFLAGS		:= -Wa,-m405
 endif
 
-CFLAGS_prom_init.o      += -mrelocatable-lib
-CFLAGS_btext.o          += -mrelocatable-lib
+CFLAGS_prom_init.o      += -fPIC
+CFLAGS_btext.o          += -fPIC
 
 obj-$(CONFIG_PPCBUG_NVRAM)	+= prep_nvram.o
 obj-$(CONFIG_PPC_OCP)		+= ocp.o
@@ -63,6 +63,7 @@ obj-$(CONFIG_PRPMC750)		+= open_pic.o indirect_pci.o pci_auto.o \
 obj-$(CONFIG_HARRIER)		+= harrier.o
 obj-$(CONFIG_PRPMC800)		+= open_pic.o indirect_pci.o pci_auto.o
 obj-$(CONFIG_SANDPOINT)		+= i8259.o open_pic.o pci_auto.o todc_time.o
+obj-$(CONFIG_SBC82xx)		+= todc_time.o
 obj-$(CONFIG_SPRUCE)		+= cpc700_pic.o indirect_pci.o pci_auto.o \
 				   todc_time.o
 obj-$(CONFIG_8260)		+= m8260_setup.o ppc8260_pic.o
@@ -72,3 +73,5 @@ obj-$(CONFIG_SERIAL_TEXT_DEBUG)	+= gen550_dbg.o
 endif
 obj-$(CONFIG_BOOTX_TEXT)	+= btext.o
 obj-$(CONFIG_MPC10X_BRIDGE)     += mpc10x_common.o indirect_pci.o
+obj-$(CONFIG_40x)		+= dcr.o
+obj-$(CONFIG_BOOKE)		+= dcr.o

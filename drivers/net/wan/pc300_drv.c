@@ -2542,7 +2542,7 @@ int cpc_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	pc300conf_t conf_aux;
 	pc300chconf_t *conf = (pc300chconf_t *) & chan->conf;
 	int ch = chan->channel;
-	void *arg = (void *) ifr->ifr_data;
+	void __user *arg = ifr->ifr_data;
 	struct if_settings *settings = &ifr->ifr_settings;
 	uclong scabase = card->hw.scabase;
 

@@ -1315,7 +1315,7 @@ el3_netdev_set_ecmd(struct net_device *dev, struct ethtool_cmd *ecmd)
  */
 
 static int
-netdev_ethtool_ioctl (struct net_device *dev, void *useraddr)
+netdev_ethtool_ioctl (struct net_device *dev, void __user *useraddr)
 {
 	u32 ethcmd;
 	struct el3_private *lp = netdev_priv(dev);
@@ -1323,7 +1323,7 @@ netdev_ethtool_ioctl (struct net_device *dev, void *useraddr)
 	/* dev_ioctl() in ../../net/core/dev.c has already checked
 	   capable(CAP_NET_ADMIN), so don't bother with that here.  */
 
-	if (get_user(ethcmd, (u32 *)useraddr))
+	if (get_user(ethcmd, (u32 __user *)useraddr))
 		return -EFAULT;
 
 	switch (ethcmd) {
@@ -1412,7 +1412,7 @@ netdev_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 
 	switch (cmd) {
 	case SIOCETHTOOL:
-		rc = netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
+		rc = netdev_ethtool_ioctl(dev, rq->ifr_data);
 		break;
 
 	default:

@@ -1,4 +1,4 @@
-/*  $Header: /var/lib/cvs/prism54-ng/ksrc/islpci_dev.c,v 1.68 2004/02/28 03:06:07 mcgrof Exp $
+/*
  *  
  *  Copyright (C) 2002 Intersil Americas Inc.
  *  Copyright (C) 2003 Herbert Valerio Riedel <hvr@gnu.org>
@@ -715,9 +715,9 @@ islpci_setup(struct pci_dev *pdev)
 	priv = netdev_priv(ndev);
 	priv->ndev = ndev;
 	priv->pdev = pdev;
-
+	priv->monitor_type = ARPHRD_IEEE80211;
 	priv->ndev->type = (priv->iw_mode == IW_MODE_MONITOR) ?
-		ARPHRD_IEEE80211: ARPHRD_ETHER;
+		priv->monitor_type : ARPHRD_ETHER;
 
 	/* save the start and end address of the PCI memory area */
 	ndev->mem_start = (unsigned long) priv->device_base;
@@ -743,8 +743,10 @@ islpci_setup(struct pci_dev *pdev)
 	/* initialize workqueue's */
 	INIT_WORK(&priv->stats_work,
 		  (void (*)(void *)) prism54_update_stats, priv);
-
 	priv->stats_timestamp = 0;
+
+	INIT_WORK(&priv->reset_task, islpci_do_reset_and_wake, priv);
+	priv->reset_task_pending = 0;
 
 	/* allocate various memory areas */
 	if (islpci_alloc_memory(priv))

@@ -30,7 +30,7 @@ extern const struct exception_table_entry
 	*search_exception_tables(unsigned long addr);
 
 asmlinkage void do_page_fault(unsigned long address, struct pt_regs *regs,
-                              int error_code);
+                              int protection, int writeaccess);
 
 /* fast TLB-fill fault handler
  * this is called from entry.S with interrupts disabled
@@ -39,8 +39,9 @@ asmlinkage void do_page_fault(unsigned long address, struct pt_regs *regs,
 void
 handle_mmu_bus_fault(struct pt_regs *regs)
 {
-	int cause, select;
+	int cause;
 #ifdef DEBUG
+	int select;
 	int index;
 	int page_id;
 	int acc, inv;
@@ -48,15 +49,14 @@ handle_mmu_bus_fault(struct pt_regs *regs)
 	int miss, we, writeac;
 	pmd_t *pmd;
 	pte_t pte;
-	int errcode;
 	unsigned long address;
 
 	cause = *R_MMU_CAUSE;
-	select = *R_TLB_SELECT;
 
 	address = cause & PAGE_MASK; /* get faulting address */
 
 #ifdef DEBUG
+	select = *R_TLB_SELECT;
 	page_id = IO_EXTRACT(R_MMU_CAUSE,  page_id,   cause);
 	acc     = IO_EXTRACT(R_MMU_CAUSE,  acc_excp,  cause);
 	inv     = IO_EXTRACT(R_MMU_CAUSE,  inv_excp,  cause);  
@@ -82,12 +82,6 @@ handle_mmu_bus_fault(struct pt_regs *regs)
 	if(writeac)
 		regs->csrinstr &= ~(1 << 5);
 	
-	/* Set errcode's R/W flag according to the mode which caused the
-	 * fault
-	 */
-
-	errcode = writeac << 1;
-
 	D(printk("bus_fault from IRP 0x%lx: addr 0x%lx, miss %d, inv %d, we %d, acc %d, dx %d pid %d\n",
 		 regs->irp, address, miss, inv, we, acc, index, page_id));
 
@@ -99,16 +93,20 @@ handle_mmu_bus_fault(struct pt_regs *regs)
 		 */
 
 		pmd = (pmd_t *)(current_pgd + pgd_index(address));
-		if (pmd_none(*pmd))
-			goto dofault;
+		if (pmd_none(*pmd)) {
+			do_page_fault(address, regs, 0, writeac);
+			return;
+		}
 		if (pmd_bad(*pmd)) {
 			printk("bad pgdir entry 0x%lx at 0x%p\n", *(unsigned long*)pmd, pmd);
 			pmd_clear(pmd);
 			return;
 		}
 		pte = *pte_offset_kernel(pmd, address);
-		if (!pte_present(pte))
-			goto dofault;
+		if (!pte_present(pte)) {
+			do_page_fault(address, regs, 0, writeac);
+			return;
+		}
 
 #ifdef DEBUG
 		printk(" found pte %lx pg %p ", pte_val(pte), pte_page(pte));
@@ -143,14 +141,10 @@ handle_mmu_bus_fault(struct pt_regs *regs)
 		*R_TLB_LO = pte_val(pte);
 
 		return;
-	} 
+	}
 
-	errcode = 1 | (we << 1);
-
- dofault:
-	/* leave it to the MM system fault handler below */
-	D(printk("do_page_fault %lx errcode %d\n", address, errcode));
-	do_page_fault(address, regs, errcode);
+	/* leave it to the MM system fault handler */
+	do_page_fault(address, regs, 1, we);
 }
 
 /* Called from arch/cris/mm/fault.c to find fixup code. */

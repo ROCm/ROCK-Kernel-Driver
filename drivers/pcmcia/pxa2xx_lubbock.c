@@ -25,6 +25,7 @@
 #include <asm/hardware.h>
 #include <asm/hardware/sa1111.h>
 #include <asm/mach-types.h>
+#include <asm/arch/lubbock.h>
 
 #include "sa1111_generic.h"
 

@@ -63,7 +63,8 @@
 #include <asm/irq.h>
 
 #include "ide-timing.h"
-#include "sis5513.h"
+
+#define DISPLAY_SIS_TIMINGS
 
 /* registers layout and init values are chipset family dependant */
 
@@ -944,12 +945,19 @@ static void __init init_hwif_sis5513 (ide_hwif_t *hwif)
 	return;
 }
 
+static ide_pci_device_t sis5513_chipset __devinitdata = {
+	.name		= "SIS5513",
+	.init_chipset	= init_chipset_sis5513,
+	.init_hwif	= init_hwif_sis5513,
+	.channels	= 2,
+	.autodma	= NOAUTODMA,
+	.enablebits	= {{0x4a,0x02,0x02}, {0x4a,0x04,0x04}},
+	.bootable	= ON_BOARD,
+};
+
 static int __devinit sis5513_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
-	ide_pci_device_t *d = &sis5513_chipsets[id->driver_data];
-	if (dev->device != d->device)
-		BUG();
-	ide_setup_pci_device(dev, d);
+	ide_setup_pci_device(dev, &sis5513_chipset);
 	return 0;
 }
 
