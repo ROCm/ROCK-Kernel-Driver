@@ -205,21 +205,19 @@ int sctp_rcv(struct sk_buff *skb)
 	 */
 	sctp_bh_lock_sock(sk);
 
-	if (sock_owned_by_user(sk)) {
+	if (sock_owned_by_user(sk))
 		sk_add_backlog(sk, (struct sk_buff *) chunk);
-	} else {
+	else
 		sctp_backlog_rcv(sk, (struct sk_buff *) chunk);
-	}
 
 	/* Release the sock and any reference counts we took in the
 	 * lookup calls.
 	 */
 	sctp_bh_unlock_sock(sk);
-	if (asoc) {
+	if (asoc)
 		sctp_association_put(asoc);
-	} else {
+	else
 		sctp_endpoint_put(ep);
-	}
 	sock_put(sk);
 	return ret;
 
@@ -266,10 +264,8 @@ int sctp_backlog_rcv(struct sock *sk, struct sk_buff *skb)
 }
 
 /* Handle icmp frag needed error. */
-static inline void sctp_icmp_frag_needed(struct sock *sk,
-					 sctp_association_t *asoc,
-					 struct sctp_transport *transport,
-					 __u32 pmtu)
+void sctp_icmp_frag_needed(struct sock *sk, struct sctp_association *asoc,
+			   struct sctp_transport *t, __u32 pmtu)
 {
 	if (unlikely(pmtu < SCTP_DEFAULT_MINSEGMENT)) {
 		printk(KERN_WARNING "%s: Reported pmtu %d too low, "
@@ -278,12 +274,95 @@ static inline void sctp_icmp_frag_needed(struct sock *sk,
 		pmtu = SCTP_DEFAULT_MINSEGMENT;
 	}
 
-	if (!sock_owned_by_user(sk) && transport && (transport->pmtu != pmtu)) {
-		transport->pmtu = pmtu;
+	if (!sock_owned_by_user(sk) && t && (t->pmtu != pmtu)) {
+		t->pmtu = pmtu;
 		sctp_assoc_sync_pmtu(asoc);
-		sctp_retransmit(&asoc->outqueue, transport,
-				SCTP_RETRANSMIT_PMTU_DISCOVERY );
+		sctp_retransmit(&asoc->outqueue, t, SCTP_RTXR_PMTUD);
 	}
+}
+
+/* Common lookup code for icmp/icmpv6 error handler. */
+struct sock *sctp_err_lookup(int family, struct sk_buff *skb,
+			     struct sctphdr *sctphdr,
+			     struct sctp_endpoint **epp, 
+			     struct sctp_association **app, 
+			     struct sctp_transport **tpp)
+{
+	union sctp_addr saddr;
+	union sctp_addr daddr;
+	struct sctp_af *af;
+	struct sock *sk = NULL;
+	struct sctp_endpoint *ep = NULL;
+	struct sctp_association *asoc = NULL;
+	struct sctp_transport *transport = NULL;
+
+	*app = NULL; *epp = NULL; *tpp = NULL;
+
+	af = sctp_get_af_specific(family);
+	if (unlikely(!af)) {
+		return NULL;
+	}
+
+	/* Initialize local addresses for lookups. */
+	af->from_skb(&saddr, skb, 1);
+	af->from_skb(&daddr, skb, 0);
+
+	/* Look for an association that matches the incoming ICMP error 
+	 * packet.
+	 */
+	asoc = __sctp_lookup_association(&saddr, &daddr, &transport);
+	if (!asoc) {
+		/* If there is no matching association, see if it matches any
+		 * endpoint. This may happen for an ICMP error generated in 
+		 * response to an INIT_ACK. 
+		 */ 
+		ep = __sctp_rcv_lookup_endpoint(&daddr);
+		if (!ep) {
+			return NULL;
+		}
+	}
+
+	if (asoc) {
+		if (ntohl(sctphdr->vtag) != asoc->c.peer_vtag) {
+			ICMP_INC_STATS_BH(IcmpInErrors);
+			goto out;
+		}
+		sk = asoc->base.sk;
+	} else
+		sk = ep->base.sk;
+
+	sctp_bh_lock_sock(sk);
+
+	/* If too many ICMPs get dropped on busy
+	 * servers this needs to be solved differently.
+	 */
+	if (sock_owned_by_user(sk))
+		NET_INC_STATS_BH(LockDroppedIcmps);
+
+	*epp = ep;
+	*app = asoc;
+	*tpp = transport;
+	return sk;
+	
+out:
+	sock_put(sk);
+	if (asoc)
+		sctp_association_put(asoc);
+	if (ep)	
+		sctp_endpoint_put(ep);
+	return NULL;
+}
+
+/* Common cleanup code for icmp/icmpv6 error handler. */
+void sctp_err_finish(struct sock *sk, struct sctp_endpoint *ep, 
+		     struct sctp_association *asoc)
+{
+	sctp_bh_unlock_sock(sk);
+	sock_put(sk);
+	if (asoc)
+		sctp_association_put(asoc);
+	if (ep)	
+		sctp_endpoint_put(ep);
 }
 
 /*
@@ -307,12 +386,12 @@ void sctp_v4_err(struct sk_buff *skb, __u32 info)
 	struct sctphdr *sh = (struct sctphdr *)(skb->data + (iph->ihl <<2));
 	int type = skb->h.icmph->type;
 	int code = skb->h.icmph->code;
-	union sctp_addr saddr, daddr;
-	struct inet_opt *inet;
-	struct sock *sk = NULL;
-	sctp_endpoint_t *ep = NULL;
-	sctp_association_t *asoc = NULL;
+	struct sock *sk;
+	sctp_endpoint_t *ep;
+	sctp_association_t *asoc;
 	struct sctp_transport *transport;
+	struct inet_opt *inet;
+	char *saveip, *savesctp;
 	int err;
 
 	if (skb->len < ((iph->ihl << 2) + 8)) {
@@ -320,44 +399,22 @@ void sctp_v4_err(struct sk_buff *skb, __u32 info)
 		return;
 	}
 
-	saddr.v4.sin_family = AF_INET;
-	saddr.v4.sin_port = ntohs(sh->source);
-	memcpy(&saddr.v4.sin_addr.s_addr, &iph->saddr, sizeof(struct in_addr));	
-	daddr.v4.sin_family = AF_INET;
-	daddr.v4.sin_port = ntohs(sh->dest);
-	memcpy(&daddr.v4.sin_addr.s_addr, &iph->daddr, sizeof(struct in_addr));	
-
-	/* Look for an association that matches the incoming ICMP error 
-	 * packet.
-	 */
-	asoc = __sctp_lookup_association(&saddr, &daddr, &transport);
-	if (!asoc) {
-		/* If there is no matching association, see if it matches any
-		 * endpoint. This may happen for an ICMP error generated in 
-		 * response to an INIT_ACK. 
-		 */ 
-		ep = __sctp_rcv_lookup_endpoint(&daddr);
-		if (!ep) {
-			ICMP_INC_STATS_BH(IcmpInErrors);
-			return;
-		}
+	/* Fix up skb to look at the embedded net header. */
+	saveip = skb->nh.raw;
+	savesctp  = skb->h.raw;
+	skb->nh.iph = iph;
+	skb->h.raw = (char *)sh;
+	sk = sctp_err_lookup(AF_INET, skb, sh, &ep, &asoc, &transport);
+	/* Put back, the original pointers. */
+	skb->nh.raw = saveip;
+	skb->h.raw = savesctp;
+	if (!sk) {
+		ICMP_INC_STATS_BH(IcmpInErrors);
+		return;
 	}
-
-	if (asoc) {
-		if (ntohl(sh->vtag) != asoc->c.peer_vtag) {
-			ICMP_INC_STATS_BH(IcmpInErrors);
-			goto out;
-		}
-		sk = asoc->base.sk;
-	} else
-		sk = ep->base.sk;
-
-	sctp_bh_lock_sock(sk);
-	/* If too many ICMPs get dropped on busy
-	 * servers this needs to be solved differently.
+	/* Warning:  The sock lock is held.  Remember to call 
+	 * sctp_err_finish!
 	 */
-	if (sock_owned_by_user(sk))
-		NET_INC_STATS_BH(LockDroppedIcmps);
 
 	switch (type) {
 	case ICMP_PARAMETERPROB:
@@ -397,13 +454,7 @@ void sctp_v4_err(struct sk_buff *skb, __u32 info)
 	}
 
 out_unlock:
-	sctp_bh_unlock_sock(sk);
-out:
-	sock_put(sk);
-	if (asoc)
-		sctp_association_put(asoc);
-	if (ep)	
-		sctp_endpoint_put(ep);
+	sctp_err_finish(sk, ep, asoc);
 }
 
 /*
@@ -780,8 +831,3 @@ sctp_association_t *__sctp_rcv_lookup(struct sk_buff *skb,
 
 	return asoc;
 }
-
-
-
-
-
