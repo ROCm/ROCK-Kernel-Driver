@@ -762,8 +762,6 @@ int ip_append_data(struct sock *sk,
 		inet->cork.fragsize = mtu = dst_pmtu(&rt->u.dst);
 		inet->cork.rt = rt;
 		inet->cork.length = 0;
-		sk->sk_sndmsg_page = NULL;
-		sk->sk_sndmsg_off = 0;
 		if ((exthdrlen = rt->u.dst.header_len) != 0) {
 			length += exthdrlen;
 			transhdrlen += exthdrlen;
@@ -1208,6 +1206,8 @@ void ip_flush_pending_frames(struct sock *sk)
 		ip_rt_put(inet->cork.rt);
 		inet->cork.rt = NULL;
 	}
+	sk->sk_sndmsg_page = NULL;
+	sk->sk_sndmsg_off = 0;
 }
 
 
