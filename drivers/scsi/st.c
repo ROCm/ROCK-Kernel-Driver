@@ -392,8 +392,6 @@ static Scsi_Request *
 	SRpnt->sr_cmd_len = 0;
 	SRpnt->sr_request->waiting = &(STp->wait);
 	SRpnt->sr_request->rq_status = RQ_SCSI_BUSY;
-	SRpnt->sr_request->rq_dev = mk_kdev(STp->disk->major,
-					    STp->disk->first_minor);
 	SRpnt->sr_request->rq_disk = STp->disk;
 
 	scsi_do_req(SRpnt, (void *) cmd, bp, bytes,
@@ -3740,8 +3738,6 @@ static int st_attach(Scsi_Device * SDp)
 	}
 	memset(tpnt, 0, sizeof(Scsi_Tape));
 	tpnt->disk = disk;
-	disk->major = SCSI_TAPE_MAJOR;	/* yeah, yeah */
-	disk->first_minor = i;
 	sprintf(disk->disk_name, "st%d", i);
 	disk->private_data = &tpnt->driver;
 	tpnt->driver = &st_template;

@@ -703,8 +703,6 @@ sg_common_write(Sg_fd * sfp, Sg_request * srp,
 	srp->my_cmdp = SRpnt;
 	q = &SRpnt->sr_device->request_queue;
 	SRpnt->sr_request->rq_disk = sdp->disk;
-	SRpnt->sr_request->rq_dev = mk_kdev(sdp->disk->major,
-					    sdp->disk->first_minor);
 	SRpnt->sr_sense_buffer[0] = 0;
 	SRpnt->sr_cmd_len = hp->cmd_len;
 	SRpnt->sr_use_sg = srp->data.k_use_sg;
@@ -1260,7 +1258,6 @@ sg_cmd_done(Scsi_Cmnd * SCpnt)
 	SRpnt->sr_buffer = NULL;
 	SRpnt->sr_underflow = 0;
 	SRpnt->sr_request->rq_disk = NULL; /* "sg" _disowns_ request blk */
-	SRpnt->sr_request->rq_dev = mk_kdev(0, 0);
 
 	srp->my_cmdp = NULL;
 	srp->done = 1;

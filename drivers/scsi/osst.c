@@ -335,8 +335,6 @@ static	Scsi_Request * osst_do_scsi(Scsi_Request *SRpnt, OS_Scsi_Tape *STp,
 	SRpnt->sr_request->waiting = &(STp->wait);
 	SRpnt->sr_request->rq_status = RQ_SCSI_BUSY;
 	SRpnt->sr_request->rq_disk = STp->disk;
-	SRpnt->sr_request->rq_dev = mk_kdev(STp->disk->major,
-					    STp->disk->first_minor);
 
 	scsi_do_req(SRpnt, (void *)cmd, bp, bytes, osst_sleep_done, timeout, retries);
 
@@ -5486,8 +5484,6 @@ static int osst_attach(Scsi_Device * SDp)
 	tpnt->device = SDp;
 	disk->private_data = &tpnt->driver;
 	sprintf(disk->disk_name, "osst%d", i);
-	disk->major = MAJOR_NR;
-	disk->first_minor = i;
 	tpnt->driver = &osst_template;
 	tpnt->disk = disk;
 	tpnt->dirty = 0;

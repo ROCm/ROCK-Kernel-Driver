@@ -1799,7 +1799,6 @@ get_rq:
 	req->buffer = bio_data(bio);	/* see ->buffer comment above */
 	req->waiting = NULL;
 	req->bio = req->biotail = bio;
-	req->rq_dev = to_kdev_t(bio->bi_bdev->bd_dev);
 	req->rq_disk = bio->bi_bdev->bd_disk;
 	req->start_time = jiffies;
 	add_request(q, req, insert_here);
