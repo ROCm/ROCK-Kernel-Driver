@@ -833,7 +833,7 @@ static int nfs_safe_remove(struct dentry *dentry)
 {
 	struct inode *dir = dentry->d_parent->d_inode;
 	struct inode *inode = dentry->d_inode;
-	int error = -EBUSY, rehash = 0;
+	int error = -EBUSY;
 		
 	dfprintk(VFS, "NFS: safe_remove(%s/%s)\n",
 		dentry->d_parent->d_name.name, dentry->d_name.name);
