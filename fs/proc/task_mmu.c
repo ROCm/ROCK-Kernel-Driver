@@ -76,22 +76,6 @@ int task_statm(struct mm_struct *mm, int *shared, int *text,
 	return size;
 }
 
-#ifdef AT_SYSINFO_EHDR
-
-static struct vm_area_struct gate_vmarea = {
-	/* Do _not_ mark this area as readable, cuz not the entire range may be readable
-	   (e.g., due to execute-only pages or holes) and the tools that read
-	   /proc/PID/maps should read the interesting bits from the gate-DSO file
-	   instead.  */
-	.vm_start = FIXADDR_USER_START,
-	.vm_end = FIXADDR_USER_END
-};
-
-# define gate_map()	&gate_vmarea
-#else
-# define gate_map()	NULL
-#endif
-
 static int show_map(struct seq_file *m, void *v)
 {
 	struct vm_area_struct *map = v;
@@ -146,15 +130,16 @@ static void *m_start(struct seq_file *m, loff_t *pos)
 		up_read(&mm->mmap_sem);
 		mmput(mm);
 		if (l == -1)
-			map = gate_map();
+			map = get_gate_vma(task);
 	}
 	return map;
 }
 
 static void m_stop(struct seq_file *m, void *v)
 {
+	struct task_struct *task = m->private;
 	struct vm_area_struct *map = v;
-	if (map && map != gate_map()) {
+	if (map && map != get_gate_vma(task)) {
 		struct mm_struct *mm = map->vm_mm;
 		up_read(&mm->mmap_sem);
 		mmput(mm);
@@ -163,13 +148,14 @@ static void m_stop(struct seq_file *m, void *v)
 
 static void *m_next(struct seq_file *m, void *v, loff_t *pos)
 {
+	struct task_struct *task = m->private;
 	struct vm_area_struct *map = v;
 	(*pos)++;
 	if (map->vm_next)
 		return map->vm_next;
 	m_stop(m, v);
-	if (map != gate_map())
-		return gate_map();
+	if (map != get_gate_vma(task))
+		return get_gate_vma(task);
 	return NULL;
 }
 

@@ -223,8 +223,7 @@ idal_buffer_to_user(struct idal_buffer *ib, void *to, size_t count)
 	size_t left;
 	int i;
 
-	if (count > ib->size)
-		BUG();
+	BUG_ON(count > ib->size);
 	for (i = 0; count > IDA_BLOCK_SIZE; i++) {
 		left = copy_to_user(to, ib->data[i], IDA_BLOCK_SIZE);
 		if (left)
@@ -244,8 +243,7 @@ idal_buffer_from_user(struct idal_buffer *ib, const void *from, size_t count)
 	size_t left;
 	int i;
 
-	if (count > ib->size)
-		BUG();
+	BUG_ON(count > ib->size);
 	for (i = 0; count > IDA_BLOCK_SIZE; i++) {
 		left = copy_from_user(ib->data[i], from, IDA_BLOCK_SIZE);
 		if (left)

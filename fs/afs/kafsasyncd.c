@@ -57,8 +57,8 @@ int afs_kafsasyncd_start(void)
 {
 	int ret;
 
-	ret = kernel_thread(kafsasyncd,NULL,0);
-	if (ret<0)
+	ret = kernel_thread(kafsasyncd, NULL, 0);
+	if (ret < 0)
 		return ret;
 
 	wait_for_completion(&kafsasyncd_alive);
@@ -85,14 +85,14 @@ void afs_kafsasyncd_stop(void)
  */
 static int kafsasyncd(void *arg)
 {
-	DECLARE_WAITQUEUE(myself,current);
-
-	struct list_head *_p;
+	struct afs_async_op *op;
 	int die;
+
+	DECLARE_WAITQUEUE(myself, current);
 
 	kafsasyncd_task = current;
 
-	printk("kAFS: Started kafsasyncd %d\n",current->pid);
+	printk("kAFS: Started kafsasyncd %d\n", current->pid);
 
 	daemonize("kafsasyncd");
 
@@ -101,7 +101,7 @@ static int kafsasyncd(void *arg)
 	/* loop around looking for things to attend to */
 	do {
 		set_current_state(TASK_INTERRUPTIBLE);
-		add_wait_queue(&kafsasyncd_sleepq,&myself);
+		add_wait_queue(&kafsasyncd_sleepq, &myself);
 
 		for (;;) {
 			if (!list_empty(&kafsasyncd_async_attnq) ||
@@ -113,7 +113,7 @@ static int kafsasyncd(void *arg)
 			set_current_state(TASK_INTERRUPTIBLE);
 		}
 
-		remove_wait_queue(&kafsasyncd_sleepq,&myself);
+		remove_wait_queue(&kafsasyncd_sleepq, &myself);
 		set_current_state(TASK_RUNNING);
 
 		/* discard pending signals */
@@ -121,7 +121,8 @@ static int kafsasyncd(void *arg)
 
 		die = kafsasyncd_die;
 
-		/* deal with the next asynchronous operation requiring attention */
+		/* deal with the next asynchronous operation requiring
+		 * attention */
 		if (!list_empty(&kafsasyncd_async_attnq)) {
 			struct afs_async_op *op;
 
@@ -131,14 +132,17 @@ static int kafsasyncd(void *arg)
 			spin_lock(&kafsasyncd_async_lock);
 
 			if (!list_empty(&kafsasyncd_async_attnq)) {
-				op = list_entry(kafsasyncd_async_attnq.next,afs_async_op_t,link);
+				op = list_entry(kafsasyncd_async_attnq.next,
+						struct afs_async_op, link);
 				list_del(&op->link);
-				list_add_tail(&op->link,&kafsasyncd_async_busyq);
+				list_add_tail(&op->link,
+					      &kafsasyncd_async_busyq);
 			}
 
 			spin_unlock(&kafsasyncd_async_lock);
 
-			_debug("@@@ Operation %p {%p}\n",op,op?op->ops:NULL);
+			_debug("@@@ Operation %p {%p}\n",
+			       op, op ? op->ops : NULL);
 
 			if (op)
 				op->ops->attend(op);
@@ -148,30 +152,30 @@ static int kafsasyncd(void *arg)
 
 	} while(!die);
 
-	/* need to kill all outstanding asynchronous operations before exiting */
+	/* need to kill all outstanding asynchronous operations before
+	 * exiting */
 	kafsasyncd_task = NULL;
 	spin_lock(&kafsasyncd_async_lock);
 
 	/* fold the busy and attention queues together */
-	list_splice_init(&kafsasyncd_async_busyq,&kafsasyncd_async_attnq);
+	list_splice_init(&kafsasyncd_async_busyq,
+			 &kafsasyncd_async_attnq);
 
 	/* dequeue kafsasyncd from all their wait queues */
-	list_for_each(_p,&kafsasyncd_async_attnq) {
-		afs_async_op_t *op = list_entry(_p,afs_async_op_t,link);
-
+	list_for_each_entry(op, &kafsasyncd_async_attnq, link) {
 		op->call->app_attn_func = kafsasyncd_null_call_attn_func;
 		op->call->app_error_func = kafsasyncd_null_call_error_func;
-		remove_wait_queue(&op->call->waitq,&op->waiter);
+		remove_wait_queue(&op->call->waitq, &op->waiter);
 	}
 
 	spin_unlock(&kafsasyncd_async_lock);
 
 	/* abort all the operations */
 	while (!list_empty(&kafsasyncd_async_attnq)) {
-		afs_async_op_t *op = list_entry(_p,afs_async_op_t,link);
+		op = list_entry(kafsasyncd_async_attnq.next, struct afs_async_op, link);
 		list_del_init(&op->link);
 
-		rxrpc_call_abort(op->call,-EIO);
+		rxrpc_call_abort(op->call, -EIO);
 		rxrpc_put_call(op->call);
 		op->call = NULL;
 
@@ -180,7 +184,7 @@ static int kafsasyncd(void *arg)
 
 	/* and that's all */
 	_leave("");
-	complete_and_exit(&kafsasyncd_dead,0);
+	complete_and_exit(&kafsasyncd_dead, 0);
 
 } /* end kafsasyncd() */
 
@@ -189,17 +193,17 @@ static int kafsasyncd(void *arg)
  * begin an operation
  * - place operation on busy queue
  */
-void afs_kafsasyncd_begin_op(afs_async_op_t *op)
+void afs_kafsasyncd_begin_op(struct afs_async_op *op)
 {
 	_enter("");
 
 	spin_lock(&kafsasyncd_async_lock);
 
-	init_waitqueue_entry(&op->waiter,kafsasyncd_task);
-	add_wait_queue(&op->call->waitq,&op->waiter);
+	init_waitqueue_entry(&op->waiter, kafsasyncd_task);
+	add_wait_queue(&op->call->waitq, &op->waiter);
 
 	list_del(&op->link);
-	list_add_tail(&op->link,&kafsasyncd_async_busyq);
+	list_add_tail(&op->link, &kafsasyncd_async_busyq);
 
 	spin_unlock(&kafsasyncd_async_lock);
 
@@ -211,14 +215,14 @@ void afs_kafsasyncd_begin_op(afs_async_op_t *op)
  * request attention for an operation
  * - move to attention queue
  */
-void afs_kafsasyncd_attend_op(afs_async_op_t *op)
+void afs_kafsasyncd_attend_op(struct afs_async_op *op)
 {
 	_enter("");
 
 	spin_lock(&kafsasyncd_async_lock);
 
 	list_del(&op->link);
-	list_add_tail(&op->link,&kafsasyncd_async_attnq);
+	list_add_tail(&op->link, &kafsasyncd_async_attnq);
 
 	spin_unlock(&kafsasyncd_async_lock);
 
@@ -232,7 +236,7 @@ void afs_kafsasyncd_attend_op(afs_async_op_t *op)
  * terminate an operation
  * - remove from either queue
  */
-void afs_kafsasyncd_terminate_op(afs_async_op_t *op)
+void afs_kafsasyncd_terminate_op(struct afs_async_op *op)
 {
 	_enter("");
 
@@ -240,7 +244,7 @@ void afs_kafsasyncd_terminate_op(afs_async_op_t *op)
 
 	if (!list_empty(&op->link)) {
 		list_del_init(&op->link);
-		remove_wait_queue(&op->call->waitq,&op->waiter);
+		remove_wait_queue(&op->call->waitq, &op->waiter);
 	}
 
 	spin_unlock(&kafsasyncd_async_lock);

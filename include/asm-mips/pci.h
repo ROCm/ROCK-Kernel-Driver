@@ -113,8 +113,7 @@ static inline void pci_dac_dma_sync_single(struct pci_dev *pdev,
 {
 	unsigned long addr;
 
-	if (direction == PCI_DMA_NONE)
-		BUG();
+	BUG_ON(direction == PCI_DMA_NONE);
 
 	addr = baddr_to_bus(pdev->bus, dma_addr) + PAGE_OFFSET;
 	dma_cache_wback_inv(addr, len);

@@ -45,6 +45,7 @@
 #include <linux/pagemap.h>
 #include <linux/rmap-locking.h>
 #include <linux/module.h>
+#include <linux/init.h>
 
 #include <asm/pgalloc.h>
 #include <asm/rmap.h>
@@ -704,25 +705,13 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 		struct vm_area_struct *	vma;
 
 		vma = find_extend_vma(mm, start);
-
-#ifdef FIXADDR_USER_START
-		if (!vma &&
-		    start >= FIXADDR_USER_START && start < FIXADDR_USER_END) {
-			static struct vm_area_struct fixmap_vma = {
-				/* Catch users - if there are any valid
-				   ones, we can make this be "&init_mm" or
-				   something.  */
-				.vm_mm = NULL,
-				.vm_start = FIXADDR_USER_START,
-				.vm_end = FIXADDR_USER_END,
-				.vm_page_prot = PAGE_READONLY,
-				.vm_flags = VM_READ | VM_EXEC,
-			};
+		if (!vma && in_gate_area(tsk, start)) {
 			unsigned long pg = start & PAGE_MASK;
+			struct vm_area_struct *gate_vma = get_gate_vma(tsk);
 			pgd_t *pgd;
 			pmd_t *pmd;
 			pte_t *pte;
-			if (write) /* user fixmap pages are read-only */
+			if (write) /* user gate pages are read-only */
 				return i ? : -EFAULT;
 			pgd = pgd_offset_k(pg);
 			if (!pgd)
@@ -738,13 +727,12 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 				get_page(pages[i]);
 			}
 			if (vmas)
-				vmas[i] = &fixmap_vma;
+				vmas[i] = gate_vma;
 			i++;
 			start += PAGE_SIZE;
 			len--;
 			continue;
 		}
-#endif
 
 		if (!vma || (pages && (vma->vm_flags & VM_IO))
 				|| !(flags & vma->vm_flags))
@@ -1433,10 +1421,8 @@ retry:
 	 */
 	if (write_access && !(vma->vm_flags & VM_SHARED)) {
 		struct page * page = alloc_page(GFP_HIGHUSER);
-		if (!page) {
-			page_cache_release(new_page);
+		if (!page)
 			goto oom;
-		}
 		copy_user_highpage(page, new_page, address);
 		page_cache_release(new_page);
 		lru_cache_add_active(page);
@@ -1493,6 +1479,7 @@ retry:
 	spin_unlock(&mm->page_table_lock);
 	goto out;
 oom:
+	page_cache_release(new_page);
 	ret = VM_FAULT_OOM;
 out:
 	pte_chain_free(pte_chain);
@@ -1700,3 +1687,18 @@ struct page * vmalloc_to_page(void * vmalloc_addr)
 }
 
 EXPORT_SYMBOL(vmalloc_to_page);
+
+#if !defined(CONFIG_ARCH_GATE_AREA) && defined(AT_SYSINFO_EHDR)
+struct vm_area_struct gate_vma;
+
+static int __init gate_vma_init(void)
+{
+	gate_vma.vm_mm = NULL;
+	gate_vma.vm_start = FIXADDR_USER_START;
+	gate_vma.vm_end = FIXADDR_USER_END;
+	gate_vma.vm_page_prot = PAGE_READONLY;
+	gate_vma.vm_flags = 0;
+	return 0;
+}
+__initcall(gate_vma_init);
+#endif

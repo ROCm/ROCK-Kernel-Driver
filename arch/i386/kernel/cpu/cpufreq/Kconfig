@@ -145,11 +145,6 @@ config X86_SPEEDSTEP_SMI
 
 	  If in doubt, say N.
 
-config X86_SPEEDSTEP_LIB
-	tristate
-	depends on (X86_SPEEDSTEP_ICH || X86_SPEEDSTEP_SMI)
-	default (X86_SPEEDSTEP_ICH || X86_SPEEDSTEP_SMI)
-
 config X86_P4_CLOCKMOD
 	tristate "Intel Pentium 4 clock modulation"
 	depends on CPU_FREQ_TABLE
@@ -160,6 +155,11 @@ config X86_P4_CLOCKMOD
 	  For details, take a look at linux/Documentation/cpu-freq. 
 
 	  If in doubt, say N.
+
+config X86_SPEEDSTEP_LIB
+	tristate
+	depends on (X86_SPEEDSTEP_ICH || X86_SPEEDSTEP_SMI || X86_P4_CLOCKMOD)
+	default (X86_SPEEDSTEP_ICH || X86_SPEEDSTEP_SMI || X86_P4_CLOCKMOD)
 
 config X86_LONGRUN
 	tristate "Transmeta LongRun"
