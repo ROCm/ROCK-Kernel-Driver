@@ -591,6 +591,13 @@ UNUSUAL_DEV( 0x090c, 0x1132, 0x0000, 0xffff,
 		US_SC_SCSI, US_PR_BULK, NULL,
 		US_FL_FIX_CAPACITY ),
 
+/* Submitted by Hartmut Wahl <hwahl@hwahl.de>*/
+UNUSUAL_DEV( 0x0839, 0x000a, 0x0001, 0x0001,
+        "Samsung",
+        "Digimax 410",
+        US_SC_SCSI, US_PR_BULK, NULL,
+        US_FL_FIX_INQUIRY),
+                
 UNUSUAL_DEV(  0x097a, 0x0001, 0x0000, 0x0001,
 		"Minds@Work",
 		"Digital Wallet",
