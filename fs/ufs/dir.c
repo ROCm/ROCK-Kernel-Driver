@@ -67,7 +67,7 @@ ufs_readdir (struct file * filp, void * dirent, filldir_t filldir)
 	lock_kernel();
 
 	sb = inode->i_sb;
-	flags = sb->u.ufs_sb.s_flags;
+	flags = UFS_SB(sb)->s_flags;
 
 	UFSD(("ENTER, ino %lu  f_pos %lu\n", inode->i_ino, (unsigned long) filp->f_pos))
 
@@ -308,8 +308,8 @@ int ufs_check_dir_entry (const char * function,	struct inode * dir,
 		error_msg = "reclen is too small for namlen";
 	else if (((char *) de - bh->b_data) + rlen > dir->i_sb->s_blocksize)
 		error_msg = "directory entry across blocks";
-	else if (fs32_to_cpu(sb, de->d_ino) > (sb->u.ufs_sb.s_uspi->s_ipg *
-				      sb->u.ufs_sb.s_uspi->s_ncg))
+	else if (fs32_to_cpu(sb, de->d_ino) > (UFS_SB(sb)->s_uspi->s_ipg *
+				      UFS_SB(sb)->s_uspi->s_ncg))
 		error_msg = "inode out of bounds";
 
 	if (error_msg != NULL)
@@ -386,7 +386,7 @@ int ufs_add_link(struct dentry *dentry, struct inode *inode)
 	UFSD(("ENTER, name %s, namelen %u\n", name, namelen))
 	
 	sb = dir->i_sb;
-	uspi = sb->u.ufs_sb.s_uspi;
+	uspi = UFS_SB(sb)->s_uspi;
 
 	if (!namelen)
 		return -EINVAL;
