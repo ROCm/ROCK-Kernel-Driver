@@ -49,9 +49,6 @@ extern void ia64_mca_check_errors( void );
 
 struct pci_fixup pcibios_fixups[1];
 
-struct pci_ops *pci_root_ops;
-
-
 /*
  * Low-level SAL-based PCI configuration access functions. Note that SAL
  * calls are already serialized (via sal_lock), so we don't need another
@@ -106,13 +103,10 @@ struct pci_ops pci_sal_ops = {
 	.write =	pci_sal_write,
 };
 
-
-/*
- * Initialization. Uses the SAL interface
- */
+struct pci_ops *pci_root_ops = &pci_sal_ops;	/* default to SAL */
 
 struct pci_bus *
-pcibios_scan_root(int bus)
+pcibios_scan_root (int bus)
 {
 	struct list_head *list = NULL;
 	struct pci_bus *pci_bus = NULL;
@@ -127,21 +121,7 @@ pcibios_scan_root(int bus)
 	}
 
 	printk("PCI: Probing PCI hardware on bus (%02x)\n", bus);
-
 	return pci_scan_bus(bus, pci_root_ops, NULL);
-}
-
-void __init
-pcibios_config_init (void)
-{
-	if (pci_root_ops)
-		return;
-
-	printk("PCI: Using SAL to access configuration space\n");
-
-	pci_root_ops = &pci_sal_ops;
-
-	return;
 }
 
 static int __init
@@ -150,11 +130,11 @@ pcibios_init (void)
 #	define PCI_BUSES_TO_SCAN 255
 	int i = 0;
 
+acpi_init();	/* hackedy hack hack... */
+
 #ifdef CONFIG_IA64_MCA
 	ia64_mca_check_errors();    /* For post-failure MCA error logging */
 #endif
-
-	pcibios_config_init();
 
 	platform_pci_fixup(0);	/* phase 0 fixups (before buses scanned) */
 
