@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exdump - Interpreter debug output routines
- *              $Revision: 162 $
+ *              $Revision: 163 $
  *
  *****************************************************************************/
 
@@ -590,6 +590,7 @@ acpi_ex_dump_object_descriptor (
 
 		acpi_ex_out_integer ("Length",       obj_desc->buffer.length);
 		acpi_ex_out_pointer ("Pointer",      obj_desc->buffer.pointer);
+		ACPI_DUMP_BUFFER (obj_desc->buffer.pointer, obj_desc->buffer.length);
 		break;
 
 

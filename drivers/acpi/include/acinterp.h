@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acinterp.h - Interpreter subcomponent prototypes and defines
- *       $Revision: 141 $
+ *       $Revision: 142 $
  *
  *****************************************************************************/
 
@@ -164,7 +164,8 @@ acpi_ex_read_data_from_field (
 acpi_status
 acpi_ex_write_data_to_field (
 	acpi_operand_object     *source_desc,
-	acpi_operand_object     *obj_desc);
+	acpi_operand_object     *obj_desc,
+	acpi_operand_object     **result_desc);
 
 /*
  * exmisc - ACPI AML (p-code) execution - specific opcodes
