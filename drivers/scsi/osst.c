@@ -322,8 +322,6 @@ static	Scsi_Request * osst_do_scsi(Scsi_Request *SRpnt, OS_Scsi_Tape *STp,
 		}
 	}
 
-        if (SRpnt->sr_device->scsi_level <= SCSI_2)
-                cmd[1] |= (SRpnt->sr_device->lun << 5) & 0xe0;
         init_completion(&STp->wait);
 	SRpnt->sr_use_sg = (bytes > (STp->buffer)->sg[0].length) ?
 				    (STp->buffer)->use_sg : 0;

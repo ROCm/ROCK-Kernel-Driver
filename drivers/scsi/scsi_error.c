@@ -502,6 +502,10 @@ static int scsi_send_eh_cmnd(Scsi_Cmnd *scmd, int timeout)
 	 */
 	scmd->owner = SCSI_OWNER_LOWLEVEL;
 
+	if (scmd->device->scsi_level <= SCSI_2)
+		scmd->cmnd[1] = (scmd->cmnd[1] & 0x1f) |
+			(scmd->lun << 5 & 0xe0);
+
 	if (host->can_queue) {
 		DECLARE_MUTEX_LOCKED(sem);
 
@@ -609,9 +613,6 @@ static int scsi_request_sense(Scsi_Cmnd *scmd)
 
 	memcpy((void *) scmd->cmnd, (void *) generic_sense,
 	       sizeof(generic_sense));
-
-	if (scmd->device->scsi_level <= SCSI_2)
-		scmd->cmnd[1] = scmd->lun << 5;
 
 	scsi_result = (!scmd->host->hostt->unchecked_isa_dma)
 	    ? &scsi_result0[0] : kmalloc(512, GFP_ATOMIC | GFP_DMA);
@@ -838,9 +839,6 @@ static int scsi_eh_tur(Scsi_Cmnd *scmd)
 retry_tur:
 	memcpy((void *) scmd->cmnd, (void *) tur_command,
 	       sizeof(tur_command));
-
-	if (scmd->device->scsi_level <= SCSI_2)
-		scmd->cmnd[1] = scmd->lun << 5;
 
 	/*
 	 * zero the sense buffer.  the scsi spec mandates that any
@@ -1419,7 +1417,7 @@ static void scsi_eh_lock_door(struct scsi_device *sdev)
 	}
 
 	sreq->sr_cmnd[0] = ALLOW_MEDIUM_REMOVAL;
-	sreq->sr_cmnd[1] = (sdev->scsi_level <= SCSI_2) ? (sdev->lun << 5) : 0;
+	sreq->sr_cmnd[1] = 0;
 	sreq->sr_cmnd[2] = 0;
 	sreq->sr_cmnd[3] = 0;
 	sreq->sr_cmnd[4] = SCSI_REMOVAL_PREVENT;

@@ -798,6 +798,12 @@ int scsi_dispatch_cmd(Scsi_Cmnd * SCpnt)
 		serial_number = 1;
 	SCpnt->serial_number = serial_number;
 	SCpnt->pid = scsi_pid++;
+	/* 
+	 * If SCSI-2 or lower, store the LUN value in cmnd.
+	 */
+	if (SCpnt->device->scsi_level <= SCSI_2)
+		SCpnt->cmnd[1] = (SCpnt->cmnd[1] & 0x1f) |
+			(SCpnt->lun << 5 & 0xe0);
 
 	/*
 	 * We will wait MIN_RESET_DELAY clock ticks after the last reset so
