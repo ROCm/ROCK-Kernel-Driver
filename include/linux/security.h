@@ -22,8 +22,6 @@
 #ifndef __LINUX_SECURITY_H
 #define __LINUX_SECURITY_H
 
-#ifdef __KERNEL__
-
 #include <linux/fs.h>
 #include <linux/binfmts.h>
 #include <linux/signal.h>
@@ -32,6 +30,23 @@
 #include <linux/sysctl.h>
 #include <linux/shm.h>
 #include <linux/msg.h>
+#include <linux/sched.h>
+
+
+/*
+ * These functions are in security/capability.c and are used
+ * as the default capabilities functions
+ */
+extern int cap_capable (struct task_struct *tsk, int cap);
+extern int cap_ptrace (struct task_struct *parent, struct task_struct *child);
+extern int cap_capget (struct task_struct *target, kernel_cap_t *effective, kernel_cap_t *inheritable, kernel_cap_t *permitted);
+extern int cap_capset_check (struct task_struct *target, kernel_cap_t *effective, kernel_cap_t *inheritable, kernel_cap_t *permitted);
+extern void cap_capset_set (struct task_struct *target, kernel_cap_t *effective, kernel_cap_t *inheritable, kernel_cap_t *permitted);
+extern int cap_bprm_set_security (struct linux_binprm *bprm);
+extern void cap_bprm_compute_creds (struct linux_binprm *bprm);
+extern int cap_task_post_setuid (uid_t old_ruid, uid_t old_euid, uid_t old_suid, int flags);
+extern void cap_task_kmod_set_label (void);
+extern void cap_task_reparent_to_init (struct task_struct *p);
 
 /*
  * Values used in the task_security_ops calls
@@ -47,6 +62,9 @@
 
 /* setfsuid or setfsgid, id0 == fsuid or fsgid */
 #define LSM_SETID_FS	8
+
+
+#ifdef CONFIG_SECURITY
 
 /* forward declares to avoid warnings */
 struct sk_buff;
@@ -843,6 +861,526 @@ struct security_operations {
 	                            struct security_operations *ops);
 };
 
+/* global variables */
+extern struct security_operations *security_ops;
+
+/* inline stuff */
+static inline int security_ptrace (struct task_struct * parent, struct task_struct * child)
+{
+	return security_ops->ptrace (parent, child);
+}
+
+static inline int security_capget (struct task_struct *target,
+				   kernel_cap_t *effective,
+				   kernel_cap_t *inheritable,
+				   kernel_cap_t *permitted)
+{
+	return security_ops->capget (target, effective, inheritable, permitted);
+}
+
+static inline int security_capset_check (struct task_struct *target,
+					 kernel_cap_t *effective,
+					 kernel_cap_t *inheritable,
+					 kernel_cap_t *permitted)
+{
+	return security_ops->capset_check (target, effective, inheritable, permitted);
+}
+
+static inline void security_capset_set (struct task_struct *target,
+					kernel_cap_t *effective,
+					kernel_cap_t *inheritable,
+					kernel_cap_t *permitted)
+{
+	security_ops->capset_set (target, effective, inheritable, permitted);
+}
+
+static inline int security_acct (struct file *file)
+{
+	return security_ops->acct (file);
+}
+
+static inline int security_quotactl (int cmds, int type, int id,
+				     struct super_block *sb)
+{
+	return security_ops->quotactl (cmds, type, id, sb);
+}
+
+static inline int security_quota_on (struct file * file)
+{
+	return security_ops->quota_on (file);
+}
+
+static inline int security_bprm_alloc (struct linux_binprm *bprm)
+{
+	return security_ops->bprm_alloc_security (bprm);
+}
+static inline void security_bprm_free (struct linux_binprm *bprm)
+{
+	security_ops->bprm_free_security (bprm);
+}
+static inline void security_bprm_compute_creds (struct linux_binprm *bprm)
+{
+	security_ops->bprm_compute_creds (bprm);
+}
+static inline int security_bprm_set (struct linux_binprm *bprm)
+{
+	return security_ops->bprm_set_security (bprm);
+}
+static inline int security_bprm_check (struct linux_binprm *bprm)
+{
+	return security_ops->bprm_check_security (bprm);
+}
+
+static inline int security_sb_alloc (struct super_block *sb)
+{
+	return security_ops->sb_alloc_security (sb);
+}
+
+static inline void security_sb_free (struct super_block *sb)
+{
+	security_ops->sb_free_security (sb);
+}
+
+static inline int security_sb_statfs (struct super_block *sb)
+{
+	return security_ops->sb_statfs (sb);
+}
+
+static inline int security_sb_mount (char *dev_name, struct nameidata *nd,
+				    char *type, unsigned long flags,
+				    void *data)
+{
+	return security_ops->sb_mount (dev_name, nd, type, flags, data);
+}
+
+static inline int security_sb_check_sb (struct vfsmount *mnt,
+					struct nameidata *nd)
+{
+	return security_ops->sb_check_sb (mnt, nd);
+}
+
+static inline int security_sb_umount (struct vfsmount *mnt, int flags)
+{
+	return security_ops->sb_umount (mnt, flags);
+}
+
+static inline void security_sb_umount_close (struct vfsmount *mnt)
+{
+	security_ops->sb_umount_close (mnt);
+}
+
+static inline void security_sb_umount_busy (struct vfsmount *mnt)
+{
+	security_ops->sb_umount_busy (mnt);
+}
+
+static inline void security_sb_post_remount (struct vfsmount *mnt,
+					     unsigned long flags, void *data)
+{
+	security_ops->sb_post_remount (mnt, flags, data);
+}
+
+static inline void security_sb_post_mountroot (void)
+{
+	security_ops->sb_post_mountroot ();
+}
+
+static inline void security_sb_post_addmount (struct vfsmount *mnt,
+					      struct nameidata *mountpoint_nd)
+{
+	security_ops->sb_post_addmount (mnt, mountpoint_nd);
+}
+
+static inline int security_sb_pivotroot (struct nameidata *old_nd,
+					 struct nameidata *new_nd)
+{
+	return security_ops->sb_pivotroot (old_nd, new_nd);
+}
+
+static inline void security_sb_post_pivotroot (struct nameidata *old_nd,
+					       struct nameidata *new_nd)
+{
+	security_ops->sb_post_pivotroot (old_nd, new_nd);
+}
+
+static inline int security_inode_alloc (struct inode *inode)
+{
+	return security_ops->inode_alloc_security (inode);
+}
+
+static inline void security_inode_free (struct inode *inode)
+{
+	security_ops->inode_free_security (inode);
+}
+	
+static inline int security_inode_create (struct inode *dir,
+					 struct dentry *dentry,
+					 int mode)
+{
+	return security_ops->inode_create (dir, dentry, mode);
+}
+
+static inline void security_inode_post_create (struct inode *dir,
+					       struct dentry *dentry,
+					       int mode)
+{
+	security_ops->inode_post_create (dir, dentry, mode);
+}
+
+static inline int security_inode_link (struct dentry *old_dentry,
+				       struct inode *dir,
+				       struct dentry *new_dentry)
+{
+	return security_ops->inode_link (old_dentry, dir, new_dentry);
+}
+
+static inline void security_inode_post_link (struct dentry *old_dentry,
+					     struct inode *dir,
+					     struct dentry *new_dentry)
+{
+	security_ops->inode_post_link (old_dentry, dir, new_dentry);
+}
+
+static inline int security_inode_unlink (struct inode *dir,
+					 struct dentry *dentry)
+{
+	return security_ops->inode_unlink (dir, dentry);
+}
+
+static inline int security_inode_symlink (struct inode *dir,
+					  struct dentry *dentry,
+					  const char *old_name)
+{
+	return security_ops->inode_symlink (dir, dentry, old_name);
+}
+
+static inline void security_inode_post_symlink (struct inode *dir,
+						struct dentry *dentry,
+						const char *old_name)
+{
+	security_ops->inode_post_symlink (dir, dentry, old_name);
+}
+
+static inline int security_inode_mkdir (struct inode *dir,
+					struct dentry *dentry,
+					int mode)
+{
+	return security_ops->inode_mkdir (dir, dentry, mode);
+}
+
+static inline void security_inode_post_mkdir (struct inode *dir,
+					      struct dentry *dentry,
+					      int mode)
+{
+	security_ops->inode_post_mkdir (dir, dentry, mode);
+}
+
+static inline int security_inode_rmdir (struct inode *dir,
+					struct dentry *dentry)
+{
+	return security_ops->inode_rmdir (dir, dentry);
+}
+
+static inline int security_inode_mknod (struct inode *dir,
+					struct dentry *dentry,
+					int mode, dev_t dev)
+{
+	return security_ops->inode_mknod (dir, dentry, mode, dev);
+}
+
+static inline void security_inode_post_mknod (struct inode *dir,
+					      struct dentry *dentry,
+					      int mode, dev_t dev)
+{
+	security_ops->inode_post_mknod (dir, dentry, mode, dev);
+}
+
+static inline int security_inode_rename (struct inode *old_dir,
+					 struct dentry *old_dentry,
+					 struct inode *new_dir,
+					 struct dentry *new_dentry)
+{
+	return security_ops->inode_rename (old_dir, old_dentry,
+					   new_dir, new_dentry);
+}
+
+static inline void security_inode_post_rename (struct inode *old_dir,
+					       struct dentry *old_dentry,
+					       struct inode *new_dir,
+					       struct dentry *new_dentry)
+{
+	security_ops->inode_post_rename (old_dir, old_dentry,
+						new_dir, new_dentry);
+}
+
+static inline int security_inode_readlink (struct dentry *dentry)
+{
+	return security_ops->inode_readlink (dentry);
+}
+
+static inline int security_inode_follow_link (struct dentry *dentry,
+					      struct nameidata *nd)
+{
+	return security_ops->inode_follow_link (dentry, nd);
+}
+
+static inline int security_inode_permission (struct inode *inode, int mask)
+{
+	return security_ops->inode_permission (inode, mask);
+}
+
+static inline int security_inode_permission_lite (struct inode *inode,
+						  int mask)
+{
+	return security_ops->inode_permission_lite (inode, mask);
+}
+
+static inline int security_inode_setattr (struct dentry *dentry,
+					  struct iattr *attr)
+{
+	return security_ops->inode_setattr (dentry, attr);
+}
+
+static inline int security_inode_getattr (struct vfsmount *mnt,
+					  struct dentry *dentry)
+{
+	return security_ops->inode_getattr (mnt, dentry);
+}
+
+static inline void security_inode_post_lookup (struct inode *inode,
+					       struct dentry *dentry)
+{
+	security_ops->inode_post_lookup (inode, dentry);
+}
+
+static inline void security_inode_delete (struct inode *inode)
+{
+	security_ops->inode_delete (inode);
+}
+
+static inline int security_inode_setxattr (struct dentry *dentry, char *name,
+					   void *value, size_t size, int flags)
+{
+	return security_ops->inode_setxattr (dentry, name, value, size, flags);
+}
+
+static inline int security_inode_getxattr (struct dentry *dentry, char *name)
+{
+	return security_ops->inode_getxattr (dentry, name);
+}
+
+static inline int security_inode_listxattr (struct dentry *dentry)
+{
+	return security_ops->inode_listxattr (dentry);
+}
+
+static inline int security_inode_removexattr (struct dentry *dentry, char *name)
+{
+	return security_ops->inode_removexattr (dentry, name);
+}
+
+static inline int security_file_permission (struct file *file, int mask)
+{
+	return security_ops->file_permission (file, mask);
+}
+
+static inline int security_file_alloc (struct file *file)
+{
+	return security_ops->file_alloc_security (file);
+}
+
+static inline void security_file_free (struct file *file)
+{
+	security_ops->file_free_security (file);
+}
+
+static inline int security_file_ioctl (struct file *file, unsigned int cmd,
+				       unsigned long arg)
+{
+	return security_ops->file_ioctl (file, cmd, arg);
+}
+
+static inline int security_file_mmap (struct file *file, unsigned long prot,
+				      unsigned long flags)
+{
+	return security_ops->file_mmap (file, prot, flags);
+}
+
+static inline int security_file_mprotect (struct vm_area_struct *vma,
+					  unsigned long prot)
+{
+	return security_ops->file_mprotect (vma, prot);
+}
+
+static inline int security_file_lock (struct file *file, unsigned int cmd)
+{
+	return security_ops->file_lock (file, cmd);
+}
+
+static inline int security_file_fcntl (struct file *file, unsigned int cmd,
+				       unsigned long arg)
+{
+	return security_ops->file_fcntl (file, cmd, arg);
+}
+
+static inline int security_file_set_fowner (struct file *file)
+{
+	return security_ops->file_set_fowner (file);
+}
+
+static inline int security_file_send_sigiotask (struct task_struct *tsk,
+						struct fown_struct *fown,
+						int fd, int reason)
+{
+	return security_ops->file_send_sigiotask (tsk, fown, fd, reason);
+}
+
+static inline int security_file_receive (struct file *file)
+{
+	return security_ops->file_receive (file);
+}
+
+static inline int security_task_create (unsigned long clone_flags)
+{
+	return security_ops->task_create (clone_flags);
+}
+
+static inline int security_task_alloc (struct task_struct *p)
+{
+	return security_ops->task_alloc_security (p);
+}
+
+static inline void security_task_free (struct task_struct *p)
+{
+	security_ops->task_free_security (p);
+}
+
+static inline int security_task_setuid (uid_t id0, uid_t id1, uid_t id2,
+					int flags)
+{
+	return security_ops->task_setuid (id0, id1, id2, flags);
+}
+
+static inline int security_task_post_setuid (uid_t old_ruid, uid_t old_euid,
+					     uid_t old_suid, int flags)
+{
+	return security_ops->task_post_setuid (old_ruid, old_euid, old_suid, flags);
+}
+
+static inline int security_task_setgid (gid_t id0, gid_t id1, gid_t id2,
+					int flags)
+{
+	return security_ops->task_setgid (id0, id1, id2, flags);
+}
+
+static inline int security_task_setpgid (struct task_struct *p, pid_t pgid)
+{
+	return security_ops->task_setpgid (p, pgid);
+}
+
+static inline int security_task_getpgid (struct task_struct *p)
+{
+	return security_ops->task_getpgid (p);
+}
+
+static inline int security_task_getsid (struct task_struct *p)
+{
+	return security_ops->task_getsid (p);
+}
+
+static inline int security_task_setgroups (int gidsetsize, gid_t *grouplist)
+{
+	return security_ops->task_setgroups (gidsetsize, grouplist);
+}
+
+static inline int security_task_setnice (struct task_struct *p, int nice)
+{
+	return security_ops->task_setnice (p, nice);
+}
+
+static inline int security_task_setrlimit (unsigned int resource,
+					   struct rlimit *new_rlim)
+{
+	return security_ops->task_setrlimit (resource, new_rlim);
+}
+
+static inline int security_task_setscheduler (struct task_struct *p,
+					      int policy,
+					      struct sched_param *lp)
+{
+	return security_ops->task_setscheduler (p, policy, lp);
+}
+
+static inline int security_task_getscheduler (struct task_struct *p)
+{
+	return security_ops->task_getscheduler (p);
+}
+
+static inline int security_task_kill (struct task_struct *p,
+				      struct siginfo *info, int sig)
+{
+	return security_ops->task_kill (p, info, sig);
+}
+
+static inline int security_task_wait (struct task_struct *p)
+{
+	return security_ops->task_wait (p);
+}
+
+static inline int security_task_prctl (int option, unsigned long arg2,
+				       unsigned long arg3,
+				       unsigned long arg4,
+				       unsigned long arg5)
+{
+	return security_ops->task_prctl (option, arg2, arg3, arg4, arg5);
+}
+
+static inline void security_task_kmod_set_label (void)
+{
+	security_ops->task_kmod_set_label ();
+}
+
+static inline void security_task_reparent_to_init (struct task_struct *p)
+{
+	security_ops->task_reparent_to_init (p);
+}
+
+static inline int security_ipc_permission (struct kern_ipc_perm *ipcp,
+					   short flag)
+{
+	return security_ops->ipc_permission (ipcp, flag);
+}
+
+static inline int security_msg_queue_alloc (struct msg_queue *msq)
+{
+	return security_ops->msg_queue_alloc_security (msq);
+}
+
+static inline void security_msg_queue_free (struct msg_queue *msq)
+{
+	security_ops->msg_queue_free_security (msq);
+}
+
+static inline int security_shm_alloc (struct shmid_kernel *shp)
+{
+	return security_ops->shm_alloc_security (shp);
+}
+
+static inline void security_shm_free (struct shmid_kernel *shp)
+{
+	security_ops->shm_free_security (shp);
+}
+
+static inline int security_sem_alloc (struct sem_array *sma)
+{
+	return security_ops->sem_alloc_security (sma);
+}
+
+static inline void security_sem_free (struct sem_array *sma)
+{
+	security_ops->sem_free_security (sma);
+}
+
 
 /* prototypes */
 extern int security_scaffolding_startup	(void);
@@ -852,11 +1390,495 @@ extern int mod_reg_security	(const char *name, struct security_operations *ops);
 extern int mod_unreg_security	(const char *name, struct security_operations *ops);
 extern int capable		(int cap);
 
-/* global variables */
-extern struct security_operations *security_ops;
+
+#else /* CONFIG_SECURITY */
+
+/*
+ * This is the default capabilities functionality.  Most of these functions
+ * are just stubbed out, but a few must call the proper capable code.
+ */
+
+static inline int security_scaffolding_startup (void)
+{
+	return 0;
+}
+
+static inline int security_ptrace (struct task_struct *parent, struct task_struct * child)
+{
+	return cap_ptrace (parent, child);
+}
+
+static inline int security_capget (struct task_struct *target,
+				   kernel_cap_t *effective,
+				   kernel_cap_t *inheritable,
+				   kernel_cap_t *permitted)
+{
+	return cap_capget (target, effective, inheritable, permitted);
+}
+
+static inline int security_capset_check (struct task_struct *target,
+					 kernel_cap_t *effective,
+					 kernel_cap_t *inheritable,
+					 kernel_cap_t *permitted)
+{
+	return cap_capset_check (target, effective, inheritable, permitted);
+}
+
+static inline void security_capset_set (struct task_struct *target,
+					kernel_cap_t *effective,
+					kernel_cap_t *inheritable,
+					kernel_cap_t *permitted)
+{
+	cap_capset_set (target, effective, inheritable, permitted);
+}
+
+static inline int security_acct (struct file *file)
+{
+	return 0;
+}
+
+static inline int security_quotactl (int cmds, int type, int id,
+				     struct super_block * sb)
+{
+	return 0;
+}
+
+static inline int security_quota_on (struct file * file)
+{
+	return 0;
+}
+
+static inline int security_bprm_alloc (struct linux_binprm *bprm)
+{
+	return 0;
+}
+
+static inline void security_bprm_free (struct linux_binprm *bprm)
+{ }
+
+static inline void security_bprm_compute_creds (struct linux_binprm *bprm)
+{ 
+	cap_bprm_compute_creds (bprm);
+}
+
+static inline int security_bprm_set (struct linux_binprm *bprm)
+{
+	return cap_bprm_set_security (bprm);
+}
+
+static inline int security_bprm_check (struct linux_binprm *bprm)
+{
+	return 0;
+}
+
+static inline int security_sb_alloc (struct super_block *sb)
+{
+	return 0;
+}
+
+static inline void security_sb_free (struct super_block *sb)
+{ }
+
+static inline int security_sb_statfs (struct super_block *sb)
+{
+	return 0;
+}
+
+static inline int security_sb_mount (char *dev_name, struct nameidata *nd,
+				    char *type, unsigned long flags,
+				    void *data)
+{
+	return 0;
+}
+
+static inline int security_sb_check_sb (struct vfsmount *mnt,
+					struct nameidata *nd)
+{
+	return 0;
+}
+
+static inline int security_sb_umount (struct vfsmount *mnt, int flags)
+{
+	return 0;
+}
+
+static inline void security_sb_umount_close (struct vfsmount *mnt)
+{ }
+
+static inline void security_sb_umount_busy (struct vfsmount *mnt)
+{ }
+
+static inline void security_sb_post_remount (struct vfsmount *mnt,
+					     unsigned long flags, void *data)
+{ }
+
+static inline void security_sb_post_mountroot (void)
+{ }
+
+static inline void security_sb_post_addmount (struct vfsmount *mnt,
+					      struct nameidata *mountpoint_nd)
+{ }
+
+static inline int security_sb_pivotroot (struct nameidata *old_nd,
+					 struct nameidata *new_nd)
+{
+	return 0;
+}
+
+static inline void security_sb_post_pivotroot (struct nameidata *old_nd,
+					       struct nameidata *new_nd)
+{ }
+
+static inline int security_inode_alloc (struct inode *inode)
+{
+	return 0;
+}
+
+static inline void security_inode_free (struct inode *inode)
+{ }
+	
+static inline int security_inode_create (struct inode *dir,
+					 struct dentry *dentry,
+					 int mode)
+{
+	return 0;
+}
+
+static inline void security_inode_post_create (struct inode *dir,
+					       struct dentry *dentry,
+					       int mode)
+{ }
+
+static inline int security_inode_link (struct dentry *old_dentry,
+				       struct inode *dir,
+				       struct dentry *new_dentry)
+{
+	return 0;
+}
+
+static inline void security_inode_post_link (struct dentry *old_dentry,
+					     struct inode *dir,
+					     struct dentry *new_dentry)
+{ }
+
+static inline int security_inode_unlink (struct inode *dir,
+					 struct dentry *dentry)
+{
+	return 0;
+}
+
+static inline int security_inode_symlink (struct inode *dir,
+					  struct dentry *dentry,
+					  const char *old_name)
+{
+	return 0;
+}
+
+static inline void security_inode_post_symlink (struct inode *dir,
+						struct dentry *dentry,
+						const char *old_name)
+{ }
+
+static inline int security_inode_mkdir (struct inode *dir,
+					struct dentry *dentry,
+					int mode)
+{
+	return 0;
+}
+
+static inline void security_inode_post_mkdir (struct inode *dir,
+					      struct dentry *dentry,
+					      int mode)
+{ }
+
+static inline int security_inode_rmdir (struct inode *dir,
+					struct dentry *dentry)
+{
+	return 0;
+}
+
+static inline int security_inode_mknod (struct inode *dir,
+					struct dentry *dentry,
+					int mode, dev_t dev)
+{
+	return 0;
+}
+
+static inline void security_inode_post_mknod (struct inode *dir,
+					      struct dentry *dentry,
+					      int mode, dev_t dev)
+{ }
+
+static inline int security_inode_rename (struct inode *old_dir,
+					 struct dentry *old_dentry,
+					 struct inode *new_dir,
+					 struct dentry *new_dentry)
+{
+	return 0;
+}
+
+static inline void security_inode_post_rename (struct inode *old_dir,
+					       struct dentry *old_dentry,
+					       struct inode *new_dir,
+					       struct dentry *new_dentry)
+{ }
+
+static inline int security_inode_readlink (struct dentry *dentry)
+{
+	return 0;
+}
+
+static inline int security_inode_follow_link (struct dentry *dentry,
+					      struct nameidata *nd)
+{
+	return 0;
+}
+
+static inline int security_inode_permission (struct inode *inode, int mask)
+{
+	return 0;
+}
+
+static inline int security_inode_permission_lite (struct inode *inode,
+						  int mask)
+{
+	return 0;
+}
+
+static inline int security_inode_setattr (struct dentry *dentry,
+					  struct iattr *attr)
+{
+	return 0;
+}
+
+static inline int security_inode_getattr (struct vfsmount *mnt,
+					  struct dentry *dentry)
+{
+	return 0;
+}
+
+static inline void security_inode_post_lookup (struct inode *inode,
+					       struct dentry *dentry)
+{ }
+
+static inline void security_inode_delete (struct inode *inode)
+{ }
+
+static inline int security_inode_setxattr (struct dentry *dentry, char *name,
+					   void *value, size_t size, int flags)
+{
+	return 0;
+}
+
+static inline int security_inode_getxattr (struct dentry *dentry, char *name)
+{
+	return 0;
+}
+
+static inline int security_inode_listxattr (struct dentry *dentry)
+{
+	return 0;
+}
+
+static inline int security_inode_removexattr (struct dentry *dentry, char *name)
+{
+	return 0;
+}
+
+static inline int security_file_permission (struct file *file, int mask)
+{
+	return 0;
+}
+
+static inline int security_file_alloc (struct file *file)
+{
+	return 0;
+}
+
+static inline void security_file_free (struct file *file)
+{ }
+
+static inline int security_file_ioctl (struct file *file, unsigned int cmd,
+				       unsigned long arg)
+{
+	return 0;
+}
+
+static inline int security_file_mmap (struct file *file, unsigned long prot,
+				      unsigned long flags)
+{
+	return 0;
+}
+
+static inline int security_file_mprotect (struct vm_area_struct *vma,
+					  unsigned long prot)
+{
+	return 0;
+}
+
+static inline int security_file_lock (struct file *file, unsigned int cmd)
+{
+	return 0;
+}
+
+static inline int security_file_fcntl (struct file *file, unsigned int cmd,
+				       unsigned long arg)
+{
+	return 0;
+}
+
+static inline int security_file_set_fowner (struct file *file)
+{
+	return 0;
+}
+
+static inline int security_file_send_sigiotask (struct task_struct *tsk,
+						struct fown_struct *fown,
+						int fd, int reason)
+{
+	return 0;
+}
+
+static inline int security_file_receive (struct file *file)
+{
+	return 0;
+}
+
+static inline int security_task_create (unsigned long clone_flags)
+{
+	return 0;
+}
+
+static inline int security_task_alloc (struct task_struct *p)
+{
+	return 0;
+}
+
+static inline void security_task_free (struct task_struct *p)
+{ }
+
+static inline int security_task_setuid (uid_t id0, uid_t id1, uid_t id2,
+					int flags)
+{
+	return 0;
+}
+
+static inline int security_task_post_setuid (uid_t old_ruid, uid_t old_euid,
+					     uid_t old_suid, int flags)
+{
+	return cap_task_post_setuid (old_ruid, old_euid, old_suid, flags);
+}
+
+static inline int security_task_setgid (gid_t id0, gid_t id1, gid_t id2,
+					int flags)
+{
+	return 0;
+}
+
+static inline int security_task_setpgid (struct task_struct *p, pid_t pgid)
+{
+	return 0;
+}
+
+static inline int security_task_getpgid (struct task_struct *p)
+{
+	return 0;
+}
+
+static inline int security_task_getsid (struct task_struct *p)
+{
+	return 0;
+}
+
+static inline int security_task_setgroups (int gidsetsize, gid_t *grouplist)
+{
+	return 0;
+}
+
+static inline int security_task_setnice (struct task_struct *p, int nice)
+{
+	return 0;
+}
+
+static inline int security_task_setrlimit (unsigned int resource,
+					   struct rlimit *new_rlim)
+{
+	return 0;
+}
+
+static inline int security_task_setscheduler (struct task_struct *p,
+					      int policy,
+					      struct sched_param *lp)
+{
+	return 0;
+}
+
+static inline int security_task_getscheduler (struct task_struct *p)
+{
+	return 0;
+}
+
+static inline int security_task_kill (struct task_struct *p,
+				      struct siginfo *info, int sig)
+{
+	return 0;
+}
+
+static inline int security_task_wait (struct task_struct *p)
+{
+	return 0;
+}
+
+static inline int security_task_prctl (int option, unsigned long arg2,
+				       unsigned long arg3,
+				       unsigned long arg4,
+				       unsigned long arg5)
+{
+	return 0;
+}
+
+static inline void security_task_kmod_set_label (void)
+{
+	cap_task_kmod_set_label ();
+}
+
+static inline void security_task_reparent_to_init (struct task_struct *p)
+{
+	cap_task_reparent_to_init (p);
+}
+
+static inline int security_ipc_permission (struct kern_ipc_perm *ipcp,
+					   short flag)
+{
+	return 0;
+}
+
+static inline int security_msg_queue_alloc (struct msg_queue *msq)
+{
+	return 0;
+}
+
+static inline void security_msg_queue_free (struct msg_queue *msq)
+{ }
+
+static inline int security_shm_alloc (struct shmid_kernel *shp)
+{
+	return 0;
+}
+
+static inline void security_shm_free (struct shmid_kernel *shp)
+{ }
+
+static inline int security_sem_alloc (struct sem_array *sma)
+{
+	return 0;
+}
+
+static inline void security_sem_free (struct sem_array *sma)
+{ }
 
 
-#endif /* __KERNEL__ */
+#endif	/* CONFIG_SECURITY */
 
 #endif /* ! __LINUX_SECURITY_H */
 

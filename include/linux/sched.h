@@ -596,9 +596,9 @@ extern int request_irq(unsigned int,
 		       unsigned long, const char *, void *);
 extern void free_irq(unsigned int, void *);
 
-/* capable prototype and code moved to security.[hc] */
-#include <linux/security.h>
-#if 0
+
+#ifndef CONFIG_SECURITY
+/* capable prototype and code are in security.[hc] if CONFIG_SECURITY */
 static inline int capable(int cap)
 {
 	if (cap_raised(current->cap_effective, cap)) {
@@ -607,7 +607,7 @@ static inline int capable(int cap)
 	}
 	return 0;
 }
-#endif	/* if 0 */
+#endif
 
 /*
  * Routines for handling mm_structs
