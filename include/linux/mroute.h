@@ -126,6 +126,8 @@ struct igmpmsg
  */
 
 #ifdef __KERNEL__
+#include <net/sock.h>
+
 extern int ip_mroute_setsockopt(struct sock *, int, char *, int);
 extern int ip_mroute_getsockopt(struct sock *, int, char *, int *);
 extern int ipmr_ioctl(struct sock *sk, int cmd, unsigned long arg);
