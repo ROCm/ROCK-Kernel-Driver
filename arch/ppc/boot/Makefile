@@ -42,4 +42,4 @@ host-progs			:= $(addprefix utils/,$(tools-y))
 $(BOOT_TARGETS): $(bootdir-y)
 
 $(bootdir-y): $(addprefix $(obj)/,$(subdir-y))
-	+$(call descend,$(obj)/$@,$(MAKECMDGOALS))
+	$(Q)$(MAKE) -f scripts/Makefile.build obj=$(obj)/$@ $(MAKECMDGOALS)
