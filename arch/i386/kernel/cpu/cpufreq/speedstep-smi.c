@@ -54,7 +54,7 @@ static struct cpufreq_frequency_table speedstep_freqs[] = {
 /* DEBUG
  *   Define it if you want verbose debug output, e.g. for bug reporting
  */
-#define SPEEDSTEP_DEBUG
+//#define SPEEDSTEP_DEBUG
 
 #ifdef SPEEDSTEP_DEBUG
 #define dprintk(msg...) printk(msg)
