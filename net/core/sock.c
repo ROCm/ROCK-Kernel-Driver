@@ -966,13 +966,13 @@ int sock_no_getsockopt(struct socket *sock, int level, int optname,
 }
 
 int sock_no_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *m,
-		    int flags)
+		    size_t len)
 {
 	return -EOPNOTSUPP;
 }
 
 int sock_no_recvmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *m,
-		    int len, int flags)
+		    size_t len, int flags)
 {
 	return -EOPNOTSUPP;
 }
