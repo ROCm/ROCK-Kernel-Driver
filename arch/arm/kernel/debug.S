@@ -436,6 +436,32 @@
 		tst	\rd, #0x10
 		beq	1001b
 		.endm
+
+#elif defined(CONFIG_ARCH_OMAP)
+
+#include <asm/arch/serial.h>
+
+		.macro	addruart,rx
+		mov	\rx, #0xff000000
+		orr	\rx, \rx, #0x00fb0000
+		.endm
+
+		.macro	senduart,rd,rx
+		strb	\rd, [\rx]
+		.endm
+
+		.macro	busyuart,rd,rx
+1002:		ldrb	\rd, [\rx, #(0x5 << OMAP_SERIAL_REG_SHIFT)]
+		and	\rd, \rd, #0x60
+		teq	\rd, #0x60
+		bne	1002b
+		.endm
+
+		.macro	waituart,rd,rx
+1001:		ldrb	\rd, [\rx, #(0x6 << OMAP_SERIAL_REG_SHIFT)]
+		tst	\rd, #0x10
+		beq	1001b
+		.endm
 #else
 #error Unknown architecture
 #endif

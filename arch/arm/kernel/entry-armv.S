@@ -608,6 +608,33 @@ ENTRY(soft_irq_mask)
 		.macro	irq_prio_table
 		.endm
 
+#elif defined(CONFIG_ARCH_OMAP)
+
+		.macro	disable_fiq
+		.endm
+
+		.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
+		ldr	\base, =IO_ADDRESS(OMAP_IH1_BASE)
+		ldr	\irqnr, [\base, #IRQ_ITR]
+		ldr	\tmp, [\base, #IRQ_MIR]
+		mov	\irqstat, #0xffffffff
+		bic	\tmp, \irqstat, \tmp
+		tst	\irqnr, \tmp
+		beq	1510f
+
+		ldr	\irqnr, [\base, #IRQ_SIR_FIQ]
+		cmp	\irqnr, #0
+		ldreq	\irqnr, [\base, #IRQ_SIR_IRQ]
+		cmpeq	\irqnr, #INT_IH2_IRQ
+		ldreq	\base, =IO_ADDRESS(OMAP_IH2_BASE)
+		ldreq	\irqnr, [\base, #IRQ_SIR_IRQ]
+		addeqs	\irqnr, \irqnr, #32
+1510:
+		.endm
+
+		.macro	irq_prio_table
+		.endm
+
 #else
 #error Unknown architecture
 #endif
