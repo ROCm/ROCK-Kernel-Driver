@@ -91,7 +91,6 @@ static void keventd_create_kthread(void *_create)
 	} else {
 		wait_for_completion(&create->started);
 		create->result = find_task_by_pid(pid);
-		wait_task_inactive(create->result);
 	}
 	complete(&create->done);
 }
@@ -131,7 +130,9 @@ struct task_struct *kthread_create(int (*threadfn)(void *data),
 void kthread_bind(struct task_struct *k, unsigned int cpu)
 {
 	BUG_ON(k->state != TASK_INTERRUPTIBLE);
-	k->thread_info->cpu = cpu;
+	/* Must have done schedule() in kthread() before we set_task_cpu */
+	wait_task_inactive(k);
+	set_task_cpu(k, cpu);
 	k->cpus_allowed = cpumask_of_cpu(cpu);
 }
 
