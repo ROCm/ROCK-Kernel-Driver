@@ -840,61 +840,6 @@ asmlinkage long sys32_fcntl64(unsigned int fd, unsigned int cmd, unsigned long a
 	return sys32_fcntl(fd, cmd, arg);
 }
 
-static int put_statfs (struct statfs32 *ubuf, struct statfs *kbuf)
-{
-	int err;
-	
-	err = put_user (kbuf->f_type, &ubuf->f_type);
-	err |= __put_user (kbuf->f_bsize, &ubuf->f_bsize);
-	err |= __put_user (kbuf->f_blocks, &ubuf->f_blocks);
-	err |= __put_user (kbuf->f_bfree, &ubuf->f_bfree);
-	err |= __put_user (kbuf->f_bavail, &ubuf->f_bavail);
-	err |= __put_user (kbuf->f_files, &ubuf->f_files);
-	err |= __put_user (kbuf->f_ffree, &ubuf->f_ffree);
-	err |= __put_user (kbuf->f_namelen, &ubuf->f_namelen);
-	err |= __put_user (kbuf->f_fsid.val[0], &ubuf->f_fsid.val[0]);
-	err |= __put_user (kbuf->f_fsid.val[1], &ubuf->f_fsid.val[1]);
-	return err;
-}
-
-extern asmlinkage int sys_statfs(const char * path, struct statfs * buf);
-
-asmlinkage int sys32_statfs(const char * path, struct statfs32 *buf)
-{
-	int ret;
-	struct statfs s;
-	mm_segment_t old_fs = get_fs();
-	char *pth;
-	
-	pth = getname (path);
-	ret = PTR_ERR(pth);
-	if (!IS_ERR(pth)) {
-		set_fs (KERNEL_DS);
-		ret = sys_statfs((const char *)pth, &s);
-		set_fs (old_fs);
-		putname (pth);
-		if (put_statfs(buf, &s))
-			return -EFAULT;
-	}
-	return ret;
-}
-
-extern asmlinkage int sys_fstatfs(unsigned int fd, struct statfs * buf);
-
-asmlinkage int sys32_fstatfs(unsigned int fd, struct statfs32 *buf)
-{
-	int ret;
-	struct statfs s;
-	mm_segment_t old_fs = get_fs();
-	
-	set_fs (KERNEL_DS);
-	ret = sys_fstatfs(fd, &s);
-	set_fs (old_fs);
-	if (put_statfs(buf, &s))
-		return -EFAULT;
-	return ret;
-}
-
 extern asmlinkage long sys_truncate(const char * path, unsigned long length);
 extern asmlinkage long sys_ftruncate(unsigned int fd, unsigned long length);
 
