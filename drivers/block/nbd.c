@@ -691,6 +691,7 @@ static int __init nbd_init(void)
 			put_disk(disk);
 			goto out;
 		}
+		memset(disk->queue, 0, sizeof(struct request_queue));
 		blk_init_queue(disk->queue, do_nbd_request, &nbd_lock);
 	}
 
