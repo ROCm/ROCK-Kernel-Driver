@@ -190,6 +190,8 @@ static void ohci_dump_roothub (struct ohci_hcd *controller, int verbose)
 	__u32			temp, ndp, i;
 
 	temp = roothub_a (controller);
+	if (temp == ~(u32)0)
+		return;
 	ndp = (temp & RH_A_NDP);
 
 	if (verbose) {

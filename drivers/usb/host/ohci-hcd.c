@@ -502,10 +502,18 @@ static void ohci_irq (struct usb_hcd *hcd)
 	if ((ohci->hcca->done_head != 0)
 			&& ! (le32_to_cpup (&ohci->hcca->done_head) & 0x01)) {
 		ints =  OHCI_INTR_WDH;
-	} else if ((ints = (readl (&regs->intrstatus)
-			& readl (&regs->intrenable))) == 0) {
+
+	/* cardbus/... hardware gone before remove() */
+	} else if ((ints = readl (&regs->intrstatus)) == ~(u32)0) {
+		ohci->disabled++;
+		err ("%s device removed!", hcd->self.bus_name);
+		return;
+
+	/* interrupt for some other device? */
+	} else if ((ints &= readl (&regs->intrenable)) == 0) {
 		return;
 	} 
+
 
 	// dbg ("Interrupt: %x frame: %x", ints, le16_to_cpu (ohci->hcca->frame_no));
 
