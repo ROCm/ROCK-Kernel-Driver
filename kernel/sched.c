@@ -457,9 +457,19 @@ static void recalc_task_prio(task_t *p, unsigned long long now)
  * Update all the scheduling statistics stuff. (sleep average
  * calculation, priority modifiers, etc.)
  */
-static void activate_task(task_t *p, runqueue_t *rq)
+static void activate_task(task_t *p, runqueue_t *rq, int local)
 {
-	unsigned long long now = sched_clock();
+	unsigned long long now;
+
+	now = sched_clock();
+#ifdef CONFIG_SMP
+	if (!local) {
+		/* Compensate for drifting sched_clock */
+		runqueue_t *this_rq = this_rq();
+		now = (now - this_rq->timestamp_last_tick)
+			+ rq->timestamp_last_tick;
+	}
+#endif
 
 	recalc_task_prio(p, now);
 
@@ -819,10 +829,8 @@ out_activate:
 	 * the waker guarantees that the freshly woken up task is going
 	 * to be considered on this CPU.)
 	 */
-	if (sync && cpu == this_cpu) {
-		__activate_task(p, rq);
-	} else {
-		activate_task(p, rq);
+	activate_task(p, rq, cpu == this_cpu);
+	if (!sync || cpu != this_cpu) {
 		if (TASK_PREEMPTS_CURR(p, rq))
 			resched_task(rq->curr);
 	}
@@ -1264,6 +1272,9 @@ lock_again:
 			rq->nr_running++;
 		}
 	} else {
+		/* Not the local CPU - must adjust timestamp */
+		p->timestamp = (p->timestamp - this_rq->timestamp_last_tick)
+					+ rq->timestamp_last_tick;
 		__activate_task(p, rq);
 		if (TASK_PREEMPTS_CURR(p, rq))
 			resched_task(rq->curr);
@@ -1366,8 +1377,8 @@ void pull_task(runqueue_t *src_rq, prio_array_t *src_array, task_t *p,
 	set_task_cpu(p, this_cpu);
 	this_rq->nr_running++;
 	enqueue_task(p, this_array);
-	p->timestamp = sched_clock() -
-				(src_rq->timestamp_last_tick - p->timestamp);
+	p->timestamp = (p->timestamp - src_rq->timestamp_last_tick)
+				+ this_rq->timestamp_last_tick;
 	/*
 	 * Note that idle threads have a prio of MAX_PRIO, for this test
 	 * to be always true for them.
@@ -3333,12 +3344,19 @@ static void __migrate_task(struct task_struct *p, int src_cpu, int dest_cpu)
 
 	set_task_cpu(p, dest_cpu);
 	if (p->array) {
+		/*
+		 * Sync timestamp with rq_dest's before activating.
+		 * The same thing could be achieved by doing this step
+		 * afterwards, and pretending it was a local activate.
+		 * This way is cleaner and logically correct.
+		 */
+		p->timestamp = p->timestamp - rq_src->timestamp_last_tick
+				+ rq_dest->timestamp_last_tick;
 		deactivate_task(p, rq_src);
-		activate_task(p, rq_dest);
+		activate_task(p, rq_dest, 0);
 		if (TASK_PREEMPTS_CURR(p, rq_dest))
 			resched_task(rq_dest->curr);
 	}
-	p->timestamp = rq_dest->timestamp_last_tick;
 
 out:
 	double_rq_unlock(rq_src, rq_dest);
