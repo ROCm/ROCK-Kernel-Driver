@@ -131,7 +131,7 @@ void bt_sock_link(struct bt_sock_list *l, struct sock *s);
 void bt_sock_unlink(struct bt_sock_list *l, struct sock *s);
 int  bt_sock_recvmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *msg, int len, int flags);
 uint bt_sock_poll(struct file * file, struct socket *sock, poll_table *wait);
-int  bt_sock_w4_connect(struct sock *sk, int flags);
+int  bt_sock_wait_state(struct sock *sk, int state, unsigned long timeo);
 
 void bt_accept_enqueue(struct sock *parent, struct sock *sk);
 struct sock *bt_accept_dequeue(struct sock *parent, struct socket *newsock);

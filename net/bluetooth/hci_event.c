@@ -62,9 +62,22 @@
 /* Command Complete OGF LINK_CTL  */
 static void hci_cc_link_ctl(struct hci_dev *hdev, __u16 ocf, struct sk_buff *skb)
 {
+	__u8 status;
+
 	BT_DBG("%s ocf 0x%x", hdev->name, ocf);
 
 	switch (ocf) {
+	case OCF_INQUIRY_CANCEL:
+		status = *((__u8 *) skb->data);
+
+		if (status) {
+			BT_DBG("%s Inquiry cancel error: status 0x%x", hdev->name, status);
+		} else {
+			clear_bit(HCI_INQUIRY, &hdev->flags);
+			hci_req_complete(hdev, status);
+		}
+		break;
+
 	default:
 		BT_DBG("%s Command complete: ogf LINK_CTL ocf %x", hdev->name, ocf);
 		break;
