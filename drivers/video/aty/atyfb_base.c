@@ -2374,6 +2374,7 @@ int __init atyfb_init(void)
 		}
 	}
 #endif				/* CONFIG_ATARI */
+	kfree(info);
 	return 0;
 }
 
