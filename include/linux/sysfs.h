@@ -1,30 +1,13 @@
 /*
- * driverfs_fs.h - definitions for the device driver filesystem
+ * sysfs.h - definitions for the device driver filesystem
  *
- * Copyright (c) 2001 Patrick Mochel <mochel@osdl.org>
+ * Copyright (c) 2001,2002 Patrick Mochel
  *
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
- *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this program; if not, write to the Free Software
- *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- *
- * This is a simple, ram-based filesystem, which allows kernel
- * callbacks for read/write of files.
- *
- * Please see Documentation/filesystems/driverfs.txt for more information.
+ * Please see Documentation/filesystems/sysfs.txt for more information.
  */
 
-#ifndef _DRIVER_FS_H_
-#define _DRIVER_FS_H_
+#ifndef _SYSFS_H_
+#define _SYSFS_H_
 
 struct driver_dir_entry;
 struct attribute;
@@ -65,4 +48,4 @@ sysfs_create_symlink(struct driver_dir_entry * parent,
 extern void
 sysfs_remove_file(struct driver_dir_entry *, const char * name);
 
-#endif /* _DDFS_H_ */
+#endif /* _SYSFS_H_ */
