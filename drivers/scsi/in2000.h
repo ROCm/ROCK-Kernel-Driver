@@ -386,8 +386,6 @@ struct IN2000_hostdata {
 #define PR_STOP      1<<7
 
 
-#include <linux/version.h>
-
 # include <linux/init.h>
 # include <linux/spinlock.h>
 # define in2000__INITFUNC(function) __initfunc(function)
