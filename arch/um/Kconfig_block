@@ -69,5 +69,6 @@ config MMAPPER
         If you'd like to be able to provide a simulated IO port space for
         User-Mode Linux processes, say Y.  If unsure, say N.
 
-endmenu
+source "drivers/block/Kconfig.iosched"
 
+endmenu
