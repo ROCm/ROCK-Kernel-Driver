@@ -167,6 +167,11 @@ void __init MP_processor_info (struct mpc_config_processor *m)
 		boot_cpu_logical_apicid = apicid;
 	}
 
+	if (num_processors >= NR_CPUS) {
+		printk(KERN_WARNING "NR_CPUS limit of %i reached.  Cannot "
+			"boot CPU(apicid 0x%d).\n", NR_CPUS, m->mpc_apicid);
+		return;
+	}
 	num_processors++;
 
 	if (MAX_APICS - m->mpc_apicid <= 0) {
