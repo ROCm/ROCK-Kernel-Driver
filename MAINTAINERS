@@ -1494,6 +1494,8 @@ P:	James Morris
 M:	jmorris@redhat.com
 P:	Hideaki YOSHIFUJI
 M:	yoshfuji@linux-ipv6.org
+P:	Patrick McHardy
+M:	kaber@coreworks.de
 L:	netdev@oss.sgi.com
 S:	Maintained
 

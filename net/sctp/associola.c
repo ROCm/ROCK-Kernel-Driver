@@ -1093,6 +1093,7 @@ static inline int sctp_peer_needs_update(struct sctp_association *asoc)
 	case SCTP_STATE_ESTABLISHED:
 	case SCTP_STATE_SHUTDOWN_PENDING:
 	case SCTP_STATE_SHUTDOWN_RECEIVED:
+	case SCTP_STATE_SHUTDOWN_SENT:
 		if ((asoc->rwnd > asoc->a_rwnd) &&
 		    ((asoc->rwnd - asoc->a_rwnd) >=
 		     min_t(__u32, (asoc->base.sk->sk_rcvbuf >> 1), asoc->pmtu)))
