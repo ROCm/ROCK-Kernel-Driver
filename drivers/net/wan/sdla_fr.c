@@ -324,27 +324,27 @@ static int Intr_test_counter;
 
 /* WAN link driver entry points. These are called by the WAN router module. */
 static int update(struct wan_device *wandev);
-static int new_if(struct wan_device *wandev, netdevice_t *dev,
+static int new_if(struct wan_device *wandev, struct net_device *dev,
 		  wanif_conf_t *conf);
-static int del_if(struct wan_device *wandev, netdevice_t *dev);
+static int del_if(struct wan_device *wandev, struct net_device *dev);
 static void disable_comm (sdla_t *card);
 
 /* WANPIPE-specific entry points */
 static int wpf_exec(struct sdla *card, void *u_cmd, void *u_data);
 
 /* Network device interface */
-static int if_init(netdevice_t *dev);
-static int if_open(netdevice_t *dev);
-static int if_close(netdevice_t *dev);
+static int if_init(struct net_device *dev);
+static int if_open(struct net_device *dev);
+static int if_close(struct net_device *dev);
 
-static void if_tx_timeout (netdevice_t *dev);
+static void if_tx_timeout(struct net_device *dev);
 
 static int if_rebuild_hdr (struct sk_buff *skb);
 
-static int if_send(struct sk_buff *skb, netdevice_t *dev);
-static int chk_bcast_mcast_addr(sdla_t *card, netdevice_t* dev,
+static int if_send(struct sk_buff *skb, struct net_device *dev);
+static int chk_bcast_mcast_addr(sdla_t *card, struct net_device* dev,
                                 struct sk_buff *skb);
-static struct net_device_stats *if_stats(netdevice_t *dev);
+static struct net_device_stats *if_stats(struct net_device *dev);
 
 /* Interrupt handlers */
 static void fr_isr(sdla_t *card);
@@ -383,9 +383,9 @@ static int fr_modem_failure(sdla_t *card, fr_mbox_t *mbox);
 static int fr_dlci_change(sdla_t *card, fr_mbox_t *mbox);
 
 /* Miscellaneous functions */
-static int update_chan_state(netdevice_t *dev);
-static void set_chan_state(netdevice_t *dev, int state);
-static netdevice_t *find_channel(sdla_t *card, unsigned dlci);
+static int update_chan_state(struct net_device *dev);
+static void set_chan_state(struct net_device *dev, int state);
+static struct net_device *find_channel(sdla_t *card, unsigned dlci);
 static int is_tx_ready(sdla_t *card, fr_channel_t *chan);
 static unsigned int dec_to_uint(unsigned char *str, int len);
 static int reply_udp( unsigned char *data, unsigned int mbox_len );
@@ -394,22 +394,23 @@ static int intr_test( sdla_t* card );
 static void init_chan_statistics( fr_channel_t* chan );
 static void init_global_statistics( sdla_t* card );
 static void read_DLCI_IB_mapping( sdla_t* card, fr_channel_t* chan );
-static int setup_for_delayed_transmit(netdevice_t* dev, struct sk_buff *skb);
+static int setup_for_delayed_transmit(struct net_device* dev,
+				      struct sk_buff *skb);
 
-netdevice_t * move_dev_to_next (sdla_t *, netdevice_t *);
-static int check_tx_status(sdla_t *, netdevice_t *);
+struct net_device *move_dev_to_next(sdla_t *card, struct net_device *dev);
+static int check_tx_status(sdla_t *card, struct net_device *dev);
 
 /* Frame Relay Socket API */
 static void trigger_fr_bh (fr_channel_t *);
-static void fr_bh (netdevice_t *);
-static int fr_bh_cleanup (netdevice_t *);
-static int bh_enqueue (netdevice_t *, struct sk_buff *);
+static void fr_bh(struct net_device *dev);
+static int fr_bh_cleanup(struct net_device *dev);
+static int bh_enqueue(struct net_device *dev, struct sk_buff *skb);
 
-static void trigger_fr_poll (netdevice_t *);
-static void fr_poll (netdevice_t *);
-//static void add_gateway (netdevice_t *);
+static void trigger_fr_poll(struct net_device *dev);
+static void fr_poll(struct net_device *dev);
+//static void add_gateway(struct net_device *dev);
 
-static void trigger_unconfig_fr (netdevice_t *dev);
+static void trigger_unconfig_fr(struct net_device *dev);
 static void unconfig_fr (sdla_t *);
 
 static void trigger_config_fr (sdla_t *);
@@ -417,11 +418,11 @@ static void config_fr (sdla_t *);
 
 
 /* Inverse ARP and Dynamic routing functions */
-int process_ARP(arphdr_1490_t *ArpPacket, sdla_t *card, netdevice_t *dev);
+int process_ARP(arphdr_1490_t *ArpPacket, sdla_t *card, struct net_device *dev);
 int is_arp(void *buf);
-int send_inarp_request(sdla_t *card, netdevice_t *dev);
+int send_inarp_request(sdla_t *card, struct net_device *dev);
 
-static void trigger_fr_arp (netdevice_t *);
+static void trigger_fr_arp(struct net_device *dev);
 static void fr_arp (unsigned long data);
 
 
@@ -443,7 +444,8 @@ void 	s508_s514_unlock(sdla_t *card, unsigned long *smp_flags);
 void 	s508_s514_lock(sdla_t *card, unsigned long *smp_flags);
 
 unsigned short calc_checksum (char *, int);
-static int setup_fr_header(struct sk_buff** skb, netdevice_t* dev, char op_mode);
+static int setup_fr_header(struct sk_buff** skb,
+			   struct net_device* dev, char op_mode);
 
 
 /****** Public Functions ****************************************************/
@@ -792,7 +794,7 @@ static int update(struct wan_device* wandev)
  * Return:	0	o.k.
  *		< 0	failure (channel will not be created)
  */
-static int new_if(struct wan_device* wandev, netdevice_t* dev,
+static int new_if(struct wan_device* wandev, struct net_device* dev,
 		  wanif_conf_t* conf)
 {
 	sdla_t* card = wandev->private;
@@ -1022,7 +1024,7 @@ static int new_if(struct wan_device* wandev, netdevice_t* dev,
 /*============================================================================
  * Delete logical channel.
  */
-static int del_if(struct wan_device* wandev, netdevice_t* dev)
+static int del_if(struct wan_device* wandev, struct net_device* dev)
 {
 	fr_channel_t* chan = dev->priv;
 	unsigned long smp_flags=0;
@@ -1118,7 +1120,7 @@ static int wpf_exec (struct sdla* card, void* u_cmd, void* u_data)
  * interface registration.  Returning anything but zero will fail interface
  * registration.
  */
-static int if_init (netdevice_t* dev)
+static int if_init(struct net_device* dev)
 {
 	fr_channel_t* chan = dev->priv;
 	sdla_t* card = chan->card;
@@ -1196,7 +1198,7 @@ static int if_init (netdevice_t* dev)
  *
  * Return 0 if O.k. or errno.
  */
-static int if_open (netdevice_t* dev)
+static int if_open(struct net_device* dev)
 {
 	fr_channel_t* chan = dev->priv;
 	sdla_t* card = chan->card;
@@ -1238,7 +1240,7 @@ static int if_open (netdevice_t* dev)
  * o if this is the last open, then disable communications and interrupts.
  * o reset flags.
  */
-static int if_close (netdevice_t* dev)
+static int if_close(struct net_device* dev)
 {
 	fr_channel_t* chan = dev->priv;
 	sdla_t* card = chan->card;
@@ -1261,8 +1263,7 @@ static int if_close (netdevice_t* dev)
  */
 static int if_rebuild_hdr (struct sk_buff* skb)
 {
-
-	netdevice_t *dev = skb->dev;
+	struct net_device *dev = skb->dev;
 	fr_channel_t* chan = dev->priv;
 	sdla_t* card = chan->card;
 
@@ -1274,7 +1275,7 @@ static int if_rebuild_hdr (struct sk_buff* skb)
 /*============================================================================
  * Handle transmit timeout event from netif watchdog
  */
-static void if_tx_timeout (netdevice_t *dev)
+static void if_tx_timeout(struct net_device *dev)
 {
     	fr_channel_t* chan = dev->priv;
 	sdla_t *card = chan->card;
@@ -1317,7 +1318,7 @@ static void if_tx_timeout (netdevice_t *dev)
  *    will inhibit further transmit requests from the protocol stack 
  *    and can be used for flow control with protocol layer.
  */
-static int if_send (struct sk_buff* skb, netdevice_t* dev)
+static int if_send(struct sk_buff* skb, struct net_device* dev)
 {
     	fr_channel_t* chan = dev->priv;
     	sdla_t* card = chan->card;
@@ -1564,7 +1565,8 @@ if_send_start_and_exit:
  * Setup so that a frame can be transmitted on the occurrence of a transmit
  * interrupt.
  */
-static int setup_for_delayed_transmit (netdevice_t* dev, struct sk_buff *skb)
+static int setup_for_delayed_transmit(struct net_device* dev,
+				      struct sk_buff *skb)
 {
         fr_channel_t* chan = dev->priv;
         sdla_t* card = chan->card;
@@ -1616,7 +1618,7 @@ static int setup_for_delayed_transmit (netdevice_t* dev, struct sk_buff *skb)
  * Return 0 if not broadcast/multicast address, otherwise return 1.
  */
 
-static int chk_bcast_mcast_addr(sdla_t *card, netdevice_t* dev,
+static int chk_bcast_mcast_addr(sdla_t *card, struct net_device* dev,
                                 struct sk_buff *skb)
 {
         u32 src_ip_addr;
@@ -1828,7 +1830,7 @@ static void switch_net_numbers(unsigned char *sendpacket, unsigned long network_
  * Get ethernet-style interface statistics.
  * Return a pointer to struct enet_statistics.
  */
-static struct net_device_stats *if_stats(netdevice_t *dev)
+static struct net_device_stats *if_stats(struct net_device *dev)
 {
 	fr_channel_t* chan = dev->priv;
 	
@@ -1954,7 +1956,7 @@ static void rx_intr (sdla_t* card)
 	fr_channel_t* chan;
 	char *ptr = &flags->iflag;
 	struct sk_buff* skb;
-	netdevice_t* dev;
+	struct net_device* dev;
 	void* buf;
 	unsigned dlci, len, offs, len_incl_hdr;
 	int i, udp_type;	
@@ -2225,7 +2227,7 @@ static void tx_intr(sdla_t *card)
 {
         fr508_flags_t* flags = card->flags;
         fr_tx_buf_ctl_t* bctl;
-        netdevice_t* dev;
+        struct net_device* dev;
         fr_channel_t* chan;
 
         if(card->hw.type == SDLA_S514){
@@ -2354,9 +2356,10 @@ static void timer_intr(sdla_t *card)
 	/* Update the channel state call.  This is call is
          * triggered by if_send() function */
 	if (card->u.f.timer_int_enabled & TMR_INT_ENABLED_UPDATE_STATE){
-		netdevice_t *dev;
+		struct net_device *dev;
 		if (card->wandev.state == WAN_CONNECTED){
-			for (dev=card->wandev.dev; dev; dev = *((netdevice_t **)dev->priv)){
+			for (dev = card->wandev.dev; dev;
+			     dev = *((struct net_device **)dev->priv)){
 				fr_channel_t *chan = dev->priv;	
 				if (chan->common.state != WAN_CONNECTED){
 					update_chan_state(dev);
@@ -2382,7 +2385,7 @@ static void timer_intr(sdla_t *card)
 	/* Transmit ARP packets */
 	if (card->u.f.timer_int_enabled & TMR_INT_ENABLED_ARP){
 		int i=0;
-		netdevice_t *dev;
+		struct net_device *dev;
 
 		if (card->u.f.arp_dev == NULL)
 			card->u.f.arp_dev = card->wandev.dev;
@@ -2586,7 +2589,7 @@ static int handle_IPXWAN(unsigned char *sendpacket,
  *	This function is called by fr_poll() polling funtion.
  */
 
-static void process_route (netdevice_t *dev)
+static void process_route(struct net_device *dev)
 {
 	fr_channel_t *chan = dev->priv;
 	sdla_t *card = chan->card;
@@ -2987,7 +2990,7 @@ static int fr_issue_isf (sdla_t* card, int isf)
 
 static unsigned int fr_send_hdr (sdla_t*card, int dlci, unsigned int offset)
 {
-	netdevice_t *dev = find_channel(card,dlci);	
+	struct net_device *dev = find_channel(card,dlci);	
 	fr_channel_t *chan;
 
 	if (!dev || !(chan=dev->priv))
@@ -3090,12 +3093,12 @@ static int fr_event (sdla_t *card, int event, fr_mbox_t* mbox)
 		case FRRES_MODEM_FAILURE:
 			return fr_modem_failure(card, mbox);
 
-		case FRRES_CHANNEL_DOWN:
-			{
-			netdevice_t *dev;
+		case FRRES_CHANNEL_DOWN: {
+			struct net_device *dev;
 
 			/* Remove all routes from associated DLCI's */
-			for (dev = card->wandev.dev; dev; dev = *((netdevice_t **)dev->priv)) {
+			for (dev = card->wandev.dev; dev;
+			     dev = *((struct net_device **)dev->priv)) {
 				fr_channel_t *chan = dev->priv;
 				if (chan->route_flag == ROUTE_ADDED) {
 					chan->route_flag = REMOVE_ROUTE;
@@ -3116,13 +3119,13 @@ static int fr_event (sdla_t *card, int event, fr_mbox_t* mbox)
 			return 1;
 			}
 
-		case FRRES_CHANNEL_UP:
-			{
-			netdevice_t *dev;
+		case FRRES_CHANNEL_UP: {
+			struct net_device *dev;
 
 			/* FIXME: Only startup devices that are on the list */
 			
-			for (dev = card->wandev.dev; dev; dev = *((netdevice_t **)dev->priv)) {
+			for (dev = card->wandev.dev; dev;
+			     dev = *((struct net_device **)dev->priv)) {
 				
 				set_chan_state(dev,WAN_CONNECTED);
 			}
@@ -3196,13 +3199,13 @@ static int fr_dlci_change (sdla_t *card, fr_mbox_t* mbox)
 	dlci_status_t* status = (void*)mbox->data;
 	int cnt = mbox->cmd.length / sizeof(dlci_status_t);
 	fr_channel_t *chan;
-	netdevice_t* dev2;
+	struct net_device* dev2;
 	
 
 	for (; cnt; --cnt, ++status) {
 
 		unsigned short dlci= status->dlci;
-		netdevice_t* dev = find_channel(card, dlci);
+		struct net_device* dev = find_channel(card, dlci);
 		
 		if (dev == NULL){
 			printk(KERN_INFO 
@@ -3261,7 +3264,8 @@ static int fr_dlci_change (sdla_t *card, fr_mbox_t* mbox)
 		}
 	}
 	
-	for (dev2 =card->wandev.dev; dev2; dev2 = *((netdevice_t **)dev2->priv)){
+	for (dev2 = card->wandev.dev; dev2;
+	     dev2 = *((struct net_device **)dev2->priv)){
 		
 		chan = dev2->priv;
 	
@@ -3317,7 +3321,7 @@ static int fr_init_dlci (sdla_t *card, fr_channel_t *chan)
 /*============================================================================
  * Update channel state. 
  */
-static int update_chan_state (netdevice_t* dev)
+static int update_chan_state(struct net_device* dev)
 {
 	fr_channel_t* chan = dev->priv;
 	sdla_t* card = chan->card;
@@ -3363,7 +3367,7 @@ static int update_chan_state (netdevice_t* dev)
 /*============================================================================
  * Set channel state.
  */
-static void set_chan_state (netdevice_t* dev, int state)
+static void set_chan_state(struct net_device* dev, int state)
 {
 	fr_channel_t* chan = dev->priv;
 	sdla_t* card = chan->card;
@@ -3416,7 +3420,7 @@ static void set_chan_state (netdevice_t* dev, int state)
  * NOTE: del_if() functions updates this array, it uses
  *       the spin locks to avoid corruption.
  */
-static netdevice_t* find_channel (sdla_t* card, unsigned dlci)
+static struct net_device* find_channel(sdla_t* card, unsigned dlci)
 {
 	if(dlci > HIGHEST_VALID_DLCI)
 		return NULL;
@@ -3473,7 +3477,7 @@ static int store_udp_mgmt_pkt(int udp_type, char udp_pkt_src, sdla_t* card,
 {
         int udp_pkt_stored = 0;
 	
-	netdevice_t *dev=find_channel(card,dlci);
+	struct net_device *dev = find_channel(card, dlci);
 	fr_channel_t *chan;
 	
 	if (!dev || !(chan=dev->priv))
@@ -3519,7 +3523,7 @@ static int process_udp_mgmt_pkt(sdla_t* card)
 	int err;
 	struct timeval tv;
 	int udp_mgmt_req_valid = 1;
-        netdevice_t* dev;
+        struct net_device* dev;
         fr_channel_t* chan;
         fr_udp_pkt_t *fr_udp_pkt;
 	unsigned short num_trc_els;
@@ -3920,7 +3924,7 @@ udp_mgmt_dflt:
  * Send Inverse ARP Request
  */
 
-int send_inarp_request(sdla_t *card, netdevice_t *dev)
+int send_inarp_request(sdla_t *card, struct net_device *dev)
 {
 	int err=0;
 
@@ -3997,7 +4001,7 @@ int is_arp(void *buf)
  * Process ARP Packet Type
  */
 
-int process_ARP(arphdr_1490_t *ArpPacket, sdla_t *card, netdevice_t* dev)
+int process_ARP(arphdr_1490_t *ArpPacket, sdla_t *card, struct net_device* dev)
 {
 
 
@@ -4154,7 +4158,7 @@ int process_ARP(arphdr_1490_t *ArpPacket, sdla_t *card, netdevice_t* dev)
  *      at a later date.
  */	
 
-static void trigger_fr_arp (netdevice_t *dev)
+static void trigger_fr_arp(struct net_device *dev)
 {
 	fr_channel_t* chan = dev->priv;
 
@@ -4175,7 +4179,7 @@ static void trigger_fr_arp (netdevice_t *dev)
 
 static void fr_arp (unsigned long data)
 {
-	netdevice_t *dev = (netdevice_t *)data;
+	struct net_device *dev = (struct net_device *)data;
 	fr_channel_t *chan = dev->priv;
 	volatile sdla_t *card = chan->card;
 	fr508_flags_t* flags = card->flags;
@@ -4367,7 +4371,7 @@ void s508_s514_unlock(sdla_t *card, unsigned long *smp_flags)
  *
  */
 
-static int bh_enqueue (netdevice_t *dev, struct sk_buff *skb)
+static int bh_enqueue(struct net_device *dev, struct sk_buff *skb)
 {
 	/* Check for full */
 	fr_channel_t* chan = dev->priv;
@@ -4440,7 +4444,7 @@ static void trigger_fr_bh (fr_channel_t *chan)
  *
  */	
 
-static void fr_bh (netdevice_t * dev)
+static void fr_bh(struct net_device * dev)
 {
 	fr_channel_t* chan = dev->priv;
 	sdla_t *card = chan->card;
@@ -4487,7 +4491,7 @@ static void fr_bh (netdevice_t * dev)
 	return;
 }
 
-static int fr_bh_cleanup (netdevice_t *dev)
+static int fr_bh_cleanup(struct net_device *dev)
 {
 	fr_channel_t* chan = dev->priv;
 
@@ -4521,7 +4525,7 @@ static int fr_bh_cleanup (netdevice_t *dev)
  *      a polling routine.
  *
  */	
-static void trigger_fr_poll (netdevice_t *dev)
+static void trigger_fr_poll(struct net_device *dev)
 {
 	fr_channel_t* chan = dev->priv;
 	schedule_task(&chan->fr_poll_task);
@@ -4551,7 +4555,7 @@ static void trigger_fr_poll (netdevice_t *dev)
  *      the fr_poll routine.  
  */
 
-static void fr_poll (netdevice_t *dev)
+static void fr_poll(struct net_device *dev)
 {
 
 	fr_channel_t* chan;
@@ -4638,7 +4642,7 @@ static void fr_poll (netdevice_t *dev)
  *      an interrupt.
  */
 
-static int check_tx_status(sdla_t *card, netdevice_t *dev)
+static int check_tx_status(sdla_t *card, struct net_device *dev)
 {
 
 	if (card->hw.type == SDLA_S514){
@@ -4668,14 +4672,13 @@ static int check_tx_status(sdla_t *card, netdevice_t *dev)
  *
  */
 
-netdevice_t * move_dev_to_next (sdla_t *card, netdevice_t *dev)
+struct net_device *move_dev_to_next(sdla_t *card, struct net_device *dev)
 {
 	if (card->wandev.new_if_cnt != 1){
-		if (*((netdevice_t **)dev->priv) == NULL){
+		if (!*((struct net_device **)dev->priv))
 			return card->wandev.dev;
-		}else{
-			return *((netdevice_t **)dev->priv);
-		}
+		else
+			return *((struct net_device **)dev->priv);
 	}
 	return dev;
 }
@@ -4725,10 +4728,11 @@ static void trigger_config_fr (sdla_t *card)
 
 static void config_fr (sdla_t *card)
 {
-	netdevice_t *dev;
+	struct net_device *dev;
 	fr_channel_t *chan;
 
-	for (dev=card->wandev.dev; dev; dev=*((netdevice_t **)dev->priv)){
+	for (dev = card->wandev.dev; dev;
+	     dev = *((struct net_device **)dev->priv)) {
 	
 		if ((chan=dev->priv) == NULL)
 			continue;
@@ -4797,7 +4801,7 @@ static void config_fr (sdla_t *card)
  *
  */
 
-static void trigger_unconfig_fr (netdevice_t *dev)
+static void trigger_unconfig_fr(struct net_device *dev)
 {
 	fr_channel_t *chan = dev->priv;
 	volatile sdla_t *card = chan->card;
@@ -4849,10 +4853,11 @@ static void trigger_unconfig_fr (netdevice_t *dev)
 
 static void unconfig_fr (sdla_t *card)
 {
-	netdevice_t *dev;
+	struct net_device *dev;
 	fr_channel_t *chan;
 
-	for (dev=card->wandev.dev; dev; dev=*((netdevice_t **)dev->priv)){
+	for (dev = card->wandev.dev; dev;
+	     dev = *((struct net_device **)dev->priv)){
 	
 		if ((chan=dev->priv) == NULL)
 			continue;
@@ -4871,7 +4876,8 @@ static void unconfig_fr (sdla_t *card)
 	}
 }
 
-static int setup_fr_header(struct sk_buff ** skb_orig, netdevice_t* dev, char op_mode)
+static int setup_fr_header(struct sk_buff **skb_orig, struct net_device* dev,
+			   char op_mode)
 {
 	struct sk_buff *skb = *skb_orig;
 	fr_channel_t *chan=dev->priv;
@@ -4929,7 +4935,7 @@ static int check_dlci_config (sdla_t *card, fr_channel_t *chan)
 	fr_conf_t *conf=NULL;
 	unsigned short dlci_num = chan->dlci;
 	int dlci_offset=0;
-	netdevice_t *dev=NULL;
+	struct net_device *dev = NULL;
 	
 	mbox->cmd.command = FR_READ_CONFIG;
 	mbox->cmd.length = 0;
@@ -4941,9 +4947,9 @@ static int check_dlci_config (sdla_t *card, fr_channel_t *chan)
 		return 0;
 	}
 
-	for (dev=card->wandev.dev; dev; dev=*((netdevice_t**)dev->priv)){
+	for (dev = card->wandev.dev; dev;
+	     dev=*((struct net_device **)dev->priv))
 		set_chan_state(dev,WAN_DISCONNECTED);
-	}
 	
 	printk(KERN_INFO "DLCI %i Not configured, configuring\n",dlci_num);
 	
@@ -4971,7 +4977,8 @@ static int check_dlci_config (sdla_t *card, fr_channel_t *chan)
 	conf = (fr_conf_t *)mbox->data;
 
 	dlci_offset=0;
-	for (dev=card->wandev.dev; dev; dev=*((netdevice_t**)dev->priv)){
+	for (dev = card->wandev.dev; dev;
+	     dev = *((struct net_device **)dev->priv)) {
 		fr_channel_t *chan_tmp = dev->priv;
 		conf->dlci[dlci_offset] = chan_tmp->dlci;		
 		dlci_offset++;
@@ -5005,7 +5012,8 @@ static int check_dlci_config (sdla_t *card, fr_channel_t *chan)
 
 	printk(KERN_INFO "Enabling Communications \n");
 
-	for (dev=card->wandev.dev; dev; dev=*((netdevice_t**)dev->priv)){
+	for (dev = card->wandev.dev; dev;
+	     dev = *((struct net_device **)dev->priv)) {
 		fr_channel_t *chan_tmp = dev->priv;
 		fr_init_dlci(card,chan_tmp);
 		fr_add_dlci(card, chan_tmp->dlci);

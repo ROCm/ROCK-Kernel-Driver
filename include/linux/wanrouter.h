@@ -44,8 +44,6 @@
 * Jan 02, 1997	Gene Kozin	Initial version (based on wanpipe.h).
 *****************************************************************************/
 
-#define netdevice_t struct net_device
-
 #include <linux/spinlock.h>       /* Support for SMP Locking */
 
 #ifndef	_ROUTER_H
@@ -505,12 +503,12 @@ struct wan_device {
 	int (*update) (struct wan_device *wandev);
 	int (*ioctl) (struct wan_device *wandev, unsigned cmd,
 		unsigned long arg);
-	int (*new_if) (struct wan_device *wandev, netdevice_t *dev,
-		wanif_conf_t *conf);
-	int (*del_if) (struct wan_device *wandev, netdevice_t *dev);
+	int (*new_if)(struct wan_device *wandev, struct net_device *dev,
+		      wanif_conf_t *conf);
+	int (*del_if)(struct wan_device *wandev, struct net_device *dev);
 					/****** maintained by the router ****/
 	struct wan_device* next;	/* -> next device */
-	netdevice_t* dev;		/* list of network interfaces */
+	struct net_device* dev;		/* list of network interfaces */
 	unsigned ndev;			/* number of interfaces */
 	struct proc_dir_entry *dent;	/* proc filesystem entry */
 };
@@ -518,8 +516,10 @@ struct wan_device {
 /* Public functions available for device drivers */
 extern int register_wan_device(struct wan_device *wandev);
 extern int unregister_wan_device(char *name);
-unsigned short wanrouter_type_trans(struct sk_buff *skb, netdevice_t *dev);
-int wanrouter_encapsulate(struct sk_buff *skb, netdevice_t *dev,unsigned short type);
+unsigned short wanrouter_type_trans(struct sk_buff *skb,
+				    struct net_device *dev);
+int wanrouter_encapsulate(struct sk_buff *skb, struct net_device *dev,
+			  unsigned short type);
 
 /* Proc interface functions. These must not be called by the drivers! */
 extern int wanrouter_proc_init(void);

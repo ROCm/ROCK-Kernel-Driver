@@ -363,8 +363,8 @@ int unregister_wan_device(char *name)
  */
 
 
-int wanrouter_encapsulate (struct sk_buff *skb, netdevice_t *dev,
-	unsigned short type)
+int wanrouter_encapsulate(struct sk_buff *skb, struct net_device *dev,
+			  unsigned short type)
 {
 	int hdr_len = 0;
 
@@ -406,7 +406,7 @@ int wanrouter_encapsulate (struct sk_buff *skb, netdevice_t *dev,
  */
 
 
-unsigned short wanrouter_type_trans (struct sk_buff *skb, netdevice_t *dev)
+unsigned short wanrouter_type_trans(struct sk_buff *skb, struct net_device *dev)
 {
 	int cnt = skb->data[0] ? 0 : 1;	/* there may be a pad present */
 	unsigned short ethertype;
@@ -597,7 +597,7 @@ static int device_setup(struct wan_device *wandev, wandev_conf_t *u_conf)
 
 static int device_shutdown(struct wan_device *wandev)
 {
-	netdevice_t *dev;
+	struct net_device *dev;
 	int err=0;
 
 	if (wandev->state == WAN_UNCONFIGURED)
@@ -661,7 +661,7 @@ static int device_stat(struct wan_device *wandev, wandev_stat_t *u_stat)
 static int device_new_if(struct wan_device *wandev, wanif_conf_t *u_conf)
 {
 	wanif_conf_t conf;
-	netdevice_t *dev=NULL;
+	struct net_device *dev = NULL;
 #ifdef CONFIG_WANPIPE_MULTPPP
 	struct ppp_device *pppdev=NULL;
 #endif
@@ -682,13 +682,14 @@ static int device_new_if(struct wan_device *wandev, wanif_conf_t *u_conf)
 		if (pppdev == NULL)
 			return -ENOBUFS;
 		memset(pppdev, 0, sizeof(struct ppp_device));
-		pppdev->dev = kmalloc(sizeof(netdevice_t), GFP_KERNEL);
+		pppdev->dev = kmalloc(sizeof(struct net_device), GFP_KERNEL);
 		if (pppdev->dev == NULL) {
 			kfree(pppdev);
 			return -ENOBUFS;
 		}
-		memset(pppdev->dev, 0, sizeof(netdevice_t));
-		err = wandev->new_if(wandev, (netdevice_t *)pppdev, &conf);
+		memset(pppdev->dev, 0, sizeof(struct net_device));
+		err = wandev->new_if(wandev,
+				     (struct net_device *)pppdev, &conf);
 		dev = pppdev->dev;
 #else
 		printk(KERN_INFO "%s: Wanpipe Mulit-Port PPP support has not been compiled in!\n",
@@ -696,10 +697,10 @@ static int device_new_if(struct wan_device *wandev, wanif_conf_t *u_conf)
 		return -EPROTONOSUPPORT;
 #endif
 	} else {
-		dev = kmalloc(sizeof(netdevice_t), GFP_KERNEL);
+		dev = kmalloc(sizeof(struct net_device), GFP_KERNEL);
 		if (dev == NULL)
 			return -ENOBUFS;
-		memset(dev, 0, sizeof(netdevice_t));
+		memset(dev, 0, sizeof(struct net_device));
 		err = wandev->new_if(wandev, dev, &conf);
 	}
 
@@ -722,7 +723,7 @@ static int device_new_if(struct wan_device *wandev, wanif_conf_t *u_conf)
 
 			err = register_netdev(dev);
 			if (!err) {
-				netdevice_t *slave=NULL;
+				struct net_device *slave = NULL;
 				unsigned long smp_flags=0;
 
 				lock_adapter_irq(&wandev->lock, &smp_flags);
@@ -731,10 +732,10 @@ static int device_new_if(struct wan_device *wandev, wanif_conf_t *u_conf)
 					wandev->dev = dev;
 				} else {
 					for (slave=wandev->dev;
-					     *((netdevice_t**)slave->priv);
-					     slave=*((netdevice_t**)slave->priv));
+					 *((struct net_device **)slave->priv);
+				 slave = *((struct net_device **)slave->priv));
 
-					*((netdevice_t**)slave->priv) = dev;
+				     *((struct net_device **)slave->priv) = dev;
 				}
 				++wandev->ndev;
 
@@ -843,14 +844,14 @@ static struct wan_device *find_device(char *name)
 
 static int delete_interface(struct wan_device *wandev, char *name)
 {
-	netdevice_t *dev=NULL, *prev=NULL;
+	struct net_device *dev = NULL, *prev = NULL;
 	unsigned long smp_flags=0;
 
 	lock_adapter_irq(&wandev->lock, &smp_flags);
 	dev = wandev->dev;
 	prev = NULL;
 	while (dev && strcmp(name, dev->name)) {
-		netdevice_t **slave = dev->priv;
+		struct net_device **slave = dev->priv;
 		prev = dev;
 		dev = *slave;
 	}
@@ -867,12 +868,12 @@ static int delete_interface(struct wan_device *wandev, char *name)
 
 	lock_adapter_irq(&wandev->lock, &smp_flags);
 	if (prev) {
-		netdevice_t **prev_slave = prev->priv;
-		netdevice_t **slave = dev->priv;
+		struct net_device **prev_slave = prev->priv;
+		struct net_device **slave = dev->priv;
 
 		*prev_slave = *slave;
 	} else {
-		netdevice_t **slave = dev->priv;
+		struct net_device **slave = dev->priv;
 		wandev->dev = *slave;
 	}
 	--wandev->ndev;

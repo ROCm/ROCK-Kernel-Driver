@@ -168,7 +168,7 @@
   
 typedef struct ppp_private_area
 {
-	netdevice_t *slave;
+	struct net_device *slave;
 	sdla_t* card;	
 	unsigned long router_start_time;	/*router start time in sec */
 	unsigned long tick_counter;		/*used for 5 second counter*/
@@ -232,25 +232,26 @@ extern void enable_irq(unsigned int);
 
 /* WAN link driver entry points. These are called by the WAN router module. */
 static int update(struct wan_device *wandev);
-static int new_if(struct wan_device *wandev, netdevice_t *dev,
+static int new_if(struct wan_device *wandev, struct net_device *dev,
 		  wanif_conf_t *conf);
-static int del_if(struct wan_device *wandev, netdevice_t *dev);
+static int del_if(struct wan_device *wandev, struct net_device *dev);
 
 /* WANPIPE-specific entry points */
 static int wpp_exec (struct sdla *card, void *u_cmd, void *u_data);
 
 /* Network device interface */
-static int if_init(netdevice_t *dev);
-static int if_open(netdevice_t *dev);
-static int if_close(netdevice_t *dev);
-static int if_header(struct sk_buff *skb, netdevice_t *dev, unsigned short type, 
+static int if_init(struct net_device *dev);
+static int if_open(struct net_device *dev);
+static int if_close(struct net_device *dev);
+static int if_header(struct sk_buff *skb, struct net_device *dev,
+		     unsigned short type, 
 		     void *daddr, void *saddr, unsigned len);
 
-static void if_tx_timeout (netdevice_t *dev);
+static void if_tx_timeout(struct net_device *dev);
 
 static int if_rebuild_hdr(struct sk_buff *skb);
-static struct net_device_stats *if_stats(netdevice_t *dev);
-static int if_send(struct sk_buff *skb, netdevice_t *dev);
+static struct net_device_stats *if_stats(struct net_device *dev);
+static int if_send(struct sk_buff *skb, struct net_device *dev);
 
 
 /* PPP firmware interface functions */
@@ -279,10 +280,10 @@ static void retrigger_comm(sdla_t *card);
 static int read_info( sdla_t *card );
 static int read_connection_info (sdla_t *card);
 static void remove_route( sdla_t *card );
-static int config508(netdevice_t *dev, sdla_t *card);
+static int config508(struct net_device *dev, sdla_t *card);
 static void show_disc_cause(sdla_t * card, unsigned cause);
 static int reply_udp( unsigned char *data, unsigned int mbox_len );
-static void process_udp_mgmt_pkt(sdla_t *card, netdevice_t *dev, 
+static void process_udp_mgmt_pkt(sdla_t *card, struct net_device *dev, 
 				ppp_private_area_t *ppp_priv_area);
 static void init_ppp_tx_rx_buff( sdla_t *card );
 static int intr_test( sdla_t *card );
@@ -291,12 +292,12 @@ static void init_ppp_priv_struct( ppp_private_area_t *ppp_priv_area);
 static void init_global_statistics( sdla_t *card );
 static int tokenize(char *str, char **tokens);
 static char* strstrip(char *str, char *s);
-static int chk_bcast_mcast_addr(sdla_t* card, netdevice_t* dev,
+static int chk_bcast_mcast_addr(sdla_t* card, struct net_device* dev,
 				struct sk_buff *skb);
 
 static int config_ppp (sdla_t *);
-static void ppp_poll(netdevice_t *);
-static void trigger_ppp_poll(netdevice_t *);
+static void ppp_poll(struct net_device *dev);
+static void trigger_ppp_poll(struct net_device *dev);
 static void ppp_poll_delay (unsigned long dev_ptr);
 
 
@@ -316,7 +317,7 @@ static void s508_lock (sdla_t *card, unsigned long *smp_flags);
 static void s508_unlock (sdla_t *card, unsigned long *smp_flags);
 
 static int store_udp_mgmt_pkt(char udp_pkt_src, sdla_t* card,
-                                struct sk_buff *skb, netdevice_t* dev,
+                                struct sk_buff *skb, struct net_device* dev,
                                 ppp_private_area_t* ppp_priv_area );
 static unsigned short calc_checksum (char *data, int len);
 static void disable_comm (sdla_t *card);
@@ -448,7 +449,7 @@ int wpp_init(sdla_t *card, wandev_conf_t *conf)
 static int update(struct wan_device *wandev)
 {
 	sdla_t* card = wandev->private;
- 	netdevice_t* dev;
+ 	struct net_device* dev;
         volatile ppp_private_area_t *ppp_priv_area;
 	ppp_flags_t *flags = card->flags;
 	unsigned long timeout;
@@ -505,7 +506,7 @@ static int update(struct wan_device *wandev)
  * Return:	0	o.k.
  *		< 0	failure (channel will not be created)
  */
-static int new_if(struct wan_device *wandev, netdevice_t *dev,
+static int new_if(struct wan_device *wandev, struct net_device *dev,
 		  wanif_conf_t *conf)
 {
 	sdla_t *card = wandev->private;
@@ -624,7 +625,7 @@ static int new_if(struct wan_device *wandev, netdevice_t *dev,
 /*============================================================================
  * Delete logical channel.
  */
-static int del_if(struct wan_device *wandev, netdevice_t *dev)
+static int del_if(struct wan_device *wandev, struct net_device *dev)
 {
 	return 0;
 }
@@ -683,7 +684,7 @@ static int wpp_exec(struct sdla *card, void *u_cmd, void *u_data)
  * interface registration.  Returning anything but zero will fail interface
  * registration.
  */
-static int if_init(netdevice_t *dev)
+static int if_init(struct net_device *dev)
 {
 	ppp_private_area_t *ppp_priv_area = dev->priv;
 	sdla_t *card = ppp_priv_area->card;
@@ -732,7 +733,7 @@ static int if_init(netdevice_t *dev)
  *
  * Return 0 if O.k. or errno.
  */
-static int if_open (netdevice_t *dev)
+static int if_open(struct net_device *dev)
 {
 	ppp_private_area_t *ppp_priv_area = dev->priv;
 	sdla_t *card = ppp_priv_area->card;
@@ -771,7 +772,7 @@ static int if_open (netdevice_t *dev)
  * o if this is the last open, then disable communications and interrupts.
  * o reset flags.
  */
-static int if_close(netdevice_t *dev)
+static int if_close(struct net_device *dev)
 {
 	ppp_private_area_t *ppp_priv_area = dev->priv;
 	sdla_t *card = ppp_priv_area->card;
@@ -792,7 +793,7 @@ static int if_close(netdevice_t *dev)
  *
  * Return:	media header length.
  */
-static int if_header(struct sk_buff *skb, netdevice_t *dev,
+static int if_header(struct sk_buff *skb, struct net_device *dev,
 	unsigned short type, void *daddr, void *saddr, unsigned len)
 {
 	switch (type)
@@ -817,7 +818,7 @@ static int if_header(struct sk_buff *skb, netdevice_t *dev,
  */
 static int if_rebuild_hdr (struct sk_buff *skb)
 {
-	netdevice_t *dev = skb->dev;
+	struct net_device *dev = skb->dev;
 	ppp_private_area_t *ppp_priv_area = dev->priv;
 	sdla_t *card = ppp_priv_area->card;
 
@@ -829,7 +830,7 @@ static int if_rebuild_hdr (struct sk_buff *skb)
 /*============================================================================
  * Handle transmit timeout event from netif watchdog
  */
-static void if_tx_timeout (netdevice_t *dev)
+static void if_tx_timeout(struct net_device *dev)
 {
     	ppp_private_area_t* chan = dev->priv;
 	sdla_t *card = chan->card;
@@ -867,7 +868,7 @@ static void if_tx_timeout (netdevice_t *dev)
  * 2. Setting tbusy flag will inhibit further transmit requests from the
  *    protocol stack and can be used for flow control with protocol layer.
  */
-static int if_send (struct sk_buff *skb, netdevice_t *dev)
+static int if_send (struct sk_buff *skb, struct net_device *dev)
 {
 	ppp_private_area_t *ppp_priv_area = dev->priv;
 	sdla_t *card = ppp_priv_area->card;
@@ -997,7 +998,7 @@ if_send_exit_crit:
  */
 
 static int store_udp_mgmt_pkt(char udp_pkt_src, sdla_t* card,
-                                struct sk_buff *skb, netdevice_t* dev,
+                                struct sk_buff *skb, struct net_device* dev,
                                 ppp_private_area_t* ppp_priv_area )
 {
 	int udp_pkt_stored = 0;
@@ -1191,7 +1192,7 @@ static void switch_net_numbers(unsigned char *sendpacket, unsigned long network_
  * Get ethernet-style interface statistics.
  * Return a pointer to struct net_device_stats.
  */
-static struct net_device_stats *if_stats(netdevice_t *dev)
+static struct net_device_stats *if_stats(struct net_device *dev)
 {
 
 	ppp_private_area_t *ppp_priv_area = dev->priv;
@@ -1571,7 +1572,7 @@ static void wpp_isr (sdla_t *card)
 {
 	ppp_flags_t *flags = card->flags;
 	char *ptr = &flags->iflag;
-	netdevice_t *dev = card->wandev.dev;
+	struct net_device *dev = card->wandev.dev;
 	int i;
 
 	card->in_isr = 1;
@@ -1651,7 +1652,7 @@ static void wpp_isr (sdla_t *card)
 static void rx_intr(sdla_t *card)
 {
 	ppp_buf_ctl_t *rxbuf = card->rxmb;
-	netdevice_t *dev = card->wandev.dev;
+	struct net_device *dev = card->wandev.dev;
 	ppp_private_area_t *ppp_priv_area;
 	struct sk_buff *skb;
 	unsigned len;
@@ -1791,7 +1792,7 @@ static void rx_intr(sdla_t *card)
 void event_intr (sdla_t *card)
 {
 
- 	netdevice_t* dev = card->wandev.dev;
+ 	struct net_device* dev = card->wandev.dev;
         ppp_private_area_t* ppp_priv_area = dev->priv;
 	volatile ppp_flags_t *flags = card->flags;
 
@@ -1910,7 +1911,7 @@ void event_intr (sdla_t *card)
 void timer_intr (sdla_t *card)
 {
 
-        netdevice_t* dev = card->wandev.dev;
+        struct net_device* dev = card->wandev.dev;
         ppp_private_area_t* ppp_priv_area = dev->priv;
 	ppp_flags_t *flags = card->flags;
 
@@ -2107,7 +2108,7 @@ static int handle_IPXWAN(unsigned char *sendpacket, char *devname, unsigned char
 static void process_route (sdla_t *card)
 {
 	ppp_flags_t *flags = card->flags;
-	netdevice_t *dev = card->wandev.dev;
+	struct net_device *dev = card->wandev.dev;
 	ppp_private_area_t *ppp_priv_area = dev->priv;
 	
 	if ((card->u.p.ip_mode == WANOPT_PPP_PEER) &&
@@ -2149,7 +2150,7 @@ static void process_route (sdla_t *card)
  */
 static void retrigger_comm(sdla_t *card)
 {
-	netdevice_t *dev = card->wandev.dev;
+	struct net_device *dev = card->wandev.dev;
 
 	if (dev && ((jiffies - card->state_tick) > HOLD_DOWN_TIME)) {
 
@@ -2166,7 +2167,7 @@ static void retrigger_comm(sdla_t *card)
 /*============================================================================
  * Configure S508 adapter.
  */
-static int config508(netdevice_t *dev, sdla_t *card)
+static int config508(struct net_device *dev, sdla_t *card)
 {
 	ppp508_conf_t cfg;
 	struct in_device *in_dev = dev->ip_ptr;
@@ -2338,7 +2339,7 @@ static void show_disc_cause(sdla_t *card, unsigned cause)
 /*=============================================================================
  * Process UDP call of type PTPIPEAB.
  */
-static void process_udp_mgmt_pkt(sdla_t *card, netdevice_t *dev, 
+static void process_udp_mgmt_pkt(sdla_t *card, struct net_device *dev, 
 				 ppp_private_area_t *ppp_priv_area ) 
 {
 	unsigned char buf2[5];
@@ -2849,7 +2850,7 @@ static void init_ppp_tx_rx_buff( sdla_t *card )
  */
 static int read_info( sdla_t *card )
 {
-	netdevice_t *dev = card->wandev.dev;
+	struct net_device *dev = card->wandev.dev;
 	ppp_private_area_t *ppp_priv_area = dev->priv;
 	int err;
 
@@ -2898,7 +2899,7 @@ static int read_info( sdla_t *card )
 static void remove_route( sdla_t *card )
 {
 
-	netdevice_t *dev = card->wandev.dev;
+	struct net_device *dev = card->wandev.dev;
 	long ip_addr;
 	int err;
 
@@ -3024,7 +3025,7 @@ static int udp_pkt_type( struct sk_buff *skb, sdla_t *card )
  * multicast source IP address.
  */
 
-static int chk_bcast_mcast_addr(sdla_t *card, netdevice_t* dev,
+static int chk_bcast_mcast_addr(sdla_t *card, struct net_device* dev,
 				struct sk_buff *skb)
 {
 	u32 src_ip_addr;
@@ -3075,7 +3076,7 @@ void s508_unlock (sdla_t *card, unsigned long *smp_flags)
 static int read_connection_info (sdla_t *card)
 {
 	ppp_mbox_t *mb = card->mbox;
-	netdevice_t *dev = card->wandev.dev;
+	struct net_device *dev = card->wandev.dev;
 	ppp_private_area_t *ppp_priv_area = dev->priv;
 	ppp508_connect_info_t *ppp508_connect_info;
 	int err;
@@ -3124,7 +3125,7 @@ static int read_connection_info (sdla_t *card)
 static int config_ppp (sdla_t *card)
 {
 
-	netdevice_t *dev = card->wandev.dev;
+	struct net_device *dev = card->wandev.dev;
 	ppp_flags_t *flags = card->flags;
 	ppp_private_area_t *ppp_priv_area = dev->priv;
 
@@ -3232,7 +3233,7 @@ static int config_ppp (sdla_t *card)
  *      trigger_ppp_poll() function is used to kick
  *      the ppp_poll routine.  
  */
-static void ppp_poll (netdevice_t *dev)
+static void ppp_poll(struct net_device *dev)
 {
 	ppp_private_area_t *ppp_priv_area; 	
 	sdla_t *card;
@@ -3377,7 +3378,7 @@ static void ppp_poll (netdevice_t *dev)
  *
  */	
 
-static void trigger_ppp_poll (netdevice_t *dev)
+static void trigger_ppp_poll(struct net_device *dev)
 {
 	ppp_private_area_t *ppp_priv_area;
 	if ((ppp_priv_area=dev->priv) != NULL){ 	
@@ -3399,7 +3400,7 @@ static void trigger_ppp_poll (netdevice_t *dev)
 
 static void ppp_poll_delay (unsigned long dev_ptr)
 {
-	netdevice_t *dev = (netdevice_t *)dev_ptr;
+	struct net_device *dev = (struct net_device *)dev_ptr;
 	trigger_ppp_poll(dev);
 }
 

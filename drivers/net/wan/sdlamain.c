@@ -64,8 +64,6 @@
 #include <linux/sdlapci.h>
 #include <linux/if_wanpipe_common.h>
 
-#define netdevice_t struct net_device
-
 #include <asm/uaccess.h>	/* kernel <-> user copy */
 #include <linux/inetdevice.h>
 
@@ -1255,7 +1253,7 @@ void wanpipe_mark_bh (void)
 	}
 } 
 
-void wakeup_sk_bh (netdevice_t *dev)
+void wakeup_sk_bh(struct net_device *dev)
 {
 	wanpipe_common_t *chan = dev->priv;
 
@@ -1268,7 +1266,7 @@ void wakeup_sk_bh (netdevice_t *dev)
 	}
 }
 
-int change_dev_flags (netdevice_t *dev, unsigned flags)
+int change_dev_flags(struct net_device *dev, unsigned flags)
 {
 	struct ifreq if_info;
 	mm_segment_t fs = get_fs();
@@ -1285,7 +1283,7 @@ int change_dev_flags (netdevice_t *dev, unsigned flags)
 	return err;
 }
 
-unsigned long get_ip_address (netdevice_t *dev, int option)
+unsigned long get_ip_address(struct net_device *dev, int option)
 {
 	
 	struct in_ifaddr *ifaddr;
@@ -1323,7 +1321,7 @@ unsigned long get_ip_address (netdevice_t *dev, int option)
 	return 0;
 }	
 
-void add_gateway(sdla_t *card, netdevice_t *dev)
+void add_gateway(sdla_t *card, struct net_device *dev)
 {
 	mm_segment_t oldfs;
 	struct rtentry route;

@@ -101,16 +101,12 @@ typedef struct
 
 #ifdef __KERNEL__
 
-#ifndef netdevice_t
-#define netdevice_t struct net_device
-#endif
-
 /* Private wanpipe socket structures. */
 struct wanpipe_opt
 {
 	void   *mbox;		/* Mail box  */
 	void   *card; 		/* Card bouded to */
-	netdevice_t *dev;	/* Bounded device */
+	struct net_device *dev;	/* Bounded device */
 	unsigned short lcn;	/* Binded LCN */
 	unsigned char  svc;	/* 0=pvc, 1=svc */
 	unsigned char  timer;   /* flag for delayed transmit*/	

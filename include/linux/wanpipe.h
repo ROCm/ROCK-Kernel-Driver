@@ -39,8 +39,6 @@
 #ifndef	_WANPIPE_H
 #define	_WANPIPE_H
 
-#define netdevice_t struct net_device
-
 #include <linux/wanrouter.h>
 
 /* Defines */
@@ -335,22 +333,22 @@ typedef struct sdla
 			u32 hi_pvc;
 			u32 lo_svc;
 			u32 hi_svc;
-			netdevice_t *svc_to_dev_map[MAX_X25_LCN];
-			netdevice_t *pvc_to_dev_map[MAX_X25_LCN];
-			netdevice_t *tx_dev;
-			netdevice_t *cmd_dev;
+			struct net_device *svc_to_dev_map[MAX_X25_LCN];
+			struct net_device *pvc_to_dev_map[MAX_X25_LCN];
+			struct net_device *tx_dev;
+			struct net_device *cmd_dev;
 			u32 no_dev;
 			volatile u8 *hdlc_buf_status;
 			u32 tx_interrupts_pending;
                         u16 timer_int_enabled;
-			netdevice_t *poll_device;
+			struct net_device *poll_device;
 			atomic_t command_busy;
 
 			u16 udp_pkt_lgth;
                         u32 udp_type;
                         u8  udp_pkt_src;
 			u32 udp_lcn;
-                        netdevice_t * udp_dev;
+                        struct net_device *udp_dev;
                         s8 udp_pkt_data[MAX_LGTH_UDP_MGNT_PKT];
 
 		 	u8 LAPB_hdlc;		/* Option to turn off X25 and run only LAPB */
@@ -369,7 +367,7 @@ typedef struct sdla
 			unsigned rx_top;	/* S508 receive buffer end */
 			unsigned short node_dlci[100];
 			unsigned short dlci_num;
-                        netdevice_t *dlci_to_dev_map[991 + 1];
+                        struct net_device *dlci_to_dev_map[991 + 1];
                         unsigned tx_interrupts_pending;
                         unsigned short timer_int_enabled;
                         unsigned short udp_pkt_lgth;
@@ -382,7 +380,7 @@ typedef struct sdla
                         void *curr_trc_el;      		/* current trace element */
                         unsigned short trc_bfr_space; 		/* trace buffer space */
 			unsigned char  update_comms_stats;
-			netdevice_t *arp_dev;
+			struct net_device *arp_dev;
 			spinlock_t if_send_lock;
 		} f;
 		struct			/****** PPP-specific data ***********/
@@ -483,10 +481,10 @@ extern sdla_t * wanpipe_find_card_num (int);
 
 extern void wanpipe_queue_work (struct work_struct *);
 extern void wanpipe_mark_bh (void);
-extern void wakeup_sk_bh (netdevice_t *);
-extern int change_dev_flags (netdevice_t *, unsigned); 
-extern unsigned long get_ip_address (netdevice_t *dev, int option);
-extern void add_gateway(sdla_t *, netdevice_t *);
+extern void wakeup_sk_bh(struct net_device *dev);
+extern int change_dev_flags(struct net_device *dev, unsigned flags);
+extern unsigned long get_ip_address(struct net_device *dev, int option);
+extern void add_gateway(sdla_t *card, struct net_device *dev);
 
 
 #endif	/* __KERNEL__ */
