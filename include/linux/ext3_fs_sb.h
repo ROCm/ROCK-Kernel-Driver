@@ -61,6 +61,7 @@ struct ext3_sb_info {
 	int s_desc_per_block_bits;
 	int s_inode_size;
 	int s_first_ino;
+	u32 s_next_generation;
 
 	/* Journaling */
 	struct inode * s_journal_inode;
