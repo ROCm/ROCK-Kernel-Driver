@@ -6,52 +6,29 @@ O_TARGET := pcmcia.o
 
 export-objs := ds.o cs.o yenta.o pci_socket.o
 
-yenta_socket-objs := pci_socket.o yenta.o
-pcmcia_core-objs := cistpl.o rsrc_mgr.o bulkmem.o cs.o
-
+obj-$(CONFIG_PCMCIA)			+= pcmcia_core.o ds.o
 ifeq ($(CONFIG_CARDBUS),y)
-  pcmcia_core-objs += cardbus.o
+  obj-$(CONFIG_PCMCIA) 			+= yenta_socket.o
 endif
-
-ifeq ($(CONFIG_PCMCIA),y)
-  obj-y   := cistpl.o rsrc_mgr.o bulkmem.o ds.o cs.o
-  ifeq ($(CONFIG_CARDBUS),y)
-    obj-y += cardbus.o yenta.o pci_socket.o
-  endif
-  ifeq ($(CONFIG_I82365),y)
-    obj-y += i82365.o
-  endif
-  ifeq ($(CONFIG_I82092),y)
-    obj-y += i82092.o
-  endif
-  ifeq ($(CONFIG_TCIC),y)
-    obj-y += tcic.o
-  endif
-  ifeq ($(CONFIG_HD64465_PCMCIA),y)
-    obj-y += hd64465_ss.o
-  endif
-else
-  ifeq ($(CONFIG_PCMCIA),m)
-    obj-m   := pcmcia_core.o ds.o
-    ifeq ($(CONFIG_I82365),y)
-      obj-m += i82365.o
-    endif
-    ifeq ($(CONFIG_I82092),y)
-      obj-m += i82092.o
-    endif
-    ifeq ($(CONFIG_TCIC),y)
-      obj-m += tcic.o
-    endif
-    ifeq ($(CONFIG_HD64465_PCMCIA),m)
-      obj-m += hd64465_ss.o
-    endif
-     ifeq ($(CONFIG_CARDBUS),y)
-	obj-m += yenta_socket.o
-     endif
-  endif
+ifeq ($(CONFIG_I82365),y)
+  obj-$(CONFIG_PCMCIA)			+= i82365.o
 endif
+ifeq ($(CONFIG_I82092),y)
+  obj-$(CONFIG_PCMCIA)			+= i82092.o
+endif
+ifeq ($(CONFIG_TCIC),y)
+  obj-$(CONFIG_PCMCIA)			+= tcic.o
+endif
+obj-$(CONFIG_HD64465_PCMCIA)		+= hd64465_ss.o
 
-obj-$(CONFIG_PCMCIA_SA1100)	+= sa1100_cs.o
+obj-$(CONFIG_PCMCIA_SA1100)		+= sa1100_cs.o
+
+
+yenta_socket-objs				:= pci_socket.o yenta.o
+
+pcmcia_core-objs-y				:= cistpl.o rsrc_mgr.o bulkmem.o cs.o
+pcmcia_core-objs-$(CONFIG_CARDBUS)		+= cardbus.o
+pcmcia_core-objs				:= $(pcmcia_core-y)
 
 sa1100_cs-objs-y				:= sa1100_generic.o
 sa1100_cs-objs-$(CONFIG_SA1100_ADSBITSY)	+= sa1100_adsbitsy.o sa1111_generic.o
@@ -74,5 +51,6 @@ sa1100_cs-objs-$(CONFIG_SA1100_STORK)		+= sa1100_stork.o
 sa1100_cs-objs-$(CONFIG_SA1100_TRIZEPS) 	+= sa1100_trizeps.o
 sa1100_cs-objs-$(CONFIG_SA1100_XP860)		+= sa1100_xp860.o sa1111_generic.o
 sa1100_cs-objs-$(CONFIG_SA1100_YOPY)		+= sa1100_yopy.o
+sa1100_cs-objs					:= $(sa11000_cs-objs-y)
 
 include $(TOPDIR)/Rules.make
