@@ -482,6 +482,11 @@ extern int unregister_framebuffer(struct fb_info *fb_info);
 extern int fb_prepare_logo(struct fb_info *fb_info);
 extern int fb_show_logo(struct fb_info *fb_info);
 extern u32 fb_get_buffer_offset(struct fb_info *info, u32 size);
+extern void move_buf_unaligned(struct fb_info *info, u8 *dst, u8 *src, u32 d_pitch,
+			     	u32 height, u32 mask, u32 shift_high, u32 shift_low,
+				u32 mod, u32 idx);
+extern void move_buf_aligned(struct fb_info *info, u8 *dst, u8 *src, u32 d_pitch,
+			     u32 s_pitch, u32 height);
 extern struct fb_info *registered_fb[FB_MAX];
 extern int num_registered_fb;
 

@@ -382,6 +382,7 @@ static struct {
 };
 
 #define NUM_FB_DRIVERS	(sizeof(fb_drivers)/sizeof(*fb_drivers))
+#define FBPIXMAPSIZE	8192
 
 extern const char *global_mode_option;
 
@@ -395,7 +396,59 @@ static int ofonly __initdata = 0;
 #endif
 
 /*
- * we need to lock this section since fbcon_cursor
+ * Drawing helpers.
+ */
+u8 sys_inbuf(u8 *src)
+{	
+	return *src;
+}
+
+void sys_outbuf(u8 src, u8 *dst)
+{
+	*dst = src;
+}	
+
+void move_buf_aligned(struct fb_info *info, u8 *dst, u8 *src, u32 d_pitch, 
+			u32 s_pitch, u32 height)
+{
+	int i, j;
+	
+	for (i = height; i--; ) {
+		for (j = 0; j < s_pitch; j++)
+			info->pixmap.outbuf(*src++, dst+j);
+		dst += d_pitch;
+	}	
+}	
+
+void move_buf_unaligned(struct fb_info *info, u8 *dst, u8 *src, u32 d_pitch, 
+			u32 height, u32 mask, u32 shift_high, u32 shift_low,
+			u32 mod, u32 idx)
+{
+	int i, j;
+	u8 tmp;
+
+	for (i = height; i--; ) {
+		for (j = 0; j < idx; j++) {
+			tmp = info->pixmap.inbuf(dst+j);
+			tmp &= mask;
+			tmp |= *src >> shift_low;
+			info->pixmap.outbuf(tmp, dst+j);
+			info->pixmap.outbuf(*src << shift_high, dst+j+1);
+			src++;
+		}
+		tmp = info->pixmap.inbuf(dst+idx);
+		tmp &= mask;
+		tmp |= *src >> shift_low;
+		info->pixmap.outbuf(tmp, dst+idx);
+		if (shift_high < mod)
+			info->pixmap.outbuf(*src<<shift_high, dst+idx+1);
+		src++;
+		dst += d_pitch;
+	}	
+}	
+
+/*
+ * we need to lock this section since fb_cursor
  * may use fb_imageblit()
  */
 u32 fb_get_buffer_offset(struct fb_info *info, u32 size)
@@ -1152,6 +1205,23 @@ register_framebuffer(struct fb_info *fb_info)
 		if (!registered_fb[i])
 			break;
 	fb_info->node = mk_kdev(FB_MAJOR, i);
+	
+	if (fb_info->pixmap.addr == NULL) {
+		fb_info->pixmap.addr = kmalloc(FBPIXMAPSIZE, GFP_KERNEL);
+		if (fb_info->pixmap.addr) {
+			fb_info->pixmap.size = FBPIXMAPSIZE;
+			fb_info->pixmap.buf_align = 1;
+			fb_info->pixmap.scan_align = 1;
+			fb_info->pixmap.flags = FB_PIXMAP_DEFAULT;
+		}
+	}	
+	fb_info->pixmap.offset = 0;
+	if (fb_info->pixmap.outbuf == NULL)
+		fb_info->pixmap.outbuf = sys_outbuf;
+	if (fb_info->pixmap.inbuf == NULL)
+		fb_info->pixmap.inbuf = sys_inbuf;
+	spin_lock_init(&fb_info->pixmap.lock);
+	
 	registered_fb[i] = fb_info;
 	sprintf(name_buf, "fb/%d", i);
 	devfs_register(NULL, name_buf, DEVFS_FL_DEFAULT,
@@ -1180,6 +1250,9 @@ unregister_framebuffer(struct fb_info *fb_info)
 	if (!registered_fb[i])
 		return -EINVAL;
 	devfs_remove("fb/%d", i);
+
+	if (fb_info->pixmap.addr)
+		kfree(fb_info->pixmap.addr);
 	registered_fb[i]=NULL;
 	num_registered_fb--;
 	return 0;
@@ -1297,5 +1370,7 @@ EXPORT_SYMBOL(fb_set_var);
 EXPORT_SYMBOL(fb_blank);
 EXPORT_SYMBOL(fb_pan_display);
 EXPORT_SYMBOL(fb_get_buffer_offset);
+EXPORT_SYMBOL(move_buf_unaligned);
+EXPORT_SYMBOL(move_buf_aligned);
 
 MODULE_LICENSE("GPL");
