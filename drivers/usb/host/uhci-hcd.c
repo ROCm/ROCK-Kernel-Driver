@@ -2515,7 +2515,7 @@ static const struct hc_driver uhci_driver = {
 	suspend:		uhci_suspend,
 	resume:			uhci_resume,
 #endif
-	stop:			uhci_stop,
+	stop:			__devexit_p(uhci_stop),
 
 	hcd_alloc:		uhci_hcd_alloc,
 	hcd_free:		uhci_hcd_free,
