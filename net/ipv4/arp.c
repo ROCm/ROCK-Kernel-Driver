@@ -69,6 +69,7 @@
  *		Arnaldo C. Melo :	convert /proc/net/arp to seq_file
  */
 
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/string.h>
 #include <linux/kernel.h>
@@ -1429,3 +1430,13 @@ static int __init arp_proc_init(void)
 }
 
 #endif /* CONFIG_PROC_FS */
+
+EXPORT_SYMBOL(arp_broken_ops);
+EXPORT_SYMBOL(arp_find);
+EXPORT_SYMBOL(arp_rcv);
+EXPORT_SYMBOL(arp_send);
+EXPORT_SYMBOL(arp_tbl);
+
+#if defined(CONFIG_ATM_CLIP) || defined(CONFIG_ATM_CLIP_MODULE)
+EXPORT_SYMBOL(clip_tbl_hook);
+#endif

@@ -37,10 +37,6 @@
 
 #ifdef CONFIG_INET
 #include <net/protocol.h>
-#include <net/arp.h>
-#if defined(CONFIG_ATM_CLIP) || defined(CONFIG_ATM_CLIP_MODULE)
-#include <net/atmclip.h>
-#endif
 #include <net/icmp.h>
 #include <net/inet_common.h>
 #include <linux/inet.h>
@@ -123,8 +119,6 @@ EXPORT_SYMBOL(icmp_statistics);
 EXPORT_SYMBOL(icmp_err_convert);
 EXPORT_SYMBOL(ip_options_compile);
 EXPORT_SYMBOL(ip_options_undo);
-EXPORT_SYMBOL(arp_send);
-EXPORT_SYMBOL(arp_broken_ops);
 EXPORT_SYMBOL(__ip_select_ident);
 EXPORT_SYMBOL(in_aton);
 EXPORT_SYMBOL(ip_mc_inc_group);
@@ -168,12 +162,6 @@ EXPORT_SYMBOL(ipv4_config);
 EXPORT_SYMBOL(xrlim_allow);
 
 EXPORT_SYMBOL(ip_rcv);
-EXPORT_SYMBOL(arp_rcv);
-EXPORT_SYMBOL(arp_tbl);
-#if defined(CONFIG_ATM_CLIP) || defined(CONFIG_ATM_CLIP_MODULE)
-EXPORT_SYMBOL(clip_tbl_hook);
-#endif
-EXPORT_SYMBOL(arp_find);
 
 #endif  /* CONFIG_INET */
 
