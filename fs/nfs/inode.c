@@ -855,23 +855,13 @@ int nfs_open(struct inode *inode, struct file *filp)
 {
 	struct rpc_auth *auth;
 	struct rpc_cred *cred;
-	int err = 0;
 
-	lock_kernel();
-	/* Ensure that we revalidate the data cache */
-	if (NFS_SERVER(inode)->flags & NFS_MOUNT_NOCTO) {
-		err = __nfs_revalidate_inode(NFS_SERVER(inode),inode);
-		if (err)
-			goto out;
-	}
 	auth = NFS_CLIENT(inode)->cl_auth;
 	cred = rpcauth_lookupcred(auth, 0);
 	filp->private_data = cred;
 	if (filp->f_mode & FMODE_WRITE)
 		nfs_set_mmcred(inode, cred);
-out:
-	unlock_kernel();
-	return err;
+	return 0;
 }
 
 int nfs_release(struct inode *inode, struct file *filp)

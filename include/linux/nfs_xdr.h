@@ -597,6 +597,7 @@ struct nfs_rpc_ops {
 	void	(*read_setup)   (struct nfs_read_data *, unsigned int count);
 	void	(*write_setup)  (struct nfs_write_data *, unsigned int count, int how);
 	void	(*commit_setup) (struct nfs_write_data *, u64 start, u32 len, int how);
+	int	(*file_open)   (struct inode *, struct file *);
 };
 
 /*

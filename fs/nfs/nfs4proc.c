@@ -1560,6 +1560,16 @@ nfs4_proc_renew(struct nfs_server *server)
 	return rpc_execute(task);
 }
 
+/*
+* To be changed into a real NFSv4 file_open soon. 
+*/
+
+int
+nfs4_proc_file_open(struct inode *inode, struct file *filp)
+{
+	return 0;
+}
+
 struct nfs_rpc_ops	nfs_v4_clientops = {
 	.version	= 4,			/* protocol version */
 	.getroot	= nfs4_proc_get_root,
@@ -1589,6 +1599,7 @@ struct nfs_rpc_ops	nfs_v4_clientops = {
 	.read_setup	= nfs4_proc_read_setup,
 	.write_setup	= nfs4_proc_write_setup,
 	.commit_setup	= nfs4_proc_commit_setup,
+	.file_open      = nfs4_proc_file_open,
 };
 
 /*
