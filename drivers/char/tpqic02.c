@@ -2759,9 +2759,7 @@ int __init qic02_tape_init(void)
 	return 0;
 }				/* qic02_tape_init */
 
-#ifdef MODULE
-
-void cleanup_module(void)
+static void qic02_module_exit(void)
 {
 	unregister_chrdev(QIC02_TAPE_MAJOR, TPQIC02_NAME);
 	if (status_zombie == NO)
@@ -2777,7 +2775,7 @@ void cleanup_module(void)
 	devfs_remove("tpqic150");
 }
 
-int init_module(void)
+static int qic02_module_init(void)
 {
 	int retval;
 	retval = qic02_tape_init();
@@ -2788,12 +2786,14 @@ int init_module(void)
 	if (!retval && qic02_tape_dynconf.ifc_type) {
 		retval = update_ifc_masks(qic02_tape_dynconf.ifc_type);
 		if (retval) {
-			cleanup_module();
+			qic02_module_exit();
 		}
 	}
 # endif
 	return retval;
 }
-#endif
 
 MODULE_LICENSE("GPL");
+
+module_init(qic02_module_init);
+module_exit(qic02_module_exit);

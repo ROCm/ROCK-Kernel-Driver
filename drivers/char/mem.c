@@ -697,9 +697,6 @@ int __init chr_dev_init(void)
 	lp_m68k_init();
 #endif
 	misc_init();
-#if CONFIG_QIC02_TAPE
-	qic02_tape_init();
-#endif
 #ifdef CONFIG_FTAPE
 	ftape_init();
 #endif
