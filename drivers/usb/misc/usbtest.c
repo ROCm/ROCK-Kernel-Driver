@@ -1349,6 +1349,13 @@ static struct usbtest_info fw_info = {
 	.alt		= 0,
 };
 
+static struct usbtest_info um_info = {
+	.name		= "user mode test driver",
+	.ep_in		= 7,
+	.ep_out		= 3,
+	.alt		= -1,
+};
+
 #ifdef IBOT2
 /* this is a nice source of high speed bulk data;
  * uses an FX2, with firmware provided in the device
@@ -1412,6 +1419,11 @@ static struct usb_device_id id_table [] = {
 	/* "Gadget Zero" firmware runs under Linux */
 	{ USB_DEVICE (0x0525, 0xa4a0),
 		.driver_info = (unsigned long) &fw_info,
+		},
+
+	/* so does a user-mode variant */
+	{ USB_DEVICE (0x0525, 0xa4a4),
+		.driver_info = (unsigned long) &um_info,
 		},
 
 #ifdef KEYSPAN_19Qi

@@ -178,10 +178,4 @@ extern int usb_stor_bulk_transfer_sglist(struct us_data *us, unsigned int pipe,
 extern int usb_stor_bulk_transfer_sg(struct us_data *us, unsigned int pipe,
 		void *buf, unsigned int length, int use_sg, int *residual);
 
-static __inline__ int usb_stor_bulk_transfer_srb(struct us_data *us,
-		unsigned int pipe, Scsi_Cmnd *srb, unsigned int length) {
-	return usb_stor_bulk_transfer_sg(us, pipe, srb->request_buffer,
-			length, srb->use_sg, &srb->resid);
-}
-
 #endif
