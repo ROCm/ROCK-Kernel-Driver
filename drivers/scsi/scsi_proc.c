@@ -281,7 +281,7 @@ static int scsi_proc_info(char *buffer, char **start, off_t offset, int length)
 	 */
 	for (shost = scsi_host_get_next(NULL); shost;
 	     shost = scsi_host_get_next(shost)) {
-		if (shost->host_queue != NULL) {
+		if (!list_empty(&shost->my_devices)) {
 			break;
 		}
 	}
@@ -291,7 +291,7 @@ static int scsi_proc_info(char *buffer, char **start, off_t offset, int length)
 	pos = begin + len;
 	for (shost = scsi_host_get_next(NULL); shost;
 	     shost = scsi_host_get_next(shost)) {
-		for (sdev = shost->host_queue; sdev; sdev = sdev->next) {
+		list_for_each_entry(sdev, &shost->my_devices, siblings) {
 			proc_print_scsidevice(sdev, buffer, &size, len);
 			len += size;
 			pos = begin + len;
@@ -359,7 +359,7 @@ static void scsi_dump_status(int level)
 	     shpnt = scsi_host_get_next(shpnt)) {
 		printk(KERN_INFO "h:c:t:l (dev sect nsect cnumsec sg) "
 			"(ret all flg) (to/cmd to ito) cmd snse result\n");
-		for (SDpnt = shpnt->host_queue; SDpnt; SDpnt = SDpnt->next) {
+		list_for_each_entry(SDpnt, &shpnt->my_devices, siblings) {
 			for (SCpnt = SDpnt->device_queue; SCpnt; SCpnt = SCpnt->next) {
 				/*  (0) h:c:t:l (dev sect nsect cnumsec sg) (ret all flg) (to/cmd to ito) cmd snse result %d %x      */
 				printk(KERN_INFO "(%3d) %2d:%1d:%2d:%2d (%6s %4llu %4ld %4ld %4x %1d) (%1d %1d 0x%2x) (%4d %4d %4d) 0x%2.2x 0x%2.2x 0x%8.8x\n",

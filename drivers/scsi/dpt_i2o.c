@@ -2509,20 +2509,13 @@ static void adpt_fail_posted_scbs(adpt_hba* pHba)
 	Scsi_Cmnd* 	cmd = NULL;
 	Scsi_Device* 	d = NULL;
 
-	if( pHba->host->host_queue != NULL ) {
-		d = pHba->host->host_queue;
-		if(!d){
-			return;
-		}
-		while( d->next != NULL ){
-			for(cmd = d->device_queue; cmd ; cmd = cmd->next){
-				if(cmd->serial_number == 0){
-					continue;
-				}
-				cmd->result = (DID_OK << 16) | (QUEUE_FULL <<1);
-				cmd->scsi_done(cmd);
+	list_for_each_entry(d, &pHba->host->my_devices, siblings) {
+		for(cmd = d->device_queue; cmd ; cmd = cmd->next){
+			if(cmd->serial_number == 0){
+				continue;
 			}
-			d = d->next;
+			cmd->result = (DID_OK << 16) | (QUEUE_FULL <<1);
+			cmd->scsi_done(cmd);
 		}
 	}
 }

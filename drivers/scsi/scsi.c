@@ -364,16 +364,8 @@ static int check_all_luns(struct Scsi_Host *shost, struct scsi_device *myself)
 {
 	struct scsi_device *sdev;
 
-	for (sdev = shost->host_queue; sdev; sdev = sdev->next) {
-		/*
-		 * Only look for other devices on the same bus
-		 * with the same target ID.
-		 */
-		if (sdev->channel != myself->channel || sdev->id != myself->id)
-			continue;
-		if (sdev == myself)
-			continue;
-
+	list_for_each_entry(sdev, &myself->same_target_siblings,
+		       	same_target_siblings) {
 		if (atomic_read(&sdev->device_active))
 			return 1;
 	}
@@ -2033,19 +2025,9 @@ int scsi_register_device(struct Scsi_Device_Template *tpnt)
 	driver_register(&tpnt->scsi_driverfs_driver);
 
 	for (shpnt = scsi_host_get_next(NULL); shpnt;
-	     shpnt = scsi_host_get_next(shpnt)) {
-		for (SDpnt = shpnt->host_queue; SDpnt;
-		     SDpnt = SDpnt->next) {
-			if (tpnt->attach)
-				/*
-				 * XXX check result when the upper level
-				 * attach return values are fixed, and
-				 * stop attaching on failure.
-				 */
-				(*tpnt->attach) (SDpnt);
-
-		}
-	}
+	     shpnt = scsi_host_get_next(shpnt)) 
+		list_for_each_entry (SDpnt, &shpnt->my_devices, siblings)
+			(*tpnt->attach) (SDpnt);
 
 	return 0;
 }
@@ -2063,11 +2045,8 @@ int scsi_unregister_device(struct Scsi_Device_Template *tpnt)
 
 	for (shpnt = scsi_host_get_next(NULL); shpnt;
 	     shpnt = scsi_host_get_next(shpnt)) {
-		for (SDpnt = shpnt->host_queue; SDpnt;
-		     SDpnt = SDpnt->next) {
-			if (tpnt->detach)
-				(*tpnt->detach) (SDpnt);
-		}
+		list_for_each_entry(SDpnt, &shpnt->my_devices, siblings)
+			(*tpnt->detach) (SDpnt);
 	}
 	/*
 	 * Extract the template from the linked list.

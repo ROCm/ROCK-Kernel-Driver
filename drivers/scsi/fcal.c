@@ -229,7 +229,7 @@ int fcal_proc_info (char *buffer, char **start, off_t offset, int length, int ho
 #endif
 	SPRINTF ("Initiator AL-PA: %02x\n", fc->sid);
 
-	SPRINTF ("\nAttached devices: %s\n", host->host_queue ? "" : "none");
+	SPRINTF ("\nAttached devices: %s\n", !list_empty(&host->my_devices) ? "" : "none");
 	
 	for (i = 0; i < fc->posmap->len; i++) {
 		unsigned char alpa = fc->posmap->list[i];
@@ -246,8 +246,8 @@ int fcal_proc_info (char *buffer, char **start, off_t offset, int length, int ho
 				 alpa, u1[0], u1[1], u2[0], u2[1]);
 		} else {
 			Scsi_Device *scd;
-			for (scd = host->host_queue ; scd; scd = scd->next)
-				if (scd->host->host_no == hostno && scd->id == target) {
+			list_for_each_entry (scd, &host->my_devices, siblings)
+				if (scd->id == target) {
 					SPRINTF ("  [AL-PA: %02x, Id: %02d, Port WWN: %08x%08x, Node WWN: %08x%08x]  ",
 						alpa, target, u1[0], u1[1], u2[0], u2[1]);
 					SPRINTF ("%s ", (scd->type < MAX_SCSI_DEVICE_CODE) ?

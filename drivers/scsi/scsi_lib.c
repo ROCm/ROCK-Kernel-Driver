@@ -242,7 +242,7 @@ void scsi_queue_next_request(request_queue_t * q, Scsi_Cmnd * SCpnt)
 	 * use function pointers to pick the right one.
 	 */
 	if (SDpnt->single_lun && blk_queue_empty(q) && SDpnt->device_busy ==0) {
-		for (SDpnt = SHpnt->host_queue; SDpnt; SDpnt = SDpnt->next) {
+		list_for_each_entry(SDpnt, &SHpnt->my_devices, siblings) {
 			if (((SHpnt->can_queue > 0)
 			     && (SHpnt->host_busy >= SHpnt->can_queue))
 			    || (SHpnt->host_blocked)
@@ -265,7 +265,7 @@ void scsi_queue_next_request(request_queue_t * q, Scsi_Cmnd * SCpnt)
 	 */
 	all_clear = 1;
 	if (SHpnt->some_device_starved) {
-		for (SDpnt = SHpnt->host_queue; SDpnt; SDpnt = SDpnt->next) {
+		list_for_each_entry(SDpnt, &SHpnt->my_devices, siblings) {
 			if ((SHpnt->can_queue > 0 && (SHpnt->host_busy >= SHpnt->can_queue))
 			    || (SHpnt->host_blocked) 
 			    || (SHpnt->host_self_blocked)) {
@@ -1050,7 +1050,7 @@ void scsi_unblock_requests(struct Scsi_Host * SHpnt)
 
 	SHpnt->host_self_blocked = FALSE;
 	/* Now that we are unblocked, try to start the queues. */
-	for (SDloop = SHpnt->host_queue; SDloop; SDloop = SDloop->next)
+	list_for_each_entry(SDloop, &SHpnt->my_devices, siblings)
 		scsi_queue_next_request(&SDloop->request_queue, NULL);
 }
 
@@ -1078,7 +1078,7 @@ void scsi_unblock_requests(struct Scsi_Host * SHpnt)
 void scsi_report_bus_reset(struct Scsi_Host * SHpnt, int channel)
 {
 	Scsi_Device *SDloop;
-	for (SDloop = SHpnt->host_queue; SDloop; SDloop = SDloop->next) {
+	list_for_each_entry(SDloop, &SHpnt->my_devices, siblings) {
 		if (channel == SDloop->channel) {
 			SDloop->was_reset = 1;
 			SDloop->expecting_cc_ua = 1;

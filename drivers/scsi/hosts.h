@@ -373,8 +373,6 @@ struct Scsi_Host
      * struct private is a way of marking it in a sort of C++ type of way.
      */
     struct list_head      sh_list;
-    Scsi_Device           * host_queue;
-    struct list_head	  all_scsi_hosts;
     struct list_head	  my_devices;
 
     spinlock_t		  default_lock;
@@ -599,9 +597,7 @@ static inline Scsi_Device *scsi_find_device(struct Scsi_Host *shost,
                                             int channel, int pun, int lun) {
         Scsi_Device *sdev;
 
-        for (sdev = shost->host_queue;
-            sdev != NULL;
-            sdev = sdev->next)
+	list_for_each_entry (sdev, &shost->my_devices, siblings)
                 if (sdev->channel == channel && sdev->id == pun
                    && sdev->lun ==lun)
                         break;

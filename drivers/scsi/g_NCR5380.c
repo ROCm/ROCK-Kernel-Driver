@@ -814,7 +814,7 @@ int generic_NCR5380_proc_info(char *buffer, char **start, off_t offset, int leng
 		PRINTP("  %d pending writes" ANDP hostdata->pendingw);
 	if (hostdata->pendingr || hostdata->pendingw)
 		PRINTP("\n");
-	for (dev = scsi_ptr->host_queue; dev; dev = dev->next) {
+	list_for_each_entry (dev, &scsi_ptr->my_devices, siblings) {
 		unsigned long br = hostdata->bytes_read[dev->id];
 		unsigned long bw = hostdata->bytes_write[dev->id];
 		long tr = hostdata->time_read[dev->id] / HZ;

@@ -1513,7 +1513,7 @@ NCR_700_intr(int irq, void *dev_id, struct pt_regs *regs)
 			       host->host_no, SCp, SCp == NULL ? NULL : SCp->host_scribble, dsp, dsp - hostdata->pScript);
 
 			/* clear all the negotiated parameters */
-			for(SDp = host->host_queue; SDp != NULL; SDp = SDp->next)
+	    		list_for_each_entry(SDp, &host->my_devices, siblings)
 				SDp->hostdata = 0;
 			
 			/* clear all the slots and their pending commands */
@@ -1740,7 +1740,7 @@ NCR_700_proc_directory_info(char *proc_buf, char **startp,
 	len += sprintf(&buf[len],"\
 Target	Depth  Active  Next Tag\n\
 ======	=====  ======  ========\n");
-	for(SDp = host->host_queue; SDp != NULL; SDp = SDp->next) {
+	list_for_each_entry(SDp, &host->my_devices, siblings) {
 		len += sprintf(&buf[len]," %2d:%2d   %4d    %4d      %4d\n", SDp->id, SDp->lun, SDp->current_queue_depth, NCR_700_get_depth(SDp), SDp->current_tag);
 	}
 	if((len -= offset) <= 0)

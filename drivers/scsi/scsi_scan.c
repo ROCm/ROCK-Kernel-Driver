@@ -508,15 +508,9 @@ struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost, uint channel,
 		init_waitqueue_head(&sdev->scpnt_wait);
 
 		/*
-		 * Add it to the end of the shost->host_queue list.
+		 * If there are any same target siblings, add this to the
+		 * sibling list
 		 */
-		if (shost->host_queue != NULL) {
-			sdev->prev = shost->host_queue;
-			while (sdev->prev->next != NULL)
-				sdev->prev = sdev->prev->next;
-			sdev->prev->next = sdev;
-		} else
-			shost->host_queue = sdev;
 		list_for_each_entry(device, &shost->my_devices, siblings) {
 			if(device->id == sdev->id &&
 			   device->channel == sdev->channel) {
@@ -525,6 +519,9 @@ struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost, uint channel,
 				break;
 			}
 		}
+		/*
+		 * Add it to the end of the shost->my_devices list.
+		 */
 		list_add_tail(&sdev->siblings, &shost->my_devices);
 	}
 	return (sdev);
@@ -540,16 +537,11 @@ struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost, uint channel,
  **/
 void scsi_free_sdev(struct scsi_device *sdev)
 {
-	if (sdev->prev != NULL)
-		sdev->prev->next = sdev->next;
-	else
-		sdev->host->host_queue = sdev->next;
-	if (sdev->next != NULL)
-		sdev->next->prev = sdev->prev;
 	list_del(&sdev->siblings);
 	list_del(&sdev->same_target_siblings);
 
 	blk_cleanup_queue(&sdev->request_queue);
+	scsi_release_commandblocks(sdev);
 	if (sdev->host->hostt->slave_destroy)
 		sdev->host->hostt->slave_destroy(sdev);
 	if (sdev->inquiry != NULL)
@@ -1099,32 +1091,6 @@ leave:
 	    " id %d lun %d name/id: '%s'\n", sdev->host->host_no,
 	    sdev->channel, sdev->id, sdev->lun, sdev->sdev_driverfs_dev.name));
 	return;
-}
-
-/**
- * scsi_find_scsi_level - return the scsi_level of a matching target
- *
- * Description:
- *     Return the scsi_level of any Scsi_Device matching @channel, @id,
- *     and @shost.
- * Notes:
- *     Needs to issue an INQUIRY to LUN 0 if no Scsi_Device matches, and
- *     if the INQUIRY can't be sent return a failure.
- **/
-static int scsi_find_scsi_level(unsigned int channel, unsigned int id,
-				struct Scsi_Host *shost)
-{
-	int res = SCSI_2;
-	Scsi_Device *sdev;
-
-	for (sdev = shost->host_queue; sdev; sdev = sdev->next)
-		if ((id == sdev->id) && (channel == sdev->channel))
-			return (int) sdev->scsi_level;
-	/*
-	 * FIXME No matching target id is configured, this needs to get
-	 * the INQUIRY for LUN 0, and use it to determine the scsi_level.
-	 */
-	return res;
 }
 
 /**
@@ -1927,7 +1893,13 @@ int scsi_add_single_device(uint host, uint channel, uint id, uint lun)
 	if (!sdevscan)
 		goto out;
 
-	sdevscan->scsi_level = scsi_find_scsi_level(channel, id, shost);
+	if(!list_empty(&sdevscan->same_target_siblings)) {
+		sdev = list_entry(&sdevscan->same_target_siblings, Scsi_Device,
+					same_target_siblings);
+		sdevscan->scsi_level = sdev->scsi_level;
+		sdev = NULL;
+	} else
+		sdevscan->scsi_level = SCSI_2;
 	error = scsi_probe_and_add_lun(sdevscan, &sdev, NULL);
 	scsi_free_sdev(sdevscan);
 

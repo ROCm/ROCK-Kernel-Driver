@@ -4398,7 +4398,7 @@ advansys_proc_info(char *buffer, char **start, off_t offset, int length,
      * Display target driver information for each device attached
      * to the board.
      */
-    for (scd = shp->host_queue; scd; scd = scd->next)
+    list_for_each_entry (scd, &shp->my_devices, siblings)
     {
         if (scd->host == shp) {
             cp = boardp->prtbuf;
@@ -9387,8 +9387,8 @@ asc_prt_scsi_host(struct Scsi_Host *s)
 
 #if ASC_LINUX_KERNEL24
     printk(
-" host_queue 0x%lx, hostt 0x%lx\n",
-        (ulong) s->host_queue, (ulong) s->hostt);
+" hostt 0x%lx\n",
+        (ulong) s->hostt);
 #elif ASC_LINUX_KERNEL22
     printk(
 " host_queue 0x%lx, hostt 0x%lx, block 0x%lx,\n",
