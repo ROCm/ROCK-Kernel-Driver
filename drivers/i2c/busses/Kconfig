@@ -49,7 +49,7 @@ config I2C_AMD8111
 
 config I2C_ELEKTOR
 	tristate "Elektor ISA card"
-	depends on I2C_ALGOPCF && BROKEN_ON_SMP
+	depends on I2C_ALGOPCF && ISA && BROKEN_ON_SMP
 	help
 	  This supports the PCF8584 ISA bus I2C adapter.  Say Y if you own
 	  such an adapter.
@@ -59,7 +59,7 @@ config I2C_ELEKTOR
 
 config I2C_ELV
 	tristate "ELV adapter"
-	depends on I2C_ALGOBIT && ISA
+	depends on I2C_ALGOBIT
 	help
 	  This supports parallel-port I2C adapters called ELV.  Say Y if you
 	  own such an adapter.
@@ -321,7 +321,7 @@ config I2C_SIS96X
 
 config I2C_VELLEMAN
 	tristate "Velleman K8000 adapter"
-	depends on I2C_ALGOBIT && ISA
+	depends on I2C_ALGOBIT
 	help
 	  This supports the Velleman K8000 parallel-port I2C adapter.  Say Y
 	  if you own such an adapter.
