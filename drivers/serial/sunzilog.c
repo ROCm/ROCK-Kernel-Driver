@@ -1522,6 +1522,10 @@ static void __init sunzilog_prepare(void)
 		up[(chip * 2) + 0].port.membase = (char *) &rp->channelA;
 		up[(chip * 2) + 1].port.membase = (char *) &rp->channelB;
 
+		/* These do nothing but make the boot output sensible */
+		up[(chip * 2) + 0].port.mapbase = (unsigned long) &rp->channelA;
+		up[(chip * 2) + 1].port.mapbase = (unsigned long) &rp->channelB;
+
 		/* Channel A */
 		up[(chip * 2) + 0].port.iotype = SERIAL_IO_MEM;
 		up[(chip * 2) + 0].port.irq = zilog_irq;
