@@ -261,7 +261,7 @@ found:
 /*
  *	Find a connected X.25 socket given my LCI and neighbour.
  */
-struct sock *__x25_find_socket(unsigned int lci, struct x25_neigh *nb)
+static struct sock *__x25_find_socket(unsigned int lci, struct x25_neigh *nb)
 {
 	struct sock *s;
 	struct hlist_node *node;
@@ -289,7 +289,7 @@ struct sock *x25_find_socket(unsigned int lci, struct x25_neigh *nb)
 /*
  *	Find a unique LCI for a given device.
  */
-unsigned int x25_new_lci(struct x25_neigh *nb)
+static unsigned int x25_new_lci(struct x25_neigh *nb)
 {
 	unsigned int lci = 1;
 	struct sock *sk;
@@ -1336,7 +1336,7 @@ static int x25_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 	return rc;
 }
 
-struct net_proto_family x25_family_ops = {
+static struct net_proto_family x25_family_ops = {
 	.family =	AF_X25,
 	.create =	x25_create,
 	.owner	=	THIS_MODULE,
@@ -1371,7 +1371,7 @@ static struct packet_type x25_packet_type = {
 	.func =	x25_lapb_receive_frame,
 };
 
-struct notifier_block x25_dev_notifier = {
+static struct notifier_block x25_dev_notifier = {
 	.notifier_call = x25_device_event,
 };
 

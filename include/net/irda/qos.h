@@ -87,7 +87,6 @@ void irda_init_max_qos_capabilies(struct qos_info *qos);
 void irda_qos_compute_intersection(struct qos_info *, struct qos_info *);
 
 __u32 irlap_max_line_capacity(__u32 speed, __u32 max_turn_time);
-__u32 irlap_requested_line_capacity(struct qos_info *qos);
 
 void irda_qos_bits_to_value(struct qos_info *qos);
 

@@ -32,9 +32,10 @@
 #include <asm/arch/clocks.h>
 #include <asm/arch/gpio.h>
 #include <asm/arch/usb.h>
-#include <asm/arch/serial.h>
 
 #include "common.h"
+
+extern int omap_gpio_init(void);
 
 static int __initdata h2_serial_ports[OMAP_MAX_NR_PORTS] = {1, 1, 1};
 
@@ -45,8 +46,8 @@ static struct resource h2_smc91x_resources[] = {
 		.flags	= IORESOURCE_MEM,
 	},
 	[1] = {
-		.start	= 0,				/* Really GPIO 0 */
-		.end	= 0,
+		.start	= OMAP_GPIO_IRQ(0),
+		.end	= OMAP_GPIO_IRQ(0),
 		.flags	= IORESOURCE_IRQ,
 	},
 };
@@ -62,9 +63,20 @@ static struct platform_device *h2_devices[] __initdata = {
 	&h2_smc91x_device,
 };
 
+static void __init h2_init_smc91x(void)
+{
+	if ((omap_request_gpio(0)) < 0) {
+		printk("Error requesting gpio 0 for smc91x irq\n");
+		return;
+	}
+	omap_set_gpio_edge_ctrl(0, OMAP_GPIO_FALLING_EDGE);
+}
+
 void h2_init_irq(void)
 {
 	omap_init_irq();
+	omap_gpio_init();
+	h2_init_smc91x();
 }
 
 static struct omap_usb_config h2_usb_config __initdata = {

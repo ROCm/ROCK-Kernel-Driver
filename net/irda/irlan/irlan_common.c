@@ -105,10 +105,13 @@ static struct file_operations irlan_fops = {
 extern struct proc_dir_entry *proc_irda;
 #endif /* CONFIG_PROC_FS */
 
+static struct irlan_cb *irlan_open(__u32 saddr, __u32 daddr);
 static void __irlan_close(struct irlan_cb *self);
 static int __irlan_insert_param(struct sk_buff *skb, char *param, int type, 
 				__u8 value_byte, __u16 value_short, 
 				__u8 *value_array, __u16 value_len);
+static void irlan_open_unicast_addr(struct irlan_cb *self);
+static void irlan_get_unicast_addr(struct irlan_cb *self);
 void irlan_close_tsaps(struct irlan_cb *self);
 
 /*
@@ -185,7 +188,7 @@ static void __exit irlan_cleanup(void)
  *    Open new instance of a client/provider, we should only register the 
  *    network device if this instance is ment for a particular client/provider
  */
-struct irlan_cb *irlan_open(__u32 saddr, __u32 daddr)
+static struct irlan_cb *irlan_open(__u32 saddr, __u32 daddr)
 {
 	struct net_device *dev;
 	struct irlan_cb *self;
@@ -294,9 +297,11 @@ struct irlan_cb *irlan_get_any(void)
  *    Here we receive the connect indication for the data channel
  *
  */
-void irlan_connect_indication(void *instance, void *sap, struct qos_info *qos,
-			      __u32 max_sdu_size, __u8 max_header_size, 
-			      struct sk_buff *skb)
+static void irlan_connect_indication(void *instance, void *sap,
+				     struct qos_info *qos,
+				     __u32 max_sdu_size,
+				     __u8 max_header_size, 
+				     struct sk_buff *skb)
 {
 	struct irlan_cb *self;
 	struct tsap_cb *tsap;
@@ -339,9 +344,11 @@ void irlan_connect_indication(void *instance, void *sap, struct qos_info *qos,
 	netif_start_queue(self->dev); /* Clear reason */
 }
 
-void irlan_connect_confirm(void *instance, void *sap, struct qos_info *qos, 
-			   __u32 max_sdu_size, __u8 max_header_size, 
-			   struct sk_buff *skb) 
+static void irlan_connect_confirm(void *instance, void *sap,
+				  struct qos_info *qos, 
+				  __u32 max_sdu_size,
+				  __u8 max_header_size, 
+				  struct sk_buff *skb) 
 {
 	struct irlan_cb *self;
 
@@ -384,8 +391,9 @@ void irlan_connect_confirm(void *instance, void *sap, struct qos_info *qos,
  *    Callback function for the IrTTP layer. Indicates a disconnection of
  *    the specified connection (handle)
  */
-void irlan_disconnect_indication(void *instance, void *sap, LM_REASON reason, 
-				 struct sk_buff *userdata) 
+static void irlan_disconnect_indication(void *instance,
+					void *sap, LM_REASON reason, 
+					struct sk_buff *userdata) 
 {
 	struct irlan_cb *self;
 	struct tsap_cb *tsap;
@@ -602,7 +610,7 @@ int irlan_run_ctrl_tx_queue(struct irlan_cb *self)
  *    This function makes sure that commands on the control channel is being
  *    sent in a command/response fashion
  */
-void irlan_ctrl_data_request(struct irlan_cb *self, struct sk_buff *skb)
+static void irlan_ctrl_data_request(struct irlan_cb *self, struct sk_buff *skb)
 {
 	IRDA_DEBUG(2, "%s()\n", __FUNCTION__ );
 
@@ -722,7 +730,7 @@ void irlan_close_data_channel(struct irlan_cb *self)
  *    address.
  *
  */
-void irlan_open_unicast_addr(struct irlan_cb *self) 
+static void irlan_open_unicast_addr(struct irlan_cb *self)
 {
 	struct sk_buff *skb;
 	__u8 *frame;
@@ -839,7 +847,7 @@ void irlan_set_multicast_filter(struct irlan_cb *self, int status)
  *    can construct its packets.
  *
  */
-void irlan_get_unicast_addr(struct irlan_cb *self) 
+static void irlan_get_unicast_addr(struct irlan_cb *self)
 {
 	struct sk_buff *skb;
 	__u8 *frame;

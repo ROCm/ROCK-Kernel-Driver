@@ -43,7 +43,6 @@ extern int  sysctl_discovery_slots;
 extern int  sysctl_discovery_timeout;
 extern int  sysctl_slot_timeout;
 extern int  sysctl_fast_poll_increase;
-int         sysctl_compression = 0;
 extern char sysctl_devname[];
 extern int  sysctl_max_baud_rate;
 extern int  sysctl_min_tx_turn_time;

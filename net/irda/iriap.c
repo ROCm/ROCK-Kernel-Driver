@@ -77,6 +77,15 @@ static void iriap_connect_confirm(void *instance, void *sap,
 static int iriap_data_indication(void *instance, void *sap,
 				 struct sk_buff *skb);
 
+static void iriap_watchdog_timer_expired(void *data);
+
+static inline void iriap_start_watchdog_timer(struct iriap_cb *self, 
+					      int timeout) 
+{
+	irda_start_timer(&self->watchdog_timer, timeout, self, 
+			 iriap_watchdog_timer_expired);
+}
+
 /*
  * Function iriap_init (void)
  *
@@ -328,7 +337,7 @@ static void iriap_disconnect_indication(void *instance, void *sap,
 /*
  * Function iriap_disconnect_request (handle)
  */
-void iriap_disconnect_request(struct iriap_cb *self)
+static void iriap_disconnect_request(struct iriap_cb *self)
 {
 	struct sk_buff *tx_skb;
 
@@ -350,31 +359,6 @@ void iriap_disconnect_request(struct iriap_cb *self)
 	skb_reserve(tx_skb, LMP_MAX_HEADER);
 
 	irlmp_disconnect_request(self->lsap, tx_skb);
-}
-
-void iriap_getinfobasedetails_request(void)
-{
-	IRDA_DEBUG(0, "%s(), Not implemented!\n", __FUNCTION__);
-}
-
-void iriap_getinfobasedetails_confirm(void)
-{
-	IRDA_DEBUG(0, "%s(), Not implemented!\n", __FUNCTION__);
-}
-
-void iriap_getobjects_request(void)
-{
-	IRDA_DEBUG(0, "%s(), Not implemented!\n", __FUNCTION__);
-}
-
-void iriap_getobjects_confirm(void)
-{
-	IRDA_DEBUG(0, "%s(), Not implemented!\n", __FUNCTION__);
-}
-
-void iriap_getvalue(void)
-{
-	IRDA_DEBUG(0, "%s(), Not implemented!\n", __FUNCTION__);
 }
 
 /*
@@ -445,7 +429,8 @@ EXPORT_SYMBOL(iriap_getvaluebyclass_request);
  *    to service user.
  *
  */
-void iriap_getvaluebyclass_confirm(struct iriap_cb *self, struct sk_buff *skb)
+static void iriap_getvaluebyclass_confirm(struct iriap_cb *self,
+					  struct sk_buff *skb)
 {
 	struct ias_value *value;
 	int charset;
@@ -552,8 +537,10 @@ void iriap_getvaluebyclass_confirm(struct iriap_cb *self, struct sk_buff *skb)
  *    Send answer back to remote LM-IAS
  *
  */
-void iriap_getvaluebyclass_response(struct iriap_cb *self, __u16 obj_id,
-				    __u8 ret_code, struct ias_value *value)
+static void iriap_getvaluebyclass_response(struct iriap_cb *self,
+					   __u16 obj_id,
+					   __u8 ret_code,
+					   struct ias_value *value)
 {
 	struct sk_buff *tx_skb;
 	int n;
@@ -641,8 +628,8 @@ void iriap_getvaluebyclass_response(struct iriap_cb *self, __u16 obj_id,
  *    getvaluebyclass is requested from peer LM-IAS
  *
  */
-void iriap_getvaluebyclass_indication(struct iriap_cb *self,
-				      struct sk_buff *skb)
+static void iriap_getvaluebyclass_indication(struct iriap_cb *self,
+					     struct sk_buff *skb)
 {
 	struct ias_object *obj;
 	struct ias_attrib *attrib;
@@ -962,7 +949,7 @@ void iriap_call_indication(struct iriap_cb *self, struct sk_buff *skb)
  *    Query has taken too long time, so abort
  *
  */
-void iriap_watchdog_timer_expired(void *data)
+static void iriap_watchdog_timer_expired(void *data)
 {
 	struct iriap_cb *self = (struct iriap_cb *) data;
 

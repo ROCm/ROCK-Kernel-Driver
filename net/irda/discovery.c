@@ -315,41 +315,6 @@ struct irda_device_info *irlmp_copy_discoveries(hashbin_t *log, int *pn,
 	return(buffer);
 }
 
-/*
- * Function irlmp_find_device (name, saddr)
- *
- *    Look through the discovery log at each of the links and try to find 
- *    the device with the given name. Return daddr and saddr. If saddr is
- *    specified, that look at that particular link only (not impl).
- */
-__u32 irlmp_find_device(hashbin_t *cachelog, char *name, __u32 *saddr)
-{
-	unsigned long flags;
-	discovery_t *d;
-
-	spin_lock_irqsave(&cachelog->hb_spinlock, flags);
-
-	/* Look at all discoveries for that link */
-	d = (discovery_t *) hashbin_get_first(cachelog);
-	while (d != NULL) {
-		IRDA_DEBUG(1, "Discovery:\n");
-		IRDA_DEBUG(1, "  daddr=%08x\n", d->data.daddr);
-		IRDA_DEBUG(1, "  nickname=%s\n", d->data.info);
-
-		if (strcmp(name, d->data.info) == 0) {
-			*saddr = d->data.saddr;
-			
-			spin_unlock_irqrestore(&cachelog->hb_spinlock, flags);
-			return d->data.daddr;
-		}
-		d = (discovery_t *) hashbin_get_next(cachelog);
-	}
-
-	spin_unlock_irqrestore(&cachelog->hb_spinlock, flags);
-
-	return 0;
-}
-
 #ifdef CONFIG_PROC_FS
 static inline discovery_t *discovery_seq_idx(loff_t pos)
 

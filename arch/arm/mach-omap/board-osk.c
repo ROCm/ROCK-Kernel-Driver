@@ -39,7 +39,6 @@
 #include <asm/arch/gpio.h>
 #include <asm/arch/fpga.h>
 #include <asm/arch/usb.h>
-#include <asm/arch/serial.h>
 
 #include "common.h"
 
@@ -57,8 +56,8 @@ static struct resource osk5912_smc91x_resources[] = {
 		.flags	= IORESOURCE_MEM,
 	},
 	[1] = {
-		.start	= 0,				/* Really GPIO 0 */
-		.end	= 0,
+		.start	= OMAP_GPIO_IRQ(0),
+		.end	= OMAP_GPIO_IRQ(0),
 		.flags	= IORESOURCE_IRQ,
 	},
 };
@@ -74,9 +73,20 @@ static struct platform_device *osk5912_devices[] __initdata = {
 	&osk5912_smc91x_device,
 };
 
+static void __init osk_init_smc91x(void)
+{
+	if ((omap_request_gpio(0)) < 0) {
+		printk("Error requesting gpio 0 for smc91x irq\n");
+		return;
+	}
+	omap_set_gpio_edge_ctrl(0, OMAP_GPIO_RISING_EDGE);
+}
+
 void osk_init_irq(void)
 {
 	omap_init_irq();
+	omap_gpio_init();
+	osk_init_smc91x();
 }
 
 static struct omap_usb_config osk_usb_config __initdata = {

@@ -173,7 +173,7 @@ out:
  *	if needed(on receiving an UI frame). sk can be null for the
  *	datalink_proto case.
  */
-void llc_sap_state_process(struct llc_sap *sap, struct sk_buff *skb)
+static void llc_sap_state_process(struct llc_sap *sap, struct sk_buff *skb)
 {
 	struct llc_sap_state_ev *ev = llc_sap_ev(skb);
 
@@ -275,7 +275,8 @@ static void llc_sap_rcv(struct llc_sap *sap, struct sk_buff *skb)
  *	Search socket list of the SAP and finds connection using the local
  *	mac, and local sap. Returns pointer for socket found, %NULL otherwise.
  */
-struct sock *llc_lookup_dgram(struct llc_sap *sap, struct llc_addr *laddr)
+static struct sock *llc_lookup_dgram(struct llc_sap *sap,
+				     struct llc_addr *laddr)
 {
 	struct sock *rc;
 	struct hlist_node *node;

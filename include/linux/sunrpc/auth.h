@@ -114,8 +114,6 @@ extern struct rpc_authops	authnull_ops;
 extern struct rpc_authops	authdes_ops;
 #endif
 
-u32			pseudoflavor_to_flavor(rpc_authflavor_t);
-
 int			rpcauth_register(struct rpc_authops *);
 int			rpcauth_unregister(struct rpc_authops *);
 struct rpc_auth *	rpcauth_create(rpc_authflavor_t, struct rpc_clnt *);

@@ -64,6 +64,7 @@ static void ircomm_tty_wait_until_sent(struct tty_struct *tty, int timeout);
 static void ircomm_tty_hangup(struct tty_struct *tty);
 static void ircomm_tty_do_softint(void *private_);
 static void ircomm_tty_shutdown(struct ircomm_tty_cb *self);
+static void ircomm_tty_stop(struct tty_struct *tty);
 
 static int ircomm_tty_data_indication(void *instance, void *sap,
 				      struct sk_buff *skb);
@@ -108,7 +109,7 @@ static struct tty_operations ops = {
  *    Init IrCOMM TTY layer/driver
  *
  */
-int __init ircomm_tty_init(void)
+static int __init ircomm_tty_init(void)
 {
 	driver = alloc_tty_driver(IRCOMM_TTY_PORTS);
 	if (!driver)
@@ -159,7 +160,7 @@ static void __exit __ircomm_tty_cleanup(struct ircomm_tty_cb *self)
  *    Remove IrCOMM TTY layer/driver
  *
  */
-void __exit ircomm_tty_cleanup(void)
+static void __exit ircomm_tty_cleanup(void)
 {
 	int ret;
 
@@ -1064,7 +1065,7 @@ void ircomm_tty_start(struct tty_struct *tty)
  *     This routine notifies the tty driver that it should stop outputting
  *     characters to the tty device. 
  */
-void ircomm_tty_stop(struct tty_struct *tty) 
+static void ircomm_tty_stop(struct tty_struct *tty) 
 {
 	struct ircomm_tty_cb *self = (struct ircomm_tty_cb *) tty->driver_data;
 

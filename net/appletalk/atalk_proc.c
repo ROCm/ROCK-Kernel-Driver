@@ -205,21 +205,21 @@ out:
 	return 0;
 }
 
-struct seq_operations atalk_seq_interface_ops = {
+static struct seq_operations atalk_seq_interface_ops = {
 	.start  = atalk_seq_interface_start,
 	.next   = atalk_seq_interface_next,
 	.stop   = atalk_seq_interface_stop,
 	.show   = atalk_seq_interface_show,
 };
 
-struct seq_operations atalk_seq_route_ops = {
+static struct seq_operations atalk_seq_route_ops = {
 	.start  = atalk_seq_route_start,
 	.next   = atalk_seq_route_next,
 	.stop   = atalk_seq_route_stop,
 	.show   = atalk_seq_route_show,
 };
 
-struct seq_operations atalk_seq_socket_ops = {
+static struct seq_operations atalk_seq_socket_ops = {
 	.start  = atalk_seq_socket_start,
 	.next   = atalk_seq_socket_next,
 	.stop   = atalk_seq_socket_stop,

@@ -1081,6 +1081,17 @@ M:	lethal@chaoticdreams.org
 L:	linux-fbdev-devel@lists.sourceforge.net
 S:	Maintained
 
+INFINIBAND SUBSYSTEM
+P:	Roland Dreier
+M:	roland@topspin.com
+P:	Sean Hefty
+M:	mshefty@ichips.intel.com
+P:	Hal Rosenstock
+M:	halr@voltaire.com
+L:	openib-general@openib.org
+W:	http://www.openib.org/
+S:	Supported
+
 INPUT (KEYBOARD, MOUSE, JOYSTICK) DRIVERS
 P:	Vojtech Pavlik
 M:	vojtech@suse.cz
@@ -1568,7 +1579,6 @@ P:	Wensong Zhang
 M:	wensong@linux-vs.org
 P:	Julian Anastasov
 M:	ja@ssi.bg
-L:	lvs-users@linuxvirtualserver.org
 S:	Maintained
 
 NFS CLIENT

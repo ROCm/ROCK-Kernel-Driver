@@ -116,11 +116,4 @@ static struct miscdevice irnet_misc_device =
 	&irnet_device_fops
 };
 
-/* Generic PPP callbacks (to call us) */
-struct ppp_channel_ops irnet_ppp_ops =
-{
-  ppp_irnet_send,
-  ppp_irnet_ioctl
-};
-
 #endif /* IRNET_PPP_H */

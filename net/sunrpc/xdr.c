@@ -33,15 +33,6 @@ xdr_encode_netobj(u32 *p, const struct xdr_netobj *obj)
 }
 
 u32 *
-xdr_decode_netobj_fixed(u32 *p, void *obj, unsigned int len)
-{
-	if (ntohl(*p++) != len)
-		return NULL;
-	memcpy(obj, p, len);
-	return p + XDR_QUADLEN(len);
-}
-
-u32 *
 xdr_decode_netobj(u32 *p, struct xdr_netobj *obj)
 {
 	unsigned int	len;
@@ -183,124 +174,6 @@ xdr_inline_pages(struct xdr_buf *xdr, unsigned int offset,
 	tail->iov_len = buflen - offset;
 
 	xdr->buflen += len;
-}
-
-/*
- * Realign the kvec if the server missed out some reply elements
- * (such as post-op attributes,...)
- * Note: This is a simple implementation that assumes that
- *            len <= iov->iov_len !!!
- *       The RPC header (assumed to be the 1st element in the iov array)
- *            is not shifted.
- */
-void xdr_shift_iovec(struct kvec *iov, int nr, size_t len)
-{
-	struct kvec *pvec;
-
-	for (pvec = iov + nr - 1; nr > 1; nr--, pvec--) {
-		struct kvec *svec = pvec - 1;
-
-		if (len > pvec->iov_len) {
-			printk(KERN_DEBUG "RPC: Urk! Large shift of short iovec.\n");
-			return;
-		}
-		memmove((char *)pvec->iov_base + len, pvec->iov_base,
-			pvec->iov_len - len);
-
-		if (len > svec->iov_len) {
-			printk(KERN_DEBUG "RPC: Urk! Large shift of short iovec.\n");
-			return;
-		}
-		memcpy(pvec->iov_base,
-		       (char *)svec->iov_base + svec->iov_len - len, len);
-	}
-}
-
-/*
- * Map a struct xdr_buf into an kvec array.
- */
-int xdr_kmap(struct kvec *iov_base, struct xdr_buf *xdr, size_t base)
-{
-	struct kvec	*iov = iov_base;
-	struct page	**ppage = xdr->pages;
-	unsigned int	len, pglen = xdr->page_len;
-
-	len = xdr->head[0].iov_len;
-	if (base < len) {
-		iov->iov_len = len - base;
-		iov->iov_base = (char *)xdr->head[0].iov_base + base;
-		iov++;
-		base = 0;
-	} else
-		base -= len;
-
-	if (pglen == 0)
-		goto map_tail;
-	if (base >= pglen) {
-		base -= pglen;
-		goto map_tail;
-	}
-	if (base || xdr->page_base) {
-		pglen -= base;
-		base  += xdr->page_base;
-		ppage += base >> PAGE_CACHE_SHIFT;
-		base &= ~PAGE_CACHE_MASK;
-	}
-	do {
-		len = PAGE_CACHE_SIZE;
-		iov->iov_base = kmap(*ppage);
-		if (base) {
-			iov->iov_base += base;
-			len -= base;
-			base = 0;
-		}
-		if (pglen < len)
-			len = pglen;
-		iov->iov_len = len;
-		iov++;
-		ppage++;
-	} while ((pglen -= len) != 0);
-map_tail:
-	if (xdr->tail[0].iov_len) {
-		iov->iov_len = xdr->tail[0].iov_len - base;
-		iov->iov_base = (char *)xdr->tail[0].iov_base + base;
-		iov++;
-	}
-	return (iov - iov_base);
-}
-
-void xdr_kunmap(struct xdr_buf *xdr, size_t base)
-{
-	struct page	**ppage = xdr->pages;
-	unsigned int	pglen = xdr->page_len;
-
-	if (!pglen)
-		return;
-	if (base > xdr->head[0].iov_len)
-		base -= xdr->head[0].iov_len;
-	else
-		base = 0;
-
-	if (base >= pglen)
-		return;
-	if (base || xdr->page_base) {
-		pglen -= base;
-		base  += xdr->page_base;
-		ppage += base >> PAGE_CACHE_SHIFT;
-		/* Note: The offset means that the length of the first
-		 * page is really (PAGE_CACHE_SIZE - (base & ~PAGE_CACHE_MASK)).
-		 * In order to avoid an extra test inside the loop,
-		 * we bump pglen here, and just subtract PAGE_CACHE_SIZE... */
-		pglen += base & ~PAGE_CACHE_MASK;
-	}
-	for (;;) {
-		flush_dcache_page(*ppage);
-		kunmap(*ppage);
-		if (pglen <= PAGE_CACHE_SIZE)
-			break;
-		pglen -= PAGE_CACHE_SIZE;
-		ppage++;
-	}
 }
 
 void
@@ -572,7 +445,7 @@ _copy_to_pages(struct page **pages, size_t pgbase, const char *p, size_t len)
  * Copies data into an arbitrary memory location from an array of pages
  * The copy is assumed to be non-overlapping.
  */
-void
+static void
 _copy_from_pages(char *p, struct page **pages, size_t pgbase, size_t len)
 {
 	struct page **pgfrom;
@@ -610,7 +483,7 @@ _copy_from_pages(char *p, struct page **pages, size_t pgbase, size_t len)
  * 'len' bytes. The extra data is not lost, but is instead
  * moved into the inlined pages and/or the tail.
  */
-void
+static void
 xdr_shrink_bufhead(struct xdr_buf *buf, size_t len)
 {
 	struct kvec *head, *tail;
@@ -683,7 +556,7 @@ xdr_shrink_bufhead(struct xdr_buf *buf, size_t len)
  * 'len' bytes. The extra data is not lost, but is instead
  * moved into the tail.
  */
-void
+static void
 xdr_shrink_pagelen(struct xdr_buf *buf, size_t len)
 {
 	struct kvec *tail;

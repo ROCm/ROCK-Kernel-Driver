@@ -95,7 +95,6 @@ u32 *	xdr_decode_string(u32 *p, char **sp, int *lenp, int maxlen);
 u32 *	xdr_decode_string_inplace(u32 *p, char **sp, int *lenp, int maxlen);
 u32 *	xdr_encode_netobj(u32 *p, const struct xdr_netobj *);
 u32 *	xdr_decode_netobj(u32 *p, struct xdr_netobj *);
-u32 *	xdr_decode_netobj_fixed(u32 *p, void *obj, unsigned int len);
 
 void	xdr_encode_pages(struct xdr_buf *, struct page **, unsigned int,
 			 unsigned int);
@@ -135,8 +134,6 @@ xdr_adjust_iovec(struct kvec *iov, u32 *p)
 	return iov->iov_len = ((u8 *) p - (u8 *) iov->iov_base);
 }
 
-void xdr_shift_iovec(struct kvec *, int, size_t);
-
 /*
  * Maximum number of iov's we use.
  */
@@ -145,10 +142,7 @@ void xdr_shift_iovec(struct kvec *, int, size_t);
 /*
  * XDR buffer helper functions
  */
-extern int xdr_kmap(struct kvec *, struct xdr_buf *, size_t);
-extern void xdr_kunmap(struct xdr_buf *, size_t);
 extern void xdr_shift_buf(struct xdr_buf *, size_t);
-extern void _copy_from_pages(char *, struct page **, size_t, size_t);
 extern void xdr_buf_from_iov(struct kvec *, struct xdr_buf *);
 extern int xdr_buf_subsegment(struct xdr_buf *, struct xdr_buf *, int, int);
 extern int xdr_buf_read_netobj(struct xdr_buf *, struct xdr_netobj *, int);

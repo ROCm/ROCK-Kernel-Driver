@@ -68,7 +68,7 @@ gact_determ(struct tcf_gact *p) {
 }
 
 
-g_rand gact_rand[MAX_RAND]= { NULL,gact_net_rand, gact_determ};
+static g_rand gact_rand[MAX_RAND]= { NULL,gact_net_rand, gact_determ};
 
 #endif
 static int

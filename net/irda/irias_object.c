@@ -116,7 +116,7 @@ EXPORT_SYMBOL(irias_new_object);
  *    Delete given attribute and deallocate all its memory
  *
  */
-void __irias_delete_attrib(struct ias_attrib *attrib)
+static void __irias_delete_attrib(struct ias_attrib *attrib)
 {
 	ASSERT(attrib != NULL, return;);
 	ASSERT(attrib->magic == IAS_ATTRIB_MAGIC, return;);
@@ -267,8 +267,8 @@ EXPORT_SYMBOL(irias_find_attrib);
  *    Add attribute to object
  *
  */
-void irias_add_attrib( struct ias_object *obj, struct ias_attrib *attrib,
-		       int owner)
+static void irias_add_attrib(struct ias_object *obj, struct ias_attrib *attrib,
+			     int owner)
 {
 	ASSERT(obj != NULL, return;);
 	ASSERT(obj->magic == IAS_OBJECT_MAGIC, return;);

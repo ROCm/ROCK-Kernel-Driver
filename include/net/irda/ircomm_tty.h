@@ -118,10 +118,8 @@ struct ircomm_tty_cb {
 };
 
 void ircomm_tty_start(struct tty_struct *tty);
-void ircomm_tty_stop(struct tty_struct *tty);
 void ircomm_tty_check_modem_status(struct ircomm_tty_cb *self);
 
-extern void ircomm_tty_change_speed(struct ircomm_tty_cb *self);
 extern int ircomm_tty_tiocmget(struct tty_struct *tty, struct file *file);
 extern int ircomm_tty_tiocmset(struct tty_struct *tty, struct file *file,
 			       unsigned int set, unsigned int clear);

@@ -343,7 +343,7 @@ static void ip_vs_process_message(const char *buffer, const size_t buflen)
  */
 static void set_mcast_loop(struct sock *sk, u_char loop)
 {
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 
 	/* setsockopt(sock, SOL_IP, IP_MULTICAST_LOOP, &loop, sizeof(loop)); */
 	lock_sock(sk);
@@ -356,7 +356,7 @@ static void set_mcast_loop(struct sock *sk, u_char loop)
  */
 static void set_mcast_ttl(struct sock *sk, u_char ttl)
 {
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 
 	/* setsockopt(sock, SOL_IP, IP_MULTICAST_TTL, &ttl, sizeof(ttl)); */
 	lock_sock(sk);
@@ -370,7 +370,7 @@ static void set_mcast_ttl(struct sock *sk, u_char ttl)
 static int set_mcast_if(struct sock *sk, char *ifname)
 {
 	struct net_device *dev;
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 
 	if ((dev = __dev_get_by_name(ifname)) == NULL)
 		return -ENODEV;

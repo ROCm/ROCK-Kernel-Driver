@@ -612,7 +612,7 @@ out:
  * Called when a device is downed. Just throw away any routes
  * via it.
  */
-void atrtr_device_down(struct net_device *dev)
+static void atrtr_device_down(struct net_device *dev)
 {
 	struct atalk_route **r = &atalk_routes;
 	struct atalk_route *tmp;
@@ -1854,12 +1854,12 @@ static struct notifier_block ddp_notifier = {
 	.notifier_call	= ddp_device_event,
 };
 
-struct packet_type ltalk_packet_type = {
+static struct packet_type ltalk_packet_type = {
 	.type		= __constant_htons(ETH_P_LOCALTALK),
 	.func		= ltalk_rcv,
 };
 
-struct packet_type ppptalk_packet_type = {
+static struct packet_type ppptalk_packet_type = {
 	.type		= __constant_htons(ETH_P_PPPTALK),
 	.func		= atalk_rcv,
 };
