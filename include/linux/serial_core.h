@@ -396,6 +396,6 @@ uart_handle_cts_change(struct uart_port *port, unsigned int status)
  */
 #define UART_ENABLE_MS(port,cflag)	((port)->flags & UPF_HARDPPS_CD || \
 					 (cflag) & CRTSCTS || \
-					 !(cflag) & CLOCAL)
+					 !((cflag) & CLOCAL))
 
 #endif
