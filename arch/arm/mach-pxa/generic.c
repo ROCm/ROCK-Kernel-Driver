@@ -138,7 +138,6 @@ void __init pxa_set_mci_info(struct pxamci_platform_data *info)
 {
 	pxamci_device.dev.platform_data = info;
 }
-EXPORT_SYMBOL(pxa_set_mci_info);
 
 
 static struct pxa2xx_udc_mach_info pxa_udc_info;
@@ -147,7 +146,6 @@ void __init pxa_set_udc_info(struct pxa2xx_udc_mach_info *info)
 {
 	memcpy(&pxa_udc_info, info, sizeof *info);
 }
-EXPORT_SYMBOL(pxa_set_udc_info);
 
 static struct resource pxa2xx_udc_resources[] = {
 	[0] = {
@@ -181,7 +179,6 @@ void __init set_pxa_fb_info(struct pxafb_mach_info *hard_pxa_fb_info)
 {
 	memcpy(&pxa_fb_info,hard_pxa_fb_info,sizeof(struct pxafb_mach_info));
 }
-EXPORT_SYMBOL(set_pxa_fb_info);
 
 static struct resource pxafb_resources[] = {
 	[0] = {

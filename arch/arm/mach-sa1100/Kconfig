@@ -143,17 +143,6 @@ config SA1100_SSP
 	  other devices, eg for BadgePAD 4 sensor support, or Jornada
 	  720 touchscreen support.
 
-config SA1100_USB
-	tristate "SA1100 USB function support"
-
-config SA1100_USB_NETLINK
-	tristate "Support for SA11x0 USB network link function"
-	depends on SA1100_USB
-
-config SA1100_USB_CHAR
-	tristate "Support for SA11x0 USB character device emulation"
-	depends on SA1100_USB
-
 config H3600_SLEEVE
 	tristate "Compaq iPAQ Handheld sleeve support"
 	depends on SA1100_H3600
