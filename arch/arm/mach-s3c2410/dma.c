@@ -12,6 +12,7 @@
  * published by the Free Software Foundation.
  *
  * Changelog:
+ *  10-Nov-2004 BJD  Ensure all external symbols exported for modules
  *  10-Nov-2004 BJD  Use sys_device and sysdev_class for power management
  *  08-Aug-2004 BJD  Apply rmk's suggestions
  *  21-Jul-2004 BJD  Ported to linux 2.6
@@ -503,6 +504,8 @@ int s3c2410_dma_enqueue(unsigned int channel, void *id,
 	return 0;
 }
 
+EXPORT_SYMBOL(s3c2410_dma_enqueue);
+
 static inline void
 s3c2410_dma_freebuf(s3c2410_dma_buf_t *buf)
 {
@@ -738,6 +741,8 @@ int s3c2410_dma_request(unsigned int channel, s3c2410_dma_client_t *client,
 	return 0;
 }
 
+EXPORT_SYMBOL(s3c2410_dma_request);
+
 /* s3c2410_dma_free
  *
  * release the given channel back to the system, will stop and flush
@@ -781,6 +786,8 @@ int s3c2410_dma_free(dmach_t channel, s3c2410_dma_client_t *client)
 
 	return 0;
 }
+
+EXPORT_SYMBOL(s3c2410_dma_free);
 
 static int s3c2410_dma_dostop(s3c2410_dma_chan_t *chan)
 {
@@ -888,6 +895,7 @@ s3c2410_dma_ctrl(dmach_t channel, s3c2410_chan_op_t op)
 	return -ENOENT;      /* unknown, don't bother */
 }
 
+EXPORT_SYMBOL(s3c2410_dma_ctrl);
 
 /* DMA configuration for each channel
  *
@@ -943,6 +951,7 @@ int s3c2410_dma_config(dmach_t channel,
 	return 0;
 }
 
+EXPORT_SYMBOL(s3c2410_dma_config);
 
 int s3c2410_dma_setflags(dmach_t channel, unsigned int flags)
 {
@@ -956,6 +965,9 @@ int s3c2410_dma_setflags(dmach_t channel, unsigned int flags)
 
 	return 0;
 }
+
+EXPORT_SYMBOL(s3c2410_dma_setflags);
+
 
 /* do we need to protect the settings of the fields from
  * irq?
@@ -974,6 +986,8 @@ int s3c2410_dma_set_opfn(dmach_t channel, s3c2410_dma_opfn_t rtn)
 	return 0;
 }
 
+EXPORT_SYMBOL(s3c2410_dma_set_opfn);
+
 int s3c2410_dma_set_buffdone_fn(dmach_t channel, s3c2410_dma_cbfn_t rtn)
 {
 	s3c2410_dma_chan_t *chan = &s3c2410_chans[channel];
@@ -986,6 +1000,8 @@ int s3c2410_dma_set_buffdone_fn(dmach_t channel, s3c2410_dma_cbfn_t rtn)
 
 	return 0;
 }
+
+EXPORT_SYMBOL(s3c2410_dma_set_buffdone_fn);
 
 /* s3c2410_dma_devconfig
  *
@@ -1043,6 +1059,8 @@ int s3c2410_dma_devconfig(int channel,
 	printk(KERN_ERR "dma%d: invalid source type (%d)\n", channel, source);
 	return -EINVAL;
 }
+
+EXPORT_SYMBOL(s3c2410_dma_devconfig);
 
 /* system device class */
 
