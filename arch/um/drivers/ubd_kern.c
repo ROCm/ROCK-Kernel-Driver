@@ -674,7 +674,7 @@ static int ubd_open(struct inode *inode, struct file *filp)
 			       "errno = %d\n", n, dev->file, -err);
 			return(err);
 		}
-		err = ubd_file_size(dev, &dev->size);
+		err = ubd_revalidate(inode->i_rdev);
 		if(err) return(err);
 	}
 	dev->count++;
