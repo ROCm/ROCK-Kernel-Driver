@@ -571,16 +571,6 @@ isdn_net_hangup(isdn_net_dev *idev)
 	if (!isdn_net_bound(idev))
 		return;
 
-	// FIXME ugly and recursive
-	if (idev->slave) {
-		isdn_net_dev *sdev = idev->slave;
-		if (isdn_net_bound(sdev)) {
-			printk(KERN_INFO
-			       "isdn_net: hang up slave %s before %s\n",
-			       sdev->name, idev->name);
-			isdn_net_hangup(sdev);
-		}
-	}
 	printk(KERN_INFO "isdn_net: local hangup %s\n", idev->name);
 	if (mlp->ops->disconnected)
 		mlp->ops->disconnected(idev);
@@ -748,6 +738,18 @@ void isdn_net_writebuf_skb(isdn_net_dev *idev, struct sk_buff *skb)
 	mlp->stats.tx_errors++;
 }
 
+static void
+isdn_net_dial_slave(isdn_net_local *mlp)
+{
+	isdn_net_dev *idev;
+
+	list_for_each_entry(idev, &mlp->slaves, slaves) {
+		if (!isdn_net_bound(idev)) {
+			isdn_net_dev_dial(idev);
+			break;
+		}
+	}
+}
 
 /*
  *  Based on cps-calculation, check if device is overloaded.
@@ -761,7 +763,7 @@ void isdn_net_writebuf_skb(isdn_net_dev *idev, struct sk_buff *skb)
 int
 isdn_net_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 {
-	isdn_net_dev *idev, *sdev;
+	isdn_net_dev *idev;
 	isdn_net_local *mlp = ndev->priv;
 
 	ndev->trans_start = jiffies;
@@ -796,19 +798,14 @@ isdn_net_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 		printk(KERN_DEBUG "%s: %d bogocps\n", idev->name, idev->cps);
 
 	if (idev->cps > mlp->triggercps) {
-		if (idev->slave) {
-			if (!idev->sqfull) {
-				/* First time overload: set timestamp only */
-				idev->sqfull = 1;
-				idev->sqfull_stamp = jiffies;
-			} else {
-				/* subsequent overload: if slavedelay exceeded, start dialing */
-				if (time_after(jiffies, idev->sqfull_stamp + mlp->slavedelay)) {
-					sdev = idev->slave;
-					if (!isdn_net_bound(sdev)) {
-						isdn_net_dev_dial(sdev);
-					}
-				}
+		if (!idev->sqfull) {
+			/* First time overload: set timestamp only */
+			idev->sqfull = 1;
+			idev->sqfull_stamp = jiffies;
+		} else {
+			/* subsequent overload: if slavedelay exceeded, start dialing */
+			if (time_after(jiffies, idev->sqfull_stamp + mlp->slavedelay)) {
+				isdn_net_dial_slave(mlp);
 			}
 		}
 	} else {

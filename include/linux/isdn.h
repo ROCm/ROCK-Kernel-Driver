@@ -401,7 +401,6 @@ typedef struct isdn_net_dev_s {
   struct tasklet_struct  tlet;
 
   isdn_net_local        *mlp;          /* Ptr to master device for all devs*/
-  struct isdn_net_dev_s *slave;        /* Ptr to Slave device for masters  */ // FIXME kill
 
   struct list_head       slaves;       /* Members of local->slaves         */
   struct list_head       online;       /* Members of local->online         */

@@ -692,7 +692,6 @@ static int
 isdn_net_force_hangup(char *name) // FIXME rename?
 {
 	isdn_net_dev *idev = isdn_net_findif(name);
-	isdn_net_dev *p;
 
 	if (!idev)
 		return -ENODEV;
@@ -700,12 +699,6 @@ isdn_net_force_hangup(char *name) // FIXME rename?
 	if (idev->isdn_slot < 0)
 		return -ENOTCONN;
 
-	p = idev->slave;
-	/* If this interface has slaves, do a hangup for them also. */
-	while (p) {
-		isdn_net_hangup(p);
-		p = p->slave;
-	}
 	isdn_net_hangup(idev);
 	return 0;
 }
