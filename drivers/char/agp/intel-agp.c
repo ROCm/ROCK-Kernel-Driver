@@ -1264,8 +1264,6 @@ static int __devinit agp_intel_probe(struct pci_dev *pdev,
 	struct resource *r;
 
 	cap_ptr = pci_find_capability(pdev, PCI_CAP_ID_AGP);
-	if (!cap_ptr)
-		return -ENODEV;
 
 	bridge = agp_alloc_bridge();
 	if (!bridge)
