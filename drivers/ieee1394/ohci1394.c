@@ -2232,7 +2232,7 @@ static irqreturn_t ohci_irq_handler(int irq, void *dev_id,
 	spin_unlock_irqrestore(&ohci->event_lock, flags);
 
 	if (!event)
-		return IRQ_HANDLED;
+		return IRQ_NONE;
 
 	DBGMSG(ohci->id, "IntEvent: %08x", event);
 
