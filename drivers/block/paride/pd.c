@@ -889,7 +889,7 @@ static void do_pd_write_done(void)
 static int __init pd_init(void)
 {
 	if (disable)
-		return -1;
+		goto out1;
 
 	pd_queue = blk_init_queue(do_pd_request, &pd_lock);
 	if (!pd_queue)
@@ -913,7 +913,7 @@ out3:
 out2:
 	blk_cleanup_queue(pd_queue);
 out1:
-	return -1;
+	return -ENODEV;
 }
 
 static void __exit pd_exit(void)
