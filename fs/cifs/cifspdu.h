@@ -79,7 +79,7 @@
 /*
  * Starting value for maximum SMB size negotiation
  */
-#define CIFS_MAX_MSGSIZE (4*1024)
+#define CIFS_MAX_MSGSIZE (4*4096)
 
 /*
  * Size of encrypted user password in bytes

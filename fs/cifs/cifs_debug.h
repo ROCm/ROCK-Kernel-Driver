@@ -33,29 +33,35 @@ void dump_smb(struct smb_hdr *, int);
  */
 #ifdef CIFS_DEBUG
 
+
 /* information message: e.g., configuration, major event */
 extern int cifsFYI;
-#define cFYI(button,prspec)\
-{ if (button && cifsFYI) printk prspec; }
+#define cifsfyi(format,arg...) if (cifsFYI) printk(KERN_DEBUG " " __FILE__ ": " format "\n" "" , ## arg)
+
+#define cFYI(button,prspec) if (button) cifsfyi prspec
+
+#define cifswarn(format, arg...) printk(KERN_WARNING ": " format "\n" , ## arg)
 
 /* debug event message: */
-#define cEVENT(button,prspec)\
-{ if (button) printk prspec; }
+extern int cifsERROR;
+
+#define cEVENT(format,arg...) if (cifsERROR) printk(KERN_EVENT __FILE__ ": " format "\n" , ## arg)
 
 /* error event message: e.g., i/o error */
-extern int cifsERROR;
-#define cERROR(button, prspec)\
-{ if (button && cifsERROR) { printk prspec; if (button > 1) BUG(); } }
+#define cifserror(format,arg...) if (cifsERROR) printk(KERN_ERR " CIFS VFS: " format "\n" "" , ## arg)
+
+#define cERROR(button, prspec) if (button) cifserror prspec
 
 /*
  *	debug OFF
  *	---------
  */
-#else				/* _CIFS_DEBUG */
+#else		/* _CIFS_DEBUG */
 #define cERROR(button,prspec)
-#define cEVENT(button,prspec)
+#define cEVENT(format,arg...)
 #define cFYI(button, prspec)
-#endif				/* _CIFS_DEBUG */
+#define cifserror(format,arg...)
+#endif		/* _CIFS_DEBUG */
 
 /*
  *	statistics
