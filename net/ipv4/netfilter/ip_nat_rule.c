@@ -1,5 +1,4 @@
 /* Everything about the rules for NAT. */
-#define __NO_VERSION__
 #include <linux/types.h>
 #include <linux/ip.h>
 #include <linux/netfilter.h>

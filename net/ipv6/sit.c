@@ -18,7 +18,6 @@
  * Nate Thompson <nate@thebog.net>:		6to4 support
  */
 
-#define __NO_VERSION__
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/errno.h>

@@ -13,9 +13,6 @@
  *	- export ip_conntrack[_expect]_{find_get,put} functions
  * */
 
-#ifdef MODULE
-#define __NO_VERSION__
-#endif
 #include <linux/version.h>
 #include <linux/config.h>
 #include <linux/types.h>

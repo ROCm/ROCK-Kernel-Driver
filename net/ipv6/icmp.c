@@ -28,7 +28,6 @@
  *	YOSHIFUJI Hideaki @USAGI:	added sysctl for icmp rate limit.
  */
 
-#define __NO_VERSION__
 #include <linux/module.h>
 #include <linux/errno.h>
 #include <linux/types.h>
