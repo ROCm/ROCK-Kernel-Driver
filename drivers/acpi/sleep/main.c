@@ -237,11 +237,11 @@ acpi_suspend (
 		acpi_set_firmware_waking_vector((acpi_physical_address) acpi_wakeup_address);
 	}
 
-	acpi_enter_sleep_state_prep(state);
-
 	status = acpi_system_save_state(state);
 	if (!ACPI_SUCCESS(status))
 		return status;
+
+	acpi_enter_sleep_state_prep(state);
 
 	/* disable interrupts and flush caches */
 	ACPI_DISABLE_IRQS();
@@ -254,8 +254,8 @@ acpi_suspend (
 	 * mode. So, we run these unconditionaly to make sure we have a usable system
 	 * no matter what.
 	 */
-	acpi_system_restore_state(state);
 	acpi_leave_sleep_state(state);
+	acpi_system_restore_state(state);
 
 	/* make sure interrupts are enabled */
 	ACPI_ENABLE_IRQS();
