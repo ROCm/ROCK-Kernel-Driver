@@ -84,7 +84,7 @@ static struct super_operations ncp_sops =
 {
 	alloc_inode:	ncp_alloc_inode,
 	destroy_inode:	ncp_destroy_inode,
-	put_inode:	force_delete,
+	drop_inode:	generic_delete_inode,
 	delete_inode:	ncp_delete_inode,
 	put_super:	ncp_put_super,
 	statfs:		ncp_statfs,

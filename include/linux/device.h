@@ -118,6 +118,7 @@ static inline struct device_driver * get_driver(struct device_driver * drv)
 }
 
 extern void put_driver(struct device_driver * drv);
+extern void remove_driver(struct device_driver * drv);
 
 extern int driver_for_each_dev(struct device_driver * drv, void * data, 
 			       int (*callback)(struct device * dev, void * data));

@@ -208,8 +208,7 @@ static int ep_link (struct ohci_hcd *ohci, struct ed *edi)
 		}
 		ed->ed_prev = ohci->ed_controltail;
 		if (!ohci->ed_controltail
-				&& !ohci->ed_rm_list [0]
-				&& !ohci->ed_rm_list [1]
+				&& !ohci->ed_rm_list
 				&& !ohci->sleeping
 				) {
 			ohci->hc_control |= OHCI_CTRL_CLE;
@@ -227,8 +226,7 @@ static int ep_link (struct ohci_hcd *ohci, struct ed *edi)
 		}
 		ed->ed_prev = ohci->ed_bulktail;
 		if (!ohci->ed_bulktail
-				&& !ohci->ed_rm_list [0]
-				&& !ohci->ed_rm_list [1]
+				&& !ohci->ed_rm_list
 				&& !ohci->sleeping
 				) {
 			ohci->hc_control |= OHCI_CTRL_BLE;
@@ -240,16 +238,16 @@ static int ep_link (struct ohci_hcd *ohci, struct ed *edi)
 	case PIPE_INTERRUPT:
 		load = ed->int_load;
 		interval = ep_2_n_interval (ed->int_period);
-		ed->int_interval = interval;
+		ed->interval = interval;
 		int_branch = ep_int_balance (ohci, interval, load);
 		ed->int_branch = int_branch;
 
 		for (i = 0; i < ep_rev (6, interval); i += inter) {
 			inter = 1;
 			for (ed_p = & (ohci->hcca->int_table [ep_rev (5, i) + int_branch]); 
-				 (*ed_p != 0) && ((dma_to_ed (ohci, le32_to_cpup (ed_p)))->int_interval >= interval); 
+				 (*ed_p != 0) && ((dma_to_ed (ohci, le32_to_cpup (ed_p)))->interval >= interval); 
 				ed_p = & ((dma_to_ed (ohci, le32_to_cpup (ed_p)))->hwNextED)) 
-					inter = ep_rev (6, (dma_to_ed (ohci, le32_to_cpup (ed_p)))->int_interval);
+					inter = ep_rev (6, (dma_to_ed (ohci, le32_to_cpup (ed_p)))->interval);
 			ed->hwNextED = *ed_p; 
 			*ed_p = cpu_to_le32 (ed->dma);
 		}
@@ -260,7 +258,7 @@ static int ep_link (struct ohci_hcd *ohci, struct ed *edi)
 
 	case PIPE_ISOCHRONOUS:
 		ed->hwNextED = 0;
-		ed->int_interval = 1;
+		ed->interval = 1;
 		if (ohci->ed_isotail != NULL) {
 			ohci->ed_isotail->hwNextED = cpu_to_le32 (ed->dma);
 			ed->ed_prev = ohci->ed_isotail;
@@ -270,7 +268,7 @@ static int ep_link (struct ohci_hcd *ohci, struct ed *edi)
 				for (ed_p = & (ohci->hcca->int_table [ep_rev (5, i)]); 
 					*ed_p != 0; 
 					ed_p = & ((dma_to_ed (ohci, le32_to_cpup (ed_p)))->hwNextED)) 
-						inter = ep_rev (6, (dma_to_ed (ohci, le32_to_cpup (ed_p)))->int_interval);
+						inter = ep_rev (6, (dma_to_ed (ohci, le32_to_cpup (ed_p)))->interval);
 				*ed_p = cpu_to_le32 (ed->dma);	
 			}	
 			ed->ed_prev = NULL;
@@ -311,7 +309,7 @@ static void periodic_unlink (
  * the link from the ed still points to another operational ed or 0
  * so the HC can eventually finish the processing of the unlinked ed
  */
-static int ep_unlink (struct ohci_hcd *ohci, struct ed *ed) 
+static int start_ed_unlink (struct ohci_hcd *ohci, struct ed *ed) 
 {
 	int	i;
 
@@ -357,8 +355,8 @@ static int ep_unlink (struct ohci_hcd *ohci, struct ed *ed)
 		break;
 
 	case PIPE_INTERRUPT:
-		periodic_unlink (ohci, ed, ed->int_branch, ed->int_interval);
-		for (i = ed->int_branch; i < NUM_INTS; i += ed->int_interval)
+		periodic_unlink (ohci, ed, ed->int_branch, ed->interval);
+		for (i = ed->int_branch; i < NUM_INTS; i += ed->interval)
 			ohci->ohci_int_load [i] -= ed->int_load;
 #ifdef OHCI_VERBOSE_DEBUG
 		ohci_dump_periodic (ohci, "UNLINK_INT");
@@ -384,6 +382,10 @@ static int ep_unlink (struct ohci_hcd *ohci, struct ed *ed)
 
 	/* FIXME ED's "unlink" state is indeterminate;
 	 * the HC might still be caching it (till SOF).
+	 * - use ed_rm_list and finish_unlinks(), adding some state that
+	 *   prevents clobbering hw linkage before the appropriate SOF
+	 * - a speedup:  when only one urb is queued on the ed, save 1msec
+	 *   by making start_urb_unlink() use this routine to deschedule.
 	 */
 	ed->state = ED_UNLINK;
 	return 0;
@@ -478,11 +480,8 @@ static struct ed *ep_add_ed (
  * put the ep on the rm_list and stop the bulk or ctrl list 
  * real work is done at the next start frame (SF) hardware interrupt
  */
-static void ed_unlink (struct usb_device *usb_dev, struct ed *ed)
+static void start_urb_unlink (struct ohci_hcd *ohci, struct ed *ed)
 {    
-	unsigned int		frame;
-   	struct ohci_hcd		*ohci = hcd_to_ohci (usb_dev->bus->hcpriv);
-
 	/* already pending? */
 	if (ed->state & ED_URB_DEL)
 		return;
@@ -503,9 +502,15 @@ static void ed_unlink (struct usb_device *usb_dev, struct ed *ed)
 			break;
 	}
 
-	frame = le16_to_cpu (ohci->hcca->frame_no) & 0x1;
-	ed->ed_rm_list = ohci->ed_rm_list [frame];
-	ohci->ed_rm_list [frame] = ed;
+	/* SF interrupt might get delayed; record the frame counter value that
+	 * indicates when the HC isn't looking at it, so concurrent unlinks
+	 * behave.  frame_no wraps every 2^16 msec, and changes right before
+	 * SF is triggered.
+	 */
+	ed->tick = le16_to_cpu (ohci->hcca->frame_no) + 1;
+
+	ed->ed_rm_list = ohci->ed_rm_list;
+	ohci->ed_rm_list = ed;
 
 	/* enable SOF interrupt */
 	if (!ohci->sleeping) {
@@ -816,10 +821,12 @@ static struct td *dl_reverse_done_list (struct ohci_hcd *ohci)
 			if (td_list->ed->hwHeadP & ED_H) {
 				if (urb_priv && ((td_list->index + 1)
 						< urb_priv->length)) {
+#ifdef OHCI_VERBOSE_DEBUG
 					dbg ("urb %p TD %d of %d, patch ED",
 						td_list->urb,
 						1 + td_list->index,
 						urb_priv->length);
+#endif
 					td_list->ed->hwHeadP = 
 			    (urb_priv->td [urb_priv->length - 1]->hwNextTD
 				    & __constant_cpu_to_le32 (TD_MASK))
@@ -841,27 +848,37 @@ static struct td *dl_reverse_done_list (struct ohci_hcd *ohci)
 
 /*-------------------------------------------------------------------------*/
 
-/* there are some pending requests to unlink 
- * - some URBs/TDs if urb_priv->state == URB_DEL
- */
-static void dl_del_list (struct ohci_hcd *ohci, unsigned int frame)
+/* wrap-aware logic stolen from <linux/jiffies.h> */
+#define tick_before(t1,t2) ((((s16)(t1))-((s16)(t2))) < 0)
+
+/* there are some urbs/eds to unlink; called in_irq(), with HCD locked */
+static void finish_unlinks (struct ohci_hcd *ohci, u16 tick)
 {
-	unsigned long	flags;
-	struct ed	*ed;
-	__u32		edINFO;
-	__u32		tdINFO;
-	struct td	*td = NULL, *td_next = NULL,
-			*tdHeadP = NULL, *tdTailP;
-	__u32		*td_p;
+	struct ed	*ed, **last;
 	int		ctrl = 0, bulk = 0;
 
-	spin_lock_irqsave (&ohci->lock, flags);
+	for (last = &ohci->ed_rm_list, ed = *last; ed != NULL; ed = *last) {
+		struct td	*td, *td_next, *tdHeadP, *tdTailP;
+		u32		*td_p;
+		int		unlinked;
 
-	for (ed = ohci->ed_rm_list [frame]; ed != NULL; ed = ed->ed_rm_list) {
+		/* only take off EDs that the HC isn't using, accounting for
+		 * frame counter wraps.  completion callbacks might prepend
+		 * EDs to the list, they'll be checked next irq.
+		 */
+		if (tick_before (tick, ed->tick)) {
+			last = &ed->ed_rm_list;
+			continue;
+		}
+		*last = ed->ed_rm_list;
+		ed->ed_rm_list = 0;
+		unlinked = 0;
 
+		/* unlink urbs from first one requested to queue end;
+		 * leave earlier urbs alone
+		 */
 		tdTailP = dma_to_td (ohci, le32_to_cpup (&ed->hwTailP));
 		tdHeadP = dma_to_td (ohci, le32_to_cpup (&ed->hwHeadP));
-		edINFO = le32_to_cpup (&ed->hwINFO);
 		td_p = &ed->hwHeadP;
 
 		for (td = tdHeadP; td != tdTailP; td = td_next) {
@@ -870,8 +887,11 @@ static void dl_del_list (struct ohci_hcd *ohci, unsigned int frame)
 
 			td_next = dma_to_td (ohci,
 				le32_to_cpup (&td->hwNextTD));
-			if ((urb_priv->state == URB_DEL)) {
-				tdINFO = le32_to_cpup (&td->hwINFO);
+			if (unlinked || (urb_priv->state == URB_DEL)) {
+				u32 tdINFO = le32_to_cpup (&td->hwINFO);
+
+				unlinked = 1;
+
 				/* HC may have partly processed this TD */
 				if (TD_CC_GET (tdINFO) < 0xE)
 					td_done (urb, td);
@@ -880,22 +900,32 @@ static void dl_del_list (struct ohci_hcd *ohci, unsigned int frame)
 
 				/* URB is done; clean up */
 				if (++ (urb_priv->td_cnt) == urb_priv->length) {
-     					spin_unlock_irqrestore (&ohci->lock,
-						flags);
+					if (urb->status == -EINPROGRESS)
+						urb->status = -ECONNRESET;
+     					spin_unlock (&ohci->lock);
 					finish_urb (ohci, urb);
-					spin_lock_irqsave (&ohci->lock, flags);
+					spin_lock (&ohci->lock);
 				}
 			} else {
 				td_p = &td->hwNextTD;
 			}
 		}
 
+		/* FIXME actually want four cases here:
+		 * (a) finishing URB unlink
+		 *     [a1] no URBs queued, so start ED unlink
+		 *     [a2] some (earlier) URBs still linked, re-enable
+		 * (b) finishing ED unlink
+		 *     [b1] no URBs queued, ED is truly idle now
+		 *     [b2] URBs now queued, link ED back into schedule
+		 * right now we only have (a)
+		 */
 		ed->state &= ~ED_URB_DEL;
 		tdHeadP = dma_to_td (ohci, le32_to_cpup (&ed->hwHeadP));
 
 		if (tdHeadP == tdTailP) {
 			if (ed->state == ED_OPER)
-				ep_unlink (ohci, ed);
+				start_ed_unlink (ohci, ed);
 			td_free (ohci, tdTailP);
 			ed->hwINFO = ED_SKIP;
 			ed->state = ED_NEW;
@@ -918,7 +948,7 @@ static void dl_del_list (struct ohci_hcd *ohci, unsigned int frame)
 			writel (0, &ohci->regs->ed_controlcurrent);
 		if (bulk)	/* reset bulk list */
 			writel (0, &ohci->regs->ed_bulkcurrent);
-		if (!ohci->ed_rm_list [!frame]) {
+		if (!ohci->ed_rm_list) {
 			if (ohci->ed_controltail)
 				ohci->hc_control |= OHCI_CTRL_CLE;
 			if (ohci->ed_bulktail)
@@ -926,9 +956,6 @@ static void dl_del_list (struct ohci_hcd *ohci, unsigned int frame)
 			writel (ohci->hc_control, &ohci->regs->control);   
 		}
 	}
-
-   	ohci->ed_rm_list [frame] = NULL;
-   	spin_unlock_irqrestore (&ohci->lock, flags);
 }
 
 
@@ -939,7 +966,7 @@ static void dl_del_list (struct ohci_hcd *ohci, unsigned int frame)
  * Process normal completions (error or success) and clean the schedules.
  *
  * This is the main path for handing urbs back to drivers.  The only other
- * path is dl_del_list(), which unlinks URBs by scanning EDs, instead of
+ * path is finish_unlinks(), which unlinks URBs using ed_rm_list, instead of
  * scanning the (re-reversed) donelist as this does.
  */
 static void dl_done_list (struct ohci_hcd *ohci, struct td *td)
@@ -960,7 +987,7 @@ static void dl_done_list (struct ohci_hcd *ohci, struct td *td)
 		/* If all this urb's TDs are done, call complete().
 		 * Interrupt transfers are the only special case:
 		 * they're reissued, until "deleted" by usb_unlink_urb
-		 * (real work done in a SOF intr, by dl_del_list).
+		 * (real work done in a SOF intr, by finish_unlinks).
 		 */
   		if (urb_priv->td_cnt == urb_priv->length) {
 			int	resubmit;
@@ -980,7 +1007,7 @@ static void dl_done_list (struct ohci_hcd *ohci, struct td *td)
 		if ((ed->hwHeadP & __constant_cpu_to_le32 (TD_MASK))
 					== ed->hwTailP
 				&& (ed->state == ED_OPER)) 
-			ep_unlink (ohci, ed);
+			start_ed_unlink (ohci, ed);
     		td = td_next;
   	}  
 	spin_unlock_irqrestore (&ohci->lock, flags);

@@ -2576,7 +2576,7 @@ static void devfs_clear_inode (struct inode *inode)
 
 static struct super_operations devfs_sops =
 { 
-    put_inode:     force_delete,
+    drop_inode:    generic_delete_inode,
     clear_inode:   devfs_clear_inode,
     statfs:        simple_statfs,
 };

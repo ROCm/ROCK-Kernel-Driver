@@ -2,13 +2,21 @@
 # always needed
 # ---------------------------------------------------------------------------
 
-all: mkdep split-include
+# The following temporary rule will make sure that people's
+# trees get updated to the right permissions, since patch(1)
+# can't do it
+CHMOD_FILES := docgen gen-all-syms kernel-doc mkcompile_h mkversion_h makelst
 
-mkdep: mkdep.c
+all: fixdep split-include $(CHMOD_FILES)
+
+fixdep: fixdep.c
 	$(HOSTCC) $(HOSTCFLAGS) -o $@ $<
 
 split-include: split-include.c
 	$(HOSTCC) $(HOSTCFLAGS) -o $@ $<
+
+$(CHMOD_FILES): FORCE
+	@chmod a+x $@
 
 # xconfig
 # ---------------------------------------------------------------------------
@@ -44,14 +52,10 @@ tkparse.o tkcond.o tkgen.o: %.o: %.c
 # DocBook stuff
 # ---------------------------------------------------------------------------
 
-doc-progs: docproc docgen gen-all-syms kernel-doc
+doc-progs: docproc
 
 docproc: docproc.c
 	$(HOSTCC) $(HOSTCFLAGS) -o $@ $<
-
-docgen gen-all-syms kernel-doc: FORCE
-	chmod 755 $@
-
 
 include $(TOPDIR)/Rules.make
 

@@ -300,11 +300,11 @@ static long do_fcntl(unsigned int fd, unsigned int cmd,
 			unlock_kernel();
 			break;
 		case F_GETLK:
-			err = fcntl_getlk(fd, (struct flock *) arg);
+			err = fcntl_getlk(filp, (struct flock *) arg);
 			break;
 		case F_SETLK:
 		case F_SETLKW:
-			err = fcntl_setlk(fd, cmd, (struct flock *) arg);
+			err = fcntl_setlk(filp, cmd, (struct flock *) arg);
 			break;
 		case F_GETOWN:
 			/*
@@ -386,13 +386,11 @@ asmlinkage long sys_fcntl64(unsigned int fd, unsigned int cmd, unsigned long arg
 
 	switch (cmd) {
 		case F_GETLK64:
-			err = fcntl_getlk64(fd, (struct flock64 *) arg);
+			err = fcntl_getlk64(filp, (struct flock64 *) arg);
 			break;
 		case F_SETLK64:
-			err = fcntl_setlk64(fd, cmd, (struct flock64 *) arg);
-			break;
 		case F_SETLKW64:
-			err = fcntl_setlk64(fd, cmd, (struct flock64 *) arg);
+			err = fcntl_setlk64(filp, cmd, (struct flock64 *) arg);
 			break;
 		default:
 			err = do_fcntl(fd, cmd, arg, filp);
@@ -551,7 +549,7 @@ void kill_fasync(struct fasync_struct **fp, int sig, int band)
 
 static int __init fasync_init(void)
 {
-	fasync_cache = kmem_cache_create("fasync cache",
+	fasync_cache = kmem_cache_create("fasync_cache",
 		sizeof(struct fasync_struct), 0, 0, NULL, NULL);
 	if (!fasync_cache)
 		panic("cannot create fasync slab cache");

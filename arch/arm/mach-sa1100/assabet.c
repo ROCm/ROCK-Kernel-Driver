@@ -171,15 +171,6 @@ fixup_assabet(struct machine_desc *desc, struct tag *tags,
 }
 
 
-static struct map_desc assabet_io_desc[] __initdata = {
- /* virtual     physical    length      domain     r  w  c  b */
-  { 0xf1000000, 0x12000000, 0x00100000, DOMAIN_IO, 0, 1, 0, 0 }, /* Board Control Register */
-  { 0xf2800000, 0x4b800000, 0x00800000, DOMAIN_IO, 0, 1, 0, 0 }, /* MQ200 */
-  /*  f3000000 - neponset system registers */
-  /*  f4000000 - neponset SA1111 registers */
-  LAST_DESC
-};
-
 static void assabet_uart_pm(struct uart_port *port, u_int state, u_int oldstate)
 {
 	if (port->mapbase == _Ser1UTCR0) {
@@ -255,12 +246,18 @@ static struct sa1100_port_fns assabet_port_fns __initdata = {
 	pm:		assabet_uart_pm,
 };
 
+static struct map_desc assabet_io_desc[] __initdata = {
+ /* virtual     physical    length      type */
+  { 0xf1000000, 0x12000000, 0x00100000, MT_DEVICE }, /* Board Control Register */
+  { 0xf2800000, 0x4b800000, 0x00800000, MT_DEVICE }  /* MQ200 */
+};
+
 static void __init assabet_map_io(void)
 {
 	extern void neponset_map_io(void);
 
 	sa1100_map_io();
-	iotable_init(assabet_io_desc);
+	iotable_init(assabet_io_desc, ARRAY_SIZE(assabet_io_desc));
 
 	if (machine_has_neponset()) {
 #ifdef CONFIG_ASSABET_NEPONSET

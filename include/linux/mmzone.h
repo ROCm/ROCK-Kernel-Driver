@@ -142,8 +142,14 @@ typedef struct pglist_data {
 extern int numnodes;
 extern pg_data_t *pgdat_list;
 
-#define memclass(pgzone, classzone)	(((pgzone)->zone_pgdat == (classzone)->zone_pgdat) \
-			&& ((pgzone) <= (classzone)))
+static inline int memclass(zone_t *pgzone, zone_t *classzone)
+{
+	if (pgzone->zone_pgdat != classzone->zone_pgdat)
+		return 0;
+	if (pgzone > classzone)
+		return 0;
+	return 1;
+}
 
 /*
  * The following two are not meant for general usage. They are here as

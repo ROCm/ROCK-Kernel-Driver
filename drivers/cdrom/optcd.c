@@ -1445,10 +1445,8 @@ static int cdromplaymsf(unsigned long arg)
 	int status;
 	struct cdrom_msf msf;
 
-	status = verify_area(VERIFY_READ, (void *) arg, sizeof msf);
-	if (status)
-		return status;
-	copy_from_user(&msf, (void *) arg, sizeof msf);
+	if (copy_from_user(&msf, (void *) arg, sizeof msf))
+		return -EFAULT;
 
 	bin2bcd(&msf);
 	status = exec_long_cmd(COMPLAY, &msf);
@@ -1469,10 +1467,8 @@ static int cdromplaytrkind(unsigned long arg)
 	struct cdrom_ti ti;
 	struct cdrom_msf msf;
 
-	status = verify_area(VERIFY_READ, (void *) arg, sizeof ti);
-	if (status)
-		return status;
-	copy_from_user(&ti, (void *) arg, sizeof ti);
+	if (copy_from_user(&ti, (void *) arg, sizeof ti))
+		return -EFAULT;
 
 	if (ti.cdti_trk0 < disk_info.first
 	    || ti.cdti_trk0 > disk_info.last
@@ -1514,15 +1510,10 @@ static int cdromreadtochdr(unsigned long arg)
 	int status;
 	struct cdrom_tochdr tochdr;
 
-	status = verify_area(VERIFY_WRITE, (void *) arg, sizeof tochdr);
-	if (status)
-		return status;
-
 	tochdr.cdth_trk0 = disk_info.first;
 	tochdr.cdth_trk1 = disk_info.last;
 
-	copy_to_user((void *) arg, &tochdr, sizeof tochdr);
-	return 0;
+	return copy_to_user((void *)arg, &tochdr, sizeof tochdr) ? -EFAULT : 0;
 }
 
 
@@ -1532,10 +1523,8 @@ static int cdromreadtocentry(unsigned long arg)
 	struct cdrom_tocentry entry;
 	struct cdrom_subchnl *tocptr;
 
-	status = verify_area(VERIFY_WRITE, (void *) arg, sizeof entry);
-	if (status)
-		return status;
-	copy_from_user(&entry, (void *) arg, sizeof entry);
+	if (copy_from_user(&entry, (void *) arg, sizeof entry))
+		return -EFAULT;
 
 	if (entry.cdte_track == CDROM_LEADOUT)
 		tocptr = &toc[disk_info.last + 1];
@@ -1557,8 +1546,7 @@ static int cdromreadtocentry(unsigned long arg)
 	else if (entry.cdte_format != CDROM_MSF)
 		return -EINVAL;
 
-	copy_to_user((void *) arg, &entry, sizeof entry);
-	return 0;
+	return copy_to_user((void *)arg, &entry, sizeof entry) ? -EFAULT : 0;
 }
 
 
@@ -1568,10 +1556,8 @@ static int cdromvolctrl(unsigned long arg)
 	struct cdrom_volctrl volctrl;
 	struct cdrom_msf msf;
 
-	status = verify_area(VERIFY_READ, (void *) arg, sizeof volctrl);
-	if (status)
-		return status;
-	copy_from_user(&volctrl, (char *) arg, sizeof volctrl);
+	if (copy_from_user(&volctrl, (char *) arg, sizeof volctrl))
+		return -EFAULT;
 
 	msf.cdmsf_min0 = 0x10;
 	msf.cdmsf_sec0 = 0x32;
@@ -1594,10 +1580,8 @@ static int cdromsubchnl(unsigned long arg)
 	int status;
 	struct cdrom_subchnl subchnl;
 
-	status = verify_area(VERIFY_WRITE, (void *) arg, sizeof subchnl);
-	if (status)
-		return status;
-	copy_from_user(&subchnl, (void *) arg, sizeof subchnl);
+	if (copy_from_user(&subchnl, (void *) arg, sizeof subchnl))
+		return -EFAULT;
 
 	if (subchnl.cdsc_format != CDROM_LBA
 	    && subchnl.cdsc_format != CDROM_MSF)
@@ -1609,7 +1593,8 @@ static int cdromsubchnl(unsigned long arg)
 		return -EIO;
 	}
 
-	copy_to_user((void *) arg, &subchnl, sizeof subchnl);
+	if (copy_to_user((void *)arg, &subchnl, sizeof subchnl))
+		return -EFAULT;
 	return 0;
 }
 
@@ -1620,10 +1605,8 @@ static int cdromread(unsigned long arg, int blocksize, int cmd)
 	struct cdrom_msf msf;
 	char buf[CD_FRAMESIZE_RAWER];
 
-	status = verify_area(VERIFY_WRITE, (void *) arg, blocksize);
-	if (status)
-		return status;
-	copy_from_user(&msf, (void *) arg, sizeof msf);
+	if (copy_from_user(&msf, (void *) arg, sizeof msf))
+		return -EFAULT;
 
 	bin2bcd(&msf);
 	msf.cdmsf_min1 = 0;
@@ -1637,8 +1620,7 @@ static int cdromread(unsigned long arg, int blocksize, int cmd)
 		return -EIO;
 	fetch_data(buf, blocksize);
 
-	copy_to_user((void *) arg, &buf, blocksize);
-	return 0;
+	return copy_to_user((void *)arg, &buf, blocksize) ? -EFAULT : 0;
 }
 
 
@@ -1647,10 +1629,8 @@ static int cdromseek(unsigned long arg)
 	int status;
 	struct cdrom_msf msf;
 
-	status = verify_area(VERIFY_READ, (void *) arg, sizeof msf);
-	if (status)
-		return status;
-	copy_from_user(&msf, (void *) arg, sizeof msf);
+	if (copy_from_user(&msf, (void *)arg, sizeof msf))
+		return -EFAULT;
 
 	bin2bcd(&msf);
 	status = exec_seek_cmd(COMSEEK, &msf);
@@ -1669,10 +1649,8 @@ static int cdrommultisession(unsigned long arg)
 	int status;
 	struct cdrom_multisession ms;
 
-	status = verify_area(VERIFY_WRITE, (void*) arg, sizeof ms);
-	if (status)
-		return status;
-	copy_from_user(&ms, (void*) arg, sizeof ms);
+	if (copy_from_user(&ms, (void*) arg, sizeof ms))
+		return -EFAULT;
 
 	ms.addr.msf.minute = disk_info.last_session.minute;
 	ms.addr.msf.second = disk_info.last_session.second;
@@ -1686,8 +1664,8 @@ static int cdrommultisession(unsigned long arg)
 
 	ms.xa_flag = disk_info.xa;
 
-  	copy_to_user((void*) arg, &ms,
-		sizeof(struct cdrom_multisession));
+  	if (copy_to_user((void *)arg, &ms, sizeof(struct cdrom_multisession)))
+		return -EFAULT;
 
 #if DEBUG_MULTIS
  	if (ms.addr_format == CDROM_MSF)

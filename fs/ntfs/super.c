@@ -52,17 +52,6 @@ const option_t on_errors_arr[] = {
 	{ 0,			NULL }
 };
 
-static const option_t readdir_opts_arr[] = {
-	{ SHOW_SYSTEM,	"system" },
-	{ SHOW_WIN32,	"win32" },
-	{ SHOW_WIN32,	"long" },
-	{ SHOW_DOS,	"dos" },
-	{ SHOW_DOS,	"short" },
-	{ SHOW_POSIX,	"posix" },
-	{ SHOW_ALL,	"all" },
-	{ 0,		NULL }
-};
-
 /**
  * simple_getbool -
  *
@@ -98,7 +87,8 @@ static BOOL parse_options(ntfs_volume *vol, char *opt)
 	uid_t uid = (uid_t)-1;
 	gid_t gid = (gid_t)-1;
 	mode_t fmask = (mode_t)-1, dmask = (mode_t)-1;
-	int mft_zone_multiplier = -1, on_errors = -1, readdir_opts = -1;
+	int mft_zone_multiplier = -1, on_errors = -1;
+	int show_sys_files = -1, case_sensitive = -1;
 	struct nls_table *nls_map = NULL, *old_nls;
 
 	/* I am lazy... (-8 */
@@ -119,6 +109,13 @@ static BOOL parse_options(ntfs_volume *vol, char *opt)
 		variable = simple_strtoul(ov = v, &v, 0);		\
 		if (*v)							\
 			goto needs_val;					\
+	} 
+#define NTFS_GETOPT_BOOL(option, variable)				\
+	if (!strcmp(p, option)) {					\
+		BOOL val;						\
+		if (!simple_getbool(v, &val))				\
+			goto needs_bool;				\
+		variable = val;						\
 	} 
 #define NTFS_GETOPT_OPTIONS_ARRAY(option, variable, opt_array)		\
 	if (!strcmp(p, option)) {					\
@@ -146,47 +143,16 @@ static BOOL parse_options(ntfs_volume *vol, char *opt)
 		else NTFS_GETOPT("umask", fmask = dmask)
 		else NTFS_GETOPT("fmask", fmask)
 		else NTFS_GETOPT("dmask", dmask)
-		else NTFS_GETOPT_WITH_DEFAULT("sloppy", sloppy, TRUE)
 		else NTFS_GETOPT("mft_zone_multiplier", mft_zone_multiplier)
+		else NTFS_GETOPT_WITH_DEFAULT("sloppy", sloppy, TRUE)
+		else NTFS_GETOPT_BOOL("show_sys_files", show_sys_files)
+		else NTFS_GETOPT_BOOL("case_sensitive", case_sensitive)
 		else NTFS_GETOPT_OPTIONS_ARRAY("errors", on_errors,
 				on_errors_arr)
-		else NTFS_GETOPT_OPTIONS_ARRAY("show_inodes", readdir_opts,
-				readdir_opts_arr)
-		else if (!strcmp(p, "show_sys_files")) {
-			BOOL val = FALSE;
-			ntfs_warning(vol->sb, "Option show_sys_files is "
-				   "deprecated. Please use option "
-				   "show_inodes=system in the future.");
-			if (!v || !*v)
-				val = TRUE;
-			else if (!simple_getbool(v, &val))
-				goto needs_bool;
-			if (val) {
-				if (readdir_opts == -1)
-					readdir_opts = 0;
-				readdir_opts |= SHOW_SYSTEM;
-			}
-		} else if (!strcmp(p, "posix")) {
-			BOOL val = FALSE;
-			ntfs_warning(vol->sb, "Option posix is deprecated. "
-				   "Please use option show_inodes=posix "
-				   "instead. Be aware that some userspace "
-				   "applications may be confused by this, "
-				   "since the short and long names of "
-				   "directory inodes will have the same inode "
-				   "numbers, yet each will only have a link "
-				   "count of 1 due to Linux not supporting "
-				   "directory hard links.");
-			if (!v || !*v)
-				goto needs_arg;
-			else if (!simple_getbool(v, &val))
-				goto needs_bool;
-			if (val) {
-				if (readdir_opts == -1)
-					readdir_opts = 0;
-				readdir_opts |= SHOW_POSIX;
-			}
-		} else if (!strcmp(p, "nls") || !strcmp(p, "iocharset")) {
+		else if (!strcmp(p, "posix") || !strcmp(p, "show_inodes"))
+			ntfs_warning(vol->sb, "Ignoring obsolete option %s.",
+					p);
+		else if (!strcmp(p, "nls") || !strcmp(p, "iocharset")) {
 			if (!strcmp(p, "iocharset"))
 				ntfs_warning(vol->sb, "Option iocharset is "
 						"deprecated. Please use "
@@ -232,6 +198,7 @@ use_utf8:
 				errors++;
 		}
 #undef NTFS_GETOPT_OPTIONS_ARRAY
+#undef NTFS_GETOPT_BOOL
 #undef NTFS_GETOPT
 #undef NTFS_GETOPT_WITH_DEFAULT
 	}
@@ -297,8 +264,18 @@ no_mount_options:
 		vol->fmask = fmask;
 	if (dmask != (mode_t)-1)
 		vol->dmask = dmask;
-	if (readdir_opts != -1)
-		vol->readdir_opts = readdir_opts;
+	if (show_sys_files != -1) {
+		if (show_sys_files)
+			NVolSetShowSystemFiles(vol);
+		else
+			NVolClearShowSystemFiles(vol);
+	}
+	if (case_sensitive != -1) {
+		if (case_sensitive)
+			NVolSetCaseSensitive(vol);
+		else
+			NVolClearCaseSensitive(vol);
+	}
 	return TRUE;
 needs_arg:
 	ntfs_error(vol->sb, "The %s option requires an argument.", p);
@@ -464,7 +441,7 @@ static struct buffer_head *read_ntfs_boot_sector(struct super_block *sb,
 			ntfs_error(sb, "Primary boot sector is invalid.");
 	} else if (!silent)
 		ntfs_error(sb, read_err_str, "primary");
-	if (NTFS_SB(sb)->on_errors & ~ON_ERRORS_RECOVER) {
+	if (!(NTFS_SB(sb)->on_errors & ON_ERRORS_RECOVER)) {
 		if (bh_primary)
 			brelse(bh_primary);
 		if (!silent)
@@ -1492,6 +1469,7 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	vol->root_ino = NULL;
 	vol->secure_ino = NULL;
 	vol->uid = vol->gid = 0;
+	vol->flags = 0;
 	vol->on_errors = 0;
 	vol->mft_zone_multiplier = 0;
 	vol->nls_map = NULL;
@@ -1530,12 +1508,6 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	 */
 	vol->fmask = 0177;
 	vol->dmask = 0077;
-
-	/*
-	 * Default is to show long file names (including POSIX file names), and
-	 * not to show system files and short file names.
-	 */
-	vol->readdir_opts = SHOW_WIN32;
 
 	/* Important to get the mount options dealt with now. */
 	if (!parse_options(vol, (char*)opt))

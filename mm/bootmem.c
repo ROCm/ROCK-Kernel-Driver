@@ -18,6 +18,7 @@
 #include <linux/bootmem.h>
 #include <linux/mmzone.h>
 #include <asm/dma.h>
+#include <asm/io.h>
 
 /*
  * Access to this subsystem has to be serialized externally. (this is

@@ -33,7 +33,7 @@ struct suspend_header {
 	char version[20];
 	int num_cpus;
 	int page_size;
-	unsigned long suspend_pagedir;
+	suspend_pagedir_t *suspend_pagedir;
 	unsigned int num_pbes;
 	struct swap_location {
 		char filename[SWAP_FILENAME_MAXLENGTH];
@@ -50,11 +50,14 @@ extern int shrink_mem(void);
 /* kernel/suspend.c */
 extern void software_suspend(void);
 extern void software_resume(void);
-extern int resume_setup(char *str);
 
 extern int register_suspend_notifier(struct notifier_block *);
 extern int unregister_suspend_notifier(struct notifier_block *);
 extern void refrigerator(unsigned long);
+
+extern unsigned int nr_copy_pages __nosavedata;
+extern suspend_pagedir_t *pagedir_nosave __nosavedata;
+
 
 #else
 #define software_suspend()		do { } while(0)

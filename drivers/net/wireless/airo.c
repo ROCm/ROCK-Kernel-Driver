@@ -191,12 +191,6 @@ static char *statsLabels[] = {
 #ifndef RUN_AT
 #define RUN_AT(x) (jiffies+(x))
 #endif
-#ifndef PDE
-static inline struct proc_dir_entry *PDE(const struct inode *inode)
-{
-	return inode->u.generic_ip;
-}
-#endif
 
 
 /* These variables are for insmod, since it seems that the rates
@@ -723,7 +717,7 @@ typedef struct {
 
 /* Leave gap of 40 commands after AIROGSTATSD32 for future */
 
-#define AIROPCAP               	AIROGSTATSD32 + 40
+#define AIROPCAP		AIROGSTATSD32 + 40
 #define AIROPVLIST              AIROPCAP      + 1
 #define AIROPSLIST		AIROPVLIST    + 1
 #define AIROPCFG		AIROPSLIST    + 1
@@ -845,7 +839,7 @@ struct airo_info {
 	struct proc_dir_entry *proc_entry;
 	struct airo_info *next;
         spinlock_t aux_lock;
-        int flags;
+        unsigned long flags;
 #define FLAG_PROMISC   IFF_PROMISC
 #define FLAG_RADIO_OFF 0x02
 #define FLAG_LOCKED    2
@@ -866,7 +860,7 @@ struct airo_info {
 #ifdef WIRELESS_EXT
 	struct iw_statistics	wstats;		// wireless stats
 	unsigned long		scan_timestamp;	/* Time started to scan */
-	struct tq_struct 	event_task;
+	struct tq_struct	event_task;
 #ifdef WIRELESS_SPY
 	int			spy_number;
 	u_char			spy_address[IW_MAX_SPY][6];

@@ -1,6 +1,5 @@
 /*
  * linux/arch/arm/mach-sa1100/simpad.c
- *
  */
 
 #include <linux/config.h>
@@ -41,10 +40,9 @@ void clear_cs3_bit(int value)
 }
 
 static struct map_desc simpad_io_desc[] __initdata = {
-  /* virtual	physical    length	domain	   r  w  c  b */
-  { 0xf2800000, 0x4b800000, 0x00800000, DOMAIN_IO, 0, 1, 0, 0 }, /* MQ200 */  
-  { 0xf1000000, 0x18000000, 0x00100000, DOMAIN_IO, 0, 1, 0, 0 }, /* Paules CS3, write only */
-  LAST_DESC
+  /* virtual	physical    length	type */
+  { 0xf2800000, 0x4b800000, 0x00800000, MT_DEVICE }, /* MQ200 */  
+  { 0xf1000000, 0x18000000, 0x00100000, MT_DEVICE }  /* Paules CS3, write only */
 };
 
 
@@ -65,7 +63,7 @@ static struct sa1100_port_fns simpad_port_fns __initdata = {
 static void __init simpad_map_io(void)
 {
 	sa1100_map_io();
-	iotable_init(simpad_io_desc);
+	iotable_init(simpad_io_desc, ARRAY_SIZE(simpad_io_desc));
 
 	PSPR = 0xc0008000;
 	GPDR &= ~GPIO_GPIO0;

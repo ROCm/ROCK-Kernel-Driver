@@ -451,7 +451,7 @@ check_if_enabled:
 		if (d->init_chipset)
 			d->init_chipset(dev);
 #ifdef __sparc__
-		printk(KERN_INFO "ATA: 100%% native mode on irq\n", __irq_itoa(pciirq));
+		printk(KERN_INFO "ATA: 100%% native mode on irq %s\n", __irq_itoa(pciirq));
 #else
 		printk(KERN_INFO "ATA: 100%% native mode on irq %d\n", pciirq);
 #endif

@@ -820,14 +820,18 @@ int timod_getmsg(unsigned int fd, char *ctl_buf, int ctl_maxlen, s32 *ctl_len,
 	if (error && ctl_maxlen > sizeof(udi) && sock->state == TS_IDLE) {
 		SOLD("generating udi");
 		udi.PRIM_type = T_UNITDATA_IND;
-		get_user(udi.SRC_length, ctl_len);
+		if (get_user(udi.SRC_length, ctl_len))
+			return -EFAULT;
 		udi.SRC_offset = sizeof(udi);
 		udi.OPT_length = udi.OPT_offset = 0;
-		copy_to_user(ctl_buf, &udi, sizeof(udi));
-		put_user(sizeof(udi)+udi.SRC_length, ctl_len);
+		if (copy_to_user(ctl_buf, &udi, sizeof(udi)) ||
+		    put_user(sizeof(udi)+udi.SRC_length, ctl_len))
+			return -EFAULT;
 		SOLD("udi done");
-	} else
-		put_user(0, ctl_len);
+	} else {
+		if (put_user(0, ctl_len))
+			return -EFAULT;
+	}
 	put_user(error, data_len);
 	SOLD("done");
 	return 0;

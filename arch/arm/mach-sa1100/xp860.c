@@ -57,17 +57,16 @@ static int __init xp860_init(void)
 __initcall(xp860_init);
 
 static struct map_desc xp860_io_desc[] __initdata = {
- /* virtual     physical    length      domain     r  w  c  b */
-  { 0xf0000000, 0x10000000, 0x00100000, DOMAIN_IO, 0, 1, 0, 0 }, /* SCSI */
-  { 0xf1000000, 0x18000000, 0x00100000, DOMAIN_IO, 0, 1, 0, 0 }, /* LAN */
-  { 0xf4000000, 0x40000000, 0x00800000, DOMAIN_IO, 0, 1, 0, 0 }, /* SA-1111 */
-  LAST_DESC
+ /* virtual     physical    length      type */
+  { 0xf0000000, 0x10000000, 0x00100000, MT_DEVICE }, /* SCSI */
+  { 0xf1000000, 0x18000000, 0x00100000, MT_DEVICE }, /* LAN */
+  { 0xf4000000, 0x40000000, 0x00800000, MT_DEVICE }  /* SA-1111 */
 };
 
 static void __init xp860_map_io(void)
 {
 	sa1100_map_io();
-	iotable_init(xp860_io_desc);
+	iotable_init(xp860_io_desc, ARRAY_SIZE(xp860_io_desc));
 
 	sa1100_register_uart(0, 3);
 	sa1100_register_uart(1, 1);

@@ -28,9 +28,6 @@ extern int irq_vector[NR_IRQS];
 
 extern void (*interrupt[NR_IRQS])(void);
 
-extern asmlinkage void thermal_interrupt(void);
-extern asmlinkage void smp_thermal_interrupt(struct pt_regs);
-
 #ifdef CONFIG_SMP
 extern asmlinkage void reschedule_interrupt(void);
 extern asmlinkage void invalidate_interrupt(void);
@@ -41,6 +38,7 @@ extern asmlinkage void call_function_interrupt(void);
 extern asmlinkage void apic_timer_interrupt(void);
 extern asmlinkage void error_interrupt(void);
 extern asmlinkage void spurious_interrupt(void);
+extern asmlinkage void thermal_interrupt(struct pt_regs);
 #endif
 
 extern void mask_irq(unsigned int irq);

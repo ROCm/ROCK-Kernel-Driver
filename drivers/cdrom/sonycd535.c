@@ -1022,11 +1022,8 @@ sony_get_subchnl_info(long arg)
 	if (!sony_toc_read) {
 		return -EIO;
 	}
-	err = verify_area(VERIFY_WRITE /* and read */ , (char *)arg, sizeof schi);
-	if (err)
-		return err;
-
-	copy_from_user(&schi, (char *)arg, sizeof schi);
+	if (copy_from_user(&schi, (char *)arg, sizeof schi))
+		return -EFAULT;
 
 	switch (sony_audio_status) {
 	case CDROM_AUDIO_PLAY:
@@ -1041,7 +1038,8 @@ sony_get_subchnl_info(long arg)
 
 	case CDROM_AUDIO_NO_STATUS:
 		schi.cdsc_audiostatus = sony_audio_status;
-		copy_to_user((char *)arg, &schi, sizeof schi);
+		if (copy_to_user((char *)arg, &schi, sizeof schi))
+			return -EFAULT;
 		return 0;
 		break;
 
@@ -1068,8 +1066,7 @@ sony_get_subchnl_info(long arg)
 		schi.cdsc_absaddr.lba = msf_to_log(last_sony_subcode->abs_msf);
 		schi.cdsc_reladdr.lba = msf_to_log(last_sony_subcode->rel_msf);
 	}
-	copy_to_user((char *)arg, &schi, sizeof schi);
-	return 0;
+	return copy_to_user((char *)arg, &schi, sizeof schi) ? -EFAULT : 0;
 }
 
 
@@ -1218,12 +1215,10 @@ cdu_ioctl(struct inode *inode,
 			if (!sony_toc_read)
 				return -EIO;
 			hdr = (struct cdrom_tochdr *)arg;
-			err = verify_area(VERIFY_WRITE, hdr, sizeof *hdr);
-			if (err)
-				return err;
 			loc_hdr.cdth_trk0 = bcd_to_int(sony_toc->first_track_num);
 			loc_hdr.cdth_trk1 = bcd_to_int(sony_toc->last_track_num);
-			copy_to_user(hdr, &loc_hdr, sizeof *hdr);
+			if (copy_to_user(hdr, &loc_hdr, sizeof *hdr))
+				return -EFAULT;
 		}
 		return 0;
 		break;
@@ -1240,11 +1235,9 @@ cdu_ioctl(struct inode *inode,
 				return -EIO;
 			}
 			entry = (struct cdrom_tocentry *)arg;
-			err = verify_area(VERIFY_WRITE /* and read */ , entry, sizeof *entry);
-			if (err)
-				return err;
 
-			copy_from_user(&loc_entry, entry, sizeof loc_entry);
+			if (copy_from_user(&loc_entry, entry, sizeof loc_entry))
+				return -EFAULT;
 
 			/* Lead out is handled separately since it is special. */
 			if (loc_entry.cdte_track == CDROM_LEADOUT) {
@@ -1268,7 +1261,8 @@ cdu_ioctl(struct inode *inode,
 				loc_entry.cdte_addr.msf.second = bcd_to_int(*(msf_val + 1));
 				loc_entry.cdte_addr.msf.frame = bcd_to_int(*(msf_val + 2));
 			}
-			copy_to_user(entry, &loc_entry, sizeof *entry);
+			if (copy_to_user(entry, &loc_entry, sizeof *entry))
+				return -EFAULT;
 		}
 		return 0;
 		break;
@@ -1281,11 +1275,9 @@ cdu_ioctl(struct inode *inode,
 			sony_get_toc();
 			if (!sony_toc_read)
 				return -EIO;
-			err = verify_area(VERIFY_READ, (char *)arg, sizeof ti);
-			if (err)
-				return err;
 
-			copy_from_user(&ti, (char *)arg, sizeof ti);
+			if (copy_from_user(&ti, (char *)arg, sizeof ti))
+				return -EFAULT;
 			if ((ti.cdti_trk0 < sony_toc->first_track_num)
 				|| (sony_toc->last_track_num < ti.cdti_trk0)
 				|| (ti.cdti_trk1 < ti.cdti_trk0)) {
@@ -1352,11 +1344,9 @@ cdu_ioctl(struct inode *inode,
 		{
 			struct cdrom_volctrl volctrl;
 
-			err = verify_area(VERIFY_READ, (char *)arg, sizeof volctrl);
-			if (err)
-				return err;
-
-			copy_from_user(&volctrl, (char *)arg, sizeof volctrl);
+			if (copy_from_user(&volctrl, (char *)arg,
+					   sizeof volctrl))
+				return -EFAULT;
 			cmd_buff[0] = SONY535_SET_VOLUME;
 			cmd_buff[1] = volctrl.channel0;
 			cmd_buff[2] = volctrl.channel1;

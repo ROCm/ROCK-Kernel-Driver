@@ -551,7 +551,8 @@ static ssize_t sync_serial_manual_write(struct file * file, const char * buf,
 	}
 
 	port = &ports[dev];
-	copy_from_user(port->out_buffer, buf, count);
+	if (copy_from_user(port->out_buffer, buf, count))
+		return -EFAULT;
 	port->outp = port->out_buffer;
 	port->out_count = count;
 	port->odd_output = 1;
@@ -597,7 +598,8 @@ static ssize_t sync_serial_write(struct file * file, const char * buf,
 		return sync_serial_manual_write(file, buf, count, ppos); 
 	}
   
-	copy_from_user(port->out_buffer, buf, count);
+	if (copy_from_user(port->out_buffer, buf, count))
+		return -EFAULT;
 	add_wait_queue(&port->out_wait_q, &wait);
 	set_current_state(TASK_INTERRUPTIBLE);
 	start_dma(port, buf, count);
@@ -658,7 +660,8 @@ static ssize_t sync_serial_read(struct file * file, char * buf,
 		avail = port->in_buffer + IN_BUFFER_SIZE - start;
   
 	count = count > avail ? avail : count;
-	copy_to_user(buf, start, count);
+	if (copy_to_user(buf, start, count))
+		return -EFAULT;
 
 	/* Disable interrupts while updating readp */
 	save_flags(flags);

@@ -2564,7 +2564,7 @@ int cpc_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 				return -EINVAL;
 			return 0;
 		case SIOCSPC300CONF:
-			if (!suser())
+			if (!capable(CAP_NET_ADMIN))
 				return -EPERM;
 			if (!arg || 
 				copy_from_user(&conf_aux.conf, arg, sizeof(pc300chconf_t)))

@@ -795,16 +795,12 @@ static int sjcd_ioctl(struct inode *ip, struct file *fp,
 
 	case CDROMPLAYTRKIND:{
 			struct cdrom_ti ti;
-			int s;
+			int s = -EFAULT;
 #if defined( SJCD_TRACE )
 			printk("SJCD: ioctl: playtrkind\n");
 #endif
-			if ((s =
-			     verify_area(VERIFY_READ, (void *) arg,
-					 sizeof(ti))) == 0) {
-				copy_from_user(&ti, (void *) arg,
-					       sizeof(ti));
-
+			if (!copy_from_user(&ti, (void *) arg, sizeof(ti))) {
+				s = 0;
 				if (ti.cdti_trk0 < sjcd_first_track_no)
 					return (-EINVAL);
 				if (ti.cdti_trk1 > sjcd_last_track_no)
@@ -879,19 +875,15 @@ static int sjcd_ioctl(struct inode *ip, struct file *fp,
 
 	case CDROMREADTOCHDR:{
 			struct cdrom_tochdr toc_header;
-			int s;
 #if defined (SJCD_TRACE )
 			printk("SJCD: ioctl: readtocheader\n");
 #endif
-			if ((s =
-			     verify_area(VERIFY_WRITE, (void *) arg,
-					 sizeof(toc_header))) == 0) {
-				toc_header.cdth_trk0 = sjcd_first_track_no;
-				toc_header.cdth_trk1 = sjcd_last_track_no;
-				copy_to_user((void *) arg, &toc_header,
-					     sizeof(toc_header));
-			}
-			return (s);
+			toc_header.cdth_trk0 = sjcd_first_track_no;
+			toc_header.cdth_trk1 = sjcd_last_track_no;
+			if (copy_to_user((void *)arg, &toc_header,
+					 sizeof(toc_header)))
+				return -EFAULT;
+			return 0;
 		}
 
 	case CDROMREADTOCENTRY:{
@@ -942,8 +934,9 @@ static int sjcd_ioctl(struct inode *ip, struct file *fp,
 				default:
 					return (-EINVAL);
 				}
-				copy_to_user((void *) arg, &toc_entry,
-					     sizeof(toc_entry));
+				if (copy_to_user((void *) arg, &toc_entry,
+						 sizeof(toc_entry)))
+					s = -EFAULT;
 			}
 			return (s);
 		}
@@ -998,8 +991,9 @@ static int sjcd_ioctl(struct inode *ip, struct file *fp,
 				default:
 					return (-EINVAL);
 				}
-				copy_to_user((void *) arg, &subchnl,
-					     sizeof(subchnl));
+				if (copy_to_user((void *) arg, &subchnl,
+					         sizeof(subchnl)))
+					s = -EFAULT;
 			}
 			return (s);
 		}
@@ -1041,16 +1035,13 @@ static int sjcd_ioctl(struct inode *ip, struct file *fp,
 
 #if defined( SJCD_GATHER_STAT )
 	case 0xABCD:{
-			int s;
 #if defined( SJCD_TRACE )
 			printk("SJCD: ioctl: statistic\n");
 #endif
-			if ((s =
-			     verify_area(VERIFY_WRITE, (void *) arg,
-					 sizeof(statistic))) == 0)
-				copy_to_user((void *) arg, &statistic,
-					     sizeof(statistic));
-			return (s);
+			if (copy_to_user((void *)arg, &statistic,
+					 sizeof(statistic)))
+				return -EFAULT;
+			return 0;
 		}
 #endif
 

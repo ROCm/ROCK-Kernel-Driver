@@ -385,7 +385,7 @@ int ide_config_drive_speed(struct ata_device *drive, byte speed)
 	enable_irq(ch->irq);
 
 	if (error) {
-		ide_dump_status(drive, NULL, "set_drive_speed_status", drive->status);
+		ata_dump(drive, NULL, "set drive speed");
 		return error;
 	}
 
@@ -875,7 +875,8 @@ static void channel_probe(struct ata_channel *ch)
 
 	/* Register this hardware interface within the global device tree.
 	 */
-	sprintf(ch->dev.bus_id, "%04x", ch->io_ports[IDE_DATA_OFFSET]);
+	sprintf(ch->dev.bus_id, "%04lx",
+		(unsigned long) ch->io_ports[IDE_DATA_OFFSET]);
 	sprintf(ch->dev.name, "ide");
 	ch->dev.driver_data = ch;
 #ifdef CONFIG_PCI

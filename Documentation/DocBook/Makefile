@@ -161,18 +161,20 @@ LOG	:=	$(patsubst %.sgml, %.log, $(BOOKS))
 OUT	:=	$(patsubst %.sgml, %.out, $(BOOKS))
 
 clean:
-	rm -f core *~
-	rm -f $(BOOKS)
-	rm -f $(DVI) $(AUX) $(TEX) $(LOG) $(OUT)
-	rm -f $(PNG-parportbook) $(EPS-parportbook)
-	rm -f $(C-procfs-example)
+	@echo 'Cleaning up (DocBook)'
+	@rm -f core *~
+	@rm -f $(BOOKS)
+	@rm -f $(DVI) $(AUX) $(TEX) $(LOG) $(OUT)
+	@rm -f $(PNG-parportbook) $(EPS-parportbook)
+	@rm -f $(C-procfs-example)
 
-mrproper: clean
-	rm -f $(PS) $(PDF)
-	rm -f -r $(HTML)
-	rm -f .depend
-	rm -f $(TOPDIR)/scripts/mkdep-docbook
-	rm -rf DBTOHTML_OUTPUT*
+mrproper:
+	@echo 'Making mrproper (DocBook)'
+	@rm -f $(PS) $(PDF)
+	@rm -f -r $(HTML)
+	@rm -f .depend
+	@rm -f $(TOPDIR)/scripts/mkdep-docbook
+	@rm -rf DBTOHTML_OUTPUT*
 
 %.ps : %.sgml
 	@(which db2ps > /dev/null 2>&1) || \

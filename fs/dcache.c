@@ -755,6 +755,9 @@ struct dentry * d_alloc_anon(struct inode *inode)
 	}
 
 	tmp = d_alloc(NULL, &(const struct qstr) {"",0,0});
+	if (!tmp)
+		return NULL;
+
 	tmp->d_parent = tmp; /* make sure dput doesn't croak */
 	
 	spin_lock(&dcache_lock);

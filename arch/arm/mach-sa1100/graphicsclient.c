@@ -9,7 +9,7 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
-
+#include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/sched.h>
 #include <linux/interrupt.h>
@@ -121,10 +121,9 @@ static void __init graphicsclient_init_irq(void)
 
 
 static struct map_desc graphicsclient_io_desc[] __initdata = {
- /* virtual     physical    length      domain     r  w  c  b */
-  { 0xf0000000, 0x10000000, 0x00400000, DOMAIN_IO, 0, 1, 0, 0 }, /* CPLD */
-  { 0xf1000000, 0x18000000, 0x00400000, DOMAIN_IO, 0, 1, 0, 0 }, /* CAN */
-  LAST_DESC
+ /* virtual     physical    length      type */
+  { 0xf0000000, 0x10000000, 0x00400000, MT_DEVICE }, /* CPLD */
+  { 0xf1000000, 0x18000000, 0x00400000, MT_DEVICE }  /* CAN */
 };
 
 static u_int graphicsclient_get_mctrl(struct uart_port *port)
@@ -187,7 +186,7 @@ static struct sa1100_port_fns graphicsclient_port_fns __initdata = {
 static void __init graphicsclient_map_io(void)
 {
 	sa1100_map_io();
-	iotable_init(graphicsclient_io_desc);
+	iotable_init(graphicsclient_io_desc, ARRAY_SIZE(graphicsclient_io_desc));
 
 	sa1100_register_uart_fns(&graphicsclient_port_fns);
 	sa1100_register_uart(0, 3);

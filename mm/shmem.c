@@ -1483,7 +1483,7 @@ static struct super_operations shmem_ops = {
 	remount_fs:	shmem_remount_fs,
 #endif
 	delete_inode:	shmem_delete_inode,
-	put_inode:	force_delete,	
+	drop_inode:	generic_delete_inode,
 	put_super:	shmem_put_super,
 };
 

@@ -99,9 +99,7 @@ static ssize_t rtas_log_read(struct file * file, char * buf,
 	rtas_log_size -= 1;
 	spin_unlock(&rtas_log_lock);
 
-	copy_to_user(buf, tmp, count);
-	error = count;
-
+	error = copy_to_user(buf, tmp, count) ? -EFAULT : count;
 out:
 	kfree(tmp);
 	return error;

@@ -13,7 +13,7 @@ export-objs = signal.o sys.o kmod.o context.o ksyms.o pm.o exec_domain.o \
 		printk.o platform.o suspend.o
 
 obj-y     = sched.o dma.o fork.o exec_domain.o panic.o printk.o \
-	    module.o exit.o itimer.o info.o time.o softirq.o resource.o \
+	    module.o exit.o itimer.o time.o softirq.o resource.o \
 	    sysctl.o capability.o ptrace.o timer.o user.o \
 	    signal.o sys.o kmod.o context.o futex.o platform.o
 

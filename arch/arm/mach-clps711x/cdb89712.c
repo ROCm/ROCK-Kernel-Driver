@@ -17,6 +17,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
+#include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/types.h>
 #include <linux/string.h>
@@ -40,14 +41,13 @@ extern void clps711x_map_io(void);
  * ethernet driver, perhaps.
  */
 static struct map_desc cdb89712_io_desc[] __initdata = {
-	{ ETHER_BASE, ETHER_START, ETHER_SIZE, DOMAIN_IO, 0, 1, 0, 0 },
-	LAST_DESC
+	{ ETHER_BASE, ETHER_START, ETHER_SIZE, MT_DEVICE }
 };
 
 static void __init cdb89712_map_io(void)
 {
 	clps711x_map_io();
-	iotable_init(cdb89712_io_desc);
+	iotable_init(cdb89712_io_desc, ARRAY_SIZE(cdb89712_io_desc));
 }
 
 MACHINE_START(CDB89712, "Cirrus-CDB89712")

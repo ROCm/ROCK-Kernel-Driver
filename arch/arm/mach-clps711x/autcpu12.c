@@ -17,6 +17,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
+#include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/types.h>
 #include <linux/string.h>
@@ -48,18 +49,16 @@ extern void clps711x_init_irq(void);
 */
 
 static struct map_desc autcpu12_io_desc[] __initdata = {
- /* virtual, physical, length, domain, r, w, c, b */
+ /* virtual, physical, length, type */
  /* memory-mapped extra io and CS8900A Ethernet chip */
  /* ethernet chip */
- 	{ AUTCPU12_VIRT_CS8900A, AUTCPU12_PHYS_CS8900A, SZ_1M, DOMAIN_IO, 0, 1, 0, 0 },
-	
- 	LAST_DESC
+ 	{ AUTCPU12_VIRT_CS8900A, AUTCPU12_PHYS_CS8900A, SZ_1M, MT_DEVICE }
 };
 
 void __init autcpu12_map_io(void)
 {
         clps711x_map_io();
-        iotable_init(autcpu12_io_desc);
+        iotable_init(autcpu12_io_desc, ARRAY_SIZE(autcpu12_io_desc));
 }
 
 MACHINE_START(AUTCPU12, "autronix autcpu12")

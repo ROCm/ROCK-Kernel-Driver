@@ -17,16 +17,15 @@
 
 
 static struct map_desc lart_io_desc[] __initdata = {
- /* virtual     physical    length      domain     r  w  c  b */
-  { 0xe8000000, 0x00000000, 0x00400000, DOMAIN_IO, 0, 1, 0, 0 }, /* main flash memory */
-  { 0xec000000, 0x08000000, 0x00400000, DOMAIN_IO, 0, 1, 0, 0 }, /* main flash, alternative location */
-  LAST_DESC
+ /* virtual     physical    length      type */
+  { 0xe8000000, 0x00000000, 0x00400000, MT_DEVICE }, /* main flash memory */
+  { 0xec000000, 0x08000000, 0x00400000, MT_DEVICE }  /* main flash, alternative location */
 };
 
 static void __init lart_map_io(void)
 {
 	sa1100_map_io();
-	iotable_init(lart_io_desc);
+	iotable_init(lart_io_desc, ARRAY_SIZE(lart_io_desc));
 
 	sa1100_register_uart(0, 3);
 	sa1100_register_uart(1, 1);

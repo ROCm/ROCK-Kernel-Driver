@@ -176,7 +176,7 @@ void xdr_shift_iovec(struct iovec *iov, int nr, size_t len)
 /*
  * Map a struct xdr_buf into an iovec array.
  */
-int xdr_kmap(struct iovec *iov_base, struct xdr_buf *xdr, unsigned int base)
+int xdr_kmap(struct iovec *iov_base, struct xdr_buf *xdr, size_t base)
 {
 	struct iovec	*iov = iov_base;
 	struct page	**ppage = xdr->pages;
@@ -226,7 +226,7 @@ map_tail:
 	return (iov - iov_base);
 }
 
-void xdr_kunmap(struct xdr_buf *xdr, unsigned int base)
+void xdr_kunmap(struct xdr_buf *xdr, size_t base)
 {
 	struct page	**ppage = xdr->pages;
 	unsigned int	pglen = xdr->page_len;
@@ -290,7 +290,7 @@ xdr_partial_copy_from_skb(struct xdr_buf *xdr, unsigned int base,
 		char *kaddr;
 
 		len = PAGE_CACHE_SIZE;
-		kaddr = kmap_atomic(*ppage, KM_USER0);
+		kaddr = kmap_atomic(*ppage, KM_SKB_SUNRPC_DATA);
 		if (base) {
 			len -= base;
 			if (pglen < len)
@@ -302,7 +302,7 @@ xdr_partial_copy_from_skb(struct xdr_buf *xdr, unsigned int base,
 				len = pglen;
 			ret = copy_actor(desc, kaddr, len);
 		}
-		kunmap_atomic(kaddr, KM_USER0);
+		kunmap_atomic(kaddr, KM_SKB_SUNRPC_DATA);
 		if (ret != len || !desc->count)
 			return;
 		ppage++;

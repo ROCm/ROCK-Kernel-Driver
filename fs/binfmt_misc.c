@@ -621,7 +621,7 @@ static struct file_operations bm_status_operations = {
 
 static struct super_operations s_ops = {
 	statfs:		simple_statfs,
-	put_inode:	force_delete,
+	drop_inode:	generic_delete_inode,
 	clear_inode:	bm_clear_inode,
 };
 

@@ -21,6 +21,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/init.h>
 #include <asm/processor.h>
 #include <asm/i387.h>
 #include <asm/msr.h>

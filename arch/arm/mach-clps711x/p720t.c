@@ -18,6 +18,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 #include <linux/config.h>
+#include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/types.h>
 #include <linux/string.h>
@@ -43,9 +44,8 @@ extern void clps711x_map_io(void);
  * We map both here.
  */
 static struct map_desc p720t_io_desc[] __initdata = {
-	{ SYSPLD_VIRT_BASE,	SYSPLD_PHYS_BASE, 1048576, DOMAIN_IO, 0, 1 },
-	{ 0xfe400000,		0x10400000,	  1048576, DOMAIN_IO, 0, 1 },
-	LAST_DESC
+	{ SYSPLD_VIRT_BASE,	SYSPLD_PHYS_BASE, 1048576, MT_DEVICE },
+	{ 0xfe400000,		0x10400000,	  1048576, MT_DEVICE }
 };
 
 static void __init
@@ -77,7 +77,7 @@ fixup_p720t(struct machine_desc *desc, struct tag *tag,
 static void __init p720t_map_io(void)
 {
 	clps711x_map_io();
-	iotable_init(p720t_io_desc);
+	iotable_init(p720t_io_desc, ARRAY_SIZE(p720t_io_desc));
 }
 
 MACHINE_START(P720T, "ARM-Prospector720T")

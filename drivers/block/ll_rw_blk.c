@@ -507,7 +507,6 @@ static char *rq_flags[] = {
 	"REQ_STARTED",
 	"REQ_DONTPREP",
 	"REQ_QUEUED",
-	"REQ_DRIVE_ACB",
 	"REQ_PC",
 	"REQ_BLOCK_PC",
 	"REQ_SENSE",
@@ -821,7 +820,7 @@ static inline void __generic_unplug_device(request_queue_t *q)
 	/*
 	 * not plugged
 	 */
-	if (!__test_and_clear_bit(QUEUE_FLAG_PLUGGED, &q->queue_flags))
+	if (!test_and_clear_bit(QUEUE_FLAG_PLUGGED, &q->queue_flags))
 		return;
 
 	if (test_bit(QUEUE_FLAG_STOPPED, &q->queue_flags))
@@ -893,6 +892,20 @@ void blk_start_queue(request_queue_t *q)
  **/
 void blk_stop_queue(request_queue_t *q)
 {
+	unsigned long flags;
+
+	spin_lock_irqsave(q->queue_lock, flags);
+
+	/*
+	 * remove from the plugged list, queue must not be called.
+	 */
+	if (test_and_clear_bit(QUEUE_FLAG_PLUGGED, &q->queue_flags)) {
+		spin_lock(&blk_plug_lock);
+		list_del(&q->plug_list);
+		spin_unlock(&blk_plug_lock);
+	}
+
+	spin_unlock_irqrestore(q->queue_lock, flags);
 	set_bit(QUEUE_FLAG_STOPPED, &q->queue_flags);
 }
 
@@ -904,45 +917,36 @@ void blk_stop_queue(request_queue_t *q)
  *   are currently stopped are ignored. This is equivalent to the older
  *   tq_disk task queue run.
  **/
+#define blk_plug_entry(entry) list_entry((entry), request_queue_t, plug_list)
 void blk_run_queues(void)
 {
-	struct list_head *n, *tmp, local_plug_list;
-	unsigned long flags;
+	struct list_head local_plug_list;
 
 	INIT_LIST_HEAD(&local_plug_list);
+
+	spin_lock_irq(&blk_plug_lock);
 
 	/*
 	 * this will happen fairly often
 	 */
-	spin_lock_irqsave(&blk_plug_lock, flags);
 	if (list_empty(&blk_plug_list)) {
-		spin_unlock_irqrestore(&blk_plug_lock, flags);
+		spin_unlock_irq(&blk_plug_lock);
 		return;
 	}
 
 	list_splice(&blk_plug_list, &local_plug_list);
 	INIT_LIST_HEAD(&blk_plug_list);
-	spin_unlock_irqrestore(&blk_plug_lock, flags);
+	spin_unlock_irq(&blk_plug_lock);
+	
+	while (!list_empty(&local_plug_list)) {
+		request_queue_t *q = blk_plug_entry(local_plug_list.next);
 
-	/*
-	 * local_plug_list is now a private copy we can traverse lockless
-	 */
-	list_for_each_safe(n, tmp, &local_plug_list) {
-		request_queue_t *q = list_entry(n, request_queue_t, plug_list);
+		BUG_ON(test_bit(QUEUE_FLAG_STOPPED, &q->queue_flags));
 
-		if (!test_bit(QUEUE_FLAG_STOPPED, &q->queue_flags)) {
-			list_del(&q->plug_list);
-			generic_unplug_device(q);
-		}
-	}
-
-	/*
-	 * add any remaining queue back to plug list
-	 */
-	if (!list_empty(&local_plug_list)) {
-		spin_lock_irqsave(&blk_plug_lock, flags);
-		list_splice(&local_plug_list, &blk_plug_list);
-		spin_unlock_irqrestore(&blk_plug_lock, flags);
+		spin_lock_irq(q->queue_lock);
+		list_del(&q->plug_list);
+		__generic_unplug_device(q);
+		spin_unlock_irq(q->queue_lock);
 	}
 }
 

@@ -10,19 +10,19 @@
 
 SYSTEM  =$(TOPDIR)/vmlinux
 
-Image:	$(CONFIGURE) $(SYSTEM)
+Image:	$(SYSTEM)
 	$(OBJCOPY) $(SYSTEM) Image
 
-zImage: $(CONFIGURE) compressed/vmlinux
+zImage: compressed/vmlinux
 	$(OBJCOPY) compressed/vmlinux zImage
 
 compressed/vmlinux: $(TOPDIR)/vmlinux
 	$(MAKE) -C compressed vmlinux
 
-install: $(CONFIGURE) Image
+install: Image
 	sh -x ./install.sh $(KERNELRELEASE) Image $(TOPDIR)/System.map "$(INSTALL_PATH)"
 
-zinstall: $(CONFIGURE) zImage
+zinstall: zImage
 	sh -x ./install.sh $(KERNELRELEASE) zImage $(TOPDIR)/System.map "$(INSTALL_PATH)"
 
 dep:

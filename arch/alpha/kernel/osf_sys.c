@@ -116,15 +116,17 @@ static int osf_filldir(void *__buf, const char *name, int namlen, loff_t offset,
 	if (reclen > buf->count)
 		return -EINVAL;
 	if (buf->basep) {
-		put_user(offset, buf->basep);
+		if (put_user(offset, buf->basep))
+			return -EFAULT;
 		buf->basep = NULL;
 	}
 	dirent = buf->dirent;
 	put_user(ino, &dirent->d_ino);
 	put_user(namlen, &dirent->d_namlen);
 	put_user(reclen, &dirent->d_reclen);
-	copy_to_user(dirent->d_name, name, namlen);
-	put_user(0, dirent->d_name + namlen);
+	if (copy_to_user(dirent->d_name, name, namlen) ||
+	    put_user(0, dirent->d_name + namlen))
+		return -EFAULT;
 	((char *) dirent) += reclen;
 	buf->dirent = dirent;
 	buf->count -= reclen;
@@ -629,18 +631,16 @@ asmlinkage long osf_proplist_syscall(enum pl_code code, union pl_args *args)
 			error = args->fset.nbytes;
 		break;
 	case PL_GET:
-		get_user(min_buf_size_ptr, &args->get.min_buf_size);
-		error = verify_area(VERIFY_WRITE, min_buf_size_ptr,
-				    sizeof(*min_buf_size_ptr));
-		if (!error)
-			put_user(0, min_buf_size_ptr);
+		error = get_user(min_buf_size_ptr, &args->get.min_buf_size);
+		if (error)
+			break;
+		error = put_user(0, min_buf_size_ptr);
 		break;
 	case PL_FGET:
-		get_user(min_buf_size_ptr, &args->fget.min_buf_size);
-		error = verify_area(VERIFY_WRITE, min_buf_size_ptr,
-				    sizeof(*min_buf_size_ptr));
-		if (!error)
-			put_user(0, min_buf_size_ptr);
+		error = get_user(min_buf_size_ptr, &args->fget.min_buf_size);
+		if (error)
+			break;
+		error = put_user(0, min_buf_size_ptr);
 		break;
 	case PL_DEL:
 	case PL_FDEL:
