@@ -30,15 +30,6 @@
 #include <asm/sn/ioc3.h>
 #include <asm/sn/io.h>
 #include <asm/sn/sn_private.h>
-#include <asm/sn/ate_utils.h>
-
-#ifdef __ia64
-#define rmallocmap atemapalloc
-#define rmfreemap atemapfree
-#define rmfree atefree
-#define rmalloc atealloc
-#endif
-
 
 extern pcibr_info_t     pcibr_info_get(vertex_hdl_t);
 extern int              pcibr_widget_to_bus(vertex_hdl_t pcibr_vhdl);
@@ -142,7 +133,7 @@ pcibr_slot_startup(vertex_hdl_t pcibr_vhdl, pcibr_slot_req_t reqp)
     error = pcibr_slot_attach(pcibr_vhdl, slot, D_PCI_HOT_PLUG_ATTACH,
                               l1_msg, &tmp_up_resp.resp_sub_errno);
 
-    strlcpy(tmp_up_resp.resp_l1_msg, l1_msg, L1_QSIZE);
+    strncpy(tmp_up_resp.resp_l1_msg, l1_msg, L1_QSIZE);
     tmp_up_resp.resp_l1_msg[L1_QSIZE] = '\0';
 
     if (COPYOUT(&tmp_up_resp, reqp->req_respp.up, reqp->req_size)) {
@@ -228,8 +219,8 @@ pcibr_slot_shutdown(vertex_hdl_t pcibr_vhdl, pcibr_slot_req_t reqp)
     error = pcibr_slot_detach(pcibr_vhdl, slot, D_PCI_HOT_PLUG_DETACH,
                               l1_msg, &tmp_down_resp.resp_sub_errno);
 
-    strlcpy(tmp_down_resp.resp_l1_msg, l1_msg,
-	    sizeof(tmp_down_resp.resp_l1_msg));
+    strncpy(tmp_down_resp.resp_l1_msg, l1_msg, L1_QSIZE);
+    tmp_down_resp.resp_l1_msg[L1_QSIZE] = '\0';
 
     shutdown_copyout:
 
@@ -1877,30 +1868,36 @@ pcibr_bus_addr_alloc(pcibr_soft_t pcibr_soft, pciio_win_info_t win_info_p,
                      pciio_space_t space, int start, int size, int align)
 {
     pciio_win_map_t win_map_p;
+    struct resource *root_resource = NULL;
+    iopaddr_t iopaddr = 0;
 
     switch (space) {
 
         case PCIIO_SPACE_IO:
             win_map_p = &pcibr_soft->bs_io_win_map;
+	    root_resource = &pcibr_soft->bs_io_win_root_resource;
             break;
 
         case PCIIO_SPACE_MEM:
             win_map_p = &pcibr_soft->bs_swin_map;
+	    root_resource = &pcibr_soft->bs_swin_root_resource;
             break;
 
         case PCIIO_SPACE_MEM32:
             win_map_p = &pcibr_soft->bs_mem_win_map;
+	    root_resource = &pcibr_soft->bs_mem_win_root_resource;
             break;
 
         default:
             return 0;
 
     }
-    return pciio_device_win_alloc(win_map_p,
+    iopaddr = pciio_device_win_alloc(root_resource,
 				  win_info_p
 				  ? &win_info_p->w_win_alloc
 				  : NULL,
 				  start, size, align);
+    return(iopaddr);
 }
 
 

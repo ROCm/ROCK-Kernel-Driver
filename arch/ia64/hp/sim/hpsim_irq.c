@@ -39,7 +39,7 @@ hpsim_irq_init (void)
 	int i;
 
 	for (i = 0; i < NR_IRQS; ++i) {
-		idesc = irq_desc(i);
+		idesc = irq_descp(i);
 		if (idesc->handler == &no_irq_type)
 			idesc->handler = &irq_type_hp_sim;
 	}

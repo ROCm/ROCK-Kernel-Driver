@@ -12,7 +12,7 @@
 EXTRA_CFLAGS := -DLITTLE_ENDIAN
 
 obj-y += pcibr/ ml_SN_intr.o shub_intr.o shuberror.o shub.o bte_error.o \
-	 pic.o geo_op.o l1.o l1_command.o klconflib.o klgraph.o ml_SN_init.o \
+	 pic.o geo_op.o l1_command.o klconflib.o klgraph.o ml_SN_init.o \
 	 ml_iograph.o module.o pciio.o xbow.o xtalk.o shubio.o
 
 obj-$(CONFIG_KDB) += kdba_io.o 

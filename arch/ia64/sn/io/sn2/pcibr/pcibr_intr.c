@@ -31,11 +31,6 @@
 #include <asm/sn/sn_private.h>
 
 #ifdef __ia64
-#define rmallocmap atemapalloc
-#define rmfreemap atemapfree
-#define rmfree atefree
-#define rmalloc atealloc
-
 inline int
 compare_and_swap_ptr(void **location, void *old_ptr, void *new_ptr)
 {

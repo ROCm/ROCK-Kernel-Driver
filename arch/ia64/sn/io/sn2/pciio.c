@@ -28,15 +28,7 @@
 #include <asm/sn/sn_sal.h>
 #include <asm/sn/io.h>
 #include <asm/sn/pci/pci_bus_cvlink.h>
-#include <asm/sn/ate_utils.h>
 #include <asm/sn/simulator.h>
-
-#ifdef __ia64
-#define rmallocmap atemapalloc
-#define rmfreemap atemapfree
-#define rmfree atefree
-#define rmalloc atealloc
-#endif
 
 #define DEBUG_PCIIO
 #undef DEBUG_PCIIO	/* turn this on for yet more console output */
@@ -1313,61 +1305,6 @@ pciio_device_detach(vertex_hdl_t pconn,
     return(0);
 }
 
-/* SN2 */
-/*
- * Allocate (if necessary) and initialize a PCI window mapping structure.
- */
-pciio_win_map_t
-pciio_device_win_map_new(pciio_win_map_t win_map,
-			 size_t region_size,
-			 size_t page_size)
-{
-	ASSERT((page_size & (page_size - 1)) == 0);
-	ASSERT((region_size & (page_size - 1)) == 0);
-
-	if (win_map == NULL)
-		NEW(win_map);
-
-	/*
-	 * The map array tracks the free ``pages'' in the region.  The worst
-	 * case scenario is when every other page in the region is free --
-	 * e.i. maximum fragmentation.  This leads to (max pages + 1) / 2 + 1
-	 * map entries.  The first "+1" handles the divide by 2 rounding; the
-	 * second handles the need for an end marker sentinel.
-	 */
-	win_map->wm_map = rmallocmap((region_size / page_size + 1) / 2 + 1);
-	win_map->wm_page_size = page_size;
-	ASSERT(win_map->wm_map != NULL);
-
-	return win_map;
-}
-
-/*
- * Free resources associated with a PCI window mapping structure.
- */
-extern void
-pciio_device_win_map_free(pciio_win_map_t win_map)
-{
-	rmfreemap(win_map->wm_map);
-	bzero(win_map, sizeof *win_map);
-}
-
-/*
- * Populate window map with specified free range.
- */
-void
-pciio_device_win_populate(pciio_win_map_t win_map,
-                          iopaddr_t ioaddr,
-                          size_t size)
-{
-	ASSERT((size & (win_map->wm_page_size - 1)) == 0);
-	ASSERT((ioaddr & (win_map->wm_page_size - 1)) == 0);
-
-	rmfree(win_map->wm_map,
-	       size / win_map->wm_page_size,
-	       (unsigned long)ioaddr / win_map->wm_page_size);
-	       
-}
 /*
  * Allocate space from the specified PCI window mapping resource.  On
  * success record information about the allocation in the supplied window
@@ -1385,94 +1322,36 @@ pciio_device_win_populate(pciio_win_map_t win_map,
  * and alignment.
  */
 iopaddr_t
-pciio_device_win_alloc(pciio_win_map_t win_map,
+pciio_device_win_alloc(struct resource *root_resource,
 		       pciio_win_alloc_t win_alloc,
 		       size_t start, size_t size, size_t align)
 {
-	unsigned long base;
 
-#ifdef PIC_LATER
-	ASSERT((size & (size - 1)) == 0);
-	ASSERT((align & (align - 1)) == 0);
+	struct resource *new_res;
+	int status = 0;
 
-	/*
-	 * Convert size and alignment to pages.  If size is greated than the
-	 * requested alignment, we bump the alignment up to size; otherwise
-	 * convert the size into a multiple of the alignment request.
-	 */
-	size = (size + win_map->wm_page_size - 1) / win_map->wm_page_size;
-	align = align / win_map->wm_page_size;
-	if (size > align)
-		align = size;
-	else
-		size = (size + align - 1) & ~(align - 1);
+	new_res = (struct resource *) kmalloc( sizeof(struct resource), KM_NOSLEEP);
 
-	/* XXXX */
-	base = rmalloc_align(win_map->wm_map, size, align, VM_NOSLEEP);
-	if (base == RMALLOC_FAIL)
-		return((iopaddr_t)NULL);
-#else
-    int                 index_page, index_page_align;
-    int                 align_pages, size_pages;
-    int                 alloc_pages, free_pages;
-    int                 addr_align;
-
-    /* Convert PCI bus alignment from bytes to pages */
-    align_pages = align / win_map->wm_page_size;
-
-    /* Convert PCI request from bytes to pages */
-    size_pages = (size / win_map->wm_page_size) +
-                  ((size % win_map->wm_page_size) ? 1 : 0);
-
-    /* Align address with the larger of the size or the requested slot align */
-    if (size_pages > align_pages)
-        align_pages = size_pages;
-  
-    /*
-     * Avoid wasting space by aligning - 1; this will prevent crossing
-     * another alignment boundary.
-     */
-    alloc_pages = size_pages + (align_pages - 1);
-
-    /* Allocate PCI bus space in pages */
-    index_page = (int) rmalloc(win_map->wm_map,
-                               (size_t) alloc_pages);
-
-    /* Error if no PCI bus address space available */
-    if (!index_page)
-        return 0;
-
-    /* PCI bus address index starts at 0 */
-    index_page--;
-
-    /* Align the page offset as requested */
-    index_page_align = (index_page + (align_pages - 1)) -
-                       ((index_page + (align_pages - 1)) % align_pages);
-
-    free_pages = (align_pages - 1) - (index_page_align - index_page);
-
-    /* Free unused PCI bus pages adjusting the index to start at 1 */
-    rmfree(win_map->wm_map, 
-           free_pages,
-           (index_page_align + 1) + size_pages);
-
-    /* Return aligned PCI bus space in bytes */ 
-    addr_align = (index_page_align * win_map->wm_page_size); 
-    base = index_page;
-    size = alloc_pages - free_pages;
-#endif	/* PIC_LATER */
+	status = allocate_resource( root_resource, new_res,
+				    size, align /* Min start addr. */,
+				    root_resource->end, align,
+				    NULL, NULL);
+	if (status) {
+		kfree(new_res);
+		return((iopaddr_t) NULL);
+	}
 
 	/*
 	 * If a window allocation cookie has been supplied, use it to keep
 	 * track of all the allocated space assigned to this window.
 	 */
 	if (win_alloc) {
-		win_alloc->wa_map = win_map;
-		win_alloc->wa_base = base;
+		win_alloc->wa_resource = new_res;
+		win_alloc->wa_base = new_res->start;
 		win_alloc->wa_pages = size;
 	}
 
-	return base * win_map->wm_page_size;
+	return new_res->start;;
 }
 
 /*
@@ -1482,10 +1361,16 @@ pciio_device_win_alloc(pciio_win_map_t win_map,
 void
 pciio_device_win_free(pciio_win_alloc_t win_alloc)
 {
-	if (win_alloc->wa_pages)
-		rmfree(win_alloc->wa_map->wm_map,
-		       win_alloc->wa_pages,
-		       win_alloc->wa_base);
+
+	int status = 0;
+
+	if (win_alloc->wa_resource) {
+		status = release_resource(win_alloc->wa_resource);
+		if (!status)
+			kfree(win_alloc->wa_resource);
+		else
+			BUG();
+	}
 }
 
 /*

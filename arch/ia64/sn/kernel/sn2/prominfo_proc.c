@@ -12,6 +12,7 @@
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/proc_fs.h>
+#include <asm/system.h>
 #include <asm/io.h>
 #include <asm/sn/simulator.h>
 
@@ -311,6 +312,9 @@ prominfo_init(void)
 	cnodeid_t cnodeid;
 	nasid_t nasid;
 	char name[NODE_NAME_LEN];
+
+	if (!ia64_platform_is("sn2"))
+		return 0;
 
 	TRACE();
 

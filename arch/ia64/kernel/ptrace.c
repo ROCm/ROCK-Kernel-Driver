@@ -199,13 +199,15 @@ ia64_decrement_ip (struct pt_regs *regs)
  *   rnat0/rnat1 gets its value from sw->ar_rnat.
  */
 static unsigned long
-get_rnat (struct pt_regs *pt, struct switch_stack *sw,
+get_rnat (struct task_struct *task, struct switch_stack *sw,
 	  unsigned long *krbs, unsigned long *urnat_addr, unsigned long *urbs_end)
 {
 	unsigned long rnat0 = 0, rnat1 = 0, urnat = 0, *slot0_kaddr, umask = 0, mask, m;
 	unsigned long *kbsp, *ubspstore, *rnat0_kaddr, *rnat1_kaddr, shift;
 	long num_regs, nbits;
+	struct pt_regs *pt;
 
+	pt = ia64_task_regs(task);
 	kbsp = (unsigned long *) sw->ar_bspstore;
 	ubspstore = (unsigned long *) pt->ar_bspstore;
 
@@ -254,21 +256,41 @@ get_rnat (struct pt_regs *pt, struct switch_stack *sw,
  * The reverse of get_rnat.
  */
 static void
-put_rnat (struct pt_regs *pt, struct switch_stack *sw,
+put_rnat (struct task_struct *task, struct switch_stack *sw,
 	  unsigned long *krbs, unsigned long *urnat_addr, unsigned long urnat,
 	  unsigned long *urbs_end)
 {
 	unsigned long rnat0 = 0, rnat1 = 0, *slot0_kaddr, umask = 0, mask, m;
 	unsigned long *kbsp, *ubspstore, *rnat0_kaddr, *rnat1_kaddr, shift;
 	long num_regs, nbits;
+	struct pt_regs *pt;
+	unsigned long cfm, *urbs_kargs;
+	struct unw_frame_info info;
 
+	pt = ia64_task_regs(task);
 	kbsp = (unsigned long *) sw->ar_bspstore;
 	ubspstore = (unsigned long *) pt->ar_bspstore;
 
-	if (urbs_end < urnat_addr)
-		nbits = ia64_rse_num_regs(urnat_addr - 63, urbs_end);
-	else
+	urbs_kargs = urbs_end;
+	if ((long)pt->cr_ifs >= 0) {
+		/*
+		 * If entered via syscall, don't allow user to set rnat bits
+		 * for syscall args.
+		 */
+		unw_init_from_blocked_task(&info,task);
+		if (unw_unwind_to_user(&info) == 0) {
+			unw_get_cfm(&info,&cfm);
+			urbs_kargs = ia64_rse_skip_regs(urbs_end,-(cfm & 0x7f));
+		}
+	}
+
+	if (urbs_kargs >= urnat_addr)
 		nbits = 63;
+	else {
+		if ((urnat_addr - 63) >= urbs_kargs)
+			return;
+		nbits = ia64_rse_num_regs(urnat_addr - 63, urbs_kargs);
+	}
 	mask = (1UL << nbits) - 1;
 
 	/*
@@ -339,7 +361,7 @@ ia64_peek (struct task_struct *child, struct switch_stack *child_stack, unsigned
 		 * read the corresponding bits in the kernel RBS.
 		 */
 		rnat_addr = ia64_rse_rnat_addr(laddr);
-		ret = get_rnat(child_regs, child_stack, krbs, rnat_addr, urbs_end);
+		ret = get_rnat(child, child_stack, krbs, rnat_addr, urbs_end);
 
 		if (laddr == rnat_addr) {
 			/* return NaT collection word itself */
@@ -390,7 +412,7 @@ ia64_poke (struct task_struct *child, struct switch_stack *child_stack, unsigned
 		 * => write the corresponding bits in the kernel RBS.
 		 */
 		if (ia64_rse_is_rnat_slot(laddr))
-			put_rnat(child_regs, child_stack, krbs, laddr, val, urbs_end);
+			put_rnat(child, child_stack, krbs, laddr, val, urbs_end);
 		else {
 			if (laddr < urbs_end) {
 				regnum = ia64_rse_num_regs(bspstore, laddr);

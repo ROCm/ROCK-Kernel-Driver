@@ -27,6 +27,9 @@
 #define  SN_SAL_LOG_CE				   0x02000006
 #define  SN_SAL_REGISTER_CE			   0x02000007
 #define  SN_SAL_GET_PARTITION_ADDR		   0x02000009
+#define  SN_SAL_XP_ADDR_REGION			   0x0200000f
+#define  SN_SAL_NO_FAULT_ZONE_VIRTUAL		   0x02000010
+#define  SN_SAL_NO_FAULT_ZONE_PHYSICAL		   0x02000011
 #define  SN_SAL_PRINT_ERROR			   0x02000012
 #define  SN_SAL_CONSOLE_PUTC                       0x02000021
 #define  SN_SAL_CONSOLE_GETC                       0x02000022
@@ -50,6 +53,7 @@
 #define  SN_SAL_SYSTEM_POWER_DOWN		   0x0200003b
 #define  SN_SAL_GET_MASTER_BASEIO_NASID		   0x0200003c
 #define  SN_SAL_COHERENCE                          0x0200003d
+#define  SN_SAL_MEMPROTECT                         0x0200003e
 #define  SN_SAL_SYSCTL_FRU_CAPTURE		   0x0200003f
 
 
@@ -514,15 +518,66 @@ sn_local_partid(void) {
 }
 
 /*
+ * Register or unregister a physical address range being referenced across
+ * a partition boundary for which certain SAL errors should be scanned for,
+ * cleaned up and ignored.  This is of value for kernel partitioning code only.
+ * Values for the operation argument:
+ *	1 = register this address range with SAL
+ *	0 = unregister this address range with SAL
+ * 
+ * SAL maintains a reference count on an address range in case it is registered
+ * multiple times.
+ * 
+ * On success, returns the reference count of the address range after the SAL
+ * call has performed the current registration/unregistration.  Returns a
+ * negative value if an error occurred.
+ */
+static inline int
+sn_register_xp_addr_region(u64 paddr, u64 len, int operation)
+{
+	struct ia64_sal_retval ret_stuff;
+	SAL_CALL(ret_stuff, SN_SAL_XP_ADDR_REGION, paddr, len, (u64)operation,
+		 0, 0, 0, 0);
+	return ret_stuff.status;
+}
+
+/*
+ * Register or unregister an instruction range for which SAL errors should
+ * be ignored.  If an error occurs while in the registered range, SAL jumps
+ * to return_addr after ignoring the error.  Values for the operation argument:
+ *	1 = register this instruction range with SAL
+ *	0 = unregister this instruction range with SAL
+ *
+ * Returns 0 on success, or a negative value if an error occurred.
+ */
+static inline int
+sn_register_nofault_code(u64 start_addr, u64 end_addr, u64 return_addr,
+			 int virtual, int operation)
+{
+	struct ia64_sal_retval ret_stuff;
+	u64 call;
+	if (virtual) {
+		call = SN_SAL_NO_FAULT_ZONE_VIRTUAL;
+	} else {
+		call = SN_SAL_NO_FAULT_ZONE_PHYSICAL;
+	}
+	SAL_CALL(ret_stuff, call, start_addr, end_addr, return_addr, (u64)1,
+		 0, 0, 0);
+	return ret_stuff.status;
+}
+
+/*
  * Change or query the coherence domain for this partition. Each cpu-based
  * nasid is represented by a bit in an array of 64-bit words:
  *      0 = not in this partition's coherency domain
  *      1 = in this partition's coherency domain
- * It is not possible for the local system's nasids to be removed from
- * the coherency domain.
  *
+ * It is not possible for the local system's nasids to be removed from
+ * the coherency domain.  Purpose of the domain arguments:
  *      new_domain = set the coherence domain to the given nasids
  *      old_domain = return the current coherence domain
+ *
+ * Returns 0 on success, or a negative value if an error occurred.
  */
 static inline int
 sn_change_coherence(u64 *new_domain, u64 *old_domain)
@@ -532,6 +587,26 @@ sn_change_coherence(u64 *new_domain, u64 *old_domain)
 		 0, 0, 0);
 	return ret_stuff.status;
 }
+
+/*
+ * Change memory access protections for a physical address range.
+ * nasid_array is not used on Altix, but may be in future architectures.
+ * Available memory protection access classes are defined after the function.
+ */
+static inline int
+sn_change_memprotect(u64 paddr, u64 len, u64 perms, u64 *nasid_array)
+{
+	struct ia64_sal_retval ret_stuff;
+	SAL_CALL(ret_stuff, SN_SAL_MEMPROTECT, paddr, len, nasid_array,
+		 perms, 0, 0, 0);
+	return ret_stuff.status;
+}
+#define SN_MEMPROT_ACCESS_CLASS_0		0x14a080
+#define SN_MEMPROT_ACCESS_CLASS_1		0x2520c2
+#define SN_MEMPROT_ACCESS_CLASS_2		0x14a1ca
+#define SN_MEMPROT_ACCESS_CLASS_3		0x14a290
+#define SN_MEMPROT_ACCESS_CLASS_6		0x084080
+#define SN_MEMPROT_ACCESS_CLASS_7		0x021080
 
 /*
  * Turns off system power.

@@ -50,6 +50,7 @@
 #include <linux/acpi.h>
 #include <linux/compiler.h>
 #include <linux/sched.h>
+#include <linux/root_dev.h>
 
 #include <asm/io.h>
 #include <asm/sal.h>
@@ -80,6 +81,7 @@ DEFINE_PER_CPU(struct pda_s, pda_percpu);
 extern void bte_init_node (nodepda_t *, cnodeid_t);
 extern void bte_init_cpu (void);
 extern void sn_timer_init(void);
+extern unsigned long last_time_offset;
 extern void (*ia64_mark_idle)(int);
 extern void snidle(int);
 
@@ -145,7 +147,7 @@ char drive_info[4*16];
  * Sets up an initial console to aid debugging.  Intended primarily
  * for bringup.  See start_kernel() in init/main.c.
  */
-#if defined(CONFIG_IA64_EARLY_PRINTK) || defined(CONFIG_IA64_SGI_SN_SIM)
+#if defined(CONFIG_IA64_EARLY_PRINTK_SGI_SN) || defined(CONFIG_IA64_SGI_SN_SIM)
 
 void __init
 early_sn_setup(void)
@@ -187,7 +189,7 @@ early_sn_setup(void)
 		printk(KERN_DEBUG "early_sn_setup: setting master_node_bedrock_address to 0x%lx\n", master_node_bedrock_address);
 	}
 }
-#endif /* CONFIG_IA64_EARLY_PRINTK */
+#endif /* CONFIG_IA64_EARLY_PRINTK_SGI_SN */
 
 #ifdef CONFIG_IA64_MCA
 extern int platform_intr_list[];
@@ -287,6 +289,12 @@ sn_setup(char **cmdline_p)
 		printk(KERN_DEBUG "sn_setup: setting master_node_bedrock_address to 0x%lx\n",
 		       master_node_bedrock_address);
 	}
+
+	/*
+	 * we set the default root device to /dev/hda
+	 * to make simulation easy
+	 */
+	ROOT_DEV = Root_HDA1;
 
 	/*
 	 * Create the PDAs and NODEPDAs for all the cpus.
