@@ -1,7 +1,7 @@
 /*
- *	Intel CPU Microcode Update driver for Linux
+ *	Intel CPU Microcode Update Driver for Linux
  *
- *	Copyright (C) 2000 Tigran Aivazian
+ *	Copyright (C) 2000-2004 Tigran Aivazian
  *
  *	This driver allows to upgrade microcode on Intel processors
  *	belonging to IA-32 family - PentiumPro, Pentium II, 
@@ -32,7 +32,7 @@
  *		Added misc device support (now uses both devfs and misc).
  *		Added MICROCODE_IOCFREE ioctl to clear memory.
  *	1.05	09 Jun 2000, Simon Trimmer <simon@veritas.com>
- *		Messages for error cases (non intel & no suitable microcode).
+ *		Messages for error cases (non Intel & no suitable microcode).
  *	1.06	03 Aug 2000, Tigran Aivazian <tigran@veritas.com>
  *		Removed ->release(). Removed exclusive open and status bitmap.
  *		Added microcode_rwsem to serialize read()/write()/ioctl().
@@ -64,6 +64,9 @@
  *		Removed ->read() method and obsoleted MICROCODE_IOCFREE ioctl
  *		because we no longer hold a copy of applied microcode 
  *		in kernel memory.
+ *	1.14	25 Jun 2004 Tigran Aivazian <tigran@veritas.com>
+ *		Fix sigmatch() macro to handle old CPUs with pf == 0.
+ *		Thanks to Stuart Swales for pointing out this bug.
  */
 
 
@@ -80,11 +83,11 @@
 #include <asm/uaccess.h>
 #include <asm/processor.h>
 
-MODULE_DESCRIPTION("Intel CPU (IA-32) microcode update driver");
+MODULE_DESCRIPTION("Intel CPU (IA-32) Microcode Update Driver");
 MODULE_AUTHOR("Tigran Aivazian <tigran@veritas.com>");
 MODULE_LICENSE("GPL");
 
-#define MICROCODE_VERSION 	"1.13"
+#define MICROCODE_VERSION 	"1.14"
 #define MICRO_DEBUG 		0
 #if MICRO_DEBUG
 #define dprintk(x...) printk(KERN_INFO x)
@@ -104,7 +107,10 @@ MODULE_LICENSE("GPL");
 #define get_datasize(mc) \
 	(((microcode_t *)mc)->hdr.datasize ? \
 	 ((microcode_t *)mc)->hdr.datasize : DEFAULT_UCODE_DATASIZE)
-#define sigmatch(s1, s2, p1, p2) (((s1) == (s2)) && ((p1) & (p2)))
+
+#define sigmatch(s1, s2, p1, p2) \
+	(((s1) == (s2)) && (((p1) & (p2)) || (((p1) == 0) && ((p2) == 0))))
+
 #define exttable_size(et) ((et)->count * EXT_SIGNATURE_SIZE + EXT_HEADER_SIZE)
 
 /* serialize access to the physical write to MSR 0x79 */
@@ -363,7 +369,7 @@ static void do_update_one (void * unused)
 	struct ucode_cpu_info *uci = ucode_cpu_info + cpu_num;
 
 	if (uci->mc == NULL) {
-		printk(KERN_INFO "microcode: No suitable data for cpu %d\n", cpu_num);
+		printk(KERN_INFO "microcode: No suitable data for CPU%d\n", cpu_num);
 		return;
 	}
 
@@ -495,16 +501,14 @@ static int __init microcode_init (void)
 	}
 
 	printk(KERN_INFO 
-		"IA-32 Microcode Update Driver: v%s <tigran@veritas.com>\n", 
-		MICROCODE_VERSION);
+		"IA-32 Microcode Update Driver: v" MICROCODE_VERSION " <tigran@veritas.com>\n");
 	return 0;
 }
 
 static void __exit microcode_exit (void)
 {
 	misc_deregister(&microcode_dev);
-	printk(KERN_INFO "IA-32 Microcode Update Driver v%s unregistered\n", 
-			MICROCODE_VERSION);
+	printk(KERN_INFO "IA-32 Microcode Update Driver v" MICROCODE_VERSION " unregistered\n");
 }
 
 module_init(microcode_init)
