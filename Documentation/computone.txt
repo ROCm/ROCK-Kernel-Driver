@@ -1,3 +1,13 @@
+NOTE: This is an unmaintained driver.  It is not guaranteed to work due to
+changes made in the tty layer in 2.6.  If you wish to take over maintenance of
+this driver, contact Michael Warfield <mhw@wittsend.com>.
+
+Changelog:
+----------
+11-01-2001:	Original Document
+
+10-29-2004:	Minor misspelling & format fix, update status of driver.
+		James Nelson <james4765@gmail.com>
 
 Computone Intelliport II/Plus Multiport Serial Driver
 -----------------------------------------------------
@@ -146,7 +156,7 @@ selects polled mode). If no base addresses are specified the defaults in
 ip2.c are used. If you are autoloading the driver module with kerneld or
 kmod the base addresses and interrupt number must also be set in ip2.c
 and recompile or just insert and options line in /etc/modprobe.conf or both.
-The options line is equivalent to the command line and takes precidence over 
+The options line is equivalent to the command line and takes precedence over
 what is in ip2.c. 
 
 /etc/modprobe.conf sample:
@@ -166,7 +176,8 @@ The equivalent for the kernel command line (in lilo.conf):
 
 
 Note:	Both io and irq should be updated to reflect YOUR system.  An "io"
-	address of 1 or 2 indicates a PCI or EISA card in the board table.		The PCI or EISA irq will be assigned automatically.
+	address of 1 or 2 indicates a PCI or EISA card in the board table.
+	The PCI or EISA irq will be assigned automatically.
 
 Specifying an invalid or in-use irq will default the driver into
 running in polled mode for that card.  If all irq entries are 0 then
