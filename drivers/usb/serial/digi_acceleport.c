@@ -218,7 +218,7 @@
 *    interrupt time.
 *  - digi_write_bulk_callback() and digi_read_bulk_callback() are
 *    called directly from interrupts.  Hence spin_lock_irqsave()
-*    and spin_lock_irqrestore() are used in the rest of the code
+*    and spin_unlock_irqrestore() are used in the rest of the code
 *    for any locks they acquire.
 *  - digi_write_bulk_callback() gets the port lock before waking up
 *    processes sleeping on the port write_wait.  It also schedules
@@ -571,7 +571,7 @@ static struct usb_serial_device_type digi_acceleport_4_device = {
 *
 *  Do spin_unlock_irqrestore and interruptible_sleep_on_timeout
 *  so that wake ups are not lost if they occur between the unlock
-*  and the sleep.  In other words, spin_lock_irqrestore and
+*  and the sleep.  In other words, spin_unlock_irqrestore and
 *  interruptible_sleep_on_timeout are "atomic" with respect to
 *  wake ups.  This is used to implement condition variables.
 */

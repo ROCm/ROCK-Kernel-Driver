@@ -463,7 +463,7 @@
       <function>spin_lock_irqsave()</function> 
       (<filename>include/linux/spinlock.h</filename>) is a variant
       which saves whether interrupts were on or off in a flags word,
-      which is passed to <function>spin_lock_irqrestore()</function>.  This 
+      which is passed to <function>spin_unlock_irqrestore()</function>.  This
       means that the same code can be used inside an hard irq handler (where
       interrupts are already off) and in softirqs (where the irq
       disabling is required).
