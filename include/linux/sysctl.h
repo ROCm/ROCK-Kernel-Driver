@@ -358,7 +358,8 @@ enum {
 	NET_IPV6_CONF=16,
 	NET_IPV6_NEIGH=17,
 	NET_IPV6_ROUTE=18,
-	NET_IPV6_BINDV6ONLY=20,
+	NET_IPV6_ICMP=19,
+	NET_IPV6_BINDV6ONLY=20
 };
 
 enum {
@@ -384,6 +385,11 @@ enum {
 	NET_IPV6_RTR_SOLICITS=8,
 	NET_IPV6_RTR_SOLICIT_INTERVAL=9,
 	NET_IPV6_RTR_SOLICIT_DELAY=10
+};
+
+/* /proc/sys/net/ipv6/icmp */
+enum {
+	NET_IPV6_ICMP_RATELIMIT=1
 };
 
 /* /proc/sys/net/<protocol>/neigh/<dev> */

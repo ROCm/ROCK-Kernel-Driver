@@ -25,6 +25,7 @@
  *					add more length checks and other fixes.
  *	yoshfuji		:	ensure to sent parameter problem for
  *					fragments.
+ *	YOSHIFUJI Hideaki @USAGI:	added sysctl for icmp rate limit.
  */
 
 #define __NO_VERSION__
@@ -39,6 +40,10 @@
 #include <linux/net.h>
 #include <linux/skbuff.h>
 #include <linux/init.h>
+
+#ifdef CONFIG_SYSCTL
+#include <linux/sysctl.h>
+#endif
 
 #include <linux/inet.h>
 #include <linux/netdevice.h>
@@ -697,3 +702,12 @@ int icmpv6_err_convert(int type, int code, int *err)
 
 	return fatal;
 }
+
+#ifdef CONFIG_SYSCTL
+ctl_table ipv6_icmp_table[] = {
+	{NET_IPV6_ICMP_RATELIMIT, "ratelimit",
+	&sysctl_icmpv6_time, sizeof(int), 0644, NULL, &proc_dointvec},
+	{0},
+};
+#endif
+

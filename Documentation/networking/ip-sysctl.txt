@@ -569,8 +569,14 @@ router_solicitations - INTEGER
 	routers are present.
 	Default: 3
 
+icmp/*:
+ratelimit - INTEGER
+	Limit the maximal rates for sending ICMPv6 packets.
+	0 to disable any limiting, otherwise the maximal rate in jiffies(1)
+	Default: 100
+
 IPv6 Update by:
-Pekka Savola
-pekkas@netcore.fi
+Pekka Savola <pekkas@netcore.fi>
+YOSHIFUJI Hideaki / USAGI Project <yoshfuji@linux-ipv6.org>
 
 $Id: ip-sysctl.txt,v 1.20 2001/12/13 09:00:18 davem Exp $

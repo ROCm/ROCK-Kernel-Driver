@@ -1,5 +1,8 @@
 /*
  * sysctl_net_ipv6.c: sysctl interface to net IPV6 subsystem.
+ *
+ * Changes:
+ * YOSHIFUJI Hideaki @USAGI:	added icmp sysctl table.
  */
 
 #include <linux/mm.h>
@@ -12,11 +15,13 @@
 #include <net/addrconf.h>
 
 extern ctl_table ipv6_route_table[];
+extern ctl_table ipv6_icmp_table[];
 
 #ifdef CONFIG_SYSCTL
 
 ctl_table ipv6_table[] = {
 	{NET_IPV6_ROUTE, "route", NULL, 0, 0555, ipv6_route_table},
+	{NET_IPV6_ICMP, "icmp", NULL, 0, 0500, ipv6_icmp_table},
 	{NET_IPV6_BINDV6ONLY, "bindv6only",
 	 &sysctl_ipv6_bindv6only, sizeof(int), 0644, NULL, &proc_dointvec},
 	{0}
