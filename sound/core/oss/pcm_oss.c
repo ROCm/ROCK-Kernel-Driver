@@ -1477,10 +1477,10 @@ static int snd_pcm_oss_release_file(snd_pcm_oss_file_t *pcm_oss_file)
 			continue;
 		runtime = substream->runtime;
 		
-		spin_lock_irq(&runtime->lock);
+		snd_pcm_stream_lock_irq(substream);
 		if (snd_pcm_running(substream))
 			snd_pcm_stop(substream, SNDRV_PCM_STATE_SETUP);
-		spin_unlock_irq(&runtime->lock);
+		snd_pcm_stream_unlock_irq(substream);
 		if (substream->open_flag) {
 			if (substream->ops->hw_free != NULL)
 				substream->ops->hw_free(substream);
@@ -1918,21 +1918,21 @@ static unsigned int snd_pcm_oss_poll(struct file *file, poll_table * wait)
 	if (psubstream != NULL) {
 		snd_pcm_runtime_t *runtime = psubstream->runtime;
 		poll_wait(file, &runtime->sleep, wait);
-		spin_lock_irq(&runtime->lock);
+		snd_pcm_stream_lock_irq(psubstream);
 		if (runtime->status->state != SNDRV_PCM_STATE_DRAINING &&
 		    (runtime->status->state != SNDRV_PCM_STATE_RUNNING ||
 		     snd_pcm_oss_playback_ready(psubstream)))
 			mask |= POLLOUT | POLLWRNORM;
-		spin_unlock_irq(&runtime->lock);
+		snd_pcm_stream_unlock_irq(psubstream);
 	}
 	if (csubstream != NULL) {
 		snd_pcm_runtime_t *runtime = csubstream->runtime;
 		poll_wait(file, &runtime->sleep, wait);
-		spin_lock_irq(&runtime->lock);
+		snd_pcm_stream_lock_irq(csubstream);
 		if (runtime->status->state != SNDRV_PCM_STATE_RUNNING ||
 		    snd_pcm_oss_capture_ready(csubstream))
 			mask |= POLLIN | POLLRDNORM;
-		spin_unlock_irq(&runtime->lock);
+		snd_pcm_stream_unlock_irq(csubstream);
 	}
 
 	return mask;
@@ -1981,11 +1981,7 @@ static int snd_pcm_oss_mmap(struct file *file, struct vm_area_struct *area)
 	if (runtime->oss.plugin_first != NULL)
 		return -EIO;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 3, 25)
 	if (area->vm_pgoff != 0)
-#else
-	if (area->vm_offset != 0)
-#endif
 		return -EINVAL;
 
 	err = snd_pcm_mmap_data(substream, file, area);
@@ -2148,9 +2144,7 @@ static void snd_pcm_oss_proc_done(snd_pcm_t *pcm)
 
 static struct file_operations snd_pcm_oss_f_reg =
 {
-#ifndef LINUX_2_2
 	.owner =	THIS_MODULE,
-#endif
 	.read =		snd_pcm_oss_read,
 	.write =	snd_pcm_oss_write,
 	.open =		snd_pcm_oss_open,

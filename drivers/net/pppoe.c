@@ -530,7 +530,7 @@ int pppoe_release(struct socket *sock)
 	if (!sk)
 		return 0;
 
-	if (test_bit(SOCK_DEAD, &sk->flags))
+	if (sock_flag(sk, SOCK_DEAD))
 		return -EBADF;
 
 	pppox_unbind_sock(sk);
@@ -780,7 +780,7 @@ int pppoe_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *m,
 	struct net_device *dev;
 	char *start;
 
-	if (test_bit(SOCK_DEAD, &sk->flags) || !(sk->state & PPPOX_CONNECTED)) {
+	if (sock_flag(sk, SOCK_DEAD) || !(sk->state & PPPOX_CONNECTED)) {
 		error = -ENOTCONN;
 		goto end;
 	}
@@ -856,7 +856,7 @@ int __pppoe_xmit(struct sock *sk, struct sk_buff *skb)
 	int data_len = skb->len;
 	struct sk_buff *skb2;
 
-	if (test_bit(SOCK_DEAD, &sk->flags)  || !(sk->state & PPPOX_CONNECTED))
+	if (sock_flag(sk, SOCK_DEAD)  || !(sk->state & PPPOX_CONNECTED))
 		goto abort;
 
 	hdr.ver	= 1;
@@ -1129,7 +1129,9 @@ void __exit pppoe_exit(void)
 	dev_remove_pack(&pppoes_ptype);
 	dev_remove_pack(&pppoed_ptype);
 	unregister_netdevice_notifier(&pppoe_notifier);
+#ifdef CONFIG_PROC_FS
 	remove_proc_entry("pppoe", proc_net);
+#endif
 }
 
 module_init(pppoe_init);

@@ -7,7 +7,7 @@ extra-y		:= head.o
 obj-y               :=	setup.o entry.o traps.o irq.o idle.o \
 			time.o process.o signal.o syscalls.o misc.o ptrace.o \
 			align.o semaphore.o bitops.o stab.o htab.o pacaData.o \
-			udbg.o binfmt_elf32.o sys_ppc32.o sys32.o ioctl32.o \
+			udbg.o binfmt_elf32.o sys_ppc32.o ioctl32.o \
 			ptrace32.o signal32.o pmc.o rtc.o init_task.o \
 			lmb.o pci.o pci_dn.o pci_dma.o
 

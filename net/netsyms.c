@@ -609,8 +609,6 @@ EXPORT_SYMBOL(dev_mc_delete);
 EXPORT_SYMBOL(dev_mc_upload);
 EXPORT_SYMBOL(__kill_fasync);
 
-EXPORT_SYMBOL(if_port_text);
-
 #ifdef CONFIG_HIPPI
 EXPORT_SYMBOL(hippi_type_trans);
 #endif

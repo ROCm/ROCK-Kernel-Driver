@@ -171,9 +171,11 @@ static int usb_storage_queuecommand( Scsi_Cmnd *srb , void (*done)(Scsi_Cmnd *))
 /* This is always called with scsi_lock(srb->host) held */
 static int usb_storage_command_abort( Scsi_Cmnd *srb )
 {
-	struct us_data *us = (struct us_data *)srb->device->host->hostdata[0];
+	struct Scsi_Host *host = srb->device->host;
+	struct us_data *us = (struct us_data *) host->hostdata[0];
+	int state = atomic_read(&us->sm_state);
 
-	US_DEBUGP("command_abort() called\n");
+	US_DEBUGP("%s called\n", __FUNCTION__);
 
 	/* Is this command still active? */
 	if (us->srb != srb) {
@@ -181,7 +183,31 @@ static int usb_storage_command_abort( Scsi_Cmnd *srb )
 		return FAILED;
 	}
 
-	return usb_stor_abort_transport(us);
+	/* Normally the current state is RUNNING.  If the control thread
+	 * hasn't even started processing this command, the state will be
+	 * IDLE.  Anything else is a bug. */
+	if (state != US_STATE_RUNNING && state != US_STATE_IDLE) {
+		printk(KERN_ERR USB_STORAGE "Error in %s: "
+			"invalid state %d\n", __FUNCTION__, state);
+		return FAILED;
+	}
+
+	/* Set state to ABORTING, set the ABORTING bit, and release the lock */
+	atomic_set(&us->sm_state, US_STATE_ABORTING);
+	set_bit(US_FLIDX_ABORTING, &us->flags);
+	scsi_unlock(host);
+
+	/* If the state was RUNNING, stop an ongoing USB transfer */
+	if (state == US_STATE_RUNNING)
+		usb_stor_stop_transport(us);
+
+	/* Wait for the aborted command to finish */
+	wait_for_completion(&us->notify);
+
+	/* Reacquire the lock and allow USB transfers to resume */
+	scsi_lock(host);
+	clear_bit(US_FLIDX_ABORTING, &us->flags);
+	return SUCCESS;
 }
 
 /* This invokes the transport reset mechanism to reset the state of the

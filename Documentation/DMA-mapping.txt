@@ -83,6 +83,15 @@ By default, the kernel assumes that your device can address the full
 to be increased.  And for a device with limitations, as discussed in
 the previous paragraph, it needs to be decreased.
 
+pci_alloc_consistent() by default will return 32-bit DMA addresses.
+PCI-X specification requires PCI-X devices to support 64-bit
+addressing (DAC) for all transactions. And at least one platform (SGI
+SN2) requires 64-bit consistent allocations to operate correctly when
+the IO bus is in PCI-X mode. Therefore, like with pci_set_dma_mask(),
+it's good practice to call pci_set_consistent_dma_mask() to set the
+appropriate mask even if your device only supports 32-bit DMA
+(default) and especially if it's a PCI-X device.
+
 For correct operation, you must interrogate the PCI layer in your
 device probe routine to see if the PCI controller on the machine can
 properly support the DMA addressing limitation your device has.  It is
@@ -93,6 +102,11 @@ device.
 The query is performed via a call to pci_set_dma_mask():
 
 	int pci_set_dma_mask(struct pci_dev *pdev, u64 device_mask);
+
+The query for consistent allocations is performed via a a call to
+pci_set_consistent_dma_mask():
+
+	int pci_set_consistent_dma_mask(struct pci_dev *pdev, u64 device_mask);
 
 Here, pdev is a pointer to the PCI device struct of your device, and
 device_mask is a bit mask describing which bits of a PCI address your
@@ -133,7 +147,7 @@ addressing.  Rather, it may fail in this case simply because
 Sparc64 is one platform which behaves in this way.
 
 Here is how you would handle a 64-bit capable device which can drive
-all 64-bits during a DAC cycle:
+all 64-bits when accessing streaming DMA:
 
 	int using_dac;
 
@@ -146,6 +160,30 @@ all 64-bits during a DAC cycle:
 		       "mydev: No suitable DMA available.\n");
 		goto ignore_this_device;
 	}
+
+If a card is capable of using 64-bit consistent allocations as well,
+the case would look like this:
+
+	int using_dac, consistent_using_dac;
+
+	if (!pci_set_dma_mask(pdev, 0xffffffffffffffff)) {
+		using_dac = 1;
+	   	consistent_using_dac = 1;
+		pci_set_consistent_dma_mask(pdev, 0xffffffffffffffff)
+	} else if (!pci_set_dma_mask(pdev, 0xffffffff)) {
+		using_dac = 0;
+		consistent_using_dac = 0;
+		pci_set_consistent_dma_mask(pdev, 0xffffffff)
+	} else {
+		printk(KERN_WARNING
+		       "mydev: No suitable DMA available.\n");
+		goto ignore_this_device;
+	}
+
+pci_set_consistent_dma_mask() will always be able to set the same or a
+smaller mask as pci_set_dma_mask(). However for the rare case that a
+device driver only uses consistent allocations, one would have to
+check the return value from pci_set_consistent().
 
 If your 64-bit device is going to be an enormous consumer of DMA
 mappings, this can be problematic since the DMA mappings are a
@@ -215,9 +253,10 @@ There are two types of DMA mappings:
 
   Think of "consistent" as "synchronous" or "coherent".
 
-  Consistent DMA mappings are always SAC addressable.  That is
-  to say, consistent DMA addresses given to the driver will always
-  be in the low 32-bits of the PCI bus space.
+  The current default is to return consistent memory in the low 32
+  bits of the PCI bus space.  However, for future compatibility you
+  should set the consistent mask even if this default is fine for your
+  driver.
 
   Good examples of what to use consistent mappings for are:
 
@@ -287,15 +326,14 @@ __get_free_pages (but takes size instead of a page order).  If your
 driver needs regions sized smaller than a page, you may prefer using
 the pci_pool interface, described below.
 
-The consistent DMA mapping interfaces, for non-NULL dev, will always
-return a DMA address which is SAC (Single Address Cycle) addressable.
-Even if the device indicates (via PCI dma mask) that it may address
-the upper 32-bits and thus perform DAC cycles, consistent allocation
-will still only return 32-bit PCI addresses for DMA.  This is true
-of the pci_pool interface as well.
-
-In fact, as mentioned above, all consistent memory provided by the
-kernel DMA APIs are always SAC addressable.
+The consistent DMA mapping interfaces, for non-NULL dev, will by
+default return a DMA address which is SAC (Single Address Cycle)
+addressable.  Even if the device indicates (via PCI dma mask) that it
+may address the upper 32-bits and thus perform DAC cycles, consistent
+allocation will only return > 32-bit PCI addresses for DMA if the
+consistent dma mask has been explicitly changed via
+pci_set_consistent_dma_mask().  This is true of the pci_pool interface
+as well.
 
 pci_alloc_consistent returns two values: the virtual address which you
 can use to access it from the CPU and dma_handle which you pass to the

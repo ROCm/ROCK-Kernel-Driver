@@ -36,17 +36,6 @@
 #include <asm/feature.h>
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0)
-#define pmu_suspend()	/**/
-#define pmu_resume()	/**/
-#endif
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,18)
-#define request_OF_resource(io,num,str)  1
-#define release_OF_resource(io,num) /**/
-#endif
-
-
 #define chip_t pmac_t
 
 

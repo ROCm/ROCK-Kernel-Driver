@@ -1496,6 +1496,7 @@ static void setup_ac3(cmipci_t *cm, snd_pcm_substream_t *subs, int do_ac3, int r
 			/* SPD24SEL for 037, 0x02 */
 			/* SPD24SEL for 039, 0x20, but cannot be set */
 			snd_cmipci_set_bit(cm, CM_REG_CHFORMAT, CM_SPD24SEL);
+			snd_cmipci_clear_bit(cm, CM_REG_MISC_CTRL, CM_SPD32SEL);
 		} else { /* can_ac3_sw */
 #ifdef DO_SOFT_AC3
 			/* FIXME: ugly hack! */
@@ -1519,7 +1520,14 @@ static void setup_ac3(cmipci_t *cm, snd_pcm_substream_t *subs, int do_ac3, int r
 		snd_cmipci_clear_bit(cm, CM_REG_MISC_CTRL, CM_AC3EN2);
 
 		if (cm->can_ac3_hw) {
-			snd_cmipci_clear_bit(cm, CM_REG_CHFORMAT, CM_SPD24SEL);
+			/* chip model >= 37 */
+			if (snd_pcm_format_width(subs->runtime->format) > 16) {
+				snd_cmipci_set_bit(cm, CM_REG_MISC_CTRL, CM_SPD32SEL);
+				snd_cmipci_set_bit(cm, CM_REG_CHFORMAT, CM_SPD24SEL);
+			} else {
+				snd_cmipci_clear_bit(cm, CM_REG_MISC_CTRL, CM_SPD32SEL);
+				snd_cmipci_clear_bit(cm, CM_REG_CHFORMAT, CM_SPD24SEL);
+			}
 		} else {
 #ifdef DO_SOFT_AC3
 			snd_cmipci_clear_bit(cm, CM_REG_MISC_CTRL, CM_SPD32SEL);
@@ -1669,7 +1677,6 @@ static irqreturn_t snd_cmipci_interrupt(int irq, void *dev_id, struct pt_regs *r
 		if ((status & CM_CHINT1) && cm->channel[1].running)
 			snd_pcm_period_elapsed(cm->channel[1].substream);
 	}
-
 	return IRQ_HANDLED;
 }
 
@@ -1742,7 +1749,7 @@ static snd_pcm_hardware_t snd_cmipci_playback_spdif =
 {
 	.info =			(SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_BLOCK_TRANSFER | SNDRV_PCM_INFO_PAUSE),
-	.formats =		SNDRV_PCM_FMTBIT_S16_LE /*| SNDRV_PCM_FMTBIT_S32_LE*/,
+	.formats =		SNDRV_PCM_FMTBIT_S16_LE,
 	.rates =		SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_48000,
 	.rate_min =		44100,
 	.rate_max =		48000,
@@ -1897,6 +1904,8 @@ static int snd_cmipci_playback_spdif_open(snd_pcm_substream_t *substream)
 	if (cm->can_ac3_hw)
 #endif
 		runtime->hw.info |= SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_MMAP_VALID;
+	if (cm->chip_version >= 37)
+		runtime->hw.formats |= SNDRV_PCM_FMTBIT_S32_LE;
 	snd_pcm_hw_constraint_minmax(runtime, SNDRV_PCM_HW_PARAM_BUFFER_SIZE, 0, 0x40000);
 	cm->dig_pcm_status = cm->dig_status;
 	return 0;

@@ -720,6 +720,7 @@ int usb_register_root_hub (struct usb_device *usb_dev, struct device *parent_dev
 	int retval;
 
 	sprintf (&usb_dev->dev.bus_id[0], "usb%d", usb_dev->bus->busnum);
+	usb_dev->state = USB_STATE_DEFAULT;
 	retval = usb_new_device (usb_dev, parent_dev);
 	if (retval)
 		dev_err (parent_dev, "can't register root hub for %s, %d\n",

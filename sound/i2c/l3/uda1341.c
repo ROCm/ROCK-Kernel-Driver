@@ -17,7 +17,7 @@
  * 2002-05-12   Tomas Kasparek  another code cleanup
  */
 
-/* $Id: uda1341.c,v 1.8 2003/03/20 16:45:59 perex Exp $ */
+/* $Id: uda1341.c,v 1.9 2003/04/19 13:34:33 perex Exp $ */
 
 #include <sound/driver.h>
 #include <linux/module.h>
@@ -36,8 +36,6 @@
 
 #include <linux/l3/l3.h>
 
-#undef DEBUG_MODE
-#undef DEBUG_FUNCTION_NAMES
 #include <sound/uda1341.h>
 
 /* {{{ HW regs definition */
@@ -93,13 +91,13 @@ const char *uda1341_reg_names[] = {
 
 const int uda1341_enum_items[] = {
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		2, //peak - before/after
-		4, //deemp - none/32/44.1/48
-		0,
-		4, //filter - flat/min/min/max
-		0, 0, 0,
-		4, //mixer - differ/line/mic/mixer
-		0, 0, 0, 0, 0,
+	2, //peak - before/after
+	4, //deemp - none/32/44.1/48
+	0,
+	4, //filter - flat/min/min/max
+	0, 0, 0,
+	4, //mixer - differ/line/mic/mixer
+	0, 0, 0, 0, 0,
 };
 
 const char ** uda1341_enum_names[] = {
@@ -117,25 +115,23 @@ typedef int uda1341_cfg[CMD_LAST];
 
 typedef struct uda1341 uda1341_t;
 
-struct uda1341{
-	void (*write) (struct l3_client *uda1341, unsigned short reg, unsigned short val);
-	unsigned char (*read) (struct l3_client *uda1341, unsigned short reg);
-        
-	unsigned char   regs[uda1341_reg_last];
-	int		active;
-
+struct uda1341 {
+	int (*write) (struct l3_client *uda1341, unsigned short reg, unsigned short val);
+	int (*read) (struct l3_client *uda1341, unsigned short reg);        
+	unsigned char regs[uda1341_reg_last];
+	int active;
 	spinlock_t reg_lock;
-
 	snd_card_t *card;
-
 	uda1341_cfg cfg;
+#ifdef CONFIG_PM
+	unsigned char suspend_regs[uda1341_reg_last];
+	uda1341_cfg suspend_cfg;
+#endif
 };
 
 //hack for ALSA magic casting
 typedef struct l3_client l3_client_t;
 #define chip_t l3_client_t      
-
-static struct l3_client *uda1341=NULL;
 
 /* transfer 8bit integer into string with binary representation */
 void int2str_bin8(uint8_t val, char *buf){
@@ -151,66 +147,45 @@ void int2str_bin8(uint8_t val, char *buf){
 
 /* {{{ HW manipulation routines */
 
-void snd_uda1341_codec_write(struct l3_client *clnt, unsigned short reg, unsigned short val)
+int snd_uda1341_codec_write(struct l3_client *clnt, unsigned short reg, unsigned short val)
 {
 	struct uda1341 *uda = clnt->driver_data;
-
-	int err=0;
 	unsigned char buf[2] = { 0xc0, 0xe0 }; // for EXT addressing
+	int err = 0;
 
-	DEBUG_NAME(KERN_DEBUG "codec_write: reg: %s val: %d ", uda1341_reg_names[reg], val);
-        
 	uda->regs[reg] = val;
 
 	if (uda->active) {
-		DEBUG("O");
 		if (IS_DATA0(reg)) {
-			DEBUG(" D0 ");
 			err = l3_write(clnt, UDA1341_DATA0, (const unsigned char *)&val, 1);
 		} else if (IS_DATA1(reg)) {
-			DEBUG(" D1 ");                        
 			err = l3_write(clnt, UDA1341_DATA1, (const unsigned char *)&val, 1);
 		} else if (IS_STATUS(reg)) {
-			DEBUG(" S ");                        
 			err = l3_write(clnt, UDA1341_STATUS, (const unsigned char *)&val, 1);
 		} else if (IS_EXTEND(reg)) {
-			DEBUG(" E ");
 			buf[0] |= (reg - ext0) & 0x7;   //EXT address
 			buf[1] |= val;                  //EXT data
-			DEBUG("%x %x ", buf[0], buf[1]);
 			err = l3_write(clnt, UDA1341_DATA0, (const unsigned char *)buf, 2);
 		}
-                
-		if (err == 1 || err == 2)
-			DEBUG("K\n");
-		else
-			DEBUG(" Error: %d\n", err);
 	} else
 		printk(KERN_ERR "UDA1341 codec not active!\n");
+	return err;
 }
 
-unsigned char snd_uda1341_codec_read(struct l3_client *clnt, unsigned short reg)
+int snd_uda1341_codec_read(struct l3_client *clnt, unsigned short reg)
 {
-	int err=0;
 	unsigned char val;
-
-	DEBUG_NAME(KERN_DEBUG "codec_read: reg: %d ", reg);
-	
-	DEBUG("O");
+	int err;
 
 	err = l3_read(clnt, reg, &val, 1);
-	
 	if (err == 1)
-		DEBUG("K\n");
-	else
-		DEBUG(" Error: %d\n", err);
-
-	return val & 63; //use just 6bits - the rest is address of the reg
+		// use just 6bits - the rest is address of the reg
+		return val & 63;
+	return err < 0 ? err : -EIO;
 }
 
-static int snd_uda1341_valid_reg(struct l3_client *clnt, unsigned short reg)
+static inline int snd_uda1341_valid_reg(struct l3_client *clnt, unsigned short reg)
 {
-	DEBUG_NAME(KERN_DEBUG "valid_reg\n");
 	return reg < uda1341_reg_last;
 }
 
@@ -221,8 +196,10 @@ int snd_uda1341_update_bits(struct l3_client *clnt, unsigned short reg, unsigned
 	unsigned short old, new;
 	struct uda1341 *uda = clnt->driver_data;
 
-	DEBUG(KERN_DEBUG "update_bits: reg: %s mask: %d shift: %d val: %d\n",
-	      uda1341_reg_names[reg], mask, shift, value);
+#if 0
+	printk(KERN_DEBUG "update_bits: reg: %s mask: %d shift: %d val: %d\n",
+	       uda1341_reg_names[reg], mask, shift, value);
+#endif
         
 	if (!snd_uda1341_valid_reg(clnt, reg))
 		return -EINVAL;
@@ -243,69 +220,110 @@ int snd_uda1341_cfg_write(struct l3_client *clnt, unsigned short what,
 {
 	struct uda1341 *uda = clnt->driver_data;
 	int ret = 0;
+#ifdef CONFIG_PM
+	int reg;
+#endif
 
-	DEBUG_NAME(KERN_DEBUG "cfg_write what: %d value: %d\n", what, value);
+#if 0
+	printk(KERN_DEBUG "cfg_write what: %d value: %d\n", what, value);
+#endif
 
 	uda->cfg[what] = value;
         
 	switch(what) {
-	case CMD_RESET: ret = snd_uda1341_update_bits(clnt, data0_2, 1, 2, 1, flush);//MUTE
-		ret = snd_uda1341_update_bits(clnt, stat0, 1, 6, 1, flush);//RESET
-		ret = snd_uda1341_update_bits(clnt, stat0, 1, 6, 0, flush);// RESTORE
+	case CMD_RESET:
+		ret = snd_uda1341_update_bits(clnt, data0_2, 1, 2, 1, flush);	// MUTE
+		ret = snd_uda1341_update_bits(clnt, stat0, 1, 6, 1, flush);	// RESET
+		ret = snd_uda1341_update_bits(clnt, stat0, 1, 6, 0, flush);	// RESTORE
 		uda->cfg[CMD_RESET]=0;
 		break;
-	case CMD_FS: ret = snd_uda1341_update_bits(clnt, stat0, 3, 4, value, flush);
+	case CMD_FS:
+		ret = snd_uda1341_update_bits(clnt, stat0, 3, 4, value, flush);
 		break;
-	case CMD_FORMAT: ret = snd_uda1341_update_bits(clnt, stat0, 7, 1, value, flush);
+	case CMD_FORMAT:
+		ret = snd_uda1341_update_bits(clnt, stat0, 7, 1, value, flush);
 		break;
-	case CMD_OGAIN: ret = snd_uda1341_update_bits(clnt, stat1, 1, 6, value, flush);
+	case CMD_OGAIN:
+		ret = snd_uda1341_update_bits(clnt, stat1, 1, 6, value, flush);
 		break;
-	case CMD_IGAIN: ret = snd_uda1341_update_bits(clnt, stat1, 1, 5, value, flush);
+	case CMD_IGAIN:
+		ret = snd_uda1341_update_bits(clnt, stat1, 1, 5, value, flush);
 		break;
-	case CMD_DAC: ret = snd_uda1341_update_bits(clnt, stat1, 1, 0, value, flush);
+	case CMD_DAC:
+		ret = snd_uda1341_update_bits(clnt, stat1, 1, 0, value, flush);
 		break;
-	case CMD_ADC: ret = snd_uda1341_update_bits(clnt, stat1, 1, 1, value, flush);
+	case CMD_ADC:
+		ret = snd_uda1341_update_bits(clnt, stat1, 1, 1, value, flush);
 		break;
-	case CMD_VOLUME: ret = snd_uda1341_update_bits(clnt, data0_0, 63, 0, value, flush);
+	case CMD_VOLUME:
+		ret = snd_uda1341_update_bits(clnt, data0_0, 63, 0, value, flush);
 		break;
-	case CMD_BASS: ret = snd_uda1341_update_bits(clnt, data0_1, 15, 2, value, flush);
+	case CMD_BASS:
+		ret = snd_uda1341_update_bits(clnt, data0_1, 15, 2, value, flush);
 		break;
-	case CMD_TREBBLE: ret = snd_uda1341_update_bits(clnt, data0_1, 3, 0, value, flush);
+	case CMD_TREBBLE:
+		ret = snd_uda1341_update_bits(clnt, data0_1, 3, 0, value, flush);
 		break;
-	case CMD_PEAK: ret = snd_uda1341_update_bits(clnt, data0_2, 1, 5, value, flush);
+	case CMD_PEAK:
+		ret = snd_uda1341_update_bits(clnt, data0_2, 1, 5, value, flush);
 		break;
-	case CMD_DEEMP: ret = snd_uda1341_update_bits(clnt, data0_2, 3, 3, value, flush);
+	case CMD_DEEMP:
+		ret = snd_uda1341_update_bits(clnt, data0_2, 3, 3, value, flush);
 		break;
-	case CMD_MUTE: ret = snd_uda1341_update_bits(clnt, data0_2, 1, 2, value, flush);
+	case CMD_MUTE:
+		ret = snd_uda1341_update_bits(clnt, data0_2, 1, 2, value, flush);
 		break;
-	case CMD_FILTER: ret = snd_uda1341_update_bits(clnt, data0_2, 3, 0, value, flush);
+	case CMD_FILTER:
+		ret = snd_uda1341_update_bits(clnt, data0_2, 3, 0, value, flush);
 		break;
-	case CMD_CH1: ret = snd_uda1341_update_bits(clnt, ext0, 31, 0, value, flush);
+	case CMD_CH1:
+		ret = snd_uda1341_update_bits(clnt, ext0, 31, 0, value, flush);
 		break;
-	case CMD_CH2: ret = snd_uda1341_update_bits(clnt, ext1, 31, 0, value, flush);
+	case CMD_CH2:
+		ret = snd_uda1341_update_bits(clnt, ext1, 31, 0, value, flush);
 		break;
-	case CMD_MIC: ret = snd_uda1341_update_bits(clnt, ext2, 7, 2, value, flush);
+	case CMD_MIC:
+		ret = snd_uda1341_update_bits(clnt, ext2, 7, 2, value, flush);
 		break;
-	case CMD_MIXER: ret = snd_uda1341_update_bits(clnt, ext2, 3, 0, value, flush);
+	case CMD_MIXER:
+		ret = snd_uda1341_update_bits(clnt, ext2, 3, 0, value, flush);
 		break;
-	case CMD_AGC: ret = snd_uda1341_update_bits(clnt, ext4, 1, 4, value, flush);
+	case CMD_AGC:
+		ret = snd_uda1341_update_bits(clnt, ext4, 1, 4, value, flush);
 		break;
-	case CMD_IG: ret = snd_uda1341_update_bits(clnt, ext4, 3, 0, value & 0x3, flush);
+	case CMD_IG:
+		ret = snd_uda1341_update_bits(clnt, ext4, 3, 0, value & 0x3, flush);
 		ret = snd_uda1341_update_bits(clnt, ext5, 31, 0, value >> 2, flush);
 		break;
-	case CMD_AGC_TIME: ret = snd_uda1341_update_bits(clnt, ext6, 7, 2, value, flush);
+	case CMD_AGC_TIME:
+		ret = snd_uda1341_update_bits(clnt, ext6, 7, 2, value, flush);
 		break;
-	case CMD_AGC_LEVEL: ret = snd_uda1341_update_bits(clnt, ext6, 3, 0, value, flush);
+	case CMD_AGC_LEVEL:
+		ret = snd_uda1341_update_bits(clnt, ext6, 3, 0, value, flush);
 		break;
-	default: ret = -EINVAL;	break;                                
+#ifdef CONFIG_PM		
+	case CMD_SUSPEND:
+		for (reg = stat0; reg < uda1341_reg_last; reg++)
+			uda->suspend_regs[reg] = uda->regs[reg];
+		for (reg = 0; reg < CMD_LAST; reg++)
+			uda->suspend_cfg[reg] = uda->cfg[reg];
+		break;
+	case CMD_RESUME:
+		for (reg = stat0; reg < uda1341_reg_last; reg++)
+			snd_uda1341_codec_write(clnt, reg, uda->suspend_regs[reg]);
+		for (reg = 0; reg < CMD_LAST; reg++)
+			uda->cfg[reg] = uda->suspend_cfg[reg];
+		break;
+#endif
+	default:
+		ret = -EINVAL;
+		break;
 	}
                 
-	if (!uda->active) {
+	if (!uda->active)
 		printk(KERN_ERR "UDA1341 codec not active!\n");                
-	}
 	return ret;
 }
-
 
 /* }}} */
 
@@ -319,9 +337,9 @@ static void snd_uda1341_proc_read(snd_info_entry_t *entry,
 	int peak;
 
 	peak = snd_uda1341_codec_read(clnt, UDA1341_DATA1);
+	if (peak < 0)
+		peak = 0;
 	
-	DEBUG_NAME(KERN_DEBUG "proc_read\n");
-
 	snd_iprintf(buffer, "%s\n\n", uda->card->longname);
 
 	// for information about computed values see UDA1341TS datasheet pages 15 - 21
@@ -343,7 +361,7 @@ static void snd_uda1341_proc_read(snd_info_entry_t *entry,
 
 	snd_iprintf(buffer, "Mute                : %s\n", uda->cfg[CMD_MUTE] ? "on" : "off");
 
-	if(uda->cfg[CMD_VOLUME] == 0)
+	if (uda->cfg[CMD_VOLUME] == 0)
 		snd_iprintf(buffer, "Volume              : 0 dB\n");
 	else if (uda->cfg[CMD_VOLUME] < 62)
 		snd_iprintf(buffer, "Volume              : %d dB\n", -1*uda->cfg[CMD_VOLUME] +1);
@@ -384,8 +402,6 @@ static void snd_uda1341_proc_regs_read(snd_info_entry_t *entry,
 	int reg;
 	char buf[12];
 
-	DEBUG_NAME(KERN_DEBUG "proc_regs_read\n");
-        
 	spin_lock(&uda->reg_lock);
 	for (reg = 0; reg < uda1341_reg_last; reg ++) {
 		if (reg == empty)
@@ -403,13 +419,10 @@ static void snd_uda1341_proc_regs_read(snd_info_entry_t *entry,
 static void __devinit snd_uda1341_proc_init(snd_card_t *card, struct l3_client *clnt)
 {
 	snd_info_entry_t *entry;
-	struct uda1341 *uda = clnt->driver_data;
 
-	DEBUG_NAME(KERN_DEBUG "proc_init\n");
-        
 	if (! snd_card_proc_new(card, "uda1341", &entry))
 		snd_info_set_text_ops(entry, clnt, snd_uda1341_proc_read);
-	if (! snd_card_proc_new(card, "uda1341-regs", &entry)) {
+	if (! snd_card_proc_new(card, "uda1341-regs", &entry))
 		snd_info_set_text_ops(entry, clnt, snd_uda1341_proc_regs_read);
 }
 
@@ -429,8 +442,6 @@ static int snd_uda1341_info_single(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t
 {
 	int mask = (kcontrol->private_value >> 12) & 63;
 
-	DEBUG_NAME(KERN_DEBUG "info_single where: %ld\n", kcontrol->private_value & 31);
-
 	uinfo->type = mask == 1 ? SNDRV_CTL_ELEM_TYPE_BOOLEAN : SNDRV_CTL_ELEM_TYPE_INTEGER;
 	uinfo->count = 1;
 	uinfo->value.integer.min = 0;
@@ -445,8 +456,6 @@ static int snd_uda1341_get_single(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_
 	int where = kcontrol->private_value & 31;        
 	int mask = (kcontrol->private_value >> 12) & 63;
 	int invert = (kcontrol->private_value >> 18) & 1;
-        
-	DEBUG_NAME(KERN_DEBUG "get_single where: %d (val: %d)\n", where, uda->cfg[where]);
         
 	ucontrol->value.integer.value[0] = uda->cfg[where];
 	if (invert)
@@ -470,9 +479,6 @@ static int snd_uda1341_put_single(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_
 	if (invert)
 		val = mask - val;
 
-	DEBUG(KERN_DEBUG "put_single where: %d reg: %d mask: %d shift: %d inv: %d val: %d\n",
-	      where, reg, mask, shift, invert, val);
-        
 	uda->cfg[where] = val;
 	return snd_uda1341_update_bits(clnt, reg, mask, shift, val, FLUSH);
 }
@@ -492,8 +498,6 @@ static int snd_uda1341_info_enum(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *
 	int where = kcontrol->private_value & 31;
 	const char **texts;
 	
-	DEBUG_NAME(KERN_DEBUG "info_enum where: %d\n", where);
-
 	// this register we don't handle this way
 	if (!uda1341_enum_items[where])
 		return -EINVAL;
@@ -516,8 +520,6 @@ static int snd_uda1341_get_enum(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t 
 	uda1341_t *uda = clnt->driver_data;
 	int where = kcontrol->private_value & 31;        
         
-	DEBUG_NAME(KERN_DEBUG "get_enum where: %d (val: %d)\n", where, uda->cfg[where]);
-        
 	ucontrol->value.enumerated.item[0] = uda->cfg[where];	
 	return 0;
 }
@@ -533,9 +535,6 @@ static int snd_uda1341_put_enum(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t 
 
 	uda->cfg[where] = (ucontrol->value.enumerated.item[0] & mask);
 	
-	DEBUG(KERN_DEBUG "put_enum where: %d reg: %d mask: %d shift: %d val: %d\n",
-	      where, reg, mask, shift, uda->cfg[where]);
-        
 	return snd_uda1341_update_bits(clnt, reg, mask, shift, uda->cfg[where], FLUSH);
 }
 
@@ -557,8 +556,6 @@ static int snd_uda1341_info_2regs(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t 
 	int mask_2 = (kcontrol->private_value >> 25) & 63;
 	int mask;
         
-	DEBUG_NAME(KERN_DEBUG "info_2regs where: %ld\n", kcontrol->private_value & 31);
-
 	mask = (mask_2 + 1) * (mask_1 + 1) - 1;
 	uinfo->type = mask == 1 ? SNDRV_CTL_ELEM_TYPE_BOOLEAN : SNDRV_CTL_ELEM_TYPE_INTEGER;
 	uinfo->count = 1;
@@ -576,8 +573,6 @@ static int snd_uda1341_get_2regs(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t
 	int mask_2 = (kcontrol->private_value >> 25) & 63;        
 	int invert = (kcontrol->private_value >> 31) & 1;
 	int mask;
-
-	DEBUG_NAME(KERN_DEBUG "get_2regs where: %d (val: %d)\n", where, uda->cfg[where]);
 
 	mask = (mask_2 + 1) * (mask_1 + 1) - 1;
 
@@ -604,10 +599,6 @@ static int snd_uda1341_put_2regs(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t
 
 	val = ucontrol->value.integer.value[0];
          
-	DEBUG_NAME(KERN_DEBUG "put_2regs where: %d reg1: %d reg2: %d mask1: %d mask2: %d "
-		   "shift1: %d shift2: %d inv: %d val: %d\n", where, reg_1, reg_2, mask_1, mask_2,
-		   shift_1, shift_2, invert, val);       
-
 	mask = (mask_2 + 1) * (mask_1 + 1) - 1;
 
 	val1 = val & mask_1;
@@ -659,20 +650,43 @@ static snd_kcontrol_new_t snd_uda1341_controls[] = {
 	UDA1341_2REGS("Gain Input Amplifier Gain (channel 2)", CMD_IG, ext4, ext5, 0, 0, 3, 31, 0),
 };
 
+static void uda1341_free(struct l3_client *uda1341)
+{
+	l3_detach_client(uda1341); // calls kfree for driver_data (uda1341_t)
+	snd_magic_kfree(uda1341);
+}
+
+static int uda1341_dev_free(snd_device_t *device)
+{
+	struct l3_client *clnt = snd_magic_cast(l3_client_t, device->device_data, return);
+	uda1341_free(clnt);
+	return 0;
+}
+
 int __init snd_chip_uda1341_mixer_new(snd_card_t *card, struct l3_client **clnt)
 {
+	static snd_device_ops_t ops = {
+		.dev_free =     uda1341_dev_free,
+	};
+	struct l3_client *uda1341;
 	int idx, err;
 
-	DEBUG_NAME(KERN_DEBUG "uda1341 mixer_new\n");
-        
 	snd_assert(card != NULL, return -EINVAL);
 
 	uda1341 = snd_magic_kcalloc(l3_client_t, 0, GFP_KERNEL);
 	if (uda1341 == NULL)
 		return -ENOMEM;
          
-	if ((err = l3_attach_client(uda1341, "l3-bit-sa1100-gpio", "snd-uda1341")))
-		return -ENODEV;
+	if ((err = l3_attach_client(uda1341, "l3-bit-sa1100-gpio", "snd-uda1341"))) {
+		kfree(uda1341);
+		return err;
+	}
+
+	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, uda1341, &ops)) < 0) {
+		l3_detach_client(uda1341);
+		kfree(uda1341);
+		return err;
+	}
 
 	for (idx = 0; idx < UDA1341_CONTROLS; idx++) {
 		if ((err = snd_ctl_add(card, snd_ctl_new1(&snd_uda1341_controls[idx], uda1341))) < 0)
@@ -688,16 +702,6 @@ int __init snd_chip_uda1341_mixer_new(snd_card_t *card, struct l3_client **clnt)
 	return 0;
 }
 
-void __init snd_chip_uda1341_mixer_del(snd_card_t *card)
-{
-	DEBUG_NAME(KERN_DEBUG "uda1341 mixer_del\n");
-        
-	l3_detach_client(uda1341);
-
-	snd_magic_kfree(uda1341);
-	uda1341 = NULL;
-}
-
 /* }}} */
 
 /* {{{ L3 operations */
@@ -706,13 +710,9 @@ static int uda1341_attach(struct l3_client *clnt)
 {
 	struct uda1341 *uda;
 
-	DEBUG_NAME(KERN_DEBUG "uda1341 attach\n");
-        
 	uda = snd_magic_kcalloc(uda1341_t, 0, GFP_KERNEL);
 	if (!uda)
 		return -ENOMEM;
-
-	memset(uda, 0, sizeof(*uda));
 
 	/* init fixed parts of my copy of registers */
 	uda->regs[stat0]   = STAT0;
@@ -728,22 +728,18 @@ static int uda1341_attach(struct l3_client *clnt)
 	spin_lock_init(&uda->reg_lock);
         
 	clnt->driver_data = uda;
-
-	//l3_open(clnt);
 	return 0;
 }
 
 static void uda1341_detach(struct l3_client *clnt)
 {
-	DEBUG_NAME(KERN_DEBUG "uda1341 detach\n");        
-	snd_magic_kfree(clnt->driver_data);
+	if (clnt->driver_data)
+		snd_magic_kfree(clnt->driver_data);
 }
 
 static int
 uda1341_command(struct l3_client *clnt, int cmd, void *arg)
 {
-	DEBUG_NAME(KERN_DEBUG "l3_command\n");
-
 	if (cmd != CMD_READ_REG)
 		return snd_uda1341_cfg_write(clnt, cmd, (int) arg, FLUSH);
 
@@ -754,8 +750,6 @@ static int uda1341_open(struct l3_client *clnt)
 {
 	struct uda1341 *uda = clnt->driver_data;
 
-	DEBUG_NAME(KERN_DEBUG "uda1341 open\n");
-        
 	uda->active = 1;
 
 	/* init default configuration */
@@ -764,8 +758,8 @@ static int uda1341_open(struct l3_client *clnt)
 	snd_uda1341_cfg_write(clnt, CMD_FORMAT, LSB16, FLUSH);  // unknown state after reset
 	snd_uda1341_cfg_write(clnt, CMD_OGAIN, ON, FLUSH);      // default off after reset
 	snd_uda1341_cfg_write(clnt, CMD_IGAIN, ON, FLUSH);      // default off after reset
-	snd_uda1341_cfg_write(clnt, CMD_DAC, ON, FLUSH);    // ??? default value after reset
-	snd_uda1341_cfg_write(clnt, CMD_ADC, ON, FLUSH);    // ??? default value after reset
+	snd_uda1341_cfg_write(clnt, CMD_DAC, ON, FLUSH);	// ??? default value after reset
+	snd_uda1341_cfg_write(clnt, CMD_ADC, ON, FLUSH);	// ??? default value after reset
 	snd_uda1341_cfg_write(clnt, CMD_VOLUME, 20, FLUSH);     // default 0dB after reset
 	snd_uda1341_cfg_write(clnt, CMD_BASS, 0, REGS_ONLY);    // default value after reset
 	snd_uda1341_cfg_write(clnt, CMD_TREBBLE, 0, REGS_ONLY); // default value after reset
@@ -790,7 +784,6 @@ static void uda1341_close(struct l3_client *clnt)
 {
 	struct uda1341 *uda = clnt->driver_data;
 
-	DEBUG_NAME(KERN_DEBUG "uda1341 close\n");
 	uda->active = 0;
 }
 
@@ -832,7 +825,6 @@ MODULE_CLASSES("{sound}");
 MODULE_DEVICES("{{UDA1341,UDA1341TS}}");
 
 EXPORT_SYMBOL(snd_chip_uda1341_mixer_new);
-EXPORT_SYMBOL(snd_chip_uda1341_mixer_del);
 
 /* }}} */
 

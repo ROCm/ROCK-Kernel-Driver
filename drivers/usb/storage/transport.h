@@ -156,22 +156,18 @@ extern int usb_stor_Bulk_max_lun(struct us_data*);
 extern int usb_stor_Bulk_reset(struct us_data*);
 
 extern void usb_stor_invoke_transport(Scsi_Cmnd*, struct us_data*);
-extern int usb_stor_abort_transport(struct us_data*);
+extern void usb_stor_stop_transport(struct us_data*);
 
-extern int usb_stor_bulk_msg(struct us_data *us, void *data,
-		unsigned int pipe, unsigned int len, unsigned int *act_len);
 extern int usb_stor_control_msg(struct us_data *us, unsigned int pipe,
 		u8 request, u8 requesttype, u16 value, u16 index,
 		void *data, u16 size);
-extern int usb_stor_interrupt_msg(struct us_data *us, void *data,
-		unsigned int len, unsigned int *act_len);
 
 extern int usb_stor_clear_halt(struct us_data*, unsigned int pipe);
 extern int usb_stor_ctrl_transfer(struct us_data *us, unsigned int pipe,
 		u8 request, u8 requesttype, u16 value, u16 index,
 		void *data, u16 size);
 extern int usb_stor_intr_transfer(struct us_data *us, void *buf,
-		unsigned int length, unsigned int *act_len);
+		unsigned int length);
 extern int usb_stor_bulk_transfer_buf(struct us_data *us, unsigned int pipe,
 		void *buf, unsigned int length, unsigned int *act_len);
 extern int usb_stor_bulk_transfer_sglist(struct us_data *us, unsigned int pipe,

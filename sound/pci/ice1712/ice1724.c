@@ -116,8 +116,9 @@ static unsigned char snd_vt1724_ac97_ready(ice1712_t *ice)
 			continue;
 		if (!(old_cmd & VT1724_AC97_READY))
 			continue;
-		return 0;
+		return old_cmd;
 	}
+	snd_printd(KERN_ERR "snd_vt1724_ac97_ready: timeout\n");
 	return old_cmd;
 }
 
@@ -127,6 +128,7 @@ static int snd_vt1724_ac97_wait_bit(ice1712_t *ice, unsigned char bit)
 	for (tm = 0; tm < 0x10000; tm++)
 		if ((inb(ICEMT1724(ice, AC97_CMD)) & bit) == 0)
 			return 0;
+	snd_printd(KERN_ERR "snd_vt1724_ac97_wait_bit: timeout\n");
 	return -EIO;
 }
 
@@ -138,9 +140,10 @@ static void snd_vt1724_ac97_write(ac97_t *ac97,
 	unsigned char old_cmd;
 
 	old_cmd = snd_vt1724_ac97_ready(ice);
+	old_cmd &= ~VT1724_AC97_ID_MASK;
+	old_cmd |= ac97->num;
 	outb(reg, ICEMT1724(ice, AC97_INDEX));
 	outw(val, ICEMT1724(ice, AC97_DATA));
-	old_cmd &= ~(VT1724_AC97_PBK_VSR | VT1724_AC97_CAP_VSR);
 	outb(old_cmd | VT1724_AC97_WRITE, ICEMT1724(ice, AC97_CMD));
 	snd_vt1724_ac97_wait_bit(ice, VT1724_AC97_WRITE);
 }
@@ -151,6 +154,8 @@ static unsigned short snd_vt1724_ac97_read(ac97_t *ac97, unsigned short reg)
 	unsigned char old_cmd;
 
 	old_cmd = snd_vt1724_ac97_ready(ice);
+	old_cmd &= ~VT1724_AC97_ID_MASK;
+	old_cmd |= ac97->num;
 	outb(reg, ICEMT1724(ice, AC97_INDEX));
 	outb(old_cmd | VT1724_AC97_READ, ICEMT1724(ice, AC97_CMD));
 	if (snd_vt1724_ac97_wait_bit(ice, VT1724_AC97_READ) < 0)
@@ -284,14 +289,15 @@ static int snd_vt1724_pcm_trigger(snd_pcm_substream_t *substream, int cmd)
 	ice1712_t *ice = snd_pcm_substream_chip(substream);
 	unsigned int what;
 	unsigned int old;
+	struct list_head *pos;
 	snd_pcm_substream_t *s;
 
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
 		what = 0;
-		s = substream;
-		do {
+		snd_pcm_group_for_each(pos, substream) {
+			s = snd_pcm_group_substream_entry(pos);
 			if (s == ice->playback_pro_substream)
 				what |= VT1724_PDMA0_PAUSE;
 			else if (s == ice->capture_pro_substream)
@@ -300,8 +306,7 @@ static int snd_vt1724_pcm_trigger(snd_pcm_substream_t *substream, int cmd)
 				what |= VT1724_PDMA4_PAUSE;
 			else if (s == ice->capture_con_substream)
 				what |= VT1724_RDMA1_PAUSE;
-			s = s->link_next;
-		} while (s != substream);
+		}
 		spin_lock(&ice->reg_lock);
 		old = inl(ICEMT1724(ice, DMA_PAUSE));
 		if (cmd == SNDRV_PCM_TRIGGER_PAUSE_PUSH)
@@ -316,7 +321,8 @@ static int snd_vt1724_pcm_trigger(snd_pcm_substream_t *substream, int cmd)
 	case SNDRV_PCM_TRIGGER_STOP:
 		what = 0;
 		s = substream;
-		do {
+		snd_pcm_group_for_each(pos, substream) {
+			s = snd_pcm_group_substream_entry(pos);
 			if (s == ice->playback_pro_substream) {
 				what |= VT1724_PDMA0_START;
 				snd_pcm_trigger_done(s, substream);
@@ -330,8 +336,7 @@ static int snd_vt1724_pcm_trigger(snd_pcm_substream_t *substream, int cmd)
 				what |= VT1724_RDMA1_START;
 				snd_pcm_trigger_done(s, substream);
 			}
-			s = s->link_next;
-		} while (s != substream);
+		}
 		spin_lock(&ice->reg_lock);
 		old = inl(ICEMT1724(ice, DMA_CONTROL));
 		if (cmd == SNDRV_PCM_TRIGGER_START)
@@ -878,6 +883,11 @@ static int __devinit snd_vt1724_ac97_mixer(ice1712_t * ice)
 
 	if (! (ice->eeprom.data[ICE_EEP2_ACLINK] & VT1724_CFG_PRO_I2S)) {
 		ac97_t ac97;
+		/* cold reset */
+		outb(inb(ICEMT1724(ice, AC97_CMD)) | 0x80, ICEMT1724(ice, AC97_CMD));
+		mdelay(5); /* FIXME */
+		outb(inb(ICEMT1724(ice, AC97_CMD)) & ~0x80, ICEMT1724(ice, AC97_CMD));
+
 		memset(&ac97, 0, sizeof(ac97));
 		ac97.write = snd_vt1724_ac97_write;
 		ac97.read = snd_vt1724_ac97_read;
@@ -1297,7 +1307,7 @@ static int snd_vt1724_pro_internal_clock_put(snd_kcontrol_t * kcontrol, snd_ctl_
 	return change;
 }
 
-static snd_kcontrol_new_t snd_vt1724_pro_internal_clock = __devinitdata {
+static snd_kcontrol_new_t snd_vt1724_pro_internal_clock __devinitdata = {
 	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
 	.name = "Multi Track Internal Clock",
 	.info = snd_vt1724_pro_internal_clock_info,
@@ -1452,7 +1462,7 @@ static int put_route_val(ice1712_t *ice, unsigned int val, int shift)
 static int snd_vt1724_pro_route_analog_get(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t *ucontrol)
 {
 	ice1712_t *ice = snd_kcontrol_chip(kcontrol);
-	int idx = kcontrol->id.index;
+	int idx = snd_ctl_get_ioffidx(kcontrol, &ucontrol->id);
 	ucontrol->value.enumerated.item[0] = get_route_val(ice, analog_route_shift(idx));
 	return 0;
 }
@@ -1460,7 +1470,7 @@ static int snd_vt1724_pro_route_analog_get(snd_kcontrol_t * kcontrol, snd_ctl_el
 static int snd_vt1724_pro_route_analog_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t *ucontrol)
 {
 	ice1712_t *ice = snd_kcontrol_chip(kcontrol);
-	int idx = kcontrol->id.index;
+	int idx = snd_ctl_get_ioffidx(kcontrol, &ucontrol->id);
 	return put_route_val(ice, ucontrol->value.enumerated.item[0],
 			     analog_route_shift(idx));
 }
@@ -1468,7 +1478,7 @@ static int snd_vt1724_pro_route_analog_put(snd_kcontrol_t * kcontrol, snd_ctl_el
 static int snd_vt1724_pro_route_spdif_get(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t *ucontrol)
 {
 	ice1712_t *ice = snd_kcontrol_chip(kcontrol);
-	int idx = kcontrol->id.index;
+	int idx = snd_ctl_get_ioffidx(kcontrol, &ucontrol->id);
 	ucontrol->value.enumerated.item[0] = get_route_val(ice, digital_route_shift(idx));
 	return 0;
 }
@@ -1476,7 +1486,7 @@ static int snd_vt1724_pro_route_spdif_get(snd_kcontrol_t * kcontrol, snd_ctl_ele
 static int snd_vt1724_pro_route_spdif_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t *ucontrol)
 {
 	ice1712_t *ice = snd_kcontrol_chip(kcontrol);
-	int idx = kcontrol->id.index;
+	int idx = snd_ctl_get_ioffidx(kcontrol, &ucontrol->id);
 	return put_route_val(ice, ucontrol->value.enumerated.item[0],
 			     digital_route_shift(idx));
 }
@@ -1495,6 +1505,7 @@ static snd_kcontrol_new_t snd_vt1724_mixer_pro_spdif_route __devinitdata = {
 	.info = snd_vt1724_pro_route_info,
 	.get = snd_vt1724_pro_route_spdif_get,
 	.put = snd_vt1724_pro_route_spdif_put,
+	.count = 2,
 };
 
 
@@ -1533,6 +1544,18 @@ static snd_kcontrol_new_t snd_vt1724_mixer_pro_peak __devinitdata = {
  *
  */
 
+static struct snd_ice1712_card_info no_matched __devinitdata;
+
+static struct snd_ice1712_card_info *card_tables[] __devinitdata = {
+	snd_vt1724_revo_cards,
+	snd_vt1724_amp_cards, 
+	0,
+};
+
+
+/*
+ */
+
 static unsigned char __devinit snd_vt1724_read_i2c(ice1712_t *ice,
 						 unsigned char dev,
 						 unsigned char addr)
@@ -1548,7 +1571,7 @@ static unsigned char __devinit snd_vt1724_read_i2c(ice1712_t *ice,
 static int __devinit snd_vt1724_read_eeprom(ice1712_t *ice)
 {
 	int dev = 0xa0;		/* EEPROM device address */
-	unsigned int i;
+	unsigned int i, size;
 
 	if ((inb(ICEREG1724(ice, I2C_CTRL)) & VT1724_I2C_EEPROM) == 0) {
 		snd_printk("ICE1724 has not detected EEPROM\n");
@@ -1559,7 +1582,9 @@ static int __devinit snd_vt1724_read_eeprom(ice1712_t *ice)
 				(snd_vt1724_read_i2c(ice, dev, 0x02) << 16) | 
 				(snd_vt1724_read_i2c(ice, dev, 0x03) << 24);
 	ice->eeprom.size = snd_vt1724_read_i2c(ice, dev, 0x04);
-	if (ice->eeprom.size > 32) {
+	if (ice->eeprom.size < 6)
+		ice->eeprom.size = 32;
+	else if (ice->eeprom.size > 32) {
 		snd_printk("invalid EEPROM (size = %i)\n", ice->eeprom.size);
 		return -EIO;
 	}
@@ -1568,7 +1593,8 @@ static int __devinit snd_vt1724_read_eeprom(ice1712_t *ice)
 		snd_printk("invalid EEPROM version %i\n", ice->eeprom.version);
 		// return -EIO;
 	}
-	for (i = 0; i < ice->eeprom.size; i++)
+	size = ice->eeprom.size - 6;
+	for (i = 0; i < size; i++)
 		ice->eeprom.data[i] = snd_vt1724_read_i2c(ice, dev, i + 6);
 
 	ice->eeprom.gpiomask = eeprom_triple(ice, ICE_EEP2_GPIO_MASK);
@@ -1605,20 +1631,13 @@ static int __devinit snd_vt1724_chip_init(ice1712_t *ice)
 static int __devinit snd_vt1724_spdif_build_controls(ice1712_t *ice)
 {
 	int err;
-	unsigned int idx;
 	snd_kcontrol_t *kctl;
 
 	snd_assert(ice->pcm != NULL, return -EIO);
 
-	for (idx = 0; idx < 2; idx++) {
-		kctl = snd_ctl_new1(&snd_vt1724_mixer_pro_spdif_route, ice);
-		if (kctl == NULL)
-			return -ENOMEM;
-		kctl->id.index = idx;
-		err = snd_ctl_add(ice->card, kctl);
-		if (err < 0)
-			return err;
-	}
+	err = snd_ctl_add(ice->card, snd_ctl_new1(&snd_vt1724_mixer_pro_spdif_route, ice));
+	if (err < 0)
+		return err;
 
 	err = snd_ctl_add(ice->card, snd_ctl_new1(&snd_vt1724_spdif_switch, ice));
 	if (err < 0)
@@ -1649,8 +1668,6 @@ static int __devinit snd_vt1724_spdif_build_controls(ice1712_t *ice)
 
 static int __devinit snd_vt1724_build_controls(ice1712_t *ice)
 {
-	unsigned int idx;
-	snd_kcontrol_t *kctl;
 	int err;
 
 	err = snd_ctl_add(ice->card, snd_ctl_new1(&snd_vt1724_eeprom, ice));
@@ -1667,12 +1684,10 @@ static int __devinit snd_vt1724_build_controls(ice1712_t *ice)
 	if (err < 0)
 		return err;
 
-	for (idx = 0; idx < ice->num_total_dacs; idx++) {
-		kctl = snd_ctl_new1(&snd_vt1724_mixer_pro_analog_route, ice);
-		if (kctl == NULL)
-			return -ENOMEM;
-		kctl->id.index = idx;
-		err = snd_ctl_add(ice->card, kctl);
+	if (ice->num_total_dacs > 0) {
+		snd_kcontrol_new_t tmp = snd_vt1724_mixer_pro_analog_route;
+		tmp.count = ice->num_total_dacs;
+		err = snd_ctl_add(ice->card, snd_ctl_new1(&tmp, ice));
 		if (err < 0)
 			return err;
 	}
@@ -1705,8 +1720,7 @@ static int snd_vt1724_free(ice1712_t *ice)
 		release_resource(ice->res_profi_port);
 		kfree_nocheck(ice->res_profi_port);
 	}
-	if (ice->akm)
-		kfree(ice->akm);
+	snd_ice1712_akm4xxx_free(ice);
 	snd_magic_kfree(ice);
 	return 0;
 }
@@ -1807,15 +1821,6 @@ static int __devinit snd_vt1724_create(snd_card_t * card,
  * Registration
  *
  */
-
-static struct snd_ice1712_card_info no_matched __devinitdata;
-
-static struct snd_ice1712_card_info *card_tables[] __devinitdata = {
-	snd_vt1724_revo_cards,
-	snd_vt1724_amp_cards, 
-	0,
-};
-
 
 static int __devinit snd_vt1724_probe(struct pci_dev *pci,
 				      const struct pci_device_id *pci_id)

@@ -2242,6 +2242,9 @@ static int __init alsa_card_es18xx_init(void)
 	cards += pnp_register_card_driver(&es18xx_pnpc_driver);
 #endif
 	if(!cards) {
+#ifdef CONFIG_PNP
+		pnp_unregister_card_driver(&es18xx_pnpc_driver);
+#endif
 #ifdef MODULE
 		snd_printk(KERN_ERR "ESS AudioDrive ES18xx soundcard not found or device busy\n");
 #endif

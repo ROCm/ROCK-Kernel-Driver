@@ -50,11 +50,6 @@ check_bugs(void)
 {
 }
 
-int sys_ioperm(unsigned long from, unsigned long num, int on)
-{
-	return -EIO;
-}
-
 /*
  * sys_ipc() is the de-multiplexer for the SysV IPC calls..
  *

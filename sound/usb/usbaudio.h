@@ -156,9 +156,6 @@ struct snd_usb_audio {
 #define QUIRK_AUDIO_FIXED_ENDPOINT	4
 #define QUIRK_STANDARD_INTERFACE	5
 
-#define QUIRK_BOOT_MASK			0x80
-#define QUIRK_BOOT_EXTIGY		(QUIRK_BOOT_MASK | 0)
-
 typedef struct snd_usb_audio_quirk snd_usb_audio_quirk_t;
 typedef struct snd_usb_midi_endpoint_info snd_usb_midi_endpoint_info_t;
 

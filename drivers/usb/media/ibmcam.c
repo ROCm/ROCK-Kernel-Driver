@@ -12,18 +12,6 @@
  * 5/24/00 Removed optional (and unnecessary) locking of the driver while
  * the device remains plugged in. Corrected race conditions in ibmcam_open
  * and ibmcam_probe() routines using this as a guideline:
- *
- * (2) The big kernel lock is automatically released when a process sleeps
- *   in the kernel and is automatically reacquired on reschedule if the
- *   process had the lock originally.  Any code that can be compiled as
- *   a module and is entered with the big kernel lock held *MUST*
- *   increment the use count to activate the indirect module protection
- *   before doing anything that might sleep.
- *
- *   In practice, this means that all routines that live in modules and
- *   are invoked under the big kernel lock should do MOD_INC_USE_COUNT
- *   as their very first action.  And all failure paths from that
- *   routine must do MOD_DEC_USE_COUNT before returning.
  */
 
 #include <linux/kernel.h>
@@ -3865,8 +3853,6 @@ static int ibmcam_probe(struct usb_interface *intf, const struct usb_device_id *
 		return -ENODEV;
 	}
 
-	/* Code below may sleep, need to lock module while we are here */
-	MOD_INC_USE_COUNT;
 	uvd = usbvideo_AllocateDevice(cams);
 	if (uvd != NULL) {
 		/* Here uvd is a fully allocated uvd object */
@@ -3896,7 +3882,6 @@ static int ibmcam_probe(struct usb_interface *intf, const struct usb_device_id *
 			uvd = NULL;
 		}
 	}
-	MOD_DEC_USE_COUNT;
 	usb_set_intfdata (intf, uvd);
 	return 0;
 }

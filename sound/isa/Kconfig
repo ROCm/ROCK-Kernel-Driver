@@ -41,7 +41,7 @@ config SND_CS4236
 
 config SND_PC98_CS4232
 	tristate "NEC PC9800 CS4232 driver"
-	depends on SND && PC9800
+	depends on SND && X86_PC9800
 	help
 	  Say 'Y' or 'M' to include support for NEC PC-9801/PC-9821 on-board
 	  soundchip based on CS4232.
@@ -191,5 +191,11 @@ config SND_SGALAXY
 	help
 	  Say 'Y' or 'M' to include support for Aztech Sound Galaxy.
 
-endmenu
+config SND_SSCAPE
+	tristate "Ensoniq SoundScape PnP driver"
+	depends on SND
+	help
+	  Say 'Y' or 'M' to include support for Ensoniq SoundScape PnP
+	  soundcard.
 
+endmenu

@@ -13,8 +13,6 @@ extern int dmascc_init(void);
 
 extern int scc_enet_init(void); 
 extern int fec_enet_init(void); 
-extern int sdla_setup(void); 
-extern int sdla_c_setup(void); 
 
 /*
  *	Devices in this list must do new style probing. That is they must
@@ -35,9 +33,6 @@ static struct net_probe pci_probes[] __initdata = {
 #if defined(CONFIG_DMASCC)
 	{dmascc_init, 0},
 #endif	
-#if defined(CONFIG_SDLA)
-	{sdla_c_setup, 0},
-#endif
 #if defined(CONFIG_SCC_ENET)
         {scc_enet_init, 0},
 #endif

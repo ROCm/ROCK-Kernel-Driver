@@ -67,7 +67,7 @@ struct us_unusual_dev {
 	unsigned int flags;
 };
 
-/* Flag definitions */
+/* Flag definitions: these entries are static */
 #define US_FL_SINGLE_LUN      0x00000001 /* allow access to only LUN 0	    */
 #define US_FL_MODE_XLATE      0x00000002 /* translate _6 to _10 commands for
 						    Win/MacOS compatibility */
@@ -77,8 +77,13 @@ struct us_unusual_dev {
 #define US_FL_FIX_INQUIRY     0x00000040 /* INQUIRY response needs fixing   */
 #define US_FL_FIX_CAPACITY    0x00000080 /* READ CAPACITY response too big  */
 
-#define US_FLIDX_CAN_CANCEL  18  /* 0x00040000  okay to cancel current_urb? */
-#define US_FLIDX_CANCEL_SG   19  /* 0x00080000	okay to cancel current_sg?  */
+/* Dynamic flag definitions: used in set_bit() etc. */
+#define US_FLIDX_URB_ACTIVE	18  /* 0x00040000  current_urb is in use  */
+#define US_FLIDX_SG_ACTIVE	19  /* 0x00080000  current_sg is in use   */
+#define US_FLIDX_ABORTING	20  /* 0x00100000  abort is in progress   */
+#define US_FLIDX_DISCONNECTING	21  /* 0x00200000  disconnect in progress */
+#define DONT_SUBMIT	((1UL << US_FLIDX_ABORTING) || \
+			 (1UL << US_FLIDX_DISCONNECTING))
 
 
 /* processing state machine states */

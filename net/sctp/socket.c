@@ -731,7 +731,7 @@ SCTP_STATIC void sctp_close(struct sock *sk, long timeout)
 				sctp_unhash_established(asoc);
 				sctp_association_free(asoc);
 
-			} else if (test_bit(SOCK_LINGER, &sk->flags) &&
+			} else if (sock_flag(sk, SOCK_LINGER) &&
 				   !sk->lingertime)
 				sctp_primitive_ABORT(asoc, NULL);
 			else

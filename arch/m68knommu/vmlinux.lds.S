@@ -27,6 +27,7 @@
 #define	RAM_START	0x10000400
 #define	RAM_LENGTH	0xffc00
 #define	RAM_END		0x10100000
+#define _ramend	_ram_end_notused
 #define	DATA_ADDR	RAM_START
 #endif
 
@@ -276,6 +277,9 @@ SECTIONS {
 		__con_initcall_start = .;
 		*(.con_initcall.init)
 		__con_initcall_end = .;
+		__security_initcall_start = .;
+		*(.security_initcall.init)
+		__security_initcall_end = .;
 		. = ALIGN(4);
 		__initramfs_start = .;
 		*(.init.ramfs)

@@ -462,7 +462,6 @@ static int ide_open (struct inode * inode, struct file * filp)
 	return -ENXIO;
 }
 
-static LIST_HEAD(ata_unused);
 static spinlock_t drives_lock = SPIN_LOCK_UNLOCKED;
 static spinlock_t drivers_lock = SPIN_LOCK_UNLOCKED;
 static LIST_HEAD(drivers);
@@ -1437,9 +1436,6 @@ int ata_attach(ide_drive_t *drive)
 	spin_unlock(&drivers_lock);
 	if(idedefault_driver.attach(drive) != 0)
 		panic("ide: default attach failed");
-	spin_lock(&drives_lock);
-	list_add_tail(&drive->list, &ata_unused);
-	spin_unlock(&drives_lock);
 	return 1;
 }
 
@@ -1737,7 +1733,6 @@ static int __initdata is_chipset_set[MAX_HWIFS];
  * "hdx=cyl,head,sect"	: disk drive is present, with specified geometry
  * "hdx=remap63"	: add 63 to all sector numbers (for OnTrack DM)
  * "hdx=remap"		: remap 0->1 (for EZDrive)
- * "hdx=noremap"	: do not remap 0->1 even though EZD was detected
  * "hdx=autotune"	: driver will attempt to tune interface speed
  *				to the fastest PIO mode supported,
  *				if possible for this drive only.
@@ -1859,8 +1854,8 @@ int __init ide_setup (char *s)
 		const char *hd_words[] = {
 			"none", "noprobe", "nowerr", "cdrom", "serialize",
 			"autotune", "noautotune", "slow", "swapdata", "bswap",
-			"flash", "remap", "noremap", "scsi", "biostimings",
-			"remap63", NULL };
+			"flash", "remap", "remap63", "scsi", "biostimings",
+			NULL };
 		unit = s[2] - 'a';
 		hw   = unit / MAX_DRIVES;
 		unit = unit % MAX_DRIVES;
@@ -1920,22 +1915,14 @@ int __init ide_setup (char *s)
 			case -12: /* "remap" */
 				drive->remap_0_to_1 = 1;
 				goto done;
-			case -13: /* "noremap" */
-				drive->remap_0_to_1 = 2;
+			case -13: /* "remap63" */
+				drive->sect0 = 63;
 				goto done;
 			case -14: /* "scsi" */
-#if defined(CONFIG_BLK_DEV_IDESCSI) && defined(CONFIG_SCSI)
 				drive->scsi = 1;
 				goto done;
-#else
-				drive->scsi = 0;
-				goto bad_option;
-#endif /* defined(CONFIG_BLK_DEV_IDESCSI) && defined(CONFIG_SCSI) */
 			case -15: /* "biostimings" */
 				drive->autotune = IDE_TUNE_BIOS;
-				goto done;
-			case -16: /* "remap63" */
-				drive->sect0 = 63;
 				goto done;
 			case 3: /* cyl,head,sect */
 				drive->media	= ide_disk;
@@ -2348,7 +2335,7 @@ int ide_register_subdriver (ide_drive_t *drive, ide_driver_t *driver, int versio
 	setup_driver_defaults(drive);
 	spin_unlock_irqrestore(&ide_lock, flags);
 	spin_lock(&drives_lock);
-	list_add(&drive->list, &driver->drives);
+	list_add_tail(&drive->list, &driver->drives);
 	spin_unlock(&drives_lock);
 //	printk(KERN_INFO "%s: attached %s driver.\n", drive->name, driver->name);
 	if ((drive->autotune == IDE_TUNE_DEFAULT) ||
@@ -2392,8 +2379,8 @@ int ide_unregister_subdriver (ide_drive_t *drive)
 	spin_unlock_irqrestore(&ide_lock, flags);
 	spin_lock(&drives_lock);
 	list_del_init(&drive->list);
-	list_add(&drive->list, &drive->driver->drives);
 	spin_unlock(&drives_lock);
+	/* drive will be added to &idedefault_driver->drives in ata_attach() */
 	return 0;
 }
 
@@ -2416,9 +2403,9 @@ int ide_register_driver(ide_driver_t *driver)
 	list_add(&driver->drivers, &drivers);
 	spin_unlock(&drivers_lock);
 
-	spin_lock(&drives_lock);
 	INIT_LIST_HEAD(&list);
-	list_splice_init(&ata_unused, &list);
+	spin_lock(&drives_lock);
+	list_splice_init(&idedefault_driver.drives, &list);
 	spin_unlock(&drives_lock);
 
 	list_for_each_safe(list_loop, tmp_storage, &list) {

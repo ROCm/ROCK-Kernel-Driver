@@ -260,7 +260,7 @@ static int xfrm_add_sa(struct sk_buff *skb, struct nlmsghdr *nlh, void **xfrma)
 	if (!x)
 		return err;
 
-	x1 = xfrm_state_lookup(&x->props.saddr, x->id.spi, x->id.proto, x->props.family);
+	x1 = xfrm_state_lookup(&x->id.daddr, x->id.spi, x->id.proto, x->props.family);
 	if (x1) {
 		xfrm_state_put(x);
 		xfrm_state_put(x1);
@@ -277,7 +277,7 @@ static int xfrm_del_sa(struct sk_buff *skb, struct nlmsghdr *nlh, void **xfrma)
 	struct xfrm_state *x;
 	struct xfrm_usersa_id *p = NLMSG_DATA(nlh);
 
-	x = xfrm_state_lookup(&p->saddr, p->spi, p->proto, p->family);
+	x = xfrm_state_lookup(&p->daddr, p->spi, p->proto, p->family);
 	if (x == NULL)
 		return -ESRCH;
 
@@ -403,7 +403,7 @@ static int xfrm_get_sa(struct sk_buff *skb, struct nlmsghdr *nlh, void **xfrma)
 	struct sk_buff *resp_skb;
 	int err;
 
-	x = xfrm_state_lookup(&p->saddr, p->spi, p->proto, p->family);
+	x = xfrm_state_lookup(&p->daddr, p->spi, p->proto, p->family);
 	err = -ESRCH;
 	if (x == NULL)
 		goto out_noput;

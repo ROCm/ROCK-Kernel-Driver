@@ -225,10 +225,6 @@ void setup_arch(char **cmdline_p)
 		(int) memory_end, (int) _ramend);
 #endif
 
-#ifdef CONFIG_BLK_DEV_BLKMEM
-	ROOT_DEV = MKDEV(BLKMEM_MAJOR, 0);
-#endif
-
 	/* Keep a copy of command line */
 	*cmdline_p = &command_line[0];
 	memcpy(saved_command_line, command_line, sizeof(saved_command_line));

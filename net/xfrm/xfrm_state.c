@@ -112,9 +112,9 @@ static void xfrm_timer_handler(unsigned long data)
 		if (tmo < next)
 			next = tmo;
 	}
-	if (x->lft.hard_use_expires_seconds && x->curlft.use_time) {
+	if (x->lft.hard_use_expires_seconds) {
 		long tmo = x->lft.hard_use_expires_seconds +
-			x->curlft.use_time - now;
+			(x->curlft.use_time ? : now) - now;
 		if (tmo <= 0)
 			goto expired;
 		if (tmo < next)
@@ -130,9 +130,9 @@ static void xfrm_timer_handler(unsigned long data)
 		else if (tmo < next)
 			next = tmo;
 	}
-	if (x->lft.soft_use_expires_seconds && x->curlft.use_time) {
+	if (x->lft.soft_use_expires_seconds) {
 		long tmo = x->lft.soft_use_expires_seconds +
-			x->curlft.use_time - now;
+			(x->curlft.use_time ? : now) - now;
 		if (tmo <= 0)
 			warn = 1;
 		else if (tmo < next)

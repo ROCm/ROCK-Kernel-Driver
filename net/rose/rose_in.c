@@ -54,7 +54,7 @@ static int rose_state1_machine(struct sock *sk, struct sk_buff *skb, int framety
 		rose->vl        = 0;
 		rose->state     = ROSE_STATE_3;
 		sk->state                    = TCP_ESTABLISHED;
-		if (!test_bit(SOCK_DEAD, &sk->flags))
+		if (!sock_flag(sk, SOCK_DEAD))
 			sk->state_change(sk);
 		break;
 

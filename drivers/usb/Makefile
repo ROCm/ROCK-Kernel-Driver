@@ -59,3 +59,6 @@ obj-$(CONFIG_USB_TEST)		+= misc/
 obj-$(CONFIG_USB_TIGL)		+= misc/
 obj-$(CONFIG_USB_USS720)	+= misc/
 
+obj-$(CONFIG_USB_NET2280)	+= gadget/
+obj-$(CONFIG_USB_ZERO)		+= gadget/
+obj-$(CONFIG_USB_ETH)		+= gadget/

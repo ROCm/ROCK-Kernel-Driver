@@ -1410,7 +1410,7 @@ void remove_suid(struct dentry *dentry)
 	}
 }
 
-static inline int
+static inline size_t
 filemap_copy_from_user(struct page *page, unsigned long offset,
 			const char __user *buf, unsigned bytes)
 {
@@ -1427,44 +1427,48 @@ filemap_copy_from_user(struct page *page, unsigned long offset,
 		left = __copy_from_user(kaddr + offset, buf, bytes);
 		kunmap(page);
 	}
-	return left;
+	return left ? 0 : bytes;
 }
 
-static int
+static size_t
 __filemap_copy_from_user_iovec(char *vaddr, 
 			const struct iovec *iov, size_t base, size_t bytes)
 {
-	int left = 0;
+	size_t copied = 0;
 
 	while (bytes) {
 		char __user *buf = iov->iov_base + base;
 		int copy = min(bytes, iov->iov_len - base);
+
 		base = 0;
-		if ((left = __copy_from_user(vaddr, buf, copy)))
+		if (__copy_from_user(vaddr, buf, copy))
 			break;
+		copied += copy;
 		bytes -= copy;
 		vaddr += copy;
 		iov++;
 	}
-	return left;
+	return copied;
 }
 
-static inline int
+static inline size_t
 filemap_copy_from_user_iovec(struct page *page, unsigned long offset,
 			const struct iovec *iov, size_t base, size_t bytes)
 {
 	char *kaddr;
-	int left;
+	size_t copied;
 
 	kaddr = kmap_atomic(page, KM_USER0);
-	left = __filemap_copy_from_user_iovec(kaddr + offset, iov, base, bytes);
+	copied = __filemap_copy_from_user_iovec(kaddr + offset, iov,
+						base, bytes);
 	kunmap_atomic(kaddr, KM_USER0);
-	if (left != 0) {
+	if (copied != bytes) {
 		kaddr = kmap(page);
-		left = __filemap_copy_from_user_iovec(kaddr + offset, iov, base, bytes);
+		copied = __filemap_copy_from_user_iovec(kaddr + offset, iov,
+							base, bytes);
 		kunmap(page);
 	}
-	return left;
+	return copied;
 }
 
 static inline void
@@ -1475,6 +1479,7 @@ filemap_set_next_iovec(const struct iovec **iovp, size_t *basep, size_t bytes)
 
 	while (bytes) {
 		int copy = min(bytes, iov->iov_len - base);
+
 		bytes -= copy;
 		base += copy;
 		if (iov->iov_len == base) {
@@ -1672,7 +1677,7 @@ generic_file_aio_write_nolock(struct kiocb *iocb, const struct iovec *iov,
 	do {
 		unsigned long index;
 		unsigned long offset;
-		long page_fault;
+		size_t copied;
 
 		offset = (pos & (PAGE_CACHE_SIZE -1)); /* Within page */
 		index = pos >> PAGE_CACHE_SHIFT;
@@ -1707,18 +1712,17 @@ generic_file_aio_write_nolock(struct kiocb *iocb, const struct iovec *iov,
 			break;
 		}
 		if (likely(nr_segs == 1))
-			page_fault = filemap_copy_from_user(page, offset,
+			copied = filemap_copy_from_user(page, offset,
 							buf, bytes);
 		else
-			page_fault = filemap_copy_from_user_iovec(page, offset,
+			copied = filemap_copy_from_user_iovec(page, offset,
 						cur_iov, iov_base, bytes);
 		flush_dcache_page(page);
-		status = a_ops->commit_write(file, page, offset, offset+bytes);
-		if (unlikely(page_fault)) {
-			status = -EFAULT;
-		} else {
+		status = a_ops->commit_write(file, page, offset,
+						offset + copied);
+		if (likely(copied > 0)) {
 			if (!status)
-				status = bytes;
+				status = copied;
 
 			if (status >= 0) {
 				written += status;
@@ -1730,6 +1734,10 @@ generic_file_aio_write_nolock(struct kiocb *iocb, const struct iovec *iov,
 							&iov_base, status);
 			}
 		}
+		if (unlikely(copied != bytes))
+			if (status >= 0)
+				status = -EFAULT;
+
 		if (!PageReferenced(page))
 			SetPageReferenced(page);
 		unlock_page(page);

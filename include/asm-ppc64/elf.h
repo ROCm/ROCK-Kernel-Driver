@@ -98,17 +98,38 @@ typedef elf_fpreg_t elf_fpregset_t[ELF_NFPREG];
 #define ELF_ET_DYN_BASE         (0x08000000)
 
 /* Common routine for both 32-bit and 64-bit processes */
-#define ELF_CORE_COPY_REGS(gregs, regs) ppc64_elf_core_copy_regs(gregs, regs);
-static inline void
-ppc64_elf_core_copy_regs(elf_gregset_t dstRegs, struct pt_regs* srcRegs)
+static inline void ppc64_elf_core_copy_regs(elf_gregset_t elf_regs,
+					    struct pt_regs *regs)
 {
 	int i;
+	int gprs = sizeof(struct pt_regs)/sizeof(elf_greg_t64);
 
-	int numGPRS = ((sizeof(struct pt_regs)/sizeof(elf_greg_t64)) < ELF_NGREG) ? (sizeof(struct pt_regs)/sizeof(elf_greg_t64)) : ELF_NGREG;
+	if (gprs > ELF_NGREG)
+		gprs = ELF_NGREG;
 
-	for (i=0; i < numGPRS; i++)
-		dstRegs[i] = (elf_greg_t)((elf_greg_t64 *)srcRegs)[i];
+	for (i=0; i < gprs; i++)
+		elf_regs[i] = (elf_greg_t)((elf_greg_t64 *)regs)[i];
 }
+#define ELF_CORE_COPY_REGS(gregs, regs) ppc64_elf_core_copy_regs(gregs, regs);
+
+static inline int dump_task_regs(struct task_struct *tsk,
+				 elf_gregset_t *elf_regs)
+{
+	struct pt_regs *regs = tsk->thread.regs;
+	if (regs)
+		ppc64_elf_core_copy_regs(*elf_regs, regs);
+
+	return 1;
+}
+#define ELF_CORE_COPY_TASK_REGS(tsk, elf_regs) dump_task_regs(tsk, elf_regs)
+
+extern int dump_task_fpu(struct task_struct *, elf_fpregset_t *); 
+#define ELF_CORE_COPY_FPREGS(tsk, elf_fpregs) dump_task_fpu(tsk, elf_fpregs)
+
+#ifdef CONFIG_SMP
+extern void dump_smp_unlazy_fpu(void);
+#define ELF_CORE_SYNC dump_smp_unlazy_fpu
+#endif
 
 /* This yields a mask that user programs can use to figure out what
    instruction set this cpu supports.  This could be done in userspace,
