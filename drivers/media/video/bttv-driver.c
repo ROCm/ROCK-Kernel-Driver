@@ -313,12 +313,12 @@ const struct bttv_tvnorm bttv_tvnorms[] = {
 		.sram           = -1,
 	}
 };
-const unsigned int BTTV_TVNORMS = ARRAY_SIZE(bttv_tvnorms);
+static const unsigned int BTTV_TVNORMS = ARRAY_SIZE(bttv_tvnorms);
 
 /* ----------------------------------------------------------------------- */
 /* bttv format list
    packed pixel formats must come first */
-const struct bttv_format bttv_formats[] = {
+static const struct bttv_format bttv_formats[] = {
 	{
 		.name     = "8 bpp, gray",
 		.palette  = VIDEO_PALETTE_GREY,
@@ -470,7 +470,7 @@ const struct bttv_format bttv_formats[] = {
 		.flags    = FORMAT_FLAGS_RAW,
 	}
 };
-const unsigned int BTTV_FORMATS = ARRAY_SIZE(bttv_formats);
+static const unsigned int BTTV_FORMATS = ARRAY_SIZE(bttv_formats);
 
 /* ----------------------------------------------------------------------- */
 

@@ -89,7 +89,6 @@ struct bttv_tvnorm {
 	int   sram;
 };
 extern const struct bttv_tvnorm bttv_tvnorms[];
-extern const unsigned int BTTV_TVNORMS;
 
 struct bttv_format {
 	char *name;
@@ -101,8 +100,6 @@ struct bttv_format {
 	int  flags;
 	int  hshift,vshift;   /* for planar modes   */
 };
-extern const struct bttv_format bttv_formats[];
-extern const unsigned int BTTV_FORMATS;
 
 /* ---------------------------------------------------------- */
 
