@@ -486,7 +486,7 @@ static struct miscdevice wdtpci_miscdev = {
 	.fops	= &wdtpci_fops,
 };
 
-#ifdef CONFIG_WDT_501
+#ifdef CONFIG_WDT_501_PCI
 static struct miscdevice temp_miscdev = {
 	.minor	= TEMP_MINOR,
 	.name	= "temperature",
@@ -550,7 +550,7 @@ static int __init wdtpci_init_one (struct pci_dev *dev,
 		printk (KERN_ERR PFX "can't misc_register on minor=%d\n", WATCHDOG_MINOR);
 		goto out_misc;
 	}
-#ifdef CONFIG_WDT_501
+#ifdef CONFIG_WDT_501_PCI
 	ret = misc_register (&temp_miscdev);
 	if (ret) {
 		printk (KERN_ERR PFX "can't misc_register (temp) on minor=%d\n", TEMP_MINOR);
@@ -562,7 +562,7 @@ static int __init wdtpci_init_one (struct pci_dev *dev,
 out:
 	return ret;
 
-#ifdef CONFIG_WDT_501
+#ifdef CONFIG_WDT_501_PCI
 out_rbt:
 	unregister_reboot_notifier(&wdtpci_notifier);
 #endif

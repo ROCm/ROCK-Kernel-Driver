@@ -68,22 +68,6 @@ config WDT
 	  say M here and read <file:Documentation/modules.txt>.  The module
 	  will be called wdt.
 
-config WDTPCI
-	tristate "WDT PCI Watchdog timer"
-	depends on WATCHDOG
-	---help---
-	  If you have a PCI WDT500/501 watchdog board, say Y here, otherwise
-	  N.  It is not possible to probe for this board, which means that you
-	  have to inform the kernel about the IO port and IRQ using the "wdt="
-	  kernel option (try "man bootparam" or see the documentation of your
-	  boot loader (lilo or loadlin) about how to pass options to the
-	  kernel at boot time).
-
-	  If you want to compile this as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called wdt_pci.
-
 config WDT_501
 	bool "WDT501 features"
 	depends on WDT
@@ -101,6 +85,33 @@ config WDT_501_FAN
 	help
 	  Enable the Fan Tachometer on the WDT501. Only do this if you have a
 	  fan tachometer actually set up.
+
+config WDTPCI
+	tristate "WDT PCI Watchdog timer"
+	depends on WATCHDOG
+	---help---
+	  If you have a PCI WDT500/501 watchdog board, say Y here, otherwise
+	  N.  It is not possible to probe for this board, which means that you
+	  have to inform the kernel about the IO port and IRQ using the "wdt="
+	  kernel option (try "man bootparam" or see the documentation of your
+	  boot loader (lilo or loadlin) about how to pass options to the
+	  kernel at boot time).
+
+	  If you want to compile this as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want),
+	  say M here and read <file:Documentation/modules.txt>.  The module
+	  will be called wdt_pci.
+
+config WDT_501_PCI
+	bool "WDT501-PCI features"
+	depends on WDTPCI
+	help
+	  Saying Y here and creating a character special file /dev/temperature
+	  with major number 10 and minor number 131 ("man mknod") will give
+	  you a thermometer inside your computer: reading from
+	  /dev/temperature yields one byte, the temperature in degrees
+	  Fahrenheit. This works only if you have a WDT501P watchdog board
+	  installed.
 
 config PCWATCHDOG
 	tristate "Berkshire Products PC Watchdog"
