@@ -254,6 +254,7 @@ struct thread_struct {
    switch faster for a limited number of ioperm using tasks. -AK */
 	int		ioperm;
 	unsigned long	*io_bitmap_ptr;
+	unsigned io_bitmap_max;
 /* cached TLS descriptors. */
 	u64 tls_array[GDT_ENTRY_TLS_ENTRIES];
 } __attribute__((aligned(16)));
