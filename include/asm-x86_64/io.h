@@ -260,10 +260,8 @@ static inline void memcpy_toio(volatile void __iomem *to, const void *from, unsi
 {
 	__memcpy_toio((unsigned long)to,from,len);
 }
-static inline void memset_io(volatile void __iomem *a, int b, size_t c)
-{
-	memset((__force void *)a,b,c);
-}
+
+void memset_io(volatile void __iomem *a, int b, size_t c);
 
 /*
  * ISA space is 'always mapped' on a typical x86 system, no need to
