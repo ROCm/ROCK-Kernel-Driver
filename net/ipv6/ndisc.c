@@ -912,6 +912,7 @@ static void ndisc_recv_na(struct sk_buff *skb)
 		neigh_update(neigh, lladdr,
 			     msg->icmph.icmp6_solicited ? NUD_REACHABLE : NUD_STALE,
 			     NEIGH_UPDATE_F_SUSPECT_CONNECTED|
+			     NEIGH_UPDATE_F_RETAIN_STATE|
 			     (msg->icmph.icmp6_override ? NEIGH_UPDATE_F_OVERRIDE : 0));
 		neigh_release(neigh);
 	}
@@ -1080,7 +1081,9 @@ static void ndisc_router_discovery(struct sk_buff *skb)
 				goto out;
 			}
 		}
-		neigh_update(neigh, lladdr, NUD_STALE, NEIGH_UPDATE_F_OVERRIDE);
+		neigh_update(neigh, lladdr, NUD_STALE,
+			     NEIGH_UPDATE_F_RETAIN_STATE|
+			     NEIGH_UPDATE_F_OVERRIDE);
 	}
 
 	if (ndopts.nd_opts_pi) {
@@ -1205,7 +1208,9 @@ static void ndisc_redirect_rcv(struct sk_buff *skb)
 
 	neigh = __neigh_lookup(&nd_tbl, target, skb->dev, 1);
 	if (neigh) {
-		neigh_update(neigh, lladdr, NUD_STALE, NEIGH_UPDATE_F_OVERRIDE);
+		neigh_update(neigh, lladdr, NUD_STALE, 
+			     NEIGH_UPDATE_F_RETAIN_STATE|
+			     NEIGH_UPDATE_F_OVERRIDE);
 		if (neigh->nud_state&NUD_VALID)
 			rt6_redirect(dest, &skb->nh.ipv6h->saddr, neigh, on_link);
 		else

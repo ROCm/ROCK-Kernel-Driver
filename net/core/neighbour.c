@@ -806,6 +806,8 @@ static __inline__ void neigh_update_hhs(struct neighbour *neigh)
 	NEIGH_UPDATE_F_SUSPECT_CONNECTED will suspect existing "connected"
 				lladdr instead of overriding it 
 				if it is different.
+	NEIGH_UPDATE_F_RETAIN_STATE allows to retain current state
+				if lladdr is unchanged.
 	NEIGH_UPDATE_F_ADMIN	means that the change is administrative.
 
    Caller MUST hold reference count on the entry.
@@ -885,8 +887,9 @@ int neigh_update(struct neighbour *neigh, const u8 *lladdr, u8 new,
 			} else
 				goto out;
 		} else {
-			if (lladdr == neigh->ha && 
-			    new == NUD_STALE && (old & NUD_CONNECTED))
+			if (lladdr == neigh->ha && new == NUD_STALE &&
+			    ((flags & NEIGH_UPDATE_F_RETAIN_STATE) ||
+			     (old & NUD_CONNECTED)))
 				new = old;
 		}
 	}

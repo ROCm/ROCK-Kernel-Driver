@@ -182,6 +182,7 @@ struct neigh_table
 /* flags for neigh_update() */
 #define NEIGH_UPDATE_F_OVERRIDE			0x00000001
 #define NEIGH_UPDATE_F_SUSPECT_CONNECTED	0x00000002
+#define NEIGH_UPDATE_F_RETAIN_STATE		0x00000004
 #define NEIGH_UPDATE_F_ADMIN			0x80000000
 
 extern void			neigh_table_init(struct neigh_table *tbl);
