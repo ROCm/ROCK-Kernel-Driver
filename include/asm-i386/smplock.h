@@ -12,10 +12,15 @@ extern spinlock_t kernel_flag;
 
 #ifdef CONFIG_SMP
 #define kernel_locked()		spin_is_locked(&kernel_flag)
+#define check_irq_holder(cpu) \
+do { \
+	if (global_irq_holder == (cpu)) \
+		BUG(); \
+} while(0)
 #else
 #ifdef CONFIG_PREEMPT
 #define kernel_locked()		preempt_get_count()
-#define global_irq_holder	0
+#define check_irq_holder(cpu)	do { } while(0)
 #else
 #define kernel_locked()		1
 #endif
@@ -28,8 +33,7 @@ extern spinlock_t kernel_flag;
 do {						\
 	if (unlikely(task->lock_depth >= 0)) {	\
 		spin_unlock(&kernel_flag);	\
-		if (global_irq_holder == (cpu))	\
-			BUG();			\
+		check_irq_holder(cpu);		\
 	}					\
 } while (0)
 
