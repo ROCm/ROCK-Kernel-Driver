@@ -105,8 +105,8 @@ static ssize_t sock_readv(struct file *file, const struct iovec *vector,
 			  unsigned long count, loff_t *ppos);
 static ssize_t sock_writev(struct file *file, const struct iovec *vector,
 			  unsigned long count, loff_t *ppos);
-static ssize_t sock_writepage(struct file *file, struct page *page,
-			  int offset, size_t size, loff_t *ppos, int more);
+static ssize_t sock_sendpage(struct file *file, struct page *page,
+			     int offset, size_t size, loff_t *ppos, int more);
 
 
 /*
@@ -126,7 +126,7 @@ static struct file_operations socket_file_ops = {
 	fasync:		sock_fasync,
 	readv:		sock_readv,
 	writev:		sock_writev,
-	writepage:	sock_writepage
+	sendpage:	sock_sendpage
 };
 
 /*
@@ -606,8 +606,8 @@ static ssize_t sock_write(struct file *file, const char *ubuf,
 	return sock_sendmsg(sock, &msg, size);
 }
 
-ssize_t sock_writepage(struct file *file, struct page *page,
-		       int offset, size_t size, loff_t *ppos, int more)
+ssize_t sock_sendpage(struct file *file, struct page *page,
+		      int offset, size_t size, loff_t *ppos, int more)
 {
 	struct socket *sock;
 	int flags;

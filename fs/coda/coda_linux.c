@@ -25,9 +25,10 @@
 #include <linux/coda_fs_i.h>
 
 /* initialize the debugging variables */
-int coda_debug = 0;
-int coda_print_entry = 0; 
+int coda_debug;
+int coda_print_entry; 
 int coda_access_cache = 1;
+int coda_fake_statfs;
 
 /* print a fid */
 char * coda_f2s(ViceFid *f)
@@ -54,50 +55,15 @@ char * coda_f2s2(ViceFid *f)
 /* recognize special .CONTROL name */
 int coda_iscontrol(const char *name, size_t length)
 {
-	if ((CODA_CONTROLLEN == length) && 
-	    (strncmp(name, CODA_CONTROL, CODA_CONTROLLEN) == 0))
-		return 1;
-	return 0;
+	return ((CODA_CONTROLLEN == length) && 
+                (strncmp(name, CODA_CONTROL, CODA_CONTROLLEN) == 0));
 }
 
 /* recognize /coda inode */
 int coda_isroot(struct inode *i)
 {
-    if ( i->i_sb->s_root->d_inode == i ) {
-	    return 1;
-    } else {
-	    return 0;
-    }
+    return ( i->i_sb->s_root->d_inode == i );
 }
-
-int coda_fid_is_weird(struct ViceFid *fid)
-{
-        /* volume roots */
-        if ( (fid->Vnode == 1) && (fid->Unique == 1 ) )
-	        return 1;
-        /* tmpfid unique (simulate.cc) */
-	if ( fid->Unique == 0xffffffff )
-	        return 1;
-	/* LocalFakeVnode (local.h)  */
-	if ( fid->Vnode == 0xfffffffd )
-	        return 1;
-	/* LocalFileVnode (venus.private.h) */
-	if ( fid->Vnode == 0xfffffffe )
-	        return 1;
-	/* local fake vid (local.h) */
-	if ( fid->Volume == 0xffffffff )
-	        return 1;
-	/* local DirVnode (venus.private.h) */
-	if ( fid->Vnode == 0xffffffff )
-	        return 1;
-	/* FakeVnode (venus.private.h) */
-	if ( fid->Vnode == 0xfffffffc )
-	        return 1;
-
-	return 0;
-}
-
-
 
 /* put the current process credentials in the cred */
 void coda_load_creds(struct coda_cred *cred)

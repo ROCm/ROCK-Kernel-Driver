@@ -5,7 +5,7 @@
  *
  *		Implementation of the Transmission Control Protocol(TCP).
  *
- * Version:	$Id: tcp_input.c,v 1.226 2001/03/07 22:00:57 davem Exp $
+ * Version:	$Id: tcp_input.c,v 1.228 2001/04/20 20:46:19 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -2970,22 +2970,7 @@ static void tcp_new_space(struct sock *sk)
 		tp->snd_cwnd_stamp = tcp_time_stamp;
 	}
 
-	/* Wakeup users. */
-	if (tcp_wspace(sk) >= tcp_min_write_space(sk)) {
-		struct socket *sock = sk->socket;
-
-		clear_bit(SOCK_NOSPACE, &sock->flags);
-
-		if (sk->sleep && waitqueue_active(sk->sleep))
-			wake_up_interruptible(sk->sleep);
-
-		if (sock->fasync_list && !(sk->shutdown&SEND_SHUTDOWN))
-			sock_wake_async(sock, 2, POLL_OUT);
-
-		/* Satisfy those who hook write_space() callback. */
-		if (sk->write_space != tcp_write_space)
-			sk->write_space(sk);
-	}
+	sk->write_space(sk);
 }
 
 static inline void tcp_check_space(struct sock *sk)
@@ -3777,6 +3762,7 @@ int tcp_rcv_state_process(struct sock *sk, struct sk_buff *skb,
 				tp->copied_seq = tp->rcv_nxt;
 				mb();
 				tcp_set_state(sk, TCP_ESTABLISHED);
+				sk->state_change(sk);
 
 				/* Note, that this wakeup is only for marginal
 				 * crossed SYN case. Passively open sockets
@@ -3784,7 +3770,6 @@ int tcp_rcv_state_process(struct sock *sk, struct sk_buff *skb,
 				 * and sk->socket == NULL.
 				 */
 				if (sk->socket) {
-					sk->state_change(sk);
 					sk_wake_async(sk,0,POLL_OUT);
 				}
 

@@ -34,7 +34,7 @@ static int swap_writepage(struct page *page)
 	return 0;
 
 in_use:
-	rw_swap_page(WRITE, page, 0);
+	rw_swap_page(WRITE, page);
 	return 0;
 }
 
@@ -163,37 +163,18 @@ struct page * lookup_swap_cache(swp_entry_t entry)
 		/*
 		 * Right now the pagecache is 32-bit only.  But it's a 32 bit index. =)
 		 */
-repeat:
-		found = find_lock_page(&swapper_space, entry.val);
+		found = find_get_swapcache_page(&swapper_space, entry.val);
 		if (!found)
 			return 0;
-		/*
-		 * Though the "found" page was in the swap cache an instant
-		 * earlier, it might have been removed by refill_inactive etc.
-		 * Re search ... Since find_lock_page grabs a reference on
-		 * the page, it can not be reused for anything else, namely
-		 * it can not be associated with another swaphandle, so it
-		 * is enough to check whether the page is still in the scache.
-		 */
-		if (!PageSwapCache(found)) {
-			UnlockPage(found);
-			page_cache_release(found);
-			goto repeat;
-		}
+		if (!PageSwapCache(found))
+			BUG();
 		if (found->mapping != &swapper_space)
-			goto out_bad;
+			BUG();
 #ifdef SWAP_CACHE_INFO
 		swap_cache_find_success++;
 #endif
-		UnlockPage(found);
 		return found;
 	}
-
-out_bad:
-	printk (KERN_ERR "VM: Found a non-swapper swap page!\n");
-	UnlockPage(found);
-	page_cache_release(found);
-	return 0;
 }
 
 /* 
@@ -205,7 +186,7 @@ out_bad:
  * the swap entry is no longer in use.
  */
 
-struct page * read_swap_cache_async(swp_entry_t entry, int wait)
+struct page * read_swap_cache_async(swp_entry_t entry)
 {
 	struct page *found_page = 0, *new_page;
 	unsigned long new_page_addr;
@@ -238,7 +219,7 @@ struct page * read_swap_cache_async(swp_entry_t entry, int wait)
 	 */
 	lock_page(new_page);
 	add_to_swap_cache(new_page, entry);
-	rw_swap_page(READ, new_page, wait);
+	rw_swap_page(READ, new_page);
 	return new_page;
 
 out_free_page:

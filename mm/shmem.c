@@ -114,7 +114,6 @@ static swp_entry_t * shmem_swp_entry (struct shmem_inode_info *info, unsigned lo
 static int shmem_free_swp(swp_entry_t *dir, unsigned int count)
 {
 	swp_entry_t *ptr, entry;
-	struct page * page;
 	int freed = 0;
 
 	for (ptr = dir; ptr < dir + count; ptr++) {
@@ -123,10 +122,8 @@ static int shmem_free_swp(swp_entry_t *dir, unsigned int count)
 		entry = *ptr;
 		*ptr = (swp_entry_t){0};
 		freed++;
-		if ((page = lookup_swap_cache(entry)) != NULL) {
-			delete_from_swap_cache(page);
-			page_cache_release(page);	
-		}
+
+		/* vmscan will do the actual page freeing later.. */
 		swap_free (entry);
 	}
 	return freed;
@@ -242,11 +239,9 @@ static int shmem_writepage(struct page * page)
 	inode = page->mapping->host;
 	info = &inode->u.shmem_i;
 	swap = __get_swap_page(2);
-	if (!swap.val) {
-		set_page_dirty(page);
-		UnlockPage(page);
-		return -ENOMEM;
-	}
+	error = -ENOMEM;
+	if (!swap.val)
+		goto out;
 
 	spin_lock(&info->lock);
 	entry = shmem_swp_entry(info, page->index);
@@ -266,11 +261,11 @@ static int shmem_writepage(struct page * page)
 	/* Add it to the swap cache */
 	add_to_swap_cache(page, swap);
 	page_cache_release(page);
-	set_page_dirty(page);
 	info->swapped++;
 
 	spin_unlock(&info->lock);
 out:
+	set_page_dirty(page);
 	UnlockPage(page);
 	return error;
 }
@@ -329,10 +324,11 @@ repeat:
 			spin_unlock (&info->lock);
 			lock_kernel();
 			swapin_readahead(*entry);
-			page = read_swap_cache(*entry);
+			page = read_swap_cache_async(*entry);
 			unlock_kernel();
 			if (!page) 
 				return ERR_PTR(-ENOMEM);
+			wait_on_page(page);
 			if (!Page_Uptodate(page)) {
 				page_cache_release(page);
 				return ERR_PTR(-EIO);
@@ -348,9 +344,6 @@ repeat:
 		if (TryLockPage(page)) 
 			goto wait_retry;
 
-		if (swap_count(page) > 2)
-			BUG();
-		
 		swap_free(*entry);
 		*entry = (swp_entry_t) {0};
 		delete_from_swap_cache_nolock(page);
@@ -432,6 +425,7 @@ failed:
 		*ptr = NOPAGE_SIGBUS;
 	return error;
 sigbus:
+	up (&inode->i_sem);
 	*ptr = NOPAGE_SIGBUS;
 	return -EFAULT;
 }

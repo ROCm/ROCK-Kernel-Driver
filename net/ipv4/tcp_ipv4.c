@@ -5,7 +5,7 @@
  *
  *		Implementation of the Transmission Control Protocol(TCP).
  *
- * Version:	$Id: tcp_ipv4.c,v 1.228 2001/04/06 18:41:36 davem Exp $
+ * Version:	$Id: tcp_ipv4.c,v 1.229 2001/04/20 20:46:19 davem Exp $
  *
  *		IPv4 specific functions
  *
@@ -1910,7 +1910,8 @@ static int tcp_v4_init_sock(struct sock *sk)
 
 	sk->state = TCP_CLOSE;
 
-	sk->write_space = tcp_write_space; 
+	sk->write_space = tcp_write_space;
+	sk->use_write_queue = 1;
 
 	sk->tp_pinfo.af_tcp.af_specific = &ipv4_specific;
 

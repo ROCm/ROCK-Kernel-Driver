@@ -542,6 +542,7 @@ nfsd3_proc_fsinfo(struct svc_rqst * rqstp, struct nfsd_fhandle    *argp,
 		if (sb->s_magic == 0x4d44 /* MSDOS_SUPER_MAGIC */) {
 			resp->f_properties = NFS3_FSF_BILLYBOY;
 		}
+		resp->f_maxfilesize = sb->s_maxbytes;
 	}
 
 	fh_put(&argp->fh);

@@ -14,9 +14,13 @@ DECLARE_LOCK_EXTERN(ip_ftp_lock);
 enum ip_ct_ftp_type
 {
 	/* PORT command from client */
-	IP_CT_FTP_PORT = IP_CT_DIR_ORIGINAL,
+	IP_CT_FTP_PORT,
 	/* PASV response from server */
-	IP_CT_FTP_PASV = IP_CT_DIR_REPLY
+	IP_CT_FTP_PASV,
+	/* EPRT command from client */
+	IP_CT_FTP_EPRT,
+	/* EPSV response from server */
+	IP_CT_FTP_EPSV,
 };
 
 /* We record seq number and length of ftp ip/port text here: all in

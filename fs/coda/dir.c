@@ -12,6 +12,7 @@
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/fs.h>
+#include <linux/file.h>
 #include <linux/stat.h>
 #include <linux/errno.h>
 #include <linux/locks.h>
@@ -49,11 +50,9 @@ static int coda_dentry_revalidate(struct dentry *de, int);
 static int coda_dentry_delete(struct dentry *);
 
 /* support routines */
-static void coda_prepare_fakefile(struct inode *coda_inode,
-		                  struct file *coda_file, 
-				  struct inode *open_inode,
-				  struct file *open_file,
-				  struct dentry *open_dentry);
+static void coda_prepare_fakefile(struct file *coda_file, 
+				  struct dentry *open_dentry,
+				  struct file *open_file);
 static int coda_venus_readdir(struct file *filp, void *dirent, 
 			      filldir_t filldir);
 int coda_fsync(struct file *, struct dentry *dentry, int datasync);
@@ -86,6 +85,7 @@ struct file_operations coda_dir_operations = {
 	read:		generic_read_dir,
 	readdir:	coda_readdir,
 	open:		coda_open,
+	flush:  	coda_flush,
 	release:	coda_release,
 	fsync:		coda_fsync,
 };
@@ -138,11 +138,6 @@ static struct dentry *coda_lookup(struct inode *dir, struct dentry *entry)
 
 	    	error = coda_cnode_make(&res_inode, &resfid, dir->i_sb);
 		if (error) return ERR_PTR(error);
-
-		/* make sure we drop unexpected weird fid's */
-		if (coda_f2i(&resfid) != res_inode->i_ino &&
-		    !coda_fid_is_weird(&resfid))
-			dropme = 1;
 	} else if (error != -ENOENT) {
 	        CDEBUG(D_INODE, "error for %s(%*s)%d\n",
 		       coda_i2s(dir), (int)length, name, error);
@@ -513,179 +508,47 @@ static int coda_rename(struct inode *old_dir, struct dentry *old_dentry,
 int coda_readdir(struct file *file, void *dirent,  filldir_t filldir)
 {
         int result = 0;
-        struct file open_file;
-	struct dentry open_dentry;
-	struct inode *inode=file->f_dentry->d_inode, *container;
+	struct dentry *cdentry;
+	struct inode *cinode, *inode = file->f_dentry->d_inode;
+	struct file *cfile, fakefile;
+	struct coda_inode_info *cii = ITOC(inode);
 
         ENTRY;
 	coda_vfs_stat.readdir++;
 
-        if ( inode->i_mapping == &inode->i_data ) {
-                CDEBUG(D_FILE, "no container inode.\n");
-                return -EIO;
-        }
+        cfile = cii->c_container;
+        if (!cfile) BUG();
 
-	container = inode->i_mapping->host;
+	cinode = cii->c_container->f_dentry->d_inode;
+	if ( S_ISREG(cinode->i_mode) ) {
+		/* Venus: we must read Venus dirents from the file */
+		cdentry = cii->c_container->f_dentry;
+		coda_prepare_fakefile(file, cdentry, &fakefile);
 
-	coda_prepare_fakefile(inode, file, container, &open_file, &open_dentry);
+		result = coda_venus_readdir(&fakefile, dirent, filldir);
 
-        if ( S_ISREG(container->i_mode) ) {
-                /* Venus: we must read Venus dirents from the file */
-                result = coda_venus_readdir(&open_file, dirent, filldir);
+		file->f_pos = fakefile.f_pos;
+		file->f_version = fakefile.f_version;
         } else {
 		/* potemkin case: we are handed a directory inode */
-                result = vfs_readdir(&open_file, filldir, dirent);
+		result = vfs_readdir(file, filldir, dirent);
         }
-
-	/* we only have to restore the file position (and f_version?) */
-	file->f_pos = open_file.f_pos;
-	file->f_version = open_file.f_version;
 
         EXIT;
 	return result;
 }
 
-/* grab the ext2 inode of the container file */
-static int coda_inode_grab(dev_t dev, ino_t ino, struct inode **ind)
-{
-        struct super_block *sbptr;
-
-        sbptr = get_super(dev);
-
-        if ( !sbptr ) {
-                printk("coda_inode_grab: coda_find_super returns NULL.\n");
-                return -ENXIO;
-        }
-                
-        *ind = NULL;
-        *ind = iget(sbptr, ino);
-
-        if ( *ind == NULL ) {
-		printk("coda_inode_grab: iget(dev: %d, ino: %ld) "
-		       "returns NULL.\n", dev, (long)ino);
-                return -ENOENT;
-        }
-	CDEBUG(D_FILE, "ino: %ld, ops at %p\n", (long)ino, (*ind)->i_op);
-        return 0;
-}
-
-/* ask venus to cache the file and return the inode of the container file,
-   put this inode pointer in the cnode for future read/writes */
-int coda_open(struct inode *i, struct file *f)
-{
-        ino_t ino;
-	dev_t dev;
-        int error = 0;
-        struct inode *cont_inode = NULL, *old_container;
-        unsigned short flags = f->f_flags & (~O_EXCL);
-	unsigned short coda_flags = coda_flags_to_cflags(flags);
-	struct coda_cred *cred;
-        struct coda_inode_info *cii;
-
-	lock_kernel();
-        ENTRY;
-	coda_vfs_stat.open++;
-
-        CDEBUG(D_SPECIAL, "OPEN inode number: %ld, count %d, flags %o.\n", 
-	       f->f_dentry->d_inode->i_ino, atomic_read(&f->f_dentry->d_count), flags);
-
-	error = venus_open(i->i_sb, coda_i2f(i), coda_flags, &ino, &dev); 
-	if (error) {
-	        CDEBUG(D_FILE, "venus: dev %d, inode %ld, out->result %d\n",
-		       dev, (long)ino, error);
-		unlock_kernel();
-		return error;
-	}
-
-        /* coda_upcall returns ino number of cached object, get inode */
-        CDEBUG(D_FILE, "cache file dev %d, ino %ld\n", dev, (long)ino);
-	error = coda_inode_grab(dev, ino, &cont_inode);
-	
-	if ( error || !cont_inode ){
-		printk("coda_open: coda_inode_grab error %d.", error);
-		if (cont_inode) 
-			iput(cont_inode);
-		unlock_kernel();
-		return error;
-	}
-
-	CODA_ALLOC(cred, struct coda_cred *, sizeof(*cred));
-	coda_load_creds(cred);
-	f->private_data = cred;
-
-	if ( i->i_mapping != &i->i_data ) {
-		old_container = i->i_mapping->host;
-		i->i_mapping = &i->i_data;
-		iput(old_container);
-	}
-	i->i_mapping = cont_inode->i_mapping;
-
-        cii = ITOC(i);
-        cii->c_contcount++;
-
-	CDEBUG(D_FILE, "result %d, coda i->i_count is %d, cii->contcount is %d for ino %ld\n", 
-	       error, atomic_read(&i->i_count), cii->c_contcount, i->i_ino);
-	CDEBUG(D_FILE, "cache ino: %ld, count %d, ops %p\n", 
-	       cont_inode->i_ino, atomic_read(&cont_inode->i_count),
-               cont_inode->i_op);
-        EXIT;
-	unlock_kernel();
-        return 0;
-}
-
-int coda_release(struct inode *i, struct file *f)
-{
-	struct inode *container = NULL;
-	int error = 0;
-        unsigned short flags = (f->f_flags) & (~O_EXCL);
-	unsigned short cflags = coda_flags_to_cflags(flags);
-	struct coda_cred *cred;
-        struct coda_inode_info *cii;
-
-	lock_kernel();
-        ENTRY;
-	coda_vfs_stat.release++;
-
-	cred = (struct coda_cred *)f->private_data;
-
-	if (i->i_mapping != &i->i_data)
-		container = i->i_mapping->host;
-
-        cii = ITOC(i);
-        CDEBUG(D_FILE, "RELEASE coda (ino %ld, ct %d, cc %d) cache (ino %ld, ct %d)\n",
-		i->i_ino, atomic_read(&i->i_count), cii->c_contcount,
-                (container ? container->i_ino : 0),
-		(container ? atomic_read(&container->i_count) : -99));
-
-        if (--cii->c_contcount == 0 && container) {
-                i->i_mapping = &i->i_data;
-                iput(container);
-        }
-
-	error = venus_release(i->i_sb, coda_i2f(i), cflags, cred);
-
-	f->private_data = NULL;
-	if (cred)
-		CODA_FREE(cred, sizeof(*cred));
-
-        CDEBUG(D_FILE, "coda_release: result: %d\n", error);
-	unlock_kernel();
-        return error;
-}
-
 /* support routines */
 
-/* instantiate a fake file and dentry to pass to coda_venus_readdir */
-static void coda_prepare_fakefile(struct inode *i, struct file *coda_file, 
-				  struct inode *cont_inode,
-				  struct file *cont_file,
-				  struct dentry *cont_dentry)
+/* instantiate a fake file to pass to coda_venus_readdir */
+static void coda_prepare_fakefile(struct file *coda_file, 
+				  struct dentry *cont_dentry,
+				  struct file *fake_file)
 {
-	cont_file->f_dentry = cont_dentry;
-	cont_file->f_dentry->d_inode = cont_inode;
-	cont_file->f_pos = coda_file->f_pos;
-	cont_file->f_version = coda_file->f_version;
-	cont_file->f_op = cont_inode->i_fop;
+	fake_file->f_dentry = cont_dentry;
+	fake_file->f_pos = coda_file->f_pos;
+	fake_file->f_version = coda_file->f_version;
+	fake_file->f_op = cont_dentry->d_inode->i_fop;
 	return ;
 }
 
@@ -783,13 +646,13 @@ CDEBUG(D_FILE, "entry %d: ino %ld, namlen %d, reclen %d, type %d, pos %d, string
 		}
                 pos += (unsigned int) vdirent->d_reclen;
 		i++;
-        } 
+	} 
 
-       if ( i >= 1024 ) {
-               printk("Repeating too much in readdir %ld\n", 
-                      filp->f_dentry->d_inode->i_ino);
-               result = -EINVAL;
-       }
+	if ( i >= 1024 ) {
+		printk("Repeating too much in readdir %ld\n", 
+		       filp->f_dentry->d_inode->i_ino);
+		result = -EINVAL;
+	}
 
 exit:
         CODA_FREE(buff, DIR_BUFSIZE);
@@ -812,7 +675,7 @@ static int coda_dentry_revalidate(struct dentry *de, int flags)
 		goto bad;
 
 	cii = ITOC(de->d_inode);
-	if (! (cii->c_flags & (C_PURGE | C_FLUSH)) )
+	if (cii->c_flags & (C_PURGE | C_FLUSH))
 		goto out;
 
 	shrink_dcache_parent(de);
@@ -874,7 +737,7 @@ int coda_revalidate_inode(struct dentry *dentry)
 	int error = 0;
 	int old_mode;
 	ino_t old_ino;
-	struct inode *inode = dentry->d_inode, *container;
+	struct inode *inode = dentry->d_inode;
 	struct coda_inode_info *cii = ITOC(inode);
 
 	ENTRY;
@@ -883,7 +746,7 @@ int coda_revalidate_inode(struct dentry *dentry)
 	       dentry->d_parent->d_name.len, dentry->d_parent->d_name.name);
 
 	lock_kernel();
-	if ( cii->c_flags == 0 )
+	if ( !cii->c_flags )
 		goto ok;
 
 	if (cii->c_flags & (C_VATTR | C_PURGE | C_FLUSH)) {
@@ -921,10 +784,10 @@ ok:
 	return 0;
 
 return_bad_inode:
-	if ( inode->i_mapping != &inode->i_data ) {
-		container = inode->i_mapping->host;
-		inode->i_mapping = &inode->i_data;
-		iput(container);
+        inode->i_mapping = &inode->i_data;
+	if (cii->c_container) {
+		fput(cii->c_container);
+		cii->c_container = NULL;
 	}
 	make_bad_inode(inode);
 	unlock_kernel();

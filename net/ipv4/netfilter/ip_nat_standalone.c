@@ -336,3 +336,6 @@ EXPORT_SYMBOL(ip_nat_helper_unregister);
 EXPORT_SYMBOL(ip_nat_expect_register);
 EXPORT_SYMBOL(ip_nat_expect_unregister);
 EXPORT_SYMBOL(ip_nat_cheat_check);
+EXPORT_SYMBOL(ip_nat_mangle_tcp_packet);
+EXPORT_SYMBOL(ip_nat_seq_adjust);
+EXPORT_SYMBOL(ip_nat_delete_sack);

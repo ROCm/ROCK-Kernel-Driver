@@ -7,7 +7,7 @@
  *		handler for protocols to use and generic option handler.
  *
  *
- * Version:	$Id: sock.c,v 1.109 2001/03/03 01:20:10 davem Exp $
+ * Version:	$Id: sock.c,v 1.110 2001/04/20 20:46:19 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -647,7 +647,8 @@ void sock_wfree(struct sk_buff *skb)
 
 	/* In case it might be waiting for more memory. */
 	atomic_sub(skb->truesize, &sk->wmem_alloc);
-	sk->write_space(sk);
+	if (!sk->use_write_queue)
+		sk->write_space(sk);
 	sock_put(sk);
 }
 

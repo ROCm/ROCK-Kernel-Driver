@@ -52,7 +52,7 @@ extern __inline__ pgd_t* get_pgd_fast(void)
         return (pgd_t *)ret;
 }
 
-extern __inline__ pgd_t *pgd_alloc(void)
+extern __inline__ pgd_t *pgd_alloc(struct mm_struct *mm)
 {
 	pgd_t *pgd;
 

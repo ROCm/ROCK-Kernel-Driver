@@ -454,7 +454,6 @@ try_again:
 		if (gfp_mask & __GFP_WAIT) {
 			memory_pressure++;
 			try_to_free_pages(gfp_mask);
-			wakeup_bdflush(0);
 			goto try_again;
 		}
 	}

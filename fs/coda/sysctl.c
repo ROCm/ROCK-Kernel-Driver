@@ -47,6 +47,7 @@ static struct ctl_table_header *fs_table_header;
 #define CODA_UPCALL 	 7       /* upcall statistics */
 #define CODA_PERMISSION	 8       /* permission statistics */
 #define CODA_CACHE_INV 	 9       /* cache invalidation statistics */
+#define CODA_FAKE_STATFS 10	 /* don't query venus for actual cache usage */
 
 static ctl_table coda_table[] = {
 	{CODA_DEBUG, "debug", &coda_debug, sizeof(int), 0644, NULL, &proc_dointvec},
@@ -58,6 +59,7 @@ static ctl_table coda_table[] = {
  	{CODA_UPCALL, "upcall_stats", NULL, 0, 0644, NULL, &do_reset_coda_upcall_stats},
  	{CODA_PERMISSION, "permission_stats", NULL, 0, 0644, NULL, &do_reset_coda_permission_stats},
  	{CODA_CACHE_INV, "cache_inv_stats", NULL, 0, 0644, NULL, &do_reset_coda_cache_inv_stats},
+ 	{CODA_FAKE_STATFS, "fake_statfs", &coda_fake_statfs, sizeof(int), 0600, NULL, &proc_dointvec},
 	{ 0 }
 };
 
@@ -109,7 +111,9 @@ char *coda_upcall_names[] = {
 	"open_by_path",   /* 31 */
 	"resolve     ",   /* 32 */
 	"reintegrate ",   /* 33 */
-	"statfs      "    /* 34 */
+	"statfs      ",   /* 34 */
+	"store       ",   /* 35 */
+	"release     "    /* 36 */
 };
 
 
@@ -297,7 +301,8 @@ int coda_vfs_stats_get_info( char * buffer, char ** start, off_t offset,
 			"===================\n\n"
 			"File Operations:\n"
 			"\topen\t\t%9d\n"
-			"\trelase\t\t%9d\n"
+			"\tflush\t\t%9d\n"
+			"\trelease\t\t%9d\n"
 			"\tfsync\t\t%9d\n\n"
 			"Dir Operations:\n"
 			"\treaddir\t\t%9d\n\n"
@@ -314,6 +319,7 @@ int coda_vfs_stats_get_info( char * buffer, char ** start, off_t offset,
 
 			/* file operations */
 			ps->open,
+			ps->flush,
 			ps->release,
 			ps->fsync,
 
@@ -485,11 +491,13 @@ void coda_sysctl_init()
 
 #ifdef CONFIG_PROC_FS
 	proc_fs_coda = proc_mkdir("coda", proc_root_fs);
-	proc_fs_coda->owner = THIS_MODULE;
-	coda_proc_create("vfs_stats", coda_vfs_stats_get_info);
-	coda_proc_create("upcall_stats", coda_upcall_stats_get_info);
-	coda_proc_create("permission_stats", coda_permission_stats_get_info);
-	coda_proc_create("cache_inv_stats", coda_cache_inv_stats_get_info);
+	if (proc_fs_coda) {
+		proc_fs_coda->owner = THIS_MODULE;
+		coda_proc_create("vfs_stats", coda_vfs_stats_get_info);
+		coda_proc_create("upcall_stats", coda_upcall_stats_get_info);
+		coda_proc_create("permission_stats", coda_permission_stats_get_info);
+		coda_proc_create("cache_inv_stats", coda_cache_inv_stats_get_info);
+	}
 #endif
 
 #ifdef CONFIG_SYSCTL

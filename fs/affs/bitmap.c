@@ -14,9 +14,8 @@
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/locks.h>
+#include <linux/bitops.h>
 #include <linux/amigaffs.h>
-
-#include <asm/bitops.h>
 
 /* This is, of course, shamelessly stolen from fs/minix */
 

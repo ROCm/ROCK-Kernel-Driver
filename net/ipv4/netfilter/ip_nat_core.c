@@ -39,7 +39,6 @@ DECLARE_RWLOCK(ip_nat_lock);
 static struct list_head bysource[IP_NAT_HTABLE_SIZE];
 static struct list_head byipsproto[IP_NAT_HTABLE_SIZE];
 LIST_HEAD(protos);
-static LIST_HEAD(helpers);
 
 extern struct ip_nat_protocol unknown_nat_protocol;
 
@@ -848,56 +847,6 @@ icmp_reply_translation(struct sk_buff *skb,
 					sizeof(*hdr) + datalen);
 
 	return NF_ACCEPT;
-}
-
-int ip_nat_helper_register(struct ip_nat_helper *me)
-{
-	int ret = 0;
-
-	WRITE_LOCK(&ip_nat_lock);
-	if (LIST_FIND(&helpers, helper_cmp, struct ip_nat_helper *,&me->tuple))
-		ret = -EBUSY;
-	else {
-		list_prepend(&helpers, me);
-		MOD_INC_USE_COUNT;
-	}
-	WRITE_UNLOCK(&ip_nat_lock);
-
-	return ret;
-}
-
-static int
-kill_helper(const struct ip_conntrack *i, void *helper)
-{
-	int ret;
-
-	READ_LOCK(&ip_nat_lock);
-	ret = (i->nat.info.helper == helper);
-	READ_UNLOCK(&ip_nat_lock);
-
-	return ret;
-}
-
-void ip_nat_helper_unregister(struct ip_nat_helper *me)
-{
-	WRITE_LOCK(&ip_nat_lock);
-	LIST_DELETE(&helpers, me);
-	WRITE_UNLOCK(&ip_nat_lock);
-
-	/* Someone could be still looking at the helper in a bh. */
-	br_write_lock_bh(BR_NETPROTO_LOCK);
-	br_write_unlock_bh(BR_NETPROTO_LOCK);
-
-	/* Find anything using it, and umm, kill them.  We can't turn
-	   them into normal connections: if we've adjusted SYNs, then
-	   they'll ackstorm.  So we just drop it.  We used to just
-	   bump module count when a connection existed, but that
-	   forces admins to gen fake RSTs or bounce box, either of
-	   which is just a long-winded way of making things
-	   worse. --RR */
-	ip_ct_selective_cleanup(kill_helper, me);
-
-	MOD_DEC_USE_COUNT;
 }
 
 int __init ip_nat_init(void)

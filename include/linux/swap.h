@@ -111,8 +111,8 @@ extern void wakeup_kswapd(void);
 extern int try_to_free_pages(unsigned int gfp_mask);
 
 /* linux/mm/page_io.c */
-extern void rw_swap_page(int, struct page *, int);
-extern void rw_swap_page_nolock(int, swp_entry_t, char *, int);
+extern void rw_swap_page(int, struct page *);
+extern void rw_swap_page_nolock(int, swp_entry_t, char *);
 
 /* linux/mm/page_alloc.c */
 
@@ -121,8 +121,7 @@ extern void show_swap_cache_info(void);
 extern void add_to_swap_cache(struct page *, swp_entry_t);
 extern int swap_check_entry(unsigned long);
 extern struct page * lookup_swap_cache(swp_entry_t);
-extern struct page * read_swap_cache_async(swp_entry_t, int);
-#define read_swap_cache(entry) read_swap_cache_async(entry, 1);
+extern struct page * read_swap_cache_async(swp_entry_t);
 
 /* linux/mm/oom_kill.c */
 extern int out_of_memory(void);

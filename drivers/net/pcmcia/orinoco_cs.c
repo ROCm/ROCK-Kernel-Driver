@@ -1,4 +1,4 @@
-/* orinoco_cs.c 0.03	- (formerly known as dldwd_cs.c)
+/* orinoco_cs.c 0.04	- (formerly known as dldwd_cs.c)
  *
  * A driver for "Hermes" chipset based PCMCIA wireless adaptors, such
  * as the Lucent WavelanIEEE/Orinoco cards and their OEM (Cabletron/
@@ -97,6 +97,28 @@
  *	o Finish external renaming to orinoco...
  *	o Testing with various Wavelan firmwares
  *
+ * v0.03 -> v0.04 - 30/3/2001 - Jean II
+ *	o Update to Wireless 11 -> add retry limit/lifetime support
+ *	o Tested with a D-Link DWL 650 card, fill in firmware support
+ *	o Warning on Vcc mismatch (D-Link 3.3v card in Lucent 5v only slot)
+ *	o Fixed the Prims2 WEP bugs that I introduced in v0.03 :-(
+ *	  It work on D-Link *only* after a tcpdump. Weird...
+ *	  And still doesn't work on Intel card. Grrrr...
+ *	o Update the mode after a setport3
+ *	o Add preamble setting for Symbol cards (not yet enabled)
+ *	o Don't complain as much about Symbol cards...
+ *
+ * v0.04 -> v0.04b - 22/4/2001 - David Gibson
+ *      o Removed the 'eth' parameter - always use ethXX as the
+ *        interface name instead of dldwdXX.  The other was racy
+ *        anyway.
+ *	o Clean up RID definitions in hermes.h, other cleanups
+ *
+ * v0.04b -> v0.04c - 24/4/2001 - Jean II
+ *	o Tim Hurley <timster@seiki.bliztech.com> reported a D-Link card
+ *	  with vendor 02 and firmware 0.08. Added in the capabilities...
+ *	o Tested Lucent firmware 7.28, everything works...
+ *
  * TODO - Jean II
  *	o inline functions (lot's of candidate, need to reorder code)
  *	o Separate Pcmcia specific code to help Airport/Mini PCI driver
@@ -133,7 +155,7 @@
 
 #ifdef PCMCIA_DEBUG
 static int pc_debug = PCMCIA_DEBUG;
-static char *version = "orinoco_cs.c 0.03 (David Gibson <hermes@gibson.dropbear.id.au>)";
+static char *version = "orinoco_cs.c 0.04 (David Gibson <hermes@gibson.dropbear.id.au>)";
 MODULE_PARM(pc_debug, "i");
 #define DEBUG(n, args...) if (pc_debug>(n)) printk(KERN_DEBUG args)
 #define DEBUGMORE(n, args...) do { if (pc_debug>(n)) printk(args); } while (0)
@@ -165,12 +187,12 @@ MODULE_PARM(pc_debug, "i");
 static uint irq_mask = 0xdeb8;
 /* Newer, simpler way of listing specific interrupts */
 static int irq_list[4] = { -1 };
-/* Control device name allocation. 0 -> dldwdX ; 1 -> ethX */
-static int eth = 1;
+/* Do a Pcmcia soft reset (may help some cards) */
+static int reset_cor = 0;
 
 MODULE_PARM(irq_mask, "i");
 MODULE_PARM(irq_list, "1-4i");
-MODULE_PARM(eth, "i");
+MODULE_PARM(reset_cor, "i");
 
 /*====================================================================*/
 
@@ -239,13 +261,15 @@ typedef struct dldwd_priv {
 	int has_wep, has_big_wep;
 	int has_mwo;
 	int has_pm;
+	int has_retry;
+	int has_preamble;
 	int broken_reset, broken_allocate;
 	uint16_t channel_mask;
 
 	/* Current configuration */
 	uint32_t iw_mode;
 	int port_type, allow_ibss;
-	uint16_t wep_on, wep_auth, tx_key;
+	uint16_t wep_on, wep_restrict, tx_key;
 	dldwd_keys_t keys;
  	char nick[IW_ESSID_MAX_SIZE+1];
 	char desired_essid[IW_ESSID_MAX_SIZE+1];
@@ -254,6 +278,8 @@ typedef struct dldwd_priv {
 	uint16_t ap_density, rts_thresh;
 	uint16_t tx_rate_ctrl;
 	uint16_t pm_on, pm_mcast, pm_period, pm_timeout;
+	uint16_t retry_short, retry_long, retry_time;
+	uint16_t preamble;
 
 	int promiscuous, allmulti, mc_count;
 
@@ -645,6 +671,34 @@ ESSID in IBSS-Ad-Hoc mode.\n", dev->name);
 			goto out;
 	}
 
+	/* Set retry settings - will fail on lot's of firmwares */
+	if (priv->has_retry) {
+		err = hermes_write_wordrec(hw, USER_BAP, HERMES_RID_SHORT_RETRY_LIMIT,
+					   priv->retry_short);
+		if (err) {
+			printk(KERN_WARNING "%s: Can't set retry limit!\n", dev->name);
+			goto out;
+		}
+		err = hermes_write_wordrec(hw, USER_BAP, HERMES_RID_LONG_RETRY_LIMIT,
+					   priv->retry_long);
+		if (err)
+			goto out;
+		err = hermes_write_wordrec(hw, USER_BAP, HERMES_RID_MAX_TX_LIFETIME,
+					   priv->retry_time);
+		if (err)
+			goto out;
+	}
+
+	/* Set preamble - only for Symbol so far... */
+	if (priv->has_preamble) {
+		err = hermes_write_wordrec(hw, USER_BAP, HERMES_RID_CNF_SYMBOL_PREAMBLE,
+					   priv->preamble);
+		if (err) {
+			printk(KERN_WARNING "%s: Can't set preamble!\n", dev->name);
+			goto out;
+		}
+	}
+
 	/* Set promiscuity / multicast*/
 	priv->promiscuous = 0;
 	priv->allmulti = 0;
@@ -672,7 +726,8 @@ static int __dldwd_hw_setup_wep(dldwd_priv_t *priv)
 {
 	hermes_t *hw = &priv->hw;
 	int err = 0;
-	
+	int	extra_wep_flag = 0;
+
 	switch (priv->firmware_type) {
 	case FIRMWARE_TYPE_LUCENT: /* Lucent style WEP */
 		if (priv->wep_on) {
@@ -696,33 +751,53 @@ static int __dldwd_hw_setup_wep(dldwd_priv_t *priv)
 			int keylen;
 			int i;
 			
+			/* Write all 4 keys */
+			for(i = 0; i < MAX_KEYS; i++) {
+				keylen = priv->keys[i].len;
+				keybuf[keylen] = '\0';
+				memcpy(keybuf, priv->keys[i].data, keylen);
+				err = hermes_write_ltv(hw, USER_BAP,
+						       HERMES_RID_CNF_PRISM2_KEY0 + i,
+						       HERMES_BYTES_TO_RECLEN(keylen + 1),
+						       &keybuf);
+				if (err)
+					return err;
+			}
+
 			err = hermes_write_wordrec(hw, USER_BAP, HERMES_RID_CNF_PRISM2_TX_KEY,
 						   priv->tx_key);
 			if (err)
 				return err;
-			
-			keybuf[LARGE_KEY_SIZE] = '\0';
 
-			/* Write all 4 keys */
-			for(i = 0; i < MAX_KEYS; i++) {
-				keylen = priv->keys[i].len;
-				keybuf[SMALL_KEY_SIZE] = '\0';
-				memcpy(keybuf, priv->keys[i].data, keylen);
-				err = HERMES_WRITE_RECORD_LEN(hw, USER_BAP, HERMES_RID_CNF_PRISM2_KEY0, &keybuf, keylen);
-				if (err)
-					return err;
-			}
-			/* Symbol cards : set the authentication :
-			 * 0 -> no encryption, 1 -> open,
-			 * 2 -> shared key, 3 -> shared key 128bit only */
+			/* Authentication is where Prism2 and Symbol
+			 * firmware differ... */
 			if (priv->firmware_type == FIRMWARE_TYPE_SYMBOL) {
-				err = hermes_write_wordrec(hw, USER_BAP, HERMES_RID_CNF_SYMBOL_AUTH_TYPE, priv->wep_auth);
+				/* Symbol cards : set the authentication :
+				 * 0 -> no encryption, 1 -> open,
+				 * 2 -> shared key, 3 -> shared key 128bit */
+				if(priv->wep_restrict) {
+					if(priv->keys[priv->tx_key].len >
+					   SMALL_KEY_SIZE)
+						extra_wep_flag = 3;
+					else
+						extra_wep_flag = 2;
+				} else
+					extra_wep_flag = 1;
+				err = hermes_write_wordrec(hw, USER_BAP, HERMES_RID_CNF_SYMBOL_AUTH_TYPE, priv->wep_restrict);
 				if (err)
 					return err;
+			} else {
+				/* Prism2 card : we need to modify master
+				 * WEP setting */
+				if(priv->wep_restrict)
+					extra_wep_flag = 2;
+				else
+					extra_wep_flag = 0;
 			}
 		}
 		
-		err = hermes_write_wordrec(hw, USER_BAP, HERMES_RID_CNF_PRISM2_WEP_ON, priv->wep_on);
+		/* Master WEP setting : on/off */
+		err = hermes_write_wordrec(hw, USER_BAP, HERMES_RID_CNF_PRISM2_WEP_ON, (priv->wep_on | extra_wep_flag));
 		if (err)
 			return err;	
 		break;
@@ -1246,6 +1321,7 @@ static int dldwd_init(struct net_device *dev)
 	}
 
 	firmver = ((uint32_t)priv->firmware_info.major << 16) | priv->firmware_info.minor;
+	DEBUG(2, "%s: firmver = 0x%X\n", dev->name, firmver);
 
 	/* Determine capabilities from the firmware version */
 
@@ -1259,7 +1335,7 @@ static int dldwd_init(struct net_device *dev)
 		priv->firmware_type = FIRMWARE_TYPE_LUCENT;
 		priv->broken_reset = 0;
 		priv->broken_allocate = 0;
-		priv->has_port3 = 1;
+		priv->has_port3 = 1;		/* Still works in 7.28 */
 		priv->has_ibss = (firmver >= 0x60006);
 		priv->has_ibss_any = (firmver >= 0x60010);
 		priv->has_wep = (firmver >= 0x40020);
@@ -1267,26 +1343,52 @@ static int dldwd_init(struct net_device *dev)
 					  Gold cards from the others? */
 		priv->has_mwo = (firmver >= 0x60000);
 		priv->has_pm = (firmver >= 0x40020);
+		priv->has_retry = 0;
+		priv->has_preamble = 0;
 		/* Tested with Lucent firmware :
-		 *	1.16 ; 4.08 ; 4.52 ; 6.04 ; 6.16 => Jean II
+		 *	1.16 ; 4.08 ; 4.52 ; 6.04 ; 6.16 ; 7.28 => Jean II
 		 * Tested CableTron firmware : 4.32 => Anton */
 		break;
 	case 0x2:
 		vendor_str = "Generic Prism II";
-		/* Note : my Intel card report this value, but I can't do
-		 * much with it, so I guess it's broken - Jean II */
+		/* Some D-Link cards report vendor 0x02... */
 
 		priv->firmware_type = FIRMWARE_TYPE_PRISM2;
 		priv->broken_reset = 0;
-		priv->broken_allocate = (firmver <= 0x10001);
+		priv->broken_allocate = 0;
 		priv->has_port3 = 1;
-		priv->has_ibss = 0; /* FIXME: no idea if this is right */
-		priv->has_wep = (firmver >= 0x20000);
-		priv->has_big_wep = 1;
+		priv->has_ibss = (firmver >= 0x00007); /* FIXME */
+		priv->has_wep = (firmver >= 0x00007); /* FIXME */
+		priv->has_big_wep = 0;
 		priv->has_mwo = 0;
-		priv->has_pm = (firmver >= 0x20000);
-		/* Tested with Intel firmware : 1.01 => Jean II */
-		/* Note : firmware 1.01 is *seriously* broken */
+		priv->has_pm = (firmver >= 0x00007); /* FIXME */
+		priv->has_retry = 0;
+		priv->has_preamble = 0;
+
+		/* Tim Hurley -> D-Link card, vendor 02, firmware 0.08 */
+
+		/* Special case for Symbol cards */
+		if(firmver == 0x10001) {
+			/* Symbol , 3Com AirConnect, Intel, Ericsson WLAN */
+			vendor_str = "Symbol";
+			/* Intel MAC : 00:02:B3:* */
+			/* 3Com MAC : 00:50:DA:* */
+
+			/* FIXME : probably need to use SYMBOL_***ARY_VER
+			 * to get proper firmware version */
+			priv->firmware_type = FIRMWARE_TYPE_SYMBOL;
+			priv->broken_reset = 0;
+			priv->broken_allocate = 1;
+			priv->has_port3 = 1;
+			priv->has_ibss = 1; /* FIXME */
+			priv->has_wep = 1; /* FIXME */
+			priv->has_big_wep = 1;	/* RID_SYMBOL_KEY_LENGTH */
+			priv->has_mwo = 0;
+			priv->has_pm = 1; /* FIXME */
+			priv->has_retry = 0;
+			priv->has_preamble = 0; /* FIXME */
+			/* Tested with Intel firmware : v15 => Jean II */
+		}
 		break;
 	case 0x3:
 		vendor_str = "Samsung";
@@ -1301,37 +1403,28 @@ static int dldwd_init(struct net_device *dev)
 		priv->has_big_wep = 0; /* FIXME */
 		priv->has_mwo = 0;
 		priv->has_pm = (firmver >= 0x20000); /* FIXME */
+		priv->has_retry = 0;
+		priv->has_preamble = 0;
 		break;
 	case 0x6:
+		/* D-Link DWL 650, ... */
 		vendor_str = "LinkSys/D-Link";
-		/* To check */
+		/* D-Link MAC : 00:40:05:* */
 
 		priv->firmware_type = FIRMWARE_TYPE_PRISM2;
 		priv->broken_reset = 0;
 		priv->broken_allocate = 0;
 		priv->has_port3 = 1;
-		priv->has_ibss = 0; /* FIXME: available in later firmwares */
-		priv->has_wep = (firmver >= 0x20000); /* FIXME */
+		priv->has_ibss = (firmver >= 0x00007); /* FIXME */
+		priv->has_wep = (firmver >= 0x00007); /* FIXME */
 		priv->has_big_wep = 0;
 		priv->has_mwo = 0;
-		priv->has_pm = (firmver >= 0x20000); /* FIXME */
+		priv->has_pm = (firmver >= 0x00007); /* FIXME */
+		priv->has_retry = 0;
+		priv->has_preamble = 0;
+		/* Tested with D-Link firmware 0.07 => Jean II */
+		/* Note : with 0.07, IBSS to a Lucent card seem flaky */
 		break;
-#if 0
-	case 0x???:		/* Could someone help here ??? */
-		vendor_str = "Symbol";
-		/* Symbol , 3Com AirConnect, Ericsson WLAN */
-
-		priv->firmware_type = FIRMWARE_TYPE_SYMBOL;
-		priv->broken_reset = 0;
-		priv->broken_allocate = 0;
-		priv->has_port3 = 1;
-		priv->has_ibss = 0; /* FIXME: available in later firmwares */
-		priv->has_wep = (firmver >= 0x20000); /* FIXME */
-		priv->has_big_wep = 1;	/* Probably RID_SYMBOL_KEY_LENGTH */
-		priv->has_mwo = 0;
-		priv->has_pm = (firmver >= 0x20000);
-		break;
-#endif
 	default:
 		vendor_str = "UNKNOWN";
 
@@ -1344,14 +1437,14 @@ static int dldwd_init(struct net_device *dev)
 		priv->has_big_wep = 0;
 		priv->has_mwo = 0;
 		priv->has_pm = 0;
+		priv->has_retry = 0;
+		priv->has_preamble = 0;
 	}
 
 	printk(KERN_INFO "%s: Firmware ID %02X vendor 0x%x (%s) version %d.%02d\n",
 	       dev->name, priv->firmware_info.id, priv->firmware_info.vendor,
 	       vendor_str, priv->firmware_info.major, priv->firmware_info.minor);
 	
-	if ((priv->broken_reset) || (priv->broken_allocate))
-		printk(KERN_INFO "%s: Buggy firmware, please upgrade ASAP.\n", dev->name);
 	if (priv->has_port3)
 		printk(KERN_INFO "%s: Ad-hoc demo mode supported.\n", dev->name);
 	if (priv->has_ibss)
@@ -1362,7 +1455,7 @@ static int dldwd_init(struct net_device *dev)
 		if (priv->has_big_wep)
 			printk("\"128\"-bit key.\n");
 		else
-			printk("40-bit key.");
+			printk("40-bit key.\n");
 	}
 
 	/* Get the MAC address */
@@ -1451,6 +1544,28 @@ static int dldwd_init(struct net_device *dev)
 			       dev->name);
 			goto out;
 		}
+	}
+
+	/* Retry setup */
+	if (priv->has_retry) {
+		err = hermes_read_wordrec(hw, USER_BAP, HERMES_RID_SHORT_RETRY_LIMIT, &priv->retry_short);
+		if (err)
+			goto out;
+
+		err = hermes_read_wordrec(hw, USER_BAP, HERMES_RID_LONG_RETRY_LIMIT, &priv->retry_long);
+		if (err)
+			goto out;
+
+		err = hermes_read_wordrec(hw, USER_BAP, HERMES_RID_MAX_TX_LIFETIME, &priv->retry_time);
+		if (err)
+			goto out;
+	}
+		
+	/* Preamble setup */
+	if (priv->has_preamble) {
+		err = hermes_read_wordrec(hw, USER_BAP, HERMES_RID_CNF_SYMBOL_PREAMBLE, &priv->preamble);
+		if (err)
+			goto out;
 	}
 		
 	/* Set up the default configuration */
@@ -1802,6 +1917,11 @@ static int dldwd_ioctl_getiwrange(struct net_device *dev, struct iw_point *rrq)
 
 	/* Much of this shamelessly taken from wvlan_cs.c. No idea
 	 * what it all means -dgibson */
+#if WIRELESS_EXT > 10
+	range.we_version_compiled = WIRELESS_EXT;
+	range.we_version_source = 11;
+#endif /* WIRELESS_EXT > 10 */
+
 	range.min_nwid = range.max_nwid = 0; /* We don't use nwids */
 
 	/* Set available channels/frequencies */
@@ -1881,6 +2001,16 @@ static int dldwd_ioctl_getiwrange(struct net_device *dev, struct iw_point *rrq)
 	range.txpower[0] = 15; /* 15dBm */
 	range.txpower_capa = IW_TXPOW_DBM;
 
+#if WIRELESS_EXT > 10
+	range.retry_capa = IW_RETRY_LIMIT | IW_RETRY_LIFETIME;
+	range.retry_flags = IW_RETRY_LIMIT;
+	range.r_time_flags = IW_RETRY_LIFETIME;
+	range.min_retry = 0;
+	range.max_retry = 65535;	/* ??? */
+	range.min_r_time = 0;
+	range.max_r_time = 65535 * 1000;	/* ??? */
+#endif /* WIRELESS_EXT > 10 */
+
 	if (copy_to_user(rrq->pointer, &range, sizeof(range)))
 		return -EFAULT;
 
@@ -1895,7 +2025,7 @@ static int dldwd_ioctl_setiwencode(struct net_device *dev, struct iw_point *erq)
 	int index = (erq->flags & IW_ENCODE_INDEX) - 1;
 	int setindex = priv->tx_key;
 	int enable = priv->wep_on;
-	int auth = priv->wep_auth;
+	int restricted = priv->wep_restrict;
 	uint16_t xlen = 0;
 	int err = 0;
 	char keybuf[MAX_KEY_SIZE];
@@ -1957,16 +2087,11 @@ static int dldwd_ioctl_setiwencode(struct net_device *dev, struct iw_point *erq)
 	
 	if (erq->flags & IW_ENCODE_DISABLED)
 		enable = 0;
-	/* Only for symbol cards (so far) - Jean II */
+	/* Only for Prism2 & Symbol cards (so far) - Jean II */
 	if (erq->flags & IW_ENCODE_OPEN)
-		auth = 1;
+		restricted = 0;
 	if (erq->flags & IW_ENCODE_RESTRICTED)
-		auth = 2;	/* If all key are 128 -> should be 3 ??? */
-	/* Agree with master wep setting */
-	if (enable == 0)
-		auth = 0;
-	else if(auth == 0)
-		auth = 1;	/* Encryption require some authentication */
+		restricted = 1;
 
 	if (erq->pointer) {
 		priv->keys[index].len = cpu_to_le16(xlen);
@@ -1975,7 +2100,7 @@ static int dldwd_ioctl_setiwencode(struct net_device *dev, struct iw_point *erq)
 	}
 	priv->tx_key = setindex;
 	priv->wep_on = enable;
-	priv->wep_auth = auth;
+	priv->wep_restrict = restricted;
 	
  out:
 	dldwd_unlock(priv);
@@ -2002,19 +2127,11 @@ static int dldwd_ioctl_getiwencode(struct net_device *dev, struct iw_point *erq)
 	erq->flags |= index + 1;
 	
 	/* Only for symbol cards - Jean II */
-	if (priv->firmware_type == FIRMWARE_TYPE_SYMBOL) {
-		switch(priv->wep_auth)	{
-		case 1:
-			erq->flags |= IW_ENCODE_OPEN;
-			break;
-		case 2:
-		case 3:
+	if (priv->firmware_type != FIRMWARE_TYPE_LUCENT) {
+		if(priv->wep_restrict)
 			erq->flags |= IW_ENCODE_RESTRICTED;
-			break;
-		case 0:
-		default:
-			break;
-		}
+		else
+			erq->flags |= IW_ENCODE_OPEN;
 	}
 
 	xlen = le16_to_cpu(priv->keys[index].len);
@@ -2520,6 +2637,92 @@ static int dldwd_ioctl_getpower(struct net_device *dev, struct iw_param *prq)
 	return err;
 }
 
+#if WIRELESS_EXT > 10
+static int dldwd_ioctl_setretry(struct net_device *dev, struct iw_param *rrq)
+{
+	dldwd_priv_t *priv = dev->priv;
+	int err = 0;
+
+
+	dldwd_lock(priv);
+
+	if ((rrq->disabled) || (!priv->has_retry)){
+		err = -EOPNOTSUPP;
+		goto out;
+	} else {
+		if (rrq->flags & IW_RETRY_LIMIT) {
+			if (rrq->flags & IW_RETRY_MAX)
+				priv->retry_long = rrq->value;
+			else if (rrq->flags & IW_RETRY_MIN)
+				priv->retry_short = rrq->value;
+			else {
+				/* No modifier : set both */
+				priv->retry_long = rrq->value;
+				priv->retry_short = rrq->value;
+			}
+		}
+		if (rrq->flags & IW_RETRY_LIFETIME) {
+			priv->retry_time = rrq->value / 1000;
+		}
+		if ((rrq->flags & IW_RETRY_TYPE) == 0) {
+			err = -EINVAL;
+			goto out;
+		}			
+	}
+
+ out:
+	dldwd_unlock(priv);
+
+	return err;
+}
+
+static int dldwd_ioctl_getretry(struct net_device *dev, struct iw_param *rrq)
+{
+	dldwd_priv_t *priv = dev->priv;
+	hermes_t *hw = &priv->hw;
+	int err = 0;
+	uint16_t short_limit, long_limit, lifetime;
+
+	dldwd_lock(priv);
+	
+	err = hermes_read_wordrec(hw, USER_BAP, HERMES_RID_SHORT_RETRY_LIMIT, &short_limit);
+	if (err)
+		goto out;
+
+	err = hermes_read_wordrec(hw, USER_BAP, HERMES_RID_LONG_RETRY_LIMIT, &long_limit);
+	if (err)
+		goto out;
+
+	err = hermes_read_wordrec(hw, USER_BAP, HERMES_RID_MAX_TX_LIFETIME, &lifetime);
+	if (err)
+		goto out;
+
+	rrq->disabled = 0;		/* Can't be disabled */
+
+	/* Note : by default, display the retry number */
+	if ((rrq->flags & IW_RETRY_TYPE) == IW_RETRY_LIFETIME) {
+		rrq->flags = IW_RETRY_LIFETIME;
+		rrq->value = lifetime * 1000;	/* ??? */
+	} else {
+		/* By default, display the min number */
+		if ((rrq->flags & IW_RETRY_MAX)) {
+			rrq->flags = IW_RETRY_LIMIT | IW_RETRY_MAX;
+			rrq->value = long_limit;
+		} else {
+			rrq->flags = IW_RETRY_LIMIT;
+			rrq->value = short_limit;
+			if(short_limit != long_limit)
+				rrq->flags |= IW_RETRY_MIN;
+		}
+	}
+
+ out:
+	dldwd_unlock(priv);
+
+	return err;
+}
+#endif /* WIRELESS_EXT > 10 */
+
 static int dldwd_ioctl_setport3(struct net_device *dev, struct iwreq *wrq)
 {
 	dldwd_priv_t *priv = dev->priv;
@@ -2548,6 +2751,10 @@ static int dldwd_ioctl_setport3(struct net_device *dev, struct iwreq *wrq)
 	default:
 		err = -EINVAL;
 	}
+
+	if (! err)
+		/* Actually update the mode we are using */
+		set_port_type(priv);
 
 	dldwd_unlock(priv);
 
@@ -2858,6 +3065,20 @@ static int dldwd_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		wrq->u.txpower.flags = IW_TXPOW_DBM;
 		break;
 
+#if WIRELESS_EXT > 10
+	case SIOCSIWRETRY:
+		DEBUG(1, "%s: SIOCSIWRETRY\n", dev->name);
+		err = dldwd_ioctl_setretry(dev, &wrq->u.retry);
+		if (! err)
+			changed = 1;
+		break;
+
+	case SIOCGIWRETRY:
+		DEBUG(1, "%s: SIOCGIWRETRY\n", dev->name);
+		err = dldwd_ioctl_getretry(dev, &wrq->u.retry);
+		break;
+#endif /* WIRELESS_EXT > 10 */
+
 	case SIOCSIWSPY:
 		DEBUG(1, "%s: SIOCSIWSPY\n", dev->name);
 
@@ -2880,7 +3101,13 @@ static int dldwd_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 				  0, "set_port3" },
 				{ SIOCDEVPRIVATE + 0x3, 0,
 				  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-				  "get_port3" }
+				  "get_port3" },
+				{ SIOCDEVPRIVATE + 0x4,
+				  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+				  0, "set_preamble" },
+				{ SIOCDEVPRIVATE + 0x5, 0,
+				  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+				  "get_preamble" }
 			};
 
 			err = verify_area(VERIFY_WRITE, wrq->u.data.pointer, sizeof(privtab));
@@ -2922,6 +3149,46 @@ static int dldwd_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		DEBUG(1, "%s: SIOCDEVPRIVATE + 0x3 (get_port3)\n",
 		      dev->name);
 		err = dldwd_ioctl_getport3(dev, wrq);
+		break;
+
+	case SIOCDEVPRIVATE + 0x4: /* set_preamble */
+		DEBUG(1, "%s: SIOCDEVPRIVATE + 0x4 (set_preamble)\n",
+		      dev->name);
+		if (! capable(CAP_NET_ADMIN)) {
+			err = -EPERM;
+			break;
+		}
+
+		/* 802.11b has recently defined some short preamble.
+		 * Basically, the Phy header has been reduced in size.
+		 * This increase performance, especially at high rates
+		 * (the preamble is transmitted at 1Mb/s), unfortunately
+		 * this give compatibility troubles... - Jean II */
+		if(priv->has_preamble) {
+			int val = *( (int *) wrq->u.name );
+
+			dldwd_lock(priv);
+			if(val)
+				priv->preamble = 1;
+			else
+				priv->preamble = 0;
+			dldwd_unlock(priv);
+			changed = 1;
+		} else
+			err = -EOPNOTSUPP;
+		break;
+
+	case SIOCDEVPRIVATE + 0x5: /* get_preamble */
+		DEBUG(1, "%s: SIOCDEVPRIVATE + 0x5 (get_preamble)\n",
+		      dev->name);
+		if(priv->has_preamble) {
+			int *val = (int *)wrq->u.name;
+
+			dldwd_lock(priv);
+			*val = priv->preamble;
+			dldwd_unlock(priv);
+		} else
+			err = -EOPNOTSUPP;
 		break;
 
 	default:
@@ -3600,6 +3867,44 @@ static void dldwd_detach(dev_link_t * link)
 	TRACE_EXIT("dldwd");
 }				/* dldwd_detach */
 
+/*
+ * Do a soft reset of the Pcmcia card using the Configuration Option Register
+ * Can't do any harm, and actually may do some good on some cards...
+ */
+static int dldwd_cor_reset(dev_link_t *link)
+{
+	conf_reg_t reg;
+	u_long default_cor; 
+
+	/* Save original COR value */
+	reg.Function = 0;
+	reg.Action = CS_READ;
+	reg.Offset = CISREG_COR;
+	reg.Value = 0;
+	CardServices(AccessConfigurationRegister, link->handle, &reg);
+	default_cor = reg.Value;
+
+	DEBUG(2, "dldwd : dldwd_cor_reset() : cor=0x%lX\n", default_cor);
+
+	/* Soft-Reset card */
+	reg.Action = CS_WRITE;
+	reg.Offset = CISREG_COR;
+	reg.Value = (default_cor | COR_SOFT_RESET);
+	CardServices(AccessConfigurationRegister, link->handle, &reg);
+
+	/* Wait until the card has acknowledged our reset */
+	mdelay(1);
+
+	/* Restore original COR configuration index */
+	reg.Value = (default_cor & COR_CONFIG_MASK);
+	CardServices(AccessConfigurationRegister, link->handle, &reg);
+
+	/* Wait until the card has finished restarting */
+	mdelay(1);
+
+	return(0);
+}
+
 /*======================================================================
   dldwd_config() is scheduled to run after a CARD_INSERTION event
   is received, to configure the PCMCIA socket, and to make the
@@ -3623,6 +3928,7 @@ static void dldwd_config(dev_link_t * link)
 	int last_fn, last_ret;
 	u_char buf[64];
 	config_info_t conf;
+	cistpl_cftable_entry_t dflt = { 0 };
 	cisinfo_t info;
 
 	TRACE_ENTER("dldwd");
@@ -3669,7 +3975,6 @@ static void dldwd_config(dev_link_t * link)
 	tuple.DesiredTuple = CISTPL_CFTABLE_ENTRY;
 	CS_CHECK(GetFirstTuple, handle, &tuple);
 	while (1) {
-		cistpl_cftable_entry_t dflt = { 0 };
 		cistpl_cftable_entry_t *cfg = &(parse.cftable_entry);
 		CFG_CHECK(GetTupleData, handle, &tuple);
 		CFG_CHECK(ParseTuple, handle, &tuple, &parse);
@@ -3693,12 +3998,16 @@ static void dldwd_config(dev_link_t * link)
 		/*  Note that the CIS values need to be rescaled */
 		if (cfg->vcc.present & (1 << CISTPL_POWER_VNOM)) {
 			if (conf.Vcc !=
-			    cfg->vcc.param[CISTPL_POWER_VNOM] /
-			    10000) goto next_entry;
+			    cfg->vcc.param[CISTPL_POWER_VNOM] / 10000) {
+				DEBUG(2, "dldwd_config: Vcc mismatch (conf.Vcc = %d, CIS = %d)\n",  conf.Vcc, cfg->vcc.param[CISTPL_POWER_VNOM] / 10000);
+				goto next_entry;
+			}
 		} else if (dflt.vcc.present & (1 << CISTPL_POWER_VNOM)) {
 			if (conf.Vcc !=
-			    dflt.vcc.param[CISTPL_POWER_VNOM] /
-			    10000) goto next_entry;
+			    dflt.vcc.param[CISTPL_POWER_VNOM] / 10000) {
+				DEBUG(2, "dldwd_config: Vcc mismatch (conf.Vcc = %d, CIS = %d)\n",  conf.Vcc, dflt.vcc.param[CISTPL_POWER_VNOM] / 10000);
+				goto next_entry;
+			}
 		}
 
 		if (cfg->vpp1.present & (1 << CISTPL_POWER_VNOM))
@@ -3789,12 +4098,12 @@ static void dldwd_config(dev_link_t * link)
 	ndev->base_addr = link->io.BasePort1;
 	ndev->irq = link->irq.AssignedIRQ;
 
-	/* Instance name : by default, use hermesX, on demand use the
-	 * regular ethX (less risky) - Jean II */
-	if(!eth)
-		sprintf(ndev->name, "hermes%d", priv->instance);
-	else
-		ndev->name[0] = '\0';
+	/* Do a Pcmcia soft reset of the card (optional) */
+	if(reset_cor)
+		dldwd_cor_reset(link);
+
+	/* register_netdev will give us an ethX name */
+	ndev->name[0] = '\0';
 	/* Tell the stack we exist */
 	if (register_netdev(ndev) != 0) {
 		printk(KERN_ERR "orinoco_cs: register_netdev() failed\n");

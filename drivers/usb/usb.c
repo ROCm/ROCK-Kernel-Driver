@@ -2,7 +2,7 @@
  * drivers/usb/usb.c
  *
  * (C) Copyright Linus Torvalds 1999
- * (C) Copyright Johannes Erdfelt 1999
+ * (C) Copyright Johannes Erdfelt 1999-2001
  * (C) Copyright Andreas Gal 1999
  * (C) Copyright Gregory P. Smith 1999
  * (C) Copyright Deti Fliegl 1999 (new USB architecture)
@@ -18,8 +18,6 @@
  * Think of this as a "USB library" rather than anything else.
  * It should be considered a slave, with no callbacks. Callbacks
  * are evil.
- *
- * $Id: usb.c,v 1.53 2000/01/14 16:19:09 acher Exp $
  */
 
 #include <linux/config.h>
@@ -340,6 +338,17 @@ void usb_release_bandwidth(struct usb_device *dev, struct urb *urb, int isoc)
 	urb->bandwidth = 0;
 }
 
+static void usb_bus_get(struct usb_bus *bus)
+{
+	atomic_inc(&bus->refcnt);
+}
+
+static void usb_bus_put(struct usb_bus *bus)
+{
+	if (atomic_dec_and_test(&bus->refcnt))
+		kfree(bus);
+}
+
 /**
  *	usb_alloc_bus - creates a new USB host controller structure
  *	@op: pointer to a struct usb_operations that this bus structure should use
@@ -377,6 +386,8 @@ struct usb_bus *usb_alloc_bus(struct usb_operations *op)
 	INIT_LIST_HEAD(&bus->bus_list);
 	INIT_LIST_HEAD(&bus->inodes);
 
+	atomic_set(&bus->refcnt, 1);
+
 	return bus;
 }
 
@@ -391,7 +402,7 @@ void usb_free_bus(struct usb_bus *bus)
 	if (!bus)
 		return;
 
-	kfree(bus);
+	usb_bus_put(bus);
 }
 
 /**
@@ -410,6 +421,8 @@ void usb_register_bus(struct usb_bus *bus)
 		bus->busnum = busnum;
 	} else
 		warn("too many buses");
+
+	usb_bus_get(bus);
 
 	/* Add it to the list of buses */
 	list_add(&bus->bus_list, &usb_bus_list);
@@ -439,6 +452,8 @@ void usb_deregister_bus(struct usb_bus *bus)
         usbdevfs_remove_bus(bus);
 
 	clear_bit(bus->busnum, busmap.busmap);
+
+	usb_bus_put(bus);
 }
 
 /*
@@ -902,6 +917,8 @@ struct usb_device *usb_alloc_dev(struct usb_device *parent, struct usb_bus *bus)
 
 	memset(dev, 0, sizeof(*dev));
 
+	usb_bus_get(bus);
+
 	dev->bus = bus;
 	dev->parent = parent;
 	atomic_set(&dev->refcnt, 1);
@@ -918,6 +935,9 @@ void usb_free_dev(struct usb_device *dev)
 	if (atomic_dec_and_test(&dev->refcnt)) {
 		dev->bus->op->deallocate(dev);
 		usb_destroy_configuration(dev);
+
+		usb_bus_put(dev->bus);
+
 		kfree(dev);
 	}
 }

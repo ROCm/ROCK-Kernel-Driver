@@ -40,6 +40,7 @@ struct coda_vfs_stats
 {
 	/* file operations */
 	int open;
+	int flush;
 	int release;
 	int fsync;
 

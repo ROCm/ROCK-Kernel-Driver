@@ -35,18 +35,18 @@
 /*
  * Limits and constants
  */
-#define		HERMES_ALLOC_LEN_MIN		((uint16_t)4)
-#define		HERMES_ALLOC_LEN_MAX		((uint16_t)2400)
+#define		HERMES_ALLOC_LEN_MIN		(4)
+#define		HERMES_ALLOC_LEN_MAX		(2400)
 #define		HERMES_LTV_LEN_MAX		(34)
-#define		HERMES_BAP_DATALEN_MAX		((uint16_t)4096)
-#define		HERMES_BAP_OFFSET_MAX		((uint16_t)4096)
-#define		HERMES_PORTID_MAX		((uint16_t)7)
-#define		HERMES_NUMPORTS_MAX		((uint16_t)(HERMES_PORTID_MAX+1))
-#define		HERMES_PDR_LEN_MAX		((uint16_t)260)	/* in bytes, from EK */
-#define		HERMES_PDA_RECS_MAX		((uint16_t)200)	/* a guess */
-#define		HERMES_PDA_LEN_MAX		((uint16_t)1024)	/* in bytes, from EK */
-#define		HERMES_SCANRESULT_MAX		((uint16_t)35)
-#define		HERMES_CHINFORESULT_MAX		((uint16_t)8)
+#define		HERMES_BAP_DATALEN_MAX		(4096)
+#define		HERMES_BAP_OFFSET_MAX		(4096)
+#define		HERMES_PORTID_MAX		(7)
+#define		HERMES_NUMPORTS_MAX		(HERMES_PORTID_MAX+1)
+#define		HERMES_PDR_LEN_MAX		(260)	/* in bytes, from EK */
+#define		HERMES_PDA_RECS_MAX		(200)	/* a guess */
+#define		HERMES_PDA_LEN_MAX		(1024)	/* in bytes, from EK */
+#define		HERMES_SCANRESULT_MAX		(35)
+#define		HERMES_CHINFORESULT_MAX		(8)
 #define		HERMES_FRAME_LEN_MAX		(2304)
 #define		HERMES_MAX_MULTICAST		(16)
 #define		HERMES_MAGIC			(0x7d1f)
@@ -86,119 +86,125 @@
 /*
  * CMD register bitmasks
  */
-#define		HERMES_CMD_BUSY			((uint16_t)0x8000)
-#define		HERMES_CMD_AINFO		((uint16_t)0x7f00)
-#define		HERMES_CMD_MACPORT		((uint16_t)0x0700)
-#define		HERMES_CMD_RECL			((uint16_t)0x0100)
-#define		HERMES_CMD_WRITE		((uint16_t)0x0100)
-#define		HERMES_CMD_PROGMODE		((uint16_t)0x0300)
-#define		HERMES_CMD_CMDCODE		((uint16_t)0x003f)
+#define		HERMES_CMD_BUSY			(0x8000)
+#define		HERMES_CMD_AINFO		(0x7f00)
+#define		HERMES_CMD_MACPORT		(0x0700)
+#define		HERMES_CMD_RECL			(0x0100)
+#define		HERMES_CMD_WRITE		(0x0100)
+#define		HERMES_CMD_PROGMODE		(0x0300)
+#define		HERMES_CMD_CMDCODE		(0x003f)
 
 /*
  * STATUS register bitmasks
  */
-#define		HERMES_STATUS_RESULT		((uint16_t)0x7f00)
-#define		HERMES_STATUS_CMDCODE		((uint16_t)0x003f)
+#define		HERMES_STATUS_RESULT		(0x7f00)
+#define		HERMES_STATUS_CMDCODE		(0x003f)
 
 /*
  * OFFSET refister bitmasks
  */
-#define		HERMES_OFFSET_BUSY		((uint16_t)0x8000)
-#define		HERMES_OFFSET_ERR		((uint16_t)0x4000)
-#define		HERMES_OFFSET_DATAOFF		((uint16_t)0x0ffe)
+#define		HERMES_OFFSET_BUSY		(0x8000)
+#define		HERMES_OFFSET_ERR		(0x4000)
+#define		HERMES_OFFSET_DATAOFF		(0x0ffe)
 
 /*
  * Event register bitmasks (INTEN, EVSTAT, EVACK)
  */
-#define		HERMES_EV_TICK			((uint16_t)0x8000)
-#define		HERMES_EV_WTERR			((uint16_t)0x4000)
-#define		HERMES_EV_INFDROP		((uint16_t)0x2000)
-#define		HERMES_EV_INFO			((uint16_t)0x0080)
-#define		HERMES_EV_DTIM			((uint16_t)0x0020)
-#define		HERMES_EV_CMD			((uint16_t)0x0010)
-#define		HERMES_EV_ALLOC			((uint16_t)0x0008)
-#define		HERMES_EV_TXEXC			((uint16_t)0x0004)
-#define		HERMES_EV_TX			((uint16_t)0x0002)
-#define		HERMES_EV_RX			((uint16_t)0x0001)
+#define		HERMES_EV_TICK			(0x8000)
+#define		HERMES_EV_WTERR			(0x4000)
+#define		HERMES_EV_INFDROP		(0x2000)
+#define		HERMES_EV_INFO			(0x0080)
+#define		HERMES_EV_DTIM			(0x0020)
+#define		HERMES_EV_CMD			(0x0010)
+#define		HERMES_EV_ALLOC			(0x0008)
+#define		HERMES_EV_TXEXC			(0x0004)
+#define		HERMES_EV_TX			(0x0002)
+#define		HERMES_EV_RX			(0x0001)
 
 /*
  * Command codes
  */
 /*--- Controller Commands --------------------------*/
-#define		HERMES_CMD_INIT			((uint16_t)0x00)
-#define		HERMES_CMD_ENABLE		((uint16_t)0x01)
-#define		HERMES_CMD_DISABLE		((uint16_t)0x02)
-#define		HERMES_CMD_DIAG			((uint16_t)0x03)
+#define		HERMES_CMD_INIT			(0x0000)
+#define		HERMES_CMD_ENABLE		(0x0001)
+#define		HERMES_CMD_DISABLE		(0x0002)
+#define		HERMES_CMD_DIAG			(0x0003)
 
 /*--- Buffer Mgmt Commands --------------------------*/
-#define		HERMES_CMD_ALLOC		((uint16_t)0x0A)
-#define		HERMES_CMD_TX			((uint16_t)0x0B)
-#define		HERMES_CMD_CLRPRST		((uint16_t)0x12)
+#define		HERMES_CMD_ALLOC		(0x000A)
+#define		HERMES_CMD_TX			(0x000B)
+#define		HERMES_CMD_CLRPRST		(0x0012)
 
 /*--- Regulate Commands --------------------------*/
-#define		HERMES_CMD_NOTIFY		((uint16_t)0x10)
-#define		HERMES_CMD_INQ			((uint16_t)0x11)
+#define		HERMES_CMD_NOTIFY		(0x0010)
+#define		HERMES_CMD_INQ			(0x0011)
 
 /*--- Configure Commands --------------------------*/
-#define		HERMES_CMD_ACCESS		((uint16_t)0x21)
-#define		HERMES_CMD_DOWNLD		((uint16_t)0x22)
+#define		HERMES_CMD_ACCESS		(0x0021)
+#define		HERMES_CMD_DOWNLD		(0x0022)
 
 /*--- Debugging Commands -----------------------------*/
-#define 	HERMES_CMD_MONITOR		((uint16_t)(0x38))
-#define		HERMES_MONITOR_ENABLE		((uint16_t)(0x0b))
-#define		HERMES_MONITOR_DISABLE		((uint16_t)(0x0f))
+#define 	HERMES_CMD_MONITOR		(0x0038)
+#define		HERMES_MONITOR_ENABLE		(0x000b)
+#define		HERMES_MONITOR_DISABLE		(0x000f)
 
 /*
  * Configuration RIDs
  */
 
-#define		HERMES_RID_CNF_PORTTYPE		((uint16_t)0xfc00)
-#define		HERMES_RID_CNF_MACADDR		((uint16_t)0xfc01)
-#define		HERMES_RID_CNF_DESIRED_SSID	((uint16_t)0xfc02)
-#define		HERMES_RID_CNF_CHANNEL		((uint16_t)0xfc03)
-#define		HERMES_RID_CNF_OWN_SSID		((uint16_t)0xfc04)
-#define		HERMES_RID_CNF_SYSTEM_SCALE	((uint16_t)0xfc06)
-#define		HERMES_RID_CNF_MAX_DATA_LEN	((uint16_t)0xfc07)
-#define		HERMES_RID_CNF_PM_ENABLE	((uint16_t)0xfc09)
-#define		HERMES_RID_CNF_PM_MCAST_RX	((uint16_t)0xfc0b)
-#define		HERMES_RID_CNF_PM_PERIOD	((uint16_t)0xfc0c)
-#define		HERMES_RID_CNF_PM_HOLDOVER	((uint16_t)0xfc0d)
-#define		HERMES_RID_CNF_NICKNAME		((uint16_t)0xfc0e)
-#define		HERMES_RID_CNF_WEP_ON		((uint16_t)0xfc20)
-#define		HERMES_RID_CNF_MWO_ROBUST	((uint16_t)0xfc25)
-#define		HERMES_RID_CNF_PRISM2_WEP_ON	((uint16_t)0xfc28)
-#define		HERMES_RID_CNF_MULTICAST_LIST	((uint16_t)0xfc80)
-#define		HERMES_RID_CNF_CREATEIBSS	((uint16_t)0xfc81)
-#define		HERMES_RID_CNF_FRAG_THRESH	((uint16_t)0xfc82)
-#define		HERMES_RID_CNF_RTS_THRESH	((uint16_t)0xfc83)
-#define		HERMES_RID_CNF_TX_RATE_CTRL	((uint16_t)0xfc84)
-#define		HERMES_RID_CNF_PROMISCUOUS	((uint16_t)0xfc85)
-#define		HERMES_RID_CNF_KEYS		((uint16_t)0xfcb0)
-#define		HERMES_RID_CNF_TX_KEY		((uint16_t)0xfcb1)
-#define		HERMES_RID_CNF_TICKTIME		((uint16_t)0xfce0)
+#define		HERMES_RID_CNF_PORTTYPE		(0xfc00)
+#define		HERMES_RID_CNF_MACADDR		(0xfc01)
+#define		HERMES_RID_CNF_DESIRED_SSID	(0xfc02)
+#define		HERMES_RID_CNF_CHANNEL		(0xfc03)
+#define		HERMES_RID_CNF_OWN_SSID		(0xfc04)
+#define		HERMES_RID_CNF_SYSTEM_SCALE	(0xfc06)
+#define		HERMES_RID_CNF_MAX_DATA_LEN	(0xfc07)
+#define		HERMES_RID_CNF_PM_ENABLE	(0xfc09)
+#define		HERMES_RID_CNF_PM_MCAST_RX	(0xfc0b)
+#define		HERMES_RID_CNF_PM_PERIOD	(0xfc0c)
+#define		HERMES_RID_CNF_PM_HOLDOVER	(0xfc0d)
+#define		HERMES_RID_CNF_NICKNAME		(0xfc0e)
+#define		HERMES_RID_CNF_WEP_ON		(0xfc20)
+#define		HERMES_RID_CNF_MWO_ROBUST	(0xfc25)
+#define		HERMES_RID_CNF_PRISM2_WEP_ON	(0xfc28)
+#define		HERMES_RID_CNF_MULTICAST_LIST	(0xfc80)
+#define		HERMES_RID_CNF_CREATEIBSS	(0xfc81)
+#define		HERMES_RID_CNF_FRAG_THRESH	(0xfc82)
+#define		HERMES_RID_CNF_RTS_THRESH	(0xfc83)
+#define		HERMES_RID_CNF_TX_RATE_CTRL	(0xfc84)
+#define		HERMES_RID_CNF_PROMISCUOUS	(0xfc85)
+#define		HERMES_RID_CNF_KEYS		(0xfcb0)
+#define		HERMES_RID_CNF_TX_KEY		(0xfcb1)
+#define		HERMES_RID_CNF_TICKTIME		(0xfce0)
 
-#define		HERMES_RID_CNF_PRISM2_TX_KEY	((uint16_t)0xfc23)
-#define		HERMES_RID_CNF_PRISM2_KEY0	((uint16_t)0xfc24)
-#define		HERMES_RID_CNF_PRISM2_KEY1	((uint16_t)0xfc25)
-#define		HERMES_RID_CNF_PRISM2_KEY2	((uint16_t)0xfc26)
-#define		HERMES_RID_CNF_PRISM2_KEY3	((uint16_t)0xfc27)
-#define		HERMES_RID_CNF_SYMBOL_AUTH_TYPE		((uint16_t)0xfc2A)
-/* This one is read only */
-#define		HERMES_RID_CNF_SYMBOL_KEY_LENGTH	((uint16_t)0xfc2B)
-#define		HERMES_RID_CNF_SYMBOL_BASIC_RATES	((uint16_t)0xfc8A)
+#define		HERMES_RID_CNF_PRISM2_TX_KEY	(0xfc23)
+#define		HERMES_RID_CNF_PRISM2_KEY0	(0xfc24)
+#define		HERMES_RID_CNF_PRISM2_KEY1	(0xfc25)
+#define		HERMES_RID_CNF_PRISM2_KEY2	(0xfc26)
+#define		HERMES_RID_CNF_PRISM2_KEY3	(0xfc27)
+#define		HERMES_RID_CNF_SYMBOL_MANDATORY_BSSID	(0xfc21)
+#define		HERMES_RID_CNF_SYMBOL_AUTH_TYPE		(0xfc2A)
+#define		HERMES_RID_CNF_SYMBOL_BASIC_RATES	(0xfc8A)
+#define		HERMES_RID_CNF_SYMBOL_PREAMBLE		(0xfc8C)
 
 /*
  * Information RIDs
  */
-#define		HERMES_RID_CHANNEL_LIST		((uint16_t)0xfd10)
-#define		HERMES_RID_STAIDENTITY		((uint16_t)0xfd20)
-#define		HERMES_RID_CURRENT_SSID		((uint16_t)0xfd41)
-#define		HERMES_RID_CURRENT_BSSID	((uint16_t)0xfd42)
-#define		HERMES_RID_COMMSQUALITY		((uint16_t)0xfd43)
-#define 	HERMES_RID_CURRENT_TX_RATE	((uint16_t)0xfd44)
-#define		HERMES_RID_WEP_AVAIL		((uint16_t)0xfd4f)
-#define		HERMES_RID_CURRENT_CHANNEL	((uint16_t)0xfdc1)
-#define		HERMES_RID_DATARATES		((uint16_t)0xfdc6)
+#define		HERMES_RID_CHANNEL_LIST		(0xfd10)
+#define		HERMES_RID_STAIDENTITY		(0xfd20)
+#define		HERMES_RID_CURRENT_SSID		(0xfd41)
+#define		HERMES_RID_CURRENT_BSSID	(0xfd42)
+#define		HERMES_RID_COMMSQUALITY		(0xfd43)
+#define 	HERMES_RID_CURRENT_TX_RATE	(0xfd44)
+#define 	HERMES_RID_SHORT_RETRY_LIMIT	(0xfd48)
+#define 	HERMES_RID_LONG_RETRY_LIMIT	(0xfd49)
+#define 	HERMES_RID_MAX_TX_LIFETIME	(0xfd4A)
+#define		HERMES_RID_WEP_AVAIL		(0xfd4f)
+#define		HERMES_RID_CURRENT_CHANNEL	(0xfdc1)
+#define		HERMES_RID_DATARATES		(0xfdc6)
+#define		HERMES_RID_SYMBOL_PRIMARY_VER	(0xfd03)
+#define		HERMES_RID_SYMBOL_SECONDARY_VER	(0xfd21)
+#define		HERMES_RID_SYMBOL_KEY_LENGTH	(0xfc2B)
 
 /*
  * Frame structures and constants
@@ -213,19 +219,19 @@ typedef struct hermes_frame_desc {
 	uint16_t tx_ctl; /* 0xC */
 } __attribute__ ((packed)) hermes_frame_desc_t;
 
-#define		HERMES_RXSTAT_ERR		((uint16_t)0x0003)
-#define		HERMES_RXSTAT_MACPORT		((uint16_t)0x0700)
-#define		HERMES_RXSTAT_MSGTYPE		((uint16_t)0xE000)
+#define		HERMES_RXSTAT_ERR		(0x0003)
+#define		HERMES_RXSTAT_MACPORT		(0x0700)
+#define		HERMES_RXSTAT_MSGTYPE		(0xE000)
 
-#define		HERMES_RXSTAT_BADCRC		((uint16_t)0x0001)
-#define		HERMES_RXSTAT_UNDECRYPTABLE	((uint16_t)0x0002)
+#define		HERMES_RXSTAT_BADCRC		(0x0001)
+#define		HERMES_RXSTAT_UNDECRYPTABLE	(0x0002)
 
 /* RFC-1042 encoded frame */
-#define		HERMES_RXSTAT_1042		((uint16_t)0x2000)
+#define		HERMES_RXSTAT_1042		(0x2000)
 /* Bridge-tunnel encoded frame */
-#define		HERMES_RXSTAT_TUNNEL		((uint16_t)0x4000)
+#define		HERMES_RXSTAT_TUNNEL		(0x4000)
 /* Wavelan-II Management Protocol frame */
-#define		HERMES_RXSTAT_WMP		((uint16_t)0x6000)
+#define		HERMES_RXSTAT_WMP		(0x6000)
 
 #ifdef __KERNEL__
 
@@ -328,8 +334,6 @@ static inline int hermes_disable_port(hermes_t *hw, int port)
 	(hermes_read_ltv((hw),(bap),(rid), sizeof(*buf), NULL, (buf)))
 #define HERMES_WRITE_RECORD(hw, bap, rid, buf) \
 	(hermes_write_ltv((hw),(bap),(rid),HERMES_BYTES_TO_RECLEN(sizeof(*buf)),(buf)))
-#define HERMES_WRITE_RECORD_LEN(hw, bap, rid, buf, len) \
-	(hermes_write_ltv((hw),(bap),(rid),HERMES_BYTES_TO_RECLEN(len),(buf)))
 
 static inline int hermes_read_wordrec(hermes_t *hw, int bap, uint16_t rid, uint16_t *word)
 {

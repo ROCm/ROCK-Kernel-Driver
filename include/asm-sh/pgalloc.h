@@ -89,7 +89,7 @@ static __inline__ void pte_free_slow(pte_t *pte)
 
 #define pte_free(pte)		pte_free_slow(pte)
 #define pgd_free(pgd)		free_pgd_slow(pgd)
-#define pgd_alloc()		get_pgd_fast()
+#define pgd_alloc(mm)		get_pgd_fast()
 
 /*
  * allocating and freeing a pmd is trivial: the 1-entry pmd is

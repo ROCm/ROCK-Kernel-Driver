@@ -39,6 +39,8 @@
 #include <linux/coda_cache.h>
 #include <linux/coda_proc.h> 
 
+#define upc_alloc() kmalloc(sizeof(struct upc_req), GFP_KERNEL)
+#define upc_free(r) kfree(r)
 
 static int coda_upcall(struct coda_sb_info *mntinfo, int inSize, int *outSize, 
 		       union inputArgs *buffer);
@@ -127,8 +129,8 @@ int venus_getattr(struct super_block *sb, struct ViceFid *fid,
         return error;
 }
 
-int  venus_setattr(struct super_block *sb, struct ViceFid *fid, 
-		      struct coda_vattr *vattr)
+int venus_setattr(struct super_block *sb, struct ViceFid *fid, 
+		  struct coda_vattr *vattr)
 {
         union inputArgs *inp;
         union outputArgs *outp;
@@ -176,15 +178,56 @@ int venus_lookup(struct super_block *sb, struct ViceFid *fid,
 	return error;
 }
 
-
-int venus_release(struct super_block *sb, struct ViceFid *fid, int flags,
-		  struct coda_cred *cred)
+int venus_store(struct super_block *sb, struct ViceFid *fid, int flags,
+                struct coda_cred *cred)
 {
         union inputArgs *inp;
         union outputArgs *outp;
         int insize, outsize, error;
 	
-	insize = SIZE(close);
+	insize = SIZE(store);
+	UPARG(CODA_STORE);
+	
+	if ( cred ) {
+		memcpy(&(inp->ih.cred), cred, sizeof(*cred));
+	} else 
+		printk("CODA: store without valid file creds.\n");
+	
+        inp->coda_store.VFid = *fid;
+        inp->coda_store.flags = flags;
+
+        error = coda_upcall(coda_sbp(sb), insize, &outsize, inp);
+
+	CODA_FREE(inp, insize);
+        return error;
+}
+
+int venus_release(struct super_block *sb, struct ViceFid *fid, int flags)
+{
+        union inputArgs *inp;
+        union outputArgs *outp;
+        int insize, outsize, error;
+	
+	insize = SIZE(release);
+	UPARG(CODA_RELEASE);
+	
+	inp->coda_release.VFid = *fid;
+	inp->coda_release.flags = flags;
+
+	error = coda_upcall(coda_sbp(sb), insize, &outsize, inp);
+
+	CODA_FREE(inp, insize);
+	return error;
+}
+
+int venus_close(struct super_block *sb, struct ViceFid *fid, int flags,
+                struct coda_cred *cred)
+{
+	union inputArgs *inp;
+	union outputArgs *outp;
+	int insize, outsize, error;
+	
+	insize = SIZE(release);
 	UPARG(CODA_CLOSE);
 	
 	if ( cred ) {
@@ -202,22 +245,21 @@ int venus_release(struct super_block *sb, struct ViceFid *fid, int flags,
 }
 
 int venus_open(struct super_block *sb, struct ViceFid *fid,
-		  int flags, ino_t *ino, dev_t *dev)
+		  int flags, struct file **fh)
 {
         union inputArgs *inp;
         union outputArgs *outp;
         int insize, outsize, error;
        
-	insize = SIZE(open);
-	UPARG(CODA_OPEN);
+	insize = SIZE(open_by_fd);
+	UPARG(CODA_OPEN_BY_FD);
 
         inp->coda_open.VFid = *fid;
         inp->coda_open.flags = flags;
 
         error = coda_upcall(coda_sbp(sb), insize, &outsize, inp);
 
-	*ino = outp->coda_open.inode;
-	*dev = outp->coda_open.dev;
+	*fh = outp->coda_open_by_fd.fh;
 
 	CODA_FREE(inp, insize);
 	return error;
@@ -519,7 +561,7 @@ int venus_pioctl(struct super_block *sb, struct ViceFid *fid,
 
         /* build packet for Venus */
         if (data->vi.in_size > VC_MAXDATASIZE) {
-	        error = -EINVAL;
+		error = -EINVAL;
 		goto exit;
         }
 
@@ -539,7 +581,7 @@ int venus_pioctl(struct super_block *sb, struct ViceFid *fid,
         /* get the data out of user space */
         if ( copy_from_user((char*)inp + (long)inp->coda_ioctl.data,
 			    data->vi.in, data->vi.in_size) ) {
-	        error = -EINVAL;
+		error = -EINVAL;
 	        goto exit;
 	}
 
@@ -557,7 +599,7 @@ int venus_pioctl(struct super_block *sb, struct ViceFid *fid,
                 CDEBUG(D_FILE, "return len %d <= request len %d\n",
                       outp->coda_ioctl.len, 
                       data->vi.out_size);
-                error = -EINVAL;
+		error = -EINVAL;
         } else {
 		error = verify_area(VERIFY_WRITE, data->vi.out, 
                                     data->vi.out_size);
@@ -566,7 +608,7 @@ int venus_pioctl(struct super_block *sb, struct ViceFid *fid,
 		if (copy_to_user(data->vi.out, 
 				 (char *)outp + (long)outp->coda_ioctl.data, 
 				 data->vi.out_size)) {
-		        error = -EINVAL;
+			error = -EINVAL;
 			goto exit;
 		}
         }
@@ -585,7 +627,7 @@ int venus_statfs(struct super_block *sb, struct statfs *sfs)
 	insize = max(INSIZE(statfs), OUTSIZE(statfs));
 	UPARG(CODA_STATFS);
 
-        error =  coda_upcall(coda_sbp(sb), insize, &outsize, inp);
+        error = coda_upcall(coda_sbp(sb), insize, &outsize, inp);
 	
         if (!error) {
 		sfs->f_blocks = outp->coda_statfs.stat.f_blocks;
@@ -696,7 +738,11 @@ static int coda_upcall(struct coda_sb_info *sbi,
 	}
 
 	/* Format the request message. */
-	CODA_ALLOC(req,struct upc_req *,sizeof(struct upc_req));
+	req = upc_alloc();
+	if (!req) {
+		printk("Failed to allocate upc_req structure\n");
+		return -ENOMEM;
+	}
 	req->uc_data = (void *)buffer;
 	req->uc_flags = 0;
 	req->uc_inSize = inSize;
@@ -768,10 +814,17 @@ static int coda_upcall(struct coda_sb_info *sbi,
 			   req->uc_opcode, req->uc_unique, req->uc_flags);
 		    
 		    list_del(&(req->uc_chain));
-		    error = -EINTR;
-		    CODA_ALLOC(sig_req, struct upc_req *, sizeof (struct upc_req));
+		    error = -ENOMEM;
+		    sig_req = upc_alloc();
+		    if (!sig_req) goto exit;
+
 		    CODA_ALLOC((sig_req->uc_data), char *, sizeof(struct coda_in_hdr));
+		    if (!sig_req->uc_data) {
+			upc_free(sig_req);
+			goto exit;
+		    }
 		    
+		    error = -EINTR;
 		    sig_inputArgs = (union inputArgs *)sig_req->uc_data;
 		    sig_inputArgs->ih.opcode = CODA_SIGNAL;
 		    sig_inputArgs->ih.unique = req->uc_unique;
@@ -799,7 +852,7 @@ static int coda_upcall(struct coda_sb_info *sbi,
 	}
 
  exit:
-	CODA_FREE(req, sizeof(struct upc_req));
+	upc_free(req);
 	if (error) 
 	        badclstats();
 	return error;
@@ -913,13 +966,17 @@ int coda_downcall(int opcode, union outputArgs * out, struct super_block *sb)
 		  clstats(CODA_PURGEFID);
 		  inode = coda_fid_to_inode(fid, sb);
 		  if ( inode ) { 
-			  CDEBUG(D_DOWNCALL, "purgefid: inode = %ld\n",
-				 inode->i_ino);
-			  coda_flag_inode_children(inode, C_PURGE);
-			  coda_purge_dentries(inode);
-			  iput(inode);
+			CDEBUG(D_DOWNCALL, "purgefid: inode = %ld\n",
+			       inode->i_ino);
+			coda_flag_inode_children(inode, C_PURGE);
+
+			/* catch the dentries later if some are still busy */
+			coda_flag_inode(inode, C_PURGE);
+			d_prune_aliases(inode);
+
+			iput(inode);
 		  } else 
-			  CDEBUG(D_DOWNCALL, "purgefid: no inode\n");
+			CDEBUG(D_DOWNCALL, "purgefid: no inode\n");
 		  return 0;
 	  }
 

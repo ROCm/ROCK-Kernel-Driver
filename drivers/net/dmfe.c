@@ -456,22 +456,21 @@ static int __init dmfe_init_one (struct pci_dev *pdev,
 	for (i = 0; i < 64; i++)
 		((u16 *) db->srom)[i] = read_srom_word(pci_iobase, i);
 
-	printk(KERN_INFO "%s: Davicom DM%04lx at 0x%lx,",
-	       dev->name,
-	       ent->driver_data >> 16,
-	       pci_iobase);
-
 	/* Set Node address */
-	for (i = 0; i < 6; i++) {
+	for (i = 0; i < 6; i++)
 		dev->dev_addr[i] = db->srom[20 + i];
-		printk("%c%02x", i ? ':' : ' ', dev->dev_addr[i]);
-	}
-
-	printk(", IRQ %d\n", pci_irqline);
 
 	i = register_netdev(dev);
 	if (i)
 		goto err_out_res;
+
+	printk(KERN_INFO "%s: Davicom DM%04lx at 0x%lx,",
+	       dev->name,
+	       ent->driver_data >> 16,
+	       pci_iobase);
+	for (i = 0; i < 6; i++)
+		printk("%c%02x", i ? ':' : ' ', dev->dev_addr[i]);
+	printk(", IRQ %d\n", pci_irqline);
 
 	return 0;
 
@@ -726,6 +725,7 @@ static void dmfe_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	struct tx_desc *txptr;
 	struct dmfe_board_info *db;
 	u32 ioaddr;
+	unsigned long flags;
 
 	if (!dev) {
 		DMFE_DBUG(1, "dmfe_interrupt() without device arg", 0);
@@ -737,7 +737,7 @@ static void dmfe_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	DMFE_DBUG(0, "dmfe_interrupt()", 0);
 
-	spin_lock_irq(&db->lock);
+	spin_lock_irqsave(&db->lock, flags);
 
 	/* Disable all interrupt in CR7 to solve the interrupt edge problem */
 	outl(0, ioaddr + DCR7);
@@ -754,7 +754,7 @@ static void dmfe_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		netif_stop_queue(dev);
 		db->wait_reset = 1;		/* Need to RESET */
 		outl(0, ioaddr + DCR7);		/* disable all interrupt */
-		spin_unlock_irq(&db->lock);
+		spin_unlock_irqrestore(&db->lock, flags);
 		return;
 	}
 
@@ -808,7 +808,7 @@ static void dmfe_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		db->cr7_data = 0x1a2cd;
 	outl(db->cr7_data, ioaddr + DCR7);
 
-	spin_unlock_irq(&db->lock);
+	spin_unlock_irqrestore(&db->lock, flags);
 }
 
 /*
@@ -900,19 +900,23 @@ static struct net_device_stats *dmfe_get_stats(struct net_device *dev)
 static void dmfe_set_filter_mode(struct net_device *dev)
 {
 	struct dmfe_board_info *db = dev->priv;
+	unsigned long flags;
 
 	DMFE_DBUG(0, "dmfe_set_filter_mode()", 0);
+	spin_lock_irqsave(&db->lock, flags);
 
 	if (dev->flags & IFF_PROMISC) {
 		DMFE_DBUG(0, "Enable PROM Mode", 0);
 		db->cr6_data |= CR6_PM | CR6_PBF;
 		update_cr6(db->cr6_data, db->ioaddr);
+		spin_unlock_irqrestore(&db->lock, flags);
 		return;
 	}
 	if (dev->flags & IFF_ALLMULTI || dev->mc_count > DMFE_MAX_MULTICAST) {
 		DMFE_DBUG(0, "Pass all multicast address", dev->mc_count);
 		db->cr6_data &= ~(CR6_PM | CR6_PBF);
 		db->cr6_data |= CR6_PAM;
+		spin_unlock_irqrestore(&db->lock, flags);
 		return;
 	}
 	DMFE_DBUG(0, "Set multicast address", dev->mc_count);
@@ -920,6 +924,7 @@ static void dmfe_set_filter_mode(struct net_device *dev)
 		dm9132_id_table(dev, dev->mc_count);	/* DM9132 */
 	else
 		send_filter_frame(dev, dev->mc_count);	/* DM9102/DM9102A */
+	spin_unlock_irqrestore(&db->lock, flags);
 }
 
 /*
@@ -946,12 +951,16 @@ static void dmfe_timer(unsigned long data)
 	unsigned char tmp_cr12;
 	struct net_device *dev = (struct net_device *) data;
 	struct dmfe_board_info *db = (struct dmfe_board_info *) dev->priv;
+	unsigned long flags;
 
 	DMFE_DBUG(0, "dmfe_timer()", 0);
+	spin_lock_irqsave(&db->lock, flags);
 
 	/* Do reset now */
-	if (db->in_reset_state)
+	if (db->in_reset_state) {
+		spin_unlock_irqrestore(&db->lock, flags);
 		return;
+	}
 
 	/* Operating Mode Check */
 	if ((db->dm910x_chk_mode & 0x1) && (db->stats.rx_packets > MAX_CHECK_PACKET)) {
@@ -983,6 +992,7 @@ static void dmfe_timer(unsigned long data)
 		dmfe_dynamic_reset(dev);
 		db->timer.expires = jiffies + DMFE_TIMER_WUT;
 		add_timer(&db->timer);
+		spin_unlock_irqrestore(&db->lock, flags);
 		return;
 	}
 	db->rx_error_cnt = 0;	/* Clear previos counter */
@@ -1038,6 +1048,7 @@ static void dmfe_timer(unsigned long data)
 	/* Timer active again */
 	db->timer.expires = jiffies + DMFE_TIMER_WUT;
 	add_timer(&db->timer);
+	spin_unlock_irqrestore(&db->lock, flags);
 }
 
 /*
@@ -1233,19 +1244,16 @@ static void send_filter_frame(struct net_device *dev, int mc_cnt)
 	struct dmfe_board_info *db = dev->priv;
 	struct dev_mc_list *mcptr;
 	struct tx_desc *txptr;
-	unsigned long flags;
 	u16 *addrptr;
 	u32 *suptr;
 	int i;
 
 	DMFE_DBUG(0, "send_filter_frame()", 0);
-	spin_lock_irqsave(&db->lock, flags);
 
 	txptr = db->tx_insert_ptr;
 	suptr = (u32 *) txptr->tx_buf_ptr;
 
 	if (txptr->tdes0 & 0x80000000) {
-		spin_unlock_irqrestore(&db->lock, flags);
 		printk(KERN_WARNING "%s: Too busy to send filter frame\n",
 		       dev->name);
 		return;
@@ -1284,7 +1292,6 @@ static void send_filter_frame(struct net_device *dev, int mc_cnt)
 	update_cr6(db->cr6_data | 0x2000, dev->base_addr);
 	outl(0x1, dev->base_addr + DCR1);	/* Issue Tx polling command */
 	update_cr6(db->cr6_data, dev->base_addr);
-	spin_unlock_irqrestore(&db->lock, flags);
 }
 
 /*

@@ -583,6 +583,8 @@ struct usb_bus {
 
 	/* usbdevfs inode list */
 	struct list_head inodes;
+
+	atomic_t refcnt;
 };
 
 #define USB_MAXCHILDREN		(16)	/* This is arbitrary */

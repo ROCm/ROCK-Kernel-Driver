@@ -6,20 +6,65 @@
  * visible pointers are surrounded in ()'s
  *
  * (C) Copyright 1999 Linus Torvalds
- * (C) Copyright 1999 Johannes Erdfelt
+ * (C) Copyright 1999-2001 Johannes Erdfelt
  */
 
 #include <linux/kernel.h>
+#include <linux/proc_fs.h>
 #include <asm/io.h>
 
 #include "uhci.h"
 
-void uhci_show_td(struct uhci_td *td)
+/* Handle REALLY large printk's so we don't overflow buffers */
+static void inline lprintk(char *buf)
 {
+	char *p;
+
+	/* Just write one line at a time */
+	while (buf) {
+		p = strchr(buf, '\n');
+		if (p)
+			*p = 0;
+		printk("%s\n", buf);
+		buf = p;
+		if (buf)
+			buf++;
+	}
+}
+
+static int inline uhci_is_skeleton_td(struct uhci *uhci, struct uhci_td *td)
+{
+	int i;
+
+	for (i = 0; i < UHCI_NUM_SKELTD; i++)
+		if (td == uhci->skeltd[i])
+			return 1;
+
+	return 0;
+}
+
+static int inline uhci_is_skeleton_qh(struct uhci *uhci, struct uhci_qh *qh)
+{
+	int i;
+
+	for (i = 0; i < UHCI_NUM_SKELQH; i++)
+		if (qh == uhci->skelqh[i])
+			return 1;
+
+	return 0;
+}
+
+static int uhci_show_td(struct uhci_td *td, char *buf, int len, int space)
+{
+	char *out = buf;
 	char *spid;
 
-	printk("%08x ", td->link);
-	printk("e%d %s%s%s%s%s%s%s%s%s%sLength=%x ",
+	/* Try to make sure there's enough memory */
+	if (len < 160)
+		return 0;
+
+	out += sprintf(out, "%*s[%p] link (%08x) ", space, "", td, td->link);
+	out += sprintf(out, "e%d %s%s%s%s%s%s%s%s%s%sLength=%x ",
 		((td->status >> 27) & 3),
 		(td->status & TD_CTRL_SPD) ?      "SPD " : "",
 		(td->status & TD_CTRL_LS) ?       "LS " : "",
@@ -48,19 +93,27 @@ void uhci_show_td(struct uhci_td *td)
 			break;
 	}
 
-	printk("MaxLen=%x DT%d EndPt=%x Dev=%x, PID=%x(%s) ",
+	out += sprintf(out, "MaxLen=%x DT%d EndPt=%x Dev=%x, PID=%x(%s) ",
 		td->info >> 21,
 		((td->info >> 19) & 1),
 		(td->info >> 15) & 15,
 		(td->info >> 8) & 127,
 		(td->info & 0xff),
 		spid);
-	printk("(buf=%08x)\n", td->buffer);
+	out += sprintf(out, "(buf=%08x)\n", td->buffer);
+
+	return out - buf;
 }
 
-static void uhci_show_sc(int port, unsigned short status)
+static int uhci_show_sc(int port, unsigned short status, char *buf, int len)
 {
-	printk("  stat%d     =     %04x   %s%s%s%s%s%s%s%s\n",
+	char *out = buf;
+
+	/* Try to make sure there's enough memory */
+	if (len < 80)
+		return 0;
+
+	out += sprintf(out, "  stat%d     =     %04x   %s%s%s%s%s%s%s%s\n",
 		port,
 		status,
 		(status & USBPORTSC_SUSP) ? "PortSuspend " : "",
@@ -71,15 +124,22 @@ static void uhci_show_sc(int port, unsigned short status)
 		(status & USBPORTSC_PE) ?   "PortEnabled " : "",
 		(status & USBPORTSC_CSC) ?  "ConnectChange " : "",
 		(status & USBPORTSC_CCS) ?  "PortConnected " : "");
+
+	return out - buf;
 }
 
-void uhci_show_status(struct uhci *uhci)
+static int uhci_show_status(struct uhci *uhci, char *buf, int len)
 {
+	char *out = buf;
 	unsigned int io_addr = uhci->io_addr;
 	unsigned short usbcmd, usbstat, usbint, usbfrnum;
 	unsigned int flbaseadd;
 	unsigned char sof;
 	unsigned short portsc1, portsc2;
+
+	/* Try to make sure there's enough memory */
+	if (len < 80 * 6)
+		return 0;
 
 	usbcmd    = inw(io_addr + 0);
 	usbstat   = inw(io_addr + 2);
@@ -90,7 +150,7 @@ void uhci_show_status(struct uhci *uhci)
 	portsc1   = inw(io_addr + 16);
 	portsc2   = inw(io_addr + 18);
 
-	printk("  usbcmd    =     %04x   %s%s%s%s%s%s%s%s\n",
+	out += sprintf(out, "  usbcmd    =     %04x   %s%s%s%s%s%s%s%s\n",
 		usbcmd,
 		(usbcmd & USBCMD_MAXP) ?    "Maxp64 " : "Maxp32 ",
 		(usbcmd & USBCMD_CF) ?      "CF " : "",
@@ -101,7 +161,7 @@ void uhci_show_status(struct uhci *uhci)
 		(usbcmd & USBCMD_HCRESET) ? "HCRESET " : "",
 		(usbcmd & USBCMD_RS) ?      "RS " : "");
 
-	printk("  usbstat   =     %04x   %s%s%s%s%s%s\n",
+	out += sprintf(out, "  usbstat   =     %04x   %s%s%s%s%s%s\n",
 		usbstat,
 		(usbstat & USBSTS_HCH) ?    "HCHalted " : "",
 		(usbstat & USBSTS_HCPE) ?   "HostControllerProcessError " : "",
@@ -110,53 +170,69 @@ void uhci_show_status(struct uhci *uhci)
 		(usbstat & USBSTS_ERROR) ?  "USBError " : "",
 		(usbstat & USBSTS_USBINT) ? "USBINT " : "");
 
-	printk("  usbint    =     %04x\n", usbint);
-	printk("  usbfrnum  =   (%d)%03x\n", (usbfrnum >> 10) & 1,
+	out += sprintf(out, "  usbint    =     %04x\n", usbint);
+	out += sprintf(out, "  usbfrnum  =   (%d)%03x\n", (usbfrnum >> 10) & 1,
 		0xfff & (4*(unsigned int)usbfrnum));
-	printk("  flbaseadd = %08x\n", flbaseadd);
-	printk("  sof       =       %02x\n", sof);
-	uhci_show_sc(1, portsc1);
-	uhci_show_sc(2, portsc2);
+	out += sprintf(out, "  flbaseadd = %08x\n", flbaseadd);
+	out += sprintf(out, "  sof       =       %02x\n", sof);
+	out += uhci_show_sc(1, portsc1, out, len - (out - buf));
+	out += uhci_show_sc(2, portsc2, out, len - (out - buf));
+
+	return out - buf;
 }
 
-#define uhci_link_to_qh(x) ((struct uhci_qh *) uhci_link_to_td(x))
-
-struct uhci_td *uhci_link_to_td(unsigned int link)
+static int uhci_show_qh(struct uhci_qh *qh, char *buf, int len, int space)
 {
-	if (link & UHCI_PTR_TERM)
-		return NULL;
-
-	return bus_to_virt(link & ~UHCI_PTR_BITS);
-}
-
-void uhci_show_urb_queue(struct urb *urb)
-{
-	struct urb_priv *urbp = urb->hcpriv;
+	char *out = buf;
+	struct urb_priv *urbp;
 	struct list_head *head, *tmp;
-	int i, checked = 0, prevactive = 0;
+	struct uhci_td *td;
+	int i = 0, checked = 0, prevactive = 0;
 
-	printk("  URB [%p] urbp [%p]\n", urb, urbp);
+	/* Try to make sure there's enough memory */
+	if (len < 80 * 6)
+		return 0;
 
-	if (urbp->qh)
-		printk("    QH [%p]\n", urbp->qh);
-	else
-		printk("    QH [%p] element (%08x) link (%08x)\n", urbp->qh,
-			urbp->qh->element, urbp->qh->link);
+	out += sprintf(out, "%*s[%p] link (%08x) element (%08x)\n", space, "",
+			qh, qh->link, qh->element);
 
-	i = 0;
+	if (qh->element & UHCI_PTR_QH)
+		out += sprintf(out, "%*s  Element points to QH (bug?)\n", space, "");
 
-	head = &urbp->list;
+	if (qh->element & UHCI_PTR_DEPTH)
+		out += sprintf(out, "%*s  Depth traverse\n", space, "");
+
+	if (qh->element & 8)
+		out += sprintf(out, "%*s  Bit 3 set (bug?)\n", space, "");
+
+	if (!(qh->element & ~(UHCI_PTR_QH | UHCI_PTR_DEPTH)))
+		out += sprintf(out, "%*s  Element is NULL (bug?)\n", space, "");
+
+	if (!qh->urbp) {
+		out += sprintf(out, "%*s  urbp == NULL\n", space, "");
+		goto out;
+	}
+
+	urbp = qh->urbp;
+
+	head = &urbp->td_list;
 	tmp = head->next;
+
+	td = list_entry(tmp, struct uhci_td, list);
+
+	if (td->dma_handle != (qh->element & ~UHCI_PTR_BITS))
+		out += sprintf(out, "%*s Element != First TD\n", space, "");
+
 	while (tmp != head) {
 		struct uhci_td *td = list_entry(tmp, struct uhci_td, list);
 
 		tmp = tmp->next;
 
-		printk("      td %d: [%p]\n", i++, td);
-		printk("      ");
-		uhci_show_td(td);
+		out += sprintf(out, "%*s%d: ", space + 2, "", i++);
+		out += uhci_show_td(td, out, len - (out - buf), 0);
 
-		if (i > 10 && !checked && prevactive && tmp != head) {
+		if (i > 10 && !checked && prevactive && tmp != head &&
+		    debug <= 2) {
 			struct list_head *ntmp = tmp;
 			struct uhci_td *ntd = td;
 			int active = 1, ni = i;
@@ -174,7 +250,7 @@ void uhci_show_urb_queue(struct urb *urb)
 			}
 
 			if (active && ni > i) {
-				printk("      [skipped %d active TD's]\n", ni - i);
+				out += sprintf(out, "%*s[skipped %d active TD's]\n", space, "", ni - i);
 				tmp = ntmp;
 				td = ntd;
 				i = ni;
@@ -183,134 +259,312 @@ void uhci_show_urb_queue(struct urb *urb)
 
 		prevactive = td->status & TD_CTRL_ACTIVE;
 	}
-}
 
-void uhci_show_queue(struct uhci_qh *qh)
-{
-	struct uhci_td *td, *first;
-	int i = 0, count = 1000;
+	if (list_empty(&urbp->queue_list) || urbp->queued)
+		goto out;
 
-	if (qh->element & UHCI_PTR_QH)
-		printk("      Element points to QH (bug?)\n");
+	out += sprintf(out, "%*sQueued QH's:\n", -space, "--");
 
-	if (qh->element & UHCI_PTR_DEPTH)
-		printk("      Depth traverse\n");
+	head = &urbp->queue_list;
+	tmp = head->next;
 
-	if (qh->element & UHCI_PTR_TERM)
-		printk("      Terminate\n");
+	while (tmp != head) {
+		struct urb_priv *nurbp = list_entry(tmp, struct urb_priv,
+						queue_list);
+		tmp = tmp->next;
 
-	if (!(qh->element & ~UHCI_PTR_BITS)) {
-		printk("      td 0: [NULL]\n");
-		return;
+		out += uhci_show_qh(nurbp->qh, out, len - (out - buf), space);
 	}
 
-	first = uhci_link_to_td(qh->element);
+out:
+	return out - buf;
+}
 
-	/* Make sure it doesn't runaway */
-	for (td = first; td && count > 0; 
-	     td = uhci_link_to_td(td->link), --count) {
-		printk("      td %d: [%p]\n", i++, td);
-		printk("      ");
-		uhci_show_td(td);
+static const char *td_names[] = {"skel_int1_td", "skel_int2_td",
+				 "skel_int4_td", "skel_int8_td",
+				 "skel_int16_td", "skel_int32_td",
+				 "skel_int64_td", "skel_int128_td",
+				 "skel_int256_td", "skel_term_td" };
+static const char *qh_names[] = { "skel_ls_control_qh", "skel_hs_control_qh",
+				  "skel_bulk_qh", "skel_term_qh" };
 
-		if (td == uhci_link_to_td(td->link)) {
-			printk(KERN_ERR "td links to itself!\n");
-			break;
-		}
+#define show_frame_num()	\
+	if (!shown) {		\
+	  shown = 1;		\
+	  out += sprintf(out, "- Frame %d\n", i); \
 	}
-}
 
-static int uhci_is_skeleton_td(struct uhci *uhci, struct uhci_td *td)
+#define show_td_name()		\
+	if (!shown) {		\
+	  shown = 1;		\
+	  out += sprintf(out, "- %s\n", td_names[i]); \
+	}
+
+#define show_qh_name()		\
+	if (!shown) {		\
+	  shown = 1;		\
+	  out += sprintf(out, "- %s\n", qh_names[i]); \
+	}
+
+static int uhci_sprint_schedule(struct uhci *uhci, char *buf, int len)
 {
-	int j;
-
-	for (j = 0; j < UHCI_NUM_SKELTD; j++)
-		if (td == uhci->skeltd + j)
-			return 1;
-
-	return 0;
-}
-
-static int uhci_is_skeleton_qh(struct uhci *uhci, struct uhci_qh *qh)
-{
-	int j;
-
-	for (j = 0; j < UHCI_NUM_SKELQH; j++)
-		if (qh == uhci->skelqh + j)
-			return 1;
-
-	return 0;
-}
-
-static const char *td_names[] = {"interrupt1", "interrupt2", "interrupt4",
-				 "interrupt8", "interrupt16", "interrupt32",
-				 "interrupt64", "interrupt128", "interrupt256" };
-static const char *qh_names[] = { "control", "bulk" };
-
-void uhci_show_queues(struct uhci *uhci)
-{
-	int i, isqh = 0;
+	char *out = buf;
+	int i;
 	struct uhci_qh *qh;
 	struct uhci_td *td;
+	struct list_head *tmp, *head;
 
+	out += sprintf(out, "HC status\n");
+	out += uhci_show_status(uhci, out, len - (out - buf));
+
+	out += sprintf(out, "Frame List\n");
 	for (i = 0; i < UHCI_NUMFRAMES; ++i) {
 		int shown = 0;
+		td = uhci->fl->frame_cpu[i];
+		if (!td)
+			continue;
 
-		td = uhci_link_to_td(uhci->fl->frame[i]);
-		if (td)
-			isqh = uhci->fl->frame[i] & UHCI_PTR_QH;
-		while (td && !isqh) {
-			if (uhci_is_skeleton_td(uhci, td))
-				break;
+		if (td->dma_handle != (dma_addr_t)uhci->fl->frame[i]) {
+			show_frame_num();
+			out += sprintf(out, "    frame list does not match td->dma_handle!\n");
+		}
+		if (uhci_is_skeleton_td(uhci, td))
+			continue;
+		show_frame_num();
 
-			if (!shown) {
-				printk("   Frame %d\n", i);
-				shown = 1;
+		head = &td->fl_list;
+		tmp = head;
+		do {
+			td = list_entry(tmp, struct uhci_td, fl_list);
+			tmp = tmp->next;
+			out += uhci_show_td(td, out, len - (out - buf), 4);
+		} while (tmp != head);
+	}
+
+	out += sprintf(out, "Skeleton TD's\n");
+	for (i = UHCI_NUM_SKELTD - 1; i >= 0; i--) {
+		int shown = 0;
+
+		td = uhci->skeltd[i];
+
+		if (debug > 1) {
+			show_td_name();
+			out += uhci_show_td(td, out, len - (out - buf), 4);
+		}
+
+		if (list_empty(&td->fl_list)) {
+			/* TD 0 is the int1 TD and links to control_ls_qh */
+			if (!i) {
+				if (td->link !=
+				    (uhci->skel_ls_control_qh->dma_handle | UHCI_PTR_QH)) {
+					show_td_name();
+					out += sprintf(out, "    skeleton TD not linked to ls_control QH!\n");
+				}
+			} else if (i < 9) {
+				if (td->link != uhci->skeltd[i - 1]->dma_handle) {
+					show_td_name();
+					out += sprintf(out, "    skeleton TD not linked to next skeleton TD!\n");
+				}
+			} else {
+				show_td_name();
+
+				if (td->link != td->dma_handle)
+					out += sprintf(out, "    skel_term_td does not link to self\n");
+
+				out += uhci_show_td(td, out, len - (out - buf), 4);
 			}
 
-			printk("[%p] ", td);
+			continue;
+		}
 
-			uhci_show_td(td);
-			td = uhci_link_to_td(td->link);
-			if (td)
-				isqh = td->link & UHCI_PTR_QH;
+		show_td_name();
+
+		head = &td->fl_list;
+		tmp = head->next;
+
+		while (tmp != head) {
+			td = list_entry(tmp, struct uhci_td, fl_list);
+
+			tmp = tmp->next;
+
+			out += uhci_show_td(td, out, len - (out - buf), 4);
+		}
+
+		if (!i) {
+			if (td->link !=
+			    (uhci->skel_ls_control_qh->dma_handle | UHCI_PTR_QH))
+				out += sprintf(out, "    last TD not linked to ls_control QH!\n");
+		} else if (i < 9) {
+			if (td->link != uhci->skeltd[i - 1]->dma_handle)
+				out += sprintf(out, "    last TD not linked to next skeleton!\n");
 		}
 	}
-	for (i = 0; i < UHCI_NUM_SKELTD; ++i) {
-		printk("  %s: [%p] (%08x)\n", td_names[i],
-			&uhci->skeltd[i],
-			uhci->skeltd[i].link);
 
-		td = uhci_link_to_td(uhci->skeltd[i].link);
-		if (td)
-			isqh = uhci->skeltd[i].link & UHCI_PTR_QH;
-		while (td && !isqh) {
-			if (uhci_is_skeleton_td(uhci, td))
-				break;
+	out += sprintf(out, "Skeleton QH's\n");
 
-			printk("[%p] ", td);
-
-			uhci_show_td(td);
-			td = uhci_link_to_td(td->link);
-			if (td)
-				isqh = td->link & UHCI_PTR_QH;
-		}
-	}
 	for (i = 0; i < UHCI_NUM_SKELQH; ++i) {
-		printk("  %s: [%p] (%08x) (%08x)\n", qh_names[i],
-			&uhci->skelqh[i],
-			uhci->skelqh[i].link, uhci->skelqh[i].element);
+		int shown = 0;
 
-		qh = uhci_link_to_qh(uhci->skelqh[i].link);
-		for (; qh; qh = uhci_link_to_qh(qh->link)) {
-			if (uhci_is_skeleton_qh(uhci, qh))
-				break;
+		qh = uhci->skelqh[i];
 
-			printk("    [%p] (%08x) (%08x)\n",
-				qh, qh->link, qh->element);
+		if (debug > 1) {
+			show_qh_name();
+			out += uhci_show_qh(qh, out, len - (out - buf), 4);
+		}
 
-			uhci_show_queue(qh);
+		/* QH 3 is the Terminating QH, it's different */
+		if (i == 3) {
+			if (qh->link != UHCI_PTR_TERM) {
+				show_qh_name();
+				out += sprintf(out, "    bandwidth reclamation on!\n");
+			}
+
+			if (qh->element != uhci->skel_term_td->dma_handle) {
+				show_qh_name();
+				out += sprintf(out, "    skel_term_qh element is not set to skel_term_td\n");
+			}
+		}
+
+		if (list_empty(&qh->list)) {
+			if (i < 3) {
+				if (qh->link !=
+				    (uhci->skelqh[i + 1]->dma_handle | UHCI_PTR_QH)) {
+					show_qh_name();
+					out += sprintf(out, "    skeleton QH not linked to next skeleton QH!\n");
+				}
+			}
+
+			continue;
+		}
+
+		show_qh_name();
+
+		head = &qh->list;
+		tmp = head->next;
+
+		while (tmp != head) {
+			qh = list_entry(tmp, struct uhci_qh, list);
+
+			tmp = tmp->next;
+
+			out += uhci_show_qh(qh, out, len - (out - buf), 4);
+		}
+
+		if (i < 3) {
+			if (qh->link !=
+			    (uhci->skelqh[i + 1]->dma_handle | UHCI_PTR_QH))
+				out += sprintf(out, "    last QH not linked to next skeleton!\n");
 		}
 	}
+
+	return out - buf;
 }
+
+#ifdef CONFIG_PROC_FS
+#define MAX_OUTPUT	(PAGE_SIZE * 8)
+
+static struct proc_dir_entry *uhci_proc_root = NULL;
+
+struct uhci_proc {
+	int size;
+	char *data;
+	struct uhci *uhci;
+};
+
+static int uhci_proc_open(struct inode *inode, struct file *file)
+{
+	const struct proc_dir_entry *dp = inode->u.generic_ip;
+	struct uhci *uhci = dp->data;
+	struct uhci_proc *up;
+	unsigned long flags;
+	int ret = -ENOMEM;
+
+	lock_kernel();
+	up = kmalloc(sizeof(*up), GFP_KERNEL);
+	if (!up)
+		goto out;
+
+	up->data = kmalloc(MAX_OUTPUT, GFP_KERNEL);
+	if (!up->data) {
+		kfree(up);
+		goto out;
+	}
+
+	spin_lock_irqsave(&uhci->frame_list_lock, flags);
+	up->size = uhci_sprint_schedule(uhci, up->data, MAX_OUTPUT);
+	spin_unlock_irqrestore(&uhci->frame_list_lock, flags);
+
+	file->private_data = up;
+
+	ret = 0;
+out:
+	unlock_kernel();
+	return ret;
+}
+
+static loff_t uhci_proc_lseek(struct file *file, loff_t off, int whence)
+{
+	struct uhci_proc *up = file->private_data;
+	loff_t new;
+
+	switch (whence) {
+	case 0:
+		new = off;
+		break;
+	case 1:
+		new = file->f_pos + off;
+		break;
+	case 2:
+	default:
+		return -EINVAL;
+	}
+	if (new < 0 || new > up->size)
+		return -EINVAL;
+	return (file->f_pos = new);
+}
+
+static ssize_t uhci_proc_read(struct file *file, char *buf, size_t nbytes,
+			loff_t *ppos)
+{
+	struct uhci_proc *up = file->private_data;
+	unsigned int pos;
+	unsigned int size;
+
+	pos = *ppos;
+	size = up->size;
+	if (pos >= size)
+		return 0;
+	if (nbytes >= size)
+		nbytes = size;
+	if (pos + nbytes > size)
+		nbytes = size - pos;
+
+	if (!access_ok(VERIFY_WRITE, buf, nbytes))
+		return -EINVAL;
+
+	copy_to_user(buf, up->data + pos, nbytes);
+
+	*ppos += nbytes;
+
+	return nbytes;
+}
+
+static int uhci_proc_release(struct inode *inode, struct file *file)
+{
+	struct uhci_proc *up = file->private_data;
+
+	kfree(up->data);
+	kfree(up);
+
+	return 0;
+}
+
+static struct file_operations uhci_proc_operations = {
+	open:		uhci_proc_open,
+	llseek:		uhci_proc_lseek,
+	read:		uhci_proc_read,
+//	write:		uhci_proc_write,
+	release:	uhci_proc_release,
+};
+#endif
 

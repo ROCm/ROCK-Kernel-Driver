@@ -94,6 +94,30 @@
 static LIST_HEAD (ohci_hcd_list);
 static spinlock_t usb_ed_lock = SPIN_LOCK_UNLOCKED;
 
+
+/*-------------------------------------------------------------------------*/
+
+/* AMD-756 (D2 rev) reports corrupt register contents in some cases.
+ * The erratum (#4) description is incorrect.  AMD's workaround waits
+ * till some bits (mostly reserved) are clear; ok for all revs.
+ */
+#define read_roothub(hc, register, mask) ({ \
+	u32 temp = readl (&hc->regs->roothub.register); \
+	if (hc->flags & OHCI_QUIRK_AMD756) \
+		while (temp & mask) \
+			temp = readl (&hc->regs->roothub.register); \
+	temp; })
+
+static u32 roothub_a (struct ohci *hc)
+	{ return read_roothub (hc, a, 0xfc0fe000); }
+static inline u32 roothub_b (struct ohci *hc)
+	{ return readl (&hc->regs->roothub.b); }
+static inline u32 roothub_status (struct ohci *hc)
+	{ return readl (&hc->regs->roothub.status); }
+static u32 roothub_portstatus (struct ohci *hc, int i)
+	{ return read_roothub (hc, portstatus [i], 0xffe0fce0); }
+
+
 /*-------------------------------------------------------------------------*
  * URB support functions 
  *-------------------------------------------------------------------------*/ 
@@ -139,10 +163,12 @@ static void urb_rm_priv_locked (urb_t * urb)
 	if (urb_priv) {
 		urb->hcpriv = NULL;
 
+#ifdef	DO_TIMEOUTS
 		if (urb->timeout) {
 			list_del (&urb->urb_list);
 			urb->timeout -= jiffies;
 		}
+#endif
 
 		/* Release int/iso bandwidth */
 		if (urb->bandwidth) {
@@ -333,10 +359,9 @@ static void ohci_dump_status (ohci_t *controller)
 
 static void ohci_dump_roothub (ohci_t *controller, int verbose)
 {
-	struct ohci_regs	*regs = controller->regs;
 	__u32			temp, ndp, i;
 
-	temp = readl (&regs->roothub.a);
+	temp = roothub_a (controller);
 	ndp = (temp & RH_A_NDP);
 
 	if (verbose) {
@@ -349,13 +374,13 @@ static void ohci_dump_roothub (ohci_t *controller, int verbose)
 			(temp & RH_A_PSM) ? " PSM" : "",
 			ndp
 			);
-		temp = readl (&regs->roothub.b);
+		temp = roothub_b (controller);
 		dbg ("roothub.b: %08x PPCM=%04x DR=%04x",
 			temp,
 			(temp & RH_B_PPCM) >> 16,
 			(temp & RH_B_DR)
 			);
-		temp = readl (&regs->roothub.status);
+		temp = roothub_status (controller);
 		dbg ("roothub.status: %08x%s%s%s%s%s%s",
 			temp,
 			(temp & RH_HS_CRWE) ? " CRWE" : "",
@@ -368,7 +393,7 @@ static void ohci_dump_roothub (ohci_t *controller, int verbose)
 	}
 	
 	for (i = 0; i < ndp; i++) {
-		temp = readl (&regs->roothub.portstatus [i]);
+		temp = roothub_portstatus (controller, i);
 		dbg ("roothub.portstatus [%d] = 0x%08x%s%s%s%s%s%s%s%s%s%s%s%s",
 			i,
 			temp,
@@ -610,7 +635,9 @@ static int sohci_submit_urb (urb_t * urb)
 				return bustime;
 			}
 			usb_claim_bandwidth (urb->dev, urb, bustime, usb_pipeisoc (urb->pipe));
+#ifdef	DO_TIMEOUTS
 			urb->timeout = 0;
+#endif
 	}
 
 	spin_lock_irqsave (&usb_ed_lock, flags);
@@ -625,6 +652,7 @@ static int sohci_submit_urb (urb_t * urb)
 	/* fill the TDs and link it to the ed */
 	td_submit_urb (urb);
 
+#ifdef	DO_TIMEOUTS
 	/* maybe add to ordered list of timeouts */
 	if (urb->timeout) {
 		struct list_head	*entry;
@@ -646,6 +674,7 @@ static int sohci_submit_urb (urb_t * urb)
 		/* drive timeouts by SF (messy, but works) */
 		writel (OHCI_INTR_SF, &ohci->regs->intrenable);	
 	}
+#endif
 
 	spin_unlock_irqrestore (&usb_ed_lock, flags);
 
@@ -1732,7 +1761,7 @@ static int rh_send_irq (ohci_t * ohci, void * rh_data, int rh_len)
 
 	__u8 data[8];
 
-	num_ports = readl (&ohci->regs->roothub.a) & RH_A_NDP; 
+	num_ports = roothub_a (ohci) & RH_A_NDP; 
 	if (num_ports > MAX_ROOT_PORTS) {
 		err ("bogus NDP=%d for OHCI usb-%s", num_ports,
 			ohci->ohci_dev->slot_name);
@@ -1741,13 +1770,13 @@ static int rh_send_irq (ohci_t * ohci, void * rh_data, int rh_len)
 		/* retry later; "should not happen" */
 		return 0;
 	}
-	*(__u8 *) data = (readl (&ohci->regs->roothub.status) & (RH_HS_LPSC | RH_HS_OCIC))
+	*(__u8 *) data = (roothub_status (ohci) & (RH_HS_LPSC | RH_HS_OCIC))
 		? 1: 0;
 	ret = *(__u8 *) data;
 
 	for ( i = 0; i < num_ports; i++) {
 		*(__u8 *) (data + (i + 1) / 8) |= 
-			((readl (&ohci->regs->roothub.portstatus[i]) &
+			((roothub_portstatus (ohci, i) &
 				(RH_PS_CSC | RH_PS_PESC | RH_PS_PSSC | RH_PS_OCIC | RH_PS_PRSC))
 			    ? 1: 0) << ((i + 1) % 8);
 		ret += *(__u8 *) (data + (i + 1) / 8);
@@ -1818,8 +1847,8 @@ static int rh_init_int_timer (urb_t * urb)
 #define OK(x) 			len = (x); break
 #define WR_RH_STAT(x) 		writel((x), &ohci->regs->roothub.status)
 #define WR_RH_PORTSTAT(x) 	writel((x), &ohci->regs->roothub.portstatus[wIndex-1])
-#define RD_RH_STAT		readl(&ohci->regs->roothub.status)
-#define RD_RH_PORTSTAT		readl(&ohci->regs->roothub.portstatus[wIndex-1])
+#define RD_RH_STAT		roothub_status(ohci)
+#define RD_RH_PORTSTAT		roothub_portstatus(ohci,wIndex-1)
 
 /* request to virtual root hub */
 
@@ -1958,7 +1987,7 @@ static int rh_submit_urb (urb_t * urb)
 		
 		case RH_GET_DESCRIPTOR | RH_CLASS:
 		    {
-			    __u32 temp = readl (&ohci->regs->roothub.a);
+			    __u32 temp = roothub_a (ohci);
 
 			    data_buf [0] = 9;		// min length;
 			    data_buf [1] = 0x29;
@@ -1973,7 +2002,7 @@ static int rh_submit_urb (urb_t * urb)
 
 			    datab [1] = 0;
 			    data_buf [5] = (temp & RH_A_POTPGT) >> 24;
-			    temp = readl (&ohci->regs->roothub.b);
+			    temp = roothub_b (ohci);
 			    data_buf [7] = temp & RH_B_DR;
 			    if (data_buf [2] < 7) {
 				data_buf [8] = 0xff;
@@ -2127,13 +2156,14 @@ static int hc_start (ohci_t * ohci)
 	writel (mask, &ohci->regs->intrstatus);
 
 #ifdef	OHCI_USE_NPS
-	writel ((readl(&ohci->regs->roothub.a) | RH_A_NPS) & ~RH_A_PSM,
+	/* required for AMD-756 and some Mac platforms */
+	writel ((roothub_a (ohci) | RH_A_NPS) & ~RH_A_PSM,
 		&ohci->regs->roothub.a);
 	writel (RH_HS_LPSC, &ohci->regs->roothub.status);
 #endif	/* OHCI_USE_NPS */
 
 	// POTPGT delay is bits 24-31, in 2 ms units.
-	mdelay ((readl(&ohci->regs->roothub.a) >> 23) & 0x1fe);
+	mdelay ((roothub_a (ohci) >> 23) & 0x1fe);
  
 	/* connect the virtual root hub */
 	ohci->rh.devnum = 0;
@@ -2347,7 +2377,8 @@ static void hc_release_ohci (ohci_t * ohci)
 static struct pci_driver ohci_pci_driver;
  
 static int __devinit
-hc_found_ohci (struct pci_dev *dev, int irq, void * mem_base)
+hc_found_ohci (struct pci_dev *dev, int irq,
+	void *mem_base, const struct pci_device_id *id)
 {
 	ohci_t * ohci;
 	u8 latency, limit;
@@ -2371,6 +2402,9 @@ hc_found_ohci (struct pci_dev *dev, int irq, void * mem_base)
 		hc_release_ohci (ohci);
 		return ret;
 	}
+	ohci->flags = id->driver_data;
+	if (ohci->flags & OHCI_QUIRK_AMD756)
+		printk (KERN_INFO __FILE__ ": AMD756 erratum 4 workaround\n");
 
 	/* bad pci latencies can contribute to overruns */ 
 	pci_read_config_byte (dev, PCI_LATENCY_TIMER, &latency);
@@ -2468,13 +2502,6 @@ ohci_pci_probe (struct pci_dev *dev, const struct pci_device_id *id)
 	unsigned long mem_resource, mem_len;
 	void *mem_base;
 
-	/* blacklisted hardware? */
-	if (id->driver_data) {
-		info ("%s (%s): %s", dev->slot_name,
-			dev->name, (char *) id->driver_data);
-		return -ENODEV;
-	}
-
 	if (pci_enable_device(dev) < 0)
 		return -ENODEV;
 	
@@ -2495,7 +2522,7 @@ ohci_pci_probe (struct pci_dev *dev, const struct pci_device_id *id)
 	/* controller writes into our memory */
 	pci_set_master (dev);
 
-	return hc_found_ohci (dev, dev->irq, mem_base);
+	return hc_found_ohci (dev, dev->irq, mem_base, id);
 } 
 
 /*-------------------------------------------------------------------------*/
@@ -2642,15 +2669,14 @@ static const struct pci_device_id __devinitdata ohci_pci_ids [] = { {
 
 	/*
 	 * AMD-756 [Viper] USB has a serious erratum when used with
-	 * lowspeed devices like mice; oopses have been seen.  The
-	 * vendor workaround needs an NDA ... for now, blacklist it.
+	 * lowspeed devices like mice.
 	 */
 	vendor:		0x1022,
 	device:		0x740c,
 	subvendor:	PCI_ANY_ID,
 	subdevice:	PCI_ANY_ID,
 
-	driver_data:	(unsigned long) "blacklisted, erratum #4",
+	driver_data:	OHCI_QUIRK_AMD756,
 
 } , {
 

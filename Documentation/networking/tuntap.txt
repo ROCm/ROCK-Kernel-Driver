@@ -37,7 +37,7 @@ Copyright (C) 1999-2000 Maxim Krasnyansky <max_mk@yahoo.com>
 	alias char-major-10-200 tun
      
      Run:
-        modprobe -a 
+        depmod -a 
 
      Driver will be automatically loaded when application access /dev/net/tun.
 

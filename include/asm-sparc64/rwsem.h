@@ -2,7 +2,7 @@
  * rwsem.h: R/W semaphores implemented using CAS
  *
  * Written by David S. Miller (davem@redhat.com), 2001.
- * Derived from asm-i386/rwsem-xadd.h
+ * Derived from asm-i386/rwsem.h
  */
 #ifndef _SPARC64_RWSEM_H
 #define _SPARC64_RWSEM_H
@@ -127,14 +127,15 @@ static inline void __up_read(struct rw_semaphore *sem)
 		"save		%%sp, -160, %%sp\n\t"
 		"mov		%%g2, %%l2\n\t"
 		"mov		%%g3, %%l3\n\t"
+		" mov		%%g7, %%o0\n\t"
 		"call		%1\n\t"
-		" mov		%%g5, %%o0\n\t"
+		" mov		%%g5, %%o1\n\t"
 		"mov		%%l2, %%g2\n\t"
 		"ba,pt		%%xcc, 2b\n\t"
 		" restore	%%l3, %%g0, %%g3\n\t"
 		".previous\n\t"
 		"! ending __up_read"
-		: : "r" (sem), "i" (rwsem_wake),
+		: : "r" (sem), "i" (rwsem_up_read_wake),
 		    "i" (RWSEM_ACTIVE_MASK)
 		: "g1", "g5", "g7", "memory", "cc");
 }
@@ -145,31 +146,28 @@ static inline void __up_write(struct rw_semaphore *sem)
 		"! beginning __up_write\n\t"
 		"sethi		%%hi(%2), %%g1\n\t"
 		"or		%%g1, %%lo(%2), %%g1\n"
-		"1:\tlduw	[%0], %%g5\n\t"
-		"sub		%%g5, %%g1, %%g7\n\t"
-		"cas		[%0], %%g5, %%g7\n\t"
-		"cmp		%%g5, %%g7\n\t"
-		"bne,pn		%%icc, 1b\n\t"
-		" sub		%%g7, %%g1, %%g7\n\t"
-		"cmp		%%g7, 0\n\t"
-		"bl,pn		%%icc, 3f\n\t"
+		"sub		%%g5, %%g5, %%g5\n\t"
+		"cas		[%0], %%g1, %%g5\n\t"
+		"cmp		%%g1, %%g5\n\t"
+		"bne,pn		%%icc, 1f\n\t"
 		" membar	#StoreStore\n"
 		"2:\n\t"
 		".subsection 2\n"
-		"3:\tmov	%0, %%g5\n\t"
+		"3:\tmov	%0, %%g1\n\t"
 		"save		%%sp, -160, %%sp\n\t"
 		"mov		%%g2, %%l2\n\t"
 		"mov		%%g3, %%l3\n\t"
+		"mov		%%g1, %%o0\n\t"
 		"call		%1\n\t"
-		" mov		%%g5, %%o0\n\t"
+		" mov		%%g5, %%o1\n\t"
 		"mov		%%l2, %%g2\n\t"
 		"ba,pt		%%xcc, 2b\n\t"
 		" restore	%%l3, %%g0, %%g3\n\t"
 		".previous\n\t"
 		"! ending __up_write"
-		: : "r" (sem), "i" (rwsem_wake),
+		: : "r" (sem), "i" (rwsem_up_write_wake),
 		    "i" (RWSEM_ACTIVE_WRITE_BIAS)
-		: "g1", "g5", "g7", "memory", "cc");
+		: "g1", "g5", "memory", "cc");
 }
 
 static inline int rwsem_atomic_update(int delta, struct rw_semaphore *sem)
@@ -190,6 +188,8 @@ static inline int rwsem_atomic_update(int delta, struct rw_semaphore *sem)
 
 	return tmp + delta;
 }
+
+#define rwsem_atomic_add rwsem_atomic_update
 
 static inline __u16 rwsem_cmpxchgw(struct rw_semaphore *sem, __u16 __old, __u16 __new)
 {
@@ -212,6 +212,11 @@ again:
 		goto again;
 
 	return prev & 0xffff;
+}
+
+static inline signed long rwsem_cmpxchg(struct rw_semaphore *sem, signed long old, signed long new)
+{
+	return cmpxchg(&sem->count,old,new);
 }
 
 #endif /* __KERNEL__ */

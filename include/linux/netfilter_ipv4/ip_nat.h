@@ -24,6 +24,15 @@ enum ip_nat_manip_type
 /* Used internally by get_unique_tuple(). */
 #define IP_NAT_RANGE_FULL 4
 
+/* NAT sequence number modifications */
+struct ip_nat_seq {
+	/* position of the last TCP sequence number 
+	 * modification (if any) */
+	u_int32_t correction_pos;
+	/* sequence number offset before and after last modification */
+	int32_t offset_before, offset_after;
+};
+
 /* Single range specification. */
 struct ip_nat_range
 {
@@ -98,6 +107,8 @@ struct ip_nat_info
 
 	/* Helper (NULL if none). */
 	struct ip_nat_helper *helper;
+
+	struct ip_nat_seq seq[IP_CT_DIR_MAX];
 };
 
 /* Set up the info structure to map into this range. */

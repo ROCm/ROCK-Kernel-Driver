@@ -134,7 +134,7 @@ extern inline void pgd_free(pgd_t * pgd)
         free_page((unsigned long) pgd);
 }
 
-extern inline pgd_t * pgd_alloc(void)
+extern inline pgd_t * pgd_alloc(struct mm_struct *mm)
 {
      pgd_t *new_pgd;
 

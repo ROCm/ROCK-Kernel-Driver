@@ -1,9 +1,10 @@
 /*
  * Cache operations for Coda.
  * For Linux 2.1: (C) 1997 Carnegie Mellon University
+ * For Linux 2.3: (C) 2000 Carnegie Mellon University
  *
  * Carnegie Mellon encourages users of this code to contribute improvements
- * to the Coda project. Contact Peter Braam <coda@cs.cmu.edu>.
+ * to the Coda project http://www.coda.cs.cmu.edu/ <coda@cs.cmu.edu>.
  */
 
 #include <linux/types.h>
@@ -59,8 +60,6 @@ void coda_cache_clear_all(struct super_block *sb, struct coda_cred *cred)
         list_for_each(tmp, &sbi->sbi_cihead)
         {
 		cii = list_entry(tmp, struct coda_inode_info, c_cilist);
-                if ( cii->c_magic != CODA_CNODE_MAGIC ) BUG();
-
                 if (!cred || coda_cred_eq(cred, &cii->c_cached_cred))
                         cii->c_cached_perm = 0;
 	}
@@ -93,26 +92,6 @@ int coda_cache_check(struct inode *inode, int mask)
    - an inode method coda_revalidate (for attributes) if the 
      flag is C_VATTR
 */
-
-/* 
-   Some of this is pretty scary: what can disappear underneath us?
-   - shrink_dcache_parent calls on purge_one_dentry which is safe:
-     it only purges children.
-   - dput is evil since it  may recurse up the dentry tree
- */
-
-void coda_purge_dentries(struct inode *inode)
-{
-	if (!inode)
-		return ;
-
-	/* better safe than sorry: dput could kill us */
-	iget(inode->i_sb, inode->i_ino);
-	/* catch the dentries later if some are still busy */
-	coda_flag_inode(inode, C_PURGE);
-	d_prune_aliases(inode);
-	iput(inode);
-}
 
 /* this won't do any harm: just flag all children */
 static void coda_flag_children(struct dentry *parent, int flag)

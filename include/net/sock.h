@@ -539,7 +539,9 @@ struct sock {
 				bsdism;
 	unsigned char		debug;
 	unsigned char		rcvtstamp;
+	unsigned char		use_write_queue;
 	unsigned char		userlocks;
+	/* Hole of 3 bytes. Try to pack. */
 	int			route_caps;
 	int			proc;
 	unsigned long	        lingertime;

@@ -11,7 +11,7 @@
 #include <asm/current.h>
 #include <asm/system.h>
 #include <asm/atomic.h>
-#include <asm/compiler.h>	/* __builtin_expect */
+#include <linux/compiler.h>
 #include <linux/wait.h>
 #include <linux/rwsem.h>
 

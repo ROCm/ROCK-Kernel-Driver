@@ -104,7 +104,7 @@ Scsi_Cmnd *last_cmnd;
 const unsigned char scsi_command_size[8] =
 {
 	6, 10, 10, 12,
-	12, 12, 10, 10
+	16, 12, 10, 10
 };
 static unsigned long serial_number;
 static Scsi_Cmnd *scsi_bh_queue_head;
@@ -832,9 +832,6 @@ void scsi_do_req(Scsi_Request * SRpnt, const void *cmnd,
 	SRpnt->sr_allowed = retries;
 	SRpnt->sr_done = done;
 	SRpnt->sr_timeout_per_command = timeout;
-
-	memcpy((void *) SRpnt->sr_cmnd, (const void *) cmnd, 
-	       sizeof(SRpnt->sr_cmnd));
 
 	if (SRpnt->sr_cmd_len == 0)
 		SRpnt->sr_cmd_len = COMMAND_SIZE(SRpnt->sr_cmnd[0]);

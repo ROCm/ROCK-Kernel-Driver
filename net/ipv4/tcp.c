@@ -5,7 +5,7 @@
  *
  *		Implementation of the Transmission Control Protocol(TCP).
  *
- * Version:	$Id: tcp.c,v 1.201 2001/03/06 22:42:56 davem Exp $
+ * Version:	$Id: tcp.c,v 1.202 2001/04/20 20:46:19 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -458,10 +458,21 @@ unsigned int tcp_poll(struct file * file, struct socket *sock, poll_table *wait)
 }
 
 /*
- *	TCP socket write_space callback. Not used.
+ *	TCP socket write_space callback.
  */
 void tcp_write_space(struct sock *sk)
 {
+	struct socket *sock = sk->socket;
+
+	if (tcp_wspace(sk) >= tcp_min_write_space(sk) && sock) {
+		clear_bit(SOCK_NOSPACE, &sock->flags);
+
+		if (sk->sleep && waitqueue_active(sk->sleep))
+			wake_up_interruptible(sk->sleep);
+
+		if (sock->fasync_list && !(sk->shutdown&SEND_SHUTDOWN))
+			sock_wake_async(sock, 2, POLL_OUT);
+	}
 }
 
 int tcp_ioctl(struct sock *sk, int cmd, unsigned long arg)

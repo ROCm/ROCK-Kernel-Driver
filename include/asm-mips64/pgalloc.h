@@ -151,7 +151,7 @@ extern void __bad_pmd(pgd_t *pgd);
 #define pte_free(pte)           free_pte_fast(pte)
 #define pmd_free(pte)           free_pmd_fast(pte)
 #define pgd_free(pgd)           free_pgd_fast(pgd)
-#define pgd_alloc()             get_pgd_fast()
+#define pgd_alloc(mm)           get_pgd_fast()
 
 extern inline pte_t * pte_alloc(pmd_t * pmd, unsigned long address)
 {

@@ -160,7 +160,7 @@ extern inline void pgd_free(pgd_t *pgd)
 	free_pmd_fast((pmd_t *)pgd);
 }
 
-extern inline pgd_t *pgd_alloc(void)
+extern inline pgd_t *pgd_alloc(struct mm_struct *mm)
 {
 	pgd_t *pgd = (pgd_t *)get_pmd_fast();
 	if (!pgd)

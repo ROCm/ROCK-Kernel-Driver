@@ -201,7 +201,7 @@ udf_parse_options(char *options, struct udf_options *uopt)
 	char *opt, *val;
 
 	uopt->novrs = 0;
-	uopt->blocksize = 512;
+	uopt->blocksize = 2048;
 	uopt->partition = 0xFFFF;
 	uopt->session = 0xFFFFFFFF;
 	uopt->lastblock = 0xFFFFFFFF;

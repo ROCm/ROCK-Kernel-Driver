@@ -1075,7 +1075,7 @@ int ndisc_rcv(struct sk_buff *skb)
 		return 0;
 
 	case NDISC_NEIGHBOUR_ADVERTISEMENT:
-		if ((ipv6_addr_type(saddr)&IPV6_ADDR_MULTICAST) &&
+		if ((ipv6_addr_type(daddr)&IPV6_ADDR_MULTICAST) &&
 		    msg->icmph.icmp6_solicited) {
 			ND_PRINTK0("NDISC: solicited NA is multicasted\n");
 			return 0;

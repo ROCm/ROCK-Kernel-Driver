@@ -181,7 +181,7 @@ static inline void wait_on_inode(struct inode *inode)
 
 static inline void write_inode(struct inode *inode, int sync)
 {
-	if (inode->i_sb && inode->i_sb->s_op && inode->i_sb->s_op->write_inode)
+	if (inode->i_sb && inode->i_sb->s_op && inode->i_sb->s_op->write_inode && !is_bad_inode(inode))
 		inode->i_sb->s_op->write_inode(inode, sync);
 }
 

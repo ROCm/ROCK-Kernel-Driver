@@ -2028,8 +2028,17 @@ static int wavelan_ioctl(struct net_device *dev,	/* device on which the ioctl is
 		if (wrq->u.data.pointer != (caddr_t) 0) {
 			struct iw_range range;
 
-			/* Set the length (useless:  it's constant). */
+			/* Set the length (very important for backward
+			 * compatibility) */
 			wrq->u.data.length = sizeof(struct iw_range);
+
+			/* Set all the info we don't care or don't know
+			 * about to zero */
+			memset(&range, 0, sizeof(range));
+
+			/* Set the Wireless Extension versions */
+			range.we_version_compiled = WIRELESS_EXT;
+			range.we_version_source = 9;
 
 			/* Set information in the range struct.  */
 			range.throughput = 1.6 * 1000 * 1000;	/* don't argue on this ! */

@@ -1040,7 +1040,7 @@ void swapin_readahead(swp_entry_t entry)
 			break;
 		}
 		/* Ok, do the async read-ahead now */
-		new_page = read_swap_cache_async(SWP_ENTRY(SWP_TYPE(entry), offset), 0);
+		new_page = read_swap_cache_async(SWP_ENTRY(SWP_TYPE(entry), offset));
 		if (new_page != NULL)
 			page_cache_release(new_page);
 		swap_free(SWP_ENTRY(SWP_TYPE(entry), offset));
@@ -1063,13 +1063,13 @@ static int do_swap_page(struct mm_struct * mm,
 	if (!page) {
 		lock_kernel();
 		swapin_readahead(entry);
-		page = read_swap_cache(entry);
+		page = read_swap_cache_async(entry);
 		unlock_kernel();
 		if (!page) {
 			spin_lock(&mm->page_table_lock);
 			return -1;
 		}
-
+		wait_on_page(page);
 		flush_page_to_ram(page);
 		flush_icache_page(vma, page);
 	}

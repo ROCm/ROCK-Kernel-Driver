@@ -202,9 +202,6 @@ static struct {
 #ifdef CONFIG_FB_SIS
 	{ "sisfb", sisfb_init, sisfb_setup },
 #endif
-#ifdef CONFIG_FB_E1355
-	{ "e1355fb", e1355fb_init, e1355fb_setup },
-#endif
 
 	/*
 	 * Generic drivers that are used as fallbacks
@@ -269,6 +266,9 @@ static struct {
 #endif
 #ifdef CONFIG_FB_HIT
 	{ "hitfb", hitfb_init, NULL },
+#endif
+#ifdef CONFIG_FB_E1355
+	{ "e1355fb", e1355fb_init, e1355fb_setup },
 #endif
 #ifdef CONFIG_FB_DC
 	{ "dcfb", dcfb_init, NULL },

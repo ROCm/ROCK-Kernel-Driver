@@ -338,7 +338,7 @@ static inline void pte_free_slow(pte_t *pte)
 #define pte_free(pte)		pte_free_fast(pte)
 #define pmd_free(pmd)		pmd_free_fast(pmd)
 #define pgd_free(pgd)		free_pgd_fast(pgd)
-#define pgd_alloc()		get_pgd_fast()
+#define pgd_alloc(mm)		get_pgd_fast()
 
 extern int do_check_pgt_cache(int, int);
 

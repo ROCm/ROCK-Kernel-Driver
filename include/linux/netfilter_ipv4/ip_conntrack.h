@@ -84,12 +84,7 @@ struct ip_conntrack_expect
 #include <linux/netfilter_ipv4/ip_nat.h>
 #endif
 
-#if defined(CONFIG_IP_NF_FTP) || defined(CONFIG_IP_NF_FTP_MODULE)
 #include <linux/netfilter_ipv4/ip_conntrack_ftp.h>
-#ifdef CONFIG_IP_NF_NAT_NEEDED
-#include <linux/netfilter_ipv4/ip_nat_ftp.h>
-#endif
-#endif
 
 struct ip_conntrack
 {
@@ -127,18 +122,14 @@ struct ip_conntrack
 	} proto;
 
 	union {
-#if defined(CONFIG_IP_NF_FTP) || defined(CONFIG_IP_NF_FTP_MODULE)
 		struct ip_ct_ftp ct_ftp_info;
-#endif
 	} help;
 
 #ifdef CONFIG_IP_NF_NAT_NEEDED
 	struct {
 		struct ip_nat_info info;
 		union {
-#if defined(CONFIG_IP_NF_FTP) || defined(CONFIG_IP_NF_FTP_MODULE)
-			struct ip_nat_ftp_info ftp_info[IP_CT_DIR_MAX];
-#endif
+			/* insert nat helper private data here */
 		} help;
 #if defined(CONFIG_IP_NF_TARGET_MASQUERADE) || \
 	defined(CONFIG_IP_NF_TARGET_MASQUERADE_MODULE)

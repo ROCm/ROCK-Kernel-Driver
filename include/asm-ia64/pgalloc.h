@@ -48,7 +48,7 @@ pgd_alloc_one_fast (void)
 }
 
 static inline pgd_t*
-pgd_alloc (void)
+pgd_alloc (struct mm_struct *mm)
 {
 	/* the VM system never calls pgd_alloc_one_fast(), so we do it here. */
 	pgd_t *pgd = pgd_alloc_one_fast();

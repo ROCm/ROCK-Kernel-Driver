@@ -191,7 +191,7 @@ extern inline pmd_t * pmd_alloc(pgd_t *pgd, unsigned long address)
 /* pgd handling */
 
 #define pgd_free(pgd)      free_pgd_slow(pgd)
-#define pgd_alloc()        get_pgd_fast()
+#define pgd_alloc(mm)      get_pgd_fast()
 
 /* other stuff */
 

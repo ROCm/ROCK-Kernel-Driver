@@ -87,7 +87,7 @@ extern __inline__ void free_pgd_slow(pgd_t *pgd)
 }
 
 #define pgd_free(pgd)		free_pgd_fast(pgd)
-#define pgd_alloc()		get_pgd_fast()
+#define pgd_alloc(mm)		get_pgd_fast()
 
 /*
  * We don't have any real pmd's, and this code never triggers because

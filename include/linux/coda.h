@@ -313,7 +313,9 @@ struct coda_statfs {
 #define CODA_RESOLVE     32
 #define CODA_REINTEGRATE 33
 #define CODA_STATFS	 34
-#define CODA_NCALLS 35
+#define CODA_STORE	 35
+#define CODA_RELEASE	 36
+#define CODA_NCALLS 37
 
 #define DOWNCALL(opcode) (opcode >= CODA_REPLACE && opcode <= CODA_PURGEFID)
 
@@ -371,6 +373,28 @@ struct coda_open_out {
     ino_t	inode;
 };
 
+
+/* coda_store: */
+struct coda_store_in {
+    struct coda_in_hdr ih;
+    ViceFid	VFid;
+    int	flags;
+};
+
+struct coda_store_out {
+    struct coda_out_hdr out;
+};
+
+/* coda_release: */
+struct coda_release_in {
+    struct coda_in_hdr ih;
+    ViceFid	VFid;
+    int	flags;
+};
+
+struct coda_release_out {
+    struct coda_out_hdr out;
+};
 
 /* coda_close: */
 struct coda_close_in {
@@ -641,6 +665,10 @@ struct coda_open_by_fd_in {
 struct coda_open_by_fd_out {
     struct coda_out_hdr oh;
     int fd;
+
+#ifdef __KERNEL__
+    struct file *fh; /* not passed from userspace but used in-kernel only */
+#endif
 };
 
 /* coda_open_by_path: */
@@ -675,6 +703,8 @@ struct coda_statfs_out {
 union inputArgs {
     struct coda_in_hdr ih;		/* NB: every struct below begins with an ih */
     struct coda_open_in coda_open;
+    struct coda_store_in coda_store;
+    struct coda_release_in coda_release;
     struct coda_close_in coda_close;
     struct coda_ioctl_in coda_ioctl;
     struct coda_getattr_in coda_getattr;

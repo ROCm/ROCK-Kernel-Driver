@@ -36,15 +36,18 @@ extern struct file_operations coda_ioctl_operations;
 
 /* operations shared over more than one file */
 int coda_open(struct inode *i, struct file *f);
+int coda_flush(struct file *f);
 int coda_release(struct inode *i, struct file *f);
 int coda_permission(struct inode *inode, int mask);
 int coda_revalidate_inode(struct dentry *);
 int coda_notify_change(struct dentry *, struct iattr *);
+int coda_isnullfid(ViceFid *fid);
 
 /* global variables */
 extern int coda_debug;
 extern int coda_print_entry;
 extern int coda_access_cache;
+extern int coda_fake_statfs;
 
 /* this file:  heloers */
 static __inline__ struct ViceFid *coda_i2f(struct inode *);
@@ -53,8 +56,6 @@ static __inline__ void coda_flag_inode(struct inode *, int flag);
 char *coda_f2s(ViceFid *f);
 char *coda_f2s2(ViceFid *f);
 int coda_isroot(struct inode *i);
-int coda_fid_is_volroot(struct ViceFid *);
-int coda_fid_is_weird(struct ViceFid *fid);
 int coda_iscontrol(const char *name, size_t length);
 
 void coda_load_creds(struct coda_cred *cred);
@@ -64,10 +65,6 @@ unsigned short coda_flags_to_cflags(unsigned short);
 void print_vattr( struct coda_vattr *attr );
 int coda_cred_ok(struct coda_cred *cred);
 int coda_cred_eq(struct coda_cred *cred1, struct coda_cred *cred2);
-
-/* cache.c */
-void coda_purge_children(struct inode *, int);
-void coda_purge_dentries(struct inode *);
 
 /* sysctl.h */
 void coda_sysctl_init(void);
@@ -120,22 +117,22 @@ do {                                                                      \
 
 /* inode to cnode access functions */
 
+#define ITOC(inode) (&((inode)->u.coda_i))
+
 static __inline__ struct ViceFid *coda_i2f(struct inode *inode)
 {
-	return &(inode->u.coda_i.c_fid);
+	return &(ITOC(inode)->c_fid);
 }
 
 static __inline__ char *coda_i2s(struct inode *inode)
 {
-	return coda_f2s(&(inode->u.coda_i.c_fid));
+	return coda_f2s(&(ITOC(inode)->c_fid));
 }
 
 /* this will not zap the inode away */
 static __inline__ void coda_flag_inode(struct inode *inode, int flag)
 {
-	inode->u.coda_i.c_flags |= flag;
+	ITOC(inode)->c_flags |= flag;
 }		
-
-#define ITOC(inode) (&((inode)->u.coda_i))
 
 #endif

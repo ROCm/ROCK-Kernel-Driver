@@ -14,13 +14,17 @@
 extern int coda_debug;
 extern int coda_print_entry;
 
-static ViceFid NullFID = { 0, 0, 0 };
-
 inline int coda_fideq(ViceFid *fid1, ViceFid *fid2)
 {
 	if (fid1->Vnode != fid2->Vnode)   return 0;
 	if (fid1->Volume != fid2->Volume) return 0;
 	if (fid1->Unique != fid2->Unique) return 0;
+	return 1;
+}
+
+inline int coda_isnullfid(ViceFid *fid)
+{
+	if (fid->Vnode || fid->Volume || fid->Unique) return 0;
 	return 1;
 }
 
@@ -64,7 +68,7 @@ struct inode * coda_iget(struct super_block * sb, ViceFid * fid,
 {
 	struct inode *inode;
 	struct coda_inode_info *cii;
-	ino_t ino = attr->va_fileid;
+	ino_t ino = coda_f2i(fid);
 
 	inode = iget4(sb, ino, coda_inocmp, fid);
 
@@ -75,14 +79,12 @@ struct inode * coda_iget(struct super_block * sb, ViceFid * fid,
 
 	/* check if the inode is already initialized */
 	cii = ITOC(inode);
-	if (coda_fideq(&cii->c_fid, &NullFID)) {
+	if (coda_isnullfid(&cii->c_fid))
 		/* new, empty inode found... initializing */
-		cii->c_fid   = *fid;
-		cii->c_vnode = inode;
-	}
+		cii->c_fid = *fid;
 
 	/* we shouldnt see inode collisions anymore */
-	if ( !coda_fideq(fid, &cii->c_fid) ) BUG();
+	if (!coda_fideq(fid, &cii->c_fid)) BUG();
 
 	/* always replace the attributes, type might have changed */
 	coda_fill_inode(inode, attr);
@@ -122,7 +124,7 @@ int coda_cnode_make(struct inode **inode, ViceFid *fid, struct super_block *sb)
 
 	CDEBUG(D_DOWNCALL, "Done making inode: ino %ld, count %d with %s\n",
 		(*inode)->i_ino, atomic_read(&(*inode)->i_count), 
-		coda_f2s(&(*inode)->u.coda_i.c_fid));
+		coda_f2s(&ITOC(*inode)->c_fid));
         EXIT;
 	return 0;
 }
@@ -135,18 +137,18 @@ void coda_replace_fid(struct inode *inode, struct ViceFid *oldfid,
 	
 	cii = ITOC(inode);
 
-	if ( ! coda_fideq(&cii->c_fid, oldfid) )
-		printk("What? oldfid != cii->c_fid. Call 911.\n");
+	if (!coda_fideq(&cii->c_fid, oldfid))
+		BUG();
 
+	/* replace fid and rehash inode */
+	/* XXX we probably need to hold some lock here! */
+	remove_inode_hash(inode);
 	cii->c_fid = *newfid;
+	inode->i_ino = coda_f2i(newfid);
+	insert_inode_hash(inode);
 }
 
-
- 
-
-/* convert a fid to an inode. Mostly we can compute
-   the inode number from the FID, but not for volume
-   mount points: those are in a list */
+/* convert a fid to an inode. */
 struct inode *coda_fid_to_inode(ViceFid *fid, struct super_block *sb) 
 {
 	ino_t nr;
@@ -161,31 +163,6 @@ struct inode *coda_fid_to_inode(ViceFid *fid, struct super_block *sb)
 
 	CDEBUG(D_INODE, "%s\n", coda_f2s(fid));
 
-
-        /* weird fids cannot be hashed, have to look for them the hard way */
-	if ( coda_fid_is_weird(fid) ) {
-		struct coda_sb_info *sbi = coda_sbp(sb);
-		struct list_head *le;
-
-                list_for_each(le, &sbi->sbi_cihead)
-                {
-			cii = list_entry(le, struct coda_inode_info, c_cilist);
-			if ( cii->c_magic != CODA_CNODE_MAGIC ) BUG();
-
-			CDEBUG(D_DOWNCALL, "iterating, now doing %s, ino %ld\n",
-			       coda_f2s(&cii->c_fid), cii->c_vnode->i_ino);
-
-			if ( coda_fideq(&cii->c_fid, fid) ) {
-				inode = cii->c_vnode;
-				CDEBUG(D_INODE, "volume root, found %ld\n", inode->i_ino);
-				iget4(sb, inode->i_ino, coda_inocmp, fid);
-				return inode;
-			}
-		}
-		return NULL;
-	}
-
-	/* fid is not weird: ino should be computable */
 	nr = coda_f2i(fid);
 	inode = iget4(sb, nr, coda_inocmp, fid);
 	if ( !inode ) {
@@ -196,13 +173,14 @@ struct inode *coda_fid_to_inode(ViceFid *fid, struct super_block *sb)
 
 	cii = ITOC(inode);
 
-	/* The inode might already be purged due to memory pressure */
-	if ( coda_fideq(&cii->c_fid, &NullFID) ) {
+	/* The inode could already be purged due to memory pressure */
+	if (coda_isnullfid(&cii->c_fid)) {
+		inode->i_nlink = 0;
 		iput(inode);
 		return NULL;
 	}
 
-	/* we shouldn't have inode collisions anymore */
+	/* we shouldn't see inode collisions anymore */
 	if ( !coda_fideq(fid, &cii->c_fid) ) BUG();
 
         CDEBUG(D_INODE, "found %ld\n", inode->i_ino);

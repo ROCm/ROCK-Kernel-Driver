@@ -171,9 +171,9 @@ static struct super_block * coda_read_super(struct super_block *sb,
 		if(vc)
 			vc->vc_sb = NULL;		
 	}
-        if (root) {
+	if (root)
                 iput(root);
-        }
+
         return NULL;
 }
 
@@ -202,47 +202,51 @@ static void coda_read_inode(struct inode *inode)
 
         if (!sbi) BUG();
 
-	cii = ITOC(inode);
-        if (cii->c_magic == CODA_CNODE_MAGIC) {
+#if 0
+	/* check if the inode is already initialized */
+	if (inode->u.generic_ip) {
             printk("coda_read_inode: initialized inode");
             return;
         }
 
-	memset(cii, 0, sizeof(struct coda_inode_info));
+	inode->u.generic_ip = cii_alloc();
+	if (!inode->u.generic_ip) {
+		CDEBUG(D_CNODE, "coda_read_inode: failed to allocate inode info\n");
+		make_bad_inode(inode);
+		return;
+	}
+	memset(inode->u.generic_ip, 0, sizeof(struct coda_inode_info));
+#endif
+
+	cii = ITOC(inode);
+	if (!coda_isnullfid(&cii->c_fid)) {
+            printk("coda_read_inode: initialized inode");
+            return;
+        }
+
 	list_add(&cii->c_cilist, &sbi->sbi_cihead);
-        cii->c_magic = CODA_CNODE_MAGIC;
 }
 
 static void coda_clear_inode(struct inode *inode)
 {
 	struct coda_inode_info *cii = ITOC(inode);
-        struct inode *open_inode;
 
         ENTRY;
         CDEBUG(D_SUPER, " inode->ino: %ld, count: %d\n", 
 	       inode->i_ino, atomic_read(&inode->i_count));        
-
-	if ( cii->c_magic != CODA_CNODE_MAGIC )
-                return;
-
-        list_del_init(&cii->c_cilist);
-
-	if ( inode->i_ino == CTL_INO )
-		goto out;
-
-	if ( inode->i_mapping != &inode->i_data ) {
-		open_inode = inode->i_mapping->host;
-                CDEBUG(D_SUPER, "DELINO cached file: ino %ld count %d.\n",  
-			open_inode->i_ino,  atomic_read(&open_inode->i_count));
-		inode->i_mapping = &inode->i_data;
-		iput(open_inode);
-        }
-	
 	CDEBUG(D_DOWNCALL, "clearing inode: %ld, %x\n", inode->i_ino, cii->c_flags);
+
+	if (cii->c_container) BUG();
+	
+        list_del_init(&cii->c_cilist);
+	inode->i_mapping = &inode->i_data;
 	coda_cache_clear_inode(inode);
-out:
-	inode->u.coda_i.c_magic = 0;
-	memset(&inode->u.coda_i.c_fid, 0, sizeof(struct ViceFid));
+
+#if 0
+	cii_free(inode->u.generic_ip);
+	inode->u.generic_ip = NULL;
+#endif
+
 	EXIT;
 }
 

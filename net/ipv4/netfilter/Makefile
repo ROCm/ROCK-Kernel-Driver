@@ -20,7 +20,7 @@ ip_nf_nat-objs		:= ip_nat_core.o ip_nat_proto_unknown.o ip_nat_proto_tcp.o ip_na
 
 # objects for the standalone - connection tracking / NAT
 ip_conntrack-objs	:= ip_conntrack_standalone.o $(ip_nf_conntrack-objs)
-iptable_nat-objs	:= ip_nat_standalone.o ip_nat_rule.o $(ip_nf_nat-objs)
+iptable_nat-objs	:= ip_nat_standalone.o ip_nat_rule.o ip_nat_helper.o $(ip_nf_nat-objs)
 
 # objects for backwards compatibility mode
 ip_nf_compat-objs	:= ip_fw_compat.o ip_fw_compat_redir.o ip_fw_compat_masq.o $(ip_nf_conntrack-objs) $(ip_nf_nat-objs)

@@ -326,12 +326,6 @@ static void hub_get(struct usb_hub *hub)
 static void hub_put(struct usb_hub *hub)
 {
 	if (atomic_dec_and_test(&hub->refcnt)) {
-		if (hub->urb) {
-			usb_unlink_urb(hub->urb);
-			usb_free_urb(hub->urb);
-			hub->urb = NULL;
-		}
-
 		if (hub->descriptor) {
 			kfree(hub->descriptor);
 			hub->descriptor = NULL;
@@ -345,6 +339,12 @@ static void hub_disconnect(struct usb_device *dev, void *ptr)
 {
 	struct usb_hub *hub = (struct usb_hub *)ptr;
 	unsigned long flags;
+
+	if (hub->urb) {
+		usb_unlink_urb(hub->urb);
+		usb_free_urb(hub->urb);
+		hub->urb = NULL;
+	}
 
 	spin_lock_irqsave(&hub_event_lock, flags);
 

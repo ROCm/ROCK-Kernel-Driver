@@ -5,6 +5,7 @@
 struct pipe_inode_info {
 	wait_queue_head_t wait;
 	char *base;
+	unsigned int len;
 	unsigned int start;
 	unsigned int readers;
 	unsigned int writers;
@@ -22,7 +23,7 @@ struct pipe_inode_info {
 #define PIPE_WAIT(inode)	(&(inode).i_pipe->wait)
 #define PIPE_BASE(inode)	((inode).i_pipe->base)
 #define PIPE_START(inode)	((inode).i_pipe->start)
-#define PIPE_LEN(inode)		((inode).i_size)
+#define PIPE_LEN(inode)		((inode).i_pipe->len)
 #define PIPE_READERS(inode)	((inode).i_pipe->readers)
 #define PIPE_WRITERS(inode)	((inode).i_pipe->writers)
 #define PIPE_WAITING_READERS(inode)	((inode).i_pipe->waiting_readers)

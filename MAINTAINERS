@@ -140,6 +140,11 @@ P:	Riccardo Facchetti
 M:	fizban@tin.it
 S:	Maintained
 
+AFFS FILE SYSTEM
+P:	Roman Zippel
+M:	zippel@linux-m68k.org
+S:	Maintained
+
 AHA152X SCSI DRIVER
 P:	Juergen E. Fischer
 M:	Juergen Fischer <fischer@norbit.de>

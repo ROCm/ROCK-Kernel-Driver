@@ -2253,7 +2253,7 @@ static int ymfpci_memalloc(ymfpci_t *codec)
 
 	/* move this volume setup to mixer */
 	ymfpci_writel(codec, YDSXGR_NATIVEDACOUTVOL, 0x3fff3fff);
-	ymfpci_writel(codec, YDSXGR_BUF441OUTVOL, 0x3fff3fff);
+	ymfpci_writel(codec, YDSXGR_BUF441OUTVOL, 0);
 	ymfpci_writel(codec, YDSXGR_NATIVEADCINVOL, 0x3fff3fff);
 	ymfpci_writel(codec, YDSXGR_NATIVEDACINVOL, 0x3fff3fff);
 

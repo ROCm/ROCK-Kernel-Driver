@@ -5,36 +5,6 @@
 #include <linux/usb.h>
 
 /*
- * This nested spinlock code is courtesy of Davide Libenzi <dlibenzi@maticad.it>
- */
-struct s_nested_lock {
-	spinlock_t lock;
-	void *uniq;
-	short int count;
-};
-
-#define nested_init(snl) \
-	spin_lock_init(&(snl)->lock); \
-	(snl)->uniq = NULL; \
-	(snl)->count = 0;
-
-#define nested_lock(snl, flags) \
-	if ((snl)->uniq == current) { \
-		(snl)->count++; \
-		flags = 0; /* No warnings */ \
-	} else { \
-		spin_lock_irqsave(&(snl)->lock, flags); \
-		(snl)->count++; \
-		(snl)->uniq = current; \
-	}
-
-#define nested_unlock(snl, flags) \
-	if (!--(snl)->count) { \
-		(snl)->uniq = NULL; \
-		spin_unlock_irqrestore(&(snl)->lock, flags); \
-	}
-
-/*
  * Universal Host Controller Interface data structures and defines
  */
 
@@ -97,24 +67,29 @@ struct s_nested_lock {
 #define UHCI_MAX_SOF_NUMBER	2047	/* in an SOF packet */
 #define CAN_SCHEDULE_FRAMES	1000	/* how far future frames can be scheduled */
 
-struct uhci_framelist {
+struct uhci_frame_list {
 	__u32 frame[UHCI_NUMFRAMES];
-} __attribute__((aligned(4096)));
 
-struct uhci_td;
+	void *frame_cpu[UHCI_NUMFRAMES];
+
+	dma_addr_t dma_handle;
+};
+
+struct urb_priv;
 
 struct uhci_qh {
 	/* Hardware fields */
-	__u32 link;				/* Next queue */
-	__u32 element;				/* Queue element pointer */
+	__u32 link;			/* Next queue */
+	__u32 element;			/* Queue element pointer */
 
 	/* Software fields */
-	/* Can't use list_head since we want a specific order */
-	struct usb_device *dev;			/* The owning device */
+	dma_addr_t dma_handle;
 
-	struct uhci_qh *prevqh, *nextqh;
+	struct usb_device *dev;
+	struct urb_priv *urbp;
 
-	struct list_head remove_list;
+	struct list_head list;		/* P: uhci->frame_list_lock */
+	struct list_head remove_list;	/* P: uhci->remove_list_lock */
 } __attribute__((aligned(16)));
 
 /*
@@ -140,8 +115,6 @@ struct uhci_qh {
 
 #define uhci_status_bits(ctrl_sts)	(ctrl_sts & 0xFE0000)
 #define uhci_actual_length(ctrl_sts)	((ctrl_sts + 1) & TD_CTRL_ACTLEN_MASK) /* 1-based */
-
-#define uhci_ptr_to_virt(x)	bus_to_virt(x & ~UHCI_PTR_BITS)
 
 /*
  * for TD <info>: (a.k.a. Token)
@@ -170,7 +143,8 @@ struct uhci_qh {
  * On 64-bit machines we probably want to take advantage of the fact that
  * hw doesn't really care about the size of the sw-only area.
  *
- * Alas, not anymore, we have more than 4 words for software, woops
+ * Alas, not anymore, we have more than 4 words for software, woops.
+ * Everything still works tho, surprise! -jerdfelt
  */
 struct uhci_td {
 	/* Hardware fields */
@@ -180,13 +154,15 @@ struct uhci_td {
 	__u32 buffer;
 
 	/* Software fields */
-	unsigned int *frameptr;		/* Frame list pointer */
-	struct uhci_td *prevtd, *nexttd; /* Previous and next TD in queue */
+	dma_addr_t dma_handle;
 
 	struct usb_device *dev;
-	struct urb *urb;		/* URB this TD belongs to */
+	struct urb *urb;
 
-	struct list_head list;
+	struct list_head list;		/* P: urb->lock */
+
+	int frame;
+	struct list_head fl_list;	/* P: frame_list_lock */
 } __attribute__((aligned(16)));
 
 /*
@@ -289,8 +265,9 @@ static inline int __interval_to_skel(int interval)
 }
 
 struct virt_root_hub {
+	struct usb_device *dev;
 	int devnum;		/* Address of Root Hub endpoint */
-	void *urb;
+	struct urb *urb;
 	void *int_addr;
 	int send;
 	int interval;
@@ -306,6 +283,12 @@ struct virt_root_hub {
  * a subset of what the full implementation needs.
  */
 struct uhci {
+	struct pci_dev *dev;
+
+	/* procfs */
+	int num;
+	struct proc_dir_entry *proc_entry;
+
 	/* Grabbed from PCI */
 	int irq;
 	unsigned int io_addr;
@@ -313,32 +296,43 @@ struct uhci {
 
 	struct list_head uhci_list;
 
+	struct pci_pool *qh_pool;
+	struct pci_pool *td_pool;
+
 	struct usb_bus *bus;
 
-	struct uhci_td skeltd[UHCI_NUM_SKELTD];	/* Skeleton TD's */
-	struct uhci_qh skelqh[UHCI_NUM_SKELQH];	/* Skeleton QH's */
+	struct uhci_td *skeltd[UHCI_NUM_SKELTD];	/* Skeleton TD's */
+	struct uhci_qh *skelqh[UHCI_NUM_SKELQH];	/* Skeleton QH's */
 
-	spinlock_t framelist_lock;
-	struct uhci_framelist *fl;		/* Frame list */
+	spinlock_t frame_list_lock;
+	struct uhci_frame_list *fl;		/* Frame list */
 	int fsbr;				/* Full speed bandwidth reclamation */
 	int is_suspended;
 
-	spinlock_t qh_remove_lock;
+	spinlock_t qh_remove_list_lock;
 	struct list_head qh_remove_list;
 
-	spinlock_t urb_remove_lock;
+	spinlock_t urb_remove_list_lock;
 	struct list_head urb_remove_list;
 
-	struct s_nested_lock urblist_lock;
+	spinlock_t urb_list_lock;
 	struct list_head urb_list;
+
+	spinlock_t complete_list_lock;
+	struct list_head complete_list;
 
 	struct virt_root_hub rh;	/* private data of the virtual root hub */
 };
 
 struct urb_priv {
 	struct urb *urb;
+	struct usb_device *dev;
+
+	dma_addr_t setup_packet_dma_handle;
+	dma_addr_t transfer_buffer_dma_handle;
 
 	struct uhci_qh *qh;		/* QH for this URB */
+	struct list_head td_list;
 
 	int fsbr : 1;			/* URB turned on FSBR */
 	int fsbr_timeout : 1;		/* URB timed out on FSBR */
@@ -347,11 +341,12 @@ struct urb_priv {
 					/*  a control transfer, retrigger */
 					/*  the status phase */
 
+	int status;			/* Final status */
+
 	unsigned long inserttime;	/* In jiffies */
 
-	struct list_head list;
-
-	struct list_head urb_queue_list;	/* URB's linked together */
+	struct list_head queue_list;
+	struct list_head complete_list;
 };
 
 /* -------------------------------------------------------------------------
@@ -408,16 +403,6 @@ struct urb_priv {
 #define RH_ACK			0x01
 #define RH_REQ_ERR		-1
 #define RH_NACK			0x00
-
-/* needed for the debugging code */
-struct uhci_td *uhci_link_to_td(unsigned int element);
-
-/* Debugging code */
-void uhci_show_td(struct uhci_td *td);
-void uhci_show_status(struct uhci *uhci);
-void uhci_show_urb_queue(struct urb *urb);
-void uhci_show_queue(struct uhci_qh *qh);
-void uhci_show_queues(struct uhci *uhci);
 
 #endif
 

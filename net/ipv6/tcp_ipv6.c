@@ -5,7 +5,7 @@
  *	Authors:
  *	Pedro Roque		<roque@di.fc.ul.pt>	
  *
- *	$Id: tcp_ipv6.c,v 1.135 2001/04/06 18:41:36 davem Exp $
+ *	$Id: tcp_ipv6.c,v 1.136 2001/04/20 20:46:19 davem Exp $
  *
  *	Based on: 
  *	linux/net/ipv4/tcp.c
@@ -1823,6 +1823,7 @@ static int tcp_v6_init_sock(struct sock *sk)
 	sk->tp_pinfo.af_tcp.af_specific = &ipv6_specific;
 
 	sk->write_space = tcp_write_space;
+	sk->use_write_queue = 1;
 
 	sk->sndbuf = sysctl_tcp_wmem[1];
 	sk->rcvbuf = sysctl_tcp_rmem[1];

@@ -13,20 +13,17 @@
 #include <linux/list.h>
 #include <linux/coda.h>
 
-#define CODA_CNODE_MAGIC        0x47114711
 /*
  * coda fs inode data
  */
 struct coda_inode_info {
         struct ViceFid     c_fid;	/* Coda identifier */
         u_short	           c_flags;     /* flags (see below) */
-	struct list_head   c_volrootlist; /* list of volroot cnoddes */
 	struct list_head   c_cilist;    /* list of all coda inodes */
-        struct inode      *c_vnode;     /* inode associated with cnode */
-        unsigned int       c_contcount; /* refcount for container inode */
+	struct file	  *c_container; /* container file for this cnode */
+	unsigned int       c_contcount; /* refcount for container file */
         struct coda_cred   c_cached_cred; /* credentials of cached perms */
         unsigned int       c_cached_perm; /* cached access permissions */
-        int                c_magic;     /* to verify the data structure */
 };
 
 /* flags */

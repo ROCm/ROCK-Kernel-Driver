@@ -26,15 +26,15 @@ static int coda_symlink_filler(struct file *file, struct page *page)
 {
 	struct inode *inode = page->mapping->host;
 	int error;
-	struct coda_inode_info *cnp;
+	struct coda_inode_info *cii;
 	unsigned int len = PAGE_SIZE;
 	char *p = kmap(page);
 
 	lock_kernel();
-        cnp = ITOC(inode);
+	cii = ITOC(inode);
 	coda_vfs_stat.follow_link++;
 
-	error = venus_readlink(inode->i_sb, &(cnp->c_fid), p, &len);
+	error = venus_readlink(inode->i_sb, &cii->c_fid, p, &len);
 	unlock_kernel();
 	if (error)
 		goto fail;

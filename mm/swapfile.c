@@ -369,13 +369,15 @@ static int try_to_unuse(unsigned int type)
 		/* Get a page for the entry, using the existing swap
                    cache page if there is one.  Otherwise, get a clean
                    page and read the swap into it. */
-		page = read_swap_cache(entry);
+		page = read_swap_cache_async(entry);
 		if (!page) {
 			swap_free(entry);
   			return -ENOMEM;
 		}
+		lock_page(page);
 		if (PageSwapCache(page))
-			delete_from_swap_cache(page);
+			delete_from_swap_cache_nolock(page);
+		UnlockPage(page);
 		read_lock(&tasklist_lock);
 		for_each_task(p)
 			unuse_process(p->mm, entry, page);
@@ -650,7 +652,7 @@ asmlinkage long sys_swapon(const char * specialfile, int swap_flags)
 	}
 
 	lock_page(virt_to_page(swap_header));
-	rw_swap_page_nolock(READ, SWP_ENTRY(type,0), (char *) swap_header, 1);
+	rw_swap_page_nolock(READ, SWP_ENTRY(type,0), (char *) swap_header);
 
 	if (!memcmp("SWAP-SPACE",swap_header->magic.magic,10))
 		swap_header_version = 1;

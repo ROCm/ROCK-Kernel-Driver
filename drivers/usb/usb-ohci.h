@@ -380,6 +380,8 @@ typedef struct ohci {
 	int irq;
 	int disabled;			/* e.g. got a UE, we're hung */
 	atomic_t resume_count;		/* defending against multiple resumes */
+	unsigned long flags;		/* for HC bugs */
+#define	OHCI_QUIRK_AMD756	0x01		/* erratum #4 */
 
 	struct ohci_regs * regs;	/* OHCI controller's memory */
 	struct list_head ohci_hcd_list;	/* list of all ohci_hcd */

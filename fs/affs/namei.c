@@ -226,7 +226,7 @@ affs_lookup(struct inode *dir, struct dentry *dentry)
 		u32 ino = bh->b_blocknr;
 
 		/* store the real header ino in d_fsdata for faster lookups */
-		dentry->d_fsdata = (void *)ino;
+		dentry->d_fsdata = (void *)(long)ino;
 		switch (be32_to_cpu(AFFS_TAIL(sb, bh)->stype)) {
 		case ST_LINKDIR:
 		case ST_LINKFILE:

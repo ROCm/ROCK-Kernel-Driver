@@ -32,6 +32,7 @@
 #include <linux/devfs_fs_kernel.h>
 #include <linux/vmalloc.h>
 #include <linux/fs.h>
+#include <linux/file.h>
 #include <linux/poll.h>
 #include <linux/init.h>
 #include <linux/list.h>
@@ -48,6 +49,8 @@
 #include <linux/coda_psdev.h>
 #include <linux/coda_proc.h>
 
+#define upc_free(r) kfree(r)
+
 /* 
  * Coda stuff
  */
@@ -59,6 +62,7 @@ unsigned long coda_timeout = 30; /* .. secs, then signals will dequeue */
 
 
 struct venus_comm coda_comms[MAX_CODADEVS];
+kmem_cache_t *cii_cache, *cred_cache, *upc_cache;
 
 /*
  * Device operations
@@ -158,29 +162,28 @@ static ssize_t coda_psdev_write(struct file *file, const char *buf,
 		}
 		count = nbytes;
 		goto out;
-        }
+	}
         
-        /* Look for the message on the processing queue. */
-        lock_kernel();
-	lh  = &vcp->vc_processing;
-        while ( (lh = lh->next) != &vcp->vc_processing ) {
+	/* Look for the message on the processing queue. */
+	lock_kernel();
+	list_for_each(lh, &vcp->vc_processing) {
 		tmp = list_entry(lh, struct upc_req , uc_chain);
-	        if (tmp->uc_unique == hdr.unique) {
+		if (tmp->uc_unique == hdr.unique) {
 			req = tmp;
 			list_del(&req->uc_chain);
-			CDEBUG(D_PSDEV,"Eureka: uniq %ld on queue!\n", 
-			       hdr.unique);
 			break;
 		}
 	}
-        unlock_kernel();
+	unlock_kernel();
 
-        if (!req) {
-	        printk("psdev_write: msg (%ld, %ld) not found\n", 
-		       hdr.opcode, hdr.unique);
+	if (!req) {
+		printk("psdev_write: msg (%ld, %ld) not found\n", 
+			hdr.opcode, hdr.unique);
 		retval = -ESRCH;
 		goto out;
-        }
+	}
+
+	CDEBUG(D_PSDEV,"Eureka: uniq %ld on queue!\n", hdr.unique);
 
         /* move data into response buffer. */
 	if (req->uc_outSize < nbytes) {
@@ -199,6 +202,13 @@ static ssize_t coda_psdev_write(struct file *file, const char *buf,
         req->uc_outSize = nbytes;	
         req->uc_flags |= REQ_WRITE;
 	count = nbytes;
+
+	/* Convert filedescriptor into a file handle */
+	if (req->uc_opcode == CODA_OPEN_BY_FD) {
+		struct coda_open_by_fd_out *outp =
+			(struct coda_open_by_fd_out *)req->uc_data;
+		outp->fh = fget(outp->fd);
+	}
 
 	CDEBUG(D_PSDEV, 
 	       "Found! Count %ld for (opc,uniq)=(%ld,%ld), upc_req at %p\n", 
@@ -258,13 +268,11 @@ static ssize_t coda_psdev_read(struct file * file, char * buf,
 		count = nbytes;
         }
 
-	if (copy_to_user(buf, req->uc_data, count)) {
+	if (copy_to_user(buf, req->uc_data, count))
 	        retval = -EFAULT;
-		goto free_out;
-	}
         
 	/* If request was not a signal, enqueue and don't free */
-	if (req->uc_opcode != CODA_SIGNAL) {
+	if (!(req->uc_flags & REQ_ASYNC)) {
 		req->uc_flags |= REQ_READ;
 		list_add(&(req->uc_chain), vcp->vc_processing.prev);
 		goto out;
@@ -273,9 +281,8 @@ static ssize_t coda_psdev_read(struct file * file, char * buf,
 	CDEBUG(D_PSDEV, "vcread: signal msg (%d, %d)\n", 
 			req->uc_opcode, req->uc_unique);
 
-free_out:
 	CODA_FREE(req->uc_data, sizeof(struct coda_in_hdr));
-	CODA_FREE(req, sizeof(struct upc_req));
+	upc_free(req);
 out:
 	unlock_kernel();
 	return (count ? count : retval);
@@ -289,12 +296,16 @@ static int coda_psdev_open(struct inode * inode, struct file * file)
 
 	lock_kernel();
 	idx = MINOR(inode->i_rdev);
-	if(idx >= MAX_CODADEVS)
+	if(idx >= MAX_CODADEVS) {
+		unlock_kernel();
 		return -ENODEV;
+	}
 
 	vcp = &coda_comms[idx];
-	if(vcp->vc_inuse)
+	if(vcp->vc_inuse) {
+		unlock_kernel();
 		return -EBUSY;
+	}
 	
 	if (!vcp->vc_inuse++) {
 		INIT_LIST_HEAD(&vcp->vc_pending);
@@ -344,7 +355,7 @@ static int coda_psdev_release(struct inode * inode, struct file * file)
 		/* Async requests need to be freed here */
 		if (req->uc_flags & REQ_ASYNC) {
 			CODA_FREE(req->uc_data, sizeof(struct coda_in_hdr));
-			CODA_FREE(req, (u_int)sizeof(struct upc_req));
+			upc_free(req);
 			continue;
 		}
 		req->uc_flags |= REQ_ABORT;
@@ -403,9 +414,8 @@ MODULE_AUTHOR("Peter J. Braam <braam@cs.cmu.edu>");
 static int __init init_coda(void)
 {
 	int status;
-	printk(KERN_INFO "Coda Kernel/Venus communications, v5.3.9, coda@cs.cmu.edu\n");
+	printk(KERN_INFO "Coda Kernel/Venus communications, v5.3.14, coda@cs.cmu.edu\n");
 
-	
 	status = init_coda_psdev();
 	if ( status ) {
 		printk("Problem (%d) in init_coda_psdev\n", status);
@@ -414,7 +424,10 @@ static int __init init_coda(void)
 	
 	status = register_filesystem(&coda_fs_type);
 	if (status) {
-		printk("coda: failed in init_coda_fs!\n");
+		printk("coda: failed to register filesystem!\n");
+		devfs_unregister(devfs_handle);
+		devfs_unregister_chrdev(CODA_PSDEV_MAJOR,"coda_psdev");
+		coda_sysctl_clean();
 	}
 	return status;
 }
@@ -429,10 +442,11 @@ static void __exit exit_coda(void)
         if ( err != 0 ) {
                 printk("coda: failed to unregister filesystem\n");
         }
-	devfs_unregister (devfs_handle);
-        devfs_unregister_chrdev(CODA_PSDEV_MAJOR,"coda_psdev");
+	devfs_unregister(devfs_handle);
+	devfs_unregister_chrdev(CODA_PSDEV_MAJOR, "coda_psdev");
 	coda_sysctl_clean();
 }
 
 module_init(init_coda);
 module_exit(exit_coda);
+

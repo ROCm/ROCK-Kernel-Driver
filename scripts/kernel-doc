@@ -164,7 +164,7 @@ my $verbose = 0;
 my $output_mode = "man";
 my %highlights = %highlights_man;
 my $blankline = $blankline_man;
-my $modulename = "API Documentation";
+my $modulename = "Kernel API";
 my $function_only = 0;
 
 # Essentially these are globals
@@ -559,7 +559,7 @@ sub output_man(%) {
     my ($parameter, $section);
     my $count;
 
-    print ".TH \"$args{'module'}\" 4 \"$args{'function'}\" \"25 May 1998\" \"API Manual\" LINUX\n";
+    print ".TH \"$args{'module'}\" 9 \"$args{'function'}\" \"April 2001\" \"API Manual\" LINUX\n";
 
     print ".SH NAME\n";
     print $args{'function'}." \\- ".$args{'purpose'}."\n";
@@ -601,7 +601,7 @@ sub output_intro_man(%) {
     my ($parameter, $section);
     my $count;
 
-    print ".TH \"$args{'module'}\" 4 \"$args{'module'}\" \"25 May 1998\" \"API Manual\" LINUX\n";
+    print ".TH \"$args{'module'}\" 9 \"$args{'module'}\" \"April 2001\" \"API Manual\" LINUX\n";
 
     foreach $section (@{$args{'sectionlist'}}) {
 	print ".SH \"$section\"\n";
