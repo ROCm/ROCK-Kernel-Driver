@@ -224,11 +224,16 @@ nfsd4_access(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_acc
 static inline int
 nfsd4_commit(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_commit *commit)
 {
+	int status;
+
 	u32 *p = (u32 *)commit->co_verf.data;
 	*p++ = nfssvc_boot.tv_sec;
 	*p++ = nfssvc_boot.tv_usec;
 
-	return nfsd_commit(rqstp, current_fh, commit->co_offset, commit->co_count);
+	status = nfsd_commit(rqstp, current_fh, commit->co_offset, commit->co_count);
+	if (status == nfserr_symlink)
+		status = nfserr_inval;
+	return status;
 }
 
 static inline int
@@ -558,9 +563,12 @@ zero_stateid:
 	*p++ = nfssvc_boot.tv_sec;
 	*p++ = nfssvc_boot.tv_usec;
 
-	return (nfsd_write(rqstp, current_fh, write->wr_offset,
+	status =  nfsd_write(rqstp, current_fh, write->wr_offset,
 			  write->wr_vec, write->wr_vlen, write->wr_buflen,
-			  &write->wr_how_written));
+			  &write->wr_how_written);
+	if (status == nfserr_symlink)
+		status = nfserr_inval;
+	return status;
 out:
 	nfs4_unlock_state();
 	return status;

@@ -1974,6 +1974,8 @@ nfsd4_lockt(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_lock
 
 	if ((status = fh_verify(rqstp, current_fh, S_IFREG, 0))) {
 		printk("NFSD: nfsd4_lockt: fh_verify() failed!\n");
+		if (status == nfserr_symlink)
+			status = nfserr_inval;
 		goto out;
 	}
 
