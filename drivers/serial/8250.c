@@ -243,6 +243,19 @@ static unsigned int serial_icr_read(struct uart_8250_port *up, int offset)
 	return value;
 }
 
+/*
+ * FIFO support.
+ */
+static inline void serial8250_clear_fifos(struct uart_8250_port *p)
+{
+	if (p->capabilities & UART_CLEAR_FIFO) {
+		serial_outp(p, UART_FCR, UART_FCR_ENABLE_FIFO);
+		serial_outp(p, UART_FCR, UART_FCR_ENABLE_FIFO |
+			       UART_FCR_CLEAR_RCVR | UART_FCR_CLEAR_XMIT);
+		serial_outp(p, UART_FCR, 0);
+	}
+}
+
 #ifdef CONFIG_SERIAL_8250_RSA
 /*
  * Attempts to turn on the RSA FIFO.  Returns zero on failure.
@@ -711,10 +724,7 @@ static void autoconfig(struct uart_8250_port *up, unsigned int probeflags)
 		serial_outp(up, UART_RSA_FRR, 0);
 #endif
 	serial_outp(up, UART_MCR, save_mcr);
-	serial_outp(up, UART_FCR, (UART_FCR_ENABLE_FIFO |
-				     UART_FCR_CLEAR_RCVR |
-				     UART_FCR_CLEAR_XMIT));
-	serial_outp(up, UART_FCR, 0);
+	serial8250_clear_fifos(up);
 	(void)serial_in(up, UART_RX);
 	serial_outp(up, UART_IER, 0);
 
@@ -1227,12 +1237,7 @@ static int serial8250_startup(struct uart_port *port)
 	 * Clear the FIFO buffers and disable them.
 	 * (they will be reeanbled in set_termios())
 	 */
-	if (up->capabilities & UART_CLEAR_FIFO) {
-		serial_outp(up, UART_FCR, UART_FCR_ENABLE_FIFO);
-		serial_outp(up, UART_FCR, UART_FCR_ENABLE_FIFO |
-				UART_FCR_CLEAR_RCVR | UART_FCR_CLEAR_XMIT);
-		serial_outp(up, UART_FCR, 0);
-	}
+	serial8250_clear_fifos(up);
 
 	/*
 	 * Clear the interrupt registers.
@@ -1345,10 +1350,7 @@ static void serial8250_shutdown(struct uart_port *port)
 	 * Disable break condition and FIFOs
 	 */
 	serial_out(up, UART_LCR, serial_inp(up, UART_LCR) & ~UART_LCR_SBC);
-	serial_outp(up, UART_FCR, UART_FCR_ENABLE_FIFO |
-				  UART_FCR_CLEAR_RCVR |
-				  UART_FCR_CLEAR_XMIT);
-	serial_outp(up, UART_FCR, 0);
+	serial8250_clear_fifos(up);
 
 #ifdef CONFIG_SERIAL_8250_RSA
 	/*
