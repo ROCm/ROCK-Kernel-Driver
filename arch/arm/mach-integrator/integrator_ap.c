@@ -24,6 +24,7 @@
 #include <linux/device.h>
 #include <linux/slab.h>
 #include <linux/string.h>
+#include <linux/sysdev.h>
 
 #include <asm/hardware.h>
 #include <asm/io.h>
@@ -132,6 +133,51 @@ static void __init ap_init_irq(void)
 		}
 	}
 }
+
+#ifdef CONFIG_PM
+static unsigned long ic_irq_enable;
+
+static int irq_suspend(struct sys_device *dev, u32 state)
+{
+	ic_irq_enable = readl(VA_IC_BASE + IRQ_ENABLE);
+	return 0;
+}
+
+static int irq_resume(struct sys_device *dev)
+{
+	/* disable all irq sources */
+	writel(-1, VA_CMIC_BASE + IRQ_ENABLE_CLEAR);
+	writel(-1, VA_IC_BASE + IRQ_ENABLE_CLEAR);
+	writel(-1, VA_IC_BASE + FIQ_ENABLE_CLEAR);
+
+	writel(ic_irq_enable, VA_IC_BASE + IRQ_ENABLE_SET);
+	return 0;
+}
+#else
+#define irq_suspend NULL
+#define irq_resume NULL
+#endif
+
+static struct sysdev_class irq_class = {
+	set_kset_name("irq"),
+	.suspend	= irq_suspend,
+	.resume		= irq_resume,
+};
+
+static struct sys_device irq_device = {
+	.id	= 0,
+	.cls	= &irq_class,
+};
+
+static int __init irq_init_sysfs(void)
+{
+	int ret = sysdev_class_register(&irq_class);
+	if (ret == 0)
+		ret = sys_device_register(&irq_device);
+	return ret;
+}
+
+device_initcall(irq_init_sysfs);
 
 /*
  * Flash handling.
