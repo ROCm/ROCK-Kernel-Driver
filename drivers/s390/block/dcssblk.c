@@ -5,6 +5,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/ctype.h>
 #include <linux/errno.h>
 #include <linux/init.h>
@@ -19,6 +20,7 @@
 //#define DCSSBLK_DEBUG		/* Debug messages on/off */
 #define DCSSBLK_NAME "dcssblk"
 #define DCSSBLK_MINORS_PER_DISK 1
+#define DCSSBLK_PARM_LEN 400
 
 #ifdef DCSSBLK_DEBUG
 #define PRINT_DEBUG(x...) printk(KERN_DEBUG DCSSBLK_NAME " debug: " x)
@@ -33,6 +35,8 @@
 static int dcssblk_open(struct inode *inode, struct file *filp);
 static int dcssblk_release(struct inode *inode, struct file *filp);
 static int dcssblk_make_request(struct request_queue *q, struct bio *bio);
+
+static char dcssblk_segments[DCSSBLK_PARM_LEN] = "\0";
 
 static int dcssblk_major;
 static struct block_device_operations dcssblk_devops = {
@@ -641,6 +645,47 @@ fail:
 	return 0;
 }
 
+static void
+dcssblk_check_params(void)
+{
+	int rc, i, j, k;
+	char buf[9];
+	struct dcssblk_dev_info *dev_info;
+
+	for (i = 0; (i < DCSSBLK_PARM_LEN) && (dcssblk_segments[i] != '\0');
+	     i++) {
+		for (j = i; (dcssblk_segments[j] != ',')  &&
+			    (dcssblk_segments[j] != '\0') &&
+			    (dcssblk_segments[j] != '(')  &&
+			    (j - i) < 8; j++)
+		{
+			buf[j-i] = dcssblk_segments[j];
+		}
+		buf[j-i] = '\0';
+		rc = dcssblk_add_store(dcssblk_root_dev, buf, j-i);
+		if ((rc >= 0) && (dcssblk_segments[j] == '(')) {
+			for (k = 0; buf[k] != '\0'; k++)
+				buf[k] = toupper(buf[k]);
+			if (!strncmp(&dcssblk_segments[j], "(local)", 7)) {
+				down_read(&dcssblk_devices_sem);
+				dev_info = dcssblk_get_device_by_name(buf);
+				up_read(&dcssblk_devices_sem);
+				if (dev_info)
+					dcssblk_shared_store(&dev_info->dev,
+							     "0\n", 2);
+			}
+		}
+		while ((dcssblk_segments[j] != ',') &&
+		       (dcssblk_segments[j] != '\0'))
+		{
+			j++;
+		}
+		if (dcssblk_segments[j] == '\0')
+			break;
+		i = j;
+	}
+}
+
 /*
  * The init/exit functions.
  */
@@ -689,11 +734,22 @@ dcssblk_init(void)
 	}
 	dcssblk_major = rc;
 	init_rwsem(&dcssblk_devices_sem);
+
+	dcssblk_check_params();
+
 	PRINT_DEBUG("...finished!\n");
 	return 0;
 }
 
 module_init(dcssblk_init);
 module_exit(dcssblk_exit);
+
+module_param_string(segments, dcssblk_segments, DCSSBLK_PARM_LEN, 0444);
+MODULE_PARM_DESC(segments, "Name of DCSS segment(s) to be loaded, "
+		 "comma-separated list, each name max. 8 chars.\n"
+		 "Adding \"(local)\" to segment name equals echoing 0 to "
+		 "/sys/devices/dcssblk/<segment name>/shared after loading "
+		 "the segment - \n"
+		 "e.g. segments=\"mydcss1,mydcss2,mydcss3(local)\"");
 
 MODULE_LICENSE("GPL");
