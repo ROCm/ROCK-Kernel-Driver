@@ -22,6 +22,7 @@
 
 #include <linux/config.h>
 
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/init.h>
@@ -210,6 +211,7 @@ smp_flush_tlb_all (void)
 {
 	on_each_cpu((void (*)(void *))local_flush_tlb_all, 0, 1, 1);
 }
+EXPORT_SYMBOL(smp_flush_tlb_all);
 
 void
 smp_flush_tlb_mm (struct mm_struct *mm)
@@ -283,6 +285,7 @@ smp_call_function_single (int cpuid, void (*func) (void *info), void *info, int 
 	put_cpu();
 	return 0;
 }
+EXPORT_SYMBOL(smp_call_function_single);
 
 /*
  * this function sends a 'generic call function' IPI to all other CPUs
@@ -337,6 +340,7 @@ smp_call_function (void (*func) (void *info), void *info, int nonatomic, int wai
 	spin_unlock(&call_lock);
 	return 0;
 }
+EXPORT_SYMBOL(smp_call_function);
 
 void
 smp_do_timer (struct pt_regs *regs)

@@ -20,6 +20,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/interrupt.h>
@@ -1255,6 +1256,7 @@ out:
 	spin_unlock(&pfm_buffer_fmt_lock);
  	return ret;
 }
+EXPORT_SYMBOL(pfm_register_buffer_fmt);
 
 int
 pfm_unregister_buffer_fmt(pfm_uuid_t uuid)
@@ -1278,6 +1280,7 @@ out:
 	return ret;
 
 }
+EXPORT_SYMBOL(pfm_unregister_buffer_fmt);
 
 static int
 pfm_reserve_session(struct task_struct *task, int is_syswide, unsigned int cpu)
@@ -3417,6 +3420,7 @@ pfm_mod_write_pmcs(struct task_struct *task, pfarg_reg_t *req, unsigned int nreq
 
 	return pfm_write_pmcs(ctx, req, nreq, regs);
 }
+EXPORT_SYMBOL(pfm_mod_write_pmcs);
 
 long
 pfm_mod_read_pmds(struct task_struct *task, pfarg_reg_t *req, unsigned int nreq, struct pt_regs *regs)
@@ -3438,6 +3442,7 @@ pfm_mod_read_pmds(struct task_struct *task, pfarg_reg_t *req, unsigned int nreq,
 
 	return pfm_read_pmds(ctx, req, nreq, regs);
 }
+EXPORT_SYMBOL(pfm_mod_read_pmds);
 
 long
 pfm_mod_fast_read_pmds(struct task_struct *task, unsigned long mask[4], unsigned long *addr, struct pt_regs *regs)
@@ -3479,6 +3484,7 @@ pfm_mod_fast_read_pmds(struct task_struct *task, unsigned long mask[4], unsigned
 	}
 	return 0;
 }
+EXPORT_SYMBOL(pfm_mod_fast_read_pmds);
 
 /*
  * Only call this function when a process it trying to

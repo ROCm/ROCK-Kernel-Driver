@@ -32,6 +32,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -53,6 +54,7 @@
 #define PREFIX			"ACPI: "
 
 void (*pm_idle) (void);
+EXPORT_SYMBOL(pm_idle);
 void (*pm_power_off) (void);
 
 unsigned char acpi_kbd_controller_present = 1;
