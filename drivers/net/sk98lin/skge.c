@@ -110,10 +110,7 @@
 
 #include	<linux/module.h>
 #include	<linux/init.h>
-
-#ifdef CONFIG_PROC_FS
 #include 	<linux/proc_fs.h>
-#endif
 
 #include	"h/skdrv1st.h"
 #include	"h/skdrv2nd.h"
@@ -5185,9 +5182,9 @@ static int __init skge_init(void)
 {
 	int error;
 
+#ifdef CONFIG_PROC_FS
 	memcpy(&SK_Root_Dir_entry, BOOT_STRING, sizeof(SK_Root_Dir_entry) - 1);
 
-#ifdef CONFIG_PROC_FS
 	pSkRootDir = proc_mkdir(SK_Root_Dir_entry, proc_net);
 	if (!pSkRootDir) {
 		printk(KERN_WARNING "Unable to create /proc/net/%s",
