@@ -552,7 +552,6 @@ void __init pSeries_final_fixup(void)
 
 	phbs_remap_io();
 	pSeries_request_regions();
-	pci_fix_bus_sysdata();
 
 	pci_addr_cache_build();
 }

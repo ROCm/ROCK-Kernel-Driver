@@ -512,7 +512,6 @@ static dev_link_t *nmclan_attach(void)
     link->next = dev_list;
     dev_list = link;
     client_reg.dev_info = &dev_info;
-    client_reg.Attributes = INFO_IO_CLIENT | INFO_CARD_SHARE;
     client_reg.EventMask =
 	CS_EVENT_CARD_INSERTION | CS_EVENT_CARD_REMOVAL |
 	CS_EVENT_RESET_PHYSICAL | CS_EVENT_CARD_RESET |
@@ -775,6 +774,7 @@ static void nmclan_config(dev_link_t *link)
 
   link->dev = &lp->node;
   link->state &= ~DEV_CONFIG_PENDING;
+  SET_NETDEV_DEV(dev, &handle_to_dev(handle));
 
   i = register_netdev(dev);
   if (i != 0) {
@@ -1702,8 +1702,7 @@ static int __init init_nmclan_cs(void)
 static void __exit exit_nmclan_cs(void)
 {
 	pcmcia_unregister_driver(&nmclan_cs_driver);
-	while (dev_list != NULL)
-		nmclan_detach(dev_list);
+	BUG_ON(dev_list != NULL);
 }
 
 module_init(init_nmclan_cs);

@@ -39,18 +39,6 @@ config PCMCIA_DEBUG
 	  In all the above examples, N is the debugging verbosity
 	  level.
 
-config PCMCIA_OBSOLETE
-	bool "Enable obsolete PCCARD code"
-	depends on PCCARD != n
-	help
-	  Say Y here to enable some code found in the PCCARD subsystem
-	  which has no in-kernel usage, but might be needed for certain
-	  external PCMCIA drivers. If you do need to say Y here so that
-	  one such driver compiles and/or works correctly, please report
-	  this to linux-pcmcia <at> lists.infradead.org
-
-	  If unsure, say N
-
 config PCMCIA
 	tristate "16-bit PCMCIA support"
 	depends on PCCARD
@@ -92,6 +80,7 @@ config YENTA
 	depends on PCCARD && PCI
 #fixme: remove dependendcy on CARDBUS
 	depends on CARDBUS
+	select PCCARD_NONSTATIC
 	---help---
 	  This option enables support for CardBus host bridges.  Virtually
 	  all modern PCMCIA bridges are CardBus compatible.  A "bridge" is 
@@ -106,6 +95,7 @@ config YENTA
 config PD6729
 	tristate "Cirrus PD6729 compatible bridge support"
 	depends on PCMCIA && PCI
+	select PCCARD_NONSTATIC
 	help
 	  This provides support for the Cirrus PD6729 PCI-to-PCMCIA bridge
 	  device, found in some older laptops and PCMCIA card readers.
@@ -113,6 +103,7 @@ config PD6729
 config I82092
 	tristate "i82092 compatible bridge support"
 	depends on PCMCIA && PCI
+	select PCCARD_NONSTATIC
 	help
 	  This provides support for the Intel I82092AA PCI-to-PCMCIA bridge device,
 	  found in some older laptops and more commonly in evaluation boards for the
@@ -121,6 +112,7 @@ config I82092
 config I82365
 	tristate "i82365 compatible bridge support"
 	depends on PCMCIA && ISA
+	select PCCARD_NONSTATIC
 	help
 	  Say Y here to include support for ISA-bus PCMCIA host bridges that
 	  are register compatible with the Intel i82365.  These are found on
@@ -131,6 +123,7 @@ config I82365
 config TCIC
 	tristate "Databook TCIC host bridge support"
 	depends on PCMCIA
+	select PCCARD_NONSTATIC
 	help
 	  Say Y here to include support for the Databook TCIC family of PCMCIA
 	  host bridges. These are only found on a handful of old systems.
@@ -189,5 +182,9 @@ config M32R_CFC_NUM
 	default "1" if PLAT_USRV || PLAT_M32700UT || PLAT_MAPPI2 || PLAT_OPSPUT
 	help
 	  Set the number of M32R CF slots.
+
+config PCCARD_NONSTATIC
+	tristate
+	depends on PCCARD
 
 endmenu

@@ -8,6 +8,7 @@
 #define VM_IOREMAP	0x00000001	/* ioremap() and friends */
 #define VM_ALLOC	0x00000002	/* vmalloc() */
 #define VM_MAP		0x00000004	/* vmap()ed pages */
+/* bits [20..32] reserved for arch specific ioremap internals */
 
 struct vm_struct {
 	void			*addr;

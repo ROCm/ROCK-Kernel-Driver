@@ -14,8 +14,6 @@ Machine check
 APICs
 
    apic		 Use IO-APIC. Default
-		 Unless you have an NVidia or VIA/Uniprocessor board.
-		Then it defaults to off.
 
    noapic	 Don't use the IO-APIC.
 
@@ -24,6 +22,8 @@ APICs
    nolapic	 Don't use the local APIC (alias for i386 compatibility)
 
    pirq=...	 See Documentation/i386/IO-APIC.txt
+
+   noapictimer	 Don't set up the APIC timer
 
 Early Console
 
@@ -61,6 +61,9 @@ Timing
   This is useful when you use a panic=... timeout and need the box
   quickly up again.
 
+  nohpet
+  Don't use the HPET timer.
+
 Idle loop
 
   idle=poll
@@ -74,7 +77,7 @@ Rebooting
    reboot=b[ios] | t[riple] | k[bd] [, [w]arm | [c]old]
    bios	  Use the CPU reboto vector for warm reset
    warm   Don't set the cold reboot flag
-   cold   Set the cold reboto flag
+   cold   Set the cold reboot flag
    triple Force a triple fault (init)
    kbd    Use the keyboard controller. cold reset (default)
 
@@ -82,6 +85,11 @@ Rebooting
    systems because the BIOS will not go through the memory check.
    Disadvantage is that not all hardware will be completely reinitialized
    on reboot so there may be boot problems on some systems.
+
+   reboot=force
+
+   Don't stop other CPUs on reboot. This can make reboot more reliable
+   in some cases.
 
 Non Executable Mappings
 
@@ -102,6 +110,9 @@ NUMA
 
   numa=off	Only set up a single NUMA node spanning all memory.
 
+  numa=noacpi   Don't parse the SRAT table for NUMA setup
+
+  numa=fake=X   Fake X nodes and ignore NUMA setup of the actual machine.
 
 ACPI
 
@@ -109,6 +120,12 @@ ACPI
   acpi=ht	Use ACPI boot table parsing, but don't enable ACPI
 		interpreter
   acpi=force	Force ACPI on (currently not needed)
+
+  acpi=strict   Disable out of spec ACPI workarounds.
+
+  acpi_sci={edge,level,high,low}  Set up ACPI SCI interrupt.
+
+  acpi=noirq	Don't route interrupts
 
 PCI
 
@@ -119,6 +136,7 @@ PCI
   pci=assign-busses    Assign busses
   pci=irqmask=MASK	       Set PCI interrupt mask to MASK
   pci=lastbus=NUMBER	       Scan upto NUMBER busses, no matter what the mptable says.
+  pci=noacpi		Don't use ACPI to set up PCI interrupt routing.
 
 IOMMU
 
@@ -144,3 +162,19 @@ IOMMU
 
   pages  Prereserve that many 128K pages for the software IO bounce buffering.
   force  Force all IO through the software TLB.
+
+Debugging
+
+  oops=panic Always panic on oopses. Default is to just kill the process,
+	     but there is a small probability of deadlocking the machine.
+	     This will also cause panics on machine check exceptions.
+	     Useful together with panic=30 to trigger a reboot.
+
+  kstack=N   Print that many words from the kernel stack in oops dumps.
+
+Misc
+
+  noreplacement  Don't replace instructions with more appropiate ones
+  				 for the CPU. This may be useful on asymmetric MP systems
+				 where some CPU have less capabilities than the others.
+

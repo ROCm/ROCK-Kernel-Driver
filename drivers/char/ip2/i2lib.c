@@ -141,7 +141,7 @@ fatality(i2eBordStrPtr pB )
 //* Code *
 //********
 
-inline int
+static inline int
 i2Validate ( i2ChanStrPtr pCh )
 {
 	//ip2trace(pCh->port_index, ITRC_VERIFY,ITRC_ENTER,2,pCh->validity,

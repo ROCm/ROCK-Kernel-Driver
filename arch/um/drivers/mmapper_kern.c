@@ -8,6 +8,8 @@
  *         Greg Lonnon glonnon@ridgerun.com or info@ridgerun.com
  *
  */
+
+#include <linux/types.h>
 #include <linux/kdev_t.h>
 #include <linux/time.h>
 #include <linux/devfs_fs_kernel.h>

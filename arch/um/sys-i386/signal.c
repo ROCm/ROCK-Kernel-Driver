@@ -146,7 +146,7 @@ int copy_sc_to_user_tt(struct sigcontext *to, struct _fpstate *fp,
 }
 #endif
 
-static int copy_sc_from_user(struct pt_regs *to, void *from)
+static int copy_sc_from_user(struct pt_regs *to, void __user *from)
 {
 	int ret;
 

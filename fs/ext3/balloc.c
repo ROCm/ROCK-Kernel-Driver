@@ -1451,7 +1451,7 @@ static inline int test_root(int a, int b)
 	}
 }
 
-int ext3_group_sparse(int group)
+static int ext3_group_sparse(int group)
 {
 	return (test_root(group, 3) || test_root(group, 5) ||
 		test_root(group, 7));

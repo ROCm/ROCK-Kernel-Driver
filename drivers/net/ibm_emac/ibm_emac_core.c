@@ -1363,6 +1363,9 @@ static void emac_reset_configure(struct ocp_enet_private *fep)
 
 	/* set frame gap */
 	out_be32(&emacp->em0ipgvr, CONFIG_IBM_EMAC_FGAP);
+	
+	/* set VLAN Tag Protocol Identifier */
+	out_be32(&emacp->em0vtpid, 0x8100);
 
 	/* Init ring buffers */
 	emac_init_rings(fep->ndev);
@@ -1700,6 +1703,15 @@ struct mal_commac_ops emac_commac_ops = {
 	.rxde = &emac_rxde_dev,
 };
 
+#ifdef CONFIG_NET_POLL_CONTROLLER
+static int emac_netpoll(struct net_device *ndev)
+{
+	emac_rxeob_dev((void *)ndev, 0);
+	emac_txeob_dev((void *)ndev, 0);
+	return 0;
+}
+#endif
+
 static int emac_init_device(struct ocp_device *ocpdev, struct ibm_ocp_mal *mal)
 {
 	int deferred_init = 0;
@@ -1882,6 +1894,9 @@ static int emac_init_device(struct ocp_device *ocpdev, struct ibm_ocp_mal *mal)
 	SET_ETHTOOL_OPS(ndev, &emac_ethtool_ops);
 	if (emacdata->tah_idx >= 0)
 		ndev->features = NETIF_F_IP_CSUM | NETIF_F_SG;
+#ifdef CONFIG_NET_POLL_CONTROLLER
+	ndev->poll_controller = emac_netpoll;
+#endif
 
 	SET_MODULE_OWNER(ndev);
 

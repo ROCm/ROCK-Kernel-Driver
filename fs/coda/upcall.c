@@ -331,7 +331,7 @@ int venus_rename(struct super_block *sb, struct CodaFid *old_fid,
 }
 
 int venus_create(struct super_block *sb, struct CodaFid *dirfid, 
-		 const char *name, int length, int excl, int mode, dev_t rdev,
+		 const char *name, int length, int excl, int mode,
 		 struct CodaFid *newfid, struct coda_vattr *attrs) 
 {
         union inputArgs *inp;
@@ -345,7 +345,6 @@ int venus_create(struct super_block *sb, struct CodaFid *dirfid,
 
         inp->coda_create.VFid = *dirfid;
         inp->coda_create.attr.va_mode = mode;
-        inp->coda_create.attr.va_rdev = huge_encode_dev(rdev);
 	inp->coda_create.excl = excl;
         inp->coda_create.mode = mode;
         inp->coda_create.name = offset;
@@ -555,6 +554,11 @@ int venus_pioctl(struct super_block *sb, struct CodaFid *fid,
 		goto exit;
         }
 
+        if (data->vi.out_size > VC_MAXDATASIZE) {
+		error = -EINVAL;
+		goto exit;
+	}
+
         inp->coda_ioctl.VFid = *fid;
     
         /* the cmd field was mutated by increasing its size field to
@@ -583,18 +587,25 @@ int venus_pioctl(struct super_block *sb, struct CodaFid *fid,
 		       error, coda_f2s(fid));
 		goto exit; 
 	}
+
+	if (outsize < (long)outp->coda_ioctl.data + outp->coda_ioctl.len) {
+		error = -EINVAL;
+		goto exit;
+	}
         
 	/* Copy out the OUT buffer. */
         if (outp->coda_ioctl.len > data->vi.out_size) {
 		error = -EINVAL;
-        } else {
-		if (copy_to_user(data->vi.out, 
-				 (char *)outp + (long)outp->coda_ioctl.data, 
-				 data->vi.out_size)) {
-			error = -EFAULT;
-			goto exit;
-		}
+		goto exit;
         }
+
+	/* Copy out the OUT buffer. */
+	if (copy_to_user(data->vi.out,
+			 (char *)outp + (long)outp->coda_ioctl.data,
+			 outp->coda_ioctl.len)) {
+		error = -EFAULT;
+		goto exit;
+	}
 
  exit:
 	CODA_FREE(inp, insize);

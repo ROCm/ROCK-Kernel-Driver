@@ -1182,7 +1182,7 @@ void fastcall sched_fork(task_t *p)
 		 */
 		current->time_slice = 1;
 		preempt_disable();
-		scheduler_tick(0, 0);
+		scheduler_tick();
 		local_irq_enable();
 		preempt_enable();
 	} else
@@ -2251,48 +2251,168 @@ EXPORT_PER_CPU_SYMBOL(kstat);
 			((rq)->curr->static_prio > (rq)->best_expired_prio))
 
 /*
+ * Do the virtual cpu time signal calculations.
+ * @p: the process that the cpu time gets accounted to
+ * @cputime: the cpu time spent in user space since the last update
+ */
+static inline void account_it_virt(struct task_struct * p, cputime_t cputime)
+{
+	cputime_t it_virt = p->it_virt_value;
+
+	if (cputime_gt(it_virt, cputime_zero) &&
+	    cputime_gt(cputime, cputime_zero)) {
+		if (cputime_ge(cputime, it_virt)) {
+			it_virt = cputime_add(it_virt, p->it_virt_incr);
+			send_sig(SIGVTALRM, p, 1);
+		}
+		it_virt = cputime_sub(it_virt, cputime);
+		p->it_virt_value = it_virt;
+	}
+}
+
+/*
+ * Do the virtual profiling signal calculations.
+ * @p: the process that the cpu time gets accounted to
+ * @cputime: the cpu time spent in user and kernel space since the last update
+ */
+static void account_it_prof(struct task_struct *p, cputime_t cputime)
+{
+	cputime_t it_prof = p->it_prof_value;
+
+	if (cputime_gt(it_prof, cputime_zero) &&
+	    cputime_gt(cputime, cputime_zero)) {
+		if (cputime_ge(cputime, it_prof)) {
+			it_prof = cputime_add(it_prof, p->it_prof_incr);
+			send_sig(SIGPROF, p, 1);
+		}
+		it_prof = cputime_sub(it_prof, cputime);
+		p->it_prof_value = it_prof;
+	}
+}
+
+/*
+ * Check if the process went over its cputime resource limit after
+ * some cpu time got added to utime/stime.
+ * @p: the process that the cpu time gets accounted to
+ * @cputime: the cpu time spent in user and kernel space since the last update
+ */
+static void check_rlimit(struct task_struct *p, cputime_t cputime)
+{
+	cputime_t total, tmp;
+
+	total = cputime_add(p->utime, p->stime);
+	tmp = jiffies_to_cputime(p->signal->rlim[RLIMIT_CPU].rlim_cur);
+	if (unlikely(cputime_gt(total, tmp))) {
+		/* Send SIGXCPU every second. */
+		tmp = cputime_sub(total, cputime);
+		if (cputime_to_secs(tmp) < cputime_to_secs(total))
+			send_sig(SIGXCPU, p, 1);
+		/* and SIGKILL when we go over max.. */
+		tmp = jiffies_to_cputime(p->signal->rlim[RLIMIT_CPU].rlim_max);
+		if (cputime_gt(total, tmp))
+			send_sig(SIGKILL, p, 1);
+	}
+}
+
+/*
+ * Account user cpu time to a process.
+ * @p: the process that the cpu time gets accounted to
+ * @hardirq_offset: the offset to subtract from hardirq_count()
+ * @cputime: the cpu time spent in user space since the last update
+ */
+void account_user_time(struct task_struct *p, cputime_t cputime)
+{
+	struct cpu_usage_stat *cpustat = &kstat_this_cpu.cpustat;
+	cputime64_t tmp;
+
+	p->utime = cputime_add(p->utime, cputime);
+
+	/* Check for signals (SIGVTALRM, SIGPROF, SIGXCPU & SIGKILL). */
+	check_rlimit(p, cputime);
+	account_it_virt(p, cputime);
+	account_it_prof(p, cputime);
+
+	/* Add user time to cpustat. */
+	tmp = cputime_to_cputime64(cputime);
+	if (TASK_NICE(p) > 0)
+		cpustat->nice = cputime64_add(cpustat->nice, tmp);
+	else
+		cpustat->user = cputime64_add(cpustat->user, tmp);
+}
+
+/*
+ * Account system cpu time to a process.
+ * @p: the process that the cpu time gets accounted to
+ * @hardirq_offset: the offset to subtract from hardirq_count()
+ * @cputime: the cpu time spent in kernel space since the last update
+ */
+void account_system_time(struct task_struct *p, int hardirq_offset,
+			 cputime_t cputime)
+{
+	struct cpu_usage_stat *cpustat = &kstat_this_cpu.cpustat;
+	runqueue_t *rq = this_rq();
+	cputime64_t tmp;
+
+	p->stime = cputime_add(p->stime, cputime);
+
+	/* Check for signals (SIGPROF, SIGXCPU & SIGKILL). */
+	if (likely(p->signal && p->exit_state < EXIT_ZOMBIE)) {
+		check_rlimit(p, cputime);
+		account_it_prof(p, cputime);
+	}
+
+	/* Add system time to cpustat. */
+	tmp = cputime_to_cputime64(cputime);
+	if (hardirq_count() - hardirq_offset)
+		cpustat->irq = cputime64_add(cpustat->irq, tmp);
+	else if (softirq_count())
+		cpustat->softirq = cputime64_add(cpustat->softirq, tmp);
+	else if (p != rq->idle)
+		cpustat->system = cputime64_add(cpustat->system, tmp);
+	else if (atomic_read(&rq->nr_iowait) > 0)
+		cpustat->iowait = cputime64_add(cpustat->iowait, tmp);
+	else
+		cpustat->idle = cputime64_add(cpustat->idle, tmp);
+}
+
+/*
+ * Account for involuntary wait time.
+ * @p: the process from which the cpu time has been stolen
+ * @steal: the cpu time spent in involuntary wait
+ */
+void account_steal_time(struct task_struct *p, cputime_t steal)
+{
+	struct cpu_usage_stat *cpustat = &kstat_this_cpu.cpustat;
+	cputime64_t steal64 = cputime_to_cputime64(steal);
+	runqueue_t *rq = this_rq();
+
+	if (p == rq->idle)
+		cpustat->system = cputime64_add(cpustat->system, steal64);
+	else
+		cpustat->steal = cputime64_add(cpustat->steal, steal64);
+}
+
+/*
  * This function gets called by the timer code, with HZ frequency.
  * We call it with interrupts disabled.
  *
  * It also gets called by the fork code, when changing the parent's
  * timeslices.
  */
-void scheduler_tick(int user_ticks, int sys_ticks)
+void scheduler_tick(void)
 {
 	int cpu = smp_processor_id();
-	struct cpu_usage_stat *cpustat = &kstat_this_cpu.cpustat;
 	runqueue_t *rq = this_rq();
 	task_t *p = current;
 
 	rq->timestamp_last_tick = sched_clock();
 
-	if (rcu_pending(cpu))
-		rcu_check_callbacks(cpu, user_ticks);
-
-	/* note: this timer irq context must be accounted for as well */
-	if (hardirq_count() - HARDIRQ_OFFSET) {
-		cpustat->irq += sys_ticks;
-		sys_ticks = 0;
-	} else if (softirq_count()) {
-		cpustat->softirq += sys_ticks;
-		sys_ticks = 0;
-	}
-
 	if (p == rq->idle) {
-		if (atomic_read(&rq->nr_iowait) > 0)
-			cpustat->iowait += sys_ticks;
-		else
-			cpustat->idle += sys_ticks;
 		if (wake_priority_sleeper(rq))
 			goto out;
 		rebalance_tick(cpu, rq, SCHED_IDLE);
 		return;
 	}
-	if (TASK_NICE(p) > 0)
-		cpustat->nice += user_ticks;
-	else
-		cpustat->user += user_ticks;
-	cpustat->system += sys_ticks;
 
 	/* Task might have expired already, but not scheduled off yet */
 	if (p->array != rq->active) {

@@ -61,10 +61,98 @@ int sysctl_overcommit_ratio = 50;	/* default is 50% */
 int sysctl_max_map_count = DEFAULT_MAX_MAP_COUNT;
 atomic_t vm_committed_space = ATOMIC_INIT(0);
 
+/*
+ * Check that a process has enough memory to allocate a new virtual
+ * mapping. 0 means there is enough memory for the allocation to
+ * succeed and -ENOMEM implies there is not.
+ *
+ * We currently support three overcommit policies, which are set via the
+ * vm.overcommit_memory sysctl.  See Documentation/vm/overcommit-accounting
+ *
+ * Strict overcommit modes added 2002 Feb 26 by Alan Cox.
+ * Additional code 2002 Jul 20 by Robert Love.
+ *
+ * cap_sys_admin is 1 if the process has admin privileges, 0 otherwise.
+ *
+ * Note this is a helper function intended to be used by LSMs which
+ * wish to use this logic.
+ */
+int __vm_enough_memory(long pages, int cap_sys_admin)
+{
+	unsigned long free, allowed;
+
+	vm_acct_memory(pages);
+
+	/*
+	 * Sometimes we want to use more memory than we have
+	 */
+	if (sysctl_overcommit_memory == OVERCOMMIT_ALWAYS)
+		return 0;
+
+	if (sysctl_overcommit_memory == OVERCOMMIT_GUESS) {
+		unsigned long n;
+
+		free = get_page_cache_size();
+		free += nr_swap_pages;
+
+		/*
+		 * Any slabs which are created with the
+		 * SLAB_RECLAIM_ACCOUNT flag claim to have contents
+		 * which are reclaimable, under pressure.  The dentry
+		 * cache and most inode caches should fall into this
+		 */
+		free += atomic_read(&slab_reclaim_pages);
+
+		/*
+		 * Leave the last 3% for root
+		 */
+		if (!cap_sys_admin)
+			free -= free / 32;
+
+		if (free > pages)
+			return 0;
+
+		/*
+		 * nr_free_pages() is very expensive on large systems,
+		 * only call if we're about to fail.
+		 */
+		n = nr_free_pages();
+		if (!cap_sys_admin)
+			n -= n / 32;
+		free += n;
+
+		if (free > pages)
+			return 0;
+		vm_unacct_memory(pages);
+		return -ENOMEM;
+	}
+
+	allowed = (totalram_pages - hugetlb_total_pages())
+	       	* sysctl_overcommit_ratio / 100;
+	/*
+	 * Leave the last 3% for root
+	 */
+	if (!cap_sys_admin)
+		allowed -= allowed / 32;
+	allowed += total_swap_pages;
+
+	/* Don't let a single process grow too big:
+	   leave 3% of the size of this process for other processes */
+	allowed -= current->mm->total_vm / 32;
+
+	if (atomic_read(&vm_committed_space) < allowed)
+		return 0;
+
+	vm_unacct_memory(pages);
+
+	return -ENOMEM;
+}
+
 EXPORT_SYMBOL(sysctl_overcommit_memory);
 EXPORT_SYMBOL(sysctl_overcommit_ratio);
 EXPORT_SYMBOL(sysctl_max_map_count);
 EXPORT_SYMBOL(vm_committed_space);
+EXPORT_SYMBOL(__vm_enough_memory);
 
 /*
  * Requires inode->i_mapping->i_mmap_lock
@@ -1346,7 +1434,6 @@ static int acct_stack_growth(struct vm_area_struct * vma, unsigned long size, un
 	struct rlimit *rlim = current->signal->rlim;
 
 	/* address space limit tests */
-	rlim = current->signal->rlim;
 	if (mm->total_vm + grow > rlim[RLIMIT_AS].rlim_cur >> PAGE_SHIFT)
 		return -ENOMEM;
 
@@ -1360,7 +1447,7 @@ static int acct_stack_growth(struct vm_area_struct * vma, unsigned long size, un
 		unsigned long limit;
 		locked = mm->locked_vm + grow;
 		limit = rlim[RLIMIT_MEMLOCK].rlim_cur >> PAGE_SHIFT;
-		if (locked > limit)
+		if (locked > limit && !capable(CAP_IPC_LOCK))
 			return -ENOMEM;
 	}
 
@@ -1388,7 +1475,6 @@ static int acct_stack_growth(struct vm_area_struct * vma, unsigned long size, un
 int expand_stack(struct vm_area_struct * vma, unsigned long address)
 {
 	int error;
-	unsigned long size, grow;
 
 	if (!(vma->vm_flags & VM_GROWSUP))
 		return -EFAULT;
@@ -1408,12 +1494,19 @@ int expand_stack(struct vm_area_struct * vma, unsigned long address)
 	 */
 	address += 4 + PAGE_SIZE - 1;
 	address &= PAGE_MASK;
-	size = address - vma->vm_start;
-	grow = (address - vma->vm_end) >> PAGE_SHIFT;
+	error = 0;
 
-	error = acct_stack_growth(vma, size, grow);
-	if (!error)
-		vma->vm_end = address;
+	/* Somebody else might have raced and expanded it already */
+	if (address > vma->vm_end) {
+		unsigned long size, grow;
+
+		size = address - vma->vm_start;
+		grow = (address - vma->vm_end) >> PAGE_SHIFT;
+
+		error = acct_stack_growth(vma, size, grow);
+		if (!error)
+			vma->vm_end = address;
+	}
 	anon_vma_unlock(vma);
 	return error;
 }
@@ -1441,7 +1534,6 @@ find_extend_vma(struct mm_struct *mm, unsigned long addr)
 int expand_stack(struct vm_area_struct *vma, unsigned long address)
 {
 	int error;
-	unsigned long size, grow;
 
 	/*
 	 * We must make sure the anon_vma is allocated
@@ -1457,13 +1549,20 @@ int expand_stack(struct vm_area_struct *vma, unsigned long address)
 	 * anon_vma lock to serialize against concurrent expand_stacks.
 	 */
 	address &= PAGE_MASK;
-	size = vma->vm_end - address;
-	grow = (vma->vm_start - address) >> PAGE_SHIFT;
+	error = 0;
 
-	error = acct_stack_growth(vma, size, grow);
-	if (!error) {
-		vma->vm_start = address;
-		vma->vm_pgoff -= grow;
+	/* Somebody else might have raced and expanded it already */
+	if (address < vma->vm_start) {
+		unsigned long size, grow;
+
+		size = vma->vm_end - address;
+		grow = (vma->vm_start - address) >> PAGE_SHIFT;
+
+		error = acct_stack_growth(vma, size, grow);
+		if (!error) {
+			vma->vm_start = address;
+			vma->vm_pgoff -= grow;
+		}
 	}
 	anon_vma_unlock(vma);
 	return error;
@@ -1771,6 +1870,16 @@ asmlinkage long sys_munmap(unsigned long addr, size_t len)
 	return ret;
 }
 
+static inline void verify_mm_writelocked(struct mm_struct *mm)
+{
+#ifdef CONFIG_DEBUG_KERNEL
+	if (unlikely(down_read_trylock(&mm->mmap_sem))) {
+		WARN_ON(1);
+		up_read(&mm->mmap_sem);
+	}
+#endif
+}
+
 /*
  *  this is really a simplified "do_mmap".  it only handles
  *  anonymous maps.  eventually we may be able to do some
@@ -1802,6 +1911,12 @@ unsigned long do_brk(unsigned long addr, unsigned long len)
 		if (locked > lock_limit && !capable(CAP_IPC_LOCK))
 			return -EAGAIN;
 	}
+
+	/*
+	 * mm->mmap_sem is required to protect against another thread
+	 * changing the mappings in case we sleep.
+	 */
+	verify_mm_writelocked(mm);
 
 	/*
 	 * Clear old maps.  this also does some error checking for us

@@ -237,7 +237,6 @@ static dev_link_t *atmel_attach(void)
 	link->next = dev_list;
 	dev_list = link;
 	client_reg.dev_info = &dev_info;
-	client_reg.Attributes = INFO_IO_CLIENT | INFO_CARD_SHARE;
 	client_reg.EventMask =
 		CS_EVENT_CARD_INSERTION | CS_EVENT_CARD_REMOVAL |
 		CS_EVENT_RESET_PHYSICAL | CS_EVENT_CARD_RESET |
@@ -346,18 +345,6 @@ static struct {
 	{ 0, 0, "OEM/11Mbps Wireless LAN PC Card V-3", "atmel_at76c502%s.bin", "OEM 11Mbps WLAN PCMCIA Card" },
 	{ 0, 0, "11WAVE/11WP611AL-E", "atmel_at76c502e%s.bin", "11WAVE WaveBuddy" } 
 };
-
-/* This is strictly temporary, until PCMCIA devices get integrated into the device model. */
-static struct device *atmel_device(void)
-{
-	static struct device dev = {
-		.bus_id    = "pcmcia",
-	};
-	kobject_set_name(&dev.kobj, "atmel_cs");
-	kobject_init(&dev.kobj);
-	
-	return &dev;
-}
 
 static void atmel_config(dev_link_t *link)
 {
@@ -549,7 +536,7 @@ static void atmel_config(dev_link_t *link)
 		init_atmel_card(link->irq.AssignedIRQ,
 				link->io.BasePort1,
 				card_index == -1 ? NULL :  card_table[card_index].firmware,
-				atmel_device(),
+				&handle_to_dev(handle),
 				card_present, 
 				link);
 	if (!((local_info_t*)link->priv)->eth_dev) 
@@ -693,13 +680,7 @@ static int atmel_cs_init(void)
 static void atmel_cs_cleanup(void)
 {
         pcmcia_unregister_driver(&atmel_driver);
-
-        /* XXX: this really needs to move into generic code.. */
-        while (dev_list != NULL) {
-                if (dev_list->state & DEV_CONFIG)
-                        atmel_release(dev_list);
-                atmel_detach(dev_list);
-        }
+	BUG_ON(dev_list != NULL);
 }
 
 /*

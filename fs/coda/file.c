@@ -26,7 +26,7 @@
 
 /* if CODA_STORE fails with EOPNOTSUPP, venus clearly doesn't support
  * CODA_STORE/CODA_RELEASE and we fall back on using the CODA_CLOSE upcall */
-int use_coda_close;
+static int use_coda_close;
 
 static ssize_t
 coda_file_read(struct file *coda_file, char __user *buf, size_t count, loff_t *ppos)

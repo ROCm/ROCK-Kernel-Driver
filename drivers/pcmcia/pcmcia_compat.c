@@ -123,23 +123,3 @@ int pcmcia_access_configuration_register(client_handle_t handle,
 }
 EXPORT_SYMBOL(pcmcia_access_configuration_register);
 
-#ifdef CONFIG_PCMCIA_OBSOLETE
-
-int pcmcia_get_first_window(window_handle_t *win, win_req_t *req)
-{
-    if ((win == NULL) || ((*win)->magic != WINDOW_MAGIC))
-	return CS_BAD_HANDLE;
-
-    return pcmcia_get_window(((client_handle_t)*win)->Socket, win, 0, req);
-}
-EXPORT_SYMBOL(pcmcia_get_first_window);
-
-int pcmcia_get_next_window(window_handle_t *win, win_req_t *req)
-{
-    if ((win == NULL) || ((*win)->magic != WINDOW_MAGIC))
-	return CS_BAD_HANDLE;
-    return pcmcia_get_window((*win)->sock, win, (*win)->index+1, req);
-}
-EXPORT_SYMBOL(pcmcia_get_next_window);
-
-#endif

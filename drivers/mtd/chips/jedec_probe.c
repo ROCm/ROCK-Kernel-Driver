@@ -32,6 +32,7 @@
 #define MANUFACTURER_HYUNDAI	0x00AD
 #define MANUFACTURER_INTEL	0x0089
 #define MANUFACTURER_MACRONIX	0x00C2
+#define MANUFACTURER_NEC	0x0010
 #define MANUFACTURER_PMC	0x009D
 #define MANUFACTURER_SST	0x00BF
 #define MANUFACTURER_ST		0x0020
@@ -114,6 +115,9 @@
 #define MX29F002T	0x00B0
 #define MX29F004T	0x0045
 #define MX29F004B	0x0046
+
+/* NEC */
+#define UPD29F064115	0x221C
 
 /* PMC */
 #define PM49FL002	0x006D
@@ -1128,6 +1132,22 @@ static const struct amd_flash_info jedec_table[] = {
 			ERASEINFO(0x08000,1),
 			ERASEINFO(0x02000,2),
 			ERASEINFO(0x04000,1)
+		}
+	}, {
+		.mfr_id		= MANUFACTURER_NEC,
+		.dev_id		= UPD29F064115,
+		.name		= "NEC uPD29F064115",
+		.uaddr		= {
+			[0] = MTD_UADDR_0x0555_0x02AA,  /* x8 */
+			[1] = MTD_UADDR_0x0555_0x02AA,  /* x16 */
+		},
+		.DevSize	= SIZE_8MiB,
+		.CmdSet		= P_ID_AMD_STD,
+		.NumEraseRegions= 3,
+		.regions	= {
+			ERASEINFO(0x2000,8),
+			ERASEINFO(0x10000,126),
+			ERASEINFO(0x2000,8),
 		}
 	}, {
 		.mfr_id		= MANUFACTURER_MACRONIX,

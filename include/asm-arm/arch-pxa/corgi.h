@@ -15,29 +15,31 @@
 
 
 /*
- * Corgi GPIO definitions
+ * Corgi (Non Standard) GPIO Definitions
  */
-#define CORGI_GPIO_KEY_INT			(0)	/* key interrupt */
+#define CORGI_GPIO_KEY_INT			(0)	/* Keyboard Interrupt */
 #define CORGI_GPIO_AC_IN			(1)
 #define CORGI_GPIO_WAKEUP			(3)
-#define CORGI_GPIO_AK_INT			(4)	// Remote Controller
-#define CORGI_GPIO_TP_INT			(5)	/* Touch Panel interrupt */
-#define CORGI_GPIO_nSD_CLK			(6)
+#define CORGI_GPIO_AK_INT			(4)	/* IR Controller Interrupt */
+#define CORGI_GPIO_TP_INT			(5)	/* Touch Panel Interrupt */
 #define CORGI_GPIO_nSD_WP			(7)
-#define CORGI_GPIO_nSD_DETECT		(9)
+#define CORGI_GPIO_nSD_DETECT		(9) /* MMC/SD Card Detect */
 #define CORGI_GPIO_nSD_INT			(10)
 #define CORGI_GPIO_MAIN_BAT_LOW		(11)
 #define CORGI_GPIO_BAT_COVER		(11)
 #define CORGI_GPIO_LED_ORANGE		(13)
-#define CORGI_GPIO_CF_CD			(14)
+#define CORGI_GPIO_CF_CD			(14) /* Compact Flash Card Detect */
 #define CORGI_GPIO_CHRG_FULL		(16)
-#define CORGI_GPIO_CF_IRQ			(17)
+#define CORGI_GPIO_CF_IRQ			(17) /* Compact Flash Interrupt */
+#define CORGI_GPIO_LCDCON_CS		(19) /* LCD Control Chip Select */
+#define CORGI_GPIO_MAX1111_CS		(20) /* MAX111 Chip Select */
 #define CORGI_GPIO_ADC_TEMP_ON		(21)
 #define CORGI_GPIO_IR_ON			(22)
-#define CORGI_GPIO_SD_PWR			(33)
+#define CORGI_GPIO_ADS7846_CS		(24) /* ADS7846 Chip Select */
+#define CORGI_GPIO_SD_PWR			(33) /* MMC/SD Power */
 #define CORGI_GPIO_CHRG_ON			(38)
 #define CORGI_GPIO_DISCHARGE_ON		(42)
-#define CORGI_GPIO_HSYNC			(44)
+#define CORGI_GPIO_HSYNC			(44) /* LCD HSync Pulse */
 #define CORGI_GPIO_USB_PULLUP		(45)
 
 

@@ -77,7 +77,6 @@ void vx_set_mic_level(vx_core_t *chip, int level);
  */
 dev_link_t *snd_vxpocket_attach(struct snd_vxp_entry *hw);
 void snd_vxpocket_detach(struct snd_vxp_entry *hw, dev_link_t *link);
-void snd_vxpocket_detach_all(struct snd_vxp_entry *hw);
 
 int vxp_add_mic_controls(vx_core_t *chip);
 

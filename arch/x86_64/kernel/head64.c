@@ -61,16 +61,17 @@ static void __init copy_bootdata(char *real_mode_data)
 
 static void __init setup_boot_cpu_data(void)
 {
-	int dummy, eax;
+	unsigned int dummy, eax;
 
 	/* get vendor info */
-	cpuid(0, &boot_cpu_data.cpuid_level,
-	      (int *)&boot_cpu_data.x86_vendor_id[0],
-	      (int *)&boot_cpu_data.x86_vendor_id[8],
-	      (int *)&boot_cpu_data.x86_vendor_id[4]);
+	cpuid(0, (unsigned int *)&boot_cpu_data.cpuid_level,
+	      (unsigned int *)&boot_cpu_data.x86_vendor_id[0],
+	      (unsigned int *)&boot_cpu_data.x86_vendor_id[8],
+	      (unsigned int *)&boot_cpu_data.x86_vendor_id[4]);
 
 	/* get cpu type */
-	cpuid(1, &eax, &dummy, &dummy, (int *) &boot_cpu_data.x86_capability);
+	cpuid(1, &eax, &dummy, &dummy,
+		(unsigned int *) &boot_cpu_data.x86_capability);
 	boot_cpu_data.x86 = (eax >> 8) & 0xf;
 	boot_cpu_data.x86_model = (eax >> 4) & 0xf;
 	boot_cpu_data.x86_mask = eax & 0xf;

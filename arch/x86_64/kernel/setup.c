@@ -493,7 +493,7 @@ void __init setup_arch(char **cmdline_p)
 
 	check_efer();
 
-	init_memory_mapping(); 
+	init_memory_mapping(0, (end_pfn_map << PAGE_SHIFT));
 
 #ifdef CONFIG_ACPI_BOOT
 	/*
@@ -657,18 +657,18 @@ static void __init display_cacheinfo(struct cpuinfo_x86 *c)
 		cpuid(0x80000005, &dummy, &ebx, &ecx, &edx);
 		printk(KERN_INFO "CPU: L1 I Cache: %dK (%d bytes/line), D cache %dK (%d bytes/line)\n",
 			edx>>24, edx&0xFF, ecx>>24, ecx&0xFF);
-		c->x86_cache_size=(ecx>>24)+(edx>>24);	
-		/* DTLB and ITLB together, but only 4K */
-		c->x86_tlbsize = ((ebx>>16)&0xff) + (ebx&0xff);
+		c->x86_cache_size=(ecx>>24)+(edx>>24);
+		/* On K8 L1 TLB is inclusive, so don't count it */
+		c->x86_tlbsize = 0;
 	}
 
 	if (n >= 0x80000006) {
 		cpuid(0x80000006, &dummy, &ebx, &ecx, &edx);
-	ecx = cpuid_ecx(0x80000006);
-	c->x86_cache_size = ecx >> 16;
+		ecx = cpuid_ecx(0x80000006);
+		c->x86_cache_size = ecx >> 16;
 		c->x86_tlbsize += ((ebx >> 16) & 0xfff) + (ebx & 0xfff);
 
-	printk(KERN_INFO "CPU: L2 Cache: %dK (%d bytes/line)\n",
+		printk(KERN_INFO "CPU: L2 Cache: %dK (%d bytes/line)\n",
 		c->x86_cache_size, ecx & 0xFF);
 	}
 
@@ -849,10 +849,10 @@ void __init early_identify_cpu(struct cpuinfo_x86 *c)
 	memset(&c->x86_capability, 0, sizeof c->x86_capability);
 
 	/* Get vendor name */
-	cpuid(0x00000000, &c->cpuid_level,
-	      (int *)&c->x86_vendor_id[0],
-	      (int *)&c->x86_vendor_id[8],
-	      (int *)&c->x86_vendor_id[4]);
+	cpuid(0x00000000, (unsigned int *)&c->cpuid_level,
+	      (unsigned int *)&c->x86_vendor_id[0],
+	      (unsigned int *)&c->x86_vendor_id[8],
+	      (unsigned int *)&c->x86_vendor_id[4]);
 		
 	get_cpu_vendor(c);
 
@@ -892,19 +892,19 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 
 	/* AMD-defined flags: level 0x80000001 */
 	xlvl = cpuid_eax(0x80000000);
-	if ( (xlvl & 0xffff0000) == 0x80000000 ) {
-		if ( xlvl >= 0x80000001 ) {
+	if ((xlvl & 0xffff0000) == 0x80000000) {
+		if (xlvl >= 0x80000001) {
 			c->x86_capability[1] = cpuid_edx(0x80000001);
 			c->x86_capability[5] = cpuid_ecx(0x80000001);
 		}
-		if ( xlvl >= 0x80000004 )
+		if (xlvl >= 0x80000004)
 			get_model_name(c); /* Default name */
 	}
 
 	/* Transmeta-defined flags: level 0x80860001 */
 	xlvl = cpuid_eax(0x80860000);
-	if ( (xlvl & 0xffff0000) == 0x80860000 ) {
-		if (  xlvl >= 0x80860001 )
+	if ((xlvl & 0xffff0000) == 0x80860000) {
+		if (xlvl >= 0x80860001)
 			c->x86_capability[2] = cpuid_edx(0x80860001);
 	}
 
@@ -918,20 +918,19 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 	 * At the end of this section, c->x86_capability better
 	 * indicate the features this CPU genuinely supports!
 	 */
-	switch ( c->x86_vendor ) {
+	switch (c->x86_vendor) {
+	case X86_VENDOR_AMD:
+		init_amd(c);
+		break;
 
-		case X86_VENDOR_AMD:
-			init_amd(c);
-			break;
+	case X86_VENDOR_INTEL:
+		init_intel(c);
+		break;
 
-		case X86_VENDOR_INTEL:
-			init_intel(c); 
-			break; 
-
-		case X86_VENDOR_UNKNOWN:
-		default:
-			display_cacheinfo(c);
-			break;
+	case X86_VENDOR_UNKNOWN:
+	default:
+		display_cacheinfo(c);
+		break;
 	}
 
 	select_idle_routine(c);
@@ -944,9 +943,9 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 	 * common between the CPUs.  The first time this routine gets
 	 * executed, c == &boot_cpu_data.
 	 */
-	if ( c != &boot_cpu_data ) {
+	if (c != &boot_cpu_data) {
 		/* AND the already accumulated flags with these */
-		for ( i = 0 ; i < NCAPINTS ; i++ )
+		for (i = 0 ; i < NCAPINTS ; i++)
 			boot_cpu_data.x86_capability[i] &= c->x86_capability[i];
 	}
 

@@ -1,8 +1,6 @@
-ifeq ($(CONFIG_HOST_2G_2G), y)
-TOP_ADDR := 0x80000000
-else
-TOP_ADDR := 0xc0000000
-endif
+SUBARCH_CORE := arch/um/sys-i386/
+
+TOP_ADDR := $(CONFIG_TOP_ADDR)
 
 ifeq ($(CONFIG_MODE_SKAS),y)
   ifneq ($(CONFIG_MODE_TT),y)

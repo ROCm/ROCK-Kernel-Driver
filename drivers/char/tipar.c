@@ -488,7 +488,7 @@ static struct parport_driver tipar_driver = {
 	.detach = tipar_detach,
 };
 
-int __init
+static int __init
 tipar_init_module(void)
 {
 	int err = 0;
@@ -525,7 +525,7 @@ out:
 	return err;	
 }
 
-void __exit
+static void __exit
 tipar_cleanup_module(void)
 {
 	unsigned int i;

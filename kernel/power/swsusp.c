@@ -843,11 +843,22 @@ int swsusp_suspend(void)
 	if ((error = arch_prepare_suspend()))
 		return error;
 	local_irq_disable();
+	/* At this point, device_suspend() has been called, but *not*
+	 * device_power_down(). We *must* device_power_down() now.
+	 * Otherwise, drivers for some devices (e.g. interrupt controllers)
+	 * become desynchronized with the actual state of the hardware
+	 * at resume time, and evil weirdness ensues.
+	 */
+	if ((error = device_power_down(PM_SUSPEND_DISK))) {
+		local_irq_enable();
+		return error;
+	}
 	save_processor_state();
 	error = swsusp_arch_suspend();
 	/* Restore control flow magically appears here */
 	restore_processor_state();
 	restore_highmem();
+	device_power_up();
 	local_irq_enable();
 	return error;
 }
@@ -867,6 +878,7 @@ int swsusp_resume(void)
 {
 	int error;
 	local_irq_disable();
+	device_power_down(PM_SUSPEND_DISK);
 	/* We'll ignore saved state, but this gets preempt count (etc) right */
 	save_processor_state();
 	error = swsusp_arch_resume();
@@ -876,6 +888,7 @@ int swsusp_resume(void)
 	BUG_ON(!error);
 	restore_processor_state();
 	restore_highmem();
+	device_power_up();
 	local_irq_enable();
 	return error;
 }

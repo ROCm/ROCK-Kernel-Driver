@@ -102,28 +102,6 @@ struct signal_info sig_info[] = {
 		      .is_irq 		= 0 },
 };
 
-void sig_handler(int sig, struct sigcontext sc)
-{
-	CHOOSE_MODE_PROC(sig_handler_common_tt, sig_handler_common_skas,
-			 sig, &sc);
-}
-
-extern int timer_irq_inited;
-
-void alarm_handler(int sig, struct sigcontext sc)
-{
-	if(!timer_irq_inited) return;
-
-	if(sig == SIGALRM)
-		switch_timers(0);
-
-	CHOOSE_MODE_PROC(sig_handler_common_tt, sig_handler_common_skas,
-			 sig, &sc);
-
-	if(sig == SIGALRM)
-		switch_timers(1);
-}
-
 void do_longjmp(void *b, int val)
 {
 	sigjmp_buf *buf = b;

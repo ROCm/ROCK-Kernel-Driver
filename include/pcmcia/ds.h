@@ -1,30 +1,16 @@
 /*
- * ds.h 1.56 2000/06/12 21:55:40
+ * ds.h -- 16-bit PCMCIA core support
  *
- * The contents of this file are subject to the Mozilla Public License
- * Version 1.1 (the "License"); you may not use this file except in
- * compliance with the License. You may obtain a copy of the License
- * at http://www.mozilla.org/MPL/
- *
- * Software distributed under the License is distributed on an "AS IS"
- * basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See
- * the License for the specific language governing rights and
- * limitations under the License. 
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  *
  * The initial developer of the original code is David A. Hinds
  * <dahinds@users.sourceforge.net>.  Portions created by David A. Hinds
  * are Copyright (C) 1999 David A. Hinds.  All Rights Reserved.
  *
- * Alternatively, the contents of this file may be used under the
- * terms of the GNU General Public License version 2 (the "GPL"), in which
- * case the provisions of the GPL are applicable instead of the
- * above.  If you wish to allow the use of your version of this file
- * only under the terms of the GPL and not to allow others to use
- * your version of this file under the MPL, indicate your decision by
- * deleting the provisions above and replace them with the notice and
- * other provisions required by the GPL.  If you do not delete the
- * provisions above, a recipient may use your version of this file
- * under either the MPL or the GPL.
+ * (C) 1999		David A. Hinds
+ * (C) 2003 - 2004	Dominik Brodowski
  */
 
 #ifndef _LINUX_DS_H
@@ -141,10 +127,11 @@ typedef struct dev_link_t {
     ((l) && ((l->state & ~DEV_BUSY) == (DEV_CONFIG|DEV_PRESENT)))
 
 
+struct pcmcia_socket;
+
 extern struct bus_type pcmcia_bus_type;
 
 struct pcmcia_driver {
-	int			use_count;
 	dev_link_t		*(*attach)(void);
 	void			(*detach)(dev_link_t *);
 	struct module		*owner;
@@ -154,6 +141,42 @@ struct pcmcia_driver {
 /* driver registration */
 int pcmcia_register_driver(struct pcmcia_driver *driver);
 void pcmcia_unregister_driver(struct pcmcia_driver *driver);
+
+struct pcmcia_device {
+	/* the socket and the device_no [for multifunction devices]
+	   uniquely define a pcmcia_device */
+	struct pcmcia_socket	*socket;
+
+	u8			device_no;
+
+	/* the hardware "function" device; certain subdevices can
+	 * share one hardware "function" device. */
+	u8			func;
+
+	struct list_head	socket_device_list;
+
+	/* deprecated, a cleaned up version will be moved into this
+	   struct soon */
+	dev_link_t		*instance;
+	struct client_t {
+		u_short			client_magic;
+		struct pcmcia_socket	*Socket;
+		u_char			Function;
+		u_int			state;
+		event_t			EventMask;
+		int (*event_handler)	(event_t event, int priority,
+					 event_callback_args_t *);
+		event_callback_args_t 	event_callback_args;
+	}			client;
+
+	struct device		dev;
+};
+
+#define to_pcmcia_dev(n) container_of(n, struct pcmcia_device, dev)
+#define to_pcmcia_drv(n) container_of(n, struct pcmcia_driver, drv)
+
+#define handle_to_pdev(handle) container_of(handle, struct pcmcia_device, client);
+#define handle_to_dev(handle) ((container_of(handle, struct pcmcia_device, client))->dev)
 
 /* error reporting */
 void cs_error(client_handle_t handle, int func, int ret);

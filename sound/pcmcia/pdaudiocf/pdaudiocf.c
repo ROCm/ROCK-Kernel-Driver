@@ -183,7 +183,6 @@ static dev_link_t *snd_pdacf_attach(void)
 
 	/* Register with Card Services */
 	client_reg.dev_info = &dev_info;
-	client_reg.Attributes = INFO_IO_CLIENT | INFO_CARD_SHARE;
 	client_reg.EventMask = 
 		CS_EVENT_CARD_INSERTION | CS_EVENT_CARD_REMOVAL
 #ifdef CONFIG_PM
@@ -271,15 +270,6 @@ static void snd_pdacf_detach(dev_link_t *link)
 	chip->chip_status |= PDAUDIOCF_STAT_IS_STALE; /* to be sure */
 	snd_card_disconnect(chip->card);
 	snd_card_free_in_thread(chip->card);
-}
-
-/*
- * snd_pdacf_detach_all - detach all instances linked to the hw
- */
-static void snd_pdacf_detach_all(void)
-{
-	while (dev_list != NULL)
-		snd_pdacf_detach(dev_list);
 }
 
 /*
@@ -413,7 +403,7 @@ static int __init init_pdacf(void)
 static void __exit exit_pdacf(void)
 {
 	pcmcia_unregister_driver(&pdacf_cs_driver);
-	snd_pdacf_detach_all();
+	BUG_ON(dev_list != NULL);
 }
 
 module_init(init_pdacf);

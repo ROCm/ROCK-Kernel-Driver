@@ -237,7 +237,6 @@ static dev_link_t *serial_attach(void)
 	link->next = dev_list;
 	dev_list = link;
 	client_reg.dev_info = &dev_info;
-	client_reg.Attributes = INFO_IO_CLIENT | INFO_CARD_SHARE;
 	client_reg.EventMask =
 	    CS_EVENT_CARD_INSERTION | CS_EVENT_CARD_REMOVAL |
 	    CS_EVENT_RESET_PHYSICAL | CS_EVENT_CARD_RESET |
@@ -749,10 +748,7 @@ static int __init init_serial_cs(void)
 static void __exit exit_serial_cs(void)
 {
 	pcmcia_unregister_driver(&serial_cs_driver);
-
-	/* XXX: this really needs to move into generic code.. */
-	while (dev_list != NULL)
-		serial_detach(dev_list);
+	BUG_ON(dev_list != NULL);
 }
 
 module_init(init_serial_cs);

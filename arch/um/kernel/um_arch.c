@@ -17,6 +17,7 @@
 #include "linux/sysrq.h"
 #include "linux/seq_file.h"
 #include "linux/delay.h"
+#include "linux/module.h"
 #include "asm/page.h"
 #include "asm/pgtable.h"
 #include "asm/ptrace.h"
@@ -156,6 +157,8 @@ static int __init uml_version_setup(char *line, int *add)
 {
 	printf("%s\n", system_utsname.release);
 	exit(0);
+
+	return 0;
 }
 
 __uml_setup("--version", uml_version_setup,
@@ -256,6 +259,8 @@ static int __init Usage(char *line, int *add)
  		p++;
  	}
 	exit(0);
+
+	return 0;
 }
 
 __uml_setup("--help", Usage,

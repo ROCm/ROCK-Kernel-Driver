@@ -627,7 +627,6 @@ xirc2ps_attach(void)
     link->next = dev_list;
     dev_list = link;
     client_reg.dev_info = &dev_info;
-    client_reg.Attributes = INFO_IO_CLIENT | INFO_CARD_SHARE;
     client_reg.EventMask =
 	CS_EVENT_CARD_INSERTION | CS_EVENT_CARD_REMOVAL |
 	CS_EVENT_RESET_PHYSICAL | CS_EVENT_CARD_RESET |
@@ -1121,6 +1120,7 @@ xirc2ps_config(dev_link_t * link)
 
     link->dev = &local->node;
     link->state &= ~DEV_CONFIG_PENDING;
+    SET_NETDEV_DEV(dev, &handle_to_dev(handle));
 
     if ((err=register_netdev(dev))) {
 	printk(KNOT_XIRC "register_netdev() failed\n");
@@ -2016,9 +2016,7 @@ static void __exit
 exit_xirc2ps_cs(void)
 {
 	pcmcia_unregister_driver(&xirc2ps_cs_driver);
-
-	while (dev_list)
-		xirc2ps_detach(dev_list);
+	BUG_ON(dev_list != NULL);
 }
 
 module_init(init_xirc2ps_cs);

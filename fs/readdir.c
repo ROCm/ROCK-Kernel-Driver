@@ -287,9 +287,10 @@ asmlinkage long sys_getdents64(unsigned int fd, struct linux_dirent64 __user * d
 	lastdirent = buf.previous;
 	if (lastdirent) {
 		typeof(lastdirent->d_off) d_off = file->f_pos;
-		error = count - buf.count;
+		error = -EFAULT;
 		if (__put_user(d_off, &lastdirent->d_off))
-			error = -EFAULT;
+			goto out_putf;
+		error = count - buf.count;
 	}
 
 out_putf:

@@ -12,6 +12,7 @@
 #include <linux/cpumask.h>
 #include <linux/init.h>
 #include <linux/topology.h>
+#include <linux/nodemask.h>
 
 #define SD_NODES_PER_DOMAIN 6
 
