@@ -3060,7 +3060,7 @@ void i2o_report_common_status(u8 req_status)
 		"PROGRESS_REPORT"	
 	};
 
-	if (req_status > I2O_REPLY_STATUS_PROGRESS_REPORT)
+	if (req_status >= ARRAY_SIZE(REPLY_STATUS))
 		printk("RequestStatus = %0#2x", req_status);
 	else
 		printk("%s", REPLY_STATUS[req_status]);

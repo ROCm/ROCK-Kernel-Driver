@@ -506,7 +506,8 @@ int wake_up_state(task_t *p, unsigned int state)
  */
 void wake_up_forked_process(task_t * p)
 {
-	runqueue_t *rq = this_rq_lock();
+	unsigned long flags;
+	runqueue_t *rq = task_rq_lock(current, &flags);
 
 	p->state = TASK_RUNNING;
 	if (!rt_task(p)) {
@@ -522,7 +523,7 @@ void wake_up_forked_process(task_t * p)
 	set_task_cpu(p, smp_processor_id());
 	activate_task(p, rq);
 
-	rq_unlock(rq);
+	task_rq_unlock(rq, &flags);
 }
 
 /*

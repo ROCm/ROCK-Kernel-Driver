@@ -15,10 +15,8 @@ enum {DIRECT = 10, DEPTH = 4};	/* Have triple indirect */
 static inline void dirty_indirect(struct buffer_head *bh, struct inode *inode)
 {
 	mark_buffer_dirty_inode(bh, inode);
-	if (IS_SYNC(inode)) {
-		ll_rw_block (WRITE, 1, &bh);
-		wait_on_buffer (bh);
-	}
+	if (IS_SYNC(inode))
+		sync_dirty_buffer(bh);
 }
 
 static int block_to_path(struct inode *inode, long block, int offsets[DEPTH])

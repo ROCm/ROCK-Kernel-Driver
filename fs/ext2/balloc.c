@@ -233,10 +233,8 @@ do_more:
 	}
 
 	mark_buffer_dirty(bitmap_bh);
-	if (sb->s_flags & MS_SYNCHRONOUS) {
-		ll_rw_block(WRITE, 1, &bitmap_bh);
-		wait_on_buffer(bitmap_bh);
-	}
+	if (sb->s_flags & MS_SYNCHRONOUS)
+		sync_dirty_buffer(bitmap_bh);
 
 	group_release_blocks(desc, bh2, group_freed);
 	freed += group_freed;
@@ -466,10 +464,8 @@ got_block:
 	write_unlock(&EXT2_I(inode)->i_meta_lock);
 
 	mark_buffer_dirty(bitmap_bh);
-	if (sb->s_flags & MS_SYNCHRONOUS) {
-		ll_rw_block(WRITE, 1, &bitmap_bh);
-		wait_on_buffer(bitmap_bh);
-	}
+	if (sb->s_flags & MS_SYNCHRONOUS)
+		sync_dirty_buffer(bitmap_bh);
 
 	ext2_debug ("allocating block %d. ", block);
 

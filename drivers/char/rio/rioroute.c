@@ -763,7 +763,7 @@ uint UnitId;
 #endif
 	UnitId--;		/* this trick relies on the Unit Id being UNSIGNED! */
 
-	if ( UnitId > MAX_RUP )		/* dontcha just lurv unsigned maths! */
+	if ( UnitId >= MAX_RUP )	/* dontcha just lurv unsigned maths! */
 		return(0);
 
 	if ( HostP->Mapping[UnitId].Flags & BEEN_HERE )

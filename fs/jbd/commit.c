@@ -562,8 +562,7 @@ start_journal_io:
 	{
 		struct buffer_head *bh = jh2bh(descriptor);
 		set_buffer_uptodate(bh);
-		ll_rw_block(WRITE, 1, &bh);
-		wait_on_buffer(bh);
+		sync_dirty_buffer(bh);
 		__brelse(bh);		/* One for getblk() */
 		journal_unlock_journal_head(descriptor);
 	}
