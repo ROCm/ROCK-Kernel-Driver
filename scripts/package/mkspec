@@ -21,11 +21,12 @@ if [ "`grep CONFIG_DRM=y .config | cut -f2 -d\=`" = "y" ]; then
 	PROVIDES=kernel-drm
 fi
 
-PROVIDES="$PROVIDES kernel-$VERSION.$PATCHLEVEL.$SUBLEVEL$EXTRAVERSION"
+PROVIDES="$PROVIDES kernel-$KERNELRELEASE"
+__KERNELRELEASE=`echo $KERNELRELEASE | sed -e "s/-//g"`
 
 echo "Name: kernel"
 echo "Summary: The Linux Kernel"
-echo "Version: "$VERSION.$PATCHLEVEL.$SUBLEVEL$EXTRAVERSION | sed -e "s/-//g"
+echo "Version: $__KERNELRELEASE"
 # we need to determine the NEXT version number so that uname and
 # rpm -q will agree
 echo "Release: `. $srctree/scripts/mkversion`"
@@ -35,8 +36,7 @@ echo "Vendor: The Linux Community"
 echo "URL: http://www.kernel.org"
 
 if ! $PREBUILT; then
-echo -n "Source: kernel-$VERSION.$PATCHLEVEL.$SUBLEVEL"
-echo "$EXTRAVERSION.tar.gz" | sed -e "s/-//g"
+echo "Source: kernel-$__KERNELRELEASE.tar.gz"
 fi
 
 echo "BuildRoot: /var/tmp/%{name}-%{PACKAGE_VERSION}-root"
@@ -65,11 +65,11 @@ echo "%install"
 echo 'mkdir -p $RPM_BUILD_ROOT/boot $RPM_BUILD_ROOT/lib $RPM_BUILD_ROOT/lib/modules'
 
 echo 'INSTALL_MOD_PATH=$RPM_BUILD_ROOT make modules_install'
-echo 'cp $KBUILD_IMAGE $RPM_BUILD_ROOT'"/boot/vmlinuz-$VERSION.$PATCHLEVEL.$SUBLEVEL$EXTRAVERSION"
+echo 'cp $KBUILD_IMAGE $RPM_BUILD_ROOT'"/boot/vmlinuz-$KERNELRELEASE"
 
-echo 'cp System.map $RPM_BUILD_ROOT'"/boot/System.map-$VERSION.$PATCHLEVEL.$SUBLEVEL$EXTRAVERSION"
+echo 'cp System.map $RPM_BUILD_ROOT'"/boot/System.map-$KERNELRELEASE"
 
-echo 'cp .config $RPM_BUILD_ROOT'"/boot/config-$VERSION.$PATCHLEVEL.$SUBLEVEL$EXTRAVERSION"
+echo 'cp .config $RPM_BUILD_ROOT'"/boot/config-$KERNELRELEASE"
 echo ""
 echo "%clean"
 echo '#echo -rf $RPM_BUILD_ROOT'
@@ -77,6 +77,6 @@ echo ""
 echo "%files"
 echo '%defattr (-, root, root)'
 echo "%dir /lib/modules"
-echo "/lib/modules/$VERSION.$PATCHLEVEL.$SUBLEVEL$EXTRAVERSION"
+echo "/lib/modules/$KERNELRELEASE"
 echo "/boot/*"
 echo ""
