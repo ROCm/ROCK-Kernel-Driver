@@ -396,15 +396,6 @@ static int exec_mmap(void)
 	struct mm_struct * mm, * old_mm;
 
 	old_mm = current->mm;
-	task_lock(current);
-	if (old_mm && atomic_read(&old_mm->mm_users) == 1) {
-		mm_release();
-		exit_mmap(old_mm);
-		task_unlock(current);
-		return 0;
-	}
-	task_unlock(current);
-
 	mm = mm_alloc();
 	if (mm) {
 		struct mm_struct *active_mm;
