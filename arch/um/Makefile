@@ -86,8 +86,6 @@ prepare: $(ARCH_SYMLINKS) $(SYS_HEADERS) $(GEN_HEADERS)
 
 LDFLAGS_vmlinux = -r
 
-vmlinux: $(ARCH_DIR)/main.o 
-
 # These aren't in Makefile-tt because they are needed in the !CONFIG_MODE_TT +
 # CONFIG_MODE_SKAS + CONFIG_STATIC_LINK case.
 
@@ -120,14 +118,11 @@ CPPFLAGS_vmlinux.lds = $(shell echo -U$(SUBARCH) \
 
 export CPPFLAGS_$(LD_SCRIPT-y) = $(CPPFLAGS_vmlinux.lds) -P -C -Uum
 
-LD_SCRIPT-y := $(ARCH_DIR)/$(LD_SCRIPT-y)
-
-#$(LD_SCRIPT-y) : $(LD_SCRIPT-y:.s=.S) scripts FORCE
-#	$(call if_changed_dep,as_s_S)
+LD_SCRIPT-y := $(ARCH_DIR)/kernel/$(LD_SCRIPT-y)
 
 linux: vmlinux $(LD_SCRIPT-y)
 	$(CC) -Wl,-T,$(LD_SCRIPT-y) $(LINK-y) $(LINK_WRAPS) \
-		-o linux $(ARCH_DIR)/main.o vmlinux -L/usr/lib -lutil
+		-o linux vmlinux -L/usr/lib -lutil
 
 USER_CFLAGS := $(patsubst -I%,,$(CFLAGS))
 USER_CFLAGS := $(patsubst -Derrno=kernel_errno,,$(USER_CFLAGS))
@@ -161,10 +156,6 @@ CLEAN_FILES += linux x.i gmon.out $(ARCH_DIR)/uml.lds \
 
 MRPROPER_FILES += $(SYMLINK_HEADERS) $(ARCH_SYMLINKS) \
 	$(addprefix $(ARCH_DIR)/kernel/,$(KERN_SYMLINKS))
-
-$(ARCH_DIR)/main.o: $(ARCH_DIR)/main.c sys_prepare
-	@ echo '  MAIN    $@'
-	@ $(CC) $(USER_CFLAGS) $(EXTRA_CFLAGS) -c -o $@ $<
 
 archmrproper:
 	@:

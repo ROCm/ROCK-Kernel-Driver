@@ -1,10 +1,10 @@
-/* 
+/*
  * Copyright (C) 2000, 2001 Jeff Dike (jdike@karaya.com)
  * Licensed under the GPL
  */
 
 #include <unistd.h>
-#include <stdio.h> 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
@@ -23,7 +23,7 @@
 #include "choose-mode.h"
 #include "uml-config.h"
 
-/* Set in set_stklim, which is called from main and __wrap_malloc.  
+/* Set in set_stklim, which is called from main and __wrap_malloc.
  * __wrap_malloc only calls it if main hasn't started.
  */
 unsigned long stacksizelim;
@@ -82,7 +82,7 @@ int main(int argc, char **argv, char **envp)
 	sigset_t mask;
 	int ret, i;
 
-	/* Enable all signals except SIGIO - in some environments, we can 
+	/* Enable all signals except SIGIO - in some environments, we can
 	 * enter with some signals blocked
 	 */
 
@@ -97,27 +97,27 @@ int main(int argc, char **argv, char **envp)
 	/* Allocate memory for thread command lines */
 	if(argc < 2 || strlen(argv[1]) < THREAD_NAME_LEN - 1){
 
-		char padding[THREAD_NAME_LEN] = { 
-			[ 0 ...  THREAD_NAME_LEN - 2] = ' ', '\0' 
+		char padding[THREAD_NAME_LEN] = {
+			[ 0 ...  THREAD_NAME_LEN - 2] = ' ', '\0'
 		};
 
 		new_argv = malloc((argc + 2) * sizeof(char*));
 		if(!new_argv) {
 			perror("Allocating extended argv");
 			exit(1);
-		}	
-		
+		}
+
 		new_argv[0] = argv[0];
 		new_argv[1] = padding;
-		
+
 		for(i = 2; i <= argc; i++)
 			new_argv[i] = argv[i - 1];
 		new_argv[argc + 1] = NULL;
-		
+
 		execvp(new_argv[0], new_argv);
 		perror("execing with extended args");
 		exit(1);
-	}	
+	}
 #endif
 
 	linux_prog = argv[0];
@@ -144,7 +144,7 @@ int main(int argc, char **argv, char **envp)
 
 	do_uml_initcalls();
 	ret = linux_main(argc, argv);
-	
+
 	/* Reboot */
 	if(ret){
 		printf("\n");

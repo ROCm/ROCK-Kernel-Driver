@@ -3,10 +3,10 @@
 # Licensed under the GPL
 #
 
-extra-y := vmlinux.lds
+extra-y := vmlinux.lds uml.lds
 
 obj-y = checksum.o config.o exec_kern.o exitcode.o frame_kern.o frame.o \
-	helper.o init_task.o irq.o irq_user.o ksyms.o mem.o mem_user.o \
+	helper.o init_task.o irq.o irq_user.o ksyms.o main.o mem.o mem_user.o \
 	physmem.o process.o process_kern.o ptrace.o reboot.o resource.o \
 	sigio_user.o sigio_kern.o signal_kern.o signal_user.o smp.o \
 	syscall_kern.o syscall_user.o sysrq.o sys_call_table.o tempfile.o \
@@ -24,7 +24,7 @@ obj-$(CONFIG_MODE_SKAS) += skas/
 user-objs-$(CONFIG_TTY_LOG) += tty_log.o
 
 USER_OBJS := $(filter %_user.o,$(obj-y))  $(user-objs-y) config.o helper.o \
-	process.o tempfile.o time.o tty_log.o umid.o user_util.o
+	main.o process.o tempfile.o time.o tty_log.o umid.o user_util.o
 USER_OBJS := $(foreach file,$(USER_OBJS),$(obj)/$(file))
 
 CFLAGS_frame.o := $(patsubst -fomit-frame-pointer,,$(USER_CFLAGS))

@@ -24,7 +24,7 @@ struct hppfs_data {
 };
 
 struct hppfs_private {
-	struct file proc_file;
+	struct file *proc_file;
 	int host_fd;
 	loff_t len;
 	struct hppfs_data *contents;
@@ -307,7 +307,7 @@ static ssize_t hppfs_read(struct file *file, char *buf, size_t count,
 		if(count > 0)
 			*ppos += count;
 	}
-	else count = read_proc(&hppfs->proc_file, buf, count, ppos, 1);
+	else count = read_proc(hppfs->proc_file, buf, count, ppos, 1);
 
 	return(count);
 }
@@ -316,7 +316,7 @@ static ssize_t hppfs_write(struct file *file, const char *buf, size_t len,
 			   loff_t *ppos)
 {
 	struct hppfs_private *data = file->private_data;
-	struct file *proc_file = &data->proc_file;
+	struct file *proc_file = data->proc_file;
 	ssize_t (*write)(struct file *, const char *, size_t, loff_t *);
 	int err;
 
@@ -471,9 +471,10 @@ static int hppfs_open(struct inode *inode, struct file *file)
 	proc_dentry = HPPFS_I(inode)->proc_dentry;
 
 	/* XXX This isn't closed anywhere */
-	err = open_private_file(&data->proc_file, proc_dentry,
-				file_mode(file->f_mode));
-	if(err)
+	data->proc_file = dentry_open(dget(proc_dentry), NULL,
+				      file_mode(file->f_mode));
+	err = PTR_ERR(data->proc_file);
+	if(IS_ERR(data->proc_file))
 		goto out_free1;
 
 	type = os_file_type(host_file);
@@ -524,9 +525,10 @@ static int hppfs_dir_open(struct inode *inode, struct file *file)
 		goto out;
 
 	proc_dentry = HPPFS_I(inode)->proc_dentry;
-	err = open_private_file(&data->proc_file, proc_dentry,
-				file_mode(file->f_mode));
-	if(err)
+	data->proc_file = dentry_open(dget(proc_dentry), NULL,
+				      file_mode(file->f_mode));
+	err = PTR_ERR(data->proc_file);
+	if(IS_ERR(data->proc_file))
 		goto out_free;
 
 	file->private_data = data;
@@ -657,40 +659,42 @@ static struct super_operations hppfs_sbops = {
 
 static int hppfs_readlink(struct dentry *dentry, char *buffer, int buflen)
 {
-	struct file proc_file;
+	struct file *proc_file;
 	struct dentry *proc_dentry;
 	int (*readlink)(struct dentry *, char *, int);
 	int err, n;
 
 	proc_dentry = HPPFS_I(dentry->d_inode)->proc_dentry;
-	err = open_private_file(&proc_file, proc_dentry, O_RDONLY);
-	if(err)
+	proc_file = dentry_open(dget(proc_dentry), NULL, O_RDONLY);
+	err = PTR_ERR(proc_dentry);
+	if(IS_ERR(proc_dentry))
 		return(err);
 
 	readlink = proc_dentry->d_inode->i_op->readlink;
 	n = (*readlink)(proc_dentry, buffer, buflen);
 
-	close_private_file(&proc_file);
+	fput(proc_file);
 
 	return(n);
 }
 
 static int hppfs_follow_link(struct dentry *dentry, struct nameidata *nd)
 {
-	struct file proc_file;
+	struct file *proc_file;
 	struct dentry *proc_dentry;
 	int (*follow_link)(struct dentry *, struct nameidata *);
 	int err, n;
 
 	proc_dentry = HPPFS_I(dentry->d_inode)->proc_dentry;
-	err = open_private_file(&proc_file, proc_dentry, O_RDONLY);
-	if(err)
+	proc_file = dentry_open(dget(proc_dentry), NULL, O_RDONLY);
+	err = PTR_ERR(proc_dentry);
+	if(IS_ERR(proc_dentry))
 		return(err);
 
 	follow_link = proc_dentry->d_inode->i_op->follow_link;
 	n = (*follow_link)(proc_dentry, nd);
 
-	close_private_file(&proc_file);
+	fput(proc_file);
 
 	return(n);
 }

@@ -1,5 +1,5 @@
 #include <asm-generic/vmlinux.lds.h>
-	
+
 OUTPUT_FORMAT(ELF_FORMAT)
 OUTPUT_ARCH(ELF_ARCH)
 ENTRY(_start)
@@ -70,12 +70,12 @@ SECTIONS
   _edata  =  .;
   PROVIDE (edata = .);
   . = ALIGN(0x1000);
-  .sbss      : 
+  .sbss      :
   {
    __bss_start = .;
    PROVIDE(_bss_start = .);
-   *(.sbss) 
-   *(.scommon) 
+   *(.sbss)
+   *(.scommon)
   }
   .bss       :
   {
