@@ -421,6 +421,7 @@ e1000_probe(struct pci_dev *pdev,
 
 	netdev->irq = pdev->irq;
 	netdev->mem_start = mmio_start;
+	netdev->mem_end = mmio_start + mmio_len;
 	netdev->base_addr = adapter->hw.io_base;
 
 	adapter->bd_number = cards_found;
@@ -1293,6 +1294,10 @@ e1000_watchdog(unsigned long data)
 	e1000_update_stats(adapter);
 	e1000_update_adaptive(&adapter->hw);
 
+
+	/* Cause software interrupt to ensure rx ring is cleaned */
+	E1000_WRITE_REG(&adapter->hw, ICS, E1000_ICS_RXDMT0);
+
 	/* Early detection of hung controller */
 	i = txdr->next_to_clean;
 	if(txdr->buffer_info[i].dma &&
@@ -1757,6 +1762,7 @@ e1000_update_stats(struct e1000_adapter *adapter)
 	                               adapter->stats.latecol;
 	adapter->net_stats.tx_aborted_errors = adapter->stats.ecol;
 	adapter->net_stats.tx_window_errors = adapter->stats.latecol;
+	adapter->net_stats.tx_carrier_errors = adapter->stats.tncrs;
 
 	/* Tx Dropped needs to be maintained elsewhere */
 
@@ -1769,7 +1775,8 @@ e1000_update_stats(struct e1000_adapter *adapter)
 			adapter->phy_stats.idle_errors += phy_tmp;
 		}
 
-		if(!e1000_read_phy_reg(hw, M88E1000_RX_ERR_CNTR, &phy_tmp))
+		if((hw->mac_type <= e1000_82546) &&
+		   !e1000_read_phy_reg(hw, M88E1000_RX_ERR_CNTR, &phy_tmp))
 			adapter->phy_stats.receive_errors += phy_tmp;
 	}
 }
@@ -2177,8 +2184,7 @@ e1000_alloc_rx_buffers(struct e1000_adapter *adapter)
 	while(!rx_ring->buffer_info[i].skb) {
 		rx_desc = E1000_RX_DESC(*rx_ring, i);
 
-		skb = alloc_skb(adapter->rx_buffer_len + reserve_len,
-		                GFP_ATOMIC);
+		skb = dev_alloc_skb(adapter->rx_buffer_len + reserve_len);
 
 		if(!skb) {
 			/* Better luck next round */
