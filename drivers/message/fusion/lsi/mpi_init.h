@@ -1,12 +1,12 @@
 /*
- *  Copyright (c) 2000-2002 LSI Logic Corporation.
+ *  Copyright (c) 2000-2003 LSI Logic Corporation.
  *
  *
- *           Name:  MPI_INIT.H
+ *           Name:  mpi_init.h
  *          Title:  MPI initiator mode messages and structures
  *  Creation Date:  June 8, 2000
  *
- *    MPI_INIT.H Version:  01.02.05
+ *    mpi_init.h Version:  01.05.xx
  *
  *  Version History
  *  ---------------
@@ -31,6 +31,8 @@
  *  10-04-01  01.02.04  Added defines for SEP request Action field.
  *  05-31-02  01.02.05  Added MPI_SCSIIO_MSGFLGS_CMD_DETERMINES_DATA_DIR define
  *                      for SCSI IO requests.
+ *  11-15-02  01.02.06  Added special extended SCSI Status defines for FCP.
+ *  06-26-03  01.02.07  Added MPI_SCSI_STATUS_FCPEXT_UNASSIGNED define.
  *  --------------------------------------------------------------------------
  */
 
@@ -45,7 +47,7 @@
 *****************************************************************************/
 
 /****************************************************************************/
-/*  SCSI IO messages and assocaited structures                              */
+/*  SCSI IO messages and associated structures                              */
 /****************************************************************************/
 
 typedef struct _MSG_SCSI_IO_REQUEST
@@ -78,6 +80,16 @@ typedef struct _MSG_SCSI_IO_REQUEST
 #define MPI_SCSIIO_MSGFLGS_SENSE_LOC_HOST           (0x00)
 #define MPI_SCSIIO_MSGFLGS_SENSE_LOC_IOC            (0x02)
 #define MPI_SCSIIO_MSGFLGS_CMD_DETERMINES_DATA_DIR  (0x04)
+#define MPI_SCSIIO_MSGFLGS_EEDP_TYPE_MASK           (0xE0)
+#define MPI_SCSIIO_MSGFLGS_EEDP_NONE                (0x00)
+#define MPI_SCSIIO_MSGFLGS_EEDP_RDPROTECT_T10       (0x20)
+#define MPI_SCSIIO_MSGFLGS_EEDP_VRPROTECT_T10       (0x40)
+#define MPI_SCSIIO_MSGFLGS_EEDP_WRPROTECT_T10       (0x60)
+#define MPI_SCSIIO_MSGFLGS_EEDP_520_READ_MODE1      (0x20)
+#define MPI_SCSIIO_MSGFLGS_EEDP_520_WRITE_MODE1     (0x40)
+#define MPI_SCSIIO_MSGFLGS_EEDP_8_9_READ_MODE1      (0x60)
+#define MPI_SCSIIO_MSGFLGS_EEDP_8_9_WRITE_MODE1     (0x80)
+
 
 /* SCSI IO LUN fields */
 
@@ -153,6 +165,10 @@ typedef struct _MSG_SCSI_IO_REPLY
 #define MPI_SCSI_STATUS_TASK_SET_FULL           (0x28)
 #define MPI_SCSI_STATUS_ACA_ACTIVE              (0x30)
 
+#define MPI_SCSI_STATUS_FCPEXT_DEVICE_LOGGED_OUT    (0x80)
+#define MPI_SCSI_STATUS_FCPEXT_NO_LINK              (0x81)
+#define MPI_SCSI_STATUS_FCPEXT_UNASSIGNED           (0x82)
+
 
 /* SCSI IO Reply SCSIState values */
 
@@ -173,6 +189,33 @@ typedef struct _MSG_SCSI_IO_REPLY
 #define MPI_SCSI_RSP_INFO_TASK_MGMT_UNSUPPORTED (0x04000000)
 #define MPI_SCSI_RSP_INFO_TASK_MGMT_FAILED      (0x05000000)
 #define MPI_SCSI_RSP_INFO_SPI_LQ_INVALID_TYPE   (0x06000000)
+
+
+/****************************************************************************/
+/*  SCSI IO 32 Request message structure                                    */
+/****************************************************************************/
+
+typedef struct _MSG_SCSI_IO32_REQUEST
+{
+    U8                      TargetID;           /* 00h */
+    U8                      Bus;                /* 01h */
+    U8                      ChainOffset;        /* 02h */
+    U8                      Function;           /* 03h */
+    U8                      CDBLength;          /* 04h */
+    U8                      SenseBufferLength;  /* 05h */
+    U8                      Reserved;           /* 06h */
+    U8                      MsgFlags;           /* 07h */
+    U32                     MsgContext;         /* 08h */
+    U8                      LUN[8];             /* 0Ch */
+    U32                     Control;            /* 14h */
+    U8                      CDB[32];            /* 18h */
+    U32                     DataLength;         /* 38h */
+    U32                     SenseBufferLowAddr; /* 3Ch */
+    SGE_IO_UNION            SGL;                /* 40h */
+} MSG_SCSI_IO32_REQUEST, MPI_POINTER PTR_MSG_SCSI_IO32_REQUEST,
+  SCSIIO32Request_t, MPI_POINTER pSCSIIO32Request_t;
+
+/* SCSI IO 32 uses the same defines as above for SCSI IO */
 
 
 /****************************************************************************/
@@ -203,6 +246,7 @@ typedef struct _MSG_SCSI_TASK_MGMT
 #define MPI_SCSITASKMGMT_TASKTYPE_TARGET_RESET          (0x03)
 #define MPI_SCSITASKMGMT_TASKTYPE_RESET_BUS             (0x04)
 #define MPI_SCSITASKMGMT_TASKTYPE_LOGICAL_UNIT_RESET    (0x05)
+#define MPI_SCSITASKMGMT_TASKTYPE_CLEAR_TASK_SET        (0x06)
 
 /* MsgFlags bits */
 #define MPI_SCSITASKMGMT_MSGFLAGS_TARGET_RESET_OPTION   (0x00)

@@ -137,6 +137,9 @@
 #include "scsi.h"
 #include "hosts.h"
 
+#include <scsi/scsi_transport.h>
+#include <scsi/scsi_transport_spi.h>
+
 #include "53c700.h"
 
 /* NOTE: For 64 bit drivers there are points in the code where we use
@@ -172,6 +175,8 @@ STATIC int NCR_700_slave_configure(Scsi_Device *SDpnt);
 STATIC void NCR_700_slave_destroy(Scsi_Device *SDpnt);
 
 STATIC struct device_attribute *NCR_700_dev_attrs[];
+
+STATIC struct scsi_transport_template *NCR_700_transport_template = NULL;
 
 static char *NCR_700_phase[] = {
 	"",
@@ -235,6 +240,53 @@ static __u8 NCR_700_SDTR_msg[] = {
 	NCR_700_MIN_PERIOD,
 	NCR_700_MAX_OFFSET
 };
+
+/* This translates the SDTR message offset and period to a value
+ * which can be loaded into the SXFER_REG.
+ *
+ * NOTE: According to SCSI-2, the true transfer period (in ns) is
+ *       actually four times this period value */
+static inline __u8
+NCR_700_offset_period_to_sxfer(struct NCR_700_Host_Parameters *hostdata,
+			       __u8 offset, __u8 period)
+{
+	int XFERP;
+
+	__u8 min_xferp = (hostdata->chip710
+			  ? NCR_710_MIN_XFERP : NCR_700_MIN_XFERP);
+	__u8 max_offset = (hostdata->chip710
+			   ? NCR_710_MAX_OFFSET : NCR_700_MAX_OFFSET);
+
+	if(offset == 0)
+		return 0;
+
+	if(period < hostdata->min_period) {
+		printk(KERN_WARNING "53c700: Period %dns is less than this chip's minimum, setting to %d\n", period*4, NCR_700_SDTR_msg[3]*4);
+		period = hostdata->min_period;
+	}
+	XFERP = (period*4 * hostdata->sync_clock)/1000 - 4;
+	if(offset > max_offset) {
+		printk(KERN_WARNING "53c700: Offset %d exceeds chip maximum, setting to %d\n",
+		       offset, max_offset);
+		offset = max_offset;
+	}
+	if(XFERP < min_xferp) {
+		printk(KERN_WARNING "53c700: XFERP %d is less than minium, setting to %d\n",
+		       XFERP,  min_xferp);
+		XFERP =  min_xferp;
+	}
+	return (offset & 0x0f) | (XFERP & 0x07)<<4;
+}
+
+static inline __u8
+NCR_700_get_SXFER(Scsi_Device *SDp)
+{
+	struct NCR_700_Host_Parameters *hostdata = 
+		(struct NCR_700_Host_Parameters *)SDp->host->hostdata[0];
+
+	return NCR_700_offset_period_to_sxfer(hostdata, spi_offset(SDp),
+					      spi_period(SDp));
+}
 
 struct Scsi_Host *
 NCR_700_detect(Scsi_Host_Template *tpnt,
@@ -326,6 +378,8 @@ NCR_700_detect(Scsi_Host_Template *tpnt,
 	hostdata->cmd = NULL;
 	host->max_id = 7;
 	host->max_lun = NCR_700_MAX_LUNS;
+	BUG_ON(NCR_700_transport_template == NULL);
+	host->transportt = NCR_700_transport_template;
 	host->unique_id = hostdata->base;
 	host->base = hostdata->base;
 	hostdata->eh_complete = NULL;
@@ -520,40 +574,6 @@ save_for_reselection(struct NCR_700_Host_Parameters *hostdata,
 	hostdata->cmd = NULL;
 }
 
-/* This translates the SDTR message offset and period to a value
- * which can be loaded into the SXFER_REG.
- *
- * NOTE: According to SCSI-2, the true transfer period (in ns) is
- *       actually four times this period value */
-STATIC inline __u8
-NCR_700_offset_period_to_sxfer(struct NCR_700_Host_Parameters *hostdata,
-			       __u8 offset, __u8 period)
-{
-	int XFERP;
-	__u8 min_xferp = (hostdata->chip710
-			  ? NCR_710_MIN_XFERP : NCR_700_MIN_XFERP);
-	__u8 max_offset = (hostdata->chip710
-			   ? NCR_710_MAX_OFFSET : NCR_700_MAX_OFFSET);
-	/* NOTE: NCR_700_SDTR_msg[3] contains our offer of the minimum
-	 * period.  It is set in NCR_700_chip_setup() */
-	if(period < NCR_700_SDTR_msg[3]) {
-		printk(KERN_WARNING "53c700: Period %dns is less than this chip's minimum, setting to %d\n", period*4, NCR_700_SDTR_msg[3]*4);
-		period = NCR_700_SDTR_msg[3];
-	}
-	XFERP = (period*4 * hostdata->sync_clock)/1000 - 4;
-	if(offset > max_offset) {
-		printk(KERN_WARNING "53c700: Offset %d exceeds chip maximum, setting to %d\n",
-		       offset, max_offset);
-		offset = max_offset;
-	}
-	if(XFERP < min_xferp) {
-		printk(KERN_WARNING "53c700: XFERP %d is less than minium, setting to %d\n",
-		       XFERP,  min_xferp);
-		XFERP =  min_xferp;
-	}
-	return (offset & 0x0f) | (XFERP & 0x07)<<4;
-}
-
 STATIC inline void
 NCR_700_unmap(struct NCR_700_Host_Parameters *hostdata, Scsi_Cmnd *SCp,
 	      struct NCR_700_command_slot *slot)
@@ -724,11 +744,9 @@ NCR_700_chip_setup(struct Scsi_Host *host)
 	 * exact details of this calculation which is based on a
 	 * setting of the SXFER register */
 	min_period = 1000*(4+min_xferp)/(4*hostdata->sync_clock);
-	if(min_period > NCR_700_MIN_PERIOD) {
-		NCR_700_SDTR_msg[3] = min_period;
-	}
-	if(hostdata->chip710)
-		NCR_700_SDTR_msg[4] = NCR_710_MAX_OFFSET;
+	hostdata->min_period = NCR_700_MIN_PERIOD;
+	if(min_period > NCR_700_MIN_PERIOD)
+		hostdata->min_period = min_period;
 }
 
 STATIC void
@@ -777,20 +795,25 @@ process_extended_message(struct Scsi_Host *host,
 		if(SCp != NULL && NCR_700_is_flag_set(SCp->device, NCR_700_DEV_BEGIN_SYNC_NEGOTIATION)) {
 			__u8 period = hostdata->msgin[3];
 			__u8 offset = hostdata->msgin[4];
-			__u8 sxfer;
 
-			if(offset != 0 && period != 0)
-				sxfer = NCR_700_offset_period_to_sxfer(hostdata, offset, period);
-			else 
-				sxfer = 0;
-			
-			if(sxfer != NCR_700_get_SXFER(SCp->device)) {
-				printk(KERN_INFO "scsi%d: (%d:%d) Synchronous at offset %d, period %dns\n",
-				       host->host_no, pun, lun,
-				       offset, period*4);
-				
-				NCR_700_set_SXFER(SCp->device, sxfer);
+			if(offset == 0 || period == 0) {
+				offset = 0;
+				period = 0;
 			}
+			
+			if(NCR_700_is_flag_set(SCp->device, NCR_700_DEV_PRINT_SYNC_NEGOTIATION)) {
+				if(spi_offset(SCp->device) != 0)
+					printk(KERN_INFO "scsi%d: (%d:%d) Synchronous at offset %d, period %dns\n",
+					       host->host_no, pun, lun,
+					       offset, period*4);
+				else
+					printk(KERN_INFO "scsi%d: (%d:%d) Asynchronous\n",
+					       host->host_no, pun, lun);
+				NCR_700_clear_flag(SCp->device, NCR_700_DEV_PRINT_SYNC_NEGOTIATION);
+			}
+				
+			spi_offset(SCp->device) = offset;
+			spi_period(SCp->device) = period;
 			
 
 			NCR_700_set_flag(SCp->device, NCR_700_DEV_NEGOTIATED_SYNC);
@@ -870,7 +893,7 @@ process_message(struct Scsi_Host *host,	struct NCR_700_Host_Parameters *hostdata
 	case A_REJECT_MSG:
 		if(SCp != NULL && NCR_700_is_flag_set(SCp->device, NCR_700_DEV_BEGIN_SYNC_NEGOTIATION)) {
 			/* Rejected our sync negotiation attempt */
-			NCR_700_set_SXFER(SCp->device, 0);
+			spi_period(SCp->device) = spi_offset(SCp->device) = 0;
 			NCR_700_set_flag(SCp->device, NCR_700_DEV_NEGOTIATED_SYNC);
 			NCR_700_clear_flag(SCp->device, NCR_700_DEV_BEGIN_SYNC_NEGOTIATION);
 		} else if(SCp != NULL && NCR_700_is_flag_set(SCp->device, NCR_700_DEV_BEGIN_TAG_QUEUEING)) {
@@ -1396,6 +1419,8 @@ NCR_700_start_command(Scsi_Cmnd *SCp)
 	   NCR_700_is_flag_clear(SCp->device, NCR_700_DEV_NEGOTIATED_SYNC)) {
 		memcpy(&hostdata->msgout[count], NCR_700_SDTR_msg,
 		       sizeof(NCR_700_SDTR_msg));
+		hostdata->msgout[count+3] = spi_period(SCp->device);
+		hostdata->msgout[count+4] = spi_offset(SCp->device);
 		count += sizeof(NCR_700_SDTR_msg);
 		NCR_700_set_flag(SCp->device, NCR_700_DEV_BEGIN_SYNC_NEGOTIATION);
 	}
@@ -1967,15 +1992,62 @@ NCR_700_host_reset(Scsi_Cmnd * SCp)
 	return SUCCESS;
 }
 
+STATIC void
+NCR_700_set_period(struct scsi_device *SDp, int period)
+{
+	struct NCR_700_Host_Parameters *hostdata = 
+		(struct NCR_700_Host_Parameters *)SDp->host->hostdata[0];
+	
+	if(!hostdata->fast || period < hostdata->min_period)
+		return;
+
+	spi_period(SDp) = period;
+	NCR_700_clear_flag(SDp, NCR_700_DEV_NEGOTIATED_SYNC);
+	NCR_700_clear_flag(SDp, NCR_700_DEV_BEGIN_SYNC_NEGOTIATION);
+	NCR_700_set_flag(SDp, NCR_700_DEV_PRINT_SYNC_NEGOTIATION);
+}
+
+STATIC void
+NCR_700_set_offset(struct scsi_device *SDp, int offset)
+{
+	struct NCR_700_Host_Parameters *hostdata = 
+		(struct NCR_700_Host_Parameters *)SDp->host->hostdata[0];
+	
+	if(!hostdata->fast ||
+	   offset > (hostdata->chip710
+		     ? NCR_710_MAX_OFFSET : NCR_700_MAX_OFFSET))
+		return;
+
+	/* if we're currently async, make sure the period is reasonable */
+	if(spi_offset(SDp) == 0 && (spi_period(SDp) < hostdata->min_period ||
+				    spi_period(SDp) > 0xff))
+		spi_period(SDp) = hostdata->min_period;
+
+	spi_offset(SDp) = offset;
+	NCR_700_clear_flag(SDp, NCR_700_DEV_NEGOTIATED_SYNC);
+	NCR_700_clear_flag(SDp, NCR_700_DEV_BEGIN_SYNC_NEGOTIATION);
+	NCR_700_set_flag(SDp, NCR_700_DEV_PRINT_SYNC_NEGOTIATION);
+}
+
+
+
 STATIC int
 NCR_700_slave_configure(Scsi_Device *SDp)
 {
+	struct NCR_700_Host_Parameters *hostdata = 
+		(struct NCR_700_Host_Parameters *)SDp->host->hostdata[0];
+
 	/* to do here: allocate memory; build a queue_full list */
 	if(SDp->tagged_supported) {
 		/* do TCQ stuff here */
 	} else {
 		/* initialise to default depth */
 		scsi_adjust_queue_depth(SDp, 0, SDp->host->cmd_per_lun);
+	}
+	if(hostdata->fast) {
+		NCR_700_set_period(SDp, hostdata->min_period);
+		NCR_700_set_offset(SDp, hostdata->chip710
+				   ? NCR_710_MAX_OFFSET : NCR_700_MAX_OFFSET);
 	}
 	return 0;
 }
@@ -2033,3 +2105,25 @@ STATIC struct device_attribute *NCR_700_dev_attrs[] = {
 EXPORT_SYMBOL(NCR_700_detect);
 EXPORT_SYMBOL(NCR_700_release);
 EXPORT_SYMBOL(NCR_700_intr);
+
+static struct spi_function_template NCR_700_transport_functions =  {
+	.set_period = NCR_700_set_period,
+	.set_offset = NCR_700_set_offset,
+};
+
+static int __init NCR_700_init(void)
+{
+	NCR_700_transport_template = spi_attach_transport(&NCR_700_transport_functions);
+	if(!NCR_700_transport_template)
+		return -ENODEV;
+	return 0;
+}
+
+static void __exit NCR_700_exit(void)
+{
+	spi_release_transport(NCR_700_transport_template);
+}
+
+module_init(NCR_700_init);
+module_exit(NCR_700_exit);
+

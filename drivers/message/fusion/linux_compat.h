@@ -15,25 +15,7 @@
 #define rwlock_init(x) do { *(x) = RW_LOCK_UNLOCKED; } while(0)
 #endif
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
-#define SET_NICE(current,x)	do {(current)->nice = (x);} while (0)
-#else
-#define SET_NICE(current,x)
-#endif
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,0)
-#define pci_enable_device(pdev)	(0)
-#define SCSI_DATA_UNKNOWN	0
-#define SCSI_DATA_WRITE		1
-#define SCSI_DATA_READ		2
-#define SCSI_DATA_NONE		3
-#endif
-
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,4)
-#define pci_set_dma_mask(pdev, mask)	(0)
-#define scsi_set_pci_device(sh, pdev)	(0)
-#endif
+#define SET_NICE(current,x) do {(current)->nice = (x);} while (0)
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0)
 #	if LINUX_VERSION_CODE < KERNEL_VERSION(2,2,18)
@@ -147,31 +129,9 @@ typedef void (*__cleanup_module_func_t)(void);
 
 
 /* PCI/driver subsystem { */
-#if 0	/* FIXME Don't know what to use to check for the proper kernel version */
-#define DEVICE_COUNT_RESOURCE           6
-#define PCI_BASEADDR_FLAGS(idx)         base_address[idx]
-#define PCI_BASEADDR_START(idx)         base_address[idx] & ~0xFUL
-/*
- * We have to keep track of the original value using
- * a temporary, and not by just sticking pdev->base_address[x]
- * back.  pdev->base_address[x] is an opaque cookie that can
- * be used by the PCI implementation on a given Linux port
- * for any purpose. -DaveM
- */
-#define PCI_BASEADDR_SIZE(__pdev, __idx) \
-({	unsigned int size, tmp; \
-	pci_read_config_dword(__pdev, PCI_BASE_ADDRESS_0 + (4*(__idx)), &tmp); \
-	pci_write_config_dword(__pdev, PCI_BASE_ADDRESS_0 + (4*(__idx)), 0xffffffff); \
-	pci_read_config_dword(__pdev, PCI_BASE_ADDRESS_0 + (4*(__idx)), &size); \
-	pci_write_config_dword(__pdev, PCI_BASE_ADDRESS_0 + (4*(__idx)), tmp); \
-	(4 - size); \
-})
-#else
 #define PCI_BASEADDR_FLAGS(idx)         resource[idx].flags
 #define PCI_BASEADDR_START(idx)         resource[idx].start
 #define PCI_BASEADDR_SIZE(dev,idx)      (dev)->resource[idx].end - (dev)->resource[idx].start + 1
-#endif		/* } ifndef 0 */
-
 
 /* Compatability for the 2.3.x PCI DMA API. */
 #ifndef PCI_DMA_BIDIRECTIONAL
@@ -227,54 +187,10 @@ static __inline__ int __get_order(unsigned long size)
 /*}-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 #endif /* PCI_DMA_BIDIRECTIONAL */
 
-/*
- *  With the new command queuing code in the SCSI mid-layer we no longer have
- *  to hold the io_request_lock spin lock when calling the scsi_done routine.
- *  For now we only do this with the 2.5.1 kernel or newer.
- */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,1)
-        #define MPT_HOST_LOCK(flags)
-        #define MPT_HOST_UNLOCK(flags)
-#else
-        #define MPT_HOST_LOCK(flags) \
-                spin_lock_irqsave(&io_request_lock, flags)
-        #define MPT_HOST_UNLOCK(flags) \
-                spin_unlock_irqrestore(&io_request_lock, flags)
-#endif
 
-/*
- *  We use our new error handling code if the kernel version is 2.4.18 or newer.
- */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,18)
-        #define MPT_SCSI_USE_NEW_EH
-#endif
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,41)
 #define mpt_work_struct work_struct
 #define MPT_INIT_WORK(_task, _func, _data) INIT_WORK(_task, _func, _data)
-#else
-#define mpt_work_struct tq_struct
-#define MPT_INIT_WORK(_task, _func, _data) \
-({	(_task)->sync = 0; \
-	(_task)->routine = (_func); \
-	(_task)->data = (void *) (_data); \
-})
-#endif
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,28)
-#define mptscsih_sync_irq(_irq) synchronize_irq(_irq)
-#else
-#define mptscsih_sync_irq(_irq) synchronize_irq()
-#endif
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,58)
-#define mpt_inc_use_count()
-#define mpt_dec_use_count()
-#else
-#define mpt_inc_use_count() MOD_INC_USE_COUNT
-#define mpt_dec_use_count() MOD_DEC_USE_COUNT
-#endif
-
+#define mpt_sync_irq(_irq) synchronize_irq(_irq)
 
 /*}-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 #endif /* _LINUX_COMPAT_H */

@@ -32,6 +32,7 @@
 #include <linux/unistd.h>
 
 #include <scsi/scsi_host.h>
+#include <scsi/scsi_transport.h>
 #include "scsi.h"
 
 #include "scsi_priv.h"
@@ -221,6 +222,11 @@ struct Scsi_Host *scsi_host_alloc(struct scsi_host_template *sht, int privsize)
 	shost->max_channel = 0;
 	shost->max_id = 8;
 	shost->max_lun = 8;
+
+	/* Give each shost a default transportt if the driver
+	 * doesn't yet support Transport Attributes */
+	if (!shost->transportt) 
+		shost->transportt = &blank_transport_template;
 
 	/*
 	 * All drivers right now should be able to handle 12 byte
