@@ -84,6 +84,7 @@ enum chipset_type {
 	SVWRKS_LE,
 	SVWRKS_GENERIC,
 	HP_ZX1,
+	ALPHA_CORE_AGP,
 };
 
 struct agp_version {
@@ -102,6 +103,7 @@ typedef struct _agp_kern_info {
 	int current_memory;
 	int cant_use_aperture;
 	unsigned long page_mask;
+	struct vm_operations_struct *vm_ops;
 } agp_kern_info;
 
 /* 

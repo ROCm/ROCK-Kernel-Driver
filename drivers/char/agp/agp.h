@@ -128,6 +128,7 @@ struct agp_bridge_data {
 	int num_aperture_sizes;
 	int capndx;
 	int cant_use_aperture;
+	struct vm_operations_struct *vm_ops;
 
 	/* Links to driver specific functions */
 

@@ -612,8 +612,11 @@ static int agp_mmap(struct file *file, struct vm_area_struct *vma)
 		if (!agp_find_seg_in_client(client, offset, size, vma->vm_page_prot))
 			goto out_inval;
 
-		if (remap_page_range(vma, vma->vm_start, (kerninfo.aper_base + offset),
-				     size, vma->vm_page_prot)) {
+		if (kerninfo.vm_ops) {
+			vma->vm_ops = kerninfo.vm_ops;
+		} else if (remap_page_range(vma, vma->vm_start, 
+					    (kerninfo.aper_base + offset),
+					    size, vma->vm_page_prot)) {
 			goto out_again;
 		}
 		AGP_UNLOCK();
@@ -624,8 +627,11 @@ static int agp_mmap(struct file *file, struct vm_area_struct *vma)
 		if (size != current_size)
 			goto out_inval;
 
-		if (remap_page_range(vma, vma->vm_start, kerninfo.aper_base,
-				     size, vma->vm_page_prot)) {
+		if (kerninfo.vm_ops) {
+			vma->vm_ops = kerninfo.vm_ops;
+		} else if (remap_page_range(vma, vma->vm_start, 
+					    kerninfo.aper_base,
+					    size, vma->vm_page_prot)) {
 			goto out_again;
 		}
 		AGP_UNLOCK();

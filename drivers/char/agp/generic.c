@@ -249,6 +249,7 @@ int agp_copy_info(agp_kern_info * info)
 	info->max_memory = agp_bridge.max_memory_agp;
 	info->current_memory = atomic_read(&agp_bridge.current_memory_agp);
 	info->cant_use_aperture = agp_bridge.cant_use_aperture;
+	info->vm_ops = agp_bridge.vm_ops;
 	info->page_mask = ~0UL;
 	return 0;
 }

@@ -141,6 +141,11 @@ config AGP_HP_ZX1
 	  This option gives you AGP GART support for the HP ZX1 chipset
 	  for IA64 processors.
 
+config AGP_ALPHA_CORE
+	tristate
+	depends on AGP && (ALPHA_GENERIC || ALPHA_TITAN || ALPHA_MARVEL)
+	default AGP
+
 # Put AGP 3.0 entries below here.
 
 config AGP_I7505
