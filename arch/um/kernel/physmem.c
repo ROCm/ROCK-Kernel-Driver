@@ -36,7 +36,7 @@ static struct rb_node **find_rb(void *virt)
 	struct phys_desc *d;
 
 	while(*n != NULL){
-		d = rb_entry(n, struct phys_desc, rb);
+		d = rb_entry(*n, struct phys_desc, rb);
 		if(d->virt == virt)
 			return(n);
 
@@ -56,7 +56,7 @@ static struct phys_desc *find_phys_mapping(void *virt)
 	if(*n == NULL)
 		return(NULL);
 
-	return(rb_entry(n, struct phys_desc, rb));
+	return(rb_entry(*n, struct phys_desc, rb));
 }
 
 static void insert_phys_mapping(struct phys_desc *desc)
