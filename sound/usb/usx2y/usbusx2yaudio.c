@@ -1007,33 +1007,13 @@ static int usX2Y_audio_stream_new(snd_card_t *card, int playback_endpoint, int c
 }
 
 /*
- * free the chip instance
- *
- * here we have to do not much, since pcm and controls are already freed
- *
- */
-static int snd_usX2Y_device_dev_free(snd_device_t *device)
-{
-	return 0;
-}
-
-
-/*
  * create a chip instance and set its names.
  */
 int usX2Y_audio_create(snd_card_t* card)
 {
 	int err = 0;
-	static snd_device_ops_t ops = {
-		.dev_free = snd_usX2Y_device_dev_free,
-	};
 	
 	INIT_LIST_HEAD(&usX2Y(card)->chip.pcm_list);
-
-	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, usX2Y(card), &ops)) < 0) {
-//		snd_usX2Y_audio_free(usX2Y(card));
-		return err;
-	}
 
 	if (0 > (err = usX2Y_audio_stream_new(card, 0xA, 0x8)))
 		return err;
