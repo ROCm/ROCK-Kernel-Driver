@@ -4,10 +4,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 2000
  *
- * $Revision: 1.7 $
- *
- * History of changes 
- *
+ * $Revision: 1.9 $
  */
 
 #define PRINTK_HEADER "dasd_erp(3370)"
@@ -32,7 +29,7 @@
  *   dasd_era_recover	for all others.
  */
 dasd_era_t
-dasd_3370_erp_examine(dasd_ccw_req_t * cqr, struct irb * irb)
+dasd_3370_erp_examine(struct dasd_ccw_req * cqr, struct irb * irb)
 {
 	char *sense = irb->ecw;
 

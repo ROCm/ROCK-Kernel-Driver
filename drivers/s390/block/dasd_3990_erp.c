@@ -5,11 +5,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 2000, 2001
  *
- * $Revision: 1.20 $
- *
- * History of changes:
- * 05/14/01 fixed PL030160GTO (BUG() in erp_action_5)
- * 05/04/02 code restructuring.
+ * $Revision: 1.24 $
  */
 
 #include <linux/timer.h>
@@ -23,11 +19,11 @@
 #include "dasd_eckd.h"
 
 
-typedef struct DCTL_data_t {
+struct DCTL_data {
 	unsigned char subcommand;	/* e.g Inhibit Write, Enable Write,... */
 	unsigned char modifier;	/* Subcommand modifier		       */
 	unsigned short res;	/* reserved */
-} __attribute__ ((packed)) DCTL_data_t;
+} __attribute__ ((packed));
 
 /*
  ***************************************************************************** 
@@ -54,10 +50,10 @@ typedef struct DCTL_data_t {
  *   dasd_era_recover	for all others.
  */
 static dasd_era_t
-dasd_3990_erp_examine_24(dasd_ccw_req_t * cqr, char *sense)
+dasd_3990_erp_examine_24(struct dasd_ccw_req * cqr, char *sense)
 {
 
-	dasd_device_t *device = cqr->device;
+	struct dasd_device *device = cqr->device;
 
 	/* check for 'Command Reject' */
 	if ((sense[0] & SNS0_CMD_REJECT) &&
@@ -111,10 +107,10 @@ dasd_3990_erp_examine_24(dasd_ccw_req_t * cqr, char *sense)
  *   dasd_era_recover	for recoverable others.
  */
 static dasd_era_t
-dasd_3990_erp_examine_32(dasd_ccw_req_t * cqr, char *sense)
+dasd_3990_erp_examine_32(struct dasd_ccw_req * cqr, char *sense)
 {
 
-	dasd_device_t *device = cqr->device;
+	struct dasd_device *device = cqr->device;
 
 	switch (sense[25]) {
 	case 0x00:
@@ -149,12 +145,12 @@ dasd_3990_erp_examine_32(dasd_ccw_req_t * cqr, char *sense)
  *   dasd_era_recover	for all others.
  */
 dasd_era_t
-dasd_3990_erp_examine(dasd_ccw_req_t * cqr, struct irb * irb)
+dasd_3990_erp_examine(struct dasd_ccw_req * cqr, struct irb * irb)
 {
 
 	char *sense = irb->ecw;
 	dasd_era_t era = dasd_era_recover;
-	dasd_device_t *device = cqr->device;
+	struct dasd_device *device = cqr->device;
 
 	/* check for successful execution first */
 	if (irb->scsw.cstat == 0x00 &&
@@ -207,10 +203,10 @@ dasd_3990_erp_examine(dasd_ccw_req_t * cqr, struct irb * irb)
  * RETURN VALUES
  *   cqr		original cqr		   
  */
-static dasd_ccw_req_t *
-dasd_3990_erp_cleanup(dasd_ccw_req_t * erp, char final_status)
+static struct dasd_ccw_req *
+dasd_3990_erp_cleanup(struct dasd_ccw_req * erp, char final_status)
 {
-	dasd_ccw_req_t *cqr = erp->refers;
+	struct dasd_ccw_req *cqr = erp->refers;
 
 	dasd_free_erp_request(erp, erp->device);
 	cqr->status = final_status;
@@ -234,10 +230,10 @@ dasd_3990_erp_cleanup(dasd_ccw_req_t * erp, char final_status)
  *   void		
  */
 static void
-dasd_3990_erp_block_queue(dasd_ccw_req_t * erp, int expires)
+dasd_3990_erp_block_queue(struct dasd_ccw_req * erp, int expires)
 {
 
-	dasd_device_t *device = erp->device;
+	struct dasd_device *device = erp->device;
 
 	DEV_MESSAGE(KERN_INFO, device,
 		    "blocking request queue for %is", expires);
@@ -258,11 +254,11 @@ dasd_3990_erp_block_queue(dasd_ccw_req_t * erp, int expires)
  * RETURN VALUES
  *   erp		modified erp
  */
-static dasd_ccw_req_t *
-dasd_3990_erp_int_req(dasd_ccw_req_t * erp)
+static struct dasd_ccw_req *
+dasd_3990_erp_int_req(struct dasd_ccw_req * erp)
 {
 
-	dasd_device_t *device = erp->device;
+	struct dasd_device *device = erp->device;
 
 	/* first time set initial retry counter and erp_function */
 	/* and retry once without blocking queue		 */
@@ -301,9 +297,9 @@ dasd_3990_erp_int_req(dasd_ccw_req_t * erp)
  *   erp		modified pointer to the ERP
  */
 static void
-dasd_3990_erp_alternate_path(dasd_ccw_req_t * erp)
+dasd_3990_erp_alternate_path(struct dasd_ccw_req * erp)
 {
-	dasd_device_t *device = erp->device;
+	struct dasd_device *device = erp->device;
 	__u8 opm;
 
 	/* try alternate valid path */
@@ -349,17 +345,18 @@ dasd_3990_erp_alternate_path(dasd_ccw_req_t * erp)
  *   dctl_cqr		pointer to NEW dctl_cqr 
  *
  */
-static dasd_ccw_req_t *
-dasd_3990_erp_DCTL(dasd_ccw_req_t * erp, char modifier)
+static struct dasd_ccw_req *
+dasd_3990_erp_DCTL(struct dasd_ccw_req * erp, char modifier)
 {
 
-	dasd_device_t *device = erp->device;
-	DCTL_data_t *DCTL_data;
+	struct dasd_device *device = erp->device;
+	struct DCTL_data *DCTL_data;
 	struct ccw1 *ccw;
-	dasd_ccw_req_t *dctl_cqr;
+	struct dasd_ccw_req *dctl_cqr;
 
 	dctl_cqr = dasd_alloc_erp_request((char *) &erp->magic, 1,
-					  sizeof (DCTL_data_t), erp->device);
+					  sizeof (struct DCTL_data),
+					  erp->device);
 	if (IS_ERR(dctl_cqr)) {
 		DEV_MESSAGE(KERN_ERR, device, "%s",
 			    "Unable to allocate DCTL-CQR");
@@ -409,8 +406,8 @@ dasd_3990_erp_DCTL(dasd_ccw_req_t * erp, char modifier)
  *   erp		pointer to the ERP
  *
  */
-static dasd_ccw_req_t *
-dasd_3990_erp_action_1(dasd_ccw_req_t * erp)
+static struct dasd_ccw_req *
+dasd_3990_erp_action_1(struct dasd_ccw_req * erp)
 {
 
 	erp->function = dasd_3990_erp_action_1;
@@ -438,11 +435,11 @@ dasd_3990_erp_action_1(dasd_ccw_req_t * erp)
  *   erp		pointer to the ERP
  *
  */
-static dasd_ccw_req_t *
-dasd_3990_erp_action_4(dasd_ccw_req_t * erp, char *sense)
+static struct dasd_ccw_req *
+dasd_3990_erp_action_4(struct dasd_ccw_req * erp, char *sense)
 {
 
-	dasd_device_t *device = erp->device;
+	struct dasd_device *device = erp->device;
 
 	/* first time set initial retry counter and erp_function    */
 	/* and retry once without waiting for state change pending  */
@@ -496,8 +493,8 @@ dasd_3990_erp_action_4(dasd_ccw_req_t * erp, char *sense)
  *   erp		pointer to the ERP
  *
  */
-static dasd_ccw_req_t *
-dasd_3990_erp_action_5(dasd_ccw_req_t * erp)
+static struct dasd_ccw_req *
+dasd_3990_erp_action_5(struct dasd_ccw_req * erp)
 {
 
 	/* first of all retry */
@@ -523,10 +520,10 @@ dasd_3990_erp_action_5(dasd_ccw_req_t * erp)
  *   void
  */
 static void
-dasd_3990_handle_env_data(dasd_ccw_req_t * erp, char *sense)
+dasd_3990_handle_env_data(struct dasd_ccw_req * erp, char *sense)
 {
 
-	dasd_device_t *device = erp->device;
+	struct dasd_device *device = erp->device;
 	char msg_format = (sense[7] & 0xF0);
 	char msg_no = (sense[7] & 0x0F);
 
@@ -1146,11 +1143,11 @@ dasd_3990_handle_env_data(dasd_ccw_req_t * erp, char *sense)
  * RETURN VALUES
  *   erp		'new' erp_head - pointer to new ERP 
  */
-static dasd_ccw_req_t *
-dasd_3990_erp_com_rej(dasd_ccw_req_t * erp, char *sense)
+static struct dasd_ccw_req *
+dasd_3990_erp_com_rej(struct dasd_ccw_req * erp, char *sense)
 {
 
-	dasd_device_t *device = erp->device;
+	struct dasd_device *device = erp->device;
 
 	erp->function = dasd_3990_erp_com_rej;
 
@@ -1187,11 +1184,11 @@ dasd_3990_erp_com_rej(dasd_ccw_req_t * erp, char *sense)
  * RETURN VALUES
  *   erp		new erp_head - pointer to new ERP
  */
-static dasd_ccw_req_t *
-dasd_3990_erp_bus_out(dasd_ccw_req_t * erp)
+static struct dasd_ccw_req *
+dasd_3990_erp_bus_out(struct dasd_ccw_req * erp)
 {
 
-	dasd_device_t *device = erp->device;
+	struct dasd_device *device = erp->device;
 
 	/* first time set initial retry counter and erp_function */
 	/* and retry once without blocking queue		 */
@@ -1226,11 +1223,11 @@ dasd_3990_erp_bus_out(dasd_ccw_req_t * erp)
  * RETURN VALUES
  *   erp		new erp_head - pointer to new ERP
  */
-static dasd_ccw_req_t *
-dasd_3990_erp_equip_check(dasd_ccw_req_t * erp, char *sense)
+static struct dasd_ccw_req *
+dasd_3990_erp_equip_check(struct dasd_ccw_req * erp, char *sense)
 {
 
-	dasd_device_t *device = erp->device;
+	struct dasd_device *device = erp->device;
 
 	erp->function = dasd_3990_erp_equip_check;
 
@@ -1288,11 +1285,11 @@ dasd_3990_erp_equip_check(dasd_ccw_req_t * erp, char *sense)
  * RETURN VALUES
  *   erp		new erp_head - pointer to new ERP
  */
-static dasd_ccw_req_t *
-dasd_3990_erp_data_check(dasd_ccw_req_t * erp, char *sense)
+static struct dasd_ccw_req *
+dasd_3990_erp_data_check(struct dasd_ccw_req * erp, char *sense)
 {
 
-	dasd_device_t *device = erp->device;
+	struct dasd_device *device = erp->device;
 
 	erp->function = dasd_3990_erp_data_check;
 
@@ -1347,11 +1344,11 @@ dasd_3990_erp_data_check(dasd_ccw_req_t * erp, char *sense)
  * RETURN VALUES
  *   erp		new erp_head - pointer to new ERP
  */
-static dasd_ccw_req_t *
-dasd_3990_erp_overrun(dasd_ccw_req_t * erp, char *sense)
+static struct dasd_ccw_req *
+dasd_3990_erp_overrun(struct dasd_ccw_req * erp, char *sense)
 {
 
-	dasd_device_t *device = erp->device;
+	struct dasd_device *device = erp->device;
 
 	erp->function = dasd_3990_erp_overrun;
 
@@ -1376,11 +1373,11 @@ dasd_3990_erp_overrun(dasd_ccw_req_t * erp, char *sense)
  * RETURN VALUES
  *   erp		new erp_head - pointer to new ERP
  */
-static dasd_ccw_req_t *
-dasd_3990_erp_inv_format(dasd_ccw_req_t * erp, char *sense)
+static struct dasd_ccw_req *
+dasd_3990_erp_inv_format(struct dasd_ccw_req * erp, char *sense)
 {
 
-	dasd_device_t *device = erp->device;
+	struct dasd_device *device = erp->device;
 
 	erp->function = dasd_3990_erp_inv_format;
 
@@ -1417,11 +1414,11 @@ dasd_3990_erp_inv_format(dasd_ccw_req_t * erp, char *sense)
  * RETURN VALUES
  *   erp		pointer to original (failed) cqr.
  */
-static dasd_ccw_req_t *
-dasd_3990_erp_EOC(dasd_ccw_req_t * default_erp, char *sense)
+static struct dasd_ccw_req *
+dasd_3990_erp_EOC(struct dasd_ccw_req * default_erp, char *sense)
 {
 
-	dasd_device_t *device = default_erp->device;
+	struct dasd_device *device = default_erp->device;
 
 	DEV_MESSAGE(KERN_ERR, device, "%s",
 		    "End-of-Cylinder - must never happen");
@@ -1442,11 +1439,11 @@ dasd_3990_erp_EOC(dasd_ccw_req_t * default_erp, char *sense)
  * RETURN VALUES
  *   erp		new erp_head - pointer to new ERP
  */
-static dasd_ccw_req_t *
-dasd_3990_erp_env_data(dasd_ccw_req_t * erp, char *sense)
+static struct dasd_ccw_req *
+dasd_3990_erp_env_data(struct dasd_ccw_req * erp, char *sense)
 {
 
-	dasd_device_t *device = erp->device;
+	struct dasd_device *device = erp->device;
 
 	erp->function = dasd_3990_erp_env_data;
 
@@ -1479,11 +1476,11 @@ dasd_3990_erp_env_data(dasd_ccw_req_t * erp, char *sense)
  * RETURN VALUES
  *   erp		new erp_head - pointer to new ERP
  */
-static dasd_ccw_req_t *
-dasd_3990_erp_no_rec(dasd_ccw_req_t * default_erp, char *sense)
+static struct dasd_ccw_req *
+dasd_3990_erp_no_rec(struct dasd_ccw_req * default_erp, char *sense)
 {
 
-	dasd_device_t *device = default_erp->device;
+	struct dasd_device *device = default_erp->device;
 
 	DEV_MESSAGE(KERN_ERR, device, "%s",
 		    "No Record Found - Fatal error should "
@@ -1506,11 +1503,11 @@ dasd_3990_erp_no_rec(dasd_ccw_req_t * default_erp, char *sense)
  * RETURN VALUES
  *   erp		new erp_head - pointer to new ERP
  */
-static dasd_ccw_req_t *
-dasd_3990_erp_file_prot(dasd_ccw_req_t * erp)
+static struct dasd_ccw_req *
+dasd_3990_erp_file_prot(struct dasd_ccw_req * erp)
 {
 
-	dasd_device_t *device = erp->device;
+	struct dasd_device *device = erp->device;
 
 	DEV_MESSAGE(KERN_ERR, device, "%s", "File Protected");
 
@@ -1532,11 +1529,11 @@ dasd_3990_erp_file_prot(dasd_ccw_req_t * erp)
  * RETURN VALUES
  *   erp		pointer to the (addtitional) ERP
  */
-static dasd_ccw_req_t *
-dasd_3990_erp_inspect_24(dasd_ccw_req_t * erp, char *sense)
+static struct dasd_ccw_req *
+dasd_3990_erp_inspect_24(struct dasd_ccw_req * erp, char *sense)
 {
 
-	dasd_ccw_req_t *erp_filled = NULL;
+	struct dasd_ccw_req *erp_filled = NULL;
 
 	/* Check sense for ....	   */
 	/* 'Command Reject'	   */
@@ -1612,11 +1609,11 @@ dasd_3990_erp_inspect_24(dasd_ccw_req_t * erp, char *sense)
  * RETURN VALUES
  *   erp		modified erp_head
  */
-static dasd_ccw_req_t *
-dasd_3990_erp_action_10_32(dasd_ccw_req_t * erp, char *sense)
+static struct dasd_ccw_req *
+dasd_3990_erp_action_10_32(struct dasd_ccw_req * erp, char *sense)
 {
 
-	dasd_device_t *device = erp->device;
+	struct dasd_device *device = erp->device;
 
 	erp->retries = 256;
 	erp->function = dasd_3990_erp_action_10_32;
@@ -1646,15 +1643,15 @@ dasd_3990_erp_action_10_32(dasd_ccw_req_t * erp, char *sense)
  *   erp		new erp or 
  *			default_erp in case of imprecise ending or error
  */
-static dasd_ccw_req_t *
-dasd_3990_erp_action_1B_32(dasd_ccw_req_t * default_erp, char *sense)
+static struct dasd_ccw_req *
+dasd_3990_erp_action_1B_32(struct dasd_ccw_req * default_erp, char *sense)
 {
 
-	dasd_device_t *device = default_erp->device;
+	struct dasd_device *device = default_erp->device;
 	__u32 cpa = 0;
-	dasd_ccw_req_t *cqr;
-	dasd_ccw_req_t *erp;
-	DE_eckd_data_t *DE_data;
+	struct dasd_ccw_req *cqr;
+	struct dasd_ccw_req *erp;
+	struct DE_eckd_data *DE_data;
 	char *LO_data;		/* LO_eckd_data_t */
 	struct ccw1 *ccw;
 
@@ -1695,8 +1692,8 @@ dasd_3990_erp_action_1B_32(dasd_ccw_req_t * default_erp, char *sense)
 	/* Build new ERP request including DE/LO */
 	erp = dasd_alloc_erp_request((char *) &cqr->magic,
 				     2 + 1,/* DE/LO + TIC */
-				     sizeof (DE_eckd_data_t) +
-				     sizeof (LO_eckd_data_t), device);
+				     sizeof (struct DE_eckd_data) +
+				     sizeof (struct LO_eckd_data), device);
 
 	if (IS_ERR(erp)) {
 		DEV_MESSAGE(KERN_ERR, device, "%s", "Unable to allocate ERP");
@@ -1705,10 +1702,10 @@ dasd_3990_erp_action_1B_32(dasd_ccw_req_t * default_erp, char *sense)
 
 	/* use original DE */
 	DE_data = erp->data;
-	memcpy(DE_data, cqr->data, sizeof (DE_eckd_data_t));
+	memcpy(DE_data, cqr->data, sizeof (struct DE_eckd_data));
 
 	/* create LO */
-	LO_data = erp->data + sizeof (DE_eckd_data_t);
+	LO_data = erp->data + sizeof (struct DE_eckd_data);
 
 	if ((sense[3] == 0x01) && (LO_data[1] & 0x01)) {
 
@@ -1791,15 +1788,15 @@ dasd_3990_erp_action_1B_32(dasd_ccw_req_t * default_erp, char *sense)
  * RETURN VALUES
  *   erp		modified erp 
  */
-static dasd_ccw_req_t *
-dasd_3990_update_1B(dasd_ccw_req_t * previous_erp, char *sense)
+static struct dasd_ccw_req *
+dasd_3990_update_1B(struct dasd_ccw_req * previous_erp, char *sense)
 {
 
-	dasd_device_t *device = previous_erp->device;
+	struct dasd_device *device = previous_erp->device;
 	__u32 cpa = 0;
-	dasd_ccw_req_t *cqr;
-	dasd_ccw_req_t *erp;
-	char *LO_data;		/* LO_eckd_data_t */
+	struct dasd_ccw_req *cqr;
+	struct dasd_ccw_req *erp;
+	char *LO_data;		/* struct LO_eckd_data */
 	struct ccw1 *ccw;
 
 	DEV_MESSAGE(KERN_DEBUG, device, "%s",
@@ -1842,7 +1839,7 @@ dasd_3990_update_1B(dasd_ccw_req_t * previous_erp, char *sense)
 	erp = previous_erp;
 
 	/* update the LO with the new returned sense data  */
-	LO_data = erp->data + sizeof (DE_eckd_data_t);
+	LO_data = erp->data + sizeof (struct DE_eckd_data);
 
 	if ((sense[3] == 0x01) && (LO_data[1] & 0x01)) {
 
@@ -1905,7 +1902,7 @@ dasd_3990_update_1B(dasd_ccw_req_t * previous_erp, char *sense)
  *
  */
 static void
-dasd_3990_erp_compound_retry(dasd_ccw_req_t * erp, char *sense)
+dasd_3990_erp_compound_retry(struct dasd_ccw_req * erp, char *sense)
 {
 
 	switch (sense[25] & 0x03) {
@@ -1949,7 +1946,7 @@ dasd_3990_erp_compound_retry(dasd_ccw_req_t * erp, char *sense)
  *
  */
 static void
-dasd_3990_erp_compound_path(dasd_ccw_req_t * erp, char *sense)
+dasd_3990_erp_compound_path(struct dasd_ccw_req * erp, char *sense)
 {
 
 	if (sense[25] & DASD_SENSE_BIT_3) {
@@ -1984,8 +1981,8 @@ dasd_3990_erp_compound_path(dasd_ccw_req_t * erp, char *sense)
  *   erp		NEW ERP pointer
  *
  */
-static dasd_ccw_req_t *
-dasd_3990_erp_compound_code(dasd_ccw_req_t * erp, char *sense)
+static struct dasd_ccw_req *
+dasd_3990_erp_compound_code(struct dasd_ccw_req * erp, char *sense)
 {
 
 	if (sense[25] & DASD_SENSE_BIT_2) {
@@ -2033,13 +2030,13 @@ dasd_3990_erp_compound_code(dasd_ccw_req_t * erp, char *sense)
  *
  */
 static void
-dasd_3990_erp_compound_config(dasd_ccw_req_t * erp, char *sense)
+dasd_3990_erp_compound_config(struct dasd_ccw_req * erp, char *sense)
 {
 
 	if ((sense[25] & DASD_SENSE_BIT_1) && (sense[26] & DASD_SENSE_BIT_2)) {
 
 		/* set to suspended duplex state then restart */
-		dasd_device_t *device = erp->device;
+		struct dasd_device *device = erp->device;
 
 		DEV_MESSAGE(KERN_ERR, device, "%s",
 			    "Set device to suspended duplex state should be "
@@ -2068,8 +2065,8 @@ dasd_3990_erp_compound_config(dasd_ccw_req_t * erp, char *sense)
  *   erp		(additional) ERP pointer
  *
  */
-static dasd_ccw_req_t *
-dasd_3990_erp_compound(dasd_ccw_req_t * erp, char *sense)
+static struct dasd_ccw_req *
+dasd_3990_erp_compound(struct dasd_ccw_req * erp, char *sense)
 {
 
 	if ((erp->function == dasd_3990_erp_compound_retry) &&
@@ -2115,11 +2112,11 @@ dasd_3990_erp_compound(dasd_ccw_req_t * erp, char *sense)
  *   erp_filled		pointer to the ERP
  *
  */
-static dasd_ccw_req_t *
-dasd_3990_erp_inspect_32(dasd_ccw_req_t * erp, char *sense)
+static struct dasd_ccw_req *
+dasd_3990_erp_inspect_32(struct dasd_ccw_req * erp, char *sense)
 {
 
-	dasd_device_t *device = erp->device;
+	struct dasd_device *device = erp->device;
 
 	erp->function = dasd_3990_erp_inspect_32;
 
@@ -2232,11 +2229,11 @@ dasd_3990_erp_inspect_32(dasd_ccw_req_t * erp, char *sense)
  * RETURN VALUES
  *   erp_new		contens was possibly modified 
  */
-static dasd_ccw_req_t *
-dasd_3990_erp_inspect(dasd_ccw_req_t * erp)
+static struct dasd_ccw_req *
+dasd_3990_erp_inspect(struct dasd_ccw_req * erp)
 {
 
-	dasd_ccw_req_t *erp_new = NULL;
+	struct dasd_ccw_req *erp_new = NULL;
 	/* sense data are located in the refers record of the */
 	/* already set up new ERP !			      */
 	char *sense = erp->refers->dstat->ecw;
@@ -2272,15 +2269,15 @@ dasd_3990_erp_inspect(dasd_ccw_req_t * erp)
  * RETURN VALUES
  *   erp		pointer to new ERP-chain head
  */
-static dasd_ccw_req_t *
-dasd_3990_erp_add_erp(dasd_ccw_req_t * cqr)
+static struct dasd_ccw_req *
+dasd_3990_erp_add_erp(struct dasd_ccw_req * cqr)
 {
 
-	dasd_device_t *device = cqr->device;
+	struct dasd_device *device = cqr->device;
 	struct ccw1 *ccw;
 
 	/* allocate additional request block */
-	dasd_ccw_req_t *erp;
+	struct dasd_ccw_req *erp;
 
 	erp = dasd_alloc_erp_request((char *) &cqr->magic, 2, 0, cqr->device);
 	if (IS_ERR(erp)) {
@@ -2333,11 +2330,11 @@ dasd_3990_erp_add_erp(dasd_ccw_req_t * cqr)
  * RETURN VALUES
  *   erp		pointer to new ERP-chain head
  */
-static dasd_ccw_req_t *
-dasd_3990_erp_additional_erp(dasd_ccw_req_t * cqr)
+static struct dasd_ccw_req *
+dasd_3990_erp_additional_erp(struct dasd_ccw_req * cqr)
 {
 
-	dasd_ccw_req_t *erp = NULL;
+	struct dasd_ccw_req *erp = NULL;
 
 	/* add erp and initialize with default TIC */
 	erp = dasd_3990_erp_add_erp(cqr);
@@ -2371,7 +2368,7 @@ dasd_3990_erp_additional_erp(dasd_ccw_req_t * cqr)
  *			returns 1 if match found, otherwise 0.
  */
 static int
-dasd_3990_erp_error_match(dasd_ccw_req_t * cqr1, dasd_ccw_req_t * cqr2)
+dasd_3990_erp_error_match(struct dasd_ccw_req *cqr1, struct dasd_ccw_req *cqr2)
 {
 
 	/* check failed CCW */
@@ -2406,11 +2403,11 @@ dasd_3990_erp_error_match(dasd_ccw_req_t * cqr1, dasd_ccw_req_t * cqr2)
  *			recovery procedure OR
  *			NULL if a 'new' error occurred.
  */
-static dasd_ccw_req_t *
-dasd_3990_erp_in_erp(dasd_ccw_req_t * cqr)
+static struct dasd_ccw_req *
+dasd_3990_erp_in_erp(struct dasd_ccw_req *cqr)
 {
 
-	dasd_ccw_req_t *erp_head = cqr,	/* save erp chain head */
+	struct dasd_ccw_req *erp_head = cqr,	/* save erp chain head */
 	*erp_match = NULL;	/* save erp chain head */
 	int match = 0;		/* 'boolean' for matching error found */
 
@@ -2450,11 +2447,11 @@ dasd_3990_erp_in_erp(dasd_ccw_req_t * cqr)
  * RETURN VALUES
  *   erp		modified/additional ERP
  */
-static dasd_ccw_req_t *
-dasd_3990_erp_further_erp(dasd_ccw_req_t * erp)
+static struct dasd_ccw_req *
+dasd_3990_erp_further_erp(struct dasd_ccw_req *erp)
 {
 
-	dasd_device_t *device = erp->device;
+	struct dasd_device *device = erp->device;
 	char *sense = erp->dstat->ecw;
 
 	/* check for 24 byte sense ERP */
@@ -2539,13 +2536,14 @@ dasd_3990_erp_further_erp(dasd_ccw_req_t * erp)
  * RETURN VALUES
  *   erp		modified/additional ERP
  */
-static dasd_ccw_req_t *
-dasd_3990_erp_handle_match_erp(dasd_ccw_req_t * erp_head, dasd_ccw_req_t * erp)
+static struct dasd_ccw_req *
+dasd_3990_erp_handle_match_erp(struct dasd_ccw_req *erp_head,
+			       struct dasd_ccw_req *erp)
 {
 
-	dasd_device_t *device = erp_head->device;
-	dasd_ccw_req_t *erp_done = erp_head;	/* finished req */
-	dasd_ccw_req_t *erp_free = NULL;	/* req to be freed */
+	struct dasd_device *device = erp_head->device;
+	struct dasd_ccw_req *erp_done = erp_head;	/* finished req */
+	struct dasd_ccw_req *erp_free = NULL;	/* req to be freed */
 
 	/* loop over successful ERPs and remove them from chanq */
 	while (erp_done != erp) {
@@ -2619,12 +2617,12 @@ dasd_3990_erp_handle_match_erp(dasd_ccw_req_t * erp_head, dasd_ccw_req_t * erp)
  *			 - the original given cqr (which's status might 
  *			   be modified)
  */
-dasd_ccw_req_t *
-dasd_3990_erp_action(dasd_ccw_req_t * cqr)
+struct dasd_ccw_req *
+dasd_3990_erp_action(struct dasd_ccw_req * cqr)
 {
 
-	dasd_ccw_req_t *erp = NULL;
-	dasd_device_t *device = cqr->device;
+	struct dasd_ccw_req *erp = NULL;
+	struct dasd_device *device = cqr->device;
 	__u32 cpa = cqr->dstat->scsw.cpa;
 
 #ifdef ERP_DEBUG
@@ -2632,7 +2630,7 @@ dasd_3990_erp_action(dasd_ccw_req_t * cqr)
 	DEV_MESSAGE(KERN_DEBUG, device, "%s",
 		    "ERP chain at BEGINNING of ERP-ACTION");
 	{
-		dasd_ccw_req_t *temp_erp = NULL;
+		struct dasd_ccw_req *temp_erp = NULL;
 
 		for (temp_erp = cqr;
 		     temp_erp != NULL; temp_erp = temp_erp->refers) {
@@ -2683,7 +2681,7 @@ dasd_3990_erp_action(dasd_ccw_req_t * cqr)
 	/* print current erp_chain */
 	DEV_MESSAGE(KERN_DEBUG, device, "%s", "ERP chain at END of ERP-ACTION");
 	{
-		dasd_ccw_req_t *temp_erp = NULL;
+		struct dasd_ccw_req *temp_erp = NULL;
 		for (temp_erp = erp;
 		     temp_erp != NULL; temp_erp = temp_erp->refers) {
 

@@ -6,16 +6,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.28 $
- *
- * History of changes
- * 07/13/00 Added fixup sections for diagnoses ans saved some registers
- * 07/14/00 fixed constraints in newly generated inline asm
- * 10/05/00 adapted to 'new' DASD driver
- *	    fixed return codes of dia250()
- *	    fixed partition handling and HDIO_GETGEO
- * 2002/01/04 Created 2.4-2.5 compatibility mode
- * 05/04/02 code restructuring.
+ * $Revision: 1.31 $
  */
 
 #include <linux/config.h>
@@ -44,17 +35,17 @@
 
 MODULE_LICENSE("GPL");
 
-typedef struct dasd_diag_private_t {
-	dasd_diag_characteristics_t rdc_data;
-	diag_rw_io_t iob;
-	diag_init_io_t iib;
+struct dasd_diag_private {
+	struct dasd_diag_characteristics rdc_data;
+	struct dasd_diag_rw_io iob;
+	struct dasd_diag_init_io iib;
 	unsigned int pt_block;
-} dasd_diag_private_t;
+};
 
-typedef struct dasd_diag_req_t {
+struct dasd_diag_req {
 	int block_count;
-	diag_bio_t bio[0];
-} dasd_diag_req_t;
+	struct dasd_diag_bio bio[0];
+};
 
 static __inline__ int
 dia250(void *iob, int cmd)
@@ -86,15 +77,15 @@ dia250(void *iob, int cmd)
 }
 
 static __inline__ int
-mdsk_init_io(dasd_device_t * device, int blocksize, int offset, int size)
+mdsk_init_io(struct dasd_device * device, int blocksize, int offset, int size)
 {
-	dasd_diag_private_t *private;
-	diag_init_io_t *iib;
+	struct dasd_diag_private *private;
+	struct dasd_diag_init_io *iib;
 	int rc;
 
-	private = (dasd_diag_private_t *) device->private;
+	private = (struct dasd_diag_private *) device->private;
 	iib = &private->iib;
-	memset(iib, 0, sizeof (diag_init_io_t));
+	memset(iib, 0, sizeof (struct dasd_diag_init_io));
 
 	iib->dev_nr = _ccw_device_get_device_number(device->cdev);
 	iib->block_size = blocksize;
@@ -108,31 +99,31 @@ mdsk_init_io(dasd_device_t * device, int blocksize, int offset, int size)
 }
 
 static __inline__ int
-mdsk_term_io(dasd_device_t * device)
+mdsk_term_io(struct dasd_device * device)
 {
-	dasd_diag_private_t *private;
-	diag_init_io_t *iib;
+	struct dasd_diag_private *private;
+	struct dasd_diag_init_io *iib;
 	int rc;
 
-	private = (dasd_diag_private_t *) device->private;
+	private = (struct dasd_diag_private *) device->private;
 	iib = &private->iib;
-	memset(iib, 0, sizeof (diag_init_io_t));
+	memset(iib, 0, sizeof (struct dasd_diag_init_io));
 	iib->dev_nr = _ccw_device_get_device_number(device->cdev);
 	rc = dia250(iib, TERM_BIO);
 	return rc & 3;
 }
 
 static int
-dasd_start_diag(dasd_ccw_req_t * cqr)
+dasd_start_diag(struct dasd_ccw_req * cqr)
 {
-	dasd_device_t *device;
-	dasd_diag_private_t *private;
-	dasd_diag_req_t *dreq;
+	struct dasd_device *device;
+	struct dasd_diag_private *private;
+	struct dasd_diag_req *dreq;
 	int rc;
 
 	device = cqr->device;
-	private = (dasd_diag_private_t *) device->private;
-	dreq = (dasd_diag_req_t *) cqr->data;
+	private = (struct dasd_diag_private *) device->private;
+	dreq = (struct dasd_diag_req *) cqr->data;
 
 	private->iob.dev_nr = _ccw_device_get_device_number(device->cdev);
 	private->iob.key = 0;
@@ -160,8 +151,8 @@ dasd_start_diag(dasd_ccw_req_t * cqr)
 static void
 dasd_ext_handler(struct pt_regs *regs, __u16 code)
 {
-	dasd_ccw_req_t *cqr, *next;
-	dasd_device_t *device;
+	struct dasd_ccw_req *cqr, *next;
+	struct dasd_device *device;
 	unsigned long long expires;
 	unsigned long flags;
 	char status;
@@ -186,11 +177,11 @@ dasd_ext_handler(struct pt_regs *regs, __u16 code)
 		irq_exit();
 		return;
 	}
-	cqr = (dasd_ccw_req_t *)(addr_t) ip;
-	device = (dasd_device_t *) cqr->device;
+	cqr = (struct dasd_ccw_req *)(addr_t) ip;
+	device = (struct dasd_device *) cqr->device;
 	if (strncmp(device->discipline->ebcname, (char *) &cqr->magic, 4)) {
 		DEV_MESSAGE(KERN_WARNING, device,
-			    " magic number of dasd_ccw_req_t 0x%08X doesn't"
+			    " magic number of dasd_ccw_req 0x%08X doesn't"
 			    " match discipline 0x%08X",
 			    cqr->magic, *(int *) (&device->discipline->name));
 		irq_exit();
@@ -208,7 +199,7 @@ dasd_ext_handler(struct pt_regs *regs, __u16 code)
 		/* Start first request on queue if possible -> fast_io. */
 		if (!list_empty(&device->ccw_queue)) {
 			next = list_entry(device->ccw_queue.next,
-					  dasd_ccw_req_t, list);
+					  struct dasd_ccw_req, list);
 			if (next->status == DASD_CQR_QUEUED) {
 				if (dasd_start_diag(next) == 0)
 					expires = next->expires;
@@ -231,18 +222,18 @@ dasd_ext_handler(struct pt_regs *regs, __u16 code)
 }
 
 static int
-dasd_diag_check_device(dasd_device_t *device)
+dasd_diag_check_device(struct dasd_device *device)
 {
-	dasd_diag_private_t *private;
-	dasd_diag_characteristics_t *rdc_data;
-	diag_bio_t bio;
+	struct dasd_diag_private *private;
+	struct dasd_diag_characteristics *rdc_data;
+	struct dasd_diag_bio bio;
 	long *label;
 	int sb, bsize;
 	int rc;
 
-	private = (dasd_diag_private_t *) device->private;
+	private = (struct dasd_diag_private *) device->private;
 	if (private == NULL) {
-		private = kmalloc(sizeof(dasd_diag_private_t), GFP_KERNEL);
+		private = kmalloc(sizeof(struct dasd_diag_private),GFP_KERNEL);
 		if (private == NULL) {
 			MESSAGE(KERN_WARNING, "%s",
 				"memory allocation failed for private data");
@@ -253,7 +244,7 @@ dasd_diag_check_device(dasd_device_t *device)
 	/* Read Device Characteristics */
 	rdc_data = (void *) &(private->rdc_data);
 	rdc_data->dev_nr = _ccw_device_get_device_number(device->cdev);
-	rdc_data->rdc_len = sizeof (dasd_diag_characteristics_t);
+	rdc_data->rdc_len = sizeof (struct dasd_diag_characteristics);
 
 	rc = diag210((struct diag210 *) rdc_data);
 	if (rc)
@@ -289,11 +280,11 @@ dasd_diag_check_device(dasd_device_t *device)
 	}
 	for (bsize = 512; bsize <= PAGE_SIZE; bsize <<= 1) {
 		mdsk_init_io(device, bsize, 0, 64);
-		memset(&bio, 0, sizeof (diag_bio_t));
+		memset(&bio, 0, sizeof (struct dasd_diag_bio));
 		bio.type = MDSK_READ_REQ;
 		bio.block_number = private->pt_block + 1;
 		bio.buffer = __pa(label);
-		memset(&private->iob, 0, sizeof (diag_rw_io_t));
+		memset(&private->iob, 0, sizeof (struct dasd_diag_rw_io));
 		private->iob.dev_nr = rdc_data->dev_nr;
 		private->iob.key = 0;
 		private->iob.flags = 0;	/* do synchronous io */
@@ -324,7 +315,7 @@ dasd_diag_check_device(dasd_device_t *device)
 }
 
 static int
-dasd_diag_fill_geometry(dasd_device_t *device, struct hd_geometry *geo)
+dasd_diag_fill_geometry(struct dasd_device *device, struct hd_geometry *geo)
 {
 	if (dasd_check_blocksize(device->bp_block) != 0)
 		return -EINVAL;
@@ -335,29 +326,29 @@ dasd_diag_fill_geometry(dasd_device_t *device, struct hd_geometry *geo)
 }
 
 static dasd_era_t
-dasd_diag_examine_error(dasd_ccw_req_t * cqr, struct irb * stat)
+dasd_diag_examine_error(struct dasd_ccw_req * cqr, struct irb * stat)
 {
 	return dasd_era_fatal;
 }
 
 static dasd_erp_fn_t
-dasd_diag_erp_action(dasd_ccw_req_t * cqr)
+dasd_diag_erp_action(struct dasd_ccw_req * cqr)
 {
 	return dasd_default_erp_action;
 }
 
 static dasd_erp_fn_t
-dasd_diag_erp_postaction(dasd_ccw_req_t * cqr)
+dasd_diag_erp_postaction(struct dasd_ccw_req * cqr)
 {
 	return dasd_default_erp_postaction;
 }
 
-static dasd_ccw_req_t *
-dasd_diag_build_cp(dasd_device_t * device, struct request *req)
+static struct dasd_ccw_req *
+dasd_diag_build_cp(struct dasd_device * device, struct request *req)
 {
-	dasd_ccw_req_t *cqr;
-	dasd_diag_req_t *dreq;
-	diag_bio_t *dbio;
+	struct dasd_ccw_req *cqr;
+	struct dasd_diag_req *dreq;
+	struct dasd_diag_bio *dbio;
 	struct bio *bio;
 	struct bio_vec *bv;
 	char *dst;
@@ -391,13 +382,14 @@ dasd_diag_build_cp(dasd_device_t * device, struct request *req)
 	if (count != last_rec - first_rec + 1)
 		return ERR_PTR(-EINVAL);
 	/* Build the request */
-	datasize = sizeof(dasd_diag_req_t) + count*sizeof(diag_bio_t);
+	datasize = sizeof(struct dasd_diag_req) +
+		count*sizeof(struct dasd_diag_bio);
 	cqr = dasd_smalloc_request(dasd_diag_discipline.name, 0,
 				   datasize, device);
 	if (IS_ERR(cqr))
 		return cqr;
 	
-	dreq = (dasd_diag_req_t *) cqr->data;
+	dreq = (struct dasd_diag_req *) cqr->data;
 	dreq->block_count = count;
 	dbio = dreq->bio;
 	recid = first_rec;
@@ -405,7 +397,7 @@ dasd_diag_build_cp(dasd_device_t * device, struct request *req)
 		bio_for_each_segment(bv, bio, i) {
 			dst = kmap(bv->bv_page) + bv->bv_offset;
 			for (off = 0; off < bv->bv_len; off += blksize) {
-				memset(dbio, 0, sizeof (diag_bio_t));
+				memset(dbio, 0, sizeof (struct dasd_diag_bio));
 				dbio->type = rw_cmd;
 				dbio->block_number = recid + 1;
 				dbio->buffer = __pa(dst);
@@ -423,24 +415,25 @@ dasd_diag_build_cp(dasd_device_t * device, struct request *req)
 }
 
 static int
-dasd_diag_fill_info(dasd_device_t * device, dasd_information2_t * info)
+dasd_diag_fill_info(struct dasd_device * device,
+		    struct dasd_information2_t * info)
 {
-	dasd_diag_private_t *private;
+	struct dasd_diag_private *private;
 
-	private = (dasd_diag_private_t *) device->private;
+	private = (struct dasd_diag_private *) device->private;
 	info->label_block = private->pt_block;
 	info->FBA_layout = 1;
 	info->format = DASD_FORMAT_LDL;
-	info->characteristics_size = sizeof (dasd_diag_characteristics_t);
+	info->characteristics_size = sizeof (struct dasd_diag_characteristics);
 	memcpy(info->characteristics,
-	       &((dasd_diag_private_t *) device->private)->rdc_data,
-	       sizeof (dasd_diag_characteristics_t));
+	       &((struct dasd_diag_private *) device->private)->rdc_data,
+	       sizeof (struct dasd_diag_characteristics));
 	info->confdata_size = 0;
 	return 0;
 }
 
 static void
-dasd_diag_dump_sense(dasd_device_t *device, dasd_ccw_req_t * req,
+dasd_diag_dump_sense(struct dasd_device *device, struct dasd_ccw_req * req,
 		     struct irb *stat)
 {
 	char *page;
@@ -463,15 +456,15 @@ dasd_diag_dump_sense(dasd_device_t *device, dasd_ccw_req_t * req,
  * max_blocks is dependent on the amount of storage that is available
  * in the static io buffer for each device. Currently each device has
  * 8192 bytes (=2 pages). dasd diag is only relevant for 31 bit.
- * The dasd_ccw_req_t has 96 bytes, the dasd_diag_req_t has 8 bytes and
- * the diag_bio_t for each block has 16 bytes. 
+ * The struct dasd_ccw_req has 96 bytes, the struct dasd_diag_req has
+ * 8 bytes and the struct dasd_diag_bio for each block has 16 bytes. 
  * That makes:
  * (8192 - 96 - 8) / 16 = 505.5 blocks at maximum.
  * We want to fit two into the available memory so that we can immediately
  * start the next request if one finishes off. That makes 252.75 blocks
  * for one request. Give a little safety and the result is 240.
  */
-dasd_discipline_t dasd_diag_discipline = {
+struct dasd_discipline dasd_diag_discipline = {
 	.owner = THIS_MODULE,
 	.name = "DIAG",
 	.ebcname = "DIAG",

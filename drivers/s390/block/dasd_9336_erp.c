@@ -4,10 +4,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 2000
  *
- * $Revision: 1.6 $
- *
- * History of changes 
- *
+ * $Revision: 1.8 $
  */
 
 #define PRINTK_HEADER "dasd_erp(9336)"
@@ -32,7 +29,7 @@
  *   dasd_era_recover	for all others.
  */
 dasd_era_t
-dasd_9336_erp_examine(dasd_ccw_req_t * cqr, struct irb * irb)
+dasd_9336_erp_examine(struct dasd_ccw_req * cqr, struct irb * irb)
 {
 	/* check for successful execution first */
 	if (irb->scsw.cstat == 0x00 &&

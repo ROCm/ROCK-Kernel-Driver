@@ -11,14 +11,10 @@
  * functions may not be called from interrupt context. In particular
  * dasd_get_device is a no-no from interrupt context.
  *
- * $Revision: 1.12 $
- *
- * History of changes 
- * 05/04/02 split from dasd.c, code restructuring.
+ * $Revision: 1.15 $
  */
 
 #include <linux/config.h>
-#include <linux/version.h>
 #include <linux/ctype.h>
 #include <linux/init.h>
 
@@ -40,14 +36,14 @@
  * can be removed since the device number will then be identical
  * to the device index.
  */
-typedef struct {
+struct dasd_devmap {
 	struct list_head devindex_list;
 	struct list_head devno_list;
         unsigned int devindex;
         unsigned short devno;
         unsigned short features;
-	dasd_device_t *device;
-} dasd_devmap_t;
+	struct dasd_device *device;
+};
 
 /*
  * Parameter parsing functions for dasd= parameter. The syntax is:
@@ -264,13 +260,12 @@ dasd_add_range(int from, int to, int features)
 	}
 	spin_lock(&dasd_devmap_lock);
 	for (devno = from; devno <= to; devno++) {
-		dasd_devmap_t *devmap, *tmp;
-		struct list_head *l;
+		struct dasd_devmap *devmap, *tmp;
 
 		devmap = NULL;
 		/* Find previous devmap for device number i */
-		list_for_each(l, &dasd_devno_hashlists[devno & 255]) {
-			tmp = list_entry(l, dasd_devmap_t, devno_list);
+		list_for_each_entry(tmp, &dasd_devno_hashlists[devno & 255],
+				    devno_list) {
 			if (tmp->devno == devno) {
 				devmap = tmp;
 				break;
@@ -278,8 +273,8 @@ dasd_add_range(int from, int to, int features)
 		}
 		if (devmap == NULL) {
 			/* This devno is new. */
-			devmap = (dasd_devmap_t *)
-				kmalloc(sizeof(dasd_devmap_t), GFP_KERNEL);
+			devmap = (struct dasd_devmap *)
+				kmalloc(sizeof(struct dasd_devmap),GFP_KERNEL);
 			if (devmap == NULL)
 				return -ENOMEM;
 			devindex = dasd_max_devindex++;
@@ -303,14 +298,15 @@ dasd_add_range(int from, int to, int features)
 int
 dasd_devno_in_range(int devno)
 {
-	struct list_head *l;
+	struct dasd_devmap *devmap;
 	int ret;
 		
 	ret = -ENOENT;
 	spin_lock(&dasd_devmap_lock);
 	/* Find devmap for device with device number devno */
-	list_for_each(l, &dasd_devno_hashlists[devno&255]) {
-		if (list_entry(l, dasd_devmap_t, devno_list)->devno == devno) {
+	list_for_each_entry(devmap, &dasd_devno_hashlists[devno&255],
+			    devno_list) {
+		if (devmap->devno == devno) {
 			/* Found the device. */
 			ret = 0;
 			break;
@@ -332,9 +328,9 @@ dasd_forget_ranges(void)
 	spin_lock(&dasd_devmap_lock);
 	for (i = 0; i < 256; i++) {
 		struct list_head *l, *next;
-		dasd_devmap_t *devmap;
+		struct dasd_devmap *devmap;
 		list_for_each_safe(l, next, &dasd_devno_hashlists[i]) {
-			devmap = list_entry(l, dasd_devmap_t, devno_list);
+			devmap = list_entry(l, struct dasd_devmap, devno_list);
 			if (devmap->device != NULL)
 				BUG();
 			list_del(&devmap->devindex_list);
@@ -349,17 +345,15 @@ dasd_forget_ranges(void)
  * Find the devmap structure from a devno. Can be removed as soon
  * as big minors are available.
  */
-static dasd_devmap_t *
+static struct dasd_devmap *
 dasd_devmap_from_devno(int devno)
 {
-	struct list_head *l;
-	dasd_devmap_t *devmap, *tmp;
+	struct dasd_devmap *devmap, *tmp;
 		
 	devmap = NULL;
 	spin_lock(&dasd_devmap_lock);
 	/* Find devmap for device with device number devno */
-	list_for_each(l, &dasd_devno_hashlists[devno&255]) {
-		tmp = list_entry(l, dasd_devmap_t, devno_list);
+	list_for_each_entry(tmp, &dasd_devno_hashlists[devno&255], devno_list) {
 		if (tmp->devno == devno) {
 			/* Found the device, return devmap */
 			devmap = tmp;
@@ -374,17 +368,16 @@ dasd_devmap_from_devno(int devno)
  * Find the devmap for a device by its device index. Can be removed
  * as soon as big minors are available.
  */
-static dasd_devmap_t *
+static struct dasd_devmap *
 dasd_devmap_from_devindex(int devindex)
 {
-	struct list_head *l;
-	dasd_devmap_t *devmap, *tmp;
+	struct dasd_devmap *devmap, *tmp;
 		
 	devmap = NULL;
 	spin_lock(&dasd_devmap_lock);
 	/* Find devmap for device with device index devindex */
-	list_for_each(l, &dasd_devindex_hashlists[devindex & 255]) {
-		tmp = list_entry(l, dasd_devmap_t, devindex_list);
+	list_for_each_entry(tmp, &dasd_devindex_hashlists[devindex & 255],
+			    devindex_list) {
 		if (tmp->devindex == devindex) {
 			/* Found the device, return devno */
 			devmap = tmp;
@@ -395,11 +388,11 @@ dasd_devmap_from_devindex(int devindex)
 	return devmap;
 }
 
-dasd_device_t *
+struct dasd_device *
 dasd_device_from_devindex(int devindex)
 {
-	dasd_devmap_t *devmap;
-	dasd_device_t *device;
+	struct dasd_devmap *devmap;
+	struct dasd_device *device;
 
 	devmap = dasd_devmap_from_devindex(devindex);
 	spin_lock(&dasd_devmap_lock);
@@ -416,9 +409,9 @@ dasd_device_from_devindex(int devindex)
  * Return kdev for a dasd device.
  */
 kdev_t
-dasd_get_kdev(dasd_device_t *device)
+dasd_get_kdev(struct dasd_device *device)
 {
-	dasd_devmap_t *devmap;
+	struct dasd_devmap *devmap;
 	int major, minor;
 	int devno;
 
@@ -436,11 +429,11 @@ dasd_get_kdev(dasd_device_t *device)
 /*
  * Create a dasd device structure for cdev.
  */
-dasd_device_t *
+struct dasd_device *
 dasd_create_device(struct ccw_device *cdev)
 {
-	dasd_devmap_t *devmap;
-	dasd_device_t *device;
+	struct dasd_devmap *devmap;
+	struct dasd_device *device;
 	int devno;
 	int rc;
 
@@ -491,10 +484,10 @@ static DECLARE_WAIT_QUEUE_HEAD(dasd_delete_wq);
  * Remove a dasd device structure.
  */
 void
-dasd_delete_device(dasd_device_t *device)
+dasd_delete_device(struct dasd_device *device)
 {
 	struct ccw_device *cdev;
-	dasd_devmap_t *devmap;
+	struct dasd_devmap *devmap;
 	int devno;
 
 	/* First remove device pointer from devmap. */
@@ -526,7 +519,7 @@ dasd_delete_device(dasd_device_t *device)
  * in dasd_delete_device.
  */
 void
-dasd_put_device_wake(dasd_device_t *device)
+dasd_put_device_wake(struct dasd_device *device)
 {
 	wake_up(&dasd_delete_wq);
 }
