@@ -7,6 +7,7 @@
 #include <linux/pci.h>
 #include <linux/init.h>
 #include <linux/agp_backend.h>
+#include <asm/agp.h>
 #include "agp.h"
 
 static struct aper_size_info_lvl2 ati_generic_sizes[7] =
@@ -47,13 +48,8 @@ static int ati_create_page_map(ati_page_map *page_map)
 		return -ENOMEM;
 
 	SetPageReserved(virt_to_page(page_map->real));
-	/*
-	 * fredi - WARNING: added looking at the changes during
-	 * 2.4.20. I dont know if it's needed though.
-	 */
-#ifdef CONFIG_X86
 	err = map_page_into_agp(virt_to_page(page_map->real));
-#endif
+
 	/* CACHE_FLUSH(); */
 	global_cache_flush();
 	page_map->remapped = ioremap_nocache(virt_to_phys(page_map->real),
@@ -76,13 +72,7 @@ static int ati_create_page_map(ati_page_map *page_map)
 
 static void ati_free_page_map(ati_page_map *page_map)
 {
-	/*
-	 * fredi - WARNING: added looking at the changes during
-	 * 2.4.20. I dont know if it's needed though.
-	 */
-#ifdef CONFIG_X86
 	unmap_page_from_agp(virt_to_page(page_map->real));
-#endif
 	iounmap(page_map->remapped);
 	ClearPageReserved(virt_to_page(page_map->real));
 	free_page((unsigned long) page_map->real);
@@ -251,7 +241,7 @@ static int ati_configure(void)
 #define GET_PAGE_DIR_IDX(addr) (GET_PAGE_DIR_OFF(addr) - \
 	GET_PAGE_DIR_OFF(agp_bridge->gart_bus_addr))
 #define GET_GATT_OFF(addr) ((addr & 0x003ff000) >> 12)
-#undef  GET_GATT(addr)
+#undef  GET_GATT
 #define GET_GATT(addr) (ati_generic_private.gatt_pages[\
 	GET_PAGE_DIR_IDX(addr)]->remapped)
 
@@ -453,7 +443,7 @@ static int __init agp_ati_probe(struct pci_dev *pdev,
 {
 	struct agp_device_ids *devs = ali_agp_device_ids;
 	struct agp_bridge_data *bridge;
-	u8 hidden_1621_id, cap_ptr;
+	u8 cap_ptr;
 	int j;
 
 	cap_ptr = pci_find_capability(pdev, PCI_CAP_ID_AGP);
