@@ -1686,19 +1686,7 @@ static void print_raid5_conf (raid5_conf_t *conf)
 	}
 }
 
-static struct disk_info *find_spare(mddev_t *mddev, int number)
-{
-	raid5_conf_t *conf = mddev->private;
-	int i;
-	for (i = conf->raid_disks; i < MD_SB_DISKS; i++) {
-		struct disk_info *p = conf->disks + i;
-		if (p->spare && p->number == number)
-			return p;
-	}
-	return NULL;
-}
-
-static int raid5_spare_active(mddev_t *mddev, mdp_disk_t **d)
+static int raid5_spare_active(mddev_t *mddev)
 {
 	int err = 0;
 	int i, failed_disk=-1, spare_disk=-1;
@@ -1727,18 +1715,7 @@ static int raid5_spare_active(mddev_t *mddev, mdp_disk_t **d)
 	 * Find the spare disk ... (can only be in the 'high'
 	 * area of the array)
 	 */
-	for (i = conf->raid_disks; i < MD_SB_DISKS; i++) {
-		tmp = conf->disks + i;
-		if (tmp->spare && tmp->number == (*d)->number) {
-			spare_disk = i;
-			break;
-		}
-	}
-	if (spare_disk == -1) {
-		MD_BUG();
-		err = 1;
-		goto abort;
-	}
+	spare_disk = mddev->spare->raid_disk;
 
 	if (!conf->spare) {
 		MD_BUG();
@@ -1751,7 +1728,7 @@ static int raid5_spare_active(mddev_t *mddev, mdp_disk_t **d)
 	spare_desc = &sb->disks[sdisk->number];
 	failed_desc = &sb->disks[fdisk->number];
 
-	if (spare_desc != *d || spare_desc->raid_disk != sdisk->raid_disk ||
+	if ( spare_desc->raid_disk != sdisk->raid_disk ||
 	    sdisk->raid_disk != spare_disk || fdisk->raid_disk != failed_disk ||
 	    failed_desc->raid_disk != fdisk->raid_disk) {
 		MD_BUG();
@@ -1788,8 +1765,6 @@ static int raid5_spare_active(mddev_t *mddev, mdp_disk_t **d)
 	xchg_values(spare_desc->number, failed_desc->number);
 	xchg_values(sdisk->number, fdisk->number);
 
-	*d = failed_desc;
-
 	if (!sdisk->bdev)
 		sdisk->used_slot = 0;
 
@@ -1821,7 +1796,7 @@ static int raid5_spare_inactive(mddev_t *mddev)
 
 	print_raid5_conf(conf);
 	spin_lock_irq(&conf->device_lock);
-	p = find_spare(mddev, mddev->spare->number);
+	p = conf->disks + mddev->spare->raid_disk;
 	if (p) {
 		p->operational = 0;
 		p->write_only = 0;
@@ -1836,7 +1811,7 @@ static int raid5_spare_inactive(mddev_t *mddev)
 	return err;
 }
 
-static int raid5_spare_write(mddev_t *mddev, int number)
+static int raid5_spare_write(mddev_t *mddev)
 {
 	raid5_conf_t *conf = mddev->private;
 	struct disk_info *p;
@@ -1844,7 +1819,7 @@ static int raid5_spare_write(mddev_t *mddev, int number)
 
 	print_raid5_conf(conf);
 	spin_lock_irq(&conf->device_lock);
-	p = find_spare(mddev, number);
+	p = conf->disks + mddev->spare->raid_disk;
 	if (p && !conf->spare) {
 		p->operational = 1;
 		p->write_only = 1;
@@ -1862,25 +1837,19 @@ static int raid5_remove_disk(mddev_t *mddev, int number)
 {
 	raid5_conf_t *conf = mddev->private;
 	int err = 1;
-	int i;
+	struct disk_info *p = conf->disks + number;
 
 	print_raid5_conf(conf);
 	spin_lock_irq(&conf->device_lock);
 
-	for (i = 0; i < MD_SB_DISKS; i++) {
-		struct disk_info *p = conf->disks + i;
-		if (p->used_slot && p->number == number) {
-			if (p->operational) {
-				err = -EBUSY;
-				goto abort;
-			}
-			if (p->spare && i < conf->raid_disks)
-				break;
-			p->bdev = NULL;
-			p->used_slot = 0;
-			err = 0;
-			break;
+	if (p->used_slot) {
+		if (p->operational) {
+			err = -EBUSY;
+			goto abort;
 		}
+		p->bdev = NULL;
+		p->used_slot = 0;
+		err = 0;
 	}
 	if (err)
 		MD_BUG();

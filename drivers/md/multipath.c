@@ -333,25 +333,21 @@ static int multipath_remove_disk(mddev_t *mddev, int number)
 {
 	multipath_conf_t *conf = mddev->private;
 	int err = 1;
-	int i;
+	struct multipath_info *p = conf->multipaths + number;
 
 	print_multipath_conf(conf);
 	spin_lock_irq(&conf->device_lock);
 
-	for (i = 0; i < MD_SB_DISKS; i++) {
-		struct multipath_info *p = conf->multipaths + i;
-		if (p->used_slot && (p->number == number)) {
-			if (p->operational) {
-				printk(KERN_ERR "hot-remove-disk, slot %d is identified to be the requested disk (number %d), but is still operational!\n", i, number);
-				err = -EBUSY;
-				goto abort;
-			}
-			p->bdev = NULL;
-			p->used_slot = 0;
-			conf->nr_disks--;
-			err = 0;
-			break;
+	if (p->used_slot) {
+		if (p->operational) {
+			printk(KERN_ERR "hot-remove-disk, slot %d is identified but is still operational!\n", number);
+			err = -EBUSY;
+			goto abort;
 		}
+		p->bdev = NULL;
+		p->used_slot = 0;
+		conf->nr_disks--;
+		err = 0;
 	}
 	if (err)
 		MD_BUG();

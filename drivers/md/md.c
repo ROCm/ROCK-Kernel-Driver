@@ -2202,7 +2202,7 @@ static int hot_remove_disk(mddev_t * mddev, kdev_t dev)
 		return -EINVAL;
 	}
 
-	err = mddev->pers->hot_remove_disk(mddev, disk->number);
+	err = mddev->pers->hot_remove_disk(mddev, disk->raid_disk);
 	if (err == -EBUSY) {
 		MD_BUG();
 		goto busy;
@@ -3314,8 +3314,7 @@ void md_do_recovery(void *data)
 					goto unlock;
 				/* success...*/
 				if (mddev->spare) {
-					mddev->pers->spare_active(mddev,
-								&mddev->spare);
+					mddev->pers->spare_active(mddev);
 					mark_disk_sync(mddev->spare);
 					mark_disk_active(mddev->spare);
 					sb->active_disks++;
@@ -3359,8 +3358,7 @@ void md_do_recovery(void *data)
 				mddev->recovery_running = 0;
 			} else {
 				if (mddev->spare)
-					mddev->pers->spare_write(mddev,
-						mddev->spare->number);
+					mddev->pers->spare_write(mddev);
 				mddev->recovery_running = 1;
 				md_wakeup_thread(mddev->sync_thread);
 			}

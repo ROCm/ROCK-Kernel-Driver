@@ -207,9 +207,9 @@ struct mdk_personality_s
 	int (*error_handler)(mddev_t *mddev, struct block_device *bdev);
 	int (*hot_add_disk) (mddev_t *mddev, mdp_disk_t *descriptor, mdk_rdev_t *rdev);
 	int (*hot_remove_disk) (mddev_t *mddev, int number);
-	int (*spare_write) (mddev_t *mddev, int number);
+	int (*spare_write) (mddev_t *mddev);
 	int (*spare_inactive) (mddev_t *mddev);
-	int (*spare_active) (mddev_t *mddev, mdp_disk_t **descriptor);
+	int (*spare_active) (mddev_t *mddev);
 	int (*sync_request)(mddev_t *mddev, sector_t sector_nr, int go_faster);
 };
 

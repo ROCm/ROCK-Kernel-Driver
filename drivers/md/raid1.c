@@ -657,19 +657,7 @@ static void close_sync(conf_t *conf)
 	conf->r1buf_pool = NULL;
 }
 
-static mirror_info_t *find_spare(mddev_t *mddev, int number)
-{
-	conf_t *conf = mddev->private;
-	int i;
-	for (i = conf->raid_disks; i < MD_SB_DISKS; i++) {
-		mirror_info_t *p = conf->mirrors + i;
-		if (p->spare && p->number == number)
-			return p;
-	}
-	return NULL;
-}
-
-static int raid1_spare_active(mddev_t *mddev, mdp_disk_t **d)
+static int raid1_spare_active(mddev_t *mddev)
 {
 	int err = 0;
 	int i, failed_disk = -1, spare_disk = -1;
@@ -706,18 +694,7 @@ static int raid1_spare_active(mddev_t *mddev, mdp_disk_t **d)
 	 * Find the spare disk ... (can only be in the 'high'
 	 * area of the array)
 	 */
-	for (i = conf->raid_disks; i < MD_SB_DISKS; i++) {
-		tmp = conf->mirrors + i;
-		if (tmp->spare && tmp->number == (*d)->number) {
-			spare_disk = i;
-			break;
-		}
-	}
-	if (spare_disk == -1) {
-		MD_BUG();
-		err = 1;
-		goto abort;
-	}
+	spare_disk = mddev->spare->raid_disk;
 
 	sdisk = conf->mirrors + spare_disk;
 	fdisk = conf->mirrors + failed_disk;
@@ -725,7 +702,7 @@ static int raid1_spare_active(mddev_t *mddev, mdp_disk_t **d)
 	spare_desc = &sb->disks[sdisk->number];
 	failed_desc = &sb->disks[fdisk->number];
 
-	if (spare_desc != *d || spare_desc->raid_disk != sdisk->raid_disk ||
+	if (spare_desc->raid_disk != sdisk->raid_disk ||
 	    sdisk->raid_disk != spare_disk || fdisk->raid_disk != failed_disk ||
 	    failed_desc->raid_disk != fdisk->raid_disk) {
 		MD_BUG();
@@ -762,8 +739,6 @@ static int raid1_spare_active(mddev_t *mddev, mdp_disk_t **d)
 	xchg_values(spare_desc->number, failed_desc->number);
 	xchg_values(sdisk->number, fdisk->number);
 
-	*d = failed_desc;
-
 	if (!sdisk->bdev)
 		sdisk->used_slot = 0;
 	/*
@@ -794,7 +769,7 @@ static int raid1_spare_inactive(mddev_t *mddev)
 
 	print_conf(conf);
 	spin_lock_irq(&conf->device_lock);
-	p = find_spare(mddev, mddev->spare->number);
+	p = conf->mirrors + mddev->spare->raid_disk;
 	if (p) {
 		p->operational = 0;
 		p->write_only = 0;
@@ -807,7 +782,7 @@ static int raid1_spare_inactive(mddev_t *mddev)
 	return err;
 }
 
-static int raid1_spare_write(mddev_t *mddev, int number)
+static int raid1_spare_write(mddev_t *mddev)
 {
 	conf_t *conf = mddev->private;
 	mirror_info_t *p;
@@ -815,7 +790,7 @@ static int raid1_spare_write(mddev_t *mddev, int number)
 
 	print_conf(conf);
 	spin_lock_irq(&conf->device_lock);
-	p = find_spare(mddev, number);
+	p = conf->mirrors + mddev->spare->raid_disk;
 	if (p) {
 		p->operational = 1;
 		p->write_only = 1;
@@ -871,25 +846,19 @@ static int raid1_remove_disk(mddev_t *mddev, int number)
 {
 	conf_t *conf = mddev->private;
 	int err = 1;
-	int i;
+	mirror_info_t *p = conf->mirrors+ number;
 
 	print_conf(conf);
 	spin_lock_irq(&conf->device_lock);
-	for (i = 0; i < MD_SB_DISKS; i++) {
-		mirror_info_t *p = conf->mirrors + i;
-		if (p->used_slot && (p->number == number)) {
-			if (p->operational) {
-				err = -EBUSY;
-				goto abort;
-			}
-			if (p->spare && (i < conf->raid_disks))
-				break;
-			p->bdev = NULL;
-			p->used_slot = 0;
-			conf->nr_disks--;
-			err = 0;
-			break;
+	if (p->used_slot) {
+		if (p->operational) {
+			err = -EBUSY;
+			goto abort;
 		}
+		p->bdev = NULL;
+		p->used_slot = 0;
+		conf->nr_disks--;
+		err = 0;
 	}
 	if (err)
 		MD_BUG();
