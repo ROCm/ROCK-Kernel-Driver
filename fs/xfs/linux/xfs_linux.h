@@ -96,6 +96,8 @@ static inline void set_buffer_unwritten_io(struct buffer_head *bh)
 #define xfs_error_level		xfs_params.error_level.val
 #define xfs_syncd_interval	xfs_params.sync_interval.val
 #define xfs_stats_clear		xfs_params.stats_clear.val
+#define xfs_inherit_sync	xfs_params.inherit_sync.val
+#define xfs_inherit_nodump	xfs_params.inherit_nodump.val
 
 #define NBPP		PAGE_SIZE
 #define DPPSHFT		(PAGE_SHIFT - 9)

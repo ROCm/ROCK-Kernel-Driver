@@ -213,6 +213,22 @@ vn_revalidate(
 		inode->i_ctime	    = va.va_ctime;
 		inode->i_atime	    = va.va_atime;
 		i_size_write(inode, va.va_size);
+		if (va.va_xflags & XFS_XFLAG_IMMUTABLE)
+			inode->i_flags |= S_IMMUTABLE;
+		else
+			inode->i_flags &= ~S_IMMUTABLE;
+		if (va.va_xflags & XFS_XFLAG_APPEND)
+			inode->i_flags |= S_APPEND;
+		else
+			inode->i_flags &= ~S_APPEND;
+		if (va.va_xflags & XFS_XFLAG_SYNC)
+			inode->i_flags |= S_SYNC;
+		else
+			inode->i_flags &= ~S_SYNC;
+		if (va.va_xflags & XFS_XFLAG_NOATIME)
+			inode->i_flags |= S_NOATIME;
+		else
+			inode->i_flags &= ~S_NOATIME;
 		VUNMODIFY(vp);
 	}
 	return -error;

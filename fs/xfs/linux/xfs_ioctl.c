@@ -72,6 +72,13 @@
 #include <linux/namei.h>
 #include <linux/pagemap.h>
 
+/*
+ * ioctl commands that are used by Linux filesystems
+ */
+#define XFS_IOC_GETXFLAGS	_IOR('f', 1, long)
+#define XFS_IOC_SETXFLAGS	_IOW('f', 2, long)
+#define XFS_IOC_GETVERSION	_IOR('v', 1, long)
+
 
 /*
  * xfs_find_handle maps from userspace xfs_fsop_handlereq structure to
@@ -328,6 +335,17 @@ xfs_open_by_handle(
 	if (permflag & O_TRUNC)
 		permflag |= 2;
 
+	if ((!(permflag & O_APPEND) || (permflag & O_TRUNC)) &&
+	    (permflag & FMODE_WRITE) && IS_APPEND(inode)) {
+		iput(inode);
+		return -XFS_ERROR(EPERM);
+	}
+
+	if ((permflag & FMODE_WRITE) && IS_IMMUTABLE(inode)) {
+		iput(inode);
+		return -XFS_ERROR(EACCES);
+	}
+
 	/* Can't write directories. */
 	if ( S_ISDIR(inode->i_mode) && (permflag & FMODE_WRITE)) {
 		iput(inode);
@@ -429,6 +447,11 @@ xfs_fssetdm_by_handle(
 	if (error)
 		return -error;
 
+	if (IS_IMMUTABLE(inode) || IS_APPEND(inode)) {
+		VN_RELE(vp);
+		return -XFS_ERROR(EPERM);
+	}
+
 	if (copy_from_user(&fsd, dmhreq.data, sizeof(fsd))) {
 		VN_RELE(vp);
 		return -XFS_ERROR(EFAULT);
@@ -514,11 +537,19 @@ xfs_attrmulti_by_handle(
 					NULL, ops[i].am_error);
 			break;
 		case ATTR_OP_SET:
+			if (IS_IMMUTABLE(inode) || IS_APPEND(inode)) {
+				ops[i].am_error = EPERM;
+				break;
+			}
 			VOP_ATTR_SET(vp,ops[i].am_attrname, ops[i].am_attrvalue,
 					ops[i].am_length, ops[i].am_flags,
 					NULL, ops[i].am_error);
 			break;
 		case ATTR_OP_REMOVE:
+			if (IS_IMMUTABLE(inode) || IS_APPEND(inode)) {
+				ops[i].am_error = EPERM;
+				break;
+			}
 			VOP_ATTR_REMOVE(vp, ops[i].am_attrname, ops[i].am_flags,
 					NULL, ops[i].am_error);
 			break;
@@ -566,6 +597,7 @@ xfs_ioc_fsgeometry(
 STATIC int
 xfs_ioc_xattr(
 	vnode_t			*vp,
+	xfs_inode_t		*ip,
 	struct file		*filp,
 	unsigned int		cmd,
 	unsigned long		arg);
@@ -648,10 +680,13 @@ xfs_ioctl(
 	case XFS_IOC_FSGEOMETRY:
 		return xfs_ioc_fsgeometry(mp, arg);
 
+	case XFS_IOC_GETVERSION:
+	case XFS_IOC_GETXFLAGS:
+	case XFS_IOC_SETXFLAGS:
 	case XFS_IOC_FSGETXATTR:
 	case XFS_IOC_FSSETXATTR:
 	case XFS_IOC_FSGETXATTRA:
-		return xfs_ioc_xattr(vp, filp, cmd, arg);
+		return xfs_ioc_xattr(vp, ip, filp, cmd, arg);
 
 	case XFS_IOC_FSSETDM: {
 		struct fsdmidata	dmi;
@@ -837,6 +872,9 @@ xfs_ioc_space(
 	int			attr_flags = 0;
 	int			error;
 
+	if (vp->v_inode.i_flags & (S_IMMUTABLE|S_APPEND))
+		return -XFS_ERROR(EPERM);
+
 	if (filp->f_flags & O_RDONLY)
 		return -XFS_ERROR(EBADF);
 
@@ -957,9 +995,50 @@ xfs_ioc_fsgeometry(
 	return 0;
 }
 
+/*
+ * Linux extended inode flags interface.
+ */
+#define LINUX_XFLAG_SYNC	0x00000008 /* Synchronous updates */
+#define LINUX_XFLAG_IMMUTABLE	0x00000010 /* Immutable file */
+#define LINUX_XFLAG_APPEND	0x00000020 /* writes to file may only append */
+#define LINUX_XFLAG_NODUMP	0x00000040 /* do not dump file */
+#define LINUX_XFLAG_NOATIME	0x00000080 /* do not update atime */
+
+STATIC unsigned int
+xfs_merge_ioc_xflags(
+	unsigned int	flags,
+	unsigned int	start)
+{
+	unsigned int	xflags = start;
+
+	if (flags & LINUX_XFLAG_IMMUTABLE)
+		xflags |= XFS_XFLAG_IMMUTABLE;
+	else
+		xflags &= ~XFS_XFLAG_IMMUTABLE;
+	if (flags & LINUX_XFLAG_APPEND)
+		xflags |= XFS_XFLAG_APPEND;
+	else
+		xflags &= ~XFS_XFLAG_APPEND;
+	if (flags & LINUX_XFLAG_SYNC)
+		xflags |= XFS_XFLAG_SYNC;
+	else
+		xflags &= ~XFS_XFLAG_SYNC;
+	if (flags & LINUX_XFLAG_NOATIME)
+		xflags |= XFS_XFLAG_NOATIME;
+	else
+		xflags &= ~XFS_XFLAG_NOATIME;
+	if (flags & LINUX_XFLAG_NODUMP)
+		xflags |= XFS_XFLAG_NODUMP;
+	else
+		xflags &= ~XFS_XFLAG_NODUMP;
+
+	return xflags;
+}
+
 STATIC int
 xfs_ioc_xattr(
 	vnode_t			*vp,
+	xfs_inode_t		*ip,
 	struct file		*filp,
 	unsigned int		cmd,
 	unsigned long		arg)
@@ -967,6 +1046,8 @@ xfs_ioc_xattr(
 	struct fsxattr		fa;
 	vattr_t			va;
 	int			error;
+	int			attr_flags;
+	unsigned int		flags;
 
 	switch (cmd) {
 	case XFS_IOC_FSGETXATTR: {
@@ -985,24 +1066,24 @@ xfs_ioc_xattr(
 	}
 
 	case XFS_IOC_FSSETXATTR: {
-		int		attr_flags = 0;
-
 		if (copy_from_user(&fa, (struct fsxattr *)arg, sizeof(fa)))
 			return -XFS_ERROR(EFAULT);
+
+		attr_flags = 0;
+		if (filp->f_flags & (O_NDELAY|O_NONBLOCK))
+			attr_flags |= ATTR_NONBLOCK;
 
 		va.va_mask = XFS_AT_XFLAGS | XFS_AT_EXTSIZE;
 		va.va_xflags  = fa.fsx_xflags;
 		va.va_extsize = fa.fsx_extsize;
 
-		if (filp->f_flags & (O_NDELAY|O_NONBLOCK))
-			attr_flags |= ATTR_NONBLOCK;
-
 		VOP_SETATTR(vp, &va, attr_flags, NULL, error);
+		if (!error)
+			vn_revalidate(vp);	/* update Linux inode flags */
 		return -error;
 	}
 
 	case XFS_IOC_FSGETXATTRA: {
-
 		va.va_mask = XFS_AT_XFLAGS|XFS_AT_EXTSIZE|XFS_AT_ANEXTENTS;
 		VOP_GETATTR(vp, &va, 0, NULL, error);
 		if (error)
@@ -1017,9 +1098,54 @@ xfs_ioc_xattr(
 		return 0;
 	}
 
+	case XFS_IOC_GETXFLAGS: {
+		flags = 0;
+		if (ip->i_d.di_flags & XFS_XFLAG_IMMUTABLE)
+			flags |= LINUX_XFLAG_IMMUTABLE;
+		if (ip->i_d.di_flags & XFS_XFLAG_APPEND)
+			flags |= LINUX_XFLAG_APPEND;
+		if (ip->i_d.di_flags & XFS_XFLAG_SYNC)
+			flags |= LINUX_XFLAG_SYNC;
+		if (ip->i_d.di_flags & XFS_XFLAG_NOATIME)
+			flags |= LINUX_XFLAG_NOATIME;
+		if (ip->i_d.di_flags & XFS_XFLAG_NODUMP)
+			flags |= LINUX_XFLAG_NODUMP;
+		if (copy_to_user((unsigned int *)arg, &flags, sizeof(flags)))
+			return -XFS_ERROR(EFAULT);
+		return 0;
+	}
+
+	case XFS_IOC_SETXFLAGS: {
+		if (copy_from_user(&flags, (unsigned int *)arg, sizeof(flags)))
+			return -XFS_ERROR(EFAULT);
+
+		if (flags & ~(LINUX_XFLAG_IMMUTABLE | LINUX_XFLAG_APPEND | \
+			      LINUX_XFLAG_NOATIME | LINUX_XFLAG_NODUMP | \
+			      LINUX_XFLAG_SYNC))
+			return -XFS_ERROR(EOPNOTSUPP);
+
+		attr_flags = 0;
+		if (filp->f_flags & (O_NDELAY|O_NONBLOCK))
+			attr_flags |= ATTR_NONBLOCK;
+
+		va.va_mask = XFS_AT_XFLAGS;
+		va.va_xflags = xfs_merge_ioc_xflags(flags, ip->i_d.di_flags);
+
+		VOP_SETATTR(vp, &va, attr_flags, NULL, error);
+		if (!error)
+			vn_revalidate(vp);	/* update Linux inode flags */
+		return -error;
+	}
+
+	case XFS_IOC_GETVERSION: {
+		flags = LINVFS_GET_IP(vp)->i_generation;
+		if (copy_to_user((unsigned int *)arg, &flags, sizeof(flags)))
+			return -XFS_ERROR(EFAULT);
+		return 0;
+	}
+
 	default:
 		return -ENOTTY;
-
 	}
 }
 

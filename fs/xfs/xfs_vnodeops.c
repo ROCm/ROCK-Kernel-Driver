@@ -265,6 +265,16 @@ xfs_getattr(
 			XFS_XFLAG_REALTIME : 0) |
 		((ip->i_d.di_flags & XFS_DIFLAG_PREALLOC) ?
 			XFS_XFLAG_PREALLOC : 0) |
+	        ((ip->i_d.di_flags & XFS_DIFLAG_IMMUTABLE) ?
+		        XFS_XFLAG_IMMUTABLE : 0) |
+		((ip->i_d.di_flags & XFS_DIFLAG_APPEND) ?
+		        XFS_XFLAG_APPEND : 0) |
+		((ip->i_d.di_flags & XFS_DIFLAG_SYNC) ?
+		        XFS_XFLAG_SYNC : 0) |
+		((ip->i_d.di_flags & XFS_DIFLAG_NOATIME) ?
+		        XFS_XFLAG_NOATIME : 0) |
+		((ip->i_d.di_flags & XFS_DIFLAG_NODUMP) ?
+		        XFS_XFLAG_NODUMP: 0) |
 		(XFS_IFORK_Q(ip) ?
 			XFS_XFLAG_HASATTR : 0);
 	vap->va_extsize = ip->i_d.di_extsize << mp->m_sb.sb_blocklog;
@@ -647,6 +657,20 @@ xfs_setattr(
 				goto error_return;
 			}
 		}
+
+		/*
+		 * Can't modify an immutable/append-only file unless
+		 * we have appropriate permission.
+		 */
+		if ((mask & XFS_AT_XFLAGS) &&
+		    (ip->i_d.di_flags &
+				(XFS_DIFLAG_IMMUTABLE|XFS_DIFLAG_APPEND) ||
+		     (vap->va_xflags &
+				(XFS_XFLAG_IMMUTABLE | XFS_XFLAG_APPEND))) &&
+		    !capable(CAP_LINUX_IMMUTABLE)) {
+			code = XFS_ERROR(EPERM);
+			goto error_return;
+		}
 	}
 
 	/*
@@ -832,6 +856,16 @@ xfs_setattr(
 				ip->i_d.di_flags |= XFS_DIFLAG_REALTIME;
 				ip->i_iocore.io_flags |= XFS_IOCORE_RT;
 			}
+			if (vap->va_xflags & XFS_XFLAG_IMMUTABLE)
+				ip->i_d.di_flags |= XFS_DIFLAG_IMMUTABLE;
+			if (vap->va_xflags & XFS_XFLAG_APPEND)
+				ip->i_d.di_flags |= XFS_DIFLAG_APPEND;
+			if (vap->va_xflags & XFS_XFLAG_SYNC)
+				ip->i_d.di_flags |= XFS_DIFLAG_SYNC;
+			if (vap->va_xflags & XFS_XFLAG_NOATIME)
+				ip->i_d.di_flags |= XFS_DIFLAG_NOATIME;
+			if (vap->va_xflags & XFS_XFLAG_NODUMP)
+				ip->i_d.di_flags |= XFS_DIFLAG_NODUMP;
 			/* can't set PREALLOC this way, just ignore it */
 		}
 		xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
@@ -1634,7 +1668,7 @@ xfs_release(
 		if ((((ip->i_d.di_mode & IFMT) == IFREG) &&
 		     ((ip->i_d.di_size > 0) || (VN_CACHED(vp) > 0)) &&
 		     (ip->i_df.if_flags & XFS_IFEXTENTS))  &&
-		    (!(ip->i_d.di_flags & XFS_DIFLAG_PREALLOC))) {
+		    (!(ip->i_d.di_flags & (XFS_DIFLAG_PREALLOC|XFS_DIFLAG_APPEND)))) {
 			if ((error = xfs_inactive_free_eofblocks(mp, ip)))
 				return (error);
 			/* Update linux inode block count after free above */
@@ -1709,7 +1743,7 @@ xfs_inactive(
 		if ((((ip->i_d.di_mode & IFMT) == IFREG) &&
 		     ((ip->i_d.di_size > 0) || (VN_CACHED(vp) > 0)) &&
 		     (ip->i_df.if_flags & XFS_IFEXTENTS))  &&
-		    (!(ip->i_d.di_flags & XFS_DIFLAG_PREALLOC) ||
+		    (!(ip->i_d.di_flags & (XFS_DIFLAG_PREALLOC|XFS_DIFLAG_APPEND)) ||
 		     (ip->i_delayed_blks != 0))) {
 			if ((error = xfs_inactive_free_eofblocks(mp, ip)))
 				return (VN_INACTIVE_CACHE);

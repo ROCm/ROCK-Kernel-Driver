@@ -3021,6 +3021,12 @@ xfs_prdinode_core(xfs_dinode_core_t *dip, int convert)
 	static char *diflags[] = {
 		"realtime",		/* XFS_DIFLAG_REALTIME */
 		"prealloc",		/* XFS_DIFLAG_PREALLOC */
+		"newrtbm",		/* XFS_DIFLAG_NEWRTBM */
+		"immutable",		/* XFS_DIFLAG_IMMUTABLE */
+		"append",		/* XFS_DIFLAG_APPEND */
+		"sync",			/* XFS_DIFLAG_SYNC */
+		"noatime",		/* XFS_DIFLAG_NOATIME */
+		"nodump",		/* XFS_DIFLAG_NODUMP */
 		NULL
 	};
 
