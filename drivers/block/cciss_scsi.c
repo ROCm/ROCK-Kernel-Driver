@@ -534,7 +534,7 @@ cciss_scsi_setup(int cntl_num)
 	if (shba == NULL)
 		return;
 	shba->scsi_host = NULL;
-	shba->lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&shba->lock);
 	shba->registered = 0;
 	if (scsi_cmd_stack_setup(cntl_num, shba) != 0) {
 		kfree(shba);
