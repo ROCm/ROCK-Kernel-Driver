@@ -77,16 +77,15 @@ static int initiate_cifs_search(const int xid, struct file * file, char * full_p
 /* return length of unicode string in bytes */
 static int cifs_unicode_bytelen(char * str)
 {
-
 	int len;
+	__le16 * ustr = (__le16 *)str;
 
-	for(len=0;len <= 2*PATH_MAX;len+=2) {
-		if((str[len] == 0) && (str[len+1] == 0)) {
-			return len;
-		}
+	for(len=0;len <= PATH_MAX;len++) {
+		if(ustr[len] == 0)
+			return len << 1;
 	}
 	cFYI(1,("Unicode string longer than PATH_MAX found"));
-	return len;
+	return len << 1;
 }
 
 static char * nxt_dir_entry(char * old_entry, char * end_of_smb)
@@ -103,6 +102,9 @@ static char * nxt_dir_entry(char * old_entry, char * end_of_smb)
 		return new_entry;
 
 }
+
+#define UNICODE_DOT cpu_to_le16(0x2e)
+
 /* return 0 if no match and 1 for . (current directory) and 2 for .. (parent) */
 static int cifs_entry_is_dot(char * current_entry, struct cifsFileInfo * cfile)
 {
@@ -145,29 +147,24 @@ static int cifs_entry_is_dot(char * current_entry, struct cifsFileInfo * cfile)
 
 	if(filename) {
 		if(cfile->srch_inf.unicode) {
+			__le16 *ufilename = (__le16 *)filename;
 			if(len == 2) {
 				/* check for . */
-				if((filename[0] == '.') && (filename[1] == 0)) {
+				if(ufilename[0] == UNICODE_DOT)
 					rc = 1;
-				}
 			} else if(len == 4) {
 				/* check for .. */
-				if((filename[0] == '.')
-				   &&(filename[1] == 0)
-				   && (filename[2] == '.')
-				   &&(filename[3] == 0)) {
+				if((ufilename[0] == UNICODE_DOT)
+				   &&(ufilename[1] == UNICODE_DOT))
 					rc = 2;
-				}
 			}
 		} else /* ASCII */ {
 			if(len == 1) {
-				if(filename[0] == '.') {
+				if(filename[0] == '.') 
 					rc = 1;
-				}
 			} else if(len == 2) {
-				if((filename[0] == '.') && (filename[1] == '.')) {
+				if((filename[0] == '.') && (filename[1] == '.')) 
 					rc = 2;
-				}
 			}
 		}
 	}
