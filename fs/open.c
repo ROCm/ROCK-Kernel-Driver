@@ -30,9 +30,7 @@ int vfs_statfs(struct super_block *sb, struct statfs *buf)
 		retval = -ENOSYS;
 		if (sb->s_op && sb->s_op->statfs) {
 			memset(buf, 0, sizeof(struct statfs));
-			lock_kernel();
 			retval = sb->s_op->statfs(sb, buf);
-			unlock_kernel();
 		}
 	}
 	return retval;

@@ -281,8 +281,12 @@ struct inode_operations coda_file_inode_operations = {
 static int coda_statfs(struct super_block *sb, struct statfs *buf)
 {
 	int error;
+	
+	lock_kernel();
 
 	error = venus_statfs(sb, buf);
+
+	unlock_kernel();
 
 	if (error) {
 		/* fake something like AFS does */

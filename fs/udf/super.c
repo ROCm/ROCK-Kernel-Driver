@@ -1726,6 +1726,8 @@ udf_put_super(struct super_block *sb)
 static int
 udf_statfs(struct super_block *sb, struct statfs *buf)
 {
+	lock_kernel();
+
 	buf->f_type = UDF_SUPER_MAGIC;
 	buf->f_bsize = sb->s_blocksize;
 	buf->f_blocks = UDF_SB_PARTLEN(sb, UDF_SB_PARTITION(sb));
@@ -1737,6 +1739,8 @@ udf_statfs(struct super_block *sb, struct statfs *buf)
 	buf->f_ffree = buf->f_bfree;
 	/* __kernel_fsid_t f_fsid */
 	buf->f_namelen = UDF_NAME_LEN;
+
+	unlock_kernel();
 
 	return 0;
 }
