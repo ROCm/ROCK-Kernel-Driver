@@ -1137,16 +1137,16 @@ void smp_percpu_timer_interrupt(struct pt_regs *regs)
 	do {
 		sparc64_do_profile(regs);
 		if (!--prof_counter(cpu)) {
-			if (cpu == boot_cpu_id) {
-				irq_enter();
+			irq_enter();
 
+			if (cpu == boot_cpu_id) {
 				kstat_cpu(cpu).irqs[0]++;
 				timer_tick_interrupt(regs);
-
-				irq_exit();
 			}
 
 			update_process_times(user);
+
+			irq_exit();
 
 			prof_counter(cpu) = prof_multiplier(cpu);
 		}

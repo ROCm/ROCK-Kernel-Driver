@@ -187,95 +187,92 @@ static struct card_ops isurf_ops = {
 static struct pnp_card *pnp_surf __devinitdata = NULL;
 #endif
 
-int __init
-setup_isurf(struct IsdnCard *card)
+static int __init
+isurf_probe(struct IsdnCardState *cs, struct IsdnCard *card)
 {
-	struct IsdnCardState *cs = card->cs;
 	unsigned long phymem;
-	char tmp[64];
 
-	strcpy(tmp, ISurf_revision);
-	printk(KERN_INFO "HiSax: ISurf driver Rev. %s\n", HiSax_getrev(tmp));
-	
-	if (card->para[1] && card->para[2]) {
-		cs->hw.isurf.reset = card->para[1];
-		phymem = card->para[2];
-		cs->irq = card->para[0];
-	} else {
-#ifdef __ISAPNP__
-		struct pnp_card *pb;
-		struct pnp_dev *pd;
+	phymem = card->para[2];
+	cs->hw.isurf.reset = card->para[1];
+	cs->irq = card->para[0];
 
-		if (isapnp_present()) {
-			cs->subtyp = 0;
-			if ((pb = pnp_find_card(
-				ISAPNP_VENDOR('S', 'I', 'E'),
-				ISAPNP_FUNCTION(0x0010), pnp_surf))) {
-				pnp_surf = pb;
-				pd = NULL;
-				if (!(pd = pnp_find_dev(pnp_surf,
-					ISAPNP_VENDOR('S', 'I', 'E'),
-					ISAPNP_FUNCTION(0x0010), pd))) {
-					printk(KERN_ERR "ISurfPnP: PnP error card found, no device\n");
-					return (0);
-				}
-				if (pnp_device_attach(pd) < 0) {
-					printk(KERN_ERR "ISurfPnP: attach failed\n");
-					return 0;
-				}
-				if (pnp_activate_dev(pd) < 0) {
-					printk(KERN_ERR "ISurfPnP: activate failed\n");
-					pnp_device_detach(pd);
-					return 0;
-				}
-				if (!pnp_irq_valid(pd, 0) || !pnp_port_valid(pd, 0) || !pnp_port_valid(pd, 1)) {
-					printk(KERN_ERR "ISurfPnP:some resources are missing %ld/%lx/%lx\n",
-						pnp_irq(pd, 0), pnp_port_start(pd, 0), pnp_port_start(pd, 1));
-					pnp_device_detach(pd);
-					return(0);
-				}
-				cs->hw.isurf.reset = pnp_port_start(pd, 0);
-				phymem = pnp_port_start(pd, 1);
-				cs->irq = pnp_irq(pd, 0);
-			} else {
-				printk(KERN_INFO "ISurfPnP: no ISAPnP card found\n");
-				return(0);
-			}
-		} else {
-			printk(KERN_INFO "ISurfPnP: no ISAPnP bus found\n");
-			return(0);
-		}
-#else
-		printk(KERN_WARNING "HiSax: %s port/mem not set\n",
-			CardType[card->typ]);
-		return (0);
-#endif
-	}
 	if (!request_io(&cs->rs, cs->hw.isurf.reset, 1, "isurf isdn"))
 		goto err;
-	cs->hw.isurf.isar = request_mmio(&cs->rs, phymem, ISURF_IOMEM_SIZE, "isurf iomem");
+
+	cs->hw.isurf.isar = request_mmio(&cs->rs, phymem, ISURF_IOMEM_SIZE,
+					 "isurf iomem");
 	if (!cs->hw.isurf.isar)
 		goto err;
 
 	cs->hw.isurf.isac = cs->hw.isurf.isar + ISURF_ISAC_OFFSET;
-	printk(KERN_INFO
-	       "ISurf: defined at 0x%x 0x%lx IRQ %d\n",
-	       cs->hw.isurf.reset,
-	       card->para[2],
-	       cs->irq);
+	printk(KERN_INFO "ISurf: defined at 0x%x 0x%lx IRQ %d\n",
+	       cs->hw.isurf.reset, phymem, cs->irq);
 
 	cs->auxcmd = &isurf_auxcmd;
 	cs->card_ops = &isurf_ops;
 	cs->bcs[0].hw.isar.reg = &cs->hw.isurf.isar_r;
 	cs->bcs[1].hw.isar.reg = &cs->hw.isurf.isar_r;
 	reset_isurf(cs, ISURF_RESET);
-	test_and_set_bit(HW_ISAR, &cs->HW_Flags);
+	__set_bit(HW_ISAR, &cs->HW_Flags);
 	isac_setup(cs, &isac_ops);
 	if (isar_setup(cs, &isar_ops))
 		goto err;
-	return 1;
+	return 0;
  err:
 	hisax_release_resources(cs);
-	return 0;
+	return -EBUSY;
+}
 
+int __init
+setup_isurf(struct IsdnCard *card)
+{
+	char tmp[64];
+
+	strcpy(tmp, ISurf_revision);
+	printk(KERN_INFO "HiSax: ISurf driver Rev. %s\n", HiSax_getrev(tmp));
+	
+#ifdef __ISAPNP__
+	if (!card->para[1] || !card->para[2]) {
+		struct pnp_card *pb;
+		struct pnp_dev *pd;
+	
+		cs->subtyp = 0;
+		if ((pb = pnp_find_card(
+			     ISAPNP_VENDOR('S', 'I', 'E'),
+			     ISAPNP_FUNCTION(0x0010), pnp_surf))) {
+			pnp_surf = pb;
+			pd = NULL;
+			if (!(pd = pnp_find_dev(pnp_surf,
+						ISAPNP_VENDOR('S', 'I', 'E'),
+						ISAPNP_FUNCTION(0x0010), pd))) {
+				printk(KERN_ERR "ISurfPnP: PnP error card found, no device\n");
+				return (0);
+			}
+			if (pnp_device_attach(pd) < 0) {
+				printk(KERN_ERR "ISurfPnP: attach failed\n");
+				return 0;
+			}
+			if (pnp_activate_dev(pd) < 0) {
+				printk(KERN_ERR "ISurfPnP: activate failed\n");
+				pnp_device_detach(pd);
+				return 0;
+			}
+			if (!pnp_irq_valid(pd, 0) || !pnp_port_valid(pd, 0) || !pnp_port_valid(pd, 1)) {
+				printk(KERN_ERR "ISurfPnP:some resources are missing %ld/%lx/%lx\n",
+				       pnp_irq(pd, 0), pnp_port_start(pd, 0), pnp_port_start(pd, 1));
+				pnp_device_detach(pd);
+				return(0);
+			}
+			card->para[1] = pnp_port_start(pd, 0);
+			card->para[2] = pnp_port_start(pd, 1);
+			card->para[0] = pnp_irq(pd, 0);
+		} else {
+			printk(KERN_INFO "ISurfPnP: no ISAPnP card found\n");
+			return 0;
+		}
+	}
+#endif
+	if (isurf_probe(card->cs, card) < 0)
+		return 0;
+	return 1;
 }
