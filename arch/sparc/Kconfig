@@ -276,9 +276,9 @@ config PRINTER
 
 	  If you have several parallel ports, you can specify which ports to
 	  use with the "lp" kernel command line option.  (Try "man bootparam"
-	  or see the documentation of your boot loader (lilo or loadlin) about
-	  how to pass options to the kernel at boot time.)  The syntax of the
-	  "lp" command line option can be found in <file:drivers/char/lp.c>.
+	  or see the documentation of your boot loader (silo) about how to pass
+	  options to the kernel at boot time.)  The syntax of the "lp" command
+	  line option can be found in <file:drivers/char/lp.c>.
 
 	  If you have more than 8 printers, you need to increase the LP_NO
 	  macro in lp.c and the PARPORT_MAX macro in parport.h.
