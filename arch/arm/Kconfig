@@ -83,6 +83,8 @@ config ARCH_CLPS711X
 
 config ARCH_CO285
 	bool "Co-EBSA285"
+	select FOOTBRIDGE
+	select FOOTBRIDGE_ADDIN
 
 config ARCH_EBSA110
 	bool "EBSA-110"
@@ -101,6 +103,7 @@ config ARCH_CAMELOT
 
 config ARCH_FOOTBRIDGE
 	bool "FootBridge"
+	select FOOTBRIDGE
 
 config ARCH_INTEGRATOR
 	bool "Integrator"
@@ -211,28 +214,6 @@ config ARCH_ACORN
 config TIMER_ACORN
 	bool
 	depends on ARCH_ACORN || ARCH_CLPS7500
-	default y
-
-#####################################################################
-# Footbridge support
-config FOOTBRIDGE
-	bool
-	depends on ARCH_CO285 || ARCH_FOOTBRIDGE
-	default y
-
-config FOOTBRIDGE_HOST
-	bool
-	depends on ARCH_CATS || ARCH_EBSA285_HOST || ARCH_NETWINDER || ARCH_PERSONAL_SERVER
-	default y
-
-config FOOTBRIDGE_ADDIN
-	bool
-	depends on ARCH_CO285 || ARCH_EBSA285_ADDIN
-	default y
-
-config ARCH_EBSA285
-	bool
-	depends on ARCH_EBSA285_HOST || ARCH_EBSA285_ADDIN
 	default y
 
 #####################################################################
