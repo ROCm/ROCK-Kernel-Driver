@@ -1802,115 +1802,63 @@ inline int generic_write_checks(struct file *file, loff_t *pos, size_t *count, i
 
 EXPORT_SYMBOL(generic_write_checks);
 
-/*
- * Write to a file through the page cache. 
- * Called under i_sem for S_ISREG files.
- *
- * We put everything into the page cache prior to writing it. This is not a
- * problem when writing full pages. With partial pages, however, we first have
- * to read the data into the cache, then dirty the page, and finally schedule
- * it for writing by marking it dirty.
- *							okir@monad.swb.de
- */
 ssize_t
-generic_file_aio_write_nolock(struct kiocb *iocb, const struct iovec *iov,
-				unsigned long nr_segs, loff_t *ppos)
+generic_file_direct_write(struct kiocb *iocb, const struct iovec *iov,
+		unsigned long *nr_segs, loff_t pos, loff_t *ppos,
+		size_t count, size_t ocount)
+{
+	struct file	*file = iocb->ki_filp;
+	struct address_space *mapping = file->f_mapping;
+	struct inode	*inode = mapping->host;
+	ssize_t		written;
+
+	if (count != ocount)
+		*nr_segs = iov_shorten((struct iovec *)iov, *nr_segs, count);
+
+	written = generic_file_direct_IO(WRITE, iocb, iov, pos, *nr_segs);
+	if (written > 0) {
+		loff_t end = pos + written;
+		if (end > i_size_read(inode) && !S_ISBLK(inode->i_mode)) {
+			i_size_write(inode,  end);
+			mark_inode_dirty(inode);
+		}
+		*ppos = end;
+	}
+
+	/*
+	 * Sync the fs metadata but not the minor inode changes and
+	 * of course not the data as we did direct DMA for the IO.
+	 * i_sem is held, which protects generic_osync_inode() from
+	 * livelocking.
+	 */
+	if (written >= 0 && file->f_flags & O_SYNC)
+		generic_osync_inode(inode, mapping, OSYNC_METADATA);
+	if (written == count && !is_sync_kiocb(iocb))
+		written = -EIOCBQUEUED;
+	return written;
+}
+
+EXPORT_SYMBOL(generic_file_direct_write);
+
+ssize_t
+generic_file_buffered_write(struct kiocb *iocb, const struct iovec *iov,
+		unsigned long nr_segs, loff_t pos, loff_t *ppos,
+		size_t count, ssize_t written)
 {
 	struct file *file = iocb->ki_filp;
 	struct address_space * mapping = file->f_mapping;
 	struct address_space_operations *a_ops = mapping->a_ops;
-	size_t ocount;		/* original count */
-	size_t count;		/* after file limit checks */
 	struct inode 	*inode = mapping->host;
 	long		status = 0;
-	loff_t		pos;
 	struct page	*page;
 	struct page	*cached_page = NULL;
-	const int	isblk = S_ISBLK(inode->i_mode);
-	ssize_t		written;
-	ssize_t		err;
 	size_t		bytes;
 	struct pagevec	lru_pvec;
 	const struct iovec *cur_iov = iov; /* current iovec */
 	size_t		iov_base = 0;	   /* offset in the current iovec */
-	unsigned long	seg;
 	char __user	*buf;
 
-	ocount = 0;
-	for (seg = 0; seg < nr_segs; seg++) {
-		const struct iovec *iv = &iov[seg];
-
-		/*
-		 * If any segment has a negative length, or the cumulative
-		 * length ever wraps negative then return -EINVAL.
-		 */
-		ocount += iv->iov_len;
-		if (unlikely((ssize_t)(ocount|iv->iov_len) < 0))
-			return -EINVAL;
-		if (access_ok(VERIFY_READ, iv->iov_base, iv->iov_len))
-			continue;
-		if (seg == 0)
-			return -EFAULT;
-		nr_segs = seg;
-		ocount -= iv->iov_len;	/* This segment is no good */
-		break;
-	}
-
-	count = ocount;
-	pos = *ppos;
 	pagevec_init(&lru_pvec, 0);
-
-	/* We can write back this queue in page reclaim */
-	current->backing_dev_info = mapping->backing_dev_info;
-	written = 0;
-
-	err = generic_write_checks(file, &pos, &count, isblk);
-	if (err)
-		goto out;
-
-	if (count == 0)
-		goto out;
-
-	err = remove_suid(file->f_dentry);
-	if (err)
-		goto out;
-
-	inode_update_time(inode, 1);
-
-	/* coalesce the iovecs and go direct-to-BIO for O_DIRECT */
-	if (unlikely(file->f_flags & O_DIRECT)) {
-		if (count != ocount)
-			nr_segs = iov_shorten((struct iovec *)iov,
-						nr_segs, count);
-		written = generic_file_direct_IO(WRITE, iocb,
-					iov, pos, nr_segs);
-		if (written > 0) {
-			loff_t end = pos + written;
-			if (end > i_size_read(inode) && !isblk) {
-				i_size_write(inode,  end);
-				mark_inode_dirty(inode);
-			}
-			*ppos = end;
-		}
-		/*
-		 * Sync the fs metadata but not the minor inode changes and
-		 * of course not the data as we did direct DMA for the IO.
-		 * i_sem is held, which protects generic_osync_inode() from
-		 * livelocking.
-		 */
-		if (written >= 0 && file->f_flags & O_SYNC)
-			status = generic_osync_inode(inode, mapping, OSYNC_METADATA);
-		if (written == count && !is_sync_kiocb(iocb))
-			written = -EIOCBQUEUED;
-		if (written < 0 || written == count)
-			goto out_status;
-		/*
-		 * direct-io write to a hole: fall through to buffered I/O
-		 * for completing the rest of the request.
-		 */
-		pos += written;
-		count -= written;
-	}
 
 	buf = iov->iov_base + written;	/* handle partial DIO write */
 	do {
@@ -2006,12 +1954,85 @@ generic_file_aio_write_nolock(struct kiocb *iocb, const struct iovec *iov,
 	if (unlikely(file->f_flags & O_DIRECT) && written)
 		status = filemap_write_and_wait(mapping);
 
-out_status:	
-	err = written ? written : status;
-out:
 	pagevec_lru_add(&lru_pvec);
+	return written ? written : status;
+}
+
+EXPORT_SYMBOL(generic_file_buffered_write);
+
+ssize_t
+generic_file_aio_write_nolock(struct kiocb *iocb, const struct iovec *iov,
+				unsigned long nr_segs, loff_t *ppos)
+{
+	struct file *file = iocb->ki_filp;
+	struct address_space * mapping = file->f_mapping;
+	size_t ocount;		/* original count */
+	size_t count;		/* after file limit checks */
+	struct inode 	*inode = mapping->host;
+	unsigned long	seg;
+	loff_t		pos;
+	ssize_t		written;
+	ssize_t		err;
+
+	ocount = 0;
+	for (seg = 0; seg < nr_segs; seg++) {
+		const struct iovec *iv = &iov[seg];
+
+		/*
+		 * If any segment has a negative length, or the cumulative
+		 * length ever wraps negative then return -EINVAL.
+		 */
+		ocount += iv->iov_len;
+		if (unlikely((ssize_t)(ocount|iv->iov_len) < 0))
+			return -EINVAL;
+		if (access_ok(VERIFY_READ, iv->iov_base, iv->iov_len))
+			continue;
+		if (seg == 0)
+			return -EFAULT;
+		nr_segs = seg;
+		ocount -= iv->iov_len;	/* This segment is no good */
+		break;
+	}
+
+	count = ocount;
+	pos = *ppos;
+
+	/* We can write back this queue in page reclaim */
+	current->backing_dev_info = mapping->backing_dev_info;
+	written = 0;
+
+	err = generic_write_checks(file, &pos, &count, S_ISBLK(inode->i_mode));
+	if (err)
+		goto out;
+
+	if (count == 0)
+		goto out;
+
+	err = remove_suid(file->f_dentry);
+	if (err)
+		goto out;
+
+	inode_update_time(inode, 1);
+
+	/* coalesce the iovecs and go direct-to-BIO for O_DIRECT */
+	if (unlikely(file->f_flags & O_DIRECT)) {
+		written = generic_file_direct_write(iocb, iov,
+				&nr_segs, pos, ppos, count, ocount);
+		if (written < 0 || written == count)
+			goto out;
+		/*
+		 * direct-io write to a hole: fall through to buffered I/O
+		 * for completing the rest of the request.
+		 */
+		pos += written;
+		count -= written;
+	}
+
+	written = generic_file_buffered_write(iocb, iov, nr_segs,
+			pos, ppos, count, written);
+out:
 	current->backing_dev_info = NULL;
-	return err;
+	return written ? written : err;
 }
 
 EXPORT_SYMBOL(generic_file_aio_write_nolock);
