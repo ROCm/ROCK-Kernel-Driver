@@ -1027,6 +1027,8 @@ int patch_ad1985(ac97_t * ac97)
 			     AC97_AD198X_MSPLT |
 			     AC97_AD198X_AC97NC);
 	ac97->flags |= AC97_STEREO_MUTES;
+	/* on AD1985 rev. 3, AC'97 revision bits are zero */
+	ac97->ext_id = (ac97->ext_id & ~AC97_EI_REV_MASK) | AC97_EI_REV_23;
 	return 0;
 }
 
