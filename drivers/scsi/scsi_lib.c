@@ -16,9 +16,9 @@
 #include <linux/init.h>
 #include <linux/pci.h>
 
-#include "scsi.h"
-#include "hosts.h"
 #include <scsi/scsi_driver.h>
+#include <scsi/scsi_host.h>
+#include "scsi.h"
 
 #include "scsi_priv.h"
 #include "scsi_logging.h"
@@ -335,13 +335,14 @@ void scsi_device_unbusy(struct scsi_device *sdev)
  */
 static void scsi_single_lun_run(struct scsi_device *current_sdev)
 {
-	struct scsi_device *sdev;
+	struct Scsi_Host *shost = current_sdev->host;
+	struct scsi_device *sdev, *tmp;
 	unsigned long flags;
 
-	spin_lock_irqsave(current_sdev->host->host_lock, flags);
+	spin_lock_irqsave(shost->host_lock, flags);
 	WARN_ON(!current_sdev->sdev_target->starget_sdev_user);
 	current_sdev->sdev_target->starget_sdev_user = NULL;
-	spin_unlock_irqrestore(current_sdev->host->host_lock, flags);
+	spin_unlock_irqrestore(shost->host_lock, flags);
 
 	/*
 	 * Call blk_run_queue for all LUNs on the target, starting with
@@ -351,21 +352,26 @@ static void scsi_single_lun_run(struct scsi_device *current_sdev)
 	 */
 	blk_run_queue(current_sdev->request_queue);
 
-	spin_lock_irqsave(current_sdev->host->host_lock, flags);
-	if (current_sdev->sdev_target->starget_sdev_user) {
-		/*
-		 * After unlock, this races with anyone clearing
-		 * starget_sdev_user, but we (should) always enter this
-		 * function again, avoiding any problems.
-		 */
-		spin_unlock_irqrestore(current_sdev->host->host_lock, flags);
-		return;
-	}
-	spin_unlock_irqrestore(current_sdev->host->host_lock, flags);
+	/*
+	 * After unlock, this races with anyone clearing starget_sdev_user,
+	 * but we always enter this function again, avoiding any problems.
+	 */
+	spin_lock_irqsave(shost->host_lock, flags);
+	if (current_sdev->sdev_target->starget_sdev_user)
+		goto out;
+	list_for_each_entry_safe(sdev, tmp, &current_sdev->same_target_siblings,
+			same_target_siblings) {
+		if (scsi_device_get(sdev))
+			continue;
 
-	list_for_each_entry(sdev, &current_sdev->same_target_siblings,
-			    same_target_siblings)
+		spin_unlock_irqrestore(shost->host_lock, flags);
 		blk_run_queue(sdev->request_queue);
+		spin_lock_irqsave(shost->host_lock, flags);
+	
+		scsi_device_put(sdev);
+	}
+ out:
+	spin_unlock_irqrestore(shost->host_lock, flags);
 }
 
 /*

@@ -32,10 +32,10 @@
 #include <linux/blkdev.h>
 #include <asm/semaphore.h>
 
-#include "scsi.h"
-#include "hosts.h"
 #include <scsi/scsi_driver.h>
 #include <scsi/scsi_devinfo.h>
+#include <scsi/scsi_host.h>
+#include "scsi.h"
 
 #include "scsi_priv.h"
 #include "scsi_logging.h"
@@ -190,13 +190,13 @@ static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
 	       	uint channel, uint id, uint lun)
 {
 	struct scsi_device *sdev, *device;
+	unsigned long flags;
 
 	sdev = kmalloc(sizeof(*sdev), GFP_ATOMIC);
 	if (!sdev)
 		goto out;
 
 	memset(sdev, 0, sizeof(*sdev));
-	atomic_set(&sdev->access_count, 0);
 	sdev->vendor = scsi_null_device_strs;
 	sdev->model = scsi_null_device_strs;
 	sdev->rev = scsi_null_device_strs;
@@ -240,7 +240,8 @@ static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
 	 * If there are any same target siblings, add this to the
 	 * sibling list
 	 */
-	list_for_each_entry(device, &shost->my_devices, siblings) {
+	spin_lock_irqsave(shost->host_lock, flags);
+	list_for_each_entry(device, &shost->__devices, siblings) {
 		if (device->id == sdev->id &&
 		    device->channel == sdev->channel) {
 			list_add_tail(&sdev->same_target_siblings,
@@ -258,10 +259,8 @@ static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
 	if (!sdev->scsi_level)
 		sdev->scsi_level = SCSI_2;
 
-	/*
-	 * Add it to the end of the shost->my_devices list.
-	 */
-	list_add_tail(&sdev->siblings, &shost->my_devices);
+	list_add_tail(&sdev->siblings, &shost->__devices);
+	spin_unlock_irqrestore(shost->host_lock, flags);
 	return sdev;
 
 out_free_queue:
@@ -285,21 +284,21 @@ void scsi_free_sdev(struct scsi_device *sdev)
 {
 	unsigned long flags;
 
+	spin_lock_irqsave(sdev->host->host_lock, flags);
 	list_del(&sdev->siblings);
 	list_del(&sdev->same_target_siblings);
+	spin_unlock_irqrestore(sdev->host->host_lock, flags);
 
 	if (sdev->request_queue)
 		scsi_free_queue(sdev->request_queue);
-	if (sdev->inquiry)
-		kfree(sdev->inquiry);
+
 	spin_lock_irqsave(sdev->host->host_lock, flags);
 	list_del(&sdev->starved_entry);
-	if (sdev->single_lun) {
-		if (--sdev->sdev_target->starget_refcnt == 0)
-			kfree(sdev->sdev_target);
-	}
+	if (sdev->single_lun && --sdev->sdev_target->starget_refcnt == 0)
+		kfree(sdev->sdev_target);
 	spin_unlock_irqrestore(sdev->host->host_lock, flags);
 
+	kfree(sdev->inquiry);
 	kfree(sdev);
 }
 
@@ -678,7 +677,7 @@ static int scsi_probe_and_add_lun(struct Scsi_Host *host,
 	 * host adapter calls into here with rescan == 0.
 	 */
 	if (rescan) {
-		sdev = scsi_find_device(host, channel, id, lun);
+		sdev = scsi_device_lookup(host, channel, id, lun);
 		if (sdev) {
 			SCSI_LOG_SCAN_BUS(3, printk(KERN_INFO
 				"scsi scan: device exists on <%d:%d:%d:%d>\n",
@@ -689,6 +688,8 @@ static int scsi_probe_and_add_lun(struct Scsi_Host *host,
 				*bflagsp = scsi_get_device_flags(sdev,
 								 sdev->vendor,
 								 sdev->model);
+			/* XXX: bandaid until callers do refcounting */
+			scsi_device_put(sdev);
 			return SCSI_SCAN_LUN_PRESENT;
 		}
 	}
@@ -1232,14 +1233,25 @@ void scsi_scan_host(struct Scsi_Host *shost)
 
 void scsi_forget_host(struct Scsi_Host *shost)
 {
-	struct list_head *le, *lh;
-	struct scsi_device *sdev;
+	struct scsi_device *sdev, *tmp;
+	unsigned long flags;
 
-	list_for_each_safe(le, lh, &shost->my_devices) {
-		sdev = list_entry(le, struct scsi_device, siblings);
-		
+	/*
+	 * Ok, this look a bit strange.  We always look for the first device
+	 * on the list as scsi_remove_device removes them from it - thus we
+	 * also have to release the lock.
+	 * We don't need to get another reference to the device before
+	 * releasing the lock as we already own the reference from
+	 * scsi_register_device that's release in scsi_remove_device.  And
+	 * after that we don't look at sdev anymore.
+	 */
+	spin_lock_irqsave(shost->host_lock, flags);
+	list_for_each_entry_safe(sdev, tmp, &shost->__devices, siblings) {
+		spin_unlock_irqrestore(shost->host_lock, flags);
 		scsi_remove_device(sdev);
+		spin_lock_irqsave(shost->host_lock, flags);
 	}
+	spin_unlock_irqrestore(shost->host_lock, flags);
 }
 
 /*

@@ -991,7 +991,7 @@ alloc_fail:
 static void sbp2_remove_device(struct scsi_id_instance_data *scsi_id)
 {
 	struct sbp2scsi_host_info *hi = scsi_id->hi;
-	struct scsi_device *sdev = scsi_find_device(hi->scsi_host, 0, scsi_id->id, 0);
+	struct scsi_device *sdev;
 
 	SBP2_DEBUG("sbp2_remove_device");
 
@@ -999,8 +999,13 @@ static void sbp2_remove_device(struct scsi_id_instance_data *scsi_id)
 	sbp2scsi_complete_all_commands(scsi_id, DID_NO_CONNECT);
 
 	/* Remove it from the scsi layer now */
-	if (sdev)
+	/* XXX(hch): why can't we simply cache the scsi_device
+	   	     in struct scsi_id_instance_data? */
+	sdev = scsi_device_lookup(hi->scsi_host, 0, scsi_id->id, 0);
+	if (sdev) {
 		scsi_remove_device(sdev);
+		scsi_device_put(sdev);
+	}
 
 	sbp2util_remove_command_orb_pool(scsi_id);
 
