@@ -1253,17 +1253,16 @@ static inline int ali_get_free_write_space(struct
 {
 	struct dmabuf *dmabuf = &state->dmabuf;
 	int free;
-	ali_update_ptr(state);
-	// catch underruns during playback
+
 	if (dmabuf->count < 0) {
 		dmabuf->count = 0;
 		dmabuf->swptr = dmabuf->hwptr;
 	}
-	free = dmabuf->dmasize - dmabuf->count;
-	free -= (dmabuf->hwptr % dmabuf->fragsize);
-	if (free < 0)
-		return (0);
-	return (free);
+	free = dmabuf->dmasize - dmabuf->swptr;
+	if ((dmabuf->count + free) > dmabuf->dmasize){
+		free = dmabuf->dmasize - dmabuf->count;
+	}
+	return free;
 }
 
 static inline int ali_get_available_read_data(struct
@@ -1860,6 +1859,7 @@ static ssize_t ali_write(struct file *file,
 			   NOTHING we can do to prevent it. */
 			   
 			/* FIXME - do timeout handling here !! */
+			schedule_timeout(tmo >= 2 ? tmo : 2);
 
 			if (signal_pending(current)) {
 				if (!ret)
