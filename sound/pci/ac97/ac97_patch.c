@@ -449,16 +449,36 @@ int patch_sigmatel_stac9756(ac97_t * ac97)
 
 int patch_sigmatel_stac9758(ac97_t * ac97)
 {
+	static unsigned short regs[4] = {
+		AC97_SIGMATEL_OUTSEL,
+		AC97_SIGMATEL_IOMISC,
+		AC97_SIGMATEL_INSEL,
+		AC97_SIGMATEL_VARIOUS
+	};
+	static unsigned short def_regs[4] = {
+		/* OUTSEL */ 0xd794,
+		/* IOMISC */ 0x2001,
+		/* INSEL */ 0x0201,
+		/* VARIOUS */ 0x0000
+	};
+	static unsigned short m675_regs[4] = {
+		/* OUTSEL */ 0x9040,
+		/* IOMISC */ 0x2102,
+		/* INSEL */ 0x0203,
+		/* VARIOUS */ 0x0001
+	};
+	unsigned short *pregs = def_regs;
+	int i;
+
+	/* Gateway M675 notebook */
+	if (ac97->pci->subsystem_vendor == 0x107b &&
+	    ac97->pci->subsystem_device == 0x0601)
+	    	pregs = m675_regs;
+
 	// patch for SigmaTel
 	ac97->build_ops = &patch_sigmatel_stac9700_ops;
-	// turn on stereo speaker, headphone and line-out
-	snd_ac97_write_cache(ac97, AC97_SIGMATEL_OUTSEL, 0x9040);
-	// headphone select and boost
-	snd_ac97_write_cache(ac97, AC97_SIGMATEL_IOMISC, 0x2102);
-	// enable mic
-	snd_ac97_write_cache(ac97, AC97_SIGMATEL_INSEL, 0x0203);
-	// enable stereo mic
-	snd_ac97_write_cache(ac97, AC97_SIGMATEL_VARIOUS, 0x0001);
+	for (i = 0; i < 4; i++)
+		snd_ac97_write_cache(ac97, regs[i], pregs[i]);
 	return 0;
 }
 
