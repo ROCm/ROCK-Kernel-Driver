@@ -18,10 +18,12 @@
 #include <linux/ptrace.h>
 #include <linux/user.h>
 #include <linux/security.h>
+#include <linux/init.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
 #include <asm/system.h>
+#include <asm/traps.h>
 
 #include "ptrace.h"
 
@@ -32,7 +34,7 @@
  * in exit.c or in signal.c.
  */
 
-#if 1
+#if 0
 /*
  * Breakpoint SWI instruction: SWI &9F0001
  */
@@ -479,24 +481,46 @@ void ptrace_break(struct task_struct *tsk, struct pt_regs *regs)
 {
 	siginfo_t info;
 
-	/*
-	 * The PC is always left pointing at the next instruction.  Fix this.
-	 */
-	regs->ARM_pc -= 4;
-
-	if (tsk->thread.debug.nsaved == 0)
-		printk(KERN_ERR "ptrace: bogus breakpoint trap\n");
-
 	ptrace_cancel_bpt(tsk);
 
 	info.si_signo = SIGTRAP;
 	info.si_errno = 0;
 	info.si_code  = TRAP_BRKPT;
-	info.si_addr  = (void *)instruction_pointer(regs) -
-			 (thumb_mode(regs) ? 2 : 4);
+	info.si_addr  = (void *)instruction_pointer(regs);
 
 	force_sig_info(SIGTRAP, &info, tsk);
 }
+
+static int break_trap(struct pt_regs *regs, unsigned int instr)
+{
+	ptrace_break(current, regs);
+	return 0;
+}
+
+static struct undef_hook arm_break_hook = {
+	.instr_mask	= 0x0fffffff,
+	.instr_val	= 0x07f001f0,
+	.cpsr_mask	= PSR_T_BIT,
+	.cpsr_val	= 0,
+	.fn		= break_trap,
+};
+
+static struct undef_hook thumb_break_hook = {
+	.instr_mask	= 0xffff,
+	.instr_val	= 0xde01,
+	.cpsr_mask	= PSR_T_BIT,
+	.cpsr_val	= PSR_T_BIT,
+	.fn		= break_trap,
+};
+
+static int __init ptrace_break_init(void)
+{
+	register_undef_hook(&arm_break_hook);
+	register_undef_hook(&thumb_break_hook);
+	return 0;
+}
+
+core_initcall(ptrace_break_init);
 
 /*
  * Read the word at offset "off" into the "struct user".  We
