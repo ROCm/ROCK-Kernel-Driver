@@ -55,12 +55,19 @@ void skb_digest_walk(const struct sk_buff *skb, struct crypto_tfm *tfm,
 {
 	int start = skb->len - skb->data_len;
 	int i, copy = start - offset;
+	struct scatterlist sg;
 
 	/* Checksum header. */
 	if (copy > 0) {
 		if (copy > len)
 			copy = len;
-		tfm->__crt_alg->cra_digest.dia_update(tfm->crt_ctx, skb->data+offset, copy);
+		
+		sg.page = virt_to_page(skb->data + offset);
+		sg.offset = (unsigned long)(skb->data + offset) % PAGE_SIZE;
+		sg.length = copy;
+		
+		crypto_hmac_update(tfm, &sg, 1);
+		
 		if ((len -= copy) == 0)
 			return;
 		offset += copy;
@@ -73,14 +80,17 @@ void skb_digest_walk(const struct sk_buff *skb, struct crypto_tfm *tfm,
 
 		end = start + skb_shinfo(skb)->frags[i].size;
 		if ((copy = end - offset) > 0) {
-			u8 *vaddr;
 			skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
 
 			if (copy > len)
 				copy = len;
-			vaddr = kmap_skb_frag(frag);
-			tfm->__crt_alg->cra_digest.dia_update(tfm->crt_ctx, vaddr+frag->page_offset+offset-start, copy);
-			kunmap_skb_frag(vaddr);
+			
+			sg.page = frag->page;
+			sg.offset = frag->page_offset + offset-start;
+			sg.length = copy;
+			
+			crypto_hmac_update(tfm, &sg, 1);
+
 			if (!(len -= copy))
 				return;
 			offset += copy;
