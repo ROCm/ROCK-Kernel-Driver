@@ -24,6 +24,8 @@
 #define REISERFS_OLD_BLOCKSIZE 4096
 #define REISERFS_SUPER_MAGIC_STRING_OFFSET_NJ 20
 
+static struct file_system_type reiserfs_fs_type;
+
 const char reiserfs_3_5_magic_string[] = REISERFS_SUPER_MAGIC_STRING;
 const char reiserfs_3_6_magic_string[] = REISER2FS_SUPER_MAGIC_STRING;
 const char reiserfs_jr_magic_string[] = REISER2FS_JR_SUPER_MAGIC_STRING;
@@ -53,6 +55,11 @@ static int is_any_reiserfs_magic_string (struct reiserfs_super_block * rs)
 {
   return (is_reiserfs_3_5 (rs) || is_reiserfs_3_6 (rs) ||
 	  is_reiserfs_jr (rs));
+}
+
+int is_reiserfs_super (struct super_block *s)
+{
+	return s -> s_type == & reiserfs_fs_type ;
 }
 
 static int reiserfs_remount (struct super_block * s, int * flags, char * data);
@@ -997,7 +1004,7 @@ int function2code (hashf_t func)
 // at the ext2 code and comparing. It's subfunctions contain no code
 // used as a template unless they are so labeled.
 //
-static int reiserfs_fill_super(struct super_block *s, void *data, int silent)
+static int reiserfs_fill_super (struct super_block * s, void * data, int silent)
 {
     struct inode *root_inode;
     int j;
@@ -1009,21 +1016,24 @@ static int reiserfs_fill_super(struct super_block *s, void *data, int silent)
     struct reiserfs_super_block * rs;
     char *jdev_name;
     struct reiserfs_sb_info *sbi;
+    int errval = -EINVAL;
 
     sbi = kmalloc(sizeof(struct reiserfs_sb_info), GFP_KERNEL);
-    if (!sbi)
-	return -ENOMEM;
+    if (!sbi) {
+	errval = -ENOMEM;
+	goto error;
+    }
     s->u.generic_sbp = sbi;
     memset (sbi, 0, sizeof (struct reiserfs_sb_info));
 
     jdev_name = NULL;
     if (parse_options ((char *) data, &(sbi->s_mount_opt), &blocks, &jdev_name) == 0) {
-	return -EINVAL;
+	goto error;
     }
 
     if (blocks) {
-  	printk("reserfs: resize option for remount only\n");
-	return -EINVAL;
+  	printk("jmacd-7: reiserfs_fill_super: resize option for remount only\n");
+	goto error;
     }	
 
     /* try old format (undistributed bitmap, super block in 8-th 1k block of a device) */
@@ -1038,7 +1048,7 @@ static int reiserfs_fill_super(struct super_block *s, void *data, int silent)
     sbi->s_mount_state = REISERFS_VALID_FS ;
 
     if (old_format ? read_old_bitmaps(s) : read_bitmaps(s)) { 
-	printk ("reiserfs_fill_super: unable to read bitmap\n");
+	printk ("jmacd-8: reiserfs_fill_super: unable to read bitmap\n");
 	goto error;
     }
 #ifdef CONFIG_REISERFS_CHECK
@@ -1056,7 +1066,7 @@ static int reiserfs_fill_super(struct super_block *s, void *data, int silent)
 			 */
     }
     if (reread_meta_blocks(s)) {
-	printk("reiserfs_fill_super: unable to reread meta blocks after journal init\n") ;
+	printk("jmacd-9: reiserfs_fill_super: unable to reread meta blocks after journal init\n") ;
 	goto error ;
     }
 
@@ -1071,7 +1081,7 @@ static int reiserfs_fill_super(struct super_block *s, void *data, int silent)
     args.dirid = REISERFS_ROOT_PARENT_OBJECTID ;
     root_inode = iget5_locked (s, REISERFS_ROOT_OBJECTID, reiserfs_find_actor, reiserfs_init_locked_inode, (void *)(&args));
     if (!root_inode) {
-	printk ("reiserfs_fill_super: get root inode failed\n");
+	printk ("jmacd-10: reiserfs_fill_super: get root inode failed\n");
 	goto error;
     }
 
@@ -1155,7 +1165,7 @@ static int reiserfs_fill_super(struct super_block *s, void *data, int silent)
     reiserfs_proc_register( s, "journal", reiserfs_journal_in_proc );
     init_waitqueue_head (&(sbi->s_wait));
 
-    return 0;
+    return (0);
 
  error:
     if (jinit_done) { /* kill the commit thread, free journal ram */
@@ -1172,10 +1182,12 @@ static int reiserfs_fill_super(struct super_block *s, void *data, int silent)
     if (SB_BUFFER_WITH_SB (s))
 	brelse(SB_BUFFER_WITH_SB (s));
 
-    kfree(sbi);
-    s->u.generic_sbp = NULL;
+    if (sbi != NULL) {
+	kfree(sbi);
+    }
 
-    return -EINVAL;
+    s->u.generic_sbp = NULL;
+    return errval;
 }
 
 
@@ -1202,66 +1214,60 @@ static int reiserfs_statfs (struct super_block * s, struct statfs * buf)
   return 0;
 }
 
-static struct super_block *reiserfs_get_sb(struct file_system_type *fs_type,
-	int flags, char *dev_name, void *data)
+static struct super_block*
+get_super_block (struct file_system_type *fs_type,
+		 int                      flags,
+		 char                    *dev_name,
+		 void                    *data)
 {
-	return get_sb_bdev(fs_type, flags, dev_name, data, reiserfs_fill_super);
+	return get_sb_bdev (fs_type, flags, dev_name, data, reiserfs_fill_super);
+}
+
+static int __init
+init_reiserfs_fs ( void )
+{
+	int ret;
+
+	if ((ret = init_inodecache ())) {
+		return ret;
+	}
+
+	reiserfs_proc_info_global_init ();
+	reiserfs_proc_register_global ("version", reiserfs_global_version_in_proc);
+
+        ret = register_filesystem (& reiserfs_fs_type);
+
+	if (ret == 0) {
+		return 0;
+	}
+
+	reiserfs_proc_unregister_global ("version");
+	reiserfs_proc_info_global_done ();
+	destroy_inodecache ();
+
+	return ret;
+}
+
+static void __exit
+exit_reiserfs_fs ( void )
+{
+	reiserfs_proc_unregister_global ("version");
+	reiserfs_proc_info_global_done ();
+        unregister_filesystem (& reiserfs_fs_type);
+	destroy_inodecache ();
 }
 
 static struct file_system_type reiserfs_fs_type = {
-	owner:		THIS_MODULE,
-	name:		"reiserfs",
-	get_sb:		reiserfs_get_sb,
-	kill_sb:	kill_block_super,
-	fs_flags:	FS_REQUIRES_DEV,
+	owner: THIS_MODULE,
+	name: "reiserfs",
+	get_sb: get_super_block,
+	kill_sb: kill_block_super,
+	fs_flags: FS_REQUIRES_DEV,
 };
 
-int reiserfs_is_super(struct super_block *s)
-{
-	return s->s_type == &reiserfs_fs_type;
-}
+MODULE_DESCRIPTION ("ReiserFS journaled filesystem");
+MODULE_AUTHOR      ("Hans Reiser <reiser@namesys.com>");
+MODULE_LICENSE     ("GPL");
 
-//
-// this is exactly what 2.3.99-pre9's init_ext2_fs is
-//
-static int __init init_reiserfs_fs (void)
-{
-	int err = init_inodecache();
-	if (err)
-		goto out1;
-	reiserfs_proc_info_global_init();
-	reiserfs_proc_register_global( "version", 
-				       reiserfs_global_version_in_proc );
-        err = register_filesystem(&reiserfs_fs_type);
-	if (err)
-		goto out;
-	return 0;
-out:
-	reiserfs_proc_unregister_global( "version" );
-	reiserfs_proc_info_global_done();
-	destroy_inodecache();
-out1:
-	return err;
-}
-
-
-MODULE_DESCRIPTION("ReiserFS journaled filesystem");
-MODULE_AUTHOR("Hans Reiser <reiser@namesys.com>");
-MODULE_LICENSE("GPL");
-
-//
-// this is exactly what 2.3.99-pre9's init_ext2_fs is
-//
-static void __exit exit_reiserfs_fs(void)
-{
-	reiserfs_proc_unregister_global( "version" );
-	reiserfs_proc_info_global_done();
-        unregister_filesystem(&reiserfs_fs_type);
-	destroy_inodecache();
-}
-
-module_init(init_reiserfs_fs) ;
-module_exit(exit_reiserfs_fs) ;
-
-
-
+module_init (init_reiserfs_fs);
+module_exit (exit_reiserfs_fs);

@@ -36,7 +36,7 @@ static struct super_block *procinfo_prologue( kdev_t dev )
 	/* get super-block by device */
 	result = get_super( dev );
 	if( result != NULL ) {
-		if( !reiserfs_is_super( result ) ) {
+		if( !is_reiserfs_super( result ) ) {
 			printk( KERN_DEBUG "reiserfs: procfs-52: "
 				"non-reiserfs super found\n" );
 			drop_super( result );
