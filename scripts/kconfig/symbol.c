@@ -149,7 +149,7 @@ void sym_calc_visibility(struct symbol *sym)
 		visible = E_OR(visible, E_CALC(prop->visible));
 	if (oldvisible != visible) {
 		sym->visible = visible;
-		sym->flags |= SYMBOL_CHANGED;
+		sym_set_changed(sym);
 	}
 }
 
@@ -277,14 +277,17 @@ out:
 	}
 
 	if (memcmp(&oldval, &newval, sizeof(newval)))
-		sym->flags |= SYMBOL_CHANGED;
+		sym_set_changed(sym);
 	sym->curr = newval;
 
 	if (sym_is_choice(sym)) {
 		int flags = sym->flags & (SYMBOL_CHANGED | SYMBOL_WRITE);
 		prop = sym_get_choice_prop(sym);
-		for (e = prop->dep; e; e = e->left.expr)
+		for (e = prop->dep; e; e = e->left.expr) {
 			e->right.sym->flags |= flags;
+			if (flags & SYMBOL_CHANGED)
+				sym_set_changed(e->right.sym);
+		}
 	}
 }
 
@@ -298,13 +301,24 @@ void sym_clear_all_valid(void)
 	sym_change_count++;
 }
 
+void sym_set_changed(struct symbol *sym)
+{
+	struct property *prop;
+
+	sym->flags |= SYMBOL_CHANGED;
+	for (prop = sym->prop; prop; prop = prop->next) {
+		if (prop->menu)
+			prop->menu->flags |= MENU_CHANGED;
+	}
+}
+
 void sym_set_all_changed(void)
 {
 	struct symbol *sym;
 	int i;
 
 	for_all_symbols(i, sym)
-		sym->flags |= SYMBOL_CHANGED;
+		sym_set_changed(sym);
 }
 
 bool sym_tristate_within_range(struct symbol *sym, tristate val)
@@ -341,7 +355,7 @@ bool sym_set_tristate_value(struct symbol *sym, tristate val)
 
 	if (sym->flags & SYMBOL_NEW) {
 		sym->flags &= ~SYMBOL_NEW;
-		sym->flags |= SYMBOL_CHANGED;
+		sym_set_changed(sym);
 	}
 	if (sym_is_choice_value(sym) && val == yes) {
 		struct property *prop = sym_get_choice_prop(sym);
@@ -461,7 +475,7 @@ bool sym_set_string_value(struct symbol *sym, const char *newval)
 
 	if (sym->flags & SYMBOL_NEW) {
 		sym->flags &= ~SYMBOL_NEW;
-		sym->flags |= SYMBOL_CHANGED;
+		sym_set_changed(sym);
 	}
 
 	oldval = S_VAL(sym->def);
@@ -526,7 +540,6 @@ struct symbol *sym_lookup(const char *name, int isconst)
 	char *new_name;
 	int hash = 0;
 
-	//printf("lookup: %s -> ", name);
 	if (name) {
 		if (name[0] && !name[1]) {
 			switch (name[0]) {
@@ -542,10 +555,8 @@ struct symbol *sym_lookup(const char *name, int isconst)
 		for (symbol = symbol_hash[hash]; symbol; symbol = symbol->next) {
 			if (!strcmp(symbol->name, name)) {
 				if ((isconst && symbol->flags & SYMBOL_CONST) ||
-				    (!isconst && !(symbol->flags & SYMBOL_CONST))) {
-					//printf("h:%p\n", symbol);
+				    (!isconst && !(symbol->flags & SYMBOL_CONST)))
 					return symbol;
-				}
 			}
 		}
 		new_name = strdup(name);
@@ -565,7 +576,6 @@ struct symbol *sym_lookup(const char *name, int isconst)
 	symbol->next = symbol_hash[hash];
 	symbol_hash[hash] = symbol;
 
-	//printf("n:%p\n", symbol);
 	return symbol;
 }
 

@@ -63,6 +63,7 @@ extern struct menu *current_menu;
 /* symbol.c */
 void sym_init(void);
 void sym_clear_all_valid(void);
+void sym_set_changed(struct symbol *sym);
 
 static inline tristate sym_get_tristate_value(struct symbol *sym)
 {
