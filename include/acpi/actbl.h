@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2003, R. Byron Moore
+ * Copyright (C) 2000 - 2004, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -165,6 +165,11 @@ struct multiple_apic_table
 	u8                              type; \
 	u8                              length;
 
+struct apic_header
+{
+	APIC_HEADER_DEF
+};
+
 /* Values for MPS INTI flags */
 
 #define POLARITY_CONFORMS       0
@@ -236,7 +241,7 @@ struct madt_address_override
 {
 	APIC_HEADER_DEF
 	u16                             reserved;               /* Reserved - must be zero */
-	u32                             address;                /* APIC physical address */
+	u64                             address;                /* APIC physical address */
 };
 
 struct madt_io_sapic

@@ -7,7 +7,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2003, R. Byron Moore
+ * Copyright (C) 2000 - 2004, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without

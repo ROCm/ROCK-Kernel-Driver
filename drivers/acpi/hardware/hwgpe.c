@@ -6,7 +6,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2003, R. Byron Moore
+ * Copyright (C) 2000 - 2004, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -348,17 +348,14 @@ acpi_hw_disable_gpe_block (
 	struct acpi_gpe_block_info      *gpe_block)
 {
 	u32                             i;
-	struct acpi_gpe_register_info   *gpe_register_info;
 	acpi_status                     status;
 
-
-	/* Get the register info for the entire GPE block */
-
-	gpe_register_info = gpe_block->register_info;
 
 	/* Examine each GPE Register within the block */
 
 	for (i = 0; i < gpe_block->register_count; i++) {
+		/* Disable all GPEs in this register */
+
 		status = acpi_hw_low_level_write (8, 0x00,
 				 &gpe_block->register_info[i].enable_address);
 		if (ACPI_FAILURE (status)) {
@@ -389,17 +386,14 @@ acpi_hw_clear_gpe_block (
 	struct acpi_gpe_block_info      *gpe_block)
 {
 	u32                             i;
-	struct acpi_gpe_register_info   *gpe_register_info;
 	acpi_status                     status;
 
-
-	/* Get the register info for the entire GPE block */
-
-	gpe_register_info = gpe_block->register_info;
 
 	/* Examine each GPE Register within the block */
 
 	for (i = 0; i < gpe_block->register_count; i++) {
+		/* Clear all GPEs in this register */
+
 		status = acpi_hw_low_level_write (8, 0xFF,
 				 &gpe_block->register_info[i].status_address);
 		if (ACPI_FAILURE (status)) {
