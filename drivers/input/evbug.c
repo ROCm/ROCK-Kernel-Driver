@@ -32,6 +32,7 @@
 #include <linux/module.h>
 #include <linux/input.h>
 #include <linux/init.h>
+#include <linux/device.h>
 
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
 MODULE_DESCRIPTION("Input driver event debug module"); 
@@ -87,8 +88,14 @@ static struct input_handler evbug_handler = {
 	.id_table =	evbug_ids,
 };
 
+static struct device_interface evbug_intf = {
+	.name		= "debug",
+	.devclass	= &input_devclass,
+};
+
 int __init evbug_init(void)
 {
+	interface_register(&evbug_intf);
 	input_register_handler(&evbug_handler);
 	return 0;
 }
@@ -96,6 +103,7 @@ int __init evbug_init(void)
 void __exit evbug_exit(void)
 {
 	input_unregister_handler(&evbug_handler);
+	interface_register(&evbug_intf);
 }
 
 module_init(evbug_init);

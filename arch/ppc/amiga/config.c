@@ -93,7 +93,6 @@ static void a3000_gettod (int *, int *, int *, int *, int *, int *);
 static void a2000_gettod (int *, int *, int *, int *, int *, int *);
 static int amiga_hwclk (int, struct hwclk_time *);
 static int amiga_set_clock_mmss (unsigned long);
-extern void amiga_mksound( unsigned int count, unsigned int ticks );
 #ifdef CONFIG_AMIGA_FLOPPY
 extern void amiga_floppy_setup(char *, int *);
 #endif
@@ -114,8 +113,6 @@ static struct console amiga_console_driver = {
 	flags:		CON_PRINTBUFFER,
 	index:		-1,
 };
-
-extern void (*kd_mksound)(unsigned int, unsigned int);
 
 
     /*
@@ -432,7 +429,6 @@ void __init config_amiga(void)
 #ifdef CONFIG_DUMMY_CONSOLE
   conswitchp           = &dummy_con;
 #endif
-  kd_mksound           = amiga_mksound;
 #ifdef CONFIG_HEARTBEAT
   mach_heartbeat = amiga_heartbeat;
 #endif

@@ -389,8 +389,15 @@ static /* inline */ void refill_inactive(const int nr_pages_in)
 		prefetchw_prev_lru_page(page, &active_list, flags);
 		if (!TestClearPageLRU(page))
 			BUG();
+		list_del(&page->lru);
+		if (page_count(page) == 0) {
+			/* It is currently in pagevec_release() */
+			SetPageLRU(page);
+			list_add(&page->lru, &active_list);
+			continue;
+		}
 		page_cache_get(page);
-		list_move(&page->lru, &l_hold);
+		list_add(&page->lru, &l_hold);
 		nr_pages--;
 	}
 	spin_unlock_irq(&_pagemap_lru_lock);
