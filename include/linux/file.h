@@ -21,7 +21,7 @@
  */
 struct files_struct {
         atomic_t count;
-        rwlock_t file_lock;     /* Protects all the below members.  Nests inside tsk->alloc_lock */
+        spinlock_t file_lock;     /* Protects all the below members.  Nests inside tsk->alloc_lock */
         int max_fds;
         int max_fdset;
         int next_fd;

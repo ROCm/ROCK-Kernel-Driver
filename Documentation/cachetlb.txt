@@ -75,7 +75,7 @@ changes occur:
 	Platform developers note that generic code will always
 	invoke this interface with mm->page_table_lock held.
 
-4) void flush_tlb_page(struct vm_area_struct *vma, unsigned long page)
+4) void flush_tlb_page(struct vm_area_struct *vma, unsigned long addr)
 
 	This time we need to remove the PAGE_SIZE sized translation
 	from the TLB.  The 'vma' is the backing structure used by
@@ -87,9 +87,9 @@ changes occur:
 
 	After running, this interface must make sure that any previous
 	page table modification for address space 'vma->vm_mm' for
-	user virtual address 'page' will be visible to the cpu.  That
+	user virtual address 'addr' will be visible to the cpu.  That
 	is, after running, there will be no entries in the TLB for
-	'vma->vm_mm' for virtual address 'page'.
+	'vma->vm_mm' for virtual address 'addr'.
 
 	This is used primarily during fault processing.
 
@@ -144,9 +144,9 @@ the sequence will be in one of the following forms:
 	   change_range_of_page_tables(mm, start, end);
 	   flush_tlb_range(vma, start, end);
 
-	3) flush_cache_page(vma, page);
+	3) flush_cache_page(vma, addr);
 	   set_pte(pte_pointer, new_pte_val);
-	   flush_tlb_page(vma, page);
+	   flush_tlb_page(vma, addr);
 
 The cache level flush will always be first, because this allows
 us to properly handle systems whose caches are strict and require
@@ -200,7 +200,7 @@ Here are the routines, one by one:
 	call flush_cache_page (see below) for each entry which may be
 	modified.
 
-4) void flush_cache_page(struct vm_area_struct *vma, unsigned long page)
+4) void flush_cache_page(struct vm_area_struct *vma, unsigned long addr)
 
 	This time we need to remove a PAGE_SIZE sized range
 	from the cache.  The 'vma' is the backing structure used by
@@ -211,7 +211,7 @@ Here are the routines, one by one:
 	"Harvard" type cache layouts).
 
 	After running, there will be no entries in the cache for
-	'vma->vm_mm' for virtual address 'page'.
+	'vma->vm_mm' for virtual address 'addr'.
 
 	This is used primarily during fault processing.
 
@@ -235,7 +235,7 @@ this value.
 NOTE: This does not fix shared mmaps, check out the sparc64 port for
 one way to solve this (in particular SPARC_FLAG_MMAPSHARED).
 
-Next, you have two methods to solve the D-cache aliasing issue for all
+Next, you have to solve the D-cache aliasing issue for all
 other cases.  Please keep in mind that fact that, for a given page
 mapped into some user address space, there is always at least one more
 mapping, that of the kernel in it's linear mapping starting at
@@ -244,35 +244,8 @@ physical page into its address space, by implication the D-cache
 aliasing problem has the potential to exist since the kernel already
 maps this page at its virtual address.
 
-First, I describe the old method to deal with this problem.  I am
-describing it for documentation purposes, but it is deprecated and the
-latter method I describe next should be used by all new ports and all
-existing ports should move over to the new mechanism as well.
-
-  flush_page_to_ram(struct page *page)
-
-	The physical page 'page' is about to be place into the
-	user address space of a process.  If it is possible for
-	stores done recently by the kernel into this physical
-	page, to not be visible to an arbitrary mapping in userspace,
-	you must flush this page from the D-cache.
-
-	If the D-cache is writeback in nature, the dirty data (if
-	any) for this physical page must be written back to main
-	memory before the cache lines are invalidated.
-
-Admittedly, the author did not think very much when designing this
-interface.  It does not give the architecture enough information about
-what exactly is going on, and there is no context to base a judgment
-on about whether an alias is possible at all.  The new interfaces to
-deal with D-cache aliasing are meant to address this by telling the
-architecture specific code exactly which is going on at the proper points
-in time.
-
-Here is the new interface:
-
-  void copy_user_page(void *to, void *from, unsigned long address)
-  void clear_user_page(void *to, unsigned long address)
+  void copy_user_page(void *to, void *from, unsigned long addr, struct page *page)
+  void clear_user_page(void *to, unsigned long addr, struct page *page)
 
 	These two routines store data in user anonymous or COW
 	pages.  It allows a port to efficiently avoid D-cache alias
@@ -285,8 +258,9 @@ Here is the new interface:
 	of the same "color" as the user mapping of the page.  Sparc64
 	for example, uses this technique.
 
-	The "address" parameter tells the virtual address where the
-	user will ultimately have this page mapped.
+	The 'addr' parameter tells the virtual address where the
+	user will ultimately have this page mapped, and the 'page'
+	parameter gives a pointer to the struct page of the target.
 
 	If D-cache aliasing is not an issue, these two routines may
 	simply call memcpy/memset directly and do nothing more.
@@ -363,5 +337,5 @@ Here is the new interface:
 
   void flush_icache_page(struct vm_area_struct *vma, struct page *page)
 	All the functionality of flush_icache_page can be implemented in
-	flush_dcache_page and update_mmu_cache. In 2.5 the hope is to
+	flush_dcache_page and update_mmu_cache. In 2.7 the hope is to
 	remove this interface completely.

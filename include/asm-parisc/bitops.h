@@ -389,10 +389,14 @@ found_middle:
  */
 #ifdef __LP64__
 #define ext2_set_bit(nr, addr)		test_and_set_bit((nr) ^ 0x38, addr)
+#define ext2_set_bit_atomic(l,nr,addr)  test_and_set_bit((nr) ^ 0x38, addr)
 #define ext2_clear_bit(nr, addr)	test_and_clear_bit((nr) ^ 0x38, addr)
+#define ext2_clear_bit_atomic(l,nr,addr) test_and_clear_bit((nr) ^ 0x38, addr)
 #else
 #define ext2_set_bit(nr, addr)		test_and_set_bit((nr) ^ 0x18, addr)
+#define ext2_set_bit_atomic(l,nr,addr)  test_and_set_bit((nr) ^ 0x18, addr)
 #define ext2_clear_bit(nr, addr)	test_and_clear_bit((nr) ^ 0x18, addr)
+#define ext2_clear_bit_atomic(l,nr,addr) test_and_clear_bit((nr) ^ 0x18, addr)
 #endif
 
 #endif	/* __KERNEL__ */

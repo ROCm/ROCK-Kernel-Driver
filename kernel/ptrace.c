@@ -179,14 +179,18 @@ int access_process_vm(struct task_struct *tsk, unsigned long addr, void *buf, in
 
 		flush_cache_page(vma, addr);
 
+		/*
+		 * FIXME!  We used to have flush_page_to_ram() in here, but
+		 * that was wrong.  davem says we need a new per-arch primitive
+		 * to handle this correctly.
+		 */
+
 		maddr = kmap(page);
 		if (write) {
 			memcpy(maddr + offset, buf, bytes);
-			flush_page_to_ram(page);
 			flush_icache_user_range(vma, page, addr, bytes);
 		} else {
 			memcpy(buf, maddr + offset, bytes);
-			flush_page_to_ram(page);
 		}
 		kunmap(page);
 		page_cache_release(page);

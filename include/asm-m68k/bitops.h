@@ -365,6 +365,24 @@ ext2_clear_bit (int nr, volatile void *vaddr)
 	return retval;
 }
 
+#define ext2_set_bit_atomic(lock, nr, addr)		\
+	({						\
+		int ret;				\
+		spin_lock(lock);			\
+		ret = ext2_set_bit((nr), (addr));	\
+		spin_unlock(lock);			\
+		ret;					\
+	})
+
+#define ext2_clear_bit_atomic(lock, nr, addr)		\
+	({						\
+		int ret;				\
+		spin_lock(lock);			\
+		ret = ext2_clear_bit((nr), (addr));	\
+		spin_unlock(lock);			\
+		ret;					\
+	})
+
 extern __inline__ int
 ext2_test_bit (int nr, const volatile void *vaddr)
 {

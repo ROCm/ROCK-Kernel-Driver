@@ -175,7 +175,7 @@ int expkey_parse(struct cache_detail *cd, char *mesg, int mlen)
 		ek = svc_expkey_lookup(&key, 2);
 		if (ek)
 			expkey_put(&ek->h, &svc_expkey_cache);
-		svc_export_put(&exp->h, &svc_export_cache);
+		exp_put(exp);
 		err = 0;
 	out_nd:
 		path_release(&nd);
@@ -648,7 +648,6 @@ exp_export(struct nfsctl_export *nxp)
 	struct svc_export	new;
 	struct svc_expkey	*fsid_key = NULL;
 	struct nameidata nd;
-	struct inode	*inode = NULL;
 	int		err;
 
 	/* Consistency check */
@@ -674,7 +673,6 @@ exp_export(struct nfsctl_export *nxp)
 	err = path_lookup(nxp->ex_path, 0, &nd);
 	if (err)
 		goto out_unlock;
-	inode = nd.dentry->d_inode;
 	err = -EINVAL;
 
 	exp = exp_get_by_name(clp, nd.mnt, nd.dentry, NULL);
@@ -687,7 +685,7 @@ exp_export(struct nfsctl_export *nxp)
 	    fsid_key->ek_export != exp)
 		goto finish;
 
-	if (exp != NULL) {
+	if (exp) {
 		/* just a flags/id/fsid update */
 
 		exp_fsid_unhash(exp);
@@ -700,7 +698,7 @@ exp_export(struct nfsctl_export *nxp)
 		goto finish;
 	}
 
-	err = check_export(inode, nxp->ex_flags);
+	err = check_export(nd.dentry->d_inode, nxp->ex_flags);
 	if (err) goto finish;
 
 	err = -ENOMEM;
@@ -838,7 +836,7 @@ exp_rootfh(svc_client *clp, char *path, struct knfsd_fh *f, int maxsize)
 		err = 0;
 	memcpy(f, &fh.fh_handle, sizeof(struct knfsd_fh));
 	fh_put(&fh);
-
+	exp_put(exp);
 out:
 	path_release(&nd);
 	return err;

@@ -182,11 +182,11 @@ struct file *fget(unsigned int fd)
 	struct file *file;
 	struct files_struct *files = current->files;
 
-	read_lock(&files->file_lock);
+	spin_lock(&files->file_lock);
 	file = fcheck(fd);
 	if (file)
 		get_file(file);
-	read_unlock(&files->file_lock);
+	spin_unlock(&files->file_lock);
 	return file;
 }
 

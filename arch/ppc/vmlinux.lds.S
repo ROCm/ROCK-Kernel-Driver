@@ -78,7 +78,11 @@ SECTIONS
 
   . = ALIGN(4096);
   __init_begin = .;
-  .init.text : { *(.init.text) }
+  .init.text : { 
+	_sinittext = .;
+	*(.init.text)
+	_einittext = .;
+  }
   .init.data : { 
     *(.init.data);
     __vtop_table_begin = .;

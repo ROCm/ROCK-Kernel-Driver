@@ -67,7 +67,6 @@ static inline void memclear_highpage_flush(struct page *page, unsigned int offse
 	kaddr = kmap_atomic(page, KM_USER0);
 	memset((char *)kaddr + offset, 0, size);
 	flush_dcache_page(page);
-	flush_page_to_ram(page);
 	kunmap_atomic(kaddr, KM_USER0);
 }
 

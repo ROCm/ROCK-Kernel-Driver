@@ -1142,6 +1142,35 @@ static void __init calculate_zone_bitmap(struct pglist_data *pgdat,
 }
 
 /*
+ * Initially all pages are reserved - free ones are freed
+ * up by free_all_bootmem() once the early boot process is
+ * done. Non-atomic initialization, single-pass.
+ */
+void __init memmap_init_zone(struct page *start, unsigned long size, int nid,
+		unsigned long zone, unsigned long start_pfn)
+{
+	struct page *page;
+
+	for (page = start; page < (start + size); page++) {
+		set_page_zone(page, nid * MAX_NR_ZONES + zone);
+		set_page_count(page, 0);
+		SetPageReserved(page);
+		INIT_LIST_HEAD(&page->list);
+#ifdef WANT_PAGE_VIRTUAL
+		/* The shift won't overflow because ZONE_NORMAL is below 4G. */
+		if (zone != ZONE_HIGHMEM)
+			set_page_address(page, __va(start_pfn << PAGE_SHIFT));
+#endif
+		start_pfn++;
+	}
+}
+
+#ifndef __HAVE_ARCH_MEMMAP_INIT
+#define memmap_init(start, size, nid, zone, start_pfn) \
+	memmap_init_zone((start), (size), (nid), (zone), (start_pfn))
+#endif
+
+/*
  * Set up the zone data structures:
  *   - mark all pages reserved
  *   - mark all memory queues empty
@@ -1151,7 +1180,6 @@ static void __init free_area_init_core(struct pglist_data *pgdat,
 		unsigned long *zones_size, unsigned long *zholes_size)
 {
 	unsigned long i, j;
-	unsigned long local_offset;
 	const unsigned long zone_required_alignment = 1UL << (MAX_ORDER-1);
 	int cpu, nid = pgdat->node_id;
 	struct page *lmem_map = pgdat->node_mem_map;
@@ -1160,7 +1188,6 @@ static void __init free_area_init_core(struct pglist_data *pgdat,
 	pgdat->nr_zones = 0;
 	init_waitqueue_head(&pgdat->kswapd_wait);
 	
-	local_offset = 0;                /* offset within lmem_map */
 	for (j = 0; j < MAX_NR_ZONES; j++) {
 		struct zone *zone = pgdat->node_zones + j;
 		unsigned long mask;
@@ -1246,36 +1273,17 @@ static void __init free_area_init_core(struct pglist_data *pgdat,
 		zone->pages_low = mask*2;
 		zone->pages_high = mask*3;
 
-		zone->zone_mem_map = lmem_map + local_offset;
+		zone->zone_mem_map = lmem_map;
 		zone->zone_start_pfn = zone_start_pfn;
 
 		if ((zone_start_pfn) & (zone_required_alignment-1))
 			printk("BUG: wrong zone alignment, it will crash\n");
 
-		/*
-		 * Initially all pages are reserved - free ones are freed
-		 * up by free_all_bootmem() once the early boot process is
-		 * done. Non-atomic initialization, single-pass.
-		 */
-		for (i = 0; i < size; i++) {
-			struct page *page = lmem_map + local_offset + i;
-			set_page_zone(page, nid * MAX_NR_ZONES + j);
-			set_page_count(page, 0);
-			SetPageReserved(page);
-			INIT_LIST_HEAD(&page->list);
-#ifdef WANT_PAGE_VIRTUAL
-			if (j != ZONE_HIGHMEM)
-				/*
-				 * The shift left won't overflow because the
-				 * ZONE_NORMAL is below 4G.
-				 */
-				set_page_address(page,
-					__va(zone_start_pfn << PAGE_SHIFT));
-#endif
-			zone_start_pfn++;
-		}
+		memmap_init(lmem_map, size, nid, j, zone_start_pfn);
 
-		local_offset += size;
+		zone_start_pfn += size;
+		lmem_map += size;
+
 		for (i = 0; ; i++) {
 			unsigned long bitmap_size;
 

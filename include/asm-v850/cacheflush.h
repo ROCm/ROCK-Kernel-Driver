@@ -29,7 +29,6 @@
 #define flush_cache_mm(mm)			((void)0)
 #define flush_cache_range(vma, start, end)	((void)0)
 #define flush_cache_page(vma, vmaddr)		((void)0)
-#define flush_page_to_ram(page)			((void)0)
 #define flush_dcache_page(page)			((void)0)
 #define flush_icache()				((void)0)
 #define flush_icache_range(start, end)		((void)0)

@@ -15,7 +15,22 @@ extern unsigned long kallsyms_num_syms __attribute__((weak));
 extern char kallsyms_names[] __attribute__((weak));
 
 /* Defined by the linker script. */
-extern char _stext[], _etext[];
+extern char _stext[], _etext[], _sinittext[], _einittext[];
+
+static inline int is_kernel_inittext(unsigned long addr)
+{
+	if (addr >= (unsigned long)_sinittext
+	    && addr <= (unsigned long)_einittext)
+		return 1;
+	return 0;
+}
+
+static inline int is_kernel_text(unsigned long addr)
+{
+	if (addr >= (unsigned long)_stext && addr <= (unsigned long)_etext)
+		return 1;
+	return 0;
+}
 
 /* Lookup an address.  modname is set to NULL if it's in the kernel. */
 const char *kallsyms_lookup(unsigned long addr,
@@ -31,7 +46,7 @@ const char *kallsyms_lookup(unsigned long addr,
 	namebuf[127] = 0;
 	namebuf[0] = 0;
 
-	if (addr >= (unsigned long)_stext && addr <= (unsigned long)_etext) {
+	if (is_kernel_text(addr) || is_kernel_inittext(addr)) {
 		unsigned long symbol_end;
 		char *name = kallsyms_names;
 
@@ -52,6 +67,8 @@ const char *kallsyms_lookup(unsigned long addr,
 		/* Base symbol size on next symbol. */
 		if (best + 1 < kallsyms_num_syms)
 			symbol_end = kallsyms_addresses[best + 1];
+		else if (is_kernel_inittext(addr))
+			symbol_end = (unsigned long)_einittext;
 		else
 			symbol_end = (unsigned long)_etext;
 
