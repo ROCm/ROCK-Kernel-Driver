@@ -21,6 +21,7 @@
 #include <linux/completion.h>
 #include <linux/namespace.h>
 #include <linux/personality.h>
+#include <linux/mempolicy.h>
 #include <linux/sem.h>
 #include <linux/file.h>
 #include <linux/binfmts.h>
@@ -972,12 +973,14 @@ struct task_struct *copy_process(unsigned long clone_flags,
 	p->security = NULL;
 	p->io_context = NULL;
 	p->audit_context = NULL;
+#ifdef CONFIG_NUMA
  	p->mempolicy = mpol_copy(p->mempolicy);
  	if (IS_ERR(p->mempolicy)) {
  		retval = PTR_ERR(p->mempolicy);
  		p->mempolicy = NULL;
  		goto bad_fork_cleanup;
  	}
+#endif
 
 	retval = -ENOMEM;
 	if ((retval = security_task_alloc(p)))
@@ -1128,7 +1131,9 @@ bad_fork_cleanup_audit:
 bad_fork_cleanup_security:
 	security_task_free(p);
 bad_fork_cleanup_policy:
+#ifdef CONFIG_NUMA
 	mpol_free(p->mempolicy);
+#endif
 bad_fork_cleanup:
 	if (p->pid > 0)
 		free_pidmap(p->pid);

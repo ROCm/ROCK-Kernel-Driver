@@ -39,6 +39,7 @@
 #include <linux/blkdev.h>
 #include <linux/security.h>
 #include <linux/swapops.h>
+#include <linux/mempolicy.h>
 #include <asm/uaccess.h>
 #include <asm/div64.h>
 #include <asm/pgtable.h>

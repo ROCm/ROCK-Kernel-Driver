@@ -29,7 +29,6 @@
 #include <linux/completion.h>
 #include <linux/pid.h>
 #include <linux/percpu.h>
-#include <linux/mempolicy.h>
 
 struct exec_domain;
 
@@ -381,6 +380,7 @@ int set_current_groups(struct group_info *group_info);
 
 
 struct audit_context;		/* See audit.c */
+struct mempolicy;
 
 struct task_struct {
 	volatile long state;	/* -1 unrunnable, 0 runnable, >0 stopped */
@@ -510,8 +510,10 @@ struct task_struct {
 	unsigned long ptrace_message;
 	siginfo_t *last_siginfo; /* For ptrace use.  */
 
+#ifdef CONFIG_NUMA
   	struct mempolicy *mempolicy;
   	short il_next;		/* could be shared with used_math */
+#endif
 };
 
 static inline pid_t process_group(struct task_struct *tsk)

@@ -21,6 +21,7 @@
 #include <linux/profile.h>
 #include <linux/module.h>
 #include <linux/mount.h>
+#include <linux/mempolicy.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgalloc.h>

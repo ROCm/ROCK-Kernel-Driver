@@ -46,6 +46,7 @@
 #include <linux/security.h>
 #include <linux/syscalls.h>
 #include <linux/rmap.h>
+#include <linux/mempolicy.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgalloc.h>

@@ -72,6 +72,7 @@
 #include <linux/interrupt.h>
 #include <linux/init.h>
 #include <linux/compat.h>
+#include <linux/mempolicy.h>
 #include <asm/uaccess.h>
 
 static kmem_cache_t *policy_cache;

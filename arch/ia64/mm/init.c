@@ -19,6 +19,7 @@
 #include <linux/slab.h>
 #include <linux/swap.h>
 #include <linux/proc_fs.h>
+#include <linux/mempolicy.h>
 
 #include <asm/a.out.h>
 #include <asm/bitops.h>

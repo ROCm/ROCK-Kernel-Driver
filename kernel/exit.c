@@ -22,6 +22,7 @@
 #include <linux/profile.h>
 #include <linux/mount.h>
 #include <linux/proc_fs.h>
+#include <linux/mempolicy.h>
 
 #include <asm/uaccess.h>
 #include <asm/unistd.h>
@@ -791,7 +792,9 @@ asmlinkage NORET_TYPE void do_exit(long code)
 	__exit_fs(tsk);
 	exit_namespace(tsk);
 	exit_thread();
+#ifdef CONFIG_NUMA
 	mpol_free(tsk->mempolicy);
+#endif
 
 	if (tsk->signal->leader)
 		disassociate_ctty(1);

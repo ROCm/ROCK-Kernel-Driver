@@ -15,6 +15,7 @@
 #include <linux/binfmts.h>
 #include <linux/mm.h>
 #include <linux/security.h>
+#include <linux/mempolicy.h>
 
 #include <asm/segment.h> 
 #include <asm/ptrace.h>
