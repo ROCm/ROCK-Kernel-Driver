@@ -52,7 +52,7 @@ loaded as a module, only the IRQ and transceiver setting may be overridden.
 For example, setting two cards to 10base2/IRQ10 and AUI/IRQ11 is done by using
 the xcvr and irq module options:
 
-   options 3c509 xcvr=3,3 irq=10,11
+   options 3c509 xcvr=3,1 irq=10,11
 
 
 (2) Full-duplex mode
