@@ -1,5 +1,5 @@
 /*
- *  acpi_bus.h - ACPI Bus Driver ($Revision: 21 $)
+ *  acpi_bus.h - ACPI Bus Driver ($Revision: 22 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -46,7 +46,6 @@ struct acpi_handle_list {
 
 /* acpi_utils.h */
 acpi_status acpi_extract_package (acpi_object *, acpi_buffer *, acpi_buffer *);
-acpi_status acpi_evaluate (acpi_handle, acpi_string, acpi_object_list *, acpi_buffer *);
 acpi_status acpi_evaluate_integer (acpi_handle, acpi_string, acpi_object_list *, unsigned long *);
 acpi_status acpi_evaluate_reference (acpi_handle, acpi_string, acpi_object_list *, struct acpi_handle_list *);
 
