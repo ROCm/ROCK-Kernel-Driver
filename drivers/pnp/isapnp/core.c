@@ -1081,6 +1081,11 @@ int __init isapnp_init(void)
 	struct pnp_card *card;
 	struct pnp_dev *dev;
 
+#if defined(CONFIG_PPC_MULTIPLATFORM)
+#include <asm/processor.h>
+	if(_machine == _MACH_Pmac)
+		isapnp_disable = 1;
+#endif
 	if (isapnp_disable) {
 		isapnp_detected = 0;
 		printk(KERN_INFO "isapnp: ISA Plug & Play support disabled\n");

@@ -45,6 +45,10 @@
 #include <linux/serial_core.h>
 #include "8250.h"
 
+#ifdef CONFIG_PPC_MULTIPLATFORM
+#include <asm/processor.h>
+#endif
+
 /*
  * Configuration:
  *   share_irqs - whether we pass SA_SHIRQ to request_irq().  This option
@@ -2038,6 +2042,12 @@ static struct console serial8250_console = {
 
 static int __init serial8250_console_init(void)
 {
+#ifdef CONFIG_PPC_MULTIPLATFORM
+	if(_machine == _MACH_Pmac) {
+		printk("%s: nothing to do on PowerMac\n",__FUNCTION__);
+		return -ENODEV;
+	}
+#endif
 	serial8250_isa_init_ports();
 	register_console(&serial8250_console);
 	return 0;
@@ -2179,6 +2189,12 @@ static int __init serial8250_init(void)
 {
 	int ret, i;
 
+#ifdef CONFIG_PPC_MULTIPLATFORM
+	if(_machine == _MACH_Pmac) {
+		printk("%s: nothing to do on PowerMac\n",__FUNCTION__);
+		return -ENODEV;
+	}
+#endif
 	printk(KERN_INFO "Serial: 8250/16550 driver $Revision: 1.90 $ "
 		"%d ports, IRQ sharing %sabled\n", (int) UART_NR,
 		share_irqs ? "en" : "dis");
