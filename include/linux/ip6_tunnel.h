@@ -16,6 +16,8 @@
 #define IP6_TNL_F_USE_ORIG_FLOWLABEL 0x4
 /* being used for Mobile IPv6 */
 #define IP6_TNL_F_MIP6_DEV 0x8
+/* copy DSCP from the outer packet */
+#define IP6_TNL_F_RCV_DSCP_COPY 0x10
 
 struct ip6_tnl_parm {
 	char name[IFNAMSIZ];	/* name of tunnel device */

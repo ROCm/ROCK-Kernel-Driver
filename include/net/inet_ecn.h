@@ -2,6 +2,7 @@
 #define _INET_ECN_H_
 
 #include <linux/ip.h>
+#include <net/dsfield.h>
 
 enum {
 	INET_ECN_NOT_ECT = 0,
@@ -91,6 +92,12 @@ static inline void IP6_ECN_set_ce(struct ipv6hdr *iph)
 static inline void IP6_ECN_clear(struct ipv6hdr *iph)
 {
 	*(u32*)iph &= ~htonl(INET_ECN_MASK << 20);
+}
+
+static inline void ipv6_copy_dscp(struct ipv6hdr *outer, struct ipv6hdr *inner)
+{
+	u32 dscp = ipv6_get_dsfield(outer) & ~INET_ECN_MASK;
+	ipv6_change_dsfield(inner, INET_ECN_MASK, dscp);
 }
 
 #endif
