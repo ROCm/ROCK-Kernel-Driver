@@ -205,7 +205,7 @@ static void hammerfall_free_buffers (void)
 static int __init alsa_hammerfall_mem_init(void)
 {
 	int i;
-	struct pci_dev *pci;
+	struct pci_dev *pci = NULL;
 	hammerfall_buf_t *rbuf;
 
 	/* make sure our buffer records are clean */
@@ -225,12 +225,12 @@ static int __init alsa_hammerfall_mem_init(void)
 	
 	i = 0;	/* card number */
 	rbuf = hammerfall_buffers;
-	pci_for_each_dev(pci) {
+	while ((pci = pci_find_device(PCI_VENDOR_ID_XILINX, PCI_ANY_ID, pci)) != NULL) {
 		int k;
 		
 		/* check for Hammerfall and Hammerfall DSP cards */
 
-		if (pci->vendor != 0x10ee || (pci->device != 0x3fc4 && pci->device != 0x3fc5)) 
+		if (pci->device != 0x3fc4 && pci->device != 0x3fc5)
 			continue;
 
 		if (!enable[i])
