@@ -305,8 +305,8 @@ struct controller {
 	u8 first_slot;
 	u8 add_support;
 	u8 push_flag;
-	u8 speed;			/* 0 = 33MHz, 1 = 66MHz */
-	u8 speed_capability;		/* 0 = 33MHz, 1 = 66MHz */
+	enum pci_bus_speed speed;
+	enum pci_bus_speed speed_capability;
 	u8 push_button;			/* 0 = no pushbutton, 1 = pushbutton present */
 	u8 slot_switch_type;		/* 0 = no switch, 1 = switch present */
 	u8 defeature_PHP;		/* 0 = PHP not supported, 1 = PHP supported */
@@ -320,9 +320,6 @@ struct controller {
 	struct tq_struct int_task_event;
 	wait_queue_head_t queue;	/* sleep & wake process */
 };
-
-#define CTRL_SPEED_33MHz	0
-#define CTRL_SPEED_66MHz	1
 
 struct irq_mapping {
 	u8 barber_pole;
@@ -635,7 +632,7 @@ static inline u8 get_controller_speed (struct controller *ctrl)
 	u16 misc;
 	
 	misc = readw(ctrl->hpc_reg + MISC);
-	return (misc & 0x0800) ? 1 : 0;
+	return (misc & 0x0800) ? PCI_SPEED_66MHz : PCI_SPEED_33MHz;
 }
 
 
