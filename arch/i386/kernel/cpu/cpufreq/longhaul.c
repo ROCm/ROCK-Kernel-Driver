@@ -100,7 +100,7 @@ static char *print_speed(int speed)
 }
 
 
-static unsigned int calc_speed(int mult, int fsb)
+static unsigned int calc_speed(int mult)
 {
 	int khz;
 	khz = (mult/10)*fsb;
@@ -182,11 +182,11 @@ static void longhaul_setstate(unsigned int clock_ratio_index)
 	if (mult == -1)
 		return;
 
-	speed = calc_speed (mult, fsb);
+	speed = calc_speed(mult);
 	if ((speed > highest_speed) || (speed < lowest_speed))
 		return;
 
-	freqs.old = calc_speed (longhaul_get_cpu_mult(), fsb);
+	freqs.old = calc_speed(longhaul_get_cpu_mult());
 	freqs.new = speed;
 	freqs.cpu = 0; /* longhaul.c is UP only driver */
 
@@ -364,8 +364,8 @@ static int __init longhaul_get_ranges(void)
 		return -EINVAL;
 	}
 
-	highest_speed = calc_speed (maxmult, fsb);
-	lowest_speed = calc_speed (minmult,fsb);
+	highest_speed = calc_speed(maxmult);
+	lowest_speed = calc_speed(minmult);
 	dprintk (KERN_INFO PFX "FSB:%dMHz  ", fsb);
 	dprintk ("Lowest speed:%s  ", print_speed(lowest_speed/1000));
 	dprintk ("Highest speed:%s\n", print_speed(highest_speed/1000));
@@ -391,7 +391,7 @@ static int __init longhaul_get_ranges(void)
 			continue;
 		if (ratio > maxmult || ratio < minmult)
 			continue;
-		longhaul_table[k].frequency = calc_speed (ratio, fsb);
+		longhaul_table[k].frequency = calc_speed(ratio);
 		longhaul_table[k].index	= j;
 		k++;
 	}
@@ -487,7 +487,7 @@ static unsigned int longhaul_get(unsigned int cpu)
 {
 	if (cpu)
 		return 0;
-	return (calc_speed (longhaul_get_cpu_mult(), fsb));
+	return calc_speed(longhaul_get_cpu_mult());
 }
 
 
@@ -588,7 +588,7 @@ static int __init longhaul_cpu_init(struct cpufreq_policy *policy)
 
 	policy->governor = CPUFREQ_DEFAULT_GOVERNOR;
 	policy->cpuinfo.transition_latency = CPUFREQ_ETERNAL;
-	policy->cur = calc_speed (longhaul_get_cpu_mult(), fsb);
+	policy->cur = calc_speed(longhaul_get_cpu_mult());
 
 	ret = cpufreq_frequency_table_cpuinfo(policy, longhaul_table);
 	if (ret)
