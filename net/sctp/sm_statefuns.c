@@ -2137,17 +2137,16 @@ sctp_disposition_t sctp_sf_eat_data_6_2(const sctp_endpoint_t *ep,
 
 	/* This is a new TSN.  */
 
-	/* If we don't have any room in our receive window, discard.
-	 * Actually, allow a little bit of overflow (up to a MTU of
-	 * of overflow).
+	/* Discard if there is no room in the receive window.
+	 * Actually, allow a little bit of overflow (up to a MTU).
 	 */
 	datalen = ntohs(chunk->chunk_hdr->length);
 	datalen -= sizeof(sctp_data_chunk_t);
 
-	if (!asoc->rwnd || (datalen > asoc->frag_point)) {
+	if (asoc->rwnd_over || (datalen > asoc->rwnd + asoc->frag_point)) {
 		SCTP_DEBUG_PRINTK("Discarding tsn: %u datalen: %Zd, "
 				  "rwnd: %d\n", tsn, datalen, asoc->rwnd);
-		goto discard_noforce;
+		goto discard_force;
 	}
 
 	/*
