@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/cio.c
  *   S/390 common I/O routines -- low level i/o calls
- *   $Revision: 1.117 $
+ *   $Revision: 1.121 $
  *
  *    Copyright (C) 1999-2002 IBM Deutschland Entwicklung GmbH,
  *			      IBM Corporation
@@ -783,3 +783,68 @@ cio_get_console_subchannel(void)
 }
 
 #endif
+static inline int
+__disable_subchannel_easy(unsigned int schid, struct schib *schib)
+{
+	int retry, cc;
+
+	cc = 0;
+	for (retry=0;retry<3;retry++) {
+		schib->pmcw.ena = 0;
+		cc = msch(schid, schib);
+		if (cc)
+			return (cc==3?-ENODEV:-EBUSY);
+		stsch(schid, schib);
+		if (!schib->pmcw.ena)
+			return 0;
+	}
+	return -EBUSY; /* uhm... */
+}
+
+static inline int
+__clear_subchannel_easy(unsigned int schid)
+{
+	int retry;
+
+	if (csch(schid))
+		return -ENODEV;
+	for (retry=0;retry<20;retry++) {
+		struct tpi_info ti;
+
+		if (tpi(&ti)) {
+			tsch(schid, (struct irb *)__LC_IRB);
+			return 0;
+		}
+		udelay(100);
+	}
+	return -EBUSY;
+}
+
+extern void do_reipl(unsigned long devno);
+/* Make sure all subchannels are quiet before we re-ipl an lpar. */
+void
+reipl(unsigned long devno)
+{
+	unsigned int schid;
+
+	local_irq_disable();
+	for (schid=0;schid<=highest_subchannel;schid++) {
+		struct schib schib;
+		if (stsch(schid, &schib))
+			goto out;
+		if (!schib.pmcw.ena)
+			continue;
+		switch(__disable_subchannel_easy(schid, &schib)) {
+		case 0:
+		case -ENODEV:
+			break;
+		default: /* -EBUSY */
+			if (__clear_subchannel_easy(schid))
+				break; /* give up... */
+			stsch(schid, &schib);
+			__disable_subchannel_easy(schid, &schib);
+		}
+	}
+out:
+	do_reipl(devno);
+}

@@ -984,6 +984,7 @@ out:
 
 static void __exit exit_rpcsec_gss(void)
 {
+	gss_svc_shutdown();
 	gss_mech_unregister_all();
 	rpcauth_unregister(&authgss_ops);
 }

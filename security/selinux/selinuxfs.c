@@ -46,6 +46,8 @@ int task_has_security(struct task_struct *tsk,
 	struct task_security_struct *tsec;
 
 	tsec = tsk->security;
+	if (!tsec)
+		return -EACCES;
 
 	return avc_has_perm(tsec->sid, SECINITSID_SECURITY,
 			    SECCLASS_SECURITY, perms, NULL, NULL);
@@ -61,8 +63,9 @@ enum sel_inos {
 	SEL_RELABEL,	/* compute relabeling decision */
 	SEL_USER,	/* compute reachable user contexts */
 	SEL_POLICYVERS,	/* return policy version for this kernel */
-	SEL_COMMIT_BOOLS,
-	SEL_MLS		/* return if MLS policy is enabled */
+	SEL_COMMIT_BOOLS, /* commit new boolean values */
+	SEL_MLS,	/* return if MLS policy is enabled */
+	SEL_DISABLE	/* disable SELinux until next reboot */
 };
 
 static ssize_t sel_read_enforce(struct file *filp, char *buf,
@@ -149,6 +152,53 @@ out:
 static struct file_operations sel_enforce_ops = {
 	.read		= sel_read_enforce,
 	.write		= sel_write_enforce,
+};
+
+#ifdef CONFIG_SECURITY_SELINUX_DISABLE
+static ssize_t sel_write_disable(struct file * file, const char * buf,
+				 size_t count, loff_t *ppos)
+
+{
+	char *page;
+	ssize_t length;
+	int new_value;
+	extern int selinux_disable(void);
+
+	if (count < 0 || count >= PAGE_SIZE)
+		return -ENOMEM;
+	if (*ppos != 0) {
+		/* No partial writes. */
+		return -EINVAL;
+	}
+	page = (char*)__get_free_page(GFP_KERNEL);
+	if (!page)
+		return -ENOMEM;
+	memset(page, 0, PAGE_SIZE);
+	length = -EFAULT;
+	if (copy_from_user(page, buf, count))
+		goto out;
+
+	length = -EINVAL;
+	if (sscanf(page, "%d", &new_value) != 1)
+		goto out;
+
+	if (new_value) {
+		length = selinux_disable();
+		if (length < 0)
+			goto out;
+	}
+
+	length = count;
+out:
+	free_page((unsigned long) page);
+	return length;
+}
+#else
+#define sel_write_disable NULL
+#endif
+
+static struct file_operations sel_disable_ops = {
+	.write		= sel_write_disable,
 };
 
 static ssize_t sel_read_policyvers(struct file *filp, char *buf,
@@ -1005,6 +1055,7 @@ static int sel_fill_super(struct super_block * sb, void * data, int silent)
 		[SEL_POLICYVERS] = {"policyvers", &sel_policyvers_ops, S_IRUGO},
 		[SEL_COMMIT_BOOLS] = {"commit_pending_bools", &sel_commit_bools_ops, S_IWUSR},
 		[SEL_MLS] = {"mls", &sel_mls_ops, S_IRUGO},
+		[SEL_DISABLE] = {"disable", &sel_disable_ops, S_IWUSR},
 		/* last one */ {""}
 	};
 	ret = simple_fill_super(sb, SELINUX_MAGIC, selinux_files);
@@ -1054,3 +1105,10 @@ static int __init init_sel_fs(void)
 }
 
 __initcall(init_sel_fs);
+
+#ifdef CONFIG_SECURITY_SELINUX_DISABLE
+void exit_sel_fs(void)
+{
+	unregister_filesystem(&sel_fs_type);
+}
+#endif

@@ -35,7 +35,7 @@ static struct security_operations capability_ops = {
 	.netlink_send =			cap_netlink_send,
 	.netlink_recv =			cap_netlink_recv,
 
-	.bprm_compute_creds =		cap_bprm_compute_creds,
+	.bprm_apply_creds =		cap_bprm_apply_creds,
 	.bprm_set_security =		cap_bprm_set_security,
 	.bprm_secureexec =		cap_bprm_secureexec,
 

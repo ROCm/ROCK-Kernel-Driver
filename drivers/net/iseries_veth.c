@@ -61,7 +61,6 @@
 #include <linux/types.h>
 #include <linux/errno.h>
 #include <linux/ioport.h>
-#include <linux/pci.h>
 #include <linux/kernel.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
@@ -78,10 +77,11 @@
 #include <asm/iSeries/HvTypes.h>
 #include <asm/iSeries/HvLpEvent.h>
 #include <asm/iommu.h>
+#include <asm/vio.h>
 
 #include "iseries_veth.h"
 
-extern struct pci_dev *iSeries_veth_dev;
+extern struct vio_dev *iSeries_veth_dev;
 
 MODULE_AUTHOR("Kyle Lucke <klucke@us.ibm.com>");
 MODULE_DESCRIPTION("iSeries Virtual ethernet driver");
@@ -895,10 +895,10 @@ static int veth_transmit_to_one(struct sk_buff *skb, HvLpIndex rlp,
 	}
 
 	dma_length = skb->len;
-	dma_address = pci_map_single(iSeries_veth_dev, skb->data,
-				     dma_length, PCI_DMA_TODEVICE);
+	dma_address = vio_map_single(iSeries_veth_dev, skb->data,
+				     dma_length, DMA_TO_DEVICE);
 
-	if (pci_dma_mapping_error(dma_address))
+	if (dma_mapping_error(dma_address))
 		goto recycle_and_drop;
 
 	/* Is it really necessary to check the length and address
@@ -1016,8 +1016,8 @@ static void veth_recycle_msg(struct veth_lpar_connection *cnx,
 		dma_address = msg->data.addr[0];
 		dma_length = msg->data.len[0];
 
-		pci_unmap_single(iSeries_veth_dev, dma_address, dma_length,
-				 PCI_DMA_TODEVICE);
+		vio_unmap_single(iSeries_veth_dev, dma_address, dma_length,
+				 DMA_TO_DEVICE);
 
 		if (msg->skb) {
 			dev_kfree_skb_any(msg->skb);

@@ -415,16 +415,12 @@ init_irq_proc (void)
 #endif
 
 	/*
-	 * Create entries for all existing IRQs. If the number of IRQs
-	 * is greater the 1/4 the total dynamic inode space for /proc,
-	 * don't pollute the inode space
+	 * Create entries for all existing IRQs.
 	 */
-	if (ACTUAL_NR_IRQS < (PROC_NDYNAMIC / 4)) {
-		for (i = 0; i < ACTUAL_NR_IRQS; i++) {
-			if (irq_desc[i].handler == &no_irq_type)
-				continue;
-			register_irq_proc(i);
-		}
+	for (i = 0; i < ACTUAL_NR_IRQS; i++) {
+		if (irq_desc[i].handler == &no_irq_type)
+			continue;
+		register_irq_proc(i);
 	}
 }
 

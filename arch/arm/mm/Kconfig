@@ -114,8 +114,9 @@ config CPU_ARM925T
 
 # ARM926T
 config CPU_ARM926T
-	bool "Support ARM926T processor"
-	depends on ARCH_INTEGRATOR || ARCH_OMAP1610
+	bool "Support ARM926T processor" if ARCH_INTEGRATOR
+	depends on ARCH_INTEGRATOR || ARCH_VERSATILE_PB || ARCH_OMAP1610
+	default y if ARCH_VERSATILE_PB
 	select CPU_32v5
 	select CPU_ABRT_EV5TJ
 	select CPU_COPY_V4WB

@@ -31,7 +31,7 @@
 #define ZFCP_LOG_AREA			ZFCP_LOG_AREA_ERP
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_ERP_REVISION "$Revision: 1.49 $"
+#define ZFCP_ERP_REVISION "$Revision: 1.51 $"
 
 #include "zfcp_ext.h"
 
@@ -1865,6 +1865,7 @@ zfcp_erp_strategy_check_port(struct zfcp_port *port, int result)
 	case ZFCP_ERP_FAILED :
 		atomic_inc(&port->erp_counter);
 		if (atomic_read(&port->erp_counter) > ZFCP_MAX_ERPS)
+			zfcp_erp_port_failed(port);
 		break;
 	case ZFCP_ERP_EXIT :
 		/* nothing */
@@ -1874,7 +1875,6 @@ zfcp_erp_strategy_check_port(struct zfcp_port *port, int result)
 	if (atomic_test_mask(ZFCP_STATUS_COMMON_ERP_FAILED, &port->status)) {
 		zfcp_erp_port_block(port, 0); /* for ZFCP_ERP_SUCCEEDED */
 		result = ZFCP_ERP_EXIT;
-			zfcp_erp_port_failed(port);
 	}
 
 	return result;
@@ -2397,8 +2397,6 @@ zfcp_erp_adapter_strategy_open_qdio(struct zfcp_erp_action *erp_action)
 		ZFCP_LOG_NORMAL("bug: shutdown of QDIO queues failed "
 				"(retval=%d)\n", retval_cleanup);
 	}
-	else
-		debug_text_event(adapter->req_dbf, 1, "q_clean");
 
  failed_qdio_establish:
 	atomic_clear_mask(ZFCP_STATUS_ADAPTER_QDIOUP, &adapter->status);
@@ -2468,10 +2466,8 @@ zfcp_erp_adapter_strategy_close_qdio(struct zfcp_erp_action *erp_action)
 		ZFCP_LOG_NORMAL("bug: shutdown of QDIO queues failed on "
 				"adapter %s\n",
 				zfcp_get_busid_by_adapter(adapter));
-	} else {
+	} else
 		ZFCP_LOG_DEBUG("queues cleaned up\n");
-		debug_text_event(adapter->req_dbf, 1, "q_clean");
-	}
 
 	/*
 	 * First we had to stop QDIO operation.
@@ -2834,9 +2830,10 @@ zfcp_erp_port_strategy_open_common(struct zfcp_erp_action *erp_action)
 			/* nameserver port may live again */
 			atomic_set_mask(ZFCP_STATUS_COMMON_RUNNING,
 					&adapter->nameserver_port->status);
-			zfcp_erp_port_reopen(adapter->nameserver_port, 0);
-			erp_action->step = ZFCP_ERP_STEP_NAMESERVER_OPEN;
-			retval = ZFCP_ERP_CONTINUES;
+			if (zfcp_erp_port_reopen(adapter->nameserver_port, 0) >= 0) {
+				erp_action->step = ZFCP_ERP_STEP_NAMESERVER_OPEN;
+				retval = ZFCP_ERP_CONTINUES;
+			} else  retval = ZFCP_ERP_FAILED;
 			break;
 		}
 		/* else nameserver port is already open, fall through */
@@ -2972,6 +2969,10 @@ zfcp_erp_port_strategy_open_nameserver_wakeup(struct zfcp_erp_action
 			debug_text_event(adapter->erp_dbf, 3, "p_pstnsw_w");
 			debug_event(adapter->erp_dbf, 3,
 				    &erp_action->port->wwpn, sizeof (wwn_t));
+			if (atomic_test_mask(
+				    ZFCP_STATUS_COMMON_ERP_FAILED,
+				    &adapter->nameserver_port->status))
+				zfcp_erp_port_failed(erp_action->port);
 			zfcp_erp_action_ready(erp_action);
 		}
 	}
@@ -3357,7 +3358,7 @@ zfcp_erp_action_enqueue(int action,
 			struct zfcp_adapter *adapter,
 			struct zfcp_port *port, struct zfcp_unit *unit)
 {
-	int retval = -1;
+	int retval = 1;
 	struct zfcp_erp_action *erp_action = NULL;
 	int stronger_action = 0;
 	u32 status = 0;
@@ -3376,7 +3377,7 @@ zfcp_erp_action_enqueue(int action,
 
 	if (!atomic_test_mask(ZFCP_STATUS_ADAPTER_ERP_THREAD_UP,
 			      &adapter->status))
-		goto out;
+		return -EIO;
 
 	debug_event(adapter->erp_dbf, 4, &action, sizeof (int));
 	/* check whether we really need this */

@@ -230,6 +230,18 @@ vfs_force_shutdown(
 	((*bhvtovfsops(next)->vfs_force_shutdown)(next, fl, file, line));
 }
 
+void
+vfs_freeze(
+	struct bhv_desc		*bdp)
+{
+	struct bhv_desc		*next = bdp;
+
+	ASSERT(next);
+	while (! (bhvtovfsops(next))->vfs_freeze)
+		next = BHV_NEXT(next);
+	((*bhvtovfsops(next)->vfs_freeze)(next));
+}
+
 vfs_t *
 vfs_allocate( void )
 {

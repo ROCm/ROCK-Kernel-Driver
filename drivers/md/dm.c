@@ -12,6 +12,7 @@
 #include <linux/moduleparam.h>
 #include <linux/blkpg.h>
 #include <linux/bio.h>
+#include <linux/buffer_head.h>
 #include <linux/mempool.h>
 #include <linux/slab.h>
 
@@ -46,6 +47,7 @@ struct target_io {
  */
 #define DMF_BLOCK_IO 0
 #define DMF_SUSPENDED 1
+#define DMF_FS_LOCKED 2
 
 struct mapped_device {
 	struct rw_semaphore lock;
@@ -80,6 +82,11 @@ struct mapped_device {
 	 */
 	uint32_t event_nr;
 	wait_queue_head_t eventq;
+
+	/*
+	 * freeze/thaw support require holding onto a super block
+	 */
+	struct super_block *frozen_sb;
 };
 
 #define MIN_IOS 256
@@ -885,6 +892,52 @@ int dm_swap_table(struct mapped_device *md, struct dm_table *table)
 }
 
 /*
+ * Functions to lock and unlock any filesystem running on the
+ * device.
+ */
+static int __lock_fs(struct mapped_device *md)
+{
+	struct block_device *bdev;
+
+	if (test_and_set_bit(DMF_FS_LOCKED, &md->flags))
+		return 0;
+
+	bdev = bdget_disk(md->disk, 0);
+	if (!bdev) {
+		DMWARN("bdget failed in __lock_fs");
+		return -ENOMEM;
+	}
+
+	WARN_ON(md->frozen_sb);
+	md->frozen_sb = freeze_bdev(bdev);
+	/* don't bdput right now, we don't want the bdev
+	 * to go away while it is locked.  We'll bdput
+	 * in __unlock_fs
+	 */
+	return 0;
+}
+
+static int __unlock_fs(struct mapped_device *md)
+{
+	struct block_device *bdev;
+
+	if (!test_and_clear_bit(DMF_FS_LOCKED, &md->flags))
+		return 0;
+
+	bdev = bdget_disk(md->disk, 0);
+	if (!bdev) {
+		DMWARN("bdget failed in __unlock_fs");
+		return -ENOMEM;
+	}
+
+	thaw_bdev(bdev, md->frozen_sb);
+	md->frozen_sb = NULL;
+	bdput(bdev);
+	bdput(bdev);
+	return 0;
+}
+
+/*
  * We need to be able to change a mapping table under a mounted
  * filesystem.  For example we might want to move some data in
  * the background.  Before the table can be swapped with
@@ -896,13 +949,27 @@ int dm_suspend(struct mapped_device *md)
 	struct dm_table *map;
 	DECLARE_WAITQUEUE(wait, current);
 
-	down_write(&md->lock);
+	/* Flush I/O to the device. */
+	down_read(&md->lock);
+	if (test_bit(DMF_BLOCK_IO, &md->flags)) {
+		up_read(&md->lock);
+		return -EINVAL;
+	}
+
+	__lock_fs(md);
+	up_read(&md->lock);
 
 	/*
 	 * First we set the BLOCK_IO flag so no more ios will be
 	 * mapped.
 	 */
+	down_write(&md->lock);
 	if (test_bit(DMF_BLOCK_IO, &md->flags)) {
+		/*
+		 * If we get here we know another thread is
+		 * trying to suspend as well, so we leave the fs
+		 * locked for this thread.
+		 */
 		up_write(&md->lock);
 		return -EINVAL;
 	}
@@ -937,6 +1004,7 @@ int dm_suspend(struct mapped_device *md)
 
 	/* were we interrupted ? */
 	if (atomic_read(&md->pending)) {
+		__unlock_fs(md);
 		clear_bit(DMF_BLOCK_IO, &md->flags);
 		up_write(&md->lock);
 		return -EINTR;
@@ -974,6 +1042,7 @@ int dm_resume(struct mapped_device *md)
 	def = bio_list_get(&md->deferred);
 	__flush_deferred_io(md, def);
 	up_write(&md->lock);
+	__unlock_fs(md);
 	dm_table_unplug_all(map);
 	dm_table_put(map);
 

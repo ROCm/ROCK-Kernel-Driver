@@ -7,7 +7,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999-2001
  *
- * $Revision: 1.136 $
+ * $Revision: 1.139 $
  */
 
 #include <linux/config.h>
@@ -74,6 +74,8 @@ dasd_alloc_device(void)
 	if (device == NULL)
 		return ERR_PTR(-ENOMEM);
 	memset(device, 0, sizeof (struct dasd_device));
+	/* open_count = 0 means device online but not in use */
+	atomic_set(&device->open_count, -1);
 
 	/* Get two pages for normal block device operations. */
 	device->ccw_mem = (void *) __get_free_pages(GFP_ATOMIC | GFP_DMA, 1);
@@ -549,6 +551,7 @@ dasd_kmalloc_request(char *magic, int cplength, int datasize,
 	}
 	strncpy((char *) &cqr->magic, magic, 4);
 	ASCEBC((char *) &cqr->magic, 4);
+	set_bit(DASD_CQR_FLAGS_USE_ERP, &cqr->flags);
 	dasd_get_device(device);
 	return cqr;
 }
@@ -597,6 +600,7 @@ dasd_smalloc_request(char *magic, int cplength, int datasize,
 	}
 	strncpy((char *) &cqr->magic, magic, 4);
 	ASCEBC((char *) &cqr->magic, 4);
+	set_bit(DASD_CQR_FLAGS_USE_ERP, &cqr->flags);
 	dasd_get_device(device);
 	return cqr;
 }
@@ -688,9 +692,10 @@ dasd_term_IO(struct dasd_ccw_req * cqr)
 		rc = ccw_device_clear(device->cdev, (long) cqr);
 		switch (rc) {
 		case 0:	/* termination successful */
-			if (cqr->retries > 0)
+		        if (cqr->retries > 0) {
+				cqr->retries--;
 				cqr->status = DASD_CQR_QUEUED;
-			else
+			} else
 				cqr->status = DASD_CQR_FAILED;
 			cqr->stopclk = get_clock();
 			break;
@@ -982,6 +987,8 @@ dasd_int_handler(struct ccw_device *cdev, unsigned long intparm,
 		 irb->scsw.cstat == 0 &&
 		 !irb->esw.esw0.erw.cons)
 		era = dasd_era_none;
+	else if (!test_bit(DASD_CQR_FLAGS_USE_ERP, &cqr->flags))
+ 	        era = dasd_era_fatal; /* don't recover this request */
 	else if (irb->esw.esw0.erw.cons)
 		era = device->discipline->examine_error(cqr, irb);
 	else 
@@ -1875,7 +1882,7 @@ dasd_generic_set_offline (struct ccw_device *cdev)
 	 * the blkdev_get in dasd_scan_partitions. We are only interested
 	 * in the other openers.
 	 */
-	max_count = device->bdev ? 1 : 0;
+	max_count = device->bdev ? 0 : -1;
 	if (atomic_read(&device->open_count) > max_count) {
 		printk (KERN_WARNING "Can't offline dasd device with open"
 			" count = %i.\n",

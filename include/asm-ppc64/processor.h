@@ -553,6 +553,8 @@ struct thread_struct {
 #endif /* CONFIG_ALTIVEC */
 };
 
+#define ARCH_MIN_TASKALIGN 16
+
 #define INIT_SP		(sizeof(init_stack) + (unsigned long) &init_stack)
 
 #define INIT_THREAD  { \

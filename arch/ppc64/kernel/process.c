@@ -536,10 +536,4 @@ void dump_stack(void)
 {
 	show_stack(current, (unsigned long *)__get_SP());
 }
-
 EXPORT_SYMBOL(dump_stack);
-
-void show_trace_task(struct task_struct *tsk)
-{
-	show_stack(tsk, (unsigned long *)tsk->thread.ksp);
-}

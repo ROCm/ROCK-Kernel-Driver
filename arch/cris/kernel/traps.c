@@ -60,14 +60,6 @@ void show_trace(unsigned long * stack)
         }
 }
 
-void show_trace_task(struct task_struct *tsk)
-{
-	/* TODO, this is not really useful since its called from
-	 * SysRq-T and we don't have a keyboard.. :) 
-	 */
-}
-
-
 /*
  * These constants are for searching for possible module text
  * segments. MODULE_RANGE is a guess of how much space is likely

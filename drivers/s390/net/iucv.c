@@ -1,5 +1,5 @@
 /* 
- * $Id: iucv.c,v 1.27 2004/03/22 07:43:43 braunu Exp $
+ * $Id: iucv.c,v 1.28 2004/04/15 06:34:58 braunu Exp $
  *
  * IUCV network driver
  *
@@ -29,7 +29,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * RELEASE-TAG: IUCV lowlevel driver $Revision: 1.27 $
+ * RELEASE-TAG: IUCV lowlevel driver $Revision: 1.28 $
  *
  */
 
@@ -351,7 +351,7 @@ do { \
 static void
 iucv_banner(void)
 {
-	char vbuf[] = "$Revision: 1.27 $";
+	char vbuf[] = "$Revision: 1.28 $";
 	char *version = vbuf;
 
 	if ((version = strchr(version, ':'))) {
@@ -800,6 +800,7 @@ iucv_register_program (__u8 pgmname[16],
 		if (iucv_pathid_table == NULL) {
 			printk(KERN_WARNING "%s: iucv_pathid_table storage "
 			       "allocation failed\n", __FUNCTION__);
+			kfree(new_handler);
 			return NULL;
 		}
 		memset (iucv_pathid_table, 0, max_connections * sizeof(handler *));

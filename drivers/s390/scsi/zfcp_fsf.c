@@ -29,7 +29,7 @@
  */
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_FSF_C_REVISION "$Revision: 1.43 $"
+#define ZFCP_FSF_C_REVISION "$Revision: 1.45 $"
 
 #include "zfcp_ext.h"
 
@@ -379,13 +379,6 @@ zfcp_fsf_protstatus_eval(struct zfcp_fsf_req *fsf_req)
 				zfcp_get_busid_by_adapter(adapter),
 				fsf_req->qtcb->prefix.prot_status_qual.
 				sequence_error.exp_req_seq_no);
-		debug_text_event(adapter->req_dbf, 1, "exp_seq!");
-		debug_event(adapter->req_dbf, 1,
-			    &fsf_req->qtcb->prefix.prot_status_qual.
-			    sequence_error.exp_req_seq_no, 4);
-		debug_text_event(adapter->req_dbf, 1, "qtcb_seq!");
-		debug_exception(adapter->req_dbf, 1,
-				&fsf_req->qtcb->prefix.req_seq_no, 4);
 		debug_text_exception(adapter->erp_dbf, 0, "prot_seq_err");
 		/* restart operation on this adapter */
 		zfcp_erp_adapter_reopen(adapter, 0);
@@ -891,7 +884,6 @@ zfcp_fsf_status_read(struct zfcp_adapter *adapter, int req_flags)
 
 	ZFCP_LOG_TRACE("Status Read request initiated (adapter%s)\n",
 		       zfcp_get_busid_by_adapter(adapter));
-	debug_text_event(adapter->req_dbf, 1, "unso");
 	goto out;
 
  failed_req_send:
@@ -1277,10 +1269,6 @@ zfcp_fsf_abort_fcp_command_handler(struct zfcp_fsf_req *new_fsf_req)
 	case FSF_FCP_COMMAND_DOES_NOT_EXIST:
 		ZFCP_LOG_FLAGS(2, "FSF_FCP_COMMAND_DOES_NOT_EXIST\n");
 		retval = 0;
-		debug_text_event(new_fsf_req->adapter->req_dbf, 3, "no_exist");
-		debug_event(new_fsf_req->adapter->req_dbf, 3,
-			    &new_fsf_req->qtcb->bottom.support.req_handle,
-			    sizeof (unsigned long));
 		debug_text_event(new_fsf_req->adapter->erp_dbf, 3,
 				 "fsf_s_no_exist");
 		new_fsf_req->status |= ZFCP_STATUS_FSFREQ_ABORTNOTNEEDED;
@@ -3373,10 +3361,6 @@ zfcp_fsf_send_fcp_command_task(struct zfcp_adapter *adapter,
 	 * (need this for look up on normal command completion)
 	 */
 	fsf_req->data.send_fcp_command_task.scsi_cmnd = scsi_cmnd;
-	debug_text_event(adapter->req_dbf, 3, "fsf/sc");
-	debug_event(adapter->req_dbf, 3, &fsf_req, sizeof (unsigned long));
-	debug_event(adapter->req_dbf, 3, &scsi_cmnd, sizeof (unsigned long));
-
 	fsf_req->data.send_fcp_command_task.start_jiffies = jiffies;
 	fsf_req->data.send_fcp_command_task.unit = unit;
 	ZFCP_LOG_DEBUG("unit=%p, fcp_lun=0x%016Lx\n", unit, unit->fcp_lun);
@@ -3517,12 +3501,9 @@ zfcp_fsf_send_fcp_command_task(struct zfcp_adapter *adapter,
  send_failed:
  no_fit:
  failed_scsi_cmnd:
-	/* dequeue new FSF request previously enqueued */
-	debug_text_event(adapter->req_dbf, 3, "fail_sc");
-	debug_event(adapter->req_dbf, 3, &scsi_cmnd, sizeof (unsigned long));
-
 	zfcp_fsf_req_free(fsf_req);
 	fsf_req = NULL;
+	scsi_cmnd->host_scribble = NULL;
  success:
  failed_req_create:
 	write_unlock_irqrestore(&adapter->request_queue.queue_lock, lock_flags);
@@ -4267,14 +4248,9 @@ zfcp_fsf_send_fcp_command_task_handler(struct zfcp_fsf_req *fsf_req)
 	 * the new eh
 	 */
 	/* always call back */
-	debug_text_event(fsf_req->adapter->req_dbf, 2, "ok_done:");
-	debug_event(fsf_req->adapter->req_dbf, 2, &scpnt,
-		    sizeof (unsigned long));
-	debug_event(fsf_req->adapter->req_dbf, 2, &scpnt->scsi_done,
-		    sizeof (unsigned long));
-	debug_event(fsf_req->adapter->req_dbf, 2, &fsf_req,
-		    sizeof (unsigned long));
+
 	(scpnt->scsi_done) (scpnt);
+
 	/*
 	 * We must hold this lock until scsi_done has been called.
 	 * Otherwise we may call scsi_done after abort regarding this
@@ -4954,15 +4930,6 @@ zfcp_fsf_req_send(struct zfcp_fsf_req *fsf_req, struct timer_list *timer)
 			 "to request queue.\n");
 	} else {
 		req_queue->distance_from_int = new_distance_from_int;
-		debug_text_event(adapter->req_dbf, 1, "o:a/seq");
-		debug_event(adapter->req_dbf, 1, &fsf_req,
-			    sizeof (unsigned long));
-		if (likely(inc_seq_no)) {
-			debug_event(adapter->req_dbf, 1,
-				    &adapter->fsf_req_seq_no, sizeof (u32));
-		} else {
-			debug_text_event(adapter->req_dbf, 1, "nocb");
-		}
 		/*
 		 * increase FSF sequence counter -
 		 * this must only be done for request successfully enqueued to

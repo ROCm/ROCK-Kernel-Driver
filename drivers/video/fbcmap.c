@@ -207,7 +207,7 @@ int fb_copy_cmap(struct fb_cmap *from, struct fb_cmap *to, int fsfromto)
 /**
  *	fb_set_cmap - set the colormap
  *	@cmap: frame buffer colormap structure
- *	@kspc: boolean, 0 copy local, 1 get_user() function
+ *	@kspc: boolean, 1 copy local, 0 get_user() function
  *	@info: frame buffer info structure
  *
  *	Sets the colormap @cmap for a screen of device @info.

@@ -42,18 +42,7 @@ void dump_stack(void)
 
 	show_trace(&stack);
 }
-
 EXPORT_SYMBOL(dump_stack);
-
-void show_trace_task(struct task_struct *tsk)
-{
-	unsigned long esp = PT_REGS_SP(&tsk->thread.regs);
-
-	/* User space on another CPU? */
-	if ((esp ^ (unsigned long)tsk) & (PAGE_MASK<<1))
-		return;
-	show_trace((unsigned long *)esp);
-}
 
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.

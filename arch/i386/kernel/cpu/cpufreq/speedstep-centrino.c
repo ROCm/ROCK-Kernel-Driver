@@ -195,21 +195,6 @@ static int centrino_cpu_init_table(struct cpufreq_policy *policy)
 	struct cpuinfo_x86 *cpu = &cpu_data[policy->cpu];
 	struct cpu_model *model;
 
-	if (!cpu_has(cpu, X86_FEATURE_EST))
-		return -ENODEV;
-
-	/* Only Intel Pentium M stepping 5 for now - add new CPUs as
-	   they appear after making sure they use PERF_CTL in the same
-	   way. */
-	if (cpu->x86_vendor != X86_VENDOR_INTEL ||
-	    cpu->x86        != 6 ||
-	    cpu->x86_model  != 9 ||
-	    cpu->x86_mask   != 5) {
-		printk(KERN_INFO PFX "found unsupported CPU with Enhanced SpeedStep: "
-		       "send /proc/cpuinfo to " MAINTAINER "\n");
-		return -ENODEV;
-	}
-
 	for(model = models; model->model_name != NULL; model++)
 		if (strcmp(cpu->x86_model_id, model->model_name) == 0)
 			break;
@@ -361,12 +346,28 @@ static inline int centrino_cpu_init_acpi(struct cpufreq_policy *policy) { return
 
 static int centrino_cpu_init(struct cpufreq_policy *policy)
 {
+	struct cpuinfo_x86 *cpu = &cpu_data[policy->cpu];
 	unsigned freq;
 	unsigned l, h;
 	int ret;
 
 	if (policy->cpu != 0)
 		return -ENODEV;
+
+	if (!cpu_has(cpu, X86_FEATURE_EST))
+		return -ENODEV;
+
+	/* Only Intel Pentium M stepping 5 for now - add new CPUs as
+	   they appear after making sure they use PERF_CTL in the same
+	   way. */
+	if (cpu->x86_vendor != X86_VENDOR_INTEL ||
+	    cpu->x86        != 6 ||
+	    cpu->x86_model  != 9 ||
+	    cpu->x86_mask   != 5) {
+		printk(KERN_INFO PFX "found unsupported CPU with Enhanced SpeedStep: "
+		       "send /proc/cpuinfo to " MAINTAINER "\n");
+		return -ENODEV;
+	}
 
 	if (centrino_cpu_init_acpi(policy)) {
 		if (centrino_cpu_init_table(policy)) {

@@ -379,10 +379,6 @@ typedef struct xfs_mount {
 	struct xfs_dmops	m_dm_ops;	/* vector of DMI ops */
 	struct xfs_qmops	m_qm_ops;	/* vector of XQM ops */
 	struct xfs_ioops	m_io_ops;	/* vector of I/O ops */
-	lock_t			m_freeze_lock;	/* Lock for m_frozen */
-	uint			m_frozen;	/* FS frozen for shutdown or
-						 * snapshot */
-	sv_t			m_wait_unfreeze;/* waiting to unfreeze */
 	atomic_t		m_active_trans;	/* number trans frozen */
 } xfs_mount_t;
 
@@ -557,16 +553,6 @@ extern int	xfs_syncsub(xfs_mount_t *, int, int, int *);
 extern void	xfs_initialize_perag(xfs_mount_t *, int);
 extern void	xfs_xlatesb(void *, struct xfs_sb *, int, xfs_arch_t,
 			__int64_t);
-
-/*
- * Flags for freeze operations.
- */
-#define XFS_FREEZE_WRITE	1
-#define XFS_FREEZE_TRANS	2
-
-extern void	xfs_start_freeze(xfs_mount_t *, int);
-extern void	xfs_finish_freeze(xfs_mount_t *);
-extern void	xfs_check_frozen(xfs_mount_t *, bhv_desc_t *, int);
 
 extern struct vfsops xfs_vfsops;
 extern struct vnodeops xfs_vnodeops;

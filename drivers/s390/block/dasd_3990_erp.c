@@ -5,7 +5,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 2000, 2001
  *
- * $Revision: 1.28 $
+ * $Revision: 1.30 $
  */
 
 #include <linux/timer.h>
@@ -1763,6 +1763,7 @@ dasd_3990_erp_action_1B_32(struct dasd_ccw_req * default_erp, char *sense)
 	erp->magic = default_erp->magic;
 	erp->expires = 0;
 	erp->retries = 256;
+	cqr->buildclk = get_clock();
 	erp->status = DASD_CQR_FILLED;
 
 	/* remove the default erp */

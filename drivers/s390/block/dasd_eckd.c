@@ -7,7 +7,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.53 $
+ * $Revision: 1.54 $
  */
 
 #include <linux/config.h>
@@ -1130,6 +1130,7 @@ dasd_eckd_release(struct block_device *bdev, int no, long args)
         cqr->cpaddr->count = 32;
 	cqr->cpaddr->cda = (__u32)(addr_t) cqr->data;
 	cqr->device = device;
+	clear_bit(DASD_CQR_FLAGS_USE_ERP, &cqr->flags);
 	cqr->retries = 0;
 	cqr->expires = 2 * HZ;
 	cqr->buildclk = get_clock();
@@ -1173,6 +1174,7 @@ dasd_eckd_reserve(struct block_device *bdev, int no, long args)
         cqr->cpaddr->count = 32;
 	cqr->cpaddr->cda = (__u32)(addr_t) cqr->data;
 	cqr->device = device;
+	clear_bit(DASD_CQR_FLAGS_USE_ERP, &cqr->flags);
 	cqr->retries = 0;
 	cqr->expires = 2 * HZ;
 	cqr->buildclk = get_clock();
@@ -1215,6 +1217,7 @@ dasd_eckd_steal_lock(struct block_device *bdev, int no, long args)
         cqr->cpaddr->count = 32;
 	cqr->cpaddr->cda = (__u32)(addr_t) cqr->data;
 	cqr->device = device;
+	clear_bit(DASD_CQR_FLAGS_USE_ERP, &cqr->flags);
 	cqr->retries = 0;
 	cqr->expires = 2 * HZ;
 	cqr->buildclk = get_clock();

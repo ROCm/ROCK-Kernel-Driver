@@ -1,5 +1,5 @@
 /*
- * $Id: netiucv.c,v 1.48 2004/04/01 13:42:09 braunu Exp $
+ * $Id: netiucv.c,v 1.49 2004/04/15 06:37:54 braunu Exp $
  *
  * IUCV network driver
  *
@@ -30,7 +30,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * RELEASE-TAG: IUCV network driver $Revision: 1.48 $
+ * RELEASE-TAG: IUCV network driver $Revision: 1.49 $
  *
  */
 
@@ -601,11 +601,12 @@ conn_action_txdone(fsm_instance *fi, int event, void *arg)
 		if ((skb = skb_dequeue(&conn->commit_queue))) {
 			atomic_dec(&skb->users);
 			dev_kfree_skb_any(skb);
-		}
-		if (privptr) {
-			privptr->stats.tx_packets++;
-			privptr->stats.tx_bytes +=
-				(skb->len - NETIUCV_HDRLEN - NETIUCV_HDRLEN);
+			if (privptr) {
+				privptr->stats.tx_packets++;
+				privptr->stats.tx_bytes +=
+					(skb->len - NETIUCV_HDRLEN
+					 	  - NETIUCV_HDRLEN);
+			}
 		}
 	}
 	conn->tx_buff->data = conn->tx_buff->tail = conn->tx_buff->head;
@@ -1078,6 +1079,7 @@ netiucv_transmit_skb(struct iucv_connection *conn, struct sk_buff *skb) {
 				       "%s: Could not allocate tx_skb\n",
 				       conn->netdev->name);
 				rc = -ENOMEM;
+				return rc;
 			} else {
 				skb_reserve(nskb, NETIUCV_HDRLEN);
 				memcpy(skb_put(nskb, skb->len),
@@ -1880,7 +1882,7 @@ static struct device_driver netiucv_driver = {
 static void
 netiucv_banner(void)
 {
-	char vbuf[] = "$Revision: 1.48 $";
+	char vbuf[] = "$Revision: 1.49 $";
 	char *version = vbuf;
 
 	if ((version = strchr(version, ':'))) {

@@ -167,8 +167,8 @@ cpufreq_procctl(ctl_table *ctl, int write, struct file *filp,
 		void __user *buffer, size_t *lenp)
 {
 	char buf[16], *p;
-	int cpu = (int) ctl->extra1;
-	int len, left = *lenp;
+	int cpu = (long) ctl->extra1;
+	unsigned int len, left = *lenp;
 
 	if (!left || (filp->f_pos && !write) || !cpu_online(cpu)) {
 		*lenp = 0;
@@ -205,7 +205,7 @@ cpufreq_sysctl(ctl_table *table, int __user *name, int nlen,
 	       void __user *oldval, size_t __user *oldlenp,
 	       void __user *newval, size_t newlen, void **context)
 {
-	int cpu = (int) table->extra1;
+	int cpu = (long) table->extra1;
 
 	if (!cpu_online(cpu))
 		return -EINVAL;
