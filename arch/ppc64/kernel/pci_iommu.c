@@ -83,7 +83,7 @@ void *pci_iommu_alloc_consistent(struct pci_dev *hwdev, size_t size,
 	if (order >= IOMAP_MAX_ORDER) {
 		printk("PCI_DMA: pci_alloc_consistent size too large: 0x%lx\n",
 			size);
-		return (void *)DMA_ERROR_CODE;
+		return NULL;
 	}
 
 	tbl = devnode_table(hwdev); 
