@@ -267,7 +267,7 @@ sn_setup(char **cmdline_p)
 	/* PROM has wrong value on SN1 */
 	sn_rtc_cycles_per_second = 990177;
 #endif
-	sn_rtc_usec_per_cyc = ((1000000UL<<IA64_USEC_PER_CYC_SHIFT)
+	sn_rtc_usec_per_cyc = ((1000000000UL<<IA64_NSEC_PER_CYC_SHIFT)
 			       + sn_rtc_cycles_per_second/2) / sn_rtc_cycles_per_second;
 		
 	for (i=0;i<NR_CPUS;i++)

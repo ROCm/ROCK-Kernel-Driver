@@ -52,11 +52,12 @@ core-$(CONFIG_IA64_GENERIC) 	+= arch/ia64/dig/ arch/ia64/hp/common/ arch/ia64/hp
 core-$(CONFIG_IA64_HP_ZX1)	+= arch/ia64/dig/
 core-$(CONFIG_IA64_SGI_SN)	+= arch/ia64/sn/kernel/ \
 				   arch/ia64/sn/io/ \
+				   arch/ia64/sn/io/sn2/ \
+				   arch/ia64/sn/io/sn2/pcibr/ \
 				   arch/ia64/sn/kernel/sn2/
 drivers-$(CONFIG_PCI)		+= arch/ia64/pci/
 drivers-$(CONFIG_IA64_HP_SIM)	+= arch/ia64/hp/sim/
 drivers-$(CONFIG_IA64_HP_ZX1)	+= arch/ia64/hp/common/ arch/ia64/hp/zx1/
-drivers-$(CONFIG_IA64_SGI_SN)	+= arch/ia64/sn/fakeprom/
 
 boot := arch/ia64/boot
 tools := arch/ia64/tools
