@@ -21,8 +21,6 @@
  *
  */
 
-/*#define CONFIG_DVB_DEVFS_ONLY 1*/
-
 #include <linux/config.h>
 #include <linux/version.h>
 #include <linux/module.h>
@@ -56,17 +54,8 @@ static char *dnames[] = {
 };
 
 
-#ifdef CONFIG_DVB_DEVFS_ONLY
-
-	#define DVB_MAX_IDS              ~0
-	#define nums2minor(num,type,id)  0
-	#define DVB_DEVFS_FLAGS          (DEVFS_FL_DEFAULT|DEVFS_FL_AUTO_DEVNUM)
-
-#else
-
-	#define DVB_MAX_IDS              4
-	#define nums2minor(num,type,id)  ((num << 6) | (id << 4) | type)
-	#define DVB_DEVFS_FLAGS          (DEVFS_FL_DEFAULT)
+#define DVB_MAX_IDS              4
+#define nums2minor(num,type,id)  ((num << 6) | (id << 4) | type)
 
 
 static
@@ -234,8 +223,7 @@ int dvb_register_device(struct dvb_adapter *adap, struct dvb_device **pdvbdev,
 
 	sprintf(name, "%s%d", dnames[type], id);
 	dvbdev->devfs_handle = devfs_register(adap->devfs_handle, name,
-					      DVB_DEVFS_FLAGS,
-					      DVB_MAJOR,
+					      0, DVB_MAJOR,
 					      nums2minor(adap->num, type, id),
 					      S_IFCHR | S_IRUSR | S_IWUSR,
 					      dvbdev->fops, dvbdev);
