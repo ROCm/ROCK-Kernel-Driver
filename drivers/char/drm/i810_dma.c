@@ -232,12 +232,12 @@ int i810_dma_cleanup(drm_device_t *dev)
 {
 	drm_device_dma_t *dma = dev->dma;
 
-#if _HAVE_DMA_IRQ
+#if __HAVE_IRQ
 	/* Make sure interrupts are disabled here because the uninstall ioctl
 	 * may not have been called from userspace and after dev_private
 	 * is freed, it's too late.
 	 */
-	if (dev->irq) DRM(irq_uninstall)(dev);
+	if ( dev->irq_enabled ) DRM(irq_uninstall)(dev);
 #endif
 
 	if (dev->dev_private) {

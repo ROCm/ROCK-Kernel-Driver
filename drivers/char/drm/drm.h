@@ -46,8 +46,8 @@
 #define DRM_IOC_WRITE		_IOC_WRITE
 #define DRM_IOC_READWRITE	_IOC_READ|_IOC_WRITE
 #define DRM_IOC(dir, group, nr, size) _IOC(dir, group, nr, size)
-#elif defined(__FreeBSD__) || defined(__NetBSD__)
-#if defined(__FreeBSD__) && defined(XFree86Server)
+#elif defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)
+#if defined(__FreeBSD__) && defined(IN_MODULE)
 /* Prevent name collision when including sys/ioccom.h */
 #undef ioctl
 #include <sys/ioccom.h>
@@ -129,6 +129,18 @@ typedef struct drm_tex_region {
 	unsigned char	padding;
 	unsigned int	age;
 } drm_tex_region_t;
+
+/**
+ * Hardware lock.
+ *
+ * The lock structure is a simple cache-line aligned integer.  To avoid
+ * processor bus contention on a multiprocessor system, there should not be any
+ * other data stored in the same cache line.
+ */
+typedef struct drm_hw_lock {
+	__volatile__ unsigned int lock;		/**< lock variable */
+	char			  padding[60];	/**< Pad to cache line */
+} drm_hw_lock_t;
 
 
 /**
@@ -580,6 +592,16 @@ typedef struct drm_scatter_gather {
 	unsigned long handle;	/**< Used for mapping / unmapping */
 } drm_scatter_gather_t;
 
+/**
+ * DRM_IOCTL_SET_VERSION ioctl argument type.
+ */
+typedef struct drm_set_version {
+	int drm_di_major;
+	int drm_di_minor;
+	int drm_dd_major;
+	int drm_dd_minor;
+} drm_set_version_t;
+
 
 #define DRM_IOCTL_BASE			'd'
 #define DRM_IO(nr)			_IO(DRM_IOCTL_BASE,nr)
@@ -594,6 +616,7 @@ typedef struct drm_scatter_gather {
 #define DRM_IOCTL_GET_MAP               DRM_IOWR(0x04, drm_map_t)
 #define DRM_IOCTL_GET_CLIENT            DRM_IOWR(0x05, drm_client_t)
 #define DRM_IOCTL_GET_STATS             DRM_IOR( 0x06, drm_stats_t)
+#define DRM_IOCTL_SET_VERSION		DRM_IOWR(0x07, drm_set_version_t)
 
 #define DRM_IOCTL_SET_UNIQUE		DRM_IOW( 0x10, drm_unique_t)
 #define DRM_IOCTL_AUTH_MAGIC		DRM_IOW( 0x11, drm_auth_t)

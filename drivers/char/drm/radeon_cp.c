@@ -855,7 +855,8 @@ static void radeon_cp_init_ring_buffer( drm_device_t *dev,
 
 	/* Initialize the memory controller */
 	RADEON_WRITE( RADEON_MC_FB_LOCATION,
-		      (dev_priv->gart_vm_start - 1) & 0xffff0000 );
+		      ( ( dev_priv->gart_vm_start - 1 ) & 0xffff0000 )
+		    | ( dev_priv->fb_location >> 16 ) );
 
 #if __REALLY_HAVE_AGP
 	if ( !dev_priv->is_pci ) {
@@ -1071,13 +1072,6 @@ static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 	dev_priv->depth_offset	= init->depth_offset;
 	dev_priv->depth_pitch	= init->depth_pitch;
 
-	dev_priv->front_pitch_offset = (((dev_priv->front_pitch/64) << 22) |
-					(dev_priv->front_offset >> 10));
-	dev_priv->back_pitch_offset = (((dev_priv->back_pitch/64) << 22) |
-				       (dev_priv->back_offset >> 10));
-	dev_priv->depth_pitch_offset = (((dev_priv->depth_pitch/64) << 22) |
-					(dev_priv->depth_offset >> 10));
-
 	/* Hardware state for depth clears.  Remove this if/when we no
 	 * longer clear the depth buffer with a 3D rectangle.  Hard-code
 	 * all values to prevent unwanted 3D state from slipping through
@@ -1124,13 +1118,6 @@ static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 		return DRM_ERR(EINVAL);
 	}
 
-	DRM_FIND_MAP( dev_priv->fb, init->fb_offset );
-	if(!dev_priv->fb) {
-		DRM_ERROR("could not find framebuffer!\n");
-		dev->dev_private = (void *)dev_priv;
-		radeon_do_cleanup_cp(dev);
-		return DRM_ERR(EINVAL);
-	}
 	DRM_FIND_MAP( dev_priv->mmio, init->mmio_offset );
 	if(!dev_priv->mmio) {
 		DRM_ERROR("could not find mmio region!\n");
@@ -1204,9 +1191,26 @@ static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 			   dev_priv->buffers->handle );
 	}
 
+	dev_priv->fb_location = ( RADEON_READ( RADEON_MC_FB_LOCATION )
+				& 0xffff ) << 16;
+
+	dev_priv->front_pitch_offset = (((dev_priv->front_pitch/64) << 22) |
+					( ( dev_priv->front_offset
+					  + dev_priv->fb_location ) >> 10 ) );
+
+	dev_priv->back_pitch_offset = (((dev_priv->back_pitch/64) << 22) |
+				       ( ( dev_priv->back_offset
+					 + dev_priv->fb_location ) >> 10 ) );
+
+	dev_priv->depth_pitch_offset = (((dev_priv->depth_pitch/64) << 22) |
+					( ( dev_priv->depth_offset
+					  + dev_priv->fb_location ) >> 10 ) );
+
 
 	dev_priv->gart_size = init->gart_size;
-	dev_priv->gart_vm_start = RADEON_READ( RADEON_CONFIG_APER_SIZE );
+	dev_priv->gart_vm_start = dev_priv->fb_location
+				+ RADEON_READ( RADEON_CONFIG_APER_SIZE );
+
 #if __REALLY_HAVE_AGP
 	if ( !dev_priv->is_pci )
 		dev_priv->gart_buffers_offset = (dev_priv->buffers->offset
@@ -1271,12 +1275,12 @@ int radeon_do_cleanup_cp( drm_device_t *dev )
 {
 	DRM_DEBUG( "\n" );
 
-#if _HAVE_DMA_IRQ
+#if __HAVE_IRQ
 	/* Make sure interrupts are disabled here because the uninstall ioctl
 	 * may not have been called from userspace and after dev_private
 	 * is freed, it's too late.
 	 */
-	if ( dev->irq ) DRM(irq_uninstall)(dev);
+	if ( dev->irq_enabled ) DRM(irq_uninstall)(dev);
 #endif
 
 	if ( dev->dev_private ) {

@@ -35,48 +35,19 @@
 
 #include "drmP.h"
 
-/** AGP virtual memory operations */
-struct vm_operations_struct   DRM(vm_ops) = {
-	.nopage = DRM(vm_nopage),
-	.open	= DRM(vm_open),
-	.close	= DRM(vm_close),
-};
-
-/** Shared virtual memory operations */
-struct vm_operations_struct   DRM(vm_shm_ops) = {
-	.nopage = DRM(vm_shm_nopage),
-	.open	= DRM(vm_open),
-	.close	= DRM(vm_shm_close),
-};
-
-/** DMA virtual memory operations */
-struct vm_operations_struct   DRM(vm_dma_ops) = {
-	.nopage = DRM(vm_dma_nopage),
-	.open	= DRM(vm_open),
-	.close	= DRM(vm_close),
-};
-
-/** Scatter-gather virtual memory operations */
-struct vm_operations_struct   DRM(vm_sg_ops) = {
-	.nopage = DRM(vm_sg_nopage),
-	.open   = DRM(vm_open),
-	.close  = DRM(vm_close),
-};
 
 /**
  * \c nopage method for AGP virtual memory.
  *
  * \param vma virtual memory area.
  * \param address access address.
- * \param write_access sharing.
  * \return pointer to the page structure.
  * 
  * Find the right map and if it's AGP memory find the real physical page to
  * map, get the page, increment the use count and return it.
  */
-struct page *DRM(vm_nopage)(struct vm_area_struct *vma,
-			    unsigned long address,
-			    int *type)
+static __inline__ struct page *DRM(do_vm_nopage)(struct vm_area_struct *vma,
+						 unsigned long address)
 {
 #if __REALLY_HAVE_AGP
 	drm_file_t *priv  = vma->vm_file->private_data;
@@ -133,8 +104,6 @@ struct page *DRM(vm_nopage)(struct vm_area_struct *vma,
 			  baddr, __va(agpmem->memory->memory[offset]), offset,
 			  atomic_read(&page->count));
 
-		if (type)
-			*type = VM_FAULT_MINOR;
 		return page;
         }
 vm_nopage_error:
@@ -148,15 +117,13 @@ vm_nopage_error:
  *
  * \param vma virtual memory area.
  * \param address access address.
- * \param write_access sharing.
  * \return pointer to the page structure.
  * 
  * Get the the mapping, find the real physical page to map, get the page, and
  * return it.
  */
-struct page *DRM(vm_shm_nopage)(struct vm_area_struct *vma,
-				unsigned long address,
-				int *type)
+static __inline__ struct page *DRM(do_vm_shm_nopage)(struct vm_area_struct *vma,
+						     unsigned long address)
 {
 	drm_map_t	 *map	 = (drm_map_t *)vma->vm_private_data;
 	unsigned long	 offset;
@@ -172,8 +139,6 @@ struct page *DRM(vm_shm_nopage)(struct vm_area_struct *vma,
 	if (!page)
 		return NOPAGE_OOM;
 	get_page(page);
-	if (type)
-		*type = VM_FAULT_MINOR;
 
 	DRM_DEBUG("shm_nopage 0x%lx\n", address);
 	return page;
@@ -265,14 +230,12 @@ void DRM(vm_shm_close)(struct vm_area_struct *vma)
  *
  * \param vma virtual memory area.
  * \param address access address.
- * \param write_access sharing.
  * \return pointer to the page structure.
  * 
  * Determine the page number from the page offset and get it from drm_device_dma::pagelist.
  */
-struct page *DRM(vm_dma_nopage)(struct vm_area_struct *vma,
-				unsigned long address,
-				int *type)
+static __inline__ struct page *DRM(do_vm_dma_nopage)(struct vm_area_struct *vma,
+						     unsigned long address)
 {
 	drm_file_t	 *priv	 = vma->vm_file->private_data;
 	drm_device_t	 *dev	 = priv->dev;
@@ -291,8 +254,6 @@ struct page *DRM(vm_dma_nopage)(struct vm_area_struct *vma,
 			     (offset & (~PAGE_MASK))));
 
 	get_page(page);
-	if (type)
-		*type = VM_FAULT_MINOR;
 
 	DRM_DEBUG("dma_nopage 0x%lx (page %lu)\n", address, page_nr);
 	return page;
@@ -303,14 +264,12 @@ struct page *DRM(vm_dma_nopage)(struct vm_area_struct *vma,
  *
  * \param vma virtual memory area.
  * \param address access address.
- * \param write_access sharing.
  * \return pointer to the page structure.
  * 
  * Determine the map offset from the page offset and get it from drm_sg_mem::pagelist.
  */
-struct page *DRM(vm_sg_nopage)(struct vm_area_struct *vma,
-			       unsigned long address,
-			       int *type)
+static __inline__ struct page *DRM(do_vm_sg_nopage)(struct vm_area_struct *vma,
+						    unsigned long address)
 {
 	drm_map_t        *map    = (drm_map_t *)vma->vm_private_data;
 	drm_file_t *priv = vma->vm_file->private_data;
@@ -331,11 +290,98 @@ struct page *DRM(vm_sg_nopage)(struct vm_area_struct *vma,
 	page_offset = (offset >> PAGE_SHIFT) + (map_offset >> PAGE_SHIFT);
 	page = entry->pagelist[page_offset];
 	get_page(page);
-	if (type)
-		*type = VM_FAULT_MINOR;
 
 	return page;
 }
+
+
+#if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,0)
+
+static struct page *DRM(vm_nopage)(struct vm_area_struct *vma,
+				   unsigned long address,
+				   int *type) {
+	if (type) *type = VM_FAULT_MINOR;
+	return DRM(do_vm_nopage)(vma, address);
+}
+
+static struct page *DRM(vm_shm_nopage)(struct vm_area_struct *vma,
+				       unsigned long address,
+				       int *type) {
+	if (type) *type = VM_FAULT_MINOR;
+	return DRM(do_vm_shm_nopage)(vma, address);
+}
+
+static struct page *DRM(vm_dma_nopage)(struct vm_area_struct *vma,
+				       unsigned long address,
+				       int *type) {
+	if (type) *type = VM_FAULT_MINOR;
+	return DRM(do_vm_dma_nopage)(vma, address);
+}
+
+static struct page *DRM(vm_sg_nopage)(struct vm_area_struct *vma,
+				      unsigned long address,
+				      int *type) {
+	if (type) *type = VM_FAULT_MINOR;
+	return DRM(do_vm_sg_nopage)(vma, address);
+}
+
+#else	/* LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,0) */
+
+static struct page *DRM(vm_nopage)(struct vm_area_struct *vma,
+				   unsigned long address,
+				   int unused) {
+	return DRM(do_vm_nopage)(vma, address);
+}
+
+static struct page *DRM(vm_shm_nopage)(struct vm_area_struct *vma,
+				       unsigned long address,
+				       int unused) {
+	return DRM(do_vm_shm_nopage)(vma, address);
+}
+
+static struct page *DRM(vm_dma_nopage)(struct vm_area_struct *vma,
+				       unsigned long address,
+				       int unused) {
+	return DRM(do_vm_dma_nopage)(vma, address);
+}
+
+static struct page *DRM(vm_sg_nopage)(struct vm_area_struct *vma,
+				      unsigned long address,
+				      int unused) {
+	return DRM(do_vm_sg_nopage)(vma, address);
+}
+
+#endif
+
+
+/** AGP virtual memory operations */
+static struct vm_operations_struct   DRM(vm_ops) = {
+	.nopage = DRM(vm_nopage),
+	.open	= DRM(vm_open),
+	.close	= DRM(vm_close),
+};
+
+/** Shared virtual memory operations */
+static struct vm_operations_struct   DRM(vm_shm_ops) = {
+	.nopage = DRM(vm_shm_nopage),
+	.open	= DRM(vm_open),
+	.close	= DRM(vm_shm_close),
+};
+
+/** DMA virtual memory operations */
+static struct vm_operations_struct   DRM(vm_dma_ops) = {
+	.nopage = DRM(vm_dma_nopage),
+	.open	= DRM(vm_open),
+	.close	= DRM(vm_close),
+};
+
+/** Scatter-gather virtual memory operations */
+static struct vm_operations_struct   DRM(vm_sg_ops) = {
+	.nopage = DRM(vm_sg_nopage),
+	.open   = DRM(vm_open),
+	.close  = DRM(vm_close),
+};
+
 
 /**
  * \c open method for shared virtual memory.
