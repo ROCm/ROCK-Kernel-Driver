@@ -1330,7 +1330,13 @@ static int se401_init(struct usb_se401 *se401)
 
 	se401->sizes=cp[4]+cp[5]*256;
 	se401->width=kmalloc(se401->sizes*sizeof(int), GFP_KERNEL);
+	if (!se401->width)
+		return 1;
 	se401->height=kmalloc(se401->sizes*sizeof(int), GFP_KERNEL);
+	if (!se401->height) {
+		kfree(se401->width);
+		return 1;
+	}
 	for (i=0; i<se401->sizes; i++) {
 		    se401->width[i]=cp[6+i*4+0]+cp[6+i*4+1]*256;
 		    se401->height[i]=cp[6+i*4+2]+cp[6+i*4+3]*256;

@@ -100,7 +100,7 @@
  *	- lots more testing!!
  */
 
-#define DRIVER_VERSION "2002-Jun-01"
+#define DRIVER_VERSION "2002-Jun-10"
 #define DRIVER_AUTHOR "Roman Weissgaerber <weissg@vienna.at>, David Brownell"
 #define DRIVER_DESC "USB 1.1 'Open' Host Controller (OHCI) Driver"
 
@@ -307,7 +307,6 @@ ohci_free_config (struct usb_hcd *hcd, struct usb_device *udev)
 	spin_lock_irqsave (&ohci->lock, flags);
 	for (i = 0; i < 32; i++) {
 		struct ed	*ed = dev->ep [i];
-		struct td	*tdTailP;
 
 		if (!ed)
 			continue;
@@ -319,10 +318,7 @@ ohci_free_config (struct usb_hcd *hcd, struct usb_device *udev)
 		case ED_NEW:
 			break;
 		case ED_UNLINK:
-			tdTailP = dma_to_td (ohci,
-				le32_to_cpup (&ed->hwTailP) & 0xfffffff0);
-			td_free (ohci, tdTailP); /* free dummy td */
-			hash_free_ed (ohci, ed);
+			td_free (ohci, ed->dummy);
 			break;
 
 		case ED_OPER:
