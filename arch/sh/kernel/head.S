@@ -69,8 +69,8 @@ ENTRY(_stext)
 
 	.balign 4
 1:	.long	0x400080F0		! MD=1, RB=0, BL=0, FD=1, IMASK=0xF
-2:	.long	SYMBOL_NAME(stack)
-3:	.long	SYMBOL_NAME(__bss_start)
-4:	.long	SYMBOL_NAME(_end)
-5:	.long	SYMBOL_NAME(start_kernel)
-6:	.long	SYMBOL_NAME(cache_init)
+2:	.long	stack
+3:	.long	__bss_start
+4:	.long	_end
+5:	.long	start_kernel
+6:	.long	cache_init

@@ -93,7 +93,6 @@ static struct fb_var_screeninfo pmagbbfb_defined = {
 struct pmagbbfb_par {
 };
 
-static int currcon = 0;
 struct pmagbbfb_par current_par;
 
 static void pmagbbfb_encode_var(struct fb_var_screeninfo *var,
@@ -273,36 +272,11 @@ static int pmagbbfb_get_fix(struct fb_fix_screeninfo *fix, int con,
 	return 0;
 }
 
-
-static int pmagbbfb_ioctl(struct inode *inode, struct file *file,
-			  unsigned int cmd, unsigned long arg, int con,
-			  struct fb_info *info)
-{
-	return -EINVAL;
-}
-
 static int pmagbbfb_switch(int con, struct fb_info *info)
 {
 	pmagbb_do_fb_set_var(&fb_display[con].var, 1);
-	currcon = con;
-
+	info->currcon = con;
 	return 0;
-}
-
-/* 0 unblank, 1 blank, 2 no vsync, 3 no hsync, 4 off */
-
-static void pmagbbfb_blank(int blank, struct fb_info *info)
-{
-	/* Not supported */
-}
-
-static int pmagbbfb_open(struct fb_info *info, int user)
-{
-	/*
-	 * Nothing, only a usage count for the moment
-	 */
-	MOD_INC_USE_COUNT;
-	return (0);
 }
 
 static void pmagbbfb_set_disp(int con, struct pmagb_b_my_fb_info *info)
@@ -317,7 +291,6 @@ static void pmagbbfb_set_disp(int con, struct pmagb_b_my_fb_info *info)
 
 	pmagbbfb_get_fix(&fix, con, (struct fb_info *) info);
 
-	display->screen_base = (char *) fix.smem_start;
 	display->visual = fix.visual;
 	display->type = fix.type;
 	display->type_aux = fix.type_aux;
@@ -331,24 +304,13 @@ static void pmagbbfb_set_disp(int con, struct pmagb_b_my_fb_info *info)
 	display->dispsw = &fbcon_cfb8;
 }
 
-static int pmagbbfb_release(struct fb_info *info, int user)
-{
-	MOD_DEC_USE_COUNT;
-	return (0);
-}
-
 static struct fb_ops pmagbbfb_ops = {
-	owner:THIS_MODULE,
-	fb_open:pmagbbfb_open,
-	fb_release:pmagbbfb_release,
-	fb_get_fix:pmagbbfb_get_fix,
-	fb_get_var:pmagbbfb_get_var,
-	fb_set_var:pmagbbfb_set_var,
-	fb_get_cmap:pmagbbfb_get_cmap,
-	fb_set_cmap:pmagbbfb_set_cmap,
-	fb_ioctl:pmagbbfb_ioctl,
-	fb_mmap:0,
-	fb_rasterimg:0
+	owner:		THIS_MODULE,
+	fb_get_fix:	pmagbbfb_get_fix,
+	fb_get_var:	pmagbbfb_get_var,
+	fb_set_var:	pmagbbfb_set_var,
+	fb_get_cmap:	pmagbbfb_get_cmap,
+	fb_set_cmap:	pmagbbfb_set_cmap,
 };
 
 int __init pmagbbfb_init_one(int slot)
@@ -391,10 +353,12 @@ int __init pmagbbfb_init_one(int slot)
 	ip->info.changevar = NULL;
 	ip->info.node = NODEV;
 	ip->info.fbops = &pmagbbfb_ops;
+	ip->info.screen_base = (char *) ip->pmagbb_fb_start;
+	fix->smem_len = info->pmagbb_fb_size;
 	ip->info.disp = &disp;
+	ip->info.currcon = -1;
 	ip->info.switch_con = &pmagbbfb_switch;
 	ip->info.updatevar = &pmagbb_fb_update_var;
-	ip->info.blank = &pmagbbfb_blank;
 	ip->info.flags = FBINFO_FLAG_DEFAULT;
 
 	pmagbb_do_fb_set_var(&pmagbbfb_defined, 1);

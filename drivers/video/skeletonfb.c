@@ -70,7 +70,6 @@ static struct display disp;
 
 static struct fb_var_screeninfo default_var;
 
-static int currcon = 0;
 static int inverse = 0;
 
 int xxxfb_init(void);
@@ -176,9 +175,9 @@ static int xxx_getcolreg(unsigned regno, unsigned *red, unsigned *green,
     return 0;
 }
 
-static int xxx_setcolreg(unsigned regno, unsigned red, unsigned green,
-			 unsigned blue, unsigned transp,
-			 const struct fb_info *info)
+static int xxxfb_setcolreg(unsigned regno, unsigned red, unsigned green,
+			   unsigned blue, unsigned transp,
+			   const struct fb_info *info)
 {
     /*
      *  Set a single color register. The values supplied have a 16 bit
@@ -254,7 +253,6 @@ static void xxx_set_disp(const void *par, struct display *disp,
      *  If you don't have any appropriate operations, you must fill in a
      *  pointer to dummy operations, and there will be no text output.
      */
-    disp->screen_base = virtual_frame_buffer_address;
 #ifdef FBCON_HAS_CFB8
     if (is_cfb8) {
 	disp->dispsw = fbcon_cfb8;
@@ -287,7 +285,7 @@ static void xxx_set_disp(const void *par, struct display *disp,
 
 struct fbgen_hwswitch xxx_switch = {
     xxx_detect, xxx_encode_fix, xxx_decode_var, xxx_encode_var, xxx_get_par,
-    xxx_set_par, xxx_getcolreg, xxx_setcolreg, xxx_pan_display, xxx_blank,
+    xxx_set_par, xxx_getcolreg, xxx_pan_display, xxx_blank,
     xxx_set_disp
 };
 
@@ -308,16 +306,17 @@ int __init xxxfb_init(void)
     fb_info.gen.info.changevar = NULL;
     fb_info.gen.info.node = NODEV;
     fb_info.gen.info.fbops = &xxxfb_ops;
+    fb_info.gen.info.screen_base = virtual_frame_buffer_address;
     fb_info.gen.info.disp = &disp;
+    fb_info.gen.info.currcon = -1;
     fb_info.gen.info.switch_con = &xxxfb_switch;
     fb_info.gen.info.updatevar = &xxxfb_update_var;
-    fb_info.gen.info.blank = &xxxfb_blank;
     fb_info.gen.info.flags = FBINFO_FLAG_DEFAULT;
     /* This should give a reasonable default video mode */
     fbgen_get_var(&disp.var, -1, &fb_info.gen.info);
     fbgen_do_set_var(&disp.var, 1, &fb_info.gen);
     fbgen_set_disp(-1, &fb_info.gen);
-    fbgen_install_cmap(0, &fb_info.gen);
+    do_install_cmap(0, &fb_info.gen);
     if (register_framebuffer(&fb_info.gen.info) < 0)
 	return -EINVAL;
     printk(KERN_INFO "fb%d: %s frame buffer device\n", GET_FB_IDX(fb_info.gen.info.node),
@@ -388,8 +387,10 @@ static struct fb_ops xxxfb_ops = {
 	fb_get_var:	fbgen_get_var,
 	fb_set_var:	fbgen_set_var,
 	fb_get_cmap:	fbgen_get_cmap,
-	fb_set_cmap:	fbgen_set_cmap,
+	fb_set_cmap:	gen_set_cmap,
+	fb_setcolreg:	xxxfb_setcolreg,
 	fb_pan_display:	fbgen_pan_display,
+	fb_blank:	fbgen_blank,
 	fb_ioctl:	xxxfb_ioctl,   /* optional */
 };
 

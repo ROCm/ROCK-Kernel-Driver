@@ -60,12 +60,17 @@ do {			\
 /* Auerswald Vendor ID */
 #define ID_AUERSWALD  	0x09BF
 
-#ifndef AUER_MINOR_BASE		/* allow external override */
+#ifdef CONFIG_USB_DYNAMIC_MINORS
+/* we can have up to 256 devices at once */
+#define AUER_MINOR_BASE	0
+#define AUER_MAX_DEVICES 256
+#else
 #define AUER_MINOR_BASE	112	/* auerswald driver minor number */
-#endif
 
 /* we can have up to this number of device plugged in at once */
 #define AUER_MAX_DEVICES 16
+#endif
+
 
 /* prefix for the device descriptors in /dev/usb */
 #define AU_PREFIX	"auer"
@@ -284,6 +289,7 @@ typedef struct
 /* Forwards */
 static void auerswald_ctrlread_complete (struct urb * urb);
 static void auerswald_removeservice (pauerswald_t cp, pauerscon_t scp);
+extern struct usb_driver auerswald_driver;
 
 
 /*-------------------------------------------------------------------*/
@@ -1941,16 +1947,18 @@ static void *auerswald_probe (struct usb_device *usbdev, unsigned int ifnum,
         auerbuf_init (&cp->bufctl);
 	init_waitqueue_head (&cp->bufferwait);
 
-	/* find a free slot in the device table */
 	down (&dev_table_mutex);
-	for (dtindex = 0; dtindex < AUER_MAX_DEVICES; ++dtindex) {
-		if (dev_table[dtindex] == NULL)
-			break;
-	}
-	if ( dtindex >= AUER_MAX_DEVICES) {
-		err ("more than %d devices plugged in, can not handle this device", AUER_MAX_DEVICES);
-		up (&dev_table_mutex);
-		goto pfail;
+	if (usb_register_dev (&auerswald_driver, 1, &dtindex)) {
+		/* find a free slot in the device table */
+		for (dtindex = 0; dtindex < AUER_MAX_DEVICES; ++dtindex) {
+			if (dev_table[dtindex] == NULL)
+				break;
+		}
+		if ( dtindex >= AUER_MAX_DEVICES) {
+			err ("more than %d devices plugged in, can not handle this device", AUER_MAX_DEVICES);
+			up (&dev_table_mutex);
+			goto pfail;
+		}
 	}
 
 	/* Give the device a name */
@@ -2081,6 +2089,9 @@ static void auerswald_disconnect (struct usb_device *usbdev, void *driver_contex
 	/* Nobody can see this device any more */
 	devfs_unregister (cp->devfs);
 
+	/* give back our USB minor number */
+	usb_deregister_dev (&auerswald_driver, 1, cp->dtindex);
+
 	/* Stop the interrupt endpoint */
 	auerswald_int_release (cp);
 
@@ -2181,6 +2192,7 @@ static void __exit auerswald_cleanup (void)
 
 MODULE_AUTHOR (DRIVER_AUTHOR);
 MODULE_DESCRIPTION (DRIVER_DESC);
+MODULE_LICENSE ("GPL");
 
 module_init (auerswald_init);
 module_exit (auerswald_cleanup);

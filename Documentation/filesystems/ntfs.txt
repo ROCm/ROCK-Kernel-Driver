@@ -1,68 +1,140 @@
-NTFS Overview
-=============
+The Linux NTFS filesystem driver
+================================
 
-Legato Systems, Inc. (http://www.legato.com) have sponsored Anton Altaparmakov
-to develop NTFS on Linux since June 2001.
 
-To mount an NTFS volume, use the filesystem type 'ntfs'. The driver
-currently works only in read-only mode, with no fault-tolerance supported.
+Table of contents
+=================
 
-If you enable the dangerous(!) write support, make sure you can recover
-from a complete loss of data. Also, download the Linux-NTFS project
-distribution from Sourceforge at http://sourceforge.net/projects/linux-ntfs/
-and always run the included ntfsfix utility after performing a write to an
-NTFS partition from Linux to fix some of the damage done by the Linux NTFS
-driver and to schedule an automatic chkdsk when Windows reboots. You should
-run ntfsfix _after_ unmounting the partition in Linux but _before_ rebooting
-into Windows. During the next reboot into Windows, chkdsk will be run
-automatically fixing the remaining damage. If no errors are found it is a
-good indication that the driver + ntfsfix together worked to full
-satisfaction. (-;
+- Overview
+- Supported mount options
+- Features
+- Known bugs and (mis-)features
+- Using Software RAID with NTFS
+- Limitiations when using the MD driver
+- ChangeLog
 
-Please note that the experimental write support is limited to Windows NT4 and
-earlier versions at the moment.
 
-If you think you have discovered a bug please have look at the "Known bugs"
-section below to see whether it isn't known already.
+Overview
+========
 
-For ftdisk support, limited success was reported with volume sets on top of
-the md driver, although mirror and stripe sets should work as well - if the
-md driver can be talked into using the same layout as Windows NT. However,
-using the md driver will fail if any of your NTFS partitions have an odd
-number of sectors.
+To mount an NTFS 1.2/3.x (Windows NT4/2000/XP) volume, use the filesystem
+type 'ntfs'. The driver currently works only in read-only mode, with no
+fault-tolerance or journalling supported.
+
+For fault tolerance and raid support (i.e. volume and stripe sets), you can use
+the kernel's Software RAID / MD driver. See section "Using Software RAID with
+NTFS" for details.
+
 
 Supported mount options
 =======================
 
-iocharset=name		Character set to use when returning file names.
+In addition to the generic mount options described by the manual page for the
+mount command (man 8 mount, also see man 5 fstab), the NTFS driver supports the
+following mount options:
+
+iocharset=name		Deprecated option. Still supported but please use
+			nls=name in the future. See description for nls=name.
+
+nls=name		Character set to use when returning file names.
 			Unlike VFAT, NTFS suppresses names that contain
 			unconvertible characters. Note that most character
 			sets contain insufficient characters to represent all
 			possible Unicode characters that can exist on NTFS. To
 			be sure you are not missing any files, you are advised
-			to use the iocharset=utf8 which should be capable of
-			representing all Unicode characters.
+			to use nls=utf8 which is capable of representing all
+			Unicode characters.
 
-utf8=<bool>		Use UTF-8 for converting file names. - It is preferable
-			to use iocharset=utf8 instead, but if the utf8 NLS is
-			not available, you can use this utf8 option, which
-			enables the driver's builtin utf8 conversion functions.
+utf8=<bool>		Option no longer supported. Currently mapped to
+			nls=utf8 but please use nls=utf8 in the future and
+			make sure utf8 is compiled either as module or into
+			the kernel. See description for nls=name.
 
 uid=
 gid=
-umask=			These options work as documented in mount(8).
-			By default, the files are owned by root and
-			not readable by anyone else.
+umask=			Provide default owner, group, and access mode mask.
+			These options work as documented in mount(8). By
+			default, the files/directories are owned by root and
+			he/she has read and write permissions, as well as
+			browse permission for directories. No one else has any
+			access permissions. I.e. the mode on all files is by
+			default rw------- and for directories rwx------, a
+			consequence of the default fmask=0177 and dmask=0077.
+			Using a umask of zero will grant all permissions to
+			everyone, i.e. all files and directories will have mode
+			rwxrwxrwx.
 
-posix=<bool>		If enabled, the file system distinguishes between
-			upper and lower case. The 8.3 alias names are presented
-			as hard links instead of being suppressed.
+fmask=
+dmask=			Instead of specifying umask which applies both to
+			files and directories, fmask applies only to files and
+			dmask only to directories.
 
-show_sys_files=<bool>	If enabled, show all system files as normal files. Note
-			that $MFT does not appear unless specifically
-			requested. For example in bash, use: "ls -l \$MFT".
-			Be careful not to write anything to them or you could
-			crash the kernel and/or corrupt your file system!
+sloppy=<BOOL>		If sloppy is specified, ignore unknown mount options.
+			Otherwise the default behaviour is to abort mount if
+			any unknown options are found.
+
+posix=<bool>		Deprecated option. Still supported but please use
+			show_inodes=posix in the future. See description for
+			show_inodes=opt.
+
+show_sys_files=<bool>	Deprecated option. Still supported but please use
+			show_inodes=system in the future. See description for
+			show_inodes=opt.
+
+show_inodes=opt		Allows choice of which types of inode names readdir()
+			returns, i.e. this affects what "ls" shows. Following
+			values can be used for "opt":
+			   system: show system files
+			   win32:  long file names (includes POSIX) [DEFAULT]
+			   long:   same as win32
+			   dos:    short file names only (excludes POSIX)
+			   short:  same as dos
+			   posix:  same as both win32 and dos
+			   all:    all file names
+			Note that the options are additive, i.e. specifying:
+			   show_inodes=system,show_inodes=win32,show_inodes=dos
+			is the same as specifying:
+			   show_inodes=all
+			Note that the "posix" and "all" options will show all
+			directory names, BUT the link count on each directory
+			inode entry is set to 1, due to Linux not supporting
+			directory hard links. This may well confuse some
+			user space applications, since the directory names will
+			have the same inode numbers. Thus it is NOT advisable
+			to use the "posix" and "all" options. We provide them
+			only for completeness sake.
+			Further, note that the "system" option will not show
+			"$MFT" due to bugs/mis-features in glibc. Even though
+			it does not show, you can specifically "ls" it:
+				ls -l \$MFT
+			And of course you can stat it, too.
+			Further, note that irrespective of what show_inodes
+			option(s) you use, all files are accessible when you
+			specify the correct name, even though they may not be
+			shown in a normal "ls", i.e. you can always access the
+			system files and both the short and long file names of
+			files and directories.
+			Finally, note that win32 and dos file names are not
+			case sensitive and can be accessed using any
+			combination of lower and upper case, while POSIX file
+			names are case sensitive and they can only be accessed
+			given the correct case.
+
+errors=opt		What to do when critical file system errors are found.
+			Following values can be used for "opt":
+			  continue: DEFAULT, try to clean-up as much as
+				    possible, e.g. marking a corrupt inode as
+				    bad so it is no longer accessed, and then
+				    continue.
+			  recover:  At present only supported is recovery of
+				    the boot sector from the backup copy. If a
+				    read-only mount, the recovery is done in
+				    memory only and not written to disk.
+			Note that the options are additive, i.e. specifying:
+			   errors=continue,errors=recover
+			This means the driver will attempt to recover and if
+			that fails it will clean-up as much as possible and
+			continue.
 
 mft_zone_multiplier=	Set the MFT zone multiplier for the volume (this
 			setting is not persistent across mounts and can be
@@ -82,173 +154,127 @@ mft_zone_multiplier=	Set the MFT zone multiplier for the volume (this
 				2		25%
 				3		37.5%
 				4		50%
+			Note this option is irrelevant for read-only mounts.
+
+
+Features
+========
+
+- This is a complete rewrite of the NTFS driver that used to be in the kernel.
+  This new driver implements NTFS read support and is functionally equivalent
+  to the old ntfs driver.
+- The new driver has full support for sparse files on NTFS 3.x volumes which
+  the old driver isn't happy with.
+- The new driver supports execution of binaries due to mmap() now being
+  supported.
+- A comparison of the two drivers using:
+	time find . -type f -exec md5sum "{}" \;
+  run three times in sequence with each driver (after a reboot) on a 1.4GiB
+  NTFS partition, showed the new driver to be 20% faster in total time elapsed
+  (from 9:43 minutes on average down to 7:53). The time spent in user space
+  was unchanged but the time spent in the kernel was decreased by a factor of
+  2.5 (from 85 CPU seconds down to 33).
+
 
 Known bugs and (mis-)features
 =============================
 
-- Do not use the driver for writing as it corrupts the file system. If you do
-  use it, get the Linux-NTFS tools and use the ntfsfix utility after
-  dismounting a partition you wrote to.
+- None
 
-- Writing of extension records is not supported properly.
-
-Please send bug reports/comments/feed back/abuse to the Linux-NTFS development
+Please send bug reports/comments/feedback/abuse to the Linux-NTFS development
 list at sourceforge: linux-ntfs-dev@lists.sourceforge.net
+
+
+Using Software RAID with NTFS
+=============================
+
+For support of volume and stripe sets, use the kernel's Software RAID / MD
+driver and set up your /etc/raidtab appropriately (see man 5 raidtab).
+
+Linear volume sets, i.e. linear raid, as well as stripe sets, i.e. raid level 0,
+have been tested and work fine (though see section "Limitiations when using the
+MD driver with NTFS volumes" especially if you want to use linear raid). Even
+though untested, there is no reason why mirrors, i.e. raid level 1, and stripes
+with parity, i.e. raid level 5, should not work, too.
+
+You have to use the "persistent-superblock 0" option for each raid-disk in the
+NTFS volume/stripe you are configuring in /etc/raidtab as the persistent
+superblock used by the MD driver would damange the NTFS volume.
+
+Windows by default uses a stripe chunk size of 64k, so you probably want the
+"chunk-size 64k" option for each raid-disk, too.
+
+For example, if you have a stripe set consisting of two partitions /dev/hda5
+and /dev/hdb1 your /etc/raidtab would look like this:
+
+raiddev /dev/md0
+	raid-level	0
+	nr-raid-disks	2
+	nr-spare-disks	0
+	persistent-superblock	0
+	chunk-size	64k
+	device		/dev/hda5
+	raid-disk	0
+	device		/dev/hdb1
+	raid-disl	1
+
+For linear raid, just change the raid-level above to "raid-level linear", for
+mirrors, change it to "raid-level 1", and for stripe sets with parity, change
+it to "raid-level 5".
+
+Note for stripe sets with parity you will also need to tell the MD driver which
+parity algorithm to use by specifying the option "parity-algorithm which",
+where you need to replace "which" with the name of the algorithm to use (see
+man 5 raidtab for available algorithms) and you will have to try the different
+available algorithms until you find one that works. Make sure you are working
+read-only when playing with this as you may damage your data otherwise. If you
+find which algorithm works please let us know (email the linux-ntfs developers
+list linux-ntfs-dev@lists.sourceforge.net or drop in on IRC in channel #ntfs
+on the irc.openprojects.net network) so we can update this documentation.
+
+Once the raidtab is setup, run for example raid0run -a to start all devices or
+raid0run /dev/md0 to start a particular md device, in this case /dev/md0.
+
+Then just use the mount command as usual to mount the ntfs volume using for
+example:	mount -t ntfs -o ro /dev/md0 /mnt/myntfsvolume
+
+It is advisable to do the mount read-only to see if the md volume has been
+setup correctly to avoid the possibility of causing damage to the data on the
+ntfs volume.
+
+
+Limitiations when using the MD driver
+=====================================
+
+Using the md driver will not work properly if any of your NTFS partitions have
+an odd number of sectors. This is especially important for linear raid as all
+data after the first partition with an odd number of sectors will be offset by
+one or more sectors so if you mount such a partition with write support you
+will cause massive damage to the data on the volume which will only become
+apparent when you try to use the volume again under Windows.
+
+So when using linear raid, make sure that all your partitions have an even
+number of sectors BEFORE attempting to use it. You have been warned!
+
 
 ChangeLog
 =========
 
-NTFS 1.1.21:
-	- Fixed bug with reading $MFT where we try to read higher mft records
-	  before having read the $DATA attribute of $MFT. (Note this is only a
-	  partial solution which will only work in the case that the attribute
-	  list is resident or non-resident but $DATA is in the first 1024
-	  bytes. But this should be enough in the majority of cases. I am not
-	  going to bother fixing the general case until someone finds this to
-	  be a problem for them, which I doubt very much will ever happen...)
-	- Fixed bogus BUG() call in readdir().
+Note that a technical ChangeLog aimed at kernel hackers is in fs/ntfs/ChangeLog.
 
-NTFS 1.1.20:
-	- Fixed two bugs in ntfs_readwrite_attr(). Thanks to Jan Kara for
-	  spotting the out of bounds one.
-	- Check return value of set_blocksize() in ntfs_read_super() and make
-	  use of get_hardsect_size() to determine the minimum block size.
-	- Fix return values of ntfs_vcn_to_lcn(). This should stop
-	  peoples start of partition being overwritten at random.
-
-NTFS 1.1.19:
-	- Fixed ntfs_getdir_unsorted(), ntfs_readdir() and ntfs_printcb() to
-	  cope with arbitrary cluster sizes. Very important for Win2k+. Also,
-	  make them detect directories which are too large and truncate the
-	  enumeration pretending end of directory was reached. Detect more
-	  error conditions and overflows. All this fixes the problem where the
-	  driver could end up in an infinite loop under certain circumstances.
-	- Fixed potential memory leaks in Unicode conversion functions and
-	  setup correct NULL return values.
-
-NTFS 1.1.18:
-
-	- Enhanced & bug fixed cluster deallocation (race fixes, etc.)
-	- Complete rewrite of cluster allocation, now race free.
-	- Fixed several bugs in the attribute modification codepaths.
-	- Hopefully fixed bug where the first sectors of some people's
-	  partitions would be overwritten by the mft. And in general fixed up
-	  mft extension code a bit (still incomplete though).
-	- Introduce splice_runlist() to allow generic splicing of two run
-	  lists into one.
-	- MFT zone is now implemented. [Stage 2 of 3; only lack dynamic
-	  growing of mft zone but that is AFAIK not even done by Windows, and
-	  the overhead would be so large that it is probably not worth doing
-	  at all, so Stage 3 might never happen...]
-	- Complete rewrite of $MFT extension and ntfs inode allocation code.
-	- Made the NTFS driver initialization string show the compile options
-	  used (i.e. whether read-only or read-write, whether a module, and
-	  whether with debug support).
-	- Modify ntfs_fill_mft_header() to set all fields and to accept more
-	  arguments.
-	- Get rid of superfluous add_mft_header().
-	- Get rid of some unused code.
-	- Fixed several bugs in and generally cleaned up ntfs_readdir,
-	  ntfs_getdir_unsorted(), and ntfs_printcb. Now they spew out huge
-	  amounts of debug output if debugging is enabled. This will be
-	  removed once I know that this works for everyone.
-	- ntfs_readdir now shows hidden files. The only files that are now
-	  hidden are the first 16 inodes (i.e. the hard coded system files),
-	  which is consistent with Windows NT4. Using the show_sys_files mount
-	  option, these files are then shown, too.
-	- Fixed the displaying of the "." and ".." directories. We still cannot
-	  cope with more than 65536 files in a directory index block which is
-	  not a problem and we now cannot cope with more than 32766 directory
-	  index blocks which should not be a problem unless you have a
-	  directory with an insanely large number of files in it. The exact
-	  number depends on the length of the file names of the directory
-	  entries and on the size of the dircetory index blocks.
-	- Fixed all problems with the last file in a directory (e.g. the last
-	  file should no longer disappear and tab completion should work). If
-	  there are still disappearing files or any other problems with the
-	  last file in a directory, please report them! Thanks.
-	- Rewrote ntfs_extend_attr() to use the new cluster allocator and the
-	  freshly introduced splice_runlists() function. This simplified
-	  ntfs_extend_attr() a lot which in turn seems to have removed one or
-	  more bugs from it.
-	- Probably other things I have forgotten... (-;
-	- Removed dollar signs from the names in the system file enumeration.
-	  Apparently gcc doesn't support dollar signs on PPC architecture.
-	  (Andrzej Krzysztofowicz)
-
-NTFS 1.1.17:
-
-	- Fixed system file handling. No longer need to use show_sys_files
-	  option for driver to work fine. System files are now always treated
-	  the same, but without the option, they are made invisible to
-	  directory listings. As a result system files can once again be opened
-	  even without the show_sys_files option. This is important for the
-	  statfs system call to work properly, for example.
-	- Implemented MFT zone including mount parameter to tune it (just like
-	  in Windows via the registry, only we make it per mount rather than
-	  global for the whole driver, so we are better but we have no way of
-	  storing the value as we don't have a registry so either specify on
-	  each mount or put it in /etc/fstab). [Stage 1 of 3, mount parameter
-	  handling.]
-	- Fixed fixup functions to handle corruption cases and to return error
-	  codes to the caller.
-	- Made fixup functions apply hotfixes where sensible. [Stage 1 of 2+,
-	  in memory only.]
-	- Fixed ommission of "NTFS: " string in ntfs_error() output.
-	- Fixed stupid if statement bug in unistr.c. Thanks to Yann E. Morin
-	  for spotting it. 
-	- Get rid of all uses of max and min macros. This actually allowed for
-	  optimizing the code in several places so it was a Good Thing(TM).
-	- Make ntfs use generic_file_open to enforce the O_LARGEFILE flag.
-	- Detect encrypted files and refuse to access them (return EACCES
-	  error code to user space).
-	- Fix handling of encrypted & compressed files so that an encrypted
-	  file no longer is considered to be compressed (this was causing
-	  kernel segmentation faults).
-
-NTFS 1.1.16:
-
-	- Removed non-functional uni_xlate mount options.
-	- Clarified the semantics of the utf8 and iocharset mount options.
-	- Threw out the non-functional mount options for using hard coded
-	  character set conversion. Only kept utf8 one.
-	- Fixed handling of mount options and proper handling of faulty mount
-	  options on remount.
-	- Cleaned up character conversion which basically became simplified a
-	  lot due to the removal of the above mentioned mount options.
-	- Made character conversion to be always consistent. Previously we
-	  could output to the VFS file names which we would then not accept
-	  back from the VFS so in effect we were generating ghost entries in
-	  the directory listings which could not be accessed by any means.
-	- Simplified time conversion functions drastically without sacrificing
-	  accuracy. (-8
-	- Fixed a use of a pointer before the check for the pointer being
-	  NULL, reported by the Stanford checker.
-	- Fixed several missing error checks, reported by the Stanford
-	  checker and fixed by Rasmus Andersen.
-
-NTFS 1.1.15 (changes since kernel 2.4.4's NTFS driver):
-
-	- New mount option show_sys_files=<bool> to show all system files as
-	  normal files.
-	- Support for files and in general any attributes up to the full 2TiB
-	  size supported by the NTFS filesystem. Note we only support up to
-	  32-bits worth of inodes/clusters at this point.
-	- Support for more than 128kiB sized runlists (using vmalloc_32()
-	  instead of kmalloc()).
-	- Fixed races in allocation of clusters and mft records.
-	- Fixed major bugs in attribute handling / searching / collation.
-	- Fixed major bugs in compressing a run list into a mapping pairs array.
-	- Fixed major bugs in inode allocation. Especially file create and
-	  mkdir.
-	- Fixed memory leaks.
-	- Fixed major bug in inode layout assignment of sequence numbers.
-	- Lots of other bug fixes I can't think of right now...
-	- Fixed NULL bug found by the Stanford checker in ntfs_dupuni2map().
-	- Convert large stack variable to dynamically allocated one in
-	  ntfs_get_free_cluster_count() (found by Stanford checker).
-
-Kernel 2.4.4:
-
+2.0.4:
+	- Cleanups and updates for kernel 2.5.11.
+2.0.3:
+	- Small bug fixes, cleanups, and performance improvements.
+2.0.2:
+	- Use default fmask of 0177 so that files are no executable by default.
+	  If you want owner executable files, just use fmask=0077.
+	- Update for kernel 2.5.9 but preserve backwards compatibility with
+	  kernel 2.5.7.
+	- Minor bug fixes, cleanups, and updates.
+2.0.1:
+	- Minor updates, primarily set the executable bit by default on files
+	  so they can be executed.
+2.0.0:
 	- Started ChangeLog.
 

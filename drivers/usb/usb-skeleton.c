@@ -85,12 +85,20 @@ static struct usb_device_id skel_table [] = {
 MODULE_DEVICE_TABLE (usb, skel_table);
 
 
-
+#ifdef CONFIG_USB_DYNAMIC_MINORS
+/* 
+ * if the user wants to use dynamic minor numbers, then we can have up to 256
+ * devices
+ */
+#define USB_SKEL_MINOR_BASE	0
+#define MAX_DEVICES		256
+#else
 /* Get a minor range for your devices from the usb maintainer */
-#define USB_SKEL_MINOR_BASE	200	
+#define USB_SKEL_MINOR_BASE	200
 
 /* we can have up to this number of device plugged in at once */
 #define MAX_DEVICES		16
+#endif
 
 /* Structure to hold all of our device specific stuff */
 struct usb_skel {
@@ -190,9 +198,6 @@ static struct usb_driver skel_driver = {
 	num_minors:	MAX_DEVICES,
 	id_table:	skel_table,
 };
-
-
-
 
 
 /**
@@ -529,15 +534,17 @@ static void * skel_probe(struct usb_device *udev, unsigned int ifnum, const stru
 		return NULL;
 	}
 
-	/* select a "subminor" number (part of a minor number) */
 	down (&minor_table_mutex);
-	for (minor = 0; minor < MAX_DEVICES; ++minor) {
-		if (minor_table[minor] == NULL)
-			break;
-	}
-	if (minor >= MAX_DEVICES) {
-		info ("Too many devices plugged in, can not handle this device.");
-		goto exit;
+	if (usb_register_dev (&skel_driver, 1, &minor)) {
+		/* we could not get a dynamic minor, so lets find one of our own */
+		for (minor = 0; minor < MAX_DEVICES; ++minor) {
+			if (minor_table[minor] == NULL)
+				break;
+		}
+		if (minor >= MAX_DEVICES) {
+			info ("Too many devices plugged in, can not handle this device.");
+			goto exit;
+		}
 	}
 
 	/* allocate memory for our device state and intialize it */
@@ -642,8 +649,11 @@ static void skel_disconnect(struct usb_device *udev, void *ptr)
 	minor = dev->minor;
 
 	/* remove our devfs node */
-	devfs_unregister(dev->devfs);
+	devfs_unregister (dev->devfs);
 
+	/* give back our dynamic minor */
+	usb_deregister_dev (&skel_driver, 1, minor);
+	
 	/* if the device is not opened, then we clean up right now */
 	if (!dev->open_count) {
 		up (&dev->sem);

@@ -1032,7 +1032,8 @@ int swim3_init(void)
 			       MAJOR_NR);
 			return -EBUSY;
 		}
-		blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST,&swim3_lock);
+		blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_fd_request,
+				&swim3_lock);
 		blksize_size[MAJOR_NR] = floppy_blocksizes;
 		blk_size[MAJOR_NR] = floppy_sizes;
 	}

@@ -23,6 +23,7 @@
  *                              iosapic_set_affinity(), initializations for
  *                              /proc/irq/#/smp_affinity
  * 02/04/02	P. Diefenbaugh	Cleaned up ACPI PCI IRQ routing.
+ * 02/04/18	J.I. Lee	bug fix in iosapic_init_pci_irq
  */
 /*
  * Here is what the interrupt logic between a PCI device and the CPU looks like:
@@ -70,7 +71,7 @@
 
 
 #undef DEBUG_IRQ_ROUTING
-#undef	OVERRIDE_DEBUG
+#undef OVERRIDE_DEBUG
 
 static spinlock_t iosapic_lock = SPIN_LOCK_UNLOCKED;
 
@@ -676,6 +677,11 @@ iosapic_init_pci_irq (void)
 		       pci_irq.route[i].bus, pci_irq.route[i].pci_id>>16, pci_irq.route[i].pin,
 		       iosapic_irq[vector].base_irq + iosapic_irq[vector].pin, vector);
 #endif
+
+		/*
+		 * Forget not to program the IOSAPIC RTE per ACPI _PRT
+		 */
+		set_rte(vector, (ia64_get_lid() >> 16) & 0xffff);
 	}
 }
 

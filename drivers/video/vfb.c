@@ -43,7 +43,6 @@
 
 static u_long videomemory, videomemorysize = VIDEOMEMSIZE;
 MODULE_PARM(videomemorysize, "l");
-static int currcon = 0;
 static struct display disp;
 static struct fb_info fb_info;
 static struct { u_char red, green, blue, pad; } palette[256];
@@ -83,13 +82,12 @@ static int vfb_get_var(struct fb_var_screeninfo *var, int con,
 		       struct fb_info *info);
 static int vfb_set_var(struct fb_var_screeninfo *var, int con,
 		       struct fb_info *info);
+static int vfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
+                         u_int transp, struct fb_info *info);
 static int vfb_pan_display(struct fb_var_screeninfo *var, int con,
 			   struct fb_info *info);
 static int vfb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			struct fb_info *info);
-static int vfb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
-			struct fb_info *info);
-
 
     /*
      *  Interface to the low level console driver
@@ -98,8 +96,6 @@ static int vfb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 int vfb_init(void);
 static int vfbcon_switch(int con, struct fb_info *info);
 static int vfbcon_updatevar(int con, struct fb_info *info);
-static void vfbcon_blank(int blank, struct fb_info *info);
-
 
     /*
      *  Internal routines
@@ -111,10 +107,6 @@ static void vfb_encode_fix(struct fb_fix_screeninfo *fix,
 static void set_color_bitfields(struct fb_var_screeninfo *var);
 static int vfb_getcolreg(u_int regno, u_int *red, u_int *green, u_int *blue,
                          u_int *transp, struct fb_info *info);
-static int vfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
-                         u_int transp, struct fb_info *info);
-static void do_install_cmap(int con, struct fb_info *info);
-
 
 static struct fb_ops vfb_ops = {
 	owner:		THIS_MODULE,
@@ -122,7 +114,8 @@ static struct fb_ops vfb_ops = {
 	fb_get_var:	vfb_get_var,
 	fb_set_var:	vfb_set_var,
 	fb_get_cmap:	vfb_get_cmap,
-	fb_set_cmap:	vfb_set_cmap,
+	fb_set_cmap:	gen_set_cmap,
+	fb_setcolreg:	vfb_setcolreg,
 	fb_pan_display:	vfb_pan_display,
 };
 
@@ -237,7 +230,6 @@ static int vfb_set_var(struct fb_var_screeninfo *var, int con,
 	    struct fb_fix_screeninfo fix;
 
 	    vfb_encode_fix(&fix, var);
-	    display->screen_base = (char *)videomemory;
 	    display->visual = fix.visual;
 	    display->type = fix.type;
 	    display->type_aux = fix.type_aux;
@@ -339,7 +331,7 @@ static int vfb_pan_display(struct fb_var_screeninfo *var, int con,
 static int vfb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			struct fb_info *info)
 {
-    if (con == currcon) /* current console? */
+    if (con == info->currcon) /* current console? */
 	return fb_get_cmap(cmap, kspc, vfb_getcolreg, info);
     else if (fb_display[con].cmap.len) /* non default colormap? */
 	fb_copy_cmap(&fb_display[con].cmap, cmap, kspc ? 0 : 2);
@@ -348,28 +340,6 @@ static int vfb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 		     cmap, kspc ? 0 : 2);
     return 0;
 }
-
-    /*
-     *  Set the Colormap
-     */
-
-static int vfb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
-			struct fb_info *info)
-{
-    int err;
-
-    if (!fb_display[con].cmap.len) {	/* no colormap allocated? */
-	if ((err = fb_alloc_cmap(&fb_display[con].cmap,
-			      1<<fb_display[con].var.bits_per_pixel, 0)))
-	    return err;
-    }
-    if (con == currcon)			/* current console? */
-	return fb_set_cmap(cmap, kspc, vfb_setcolreg, info);
-    else
-	fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
-    return 0;
-}
-
 
 int __init vfb_setup(char *options)
 {
@@ -406,10 +376,11 @@ int __init vfb_init(void)
     fb_info.changevar = NULL;
     fb_info.node = NODEV;
     fb_info.fbops = &vfb_ops;
+    fb_info.screen_base = (char *)videomemory;
     fb_info.disp = &disp;
+    fb_info.currcon = -1;	
     fb_info.switch_con = &vfbcon_switch;
     fb_info.updatevar = &vfbcon_updatevar;
-    fb_info.blank = &vfbcon_blank;
     fb_info.flags = FBINFO_FLAG_DEFAULT;
 
     vfb_set_var(&vfb_default, -1, &fb_info);
@@ -428,10 +399,10 @@ int __init vfb_init(void)
 static int vfbcon_switch(int con, struct fb_info *info)
 {
     /* Do we have to save the colormap? */
-    if (fb_display[currcon].cmap.len)
-	fb_get_cmap(&fb_display[currcon].cmap, 1, vfb_getcolreg, info);
+    if (fb_display[info->currcon].cmap.len)
+	fb_get_cmap(&fb_display[info->currcon].cmap, 1, vfb_getcolreg, info);
 
-    currcon = con;
+    info->currcon = con;
     /* Install new colormap */
     do_install_cmap(con, info);
     return 0;
@@ -445,15 +416,6 @@ static int vfbcon_updatevar(int con, struct fb_info *info)
 {
     /* Nothing */
     return 0;
-}
-
-    /*
-     *  Blank the display.
-     */
-
-static void vfbcon_blank(int blank, struct fb_info *info)
-{
-    /* Nothing */
 }
 
 static u_long get_line_length(int xres_virtual, int bpp)
@@ -585,19 +547,6 @@ static int vfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
     palette[regno].blue = blue;
     return 0;
 }
-
-
-static void do_install_cmap(int con, struct fb_info *info)
-{
-    if (con != currcon)
-	return;
-    if (fb_display[con].cmap.len)
-	fb_set_cmap(&fb_display[con].cmap, 1, vfb_setcolreg, info);
-    else
-	fb_set_cmap(fb_default_cmap(1<<fb_display[con].var.bits_per_pixel), 1,
-		    vfb_setcolreg, info);
-}
-
 
 #ifdef MODULE
 MODULE_LICENSE("GPL");

@@ -382,7 +382,7 @@ fb_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 	if (count) {
 	    char *base_addr;
 
-	    base_addr = info->disp->screen_base;
+	    base_addr = info->screen_base;
 	    count -= copy_to_user(buf, base_addr+p, count);
 	    if (!count)
 		return -EFAULT;
@@ -418,7 +418,7 @@ fb_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 	if (count) {
 	    char *base_addr;
 
-	    base_addr = info->disp->screen_base;
+	    base_addr = info->screen_base;
 	    count -= copy_from_user(base_addr+p, buf, count);
 	    *ppos += count;
 	    err = -EFAULT;
@@ -522,10 +522,9 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 			set_con2fb_map(i, con2fb.framebuffer);
 		return 0;
 	case FBIOBLANK:
-		if (info->blank == 0)
+		if (fb->fb_blank == 0)
 			return -EINVAL;
-		(*info->blank)(arg, info);
-		return 0;
+		return fb->fb_blank(arg, info);
 	default:
 		if (fb->fb_ioctl == NULL)
 			return -EINVAL;

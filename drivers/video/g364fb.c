@@ -77,7 +77,6 @@
 #define MON_ID_REG 	0xe4100000 	/* unused */
 #define RESET_REG 	0xe4180000  	/* Write only */
 
-static int currcon = 0;
 static struct display disp;
 static struct fb_info fb_info;
 static struct { u_char red, green, blue, pad; } palette[256];
@@ -99,8 +98,9 @@ static int g364fb_pan_display(struct fb_var_screeninfo *var, int con,
 			      struct fb_info *info);
 static int g364fb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			   struct fb_info *info);
-static int g364fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
-			   struct fb_info *info);
+static int g364fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
+			    u_int transp, struct fb_info *info);
+static int g364fb_blank(int blank, struct fb_info *info);
 
 
 /*
@@ -109,18 +109,12 @@ static int g364fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 int g364fb_init(void);
 static int g364fbcon_switch(int con, struct fb_info *info);
 static int g364fbcon_updatevar(int con, struct fb_info *info);
-static void g364fbcon_blank(int blank, struct fb_info *info);
-
 
 /*
  *  Internal routines
  */
 static int g364fb_getcolreg(u_int regno, u_int *red, u_int *green, u_int *blue,
 			    u_int *transp, struct fb_info *info);
-static int g364fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
-			    u_int transp, struct fb_info *info);
-static void do_install_cmap(int con, struct fb_info *info);
-
 
 static struct fb_ops g364fb_ops = {
 	owner:		THIS_MODULE,
@@ -128,8 +122,10 @@ static struct fb_ops g364fb_ops = {
 	fb_get_var:	g364fb_get_var,
 	fb_set_var:	g364fb_set_var,
 	fb_get_cmap:	g364fb_get_cmap,
-	fb_set_cmap:	g364fb_set_cmap,
+	fb_set_cmap:	gen_set_cmap,
+	fb_setcolreg:	g364fb_setcolreg,
 	fb_pan_display:	g364fb_pan_display,
+	fb_blank:	g364fb_blank,
 };
 
 
@@ -241,7 +237,7 @@ static int g364fb_pan_display(struct fb_var_screeninfo *var, int con,
 static int g364fb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			   struct fb_info *info)
 {
-    if (con == currcon) /* current console? */
+    if (con == info->currcon) /* current console? */
 	return fb_get_cmap(cmap, kspc, g364fb_getcolreg, info);
     else if (fb_display[con].cmap.len) /* non default colormap? */
 	fb_copy_cmap(&fb_display[con].cmap, cmap, kspc ? 0 : 2);
@@ -250,27 +246,6 @@ static int g364fb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 		     cmap, kspc ? 0 : 2);
     return 0;
 }
-
-/*
- *  Set the Colormap
- */
-static int g364fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
-			   struct fb_info *info)
-{
-    int err;
-
-    if (!fb_display[con].cmap.len) {	/* no colormap allocated? */
-	if ((err = fb_alloc_cmap(&fb_display[con].cmap,
-				 1<<fb_display[con].var.bits_per_pixel, 0)))
-	    return err;
-    }
-    if (con == currcon) {		/* current console? */
-	return fb_set_cmap(cmap, kspc, g364fb_setcolreg, info);
-    } else
-	fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
-    return 0;
-}
-
 
 /*
  *  Initialisation
@@ -366,7 +341,6 @@ int __init g364fb_init(void)
     disp.cmap.start = 0;
     disp.cmap.len = 0;
     disp.cmap.red = disp.cmap.green = disp.cmap.blue = disp.cmap.transp = NULL;
-    disp.screen_base = (char *)G364_MEM_BASE; /* virtual kernel address */
     disp.visual = fb_fix.visual;
     disp.type = fb_fix.type;
     disp.type_aux = fb_fix.type_aux;
@@ -380,12 +354,13 @@ int __init g364fb_init(void)
     strcpy(fb_info.modename, fb_fix.id);
     fb_info.node = NODEV;
     fb_info.fbops = &g364fb_ops;
+    fb_info.screen_base = (char *)G364_MEM_BASE; /* virtual kernel address */
     fb_info.disp = &disp;
+    fb_info.currcon = -1;	
     fb_info.fontname[0] = '\0';
     fb_info.changevar = NULL;
     fb_info.switch_con = &g364fbcon_switch;
     fb_info.updatevar = &g364fbcon_updatevar;
-    fb_info.blank = &g364fbcon_blank;
     fb_info.flags = FBINFO_FLAG_DEFAULT;
 
     g364fb_set_var(&fb_var, -1, &fb_info);
@@ -402,10 +377,10 @@ int __init g364fb_init(void)
 static int g364fbcon_switch(int con, struct fb_info *info)
 {
     /* Do we have to save the colormap? */
-    if (fb_display[currcon].cmap.len)
-	fb_get_cmap(&fb_display[currcon].cmap, 1, g364fb_getcolreg, info);
+    if (fb_display[info->currcon].cmap.len)
+	fb_get_cmap(&fb_display[info->currcon].cmap, 1, g364fb_getcolreg, info);
 
-    currcon = con;
+    info->currcon = con;
     /* Install new colormap */
     do_install_cmap(con, info);
     g364fbcon_updatevar(con, info);    
@@ -417,8 +392,8 @@ static int g364fbcon_switch(int con, struct fb_info *info)
  */
 static int g364fbcon_updatevar(int con, struct fb_info *info)
 {
-    if (con == currcon) {
-	struct fb_var_screeninfo *var = &fb_display[currcon].var;
+    if (con == info->currcon) {
+	struct fb_var_screeninfo *var = &fb_display[info->currcon].var;
 
 	/* hardware scrolling */
 	*(unsigned int *)TOP_REG = var->yoffset * var->xres;	
@@ -429,12 +404,13 @@ static int g364fbcon_updatevar(int con, struct fb_info *info)
 /*
  *  Blank the display.
  */
-static void g364fbcon_blank(int blank, struct fb_info *info)
+static int g364fb_blank(int blank, struct fb_info *info)
 {
     if (blank)
 	*(unsigned int *) CTLA_REG |= FORCE_BLANK;	
     else
 	*(unsigned int *) CTLA_REG &= ~FORCE_BLANK;	
+    return 0;	
 }
 
 /*
@@ -474,18 +450,6 @@ static int g364fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
     ptr[regno << 1] = (red << 16) | (green << 8) | blue;
 
     return 0;
-}
-
-
-static void do_install_cmap(int con, struct fb_info *info)
-{
-    if (con != currcon)
-	return;
-    if (fb_display[con].cmap.len)
-	fb_set_cmap(&fb_display[con].cmap, 1, g364fb_setcolreg, info);
-    else
-	fb_set_cmap(fb_default_cmap(1<<fb_display[con].var.bits_per_pixel), 1,
-		    g364fb_setcolreg, info);
 }
 
 MODULE_LICENSE("GPL");

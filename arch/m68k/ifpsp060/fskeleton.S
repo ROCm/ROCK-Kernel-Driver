@@ -80,7 +80,7 @@ _060_real_ovfl:
 	fsave		-(%sp)
 	move.w		#0x6000,0x2(%sp)
 	frestore	(%sp)+
-	bral		SYMBOL_NAME(trap)	| jump to trap handler
+	bral		trap	| jump to trap handler
 
 
 |
@@ -99,7 +99,7 @@ _060_real_unfl:
 	fsave		-(%sp)
 	move.w		#0x6000,0x2(%sp)
 	frestore	(%sp)+
-	bral		SYMBOL_NAME(trap)	| jump to trap handler
+	bral		trap	| jump to trap handler
 
 |
 | _060_real_operr():
@@ -118,7 +118,7 @@ _060_real_operr:
 	fsave		-(%sp)
 	move.w		#0x6000,0x2(%sp)
 	frestore	(%sp)+
-	bral		SYMBOL_NAME(trap)	| jump to trap handler
+	bral		trap	| jump to trap handler
 
 |
 | _060_real_snan():
@@ -137,7 +137,7 @@ _060_real_snan:
 	fsave		-(%sp)
 	move.w		#0x6000,0x2(%sp)
 	frestore	(%sp)+
-	bral		SYMBOL_NAME(trap)	| jump to trap handler
+	bral		trap	| jump to trap handler
 
 |
 | _060_real_dz():
@@ -156,7 +156,7 @@ _060_real_dz:
 	fsave		-(%sp)
 	move.w		#0x6000,0x2(%sp)
 	frestore	(%sp)+
-	bral		SYMBOL_NAME(trap)	| jump to trap handler
+	bral		trap	| jump to trap handler
 
 |
 | _060_real_inex():
@@ -175,7 +175,7 @@ _060_real_inex:
 	fsave		-(%sp)
 	move.w		#0x6000,0x2(%sp)
 	frestore	(%sp)+
-	bral		SYMBOL_NAME(trap)	| jump to trap handler
+	bral		trap	| jump to trap handler
 
 |
 | _060_real_bsun():
@@ -197,7 +197,7 @@ _060_real_bsun:
 	andi.b		#0xfe,(%sp)
 	fmove.l		(%sp)+,%fpsr
 
-	bral		SYMBOL_NAME(trap)	| jump to trap handler
+	bral		trap	| jump to trap handler
 
 |
 | _060_real_fline():
@@ -211,7 +211,7 @@ _060_real_bsun:
 | 
 	.global		_060_real_fline
 _060_real_fline:
-	bral		SYMBOL_NAME(trap)	| jump to trap handler
+	bral		trap	| jump to trap handler
 
 |
 | _060_real_fpu_disabled():
@@ -250,7 +250,7 @@ _060_real_fpu_disabled:
 |
 	.global		_060_real_trap
 _060_real_trap:
-	bral		SYMBOL_NAME(trap)	| jump to trap handler
+	bral		trap	| jump to trap handler
 
 |############################################################################
 

@@ -737,7 +737,7 @@ acornfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 		  u_int trans, struct fb_info *info)
 {
 	union palette pal;
-	int bpp = fb_display[current_par.currcon].var.bits_per_pixel;
+	int bpp = fb_display[info->currcon].var.bits_per_pixel;
 
 	if (regno >= current_par.palette_size)
 		return 1;
@@ -780,33 +780,13 @@ acornfb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 {
 	int err = 0;
 
-	if (con == current_par.currcon)
+	if (con == info->currcon)
 		err = fb_get_cmap(cmap, kspc, acornfb_getcolreg, info);
 	else if (fb_display[con].cmap.len)
 		fb_copy_cmap(&fb_display[con].cmap, cmap, kspc ? 0 : 2);
 	else
 		fb_copy_cmap(fb_default_cmap(current_par.palette_size),
 			     cmap, kspc ? 0 : 2);
-	return err;
-}
-
-static int
-acornfb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
-		 struct fb_info *info)
-{
-	int err = 0;
-
-	if (!fb_display[con].cmap.len)
-		err = fb_alloc_cmap(&fb_display[con].cmap,
-				    current_par.palette_size, 0);
-	if (!err) {
-		if (con == current_par.currcon)
-			err = fb_set_cmap(cmap, kspc, acornfb_setcolreg,
-					  info);
-		else
-			fb_copy_cmap(cmap, &fb_display[con].cmap,
-				     kspc ? 0 : 1);
-	}
 	return err;
 }
 
@@ -1037,7 +1017,7 @@ acornfb_set_var(struct fb_var_screeninfo *var, int con, struct fb_info *info)
 		break;
 	}
 
-	display->screen_base	= (char *)current_par.screen_base;
+	info->screen_base	= (char *)current_par.screen_base;
 	display->type		= FB_TYPE_PACKED_PIXELS;
 	display->type_aux	= 0;
 	display->ypanstep	= 1;
@@ -1050,7 +1030,7 @@ acornfb_set_var(struct fb_var_screeninfo *var, int con, struct fb_info *info)
 	if (chgvar && info && info->changevar)
 		info->changevar(con);
 
-	if (con == current_par.currcon) {
+	if (con == info->currcon) {
 		struct fb_cmap *cmap;
 		unsigned long start, size;
 		int control;
@@ -1087,7 +1067,7 @@ acornfb_set_var(struct fb_var_screeninfo *var, int con, struct fb_info *info)
 		else
 			cmap = fb_default_cmap(current_par.palette_size);
 
-		fb_set_cmap(cmap, 1, acornfb_setcolreg, info);
+		fb_set_cmap(cmap, 1, info);
 	}
 	return 0;
 }
@@ -1165,15 +1145,17 @@ static struct fb_ops acornfb_ops = {
 	fb_get_var:	acornfb_get_var,
 	fb_set_var:	acornfb_set_var,
 	fb_get_cmap:	acornfb_get_cmap,
-	fb_set_cmap:	acornfb_set_cmap,
+	fb_set_cmap:	gen_set_cmap,
+	fb_set_colreg:	acornfb_setcolreg,
 	fb_pan_display:	acornfb_pan_display,
+	fb_blank:	acornfb_blank,
 	fb_mmap:	acornfb_mmap,
 };
 
 static int
 acornfb_updatevar(int con, struct fb_info *info)
 {
-	if (con == current_par.currcon)
+	if (con == info->currcon)
 		acornfb_update_dma(&fb_display[con].var);
 
 	return 0;
@@ -1184,14 +1166,14 @@ acornfb_switch(int con, struct fb_info *info)
 {
 	struct fb_cmap *cmap;
 
-	if (current_par.currcon >= 0) {
-		cmap = &fb_display[current_par.currcon].cmap;
+	if (info->currcon >= 0) {
+		cmap = &fb_display[info->currcon].cmap;
 
 		if (cmap->len)
 			fb_get_cmap(cmap, 1, acornfb_getcolreg, info);
 	}
 
-	current_par.currcon = con;
+	info->currcon = con;
 
 	fb_display[con].var.activate = FB_ACTIVATE_NOW;
 
@@ -1200,11 +1182,11 @@ acornfb_switch(int con, struct fb_info *info)
 	return 0;
 }
 
-static void
+static int 
 acornfb_blank(int blank, struct fb_info *info)
 {
 	union palette p;
-	int i, bpp = fb_display[current_par.currcon].var.bits_per_pixel;
+	int i, bpp = fb_display[info->currcon].var.bits_per_pixel;
 
 #ifdef FBCON_HAS_CFB16
 	if (bpp == 16) {
@@ -1232,6 +1214,7 @@ acornfb_blank(int blank, struct fb_info *info)
 			acornfb_palette_write(i, p);
 		}
 	}
+	return 0;
 }
 
 /*
@@ -1324,7 +1307,6 @@ acornfb_init_fbinfo(void)
 	fb_info.changevar	   = NULL;
 	fb_info.switch_con	   = acornfb_switch;
 	fb_info.updatevar	   = acornfb_updatevar;
-	fb_info.blank		   = acornfb_blank;
 	fb_info.flags		   = FBINFO_FLAG_DEFAULT;
 
 	global_disp.dispsw	   = &fbcon_dummy;
@@ -1635,7 +1617,7 @@ acornfb_init(void)
 		}
 	}
 
-	current_par.currcon	   = -1;
+	fb_info.currcon	   = -1;
 	current_par.screen_base	   = SCREEN_BASE;
 	current_par.screen_base_p  = SCREEN_START;
 	current_par.using_vram     = 0;

@@ -991,6 +991,7 @@ static int snd_pcm_playback_drain(snd_pcm_substream_t * substream)
 	int err, result = 0;
 	wait_queue_t wait;
 	enum { READY, EXPIRED, SUSPENDED, SIGNALED } state = READY;
+	snd_pcm_uframes_t stop_threshold;
 
 	snd_assert(substream != NULL, return -ENXIO);
 	snd_assert(substream->stream == SNDRV_PCM_STREAM_PLAYBACK, return -EINVAL);
@@ -999,6 +1000,13 @@ static int snd_pcm_playback_drain(snd_pcm_substream_t * substream)
 
 	snd_power_lock(card);
 	spin_lock_irq(&runtime->lock);
+
+	/* stop_threshold fixup to avoid endless loop when */
+	/* stop_threshold > buffer_size */
+	stop_threshold = runtime->stop_threshold;
+	if (runtime->stop_threshold > runtime->buffer_size)
+		runtime->stop_threshold = runtime->buffer_size;
+
 	switch (runtime->status->state) {
 	case SNDRV_PCM_STATE_PAUSED:
 		snd_pcm_pause(substream, 0);
@@ -1090,6 +1098,7 @@ static int snd_pcm_playback_drain(snd_pcm_substream_t * substream)
 	}
 
       _end:
+	runtime->stop_threshold = stop_threshold;
 	spin_unlock_irq(&runtime->lock);
 	snd_power_unlock(card);
 	if (state == EXPIRED)

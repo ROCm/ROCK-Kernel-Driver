@@ -94,7 +94,6 @@ static union {
 
 static int             inverse   = 0;
 static int             mtrr      = 0;
-static int             currcon   = 0;
 
 static int             pmi_setpal = 0;	/* pmi for palette changes ??? */
 static int             ypan       = 0;  /* 0..nothing, 1..ypan, 2..ywrap */
@@ -135,8 +134,8 @@ static int vesafb_pan_display(struct fb_var_screeninfo *var, int con,
 
 static int vesafb_update_var(int con, struct fb_info *info)
 {
-	if (con == currcon && ypan) {
-		struct fb_var_screeninfo *var = &fb_display[currcon].var;
+	if (con == info->currcon && ypan) {
+		struct fb_var_screeninfo *var = &fb_display[info->currcon].var;
 		return vesafb_pan_display(var,con,info);
 	}
 	return 0;
@@ -183,7 +182,6 @@ static void vesafb_set_disp(int con)
 	vesafb_get_fix(&fix, con, 0);
 
 	memset(display, 0, sizeof(struct display));
-	display->screen_base = video_vbase;
 	display->visual = fix.visual;
 	display->type = fix.type;
 	display->type_aux = fix.type_aux;
@@ -329,9 +327,9 @@ static void vesa_setpalette(int regno, unsigned red, unsigned green, unsigned bl
 
 #endif
 
-static int vesa_setcolreg(unsigned regno, unsigned red, unsigned green,
-			  unsigned blue, unsigned transp,
-			  struct fb_info *fb_info)
+static int vesafb_setcolreg(unsigned regno, unsigned red, unsigned green,
+			    unsigned blue, unsigned transp,
+			    struct fb_info *fb_info)
 {
 	/*
 	 *  Set a single color register. The values supplied are
@@ -397,21 +395,10 @@ static int vesa_setcolreg(unsigned regno, unsigned red, unsigned green,
     return 0;
 }
 
-static void do_install_cmap(int con, struct fb_info *info)
-{
-	if (con != currcon)
-		return;
-	if (fb_display[con].cmap.len)
-		fb_set_cmap(&fb_display[con].cmap, 1, vesa_setcolreg, info);
-	else
-		fb_set_cmap(fb_default_cmap(video_cmap_len), 1, vesa_setcolreg,
-			    info);
-}
-
 static int vesafb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			   struct fb_info *info)
 {
-	if (con == currcon) /* current console? */
+	if (con == info->currcon) /* current console? */
 		return fb_get_cmap(cmap, kspc, vesa_getcolreg, info);
 	else if (fb_display[con].cmap.len) /* non default colormap? */
 		fb_copy_cmap(&fb_display[con].cmap, cmap, kspc ? 0 : 2);
@@ -421,30 +408,14 @@ static int vesafb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 	return 0;
 }
 
-static int vesafb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
-			   struct fb_info *info)
-{
-	int err;
-
-	if (!fb_display[con].cmap.len) {	/* no colormap allocated? */
-		err = fb_alloc_cmap(&fb_display[con].cmap,video_cmap_len,0);
-		if (err)
-			return err;
-	}
-	if (con == currcon)			/* current console? */
-		return fb_set_cmap(cmap, kspc, vesa_setcolreg, info);
-	else
-		fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
-	return 0;
-}
-
 static struct fb_ops vesafb_ops = {
 	owner:		THIS_MODULE,
 	fb_get_fix:	vesafb_get_fix,
 	fb_get_var:	vesafb_get_var,
 	fb_set_var:	vesafb_set_var,
 	fb_get_cmap:	vesafb_get_cmap,
-	fb_set_cmap:	vesafb_set_cmap,
+	fb_set_cmap:	gen_set_cmap,
+	fb_setcolreg:	vesafb_setcolreg,
 	fb_pan_display:	vesafb_pan_display,
 };
 
@@ -483,22 +454,15 @@ int __init vesafb_setup(char *options)
 static int vesafb_switch(int con, struct fb_info *info)
 {
 	/* Do we have to save the colormap? */
-	if (fb_display[currcon].cmap.len)
-		fb_get_cmap(&fb_display[currcon].cmap, 1, vesa_getcolreg,
+	if (fb_display[info->currcon].cmap.len)
+		fb_get_cmap(&fb_display[info->currcon].cmap, 1, vesa_getcolreg,
 			    info);
 	
-	currcon = con;
+	info->currcon = con;
 	/* Install new colormap */
 	do_install_cmap(con, info);
 	vesafb_update_var(con,info);
 	return 1;
-}
-
-/* 0 unblank, 1 blank, 2 no vsync, 3 no hsync, 4 off */
-
-static void vesafb_blank(int blank, struct fb_info *info)
-{
-	/* Not supported */
 }
 
 int __init vesafb_init(void)
@@ -650,10 +614,11 @@ int __init vesafb_init(void)
 	fb_info.changevar = NULL;
 	fb_info.node = NODEV;
 	fb_info.fbops = &vesafb_ops;
+	fb_info.screen_base = video_vbase;
 	fb_info.disp=&disp;
+	fb_info.currcon = -1;
 	fb_info.switch_con=&vesafb_switch;
 	fb_info.updatevar=&vesafb_update_var;
-	fb_info.blank=&vesafb_blank;
 	fb_info.flags=FBINFO_FLAG_DEFAULT;
 	vesafb_set_disp(-1);
 

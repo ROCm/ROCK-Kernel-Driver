@@ -11,7 +11,7 @@
  * possibly do the LDT unload here?
  */
 #define destroy_context(mm)		do { } while(0)
-#define init_new_context(tsk,mm)	0
+int init_new_context(struct task_struct *tsk, struct mm_struct *mm);
 
 #ifdef CONFIG_SMP
 
@@ -31,19 +31,20 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next, str
 	if (likely(prev != next)) {
 		/* stop flush ipis for the previous mm */
 		clear_bit(cpu, &prev->cpu_vm_mask);
-		/*
-		 * Re-load LDT if necessary
-		 */
-		if (unlikely(prev->context.segments != next->context.segments))
-			load_LDT(next);
 #ifdef CONFIG_SMP
 		cpu_tlbstate[cpu].state = TLBSTATE_OK;
 		cpu_tlbstate[cpu].active_mm = next;
 #endif
 		set_bit(cpu, &next->cpu_vm_mask);
-		set_bit(cpu, &next->context.cpuvalid);
+
 		/* Re-load page tables */
 		asm volatile("movl %0,%%cr3": :"r" (__pa(next->pgd)));
+
+		/* load_LDT, if either the previous or next thread
+		 * has a non-default LDT.
+		 */
+		if (next->context.size+prev->context.size)
+			load_LDT(&next->context);
 	}
 #ifdef CONFIG_SMP
 	else {
@@ -55,9 +56,8 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next, str
 			 * tlb flush IPI delivery. We must flush our tlb.
 			 */
 			local_flush_tlb();
+			load_LDT(&next->context);
 		}
-		if (!test_and_set_bit(cpu, &next->context.cpuvalid))
-			load_LDT(next);
 	}
 #endif
 }

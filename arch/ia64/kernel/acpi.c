@@ -56,18 +56,43 @@ asm (".weak iosapic_version");
 void (*pm_idle) (void);
 void (*pm_power_off) (void);
 
-
-/*
- * TBD: Should go away once we have an ACPI parser.
- */
 const char *
 acpi_get_sysname (void)
 {
 #ifdef CONFIG_IA64_GENERIC
-	return "hpsim";
+	unsigned long rsdp_phys = 0;
+	struct acpi20_table_rsdp *rsdp;
+	struct acpi_table_xsdt *xsdt;
+	struct acpi_table_header *hdr;
+
+	if ((0 != acpi_find_rsdp(&rsdp_phys)) || !rsdp_phys) {
+		printk("ACPI 2.0 RSDP not found, default to \"dig\"\n");
+		return "dig";
+	}
+
+	rsdp = (struct acpi20_table_rsdp *) __va(rsdp_phys);
+	if (strncmp(rsdp->signature, RSDP_SIG, sizeof(RSDP_SIG) - 1)) {
+		printk("ACPI 2.0 RSDP signature incorrect, default to \"dig\"\n");
+		return "dig";
+	}
+
+	xsdt = (struct acpi_table_xsdt *) __va(rsdp->xsdt_address);
+	hdr = &xsdt->header;
+	if (strncmp(hdr->signature, XSDT_SIG, sizeof(XSDT_SIG) - 1)) {
+		printk("ACPI 2.0 XSDT signature incorrect, default to \"dig\"\n");
+		return "dig";
+	}
+
+	if (!strcmp(hdr->oem_id, "HP")) {
+		return "hpzx1";
+	}
+
+	return "dig";
 #else
 # if defined (CONFIG_IA64_HP_SIM)
 	return "hpsim";
+# elif defined (CONFIG_IA64_HP_ZX1)
+	return "hpzx1";
 # elif defined (CONFIG_IA64_SGI_SN1)
 	return "sn1";
 # elif defined (CONFIG_IA64_SGI_SN2)
@@ -79,6 +104,69 @@ acpi_get_sysname (void)
 # endif
 #endif
 }
+
+#ifdef CONFIG_ACPI
+
+/**
+ * acpi_get_crs - Return the current resource settings for a device
+ * obj: A handle for this device
+ * buf: A buffer to be populated by this call.
+ *
+ * Pass a valid handle, typically obtained by walking the namespace and a
+ * pointer to an allocated buffer, and this function will fill in the buffer
+ * with a list of acpi_resource structures.
+ */
+acpi_status
+acpi_get_crs (acpi_handle obj, acpi_buffer *buf)
+{
+	acpi_status result;
+	buf->length = 0;
+	buf->pointer = NULL;
+
+	result = acpi_get_current_resources(obj, buf);
+	if (result != AE_BUFFER_OVERFLOW)
+		return result;
+	buf->pointer = kmalloc(buf->length, GFP_KERNEL);
+	if (!buf->pointer)
+		return -ENOMEM;
+
+	result = acpi_get_current_resources(obj, buf);
+
+	return result;
+}
+
+acpi_resource *
+acpi_get_crs_next (acpi_buffer *buf, int *offset)
+{
+	acpi_resource *res;
+
+	if (*offset >= buf->length)
+		return NULL;
+
+	res = buf->pointer + *offset;
+	*offset += res->length;
+	return res;
+}
+
+acpi_resource_data *
+acpi_get_crs_type (acpi_buffer *buf, int *offset, int type)
+{
+	for (;;) {
+		acpi_resource *res = acpi_get_crs_next(buf, offset);
+		if (!res)
+			return NULL;
+		if (res->id == type)
+			return &res->data;
+	}
+}
+
+void
+acpi_dispose_crs (acpi_buffer *buf)
+{
+	kfree(buf->pointer);
+}
+
+#endif /* CONFIG_ACPI */
 
 #ifdef CONFIG_ACPI_BOOT
 

@@ -194,6 +194,8 @@ snd_seq_oss_midi_check_new_port(snd_seq_port_info_t *pinfo)
 		kfree(mdev);
 		return -ENOMEM;
 	}
+	/* OSS sequencer adds running status to all sequences */
+	snd_midi_event_no_status(mdev->coder, 1);
 
 	/*
 	 * look for en empty slot

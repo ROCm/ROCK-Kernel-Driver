@@ -74,7 +74,6 @@ struct hpfb_par
 {
 };
 
-static int currcon = 0;
 struct hpfb_par current_par;
 
 static void hpfb_encode_var(struct fb_var_screeninfo *var, 
@@ -226,15 +225,8 @@ static void topcat_blit(int x0, int y0, int x1, int y1, int w, int h)
 static int hpfb_switch(int con, struct fb_info *info)
 {
 	do_fb_set_var(&fb_display[con].var,1);
-	currcon=con;
+	info->currcon = con;
 	return 0;
-}
-
-/* 0 unblank, 1 blank, 2 no vsync, 3 no hsync, 4 off */
-
-static void hpfb_blank(int blank, struct fb_info *info)
-{
-	/* Not supported */
 }
 
 static void hpfb_set_disp(int con)
@@ -249,7 +241,6 @@ static void hpfb_set_disp(int con)
 
 	hpfb_get_fix(&fix, con, 0);
 
-	display->screen_base = fix.smem_start;
 	display->visual = fix.visual;
 	display->type = fix.type;
 	display->type_aux = fix.type_aux;
@@ -330,10 +321,11 @@ int __init hpfb_init_one(unsigned long base)
 	fb_info.changevar = NULL;
 	fb_info.node = NODEV;
 	fb_info.fbops = &hpfb_ops;
+	fb_info.screen_base = fb_start;
 	fb_info.disp = &disp;
+	fb_info.currcon = -1;
 	fb_info.switch_con = &hpfb_switch;
 	fb_info.updatevar = &fb_update_var;
-	fb_info.blank = &hpfb_blank;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;
 	do_fb_set_var(&hpfb_defined, 1);
 

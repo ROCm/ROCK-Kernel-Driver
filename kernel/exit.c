@@ -687,7 +687,7 @@ end_wait4:
 	return retval;
 }
 
-#if !defined(__alpha__) && !defined(__ia64__)
+#if !defined(__alpha__) && !defined(__ia64__) && !defined(__arm__)
 
 /*
  * sys_waitpid() remains for compatibility. waitpid() should be

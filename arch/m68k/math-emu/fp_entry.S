@@ -41,17 +41,17 @@
 
 #include "fp_emu.h"
 
-	.globl	SYMBOL_NAME(fpu_emu)
+	.globl	fpu_emu
 	.globl	fp_debugprint
 	.globl	fp_err_ua1,fp_err_ua2
 
 	.text
-SYMBOL_NAME_LABEL(fpu_emu)
+fpu_emu:
 	SAVE_ALL_INT
 	GET_CURRENT(%d0)
 
 #if defined(CPU_M68020_OR_M68030) && defined(CPU_M68040_OR_M68060)
-        tst.l	SYMBOL_NAME(m68k_is040or060)
+        tst.l	m68k_is040or060
         jeq	1f
 #endif
 #if defined(CPU_M68040_OR_M68060)
@@ -63,7 +63,7 @@ SYMBOL_NAME_LABEL(fpu_emu)
 
 #if defined(CONFIG_M68060)
 #if !defined(CPU_M68060_ONLY)
-	btst	#3,SYMBOL_NAME(m68k_cputype)+3
+	btst	#3,m68k_cputype+3
 	jeq	1f
 #endif
 	btst	#7,(FPS_SR,%sp)
@@ -72,11 +72,11 @@ SYMBOL_NAME_LABEL(fpu_emu)
 1:
 	| emulation successful?
 	tst.l	%d0
-	jeq	SYMBOL_NAME(ret_from_exception)
+	jeq	ret_from_exception
 
 	| send some signal to program here
 
-	jra	SYMBOL_NAME(ret_from_exception)
+	jra	ret_from_exception
 
 	| we jump here after an access error while trying to access
 	| user space, we correct stackpointer and send a SIGSEGV to
@@ -88,9 +88,9 @@ fp_err_ua1:
 	move.l	%a0,-(%sp)
 	pea	SEGV_MAPERR
 	pea	SIGSEGV
-	jsr	SYMBOL_NAME(fpemu_signal)
+	jsr	fpemu_signal
 	add.w	#12,%sp
-	jra	SYMBOL_NAME(ret_from_exception)
+	jra	ret_from_exception
 
 #if defined(CONFIG_M68060)
 	| send a trace signal if we are debugged
@@ -99,9 +99,9 @@ fp_sendtrace060:
 	move.l	(FPS_PC,%sp),-(%sp)
 	pea	TRAP_TRACE
 	pea	SIGTRAP
-	jsr	SYMBOL_NAME(fpemu_signal)
+	jsr	fpemu_signal
 	add.w	#12,%sp
-	jra	SYMBOL_NAME(ret_from_exception)
+	jra	ret_from_exception
 #endif
 
 	.globl	fp_get_data_reg, fp_put_data_reg

@@ -116,6 +116,8 @@ static char __init *mpc_family(int family,int model)
 		case 0x0F:
 			if (model == 0x00)
 				return("Pentium 4(tm)");
+			if (model == 0x02)
+				return("XEON(tm)");
 			if (model == 0x0F)
 				return("Special controller");
 	}

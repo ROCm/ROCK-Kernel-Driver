@@ -15,8 +15,8 @@
 
 		.text
 
-		.globl	SYMBOL_NAME(uaccess_user)
-SYMBOL_NAME(uaccess_user):
+		.globl	uaccess_user
+uaccess_user:
 		.word	uaccess_user_put_byte
 		.word	uaccess_user_get_byte
 		.word	uaccess_user_put_half
@@ -84,8 +84,8 @@ USER(		ldrt	r0, [r0])
 
 
 
-		.globl	SYMBOL_NAME(uaccess_kernel)
-SYMBOL_NAME(uaccess_kernel):
+		.globl	uaccess_kernel
+uaccess_kernel:
 		.word	uaccess_kernel_put_byte
 		.word	uaccess_kernel_get_byte
 		.word	uaccess_kernel_put_half
@@ -154,7 +154,7 @@ uaccess_kernel_get_word:
  */
 uaccess_kernel_copy:
 		stmfd	sp!, {lr}
-		bl	SYMBOL_NAME(memcpy)
+		bl	memcpy
 		mov	r0, #0
 		ldmfd	sp!, {pc}^
 

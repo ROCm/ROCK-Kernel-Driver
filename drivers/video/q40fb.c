@@ -22,7 +22,6 @@
 #define FBIOSETSCROLLMODE   0x4611
 
 #define Q40_PHYS_SCREEN_ADDR 0xFE800000
-static unsigned long q40_screen_addr;
 
 static u16 fbcon_cmap_cfb16[16];
 
@@ -38,13 +37,12 @@ static int q40fb_get_cmap(struct fb_cmap *cmap,int kspc,int con,
 			 struct fb_info *info);
 static int q40fb_set_cmap(struct fb_cmap *cmap,int kspc,int con,
 			 struct fb_info *info);
-static int q40fb_ioctl(struct inode *inode, struct file *file,
-		      unsigned int cmd, unsigned long arg, int con,
-		      struct fb_info *info);
+static int q40fb_setcolreg(unsigned regno, unsigned red, unsigned green,
+			   unsigned blue, unsigned transp,
+			   const struct fb_info *info);
 
 static int q40con_switch(int con, struct fb_info *info);
 static int q40con_updatevar(int con, struct fb_info *info);
-static void q40con_blank(int blank, struct fb_info *info);
 
 static void q40fb_set_disp(int con, struct fb_info *info);
 
@@ -57,10 +55,8 @@ static struct fb_ops q40fb_ops = {
 	fb_set_var:	q40fb_set_var,
 	fb_get_cmap:	q40fb_get_cmap,
 	fb_set_cmap:	q40fb_set_cmap,
-	fb_ioctl:	q40fb_ioctl,
+	fb_setcolreg:	q40fb_setcolreg,
 };
-
-static int currcon=0;
 
 static char q40fb_name[]="Q40";
 
@@ -70,7 +66,7 @@ static int q40fb_get_fix(struct fb_fix_screeninfo *fix, int con,
 	memset(fix, 0, sizeof(struct fb_fix_screeninfo));
 
 	strcpy(fix->id,"Q40");
-	fix->smem_start=q40_screen_addr;
+	fix->smem_start = info->screen_base;
 	fix->smem_len=1024*1024;
 	fix->type=FB_TYPE_PACKED_PIXELS;
 	fix->type_aux=0;
@@ -185,9 +181,9 @@ static int q40_getcolreg(unsigned regno, unsigned *red, unsigned *green,
     return 0;
 }
 
-static int q40_setcolreg(unsigned regno, unsigned red, unsigned green,
-			 unsigned blue, unsigned transp,
-			 const struct fb_info *info)
+static int q40fb_setcolreg(unsigned regno, unsigned red, unsigned green,
+			   unsigned blue, unsigned transp,
+			   const struct fb_info *info)
 {
     /*
      *  Set a single color register. The values supplied have a 16 bit
@@ -211,7 +207,7 @@ static int q40fb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			 struct fb_info *info)
 {
 #if 1
-	if (con == currcon) /* current console? */
+	if (con == info->currcon) /* current console? */
 		return fb_get_cmap(cmap, kspc, q40_getcolreg, info);
 	else if (fb_display[con].cmap.len) /* non default colormap? */
 		fb_copy_cmap(&fb_display[con].cmap, cmap, kspc ? 0 : 2);
@@ -238,8 +234,8 @@ static int q40fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 					 0)))
 			return err;
 	}
-	if (con == currcon)			/* current console? */
-		return fb_set_cmap(cmap, kspc, q40_setcolreg, info);
+	if (con == info->currcon)			/* current console? */
+		return fb_set_cmap(cmap, kspc, info);
 	else
 		fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
 	return 0;
@@ -248,34 +244,6 @@ static int q40fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 
 	return -EINVAL;
 #endif
-}
-
-static int q40fb_ioctl(struct inode *inode, struct file *file,
-		      unsigned int cmd, unsigned long arg, int con,
-		      struct fb_info *info)
-{
-#if 0
-        unsigned long i;
-	struct display *display;
-
-	if (con>=0)
-	  display = &fb_display[con];
-	else
-	  display = &disp[0];
-
-        if (cmd == FBIOSETSCROLLMODE)
-	  {
-	    i = verify_area(VERIFY_READ, (void *)arg, sizeof(unsigned long));
-	    if (!i) 
-	      {
-		copy_from_user(&i, (void *)arg, sizeof(unsigned long));
-		display->scrollmode = i;
-	      }
-	    q40_updatescrollmode(display);
-	    return i;
-	  }
-#endif
-	return -EINVAL;
 }
 
 static void q40fb_set_disp(int con, struct fb_info *info)
@@ -292,7 +260,6 @@ static void q40fb_set_disp(int con, struct fb_info *info)
 
   if (con<0) con=0;
 
-   display->screen_base = fix.smem_start;
    display->visual = fix.visual;
    display->type = fix.type;
    display->type_aux = fix.type_aux;
@@ -318,19 +285,19 @@ int __init q40fb_init(void)
         if ( !MACH_IS_Q40)
 	  return -ENXIO;
 #if 0
-        q40_screen_addr = kernel_map(Q40_PHYS_SCREEN_ADDR, 1024*1024,
+        fb_info.screen_base = kernel_map(Q40_PHYS_SCREEN_ADDR, 1024*1024,
 					   KERNELMAP_NO_COPYBACK, NULL);
 #else
-	q40_screen_addr = Q40_PHYS_SCREEN_ADDR; /* mapped in q40/config.c */
+	fb_info.screen_base = Q40_PHYS_SCREEN_ADDR; /* mapped in q40/config.c */
 #endif
 
 	fb_info.changevar=NULL;
 	strcpy(&fb_info.modename[0],q40fb_name);
 	fb_info.fontname[0]=0;
 	fb_info.disp=disp;
+	fb_info.currcon = -1;
 	fb_info.switch_con=&q40con_switch;
 	fb_info.updatevar=&q40con_updatevar;
-	fb_info.blank=&q40con_blank;	
 	fb_info.node = NODEV;
 	fb_info.fbops = &q40fb_ops;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;  /* not as module for now */
@@ -353,19 +320,13 @@ int __init q40fb_init(void)
 	
 static int q40con_switch(int con, struct fb_info *info)
 { 
-	currcon=con;
-	
+	info->currcon=con;
 	return 0;
-
 }
 
 static int q40con_updatevar(int con, struct fb_info *info)
 {
 	return 0;
-}
-
-static void q40con_blank(int blank, struct fb_info *info)
-{
 }
 
 MODULE_LICENSE("GPL");

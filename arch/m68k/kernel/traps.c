@@ -64,7 +64,7 @@ e_vector vectors[256] = {
 /* nmi handler for the Amiga */
 asm(".text\n"
     __ALIGN_STR "\n"
-    SYMBOL_NAME_STR(nmihandler) ": rte");
+    "nmihandler: rte");
 
 /*
  * this must be called very early as the kernel might

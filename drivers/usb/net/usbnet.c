@@ -121,7 +121,7 @@
 #define	CONFIG_USB_PL2301
 
 
-#define DRIVER_VERSION		"06-Apr-2002"
+#define DRIVER_VERSION		"26-Apr-2002"
 
 /*-------------------------------------------------------------------------*/
 
@@ -484,14 +484,6 @@ static int genelink_free (struct usbnet *dev)
 	return 0;
 }
 
-#else
-
-static int genelink_check_connect (struct usbnet *dev)
-{
-	dbg ("%s: assuming peer is connected", dev->net.name);
-	return 0;
-}
-
 #endif
 
 // reset the device status
@@ -623,12 +615,15 @@ static const struct driver_info	genelink_info = {
 	description:	"Genesys GeneLink",
 	flags:		FLAG_FRAMING_GL | FLAG_NO_SETINT,
 	reset:		genelink_reset,
-	check_connect:	genelink_check_connect,
 	rx_fixup:	genelink_rx_fixup,
 	tx_fixup:	genelink_tx_fixup,
 
 	in: 1, out: 2,
 	epsize:	64,
+
+#ifdef	GENELINK_ACK
+	check_connect:	genelink_check_connect,
+#endif
 };
 
 #endif /* CONFIG_USB_GENESYS */
@@ -652,11 +647,15 @@ static const struct driver_info	genelink_info = {
  *
  *-------------------------------------------------------------------------*/
 
+static int linuxdev_check_connect (struct usbnet *dev)
+{
+	return 0;		// by definition, always connected
+}
 
 static const struct driver_info	linuxdev_info = {
 	description:	"Linux Device",
 	// no reset defined (yet?)
-	// no check_connect needed!
+	check_connect:	linuxdev_check_connect,
 	in: 2, out: 1,
 	epsize:	64,
 };
@@ -1169,21 +1168,11 @@ static int pl_reset (struct usbnet *dev)
 		PL_S_EN|PL_RESET_OUT|PL_RESET_IN|PL_PEER_E);
 }
 
-static int pl_check_connect (struct usbnet *dev)
-{
-	// FIXME test interrupt data PL_PEER_E bit
-	// plus, there's some handshake done by
-	// the prolific win32 driver... 
-	dbg ("%s: assuming peer is connected", dev->net.name);
-	return 0;
-}
-
 static const struct driver_info	prolific_info = {
 	description:	"Prolific PL-2301/PL-2302",
 	flags:		FLAG_NO_SETINT,
 		/* some PL-2302 versions seem to fail usb_set_interface() */
 	reset:		pl_reset,
-	check_connect:	pl_check_connect,
 
 	in: 3, out: 2,
 	epsize:	64,
@@ -1567,7 +1556,7 @@ static int usbnet_ethtool_ioctl (struct net_device *net, void *useraddr)
 		if (dev->driver_info->check_connect) {
 			struct ethtool_value	edata = { ETHTOOL_GLINK };
 
-			edata.data = dev->driver_info->check_connect (dev);
+			edata.data = dev->driver_info->check_connect (dev) == 0;
 			if (copy_to_user (useraddr, &edata, sizeof (edata)))
 				return -EFAULT;
 			return 0;

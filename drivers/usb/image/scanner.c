@@ -953,9 +953,11 @@ probe_scanner(struct usb_device *dev, unsigned int ifnum,
 	
 	down(&scn_mutex);
 
-	for (scn_minor = 0; scn_minor < SCN_MAX_MNR; scn_minor++) {
-		if (!p_scn_table[scn_minor])
-			break;
+	if (usb_register_dev(&scanner_driver, 1, &scn_minor)) {
+		for (scn_minor = 0; scn_minor < SCN_MAX_MNR; scn_minor++) {
+			if (!p_scn_table[scn_minor])
+				break;
+		}
 	}
 
 /* Check to make sure that the last slot isn't already taken */
@@ -1086,6 +1088,7 @@ disconnect_scanner(struct usb_device *dev, void *ptr)
 
 	dbg("disconnect_scanner: De-allocating minor:%d", scn->scn_minor);
 	devfs_unregister(scn->devfs);
+	usb_deregister_dev(&scanner_driver, 1, scn->scn_minor);
 	p_scn_table[scn->scn_minor] = NULL;
 	usb_free_urb(scn->scn_irq);
 	up (&(scn->sem));

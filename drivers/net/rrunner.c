@@ -773,7 +773,7 @@ static int rr_init1(struct net_device *dev)
 	 * Give the FirmWare time to chew on the `get running' command.
 	 */
 	myjif = jiffies + 5 * HZ;
-	while ((jiffies < myjif) && !rrpriv->fw_running);
+	while (time_before(jiffies, myjif) && !rrpriv->fw_running);
 
 	netif_start_queue(dev);
 

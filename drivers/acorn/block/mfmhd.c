@@ -1427,7 +1427,7 @@ int mfm_init (void)
 	hdc63463_irqpolladdress	= mfm_IRQPollLoc;
 	hdc63463_irqpollmask	= irqmask;
 
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST);
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_mfm_request);
 
 	add_gendisk(&mfm_gendisk);
 

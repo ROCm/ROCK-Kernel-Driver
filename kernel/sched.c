@@ -1760,7 +1760,7 @@ void __init migration_init(void)
 	current->cpus_allowed = -1L;
 
 	for (cpu = 0; cpu < smp_num_cpus; cpu++)
-		while (!cpu_rq(cpu)->migration_thread)
+		while (!cpu_rq(cpu_logical_map(cpu))->migration_thread)
 			schedule_timeout(2);
 }
 #endif

@@ -242,7 +242,6 @@ static int sisfb_off = 0;
 static int sisfb_crt1off = 0;
 static int sisfb_inverse = 0;
 static int sisvga_enabled = 0;
-static int currcon = 0;
 /*karl*/
 static int sisfb_tvmode = 0;
 static int sisfb_mem = 0;
@@ -599,8 +598,9 @@ static int sisfb_set_var (struct fb_var_screeninfo *var, int con,
 			  struct fb_info *info);
 static int sisfb_get_cmap (struct fb_cmap *cmap, int kspc, int con,
 			   struct fb_info *info);
-static int sisfb_set_cmap (struct fb_cmap *cmap, int kspc, int con,
-			   struct fb_info *info);
+static int sisfb_setcolreg (unsigned regno, unsigned red, unsigned green,
+			    unsigned blue, unsigned transp,
+			    struct fb_info *fb_info);
 static int sisfb_ioctl (struct inode *inode, struct file *file,
 			unsigned int cmd, unsigned long arg, int con,
 			struct fb_info *info);
@@ -609,7 +609,7 @@ static int sisfb_ioctl (struct inode *inode, struct file *file,
 int sisfb_init (void);
 static int sisfb_update_var (int con, struct fb_info *info);
 static int sisfb_switch (int con, struct fb_info *info);
-static void sisfb_blank (int blank, struct fb_info *info);
+static int sisfb_blank(int blank, struct fb_info *info);
 
 /* hardware access routines */
 void sisfb_set_reg1 (u16 port, u16 index, u16 data);
@@ -630,13 +630,9 @@ static u8 sisfb_search_refresh_rate (unsigned int rate);
 static int sis_getcolreg (unsigned regno, unsigned *red, unsigned *green,
 			  unsigned *blue, unsigned *transp,
 			  struct fb_info *fb_info);
-static int sis_setcolreg (unsigned regno, unsigned red, unsigned green,
-			  unsigned blue, unsigned transp,
-			  struct fb_info *fb_info);
 static int sisfb_do_set_var (struct fb_var_screeninfo *var, int isactive,
 			     struct fb_info *info);
 static void sisfb_set_disp (int con, struct fb_var_screeninfo *var);
-static void sisfb_do_install_cmap (int con, struct fb_info *info);
 
 /* Chip-dependent Routines */
 #ifdef CONFIG_FB_SIS_300
@@ -668,7 +664,7 @@ static void sisfb_post_setmode (void);
 static void sisfb_crtc_to_var (struct fb_var_screeninfo *var);
 
 /* Export functions  */
-static void sis_get_glyph (SIS_GLYINFO * gly);
+static void sis_get_glyph (struct fb_info *info, SIS_GLYINFO * gly);
 void sis_dispinfo (struct ap_data *rec);
 void sis_malloc (struct sis_memreq *req);
 void sis_free (unsigned long base);

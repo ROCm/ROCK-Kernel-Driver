@@ -110,7 +110,7 @@ static void cg3_loadcmap (struct fb_info_sbusfb *fb, struct display *p, int inde
 	spin_unlock_irqrestore(&fb->lock, flags);
 }
 
-static void cg3_blank (struct fb_info_sbusfb *fb)
+static int cg3_blank (struct fb_info_sbusfb *fb)
 {
 	unsigned long flags;
 	u8 tmp;
@@ -120,9 +120,10 @@ static void cg3_blank (struct fb_info_sbusfb *fb)
 	tmp &= ~CG3_CR_ENABLE_VIDEO;
 	sbus_writeb(tmp, &fb->s.cg3.regs->control);
 	spin_unlock_irqrestore(&fb->lock, flags);
+	return 0;
 }
 
-static void cg3_unblank (struct fb_info_sbusfb *fb)
+static int cg3_unblank (struct fb_info_sbusfb *fb)
 {
 	unsigned long flags;
 	u8 tmp;
@@ -132,12 +133,13 @@ static void cg3_unblank (struct fb_info_sbusfb *fb)
 	tmp |= CG3_CR_ENABLE_VIDEO;
 	sbus_writeb(tmp, &fb->s.cg3.regs->control);
 	spin_unlock_irqrestore(&fb->lock, flags);
+	return 0;
 }
 
 static void cg3_margins (struct fb_info_sbusfb *fb, struct display *p,
 			 int x_margin, int y_margin)
 {
-	p->screen_base += (y_margin - fb->y_margin) *
+	fb->info.screen_base += (y_margin - fb->y_margin) *
 		p->line_length + (x_margin - fb->x_margin);
 }
 
@@ -218,12 +220,12 @@ char __init *cgthreefb_init(struct fb_info_sbusfb *fb)
 	fix->accel = FB_ACCEL_SUN_CGTHREE;
 	
 	disp->scrollmode = SCROLL_YREDRAW;
-	if (!disp->screen_base) {
-		disp->screen_base = (char *)
+	if (!fb->info.screen_base) {
+		fb->info.screen_base = (char *)
 			sbus_ioremap(&sdev->resource[0], CG3_RAM_OFFSET,
 				     type->fb_size, "cg3 ram");
 	}
-	disp->screen_base += fix->line_length * fb->y_margin + fb->x_margin;
+	fb->info.screen_base += fix->line_length * fb->y_margin + fb->x_margin;
 	fb->dispsw = fbcon_cfb8;
 
 	fb->margins = cg3_margins;

@@ -78,6 +78,13 @@ void clear_local_APIC(void)
 		apic_write_around(APIC_LVTPC, v | APIC_LVT_MASKED);
 	}
 
+/* lets not touch this if we didn't frob it */
+#ifdef CONFIG_X86_MCE_P4THERMAL
+	if (maxlvt >= 5) {
+		v = apic_read(APIC_LVTTHMR);
+		apic_write_around(APIC_LVTTHMR, v | APIC_LVT_MASKED);
+	}
+#endif
 	/*
 	 * Clean APIC state for other OSs:
 	 */
@@ -88,6 +95,11 @@ void clear_local_APIC(void)
 		apic_write_around(APIC_LVTERR, APIC_LVT_MASKED);
 	if (maxlvt >= 4)
 		apic_write_around(APIC_LVTPC, APIC_LVT_MASKED);
+
+#ifdef CONFIG_X86_MCE_P4THERMAL
+	if (maxlvt >= 5)
+		apic_write_around(APIC_LVTTHMR, APIC_LVT_MASKED);
+#endif
 	v = GET_APIC_VERSION(apic_read(APIC_LVR));
 	if (APIC_INTEGRATED(v)) {	/* !82489DX */
 		if (maxlvt > 3)		/* Due to Pentium errata 3AP and 11AP. */
@@ -472,6 +484,7 @@ static void apic_pm_suspend(void *data)
 	apic_pm_state.apic_tmict = apic_read(APIC_TMICT);
 	apic_pm_state.apic_tdcr = apic_read(APIC_TDCR);
 	apic_pm_state.apic_thmr = apic_read(APIC_LVTTHMR);
+	
 	__save_flags(flags);
 	__cli();
 	disable_local_APIC();

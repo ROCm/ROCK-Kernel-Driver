@@ -1694,7 +1694,7 @@ int __init sjcd_init(void)
 		return (-EIO);
 	}
 
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST,&sjcd_lock);
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_sjcd_request, &sjcd_lock);
 	register_disk(NULL, mk_kdev(MAJOR_NR, 0), 1, &sjcd_fops, 0);
 
 	if (check_region(sjcd_base, 4)) {

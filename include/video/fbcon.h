@@ -55,8 +55,6 @@ struct display {
     struct fb_var_screeninfo var;   /* variable infos. yoffset and vmode */
                                     /* are updated by fbcon.c */
     struct fb_cmap cmap;            /* colormap */
-    char *screen_base;              /* pointer to top of virtual screen */    
-                                    /* (virtual address) */
     int visual;
     int type;                       /* see FB_TYPE_* */
     int type_aux;                   /* Interleave for interleaved Planes */
@@ -141,6 +139,8 @@ extern int set_all_vcs(int fbidx, struct fb_ops *fb,
 	(((s) >> ((p)->bgshift)) & 0x0f)
 #define	attr_bgcol_ec(p,conp) \
 	((conp) ? (((conp)->vc_video_erase_char >> ((p)->bgshift)) & 0x0f) : 0)
+#define attr_fgcol_ec(p,vc) \
+	((vc) ? (((vc)->vc_video_erase_char >> ((p)->fgshift)) & 0x0f) : 0)
 
 /* Monochrome */
 #define attr_bold(p,s) \

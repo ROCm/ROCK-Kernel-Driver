@@ -29,6 +29,7 @@
 #include <sound/driver.h>
 #include <linux/delay.h>
 #include <linux/init.h>
+#include <linux/pci.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
 #include <sound/core.h>
@@ -165,7 +166,7 @@ static int __devinit snd_emu10k1_init(emu10k1_t * emu, int enable_ir)
 	memset(emu->silent_page, 0, PAGE_SIZE);
 	silent_page = emu->silent_page_dmaaddr << 1;
 	for (idx = 0; idx < MAXPAGES; idx++)
-		emu->ptb_pages[idx] = silent_page | idx;
+		emu->ptb_pages[idx] = cpu_to_le32(silent_page | idx);
 	snd_emu10k1_ptr_write(emu, PTB, 0, emu->ptb_pages_dmaaddr);
 	snd_emu10k1_ptr_write(emu, TCB, 0, 0);	/* taken from original driver */
 	snd_emu10k1_ptr_write(emu, TCBS, 0, 4);	/* taken from original driver */
@@ -630,9 +631,9 @@ int __devinit snd_emu10k1_create(snd_card_t * card,
 	
 	emu->fx8010.fxbus_mask = 0x303f;
 	if (extin_mask == 0)
-		extin_mask = 0x1fcf;
+		extin_mask = 0x3fcf;
 	if (extout_mask == 0)
-		extout_mask = 0x3fff;
+		extout_mask = 0x1fff;
 	emu->fx8010.extin_mask = extin_mask;
 	emu->fx8010.extout_mask = extout_mask;
 

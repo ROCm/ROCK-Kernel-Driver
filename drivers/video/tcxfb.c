@@ -198,7 +198,7 @@ static void tcx_setcursor (struct fb_info_sbusfb *fb)
 	spin_unlock_irqrestore(&fb->lock, flags);
 }
 
-static void tcx_blank (struct fb_info_sbusfb *fb)
+static int tcx_blank (struct fb_info_sbusfb *fb)
 {
 	unsigned long flags;
 	u32 tmp;
@@ -211,9 +211,10 @@ static void tcx_blank (struct fb_info_sbusfb *fb)
         tmp |= TCX_THC_MISC_HSYNC_DIS;
 	sbus_writel(tmp, &fb->s.tcx.thc->thc_misc);
 	spin_unlock_irqrestore(&fb->lock, flags);
+	return 0;
 }
 
-static void tcx_unblank (struct fb_info_sbusfb *fb)
+static int tcx_unblank (struct fb_info_sbusfb *fb)
 {
 	unsigned long flags;
 	u32 tmp;
@@ -225,6 +226,7 @@ static void tcx_unblank (struct fb_info_sbusfb *fb)
 	tmp |= TCX_THC_MISC_VIDEO;
 	sbus_writel(tmp, &fb->s.tcx.thc->thc_misc);
 	spin_unlock_irqrestore(&fb->lock, flags);
+	return 0;
 }
 
 static void tcx_reset (struct fb_info_sbusfb *fb)
@@ -251,7 +253,7 @@ static void tcx_reset (struct fb_info_sbusfb *fb)
 
 static void tcx_margins (struct fb_info_sbusfb *fb, struct display *p, int x_margin, int y_margin)
 {
-	p->screen_base += (y_margin - fb->y_margin) * p->line_length + (x_margin - fb->x_margin);
+	fb->info.screen_base += (y_margin - fb->y_margin) * p->line_length + (x_margin - fb->x_margin);
 }
 
 static char idstring[60] __initdata = { 0 };
@@ -282,12 +284,12 @@ char __init *tcxfb_init(struct fb_info_sbusfb *fb)
 	fix->accel = FB_ACCEL_SUN_TCX;
 
 	disp->scrollmode = SCROLL_YREDRAW;
-	if (!disp->screen_base) {
-		disp->screen_base = (char *)
+	if (!fb->info.screen_base) {
+		fb->info.screen_base = (char *)
 			sbus_ioremap(&sdev->resource[0], 0,
 				     type->fb_size, "tcx ram");
 	}
-	disp->screen_base += fix->line_length * fb->y_margin + fb->x_margin;
+	fb->info.screen_base += fix->line_length * fb->y_margin + fb->x_margin;
 	fb->s.tcx.tec = (struct tcx_tec *)
 		sbus_ioremap(&sdev->resource[7], 0,
 			     sizeof(struct tcx_tec), "tcx tec");

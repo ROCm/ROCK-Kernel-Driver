@@ -1925,7 +1925,7 @@ int __init aztcd_init(void)
 		       MAJOR_NR);
 		return -EIO;
 	}
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST, &aztSpin);
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_aztcd_request, &aztSpin);
 	blksize_size[MAJOR_NR] = aztcd_blocksizes;
 	register_disk(NULL, mk_kdev(MAJOR_NR, 0), 1, &azt_fops, 0);
 

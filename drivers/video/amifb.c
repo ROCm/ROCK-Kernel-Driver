@@ -739,8 +739,6 @@ static struct amifb_par {
 	u_short fmode;		/* vmode */
 } currentpar;
 
-static int currcon = 0;
-
 static struct display disp;
 
 static struct fb_info fb_info;
@@ -1096,11 +1094,12 @@ static int amifb_get_var(struct fb_var_screeninfo *var, int con,
 			 struct fb_info *info);
 static int amifb_set_var(struct fb_var_screeninfo *var, int con,
 			 struct fb_info *info);
+static int amifb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
+                           u_int transp, struct fb_info *info);
+static int amifb_blank(int blank, struct fb_info *info);
 static int amifb_pan_display(struct fb_var_screeninfo *var, int con,
 			     struct fb_info *info);
 static int amifb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
-			  struct fb_info *info);
-static int amifb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 			  struct fb_info *info);
 static int amifb_ioctl(struct inode *inode, struct file *file, u_int cmd,
 		       u_long arg, int con, struct fb_info *info);
@@ -1121,13 +1120,11 @@ int amifb_init(void);
 static void amifb_deinit(void);
 static int amifbcon_switch(int con, struct fb_info *info);
 static int amifbcon_updatevar(int con, struct fb_info *info);
-static void amifbcon_blank(int blank, struct fb_info *info);
 
 	/*
 	 * Internal routines
 	 */
 
-static void do_install_cmap(int con, struct fb_info *info);
 static int flash_cursor(void);
 static void amifb_interrupt(int irq, void *dev_id, struct pt_regs *fp);
 static u_long chipalloc(u_long size);
@@ -1152,8 +1149,6 @@ static void ami_pan_var(struct fb_var_screeninfo *var);
 static int ami_update_par(void);
 static int ami_getcolreg(u_int regno, u_int *red, u_int *green, u_int *blue,
                          u_int *transp, struct fb_info *info);
-static int ami_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
-                         u_int transp, struct fb_info *info);
 static void ami_update_display(void);
 static void ami_init_display(void);
 static void ami_do_blank(void);
@@ -1175,8 +1170,10 @@ static struct fb_ops amifb_ops = {
 	fb_get_var:	amifb_get_var,
 	fb_set_var:	amifb_set_var,
 	fb_get_cmap:	amifb_get_cmap,
-	fb_set_cmap:	amifb_set_cmap,
+	fb_set_cmap:	gen_set_cmap,
+	fb_setcolreg:	amifb_setcolreg,
 	fb_pan_display:	amifb_pan_display,
+	fb_blankL:	amifb_blank,
 	fb_ioctl:	amifb_ioctl,
 };
 
@@ -1336,7 +1333,6 @@ static int amifb_set_var(struct fb_var_screeninfo *var, int con,
 			struct fb_fix_screeninfo fix;
 
 			ami_encode_fix(&fix, &par);
-			display->screen_base = (char *)videomemory;
 			display->visual = fix.visual;
 			display->type = fix.type;
 			display->type_aux = fix.type_aux;
@@ -1372,7 +1368,7 @@ static int amifb_set_var(struct fb_var_screeninfo *var, int con,
 				return err;
 			do_install_cmap(con, info);
 		}
-		if (con == currcon)
+		if (con == info->currcon)
 			ami_set_var(&display->var);
 	}
 	return 0;
@@ -1399,7 +1395,7 @@ static int amifb_pan_display(struct fb_var_screeninfo *var, int con,
 		    var->yoffset+fb_display[con].var.yres > fb_display[con].var.yres_virtual)
 			return -EINVAL;
 	}
-	if (con == currcon)
+	if (con == info->currcon)
 		ami_pan_var(var);
 	fb_display[con].var.xoffset = var->xoffset;
 	fb_display[con].var.yoffset = var->yoffset;
@@ -1417,7 +1413,7 @@ static int amifb_pan_display(struct fb_var_screeninfo *var, int con,
 static int amifb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			  struct fb_info *info)
 {
-	if (con == currcon) /* current console? */
+	if (con == info->currcon) /* current console? */
 		return fb_get_cmap(cmap, kspc, ami_getcolreg, info);
 	else if (fb_display[con].cmap.len) /* non default colormap? */
 		fb_copy_cmap(&fb_display[con].cmap, cmap, kspc ? 0 : 2);
@@ -1426,29 +1422,7 @@ static int amifb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			     cmap, kspc ? 0 : 2);
 	return 0;
 }
-
-	/*
-	 * Set the Colormap
-	 */
-
-static int amifb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
-			  struct fb_info *info)
-{
-	int err;
-
-	if (!fb_display[con].cmap.len) {	/* no colormap allocated? */
-		if ((err = fb_alloc_cmap(&fb_display[con].cmap,
-					 1<<fb_display[con].var.bits_per_pixel,
-					 0)))
-			return err;
-	}
-	if (con == currcon)			/* current console? */
-		return fb_set_cmap(cmap, kspc, ami_setcolreg, info);
-	else
-		fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
-	return 0;
-}
-
+	
 	/*
 	 * Amiga Frame Buffer Specific ioctls
 	 */
@@ -1732,9 +1706,9 @@ default_chipset:
 	fb_info.node = NODEV;
 	fb_info.fbops = &amifb_ops;
 	fb_info.disp = &disp;
+	fb_info.currcon = 1;
 	fb_info.switch_con = &amifbcon_switch;
 	fb_info.updatevar = &amifbcon_updatevar;
-	fb_info.blank = &amifbcon_blank;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;
 	memset(&var, 0, sizeof(var));
 
@@ -1770,6 +1744,7 @@ default_chipset:
 		videomemory = ZTWO_VADDR(videomemory_phys);
 	}
 
+	fb_info.screen_base = (char *)videomemory;
 	memset(dummysprite, 0, DUMMYSPRITEMEMSIZE);
 
 	/*
@@ -1819,10 +1794,10 @@ static void amifb_deinit(void)
 static int amifbcon_switch(int con, struct fb_info *info)
 {
 	/* Do we have to save the colormap? */
-	if (fb_display[currcon].cmap.len)
-		fb_get_cmap(&fb_display[currcon].cmap, 1, ami_getcolreg, info);
+	if (fb_display[info->currcon].cmap.len)
+		fb_get_cmap(&fb_display[info->currcon].cmap, 1, ami_getcolreg, info);
 
-	currcon = con;
+	info->currcon = con;
 	ami_set_var(&fb_display[con].var);
 	/* Install new colormap */
 	do_install_cmap(con, info);
@@ -1843,24 +1818,10 @@ static int amifbcon_updatevar(int con, struct fb_info *info)
 	 * Blank the display.
 	 */
 
-static void amifbcon_blank(int blank, struct fb_info *info)
+static int amifb_blank(int blank, struct fb_info *info)
 {
 	do_blank = blank ? blank : -1;
-}
-
-	/*
-	 * Set the colormap
-	 */
-
-static void do_install_cmap(int con, struct fb_info *info)
-{
-	if (con != currcon)
-		return;
-	if (fb_display[con].cmap.len)
-		fb_set_cmap(&fb_display[con].cmap, 1, ami_setcolreg, info);
-	else
-		fb_set_cmap(fb_default_cmap(1<<fb_display[con].var.bits_per_pixel),
-					    1, ami_setcolreg, info);
+	return 0;
 }
 
 static int flash_cursor(void)
@@ -2611,8 +2572,8 @@ static int ami_getcolreg(u_int regno, u_int *red, u_int *green, u_int *blue,
 	 * entries in the var structure). Return != 0 for invalid regno.
 	 */
 
-static int ami_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
-                         u_int transp, struct fb_info *info)
+static int amifb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
+                           u_int transp, struct fb_info *info)
 {
 	if (IS_AGA) {
 		if (regno > 255)

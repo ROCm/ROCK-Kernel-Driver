@@ -87,7 +87,7 @@ static void p9100_loadcmap (struct fb_info_sbusfb *fb, struct display *p, int in
 	spin_unlock_irqrestore(&fb->lock, flags);
 }
 
-static void p9100_blank (struct fb_info_sbusfb *fb)
+static int p9100_blank (struct fb_info_sbusfb *fb)
 {
 	unsigned long flags;
 	u32 val;
@@ -97,9 +97,10 @@ static void p9100_blank (struct fb_info_sbusfb *fb)
 	val &= ~ SCREENPAINT_TIMECTL1_ENABLE_VIDEO;
 	WRITECTL(vid_screenpaint_timectl1, val);
 	spin_unlock_irqrestore(&fb->lock, flags);
+	return 0;
 }
 
-static void p9100_unblank (struct fb_info_sbusfb *fb)
+static int p9100_unblank (struct fb_info_sbusfb *fb)
 {
 	unsigned long flags;
 	u32 val;
@@ -109,11 +110,12 @@ static void p9100_unblank (struct fb_info_sbusfb *fb)
 	val |= SCREENPAINT_TIMECTL1_ENABLE_VIDEO;
 	WRITECTL(vid_screenpaint_timectl1, val);
 	spin_unlock_irqrestore(&fb->lock, flags);
+	return 0;
 }
 
 static void p9100_margins (struct fb_info_sbusfb *fb, struct display *p, int x_margin, int y_margin)
 {
-  p->screen_base += (y_margin - fb->y_margin) * p->line_length + 
+  fb->info.screen_base += (y_margin - fb->y_margin) * p->line_length + 
     (x_margin - fb->x_margin);
 }
 
@@ -149,12 +151,12 @@ char * __init p9100fb_init(struct fb_info_sbusfb *fb)
 	fix->line_length = fb->var.xres_virtual;
 
 	disp->scrollmode = SCROLL_YREDRAW;
-	if (!disp->screen_base)
-		disp->screen_base = (char *)
+	if (!fb->info.screen_base)
+		fb->info.screen_base = (char *)
 			sbus_ioremap(&sdev->resource[2], 0,
 				     type->fb_size, "p9100 ram");
-	fb->s.p9100.fbmem = (volatile u32 *)disp->screen_base;
-	disp->screen_base += fix->line_length * fb->y_margin + fb->x_margin;
+	fb->s.p9100.fbmem = (volatile u32 *)fb->info.screen_base;
+	fb->info.screen_base += fix->line_length * fb->y_margin + fb->x_margin;
 
 	READCTL(sys_config, tmp);
         switch ((tmp >> SYS_CONFIG_PIXELSIZE_SHIFT) & 7) {
@@ -186,7 +188,7 @@ char * __init p9100fb_init(struct fb_info_sbusfb *fb)
 	fb->mmap_map = p9100_mmap_map;
 	
 	sprintf(idstring, "%s at 0x%x", "p9100", 
-		(unsigned int)disp->screen_base);
+		(unsigned int)fb->info.screen_base);
 
 	return idstring;
 }

@@ -249,10 +249,7 @@ int fb_get_cmap(struct fb_cmap *cmap, int kspc,
  *
  */
 
-int fb_set_cmap(struct fb_cmap *cmap, int kspc,
-    	    	int (*setcolreg)(u_int, u_int, u_int, u_int, u_int,
-				 struct fb_info *),
-		struct fb_info *info)
+int fb_set_cmap(struct fb_cmap *cmap, int kspc, struct fb_info *info)
 {
     int i, start;
     u16 *red, *green, *blue, *transp;
@@ -264,7 +261,7 @@ int fb_set_cmap(struct fb_cmap *cmap, int kspc,
     transp = cmap->transp;
     start = cmap->start;
 
-    if (start < 0)
+    if (start < 0 || !info->fbops->fb_setcolreg)
 	return -EINVAL;
     for (i = 0; i < cmap->len; i++) {
 	if (kspc) {
@@ -286,7 +283,7 @@ int fb_set_cmap(struct fb_cmap *cmap, int kspc,
 	blue++;
 	if (transp)
 	    transp++;
-	if (setcolreg(start++, hred, hgreen, hblue, htransp, info))
+	if (info->fbops->fb_setcolreg(start++, hred, hgreen, hblue, htransp, info))
 	    return 0;
     }
     return 0;

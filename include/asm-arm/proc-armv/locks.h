@@ -24,7 +24,7 @@
 "	str	lr, [%0]\n"			\
 "	msr	cpsr_c, ip\n"			\
 "	movmi	ip, %0\n"			\
-"	blmi	" SYMBOL_NAME_STR(fail)		\
+"	blmi	" #fail				\
 	:					\
 	: "r" (ptr), "I" (1)			\
 	: "ip", "lr", "cc");			\
@@ -44,7 +44,7 @@
 "	msr	cpsr_c, ip\n"			\
 "	movmi	ip, %1\n"			\
 "	movpl	ip, #0\n"			\
-"	blmi	" SYMBOL_NAME_STR(fail) "\n"	\
+"	blmi	" #fail "\n"			\
 "	mov	%0, ip"				\
 	: "=&r" (ret)				\
 	: "r" (ptr), "I" (1)			\
@@ -64,7 +64,7 @@
 "	str	lr, [%0]\n"			\
 "	msr	cpsr_c, ip\n"			\
 "	movle	ip, %0\n"			\
-"	blle	" SYMBOL_NAME_STR(wake)		\
+"	blle	" #wake				\
 	:					\
 	: "r" (ptr), "I" (1)			\
 	: "ip", "lr", "cc");			\
@@ -91,7 +91,7 @@
 "	str	lr, [%0]\n"			\
 "	msr	cpsr_c, ip\n"			\
 "	movne	ip, %0\n"			\
-"	blne	" SYMBOL_NAME_STR(fail)		\
+"	blne	" #fail				\
 	:					\
 	: "r" (ptr), "I" (RW_LOCK_BIAS)		\
 	: "ip", "lr", "cc");			\
@@ -109,7 +109,7 @@
 "	str	lr, [%0]\n"			\
 "	msr	cpsr_c, ip\n"			\
 "	movcs	ip, %0\n"			\
-"	blcs	" SYMBOL_NAME_STR(wake)		\
+"	blcs	" #wake				\
 	:					\
 	: "r" (ptr), "I" (RW_LOCK_BIAS)		\
 	: "ip", "lr", "cc");			\
@@ -130,7 +130,7 @@
 "	str	lr, [%0]\n"			\
 "	msr	cpsr_c, ip\n"			\
 "	moveq	ip, %0\n"			\
-"	bleq	" SYMBOL_NAME_STR(wake)		\
+"	bleq	" #wake				\
 	:					\
 	: "r" (ptr), "I" (1)			\
 	: "ip", "lr", "cc");			\

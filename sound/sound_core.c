@@ -229,7 +229,7 @@ static struct sound_unit *chains[SOUND_STEP];
  
 int register_sound_special(struct file_operations *fops, int unit)
 {
-	const int chain = unit % (SOUND_STEP-1);
+	const int chain = unit % SOUND_STEP;
 	int max_unit = 128 + chain;
 	const char *name;
 	char _name[16];
@@ -243,6 +243,7 @@ int register_sound_special(struct file_operations *fops, int unit)
 		if (unit >= SOUND_STEP)
 			goto __unknown;
 		max_unit = unit + 1;
+		break;
 	    case 2:
 		name = "midi";
 		break;
@@ -382,7 +383,7 @@ EXPORT_SYMBOL(register_sound_synth);
 
 void unregister_sound_special(int unit)
 {
-	sound_remove_unit(&chains[unit&15], unit);
+	sound_remove_unit(&chains[unit % SOUND_STEP], unit);
 }
  
 EXPORT_SYMBOL(unregister_sound_special);

@@ -50,8 +50,6 @@
 
 static char fontname[40] __initdata = { 0 };
 
-static int currcon = 0;
-
 static int default_vmode = VMODE_NVRAM;
 static int default_cmode = CMODE_NVRAM;
 
@@ -110,6 +108,9 @@ static int platinum_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			     struct fb_info *info);
 static int platinum_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 			     struct fb_info *info);
+static int platinum_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
+			      u_int transp, struct fb_info *fb);
+static int platinum_blank(int blank, struct fb_info *fb);
 
 
 /*
@@ -118,8 +119,6 @@ static int platinum_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 
 static int platinum_switch(int con, struct fb_info *fb);
 static int platinum_updatevar(int con, struct fb_info *fb);
-static void platinum_blank(int blank, struct fb_info *fb);
-
 
 /*
  * internal functions
@@ -144,10 +143,6 @@ static void platinum_set_dispsw(struct display *disp,
 				int accel);
 static int platinum_getcolreg(u_int regno, u_int *red, u_int *green, u_int *blue,
 			      u_int *transp, struct fb_info *fb);
-static int platinum_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
-			      u_int transp, struct fb_info *fb);
-static void do_install_cmap(int con, struct fb_info *info);
-
 
 /*
  * Interface used by the world
@@ -163,6 +158,8 @@ static struct fb_ops platinumfb_ops = {
 	fb_set_var:	platinum_set_var,
 	fb_get_cmap:	platinum_get_cmap,
 	fb_set_cmap:	platinum_set_cmap,
+	fb_setcolreg:	platinum_setcolreg,
+	fb_blank:	platinum_blank,
 };
 
 static int platinum_get_fix(struct fb_fix_screeninfo *fix, int con,
@@ -260,7 +257,7 @@ static int platinum_set_var(struct fb_var_screeninfo *var, int con,
 	    struct fb_fix_screeninfo fix;
 
 	    platinum_encode_fix(&fix, &par, info);
-	    display->screen_base = (char *) info->frame_buffer + init->fb_offset + 0x20;
+	    info->fb_info.screen_base = (char *) info->frame_buffer + init->fb_offset + 0x20;
 	    display->visual = fix.visual;
 	    display->type = fix.type;
 	    display->type_aux = fix.type_aux;
@@ -321,7 +318,7 @@ static int platinum_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 
 	if (!info->display_fg ||
 	    info->display_fg->vc_num == con)	/* current console? */
-		return fb_set_cmap(cmap, kspc, platinum_setcolreg, info);
+		return fb_set_cmap(cmap, kspc, info);
 	else
 		fb_copy_cmap(cmap, &disp->cmap, kspc ? 0 : 1);
 	return 0;
@@ -332,10 +329,10 @@ static int platinum_switch(int con, struct fb_info *fb)
 	struct fb_info_platinum *info = (struct fb_info_platinum *) fb;
 	struct fb_par_platinum par;
 
-	if (fb_display[currcon].cmap.len)
-		fb_get_cmap(&fb_display[currcon].cmap, 1, platinum_getcolreg,
+	if (fb_display[info->currcon].cmap.len)
+		fb_get_cmap(&fb_display[info->currcon].cmap, 1, platinum_getcolreg,
 			    fb);
-	currcon = con;
+	info->currcon = con;
 
 	platinum_var_to_par(&fb_display[con].var, &par, info);
 	platinum_set_par(&par, info);
@@ -351,7 +348,7 @@ static int platinum_updatevar(int con, struct fb_info *fb)
 	return 0;
 }
 
-static void platinum_blank(int blank,  struct fb_info *fb)
+static int platinum_blank(int blank,  struct fb_info *fb)
 {
 /*
  *  Blank the screen if blank_mode != 0, else unblank. If blank == NULL
@@ -378,7 +375,7 @@ static void platinum_blank(int blank,  struct fb_info *fb)
 	out_le32(&info->platinum_regs->ctrl.r, ctrl);
 */
 /* TODO: Figure out how the heck to powerdown this thing! */
-    return;
+    return 0;
 }
 
 static int platinum_getcolreg(u_int regno, u_int *red, u_int *green,
@@ -427,20 +424,6 @@ static int platinum_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 #endif
 	}
 	return 0;
-}
-
-static void do_install_cmap(int con, struct fb_info *info)
-{
-	if (con != currcon)
-		return;
-	if (fb_display[con].cmap.len)
-		fb_set_cmap(&fb_display[con].cmap, 1, platinum_setcolreg,
-			    info);
-	else {
-		int size = fb_display[con].var.bits_per_pixel == 16 ? 32 : 256;
-		fb_set_cmap(fb_default_cmap(size), 1, platinum_setcolreg,
-			    info);
-	}
 }
 
 static inline int platinum_vram_reqd(int video_mode, int color_mode)
@@ -594,11 +577,11 @@ static int __init init_platinum(struct fb_info_platinum *info)
 	info->fb_info.node = NODEV;
 	info->fb_info.fbops = &platinumfb_ops;
 	info->fb_info.disp = disp;
+	info->fb_info.currcon = -1;
 	strcpy(info->fb_info.fontname, fontname);
 	info->fb_info.changevar = NULL;
 	info->fb_info.switch_con = &platinum_switch;
 	info->fb_info.updatevar = &platinum_updatevar;
-	info->fb_info.blank = &platinum_blank;
 	info->fb_info.flags = FBINFO_FLAG_DEFAULT;
 
 	for (j = 0; j < 16; j++) {

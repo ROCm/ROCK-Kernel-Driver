@@ -25,10 +25,7 @@
  * e-mail - mail your message to Paul Stewart <stewart@wetlogic.net>
  */
 
-#define HIDDEV_MINOR_BASE	96
-#define HIDDEV_MINORS		16
-#define HIDDEV_BUFFER_SIZE	64
-
+#include <linux/config.h>
 #include <linux/poll.h>
 #include <linux/slab.h>
 #include <linux/module.h>
@@ -38,6 +35,15 @@
 #include <linux/usb.h>
 #include "hid.h"
 #include <linux/hiddev.h>
+
+#ifdef CONFIG_USB_DYNAMIC_MINORS
+#define HIDDEV_MINOR_BASE	0
+#define HIDDEV_MINORS		256
+#else
+#define HIDDEV_MINOR_BASE	96
+#define HIDDEV_MINORS		16
+#endif
+#define HIDDEV_BUFFER_SIZE	64
 
 struct hiddev {
 	int exist;
@@ -61,6 +67,9 @@ struct hiddev_list {
 
 static struct hiddev *hiddev_table[HIDDEV_MINORS];
 static devfs_handle_t hiddev_devfs_handle;
+
+/* forward reference to make our lives easier */
+extern struct usb_driver hiddev_driver;
 
 /*
  * Find a report, given the report's type and ID.  The ID can be specified
@@ -184,6 +193,7 @@ static int hiddev_fasync(int fd, struct file *file, int on)
 static void hiddev_cleanup(struct hiddev *hiddev)
 {
 	devfs_unregister(hiddev->devfs);
+	usb_deregister_dev(&hiddev_driver, 1, hiddev->minor);
 	hiddev_table[hiddev->minor] = NULL;
 	kfree(hiddev);
 }
@@ -605,10 +615,12 @@ int hiddev_connect(struct hid_device *hid)
 	if (i == hid->maxapplication)
 		return -1;
 
-	for (minor = 0; minor < HIDDEV_MINORS && hiddev_table[minor]; minor++);
-	if (minor == HIDDEV_MINORS) {
-		printk(KERN_ERR "hiddev: no more free hiddev devices\n");
-		return -1;
+	if (usb_register_dev (&hiddev_driver, 1, &minor)) {
+		for (minor = 0; minor < HIDDEV_MINORS && hiddev_table[minor]; minor++);
+		if (minor == HIDDEV_MINORS) {
+			printk(KERN_ERR "hiddev: no more free hiddev devices\n");
+			return -1;
+		}
 	}
 
 	if (!(hiddev = kmalloc(sizeof(struct hiddev), GFP_KERNEL)))

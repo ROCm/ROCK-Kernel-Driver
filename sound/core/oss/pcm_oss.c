@@ -557,7 +557,6 @@ snd_pcm_sframes_t snd_pcm_oss_read3(snd_pcm_substream_t *substream, char *ptr, s
 			if (ret < 0)
 				break;
 		}
-		ret = snd_pcm_lib_read(substream, ptr, frames);
 		if (in_kernel) {
 			mm_segment_t fs;
 			fs = snd_enter_user();
@@ -1567,16 +1566,14 @@ static int snd_pcm_oss_open(struct inode *inode, struct file *file)
 			nonblock = 1;
 		else if (psetup->block)
 			nonblock = 0;
-		else if (!nonblock)
-			nonblock = snd_nonblock_open;
 	} else if (csetup && !csetup->disable) {
 		if (csetup->nonblock)
 			nonblock = 1;
 		else if (csetup->block)
 			nonblock = 0;
-		else if (!nonblock)
-			nonblock = snd_nonblock_open;
 	}
+	if (!nonblock)
+		nonblock = snd_nonblock_open;
 
 	init_waitqueue_entry(&wait, current);
 	add_wait_queue(&pcm->open_wait, &wait);

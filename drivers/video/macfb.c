@@ -205,7 +205,6 @@ static union {
 
 static int             inverse   = 0;
 static int             vidtest   = 0;
-static int             currcon   = 0;
 
 static int macfb_update_var(int con, struct fb_info *info)
 {
@@ -251,7 +250,6 @@ static void macfb_set_disp(int con)
 	macfb_get_fix(&fix, con, &fb_info);
 
 	memset(display, 0, sizeof(struct display));
-	display->screen_base = video_vbase;
 	display->visual = fix.visual;
 	display->type = fix.type;
 	display->type_aux = fix.type_aux;
@@ -789,21 +787,10 @@ static int macfb_setcolreg(unsigned regno, unsigned red, unsigned green,
     return 0;
 }
 
-static void do_install_cmap(int con, struct fb_info *info)
-{
-	if (con != currcon)
-		return;
-	if (fb_display[con].cmap.len)
-		fb_set_cmap(&fb_display[con].cmap, 1, macfb_setcolreg, info);
-	else
-		fb_set_cmap(fb_default_cmap(video_cmap_len), 1,
-			    macfb_setcolreg, info);
-}
-
 static int macfb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			  struct fb_info *info)
 {
-	if (con == currcon) /* current console? */
+	if (con == info->currcon) /* current console? */
 		return fb_get_cmap(cmap, kspc, macfb_getcolreg, info);
 	else if (fb_display[con].cmap.len) /* non default colormap? */
 		fb_copy_cmap(&fb_display[con].cmap, cmap, kspc ? 0 : 2);
@@ -813,30 +800,14 @@ static int macfb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 	return 0;
 }
 
-static int macfb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
-			  struct fb_info *info)
-{
-	int err;
-
-	if (!fb_display[con].cmap.len) {	/* no colormap allocated? */
-		err = fb_alloc_cmap(&fb_display[con].cmap,video_cmap_len,0);
-		if (err)
-			return err;
-	}
-	if (con == currcon)			/* current console? */
-		return fb_set_cmap(cmap, kspc, macfb_setcolreg, info);
-	else
-		fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
-	return 0;
-}
-
 static struct fb_ops macfb_ops = {
 	owner:		THIS_MODULE,
 	fb_get_fix:	macfb_get_fix,
 	fb_get_var:	macfb_get_var,
 	fb_set_var:	macfb_set_var,
 	fb_get_cmap:	macfb_get_cmap,
-	fb_set_cmap:	macfb_set_cmap,
+	fb_set_cmap:	gen_set_cmap,
+	fb_setcolreg:	macfb_setcolreg,
 };
 
 void __init macfb_setup(char *options, int *ints)
@@ -864,20 +835,15 @@ void __init macfb_setup(char *options, int *ints)
 static int macfb_switch(int con, struct fb_info *info)
 {
 	/* Do we have to save the colormap? */
-	if (fb_display[currcon].cmap.len)
-		fb_get_cmap(&fb_display[currcon].cmap, 1, macfb_getcolreg,
+	if (fb_display[info->currcon].cmap.len)
+		fb_get_cmap(&fb_display[info->currcon].cmap, 1, macfb_getcolreg,
 			    info);
 	
-	currcon = con;
+	info->currcon = con;
 	/* Install new colormap */
 	do_install_cmap(con, info);
 	macfb_update_var(con, info);
 	return 1;
-}
-
-static void macfb_blank(int blank, struct fb_info *info)
-{
-	/* Not supported */
 }
 
 void __init macfb_init(void)
@@ -1220,14 +1186,14 @@ void __init macfb_init(void)
 			break;
 		}
 	
-	fb_info.changevar  = NULL;
-	fb_info.node       = NODEV;
-	fb_info.fbops      = &macfb_ops;
-	fb_info.disp       = &disp;
-	fb_info.switch_con = &macfb_switch;
-	fb_info.updatevar  = &macfb_update_var;
-	fb_info.blank      = &macfb_blank;
-	fb_info.flags      = FBINFO_FLAG_DEFAULT;
+	fb_info.changevar   = NULL;
+	fb_info.node        = NODEV;
+	fb_info.fbops       = &macfb_ops;
+	fb_info.screen_base = video_vbase;
+	fb_info.disp        = &disp;
+	fb_info.switch_con  = &macfb_switch;
+	fb_info.updatevar   = &macfb_update_var;
+	fb_info.flags       = FBINFO_FLAG_DEFAULT;
 	macfb_set_disp(-1);
 	do_install_cmap(0, &fb_info);
 	

@@ -78,6 +78,7 @@
 #define MODE_SENSE_10         0x5a
 #define PERSISTENT_RESERVE_IN 0x5e
 #define PERSISTENT_RESERVE_OUT 0x5f
+#define REPORT_LUNS           0xa0
 #define MOVE_MEDIUM           0xa5
 #define READ_12               0xa8
 #define WRITE_12              0xaa
@@ -130,6 +131,7 @@
 
 #define TYPE_DISK           0x00
 #define TYPE_TAPE           0x01
+#define TYPE_PRINTER        0x02
 #define TYPE_PROCESSOR      0x03    /* HP scanners use this */
 #define TYPE_WORM           0x04    /* Treated as ROM by our system */
 #define TYPE_ROM            0x05
@@ -162,6 +164,13 @@ struct ccs_modesel_head
     u_char  block_length_med;
     u_char  block_length_lo;
 };
+
+/*
+ * ScsiLun: 8 byte LUN.
+ */
+typedef struct scsi_lun {
+	u8 scsi_lun[8];
+} ScsiLun;
 
 /*
  *  MESSAGE CODES

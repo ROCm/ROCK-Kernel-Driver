@@ -52,7 +52,7 @@
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 4, 0)
 #if defined(__i386__) || defined(__ppc__)
 /*
- * Here a dirty hack for 2.4 kernels.. See kernel/memory.c.
+ * Here a dirty hack for 2.4 kernels.. See sound/core/memory.c.
  */
 #define HACK_PCI_ALLOC_CONSISTENT
 #include <linux/pci.h>

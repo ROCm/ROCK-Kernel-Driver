@@ -55,7 +55,6 @@ struct acornfb_par {
 	unsigned int	vram_half_sam;
 	unsigned int	palette_size;
 	  signed int	montype;
-	  signed int	currcon;
 	unsigned int	using_vram	: 1;
 	unsigned int	dpms		: 1;
 

@@ -31,7 +31,7 @@
  * aligned pages in others
  */
 #define __set_ptb_entry(emu,page,addr) \
-	((emu)->ptb_pages[page] = ((addr) << 1) | (page))
+	((emu)->ptb_pages[page] = cpu_to_le32(((addr) << 1) | (page)))
 
 #define UNIT_PAGES		(PAGE_SIZE / EMUPAGESIZE)
 #define MAX_ALIGN_PAGES		(MAXPAGES / UNIT_PAGES)

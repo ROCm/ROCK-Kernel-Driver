@@ -11,16 +11,16 @@
 #include <asm/assembler.h>
 		.text
 
-		.global	SYMBOL_NAME(floppy_fiqin_end)
+		.global	floppy_fiqin_end
 ENTRY(floppy_fiqin_start)
 		subs	r9, r9, #1
 		ldrgtb	r12, [r11, #-4]
 		ldrleb	r12, [r11], #0
 		strb	r12, [r10], #1
 		subs	pc, lr, #4
-SYMBOL_NAME(floppy_fiqin_end):
+floppy_fiqin_end:
 
-		.global	SYMBOL_NAME(floppy_fiqout_end)
+		.global	floppy_fiqout_end
 ENTRY(floppy_fiqout_start)
 		subs	r9, r9, #1
 		ldrgeb	r12, [r10], #1
@@ -29,4 +29,4 @@ ENTRY(floppy_fiqout_start)
 		subles	pc, lr, #4
 		strb	r12, [r11, #-4]
 		subs	pc, lr, #4
-SYMBOL_NAME(floppy_fiqout_end):
+floppy_fiqout_end:

@@ -158,6 +158,8 @@ const char *const scsi_device_types[MAX_SCSI_DEVICE_CODE] =
 	"Enclosure        ",
 };
 
+static char * scsi_null_device_strs = "nullnullnullnull";
+
 /* 
  * Function prototypes.
  */
@@ -1831,6 +1833,8 @@ static int proc_scsi_gen_write(struct file * file, const char * buf,
 				HBA_ptr->host_queue = scd->next;
 			}
 			blk_cleanup_queue(&scd->request_queue);
+			if (scd->inquiry)
+				kfree(scd->inquiry);
 			kfree((char *) scd);
 		} else {
 			goto out;
@@ -2129,6 +2133,8 @@ int scsi_unregister_host(Scsi_Host_Template * tpnt)
 			blk_cleanup_queue(&SDpnt->request_queue);
 			/* Next free up the Scsi_Device structures for this host */
 			shpnt->host_queue = SDpnt->next;
+			if (SDpnt->inquiry)
+				kfree(SDpnt->inquiry);
 			kfree((char *) SDpnt);
 
 		}
@@ -2618,6 +2624,9 @@ Scsi_Device * scsi_get_host_dev(struct Scsi_Host * SHpnt)
         	return NULL;
         	
         memset(SDpnt, 0, sizeof(Scsi_Device));
+	SDpnt->vendor = scsi_null_device_strs;
+	SDpnt->model = scsi_null_device_strs;
+	SDpnt->rev = scsi_null_device_strs;
 
         SDpnt->host = SHpnt;
         SDpnt->id = SHpnt->this_id;
@@ -2664,6 +2673,8 @@ void scsi_free_host_dev(Scsi_Device * SDpnt)
          * it now.
          */
 	scsi_release_commandblocks(SDpnt);
+	if (SDpnt->inquiry)
+		kfree(SDpnt->inquiry);
         kfree(SDpnt);
 }
 

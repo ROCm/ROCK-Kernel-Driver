@@ -353,6 +353,9 @@ extern long __cmpxchg_called_with_bad_pointer(void);
 # define IS_IA32_PROCESS(regs)	(ia64_psr(regs)->is != 0)
 #else
 # define IS_IA32_PROCESS(regs)		0
+struct task_struct;
+static inline void ia32_save_state(struct task_struct *t __attribute__((unused))){}
+static inline void ia32_load_state(struct task_struct *t __attribute__((unused))){}
 #endif
 
 /*

@@ -378,7 +378,6 @@ enum {
 #define CURSOR_BLINK_RATE	20
 #define CURSOR_DRAW_DELAY	2
 
-static int currcon = 0;
 static int inverse = 0;
 static char fontname[40] __initdata = { 0 };
 static char curblink __initdata = 1;
@@ -1241,7 +1240,7 @@ imsttfb_setcolreg (u_int regno, u_int red, u_int green, u_int blue,
 		   u_int transp, struct fb_info *info)
 {
 	struct fb_info_imstt *p = (struct fb_info_imstt *)info;
-	u_int bpp = fb_display[currcon].var.bits_per_pixel;
+	u_int bpp = fb_display[info->currcon].var.bits_per_pixel;
 
 	if (regno > 255)
 		return 1;
@@ -1269,7 +1268,7 @@ imsttfb_setcolreg (u_int regno, u_int red, u_int green, u_int blue,
 		switch (bpp) {
 #ifdef FBCON_HAS_CFB16
 			case 16:
-				p->fbcon_cmap.cfb16[regno] = (regno << (fb_display[currcon].var.green.length == 5 ? 10 : 11)) | (regno << 5) | regno;
+				p->fbcon_cmap.cfb16[regno] = (regno << (fb_display[info->currcon].var.green.length == 5 ? 10 : 11)) | (regno << 5) | regno;
 				break;
 #endif
 #ifdef FBCON_HAS_CFB24
@@ -1287,17 +1286,6 @@ imsttfb_setcolreg (u_int regno, u_int red, u_int green, u_int blue,
 		}
 
 	return 0;
-}
-
-static void
-do_install_cmap (int con, struct fb_info *info)
-{
-	if (fb_display[con].cmap.len)
-		fb_set_cmap(&fb_display[con].cmap, 1, imsttfb_setcolreg, info);
-	else {
-		u_int size = fb_display[con].var.bits_per_pixel == 16 ? 32 : 256;
-		fb_set_cmap(fb_default_cmap(size), 1, imsttfb_setcolreg, info);
-	}
 }
 
 static int
@@ -1414,7 +1402,6 @@ set_disp (struct display *disp, struct fb_info_imstt *p)
 
 	disp->visual = disp->var.bits_per_pixel == 8 ? FB_VISUAL_PSEUDOCOLOR
 					 	     : FB_VISUAL_DIRECTCOLOR;
-	disp->screen_base = (__u8 *)p->frame_buffer;
 	disp->visual = p->fix.visual;
 	disp->type = p->fix.type;
 	disp->type_aux = p->fix.type_aux;
@@ -1493,7 +1480,7 @@ imsttfb_set_var (struct fb_var_screeninfo *var, int con, struct fb_info *info)
 	if (info->changevar)
 		(*info->changevar)(con);
 
-	if (con == currcon) {
+	if (con == info->currcon) {
 		if (oldgreenlen != disp->var.green.length) {
 			if (disp->var.green.length == 6)
 				set_565(p);
@@ -1529,7 +1516,7 @@ imsttfb_pan_display (struct fb_var_screeninfo *var, int con, struct fb_info *inf
 
 	disp->var.xoffset = var->xoffset;
 	disp->var.yoffset = var->yoffset;
-	if (con == currcon)
+	if (con == info->currcon)
 		set_offset(disp, p);
 
 	return 0;
@@ -1538,7 +1525,7 @@ imsttfb_pan_display (struct fb_var_screeninfo *var, int con, struct fb_info *inf
 static int
 imsttfb_get_cmap (struct fb_cmap *cmap, int kspc, int con, struct fb_info *info)
 {
-	if (con == currcon)	/* current console? */
+	if (con == info->currcon)	/* current console? */
 		return fb_get_cmap(cmap, kspc, imsttfb_getcolreg, info);
 	else if (fb_display[con].cmap.len)	/* non default colormap? */
 		fb_copy_cmap(&fb_display[con].cmap, cmap, kspc ? 0 : 2);
@@ -1550,21 +1537,57 @@ imsttfb_get_cmap (struct fb_cmap *cmap, int kspc, int con, struct fb_info *info)
 	return 0;
 }
 
-static int
-imsttfb_set_cmap (struct fb_cmap *cmap, int kspc, int con, struct fb_info *info)
+static int 
+imsttfb_blank (int blank, struct fb_info *info)
 {
-	int err;
+	struct fb_info_imstt *p = (struct fb_info_imstt *)info;
+	__u32 ctrl;
 
-	if (!fb_display[con].cmap.len) {	/* no colormap allocated? */
-		int size = fb_display[con].var.bits_per_pixel == 16 ? 32 : 256;
-		if ((err = fb_alloc_cmap(&fb_display[con].cmap, size, 0)))
-			return err;
+	ctrl = in_le32(&p->dc_regs[STGCTL]);
+	if (blank > 0) {
+		switch (blank - 1) {
+			case VESA_NO_BLANKING:
+			case VESA_POWERDOWN:
+				ctrl &= ~0x00000380;
+				if (p->ramdac == IBM) {
+					p->cmap_regs[PIDXHI] = 0;	eieio();
+					p->cmap_regs[PIDXLO] = MISCTL2;	eieio();
+					p->cmap_regs[PIDXDATA] = 0x55;	eieio();
+					p->cmap_regs[PIDXLO] = MISCTL1;	eieio();
+					p->cmap_regs[PIDXDATA] = 0x11;	eieio();
+					p->cmap_regs[PIDXLO] = SYNCCTL;	eieio();
+					p->cmap_regs[PIDXDATA] = 0x0f;	eieio();
+					p->cmap_regs[PIDXLO] = PWRMNGMT;eieio();
+					p->cmap_regs[PIDXDATA] = 0x1f;	eieio();
+					p->cmap_regs[PIDXLO] = CLKCTL;	eieio();
+					p->cmap_regs[PIDXDATA] = 0xc0;
+				}
+				break;
+			case VESA_VSYNC_SUSPEND:
+				ctrl &= ~0x00000020;
+				break;
+			case VESA_HSYNC_SUSPEND:
+				ctrl &= ~0x00000010;
+				break;
+		}
+	} else {
+		if (p->ramdac == IBM) {
+			ctrl |= 0x000017b0;
+			p->cmap_regs[PIDXHI] = 0;	eieio();
+			p->cmap_regs[PIDXLO] = CLKCTL;	eieio();
+			p->cmap_regs[PIDXDATA] = 0x01;	eieio();
+			p->cmap_regs[PIDXLO] = PWRMNGMT;eieio();
+			p->cmap_regs[PIDXDATA] = 0x00;	eieio();
+			p->cmap_regs[PIDXLO] = SYNCCTL;	eieio();
+			p->cmap_regs[PIDXDATA] = 0x00;	eieio();
+			p->cmap_regs[PIDXLO] = MISCTL1;	eieio();
+			p->cmap_regs[PIDXDATA] = 0x01;	eieio();
+			p->cmap_regs[PIDXLO] = MISCTL2;	eieio();
+			p->cmap_regs[PIDXDATA] = 0x45;	eieio();
+		} else
+			ctrl |= 0x00001780;
 	}
-	if (con == currcon)			/* current console? */
-		return fb_set_cmap(cmap, kspc, imsttfb_setcolreg, info);
-	else
-		fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
-
+	out_le32(&p->dc_regs[STGCTL], ctrl);
 	return 0;
 }
 
@@ -1652,8 +1675,10 @@ static struct fb_ops imsttfb_ops = {
 	fb_get_var:	imsttfb_get_var,
 	fb_set_var:	imsttfb_set_var,
 	fb_get_cmap:	imsttfb_get_cmap,
-	fb_set_cmap:	imsttfb_set_cmap,
+	fb_set_cmap:	gen_set_cmap,
+	fb_setcolreg:	imsttfb_setcolreg,
 	fb_pan_display:	imsttfb_pan_display,
+	fb_blank:	imsttfb_blank,
 	fb_ioctl:	imsttfb_ioctl,
 };
 
@@ -1661,7 +1686,7 @@ static int
 imsttfbcon_switch (int con, struct fb_info *info)
 {
 	struct fb_info_imstt *p = (struct fb_info_imstt *)info;
-	struct display *old = &fb_display[currcon], *new = &fb_display[con];
+	struct display *old = &fb_display[info->currcon], *new = &fb_display[con];
 
 	if (old->cmap.len)
 		fb_get_cmap(&old->cmap, 1, imsttfb_getcolreg, info);
@@ -1669,7 +1694,7 @@ imsttfbcon_switch (int con, struct fb_info *info)
 	if (old->conp && old->conp->vc_sw && old->conp->vc_sw->con_cursor)
 		old->conp->vc_sw->con_cursor(old->conp, CM_ERASE);
 
-	currcon = con;
+	info->currcon = con;
 
 	if (old->var.xres != new->var.xres
 	    || old->var.yres != new->var.yres
@@ -1702,7 +1727,7 @@ imsttfbcon_updatevar (int con, struct fb_info *info)
 	struct fb_info_imstt *p = (struct fb_info_imstt *)info;
 	struct display *disp = &fb_display[con];
 
-	if (con != currcon)
+	if (con != info->currcon)
 		goto out;
 
 	if (p->ramdac == IBM)
@@ -1712,59 +1737,6 @@ imsttfbcon_updatevar (int con, struct fb_info *info)
 
 out:
 	return 0;
-}
-
-static void
-imsttfbcon_blank (int blank, struct fb_info *info)
-{
-	struct fb_info_imstt *p = (struct fb_info_imstt *)info;
-	__u32 ctrl;
-
-	ctrl = in_le32(&p->dc_regs[STGCTL]);
-	if (blank > 0) {
-		switch (blank - 1) {
-			case VESA_NO_BLANKING:
-			case VESA_POWERDOWN:
-				ctrl &= ~0x00000380;
-				if (p->ramdac == IBM) {
-					p->cmap_regs[PIDXHI] = 0;	eieio();
-					p->cmap_regs[PIDXLO] = MISCTL2;	eieio();
-					p->cmap_regs[PIDXDATA] = 0x55;	eieio();
-					p->cmap_regs[PIDXLO] = MISCTL1;	eieio();
-					p->cmap_regs[PIDXDATA] = 0x11;	eieio();
-					p->cmap_regs[PIDXLO] = SYNCCTL;	eieio();
-					p->cmap_regs[PIDXDATA] = 0x0f;	eieio();
-					p->cmap_regs[PIDXLO] = PWRMNGMT;eieio();
-					p->cmap_regs[PIDXDATA] = 0x1f;	eieio();
-					p->cmap_regs[PIDXLO] = CLKCTL;	eieio();
-					p->cmap_regs[PIDXDATA] = 0xc0;
-				}
-				break;
-			case VESA_VSYNC_SUSPEND:
-				ctrl &= ~0x00000020;
-				break;
-			case VESA_HSYNC_SUSPEND:
-				ctrl &= ~0x00000010;
-				break;
-		}
-	} else {
-		if (p->ramdac == IBM) {
-			ctrl |= 0x000017b0;
-			p->cmap_regs[PIDXHI] = 0;	eieio();
-			p->cmap_regs[PIDXLO] = CLKCTL;	eieio();
-			p->cmap_regs[PIDXDATA] = 0x01;	eieio();
-			p->cmap_regs[PIDXLO] = PWRMNGMT;eieio();
-			p->cmap_regs[PIDXDATA] = 0x00;	eieio();
-			p->cmap_regs[PIDXLO] = SYNCCTL;	eieio();
-			p->cmap_regs[PIDXDATA] = 0x00;	eieio();
-			p->cmap_regs[PIDXLO] = MISCTL1;	eieio();
-			p->cmap_regs[PIDXDATA] = 0x01;	eieio();
-			p->cmap_regs[PIDXLO] = MISCTL2;	eieio();
-			p->cmap_regs[PIDXDATA] = 0x45;	eieio();
-		} else
-			ctrl |= 0x00001780;
-	}
-	out_le32(&p->dc_regs[STGCTL], ctrl);
 }
 
 static void __init 
@@ -1869,10 +1841,11 @@ init_imstt(struct fb_info_imstt *p)
 	p->info.node = NODEV;
 	p->info.fbops = &imsttfb_ops;
 	p->info.disp = &p->disp;
+	p->info.screen_base = (__u8 *)p->frame_buffer;
+	p->info.currcon = -1;
 	p->info.changevar = 0;
 	p->info.switch_con = &imsttfbcon_switch;
 	p->info.updatevar = &imsttfbcon_updatevar;
-	p->info.blank = &imsttfbcon_blank;
 	p->info.flags = FBINFO_FLAG_DEFAULT;
 
 	for (i = 0; i < 16; i++) {

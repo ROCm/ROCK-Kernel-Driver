@@ -15,7 +15,7 @@
 #include <asm/byteorder.h>
 
 static inline unsigned short
-from64to16(unsigned long x)
+from64to16 (unsigned long x)
 {
 	/* add up 32-bit words for 33 bits */
 	x = (x & 0xffffffff) + (x >> 32);
@@ -32,22 +32,17 @@ from64to16(unsigned long x)
  * computes the checksum of the TCP/UDP pseudo-header
  * returns a 16-bit checksum, already complemented.
  */
-unsigned short int csum_tcpudp_magic(unsigned long saddr,
-				   unsigned long daddr,
-				   unsigned short len,
-				   unsigned short proto,
-				   unsigned int sum)
+unsigned short int
+csum_tcpudp_magic (unsigned long saddr, unsigned long daddr, unsigned short len,
+		   unsigned short proto, unsigned int sum)
 {
-	return ~from64to16(saddr + daddr + sum +
-		((unsigned long) ntohs(len) << 16) +
-		((unsigned long) proto << 8));
+	return ~from64to16(saddr + daddr + sum + ((unsigned long) ntohs(len) << 16) +
+			   ((unsigned long) proto << 8));
 }
 
-unsigned int csum_tcpudp_nofold(unsigned long saddr,
-				   unsigned long daddr,
-				   unsigned short len,
-				   unsigned short proto,
-				   unsigned int sum)
+unsigned int
+csum_tcpudp_nofold (unsigned long saddr, unsigned long daddr, unsigned short len,
+		    unsigned short proto, unsigned int sum)
 {
 	unsigned long result;
 
@@ -66,15 +61,6 @@ unsigned int csum_tcpudp_nofold(unsigned long saddr,
 extern unsigned long do_csum (const unsigned char *, long);
 
 /*
- *	This is a version of ip_compute_csum() optimized for IP headers,
- *	which always checksum on 4 octet boundaries.
- */
-unsigned short ip_fast_csum(unsigned char * iph, unsigned int ihl)
-{
-	return ~do_csum(iph, ihl*4);
-}
-
-/*
  * computes the checksum of a memory block at buff, length len,
  * and adds in "sum" (32-bit)
  *
@@ -86,7 +72,8 @@ unsigned short ip_fast_csum(unsigned char * iph, unsigned int ihl)
  *
  * it's best to have buff aligned on a 32-bit boundary
  */
-unsigned int csum_partial(const unsigned char * buff, int len, unsigned int sum)
+unsigned int
+csum_partial (const unsigned char * buff, int len, unsigned int sum)
 {
 	unsigned long result = do_csum(buff, len);
 
@@ -102,7 +89,8 @@ unsigned int csum_partial(const unsigned char * buff, int len, unsigned int sum)
  * this routine is used for miscellaneous IP-like checksums, mainly
  * in icmp.c
  */
-unsigned short ip_compute_csum(unsigned char * buff, int len)
+unsigned short
+ip_compute_csum (unsigned char * buff, int len)
 {
 	return ~do_csum(buff,len);
 }

@@ -42,7 +42,7 @@ struct fake_pci_dev {
 
 static struct fake_pci_dev *fake_pci_head, **fake_pci_tail = &fake_pci_head;
 
-static struct pci_ops orig_pci_ops;
+static struct pci_ops *orig_pci_ops;
 
 static inline struct fake_pci_dev *
 fake_pci_find_slot(unsigned char bus, unsigned int devfn)
@@ -77,7 +77,7 @@ static int hp_cfg_read##sz (struct pci_dev *dev, int where, u##bits *value) \
 { \
 	struct fake_pci_dev *fake_dev; \
 	if (!(fake_dev = fake_pci_find_slot(dev->bus->number, dev->devfn))) \
-		return orig_pci_ops.name(dev, where, value); \
+		return orig_pci_ops->name(dev, where, value); \
 	\
 	switch (where) { \
 	case PCI_COMMAND: \
@@ -105,7 +105,7 @@ static int hp_cfg_write##sz (struct pci_dev *dev, int where, u##bits value) \
 { \
 	struct fake_pci_dev *fake_dev; \
 	if (!(fake_dev = fake_pci_find_slot(dev->bus->number, dev->devfn))) \
-		return orig_pci_ops.name(dev, where, value); \
+		return orig_pci_ops->name(dev, where, value); \
 	\
 	switch (where) { \
 	case PCI_BASE_ADDRESS_0: \
@@ -295,7 +295,7 @@ hpzx1_lba_probe(acpi_handle obj, u32 depth, void *context, void **ret)
 	if (status != AE_OK)
 		return status;
 
-	status = acpi_cf_evaluate_method(obj, METHOD_NAME__BBN, &busnum);
+	status = acpi_evaluate_integer(obj, METHOD_NAME__BBN, NULL, &busnum);
 	if (ACPI_FAILURE(status)) {
 		printk(KERN_ERR PFX "evaluate _BBN fail=0x%x\n", status);
 		busnum = 0;	// no _BBN; stick it on bus 0
@@ -313,7 +313,7 @@ hpzx1_lba_probe(acpi_handle obj, u32 depth, void *context, void **ret)
 static void
 hpzx1_acpi_dev_init(void)
 {
-	extern struct pci_ops pci_conf;
+	extern struct pci_ops *pci_root_ops;
 
 	/*
 	 * Make fake PCI devices for the following hardware in the
@@ -383,8 +383,8 @@ hpzx1_acpi_dev_init(void)
 	/*
 	 * Replace PCI ops, but only if we made fake devices.
 	 */
-	orig_pci_ops = pci_conf;
-	pci_conf = hp_pci_conf;
+	orig_pci_ops = pci_root_ops;
+	pci_root_ops = &hp_pci_conf;
 }
 
 extern void sba_init(void);

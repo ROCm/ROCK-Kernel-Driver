@@ -11,7 +11,7 @@
 #include <asm/assembler.h>
 		.text
 
-LC0:		.word	SYMBOL_NAME(loops_per_jiffy)
+LC0:		.word	loops_per_jiffy
 
 /*
  * 0 <= r0 <= 2000
@@ -53,5 +53,5 @@ ENTRY(__delay)
 		RETINSTR(movls,pc,lr)
 		subs	r0, r0, #1
 #endif
-		bhi	SYMBOL_NAME(__delay)
+		bhi	__delay
 		RETINSTR(mov,pc,lr)

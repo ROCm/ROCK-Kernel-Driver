@@ -50,20 +50,10 @@ struct radix_tree_path {
 static kmem_cache_t *radix_tree_node_cachep;
 static mempool_t *radix_tree_node_pool;
 
-/*
- * mempool scribbles on the first eight bytes of the managed
- * memory.  Here we implement a temp workaround for that.
- */
-#include <linux/list.h>
 static inline struct radix_tree_node *
 radix_tree_node_alloc(struct radix_tree_root *root)
 {
-	struct radix_tree_node *ret;
-
-	ret = mempool_alloc(radix_tree_node_pool, root->gfp_mask);
-	if (ret)
-		memset(ret, 0, sizeof(struct list_head));
-	return ret;
+	return mempool_alloc(radix_tree_node_pool, root->gfp_mask);
 }
 
 static inline void

@@ -149,8 +149,9 @@ static int control_pan_display(struct fb_var_screeninfo *var, int con,
 	struct fb_info *info);
 static int control_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 	struct fb_info *info);
-static int control_set_cmap(struct fb_cmap *cmap, int kspc, int con,
-	struct fb_info *info);
+static int controlfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
+	u_int transp, struct fb_info *info);
+static int controlfb_blank(int blank_mode, struct fb_info *info);
 static int control_mmap(struct fb_info *info, struct file *file,
 	struct vm_area_struct *vma);
 
@@ -159,15 +160,12 @@ static int control_mmap(struct fb_info *info, struct file *file,
  */
 static int controlfb_switch(int con, struct fb_info *info);
 static int controlfb_updatevar(int con, struct fb_info *info);
-static void controlfb_blank(int blank_mode, struct fb_info *info);
 
 /*
  * low level cmap set/get ops
  */
 static int controlfb_getcolreg(u_int regno, u_int *red, u_int *green,
 	u_int *blue, u_int *transp, struct fb_info *info);
-static int controlfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
-	u_int transp, struct fb_info *info);
 
 /*
  * inititialization
@@ -184,7 +182,6 @@ static void control_cfb32_revc(struct display *p, int xx, int yy);
 
 /******************** Prototypes for internal functions **********************/
 
-static void do_install_cmap(struct display *disp, struct fb_info *info);
 static void set_control_clock(unsigned char *params);
 static int init_control(struct fb_info_control *p);
 static void control_set_hardware(struct fb_info_control *p,
@@ -214,7 +211,6 @@ static void control_cleanup(void);
 
 /************************** Internal variables *******************************/
 
-static int currcon;
 static struct fb_info_control *control_fb;
 
 static char fontname[40] __initdata = { 0 };
@@ -228,8 +224,10 @@ static struct fb_ops controlfb_ops = {
 	fb_get_var:	control_get_var,
 	fb_set_var:	control_set_var,
 	fb_get_cmap:	control_get_cmap,
-	fb_set_cmap:	control_set_cmap,
+	fb_set_cmap:	gen_set_cmap,
+	fb_setcolreg:	control_setcolreg,
 	fb_pan_display:	control_pan_display,
+	fb_blank:	controlfb_blank,
 	fb_mmap:	control_mmap,
 };
 
@@ -324,12 +322,12 @@ static int control_set_var(struct fb_var_screeninfo *var, int con,
 	} else
 		disp->var = *var;
 
-	if(con == currcon) {
+	if (con == info->currcon) {
 		control_set_hardware(p, &par);
 		if(depthchange) {
 			if((err = fb_alloc_cmap(&disp->cmap, 0, 0)))
 				return err;
-			do_install_cmap(disp, info);
+			do_install_cmap(con, info);
 		}
 	}
 
@@ -377,7 +375,7 @@ static int control_pan_display(struct fb_var_screeninfo *var, int con,
 static int control_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			  struct fb_info *info)
 {
-	if (con == currcon)		/* current console? */
+	if (con == info->currcon)		/* current console? */
 		return fb_get_cmap(cmap, kspc, controlfb_getcolreg, info);
 	if (fb_display[con].cmap.len)	/* non default colormap? */
 		fb_copy_cmap(&fb_display[con].cmap, cmap, kspc ? 0: 2);
@@ -387,24 +385,6 @@ static int control_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 	}
 	return 0;
 }
-
-static int control_set_cmap(struct fb_cmap *cmap, int kspc, int con,
-			 struct fb_info *info)
-{
-	struct display *disp = (con < 0)? info->disp: &fb_display[con];
-	int err, size = disp->var.bits_per_pixel == 16 ? 32 : 256;
-
-	if (disp->cmap.len != size) {
-		err = fb_alloc_cmap(&disp->cmap, size, 0);
-		if (err)
-			return err;
-	}
-	if (con == currcon)
-		return fb_set_cmap(cmap, kspc, controlfb_setcolreg, info);
-	fb_copy_cmap(cmap, &disp->cmap, kspc ? 0 : 1);
-	return 0;
-}
-
 
 /*
  * Private mmap since we want to have a different caching on the framebuffer
@@ -463,16 +443,16 @@ static int controlfb_switch(int con, struct fb_info *info)
 	struct fb_info_control	*p = (struct fb_info_control *)info;
 	struct fb_par_control	par;
 
-	if (currcon >= 0 && fb_display[currcon].cmap.len)
-		fb_get_cmap(&fb_display[currcon].cmap, 1, controlfb_getcolreg,
+	if (info->currcon >= 0 && fb_display[info->currcon].cmap.len)
+		fb_get_cmap(&fb_display[info->currcon].cmap, 1, controlfb_getcolreg,
 			    info);
-	currcon = con;
+	info->currcon = con;
 
 	fb_display[con].var.activate = FB_ACTIVATE_NOW;
 	control_var_to_par(&fb_display[con].var, &par, info);
 	control_set_hardware(p, &par);
 	control_set_dispsw(&fb_display[con], par.cmode, p);
-	do_install_cmap(&fb_display[con], info);
+	do_install_cmap(con, info);
 
 	return 1;
 }
@@ -489,7 +469,7 @@ static int controlfb_updatevar(int con, struct fb_info *info)
 }
 
 
-static void controlfb_blank(int blank_mode, struct fb_info *info)
+static int controlfb_blank(int blank_mode, struct fb_info *info)
 {
 	struct fb_info_control *p = (struct fb_info_control *) info;
 	unsigned ctrl;
@@ -518,7 +498,7 @@ static void controlfb_blank(int blank_mode, struct fb_info *info)
 	}
 	out_le32(CNTRL_REG(p,ctrl), ctrl);
 
-	return;
+	return 0;
 }
 
 
@@ -579,19 +559,6 @@ static int controlfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 		}
 	return 0;
 }
-
-static void do_install_cmap(struct display *disp, struct fb_info *info)
-{
-	if (disp->cmap.len)
-		fb_set_cmap(&disp->cmap, 1, controlfb_setcolreg,
-			    info);
-	else {
-		int size = disp->var.bits_per_pixel == 16 ? 32 : 256;
-		fb_set_cmap(fb_default_cmap(size), 1, controlfb_setcolreg,
-			    info);
-	}
-}
-
 
 static void set_control_clock(unsigned char *params)
 {
@@ -668,7 +635,7 @@ try_again:
 		var.yres_virtual = vyres;
 
 	control_init_info(&p->info, p);
-	currcon = -1;
+	p->info.currcon = -1;
 	var.activate = FB_ACTIVATE_NOW;
 
 	if (control_set_var(&var, -1, &p->info) < 0) {
@@ -1255,7 +1222,7 @@ static void control_par_to_display(struct fb_par_control *par,
 	disp->ywrapstep = fix->ywrapstep;
 
 	control_par_to_var(par, &disp->var);
-	disp->screen_base = (char *) p->frame_buffer + CTRLFB_OFF;
+	p->info.screen_base = (char *) p->frame_buffer + CTRLFB_OFF;
 	disp->visual = fix->visual;
 	disp->line_length = fix->line_length;
 	control_set_dispsw(disp, par->cmode, p);
@@ -1271,7 +1238,7 @@ static void control_cfb16_revc(struct display *p, int xx, int yy)
     u8 *dest;
     int bytes = p->next_line, rows;
 
-    dest = p->screen_base + yy * fontheight(p) * bytes + xx * fontwidth(p)*2;
+    dest = p->info.screen_base + yy * fontheight(p) * bytes + xx * fontwidth(p)*2;
     for (rows = fontheight(p); rows--; dest += bytes) {
        switch (fontwidth(p)) {
        case 16:
@@ -1294,7 +1261,7 @@ static void control_cfb32_revc(struct display *p, int xx, int yy)
     u8 *dest;
     int bytes = p->next_line, rows;
 
-    dest = p->screen_base + yy * fontheight(p) * bytes + xx * fontwidth(p) * 4;
+    dest = p->info.screen_base + yy * fontheight(p) * bytes + xx * fontwidth(p) * 4;
     for (rows = fontheight(p); rows--; dest += bytes) {
        switch (fontwidth(p)) {
        case 16:
@@ -1383,7 +1350,6 @@ static void __init control_init_info(struct fb_info *info, struct fb_info_contro
 	info->changevar = NULL;
 	info->switch_con = &controlfb_switch;
 	info->updatevar = &controlfb_updatevar;
-	info->blank = &controlfb_blank;
 }
 
 

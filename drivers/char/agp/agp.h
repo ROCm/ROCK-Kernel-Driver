@@ -248,6 +248,9 @@ struct agp_bridge_data {
 #ifndef PCI_DEVICE_ID_AL_M1641_0
 #define PCI_DEVICE_ID_AL_M1641_0	0x1641
 #endif
+#ifndef PCI_DEVICE_ID_AL_M1644_0
+#define PCI_DEVICE_ID_AL_M1644_0	0x1644
+#endif
 #ifndef PCI_DEVICE_ID_AL_M1647_0
 #define PCI_DEVICE_ID_AL_M1647_0	0x1647
 #endif

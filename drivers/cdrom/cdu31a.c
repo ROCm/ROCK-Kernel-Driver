@@ -3440,7 +3440,7 @@ int __init cdu31a_init(void)
 		    strcmp("CD-ROM CDU31A", drive_config.product_id) == 0;
 
 		blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR),
-			       DEVICE_REQUEST,
+			       do_cdu31a_request,
 			       &cdu31a_lock);
 		cdu31a_block_size = 1024;	/* 1kB default block size */
 		/* use 'mount -o block=2048' */

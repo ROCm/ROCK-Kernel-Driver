@@ -49,6 +49,7 @@
 #include <asm/uaccess.h>
 
 #define MAJOR_NR SCSI_CDROM_MAJOR
+#define LOCAL_END_REQUEST
 #include <linux/blk.h>
 #include "scsi.h"
 #include "hosts.h"

@@ -28,5 +28,8 @@ fi
 if [ "$CONFIG_SND" != "n" -a "$CONFIG_PPC" = "y" ]; then
   source sound/ppc/Config.in
 fi
+if [ "$CONFIG_SND" != "n" -a "$CONFIG_ARM" = "y" ]; then
+  source sound/arm/Config.in
+fi
 
 endmenu

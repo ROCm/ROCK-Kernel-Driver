@@ -589,7 +589,7 @@ static void ffb_revc(struct display *p, int xx, int yy)
 }
 
 #if 0
-static void ffb_blank(struct fb_info_sbusfb *fb)
+static int ffb_blank(struct fb_info_sbusfb *fb)
 {
 	struct ffb_dac *dac = fb->s.ffb.dac;
 	unsigned long flags;
@@ -601,10 +601,11 @@ static void ffb_blank(struct fb_info_sbusfb *fb)
 	upa_writel(0x6000, &dac->type);
 	upa_writel(tmp, &dac->value);
 	spin_unlock_irqrestore(&fb->lock, flags);
+	return 0;
 }
 #endif
 
-static void ffb_unblank(struct fb_info_sbusfb *fb)
+static int ffb_unblank(struct fb_info_sbusfb *fb)
 {
 	struct ffb_dac *dac = fb->s.ffb.dac;
 	unsigned long flags;
@@ -616,6 +617,7 @@ static void ffb_unblank(struct fb_info_sbusfb *fb)
 	upa_writel(0x6000, &dac->type);
 	upa_writel(tmp, &dac->value);
 	spin_unlock_irqrestore(&fb->lock, flags);
+	return 0;
 }
 
 static void ffb_loadcmap (struct fb_info_sbusfb *fb, struct display *p, int index, int count)
@@ -663,7 +665,7 @@ static void ffb_margins (struct fb_info_sbusfb *fb, struct display *p, int x_mar
 	spin_lock_irqsave(&fb->lock, flags);
 	fb->s.ffb.xy_margin = (y_margin << 16) + x_margin;
 	fb->s.ffb.yx_margin = (((u64)y_margin) << 32) + x_margin;
-	p->screen_base += 8192 * (y_margin - fb->y_margin) + 4 * (x_margin - fb->x_margin);
+	fb->info.screen_base += 8192 * (y_margin - fb->y_margin) + 4 * (x_margin - fb->x_margin);
 	FFBWait(fbc);
 	spin_unlock_irqrestore(&fb->lock, flags);
 }
@@ -859,7 +861,7 @@ char __init *creatorfb_init(struct fb_info_sbusfb *fb)
 	var->accel_flags = FB_ACCELF_TEXT;
 	
 	disp->scrollmode = SCROLL_YREDRAW;
-	disp->screen_base = (char *)__va(regs[0].phys_addr) + FFB_DFB24_POFF + 8192 * fb->y_margin + 4 * fb->x_margin;
+	fb->info.screen_base = (char *)__va(regs[0].phys_addr) + FFB_DFB24_POFF + 8192 * fb->y_margin + 4 * fb->x_margin;
 	fb->s.ffb.xy_margin = (fb->y_margin << 16) + fb->x_margin;
 	fb->s.ffb.yx_margin = (((u64)fb->y_margin) << 32) + fb->x_margin;
 	fb->s.ffb.fbc = (struct ffb_fbc *)(regs[0].phys_addr + FFB_FBC_REGS_POFF);

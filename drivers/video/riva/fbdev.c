@@ -107,7 +107,7 @@
  *
  * ------------------------------------------------------------------------- */
 
-static void rivafb_blank(int blank, struct fb_info *info);
+static int rivafb_blank(int blank, struct fb_info *info);
 
 extern void riva_setup_accel(struct rivafb_info *rinfo);
 extern inline void wait_for_idle(struct rivafb_info *rinfo);
@@ -662,7 +662,6 @@ static void riva_set_dispsw(struct rivafb_info *rinfo, struct display *disp)
 
 	disp->dispsw_data = NULL;
 
-	disp->screen_base = rinfo->fb_base;
 	disp->type = FB_TYPE_PACKED_PIXELS;
 	disp->type_aux = 0;
 	disp->ypanstep = 1;
@@ -725,7 +724,7 @@ static void riva_set_dispsw(struct rivafb_info *rinfo, struct display *disp)
  * Sets color register @regnum.
  *
  * CALLED FROM:
- * riva_setcolreg()
+ * rivafb_setcolreg()
  */
 static void riva_wclut(RIVA_HW_INST *chip,
 		       unsigned char regnum, unsigned char red,
@@ -1092,7 +1091,7 @@ static int rivafb_do_maximize(struct rivafb_info *rinfo,
  *
  * CALLED FROM:
  * riva_getcolreg()
- * riva_setcolreg()
+ * rivafb_setcolreg()
  * rivafb_get_cmap()
  * rivafb_set_cmap()
  */
@@ -1170,7 +1169,7 @@ static int riva_getcolreg(unsigned regno, unsigned *red, unsigned *green,
 }
 
 /**
- * riva_setcolreg
+ * rivafb_setcolreg
  * @regno: register index
  * @red: red component
  * @green: green component
@@ -1189,15 +1188,15 @@ static int riva_getcolreg(unsigned regno, unsigned *red, unsigned *green,
  * rivafb_set_cmap()
  * fbcmap.c:fb_set_cmap()
  *	fbgen.c:fbgen_get_cmap()
- *	fbgen.c:fbgen_install_cmap()
+ *	fbgen.c:do_install_cmap()
  *		fbgen.c:fbgen_set_var()
  *		fbgen.c:fbgen_switch()
  *		fbgen.c:fbgen_blank()
  *	fbgen.c:fbgen_blank()
  */
-static int riva_setcolreg(unsigned regno, unsigned red, unsigned green,
-			  unsigned blue, unsigned transp,
-			  struct fb_info *info)
+static int rivafb_setcolreg(unsigned regno, unsigned red, unsigned green,
+			    unsigned blue, unsigned transp,
+			    struct fb_info *info)
 {
 	struct rivafb_info *rivainfo = (struct rivafb_info *)info;
 	RIVA_HW_INST *chip = &rivainfo->riva;
@@ -1518,7 +1517,7 @@ static int rivafb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 
 	dsp = (con < 0) ? rivainfo->info.disp : &fb_display[con];
 
-	if (con == rivainfo->currcon) {	/* current console? */
+	if (con == info->currcon) {	/* current console? */
 		int rc = fb_get_cmap(cmap, kspc, riva_getcolreg, info);
 		DPRINTK("EXIT - returning %d\n", rc);
 		return rc;
@@ -1556,8 +1555,8 @@ static int rivafb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 			return err;
 		}
 	}
-	if (con == rivainfo->currcon) {	/* current console? */
-		int rc = fb_set_cmap(cmap, kspc, riva_setcolreg, info);
+	if (con == info->currcon) {	/* current console? */
+		int rc = fb_set_cmap(cmap, kspc, info);
 		DPRINTK("EXIT - returning %d\n", rc);
 		return rc;
 	} else
@@ -1611,7 +1610,7 @@ static int rivafb_pan_display(struct fb_var_screeninfo *var, int con,
 
 	base = var->yoffset * dsp->line_length + var->xoffset;
 
-	if (con == rivainfo->currcon) {
+	if (con == info->currcon) {
 		rivainfo->riva.SetStartAddress(&rivainfo->riva, base);
 	}
 
@@ -1665,11 +1664,11 @@ static int rivafb_switch(int con, struct fb_info *info)
 
 	dsp = (con < 0) ? rivainfo->info.disp : &fb_display[con];
 
-	if (rivainfo->currcon >= 0) {
+	if (info->currcon >= 0) {
 		/* Do we have to save the colormap? */
 		cmap = &(rivainfo->currcon_display->cmap);
 		DPRINTK("switch1: con = %d, cmap.len = %d\n",
-			 rivainfo->currcon, cmap->len);
+			 info->currcon, cmap->len);
 
 		if (cmap->len) {
 			DPRINTK("switch1a: %p %p %p %p\n", cmap->red,
@@ -1677,7 +1676,7 @@ static int rivafb_switch(int con, struct fb_info *info)
 			fb_get_cmap(cmap, 1, riva_getcolreg, info);
 		}
 	}
-	rivainfo->currcon = con;
+	info->currcon = con;
 	rivainfo->currcon_display = dsp;
 
 	rivafb_set_var(&dsp->var, con, info);
@@ -1699,7 +1698,7 @@ static int rivafb_updatevar(int con, struct fb_info *info)
 	return rc;
 }
 
-static void rivafb_blank(int blank, struct fb_info *info)
+static int rivafb_blank(int blank, struct fb_info *info)
 {
 	unsigned char tmp, vesa;
 	struct rivafb_info *rinfo = (struct rivafb_info *)info;
@@ -1732,6 +1731,7 @@ static void rivafb_blank(int blank, struct fb_info *info)
 	CRTCout(rinfo, 0x1a, vesa);
 
 	DPRINTK("EXIT\n");
+	return 0;
 }
 
 
@@ -1750,7 +1750,9 @@ static struct fb_ops riva_fb_ops = {
 	fb_set_var:	rivafb_set_var,
 	fb_get_cmap:	rivafb_get_cmap,
 	fb_set_cmap:	rivafb_set_cmap,
+	fb_setcolreg:	rivafb_setcolreg,
 	fb_pan_display:	rivafb_pan_display,
+	fb_blank:	rivafb_blank,
 	fb_ioctl:	rivafb_ioctl,
 	fb_rasterimg:	rivafb_rasterimg,
 };
@@ -1814,17 +1816,17 @@ static int __devinit riva_set_fbinfo(struct rivafb_info *rinfo)
 	info->node = NODEV;
 	info->flags = FBINFO_FLAG_DEFAULT;
 	info->fbops = &riva_fb_ops;
-
+	info->screen_base = rinfo->fb_base;
 	/* FIXME: set monspecs to what??? */
 
 	info->display_fg = NULL;
+	info->currcon = -1;
 	strncpy(info->fontname, fontname, sizeof(info->fontname));
 	info->fontname[sizeof(info->fontname) - 1] = 0;
 
 	info->changevar = NULL;
 	info->switch_con = rivafb_switch;
 	info->updatevar = rivafb_updatevar;
-	info->blank = rivafb_blank;
 
 	if (riva_init_disp(rinfo) < 0)	/* must be done last */
 		return -1;

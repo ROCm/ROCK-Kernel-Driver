@@ -64,8 +64,6 @@ static char default_fontname[40] __initdata = { 0 };
 static struct fb_var_screeninfo default_var;
 static int default_var_valid = 0;
 
-static int currcon = 0;
-
 static struct { u_char red, green, blue, pad; } palette[256];
 #ifdef FBCON_HAS_CFB32
 static u32 fbcon_cfb32_cmap[16];
@@ -748,8 +746,8 @@ static int tgafb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 	if ((err = fb_alloc_cmap(&fb_display[con].cmap, 256, 0)))
 	    return err;
     }
-    if (con == currcon) {		/* current console? */
-	err = fb_set_cmap(cmap, kspc, tgafb_setcolreg, info);
+    if (con == info->currcon) {		/* current console? */
+	err = fb_set_cmap(cmap, kspc, info);
 #if 1
 	if (fb_info.tga_type != TGA_TYPE_8PLANE)
 		tgafb_update_palette();
@@ -831,7 +829,6 @@ static int tgafb_blank(int blank, struct fb_info_gen *info)
 static void tgafb_set_disp(const void *fb_par, struct display *disp,
 	struct fb_info_gen *info)
 {
-    disp->screen_base = (char *)fb_info.tga_fb_base;
     switch (fb_info.tga_type) {
 #ifdef FBCON_HAS_CFB8
 	case TGA_TYPE_8PLANE:
@@ -855,7 +852,7 @@ static void tgafb_set_disp(const void *fb_par, struct display *disp,
 
 struct fbgen_hwswitch tgafb_hwswitch = {
     tgafb_detect, tgafb_encode_fix, tgafb_decode_var, tgafb_encode_var, tgafb_get_par,
-    tgafb_set_par, tgafb_getcolreg, tgafb_setcolreg, NULL, tgafb_blank, 
+    tgafb_set_par, tgafb_getcolreg, NULL, tgafb_blank, 
     tgafb_set_disp
 };
 
@@ -876,6 +873,8 @@ static struct fb_ops tgafb_ops = {
 	fb_set_var:	fbgen_set_var,
 	fb_get_cmap:	fbgen_get_cmap,
 	fb_set_cmap:	tgafb_set_cmap,
+	fb_setcolreg:	tgafb_setcolreg,
+	fb_blank:	fbgen_blank,
 };
 
 
@@ -940,11 +939,12 @@ int __init tgafb_init(void)
     fb_info.gen.info.node = NODEV;
     fb_info.gen.info.flags = FBINFO_FLAG_DEFAULT;
     fb_info.gen.info.fbops = &tgafb_ops;
+    fb_info.gen.info.screen_base = (char *)fb_info.tga_fb_base;
     fb_info.gen.info.disp = &disp;
+    fb_info.gen.info.currcon = -1;	
     fb_info.gen.info.changevar = NULL;
     fb_info.gen.info.switch_con = &fbgen_switch;
     fb_info.gen.info.updatevar = &fbgen_update_var;
-    fb_info.gen.info.blank = &fbgen_blank;
     strcpy(fb_info.gen.info.fontname, default_fontname);
     fb_info.gen.parsize = sizeof (struct tgafb_par);
     fb_info.gen.fbhw = &tgafb_hwswitch;
@@ -978,7 +978,7 @@ int __init tgafb_init(void)
     disp.var.activate = FB_ACTIVATE_NOW;
     fbgen_do_set_var(&disp.var, 1, &fb_info.gen);
     fbgen_set_disp(-1, &fb_info.gen);
-    fbgen_install_cmap(0, &fb_info.gen);
+    do_install_cmap(0, &fb_info.gen);
     if (register_framebuffer(&fb_info.gen.info) < 0)
 	return -EINVAL;
     printk(KERN_INFO "fb%d: %s frame buffer device at 0x%lx\n", 

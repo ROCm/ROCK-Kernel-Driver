@@ -239,7 +239,6 @@ struct radeonfb_info {
 	struct pci_dev *pdev;
 
 	struct display disp;
-	int currcon;
 	struct display *currcon_display;
 
 	struct { u8 red, green, blue, pad; } palette[256];
@@ -565,21 +564,19 @@ static int radeonfb_set_var (struct fb_var_screeninfo *var, int con,
                              struct fb_info *info);
 static int radeonfb_get_cmap (struct fb_cmap *cmap, int kspc, int con,
                               struct fb_info *info);
-static int radeonfb_set_cmap (struct fb_cmap *cmap, int kspc, int con,
-                              struct fb_info *info);
+static int radeonfb_setcolreg (unsigned regno, unsigned red, unsigned green,
+                               unsigned blue, unsigned transp, struct fb_info *info);
 static int radeonfb_pan_display (struct fb_var_screeninfo *var, int con,
                                  struct fb_info *info);
+static int radeonfb_blank (int blank, struct fb_info *info);
 static int radeonfb_ioctl (struct inode *inode, struct file *file, unsigned int cmd,
                            unsigned long arg, int con, struct fb_info *info);
 static int radeonfb_switch (int con, struct fb_info *info);
 static int radeonfb_updatevar (int con, struct fb_info *info);
-static void radeonfb_blank (int blank, struct fb_info *info);
 static int radeon_get_cmap_len (const struct fb_var_screeninfo *var);
 static int radeon_getcolreg (unsigned regno, unsigned *red, unsigned *green,
                              unsigned *blue, unsigned *transp,
                              struct fb_info *info);
-static int radeon_setcolreg (unsigned regno, unsigned red, unsigned green,
-                             unsigned blue, unsigned transp, struct fb_info *info);
 static void radeon_set_dispsw (struct radeonfb_info *rinfo, struct display *disp);
 static void radeon_save_state (struct radeonfb_info *rinfo,
                                struct radeon_regs *save);
@@ -609,8 +606,10 @@ static struct fb_ops radeon_fb_ops = {
 	fb_get_var:		radeonfb_get_var,
 	fb_set_var:		radeonfb_set_var,
 	fb_get_cmap:		radeonfb_get_cmap,
-	fb_set_cmap:		radeonfb_set_cmap,
+	fb_set_cmap:		gen_set_cmap,
+	fb_setcolreg:		radeonfb_setcolreg,
 	fb_pan_display:		radeonfb_pan_display,
+	fb_blank:		radeonfb_blank,
 	fb_ioctl:		radeonfb_ioctl,
 };
 
@@ -1308,13 +1307,14 @@ static int __devinit radeon_set_fbinfo (struct radeonfb_info *rinfo)
         info->node = NODEV;
         info->flags = FBINFO_FLAG_DEFAULT;
         info->fbops = &radeon_fb_ops;
-        info->display_fg = NULL;
+        info->screen_base = (char*)rinfo->fb_base;
+  	info->display_fg = NULL;
+	info->currcon = -1;
         strncpy (info->fontname, fontname, sizeof (info->fontname));
         info->fontname[sizeof (info->fontname) - 1] = 0;
         info->changevar = NULL;
         info->switch_con = radeonfb_switch;
         info->updatevar = radeonfb_updatevar;
-        info->blank = radeonfb_blank;
 
         if (radeon_init_disp (rinfo) < 0)
                 return -1;   
@@ -1382,7 +1382,6 @@ static void radeon_set_dispsw (struct radeonfb_info *rinfo, struct display *disp
                 
         disp->dispsw_data = NULL;
         
-        disp->screen_base = (char*)rinfo->fb_base;
         disp->type = FB_TYPE_PACKED_PIXELS;
         disp->type_aux = 0;
         disp->ypanstep = 1;
@@ -1431,25 +1430,6 @@ static void radeon_set_dispsw (struct radeonfb_info *rinfo, struct display *disp
         return;
 }
                         
-
-
-static void do_install_cmap(int con, struct fb_info *info)
-{
-        struct radeonfb_info *rinfo = (struct radeonfb_info *) info;
-                
-        if (con != rinfo->currcon)
-                return;
-                
-        if (fb_display[con].cmap.len)
-                fb_set_cmap(&fb_display[con].cmap, 1, radeon_setcolreg, info);
-        else {
-                int size = fb_display[con].var.bits_per_pixel == 8 ? 256 : 32;
-                fb_set_cmap(fb_default_cmap(size), 1, radeon_setcolreg, info);
-        }
-}
-
-
-
 static int radeonfb_do_maximize(struct radeonfb_info *rinfo,
                                 struct fb_var_screeninfo *var,
                                 struct fb_var_screeninfo *v,
@@ -1711,7 +1691,7 @@ static int radeonfb_get_cmap (struct fb_cmap *cmap, int kspc, int con,
                 
         disp = (con < 0) ? rinfo->info.disp : &fb_display[con];
         
-        if (con == rinfo->currcon) {
+        if (con == info->currcon) {
                 int rc = fb_get_cmap (cmap, kspc, radeon_getcolreg, info);
                 return rc;
         } else if (disp->cmap.len)
@@ -1741,8 +1721,8 @@ static int radeonfb_set_cmap (struct fb_cmap *cmap, int kspc, int con,
                         return err;
         }
  
-        if (con == rinfo->currcon) {
-                int rc = fb_set_cmap (cmap, kspc, radeon_setcolreg, info);
+        if (con == info->currcon) {
+                int rc = fb_set_cmap (cmap, kspc, info);
                 return rc;
         } else
                 fb_copy_cmap (cmap, &disp->cmap, kspc ? 0 : 1);
@@ -1789,7 +1769,7 @@ static int radeonfb_switch (int con, struct fb_info *info)
         
         disp = (con < 0) ? rinfo->info.disp : &fb_display[con];
                 
-        if (rinfo->currcon >= 0) {
+        if (info->currcon >= 0) {
                 cmap = &(rinfo->currcon_display->cmap);
                 if (cmap->len)
                         fb_get_cmap (cmap, 1, radeon_getcolreg, info);
@@ -1802,7 +1782,7 @@ static int radeonfb_switch (int con, struct fb_info *info)
                 switchcon = 1;
         
         if (switchcon) {
-                rinfo->currcon = con;
+                info->currcon = con;
                 rinfo->currcon_display = disp;
                 disp->var.activate = FB_ACTIVATE_NOW;
         
@@ -1833,7 +1813,7 @@ static int radeonfb_updatevar (int con, struct fb_info *info)
         return rc;
 }
 
-static void radeonfb_blank (int blank, struct fb_info *info)
+static int radeonfb_blank (int blank, struct fb_info *info)
 {
         struct radeonfb_info *rinfo = (struct radeonfb_info *) info;
         u32 val = INREG(CRTC_EXT_CNTL);
@@ -1858,9 +1838,8 @@ static void radeonfb_blank (int blank, struct fb_info *info)
         }
         
         OUTREG(CRTC_EXT_CNTL, val);
+	return 0;
 }
-
-
 
 static int radeon_get_cmap_len (const struct fb_var_screeninfo *var)
 {
@@ -1899,8 +1878,8 @@ static int radeon_getcolreg (unsigned regno, unsigned *red, unsigned *green,
 
 
 
-static int radeon_setcolreg (unsigned regno, unsigned red, unsigned green,
-                             unsigned blue, unsigned transp, struct fb_info *info)
+static int radeonfb_setcolreg (unsigned regno, unsigned red, unsigned green,
+                               unsigned blue, unsigned transp, struct fb_info *info)
 {
         struct radeonfb_info *rinfo = (struct radeonfb_info *) info;
 	u32 pindex;

@@ -379,9 +379,6 @@ struct fb_info {
 					/* tell fb to switch consoles */
    int (*updatevar)(int, struct fb_info*);
 					/* tell fb to update the vars */
-   void (*blank)(int, struct fb_info*);	/* tell fb to (un)blank the screen */
-					/* arg = 0: unblank */
-					/* arg > 0: VESA level (arg-1) */
    void *pseudo_palette;                /* Fake palette of 16 colors and 
 					   the cursor's color for non
                                            palette mode */
@@ -413,8 +410,6 @@ struct fbgen_hwswitch {
     void (*set_par)(const void *par, struct fb_info_gen *info);
     int (*getcolreg)(unsigned regno, unsigned *red, unsigned *green,
 		     unsigned *blue, unsigned *transp, struct fb_info *info);
-    int (*setcolreg)(unsigned regno, unsigned red, unsigned green,
-		     unsigned blue, unsigned transp, struct fb_info *info);
     int (*pan_display)(const struct fb_var_screeninfo *var,
 		       struct fb_info_gen *info);
     int (*blank)(int blank_mode, struct fb_info_gen *info);
@@ -470,11 +465,11 @@ extern void cfb_imageblit(struct fb_info *info, struct fb_image *image);
 extern int fbgen_do_set_var(struct fb_var_screeninfo *var, int isactive,
 			    struct fb_info_gen *info);
 extern void fbgen_set_disp(int con, struct fb_info_gen *info);
-extern void fbgen_install_cmap(int con, struct fb_info_gen *info);
+extern void do_install_cmap(int con, struct fb_info *info);
 extern int fbgen_update_var(int con, struct fb_info *info);
 extern int gen_update_var(int con, struct fb_info *info);
 extern int fbgen_switch(int con, struct fb_info *info);
-extern void fbgen_blank(int blank, struct fb_info *info);
+extern int fbgen_blank(int blank, struct fb_info *info);
 extern int gen_switch(int con, struct fb_info *info);
 
 extern void gen_set_disp(int con, struct fb_info *info);
@@ -499,10 +494,7 @@ extern int fb_get_cmap(struct fb_cmap *cmap, int kspc,
 		       int (*getcolreg)(u_int, u_int *, u_int *, u_int *,
 					u_int *, struct fb_info *),
 		       struct fb_info *fb_info);
-extern int fb_set_cmap(struct fb_cmap *cmap, int kspc,
-		       int (*setcolreg)(u_int, u_int, u_int, u_int, u_int,
-					struct fb_info *),
-		       struct fb_info *fb_info);
+extern int fb_set_cmap(struct fb_cmap *cmap, int kspc, struct fb_info *fb_info);
 extern struct fb_cmap *fb_default_cmap(int len);
 extern void fb_invert_cmaps(void);
 

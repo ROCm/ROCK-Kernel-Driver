@@ -1,3 +1,6 @@
+/*
+ * arch/i386/kernel/bluesmoke.c - x86 Machine Check Exception Reporting
+ */
 
 #include <linux/init.h>
 #include <linux/types.h>
@@ -19,21 +22,12 @@ static int mce_disabled __initdata = 0;
 
 static int banks;
 
-/*
- * If we get an MCE, we don't know what state the caches/TLB's are
- * going to be in, so we throw them all away.
- */
-static void inline flush_all (void)
-{   
-	__asm__ __volatile__ ("invd": : );
-	__flush_tlb();
-}
 
+#ifdef CONFIG_X86_MCE_P4THERMAL
 /*
  *	P4/Xeon Thermal transition interrupt handler
  */
 
-#ifdef CONFIG_X86_LOCAL_APIC
 static void intel_thermal_interrupt(struct pt_regs *regs)
 {
 	u32 l, h;
@@ -49,7 +43,6 @@ static void intel_thermal_interrupt(struct pt_regs *regs)
 		printk(KERN_INFO "CPU#%d: Temperature/speed normal\n", cpu);
 	}
 }
-#endif
 
 static void unexpected_thermal_interrupt(struct pt_regs *regs)
 {	
@@ -71,14 +64,13 @@ asmlinkage void smp_thermal_interrupt(struct pt_regs regs)
 
 static void __init intel_init_thermal(struct cpuinfo_x86 *c)
 {
-#ifdef CONFIG_X86_LOCAL_APIC
 	u32 l, h;
 	unsigned int cpu = smp_processor_id();
 
 	/* Thermal monitoring */
 	if (!test_bit(X86_FEATURE_ACPI, c->x86_capability))
 		return;	/* -ENODEV */
-	
+
 	/* Clock modulation */
 	if (!test_bit(X86_FEATURE_ACC, c->x86_capability))
 		return;	/* -ENODEV */
@@ -96,16 +88,16 @@ static void __init intel_init_thermal(struct cpuinfo_x86 *c)
 		printk(KERN_INFO "CPU#%d: Thermal monitoring enabled\n", cpu);
 	}
 
-	/* check wether a vector already exists */	
+	/* check whether a vector already exists */	
 	l = apic_read(APIC_LVTTHMR);
 	if (l & 0xff) {
 		printk(KERN_DEBUG "CPU#%d: Thermal LVT already handled\n", cpu);
 		return; /* -EBUSY */
 	}
-	
+
 	wrmsr(MSR_IA32_MISC_ENABLE, l | (1<<3), h);
 	printk(KERN_INFO "CPU#%d: Thermal monitoring enabled\n", cpu);
-	
+
 	/* The temperature transition interrupt handler setup */
 	l = THERMAL_APIC_VECTOR;		/* our delivery vector */
 	l |= (APIC_DM_FIXED | APIC_LVT_MASKED);	/* we'll mask till we're ready */
@@ -120,8 +112,9 @@ static void __init intel_init_thermal(struct cpuinfo_x86 *c)
 	apic_write_around(APIC_LVTTHMR, l & ~APIC_LVT_MASKED);
 
 	return;
-#endif
 }
+#endif /* CONFIG_X86_MCE_P4THERMAL */
+
 
 /*
  *	Machine Check Handler For PII/PIII
@@ -134,32 +127,26 @@ static void intel_machine_check(struct pt_regs * regs, long error_code)
 	u32 mcgstl, mcgsth;
 	int i;
 
-	flush_all();
-
 	rdmsr(MSR_IA32_MCG_STATUS, mcgstl, mcgsth);
 	if(mcgstl&(1<<0))	/* Recoverable ? */
 		recover=0;
 
 	printk(KERN_EMERG "CPU %d: Machine Check Exception: %08x%08x\n", smp_processor_id(), mcgsth, mcgstl);
-	
-	for(i=0;i<banks;i++)
-	{
+
+	for (i=0;i<banks;i++) {
 		rdmsr(MSR_IA32_MC0_STATUS+i*4,low, high);
-		if(high&(1<<31))
-		{
+		if(high&(1<<31)) {
 			if(high&(1<<29))
 				recover|=1;
 			if(high&(1<<25))
 				recover|=2;
 			printk(KERN_EMERG "Bank %d: %08x%08x", i, high, low);
 			high&=~(1<<31);
-			if(high&(1<<27))
-			{
+			if(high&(1<<27)) {
 				rdmsr(MSR_IA32_MC0_MISC+i*4, alow, ahigh);
 				printk("[%08x%08x]", ahigh, alow);
 			}
-			if(high&(1<<26))
-			{
+			if(high&(1<<26)) {
 				rdmsr(MSR_IA32_MC0_ADDR+i*4, alow, ahigh);
 				printk(" at %08x%08x", ahigh, alow);
 			}
@@ -170,7 +157,7 @@ static void intel_machine_check(struct pt_regs * regs, long error_code)
 			wmb();
 		}
 	}
-	
+
 	if(recover&2)
 		panic("CPU context corrupt");
 	if(recover&1)
@@ -183,7 +170,7 @@ static void intel_machine_check(struct pt_regs * regs, long error_code)
 /*
  *	Machine check handler for Pentium class Intel
  */
- 
+
 static void pentium_machine_check(struct pt_regs * regs, long error_code)
 {
 	u32 loaddr, hi, lotype;
@@ -197,7 +184,7 @@ static void pentium_machine_check(struct pt_regs * regs, long error_code)
 /*
  *	Machine check handler for WinChip C6
  */
- 
+
 static void winchip_machine_check(struct pt_regs * regs, long error_code)
 {
 	printk(KERN_EMERG "CPU#%d: Machine Check Exception.\n", smp_processor_id());
@@ -225,47 +212,50 @@ asmlinkage void do_machine_check(struct pt_regs * regs, long error_code)
 
 
 #ifdef CONFIG_X86_MCE_NONFATAL
-struct timer_list mce_timer;
+static struct timer_list mce_timer;
+static int timerset = 0;
 
-static void mce_checkregs (unsigned int cpu)
+#define MCE_RATE	15*HZ	/* timer rate is 15s */
+
+static void mce_checkregs (void *info)
 {
 	u32 low, high;
 	int i;
+	unsigned int *cpu = info;
 
-	if (cpu!=smp_processor_id())
-		BUG();
+	BUG_ON (*cpu != smp_processor_id());
 
 	for (i=0; i<banks; i++) {
 		rdmsr(MSR_IA32_MC0_STATUS+i*4, low, high);
 
 		if ((low | high) != 0) {
-			flush_all();
 			printk (KERN_EMERG "MCE: The hardware reports a non fatal, correctable incident occured on CPU %d.\n", smp_processor_id());
 			printk (KERN_EMERG "Bank %d: %08x%08x\n", i, high, low);
 
-			/* Scrub the error so we don't pick it up in 5 seconds time. */
+			/* Scrub the error so we don't pick it up in MCE_RATE seconds time. */
 			wrmsr(MSR_IA32_MC0_STATUS+i*4, 0UL, 0UL);
 
 			/* Serialize */
 			wmb();
 		}
 	}
-
-	/* Refresh the timer. */
-	mce_timer.expires = jiffies + 5 * HZ;
-	add_timer (&mce_timer);
 }
+
 
 static void mce_timerfunc (unsigned long data)
 {
-	int i;
+	unsigned int i;
 
 	for (i=0; i<smp_num_cpus; i++) {
 		if (i == smp_processor_id())
-			mce_checkregs(i);
+			mce_checkregs(&i);
 		else
-			smp_call_function (mce_checkregs, i, 1, 1);
+			smp_call_function (mce_checkregs, &i, 1, 1);
 	}
+
+	/* Refresh the timer. */
+	mce_timer.expires = jiffies + MCE_RATE;
+	add_timer (&mce_timer);
 }
 #endif
 
@@ -286,11 +276,11 @@ static void __init intel_mcheck_init(struct cpuinfo_x86 *c)
 
 	if( !test_bit(X86_FEATURE_MCE, c->x86_capability) )
 		return;	
-	
+
 	/*
 	 *	Pentium machine check
 	 */
-	
+
 	if(c->x86 == 5)
 	{
 		/* Default P5 to off as its often misconnected */
@@ -308,20 +298,20 @@ static void __init intel_mcheck_init(struct cpuinfo_x86 *c)
 		printk(KERN_INFO "Intel old style machine check reporting enabled on CPU#%d.\n", smp_processor_id());
 		return;
 	}
-	
+
 
 	/*
 	 *	Check for PPro style MCA
 	 */
-	 		
+ 		
 	if( !test_bit(X86_FEATURE_MCA, c->x86_capability) )
 		return;
-		
+
 	/* Ok machine check is available */
-	
+
 	machine_check_vector = intel_machine_check;
 	wmb();
-	
+
 	if(done==0)
 		printk(KERN_INFO "Intel machine check architecture supported.\n");
 	rdmsr(MSR_IA32_MCG_CAP, l, h);
@@ -343,8 +333,12 @@ static void __init intel_mcheck_init(struct cpuinfo_x86 *c)
 
 	set_in_cr4(X86_CR4_MCE);
 	printk(KERN_INFO "Intel machine check reporting enabled on CPU#%d.\n", smp_processor_id());
-	
-	intel_init_thermal(c);
+
+#ifdef CONFIG_X86_MCE_P4THERMAL
+	/* Only enable thermal throttling warning on Pentium 4. */
+	if (c->x86_vendor == X86_VENDOR_INTEL && c->x86 == 15)
+		intel_init_thermal(c);
+#endif
 
 	done=1;
 }
@@ -352,7 +346,7 @@ static void __init intel_mcheck_init(struct cpuinfo_x86 *c)
 /*
  *	Set up machine check reporting on the Winchip C6 series
  */
- 
+
 static void __init winchip_mcheck_init(struct cpuinfo_x86 *c)
 {
 	u32 lo, hi;
@@ -377,6 +371,7 @@ static void __init winchip_mcheck_init(struct cpuinfo_x86 *c)
 
 void __init mcheck_init(struct cpuinfo_x86 *c)
 {
+
 	if(mce_disabled==1)
 		return;
 
@@ -387,12 +382,17 @@ void __init mcheck_init(struct cpuinfo_x86 *c)
 			if(c->x86 == 6) {
 				intel_mcheck_init(c);
 #ifdef CONFIG_X86_MCE_NONFATAL
-				/* Set the timer to check for non-fatal errors every 5 seconds */
-				init_timer (&mce_timer);
-				mce_timer.expires = jiffies + 5 * HZ;
-				mce_timer.data = 0;
-				mce_timer.function = &mce_timerfunc;
-				add_timer (&mce_timer);
+				if (timerset == 0) {
+					/* Set the timer to check for non-fatal
+					   errors every MCE_RATE seconds */
+					init_timer (&mce_timer);
+					mce_timer.expires = jiffies + MCE_RATE;
+					mce_timer.data = 0;
+					mce_timer.function = &mce_timerfunc;
+					add_timer (&mce_timer);
+					timerset = 1;
+					printk(KERN_INFO "Machine check exception polling timer started.\n");
+				}
 #endif
 			}
 			break;

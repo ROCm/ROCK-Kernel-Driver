@@ -52,7 +52,6 @@ struct sgivwfb_par {
 u_long                sgivwfb_mem_phys;
 u_long                sgivwfb_mem_size;
 
-static volatile char  *fbmem;
 static asregs         *regs;
 static struct fb_info fb_info;
 static struct { u_char red, green, blue, pad; } palette[256];
@@ -62,7 +61,6 @@ static int            ypan       = 0;
 static int            ywrap      = 0;
 
 /* console related variables */
-static int currcon = 0;
 static struct display disp;
 
 static union {
@@ -99,8 +97,8 @@ static int sgivwfb_set_var(struct fb_var_screeninfo *var, int con,
 			   struct fb_info *info);
 static int sgivwfb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			    struct fb_info *info);
-static int sgivwfb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
-			    struct fb_info *info);
+static int sgivwfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
+			     u_int transp, struct fb_info *info);
 static int sgivwfb_mmap(struct fb_info *info, struct file *file,
                         struct vm_area_struct *vma);
 
@@ -110,7 +108,8 @@ static struct fb_ops sgivwfb_ops = {
 	fb_get_var:	sgivwfb_get_var,
 	fb_set_var:	sgivwfb_set_var,
 	fb_get_cmap:	sgivwfb_get_cmap,
-	fb_set_cmap:	sgivwfb_set_cmap,
+	fb_set_cmap:	gen_set_cmap,
+	fb_setcolreg:	sgivwfb_setcolreg,
 	fb_mmap:	sgivwfb_mmap,
 };
 
@@ -120,7 +119,6 @@ static struct fb_ops sgivwfb_ops = {
 int sgivwfb_init(void);
 static int sgivwfbcon_switch(int con, struct fb_info *info);
 static int sgivwfbcon_updatevar(int con, struct fb_info *info);
-static void sgivwfbcon_blank(int blank, struct fb_info *info);
 
 /*
  *  Internal routines
@@ -132,9 +130,6 @@ static void sgivwfb_encode_fix(struct fb_fix_screeninfo *fix,
 			       struct fb_var_screeninfo *var);
 static int sgivwfb_getcolreg(u_int regno, u_int *red, u_int *green, u_int *blue,
 			     u_int *transp, struct fb_info *info);
-static int sgivwfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
-			     u_int transp, struct fb_info *info);
-static void do_install_cmap(int con, struct fb_info *info);
 
 static unsigned long get_line_length(int xres_virtual, int bpp)
 {
@@ -556,17 +551,6 @@ static int sgivwfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
   return 0;
 }
 
-static void do_install_cmap(int con, struct fb_info *info)
-{
-    if (con != currcon)
-	return;
-    if (fb_display[con].cmap.len)
-	fb_set_cmap(&fb_display[con].cmap, 1, sgivwfb_setcolreg, info);
-    else
-	fb_set_cmap(fb_default_cmap(1<<fb_display[con].var.bits_per_pixel), 1,
-		    sgivwfb_setcolreg, info);
-}
-
 /* ---------------------------------------------------- */
 
 /*
@@ -755,7 +739,6 @@ static int sgivwfb_set_var(struct fb_var_screeninfo *var, int con,
 	     var->xres_virtual, var->yres_virtual);
       activate_par(&par_current);
       sgivwfb_encode_fix(&fix, var);
-      display->screen_base = (char *)fbmem;
       display->visual = fix.visual;
       display->type = fix.type;
       display->type_aux = fix.type_aux;
@@ -805,33 +788,13 @@ static int sgivwfb_set_var(struct fb_var_screeninfo *var, int con,
 static int sgivwfb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			    struct fb_info *info)
 {
-  if (con == currcon) /* current console? */
+  if (con == info->currcon) /* current console? */
     return fb_get_cmap(cmap, kspc, sgivwfb_getcolreg, info);
   else if (fb_display[con].cmap.len) /* non default colormap? */
     fb_copy_cmap(&fb_display[con].cmap, cmap, kspc ? 0 : 2);
   else
     fb_copy_cmap(fb_default_cmap(1<<fb_display[con].var.bits_per_pixel),
 		 cmap, kspc ? 0 : 2);
-  return 0;
-}
-
-/*
- *  Set the Colormap
- */
-static int sgivwfb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
-			    struct fb_info *info)
-{
-  int err;
-
-  if (!fb_display[con].cmap.len) {	/* no colormap allocated? */
-    int size = fb_display[con].var.bits_per_pixel == 16 ? 32 : 256;
-    if ((err = fb_alloc_cmap(&fb_display[con].cmap, size, 0)))
-      return err;
-  }
-  if (con == currcon)			/* current console? */
-    return fb_set_cmap(cmap, kspc, sgivwfb_setcolreg, info);
-  else
-    fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
   return 0;
 }
 
@@ -893,14 +856,14 @@ int __init sgivwfb_init(void)
   fb_info.node = NODEV;
   fb_info.fbops = &sgivwfb_ops;
   fb_info.disp = &disp;
+  fb_info.currcon = -1;	
   fb_info.switch_con = &sgivwfbcon_switch;
   fb_info.updatevar = &sgivwfbcon_updatevar;
-  fb_info.blank = &sgivwfbcon_blank;
   fb_info.flags = FBINFO_FLAG_DEFAULT;
 
-  fbmem = ioremap_nocache((unsigned long)sgivwfb_mem_phys, sgivwfb_mem_size);
-  if (!fbmem) {
-    printk(KERN_ERR "sgivwfb: couldn't ioremap fbmem\n");
+  fb_info.screen_base = ioremap_nocache((unsigned long)sgivwfb_mem_phys, sgivwfb_mem_size);
+  if (!fb_info.screen_base) {
+    printk(KERN_ERR "sgivwfb: couldn't ioremap screen_base\n");
     goto fail_ioremap_fbmem;
   }
 
@@ -918,7 +881,7 @@ int __init sgivwfb_init(void)
   return 0;
 
  fail_register_framebuffer:
-  iounmap((char*)fbmem);
+  iounmap((char*)fb_info.screen_base);
  fail_ioremap_fbmem:
   iounmap(regs);
  fail_ioremap_regs:
@@ -928,10 +891,10 @@ int __init sgivwfb_init(void)
 static int sgivwfbcon_switch(int con, struct fb_info *info)
 {
   /* Do we have to save the colormap? */
-  if (fb_display[currcon].cmap.len)
-    fb_get_cmap(&fb_display[currcon].cmap, 1, sgivwfb_getcolreg, info);
+  if (fb_display[info->currcon].cmap.len)
+    fb_get_cmap(&fb_display[info->currcon].cmap, 1, sgivwfb_getcolreg, info);
 
-  currcon = con;
+  info->currcon = con;
   /* Install new colormap */
   do_install_cmap(con, info);
   return 0;
@@ -944,14 +907,6 @@ static int sgivwfbcon_updatevar(int con, struct fb_info *info)
 {
     /* Nothing */
     return 0;
-}
-
-/*
- *  Blank the display.
- */
-static void sgivwfbcon_blank(int blank, struct fb_info *info)
-{
-    /* Nothing */
 }
 
 #ifdef MODULE
@@ -967,7 +922,7 @@ void cleanup_module(void)
   unregister_framebuffer(&fb_info);
   dbe_TurnOffDma();
   iounmap(regs);
-  iounmap(fbmem);
+  iounmap(&fb_info.screen_base);
 }
 
 #endif /* MODULE */

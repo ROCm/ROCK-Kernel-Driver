@@ -26,7 +26,6 @@
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/time.h>
-#include <linux/pci.h>
 #include <sound/core.h>
 #include <sound/info.h>
 
