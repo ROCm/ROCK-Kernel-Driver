@@ -28,34 +28,21 @@
  *  with this program; if not, write  to the Free Software Foundation, Inc.,
  *  675 Mass Ave, Cambridge, MA 02139, USA.
  *
- *      History: 12/26/2001 - armin
- *		initial release
- *
  */
 
 #include <linux/config.h>
-#include <platforms/4xx/ibmstb4.h>
+#include <linux/module.h>
+#include "ibmstb4.h"
+#include <asm/ocp.h>
 
-const struct NS16550* COM_PORTS[] =
-{
-  (struct NS16550*) UART0_IO_BASE,
-  (struct NS16550*) UART1_IO_BASE,
-  (struct NS16550*) UART2_IO_BASE,
-};
-
-const struct iic_regs* IIC_ADDR[]=
-{
-	(struct iic_regs*) IIC0_BASE,
-};
-
-
-const struct gpio_regs* GPIO_ADDR[] =
-{
-	(struct gpio_regs*)	GPIO0_BASE,
-};
-
-const struct ide_regs* IDE_ADDR[] =
-{
-	(struct ide_regs*) IDE0_IO_ADDR,
-
+struct ocp_def core_ocp[] = {
+	{UART, UART0_IO_BASE, UART0_INT,IBM_CPM_UART0},
+	{UART, UART1_IO_BASE, UART1_INT, IBM_CPM_UART1},
+	{UART, UART2_IO_BASE, UART2_INT, IBM_CPM_UART2},
+	{IIC, IIC0_BASE, IIC0_IRQ, IBM_CPM_IIC0},
+	{IIC, IIC1_BASE, IIC1_IRQ, IBM_CPM_IIC1},
+	{GPIO, GPIO0_BASE, OCP_IRQ_NA, IBM_CPM_GPIO0},
+	{IDE, IDE0_BASE, IDE0_IRQ, OCP_CPM_NA},
+	{USB, USB0_BASE, USB0_IRQ, IBM_CPM_USB0},
+	{OCP_NULL_TYPE, 0x0, OCP_IRQ_NA, OCP_CPM_NA},
 };

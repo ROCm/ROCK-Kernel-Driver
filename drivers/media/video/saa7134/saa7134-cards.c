@@ -288,6 +288,81 @@ struct saa7134_board saa7134_boards[] = {
 			.amux = LINE2,
 		},
 	},
+	[SAA7134_BOARD_KWORLD] = {
+                .name           = "Kworld/KuroutoShikou SAA7130-TVPCI",
+		.audio_clock    = 0x00187de7,
+		.tuner_type     = TUNER_PHILIPS_NTSC_M,
+                .inputs         = {{
+                        .name = name_svideo,
+                        .vmux = 8,
+                        .amux = LINE1,
+                },{
+                        .name = name_comp1,
+                        .vmux = 3,
+                        .amux = LINE1,
+                },{
+                        .name = name_tv,
+                        .vmux = 1,
+                        .amux = TV,
+                        .tv   = 1,
+                }},
+        },
+	[SAA7134_BOARD_CINERGY600] = {
+                .name           = "Terratec Cinergy 600 TV",
+                .audio_clock    = 0x00200000,
+                .tuner_type     = TUNER_PHILIPS_PAL,
+                .inputs         = {{
+                        .name = name_tv,
+                        .vmux = 1,
+                        .amux = TV,
+                        .tv   = 1,
+                },{
+                        .name = name_comp1,
+                        .vmux = 4,
+                        .amux = LINE1,
+                },{
+                        .name = name_svideo,
+                        .vmux = 8,
+                        .amux = LINE1,
+                },{
+                        .name = name_comp2, // CVideo over SVideo Connector
+                        .vmux = 0,
+                        .amux = LINE1,
+                }},
+		.radio = {
+			.name = name_radio,
+			.amux = LINE2,
+               },
+
+        },
+	[SAA7134_BOARD_MD7134] = {
+		.name           = "Medion 7134",
+		.audio_clock    = 0x00200000,
+		.tuner_type     = TUNER_PHILIPS_FM1216ME_MK3,
+		.need_tda9887   = 1,
+		.inputs = {{
+			.name   = name_tv,
+			.vmux   = 1,
+			.amux   = LINE2,
+			.tv     =   1,
+		},{
+			.name   = name_comp1,
+			.vmux   = 0,
+			.amux   = LINE2,
+		},{
+			.name   = name_comp2,
+			.vmux   = 3,
+			.amux   = LINE2,
+		},{
+			.name   = name_svideo,
+			.vmux   = 8,
+			.amux   = LINE2,
+		}},
+		.radio = {
+			.name   = name_radio,
+			.amux   = LINE2,
+		},
+      },
 };
 const int saa7134_bcount = (sizeof(saa7134_boards)/sizeof(struct saa7134_board));
 
@@ -320,7 +395,25 @@ struct pci_device_id __devinitdata saa7134_pci_tbl[] = {
                 .subdevice    = 0x1142,
                 .driver_data  = SAA7134_BOARD_CINERGY400,
         },{
-
+                .vendor       = PCI_VENDOR_ID_PHILIPS,
+                .device       = PCI_DEVICE_ID_PHILIPS_SAA7134,
+                .subvendor    = 0x153B,
+                .subdevice    = 0x1143,
+                .driver_data  = SAA7134_BOARD_CINERGY600,
+        },{
+		.vendor       = PCI_VENDOR_ID_PHILIPS,
+		.device       = PCI_DEVICE_ID_PHILIPS_SAA7134,
+		.subvendor    = 0x5168,
+		.subdevice    = 0x0138,
+		.driver_data  = SAA7134_BOARD_FLYVIDEO3000,
+        },{
+		.vendor       = PCI_VENDOR_ID_PHILIPS,
+		.device       = PCI_DEVICE_ID_PHILIPS_SAA7134,
+		.subvendor    = 0x16be,
+		.subdevice    = 0x0003,
+		.driver_data  = SAA7134_BOARD_MD7134,
+	},{
+		
 		/* --- boards without eeprom + subsystem ID --- */
                 .vendor       = PCI_VENDOR_ID_PHILIPS,
                 .device       = PCI_DEVICE_ID_PHILIPS_SAA7134,

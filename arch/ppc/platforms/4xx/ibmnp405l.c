@@ -28,9 +28,6 @@
  *  with this program; if not, write  to the Free Software Foundation, Inc.,
  *  675 Mass Ave, Cambridge, MA 02139, USA.
  *
- *      History: 12/26/2001 - armin
- *		initial release
- *
  */
 
 #include <linux/config.h>
@@ -41,30 +38,15 @@
 #include <linux/string.h>
 #include <platforms/4xx/ibmnp405l.h>
 
-const struct NS16550* COM_PORTS[] =
-{
-  (struct NS16550*) UART0_IO_BASE,
-  (struct NS16550*) UART1_IO_BASE,
-};
+struct ocp_def core_ocp[] = {
+	{UART, UART0_IO_BASE, UART0_INT, IBM_CPM_UART0},
+	{UART, UART1_IO_BASE, UART1_INT, IBM_CPM_UART1},
+	{IIC, IIC0_BASE, IIC0_IRQ, IBM_CPM_IIC0},
+	{GPIO, GPIO0_BASE, OCP_IRQ_NA, IBM_CPM_GPIO0},
+	{OPB, OPB0_BASE, OCP_IRQ_NA, IBM_CPM_OPB},
+	{EMAC, EMAC0_BASE, BL_MAC_ETH0, IBM_CPM_EMAC0},
+	{EMAC, EMAC1_BASE, BL_MAC_ETH1, IBM_CPM_EMAC1},
+	{ZMII, ZMII0_BASE, OCP_IRQ_NA, OCP_CPM_NA},
+	{OCP_NULL_TYPE, 0x0, OCP_IRQ_NA, OCP_CPM_NA},
 
-const struct iic_regs* IIC_ADDR[]=
-{
-	(struct iic_regs*) IIC0_BASE,
-};
-
-
-const struct gpio_regs* GPIO_ADDR[] =
-{
-	(struct gpio_regs*)	GPIO0_BASE,
-};
-
-const struct emac_regs* EMAC_ADDR[]=
-{
-	(struct emac_regs*) EMAC0_BASE,
-	(struct emac_regs*) EMAC1_BASE
-};
-
-const struct zmii_regs* ZMII_ADDR[]=
-{
-	(zmii_t*)	ZMII0_BASE,
 };

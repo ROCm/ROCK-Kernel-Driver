@@ -13,9 +13,6 @@
  * Free Software Foundation;  either version 2 of the  License, or (at your
  * option) any later version.
  *
- *	History: 11/09/2001 - armin
- *       added board_init to add in additional instuctions needed during platfrom_init
- *
  */
 
 #include <linux/config.h>
@@ -25,6 +22,8 @@
 #include <asm/pci-bridge.h>
 #include <asm/machdep.h>
 #include <asm/todc.h>
+
+void *cpci405_nvram; 
 
 /*
  * Some IRQs unique to CPCI-405.
@@ -51,28 +50,31 @@ ppc405_map_irq(struct pci_dev *dev, unsigned char idsel, unsigned char pin)
 };
 
 void __init
-board_setup_arch(void)
+cpci405_setup_arch(void)
 {
+	ppc4xx_setup_arch();
+	TODC_INIT(TODC_TYPE_MK48T35, cpci405_nvram, cpci405_nvram, cpci405_nvram, 8);
 }
 
 void __init
-board_io_mapping(void)
+cpci405_map_io(void)
 {
+	ppc4xx_map_io();
+	cpci405_nvram = ioremap(CPCI405_NVRAM_PADDR, CPCI405_NVRAM_SIZE);
 }
 
 void __init
-board_setup_irq(void)
+platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
+	      unsigned long r6, unsigned long r7)
 {
-}
+	ppc4xx_init(r3, r4, r5, r6, r7);
 
-void __init
-board_init(void)
-{
-#ifdef CONFIG_PPC_RTC
+	ppc_md.setup_arch = cpci405_setup_arch;
+	ppc_md.setup_io_mappings = cpci405_map_io;
+
 	ppc_md.time_init = todc_time_init;
 	ppc_md.set_rtc_time = todc_set_rtc_time;
 	ppc_md.get_rtc_time = todc_get_rtc_time;
 	ppc_md.nvram_read_val = todc_direct_read_val;
 	ppc_md.nvram_write_val = todc_direct_write_val;
-#endif
 }

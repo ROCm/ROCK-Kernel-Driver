@@ -235,7 +235,7 @@ do_nfs_direct_IO(int rw, const struct inode *inode,
  * this function to do a write.
  */
 int
-nfs_direct_IO(int rw, struct file *file, const struct iovec *iov,
+nfs_direct_IO(int rw, struct kiocb *iocb, const struct iovec *iov,
 		loff_t offset, unsigned long nr_segs)
 {
 	/* None of this works yet, so prevent it from compiling. */

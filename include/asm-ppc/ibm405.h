@@ -29,12 +29,6 @@
  *  You should have received a copy of the  GNU General Public License along
  *  with this program; if not, write  to the Free Software Foundation, Inc.,
  *  675 Mass Ave, Cambridge, MA 02139, USA.
- *
- *	Version 1.0 (02/01/17) - A. Kuster
- *	Initial version	 - moved 405  specific out of the other core.h's
- *
- *	Version 1.0 (02/08/02) - A. Kuster
- *	removed DCRN_UIC1_BASE to NP405L & H
  */
 
 #ifdef __KERNEL__
@@ -55,6 +49,11 @@
 #define ET_NCFG	2
 #define ET_BUSERR	4
 #define ET_BUSTO	6
+
+/* Clock and power management shifts for emacs */
+#define IBM_CPM_EMMII	0	/* Shift value for MII */
+#define IBM_CPM_EMRX	1	/* Shift value for recv */
+#define IBM_CPM_EMTX	2	/* Shift value for MAC */
 
 #ifdef DCRN_CHCR_BASE
 #define DCRN_CHCR0	(DCRN_CHCR_BASE + 0x0)	/* Chip Control Register 1 */
@@ -233,16 +232,6 @@
 #define DCRN_MALTXCTP3R(base)	((base) + 0x23)	/* Channel Tx 3 Channel Table Pointer */
 #define DCRN_MALRCBS0(base)	((base) + 0x60)	/* Channel Rx 0 Channel Buffer Size */
 #define DCRN_MALRCBS1(base)	((base) + 0x61)	/* Channel Rx 1 Channel Buffer Size */
-
-/* EMAC DCRN's */
-#define DCRN_MALRXCTP2R(base)	((base) + 0x42)	/* Channel Rx 2 Channel Table Pointer */
-#define DCRN_MALRXCTP3R(base)	((base) + 0x43)	/* Channel Rx 3 Channel Table Pointer */
-#define DCRN_MALTXCTP4R(base)	((base) + 0x24)	/* Channel Tx 4 Channel Table Pointer */
-#define DCRN_MALTXCTP5R(base)	((base) + 0x25)	/* Channel Tx 5 Channel Table Pointer */
-#define DCRN_MALTXCTP6R(base)	((base) + 0x26)	/* Channel Tx 6 Channel Table Pointer */
-#define DCRN_MALTXCTP7R(base)	((base) + 0x27)	/* Channel Tx 7 Channel Table Pointer */
-#define DCRN_MALRCBS2(base)	((base) + 0x62)	/* Channel Rx 2 Channel Buffer Size */
-#define DCRN_MALRCBS3(base)	((base) + 0x63)	/* Channel Rx 3 Channel Buffer Size */
 
  /* DCRN_MALCR */
 #define MALCR_MMSR		0x80000000	/* MAL Software reset */

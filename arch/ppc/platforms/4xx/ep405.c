@@ -2,7 +2,7 @@
  *    Copyright 2001 MontaVista Software Inc.
  *        <mlocke@mvista.com>
  *
- * 	Not much is needed for the Embedded Planet 405gp board
+ * 	Not much needed for the Embedded Planet 405gp board
  *
  */
 #include <linux/config.h>
@@ -12,7 +12,7 @@
 #include <asm/pci-bridge.h>
 #include <asm/machdep.h>
 #include <asm/todc.h>
-#include <platforms/4xx/ibm_ocp.h>
+#include <asm/ibm_ocp_pci.h>
 
 #undef DEBUG
 #ifdef DEBUG
@@ -33,7 +33,6 @@ static struct {
 	{0x07, 0x0E, 25},		/* EP405PC: USB */
 #endif
 };
-#define EP405_DEVTABLE_SIZE (sizeof(ep405_devtable)/sizeof(ep405_devtable[0]))
 
 int __init
 ppc405_map_irq(struct pci_dev *dev, unsigned char idsel, unsigned char pin)
@@ -42,7 +41,7 @@ ppc405_map_irq(struct pci_dev *dev, unsigned char idsel, unsigned char pin)
 
 	/* AFAICT this is only called a few times during PCI setup, so
 	   performance is not critical */
-	for (i = 0; i < EP405_DEVTABLE_SIZE; i++) {
+	for (i = 0; i < ARRAY_SIZE(ep405_devtable); i++) {
 		if (idsel == ep405_devtable[i].pci_idsel)
 			return ep405_devtable[i].irq;
 	}
@@ -50,11 +49,11 @@ ppc405_map_irq(struct pci_dev *dev, unsigned char idsel, unsigned char pin)
 };
 
 void __init
-board_setup_arch(void)
+ep405_setup_arch(void)
 {
-	bd_t *bip = (bd_t *) __res;
+	ppc4xx_setup_arch();
 
-	if (bip->bi_nvramsize == 512*1024) {
+	if (__res.bi_nvramsize == 512*1024) {
 		/* FIXME: we should properly handle NVRTCs of different sizes */
 		TODC_INIT(TODC_TYPE_DS1557, ep405_nvram, ep405_nvram, ep405_nvram, 8);
 	}
@@ -128,9 +127,11 @@ bios_fixup(struct pci_controller *hose, struct pcil0_regs *pcip)
 }
 
 void __init
-board_io_mapping(void)
+ep405_map_io(void)
 {
-	bd_t *bip = (bd_t *) __res;
+	bd_t *bip = &__res;
+
+	ppc4xx_map_io();
 
 	ep405_bcsr = ioremap(EP405_BCSR_PADDR, EP405_BCSR_SIZE);
 
@@ -140,9 +141,11 @@ board_io_mapping(void)
 }
 
 void __init
-board_setup_irq(void)
+ep405_init_IRQ(void)
 {
 	int i;
+
+	ppc4xx_init_IRQ();
 
 	/* Workaround for a bug in the firmware it incorrectly sets
 	   the IRQ polarities for XIRQ0 and XIRQ1 */
@@ -153,7 +156,7 @@ board_setup_irq(void)
 	writeb(0xf0, ep405_bcsr+10);
 
 	/* Set up IRQ routing */
-	for (i = 0; i < EP405_DEVTABLE_SIZE; i++) {
+	for (i = 0; i < ARRAY_SIZE(ep405_devtable); i++) {
 		if ( (ep405_devtable[i].irq >= 25)
 		     && (ep405_devtable[i].irq) <= 31) {
 			writeb(ep405_devtable[i].cpld_xirq_select, ep405_bcsr+5);
@@ -163,22 +166,23 @@ board_setup_irq(void)
 }
 
 void __init
-board_init(void)
+platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
+	      unsigned long r6, unsigned long r7)
 {
-#ifdef CONFIG_PPC_RTC
-	bd_t *bip = (bd_t *) __res;
+	ppc4xx_init(r3, r4, r5, r6, r7);
 
-	/* FIXME: we should be able to access the NVRAM even if PPC_RTC is not configured */
+	ppc_md.setup_arch = ep405_setup_arch;
+	ppc_md.setup_io_mappings = ep405_map_io;
+	ppc_md.init_IRQ = ep405_init_IRQ;
+
 	ppc_md.nvram_read_val = todc_direct_read_val;
 	ppc_md.nvram_write_val = todc_direct_write_val;
 
-	if (bip->bi_nvramsize == 512*1024) {
+	if (__res.bi_nvramsize == 512*1024) {
 		ppc_md.time_init = todc_time_init;
 		ppc_md.set_rtc_time = todc_set_rtc_time;
 		ppc_md.get_rtc_time = todc_get_rtc_time;
 	} else {
 		printk("EP405: NVRTC size is not 512k (not a DS1557).  Not sure what to do with it\n");
 	}
-
-#endif
 }

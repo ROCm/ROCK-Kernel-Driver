@@ -117,6 +117,9 @@ struct saa7134_format {
 #define SAA7134_BOARD_TVSTATION_RDS     7
 #define SAA7134_BOARD_CINERGY400	8
 #define SAA7134_BOARD_MD5044		9
+#define SAA7134_BOARD_KWORLD           10
+#define SAA7134_BOARD_CINERGY600       11
+#define SAA7134_BOARD_MD7134           12
 
 #define SAA7134_INPUT_MAX 8
 
@@ -159,7 +162,7 @@ struct saa7134_board {
 
 #define RESOURCE_OVERLAY       1
 #define RESOURCE_VIDEO         2
-#define RESOURCE_VBI           3
+#define RESOURCE_VBI           4
 
 #define INTERLACE_AUTO         0
 #define INTERLACE_ON           1
@@ -224,7 +227,6 @@ struct saa7134_fh {
 	/* video capture */
 	struct saa7134_format      *fmt;
 	int                        width,height;
-	enum v4l2_field            field;
 	struct videobuf_queue      cap;
 	struct saa7134_pgtable     pt_cap;
 

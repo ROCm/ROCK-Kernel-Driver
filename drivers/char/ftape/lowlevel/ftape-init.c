@@ -31,19 +31,13 @@
 #include <linux/major.h>
 
 #include <linux/ftape.h>
-#if LINUX_VERSION_CODE >= KERNEL_VER(2,1,16)
 #include <linux/init.h>
-#else
-#define __initdata
-#define __initfunc(__arg) __arg
-#endif
 #include <linux/qic117.h>
 #ifdef CONFIG_ZFTAPE
 #include <linux/zftape.h>
 #endif
 
 #include "../lowlevel/ftape-init.h"
-#include "../lowlevel/ftape_syms.h"
 #include "../lowlevel/ftape-io.h"
 #include "../lowlevel/ftape-read.h"
 #include "../lowlevel/ftape-write.h"
@@ -114,9 +108,6 @@ KERN_INFO "Compiled for Linux version %s"
 	ft_failure   = 1;         /* inhibit any operation but open */
 	ftape_udelay_calibrate(); /* must be before fdc_wait_calibrate ! */
 	fdc_wait_calibrate();
-#if LINUX_VERSION_CODE < KERNEL_VER(2,1,18)
-	register_symtab(&ftape_symbol_table); /* add global ftape symbols */
-#endif
 #if defined(CONFIG_PROC_FS) && defined(CONFIG_FT_PROC_FS)
 	(void)ftape_proc_init();
 #endif
@@ -132,7 +123,6 @@ KERN_INFO "Compiled for Linux version %s"
 static int ft_tracing = -1;
 #endif
 
-#if LINUX_VERSION_CODE >= KERNEL_VER(2,1,18)
 #define FT_MOD_PARM(var,type,desc) \
 	MODULE_PARM(var,type); MODULE_PARM_DESC(var,desc)
 
@@ -154,7 +144,6 @@ MODULE_AUTHOR(
 MODULE_DESCRIPTION(
 	"QIC-117 driver for QIC-40/80/3010/3020 floppy tape drives.");
 MODULE_LICENSE("GPL");
-#endif
 
 /*  Called by modules package when installing the driver
  */

@@ -302,7 +302,6 @@ void wait_for_all_aios(struct kioctx *ctx)
 	add_wait_queue(&ctx->wait, &wait);
 	set_task_state(tsk, TASK_UNINTERRUPTIBLE);
 	while (ctx->reqs_active) {
-		printk("ctx->reqs_active = %d\n", ctx->reqs_active);
 		schedule();
 		set_task_state(tsk, TASK_UNINTERRUPTIBLE);
 	}

@@ -1,7 +1,7 @@
 /*
  *
  *
- *    Copyright 2000 MontaVista Software Inc.
+ *    Copyright 2000-2002  MontaVista Software Inc.
  * 	Author: MontaVista Software, Inc.
  *         	akuster@mvista.com or source@mvista.com
  *
@@ -17,7 +17,7 @@
 #ifdef __KERNEL__
 #ifndef __ASM_ASH_H__
 #define __ASM_ASH_H__
-#include <platforms/4xx/ibm_ocp.h>
+#include <asm/ibm_ocp.h>
 #include <platforms/4xx/ibmnp405h.h>
 
 #ifndef __ASSEMBLY__
@@ -32,7 +32,7 @@ typedef struct board_info {
 	unsigned char	 bi_s_version[4];	/* Version of this structure */
 	unsigned char	 bi_r_version[30];	/* Version of the IBM ROM */
 	unsigned int	 bi_memsize;		/* DRAM installed, in bytes */
-	unsigned char	 bi_enetaddr[EMAC_NUMS][6];	/* Local Ethernet MAC address */
+	unsigned char	 bi_enetaddr[4][6];	/* Local Ethernet MAC address */
 	unsigned char	 bi_pci_enetaddr[6];
 	unsigned int	 bi_intfreq;		/* Processor speed, in Hz */
 	unsigned int	 bi_busfreq;		/* PLB Bus speed, in Hz */
@@ -76,7 +76,7 @@ extern  void *ash_rtc_base;
 #define BASE_BAUD		691200
 #endif
 
-#define PPC4xx_MACHINE_NAME "IBM NP405H Ceder"
+#define PPC4xx_MACHINE_NAME "IBM NP405H Ash"
 
 extern char pci_irq_table[][4];
 

@@ -28,26 +28,18 @@
  *  with this program; if not, write  to the Free Software Foundation, Inc.,
  *  675 Mass Ave, Cambridge, MA 02139, USA.
  *
- *      History: 01/08/2002 - armin
- *		initial release
- *
  */
 
 #include <linux/config.h>
-#include <platforms/4xx/ibmstb3.h>
+#include "ibmstb3.h"
+#include <asm/ocp.h>
 
-const struct NS16550* COM_PORTS[] =
-{
-  (struct NS16550*) UART0_IO_BASE,
+struct ocp_def core_ocp[] = {
+	{UART, UART0_IO_BASE, UART0_INT, IBM_CPM_UART0},
+	{IIC, IIC0_BASE, IIC0_IRQ, IBM_CPM_IIC0},
+	{IIC, IIC1_BASE, IIC1_IRQ, IBM_CPM_IIC1},
+	{GPIO, GPIO0_BASE, OCP_IRQ_NA, IBM_CPM_GPIO0},
+	{OPB, OPB0_BASE, OCP_IRQ_NA, OCP_CPM_NA},
+	{OCP_NULL_TYPE, 0x0, OCP_IRQ_NA, OCP_CPM_NA},
+
 };
-
-const struct iic_regs* IIC_ADDR[]=
-{
-	(struct iic_regs*) IIC0_BASE,
-};
-
-const struct gpio_regs* GPIO_ADDR[] =
-{
-	(struct gpio_regs*)	GPIO0_BASE,
-};
-

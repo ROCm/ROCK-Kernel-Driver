@@ -42,19 +42,10 @@ static int debug = 0;	/* insmod parameter */
 /* Addresses to scan */
 static unsigned short normal_i2c[] =  {
     I2C_TDA9875 >> 1,
-    I2C_CLIENT_END};
-static unsigned short normal_i2c_range[] = {I2C_CLIENT_END};
-static unsigned short probe[2]        = { I2C_CLIENT_END, I2C_CLIENT_END };
-static unsigned short probe_range[2]  = { I2C_CLIENT_END, I2C_CLIENT_END };
-static unsigned short ignore[2]       = { I2C_CLIENT_END, I2C_CLIENT_END };
-static unsigned short ignore_range[2] = { I2C_CLIENT_END, I2C_CLIENT_END };
-static unsigned short force[2]        = { I2C_CLIENT_END, I2C_CLIENT_END };
-static struct i2c_client_address_data addr_data = {
-	normal_i2c, normal_i2c_range, 
-	probe, probe_range, 
-	ignore, ignore_range, 
-	force
+    I2C_CLIENT_END
 };
+static unsigned short normal_i2c_range[] = {I2C_CLIENT_END};
+I2C_CLIENT_INSMOD;
 
 /* This is a superset of the TDA9875 */
 struct tda9875 {
@@ -63,7 +54,6 @@ struct tda9875 {
 	int bass, treble;
 	struct i2c_client c;
 };
-
 
 static struct i2c_driver driver;
 static struct i2c_client client_template;
@@ -397,22 +387,20 @@ static int tda9875_command(struct i2c_client *client,
 
 
 static struct i2c_driver driver = {
-        "i2c tda9875 driver",
-        I2C_DRIVERID_TDA9875, /* Get new one for TDA9875 */
-        I2C_DF_NOTIFY,
-	tda9875_probe,
-        tda9875_detach,
-        tda9875_command,
+	.owner          = THIS_MODULE,
+        .name           = "i2c tda9875 driver",
+        .id             = I2C_DRIVERID_TDA9875,
+        .flags          = I2C_DF_NOTIFY,
+	.attach_adapter = tda9875_probe,
+        .detach_client  = tda9875_detach,
+        .command        = tda9875_command,
 };
 
 static struct i2c_client client_template =
 {
-        "(unset)",		/* name */
-        -1,
-        0,
-        0,
-        NULL,
-        &driver
+        .name    = "tda9875",
+        .id      = -1,
+        .driver  = &driver,
 };
 
 static int tda9875_init(void)

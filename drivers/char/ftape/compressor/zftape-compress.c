@@ -37,11 +37,7 @@
 
 #include <linux/zftape.h>
 
-#if LINUX_VERSION_CODE >= KERNEL_VER(2,1,6)
 #include <asm/uaccess.h>
-#else
-#include <asm/segment.h>
-#endif
 
 #include "../zftape/zftape-init.h"
 #include "../zftape/zftape-eof.h"
@@ -271,15 +267,9 @@ static void get_next_cluster(cmpr_info *cluster, const __u8 *buff,
 
 static void zftc_lock(void)
 {
-#if LINUX_VERSION_CODE < KERNEL_VER(2,1,18)
-	if (!MOD_IN_USE) {
-		MOD_INC_USE_COUNT;
-	}
-#else
 	MOD_INC_USE_COUNT; /*  sets MOD_VISITED and MOD_USED_ONCE,
 			    *  locking is done with can_unload()
 			    */
-#endif
 	keep_module_locked = 1;
 }
 
@@ -291,11 +281,6 @@ static void zftc_reset(void)
 
 	memset((void *)&cseg, '\0', sizeof(cseg));
 	zftc_stats();
-#if LINUX_VERSION_CODE < KERNEL_VER(2,1,18)
-	if (MOD_IN_USE) {
-		MOD_DEC_USE_COUNT;
-	}
-#endif
 	keep_module_locked = 0;
 	TRACE_EXIT;
 }
@@ -570,15 +555,9 @@ static int zftc_write(int *write_cnt,
 	TRACE_FUN(ft_t_flow);
 	
 	keep_module_locked = 1;
-#if LINUX_VERSION_CODE >= KERNEL_VER(2,1,18)
 	MOD_INC_USE_COUNT; /*  sets MOD_VISITED and MOD_USED_ONCE,
 			    *  locking is done with can_unload()
 			    */
-#else
-	if (!MOD_IN_USE) {
-		MOD_INC_USE_COUNT;
-	}
-#endif
 	/* Note: we do not unlock the module because
 	 * there are some values cached in that `cseg' variable.  We
 	 * don't don't want to use this information when being
@@ -618,17 +597,10 @@ static int zftc_write(int *write_cnt,
 		 * block.  We know, that the compression buffer is
 		 * empty (else there wouldn't be any space left).  
 		 */
-#if LINUX_VERSION_CODE > KERNEL_VER(2,1,3)
 		if (copy_from_user(zftc_scratch_buf, src_buf + result, 
 				   volume->blk_sz) != 0) {
 			TRACE_EXIT -EFAULT;
 		}
-#else
-		TRACE_CATCH(verify_area(VERIFY_READ, src_buf + result, 
-					volume->blk_sz),);
-		memcpy_fromfs(zftc_scratch_buf, src_buf + result, 
-			      volume->blk_sz);
-#endif
 		req_len_left -= volume->blk_sz;
 		cseg.cmpr_sz = zft_compress(zftc_scratch_buf, volume->blk_sz, 
 					    zftc_buf);
@@ -704,15 +676,9 @@ static int zftc_read (int *read_cnt,
 	TRACE_FUN(ft_t_flow);
 
 	keep_module_locked = 1;
-#if LINUX_VERSION_CODE >= KERNEL_VER(2,1,18)
 	MOD_INC_USE_COUNT; /*  sets MOD_VISITED and MOD_USED_ONCE,
 			    *  locking is done with can_unload()
 			    */
-#else
-	if (!MOD_IN_USE) {
-		MOD_INC_USE_COUNT;
-	}
-#endif
 	TRACE_CATCH(zft_allocate_cmpr_mem(volume->blk_sz),);
 	if (pos->seg_byte_pos == 0) {
 		/* new segment just read
@@ -746,16 +712,11 @@ static int zftc_read (int *read_cnt,
 				      "Uncompressed blk (%d) != blk size (%d)",
 				      uncompressed_sz, volume->blk_sz);
 			}       
-#if LINUX_VERSION_CODE > KERNEL_VER(2,1,3)
 			if (copy_to_user(dst_buf + result, 
 					 zftc_scratch_buf, 
 					 uncompressed_sz) != 0 ) {
 				TRACE_EXIT -EFAULT;
 			}
-#else
-			memcpy_tofs(dst_buf + result, zftc_scratch_buf, 
-				    uncompressed_sz);
-#endif
 			remaining      -= uncompressed_sz;
 			result     += uncompressed_sz;
 			cseg.cmpr_pos  = 0;
@@ -839,15 +800,9 @@ static int zftc_seek(unsigned int new_block_pos,
 	TRACE_FUN(ft_t_flow);
 
 	keep_module_locked = 1;
-#if LINUX_VERSION_CODE >= KERNEL_VER(2,1,18)
 	MOD_INC_USE_COUNT; /*  sets MOD_VISITED and MOD_USED_ONCE,
 			    *  locking is done with can_unload()
 			    */
-#else
-	if (!MOD_IN_USE) {
-		MOD_INC_USE_COUNT;
-	}
-#endif
 	if (new_block_pos == 0) {
 		pos->seg_pos      = volume->start_seg;
 		pos->seg_byte_pos = 0;
@@ -1272,14 +1227,10 @@ int init_module(void)
 {
 	int result;
 
-#if LINUX_VERSION_CODE < KERNEL_VER(2,1,18)
-	register_symtab(0); /* remove global ftape symbols */
-#else
 #if 0 /* FIXME --RR */
 	if (!mod_member_present(&__this_module, can_unload))
 		return -EBUSY;
 	__this_module.can_unload = can_unload;
-#endif
 #endif
 	result = zft_compressor_init();
 	keep_module_locked = 0;
