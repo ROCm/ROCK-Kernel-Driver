@@ -276,9 +276,9 @@ config MWINCHIP3D
 	help
 	  Select this for an IDT Winchip-2A or 3.  Linux and GCC
 	  treat this chip as a 586TSC with some extended instructions
-	  and alignment reqirements.  Development kernels also enable
-	  out of order memory stores for this CPU, which can increase
-	  performance of some operations.
+	  and alignment reqirements.  Also enable out of order memory
+	  stores for this CPU, which can increase performance of some
+	  operations.
 
 config MCYRIXIII
 	bool "CyrixIII/VIA-C3"
