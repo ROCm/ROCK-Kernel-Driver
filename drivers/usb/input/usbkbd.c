@@ -299,6 +299,7 @@ static int usb_kbd_probe(struct usb_interface *iface,
 	kbd->dev.id.vendor = dev->descriptor.idVendor;
 	kbd->dev.id.product = dev->descriptor.idProduct;
 	kbd->dev.id.version = dev->descriptor.bcdDevice;
+	kbd->dev.dev = &iface->dev;
 
 	if (!(buf = kmalloc(63, GFP_KERNEL))) {
 		usb_free_urb(kbd->irq);
