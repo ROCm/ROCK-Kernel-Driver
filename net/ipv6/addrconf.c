@@ -97,6 +97,8 @@ static int __ipv6_try_regen_rndid(struct inet6_dev *idev, struct in6_addr *tmpad
 static void ipv6_regen_rndid(unsigned long data);
 
 static int desync_factor = MAX_DESYNC_FACTOR * HZ;
+static struct crypto_tfm *md5_tfm;
+static spinlock_t md5_tfm_lock = SPIN_LOCK_UNLOCKED;
 #endif
 
 static int ipv6_count_addresses(struct inet6_dev *idev);
@@ -1045,7 +1047,6 @@ static int __ipv6_regen_rndid(struct inet6_dev *idev)
 	struct net_device *dev;
 	u8 eui64[8];
 	u8 digest[16];
-	struct crypto_tfm *tfm;
 	struct scatterlist sg[2];
 
 	sg[0].page = virt_to_page(idev->entropy);
@@ -1067,18 +1068,16 @@ static int __ipv6_regen_rndid(struct inet6_dev *idev)
 		get_random_bytes(eui64, sizeof(eui64));
 	}
 regen:
-	tfm = crypto_alloc_tfm("md5", 0);
-	if (tfm == NULL) {
-		if (net_ratelimit())
-			printk(KERN_WARNING
-				"failed to load transform for md5\n");
+	spin_lock(&md5_tfm_lock);
+	if (unlikely(md5_tfm == NULL)) {
+		spin_unlock(&md5_tfm_lock);
 		in6_dev_put(idev);
 		return -1;
 	}
-	crypto_digest_init(tfm);
-	crypto_digest_update(tfm, sg, 2);
-	crypto_digest_final(tfm, digest);
-	crypto_free_tfm(tfm);
+	crypto_digest_init(md5_tfm);
+	crypto_digest_update(md5_tfm, sg, 2);
+	crypto_digest_final(md5_tfm, digest);
+	spin_unlock(&md5_tfm_lock);
 
 	memcpy(idev->rndid, &digest[0], 8);
 	idev->rndid[0] &= ~0x02;
@@ -1106,6 +1105,9 @@ regen:
 			goto regen;
 	}
 	
+	idev->regen_timer.expires = jiffies +
+					idev->cnf.temp_prefered_lft * HZ - 
+					idev->cnf.regen_max_retry * idev->cnf.dad_transmits * idev->nd_parms->retrans_time - desync_factor;
 	if (time_before(idev->regen_timer.expires, jiffies)) {
 		idev->regen_timer.expires = 0;
 		printk(KERN_WARNING
@@ -2647,7 +2649,16 @@ void __init addrconf_init(void)
 {
 #ifdef MODULE
 	struct net_device *dev;
+#endif
 
+#ifdef CONFIG_IPV6_PRIVACY
+	md5_tfm = crypto_alloc_tfm("md5", 0);
+	if (unlikely(md5_tfm == NULL))
+		printk(KERN_WARNING
+			"failed to load transform for md5\n");
+#endif
+
+#ifdef MODULE
 	/* This takes sense only during module load. */
 	rtnl_lock();
 	for (dev = dev_base; dev; dev = dev->next) {
@@ -2731,6 +2742,13 @@ void addrconf_cleanup(void)
 	del_timer(&addr_chk_timer);
 
 	rtnl_unlock();
+
+#ifdef CONFIG_IPV6_PRIVACY
+	if (likely(md5_tfm != NULL)) {
+		crypto_free_tfm(md5_tfm);
+		md5_tfm = NULL;
+	}
+#endif
 
 #ifdef CONFIG_PROC_FS
 	proc_net_remove("if_inet6");
