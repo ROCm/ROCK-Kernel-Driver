@@ -227,7 +227,7 @@ config SCSI_DECSII
 	depends on DECSTATION && SCSI
 
 config BLK_DEV_3W_XXXX_RAID
-	tristate "3ware Hardware ATA-RAID support"
+	tristate "3ware 5/6/7/8xxx ATA-RAID support"
 	depends on PCI && SCSI
 	help
 	  3ware is the only hardware ATA-Raid product in Linux to date.
@@ -238,6 +238,17 @@ config BLK_DEV_3W_XXXX_RAID
 
 	  Please read the comments at the top of
 	  <file:drivers/scsi/3w-xxxx.c>.
+
+config SCSI_3W_9XXX
+	tristate "3ware 9xxx SATA-RAID support"
+	depends on PCI && SCSI
+	help
+	  This driver supports the 9000 series 3ware SATA-RAID cards.
+
+	  <http://www.amcc.com>
+
+	  Please read the comments at the top of
+	  <file:drivers/scsi/3w-9xxx.c>.
 
 config SCSI_7000FASST
 	tristate "7000FASST SCSI support"
