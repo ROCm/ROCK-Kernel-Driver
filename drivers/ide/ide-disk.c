@@ -1610,56 +1610,6 @@ static void idedisk_add_settings(ide_drive_t *drive)
 #endif
 }
 
-static int idedisk_suspend(struct device *dev, u32 state, u32 level)
-{
-	ide_drive_t *drive = dev->driver_data;
-
-	printk("Suspending device %p\n", dev->driver_data);
-
-	/* I hope that every freeze operation from the upper levels have
-	 * already been done...
-	 */
-
-	if (level != SUSPEND_SAVE_STATE)
-		return 0;
-	BUG_ON(in_interrupt());
-
-	printk("Waiting for commands to finish\n");
-
-	/* wait until all commands are finished */
-	/* FIXME: waiting for spinlocks should be done instead. */
-	if (!(HWGROUP(drive)))
-		printk("No hwgroup?\n");
-	while (HWGROUP(drive)->handler)
-		yield();
-
-	/* set the drive to standby */
-	printk(KERN_INFO "suspending: %s ", drive->name);
-	if (drive->driver) {
-		if (drive->driver->standby)
-			drive->driver->standby(drive);
-	}
-	drive->blocked = 1;
-
-	while (HWGROUP(drive)->handler)
-		yield();
-
-	return 0;
-}
-
-static int idedisk_resume(struct device *dev, u32 level)
-{
-	ide_drive_t *drive = dev->driver_data;
-
-	if (level != RESUME_RESTORE_STATE)
-		return 0;
-	if (!drive->blocked)
-		panic("ide: Resume but not suspended?\n");
-
-	drive->blocked = 0;
-	return 0;
-}
-
 
 /* This is just a hook for the overall driver tree.
  */
