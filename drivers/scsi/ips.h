@@ -64,11 +64,7 @@
    /*
     * Some handy macros
     */
-   #ifndef LinuxVersionCode
-      #define LinuxVersionCode(x,y,z)  (((x)<<16)+((y)<<8)+(z))
-   #endif
-
-   #if LINUX_VERSION_CODE >= LinuxVersionCode(2,4,20) || defined CONFIG_HIGHIO
+   #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,20) || defined CONFIG_HIGHIO
       #define IPS_HIGHIO
       #define IPS_HIGHMEM_IO     .highmem_io = 1,
    #else
@@ -97,12 +93,12 @@
     #define IPS_SGLIST_SIZE(ha)       (IPS_USE_ENH_SGLIST(ha) ? \
                                          sizeof(IPS_ENH_SG_LIST) : sizeof(IPS_STD_SG_LIST))
 
-   #if LINUX_VERSION_CODE < LinuxVersionCode(2,4,4)
+   #if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,4)
       #define pci_set_dma_mask(dev,mask) (1)
       #define scsi_set_pci_device(sh,dev) (0)
    #endif
 
-   #if LINUX_VERSION_CODE < LinuxVersionCode(2,5,0)
+   #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
       #define scsi_register_host(x)    scsi_register_module(MODULE_SCSI_HA,x)
       #define scsi_unregister_host(x)  scsi_unregister_module(MODULE_SCSI_HA,x)
    #endif
@@ -439,7 +435,7 @@
    /*
     * Scsi_Host Template
     */
-#if LINUX_VERSION_CODE < LinuxVersionCode(2,5,0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
    static void ips_select_queue_depth(struct Scsi_Host *, Scsi_Device *);
    static int ips_biosparam(Disk *disk, kdev_t dev, int geom[]);
 #define IPS {	\

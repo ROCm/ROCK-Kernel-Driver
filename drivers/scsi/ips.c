@@ -202,7 +202,7 @@
    #error "This driver has only been tested on the x86/ia64 platforms"
 #endif
 
-#if LINUX_VERSION_CODE <= LinuxVersionCode(2,5,0)
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,5,0)
     #include "sd.h"
     #define IPS_SG_ADDRESS(sg)       ((sg)->address)
     #define IPS_LOCK_SAVE(lock,flags) spin_lock_irqsave(&io_request_lock,flags)
@@ -1136,7 +1136,7 @@ ips_queue(Scsi_Cmnd *SC, void (*done) (Scsi_Cmnd *)) {
 /*                                                                          */
 /****************************************************************************/
 static int
-#if LINUX_VERSION_CODE < LinuxVersionCode(2,5,0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
 ips_biosparam(Disk *disk, kdev_t dev, int geom[]) {
    ips_ha_t         *ha = (ips_ha_t *) disk->device->host->hostdata;
    unsigned long     capacity = disk->capacity;
@@ -1182,7 +1182,7 @@ ips_biosparam(struct scsi_device *sdev, struct block_device *bdev,
 
    return (0);
 }
-#if LINUX_VERSION_CODE < LinuxVersionCode(2,5,0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
 /****************************************************************************/
 /*                                                                          */
 /* Routine Name: ips_select_queue_depth                                     */
@@ -6755,7 +6755,7 @@ ips_register_scsi( int index){
 	sh->unchecked_isa_dma = sh->hostt->unchecked_isa_dma;
 	sh->use_clustering = sh->hostt->use_clustering;
 
-#if LINUX_VERSION_CODE >= LinuxVersionCode(2,4,7)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,7)
 	sh->max_sectors = 128;
 #endif 
 
@@ -7138,7 +7138,7 @@ static int ips_init_phase2( int index )
 }
 
 
-#if LINUX_VERSION_CODE >= LinuxVersionCode(2,4,9)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,9)
 MODULE_LICENSE("GPL");
 #endif
 
