@@ -27,7 +27,7 @@
  * Effectively, it's the maximum number of compact node ids (cnodeid_t).
  * This is not necessarily the same as MAX_NASIDS.
  */
-#define MAX_COMPACT_NODES       128
+#define MAX_COMPACT_NODES       2048
 
 /*
  * MAX_REGIONS refers to the maximum number of hardware partitioned regions.
