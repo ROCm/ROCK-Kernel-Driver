@@ -26,7 +26,6 @@
  * TODO: 
  * - Allocate more than order 0 pages to avoid too much linear map splitting.
  */
-#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/pci.h>
 #include <linux/init.h>
@@ -34,6 +33,7 @@
 #include <linux/miscdevice.h>
 #include <linux/pm.h>
 #include <linux/agp_backend.h>
+#include <linux/agpgart.h>
 #include <linux/vmalloc.h>
 #include <asm/io.h>
 #include "agp.h"
