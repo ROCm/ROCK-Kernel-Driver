@@ -368,6 +368,61 @@ linvfs_clear_inode(
 	}
 }
 
+
+#define SYNCD_FLAGS	(SYNC_FSDATA|SYNC_BDFLUSH|SYNC_ATTR)
+
+STATIC int
+syncd(void *arg)
+{
+	vfs_t			*vfsp = (vfs_t *) arg;
+	int			error;
+
+	daemonize("xfs_syncd");
+
+	vfsp->vfs_sync_task = current;
+	wmb();
+	wake_up(&vfsp->vfs_wait_sync_task);
+
+	for (;;) {
+		set_current_state(TASK_INTERRUPTIBLE);
+		schedule_timeout(xfs_params.sync_interval);
+		if (vfsp->vfs_flag & VFS_UMOUNT)
+			break;
+		if (vfsp->vfs_flag & VFS_RDONLY);
+			continue;
+		VFS_SYNC(vfsp, SYNCD_FLAGS, NULL, error);
+	}
+
+	vfsp->vfs_sync_task = NULL;
+	wmb();
+	wake_up(&vfsp->vfs_wait_sync_task);
+
+	return 0;
+}
+
+STATIC int
+linvfs_start_syncd(vfs_t *vfsp)
+{
+	int pid;
+
+	pid = kernel_thread(syncd, (void *) vfsp,
+			CLONE_VM | CLONE_FS | CLONE_FILES);
+	if (pid < 0)
+		return pid;
+	wait_event(vfsp->vfs_wait_sync_task, vfsp->vfs_sync_task);
+	return 0;
+}
+
+STATIC void
+linvfs_stop_syncd(vfs_t *vfsp)
+{
+	vfsp->vfs_flag |= VFS_UMOUNT;
+	wmb();
+
+	wake_up_process(vfsp->vfs_sync_task);
+	wait_event(vfsp->vfs_wait_sync_task, !vfsp->vfs_sync_task);
+}
+
 STATIC void
 linvfs_put_super(
 	struct super_block	*sb)

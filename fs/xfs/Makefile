@@ -125,7 +125,6 @@ xfs-y				+= $(addprefix linux/, \
 				   xfs_iomap.o \
 				   xfs_iops.o \
 				   xfs_lrw.o \
-				   xfs_syncd.o \
 				   xfs_super.o \
 				   xfs_vfs.o \
 				   xfs_vnode.o)

@@ -104,7 +104,5 @@ extern void xfs_free_buftarg(struct pb_target *);
 
 extern void xfs_setsize_buftarg(struct pb_target *, unsigned int, unsigned int);
 extern unsigned int xfs_getsize_buftarg(struct pb_target *);
-extern int linvfs_start_syncd(vfs_t *);
-extern void linvfs_stop_syncd(vfs_t *);
 
 #endif	/* __XFS_SUPER_H__ */
