@@ -223,6 +223,7 @@ struct thread_struct {
 	__u64 map_base;			/* base address for get_unmapped_area() */
 	__u64 task_size;		/* limit for task size */
 	struct siginfo *siginfo;	/* current siginfo struct for ptrace() */
+	__u64 last_fph_cpu;		/* CPU that may hold the contents of f32-f127 */
 
 #ifdef CONFIG_IA32_SUPPORT
 	__u64 eflag;			/* IA32 EFLAGS reg */
@@ -270,12 +271,8 @@ struct thread_struct {
 
 #define start_thread(regs,new_ip,new_sp) do {							\
 	set_fs(USER_DS);									\
-	ia64_psr(regs)->dfh = 1;	/* disable fph */					\
-	ia64_psr(regs)->mfh = 0;	/* clear mfh */						\
-	ia64_psr(regs)->cpl = 3;	/* set user mode */					\
-	ia64_psr(regs)->ri = 0;		/* clear return slot number */				\
-	ia64_psr(regs)->is = 0;		/* IA-64 instruction set */				\
-	ia64_psr(regs)->sp = 1;		/* enforce secure perfmon */				\
+	regs->cr_ipsr = ((regs->cr_ipsr | (IA64_PSR_BITS_TO_SET | IA64_PSR_CPL | IA64_PSR_SP))	\
+			 & ~(IA64_PSR_BITS_TO_CLEAR | IA64_PSR_RI | IA64_PSR_IS));		\
 	regs->cr_iip = new_ip;									\
 	regs->ar_rsc = 0xf;		/* eager mode, privilege level 3 */			\
 	regs->ar_rnat = 0;									\
@@ -284,7 +281,7 @@ struct thread_struct {
 	regs->loadrs = 0;									\
 	regs->r8 = current->mm->dumpable;	/* set "don't zap registers" flag */		\
 	regs->r12 = new_sp - 16;	/* allocate 16 byte scratch area */			\
-	if (!likely (current->mm->dumpable)) {					\
+	if (unlikely(!current->mm->dumpable)) {					\
 		/*										\
 		 * Zap scratch regs to avoid leaking bits between processes with different	\
 		 * uid/privileges.								\
@@ -393,8 +390,6 @@ ia64_set_kr (unsigned long regnum, unsigned long r)
 	}
 }
 
-#ifndef CONFIG_SMP
-
 static inline struct task_struct *
 ia64_get_fpu_owner (void)
 {
@@ -406,8 +401,6 @@ ia64_set_fpu_owner (struct task_struct *t)
 {
 	ia64_set_kr(IA64_KR_FPU_OWNER, (unsigned long) t);
 }
-
-#endif /* !CONFIG_SMP */
 
 extern void __ia64_init_fpu (void);
 extern void __ia64_save_fpu (struct ia64_fpreg *fph);

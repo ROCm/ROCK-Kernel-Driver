@@ -35,11 +35,13 @@
 		1 << _PAGE_SIZE_4K )
 
 struct ia64_ctx ia64_ctx = {
-	lock:	SPIN_LOCK_UNLOCKED,
-	next:	1,
-	limit:	(1 << 15) - 1,		/* start out with the safe (architected) limit */
-	max_ctx: ~0U
+	.lock =		SPIN_LOCK_UNLOCKED,
+	.next =		1,
+	.limit =	(1 << 15) - 1,		/* start out with the safe (architected) limit */
+	.max_ctx =	~0U
 };
+
+u8 ia64_need_tlb_flush __per_cpu_data;
 
 /*
  * Acquire the ia64_ctx.lock before calling this function!
@@ -49,6 +51,7 @@ wrap_mmu_context (struct mm_struct *mm)
 {
 	unsigned long tsk_context, max_ctx = ia64_ctx.max_ctx;
 	struct task_struct *tsk;
+	int i;
 
 	if (ia64_ctx.next > max_ctx)
 		ia64_ctx.next = 300;	/* skip daemons */
@@ -77,7 +80,11 @@ wrap_mmu_context (struct mm_struct *mm)
 			ia64_ctx.limit = tsk_context;
 	}
 	read_unlock(&tasklist_lock);
-	flush_tlb_all();
+	/* can't call flush_tlb_all() here because of race condition with O(1) scheduler [EF] */
+	for (i = 0; i < NR_CPUS; ++i)
+		if (i != smp_processor_id())
+			per_cpu(ia64_need_tlb_flush, i) = 1;
+	__flush_tlb_all();
 }
 
 void

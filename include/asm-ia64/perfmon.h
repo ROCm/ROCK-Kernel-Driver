@@ -172,9 +172,8 @@ extern int  pfm_use_debug_registers(struct task_struct *);
 extern int  pfm_release_debug_registers(struct task_struct *);
 extern int  pfm_cleanup_smpl_buf(struct task_struct *);
 extern void pfm_syst_wide_update_task(struct task_struct *, int);
-extern void pfm_ovfl_block_reset (void);
-
-extern int pfm_syst_wide;
+extern void pfm_ovfl_block_reset(void);
+extern void perfmon_init_percpu(void);
 
 #endif /* __KERNEL__ */
 

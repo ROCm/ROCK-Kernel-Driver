@@ -210,6 +210,7 @@ extern ia64_mv_pci_unmap_sg swiotlb_unmap_sg;
 extern ia64_mv_pci_dma_sync_single swiotlb_sync_single;
 extern ia64_mv_pci_dma_sync_sg swiotlb_sync_sg;
 extern ia64_mv_pci_dma_address swiotlb_dma_address;
+extern ia64_mv_pci_dma_supported swiotlb_pci_dma_supported;
 
 /*
  * Define default versions so we can extend machvec for new platforms without having

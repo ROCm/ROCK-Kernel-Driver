@@ -190,6 +190,9 @@ typedef void efi_reset_system_t (int reset_type, efi_status_t status,
 #define SAL_SYSTEM_TABLE_GUID    \
     EFI_GUID(  0xeb9d2d32, 0x2d88, 0x11d3, 0x9a, 0x16, 0x0, 0x90, 0x27, 0x3f, 0xc1, 0x4d )
 
+#define HCDP_TABLE_GUID	\
+    EFI_GUID(  0xf951938d, 0x620b, 0x42ef, 0x82, 0x79, 0xa8, 0x4b, 0x79, 0x61, 0x78, 0x98 )
+
 typedef struct {
 	efi_guid_t guid;
 	u64 table;
@@ -225,6 +228,7 @@ extern struct efi {
 	void *smbios;			/* SM BIOS table */
 	void *sal_systab;		/* SAL system table */
 	void *boot_info;		/* boot info table */
+	void *hcdp;			/* HCDP table */
 	efi_get_time_t *get_time;
 	efi_set_time_t *set_time;
 	efi_get_wakeup_time_t *get_wakeup_time;

@@ -87,7 +87,12 @@ typedef union ia64_va {
 #define REGION_SIZE		REGION_NUMBER(1)
 #define REGION_KERNEL		7
 
-#define BUG() do { printk("kernel BUG at %s:%d!\n", __FILE__, __LINE__); *(int *)0=0; } while (0)
+#if (__GNUC__ > 3) || (__GNUC__ == 3 && __GNUC_MINOR__ >= 1)
+# define ia64_abort()	__builtin_trap()
+#else
+# define ia64_abort()	(*(volatile int *) 0 = 0)
+#endif
+#define BUG() do { printk("kernel BUG at %s:%d!\n", __FILE__, __LINE__); ia64_abort(); } while (0)
 #define PAGE_BUG(page) do { BUG(); } while (0)
 
 static __inline__ int

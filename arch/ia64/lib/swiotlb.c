@@ -415,18 +415,21 @@ int
 swiotlb_map_sg (struct pci_dev *hwdev, struct scatterlist *sg, int nelems, int direction)
 {
 	void *addr;
+	unsigned long pci_addr;
 	int i;
 
 	if (direction == PCI_DMA_NONE)
 		BUG();
 
 	for (i = 0; i < nelems; i++, sg++) {
-		sg->orig_address = SG_ENT_VIRT_ADDRESS(sg);
-		if ((SG_ENT_PHYS_ADDRESS(sg) & ~hwdev->dma_mask) != 0) {
-			addr = map_single(hwdev, sg->orig_address, sg->length, direction);
-			sg->page = virt_to_page(addr);
-			sg->offset = (u64) addr & ~PAGE_MASK;
-		}
+		addr = SG_ENT_VIRT_ADDRESS(sg);
+		pci_addr = virt_to_phys(addr);
+		if ((pci_addr & ~hwdev->dma_mask) != 0)
+			sg->dma_address = (dma_addr_t)
+				map_single(hwdev, addr, sg->length, direction);
+		else
+			sg->dma_address = pci_addr;
+		sg->dma_length = sg->length;
 	}
 	return nelems;
 }
@@ -444,12 +447,10 @@ swiotlb_unmap_sg (struct pci_dev *hwdev, struct scatterlist *sg, int nelems, int
 		BUG();
 
 	for (i = 0; i < nelems; i++, sg++)
-		if (sg->orig_address != SG_ENT_VIRT_ADDRESS(sg)) {
-			unmap_single(hwdev, SG_ENT_VIRT_ADDRESS(sg), sg->length, direction);
-			sg->page = virt_to_page(sg->orig_address);
-			sg->offset = (u64) sg->orig_address & ~PAGE_MASK;
-		} else if (direction == PCI_DMA_FROMDEVICE)
-			mark_clean(SG_ENT_VIRT_ADDRESS(sg), sg->length);
+		if (sg->dma_address != SG_ENT_PHYS_ADDRESS(sg))
+			unmap_single(hwdev, (void *) sg->dma_address, sg->dma_length, direction);
+		else if (direction == PCI_DMA_FROMDEVICE)
+			mark_clean(SG_ENT_VIRT_ADDRESS(sg), sg->dma_length);
 }
 
 /*
@@ -468,14 +469,14 @@ swiotlb_sync_sg (struct pci_dev *hwdev, struct scatterlist *sg, int nelems, int 
 		BUG();
 
 	for (i = 0; i < nelems; i++, sg++)
-		if (sg->orig_address != SG_ENT_VIRT_ADDRESS(sg))
-			sync_single(hwdev, SG_ENT_VIRT_ADDRESS(sg), sg->length, direction);
+		if (sg->dma_address != SG_ENT_PHYS_ADDRESS(sg))
+			sync_single(hwdev, (void *) sg->dma_address, sg->dma_length, direction);
 }
 
 unsigned long
 swiotlb_dma_address (struct scatterlist *sg)
 {
-	return SG_ENT_PHYS_ADDRESS(sg);
+	return sg->dma_address;
 }
 
 /*

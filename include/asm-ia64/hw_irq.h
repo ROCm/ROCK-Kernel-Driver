@@ -2,10 +2,11 @@
 #define _ASM_IA64_HW_IRQ_H
 
 /*
- * Copyright (C) 2001 Hewlett-Packard Co
- * Copyright (C) 2001 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 2001-2002 Hewlett-Packard Co
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
+#include <linux/interrupt.h>
 #include <linux/sched.h>
 #include <linux/types.h>
 
@@ -67,6 +68,8 @@ enum {
 
 extern __u8 isa_irq_to_vector_map[16];
 #define isa_irq_to_vector(x)	isa_irq_to_vector_map[(x)]
+extern __u8 gsi_to_vector_map[255];
+#define gsi_to_vector(x)	gsi_to_vector_map[(x)]
 
 extern unsigned long ipi_base_addr;
 
