@@ -239,7 +239,7 @@ static struct atm_dev sigd_dev = {
 	999,		/* dummy device number */
 	NULL,NULL,	/* pretend not to have any VCCs */
 	NULL,NULL,	/* no data */
-	{ 0 },		/* no flags */
+	0,		/* no flags */
 	NULL,		/* no local address */
 	{ 0 }		/* no ESI, no statistics */
 };
