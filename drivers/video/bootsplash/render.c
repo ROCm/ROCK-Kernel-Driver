@@ -253,7 +253,7 @@ void splash_cursor(struct splash_data *sd, struct fb_info *info, struct fb_curso
                         info->cursor.image.fg_color = cursor->image.fg_color;
                 } else {
                         if (cursor->image.cmap.len)
-                                fb_copy_cmap(&cursor->image.cmap, &info->cursor.image.cmap, 0);
+                                fb_copy_cmap(&cursor->image.cmap, &info->cursor.image.cmap);
                 }
                 info->cursor.image.depth = cursor->image.depth;
         }

@@ -638,9 +638,5 @@ config IP_NF_MATCH_CONNMARK
 	depends on IP_NF_IPTABLES
 	  help
 
-config IP_NF_TARGET_CLUSTERIP
-	tristate ' CLUSTERIP target support'
-	depends on IP_NF_CONNTRACK_MARK!=n && IP_NF_IPTABLES!=n
-
 endmenu
 

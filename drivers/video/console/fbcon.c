@@ -784,16 +784,21 @@ static void fbcon_init(struct vc_data *vc, int init)
 		if (vc->vc_can_do_color)
 			vc->vc_complement_mask <<= 1;
 	}
-#ifdef CONFIG_BOOTSPLASH
-	if(vc->vc_splash_data && vc->vc_splash_data->splash_state) {
-		con_remap_def_color(vc->vc_num, vc->vc_splash_data->splash_color << 4 | vc->vc_splash_data->splash_fg_color);
-	}
-#endif 
-
 	cols = vc->vc_cols;
 	rows = vc->vc_rows;
 	new_cols = info->var.xres / vc->vc_font.width;
 	new_rows = info->var.yres / vc->vc_font.height;
+
+#ifdef CONFIG_BOOTSPLASH
+	if (vc->vc_splash_data && vc->vc_splash_data->splash_state) {
+		new_cols = vc->vc_splash_data->splash_text_wi / vc->vc_font.width;
+		new_rows = vc->vc_splash_data->splash_text_he / vc->vc_font.height;
+		logo = 0;
+
+		con_remap_def_color(vc->vc_num, vc->vc_splash_data->splash_color << 4 | vc->vc_splash_data->splash_fg_color);
+	}
+#endif
+
 	vc_resize(vc->vc_num, new_cols, new_rows);
 	/*
 	 * We must always set the mode. The mode of the previous console
@@ -821,14 +826,6 @@ static void fbcon_init(struct vc_data *vc, int init)
 		vc->vc_cols = new_cols;
 		vc->vc_rows = new_rows;
 	}
-
-#ifdef CONFIG_BOOTSPLASH
-	if (vc->vc_splash_data && vc->vc_splash_data->splash_state) {
-		nr_cols = vc->vc_splash_data->splash_text_wi / vc->vc_font.width;
-		nr_rows = vc->vc_splash_data->splash_text_he / vc->vc_font.height;
-		logo = 0;
-	}
-#endif
 
 	if (logo) {
 		/* Need to make room for the logo */
