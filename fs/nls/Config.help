@@ -224,6 +224,15 @@ CONFIG_NLS_CODEPAGE_950
   say Y here if you want to include the DOS codepage for Traditional
   Chinese(Big5).
 
+CONFIG_NLS_CODEPAGE_1250
+  If you want to display filenames with native language characters
+  from the Microsoft FAT file system family or from JOLIET CDROMs
+  correctly on the screen, you need to include the appropriate
+  input/output character sets. Say Y here for the Windows CP-1250
+  character set, which works for most Latin-written Slavic and Central
+  European languages: Czech, German, Hungarian, Polish, Rumanian, Croatian,
+  Slovak, Slovene.
+
 CONFIG_NLS_ISO8859_1
   If you want to display filenames with native language characters
   from the Microsoft FAT file system family or from JOLIET CD-ROMs
