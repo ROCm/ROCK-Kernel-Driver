@@ -240,14 +240,10 @@ static int set_attention_status (struct hotplug_slot *hotplug_slot, u8 status)
 {
 	struct slot *slot = get_slot (hotplug_slot, __FUNCTION__);
 
-	if (slot == NULL)
-		return -ENODEV;
-	
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
 	hotplug_slot->info->attention_status = status;
 	slot->hpc_ops->set_attention_status(slot, status);
-
 
 	return 0;
 }
@@ -256,9 +252,6 @@ static int set_attention_status (struct hotplug_slot *hotplug_slot, u8 status)
 static int enable_slot (struct hotplug_slot *hotplug_slot)
 {
 	struct slot *slot = get_slot (hotplug_slot, __FUNCTION__);
-	
-	if (slot == NULL)
-		return -ENODEV;
 
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
@@ -269,9 +262,6 @@ static int enable_slot (struct hotplug_slot *hotplug_slot)
 static int disable_slot (struct hotplug_slot *hotplug_slot)
 {
 	struct slot *slot = get_slot (hotplug_slot, __FUNCTION__);
-	
-	if (slot == NULL)
-		return -ENODEV;
 
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
@@ -282,10 +272,7 @@ static int get_power_status (struct hotplug_slot *hotplug_slot, u8 *value)
 {
 	struct slot *slot = get_slot (hotplug_slot, __FUNCTION__);
 	int retval;
-	
-	if (slot == NULL)
-		return -ENODEV;
-	
+
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
 	retval = slot->hpc_ops->get_power_status(slot, value);
@@ -299,10 +286,7 @@ static int get_attention_status (struct hotplug_slot *hotplug_slot, u8 *value)
 {
 	struct slot *slot = get_slot (hotplug_slot, __FUNCTION__);
 	int retval;
-	
-	if (slot == NULL)
-		return -ENODEV;
-	
+
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
 	retval = slot->hpc_ops->get_attention_status(slot, value);
@@ -316,10 +300,7 @@ static int get_latch_status (struct hotplug_slot *hotplug_slot, u8 *value)
 {
 	struct slot *slot = get_slot (hotplug_slot, __FUNCTION__);
 	int retval;
-	
-	if (slot == NULL)
-		return -ENODEV;
-	
+
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
 	retval = slot->hpc_ops->get_latch_status(slot, value);
@@ -333,14 +314,10 @@ static int get_adapter_status (struct hotplug_slot *hotplug_slot, u8 *value)
 {
 	struct slot *slot = get_slot (hotplug_slot, __FUNCTION__);
 	int retval;
-	
-	if (slot == NULL)
-		return -ENODEV;
 
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
 	retval = slot->hpc_ops->get_adapter_status(slot, value);
-
 	if (retval < 0)
 		*value = hotplug_slot->info->adapter_status;
 
@@ -351,9 +328,6 @@ static int get_max_bus_speed (struct hotplug_slot *hotplug_slot, enum pci_bus_sp
 {
 	struct slot *slot = get_slot (hotplug_slot, __FUNCTION__);
 	int retval;
-	
-	if (slot == NULL)
-		return -ENODEV;
 
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 	
@@ -368,9 +342,6 @@ static int get_cur_bus_speed (struct hotplug_slot *hotplug_slot, enum pci_bus_sp
 {
 	struct slot *slot = get_slot (hotplug_slot, __FUNCTION__);
 	int retval;
-	
-	if (slot == NULL)
-		return -ENODEV;
 
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 	
