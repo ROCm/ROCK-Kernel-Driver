@@ -868,7 +868,7 @@ typedef struct {
     ushort              raw_feat;               /* feat. raw service (s/g,..)*/
     ushort              screen_feat;            /* feat. raw service (s/g,..)*/
     ushort              bmic;                   /* BMIC address (EISA) */
-    void                *brd;                   /* DPRAM address */
+    void __iomem        *brd;                   /* DPRAM address */
     ulong32             brd_phys;               /* slot number/BIOS address */
     gdt6c_plx_regs      *plx;                   /* PLX regs (new PCI contr.) */
     gdth_cmd_str        *pccb;                  /* address command structure */
