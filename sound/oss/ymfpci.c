@@ -2628,7 +2628,8 @@ static int __devinit ymf_probe_one(struct pci_dev *pcidev, const struct pci_devi
  out_release_region:
 	release_mem_region(pci_resource_start(pcidev, 0), 0x8000);
  out_free:
-	ac97_release_codec(codec->ac97_codec[0]);
+	if (codec->ac97_codec[0])
+		ac97_release_codec(codec->ac97_codec[0]);
 	return -ENODEV;
 }
 
