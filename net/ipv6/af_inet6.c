@@ -111,7 +111,7 @@ static void inet6_sock_destruct(struct sock *sk)
 #ifdef INET_REFCNT_DEBUG
 	atomic_dec(&inet6_sock_nr);
 #endif
-	MOD_DEC_USE_COUNT;
+	module_put(THIS_MODULE);
 }
 
 static __inline__ kmem_cache_t *inet6_sk_slab(int protocol)
@@ -242,7 +242,10 @@ static int inet6_create(struct socket *sock, int protocol)
 	atomic_inc(&inet6_sock_nr);
 	atomic_inc(&inet_sock_nr);
 #endif
-	MOD_INC_USE_COUNT;
+	if (!try_get_module(THIS_MODULE)) {
+		inet_sock_release(sk);
+		return -EBUSY;
+	}
 
 	if (inet->num) {
 		/* It assumes that any protocol which allows
@@ -255,7 +258,7 @@ static int inet6_create(struct socket *sock, int protocol)
 	if (sk->prot->init) {
 		int err = sk->prot->init(sk);
 		if (err != 0) {
-			MOD_DEC_USE_COUNT;
+			module_put(THIS_MODULE);
 			inet_sock_release(sk);
 			return err;
 		}

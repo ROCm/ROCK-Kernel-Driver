@@ -231,10 +231,11 @@ struct ip_tunnel * ipip_tunnel_locate(struct ip_tunnel_parm *parms, int create)
 	if (!create)
 		return NULL;
 
-	MOD_INC_USE_COUNT;
+	if (!try_module_get(THIS_MODULE))
+		return NULL;
 	dev = kmalloc(sizeof(*dev) + sizeof(*t), GFP_KERNEL);
 	if (dev == NULL) {
-		MOD_DEC_USE_COUNT;
+		module_put(THIS_MODULE);
 		return NULL;
 	}
 	memset(dev, 0, sizeof(*dev) + sizeof(*t));
@@ -266,7 +267,7 @@ struct ip_tunnel * ipip_tunnel_locate(struct ip_tunnel_parm *parms, int create)
 
 failed:
 	kfree(dev);
-	MOD_DEC_USE_COUNT;
+	module_put(THIS_MODULE);
 	return NULL;
 }
 
@@ -274,7 +275,7 @@ static void ipip_tunnel_destructor(struct net_device *dev)
 {
 	if (dev != &ipip_fb_tunnel_dev) {
 		kfree(dev);
-		MOD_DEC_USE_COUNT;
+		module_put(THIS_MODULE);
 	}
 }
 
@@ -682,7 +683,8 @@ ipip_tunnel_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd)
 	struct ip_tunnel_parm p;
 	struct ip_tunnel *t;
 
-	MOD_INC_USE_COUNT;
+	if (!try_module_get(THIS_MODULE))
+		return -EBUSY;
 
 	switch (cmd) {
 	case SIOCGETTUNNEL:
@@ -782,7 +784,7 @@ ipip_tunnel_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd)
 	}
 
 done:
-	MOD_DEC_USE_COUNT;
+	module_put(THIS_MODULE);
 	return err;
 }
 
@@ -861,13 +863,14 @@ static int ipip_tunnel_init(struct net_device *dev)
 #ifdef MODULE
 static int ipip_fb_tunnel_open(struct net_device *dev)
 {
-	MOD_INC_USE_COUNT;
+	if (!try_module_get(THIS_MODULE))
+		return -EBUSY;
 	return 0;
 }
 
 static int ipip_fb_tunnel_close(struct net_device *dev)
 {
-	MOD_DEC_USE_COUNT;
+	module_put(THIS_MODULE);
 	return 0;
 }
 #endif
