@@ -754,6 +754,7 @@ void pdc_io_reset_devices(void);
 int pdc_iodc_getc(void);
 void pdc_iodc_putc(unsigned char c);
 void pdc_iodc_outc(unsigned char c);
+void pdc_printf(const char *fmt, ...);
 
 void pdc_emergency_unlock(void);
 int pdc_sti_call(unsigned long func, unsigned long flags,
