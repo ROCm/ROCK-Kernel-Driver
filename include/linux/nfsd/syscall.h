@@ -59,7 +59,7 @@ struct nfsctl_client {
 struct nfsctl_export {
 	char			ex_client[NFSCLNT_IDMAX+1];
 	char			ex_path[NFS_MAXPATHLEN+1];
-	__kernel_dev_t		ex_dev;
+	__kernel_old_dev_t	ex_dev;
 	__kernel_ino_t		ex_ino;
 	int			ex_flags;
 	__kernel_uid_t		ex_anon_uid;
@@ -104,7 +104,6 @@ struct nfsctl_arg {
 #define ca_export	u.u_export
 #define ca_getfd	u.u_getfd
 #define	ca_getfs	u.u_getfs
-#define ca_authd	u.u_authd
 };
 
 union nfsctl_res {
