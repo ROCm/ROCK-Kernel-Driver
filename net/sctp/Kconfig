@@ -5,14 +5,9 @@
 menu "SCTP Configuration (EXPERIMENTAL)"
 	depends on INET && EXPERIMENTAL
 
-config IPV6_SCTP__
-	tristate
-	default y if IPV6=n
-	default IPV6 if IPV6
-
 config IP_SCTP
 	tristate "The SCTP Protocol (EXPERIMENTAL)"
-	depends on IPV6_SCTP__
+	depends on IPV6 || IPV6=n
 	---help---
 	  Stream Control Transmission Protocol
 
@@ -61,6 +56,7 @@ config SCTP_DBG_OBJCNT
 choice
 	prompt "SCTP: Cookie HMAC Algorithm"
 	depends on IP_SCTP
+	default SCTP_HMAC_MD5
 	help
 	  HMAC algorithm to be used during association initialization.  It
 	  is strongly recommended to use HMAC-SHA1 or HMAC-MD5.  See 
