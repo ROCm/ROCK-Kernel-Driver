@@ -113,6 +113,32 @@ linvfs_write(
 }
 
 
+STATIC ssize_t
+linvfs_aio_read(
+	struct kiocb		*iocb,
+	char			*buf,
+	size_t			count,
+	loff_t			pos)
+{
+	struct iovec		iov = {buf, count};
+
+	return linvfs_readv(iocb->ki_filp, &iov, 1, &iocb->ki_pos);
+}
+
+
+STATIC ssize_t
+linvfs_aio_write(
+	struct kiocb		*iocb,
+	const char		*buf,
+	size_t			count,
+	loff_t			pos)
+{
+	struct iovec		iov = {(void *)buf, count};
+
+	return linvfs_writev(iocb->ki_filp, &iov, 1, &iocb->ki_pos);
+}
+
+
 STATIC int
 linvfs_open(
 	struct inode	*inode,
@@ -320,6 +346,8 @@ struct file_operations linvfs_file_operations = {
 	.write		= linvfs_write,
 	.readv		= linvfs_readv,
 	.writev		= linvfs_writev,
+	.aio_read	= linvfs_aio_read,
+	.aio_write	= linvfs_aio_write,
 	.ioctl		= linvfs_ioctl,
 	.mmap		= linvfs_file_mmap,
 	.open		= linvfs_open,

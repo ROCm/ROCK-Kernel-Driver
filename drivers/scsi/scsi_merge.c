@@ -62,16 +62,28 @@ int scsi_init_io(Scsi_Cmnd *SCpnt)
 	int count, gfp_mask;
 
 	/*
-	 * First we need to know how many scatter gather segments are needed.
+	 * non-sg block request. FIXME: check bouncing for isa hosts!
 	 */
-	count = req->nr_phys_segments;
+	if ((req->flags & REQ_BLOCK_PC) && !req->bio) {
+		/*
+		 * FIXME: isa bouncing
+		 */
+		if (SCpnt->host->unchecked_isa_dma)
+			goto fail;
+
+		SCpnt->request_bufflen = req->data_len;
+		SCpnt->request_buffer = req->data;
+		req->buffer = req->data;
+		SCpnt->use_sg = 0;
+		return 1;
+	}
 
 	/*
 	 * we used to not use scatter-gather for single segment request,
 	 * but now we do (it makes highmem I/O easier to support without
 	 * kmapping pages)
 	 */
-	SCpnt->use_sg = count;
+	SCpnt->use_sg = req->nr_phys_segments;
 
 	gfp_mask = GFP_NOIO;
 	if (in_interrupt()) {
@@ -111,6 +123,7 @@ int scsi_init_io(Scsi_Cmnd *SCpnt)
 	/*
 	 * kill it. there should be no leftover blocks in this request
 	 */
+fail:
 	SCpnt = scsi_end_request(SCpnt, 0, req->nr_sectors);
 	BUG_ON(SCpnt);
 	return 0;

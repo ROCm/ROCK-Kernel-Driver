@@ -34,10 +34,11 @@
 
 #define MAJOR_NR	FLOPPY_MAJOR
 #define DEVICE_NAME "floppy"
-#define DEVICE_NR(device) ( (minor(device) & 3) | ((minor(device) & 0x80 ) >> 5 ))
+#define QUEUE (&swim3_queue)
 #include <linux/blk.h>
 #include <linux/devfs_fs_kernel.h>
 
+static struct request_queue swim3_queue;
 static struct gendisk *disks[2];
 
 #define MAX_FLOPPIES	2
@@ -246,8 +247,8 @@ static int floppy_ioctl(struct inode *inode, struct file *filp,
 			unsigned int cmd, unsigned long param);
 static int floppy_open(struct inode *inode, struct file *filp);
 static int floppy_release(struct inode *inode, struct file *filp);
-static int floppy_check_change(kdev_t dev);
-static int floppy_revalidate(kdev_t dev);
+static int floppy_check_change(struct gendisk *disk);
+static int floppy_revalidate(struct gendisk *disk);
 static int swim3_add_device(struct device_node *swims);
 int swim3_init(void);
 
@@ -819,17 +820,11 @@ static struct floppy_struct floppy_type =
 static int floppy_ioctl(struct inode *inode, struct file *filp,
 			unsigned int cmd, unsigned long param)
 {
-	struct floppy_state *fs;
+	struct floppy_state *fs = inode->i_bdev->bd_disk->private_data;
 	int err;
-	int devnum = minor(inode->i_rdev);
-
-	if (devnum >= floppy_count)
-		return -ENODEV;
 		
 	if ((cmd & 0x80) && !capable(CAP_SYS_ADMIN))
 		return -EPERM;
-
-	fs = &floppy_states[devnum];
 
 	if (fs->media_bay && check_media_bay(fs->media_bay, MB_FD))
 		return -ENXIO;
@@ -851,19 +846,10 @@ static int floppy_ioctl(struct inode *inode, struct file *filp,
 
 static int floppy_open(struct inode *inode, struct file *filp)
 {
-	struct floppy_state *fs;
-	volatile struct swim3 *sw;
-	int n, err;
-	int devnum = minor(inode->i_rdev);
+	struct floppy_state *fs = inode->i_bdev->bd_disk->private_data;
+	volatile struct swim3 *sw = fs->swim3;
+	int n, err = 0;
 
-	if (devnum >= floppy_count)
-		return -ENODEV;
-	if (filp == 0)
-		return -EIO;
-		
-	fs = &floppy_states[devnum];
-	sw = fs->swim3;
-	err = 0;
 	if (fs->ref_count == 0) {
 		if (fs->media_bay && check_media_bay(fs->media_bay, MB_FD))
 			return -ENXIO;
@@ -926,15 +912,8 @@ static int floppy_open(struct inode *inode, struct file *filp)
 
 static int floppy_release(struct inode *inode, struct file *filp)
 {
-	struct floppy_state *fs;
-	volatile struct swim3 *sw;
-	int devnum = minor(inode->i_rdev);
-
-	if (devnum >= floppy_count)
-		return -ENODEV;
-
-	fs = &floppy_states[devnum];
-	sw = fs->swim3;
+	struct floppy_state *fs = inode->i_bdev->bd_disk->private_data;
+	volatile struct swim3 *sw = fs->swim3;
 	if (fs->ref_count > 0 && --fs->ref_count == 0) {
 		swim3_action(fs, MOTOR_OFF);
 		out_8(&sw->control_bic, 0xff);
@@ -942,29 +921,17 @@ static int floppy_release(struct inode *inode, struct file *filp)
 	return 0;
 }
 
-static int floppy_check_change(kdev_t dev)
+static int floppy_check_change(struct gendisk *disk)
 {
-	struct floppy_state *fs;
-	int devnum = minor(dev);
-
-	if (major(dev) != MAJOR_NR || (devnum >= floppy_count))
-		return 0;
-		
-	fs = &floppy_states[devnum];
+	struct floppy_state *fs = disk->private_data;
 	return fs->ejected;
 }
 
-static int floppy_revalidate(kdev_t dev)
+static int floppy_revalidate(struct gendisk *disk)
 {
-	struct floppy_state *fs;
+	struct floppy_state *fs = disk->private_data;
 	volatile struct swim3 *sw;
 	int ret, n;
-	int devnum = minor(dev);
-
-	if (major(dev) != MAJOR_NR || (devnum >= floppy_count))
-		return 0;
-
-	fs = &floppy_states[devnum];
 
 	if (fs->media_bay && check_media_bay(fs->media_bay, MB_FD))
 		return -ENXIO;
@@ -1002,11 +969,11 @@ static void floppy_off(unsigned int nr)
 }
 
 static struct block_device_operations floppy_fops = {
-	open:			floppy_open,
-	release:		floppy_release,
-	ioctl:			floppy_ioctl,
-	check_media_change:	floppy_check_change,
-	revalidate:		floppy_revalidate,
+	.open		= floppy_open,
+	.release	= floppy_release,
+	.ioctl		= floppy_ioctl,
+	.media_changed	= floppy_check_change,
+	.revalidate_disk= floppy_revalidate,
 };
 
 static devfs_handle_t floppy_devfs_handle;
@@ -1047,12 +1014,14 @@ int swim3_init(void)
 		err = -EBUSY;
 		goto out;
 	}
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_fd_request, &swim3_lock);
+	blk_init_queue(&swim3_queue, do_fd_request, &swim3_lock);
 	for (i = 0; i < floppy_count; i++) {
 		struct gendisk *disk = disks[i];
 		disk->major = MAJOR_NR;
 		disk->first_minor = i;
 		disk->fops = &floppy_fops;
+		disk->private_data = &floppy_states[i];
+		disk->queue = &swim3_queue;
 		sprintf(disk->disk_name, "fd%d", i);
 		set_capacity(disk, 2880);
 		add_disk(disk);

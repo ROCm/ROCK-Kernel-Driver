@@ -10,6 +10,8 @@
  * add themselves as children of the system bus.
  */
 
+#define DEBUG 1
+
 #include <linux/device.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -76,8 +78,8 @@ int sys_register_root(struct sys_root * root)
  */
 void sys_unegister_root(struct sys_root *  root)
 {
-	put_device(&root->sysdev);
-	put_device(&root->dev);
+	device_unregister(&root->sysdev);
+	device_unregister(&root->dev);
 }
 
 /**
@@ -125,7 +127,7 @@ int sys_device_register(struct sys_device * sysdev)
 void sys_device_unregister(struct sys_device * sysdev)
 {
 	if (sysdev)
-		put_device(&sysdev->dev);
+		device_unregister(&sysdev->dev);
 }
 
 struct bus_type system_bus_type = {

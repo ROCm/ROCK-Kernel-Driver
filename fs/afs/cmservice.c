@@ -129,11 +129,7 @@ static int kafscmd(void *arg)
 	/* only certain signals are of interest */
 	spin_lock_irq(&current->sig->siglock);
 	siginitsetinv(&current->blocked,0);
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,3)
 	recalc_sigpending();
-#else
-	recalc_sigpending(current);
-#endif
 	spin_unlock_irq(&current->sig->siglock);
 
 	/* loop around looking for things to attend to */
@@ -360,6 +356,9 @@ void afscm_stop(void)
 
 			rxrpc_call_abort(call,-ESRCH); /* abort, dequeue and put */
 
+			_debug("nuking active call %08x.%d",
+			       ntohl(call->conn->conn_id),ntohl(call->call_id));
+			rxrpc_put_call(call);
 			rxrpc_put_call(call);
 
 			spin_lock(&afscm_calls_lock);

@@ -160,7 +160,7 @@ int scsi_set_medium_removal(Scsi_Device *dev, char state)
 	       return 0;
 
 	scsi_cmd[0] = ALLOW_MEDIUM_REMOVAL;
-	scsi_cmd[1] = (dev->scsi_level <= SCSI_2) ? (dev->lun << 5) : 0;
+	scsi_cmd[1] = 0;
 	scsi_cmd[2] = 0;
 	scsi_cmd[3] = 0;
 	scsi_cmd[4] = state;
@@ -297,12 +297,6 @@ int scsi_ioctl_send_command(Scsi_Device * dev, Scsi_Ioctl_Command * sic)
 	if(copy_from_user(buf, cmd_in + cmdlen, inlen))
 		goto error;
 
-	/*
-	 * Set the lun field to the correct value.
-	 */
-	if (dev->scsi_level <= SCSI_2)
-		cmd[1] = (cmd[1] & 0x1f) | (dev->lun << 5);
-
 	switch (opcode) {
 	case FORMAT_UNIT:
 		timeout = FORMAT_UNIT_TIMEOUT;
@@ -416,7 +410,6 @@ scsi_ioctl_get_pci(Scsi_Device * dev, void *arg)
 int scsi_ioctl(Scsi_Device * dev, int cmd, void *arg)
 {
 	char scsi_cmd[MAX_COMMAND_SIZE];
-	char cmd_byte1;
 
 	/* No idea how this happens.... */
 	if (!dev)
@@ -431,7 +424,6 @@ int scsi_ioctl(Scsi_Device * dev, int cmd, void *arg)
 	if (!scsi_block_when_processing_errors(dev)) {
 		return -ENODEV;
 	}
-	cmd_byte1 = (dev->scsi_level <= SCSI_2) ? (dev->lun << 5) : 0;
 
 	switch (cmd) {
 	case SCSI_IOCTL_GET_IDLUN:
@@ -484,7 +476,7 @@ int scsi_ioctl(Scsi_Device * dev, int cmd, void *arg)
 		return scsi_set_medium_removal(dev, SCSI_REMOVAL_ALLOW);
 	case SCSI_IOCTL_TEST_UNIT_READY:
 		scsi_cmd[0] = TEST_UNIT_READY;
-		scsi_cmd[1] = cmd_byte1;
+		scsi_cmd[1] = 0;
 		scsi_cmd[2] = scsi_cmd[3] = scsi_cmd[5] = 0;
 		scsi_cmd[4] = 0;
 		return ioctl_internal_command((Scsi_Device *) dev, scsi_cmd,
@@ -492,7 +484,7 @@ int scsi_ioctl(Scsi_Device * dev, int cmd, void *arg)
 		break;
 	case SCSI_IOCTL_START_UNIT:
 		scsi_cmd[0] = START_STOP;
-		scsi_cmd[1] = cmd_byte1;
+		scsi_cmd[1] = 0;
 		scsi_cmd[2] = scsi_cmd[3] = scsi_cmd[5] = 0;
 		scsi_cmd[4] = 1;
 		return ioctl_internal_command((Scsi_Device *) dev, scsi_cmd,
@@ -500,7 +492,7 @@ int scsi_ioctl(Scsi_Device * dev, int cmd, void *arg)
 		break;
 	case SCSI_IOCTL_STOP_UNIT:
 		scsi_cmd[0] = START_STOP;
-		scsi_cmd[1] = cmd_byte1;
+		scsi_cmd[1] = 0;
 		scsi_cmd[2] = scsi_cmd[3] = scsi_cmd[5] = 0;
 		scsi_cmd[4] = 0;
 		return ioctl_internal_command((Scsi_Device *) dev, scsi_cmd,

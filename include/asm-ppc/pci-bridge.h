@@ -68,6 +68,11 @@ struct pci_controller {
 	struct pci_ops *ops;
 	volatile unsigned int *cfg_addr;
 	volatile unsigned char *cfg_data;
+	/*
+	 * If set, indirect method will set the cfg_type bit as
+	 * needed to generate type 1 configuration transactions.
+	 */
+	int set_cfg_type;
 
 	/* Currently, we limit ourselves to 1 IO range and 3 mem
 	 * ranges since the common pci_bus structure can't handle more

@@ -291,15 +291,11 @@ __setup("max_scsi_report_luns=", scsi_report_luns_setup);
  **/
 static void scsi_unlock_floptical(Scsi_Request *sreq, unsigned char *result)
 {
-	Scsi_Device *sdscan = sreq->sr_device;
 	unsigned char scsi_cmd[MAX_COMMAND_SIZE];
 
 	printk(KERN_NOTICE "scsi: unlocking floptical drive\n");
 	scsi_cmd[0] = MODE_SENSE;
-	if (sdscan->scsi_level <= SCSI_2)
-		scsi_cmd[1] = (sdscan->lun << 5) & 0xe0;
-	else
-		scsi_cmd[1] = 0;
+	scsi_cmd[1] = 0;
 	scsi_cmd[2] = 0x2e;
 	scsi_cmd[3] = 0;
 	scsi_cmd[4] = 0x2a;	/* size */
@@ -611,8 +607,6 @@ unsigned char *scsi_get_evpd_page(Scsi_Device *sdev, Scsi_Request *sreq)
 {
 	unsigned char *evpd_page;
 	unsigned char scsi_cmd[MAX_COMMAND_SIZE];
-	int lun = sdev->lun;
-	int scsi_level = sdev->scsi_level;
 	int max_lgth = 255;
 
 retry:
@@ -629,10 +623,7 @@ retry:
 
 	memset(scsi_cmd, 0, MAX_COMMAND_SIZE);
 	scsi_cmd[0] = INQUIRY;
-	if ((lun > 0) && (scsi_level <= SCSI_2))
-		scsi_cmd[1] = ((lun << 5) & 0xe0) | 0x01;
-	else
-		scsi_cmd[1] = 0x01;	/* SCSI_3 and higher, don't touch */
+	scsi_cmd[1] = 0x01;
 	scsi_cmd[4] = max_lgth;
 	sreq->sr_cmd_len = 0;
 	sreq->sr_sense_buffer[0] = 0;
@@ -870,8 +861,6 @@ int scsi_get_deviceid(Scsi_Device *sdev, Scsi_Request *sreq)
 	unsigned char *id_page;
 	unsigned char scsi_cmd[MAX_COMMAND_SIZE];
 	int id_idx, scnt, ret;
-	int lun = sdev->lun;
-	int scsi_level = sdev->scsi_level;
 	int max_lgth = 255;
 
 retry:
@@ -888,10 +877,7 @@ retry:
 
 	memset(scsi_cmd, 0, MAX_COMMAND_SIZE);
 	scsi_cmd[0] = INQUIRY;
-	if ((lun > 0) && (scsi_level <= SCSI_2))
-		scsi_cmd[1] = ((lun << 5) & 0xe0) | 0x01;
-	else
-		scsi_cmd[1] = 0x01;	/* SCSI_3 and higher, don't touch */
+	scsi_cmd[1] = 0x01;
 	scsi_cmd[2] = 0x83;
 	scsi_cmd[4] = max_lgth;
 	sreq->sr_cmd_len = 0;
@@ -977,8 +963,6 @@ int scsi_get_serialnumber(Scsi_Device *sdev, Scsi_Request *sreq)
 {
 	unsigned char *serialnumber_page;
 	unsigned char scsi_cmd[MAX_COMMAND_SIZE];
-	int lun = sdev->lun;
-	int scsi_level = sdev->scsi_level;
 	int max_lgth = 255;
 
  retry:
@@ -995,10 +979,7 @@ int scsi_get_serialnumber(Scsi_Device *sdev, Scsi_Request *sreq)
 
 	memset(scsi_cmd, 0, MAX_COMMAND_SIZE);
 	scsi_cmd[0] = INQUIRY;
-	if ((lun > 0) && (scsi_level <= SCSI_2))
-		scsi_cmd[1] = ((lun << 5) & 0xe0) | 0x01;
-	else
-		scsi_cmd[1] = 0x01;	/* SCSI_3 and higher, don't touch */
+	scsi_cmd[1] = 0x01;
 	scsi_cmd[2] = 0x80;
 	scsi_cmd[4] = max_lgth;
 	sreq->sr_cmd_len = 0;
@@ -1181,8 +1162,6 @@ static void scsi_probe_lun(Scsi_Request *sreq, char *inq_result,
 
 	memset(scsi_cmd, 0, 6);
 	scsi_cmd[0] = INQUIRY;
-	if ((sdev->lun > 0) && (sdev->scsi_level <= SCSI_2))
-		scsi_cmd[1] = (sdev->lun << 5) & 0xe0;
 	scsi_cmd[4] = 36;	/* issue conservative alloc_length */
 	sreq->sr_cmd_len = 0;
 	sreq->sr_data_direction = SCSI_DATA_READ;
@@ -1230,8 +1209,6 @@ static void scsi_probe_lun(Scsi_Request *sreq, char *inq_result,
 	if (possible_inq_resp_len > 36) {	/* do additional INQUIRY */
 		memset(scsi_cmd, 0, 6);
 		scsi_cmd[0] = INQUIRY;
-		if ((sdev->lun > 0) && (sdev->scsi_level <= SCSI_2))
-			scsi_cmd[1] = (sdev->lun << 5) & 0xe0;
 		scsi_cmd[4] = (unsigned char) possible_inq_resp_len;
 		sreq->sr_cmd_len = 0;
 		sreq->sr_data_direction = SCSI_DATA_READ;

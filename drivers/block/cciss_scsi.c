@@ -1250,8 +1250,6 @@ cciss_scsi_user_command(int ctlr, int hostno, char *buffer, int length)
 	return length;
 }
 
-/* It's a pity that we need this, but, we do... */
-extern struct Scsi_Host *scsi_hostlist;  /* from ../scsi/hosts.c */
 
 int
 cciss_scsi_proc_info(char *buffer, /* data buffer */
@@ -1268,24 +1266,9 @@ cciss_scsi_proc_info(char *buffer, /* data buffer */
 	ctlr_info_t *ci;
 	int cntl_num;
 
-	/* Lets see if we can find our Scsi_Host... 
-	   this might be kind of "bad", searching scis_hostlist this way
-	   but how else can we find the scsi host?  I think I've seen
-	   this coded both ways, (circular list and null terminated list)
-	   I coded it to work either way, since I wasn't sure.  */
 
-	sh = scsi_hostlist;
-	found=0;
-	do {
-		if (sh == NULL) break;
-		if (sh->host_no == hostnum) {
-			found++;
-			break;
-		}
-		sh = sh->next;
-	} while (sh != scsi_hostlist && sh != NULL);
-
-	if (sh == NULL || found == 0) /* This really shouldn't ever happen. */
+	sh = scsi_host_hn_get(hostnum);
+	if (sh == NULL) /* This really shouldn't ever happen. */
 		return -EINVAL;
 
 	ci = (ctlr_info_t *) sh->hostdata[0];

@@ -730,8 +730,8 @@ struct block_device_operations {
 	int (*open) (struct inode *, struct file *);
 	int (*release) (struct inode *, struct file *);
 	int (*ioctl) (struct inode *, struct file *, unsigned, unsigned long);
-	int (*check_media_change) (kdev_t);
-	int (*revalidate) (kdev_t);
+	int (*media_changed) (struct gendisk *);
+	int (*revalidate_disk) (struct gendisk *);
 	struct module *owner;
 };
 
@@ -1251,7 +1251,8 @@ extern ssize_t do_sync_write(struct file *filp, const char *buf, size_t len, lof
 ssize_t generic_file_write_nolock(struct file *file, const struct iovec *iov,
 				unsigned long nr_segs, loff_t *ppos);
 extern ssize_t generic_file_sendfile(struct file *, struct file *, loff_t *, size_t);
-extern void do_generic_file_read(struct file *, loff_t *, read_descriptor_t *, read_actor_t);
+extern void do_generic_mapping_read(struct address_space *, struct file_ra_state *, struct file *,
+				    loff_t *, read_descriptor_t *, read_actor_t);
 extern ssize_t generic_file_direct_IO(int rw, struct file *file,
 	const struct iovec *iov, loff_t offset, unsigned long nr_segs);
 extern int generic_direct_IO(int rw, struct inode *inode, const struct iovec 
@@ -1267,6 +1268,18 @@ extern int generic_file_open(struct inode * inode, struct file * filp);
 
 extern int generic_vm_writeback(struct page *page,
 				struct writeback_control *wbc);
+
+static inline void do_generic_file_read(struct file * filp, loff_t *ppos,
+					read_descriptor_t * desc,
+					read_actor_t actor)
+{
+	do_generic_mapping_read(filp->f_dentry->d_inode->i_mapping,
+				&filp->f_ra,
+				filp,
+				ppos,
+				desc,
+				actor);
+}
 
 extern struct file_operations generic_ro_fops;
 

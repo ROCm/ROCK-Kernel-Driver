@@ -338,16 +338,35 @@ typedef struct isdn_net_local_s {
 				       /* phone[0] = Incoming Numbers      */
 				       /* phone[1] = Outgoing Numbers      */
 
-  struct list_head       slaves;       /* list of all bundled channels     */
-  struct list_head       online;       /* list of all bundled channels, 
-					  which are currently online       */
-  spinlock_t             online_lock;  /* lock to protect online list      */
+  struct list_head       slaves;       /* list of all bundled channels    
+					  protected by serializing config
+					  ioctls / no change allowed when
+					  interface is running             */
+  struct list_head       online;       /* list of all bundled channels 
+					  which can be used for actual
+					  data (IP) transfer              
+					  protected by xmit_lock           */
+
+  spinlock_t             xmit_lock;    /* used to protect the xmit path of 
+					  a net_device, including all
+					  associated channels's frame_cnt  */
   struct list_head       running_devs; /* member of global running_devs    */
   atomic_t               refcnt;       /* references held by ISDN code     */
 
 #ifdef CONFIG_ISDN_X25
   struct concap_device_ops *dops;      /* callbacks used by encapsulator   */
 #endif
+#ifdef CONFIG_ISDN_PPP
+  unsigned int           mpppcfg;
+  long                   mp_seqno;
+  struct ippp_ccp        *ccp;
+  unsigned long          debug;
+#ifdef CONFIG_ISDN_PPP_VJ
+  unsigned char         *cbuf;
+  struct slcompress     *slcomp;
+#endif
+#endif
+
   /* use an own struct for that in later versions */
   ulong cisco_myseq;                   /* Local keepalive seq. for Cisco   */
   ulong cisco_mineseen;                /* returned keepalive seq. from remote */
@@ -391,14 +410,11 @@ typedef struct isdn_net_dev_s {
   int                    chargeint;    /* Interval between charge-infos    */
 
   int                    pppbind;      /* ippp device for bindings         */
-  int			 ppp_slot;     /* PPPD device slot number          */
+  struct ipppd          *ipppd;        /* /dev/ipppX which controls us     */
 
-  spinlock_t             xmit_lock;    /* used to protect the xmit path of */
-                                       /* a particular channel (including  */
-                                       /* the frame_cnt                    */
   struct sk_buff_head    super_tx_queue; /* List of supervisory frames to  */
 	                               /* be transmitted asap              */
-  atomic_t               frame_cnt;    /* number of frames currently       */
+  int                    frame_cnt;    /* number of frames currently       */
                         	       /* queued in HL driver              */
   struct tasklet_struct  tlet;
 
@@ -410,6 +426,11 @@ typedef struct isdn_net_dev_s {
   char                   name[10];     /* Name of device                   */
   struct list_head       global_list;  /* global list of all isdn_net_devs */
 #ifdef CONFIG_ISDN_PPP
+  unsigned int           pppcfg;
+  unsigned int           pppseq;       /* last seq no seen                 */
+  struct ippp_ccp        *ccp;
+  unsigned long          debug;
+
   ippp_bundle * pb;		/* pointer to the common bundle structure
    			         * with the per-bundle data */
 #endif

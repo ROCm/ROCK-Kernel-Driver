@@ -22,9 +22,12 @@
  * The structure of the IO-APIC:
  */
 struct IO_APIC_reg_00 {
-	__u32	__reserved_2	: 24,
+	__u32	__reserved_2	: 14,
+		LTS		:  1,
+		delivery_type	:  1,
+		__reserved_1	:  8,
 		ID		:  4,
-		__reserved_1	:  4;
+		__reserved_0	:  4;
 } __attribute__ ((packed));
 
 struct IO_APIC_reg_01 {

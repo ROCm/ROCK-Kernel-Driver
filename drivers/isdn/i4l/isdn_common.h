@@ -47,7 +47,7 @@
 #endif
 
 #define isdn_BUG() \
-do { printk(KERN_WARNING "ISDN Bug at %s:%d\n", __FILE__, __LINE__); \
+do { printk(KERN_WARNING "ISDN BUG at %s:%d\n", __FILE__, __LINE__); \
 } while(0)
 
 #define HERE printk("%s:%d (%s)\n", __FILE__, __LINE__, __FUNCTION__)

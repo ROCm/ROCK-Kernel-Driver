@@ -381,8 +381,6 @@ static Scsi_Request *
 		}
 	}
 
-	if (SRpnt->sr_device->scsi_level <= SCSI_2)
-		cmd[1] |= (SRpnt->sr_device->lun << 5) & 0xe0;
 	init_completion(&STp->wait);
 	SRpnt->sr_use_sg = STp->buffer->do_dio || (bytes > (STp->buffer)->frp[0].length);
 	if (SRpnt->sr_use_sg) {
@@ -3994,7 +3992,7 @@ static void __exit exit_st(void)
 		kfree(scsi_tapes);
 	}
 	st_template.dev_max = 0;
-	remove_driver(&st_template.scsi_driverfs_driver);
+	driver_unregister(&st_template.scsi_driverfs_driver);
 	printk(KERN_INFO "st: Unloaded.\n");
 }
 

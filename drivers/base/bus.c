@@ -43,28 +43,23 @@ int bus_for_each_dev(struct bus_type * bus, void * data,
 		     int (*callback)(struct device * dev, void * data))
 {
 	struct list_head * node;
-	struct device * prev = NULL;
 	int error = 0;
 
-	get_bus(bus);
-	spin_lock(&device_lock);
-	list_for_each(node,&bus->devices) {
-		struct device * dev = get_device_locked(to_dev(node));
-		if (dev) {
-			spin_unlock(&device_lock);
-			error = callback(dev,data);
-			if (prev)
-				put_device(prev);
-			prev = dev;
-			spin_lock(&device_lock);
-			if (error)
-				break;
+	bus = get_bus(bus);
+	if (bus) {
+		down_read(&bus->rwsem);
+		list_for_each(node,&bus->devices) {
+			struct device * dev = get_device(to_dev(node));
+			if (dev) {
+				error = callback(dev,data);
+				put_device(dev);
+				if (error)
+					break;
+			}
 		}
+		up_read(&bus->rwsem);
+		put_bus(bus);
 	}
-	spin_unlock(&device_lock);
-	if (prev)
-		put_device(prev);
-	put_bus(bus);
 	return error;
 }
 
@@ -72,31 +67,125 @@ int bus_for_each_drv(struct bus_type * bus, void * data,
 		     int (*callback)(struct device_driver * drv, void * data))
 {
 	struct list_head * node;
-	struct device_driver * prev = NULL;
 	int error = 0;
 
-	/* pin bus in memory */
-	get_bus(bus);
+	bus = get_bus(bus);
+	if (bus) {
+		down_read(&bus->rwsem);
+		list_for_each(node,&bus->drivers) {
+			struct device_driver * drv = get_driver(to_drv(node));
+			if (drv) {
+				error = callback(drv,data);
+				put_driver(drv);
+				if (error)
+					break;
+			}
+		}
+		up_read(&bus->rwsem);
+		put_bus(bus);
+	}
+	return error;
+}
 
-	spin_lock(&device_lock);
-	list_for_each(node,&bus->drivers) {
-		struct device_driver * drv = get_driver(to_drv(node));
-		if (drv) {
-			spin_unlock(&device_lock);
-			error = callback(drv,data);
-			if (prev)
-				put_driver(prev);
-			prev = drv;
-			spin_lock(&device_lock);
-			if (error)
-				break;
+static void attach(struct device * dev)
+{
+	pr_debug("bound device '%s' to driver '%s'\n",
+		 dev->bus_id,dev->driver->name);
+	list_add_tail(&dev->driver_list,&dev->driver->devices);
+}
+
+static int bus_match(struct device * dev, struct device_driver * drv)
+{
+	int error = -ENODEV;
+	if (dev->bus->match(dev,drv)) {
+		dev->driver = drv;
+		if (drv->probe) {
+			if (!(error = drv->probe(dev)))
+				attach(dev);
+			else
+				dev->driver = NULL;
+		} else 
+			attach(dev);
+	}
+	return error;
+}
+
+static int device_attach(struct device * dev)
+{
+	struct bus_type * bus = dev->bus;
+	struct list_head * entry;
+	int error = 0;
+
+	if (dev->driver) {
+		attach(dev);
+		return 0;
+	}
+
+	if (!bus->match)
+		return 0;
+
+	list_for_each(entry,&bus->drivers) {
+		struct device_driver * drv = 
+			get_driver(container_of(entry,struct device_driver,bus_list));
+		if (!drv)
+			continue;
+		error = bus_match(dev,drv);
+		put_driver(drv);
+		if (!error)
+			break;
+	}
+	return error;
+}
+
+static int driver_attach(struct device_driver * drv)
+{
+	struct bus_type * bus = drv->bus;
+	struct list_head * entry;
+	int error = 0;
+
+	if (!bus->match)
+		return 0;
+
+	list_for_each(entry,&bus->devices) {
+		struct device * dev = container_of(entry,struct device,bus_list);
+		if (get_device(dev)) {
+			if (!dev->driver) {
+				if (!bus_match(dev,drv) && dev->driver)
+					devclass_add_device(dev);
+			}
+			put_device(dev);
 		}
 	}
-	spin_unlock(&device_lock);
-	if (prev)
-		put_driver(prev);
-	put_bus(bus);
 	return error;
+}
+
+static void detach(struct device * dev, struct device_driver * drv)
+{
+	if (drv) {
+		list_del_init(&dev->driver_list);
+		devclass_remove_device(dev);
+		if (drv->remove)
+			drv->remove(dev);
+		dev->driver = NULL;
+	}
+}
+
+static void device_detach(struct device * dev)
+{
+	detach(dev,dev->driver);
+}
+
+static void driver_detach(struct device_driver * drv)
+{
+	struct list_head * entry, * next;
+	list_for_each_safe(entry,next,&drv->devices) {
+		struct device * dev = container_of(entry,struct device,driver_list);
+		if (get_device(dev)) {
+			detach(dev,drv);
+			put_device(dev);
+		}
+	}
+	
 }
 
 /**
@@ -110,12 +199,13 @@ int bus_for_each_drv(struct bus_type * bus, void * data,
  */
 int bus_add_device(struct device * dev)
 {
-	if (dev->bus) {
-		pr_debug("registering %s with bus '%s'\n",dev->bus_id,dev->bus->name);
-		get_bus(dev->bus);
-		spin_lock(&device_lock);
+	struct bus_type * bus = get_bus(dev->bus);
+	if (bus) {
+		down_write(&dev->bus->rwsem);
+		pr_debug("bus %s: add device %s\n",bus->name,dev->bus_id);
 		list_add_tail(&dev->bus_list,&dev->bus->devices);
-		spin_unlock(&device_lock);
+		device_attach(dev);
+		up_write(&dev->bus->rwsem);
 		device_bus_link(dev);
 	}
 	return 0;
@@ -131,17 +221,70 @@ int bus_add_device(struct device * dev)
 void bus_remove_device(struct device * dev)
 {
 	if (dev->bus) {
+		down_write(&dev->bus->rwsem);
+		pr_debug("bus %s: remove device %s\n",dev->bus->name,dev->bus_id);
 		device_remove_symlink(&dev->bus->device_dir,dev->bus_id);
+		device_detach(dev);
+		list_del_init(&dev->bus_list);
+		up_write(&dev->bus->rwsem);
 		put_bus(dev->bus);
 	}
 }
 
+int bus_add_driver(struct device_driver * drv)
+{
+	struct bus_type * bus = get_bus(drv->bus);
+	if (bus) {
+		down_write(&bus->rwsem);
+		pr_debug("bus %s: add driver %s\n",bus->name,drv->name);
+		list_add_tail(&drv->bus_list,&bus->drivers);
+		driver_attach(drv);
+		up_write(&bus->rwsem);
+		driver_make_dir(drv);
+	}
+	return 0;
+}
+
+void bus_remove_driver(struct device_driver * drv)
+{
+	if (drv->bus) {
+		down_write(&drv->bus->rwsem);
+		pr_debug("bus %s: remove driver %s\n",drv->bus->name,drv->name);
+		driver_detach(drv);
+		list_del_init(&drv->bus_list);
+		up_write(&drv->bus->rwsem);
+	}
+}
+
+struct bus_type * get_bus(struct bus_type * bus)
+{
+	struct bus_type * ret = bus;
+	spin_lock(&device_lock);
+	if (bus && bus->present && atomic_read(&bus->refcount))
+		atomic_inc(&bus->refcount);
+	else
+		ret = NULL;
+	spin_unlock(&device_lock);
+	return ret;
+}
+
+void put_bus(struct bus_type * bus)
+{
+	if (!atomic_dec_and_lock(&bus->refcount,&device_lock))
+		return;
+	list_del_init(&bus->node);
+	spin_unlock(&device_lock);
+	BUG_ON(bus->present);
+	bus_remove_dir(bus);
+}
+
 int bus_register(struct bus_type * bus)
 {
-	rwlock_init(&bus->lock);
+	init_rwsem(&bus->rwsem);
 	INIT_LIST_HEAD(&bus->devices);
 	INIT_LIST_HEAD(&bus->drivers);
 	atomic_set(&bus->refcount,2);
+	bus->present = 1;
 
 	spin_lock(&device_lock);
 	list_add_tail(&bus->node,&bus_driver_list);
@@ -156,13 +299,14 @@ int bus_register(struct bus_type * bus)
 	return 0;
 }
 
-void put_bus(struct bus_type * bus)
+void bus_unregister(struct bus_type * bus)
 {
-	if (!atomic_dec_and_lock(&bus->refcount,&device_lock))
-		return;
-	list_del_init(&bus->node);
+	spin_lock(&device_lock);
+	bus->present = 0;
 	spin_unlock(&device_lock);
-	bus_remove_dir(bus);
+
+	pr_debug("bus %s: unregistering\n",bus->name);
+	put_bus(bus);
 }
 
 EXPORT_SYMBOL(bus_for_each_dev);
@@ -170,4 +314,6 @@ EXPORT_SYMBOL(bus_for_each_drv);
 EXPORT_SYMBOL(bus_add_device);
 EXPORT_SYMBOL(bus_remove_device);
 EXPORT_SYMBOL(bus_register);
+EXPORT_SYMBOL(bus_unregister);
+EXPORT_SYMBOL(get_bus);
 EXPORT_SYMBOL(put_bus);

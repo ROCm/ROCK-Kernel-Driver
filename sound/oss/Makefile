@@ -96,6 +96,10 @@ wavefront-objs  := wavfront.o wf_midi.o yss225.o
 
 host-progs	:= bin2hex hex2hex
 
+# Files generated that shall be removed upon make clean
+clean-files := maui_boot.h msndperm.c msndinit.c pndsperm.c pndspini.c \
+               pss_boot.h trix_boot.h
+
 include $(TOPDIR)/Rules.make
 
 # Firmware files that need translation
