@@ -2168,7 +2168,7 @@ int jfsIOWait(void *arg)
 
 	spin_lock_irq(&current->sigmask_lock);
 	sigfillset(&current->blocked);
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 
 	complete(&jfsIOwait);

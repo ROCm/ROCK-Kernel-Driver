@@ -2786,7 +2786,7 @@ int jfs_lazycommit(void)
 
 	spin_lock_irq(&current->sigmask_lock);
 	sigfillset(&current->blocked);
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 
 	LAZY_LOCK_INIT();
@@ -2912,7 +2912,7 @@ int jfs_sync(void)
 
 	spin_lock_irq(&current->sigmask_lock);
 	sigfillset(&current->blocked);
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 
 	complete(&jfsIOwait);
