@@ -1271,7 +1271,7 @@ static int drain_dac(struct i810_state *state, int signals_allowed)
 	 * any possible deadlocks.
 	 */
 	dmabuf->trigger = PCM_ENABLE_OUTPUT;
-	i810_update_lvi(state, 0);
+	__i810_update_lvi(state, 0);
 
 	spin_unlock_irqrestore(&state->card->lock, flags);
 
