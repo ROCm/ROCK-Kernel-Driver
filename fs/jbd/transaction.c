@@ -666,7 +666,8 @@ done_locked:
 		int offset;
 		char *source;
 
-		J_ASSERT_JH(jh, buffer_uptodate(jh2bh(jh)));
+		J_EXPECT_JH(jh, buffer_uptodate(jh2bh(jh)),
+			    "Possible IO failure.\n");
 		page = jh2bh(jh)->b_page;
 		offset = ((unsigned long) jh2bh(jh)->b_data) & ~PAGE_MASK;
 		source = kmap(page);
