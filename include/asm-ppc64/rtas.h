@@ -241,4 +241,6 @@ extern void rtas_stop_self(void);
 /* RMO buffer reserved for user-space RTAS use */
 extern unsigned long rtas_rmo_buf;
 
+#define GLOBAL_INTERRUPT_QUEUE 9005
+
 #endif /* _PPC64_RTAS_H */

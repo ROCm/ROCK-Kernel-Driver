@@ -28,7 +28,6 @@ struct smp_ops_t {
 	int   (*probe)(void);
 	void  (*kick_cpu)(int nr);
 	void  (*setup_cpu)(int nr);
-	void  (*late_setup_cpu)(int nr);
 	void  (*take_timebase)(void);
 	void  (*give_timebase)(void);
 	int   (*cpu_disable)(void);

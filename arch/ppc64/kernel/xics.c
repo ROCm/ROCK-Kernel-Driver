@@ -643,20 +643,16 @@ static void xics_set_affinity(unsigned int virq, cpumask_t cpumask)
 /* Interrupts are disabled. */
 void xics_migrate_irqs_away(void)
 {
-	int set_indicator = rtas_token("set-indicator");
-	const unsigned int giqs = 9005UL; /* Global Interrupt Queue Server */
-	int status = 0;
+	int status;
 	unsigned int irq, virq, cpu = smp_processor_id();
-
-	BUG_ON(set_indicator == RTAS_UNKNOWN_SERVICE);
 
 	/* Reject any interrupt that was queued to us... */
 	ops->cppr_info(cpu, 0);
 	iosync();
 
 	/* Refuse any new interrupts... */
-	rtas_call(set_indicator, 3, 1, &status, giqs,
-		  hard_smp_processor_id(), 0);
+	status = rtas_set_indicator(GLOBAL_INTERRUPT_QUEUE,
+				    hard_smp_processor_id(), 0);
 	WARN_ON(status != 0);
 
 	/* Allow IPIs again... */
