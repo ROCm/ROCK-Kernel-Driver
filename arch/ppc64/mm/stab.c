@@ -106,30 +106,14 @@ static int make_ste(unsigned long stab, unsigned long esid, unsigned long vsid)
 	return (global_entry | (castout_entry & 0x7));
 }
 
-static inline void __ste_allocate(unsigned long esid, unsigned long vsid)
-{
-	unsigned char stab_entry;
-	unsigned long offset;
-
-	stab_entry = make_ste(get_paca()->stab_addr, esid, vsid);
-
-	if ((esid << SID_SHIFT) >= KERNELBASE)
-		return;
-
-	offset = __get_cpu_var(stab_cache_ptr);
-	if (offset < NR_STAB_CACHE_ENTRIES)
-		__get_cpu_var(stab_cache[offset++]) = stab_entry;
-	else
-		offset = NR_STAB_CACHE_ENTRIES+1;
-	__get_cpu_var(stab_cache_ptr) = offset;
-}
-
 /*
- * Allocate a segment table entry for the given ea.
+ * Allocate a segment table entry for the given ea and mm
  */
-int ste_allocate(unsigned long ea)
+static int __ste_allocate(unsigned long ea, struct mm_struct *mm)
 {
 	unsigned long vsid;
+	unsigned char stab_entry;
+	unsigned long offset;
 
 	/* Check for invalid effective addresses. */
 	if (!IS_VALID_EA(ea))
@@ -139,17 +123,32 @@ int ste_allocate(unsigned long ea)
 	if (ea >= KERNELBASE) {
 		vsid = get_kernel_vsid(ea);
 	} else {
-		if (!current->mm)
+		if (! mm)
 			return 1;
 
-		vsid = get_vsid(current->mm->context.id, ea);
+		vsid = get_vsid(mm->context.id, ea);
 	}
 
-	__ste_allocate(GET_ESID(ea), vsid);
-	/* Order update */
-	asm volatile("sync":::"memory");
+	stab_entry = make_ste(get_paca()->stab_addr, GET_ESID(ea), vsid);
+
+	if (ea < KERNELBASE) {
+		offset = __get_cpu_var(stab_cache_ptr);
+		if (offset < NR_STAB_CACHE_ENTRIES)
+			__get_cpu_var(stab_cache[offset++]) = stab_entry;
+		else
+			offset = NR_STAB_CACHE_ENTRIES+1;
+		__get_cpu_var(stab_cache_ptr) = offset;
+
+		/* Order update */
+		asm volatile("sync":::"memory");
+	}
 
 	return 0;
+}
+
+int ste_allocate(unsigned long ea)
+{
+	return __ste_allocate(ea, current->mm);
 }
 
 /*
@@ -160,34 +159,24 @@ static void preload_stab(struct task_struct *tsk, struct mm_struct *mm)
 	unsigned long pc = KSTK_EIP(tsk);
 	unsigned long stack = KSTK_ESP(tsk);
 	unsigned long unmapped_base;
-	unsigned long vsid;
 
 	if (test_tsk_thread_flag(tsk, TIF_32BIT))
 		unmapped_base = TASK_UNMAPPED_BASE_USER32;
 	else
 		unmapped_base = TASK_UNMAPPED_BASE_USER64;
 
-	if (!IS_VALID_EA(pc) || (pc >= KERNELBASE))
-		return;
-	vsid = get_vsid(mm->context.id, pc);
-	__ste_allocate(GET_ESID(pc), vsid);
+	__ste_allocate(pc, mm);
 
 	if (GET_ESID(pc) == GET_ESID(stack))
 		return;
 
-	if (!IS_VALID_EA(stack) || (stack >= KERNELBASE))
-		return;
-	vsid = get_vsid(mm->context.id, stack);
-	__ste_allocate(GET_ESID(stack), vsid);
+	__ste_allocate(stack, mm);
 
 	if ((GET_ESID(pc) == GET_ESID(unmapped_base))
 	    || (GET_ESID(stack) == GET_ESID(unmapped_base)))
 		return;
 
-	if (!IS_VALID_EA(unmapped_base) || (unmapped_base >= KERNELBASE))
-		return;
-	vsid = get_vsid(mm->context.id, unmapped_base);
-	__ste_allocate(GET_ESID(unmapped_base), vsid);
+	__ste_allocate(unmapped_base, mm);
 
 	/* Order update */
 	asm volatile("sync" : : : "memory");
