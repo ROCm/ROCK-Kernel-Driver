@@ -384,16 +384,6 @@ nomem:
 	return -ENOMEM;
 }
 
-/*
- * Parameter block passed down to zap_pte_range in exceptional cases.
- */
-struct zap_details {
-	struct vm_area_struct *nonlinear_vma;	/* Check page->index if set */
-	struct address_space *check_mapping;	/* Check page->mapping if set */
-	pgoff_t	first_index;			/* Lowest page->index to unmap */
-	pgoff_t last_index;			/* Highest page->index to unmap */
-};
-
 static void zap_pte_range(struct mmu_gather *tlb,
 		pmd_t *pmd, unsigned long address,
 		unsigned long size, struct zap_details *details)
