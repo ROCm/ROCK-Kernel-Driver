@@ -1078,6 +1078,7 @@ int lmLogOpen(struct super_block *sb, log_t ** logptr)
 	 */
 
 	log->sb = sb;		/* This should be a list */
+	log->bdev = sb->s_bdev;
 	log->flag = JFS_INLINELOG;
 	log->base = addressPXD(&JFS_SBI(sb)->logpxd);
 	log->size = lengthPXD(&JFS_SBI(sb)->logpxd) >>
