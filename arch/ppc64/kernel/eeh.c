@@ -53,6 +53,7 @@ static int eeh_error_buf_size;
 
 /* Buffer for reporting slot-error-detail rtas calls */
 static unsigned char slot_errbuf[RTAS_ERROR_LOG_MAX];
+static spinlock_t slot_errbuf_lock = SPIN_LOCK_UNLOCKED;
 
 /* Workqueue data for EEH event device removal */
 struct eeh_event {
@@ -422,6 +423,7 @@ static void eeh_event_handler(void *dummy)
 		if (event == NULL)
 			break;
 
+		spin_lock_irqsave(&slot_errbuf_lock, flags);
 		memset(slot_errbuf, 0, eeh_error_buf_size);
 
 		log_event = rtas_call(rtas_token("ibm,slot-error-detail"), 8, 1, NULL,
@@ -432,6 +434,7 @@ static void eeh_event_handler(void *dummy)
 				      2 /* Permanent Error */);
 		if (log_event == 0) 
 			log_error(slot_errbuf, ERR_TYPE_RTAS_LOG, 0);
+		spin_unlock_irqrestore(&slot_errbuf_lock, flags);
 
 		rc = 1;
 		if (strcmp(event->dn->name, "ethernet") == 0) {
