@@ -45,8 +45,10 @@
 #include <asm/arch/hardware.h>
 #include <asm/arch/irqs.h>
 
+#define DRIVER_DESC	"H3600 touchscreen driver"
+
 MODULE_AUTHOR("James Simmons <jsimmons@transvirtual.com>");
-MODULE_DESCRIPTION("H3600 touchscreen driver");
+MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
 
 /*
@@ -479,9 +481,13 @@ static void h3600ts_disconnect(struct serio *serio)
  */
 
 static struct serio_driver h3600ts_drv = {
-	.interrupt =	h3600ts_interrupt,
-	.connect =	h3600ts_connect,
-	.disconnect =	h3600ts_disconnect,
+	.driver		= {
+		.name	= "h3600ts",
+	},
+	.description	= DRIVER_DESC,
+	.interrupt	= h3600ts_interrupt,
+	.connect	= h3600ts_connect,
+	.disconnect	= h3600ts_disconnect,
 };
 
 /*

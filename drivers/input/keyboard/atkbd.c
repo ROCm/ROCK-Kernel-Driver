@@ -27,8 +27,10 @@
 #include <linux/serio.h>
 #include <linux/workqueue.h>
 
+#define DRIVER_DESC	"AT and PS/2 keyboard driver"
+
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
-MODULE_DESCRIPTION("AT and PS/2 keyboard driver");
+MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
 
 static int atkbd_set = 2;
@@ -891,11 +893,15 @@ static int atkbd_reconnect(struct serio *serio)
 }
 
 static struct serio_driver atkbd_drv = {
-	.interrupt =	atkbd_interrupt,
-	.connect =	atkbd_connect,
-	.reconnect = 	atkbd_reconnect,
-	.disconnect =	atkbd_disconnect,
-	.cleanup =	atkbd_cleanup,
+	.driver		= {
+		.name	= "atkbd",
+	},
+	.description	= DRIVER_DESC,
+	.interrupt	= atkbd_interrupt,
+	.connect	= atkbd_connect,
+	.reconnect	= atkbd_reconnect,
+	.disconnect	= atkbd_disconnect,
+	.cleanup	= atkbd_cleanup,
 };
 
 int __init atkbd_init(void)

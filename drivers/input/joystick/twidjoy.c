@@ -247,9 +247,13 @@ static void twidjoy_connect(struct serio *serio, struct serio_driver *drv)
  */
 
 static struct serio_driver twidjoy_drv = {
-	.interrupt =	twidjoy_interrupt,
-	.connect =	twidjoy_connect,
-	.disconnect =	twidjoy_disconnect,
+	.driver		= {
+		.name	= "twidjoy",
+	},
+	.description	= DRIVER_DESC,
+	.interrupt	= twidjoy_interrupt,
+	.connect	= twidjoy_connect,
+	.disconnect	= twidjoy_disconnect,
 };
 
 /*

@@ -34,8 +34,10 @@
 #include <linux/init.h>
 #include <linux/serio.h>
 
+#define DRIVER_DESC	"XT keyboard driver"
+
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
-MODULE_DESCRIPTION("XT keyboard driver");
+MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
 
 #define XTKBD_EMUL0	0xe0
@@ -144,9 +146,13 @@ void xtkbd_disconnect(struct serio *serio)
 }
 
 struct serio_driver xtkbd_drv = {
-	.interrupt =	xtkbd_interrupt,
-	.connect =	xtkbd_connect,
-	.disconnect =	xtkbd_disconnect
+	.driver		= {
+		.name	= "xtkbd",
+	},
+	.description	= DRIVER_DESC,
+	.interrupt	= xtkbd_interrupt,
+	.connect	= xtkbd_connect,
+	.disconnect	= xtkbd_disconnect,
 };
 
 int __init xtkbd_init(void)

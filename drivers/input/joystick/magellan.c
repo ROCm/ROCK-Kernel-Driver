@@ -35,8 +35,10 @@
 #include <linux/serio.h>
 #include <linux/init.h>
 
+#define DRIVER_DESC	"Magellan and SpaceMouse 6dof controller driver"
+
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
-MODULE_DESCRIPTION("Magellan and SpaceMouse 6dof controller driver");
+MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
 
 /*
@@ -200,9 +202,13 @@ static void magellan_connect(struct serio *serio, struct serio_driver *drv)
  */
 
 static struct serio_driver magellan_drv = {
-	.interrupt =	magellan_interrupt,
-	.connect =	magellan_connect,
-	.disconnect =	magellan_disconnect,
+	.driver		= {
+		.name	= "magellan",
+	},
+	.description	= DRIVER_DESC,
+	.interrupt	= magellan_interrupt,
+	.connect	= magellan_connect,
+	.disconnect	= magellan_disconnect,
 };
 
 /*

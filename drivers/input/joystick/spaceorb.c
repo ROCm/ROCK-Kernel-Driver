@@ -38,8 +38,10 @@
 #include <linux/input.h>
 #include <linux/serio.h>
 
+#define DRIVER_DESC	"SpaceTec SpaceOrb 360 and Avenger 6dof controller driver"
+
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
-MODULE_DESCRIPTION("SpaceTec SpaceOrb 360 and Avenger 6dof controller driver");
+MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
 
 /*
@@ -214,9 +216,13 @@ static void spaceorb_connect(struct serio *serio, struct serio_driver *drv)
  */
 
 static struct serio_driver spaceorb_drv = {
-	.interrupt =	spaceorb_interrupt,
-	.connect =	spaceorb_connect,
-	.disconnect =	spaceorb_disconnect,
+	.driver		= {
+		.name	= "spaceorb",
+	},
+	.description	= DRIVER_DESC,
+	.interrupt	= spaceorb_interrupt,
+	.connect	= spaceorb_connect,
+	.disconnect	= spaceorb_disconnect,
 };
 
 /*

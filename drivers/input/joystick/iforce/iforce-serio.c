@@ -159,8 +159,12 @@ static void iforce_serio_disconnect(struct serio *serio)
 }
 
 struct serio_driver iforce_serio_drv = {
-	.write_wakeup =	iforce_serio_write_wakeup,
-	.interrupt =	iforce_serio_irq,
-	.connect =	iforce_serio_connect,
-	.disconnect =	iforce_serio_disconnect,
+	.driver		= {
+		.name	= "iforce",
+	},
+	.description	= "RS232 I-Force joysticks and wheels driver",
+	.write_wakeup	= iforce_serio_write_wakeup,
+	.interrupt	= iforce_serio_irq,
+	.connect	= iforce_serio_connect,
+	.disconnect	= iforce_serio_disconnect,
 };

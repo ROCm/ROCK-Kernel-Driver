@@ -37,8 +37,10 @@
 #include <linux/serio.h>
 #include <linux/init.h>
 
+#define DRIVER_DESC	"Serial mouse driver"
+
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
-MODULE_DESCRIPTION("Serial mouse driver");
+MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
 
 static char *sermouse_protocols[] = { "None", "Mouse Systems Mouse", "Sun Mouse", "Microsoft Mouse",
@@ -290,9 +292,13 @@ static void sermouse_connect(struct serio *serio, struct serio_driver *drv)
 }
 
 static struct serio_driver sermouse_drv = {
-	.interrupt =	sermouse_interrupt,
-	.connect =	sermouse_connect,
-	.disconnect =	sermouse_disconnect
+	.driver		= {
+		.name	= "sermouse",
+	},
+	.description	= DRIVER_DESC,
+	.interrupt	= sermouse_interrupt,
+	.connect	= sermouse_connect,
+	.disconnect	= sermouse_disconnect,
 };
 
 int __init sermouse_init(void)

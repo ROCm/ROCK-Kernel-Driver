@@ -76,8 +76,10 @@
 #include <linux/serio.h>
 #include <linux/workqueue.h>
 
+#define DRIVER_DESC	"LK keyboard driver"
+
 MODULE_AUTHOR ("Jan-Benedict Glaw <jbglaw@lug-owl.de>");
-MODULE_DESCRIPTION ("LK keyboard driver");
+MODULE_DESCRIPTION (DRIVER_DESC);
 MODULE_LICENSE ("GPL");
 
 /*
@@ -704,9 +706,13 @@ lkkbd_disconnect (struct serio *serio)
 }
 
 static struct serio_driver lkkbd_drv = {
-	.connect = lkkbd_connect,
-	.disconnect = lkkbd_disconnect,
-	.interrupt = lkkbd_interrupt,
+	.driver		= {
+		.name	= "lkkbd",
+	},
+	.description	= DRIVER_DESC,
+	.connect	= lkkbd_connect,
+	.disconnect	= lkkbd_disconnect,
+	.interrupt	= lkkbd_interrupt,
 };
 
 /*

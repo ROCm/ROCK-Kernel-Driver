@@ -36,8 +36,10 @@
 #include <linux/serio.h>
 #include <linux/init.h>
 
+#define DRIVER_DESC	"Gunze AHL-51S touchscreen driver"
+
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
-MODULE_DESCRIPTION("Gunze AHL-51S touchscreen driver");
+MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
 
 /*
@@ -157,9 +159,13 @@ static void gunze_connect(struct serio *serio, struct serio_driver *drv)
  */
 
 static struct serio_driver gunze_drv = {
-	.interrupt =	gunze_interrupt,
-	.connect =	gunze_connect,
-	.disconnect =	gunze_disconnect,
+	.driver		= {
+		.name	= "gunze",
+	},
+	.description	= DRIVER_DESC,
+	.interrupt	= gunze_interrupt,
+	.connect	= gunze_connect,
+	.disconnect	= gunze_disconnect,
 };
 
 /*

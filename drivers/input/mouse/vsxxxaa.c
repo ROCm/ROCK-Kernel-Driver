@@ -82,8 +82,10 @@
 #include <linux/serio.h>
 #include <linux/init.h>
 
+#define DRIVER_DESC	"Serial DEC VSXXX-AA/GA mouse / DEC tablet driver"
+
 MODULE_AUTHOR ("Jan-Benedict Glaw <jbglaw@lug-owl.de>");
-MODULE_DESCRIPTION ("Serial DEC VSXXX-AA/GA mouse / DEC tablet driver");
+MODULE_DESCRIPTION (DRIVER_DESC);
 MODULE_LICENSE ("GPL");
 
 #undef VSXXXAA_DEBUG
@@ -541,9 +543,13 @@ vsxxxaa_connect (struct serio *serio, struct serio_driver *drv)
 }
 
 static struct serio_driver vsxxxaa_drv = {
-	.connect = vsxxxaa_connect,
-	.interrupt = vsxxxaa_interrupt,
-	.disconnect = vsxxxaa_disconnect,
+	.driver		= {
+		.name	= "vsxxxaa",
+	},
+	.description	= DRIVER_DESC,
+	.connect	= vsxxxaa_connect,
+	.interrupt	= vsxxxaa_interrupt,
+	.disconnect	= vsxxxaa_disconnect,
 };
 
 int __init

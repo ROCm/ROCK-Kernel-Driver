@@ -18,6 +18,7 @@
 
 #include <linux/list.h>
 #include <linux/spinlock.h>
+#include <linux/device.h>
 
 struct serio {
 	void *private;
@@ -44,12 +45,15 @@ struct serio {
 
 	struct serio_driver *drv; /* Accessed from interrupt, writes must be protected by serio_lock */
 
+	struct device dev;
+
 	struct list_head node;
 };
+#define to_serio_port(d)	container_of(d, struct serio, dev)
 
 struct serio_driver {
 	void *private;
-	char *name;
+	char *description;
 
 	void (*write_wakeup)(struct serio *);
 	irqreturn_t (*interrupt)(struct serio *, unsigned char,
@@ -59,8 +63,11 @@ struct serio_driver {
 	void (*disconnect)(struct serio *);
 	void (*cleanup)(struct serio *);
 
+	struct device_driver driver;
+
 	struct list_head node;
 };
+#define to_serio_driver(d)	container_of(d, struct serio_driver, driver)
 
 int serio_open(struct serio *serio, struct serio_driver *drv);
 void serio_close(struct serio *serio);

@@ -39,8 +39,10 @@
 #include <linux/input.h>
 #include <linux/serio.h>
 
+#define DRIVER_DESC	"SpaceTec SpaceBall 2003/3003/4000 FLX driver"
+
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
-MODULE_DESCRIPTION("SpaceTec SpaceBall 2003/3003/4000 FLX driver");
+MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
 
 /*
@@ -270,9 +272,13 @@ static void spaceball_connect(struct serio *serio, struct serio_driver *drv)
  */
 
 static struct serio_driver spaceball_drv = {
-	.interrupt =	spaceball_interrupt,
-	.connect =	spaceball_connect,
-	.disconnect =	spaceball_disconnect,
+	.driver		= {
+		.name	= "spaceball",
+	},
+	.description	= DRIVER_DESC,
+	.interrupt	= spaceball_interrupt,
+	.connect	= spaceball_connect,
+	.disconnect	= spaceball_disconnect,
 };
 
 /*

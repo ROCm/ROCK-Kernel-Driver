@@ -32,8 +32,10 @@
 #include <linux/init.h>
 #include <linux/serio.h>
 
+#define DRIVER_DESC	"Newton keyboard driver"
+
 MODULE_AUTHOR("Justin Cormack <j.cormack@doc.ic.ac.uk>");
-MODULE_DESCRIPTION("Newton keyboard driver");
+MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
 
 #define NKBD_KEY	0x7f
@@ -139,9 +141,13 @@ void nkbd_disconnect(struct serio *serio)
 }
 
 struct serio_driver nkbd_drv = {
-	.interrupt =	nkbd_interrupt,
-	.connect =	nkbd_connect,
-	.disconnect =	nkbd_disconnect
+	.driver		= {
+		.name	= "newtonkbd",
+	},
+	.description	= DRIVER_DESC,
+	.interrupt	= nkbd_interrupt,
+	.connect	= nkbd_connect,
+	.disconnect	= nkbd_disconnect,
 };
 
 int __init nkbd_init(void)

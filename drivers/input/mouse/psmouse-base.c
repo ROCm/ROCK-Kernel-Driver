@@ -22,8 +22,10 @@
 #include "synaptics.h"
 #include "logips2pp.h"
 
+#define DRIVER_DESC	"PS/2 mouse driver"
+
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
-MODULE_DESCRIPTION("PS/2 mouse driver");
+MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
 
 static char *psmouse_proto;
@@ -815,11 +817,15 @@ static int psmouse_reconnect(struct serio *serio)
 
 
 static struct serio_driver psmouse_drv = {
-	.interrupt =	psmouse_interrupt,
-	.connect =	psmouse_connect,
-	.reconnect =	psmouse_reconnect,
-	.disconnect =	psmouse_disconnect,
-	.cleanup =	psmouse_cleanup,
+	.driver		= {
+		.name	= "psmouse",
+	},
+	.description	= DRIVER_DESC,
+	.interrupt	= psmouse_interrupt,
+	.connect	= psmouse_connect,
+	.reconnect	= psmouse_reconnect,
+	.disconnect	= psmouse_disconnect,
+	.cleanup	= psmouse_cleanup,
 };
 
 static inline void psmouse_parse_proto(void)
