@@ -2166,7 +2166,10 @@ static u16 setup_card(struct airo_info *ai, u8 *mac)
 	if ( status != SUCCESS ) return ERROR;
 
 	status = enable_MAC(ai, &rsp);
-	if ( status != SUCCESS ) return ERROR;
+	if ( status != SUCCESS || (rsp.status & 0xFF00) != 0) {
+		printk( KERN_ERR "airo: Bad MAC enable reason = %x, rid = %x, offset = %d\n", rsp.rsp0, rsp.rsp1, rsp.rsp2 );
+		return ERROR;
+	}
 
 	/* Grab the initial wep key, we gotta save it for auto_wep */
 	rc = readWepKeyRid(ai, &wkr, 1);
