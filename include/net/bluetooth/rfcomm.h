@@ -185,6 +185,7 @@ struct rfcomm_dlc {
 	atomic_t      refcnt;
 	u8            dlci;
 	u8            addr;
+	u8            priority;
 
 	uint          mtu;
 	u8            v24_sig;
