@@ -792,6 +792,10 @@ int usb_stor_CBI_transport(Scsi_Cmnd *srb, struct us_data *us)
 					srb->request_buffer, transfer_length,
 					srb->use_sg, &srb->resid);
 		US_DEBUGP("CBI data stage result is 0x%x\n", result);
+
+		/* if we stalled the data transfer it means command failed */
+		if (result == USB_STOR_XFER_STALLED)
+			return USB_STOR_TRANSPORT_FAILED;
 		if (result > USB_STOR_XFER_STALLED)
 			return USB_STOR_TRANSPORT_ERROR;
 	}
@@ -883,6 +887,10 @@ int usb_stor_CB_transport(Scsi_Cmnd *srb, struct us_data *us)
 					srb->request_buffer, transfer_length,
 					srb->use_sg, &srb->resid);
 		US_DEBUGP("CB data stage result is 0x%x\n", result);
+
+		/* if we stalled the data transfer it means command failed */
+		if (result == USB_STOR_XFER_STALLED)
+			return USB_STOR_TRANSPORT_FAILED;
 		if (result > USB_STOR_XFER_STALLED)
 			return USB_STOR_TRANSPORT_ERROR;
 	}
