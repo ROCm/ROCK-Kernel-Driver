@@ -19,8 +19,7 @@
 //
 
 #include <asm/types.h>
-#include <asm/page.h>
-
+#include <asm/bug.h>
 
 
 #define DELTA 0x9E3779B9
