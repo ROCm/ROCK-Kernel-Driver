@@ -1973,11 +1973,19 @@ static int load_balance(int this_cpu, runqueue_t *this_rq,
 			 */
 			sd->nr_balance_failed = sd->cache_nice_tries;
 		}
-	} else
-		sd->nr_balance_failed = 0;
 
-	/* We were unbalanced, so reset the balancing interval */
-	sd->balance_interval = sd->min_interval;
+		/*
+		 * We were unbalanced, but unsuccessful in move_tasks(),
+		 * so bump the balance_interval to lessen the lock contention.
+		 */
+		if (sd->balance_interval < sd->max_interval)
+			sd->balance_interval++;
+	} else {
+                sd->nr_balance_failed = 0;
+
+		/* We were unbalanced, so reset the balancing interval */
+		sd->balance_interval = sd->min_interval;
+	}
 
 	return nr_moved;
 
