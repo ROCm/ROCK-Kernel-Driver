@@ -11,6 +11,9 @@ config MIPS64
 	  64-bit processing, otherwise say N.  You must say Y for kernels for
 	  SGI IP27 (Origin 200 and 2000).  If in doubt say N.
 
+config 64BIT
+	def_bool MIPS64
+
 config MIPS32
 	bool
 	depends on MIPS64 = 'n'
