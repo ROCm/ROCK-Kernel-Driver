@@ -1,7 +1,7 @@
 /* SCTP kernel reference Implementation
+ * (C) Copyright IBM Corp. 2001, 2004
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
- * Copyright (c) 2001-2003 International Business Machines, Corp.
  * Copyright (c) 2001 Intel Corp.
  *
  * This file is part of the SCTP kernel reference Implementation
@@ -36,6 +36,7 @@
  *    La Monte H.P. Yarroll <piggy@acm.org>
  *    Jon Grimm             <jgrimm@us.ibm.com>
  *    Karl Knutson          <karl@athena.chicago.il.us>
+ *    Sridhar Samudrala     <sri@us.ibm.com>
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -251,6 +252,40 @@ int sctp_tsnmap_next_gap_ack(const struct sctp_tsnmap *map,
 	}
 
 	return ended;
+}
+
+/* Mark this and any lower TSN as seen.  */
+void sctp_tsnmap_skip(struct sctp_tsnmap *map, __u32 tsn)
+{
+	__s32 gap;
+
+	/* Vacuously mark any TSN which precedes the map base or
+	 * exceeds the end of the map.
+	 */
+	if (TSN_lt(tsn, map->base_tsn))
+		return;
+	if (!TSN_lt(tsn, map->base_tsn + map->len + map->len))
+		return;
+
+	/* Bump the max.  */
+	if (TSN_lt(map->max_tsn_seen, tsn))
+		map->max_tsn_seen = tsn;
+
+	/* Assert: TSN is in range.  */
+	gap = tsn - map->base_tsn + 1;
+
+	/* Mark the TSNs as received.  */
+	if (gap <= map->len)
+		memset(map->tsn_map, 0x01, gap);
+	else {
+		memset(map->tsn_map, 0x01, map->len);
+		memset(map->overflow_map, 0x01, (gap - map->len));
+	}
+
+	/* Go fixup any internal TSN mapping variables including
+	 * cumulative_tsn_ack_point.
+	 */
+	sctp_tsnmap_update(map);
 }
 
 /********************************************************************

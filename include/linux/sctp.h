@@ -1,5 +1,5 @@
 /* SCTP kernel reference Implementation
- * (C) Copyright IBM Corp. 2001, 2003
+ * (C) Copyright IBM Corp. 2001, 2004
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
  * Copyright (c) 2001 Intel Corp.
@@ -93,6 +93,9 @@ typedef enum {
         SCTP_CID_ECN_CWR		= 13,
         SCTP_CID_SHUTDOWN_COMPLETE	= 14,
 
+	/* PR-SCTP Sec 3.2 */
+	SCTP_CID_FWD_TSN		= 0xC0,
+
 	/* Use hex, as defined in ADDIP sec. 3.1 */
 	SCTP_CID_ASCONF			= 0xC1,
 	SCTP_CID_ASCONF_ACK		= 0x80,
@@ -167,6 +170,9 @@ typedef enum {
 	SCTP_PARAM_HOST_NAME_ADDRESS		= __constant_htons(11),
 	SCTP_PARAM_SUPPORTED_ADDRESS_TYPES	= __constant_htons(12),
 	SCTP_PARAM_ECN_CAPABLE			= __constant_htons(0x8000),
+
+	/* PR-SCTP Sec 3.1 */
+	SCTP_PARAM_FWD_TSN_SUPPORT	= __constant_htons(0xc000),
 
 	/* Add-IP Extension. Section 3.2 */
 	SCTP_PARAM_ADD_IP		= __constant_htons(0xc001),
@@ -472,9 +478,67 @@ typedef struct sctp_cwr_chunk {
 	sctp_cwrhdr_t cwr_hdr;
 } __attribute__((packed)) sctp_cwr_chunk_t;
 
-/*
- * ADDIP Section 3.1 New Chunk Types
+/* PR-SCTP
+ * 3.2 Forward Cumulative TSN Chunk Definition (FORWARD TSN)
+ *
+ * Forward Cumulative TSN chunk has the following format:
+ *
+ *        0                   1                   2                   3
+ *        0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+ *      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *      |   Type = 192  |  Flags = 0x00 |        Length = Variable      |
+ *      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *      |                      New Cumulative TSN                       |
+ *      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *      |         Stream-1              |       Stream Sequence-1       |
+ *      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *      \                                                               /
+ *      /                                                               \
+ *      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *      |         Stream-N              |       Stream Sequence-N       |
+ *      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *
+ *      Chunk Flags:
+ *
+ *        Set to all zeros on transmit and ignored on receipt.
+ *
+ *      New Cumulative TSN: 32 bit u_int
+ *
+ *       This indicates the new cumulative TSN to the data receiver. Upon
+ *       the reception of this value, the data receiver MUST consider
+ *       any missing TSNs earlier than or equal to this value as received
+ *       and stop reporting them as gaps in any subsequent SACKs.
+ *
+ *      Stream-N: 16 bit u_int
+ *
+ *       This field holds a stream number that was skipped by this
+ *       FWD-TSN.
+ *
+ *      Stream Sequence-N: 16 bit u_int
+ *       This field holds the sequence number associated with the stream
+ *       that was skipped. The stream sequence field holds the largest stream
+ *       sequence number in this stream being skipped.  The receiver of
+ *       the FWD-TSN's can use the Stream-N and Stream Sequence-N fields
+ *       to enable delivery of any stranded TSN's that remain on the stream
+ *       re-ordering queues. This field MUST NOT report TSN's corresponding
+ *       to DATA chunk that are marked as unordered. For ordered DATA
+ *       chunks this field MUST be filled in.
  */
+struct sctp_fwdtsn_skip {
+	__u16 stream;
+	__u16 ssn;
+} __attribute__((packed));
+
+struct sctp_fwdtsn_hdr {
+	__u32 new_cum_tsn;
+	struct sctp_fwdtsn_skip skip[0];
+} __attribute((packed));
+
+struct sctp_fwdtsn_chunk {
+	struct sctp_chunkhdr chunk_hdr;
+	struct sctp_fwdtsn_hdr fwdtsn_hdr;
+} __attribute((packed));
+
 
 /* ADDIP
  * Section 3.1.1 Address Configuration Change Chunk (ASCONF)
