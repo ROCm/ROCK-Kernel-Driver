@@ -206,7 +206,7 @@ usb_bind_driver (struct usb_driver *driver, struct usb_interface *interface)
 	if (id) {
 		for (i = 0; i < interface->num_altsetting; i++) {
 		  	interface->act_altsetting = i;
-			id = usb_match_id(dev, interface, id);
+			id = usb_match_id(interface, id);
 			if (id) {
 				down(&driver->serialize);
 				private = driver->probe(dev,ifnum,id);
@@ -466,7 +466,6 @@ void usb_driver_release_interface(struct usb_driver *driver, struct usb_interfac
 
 /**
  * usb_match_id - find first usb_device_id matching device or interface
- * @dev: the device whose descriptors are considered when matching
  * @interface: the interface of interest
  * @id: array of usb_device_id structures, terminated by zero entry
  *
@@ -528,14 +527,17 @@ void usb_driver_release_interface(struct usb_driver *driver, struct usb_interfac
  * its associated class and subclass.
  */   
 const struct usb_device_id *
-usb_match_id(struct usb_device *dev, struct usb_interface *interface,
-	     const struct usb_device_id *id)
+usb_match_id(struct usb_interface *interface, const struct usb_device_id *id)
 {
-	struct usb_interface_descriptor	*intf = 0;
+	struct usb_interface_descriptor *intf;
+	struct usb_device *dev;
 
 	/* proc_connectinfo in devio.c may call us with id == NULL. */
 	if (id == NULL)
 		return NULL;
+
+	intf = &interface->altsetting [interface->act_altsetting];
+	dev = interface_to_usbdev(interface);
 
 	/* It is important to check that id->driver_info is nonzero,
 	   since an entry that is all zeroes except for a nonzero
@@ -575,19 +577,17 @@ usb_match_id(struct usb_device *dev, struct usb_interface *interface,
 		    (id->bDeviceProtocol != dev->descriptor.bDeviceProtocol))
 			continue;
 
-		intf = &interface->altsetting [interface->act_altsetting];
-
 		if ((id->match_flags & USB_DEVICE_ID_MATCH_INT_CLASS) &&
 		    (id->bInterfaceClass != intf->bInterfaceClass))
 			continue;
 
 		if ((id->match_flags & USB_DEVICE_ID_MATCH_INT_SUBCLASS) &&
 		    (id->bInterfaceSubClass != intf->bInterfaceSubClass))
-		    continue;
+			continue;
 
 		if ((id->match_flags & USB_DEVICE_ID_MATCH_INT_PROTOCOL) &&
 		    (id->bInterfaceProtocol != intf->bInterfaceProtocol))
-		    continue;
+			continue;
 
 		return id;
 	}

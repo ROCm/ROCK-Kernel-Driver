@@ -443,8 +443,7 @@ extern void usb_driver_claim_interface(struct usb_driver *driver,
 extern int usb_interface_claimed(struct usb_interface *iface);
 extern void usb_driver_release_interface(struct usb_driver *driver,
 			struct usb_interface *iface);
-const struct usb_device_id *usb_match_id(struct usb_device *dev,
-					 struct usb_interface *interface,
+const struct usb_device_id *usb_match_id(struct usb_interface *interface,
 					 const struct usb_device_id *id);
 
 /**
