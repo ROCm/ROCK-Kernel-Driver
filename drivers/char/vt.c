@@ -2117,6 +2117,8 @@ void set_console(int nr)
 	schedule_console_callback();
 }
 
+struct tty_driver *console_driver;
+
 #ifdef CONFIG_VT_CONSOLE
 
 /*
@@ -2215,8 +2217,6 @@ void vt_console_print(struct console *co, const char * b, unsigned count)
 quit:
 	clear_bit(0, &printing);
 }
-
-struct tty_driver *console_driver;
 
 static struct tty_driver *vt_console_device(struct console *c, int *index)
 {
