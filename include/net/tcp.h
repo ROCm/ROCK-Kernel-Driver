@@ -208,6 +208,8 @@ struct tcp_tw_bucket {
 #endif
 };
 
+#define tcptw_sk(__sk)	((struct tcp_tw_bucket *)(__sk))
+
 extern kmem_cache_t *tcp_timewait_cachep;
 
 static inline void tcp_tw_put(struct tcp_tw_bucket *tw)
@@ -246,7 +248,11 @@ extern void tcp_tw_deschedule(struct tcp_tw_bucket *tw);
 #endif /* __BIG_ENDIAN */
 #define TCP_IPV4_MATCH(__sk, __cookie, __saddr, __daddr, __ports, __dif)\
 	(((*((__u64 *)&(inet_sk(__sk)->daddr)))== (__cookie))	&&	\
-	 ((*((__u32 *)&(inet_sk(__sk)->dport)))== (__ports))   &&	\
+	 ((*((__u32 *)&(inet_sk(__sk)->dport)))== (__ports))	&&	\
+	 (!((__sk)->bound_dev_if) || ((__sk)->bound_dev_if == (__dif))))
+#define TCP_IPV4_TW_MATCH(__sk, __cookie, __saddr, __daddr, __ports, __dif)\
+	(((*((__u64 *)&(tcptw_sk(__sk)->daddr)))== (__cookie))	&&	\
+	 ((*((__u32 *)&(tcptw_sk(__sk)->dport)))== (__ports))	&&	\
 	 (!((__sk)->bound_dev_if) || ((__sk)->bound_dev_if == (__dif))))
 #else /* 32-bit arch */
 #define TCP_V4_ADDR_COOKIE(__name, __saddr, __daddr)
@@ -254,6 +260,11 @@ extern void tcp_tw_deschedule(struct tcp_tw_bucket *tw);
 	((inet_sk(__sk)->daddr			== (__saddr))	&&	\
 	 (inet_sk(__sk)->rcv_saddr		== (__daddr))	&&	\
 	 ((*((__u32 *)&(inet_sk(__sk)->dport)))== (__ports))	&&	\
+	 (!((__sk)->bound_dev_if) || ((__sk)->bound_dev_if == (__dif))))
+#define TCP_IPV4_TW_MATCH(__sk, __cookie, __saddr, __daddr, __ports, __dif)\
+	((tcptw_sk(__sk)->daddr			== (__saddr))	&&	\
+	 (tcptw_sk(__sk)->rcv_saddr		== (__daddr))	&&	\
+	 ((*((__u32 *)&(tcptw_sk(__sk)->dport)))== (__ports))	&&	\
 	 (!((__sk)->bound_dev_if) || ((__sk)->bound_dev_if == (__dif))))
 #endif /* 64-bit arch */
 

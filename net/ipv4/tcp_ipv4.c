@@ -509,7 +509,7 @@ static inline struct sock *__tcp_v4_lookup_established(u32 saddr, u16 sport,
 
 	/* Must check for a TIME_WAIT'er before going to listener hash. */
 	for (sk = (head + tcp_ehash_size)->chain; sk; sk = sk->next)
-		if (TCP_IPV4_MATCH(sk, acookie, saddr, daddr, ports, dif))
+		if (TCP_IPV4_TW_MATCH(sk, acookie, saddr, daddr, ports, dif))
 			goto hit;
 out:
 	read_unlock(&head->lock);
@@ -570,7 +570,7 @@ static int __tcp_v4_check_established(struct sock *sk, __u16 lport,
 	     skp = &sk2->next) {
 		tw = (struct tcp_tw_bucket *)sk2;
 
-		if (TCP_IPV4_MATCH(sk2, acookie, saddr, daddr, ports, dif)) {
+		if (TCP_IPV4_TW_MATCH(sk2, acookie, saddr, daddr, ports, dif)) {
 			struct tcp_opt *tp = tcp_sk(sk);
 
 			/* With PAWS, it is safe from the viewpoint
