@@ -16,17 +16,26 @@
 #include <asm/mmu_context.h>
 #include <asm/iSeries/HvCallHpt.h>
 #include <asm/abs_addr.h>
-
-#if 0
 #include <linux/spinlock.h>
-#include <linux/bitops.h>
-#include <linux/threads.h>
-#include <linux/smp.h>
 
-#include <asm/tlbflush.h>
-#include <asm/tlb.h>
-#include <asm/cputable.h>
-#endif
+static spinlock_t iSeries_hlocks[64] __cacheline_aligned_in_smp = { [0 ... 63] = SPIN_LOCK_UNLOCKED};
+
+/*
+ * Very primitive algorithm for picking up a lock
+ */
+static inline void iSeries_hlock(unsigned long slot)
+{
+	if (slot & 0x8)
+		slot = ~slot;
+	spin_lock(&iSeries_hlocks[(slot >> 4) & 0x3f]);
+}
+
+static inline void iSeries_hunlock(unsigned long slot)
+{
+	if (slot & 0x8)
+		slot = ~slot;
+	spin_unlock(&iSeries_hlocks[(slot >> 4) & 0x3f]);
+}
 
 static long iSeries_hpte_insert(unsigned long hpte_group, unsigned long va,
 			 unsigned long prpn, int secondary,
@@ -44,12 +53,15 @@ static long iSeries_hpte_insert(unsigned long hpte_group, unsigned long va,
 	if (secondary)
 		return -1;
 
-	slot = HvCallHpt_findValid(&lhpte, va >> PAGE_SHIFT);
-	if (lhpte.dw0.dw0.v)
-		panic("select_hpte_slot found entry already valid\n");
+	iSeries_hlock(hpte_group);
 
-	if (slot == -1)	/* No available entry found in either group */
+	slot = HvCallHpt_findValid(&lhpte, va >> PAGE_SHIFT);
+	BUG_ON(lhpte.dw0.dw0.v);
+
+	if (slot == -1)	{ /* No available entry found in either group */
+		iSeries_hunlock(hpte_group);
 		return -1;
+	}
 
 	if (slot < 0) {		/* MSB set means secondary group */
 		secondary = 1;
@@ -68,6 +80,8 @@ static long iSeries_hpte_insert(unsigned long hpte_group, unsigned long va,
 
 	/* Now fill in the actual HPTE */
 	HvCallHpt_addValidate(slot, secondary, &lhpte);
+
+	iSeries_hunlock(hpte_group);
 
 	return (secondary << 3) | (slot & 7);
 }
@@ -92,6 +106,8 @@ static long iSeries_hpte_remove(unsigned long hpte_group)
 	/* Pick a random slot to start at */
 	slot_offset = mftb() & 0x7;
 
+	iSeries_hlock(hpte_group);
+
 	for (i = 0; i < HPTES_PER_GROUP; i++) {
 		lhpte.dw0.dword0 = 
 			iSeries_hpte_getword0(hpte_group + slot_offset);
@@ -99,12 +115,15 @@ static long iSeries_hpte_remove(unsigned long hpte_group)
 		if (!lhpte.dw0.dw0.bolted) {
 			HvCallHpt_invalidateSetSwBitsGet(hpte_group + 
 							 slot_offset, 0, 0);
+			iSeries_hunlock(hpte_group);
 			return i;
 		}
 
 		slot_offset++;
 		slot_offset &= 0x7;
 	}
+
+	iSeries_hunlock(hpte_group);
 
 	return -1;
 }
@@ -121,11 +140,16 @@ static long iSeries_hpte_updatepp(unsigned long slot, unsigned long newpp,
 	HPTE hpte;
 	unsigned long avpn = va >> 23;
 
+	iSeries_hlock(slot);
+
 	HvCallHpt_get(&hpte, slot);
 	if ((hpte.dw0.dw0.avpn == avpn) && (hpte.dw0.dw0.v)) {
 		HvCallHpt_setPp(slot, (newpp & 0x3) | ((newpp & 0x4) << 1));
+		iSeries_hunlock(slot);
 		return 0;
 	}
+	iSeries_hunlock(slot);
+
 	return -1;
 }
 
@@ -186,11 +210,20 @@ static void iSeries_hpte_invalidate(unsigned long slot, unsigned long va,
 {
 	HPTE lhpte;
 	unsigned long avpn = va >> 23;
+	unsigned long flags;
+
+	local_irq_save(flags);
+
+	iSeries_hlock(slot);
 
 	lhpte.dw0.dword0 = iSeries_hpte_getword0(slot);
 	
 	if ((lhpte.dw0.dw0.avpn == avpn) && lhpte.dw0.dw0.v)
 		HvCallHpt_invalidateSetSwBitsGet(slot, 0, 0);
+
+	iSeries_hunlock(slot);
+
+	local_irq_restore(flags);
 }
 
 void hpte_init_iSeries(void)

@@ -49,7 +49,6 @@ static int ipcomp6_input(struct xfrm_state *x, struct xfrm_decap_state *decap, s
 {
 	int err = 0;
 	u8 nexthdr = 0;
-	u8 *prevhdr;
 	int hdr_len = skb->h.raw - skb->nh.raw;
 	unsigned char *tmp_hdr = NULL;
 	struct ipv6hdr *iph;
@@ -106,8 +105,6 @@ static int ipcomp6_input(struct xfrm_state *x, struct xfrm_decap_state *decap, s
 	iph = skb->nh.ipv6h;
 	iph->payload_len = htons(skb->len);
 	
-	ip6_find_1stfragopt(skb, &prevhdr);
-	*prevhdr = nexthdr;
 out:
 	if (tmp_hdr)
 		kfree(tmp_hdr);

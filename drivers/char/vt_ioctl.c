@@ -915,7 +915,7 @@ int vt_ioctl(struct tty_struct *tty, struct file * file,
 		op.width = 8;
 		op.height = 0;
 		op.charcount = 256;
-		op.data = (char *) arg;
+		op.data = up;
 		return con_font_op(fg_console, &op);
 	}
 
@@ -925,7 +925,7 @@ int vt_ioctl(struct tty_struct *tty, struct file * file,
 		op.width = 8;
 		op.height = 32;
 		op.charcount = 256;
-		op.data = (char *) arg;
+		op.data = up;
 		return con_font_op(fg_console, &op);
 	}
 

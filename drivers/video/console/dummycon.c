@@ -71,7 +71,10 @@ const struct consw dummy_con = {
     .con_bmove =	DUMMY,
     .con_switch =	DUMMY,
     .con_blank =	DUMMY,
-    .con_font_op =	DUMMY,
+    .con_font_set =	DUMMY,
+    .con_font_get =	DUMMY,
+    .con_font_default =	DUMMY,
+    .con_font_copy =	DUMMY,
     .con_set_palette =	DUMMY,
     .con_scrolldelta =	DUMMY,
 };

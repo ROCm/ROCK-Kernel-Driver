@@ -16,7 +16,11 @@
 #define FBIOGETCMAP		0x4604
 #define FBIOPUTCMAP		0x4605
 #define FBIOPAN_DISPLAY		0x4606
+#ifdef __KERNEL__
+#define FBIO_CURSOR            _IOWR('F', 0x08, struct fb_cursor_user)
+#else
 #define FBIO_CURSOR            _IOWR('F', 0x08, struct fb_cursor)
+#endif
 /* 0x4607-0x460B are defined below */
 /* #define FBIOGET_MONITORSPEC	0x460C */
 /* #define FBIOPUT_MONITORSPEC	0x460D */
@@ -397,6 +401,36 @@ struct fb_info;
 struct device;
 struct file;
 
+struct fb_cmap_user {
+	__u32 start;			/* First entry	*/
+	__u32 len;			/* Number of entries */
+	__u16 __user *red;		/* Red values	*/
+	__u16 __user *green;
+	__u16 __user *blue;
+	__u16 __user *transp;		/* transparency, can be NULL */
+};
+
+struct fb_image_user {
+	__u32 dx;			/* Where to place image */
+	__u32 dy;
+	__u32 width;			/* Size of image */
+	__u32 height;
+	__u32 fg_color;			/* Only used when a mono bitmap */
+	__u32 bg_color;
+	__u8  depth;			/* Depth of the image */
+	const char __user *data;	/* Pointer to image data */
+	struct fb_cmap_user cmap;	/* color map info */
+};
+
+struct fb_cursor_user {
+	__u16 set;			/* what to set */
+	__u16 enable;			/* cursor on/off */
+	__u16 rop;			/* bitop operation */
+	const char __user *mask;	/* cursor mask bits */
+	struct fbcurpos hot;		/* cursor hot spot */
+	struct fb_image_user image;	/* Cursor image */
+};
+
 /*
  * Register/unregister for framebuffer events
  */
@@ -696,8 +730,10 @@ extern const struct fb_videomode vesa_modes[];
 /* drivers/video/fbcmap.c */
 extern int fb_alloc_cmap(struct fb_cmap *cmap, int len, int transp);
 extern void fb_dealloc_cmap(struct fb_cmap *cmap);
-extern int fb_copy_cmap(struct fb_cmap *from, struct fb_cmap *to, int fsfromto);
-extern int fb_set_cmap(struct fb_cmap *cmap, int kspc, struct fb_info *fb_info);
+extern int fb_copy_cmap(struct fb_cmap *from, struct fb_cmap *to);
+extern int fb_cmap_to_user(struct fb_cmap *from, struct fb_cmap_user *to);
+extern int fb_set_cmap(struct fb_cmap *cmap, struct fb_info *fb_info);
+extern int fb_set_user_cmap(struct fb_cmap_user *cmap, struct fb_info *fb_info);
 extern struct fb_cmap *fb_default_cmap(int len);
 extern void fb_invert_cmaps(void);
 

@@ -15,19 +15,22 @@ static		int	cons_hold_cnt;
 /* If defined, enables serial console.  The value (1 through 4)
  * should designate which SCC is used, but this isn't complete.  Only
  * SCC1 is known to work at this time.
+ * We're only linked if SERIAL_CPM_CONSOLE=y, so we only need to test
+ * SERIAL_CPM_SCC1.
  */
-#ifdef CONFIG_SCC_CONSOLE
+#ifdef CONFIG_SERIAL_CPM_SCC1
 #define SCC_CONSOLE 1
 #endif
 
 unsigned long
 serial_init(int ignored, bd_t *bd)
 {
-	volatile smc_t		*sp;
-	volatile smc_uart_t	*up;
 #ifdef SCC_CONSOLE
 	volatile scc_t		*sccp;
 	volatile scc_uart_t	*sup;
+#else
+	volatile smc_t		*sp;
+	volatile smc_uart_t	*up;
 #endif
 	volatile cbd_t	*tbdf, *rbdf;
 	volatile cpm2_map_t	*ip;
@@ -222,8 +225,11 @@ serial_readbuf(u_char *cbuf)
 {
 	volatile cbd_t		*rbdf;
 	volatile char		*buf;
-	volatile smc_uart_t	*up;
+#ifdef SCC_CONSOLE
 	volatile scc_uart_t	*sup;
+#else
+	volatile smc_uart_t	*up;
+#endif
 	volatile cpm2_map_t	*ip;
 	int	i, nc;
 
@@ -254,10 +260,12 @@ serial_putc(void *ignored, const char c)
 {
 	volatile cbd_t		*tbdf;
 	volatile char		*buf;
-	volatile smc_uart_t	*up;
+#ifdef SCC_CONSOLE
 	volatile scc_uart_t	*sup;
+#else
+	volatile smc_uart_t	*up;
+#endif
 	volatile cpm2_map_t	*ip;
-	extern bd_t		*board_info;
 
 	ip = (cpm2_map_t *)CPM_MAP_ADDR;
 #ifdef SCC_CONSOLE
@@ -297,8 +305,11 @@ int
 serial_tstc(void *ignored)
 {
 	volatile cbd_t		*rbdf;
-	volatile smc_uart_t	*up;
+#ifdef SCC_CONSOLE
 	volatile scc_uart_t	*sup;
+#else
+	volatile smc_uart_t	*up;
+#endif
 	volatile cpm2_map_t	*ip;
 
 	ip = (cpm2_map_t *)CPM_MAP_ADDR;

@@ -165,7 +165,6 @@ static void fbcon_bmove(struct vc_data *vc, int sy, int sx, int dy, int dx,
 			int height, int width);
 static int fbcon_switch(struct vc_data *vc);
 static int fbcon_blank(struct vc_data *vc, int blank, int mode_switch);
-static int fbcon_font_op(struct vc_data *vc, struct console_font_op *op);
 static int fbcon_set_palette(struct vc_data *vc, unsigned char *table);
 static int fbcon_scrolldelta(struct vc_data *vc, int lines);
 void accel_clear_margins(struct vc_data *vc, struct fb_info *info,
@@ -2001,36 +2000,36 @@ static void fbcon_free_font(struct display *p)
 	p->userfont = 0;
 }
 
-static inline int fbcon_get_font(struct vc_data *vc, struct console_font_op *op)
+static int fbcon_get_font(struct vc_data *vc, struct console_font *font)
 {
 	u8 *fontdata = vc->vc_font.data;
-	u8 *data = op->data;
+	u8 *data = font->data;
 	int i, j;
 
-	op->width = vc->vc_font.width;
-	op->height = vc->vc_font.height;
-	op->charcount = vc->vc_hi_font_mask ? 512 : 256;
-	if (!op->data)
+	font->width = vc->vc_font.width;
+	font->height = vc->vc_font.height;
+	font->charcount = vc->vc_hi_font_mask ? 512 : 256;
+	if (!font->data)
 		return 0;
 
-	if (op->width <= 8) {
+	if (font->width <= 8) {
 		j = vc->vc_font.height;
-		for (i = 0; i < op->charcount; i++) {
+		for (i = 0; i < font->charcount; i++) {
 			memcpy(data, fontdata, j);
 			memset(data + j, 0, 32 - j);
 			data += 32;
 			fontdata += j;
 		}
-	} else if (op->width <= 16) {
+	} else if (font->width <= 16) {
 		j = vc->vc_font.height * 2;
-		for (i = 0; i < op->charcount; i++) {
+		for (i = 0; i < font->charcount; i++) {
 			memcpy(data, fontdata, j);
 			memset(data + j, 0, 64 - j);
 			data += 64;
 			fontdata += j;
 		}
-	} else if (op->width <= 24) {
-		for (i = 0; i < op->charcount; i++) {
+	} else if (font->width <= 24) {
+		for (i = 0; i < font->charcount; i++) {
 			for (j = 0; j < vc->vc_font.height; j++) {
 				*data++ = fontdata[0];
 				*data++ = fontdata[1];
@@ -2042,7 +2041,7 @@ static inline int fbcon_get_font(struct vc_data *vc, struct console_font_op *op)
 		}
 	} else {
 		j = vc->vc_font.height * 4;
-		for (i = 0; i < op->charcount; i++) {
+		for (i = 0; i < font->charcount; i++) {
 			memcpy(data, fontdata, j);
 			memset(data + j, 0, 128 - j);
 			data += 128;
@@ -2052,22 +2051,14 @@ static inline int fbcon_get_font(struct vc_data *vc, struct console_font_op *op)
 	return 0;
 }
 
-static int fbcon_do_set_font(struct vc_data *vc, struct console_font_op *op,
+static int fbcon_do_set_font(struct vc_data *vc, int w, int h,
 			     u8 * data, int userfont)
 {
 	struct fb_info *info = registered_fb[(int) con2fb_map[vc->vc_num]];
 	struct display *p = &fb_display[vc->vc_num];
 	int resize;
-	int w = op->width;
-	int h = op->height;
 	int cnt;
 	char *old_data = NULL;
-
-	if (!w > 32) {
-		if (userfont && op->op != KD_FONT_OP_COPY)
-			kfree(data - FONT_EXTRA_WORDS * sizeof(int));
-		return -ENXIO;
-	}
 
 	if (CON_IS_VISIBLE(vc) && softback_lines)
 		fbcon_set_origin(vc);
@@ -2168,33 +2159,32 @@ static int fbcon_do_set_font(struct vc_data *vc, struct console_font_op *op,
 	return 0;
 }
 
-static inline int fbcon_copy_font(struct vc_data *vc, struct console_font_op *op)
+static int fbcon_copy_font(struct vc_data *vc, int con)
 {
-	struct display *od;
-	int h = op->height;
+	struct display *od = &fb_display[con];
+	struct console_font *f = &vc->vc_font;
 
-	if (h < 0 || !vc_cons_allocated(h))
-		return -ENOTTY;
-	if (h == vc->vc_num)
-		return 0;	/* nothing to do */
-	od = &fb_display[h];
-	if (od->fontdata == vc->vc_font.data)
+	if (od->fontdata == f->data)
 		return 0;	/* already the same font... */
-	op->width = vc->vc_font.width;
-	op->height = vc->vc_font.height;
-	return fbcon_do_set_font(vc, op, od->fontdata, od->userfont);
+	return fbcon_do_set_font(vc, f->width, f->height, od->fontdata, od->userfont);
 }
 
-static inline int fbcon_set_font(struct vc_data *vc, struct console_font_op *op)
+/*
+ *  User asked to set font; we are guaranteed that
+ *	a) width and height are in range 1..32
+ *	b) charcount does not exceed 512
+ */
+
+static int fbcon_set_font(struct vc_data *vc, struct console_font *font, unsigned flags)
 {
-	int w = op->width;
-	int h = op->height;
+	unsigned charcount = font->charcount;
+	int w = font->width;
+	int h = font->height;
 	int size = h;
 	int i, k;
-	u8 *new_data, *data = op->data, *p;
+	u8 *new_data, *data = font->data, *p;
 
-	if ((w <= 0) || (w > 32)
-	    || (op->charcount != 256 && op->charcount != 512))
+	if (charcount != 256 && charcount != 512)
 		return -EINVAL;
 
 	if (w > 8) {
@@ -2203,32 +2193,33 @@ static inline int fbcon_set_font(struct vc_data *vc, struct console_font_op *op)
 		else
 			size *= 4;
 	}
-	size *= op->charcount;
+	size *= charcount;
 
-	if (!
-	    (new_data =
-	     kmalloc(FONT_EXTRA_WORDS * sizeof(int) + size, GFP_USER)))
+	new_data = kmalloc(FONT_EXTRA_WORDS * sizeof(int) + size, GFP_USER);
+
+	if (!new_data)
 		return -ENOMEM;
+
 	new_data += FONT_EXTRA_WORDS * sizeof(int);
 	FNTSIZE(new_data) = size;
-	FNTCHARCNT(new_data) = op->charcount;
+	FNTCHARCNT(new_data) = charcount;
 	REFCOUNT(new_data) = 0;	/* usage counter */
 	p = new_data;
 	if (w <= 8) {
-		for (i = 0; i < op->charcount; i++) {
+		for (i = 0; i < charcount; i++) {
 			memcpy(p, data, h);
 			data += 32;
 			p += h;
 		}
 	} else if (w <= 16) {
 		h *= 2;
-		for (i = 0; i < op->charcount; i++) {
+		for (i = 0; i < charcount; i++) {
 			memcpy(p, data, h);
 			data += 64;
 			p += h;
 		}
 	} else if (w <= 24) {
-		for (i = 0; i < op->charcount; i++) {
+		for (i = 0; i < charcount; i++) {
 			int j;
 			for (j = 0; j < h; j++) {
 				memcpy(p, data, 3);
@@ -2240,7 +2231,7 @@ static inline int fbcon_set_font(struct vc_data *vc, struct console_font_op *op)
 		}
 	} else {
 		h *= 4;
-		for (i = 0; i < op->charcount; i++) {
+		for (i = 0; i < charcount; i++) {
 			memcpy(p, data, h);
 			data += 128;
 			p += h;
@@ -2270,43 +2261,22 @@ static inline int fbcon_set_font(struct vc_data *vc, struct console_font_op *op)
 			break;
 		}
 	}
-	return fbcon_do_set_font(vc, op, new_data, 1);
+	return fbcon_do_set_font(vc, font->width, font->height, new_data, 1);
 }
 
-static inline int fbcon_set_def_font(struct vc_data *vc, struct console_font_op *op)
+static int fbcon_set_def_font(struct vc_data *vc, struct console_font *font, char *name)
 {
 	struct fb_info *info = registered_fb[(int) con2fb_map[vc->vc_num]];
-	char name[MAX_FONT_NAME];
 	struct font_desc *f;
 
-	if (!op->data)
+	if (!name)
 		f = get_default_font(info->var.xres, info->var.yres);
-	else if (strncpy_from_user(name, op->data, MAX_FONT_NAME - 1) < 0)
-		return -EFAULT;
-	else {
-		name[MAX_FONT_NAME - 1] = 0;
-		if (!(f = find_font(name)))
-			return -ENOENT;
-	}
-	op->width = f->width;
-	op->height = f->height;
-	return fbcon_do_set_font(vc, op, f->data, 0);
-}
+	else if (!(f = find_font(name)))
+		return -ENOENT;
 
-static int fbcon_font_op(struct vc_data *vc, struct console_font_op *op)
-{
-	switch (op->op) {
-	case KD_FONT_OP_SET:
-		return fbcon_set_font(vc, op);
-	case KD_FONT_OP_GET:
-		return fbcon_get_font(vc, op);
-	case KD_FONT_OP_SET_DEFAULT:
-		return fbcon_set_def_font(vc, op);
-	case KD_FONT_OP_COPY:
-		return fbcon_copy_font(vc, op);
-	default:
-		return -ENOSYS;
-	}
+	font->width = f->width;
+	font->height = f->height;
+	return fbcon_do_set_font(vc, f->width, f->height, f->data, 0);
 }
 
 static u16 palette_red[16];
@@ -2340,7 +2310,7 @@ static int fbcon_set_palette(struct vc_data *vc, unsigned char *table)
 	else
 		palette_cmap.len = 16;
 	palette_cmap.start = 0;
-	return fb_set_cmap(&palette_cmap, 1, info);
+	return fb_set_cmap(&palette_cmap, info);
 }
 
 static u16 *fbcon_screen_pos(struct vc_data *vc, int offset)
@@ -2609,7 +2579,10 @@ const struct consw fb_con = {
 	.con_bmove 		= fbcon_bmove,
 	.con_switch 		= fbcon_switch,
 	.con_blank 		= fbcon_blank,
-	.con_font_op 		= fbcon_font_op,
+	.con_font_set 		= fbcon_set_font,
+	.con_font_get 		= fbcon_get_font,
+	.con_font_default	= fbcon_set_def_font,
+	.con_font_copy 		= fbcon_copy_font,
 	.con_set_palette 	= fbcon_set_palette,
 	.con_scrolldelta 	= fbcon_scrolldelta,
 	.con_set_origin 	= fbcon_set_origin,

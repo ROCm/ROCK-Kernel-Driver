@@ -63,7 +63,7 @@ static struct resource coyote_flash_resource = {
 	.flags		= IORESOURCE_MEM,
 };
 
-static struct platform_device coyote_flash_device = {
+static struct platform_device coyote_flash = {
 	.name		= "IXP4XX-Flash",
 	.id		= 0,
 	.dev		= {
@@ -73,9 +73,13 @@ static struct platform_device coyote_flash_device = {
 	.resource	= &coyote_flash_resource,
 };
 
+static struct platform_device *coyote_devices[] __initdata = {
+	&coyote_flash
+};
+
 static void __init coyote_init(void)
 {
-	platform_add_device(&coyote_flash_device);
+	platform_add_devices(&coyote_devices, ARRAY_SIZE(coyote_devices));
 }
 
 MACHINE_START(ADI_COYOTE, "ADI Engineering IXP4XX Coyote Development Platform")

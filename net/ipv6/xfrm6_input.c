@@ -34,12 +34,11 @@ int xfrm6_rcv(struct sk_buff **pskb, unsigned int *nhoffp)
 	struct xfrm_state *x;
 	int xfrm_nr = 0;
 	int decaps = 0;
-	int nexthdr = 0;
-	u8 *prevhdr = NULL;
+	int nexthdr;
+	unsigned int nhoff;
 
-	ip6_find_1stfragopt(skb, &prevhdr);
-	nexthdr = *prevhdr;
-	*nhoffp = prevhdr - skb->nh.raw;
+	nhoff = *nhoffp;
+	nexthdr = skb->nh.raw[nhoff];
 
 	if ((err = xfrm_parse_spi(skb, nexthdr, &spi, &seq)) != 0)
 		goto drop;
@@ -66,6 +65,8 @@ int xfrm6_rcv(struct sk_buff **pskb, unsigned int *nhoffp)
 		nexthdr = x->type->input(x, &(xfrm_vec[xfrm_nr].decap), skb);
 		if (nexthdr <= 0)
 			goto drop_unlock;
+
+		skb->nh.raw[nhoff] = nexthdr;
 
 		if (x->props.replay_window)
 			xfrm_replay_advance(x, seq);

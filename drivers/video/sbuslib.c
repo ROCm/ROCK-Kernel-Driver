@@ -132,7 +132,7 @@ int sbusfb_ioctl_helper(unsigned long cmd, unsigned long arg,
 				return -EFAULT;
 
 			cmap.start = index + i;
-			err = fb_set_cmap(&cmap, 0, info);
+			err = fb_set_cmap(&cmap, info);
 			if (err)
 				return err;
 		}

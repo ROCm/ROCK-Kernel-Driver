@@ -149,6 +149,12 @@ struct console_font_op {
 	unsigned int flags;	/* KD_FONT_FLAG_* */
 	unsigned int width, height;	/* font size */
 	unsigned int charcount;
+	unsigned char __user *data;	/* font data with height fixed to 32 */
+};
+
+struct console_font {
+	unsigned int width, height;	/* font size */
+	unsigned int charcount;
 	unsigned char *data;	/* font data with height fixed to 32 */
 };
 

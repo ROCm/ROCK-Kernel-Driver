@@ -6,6 +6,18 @@
 	.text
 	.align	64
 
+	.globl		_raw_spin_lock
+_raw_spin_lock:		/* %o0 = lock_ptr */
+1:	ldstub		[%o0], %g7
+	brnz,pn		%g7, 2f
+	 membar		#StoreLoad | #StoreStore
+	retl
+	 nop
+2:	ldub		[%o0], %g7
+	brnz,pt		%g7, 2b
+	 membar		#LoadLoad
+	ba,a,pt		%xcc, 1b
+
 	.globl	_raw_spin_lock_flags
 _raw_spin_lock_flags:	/* %o0 = lock_ptr, %o1 = irq_flags */
 1:	ldstub		[%o0], %g7
