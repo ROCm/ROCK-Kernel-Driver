@@ -755,7 +755,7 @@ qeth_get_cards_problem(struct ccw_device *cdev, unsigned char *buffer,
 	int problem = 0;
 	struct qeth_card *card;
 
-	card = cdev->dev.driver_data;
+	card = CARD_FROM_CDEV(cdev);
 
 	if (atomic_read(&card->shutdown_phase))
 		return 0;
@@ -6105,7 +6105,7 @@ qeth_interrupt_handler_read(struct ccw_device *cdev, unsigned long intparm,
 	sprintf(dbf_text, "%4x", rqparam);
 	QETH_DBF_TEXT4(0, trace, dbf_text);
 
-	card = cdev->dev.driver_data;
+	card = CARD_FROM_CDEV(cdev);
 	if (!card)
 		return;
 
@@ -6231,7 +6231,7 @@ qeth_interrupt_handler_write(struct ccw_device *cdev, unsigned long intparm,
 	sprintf(dbf_text, "%4x", rqparam);
 	QETH_DBF_TEXT4(0, trace, dbf_text);
 
-	card = cdev->dev.driver_data;
+	card = CARD_FROM_CDEV(cdev);
 	if (!card)
 		return;
 
@@ -6343,7 +6343,7 @@ qeth_interrupt_handler_qdio(struct ccw_device *cdev, unsigned long intparm,
 	sprintf(dbf_text, "%4x", rqparam);
 	QETH_DBF_TEXT4(0, trace, dbf_text);
 
-	card = cdev->dev.driver_data;
+	card = CARD_FROM_CDEV(cdev);
 	if (!card)
 		return;
 
@@ -10620,13 +10620,10 @@ qeth_probe_device(struct ccwgroup_device *gdev)
 	card->gdev = gdev;
 
 	gdev->cdev[0]->handler = qeth_interrupt_handler_read;
-	gdev->cdev[0]->dev.driver_data = card;
 
 	gdev->cdev[1]->handler = qeth_interrupt_handler_write;
-	gdev->cdev[1]->dev.driver_data = card;
 
 	gdev->cdev[2]->handler = qeth_interrupt_handler_qdio;
-	gdev->cdev[2]->dev.driver_data = card;
 
 	ret = __qeth_create_attributes(&gdev->dev);
 	if (ret != 0)

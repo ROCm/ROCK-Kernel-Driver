@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/ccwgroup.c
  *  bus driver for ccwgroup
- *   $Revision: 1.24 $
+ *   $Revision: 1.25 $
  *
  *    Copyright (C) 2002 IBM Deutschland Entwicklung GmbH,
  *                       IBM Corporation
@@ -102,8 +102,10 @@ ccwgroup_release (struct device *dev)
 
 	gdev = to_ccwgroupdev(dev);
 
-	for (i = 0; i < gdev->count; i++)
+	for (i = 0; i < gdev->count; i++) {
+		gdev->cdev[i]->dev.driver_data = NULL;
 		put_device(&gdev->cdev[i]->dev);
+	}
 	kfree(gdev);
 }
 
@@ -155,6 +157,7 @@ ccwgroup_create(struct device *root,
 	struct ccwgroup_device *gdev;
 	int i;
 	int rc;
+	int del_drvdata;
 
 	if (argc > 256) /* disallow dumb users */
 		return -EINVAL;
@@ -166,6 +169,7 @@ ccwgroup_create(struct device *root,
 	memset(gdev, 0, sizeof(*gdev) + argc*sizeof(gdev->cdev[0]));
 	atomic_set(&gdev->onoff, 0);
 
+	del_drvdata = 0;
 	for (i = 0; i < argc; i++) {
 		gdev->cdev[i] = get_ccwdev_by_busid(cdrv, argv[i]);
 
@@ -177,7 +181,15 @@ ccwgroup_create(struct device *root,
 			rc = -EINVAL;
 			goto error;
 		}
+		/* Don't allow a device to belong to more than one group. */
+		if (gdev->cdev[i]->dev.driver_data) {
+			rc = -EINVAL;
+			goto error;
+		}
 	}
+	for (i = 0; i < argc; i++)
+		gdev->cdev[i]->dev.driver_data = gdev;
+	del_drvdata = 1;
 
 	*gdev = (struct ccwgroup_device) {
 		.creator_id = creator_id,
@@ -212,9 +224,11 @@ ccwgroup_create(struct device *root,
 	device_unregister(&gdev->dev);
 error:
 	for (i = 0; i < argc; i++)
-		if (gdev->cdev[i])
+		if (gdev->cdev[i]) {
 			put_device(&gdev->cdev[i]->dev);
-
+			if (del_drvdata)
+				gdev->cdev[i]->dev.driver_data = NULL;
+		}
 	kfree(gdev);
 
 	return rc;
@@ -399,40 +413,14 @@ static inline struct ccwgroup_device *
 __ccwgroup_get_gdev_by_cdev(struct ccw_device *cdev)
 {
 	struct ccwgroup_device *gdev;
-	struct list_head *entry;
-	struct device *dev;
-	int i, found;
 
-	/*
-	 * Find groupdevice cdev belongs to.
-	 * Unfortunately, we can't use bus_for_each_dev() because of the
-	 * semaphore (and return value of fn() is int).
-	 */
-	if (!get_bus(&ccwgroup_bus_type))
+	if (cdev->dev.driver_data) {
+		gdev = (struct ccwgroup_device *)cdev->dev.driver_data;
+		if (get_device(&gdev->dev))
+			return gdev;
 		return NULL;
-
-	gdev = NULL;
-	down_read(&ccwgroup_bus_type.subsys.rwsem);
-
-	list_for_each(entry, &ccwgroup_bus_type.devices.list) {
-		dev = get_device(container_of(entry, struct device, bus_list));
-		found = 0;
-		if (!dev)
-			continue;
-		gdev = to_ccwgroupdev(dev);
-		for (i = 0; i < gdev->count && (!found); i++) {
-			if (gdev->cdev[i] == cdev)
-				found = 1;
-		}
-		if (found)
-			break;
-		put_device(dev);
-		gdev = NULL;
 	}
-	up_read(&ccwgroup_bus_type.subsys.rwsem);
-	put_bus(&ccwgroup_bus_type);
-
-	return gdev;
+	return NULL;
 }
 
 void
