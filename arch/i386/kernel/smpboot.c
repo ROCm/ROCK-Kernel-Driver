@@ -422,7 +422,7 @@ void __init smp_callin(void)
 	/*
 	 *      Synchronize the TSC with the BP
 	 */
-	if (cpu_has_tsc)
+	if (cpu_has_tsc && cpu_khz)
 		synchronize_tsc_ap();
 }
 
@@ -1114,7 +1114,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	/*
 	 * Synchronize the TSC with the AP
 	 */
-	if (cpu_has_tsc && cpucount)
+	if (cpu_has_tsc && cpucount && cpu_khz)
 		synchronize_tsc_bp();
 }
 

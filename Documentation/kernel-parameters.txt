@@ -207,6 +207,12 @@ running once the system is up.
 
 	chandev=	[HW,NET] Generic channel device initialisation
  
+ 	clock=		[BUGS=IA-32, HW] gettimeofday timesource override. 
+			Forces specified timesource (if avaliable) to be used
+			when calculating gettimeofday(). If specicified timesource
+			is not avalible, it defaults to PIT. 
+			Format: { pit | tsc | cyclone | ... }
+			
 	cm206=		[HW,CD]
 			Format: { auto | [<io>,][<irq>] }
 
