@@ -608,15 +608,9 @@ int cpufreq_driver_target(struct cpufreq_policy *policy,
 EXPORT_SYMBOL_GPL(cpufreq_driver_target);
 
 
-int cpufreq_governor(unsigned int cpu, unsigned int event)
+static int __cpufreq_governor(struct cpufreq_policy *policy, unsigned int event)
 {
 	int ret = 0;
-	struct cpufreq_policy *policy = cpufreq_cpu_get(cpu);
-
-	if (!policy)
-		return -EINVAL;
-
-	down(&policy->lock);
 
 	switch (policy->policy) {
 	case CPUFREQ_POLICY_POWERSAVE: 
@@ -644,6 +638,20 @@ int cpufreq_governor(unsigned int cpu, unsigned int event)
 		ret = -EINVAL;
 	}
 
+	return ret;
+}
+
+
+int cpufreq_governor(unsigned int cpu, unsigned int event)
+{
+	int ret = 0;
+	struct cpufreq_policy *policy = cpufreq_cpu_get(cpu);
+
+	if (!policy)
+		return -EINVAL;
+
+	down(&policy->lock);
+	ret = __cpufreq_governor(policy, event);
 	up(&policy->lock);
 
 	cpufreq_cpu_put(policy);
