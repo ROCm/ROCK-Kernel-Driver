@@ -811,7 +811,8 @@ sd_spinup_disk(struct scsi_disk *sdkp, char *diskname,
 	       struct scsi_request *SRpnt, unsigned char *buffer) {
 	unsigned char cmd[10];
 	unsigned long spintime_value = 0;
-	int the_result, retries, spintime;
+	int retries, spintime;
+	unsigned int the_result;
 
 	spintime = 0;
 
@@ -820,7 +821,7 @@ sd_spinup_disk(struct scsi_disk *sdkp, char *diskname,
 	do {
 		retries = 0;
 
-		while (retries < 3) {
+		do {
 			cmd[0] = TEST_UNIT_READY;
 			memset((void *) &cmd[1], 0, 9);
 
@@ -834,10 +835,9 @@ sd_spinup_disk(struct scsi_disk *sdkp, char *diskname,
 
 			the_result = SRpnt->sr_result;
 			retries++;
-			if (the_result == 0
-			    || SRpnt->sr_sense_buffer[2] != UNIT_ATTENTION)
-				break;
-		}
+		} while (retries < 3 && !scsi_status_is_good(the_result)
+			 && ((driver_byte(the_result) & DRIVER_SENSE)
+			     && SRpnt->sr_sense_buffer[2] == UNIT_ATTENTION));
 
 		/*
 		 * If the drive has indicated to us that it doesn't have
@@ -847,8 +847,15 @@ sd_spinup_disk(struct scsi_disk *sdkp, char *diskname,
 		if (media_not_present(sdkp, SRpnt))
 			return;
 
-		if (the_result == 0)
-			break;		/* all is well now */
+		if ((driver_byte(the_result) & DRIVER_SENSE) == 0) {
+			/* no sense, TUR either succeeded or failed
+			 * with a status error */
+			if(!spintime && !scsi_status_is_good(the_result))
+				printk(KERN_NOTICE "%s: Unit Not Ready, error = 0x%x\n", diskname, the_result);
+			break;
+		}
+					
+					
 
 		/*
 		 * If manual intervention is required, or this is an
@@ -856,13 +863,13 @@ sd_spinup_disk(struct scsi_disk *sdkp, char *diskname,
 		 */
 		if (SRpnt->sr_sense_buffer[2] == NOT_READY &&
 		    SRpnt->sr_sense_buffer[12] == 4 /* not ready */ &&
-		    SRpnt->sr_sense_buffer[13] == 3)
+		    SRpnt->sr_sense_buffer[13] == 3) {
 			break;		/* manual intervention required */
 
 		/*
 		 * Issue command to spin up drive when not ready
 		 */
-		if (SRpnt->sr_sense_buffer[2] == NOT_READY) {
+		} else if (SRpnt->sr_sense_buffer[2] == NOT_READY) {
 			unsigned long time1;
 			if (!spintime) {
 				printk(KERN_NOTICE "%s: Spinning up disk...",
@@ -889,15 +896,24 @@ sd_spinup_disk(struct scsi_disk *sdkp, char *diskname,
 				time1 = schedule_timeout(time1);
 			} while(time1);
 			printk(".");
+		} else {
+			/* we don't understand the sense code, so it's
+			 * probably pointless to loop */
+			if(!spintime) {
+				printk(KERN_NOTICE "%s: Unit Not Ready, sense:\n", diskname);
+				print_req_sense("", SRpnt);
+			}
+			break;
 		}
+				
 	} while (spintime &&
 		 time_after(spintime_value + 100 * HZ, jiffies));
 
 	if (spintime) {
-		if (the_result)
-			printk("not responding...\n");
-		else
+		if (scsi_status_is_good(the_result))
 			printk("ready\n");
+		else
+			printk("not responding...\n");
 	}
 }
 
