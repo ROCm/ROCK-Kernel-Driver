@@ -783,14 +783,18 @@ ed_halted (struct ohci_hcd *ohci, struct td *td, int cc, struct td *rev)
 		ed->hwHeadP = next->hwNextTD | toggle;
 	}
 
-	/* help for troubleshooting: */
-	ohci_dbg (ohci,
-		"urb %p usb-%s-%s ep-%d-%s cc %d --> status %d\n",
-		urb,
-		urb->dev->bus->bus_name, urb->dev->devpath,
-		usb_pipeendpoint (urb->pipe),
-		usb_pipein (urb->pipe) ? "IN" : "OUT",
-		cc, cc_to_error [cc]);
+	/* help for troubleshooting:  report anything that
+	 * looks odd ... that doesn't include protocol stalls
+	 * (or maybe some other things)
+	 */
+	if (cc != TD_CC_STALL || !usb_pipecontrol (urb->pipe))
+		ohci_dbg (ohci,
+			"urb %p path %s ep%d%s %08x cc %d --> status %d\n",
+			urb, urb->dev->devpath,
+			usb_pipeendpoint (urb->pipe),
+			usb_pipein (urb->pipe) ? "in" : "out",
+			le32_to_cpu (td->hwINFO),
+			cc, cc_to_error [cc]);
 
 	return rev;
 }

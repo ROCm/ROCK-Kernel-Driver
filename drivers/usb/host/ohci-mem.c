@@ -115,8 +115,8 @@ td_free (struct ohci_hcd *hc, struct td *td)
 		prev = &(*prev)->td_hash;
 	if (*prev)
 		*prev = td->td_hash;
-	else
-		ohci_dbg (hc, "bad hash for td %p\n", td);
+	else if ((td->hwINFO & TD_DONE) != 0)
+		ohci_dbg (hc, "no hash for td %p\n", td);
 	pci_pool_free (hc->td_cache, td, td->td_dma);
 }
 
