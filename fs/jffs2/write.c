@@ -5,33 +5,9 @@
  *
  * Created by David Woodhouse <dwmw2@cambridge.redhat.com>
  *
- * The original JFFS, from which the design for JFFS2 was derived,
- * was designed and implemented by Axis Communications AB.
+ * For licensing information, see the file 'LICENCE' in this directory.
  *
- * The contents of this file are subject to the Red Hat eCos Public
- * License Version 1.1 (the "Licence"); you may not use this file
- * except in compliance with the Licence.  You may obtain a copy of
- * the Licence at http://www.redhat.com/
- *
- * Software distributed under the Licence is distributed on an "AS IS"
- * basis, WITHOUT WARRANTY OF ANY KIND, either express or implied.
- * See the Licence for the specific language governing rights and
- * limitations under the Licence.
- *
- * The Original Code is JFFS2 - Journalling Flash File System, version 2
- *
- * Alternatively, the contents of this file may be used under the
- * terms of the GNU General Public License version 2 (the "GPL"), in
- * which case the provisions of the GPL are applicable instead of the
- * above.  If you wish to allow the use of your version of this file
- * only under the terms of the GPL and not to allow others to use your
- * version of this file under the RHEPL, indicate your decision by
- * deleting the provisions above and replace them with the notice and
- * other provisions required by the GPL.  If you do not delete the
- * provisions above, a recipient may use your version of this file
- * under either the RHEPL or the GPL.
- *
- * $Id: write.c,v 1.52 2002/03/08 11:01:43 dwmw2 Exp $
+ * $Id: write.c,v 1.56 2002/07/10 14:05:16 dwmw2 Exp $
  *
  */
 
@@ -89,7 +65,7 @@ static void writecheck(struct jffs2_sb_info *c, uint32_t ofs)
 			ret = 1;
 	}
 	if (ret) {
-		printk(KERN_WARNING "ARGH. About to write node to 0x%08x on flash, but there's data already there:\n", ofs);
+		printk(KERN_WARNING "ARGH. About to write node to 0x%08x on flash, but there are data already there:\n", ofs);
 		printk(KERN_WARNING "0x%08x: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n", 
 		       ofs,
 		       buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7],
@@ -386,8 +362,10 @@ int jffs2_do_create(struct jffs2_sb_info *c, struct jffs2_inode_info *dir_f, str
 	 */
 	ret = jffs2_reserve_space(c, sizeof(*ri), &phys_ofs, &alloclen, ALLOC_NORMAL);
 	D1(printk(KERN_DEBUG "jffs2_do_create(): reserved 0x%x bytes\n", alloclen));
-	if (ret)
+	if (ret) {
+		up(&f->sem);
 		return ret;
+	}
 
 	ri->data_crc = 0;
 	ri->node_crc = crc32(0, ri, sizeof(*ri)-8);
@@ -472,7 +450,8 @@ int jffs2_do_create(struct jffs2_sb_info *c, struct jffs2_inode_info *dir_f, str
 }
 
 
-int jffs2_do_unlink(struct jffs2_sb_info *c, struct jffs2_inode_info *dir_f, const char *name, int namelen, struct jffs2_inode_info *dead_f)
+int jffs2_do_unlink(struct jffs2_sb_info *c, struct jffs2_inode_info *dir_f,
+		    const char *name, int namelen, struct jffs2_inode_info *dead_f)
 {
 	struct jffs2_raw_dirent *rd;
 	struct jffs2_full_dirent *fd;
@@ -522,7 +501,10 @@ int jffs2_do_unlink(struct jffs2_sb_info *c, struct jffs2_inode_info *dir_f, con
 	jffs2_complete_reservation(c);
 	up(&dir_f->sem);
 	
-	if (dead_f) { /* Null if this was a rename not a real unlink */
+	/* dead_f is NULL if this was a rename not a real unlink */
+	/* Also catch the !f->inocache case, where there was a dirent
+	   pointing to an inode which didn't exist. */
+	if (dead_f && dead_f->inocache) { 
 
 		down(&dead_f->sem);
 

@@ -5,33 +5,9 @@
  *
  * Created by David Woodhouse <dwmw2@cambridge.redhat.com>
  *
- * The original JFFS, from which the design for JFFS2 was derived,
- * was designed and implemented by Axis Communications AB.
+ * For licensing information, see the file 'LICENCE' in this directory.
  *
- * The contents of this file are subject to the Red Hat eCos Public
- * License Version 1.1 (the "Licence"); you may not use this file
- * except in compliance with the Licence.  You may obtain a copy of
- * the Licence at http://www.redhat.com/
- *
- * Software distributed under the Licence is distributed on an "AS IS"
- * basis, WITHOUT WARRANTY OF ANY KIND, either express or implied.
- * See the Licence for the specific language governing rights and
- * limitations under the Licence.
- *
- * The Original Code is JFFS2 - Journalling Flash File System, version 2
- *
- * Alternatively, the contents of this file may be used under the
- * terms of the GNU General Public License version 2 (the "GPL"), in
- * which case the provisions of the GPL are applicable instead of the
- * above.  If you wish to allow the use of your version of this file
- * only under the terms of the GPL and not to allow others to use your
- * version of this file under the RHEPL, indicate your decision by
- * deleting the provisions above and replace them with the notice and
- * other provisions required by the GPL.  If you do not delete the
- * provisions above, a recipient may use your version of this file
- * under either the RHEPL or the GPL.
- *
- * $Id: super.c,v 1.64 2002/03/17 10:18:42 dwmw2 Exp $
+ * $Id: super.c,v 1.73 2002/07/23 17:00:45 dwmw2 Exp $
  *
  */
 
@@ -43,12 +19,12 @@
 #include <linux/init.h>
 #include <linux/list.h>
 #include <linux/fs.h>
-#include <linux/namei.h>
 #include <linux/jffs2.h>
 #include <linux/pagemap.h>
 #include <linux/mtd/mtd.h>
 #include <linux/interrupt.h>
 #include <linux/ctype.h>
+#include <linux/namei.h>
 #include "nodelist.h"
 
 void jffs2_put_super (struct super_block *);
@@ -83,14 +59,14 @@ static void jffs2_i_init_once(void * foo, kmem_cache_t * cachep, unsigned long f
 
 static struct super_operations jffs2_super_operations =
 {
-	alloc_inode:	jffs2_alloc_inode,
-	destroy_inode:	jffs2_destroy_inode,
-	read_inode:	jffs2_read_inode,
-	put_super:	jffs2_put_super,
-	write_super:	jffs2_write_super,
-	statfs:		jffs2_statfs,
-	remount_fs:	jffs2_remount_fs,
-	clear_inode:	jffs2_clear_inode
+	.alloc_inode =	jffs2_alloc_inode,
+	.destroy_inode =jffs2_destroy_inode,
+	.read_inode =	jffs2_read_inode,
+	.put_super =	jffs2_put_super,
+	.write_super =	jffs2_write_super,
+	.statfs =	jffs2_statfs,
+	.remount_fs =	jffs2_remount_fs,
+	.clear_inode =	jffs2_clear_inode
 };
 
 static int jffs2_sb_compare(struct super_block *sb, void *data)
@@ -101,11 +77,11 @@ static int jffs2_sb_compare(struct super_block *sb, void *data)
 	/* The superblocks are considered to be equivalent if the underlying MTD
 	   device is the same one */
 	if (c->mtd == p->mtd) {
-		D1(printk(KERN_DEBUG "jffs2_sb_compare: match on device %d (\"%s\")\n", mtd->index, mtd->name));
+		D1(printk(KERN_DEBUG "jffs2_sb_compare: match on device %d (\"%s\")\n", p->mtd->index, p->mtd->name));
 		return 1;
 	} else {
 		D1(printk(KERN_DEBUG "jffs2_sb_compare: No match, device %d (\"%s\"), device %d (\"%s\")\n",
-			  c->mtd->index, c->mtd->name, mtd->index, mtd->name));
+			  c->mtd->index, c->mtd->name, p->mtd->index, p->mtd->name));
 		return 0;
 	}
 }
@@ -282,10 +258,15 @@ void jffs2_put_super (struct super_block *sb)
 
 	if (!(sb->s_flags & MS_RDONLY))
 		jffs2_stop_garbage_collect_thread(c);
+	down(&c->alloc_sem);
 	jffs2_flush_wbuf(c, 1);
+	up(&c->alloc_sem);
 	jffs2_free_ino_caches(c);
 	jffs2_free_raw_node_refs(c);
 	kfree(c->blocks);
+	if (c->wbuf)
+		kfree(c->wbuf);
+	kfree(c->inocache_list);
 	if (c->mtd->sync)
 		c->mtd->sync(c->mtd);
 
@@ -301,10 +282,10 @@ static void jffs2_kill_sb(struct super_block *sb)
 }
  
 static struct file_system_type jffs2_fs_type = {
-	owner:		THIS_MODULE,
-	name:		"jffs2",
-	get_sb:		jffs2_get_sb,
-	kill_sb:	jffs2_kill_sb,
+	.owner =	THIS_MODULE,
+	.name =		"jffs2",
+	.get_sb =	jffs2_get_sb,
+	.kill_sb =	jffs2_kill_sb,
 };
 
 
@@ -326,18 +307,25 @@ static int __init init_jffs2_fs(void)
 	ret = jffs2_zlib_init();
 	if (ret) {
 		printk(KERN_ERR "JFFS2 error: Failed to initialise zlib workspaces\n");
-		return ret;
+		goto out;
 	}
 	ret = jffs2_create_slab_caches();
 	if (ret) {
 		printk(KERN_ERR "JFFS2 error: Failed to initialise slab caches\n");
-		return ret;
+		goto out_zlib;
 	}
 	ret = register_filesystem(&jffs2_fs_type);
 	if (ret) {
 		printk(KERN_ERR "JFFS2 error: Failed to register filesystem\n");
-		jffs2_destroy_slab_caches();
+		goto out_slab;
 	}
+	return 0;
+
+ out_slab:
+	jffs2_destroy_slab_caches();
+ out_zlib:
+	jffs2_zlib_exit();
+ out:
 	return ret;
 }
 
