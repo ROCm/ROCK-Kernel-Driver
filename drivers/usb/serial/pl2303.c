@@ -659,7 +659,7 @@ static void pl2303_break_ctl (struct usb_serial_port *port, int break_state)
 		state = BREAK_OFF;
 	else
 		state = BREAK_ON;
-	dbg("%s - turning break %s", state==BREAK_OFF ? "off" : "on", __FUNCTION__);
+	dbg("%s - turning break %s", __FUNCTION__, state==BREAK_OFF ? "off" : "on");
 
 	result = usb_control_msg (serial->dev, usb_sndctrlpipe (serial->dev, 0),
 				  BREAK_REQUEST, BREAK_REQUEST_TYPE, state, 
