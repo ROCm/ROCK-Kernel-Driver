@@ -47,7 +47,6 @@ endif
 params_phys-$(CONFIG_ARCH_SA1100)	:= 0xc0000100
 initrd_phys-$(CONFIG_ARCH_SA1100)	:= 0xc0800000
    zreladdr-$(CONFIG_ARCH_PXA)		:= 0xa0008000
-   zreladdr-$(CONFIG_ARCH_ANAKIN)	:= 0x20008000
    zreladdr-$(CONFIG_ARCH_IOP3XX)	:= 0xa0008000
 params_phys-$(CONFIG_ARCH_IOP3XX)	:= 0xa0000100
    zreladdr-$(CONFIG_ARCH_ADIFCC)	:= 0xc0008000

@@ -25,7 +25,6 @@ CONFIG_MODULES=y
 #
 # System Type
 #
-# CONFIG_ARCH_ANAKIN is not set
 # CONFIG_ARCH_ARCA5K is not set
 # CONFIG_ARCH_CLPS7500 is not set
 # CONFIG_ARCH_CLPS711X is not set
@@ -662,7 +661,6 @@ CONFIG_DUMMY_CONSOLE=y
 # CONFIG_FB_CLPS711X is not set
 # CONFIG_FB_CYBER2000 is not set
 CONFIG_FB_SA1100=y
-# CONFIG_FB_ANAKIN is not set
 # CONFIG_FB_E1355 is not set
 # CONFIG_FB_VIRTUAL is not set
 # CONFIG_FBCON_ADVANCED is not set
