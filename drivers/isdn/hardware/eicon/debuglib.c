@@ -23,8 +23,15 @@
   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
  */
+
 #include "debuglib.h"
+
+#ifdef DIVA_NO_DEBUGLIB
+static DIVA_DI_PRINTF dprintf;
+#else /* DIVA_NO_DEBUGLIB */
+ 
 _DbgHandle_ myDriverDebugHandle = { 0 /*!Registered*/, DBG_HANDLE_VERSION };
+DIVA_DI_PRINTF dprintf = no_printf;
 /*****************************************************************************/
 #define DBG_FUNC(name) \
 void  \
@@ -146,3 +153,4 @@ void  xdi_dbg_xlog (char* x, ...) {
  va_end(ap);
 }
 /*****************************************************************************/
+#endif /* DIVA_NO_DEBUGLIB */

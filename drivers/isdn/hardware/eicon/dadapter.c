@@ -49,8 +49,21 @@ dword Adapters = 0; /* Number of adapters */
   Shadow IDI_DIMAINT
   and 'shadow' debug stuff
    -------------------------------------------------------------------------- */
-static void no_printf (unsigned char * format, ...) { }
-DIVA_DI_PRINTF dprintf = no_printf;
+static void no_printf (unsigned char * format, ...)
+{
+#ifdef EBUG
+	va_list ap;
+	va_start (ap, format);
+	debug((format, ap));
+	va_end (ap);
+#endif
+}
+
+/* -------------------------------------------------------------------------
+  Portable debug Library
+  ------------------------------------------------------------------------- */
+#include "debuglib.c"
+  
 static DESCRIPTOR  MAdapter =  {IDI_DIMAINT, /* Adapter Type */
                 0x00,     /* Channels */
                 0x0000,    /* Features */
@@ -86,6 +99,7 @@ void diva_didd_load_time_init (void) {
   Should be called as last step, if driver does unload
   -------------------------------------------------------------------------- */
 void diva_didd_load_time_finit (void) {
+ diva_os_destroy_spin_lock (&didd_spin, "didd");
 }
 /* --------------------------------------------------------------------------
   Called in order to register new adapter in adapter array
@@ -349,7 +363,4 @@ void IDI_CALL_LINK_T DIVA_DIDD_Read (void IDI_CALL_ENTITY_T * buffer,
                    int length) {
  diva_didd_read_adapter_array (buffer, length);
 }
-/* -------------------------------------------------------------------------
-  Portable debug Library
-  ------------------------------------------------------------------------- */
-#include "debuglib.c"
+
