@@ -99,6 +99,40 @@ struct rt_sigframe
 
 extern int do_signal(sigset_t *oldset, struct pt_regs *regs);
 
+/*
+ * Atomically swap in the new signal mask, and wait for a signal.
+ */
+long sys_sigsuspend(old_sigset_t mask, int p2, int p3, int p4, int p6, int p7,
+	       struct pt_regs *regs)
+{
+	sigset_t saveset;
+
+	mask &= _BLOCKABLE;
+	spin_lock_irq(&current->sig->siglock);
+	saveset = current->blocked;
+	siginitset(&current->blocked, mask);
+	recalc_sigpending();
+	spin_unlock_irq(&current->sig->siglock);
+
+	regs->result = -EINTR;
+	regs->gpr[3] = EINTR;
+	regs->ccr |= 0x10000000;
+	while (1) {
+		current->state = TASK_INTERRUPTIBLE;
+		schedule();
+		if (do_signal(&saveset, regs))
+			/*
+			 * If a signal handler needs to be called,
+			 * do_signal() has set R3 to the signal number (the
+			 * first argument of the signal handler), so don't
+			 * overwrite that with EINTR !
+			 * In the other cases, do_signal() doesn't touch 
+			 * R3, so it's still set to -EINTR (see above).
+			 */
+			return regs->gpr[3];
+	}
+}
+
 long sys_rt_sigsuspend(sigset_t *unewset, size_t sigsetsize, int p3, int p4, int p6,
 		  int p7, struct pt_regs *regs)
 {
@@ -134,6 +168,37 @@ long sys_sigaltstack(const stack_t *uss, stack_t *uoss, unsigned long r5,
 		     struct pt_regs *regs)
 {
 	return do_sigaltstack(uss, uoss, regs->gpr[1]);
+}
+
+long sys_sigaction(int sig, const struct old_sigaction *act,
+	      struct old_sigaction *oact)
+{
+	struct k_sigaction new_ka, old_ka;
+	int ret;
+
+	if (act) {
+		old_sigset_t mask;
+
+		if (verify_area(VERIFY_READ, act, sizeof(*act)) ||
+		    __get_user(new_ka.sa.sa_handler, &act->sa_handler) ||
+		    __get_user(new_ka.sa.sa_restorer, &act->sa_restorer))
+			return -EFAULT;
+		__get_user(new_ka.sa.sa_flags, &act->sa_flags);
+		__get_user(mask, &act->sa_mask);
+		siginitset(&new_ka.sa.sa_mask, mask);
+	}
+
+	ret = do_sigaction(sig, act ? &new_ka : NULL, oact ? &old_ka : NULL);
+	if (!ret && oact) {
+		if (verify_area(VERIFY_WRITE, oact, sizeof(*oact)) ||
+		    __put_user(old_ka.sa.sa_handler, &oact->sa_handler) ||
+		    __put_user(old_ka.sa.sa_restorer, &oact->sa_restorer))
+			return -EFAULT;
+		__put_user(old_ka.sa.sa_flags, &oact->sa_flags);
+		__put_user(old_ka.sa.sa_mask.sig[0], &oact->sa_mask);
+	}
+
+	return ret;
 }
 
 /*
@@ -258,6 +323,116 @@ static void setup_rt_frame(struct pt_regs *regs, struct sigregs *frame,
 badframe:
 #if DEBUG_SIG
 	printk("badframe in setup_rt_frame, regs=%p frame=%p newsp=%lx\n",
+	       regs, frame, newsp);
+#endif
+	do_exit(SIGSEGV);
+}
+
+/*
+ * Do a signal return; undo the signal stack.
+ */
+long sys_sigreturn(unsigned long r3, unsigned long r4, unsigned long r5,
+		   unsigned long r6, unsigned long r7, unsigned long r8,
+		   struct pt_regs *regs)
+{
+	struct sigcontext *sc, sigctx;
+	struct sigregs *sr;
+	elf_gregset_t saved_regs;  /* an array of ELF_NGREG unsigned longs */
+	sigset_t set;
+
+	sc = (struct sigcontext *)(regs->gpr[1] + __SIGNAL_FRAMESIZE);
+	if (copy_from_user(&sigctx, sc, sizeof(sigctx)))
+		goto badframe;
+
+	set.sig[0] = sigctx.oldmask;
+#if _NSIG_WORDS > 1
+	set.sig[1] = sigctx._unused[3];
+#endif
+	sigdelsetmask(&set, ~_BLOCKABLE);
+	spin_lock_irq(&current->sig->siglock);
+	current->blocked = set;
+	recalc_sigpending();
+	spin_unlock_irq(&current->sig->siglock);
+	if (regs->msr & MSR_FP)
+		giveup_fpu(current);
+
+	/* restore registers */
+	sr = (struct sigregs *)sigctx.regs;
+	if (copy_from_user(saved_regs, &sr->gp_regs, sizeof(sr->gp_regs)))
+		goto badframe;
+	saved_regs[PT_MSR] = (regs->msr & ~MSR_USERCHANGE)
+		| (saved_regs[PT_MSR] & MSR_USERCHANGE);
+	saved_regs[PT_SOFTE] = regs->softe;
+	memcpy(regs, saved_regs, GP_REGS_SIZE);
+
+	if (copy_from_user(current->thread.fpr, &sr->fp_regs,
+			   sizeof(sr->fp_regs)))
+		goto badframe;
+
+	return regs->result;
+
+badframe:
+	do_exit(SIGSEGV);
+}	
+
+/*
+ * Set up a signal frame.
+ */
+static void setup_frame(struct pt_regs *regs, struct sigregs *frame,
+	    unsigned long newsp)
+{
+
+	/* Handler is *really* a pointer to the function descriptor for
+	 * the signal routine.  The first entry in the function
+	 * descriptor is the entry address of signal and the second
+	 * entry is the TOC value we need to use.
+	 */
+	struct funct_descr_entry {
+		unsigned long entry;
+		unsigned long toc;
+	};
+  
+	struct funct_descr_entry * funct_desc_ptr;
+	unsigned long temp_ptr;
+
+	struct sigcontext *sc = (struct sigcontext *)newsp;
+  
+	if (verify_area(VERIFY_WRITE, frame, sizeof(*frame)))
+		goto badframe;
+	if (regs->msr & MSR_FP)
+		giveup_fpu(current);
+	if (__copy_to_user(&frame->gp_regs, regs, GP_REGS_SIZE)
+	    || __copy_to_user(&frame->fp_regs, current->thread.fpr,
+			      ELF_NFPREG * sizeof(double))
+	    /* li r0, __NR_sigreturn */
+	    || __put_user(0x38000000UL + __NR_sigreturn, &frame->tramp[0])
+	    /* sc */
+	    || __put_user(0x44000002UL, &frame->tramp[1]))
+		goto badframe;
+	flush_icache_range((unsigned long)&frame->tramp[0],
+			   (unsigned long)&frame->tramp[2]);
+	current->thread.fpscr = 0;	/* turn off all fp exceptions */
+
+	newsp -= __SIGNAL_FRAMESIZE;
+	if (get_user(temp_ptr, &sc->handler))
+		goto badframe;
+  
+	funct_desc_ptr = (struct funct_descr_entry *)temp_ptr;
+
+	if (put_user(regs->gpr[1], (unsigned long *)newsp)
+	    || get_user(regs->nip, &funct_desc_ptr ->entry)
+	    || get_user(regs->gpr[2],&funct_desc_ptr->toc)
+	    || get_user(regs->gpr[3], &sc->signal))
+		goto badframe;
+	regs->gpr[1] = newsp;
+	regs->gpr[4] = (unsigned long)sc;
+	regs->link = (unsigned long)frame->tramp;
+
+	return;
+
+badframe:
+#if DEBUG_SIG
+	printk("badframe in setup_frame, regs=%p frame=%p newsp=%lx\n",
 	       regs, frame, newsp);
 #endif
 	do_exit(SIGSEGV);
@@ -407,7 +582,10 @@ int do_signal(sigset_t *oldset, struct pt_regs *regs)
 	if (newsp == frame)
 		return 0;		/* no signals delivered */
 
-	setup_rt_frame(regs, (struct sigregs *)frame, newsp);
-
+	/* Invoke correct stack setup routine */
+	if (ka->sa.sa_flags & SA_SIGINFO)
+		setup_rt_frame(regs, (struct sigregs *)frame, newsp);
+	else
+		setup_frame(regs, (struct sigregs *)frame, newsp);
 	return 1;
 }
