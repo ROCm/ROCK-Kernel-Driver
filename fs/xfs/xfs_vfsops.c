@@ -274,8 +274,7 @@ xfs_start_flags(
 	if (ap->flags & XFSMNT_OSYNCISOSYNC)
 		mp->m_flags |= XFS_MOUNT_OSYNCISOSYNC;
 
-	/* Default on Linux */
-	if (1 || ap->flags & XFSMNT_32BITINODES)
+	if (ap->flags & XFSMNT_32BITINODES)
 		mp->m_flags |= XFS_MOUNT_32BITINODES;
 
 	if (ap->flags & XFSMNT_IOSIZE) {

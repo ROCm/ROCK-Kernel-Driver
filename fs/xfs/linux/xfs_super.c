@@ -121,6 +121,9 @@ xfs_parseargs(
 
 	iosize = dsunit = dswidth = vol_dsunit = vol_dswidth = 0;
 
+	/* Default to 32 bit inodes on linux all the time */
+	args->flags |= XFSMNT_32BITINODES;
+
 	/* Copy the already-parsed mount(2) flags we're interested in */
 	if (flags & MS_NOATIME)
 		args->flags |= XFSMNT_NOATIME;
