@@ -661,6 +661,7 @@ static int storage_probe(struct usb_interface *intf,
 	/* copy over the subclass and protocol data */
 	ss->subclass = subclass;
 	ss->protocol = protocol;
+	ss->flags = flags;
 	ss->unusual_dev = unusual_dev;
 
 	/* copy over the endpoint data */
