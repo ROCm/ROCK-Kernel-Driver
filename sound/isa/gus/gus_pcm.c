@@ -334,9 +334,11 @@ static int snd_gf1_pcm_poke_block(snd_gus_card_t *gus, unsigned char *buf,
 					snd_gf1_poke(gus, pos++, *buf++ ^ invert);
 			}
 		}
-		schedule_timeout(1);
-		if (signal_pending(current))
-			return -EAGAIN;
+		if (count > 0 && !in_interrupt()) {
+			schedule_timeout(1);
+			if (signal_pending(current))
+				return -EAGAIN;
+		}
 	}
 	return 0;
 }
