@@ -132,7 +132,7 @@ struct eth1394_node_info {
 };
 
 /* Our ieee1394 highlevel driver */
-#define ETH1394_DRIVER_NAME "ip1394"
+#define ETH1394_DRIVER_NAME "eth1394"
 static const char driver_name[] = ETH1394_DRIVER_NAME;
 
 static kmem_cache_t *packet_task_cache;
