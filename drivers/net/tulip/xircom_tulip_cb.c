@@ -648,8 +648,7 @@ err_out_cleardev:
 	pci_set_drvdata(pdev, NULL);
 	pci_release_regions(pdev);
 err_out_free_netdev:
-	unregister_netdev(dev);
-	kfree(dev);
+	free_netdev(dev);
 	return -ENODEV;
 }
 

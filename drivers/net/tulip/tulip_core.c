@@ -1710,7 +1710,7 @@ err_out_free_res:
 	pci_release_regions (pdev);
 
 err_out_free_netdev:
-	kfree (dev);
+	free_netdev (dev);
 	return -ENODEV;
 }
 

@@ -547,7 +547,7 @@ static int bpq_new_device(struct net_device *edev)
 
  error:
 	dev_put(edev);
-	kfree(ndev);
+	free_netdev(ndev);
 	return err;
 	
 }

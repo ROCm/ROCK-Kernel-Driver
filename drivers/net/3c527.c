@@ -212,8 +212,6 @@ static inline u16 next_tx(u16 tx) { return (tx+1)&(TX_RING_LEN-1); };
 
 
 /* Index to functions, as function prototypes. */
-extern int mc32_probe(struct net_device *dev);
-
 static int	mc32_probe1(struct net_device *dev, int ioaddr);
 static int      mc32_command(struct net_device *dev, u16 cmd, void *data, int len);
 static int	mc32_open(struct net_device *dev);
@@ -226,9 +224,19 @@ static void	mc32_set_multicast_list(struct net_device *dev);
 static void	mc32_reset_multicast_list(struct net_device *dev);
 static struct ethtool_ops netdev_ethtool_ops;
 
+static void cleanup_card(struct net_device *dev)
+{
+	struct mc32_local *lp=dev->priv;
+	unsigned slot = lp->slot;
+	mca_mark_as_unused(slot);
+	mca_set_adapter_name(slot, NULL);
+	free_irq(dev->irq, dev);
+	release_region(dev->base_addr, MC32_IO_EXTENT);
+}
+
 /**
  * mc32_probe 	-	Search for supported boards
- * @dev: device to probe
+ * @unit: interface number to use
  *
  * Because MCA bus is a real bus and we can scan for cards we could do a
  * single scan for all boards here. Right now we use the passed in device
@@ -236,10 +244,18 @@ static struct ethtool_ops netdev_ethtool_ops;
  * in particular.
  */
 
-int __init mc32_probe(struct net_device *dev)
+struct net_device *__init mc32_probe(int unit)
 {
+	struct net_device *dev = alloc_etherdev(sizeof(struct mc32_local));
 	static int current_mca_slot = -1;
 	int i;
+	int err;
+
+	if (!dev)
+		return ERR_PTR(-ENOMEM);
+
+	if (unit >= 0)
+		sprintf(dev->name, "eth%d", unit);
 
 	SET_MODULE_OWNER(dev);
 
@@ -260,12 +276,18 @@ int __init mc32_probe(struct net_device *dev)
 				mca_set_adapter_name(current_mca_slot, 
 						mc32_adapters[i].name);
 				mca_mark_as_used(current_mca_slot);
-				return 0;
+				err = register_netdev(dev);
+				if (err) {
+					cleanup_card(dev);
+					free_netdev(dev);
+					dev = ERR_PTR(err);
+				}
+				return dev;
 			}
 			
 		}
 	}
-	return -ENODEV;
+	return ERR_PTR(-ENODEV);
 }
 
 /**
@@ -285,7 +307,7 @@ static int __init mc32_probe1(struct net_device *dev, int slot)
 	int i, err;
 	u8 POS;
 	u32 base;
-	struct mc32_local *lp;
+	struct mc32_local *lp = dev->priv;
 	static u16 mca_io_bases[]={
 		0x7280,0x7290,
 		0x7680,0x7690,
@@ -412,24 +434,14 @@ static int __init mc32_probe1(struct net_device *dev, int slot)
 	 *	Grab the IRQ
 	 */
 
-	i = request_irq(dev->irq, &mc32_interrupt, SA_SHIRQ | SA_SAMPLE_RANDOM, dev->name, dev);
-	if (i) {
+	err = request_irq(dev->irq, &mc32_interrupt, SA_SHIRQ | SA_SAMPLE_RANDOM, dev->name, dev);
+	if (err) {
 		release_region(dev->base_addr, MC32_IO_EXTENT);
 		printk(KERN_ERR "%s: unable to get IRQ %d.\n", dev->name, dev->irq);
-		return i;
+		goto err_exit_ports;
 	}
 
-
-	/* Initialize the device structure. */
-	dev->priv = kmalloc(sizeof(struct mc32_local), GFP_KERNEL);
-	if (dev->priv == NULL)
-	{
-		err = -ENOMEM;
-		goto err_exit_irq; 
-	}
-
-	memset(dev->priv, 0, sizeof(struct mc32_local));
-	lp = dev->priv;
+	memset(lp, 0, sizeof(struct mc32_local));
 	lp->slot = slot;
 
 	i=0;
@@ -443,7 +455,7 @@ static int __init mc32_probe1(struct net_device *dev, int slot)
 		{
 			printk(KERN_ERR "%s: failed to boot adapter.\n", dev->name);
 			err = -ENODEV; 
-			goto err_exit_free;
+			goto err_exit_irq;
 		}
 		udelay(1000);
 		if(inb(dev->base_addr+2)&(1<<5))
@@ -458,7 +470,7 @@ static int __init mc32_probe1(struct net_device *dev, int slot)
 		else
 			printk(KERN_ERR "%s: unknown failure %d.\n", dev->name, base);
 		err = -ENODEV; 
-		goto err_exit_free;
+		goto err_exit_irq;
 	}
 	
 	base=0;
@@ -474,7 +486,7 @@ static int __init mc32_probe1(struct net_device *dev, int slot)
 			{
 				printk(KERN_ERR "%s: mailbox read fail (%d).\n", dev->name, i);
 				err = -ENODEV;
-				goto err_exit_free;
+				goto err_exit_irq;
 			}
 		}
 
@@ -517,15 +529,11 @@ static int __init mc32_probe1(struct net_device *dev, int slot)
 	dev->watchdog_timeo	= HZ*5;	/* Board does all the work */
 	dev->ethtool_ops	= &netdev_ethtool_ops;
 
-	/* Fill in the fields of the device structure with ethernet values. */
-	ether_setup(dev);
-	
 	return 0;
 
-err_exit_free:
-	kfree(dev->priv);
 err_exit_irq:
 	free_irq(dev->irq, dev);
+err_exit_ports:
 	release_region(dev->base_addr, MC32_IO_EXTENT);
 	return err;
 }
@@ -1630,7 +1638,7 @@ static struct ethtool_ops netdev_ethtool_ops = {
 
 #ifdef MODULE
 
-static struct net_device this_device;
+static struct net_device *this_device;
 
 /**
  *	init_module		-	entry point
@@ -1642,12 +1650,9 @@ static struct net_device this_device;
 
 int init_module(void)
 {
-	int result;
-	
-	this_device.init = mc32_probe;
-	if ((result = register_netdev(&this_device)) != 0)
-		return result;
-
+	this_device = mc32_probe(-1);
+	if (IS_ERR(this_device))
+		return PTR_ERR(this_device);
 	return 0;
 }
 
@@ -1664,24 +1669,9 @@ int init_module(void)
 
 void cleanup_module(void)
 {
-	int slot;
-	
-	unregister_netdev(&this_device);
-
-	/*
-	 * If we don't do this, we can't re-insmod it later.
-	 */
-	 
-	if (this_device.priv)
-	{
-		struct mc32_local *lp=this_device.priv;
-		slot = lp->slot;
-		mca_mark_as_unused(slot);
-		mca_set_adapter_name(slot, NULL);
-		kfree(this_device.priv);
-	}
-	free_irq(this_device.irq, &this_device);
-	release_region(this_device.base_addr, MC32_IO_EXTENT);
+	unregister_netdev(this_device);
+	cleanup_card(this_device);
+	free_netdev(this_device);
 }
 
 #endif /* MODULE */

@@ -463,7 +463,6 @@ static void	tc35815_set_multicast_list(struct net_device *dev);
 static void 	tc35815_chip_reset(struct net_device *dev);
 static void 	tc35815_chip_init(struct net_device *dev);
 static void 	tc35815_phy_chip_init(struct net_device *dev);
-static int 	tc35815_proc_info(char *buffer, char **start, off_t offset, int length, int *eof, void *data);
 
 /* A list of all installed tc35815 devices. */
 static struct net_device *root_tc35815_dev = NULL;
@@ -482,78 +481,76 @@ int
 tc35815_probe(struct pci_dev *pdev,
 		const struct pci_device_id *ent)
 {
-	static int called = 0;
 	int err = 0;
 	int ret;
+	unsigned long pci_memaddr;
+	unsigned int pci_irq_line;
 
-	if (called)
-		return -ENODEV;
-	called++;
+	printk(KERN_INFO "tc35815_probe: found device %#08x.%#08x\n", ent->vendor, ent->device);
 
-	if (pdev) {
-		unsigned int pci_memaddr;
-		unsigned int pci_irq_line;
+	err = pci_enable_device(pdev);
+	if (err)
+		return err;
 
-		printk(KERN_INFO "tc35815_probe: found device %#08x.%#08x\n", ent->vendor, ent->device);
+        pci_memaddr = pci_resource_start (pdev, 1);
 
-	        pci_memaddr = pci_resource_start (pdev, 1);
+        printk(KERN_INFO "    pci_memaddr=%#08lx  resource_flags=%#08lx\n", pci_memaddr, pci_resource_flags (pdev, 0));
 
-	        printk(KERN_INFO "    pci_memaddr=%#08lx  resource_flags=%#08lx\n", pci_memaddr, pci_resource_flags (pdev, 0));
-
-		if (!pci_memaddr) {
-			printk(KERN_WARNING "no PCI MEM resources, aborting\n");
-			return -ENODEV;
-		}
-		pci_irq_line = pdev->irq;
-		/* irq disabled. */
-		if (pci_irq_line == 0) {
-			printk(KERN_WARNING "no PCI irq, aborting\n");
-			return -ENODEV;
-		}
-
-		ret =  tc35815_probe1(pdev, pci_memaddr, pci_irq_line);
-
-		if (!ret) {
-			if ((err = pci_enable_device(pdev)) < 0) {
-			    printk(KERN_ERR "tc35815_probe: failed to enable device -- err=%d\n", err);
-			    return err;
-			}
-			pci_set_master(pdev);
-		}
-
-		return ret;
+	if (!pci_memaddr) {
+		printk(KERN_WARNING "no PCI MEM resources, aborting\n");
+		ret = -ENODEV;
+		goto err_out;
 	}
-	return -ENODEV;
+	pci_irq_line = pdev->irq;
+	/* irq disabled. */
+	if (pci_irq_line == 0) {
+		printk(KERN_WARNING "no PCI irq, aborting\n");
+		ret = -ENODEV;
+		goto err_out;
+	}
+
+	ret =  tc35815_probe1(pdev, pci_memaddr, pci_irq_line);
+	if (ret)
+		goto err_out;
+
+	pci_set_master(pdev);
+
+	return 0;
+
+err_out:
+	pci_disable_device(pdev);
+	return ret;
 }
 
 static int __devinit tc35815_probe1(struct pci_dev *pdev, unsigned int base_addr, unsigned int irq)
 {
 	static unsigned version_printed = 0;
-	int i;
+	int i, ret;
 	struct tc35815_local *lp;
 	struct tc35815_regs *tr;
 	struct net_device *dev;
 
 	/* Allocate a new 'dev' if needed. */
-	dev = init_etherdev(NULL, sizeof(struct tc35815_local));
+	dev = alloc_etherdev(sizeof(struct tc35815_local));
 	if (dev == NULL)
 		return -ENOMEM;
 
 	/*
-	 * init_etherdev allocs and zeros dev->priv
+	 * alloc_etherdev allocs and zeros dev->priv
 	 */
 	lp = dev->priv;
 
 	if (tc35815_debug  &&  version_printed++ == 0)
 		printk(KERN_DEBUG "%s", version);
 
-	printk(KERN_INFO "%s: %s found at %#x, irq %d\n",
-	       dev->name, cardname, base_addr, irq);
-
 	/* Fill in the 'dev' fields. */
 	dev->irq = irq;
 	dev->base_addr = (unsigned long)ioremap(base_addr,
 						sizeof(struct tc35815_regs));
+	if (!dev->base_addr) {
+		ret = -ENOMEM;
+		goto err_out;
+	}
 	tr = (struct tc35815_regs*)dev->base_addr;
 
 	tc35815_chip_reset(dev);
@@ -570,9 +567,6 @@ static int __devinit tc35815_probe1(struct pci_dev *pdev, unsigned int base_addr
 		dev->dev_addr[i] = data & 0xff;
 		dev->dev_addr[i+1] = data >> 8;
 	}
-	for (i = 0; i < 6; i++)
-		printk(" %2.2x", dev->dev_addr[i]);
-	printk("\n");
 
 	/* Initialize the device structure. */
 	lp->pdev = pdev;
@@ -594,8 +588,6 @@ static int __devinit tc35815_probe1(struct pci_dev *pdev, unsigned int base_addr
 
 	/* do auto negotiation */
 	tc35815_phy_chip_init(dev);
-	printk(KERN_INFO "%s: linkspeed %dMbps, %s Duplex\n",
-	       dev->name, lp->linkspeed, lp->fullduplex ? "Full" : "Half");
 
 	dev->open		= tc35815_open;
 	dev->stop		= tc35815_close;
@@ -604,20 +596,34 @@ static int __devinit tc35815_probe1(struct pci_dev *pdev, unsigned int base_addr
 	dev->hard_start_xmit	= tc35815_send_packet;
 	dev->get_stats		= tc35815_get_stats;
 	dev->set_multicast_list = tc35815_set_multicast_list;
+	SET_MODULE_OWNER(dev);
 
-#if 0	/* XXX called in init_etherdev */
-	/* Fill in the fields of the device structure with ethernet values. */
-	ether_setup(dev);
-#endif
+	ret = register_netdev(dev);
+	if (ret)
+		goto err_out_iounmap;
+
+	printk(KERN_INFO "%s: %s found at %#x, irq %d, MAC",
+	       dev->name, cardname, base_addr, irq);
+	for (i = 0; i < 6; i++)
+		printk(" %2.2x", dev->dev_addr[i]);
+	printk("\n");
+	printk(KERN_INFO "%s: linkspeed %dMbps, %s Duplex\n",
+	       dev->name, lp->linkspeed, lp->fullduplex ? "Full" : "Half");
 
 	return 0;
+
+err_out_iounmap:
+	iounmap((void *) dev->base_addr);
+err_out:
+	free_netdev(dev);
+	return ret;
 }
 
 
 static int
 tc35815_init_queues(struct net_device *dev)
 {
-	struct tc35815_local *lp = (struct tc35815_local *)dev->priv;
+	struct tc35815_local *lp = dev->priv;
 	int i;
 	unsigned long fd_addr;
 
@@ -702,7 +708,7 @@ tc35815_init_queues(struct net_device *dev)
 static void
 tc35815_clear_queues(struct net_device *dev)
 {
-	struct tc35815_local *lp = (struct tc35815_local *)dev->priv;
+	struct tc35815_local *lp = dev->priv;
 	int i;
 
 	for (i = 0; i < TX_FD_NUM; i++) {
@@ -719,7 +725,7 @@ tc35815_clear_queues(struct net_device *dev)
 static void
 tc35815_free_queues(struct net_device *dev)
 {
-	struct tc35815_local *lp = (struct tc35815_local *)dev->priv;
+	struct tc35815_local *lp = dev->priv;
 	int i;
 
 	if (lp->tfd_base) {
@@ -805,7 +811,7 @@ dump_frfd(struct FrFD *fd)
 static void
 panic_queues(struct net_device *dev)
 {
-	struct tc35815_local *lp = (struct tc35815_local *)dev->priv;
+	struct tc35815_local *lp = dev->priv;
 	int i;
 
 	printk("TxFD base %p, start %d, end %d\n",
@@ -823,6 +829,7 @@ panic_queues(struct net_device *dev)
 	panic("%s: Illegal queue state.", dev->name);
 }
 
+#if 0
 static void print_buf(char *add, int length)
 {
 	int i;
@@ -839,6 +846,7 @@ static void print_buf(char *add, int length)
 	}
 	printk("\n");
 }
+#endif
 
 static void print_eth(char *add)
 {
@@ -864,7 +872,7 @@ static void print_eth(char *add)
 static int
 tc35815_open(struct net_device *dev)
 {
-	struct tc35815_local *lp = (struct tc35815_local *)dev->priv;
+	struct tc35815_local *lp = dev->priv;
 	/*
 	 * This is used if the interrupt line can turned off (shared).
 	 * See 3c503.c for an example of selecting the IRQ at config-time.
@@ -888,19 +896,17 @@ tc35815_open(struct net_device *dev)
 	lp->tbusy = 0;
 	netif_start_queue(dev);
 
-	MOD_INC_USE_COUNT;
-
 	return 0;
 }
 
 static void tc35815_tx_timeout(struct net_device *dev)
 {
-	struct tc35815_local *lp = (struct tc35815_local *)dev->priv;
+	struct tc35815_local *lp = dev->priv;
 	struct tc35815_regs *tr = (struct tc35815_regs *)dev->base_addr;
-	int flags;
+	unsigned long flags;
 
 	spin_lock_irqsave(&lp->lock, flags);
-	printk(KERN_WARNING "%s: transmit timed out, status %#x\n",
+	printk(KERN_WARNING "%s: transmit timed out, status %#lx\n",
 	       dev->name, tc_readl(&tr->Tx_Stat));
 	/* Try to restart the adaptor. */
 	tc35815_chip_reset(dev);
@@ -914,7 +920,7 @@ static void tc35815_tx_timeout(struct net_device *dev)
 
 static int tc35815_send_packet(struct sk_buff *skb, struct net_device *dev)
 {
-	struct tc35815_local *lp = (struct tc35815_local *)dev->priv;
+	struct tc35815_local *lp = dev->priv;
 	struct tc35815_regs *tr = (struct tc35815_regs *)dev->base_addr;
 
 	if (netif_queue_stopped(dev)) {
@@ -925,7 +931,7 @@ static int tc35815_send_packet(struct sk_buff *skb, struct net_device *dev)
 		int tickssofar = jiffies - dev->trans_start;
 		if (tickssofar < 5)
 			return 1;
-		printk(KERN_WARNING "%s: transmit timed out, status %#x\n",
+		printk(KERN_WARNING "%s: transmit timed out, status %#lx\n",
 		       dev->name, tc_readl(&tr->Tx_Stat));
 		/* Try to restart the adaptor. */
 		tc35815_chip_reset(dev);
@@ -947,7 +953,7 @@ static int tc35815_send_packet(struct sk_buff *skb, struct net_device *dev)
 		short length = ETH_ZLEN < skb->len ? skb->len : ETH_ZLEN;
 		unsigned char *buf = skb->data;
 		struct TxFD *txfd = &lp->tfd_base[lp->tfd_start];
-		int flags;
+		unsigned long flags;
 		lp->stats.tx_bytes += skb->len;
 
 
@@ -1051,7 +1057,7 @@ static irqreturn_t tc35815_interrupt(int irq, void *dev_id, struct pt_regs * reg
 	}
 
 	tr = (struct tc35815_regs*)dev->base_addr;
-	lp = (struct tc35815_local *)dev->priv;
+	lp = dev->priv;
 
 	do {
 		status = tc_readl(&tr->Int_Src);
@@ -1107,7 +1113,7 @@ static irqreturn_t tc35815_interrupt(int irq, void *dev_id, struct pt_regs * reg
 static void
 tc35815_rx(struct net_device *dev)
 {
-	struct tc35815_local *lp = (struct tc35815_local *)dev->priv;
+	struct tc35815_local *lp = dev->priv;
 	struct tc35815_regs *tr = (struct tc35815_regs*)dev->base_addr;
 	unsigned int fdctl;
 	int i;
@@ -1157,7 +1163,9 @@ tc35815_rx(struct net_device *dev)
 				offset += len;
 				cur_bd++;
 			}
-	//		print_buf(data,pkt_len);
+#if 0
+			print_buf(data,pkt_len);
+#endif
 			if (tc35815_debug > 3)
 				print_eth(data);
 			skb->protocol = eth_type_trans(skb, dev);
@@ -1247,7 +1255,7 @@ tc35815_rx(struct net_device *dev)
 static void
 tc35815_check_tx_stat(struct net_device *dev, int status)
 {
-	struct tc35815_local *lp = (struct tc35815_local *)dev->priv;
+	struct tc35815_local *lp = dev->priv;
 	const char *msg = NULL;
 
 	/* count collisions */
@@ -1304,7 +1312,7 @@ tc35815_check_tx_stat(struct net_device *dev, int status)
 static void
 tc35815_txdone(struct net_device *dev)
 {
-	struct tc35815_local *lp = (struct tc35815_local *)dev->priv;
+	struct tc35815_local *lp = dev->priv;
 	struct tc35815_regs *tr = (struct tc35815_regs*)dev->base_addr;
 	struct TxFD *txfd;
 	unsigned int fdctl;
@@ -1379,7 +1387,7 @@ tc35815_txdone(struct net_device *dev)
 static int
 tc35815_close(struct net_device *dev)
 {
-	struct tc35815_local *lp = (struct tc35815_local *)dev->priv;
+	struct tc35815_local *lp = dev->priv;
 
 	lp->tbusy = 1;
 	netif_stop_queue(dev);
@@ -1391,8 +1399,6 @@ tc35815_close(struct net_device *dev)
 
 	tc35815_free_queues(dev);
 
-	MOD_DEC_USE_COUNT;
-
 	return 0;
 }
 
@@ -1402,7 +1408,7 @@ tc35815_close(struct net_device *dev)
  */
 static struct net_device_stats *tc35815_get_stats(struct net_device *dev)
 {
-	struct tc35815_local *lp = (struct tc35815_local *)dev->priv;
+	struct tc35815_local *lp = dev->priv;
 	struct tc35815_regs *tr = (struct tc35815_regs*)dev->base_addr;
 	unsigned long flags;
 
@@ -1456,7 +1462,7 @@ static void tc35815_set_cam_entry(struct tc35815_regs *tr, int index, unsigned c
 		int i;
 		for (i = cam_index / 4; i < cam_index / 4 + 2; i++) {
 			tc_writel(i * 4, &tr->CAM_Adr);
-			printk("CAM 0x%x: %08x",
+			printk("CAM 0x%x: %08lx",
 			       i * 4, tc_readl(&tr->CAM_Data));
 		}
 	}
@@ -1513,9 +1519,9 @@ tc35815_set_multicast_list(struct net_device *dev)
 
 static unsigned long tc_phy_read(struct net_device *dev, struct tc35815_regs *tr, int phy, int phy_reg)
 {
-	struct tc35815_local *lp = (struct tc35815_local *)dev->priv;
+	struct tc35815_local *lp = dev->priv;
 	unsigned long data;
-	int flags;
+	unsigned long flags;
 	
 	spin_lock_irqsave(&lp->lock, flags);
 
@@ -1529,8 +1535,8 @@ static unsigned long tc_phy_read(struct net_device *dev, struct tc35815_regs *tr
 
 static void tc_phy_write(struct net_device *dev, unsigned long d, struct tc35815_regs *tr, int phy, int phy_reg)
 {
-	struct tc35815_local *lp = (struct tc35815_local *)dev->priv;
-	int flags;
+	struct tc35815_local *lp = dev->priv;
+	unsigned long flags;
 
 	spin_lock_irqsave(&lp->lock, flags);
 
@@ -1543,7 +1549,7 @@ static void tc_phy_write(struct net_device *dev, unsigned long d, struct tc35815
 
 static void tc35815_phy_chip_init(struct net_device *dev)
 {
-	struct tc35815_local *lp = (struct tc35815_local *)dev->priv;
+	struct tc35815_local *lp = dev->priv;
 	struct tc35815_regs *tr = (struct tc35815_regs*)dev->base_addr;
 	static int first = 1;
 	unsigned short ctl;
@@ -1648,9 +1654,9 @@ static void tc35815_chip_reset(struct net_device *dev)
 
 static void tc35815_chip_init(struct net_device *dev)
 {
-	struct tc35815_local *lp = (struct tc35815_local *)dev->priv;
+	struct tc35815_local *lp = dev->priv;
 	struct tc35815_regs *tr = (struct tc35815_regs*)dev->base_addr;
-	int flags;
+	unsigned long flags;
 	unsigned long txctl = TX_CTL_CMD;
 
 	tc35815_phy_chip_init(dev);
@@ -1694,40 +1700,6 @@ static void tc35815_chip_init(struct net_device *dev)
 	tc_writel(virt_to_bus(lp->tfd_base), &tr->TxFrmPtr);	/* start DMA transmitter */
 #endif
 	spin_unlock_irqrestore(&lp->lock, flags);
-}
-
-static int tc35815_proc_info(char *buffer, char **start, off_t offset, int length, int *eof, void *data)
-{
-	int len = 0;
-	off_t pos = 0;
-	off_t begin = 0;
-	struct net_device *dev;
-
-	len += sprintf(buffer, "TC35815 statistics:\n");
-	for (dev = root_tc35815_dev; dev; dev = ((struct tc35815_local *)dev->priv)->next_module) {
-		struct tc35815_local *lp = (struct tc35815_local *)dev->priv;
-		len += sprintf(buffer + len,
-			       "%s: tx_ints %d, rx_ints %d, max_tx_qlen %d\n",
-			       dev->name,
-			       lp->lstats.tx_ints,
-			       lp->lstats.rx_ints,
-			       lp->lstats.max_tx_qlen);
-		pos = begin + len;
-
-		if (pos < offset) {
-			len = 0;
-			begin = pos;
-		}
-    
-		if (pos > offset+length) break;
-	}
-
-	*start = buffer + (offset - begin);
-	len -= (offset - begin);
-  
-	if (len > length) len = length;
-  
-	return len;
 }
 
 /* XXX */

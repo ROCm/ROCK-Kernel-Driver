@@ -103,7 +103,7 @@ static int __init dummy_init_one(int index)
 		return -ENOMEM;
 
 	if ((err = register_netdev(dev_dummy))) {
-		kfree(dev_dummy);
+		free_netdev(dev_dummy);
 		dev_dummy = NULL;
 	} else {
 		dummies[index] = dev_dummy; 
