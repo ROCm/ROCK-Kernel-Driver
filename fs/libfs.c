@@ -4,7 +4,10 @@
  */
 
 #include <linux/pagemap.h>
+#include <linux/mount.h>
 #include <linux/vfs.h>
+
+extern struct vfsmount *do_kern_mount(const char *, int, char *, void *);
 
 int simple_getattr(struct vfsmount *mnt, struct dentry *dentry,
 		   struct kstat *stat)
@@ -389,4 +392,37 @@ out:
 	d_genocide(root);
 	dput(root);
 	return -ENOMEM;
+}
+
+static spinlock_t pin_fs_lock = SPIN_LOCK_UNLOCKED;
+
+int simple_pin_fs(char *name, struct vfsmount **mount, int *count)
+{
+	struct vfsmount *mnt = NULL;
+	spin_lock(&pin_fs_lock);
+	if (unlikely(!*mount)) {
+		spin_unlock(&pin_fs_lock);
+		mnt = do_kern_mount(name, 0, name, NULL);
+		if (IS_ERR(mnt))
+			return PTR_ERR(mnt);
+		spin_lock(&pin_fs_lock);
+		if (!*mount)
+			*mount = mnt;
+	}
+	mntget(*mount);
+	++*count;
+	spin_unlock(&pin_fs_lock);
+	mntput(mnt);
+	return 0;
+}
+
+void simple_release_fs(struct vfsmount **mount, int *count)
+{
+	struct vfsmount *mnt;
+	spin_lock(&pin_fs_lock);
+	mnt = *mount;
+	if (!--*count)
+		*mount = NULL;
+	spin_unlock(&pin_fs_lock);
+	mntput(mnt);
 }

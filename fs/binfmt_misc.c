@@ -53,7 +53,7 @@ typedef struct {
 
 static rwlock_t entries_lock __attribute__((unused)) = RW_LOCK_UNLOCKED;
 static struct vfsmount *bm_mnt;
-static int entry_count = 0;
+static int entry_count;
 
 /* 
  * Check if we support the binfmt
@@ -399,19 +399,7 @@ static struct inode *bm_get_inode(struct super_block *sb, int mode)
 
 static void bm_clear_inode(struct inode *inode)
 {
-	Node *e = inode->u.generic_ip;
-
-	if (e) {
-		struct vfsmount *mnt;
-		write_lock(&entries_lock);
-		list_del(&e->list);
-		mnt = bm_mnt;
-		if (!--entry_count)
-			bm_mnt = NULL;
-		write_unlock(&entries_lock);
-		kfree(e);
-		mntput(mnt);
-	}
+	kfree(inode->u.generic_ip);
 }
 
 static void kill_node(Node *e)
@@ -430,6 +418,7 @@ static void kill_node(Node *e)
 		dentry->d_inode->i_nlink--;
 		d_drop(dentry);
 		dput(dentry);
+		simple_release_fs(&bm_mnt, &entry_count);
 	}
 }
 
@@ -498,8 +487,6 @@ static struct file_operations bm_entry_operations = {
 	.write		= bm_entry_write,
 };
 
-static struct file_system_type bm_fs_type;
-
 /* /register */
 
 static ssize_t bm_register_write(struct file *file, const char *buffer,
@@ -507,7 +494,6 @@ static ssize_t bm_register_write(struct file *file, const char *buffer,
 {
 	Node *e;
 	struct inode *inode;
-	struct vfsmount *mnt = NULL;
 	struct dentry *root, *dentry;
 	struct super_block *sb = file->f_vfsmnt->mnt_sb;
 	int err = 0;
@@ -534,32 +520,22 @@ static ssize_t bm_register_write(struct file *file, const char *buffer,
 	if (!inode)
 		goto out2;
 
-	write_lock(&entries_lock);
-	if (!bm_mnt) {
-		write_unlock(&entries_lock);
-		mnt = kern_mount(&bm_fs_type);
-		if (IS_ERR(mnt)) {
-			err = PTR_ERR(mnt);
-			iput(inode);
-			inode = NULL;
-			goto out2;
-		}
-		write_lock(&entries_lock);
-		if (!bm_mnt)
-			bm_mnt = mnt;
+	err = simple_pin_fs("binfmt_misc", &bm_mnt, &entry_count);
+	if (err) {
+		iput(inode);
+		inode = NULL;
+		goto out2;
 	}
-	mntget(bm_mnt);
-	entry_count++;
 
 	e->dentry = dget(dentry);
 	inode->u.generic_ip = e;
 	inode->i_fop = &bm_entry_operations;
-	d_instantiate(dentry, inode);
 
+	write_lock(&entries_lock);
+	d_instantiate(dentry, inode);
 	list_add(&e->list, &entries);
 	write_unlock(&entries_lock);
 
-	mntput(mnt);
 	err = 0;
 out2:
 	dput(dentry);

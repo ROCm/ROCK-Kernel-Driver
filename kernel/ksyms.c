@@ -314,6 +314,8 @@ EXPORT_SYMBOL(simple_prepare_write);
 EXPORT_SYMBOL(simple_commit_write);
 EXPORT_SYMBOL(simple_empty);
 EXPORT_SYMBOL(simple_fill_super);
+EXPORT_SYMBOL(simple_pin_fs);
+EXPORT_SYMBOL(simple_release_fs);
 EXPORT_SYMBOL(fd_install);
 EXPORT_SYMBOL(put_unused_fd);
 EXPORT_SYMBOL(get_sb_bdev);
