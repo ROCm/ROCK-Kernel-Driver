@@ -388,20 +388,17 @@ int bio_uncopy_user(struct bio *bio)
 	struct bio_vec *bvec;
 	int i, ret = 0;
 
-	if (bio_data_dir(bio) == READ) {
-		char *uaddr = bio->bi_private;
+	char *uaddr = bio->bi_private;
+	
+	__bio_for_each_segment(bvec, bio, i, 0) {
+		char *addr = page_address(bvec->bv_page);
+		if (bio_data_dir(bio) == READ && !ret && 
+		    copy_to_user(uaddr, addr, bvec->bv_len))
+			ret = -EFAULT;
 
-		__bio_for_each_segment(bvec, bio, i, 0) {
-			char *addr = page_address(bvec->bv_page);
-
-			if (!ret && copy_to_user(uaddr, addr, bvec->bv_len))
-				ret = -EFAULT;
-
-			__free_page(bvec->bv_page);
-			uaddr += bvec->bv_len;
-		}
+		__free_page(bvec->bv_page);
+		uaddr += bvec->bv_len;
 	}
-
 	bio_put(bio);
 	return ret;
 }
