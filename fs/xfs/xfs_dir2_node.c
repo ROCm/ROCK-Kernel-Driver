@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2004 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -224,12 +224,21 @@ xfs_dir2_leafn_add(
 	mp = dp->i_mount;
 	tp = args->trans;
 	leaf = bp->data;
+
+	/*
+	 * Quick check just to make sure we are not going to index
+	 * into other peoples memory
+	 */
+	if (index < 0)
+		return XFS_ERROR(EFSCORRUPTED);
+
 	/*
 	 * If there are already the maximum number of leaf entries in
 	 * the block, if there are no stale entries it won't fit.
 	 * Caller will do a split.  If there are stale entries we'll do
 	 * a compact.
 	 */
+
 	if (INT_GET(leaf->hdr.count, ARCH_CONVERT) == XFS_DIR2_MAX_LEAF_ENTS(mp)) {
 		if (INT_ISZERO(leaf->hdr.stale, ARCH_CONVERT))
 			return XFS_ERROR(ENOSPC);
@@ -828,12 +837,24 @@ xfs_dir2_leafn_rebalance(
 		state->inleaf = !swap;
 	else
 		state->inleaf =
-			swap ^ (args->hashval < INT_GET(leaf2->ents[0].hashval, ARCH_CONVERT));
+			swap ^ (blk1->index <= INT_GET(leaf1->hdr.count, ARCH_CONVERT));
 	/*
 	 * Adjust the expected index for insertion.
 	 */
 	if (!state->inleaf)
 		blk2->index = blk1->index - INT_GET(leaf1->hdr.count, ARCH_CONVERT);
+	
+	/* 
+	 * Finally sanity check just to make sure we are not returning a negative index 
+	 */
+	if(blk2->index < 0) {
+		state->inleaf = 1;
+		blk2->index = 0;
+		cmn_err(CE_ALERT,
+			"xfs_dir2_leafn_rebalance: picked the wrong leaf? reverting orignal leaf: "
+			"blk1->index %d\n",
+			blk1->index);
+	}
 }
 
 /*
