@@ -1292,7 +1292,7 @@ vicam_probe( struct usb_interface *intf, const struct usb_device_id *id)
 	interface = &intf->altsetting[0];
 
 	DBG(KERN_DEBUG "Interface %d. has %u. endpoints!\n",
-	       ifnum, (unsigned) (interface->desc.bNumEndpoints));
+	       interface->desc.bInterfaceNumber, (unsigned) (interface->desc.bNumEndpoints));
 	endpoint = &interface->endpoint[0].desc;
 
 	if ((endpoint->bEndpointAddress & 0x80) &&
