@@ -89,7 +89,7 @@ void pci_resetbus(void)
 	int	i;
 
 #ifdef DEBUGPCI
-	printk("pci_resetbus()\n");
+	printk(KERN_DEBUG "pci_resetbus()\n");
 #endif
 
 	*((volatile unsigned short *) (MCF_MBAR+MCFSIM_PADDR)) |= eLIA_PCIRESET;
@@ -113,7 +113,7 @@ int pcibios_assign_resource_slot(int slot)
 	int			bar;
 
 #ifdef DEBUGPCI
-	printk("pcibios_assign_resource_slot(slot=%x)\n", slot);
+	printk(KERN_INFO "pcibios_assign_resource_slot(slot=%x)\n", slot);
 #endif
 
 	rp = (volatile unsigned long *) COMEM_BASE;
@@ -125,9 +125,9 @@ int pcibios_assign_resource_slot(int slot)
 		rp[LREG(COMEM_DAHBASE)] = COMEM_DA_CFGRD | idsel;
 		val = rp[LREG(addr)];
 #ifdef DEBUGRES
-		printk("-----------------------------------"
+		printk(KERN_DEBUG "-----------------------------------"
 			"-------------------------------------\n");
-		printk("BAR[%d]: read=%08x ", bar, val);
+		printk(KERN_DEBUG "BAR[%d]: read=%08x ", bar, val);
 #endif
 
 		rp[LREG(COMEM_DAHBASE)] = COMEM_DA_CFGWR | idsel;
@@ -136,11 +136,11 @@ int pcibios_assign_resource_slot(int slot)
 		rp[LREG(COMEM_DAHBASE)] = COMEM_DA_CFGRD | idsel;
 		val = rp[LREG(addr)];
 #ifdef DEBUGRES
-		printk("write=%08x ", val);
+		printk(KERN_DEBUG "write=%08x ", val);
 #endif
 		if (val == 0) {
 #ifdef DEBUGRES
-			printk("\n");
+			printk(KERN_DEBUG "\n");
 #endif
 			continue;
 		}
@@ -153,7 +153,7 @@ int pcibios_assign_resource_slot(int slot)
 		}
 
 #ifdef DEBUGRES
-		printk("size=%08x(%d)\n", (0x1 << i), i);
+		printk(KERN_DEBUG "size=%08x(%d)\n", (0x1 << i), i);
 #endif
 		i = 0x1 << i;
 
@@ -162,14 +162,14 @@ int pcibios_assign_resource_slot(int slot)
 			if (i < PCI_MINIO)
 				i = PCI_MINIO;
 #ifdef DEBUGRES
-			printk("BAR[%d]: IO size=%08x iobase=%08x\n",
+			printk(KERN_DEBUG "BAR[%d]: IO size=%08x iobase=%08x\n",
 				bar, i, pci_iobase);
 #endif
 			if (i > 0xffff) {
 				/* Invalid size?? */
 				val = 0 | PCI_BASE_ADDRESS_SPACE_IO;
 #ifdef DEBUGRES
-				printk("BAR[%d]: too big for IO??\n", bar);
+				printk(KERN_DEBUG "BAR[%d]: too big for IO??\n", bar);
 #endif
 			} else {
 				/* Check for un-alignment */
@@ -182,7 +182,7 @@ int pcibios_assign_resource_slot(int slot)
 			if (i < PCI_MINMEM)
 				i = PCI_MINMEM;
 #ifdef DEBUGRES
-			printk("BAR[%d]: MEMORY size=%08x membase=%08x\n",
+			printk(KERN_DEBUG "BAR[%d]: MEMORY size=%08x membase=%08x\n",
 				bar, i, pci_membase);
 #endif
 			/* Check for un-alignment */
@@ -196,12 +196,12 @@ int pcibios_assign_resource_slot(int slot)
 		rp[LREG(COMEM_DAHBASE)] = COMEM_DA_CFGWR | idsel;
 		rp[LREG(addr)] = val;
 #ifdef DEBUGRES
-		printk("BAR[%d]: assigned bar=%08x\n", bar, val);
+		printk(KERN_DEBUG "BAR[%d]: assigned bar=%08x\n", bar, val);
 #endif
 	}
 
 #ifdef DEBUGRES
-	printk("-----------------------------------"
+	printk(KERN_DEBUG "-----------------------------------"
 			"-------------------------------------\n");
 #endif
 
@@ -215,7 +215,7 @@ int pcibios_assign_resource_slot(int slot)
 		addr = (PCI_INTERRUPT_LINE & 0xfc)+(~PCI_INTERRUPT_LINE & 0x03);
 		ip[addr] = 25;
 #ifdef DEBUGRES
-		printk("IRQ LINE=25\n");
+		printk(KERN_DEBUG "IRQ LINE=25\n");
 #endif
 	}
 
@@ -232,7 +232,7 @@ int pcibios_enable_slot(int slot)
 	unsigned short		cmd;
 
 #ifdef DEBUGPCI
-	printk("pcibios_enbale_slot(slot=%x)\n", slot);
+	printk(KERN_DEBUG "pcibios_enbale_slot(slot=%x)\n", slot);
 #endif
 
 	rp = (volatile unsigned long *) COMEM_BASE;
@@ -273,7 +273,7 @@ void pcibios_assign_resources(void)
 		rp[LREG(COMEM_PCIBUS)] = 0; /* Clear bus */
 		id = rp[LREG(COMEM_PCIBUS)];
 		if ((id != 0) && ((id & 0xffff0000) != (sel & 0xffff0000))) {
-			printk("PCI: slot=%d id=%08x\n", slot, (int) id);
+			printk(KERN_INFO "PCI: slot=%d id=%08x\n", slot, (int) id);
 			pci_slotmask |= 0x1 << slot;
 			pcibios_assign_resource_slot(slot);
 			pcibios_enable_slot(slot);
@@ -290,7 +290,7 @@ int pcibios_init(void)
 	int			slot;
 
 #ifdef DEBUGPCI
-	printk("pcibios_init()\n");
+	printk(KERN_DEBUG "pcibios_init()\n");
 #endif
 
 	pci_resetbus();
@@ -302,7 +302,7 @@ int pcibios_init(void)
 	 */
 	rp = (volatile unsigned long *) COMEM_BASE;
 	if ((rp[LREG(COMEM_LBUSCFG)] & 0xff) != 0x50) {
-		printk("PCI: no PCI bus present\n");
+		printk(KERN_INFO "PCI: no PCI bus present\n");
 		return(0);
 	}
 
@@ -317,11 +317,11 @@ int pcibios_init(void)
 	rp[LREG(COMEM_PCIBUS)] = 0; /* Clear bus */
 	id = rp[LREG(COMEM_PCIBUS)];
 	if ((id == 0) || ((id & 0xffff0000) == (sel & 0xffff0000))) {
-		printk("PCI: no PCI bus bridge present\n");
+		printk(KERN_INFO "PCI: no PCI bus bridge present\n");
 		return(0);
 	}
 
-	printk("PCI: bridge device at slot=%d id=%08x\n", slot, (int) id);
+	printk(KERN_INFO "PCI: bridge device at slot=%d id=%08x\n", slot, (int) id);
 	pci_slotmask |= 0x1 << slot;
 	pci_shmemaddr = pci_membase;
 	pcibios_assign_resource_slot(slot);
@@ -332,7 +332,7 @@ int pcibios_init(void)
 
 	/* Get PCI irq for local vectoring */
 	if (request_irq(COMEM_IRQ, pci_interrupt, 0, "PCI bridge", NULL)) {
-		printk("PCI: failed to acquire interrupt %d\n", COMEM_IRQ);
+		printk(KERN_WARNING "PCI: failed to acquire interrupt %d\n", COMEM_IRQ);
 	} else {
 		mcf_autovector(COMEM_IRQ);
 	}
@@ -379,7 +379,7 @@ int pcibios_enable_device(struct pci_dev *dev, int mask)
 
 void pcibios_update_resource(struct pci_dev *dev, struct resource *root, struct resource *r, int resource)
 {
-	printk("%s(%d): no support for changing PCI resources...\n",
+	printk(KERN_WARNING "%s(%d): no support for changing PCI resources...\n",
 		__FILE__, __LINE__);
 }
 
@@ -401,7 +401,7 @@ void pci_outb(unsigned char val, unsigned int addr)
 	volatile unsigned char	*bp;
 
 #ifdef DEBUGIO
-	printk("pci_outb(val=%02x,addr=%x)\n", val, addr);
+	printk(KERN_DEBUG "pci_outb(val=%02x,addr=%x)\n", val, addr);
 #endif
 
 	rp = (volatile unsigned long *) COMEM_BASE;
@@ -419,7 +419,7 @@ void pci_outw(unsigned short val, unsigned int addr)
 	volatile unsigned short	*sp;
 
 #ifdef DEBUGIO
-	printk("pci_outw(val=%04x,addr=%x)", val, addr);
+	printk(KERN_DEBUG "pci_outw(val=%04x,addr=%x)", val, addr);
 #endif
 
 	rp = (volatile unsigned long *) COMEM_BASE;
@@ -439,7 +439,7 @@ void pci_outl(unsigned int val, unsigned int addr)
 	volatile unsigned int	*lp;
 
 #ifdef DEBUGIO
-	printk("pci_outl(val=%08x,addr=%x)\n", val, addr);
+	printk(KERN_DEBUG "pci_outl(val=%08x,addr=%x)\n", val, addr);
 #endif
 
 	rp = (volatile unsigned long *) COMEM_BASE;
@@ -470,7 +470,7 @@ unsigned char pci_inb(unsigned int addr)
 	unsigned char		val;
 
 #ifdef DEBUGIO
-	printk("pci_inb(addr=%x)", addr);
+	printk(KERN_DEBUG "pci_inb(addr=%x)", addr);
 #endif
 
 	rp = (volatile unsigned long *) COMEM_BASE;
@@ -501,7 +501,7 @@ unsigned short pci_inw(unsigned int addr)
 	unsigned short		val;
 
 #ifdef DEBUGIO
-	printk("pci_inw(addr=%x)", addr);
+	printk(KERN_DEBUG "pci_inw(addr=%x)", addr);
 #endif
 
 	rp = (volatile unsigned long *) COMEM_BASE;
@@ -514,7 +514,7 @@ unsigned short pci_inw(unsigned int addr)
 	if (pci_byteswap)
 		val = ((val & 0xff) << 8) | ((val >> 8) & 0xff);
 #ifdef DEBUGIO
-	printk("=%04x\n", val);
+	printk(KERN_DEBUG "=%04x\n", val);
 #endif
 	return(val);
 }
@@ -528,7 +528,7 @@ unsigned int pci_inl(unsigned int addr)
 	unsigned int		val;
 
 #ifdef DEBUGIO
-	printk("pci_inl(addr=%x)", addr);
+	printk(KERN_DEBUG "pci_inl(addr=%x)", addr);
 #endif
 
 	rp = (volatile unsigned long *) COMEM_BASE;
@@ -541,7 +541,7 @@ unsigned int pci_inl(unsigned int addr)
 			((val & 0x00ff0000) >> 8) | (val >> 24);
 
 #ifdef DEBUGIO
-	printk("=%08x\n", val);
+	printk(KERN_DEBUG "=%08x\n", val);
 #endif
 	return(val);
 }
@@ -556,7 +556,7 @@ void pci_outsb(void *addr, void *buf, int len)
 	unsigned int		a = (unsigned int) addr;
 
 #ifdef DEBUGIO
-	printk("pci_outsb(addr=%x,buf=%x,len=%d)\n", (int)addr, (int)buf, len);
+	printk(KERN_DEBUG "pci_outsb(addr=%x,buf=%x,len=%d)\n", (int)addr, (int)buf, len);
 #endif
 
 	rp = (volatile unsigned long *) COMEM_BASE;
@@ -580,7 +580,7 @@ void pci_outsw(void *addr, void *buf, int len)
 	unsigned int		a = (unsigned int) addr;
 
 #ifdef DEBUGIO
-	printk("pci_outsw(addr=%x,buf=%x,len=%d)\n", (int)addr, (int)buf, len);
+	printk(KERN_DEBUG "pci_outsw(addr=%x,buf=%x,len=%d)\n", (int)addr, (int)buf, len);
 #endif
 
 	rp = (volatile unsigned long *) COMEM_BASE;
@@ -608,7 +608,7 @@ void pci_outsl(void *addr, void *buf, int len)
 	unsigned int		a = (unsigned int) addr;
 
 #ifdef DEBUGIO
-	printk("pci_outsl(addr=%x,buf=%x,len=%d)\n", (int)addr, (int)buf, len);
+	printk(KERN_DEBUG "pci_outsl(addr=%x,buf=%x,len=%d)\n", (int)addr, (int)buf, len);
 #endif
 
 	rp = (volatile unsigned long *) COMEM_BASE;
@@ -636,7 +636,7 @@ void pci_insb(void *addr, void *buf, int len)
 	unsigned int		a = (unsigned int) addr;
 
 #ifdef DEBUGIO
-	printk("pci_insb(addr=%x,buf=%x,len=%d)\n", (int)addr, (int)buf, len);
+	printk(KERN_DEBUG "pci_insb(addr=%x,buf=%x,len=%d)\n", (int)addr, (int)buf, len);
 #endif
 
 	rp = (volatile unsigned long *) COMEM_BASE;
@@ -660,7 +660,7 @@ void pci_insw(void *addr, void *buf, int len)
 	unsigned int		a = (unsigned int) addr;
 
 #ifdef DEBUGIO
-	printk("pci_insw(addr=%x,buf=%x,len=%d)\n", (int)addr, (int)buf, len);
+	printk(KERN_DEBUG "pci_insw(addr=%x,buf=%x,len=%d)\n", (int)addr, (int)buf, len);
 #endif
 
 	rp = (volatile unsigned long *) COMEM_BASE;
@@ -688,7 +688,7 @@ void pci_insl(void *addr, void *buf, int len)
 	unsigned int		a = (unsigned int) addr;
 
 #ifdef DEBUGIO
-	printk("pci_insl(addr=%x,buf=%x,len=%d)\n", (int)addr, (int)buf, len);
+	printk(KERN_DEBUG "pci_insl(addr=%x,buf=%x,len=%d)\n", (int)addr, (int)buf, len);
 #endif
 
 	rp = (volatile unsigned long *) COMEM_BASE;
@@ -725,7 +725,7 @@ int pci_request_irq(unsigned int irq,
 	int	i;
 
 #ifdef DEBUGIO
-	printk("pci_request_irq(irq=%d,handler=%x,flags=%x,device=%s,"
+	printk(KERN_DEBUG "pci_request_irq(irq=%d,handler=%x,flags=%x,device=%s,"
 		"dev_id=%x)\n", irq, (int) handler, (int) flags, device,
 		(int) dev_id);
 #endif
@@ -757,7 +757,7 @@ void pci_free_irq(unsigned int irq, void *dev_id)
 	int	i;
 
 #ifdef DEBUGIO
-	printk("pci_free_irq(irq=%d,dev_id=%x)\n", irq, (int) dev_id);
+	printk(KERN_DEBUG "pci_free_irq(irq=%d,dev_id=%x)\n", irq, (int) dev_id);
 #endif
 
 	if (dev_id == (void *) NULL)
@@ -781,7 +781,7 @@ void pci_interrupt(int irq, void *id, struct pt_regs *fp)
 	int	i;
 
 #ifdef DEBUGIO
-	printk("pci_interrupt(irq=%d,id=%x,fp=%x)\n", irq, (int) id, (int) fp);
+	printk(KERN_DEBUG "pci_interrupt(irq=%d,id=%x,fp=%x)\n", irq, (int) id, (int) fp);
 #endif
 
 	for (i = 0; (i < COMEM_MAXPCI); i++) {
@@ -809,7 +809,7 @@ void *pci_bmalloc(int size)
 	int	i, j, nrslots;
 
 #ifdef DEBUGIO
-	printk("pci_bmalloc(size=%d)\n", size);
+	printk(KERN_DEBUG "pci_bmalloc(size=%d)\n", size);
 #endif
 
 	if (size <= 0)
@@ -841,7 +841,7 @@ void pci_bmfree(void *mp, int size)
 	int	i, j, nrslots;
 
 #ifdef DEBUGIO
-	printk("pci_bmfree(mp=%x,size=%d)\n", (int) mp, size);
+	printk(KERN_DEBUG "pci_bmfree(mp=%x,size=%d)\n", (int) mp, size);
 #endif
 
 	nrslots = size / PCI_MEMSLOTSIZE;
@@ -859,12 +859,12 @@ unsigned long pci_virt_to_bus(volatile void *address)
 	unsigned long	l;
 
 #ifdef DEBUGIO
-	printk("pci_virt_to_bus(address=%x)", (int) address);
+	printk(KERN_DEBUG "pci_virt_to_bus(address=%x)", (int) address);
 #endif
 
 	l = ((unsigned long) address) - COMEM_BASE;
 #ifdef DEBUGIO
-	printk("=%x\n", (int) (l+pci_shmemaddr));
+	printk(KERN_DEBUG "=%x\n", (int) (l+pci_shmemaddr));
 #endif
 	return(l + pci_shmemaddr);
 }
@@ -876,12 +876,12 @@ void *pci_bus_to_virt(unsigned long address)
 	unsigned long	l;
 
 #ifdef DEBUGIO
-	printk("pci_bus_to_virt(address=%x)", (int) address);
+	printk(KERN_DEBUG "pci_bus_to_virt(address=%x)", (int) address);
 #endif
 
 	l = address - pci_shmemaddr;
 #ifdef DEBUGIO
-	printk("=%x\n", (int) (address + COMEM_BASE));
+	printk(KERN_DEBUG "=%x\n", (int) (address + COMEM_BASE));
 #endif
 	return((void *) (address + COMEM_BASE));
 }
@@ -895,7 +895,7 @@ void pci_bmcpyto(void *dst, void *src, int len)
 	int		i, j;
 
 #ifdef DEBUGIO
-	printk("pci_bmcpyto(dst=%x,src=%x,len=%d)\n", (int)dst, (int)src, len);
+	printk(KERN_DEBUG "pci_bmcpyto(dst=%x,src=%x,len=%d)\n", (int)dst, (int)src, len);
 #endif
 
 	dp = (unsigned long *) dst;
@@ -903,13 +903,13 @@ void pci_bmcpyto(void *dst, void *src, int len)
 	i = len >> 2;
 
 #if 0
-	printk("DATA:");
+	printk(KERN_INFO "DATA:");
 	scp = (unsigned char *) sp;
 	for (i = 0; (i < len); i++) {
-		if ((i % 16) == 0) printk("\n%04x: ", i);
-		printk("%02x ", *scp++);
+		if ((i % 16) == 0) printk(KERN_INFO "\n%04x: ", i);
+		printk(KERN_INFO "%02x ", *scp++);
 	}
-	printk("\n");
+	printk(KERN_INFO "\n");
 #endif
 
 	for (j = 0; (i >= 0); i--, j++) {
@@ -936,7 +936,7 @@ void pci_bmcpyfrom(void *dst, void *src, int len)
 	int		i;
 
 #ifdef DEBUGIO
-	printk("pci_bmcpyfrom(dst=%x,src=%x,len=%d)\n",(int)dst,(int)src,len);
+	printk(KERN_DEBUG "pci_bmcpyfrom(dst=%x,src=%x,len=%d)\n",(int)dst,(int)src,len);
 #endif
 
 	dp = (unsigned long *) dst;
@@ -958,13 +958,13 @@ void pci_bmcpyfrom(void *dst, void *src, int len)
 	}
 
 #if 0
-	printk("DATA:");
+	printk(KERN_INFO "DATA:");
 	dcp = (unsigned char *) dst;
 	for (i = 0; (i < len); i++) {
-		if ((i % 16) == 0) printk("\n%04x: ", i);
-		printk("%02x ", *dcp++);
+		if ((i % 16) == 0) printk(KERN_INFO "\n%04x: ", i);
+		printk(KERN_INFO "%02x ", *dcp++);
 	}
-	printk("\n");
+	printk(KERN_INFO "\n");
 #endif
 }
 
