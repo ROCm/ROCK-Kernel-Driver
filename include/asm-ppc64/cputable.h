@@ -131,6 +131,7 @@ extern firmware_feature_t firmware_features_table[];
 #define CPU_FTR_SMT  			0x0000010000000000
 #define CPU_FTR_COHERENT_ICACHE  	0x0000020000000000
 #define CPU_FTR_LOCKLESS_TLBIE		0x0000040000000000
+#define CPU_FTR_MMCRA_SIHV		0x0000080000000000
 
 /* Platform firmware features */
 #define FW_FTR_                         0x0000000000000001
