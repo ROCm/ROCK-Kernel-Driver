@@ -17,7 +17,6 @@
 #define MAP_32BIT	0x40		/* only give out 32bit addresses */
 
 #define MAP_GROWSDOWN	0x0100		/* stack-like segment */
-#define MAP_HUGETLB	0x0400		/* Backed with hugetlb pages */
 #define MAP_DENYWRITE	0x0800		/* ETXTBSY */
 #define MAP_EXECUTABLE	0x1000		/* mark it as an executable */
 #define MAP_LOCKED	0x2000		/* pages are locked */
