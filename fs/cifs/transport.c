@@ -202,8 +202,8 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 		atomic_inc(&ses->server->inFlight); 
 	}
  
-	if(atomic_read(&ses->server->inFlight) > 50) {
-		wait_event(ses->server->request_q,atomic_read(&ses->server->inFlight) <= 50);
+	if(atomic_read(&ses->server->inFlight) > CIFS_MAX_REQ) {
+		wait_event(ses->server->request_q,atomic_read(&ses->server->inFlight) <= CIFS_MAX_REQ);
 	}
 
 	/* make sure that we sign in the same order that we send on this socket 
@@ -235,7 +235,7 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 			atomic_dec(&ses->server->inFlight); 
 			wake_up(&ses->server->request_q);
 		}
-		return -EIO;
+		return -ENOMEM;
 	}
 
 	if (in_buf->smb_buf_length > CIFS_MAX_MSGSIZE + MAX_CIFS_HDR_SIZE - 4) {

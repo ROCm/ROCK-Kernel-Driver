@@ -268,6 +268,8 @@ Misc /proc/fs/cifs Flags and Debug Info
 =======================================
 Informational pseudo-files:
 DebugData		Displays information about active CIFS sessions
+			as well as per share statistics (if CONFIG_CIFS_STATS
+			is enabled in the kernel configuration).
 SimultaneousOps		Counter which holds maximum number of
 			simultaneous outstanding SMB/CIFS requests.
 Stats			Lists summary resource usage information
@@ -324,13 +326,25 @@ and for more extensive tracing including the start of smb requests and responses
 Three other experimental features are under development and to test 
 require enabling an ifdef (e.g. by  adding "#define CIFS_FCNTL" in cifsglob.h)
 
-	CIFS_QUOTA
+	CONFIG_CIFS_QUOTA
 
-	CIFS_XATTR
+	CONFIG_CIFS_XATTR
 
-	CIFS_FCNTL  (fcntl needed for support of directory change notification)
+	CONFIG_CIFS_FCNTL  (fcntl needed for support of directory change 
+			    notification and perhaps later for file leases)
+
+Per share (per client mount) statistics are available in /proc/fs/cifs/DebugData
+if the kernel was configured with cifs statistics enabled.  The statistics
+represent the number of successful (ie non-zero return code from the server) 
+SMB responses to some of the more common commands (open, delete, mkdir etc.).
+Also recorded is the total bytes read and bytes written to the server for
+that share.  Note that due to client caching effects this can be less than the
+number of bytes read and written by the application running on the client.
+The statistics for the number of total SMBs and oplock breaks are different in
+that they represent all for that share, not just those for which the server
+returned success.
 	
-Also note that "cat /proc/fs/cifs/DebugData" will display some information about 
+Also note that "cat /proc/fs/cifs/DebugData" will display information about 
 the active sessions and the shares that are mounted.  Note: NTLMv2 enablement 
 will not work since they its implementation is not quite complete yet.
 Do not alter these configuration values unless you are doing specific testing.  
