@@ -347,6 +347,8 @@
 #define BT848_PLL_X            (1<<7)
 #define BT848_PLL_C            (1<<6)
 
+#define BT848_DVSIF            0x0FC
+
 /* Bt878 register */
 
 #define BT878_DEVCTRL 0x40

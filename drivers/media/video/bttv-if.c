@@ -41,11 +41,13 @@ static struct i2c_adapter bttv_i2c_adap_template;
 static struct i2c_client bttv_i2c_client_template;
 
 EXPORT_SYMBOL(bttv_get_cardinfo);
+EXPORT_SYMBOL(bttv_get_pcidev);
 EXPORT_SYMBOL(bttv_get_id);
 EXPORT_SYMBOL(bttv_gpio_enable);
 EXPORT_SYMBOL(bttv_read_gpio);
 EXPORT_SYMBOL(bttv_write_gpio);
 EXPORT_SYMBOL(bttv_get_gpio_queue);
+EXPORT_SYMBOL(bttv_i2c_call);
 
 /* ----------------------------------------------------------------------- */
 /* Exported functions - for other modules which want to access the         */
@@ -60,6 +62,13 @@ int bttv_get_cardinfo(unsigned int card, int *type, int *cardid)
 	*type   = bttvs[card].type;
 	*cardid = bttvs[card].cardid;
 	return 0;
+}
+
+struct pci_dev* bttv_get_pcidev(unsigned int card)
+{
+	if (card >= bttv_num)
+		return NULL;
+	return bttvs[card].dev;
 }
 
 int bttv_get_id(unsigned int card)
@@ -243,6 +252,13 @@ void bttv_call_i2c_clients(struct bttv *btv, unsigned int cmd, void *arg)
 		btv->i2c_clients[i]->driver->command(
 			btv->i2c_clients[i],cmd,arg);
 	}
+}
+
+void bttv_i2c_call(unsigned int card, unsigned int cmd, void *arg)
+{
+	if (card >= bttv_num)
+		return;
+	bttv_call_i2c_clients(&bttvs[card], cmd, arg);
 }
 
 static struct i2c_algo_bit_data bttv_i2c_algo_template = {
