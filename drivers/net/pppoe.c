@@ -333,7 +333,11 @@ static int pppoe_rcv_core(struct sock *sk, struct sk_buff *skb)
 	struct pppox_opt *relay_po = NULL;
 
 	if (sk->sk_state & PPPOX_BOUND) {
+		struct pppoe_hdr *ph = (struct pppoe_hdr *) skb->nh.raw;
+		int len = ntohs(ph->length);
 		skb_pull(skb, sizeof(struct pppoe_hdr));
+		skb_trim(skb, len);
+
 		ppp_input(&po->chan, skb);
 	} else if (sk->sk_state & PPPOX_RELAY) {
 		relay_po = get_item_by_addr(&po->pppoe_relay);
@@ -371,17 +375,22 @@ static int pppoe_rcv(struct sk_buff *skb,
 		     struct packet_type *pt)
 
 {
-	struct pppoe_hdr *ph = (struct pppoe_hdr *) skb->nh.raw;
+	struct pppoe_hdr *ph;
 	struct pppox_opt *po;
-	struct sock *sk ;
+	struct sock *sk;
 	int ret;
 
-	po = get_item((unsigned long) ph->sid, skb->mac.ethernet->h_source);
+	if (!pskb_may_pull(skb, sizeof(struct pppoe_hdr)))
+		goto drop;
 
-	if (!po) {
-		kfree_skb(skb);
-		return NET_RX_DROP;
-	}
+	if (!(skb = skb_share_check(skb, GFP_ATOMIC))) 
+		goto out;
+
+	ph = (struct pppoe_hdr *) skb->nh.raw;
+
+	po = get_item((unsigned long) ph->sid, skb->mac.ethernet->h_source);
+	if (!po) 
+		goto drop;
 
 	sk = po->sk;
 	bh_lock_sock(sk);
@@ -398,6 +407,10 @@ static int pppoe_rcv(struct sk_buff *skb,
 	sock_put(sk);
 
 	return ret;
+drop:
+	kfree_skb(skb);
+out:
+	return NET_RX_DROP;
 }
 
 /************************************************************************
@@ -411,9 +424,16 @@ static int pppoe_disc_rcv(struct sk_buff *skb,
 			  struct packet_type *pt)
 
 {
-	struct pppoe_hdr *ph = (struct pppoe_hdr *) skb->nh.raw;
+	struct pppoe_hdr *ph;
 	struct pppox_opt *po;
 
+	if (!pskb_may_pull(skb, sizeof(struct pppoe_hdr)))
+		goto abort;
+
+	if (!(skb = skb_share_check(skb, GFP_ATOMIC))) 
+		goto out;
+
+	ph = (struct pppoe_hdr *) skb->nh.raw;
 	if (ph->code != PADT_CODE)
 		goto abort;
 
@@ -441,17 +461,20 @@ static int pppoe_disc_rcv(struct sk_buff *skb,
 
 abort:
 	kfree_skb(skb);
+out:
 	return NET_RX_SUCCESS; /* Lies... :-) */
 }
 
 static struct packet_type pppoes_ptype = {
 	.type	= __constant_htons(ETH_P_PPP_SES),
 	.func	= pppoe_rcv,
+	.data   = (void *)1,
 };
 
 static struct packet_type pppoed_ptype = {
 	.type	= __constant_htons(ETH_P_PPP_DISC),
 	.func	= pppoe_disc_rcv,
+	.data   = (void *)1,
 };
 
 /***********************************************************************
