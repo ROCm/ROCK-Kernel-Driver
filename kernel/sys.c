@@ -233,6 +233,8 @@ cond_syscall(compat_sys_futex)
 cond_syscall(sys_epoll_create)
 cond_syscall(sys_epoll_ctl)
 cond_syscall(sys_epoll_wait)
+cond_syscall(sys_pciconfig_read)
+cond_syscall(sys_pciconfig_write)
 
 static int set_one_prio(struct task_struct *p, int niceval, int error)
 {
