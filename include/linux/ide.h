@@ -1422,7 +1422,7 @@ enum {
 
 typedef struct ide_pci_device_s {
 	char			*name;
-	void			(*init_setup)(struct pci_dev *, struct ide_pci_device_s *);
+	int			(*init_setup)(struct pci_dev *, struct ide_pci_device_s *);
 	void			(*init_setup_dma)(struct pci_dev *, struct ide_pci_device_s *, ide_hwif_t *);
 	unsigned int		(*init_chipset)(struct pci_dev *, const char *);
 	void			(*init_iops)(ide_hwif_t *);

@@ -620,8 +620,7 @@ static ide_pci_device_t via82cxxx_chipset __devinitdata = {
 
 static int __devinit via_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
-	ide_setup_pci_device(dev, &via82cxxx_chipset);
-	return 0;
+	return ide_setup_pci_device(dev, &via82cxxx_chipset);
 }
 
 static struct pci_device_id via_pci_tbl[] = {

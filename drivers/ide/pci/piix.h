@@ -5,7 +5,7 @@
 #include <linux/pci.h>
 #include <linux/ide.h>
 
-static void init_setup_piix(struct pci_dev *, ide_pci_device_t *);
+static int init_setup_piix(struct pci_dev *, ide_pci_device_t *);
 static unsigned int __devinit init_chipset_piix(struct pci_dev *, const char *);
 static void init_hwif_piix(ide_hwif_t *);
 

@@ -316,21 +316,21 @@ static void __devinit init_hwif_pdc202new(ide_hwif_t *hwif)
 #endif /* PDC202_DEBUG_CABLE */
 }
 
-static void __devinit init_setup_pdcnew(struct pci_dev *dev, ide_pci_device_t *d)
+static int __devinit init_setup_pdcnew(struct pci_dev *dev, ide_pci_device_t *d)
 {
-	ide_setup_pci_device(dev, d);
+	return ide_setup_pci_device(dev, d);
 }
 
-static void __devinit init_setup_pdc20270(struct pci_dev *dev, ide_pci_device_t *d)
+static int __devinit init_setup_pdc20270(struct pci_dev *dev,
+					 ide_pci_device_t *d)
 {
 	struct pci_dev *findev = NULL;
 
 	if ((dev->bus->self &&
 	     dev->bus->self->vendor == PCI_VENDOR_ID_DEC) &&
 	    (dev->bus->self->device == PCI_DEVICE_ID_DEC_21150)) {
-		if (PCI_SLOT(dev->devfn) & 2) {
-			return;
-		}
+		if (PCI_SLOT(dev->devfn) & 2)
+			return -ENODEV;
 		d->extra = 0;
 		while ((findev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, findev)) != NULL) {
 			if ((findev->vendor == dev->vendor) &&
@@ -339,15 +339,15 @@ static void __devinit init_setup_pdc20270(struct pci_dev *dev, ide_pci_device_t 
 				if (findev->irq != dev->irq) {
 					findev->irq = dev->irq;
 				}
-				ide_setup_pci_devices(dev, findev, d);
-				return;
+				return ide_setup_pci_devices(dev, findev, d);
 			}
 		}
 	}
-	ide_setup_pci_device(dev, d);
+	return ide_setup_pci_device(dev, d);
 }
 
-static void __devinit init_setup_pdc20276(struct pci_dev *dev, ide_pci_device_t *d)
+static int __devinit init_setup_pdc20276(struct pci_dev *dev,
+					 ide_pci_device_t *d)
 {
 	if ((dev->bus->self) &&
 	    (dev->bus->self->vendor == PCI_VENDOR_ID_INTEL) &&
@@ -355,9 +355,9 @@ static void __devinit init_setup_pdc20276(struct pci_dev *dev, ide_pci_device_t 
 	     (dev->bus->self->device == PCI_DEVICE_ID_INTEL_I960RM))) {
 		printk(KERN_INFO "ide: Skipping Promise PDC20276 "
 			"attached to I2O RAID controller.\n");
-		return;
+		return -ENODEV;
 	}
-	ide_setup_pci_device(dev, d);
+	return ide_setup_pci_device(dev, d);
 }
 
 /**
@@ -373,8 +373,7 @@ static int __devinit pdc202new_init_one(struct pci_dev *dev, const struct pci_de
 {
 	ide_pci_device_t *d = &pdcnew_chipsets[id->driver_data];
 
-	d->init_setup(dev, d);
-	return 0;
+	return d->init_setup(dev, d);
 }
 
 static struct pci_device_id pdc202new_pci_tbl[] = {

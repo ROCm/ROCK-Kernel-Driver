@@ -535,9 +535,9 @@ static void __devinit init_hwif_piix(ide_hwif_t *hwif)
  *	a standard ide PCI setup
  */
 
-static void __devinit init_setup_piix(struct pci_dev *dev, ide_pci_device_t *d)
+static int __devinit init_setup_piix(struct pci_dev *dev, ide_pci_device_t *d)
 {
-	ide_setup_pci_device(dev, d);
+	return ide_setup_pci_device(dev, d);
 }
 
 /**
@@ -553,8 +553,7 @@ static int __devinit piix_init_one(struct pci_dev *dev, const struct pci_device_
 {
 	ide_pci_device_t *d = &piix_pci_info[id->driver_data];
 
-	d->init_setup(dev, d);
-	return 0;
+	return d->init_setup(dev, d);
 }
 
 /**

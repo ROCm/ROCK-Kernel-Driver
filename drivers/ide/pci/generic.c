@@ -113,8 +113,7 @@ static int __devinit generic_init_one(struct pci_dev *dev, const struct pci_devi
 		printk(KERN_INFO "Skipping disabled %s IDE controller.\n", d->name);
 		goto out;
 	}
-	ret = 0;
-	ide_setup_pci_device(dev, d);
+	ret = ide_setup_pci_device(dev, d);
 out:
 	return ret;
 }

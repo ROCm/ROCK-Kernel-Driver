@@ -21,8 +21,8 @@ static const char *svwks_bad_ata100[] = {
 	NULL
 };
 
-static void init_setup_svwks(struct pci_dev *, ide_pci_device_t *);
-static void init_setup_csb6(struct pci_dev *, ide_pci_device_t *);
+static int init_setup_svwks(struct pci_dev *, ide_pci_device_t *);
+static int init_setup_csb6(struct pci_dev *, ide_pci_device_t *);
 static unsigned int init_chipset_svwks(struct pci_dev *, const char *);
 static void init_hwif_svwks(ide_hwif_t *);
 static void init_dma_svwks(ide_hwif_t *, unsigned long);

@@ -1191,12 +1191,12 @@ static void __devinit init_dma_hpt366(ide_hwif_t *hwif, unsigned long dmabase)
 	ide_setup_dma(hwif, dmabase, 8);
 }
 
-static void __devinit init_setup_hpt374(struct pci_dev *dev, ide_pci_device_t *d)
+static int __devinit init_setup_hpt374(struct pci_dev *dev, ide_pci_device_t *d)
 {
 	struct pci_dev *findev = NULL;
 
 	if (PCI_FUNC(dev->devfn) & 1)
-		return;
+		return -ENODEV;
 
 	while ((findev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, findev)) != NULL) {
 		if ((findev->vendor == dev->vendor) &&
@@ -1209,19 +1209,18 @@ static void __devinit init_setup_hpt374(struct pci_dev *dev, ide_pci_device_t *d
 				printk(KERN_WARNING "%s: pci-config space interrupt "
 					"fixed.\n", d->name);
 			}
-			ide_setup_pci_devices(dev, findev, d);
-			return;
+			return ide_setup_pci_devices(dev, findev, d);
 		}
 	}
-	ide_setup_pci_device(dev, d);
+	return ide_setup_pci_device(dev, d);
 }
 
-static void __devinit init_setup_hpt37x(struct pci_dev *dev, ide_pci_device_t *d)
+static int __devinit init_setup_hpt37x(struct pci_dev *dev, ide_pci_device_t *d)
 {
-	ide_setup_pci_device(dev, d);
+	return ide_setup_pci_device(dev, d);
 }
 
-static void __devinit init_setup_hpt366(struct pci_dev *dev, ide_pci_device_t *d)
+static int __devinit init_setup_hpt366(struct pci_dev *dev, ide_pci_device_t *d)
 {
 	struct pci_dev *findev = NULL;
 	u8 pin1 = 0, pin2 = 0;
@@ -1231,7 +1230,7 @@ static void __devinit init_setup_hpt366(struct pci_dev *dev, ide_pci_device_t *d
 				 "HPT372N" };
 
 	if (PCI_FUNC(dev->devfn) & 1)
-		return;
+		return -ENODEV;
 
 	pci_read_config_dword(dev, PCI_CLASS_REVISION, &class_rev);
 	class_rev &= 0xff;
@@ -1246,9 +1245,10 @@ static void __devinit init_setup_hpt366(struct pci_dev *dev, ide_pci_device_t *d
 		case 6:
 		case 5:
 		case 4:
-		case 3: ide_setup_pci_device(dev, d);
-			return;
-		default:	break;
+		case 3:
+			goto init_single;
+		default:
+			break;
 	}
 
 	d->channels = 1;
@@ -1266,11 +1266,11 @@ static void __devinit init_setup_hpt366(struct pci_dev *dev, ide_pci_device_t *d
 					"pin1=%d pin2=%d\n", d->name,
 					pin1, pin2);
 			}
-			ide_setup_pci_devices(dev, findev, d);
-			return;
+			return ide_setup_pci_devices(dev, findev, d);
 		}
 	}
-	ide_setup_pci_device(dev, d);
+init_single:
+	return ide_setup_pci_device(dev, d);
 }
 
 
@@ -1287,8 +1287,7 @@ static int __devinit hpt366_init_one(struct pci_dev *dev, const struct pci_devic
 {
 	ide_pci_device_t *d = &hpt366_chipsets[id->driver_data];
 
-	d->init_setup(dev, d);
-	return 0;
+	return d->init_setup(dev, d);
 }
 
 static struct pci_device_id hpt366_pci_tbl[] = {

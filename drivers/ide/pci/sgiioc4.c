@@ -681,12 +681,14 @@ static unsigned int __devinit
 pci_init_sgiioc4(struct pci_dev *dev, ide_pci_device_t * d)
 {
 	unsigned int class_rev;
+	int ret;
 
-	if (pci_enable_device(dev)) {
+	ret = pci_enable_device(dev);
+	if (ret < 0) {
 		printk(KERN_ERR
 		       "Failed to enable device %s at slot %s\n",
 		       d->name, dev->slot_name);
-		return -ENODEV;
+		goto out;
 	}
 	pci_set_master(dev);
 
@@ -698,9 +700,18 @@ pci_init_sgiioc4(struct pci_dev *dev, ide_pci_device_t * d)
 		printk(KERN_ERR "Skipping %s IDE controller in slot %s: "
 			"firmware is obsolete - please upgrade to revision"
 			"46 or higher\n", d->name, dev->slot_name);
-		return -ENODEV;
+		ret = -EAGAIN;
+		goto err_disable;
 	}
-	return sgiioc4_ide_setup_pci_device(dev, d);
+	ret = sgiioc4_ide_setup_pci_device(dev, d);
+	if (ret < 0)
+		goto err_disable;
+out:
+	return ret;
+
+err_disable:
+	pci_disable_device(dev);
+	goto out;
 }
 
 static ide_pci_device_t sgiioc4_chipsets[] __devinitdata = {

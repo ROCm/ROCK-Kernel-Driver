@@ -658,7 +658,8 @@ static void __devinit init_dma_pdc202xx(ide_hwif_t *hwif, unsigned long dmabase)
 	ide_setup_dma(hwif, dmabase, 8);
 }
 
-static void __devinit init_setup_pdc202ata4(struct pci_dev *dev, ide_pci_device_t *d)
+static int __devinit init_setup_pdc202ata4(struct pci_dev *dev,
+					   ide_pci_device_t *d)
 {
 	if ((dev->class >> 8) != PCI_CLASS_STORAGE_IDE) {
 		u8 irq = 0, irq2 = 0;
@@ -685,10 +686,11 @@ static void __devinit init_setup_pdc202ata4(struct pci_dev *dev, ide_pci_device_
         }
 #endif
 
-	ide_setup_pci_device(dev, d);
+	return ide_setup_pci_device(dev, d);
 }
 
-static void __devinit init_setup_pdc20265(struct pci_dev *dev, ide_pci_device_t *d)
+static int __devinit init_setup_pdc20265(struct pci_dev *dev,
+					 ide_pci_device_t *d)
 {
 	if ((dev->bus->self) &&
 	    (dev->bus->self->vendor == PCI_VENDOR_ID_INTEL) &&
@@ -696,7 +698,7 @@ static void __devinit init_setup_pdc20265(struct pci_dev *dev, ide_pci_device_t 
 	     (dev->bus->self->device == PCI_DEVICE_ID_INTEL_I960RM))) {
 		printk(KERN_INFO "ide: Skipping Promise PDC20265 "
 			"attached to I2O RAID controller.\n");
-		return;
+		return -ENODEV;
 	}
 
 #if 0
@@ -714,12 +716,13 @@ static void __devinit init_setup_pdc20265(struct pci_dev *dev, ide_pci_device_t 
         }
 #endif
 
-	ide_setup_pci_device(dev, d);
+	return ide_setup_pci_device(dev, d);
 }
 
-static void __devinit init_setup_pdc202xx(struct pci_dev *dev, ide_pci_device_t *d)
+static int __devinit init_setup_pdc202xx(struct pci_dev *dev,
+					 ide_pci_device_t *d)
 {
-	ide_setup_pci_device(dev, d);
+	return ide_setup_pci_device(dev, d);
 }
 
 /**
@@ -735,8 +738,7 @@ static int __devinit pdc202xx_init_one(struct pci_dev *dev, const struct pci_dev
 {
 	ide_pci_device_t *d = &pdc202xx_chipsets[id->driver_data];
 
-	d->init_setup(dev, d);
-	return 0;
+	return d->init_setup(dev, d);
 }
 
 static struct pci_device_id pdc202xx_pci_tbl[] = {
