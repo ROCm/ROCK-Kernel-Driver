@@ -47,7 +47,7 @@ struct upc_comm {
 };
 
 #define ISLENTO(minor) (current->pid == upc_comms[minor].uc_pid \
-                || current->p_pptr->pid == upc_comms[minor].uc_pid)
+                || current->parent->pid == upc_comms[minor].uc_pid)
 
 extern struct upc_comm upc_comms[MAX_PRESTODEV];
 
