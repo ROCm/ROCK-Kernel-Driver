@@ -111,6 +111,9 @@ print_conntrack(char *buffer, struct ip_conntrack *conntrack)
 		len += sprintf(buffer + len, "[ASSURED] ");
 	len += sprintf(buffer + len, "use=%u ",
 		       atomic_read(&conntrack->ct_general.use));
+#if defined(CONFIG_IP_NF_CONNTRACK_MARK)
+	len += sprintf(buffer + len, "mark=%ld ", conntrack->mark);
+#endif
 	len += sprintf(buffer + len, "\n");
 
 	return len;

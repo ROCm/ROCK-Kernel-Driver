@@ -159,3 +159,4 @@ EXPORT_SYMBOL(proc_root_fs);
 EXPORT_SYMBOL(proc_net);
 EXPORT_SYMBOL(proc_bus);
 EXPORT_SYMBOL(proc_root_driver);
+EXPORT_SYMBOL(proc_file_operations);

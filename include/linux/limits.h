@@ -3,7 +3,7 @@
 
 #define NR_OPEN	        1024
 
-#define NGROUPS_MAX    65536	/* supplemental group IDs are available */
+#define __NGROUPS_MAX  65536	/* supplemental group IDs are available */
 #define ARG_MAX       131072	/* # bytes of args + environ for exec() */
 #define CHILD_MAX        999    /* no limit :-) */
 #define OPEN_MAX         256	/* # open files a process may have */
@@ -18,5 +18,12 @@
 #define XATTR_LIST_MAX 65536	/* size of extended attribute namelist (64k) */
 
 #define RTSIG_MAX	  32
+
+#ifdef __KERNEL__
+extern int ngroups_max;
+# define NGROUPS_MAX ngroups_max
+#else
+# define NGROUPS_MAX __NGROUPS_MAX
+#endif
 
 #endif

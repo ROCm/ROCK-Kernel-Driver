@@ -34,7 +34,7 @@ int proc_match(int len, const char *name, struct proc_dir_entry *de)
 	return !memcmp(name, de->name, len);
 }
 
-static struct file_operations proc_file_operations = {
+struct file_operations proc_file_operations = {
 	.llseek		= proc_file_lseek,
 	.read		= proc_file_read,
 	.write		= proc_file_write,
