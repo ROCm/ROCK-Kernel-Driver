@@ -36,7 +36,7 @@ comma = ,
 # Note that GCC does not numerically define an architecture version
 # macro, but instead defines a whole series of macros which makes
 # testing for a specific architecture or later rather impossible.
-arch-$(CONFIG_CPU_32v6)		:=-D__LINUX_ARM_ARCH__=6 -march=armv5t -Wa,-march=armv6
+arch-$(CONFIG_CPU_32v6)		:=-D__LINUX_ARM_ARCH__=6 $(call check_gcc,-march=armv6,-march=armv5t -Wa$(comma)-march=armv6)
 arch-$(CONFIG_CPU_32v5)		:=-D__LINUX_ARM_ARCH__=5 $(call check_gcc,-march=armv5te,-march=armv4)
 arch-$(CONFIG_CPU_32v4)		:=-D__LINUX_ARM_ARCH__=4 -march=armv4
 arch-$(CONFIG_CPU_32v3)		:=-D__LINUX_ARM_ARCH__=3 -march=armv3
@@ -54,20 +54,13 @@ tune-$(CONFIG_CPU_XSCALE)	:=$(call check_gcc,-mtune=xscale,-mtune=strongarm110) 
 tune-$(CONFIG_CPU_V6)		:=-mtune=strongarm
 
 # Need -Uarm for gcc < 3.x
-CFLAGS_BOOT	:=-mapcs-32 $(arch-y) $(tune-y) -mshort-load-bytes -msoft-float -Wa,-mno-fpu -Uarm
 CFLAGS		+=-mapcs-32 $(arch-y) $(tune-y) -mshort-load-bytes -msoft-float -Wa,-mno-fpu -Uarm
 AFLAGS		+=-mapcs-32 $(arch-y) $(tune-y) -msoft-float -Wa,-mno-fpu
 
 #Default value
 DATAADDR	:= .
 
-PROCESSOR	:= armv
 head-y		:= arch/arm/kernel/head.o arch/arm/kernel/init_task.o
-ifeq ($(CONFIG_CPU_BIG_ENDIAN),y)
-  LDFLAGS_BLOB	+= --oformat elf32-bigarm
-else
-  LDFLAGS_BLOB	+= --oformat elf32-littlearm
-endif
 textaddr-y	:= 0xC0008000
 
  machine-$(CONFIG_ARCH_ARCA5K)	   := arc
@@ -99,14 +92,13 @@ textaddr-$(CONFIG_ARCH_FORTUNET)   := 0xc0008000
  machine-$(CONFIG_ARCH_IOP3XX)	   := iop3xx
  machine-$(CONFIG_ARCH_ADIFCC)	   := adifcc
 
-MACHINE  := $(machine-y)
 TEXTADDR := $(textaddr-y)
 ifeq ($(incdir-y),)
-incdir-y := $(MACHINE)
+incdir-y := $(machine-y)
 endif
 INCDIR   := $(incdir-y)
   
-export	MACHINE PROCESSOR TEXTADDR GZFLAGS CFLAGS_BOOT
+export	TEXTADDR GZFLAGS
 
 # Do we have FASTFPE?
 FASTFPE		:=arch/arm/fastfpe
@@ -116,8 +108,8 @@ endif
 
 # If we have a machine-specific directory, then include it in the build.
 core-y				+= arch/arm/kernel/ arch/arm/mm/ arch/arm/common/
-ifneq ($(MACHINE),)
-core-y				+= arch/arm/mach-$(MACHINE)/
+ifneq ($(machine-y),)
+core-y				+= arch/arm/mach-$(machine-y)/
 endif
 core-$(CONFIG_FPE_NWFPE)	+= arch/arm/nwfpe/
 core-$(CONFIG_FPE_FASTFPE)	+= $(FASTFPE_OBJ)
@@ -134,20 +126,18 @@ all: zImage
 boot := arch/arm/boot
 
 #	Update machine arch and proc symlinks if something which affects
-#	them changed.  We use .arch and .proc to indicate when they were
-#	updated last, otherwise make uses the target directory mtime.
+#	them changed.  We use .arch to indicate when they were updated
+#	last, otherwise make uses the target directory mtime.
 
-include/asm-arm/.arch: $(wildcard include/config/arch/*.h)
-	@echo '  Making asm-arm/arch -> asm-arm/arch-$(INCDIR) symlink'
-	@rm -f include/asm-arm/arch
-	@ln -sf arch-$(INCDIR) include/asm-arm/arch
+include/asm-arm/.arch: $(wildcard include/config/arch/*.h) include/config/MARKER
+	@echo '  SYMLINK include/asm-arm/arch -> include/asm-arm/arch-$(INCDIR)'
+	@ln -fsn arch-$(INCDIR) include/asm-arm/arch
 	@touch $@
 
-prepare: maketools
+prepare: maketools include/asm-arm/.arch
 
 .PHONY: maketools FORCE
-maketools: include/asm-arm/.arch \
-	   include/asm-arm/constants.h include/linux/version.h FORCE
+maketools: include/asm-arm/constants.h include/linux/version.h FORCE
 	$(Q)$(MAKE) $(build)=arch/arm/tools include/asm-arm/mach-types.h
 
 # Convert bzImage to zImage
@@ -160,8 +150,8 @@ zImage Image bootpImage uImage: vmlinux
 zinstall install: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) $@
 
-CLEAN_FILES += include/asm-arm/constants.h* include/asm-arm/mach-types.h
-MRPROPER_FILES += include/asm-arm/arch include/asm-arm/.arch
+CLEAN_FILES += include/asm-arm/constants.h* include/asm-arm/mach-types.h \
+	       include/asm-arm/arch include/asm-arm/.arch
 
 # We use MRPROPER_FILES and CLEAN_FILES now
 archclean:
@@ -175,8 +165,7 @@ i:;	$(Q)$(MAKE) $(build)=$(boot) install
 zi:;	$(Q)$(MAKE) $(build)=$(boot) zinstall
 
 arch/$(ARCH)/kernel/asm-offsets.s: include/asm include/linux/version.h \
-				   include/asm-arm/.arch \
-				   include/config/MARKER
+				   include/asm-arm/.arch
 
 include/asm-$(ARCH)/constants.h: arch/$(ARCH)/kernel/asm-offsets.s
 	$(call filechk,gen-asm-offsets)

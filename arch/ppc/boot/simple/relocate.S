@@ -196,9 +196,9 @@ start_ldr:
 	/*
 	 * Start at the begining.
 	 */
+#ifdef CONFIG_PPC_MULTIPLATFORM
 	li	r9,0xc
 	mtlr	r9
-#ifdef CONFIG_PPC_MULTIPLATFORM
 	/* tell kernel we're prep, by putting 0xdeadc0de at KERNELLOAD,
 	 * and tell the kernel to start on the 4th instruction since we
 	 * overwrite the first 3 sometimes (which are 'nop').
@@ -207,6 +207,9 @@ start_ldr:
 	ori	r10,r10,0xdeadc0de@l
 	li	r9,0
 	stw	r10,0(r9)
+#else
+	li	r9,0
+	mtlr	r9
 #endif
 	blr
 

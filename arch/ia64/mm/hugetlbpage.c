@@ -597,6 +597,7 @@ unsigned long hugetlb_total_pages(void)
 {
 	return htlbzone_pages * (HPAGE_SIZE / PAGE_SIZE);
 }
+EXPORT_SYMBOL(hugetlb_total_pages);
 
 static struct page *hugetlb_nopage(struct vm_area_struct * area, unsigned long address, int *unused)
 {

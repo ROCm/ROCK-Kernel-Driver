@@ -158,8 +158,10 @@ setup_memory_node(int nid, void *kernel_end)
 	if (!nid && (node_max_pfn < end_kernel_pfn || node_min_pfn > start_kernel_pfn))
 		panic("kernel loaded out of ram");
 
-	/* Zone start phys-addr must be 2^(MAX_ORDER-1) aligned */
-	node_min_pfn = (node_min_pfn + ((1UL << (MAX_ORDER-1))-1)) & ~((1UL << (MAX_ORDER-1))-1);
+	/* Zone start phys-addr must be 2^(MAX_ORDER-1) aligned.
+	   Note that we round this down, not up - node memory
+	   has much larger alignment than 8Mb, so it's safe. */
+	node_min_pfn &= ~((1UL << (MAX_ORDER-1))-1);
 
 	/* We need to know how many physically contiguous pages
 	   we'll need for the bootmap.  */
