@@ -1515,8 +1515,8 @@ static char devicename[9] =
 {0,};
 static struct net_device dev_82596 =
 {
-	name: devicename,	/* device name inserted by drivers/net/net_init.c */
-	init: lasi_i82596_probe,
+	.name = devicename,	/* device name inserted by drivers/net/net_init.c */
+	.init = lasi_i82596_probe,
 };
 
 

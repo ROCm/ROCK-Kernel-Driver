@@ -963,27 +963,27 @@ static int dlci_dump(struct net_device *dev)
 }
 
 static struct comx_protocol fr_master_protocol = {
-	name:		"frad", 
-	version:	VERSION,
-	encap_type:	ARPHRD_FRAD, 
-	line_init:	fr_master_init, 
-	line_exit:	fr_exit, 
+	.name		= "frad", 
+	.version	= VERSION,
+	.encap_type	= ARPHRD_FRAD, 
+	.line_init	= fr_master_init, 
+	.line_exit	= fr_exit, 
 };
 
 static struct comx_protocol fr_slave_protocol = {
-	name:		"ietf-ip", 
-	version:	VERSION,
-	encap_type:	ARPHRD_DLCI, 
-	line_init:	fr_slave_init, 
-	line_exit:	fr_exit, 
+	.name		= "ietf-ip", 
+	.version	= VERSION,
+	.encap_type	= ARPHRD_DLCI, 
+	.line_init	= fr_slave_init, 
+	.line_exit	= fr_exit, 
 };
 
 static struct comx_hardware fr_dlci = { 
-	name:		"dlci", 
-	version:	VERSION,
-	hw_init:	dlci_init, 
-	hw_exit:	dlci_exit, 
-	hw_dump:	dlci_dump, 
+	.name		= "dlci", 
+	.version	= VERSION,
+	.hw_init	= dlci_init, 
+	.hw_exit	= dlci_exit, 
+	.hw_dump	= dlci_dump, 
 };
 
 #ifdef MODULE

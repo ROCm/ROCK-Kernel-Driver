@@ -448,10 +448,10 @@ static void __devexit abyss_detach (struct pci_dev *pdev)
 }
 
 static struct pci_driver abyss_driver = {
-	name:		"abyss",
-	id_table:	abyss_pci_tbl,
-	probe:		abyss_attach,
-	remove:		__devexit_p(abyss_detach),
+	.name		= "abyss",
+	.id_table	= abyss_pci_tbl,
+	.probe		= abyss_attach,
+	.remove		= __devexit_p(abyss_detach),
 };
 
 static int __init abyss_init (void)

@@ -382,12 +382,12 @@ static struct pci_device_id orinoco_plx_pci_id_table[] __devinitdata = {
 MODULE_DEVICE_TABLE(pci, orinoco_plx_pci_id_table);
 
 static struct pci_driver orinoco_plx_driver = {
-	name:"orinoco_plx",
-	id_table:orinoco_plx_pci_id_table,
-	probe:orinoco_plx_init_one,
-	remove:orinoco_plx_remove_one,
-	suspend:0,
-	resume:0
+	.name		= "orinoco_plx",
+	.id_table	= orinoco_plx_pci_id_table,
+	.probe		= orinoco_plx_init_one,
+	.remove		= orinoco_plx_remove_one,
+	.suspend	= 0,
+	.resume		= 0
 };
 
 static int __init orinoco_plx_init(void)

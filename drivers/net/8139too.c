@@ -2611,13 +2611,13 @@ static int rtl8139_resume (struct pci_dev *pdev)
 
 
 static struct pci_driver rtl8139_pci_driver = {
-	name:		DRV_NAME,
-	id_table:	rtl8139_pci_tbl,
-	probe:		rtl8139_init_one,
-	remove:		__devexit_p(rtl8139_remove_one),
+	.name		= DRV_NAME,
+	.id_table	= rtl8139_pci_tbl,
+	.probe		= rtl8139_init_one,
+	.remove		= __devexit_p(rtl8139_remove_one),
 #ifdef CONFIG_PM
-	suspend:	rtl8139_suspend,
-	resume:		rtl8139_resume,
+	.suspend	= rtl8139_suspend,
+	.resume		= rtl8139_resume,
 #endif /* CONFIG_PM */
 };
 

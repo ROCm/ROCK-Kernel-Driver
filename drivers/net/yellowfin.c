@@ -1484,10 +1484,10 @@ static void __devexit yellowfin_remove_one (struct pci_dev *pdev)
 
 
 static struct pci_driver yellowfin_driver = {
-	name:		DRV_NAME,
-	id_table:	yellowfin_pci_tbl,
-	probe:		yellowfin_init_one,
-	remove:		__devexit_p(yellowfin_remove_one),
+	.name		= DRV_NAME,
+	.id_table	= yellowfin_pci_tbl,
+	.probe		= yellowfin_init_one,
+	.remove		= __devexit_p(yellowfin_remove_one),
 };
 
 

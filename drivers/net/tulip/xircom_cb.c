@@ -148,12 +148,12 @@ static struct pci_device_id xircom_pci_table[] __devinitdata = {
 MODULE_DEVICE_TABLE(pci, xircom_pci_table);
 
 static struct pci_driver xircom_ops = {
-	name:		"xircom_cb", 
-	id_table:	xircom_pci_table, 
-	probe:		xircom_probe, 
-	remove:		xircom_remove, 
-	suspend:NULL,
-	resume:NULL
+	.name		= "xircom_cb", 
+	.id_table	= xircom_pci_table, 
+	.probe		= xircom_probe, 
+	.remove		= xircom_remove, 
+	.suspend =NULL,
+	.resume =NULL
 };
 
 

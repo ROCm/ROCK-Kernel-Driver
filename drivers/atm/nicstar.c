@@ -259,14 +259,14 @@ static struct ns_dev *cards[NS_MAX_CARDS];
 static unsigned num_cards;
 static struct atmdev_ops atm_ops =
 {
-   open:	ns_open,
-   close:	ns_close,
-   ioctl:	ns_ioctl,
-   send:	ns_send,
-   phy_put:	ns_phy_put,
-   phy_get:	ns_phy_get,
-   proc_read:	ns_proc_read,
-   owner:	THIS_MODULE,
+   .open	= ns_open,
+   .close	= ns_close,
+   .ioctl	= ns_ioctl,
+   .send	= ns_send,
+   .phy_put	= ns_phy_put,
+   .phy_get	= ns_phy_get,
+   .proc_read	= ns_proc_read,
+   .owner	= THIS_MODULE,
 };
 static struct timer_list ns_timer;
 static char *mac[NS_MAX_CARDS];

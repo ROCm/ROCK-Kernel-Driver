@@ -332,7 +332,7 @@ static int pppoe_device_event(struct notifier_block *this,
 
 
 static struct notifier_block pppoe_notifier = {
-	notifier_call: pppoe_device_event,
+	.notifier_call = pppoe_device_event,
 };
 
 
@@ -459,13 +459,13 @@ abort:
 }
 
 struct packet_type pppoes_ptype = {
-	type:	__constant_htons(ETH_P_PPP_SES),
-	func:	pppoe_rcv,
+	.type	= __constant_htons(ETH_P_PPP_SES),
+	.func	= pppoe_rcv,
 };
 
 struct packet_type pppoed_ptype = {
-	type:	__constant_htons(ETH_P_PPP_DISC),
-	func:	pppoe_disc_rcv,
+	.type	= __constant_htons(ETH_P_PPP_DISC),
+	.func	= pppoe_disc_rcv,
 };
 
 /***********************************************************************
@@ -1033,27 +1033,27 @@ int pppoe_proc_info(char *buffer, char **start, off_t offset, int length)
 
 
 struct proto_ops pppoe_ops = {
-    family:		AF_PPPOX,
-    release:		pppoe_release,
-    bind:		sock_no_bind,
-    connect:		pppoe_connect,
-    socketpair:		sock_no_socketpair,
-    accept:		sock_no_accept,
-    getname:		pppoe_getname,
-    poll:		datagram_poll,
-    ioctl:		pppoe_ioctl,
-    listen:		sock_no_listen,
-    shutdown:		sock_no_shutdown,
-    setsockopt:		sock_no_setsockopt,
-    getsockopt:		sock_no_getsockopt,
-    sendmsg:		pppoe_sendmsg,
-    recvmsg:		pppoe_rcvmsg,
-    mmap:		sock_no_mmap
+    .family		= AF_PPPOX,
+    .release		= pppoe_release,
+    .bind		= sock_no_bind,
+    .connect		= pppoe_connect,
+    .socketpair		= sock_no_socketpair,
+    .accept		= sock_no_accept,
+    .getname		= pppoe_getname,
+    .poll		= datagram_poll,
+    .ioctl		= pppoe_ioctl,
+    .listen		= sock_no_listen,
+    .shutdown		= sock_no_shutdown,
+    .setsockopt		= sock_no_setsockopt,
+    .getsockopt		= sock_no_getsockopt,
+    .sendmsg		= pppoe_sendmsg,
+    .recvmsg		= pppoe_rcvmsg,
+    .mmap		= sock_no_mmap
 };
 
 struct pppox_proto pppoe_proto = {
-    create:	pppoe_create,
-    ioctl:	pppoe_ioctl
+    .create	= pppoe_create,
+    .ioctl	= pppoe_ioctl
 };
 
 

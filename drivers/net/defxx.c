@@ -3360,10 +3360,10 @@ static struct pci_device_id dfx_pci_tbl[] __devinitdata = {
 MODULE_DEVICE_TABLE(pci, dfx_pci_tbl);
 
 static struct pci_driver dfx_driver = {
-	name:		"defxx",
-	probe:		dfx_init_one,
-	remove:		__devexit_p(dfx_remove_one),
-	id_table:	dfx_pci_tbl,
+	.name		= "defxx",
+	.probe		= dfx_init_one,
+	.remove		= __devexit_p(dfx_remove_one),
+	.id_table	= dfx_pci_tbl,
 };
 
 static int dfx_have_pci;

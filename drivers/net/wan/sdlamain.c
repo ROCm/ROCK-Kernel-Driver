@@ -244,8 +244,8 @@ static sdla_t* card_array = NULL;	/* adapter data space */
 DECLARE_TASK_QUEUE(wanpipe_tq_custom);
 static struct tq_struct wanpipe_tq_task = 
 {
-	routine: (void (*)(void *)) run_wanpipe_tq,
-	data: &wanpipe_tq_custom
+	.routine = (void (*)(void *)) run_wanpipe_tq,
+	.data = &wanpipe_tq_custom
 };
 #else
 static struct tq_struct *wanpipe_tq_custom = NULL;

@@ -56,9 +56,9 @@ static /* const */ char drivername[] = "vlsi_ir";
 
 static struct pci_device_id vlsi_irda_table [] __devinitdata = { {
 
-	class:          PCI_CLASS_WIRELESS_IRDA << 8,
-	vendor:         PCI_VENDOR_ID_VLSI,
-	device:         PCI_DEVICE_ID_VLSI_82C147,
+	.class =        PCI_CLASS_WIRELESS_IRDA << 8,
+	.vendor =       PCI_VENDOR_ID_VLSI,
+	.device =       PCI_DEVICE_ID_VLSI_82C147,
 	}, { /* all zeroes */ }
 };
 
@@ -1288,12 +1288,12 @@ static int vlsi_irda_resume(struct pci_dev *pdev)
 /*********************************************************/
 
 static struct pci_driver vlsi_irda_driver = {
-	name:           drivername,
-	id_table:       vlsi_irda_table,
-	probe:          vlsi_irda_probe,
-	remove:         __devexit_p(vlsi_irda_remove),
-	suspend:        vlsi_irda_suspend,
-	resume:         vlsi_irda_resume,
+	.name		= drivername,
+	.id_table	= vlsi_irda_table,
+	.probe		= vlsi_irda_probe,
+	.remove		= __devexit_p(vlsi_irda_remove),
+	.suspend	= vlsi_irda_suspend,
+	.resume		= vlsi_irda_resume,
 };
 
 static int __init vlsi_mod_init(void)

@@ -3109,13 +3109,13 @@ static void __devexit gem_remove_one(struct pci_dev *pdev)
 }
 
 static struct pci_driver gem_driver = {
-	name:		GEM_MODULE_NAME,
-	id_table:	gem_pci_tbl,
-	probe:		gem_init_one,
-	remove:		__devexit_p(gem_remove_one),
+	.name		= GEM_MODULE_NAME,
+	.id_table	= gem_pci_tbl,
+	.probe		= gem_init_one,
+	.remove		= __devexit_p(gem_remove_one),
 #ifdef CONFIG_PM
-	suspend:	gem_suspend,
-	resume:		gem_resume,
+	.suspend	= gem_suspend,
+	.resume		= gem_resume,
 #endif /* CONFIG_PM */
 };
 

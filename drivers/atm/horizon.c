@@ -2739,12 +2739,12 @@ static int hrz_proc_read (struct atm_dev * atm_dev, loff_t * pos, char * page) {
 }
 
 static const struct atmdev_ops hrz_ops = {
-  open:		hrz_open,
-  close:	hrz_close,
-  send:		hrz_send,
-  sg_send:	hrz_sg_send,
-  proc_read:	hrz_proc_read,
-  owner:	THIS_MODULE,
+  .open	= hrz_open,
+  .close	= hrz_close,
+  .send	= hrz_send,
+  .sg_send	= hrz_sg_send,
+  .proc_read	= hrz_proc_read,
+  .owner	= THIS_MODULE,
 };
 
 static int __init hrz_probe (void) {

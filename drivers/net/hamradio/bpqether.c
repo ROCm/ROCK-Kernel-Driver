@@ -102,12 +102,12 @@ static int bpq_device_event(struct notifier_block *, unsigned long, void *);
 static char *bpq_print_ethaddr(unsigned char *);
 
 static struct packet_type bpq_packet_type = {
-	type:	__constant_htons(ETH_P_BPQ),
-	func:	bpq_rcv,
+	.type	= __constant_htons(ETH_P_BPQ),
+	.func	= bpq_rcv,
 };
 
 static struct notifier_block bpq_dev_notifier = {
-	notifier_call:	bpq_device_event,
+	.notifier_call =bpq_device_event,
 };
 
 

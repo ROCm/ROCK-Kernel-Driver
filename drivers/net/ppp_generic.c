@@ -765,13 +765,13 @@ static int ppp_unattached_ioctl(struct ppp_file *pf, struct file *file,
 }
 
 static struct file_operations ppp_device_fops = {
-	owner:		THIS_MODULE,
-	read:		ppp_read,
-	write:		ppp_write,
-	poll:		ppp_poll,
-	ioctl:		ppp_ioctl,
-	open:		ppp_open,
-	release:	ppp_release
+	.owner		= THIS_MODULE,
+	.read		= ppp_read,
+	.write		= ppp_write,
+	.poll		= ppp_poll,
+	.ioctl		= ppp_ioctl,
+	.open		= ppp_open,
+	.release	= ppp_release
 };
 
 #define PPP_MAJOR	108

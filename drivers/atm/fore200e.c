@@ -2931,15 +2931,15 @@ module_exit(fore200e_module_cleanup);
 
 static const struct atmdev_ops fore200e_ops =
 {
-	open:         fore200e_open,
-	close:        fore200e_close,
-	ioctl:        fore200e_ioctl,
-	getsockopt:   fore200e_getsockopt,
-	setsockopt:   fore200e_setsockopt,
-	send:         fore200e_send,
-	change_qos:   fore200e_change_qos,
-	proc_read:    fore200e_proc_read,
-	owner:        THIS_MODULE,
+	.open       = fore200e_open,
+	.close      = fore200e_close,
+	.ioctl      = fore200e_ioctl,
+	.getsockopt = fore200e_getsockopt,
+	.setsockopt = fore200e_setsockopt,
+	.send       = fore200e_send,
+	.change_qos = fore200e_change_qos,
+	.proc_read  = fore200e_proc_read,
+	.owner      = THIS_MODULE,
 };
 
 

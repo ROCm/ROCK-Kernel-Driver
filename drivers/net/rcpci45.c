@@ -264,10 +264,10 @@ err_out:
 }
 
 static struct pci_driver rcpci45_driver = {
-	name:		"rcpci45",
-	id_table:	rcpci45_pci_table,
-	probe:		rcpci45_init_one,
-	remove:		__devexit_p(rcpci45_remove_one),
+	.name		= "rcpci45",
+	.id_table	= rcpci45_pci_table,
+	.probe		= rcpci45_init_one,
+	.remove		= __devexit_p(rcpci45_remove_one),
 };
 
 static int __init

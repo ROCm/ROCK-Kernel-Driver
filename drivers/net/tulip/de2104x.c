@@ -2213,13 +2213,13 @@ out:
 #endif /* CONFIG_PM */
 
 static struct pci_driver de_driver = {
-	name:		DRV_NAME,
-	id_table:	de_pci_tbl,
-	probe:		de_init_one,
-	remove:		de_remove_one,
+	.name		= DRV_NAME,
+	.id_table	= de_pci_tbl,
+	.probe		= de_init_one,
+	.remove		= de_remove_one,
 #ifdef CONFIG_PM
-	suspend:	de_suspend,
-	resume:		de_resume,
+	.suspend	= de_suspend,
+	.resume		= de_resume,
 #endif
 };
 
