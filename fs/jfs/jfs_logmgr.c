@@ -185,9 +185,7 @@ static void lbmWrite(log_t * log, lbuf_t * bp, int flag, int cant_block);
 static void lbmDirectWrite(log_t * log, lbuf_t * bp, int flag);
 static int lbmIOWait(lbuf_t * bp, int flag);
 static bio_end_io_t lbmIODone;
-#ifdef _STILL_TO_PORT
-static void lbmDirectIODone(iobuf_t * ddbp);
-#endif				/* _STILL_TO_PORT */
+
 void lbmStartIO(lbuf_t * bp);
 void lmGCwrite(log_t * log, int cant_block);
 
@@ -1810,42 +1808,6 @@ static void lbmfree(lbuf_t * bp)
 }
 
 
-#ifdef _THIS_IS_NOT_USED
-/*
- *	lbmRelease()
- *
- * remove the log buffer from log device write queue;
- */
-static void lbmRelease(log_t * log, uint flag)
-{
-	lbuf_t *bp, *tail;
-	unsigned long flags;
-
-	bp = log->bp;
-
-	LCACHE_LOCK(flags);
-
-	tail = log->wqueue;
-
-	/* single element queue */
-	if (bp == tail) {
-		log->wqueue = NULL;
-		bp->l_wqnext = NULL;
-	}
-	/* multi element queue */
-	else {
-		tail->l_wqnext = bp->l_wqnext;
-		bp->l_wqnext = NULL;
-	}
-
-	if (flag & lbmFREE)
-		lbmfree(bp);
-
-	LCACHE_UNLOCK(flags);
-}
-#endif				/* _THIS_IS_NOT_USED */
-
-
 /*
  * NAME:	lbmRedrive
  *
@@ -2271,63 +2233,6 @@ int jfsIOWait(void *arg)
 	return 0;
 }
 
-
-#ifdef _STILL_TO_PORT
-/*
- *	lbmDirectIODone()
- *
- * iodone() for lbmDirectWrite() to bypass write queue;
- * executed at INTIODONE level;
- */
-static void lbmDirectIODone(iobuf_t * iobp)
-{
-	lbuf_t *bp;
-	unsigned long flags;
-
-	/*
-	 * get back jfs buffer bound to the io buffer
-	 */
-	bp = (lbuf_t *) iobp->b_jfsbp;
-	jEVENT(0,
-	       ("lbmDirectIODone: bp:0x%p flag:0x%x\n", bp, bp->l_flag));
-
-	LCACHE_LOCK(flags);		/* disable+lock */
-
-	bp->l_flag |= lbmDONE;
-
-	if (iobp->b_flags & B_ERROR) {
-		bp->l_flag |= lbmERROR;
-#ifdef _JFS_OS2
-		SysLogError();
-#endif
-	}
-
-	/*
-	 *      pageout completion
-	 */
-	bp->l_flag &= ~lbmWRITE;
-
-	/*
-	 *      synchronous pageout:
-	 */
-	if (bp->l_flag & lbmSYNC) {
-		LCACHE_UNLOCK(flags);	/* unlock+enable */
-
-		/* wakeup I/O initiator */
-		LCACHE_WAKEUP(&bp->l_ioevent);
-	}
-	/*
-	 *      asynchronous pageout:
-	 */
-	else {
-		assert(bp->l_flag & lbmRELEASE);
-		assert(bp->l_flag & lbmFREE);
-		lbmfree(bp);
-
-		LCACHE_UNLOCK(flags);	/* unlock+enable */
-	}
-}
-#endif				/* _STILL_TO_PORT */
 
 #ifdef _STILL_TO_PORT
 /*

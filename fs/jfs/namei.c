@@ -587,7 +587,7 @@ int jfs_unlink(struct inode *dip, struct dentry *dentry)
  */
 s64 commitZeroLink(tid_t tid, struct inode *ip)
 {
-	int filetype, committype;
+	int filetype;
 	tblock_t *tblk;
 
 	jFYI(1, ("commitZeroLink: tid = %d, ip = 0x%p\n", tid, ip));
@@ -608,66 +608,25 @@ s64 commitZeroLink(tid_t tid, struct inode *ip)
 		return 0;
 	}
 
-#ifdef _STILL_TO_PORT
-	/*
-	 *      free from block allocation map:
-	 *
-	 * if there is no cache control element associated with 
-	 * the file, free resources in both persistent and work map;
-	 * otherwise just persistent map. 
-	 */
-	if (ip->i_cacheid) {
-		committype = COMMIT_PMAP;
-
-		/* mark for iClose() to free from working map */
-		set_cflag(COMMIT_Freewmap, ip);
-	} else
-		committype = COMMIT_PWMAP;
-#else				/* _STILL_TO_PORT */
-
 	set_cflag(COMMIT_Freewmap, ip);
-	committype = COMMIT_PMAP;
-#endif				/* _STILL_TO_PORT */
 
 	/* mark transaction of block map update type */
 	tblk = tid_to_tblock(tid);
-	tblk->xflag |= committype;
+	tblk->xflag |= COMMIT_PMAP;
 
 	/*
 	 * free EA
 	 */
-	if (JFS_IP(ip)->ea.flag & DXD_EXTENT) {
-#ifdef _STILL_TO_PORT
-		/* free EA pages from cache */
-		if (committype == COMMIT_PWMAP)
-			bmExtentInvalidate(ip, addressDXD(&ip->i_ea),
-					   lengthDXD(&ip->i_ea));
-#endif				/* _STILL_TO_PORT */
-
+	if (JFS_IP(ip)->ea.flag & DXD_EXTENT)
 		/* acquire maplock on EA to be freed from block map */
 		txEA(tid, ip, &JFS_IP(ip)->ea, NULL);
-
-		if (committype == COMMIT_PWMAP)
-			JFS_IP(ip)->ea.flag = 0;
-	}
 
 	/*
 	 * free ACL
 	 */
-	if (JFS_IP(ip)->acl.flag & DXD_EXTENT) {
-#ifdef _STILL_TO_PORT
-		/* free ACL pages from cache */
-		if (committype == COMMIT_PWMAP)
-			bmExtentInvalidate(ip, addressDXD(&ip->i_acl),
-					   lengthDXD(&ip->i_acl));
-#endif				/* _STILL_TO_PORT */
-
+	if (JFS_IP(ip)->acl.flag & DXD_EXTENT)
 		/* acquire maplock on EA to be freed from block map */
 		txEA(tid, ip, &JFS_IP(ip)->acl, NULL);
-
-		if (committype == COMMIT_PWMAP)
-			JFS_IP(ip)->acl.flag = 0;
-	}
 
 	/*
 	 * free xtree/data (truncate to zero length):
