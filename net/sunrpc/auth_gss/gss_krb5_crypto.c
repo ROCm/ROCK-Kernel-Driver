@@ -59,14 +59,14 @@ krb5_encrypt(
         struct scatterlist sg[1];
 	u8 local_iv[16] = {0};
 
-	dprintk("RPC: krb5_encrypt: input data:\n");
+	dprintk("RPC:      krb5_encrypt: input data:\n");
 	print_hexl((u32 *)in, length, 0);
 
 	if (length % crypto_tfm_alg_blocksize(tfm) != 0)
 		goto out;
 
 	if (crypto_tfm_alg_ivsize(tfm) > 16) {
-		dprintk("RPC: gss_k5encrypt: tfm iv size to large %d\n",
+		dprintk("RPC:      gss_k5encrypt: tfm iv size to large %d\n",
 		         crypto_tfm_alg_ivsize(tfm));
 		goto out;
 	}
@@ -81,10 +81,10 @@ krb5_encrypt(
 
 	ret = crypto_cipher_encrypt_iv(tfm, sg, sg, length, local_iv);
 
-	dprintk("RPC: krb5_encrypt: output data:\n");
+	dprintk("RPC:      krb5_encrypt: output data:\n");
 	print_hexl((u32 *)out, length, 0);
 out:
-	dprintk("krb5_encrypt returns %d\n",ret);
+	dprintk("RPC:      krb5_encrypt returns %d\n",ret);
 	return(ret);
 }
 
@@ -100,14 +100,14 @@ krb5_decrypt(
 	struct scatterlist sg[1];
 	u8 local_iv[16] = {0};
 
-	dprintk("RPC: krb5_decrypt: input data:\n");
+	dprintk("RPC:      krb5_decrypt: input data:\n");
 	print_hexl((u32 *)in, length, 0);
 
 	if (length % crypto_tfm_alg_blocksize(tfm) != 0)
 		goto out;
 
 	if (crypto_tfm_alg_ivsize(tfm) > 16) {
-		dprintk("RPC: gss_k5decrypt: tfm iv size to large %d\n",
+		dprintk("RPC:      gss_k5decrypt: tfm iv size to large %d\n",
 			crypto_tfm_alg_ivsize(tfm));
 		goto out;
 	}
@@ -121,10 +121,10 @@ krb5_decrypt(
 
 	ret = crypto_cipher_decrypt_iv(tfm, sg, sg, length, local_iv);
 
-	dprintk("RPC: krb5_decrypt: output_data:\n");
+	dprintk("RPC:      krb5_decrypt: output_data:\n");
 	print_hexl((u32 *)out, length, 0);
 out:
-	dprintk("gss_k5decrypt returns %d\n",ret);
+	dprintk("RPC:      gss_k5decrypt returns %d\n",ret);
 	return(ret);
 }
 
@@ -153,7 +153,7 @@ krb5_make_checksum(s32 cksumtype, char *header, struct xdr_buf *body,
 			cksumname = "md5";
 			break;
 		default:
-			dprintk("RPC: krb5_make_checksum:"
+			dprintk("RPC:      krb5_make_checksum:"
 				" unsupported checksum %d", cksumtype);
 			goto out;
 	}

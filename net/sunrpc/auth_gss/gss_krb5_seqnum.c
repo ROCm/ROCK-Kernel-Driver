@@ -70,7 +70,7 @@ krb5_get_seq_num(struct crypto_tfm *key,
 	s32 code;
 	unsigned char plain[8];
 
-	dprintk("krb5_get_seq_num: \n");
+	dprintk("RPC:      krb5_get_seq_num:\n");
 
 	if ((code = krb5_decrypt(key, cksum, buf, plain, 8)))
 		return code;

@@ -100,7 +100,7 @@ get_key(char **p, char *end, struct crypto_tfm **res)
 			alg_mode = CRYPTO_TFM_MODE_CBC;
 			break;
 		default:
-			dprintk("RPC: get_key: unsupported algorithm %d\n", alg);
+			dprintk("RPC:      get_key: unsupported algorithm %d\n", alg);
 			goto out_err_free_key;
 	}
 	if (!(*res = crypto_alloc_tfm(alg_name, alg_mode)))
@@ -155,7 +155,7 @@ gss_import_sec_context_kerberos(struct xdr_netobj *inbuf,
 		goto out_err_free_key2;
 
 	ctx_id->internal_ctx_id = ctx;
-	dprintk("Succesfully imported new context.\n");
+	dprintk("RPC:      Succesfully imported new context.\n");
 	return 0;
 
 out_err_free_key2:
@@ -197,7 +197,7 @@ gss_verify_mic_kerberos(struct gss_ctx		*ctx,
 	if (!maj_stat && qop_state)
 	    *qstate = qop_state;
 
-	dprintk("RPC: gss_verify_mic_kerberos returning %d\n", maj_stat);
+	dprintk("RPC:      gss_verify_mic_kerberos returning %d\n", maj_stat);
 	return maj_stat;
 }
 
@@ -211,7 +211,7 @@ gss_get_mic_kerberos(struct gss_ctx	*ctx,
 
 	err = krb5_make_token(kctx, qop, message, mic_token, KG_TOK_MIC_MSG);
 
-	dprintk("RPC: gss_get_mic_kerberos returning %d\n",err);
+	dprintk("RPC:      gss_get_mic_kerberos returning %d\n",err);
 
 	return err;
 }

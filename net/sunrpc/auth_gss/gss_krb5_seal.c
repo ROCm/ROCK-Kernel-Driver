@@ -101,12 +101,12 @@ krb5_make_token(struct krb5_ctx *ctx, int qop_req,
 			checksum_type = CKSUMTYPE_RSA_MD5;
 			break;
 		default:
-			dprintk("RPC: gss_krb5_seal: ctx->signalg %d not"
+			dprintk("RPC:      gss_krb5_seal: ctx->signalg %d not"
 				" supported\n", ctx->signalg);
 			goto out_err;
 	}
 	if (ctx->sealalg != SEAL_ALG_NONE && ctx->sealalg != SEAL_ALG_DES) {
-		dprintk("RPC: gss_krb5_seal: ctx->sealalg %d not supported\n",
+		dprintk("RPC:      gss_krb5_seal: ctx->sealalg %d not supported\n",
 			ctx->sealalg);
 		goto out_err;
 	}
@@ -151,7 +151,7 @@ krb5_make_token(struct krb5_ctx *ctx, int qop_req,
 		       md5cksum.data + md5cksum.len - KRB5_CKSUM_LENGTH,
 		       KRB5_CKSUM_LENGTH);
 
-		dprintk("make_seal_token: cksum data: \n");
+		dprintk("RPC:      make_seal_token: cksum data: \n");
 		print_hexl((u32 *) (krb5_hdr + 16), KRB5_CKSUM_LENGTH, 0);
 		break;
 	default:

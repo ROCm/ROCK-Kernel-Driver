@@ -81,7 +81,7 @@ gss_mech_register(struct xdr_netobj * mech_type, struct gss_api_ops * ops)
 	spin_lock(&registered_mechs_lock);
 	list_add(&gm->gm_list, &registered_mechs);
 	spin_unlock(&registered_mechs_lock);
-	dprintk("RPC: gss_mech_register: registered mechanism with oid:\n");
+	dprintk("RPC:      gss_mech_register: registered mechanism with oid:\n");
 	print_hexl((u32 *)mech_type->data, mech_type->len, 0);
 	return 0;
 }
@@ -93,11 +93,10 @@ do_gss_mech_unregister(struct gss_api_mech *gm)
 
 	list_del(&gm->gm_list);
 
-	dprintk("RPC: unregistered mechanism with oid:\n");
+	dprintk("RPC:      unregistered mechanism with oid:\n");
 	print_hexl((u32 *)gm->gm_oid.data, gm->gm_oid.len, 0);
 	if (!gss_mech_put(gm)) {
-		dprintk("RPC: We just unregistered a gss_mechanism which"
-				" someone is still using.\n");
+		dprintk("RPC:      We just unregistered a gss_mechanism which someone is still using.\n");
 		return -1;
 	} else {
 		return 0;
@@ -145,7 +144,7 @@ gss_mech_get_by_OID(struct xdr_netobj *mech_type)
 {
 	struct gss_api_mech 	*pos, *gm = NULL;
 
-	dprintk("RPC: gss_mech_get_by_OID searching for mechanism with OID:\n");
+	dprintk("RPC:      gss_mech_get_by_OID searching for mechanism with OID:\n");
 	print_hexl((u32 *)mech_type->data, mech_type->len, 0);
 	spin_lock(&registered_mechs_lock);
 	list_for_each_entry(pos, &registered_mechs, gm_list) {
@@ -157,7 +156,7 @@ gss_mech_get_by_OID(struct xdr_netobj *mech_type)
 		}
 	}
 	spin_unlock(&registered_mechs_lock);
-	dprintk("RPC: gss_mech_get_by_OID %s it\n", gm ? "found" : "didn't find");
+	dprintk("RPC:      gss_mech_get_by_OID %s it\n", gm ? "found" : "didn't find");
 	return gm;
 }
 
@@ -244,7 +243,8 @@ gss_verify_mic(struct gss_ctx		*context_handle,
 u32
 gss_delete_sec_context(struct gss_ctx	**context_handle)
 {
-	dprintk("gss_delete_sec_context deleting %p\n",*context_handle);
+	dprintk("RPC:      gss_delete_sec_context deleting %p\n",
+			*context_handle);
 
 	if (!*context_handle)
 		return(GSS_S_NO_CONTEXT);
