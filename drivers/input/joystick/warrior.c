@@ -194,9 +194,9 @@ static void warrior_connect(struct serio *serio, struct serio_dev *dev)
  */
 
 static struct serio_dev warrior_dev = {
-	interrupt:	warrior_interrupt,
-	connect:	warrior_connect,
-	disconnect:	warrior_disconnect,
+	.interrupt =	warrior_interrupt,
+	.connect =	warrior_connect,
+	.disconnect =	warrior_disconnect,
 };
 
 /*

@@ -414,13 +414,13 @@ static unsigned int mousedev_poll(struct file *file, poll_table *wait)
 }
 
 struct file_operations mousedev_fops = {
-	owner:		THIS_MODULE,
-	read:		mousedev_read,
-	write:		mousedev_write,
-	poll:		mousedev_poll,
-	open:		mousedev_open,
-	release:	mousedev_release,
-	fasync:		mousedev_fasync,
+	.owner =	THIS_MODULE,
+	.read =		mousedev_read,
+	.write =	mousedev_write,
+	.poll =		mousedev_poll,
+	.open =		mousedev_open,
+	.release =	mousedev_release,
+	.fasync =	mousedev_fasync,
 };
 
 static struct input_handle *mousedev_connect(struct input_handler *handler, struct input_dev *dev, struct input_device_id *id)
@@ -477,17 +477,17 @@ static void mousedev_disconnect(struct input_handle *handle)
 
 static struct input_device_id mousedev_ids[] = {
 	{
-		flags: INPUT_DEVICE_ID_MATCH_EVBIT | INPUT_DEVICE_ID_MATCH_KEYBIT | INPUT_DEVICE_ID_MATCH_RELBIT,
-		evbit: { BIT(EV_KEY) | BIT(EV_REL) },
-		keybit: { [LONG(BTN_LEFT)] = BIT(BTN_LEFT) },
-		relbit: { BIT(REL_X) | BIT(REL_Y) },
+		.flags = INPUT_DEVICE_ID_MATCH_EVBIT | INPUT_DEVICE_ID_MATCH_KEYBIT | INPUT_DEVICE_ID_MATCH_RELBIT,
+		.evbit = { BIT(EV_KEY) | BIT(EV_REL) },
+		.keybit = { [LONG(BTN_LEFT)] = BIT(BTN_LEFT) },
+		.relbit = { BIT(REL_X) | BIT(REL_Y) },
 	},	/* A mouse like device, at least one button, two relative axes */
 
 	{
-		flags: INPUT_DEVICE_ID_MATCH_EVBIT | INPUT_DEVICE_ID_MATCH_KEYBIT | INPUT_DEVICE_ID_MATCH_ABSBIT,
-		evbit: { BIT(EV_KEY) | BIT(EV_ABS) },
-		keybit: { [LONG(BTN_TOUCH)] = BIT(BTN_TOUCH) },
-		absbit: { BIT(ABS_X) | BIT(ABS_Y) },
+		.flags = INPUT_DEVICE_ID_MATCH_EVBIT | INPUT_DEVICE_ID_MATCH_KEYBIT | INPUT_DEVICE_ID_MATCH_ABSBIT,
+		.evbit = { BIT(EV_KEY) | BIT(EV_ABS) },
+		.keybit = { [LONG(BTN_TOUCH)] = BIT(BTN_TOUCH) },
+		.absbit = { BIT(ABS_X) | BIT(ABS_Y) },
 	},	/* A tablet like device, at least touch detection, two absolute axes */
 
 	{ }, 	/* Terminating entry */
@@ -496,13 +496,13 @@ static struct input_device_id mousedev_ids[] = {
 MODULE_DEVICE_TABLE(input, mousedev_ids);
 	
 static struct input_handler mousedev_handler = {
-	event:		mousedev_event,
-	connect:	mousedev_connect,
-	disconnect:	mousedev_disconnect,
-	fops:		&mousedev_fops,
-	minor:		MOUSEDEV_MINOR_BASE,
-	name:		"mousedev",
-	id_table:	mousedev_ids,
+	.event =	mousedev_event,
+	.connect =	mousedev_connect,
+	.disconnect =	mousedev_disconnect,
+	.fops =		&mousedev_fops,
+	.minor =	MOUSEDEV_MINOR_BASE,
+	.name =		"mousedev",
+	.id_table =	mousedev_ids,
 };
 
 #ifdef CONFIG_INPUT_MOUSEDEV_PSAUX

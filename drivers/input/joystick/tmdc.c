@@ -361,8 +361,8 @@ static void tmdc_disconnect(struct gameport *gameport)
 }
 
 static struct gameport_dev tmdc_dev = {
-	connect:	tmdc_connect,
-	disconnect:	tmdc_disconnect,
+	.connect =	tmdc_connect,
+	.disconnect =	tmdc_disconnect,
 };
 
 int __init tmdc_init(void)

@@ -136,18 +136,18 @@ static void power_disconnect(struct input_handle *handle)
 
 static struct input_device_id power_ids[] = {
 	{
-		flags: INPUT_DEVICE_ID_MATCH_EVBIT | INPUT_DEVICE_ID_MATCH_KEYBIT,
-		evbit: { BIT(EV_KEY) },
-		keybit: { [LONG(KEY_SUSPEND)] = BIT(KEY_SUSPEND) }
+		.flags = INPUT_DEVICE_ID_MATCH_EVBIT | INPUT_DEVICE_ID_MATCH_KEYBIT,
+		.evbit = { BIT(EV_KEY) },
+		.keybit = { [LONG(KEY_SUSPEND)] = BIT(KEY_SUSPEND) }
 	},	
 	{
-		flags: INPUT_DEVICE_ID_MATCH_EVBIT | INPUT_DEVICE_ID_MATCH_KEYBIT,
-		evbit: { BIT(EV_KEY) },
-		keybit: { [LONG(KEY_POWER)] = BIT(KEY_POWER) }
+		.flags = INPUT_DEVICE_ID_MATCH_EVBIT | INPUT_DEVICE_ID_MATCH_KEYBIT,
+		.evbit = { BIT(EV_KEY) },
+		.keybit = { [LONG(KEY_POWER)] = BIT(KEY_POWER) }
 	},	
 	{
-		flags: INPUT_DEVICE_ID_MATCH_EVBIT,
-		evbit: { BIT(EV_PWR) },
+		.flags = INPUT_DEVICE_ID_MATCH_EVBIT,
+		.evbit = { BIT(EV_PWR) },
 	},	
 	{ }, 	/* Terminating entry */
 };
@@ -155,11 +155,11 @@ static struct input_device_id power_ids[] = {
 MODULE_DEVICE_TABLE(input, power_ids);
 	
 static struct input_handler power_handler = {
-	event:		power_event,
-	connect:	power_connect,
-	disconnect:	power_disconnect,
-	name:		"power",
-	id_table:	power_ids,
+	.event =	power_event,
+	.connect =	power_connect,
+	.disconnect =	power_disconnect,
+	.name =		"power",
+	.id_table =	power_ids,
 };
 
 static int __init power_init(void)

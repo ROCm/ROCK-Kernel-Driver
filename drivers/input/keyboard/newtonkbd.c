@@ -129,9 +129,9 @@ void nkbd_disconnect(struct serio *serio)
 }
 
 struct serio_dev nkbd_dev = {
-	interrupt:	nkbd_interrupt,
-	connect:	nkbd_connect,
-	disconnect:	nkbd_disconnect
+	.interrupt =	nkbd_interrupt,
+	.connect =	nkbd_connect,
+	.disconnect =	nkbd_disconnect
 };
 
 int __init nkbd_init(void)

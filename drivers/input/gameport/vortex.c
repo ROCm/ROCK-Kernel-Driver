@@ -165,10 +165,10 @@ static struct pci_device_id vortex_id_table[] __devinitdata =
  { 0 }};
 
 static struct pci_driver vortex_driver = {
-	name:		"vortex",
-	id_table:	vortex_id_table,
-	probe:		vortex_probe,
-	remove:		vortex_remove,
+	.name =		"vortex",
+	.id_table =	vortex_id_table,
+	.probe =	vortex_probe,
+	.remove =	vortex_remove,
 };
 
 int __init vortex_init(void)

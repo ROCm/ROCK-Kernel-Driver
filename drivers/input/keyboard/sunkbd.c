@@ -294,9 +294,9 @@ static void sunkbd_disconnect(struct serio *serio)
 }
 
 static struct serio_dev sunkbd_dev = {
-	interrupt:	sunkbd_interrupt,
-	connect:	sunkbd_connect,
-	disconnect:	sunkbd_disconnect
+	.interrupt =	sunkbd_interrupt,
+	.connect =	sunkbd_connect,
+	.disconnect =	sunkbd_disconnect
 };
 
 /*

@@ -368,8 +368,7 @@ static void analog_calibrate_timer(struct analog_port *port)
 	unsigned int i, t, tx, t1, t2, t3;
 	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 	GET_TIME(t1);
 #ifdef FAKE_TIME
 	analog_faketime += 830;
@@ -377,19 +376,18 @@ static void analog_calibrate_timer(struct analog_port *port)
 	udelay(1000);
 	GET_TIME(t2);
 	GET_TIME(t3);
-	restore_flags(flags);
+	local_irq_restore(flags);
 
 	port->speed = DELTA(t1, t2) - DELTA(t2, t3);
 
 	tx = ~0;
 
 	for (i = 0; i < 50; i++) {
-		save_flags(flags);
-		cli();
+		local_irq_save(flags);
 		GET_TIME(t1);
 		for (t = 0; t < 50; t++) { gameport_read(gameport); GET_TIME(t2); }
 		GET_TIME(t3);
-		restore_flags(flags);
+		local_irq_restore(flags);
 		udelay(i);
 		t = DELTA(t1, t2) - DELTA(t2, t3);
 		if (t < tx) tx = t;
@@ -737,8 +735,8 @@ static void analog_parse_options(void)
  */
 
 static struct gameport_dev analog_dev = {
-	connect:	analog_connect,
-	disconnect:	analog_disconnect,
+	.connect =	analog_connect,
+	.disconnect =	analog_disconnect,
 };
 
 #ifndef MODULE

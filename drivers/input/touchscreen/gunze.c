@@ -154,9 +154,9 @@ static void gunze_connect(struct serio *serio, struct serio_dev *dev)
  */
 
 static struct serio_dev gunze_dev = {
-	interrupt:	gunze_interrupt,
-	connect:	gunze_connect,
-	disconnect:	gunze_disconnect,
+	.interrupt =	gunze_interrupt,
+	.connect =	gunze_connect,
+	.disconnect =	gunze_disconnect,
 };
 
 /*

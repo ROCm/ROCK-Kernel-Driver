@@ -541,8 +541,8 @@ static void adi_disconnect(struct gameport *gameport)
  */
 
 static struct gameport_dev adi_dev = {
-	connect:	adi_connect,
-	disconnect:	adi_disconnect,
+	.connect =	adi_connect,
+	.disconnect =	adi_disconnect,
 };
 
 int __init adi_init(void)

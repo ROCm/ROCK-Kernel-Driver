@@ -197,8 +197,8 @@ static void keybdev_disconnect(struct input_handle *handle)
 
 static struct input_device_id keybdev_ids[] = {
 	{
-		flags: INPUT_DEVICE_ID_MATCH_EVBIT,
-		evbit: { BIT(EV_KEY) },
+		.flags = INPUT_DEVICE_ID_MATCH_EVBIT,
+		.evbit = { BIT(EV_KEY) },
 	},	
 	{ }, 	/* Terminating entry */
 };
@@ -206,11 +206,11 @@ static struct input_device_id keybdev_ids[] = {
 MODULE_DEVICE_TABLE(input, keybdev_ids);
 	
 static struct input_handler keybdev_handler = {
-	event:		keybdev_event,
-	connect:	keybdev_connect,
-	disconnect:	keybdev_disconnect,
-	name:		"keybdev",
-	id_table:	keybdev_ids,
+	.event =	keybdev_event,
+	.connect =	keybdev_connect,
+	.disconnect =	keybdev_disconnect,
+	.name =		"keybdev",
+	.id_table =	keybdev_ids,
 };
 
 static int __init keybdev_init(void)

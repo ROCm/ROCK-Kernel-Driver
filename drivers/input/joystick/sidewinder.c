@@ -743,8 +743,8 @@ static void sw_disconnect(struct gameport *gameport)
 }
 
 static struct gameport_dev sw_dev = {
-	connect:	sw_connect,
-	disconnect:	sw_disconnect,
+	.connect =	sw_connect,
+	.disconnect =	sw_disconnect,
 };
 
 int __init sw_init(void)

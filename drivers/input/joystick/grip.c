@@ -408,8 +408,8 @@ static void grip_disconnect(struct gameport *gameport)
 }
 
 static struct gameport_dev grip_dev = {
-	connect:	grip_connect,
-	disconnect:	grip_disconnect,
+	.connect =	grip_connect,
+	.disconnect =	grip_disconnect,
 };
 
 int __init grip_init(void)

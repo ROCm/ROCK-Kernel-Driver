@@ -110,10 +110,10 @@ static void __devexit emu_remove(struct pci_dev *pdev)
 }
 
 static struct pci_driver emu_driver = {
-        name:           "Emu10k1 Gameport",
-        id_table:       emu_tbl,
-        probe:          emu_probe,
-        remove:         __devexit_p(emu_remove),
+        .name =         "Emu10k1 Gameport",
+        .id_table =     emu_tbl,
+        .probe =        emu_probe,
+        .remove =       __devexit_p(emu_remove),
 };
 
 int __init emu_init(void)

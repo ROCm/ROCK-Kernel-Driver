@@ -296,41 +296,41 @@ static void i8042_close(struct serio *port)
  */
 
 static struct i8042_values i8042_kbd_values = {
-	irq:		I8042_KBD_IRQ,
-	irqen:		I8042_CTR_KBDINT,
-	disable:	I8042_CTR_KBDDIS,
-	name:		"KBD",
-	exists:		0,
+	.irq =		I8042_KBD_IRQ,
+	.irqen =	I8042_CTR_KBDINT,
+	.disable =	I8042_CTR_KBDDIS,
+	.name =		"KBD",
+	.exists =	0,
 };
 
 static struct serio i8042_kbd_port =
 {
-	type:		SERIO_8042,
-	write:		i8042_kbd_write,
-	open:		i8042_open,
-	close:		i8042_close,
-	driver:		&i8042_kbd_values,
-	name:		"i8042 Kbd Port",
-	phys:		I8042_KBD_PHYS_DESC,
+	.type =		SERIO_8042,
+	.write =	i8042_kbd_write,
+	.open =		i8042_open,
+	.close =	i8042_close,
+	.driver =	&i8042_kbd_values,
+	.name =		"i8042 Kbd Port",
+	.phys =		I8042_KBD_PHYS_DESC,
 };
 
 static struct i8042_values i8042_aux_values = {
-	irq:		I8042_AUX_IRQ,
-	irqen:		I8042_CTR_AUXINT,
-	disable:	I8042_CTR_AUXDIS,
-	name:		"AUX",
-	exists:		0,
+	.irq =		I8042_AUX_IRQ,
+	.irqen =	I8042_CTR_AUXINT,
+	.disable =	I8042_CTR_AUXDIS,
+	.name =		"AUX",
+	.exists =	0,
 };
 
 static struct serio i8042_aux_port =
 {
-	type:		SERIO_8042,
-	write:		i8042_aux_write,
-	open:		i8042_open,
-	close:		i8042_close,
-	driver:		&i8042_aux_values,
-	name:		"i8042 Aux Port",
-	phys:		I8042_AUX_PHYS_DESC,
+	.type =		SERIO_8042,
+	.write =	i8042_aux_write,
+	.open =		i8042_open,
+	.close =	i8042_close,
+	.driver =	&i8042_aux_values,
+	.name =		"i8042 Aux Port",
+	.phys =		I8042_AUX_PHYS_DESC,
 };
 
 /*

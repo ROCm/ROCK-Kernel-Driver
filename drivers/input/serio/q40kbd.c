@@ -49,10 +49,10 @@ MODULE_LICENSE("GPL");
 
 static struct serio q40kbd_port =
 {
-	type:   SERIO_8042,
-	write:  NULL,
-	name:	"Q40 PS/2 kbd port",
-	phys:	"isa0060/serio0",
+	.type	= SERIO_8042,
+	.write	= NULL,
+	.name	= "Q40 PS/2 kbd port",
+	.phys	= "isa0060/serio0",
 };
 
 static void q40kbd_interrupt(int irq, void *dev_id, struct pt_regs *regs)

@@ -159,8 +159,8 @@ static void iforce_serio_disconnect(struct serio *serio)
 }
 
 struct serio_dev iforce_serio_dev = {
-	write_wakeup:	iforce_serio_write_wakeup,
-	interrupt:	iforce_serio_irq,
-	connect:	iforce_serio_connect,
-	disconnect:	iforce_serio_disconnect,
+	.write_wakeup =	iforce_serio_write_wakeup,
+	.interrupt =	iforce_serio_irq,
+	.connect =	iforce_serio_connect,
+	.disconnect =	iforce_serio_disconnect,
 };

@@ -163,8 +163,8 @@ static struct ns558* ns558_isa_probe(int io, struct ns558 *next)
 #ifdef __ISAPNP__
 
 #define NS558_DEVICE(a,b,c,d)\
-	card_vendor: ISAPNP_ANY_ID, card_device: ISAPNP_ANY_ID,\
-	vendor: ISAPNP_VENDOR(a,b,c), function: ISAPNP_DEVICE(d)
+	.card_vendor = ISAPNP_ANY_ID, card_device: ISAPNP_ANY_ID,\
+	.vendor = ISAPNP_VENDOR(a,b,c), function: ISAPNP_DEVICE(d)
 
 static struct isapnp_device_id pnp_devids[] = {
 	{ NS558_DEVICE('@','P','@',0x0001) }, /* ALS 100 */

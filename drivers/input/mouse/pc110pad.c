@@ -95,14 +95,11 @@ static int pc110pad_open(struct input_dev *dev)
 	if (pc110pad_used++)
 		return 0;
 
-	__save_flags(flags);
-	__cli();
 	pc110pad_interrupt(0,0,0);
 	pc110pad_interrupt(0,0,0);
 	pc110pad_interrupt(0,0,0);
 	outb(PC110PAD_ON, pc110pad_io + 2);
 	pc110pad_count = 0;
-	__restore_flags(flags);
 
 	return 0;
 }

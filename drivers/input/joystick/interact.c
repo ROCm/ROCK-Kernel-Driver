@@ -293,8 +293,8 @@ static void interact_disconnect(struct gameport *gameport)
 }
 
 static struct gameport_dev interact_dev = {
-	connect:	interact_connect,
-	disconnect:	interact_disconnect,
+	.connect =	interact_connect,
+	.disconnect =	interact_disconnect,
 };
 
 int __init interact_init(void)

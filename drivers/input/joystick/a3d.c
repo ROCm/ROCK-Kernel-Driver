@@ -378,8 +378,8 @@ static void a3d_disconnect(struct gameport *gameport)
 }
 
 static struct gameport_dev a3d_dev = {
-	connect:	a3d_connect,
-	disconnect:	a3d_disconnect,
+	.connect =	a3d_connect,
+	.disconnect =	a3d_disconnect,
 };
 
 int __init a3d_init(void)

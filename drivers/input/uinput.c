@@ -351,20 +351,20 @@ static int uinput_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 }
 
 struct file_operations uinput_fops = {
-	owner:		THIS_MODULE,
-	open:		uinput_open,
-	release:	uinput_close,
-	read:		uinput_read,
-	write:		uinput_write,
-	poll:		uinput_poll,
+	.owner =	THIS_MODULE,
+	.open =		uinput_open,
+	.release =	uinput_close,
+	.read =		uinput_read,
+	.write =	uinput_write,
+	.poll =		uinput_poll,
 //	fasync:		uinput_fasync,
-	ioctl:		uinput_ioctl,
+	.ioctl =	uinput_ioctl,
 };
 
 static struct miscdevice uinput_misc = {
-	fops:		&uinput_fops,
-	minor:		UINPUT_MINOR,
-	name:		UINPUT_NAME,
+	.fops =		&uinput_fops,
+	.minor =	UINPUT_MINOR,
+	.name =		UINPUT_NAME,
 };
 
 static int __init uinput_init(void)

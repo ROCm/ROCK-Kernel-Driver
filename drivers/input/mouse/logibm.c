@@ -98,13 +98,13 @@ static void logibm_close(struct input_dev *dev)
 }
 
 static struct input_dev logibm_dev = {
-	evbit:		{ BIT(EV_KEY) | BIT(EV_REL) },
-	keybit: 	{ [LONG(BTN_LEFT)] = BIT(BTN_LEFT) | BIT(BTN_MIDDLE) | BIT(BTN_RIGHT) },
-	relbit:		{ BIT(REL_X) | BIT(REL_Y) },
-	open:		logibm_open,
-	close:		logibm_close,
-	name:		"Logitech bus mouse",
-	phys:		"isa023c/input0",
+	.evbit	= { BIT(EV_KEY) | BIT(EV_REL) },
+	.keybit = { [LONG(BTN_LEFT)] = BIT(BTN_LEFT) | BIT(BTN_MIDDLE) | BIT(BTN_RIGHT) },
+	.relbit	= { BIT(REL_X) | BIT(REL_Y) },
+	.open	= logibm_open,
+	.close	= logibm_close,
+	.name	= "Logitech bus mouse",
+	.phys	= "isa023c/input0",
 };
 
 static void logibm_interrupt(int irq, void *dev_id, struct pt_regs *regs)

@@ -263,9 +263,9 @@ static void spaceball_connect(struct serio *serio, struct serio_dev *dev)
  */
 
 static struct serio_dev spaceball_dev = {
-	interrupt:	spaceball_interrupt,
-	connect:	spaceball_connect,
-	disconnect:	spaceball_disconnect,
+	.interrupt =	spaceball_interrupt,
+	.connect =	spaceball_connect,
+	.disconnect =	spaceball_disconnect,
 };
 
 /*

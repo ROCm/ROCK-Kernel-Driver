@@ -613,9 +613,9 @@ static void psmouse_connect(struct serio *serio, struct serio_dev *dev)
 }
 
 static struct serio_dev psmouse_dev = {
-	interrupt:	psmouse_interrupt,
-	connect:	psmouse_connect,
-	disconnect:	psmouse_disconnect
+	.interrupt =	psmouse_interrupt,
+	.connect =	psmouse_connect,
+	.disconnect =	psmouse_disconnect
 };
 
 int __init psmouse_init(void)

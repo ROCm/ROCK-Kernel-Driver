@@ -108,13 +108,13 @@ static void inport_close(struct input_dev *dev)
 }
 
 static struct input_dev inport_dev = {
-	evbit:		{ BIT(EV_KEY) | BIT(EV_REL) },
-	keybit: 	{ [LONG(BTN_LEFT)] = BIT(BTN_LEFT) | BIT(BTN_MIDDLE) | BIT(BTN_RIGHT) },
-	relbit:		{ BIT(REL_X) | BIT(REL_Y) },
-	open:		inport_open,
-	close:		inport_close,
-	name:		INPORT_NAME,
-	phys:		"isa023c/input0",
+	.evbit	= { BIT(EV_KEY) | BIT(EV_REL) },
+	.keybit	= { [LONG(BTN_LEFT)] = BIT(BTN_LEFT) | BIT(BTN_MIDDLE) | BIT(BTN_RIGHT) },
+	.relbit	= { BIT(REL_X) | BIT(REL_Y) },
+	.open	= inport_open,
+	.close	= inport_close,
+	.name	= INPORT_NAME,
+	.phys	= "isa023c/input0",
 };
 
 static void inport_interrupt(int irq, void *dev_id, struct pt_regs *regs)

@@ -235,8 +235,8 @@ static void cobra_disconnect(struct gameport *gameport)
 }
 
 static struct gameport_dev cobra_dev = {
-	connect:	cobra_connect,
-	disconnect:	cobra_disconnect,
+	.connect =	cobra_connect,
+	.disconnect =	cobra_disconnect,
 };
 
 int __init cobra_init(void)

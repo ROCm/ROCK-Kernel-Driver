@@ -399,15 +399,15 @@ static int evdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 }
 
 static struct file_operations evdev_fops = {
-	owner:		THIS_MODULE,
-	read:		evdev_read,
-	write:		evdev_write,
-	poll:		evdev_poll,
-	open:		evdev_open,
-	release:	evdev_release,
-	ioctl:		evdev_ioctl,
-	fasync:		evdev_fasync,
-	flush:		evdev_flush
+	.owner =	THIS_MODULE,
+	.read =		evdev_read,
+	.write =	evdev_write,
+	.poll =		evdev_poll,
+	.open =		evdev_open,
+	.release =	evdev_release,
+	.ioctl =	evdev_ioctl,
+	.fasync =	evdev_fasync,
+	.flush =	evdev_flush
 };
 
 static struct input_handle *evdev_connect(struct input_handler *handler, struct input_dev *dev, struct input_device_id *id)
@@ -468,13 +468,13 @@ static struct input_device_id evdev_ids[] = {
 MODULE_DEVICE_TABLE(input, evdev_ids);
 
 static struct input_handler evdev_handler = {
-	event:		evdev_event,
-	connect:	evdev_connect,
-	disconnect:	evdev_disconnect,
-	fops:		&evdev_fops,
-	minor:		EVDEV_MINOR_BASE,
-	name:		"evdev",
-	id_table:	evdev_ids,
+	.event =	evdev_event,
+	.connect =	evdev_connect,
+	.disconnect =	evdev_disconnect,
+	.fops =		&evdev_fops,
+	.minor =	EVDEV_MINOR_BASE,
+	.name =		"evdev",
+	.id_table =	evdev_ids,
 };
 
 static int __init evdev_init(void)

@@ -461,9 +461,9 @@ static void h3600ts_disconnect(struct serio *serio)
  */
 
 static struct serio_dev h3600ts_dev = {
-	interrupt:	h3600ts_interrupt,
-	connect:	h3600ts_connect,
-	disconnect:	h3600ts_disconnect,
+	.interrupt =	h3600ts_interrupt,
+	.connect =	h3600ts_connect,
+	.disconnect =	h3600ts_disconnect,
 };
 
 /*

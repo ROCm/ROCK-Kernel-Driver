@@ -192,9 +192,9 @@ static void magellan_connect(struct serio *serio, struct serio_dev *dev)
  */
 
 static struct serio_dev magellan_dev = {
-	interrupt:	magellan_interrupt,
-	connect:	magellan_connect,
-	disconnect:	magellan_disconnect,
+	.interrupt =	magellan_interrupt,
+	.connect =	magellan_connect,
+	.disconnect =	magellan_disconnect,
 };
 
 /*

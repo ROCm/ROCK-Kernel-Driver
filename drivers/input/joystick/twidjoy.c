@@ -240,9 +240,9 @@ static void twidjoy_connect(struct serio *serio, struct serio_dev *dev)
  */
 
 static struct serio_dev twidjoy_dev = {
-	interrupt:	twidjoy_interrupt,
-	connect:	twidjoy_connect,
-	disconnect:	twidjoy_disconnect,
+	.interrupt =	twidjoy_interrupt,
+	.connect =	twidjoy_connect,
+	.disconnect =	twidjoy_disconnect,
 };
 
 /*

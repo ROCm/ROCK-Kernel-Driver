@@ -312,10 +312,10 @@ static void __devexit cs461x_pci_remove(struct pci_dev *pdev)
 }
 	
 static struct pci_driver cs461x_pci_driver = {
-        name:           "CS461x Gameport",
-        id_table:       cs461x_pci_tbl,
-        probe:          cs461x_pci_probe,
-        remove:         __devexit_p(cs461x_pci_remove),
+        .name =         "CS461x Gameport",
+        .id_table =     cs461x_pci_tbl,
+        .probe =        cs461x_pci_probe,
+        .remove =       __devexit_p(cs461x_pci_remove),
 };
 
 int __init cs461x_init(void)

@@ -650,8 +650,8 @@ static int input_open_file(struct inode *inode, struct file *file)
 }
 
 static struct file_operations input_fops = {
-	owner: THIS_MODULE,
-	open: input_open_file,
+	.owner = THIS_MODULE,
+	.open = input_open_file,
 };
 
 devfs_handle_t input_register_minor(char *name, int minor, int minor_base)

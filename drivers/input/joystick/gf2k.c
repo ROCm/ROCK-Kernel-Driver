@@ -343,8 +343,8 @@ static void gf2k_disconnect(struct gameport *gameport)
 }
 
 static struct gameport_dev gf2k_dev = {
-	connect:	gf2k_connect,
-	disconnect:	gf2k_disconnect,
+	.connect =	gf2k_connect,
+	.disconnect =	gf2k_disconnect,
 };
 
 int __init gf2k_init(void)

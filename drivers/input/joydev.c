@@ -402,14 +402,14 @@ static int joydev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 }
 
 static struct file_operations joydev_fops = {
-	owner:		THIS_MODULE,
-	read:		joydev_read,
-	write:		joydev_write,
-	poll:		joydev_poll,
-	open:		joydev_open,
-	release:	joydev_release,
-	ioctl:		joydev_ioctl,
-	fasync:		joydev_fasync,
+	.owner =	THIS_MODULE,
+	.read =		joydev_read,
+	.write =	joydev_write,
+	.poll =		joydev_poll,
+	.open =		joydev_open,
+	.release =	joydev_release,
+	.ioctl =	joydev_ioctl,
+	.fasync =	joydev_fasync,
 };
 
 static struct input_handle *joydev_connect(struct input_handler *handler, struct input_dev *dev, struct input_device_id *id)
@@ -505,19 +505,19 @@ static void joydev_disconnect(struct input_handle *handle)
 
 static struct input_device_id joydev_ids[] = {
 	{
-		flags: INPUT_DEVICE_ID_MATCH_EVBIT,
-		evbit: { BIT(EV_KEY) | BIT(EV_ABS) },
-		absbit: { BIT(ABS_X) },
+		.flags = INPUT_DEVICE_ID_MATCH_EVBIT,
+		.evbit = { BIT(EV_KEY) | BIT(EV_ABS) },
+		.absbit = { BIT(ABS_X) },
 	},
 	{
-		flags: INPUT_DEVICE_ID_MATCH_EVBIT,
-		evbit: { BIT(EV_KEY) | BIT(EV_ABS) },
-		absbit: { BIT(ABS_WHEEL) },
+		.flags = INPUT_DEVICE_ID_MATCH_EVBIT,
+		.evbit = { BIT(EV_KEY) | BIT(EV_ABS) },
+		.absbit = { BIT(ABS_WHEEL) },
 	},
 	{
-		flags: INPUT_DEVICE_ID_MATCH_EVBIT,
-		evbit: { BIT(EV_KEY) | BIT(EV_ABS) },
-		absbit: { BIT(ABS_THROTTLE) },
+		.flags = INPUT_DEVICE_ID_MATCH_EVBIT,
+		.evbit = { BIT(EV_KEY) | BIT(EV_ABS) },
+		.absbit = { BIT(ABS_THROTTLE) },
 	},
 	{ }, 	/* Terminating entry */
 };
@@ -525,13 +525,13 @@ static struct input_device_id joydev_ids[] = {
 MODULE_DEVICE_TABLE(input, joydev_ids);
 
 static struct input_handler joydev_handler = {
-	event:		joydev_event,
-	connect:	joydev_connect,
-	disconnect:	joydev_disconnect,
-	fops:		&joydev_fops,
-	minor:		JOYDEV_MINOR_BASE,
-	name:		"joydev",
-	id_table:	joydev_ids,
+	.event =	joydev_event,
+	.connect =	joydev_connect,
+	.disconnect =	joydev_disconnect,
+	.fops =		&joydev_fops,
+	.minor =	JOYDEV_MINOR_BASE,
+	.name =		"joydev",
+	.id_table =	joydev_ids,
 };
 
 static int __init joydev_init(void)

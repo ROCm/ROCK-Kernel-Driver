@@ -523,9 +523,9 @@ static void atkbd_connect(struct serio *serio, struct serio_dev *dev)
 
 
 static struct serio_dev atkbd_dev = {
-	interrupt:	atkbd_interrupt,
-	connect:	atkbd_connect,
-	disconnect:	atkbd_disconnect
+	.interrupt =	atkbd_interrupt,
+	.connect =	atkbd_connect,
+	.disconnect =	atkbd_disconnect
 };
 
 #ifndef MODULE

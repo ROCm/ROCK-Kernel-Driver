@@ -207,9 +207,9 @@ static void spaceorb_connect(struct serio *serio, struct serio_dev *dev)
  */
 
 static struct serio_dev spaceorb_dev = {
-	interrupt:	spaceorb_interrupt,
-	connect:	spaceorb_connect,
-	disconnect:	spaceorb_disconnect,
+	.interrupt =	spaceorb_interrupt,
+	.connect =	spaceorb_connect,
+	.disconnect =	spaceorb_disconnect,
 };
 
 /*

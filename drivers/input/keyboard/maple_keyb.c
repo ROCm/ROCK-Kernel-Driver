@@ -160,10 +160,10 @@ static void dc_kbd_disconnect(struct maple_device *dev)
 
 
 static struct maple_driver dc_kbd_driver = {
-	function:	MAPLE_FUNC_KEYBOARD,
-	name:		"Dreamcast keyboard",
-	connect:	dc_kbd_connect,
-	disconnect:	dc_kbd_disconnect,
+	.function =	MAPLE_FUNC_KEYBOARD,
+	.name =		"Dreamcast keyboard",
+	.connect =	dc_kbd_connect,
+	.disconnect =	dc_kbd_disconnect,
 };
 
 

@@ -137,10 +137,10 @@ static struct pci_device_id fm801_gp_id_table[] __devinitdata = {
 };
 
 static struct pci_driver fm801_gp_driver = {
-	name:		"FM801 GP",
-	id_table:	fm801_gp_id_table,
-	probe:		fm801_gp_probe,
-	remove:		fm801_gp_remove,
+	.name =		"FM801 GP",
+	.id_table =	fm801_gp_id_table,
+	.probe =	fm801_gp_probe,
+	.remove =	fm801_gp_remove,
 };
 
 int __init fm801_gp_init(void)

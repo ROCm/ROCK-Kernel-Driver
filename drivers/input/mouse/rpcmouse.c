@@ -36,11 +36,11 @@ MODULE_LICENSE("GPL");
 static short rpcmouse_lastx, rpcmouse_lasty;
 
 static struct input_dev rpcmouse_dev = {
-	evbit:		{ BIT(EV_KEY) | BIT(EV_REL) },
-	keybit: 	{ [LONG(BTN_LEFT)] = BIT(BTN_LEFT) | BIT(BTN_MIDDLE) | BIT(BTN_RIGHT) },
-	relbit:		{ BIT(REL_X) | BIT(REL_Y) },
-	name:		"Acorn RiscPC Mouse",
-	phys:		"rpcmouse/input0",
+	.evbit	= { BIT(EV_KEY) | BIT(EV_REL) },
+	.keybit = { [LONG(BTN_LEFT)] = BIT(BTN_LEFT) | BIT(BTN_MIDDLE) | BIT(BTN_RIGHT) },
+	.relbit	= { BIT(REL_X) | BIT(REL_Y) },
+	.name	= "Acorn RiscPC Mouse",
+	.phys	= "rpcmouse/input0",
 };
 
 static void rpcmouse_irq(int irq, void *dev_id, struct pt_regs *regs)

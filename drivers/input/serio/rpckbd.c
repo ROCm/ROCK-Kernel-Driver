@@ -55,10 +55,10 @@ static inline void rpckbd_write(unsigned char val)
 
 static struct serio rpckbd_port =
 {
-	type:	SERIO_8042,
-	write:	rpckbd_write,
-	name: 	"RiscPC PS/2 kbd port",
-	phys:	"rpckbd/serio0",
+	.type	= SERIO_8042,
+	.write	= rpckbd_write,
+	.name	= "RiscPC PS/2 kbd port",
+	.phys	= "rpckbd/serio0",
 };
 
 static void rpckbd_rx(int irq, void *dev_id, struct pt_regs *regs)

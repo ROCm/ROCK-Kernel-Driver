@@ -137,9 +137,9 @@ void xtkbd_disconnect(struct serio *serio)
 }
 
 struct serio_dev xtkbd_dev = {
-	interrupt:	xtkbd_interrupt,
-	connect:	xtkbd_connect,
-	disconnect:	xtkbd_disconnect
+	.interrupt =	xtkbd_interrupt,
+	.connect =	xtkbd_connect,
+	.disconnect =	xtkbd_disconnect
 };
 
 int __init xtkbd_init(void)

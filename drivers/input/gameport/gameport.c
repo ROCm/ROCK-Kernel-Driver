@@ -94,13 +94,12 @@ static int gameport_measure_speed(struct gameport *gameport)
 	tx = 1 << 30;
 
 	for(i = 0; i < 50; i++) {
-		save_flags(flags);	/* Yes, all CPUs */
-		cli();
+		local_irq_save(flags);
 		GET_TIME(t1);
 		for(t = 0; t < 50; t++) gameport_read(gameport);
 		GET_TIME(t2);
 		GET_TIME(t3);
-		restore_flags(flags);
+		local_irq_restore(flags);
 		udelay(i * 10);
 		if ((t = DELTA(t2,t1) - DELTA(t3,t2)) < tx) tx = t;
 	}

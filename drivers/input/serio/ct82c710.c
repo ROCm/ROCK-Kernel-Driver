@@ -141,12 +141,12 @@ static int ct82c710_write(struct serio *port, unsigned char c)
 
 static struct serio ct82c710_port =
 {
-	type:	SERIO_8042,
-	name:	ct82c710_name,
-	phys:	ct82c710_phys,
-	write:	ct82c710_write,
-	open:	ct82c710_open,
-	close:	ct82c710_close,
+	.type	= SERIO_8042,
+	.name	= ct82c710_name,
+	.phys	= ct82c710_phys,
+	.write	= ct82c710_write,
+	.open	= ct82c710_open,
+	.close	= ct82c710_close,
 };
 
 /*

@@ -279,9 +279,9 @@ static void sermouse_connect(struct serio *serio, struct serio_dev *dev)
 }
 
 static struct serio_dev sermouse_dev = {
-	interrupt:	sermouse_interrupt,
-	connect:	sermouse_connect,
-	disconnect:	sermouse_disconnect
+	.interrupt =	sermouse_interrupt,
+	.connect =	sermouse_connect,
+	.disconnect =	sermouse_disconnect
 };
 
 int __init sermouse_init(void)

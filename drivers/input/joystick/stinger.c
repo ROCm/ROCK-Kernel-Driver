@@ -182,9 +182,9 @@ static void stinger_connect(struct serio *serio, struct serio_dev *dev)
  */
 
 static struct serio_dev stinger_dev = {
-	interrupt:	stinger_interrupt,
-	connect:	stinger_connect,
-	disconnect:	stinger_disconnect,
+	.interrupt =	stinger_interrupt,
+	.connect =	stinger_connect,
+	.disconnect =	stinger_disconnect,
 };
 
 /*

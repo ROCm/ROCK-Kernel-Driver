@@ -107,10 +107,10 @@ static void dc_mouse_disconnect(struct maple_device *dev)
 
 
 static struct maple_driver dc_mouse_driver = {
-	function:	MAPLE_FUNC_MOUSE,
-	name:		"Dreamcast mouse",
-	connect:	dc_mouse_connect,
-	disconnect:	dc_mouse_disconnect,
+	.function =	MAPLE_FUNC_MOUSE,
+	.name =		"Dreamcast mouse",
+	.connect =	dc_mouse_connect,
+	.disconnect =	dc_mouse_disconnect,
 };
 
 

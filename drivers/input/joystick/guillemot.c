@@ -265,8 +265,8 @@ static void guillemot_disconnect(struct gameport *gameport)
 }
 
 static struct gameport_dev guillemot_dev = {
-	connect:	guillemot_connect,
-	disconnect:	guillemot_disconnect,
+	.connect =	guillemot_connect,
+	.disconnect =	guillemot_disconnect,
 };
 
 int __init guillemot_init(void)
