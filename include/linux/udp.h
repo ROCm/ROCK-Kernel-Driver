@@ -31,6 +31,7 @@ struct udphdr {
 #define UDP_ENCAP	100	/* Set the socket to accept encapsulated packets */
 
 /* UDP encapsulation types */
+#define UDP_ENCAP_ESPINUDP_NON_IKE	1 /* draft-ietf-ipsec-nat-t-ike-00/01 */
 #define UDP_ENCAP_ESPINUDP	2 /* draft-ietf-ipsec-udp-encaps-06 */
 
 #ifdef __KERNEL__
