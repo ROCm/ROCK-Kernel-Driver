@@ -37,6 +37,7 @@
 #include <linux/kmod.h>
 #include <linux/interrupt.h>
 #include <linux/poll.h>
+#include <linux/device.h>
 
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
 MODULE_DESCRIPTION("Input core");
@@ -808,9 +809,15 @@ static int input_handlers_read(char *buf, char **start, off_t pos, int count, in
 
 #endif
 
+struct device_class input_devclass = {
+	.name		= "input",
+};
+
 static int __init input_init(void)
 {
 	struct proc_dir_entry *entry;
+
+	devclass_register(&input_devclass);
 
 #ifdef CONFIG_PROC_FS
 	proc_bus_input_dir = proc_mkdir("input", proc_bus);
@@ -841,6 +848,7 @@ static void __exit input_exit(void)
 	devfs_unregister(input_devfs_handle);
         if (unregister_chrdev(INPUT_MAJOR, "input"))
                 printk(KERN_ERR "input: can't unregister char major %d", INPUT_MAJOR);
+	devclass_unregister(&input_devclass);
 }
 
 module_init(input_init);

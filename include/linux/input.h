@@ -912,5 +912,7 @@ void input_event(struct input_dev *dev, unsigned int type, unsigned int code, in
 #define input_report_ff(a,b,c)	input_event(a, EV_FF, b, c)
 #define input_report_ff_status(a,b,c)	input_event(a, EV_FF_STATUS, b, c)
 
+extern struct device_class input_devclass;
+
 #endif
 #endif
