@@ -10,7 +10,7 @@
 #include <linux/init.h>
 #include <linux/pm.h>
 
-#ifdef CONFIG_SOFTWARE_SUSPEND
+#ifdef CONFIG_PM
 /* page backup entry */
 typedef struct pbe {
 	unsigned long address;		/* address of the copy */
@@ -53,6 +53,9 @@ extern suspend_pagedir_t *pagedir_nosave __nosavedata;
 extern void do_suspend_lowlevel(int resume);
 extern void do_suspend_lowlevel_s4bios(int resume);
 
+#endif /* CONFIG_PM */
+
+#ifdef CONFIG_SOFTWARE_SUSPEND
 extern int software_suspend(void);
 #else	/* CONFIG_SOFTWARE_SUSPEND */
 static inline int software_suspend(void)
