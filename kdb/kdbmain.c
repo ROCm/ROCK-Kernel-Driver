@@ -2097,7 +2097,7 @@ kdb_md_line(const char *fmtstr, kdb_machreg_t addr,
 			cp = wc.c;
 #endif
 			wc.word = word;
-#define printable_char(c) ({unsigned char __c = toascii(c); isalnum(__c) ? __c : '.';})
+#define printable_char(c) ({unsigned char __c = c; isprint(__c) ? __c : '.';})
 			switch (bytesperword) {
 			case 8:
 				*c++ = printable_char(*cp++);
