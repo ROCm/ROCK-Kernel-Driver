@@ -20,6 +20,7 @@ obj-$(CONFIG_MODULES)		+= module.o v850_ksyms.o
 obj-$(CONFIG_V850E_MA1)		+= ma.o	nb85e_utils.o nb85e_timer_d.o
 obj-$(CONFIG_V850E_NB85E)	+= nb85e_intc.o
 obj-$(CONFIG_V850E2_ANNA)	+= anna.o nb85e_intc.o nb85e_utils.o nb85e_timer_d.o
+obj-$(CONFIG_V850E_AS85EP1)	+= as85ep1.o nb85e_intc.o nb85e_utils.o nb85e_timer_d.o
 # platform-specific code
 obj-$(CONFIG_V850E_SIM)		+= sim.o simcons.o
 obj-$(CONFIG_V850E2_SIM85E2C)	+= sim85e2c.o nb85e_intc.o memcons.o

@@ -63,6 +63,8 @@ menu "Processor type and features"
       	     bool "NA85E2C-FPGA"
       config V850E2_ANNA
       	     bool "Anna"
+      config V850E_AS85EP1
+      	     bool "AS85EP1"
    endchoice
 
 
