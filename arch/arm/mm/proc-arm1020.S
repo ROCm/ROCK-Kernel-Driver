@@ -420,8 +420,6 @@ ENTRY(cpu_arm1020_set_pte)
 	mov	pc, lr
 
 
-cpu_manu_name:
-	.asciz	"ARM/VLSI"
 ENTRY(cpu_arm1020_name)
 	.ascii	"Arm1020"
 #ifndef CONFIG_CPU_ICACHE_DISABLE
@@ -518,15 +516,9 @@ arm1020_processor_functions:
 
 	.size	arm1020_processor_functions, . - arm1020_processor_functions
 
-	.type	cpu_arm1020_info, #object
-cpu_arm1020_info:
-	.long	cpu_manu_name
-	.long	cpu_arm1020_name
-	.size	cpu_arm1020_info, . - cpu_arm1020_info
-
 	.type	cpu_arch_name, #object
 cpu_arch_name:
-	.asciz	"armv4"
+	.asciz	"armv4t"
 	.size	cpu_arch_name, . - cpu_arch_name
 
 	.type	cpu_elf_name, #object
@@ -546,7 +538,7 @@ __arm1020_proc_info:
 	.long	cpu_arch_name
 	.long	cpu_elf_name
 	.long	HWCAP_SWP | HWCAP_HALF | HWCAP_THUMB
-	.long	cpu_arm1020_info
+	.long	cpu_arm1020_name
 	.long	arm1020_processor_functions
 	.long	v4wbi_tlb_fns
 	.long	v4wb_user_fns

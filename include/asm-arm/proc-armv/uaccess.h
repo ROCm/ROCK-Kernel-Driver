@@ -12,7 +12,7 @@
  * Note that this is actually 0x1,0000,0000
  */
 #define KERNEL_DS	0x00000000
-#define USER_DS		PAGE_OFFSET
+#define USER_DS		TASK_SIZE
 
 static inline void set_fs (mm_segment_t fs)
 {
@@ -50,8 +50,8 @@ static inline void set_fs (mm_segment_t fs)
 	"	.align	3\n"					\
 	"	.long	1b, 3b\n"				\
 	"	.previous"					\
-	: "=r" (err)						\
-	: "r" (x), "r" (__pu_addr), "i" (-EFAULT), "0" (err)	\
+	: "+r" (err)						\
+	: "r" (x), "r" (__pu_addr), "i" (-EFAULT)		\
 	: "cc")
 
 #ifndef __ARMEB__
@@ -83,19 +83,18 @@ static inline void set_fs (mm_segment_t fs)
 	"	.align	3\n"					\
 	"	.long	1b, 3b\n"				\
 	"	.previous"					\
-	: "=r" (err)						\
-	: "r" (x), "r" (__pu_addr), "i" (-EFAULT), "0" (err))
+	: "+r" (err)						\
+	: "r" (x), "r" (__pu_addr), "i" (-EFAULT)		\
+	: "cc")
 
 #define __put_user_asm_dword(x,__pu_addr,err)			\
-({								\
-	unsigned long long __temp = (unsigned long long)x;	\
 	__asm__ __volatile__(					\
-	"1:	strt	%1, [%2], #0\n"				\
-	"2:	strt	%3, [%4], #0\n"				\
+	"1:	strt	%Q2, [%1], #4\n"			\
+	"2:	strt	%R2, [%1], #0\n"			\
 	"3:\n"							\
 	"	.section .fixup,\"ax\"\n"			\
 	"	.align	2\n"					\
-	"4:	mov	%0, %5\n"				\
+	"4:	mov	%0, %3\n"				\
 	"	b	3b\n"					\
 	"	.previous\n"					\
 	"	.section __ex_table,\"a\"\n"			\
@@ -103,12 +102,9 @@ static inline void set_fs (mm_segment_t fs)
 	"	.long	1b, 4b\n"				\
 	"	.long	2b, 4b\n"				\
 	"	.previous"					\
-	: "=r" (err)						\
-	: "r" (__temp), "r" (__pu_addr),			\
-	  "r" (__temp >> 32), "r" (__pu_addr + 4),		\
-	  "i" (-EFAULT), "0" (err)				\
-	: "cc");						\
-})
+	: "+r" (err), "+r" (__pu_addr)				\
+	: "r" (x), "i" (-EFAULT)				\
+	: "cc")
 
 #define __get_user_asm_byte(x,addr,err)				\
 	__asm__ __volatile__(					\
@@ -124,23 +120,24 @@ static inline void set_fs (mm_segment_t fs)
 	"	.align	3\n"					\
 	"	.long	1b, 3b\n"				\
 	"	.previous"					\
-	: "=r" (err), "=&r" (x)					\
-	: "r" (addr), "i" (-EFAULT), "0" (err))
+	: "+r" (err), "=&r" (x)					\
+	: "r" (addr), "i" (-EFAULT)				\
+	: "cc")
 
 #ifndef __ARMEB__
-#define __get_user_asm_half(x,addr,err)				\
+#define __get_user_asm_half(x,__gu_addr,err)			\
 ({								\
-	unsigned long __b1, __b2, __ptr = (unsigned long)addr;	\
-	__get_user_asm_byte(__b1, __ptr, err);			\
-	__get_user_asm_byte(__b2, __ptr + 1, err);		\
+	unsigned long __b1, __b2;				\
+	__get_user_asm_byte(__b1, __gu_addr, err);		\
+	__get_user_asm_byte(__b2, __gu_addr + 1, err);		\
 	(x) = __b1 | (__b2 << 8);				\
 })
 #else
-#define __get_user_asm_half(x,addr,err)				\
+#define __get_user_asm_half(x,__gu_addr,err)			\
 ({								\
 	unsigned long __b1, __b2;				\
-	__get_user_asm_byte(__b1, addr, err);			\
-	__get_user_asm_byte(__b2, (int)(addr) + 1, err);	\
+	__get_user_asm_byte(__b1, __gu_addr, err);		\
+	__get_user_asm_byte(__b2, __gu_addr + 1, err);		\
 	(x) = (__b1 << 8) | __b2;				\
 })
 #endif
@@ -159,8 +156,9 @@ static inline void set_fs (mm_segment_t fs)
 	"	.align	3\n"					\
 	"	.long	1b, 3b\n"				\
 	"	.previous"					\
-	: "=r" (err), "=&r" (x)					\
-	: "r" (addr), "i" (-EFAULT), "0" (err))
+	: "+r" (err), "=&r" (x)					\
+	: "r" (addr), "i" (-EFAULT)				\
+	: "cc")
 
 extern unsigned long __arch_copy_from_user(void *to, const void *from, unsigned long n);
 #define __do_copy_from_user(to,from,n)				\

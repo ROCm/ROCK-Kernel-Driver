@@ -81,7 +81,7 @@ unsigned long phys_initrd_start __initdata = 0;
 unsigned long phys_initrd_size __initdata = 0;
 
 static struct meminfo meminfo __initdata = { 0, };
-static struct proc_info_item proc_info;
+static const char *cpu_name;
 static const char *machine_name;
 static char command_line[COMMAND_LINE_SIZE];
 
@@ -275,7 +275,7 @@ static void __init setup_processor(void)
 		while (1);
 	}
 
-	proc_info = *list->info;
+	cpu_name = list->cpu_name;
 
 #ifdef MULTI_CPU
 	processor = *list->proc;
@@ -287,9 +287,9 @@ static void __init setup_processor(void)
 	cpu_user = *list->user;
 #endif
 
-	printk("CPU: %s %s revision %d (ARMv%s)\n",
-	       proc_info.manufacturer, proc_info.cpu_name,
-	       (int)processor_id & 15, proc_arch[cpu_architecture()]);
+	printk("CPU: %s [%08x] revision %d (ARMv%s)\n",
+	       cpu_name, processor_id, (int)processor_id & 15,
+	       proc_arch[cpu_architecture()]);
 
 	dump_cpu_info();
 
@@ -723,9 +723,8 @@ static int c_show(struct seq_file *m, void *v)
 {
 	int i;
 
-	seq_printf(m, "Processor\t: %s %s rev %d (%s)\n",
-		   proc_info.manufacturer, proc_info.cpu_name,
-		   (int)processor_id & 15, elf_platform);
+	seq_printf(m, "Processor\t: %s rev %d (%s)\n",
+		   cpu_name, (int)processor_id & 15, elf_platform);
 
 	seq_printf(m, "BogoMIPS\t: %lu.%02lu\n",
 		   loops_per_jiffy / (500000/HZ),
