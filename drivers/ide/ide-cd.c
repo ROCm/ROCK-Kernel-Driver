@@ -854,13 +854,10 @@ static ide_startstop_t cdrom_start_packet_command(ide_drive_t *drive,
 	HWIF(drive)->OUTB(xferlen >> 8  , IDE_BCOUNTH_REG);
 	if (IDE_CONTROL_REG)
 		HWIF(drive)->OUTB(drive->ctl, IDE_CONTROL_REG);
-
+ 
 	if (CDROM_CONFIG_FLAGS (drive)->drq_interrupt) {
-		if (HWGROUP(drive)->handler != NULL)
-			BUG();
-		ide_set_handler (drive, handler, WAIT_CMD, cdrom_timer_expiry);
 		/* packet command */
-		HWIF(drive)->OUTB(WIN_PACKETCMD, IDE_COMMAND_REG);
+		ide_execute_command(drive, WIN_PACKETCMD, handler, WAIT_CMD, cdrom_timer_expiry);
 		return ide_started;
 	} else {
 		/* packet command */
