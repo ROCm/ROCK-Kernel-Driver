@@ -37,6 +37,8 @@
 
 # if defined(CONFIG_HUGETLB_PAGE_SIZE_4GB)
 #  define HPAGE_SHIFT	32
+# elif defined(CONFIG_HUGETLB_PAGE_SIZE_1GB)
+#  define HPAGE_SHIFT	30
 # elif defined(CONFIG_HUGETLB_PAGE_SIZE_256MB)
 #  define HPAGE_SHIFT	28
 # elif defined(CONFIG_HUGETLB_PAGE_SIZE_64MB)
