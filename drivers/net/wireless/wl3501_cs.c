@@ -644,14 +644,13 @@ static int wl3501_send_pkt(struct wl3501_card *this, u8 *data, u16 len)
 static int wl3501_mgmt_resync(struct wl3501_card *this)
 {
 	struct wl3501_resync_req signal;
-	u16 ptr;
 	int rc = 1;
 
 	signal.next_blk = 0;
 	signal.sig_id = WL3501_SIG_RESYNC_REQ;
 
 	if (wl3501_esbq_req_test(this)) {
-		ptr = wl3501_get_tx_buffer(this, sizeof(signal));
+		u16 ptr = wl3501_get_tx_buffer(this, sizeof(signal));
 		if (ptr) {
 			wl3501_set_to_wla(this, ptr, &signal, sizeof(signal));
 			wl3501_esbq_req(this, &ptr);
@@ -664,7 +663,6 @@ static int wl3501_mgmt_resync(struct wl3501_card *this)
 static int wl3501_mgmt_scan(struct wl3501_card *this, u16 chan_time)
 {
 	struct wl3501_scan_req signal;
-	u16 ptr;
 	int rc = 1;
 
 	signal.next_blk = 0;
@@ -684,7 +682,7 @@ static int wl3501_mgmt_scan(struct wl3501_card *this, u16 chan_time)
 	this->bss_cnt = this->join_sta_bss = 0;
 
 	if (wl3501_esbq_req_test(this)) {
-		ptr = wl3501_get_tx_buffer(this, sizeof(signal));
+		u16 ptr = wl3501_get_tx_buffer(this, sizeof(signal));
 		if (ptr) {
 			wl3501_set_to_wla(this, ptr, &signal, sizeof(signal));
 			wl3501_esbq_req(this, &ptr);
@@ -697,7 +695,6 @@ static int wl3501_mgmt_scan(struct wl3501_card *this, u16 chan_time)
 static int wl3501_mgmt_join(struct wl3501_card *this, u16 stas)
 {
 	struct wl3501_join_req signal;
-	u16 ptr;
 
 	signal.next_blk = 0;
 	signal.sig_id = WL3501_SIG_JOIN_REQ;
@@ -706,8 +703,9 @@ static int wl3501_mgmt_join(struct wl3501_card *this, u16 stas)
 	       (char *)&(this->bss_set[stas].beacon_period), 72);
 	this->cap_info = signal.cap_info;
 	this->chan = signal.phy_pset[2];
+
 	if (wl3501_esbq_req_test(this)) {
-		ptr = wl3501_get_tx_buffer(this, sizeof(signal));
+		u16 ptr = wl3501_get_tx_buffer(this, sizeof(signal));
 		if (ptr) {
 			wl3501_set_to_wla(this, ptr, &signal, sizeof(signal));
 			wl3501_esbq_req(this, &ptr);
@@ -721,7 +719,6 @@ static int wl3501_mgmt_start(struct wl3501_card *this)
 {
 	struct wl3501_start_req signal;
 	int rc = 1;
-	u16 ptr;
 
 	signal.next_blk = 0;
 	signal.sig_id = WL3501_SIG_START_REQ;
@@ -746,8 +743,9 @@ static int wl3501_mgmt_start(struct wl3501_card *this)
 	signal.ibss_pset[1] = 2;
 	signal.ibss_pset[2] = 10;
 	signal.ibss_pset[3] = 0;
+
 	if (wl3501_esbq_req_test(this)) {
-		ptr = wl3501_get_tx_buffer(this, sizeof(signal));
+		u16 ptr = wl3501_get_tx_buffer(this, sizeof(signal));
 		if (ptr) {
 			wl3501_set_to_wla(this, ptr, &signal, sizeof(signal));
 			wl3501_esbq_req(this, &ptr);
