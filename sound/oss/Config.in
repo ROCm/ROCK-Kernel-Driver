@@ -11,7 +11,6 @@ dep_tristate '  C-Media PCI (CMI8338/8738)' CONFIG_SOUND_CMPCI $CONFIG_SOUND $CO
 if [ "$CONFIG_SOUND_CMPCI" = "y" -o "$CONFIG_SOUND_CMPCI" = "m" ]; then
     bool '    Enable legacy FM' CONFIG_SOUND_CMPCI_FM
     if [ "$CONFIG_SOUND_CMPCI_FM" = "y" ]; then
-	define_hex CONFIG_SOUND_CMPCI_FMIO 388
         hex '    FM I/O 388, 3C8, 3E0, 3E8' CONFIG_SOUND_CMPCI_FMIO 388
     fi
     bool '    Enable legacy MPU-401' CONFIG_SOUND_CMPCI_MIDI
