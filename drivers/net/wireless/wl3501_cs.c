@@ -968,7 +968,7 @@ static u16 wl3501_receive(struct wl3501_card *this, u8 *bf, u16 size)
 			wl3501_get_from_wla(this, next_addr + 5, data,
 					    WL3501_BLKSZ - 5);
 			size -= (WL3501_BLKSZ - 5);
-			data -= (WL3501_BLKSZ - 5);
+			data += (WL3501_BLKSZ - 5);
 			wl3501_get_from_wla(this, next_addr + 2, &next_addr1,
 					    sizeof(next_addr1));
 			next_addr = next_addr1;
