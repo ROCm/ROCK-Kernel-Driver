@@ -260,6 +260,8 @@ void usb_hcd_pci_remove (struct pci_dev *dev)
 	}
 
 	usb_deregister_bus (&hcd->self);
+
+	pci_disable_device(dev);
 }
 EXPORT_SYMBOL (usb_hcd_pci_remove);
 
