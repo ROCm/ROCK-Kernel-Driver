@@ -146,10 +146,11 @@ static int ohci_hub_suspend (struct usb_hcd *hcd)
 	ohci->next_statechange = jiffies + msecs_to_jiffies (5);
 
 succeed:
-	/* it's not USB_STATE_SUSPENDED unless access to this
+	/* it's not HCD_STATE_SUSPENDED unless access to this
 	 * hub from the non-usb side (PCI, SOC, etc) stopped 
 	 */
 	root->dev.power.power_state = 3;
+	root->state = USB_STATE_SUSPENDED;
 done:
 	spin_unlock_irq (&ohci->lock);
 	return status;
@@ -289,7 +290,7 @@ static int ohci_hub_resume (struct usb_hcd *hcd)
 		ohci->hc_control |= enables;
 		writel (ohci->hc_control, &ohci->regs->control);
 		if (temp)
-			writel (status, &ohci->regs->cmdstatus);
+			writel (temp, &ohci->regs->cmdstatus);
 		(void) ohci_readl (&ohci->regs->control);
 	}
 
@@ -481,8 +482,8 @@ static void start_hnp(struct ohci_hcd *ohci);
 /* this timer value might be vendor-specific ... */
 #define	PORT_RESET_HW_MSEC	10
 
-/* wrap-aware logic stolen from <linux/jiffies.h> */
-#define tick_before(t1,t2) ((((s16)(t1))-((s16)(t2))) < 0)
+/* wrap-aware logic morphed from <linux/jiffies.h> */
+#define tick_before(t1,t2) ((s16)(((s16)(t1))-((s16)(t2))) < 0)
 
 /* called from some task, normally khubd */
 static inline void root_port_reset (struct ohci_hcd *ohci, unsigned port)

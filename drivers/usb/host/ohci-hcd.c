@@ -409,11 +409,19 @@ static int hc_reset (struct ohci_hcd *ohci)
 
 	/* boot firmware should have set this up (5.1.1.3.1) */
 	if (!ohci->fminterval) {
+		u32	t2;
+
 		temp = ohci_readl (&ohci->regs->fminterval);
-		if (temp & 0x3fff0000)
-			ohci->fminterval = temp;
-		else
-			ohci->fminterval = DEFAULT_FMINTERVAL;
+		ohci->fminterval = temp & 0x3fff;
+		if (ohci->fminterval != FI)
+			ohci_dbg (ohci, "fminterval delta %d\n",
+				ohci->fminterval - FI);
+
+		t2 = FSMP (ohci->fminterval);
+		temp >>= 16;
+		if ((t2/2) < temp || temp > t2)
+			temp = t2;
+		ohci->fminterval |= temp << 16;
 		/* also: power/overcurrent flags in roothub.a */
 	}
 

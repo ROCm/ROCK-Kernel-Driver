@@ -406,13 +406,14 @@ static inline void disable (struct ohci_hcd *ohci)
 }
 
 #define	FI			0x2edf		/* 12000 bits per frame (-1) */
-#define	DEFAULT_FMINTERVAL 	((((6 * (FI - 210)) / 7) << 16) | FI)
+#define	FSMP(fi) 		((6 * ((fi) - 210)) / 7)
 #define LSTHRESH		0x628		/* lowspeed bit threshold */
 
 static inline void periodic_reinit (struct ohci_hcd *ohci)
 {
+	u32	fi = ohci->fminterval & 0x0ffff;
 	writel (ohci->fminterval, &ohci->regs->fminterval);
-	writel (((9 * FI) / 10) & 0x3fff, &ohci->regs->periodicstart);
+	writel (((9 * fi) / 10) & 0x3fff, &ohci->regs->periodicstart);
 	writel (LSTHRESH, &ohci->regs->lsthresh);
 }
 
