@@ -259,7 +259,7 @@ int d_invalidate(struct dentry * dentry)
 static inline struct dentry * __dget_locked(struct dentry *dentry)
 {
 	atomic_inc(&dentry->d_count);
-	if (atomic_read(&dentry->d_count) == 1) {
+	if (!list_empty(&dentry->d_lru)) {
 		dentry_stat.nr_unused--;
 		list_del_init(&dentry->d_lru);
 	}
@@ -935,8 +935,9 @@ struct dentry *d_splice_alias(struct inode *inode, struct dentry *dentry)
  * lookup is going on.
  *
  * dentry_unused list is not updated even if lookup finds the required dentry
- * in there. It is updated in places such as prune_dcache, shrink_dcache_sb and
- * select_parent. This laziness saves lookup from dcache_lock acquisition.
+ * in there. It is updated in places such as prune_dcache, shrink_dcache_sb,
+ * select_parent and __dget_locked. This laziness saves lookup from dcache_lock
+ * acquisition.
  *
  * d_lookup() is protected against the concurrent renames in some unrelated
  * directory using the seqlockt_t rename_lock.
