@@ -263,6 +263,7 @@ choice 'Physical memory granularity'				\
 
 bool 'Kernel debugging' CONFIG_DEBUG_KERNEL
 if [ "$CONFIG_DEBUG_KERNEL" != "n" ]; then
+   bool '  Load all symbols for debugging/kksymoops' CONFIG_KALLSYMS
    bool '  Print possible IA64 hazards to console' CONFIG_IA64_PRINT_HAZARDS
    bool '  Disable VHPT' CONFIG_DISABLE_VHPT
    bool '  Magic SysRq key' CONFIG_MAGIC_SYSRQ

@@ -12,6 +12,7 @@
 #include <linux/errno.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
+#include <linux/module.h>
 #include <linux/personality.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
@@ -45,8 +46,9 @@ static void
 do_show_stack (struct unw_frame_info *info, void *arg)
 {
 	unsigned long ip, sp, bsp;
+	char buf[80];			/* don't make it so big that it overflows the stack! */
 
-	printk("\nCall Trace: ");
+	printk("\nCall Trace:\n");
 	do {
 		unw_get_ip(info, &ip);
 		if (ip == 0)
@@ -54,7 +56,9 @@ do_show_stack (struct unw_frame_info *info, void *arg)
 
 		unw_get_sp(info, &sp);
 		unw_get_bsp(info, &bsp);
-		printk("[<%016lx>] sp=0x%016lx bsp=0x%016lx\n", ip, sp, bsp);
+		snprintf(buf, sizeof(buf), " [<%016lx>] %%s sp=0x%016lx bsp=0x%016lx\n",
+			 ip, sp, bsp);
+		print_symbol(buf, ip);
 	} while (unw_unwind(info) >= 0);
 }
 
@@ -94,6 +98,7 @@ show_regs (struct pt_regs *regs)
 	printk("\nPid: %d, comm: %20s\n", current->pid, current->comm);
 	printk("psr : %016lx ifs : %016lx ip  : [<%016lx>]    %s\n",
 	       regs->cr_ipsr, regs->cr_ifs, ip, print_tainted());
+	print_symbol("ip is at %s\n", ip);
 	printk("unat: %016lx pfs : %016lx rsc : %016lx\n",
 	       regs->ar_unat, regs->ar_pfs, regs->ar_rsc);
 	printk("rnat: %016lx bsps: %016lx pr  : %016lx\n",

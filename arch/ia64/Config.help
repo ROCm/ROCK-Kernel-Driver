@@ -157,6 +157,11 @@ CONFIG_PCMCIA
   and ds.o.  If you want to compile it as a module, say M here and
   read <file:Documentation/modules.txt>.
 
+CONFIG_KALLSYMS
+  Say Y here to let the kernel print out symbolic crash information and
+  symbolic stack backtraces. This increases the size of the kernel
+  somewhat, as all symbols have to be loaded into the kernel image.
+
 CONFIG_KCORE_ELF
   If you enabled support for /proc file system then the file
   /proc/kcore will contain the kernel core image. This can be used
