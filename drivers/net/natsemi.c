@@ -1662,7 +1662,7 @@ static void netdev_error(struct net_device *dev, int intr_status)
 		if ((np->tx_config & TxDrthMask) < 62)
 			np->tx_config += 2;
 		if (debug > 2)
-			printk(KERN_NOTICE "%s: increasing Tx theshold, new tx cfg %8.8xh.\n",
+			printk(KERN_NOTICE "%s: increasing Tx threshold, new tx cfg %8.8xh.\n",
 					dev->name, np->tx_config);
 		writel(np->tx_config, ioaddr + TxConfig);
 	}
