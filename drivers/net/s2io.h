@@ -693,6 +693,27 @@ static inline void writeq(u64 val, void *addr)
 	writel((u32) (val), addr);
 	writel((u32) (val >> 32), (addr + 4));
 }
+
+/* In 32 bit modes, some registers have to be written in a 
+ * particular order to expect correct hardware operation. The
+ * macro SPECIAL_REG_WRITE is used to perform such ordered 
+ * writes. Defines UF (Upper First) and LF (Lower First) will 
+ * be used to specify the required write order.
+ */
+#define UF	1
+#define LF	2
+static inline void SPECIAL_REG_WRITE(u64 val, void *addr, int order)
+{
+	if (order == LF) {
+		writel((u32) (val), addr);
+		writel((u32) (val >> 32), (addr + 4));
+	} else {
+		writel((u32) (val >> 32), (addr + 4));
+		writel((u32) (val), addr);
+	}
+}
+#else
+#define SPECIAL_REG_WRITE(val, addr, dummy) writeq(val, addr)
 #endif
 
 /*  Interrupt related values of Xena */
