@@ -74,12 +74,6 @@ DF_MASK		= 0x00000400
 NT_MASK		= 0x00004000
 VM_MASK		= 0x00020000
 
-/*
- * ESP0 is at offset 4. 0x200 is the size of the TSS, and
- * also thus the top-of-stack pointer offset of SYSENTER_ESP
- */
-TSS_ESP0_OFFSET = (4 - 0x200)
-
 #ifdef CONFIG_PREEMPT
 #define preempt_stop		cli
 #else
@@ -163,8 +157,8 @@ do_lcall:
 	movl %edx,EIP(%ebp)	# Now we move them to their "normal" places
 	movl %ecx,CS(%ebp)	#
 	GET_THREAD_INFO_WITH_ESP(%ebp)	# GET_THREAD_INFO
-	movl TI_EXEC_DOMAIN(%ebp), %edx	# Get the execution domain
-	call *4(%edx)		# Call the lcall7 handler for the domain
+	movl TI_exec_domain(%ebp), %edx	# Get the execution domain
+	call *EXEC_DOMAIN_handler(%edx)	# Call the handler for the domain
 	addl $4, %esp
 	popl %eax
 	jmp resume_userspace
@@ -208,7 +202,7 @@ ENTRY(resume_userspace)
  	cli				# make sure we don't miss an interrupt
 					# setting need_resched or sigpending
 					# between sampling and the iret
-	movl TI_FLAGS(%ebp), %ecx
+	movl TI_flags(%ebp), %ecx
 	andl $_TIF_WORK_MASK, %ecx	# is there any work to be done on
 					# int/exception return?
 	jne work_pending
@@ -216,18 +210,18 @@ ENTRY(resume_userspace)
 
 #ifdef CONFIG_PREEMPT
 ENTRY(resume_kernel)
-	cmpl $0,TI_PRE_COUNT(%ebp)	# non-zero preempt_count ?
+	cmpl $0,TI_preempt_count(%ebp)	# non-zero preempt_count ?
 	jnz restore_all
 need_resched:
-	movl TI_FLAGS(%ebp), %ecx	# need_resched set ?
+	movl TI_flags(%ebp), %ecx	# need_resched set ?
 	testb $_TIF_NEED_RESCHED, %cl
 	jz restore_all
 	testl $IF_MASK,EFLAGS(%esp)     # interrupts off (exception path) ?
 	jz restore_all
-	movl $PREEMPT_ACTIVE,TI_PRE_COUNT(%ebp)
+	movl $PREEMPT_ACTIVE,TI_preempt_count(%ebp)
 	sti
 	call schedule
-	movl $0,TI_PRE_COUNT(%ebp)
+	movl $0,TI_preempt_count(%ebp)
 	cli
 	jmp need_resched
 #endif
@@ -237,7 +231,7 @@ need_resched:
 
 	# sysenter call handler stub
 ENTRY(sysenter_entry)
-	movl TSS_ESP0_OFFSET(%esp),%esp
+	movl TSS_sysenter_esp0(%esp),%esp
 sysenter_past_esp:
 	sti
 	pushl $(__USER_DS)
@@ -264,12 +258,12 @@ sysenter_past_esp:
 	cmpl $(nr_syscalls), %eax
 	jae syscall_badsys
 
-	testb $(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT),TI_FLAGS(%ebp)
+	testb $(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT),TI_flags(%ebp)
 	jnz syscall_trace_entry
 	call *sys_call_table(,%eax,4)
 	movl %eax,EAX(%esp)
 	cli
-	movl TI_FLAGS(%ebp), %ecx
+	movl TI_flags(%ebp), %ecx
 	testw $_TIF_ALLWORK_MASK, %cx
 	jne syscall_exit_work
 /* if something modifies registers it must also disable sysexit */
@@ -287,7 +281,7 @@ ENTRY(system_call)
 	cmpl $(nr_syscalls), %eax
 	jae syscall_badsys
 					# system call tracing in operation
-	testb $(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT),TI_FLAGS(%ebp)
+	testb $(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT),TI_flags(%ebp)
 	jnz syscall_trace_entry
 syscall_call:
 	call *sys_call_table(,%eax,4)
@@ -296,7 +290,7 @@ syscall_exit:
 	cli				# make sure we don't miss an interrupt
 					# setting need_resched or sigpending
 					# between sampling and the iret
-	movl TI_FLAGS(%ebp), %ecx
+	movl TI_flags(%ebp), %ecx
 	testw $_TIF_ALLWORK_MASK, %cx	# current->work
 	jne syscall_exit_work
 restore_all:
@@ -312,7 +306,7 @@ work_resched:
 	cli				# make sure we don't miss an interrupt
 					# setting need_resched or sigpending
 					# between sampling and the iret
-	movl TI_FLAGS(%ebp), %ecx
+	movl TI_flags(%ebp), %ecx
 	andl $_TIF_WORK_MASK, %ecx	# is there any work to be done other
 					# than syscall tracing?
 	jz restore_all
@@ -473,7 +467,7 @@ device_not_available_emulate:
  * that sets up the real kernel stack. Check here, since we can't
  * allow the wrong stack to be used.
  *
- * "TSS_ESP0_OFFSET+12" is because the NMI/debug handler will have
+ * "TSS_sysenter_esp0+12" is because the NMI/debug handler will have
  * already pushed 3 words if it hits on the sysenter instruction:
  * eflags, cs and eip.
  *
@@ -485,7 +479,7 @@ device_not_available_emulate:
 	cmpw $__KERNEL_CS,4(%esp);		\
 	jne ok;					\
 label:						\
-	movl TSS_ESP0_OFFSET+offset(%esp),%esp;	\
+	movl TSS_sysenter_esp0+offset(%esp),%esp;	\
 	pushfl;					\
 	pushl $__KERNEL_CS;			\
 	pushl $sysenter_past_esp
