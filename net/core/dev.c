@@ -1229,19 +1229,20 @@ static void sample_queue(unsigned long dummy)
 
 int netif_rx(struct sk_buff *skb)
 {
-	int this_cpu = smp_processor_id();
+	int this_cpu;
 	struct softnet_data *queue;
 	unsigned long flags;
 
 	if (!skb->stamp.tv_sec)
 		do_gettimeofday(&skb->stamp);
 
-	/* The code is rearranged so that the path is the most
-	   short when CPU is congested, but is still operating.
+	/*
+	 * The code is rearranged so that the path is the most
+	 * short when CPU is congested, but is still operating.
 	 */
-	queue = &softnet_data[this_cpu];
-
 	local_irq_save(flags);
+	this_cpu = smp_processor_id();
+	queue = &softnet_data[this_cpu];
 
 	netdev_rx_stat[this_cpu].total++;
 	if (queue->input_pkt_queue.qlen <= netdev_max_backlog) {
@@ -1252,10 +1253,10 @@ int netif_rx(struct sk_buff *skb)
 enqueue:
 			dev_hold(skb->dev);
 			__skb_queue_tail(&queue->input_pkt_queue, skb);
-			local_irq_restore(flags);
 #ifndef OFFLINE_SAMPLE
 			get_sample_stats(this_cpu);
 #endif
+			local_irq_restore(flags);
 			return queue->cng_level;
 		}
 
