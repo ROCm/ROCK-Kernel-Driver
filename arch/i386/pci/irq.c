@@ -897,7 +897,7 @@ static int __init pcibios_irq_init(void)
 {
 	DBG("PCI: IRQ init\n");
 
-	if (pcibios_enable_irq)
+	if (pcibios_enable_irq || raw_pci_ops == NULL)
 		return 0;
 
 	pirq_table = pirq_find_routing_table();

@@ -271,7 +271,6 @@ struct bus_info {
 ***********************************************************/
 extern struct list_head ibmphp_ebda_pci_rsrc_head;
 extern struct list_head ibmphp_slot_head;
-extern struct list_head ibmphp_res_head;
 /***********************************************************
 * FUNCTION PROTOTYPES                                      *
 ***********************************************************/
@@ -754,7 +753,6 @@ struct controller {
 /* Functions */
 
 extern int ibmphp_init_devno (struct slot **);	/* This function is called from EBDA, so we need it not be static */
-extern int ibmphp_disable_slot (struct hotplug_slot *);	/* This function is called from HPC, so we need it to not be static */
 extern int ibmphp_do_disable_slot (struct slot *slot_cur);
 extern int ibmphp_update_slot_info (struct slot *);	/* This function is called from HPC, so we need it to not be be static */
 extern int ibmphp_configure_card (struct pci_func *, u8);

@@ -94,6 +94,7 @@ int register_vio_slot(struct device_node *dn)
 		slot->state = NOT_CONFIGURED;
 	if (setup_vio_hotplug_slot_info(slot))
 		goto exit_rc;
+	strcpy(slot->name, slot->dev.vio_dev->dev.bus_id);
 	info("%s: registered VIO device[name=%s vio_dev=%p]\n",
 		__FUNCTION__, slot->name, slot->dev.vio_dev); 
 	rc = register_slot(slot);

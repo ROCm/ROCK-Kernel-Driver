@@ -37,7 +37,6 @@
 int pciehprm_init(enum php_ctlr_type ct);
 void pciehprm_cleanup(void);
 int pciehprm_print_pirt(void);
-void *pciehprm_get_slot(struct slot *slot);
 int pciehprm_find_available_resources(struct controller *ctrl);
 int pciehprm_set_hpp(struct controller *ctrl, struct pci_func *func, u8 card_type);
 void pciehprm_enable_card(struct controller *ctrl, struct pci_func *func, u8 card_type);
