@@ -71,7 +71,9 @@ extern spinlock_t sal_lock;
 # define SAL_CALL_REENTRANT(result,args...) do {	\
 	struct ia64_fpreg __ia64_scs_fr[6];		\
 	ia64_save_scratch_fpregs(__ia64_scs_fr);	\
+	preempt_disable();				\
 	__SAL_CALL(result, args);			\
+	preempt_enable();				\
 	ia64_load_scratch_fpregs(__ia64_scs_fr);	\
 } while (0)
 
