@@ -1286,6 +1286,9 @@ static int irda_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 		/* Check if we are still connected */
 		if (sk->state != TCP_ESTABLISHED)
 			return -ENOTCONN;
+		/* Handle signals */
+		if (signal_pending(current)) 
+			return -ERESTARTSYS;
 	}
 
 	/* Check that we don't send out to big frames */
