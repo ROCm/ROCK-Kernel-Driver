@@ -798,7 +798,7 @@ void prom_initialize_dart_table(void)
 	 * will blow up an entire large page anyway in the kernel mapping
 	 */
 	RELOC(dart_tablebase) =
-		absolute_to_virt(lmb_alloc_base(1UL<<24, 1UL<<24, 0x80000000L));
+		abs_to_virt(lmb_alloc_base(1UL<<24, 1UL<<24, 0x80000000L));
 
 	prom_print(RELOC("Dart at: "));
 	prom_print_hex(RELOC(dart_tablebase));
