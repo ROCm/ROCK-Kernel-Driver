@@ -119,7 +119,7 @@ static struct i2c_algorithm smbus_algorithm = {
 
 static struct i2c_adapter nforce2_adapter = {
 	.owner          = THIS_MODULE,
-	.class          = I2C_ADAP_CLASS_SMBUS,
+	.class          = I2C_CLASS_SMBUS,
 	.algo           = &smbus_algorithm,
 	.name   	= "unset",
 };

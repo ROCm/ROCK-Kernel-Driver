@@ -500,7 +500,7 @@ static DEVICE_ATTR(alarms, S_IRUGO | S_IWUSR, show_alarms, NULL);
      * when a new adapter is inserted (and it87_driver is still present) */
 static int it87_attach_adapter(struct i2c_adapter *adapter)
 {
-	if (!(adapter->class & I2C_ADAP_CLASS_SMBUS))
+	if (!(adapter->class & I2C_CLASS_SMBUS))
 		return 0;
 	return i2c_detect(adapter, &addr_data, it87_detect);
 }

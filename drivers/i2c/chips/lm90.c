@@ -274,7 +274,7 @@ static DEVICE_ATTR(alarms, S_IRUGO, show_alarms, NULL);
 
 static int lm90_attach_adapter(struct i2c_adapter *adapter)
 {
-	if (!(adapter->class & I2C_ADAP_CLASS_SMBUS))
+	if (!(adapter->class & I2C_CLASS_SMBUS))
 		return 0;
 	return i2c_detect(adapter, &addr_data, lm90_detect);
 }

@@ -347,8 +347,8 @@ static struct i2c_adapter saa7134_adap_template = {
 	.inc_use       = inc_use,
 	.dec_use       = dec_use,
 #endif
-#ifdef I2C_ADAP_CLASS_TV_ANALOG
-	.class         = I2C_ADAP_CLASS_TV_ANALOG,
+#ifdef I2C_CLASS_TV_ANALOG
+	.class         = I2C_CLASS_TV_ANALOG,
 #endif
 	I2C_DEVNAME("saa7134"),
 	.id            = I2C_ALGO_SAA7134,

@@ -357,7 +357,7 @@ static struct i2c_algorithm ali1563_algorithm = {
 
 static struct i2c_adapter ali1563_adapter = {
 	.owner	= THIS_MODULE,
-	.class	= I2C_ADAP_CLASS_SMBUS,
+	.class	= I2C_CLASS_SMBUS,
 	.algo	= &ali1563_algorithm,
 };
 

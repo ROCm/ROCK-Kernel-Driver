@@ -113,6 +113,7 @@ struct i2c_driver {
 	struct module *owner;
 	char name[32];
 	int id;
+	unsigned int class;
 	unsigned int flags;		/* div., see below		*/
 
 	/* Notifies the driver that a new bus has appeared. This routine
@@ -237,7 +238,6 @@ struct i2c_adapter {
 	/* data fields that are valid for all devices	*/
 	struct semaphore bus_lock;
 	struct semaphore clist_lock;
-	unsigned int flags;/* flags specifying div. data		*/
 
 	int timeout;
 	int retries;
@@ -286,12 +286,14 @@ static inline void i2c_set_adapdata (struct i2c_adapter *dev, void *data)
 						/* Must equal I2C_M_TEN below */
 
 /* i2c adapter classes (bitmask) */
-#define I2C_ADAP_CLASS_SMBUS		(1<<0)	/* lm_sensors, ... */
-#define I2C_ADAP_CLASS_TV_ANALOG	(1<<1)	/* bttv + friends */
-#define I2C_ADAP_CLASS_TV_DIGITAL	(1<<2)	/* dbv cards */
-#define I2C_ADAP_CLASS_DDC		(1<<3)	/* i2c-matroxfb ? */
-#define I2C_ADAP_CLASS_CAM_ANALOG	(1<<4)	/* camera with analog CCD */
-#define I2C_ADAP_CLASS_CAM_DIGITAL	(1<<5)	/* most webcams */
+#define I2C_CLASS_SMBUS		(1<<0)	/* lm_sensors, ... */
+#define I2C_CLASS_TV_ANALOG	(1<<1)	/* bttv + friends */
+#define I2C_CLASS_TV_DIGITAL	(1<<2)	/* dvb cards */
+#define I2C_CLASS_DDC		(1<<3)	/* i2c-matroxfb ? */
+#define I2C_CLASS_CAM_ANALOG	(1<<4)	/* camera with analog CCD */
+#define I2C_CLASS_CAM_DIGITAL	(1<<5)	/* most webcams */
+#define I2C_CLASS_SOUND		(1<<6)	/* sound devices */
+#define I2C_CLASS_ALL		(UINT_MAX) /* all of the above */
 
 /* i2c_client_address_data is the struct for holding default client
  * addresses for a driver and for the parameters supplied on the

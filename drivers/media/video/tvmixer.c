@@ -263,8 +263,8 @@ static int tvmixer_clients(struct i2c_client *client)
 	struct video_audio va;
 	int i,minor;
 
-#ifdef I2C_ADAP_CLASS_TV_ANALOG
-	if (!(client->adapter->class & I2C_ADAP_CLASS_TV_ANALOG))
+#ifdef I2C_CLASS_TV_ANALOG
+	if (!(client->adapter->class & I2C_CLASS_TV_ANALOG))
 		return -1;
 #else
 	/* TV card ??? */
