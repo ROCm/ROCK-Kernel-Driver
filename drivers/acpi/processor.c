@@ -2489,6 +2489,10 @@ static struct dmi_system_id __initdata processor_dmi_table[] = {
 	{},
 };
 
+/* We keep the driver loaded even when ACPI is not running. 
+   This is needed for the powernow-k8 driver, that works even without
+   ACPI, but needs symbols from this driver */
+
 static int __init
 acpi_processor_init (void)
 {
@@ -2501,13 +2505,13 @@ acpi_processor_init (void)
 
 	acpi_processor_dir = proc_mkdir(ACPI_PROCESSOR_CLASS, acpi_root_dir);
 	if (!acpi_processor_dir)
-		return_VALUE(-ENODEV);
+		return_VALUE(0);
 	acpi_processor_dir->owner = THIS_MODULE;
 
 	result = acpi_bus_register_driver(&acpi_processor_driver);
 	if (result < 0) {
 		remove_proc_entry(ACPI_PROCESSOR_CLASS, acpi_root_dir);
-		return_VALUE(-ENODEV);
+		return_VALUE(0);
 	}
 
 	acpi_thermal_cpufreq_init();
