@@ -353,9 +353,13 @@ copy_thread (int nr, unsigned long clone_flags,
 	/* copy parts of thread_struct: */
 	p->thread.ksp = (unsigned long) child_stack - 16;
 
-	/* stop some PSR bits from being inherited: */
+	/* stop some PSR bits from being inherited.
+	 * the psr.up/psr.pp bits must be cleared on fork but inherited on execve()
+	 * therefore we must specify them explicitly here and not include them in
+	 * IA64_PSR_BITS_TO_CLEAR.
+	 */
 	child_ptregs->cr_ipsr =  ((child_ptregs->cr_ipsr | IA64_PSR_BITS_TO_SET)
-				  & ~IA64_PSR_BITS_TO_CLEAR);
+			      & ~(IA64_PSR_BITS_TO_CLEAR | IA64_PSR_PP | IA64_PSR_UP));
 
 	/*
 	 * NOTE: The calling convention considers all floating point
