@@ -413,7 +413,7 @@ static unsigned long carm_major_alloc;
 static int carm_bdev_ioctl(struct inode *ino, struct file *fil,
 			   unsigned int cmd, unsigned long arg)
 {
-	void __user *usermem = (void *) arg;
+	void __user *usermem = (void __user *) arg;
 	struct carm_port *port = ino->i_bdev->bd_disk->private_data;
 	struct hd_geometry geom;
 
