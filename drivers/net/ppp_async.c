@@ -24,7 +24,7 @@
 #include <linux/tty.h>
 #include <linux/netdevice.h>
 #include <linux/poll.h>
-#include <linux/crc16.h>
+#include <linux/crc-ccitt.h>
 #include <linux/ppp_defs.h>
 #include <linux/if_ppp.h>
 #include <linux/ppp_channel.h>

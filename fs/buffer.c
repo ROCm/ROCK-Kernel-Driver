@@ -1588,10 +1588,9 @@ __bread(struct block_device *bdev, sector_t block, int size)
 EXPORT_SYMBOL(__bread);
 
 /*
- * invalidate_bh_lrus() is called rarely - at unmount.  Because it is only for
- * unmount it only needs to ensure that all buffers from the target device are
- * invalidated on return and it doesn't need to worry about new buffers from
- * that device being added - the unmount code has to prevent that.
+ * invalidate_bh_lrus() is called rarely - but not only at unmount.
+ * This doesn't race because it runs in each cpu either in irq
+ * or with preempt disabled.
  */
 static void invalidate_bh_lru(void *arg)
 {
@@ -1807,10 +1806,10 @@ EXPORT_SYMBOL(unmap_underlying_metadata);
  * state inside lock_buffer().
  *
  * If block_write_full_page() is called for regular writeback
- * (called_for_sync() is false) then it will redirty a page which has a locked
- * buffer.   This only can happen if someone has written the buffer directly,
- * with submit_bh().  At the address_space level PageWriteback prevents this
- * contention from occurring.
+ * (wbc->sync_mode == WB_SYNC_NONE) then it will redirty a page which has a
+ * locked buffer.   This only can happen if someone has written the buffer
+ * directly, with submit_bh().  At the address_space level PageWriteback
+ * prevents this contention from occurring.
  */
 static int __block_write_full_page(struct inode *inode, struct page *page,
 			get_block_t *get_block, struct writeback_control *wbc)
@@ -1899,14 +1898,14 @@ static int __block_write_full_page(struct inode *inode, struct page *page,
 		}
 	} while ((bh = bh->b_this_page) != head);
 
+	/*
+	 * The page and its buffers are protected by PageWriteback(), so we can
+	 * drop the bh refcounts early.
+	 */
 	BUG_ON(PageWriteback(page));
-	set_page_writeback(page);	/* Keeps try_to_free_buffers() away */
+	set_page_writeback(page);
 	unlock_page(page);
 
-	/*
-	 * The page may come unlocked any time after the *first* submit_bh()
-	 * call.  Be careful with its buffers.
-	 */
 	do {
 		struct buffer_head *next = bh->b_this_page;
 		if (buffer_async_write(bh)) {
@@ -1936,6 +1935,10 @@ done:
 		if (uptodate)
 			SetPageUptodate(page);
 		end_page_writeback(page);
+		/*
+		 * The page and buffer_heads can be released at any time from
+		 * here on.
+		 */
 		wbc->pages_skipped++;	/* We didn't write this page */
 	}
 	return err;
@@ -2723,7 +2726,7 @@ int block_write_full_page(struct page *page, get_block_t *get_block,
 
 	/*
 	 * The page straddles i_size.  It must be zeroed out on each and every
-	 * writepage invocation because it may be mmapped.  "A file is mapped
+	 * writepage invokation because it may be mmapped.  "A file is mapped
 	 * in multiples of the page size.  For a file that is not a multiple of
 	 * the  page size, the remaining memory is zeroed when mapped, and
 	 * writes to that region are not written out to the file."

@@ -128,7 +128,7 @@ static struct mtd_info *jedec_probe(struct map_info *map)
    {
       printk("mtd: Increase MAX_JEDEC_CHIPS, too many banks.\n");
       kfree(MTD);
-      return 0;
+      return NULL;
    }
    
    for (Base = 0; Base < map->size; Base += my_bank_size)
@@ -141,7 +141,7 @@ static struct mtd_info *jedec_probe(struct map_info *map)
 	 if (jedec_probe8(map,Base,priv) == 0) {
 		 printk("did recognize jedec chip\n");
 		 kfree(MTD);
-	         return 0;
+	         return NULL;
 	 }
       }
       if (map->buswidth == 2)
@@ -167,7 +167,7 @@ static struct mtd_info *jedec_probe(struct map_info *map)
       {
 	 printk("mtd: Failed. Device has incompatible mixed sector sizes\n");
 	 kfree(MTD);
-	 return 0;
+	 return NULL;
       }      
    }
    
@@ -193,7 +193,7 @@ static struct mtd_info *jedec_probe(struct map_info *map)
       {
 	 printk("mtd: Internal Error, JEDEC not set\n");
 	 kfree(MTD);
-	 return 0;
+	 return NULL;
       }
       
       if (Uniq != 0)
@@ -221,7 +221,7 @@ static struct mtd_info *jedec_probe(struct map_info *map)
    if (!priv->size) {
 	   printk("priv->size is zero\n");
 	   kfree(MTD);
-	   return 0;
+	   return NULL;
    }
    if (priv->size/my_bank_size) {
 	   if (priv->size/my_bank_size == 1) {
@@ -240,7 +240,7 @@ static struct mtd_info *jedec_probe(struct map_info *map)
 		      {
 			 printk("mtd: Failed. Cannot handle unsymmetric banking\n");
 			 kfree(MTD);
-			 return 0;
+			 return NULL;
 		      }      
 		   }
 	   }
@@ -385,7 +385,7 @@ static const struct JEDECTable *jedec_idtoinf(__u8 mfr,__u8 id)
    for (I = 0; JEDEC_table[I].jedec != 0; I++)
       if (JEDEC_table[I].jedec == Id)
 	 return JEDEC_table + I;
-   return 0;
+   return NULL;
 }
 
 // Look for flash using an 8 bit bus interface

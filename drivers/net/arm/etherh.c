@@ -574,7 +574,7 @@ etherh_probe(struct expansion_card *ec, const struct ecard_id *id)
 	if (ret)
 		goto out;
 
-	dev = alloc_ei_netdev();
+	dev = __alloc_ei_netdev(sizeof(struct etherh_priv));
 	if (!dev) {
 		ret = -ENOMEM;
 		goto release;

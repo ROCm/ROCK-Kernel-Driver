@@ -214,7 +214,6 @@ static void __pci_addr_cache_insert_device(struct pci_dev *dev)
 	if (!dn) {
 		printk(KERN_WARNING "PCI: no pci dn found for dev=%s %s\n",
 			pci_name(dev), pci_pretty_name(dev));
-		pci_dev_put(dev);
 		return;
 	}
 
@@ -225,9 +224,11 @@ static void __pci_addr_cache_insert_device(struct pci_dev *dev)
 		printk(KERN_INFO "PCI: skip building address cache for=%s %s\n",
 		       pci_name(dev), pci_pretty_name(dev));
 #endif
-		pci_dev_put(dev);
 		return;
 	}
+
+	/* The cache holds a reference to the device... */
+	pci_dev_get(dev);
 
 	/* Walk resources on this device, poke them into the tree */
 	for (i = 0; i < DEVICE_COUNT_RESOURCE; i++) {
@@ -278,6 +279,8 @@ restart:
 		}
 		n = rb_next(n);
 	}
+
+	/* The cache no longer holds its reference to this device... */
 	pci_dev_put(dev);
 }
 
@@ -317,7 +320,6 @@ void __init pci_addr_cache_build(void)
 	while ((dev = pci_get_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 		/* Ignore PCI bridges ( XXX why ??) */
 		if ((dev->class >> 16) == PCI_BASE_CLASS_BRIDGE) {
-			pci_dev_put(dev);
 			continue;
 		}
 		pci_addr_cache_insert_device(dev);
@@ -483,14 +485,8 @@ static void *early_enable_eeh(struct device_node *dn, void *data)
 	if (status && strcmp(status, "ok") != 0)
 		return NULL;	/* ignore devices with bad status */
 
-	/* Weed out PHBs or other bad nodes. */
+	/* Ignore bad nodes. */
 	if (!class_code || !vendor_id || !device_id)
-		return NULL;
-
-	/* Ignore known PHBs and EADs bridges */
-	if (*vendor_id == PCI_VENDOR_ID_IBM &&
-	    (*device_id == 0x0102 || *device_id == 0x008b ||
-	     *device_id == 0x0188 || *device_id == 0x0302))
 		return NULL;
 
 	/* There is nothing to check on PCI to ISA bridges */
@@ -524,15 +520,8 @@ static void *early_enable_eeh(struct device_node *dn, void *data)
 		dn->eeh_mode |= EEH_MODE_NOCHECK;
 	}
 
-	/* This device may already have an EEH parent. */
-	if (dn->parent && (dn->parent->eeh_mode & EEH_MODE_SUPPORTED)) {
-		/* Parent supports EEH. */
-		dn->eeh_mode |= EEH_MODE_SUPPORTED;
-		dn->eeh_config_addr = dn->parent->eeh_config_addr;
-		return NULL;
-	}
-
-	/* Ok... see if this device supports EEH. */
+	/* Ok... see if this device supports EEH.  Some do, some don't,
+	 * and the only way to find out is to check each and every one. */
 	regs = (u32 *)get_property(dn, "reg", 0);
 	if (regs) {
 		/* First register entry is addr (00BBSS00)  */
@@ -545,12 +534,18 @@ static void *early_enable_eeh(struct device_node *dn, void *data)
 			dn->eeh_mode |= EEH_MODE_SUPPORTED;
 			dn->eeh_config_addr = regs[0];
 #ifdef DEBUG
-			printk(KERN_DEBUG "EEH: %s: eeh enabled\n",
-			       dn->full_name);
+			printk(KERN_DEBUG "EEH: %s: eeh enabled\n", dn->full_name);
 #endif
 		} else {
-			printk(KERN_WARNING "EEH: %s: could not enable EEH, rtas_call failed; rc=%d\n",
-			       dn->full_name, ret);
+
+			/* This device doesn't support EEH, but it may have an
+			 * EEH parent, in which case we mark it as supported. */
+			if (dn->parent && (dn->parent->eeh_mode & EEH_MODE_SUPPORTED)) {
+				/* Parent supports EEH. */
+				dn->eeh_mode |= EEH_MODE_SUPPORTED;
+				dn->eeh_config_addr = dn->parent->eeh_config_addr;
+				return NULL;
+			}
 		}
 	} else {
 		printk(KERN_WARNING "EEH: %s: unable to get reg property.\n",

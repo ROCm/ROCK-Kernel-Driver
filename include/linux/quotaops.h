@@ -69,9 +69,22 @@ static __inline__ void DQUOT_INIT(struct inode *inode)
 /* The same as with DQUOT_INIT */
 static __inline__ void DQUOT_DROP(struct inode *inode)
 {
-	if (IS_QUOTAINIT(inode)) {
-		BUG_ON(!inode->i_sb);
-		inode->i_sb->dq_op->drop(inode);	/* Ops must be set when there's any quota... */
+	/* Here we can get arbitrary inode from clear_inode() so we have
+	 * to be careful. OTOH we don't need locking as quota operations
+	 * are allowed to change only at mount time */
+	if (!IS_NOQUOTA(inode) && inode->i_sb && inode->i_sb->dq_op
+	    && inode->i_sb->dq_op->drop) {
+		int cnt;
+		/* Test before calling to rule out calls from proc and such
+                 * where we are not allowed to block. Note that this is
+		 * actually reliable test even without the lock - the caller
+		 * must assure that nobody can come after the DQUOT_DROP and
+		 * add quota pointers back anyway */
+		for (cnt = 0; cnt < MAXQUOTAS; cnt++)
+			if (inode->i_dquot[cnt] != NODQUOT)
+				break;
+		if (cnt < MAXQUOTAS)
+			inode->i_sb->dq_op->drop(inode);
 	}
 }
 

@@ -259,19 +259,19 @@ static struct dir_table_slot *find_index(struct inode *ip, u32 index,
 			jfs_warn("find_entry called with index = %d", index);
 			maxWarnings--;
 		}
-		return 0;
+		return NULL;
 	}
 
 	if (index >= jfs_ip->next_index) {
 		jfs_warn("find_entry called with index >= next_index");
-		return 0;
+		return NULL;
 	}
 
 	if (jfs_ip->next_index <= (MAX_INLINE_DIRTABLE_ENTRY + 1)) {
 		/*
 		 * Inline directory table
 		 */
-		*mp = 0;
+		*mp = NULL;
 		slot = &jfs_ip->i_dirtable[index - 2];
 	} else {
 		offset = (index - 2) * sizeof(struct dir_table_slot);
@@ -281,7 +281,7 @@ static struct dir_table_slot *find_index(struct inode *ip, u32 index,
 
 		if (*mp && (*lblock != blkno)) {
 			release_metapage(*mp);
-			*mp = 0;
+			*mp = NULL;
 		}
 		if (*mp == 0) {
 			*lblock = blkno;
@@ -289,7 +289,7 @@ static struct dir_table_slot *find_index(struct inode *ip, u32 index,
 		}
 		if (*mp == 0) {
 			jfs_err("free_index: error reading directory table");
-			return 0;
+			return NULL;
 		}
 
 		slot =
@@ -490,7 +490,7 @@ static void free_index(tid_t tid, struct inode *ip, u32 index, u32 next)
 {
 	struct dir_table_slot *dirtab_slot;
 	s64 lblock;
-	struct metapage *mp = 0;
+	struct metapage *mp = NULL;
 
 	dirtab_slot = find_index(ip, index, &mp, &lblock);
 
@@ -543,7 +543,7 @@ static int read_index(struct inode *ip, u32 index,
 		     struct dir_table_slot * dirtab_slot)
 {
 	s64 lblock;
-	struct metapage *mp = 0;
+	struct metapage *mp = NULL;
 	struct dir_table_slot *slot;
 
 	slot = find_index(ip, index, &mp, &lblock);
@@ -850,7 +850,7 @@ int dtInsert(tid_t tid, struct inode *ip,
 		data.leaf.ip = ip;
 	} else {
 		n = NDTLEAF_LEGACY(name->namlen);
-		data.leaf.ip = 0;	/* signifies legacy directory format */
+		data.leaf.ip = NULL;	/* signifies legacy directory format */
 	}
 	data.leaf.ino = cpu_to_le32(*fsn);
 
@@ -940,7 +940,7 @@ static int dtSplitUp(tid_t tid,
 	int xlen, xsize;
 	struct pxdlist pxdlist;
 	pxd_t *pxd;
-	struct component_name key = { 0, 0 };
+	struct component_name key = { 0, NULL };
 	ddata_t *data = split->data;
 	int n;
 	struct dt_lock *dtlck;
@@ -1550,7 +1550,7 @@ static int dtSplitPage(tid_t tid, struct inode *ip, struct dtsplit * split,
 	if ((rp->header.flag & BT_LEAF) && DO_INDEX(ip)) {
 		s64 lblock;
 
-		mp = 0;
+		mp = NULL;
 		stbl = DT_GETSTBL(rp);
 		for (n = 0; n < rp->header.nextindex; n++) {
 			ldtentry = (struct ldtentry *) & rp->slot[stbl[n]];
@@ -1676,7 +1676,7 @@ static int dtExtendPage(tid_t tid,
 		if (DO_INDEX(ip)) {
 			s64 lblock;
 
-			mp = 0;
+			mp = NULL;
 			stbl = DT_GETSTBL(sp);
 			for (n = 0; n < sp->header.nextindex; n++) {
 				ldtentry =
@@ -1970,7 +1970,7 @@ static int dtSplitRoot(tid_t tid,
 	 */
 	if ((rp->header.flag & BT_LEAF) && DO_INDEX(ip)) {
 		s64 lblock;
-		struct metapage *mp = 0;
+		struct metapage *mp = NULL;
 		struct ldtentry *ldtentry;
 
 		stbl = DT_GETSTBL(rp);
@@ -2181,7 +2181,7 @@ int dtDelete(tid_t tid,
 		if (DO_INDEX(ip) && index < p->header.nextindex) {
 			s64 lblock;
 
-			imp = 0;
+			imp = NULL;
 			stbl = DT_GETSTBL(p);
 			for (i = index; i < p->header.nextindex; i++) {
 				ldtentry =
@@ -3873,8 +3873,8 @@ static void dtInsertEntry(dtpage_t * p, int index, struct component_name * key,
 			  ddata_t * data, struct dt_lock ** dtlock)
 {
 	struct dtslot *h, *t;
-	struct ldtentry *lh = 0;
-	struct idtentry *ih = 0;
+	struct ldtentry *lh = NULL;
+	struct idtentry *ih = NULL;
 	int hsi, fsi, klen, len, nextindex;
 	wchar_t *kname, *name;
 	s8 *stbl;
@@ -3883,7 +3883,7 @@ static void dtInsertEntry(dtpage_t * p, int index, struct component_name * key,
 	struct lv *lv;
 	int xsi, n;
 	s64 bn = 0;
-	struct metapage *mp = 0;
+	struct metapage *mp = NULL;
 
 	klen = key->namlen;
 	kname = key->name;
@@ -3999,7 +3999,7 @@ static void dtInsertEntry(dtpage_t * p, int index, struct component_name * key,
 			 * Need to update slot number for entries that moved
 			 * in the stbl
 			 */
-			mp = 0;
+			mp = NULL;
 			for (n = index + 1; n <= nextindex; n++) {
 				lh = (struct ldtentry *) & (p->slot[stbl[n]]);
 				modify_index(data->leaf.tid, data->leaf.ip,
@@ -4035,8 +4035,8 @@ static void dtMoveEntry(dtpage_t * sp, int si, dtpage_t * dp,
 	int dsi;		/* dst slot index */
 	s8 *sstbl, *dstbl;	/* sorted entry table */
 	int snamlen, len;
-	struct ldtentry *slh, *dlh = 0;
-	struct idtentry *sih, *dih = 0;
+	struct ldtentry *slh, *dlh = NULL;
+	struct idtentry *sih, *dih = NULL;
 	struct dtslot *h, *s, *d;
 	struct dt_lock *sdtlck = *sdtlock, *ddtlck = *ddtlock;
 	struct lv *slv, *dlv;

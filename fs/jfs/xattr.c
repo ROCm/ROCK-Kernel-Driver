@@ -592,7 +592,7 @@ static int ea_put(struct inode *inode, struct ea_buffer *ea_buf, int new_size)
 
 	if (new_size == 0) {
 		ea_release(inode, ea_buf);
-		ea_buf = 0;
+		ea_buf = NULL;
 	} else if (ea_buf->flag & EA_INLINE) {
 		assert(new_size <= sizeof (ji->i_inline_ea));
 		ji->mode2 &= ~INLINEEA;
@@ -633,7 +633,7 @@ static int ea_put(struct inode *inode, struct ea_buffer *ea_buf, int new_size)
 		}
 		ji->ea = ea_buf->new_ea;
 	} else {
-		txEA(tid, inode, &ji->ea, 0);
+		txEA(tid, inode, &ji->ea, NULL);
 		if (ji->ea.flag & DXD_INLINE)
 			ji->mode2 |= INLINEEA;
 		ji->ea.flag = 0;
@@ -1039,5 +1039,5 @@ ssize_t jfs_listxattr(struct dentry * dentry, char *data, size_t buf_size)
 
 int jfs_removexattr(struct dentry *dentry, const char *name)
 {
-	return __jfs_setxattr(dentry->d_inode, name, 0, 0, XATTR_REPLACE);
+	return __jfs_setxattr(dentry->d_inode, name, NULL, 0, XATTR_REPLACE);
 }

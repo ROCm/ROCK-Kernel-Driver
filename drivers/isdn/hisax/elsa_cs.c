@@ -271,19 +271,6 @@ static void elsa_cs_detach(dev_link_t *link)
     if (link->state & DEV_CONFIG)
         elsa_cs_release(link);
 
-    /*
-       If the device is currently configured and active, we won't
-       actually delete it yet.  Instead, it is marked so that when
-       the release() function is called, that will trigger a proper
-       detach().
-    */
-    if (link->state & DEV_CONFIG) {
-      DEBUG(0, "elsa_cs: detach postponed, '%s' "
-               "still locked\n", link->dev->dev_name);
-        link->state |= DEV_STALE_LINK;
-        return;
-    }
-
     /* Break the link with Card Services */
     if (link->handle) {
         ret = pcmcia_deregister_client(link->handle);
@@ -480,10 +467,6 @@ static void elsa_cs_release(dev_link_t *link)
     pcmcia_release_io(link->handle, &link->io);
     pcmcia_release_irq(link->handle, &link->irq);
     link->state &= ~DEV_CONFIG;
-
-    if (link->state & DEV_STALE_LINK)
-        elsa_cs_detach(link);
-
 } /* elsa_cs_release */
 
 /*======================================================================

@@ -106,11 +106,6 @@ config FRAMEBUFFER_CONSOLE
 	tristate "Framebuffer Console support"
 	depends on FB
 
-config PCI_CONSOLE
-	bool
-	depends on FRAMEBUFFER_CONSOLE
-	default y
-
 config FONTS
 	bool "Select compiled-in fonts"
 	depends on FRAMEBUFFER_CONSOLE

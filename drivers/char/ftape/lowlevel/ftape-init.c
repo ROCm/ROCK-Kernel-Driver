@@ -55,7 +55,7 @@ char ft_rev[] __initdata = "$Revision: 1.8 $";
 char ft_dat[] __initdata = "$Date: 1997/11/06 00:38:08 $";
 
 
-#ifndef CONFIG_FT_NO_TRACE_AT_ALL
+#if defined(MODULE) && !defined(CONFIG_FT_NO_TRACE_AT_ALL)
 static int ft_tracing = -1;
 #endif
 

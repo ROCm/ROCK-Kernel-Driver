@@ -330,9 +330,9 @@ int txInit(void)
 void txExit(void)
 {
 	vfree(TxLock);
-	TxLock = 0;
+	TxLock = NULL;
 	vfree(TxBlock);
-	TxBlock = 0;
+	TxBlock = NULL;
 }
 
 
@@ -1554,7 +1554,7 @@ static int dataLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
 		hold_metapage(mp, 0);
 		atomic_dec(&mp->nohomeok);
 		discard_metapage(mp);
-		tlck->mp = 0;
+		tlck->mp = NULL;
 		return 0;
 	}
 
@@ -2270,7 +2270,7 @@ static void txUpdateMap(struct tblock * tblk)
 	struct pxd_lock pxdlock;
 	int maptype;
 	int k, nlock;
-	struct metapage *mp = 0;
+	struct metapage *mp = NULL;
 
 	ipimap = JFS_SBI(tblk->sb)->ipimap;
 
@@ -2358,7 +2358,7 @@ static void txUpdateMap(struct tblock * tblk)
 			assert(atomic_read(&mp->nohomeok) == 1);
 			atomic_dec(&mp->nohomeok);
 			discard_metapage(mp);
-			tlck->mp = 0;
+			tlck->mp = NULL;
 		}
 	}
 	/*
