@@ -36,13 +36,16 @@
 /* If you edit this file, please try to keep it sorted first by VendorID,
  * then by ProductID.
  *
- * If you want to add an entry for this file, please send the following
- * to greg@kroah.com:
- *	- patch that adds the entry for your device which includes your
- *	  email address right above the entry.
+ * If you want to add an entry for this file, be sure to include the
+ * following information:
+ *	- a patch that adds the entry for your device, including your
+ *	  email address right above the entry (plus maybe a brief
+ *	  explanation of the reason for the entry),
  *	- a copy of /proc/bus/usb/devices with your device plugged in
  *	  running with this patch.
- *
+ * Send your submission to either Phil Dibowitz <phil@ipom.com> or
+ * Alan Stern <stern@rowland.harvard.edu>, and don't forget to CC: the
+ * USB development list <linux-usb-devel@lists.sourceforge.net>.
  */
 
 UNUSUAL_DEV(  0x03ee, 0x6901, 0x0000, 0x0100,
