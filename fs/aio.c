@@ -396,6 +396,8 @@ static struct kiocb fastcall *__aio_get_req(struct kioctx *ctx)
 	req->ki_cancel = NULL;
 	req->ki_retry = NULL;
 	req->ki_obj.user = NULL;
+	req->ki_dtor = NULL;
+	req->private = NULL;
 
 	/* Check if the completion queue has enough free space to
 	 * accept an event from this io.
@@ -436,9 +438,13 @@ static inline struct kiocb *aio_get_req(struct kioctx *ctx)
 
 static inline void really_put_req(struct kioctx *ctx, struct kiocb *req)
 {
+	if (req->ki_dtor)
+		req->ki_dtor(req);
 	req->ki_ctx = NULL;
 	req->ki_filp = NULL;
 	req->ki_obj.user = NULL;
+	req->ki_dtor = NULL;
+	req->private = NULL;
 	kmem_cache_free(kiocb_cachep, req);
 	ctx->reqs_active--;
 
