@@ -421,7 +421,7 @@ struct sched_domain {
 	.nr_balance_failed	= 0,			\
 }
 #endif
-#endif /*  ARCH_HAS_SCHED_TUNE */
+#endif /* ARCH_HAS_SCHED_TUNE */
 #endif
 
 
@@ -2078,7 +2078,7 @@ static int load_balance(int this_cpu, runqueue_t *this_rq,
 		goto out_balanced;
 	}
 
- 	schedstat_add(sd, lb_imbalance[idle], imbalance);
+	schedstat_add(sd, lb_imbalance[idle], imbalance);
 
 	nr_moved = 0;
 	if (busiest->nr_running > 1) {
@@ -2221,29 +2221,29 @@ static void active_load_balance(runqueue_t *busiest, int busiest_cpu)
 	if (!sd)
 		return;
 
- 	group = sd->groups;
+	group = sd->groups;
 	while (!cpu_isset(busiest_cpu, group->cpumask))
- 		group = group->next;
- 	busy_group = group;
+		group = group->next;
+	busy_group = group;
 
- 	group = sd->groups;
- 	do {
+	group = sd->groups;
+	do {
 		cpumask_t tmp;
 		runqueue_t *rq;
 		int push_cpu = 0;
 
- 		if (group == busy_group)
- 			goto next_group;
+		if (group == busy_group)
+			goto next_group;
 
 		cpus_and(tmp, group->cpumask, cpu_online_map);
 		if (!cpus_weight(tmp))
 			goto next_group;
 
- 		for_each_cpu_mask(i, tmp) {
+		for_each_cpu_mask(i, tmp) {
 			if (!idle_cpu(i))
 				goto next_group;
- 			push_cpu = i;
- 		}
+			push_cpu = i;
+		}
 
 		rq = cpu_rq(push_cpu);
 
@@ -3792,7 +3792,7 @@ static void __migrate_task(struct task_struct *p, int src_cpu, int dest_cpu)
 	if (unlikely(cpu_is_offline(dest_cpu)))
 		return;
 
-	rq_src  = cpu_rq(src_cpu);
+	rq_src = cpu_rq(src_cpu);
 	rq_dest = cpu_rq(dest_cpu);
 
 	double_rq_lock(rq_src, rq_dest);
@@ -3897,7 +3897,7 @@ wait_to_die:
 }
 
 #ifdef CONFIG_HOTPLUG_CPU
-/* migrate_all_tasks - function to migrate all tasks from the dead cpu.  */
+/* migrate_all_tasks - function to migrate all tasks from the dead cpu. */
 static void migrate_all_tasks(int src_cpu)
 {
 	struct task_struct *tsk, *t;
@@ -3930,15 +3930,16 @@ static void migrate_all_tasks(int src_cpu)
 			cpus_setall(tsk->cpus_allowed);
 			dest_cpu = any_online_cpu(tsk->cpus_allowed);
 
-			/* Don't tell them about moving exiting tasks
-			   or kernel threads (both mm NULL), since
-			   they never leave kernel. */
+			/*
+			 * Don't tell them about moving exiting tasks
+			 * or kernel threads (both mm NULL), since
+			 * they never leave kernel.
+			 */
 			if (tsk->mm && printk_ratelimit())
 				printk(KERN_INFO "process %d (%s) no "
 				       "longer affine to cpu%d\n",
 				       tsk->pid, tsk->comm, src_cpu);
 		}
-
 		__migrate_task(tsk, src_cpu, dest_cpu);
 	} while_each_thread(t, tsk);
 
@@ -4019,7 +4020,7 @@ static int migration_call(struct notifier_block *nfb, unsigned long action,
 		rq->idle->static_prio = MAX_PRIO;
 		__setscheduler(rq->idle, SCHED_NORMAL, 0);
 		task_rq_unlock(rq, &flags);
- 		BUG_ON(rq->nr_running != 0);
+		BUG_ON(rq->nr_running != 0);
 
 		/* No need to migrate the tasks: it was best-effort if
 		 * they didn't do lock_cpu_hotplug().  Just wake up
@@ -4034,7 +4035,7 @@ static int migration_call(struct notifier_block *nfb, unsigned long action,
 			complete(&req->done);
 		}
 		spin_unlock_irq(&rq->lock);
- 		break;
+		break;
 #endif
 	}
 	return NOTIFY_OK;
@@ -4210,25 +4211,25 @@ __init static int cpu_to_node_group(int cpu)
 
 /* Groups for isolated scheduling domains */
 static struct sched_group sched_group_isolated[NR_CPUS];
+
+/* cpus with isolated domains */
+cpumask_t __initdata cpu_isolated_map = CPU_MASK_NONE;
+
 __init static int cpu_to_isolated_group(int cpu)
 {
-        return cpu;
+	return cpu;
 }
 
-cpumask_t __initdata cpu_isolated_map = CPU_MASK_NONE; /* cpus with isolated domains */
-
 /* Setup the mask of cpus configured for isolated domains */
-static int __init
-isolated_cpu_setup(char *str)
+static int __init isolated_cpu_setup(char *str)
 {
-        int ints[NR_CPUS], i;
+	int ints[NR_CPUS], i;
 
-        str = get_options(str, ARRAY_SIZE(ints), ints);
-        cpus_clear(cpu_isolated_map);
-        for (i=1; i<=ints[0]; i++) {
-                cpu_set(ints[i], cpu_isolated_map);
-        }
-        return 1;
+	str = get_options(str, ARRAY_SIZE(ints), ints);
+	cpus_clear(cpu_isolated_map);
+	for (i = 1; i <= ints[0]; i++)
+		cpu_set(ints[i], cpu_isolated_map);
+	return 1;
 }
 
 __setup ("isolcpus=", isolated_cpu_setup);
