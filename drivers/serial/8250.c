@@ -20,28 +20,29 @@
  *  membase is an 'ioremapped' cookie.
  */
 #include <linux/config.h>
-#include <linux/module.h>
-#include <linux/moduleparam.h>
-#include <linux/tty.h>
-#include <linux/ioport.h>
-#include <linux/init.h>
-#include <linux/console.h>
-#include <linux/sysrq.h>
-#include <linux/serial_reg.h>
-#include <linux/serial.h>
-#include <linux/serial_8250.h>
-#include <linux/circ_buf.h>
-#include <linux/delay.h>
-#include <linux/device.h>
-
-#include <asm/io.h>
-#include <asm/irq.h>
 
 #if defined(CONFIG_SERIAL_8250_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
 #define SUPPORT_SYSRQ
 #endif
 
+#include <linux/module.h>
+#include <linux/moduleparam.h>
+#include <linux/ioport.h>
+#include <linux/init.h>
+#include <linux/console.h>
+#include <linux/sysrq.h>
+#include <linux/delay.h>
+#include <linux/device.h>
+#include <linux/tty.h>
+#include <linux/tty_flip.h>
+#include <linux/serial_reg.h>
 #include <linux/serial_core.h>
+#include <linux/serial.h>
+#include <linux/serial_8250.h>
+
+#include <asm/io.h>
+#include <asm/irq.h>
+
 #include "8250.h"
 
 /*
@@ -979,16 +980,19 @@ receive_chars(struct uart_8250_port *up, int *status, struct pt_regs *regs)
 	struct tty_struct *tty = up->port.info->tty;
 	unsigned char ch, lsr = *status;
 	int max_count = 256;
+	char flag;
 
 	do {
+		/* The following is not allowed by the tty layer and
+		   unsafe. It should be fixed ASAP */
 		if (unlikely(tty->flip.count >= TTY_FLIPBUF_SIZE)) {
-			tty->flip.work.func((void *)tty);
-			if (tty->flip.count >= TTY_FLIPBUF_SIZE)
-				return; // if TTY_DONT_FLIP is set
+			if(tty->low_latency)
+				tty_flip_buffer_push(tty);
+			/* If this failed then we will throw away the
+			   bytes but must do so to clear interrupts */
 		}
 		ch = serial_inp(up, UART_RX);
-		*tty->flip.char_buf_ptr = ch;
-		*tty->flip.flag_buf_ptr = TTY_NORMAL;
+		flag = TTY_NORMAL;
 		up->port.icount.rx++;
 
 #ifdef CONFIG_SERIAL_8250_CONSOLE
@@ -1031,18 +1035,16 @@ receive_chars(struct uart_8250_port *up, int *status, struct pt_regs *regs)
 
 			if (lsr & UART_LSR_BI) {
 				DEBUG_INTR("handling break....");
-				*tty->flip.flag_buf_ptr = TTY_BREAK;
+				flag = TTY_BREAK;
 			} else if (lsr & UART_LSR_PE)
-				*tty->flip.flag_buf_ptr = TTY_PARITY;
+				flag = TTY_PARITY;
 			else if (lsr & UART_LSR_FE)
-				*tty->flip.flag_buf_ptr = TTY_FRAME;
+				flag = TTY_FRAME;
 		}
 		if (uart_handle_sysrq_char(&up->port, ch, regs))
 			goto ignore_char;
 		if ((lsr & up->port.ignore_status_mask) == 0) {
-			tty->flip.flag_buf_ptr++;
-			tty->flip.char_buf_ptr++;
-			tty->flip.count++;
+			tty_insert_flip_char(tty, ch, flag);
 		}
 		if ((lsr & UART_LSR_OE) &&
 		    tty->flip.count < TTY_FLIPBUF_SIZE) {
@@ -1051,10 +1053,7 @@ receive_chars(struct uart_8250_port *up, int *status, struct pt_regs *regs)
 			 * immediately, and doesn't affect the current
 			 * character.
 			 */
-			*tty->flip.flag_buf_ptr = TTY_OVERRUN;
-			tty->flip.flag_buf_ptr++;
-			tty->flip.char_buf_ptr++;
-			tty->flip.count++;
+			tty_insert_flip_char(tty, 0, TTY_OVERRUN);
 		}
 	ignore_char:
 		lsr = serial_inp(up, UART_LSR);

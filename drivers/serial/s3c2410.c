@@ -12,11 +12,12 @@
  */
 #include <linux/config.h>
 #include <linux/module.h>
-#include <linux/tty.h>
 #include <linux/ioport.h>
 #include <linux/device.h>
 #include <linux/init.h>
 #include <linux/console.h>
+#include <linux/tty.h>
+#include <linux/tty_flip.h>
 #include <linux/serial_core.h>
 #include <linux/serial.h>
 
@@ -111,7 +112,7 @@ serial_s3c2410_rx_chars(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct uart_port *port = dev_id;
 	struct tty_struct *tty = port->info->tty;
-	unsigned int ufcon, ch, rxs, ufstat;
+	unsigned int ufcon, ch, flag, rxs, ufstat;
 	int max_count = 256;
 
 	while (max_count-- > 0) {
@@ -122,17 +123,16 @@ serial_s3c2410_rx_chars(int irq, void *dev_id, struct pt_regs *regs)
 			break;
 
 		if (tty->flip.count >= TTY_FLIPBUF_SIZE) {
-			tty->flip.work.func((void *)tty);
-			if (tty->flip.count >= TTY_FLIPBUF_SIZE) {
-				printk(KERN_WARNING "TTY_DONT_FLIP set\n");
-				goto out;
-			}
+			if (tty->low_latency)
+				tty_flip_buffer_push(tty);
+			/*
+			 * If this failed then we will throw away the
+			 * bytes but must do so to clear interrupts
+			 */
 		}
 
 		ch = rd_regb(port, S3C2410_URXH);
-
-		*tty->flip.char_buf_ptr = ch;
-		*tty->flip.flag_buf_ptr = TTY_NORMAL;
+		flag = TTY_NORMAL;
 		port->icount.rx++;
 
 		rxs = rd_regb(port, S3C2410_UERSTAT) | RXSTAT_DUMMY_READ;
@@ -146,15 +146,13 @@ serial_s3c2410_rx_chars(int irq, void *dev_id, struct pt_regs *regs)
 			rxs &= port->read_status_mask;
 
 			if (rxs & S3C2410_UERSTAT_PARITY)
-				*tty->flip.flag_buf_ptr = TTY_PARITY;
+				flag = TTY_PARITY;
 			else if (rxs & ( S3C2410_UERSTAT_FRAME | S3C2410_UERSTAT_OVERRUN))
-				*tty->flip.flag_buf_ptr = TTY_FRAME;
+				flag = TTY_FRAME;
 		}
 
 		if ((rxs & port->ignore_status_mask) == 0) {
-			tty->flip.flag_buf_ptr++;
-			tty->flip.char_buf_ptr++;
-			tty->flip.count++;
+			tty_insert_flip_char(tty, ch, flag);
 		}
 
 		if ((rxs & S3C2410_UERSTAT_OVERRUN) &&
@@ -164,9 +162,7 @@ serial_s3c2410_rx_chars(int irq, void *dev_id, struct pt_regs *regs)
 			 * immediately, and doesn't affect the current
 			 * character.
 			 */
-			*tty->flip.char_buf_ptr++ = 0;
-			*tty->flip.flag_buf_ptr++ = TTY_OVERRUN;
-			tty->flip.count++;
+			tty_insert_flip_char(tty, 0, TTY_OVERRUN);
 		}
 	}
 	tty_flip_buffer_push(tty);
