@@ -56,7 +56,7 @@
 #define DBG(fmt...)
 #endif
 
-extern void pseries_secondary_smp_init(unsigned long); 
+extern void pSeries_secondary_smp_init(unsigned long);
 
 /* Get state of physical CPU.
  * Return codes:
@@ -192,7 +192,7 @@ static inline int __devinit smp_startup_cpu(unsigned int lcpu)
 {
 	int status;
 	unsigned long start_here = __pa((u32)*((unsigned long *)
-					       pseries_secondary_smp_init));
+					       pSeries_secondary_smp_init));
 	unsigned int pcpu;
 
 	/* At boot time the cpus are already spinning in hold
@@ -362,7 +362,7 @@ void __init smp_init_pSeries(void)
 			rtas_call(rtas_token("start-cpu"), 3, 1, &ret,
 				  get_hard_smp_processor_id(i),
 				  __pa((u32)*((unsigned long *)
-					      pseries_secondary_smp_init)),
+					      pSeries_secondary_smp_init)),
 				  i);
 		}
 	}

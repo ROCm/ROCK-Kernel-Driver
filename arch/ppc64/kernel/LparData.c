@@ -59,23 +59,23 @@ struct HvReleaseData hvReleaseData = {
 		0xf4, 0x4b, 0xf6, 0xf4 },
 };
 
-extern void SystemReset_Iseries(void);
-extern void MachineCheck_Iseries(void);
-extern void DataAccess_Iseries(void);
-extern void InstructionAccess_Iseries(void);
-extern void HardwareInterrupt_Iseries(void);
-extern void Alignment_Iseries(void);
-extern void ProgramCheck_Iseries(void);
-extern void FPUnavailable_Iseries(void);
-extern void Decrementer_Iseries(void);
-extern void Trap_0a_Iseries(void);
-extern void Trap_0b_Iseries(void);
-extern void SystemCall_Iseries(void);
-extern void SingleStep_Iseries(void);
-extern void Trap_0e_Iseries(void);
-extern void PerformanceMonitor_Iseries(void);
-extern void DataAccessSLB_Iseries(void);
-extern void InstructionAccessSLB_Iseries(void);
+extern void system_reset_iSeries(void);
+extern void machine_check_iSeries(void);
+extern void data_access_iSeries(void);
+extern void instruction_access_iSeries(void);
+extern void hardware_interrupt_iSeries(void);
+extern void alignment_iSeries(void);
+extern void program_check_iSeries(void);
+extern void fp_unavailable_iSeries(void);
+extern void decrementer_iSeries(void);
+extern void trap_0a_iSeries(void);
+extern void trap_0b_iSeries(void);
+extern void system_call_iSeries(void);
+extern void single_step_iSeries(void);
+extern void trap_0e_iSeries(void);
+extern void performance_monitor_iSeries(void);
+extern void data_access_slb_iSeries(void);
+extern void instruction_access_slb_iSeries(void);
 	
 struct ItLpNaca itLpNaca = {
 	.xDesc = 0xd397d581,		/* "LpNa" ebcdic */
@@ -105,27 +105,27 @@ struct ItLpNaca itLpNaca = {
 	.xSlicSegmentTablePtr = 0,	/* seg table */
 	.xOldLpQueue = { 0 }, 		/* Old LP Queue */
 	.xInterruptHdlr = {
-		(u64)SystemReset_Iseries,	/* 0x100 System Reset */
-		(u64)MachineCheck_Iseries,	/* 0x200 Machine Check */
-		(u64)DataAccess_Iseries,	/* 0x300 Data Access */
-		(u64)InstructionAccess_Iseries,	/* 0x400 Instruction Access */
-		(u64)HardwareInterrupt_Iseries,	/* 0x500 External */
-		(u64)Alignment_Iseries,		/* 0x600 Alignment */
-		(u64)ProgramCheck_Iseries,	/* 0x700 Program Check */
-		(u64)FPUnavailable_Iseries,	/* 0x800 FP Unavailable */
-		(u64)Decrementer_Iseries,	/* 0x900 Decrementer */
-		(u64)Trap_0a_Iseries,		/* 0xa00 Trap 0A */
-		(u64)Trap_0b_Iseries,		/* 0xb00 Trap 0B */
-		(u64)SystemCall_Iseries,	/* 0xc00 System Call */
-		(u64)SingleStep_Iseries,	/* 0xd00 Single Step */
-		(u64)Trap_0e_Iseries,		/* 0xe00 Trap 0E */
-		(u64)PerformanceMonitor_Iseries,/* 0xf00 Performance Monitor */
+		(u64)system_reset_iSeries,	/* 0x100 System Reset */
+		(u64)machine_check_iSeries,	/* 0x200 Machine Check */
+		(u64)data_access_iSeries,	/* 0x300 Data Access */
+		(u64)instruction_access_iSeries, /* 0x400 Instruction Access */
+		(u64)hardware_interrupt_iSeries, /* 0x500 External */
+		(u64)alignment_iSeries,		/* 0x600 Alignment */
+		(u64)program_check_iSeries,	/* 0x700 Program Check */
+		(u64)fp_unavailable_iSeries,	/* 0x800 FP Unavailable */
+		(u64)decrementer_iSeries,	/* 0x900 Decrementer */
+		(u64)trap_0a_iSeries,		/* 0xa00 Trap 0A */
+		(u64)trap_0b_iSeries,		/* 0xb00 Trap 0B */
+		(u64)system_call_iSeries,	/* 0xc00 System Call */
+		(u64)single_step_iSeries,	/* 0xd00 Single Step */
+		(u64)trap_0e_iSeries,		/* 0xe00 Trap 0E */
+		(u64)performance_monitor_iSeries,/* 0xf00 Performance Monitor */
 		0,				/* int 0x1000 */
 		0,				/* int 0x1010 */
 		0,				/* int 0x1020 CPU ctls */
-		(u64)HardwareInterrupt_Iseries, /* SC Ret Hdlr */
-		(u64)DataAccessSLB_Iseries,	/* 0x380 D-SLB */
-		(u64)InstructionAccessSLB_Iseries /* 0x480 I-SLB */
+		(u64)hardware_interrupt_iSeries, /* SC Ret Hdlr */
+		(u64)data_access_slb_iSeries,	/* 0x380 D-SLB */
+		(u64)instruction_access_slb_iSeries /* 0x480 I-SLB */
 	}
 };
 EXPORT_SYMBOL(itLpNaca);
