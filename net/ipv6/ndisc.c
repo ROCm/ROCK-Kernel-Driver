@@ -1321,7 +1321,6 @@ void ndisc_send_redirect(struct sk_buff *skb, struct neighbour *neigh,
 	if (rt == NULL)
 		return;
 	dst = &rt->u.dst;
-	dst_clone(dst);
 
 	err = xfrm_lookup(&dst, &fl, NULL, 0);
 	if (err) {
@@ -1329,16 +1328,17 @@ void ndisc_send_redirect(struct sk_buff *skb, struct neighbour *neigh,
 		return;
 	}
 
+	rt = (struct rt6_info *) dst;
+
 	if (rt->rt6i_flags & RTF_GATEWAY) {
 		ND_PRINTK1("ndisc_send_redirect: not a neighbour\n");
-		dst_release(&rt->u.dst);
+		dst_release(dst);
 		return;
 	}
-	if (!xrlim_allow(&rt->u.dst, 1*HZ)) {
-		dst_release(&rt->u.dst);
+	if (!xrlim_allow(dst, 1*HZ)) {
+		dst_release(dst);
 		return;
 	}
-	dst_release(&rt->u.dst);
 
 	if (dev->addr_len) {
 		if (neigh->nud_state&NUD_VALID) {
@@ -1348,6 +1348,7 @@ void ndisc_send_redirect(struct sk_buff *skb, struct neighbour *neigh,
 			   We will make it later, when will be sure,
 			   that it is alive.
 			 */
+			dst_release(dst);
 			return;
 		}
 	}
