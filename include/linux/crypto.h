@@ -144,6 +144,9 @@ struct digest_tfm {
 	void (*dit_final)(struct crypto_tfm *tfm, u8 *out);
 	void (*dit_digest)(struct crypto_tfm *tfm, struct scatterlist *sg,
 	                   unsigned int nsg, u8 *out);
+#ifdef CONFIG_CRYPTO_HMAC
+	void *dit_hmac_block;
+#endif
 };
 
 struct compress_tfm {

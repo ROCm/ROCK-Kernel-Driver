@@ -63,12 +63,19 @@ int crypto_init_digest_flags(struct crypto_tfm *tfm, u32 flags)
 	return crypto_cipher_flags(flags) ? -EINVAL : 0;
 }
 
-void crypto_init_digest_ops(struct crypto_tfm *tfm)
+int crypto_init_digest_ops(struct crypto_tfm *tfm)
 {
 	struct digest_tfm *ops = &tfm->crt_digest;
 	
-	ops->dit_init		= init;
-	ops->dit_update		= update;
-	ops->dit_final		= final;
-	ops->dit_digest		= digest;
+	ops->dit_init	= init;
+	ops->dit_update	= update;
+	ops->dit_final	= final;
+	ops->dit_digest	= digest;
+	
+	return crypto_alloc_hmac_block(tfm);
+}
+
+void crypto_exit_digest_ops(struct crypto_tfm *tfm)
+{
+	crypto_free_hmac_block(tfm);
 }
