@@ -618,7 +618,7 @@ static struct sk_buff * pfkey_xfrm_state2msg(struct xfrm_state *x, int add_keys,
 	/* identity & sensitivity */
 
 	if ((x->props.family == AF_INET &&
-	     x->sel.saddr.xfrm4_addr != x->props.saddr.xfrm4_addr) ||
+	     x->sel.saddr.xfrm4_addr != x->props.saddr.xfrm4_addr)
 #if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
 	    || (x->props.family == AF_INET6 &&
 		memcmp (x->sel.saddr.a6, x->props.saddr.a6, sizeof (struct in6_addr)))
@@ -1611,8 +1611,15 @@ static void pfkey_xfrm_policy2msg(struct sk_buff *skb, struct xfrm_policy *xp, i
 	struct sadb_lifetime *lifetime;
 	struct sadb_x_policy *pol;
 	struct sockaddr_in   *sin;
+#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
+	struct sockaddr_in6  *sin6;
+#endif
 	int i;
 	int size;
+	int sockaddr_size = pfkey_sockaddr_size(xp->family);
+	int socklen = (xp->family == AF_INET ?
+		       sizeof(struct sockaddr_in) :
+		       sizeof(struct sockaddr_in6));
 
 	size = pfkey_xfrm_policy2msg_size(xp);
 
