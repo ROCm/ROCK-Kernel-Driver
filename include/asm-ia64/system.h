@@ -13,7 +13,6 @@
  * Copyright (C) 1999 Don Dugger <don.dugger@intel.com>
  */
 #include <linux/config.h>
-#include <linux/percpu.h>
 
 #include <asm/kregs.h>
 #include <asm/page.h>
@@ -26,6 +25,7 @@
 
 #ifndef __ASSEMBLY__
 
+#include <linux/percpu.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
 
