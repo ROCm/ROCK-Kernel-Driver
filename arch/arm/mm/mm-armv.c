@@ -279,7 +279,7 @@ static void __init build_mem_type_table(void)
 	if (cpu_arch < CPU_ARCH_ARMv5) {
 		writealloc = 0;
 		ecc = 0;
-		mem_types[MT_MINICACHE].prot_sect &= ~PMD_SECT_TEX(1);
+		mem_types[MT_MINICLEAN].prot_sect &= ~PMD_SECT_TEX(1);
 	}
 
 	if (writethrough) {

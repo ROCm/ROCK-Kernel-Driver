@@ -31,6 +31,8 @@
 #include <asm/hardware/sa1111.h>
 #include <asm/mach/serial_sa1100.h>
 
+#include <asm/arch/badge4.h>
+
 #include "generic.h"
 
 static int __init badge4_sa1111_init(void)
@@ -47,6 +49,17 @@ static int __init badge4_sa1111_init(void)
 	return sa1111_init(BADGE4_SA1111_BASE, BADGE4_IRQ_GPIO_SA1111);
 }
 
+
+static int five_v_on __initdata = 0;
+
+static int __init five_v_on_setup(char *ignore)
+{
+        five_v_on = 1;
+	return 1;
+}
+__setup("five_v_on", five_v_on_setup);
+
+
 static int __init badge4_init(void)
 {
 	int ret;
@@ -54,24 +67,18 @@ static int __init badge4_init(void)
 	if (!machine_is_badge4())
 		return -ENODEV;
 
-	ret = badge4_sa1111_init();
-	if (ret < 0)
-		printk(KERN_ERR
-		       "%s: SA-1111 initialization failed (%d)\n",
-			__FUNCTION__, ret);
-
-	/* N.B, according to rmk this is the singular place that GPDR
-           should be set */
-
-	/* Video expansion */
-	GPCR  = (BADGE4_GPIO_INT_VID | BADGE4_GPIO_LGP2 | BADGE4_GPIO_LGP3 |
-		 BADGE4_GPIO_LGP4 | BADGE4_GPIO_LGP5 | BADGE4_GPIO_LGP6 |
-		 BADGE4_GPIO_LGP7 | BADGE4_GPIO_LGP8 | BADGE4_GPIO_LGP9 |
+	/* LCD */
+	GPCR  = (BADGE4_GPIO_LGP2 | BADGE4_GPIO_LGP3 |
+		 BADGE4_GPIO_LGP4 | BADGE4_GPIO_LGP5 |
+		 BADGE4_GPIO_LGP6 | BADGE4_GPIO_LGP7 |
+		 BADGE4_GPIO_LGP8 | BADGE4_GPIO_LGP9 |
 		 BADGE4_GPIO_GPA_VID | BADGE4_GPIO_GPB_VID |
 		 BADGE4_GPIO_GPC_VID);
-	GPDR |= (BADGE4_GPIO_INT_VID | BADGE4_GPIO_LGP2 | BADGE4_GPIO_LGP3 |
-		 BADGE4_GPIO_LGP4 | BADGE4_GPIO_LGP5 | BADGE4_GPIO_LGP6 |
-		 BADGE4_GPIO_LGP7 | BADGE4_GPIO_LGP8 | BADGE4_GPIO_LGP9 |
+	GPDR &= ~BADGE4_GPIO_INT_VID;
+	GPDR |= (BADGE4_GPIO_LGP2 | BADGE4_GPIO_LGP3 |
+		 BADGE4_GPIO_LGP4 | BADGE4_GPIO_LGP5 |
+		 BADGE4_GPIO_LGP6 | BADGE4_GPIO_LGP7 |
+		 BADGE4_GPIO_LGP8 | BADGE4_GPIO_LGP9 |
 		 BADGE4_GPIO_GPA_VID | BADGE4_GPIO_GPB_VID |
 		 BADGE4_GPIO_GPC_VID);
 
@@ -83,28 +90,55 @@ static int __init badge4_init(void)
 	GPCR  = (BADGE4_GPIO_UART_HS1 | BADGE4_GPIO_UART_HS2);
 	GPDR |= (BADGE4_GPIO_UART_HS1 | BADGE4_GPIO_UART_HS2);
 
-	/* drives CPLD muxsel0 input */
+	/* CPLD muxsel0 input for mux/adc chip select */
 	GPCR  = BADGE4_GPIO_MUXSEL0;
 	GPDR |= BADGE4_GPIO_MUXSEL0;
 
-	/* test points */
-	GPCR  = (BADGE4_GPIO_TESTPT_J7 | BADGE4_GPIO_TESTPT_J6 |
-		 BADGE4_GPIO_TESTPT_J5);
-	GPDR |= (BADGE4_GPIO_TESTPT_J7 | BADGE4_GPIO_TESTPT_J6 |
-		 BADGE4_GPIO_TESTPT_J5);
-
-	/* drives CPLD sdram type inputs; this shouldn't be needed;
-           bootloader left it this way. */
-	GPDR |= (BADGE4_GPIO_SDTYP0 | BADGE4_GPIO_SDTYP1);
+	/* test points: J5, J6 as inputs, J7 outputs */
+	GPDR &= ~(BADGE4_GPIO_TESTPT_J5 | BADGE4_GPIO_TESTPT_J6);
+	GPCR  = BADGE4_GPIO_TESTPT_J7;
+	GPDR |= BADGE4_GPIO_TESTPT_J7;
 
  	/* 5V supply rail. */
  	GPCR  = BADGE4_GPIO_PCMEN5V;		/* initially off */
   	GPDR |= BADGE4_GPIO_PCMEN5V;
 
-	/* drives SA1111 reset pin; this shouldn't be needed;
-           bootloader left it this way. */
-	GPSR  = BADGE4_GPIO_SA1111_NRST;
-	GPDR |= BADGE4_GPIO_SA1111_NRST;
+	/* CPLD sdram type inputs; set up by blob */
+	//GPDR |= (BADGE4_GPIO_SDTYP1 | BADGE4_GPIO_SDTYP0);
+	printk(KERN_DEBUG __FILE__ ": SDRAM CPLD typ1=%d typ0=%d\n",
+	       !!(GPLR & BADGE4_GPIO_SDTYP1),
+	       !!(GPLR & BADGE4_GPIO_SDTYP0));
+
+	/* SA1111 reset pin; set up by blob */
+	//GPSR  = BADGE4_GPIO_SA1111_NRST;
+	//GPDR |= BADGE4_GPIO_SA1111_NRST;
+
+
+	/* power management cruft */
+	PGSR = 0;
+	PWER = 0;
+	PCFR = 0;
+	PSDR = 0;
+
+	PWER |= PWER_GPIO26;	/* wake up on an edge from TESTPT_J5 */
+	PWER |= PWER_RTC;	/* wake up if rtc fires */
+
+	/* drive sa1111_nrst during sleep */
+	PGSR |= BADGE4_GPIO_SA1111_NRST;
+	/* drive CPLD as is during sleep */
+	PGSR |= (GPLR & (BADGE4_GPIO_SDTYP0|BADGE4_GPIO_SDTYP1));
+
+
+	/* Now bring up the SA-1111. */
+	ret = badge4_sa1111_init();
+	if (ret < 0)
+		printk(KERN_ERR
+		       "%s: SA-1111 initialization failed (%d)\n",
+		       __FUNCTION__, ret);
+
+
+	/* maybe turn on 5v0 from the start */
+	badge4_set_5V(BADGE4_5V_INITIALLY, five_v_on);
 
 	return 0;
 }
