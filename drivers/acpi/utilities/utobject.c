@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utobject - ACPI object create/delete/size/cache routines
- *              $Revision: 77 $
+ *              $Revision: 79 $
  *
  *****************************************************************************/
 
@@ -116,6 +116,59 @@ acpi_ut_create_internal_object_dbg (
 
 /*******************************************************************************
  *
+ * FUNCTION:    Acpi_ut_create_buffer_object
+ *
+ * PARAMETERS:  Buffer_size            - Size of buffer to be created
+ *
+ * RETURN:      Pointer to a new Buffer object
+ *
+ * DESCRIPTION: Create a fully initialized buffer object
+ *
+ ******************************************************************************/
+
+acpi_operand_object *
+acpi_ut_create_buffer_object (
+	ACPI_SIZE               buffer_size)
+{
+	acpi_operand_object     *buffer_desc;
+	u8                      *buffer;
+
+
+	ACPI_FUNCTION_TRACE_U32 ("Ut_create_buffer_object", buffer_size);
+
+
+	/*
+	 * Create a new Buffer object
+	 */
+	buffer_desc = acpi_ut_create_internal_object (ACPI_TYPE_BUFFER);
+	if (!buffer_desc) {
+		return_PTR (NULL);
+	}
+
+	/* Allocate the actual buffer */
+
+	buffer = ACPI_MEM_CALLOCATE (buffer_size);
+	if (!buffer) {
+		ACPI_REPORT_ERROR (("Create_buffer: could not allocate size %X\n",
+			(u32) buffer_size));
+		acpi_ut_remove_reference (buffer_desc);
+		return_PTR (NULL);
+	}
+
+	/* Complete buffer object initialization */
+
+	buffer_desc->buffer.flags |= AOPOBJ_DATA_VALID;
+	buffer_desc->buffer.pointer = buffer;
+	buffer_desc->buffer.length = (u32) buffer_size;
+
+	/* Return the new buffer descriptor */
+
+	return_PTR (buffer_desc);
+}
+
+
+/*******************************************************************************
+ *
  * FUNCTION:    Acpi_ut_valid_internal_object
  *
  * PARAMETERS:  Object              - Object to be validated
@@ -135,8 +188,7 @@ acpi_ut_valid_internal_object (
 	/* Check for a null pointer */
 
 	if (!object) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
-			"**** Null Object Ptr\n"));
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "**** Null Object Ptr\n"));
 		return (FALSE);
 	}
 
@@ -161,10 +213,17 @@ acpi_ut_valid_internal_object (
 			"**** Obj %p is a parser obj, not ACPI obj\n", object));
 		break;
 
+	case ACPI_DESC_TYPE_CACHED:
+
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+			"**** Obj %p has already been released to internal cache\n", object));
+		break;
+
 	default:
 
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
-			"**** Obj %p is of unknown type\n", object));
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+			"**** Obj %p has unknown descriptor type %X\n", object,
+			ACPI_GET_DESCRIPTOR_TYPE (object)));
 		break;
 	}
 

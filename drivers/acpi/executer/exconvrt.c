@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exconvrt - Object conversion routines
- *              $Revision: 41 $
+ *              $Revision: 44 $
  *
  *****************************************************************************/
 
@@ -147,10 +147,15 @@ acpi_ex_convert_to_integer (
 		return_ACPI_STATUS (AE_NO_MEMORY);
 	}
 
-	/* Save the Result, delete original descriptor, store new descriptor */
+	/* Save the Result */
 
 	ret_desc->integer.value = result;
 
+	/*
+	 * If we are about to overwrite the original object on the operand stack,
+	 * we must remove a reference on the original object because we are
+	 * essentially removing it from the stack.
+	 */
 	if (*result_desc == obj_desc) {
 		if (walk_state->opcode != AML_STORE_OP) {
 			acpi_ut_remove_reference (obj_desc);
@@ -191,76 +196,50 @@ acpi_ex_convert_to_buffer (
 
 
 	switch (ACPI_GET_OBJECT_TYPE (obj_desc)) {
+	case ACPI_TYPE_BUFFER:
+
+		/* No conversion necessary */
+
+		*result_desc = obj_desc;
+		return_ACPI_STATUS (AE_OK);
+
+
 	case ACPI_TYPE_INTEGER:
 
 		/*
-		 * Create a new Buffer object
+		 * Create a new Buffer object.
+		 * Need enough space for one integer
 		 */
-		ret_desc = acpi_ut_create_internal_object (ACPI_TYPE_BUFFER);
+		ret_desc = acpi_ut_create_buffer_object (acpi_gbl_integer_byte_width);
 		if (!ret_desc) {
-			return_ACPI_STATUS (AE_NO_MEMORY);
-		}
-
-		/* Need enough space for one integer */
-
-		new_buf = ACPI_MEM_CALLOCATE (acpi_gbl_integer_byte_width);
-		if (!new_buf) {
-			ACPI_REPORT_ERROR
-				(("Ex_convert_to_buffer: Buffer allocation failure\n"));
-			acpi_ut_remove_reference (ret_desc);
 			return_ACPI_STATUS (AE_NO_MEMORY);
 		}
 
 		/* Copy the integer to the buffer */
 
+		new_buf = ret_desc->buffer.pointer;
 		for (i = 0; i < acpi_gbl_integer_byte_width; i++) {
 			new_buf[i] = (u8) (obj_desc->integer.value >> (i * 8));
 		}
-
-		/* Complete buffer object initialization */
-
-		ret_desc->buffer.flags |= AOPOBJ_DATA_VALID;
-		ret_desc->buffer.pointer = new_buf;
-		ret_desc->buffer.length = acpi_gbl_integer_byte_width;
-
-		/* Return the new buffer descriptor */
-
-		*result_desc = ret_desc;
 		break;
 
 
 	case ACPI_TYPE_STRING:
+
 		/*
 		 * Create a new Buffer object
+		 * Size will be the string length
 		 */
-		ret_desc = acpi_ut_create_internal_object (ACPI_TYPE_BUFFER);
+		ret_desc = acpi_ut_create_buffer_object (obj_desc->string.length);
 		if (!ret_desc) {
 			return_ACPI_STATUS (AE_NO_MEMORY);
 		}
 
-		/* Need enough space for one integer */
+		/* Copy the string to the buffer */
 
-		new_buf = ACPI_MEM_CALLOCATE (obj_desc->string.length);
-		if (!new_buf) {
-			ACPI_REPORT_ERROR
-				(("Ex_convert_to_buffer: Buffer allocation failure\n"));
-			acpi_ut_remove_reference (ret_desc);
-			return_ACPI_STATUS (AE_NO_MEMORY);
-		}
-
-		ACPI_STRNCPY ((char *) new_buf, (char *) obj_desc->string.pointer, obj_desc->string.length);
-		ret_desc->buffer.flags |= AOPOBJ_DATA_VALID;
-		ret_desc->buffer.pointer = new_buf;
-		ret_desc->buffer.length = obj_desc->string.length;
-
-		/* Return the new buffer descriptor */
-
-		*result_desc = ret_desc;
-		break;
-
-
-	case ACPI_TYPE_BUFFER:
-		*result_desc = obj_desc;
+		new_buf = ret_desc->buffer.pointer;
+		ACPI_STRNCPY ((char *) new_buf, (char *) obj_desc->string.pointer,
+			obj_desc->string.length);
 		break;
 
 
@@ -270,7 +249,20 @@ acpi_ex_convert_to_buffer (
 
 	/* Mark buffer initialized */
 
-	(*result_desc)->common.flags |= AOPOBJ_DATA_VALID;
+	ret_desc->common.flags |= AOPOBJ_DATA_VALID;
+
+	/*
+	 * If we are about to overwrite the original object on the operand stack,
+	 * we must remove a reference on the original object because we are
+	 * essentially removing it from the stack.
+	 */
+	if (*result_desc == obj_desc) {
+		if (walk_state->opcode != AML_STORE_OP) {
+			acpi_ut_remove_reference (obj_desc);
+		}
+	}
+
+	*result_desc = ret_desc;
 	return_ACPI_STATUS (AE_OK);
 }
 
@@ -405,6 +397,19 @@ acpi_ex_convert_to_string (
 
 
 	switch (ACPI_GET_OBJECT_TYPE (obj_desc)) {
+	case ACPI_TYPE_STRING:
+
+		if (max_length >= obj_desc->string.length) {
+			*result_desc = obj_desc;
+			return_ACPI_STATUS (AE_OK);
+		}
+		else {
+			/* Must copy the string first and then truncate it */
+
+			return_ACPI_STATUS (AE_NOT_IMPLEMENTED);
+		}
+
+
 	case ACPI_TYPE_INTEGER:
 
 		string_length = acpi_gbl_integer_byte_width * 2;
@@ -446,16 +451,6 @@ acpi_ex_convert_to_string (
 		}
 
 		ret_desc->buffer.pointer = new_buf;
-
-		/* Return the new buffer descriptor */
-
-		if (*result_desc == obj_desc) {
-			if (walk_state->opcode != AML_STORE_OP) {
-				acpi_ut_remove_reference (obj_desc);
-			}
-		}
-
-		*result_desc = ret_desc;
 		break;
 
 
@@ -511,30 +506,6 @@ acpi_ex_convert_to_string (
 		new_buf [index-1] = 0;
 		ret_desc->buffer.pointer = new_buf;
 		ret_desc->string.length = (u32) ACPI_STRLEN ((char *) new_buf);
-
-		/* Return the new buffer descriptor */
-
-		if (*result_desc == obj_desc) {
-			if (walk_state->opcode != AML_STORE_OP) {
-				acpi_ut_remove_reference (obj_desc);
-			}
-		}
-
-		*result_desc = ret_desc;
-		break;
-
-
-	case ACPI_TYPE_STRING:
-
-		if (max_length >= obj_desc->string.length) {
-			*result_desc = obj_desc;
-		}
-
-		else {
-			/* Must copy the string first and then truncate it */
-
-			return_ACPI_STATUS (AE_NOT_IMPLEMENTED);
-		}
 		break;
 
 
@@ -542,6 +513,19 @@ acpi_ex_convert_to_string (
 		return_ACPI_STATUS (AE_TYPE);
 	}
 
+
+	/*
+	 * If we are about to overwrite the original object on the operand stack,
+	 * we must remove a reference on the original object because we are
+	 * essentially removing it from the stack.
+	 */
+	if (*result_desc == obj_desc) {
+		if (walk_state->opcode != AML_STORE_OP) {
+			acpi_ut_remove_reference (obj_desc);
+		}
+	}
+
+	*result_desc = ret_desc;
 	return_ACPI_STATUS (AE_OK);
 }
 

@@ -2,7 +2,7 @@
  *
  * Module Name: nseval - Object evaluation interfaces -- includes control
  *                       method lookup and execution.
- *              $Revision: 118 $
+ *              $Revision: 119 $
  *
  ******************************************************************************/
 
@@ -383,7 +383,7 @@ acpi_ns_execute_control_method (
 		return_ACPI_STATUS (AE_NULL_OBJECT);
 	}
 
-	ACPI_DUMP_PATHNAME (method_node, "Ns_execute_control_method: Executing",
+	ACPI_DUMP_PATHNAME (method_node, "Execute Method:",
 		ACPI_LV_INFO, _COMPONENT);
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Method at AML address %p Length %X\n",
