@@ -333,7 +333,6 @@ extern struct tree_balance * cur_tb;
 
 void reiserfs_panic (struct super_block * sb, const char * fmt, ...)
 {
-  show_reiserfs_locks() ;
   do_reiserfs_warning(fmt);
   printk ( KERN_EMERG "%s", error_buf);
   BUG ();
