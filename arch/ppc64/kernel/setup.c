@@ -77,6 +77,8 @@ unsigned long decr_overclock_proc0 = 1;
 unsigned long decr_overclock_set = 0;
 unsigned long decr_overclock_proc0_set = 0;
 
+int powersave_nap;
+
 #ifdef CONFIG_XMON
 extern void xmon_map_scc(void);
 #endif
