@@ -11,8 +11,6 @@
 #include <linux/dmi.h>
 #include <linux/bootmem.h>
 
-unsigned long dmi_broken;
-EXPORT_SYMBOL(dmi_broken);
 
 int es7000_plat = 0;
 

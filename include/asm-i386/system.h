@@ -465,12 +465,6 @@ struct alt_instr {
 void disable_hlt(void);
 void enable_hlt(void);
 
-extern unsigned long dmi_broken;
 extern int es7000_plat;
-
-#define BROKEN_ACPI_Sx		0x0001
-#define BROKEN_INIT_AFTER_S1	0x0002
-#define BROKEN_PNP_BIOS		0x0004
-#define BROKEN_CPUFREQ		0x0008
 
 #endif
