@@ -2164,14 +2164,6 @@ int try_to_free_buffers(struct page *page)
 }
 EXPORT_SYMBOL(try_to_free_buffers);
 
-/* ================== Debugging =================== */
-
-void show_buffers(void)
-{
-	printk("Buffer memory:   %6dkB\n",
-			atomic_read(&buffermem_pages) << (PAGE_SHIFT-10));
-}
-
 int block_sync_page(struct page *page)
 {
 	run_task_queue(&tq_disk);

@@ -562,6 +562,11 @@ unsigned int nr_free_highpages (void)
 }
 #endif
 
+unsigned long nr_buffermem_pages(void)
+{
+	return atomic_read(&buffermem_pages);
+}
+
 /*
  * Accumulate the page_state information across all CPUs.
  * The result is unavoidably approximate - it can change

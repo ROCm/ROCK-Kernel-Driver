@@ -1586,8 +1586,6 @@ extern ssize_t generic_read_dir(struct file *, char *, size_t, loff_t *);
 extern struct file_operations simple_dir_operations;
 extern struct inode_operations simple_dir_inode_operations;
 
-extern void show_buffers(void);
-
 #ifdef CONFIG_BLK_DEV_INITRD
 extern unsigned int real_root_dev;
 #endif

@@ -423,7 +423,8 @@ static _INLINE_ void receive_chars(struct sgi_serial *info, struct pt_regs *regs
 			show_state();
 			return;
 		} else if (ch == 2) {
-			show_buffers();
+			printk("%ld buffermem pages\n",
+					nr_buffermem_pages());
 			return;
 		}
 	}
