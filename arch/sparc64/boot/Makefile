@@ -4,17 +4,27 @@
 # Copyright (C) 1995 David S. Miller (davem@caip.rutgers.edu)
 # Copyright (C) 1997 Jakub Jelinek (jj@sunsite.mff.cuni.cz)
 
-ROOT_IMG	=/usr/src/root.img
-ELFTOAOUT	=elftoaout
+ROOT_IMG	:= /usr/src/root.img
+ELFTOAOUT	:= elftoaout
 
-all: boot
+host-progs    := piggyback
+EXTRA_TARGETS := tftpboot.img vmlinux.aout
 
-boot:
-	@echo "Nothing special to be done for 'boot' on Linux/UltraSPARC."
+quiet_cmd_elftoaout = ELT2AOUT $@
+      cmd_elftoaout = $(ELFTOAOUT) vmlinux -o $@
+quiet_cmd_piggy     = PIGGY    $@
+      cmd_piggy     = $(obj)/piggyback $@ System.map $(ROOT_IMG)
 
-tftpboot.img: piggyback $(TOPDIR)/vmlinux $(ROOT_IMG)
-	$(ELFTOAOUT) $(TOPDIR)/vmlinux -o tftpboot.img
-	./piggyback tftpboot.img $(TOPDIR)/System.map $(ROOT_IMG)
+$(obj)/tftpboot.img: $(obj)/piggyback System.map vmlinux $(ROOT_IMG) FORCE
+	$(call if_changed,elftoaout)
+	$(call if_changed,piggy)
+	@echo '  kernel: $@ is ready'
 
-piggyback: piggyback.c
-	$(HOSTCC) $(HOSTCFLAGS) -o piggyback piggyback.c
+$(obj)/vmlinux.aout: vmlinux FORCE
+	$(call if_changed,elftoaout)
+	@echo '  kernel: $@ is ready'
+
+archhelp:
+	@echo  '* vmlinux       - Standard sparc64 kernel'
+	@echo  '  vmlinux.aout  - a.out kernel for sparc64'
+	@echo  '  tftpboot.img  - Image prepared for tftp'
