@@ -195,19 +195,13 @@ sdev_rd_attr (rev, "%.4s\n");
 sdev_rw_attr_bit (online);
 
 static ssize_t
-show_rescan_field (struct device *dev, char *buf)
-{
-	return 0; 
-}
-
-static ssize_t
 store_rescan_field (struct device *dev, const char *buf, size_t count) 
 {
 	scsi_rescan_device(dev);
-	return 0;
+	return count;
 }
 
-static DEVICE_ATTR(rescan, S_IRUGO | S_IWUSR, show_rescan_field, store_rescan_field)
+static DEVICE_ATTR(rescan, S_IWUSR, NULL, store_rescan_field)
 
 /* Default template for device attributes.  May NOT be modified */
 struct device_attribute *scsi_sysfs_sdev_attrs[] = {
