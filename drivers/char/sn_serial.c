@@ -500,9 +500,10 @@ sn_sal_connect_interrupt(void)
 	nasid_t console_nasid;
 	unsigned int console_irq;
 	int result;
+	extern cpuid_t sn_get_node_first_cpu(cnodeid_t cnode);
 
 	console_nasid = ia64_sn_get_console_nasid();
-	intr_cpuid = NODEPDA(NASID_TO_COMPACT_NODEID(console_nasid))->node_first_cpu;
+	intr_cpuid = sn_get_node_first_cpu(NASID_TO_COMPACT_NODEID(console_nasid));
 	intr_cpuloc = cpu_physical_id(intr_cpuid);
 	console_irq = CPU_VECTOR_TO_IRQ(intr_cpuloc, SGI_UART_VECTOR);
 

@@ -293,11 +293,6 @@ smp_callin (void)
 	 */
 	ia64_init_itm();
 
-	/*
-	 * Set I/O port base per CPU
-	 */
-	ia64_set_kr(IA64_KR_IO_BASE, __pa(ia64_iobase));
-
 	ia64_mca_cmc_vector_setup();	/* Setup vector on AP & enable */
 
 #ifdef CONFIG_PERFMON
@@ -337,6 +332,9 @@ int __init
 start_secondary (void *unused)
 {
 	extern int cpu_idle (void);
+
+	/* Early console may use I/O ports */
+	ia64_set_kr(IA64_KR_IO_BASE, __pa(ia64_iobase));
 
 	Dprintk("start_secondary: starting CPU 0x%x\n", hard_smp_processor_id());
 	efi_map_pal_code();

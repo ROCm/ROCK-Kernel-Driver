@@ -105,37 +105,37 @@ static:	cmp.eq p6,p7=6,r28		/* PAL_PTCE_INFO */
 1:	cmp.eq p6,p7=15,r28		/* PAL_PERF_MON_INFO */
 (p7)	br.cond.sptk.few 1f
 	mov r8=0			/* status = 0 */
-	movl r9 =0x12082004		/* generic=4 width=32 retired=8 cycles=18 */
+	movl r9 =0x08122f04		/* generic=4 width=47 retired=8 cycles=18 */
 	mov r10=0			/* reserved */
 	mov r11=0			/* reserved */
 	mov r16=0xffff			/* implemented PMC */
-	mov r17=0xffff			/* implemented PMD */
+	mov r17=0x3ffff			/* implemented PMD */
 	add r18=8,r29			/* second index */
 	;;
 	st8 [r29]=r16,16		/* store implemented PMC */
 	st8 [r18]=r0,16			/* clear remaining bits  */
 	;;
-	st8 [r29]=r0,16			/* store implemented PMC */
+	st8 [r29]=r0,16			/* clear remaining bits  */
 	st8 [r18]=r0,16			/* clear remaining bits  */
 	;;
 	st8 [r29]=r17,16		/* store implemented PMD */
 	st8 [r18]=r0,16			/* clear remaining bits  */
 	mov r16=0xf0			/* cycles count capable PMC */
 	;;
-	st8 [r29]=r0,16			/* store implemented PMC */
+	st8 [r29]=r0,16			/* clear remaining bits  */
 	st8 [r18]=r0,16			/* clear remaining bits  */
-	mov r17=0x10			/* retired bundles capable PMC */
+	mov r17=0xf0			/* retired bundles capable PMC */
 	;;
 	st8 [r29]=r16,16		/* store cycles capable */
 	st8 [r18]=r0,16			/* clear remaining bits  */
 	;;
-	st8 [r29]=r0,16			/* store implemented PMC */
+	st8 [r29]=r0,16			/* clear remaining bits  */
 	st8 [r18]=r0,16			/* clear remaining bits  */
 	;;
 	st8 [r29]=r17,16		/* store retired bundle capable */
 	st8 [r18]=r0,16			/* clear remaining bits  */
 	;;
-	st8 [r29]=r0,16			/* store implemented PMC */
+	st8 [r29]=r0,16			/* clear remaining bits  */
 	st8 [r18]=r0,16			/* clear remaining bits  */
 	;;
 1:	br.cond.sptk.few rp

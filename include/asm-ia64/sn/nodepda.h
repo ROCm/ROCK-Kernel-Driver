@@ -36,13 +36,6 @@
 
 
 struct nodepda_s {
-
-
-	cpuid_t         node_first_cpu; /* Starting cpu number for node */
-					/* WARNING: no guarantee that   */
-					/*  the second cpu on a node is */
-					/*  node_first_cpu+1.           */
-
 	vertex_hdl_t 	xbow_vhdl;
 	nasid_t		xbow_peer;	/* NASID of our peer hub on xbow */
 	struct semaphore xbow_sema;	/* Sema for xbow synchronization */

@@ -5,15 +5,7 @@
  * Copyright (C) 2002-2003  Hewlett Packard Co
  *               Stephane Eranian <eranian@hpl.hp.com>
  */
-
-#define RDEP(x)	(1UL<<(x))
-
-#ifndef CONFIG_ITANIUM
-#error "This file is only valid when CONFIG_ITANIUM is defined"
-#endif
-
 static int pfm_ita_pmc_check(struct task_struct *task, pfm_context_t *ctx, unsigned int cnum, unsigned long *val, struct pt_regs *regs);
-static int pfm_write_ibr_dbr(int mode, pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs);
 
 static pfm_reg_desc_t pfm_ita_pmc_desc[PMU_MAX_PMCS]={
 /* pmc0  */ { PFM_REG_CONTROL , 0, 0x1UL, -1UL, NULL, NULL, {0UL,0UL, 0UL, 0UL}, {0UL,0UL, 0UL, 0UL}},
@@ -55,31 +47,22 @@ static pfm_reg_desc_t pfm_ita_pmd_desc[PMU_MAX_PMDS]={
 	    { PFM_REG_END     , 0, 0UL, -1UL, NULL, NULL, {0,}, {0,}}, /* end marker */
 };
 
-/*
- * impl_pmcs, impl_pmds are computed at runtime to minimize errors!
- */
-static pmu_config_t pmu_conf={
-	.pmu_name      = "Itanium",
-	.pmu_family    = 0x7,
-	.enabled       = 0,
-	.ovfl_val      = (1UL << 32) - 1,
-	.pmd_desc      = pfm_ita_pmd_desc,
-	.pmc_desc      = pfm_ita_pmc_desc,
-	.num_ibrs      = 8,
-	.num_dbrs      = 8,
-	.use_rr_dbregs = 1 /* debug register are use for range retrictions */
-};
-
 static int
 pfm_ita_pmc_check(struct task_struct *task, pfm_context_t *ctx, unsigned int cnum, unsigned long *val, struct pt_regs *regs)
 {
 	int ret;
+	int is_loaded;
+
+	/* sanitfy check */
+	if (ctx == NULL) return -EINVAL;
+
+	is_loaded = ctx->ctx_state == PFM_CTX_LOADED || ctx->ctx_state == PFM_CTX_MASKED;
 
 	/*
 	 * we must clear the (instruction) debug registers if pmc13.ta bit is cleared
 	 * before they are written (fl_using_dbreg==0) to avoid picking up stale information.
 	 */
-	if (cnum == 13 && ((*val & 0x1) == 0UL) && ctx->ctx_fl_using_dbreg == 0) {
+	if (cnum == 13 && is_loaded && ((*val & 0x1) == 0UL) && ctx->ctx_fl_using_dbreg == 0) {
 
 		DPRINT(("pmc[%d]=0x%lx has active pmc13.ta cleared, clearing ibr\n", cnum, *val));
 
@@ -98,7 +81,7 @@ pfm_ita_pmc_check(struct task_struct *task, pfm_context_t *ctx, unsigned int cnu
 	 * we must clear the (data) debug registers if pmc11.pt bit is cleared
 	 * before they are written (fl_using_dbreg==0) to avoid picking up stale information.
 	 */
-	if (cnum == 11 && ((*val >> 28)& 0x1) == 0 && ctx->ctx_fl_using_dbreg == 0) {
+	if (cnum == 11 && is_loaded && ((*val >> 28)& 0x1) == 0 && ctx->ctx_fl_using_dbreg == 0) {
 
 		DPRINT(("pmc[%d]=0x%lx has active pmc11.pt cleared, clearing dbr\n", cnum, *val));
 
@@ -114,4 +97,19 @@ pfm_ita_pmc_check(struct task_struct *task, pfm_context_t *ctx, unsigned int cnu
 	}
 	return 0;
 }
+
+/*
+ * impl_pmcs, impl_pmds are computed at runtime to minimize errors!
+ */
+static pmu_config_t pmu_conf_ita={
+	.pmu_name      = "Itanium",
+	.pmu_family    = 0x7,
+	.ovfl_val      = (1UL << 32) - 1,
+	.pmd_desc      = pfm_ita_pmd_desc,
+	.pmc_desc      = pfm_ita_pmc_desc,
+	.num_ibrs      = 8,
+	.num_dbrs      = 8,
+	.use_rr_dbregs = 1, /* debug register are use for range retrictions */
+};
+
 
