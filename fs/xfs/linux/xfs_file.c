@@ -59,104 +59,101 @@ static struct vm_operations_struct linvfs_file_vm_ops;
 
 
 STATIC ssize_t
-linvfs_readv(
-	struct file		*filp,
-	const struct iovec	*iovp,
-	unsigned long		nr_segs,
-	loff_t			*ppos)
+linvfs_read(
+	struct kiocb		*iocb,
+	char __user		*buf,
+	size_t			count,
+	loff_t			pos)
 {
-	vnode_t			*vp = LINVFS_GET_VP(filp->f_dentry->d_inode);
+	struct iovec		iov = {buf, count};
+	vnode_t			*vp;
 	int			error;
 
-	VOP_READ(vp, filp, iovp, nr_segs, ppos, NULL, error);
+	BUG_ON(iocb->ki_pos != pos);
+	vp = LINVFS_GET_VP(iocb->ki_filp->f_dentry->d_inode);
+	VOP_READ(vp, iocb, &iov, 1, &iocb->ki_pos, NULL, error);
 
 	return error;
 }
 
 
 STATIC ssize_t
-linvfs_writev(
-	struct file		*filp,
-	const struct iovec	*iovp,
-	unsigned long		nr_segs,
-	loff_t			*ppos)
+linvfs_write(
+	struct kiocb	*iocb,
+	const char 	*buf,
+	size_t		count,
+	loff_t		pos)
 {
-	struct inode		*inode = filp->f_dentry->d_inode;
-	vnode_t			*vp = LINVFS_GET_VP(inode);
-	int			error = filp->f_error;
+	struct iovec	iov = {(void *)buf, count};
+	struct file	*file = iocb->ki_filp;
+	struct inode	*inode = file->f_dentry->d_inode->i_mapping->host;
+	vnode_t		*vp = LINVFS_GET_VP(inode);
+	int		error;
+	int		direct = file->f_flags & O_DIRECT;
 
-	if (unlikely(error)) {
-		filp->f_error = 0;
-		return error;
-	}
+	BUG_ON(iocb->ki_pos != pos);
 
-	/*
-	 * We allow multiple direct writers in, there is no
-	 * potential call to vmtruncate in that path.
-	 */
-	if (filp->f_flags & O_DIRECT) {
-		VOP_WRITE(vp, filp, iovp, nr_segs, ppos, NULL, error);
+	if (direct) {
+		VOP_WRITE(vp, iocb, &iov, 1, &iocb->ki_pos, NULL, error);
 	} else {
 		down(&inode->i_sem);
-		VOP_WRITE(vp, filp, iovp, nr_segs, ppos, NULL, error);
+		VOP_WRITE(vp, iocb, &iov, 1, &iocb->ki_pos, NULL, error);
 		up(&inode->i_sem);
 	}
 
 	return error;
 }
 
-
 STATIC ssize_t
-linvfs_read(
-	struct file		*filp,
-	char			*buf,
-	size_t			count,
-	loff_t			*ppos)
-{
-	struct iovec		iov = {buf, count};
-
-	return linvfs_readv(filp, &iov, 1, ppos);
-}
-
-
-STATIC ssize_t
-linvfs_write(
+linvfs_readv(
 	struct file		*file,
-	const char		*buf,
-	size_t			count,
+	const struct iovec 	*iov,
+	unsigned long		nr_segs,
 	loff_t			*ppos)
 {
-	struct iovec		iov = {(void *)buf, count};
+	struct inode	*inode = file->f_dentry->d_inode->i_mapping->host;
+	vnode_t		*vp = LINVFS_GET_VP(inode);
+	struct		kiocb kiocb;
+	int		error;
 
-	return linvfs_writev(file, &iov, 1, ppos);
+	init_sync_kiocb(&kiocb, file);
+	kiocb.ki_pos = *ppos;
+	VOP_READ(vp, &kiocb, iov, nr_segs, &kiocb.ki_pos, NULL, error);
+	if (-EIOCBQUEUED == error)
+		error = wait_on_sync_kiocb(&kiocb);
+	*ppos = kiocb.ki_pos;
+
+	return error;
 }
-
 
 STATIC ssize_t
-linvfs_aio_read(
-	struct kiocb		*iocb,
-	char			*buf,
-	size_t			count,
-	loff_t			pos)
+linvfs_writev(
+	struct file		*file,
+	const struct iovec 	*iov,
+	unsigned long		nr_segs,
+	loff_t			*ppos)
 {
-	struct iovec		iov = {buf, count};
+	struct inode	*inode = file->f_dentry->d_inode->i_mapping->host;
+	vnode_t		*vp = LINVFS_GET_VP(inode);
+	struct		kiocb kiocb;
+	int		error;
+	int		direct = file->f_flags & O_DIRECT;
 
-	return linvfs_readv(iocb->ki_filp, &iov, 1, &iocb->ki_pos);
+	init_sync_kiocb(&kiocb, file);
+	kiocb.ki_pos = *ppos;
+	if (direct) {
+		VOP_WRITE(vp, &kiocb, iov, nr_segs, &kiocb.ki_pos, NULL, error);
+	} else {
+		down(&inode->i_sem);
+		VOP_WRITE(vp, &kiocb, iov, nr_segs, &kiocb.ki_pos, NULL, error);
+		up(&inode->i_sem);
+	}
+	if (-EIOCBQUEUED == error)
+		error = wait_on_sync_kiocb(&kiocb);
+	*ppos = kiocb.ki_pos;
+
+	return error;
 }
-
-
-STATIC ssize_t
-linvfs_aio_write(
-	struct kiocb		*iocb,
-	const char		*buf,
-	size_t			count,
-	loff_t			pos)
-{
-	struct iovec		iov = {(void *)buf, count};
-
-	return linvfs_writev(iocb->ki_filp, &iov, 1, &iocb->ki_pos);
-}
-
 
 STATIC ssize_t
 linvfs_sendfile(
@@ -381,12 +378,12 @@ linvfs_mprotect(
 
 struct file_operations linvfs_file_operations = {
 	.llseek		= generic_file_llseek,
-	.read		= linvfs_read,
-	.write		= linvfs_write,
+	.read		= do_sync_read,
+	.write		= do_sync_write,
 	.readv		= linvfs_readv,
 	.writev		= linvfs_writev,
-	.aio_read	= linvfs_aio_read,
-	.aio_write	= linvfs_aio_write,
+	.aio_read	= linvfs_read,
+	.aio_write	= linvfs_write,
 	.sendfile	= linvfs_sendfile,
 	.ioctl		= linvfs_ioctl,
 	.mmap		= linvfs_file_mmap,

@@ -79,8 +79,9 @@ typedef enum {				/* pbm_flags values */
 	PBMF_EOF =		0x01,	/* mapping contains EOF		*/
 	PBMF_HOLE =		0x02,	/* mapping covers a hole	*/
 	PBMF_DELAY =		0x04,	/* mapping covers delalloc region  */
-	PBMF_UNWRITTEN =	0x20	/* mapping covers allocated	*/
+	PBMF_UNWRITTEN =	0x20,	/* mapping covers allocated	*/
 					/* but uninitialized file data	*/
+	PBMF_NEW =		0x40	/* just allocated		*/
 } bmap_flags_t;
 
 typedef enum {
@@ -95,6 +96,7 @@ typedef enum {
 	BMAP_MMAP = (1 << 6),		/* allocate for mmap write */
 	BMAP_SYNC = (1 << 7),		/* sync write */
 	BMAP_TRYLOCK = (1 << 8),	/* non-blocking request */
+	BMAP_DEVICE = (1 << 9),		/* we only want to know the device */
 } bmapi_flags_t;
 
 typedef enum page_buf_flags_e {		/* pb_flags values */

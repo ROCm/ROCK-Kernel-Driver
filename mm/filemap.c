@@ -724,7 +724,7 @@ success:
  * This is the "read()" routine for all filesystems
  * that can use the page cache directly.
  */
-static ssize_t
+ssize_t
 __generic_file_aio_read(struct kiocb *iocb, const struct iovec *iov,
 		unsigned long nr_segs, loff_t *ppos)
 {
@@ -809,6 +809,7 @@ generic_file_aio_read(struct kiocb *iocb, char __user *buf, size_t count, loff_t
 	return __generic_file_aio_read(iocb, &local_iov, 1, &iocb->ki_pos);
 }
 EXPORT_SYMBOL(generic_file_aio_read);
+EXPORT_SYMBOL(__generic_file_aio_read);
 
 ssize_t
 generic_file_read(struct file *filp, char __user *buf, size_t count, loff_t *ppos)
