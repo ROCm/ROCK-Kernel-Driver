@@ -59,7 +59,7 @@ struct rlimit {
  * GPG wants 32kB of mlocked memory, to make sure pass phrases
  * and other sensitive information are never written to disk.
  */
-#define MLOCK_LIMIT	(32*1024)
+#define MLOCK_LIMIT	(8 * PAGE_SIZE)
 
 /*
  * Due to binary compatibility, the actual resource numbers
