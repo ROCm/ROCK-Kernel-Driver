@@ -3001,6 +3001,7 @@ static int __devinit cm_probe(struct pci_dev *pcidev, const struct pci_device_id
 	int i, val, ret;
 	unsigned char reg_mask;
 	int timeout;
+	struct resource *ports;
 	struct {
 		unsigned short	deviceid;
 		char		*devicename;
@@ -3202,12 +3203,16 @@ static int __devinit cm_probe(struct pci_dev *pcidev, const struct pci_device_id
 		s->iomidi = 0;
 		goto skip_mpu;
 	}
+	ports = request_region(s->iomidi, 2, "mpu401");
+	if (!ports)
+		goto skip_mpu;
 	/* disable MPU-401 */
 	maskb(s->iobase + CODEC_CMI_FUNCTRL1, ~0x04, 0);
 	s->mpu_data.name = "cmpci mpu";
 	s->mpu_data.io_base = s->iomidi;
 	s->mpu_data.irq = -s->irq;	// tell mpu401 to share irq
-	if (probe_mpu401(&s->mpu_data)) {
+	if (probe_mpu401(&s->mpu_data, ports)) {
+		release_region(s->iomidi, 2);
 		s->iomidi = 0;
 		goto skip_mpu;
 	}
@@ -3221,7 +3226,8 @@ static int __devinit cm_probe(struct pci_dev *pcidev, const struct pci_device_id
 		else
 			break;
 	}
-	if (!probe_mpu401(&s->mpu_data)) {
+	if (!probe_mpu401(&s->mpu_data, ports)) {
+		release_region(s->iomidi, 2);
 		s->iomidi = 0;
 		maskb(s->iobase + CODEC_CMI_FUNCTRL1, ~0, 0x04);
 	} else {

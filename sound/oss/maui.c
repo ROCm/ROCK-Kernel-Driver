@@ -301,11 +301,13 @@ static int maui_load_patch(int dev, int format, const char __user *addr,
 
 static int __init probe_maui(struct address_info *hw_config)
 {
+	struct resource *ports;
 	int this_dev;
 	int i;
 	int tmp1, tmp2, ret;
 
-	if (check_region(hw_config->io_base, 2))
+	ports = request_region(hw_config->io_base, 2, "mpu401");
+	if (!ports)
 		return 0;
 
 	if (!request_region(hw_config->io_base + 2, 6, "Maui"))
@@ -357,10 +359,10 @@ static int __init probe_maui(struct address_info *hw_config)
 	printk(KERN_DEBUG "Available DRAM %dk\n", tmp1 / 1024);
 
 	for (i = 0; i < 1000; i++)
-		if (probe_mpu401(hw_config))
+		if (probe_mpu401(hw_config, ports))
 			break;
 
-	ret = probe_mpu401(hw_config);
+	ret = probe_mpu401(hw_config, ports);
 	if (!ret)
 		goto out3;
 
@@ -396,6 +398,7 @@ out3:
 out2:
 	release_region(hw_config->io_base + 2, 6);
 out:
+	release_region(hw_config->io_base, 2);
 	return 0;
 }
 

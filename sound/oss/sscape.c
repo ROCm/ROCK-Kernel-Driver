@@ -600,6 +600,7 @@ static coproc_operations sscape_coproc_operations =
 	&adev_info
 };
 
+static struct resource *sscape_ports;
 static int sscape_is_pnp;
 
 static void __init attach_sscape(struct address_info *hw_config)
@@ -637,7 +638,6 @@ static void __init attach_sscape(struct address_info *hw_config)
 
 	int i, irq_bits = 0xff;
 
-	request_region(devc->base + 2, 6, "SoundScape");
 	if (old_hardware)
 	{
 		valid_interrupts = valid_interrupts_old;
@@ -657,6 +657,8 @@ static void __init attach_sscape(struct address_info *hw_config)
 	if (hw_config->irq > 15 || (regs[4] = irq_bits == 0xff))
 	{
 		printk(KERN_ERR "Invalid IRQ%d\n", hw_config->irq);
+		release_region(devc->base, 2);
+		release_region(devc->base + 2, 6);
 		if (sscape_is_pnp)
 			release_region(devc->codec, 2);
 		return;
@@ -696,7 +698,7 @@ static void __init attach_sscape(struct address_info *hw_config)
 	}
 #endif
 
-	if (probe_mpu401(hw_config))
+	if (probe_mpu401(hw_config, sscape_ports))
 		hw_config->always_detect = 1;
 	hw_config->name = "SoundScape";
 
@@ -719,9 +721,6 @@ static int detect_ga(sscape_info * devc)
 	unsigned char save;
 
 	DDB(printk("Entered Soundscape detect_ga(%x)\n", devc->base));
-
-	if (check_region(devc->base, 8))
-		return 0;
 
 	/*
 	 * First check that the address register of "ODIE" is
@@ -1115,11 +1114,6 @@ static int __init detect_sscape_pnp(sscape_info* devc)
 
 	DDB(printk("Entered detect_sscape_pnp(%x)\n", devc->base));
 
-	if (check_region(devc->base, 8)) {
-		printk(KERN_ERR "detect_sscape_pnp: port %x is not free\n", devc->base);	
-		return 0;
-	}
-		
 	if (!request_region(devc->codec, 2, "sscape codec")) {
 		printk(KERN_ERR "detect_sscape_pnp: port %x is not free\n", devc->codec);	
 		return 0;
@@ -1243,9 +1237,20 @@ static int __init probe_sscape(struct address_info *hw_config)
 #endif
 	devc->failed = 1;
 
+	sscape_ports = request_region(devc->base, 2, "mpu401");
+	if (!sscape_ports)
+		return 0;
+
+	if (!request_region(devc->base + 2, 6, "SoundScape")) {
+		release_region(devc->base, 2);
+		return 0;
+	}
+
 	if (!detect_ga(devc)) {
 		if (detect_sscape_pnp(devc))
 			return 1;
+		release_region(devc->base, 2);
+		release_region(devc->base + 2, 6);
 		return 0;
 	}
 

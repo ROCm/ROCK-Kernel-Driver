@@ -1219,17 +1219,22 @@ int probe_sbmpu(struct address_info *hw_config, struct module *owner)
 #if defined(CONFIG_SOUND_MPU401)
 	if (devc->model == MDL_ESS)
 	{
-		if (check_region(hw_config->io_base, 2))
-		{
+		struct resource *ports;
+		ports = request_region(hw_config->io_base, 2, "mpu401");
+		if (!ports) {
 			printk(KERN_ERR "sbmpu: I/O port conflict (%x)\n", hw_config->io_base);
 			return 0;
 		}
-		if (!ess_midi_init(devc, hw_config))
+		if (!ess_midi_init(devc, hw_config)) {
+			release_region(hw_config->io_base, 2);
 			return 0;
+		}
 		hw_config->name = "ESS1xxx MPU";
 		devc->midi_irq_cookie = NULL;
-		if (!probe_mpu401(hw_config))
+		if (!probe_mpu401(hw_config, ports)) {
+			release_region(hw_config->io_base, 2);
 			return 0;
+		}
 		attach_mpu401(hw_config, owner);
 		if (last_sb->irq == -hw_config->irq)
 			last_sb->midi_irq_cookie=(void *)hw_config->slots[1];

@@ -747,13 +747,15 @@ static int __init attach_pss(struct address_info *hw_config)
 
 static int __init probe_pss_mpu(struct address_info *hw_config)
 {
+	struct resource *ports;
 	int timeout;
 
 	if (!pss_initialized)
 		return 0;
 
-	if (check_region(hw_config->io_base, 2))
-	{
+	ports = request_region(hw_config->io_base, 2, "mpu401");
+
+	if (!ports) {
 		printk(KERN_ERR "PSS: MPU I/O port conflict\n");
 		return 0;
 	}
@@ -787,7 +789,7 @@ static int __init probe_pss_mpu(struct address_info *hw_config)
 			break;	/* No more input */
 	}
 
-	if (!probe_mpu401(hw_config))
+	if (!probe_mpu401(hw_config, ports))
 		goto fail;
 
 	attach_mpu401(hw_config, THIS_MODULE);	/* Slot 1 */
@@ -795,6 +797,7 @@ static int __init probe_pss_mpu(struct address_info *hw_config)
 		midi_devs[hw_config->slots[1]]->coproc = &pss_coproc_operations;
 	return 1;
 fail:
+	release_region(hw_config->io_base, 2);
 	return 0;
 }
 

@@ -539,22 +539,11 @@ static struct mixer_operations opl3sa3_mixer_operations =
  * Component probe, attach, unload functions
  */
 
-static inline int __init probe_opl3sa2_mpu(struct address_info* hw_config)
-{
-	return probe_mpu401(hw_config);
-}
-
-
-static inline int __init attach_opl3sa2_mpu(struct address_info* hw_config)
-{
-	return attach_mpu401(hw_config, THIS_MODULE);
-}
-
-
 static inline void __exit unload_opl3sa2_mpu(struct address_info *hw_config)
 {
 	unload_mpu401(hw_config);
 }
+
 
 static void __init attach_opl3sa2_mss(struct address_info* hw_config, struct resource *ports)
 {
@@ -1062,15 +1051,23 @@ static int __init init_opl3sa2(void)
 		
 		/* Attach MPU if we've been asked to do so, failure isn't fatal */
 		if (opl3sa2_state[card].cfg_mpu.io_base != -1) {
-			if (probe_opl3sa2_mpu(&opl3sa2_state[card].cfg_mpu)) {
-				if (attach_opl3sa2_mpu(&opl3sa2_state[card].cfg_mpu)) {
-					printk(KERN_ERR PFX "failed to attach MPU401\n");
-					opl3sa2_state[card].cfg_mpu.slots[1] = -1;
-				}
+			int base = opl3sa2_state[card].cfg_mpu.io_base;
+			struct resource *ports;
+			ports = request_region(base, 2, "mpu401");
+			if (!ports)
+				goto out;
+			if (!probe_mpu401(&opl3sa2_state[card].cfg_mpu, ports)) {
+				release_region(base, 2);
+				goto out;
+			}
+			if (attach_mpu401(&opl3sa2_state[card].cfg_mpu, THIS_MODULE)) {
+				printk(KERN_ERR PFX "failed to attach MPU401\n");
+				opl3sa2_state[card].cfg_mpu.slots[1] = -1;
 			}
 		}
 	}
 
+out:
 	if (isapnp) {
 		printk(KERN_NOTICE PFX "%d PnP card(s) found.\n", opl3sa2_cards_num);
 	}
