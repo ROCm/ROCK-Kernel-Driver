@@ -606,8 +606,12 @@ static void udf_table_free_blocks(struct super_block * sb,
 					mark_inode_dirty(table);
 				}
 			}
-			udf_new_tag(nbh->b_data, TID_ALLOC_EXTENT_DESC, 2, 1,
-				nbloc.logicalBlockNum, sizeof(tag));
+			if (UDF_SB_UDFREV(sb) >= 0x0200)
+				udf_new_tag(nbh->b_data, TID_ALLOC_EXTENT_DESC, 3, 1,
+					nbloc.logicalBlockNum, sizeof(tag));
+			else
+				udf_new_tag(nbh->b_data, TID_ALLOC_EXTENT_DESC, 2, 1,
+					nbloc.logicalBlockNum, sizeof(tag));
 			switch (UDF_I_ALLOCTYPE(table))
 			{
 				case ICB_FLAG_AD_SHORT:

@@ -851,6 +851,14 @@ udf_load_partdesc(struct super_block *sb, struct buffer_head *bh)
 		{
 			UDF_SB_PARTLEN(sb,i) = le32_to_cpu(p->partitionLength); /* blocks */
 			UDF_SB_PARTROOT(sb,i) = le32_to_cpu(p->partitionStartingLocation) + UDF_SB_SESSION(sb);
+			if (le32_to_cpu(p->accessType) == PARTITION_ACCESS_R)
+				UDF_SB_PARTFLAGS(sb,i) |= UDF_PART_FLAG_READ_ONLY;
+			if (le32_to_cpu(p->accessType) == PARTITION_ACCESS_WO)
+				UDF_SB_PARTFLAGS(sb,i) |= UDF_PART_FLAG_WRITE_ONCE;
+			if (le32_to_cpu(p->accessType) == PARTITION_ACCESS_RW)
+				UDF_SB_PARTFLAGS(sb,i) |= UDF_PART_FLAG_REWRITABLE;
+			if (le32_to_cpu(p->accessType) == PARTITION_ACCESS_OW)
+				UDF_SB_PARTFLAGS(sb,i) |= UDF_PART_FLAG_OVERWRITABLE;
 
 			if (!strcmp(p->partitionContents.ident, PARTITION_CONTENTS_NSR02) ||
 				!strcmp(p->partitionContents.ident, PARTITION_CONTENTS_NSR03))
