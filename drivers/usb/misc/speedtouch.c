@@ -57,6 +57,7 @@
 #include <asm/uaccess.h>
 #include <linux/usb.h>
 #include <linux/smp_lock.h>
+#include <linux/interrupt.h>
 
 #include <linux/atm.h>
 #include <linux/atmdev.h>
@@ -138,6 +139,7 @@ struct udsl_usb_send_data_context {
 
 struct udsl_instance_data {
 	int minor;
+	struct tasklet_struct recvqueue_tasklet;
 
 	/* usb device part */
 	struct usb_device *usb_dev;
@@ -159,11 +161,7 @@ struct udsl_instance_data *minor_data[MAX_UDSL];
 
 static const char udsl_driver_name[] = "Alcatel SpeedTouch USB";
 
-/* data thread */
-DECLARE_WAIT_QUEUE_HEAD (udsl_wqh);
-static DECLARE_COMPLETION(thread_grave);
 static DECLARE_MUTEX(udsl_usb_ioctl_lock);
-static unsigned int datapid;
 
 #ifdef DEBUG_PACKET
 int udsl_print_packet (const unsigned char *data, int len);
@@ -178,7 +176,7 @@ static void udsl_atm_close (struct atm_vcc *vcc);
 static int udsl_atm_ioctl (struct atm_dev *dev, unsigned int cmd, void *arg);
 static int udsl_atm_send (struct atm_vcc *vcc, struct sk_buff *skb);
 int udsl_atm_proc_read (struct atm_dev *atm_dev, loff_t * pos, char *page);
-void udsl_atm_processqueue (struct udsl_instance_data *instance);
+void udsl_atm_processqueue (unsigned long data);
 
 static struct atmdev_ops udsl_atm_devops = {
 	.open =		udsl_atm_open,
@@ -372,8 +370,9 @@ int udsl_atm_send (struct atm_vcc *vcc, struct sk_buff *skb)
 };
 
 
-void udsl_atm_processqueue (struct udsl_instance_data *instance)
+void udsl_atm_processqueue (unsigned long data)
 {
+	struct udsl_instance_data *instance = (struct udsl_instance_data *) data;
 	struct atmsar_vcc_data *atmsar_vcc = NULL;
 	struct sk_buff *new = NULL, *skb = NULL, *tmp = NULL;
 	unsigned long iflags;
@@ -437,66 +436,6 @@ void udsl_atm_processqueue (struct udsl_instance_data *instance)
 	PDEBUG ("udsl_atm_processqueue successfull\n");
 }
 
-int udsl_atm_processqueue_thread (void *data)
-{
-	int i = 0;
-	DECLARE_WAITQUEUE (wait, current);
-
-	lock_kernel ();
-	daemonize ();
-
-	/* Setup a nice name */
-	strcpy (current->comm, "kSpeedSARd");
-
-	add_wait_queue (&udsl_wqh, &wait);
-	set_current_state(TASK_INTERRUPTIBLE);
-
-	for (;;) {
-		schedule();
-		if (signal_pending (current))
-			break;
-		PDEBUG ("SpeedSARd awoke\n");
-retry:
-		for (i = 0; i < MAX_UDSL; i++)
-			if (minor_data[i])
-				udsl_atm_processqueue (minor_data[i]);
-		set_current_state(TASK_INTERRUPTIBLE);
-		/* we must check for data recieved and restart processing if there's any */
-		for (i = 0; i < MAX_UDSL; i++) {
-			spin_lock_irq(&minor_data[i]->recvqlock);
-			if (!skb_queue_empty(&minor_data[i]->recvqueue)) {
-				spin_unlock_irq(&minor_data[i]->recvqlock);
-				set_current_state(TASK_RUNNING);
-				goto retry;
-			} else {
-				spin_unlock_irq(&minor_data[i]->recvqlock);
-			}
-		}
-	};
-
-	set_current_state(TASK_RUNNING);
-	remove_wait_queue (&udsl_wqh, &wait);
-	PDEBUG ("SpeedSARd is exiting\n");
-	complete_and_exit(&thread_grave, 0);
-	return 0; //never reached
-}
-
-
-void udsl_atm_sar_start (void)
-{
-	datapid = kernel_thread (udsl_atm_processqueue_thread, (void *) NULL,
-				 CLONE_FS | CLONE_FILES | CLONE_SIGHAND);
-}
-
-void udsl_atm_sar_stop (void)
-{
-	int ret;
-	/* Kill the thread */
-	ret = kill_proc (datapid, SIGTERM, 1);
-	if (!ret) {
-		wait_for_completion(&thread_grave);
-	}
-}
 
 /***************************************************************************
 *
@@ -739,7 +678,7 @@ void udsl_usb_data_receive (struct urb *urb, struct pt_regs *regs)
 		spin_lock (&instance->recvqlock);
 		skb_queue_tail (&instance->recvqueue, ctx->skb);
 		spin_unlock (&instance->recvqlock);
-		wake_up (&udsl_wqh);
+		tasklet_schedule (&instance->recvqueue_tasklet);
 		/* get a new skb */
 		ctx->skb = dev_alloc_skb (UDSL_RECEIVE_BUFFER_SIZE);
 		if (!ctx->skb) {
@@ -975,6 +914,7 @@ static int udsl_usb_probe (struct usb_interface *intf, const struct usb_device_i
 	instance->rcvbufs = NULL;
 	spin_lock_init (&instance->sndqlock);
 	spin_lock_init (&instance->recvqlock);
+	tasklet_init (&instance->recvqueue_tasklet, udsl_atm_processqueue, (unsigned long) instance);
 
 	udsl_atm_startdevice (instance, &udsl_atm_devops);
 
@@ -1032,16 +972,11 @@ static int __init udsl_usb_init (void)
 	for (i = 0; i < MAX_UDSL; i++)
 		minor_data[i] = NULL;
 
-	init_waitqueue_head (&udsl_wqh);
-	udsl_atm_sar_start ();
-
 	return usb_register (&udsl_usb_driver);
 }
 
 static void __exit udsl_usb_cleanup (void)
 {
-	/* killing threads */
-	udsl_atm_sar_stop ();
 	usb_deregister (&udsl_usb_driver);
 }
 
