@@ -830,7 +830,7 @@ void __init mp_register_lapic (
 	MP_processor_info(&processor);
 }
 
-#ifdef CONFIG_X86_IO_APIC
+#if defined(CONFIG_X86_IO_APIC) && defined(CONFIG_ACPI_INTERPRETER)
 
 #define MP_ISA_BUS		0
 #define MP_MAX_IOAPIC_PIN	127
@@ -1019,8 +1019,6 @@ void __init mp_config_acpi_legacy_irqs (void)
 	}
 }
 
-#ifdef	CONFIG_ACPI
-
 /* Ensure the ACPI SCI interrupt level is active low, edge-triggered */
 
 extern FADT_DESCRIPTOR acpi_fadt;
@@ -1074,7 +1072,6 @@ void __init mp_config_ioapic_for_sci(int irq)
 
 	io_apic_set_pci_routing(ioapic, ioapic_pin, irq, 1, 1); // Active low, level triggered
 }
-#endif	/* CONFIG_ACPI */
 
 #ifdef CONFIG_ACPI_PCI
 
@@ -1154,5 +1151,5 @@ void __init mp_parse_prt (void)
 }
 
 #endif /*CONFIG_ACPI_PCI*/
-#endif	/* CONFIG_X86_IO_APIC */
+#endif /*CONFIG_X86_IO_APIC && CONFIG_ACPI_INTERPRETER*/
 #endif /*CONFIG_ACPI_BOOT*/
