@@ -30,6 +30,7 @@
 #define	MIP_BUSY		1
 #define	MIP_SPIN		0xf0000
 #define	MIP_VALID		0x0100000000000000
+#define	MIP_PORT(VALUE)	((VALUE >> 32) & 0xffff)
 
 #define	MIP_RD_LO(VALUE)	(VALUE & 0xffffffff)   
 

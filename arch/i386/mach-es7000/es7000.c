@@ -83,6 +83,7 @@ parse_unisys_oem (char *oemptr, int oem_entries)
 			host = (struct mip_reg *)val;
 			host_reg = __va(host);
 			val = MIP_RD_LO(mi->mip_reg);
+			mip_port = MIP_PORT(mi->mip_info);
 			mip_addr = val;
 			mip = (struct mip_reg *)val;
 			mip_reg = __va(mip);
