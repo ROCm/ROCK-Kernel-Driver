@@ -92,6 +92,7 @@ extern void			rt6_purge_dflt_routers(int lst_resort);
 extern void			rt6_redirect(struct in6_addr *dest,
 					     struct in6_addr *saddr,
 					     struct neighbour *neigh,
+					     u8 *lladdr,
 					     int on_link);
 
 extern void			rt6_pmtu_discovery(struct in6_addr *daddr,

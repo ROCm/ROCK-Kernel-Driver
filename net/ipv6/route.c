@@ -1007,7 +1007,7 @@ static int ip6_route_del(struct in6_rtmsg *rtmsg, struct nlmsghdr *nlh, void *_r
  *	Handle redirects
  */
 void rt6_redirect(struct in6_addr *dest, struct in6_addr *saddr,
-		  struct neighbour *neigh, int on_link)
+		  struct neighbour *neigh, u8 *lladdr, int on_link)
 {
 	struct rt6_info *rt, *nrt;
 
@@ -1020,22 +1020,13 @@ void rt6_redirect(struct in6_addr *dest, struct in6_addr *saddr,
 	if (neigh->dev != rt->rt6i_dev)
 		goto out;
 
-	/* Redirect received -> path was valid.
-	   Look, redirects are sent only in response to data packets,
-	   so that this nexthop apparently is reachable. --ANK
-	 */
-	dst_confirm(&rt->u.dst);
-
-	/* Duplicate redirect: silently ignore. */
-	if (neigh == rt->u.dst.neighbour)
-		goto out;
-
-	/* Current route is on-link; redirect is always invalid.
-	   
-	   Seems, previous statement is not true. It could
-	   be node, which looks for us as on-link (f.e. proxy ndisc)
-	   But then router serving it might decide, that we should
-	   know truth 8)8) --ANK (980726).
+	/*
+	 * Current route is on-link; redirect is always invalid.
+	 * 
+	 * Seems, previous statement is not true. It could
+	 * be node, which looks for us as on-link (f.e. proxy ndisc)
+	 * But then router serving it might decide, that we should
+	 * know truth 8)8) --ANK (980726).
 	 */
 	if (!(rt->rt6i_flags&RTF_GATEWAY))
 		goto out;
@@ -1047,7 +1038,6 @@ void rt6_redirect(struct in6_addr *dest, struct in6_addr *saddr,
 	 *	is a bit fuzzy and one might need to check all default
 	 *	routers.
 	 */
-
 	if (ipv6_addr_cmp(saddr, &rt->rt6i_gateway)) {
 		if (rt->rt6i_flags & RTF_DEFAULT) {
 			struct rt6_info *rt1;
@@ -1075,6 +1065,24 @@ source_ok:
 	/*
 	 *	We have finally decided to accept it.
 	 */
+
+	neigh_update(neigh, lladdr, NUD_STALE, 
+		     NEIGH_UPDATE_F_WEAK_OVERRIDE|
+		     NEIGH_UPDATE_F_OVERRIDE|
+		     (on_link ? 0 : (NEIGH_UPDATE_F_OVERRIDE_ISROUTER|
+				     NEIGH_UPDATE_F_ISROUTER))
+		     );
+
+	/*
+	 * Redirect received -> path was valid.
+	 * Look, redirects are sent only in response to data packets,
+	 * so that this nexthop apparently is reachable. --ANK
+	 */
+	dst_confirm(&rt->u.dst);
+
+	/* Duplicate redirect: silently ignore. */
+	if (neigh == rt->u.dst.neighbour)
+		goto out;
 
 	nrt = ip6_rt_copy(rt);
 	if (nrt == NULL)

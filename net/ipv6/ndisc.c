@@ -1204,24 +1204,11 @@ static void ndisc_redirect_rcv(struct sk_buff *skb)
 			return;
 		}
 	}
-	/* passed validation tests */
-
-	/*
-	   We install redirect only if nexthop state is valid.
-	 */
 
 	neigh = __neigh_lookup(&nd_tbl, target, skb->dev, 1);
 	if (neigh) {
-		neigh_update(neigh, lladdr, NUD_STALE, 
-			     NEIGH_UPDATE_F_WEAK_OVERRIDE|
-			     NEIGH_UPDATE_F_OVERRIDE|
-			     (on_link ? 0 : (NEIGH_UPDATE_F_OVERRIDE_ISROUTER|
-					     NEIGH_UPDATE_F_ISROUTER))
-			     );
-		if (neigh->nud_state&NUD_VALID)
-			rt6_redirect(dest, &skb->nh.ipv6h->saddr, neigh, on_link);
-		else
-			__neigh_event_send(neigh, NULL);
+		rt6_redirect(dest, &skb->nh.ipv6h->saddr, neigh, lladdr, 
+			     on_link);
 		neigh_release(neigh);
 	}
 	in6_dev_put(in6_dev);
