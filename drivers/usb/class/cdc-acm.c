@@ -573,9 +573,11 @@ static int acm_probe (struct usb_interface *intf,
 	struct usb_device *dev;
 	struct acm *acm;
 	struct usb_host_config *cfacm;
-	struct usb_interface *data;
-	struct usb_host_interface *ifcom, *ifdata;
-	struct usb_endpoint_descriptor *epctrl, *epread, *epwrite;
+	struct usb_interface *data = NULL;
+	struct usb_host_interface *ifcom, *ifdata = NULL;
+	struct usb_endpoint_descriptor *epctrl = NULL;
+	struct usb_endpoint_descriptor *epread = NULL;
+	struct usb_endpoint_descriptor *epwrite = NULL;
 	int readsize, ctrlsize, minor, j;
 	unsigned char *buf;
 
