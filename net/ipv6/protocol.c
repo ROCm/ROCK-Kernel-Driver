@@ -80,5 +80,7 @@ int inet6_del_protocol(struct inet6_protocol *prot, unsigned char protocol)
 
 	spin_unlock_bh(&inet6_proto_lock);
 
+	synchronize_net();
+
 	return ret;
 }
