@@ -64,7 +64,6 @@ DATAADDR	:= .
 head-y		:= arch/arm/kernel/head.o arch/arm/kernel/init_task.o
 textaddr-y	:= 0xC0008000
 
- machine-$(CONFIG_ARCH_ARCA5K)	   := arc
  machine-$(CONFIG_ARCH_RPC)	   := rpc
  machine-$(CONFIG_ARCH_EBSA110)	   := ebsa110
  machine-$(CONFIG_ARCH_CLPS7500)   := clps7500
