@@ -833,32 +833,32 @@ static int spx_getsockopt(struct socket *sock, int level, int optname,
 }
 
 static struct proto_ops SOCKOPS_WRAPPED(spx_ops) = {
-	family:		PF_IPX,
+	.family =	PF_IPX,
 
-	release:	spx_release,
-	bind:		spx_bind,
-	connect:	spx_connect,
-	socketpair:	sock_no_socketpair,
-	accept:		spx_accept,
-	getname:	spx_getname,
-	poll:		spx_datagram_poll,
-	ioctl:		spx_ioctl,
-	listen:		spx_listen,
-	shutdown:	sock_no_shutdown,
-	setsockopt:	spx_setsockopt,
-	getsockopt:	spx_getsockopt,
-	sendmsg:	spx_sendmsg,
-	recvmsg:	spx_recvmsg,
-	mmap:		sock_no_mmap,
-	sendpage:	sock_no_sendpage,
+	.release =	spx_release,
+	.bind =		spx_bind,
+	.connect =	spx_connect,
+	.socketpair =	sock_no_socketpair,
+	.accept =	spx_accept,
+	.getname =	spx_getname,
+	.poll =		spx_datagram_poll,
+	.ioctl =	spx_ioctl,
+	.listen =	spx_listen,
+	.shutdown =	sock_no_shutdown,
+	.setsockopt =	spx_setsockopt,
+	.getsockopt =	spx_getsockopt,
+	.sendmsg =	spx_sendmsg,
+	.recvmsg =	spx_recvmsg,
+	.mmap =		sock_no_mmap,
+	.sendpage =	sock_no_sendpage,
 };
 
 #include <linux/smp_lock.h>
 SOCKOPS_WRAP(spx, PF_IPX);
 
 static struct net_proto_family spx_family_ops = {
-	family:	 PF_IPX,
-	create:	 spx_create,
+	.family = PF_IPX,
+	.create = spx_create,
 };
 
 static char banner[] __initdata =

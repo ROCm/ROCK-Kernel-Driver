@@ -121,68 +121,68 @@ struct icmp_mib icmp_statistics[NR_CPUS * 2];
 
 struct icmp_err icmp_err_convert[] = {
 	{
-		errno:	ENETUNREACH,	/* ICMP_NET_UNREACH */
-		fatal:	0,
+		.errno =ENETUNREACH,	/* ICMP_NET_UNREACH */
+		.fatal =0,
 	},
 	{
-		errno:	EHOSTUNREACH,	/* ICMP_HOST_UNREACH */
-		fatal:	0,
+		.errno =EHOSTUNREACH,	/* ICMP_HOST_UNREACH */
+		.fatal =0,
 	},
 	{
-		errno:	ENOPROTOOPT	/* ICMP_PROT_UNREACH */,
-		fatal:	1,
+		.errno =ENOPROTOOPT	/* ICMP_PROT_UNREACH */,
+		.fatal =1,
 	},
 	{
-		errno:	ECONNREFUSED,	/* ICMP_PORT_UNREACH */
-		fatal:	1,
+		.errno =ECONNREFUSED,	/* ICMP_PORT_UNREACH */
+		.fatal =1,
 	},
 	{
-		errno:	EMSGSIZE,	/* ICMP_FRAG_NEEDED */
-		fatal:	0,
+		.errno =EMSGSIZE,	/* ICMP_FRAG_NEEDED */
+		.fatal =0,
 	},
 	{
-		errno:	EOPNOTSUPP,	/* ICMP_SR_FAILED */
-		fatal:	0,
+		.errno =EOPNOTSUPP,	/* ICMP_SR_FAILED */
+		.fatal =0,
 	},
 	{
-		errno:	ENETUNREACH,	/* ICMP_NET_UNKNOWN */
-		fatal:	1,
+		.errno =ENETUNREACH,	/* ICMP_NET_UNKNOWN */
+		.fatal =1,
 	},
 	{
-		errno:	EHOSTDOWN,	/* ICMP_HOST_UNKNOWN */
-		fatal:	1,
+		.errno =EHOSTDOWN,	/* ICMP_HOST_UNKNOWN */
+		.fatal =1,
 	},
 	{
-		errno:	ENONET,		/* ICMP_HOST_ISOLATED */
-		fatal:	1,
+		.errno =ENONET,		/* ICMP_HOST_ISOLATED */
+		.fatal =1,
 	},
 	{
-		errno:	ENETUNREACH,	/* ICMP_NET_ANO	*/
-		fatal:	1,
+		.errno =ENETUNREACH,	/* ICMP_NET_ANO	*/
+		.fatal =1,
 	},
 	{
-		errno:	EHOSTUNREACH,	/* ICMP_HOST_ANO */
-		fatal:	1,
+		.errno =EHOSTUNREACH,	/* ICMP_HOST_ANO */
+		.fatal =1,
 	},
 	{
-		errno:	ENETUNREACH,	/* ICMP_NET_UNR_TOS */
-		fatal:	0,
+		.errno =ENETUNREACH,	/* ICMP_NET_UNR_TOS */
+		.fatal =0,
 	},
 	{
-		errno:	EHOSTUNREACH,	/* ICMP_HOST_UNR_TOS */
-		fatal:	0,
+		.errno =EHOSTUNREACH,	/* ICMP_HOST_UNR_TOS */
+		.fatal =0,
 	},
 	{
-		errno:	EHOSTUNREACH,	/* ICMP_PKT_FILTERED */
-		fatal:	1,
+		.errno =EHOSTUNREACH,	/* ICMP_PKT_FILTERED */
+		.fatal =1,
 	},
 	{
-		errno:	EHOSTUNREACH,	/* ICMP_PREC_VIOLATION */
-		fatal:	1,
+		.errno =EHOSTUNREACH,	/* ICMP_PREC_VIOLATION */
+		.fatal =1,
 	},
 	{
-		errno:	EHOSTUNREACH,	/* ICMP_PREC_CUTOFF */
-		fatal:	1,
+		.errno =EHOSTUNREACH,	/* ICMP_PREC_CUTOFF */
+		.fatal =1,
 	},
 };
 
@@ -1022,123 +1022,123 @@ error:
 static struct icmp_control icmp_pointers[NR_ICMP_TYPES + 1] = {
 	/* ECHO REPLY (0) */
 	[0] = {
-		output:	 &icmp_statistics[0].IcmpOutEchoReps,
-		input:	 &icmp_statistics[0].IcmpInEchoReps,
-		handler: icmp_discard,
+		.output =	 &icmp_statistics[0].IcmpOutEchoReps,
+		.input = &icmp_statistics[0].IcmpInEchoReps,
+		.handler = icmp_discard,
 	},
 	[1] = {
-		output:	 &icmp_statistics[0].dummy,
-		input:	 &icmp_statistics[0].IcmpInErrors,
-		handler: icmp_discard,
-		error:	 1,
+		.output =	 &icmp_statistics[0].dummy,
+		.input = &icmp_statistics[0].IcmpInErrors,
+		.handler = icmp_discard,
+		.error = 1,
 	},
 	[2] = {
-		output:	 &icmp_statistics[0].dummy,
-		input:	 &icmp_statistics[0].IcmpInErrors,
-		handler: icmp_discard,
-		error:	 1,
+		.output =	 &icmp_statistics[0].dummy,
+		.input = &icmp_statistics[0].IcmpInErrors,
+		.handler = icmp_discard,
+		.error = 1,
 	},
 	/* DEST UNREACH (3) */
 	[3] = {
-		output:	 &icmp_statistics[0].IcmpOutDestUnreachs,
-		input:	 &icmp_statistics[0].IcmpInDestUnreachs,
-		handler: icmp_unreach,
-		error:	 1,
+		.output =	 &icmp_statistics[0].IcmpOutDestUnreachs,
+		.input = &icmp_statistics[0].IcmpInDestUnreachs,
+		.handler = icmp_unreach,
+		.error = 1,
 	},
 	/* SOURCE QUENCH (4) */
 	[4] = {
-		output:	 &icmp_statistics[0].IcmpOutSrcQuenchs,
-		input:	 &icmp_statistics[0].IcmpInSrcQuenchs,
+		.output =	 &icmp_statistics[0].IcmpOutSrcQuenchs,
+		.input = &icmp_statistics[0].IcmpInSrcQuenchs,
 		icmp_unreach,
-		error:	 1,
+		.error = 1,
 	},
 	/* REDIRECT (5) */
 	[5] = {
-		output:	 &icmp_statistics[0].IcmpOutRedirects,
-		input:	 &icmp_statistics[0].IcmpInRedirects,
-		handler: icmp_redirect,
-		error:	 1,
+		.output =	 &icmp_statistics[0].IcmpOutRedirects,
+		.input = &icmp_statistics[0].IcmpInRedirects,
+		.handler = icmp_redirect,
+		.error = 1,
 	},
 	[6] = {
-		output:	 &icmp_statistics[0].dummy,
-		input:	 &icmp_statistics[0].IcmpInErrors,
-		handler: icmp_discard,
-		error:	 1,
+		.output =	 &icmp_statistics[0].dummy,
+		.input = &icmp_statistics[0].IcmpInErrors,
+		.handler = icmp_discard,
+		.error = 1,
 	},
 	[7] = {
-		output:	 &icmp_statistics[0].dummy,
-		input:	 &icmp_statistics[0].IcmpInErrors,
-		handler: icmp_discard,
-		error:	 1,
+		.output =	 &icmp_statistics[0].dummy,
+		.input = &icmp_statistics[0].IcmpInErrors,
+		.handler = icmp_discard,
+		.error = 1,
 	},
 	/* ECHO (8) */
 	[8] = {
-		output:	 &icmp_statistics[0].IcmpOutEchos,
-		input:	 &icmp_statistics[0].IcmpInEchos,
-		handler: icmp_echo,
-		error:	 0,
+		.output =	 &icmp_statistics[0].IcmpOutEchos,
+		.input = &icmp_statistics[0].IcmpInEchos,
+		.handler = icmp_echo,
+		.error = 0,
 	},
 	[9] = {
-		output:	 &icmp_statistics[0].dummy,
-		input:	 &icmp_statistics[0].IcmpInErrors,
-		handler: icmp_discard,
-		error:	 1,
+		.output =	 &icmp_statistics[0].dummy,
+		.input = &icmp_statistics[0].IcmpInErrors,
+		.handler = icmp_discard,
+		.error = 1,
 	},
 	[10] = {
-		output:	 &icmp_statistics[0].dummy,
-		input:	 &icmp_statistics[0].IcmpInErrors,
-		handler: icmp_discard,
-		error:	 1,
+		.output =	 &icmp_statistics[0].dummy,
+		.input = &icmp_statistics[0].IcmpInErrors,
+		.handler = icmp_discard,
+		.error = 1,
 	},
 	/* TIME EXCEEDED (11) */
 	[11] = {
-		output:	 &icmp_statistics[0].IcmpOutTimeExcds,
-		input:	 &icmp_statistics[0].IcmpInTimeExcds,
-		handler: icmp_unreach,
-		error:	 1,
+		.output =	 &icmp_statistics[0].IcmpOutTimeExcds,
+		.input = &icmp_statistics[0].IcmpInTimeExcds,
+		.handler = icmp_unreach,
+		.error = 1,
 	},
 	/* PARAMETER PROBLEM (12) */
 	[12] = {
-		output:	 &icmp_statistics[0].IcmpOutParmProbs,
-		input:	 &icmp_statistics[0].IcmpInParmProbs,
-		handler: icmp_unreach,
-		error:	 1,
+		.output =	 &icmp_statistics[0].IcmpOutParmProbs,
+		.input = &icmp_statistics[0].IcmpInParmProbs,
+		.handler = icmp_unreach,
+		.error = 1,
 	},
 	/* TIMESTAMP (13) */
 	[13] = {
-		output:	 &icmp_statistics[0].IcmpOutTimestamps,
-		input:	 &icmp_statistics[0].IcmpInTimestamps,
-		handler: icmp_timestamp,
+		.output =	 &icmp_statistics[0].IcmpOutTimestamps,
+		.input = &icmp_statistics[0].IcmpInTimestamps,
+		.handler = icmp_timestamp,
 	},
 	/* TIMESTAMP REPLY (14) */
 	[14] = {
-		output:	 &icmp_statistics[0].IcmpOutTimestampReps,
-		input:	 &icmp_statistics[0].IcmpInTimestampReps,
-		handler: icmp_discard,
+		.output =	 &icmp_statistics[0].IcmpOutTimestampReps,
+		.input = &icmp_statistics[0].IcmpInTimestampReps,
+		.handler = icmp_discard,
 	},
 	/* INFO (15) */
 	[15] = {
-		output:	 &icmp_statistics[0].dummy,
-		input:	 &icmp_statistics[0].dummy,
-		handler: icmp_discard,
+		.output =	 &icmp_statistics[0].dummy,
+		.input = &icmp_statistics[0].dummy,
+		.handler = icmp_discard,
 	},
 	/* INFO REPLY (16) */
  	[16] = {
-		output:	 &icmp_statistics[0].dummy,
-		input:	 &icmp_statistics[0].dummy,
-		handler: icmp_discard,
+		.output =	 &icmp_statistics[0].dummy,
+		.input = &icmp_statistics[0].dummy,
+		.handler = icmp_discard,
 	},
 	/* ADDR MASK (17) */
 	[17] = {
-		output:	 &icmp_statistics[0].IcmpOutAddrMasks,
-		input:	 &icmp_statistics[0].IcmpInAddrMasks,
-		handler: icmp_address,
+		.output =	 &icmp_statistics[0].IcmpOutAddrMasks,
+		.input = &icmp_statistics[0].IcmpInAddrMasks,
+		.handler = icmp_address,
 	},
 	/* ADDR MASK REPLY (18) */
 	[18] = {
-		output:	 &icmp_statistics[0].IcmpOutAddrMaskReps,
-		input:	 &icmp_statistics[0].IcmpInAddrMaskReps,
-		handler: icmp_address_reply,
+		.output =	 &icmp_statistics[0].IcmpOutAddrMaskReps,
+		.input = &icmp_statistics[0].IcmpInAddrMaskReps,
+		.handler = icmp_address_reply,
 	}
 };
 

@@ -58,10 +58,10 @@ struct dn_fib_rule
 };
 
 static struct dn_fib_rule default_rule = {
-	r_clntref:		ATOMIC_INIT(2),
-	r_preference:		0x7fff,
-	r_table:		DN_DEFAULT_TABLE,
-	r_action:		RTN_UNICAST
+	.r_clntref =		ATOMIC_INIT(2),
+	.r_preference =		0x7fff,
+	.r_table =		DN_DEFAULT_TABLE,
+	.r_action =		RTN_UNICAST
 };
 
 static struct dn_fib_rule *dn_fib_rules = &default_rule;
@@ -296,7 +296,7 @@ static int dn_fib_rules_event(struct notifier_block *this, unsigned long event, 
 
 
 static struct notifier_block dn_fib_rules_notifier = {
-	notifier_call:		dn_fib_rules_event,
+	.notifier_call =	dn_fib_rules_event,
 };
 
 static int dn_fib_fill_rule(struct sk_buff *skb, struct dn_fib_rule *r, struct netlink_callback *cb)

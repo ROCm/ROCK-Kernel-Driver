@@ -204,8 +204,8 @@ void skb_free_datagram(struct sock *sk, struct sk_buff *skb)
 int skb_copy_datagram(const struct sk_buff *skb, int offset, char *to, int size)
 {
 	struct iovec iov = {
-		iov_base: to,
-		iov_len:  size,
+		.iov_base = to,
+		.iov_len =size,
 	};
 
 	return skb_copy_datagram_iovec(skb, offset, &iov, size);

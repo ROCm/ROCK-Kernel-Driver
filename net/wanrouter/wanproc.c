@@ -81,7 +81,7 @@ static int router_proc_perms(struct inode *, int);
 
 static struct inode_operations router_inode =
 {
-	permission:	router_proc_perms,
+	.permission =	router_proc_perms,
 };
 
 /*
@@ -194,17 +194,17 @@ static int status_show(struct seq_file *m, void *v)
 }
 
 static struct seq_operations config_op = {
-	start:	r_start,
-	next:	r_next,
-	stop:	r_stop,
-	show:	config_show
+	.start =r_start,
+	.next =	r_next,
+	.stop =	r_stop,
+	.show =	config_show
 };
 
 static struct seq_operations status_op = {
-	start:	r_start,
-	next:	r_next,
-	stop:	r_stop,
-	show:	status_show
+	.start =r_start,
+	.next =	r_next,
+	.stop =	r_stop,
+	.show =	status_show
 };
 
 static int config_open(struct inode *inode, struct file *file)
@@ -219,18 +219,18 @@ static int status_open(struct inode *inode, struct file *file)
 
 static struct file_operations config_fops =
 {
-	open:		config_open,
-	read:		seq_read,
-	llseek:		seq_lseek,
-	release:	seq_release,
+	.open =		config_open,
+	.read =		seq_read,
+	.llseek =	seq_lseek,
+	.release =	seq_release,
 };
 
 static struct file_operations status_fops =
 {
-	open:		status_open,
-	read:		seq_read,
-	llseek:		seq_lseek,
-	release:	seq_release,
+	.open =		status_open,
+	.read =		seq_read,
+	.llseek =	seq_lseek,
+	.release =	seq_release,
 };
 
 static int wandev_show(struct seq_file *m, void *v)
@@ -302,11 +302,11 @@ static int wandev_open(struct inode *inode, struct file *file)
 
 static struct file_operations wandev_fops =
 {
-	open:		wandev_open,
-	read:		seq_read,
-	llseek:		seq_lseek,
-	release:	single_release,
-	ioctl:		wanrouter_ioctl,
+	.open =		wandev_open,
+	.read =		seq_read,
+	.llseek =	seq_lseek,
+	.release =	single_release,
+	.ioctl =	wanrouter_ioctl,
 };
 
 /*

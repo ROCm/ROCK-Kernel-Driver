@@ -78,24 +78,24 @@ static int pvc_getname(struct socket *sock,struct sockaddr *sockaddr,
 
 
 static struct proto_ops SOCKOPS_WRAPPED(pvc_proto_ops) = {
-	family:		PF_ATMPVC,
+	.family =	PF_ATMPVC,
 
-	release:	atm_release,
-	bind:		pvc_bind,
-	connect:	pvc_connect,
-	socketpair:	sock_no_socketpair,
-	accept:		sock_no_accept,
-	getname:	pvc_getname,
-	poll:		atm_poll,
-	ioctl:		atm_ioctl,
-	listen:		sock_no_listen,
-	shutdown:	pvc_shutdown,
-	setsockopt:	atm_setsockopt,
-	getsockopt:	atm_getsockopt,
-	sendmsg:	atm_sendmsg,
-	recvmsg:	atm_recvmsg,
-	mmap:		sock_no_mmap,
-	sendpage:	sock_no_sendpage,
+	.release =	atm_release,
+	.bind =		pvc_bind,
+	.connect =	pvc_connect,
+	.socketpair =	sock_no_socketpair,
+	.accept =	sock_no_accept,
+	.getname =	pvc_getname,
+	.poll =		atm_poll,
+	.ioctl =	atm_ioctl,
+	.listen =	sock_no_listen,
+	.shutdown =	pvc_shutdown,
+	.setsockopt =	atm_setsockopt,
+	.getsockopt =	atm_getsockopt,
+	.sendmsg =	atm_sendmsg,
+	.recvmsg =	atm_recvmsg,
+	.mmap =		sock_no_mmap,
+	.sendpage =	sock_no_sendpage,
 };
 
 
@@ -111,8 +111,8 @@ static int pvc_create(struct socket *sock,int protocol)
 
 
 static struct net_proto_family pvc_family_ops = {
-	family:	PF_ATMPVC,
-	create:	pvc_create,
+	.family =PF_ATMPVC,
+	.create =pvc_create,
 };
 
 

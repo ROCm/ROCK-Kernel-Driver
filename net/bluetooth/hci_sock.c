@@ -80,7 +80,7 @@ static struct hci_sec_filter hci_sec_filter = {
 };
 
 static struct bluez_sock_list hci_sk_list = {
-	lock: RW_LOCK_UNLOCKED
+	.lock = RW_LOCK_UNLOCKED
 };
 
 /* Send frame to RAW socket */
@@ -522,22 +522,22 @@ int hci_sock_getsockopt(struct socket *sock, int level, int optname, char *optva
 }
 
 struct proto_ops hci_sock_ops = {
-	family:		PF_BLUETOOTH,
-	release:	hci_sock_release,
-	bind:		hci_sock_bind,
-	getname:	hci_sock_getname,
-	sendmsg:	hci_sock_sendmsg,
-	recvmsg:	hci_sock_recvmsg,
-	ioctl:		hci_sock_ioctl,
-	poll:		datagram_poll,
-	listen:		sock_no_listen,
-	shutdown:	sock_no_shutdown,
-	setsockopt:	hci_sock_setsockopt,
-	getsockopt:	hci_sock_getsockopt,
-	connect:	sock_no_connect,
-	socketpair:	sock_no_socketpair,
-	accept:		sock_no_accept,
-	mmap:		sock_no_mmap
+	.family =	PF_BLUETOOTH,
+	.release =	hci_sock_release,
+	.bind =		hci_sock_bind,
+	.getname =	hci_sock_getname,
+	.sendmsg =	hci_sock_sendmsg,
+	.recvmsg =	hci_sock_recvmsg,
+	.ioctl =	hci_sock_ioctl,
+	.poll =		datagram_poll,
+	.listen =	sock_no_listen,
+	.shutdown =	sock_no_shutdown,
+	.setsockopt =	hci_sock_setsockopt,
+	.getsockopt =	hci_sock_getsockopt,
+	.connect =	sock_no_connect,
+	.socketpair =	sock_no_socketpair,
+	.accept =	sock_no_accept,
+	.mmap =		sock_no_mmap
 };
 
 static int hci_sock_create(struct socket *sock, int protocol)
@@ -600,12 +600,12 @@ static int hci_sock_dev_event(struct notifier_block *this, unsigned long event, 
 }
 
 struct net_proto_family hci_sock_family_ops = {
-	family: PF_BLUETOOTH,
-	create: hci_sock_create
+	.family = PF_BLUETOOTH,
+	.create = hci_sock_create
 };
 
 struct notifier_block hci_sock_nblock = {
-	notifier_call: hci_sock_dev_event
+	.notifier_call = hci_sock_dev_event
 };
 
 int hci_sock_init(void)

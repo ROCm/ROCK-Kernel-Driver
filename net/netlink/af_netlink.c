@@ -987,29 +987,29 @@ int netlink_unregister_notifier(struct notifier_block *nb)
 }
                 
 struct proto_ops netlink_ops = {
-	family:		PF_NETLINK,
+	.family =	PF_NETLINK,
 
-	release:	netlink_release,
-	bind:		netlink_bind,
-	connect:	netlink_connect,
-	socketpair:	sock_no_socketpair,
-	accept:		sock_no_accept,
-	getname:	netlink_getname,
-	poll:		datagram_poll,
-	ioctl:		sock_no_ioctl,
-	listen:		sock_no_listen,
-	shutdown:	sock_no_shutdown,
-	setsockopt:	sock_no_setsockopt,
-	getsockopt:	sock_no_getsockopt,
-	sendmsg:	netlink_sendmsg,
-	recvmsg:	netlink_recvmsg,
-	mmap:		sock_no_mmap,
-	sendpage:	sock_no_sendpage,
+	.release =	netlink_release,
+	.bind =		netlink_bind,
+	.connect =	netlink_connect,
+	.socketpair =	sock_no_socketpair,
+	.accept =	sock_no_accept,
+	.getname =	netlink_getname,
+	.poll =		datagram_poll,
+	.ioctl =	sock_no_ioctl,
+	.listen =	sock_no_listen,
+	.shutdown =	sock_no_shutdown,
+	.setsockopt =	sock_no_setsockopt,
+	.getsockopt =	sock_no_getsockopt,
+	.sendmsg =	netlink_sendmsg,
+	.recvmsg =	netlink_recvmsg,
+	.mmap =		sock_no_mmap,
+	.sendpage =	sock_no_sendpage,
 };
 
 struct net_proto_family netlink_family_ops = {
-	family:	PF_NETLINK,
-	create:	netlink_create,
+	.family =PF_NETLINK,
+	.create =netlink_create,
 };
 
 static int __init netlink_proto_init(void)
