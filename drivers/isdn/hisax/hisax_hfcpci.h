@@ -17,9 +17,11 @@ struct hfcpci_adapter {
 	spinlock_t hw_lock;
 	unsigned int irq;
 	void *mmio;
-	char *fifo;
+	u8 *fifo;
 	dma_addr_t fifo_dma;
 
+	struct FsmInst l1m;
+	struct FsmTimer timer;
 	struct sk_buff *tx_skb;
 	int last_fcnt;
 

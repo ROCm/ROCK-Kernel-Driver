@@ -13,6 +13,7 @@
  *
  */
 
+// XXX timer3
 
 #include <linux/version.h>
 #include <linux/module.h>
@@ -68,6 +69,7 @@ static struct pci_device_id hfcpci_ids[] __devinitdata = {
 	ID(DIGI,    DIGI_DF_M_E,      "Digi DataFire Micro V (Europe)"),
 	ID(DIGI,    DIGI_DF_M_IOM2_A, "Digi DataFire Micro V IOM2 (America)"),
 	ID(DIGI,    DIGI_DF_M_A,      "Digi DataFire Micro V (America)"),
+	{ } 
 };
 MODULE_DEVICE_TABLE(pci, hfcpci_ids);
 
@@ -78,6 +80,16 @@ MODULE_PARM(protocol, "i");
 
 // ----------------------------------------------------------------------
 //
+
+#define DBG_WARN      0x0001
+#define DBG_INFO      0x0002
+#define DBG_IRQ       0x0010
+#define DBG_L1M       0x0020
+#define DBG_PR        0x0040
+#define DBG_D_XMIT    0x0100
+#define DBG_D_RECV    0x0200
+#define DBG_B_XMIT    0x1000
+#define DBG_B_RECV    0x2000
 
 /* memory window base address offset (in config space) */
 
@@ -238,19 +250,23 @@ MODULE_PARM(protocol, "i");
 #define CLKDEL_TE	0x0e	/* CLKDEL in TE mode */
 #define CLKDEL_NT	0x6c	/* CLKDEL in NT mode */
 
-#define MAX_D_FRAMES 0x0f
-#define MAX_B_FRAMES 0x1f
-#define B_FIFO_SIZE  (0x2000 - 0x200)
-#define D_FIFO_SIZE  0x200
+#define MAX_D_FRAMES 0x10
+#define MAX_B_FRAMES 0x20
+#define B_FIFO_START 0x0200
+#define B_FIFO_END   0x2000
+#define B_FIFO_SIZE  (B_FIFO_END - B_FIFO_START)
+#define D_FIFO_START 0x0000
+#define D_FIFO_END   0x0200
+#define D_FIFO_SIZE  (D_FIFO_END - D_FIFO_START)
 
 // ----------------------------------------------------------------------
-//
+// push messages to the upper layers
 
 static inline void D_L1L2(struct hfcpci_adapter *adapter, int pr, void *arg)
 {
 	struct hisax_if *ifc = (struct hisax_if *) &adapter->d_if;
 
-	DBG(2, "pr %#x", pr);
+	DBG(DBG_PR, "pr %#x", pr);
 	ifc->l1l2(ifc, pr, arg);
 }
 
@@ -258,12 +274,12 @@ static inline void B_L1L2(struct hfcpci_bcs *bcs, int pr, void *arg)
 {
 	struct hisax_if *ifc = (struct hisax_if *) &bcs->b_if;
 
-	DBG(2, "pr %#x", pr);
+	DBG(DBG_PR, "pr %#x", pr);
 	ifc->l1l2(ifc, pr, arg);
 }
 
 // ----------------------------------------------------------------------
-//
+// MMIO
 
 static inline void
 hfcpci_writeb(struct hfcpci_adapter *adapter, u8 b, unsigned char offset)
@@ -277,7 +293,10 @@ hfcpci_readb(struct hfcpci_adapter *adapter, unsigned char offset)
 	return readb(adapter->mmio + offset);
 }
 
-#define DECL_B_F(r, f)                                                       \
+// ----------------------------------------------------------------------
+// magic to define the various F/Z counter accesses
+
+#define DECL_B_F(r, f)                                                      \
 static inline u8                                                            \
 get_b_##r##_##f (struct hfcpci_bcs *bcs)                                    \
 {                                                                           \
@@ -312,12 +331,12 @@ DECL_B_F(tx, f2)
 #undef DECL_B_F
 
 #define DECL_B_Z(r, z)                                                      \
-static inline u8                                                            \
+static inline u16                                                           \
 get_b_##r##_##z (struct hfcpci_bcs *bcs, u8 f)                              \
 {                                                                           \
 	u16 off = bcs->channel ? OFF_B2_##r##_##z : OFF_B1_##r##_##z;       \
                                                                             \
-	return le16_to_cpu(*((u16 *) bcs->adapter->fifo + off + f * 4));    \
+	return le16_to_cpu(*((u16 *) (bcs->adapter->fifo + off + f * 4)));  \
 }                                                                           \
                                                                             \
 static inline void                                                          \
@@ -330,11 +349,11 @@ set_b_##r##_##z(struct hfcpci_bcs *bcs, u8 f, u16 z)                        \
 
 #define OFF_B1_rx_z1 0x6000
 #define OFF_B2_rx_z1 0x6100
-#define OFF_B1_rx_z2 0x6000
-#define OFF_B2_rx_z2 0x6100
+#define OFF_B1_rx_z2 0x6002
+#define OFF_B2_rx_z2 0x6102
 
-#define OFF_B1_tx_z1 0x2002
-#define OFF_B2_tx_z1 0x2102
+#define OFF_B1_tx_z1 0x2000
+#define OFF_B2_tx_z1 0x2100
 #define OFF_B1_tx_z2 0x2002
 #define OFF_B2_tx_z2 0x2102
 
@@ -345,8 +364,239 @@ DECL_B_Z(tx, z2)
 
 #undef DECL_B_Z
 
+#define DECL_D_F(r, f)                                                      \
+static inline u8                                                            \
+get_d_##r##_##f (struct hfcpci_adapter *adapter)                            \
+{                                                                           \
+	u16 off = OFF_D_##r##_##f;                                          \
+                                                                            \
+	return *(adapter->fifo + off) & 0xf;                                \
+}                                                                           \
+                                                                            \
+static inline void                                                          \
+set_d_##r##_##f (struct hfcpci_adapter *adapter, u8 f)                      \
+{                                                                           \
+	u16 off = OFF_D_##r##_##f;                                          \
+                                                                            \
+	*(adapter->fifo + off) = f | 0x10;                                  \
+}
+
+#define OFF_D_rx_f1 0x60a0
+#define OFF_D_rx_f2 0x60a1
+
+#define OFF_D_tx_f1 0x20a0
+#define OFF_D_tx_f2 0x20a1
+
+DECL_D_F(rx, f1)
+DECL_D_F(rx, f2)
+DECL_D_F(tx, f1)
+DECL_D_F(tx, f2)
+
+#undef DECL_D_F
+
+#define DECL_D_Z(r, z)                                                      \
+static inline u16                                                           \
+get_d_##r##_##z (struct hfcpci_adapter *adapter, u8 f)                      \
+{                                                                           \
+	u16 off = OFF_D_##r##_##z;                                          \
+                                                                            \
+	return le16_to_cpu(*((u16 *) (adapter->fifo + off + (f | 0x10) * 4)));\
+}                                                                           \
+                                                                            \
+static inline void                                                          \
+set_d_##r##_##z(struct hfcpci_adapter *adapter, u8 f, u16 z)                \
+{                                                                           \
+	u16 off = OFF_D_##r##_##z;                                          \
+                                                                            \
+	*((u16 *) (adapter->fifo + off + (f | 0x10) * 4)) = cpu_to_le16(z); \
+}
+
+#define OFF_D_rx_z1 0x6080
+#define OFF_D_rx_z2 0x6082
+
+#define OFF_D_tx_z1 0x2080
+#define OFF_D_tx_z2 0x2082
+
+DECL_D_Z(rx, z1)
+DECL_D_Z(rx, z2)
+DECL_D_Z(tx, z1)
+DECL_D_Z(tx, z2)
+
+#undef DECL_B_Z
+
 // ----------------------------------------------------------------------
-//
+// fill b / d fifos
+
+static inline void
+hfcpci_fill_d_fifo(struct hfcpci_adapter *adapter)
+{
+	u8 f1, f2;
+	u16 z1, z2;
+	int cnt, fcnt;
+	char *fifo_adr = adapter->fifo;
+	struct sk_buff *tx_skb = adapter->tx_skb;
+	
+	f1 = get_d_tx_f1(adapter);
+	f2 = get_d_tx_f2(adapter);
+	DBG(DBG_D_XMIT, "f1 %#x f2 %#x", f1, f2);
+
+	fcnt = f1 - f2;
+	if (fcnt < 0)
+		fcnt += MAX_D_FRAMES;
+	
+	if (fcnt) {
+		printk("BUG\n");
+		return;
+	}
+
+	z1 = get_d_tx_z1(adapter, f1);
+	z2 = get_d_tx_z2(adapter, f1); //XXX
+	DBG(DBG_D_XMIT, "z1 %#x z2 %#x", z1, z2);
+
+	cnt = z2 - z1;
+	if (cnt <= 0)
+		cnt += D_FIFO_SIZE;
+
+	if (tx_skb->len > cnt) {
+		printk("BUG\n");
+		return;
+	}
+
+	cnt = tx_skb->len;
+	if (z1 + cnt <= D_FIFO_END) {
+		memcpy(fifo_adr + z1, tx_skb->data, cnt);
+	} else {
+		memcpy(fifo_adr + z1, tx_skb->data, D_FIFO_END - z1);
+		memcpy(fifo_adr + D_FIFO_START, 
+		       tx_skb->data + (D_FIFO_END - z1), 
+		       cnt - (D_FIFO_END - z1));
+	}
+	z1 += cnt;
+	if (z1 >= D_FIFO_END)
+		z1 -= D_FIFO_SIZE;
+
+	f1 = (f1 + 1) & (MAX_D_FRAMES - 1);
+	mb();
+	set_d_tx_z1(adapter, f1, z1);
+	mb();
+	set_d_tx_f1(adapter, f1);
+}
+
+static inline void
+hfcpci_fill_b_fifo_hdlc(struct hfcpci_bcs *bcs)
+{
+	u8 f1, f2;
+	u16 z1, z2;
+	int cnt, fcnt;
+	char *fifo_adr = bcs->adapter->fifo + (bcs->channel ? 0x2000 : 0x0000);
+	struct sk_buff *tx_skb = bcs->tx_skb;
+	
+	f1 = get_b_tx_f1(bcs);
+	f2 = get_b_tx_f2(bcs);
+	DBG(DBG_B_XMIT, "f1 %#x f2 %#x", f1, f2);
+
+	fcnt = f1 - f2;
+	if (fcnt < 0)
+		fcnt += MAX_B_FRAMES;
+	
+	if (fcnt) {
+		printk("BUG\n");
+		return;
+	}
+
+	z1 = get_b_tx_z1(bcs, f1);
+	z2 = get_b_tx_z2(bcs, f1); //XXX
+	DBG(DBG_B_XMIT, "z1 %#x z2 %#x", z1, z2);
+
+	cnt = z2 - z1;
+	if (cnt <= 0)
+		cnt += B_FIFO_SIZE;
+
+	if (tx_skb->len > cnt) {
+		printk("BUG\n");
+		return;
+	}
+
+	cnt = tx_skb->len;
+	if (z1 + cnt <= B_FIFO_END) {
+		memcpy(fifo_adr + z1, tx_skb->data, cnt);
+	} else {
+		memcpy(fifo_adr + z1, tx_skb->data, B_FIFO_END - z1);
+		memcpy(fifo_adr + B_FIFO_START,
+		       tx_skb->data + (B_FIFO_END - z1), 
+		       cnt - (B_FIFO_END - z1));
+	}
+	z1 += cnt;
+	if (z1 >= B_FIFO_END)
+		z1 -= B_FIFO_SIZE;
+
+	f1 = (f1 + 1) & (MAX_B_FRAMES - 1);
+	mb();
+	set_b_tx_z1(bcs, f1, z1);
+	mb();
+	set_b_tx_f1(bcs, f1);
+}
+
+static inline void
+hfcpci_fill_b_fifo_trans(struct hfcpci_bcs *bcs)
+{
+	int cnt;
+	char *fifo_adr = bcs->adapter->fifo + (bcs->channel ? 0x2000 : 0x0000);
+	struct sk_buff *tx_skb = bcs->tx_skb;
+	u8 f1, f2;
+	u16 z1, z2;
+
+	f1 = get_b_tx_f1(bcs);
+	f2 = get_b_tx_f2(bcs);
+
+	if (f1 != f2)
+		BUG();
+
+	z1 = get_b_tx_z1(bcs, f1);
+	z2 = get_b_tx_z2(bcs, f1);
+
+	cnt = z2 - z1;
+	if (cnt <= 0)
+		cnt += B_FIFO_SIZE;
+
+	if (tx_skb->len > cnt)
+		BUG();
+
+	if (z1 + cnt <= B_FIFO_END) {
+		memcpy(fifo_adr + z1, tx_skb->data, cnt);
+	} else {
+		memcpy(fifo_adr + z1, tx_skb->data, B_FIFO_END - z1);
+		memcpy(fifo_adr + B_FIFO_START,
+		       tx_skb->data + (B_FIFO_END - z1), 
+		       cnt - (B_FIFO_END - z1));
+	}
+	z1 += cnt;
+	if (z1 >= B_FIFO_END)
+		z1 -= B_FIFO_SIZE;
+
+	mb();
+	set_b_tx_z1(bcs, f1, z1);
+}
+
+static inline void
+hfcpci_fill_b_fifo(struct hfcpci_bcs *bcs)
+{
+	if (!bcs->tx_skb) {
+		DBG(DBG_WARN, "?");
+		return;
+	}
+	
+	switch (bcs->mode) {
+	case L1_MODE_TRANS:
+		hfcpci_fill_b_fifo_trans(bcs);
+		break;
+	case L1_MODE_HDLC:
+		hfcpci_fill_b_fifo_hdlc(bcs);
+		break;
+	default:
+		DBG(DBG_WARN, "?");
+	}
+}
 
 static void hfcpci_clear_b_rx_fifo(struct hfcpci_bcs *bcs);
 static void hfcpci_clear_b_tx_fifo(struct hfcpci_bcs *bcs);
@@ -356,7 +606,7 @@ hfcpci_b_mode(struct hfcpci_bcs *bcs, int mode)
 {
 	struct hfcpci_adapter *adapter = bcs->adapter;
 	
-	DBG(0x40, "B%d mode %d --> %d",
+	DBG(DBG_B_XMIT, "B%d mode %d --> %d",
 	    bcs->channel + 1, bcs->mode, mode);
 
 	if (bcs->mode == mode)
@@ -385,7 +635,6 @@ hfcpci_b_mode(struct hfcpci_bcs *bcs, int mode)
 			adapter->sctrl_r |= SCTRL_B1_ENA;
 			adapter->fifo_en |= HFCPCI_FIFOEN_B1;
 			adapter->int_m1 |= (HFCPCI_INTS_B1TRANS + HFCPCI_INTS_B1REC);
-//			adapter->conn &= ~0x03;
 
 			if (mode == L1_MODE_TRANS)
 				adapter->ctmt |= 1;
@@ -397,7 +646,6 @@ hfcpci_b_mode(struct hfcpci_bcs *bcs, int mode)
 			adapter->sctrl_r |= SCTRL_B2_ENA;
 			adapter->fifo_en |= HFCPCI_FIFOEN_B2;
 			adapter->int_m1 |= (HFCPCI_INTS_B2TRANS + HFCPCI_INTS_B2REC);
-//			adapter->conn &= ~0x18; // XXX
 
 			if (mode == L1_MODE_TRANS)
 				adapter->ctmt |= 2;
@@ -417,203 +665,226 @@ hfcpci_b_mode(struct hfcpci_bcs *bcs, int mode)
 	bcs->mode = mode;
 }
 
-static inline void
-hfcpci_fill_b_fifo_trans(struct hfcpci_bcs *bcs)
+// ----------------------------------------------------------------------
+// Layer 1 state machine
+
+static struct Fsm l1fsm;
+
+enum {
+	ST_L1_F0,
+	ST_L1_F2,
+	ST_L1_F3,
+	ST_L1_F4,
+	ST_L1_F5,
+	ST_L1_F6,
+	ST_L1_F7,
+	ST_L1_F8,
+};
+
+#define L1_STATE_COUNT (ST_L1_F8+1)
+
+static char *strL1State[] =
 {
-	int cnt;
-	char *fifo_adr = bcs->adapter->fifo + (bcs->channel ? 0x2000 : 0x0000);
-	struct sk_buff *skb = bcs->tx_skb;
-	u8 f1, f2;
-	u16 z1, z2;
+	"ST_L1_F0",
+	"ST_L1_F2",
+	"ST_L1_F3",
+	"ST_L1_F4",
+	"ST_L1_F5",
+	"ST_L1_F6",
+	"ST_L1_F7",
+	"ST_L1_F8",
+};
 
-	f1 = get_b_tx_f1(bcs);
-	f2 = get_b_tx_f2(bcs);
+enum {
+	EV_PH_F0,
+	EV_PH_1,
+	EV_PH_F2,
+	EV_PH_F3,
+	EV_PH_F4,
+	EV_PH_F5,
+	EV_PH_F6,
+	EV_PH_F7,
+	EV_PH_F8,
+	EV_PH_ACTIVATE_REQ,
+	EV_PH_DEACTIVATE_REQ,
+	EV_TIMER3,
+};
 
-	if (f1 != f2)
-		BUG();
+#define L1_EVENT_COUNT (EV_TIMER3 + 1)
 
-	z1 = get_b_tx_z1(bcs, f1);
-	z2 = get_b_tx_z2(bcs, f1);
+static char *strL1Event[] =
+{
+	"EV_PH_F0",
+	"EV_PH_1",
+	"EV_PH_F2",
+	"EV_PH_F3",
+	"EV_PH_F4",
+	"EV_PH_F5",
+	"EV_PH_F6",
+	"EV_PH_F7",
+	"EV_PH_F8",
+	"EV_PH_ACTIVATE_REQ",
+	"EV_PH_DEACTIVATE_REQ",
+	"EV_TIMER3",
+};
 
-	cnt = z2 - z1;
-	if (cnt <= 0)
-		cnt += B_FIFO_SIZE;
-
-	if (bcs->tx_skb->len > cnt)
-		BUG();
-
-	if (z1 + cnt <= 0x2000) {
-		memcpy(fifo_adr + z1, skb->data, cnt);
-	} else {
-		memcpy(fifo_adr + z1, skb->data, 0x2000 - z1);
-		memcpy(fifo_adr + 0x200, skb->data + (0x2000 - z1), 
-		       cnt - (0x2000 - z2));
-	}
-	z1 += cnt;
-	if (z1 >= 0x2000)
-		z1 -= B_FIFO_SIZE;
-
-	mb();
-	set_b_tx_z1(bcs, f1, z1);
+static void l1_ignore(struct FsmInst *fi, int event, void *arg)
+{
 }
 
-static inline void
-hfcpci_fill_b_fifo_hdlc(struct hfcpci_bcs *bcs)
+static void l1_go_f3(struct FsmInst *fi, int event, void *arg)
 {
-#if 0
-	struct IsdnCardState *cs = bcs->cs;
-	unsigned long flags;
-	int maxlen, fcnt;
-	int count, new_z1;
-	bzfifo_type *bz;
-	u_char *bdata;
-	u_char new_f1, *src, *dst;
-	unsigned short *z1t, *z2t;
-
-	if (cs->debug & L1_DEB_HSCX)
-		debugl1(cs, "hfcpci_fill_fifo_hdlc %d f1(%d) f2(%d) z1(f1)(%x)",
-			bcs->channel, bz->f1, bz->f2,
-			bz->za[bz->f1].z1);
-
-	fcnt = bz->f1 - bz->f2;	/* frame count actually buffered */
-	if (fcnt < 0)
-		fcnt += (MAX_B_FRAMES + 1);	/* if wrap around */
-	if (fcnt > (MAX_B_FRAMES - 1)) {
-		if (cs->debug & L1_DEB_HSCX)
-			debugl1(cs, "hfcpci_fill_Bfifo more as 14 frames");
-		restore_flags(flags);
-		return;
-	}
-	/* now determine free bytes in FIFO buffer */
-	count = bz->za[bz->f1].z2 - bz->za[bz->f1].z1;
-	if (count <= 0)
-		count += B_FIFO_SIZE;	/* count now contains available bytes */
-
-	if (cs->debug & L1_DEB_HSCX)
-		debugl1(cs, "hfcpci_fill_fifo %d count(%ld/%d),%lx",
-			bcs->channel, bcs->tx_skb->len,
-			count, current->state);
-
-	if (count < bcs->tx_skb->len) {
-		if (cs->debug & L1_DEB_HSCX)
-			debugl1(cs, "hfcpci_fill_fifo no fifo mem");
-		restore_flags(flags);
-		return;
-	}
-	count = bcs->tx_skb->len;	/* get frame len */
-	new_z1 = bz->za[bz->f1].z1 + count;	/* new buffer Position */
-	if (new_z1 >= (B_FIFO_SIZE + B_SUB_VAL))
-		new_z1 -= B_FIFO_SIZE;	/* buffer wrap */
-
-	new_f1 = ((bz->f1 + 1) & MAX_B_FRAMES);
-	src = bcs->tx_skb->data;	/* source pointer */
-	dst = bdata + (bz->za[bz->f1].z1 - B_SUB_VAL);
-	maxlen = (B_FIFO_SIZE + B_SUB_VAL) - bz->za[bz->f1].z1;		/* end fifo */
-	if (maxlen > count)
-		maxlen = count;	/* limit size */
-	memcpy(dst, src, maxlen);	/* first copy */
-
-	count -= maxlen;	/* remaining bytes */
-	if (count) {
-		dst = bdata;	/* start of buffer */
-		src += maxlen;	/* new position */
-		memcpy(dst, src, count);
-	}
-	bcs->tx_cnt -= bcs->tx_skb->len;
-	if (bcs->st->lli.l1writewakeup &&
-	    (PACKET_NOACK != bcs->tx_skb->pkt_type))
-		bcs->st->lli.l1writewakeup(bcs->st, bcs->tx_skb->len);
-
-	cli();
-	bz->za[new_f1].z1 = new_z1;	/* for next buffer */
-	bz->f1 = new_f1;	/* next frame */
-	restore_flags(flags);
-
-	dev_kfree_skb_any(bcs->tx_skb);
-	bcs->tx_skb = NULL;
-	test_and_clear_bit(BC_FLG_BUSY, &bcs->Flag);
-	return;
-#endif
+	FsmChangeState(fi, ST_L1_F3);
 }
 
-static inline void
-hfcpci_fill_b_fifo(struct hfcpci_bcs *bcs)
+static void l1_go_f3_deact_ind(struct FsmInst *fi, int event, void *arg)
 {
-	if (!bcs->tx_skb) {
-		DBG(0x1, "?");
-		return;
-	}
+	struct hfcpci_adapter *adapter = fi->userdata;
+
+	FsmChangeState(fi, ST_L1_F3);
+	D_L1L2(adapter, PH_DEACTIVATE | INDICATION, NULL);
+}
+
+static void l1_go_f4(struct FsmInst *fi, int event, void *arg)
+{
+	FsmChangeState(fi, ST_L1_F3);
+}
+
+static void l1_go_f5(struct FsmInst *fi, int event, void *arg)
+{
+	FsmChangeState(fi, ST_L1_F3);
+}
+
+static void l1_go_f6(struct FsmInst *fi, int event, void *arg)
+{
+	FsmChangeState(fi, ST_L1_F6);
+}
+
+static void l1_go_f6_deact_ind(struct FsmInst *fi, int event, void *arg)
+{
+	struct hfcpci_adapter *adapter = fi->userdata;
+
+	FsmChangeState(fi, ST_L1_F6);
+	D_L1L2(adapter, PH_DEACTIVATE | INDICATION, NULL);
+}
+
+static void l1_go_f7(struct FsmInst *fi, int event, void *arg)
+{
+	FsmChangeState(fi, ST_L1_F7);
+}
+
+static void l1_go_f7_act_ind(struct FsmInst *fi, int event, void *arg)
+{
+	struct hfcpci_adapter *adapter = fi->userdata;
+
+	FsmChangeState(fi, ST_L1_F7);
+	D_L1L2(adapter, PH_ACTIVATE | INDICATION, NULL);
+}
+
+static void l1_go_f8(struct FsmInst *fi, int event, void *arg)
+{
+	FsmChangeState(fi, ST_L1_F8);
+}
+
+static void l1_go_f8_deact_ind(struct FsmInst *fi, int event, void *arg)
+{
+	struct hfcpci_adapter *adapter = fi->userdata;
+
+	FsmChangeState(fi, ST_L1_F8);
+	D_L1L2(adapter, PH_DEACTIVATE | INDICATION, NULL);
+}
+
+static void l1_act_req(struct FsmInst *fi, int event, void *arg)
+{
+	struct hfcpci_adapter *adapter = fi->userdata;
+
+	hfcpci_writeb(adapter, HFCPCI_ACTIVATE | HFCPCI_DO_ACTION, HFCPCI_STATES);
+}
+
+static struct FsmNode L1FnList[] __initdata =
+{
+	{ST_L1_F2,            EV_PH_F3,             l1_go_f3},
+	{ST_L1_F2,            EV_PH_F6,             l1_go_f6},
+	{ST_L1_F2,            EV_PH_F7,             l1_go_f7_act_ind},
+
+	{ST_L1_F3,            EV_PH_F3,             l1_ignore},
+	{ST_L1_F3,            EV_PH_F4,             l1_go_f4},
+	{ST_L1_F3,            EV_PH_F5,             l1_go_f5},
+	{ST_L1_F3,            EV_PH_F6,             l1_go_f6},
+	{ST_L1_F3,            EV_PH_F7,             l1_go_f7_act_ind},
+	{ST_L1_F3,            EV_PH_ACTIVATE_REQ,   l1_act_req},
+
+	{ST_L1_F4,            EV_PH_F7,             l1_ignore},
+	{ST_L1_F4,            EV_PH_F3,             l1_go_f3},
+	{ST_L1_F4,            EV_PH_F5,             l1_go_f5},
+	{ST_L1_F4,            EV_PH_F6,             l1_go_f6},
+	{ST_L1_F4,            EV_PH_F7,             l1_go_f7},
+
+	{ST_L1_F5,            EV_PH_F7,             l1_ignore},
+	{ST_L1_F5,            EV_PH_F3,             l1_go_f3},
+	{ST_L1_F5,            EV_PH_F6,             l1_go_f6},
+	{ST_L1_F5,            EV_PH_F7,             l1_go_f7},
+
+	{ST_L1_F6,            EV_PH_F7,             l1_ignore},
+	{ST_L1_F6,            EV_PH_F3,             l1_go_f3},
+	{ST_L1_F6,            EV_PH_F7,             l1_go_f7_act_ind},
+	{ST_L1_F6,            EV_PH_F8,             l1_go_f8},
+
+	{ST_L1_F7,            EV_PH_F7,             l1_ignore},
+	{ST_L1_F7,            EV_PH_F3,             l1_go_f3_deact_ind},
+	{ST_L1_F7,            EV_PH_F6,             l1_go_f6_deact_ind},
+	{ST_L1_F7,            EV_PH_F8,             l1_go_f8_deact_ind},
+
+	{ST_L1_F8,            EV_PH_F7,             l1_ignore},
+	{ST_L1_F8,            EV_PH_F3,             l1_go_f3},
+	{ST_L1_F8,            EV_PH_F6,             l1_go_f6},
+	{ST_L1_F8,            EV_PH_F7,             l1_go_f7_act_ind},
+
+};
+
+static void l1m_debug(struct FsmInst *fi, char *fmt, ...)
+{
+	va_list args;
+	char buf[256];
 	
-	switch (bcs->mode) {
-	case L1_MODE_TRANS:
-		hfcpci_fill_b_fifo_trans(bcs);
-		break;
-	case L1_MODE_HDLC:
-		hfcpci_fill_b_fifo_hdlc(bcs);
-		break;
-	default:
-		DBG(0x1, "?");
-	}
-}
-
-static void
-hfcpci_d_l2l1(struct hisax_if *ifc, int pr, void *arg)
-{
-}
-
-static void
-hfcpci_b_l2l1(struct hisax_if *ifc, int pr, void *arg)
-{
-	struct hfcpci_bcs *bcs = ifc->priv;
-	struct sk_buff *skb = arg;
-	int mode;
-
-	DBG(0x10, "pr %#x", pr);
-
-	switch (pr) {
-	case PH_DATA | REQUEST:
-		if (bcs->tx_skb)
-			BUG();
-		
-		bcs->tx_skb = skb;
-		DBG_SKB(1, skb);
-		hfcpci_fill_b_fifo(bcs);
-		break;
-	case PH_ACTIVATE | REQUEST:
-		mode = (int) arg;
-		DBG(4,"B%d,PH_ACTIVATE_REQUEST %d", bcs->channel + 1, mode);
-		hfcpci_b_mode(bcs, mode);
-		B_L1L2(bcs, PH_ACTIVATE | INDICATION, NULL);
-		break;
-	case PH_DEACTIVATE | REQUEST:
-		DBG(4,"B%d,PH_DEACTIVATE_REQUEST", bcs->channel + 1);
-		hfcpci_b_mode(bcs, L1_MODE_NULL);
-		B_L1L2(bcs, PH_DEACTIVATE | INDICATION, NULL);
-		break;
-	}
+	va_start(args, fmt);
+	vsprintf(buf, fmt, args);
+	DBG(DBG_L1M, "%s", buf);
+	va_end(args);
 }
 
 // ----------------------------------------------------------------------
-//
+// clear FIFOs
 
-static inline void
-hfcpci_state_irq(struct hfcpci_adapter *adapter)
+static void
+hfcpci_clear_d_rx_fifo(struct hfcpci_adapter *adapter)
 {
-	u8 val;
+	u8 fifo_state;
 
-	val = hfcpci_readb(adapter, HFCPCI_STATES) & 0xf;
-#if 0
-	DBG(0x1, "ph_state chg %d->%d", adapter->ph_state, val);
-	adapter->ph_state = val;
-#endif
-	// XXX FsmEvent
-}
+	DBG(DBG_D_RECV, "");
 
-static inline void
-hfcpci_timer_irq(struct hfcpci_adapter *adapter)
-{
-	hfcpci_writeb(adapter, adapter->ctmt | HFCPCI_CLTIMER, HFCPCI_CTMT);
-}
+	fifo_state = adapter->fifo_en & HFCPCI_FIFOEN_DRX;
+
+	if (fifo_state) { // enabled
+		// XXX locking
+	        adapter->fifo_en &= ~fifo_state;
+		hfcpci_writeb(adapter, adapter->fifo_en, HFCPCI_FIFO_EN);
+	}
+	
+	adapter->last_fcnt = 0;
+
+	set_d_rx_z1(adapter, MAX_D_FRAMES - 1, D_FIFO_END - 1);
+	set_d_rx_z2(adapter, MAX_D_FRAMES - 1, D_FIFO_END - 1);
+	mb();
+	set_d_rx_f1(adapter, MAX_D_FRAMES - 1);
+	set_d_rx_f2(adapter, MAX_D_FRAMES - 1);
+	mb();
+	
+	if (fifo_state) {
+	        adapter->fifo_en |= fifo_state;
+		hfcpci_writeb(adapter, adapter->fifo_en, HFCPCI_FIFO_EN);
+	}
+}   
 
 static void
 hfcpci_clear_b_rx_fifo(struct hfcpci_bcs *bcs)
@@ -621,6 +892,8 @@ hfcpci_clear_b_rx_fifo(struct hfcpci_bcs *bcs)
 	struct hfcpci_adapter *adapter = bcs->adapter;
 	int nr = bcs->channel;
 	u8 fifo_state;
+
+	DBG(DBG_B_RECV, "");
 
 	fifo_state = adapter->fifo_en & 
 		(nr ? HFCPCI_FIFOEN_B2RX : HFCPCI_FIFOEN_B1RX);
@@ -632,11 +905,11 @@ hfcpci_clear_b_rx_fifo(struct hfcpci_bcs *bcs)
 	
 	bcs->last_fcnt = 0;
 
-	set_b_rx_z1(bcs, MAX_B_FRAMES, 0x1fff);
-	set_b_rx_z2(bcs, MAX_B_FRAMES, 0x1fff);
+	set_b_rx_z1(bcs, MAX_B_FRAMES - 1, B_FIFO_END - 1);
+	set_b_rx_z2(bcs, MAX_B_FRAMES - 1, B_FIFO_END - 1);
 	mb();
-	set_b_rx_f1(bcs, MAX_B_FRAMES);
-	set_b_rx_f2(bcs, MAX_B_FRAMES);
+	set_b_rx_f1(bcs, MAX_B_FRAMES - 1);
+	set_b_rx_f2(bcs, MAX_B_FRAMES - 1);
 	mb();
 	
 	if (fifo_state) {
@@ -644,6 +917,8 @@ hfcpci_clear_b_rx_fifo(struct hfcpci_bcs *bcs)
 		hfcpci_writeb(adapter, adapter->fifo_en, HFCPCI_FIFO_EN);
 	}
 }   
+
+// XXX clear d_tx_fifo?
 
 static void
 hfcpci_clear_b_tx_fifo(struct hfcpci_bcs *bcs)
@@ -662,11 +937,11 @@ hfcpci_clear_b_tx_fifo(struct hfcpci_bcs *bcs)
 	
 	bcs->last_fcnt = 0;
 
-	set_b_rx_z1(bcs, MAX_B_FRAMES, 0x1fff);
-	set_b_rx_z2(bcs, MAX_B_FRAMES, 0x1fff);
+	set_b_rx_z1(bcs, MAX_B_FRAMES - 1, B_FIFO_END - 1);
+	set_b_rx_z2(bcs, MAX_B_FRAMES - 1, B_FIFO_END - 1);
 	mb();
-	set_b_rx_f1(bcs, MAX_B_FRAMES);
-	set_b_rx_f2(bcs, MAX_B_FRAMES);
+	set_b_rx_f1(bcs, MAX_B_FRAMES - 1);
+	set_b_rx_f2(bcs, MAX_B_FRAMES - 1);
 	mb();
 	
 	if (fifo_state) {
@@ -674,6 +949,152 @@ hfcpci_clear_b_tx_fifo(struct hfcpci_bcs *bcs)
 		hfcpci_writeb(adapter, adapter->fifo_en, HFCPCI_FIFO_EN);
 	}
 }   
+
+// ----------------------------------------------------------------------
+// receive messages from upper layers
+
+static void
+hfcpci_d_l2l1(struct hisax_if *ifc, int pr, void *arg)
+{
+	struct hfcpci_adapter *adapter = ifc->priv;
+	struct sk_buff *skb = arg;
+
+	DBG(DBG_PR, "pr %#x", pr);
+
+	switch (pr) {
+	case PH_ACTIVATE | REQUEST:
+		FsmEvent(&adapter->l1m, EV_PH_ACTIVATE_REQ, NULL);
+		break;
+	case PH_DEACTIVATE | REQUEST:
+		FsmEvent(&adapter->l1m, EV_PH_DEACTIVATE_REQ, NULL);
+		break;
+	case PH_DATA | REQUEST:
+		DBG(DBG_PR, "PH_DATA REQUEST len %d", skb->len);
+		DBG_SKB(DBG_D_XMIT, skb);
+		if (adapter->l1m.state != ST_L1_F7) {
+			DBG(DBG_WARN, "L1 wrong state %d", adapter->l1m.state);
+			break;
+		}
+		if (adapter->tx_skb)
+			BUG();
+
+		adapter->tx_skb = skb;
+		hfcpci_fill_d_fifo(adapter);
+		break;
+	}
+}
+
+static void
+hfcpci_b_l2l1(struct hisax_if *ifc, int pr, void *arg)
+{
+	struct hfcpci_bcs *bcs = ifc->priv;
+	struct sk_buff *skb = arg;
+	int mode;
+
+	DBG(DBG_PR, "pr %#x", pr);
+
+	switch (pr) {
+	case PH_DATA | REQUEST:
+		if (bcs->tx_skb)
+			BUG();
+		
+		bcs->tx_skb = skb;
+		DBG_SKB(DBG_B_XMIT, skb);
+		hfcpci_fill_b_fifo(bcs);
+		break;
+	case PH_ACTIVATE | REQUEST:
+		mode = (int) arg;
+		DBG(DBG_PR,"B%d,PH_ACTIVATE_REQUEST %d", bcs->channel + 1, mode);
+		hfcpci_b_mode(bcs, mode);
+		B_L1L2(bcs, PH_ACTIVATE | INDICATION, NULL);
+		break;
+	case PH_DEACTIVATE | REQUEST:
+		DBG(DBG_PR,"B%d,PH_DEACTIVATE_REQUEST", bcs->channel + 1);
+		hfcpci_b_mode(bcs, L1_MODE_NULL);
+		B_L1L2(bcs, PH_DEACTIVATE | INDICATION, NULL);
+		break;
+	}
+}
+
+// ----------------------------------------------------------------------
+// receive IRQ
+
+static inline void
+hfcpci_d_recv_irq(struct hfcpci_adapter *adapter)
+{
+	struct sk_buff *skb;
+	char *fifo_adr = adapter->fifo + 0x4000;
+	char *p;
+	int cnt, fcnt;
+	int loop = 5;
+	u8 f1, f2;
+	u16 z1, z2;
+
+	while (loop-- > 0) {
+		f1 = get_d_rx_f1(adapter);
+		f2 = get_d_rx_f2(adapter);
+		DBG(DBG_D_RECV, "f1 %#x f2 %#x", f1, f2);
+		
+		fcnt = f1 - f2;
+		if (fcnt < 0)
+			fcnt += 16;
+
+		if (!fcnt)
+			return;
+		
+		if (fcnt < adapter->last_fcnt)
+			/* overrun */
+			hfcpci_clear_d_rx_fifo(adapter);
+			// XXX init last_fcnt
+
+		z1 = get_d_rx_z1(adapter, f2);
+		z2 = get_d_rx_z2(adapter, f2);
+		DBG(DBG_D_RECV, "z1 %#x z2 %#x", z1, z2);
+
+		cnt = z1 - z2;
+		if (cnt < 0)
+			cnt += D_FIFO_SIZE;
+		cnt++;
+		
+		if (cnt < 4) {
+			DBG(DBG_WARN, "frame too short");
+			goto next;
+		}
+		if (fifo_adr[z1] != 0) {
+			DBG(DBG_WARN, "CRC error");
+			goto next;
+		}
+		cnt -= 3;
+		skb = dev_alloc_skb(cnt);
+		if (!skb) {
+			DBG(DBG_WARN, "no mem");
+			goto next;
+		}
+		p = skb_put(skb, cnt);
+		if (z2 + cnt <= D_FIFO_END) {
+			memcpy(p, fifo_adr + z2, cnt);
+		} else {
+			memcpy(p, fifo_adr + z2, D_FIFO_END - z2);
+			memcpy(p + (D_FIFO_END - z2), fifo_adr + D_FIFO_START,
+			       cnt - (D_FIFO_END - z2));
+		}
+
+		DBG_SKB(DBG_D_RECV, skb);
+		D_L1L2(adapter, PH_DATA | INDICATION, skb);
+	
+	next:
+		if (++z1 >= D_FIFO_END)
+			z1 -= D_FIFO_START;
+
+		f2 = (f2 + 1) & (MAX_D_FRAMES - 1);
+		mb();
+		set_d_rx_z2(adapter, f2, z1);
+		mb();
+		set_d_rx_f2(adapter, f2);
+		
+		adapter->last_fcnt = fcnt - 1;
+	}
+}
 
 static inline void
 hfcpci_b_recv_hdlc_irq(struct hfcpci_adapter *adapter, int nr)
@@ -690,12 +1111,11 @@ hfcpci_b_recv_hdlc_irq(struct hfcpci_adapter *adapter, int nr)
 	while (loop-- > 0) {
 		f1 = get_b_rx_f1(bcs);
 		f2 = get_b_rx_f2(bcs);
-		
-		DBG(0x10, "f1 %d f2 %d\n", f1, f2);
+		DBG(DBG_B_RECV, "f1 %d f2 %d", f1, f2);
 		
 		fcnt = f1 - f2;
 		if (fcnt < 0)
-			fcnt += MAX_B_FRAMES;
+			fcnt += 32;
 
 		if (!fcnt)
 			return;
@@ -707,43 +1127,44 @@ hfcpci_b_recv_hdlc_irq(struct hfcpci_adapter *adapter, int nr)
 		
 		z1 = get_b_rx_z1(bcs, f2);
 		z2 = get_b_rx_z2(bcs, f2);
-		
+		DBG(DBG_B_RECV, "z1 %d z2 %d", z1, z2);
+
 		cnt = z1 - z2;
 		if (cnt < 0)
 			cnt += B_FIFO_SIZE;
 		cnt++;
 		
 		if (cnt < 4) {
-			DBG(0x01, "frame too short\n");
+			DBG(DBG_WARN, "frame too short");
 			goto next;
 		}
 		if (fifo_adr[z1] != 0) {
-			DBG(0x01, "CRC error\n");
+			DBG(DBG_WARN, "CRC error");
 			goto next;
 		}
 		cnt -= 3;
 		skb = dev_alloc_skb(cnt);
 		if (!skb) {
-			DBG(0x01, "no mem\n");
+			DBG(DBG_WARN, "no mem");
 			goto next;
 		}
 		p = skb_put(skb, cnt);
-		if (z2 + cnt <= 0x2000) {
+		if (z2 + cnt <= B_FIFO_END) {
 			memcpy(p, fifo_adr + z2, cnt);
 		} else {
-			memcpy(p, fifo_adr + z2, 0x2000 - z2);
-			p += 0x2000 - z2;
-			memcpy(p, fifo_adr + 0x200, cnt - (0x2000 - z2));
+			memcpy(p, fifo_adr + z2, B_FIFO_END - z2);
+			memcpy(p + (B_FIFO_END - z2), fifo_adr + B_FIFO_START,
+			       cnt - (B_FIFO_END - z2));
 		}
 
-		DBG_SKB(1, skb);
+		DBG_SKB(DBG_B_RECV, skb);
 		B_L1L2(bcs, PH_DATA | INDICATION, skb);
 	
 	next:
-		if (++z1 >= 0x2000)
+		if (++z1 >= B_FIFO_END)
 			z1 -= B_FIFO_SIZE;
 
-		f2 = (f2 + 1) & MAX_B_FRAMES;
+		f2 = (f2 + 1) & (MAX_B_FRAMES - 1);
 		mb();
 		set_b_rx_z2(bcs, f2, z1);
 		mb();
@@ -788,7 +1209,7 @@ hfcpci_b_recv_trans_irq(struct hfcpci_adapter *adapter, int nr)
 		
 		skb = dev_alloc_skb(cnt);
 		if (!skb) {
-			DBG(0x01, "no mem\n");
+			DBG(DBG_WARN, "no mem");
 			goto next;
 		}
 		
@@ -801,7 +1222,7 @@ hfcpci_b_recv_trans_irq(struct hfcpci_adapter *adapter, int nr)
 			memcpy(p, fifo_adr + 0x200, cnt - (0x2000 - z2));
 		}
 		
-		DBG_SKB(1, skb);
+		DBG_SKB(DBG_B_RECV, skb);
 		B_L1L2(bcs, PH_DATA | INDICATION, skb);
 		
 	next:
@@ -818,11 +1239,11 @@ hfcpci_b_recv_trans_irq(struct hfcpci_adapter *adapter, int nr)
 static inline void
 hfcpci_b_recv_irq(struct hfcpci_adapter *adapter, int nr)
 {
-	DBG(0x10, "");
+	DBG(DBG_B_RECV, "");
 
 	switch (adapter->bcs[nr].mode) {
 	case L1_MODE_NULL:
-		DBG(0x10, "?");
+		DBG(DBG_WARN, "?");
 		break;
 		
 	case L1_MODE_HDLC:
@@ -835,35 +1256,28 @@ hfcpci_b_recv_irq(struct hfcpci_adapter *adapter, int nr)
 	}
 }
 
-static void
-hfcpci_clear_d_rx_fifo(struct hfcpci_adapter *adapter)
-{
-	u8 fifo_state;
-
-	fifo_state = adapter->fifo_en & HFCPCI_FIFOEN_DRX;
-
-	if (fifo_state) { // enabled
-		// XXX locking
-	        adapter->fifo_en &= ~fifo_state;
-		hfcpci_writeb(adapter, adapter->fifo_en, HFCPCI_FIFO_EN);
-	}
-	
-	adapter->last_fcnt = 0;
-
-	*((u16 *) (adapter->fifo + 0x6080 + (0x10 | MAX_D_FRAMES) * 4    )) = cpu_to_le16(0x1ff); // Z1
-	*((u16 *) (adapter->fifo + 0x6080 + (0x10 | MAX_D_FRAMES) * 4 + 2)) = cpu_to_le16(0x1ff); // Z2
-	mb();
-	*(adapter->fifo + 0x60a0) = 0x10 | MAX_D_FRAMES; // F1
-	*(adapter->fifo + 0x60a0) = 0x10 | MAX_D_FRAMES; // F2
-	mb();
-	
-	if (fifo_state) {
-	        adapter->fifo_en |= fifo_state;
-		hfcpci_writeb(adapter, adapter->fifo_en, HFCPCI_FIFO_EN);
-	}
-}   
+// ----------------------------------------------------------------------
+// transmit IRQ
 
 // XXX make xmit FIFO deeper than 1 
+
+static inline void
+hfcpci_d_xmit_irq(struct hfcpci_adapter *adapter)
+{
+	struct sk_buff *skb;
+
+	DBG(DBG_D_XMIT, "");
+
+	skb = adapter->tx_skb;
+	if (!skb) {
+		DBG(DBG_WARN, "?");
+		return;
+	}
+
+	adapter->tx_skb = NULL;
+	D_L1L2(adapter, PH_DATA | CONFIRM, (void *) skb->truesize);
+	dev_kfree_skb_irq(skb);
+}
 
 static inline void
 hfcpci_b_xmit_irq(struct hfcpci_adapter *adapter, int nr)
@@ -871,11 +1285,11 @@ hfcpci_b_xmit_irq(struct hfcpci_adapter *adapter, int nr)
 	struct hfcpci_bcs *bcs = &adapter->bcs[nr];
 	struct sk_buff *skb;
 
-	DBG(0x10, "");
+	DBG(DBG_B_XMIT, "");
 
 	skb = bcs->tx_skb;
 	if (!skb) {
-		DBG(0x10, "?");
+		DBG(DBG_WARN, "?");
 		return;
 	}
 
@@ -884,97 +1298,30 @@ hfcpci_b_xmit_irq(struct hfcpci_adapter *adapter, int nr)
 	dev_kfree_skb_irq(skb);
 }
 
-static inline void
-hfcpci_d_recv_irq(struct hfcpci_adapter *adapter)
-{
-	struct sk_buff *skb;
-	char *p;
-	int cnt, fcnt;
-	int loop = 5;
-	u8 f1, f2;
-	u16 z1, z2;
-
-	while (loop-- > 0) {
-		f1 = *(adapter->fifo + 0x60a0) & 0x0f; // F1
-		f2 = *(adapter->fifo + 0x60a1) & 0x0f; // F2
-		
-		DBG(0x10, "f1 %d f2 %d\n", f1, f2);
-		
-		fcnt = f1 - f2;
-		if (fcnt < 0)
-			fcnt += MAX_D_FRAMES;
-
-		if (!fcnt)
-			return;
-		
-		if (fcnt < adapter->last_fcnt)
-			/* overrun */
-			hfcpci_clear_d_rx_fifo(adapter);
-			// XXX init last_fcnt
-		
-		z1 = le16_to_cpu(*((u16 *) (adapter->fifo + 0x6080 + f2 * 4    )));
-		z2 = le16_to_cpu(*((u16 *) (adapter->fifo + 0x6080 + f2 * 4 + 2)));
-		
-		cnt = z1 - z2;
-		if (cnt < 0)
-			cnt += D_FIFO_SIZE;
-		cnt++;
-		
-		if (cnt < 4) {
-			DBG(0x01, "frame too short\n");
-			goto next;
-		}
-		if (*(adapter->fifo + 0x4000 + z1) != 0) {
-			DBG(0x01, "CRC error\n");
-			goto next;
-		}
-		cnt -= 3;
-		skb = dev_alloc_skb(cnt);
-		if (!skb) {
-			DBG(0x01, "no mem\n");
-			goto next;
-		}
-		p = skb_put(skb, cnt);
-		if (z2 + cnt <= 0x200) {
-			memcpy(p, adapter->fifo + 0x4000 + z2, cnt);
-		} else {
-			memcpy(p, adapter->fifo + 0x4000 + z2, 0x200 - z2);
-			p += 0x200 - z2;
-			memcpy(p, adapter->fifo + 0x4000, cnt - (0x200 - z2));
-		}
-
-		DBG_SKB(1, skb);
-		D_L1L2(adapter, PH_DATA | INDICATION, skb);
-	
-	next:
-		z1 = (z1 + 1) & 0x1ff;
-		f2 = (f2 + 1) & MAX_B_FRAMES;
-		mb();
-		*((u16 *) (adapter->fifo + 0x6080 + f2 * 4 + 2)) = cpu_to_le16(z1); // Z2
-		mb();
-		*(adapter->fifo + 0x60a1) = f2; // F2
-		
-		adapter->last_fcnt = fcnt - 1;
-	}
-}
+// ----------------------------------------------------------------------
+// Layer 1 state change IRQ
 
 static inline void
-hfcpci_d_xmit_irq(struct hfcpci_adapter *adapter)
+hfcpci_state_irq(struct hfcpci_adapter *adapter)
 {
-	struct sk_buff *skb;
+	u8 val;
 
-	DBG(0x10, "");
-
-	skb = adapter->tx_skb;
-	if (!skb) {
-		DBG(0x10, "?");
-		return;
-	}
-
-	adapter->tx_skb = NULL;
-	D_L1L2(adapter, PH_DATA | CONFIRM, (void *) skb->truesize);
-	dev_kfree_skb_irq(skb);
+	val = hfcpci_readb(adapter, HFCPCI_STATES);
+	DBG(DBG_L1M, "STATES %#x", val);
+	FsmEvent(&adapter->l1m, val & 0xf, NULL);
 }
+
+// ----------------------------------------------------------------------
+// Timer IRQ
+
+static inline void
+hfcpci_timer_irq(struct hfcpci_adapter *adapter)
+{
+	hfcpci_writeb(adapter, adapter->ctmt | HFCPCI_CLTIMER, HFCPCI_CTMT);
+}
+
+// ----------------------------------------------------------------------
+// IRQ handler
 
 static void
 hfcpci_irq(int intno, void *dev, struct pt_regs *regs)
@@ -993,7 +1340,7 @@ hfcpci_irq(int intno, void *dev, struct pt_regs *regs)
 	spin_lock(&adapter->hw_lock);
 	while (loop-- > 0) {
 		val = hfcpci_readb(adapter, HFCPCI_INT_S1);
-		DBG(0x10, "stat %02x s1 %02x\n", stat, val);
+		DBG(DBG_IRQ, "stat %02x s1 %02x", stat, val);
 		val &= adapter->int_m1;
 
 		if (!val)
@@ -1027,6 +1374,7 @@ hfcpci_irq(int intno, void *dev, struct pt_regs *regs)
 }
 
 // ----------------------------------------------------------------------
+// reset hardware
 
 static void
 hfcpci_reset(struct hfcpci_adapter *adapter)
@@ -1047,6 +1395,9 @@ hfcpci_reset(struct hfcpci_adapter *adapter)
 	if (hfcpci_readb(adapter, HFCPCI_STATUS) & 2) // XX
 		printk(KERN_WARNING "HFC-PCI init bit busy\n");
 }
+
+// ----------------------------------------------------------------------
+// init hardware
 
 static void
 hfcpci_hw_init(struct hfcpci_adapter *adapter)
@@ -1074,12 +1425,13 @@ hfcpci_hw_init(struct hfcpci_adapter *adapter)
 	hfcpci_writeb(adapter, adapter->ctmt, HFCPCI_CTMT);
 
 	adapter->int_m1 = HFCPCI_INTS_DTRANS | HFCPCI_INTS_DREC |
-		HFCPCI_INTS_L1STATE | HFCPCI_INTS_TIMER;
+		HFCPCI_INTS_L1STATE;
 	hfcpci_writeb(adapter, adapter->int_m1, HFCPCI_INT_M1);
 
 	/* clear already pending ints */
 	hfcpci_readb(adapter, HFCPCI_INT_S1);
 
+	adapter->l1m.state = 2;
 	hfcpci_writeb(adapter, HFCPCI_LOAD_STATE | 2, HFCPCI_STATES);	// XX /* HFC ST 2 */
 	udelay(10);
 	hfcpci_writeb(adapter, 2, HFCPCI_STATES);	/* HFC ST 2 */
@@ -1118,6 +1470,7 @@ hfcpci_hw_init(struct hfcpci_adapter *adapter)
 }
 
 // ----------------------------------------------------------------------
+// probe / remove
 
 static struct hfcpci_adapter * __devinit 
 new_adapter(struct pci_dev *pdev)
@@ -1165,6 +1518,7 @@ static int __devinit hfcpci_probe(struct pci_dev *pdev,
 	struct hfcpci_adapter *adapter;
 	int retval;
 
+	DBG(DBG_INFO, "");
 	retval = -ENOMEM;
 	adapter = new_adapter(pdev);
 	if (!adapter)
@@ -1176,12 +1530,12 @@ static int __devinit hfcpci_probe(struct pci_dev *pdev,
 
 	adapter->irq = pdev->irq;
 	retval = request_irq(adapter->irq, hfcpci_irq, SA_SHIRQ, 
-			     "hfc_pci", adapter);
+			     "hfcpci", adapter);
 	if (retval)
 		goto err_free;
 
 	retval = -EBUSY;
-	if (!request_region(pci_resource_start(pdev, 1), 256, "hfc_pci"))
+	if (!request_mem_region(pci_resource_start(pdev, 1), 256, "hfcpci"))
 		goto err_free_irq;
 
 	adapter->mmio = ioremap(pci_resource_start(pdev, 1), 256); // XX pci_io
@@ -1199,6 +1553,17 @@ static int __devinit hfcpci_probe(struct pci_dev *pdev,
 	pci_write_config_dword(pdev, HFCPCI_MWBA, (u32) adapter->fifo_dma);
 	pci_set_master(pdev);
 
+	adapter->l1m.fsm = &l1fsm;
+	adapter->l1m.state = ST_L1_F0;
+#ifdef CONFIG_HISAX_DEBUG
+	adapter->l1m.debug = 1;
+#else
+	adapter->l1m.debug = 0;
+#endif
+	adapter->l1m.userdata = adapter;
+	adapter->l1m.printdebug = l1m_debug;
+	FsmInitTimer(&adapter->l1m, &adapter->timer);
+
 	hfcpci_reset(adapter);
 	hfcpci_hw_init(adapter);
 
@@ -1210,7 +1575,7 @@ static int __devinit hfcpci_probe(struct pci_dev *pdev,
  err_unmap:
 	iounmap(adapter->mmio);
  err_release_region:
-	release_region(pci_resource_start(pdev, 1), 256);
+	release_mem_region(pci_resource_start(pdev, 1), 256);
  err_free_irq:
 	free_irq(adapter->irq, adapter);
  err_free:
@@ -1233,7 +1598,7 @@ static void __devexit hfcpci_remove(struct pci_dev *pdev)
 	pci_free_consistent(pdev, 32768, adapter->fifo, adapter->fifo_dma);
 
 	iounmap(adapter->mmio);
-	release_region(pci_resource_start(pdev, 1), 256);
+	release_mem_region(pci_resource_start(pdev, 1), 256);
 	free_irq(adapter->irq, adapter);
 	delete_adapter(adapter);
 }
@@ -1247,13 +1612,33 @@ static struct pci_driver hfcpci_driver = {
 
 static int __init hisax_hfcpci_init(void)
 {
+	int retval;
+
 	printk(KERN_INFO "hisax_hfcpcipnp: HFC PCI ISDN driver v0.0.1\n");
 
-	return pci_module_init(&hfcpci_driver);
+	l1fsm.state_count = L1_STATE_COUNT;
+	l1fsm.event_count = L1_EVENT_COUNT;
+	l1fsm.strState = strL1State;
+	l1fsm.strEvent = strL1Event;
+	retval = FsmNew(&l1fsm, L1FnList, ARRAY_SIZE(L1FnList));
+	if (retval)
+		goto err;
+
+	retval = pci_module_init(&hfcpci_driver);
+	if (retval)
+		goto err_fsm;
+	
+	return 0;
+
+ err_fsm:
+	FsmFree(&l1fsm);
+ err:
+	return retval;
 }
 
 static void __exit hisax_hfcpci_exit(void)
 {
+	FsmFree(&l1fsm);
 	pci_unregister_driver(&hfcpci_driver);
 }
 
