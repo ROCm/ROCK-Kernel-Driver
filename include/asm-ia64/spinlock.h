@@ -22,26 +22,72 @@ typedef struct {
 #define SPIN_LOCK_UNLOCKED			(spinlock_t) { 0 }
 #define spin_lock_init(x)			((x)->lock = 0)
 
-#define DEBUG_SPIN_LOCK	0
+#define NEW_LOCK
+#ifdef NEW_LOCK
 
-#if DEBUG_SPIN_LOCK
+/*
+ * Try to get the lock.  If we fail to get the lock, make a non-standard call to
+ * ia64_spinlock_contention().  We do not use a normal call because that would force all
+ * callers of spin_lock() to be non-leaf routines.  Instead, ia64_spinlock_contention() is
+ * carefully coded to touch only those registers that spin_lock() marks "clobbered".
+ */
 
-#include <ia64intrin.h>
+#define IA64_SPINLOCK_CLOBBERS "ar.pfs", "p14", "r28", "r29", "r30", "b6", "memory"
 
-#define _raw_spin_lock(x)								\
-do {											\
-	unsigned long _timeout = 1000000000;						\
-	volatile unsigned int _old = 0, _new = 1, *_ptr = &((x)->lock);			\
-	do {										\
-		if (_timeout-- == 0) {							\
-			extern void dump_stack (void);					\
-			printk("kernel DEADLOCK at %s:%d?\n", __FILE__, __LINE__);	\
-			dump_stack();							\
-		}									\
-	} while (__sync_val_compare_and_swap(_ptr, _old, _new) != _old);		\
-} while (0)
+static inline void
+_raw_spin_lock (spinlock_t *lock)
+{
+	register volatile unsigned int *ptr asm ("r31") = &lock->lock;
 
+#if __GNUC__ < 3 || (__GNUC__ == 3 && __GNUC_MINOR__ < 4)
+# ifdef CONFIG_ITANIUM
+	/* don't use brl on Itanium... */
+	asm volatile ("{\n\t"
+		      "  mov ar.ccv = r0\n\t"
+		      "  mov r28 = ip\n\t"
+		      "  mov r30 = 1;;\n\t"
+		      "}\n\t"
+		      "cmpxchg4.acq r30 = [%1], r30, ar.ccv\n\t"
+		      "movl r29 = ia64_spinlock_contention_pre3_4;;\n\t"
+		      "cmp4.ne p14, p0 = r30, r0\n\t"
+		      "mov b6 = r29;;\n"
+		      "(p14) br.cond.spnt.many b6"
+		      : "=r"(ptr) : "r"(ptr) : IA64_SPINLOCK_CLOBBERS);
+# else
+	asm volatile ("{\n\t"
+		      "  mov ar.ccv = r0\n\t"
+		      "  mov r28 = ip\n\t"
+		      "  mov r30 = 1;;\n\t"
+		      "}\n\t"
+		      "cmpxchg4.acq r30 = [%1], r30, ar.ccv;;\n\t"
+		      "cmp4.ne p14, p0 = r30, r0\n"
+		      "(p14) brl.cond.spnt.many ia64_spinlock_contention_pre3_4"
+		      : "=r"(ptr) : "r"(ptr) : IA64_SPINLOCK_CLOBBERS);
+# endif /* CONFIG_MCKINLEY */
 #else
+# ifdef CONFIG_ITANIUM
+	/* don't use brl on Itanium... */
+	/* mis-declare, so we get the entry-point, not it's function descriptor: */
+	asm volatile ("mov r30 = 1\n\t"
+		      "mov ar.ccv = r0;;\n\t"
+		      "cmpxchg4.acq r30 = [%0], r30, ar.ccv\n\t"
+		      "movl r29 = ia64_spinlock_contention;;\n\t"
+		      "cmp4.ne p14, p0 = r30, r0\n\t"
+		      "mov b6 = r29;;\n"
+		      "(p14) br.call.spnt.many b6 = b6"
+		      : "=r"(ptr) : "r"(ptr) : IA64_SPINLOCK_CLOBBERS);
+# else
+	asm volatile ("mov r30 = 1\n\t"
+		      "mov ar.ccv = r0;;\n\t"
+		      "cmpxchg4.acq r30 = [%0], r30, ar.ccv;;\n\t"
+		      "cmp4.ne p14, p0 = r30, r0\n\t"
+		      "(p14) brl.call.spnt.many b6=ia64_spinlock_contention"
+		      : "=r"(ptr) : "r"(ptr) : IA64_SPINLOCK_CLOBBERS);
+# endif /* CONFIG_MCKINLEY */
+#endif
+}
+
+#else /* !NEW_LOCK */
 
 /*
  * Streamlined test_and_set_bit(0, (x)).  We use test-and-test-and-set
@@ -64,7 +110,7 @@ do {											\
 	";;\n"							\
 	:: "r"(&(x)->lock) : "ar.ccv", "p7", "r2", "r29", "memory")
 
-#endif /* !DEBUG_SPIN_LOCK */
+#endif /* !NEW_LOCK */
 
 #define spin_is_locked(x)	((x)->lock != 0)
 #define _raw_spin_unlock(x)	do { barrier(); ((spinlock_t *) x)->lock = 0; } while (0)

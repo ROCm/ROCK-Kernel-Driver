@@ -129,7 +129,7 @@ extern long __cmpxchg_called_with_bad_pointer(void);
 	      case 8: _o_ = (__u64) (long) (old); break;				\
 	      default: break;								\
 	}										\
-	 __asm__ __volatile__ ("mov ar.ccv=%0;;" :: "rO"(_o_));				\
+	__asm__ __volatile__ ("mov ar.ccv=%0;;" :: "rO"(_o_));				\
 	switch (size) {									\
 	      case 1:									\
 		__asm__ __volatile__ ("cmpxchg1."sem" %0=[%1],%2,ar.ccv"		\

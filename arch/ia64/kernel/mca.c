@@ -282,7 +282,7 @@ fetch_min_state (pal_min_state_area_t *ms, struct pt_regs *pt, struct switch_sta
 	dst_banked = &pt->r16;		/* r16-r31 are contiguous in struct pt_regs */
 	src_banked = ms->pmsa_bank1_gr;
 	for (i = 0; i < 16; ++i)
-		*dst_banked = *src_banked;
+		dst_banked[i] = src_banked[i];
 	pt->b0 = ms->pmsa_br0;
 	sw->b1 = ms->pmsa_br1;
 
@@ -339,7 +339,6 @@ init_handler_platform (sal_log_processor_info_t *proc_ptr,
 	show_min_state(&SAL_LPI_PSI_INFO(proc_ptr)->min_state_area);
 
 	fetch_min_state(&SAL_LPI_PSI_INFO(proc_ptr)->min_state_area, pt, sw);
-
 	unw_init_from_interruption(&info, current, pt, sw);
 	ia64_do_show_stack(&info, NULL);
 

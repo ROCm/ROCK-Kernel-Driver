@@ -682,7 +682,7 @@ finish_prologue (struct unw_state_record *sr)
 	 * First, resolve implicit register save locations (see Section "11.4.2.3 Rules
 	 * for Using Unwind Descriptors", rule 3):
 	 */
-	for (i = 0; i < (int) sizeof(unw.save_order)/sizeof(unw.save_order[0]); ++i) {
+	for (i = 0; i < (int) (sizeof(unw.save_order)/sizeof(unw.save_order[0])); ++i) {
 		reg = sr->curr.reg + unw.save_order[i];
 		if (reg->where == UNW_WHERE_GR_SAVE) {
 			reg->where = UNW_WHERE_GR;
@@ -698,7 +698,7 @@ finish_prologue (struct unw_state_record *sr)
 	 */
 	if (sr->imask) {
 		unsigned char kind, mask = 0, *cp = sr->imask;
-		unsigned long t;
+		int t;
 		static const unsigned char limit[3] = {
 			UNW_REG_F31, UNW_REG_R7, UNW_REG_B5
 		};
@@ -1931,7 +1931,7 @@ init_frame_info (struct unw_frame_info *info, struct task_struct *t,
 		   "  pr     0x%lx\n"
 		   "  sw     0x%lx\n"
 		   "  sp     0x%lx\n",
-		   __FUNCTION__, (unsigned long) task, rbslimit, rbstop, stktop, stklimit,
+		   __FUNCTION__, (unsigned long) t, rbslimit, rbstop, stktop, stklimit,
 		   info->pr, (unsigned long) info->sw, info->sp);
 	STAT(unw.stat.api.init_time += ia64_get_itc() - start; local_irq_restore(flags));
 }
@@ -1944,6 +1944,8 @@ unw_init_from_interruption (struct unw_frame_info *info, struct task_struct *t,
 
 	init_frame_info(info, t, sw, pt->r12);
 	info->cfm_loc = &pt->cr_ifs;
+	info->unat_loc = &pt->ar_unat;
+	info->pfs_loc = &pt->ar_pfs;
 	sof = *info->cfm_loc & 0x7f;
 	info->bsp = (unsigned long) ia64_rse_skip_regs((unsigned long *) info->regstk.top, -sof);
 	info->ip = pt->cr_iip + ia64_psr(pt)->ri;
@@ -1952,7 +1954,7 @@ unw_init_from_interruption (struct unw_frame_info *info, struct task_struct *t,
 		   "  bsp    0x%lx\n"
 		   "  sof    0x%lx\n"
 		   "  ip     0x%lx\n",
-		   info->bsp, sof, info->ip);
+		   __FUNCTION__, info->bsp, sof, info->ip);
 	find_save_locs(info);
 }
 
@@ -1970,7 +1972,7 @@ unw_init_frame_info (struct unw_frame_info *info, struct task_struct *t, struct 
 		   "  bsp    0x%lx\n"
 		   "  sol    0x%lx\n"
 		   "  ip     0x%lx\n",
-		   info->bsp, sol, info->ip);
+		   __FUNCTION__, info->bsp, sol, info->ip);
 	find_save_locs(info);
 }
 

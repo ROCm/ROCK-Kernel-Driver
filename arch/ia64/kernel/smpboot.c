@@ -397,13 +397,26 @@ do_boot_cpu (int sapicid, int cpu)
 	return 0;
 }
 
-unsigned long cache_decay_ticks;	/* # of ticks an idle task is considered cache-hot */
+static int __init
+decay (char *str)
+{
+	int ticks;
+	get_option (&str, &ticks);
+	cache_decay_ticks = ticks;
+	return 1;
+}
+
+__setup("decay=", decay);
+
+/*
+ * # of ticks an idle task is considered cache-hot.  Highly application-dependent.  There
+ * are apps out there which are known to suffer significantly with values >= 4.
+ */
+unsigned long cache_decay_ticks = 10;	/* equal to MIN_TIMESLICE */
 
 static void
 smp_tune_scheduling (void)
 {
-	cache_decay_ticks = 10;	/* XXX base this on PAL info and cache-bandwidth estimate */
-
 	printk(KERN_INFO "task migration cache decay timeout: %ld msecs.\n",
 	       (cache_decay_ticks + 1) * 1000 / HZ);
 }
