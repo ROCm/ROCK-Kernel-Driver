@@ -28,7 +28,7 @@
 static int rtc_busy = 0;
 
 /* Retrieve the current date and time from the real time clock. */
-void get_rtc_time(struct rtc_time *t)
+static void get_rtc_time(struct rtc_time *t)
 {
 	unsigned long regs = mstk48t02_regs;
 	u8 tmp;
