@@ -1157,6 +1157,40 @@ static u32 board_added(struct pci_func * func, struct controller * ctrl)
 		return -1;
 	}
 
+	
+	if ((ctrl->pci_dev->vendor == 0x8086) && (ctrl->pci_dev->device == 0x0332)) {
+		if (slots_not_empty)
+			return WRONG_BUS_FREQUENCY;
+		
+		if ((rc = p_slot->hpc_ops->set_bus_speed_mode(p_slot, PCI_SPEED_33MHz))) {
+			err("%s: Issue of set bus speed mode command failed\n", __FUNCTION__);
+			up(&ctrl->crit_sect);
+			return WRONG_BUS_FREQUENCY;
+		}
+		wait_for_ctrl_irq (ctrl);
+		
+		if ((rc = p_slot->hpc_ops->check_cmd_status(ctrl))) {
+			err("%s: Can't set bus speed/mode in the case of adapter & bus mismatch\n",
+				  __FUNCTION__);
+			err("%s: Error code (%d)\n", __FUNCTION__, rc);
+			up(&ctrl->crit_sect);
+			return WRONG_BUS_FREQUENCY;
+		}
+		/* turn on board, blink green LED, turn off Amber LED */
+		if ((rc = p_slot->hpc_ops->slot_enable(p_slot))) {
+			err("%s: Issue of Slot Enable command failed\n", __FUNCTION__);
+			up(&ctrl->crit_sect);
+			return rc;
+		}
+		wait_for_ctrl_irq (ctrl);
+
+		if ((rc = p_slot->hpc_ops->check_cmd_status(ctrl))) {
+			err("%s: Failed to enable slot, error code(%d)\n", __FUNCTION__, rc);
+			up(&ctrl->crit_sect);
+			return rc;  
+		}
+	}
+ 
 	rc = p_slot->hpc_ops->get_adapter_speed(p_slot, &adapter_speed);
 	/* 0 = PCI 33Mhz, 1 = PCI 66 Mhz, 2 = PCI-X 66 PA, 4 = PCI-X 66 ECC, */
 	/* 5 = PCI-X 133 PA, 7 = PCI-X 133 ECC,  0xa = PCI-X 133 Mhz 266, */
