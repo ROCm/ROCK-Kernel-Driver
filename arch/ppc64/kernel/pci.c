@@ -392,7 +392,7 @@ pcibios_init(void)
 	iSeries_pcibios_init(); 
 #endif
 
-	ppc64_boot_msg(0x40, "PCI Probe");
+	//ppc64_boot_msg(0x40, "PCI Probe");
 	printk("PCI: Probing PCI hardware\n");
 	PPCDBG(PPCDBG_BUSWALK,"PCI: Probing PCI hardware\n");
 
@@ -432,7 +432,7 @@ pcibios_init(void)
 
 	printk("PCI: Probing PCI hardware done\n");
 	PPCDBG(PPCDBG_BUSWALK,"PCI: Probing PCI hardware done.\n");
-	ppc64_boot_msg(0x41, "PCI Done");
+	//ppc64_boot_msg(0x41, "PCI Done");
 
 }
 

@@ -587,7 +587,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys32_settimeofday
 	.llong .sys32_getgroups	        /* 80 */
 	.llong .sys32_setgroups
-	.llong .ppc32_select
+	.llong .sys_ni_syscall		/* old select syscall */
 	.llong .sys_symlink
 	.llong .sys_ni_syscall		/* old lstat syscall */
 	.llong .sys32_readlink	        /* 85 */
@@ -830,7 +830,7 @@ _GLOBAL(sys_call_table)
 	.llong .sys_settimeofday
 	.llong .sys_getgroups		/* 80 */
 	.llong .sys_setgroups
-	.llong .sys_select
+	.llong .sys_ni_syscall		/* old select syscall */
 	.llong .sys_symlink
 	.llong .sys_ni_syscall		/* old lstat syscall */
 	.llong .sys_readlink		/* 85 */
