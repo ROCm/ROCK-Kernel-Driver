@@ -166,7 +166,7 @@ static unsigned sfq_hash(struct sfq_sched_data *q, struct sk_buff *skb)
 	return sfq_fold_hash(q, h, h2);
 }
 
-extern __inline__ void sfq_link(struct sfq_sched_data *q, sfq_index x)
+static inline void sfq_link(struct sfq_sched_data *q, sfq_index x)
 {
 	sfq_index p, n;
 	int d = q->qs[x].qlen + SFQ_DEPTH;
@@ -178,7 +178,7 @@ extern __inline__ void sfq_link(struct sfq_sched_data *q, sfq_index x)
 	q->dep[p].next = q->dep[n].prev = x;
 }
 
-extern __inline__ void sfq_dec(struct sfq_sched_data *q, sfq_index x)
+static inline void sfq_dec(struct sfq_sched_data *q, sfq_index x)
 {
 	sfq_index p, n;
 
@@ -193,7 +193,7 @@ extern __inline__ void sfq_dec(struct sfq_sched_data *q, sfq_index x)
 	sfq_link(q, x);
 }
 
-extern __inline__ void sfq_inc(struct sfq_sched_data *q, sfq_index x)
+static inline void sfq_inc(struct sfq_sched_data *q, sfq_index x)
 {
 	sfq_index p, n;
 	int d;
