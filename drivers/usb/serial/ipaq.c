@@ -9,6 +9,16 @@
  *	the Free Software Foundation; either version 2 of the License, or
  *	(at your option) any later version.
  *
+ * (8/3/2002) ganesh
+ * 	The ipaq sometimes emits a '\0' before the CLIENT string. At this
+ * 	point of time, the ppp ldisc is not yet attached to the tty, so
+ * 	n_tty echoes "^ " to the ipaq, which messes up the chat. In 2.5.6-pre2
+ * 	this causes a panic because echo_char() tries to sleep in interrupt
+ * 	context.
+ * 	The fix is to tell the upper layers that this is a raw device so that
+ * 	echoing is suppressed. Thanks to Lyle Lindholm for a detailed bug
+ * 	report.
+ *
  * (25/2/2002) ganesh
  * 	Added support for the HP Jornada 548 and 568. Completely untested.
  * 	Thanks to info from Heath Robinson and Arieh Davidoff.
@@ -148,6 +158,8 @@ static int ipaq_open(struct usb_serial_port *port, struct file *filp)
 		 */
 
 		port->tty->low_latency = 1;
+		port->tty->raw = 1;
+		port->tty->real_raw = 1;
 
 		/*
 		 * Lose the small buffers usbserial provides. Make larger ones.
