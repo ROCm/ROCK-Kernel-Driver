@@ -55,6 +55,11 @@ ifeq ($(CONFIG_X86_GENERICARCH),y)
 cflags-$(CONFIG_M586) += -mcpu=i686
 endif
 
+# -mregparm=3 doesn't work on old crufty 2.95
+# The -Wpacked argument was only added with gcc 3.0, check if the compiler
+# supports it and only enable regparm when it works.
+cflags-$(CONFIG_REGPARM) 	+= $(shell if $(CC) -Wpacked -S -o /dev/null -xc /dev/null > /dev/null 2>&1; then echo "-mregparm=3"; fi ;)
+
 CFLAGS += $(cflags-y)
 
 # Default subarch .c files
