@@ -402,7 +402,13 @@ static int ipv6_auth_hdr(struct sk_buff **skb_ptr, int nhoff)
 	if (!pskb_may_pull(skb, (skb->h.raw-skb->data)+8))
 		goto fail;
 
-	len = (skb->h.raw[1]+1)<<2;
+	/*
+	 * RFC2402 2.2 Payload Length
+	 * The 8-bit field specifies the length of AH in 32-bit words 
+	 * (4-byte units), minus "2".
+	 * -- Noriaki Takamiya @USAGI Project
+	 */
+	len = (skb->h.raw[1]+2)<<2;
 
 	if (len&7)
 		goto fail;
