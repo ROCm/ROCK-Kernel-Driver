@@ -2034,13 +2034,6 @@ static int cciss_pci_init(ctlr_info_t *c, struct pci_dev *pdev)
 	int cfg_base_addr_index;
 	int i;
 
-	vendor_id = pdev->vendor;
-	device_id = pdev->device;
-	irq = pdev->irq;
-
-	for(i=0; i<6; i++)
-		addr[i] = pdev->resource[i].start;
-
 	if (pci_enable_device(pdev))
 	{
 		printk(KERN_ERR "cciss: Unable to Enable PCI device\n");
@@ -2051,6 +2044,13 @@ static int cciss_pci_init(ctlr_info_t *c, struct pci_dev *pdev)
 		printk(KERN_ERR "cciss:  Unable to set DMA mask\n");
 		return(-1);
 	}
+
+	vendor_id = pdev->vendor;
+	device_id = pdev->device;
+	irq = pdev->irq;
+
+	for(i=0; i<6; i++)
+		addr[i] = pdev->resource[i].start;
 
 	(void) pci_read_config_word(pdev, PCI_COMMAND,&command);
 	(void) pci_read_config_byte(pdev, PCI_CLASS_REVISION, &revision);

@@ -146,8 +146,8 @@ static void add_to_flushlist(struct inode *inode, struct buffer_head *bh) {
 static inline void fix_tail_page_for_writing(struct page *page) {
     struct buffer_head *head, *next, *bh ;
 
-    if (page && page->buffers) {
-	head = page->buffers ;
+    if (page && page_has_buffers(page)) {
+	head = page_buffers(page) ;
 	bh = head ;
 	do {
 	    next = bh->b_this_page ;
@@ -745,13 +745,22 @@ int reiserfs_get_block (struct inode * inode, sector_t block,
 		if (retval) {
 		    if ( retval != -ENOSPC )
 			printk("clm-6004: convert tail failed inode %lu, error %d\n", inode->i_ino, retval) ;
-		    if (allocated_block_nr)
+		    if (allocated_block_nr) {
+			/* the bitmap, the super, and the stat data == 3 */
+			journal_begin(&th, inode->i_sb, 3) ;
 			reiserfs_free_block (&th, allocated_block_nr);
+			transaction_started = 1 ;
+		    }
 		    goto failure ;
 		}
 		goto research ;
 	    }
 	    retval = direct2indirect (&th, inode, &path, unbh, tail_offset);
+	    if (retval) {
+		reiserfs_unmap_buffer(unbh);
+		reiserfs_free_block (&th, allocated_block_nr);
+		goto failure;
+	    }
 	    /* it is important the mark_buffer_uptodate is done after
 	    ** the direct2indirect.  The buffer might contain valid
 	    ** data newer than the data on disk (read by readpage, changed,
@@ -761,10 +770,7 @@ int reiserfs_get_block (struct inode * inode, sector_t block,
 	    ** the disk
 	    */
 	    mark_buffer_uptodate (unbh, 1);
-	    if (retval) {
-		reiserfs_free_block (&th, allocated_block_nr);
-		goto failure;
-	    }
+
 	    /* we've converted the tail, so we must 
 	    ** flush unbh before the transaction commits
 	    */
@@ -933,9 +939,6 @@ static void init_inode (struct inode * inode, struct path * path)
 	// (directories and symlinks)
 	struct stat_data * sd = (struct stat_data *)B_I_PITEM (bh, ih);
 
-	/* both old and new directories have old keys */
-	//version = (S_ISDIR (sd->sd_mode) ? ITEM_VERSION_1 : ITEM_VERSION_2);
-
 	inode->i_mode   = sd_v2_mode(sd);
 	inode->i_nlink  = sd_v2_nlink(sd);
 	inode->i_uid    = sd_v2_uid(sd);
@@ -956,6 +959,7 @@ static void init_inode (struct inode * inode, struct path * path)
 	else
 	    set_inode_item_key_version (inode, KEY_FORMAT_3_6);
 	REISERFS_I(inode)->i_first_direct_byte = 0;
+	set_inode_sd_version (inode, STAT_DATA_V2);
     }
 
     pathrelse (path);
@@ -1107,8 +1111,19 @@ void reiserfs_update_sd (struct reiserfs_transaction_handle *th,
     return;
 }
 
+/* reiserfs_read_inode2 is called to read the inode off disk, and it
+** does a make_bad_inode when things go wrong.  But, we need to make sure
+** and clear the key in the private portion of the inode, otherwise a
+** corresponding iput might try to delete whatever object the inode last
+** represented.
+*/
+static void reiserfs_make_bad_inode(struct inode *inode) {
+    memset(INODE_PKEY(inode), 0, KEY_SIZE);
+    make_bad_inode(inode);
+}
+
 void reiserfs_read_inode(struct inode *inode) {
-    make_bad_inode(inode) ;
+    reiserfs_make_bad_inode(inode) ;
 }
 
 
@@ -1128,7 +1143,7 @@ void reiserfs_read_inode2 (struct inode * inode, void *p)
     int retval;
 
     if (!p) {
-	make_bad_inode(inode) ;
+	reiserfs_make_bad_inode(inode) ;
 	return;
     }
 
@@ -1148,13 +1163,13 @@ void reiserfs_read_inode2 (struct inode * inode, void *p)
 	reiserfs_warning ("vs-13070: reiserfs_read_inode2: "
                     "i/o failure occurred trying to find stat data of %K\n",
                     &key);
-	make_bad_inode(inode) ;
+	reiserfs_make_bad_inode(inode) ;
 	return;
     }
     if (retval != ITEM_FOUND) {
 	/* a stale NFS handle can trigger this without it being an error */
 	pathrelse (&path_to_sd);
-	make_bad_inode(inode) ;
+	reiserfs_make_bad_inode(inode) ;
 	inode->i_nlink = 0;
 	return;
     }
@@ -1181,7 +1196,7 @@ void reiserfs_read_inode2 (struct inode * inode, void *p)
 			      "dead inode read from disk %K. "
 			      "This is likely to be race with knfsd. Ignore\n", 
 			      &key );
-	    make_bad_inode( inode );
+	    reiserfs_make_bad_inode( inode );
     }
 
     reiserfs_check_path(&path_to_sd) ; /* init inode should be relsing */
@@ -1207,7 +1222,8 @@ static int reiserfs_find_actor( struct inode *inode,
     struct reiserfs_iget4_args *args;
 
     args = opaque;
-    return INODE_PKEY( inode ) -> k_dir_id == args -> objectid;
+    /* args is already in CPU order */
+    return le32_to_cpu(INODE_PKEY(inode)->k_dir_id) == args -> objectid;
 }
 
 struct inode * reiserfs_iget (struct super_block * s, const struct cpu_key * key)
@@ -1685,7 +1701,7 @@ static int grab_tail_page(struct inode *p_s_inode,
 
     kunmap(page) ; /* mapped by block_prepare_write */
 
-    head = page->buffers ;      
+    head = page_buffers(page) ;      
     bh = head;
     do {
 	if (pos >= start) {
@@ -1930,7 +1946,7 @@ static int reiserfs_write_full_page(struct page *page) {
     struct buffer_head *arr[PAGE_CACHE_SIZE/512] ;
     int nr = 0 ;
 
-    if (!page->buffers) {
+    if (!page_has_buffers(page)) {
         block_prepare_write(page, 0, 0, NULL) ;
 	kunmap(page) ;
     }
@@ -1948,7 +1964,7 @@ static int reiserfs_write_full_page(struct page *page) {
 	flush_dcache_page(page) ;
 	kunmap(page) ;
     }
-    head = page->buffers ;
+    head = page_buffers(page) ;
     bh = head ;
     block = page->index << (PAGE_CACHE_SHIFT - inode->i_sb->s_blocksize_bits) ;
     do {

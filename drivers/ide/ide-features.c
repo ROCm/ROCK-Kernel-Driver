@@ -69,34 +69,6 @@ char *ide_xfer_verbose (byte xfer_rate)
 	}
 }
 
-/*
- * A Verbose noise maker for debugging on the attempted dmaing calls.
- */
-char *ide_dmafunc_verbose (ide_dma_action_t dmafunc)
-{
-	switch (dmafunc) {
-		case ide_dma_read:		return("ide_dma_read");
-		case ide_dma_write:		return("ide_dma_write");
-		case ide_dma_begin:		return("ide_dma_begin");
-		case ide_dma_end:		return("ide_dma_end:");
-		case ide_dma_check:		return("ide_dma_check");
-		case ide_dma_on:		return("ide_dma_on");
-		case ide_dma_off:		return("ide_dma_off");
-		case ide_dma_off_quietly:	return("ide_dma_off_quietly");
-		case ide_dma_test_irq:		return("ide_dma_test_irq");
-		case ide_dma_bad_drive:		return("ide_dma_bad_drive");
-		case ide_dma_good_drive:	return("ide_dma_good_drive");
-		case ide_dma_verbose:		return("ide_dma_verbose");
-		case ide_dma_retune:		return("ide_dma_retune");
-		case ide_dma_lostirq:		return("ide_dma_lostirq");
-		case ide_dma_timeout:		return("ide_dma_timeout");
-		default:			return("unknown");
-	}
-}
-
-/*
- *
- */
 byte ide_auto_reduce_xfer (ide_drive_t *drive)
 {
 	if (!drive->crc_count)
@@ -122,9 +94,6 @@ byte ide_auto_reduce_xfer (ide_drive_t *drive)
 	}
 }
 
-/*
- * Update the 
- */
 int ide_driveid_update (ide_drive_t *drive)
 {
 	/*
@@ -184,7 +153,7 @@ int ide_driveid_update (ide_drive_t *drive)
  * in combination with the device (usually a disk) properly detect
  * and acknowledge each end of the ribbon.
  */
-int ide_ata66_check (ide_drive_t *drive, ide_task_t *args)
+int ide_ata66_check (ide_drive_t *drive, struct ata_taskfile *args)
 {
 	if ((args->taskfile.command == WIN_SETFEATURES) &&
 	    (args->taskfile.sector_number > XFER_UDMA_2) &&
@@ -195,10 +164,10 @@ int ide_ata66_check (ide_drive_t *drive, ide_task_t *args)
 		}
 #ifndef CONFIG_IDEDMA_IVB
 		if ((drive->id->hw_config & 0x6000) == 0) {
-#else /* !CONFIG_IDEDMA_IVB */
+#else
 		if (((drive->id->hw_config & 0x2000) == 0) ||
 		    ((drive->id->hw_config & 0x4000) == 0)) {
-#endif /* CONFIG_IDEDMA_IVB */
+#endif
 			printk("%s: Speed warnings UDMA 3/4/5 is not functional.\n", drive->name);
 			return 1;
 		}
@@ -211,7 +180,7 @@ int ide_ata66_check (ide_drive_t *drive, ide_task_t *args)
  * 1 : Safe to update drive->id DMA registers.
  * 0 : OOPs not allowed.
  */
-int set_transfer (ide_drive_t *drive, ide_task_t *args)
+int set_transfer (ide_drive_t *drive, struct ata_taskfile *args)
 {
 	if ((args->taskfile.command == WIN_SETFEATURES) &&
 	    (args->taskfile.sector_number >= XFER_SW_DMA_0) &&
@@ -232,7 +201,7 @@ byte eighty_ninty_three (ide_drive_t *drive)
 	return ((byte) ((drive->channel->udma_four) &&
 #ifndef CONFIG_IDEDMA_IVB
 			(drive->id->hw_config & 0x4000) &&
-#endif /* CONFIG_IDEDMA_IVB */
+#endif
 			(drive->id->hw_config & 0x6000)) ? 1 : 0);
 }
 

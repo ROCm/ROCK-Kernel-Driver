@@ -15,7 +15,7 @@
    memory, though. */
 
 #ifndef VERBOSE_IDE_CD_ERRORS
-#define VERBOSE_IDE_CD_ERRORS 1
+# define VERBOSE_IDE_CD_ERRORS 1
 #endif
 
 
@@ -24,7 +24,7 @@
    this will give you a slightly smaller kernel. */
 
 #ifndef STANDARD_ATAPI
-#define STANDARD_ATAPI 0
+# define STANDARD_ATAPI 0
 #endif
 
 
@@ -32,14 +32,14 @@
    This is apparently needed for supermount. */
 
 #ifndef NO_DOOR_LOCKING
-#define NO_DOOR_LOCKING 0
+# define NO_DOOR_LOCKING 0
 #endif
 
 /************************************************************************/
 
-#define SECTOR_BITS 		9
+#define SECTOR_BITS		9
 #ifndef SECTOR_SIZE
-#define SECTOR_SIZE		(1 << SECTOR_BITS)
+# define SECTOR_SIZE		(1 << SECTOR_BITS)
 #endif
 #define SECTORS_PER_FRAME	(CD_FRAMESIZE >> SECTOR_BITS)
 #define SECTOR_BUFFER_SIZE	(CD_FRAMESIZE * 32)
@@ -49,12 +49,6 @@
 #define BLOCKS_PER_FRAME	(CD_FRAMESIZE / BLOCK_SIZE)
 
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
-
-/* special command codes for strategy routine. */
-#define PACKET_COMMAND        4315
-#define REQUEST_SENSE_COMMAND 4316
-#define RESET_DRIVE_COMMAND   4317
-
 
 /* Configuration flags.  These describe the capabilities of the drive.
    They generally do not change after initialization, unless we learn
@@ -90,7 +84,6 @@ struct ide_cd_config_flags {
 };
 #define CDROM_CONFIG_FLAGS(drive) (&(((struct cdrom_info *)(drive->driver_data))->config_flags))
 
- 
 /* State flags.  These give information about the current state of the
    drive, and will change during normal operation. */
 struct ide_cd_state_flags {
@@ -111,24 +104,23 @@ struct packet_command {
 	int quiet;
 	int timeout;
 	struct request_sense *sense;
-	unsigned char c[12];
 };
 
 /* Structure of a MSF cdrom address. */
 struct atapi_msf {
-	byte reserved;
-	byte minute;
-	byte second;
-	byte frame;
-};
+	u8 __reserved;
+	u8 minute;
+	u8 second;
+	u8 frame;
+} __attribute__((packed));
 
 /* Space to hold the disk TOC. */
 #define MAX_TRACKS 99
 struct atapi_toc_header {
-	unsigned short toc_length;
-	byte first_track;
-	byte last_track;
-};
+	u16 toc_length;
+	u8 first_track;
+	u8 last_track;
+} __attribute__((packed));
 
 struct atapi_toc_entry {
 	byte reserved1;
@@ -162,17 +154,17 @@ struct atapi_toc {
 /* This structure is annoyingly close to, but not identical with,
    the cdrom_subchnl structure from cdrom.h. */
 struct atapi_cdrom_subchnl {
- 	u_char  acdsc_reserved;
- 	u_char  acdsc_audiostatus;
- 	u_short acdsc_length;
-	u_char  acdsc_format;
+	u8	acdsc_reserved;
+	u8	acdsc_audiostatus;
+	u16	acdsc_length;
+	u8	acdsc_format;
 
 #if defined(__BIG_ENDIAN_BITFIELD)
-	u_char  acdsc_ctrl:     4;
-	u_char  acdsc_adr:      4;
+	u8	acdsc_ctrl:     4;
+	u8	acdsc_adr:      4;
 #elif defined(__LITTLE_ENDIAN_BITFIELD)
-	u_char  acdsc_adr:	4;
-	u_char  acdsc_ctrl:	4;
+	u8	acdsc_adr:	4;
+	u8	acdsc_ctrl:	4;
 #else
 #error "Please fix <asm/byteorder.h>"
 #endif

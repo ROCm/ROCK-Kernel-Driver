@@ -22,6 +22,7 @@
 
 #ifdef __KERNEL__
 
+#include <linux/config.h>
 #include <linux/types.h>
 #include <asm/byteorder.h>
 #include <asm/memory.h>
@@ -269,13 +270,22 @@ extern void consistent_free(void *vaddr, size_t size, dma_addr_t handle);
 extern void consistent_sync(void *vaddr, size_t size, int rw);
 
 /*
- * FIXME: I'm sure these will need to be changed for DISCONTIG
- */
-/*
  * Change "struct page" to physical address.
  */
-#define page_to_phys(page)	(PHYS_OFFSET + ((page - mem_map) << PAGE_SHIFT))
-#define page_to_bus(page)	(PHYS_OFFSET + ((page - mem_map) << PAGE_SHIFT))
+#ifdef CONFIG_DISCONTIG
+#define page_to_phys(page)					  \
+	((((page) - page_zone(page)->zone_mem_map) << PAGE_SHIFT) \
+		  + page_zone(page)->zone_start_paddr)
+#else
+#define page_to_phys(page)					  \
+	(PHYS_OFFSET + (((page) - mem_map) << PAGE_SHIFT))
+#endif
+
+/*
+ * We should really eliminate virt_to_bus() here - it's depreciated.
+ */
+#define page_to_bus(page)					  \
+	(virt_to_bus(page_address(page)))
 
 /*
  * can the hardware map this into one segment or not, given no other

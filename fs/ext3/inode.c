@@ -1029,7 +1029,7 @@ static int ext3_prepare_write(struct file *file, struct page *page,
 		goto prepare_write_failed;
 
 	if (ext3_should_journal_data(inode)) {
-		ret = walk_page_buffers(handle, page->buffers,
+		ret = walk_page_buffers(handle, page_buffers(page),
 				from, to, NULL, do_journal_get_write_access);
 		if (ret) {
 			/*
@@ -1102,7 +1102,7 @@ static int ext3_commit_write(struct file *file, struct page *page,
 		int partial = 0;
 		loff_t pos = ((loff_t)page->index << PAGE_CACHE_SHIFT) + to;
 
-		ret = walk_page_buffers(handle, page->buffers,
+		ret = walk_page_buffers(handle, page_buffers(page),
 			from, to, &partial, commit_write_fn);
 		if (!partial)
 			SetPageUptodate(page);
@@ -1112,7 +1112,7 @@ static int ext3_commit_write(struct file *file, struct page *page,
 		EXT3_I(inode)->i_state |= EXT3_STATE_JDATA;
 	} else {
 		if (ext3_should_order_data(inode)) {
-			ret = walk_page_buffers(handle, page->buffers,
+			ret = walk_page_buffers(handle, page_buffers(page),
 				from, to, NULL, journal_dirty_sync_data);
 		}
 		/* Be careful here if generic_commit_write becomes a
@@ -1252,7 +1252,7 @@ static int bget_one(handle_t *handle, struct buffer_head *bh)
 static int ext3_writepage(struct page *page)
 {
 	struct inode *inode = page->mapping->host;
-	struct buffer_head *page_buffers;
+	struct buffer_head *page_bufs;
 	handle_t *handle = NULL;
 	int ret = 0, err;
 	int needed;
@@ -1285,14 +1285,14 @@ static int ext3_writepage(struct page *page)
 
 	unlock_kernel();
 
-	page_buffers = NULL;	/* Purely to prevent compiler warning */
+	page_bufs = NULL;	/* Purely to prevent compiler warning */
 
 	/* bget() all the buffers */
 	if (order_data) {
-		if (!page->buffers)
+		if (!page_has_buffers(page))
 			create_empty_buffers(page, inode->i_sb->s_blocksize);
-		page_buffers = page->buffers;
-		walk_page_buffers(handle, page_buffers, 0,
+		page_bufs = page_buffers(page);
+		walk_page_buffers(handle, page_bufs, 0,
 				PAGE_CACHE_SIZE, NULL, bget_one);
 	}
 
@@ -1301,7 +1301,7 @@ static int ext3_writepage(struct page *page)
 	/*
 	 * The page can become unlocked at any point now, and
 	 * truncate can then come in and change things.  So we
-	 * can't touch *page from now on.  But *page_buffers is
+	 * can't touch *page from now on.  But *page_bufs is
 	 * safe due to elevated refcount.
 	 */
 
@@ -1310,7 +1310,7 @@ static int ext3_writepage(struct page *page)
 
 	/* And attach them to the current transaction */
 	if (order_data) {
-		err = walk_page_buffers(handle, page_buffers,
+		err = walk_page_buffers(handle, page_bufs,
 			0, PAGE_CACHE_SIZE, NULL, journal_dirty_async_data);
 		if (!ret)
 			ret = err;
@@ -1392,11 +1392,11 @@ static int ext3_block_truncate_page(handle_t *handle,
 	if (!page)
 		goto out;
 
-	if (!page->buffers)
+	if (!page_has_buffers(page))
 		create_empty_buffers(page, blocksize);
 
 	/* Find the buffer that contains "offset" */
-	bh = page->buffers;
+	bh = page_buffers(page);
 	pos = blocksize;
 	while (offset >= pos) {
 		bh = bh->b_this_page;

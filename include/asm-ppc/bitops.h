@@ -394,8 +394,8 @@ found_middle:
 
 #ifdef __KERNEL__
 
-#define ext2_set_bit(nr, addr)		__test_and_set_bit((nr) ^ 0x18, addr)
-#define ext2_clear_bit(nr, addr)	__test_and_clear_bit((nr) ^ 0x18, addr)
+#define ext2_set_bit(nr, addr)	__test_and_set_bit((nr) ^ 0x18, (unsigned long *)(addr))
+#define ext2_clear_bit(nr, addr) __test_and_clear_bit((nr) ^ 0x18, (unsigned long *)(addr))
 
 static __inline__ int ext2_test_bit(int nr, __const__ void * addr)
 {

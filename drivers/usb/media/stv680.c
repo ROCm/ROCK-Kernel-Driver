@@ -1171,8 +1171,8 @@ static int stv_close (struct inode *inode, struct file *file)
 	return 0;
 }
 
-static int stv680_ioctl (struct inode *inode, struct file *file,
-			 unsigned int cmd, void *arg)
+static int stv680_do_ioctl (struct inode *inode, struct file *file,
+			    unsigned int cmd, void *arg)
 {
 	struct video_device *vdev = file->private_data;
 	struct usb_stv *stv680 = (struct usb_stv *) vdev;
@@ -1342,6 +1342,12 @@ static int stv680_ioctl (struct inode *inode, struct file *file,
 	return 0;
 }
 
+static int stv680_ioctl(struct inode *inode, struct file *file,
+			unsigned int cmd, unsigned long arg)
+{
+	return video_usercopy(inode, file, cmd, arg, stv680_do_ioctl);
+}
+
 static int stv680_mmap (struct file *file, struct vm_area_struct *vma)
 {
 	struct video_device *dev = file->private_data;
@@ -1434,7 +1440,7 @@ static struct file_operations stv680_fops = {
 	release:       	stv_close,
 	read:		stv680_read,
 	mmap:		stv680_mmap,
-	ioctl:          video_generic_ioctl,
+	ioctl:          stv680_ioctl,
 	llseek:         no_llseek,
 };
 static struct video_device stv680_template = {
@@ -1443,7 +1449,6 @@ static struct video_device stv680_template = {
 	type:		VID_TYPE_CAPTURE,
 	hardware:	VID_HARDWARE_SE401,
 	fops:           &stv680_fops,
-	kernel_ioctl:	stv680_ioctl,
 };
 
 static void *__devinit stv680_probe (struct usb_device *dev, unsigned int ifnum, const struct usb_device_id *id)

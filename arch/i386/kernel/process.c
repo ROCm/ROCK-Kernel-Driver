@@ -142,6 +142,7 @@ void cpu_idle (void)
 		void (*idle)(void) = pm_idle;
 		if (!idle)
 			idle = default_idle;
+		irq_stat[smp_processor_id()].idle_timestamp = jiffies;
 		while (!need_resched())
 			idle();
 		schedule();

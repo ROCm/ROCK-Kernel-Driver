@@ -30,6 +30,7 @@
 #include <linux/unistd.h>
 #include <linux/init.h>
 #include <linux/spinlock.h>
+#include <linux/errno.h>
 
 #include <asm/ptrace.h>
 #include <asm/atomic.h>
@@ -47,6 +48,7 @@
 #include <asm/pmac_feature.h>
 #include <asm/time.h>
 #include <asm/open_pic.h>
+#include <asm/cacheflush.h>
 
 /*
  * Powersurge (old powermac SMP) support.

@@ -746,9 +746,8 @@ static int read_super_block (struct super_block * s, int offset)
     //
     // ok, reiserfs signature (old or new) found in at the given offset
     //    
-    brelse (bh);
-    
     sb_set_blocksize (s, sb_blocksize(rs));
+    brelse (bh);
     
     bh = reiserfs_bread (s, offset / s->s_blocksize);
     if (!bh) {
@@ -770,7 +769,7 @@ static int read_super_block (struct super_block * s, int offset)
     if ( rs->s_v1.s_root_block == -1 ) {
        brelse(bh) ;
        printk("dev %s: Unfinished reiserfsck --rebuild-tree run detected. Please run\n"
-              "reiserfsck --rebuild-tree and wait for a completion. If that fais\n"
+              "reiserfsck --rebuild-tree and wait for a completion. If that fails\n"
               "get newer reiserfsprogs package\n", s->s_id);
        return 1;
     }

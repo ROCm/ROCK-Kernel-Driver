@@ -4555,9 +4555,11 @@ ov51x_v4l1_close(struct inode *inode, struct file *file)
 
 /* Do not call this function directly! */
 static int 
-ov51x_v4l1_ioctl_internal(struct usb_ov511 *ov, unsigned int cmd,
-			  void *arg)
+ov51x_v4l1_ioctl_internal(struct inode *inode, struct file *file,
+			  unsigned int cmd, void *arg)
 {
+	struct video_device *vdev = file->private_data;
+	struct usb_ov511 *ov = vdev->priv;
 	PDEBUG(5, "IOCtl: 0x%X", cmd);
 
 	if (!ov->dev)
@@ -5067,7 +5069,7 @@ redo:
 
 static int 
 ov51x_v4l1_ioctl(struct inode *inode, struct file *file,
-		 unsigned int cmd, void *arg)
+		 unsigned int cmd, unsigned long arg)
 {
 	struct video_device *vdev = file->private_data;
 	struct usb_ov511 *ov = vdev->priv;
@@ -5076,7 +5078,7 @@ ov51x_v4l1_ioctl(struct inode *inode, struct file *file,
 	if (down_interruptible(&ov->lock))
 		return -EINTR;
 
-	rc = ov51x_v4l1_ioctl_internal(ov, cmd, arg);
+	rc = video_usercopy(inode, file, cmd, arg, ov51x_v4l1_ioctl_internal);
 
 	up(&ov->lock);
 	return rc;
@@ -5284,7 +5286,7 @@ static struct file_operations ov511_fops = {
 	release:       	ov51x_v4l1_close,
 	read:		ov51x_v4l1_read,
 	mmap:		ov51x_v4l1_mmap,
-	ioctl:          video_generic_ioctl,
+	ioctl:          ov51x_v4l1_ioctl,
 	llseek:         no_llseek,
 };
 
@@ -5294,7 +5296,6 @@ static struct video_device vdev_template = {
 	type:		VID_TYPE_CAPTURE,
 	hardware:	VID_HARDWARE_OV511,
 	fops:           &ov511_fops,
-	kernel_ioctl:	ov51x_v4l1_ioctl,
 };
 
 #if defined(CONFIG_PROC_FS) && defined(CONFIG_VIDEO_PROC_FS)

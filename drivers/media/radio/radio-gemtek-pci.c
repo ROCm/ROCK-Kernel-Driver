@@ -177,8 +177,8 @@ static inline unsigned int gemtek_pci_getsignal( struct gemtek_pci_card *card )
 	return ( inb( card->iobase ) & 0x08 ) ? 0 : 1;
 }
 
-static int gemtek_pci_ioctl(struct inode *inode, struct file *file,
-			    unsigned int cmd, void *arg)
+static int gemtek_pci_do_ioctl(struct inode *inode, struct file *file,
+			       unsigned int cmd, void *arg)
 {
 	struct video_device *dev = video_devdata(file);
 	struct gemtek_pci_card *card = dev->priv;
@@ -272,6 +272,12 @@ static int gemtek_pci_ioctl(struct inode *inode, struct file *file,
 	}
 }
 
+static int gemtek_pci_ioctl(struct inode *inode, struct file *file,
+			    unsigned int cmd, unsigned long arg)
+{
+	return video_usercopy(inode, file, cmd, arg, gemtek_pci_do_ioctl);
+}
+
 enum {
 	GEMTEK_PR103
 };
@@ -295,7 +301,7 @@ static struct file_operations gemtek_pci_fops = {
 	owner:		THIS_MODULE,
 	open:           video_exclusive_open,
 	release:        video_exclusive_release,
-	ioctl:		video_generic_ioctl,
+	ioctl:		gemtek_pci_ioctl,
 	llseek:         no_llseek,
 };
 
@@ -305,7 +311,6 @@ static struct video_device vdev_template = {
 	type:          VID_TYPE_TUNER,
 	hardware:      VID_HARDWARE_GEMTEK,
 	fops:          &gemtek_pci_fops,
-	kernel_ioctl:  gemtek_pci_ioctl,
 };
 
 static int __devinit gemtek_pci_probe( struct pci_dev *pci_dev, const struct pci_device_id *pci_id )

@@ -14,10 +14,9 @@
 #ifndef __ASM_ARCH_SYSTEM_H
 #define __ASM_ARCH_SYSTEM_H
 
-static void arch_idle(void)
+static inline void arch_idle(void)
 {
-	while (!need_resched() && !hlt_counter)
-		cpu_do_idle(IDLE_WAIT_SLOW);
+	cpu_do_idle();
 }
 
 #define arch_reset(mode)	do { } while (0)

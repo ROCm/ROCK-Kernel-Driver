@@ -106,8 +106,10 @@ static struct irqaction irq_cascade = { handler: no_action, name: "cascade", };
 static struct resource pic1_resource = { "pic1", 0x20, 0x3f };
 static struct resource pic2_resource = { "pic2", 0xa0, 0xbf };
 
-void __init isa_init_irq(unsigned int irq)
+void __init isa_init_irq(unsigned int host_irq)
 {
+	unsigned int irq;
+
 	/*
 	 * Setup, and then probe for an ISA PIC
 	 * If the PIC is not there, then we
@@ -133,10 +135,10 @@ void __init isa_init_irq(unsigned int irq)
 		outb(0xff, PIC_MASK_HI);/* mask all IRQs	*/
 	} else {
 		printk(KERN_INFO "IRQ: ISA PIC not found\n");
-		irq = -1;
+		host_irq = (unsigned int)-1;
 	}
 
-	if (irq != -1) {
+	if (host_irq != (unsigned int)-1) {
 		for (irq = _ISA_IRQ(0); irq < _ISA_IRQ(8); irq++) {
 			set_irq_chip(irq, &isa_lo_chip);
 			set_irq_handler(irq, do_level_IRQ);
@@ -153,7 +155,7 @@ void __init isa_init_irq(unsigned int irq)
 		request_resource(&ioport_resource, &pic2_resource);
 		setup_irq(IRQ_ISA_CASCADE, &irq_cascade);
 
-		set_irq_chained_handler(irq, isa_irq_handler);
+		set_irq_chained_handler(host_irq, isa_irq_handler);
 
 		/*
 		 * On the NetWinder, don't automatically

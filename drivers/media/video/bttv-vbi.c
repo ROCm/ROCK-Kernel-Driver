@@ -276,8 +276,8 @@ static int vbi_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static int vbi_ioctl(struct inode *inode, struct file *file,
-		     unsigned int cmd, void *arg)
+static int vbi_do_ioctl(struct inode *inode, struct file *file,
+			unsigned int cmd, void *arg)
 {
 	struct bttv *btv = file->private_data;
 #ifdef HAVE_V4L2
@@ -507,6 +507,12 @@ static int vbi_ioctl(struct inode *inode, struct file *file,
 #endif
 }
 
+static int vbi_ioctl(struct inode *inode, struct file *file,
+		     unsigned int cmd, unsigned long arg)
+{
+	return video_usercopy(inode, file, cmd, arg, vbi_do_ioctl);
+}
+
 static ssize_t vbi_read(struct file *file, char *data,
 			size_t count, loff_t *ppos)
 {
@@ -634,7 +640,7 @@ static struct file_operations vbi_fops =
 	owner:	  THIS_MODULE,
 	open:	  vbi_open,
 	release:  vbi_release,
-	ioctl:	  video_generic_ioctl,
+	ioctl:	  vbi_ioctl,
 	llseek:	  no_llseek,
 	read:	  vbi_read,
 	poll:	  vbi_poll,
@@ -647,7 +653,6 @@ struct video_device bttv_vbi_template =
 	type:     VID_TYPE_TUNER|VID_TYPE_TELETEXT,
 	hardware: VID_HARDWARE_BT848,
 	fops:     &vbi_fops,
-	kernel_ioctl: vbi_ioctl,
 	minor:    -1,
 };
 

@@ -43,7 +43,7 @@ switch_mm(struct mm_struct *prev, struct mm_struct *next,
 	  struct task_struct *tsk, unsigned int cpu)
 {
 	if (prev != next)
-		cpu_switch_mm(next->pgd, tsk);
+		cpu_switch_mm(next->pgd, next);
 }
 
 #define activate_mm(prev, next) \

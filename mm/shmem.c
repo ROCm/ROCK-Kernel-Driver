@@ -370,9 +370,10 @@ static int shmem_unuse_inode (struct shmem_inode_info *info, swp_entry_t entry, 
 	swp_entry_t *ptr;
 	unsigned long idx;
 	int offset;
-	
-	idx = 0;
+
 	spin_lock (&info->lock);
+repeat:
+	idx = 0;
 	offset = shmem_clear_swp (entry, info->i_direct, SHMEM_NR_DIRECT);
 	if (offset >= 0)
 		goto found;
@@ -389,13 +390,16 @@ static int shmem_unuse_inode (struct shmem_inode_info *info, swp_entry_t entry, 
 	spin_unlock (&info->lock);
 	return 0;
 found:
-	delete_from_swap_cache(page);
-	add_to_page_cache(page, info->vfs_inode.i_mapping, offset + idx);
-	SetPageDirty(page);
-	SetPageUptodate(page);
-	info->swapped--;
-	spin_unlock(&info->lock);
-	return 1;
+	if (!move_from_swap_cache (page, offset+idx, info->vfs_inode.i_mapping)) {
+		info->swapped--;
+		SetPageUptodate (page);
+		spin_unlock (&info->lock);
+		return 1;
+	}
+
+	/* Yield for kswapd, and try again */
+	yield();
+	goto repeat;
 }
 
 /*
@@ -425,6 +429,7 @@ void shmem_unuse(swp_entry_t entry, struct page *page)
  */
 static int shmem_writepage(struct page * page)
 {
+	int err;
 	struct shmem_inode_info *info;
 	swp_entry_t *entry, swap;
 	struct address_space *mapping;
@@ -442,7 +447,6 @@ static int shmem_writepage(struct page * page)
 	info = SHMEM_I(inode);
 	if (info->locked)
 		return fail_writepage(page);
-getswap:
 	swap = get_swap_page();
 	if (!swap.val)
 		return fail_writepage(page);
@@ -455,29 +459,20 @@ getswap:
 	if (entry->val)
 		BUG();
 
-	/* Remove it from the page cache */
-	remove_inode_page(page);
-	page_cache_release(page);
-
-	/* Add it to the swap cache */
-	if (add_to_swap_cache(page, swap) != 0) {
-		/*
-		 * Raced with "speculative" read_swap_cache_async.
-		 * Add page back to page cache, unref swap, try again.
-		 */
-		add_to_page_cache_locked(page, mapping, index);
+	err = move_to_swap_cache(page, swap);
+	if (!err) {
+		*entry = swap;
+		info->swapped++;
 		spin_unlock(&info->lock);
-		swap_free(swap);
-		goto getswap;
+		SetPageUptodate(page);
+		set_page_dirty(page);
+		UnlockPage(page);
+		return 0;
 	}
 
-	*entry = swap;
-	info->swapped++;
 	spin_unlock(&info->lock);
-	SetPageUptodate(page);
-	set_page_dirty(page);
-	UnlockPage(page);
-	return 0;
+	swap_free(swap);
+	return fail_writepage(page);
 }
 
 /*
@@ -493,10 +488,11 @@ getswap:
  */
 static struct page * shmem_getpage_locked(struct shmem_inode_info *info, struct inode * inode, unsigned long idx)
 {
-	struct address_space * mapping = inode->i_mapping;
+	struct address_space *mapping = inode->i_mapping;
 	struct shmem_sb_info *sbinfo;
-	struct page * page;
+	struct page *page;
 	swp_entry_t *entry;
+	int error;
 
 repeat:
 	page = find_lock_page(mapping, idx);
@@ -524,8 +520,6 @@ repeat:
 	
 	shmem_recalc_inode(inode);
 	if (entry->val) {
-		unsigned long flags;
-
 		/* Look it up and read it in.. */
 		page = find_get_page(&swapper_space, entry->val);
 		if (!page) {
@@ -550,16 +544,18 @@ repeat:
 			goto repeat;
 		}
 
-		/* We have to this with page locked to prevent races */
+		/* We have to do this with page locked to prevent races */
 		if (TryLockPage(page)) 
 			goto wait_retry;
 
+		error = move_from_swap_cache(page, idx, mapping);
+		if (error < 0) {
+			UnlockPage(page);
+			return ERR_PTR(error);
+		}
+
 		swap_free(*entry);
 		*entry = (swp_entry_t) {0};
-		delete_from_swap_cache(page);
-		flags = page->flags & ~((1 << PG_uptodate) | (1 << PG_error) | (1 << PG_referenced) | (1 << PG_arch_1));
-		page->flags = flags | (1 << PG_dirty);
-		add_to_page_cache_locked(page, mapping, idx);
 		info->swapped--;
 		spin_unlock (&info->lock);
 	} else {
@@ -581,9 +577,13 @@ repeat:
 		page = page_cache_alloc(mapping);
 		if (!page)
 			return ERR_PTR(-ENOMEM);
+		error = add_to_page_cache(page, mapping, idx);
+		if (error < 0) {
+			page_cache_release(page);
+			return ERR_PTR(-ENOMEM);
+		}
 		clear_highpage(page);
 		inode->i_blocks += BLOCKS_PER_PAGE;
-		add_to_page_cache (page, mapping, idx);
 	}
 
 	/* We have the page */

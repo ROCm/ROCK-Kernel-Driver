@@ -37,11 +37,13 @@ static struct address_space_operations swap_aops = {
 };
 
 struct address_space swapper_space = {
-	LIST_HEAD_INIT(swapper_space.clean_pages),
-	LIST_HEAD_INIT(swapper_space.dirty_pages),
-	LIST_HEAD_INIT(swapper_space.locked_pages),
-	0,				/* nrpages	*/
-	&swap_aops,
+	page_tree:	RADIX_TREE_INIT(GFP_ATOMIC),
+	page_lock:	RW_LOCK_UNLOCKED,
+	clean_pages:	LIST_HEAD_INIT(swapper_space.clean_pages),
+	dirty_pages:	LIST_HEAD_INIT(swapper_space.dirty_pages),
+	locked_pages:	LIST_HEAD_INIT(swapper_space.locked_pages),
+	a_ops:		&swap_aops,
+	i_shared_lock:	SPIN_LOCK_UNLOCKED,
 };
 
 #ifdef SWAP_CACHE_INFO
@@ -69,17 +71,21 @@ void show_swap_cache_info(void)
 
 int add_to_swap_cache(struct page *page, swp_entry_t entry)
 {
+	int error;
+
 	if (page->mapping)
 		BUG();
 	if (!swap_duplicate(entry)) {
 		INC_CACHE_INFO(noent_race);
 		return -ENOENT;
 	}
-	if (add_to_page_cache_unique(page, &swapper_space, entry.val,
-			page_hash(&swapper_space, entry.val)) != 0) {
+
+	error = add_to_page_cache_unique(page, &swapper_space, entry.val);
+	if (error != 0) {
 		swap_free(entry);
-		INC_CACHE_INFO(exist_race);
-		return -EEXIST;
+		if (error == -EEXIST)
+			INC_CACHE_INFO(exist_race);
+		return error;
 	}
 	if (!PageLocked(page))
 		BUG();
@@ -121,12 +127,94 @@ void delete_from_swap_cache(struct page *page)
 
 	entry.val = page->index;
 
-	spin_lock(&pagecache_lock);
+	write_lock(&swapper_space.page_lock);
 	__delete_from_swap_cache(page);
-	spin_unlock(&pagecache_lock);
+	write_unlock(&swapper_space.page_lock);
 
 	swap_free(entry);
 	page_cache_release(page);
+}
+
+int move_to_swap_cache(struct page *page, swp_entry_t entry)
+{
+	struct address_space *mapping = page->mapping;
+	void **pslot;
+	int err;
+
+	if (!mapping)
+		BUG();
+
+	if (!swap_duplicate(entry)) {
+		INC_CACHE_INFO(noent_race);
+		return -ENOENT;
+	}
+
+	write_lock(&swapper_space.page_lock);
+	write_lock(&mapping->page_lock);
+
+	err = radix_tree_reserve(&swapper_space.page_tree, entry.val, &pslot);
+	if (!err) {
+		/* Remove it from the page cache */
+		__remove_inode_page (page);
+
+		/* Add it to the swap cache */
+		*pslot = page;
+		page->flags = ((page->flags & ~(1 << PG_uptodate | 1 << PG_error
+						| 1 << PG_dirty  | 1 << PG_referenced
+						| 1 << PG_arch_1 | 1 << PG_checked))
+			       | (1 << PG_locked));
+		___add_to_page_cache(page, &swapper_space, entry.val);
+	}
+
+	write_unlock(&mapping->page_lock);
+	write_unlock(&swapper_space.page_lock);
+
+	if (!err) {
+		INC_CACHE_INFO(add_total);
+		return 0;
+	}
+
+	swap_free(entry);
+
+	if (err == -EEXIST)
+		INC_CACHE_INFO(exist_race);
+
+	return err;
+}
+
+int move_from_swap_cache(struct page *page, unsigned long index,
+		struct address_space *mapping)
+{
+	void **pslot;
+	int err;
+
+	if (!PageLocked(page))
+		BUG();
+
+	write_lock(&swapper_space.page_lock);
+	write_lock(&mapping->page_lock);
+
+	err = radix_tree_reserve(&mapping->page_tree, index, &pslot);
+	if (!err) {
+		swp_entry_t entry;
+
+		block_flushpage(page, 0);
+		entry.val = page->index;
+		__delete_from_swap_cache(page);
+		swap_free(entry);
+
+		*pslot = page;
+		page->flags &= ~(1 << PG_uptodate | 1 << PG_error |
+				 1 << PG_referenced | 1 << PG_arch_1 |
+				 1 << PG_checked);
+		page->flags |= (1 << PG_dirty);
+		___add_to_page_cache(page, mapping, index);
+	}
+
+	write_unlock(&mapping->page_lock);
+	write_unlock(&swapper_space.page_lock);
+
+	return err;
 }
 
 /* 
@@ -213,6 +301,7 @@ struct page * read_swap_cache_async(swp_entry_t entry)
 		 * swap cache: added by a racing read_swap_cache_async,
 		 * or by try_to_swap_out (or shmem_writepage) re-using
 		 * the just freed swap entry for an existing page.
+		 * May fail (-ENOMEM) if radix-tree node allocation failed.
 		 */
 		err = add_to_swap_cache(new_page, entry);
 		if (!err) {
@@ -222,7 +311,7 @@ struct page * read_swap_cache_async(swp_entry_t entry)
 			rw_swap_page(READ, new_page);
 			return new_page;
 		}
-	} while (err != -ENOENT);
+	} while (err != -ENOENT && err != -ENOMEM);
 
 	if (new_page)
 		page_cache_release(new_page);

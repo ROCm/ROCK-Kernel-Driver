@@ -7,13 +7,7 @@
 
 static inline void arch_idle(void)
 {
-	if (!hlt_counter) {
-		int flags;
-		local_irq_save(flags);
-		if (!need_resched())
-			cpu_do_idle(0);
-		local_irq_restore(flags);
-	}
+	cpu_do_idle();
 }
 
 #ifdef CONFIG_SA1100_VICTOR

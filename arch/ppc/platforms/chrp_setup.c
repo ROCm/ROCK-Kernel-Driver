@@ -607,7 +607,7 @@ chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	 * Print the banner, then scroll down so boot progress
 	 * can be printed.  -- Cort 
 	 */
-	if ( ppc_md.progress ) ppc_md.progress("Linux/PPC "UTS_RELEASE"\n", 0x0);
+	if (ppc_md.progress) ppc_md.progress("Linux/PPC "UTS_RELEASE"\n", 0x0);
 }
 
 void __chrp

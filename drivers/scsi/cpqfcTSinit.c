@@ -261,10 +261,22 @@ static void launch_FCworker_thread(struct Scsi_Host *HostAdapter)
 /* "Entry" point to discover if any supported PCI 
    bus adapter can be found
 */
-// We're supporting:
-// Compaq 64-bit, 66MHz HBA with Tachyon TS
-// Agilent XL2 
-#define HBA_TYPES 2
+/* We're supporting:
+ * Compaq 64-bit, 66MHz HBA with Tachyon TS
+ * Agilent XL2 
+ * HP Tachyon
+ */
+#define HBA_TYPES 3
+
+#ifndef PCI_DEVICE_ID_COMPAQ_
+#define PCI_DEVICE_ID_COMPAQ_TACHYON	0xa0fc
+#endif
+
+static struct SupportedPCIcards cpqfc_boards[] __initdata = {
+	{PCI_VENDOR_ID_COMPAQ, PCI_DEVICE_ID_COMPAQ_TACHYON},
+	{PCI_VENDOR_ID_HP, PCI_DEVICE_ID_HP_TACHLITE},
+	{PCI_VENDOR_ID_HP, PCI_DEVICE_ID_HP_TACHYON},
+};
 
 
 int cpqfcTS_detect(Scsi_Host_Template *ScsiHostTemplate)
@@ -274,35 +286,28 @@ int cpqfcTS_detect(Scsi_Host_Template *ScsiHostTemplate)
   struct Scsi_Host *HostAdapter = NULL;
   CPQFCHBA *cpqfcHBAdata = NULL; 
   struct timer_list *cpqfcTStimer = NULL;
-  SupportedPCIcards PCIids[HBA_TYPES];
   int i;
-  
+
   ENTER("cpqfcTS_detect");
-  
+
 #if LINUX_VERSION_CODE < LinuxVersionCode(2,3,27)
   ScsiHostTemplate->proc_dir = &proc_scsi_cpqfcTS;
 #else
   ScsiHostTemplate->proc_name = "cpqfcTS";
 #endif
-  
+
   if( pci_present() == 0) // no PCI busses?
   {
     printk( "  no PCI bus?@#!\n");
     return NumberOfAdapters;
   }
 
-  // what HBA adapters are we supporting?
-  PCIids[0].vendor_id = PCI_VENDOR_ID_COMPAQ;
-  PCIids[0].device_id = CPQ_DEVICE_ID;
-  PCIids[1].vendor_id = PCI_VENDOR_ID_HP; // i.e. 103Ch (Agilent == HP for now)
-  PCIids[1].device_id = AGILENT_XL2_ID;   // i.e. 1029h
-
   for( i=0; i < HBA_TYPES; i++)
   {
     // look for all HBAs of each type
 
-    while( (PciDev =
-      pci_find_device( PCIids[i].vendor_id, PCIids[i].device_id, PciDev) ))
+    while((PciDev = pci_find_device(cpqfc_boards[i].vendor_id,
+				    cpqfc_boards[i].device_id, PciDev)))
     {
 
       if (pci_set_dma_mask(PciDev, CPQFCTS_DMA_MASK) != 0) {

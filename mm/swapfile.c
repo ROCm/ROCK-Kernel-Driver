@@ -239,10 +239,10 @@ static int exclusive_swap_page(struct page *page)
 		/* Is the only swap cache user the cache itself? */
 		if (p->swap_map[SWP_OFFSET(entry)] == 1) {
 			/* Recheck the page count with the pagecache lock held.. */
-			spin_lock(&pagecache_lock);
-			if (page_count(page) - !!page->buffers == 2)
+			read_lock(&swapper_space.page_lock);
+			if (page_count(page) - !!PagePrivate(page) == 2)
 				retval = 1;
-			spin_unlock(&pagecache_lock);
+			read_unlock(&swapper_space.page_lock);
 		}
 		swap_info_put(p);
 	}
@@ -265,7 +265,7 @@ int can_share_swap_page(struct page *page)
 		BUG();
 	switch (page_count(page)) {
 	case 3:
-		if (!page->buffers)
+		if (!PagePrivate(page))
 			break;
 		/* Fallthrough */
 	case 2:
@@ -295,7 +295,7 @@ int remove_exclusive_swap_page(struct page *page)
 		BUG();
 	if (!PageSwapCache(page))
 		return 0;
-	if (page_count(page) - !!page->buffers != 2)	/* 2: us + cache */
+	if (page_count(page) - !!PagePrivate(page) != 2) /* 2: us + cache */
 		return 0;
 
 	entry.val = page->index;
@@ -307,13 +307,13 @@ int remove_exclusive_swap_page(struct page *page)
 	retval = 0;
 	if (p->swap_map[SWP_OFFSET(entry)] == 1) {
 		/* Recheck the page count with the pagecache lock held.. */
-		spin_lock(&pagecache_lock);
-		if (page_count(page) - !!page->buffers == 2) {
+		read_lock(&swapper_space.page_lock);
+		if (page_count(page) - !!PagePrivate(page) == 2) {
 			__delete_from_swap_cache(page);
 			SetPageDirty(page);
 			retval = 1;
 		}
-		spin_unlock(&pagecache_lock);
+		read_unlock(&swapper_space.page_lock);
 	}
 	swap_info_put(p);
 
@@ -344,7 +344,7 @@ void free_swap_and_cache(swp_entry_t entry)
 	if (page) {
 		page_cache_get(page);
 		/* Only cache user (+us), or swap space full? Free it! */
-		if (page_count(page) - !!page->buffers == 2 || vm_swap_full()) {
+		if (page_count(page) - !!PagePrivate(page) == 2 || vm_swap_full()) {
 			delete_from_swap_cache(page);
 			SetPageDirty(page);
 		}
@@ -959,7 +959,7 @@ asmlinkage long sys_swapon(const char * specialfile, int swap_flags)
 		p->lowest_bit = 0;
 		p->highest_bit = 0;
 		for (i = 1 ; i < 8*PAGE_SIZE ; i++) {
-			if (test_bit(i,(char *) swap_header)) {
+			if (test_bit(i,(unsigned long *) swap_header)) {
 				if (!p->lowest_bit)
 					p->lowest_bit = i;
 				p->highest_bit = i;
@@ -974,7 +974,7 @@ asmlinkage long sys_swapon(const char * specialfile, int swap_flags)
 			goto bad_swap;
 		}
 		for (i = 1 ; i < maxpages ; i++) {
-			if (test_bit(i,(char *) swap_header))
+			if (test_bit(i,(unsigned long *) swap_header))
 				p->swap_map[i] = 0;
 			else
 				p->swap_map[i] = SWAP_MAP_BAD;

@@ -341,9 +341,12 @@ static int i2c_getdata(struct saa5249_device *t, int count, u8 *buf)
  *	Standard character-device-driver functions
  */
 
-static int do_saa5249_ioctl(struct saa5249_device *t, unsigned int cmd, void *arg) 
+static int do_saa5249_ioctl(struct inode *inode, struct file *file,
+			    unsigned int cmd, void *arg)
 {
 	static int virtual_mode = FALSE;
+	struct video_device *vd = video_devdata(file);
+	struct saa5249_device *t=vd->priv;
 
 	switch(cmd) 
 	{
@@ -591,16 +594,15 @@ static int do_saa5249_ioctl(struct saa5249_device *t, unsigned int cmd, void *ar
  */
  
 static int saa5249_ioctl(struct inode *inode, struct file *file,
-			 unsigned int cmd, void *arg) 
+			 unsigned int cmd, unsigned long arg) 
 {
 	struct video_device *vd = video_devdata(file);
 	struct saa5249_device *t=vd->priv;
 	int err;
 	
 	down(&t->lock);
-	err = do_saa5249_ioctl(t, cmd, arg);
+	err = video_usercopy(inode,file,cmd,arg,do_saa5249_ioctl);
 	up(&t->lock);
-
 	return err;
 }
 
@@ -679,7 +681,7 @@ static struct file_operations saa_fops = {
 	owner:		THIS_MODULE,
 	open:		saa5249_open,
 	release:       	saa5249_release,
-	ioctl:          video_generic_ioctl,
+	ioctl:          saa5249_ioctl,
 	llseek:         no_llseek,
 };
 
@@ -690,7 +692,6 @@ static struct video_device saa_template =
 	type:		VID_TYPE_TELETEXT,	/*| VID_TYPE_TUNER ?? */
 	hardware:	VID_HARDWARE_SAA5249,
 	fops:           &saa_fops,
-	kernel_ioctl:  	saa5249_ioctl,
 };
 
 MODULE_LICENSE("GPL");

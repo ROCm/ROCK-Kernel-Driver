@@ -143,6 +143,8 @@ void inode_init_once(struct inode *inode)
 	INIT_LIST_HEAD(&inode->i_dirty_data_buffers);
 	INIT_LIST_HEAD(&inode->i_devices);
 	sema_init(&inode->i_sem, 1);
+	INIT_RADIX_TREE(&inode->i_data.page_tree, GFP_ATOMIC);
+	rwlock_init(&inode->i_data.page_lock);
 	spin_lock_init(&inode->i_data.i_shared_lock);
 	INIT_LIST_HEAD(&inode->i_data.i_mmap);
 	INIT_LIST_HEAD(&inode->i_data.i_mmap_shared);
@@ -431,7 +433,7 @@ void sync_inodes(void)
 	}
 }
 
-static void try_to_sync_unused_inodes(void * arg)
+static void try_to_sync_unused_inodes(unsigned long pexclusive)
 {
 	struct super_block * sb;
 	int nr_inodes = inodes_stat.nr_unused;
@@ -448,9 +450,8 @@ static void try_to_sync_unused_inodes(void * arg)
 	}
 	spin_unlock(&sb_lock);
 	spin_unlock(&inode_lock);
+	clear_bit(0, (unsigned long *)pexclusive);
 }
-
-static struct tq_struct unused_inodes_flush_task;
 
 /**
  *	write_inode_now	-	write an inode to disk
@@ -744,8 +745,15 @@ void prune_icache(int goal)
 	 * from here or we're either synchronously dogslow
 	 * or we deadlock with oom.
 	 */
-	if (goal)
-		schedule_task(&unused_inodes_flush_task);
+	if (goal) {
+		static unsigned long exclusive;
+
+		if (!test_and_set_bit(0, &exclusive)) {
+			if (pdflush_operation(try_to_sync_unused_inodes,
+						(unsigned long)&exclusive))
+				clear_bit(0, &exclusive);
+		}
+	}
 }
 /*
  * This is called from kswapd when we think we need some
@@ -1171,8 +1179,6 @@ void __init inode_init(unsigned long mempages)
 					 NULL);
 	if (!inode_cachep)
 		panic("cannot create inode slab cache");
-
-	unused_inodes_flush_task.routine = try_to_sync_unused_inodes;
 }
 
 static inline void do_atime_update(struct inode *inode)

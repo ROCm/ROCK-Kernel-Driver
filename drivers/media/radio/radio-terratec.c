@@ -185,8 +185,8 @@ int tt_getsigstr(struct tt_device *dev)		/* TODO */
 
 /* implement the video4linux api */
 
-static int tt_ioctl(struct inode *inode, struct file *file,
-		    unsigned int cmd, void *arg)
+static int tt_do_ioctl(struct inode *inode, struct file *file,
+		       unsigned int cmd, void *arg)
 {
 	struct video_device *dev = video_devdata(file);
 	struct tt_device *tt=dev->priv;
@@ -263,13 +263,19 @@ static int tt_ioctl(struct inode *inode, struct file *file,
 	}
 }
 
+static int tt_ioctl(struct inode *inode, struct file *file,
+		    unsigned int cmd, unsigned long arg)
+{
+	return video_usercopy(inode, file, cmd, arg, tt_do_ioctl);
+}
+
 static struct tt_device terratec_unit;
 
 static struct file_operations terratec_fops = {
 	owner:		THIS_MODULE,
 	open:           video_exclusive_open,
 	release:        video_exclusive_release,
-	ioctl:		video_generic_ioctl,
+	ioctl:		tt_ioctl,
 	llseek:         no_llseek,
 };
 
@@ -280,7 +286,6 @@ static struct video_device terratec_radio=
 	type:		VID_TYPE_TUNER,
 	hardware:	VID_HARDWARE_TERRATEC,
 	fops:           &terratec_fops,
-	kernel_ioctl:	tt_ioctl,
 };
 
 static int __init terratec_init(void)

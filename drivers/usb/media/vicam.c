@@ -483,8 +483,8 @@ static int vicam_v4l_read(struct file *file, char *user_buf,
 	return buflen;
 }
 
-static int vicam_v4l_ioctl(struct inode *inode, struct file *file,
-			   unsigned int cmd, void *arg)
+static int vicam_v4l_do_ioctl(struct inode *inode, struct file *file,
+			      unsigned int cmd, void *arg)
 {
 	struct video_device *vdev = file->private_data;
 	struct usb_vicam *vicam = (struct usb_vicam *)vdev;
@@ -593,6 +593,12 @@ static int vicam_v4l_ioctl(struct inode *inode, struct file *file,
         return ret;
 }
 
+static int vicam_v4l_ioctl(struct inode *inode, struct file *file,
+			   unsigned int cmd, unsigned long arg)
+{
+	return video_usercopy(inode, file, cmd, arg, vicam_v4l_do_ioctl);
+}
+
 static int vicam_v4l_mmap(struct file *file, struct vm_area_struct *vma)
 {
 	struct video_device *vdev = file->private_data;
@@ -639,7 +645,7 @@ static struct file_operations vicam_fops = {
 	release:       	vicam_v4l_close,
 	read:		vicam_v4l_read,
 	mmap:		vicam_v4l_mmap,
-	ioctl:		video_generic_ioctl,
+	ioctl:		vicam_v4l_ioctl,
 	llseek:         no_llseek,
 };
 static struct video_device vicam_template = {
@@ -648,7 +654,6 @@ static struct video_device vicam_template = {
 	type:		VID_TYPE_CAPTURE,
 	hardware:	VID_HARDWARE_SE401, /* need to ask for own id */
 	fops:           &vicam_fops,
-	kernel_ioctl:	vicam_v4l_ioctl,
 };
 
 /******************************************************************************

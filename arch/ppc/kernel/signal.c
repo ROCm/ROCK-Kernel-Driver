@@ -34,6 +34,7 @@
 #include <asm/ucontext.h>
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
+#include <asm/cacheflush.h>
 
 #define DEBUG_SIG 0
 

@@ -266,6 +266,7 @@ ssize_t	rw_raw_dev(int rw, struct file *filp, char *buf,
 	unsigned long	limit;
 	int		sector_size, sector_bits, sector_mask;
 	sector_t	blocknr;
+	struct block_device *bdev;
 	
 	/*
 	 * First, a few checks on device size limits 
@@ -286,12 +287,13 @@ ssize_t	rw_raw_dev(int rw, struct file *filp, char *buf,
 		new_iobuf = 1;
 	}
 
-	dev = to_kdev_t(raw_devices[minor].binding->bd_dev);
+	bdev = raw_devices[minor].binding;
+	dev = to_kdev_t(bdev->bd_dev);
 	sector_size = raw_devices[minor].sector_size;
 	sector_bits = raw_devices[minor].sector_bits;
 	sector_mask = sector_size - 1;
 
-	limit = blkdev_size_in_bytes(dev) >> sector_bits;
+	limit = bdev->bd_inode->i_size >> sector_bits;
 	if (!limit)
 		limit = INT_MAX;
 	dprintk ("rw_raw_dev: dev %d:%d (+%d)\n",

@@ -44,15 +44,14 @@
 #include <asm/memory.h>
 #include <asm/page.h>
 
-/* forward declare task_struct */
-struct task_struct;
+struct mm_struct;
 
 /* declare all the functions as extern */
 extern void cpu_data_abort(unsigned long pc);
 extern void cpu_check_bugs(void);
 extern void cpu_proc_init(void);
 extern void cpu_proc_fin(void);
-extern int cpu_do_idle(int mode);
+extern int cpu_do_idle(void);
 
 extern void cpu_cache_clean_invalidate_all(void);
 extern void cpu_cache_clean_invalidate_range(unsigned long address, unsigned long end, int flags);
@@ -65,13 +64,13 @@ extern void cpu_dcache_clean_entry(unsigned long address);
 extern void cpu_icache_invalidate_range(unsigned long start, unsigned long end);
 extern void cpu_icache_invalidate_page(void *virt_page);
 
-extern void cpu_set_pgd(unsigned long pgd_phys);
+extern void cpu_set_pgd(unsigned long pgd_phys, struct mm_struct *mm);
 extern void cpu_set_pmd(pmd_t *pmdp, pmd_t pmd);
 extern void cpu_set_pte(pte_t *ptep, pte_t pte);
 
 extern volatile void cpu_reset(unsigned long addr);
 
-#define cpu_switch_mm(pgd,tsk) cpu_set_pgd(__virt_to_phys((unsigned long)(pgd)))
+#define cpu_switch_mm(pgd,mm) cpu_set_pgd(__virt_to_phys((unsigned long)(pgd)),mm)
 
 #define cpu_get_pgd()	\
 	({						\

@@ -524,11 +524,11 @@ static int chown_common(struct dentry * dentry, uid_t user, gid_t group)
 		goto out;
 	newattrs.ia_valid =  ATTR_CTIME;
 	if (user != (uid_t) -1) {
-		newattrs.ia_valid =  ATTR_UID;
+		newattrs.ia_valid |= ATTR_UID;
 		newattrs.ia_uid = user;
 	}
 	if (group != (gid_t) -1) {
-		newattrs.ia_valid =  ATTR_GID;
+		newattrs.ia_valid |= ATTR_GID;
 		newattrs.ia_gid = group;
 	}
 	if (!S_ISDIR(inode->i_mode))
@@ -635,7 +635,6 @@ struct file *dentry_open(struct dentry *dentry, struct vfsmount *mnt, int flags)
 	f->f_dentry = dentry;
 	f->f_vfsmnt = mnt;
 	f->f_pos = 0;
-	f->f_reada = 0;
 	f->f_op = fops_get(inode->i_fop);
 	file_move(f, &inode->i_sb->s_files);
 
@@ -686,7 +685,7 @@ int get_unused_fd(void)
 	write_lock(&files->file_lock);
 
 repeat:
- 	fd = find_next_zero_bit(files->open_fds, 
+ 	fd = find_next_zero_bit(files->open_fds->fds_bits, 
 				files->max_fdset, 
 				files->next_fd);
 

@@ -156,7 +156,6 @@ static int rd_blkdev_pagecache_IO(int rw, struct bio_vec *vec,
 
 	do {
 		int count;
-		struct page ** hash;
 		struct page * page;
 		char * src, * dst;
 		int unlock = 0;
@@ -166,8 +165,7 @@ static int rd_blkdev_pagecache_IO(int rw, struct bio_vec *vec,
 			count = size;
 		size -= count;
 
-		hash = page_hash(mapping, index);
-		page = __find_get_page(mapping, index, hash);
+		page = find_get_page(mapping, index);
 		if (!page) {
 			page = grab_cache_page(mapping, index);
 			err = -ENOMEM;

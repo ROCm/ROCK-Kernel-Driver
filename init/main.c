@@ -69,6 +69,7 @@ extern void sbus_init(void);
 extern void sysctl_init(void);
 extern void signals_init(void);
 
+extern void radix_tree_init(void);
 extern void free_initmem(void);
 
 #ifdef CONFIG_TC
@@ -271,6 +272,10 @@ static void __init smp_init(void)
 #define smp_init()	do { } while (0)
 #endif
 
+static inline void setup_per_cpu_areas(void)
+{
+}
+
 #else
 
 #ifdef __GENERIC_PER_CPU
@@ -294,10 +299,6 @@ static void __init setup_per_cpu_areas(void)
 		__per_cpu_offset[i] = ptr - __per_cpu_start;
 		memcpy(ptr, __per_cpu_start, size);
 	}
-}
-#else
-static inline void setup_per_cpu_areas(void)
-{
 }
 #endif /* !__GENERIC_PER_CPU */
 
@@ -392,7 +393,7 @@ asmlinkage void __init start_kernel(void)
 	proc_caches_init();
 	vfs_caches_init(mempages);
 	buffer_init(mempages);
-	page_cache_init(mempages);
+	radix_tree_init();
 #if defined(CONFIG_ARCH_S390)
 	ccwcache_init();
 #endif

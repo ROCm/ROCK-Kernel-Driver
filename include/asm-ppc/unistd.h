@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.unistd.h 1.11 10/18/01 17:29:53 trini
+ * BK Id: %F% %I% %G% %U% %#%
  */
 #ifndef _ASM_PPC_UNISTD_H_
 #define _ASM_PPC_UNISTD_H_
@@ -229,6 +229,8 @@
 #define __NR_lremovexattr	219
 #define __NR_fremovexattr	220
 #define __NR_futex		221
+#define __NR_sched_setaffinity	222
+#define __NR_sched_getaffinity	223
 
 #define __NR(n)	#n
 
@@ -432,7 +434,7 @@ static inline _syscall1(int,delete_module,const char *,name)
 
 static inline pid_t wait(int * wait_stat) 
 {
-	return waitpid(-1,wait_stat,0);
+	return waitpid(-1, wait_stat, 0);
 }
 
 #endif /* __KERNEL_SYSCALLS__ */

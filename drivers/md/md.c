@@ -1577,7 +1577,7 @@ static int device_size_calculation(mddev_t * mddev)
 	if (!md_size[mdidx(mddev)])
 		md_size[mdidx(mddev)] = sb->size * data_disks;
 
-	readahead = MD_READAHEAD;
+	readahead = (blk_get_readahead(rdev->dev) * 512) / PAGE_SIZE;
 	if (!sb->level || (sb->level == 4) || (sb->level == 5)) {
 		readahead = (mddev->sb->chunk_size>>PAGE_SHIFT) * 4 * data_disks;
 		if (readahead < data_disks * (MAX_SECTORS>>(PAGE_SHIFT-9))*2)
@@ -3387,7 +3387,7 @@ recheck:
 	/*
 	 * Tune reconstruction:
 	 */
-	window = MAX_READAHEAD*(PAGE_SIZE/512);
+	window = 32*(PAGE_SIZE/512);
 	printk(KERN_INFO "md: using %dk window, over a total of %d blocks.\n",
 	       window/2,max_sectors/2);
 
@@ -3605,7 +3605,7 @@ static void md_geninit(void)
 	for(i = 0; i < MAX_MD_DEVS; i++) {
 		md_blocksizes[i] = 1024;
 		md_size[i] = 0;
-		md_maxreadahead[i] = MD_READAHEAD;
+		md_maxreadahead[i] = 32;
 	}
 	blksize_size[MAJOR_NR] = md_blocksizes;
 	blk_size[MAJOR_NR] = md_size;

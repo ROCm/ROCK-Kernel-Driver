@@ -1046,8 +1046,8 @@ static int se401_close(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static int se401_ioctl(struct inode *inode, struct file *file,
-		       unsigned int cmd, void *arg)
+static int se401_do_ioctl(struct inode *inode, struct file *file,
+			  unsigned int cmd, void *arg)
 {
 	struct video_device *vdev = file->private_data;
         struct usb_se401 *se401 = (struct usb_se401 *)vdev;
@@ -1210,6 +1210,12 @@ static int se401_ioctl(struct inode *inode, struct file *file,
         return 0;
 }
 
+static int se401_ioctl(struct inode *inode, struct file *file,
+		       unsigned int cmd, unsigned long arg)
+{
+	return video_usercopy(inode, file, cmd, arg, se401_do_ioctl);
+}
+
 static int se401_read(struct file *file, char *buf,
 		     size_t count, loff_t *ppos)
 {
@@ -1294,7 +1300,7 @@ static struct file_operations se401_fops = {
         release:        se401_close,
         read:           se401_read,
         mmap:           se401_mmap,
-	ioctl:          video_generic_ioctl,
+	ioctl:          se401_ioctl,
 	llseek:         no_llseek,
 };
 static struct video_device se401_template = {
@@ -1303,7 +1309,6 @@ static struct video_device se401_template = {
         type:           VID_TYPE_CAPTURE,
         hardware:       VID_HARDWARE_SE401,
 	fops:           &se401_fops,
-        kernel_ioctl:   se401_ioctl,
 };
 
 
