@@ -47,6 +47,7 @@
 #include <asm/errno.h>
 #include <asm/segment.h>
 #include <asm/smp.h>
+#include <asm/page.h>
 #include "irq_vectors.h"
 
 EBX		= 0x00
@@ -232,7 +233,7 @@ need_resched:
 #endif
 
 /* Points to after the "sysenter" instruction in the vsyscall page */
-#define SYSENTER_RETURN 0xffffe007
+#define SYSENTER_RETURN 0xffffe009
 
 	# sysenter call handler stub
 	ALIGN
@@ -243,6 +244,18 @@ ENTRY(sysenter_entry)
 	pushfl
 	pushl $(__USER_CS)
 	pushl $SYSENTER_RETURN
+
+/*
+ * Load the potential sixth argument from user stack.
+ * Careful about security.
+ */
+	cmpl $__PAGE_OFFSET-3,%ebp
+	jae syscall_badsys
+1:	movl (%ebp),%ebp
+.section __ex_table,"a"
+	.align 4
+	.long 1b,syscall_badsys
+.previous
 
 	pushl %eax
 	SAVE_ALL
