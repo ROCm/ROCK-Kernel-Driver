@@ -424,11 +424,11 @@ static int udpv6_recvmsg(struct sock *sk, struct msghdr *msg, int len,
 		sin6->sin6_flowinfo = 0;
 		sin6->sin6_scope_id = 0;
 
-		if (skb->protocol == __constant_htons(ETH_P_IP)) {
+		if (skb->protocol == htons(ETH_P_IP)) {
 			struct inet_opt *inet = inet_sk(sk);
 
 			ipv6_addr_set(&sin6->sin6_addr, 0, 0,
-				      __constant_htonl(0xffff), skb->nh.iph->saddr);
+				      htonl(0xffff), skb->nh.iph->saddr);
 			if (inet->cmsg_flags)
 				ip_cmsg_recv(msg, skb);
 		} else {

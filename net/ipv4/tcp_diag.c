@@ -360,7 +360,7 @@ int tcpdiag_bc_run(char *bc, int len, struct sock *sk)
 				break;
 			if (sk->family == AF_INET6 && cond->family == AF_INET) {
 				if (addr[0] == 0 && addr[1] == 0 &&
-				    addr[2] == __constant_htonl(0xffff) &&
+				    addr[2] == htonl(0xffff) &&
 				    bitstring_match(addr+3, cond->addr, cond->prefix_len))
 					break;
 			}

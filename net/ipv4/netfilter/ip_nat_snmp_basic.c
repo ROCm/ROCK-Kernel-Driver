@@ -1260,9 +1260,9 @@ static unsigned int nat_help(struct ip_conntrack *ct,
 	 * on post routing (SNAT).
 	 */
 	if (!((dir == IP_CT_DIR_REPLY && hooknum == NF_IP_PRE_ROUTING &&
-			udph->source == __constant_ntohs(SNMP_PORT)) ||
+			udph->source == ntohs(SNMP_PORT)) ||
 	      (dir == IP_CT_DIR_ORIGINAL && hooknum == NF_IP_POST_ROUTING &&
-	      		udph->dest == __constant_ntohs(SNMP_TRAP_PORT)))) {
+	      		udph->dest == ntohs(SNMP_TRAP_PORT)))) {
 		spin_unlock_bh(&snmp_lock);
 		return NF_ACCEPT;
 	}

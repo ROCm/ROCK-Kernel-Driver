@@ -136,7 +136,7 @@ int ip_build_and_send_pkt(struct sk_buff *skb, struct sock *sk,
 	iph->ihl      = 5;
 	iph->tos      = inet->tos;
 	if (ip_dont_fragment(sk, &rt->u.dst))
-		iph->frag_off = __constant_htons(IP_DF);
+		iph->frag_off = htons(IP_DF);
 	else
 		iph->frag_off = 0;
 	iph->ttl      = inet->ttl;
@@ -187,7 +187,7 @@ __inline__ int ip_finish_output(struct sk_buff *skb)
 	struct net_device *dev = skb->dst->dev;
 
 	skb->dev = dev;
-	skb->protocol = __constant_htons(ETH_P_IP);
+	skb->protocol = htons(ETH_P_IP);
 
 	return NF_HOOK(PF_INET, NF_IP_POST_ROUTING, skb, NULL, dev,
 		       ip_finish_output2);
@@ -209,7 +209,7 @@ int ip_mc_output(struct sk_buff *skb)
 #endif
 
 	skb->dev = dev;
-	skb->protocol = __constant_htons(ETH_P_IP);
+	skb->protocol = htons(ETH_P_IP);
 
 	/*
 	 *	Multicasts are looped back for other local users
@@ -394,7 +394,7 @@ packet_routed:
 	*((__u16 *)iph)	= htons((4 << 12) | (5 << 8) | (inet->tos & 0xff));
 	iph->tot_len = htons(skb->len);
 	if (ip_dont_fragment(sk, &rt->u.dst))
-		iph->frag_off = __constant_htons(IP_DF);
+		iph->frag_off = htons(IP_DF);
 	else
 		iph->frag_off = 0;
 	iph->ttl      = inet->ttl;
@@ -463,7 +463,7 @@ static int ip_build_xmit_slow(struct sock *sk,
 
 	mtu = rt->u.dst.pmtu;
 	if (ip_dont_fragment(sk, &rt->u.dst))
-		df = __constant_htons(IP_DF);
+		df = htons(IP_DF);
 
 	length -= sizeof(struct iphdr);
 
@@ -594,7 +594,7 @@ static int ip_build_xmit_slow(struct sock *sk,
 				/*
 				 *	Any further fragments will have MF set.
 				 */
-				mf = __constant_htons(IP_MF);
+				mf = htons(IP_MF);
 			}
 			if (rt->rt_type == RTN_MULTICAST)
 				iph->ttl = inet->mc_ttl;
@@ -693,7 +693,7 @@ int ip_build_xmit(struct sock *sk,
 	 */
 	df = 0;
 	if (ip_dont_fragment(sk, &rt->u.dst))
-		df = __constant_htons(IP_DF);
+		df = htons(IP_DF);
 
 	/* 
 	 *	Fast path for unfragmented frames without options. 
@@ -797,7 +797,7 @@ int ip_fragment(struct sk_buff *skb, int (*output)(struct sk_buff*))
 	 */
 
 	offset = (ntohs(iph->frag_off) & IP_OFFSET) << 3;
-	not_last_frag = iph->frag_off & __constant_htons(IP_MF);
+	not_last_frag = iph->frag_off & htons(IP_MF);
 
 	/*
 	 *	Keep copying data until we run out.
@@ -882,7 +882,7 @@ int ip_fragment(struct sk_buff *skb, int (*output)(struct sk_buff*))
 		 *		   last fragment then keep MF on each bit
 		 */
 		if (left > 0 || not_last_frag)
-			iph->frag_off |= __constant_htons(IP_MF);
+			iph->frag_off |= htons(IP_MF);
 		ptr += len;
 		offset += len;
 

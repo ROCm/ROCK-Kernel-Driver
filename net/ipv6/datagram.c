@@ -150,7 +150,7 @@ int ipv6_recv_error(struct sock *sk, struct msghdr *msg, int len)
 			}
 		} else {
 			ipv6_addr_set(&sin->sin6_addr, 0, 0,
-				      __constant_htonl(0xffff),
+				      htonl(0xffff),
 				      *(u32*)(skb->nh.raw + serr->addr_offset));
 		}
 	}
@@ -173,7 +173,7 @@ int ipv6_recv_error(struct sock *sk, struct msghdr *msg, int len)
 			struct inet_opt *inet = inet_sk(sk);
 
 			ipv6_addr_set(&sin->sin6_addr, 0, 0,
-				      __constant_htonl(0xffff),
+				      htonl(0xffff),
 				      skb->nh.iph->saddr);
 			if (inet->cmsg_flags)
 				ip_cmsg_recv(msg, skb);

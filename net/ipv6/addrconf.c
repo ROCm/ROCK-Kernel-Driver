@@ -144,47 +144,47 @@ int ipv6_addr_type(struct in6_addr *addr)
 	/* Consider all addresses with the first three bits different of
 	   000 and 111 as unicasts.
 	 */
-	if ((st & __constant_htonl(0xE0000000)) != __constant_htonl(0x00000000) &&
-	    (st & __constant_htonl(0xE0000000)) != __constant_htonl(0xE0000000))
+	if ((st & htonl(0xE0000000)) != htonl(0x00000000) &&
+	    (st & htonl(0xE0000000)) != htonl(0xE0000000))
 		return IPV6_ADDR_UNICAST;
 
-	if ((st & __constant_htonl(0xFF000000)) == __constant_htonl(0xFF000000)) {
+	if ((st & htonl(0xFF000000)) == htonl(0xFF000000)) {
 		int type = IPV6_ADDR_MULTICAST;
 
-		switch((st & __constant_htonl(0x00FF0000))) {
-			case __constant_htonl(0x00010000):
+		switch((st & htonl(0x00FF0000))) {
+			case htonl(0x00010000):
 				type |= IPV6_ADDR_LOOPBACK;
 				break;
 
-			case __constant_htonl(0x00020000):
+			case htonl(0x00020000):
 				type |= IPV6_ADDR_LINKLOCAL;
 				break;
 
-			case __constant_htonl(0x00050000):
+			case htonl(0x00050000):
 				type |= IPV6_ADDR_SITELOCAL;
 				break;
 		};
 		return type;
 	}
 	
-	if ((st & __constant_htonl(0xFFC00000)) == __constant_htonl(0xFE800000))
+	if ((st & htonl(0xFFC00000)) == htonl(0xFE800000))
 		return (IPV6_ADDR_LINKLOCAL | IPV6_ADDR_UNICAST);
 
-	if ((st & __constant_htonl(0xFFC00000)) == __constant_htonl(0xFEC00000))
+	if ((st & htonl(0xFFC00000)) == htonl(0xFEC00000))
 		return (IPV6_ADDR_SITELOCAL | IPV6_ADDR_UNICAST);
 
 	if ((addr->s6_addr32[0] | addr->s6_addr32[1]) == 0) {
 		if (addr->s6_addr32[2] == 0) {
-			if (addr->in6_u.u6_addr32[3] == 0)
+			if (addr->s6_addr32[3] == 0)
 				return IPV6_ADDR_ANY;
 
-			if (addr->s6_addr32[3] == __constant_htonl(0x00000001))
+			if (addr->s6_addr32[3] == htonl(0x00000001))
 				return (IPV6_ADDR_LOOPBACK | IPV6_ADDR_UNICAST);
 
 			return (IPV6_ADDR_COMPATv4 | IPV6_ADDR_UNICAST);
 		}
 
-		if (addr->s6_addr32[2] == __constant_htonl(0x0000ffff))
+		if (addr->s6_addr32[2] == htonl(0x0000ffff))
 			return IPV6_ADDR_MAPPED;
 	}
 
@@ -755,7 +755,7 @@ static void addrconf_add_mroute(struct net_device *dev)
 
 	memset(&rtmsg, 0, sizeof(rtmsg));
 	ipv6_addr_set(&rtmsg.rtmsg_dst,
-		      __constant_htonl(0xFF000000), 0, 0, 0);
+		      htonl(0xFF000000), 0, 0, 0);
 	rtmsg.rtmsg_dst_len = 8;
 	rtmsg.rtmsg_metric = IP6_RT_PRIO_ADDRCONF;
 	rtmsg.rtmsg_ifindex = dev->ifindex;
@@ -785,7 +785,7 @@ static void addrconf_add_lroute(struct net_device *dev)
 {
 	struct in6_addr addr;
 
-	ipv6_addr_set(&addr,  __constant_htonl(0xFE800000), 0, 0, 0);
+	ipv6_addr_set(&addr,  htonl(0xFE800000), 0, 0, 0);
 	addrconf_prefix_route(&addr, 10, dev, 0, RTF_ADDRCONF);
 }
 
@@ -1123,7 +1123,7 @@ static void sit_add_v4_addrs(struct inet6_dev *idev)
 	memcpy(&addr.s6_addr32[3], idev->dev->dev_addr, 4);
 
 	if (idev->dev->flags&IFF_POINTOPOINT) {
-		addr.s6_addr32[0] = __constant_htonl(0xfe800000);
+		addr.s6_addr32[0] = htonl(0xfe800000);
 		scope = IFA_LINK;
 	} else {
 		scope = IPV6_ADDR_COMPATv4;
@@ -1237,9 +1237,7 @@ static void addrconf_dev_config(struct net_device *dev)
 		return;
 
 	memset(&addr, 0, sizeof(struct in6_addr));
-
-	addr.s6_addr[0] = 0xFE;
-	addr.s6_addr[1] = 0x80;
+	addr.s6_addr32[0] = htonl(0xFE800000);
 
 	if (ipv6_generate_eui64(addr.s6_addr + 8, dev) == 0)
 		addrconf_add_linklocal(idev, &addr);

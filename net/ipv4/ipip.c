@@ -483,7 +483,7 @@ int ipip_rcv(struct sk_buff *skb)
 	skb->mac.raw = skb->nh.raw;
 	skb->nh.raw = skb->data;
 	memset(&(IPCB(skb)->opt), 0, sizeof(struct ip_options));
-	skb->protocol = __constant_htons(ETH_P_IP);
+	skb->protocol = htons(ETH_P_IP);
 	skb->pkt_type = PACKET_HOST;
 
 	read_lock(&ipip_lock);
@@ -544,7 +544,7 @@ static int ipip_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 		goto tx_error;
 	}
 
-	if (skb->protocol != __constant_htons(ETH_P_IP))
+	if (skb->protocol != htons(ETH_P_IP))
 		goto tx_error;
 
 	if (tos&1)
@@ -585,9 +585,9 @@ static int ipip_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 	if (skb->dst && mtu < skb->dst->pmtu)
 		skb->dst->pmtu = mtu;
 
-	df |= (old_iph->frag_off&__constant_htons(IP_DF));
+	df |= (old_iph->frag_off&htons(IP_DF));
 
-	if ((old_iph->frag_off&__constant_htons(IP_DF)) && mtu < ntohs(old_iph->tot_len)) {
+	if ((old_iph->frag_off&htons(IP_DF)) && mtu < ntohs(old_iph->tot_len)) {
 		icmp_send(skb, ICMP_DEST_UNREACH, ICMP_FRAG_NEEDED, htonl(mtu));
 		ip_rt_put(rt);
 		goto tx_error;
@@ -703,10 +703,10 @@ ipip_tunnel_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd)
 
 		err = -EINVAL;
 		if (p.iph.version != 4 || p.iph.protocol != IPPROTO_IPIP ||
-		    p.iph.ihl != 5 || (p.iph.frag_off&__constant_htons(~IP_DF)))
+		    p.iph.ihl != 5 || (p.iph.frag_off&htons(~IP_DF)))
 			goto done;
 		if (p.iph.ttl)
-			p.iph.frag_off |= __constant_htons(IP_DF);
+			p.iph.frag_off |= htons(IP_DF);
 
 		t = ipip_tunnel_locate(&p, cmd == SIOCADDTUNNEL);
 
