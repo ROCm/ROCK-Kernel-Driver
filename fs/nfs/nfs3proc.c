@@ -41,9 +41,9 @@ static inline int
 nfs3_rpc_call_wrapper(struct rpc_clnt *clnt, u32 proc, void *argp, void *resp, int flags)
 {
 	struct rpc_message msg = {
-		rpc_proc:	proc,
-		rpc_argp:	argp,
-		rpc_resp:	resp,
+		.rpc_proc	= proc,
+		.rpc_argp	= argp,
+		.rpc_resp	= resp,
 	};
 	return nfs3_rpc_wrapper(clnt, &msg, flags);
 }
@@ -90,8 +90,8 @@ nfs3_proc_setattr(struct inode *inode, struct nfs_fattr *fattr,
 			struct iattr *sattr)
 {
 	struct nfs3_sattrargs	arg = {
-		fh:		NFS_FH(inode),
-		sattr:		sattr,
+		.fh		= NFS_FH(inode),
+		.sattr		= sattr,
 	};
 	int	status;
 
@@ -108,14 +108,14 @@ nfs3_proc_lookup(struct inode *dir, struct qstr *name,
 {
 	struct nfs_fattr	dir_attr;
 	struct nfs3_diropargs	arg = {
-		fh:		NFS_FH(dir),
-		name:		name->name,
-		len:		name->len
+		.fh		= NFS_FH(dir),
+		.name		= name->name,
+		.len		= name->len
 	};
 	struct nfs3_diropres	res = {
-		dir_attr:	&dir_attr,
-		fh:		fhandle,
-		fattr:		fattr
+		.dir_attr	= &dir_attr,
+		.fh		= fhandle,
+		.fattr		= fattr
 	};
 	int			status;
 
@@ -180,9 +180,9 @@ nfs3_proc_readlink(struct inode *inode, struct page *page)
 {
 	struct nfs_fattr	fattr;
 	struct nfs3_readlinkargs args = {
-		fh:		NFS_FH(inode),
-		count:		PAGE_CACHE_SIZE,
-		pages:		&page
+		.fh		= NFS_FH(inode),
+		.count		= PAGE_CACHE_SIZE,
+		.pages		= &page
 	};
 	int			status;
 
@@ -203,21 +203,21 @@ nfs3_proc_read(struct inode *inode, struct rpc_cred *cred,
 {
 	u64			offset = page_offset(page) + base;
 	struct nfs_readargs	arg = {
-		fh:		NFS_FH(inode),
-		offset:		offset,
-		count:		count,
-		pgbase:		base,
-		pages:		&page
+		.fh		= NFS_FH(inode),
+		.offset		= offset,
+		.count		= count,
+		.pgbase		= base,
+		.pages		= &page
 	};
 	struct nfs_readres	res = {
-		fattr:		fattr,
-		count:		count,
+		.fattr		= fattr,
+		.count		= count,
 	};
 	struct rpc_message	msg = {
-		rpc_proc:	NFS3PROC_READ,
-		rpc_argp:	&arg,
-		rpc_resp:	&res,
-		rpc_cred:	cred
+		.rpc_proc	= NFS3PROC_READ,
+		.rpc_argp	= &arg,
+		.rpc_resp	= &res,
+		.rpc_cred	= cred
 	};
 	int			status;
 
@@ -237,22 +237,22 @@ nfs3_proc_write(struct inode *inode, struct rpc_cred *cred,
 {
 	u64			offset = page_offset(page) + base;
 	struct nfs_writeargs	arg = {
-		fh:		NFS_FH(inode),
-		offset:		offset,
-		count:		count,
-		stable:		NFS_FILE_SYNC,
-		pgbase:		base,
-		pages:		&page
+		.fh		= NFS_FH(inode),
+		.offset		= offset,
+		.count		= count,
+		.stable		= NFS_FILE_SYNC,
+		.pgbase		= base,
+		.pages		= &page
 	};
 	struct nfs_writeres	res = {
-		fattr:		fattr,
-		verf:		verf,
+		.fattr		= fattr,
+		.verf		= verf,
 	};
 	struct rpc_message	msg = {
-		rpc_proc:	NFS3PROC_WRITE,
-		rpc_argp:	&arg,
-		rpc_resp:	&res,
-		rpc_cred:	cred
+		.rpc_proc	= NFS3PROC_WRITE,
+		.rpc_argp	= &arg,
+		.rpc_resp	= &res,
+		.rpc_cred	= cred
 	};
 	int			status, rpcflags = 0;
 
@@ -278,15 +278,15 @@ nfs3_proc_create(struct inode *dir, struct qstr *name, struct iattr *sattr,
 {
 	struct nfs_fattr	dir_attr;
 	struct nfs3_createargs	arg = {
-		fh:		NFS_FH(dir),
-		name:		name->name,
-		len:		name->len,
-		sattr:		sattr,
+		.fh		= NFS_FH(dir),
+		.name		= name->name,
+		.len		= name->len,
+		.sattr		= sattr,
 	};
 	struct nfs3_diropres	res = {
-		dir_attr:	&dir_attr,
-		fh:		fhandle,
-		fattr:		fattr
+		.dir_attr	= &dir_attr,
+		.fh		= fhandle,
+		.fattr		= fattr
 	};
 	int			status;
 
@@ -329,8 +329,8 @@ exit:
 	 * sure we set the attributes afterwards. */
 	if (status == 0 && arg.createmode == NFS3_CREATE_EXCLUSIVE) {
 		struct nfs3_sattrargs	arg = {
-			fh:		fhandle,
-			sattr:		sattr,
+			.fh		= fhandle,
+			.sattr		= sattr,
 		};
 		dprintk("NFS call  setattr (post-create)\n");
 
@@ -351,14 +351,14 @@ nfs3_proc_remove(struct inode *dir, struct qstr *name)
 {
 	struct nfs_fattr	dir_attr;
 	struct nfs3_diropargs	arg = {
-		fh:		NFS_FH(dir),
-		name:		name->name,
-		len:		name->len
+		.fh		= NFS_FH(dir),
+		.name		= name->name,
+		.len		= name->len
 	};
 	struct rpc_message	msg = {
-		rpc_proc:	NFS3PROC_REMOVE,
-		rpc_argp:	&arg,
-		rpc_resp:	&dir_attr,
+		.rpc_proc	= NFS3PROC_REMOVE,
+		.rpc_argp	= &arg,
+		.rpc_resp	= &dir_attr,
 	};
 	int			status;
 
@@ -408,16 +408,16 @@ nfs3_proc_rename(struct inode *old_dir, struct qstr *old_name,
 {
 	struct nfs_fattr	old_dir_attr, new_dir_attr;
 	struct nfs3_renameargs	arg = {
-		fromfh:		NFS_FH(old_dir),
-		fromname:	old_name->name,
-		fromlen:	old_name->len,
-		tofh:		NFS_FH(new_dir),
-		toname:		new_name->name,
-		tolen:		new_name->len
+		.fromfh		= NFS_FH(old_dir),
+		.fromname	= old_name->name,
+		.fromlen	= old_name->len,
+		.tofh		= NFS_FH(new_dir),
+		.toname		= new_name->name,
+		.tolen		= new_name->len
 	};
 	struct nfs3_renameres	res = {
-		fromattr:	&old_dir_attr,
-		toattr:		&new_dir_attr
+		.fromattr	= &old_dir_attr,
+		.toattr		= &new_dir_attr
 	};
 	int			status;
 
@@ -436,14 +436,14 @@ nfs3_proc_link(struct inode *inode, struct inode *dir, struct qstr *name)
 {
 	struct nfs_fattr	dir_attr, fattr;
 	struct nfs3_linkargs	arg = {
-		fromfh:		NFS_FH(inode),
-		tofh:		NFS_FH(dir),
-		toname:		name->name,
-		tolen:		name->len
+		.fromfh		= NFS_FH(inode),
+		.tofh		= NFS_FH(dir),
+		.toname		= name->name,
+		.tolen		= name->len
 	};
 	struct nfs3_linkres	res = {
-		dir_attr:	&dir_attr,
-		fattr:		&fattr
+		.dir_attr	= &dir_attr,
+		.fattr		= &fattr
 	};
 	int			status;
 
@@ -464,17 +464,17 @@ nfs3_proc_symlink(struct inode *dir, struct qstr *name, struct qstr *path,
 {
 	struct nfs_fattr	dir_attr;
 	struct nfs3_symlinkargs	arg = {
-		fromfh:		NFS_FH(dir),
-		fromname:	name->name,
-		fromlen:	name->len,
-		topath:		path->name,
-		tolen:		path->len,
-		sattr:		sattr
+		.fromfh		= NFS_FH(dir),
+		.fromname	= name->name,
+		.fromlen	= name->len,
+		.topath		= path->name,
+		.tolen		= path->len,
+		.sattr		= sattr
 	};
 	struct nfs3_diropres	res = {
-		dir_attr:	&dir_attr,
-		fh:		fhandle,
-		fattr:		fattr
+		.dir_attr	= &dir_attr,
+		.fh		= fhandle,
+		.fattr		= fattr
 	};
 	int			status;
 
@@ -493,15 +493,15 @@ nfs3_proc_mkdir(struct inode *dir, struct qstr *name, struct iattr *sattr,
 {
 	struct nfs_fattr	dir_attr;
 	struct nfs3_mkdirargs	arg = {
-		fh:		NFS_FH(dir),
-		name:		name->name,
-		len:		name->len,
-		sattr:		sattr
+		.fh		= NFS_FH(dir),
+		.name		= name->name,
+		.len		= name->len,
+		.sattr		= sattr
 	};
 	struct nfs3_diropres	res = {
-		dir_attr:	&dir_attr,
-		fh:		fhandle,
-		fattr:		fattr
+		.dir_attr	= &dir_attr,
+		.fh		= fhandle,
+		.fattr		= fattr
 	};
 	int			status;
 
@@ -519,9 +519,9 @@ nfs3_proc_rmdir(struct inode *dir, struct qstr *name)
 {
 	struct nfs_fattr	dir_attr;
 	struct nfs3_diropargs	arg = {
-		fh:		NFS_FH(dir),
-		name:		name->name,
-		len:		name->len
+		.fh		= NFS_FH(dir),
+		.name		= name->name,
+		.len		= name->len
 	};
 	int			status;
 
@@ -549,23 +549,23 @@ nfs3_proc_readdir(struct inode *dir, struct rpc_cred *cred,
 	struct nfs_fattr	dir_attr;
 	u32			*verf = NFS_COOKIEVERF(dir);
 	struct nfs3_readdirargs	arg = {
-		fh:		NFS_FH(dir),
-		cookie:		cookie,
-		verf:		{verf[0], verf[1]},
-		plus:		plus,
-		count:		count,
-		pages:		&page
+		.fh		= NFS_FH(dir),
+		.cookie		= cookie,
+		.verf		= {verf[0], verf[1]},
+		.plus		= plus,
+		.count		= count,
+		.pages		= &page
 	};
 	struct nfs3_readdirres	res = {
-		dir_attr:	&dir_attr,
-		verf:		verf,
-		plus:		plus
+		.dir_attr	= &dir_attr,
+		.verf		= verf,
+		.plus		= plus
 	};
 	struct rpc_message	msg = {
-		rpc_proc:	NFS3PROC_READDIR,
-		rpc_argp:	&arg,
-		rpc_resp:	&res,
-		rpc_cred:	cred
+		.rpc_proc	= NFS3PROC_READDIR,
+		.rpc_argp	= &arg,
+		.rpc_resp	= &res,
+		.rpc_cred	= cred
 	};
 	int			status;
 
@@ -591,16 +591,16 @@ nfs3_proc_mknod(struct inode *dir, struct qstr *name, struct iattr *sattr,
 {
 	struct nfs_fattr	dir_attr;
 	struct nfs3_mknodargs	arg = {
-		fh:		NFS_FH(dir),
-		name:		name->name,
-		len:		name->len,
-		sattr:		sattr,
-		rdev:		rdev
+		.fh		= NFS_FH(dir),
+		.name		= name->name,
+		.len		= name->len,
+		.sattr		= sattr,
+		.rdev		= rdev
 	};
 	struct nfs3_diropres	res = {
-		dir_attr:	&dir_attr,
-		fh:		fh,
-		fattr:		fattr
+		.dir_attr	= &dir_attr,
+		.fh		= fh,
+		.fattr		= fattr
 	};
 	int			status;
 
@@ -645,26 +645,26 @@ error:
 extern u32 *nfs3_decode_dirent(u32 *, struct nfs_entry *, int);
 
 struct nfs_rpc_ops	nfs_v3_clientops = {
-	version:	3,			/* protocol version */
-	getroot:	nfs3_proc_get_root,
-	getattr:	nfs3_proc_getattr,
-	setattr:	nfs3_proc_setattr,
-	lookup:		nfs3_proc_lookup,
-	access:		nfs3_proc_access,
-	readlink:	nfs3_proc_readlink,
-	read:		nfs3_proc_read,
-	write:		nfs3_proc_write,
-	create:		nfs3_proc_create,
-	remove:		nfs3_proc_remove,
-	unlink_setup:	nfs3_proc_unlink_setup,
-	unlink_done:	nfs3_proc_unlink_done,
-	rename:		nfs3_proc_rename,
-	link:		nfs3_proc_link,
-	symlink:	nfs3_proc_symlink,
-	mkdir:		nfs3_proc_mkdir,
-	rmdir:		nfs3_proc_rmdir,
-	readdir:	nfs3_proc_readdir,
-	mknod:		nfs3_proc_mknod,
-	statfs:		nfs3_proc_statfs,
-	decode_dirent:	nfs3_decode_dirent,
+	.version	= 3,			/* protocol version */
+	.getroot	= nfs3_proc_get_root,
+	.getattr	= nfs3_proc_getattr,
+	.setattr	= nfs3_proc_setattr,
+	.lookup		= nfs3_proc_lookup,
+	.access		= nfs3_proc_access,
+	.readlink	= nfs3_proc_readlink,
+	.read		= nfs3_proc_read,
+	.write		= nfs3_proc_write,
+	.create		= nfs3_proc_create,
+	.remove		= nfs3_proc_remove,
+	.unlink_setup	= nfs3_proc_unlink_setup,
+	.unlink_done	= nfs3_proc_unlink_done,
+	.rename		= nfs3_proc_rename,
+	.link		= nfs3_proc_link,
+	.symlink	= nfs3_proc_symlink,
+	.mkdir		= nfs3_proc_mkdir,
+	.rmdir		= nfs3_proc_rmdir,
+	.readdir	= nfs3_proc_readdir,
+	.mknod		= nfs3_proc_mknod,
+	.statfs		= nfs3_proc_statfs,
+	.decode_dirent	= nfs3_decode_dirent,
 };

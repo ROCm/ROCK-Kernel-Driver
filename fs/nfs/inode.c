@@ -55,22 +55,22 @@ static int  nfs_statfs(struct super_block *, struct statfs *);
 static int  nfs_show_options(struct seq_file *, struct vfsmount *);
 
 static struct super_operations nfs_sops = { 
-	alloc_inode:	nfs_alloc_inode,
-	destroy_inode:	nfs_destroy_inode,
-	write_inode:	nfs_write_inode,
-	delete_inode:	nfs_delete_inode,
-	put_super:	nfs_put_super,
-	statfs:		nfs_statfs,
-	clear_inode:	nfs_clear_inode,
-	umount_begin:	nfs_umount_begin,
-	show_options:	nfs_show_options,
+	.alloc_inode	= nfs_alloc_inode,
+	.destroy_inode	= nfs_destroy_inode,
+	.write_inode	= nfs_write_inode,
+	.delete_inode	= nfs_delete_inode,
+	.put_super	= nfs_put_super,
+	.statfs		= nfs_statfs,
+	.clear_inode	= nfs_clear_inode,
+	.umount_begin	= nfs_umount_begin,
+	.show_options	= nfs_show_options,
 };
 
 /*
  * RPC cruft for NFS
  */
 struct rpc_stat			nfs_rpcstat = {
-	program:		&nfs_program
+	.program		= &nfs_program
 };
 static struct rpc_version *	nfs_version[] = {
 	NULL,
@@ -82,11 +82,11 @@ static struct rpc_version *	nfs_version[] = {
 };
 
 struct rpc_program		nfs_program = {
-	name:			"nfs",
-	number:			NFS_PROGRAM,
-	nrvers:			sizeof(nfs_version) / sizeof(nfs_version[0]),
-	version:		nfs_version,
-	stats:			&nfs_rpcstat,
+	.name			= "nfs",
+	.number			= NFS_PROGRAM,
+	.nrvers			= sizeof(nfs_version) / sizeof(nfs_version[0]),
+	.version		= nfs_version,
+	.stats			= &nfs_rpcstat,
 };
 
 static inline unsigned long
@@ -654,8 +654,8 @@ static struct inode *
 __nfs_fhget(struct super_block *sb, struct nfs_fh *fh, struct nfs_fattr *fattr)
 {
 	struct nfs_find_desc desc = {
-		fh:	fh,
-		fattr:	fattr
+		.fh	= fh,
+		.fattr	= fattr
 	};
 	struct inode *inode = NULL;
 	unsigned long hash;
@@ -1261,11 +1261,11 @@ static void nfs_kill_super(struct super_block *s)
 }
 
 static struct file_system_type nfs_fs_type = {
-	owner:		THIS_MODULE,
-	name:		"nfs",
-	get_sb:		nfs_get_sb,
-	kill_sb:	nfs_kill_super,
-	fs_flags:	FS_ODD_RENAME,
+	.owner		= THIS_MODULE,
+	.name		= "nfs",
+	.get_sb		= nfs_get_sb,
+	.kill_sb	= nfs_kill_super,
+	.fs_flags	= FS_ODD_RENAME,
 };
 
 extern int nfs_init_nfspagecache(void);

@@ -59,7 +59,7 @@ nfs_gen_mount(struct sockaddr_in *addr, char *path, struct nfs_fh *fh, int versi
 {
 	struct rpc_clnt		*mnt_clnt;
 	struct mnt_fhstatus	result = {
-		fh:		fh
+		.fh		= fh
 	};
 	char			hostname[32];
 	int			status;
@@ -152,40 +152,40 @@ xdr_decode_fhstatus3(struct rpc_rqst *req, u32 *p, struct mnt_fhstatus *res)
 #define MNT_fhstatus_sz		(1 + 8)
 
 static struct rpc_procinfo	mnt_procedures[2] = {
-	{ p_procname:		"mnt_null",
-	  p_encode:		(kxdrproc_t) xdr_error,	
-	  p_decode:		(kxdrproc_t) xdr_error,
+	{ .p_procname		= "mnt_null",
+	  .p_encode		= (kxdrproc_t) xdr_error,	
+	  .p_decode		= (kxdrproc_t) xdr_error,
 	},
-	{ p_procname:		"mnt_mount",
-	  p_encode:		(kxdrproc_t) xdr_encode_dirpath,	
-	  p_decode:		(kxdrproc_t) xdr_decode_fhstatus,
-	  p_bufsiz:		MNT_dirpath_sz << 2,
+	{ .p_procname		= "mnt_mount",
+	  .p_encode		= (kxdrproc_t) xdr_encode_dirpath,	
+	  .p_decode		= (kxdrproc_t) xdr_decode_fhstatus,
+	  .p_bufsiz		= MNT_dirpath_sz << 2,
 	},
 };
 
 static struct rpc_procinfo mnt3_procedures[2] = {
-	{ p_procname:		"mnt3_null",
-	  p_encode:		(kxdrproc_t) xdr_error,
-	  p_decode:		(kxdrproc_t) xdr_error,
+	{ .p_procname		= "mnt3_null",
+	  .p_encode		= (kxdrproc_t) xdr_error,
+	  .p_decode		= (kxdrproc_t) xdr_error,
 	},
-	{ p_procname:		"mnt3_mount",
-	  p_encode:		(kxdrproc_t) xdr_encode_dirpath,
-	  p_decode:		(kxdrproc_t) xdr_decode_fhstatus3,
-	  p_bufsiz:		MNT_dirpath_sz << 2,
+	{ .p_procname		= "mnt3_mount",
+	  .p_encode		= (kxdrproc_t) xdr_encode_dirpath,
+	  .p_decode		= (kxdrproc_t) xdr_decode_fhstatus3,
+	  .p_bufsiz		= MNT_dirpath_sz << 2,
 	},
 };
 
 
 static struct rpc_version	mnt_version1 = {
-		number:		1,
-		nrprocs: 	2,
-		procs: 		mnt_procedures
+		.number		= 1,
+		.nrprocs 	= 2,
+		.procs 		= mnt_procedures
 };
 
 static struct rpc_version       mnt_version3 = {
-		number:		3,
-		nrprocs:	2,
-		procs:		mnt3_procedures
+		.number		= 3,
+		.nrprocs	= 2,
+		.procs		= mnt3_procedures
 };
 
 static struct rpc_version *	mnt_version[] = {
@@ -198,9 +198,9 @@ static struct rpc_version *	mnt_version[] = {
 static struct rpc_stat		mnt_stats;
 
 struct rpc_program	mnt_program = {
-	name:		"mount",
-	number:		NFS_MNT_PROGRAM,
-	nrvers:		sizeof(mnt_version)/sizeof(mnt_version[0]),
-	version:	mnt_version,
-	stats:		&mnt_stats,
+	.name		= "mount",
+	.number		= NFS_MNT_PROGRAM,
+	.nrvers		= sizeof(mnt_version)/sizeof(mnt_version[0]),
+	.version	= mnt_version,
+	.stats		= &mnt_stats,
 };
