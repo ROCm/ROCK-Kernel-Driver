@@ -218,14 +218,14 @@ long sys32_sigreturn(unsigned long r3, unsigned long r4, unsigned long r5,
 		     unsigned long r6, unsigned long r7, unsigned long r8,
 		     struct pt_regs *regs)
 {
-	struct sigcontext32_struct *sc, sigctx;
+	struct sigcontext32 *sc, sigctx;
 	struct sigregs32 *sr;
 	int ret;
 	elf_gregset_t32 saved_regs;  /* an array of ELF_NGREG unsigned ints (32 bits) */
 	sigset_t set;
 	int i;
 
-	sc = (struct sigcontext32_struct *)(regs->gpr[1] + __SIGNAL_FRAMESIZE32);
+	sc = (struct sigcontext32 *)(regs->gpr[1] + __SIGNAL_FRAMESIZE32);
 	if (copy_from_user(&sigctx, sc, sizeof(sigctx)))
 		goto badframe;
 
@@ -315,8 +315,7 @@ badframe:
 static void setup_frame32(struct pt_regs *regs, struct sigregs32 *frame,
             unsigned int newsp)
 {
-	struct sigcontext32_struct *sc =
-		(struct sigcontext32_struct *)(u64)newsp;
+	struct sigcontext32 *sc = (struct sigcontext32 *)(u64)newsp;
 	int i;
 
 	if (verify_area(VERIFY_WRITE, frame, sizeof(*frame)))
@@ -430,7 +429,7 @@ long sys32_rt_sigreturn(unsigned long r3, unsigned long r4, unsigned long r5,
 			struct pt_regs * regs)
 {
 	struct rt_sigframe_32 *rt_sf;
-	struct sigcontext32_struct sigctx;
+	struct sigcontext32 sigctx;
 	struct sigregs32 *sr;
 	int ret;
 	elf_gregset_t32 saved_regs;   /* an array of 32 bit register values */
@@ -958,7 +957,7 @@ static void handle_signal32(unsigned long sig, siginfo_t *info,
 		sigset_t *oldset, struct pt_regs * regs, unsigned int *newspp,
 		unsigned int frame)
 {
-	struct sigcontext32_struct *sc;
+	struct sigcontext32 *sc;
 	struct rt_sigframe_32 *rt_sf;
 	struct k_sigaction *ka = &current->sig->action[sig-1];
 
@@ -1000,7 +999,7 @@ static void handle_signal32(unsigned long sig, siginfo_t *info,
 	} else {
 		/* Put a sigcontext on the stack */
 		*newspp -= sizeof(*sc);
-		sc = (struct sigcontext32_struct *)(u64)*newspp;
+		sc = (struct sigcontext32 *)(u64)*newspp;
 		if (verify_area(VERIFY_WRITE, sc, sizeof(*sc)))
 			goto badframe;
 		/*
