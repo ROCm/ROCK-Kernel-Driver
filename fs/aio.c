@@ -413,7 +413,7 @@ static struct kiocb *__aio_get_req(struct kioctx *ctx)
 		req->ki_user_obj = NULL;
 		req->ki_ctx = ctx;
 		req->ki_users = 1;
-	} else
+	} else {
 		kmem_cache_free(kiocb_cachep, req);
 		okay = 1;
 	}
