@@ -2244,13 +2244,6 @@ L:	linux_udf@hpesjro.fc.hp.com
 W:	http://linux-udf.sourceforge.net
 S:	Maintained
 
-UMSDOS FILESYSTEM
-P:	Matija Nalis
-M:	Matija Nalis <mnalis-umsdos@voyager.hr>
-L:	linux-kernel@vger.kernel.org
-W:	http://linux.voyager.hr/umsdos/
-S:	Maintained
-
 UNIFORM CDROM DRIVER
 P:	Jens Axboe
 M:	axboe@suse.de
