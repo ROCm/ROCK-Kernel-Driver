@@ -79,7 +79,7 @@ install: $(BOOTIMAGE)
 
 clean:
 	@echo 'Cleaning up (boot)'
-	@rm -f tools/build
+	@rm -f tools/build vmlinux.bin bvmlinux.bin
 	@rm -f setup bootsect zImage compressed/vmlinux.out
 	@rm -f bsetup bbootsect bzImage compressed/bvmlinux.out
 	@$(MAKE) -C compressed clean
