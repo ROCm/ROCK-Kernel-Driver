@@ -759,8 +759,10 @@ struct task_struct *copy_process(unsigned long clone_flags,
 		goto fork_out;
 
 	retval = -EAGAIN;
-	if (atomic_read(&p->user->processes) >= p->rlim[RLIMIT_NPROC].rlim_cur) {
-		if (!capable(CAP_SYS_ADMIN) && !capable(CAP_SYS_RESOURCE))
+	if (atomic_read(&p->user->processes) >=
+			p->rlim[RLIMIT_NPROC].rlim_cur) {
+		if (!capable(CAP_SYS_ADMIN) && !capable(CAP_SYS_RESOURCE) &&
+				p->user != &root_user)
 			goto bad_fork_free;
 	}
 

@@ -601,6 +601,14 @@ static int set_user(uid_t new_ruid, int dumpclear)
 	new_user = alloc_uid(new_ruid);
 	if (!new_user)
 		return -EAGAIN;
+
+	if (atomic_read(&new_user->processes) >=
+				current->rlim[RLIMIT_NPROC].rlim_cur &&
+			new_user != &root_user) {
+		free_uid(new_user);
+		return -EAGAIN;
+	}
+
 	switch_uid(new_user);
 
 	if(dumpclear)
