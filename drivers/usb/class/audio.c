@@ -2953,6 +2953,8 @@ static void usb_audio_parsestreaming(struct usb_audio_state *s, unsigned char *b
 			if (alts->desc.bInterfaceClass != USB_CLASS_AUDIO || alts->desc.bInterfaceSubClass != 2)
 				continue;
 			if (alts->desc.bNumEndpoints < 1) {
+				/* altsetting 0 should never have iso EPs */
+				if (alts->desc.bAlternateSetting != 0)
 				printk(KERN_ERR "usbaudio: device %u interface %u altsetting %u does not have an endpoint\n", 
 				       dev->devnum, asifout, i);
 				continue;
