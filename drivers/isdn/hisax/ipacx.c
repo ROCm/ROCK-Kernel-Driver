@@ -402,8 +402,10 @@ dch_setstack(struct PStack *st, struct IsdnCardState *cs)
 }
 
 static struct dc_l1_ops ipacx_dc_l1_ops = {
-	.fill_fifo = dch_fill_fifo,
-	.open      = dch_setstack,
+	.fill_fifo  = dch_fill_fifo,
+	.open       = dch_setstack,
+	.bh_func    = dch_bh,
+	.dbusy_func = dbusy_timer_handler,
 };
 
 //----------------------------------------------------------
@@ -413,11 +415,7 @@ dch_init(struct IsdnCardState *cs)
 {
 	printk(KERN_INFO "HiSax: IPACX ISDN driver v0.1.0\n");
 
-	cs->dc_l1_ops = &ipacx_dc_l1_ops;
-	INIT_WORK(&cs->work, dch_bh, cs);
-	cs->dbusytimer.function = (void *) dbusy_timer_handler;
-	cs->dbusytimer.data = (long) cs;
-	init_timer(&cs->dbusytimer);
+	dc_l1_init(cs, &ipacx_dc_l1_ops);
 
 	ipacx_write_reg(cs, IPACX_TR_CONF0, 0x00);  // clear LDD
 	ipacx_write_reg(cs, IPACX_TR_CONF2, 0x00);  // enable transmitter

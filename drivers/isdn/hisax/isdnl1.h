@@ -7,6 +7,9 @@
  *
  */
 
+#ifndef __ISDNL1_H__
+#define __ISDNL1_H__
+
 #define D_RCVBUFREADY	0
 #define D_XMTBUFREADY	1
 #define D_L1STATECHANGE	2
@@ -30,6 +33,8 @@ extern void DChannel_proc_xmt(struct IsdnCardState *cs);
 extern void DChannel_proc_rcv(struct IsdnCardState *cs);
 extern void l1_msg(struct IsdnCardState *cs, int pr, void *arg);
 extern void l1_msg_b(struct PStack *st, int pr, void *arg);
+
+void dc_l1_init(struct IsdnCardState *cs, struct dc_l1_ops *ops);
 
 static inline void
 fill_fifo_b(struct BCState *bcs)
@@ -588,3 +593,5 @@ bc_close(struct BCState *bcs)
 		clear_bit(BC_FLG_BUSY, &bcs->Flag);
 	}
 }
+
+#endif

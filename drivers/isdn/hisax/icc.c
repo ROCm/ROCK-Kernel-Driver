@@ -499,9 +499,11 @@ dbusy_timer_handler(struct IsdnCardState *cs)
 }
 
 static struct dc_l1_ops icc_l1_ops = {
-	.fill_fifo = icc_fill_fifo,
-	.open      = setstack_icc,
-	.close     = DC_Close_icc,
+	.fill_fifo  = icc_fill_fifo,
+	.open       = setstack_icc,
+	.close      = DC_Close_icc,
+	.bh_func    = icc_bh,
+	.dbusy_func = dbusy_timer_handler,
 };
 
 void __init
@@ -509,13 +511,9 @@ initicc(struct IsdnCardState *cs)
 {
 	int val, eval;
 
-	cs->dc_l1_ops = &icc_l1_ops;
-	INIT_WORK(&cs->work, icc_bh, cs);
+	dc_l1_init(cs, &icc_l1_ops);
 	cs->dc.icc.mon_tx = NULL;
 	cs->dc.icc.mon_rx = NULL;
-	cs->dbusytimer.function = (void *) dbusy_timer_handler;
-	cs->dbusytimer.data = (long) cs;
-	init_timer(&cs->dbusytimer);
 
 	val = icc_read_reg(cs, ICC_STAR);
 	debugl1(cs, "ICC STAR %x", val);

@@ -6,6 +6,10 @@
  * of the GNU General Public License, incorporated herein by reference.
  *
  */
+
+#ifndef __HISAX_H__
+#define __HISAX_H__
+
 #include <linux/config.h>
 #include <linux/errno.h>
 #include <linux/fs.h>
@@ -857,7 +861,7 @@ struct card_ops {
 	void   (*test)      (struct IsdnCardState *);
 	int    (*reset)     (struct IsdnCardState *);
 	void   (*release)   (struct IsdnCardState *);
-	void   (*aux_ind)   (struct IsdnCardState *, void *arg);
+	void   (*aux_ind)   (struct IsdnCardState *, void *);
 	void   (*irq_func)  (int, void *, struct pt_regs *);
 };
 
@@ -892,6 +896,9 @@ struct dc_l1_ops {
 	void   (*fill_fifo)  (struct IsdnCardState *);
 	int    (*open)       (struct PStack *, struct IsdnCardState *);
 	void   (*close)      (struct IsdnCardState *);
+
+	void   (*bh_func)    (void *);
+	void   (*dbusy_func) (struct IsdnCardState *);
 };
 
 #define HW_IOM1			0
@@ -1429,3 +1436,5 @@ L4L3(struct PStack *st, int pr, void *arg)
 {
 	st->l3.l4l3(st, pr, arg);
 }
+
+#endif

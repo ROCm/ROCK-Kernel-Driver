@@ -616,10 +616,6 @@ w6692_reset(struct IsdnCardState *cs)
 static void
 w6692_init(struct IsdnCardState *cs)
 {
-	INIT_WORK(&cs->work, W6692_bh, cs);
-	cs->dbusytimer.function = (void *) dbusy_timer_handler;
-	cs->dbusytimer.data = (long) cs;
-	init_timer(&cs->dbusytimer);
 	w6692_reset(cs);
 	ph_command(cs, W_L1CMD_RST);
 	cs->dc.w6692.ph_state = W_L1CMD_RST;
@@ -662,8 +658,10 @@ static struct card_ops w6692_ops = {
 };
 
 static struct dc_l1_ops w6692_dc_l1_ops = {
-	.fill_fifo = W6692_fill_fifo,
-	.open      = setstack_W6692,
+	.fill_fifo  = W6692_fill_fifo,
+	.open       = setstack_W6692,
+	.bh_func    = W6692_bh,
+	.dbusy_func = dbusy_timer_handler,
 };
 
 static struct bc_l1_ops w6692_bc_l1_ops = {
@@ -762,7 +760,7 @@ setup_w6692(struct IsdnCard *card)
 
 	cs->dc_hw_ops = &w6692_dc_hw_ops;
 	cs->bc_hw_ops = &w6692_bc_hw_ops;
-	cs->dc_l1_ops = &w6692_dc_l1_ops;
+	dc_l1_init(cs, &w6692_dc_l1_ops);
 	cs->bc_l1_ops = &w6692_bc_l1_ops;
 	cs->cardmsg = &w6692_card_msg;
 	cs->irq_flags |= SA_SHIRQ;

@@ -24,6 +24,7 @@
 #include <linux/kernel_stat.h>
 #include <linux/workqueue.h>
 #include <linux/interrupt.h>
+#include "isdnl1.h"
 #define HISAX_STATUS_BUFSIZE 4096
 #define INCLUDE_INLINE_FUNCS
 
@@ -1748,6 +1749,10 @@ static void hisax_bc_close(struct BCState *bcs);
 static void hisax_bh(void *data);
 static void EChannel_proc_rcv(struct hisax_d_if *d_if);
 
+static struct dc_l1_ops hisax_l1_ops = {
+	.bh_func = hisax_bh,
+};
+
 int hisax_register(struct hisax_d_if *hisax_d_if, struct hisax_b_if *b_if[],
 		   char *name, int protocol)
 {
@@ -1778,7 +1783,7 @@ int hisax_register(struct hisax_d_if *hisax_d_if, struct hisax_b_if *b_if[],
 	cs->hw.hisax_d_if = hisax_d_if;
 	cs->cardmsg = hisax_cardmsg;
 	cs->iif.owner = hisax_d_if->owner; // FIXME should be done before registering
-	INIT_WORK(&cs->work, hisax_bh, cs);
+	dc_l1_init(cs, &hisax_l1_ops);
 	cs->channel[0].d_st->l1.l2l1 = hisax_d_l2l1;
 	cs->bc_l1_ops->open = hisax_bc_setstack;
 	cs->bc_l1_ops->close = hisax_bc_close;

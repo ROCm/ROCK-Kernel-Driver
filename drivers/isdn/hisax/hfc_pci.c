@@ -1345,8 +1345,10 @@ static struct bc_l1_ops hfcpci_bc_l1_ops = {
 };
 
 static struct dc_l1_ops hfcpci_dc_l1_ops = {
-	.fill_fifo = hfcpci_fill_dfifo,
-	.open      = setstack_hfcpci,
+	.fill_fifo  = hfcpci_fill_dfifo,
+	.open       = setstack_hfcpci,
+	.bh_func    = hfcpci_bh,
+	.dbusy_func = hfcpci_dbusy_timer,
 };
 
 /********************************/
@@ -1355,12 +1357,8 @@ static struct dc_l1_ops hfcpci_dc_l1_ops = {
 void __init
 inithfcpci(struct IsdnCardState *cs)
 {
-	cs->dbusytimer.function = (void *) hfcpci_dbusy_timer;
-	cs->dbusytimer.data = (long) cs;
-	init_timer(&cs->dbusytimer);
-	INIT_WORK(&cs->work, hfcpci_bh, cs);
+	dc_l1_init(cs, &hfcpci_dc_l1_ops);
 	cs->bc_l1_ops = &hfcpci_bc_l1_ops;
-	cs->dc_l1_ops = &hfcpci_dc_l1_ops;
 	mode_hfcpci(cs->bcs, 0, 0);
 	mode_hfcpci(cs->bcs + 1, 0, 1);
 }

@@ -910,6 +910,16 @@ setstack_HiSax(struct PStack *st, struct IsdnCardState *cs)
 }
 
 void
+dc_l1_init(struct IsdnCardState *cs, struct dc_l1_ops *ops)
+{
+	cs->dc_l1_ops = ops;
+	INIT_WORK(&cs->work, ops->bh_func, cs);
+	init_timer(&cs->dbusytimer);
+	cs->dbusytimer.function = (void *)(unsigned long) ops->dbusy_func;
+	cs->dbusytimer.data = (unsigned long) cs;
+}
+
+void
 setstack_l1_B(struct PStack *st)
 {
 	struct IsdnCardState *cs = st->l1.hardware;

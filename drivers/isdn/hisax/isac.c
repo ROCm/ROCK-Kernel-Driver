@@ -497,15 +497,19 @@ dbusy_timer_handler(struct IsdnCardState *cs)
 }
 
 static struct dc_l1_ops isac_l1_ops = {
-	.fill_fifo = isac_fill_fifo,
-	.open      = setstack_isac,
-	.close     = DC_Close_isac,
+	.fill_fifo  = isac_fill_fifo,
+	.open       = setstack_isac,
+	.close      = DC_Close_isac,
+	.bh_func    = isac_bh,
+	.dbusy_func = dbusy_timer_handler,
 };
 
 void __devinit
 initisac(struct IsdnCardState *cs)
 {
 	int val, eval;
+
+	dc_l1_init(cs, &isac_l1_ops);
 
 	val = isac_read(cs, ISAC_STAR);
 	debugl1(cs, "ISAC STAR %x", val);
@@ -522,14 +526,8 @@ initisac(struct IsdnCardState *cs)
 	/* Disable all IRQ */
 	isac_write(cs, ISAC_MASK, 0xFF);
 
-	cs->dc_l1_ops = &isac_l1_ops;
-	INIT_WORK(&cs->work, isac_bh, cs);
 	cs->dc.isac.mon_tx = NULL;
 	cs->dc.isac.mon_rx = NULL;
-	cs->dbusytimer.function = (void *) dbusy_timer_handler;
-	cs->dbusytimer.data = (long) cs;
-	init_timer(&cs->dbusytimer);
-  	isac_write(cs, ISAC_MASK, 0xff);
   	cs->dc.isac.mocr = 0xaa;
 	if (test_bit(HW_IOM1, &cs->HW_Flags)) {
 		/* IOM 1 Mode */

@@ -858,20 +858,17 @@ static struct bc_l1_ops hfcd_bc_l1_ops = {
 };
 
 static struct dc_l1_ops hfcd_dc_l1_ops = {
-	.fill_fifo = hfc_fill_dfifo,
-	.open      = setstack_hfcd,
+	.fill_fifo  = hfc_fill_dfifo,
+	.open       = setstack_hfcd,
+	.bh_func    = hfcd_bh,
+	.dbusy_func = hfc_dbusy_timer,
 };
 
 void __init
 init2bds0(struct IsdnCardState *cs)
 {
-
+	dc_l1_init(cs, &hfcd_dc_l1_ops);
 	cs->bc_l1_ops = &hfcd_bc_l1_ops;
-	cs->dc_l1_ops = &hfcd_dc_l1_ops;
-	cs->dbusytimer.function = (void *) hfc_dbusy_timer;
-	cs->dbusytimer.data = (long) cs;
-	init_timer(&cs->dbusytimer);
-	INIT_WORK(&cs->work, hfcd_bh, cs);
 	if (!cs->hw.hfcD.send)
 		cs->hw.hfcD.send = init_send_hfcd(16);
 	if (!cs->bcs[0].hw.hfc.send)

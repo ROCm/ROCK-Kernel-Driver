@@ -758,27 +758,25 @@ static u16 initAMD[] = {
 	0xFFFF};
 
 static struct dc_l1_ops amd7930_l1_ops = {
-	.open      = setstack_Amd7930,
+	.open       = setstack_Amd7930,
+	.bh_func    = Amd7930_bh,
+	.dbusy_func = dbusy_timer_handler,
 };
 
 void __devinit
 Amd7930_init(struct IsdnCardState *cs)
 {
-    u16 *ptr;
-    u8 cmd, cnt;
+	u16 *ptr;
+	u8 cmd, cnt;
 
         if (cs->debug & L1_DEB_ISAC)
 		debugl1(cs, "Amd7930: initamd called");
 
+	dc_l1_init(cs, &amd7930_l1_ops);
         cs->dc.amd7930.tx_xmtlen = 0;
         cs->dc.amd7930.old_state = 0;
         cs->dc.amd7930.lmr1 = 0x40;
         cs->dc.amd7930.ph_command = Amd7930_ph_command;
-	INIT_WORK(&cs->work, Amd7930_bh, cs);
-	cs->dc_l1_ops = &amd7930_l1_ops;
-	cs->dbusytimer.function = (void *) dbusy_timer_handler;
-	cs->dbusytimer.data = (long) cs;
-	init_timer(&cs->dbusytimer);
 
 	/* AMD Initialisation */
 	for (ptr = initAMD; *ptr != 0xFFFF; ) {
