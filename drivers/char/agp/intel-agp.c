@@ -1748,12 +1748,16 @@ static int agp_intel_resume(struct pci_dev *pdev)
 
 	if (bridge->driver == &intel_generic_driver)
 		intel_configure();
+	else if (bridge->driver == &intel_850_driver)
+		intel_850_configure();
 	else if (bridge->driver == &intel_845_driver)
 		intel_845_configure();
 	else if (bridge->driver == &intel_830mp_driver)
 		intel_830mp_configure();
 	else if (bridge->driver == &intel_915_driver)
 		intel_i915_configure();
+	else if (bridge->driver == &intel_830_driver)
+		intel_i830_configure();
 
 	return 0;
 }
