@@ -24,7 +24,6 @@
  */
 
 #include <linux/module.h>
-#include <linux/version.h>
 #include <linux/slab.h>	/* for kmalloc() and kfree() */
 #include <linux/sched.h>	/* for struct wait_queue etc */
 #include <linux/major.h>

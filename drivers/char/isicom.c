@@ -38,7 +38,6 @@
  */
 
 #include <linux/module.h>
-#include <linux/version.h>
 #include <linux/kernel.h>
 #include <linux/tty.h>
 #include <linux/termios.h>

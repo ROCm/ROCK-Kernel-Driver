@@ -19,13 +19,11 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
-#include <linux/version.h>
 #include <linux/kernel.h>
 #include <linux/miscdevice.h>
 #include <linux/watchdog.h>
 #include <linux/ioport.h>
 #include <linux/spinlock.h>
-#include <linux/ioport.h>
 #include <asm/semaphore.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>

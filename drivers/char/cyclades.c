@@ -670,7 +670,6 @@ static char rcsid[] =
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/pci.h>
-#include <linux/version.h>
 
 #include <linux/stat.h>
 #include <linux/proc_fs.h>

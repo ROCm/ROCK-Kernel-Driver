@@ -85,11 +85,9 @@
 #include <linux/string.h>
 #include <linux/fcntl.h>
 #include <linux/ptrace.h>
-#include <linux/major.h>
 #include <linux/ioport.h>
 #include <linux/delay.h>
 #include <linux/wait.h>
-#include <linux/delay.h>
 #include <linux/pci.h>
 #include <asm/uaccess.h>
 #include <asm/atomic.h>
