@@ -4512,11 +4512,7 @@ int gdth_eh_host_reset(Scsi_Cmnd *scp)
 }
 #endif
 
-#if LINUX_VERSION_CODE >= 0x010300
-int gdth_bios_param(Disk *disk,kdev_t dev,int *ip)
-#else
-int gdth_bios_param(Disk *disk,int dev,int *ip)
-#endif
+int gdth_bios_param(Disk *disk,struct block_device *bdev,int *ip)
 {
     unchar b, t;
     int hanum;

@@ -102,6 +102,12 @@ struct MCA_info {
 
 static struct MCA_info* mca_info = NULL;
 
+/*
+ * Motherboard register spinlock. Untested on SMP at the moment, but
+ * are there any MCA SMP boxes?
+ */
+static spinlock_t mca_lock = SPIN_LOCK_UNLOCKED;
+
 /* MCA registers */
 
 #define MCA_MOTHERBOARD_SETUP_REG	0x94
@@ -213,8 +219,11 @@ void __init mca_init(void)
 	}
 	memset(mca_info, 0, sizeof(struct MCA_info));
 
-	save_flags(flags);
-	cli();
+	/*
+	 * We do not expect many MCA interrupts during initialization,
+	 * but let us be safe:
+	 */
+	spin_lock_irq(&mca_lock);
 
 	/* Make sure adapter setup is off */
 
@@ -300,8 +309,7 @@ void __init mca_init(void)
 	outb_p(0, MCA_ADAPTER_SETUP_REG);
 
 	/* Enable interrupts and return memory start */
-
-	restore_flags(flags);
+	spin_unlock_irq(&mca_lock);
 
 	for (i = 0; i < MCA_STANDARD_RESOURCES; i++)
 		request_resource(&ioport_resource, mca_standard_resources + i);
@@ -514,8 +522,7 @@ unsigned char mca_read_pos(int slot, int reg)
 	if(slot < 0 || slot >= MCA_NUMADAPTERS || mca_info == NULL) return 0;
 	if(reg < 0 || reg >= 8) return 0;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&mca_lock, flags);
 
 	/* Make sure motherboard setup is off */
 
@@ -566,7 +573,7 @@ unsigned char mca_read_pos(int slot, int reg)
 
 	mca_info->slot[slot].pos[reg] = byte;
 
-	restore_flags(flags);
+	spin_unlock_irqrestore(&mca_lock, flags);
 
 	return byte;
 } /* mca_read_pos() */
@@ -610,8 +617,7 @@ void mca_write_pos(int slot, int reg, unsigned char byte)
 	if(mca_info == NULL)
 		return;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&mca_lock, flags);
 
 	/* Make sure motherboard setup is off */
 
@@ -623,7 +629,7 @@ void mca_write_pos(int slot, int reg, unsigned char byte)
 	outb_p(byte, MCA_POS_REG(reg));
 	outb_p(0, MCA_ADAPTER_SETUP_REG);
 
-	restore_flags(flags);
+	spin_unlock_irqrestore(&mca_lock, flags);
 
 	/* Update the global register list, while we have the byte */
 

@@ -512,7 +512,7 @@ int generic_NCR5380_release_resources(struct Scsi_Host *instance)
  *	Locks: none
  */
 
-int generic_NCR5380_biosparam(Disk * disk, kdev_t dev, int *ip)
+int generic_NCR5380_biosparam(Disk * disk, struct block_device *dev, int *ip)
 {
 	int size = disk->capacity;
 	ip[0] = 64;

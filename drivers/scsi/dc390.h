@@ -39,7 +39,7 @@ extern int DC390_detect(Scsi_Host_Template *psht);
 extern int DC390_queue_command(Scsi_Cmnd *cmd, void (*done)(Scsi_Cmnd *));
 extern int DC390_abort(Scsi_Cmnd *cmd);
 extern int DC390_reset(Scsi_Cmnd *cmd, unsigned int resetFlags);
-extern int DC390_bios_param(Disk *disk, kdev_t devno, int geom[]);
+extern int DC390_bios_param(Disk *disk, struct block_device *dev, int geom[]);
 
 #ifdef MODULE
 static int DC390_release(struct Scsi_Host *);

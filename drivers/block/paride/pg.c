@@ -162,16 +162,13 @@ static int pg_drive_count;
 
 
 #include <linux/module.h>
-#include <linux/errno.h>
+#include <linux/init.h>
 #include <linux/fs.h>
 #include <linux/devfs_fs_kernel.h>
-#include <linux/kernel.h>
 #include <linux/delay.h>
 #include <linux/slab.h>
 #include <linux/mtio.h>
 #include <linux/pg.h>
-#include <linux/wait.h>
-#include <linux/smp_lock.h>
 
 #include <asm/uaccess.h>
 
@@ -217,11 +214,6 @@ MODULE_PARM(drive3,"1-6i");
 #define STAT_BUSY       0x80
 
 #define ATAPI_IDENTIFY		0x12
-
-int pg_init(void);
-#ifdef MODULE
-void cleanup_module( void );
-#endif
 
 static int pg_open(struct inode *inode, struct file *file);
 static int pg_release (struct inode *inode, struct file *file);
@@ -290,64 +282,6 @@ void pg_init_units( void )
 } 
 
 static devfs_handle_t devfs_handle;
-
-int pg_init (void)      /* preliminary initialisation */
-
-{       int unit;
-
-	if (disable) return -1;
-
-	pg_init_units();
-
-	if (pg_detect()) return -1;
-
-	if (devfs_register_chrdev(major,name,&pg_fops)) {
-		printk("pg_init: unable to get major number %d\n",
-			major);
-		for (unit=0;unit<PG_UNITS;unit++)
-		  if (PG.present) pi_release(PI);
-		return -1;
-	}
-	devfs_handle = devfs_mk_dir (NULL, "pg", NULL);
-	devfs_register_series (devfs_handle, "%u", 4, DEVFS_FL_DEFAULT,
-			       major, 0, S_IFCHR | S_IRUSR | S_IWUSR,
-			       &pg_fops, NULL);
-	return 0;
-}
-
-#ifdef MODULE
-
-/* Glue for modules ... */
-
-void    cleanup_module(void);
-
-int     init_module(void)
-
-{       int     err;
-
-#ifdef PARIDE_JUMBO
-       { extern paride_init();
-         paride_init();
-       } 
-#endif
-
-	err = pg_init();
-
-	return err;
-}
-
-void    cleanup_module(void)
-
-{       int unit;
-
-	devfs_unregister (devfs_handle);
-	devfs_unregister_chrdev(major,name);
-
-	for (unit=0;unit<PG_UNITS;unit++)
-	  if (PG.present) pi_release(PI);
-}
-
-#endif
 
 #define	WR(c,r,v)	pi_write_regr(PI,c,r,v)
 #define	RR(c,r)		(pi_read_regr(PI,c,r))
@@ -691,6 +625,43 @@ static ssize_t pg_read(struct file * filp, char * buf,
 	return copy+hs;
 }
 
-/* end of pg.c */
+static int __init pg_init(void)
+{
+	int unit;
+
+	if (disable)
+		return -1;
+
+	pg_init_units();
+
+	if (pg_detect())
+		return -1;
+
+	if (devfs_register_chrdev(major,name,&pg_fops)) {
+		printk("pg_init: unable to get major number %d\n",
+			major);
+		for (unit=0;unit<PG_UNITS;unit++)
+		  if (PG.present) pi_release(PI);
+		return -1;
+	}
+	devfs_handle = devfs_mk_dir (NULL, "pg", NULL);
+	devfs_register_series (devfs_handle, "%u", 4, DEVFS_FL_DEFAULT,
+			       major, 0, S_IFCHR | S_IRUSR | S_IWUSR,
+			       &pg_fops, NULL);
+	return 0;
+}
+
+static void __exit pg_exit(void)
+{
+	int unit;
+
+	devfs_unregister (devfs_handle);
+	devfs_unregister_chrdev(major,name);
+
+	for (unit=0;unit<PG_UNITS;unit++)
+		if (PG.present) pi_release(PI);
+}
 
 MODULE_LICENSE("GPL");
+module_init(pg_init)
+module_exit(pg_exit)

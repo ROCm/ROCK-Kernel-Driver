@@ -69,8 +69,9 @@ int add_partition(struct block_device *bdev, struct blkpg_partition *p)
 	struct gendisk *g;
 	long long ppstart, pplength;
 	long pstart, plength;
-	int i, drive, first_minor, end_minor, minor;
+	int i;
 	kdev_t dev = to_kdev_t(bdev->bd_dev);
+	struct hd_struct *part;
 
 	/* convert bytes to sectors, check for fit in a hd_struct */
 	ppstart = (p->start >> 9);
@@ -85,37 +86,32 @@ int add_partition(struct block_device *bdev, struct blkpg_partition *p)
 	g = get_gendisk(dev);
 	if (!g)
 		return -ENXIO;
+	part = g->part + minor(dev);
 
 	/* existing drive? */
-	drive = (minor(dev) >> g->minor_shift);
-	first_minor = (drive << g->minor_shift);
-	end_minor   = first_minor + (1 << g->minor_shift);
-	if (drive >= g->nr_real)
-		return -ENXIO;
 
 	/* drive and partition number OK? */
-	if (first_minor != minor(dev))
+	if (bdev != bdev->bd_contains)
 		return -EINVAL;
 	if (p->pno <= 0 || p->pno >= (1 << g->minor_shift))
 		return -EINVAL;
 
 	/* partition number in use? */
-	minor = first_minor + p->pno;
-	if (g->part[minor].nr_sects != 0)
+	if (part[p->pno].nr_sects != 0)
 		return -EBUSY;
 
 	/* overlap? */
-	for (i=first_minor+1; i<end_minor; i++)
-		if (!(pstart+plength <= g->part[i].start_sect ||
-		      pstart >= g->part[i].start_sect + g->part[i].nr_sects))
+	for (i = 1; i < (1<<g->minor_shift); i++)
+		if (!(pstart+plength <= part[i].start_sect ||
+		      pstart >= part[i].start_sect + part[i].nr_sects))
 			return -EBUSY;
 
 	/* all seems OK */
-	g->part[minor].start_sect = pstart;
-	g->part[minor].nr_sects = plength;
+	part[p->pno].start_sect = pstart;
+	part[p->pno].nr_sects = plength;
 	if (g->sizes)
-		g->sizes[minor] = (plength >> (BLOCK_SIZE_BITS - 9));
-	devfs_register_partitions (g, first_minor, 0);
+		g->sizes[minor(dev)+p->pno] = (plength >> (BLOCK_SIZE_BITS-9));
+	devfs_register_partitions (g, minor(dev), 0);
 	return 0;
 }
 
@@ -133,33 +129,27 @@ int del_partition(struct block_device *bdev, struct blkpg_partition *p)
 {
 	kdev_t dev = to_kdev_t(bdev->bd_dev);
 	struct gendisk *g;
-	kdev_t devp;
 	struct block_device *bdevp;
-	int drive, first_minor, minor;
+	struct hd_struct *part;
 	int holder;
 
 	/* find the drive major */
 	g = get_gendisk(dev);
 	if (!g)
 		return -ENXIO;
+	part = g->part + minor(dev);
 
-	/* drive and partition number OK? */
-	drive = (minor(dev) >> g->minor_shift);
-	first_minor = (drive << g->minor_shift);
-
-	if (first_minor != minor(dev))
+	if (bdev != bdev->bd_contains)
 		return -EINVAL;
 	if (p->pno <= 0 || p->pno >= (1 << g->minor_shift))
   		return -EINVAL;
 
 	/* existing drive and partition? */
-	minor = first_minor + p->pno;
-	if (drive >= g->nr_real || g->part[minor].nr_sects == 0)
+	if (part[p->pno].nr_sects == 0)
 		return -ENXIO;
 
 	/* partition in use? Incomplete check for now. */
-	devp = mk_kdev(major(dev), minor);
-	bdevp = bdget(kdev_t_to_nr(devp));
+	bdevp = bdget(MKDEV(major(dev), minor(dev) + p->pno));
 	if (!bdevp)
 		return -ENOMEM;
 	if (bd_claim(bdevp, &holder) < 0) {
@@ -171,11 +161,11 @@ int del_partition(struct block_device *bdev, struct blkpg_partition *p)
 	fsync_bdev(bdevp);
 	invalidate_bdev(bdevp, 0);
 
-	g->part[minor].start_sect = 0;
-	g->part[minor].nr_sects = 0;
+	part[p->pno].start_sect = 0;
+	part[p->pno].nr_sects = 0;
 	if (g->sizes)
-		g->sizes[minor] = 0;
-	devfs_register_partitions (g, first_minor, 0);
+		g->sizes[minor(dev) + p->pno] = 0;
+	devfs_register_partitions (g, minor(dev), 0);
 	bd_release(bdevp);
 	bdput(bdevp);
 
@@ -222,10 +212,6 @@ int blk_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long arg)
 	kdev_t dev = to_kdev_t(bdev->bd_dev);
 	int holder;
 	struct backing_dev_info *bdi;
-
-	intval = block_ioctl(bdev, cmd, arg);
-	if (intval != -ENOTTY)
-		return intval;
 
 	switch (cmd) {
 		case BLKROSET:
@@ -296,14 +282,6 @@ int blk_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long arg)
 
 		case BLKPG:
 			return blkpg_ioctl(bdev, (struct blkpg_ioctl_arg *) arg);
-			
-		/*
-		 * deprecated, use the /proc/iosched interface instead
-		 */
-		case BLKELVGET:
-		case BLKELVSET:
-			return -ENOTTY;
-
 		case BLKBSZGET:
 			/* get the logical block size (cf. BLKSSZGET) */
 			intval = block_size(bdev);
@@ -330,5 +308,3 @@ int blk_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long arg)
 			return -EINVAL;
 	}
 }
-
-EXPORT_SYMBOL(blk_ioctl);

@@ -342,14 +342,6 @@ static int xpram_ioctl (struct inode *inode, struct file *filp,
 	if (idx >= xpram_devs)
 		return -ENODEV;
 	switch (cmd) {
-	case BLKGETSIZE:
-		/* Return the device size, expressed in sectors */
-		return put_user(xpram_sizes[idx] << 1, (unsigned long *) arg);
-	case BLKGETSIZE64:
-		/* Return the device size, expressed in bytes */
-		return put_user((u64) xpram_sizes[idx] << 10, (u64 *) arg);
-	case BLKFLSBUF:
-		return blk_ioctl(((struct inode *) inode)->i_bdev, cmd, arg);
 	case BLKRRPART:
 		/* re-read partition table: can't do it */
 		return -EINVAL;

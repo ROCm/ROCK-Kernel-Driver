@@ -2,6 +2,7 @@
 #define __LINUX_SPINLOCK_H
 
 #include <linux/config.h>
+#include <linux/preempt.h>
 #include <linux/linkage.h>
 #include <linux/compiler.h>
 #include <linux/thread_info.h>
@@ -120,36 +121,6 @@
 
 #ifdef CONFIG_PREEMPT
 
-asmlinkage void preempt_schedule(void);
-
-#define preempt_get_count() (current_thread_info()->preempt_count)
-
-#define preempt_disable() \
-do { \
-	++current_thread_info()->preempt_count; \
-	barrier(); \
-} while (0)
-
-#define preempt_enable_no_resched() \
-do { \
-	--current_thread_info()->preempt_count; \
-	barrier(); \
-} while (0)
-
-#define preempt_enable() \
-do { \
-	--current_thread_info()->preempt_count; \
-	barrier(); \
-	if (unlikely(test_thread_flag(TIF_NEED_RESCHED))) \
-		preempt_schedule(); \
-} while (0)
-
-#define preempt_check_resched() \
-do { \
-	if (unlikely(test_thread_flag(TIF_NEED_RESCHED))) \
-		preempt_schedule(); \
-} while (0)
-
 #define spin_lock(lock)	\
 do { \
 	preempt_disable(); \
@@ -178,12 +149,6 @@ do { \
 				1 : ({preempt_enable(); 0;});})
 
 #else
-
-#define preempt_get_count()		(0)
-#define preempt_disable()		do { } while (0)
-#define preempt_enable_no_resched()	do {} while(0)
-#define preempt_enable()		do { } while (0)
-#define preempt_check_resched()		do { } while (0)
 
 #define spin_lock(lock)			_raw_spin_lock(lock)
 #define spin_trylock(lock)		_raw_spin_trylock(lock)

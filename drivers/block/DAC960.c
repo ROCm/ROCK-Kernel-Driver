@@ -2055,29 +2055,20 @@ static void DAC960_ComputeGenericDiskInfo(DAC960_Controller_T *Controller)
 static void DAC960_RegisterDisk(DAC960_Controller_T *Controller,
 				int LogicalDriveNumber)
 {
-  if (Controller->FirmwareType == DAC960_V1_Controller)
-    {
+  long size;
+  if (Controller->FirmwareType == DAC960_V1_Controller) {
       if (LogicalDriveNumber > Controller->LogicalDriveCount - 1) return;
-      register_disk(&Controller->GenericDiskInfo,
-		    DAC960_KernelDevice(Controller->ControllerNumber,
-					LogicalDriveNumber, 0),
-		    DAC960_MaxPartitions,
-		    &DAC960_BlockDeviceOperations,
-		    Controller->V1.LogicalDriveInformation
-				   [LogicalDriveNumber].LogicalDriveSize);
-    }
-  else
-    {
+      size = Controller->V1.LogicalDriveInformation
+				   [LogicalDriveNumber].LogicalDriveSize;
+  } else {
       DAC960_V2_LogicalDeviceInfo_T *LogicalDeviceInfo =
 	Controller->V2.LogicalDeviceInformation[LogicalDriveNumber];
       if (LogicalDeviceInfo == NULL) return;
-      register_disk(&Controller->GenericDiskInfo,
-		    DAC960_KernelDevice(Controller->ControllerNumber,
-					LogicalDriveNumber, 0),
-		    DAC960_MaxPartitions,
-		    &DAC960_BlockDeviceOperations,
-		    LogicalDeviceInfo->ConfigurableDeviceSize);
-    }
+      size = LogicalDeviceInfo->ConfigurableDeviceSize;
+  }
+  register_disk(&Controller->GenericDiskInfo,
+    DAC960_KernelDevice(Controller->ControllerNumber, LogicalDriveNumber, 0),
+    DAC960_MaxPartitions, &DAC960_BlockDeviceOperations, size);
 }
 
 
@@ -5399,15 +5390,9 @@ static int DAC960_IOCTL(Inode_T *Inode, File_T *File,
 	    LogicalDeviceInfo->ConfigurableDeviceSize
 	    / (Geometry.heads * Geometry.sectors);
 	}
-      Geometry.start = get_start_sect(Inode->i_rdev);
+      Geometry.start = get_start_sect(Inode->i_bdev);
       return (copy_to_user(UserGeometry, &Geometry,
 			   sizeof(DiskGeometry_T)) ? -EFAULT : 0);
-    case BLKGETSIZE:
-    case BLKGETSIZE64:
-    case BLKFLSBUF:
-    case BLKBSZGET:
-    case BLKBSZSET:
-      return blk_ioctl(Inode->i_bdev, Request, Argument);
 
     case BLKRRPART:
       /* Re-Read Partition Table. */

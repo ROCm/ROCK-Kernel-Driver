@@ -3097,7 +3097,7 @@ static int sbp2scsi_reset (Scsi_Cmnd *SCpnt)
 /*
  * Called by scsi stack to get bios parameters (used by fdisk, and at boot).
  */
-static int sbp2scsi_biosparam (Scsi_Disk *disk, kdev_t dev, int geom[]) 
+static int sbp2scsi_biosparam (Scsi_Disk *disk, struct block_device *dev, int geom[]) 
 {
 	int heads, sectors, cylinders;
 

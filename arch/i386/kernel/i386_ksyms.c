@@ -132,13 +132,7 @@ EXPORT_SYMBOL(cpu_online_map);
 EXPORT_SYMBOL_NOVERS(__write_lock_failed);
 EXPORT_SYMBOL_NOVERS(__read_lock_failed);
 
-/* Global SMP irq stuff */
-EXPORT_SYMBOL(synchronize_irq);
-EXPORT_SYMBOL(global_irq_holder);
-EXPORT_SYMBOL(__global_cli);
-EXPORT_SYMBOL(__global_sti);
-EXPORT_SYMBOL(__global_save_flags);
-EXPORT_SYMBOL(__global_restore_flags);
+/* Global SMP stuff */
 EXPORT_SYMBOL(smp_call_function);
 
 /* TLB flushing */

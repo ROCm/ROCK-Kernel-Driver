@@ -902,7 +902,7 @@ int i2o_scsi_reset(Scsi_Cmnd * SCpnt, unsigned int reset_flags)
  *	This is anyones guess quite frankly.
  */
  
-int i2o_scsi_bios_param(Disk * disk, kdev_t dev, int *ip)
+int i2o_scsi_bios_param(Disk * disk, struct block_device *dev, int *ip)
 {
 	int size;
 

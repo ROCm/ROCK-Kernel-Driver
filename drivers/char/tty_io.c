@@ -150,8 +150,7 @@ extern void con3215_init(void);
 extern void tty3215_init(void);
 extern void tub3270_con_init(void);
 extern void tub3270_init(void);
-extern void rs285_console_init(void);
-extern void sa1100_rs_console_init(void);
+extern void uart_console_init(void);
 extern void sgi_serial_console_init(void);
 extern void sci_console_init(void);
 extern void tx3912_console_init(void);
@@ -456,11 +455,12 @@ void do_tty_hangup(void *data)
 	}
 	file_list_unlock();
 	
-	/* FIXME! What are the locking issues here? This may me overdoing things.. */
+	/* FIXME! What are the locking issues here? This may me overdoing things..
+	* this question is especially important now that we've removed the irqlock. */
 	{
 		unsigned long flags;
 
-		save_flags(flags); cli();
+		__save_flags(flags); __cli(); // FIXME: is this safe?
 		if (tty->ldisc.flush_buffer)
 			tty->ldisc.flush_buffer(tty);
 		if (tty->driver.flush_buffer)
@@ -468,7 +468,7 @@ void do_tty_hangup(void *data)
 		if ((test_bit(TTY_DO_WRITE_WAKEUP, &tty->flags)) &&
 		    tty->ldisc.write_wakeup)
 			(tty->ldisc.write_wakeup)(tty);
-		restore_flags(flags);
+		__restore_flags(flags); // FIXME: is this safe?
 	}
 
 	wake_up_interruptible(&tty->write_wait);
@@ -1900,7 +1900,7 @@ static void flush_to_ldisc(void *private_)
 		fp = tty->flip.flag_buf + TTY_FLIPBUF_SIZE;
 		tty->flip.buf_num = 0;
 
-		save_flags(flags); cli();
+		__save_flags(flags); __cli(); // FIXME: is this safe?
 		tty->flip.char_buf_ptr = tty->flip.char_buf;
 		tty->flip.flag_buf_ptr = tty->flip.flag_buf;
 	} else {
@@ -1908,13 +1908,13 @@ static void flush_to_ldisc(void *private_)
 		fp = tty->flip.flag_buf;
 		tty->flip.buf_num = 1;
 
-		save_flags(flags); cli();
+		__save_flags(flags); __cli(); // FIXME: is this safe?
 		tty->flip.char_buf_ptr = tty->flip.char_buf + TTY_FLIPBUF_SIZE;
 		tty->flip.flag_buf_ptr = tty->flip.flag_buf + TTY_FLIPBUF_SIZE;
 	}
 	count = tty->flip.count;
 	tty->flip.count = 0;
-	restore_flags(flags);
+	__restore_flags(flags); // FIXME: is this safe?
 	
 	tty->ldisc.receive_buf(tty, cp, fp, count);
 }
@@ -2220,17 +2220,11 @@ void __init console_init(void)
 #ifdef CONFIG_STDIO_CONSOLE
 	stdio_console_init();
 #endif
-#ifdef CONFIG_SERIAL_21285_CONSOLE
-	rs285_console_init();
-#endif
-#ifdef CONFIG_SERIAL_SA1100_CONSOLE
-	sa1100_rs_console_init();
+#ifdef CONFIG_SERIAL_CORE_CONSOLE
+	uart_console_init();
 #endif
 #ifdef CONFIG_ARC_CONSOLE
 	arc_console_init();
-#endif
-#ifdef CONFIG_SERIAL_AMBA_CONSOLE
-	ambauart_console_init();
 #endif
 #ifdef CONFIG_SERIAL_TX3912_CONSOLE
 	tx3912_console_init();

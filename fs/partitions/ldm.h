@@ -150,8 +150,7 @@ struct ldm_part {
 	unsigned long size;
 };
 
-int ldm_partition(struct gendisk *hd, struct block_device *bdev,
-		unsigned long first_sector, int first_part_minor);
+int ldm_partition(struct parsed_partitions *state, struct block_device *bdev);
 
 #endif /* _FS_PT_LDM_H_ */
 

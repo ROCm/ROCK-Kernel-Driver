@@ -302,8 +302,7 @@ static void __read_entry(struct hfs_cat_entry *entry,
 		entry->modify_date = hfs_get_nl(cat->u.dir.MdDat);
 		entry->backup_date = hfs_get_nl(cat->u.dir.BkDat);
 		dir->dirs = dir->files = 0;
-		hfs_init_waitqueue(&dir->read_wait);
-		hfs_init_waitqueue(&dir->write_wait);
+		init_rwsem(&dir->sem);
 	} else if (cat->cdrType == HFS_CDR_FIL) {
 		struct hfs_file *fil = &entry->u.file;
 
@@ -642,51 +641,6 @@ static void update_dir(struct hfs_mdb *mdb, struct hfs_cat_entry *dir,
 }
 
 /*
- * Add a writer to dir, excluding readers.
- *
- * XXX: this is wrong. it allows a move to occur when a directory
- *      is being written to. 
- */
-static inline void start_write(struct hfs_cat_entry *dir)
-{
-	if (dir->u.dir.readers || waitqueue_active(&dir->u.dir.read_wait)) {
-		hfs_sleep_on(&dir->u.dir.write_wait);
-	}
-	++dir->u.dir.writers;
-}
-
-/*
- * Add a reader to dir, excluding writers.
- */
-static inline void start_read(struct hfs_cat_entry *dir)
-{
-	if (dir->u.dir.writers || waitqueue_active(&dir->u.dir.write_wait)) {
-		hfs_sleep_on(&dir->u.dir.read_wait);
-	}
-	++dir->u.dir.readers;
-}
-
-/*
- * Remove a writer from dir, possibly admitting readers.
- */
-static inline void end_write(struct hfs_cat_entry *dir)
-{
-	if (!(--dir->u.dir.writers)) {
-		hfs_wake_up(&dir->u.dir.read_wait);
-	}
-}
-
-/*
- * Remove a reader from dir, possibly admitting writers.
- */
-static inline void end_read(struct hfs_cat_entry *dir)
-{
-	if (!(--dir->u.dir.readers)) {
-		hfs_wake_up(&dir->u.dir.write_wait);
-	}
-}
-
-/*
  * create_entry()
  *
  * Add a new file or directory to the catalog B-tree and
@@ -707,7 +661,7 @@ static int create_entry(struct hfs_cat_entry *parent, struct hfs_cat_key *key,
 	}
 
 	/* keep readers from getting confused by changing dir size */
-	start_write(parent);
+	down_write(&parent->u.dir.sem);
 
 	/* create a locked entry in the cache */
 	entry = get_entry(mdb, key, 0);
@@ -782,7 +736,7 @@ bail1:
 bail2:
 	hfs_cat_put(entry);
 done:
-	end_write(parent);
+	up_write(&parent->u.dir.sem);
 	return error;
 }
 
@@ -1058,21 +1012,19 @@ int hfs_cat_open(struct hfs_cat_entry *dir, struct hfs_brec *brec)
 	struct hfs_cat_key key;
 	int error;
 
-	if (dir->type != HFS_CDR_DIR) {
+	if (dir->type != HFS_CDR_DIR)
 		return -EINVAL;
-	}
 	
 	/* Block writers */
-	start_read(dir);
+	down_read(&dir->u.dir.sem);
 
 	/* Find the directory */
 	hfs_cat_build_key(dir->cnid, NULL, &key);
 	error = hfs_bfind(brec, dir->mdb->cat_tree,
 			  HFS_BKEY(&key), HFS_BFIND_READ_EQ);
 
-	if (error) {
-		end_read(dir);
-	}
+	if (error)
+		up_read(&dir->u.dir.sem);
 
 	return error;
 }
@@ -1109,7 +1061,7 @@ int hfs_cat_next(struct hfs_cat_entry *dir, struct hfs_brec *brec,
 		*type = ((struct hfs_cat_rec *)brec->data)->cdrType;
 		*cnid = brec_to_id(brec);
 	} else {
-		end_read(dir);
+		up_read(&dir->u.dir.sem);
 	}
 	return error;
 }
@@ -1127,7 +1079,7 @@ void hfs_cat_close(struct hfs_cat_entry *dir, struct hfs_brec *brec)
 {
 	if (dir && brec) {
 		hfs_brec_relse(brec, NULL);
-		end_read(dir);
+		up_read(&dir->u.dir.sem);
 	}
 }
 
@@ -1260,11 +1212,11 @@ int hfs_cat_delete(struct hfs_cat_entry *parent, struct hfs_cat_entry *entry,
 	}
 
 	/* keep readers from getting confused by changing dir size */
-	start_write(parent);
+	down_write(&parent->u.dir.sem);
 
 	/* don't delete a busy directory */
 	if (entry->type == HFS_CDR_DIR) {
-		start_read(entry);
+		down_read(&entry->u.dir.sem);
 
 		error = -ENOTEMPTY;
 		if (entry->u.dir.files || entry->u.dir.dirs) 
@@ -1299,10 +1251,9 @@ hfs_delete_unlock:
 	unlock_entry(entry);
 
 hfs_delete_end:
-	if (entry->type == HFS_CDR_DIR) {
-		end_read(entry);
-	}
-	end_write(parent);
+	if (entry->type == HFS_CDR_DIR)
+		up_read(&entry->u.dir.sem);
+	up_write(&parent->u.dir.sem);
 	return error;
 }
 
@@ -1347,10 +1298,10 @@ int hfs_cat_move(struct hfs_cat_entry *old_dir, struct hfs_cat_entry *new_dir,
 	}
 
 	/* keep readers from getting confused by changing dir size */
-	start_write(new_dir);
-	if (old_dir != new_dir) {
-		start_write(old_dir);
-	}
+	down_write(&new_dir->u.dir.sem);
+	/* AV: smells like a deadlock */
+	if (old_dir != new_dir)
+		down_write(&old_dir->u.dir.sem);
 
 	/* Don't move a directory inside itself */
 	if (is_dir) {
@@ -1556,10 +1507,9 @@ bail3:
 		hfs_cat_put(dest);
 	}
 done:
-	if (new_dir != old_dir) {
-		end_write(old_dir);
-	}
-	end_write(new_dir);
+	if (new_dir != old_dir)
+		up_write(&old_dir->u.dir.sem);
+	up_write(&new_dir->u.dir.sem);
 	return error;
 }
 

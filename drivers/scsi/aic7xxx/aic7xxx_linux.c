@@ -2722,7 +2722,7 @@ ahc_linux_bus_reset(Scsi_Cmnd *cmd)
  * Return the disk geometry for the given SCSI device.
  */
 int
-ahc_linux_biosparam(Disk *disk, kdev_t dev, int geom[])
+ahc_linux_biosparam(Disk *disk, struct block_device *bdev, int geom[])
 {
 	int	heads;
 	int	sectors;
@@ -2733,7 +2733,7 @@ ahc_linux_biosparam(Disk *disk, kdev_t dev, int geom[])
 	unsigned char *buf;
 
 	ahc = *((struct ahc_softc **)disk->device->host->hostdata);
-	buf = scsi_bios_ptable(dev);
+	buf = scsi_bios_ptable(bdev);
 
 	if (buf) {
 		ret = scsi_partsize(buf, disk->capacity,

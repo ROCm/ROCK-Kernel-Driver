@@ -3576,7 +3576,7 @@ mptscsih_taskmgmt_complete(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *m
  */
 
 int
-mptscsih_bios_param(Disk * disk, kdev_t dev, int *ip)
+mptscsih_bios_param(Disk * disk, struct block_device *dev, int *ip)
 {
 	int size;
 

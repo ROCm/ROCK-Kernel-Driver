@@ -1,13 +1,12 @@
 #ifndef _SCSI_DEBUG_H
 
 #include <linux/types.h>
-#include <linux/kdev_t.h>
 
 static int scsi_debug_detect(Scsi_Host_Template *);
 /* static int scsi_debug_command(Scsi_Cmnd *); */
 static int scsi_debug_queuecommand(Scsi_Cmnd *, void (*done) (Scsi_Cmnd *));
 static int scsi_debug_abort(Scsi_Cmnd *);
-static int scsi_debug_biosparam(Disk *, kdev_t, int[]);
+static int scsi_debug_biosparam(Disk *, struct block_device *, int[]);
 static int scsi_debug_bus_reset(Scsi_Cmnd *);
 static int scsi_debug_device_reset(Scsi_Cmnd *);
 static int scsi_debug_host_reset(Scsi_Cmnd *);

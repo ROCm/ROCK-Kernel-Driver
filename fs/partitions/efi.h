@@ -112,9 +112,7 @@ typedef struct _legacy_mbr {
 } __attribute__ ((packed)) legacy_mbr;
 
 /* Functions */
-extern int
- efi_partition(struct gendisk *hd, struct block_device *bdev,
-	      unsigned long first_sector, int first_part_minor);
+extern int efi_partition(struct parsed_partitions *state, struct block_device *bdev);
 
 #endif
 

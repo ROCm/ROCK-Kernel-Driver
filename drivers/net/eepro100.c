@@ -1354,7 +1354,7 @@ static void speedo_tx_timeout(struct net_device *dev)
 		udelay(10);
 		/* Disable interrupts. */
 		outw(SCBMaskAll, ioaddr + SCBCmd);
-		synchronize_irq();
+		synchronize_irq(dev->irq);
 		speedo_tx_buffer_gc(dev);
 		/* Free as much as possible.
 		   It helps to recover from a hang because of out-of-memory.
