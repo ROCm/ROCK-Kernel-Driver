@@ -2440,7 +2440,7 @@ sg_add_sfp(Sg_device * sdp, int dev)
 		return NULL;
 	memset(sfp, 0, sizeof (Sg_fd));
 	init_waitqueue_head(&sfp->read_wait);
-	sfp->rq_list_lock = RW_LOCK_UNLOCKED;
+	rwlock_init(&sfp->rq_list_lock);
 
 	sfp->timeout = SG_DEFAULT_TIMEOUT;
 	sfp->timeout_user = SG_DEFAULT_TIMEOUT_USER;
