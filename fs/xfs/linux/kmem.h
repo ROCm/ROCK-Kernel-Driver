@@ -40,7 +40,7 @@
 /*
  * Cutoff point to use vmalloc instead of kmalloc.
  */
-#define MAX_SLAB_SIZE	0x10000
+#define MAX_SLAB_SIZE	0x20000
 
 /*
  * XFS uses slightly different names for these due to the
