@@ -66,17 +66,29 @@ int sysctl_aarp_retransmit_limit = AARP_RETRANSMIT_LIMIT;
 int sysctl_aarp_resolve_time = AARP_RESOLVE_TIME;
 
 /* Lists of aarp entries */
+/**
+ *	struct aarp_entry - AARP entry
+ *	@last_sent - Last time we xmitted the aarp request 
+ *	@packet_queue - Queue of frames wait for resolution
+ *	@status - Used for proxy AARP
+ *	expires_at - Entry expiry time
+ *	target_addr - DDP Address
+ *	dev - Device to use
+ *	hwaddr - Physical i/f address of target/router
+ *	xmit_count - When this hits 10 we give up
+ *	next - Next entry in chain
+ */
 struct aarp_entry {
 	/* These first two are only used for unresolved entries */
-	unsigned long last_sent;		/* Last time we xmitted the aarp request */
-	struct sk_buff_head packet_queue;	/* Queue of frames wait for resolution */
-	int status;				/* Used for proxy AARP */
-	unsigned long expires_at;		/* Entry expiry time */
-	struct at_addr target_addr;		/* DDP Address */
-	struct net_device *dev;			/* Device to use */
-	char hwaddr[6];				/* Physical i/f address of target/router */
-	unsigned short xmit_count;		/* When this hits 10 we give up */
-	struct aarp_entry *next;		/* Next entry in chain */
+	unsigned long		last_sent;
+	struct sk_buff_head	packet_queue;
+	int			status;
+	unsigned long		expires_at;
+	struct at_addr		target_addr;
+	struct net_device	*dev;
+	char			hwaddr[6];
+	unsigned short		xmit_count;
+	struct aarp_entry	*next;
 };
 
 /* Hashed list of resolved, unresolved and proxy entries */
@@ -371,7 +383,7 @@ static int aarp_device_event(struct notifier_block *this, unsigned long event,
  
 static struct aarp_entry *aarp_alloc(void)
 {
-	struct aarp_entry *a = kmalloc(sizeof(struct aarp_entry), GFP_ATOMIC);
+	struct aarp_entry *a = kmalloc(sizeof(*a), GFP_ATOMIC);
 
 	if (a)
 		skb_queue_head_init(&a->packet_queue);
@@ -430,22 +442,22 @@ static struct at_addr *__aarp_proxy_find(struct net_device *dev,
  */
 void aarp_send_probe_phase1(struct atalk_iface *iface)
 {
-    struct ifreq atreq;
-    struct sockaddr_at *sa = (struct sockaddr_at *)&atreq.ifr_addr;
+	struct ifreq atreq;
+	struct sockaddr_at *sa = (struct sockaddr_at *)&atreq.ifr_addr;
 
-    sa->sat_addr.s_node = iface->address.s_node;
-    sa->sat_addr.s_net = ntohs(iface->address.s_net);
+	sa->sat_addr.s_node = iface->address.s_node;
+	sa->sat_addr.s_net = ntohs(iface->address.s_net);
 
-    /* We pass the Net:Node to the drivers/cards by a Device ioctl. */
-    if (!(iface->dev->do_ioctl(iface->dev, &atreq, SIOCSIFADDR))) {
-	    (void)iface->dev->do_ioctl(iface->dev, &atreq, SIOCGIFADDR);
-	    if (iface->address.s_net != htons(sa->sat_addr.s_net) ||
-		iface->address.s_node != sa->sat_addr.s_node)
-		    iface->status |= ATIF_PROBE_FAIL;
+	/* We pass the Net:Node to the drivers/cards by a Device ioctl. */
+	if (!(iface->dev->do_ioctl(iface->dev, &atreq, SIOCSIFADDR))) {
+		(void)iface->dev->do_ioctl(iface->dev, &atreq, SIOCGIFADDR);
+		if (iface->address.s_net != htons(sa->sat_addr.s_net) ||
+		    iface->address.s_node != sa->sat_addr.s_node)
+			iface->status |= ATIF_PROBE_FAIL;
 
-	    iface->address.s_net  = htons(sa->sat_addr.s_net);
-	    iface->address.s_node = sa->sat_addr.s_node;
-    }
+		iface->address.s_net  = htons(sa->sat_addr.s_net);
+		iface->address.s_node = sa->sat_addr.s_node;
+	}
 }
 
 
@@ -462,7 +474,7 @@ void aarp_probe_network(struct atalk_iface *atif)
 
 			/* Defer 1/10th */
 			current->state = TASK_INTERRUPTIBLE;
-			schedule_timeout(HZ/10);
+			schedule_timeout(HZ / 10);
 							
 			if (atif->status & ATIF_PROBE_FAIL)
 				break;
@@ -472,7 +484,7 @@ void aarp_probe_network(struct atalk_iface *atif)
 
 int aarp_proxy_probe_network(struct atalk_iface *atif, struct at_addr *sa)
 {
-	int hash, retval = 1;
+	int hash, retval = -EPROTONOSUPPORT;
 	struct aarp_entry *entry;
 	unsigned int count;
 	
@@ -480,19 +492,18 @@ int aarp_proxy_probe_network(struct atalk_iface *atif, struct at_addr *sa)
 	 * we don't currently support LocalTalk or PPP for proxy AARP;
 	 * if someone wants to try and add it, have fun
 	 */
-	if (atif->dev->type == ARPHRD_LOCALTLK)
-		return -EPROTONOSUPPORT;
-		
-	if (atif->dev->type == ARPHRD_PPP)
-		return -EPROTONOSUPPORT;
+	if (atif->dev->type == ARPHRD_LOCALTLK ||
+	    atif->dev->type == ARPHRD_PPP)
+		goto out;
 		
 	/* 
 	 * create a new AARP entry with the flags set to be published -- 
 	 * we need this one to hang around even if it's in use
 	 */
 	entry = aarp_alloc();
+	retval = -ENOMEM;
 	if (!entry)
-		return -ENOMEM;
+		goto out;
 	
 	entry->expires_at = -1;
 	entry->status = ATIF_PROBE;
@@ -512,7 +523,7 @@ int aarp_proxy_probe_network(struct atalk_iface *atif, struct at_addr *sa)
 		/* Defer 1/10th */
 		current->state = TASK_INTERRUPTIBLE;
 		spin_unlock_bh(&aarp_lock);
-		schedule_timeout(HZ/10);
+		schedule_timeout(HZ / 10);
 		spin_lock_bh(&aarp_lock);
 
 		if (entry->status & ATIF_PROBE_FAIL)
@@ -522,10 +533,13 @@ int aarp_proxy_probe_network(struct atalk_iface *atif, struct at_addr *sa)
 	if (entry->status & ATIF_PROBE_FAIL) {
 		entry->expires_at = jiffies - 1; /* free the entry */
 		retval = -EADDRINUSE; /* return network full */
-	} else /* clear the probing flag */
+	} else { /* clear the probing flag */
 		entry->status &= ~ATIF_PROBE;
+		retval = 1;
+	}
 
 	spin_unlock_bh(&aarp_lock);
+out:
 	return retval;
 }
 
@@ -613,8 +627,7 @@ int aarp_send_ddp(struct net_device *dev,struct sk_buff *skb,
 	a = __aarp_find_entry(unresolved[hash], dev, sa);
 	if (a) { /* Queue onto the unresolved queue */
 		skb_queue_tail(&a->packet_queue, skb);
-		spin_unlock_bh(&aarp_lock);
-		return 0;
+		goto out_unlock;
 	}
 
 	/* Allocate a new entry */
@@ -627,11 +640,11 @@ int aarp_send_ddp(struct net_device *dev,struct sk_buff *skb,
 
 	/* Set up the queue */
 	skb_queue_tail(&a->packet_queue, skb);
-	a->expires_at = jiffies + sysctl_aarp_resolve_time;
-	a->dev = dev;
-	a->next = unresolved[hash];
-	a->target_addr = *sa;
-	a->xmit_count = 0;
+	a->expires_at	 = jiffies + sysctl_aarp_resolve_time;
+	a->dev		 = dev;
+	a->next		 = unresolved[hash];
+	a->target_addr	 = *sa;
+	a->xmit_count	 = 0;
 	unresolved[hash] = a;
 	unresolved_count++;
 
@@ -647,12 +660,14 @@ int aarp_send_ddp(struct net_device *dev,struct sk_buff *skb,
 		mod_timer(&aarp_timer, jiffies + sysctl_aarp_tick_time);
 
 	/* Now finally, it is safe to drop the lock. */
+out_unlock:
 	spin_unlock_bh(&aarp_lock);
 
 	/* Tell the ddp layer we have taken over for this frame. */
 	return 0;
 
-sendit: if (skb->sk)
+sendit:
+	if (skb->sk)
 		skb->priority = skb->sk->priority;
 	dev_queue_xmit(skb);
 	return 1;
@@ -696,7 +711,7 @@ static void __aarp_resolved(struct aarp_entry **list, struct aarp_entry *a,
  *	frame. We currently only support Ethernet.
  */
 static int aarp_rcv(struct sk_buff *skb, struct net_device *dev,
-			struct packet_type *pt)
+		    struct packet_type *pt)
 {
 	struct elapaarp *ea = (struct elapaarp *)skb->h.raw;
 	int hash, ret = 0;
@@ -742,7 +757,7 @@ static int aarp_rcv(struct sk_buff *skb, struct net_device *dev,
 
 	/* Check for replies of proxy AARP entries */
 	da.s_node = ea->pa_dst_node;
-	da.s_net = ea->pa_dst_net;
+	da.s_net  = ea->pa_dst_net;
 
 	spin_lock_bh(&aarp_lock);
 	a = __aarp_find_entry(proxies[hash], dev, &da);
@@ -834,9 +849,12 @@ static int aarp_rcv(struct sk_buff *skb, struct net_device *dev,
 			break;
 	}
 
-unlock:	spin_unlock_bh(&aarp_lock);
-out1:	ret = 1;
-out0:	kfree_skb(skb);
+unlock:
+	spin_unlock_bh(&aarp_lock);
+out1:
+	ret = 1;
+out0:
+	kfree_skb(skb);
 	return ret;
 }
 
@@ -853,8 +871,8 @@ void __init aarp_proto_init(void)
 		printk(KERN_CRIT "Unable to register AARP with SNAP.\n");
 	init_timer(&aarp_timer);
 	aarp_timer.function = aarp_expire_timeout;
-	aarp_timer.data = 0;
-	aarp_timer.expires = jiffies + sysctl_aarp_expiry_time;
+	aarp_timer.data	    = 0;
+	aarp_timer.expires  = jiffies + sysctl_aarp_expiry_time;
 	add_timer(&aarp_timer);
 	register_netdevice_notifier(&aarp_notifier);
 }
@@ -880,81 +898,84 @@ static int aarp_get_info(char *buffer, char **start, off_t offset, int length)
 {
 	/* we should dump all our AARP entries */
 	struct aarp_entry *entry;
-	int len, ct;
-
-	len = sprintf(buffer,
-		"%-10.10s  %-10.10s%-18.18s%12.12s%12.12s xmit_count  status\n",
-		"address", "device", "hw addr", "last_sent", "expires");
+	int ct, len = sprintf(buffer,
+			      "%-10.10s  %-10.10s%-18.18s%12.12s%12.12s "
+			      "xmit_count  status\n",
+			      "address", "device", "hw addr", "last_sent",
+			      "expires");
 
 	spin_lock_bh(&aarp_lock);
 
 	for (ct = 0; ct < AARP_HASH_SIZE; ct++) {
 		for (entry = resolved[ct]; entry; entry = entry->next) {
-			len+= sprintf(buffer+len,"%6u:%-3u  ",
+			len += sprintf(buffer + len, "%6u:%-3u  ",
 				(unsigned int)ntohs(entry->target_addr.s_net),
 				(unsigned int)(entry->target_addr.s_node));
-			len+= sprintf(buffer+len,"%-10.10s",
-				entry->dev->name);
-			len+= sprintf(buffer+len,"%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X",
-				(int)(entry->hwaddr[0] & 0x000000FF),
-				(int)(entry->hwaddr[1] & 0x000000FF),
-				(int)(entry->hwaddr[2] & 0x000000FF),
-				(int)(entry->hwaddr[3] & 0x000000FF),
-				(int)(entry->hwaddr[4] & 0x000000FF),
-				(int)(entry->hwaddr[5] & 0x000000FF));
-			len+= sprintf(buffer+len,"%12lu ""%12lu ",
-				(unsigned long)entry->last_sent,
-				(unsigned long)entry->expires_at);
-			len+=sprintf(buffer+len,"%10u",
-				(unsigned int)entry->xmit_count);
+			len += sprintf(buffer + len, "%-10.10s",
+				       entry->dev->name);
+			len += sprintf(buffer + len,
+				       "%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X",
+				       (int)(entry->hwaddr[0] & 0x000000FF),
+				       (int)(entry->hwaddr[1] & 0x000000FF),
+				       (int)(entry->hwaddr[2] & 0x000000FF),
+				       (int)(entry->hwaddr[3] & 0x000000FF),
+				       (int)(entry->hwaddr[4] & 0x000000FF),
+				       (int)(entry->hwaddr[5] & 0x000000FF));
+			len += sprintf(buffer + len, "%12lu ""%12lu ",
+				       (unsigned long)entry->last_sent,
+				       (unsigned long)entry->expires_at);
+			len += sprintf(buffer + len, "%10u",
+				       (unsigned int)entry->xmit_count);
 
-			len+=sprintf(buffer+len,"   resolved\n");
+			len += sprintf(buffer + len, "   resolved\n");
 		}
 	}
 
 	for (ct = 0; ct < AARP_HASH_SIZE; ct++) {
 		for (entry = unresolved[ct]; entry; entry = entry->next) {
-			len+= sprintf(buffer+len,"%6u:%-3u  ",
+			len += sprintf(buffer + len, "%6u:%-3u  ",
 				(unsigned int)ntohs(entry->target_addr.s_net),
 				(unsigned int)(entry->target_addr.s_node));
-			len+= sprintf(buffer+len,"%-10.10s",
-				entry->dev->name);
-			len+= sprintf(buffer+len,"%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X",
-				(int)(entry->hwaddr[0] & 0x000000FF),
-				(int)(entry->hwaddr[1] & 0x000000FF),
-				(int)(entry->hwaddr[2] & 0x000000FF),
-				(int)(entry->hwaddr[3] & 0x000000FF),
-				(int)(entry->hwaddr[4] & 0x000000FF),
-				(int)(entry->hwaddr[5] & 0x000000FF));
-			len+= sprintf(buffer+len,"%12lu ""%12lu ",
-				(unsigned long)entry->last_sent,
-				(unsigned long)entry->expires_at);
-			len+=sprintf(buffer+len,"%10u",
-				(unsigned int)entry->xmit_count);
-			len+=sprintf(buffer+len," unresolved\n");
+			len += sprintf(buffer + len, "%-10.10s",
+				       entry->dev->name);
+			len += sprintf(buffer + len,
+				       "%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X",
+				       (int)(entry->hwaddr[0] & 0x000000FF),
+				       (int)(entry->hwaddr[1] & 0x000000FF),
+				       (int)(entry->hwaddr[2] & 0x000000FF),
+				       (int)(entry->hwaddr[3] & 0x000000FF),
+				       (int)(entry->hwaddr[4] & 0x000000FF),
+				       (int)(entry->hwaddr[5] & 0x000000FF));
+			len += sprintf(buffer + len, "%12lu ""%12lu ",
+				       (unsigned long)entry->last_sent,
+				       (unsigned long)entry->expires_at);
+			len += sprintf(buffer + len, "%10u",
+				       (unsigned int)entry->xmit_count);
+			len += sprintf(buffer + len, " unresolved\n");
 		}
 	}
 
 	for (ct = 0; ct < AARP_HASH_SIZE; ct++) {
 		for (entry = proxies[ct]; entry; entry = entry->next) {
-			len+= sprintf(buffer+len,"%6u:%-3u  ",
+			len += sprintf(buffer + len, "%6u:%-3u  ",
 				(unsigned int)ntohs(entry->target_addr.s_net),
 				(unsigned int)(entry->target_addr.s_node));
-			len+= sprintf(buffer+len,"%-10.10s",
-				entry->dev->name);
-			len+= sprintf(buffer+len,"%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X",
-				(int)(entry->hwaddr[0] & 0x000000FF),
-				(int)(entry->hwaddr[1] & 0x000000FF),
-				(int)(entry->hwaddr[2] & 0x000000FF),
-				(int)(entry->hwaddr[3] & 0x000000FF),
-				(int)(entry->hwaddr[4] & 0x000000FF),
-				(int)(entry->hwaddr[5] & 0x000000FF));
-			len+= sprintf(buffer+len,"%12lu ""%12lu ",
-				(unsigned long)entry->last_sent,
-				(unsigned long)entry->expires_at);
-			len+=sprintf(buffer+len,"%10u",
-				(unsigned int)entry->xmit_count);
-			len+=sprintf(buffer+len,"      proxy\n");
+			len += sprintf(buffer + len, "%-10.10s",
+				       entry->dev->name);
+			len += sprintf(buffer + len,
+				       "%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X",
+				       (int)(entry->hwaddr[0] & 0x000000FF),
+				       (int)(entry->hwaddr[1] & 0x000000FF),
+				       (int)(entry->hwaddr[2] & 0x000000FF),
+				       (int)(entry->hwaddr[3] & 0x000000FF),
+				       (int)(entry->hwaddr[4] & 0x000000FF),
+				       (int)(entry->hwaddr[5] & 0x000000FF));
+			len += sprintf(buffer + len, "%12lu ""%12lu ",
+				       (unsigned long)entry->last_sent,
+				       (unsigned long)entry->expires_at);
+			len += sprintf(buffer + len, "%10u",
+				       (unsigned int)entry->xmit_count);
+			len += sprintf(buffer + len, "      proxy\n");
 		}
 	}
 
