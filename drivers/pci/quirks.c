@@ -535,6 +535,15 @@ static void __init quirk_mediagx_master(struct pci_dev *dev)
 	}
 }
 
+/* This was originally an Alpha specific thing, but it really fits here.
+ * The i82375 PCI/EISA bridge appears as non-classified. Fix that.
+ */
+
+static void __init quirk_eisa_bridge(struct pci_dev *dev)
+{
+	dev->class = PCI_CLASS_BRIDGE_EISA << 8;
+}
+
 /*
  *  The main table of quirks.
  */
@@ -604,6 +613,7 @@ static struct pci_fixup pci_fixups[] __devinitdata = {
 
 	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_CYRIX,	PCI_DEVICE_ID_CYRIX_PCI_MASTER, quirk_mediagx_master },
 	
+	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82375,	quirk_eisa_bridge },
 
 	{ 0 }
 };

@@ -1,6 +1,28 @@
 #
-# PCI configuration
+# EISA configuration
 #
+config EISA_PCI_EISA
+	bool "Generic PCI/EISA bridge"
+	depends on PCI && EISA
+	default y
+	---help---
+	  Activate this option if your system contains a PCI to EISA
+	  bridge. If your system have both PCI and EISA slots, you
+	  certainly need this option.
+
+	  When in doubt, say Y.
+
+config EISA_VIRTUAL_ROOT
+	bool "EISA virtual root device"
+	depends on EISA
+	default y
+	---help---
+	  Activate this option if your system only have EISA bus
+	  (no PCI slots). The Alpha Jensen is an example of such
+	  a system.
+
+	  When in doubt, say Y.
+
 config EISA_NAMES
 	bool "EISA device name database"
 	depends on EISA
