@@ -645,9 +645,7 @@ struct sock *tcp_create_openreq_child(struct sock *sk, struct open_request *req,
 
 	if(newsk != NULL) {
 		struct tcp_opt *newtp;
-#ifdef CONFIG_FILTER
 		struct sk_filter *filter;
-#endif
 
 		memcpy(newsk, sk, sizeof(struct tcp_sock));
 		newsk->state = TCP_SYN_RECV;
@@ -677,10 +675,10 @@ struct sock *tcp_create_openreq_child(struct sock *sk, struct open_request *req,
 		newsk->callback_lock = RW_LOCK_UNLOCKED;
 		skb_queue_head_init(&newsk->error_queue);
 		newsk->write_space = tcp_write_space;
-#ifdef CONFIG_FILTER
+
 		if ((filter = newsk->filter) != NULL)
 			sk_filter_charge(newsk, filter);
-#endif
+
 		if (unlikely(xfrm_sk_clone_policy(newsk))) {
 			/* It is still raw copy of parent, so invalidate
 			 * destructor and make plain sk_free() */
