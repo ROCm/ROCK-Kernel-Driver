@@ -954,6 +954,13 @@ ext3_xattr_set_handle(handle_t *handle, struct inode *inode, int name_index,
 	error = ext3_get_inode_loc(inode, &is.iloc);
 	if (error)
 		goto cleanup;
+
+	if (EXT3_I(inode)->i_state & EXT3_STATE_NEW) {
+		struct ext3_inode *raw_inode = ext3_raw_inode(&is.iloc);
+		memset(raw_inode, 0, EXT3_SB(inode->i_sb)->s_inode_size);
+		EXT3_I(inode)->i_state &= ~EXT3_STATE_NEW;
+	}
+
 	error = ext3_xattr_ibody_find(inode, &i, &is);
 	if (error)
 		goto cleanup;
