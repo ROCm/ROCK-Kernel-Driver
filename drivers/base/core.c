@@ -54,7 +54,7 @@ static void attach(struct device * dev)
  */
 static int found_match(struct device * dev, struct device_driver * drv)
 {
-	int error = 0;
+	int error;
 
 	if (!(error = probe(dev,get_driver(drv)))) {
 		pr_debug("bound device '%s' to driver '%s'\n",
@@ -64,7 +64,7 @@ static int found_match(struct device * dev, struct device_driver * drv)
 		put_driver(drv);
 		dev->driver = NULL;
 	}
-	return error;
+	return error == 0;
 }
 
 /**
@@ -75,7 +75,9 @@ static int found_match(struct device * dev, struct device_driver * drv)
  * This function is used as a callback to bus_for_each_drv.
  * It calls the bus's match callback to check if the driver supports
  * the device. If so, it calls the found_match() function above to 
- * take care of all the details.
+ * try taking care of all the details.
+ *
+ * Returns zero (to continue the scan) if the driver didn't attach.
  */
 static int do_device_attach(struct device_driver * drv, void * data)
 {
