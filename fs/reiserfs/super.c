@@ -984,6 +984,7 @@ static int read_super_block (struct super_block * s, int offset)
 {
     struct buffer_head * bh;
     struct reiserfs_super_block * rs;
+    int fs_blocksize;
  
 
     bh = sb_bread (s, offset / s->s_blocksize);
@@ -1003,8 +1004,9 @@ static int read_super_block (struct super_block * s, int offset)
     //
     // ok, reiserfs signature (old or new) found in at the given offset
     //    
-    sb_set_blocksize (s, sb_blocksize(rs));
+    fs_blocksize = sb_blocksize(rs);
     brelse (bh);
+    sb_set_blocksize (s, fs_blocksize);
     
     bh = sb_bread (s, offset / s->s_blocksize);
     if (!bh) {

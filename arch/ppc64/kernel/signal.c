@@ -220,6 +220,9 @@ int sys_rt_sigreturn(unsigned long r3, unsigned long r4, unsigned long r5,
 	sigset_t set;
 	stack_t st;
 
+	/* Always make any pending restarted system calls return -EINTR */
+	current_thread_info()->restart_block.fn = do_no_restart_syscall;
+
 	if (verify_area(VERIFY_READ, uc, sizeof(*uc)))
 		goto badframe;
 
@@ -354,8 +357,6 @@ syscall_restart(struct pt_regs *regs, struct k_sigaction *ka)
 {
 	switch ((int)regs->result) {
 	case -ERESTART_RESTARTBLOCK:
-		current_thread_info()->restart_block.fn = do_no_restart_syscall;
-		/* fallthrough */
 	case -ERESTARTNOHAND:
 		/* ERESTARTNOHAND means that the syscall should only be
 		 * restarted if there was no handler for the signal, and since

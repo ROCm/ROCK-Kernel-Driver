@@ -292,7 +292,7 @@
 			  "=&r" (__sc_7),  "=&r" (__sc_8)		\
 			: __sc_asm_input_##nr				\
 			: "cr0", "ctr", "memory",			\
-			        "r9", "r10","r11", "r12");		\
+			  "r9", "r10","r11", "r12");			\
 		__sc_ret = __sc_3;					\
 		__sc_err = __sc_0;					\
 	}								\
@@ -369,9 +369,9 @@ type name(type1 arg1, type2 arg2, type3 arg3, type4 arg4, type5 arg5)	\
 }
 
 #define _syscall6(type,name,type1,arg1,type2,arg2,type3,arg3,type4,arg4,type5,arg5,type6,arg6) \
-type name(type1 arg1, type2 arg2, type3 arg3, type4 arg4, type5 arg5, type6 arg6)	\
+type name(type1 arg1, type2 arg2, type3 arg3, type4 arg4, type5 arg5, type6 arg6) \
 {									\
-	__syscall_nr(6, type, name, arg1, arg2, arg3, arg4, arg5, arg6);	\
+	__syscall_nr(6, type, name, arg1, arg2, arg3, arg4, arg5, arg6); \
 }
 
 #ifdef __KERNEL__

@@ -2213,6 +2213,7 @@ struct device_node *of_find_node_by_type(struct device_node *from,
 	read_unlock(&devtree_lock);
 	return np;
 }
+EXPORT_SYMBOL(of_find_node_by_type);
 
 /**
  *	of_find_compatible_node - Find a node based on type and one of the

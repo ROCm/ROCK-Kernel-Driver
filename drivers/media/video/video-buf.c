@@ -320,14 +320,16 @@ int videobuf_waiton(struct videobuf_buffer *vb, int non_blocking, int intr)
 	DECLARE_WAITQUEUE(wait, current);
 	
 	add_wait_queue(&vb->done, &wait);
-	while (vb->state == STATE_ACTIVE ||
-	       vb->state == STATE_QUEUED) {
+	while (vb->state == STATE_ACTIVE || vb->state == STATE_QUEUED) {
 		if (non_blocking) {
 			retval = -EAGAIN;
 			break;
 		}
-		current->state = intr ? TASK_INTERRUPTIBLE : TASK_UNINTERRUPTIBLE;
-		schedule();
+		set_current_state(intr ? TASK_INTERRUPTIBLE :
+					TASK_UNINTERRUPTIBLE);
+		if (vb->state == STATE_ACTIVE || vb->state == STATE_QUEUED)
+			schedule();
+		set_current_state(TASK_RUNNING);
 		if (intr && signal_pending(current)) {
 			dprintk(1,"buffer waiton: -EINTR\n");
 			retval = -EINTR;

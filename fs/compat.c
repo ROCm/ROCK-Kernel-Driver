@@ -210,11 +210,14 @@ asmlinkage long compat_statfs64(const char *path, compat_size_t sz, struct compa
 	return error;
 }
 
-asmlinkage long compat_fstatfs64(unsigned int fd, struct compat_statfs64 *buf)
+asmlinkage long compat_fstatfs64(unsigned int fd, compat_size_t sz, struct compat_statfs64 *buf)
 {
 	struct file * file;
 	struct kstatfs tmp;
 	int error;
+
+	if (sz != sizeof(*buf))
+		return -EINVAL;
 
 	error = -EBADF;
 	file = fget(fd);

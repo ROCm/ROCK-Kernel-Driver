@@ -534,7 +534,7 @@ void __devinit pcibios_fixup_device_resources(struct pci_dev *dev,
 }
 EXPORT_SYMBOL(pcibios_fixup_device_resources);
 
-void __init pcibios_fixup_bus(struct pci_bus *bus)
+void __devinit pcibios_fixup_bus(struct pci_bus *bus)
 {
 	struct pci_controller *hose = PCI_GET_PHB_PTR(bus);
 	struct list_head *ln;
@@ -583,6 +583,7 @@ void __init pcibios_fixup_bus(struct pci_bus *bus)
 			pcibios_fixup_device_resources(dev, bus);
 	}
 }
+EXPORT_SYMBOL(pcibios_fixup_bus);
 
 static void check_s7a(void)
 {
@@ -654,6 +655,7 @@ int unmap_bus_range(struct pci_bus *bus)
 
 	return 0;
 }
+EXPORT_SYMBOL(unmap_bus_range);
 
 int remap_bus_range(struct pci_bus *bus)
 {
@@ -673,6 +675,7 @@ int remap_bus_range(struct pci_bus *bus)
 
 	return 0;
 }
+EXPORT_SYMBOL(remap_bus_range);
 
 static void phbs_fixup_io(void)
 {

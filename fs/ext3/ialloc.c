@@ -469,8 +469,11 @@ struct inode *ext3_new_inode(handle_t *handle, struct inode * dir, int mode)
 		if (!bitmap_bh)
 			goto fail;
 
-		ino = ext3_find_first_zero_bit((unsigned long *)
-				bitmap_bh->b_data, EXT3_INODES_PER_GROUP(sb));
+		ino = 0;
+
+repeat_in_this_group:
+		ino = ext3_find_next_zero_bit((unsigned long *)
+				bitmap_bh->b_data, EXT3_INODES_PER_GROUP(sb), ino);
 		if (ino < EXT3_INODES_PER_GROUP(sb)) {
 			int credits = 0;
 
@@ -493,6 +496,9 @@ struct inode *ext3_new_inode(handle_t *handle, struct inode * dir, int mode)
 			}
 			/* we lost it */
 			journal_release_buffer(handle, bitmap_bh, credits);
+
+			if (++ino < EXT3_INODES_PER_GROUP(sb))
+				goto repeat_in_this_group;
 		}
 
 		/*

@@ -1,5 +1,5 @@
 config BINFMT_ELF
-	tristate "Kernel support for ELF binaries"
+	bool "Kernel support for ELF binaries"
 	depends on MMU
 	default y
 	---help---

@@ -54,7 +54,7 @@
 
 #define ELF_NGREG	48	/* includes nip, msr, lr, etc. */
 #define ELF_NFPREG	33	/* includes fpscr */
-#define ELF_NVRREG	33	/* includes vscr */
+#define ELF_NVRREG	34	/* includes vscr */
 
 typedef unsigned long elf_greg_t64;
 typedef elf_greg_t64 elf_gregset_t64[ELF_NGREG];
@@ -81,6 +81,23 @@ typedef elf_greg_t32 elf_gregset_t32[ELF_NGREG];
 
 typedef double elf_fpreg_t;
 typedef elf_fpreg_t elf_fpregset_t[ELF_NFPREG];
+
+/* Altivec registers */
+/*
+ * The entries with indexes 0-31 contain the corresponding vector registers. 
+ * The entry with index 32 contains the vscr as the last word (offset 12) 
+ * within the quadword.  This allows the vscr to be stored as either a 
+ * quadword (since it must be copied via a vector register to/from storage) 
+ * or as a word.  The entry with index 33 contains the vrsave as the first 
+ * word (offset 0) within the quadword.
+ *
+ * This definition of the VMX state is compatible with the current PPC32 
+ * ptrace interface.  This allows signal handling and ptrace to use the same 
+ * structures.  This also simplifies the implementation of a bi-arch 
+ * (combined (32- and 64-bit) gdb.
+ */
+typedef __vector128 elf_vrreg_t;
+typedef elf_vrreg_t elf_vrregset_t[ELF_NVRREG];
 
 /*
  * This is used to ensure we don't load something for the wrong architecture.

@@ -277,8 +277,6 @@ static void __init init_intel(struct cpuinfo_x86 *c)
 		extern	int phys_proc_id[NR_CPUS];
 		
 		u32 	eax, ebx, ecx, edx;
-		int 	index_lsb, index_msb, tmp;
-		int	initial_apic_id;
 		int 	cpu = smp_processor_id();
 
 		cpuid(1, &eax, &ebx, &ecx, &edx);
@@ -287,8 +285,6 @@ static void __init init_intel(struct cpuinfo_x86 *c)
 		if (smp_num_siblings == 1) {
 			printk(KERN_INFO  "CPU: Hyper-Threading is disabled\n");
 		} else if (smp_num_siblings > 1 ) {
-			index_lsb = 0;
-			index_msb = 31;
 			/*
 			 * At this point we only support two siblings per
 			 * processor package.
@@ -299,20 +295,13 @@ static void __init init_intel(struct cpuinfo_x86 *c)
 				smp_num_siblings = 1;
 				goto too_many_siblings;
 			}
-			tmp = smp_num_siblings;
-			while ((tmp & 1) == 0) {
-				tmp >>=1 ;
-				index_lsb++;
-			}
-			tmp = smp_num_siblings;
-			while ((tmp & 0x80000000 ) == 0) {
-				tmp <<=1 ;
-				index_msb--;
-			}
-			if (index_lsb != index_msb )
-				index_msb++;
-			initial_apic_id = ebx >> 24 & 0xff;
-			phys_proc_id[cpu] = initial_apic_id >> index_msb;
+			/* cpuid returns the value latched in the HW at reset,
+			 * not the APIC ID register's value.  For any box
+			 * whose BIOS changes APIC IDs, like clustered APIC
+			 * systems, we must use hard_smp_processor_id.
+			 * See Intel's IA-32 SW Dev's Manual Vol2 under CPUID.
+			 */
+			phys_proc_id[cpu] = hard_smp_processor_id() & ~(smp_num_siblings - 1);
 
 			printk(KERN_INFO  "CPU: Physical Processor ID: %d\n",
                                phys_proc_id[cpu]);

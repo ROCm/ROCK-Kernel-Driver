@@ -257,7 +257,7 @@ red_enqueue(struct sk_buff *skb, struct Qdisc* sch)
 	if (q->qave < q->qth_min) {
 		q->qcount = -1;
 enqueue:
-		if (sch->stats.backlog <= q->limit) {
+		if (sch->stats.backlog + skb->len <= q->limit) {
 			__skb_queue_tail(&sch->q, skb);
 			sch->stats.backlog += skb->len;
 			sch->stats.bytes += skb->len;

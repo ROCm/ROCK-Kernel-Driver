@@ -300,6 +300,9 @@ static void setup_frame32(struct pt_regs *regs, struct sigregs32 *frame,
 	struct sigcontext32 *sc = (struct sigcontext32 *)(u64)newsp;
 	int i;
 
+	/* Always make any pending restarted system calls return -EINTR */
+	current_thread_info()->restart_block.fn = do_no_restart_syscall;
+
 	if (verify_area(VERIFY_WRITE, frame, sizeof(*frame)))
 		goto badframe;
 	if (regs->msr & MSR_FP)
@@ -419,6 +422,9 @@ long sys32_rt_sigreturn(unsigned long r3, unsigned long r4, unsigned long r5,
 	stack_t st;
 	int i;
 	mm_segment_t old_fs;
+
+	/* Always make any pending restarted system calls return -EINTR */
+	current_thread_info()->restart_block.fn = do_no_restart_syscall;
 
 	/* Adjust the inputted reg1 to point to the first rt signal frame */
 	rt_sf = (struct rt_sigframe_32 *)(regs->gpr[1] + __SIGNAL_FRAMESIZE32);
