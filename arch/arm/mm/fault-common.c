@@ -132,10 +132,12 @@ __do_user_fault(struct task_struct *tsk, unsigned long addr,
 	struct siginfo si;
 
 #ifdef CONFIG_DEBUG_USER
-	printk(KERN_DEBUG "%s: unhandled page fault at 0x%08lx, code 0x%03x\n",
-	       tsk->comm, addr, fsr);
-	show_pte(tsk->mm, addr);
-	show_regs(regs);
+	if (user_debug & UDBG_SEGV) {
+		printk(KERN_DEBUG "%s: unhandled page fault at 0x%08lx, code 0x%03x\n",
+		       tsk->comm, addr, fsr);
+		show_pte(tsk->mm, addr);
+		show_regs(regs);
+	}
 #endif
 
 	tsk->thread.address = addr;
@@ -296,8 +298,10 @@ do_sigbus:
 	tsk->thread.trap_no = 14;
 	force_sig(SIGBUS, tsk);
 #ifdef CONFIG_DEBUG_USER
-	printk(KERN_DEBUG "%s: sigbus at 0x%08lx, pc=0x%08lx\n",
-		current->comm, addr, instruction_pointer(regs));
+	if (user_debug & UDBG_BUS) {
+		printk(KERN_DEBUG "%s: sigbus at 0x%08lx, pc=0x%08lx\n",
+			current->comm, addr, instruction_pointer(regs));
+	}
 #endif
 
 	/* Kernel mode? Handle exceptions or die */

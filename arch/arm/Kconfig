@@ -657,6 +657,15 @@ config DEBUG_USER
 	  sometimes helpful for debugging but serves no purpose on a
 	  production system. Most people should say N here.
 
+	  In addition, you need to pass user_debug=N on the kernel command
+	  line to enable this feature.  N consists of the sum of:
+
+	      1 - undefined instruction events
+	      2 - system calls
+	      4 - invalid data aborts
+	      8 - SIGSEGV faults
+	     16 - SIGBUS faults
+
 config DEBUG_INFO
 	bool "Include GDB debugging information in kernel binary"
 	help
