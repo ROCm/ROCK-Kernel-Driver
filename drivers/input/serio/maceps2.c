@@ -17,6 +17,7 @@
 #include <linux/device.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
+#include <linux/err.h>
 
 #include <asm/io.h>
 #include <asm/irq.h>
@@ -46,15 +47,18 @@ MODULE_LICENSE("GPL");
 #define PS2_CONTROL_RX_CLOCK_ENABLE  BIT(4) /* pause reception if set to 0 */
 #define PS2_CONTROL_RESET            BIT(5) /* reset */
 
-
 struct maceps2_data {
 	struct mace_ps2port *port;
 	int irq;
 };
 
+static struct maceps2_data port_data[2];
+static struct serio *maceps2_port[2];
+static struct platform_device *maceps2_device;
+
 static int maceps2_write(struct serio *dev, unsigned char val)
 {
-	struct mace_ps2port *port = ((struct maceps2_data *)dev->driver)->port;
+	struct mace_ps2port *port = ((struct maceps2_data *)dev->port_data)->port;
 	unsigned int timeout = MACE_PS2_TIMEOUT;
 
 	do {
@@ -68,11 +72,10 @@ static int maceps2_write(struct serio *dev, unsigned char val)
 	return -1;
 }
 
-static irqreturn_t maceps2_interrupt(int irq, void *dev_id,
-				     struct pt_regs *regs)
+static irqreturn_t maceps2_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct serio *dev = dev_id;
-	struct mace_ps2port *port = ((struct maceps2_data *)dev->driver)->port;
+	struct mace_ps2port *port = ((struct maceps2_data *)dev->port_data)->port;
 	unsigned int byte;
 
 	if (mace_read(port->status) & PS2_STATUS_RX_FULL) {
@@ -85,7 +88,7 @@ static irqreturn_t maceps2_interrupt(int irq, void *dev_id,
 
 static int maceps2_open(struct serio *dev)
 {
-	struct maceps2_data *data = (struct maceps2_data *)dev->driver;
+	struct maceps2_data *data = (struct maceps2_data *)dev->port_data;
 
 	if (request_irq(data->irq, maceps2_interrupt, 0, "PS/2 port", dev)) {
 		printk(KERN_ERR "Could not allocate PS/2 IRQ\n");
@@ -106,7 +109,7 @@ static int maceps2_open(struct serio *dev)
 
 static void maceps2_close(struct serio *dev)
 {
-	struct maceps2_data *data = (struct maceps2_data *)dev->driver;
+	struct maceps2_data *data = (struct maceps2_data *)dev->port_data;
 
 	mace_write(PS2_CONTROL_TX_CLOCK_DISABLE | PS2_CONTROL_RESET,
 		   data->port->control);
@@ -114,46 +117,59 @@ static void maceps2_close(struct serio *dev)
 	free_irq(data->irq, dev);
 }
 
-static struct maceps2_data port0_data, port1_data;
 
-static struct serio maceps2_port0 =
+static struct serio * __init maceps2_allocate_port(int idx)
 {
-	.type	= SERIO_8042,
-	.open	= maceps2_open,
-	.close	= maceps2_close,
-	.write	= maceps2_write,
-	.name	= "MACE PS/2 port0",
-	.phys	= "mace/serio0",
-	.driver = &port0_data,
-};
+	struct serio *serio;
 
-static struct serio maceps2_port1 =
-{
-	.type	= SERIO_8042,
-	.open	= maceps2_open,
-	.close	= maceps2_close,
-	.write	= maceps2_write,
-	.name	= "MACE PS/2 port1",
-	.phys	= "mace/serio1",
-	.driver = &port1_data,
-};
+	serio = kmalloc(sizeof(struct serio), GFP_KERNEL);
+	if (serio) {
+		memset(serio, 0, sizeof(struct serio));
+		serio->type		= SERIO_8042;
+		serio->write		= maceps2_write;
+		serio->open		= maceps2_open;
+		serio->close		= maceps2_close;
+		snprintf(serio->name, sizeof(serio->name), "MACE PS/2 port%d", idx);
+		snprintf(serio->phys, sizeof(serio->phys), "mace/serio%d", idx);
+		serio->port_data	= &port_data[idx];
+		serio->dev.parent	= &maceps2_device->dev;
+	}
+
+	return serio;
+}
+
 
 static int __init maceps2_init(void)
 {
-	port0_data.port = &mace->perif.ps2.keyb;
-	port0_data.irq  = MACEISA_KEYB_IRQ;
-	port1_data.port = &mace->perif.ps2.mouse;
-	port1_data.irq  = MACEISA_MOUSE_IRQ;
-	serio_register_port(&maceps2_port0);
-	serio_register_port(&maceps2_port1);
+	maceps2_device = platform_device_register_simple("maceps2", -1, NULL, 0);
+	if (IS_ERR(maceps2_device))
+		return PTR_ERR(maceps2_device);
+
+	port_data[0].port = &mace->perif.ps2.keyb;
+	port_data[0].irq  = MACEISA_KEYB_IRQ;
+	port_data[1].port = &mace->perif.ps2.mouse;
+	port_data[1].irq  = MACEISA_MOUSE_IRQ;
+
+	maceps2_port[0] = maceps2_allocate_port(0);
+	maceps2_port[1] = maceps2_allocate_port(1);
+	if (!maceps2_port[0] || !maceps2_port[1]) {
+		kfree(maceps2_port[0]);
+		kfree(maceps2_port[1]);
+		platform_device_unregister(maceps2_device);
+		return -ENOMEM;
+	}
+
+	serio_register_port(maceps2_port[0]);
+	serio_register_port(maceps2_port[1]);
 
 	return 0;
 }
 
 static void __exit maceps2_exit(void)
 {
-	serio_unregister_port(&maceps2_port0);
-	serio_unregister_port(&maceps2_port1);
+	serio_unregister_port(maceps2_port[0]);
+	serio_unregister_port(maceps2_port[1]);
+	platform_device_unregister(maceps2_device);
 }
 
 module_init(maceps2_init);

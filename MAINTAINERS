@@ -1063,6 +1063,13 @@ M:	lethal@chaoticdreams.org
 L:	linux-fbdev-devel@lists.sourceforge.net
 S:	Maintained
 
+INPUT (KEYBOARD, MOUSE, JOYSTICK) DRIVERS
+P:	Vojtech Pavlik
+M:	vojtech@suse.cz
+L:	linux-input@atrey.karlin.mff.cuni.cz
+L:	linux-joystick@atrey.karlin.mff.cuni.cz
+S:	Maintained
+
 INTEL 810/815 FRAMEBUFFER DRIVER
 P:      Antonino Daplas
 M:      adaplas@pol.net
@@ -1186,13 +1193,6 @@ M:	shaggy@austin.ibm.com
 L:	jfs-discussion@oss.software.ibm.com
 W:	http://oss.software.ibm.com/jfs/
 S:	Supported
-
-JOYSTICK DRIVER
-P:	Vojtech Pavlik
-M:	vojtech@suse.cz
-L:	linux-joystick@atrey.karlin.mff.cuni.cz
-W:	http://www.suse.cz/development/joystick/
-S:	Maintained
 
 KCONFIG
 P:	Roman Zippel
@@ -2176,12 +2176,11 @@ M:	dbrownell@users.sourceforge.net
 L:	linux-usb-devel@lists.sourceforge.net
 S:	Maintained
 
-USB HID/HIDBP/INPUT DRIVERS
+USB HID/HIDBP DRIVERS
 P:	Vojtech Pavlik
 M:	vojtech@suse.cz
 L:	linux-usb-users@lists.sourceforge.net
 L:	linux-usb-devel@lists.sourceforge.net
-W:	http://www.suse.cz/development/input/
 S:	Maintained
 
 USB HUB DRIVER

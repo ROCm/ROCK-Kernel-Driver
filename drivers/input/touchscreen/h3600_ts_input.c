@@ -45,8 +45,10 @@
 #include <asm/arch/hardware.h>
 #include <asm/arch/irqs.h>
 
+#define DRIVER_DESC	"H3600 touchscreen driver"
+
 MODULE_AUTHOR("James Simmons <jsimmons@transvirtual.com>");
-MODULE_DESCRIPTION("H3600 touchscreen driver");
+MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
 
 /*
@@ -373,7 +375,7 @@ static irqreturn_t h3600ts_interrupt(struct serio *serio, unsigned char data,
  * new serio device. It looks whether it was registered as a H3600 touchscreen
  * and if yes, registers it as an input device.
  */
-static void h3600ts_connect(struct serio *serio, struct serio_dev *dev)
+static void h3600ts_connect(struct serio *serio, struct serio_driver *drv)
 {
 	struct h3600_dev *ts;
 
@@ -441,7 +443,7 @@ static void h3600ts_connect(struct serio *serio, struct serio_dev *dev)
 	ts->dev.id.product = 0x0666;  /* FIXME !!! We can ask the hardware */
 	ts->dev.id.version = 0x0100;
 
-	if (serio_open(serio, dev)) {
+	if (serio_open(serio, drv)) {
         	free_irq(IRQ_GPIO_BITSY_ACTION_BUTTON, ts);
         	free_irq(IRQ_GPIO_BITSY_NPOWER_BUTTON, ts);
 		kfree(ts);
@@ -478,10 +480,14 @@ static void h3600ts_disconnect(struct serio *serio)
  * The serio device structure.
  */
 
-static struct serio_dev h3600ts_dev = {
-	.interrupt =	h3600ts_interrupt,
-	.connect =	h3600ts_connect,
-	.disconnect =	h3600ts_disconnect,
+static struct serio_driver h3600ts_drv = {
+	.driver		= {
+		.name	= "h3600ts",
+	},
+	.description	= DRIVER_DESC,
+	.interrupt	= h3600ts_interrupt,
+	.connect	= h3600ts_connect,
+	.disconnect	= h3600ts_disconnect,
 };
 
 /*
@@ -490,13 +496,13 @@ static struct serio_dev h3600ts_dev = {
 
 static int __init h3600ts_init(void)
 {
-	serio_register_device(&h3600ts_dev);
+	serio_register_driver(&h3600ts_drv);
 	return 0;
 }
 
 static void __exit h3600ts_exit(void)
 {
-	serio_unregister_device(&h3600ts_dev);
+	serio_unregister_driver(&h3600ts_drv);
 }
 
 module_init(h3600ts_init);
