@@ -333,16 +333,17 @@ int keventd_up(void)
 int current_is_keventd(void)
 {
 	struct cpu_workqueue_struct *cwq;
-	int cpu;
+	int cpu = smp_processor_id();	/* preempt-safe: keventd is per-cpu */
+	int ret = 0;
 
 	BUG_ON(!keventd_wq);
 
-	for_each_cpu(cpu) {
-		cwq = keventd_wq->cpu_wq + cpu;
-		if (current == cwq->thread)
-			return 1;
-	}
-	return 0;
+	cwq = keventd_wq->cpu_wq + cpu;
+	if (current == cwq->thread)
+		ret = 1;
+
+	return ret;
+
 }
 
 void init_workqueues(void)
