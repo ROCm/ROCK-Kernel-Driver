@@ -52,6 +52,7 @@ struct ei_device {
 	void (*block_input)(struct net_device *, int, struct sk_buff *, int);
 	unsigned long rmem_start;
 	unsigned long rmem_end;
+	void __iomem *mem;
 	unsigned char mcfilter[8];
 	unsigned open:1;
 	unsigned word16:1;  		/* We have the 16-bit (vs 8-bit) version of the card. */
