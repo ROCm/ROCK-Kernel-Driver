@@ -34,6 +34,11 @@
 
 void* OpenPIC_Addr;
 static volatile struct OpenPIC *OpenPIC = NULL;
+/*
+ * We define OpenPIC_InitSenses table thusly:
+ * bit 0x1: sense, 0 for edge and 1 for level.
+ * bit 0x2: polarity, 0 for negative, 1 for positive.
+ */
 u_int OpenPIC_NumInitSenses __initdata = 0;
 u_char *OpenPIC_InitSenses __initdata = NULL;
 extern int use_of_interrupt_tree;
@@ -380,14 +385,8 @@ void __init openpic_init(int main_pic, int offset, unsigned char *chrp_ack,
 
 	openpic_set_priority(0xf);
 
-	/* SIOint (8259 cascade) is special */
-	if (offset) {
-		openpic_initirq(0, 8, offset, 1, 1);
-		openpic_mapirq(0, 1<<0, 0);
-	}
-
-	/* Init all external sources */
-	for (i = 1; i < NumSources; i++) {
+	/* Init all external sources, including possibly the cascade. */
+	for (i = 0; i < NumSources; i++) {
 		int pri, sense;
 
 		if (ISR[i] == 0)
@@ -397,12 +396,18 @@ void __init openpic_init(int main_pic, int offset, unsigned char *chrp_ack,
 		openpic_disable_irq(i+offset);
 
 		pri = (i == programmer_switch_irq)? 9: 8;
+		/*
+		 * We find the vale from either the InitSenses table
+		 * or assume a negative polarity level interrupt.
+		 */
 		sense = (i < OpenPIC_NumInitSenses)? OpenPIC_InitSenses[i]: 1;
-		if (sense)
+
+		if ((sense & IRQ_SENSE_MASK) == 1)
 			irq_desc[i+offset].status = IRQ_LEVEL;
 
 		/* Enabled, Priority 8 or 9 */
-		openpic_initirq(i, pri, i+offset, !sense, sense);
+		openpic_initirq(i, pri, i+offset, (sense & IRQ_POLARITY_MASK),
+				(sense & IRQ_SENSE_MASK));
 		/* Processor 0 */
 		openpic_mapirq(i, 1<<0, 0);
 	}
