@@ -3,6 +3,7 @@
 #include "linux/string.h"
 #include "linux/smp_lock.h"
 #include "linux/spinlock.h"
+#include <linux/highmem.h>
 #include "asm/current.h"
 #include "asm/delay.h"
 #include "asm/processor.h"
@@ -74,6 +75,13 @@ EXPORT_SYMBOL_NOVERS(__write_lock_failed);
 extern void FASTCALL( __read_lock_failed(rwlock_t *rw));
 EXPORT_SYMBOL_NOVERS(__read_lock_failed);
 
-EXPORT_SYMBOL(smp_num_cpus);
-
 #endif
+
+#ifdef CONFIG_HIGHMEM
+EXPORT_SYMBOL(kmap);
+EXPORT_SYMBOL(kunmap);
+EXPORT_SYMBOL(kmap_atomic);
+EXPORT_SYMBOL(kunmap_atomic);
+EXPORT_SYMBOL(kmap_atomic_to_page);
+#endif
+
