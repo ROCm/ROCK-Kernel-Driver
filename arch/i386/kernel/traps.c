@@ -292,35 +292,52 @@ bug:
 	printk("Kernel BUG\n");
 }
 
-spinlock_t die_lock = SPIN_LOCK_UNLOCKED;
-
 void die(const char * str, struct pt_regs * regs, long err)
 {
+	static struct {
+		spinlock_t lock;
+		u32 lock_owner;
+		int lock_owner_depth;
+	} die = {
+		.lock =			SPIN_LOCK_UNLOCKED,
+		.lock_owner =		-1,
+		.lock_owner_depth =	0
+	};
 	static int die_counter;
-	int nl = 0;
 
-	console_verbose();
-	spin_lock_irq(&die_lock);
-	bust_spinlocks(1);
-	handle_BUG(regs);
-	printk(KERN_ALERT "%s: %04lx [#%d]\n", str, err & 0xffff, ++die_counter);
+	if (die.lock_owner != smp_processor_id()) {
+		console_verbose();
+		spin_lock_irq(&die.lock);
+		die.lock_owner = smp_processor_id();
+		die.lock_owner_depth = 0;
+		bust_spinlocks(1);
+	}
+
+	if (++die.lock_owner_depth < 3) {
+		int nl = 0;
+		handle_BUG(regs);
+		printk(KERN_ALERT "%s: %04lx [#%d]\n", str, err & 0xffff, ++die_counter);
 #ifdef CONFIG_PREEMPT
-	printk("PREEMPT ");
-	nl = 1;
+		printk("PREEMPT ");
+		nl = 1;
 #endif
 #ifdef CONFIG_SMP
-	printk("SMP ");
-	nl = 1;
+		printk("SMP ");
+		nl = 1;
 #endif
 #ifdef CONFIG_DEBUG_PAGEALLOC
-	printk("DEBUG_PAGEALLOC");
-	nl = 1;
+		printk("DEBUG_PAGEALLOC");
+		nl = 1;
 #endif
-	if (nl)
-		printk("\n");
-	show_registers(regs);
+		if (nl)
+			printk("\n");
+		show_registers(regs);
+  	} else
+		printk(KERN_ERR "Recursive die() failure, output suppressed\n");
+
 	bust_spinlocks(0);
-	spin_unlock_irq(&die_lock);
+	die.lock_owner = -1;
+	spin_unlock_irq(&die.lock);
 	if (in_interrupt())
 		panic("Fatal exception in interrupt");
 
