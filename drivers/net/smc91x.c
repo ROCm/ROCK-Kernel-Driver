@@ -55,6 +55,9 @@
  *                                  smc_phy_configure
  *                                - clean up (and fix stack overrun) in PHY
  *                                  MII read/write functions
+ *   09/15/04  Hayato Fujiwara    - Add m32r support.
+ *                                - Modify for SMP kernel; Change spin-locked
+ *                                  regions.
  */
 static const char version[] =
 	"smc91x.c: v1.0, mar 07 2003 by Nicolas Pitre <nico@cam.org>\n";
@@ -256,24 +259,18 @@ static void PRINT_PKT(u_char *buf, int length)
 
 /* this enables an interrupt in the interrupt mask register */
 #define SMC_ENABLE_INT(x) do {						\
-	unsigned long flags;						\
 	unsigned char mask;						\
-	spin_lock_irqsave(&lp->lock, flags);				\
 	mask = SMC_GET_INT_MASK();					\
 	mask |= (x);							\
 	SMC_SET_INT_MASK(mask);						\
-	spin_unlock_irqrestore(&lp->lock, flags);			\
 } while (0)
 
 /* this disables an interrupt from the interrupt mask register */
 #define SMC_DISABLE_INT(x) do {						\
-	unsigned long flags;						\
 	unsigned char mask;						\
-	spin_lock_irqsave(&lp->lock, flags);				\
 	mask = SMC_GET_INT_MASK();					\
 	mask &= ~(x);							\
 	SMC_SET_INT_MASK(mask);						\
-	spin_unlock_irqrestore(&lp->lock, flags);			\
 } while (0)
 
 /*
@@ -580,8 +577,11 @@ static int smc_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	struct smc_local *lp = netdev_priv(dev);
 	unsigned long ioaddr = dev->base_addr;
 	unsigned int numPages, poll_count, status, saved_bank;
+	unsigned long flags;
 
 	DBG(3, "%s: %s\n", dev->name, __FUNCTION__);
+
+	spin_lock_irqsave(&lp->lock, flags);
 
 	BUG_ON(lp->saved_skb != NULL);
 	lp->saved_skb = skb;
@@ -604,6 +604,7 @@ static int smc_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		lp->stats.tx_errors++;
 		lp->stats.tx_dropped++;
 		dev_kfree_skb(skb);
+		spin_unlock_irqrestore(&lp->lock, flags);
 		return 0;
 	}
 
@@ -652,6 +653,7 @@ static int smc_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	}
 
 	SMC_SELECT_BANK(saved_bank);
+	spin_unlock_irqrestore(&lp->lock, flags);
 	return 0;
 }
 
@@ -1166,6 +1168,8 @@ static irqreturn_t smc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	DBG(3, "%s: %s\n", dev->name, __FUNCTION__);
 
+	spin_lock(&lp->lock);
+
 	saved_bank = SMC_CURRENT_BANK();
 	SMC_SELECT_BANK(2);
 	saved_pointer = SMC_GET_PTR();
@@ -1188,8 +1192,6 @@ static irqreturn_t smc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		status &= mask;
 		if (!status)
 			break;
-
-		spin_lock(&lp->lock);
 
 		if (status & IM_RCV_INT) {
 			DBG(3, "%s: RX irq\n", dev->name);
@@ -1239,7 +1241,6 @@ static irqreturn_t smc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			PRINTK("%s: UNSUPPORTED: ERCV INTERRUPT \n", dev->name);
 		}
 
-		spin_unlock(&lp->lock);
 	} while (--timeout);
 
 	/* restore register states */
@@ -1249,6 +1250,7 @@ static irqreturn_t smc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	DBG(3, "%s: Interrupt done (%d loops)\n", dev->name, 8-timeout);
 
+	spin_unlock(&lp->lock);
 	/*
 	 * We return IRQ_HANDLED unconditionally here even if there was
 	 * nothing to do.  There is a possibility that a packet might
@@ -1264,7 +1266,9 @@ static irqreturn_t smc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 static void smc_timeout(struct net_device *dev)
 {
 	struct smc_local *lp = netdev_priv(dev);
+	unsigned long flags;
 
+	spin_lock_irqsave(&lp->lock, flags);
 	DBG(2, "%s: %s\n", dev->name, __FUNCTION__);
 
 	smc_reset(dev);
@@ -1298,6 +1302,9 @@ static void smc_timeout(struct net_device *dev)
 	}
 	/* We can accept TX packets again */
 	dev->trans_start = jiffies;
+
+	spin_unlock_irqrestore(&lp->lock, flags);
+
 	netif_wake_queue(dev);
 }
 
@@ -1438,7 +1445,7 @@ smc_open(struct net_device *dev)
 	 * address using ifconfig eth0 hw ether xx:xx:xx:xx:xx:xx
 	 */
 	if (!is_valid_ether_addr(dev->dev_addr)) {
-		DBG(2, (KERN_DEBUG "smc_open: no valid ethernet hw addr\n"));
+		DBG(2, "smc_open: no valid ethernet hw addr\n");
 		return -EINVAL;
 	}
 
@@ -1878,7 +1885,9 @@ static int __init smc_probe(struct net_device *dev, unsigned long ioaddr)
       	if (retval)
       		goto err_out;
 
+#if !defined(__m32r__)
 	set_irq_type(dev->irq, IRQT_RISING);
+#endif
 #ifdef SMC_USE_PXA_DMA
 	{
 		int dma = pxa_request_dma(dev->name, DMA_PRIO_LOW,

@@ -198,7 +198,7 @@ extern struct address_space_operations hfs_btree_aops;
 
 extern struct inode *hfs_new_inode(struct inode *, struct qstr *, int);
 extern void hfs_inode_write_fork(struct inode *, struct hfs_extent *, u32 *, u32 *);
-extern void hfs_write_inode(struct inode *, int);
+extern int hfs_write_inode(struct inode *, int);
 extern int hfs_inode_setattr(struct dentry *, struct iattr *);
 extern void hfs_inode_read_fork(struct inode *inode, struct hfs_extent *ext,
 				u32 log_size, u32 phys_size, u32 clump_size);

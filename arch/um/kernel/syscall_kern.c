@@ -44,17 +44,6 @@ long sys_fork(void)
 	return(ret);
 }
 
-long sys_clone(unsigned long clone_flags, unsigned long newsp,
-	       int *parent_tid, int *child_tid)
-{
-	long ret;
-
-	current->thread.forking = 1;
-	ret = do_fork(clone_flags, newsp, NULL, 0, parent_tid, child_tid);
-	current->thread.forking = 0;
-	return(ret);
-}
-
 long sys_vfork(void)
 {
 	long ret;

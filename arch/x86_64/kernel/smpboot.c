@@ -575,7 +575,7 @@ static void __init do_boot_cpu (int apicid)
 	start_rip = setup_trampoline();
 
 	init_rsp = idle->thread.rsp; 
-	init_tss[cpu].rsp0 = init_rsp;
+	per_cpu(init_tss,cpu).rsp0 = init_rsp;
 	initial_code = start_secondary;
 	clear_ti_thread_flag(idle->thread_info, TIF_FORK);
 

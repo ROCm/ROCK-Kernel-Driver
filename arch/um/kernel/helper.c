@@ -132,7 +132,7 @@ int run_helper_thread(int (*proc)(void *), void *arg, unsigned int flags,
 		return(-errno);
 	}
 	if(stack_out == NULL){
-		pid = waitpid(pid, &status, 0);
+		CATCH_EINTR(pid = waitpid(pid, &status, 0));
 		if(pid < 0){
 			printk("run_helper_thread - wait failed, errno = %d\n",
 			       errno);
@@ -151,7 +151,7 @@ int helper_wait(int pid, int block)
 {
 	int ret;
 
-	ret = waitpid(pid, NULL, WNOHANG);
+	CATCH_EINTR(ret = waitpid(pid, NULL, WNOHANG));
 	if(ret < 0){
 		printk("helper_wait : waitpid failed, errno = %d\n", errno);
 		return(-errno);

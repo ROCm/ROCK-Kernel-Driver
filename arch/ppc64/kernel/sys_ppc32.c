@@ -72,7 +72,6 @@
 #include <asm/semaphore.h>
 #include <asm/ppcdebug.h>
 #include <asm/time.h>
-#include <asm/ppc32.h>
 #include <asm/mmu_context.h>
 
 #include "pci.h"
@@ -700,7 +699,7 @@ asmlinkage int sys32_pciconfig_read(u32 bus, u32 dfn, u32 off, u32 len, u32 ubuf
 				  (unsigned long) dfn,
 				  (unsigned long) off,
 				  (unsigned long) len,
-				  (unsigned char __user *)AA(ubuf));
+				  compat_ptr(ubuf));
 }
 
 asmlinkage int sys32_pciconfig_write(u32 bus, u32 dfn, u32 off, u32 len, u32 ubuf)
@@ -709,7 +708,7 @@ asmlinkage int sys32_pciconfig_write(u32 bus, u32 dfn, u32 off, u32 len, u32 ubu
 				   (unsigned long) dfn,
 				   (unsigned long) off,
 				   (unsigned long) len,
-				   (unsigned char __user *)AA(ubuf));
+				   compat_ptr(ubuf));
 }
 
 #define IOBASE_BRIDGE_NUMBER	0
@@ -1095,7 +1094,7 @@ struct __sysctl_args32 {
 	u32 __unused[4];
 };
 
-extern asmlinkage long sys32_sysctl(struct __sysctl_args32 __user *args)
+asmlinkage long sys32_sysctl(struct __sysctl_args32 __user *args)
 {
 	struct __sysctl_args32 tmp;
 	int error;
@@ -1114,19 +1113,20 @@ extern asmlinkage long sys32_sysctl(struct __sysctl_args32 __user *args)
 		   glibc's __sysctl uses rw memory for the structure
 		   anyway.  */
 		oldlenp = (size_t __user *)addr;
-		if (get_user(oldlen, (u32 __user *)A(tmp.oldlenp)) ||
+		if (get_user(oldlen, (compat_size_t __user *)compat_ptr(tmp.oldlenp)) ||
 		    put_user(oldlen, oldlenp))
 			return -EFAULT;
 	}
 
 	lock_kernel();
-	error = do_sysctl((int __user *)A(tmp.name), tmp.nlen, (void __user *)A(tmp.oldval),
-			  oldlenp, (void __user *)A(tmp.newval), tmp.newlen);
+	error = do_sysctl(compat_ptr(tmp.name), tmp.nlen,
+			  compat_ptr(tmp.oldval), oldlenp,
+			  compat_ptr(tmp.newval), tmp.newlen);
 	unlock_kernel();
 	if (oldlenp) {
 		if (!error) {
 			if (get_user(oldlen, oldlenp) ||
-			    put_user(oldlen, (u32 __user *)A(tmp.oldlenp)))
+			    put_user(oldlen, (compat_size_t __user *)compat_ptr(tmp.oldlenp)))
 				error = -EFAULT;
 		}
 		copy_to_user(args->__unused, tmp.__unused, sizeof(tmp.__unused));

@@ -143,7 +143,7 @@ static int __init parse_iomem(char *str, int *add)
 	struct iomem_region *new;
 	struct uml_stat buf;
 	char *file, *driver;
-	int fd, err;
+	int fd, err, size;
 
 	driver = str;
 	file = strchr(str,',');
@@ -171,10 +171,12 @@ static int __init parse_iomem(char *str, int *add)
 		goto out_close;
 	}
 
+	size = (buf.ust_size + UM_KERN_PAGE_SIZE) & ~(UM_KERN_PAGE_SIZE - 1);
+
 	*new = ((struct iomem_region) { .next		= iomem_regions,
 					.driver		= driver,
 					.fd		= fd,
-					.size		= buf.ust_size,
+					.size		= size,
 					.phys		= 0,
 					.virt		= 0 });
 	iomem_regions = new;

@@ -1099,7 +1099,7 @@ ssize_t reiserfs_file_write( struct file *file, /* the file we are going to writ
 {
     size_t already_written = 0; // Number of bytes already written to the file.
     loff_t pos; // Current position in the file.
-    size_t res; // return value of various functions that we call.
+    ssize_t res; // return value of various functions that we call.
     struct inode *inode = file->f_dentry->d_inode; // Inode of the file that we are writing to.
 				/* To simplify coding at this time, we store
 				   locked pages in array for now */
@@ -1108,7 +1108,7 @@ ssize_t reiserfs_file_write( struct file *file, /* the file we are going to writ
     th.t_trans_id = 0;
 
     if ( file->f_flags & O_DIRECT) { // Direct IO needs treatment
-	int result, after_file_end = 0;
+	ssize_t result, after_file_end = 0;
 	if ( (*ppos + count >= inode->i_size) || (file->f_flags & O_APPEND) ) {
 	    /* If we are appending a file, we need to put this savelink in here.
 	       If we will crash while doing direct io, finish_unfinished will

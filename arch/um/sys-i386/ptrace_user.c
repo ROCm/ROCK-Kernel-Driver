@@ -42,7 +42,8 @@ static void write_debugregs(int pid, unsigned long *regs)
 		if(ptrace(PTRACE_POKEUSER, pid, &dummy->u_debugreg[i],
 			  regs[i]) < 0)
 			printk("write_debugregs - ptrace failed on "
-			       "register %d, errno = %d\n", errno);
+			       "register %d, value = 0x%x, errno = %d\n", i,
+			       regs[i], errno);
 	}
 }
 

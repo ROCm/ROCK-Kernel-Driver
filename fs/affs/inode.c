@@ -181,7 +181,7 @@ bad_inode:
 	return;
 }
 
-void
+int
 affs_write_inode(struct inode *inode, int unused)
 {
 	struct super_block	*sb = inode->i_sb;
@@ -194,11 +194,11 @@ affs_write_inode(struct inode *inode, int unused)
 
 	if (!inode->i_nlink)
 		// possibly free block
-		return;
+		return 0;
 	bh = affs_bread(sb, inode->i_ino);
 	if (!bh) {
 		affs_error(sb,"write_inode","Cannot read block %lu",inode->i_ino);
-		return;
+		return -EIO;
 	}
 	tail = AFFS_TAIL(sb, bh);
 	if (tail->stype == cpu_to_be32(ST_ROOT)) {
@@ -226,6 +226,7 @@ affs_write_inode(struct inode *inode, int unused)
 	mark_buffer_dirty_inode(bh, inode);
 	affs_brelse(bh);
 	affs_free_prealloc(inode);
+	return 0;
 }
 
 int

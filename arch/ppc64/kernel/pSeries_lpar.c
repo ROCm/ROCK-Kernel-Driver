@@ -660,14 +660,15 @@ void pSeries_lpar_flush_hash_range(unsigned long context, unsigned long number,
 	int i;
 	unsigned long flags;
 	struct ppc64_tlb_batch *batch = &__get_cpu_var(ppc64_tlb_batch);
+	int lock_tlbie = !(cur_cpu_spec->cpu_features & CPU_FTR_LOCKLESS_TLBIE);
 
-	if (!(cur_cpu_spec->cpu_features & CPU_FTR_LOCKLESS_TLBIE))
+	if (lock_tlbie)
 		spin_lock_irqsave(&pSeries_lpar_tlbie_lock, flags);
 
 	for (i = 0; i < number; i++)
 		flush_hash_page(context, batch->addr[i], batch->pte[i], local);
 
-	if (!(cur_cpu_spec->cpu_features & CPU_FTR_LOCKLESS_TLBIE))
+	if (lock_tlbie)
 		spin_unlock_irqrestore(&pSeries_lpar_tlbie_lock, flags);
 }
 

@@ -44,8 +44,7 @@ EXPORT_SYMBOL(init_task);
  * section. Since TSS's are completely CPU-local, we want them
  * on exact cacheline boundaries, to eliminate cacheline ping-pong.
  */ 
-struct tss_struct init_tss[NR_CPUS] __cacheline_aligned;
-
+DEFINE_PER_CPU(struct tss_struct, init_tss) ____cacheline_maxaligned_in_smp;
 
 #define ALIGN_TO_4K __attribute__((section(".data.init_task")))
 

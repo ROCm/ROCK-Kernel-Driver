@@ -200,7 +200,7 @@ source "drivers/net/arm/Kconfig"
 
 config MACE
 	tristate "MACE (Power Mac ethernet) support"
-	depends on NET_ETHERNET && PPC_PMAC
+	depends on NET_ETHERNET && PPC32 && PPC_PMAC
 	select CRC32
 	help
 	  Power Macintoshes and clones with Ethernet built-in on the
@@ -223,7 +223,7 @@ config MACE_AAUI_PORT
 
 config BMAC
 	tristate "BMAC (G3 ethernet) support"
-	depends on NET_ETHERNET && PPC_PMAC
+	depends on NET_ETHERNET && PPC32 && PPC_PMAC
 	select CRC32
 	help
 	  Say Y for support of BMAC Ethernet interfaces. These are used on G3
@@ -817,7 +817,7 @@ config SMC91X
 	tristate "SMC 91C9x/91C1xxx support"
 	select CRC32
 	select MII
-	depends on NET_ETHERNET && (ARM || REDWOOD_5 || REDWOOD_6)
+	depends on NET_ETHERNET && (ARM || REDWOOD_5 || REDWOOD_6 || M32R)
 	help
 	  This is a driver for SMC's 91x series of Ethernet chipsets,
 	  including the SMC91C94 and the SMC91C111. Say Y if you want it
@@ -1075,7 +1075,7 @@ config ETH16I
 
 config NE2000
 	tristate "NE2000/NE1000 support"
-	depends on NET_ISA || (Q40 && m)
+	depends on NET_ISA || (Q40 && m) || M32R
 	select CRC32
 	---help---
 	  If you have a network (Ethernet) card of this type, say Y and read

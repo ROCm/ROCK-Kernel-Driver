@@ -1,19 +1,18 @@
 RCU Concepts
 
 
-The basic idea behind RCU is to split destructive operations into two
-parts, one that makes anyone from seeing the data item being destroyed,
-and one that actually carries out the destruction.  A "grace period"
-must elapse between the two parts, and this grace period must be long
-enough that any readers accessing the item being deleted have since
-dropped their references.  For example, an RCU-protected deletion from a
-linked list would first remove the item from the list, wait for a grace
-period to elapse, then free the element.  See the listRCU.txt file for
-more information on using RCU with linked lists.
+The basic idea behind RCU (read-copy update) is to split destructive
+operations into two parts, one that prevents anyone from seeing the data
+item being destroyed, and one that actually carries out the destruction.
+A "grace period" must elapse between the two parts, and this grace period
+must be long enough that any readers accessing the item being deleted have
+since dropped their references.  For example, an RCU-protected deletion
+from a linked list would first remove the item from the list, wait for
+a grace period to elapse, then free the element.  See the listRCU.txt
+file for more information on using RCU with linked lists.
 
 
 Frequently Asked Questions
-
 
 o	Why would anyone want to use RCU?
 
@@ -24,7 +23,6 @@ o	Why would anyone want to use RCU?
 	on modern CPUs is what gives RCU its performance advantages
 	in read-mostly situations.  The fact that RCU readers need not
 	acquire locks can also greatly simplify deadlock-avoidance code.
-
 
 o	How can the updater tell when a grace period has completed
 	if the RCU readers give no indication when they are done?
@@ -50,6 +48,19 @@ o	How can I see where RCU is currently used in the Linux kernel?
 o	What guidelines should I follow when writing code that uses RCU?
 
 	See the checklist.txt file in this directory.
+
+o	Why the name "RCU"?
+
+	"RCU" stands for "read-copy update".  The file listRCU.txt has
+	more information on where this name came from, search for
+	"read-copy update" to find it.
+
+o	I hear that RCU is patented?  What is with that?
+
+	Yes, it is.  There are several known patents related to RCU,
+	search for the string "Patent" in RTFP.txt to find them.
+	Of these, one was allowed to lapse by the assignee, and the
+	others have been contributed to the Linux kernel under GPL.
 
 o	Where can I find more information on RCU?
 

@@ -248,11 +248,11 @@ struct typhoon {
 	/* Tx cache line section */
 	struct transmit_ring 	txLoRing	____cacheline_aligned;	
 	struct pci_dev *	tx_pdev;
-	unsigned long		tx_ioaddr;
+	void __iomem		*tx_ioaddr;
 	u32			txlo_dma_addr;
 
 	/* Irq/Rx cache line section */
-	unsigned long		ioaddr		____cacheline_aligned;
+	void __iomem		*ioaddr		____cacheline_aligned;
 	struct typhoon_indexes *indexes;
 	u8			awaiting_resp;
 	u8			duplex;
@@ -373,7 +373,7 @@ typhoon_inc_rx_index(u32 *index, const int count)
 }
 
 static int
-typhoon_reset(unsigned long ioaddr, int wait_type)
+typhoon_reset(void __iomem *ioaddr, int wait_type)
 {
 	int i, err = 0;
 	int timeout;
@@ -428,7 +428,7 @@ out:
 }
 
 static int
-typhoon_wait_status(unsigned long ioaddr, u32 wait_value)
+typhoon_wait_status(void __iomem *ioaddr, u32 wait_value)
 {
 	int i, err = 0;
 
@@ -1240,7 +1240,7 @@ typhoon_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 }
 
 static int
-typhoon_wait_interrupt(unsigned long ioaddr)
+typhoon_wait_interrupt(void __iomem *ioaddr)
 {
 	int i, err = 0;
 
@@ -1348,7 +1348,7 @@ typhoon_init_rings(struct typhoon *tp)
 static int
 typhoon_download_firmware(struct typhoon *tp)
 {
-	unsigned long ioaddr = tp->ioaddr;
+	void __iomem *ioaddr = tp->ioaddr;
 	struct pci_dev *pdev = tp->pdev;
 	struct typhoon_file_header *fHdr;
 	struct typhoon_section_header *sHdr;
@@ -1497,7 +1497,7 @@ err_out:
 static int
 typhoon_boot_3XP(struct typhoon *tp, u32 initial_status)
 {
-	unsigned long ioaddr = tp->ioaddr;
+	void __iomem *ioaddr = tp->ioaddr;
 
 	if(typhoon_wait_status(ioaddr, initial_status) < 0) {
 		printk(KERN_ERR "%s: boot ready timeout\n", tp->name);
@@ -1812,7 +1812,8 @@ static irqreturn_t
 typhoon_interrupt(int irq, void *dev_instance, struct pt_regs *rgs)
 {
 	struct net_device *dev = (struct net_device *) dev_instance;
-	unsigned long ioaddr = dev->base_addr;
+	struct typhoon *tp = dev->priv;
+	void __iomem *ioaddr = tp->ioaddr;
 	u32 intr_status;
 
 	intr_status = readl(ioaddr + TYPHOON_REG_INTR_STATUS);
@@ -1852,7 +1853,7 @@ static int
 typhoon_sleep(struct typhoon *tp, int state, u16 events)
 {
 	struct pci_dev *pdev = tp->pdev;
-	unsigned long ioaddr = tp->ioaddr;
+	void __iomem *ioaddr = tp->ioaddr;
 	struct cmd_desc xp_cmd;
 	int err;
 
@@ -1890,7 +1891,7 @@ static int
 typhoon_wakeup(struct typhoon *tp, int wait_type)
 {
 	struct pci_dev *pdev = tp->pdev;
-	unsigned long ioaddr = tp->ioaddr;
+	void __iomem *ioaddr = tp->ioaddr;
 
 	pci_set_power_state(pdev, 0);
 	pci_restore_state(pdev, tp->pci_state);
@@ -1911,7 +1912,7 @@ static int
 typhoon_start_runtime(struct typhoon *tp)
 {
 	struct net_device *dev = tp->dev;
-	unsigned long ioaddr = tp->ioaddr;
+	void __iomem *ioaddr = tp->ioaddr;
 	struct cmd_desc xp_cmd;
 	int err;
 
@@ -2006,7 +2007,7 @@ typhoon_stop_runtime(struct typhoon *tp, int wait_type)
 {
 	struct typhoon_indexes *indexes = tp->indexes;
 	struct transmit_ring *txLo = &tp->txLoRing;
-	unsigned long ioaddr = tp->ioaddr;
+	void __iomem *ioaddr = tp->ioaddr;
 	struct cmd_desc xp_cmd;
 	int i;
 
@@ -2070,7 +2071,7 @@ typhoon_tx_timeout(struct net_device *dev)
 {
 	struct typhoon *tp = (struct typhoon *) dev->priv;
 
-	if(typhoon_reset(dev->base_addr, WaitNoSleep) < 0) {
+	if(typhoon_reset(tp->ioaddr, WaitNoSleep) < 0) {
 		printk(KERN_WARNING "%s: could not reset in tx timeout\n",
 					dev->name);
 		goto truely_dead;
@@ -2091,7 +2092,7 @@ typhoon_tx_timeout(struct net_device *dev)
 
 truely_dead:
 	/* Reset the hardware, and turn off carrier to avoid more timeouts */
-	typhoon_reset(dev->base_addr, NoWait);
+	typhoon_reset(tp->ioaddr, NoWait);
 	netif_carrier_off(dev);
 }
 
@@ -2126,7 +2127,7 @@ out_sleep:
 	if(typhoon_boot_3XP(tp, TYPHOON_STATUS_WAITING_FOR_HOST) < 0) {
 		printk(KERN_ERR "%s: unable to reboot into sleep img\n",
 				dev->name);
-		typhoon_reset(dev->base_addr, NoWait);
+		typhoon_reset(tp->ioaddr, NoWait);
 		goto out;
 	}
 
@@ -2192,7 +2193,7 @@ typhoon_resume(struct pci_dev *pdev)
 	return 0;
 
 reset:
-	typhoon_reset(dev->base_addr, NoWait);
+	typhoon_reset(tp->ioaddr, NoWait);
 	return -EBUSY;
 }
 
@@ -2276,6 +2277,7 @@ typhoon_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	struct typhoon *tp;
 	int card_id = (int) ent->driver_data;
 	unsigned long ioaddr;
+	void __iomem *ioaddr_mapped;
 	void *shared;
 	dma_addr_t shared_dma;
 	struct cmd_desc xp_cmd;
@@ -2345,14 +2347,13 @@ typhoon_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	/* map our MMIO region
 	 */
 	ioaddr = pci_resource_start(pdev, 1);
-	ioaddr = (unsigned long) ioremap(ioaddr, 128);
-	if(!ioaddr) {
+	ioaddr_mapped = ioremap(ioaddr, 128);
+	if (!ioaddr_mapped) {
 		printk(ERR_PFX "%s: cannot remap MMIO, aborting\n",
 		       pci_name(pdev));
 		err = -EIO;
 		goto error_out_regions;
 	}
-	dev->base_addr = ioaddr;
 
 	/* allocate pci dma space for rx and tx descriptor rings
 	 */
@@ -2371,8 +2372,8 @@ typhoon_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	tp->shared_dma = shared_dma;
 	tp->pdev = pdev;
 	tp->tx_pdev = pdev;
-	tp->ioaddr = dev->base_addr;
-	tp->tx_ioaddr = dev->base_addr;
+	tp->ioaddr = ioaddr_mapped;
+	tp->tx_ioaddr = ioaddr_mapped;
 	tp->dev = dev;
 
 	/* need to be able to restore PCI state after a suspend */
@@ -2385,7 +2386,7 @@ typhoon_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	 * 4) Get the hardware address.
 	 * 5) Put the card to sleep.
 	 */
-	if(typhoon_reset(ioaddr, WaitSleep) < 0) {
+	if (typhoon_reset(ioaddr_mapped, WaitSleep) < 0) {
 		printk(ERR_PFX "%s: could not reset 3XP\n", pci_name(pdev));
 		err = -EIO;
 		goto error_out_dma;
@@ -2518,13 +2519,13 @@ typhoon_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	return 0;
 
 error_out_reset:
-	typhoon_reset(ioaddr, NoWait);
+	typhoon_reset(ioaddr_mapped, NoWait);
 
 error_out_dma:
 	pci_free_consistent(pdev, sizeof(struct typhoon_shared),
 			    shared, shared_dma);
 error_out_remap:
-	iounmap((void *) ioaddr);
+	iounmap(ioaddr_mapped);
 error_out_regions:
 	pci_release_regions(pdev);
 error_out_dev:
@@ -2542,8 +2543,8 @@ typhoon_remove_one(struct pci_dev *pdev)
 	unregister_netdev(dev);
 	pci_set_power_state(pdev, 0);
 	pci_restore_state(pdev, tp->pci_state);
-	typhoon_reset(dev->base_addr, NoWait);
-	iounmap((char *) (dev->base_addr));
+	typhoon_reset(tp->ioaddr, NoWait);
+	iounmap(tp->ioaddr);
 	pci_free_consistent(pdev, sizeof(struct typhoon_shared),
 			    tp->shared, tp->shared_dma);
 	pci_release_regions(pdev);

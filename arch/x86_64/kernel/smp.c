@@ -396,6 +396,7 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
  *
  * You must not call this function with disabled interrupts or from a
  * hardware interrupt handler or from a bottom half handler.
+ * Actually there are a few legal cases, like panic.
  */
 {
 	struct call_data_struct data;
@@ -403,9 +404,6 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 
 	if (!cpus)
 		return 0;
-
-	/* Can deadlock when called with interrupts disabled */
-	WARN_ON(irqs_disabled());
 
 	data.func = func;
 	data.info = info;

@@ -276,7 +276,7 @@ extern void fat_put_super(struct super_block *sb);
 int fat_fill_super(struct super_block *sb, void *data, int silent,
 		   struct inode_operations *fs_dir_inode_ops, int isvfat);
 extern int fat_statfs(struct super_block *sb, struct kstatfs *buf);
-extern void fat_write_inode(struct inode *inode, int wait);
+extern int fat_write_inode(struct inode *inode, int wait);
 extern int fat_notify_change(struct dentry * dentry, struct iattr * attr);
 
 /* fat/misc.c */

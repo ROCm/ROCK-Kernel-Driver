@@ -130,11 +130,20 @@ void cpu_idle (void)
 {
 	/* endless idle loop with no priority at all */
 	while (1) {
-		void (*idle)(void) = pm_idle;
-		if (!idle)
-			idle = default_idle;
-		while (!need_resched())
+		while (!need_resched()) {
+			void (*idle)(void);
+			/*
+			 * Mark this as an RCU critical section so that
+			 * synchronize_kernel() in the unload path waits
+			 * for our completion.
+			 */
+			rcu_read_lock();
+			idle = pm_idle;
+			if (!idle)
+				idle = default_idle;
 			idle();
+			rcu_read_unlock();
+		}
 		schedule();
 	}
 }
@@ -250,11 +259,17 @@ void show_regs(struct pt_regs *regs)
 void exit_thread(void)
 {
 	struct task_struct *me = current;
+	struct thread_struct *t = &me->thread;
 	if (me->thread.io_bitmap_ptr) { 
-		struct tss_struct *tss = init_tss + get_cpu();
-		kfree(me->thread.io_bitmap_ptr); 
-		me->thread.io_bitmap_ptr = NULL;
-		tss->io_bitmap_base = INVALID_IO_BITMAP_OFFSET;
+		struct tss_struct *tss = &per_cpu(init_tss, get_cpu());
+
+		kfree(t->io_bitmap_ptr);
+		t->io_bitmap_ptr = NULL;
+		/*
+		 * Careful, clear this in the TSS too:
+		 */
+		memset(tss->io_bitmap, 0xff, t->io_bitmap_max);
+		t->io_bitmap_max = 0;
 		put_cpu();
 	}
 }
@@ -362,8 +377,10 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long rsp,
 
 	if (unlikely(me->thread.io_bitmap_ptr != NULL)) { 
 		p->thread.io_bitmap_ptr = kmalloc(IO_BITMAP_BYTES, GFP_KERNEL);
-		if (!p->thread.io_bitmap_ptr) 
+		if (!p->thread.io_bitmap_ptr) {
+			p->thread.io_bitmap_max = 0;
 			return -ENOMEM;
+		}
 		memcpy(p->thread.io_bitmap_ptr, me->thread.io_bitmap_ptr, IO_BITMAP_BYTES);
 	} 
 
@@ -382,8 +399,10 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long rsp,
 	}
 	err = 0;
 out:
-	if (err && p->thread.io_bitmap_ptr)
+	if (err && p->thread.io_bitmap_ptr) {
 		kfree(p->thread.io_bitmap_ptr);
+		p->thread.io_bitmap_max = 0;
+	}
 	return err;
 }
 
@@ -404,7 +423,7 @@ struct task_struct *__switch_to(struct task_struct *prev_p, struct task_struct *
 	struct thread_struct *prev = &prev_p->thread,
 				 *next = &next_p->thread;
 	int cpu = smp_processor_id();  
-	struct tss_struct *tss = init_tss + cpu;
+	struct tss_struct *tss = &per_cpu(init_tss, cpu);
 
 	unlazy_fpu(prev_p);
 
@@ -490,22 +509,18 @@ struct task_struct *__switch_to(struct task_struct *prev_p, struct task_struct *
 	 * Handle the IO bitmap 
 	 */ 
 	if (unlikely(prev->io_bitmap_ptr || next->io_bitmap_ptr)) {
-		if (next->io_bitmap_ptr) {
+		if (next->io_bitmap_ptr)
 			/*
-			 * 2 cachelines copy ... not good, but not that
-			 * bad either. Anyone got something better?
-			 * This only affects processes which use ioperm().
-			 */
-			memcpy(tss->io_bitmap, next->io_bitmap_ptr, IO_BITMAP_BYTES);
-			tss->io_bitmap_base = IO_BITMAP_OFFSET;
-		} else {
+			 * Copy the relevant range of the IO bitmap.
+			 * Normally this is 128 bytes or less:
+ 			 */
+			memcpy(tss->io_bitmap, next->io_bitmap_ptr,
+				max(prev->io_bitmap_max, next->io_bitmap_max));
+		else {
 			/*
-			 * a bitmap offset pointing outside of the TSS limit
-			 * causes a nicely controllable SIGSEGV if a process
-			 * tries to use a port IO instruction. The first
-			 * sys_ioperm() call sets up the bitmap properly.
+			 * Clear any possible leftover bits:
 			 */
-			tss->io_bitmap_base = INVALID_IO_BITMAP_OFFSET;
+			memset(tss->io_bitmap, 0xff, prev->io_bitmap_max);
 		}
 	}
 

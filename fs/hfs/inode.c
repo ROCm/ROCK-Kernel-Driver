@@ -381,7 +381,7 @@ void hfs_inode_write_fork(struct inode *inode, struct hfs_extent *ext,
 					 HFS_SB(inode->i_sb)->alloc_blksz);
 }
 
-void hfs_write_inode(struct inode *inode, int unused)
+int hfs_write_inode(struct inode *inode, int unused)
 {
 	struct hfs_find_data fd;
 	hfs_cat_rec rec;
@@ -395,27 +395,27 @@ void hfs_write_inode(struct inode *inode, int unused)
 			break;
 		case HFS_EXT_CNID:
 			hfs_btree_write(HFS_SB(inode->i_sb)->ext_tree);
-			return;
+			return 0;
 		case HFS_CAT_CNID:
 			hfs_btree_write(HFS_SB(inode->i_sb)->cat_tree);
-			return;
+			return 0;
 		default:
 			BUG();
-			return;
+			return -EIO;
 		}
 	}
 
 	if (HFS_IS_RSRC(inode)) {
 		mark_inode_dirty(HFS_I(inode)->rsrc_inode);
-		return;
+		return 0;
 	}
 
 	if (!inode->i_nlink)
-		return;
+		return 0;
 
 	if (hfs_find_init(HFS_SB(inode->i_sb)->cat_tree, &fd))
 		/* panic? */
-		return;
+		return -EIO;
 
 	fd.search_key->cat = HFS_I(inode)->cat_key;
 	if (hfs_brec_find(&fd))
@@ -460,6 +460,7 @@ void hfs_write_inode(struct inode *inode, int unused)
 	}
 out:
 	hfs_find_exit(&fd);
+	return 0;
 }
 
 static struct dentry *hfs_file_lookup(struct inode *dir, struct dentry *dentry,

@@ -134,7 +134,7 @@ extern unsigned long sysv_count_free_blocks(struct super_block *);
 extern void sysv_truncate(struct inode *);
 
 /* inode.c */
-extern void sysv_write_inode(struct inode *, int);
+extern int sysv_write_inode(struct inode *, int);
 extern int sysv_sync_inode(struct inode *);
 extern int sysv_sync_file(struct file *, struct dentry *, int);
 extern void sysv_set_inode(struct inode *, dev_t);

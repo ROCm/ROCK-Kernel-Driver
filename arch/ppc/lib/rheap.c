@@ -216,7 +216,7 @@ static void attach_free_block(rh_info_t * info, rh_block_t * blkn)
 
 	/* Grow the after block backwards */
 	if (before == NULL && after != NULL) {
-		(int8_t *) after->start -= size;
+		after->start = (int8_t *)after->start - size;
 		after->size += size;
 		return;
 	}
@@ -407,7 +407,7 @@ void *rh_detach_region(rh_info_t * info, void *start, int size)
 	/* blk still in free list, with updated start and/or size */
 	if (bs == s || be == e) {
 		if (bs == s)
-			(int8_t *) blk->start += size;
+			blk->start = (int8_t *)blk->start + size;
 		blk->size -= size;
 
 	} else {
@@ -471,7 +471,7 @@ void *rh_alloc(rh_info_t * info, int size, const char *owner)
 	newblk->owner = owner;
 
 	/* blk still in free list, with updated start, size */
-	(int8_t *) blk->start += size;
+	blk->start = (int8_t *)blk->start + size;
 	blk->size -= size;
 
 	start = newblk->start;
@@ -535,7 +535,7 @@ void *rh_alloc_fixed(rh_info_t * info, void *start, int size, const char *owner)
 	/* blk still in free list, with updated start and/or size */
 	if (bs == s || be == e) {
 		if (bs == s)
-			(int8_t *) blk->start += size;
+			blk->start = (int8_t *)blk->start + size;
 		blk->size -= size;
 
 	} else {

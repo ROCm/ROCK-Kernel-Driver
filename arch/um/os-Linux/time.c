@@ -1,15 +1,12 @@
-/*
- * sys-i386/time.c
- * Created 		25.9.2002	Sapan Bhatia
- *
- */
+#include <stdlib.h>
+#include <sys/time.h>
 
-unsigned long long time_stamp(void)
+unsigned long long os_usecs(void)
 {
-	unsigned long low, high;
+	struct timeval tv;
 
-	asm("rdtsc" : "=a" (low), "=d" (high));
-	return((((unsigned long long) high) << 32) + low);
+	gettimeofday(&tv, NULL);
+	return((unsigned long long) tv.tv_sec * 1000000 + tv.tv_usec);
 }
 
 /*

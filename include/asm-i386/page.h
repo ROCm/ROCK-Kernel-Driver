@@ -94,13 +94,13 @@ typedef struct { unsigned long pgprot; } pgprot_t;
  * and CONFIG_HIGHMEM64G options in the kernel configuration.
  */
 
+#ifndef __ASSEMBLY__
+
 /*
  * This much address space is reserved for vmalloc() and iomap()
  * as well as fixmap mappings.
  */
-#define __VMALLOC_RESERVE	(128 << 20)
-
-#ifndef __ASSEMBLY__
+extern unsigned int __VMALLOC_RESERVE;
 
 /* Pure 2^n version of get_order */
 static __inline__ int get_order(unsigned long size)

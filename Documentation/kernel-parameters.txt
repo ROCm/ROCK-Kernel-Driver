@@ -453,6 +453,11 @@ running once the system is up.
 	hd?=		[HW] (E)IDE subsystem
 	hd?lun=		See Documentation/ide.txt.
 
+	highmem=nn[KMG]	[KNL,BOOT] forces the highmem zone to have an exact
+			size of <nn>. This works even on boxes that have no
+			highmem otherwise. This also works to reduce highmem
+			size on bigger boxes.
+
 	hisax=		[HW,ISDN]
 			See Documentation/isdn/README.HiSax.
 
@@ -885,6 +890,13 @@ running once the system is up.
 		noacpi			[IA-32] Do not use ACPI for IRQ routing
 					or for PCI scanning.
 
+		firmware		[ARM] Do not re-enumerate the bus but
+					instead just use the configuration
+					from the bootloader. This is currently
+					used on IXP2000 systems where the
+					bus has to be configured a certain way
+					for adjunct CPUs.
+
 	pcmv=		[HW,PCMCIA] BadgePAD 4
 
 	pd.		[PARIDE]
@@ -1285,6 +1297,12 @@ running once the system is up.
 			Use vga=ask for menu.
 			This is actually a boot loader parameter; the value is
 			passed to the kernel using a special protocol.
+
+	vmalloc=nn[KMG]	[KNL,BOOT] forces the vmalloc area to have an exact
+			size of <nn>. This can be used to increase the
+			minimum size (128MB on x86). It can also be used to
+			decrease the size and leave more room for directly
+			mapped kernel RAM.
 
 	vmhalt=		[KNL,S390]
 

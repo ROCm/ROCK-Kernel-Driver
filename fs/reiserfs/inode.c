@@ -1504,7 +1504,7 @@ int reiserfs_encode_fh(struct dentry *dentry, __u32 *data, int *lenp, int need_p
 ** to properly mark inodes for datasync and such, but only actually
 ** does something when called for a synchronous update.
 */
-void reiserfs_write_inode (struct inode * inode, int do_sync) {
+int reiserfs_write_inode (struct inode * inode, int do_sync) {
     struct reiserfs_transaction_handle th ;
     int jbegin_count = 1 ;
 
@@ -1512,7 +1512,7 @@ void reiserfs_write_inode (struct inode * inode, int do_sync) {
         reiserfs_warning (inode->i_sb,
 			  "clm-6005: writing inode %lu on readonly FS",
 			  inode->i_ino) ;
-        return ;
+        return -EROFS;
     }
     /* memory pressure can sometimes initiate write_inode calls with sync == 1,
     ** these cases are just when the system needs ram, not when the 
@@ -1526,6 +1526,7 @@ void reiserfs_write_inode (struct inode * inode, int do_sync) {
 	journal_end_sync(&th, inode->i_sb, jbegin_count) ;
 	reiserfs_write_unlock(inode->i_sb);
     }
+    return 0;
 }
 
 /* FIXME: no need any more. right? */

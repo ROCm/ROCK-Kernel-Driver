@@ -100,12 +100,18 @@ static __inline__ void _outl(u32 l, unsigned long addr)
 #define inl_p(__addr)		inl(__addr)
 #define outl_p(__l, __addr)	outl(__l, __addr)
 
-extern void outsb(unsigned long addr, const void *src, unsigned long count);
-extern void outsw(unsigned long addr, const void *src, unsigned long count);
-extern void outsl(unsigned long addr, const void *src, unsigned long count);
-extern void insb(unsigned long addr, void *dst, unsigned long count);
-extern void insw(unsigned long addr, void *dst, unsigned long count);
-extern void insl(unsigned long addr, void *dst, unsigned long count);
+extern void outsb(void __iomem *addr, const void *src, unsigned long count);
+extern void outsw(void __iomem *addr, const void *src, unsigned long count);
+extern void outsl(void __iomem *addr, const void *src, unsigned long count);
+extern void insb(void __iomem *addr, void *dst, unsigned long count);
+extern void insw(void __iomem *addr, void *dst, unsigned long count);
+extern void insl(void __iomem *addr, void *dst, unsigned long count);
+#define ioread8_rep(a,d,c)	insb(a,d,c)
+#define ioread16_rep(a,d,c)	insw(a,d,c)
+#define ioread32_rep(a,d,c)	insl(a,d,c)
+#define iowrite8_rep(a,s,c)	outsb(a,s,c)
+#define iowrite16_rep(a,s,c)	outsw(a,s,c)
+#define iowrite32_rep(a,s,c)	outsl(a,s,c)
 
 /* Memory functions, same as I/O accesses on Ultra. */
 static inline u8 _readb(void __iomem *addr)

@@ -14,30 +14,6 @@
  * 2 of the License, or (at your option) any later version.
  */
 
-/* Use this to get at 32-bit user passed pointers. */
-/* Things to consider: the low-level assembly stub does
-   srl x, 0, x for first four arguments, so if you have
-   pointer to something in the first four arguments, just
-   declare it as a pointer, not u32. On the other side, 
-   arguments from 5th onwards should be declared as u32
-   for pointers, and need AA() around each usage.
-   A() macro should be used for places where you e.g.
-   have some internal variable u32 and just want to get
-   rid of a compiler warning. AA() has to be used in
-   places where you want to convert a function argument
-   to 32bit pointer or when you e.g. access pt_regs
-   structure and want to consider 32bit registers only.
-   -
- */
-#define A(__x) ((unsigned long)(__x))
-#define AA(__x)				\
-({	unsigned long __ret;		\
-	__asm__ ("clrldi	%0, %0, 32"	\
-		 : "=r" (__ret)		\
-		 : "0" (__x));		\
-	__ret;				\
-})
-
 /* These are here to support 32-bit syscalls on a 64-bit kernel. */
 
 typedef struct compat_siginfo {

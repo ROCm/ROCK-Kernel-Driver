@@ -56,7 +56,7 @@ static void set_bitmap(unsigned long *bitmap, unsigned int base, unsigned int ex
  */
 asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int turn_on)
 {
-	unsigned int i, max_long, bytes, bytes_updated;
+	unsigned long i, max_long, bytes, bytes_updated;
 	struct thread_struct * t = &current->thread;
 	struct tss_struct * tss;
 	unsigned long *bitmap;
@@ -105,8 +105,11 @@ asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int turn_on)
 
 	t->io_bitmap_max = bytes;
 
-	/* Update the TSS: */
-	memcpy(tss->io_bitmap, t->io_bitmap_ptr, bytes_updated);
+	/*
+	 * Sets the lazy trigger so that the next I/O operation will
+	 * reload the correct bitmap.
+	 */
+	tss->io_bitmap_base = INVALID_IO_BITMAP_OFFSET_LAZY;
 
 	put_cpu();
 

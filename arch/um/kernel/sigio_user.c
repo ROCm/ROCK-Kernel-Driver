@@ -68,7 +68,8 @@ void __init check_one_sigio(void (*proc)(int, int))
 		return;
 	}
 
-	err = __raw(master, 1, 0); //Not now, but complain so we now where we failed.
+	/* Not now, but complain so we now where we failed. */
+	err = raw(master);
 	if (err < 0)
 		panic("check_sigio : __raw failed, errno = %d\n", -err);
 

@@ -2745,21 +2745,21 @@ out_brelse:
  * `stuff()' is running, and the new i_size will be lost.  Plus the inode
  * will no longer be on the superblock's dirty inode list.
  */
-void ext3_write_inode(struct inode *inode, int wait)
+int ext3_write_inode(struct inode *inode, int wait)
 {
 	if (current->flags & PF_MEMALLOC)
-		return;
+		return 0;
 
 	if (ext3_journal_current_handle()) {
 		jbd_debug(0, "called recursively, non-PF_MEMALLOC!\n");
 		dump_stack();
-		return;
+		return -EIO;
 	}
 
 	if (!wait)
-		return;
+		return 0;
 
-	ext3_force_commit(inode->i_sb);
+	return ext3_force_commit(inode->i_sb);
 }
 
 /*

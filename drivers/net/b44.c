@@ -1837,7 +1837,7 @@ static int __devinit b44_init_one(struct pci_dev *pdev,
 	return 0;
 
 err_out_iounmap:
-	iounmap((void *) bp->regs);
+	iounmap(bp->regs);
 
 err_out_free_dev:
 	free_netdev(dev);
@@ -1859,7 +1859,7 @@ static void __devexit b44_remove_one(struct pci_dev *pdev)
 		struct b44 *bp = netdev_priv(dev);
 
 		unregister_netdev(dev);
-		iounmap((void *) bp->regs);
+		iounmap(bp->regs);
 		free_netdev(dev);
 		pci_release_regions(pdev);
 		pci_disable_device(pdev);

@@ -10,7 +10,6 @@
 #include <sys/time.h>
 #include <signal.h>
 #include <errno.h>
-#include <string.h>
 #include "user_util.h"
 #include "kern_util.h"
 #include "user.h"
@@ -95,49 +94,12 @@ void uml_idle_timer(void)
 	set_interval(ITIMER_REAL);
 }
 
-static unsigned long long get_host_hz(void)
-{
-	char mhzline[16], *end;
-	unsigned long long mhz;
-	int ret, mult, rest, len;
-
-	ret = cpu_feature("cpu MHz", mhzline,
-			  sizeof(mhzline) / sizeof(mhzline[0]));
-	if(!ret)
-		panic ("Could not get host MHZ");
-
-	mhz = strtoul(mhzline, &end, 10);
-
-	/* This business is to parse a floating point number without using
-	 * floating types.
-	 */
-
-	rest = 0;
-	mult = 0;
-	if(*end == '.'){
-		end++;
-		len = strlen(end);
-		if(len < 6)
-			mult = 6 - len;
-		else if(len > 6)
-			end[6] = '\0';
-		rest = strtoul(end, NULL, 10);
-		while(mult-- > 0)
-			rest *= 10;
-	}
-
-	return(1000000 * mhz + rest);
-}
-
-unsigned long long host_hz = 0;
-
 extern int do_posix_clock_monotonic_gettime(struct timespec *tp);
 
 void time_init(void)
 {
 	struct timespec now;
 
-	host_hz = get_host_hz();
 	if(signal(SIGVTALRM, boot_timer_handler) == SIG_ERR)
 		panic("Couldn't set SIGVTALRM handler");
 	set_interval(ITIMER_VIRTUAL);

@@ -16,7 +16,7 @@
 /* Protected by sigio_lock() called from write_sigio_workaround */
 static int sigio_irq_fd = -1;
 
-irqreturn_t sigio_interrupt(int irq, void *data, struct pt_regs *unused)
+static irqreturn_t sigio_interrupt(int irq, void *data, struct pt_regs *unused)
 {
 	read_sigio_fd(sigio_irq_fd);
 	reactivate_fd(sigio_irq_fd, SIGIO_WRITE_IRQ);
@@ -25,10 +25,14 @@ irqreturn_t sigio_interrupt(int irq, void *data, struct pt_regs *unused)
 
 int write_sigio_irq(int fd)
 {
-	if(um_request_irq(SIGIO_WRITE_IRQ, fd, IRQ_READ, sigio_interrupt,
+	int err;
+
+	err = um_request_irq(SIGIO_WRITE_IRQ, fd, IRQ_READ, sigio_interrupt,
 			  SA_INTERRUPT | SA_SAMPLE_RANDOM, "write sigio", 
-			  NULL)){
-		printk("write_sigio_irq : um_request_irq failed\n");
+			     NULL);
+	if(err){
+		printk("write_sigio_irq : um_request_irq failed, err = %d\n",
+		       err);
 		return(-1);
 	}
 	sigio_irq_fd = fd;

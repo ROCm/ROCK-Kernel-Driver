@@ -18,7 +18,7 @@ static int i8042_aux_irq = -1;
 #define I8042_AUX_PHYS_DESC "sparcps2/serio1"
 #define I8042_MUX_PHYS_DESC "sparcps2/serio%d"
 
-static unsigned long kbd_iobase;
+static void __iomem *kbd_iobase;
 
 #define I8042_COMMAND_REG	(kbd_iobase + 0x64UL)
 #define I8042_DATA_REG		(kbd_iobase + 0x60UL)
@@ -64,7 +64,7 @@ static int i8042_platform_init(void)
 	if (strncmp(prop, "SUNW,JavaStation-1", len) == 0) {
 		/* Hardcoded values for MrCoffee.  */
 		i8042_kbd_irq = i8042_aux_irq = 13 | 0x20;
-		kbd_iobase = (unsigned long) ioremap(0x71300060, 8);
+		kbd_iobase = ioremap(0x71300060, 8);
 		if (!kbd_iobase)
 			return -1;
 	} else {
@@ -85,7 +85,7 @@ static int i8042_platform_init(void)
 			if (!strcmp(child->prom_name, OBP_PS2KBD_NAME1) ||
 			    !strcmp(child->prom_name, OBP_PS2KBD_NAME2)) {
 				i8042_kbd_irq = child->irqs[0];
-				kbd_iobase = (unsigned long)
+				kbd_iobase =
 					ioremap(child->resource[0].start, 8);
 			}
 			if (!strcmp(child->prom_name, OBP_PS2MS_NAME1) ||
@@ -109,7 +109,7 @@ static int i8042_platform_init(void)
 static inline void i8042_platform_exit(void)
 {
 #ifdef CONFIG_PCI
-	iounmap((void *)kbd_iobase);
+	iounmap(kbd_iobase);
 #endif
 }
 

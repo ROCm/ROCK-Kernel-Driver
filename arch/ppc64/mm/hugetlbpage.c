@@ -853,7 +853,7 @@ static void flush_hash_hugepage(mm_context_t context, unsigned long ea,
 	vsid = get_vsid(context.id, ea);
 
 	va = (vsid << 28) | (ea & 0x0fffffff);
-	vpn = va >> LARGE_PAGE_SHIFT;
+	vpn = va >> HPAGE_SHIFT;
 	hash = hpt_hash(vpn, 1);
 	if (hugepte_val(pte) & _HUGEPAGE_SECONDARY)
 		hash = ~hash;

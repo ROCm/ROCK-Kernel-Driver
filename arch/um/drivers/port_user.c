@@ -76,12 +76,17 @@ void port_free(void *d)
 int port_open(int input, int output, int primary, void *d, char **dev_out)
 {
 	struct port_chan *data = d;
-	int fd;
+	int fd, err;
 
 	fd = port_wait(data->kernel_data);
 	if((fd >= 0) && data->raw){
-		tcgetattr(fd, &data->tt);
-		raw(fd, 0);
+		CATCH_EINTR(err = tcgetattr(fd, &data->tt));
+		if(err)
+			return(err);
+
+		err = raw(fd);
+		if(err)
+			return(err);
 	}
 	*dev_out = data->dev;
 	return(fd);
