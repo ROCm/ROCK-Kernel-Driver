@@ -3504,7 +3504,7 @@ e1000_read_eeprom(struct e1000_hw *hw,
     /* A check for invalid values:  offset too large, too many words, and not
      * enough words.
      */
-    if((offset > eeprom->word_size) || (words > eeprom->word_size - offset) ||
+    if((offset >= eeprom->word_size) || (words > eeprom->word_size - offset) ||
        (words == 0)) {
         DEBUGOUT("\"words\" parameter out of bounds\n");
         return -E1000_ERR_EEPROM;
@@ -3652,7 +3652,7 @@ e1000_write_eeprom(struct e1000_hw *hw,
     /* A check for invalid values:  offset too large, too many words, and not
      * enough words.
      */
-    if((offset > eeprom->word_size) || (words > eeprom->word_size - offset) ||
+    if((offset >= eeprom->word_size) || (words > eeprom->word_size - offset) ||
        (words == 0)) {
         DEBUGOUT("\"words\" parameter out of bounds\n");
         return -E1000_ERR_EEPROM;
