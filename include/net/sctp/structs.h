@@ -255,6 +255,12 @@ typedef struct sctp_func {
 
 sctp_func_t *sctp_get_af_specific(const sockaddr_storage_t *address);
 
+/* Protocol family functions. */
+typedef struct sctp_pf {
+	void (*event_msgname)(sctp_ulpevent_t *, char *, int *);
+	void (*skb_msgname)(struct sk_buff *, char *, int *);
+} sctp_pf_t;
+
 /* SCTP Socket type: UDP or TCP style. */
 typedef enum {
 	SCTP_SOCKET_UDP = 0,
@@ -280,6 +286,7 @@ struct sctp_opt {
 	__u32 autoclose;
 	__u8 nodelay;
 	__u8 disable_fragments;
+	sctp_pf_t *pf;
 };
 
 
@@ -845,6 +852,7 @@ int sctp_outqueue_set_output_handlers(sctp_outqueue_t *,
                                       sctp_outqueue_ohandler_force_t force);
 void sctp_outqueue_restart(sctp_outqueue_t *);
 void sctp_retransmit(sctp_outqueue_t *, sctp_transport_t *, __u8);
+void sctp_retransmit_mark(sctp_outqueue_t *, sctp_transport_t *, __u8);
 
 
 /* These bind address data fields common between endpoints and associations */
@@ -1128,6 +1136,11 @@ struct SCTP_association {
 		 */
 		sctp_transport_t *primary_path;
 
+		/* Cache the primary path address here, when we
+		 * need a an address for msg_name. 
+		 */
+		sockaddr_storage_t primary_addr;
+		
 		/* active_path
 		 *   The path that we are currently using to
 		 *   transmit new data and most control chunks.
@@ -1183,7 +1196,7 @@ struct SCTP_association {
 		int next_dup_tsn;
 
 		/* Do we need to sack the peer? */
-		int sack_needed;
+		uint8_t sack_needed;
 
 		/* These are capabilities which our peer advertised.  */
 		__u8	ecn_capable;     /* Can peer do ECN? */

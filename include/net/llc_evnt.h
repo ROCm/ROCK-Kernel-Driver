@@ -31,26 +31,12 @@
 #define LLC_STATION_EV_RX_NULL_DSAP_TEST_C			8
 #define LLC_STATION_EV_DISABLE_REQ				9
 
-/* Interfaces for various types of supported events */
-struct llc_stat_ev_simple_if {
-	u8 ev;
-};
-
-struct llc_stat_ev_prim_if {
-	u8 prim; /* connect, disconnect, reset, ... */
-	u8 type; /* request, indicate, response, confirm */
-};
-
-union llc_stat_ev_if {
-	struct llc_stat_ev_simple_if  a;	/* 'a' for simple, easy ... */
-	struct llc_stat_ev_prim_if    prim;
-};
-
 struct llc_station_state_ev {
-	u8		     type;
-	u8		     reason;
-	union llc_stat_ev_if data;
-	struct list_head     node; /* node in station->ev_q.list */
+	u8		 type;
+	u8		 prim;
+	u8		 prim_type;
+	u8		 reason;
+	struct list_head node; /* node in station->ev_q.list */
 };
 
 static __inline__ struct llc_station_state_ev *

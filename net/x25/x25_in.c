@@ -98,7 +98,7 @@ static int x25_queue_rx_frame(struct sock *sk, struct sk_buff *skb, int more)
  */
 static int x25_state1_machine(struct sock *sk, struct sk_buff *skb, int frametype)
 {
-	x25_address source_addr, dest_addr;
+	struct x25_address source_addr, dest_addr;
 
 	switch (frametype) {
 		case X25_CALL_ACCEPTED: {

@@ -1163,6 +1163,8 @@ static int htb_init(struct Qdisc *sch, struct rtattr *opt)
 	skb_queue_head_init(&q->direct_queue);
 
 	q->direct_qlen = sch->dev->tx_queue_len;
+	if (q->direct_qlen < 2) /* some devices have zero tx_queue_len */
+		q->direct_qlen = 2;
 	q->timer.function = htb_timer;
 	q->timer.data = (unsigned long)sch;
 
@@ -1429,6 +1431,10 @@ static int htb_change_class(struct Qdisc *sch, u32 classid,
 	if (!rtab || !ctab) goto failure;
 
 	if (!cl) { /* new class */
+		/* check for valid classid */
+		if (!classid || TC_H_MAJ(classid^sch->handle) || htb_find(classid,sch))
+			goto failure;
+
 		/* check maximal depth */
 		if (parent && parent->parent && parent->parent->level < 2) {
 			printk(KERN_ERR "htb: tree is too deep\n");
