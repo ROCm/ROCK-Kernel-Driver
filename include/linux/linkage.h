@@ -14,6 +14,10 @@
 #define asmlinkage CPP_ASMLINKAGE
 #endif
 
+#ifndef prevent_tail_call
+# define prevent_tail_call(ret) do { } while (0)
+#endif
+
 #ifndef __ALIGN
 #define __ALIGN		.align 4,0x90
 #define __ALIGN_STR	".align 4,0x90"

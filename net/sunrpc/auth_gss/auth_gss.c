@@ -246,7 +246,7 @@ gss_parse_init_downcall(struct gss_api_mech *gm, struct xdr_netobj *buf,
 	spin_lock_init(&ctx->gc_seq_lock);
 	atomic_set(&ctx->count,1);
 
-	if (simple_get_bytes(&p, end, uid, sizeof(uid)))
+	if (simple_get_bytes(&p, end, uid, sizeof(*uid)))
 		goto err_free_ctx;
 	/* FIXME: discarded timeout for now */
 	if (simple_get_bytes(&p, end, &timeout, sizeof(timeout)))

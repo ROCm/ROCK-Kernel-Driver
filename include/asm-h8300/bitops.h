@@ -273,6 +273,8 @@ found_middle:
 	return result + __ffs(tmp);
 }
 
+#define find_first_bit(addr, size) find_next_bit(addr, size, 0)
+
 /*
  * Every architecture must define this function. It's the fastest
  * way of searching a 140-bit bitmap where the first 100 bits are

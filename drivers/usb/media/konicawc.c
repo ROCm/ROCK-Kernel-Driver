@@ -362,8 +362,8 @@ static void konicawc_isoc_irq(struct urb *urb, struct pt_regs *regs)
 		else if (!urb->status && !cam->last_data_urb->status)
 			len = konicawc_compress_iso(uvd, cam->last_data_urb, urb);
 
-		resubmit_urb(uvd, urb);
 		resubmit_urb(uvd, cam->last_data_urb);
+		resubmit_urb(uvd, urb);
 		cam->last_data_urb = NULL;
 		uvd->stats.urb_length = len;
 		uvd->stats.data_count += len;

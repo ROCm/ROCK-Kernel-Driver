@@ -1166,7 +1166,7 @@ static struct fb_videomode __devinitdata cyber2000fb_default_mode = {
 	.vmode		= FB_VMODE_NONINTERLACED
 };
 
-static char igs_regs[] __devinitdata = {
+static char igs_regs[] = {
 	EXT_CRT_IRQ,		0,
 	EXT_CRT_TEST,		0,
 	EXT_SYNC_CTL,		0,
@@ -1289,7 +1289,7 @@ cyberpro_alloc_fb_info(unsigned int id, char *name)
 	return cfb;
 }
 
-static void __devinit
+static void
 cyberpro_free_fb_info(struct cfb_info *cfb)
 {
 	if (cfb) {

@@ -216,4 +216,8 @@ extern void bhv_insert_all_vfsops(struct vfs *);
 extern void bhv_remove_all_vfsops(struct vfs *, int);
 extern void bhv_remove_vfsops(struct vfs *, int);
 
+#define fs_frozen(vfsp)		((vfsp)->vfs_super->s_frozen)
+#define fs_check_frozen(vfsp, level) \
+	vfs_check_frozen(vfsp->vfs_super, level);
+
 #endif	/* __XFS_VFS_H__ */
