@@ -3533,22 +3533,14 @@ static ssize_t st_device_kdev_read(struct device *driverfs_dev,
 	kdev.value=(int)driverfs_dev->driver_data;
 	return off ? 0 : sprintf(page, "%x\n",kdev.value);
 }
-static struct driver_file_entry st_device_kdev_file = {
-	name: "kdev",
-	mode: S_IRUGO,
-	show: st_device_kdev_read,
-};
+static DEVICE_ATTR(kdev,"kdev",S_IRUGO,st_device_kdev_read,NULL);
 
 static ssize_t st_device_type_read(struct device *driverfs_dev, 
 				   char *page, size_t count, loff_t off) 
 {
 	return off ? 0 : sprintf (page, "CHR\n");
 }
-static struct driver_file_entry st_device_type_file = {
-	name: "type",
-	mode: S_IRUGO,
-	show: st_device_type_read,
-};
+static DEVICE_ATTR(type,"type",S_IRUGO,st_device_type_read,NULL);
 
 
 static struct file_operations st_fops =
@@ -3664,8 +3656,8 @@ static int st_attach(Scsi_Device * SDp)
 			(void *)__mkdev(MAJOR_NR, i + (mode << 5));
 	    device_register(&tpnt->driverfs_dev_r[mode]);
 	    device_create_file(&tpnt->driverfs_dev_r[mode], 
-			       &st_device_type_file);
-	    device_create_file(&tpnt->driverfs_dev_r[mode], &st_device_kdev_file);
+			       &dev_attr_type);
+	    device_create_file(&tpnt->driverfs_dev_r[mode], &dev_attr_kdev);
 	    tpnt->de_r[mode] =
 		devfs_register (SDp->de, name, DEVFS_FL_DEFAULT,
 				MAJOR_NR, i + (mode << 5),
@@ -3683,9 +3675,9 @@ static int st_attach(Scsi_Device * SDp)
 			(void *)__mkdev(MAJOR_NR, i + (mode << 5) + 128);
 	    device_register(&tpnt->driverfs_dev_n[mode]);
 	    device_create_file(&tpnt->driverfs_dev_n[mode], 
-			&st_device_type_file);
+			       &dev_attr_type);
 	    device_create_file(&tpnt->driverfs_dev_n[mode], 
-			&st_device_kdev_file);
+			       &dev_attr_kdev);
 	    tpnt->de_n[mode] =
 		devfs_register (SDp->de, name, DEVFS_FL_DEFAULT,
 				MAJOR_NR, i + (mode << 5) + 128,
@@ -3785,16 +3777,16 @@ static void st_detach(Scsi_Device * SDp)
 				devfs_unregister (tpnt->de_r[mode]);
 				tpnt->de_r[mode] = NULL;
 				device_remove_file(&tpnt->driverfs_dev_r[mode],
-						   st_device_type_file.name);
+						   &dev_attr_type);
 				device_remove_file(&tpnt->driverfs_dev_r[mode],
-						   st_device_kdev_file.name);
+						   &dev_attr_type);
 				put_device(&tpnt->driverfs_dev_r[mode]);
 				devfs_unregister (tpnt->de_n[mode]);
 				tpnt->de_n[mode] = NULL;
 				device_remove_file(&tpnt->driverfs_dev_n[mode],
-						   st_device_type_file.name);
+						   &dev_attr_type);
 				device_remove_file(&tpnt->driverfs_dev_n[mode],
-						   st_device_kdev_file.name);
+						   &dev_attr_kdev);
 				put_device(&tpnt->driverfs_dev_n[mode]);
 			}
 			if (tpnt->buffer) {
