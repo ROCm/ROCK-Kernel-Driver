@@ -235,7 +235,8 @@ void tr_source_route(struct sk_buff *skb,struct trh_hdr *trh,struct net_device *
 	unsigned int hash;
 	struct rif_cache_s *entry;
 	unsigned char *olddata;
-	unsigned char mcast_func_addr[] = {0xC0,0x00,0x00,0x04,0x00,0x00};
+	static const unsigned char mcast_func_addr[] 
+		= {0xC0,0x00,0x00,0x04,0x00,0x00};
 	
 	spin_lock_bh(&rif_lock);
 
