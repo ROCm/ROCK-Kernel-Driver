@@ -84,10 +84,10 @@ $(obj)/bootpImage: $(obj)/bootp/bootp FORCE
 	@echo '  Kernel: $@ is ready'
 
 $(obj)/compressed/vmlinux: vmlinux FORCE
-	$(Q)$(MAKE) -f scripts/Makefile.build obj=$(obj)/compressed $@
+	$(Q)$(MAKE) $(build)=$(obj)/compressed $@
 
 $(obj)/bootp/bootp: $(obj)/zImage initrd FORCE
-	$(Q)$(MAKE) -f scripts/Makefile.build obj=$(obj)/compressed $@
+	$(Q)$(MAKE) $(build)=$(obj)/compressed $@
 
 .PHONY: initrd
 initrd:
@@ -108,14 +108,3 @@ zinstall: $(obj)/zImage
 
 clean-files := $(addprefix $(obj)/,Image zImage bootpImage)
 subdir-	    := bootp compressed
-
-archhelp:
-	@echo  '* zImage        - Compressed kernel image (arch/$(ARCH)/boot/zImage)'
-	@echo  '  Image         - Uncompressed kernel image (arch/$(ARCH)/boot/Image)'
-	@echo  '  bootpImage    - Combined zImage and initial RAM disk' 
-	@echo  '  initrd        - Create an initial image'
-	@echo  '  install       - Install uncompressed kernel'
-	@echo  '  zinstall      - Install compressed kernel'
-	@echo  '                  Install using (your) ~/bin/installkernel or'
-	@echo  '                  (distribution) /sbin/installkernel or'
-	@echo  '                  install to $$(INSTALL_PATH) and run lilo'
