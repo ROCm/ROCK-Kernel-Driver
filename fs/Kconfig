@@ -1476,10 +1476,14 @@ config FS_MBCACHE
 	default y if EXT2_FS=y || EXT3_FS=y
 	default m if EXT2_FS=m || EXT3_FS=m
 
-# Posix ACL utility routines (for now, only ext2/ext3/jfs/xfs)
+# Posix ACL utility routines (for now, only ext2/ext3/jfs)
+#
+# NOTE: you can implement Posix ACLs without these helpers (XFS does).
+# 	Never use this symbol for ifdefs.
+#
 config FS_POSIX_ACL
 	bool
-	depends on EXT2_FS_POSIX_ACL || EXT3_FS_POSIX_ACL || JFS_POSIX_ACL || XFS_POSIX_ACL
+	depends on EXT2_FS_POSIX_ACL || EXT3_FS_POSIX_ACL || JFS_POSIX_ACL
 	default y
 
 menu "Partition Types"
