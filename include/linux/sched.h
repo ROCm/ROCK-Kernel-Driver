@@ -614,7 +614,19 @@ struct task_struct {
 	struct key *process_keyring;	/* keyring private to this process (CLONE_THREAD) */
 	struct key *thread_keyring;	/* keyring private to this thread */
 #endif
-	unsigned short used_math;
+/*
+ * Must be changed atomically so it shouldn't be
+ * be a shareable bitflag.
+ */
+	unsigned char used_math;
+/*
+ * OOM kill score adjustment (bit shift).
+ * Cannot live together with used_math since
+ * used_math and oomkilladj can be changed at the
+ * same time, so they would race if they're in the
+ * same atomic block.
+ */
+	short oomkilladj;
 	char comm[TASK_COMM_LEN];
 /* file system info */
 	int link_count, total_link_count;
