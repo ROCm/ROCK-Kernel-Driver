@@ -42,8 +42,8 @@ static int do_signal(sigset_t *oldset, struct pt_regs * regs,
 /* {set, get}context() needed for 64-bit SparcLinux userland. */
 asmlinkage void sparc64_set_context(struct pt_regs *regs)
 {
-	struct ucontext *ucp = (struct ucontext *) regs->u_regs[UREG_I0];
-	mc_gregset_t *grp;
+	struct ucontext *ucp = (struct ucontext __user *) regs->u_regs[UREG_I0];
+	mc_gregset_t __user *grp;
 	unsigned long pc, npc, tstate;
 	unsigned long fp, i7;
 	unsigned char fenab;
@@ -104,9 +104,9 @@ asmlinkage void sparc64_set_context(struct pt_regs *regs)
 	err |= __get_user(fp, &(ucp->uc_mcontext.mc_fp));
 	err |= __get_user(i7, &(ucp->uc_mcontext.mc_i7));
 	err |= __put_user(fp,
-	      (&(((struct reg_window *)(STACK_BIAS+regs->u_regs[UREG_I6]))->ins[6])));
+	      (&(((struct reg_window __user *)(STACK_BIAS+regs->u_regs[UREG_I6]))->ins[6])));
 	err |= __put_user(i7,
-	      (&(((struct reg_window *)(STACK_BIAS+regs->u_regs[UREG_I6]))->ins[7])));
+	      (&(((struct reg_window __user *)(STACK_BIAS+regs->u_regs[UREG_I6]))->ins[7])));
 
 	err |= __get_user(fenab, &(ucp->uc_mcontext.mc_fpregs.mcfpu_enab));
 	if (fenab) {
@@ -121,7 +121,7 @@ asmlinkage void sparc64_set_context(struct pt_regs *regs)
 					      (sizeof(unsigned int) * 32));
 		if (fprs & FPRS_DU)
 			err |= copy_from_user(fpregs+16,
-			 ((unsigned long *)&(ucp->uc_mcontext.mc_fpregs.mcfpu_fregs))+16,
+			 ((unsigned long __user *)&(ucp->uc_mcontext.mc_fpregs.mcfpu_fregs))+16,
 			 (sizeof(unsigned int) * 32));
 		err |= __get_user(current_thread_info()->xfsr[0],
 				  &(ucp->uc_mcontext.mc_fpregs.mcfpu_fsr));
@@ -139,9 +139,9 @@ do_sigsegv:
 
 asmlinkage void sparc64_get_context(struct pt_regs *regs)
 {
-	struct ucontext *ucp = (struct ucontext *) regs->u_regs[UREG_I0];
-	mc_gregset_t *grp;
-	mcontext_t *mcp;
+	struct ucontext *ucp = (struct ucontext __user *) regs->u_regs[UREG_I0];
+	mc_gregset_t __user *grp;
+	mcontext_t __user *mcp;
 	unsigned long fp, i7;
 	unsigned char fenab;
 	int err;
@@ -170,7 +170,7 @@ asmlinkage void sparc64_get_context(struct pt_regs *regs)
 	err = 0;
 	if (_NSIG_WORDS == 1)
 		err |= __put_user(current->blocked.sig[0],
-				  (unsigned long *)&ucp->uc_sigmask);
+				  (unsigned long __user *)&ucp->uc_sigmask);
 	else
 		err |= __copy_to_user(&ucp->uc_sigmask, &current->blocked,
 				      sizeof(sigset_t));
@@ -196,9 +196,9 @@ asmlinkage void sparc64_get_context(struct pt_regs *regs)
 	err |= __put_user(regs->u_regs[UREG_I7], &((*grp)[MC_O7]));
 
 	err |= __get_user(fp,
-		 (&(((struct reg_window *)(STACK_BIAS+regs->u_regs[UREG_I6]))->ins[6])));
+		 (&(((struct reg_window __user *)(STACK_BIAS+regs->u_regs[UREG_I6]))->ins[6])));
 	err |= __get_user(i7,
-		 (&(((struct reg_window *)(STACK_BIAS+regs->u_regs[UREG_I6]))->ins[7])));
+		 (&(((struct reg_window __user *)(STACK_BIAS+regs->u_regs[UREG_I6]))->ins[7])));
 	err |= __put_user(fp, &(mcp->mc_fp));
 	err |= __put_user(i7, &(mcp->mc_i7));
 
@@ -213,7 +213,7 @@ asmlinkage void sparc64_get_context(struct pt_regs *regs)
 					    (sizeof(unsigned int) * 32));
 		if (fprs & FPRS_DU)
 			err |= copy_to_user(
-                          ((unsigned long *)&(mcp->mc_fpregs.mcfpu_fregs))+16, fpregs+16,
+                          ((unsigned long __user *)&(mcp->mc_fpregs.mcfpu_fregs))+16, fpregs+16,
 			  (sizeof(unsigned int) * 32));
 		err |= __put_user(current_thread_info()->xfsr[0], &(mcp->mc_fpregs.mcfpu_fsr));
 		err |= __put_user(current_thread_info()->gsr[0], &(mcp->mc_fpregs.mcfpu_gsr));
@@ -231,7 +231,7 @@ struct rt_signal_frame {
 	struct sparc_stackf	ss;
 	siginfo_t		info;
 	struct pt_regs		regs;
-	__siginfo_fpu_t *	fpu_save;
+	__siginfo_fpu_t __user	*fpu_save;
 	stack_t			stack;
 	sigset_t		mask;
 	__siginfo_fpu_t		fpu_state;
@@ -300,7 +300,7 @@ asmlinkage void do_sigsuspend(struct pt_regs *regs)
 	_sigpause_common(regs->u_regs[UREG_I0], regs);
 }
 
-asmlinkage void do_rt_sigsuspend(sigset_t *uset, size_t sigsetsize, struct pt_regs *regs)
+asmlinkage void do_rt_sigsuspend(sigset_t __user *uset, size_t sigsetsize, struct pt_regs *regs)
 {
 	sigset_t oldset, set;
         
@@ -351,7 +351,7 @@ asmlinkage void do_rt_sigsuspend(sigset_t *uset, size_t sigsetsize, struct pt_re
 }
 
 static inline int
-restore_fpu_state(struct pt_regs *regs, __siginfo_fpu_t *fpu)
+restore_fpu_state(struct pt_regs *regs, __siginfo_fpu_t __user *fpu)
 {
 	unsigned long *fpregs = current_thread_info()->fpregs;
 	unsigned long fprs;
@@ -374,16 +374,16 @@ restore_fpu_state(struct pt_regs *regs, __siginfo_fpu_t *fpu)
 
 void do_rt_sigreturn(struct pt_regs *regs)
 {
-	struct rt_signal_frame *sf;
+	struct rt_signal_frame __user *sf;
 	unsigned long tpc, tnpc, tstate;
-	__siginfo_fpu_t *fpu_save;
+	__siginfo_fpu_t __user *fpu_save;
 	mm_segment_t old_fs;
 	sigset_t set;
 	stack_t st;
 	int err;
 
 	synchronize_user_stack ();
-	sf = (struct rt_signal_frame *)
+	sf = (struct rt_signal_frame __user *)
 		(regs->u_regs [UREG_FP] + STACK_BIAS);
 
 	/* 1. Make sure we are not getting garbage from the user */
@@ -438,7 +438,7 @@ segv:
 }
 
 /* Checks if the fp is valid */
-static int invalid_frame_pointer(void *fp, int fplen)
+static int invalid_frame_pointer(void __user *fp, int fplen)
 {
 	if (((unsigned long) fp) & 7)
 		return 1;
@@ -446,7 +446,7 @@ static int invalid_frame_pointer(void *fp, int fplen)
 }
 
 static inline int
-save_fpu_state(struct pt_regs *regs, __siginfo_fpu_t *fpu)
+save_fpu_state(struct pt_regs *regs, __siginfo_fpu_t __user *fpu)
 {
 	unsigned long *fpregs = (unsigned long *)(regs+1);
 	unsigned long fprs;
@@ -466,7 +466,7 @@ save_fpu_state(struct pt_regs *regs, __siginfo_fpu_t *fpu)
 	return err;
 }
 
-static inline void *get_sigframe(struct k_sigaction *ka, struct pt_regs *regs, unsigned long framesize)
+static inline void __user *get_sigframe(struct k_sigaction *ka, struct pt_regs *regs, unsigned long framesize)
 {
 	unsigned long sp;
 
@@ -478,14 +478,14 @@ static inline void *get_sigframe(struct k_sigaction *ka, struct pt_regs *regs, u
 		    !((current->sas_ss_sp + current->sas_ss_size) & 7))
 			sp = current->sas_ss_sp + current->sas_ss_size;
 	}
-	return (void *)(sp - framesize);
+	return (void __user *)(sp - framesize);
 }
 
 static inline void
 setup_rt_frame(struct k_sigaction *ka, struct pt_regs *regs,
 	       int signo, sigset_t *oldset, siginfo_t *info)
 {
-	struct rt_signal_frame *sf;
+	struct rt_signal_frame __user *sf;
 	int sigframe_size, err;
 
 	/* 1. Make sure everything is clean */
@@ -496,7 +496,8 @@ setup_rt_frame(struct k_sigaction *ka, struct pt_regs *regs,
 	if (!(current_thread_info()->fpsaved[0] & FPRS_FEF))
 		sigframe_size -= sizeof(__siginfo_fpu_t);
 
-	sf = (struct rt_signal_frame *)get_sigframe(ka, regs, sigframe_size);
+	sf = (struct rt_signal_frame __user *)
+		get_sigframe(ka, regs, sigframe_size);
 	
 	if (invalid_frame_pointer (sf, sigframe_size))
 		goto sigill;
@@ -521,8 +522,8 @@ setup_rt_frame(struct k_sigaction *ka, struct pt_regs *regs,
 
 	err |= copy_to_user(&sf->mask, oldset, sizeof(sigset_t));
 
-	err |= copy_in_user((u64 *)sf,
-			    (u64 *)(regs->u_regs[UREG_FP]+STACK_BIAS),
+	err |= copy_in_user((u64 __user *)sf,
+			    (u64 __user *)(regs->u_regs[UREG_FP]+STACK_BIAS),
 			    sizeof(struct reg_window));
 
 	if (info)
@@ -560,7 +561,8 @@ static inline void handle_signal(unsigned long signr, struct k_sigaction *ka,
 				 siginfo_t *info,
 				 sigset_t *oldset, struct pt_regs *regs)
 {
-	setup_rt_frame(ka, regs, signr, oldset, (ka->sa.sa_flags & SA_SIGINFO) ? info : NULL);
+	setup_rt_frame(ka, regs, signr, oldset,
+		       (ka->sa.sa_flags & SA_SIGINFO) ? info : NULL);
 	if (ka->sa.sa_flags & SA_ONESHOT)
 		ka->sa.sa_handler = SIG_DFL;
 	if (!(ka->sa.sa_flags & SA_NOMASK)) {
