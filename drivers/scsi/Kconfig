@@ -1230,6 +1230,8 @@ config SCSI_QLOGICPTI
 	  To compile this driver as a module, choose M here: the
 	  module will be called qlogicpti.
 
+source "drivers/scsi/qla2xxx/Kconfig"
+
 config SCSI_SEAGATE
 	tristate "Seagate ST-02 and Future Domain TMC-8xx SCSI support"
 	depends on X86 && ISA && SCSI && BROKEN

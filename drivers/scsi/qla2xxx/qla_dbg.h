@@ -1,0 +1,205 @@
+/******************************************************************************
+ *                  QLOGIC LINUX SOFTWARE
+ *
+ * QLogic ISP2x00 device driver for Linux 2.6.x
+ * Copyright (C) 2003 QLogic Corporation
+ * (www.qlogic.com)
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the
+ * Free Software Foundation; either version 2, or (at your option) any
+ * later version.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
+ *
+ ******************************************************************************/
+
+/*
+ * Firmware Dump structure definition
+ */
+#define FW_DUMP_SIZE	0xBC000		/* bytes */
+
+#if defined(ISP2300)
+struct fw_dump {
+	uint16_t hccr;
+	uint16_t pbiu_reg[8];
+	uint16_t risc_host_reg[8];
+	uint16_t mailbox_reg[32];
+	uint16_t resp_dma_reg[32];
+	uint16_t dma_reg[48];
+	uint16_t risc_hdw_reg[16];
+	uint16_t risc_gp0_reg[16];
+	uint16_t risc_gp1_reg[16];
+	uint16_t risc_gp2_reg[16];
+	uint16_t risc_gp3_reg[16];
+	uint16_t risc_gp4_reg[16];
+	uint16_t risc_gp5_reg[16];
+	uint16_t risc_gp6_reg[16];
+	uint16_t risc_gp7_reg[16];
+	uint16_t frame_buf_hdw_reg[64];
+	uint16_t fpm_b0_reg[64];
+	uint16_t fpm_b1_reg[64];
+	uint16_t risc_ram[0xf800];
+	uint16_t stack_ram[0x1000];
+	uint16_t data_ram[0xF000];
+};
+#else /* defined(ISP2300) */
+struct fw_dump {
+	uint16_t hccr;
+	uint16_t pbiu_reg[8];
+#if defined(ISP2200)
+	uint16_t mailbox_reg[32];
+#else
+	uint16_t mailbox_reg[8];
+#endif
+	uint16_t dma_reg[48];
+	uint16_t risc_hdw_reg[16];
+	uint16_t risc_gp0_reg[16];
+	uint16_t risc_gp1_reg[16];
+	uint16_t risc_gp2_reg[16];
+	uint16_t risc_gp3_reg[16];
+	uint16_t risc_gp4_reg[16];
+	uint16_t risc_gp5_reg[16];
+	uint16_t risc_gp6_reg[16];
+	uint16_t risc_gp7_reg[16];
+	uint16_t frame_buf_hdw_reg[16];
+	uint16_t fpm_b0_reg[64];
+	uint16_t fpm_b1_reg[64];
+	uint16_t risc_ram[0xf000];
+};
+#endif /* defined(ISP2300) */
+
+/*
+* Macros use for debugging the driver.
+*/
+#undef ENTER_TRACE
+#if defined(ENTER_TRACE)
+#define ENTER(x)	do { printk("qla2100 : Entering %s()\n", x); } while (0)
+#define LEAVE(x)	do { printk("qla2100 : Leaving %s()\n", x);  } while (0)
+#define ENTER_INTR(x)	do { printk("qla2100 : Entering %s()\n", x); } while (0)
+#define LEAVE_INTR(x)	do { printk("qla2100 : Leaving %s()\n", x);  } while (0)
+#else
+#define ENTER(x)	do {} while (0)
+#define LEAVE(x)	do {} while (0)
+#define ENTER_INTR(x) 	do {} while (0)
+#define LEAVE_INTR(x)   do {} while (0)
+#endif
+
+#if  DEBUG_QLA2100
+#define DEBUG(x)	do {x;} while (0);
+#else
+#define DEBUG(x)	do {} while (0);
+#endif
+
+#if defined(QL_DEBUG_LEVEL_1)
+#define DEBUG1(x)	do {x;} while (0);
+#else
+#define DEBUG1(x)	do {} while (0);
+#endif
+
+#if defined(QL_DEBUG_LEVEL_2)
+#define DEBUG2(x)       do {x;} while (0);
+#define DEBUG2_3(x)     do {x;} while (0);
+#define DEBUG2_3_11(x)  do {x;} while (0);
+#define DEBUG2_9_10(x)    do {x;} while (0);
+#define DEBUG2_11(x)    do {x;} while (0);
+#else
+#define DEBUG2(x)	do {} while (0);
+#endif
+
+#if defined(QL_DEBUG_LEVEL_3)
+#define DEBUG3(x)	do {x;} while (0);
+#define DEBUG2_3(x)	do {x;} while (0);
+#define DEBUG2_3_11(x)	do {x;} while (0);
+#define DEBUG3_11(x)	do {x;} while (0);
+#else
+#define DEBUG3(x)	do {} while (0);
+  #if !defined(QL_DEBUG_LEVEL_2)
+  #define DEBUG2_3(x)	do {} while (0);
+  #endif
+#endif
+
+#if defined(QL_DEBUG_LEVEL_4)
+#define DEBUG4(x)	do {x;} while (0);
+#else
+#define DEBUG4(x)	do {} while (0);
+#endif
+
+#if defined(QL_DEBUG_LEVEL_5)
+#define DEBUG5(x)          do {x;} while (0);
+#else
+#define DEBUG5(x)	do {} while (0);
+#endif
+
+#if defined(QL_DEBUG_LEVEL_7)
+#define DEBUG7(x)          do {x;} while (0);
+#else
+#define DEBUG7(x)	   do {} while (0);
+#endif
+
+#if defined(QL_DEBUG_LEVEL_9)
+#define DEBUG9(x)       do {x;} while (0);
+#define DEBUG9_10(x)    do {x;} while (0);
+#define DEBUG2_9_10(x)	do {x;} while (0);
+#else
+#define DEBUG9(x)	do {} while (0);
+#endif
+
+#if defined(QL_DEBUG_LEVEL_10)
+#define DEBUG10(x)      do {x;} while (0);
+#define DEBUG2_9_10(x)	do {x;} while (0);
+#define DEBUG9_10(x)	do {x;} while (0);
+#else
+#define DEBUG10(x)	do {} while (0);
+  #if !defined(DEBUG2_9_10)
+  #define DEBUG2_9_10(x)	do {} while (0);
+  #endif
+  #if !defined(DEBUG9_10)
+  #define DEBUG9_10(x)	do {} while (0);
+  #endif
+#endif
+
+#if defined(QL_DEBUG_LEVEL_11)
+#define DEBUG11(x)      do{x;} while(0);
+#if !defined(DEBUG2_11)
+#define DEBUG2_11(x)    do{x;} while(0);
+#endif
+#if !defined(DEBUG2_3_11)
+#define DEBUG2_3_11(x)  do{x;} while(0);
+#endif
+#if !defined(DEBUG3_11)
+#define DEBUG3_11(x)    do{x;} while(0);
+#endif
+#else
+#define DEBUG11(x)	do{} while(0);
+  #if !defined(QL_DEBUG_LEVEL_2)
+  #define DEBUG2_11(x)	do{} while(0);
+    #if !defined(QL_DEBUG_LEVEL_3)
+    #define DEBUG2_3_11(x) do{} while(0);
+    #endif
+  #endif
+  #if !defined(QL_DEBUG_LEVEL_3)
+  #define DEBUG3_11(x)	do{} while(0);
+  #endif
+#endif
+
+#if defined(QL_DEBUG_LEVEL_12)
+#define DEBUG12(x)      do {x;} while (0);
+#else
+#define DEBUG12(x)	do {} while (0);
+#endif
+
+#if defined(QL_DEBUG_LEVEL_13)
+#define DEBUG13(x)      do {x;} while (0)
+#else
+#define DEBUG13(x)	do {} while (0)
+#endif
+
+#if defined(QL_DEBUG_LEVEL_14)
+#define DEBUG14(x)      do {x;} while (0)
+#else
+#define DEBUG14(x)	do {} while (0)
+#endif
