@@ -60,6 +60,7 @@ obj-$(CONFIG_USB_EMI26)		+= misc/
 obj-$(CONFIG_USB_LCD)		+= misc/
 obj-$(CONFIG_USB_RIO500)	+= misc/
 obj-$(CONFIG_USB_SPEEDTOUCH)	+= misc/
+obj-$(CONFIG_USB_TEST)		+= misc/
 obj-$(CONFIG_USB_TIGL)		+= misc/
 obj-$(CONFIG_USB_USS720)	+= misc/
 

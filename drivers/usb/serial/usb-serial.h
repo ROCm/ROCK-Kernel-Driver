@@ -117,7 +117,7 @@ struct usb_serial_port {
 	__u8			bulk_out_endpointAddress;
 
 	wait_queue_head_t	write_wait;
-	struct work_struct			work;
+	struct work_struct	work;
 	int			open_count;
 	struct semaphore	sem;
 	void *			private;
@@ -256,6 +256,19 @@ extern int ezusb_writememory (struct usb_serial *serial, int address, unsigned c
 extern int ezusb_set_reset (struct usb_serial *serial, unsigned char reset_bit);
 #endif
 
+/* USB Serial console functions */
+#ifdef CONFIG_USB_SERIAL_CONSOLE
+extern void usb_serial_console_init (int debug, int minor);
+extern void usb_serial_console_exit (void);
+#else
+static inline void usb_serial_console_init (int debug, int minor) { }
+static inline void usb_serial_console_exit (void) { }
+#endif
+
+/* Functions needed by the usb serial console code */
+extern struct usb_serial *usb_serial_get_by_minor (unsigned int minor);
+extern int usb_serial_generic_open (struct usb_serial_port *port, struct file *filp);
+extern int usb_serial_generic_write (struct usb_serial_port *port, int from_user, const unsigned char *buf, int count);
 
 /* Inline functions to check the sanity of a pointer that is passed to us */
 static inline int serial_paranoia_check (struct usb_serial *serial, const char *function)

@@ -555,8 +555,6 @@ static int init(void * unused)
 	unlock_kernel();
 	system_running = 1;
 
-	kstat.pgfree = 0;
-
 	if (open("/dev/console", O_RDWR, 0) < 0)
 		printk("Warning: unable to open an initial console.\n");
 

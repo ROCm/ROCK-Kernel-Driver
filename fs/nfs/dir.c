@@ -125,14 +125,14 @@ int nfs_readdir_filler(nfs_readdir_descriptor_t *desc, struct page *page)
 	 *	 throught inode->i_sem or some other mechanism.
 	 */
 	if (page->index == 0)
-		invalidate_inode_pages(inode);
+		invalidate_inode_pages(inode->i_mapping);
 	unlock_page(page);
 	return 0;
  error:
 	SetPageError(page);
 	kunmap(page);
 	unlock_page(page);
-	invalidate_inode_pages(inode);
+	invalidate_inode_pages(inode->i_mapping);
 	desc->error = error;
 	return -EIO;
 }

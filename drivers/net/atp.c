@@ -27,11 +27,12 @@
 
 
 	Modular support/softnet added by Alan Cox.
+	_bit abuse fixed up by Alan Cox
 
 */
 
 static const char versionA[] =
-"atp.c:v1.09 8/9/2000 Donald Becker <becker@scyld.com>\n";
+"atp.c:v1.09=ac 2002/10/01 Donald Becker <becker@scyld.com>\n";
 static const char versionB[] =
 "  http://www.scyld.com/network/atp.html\n";
 
@@ -164,8 +165,6 @@ MODULE_PARM_DESC(io, "ATP I/O base address(es)");
 MODULE_PARM_DESC(irq, "ATP IRQ number(s)");
 MODULE_PARM_DESC(xcvr, "ATP tranceiver(s) (0=internal, 1=external)");
 
-#define RUN_AT(x) (jiffies + (x))
-
 /* The number of low I/O ports used by the ethercard. */
 #define ETHERCARD_TOTAL_SIZE	3
 
@@ -223,6 +222,8 @@ static struct net_device *root_atp_dev;
    If dev->base_addr == 1, always return failure.
    If dev->base_addr == 2, allocate space for the device and return success
    (detachable devices only).
+   
+   FIXME: we should use the parport layer for this
    */
 static int __init atp_init(struct net_device *dev)
 {
@@ -402,13 +403,13 @@ static void __init get_node_ID(struct net_device *dev)
  * DO :	 _________X_______X
  */
 
-static unsigned short __init eeprom_op(long ioaddr, unsigned int cmd)
+static unsigned short __init eeprom_op(long ioaddr, u32 cmd)
 {
 	unsigned eedata_out = 0;
 	int num_bits = EE_CMD_SIZE;
 
 	while (--num_bits >= 0) {
-		char outval = test_bit(num_bits, &cmd) ? EE_DATA_WRITE : 0;
+		char outval = (cmd & (1<<num_bits)) ? EE_DATA_WRITE : 0;
 		write_reg_high(ioaddr, PROM_CMD, outval | EE_CLK_LOW);
 		write_reg_high(ioaddr, PROM_CMD, outval | EE_CLK_HIGH);
 		eedata_out <<= 1;
@@ -445,7 +446,7 @@ static int net_open(struct net_device *dev)
 	hardware_init(dev);
 
 	init_timer(&lp->timer);
-	lp->timer.expires = RUN_AT(TIMED_CHECKER);
+	lp->timer.expires = jiffies + TIMED_CHECKER;
 	lp->timer.data = (unsigned long)dev;
 	lp->timer.function = &atp_timed_checker;    /* timer handler */
 	add_timer(&lp->timer);
@@ -687,7 +688,7 @@ static void atp_interrupt(int irq, void *dev_instance, struct pt_regs * regs)
 		for (i = 0; i < 6; i++)
 			write_reg_byte(ioaddr, PAR0 + i, dev->dev_addr[i]);
 #if 0 && defined(TIMED_CHECKER)
-		mod_timer(&lp->timer, RUN_AT(TIMED_CHECKER));
+		mod_timer(&lp->timer, jiffies + TIMED_CHECKER);
 #endif
 	}
 
@@ -740,7 +741,7 @@ static void atp_timed_checker(unsigned long data)
 #endif
 	}
 	spin_unlock(&lp->lock);
-	lp->timer.expires = RUN_AT(TIMED_CHECKER);
+	lp->timer.expires = jiffies + TIMED_CHECKER;
 	add_timer(&lp->timer);
 }
 #endif
@@ -893,8 +894,10 @@ static void set_rx_mode_8012(struct net_device *dev)
 		memset(mc_filter, 0, sizeof(mc_filter));
 		for (i = 0, mclist = dev->mc_list; mclist && i < dev->mc_count;
 			 i++, mclist = mclist->next)
-			set_bit(ether_crc_le(ETH_ALEN, mclist->dmi_addr) & 0x3f,
-					mc_filter);
+		{
+			int filterbit = ether_crc_le(ETH_ALEN, mclist->dmi_addr) & 0x3f;
+			mc_filter[filterbit >> 5] |= cpu_to_le32(1 << (filterbit & 31));
+		}
 		new_mode = CMR2h_Normal;
 	}
 	lp->addr_mode = new_mode;

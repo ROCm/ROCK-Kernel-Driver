@@ -106,6 +106,8 @@ static struct MCA_info* mca_info = NULL;
 /*
  * Motherboard register spinlock. Untested on SMP at the moment, but
  * are there any MCA SMP boxes?
+ *
+ * Yes - Alan
  */
 static spinlock_t mca_lock = SPIN_LOCK_UNLOCKED;
 

@@ -159,8 +159,6 @@ static struct timer_list sjcd_delay_timer;
 
 #define CLEAR_TIMER del_timer( &sjcd_delay_timer )
 
-static int sjcd_cleanup(void);
-
 /*
  * Set up device, i.e., use command line data to set
  * base address.
@@ -1664,14 +1662,7 @@ static struct {
 	unsigned char major, minor;
 } sjcd_version;
 
-static struct gendisk sjcd_disk =
-{
-	.major = MAJOR_NR,
-	.first_minor = 0,
-	.minor_shift = 0,
-	.fops = &sjcd_fops,
-	.disk_name = "sjcd"
-};
+static struct gendisk *sjcd_disk;
 
 /*
  * Test for presence of drive and initialize it. Called at boot time.
@@ -1698,12 +1689,22 @@ static int __init sjcd_init(void)
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_sjcd_request, &sjcd_lock);
 	blk_queue_hardsect_size(BLK_DEFAULT_QUEUE(MAJOR_NR), 2048);
 
+	sjcd_disk = alloc_disk();
+	if (!sjcd_disk) {
+		printk(KERN_ERR "SJCD: can't allocate disk");
+		goto out1;
+	}
+	sjcd_disk->major = MAJOR_NR,
+	sjcd_disk->first_minor = 0,
+	sjcd_disk->minor_shift = 0,
+	sjcd_disk->fops = &sjcd_fops,
+	sprintf(sjcd_disk->disk_name, "sjcd");
+
 	if (check_region(sjcd_base, 4)) {
 		printk
 		    ("SJCD: Init failed, I/O port (%X) is already in use\n",
 		     sjcd_base);
-		sjcd_cleanup();
-		return (-EIO);
+		goto out2;
 	}
 
 	/*
@@ -1725,8 +1726,7 @@ static int __init sjcd_init(void)
 	}
 	if (i == 0 || sjcd_command_failed) {
 		printk(" reset failed, no drive found.\n");
-		sjcd_cleanup();
-		return (-EIO);
+		goto out3;
 	} else
 		printk("\n");
 
@@ -1748,8 +1748,7 @@ static int __init sjcd_init(void)
 	}
 	if (i == 0 || sjcd_command_failed) {
 		printk(" get version failed, no drive found.\n");
-		sjcd_cleanup();
-		return (-EIO);
+		goto out3;
 	}
 
 	if (sjcd_load_response(&sjcd_version, sizeof(sjcd_version)) == 0) {
@@ -1757,8 +1756,7 @@ static int __init sjcd_init(void)
 		       (int) sjcd_version.minor);
 	} else {
 		printk(" read version failed, no drive found.\n");
-		sjcd_cleanup();
-		return (-EIO);
+		goto out3;
 	}
 
 	/*
@@ -1781,8 +1779,7 @@ static int __init sjcd_init(void)
 		}
 		if (i == 0 || sjcd_command_failed) {
 			printk(" get status failed, no drive found.\n");
-			sjcd_cleanup();
-			return (-EIO);
+			goto out3;
 		} else
 			printk("\n");
 	}
@@ -1790,33 +1787,32 @@ static int __init sjcd_init(void)
 	printk(KERN_INFO "SJCD: Status: port=0x%x.\n", sjcd_base);
 	devfs_register(NULL, "sjcd", DEVFS_FL_DEFAULT, MAJOR_NR, 0,
 		       S_IFBLK | S_IRUGO | S_IWUGO, &sjcd_fops, NULL);
-	add_disk(&sjcd_disk);
+	add_disk(sjcd_disk);
 
 	sjcd_present++;
 	return (0);
-}
-
-static int sjcd_cleanup(void)
-{
+out3:
+	release_region(sjcd_base, 4);
+	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
+out2:
+	put_disk(sjcd_disk);
+out1:
 	if ((unregister_blkdev(MAJOR_NR, "sjcd") == -EINVAL))
 		printk("SJCD: cannot unregister device.\n");
-	else {
-		release_region(sjcd_base, 4);
-		blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
-	}
-
-	return (0);
+	return (-EIO);
 }
-
 
 static void __exit sjcd_exit(void)
 {
 	devfs_find_and_unregister(NULL, "sjcd", 0, 0, DEVFS_SPECIAL_BLK, 0);
-	del_gendisk(&sjcd_disk);
-	if (sjcd_cleanup())
-		printk("SJCD: module: cannot be removed.\n");
-	else
-		printk(KERN_INFO "SJCD: module: removed.\n");
+	del_gendisk(sjcd_disk);
+	put_disk(sjcd_disk);
+	release_region(sjcd_base, 4);
+	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
+	if ((unregister_blkdev(MAJOR_NR, "sjcd") == -EINVAL))
+		printk("SJCD: cannot unregister device.\n");
+	printk(KERN_INFO "SJCD: module: removed.\n");
+	return (0);
 }
 
 module_init(sjcd_init);

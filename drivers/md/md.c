@@ -1389,10 +1389,9 @@ static int do_md_run(mddev_t * mddev)
 #endif
 	}
 
-	disk = kmalloc(sizeof(struct gendisk), GFP_KERNEL);
+	disk = alloc_disk();
 	if (!disk)
 		return -ENOMEM;
-	memset(disk, 0, sizeof(struct gendisk));
 	disk->major = MD_MAJOR;
 	disk->first_minor = mdidx(mddev);
 	disk->minor_shift = 0;
@@ -1408,7 +1407,7 @@ static int do_md_run(mddev_t * mddev)
 	if (err) {
 		printk(KERN_ERR "md: pers->run() failed ...\n");
 		mddev->pers = NULL;
-		kfree(disk);
+		put_disk(disk);
 		return -EINVAL;
 	}
 
@@ -1538,7 +1537,7 @@ static int do_md_stop(mddev_t * mddev, int ro)
 
 		if (disk) {
 			del_gendisk(disk);
-			kfree(disk);
+			put_disk(disk);
 		}
 
 	} else

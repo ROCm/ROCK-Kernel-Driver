@@ -14,6 +14,9 @@
  *
  * See Documentation/usb/usb-serial.txt for more information on using this driver
  *
+ * (10/02/2002) gkh
+ *	moved the console code to console.c and out of this file.
+ *
  * (06/05/2002) gkh
  *	moved location of startup() call in serial_probe() until after all
  *	of the port information and endpoints are initialized.  This makes
@@ -325,13 +328,6 @@
 #include <asm/uaccess.h>
 #include <linux/usb.h>
 
-#ifdef MODULE
-#undef CONFIG_USB_SERIAL_CONSOLE
-#endif
-#ifdef CONFIG_USB_SERIAL_CONSOLE
-#include <linux/console.h>
-#include <linux/serial.h>
-#endif
 
 #ifdef CONFIG_USB_SERIAL_DEBUG
 	static int debug = 1;
@@ -346,15 +342,15 @@
  * Version Information
  */
 #define DRIVER_VERSION "v1.6"
-#define DRIVER_AUTHOR "Greg Kroah-Hartman, greg@kroah.com, http://www.kroah.com/linux-usb/"
+#define DRIVER_AUTHOR "Greg Kroah-Hartman, greg@kroah.com, http://www.kroah.com/linux/"
 #define DRIVER_DESC "USB Serial Driver core"
 
 /* function prototypes for a "generic" type serial converter (no flow control, not all endpoints needed) */
 /* need to always compile these in, as some of the other devices use these functions as their own. */
 /* if a driver does not provide a function pointer, the generic function will be called. */
-static int  generic_open		(struct usb_serial_port *port, struct file *filp);
+int usb_serial_generic_open		(struct usb_serial_port *port, struct file *filp);
+int usb_serial_generic_write		(struct usb_serial_port *port, int from_user, const unsigned char *buf, int count);
 static void generic_close		(struct usb_serial_port *port, struct file *filp);
-static int  generic_write		(struct usb_serial_port *port, int from_user, const unsigned char *buf, int count);
 static int  generic_write_room		(struct usb_serial_port *port);
 static int  generic_chars_in_buffer	(struct usb_serial_port *port);
 static void generic_read_bulk_callback	(struct urb *urb);
@@ -413,18 +409,8 @@ static struct termios *		serial_termios_locked[SERIAL_TTY_MINORS];
 static struct usb_serial	*serial_table[SERIAL_TTY_MINORS];	/* initially all NULL */
 static LIST_HEAD(usb_serial_driver_list);
 
-#ifdef CONFIG_USB_SERIAL_CONSOLE
-struct usbcons_info {
-	int			magic;
-	int			break_flag;
-	struct usb_serial_port	*port;
-};
 
-static struct usbcons_info usbcons_info;
-static struct console usbcons;
-#endif /* CONFIG_USB_SERIAL_CONSOLE */
-
-static struct usb_serial *get_serial_by_minor (unsigned int minor)
+struct usb_serial *usb_serial_get_by_minor (unsigned int minor)
 {
 	return serial_table[minor];
 }
@@ -532,7 +518,7 @@ static int serial_open (struct tty_struct *tty, struct file * filp)
 	tty->driver_data = NULL;
 
 	/* get the serial object associated with this tty pointer */
-	serial = get_serial_by_minor (minor(tty->device));
+	serial = usb_serial_get_by_minor (minor(tty->device));
 
 	if (serial_paranoia_check (serial, __FUNCTION__))
 		return -ENODEV;
@@ -556,7 +542,7 @@ static int serial_open (struct tty_struct *tty, struct file * filp)
 		if (serial->type->open)
 			retval = serial->type->open(port, filp);
 		else
-			retval = generic_open(port, filp);
+			retval = usb_serial_generic_open(port, filp);
 		if (retval) {
 			port->open_count = 0;
 			if (serial->type->owner)
@@ -632,7 +618,7 @@ static int serial_write (struct tty_struct * tty, int from_user, const unsigned 
 	if (serial->type->write)
 		retval = serial->type->write(port, from_user, buf, count);
 	else
-		retval = generic_write(port, from_user, buf, count);
+		retval = usb_serial_generic_write(port, from_user, buf, count);
 
 exit:
 	up (&port->sem);
@@ -847,7 +833,7 @@ static int serial_read_proc (char *page, char **start, off_t off, int count, int
 	dbg("%s", __FUNCTION__);
 	length += sprintf (page, "usbserinfo:1.0 driver:%s\n", DRIVER_VERSION);
 	for (i = 0; i < SERIAL_TTY_MINORS && length < PAGE_SIZE; ++i) {
-		serial = get_serial_by_minor(i);
+		serial = usb_serial_get_by_minor(i);
 		if (serial == NULL)
 			continue;
 
@@ -881,7 +867,7 @@ done:
 /*****************************************************************************
  * generic devices specific driver functions
  *****************************************************************************/
-static int generic_open (struct usb_serial_port *port, struct file *filp)
+int usb_serial_generic_open (struct usb_serial_port *port, struct file *filp)
 {
 	struct usb_serial *serial = port->serial;
 	int result = 0;
@@ -937,7 +923,7 @@ static void generic_close (struct usb_serial_port *port, struct file * filp)
 	generic_cleanup (port);
 }
 
-static int generic_write (struct usb_serial_port *port, int from_user, const unsigned char *buf, int count)
+int usb_serial_generic_write (struct usb_serial_port *port, int from_user, const unsigned char *buf, int count)
 {
 	struct usb_serial *serial = port->serial;
 	int result;
@@ -1430,25 +1416,7 @@ int usb_serial_probe(struct usb_interface *interface,
 		     type->name, serial->port[i].number, serial->port[i].number);
 	}
 
-#ifdef CONFIG_USB_SERIAL_CONSOLE
-	if (minor == 0) {
-		/* 
-		 * Call register_console() if this is the first device plugged
-		 * in.  If we call it earlier, then the callback to
-		 * console_setup() will fail, as there is not a device seen by
-		 * the USB subsystem yet.
-		 */
-		/*
-		 * Register console.
-		 * NOTES:
-		 * console_setup() is called (back) immediately (from register_console).
-		 * console_write() is called immediately from register_console iff
-		 * CON_PRINTBUFFER is set in flags.
-		 */
-		dbg ("registering the USB serial console.");
-		register_console(&usbcons);
-	}
-#endif
+	usb_serial_console_init (debug, minor);
 
 	/* success */
 	dev_set_drvdata (&interface->dev, serial);
@@ -1635,9 +1603,7 @@ static int __init usb_serial_init(void)
 
 static void __exit usb_serial_exit(void)
 {
-#ifdef CONFIG_USB_SERIAL_CONSOLE
-	unregister_console(&usbcons);
-#endif
+	usb_serial_console_exit();
 
 #ifdef CONFIG_USB_SERIAL_GENERIC
 	/* remove our generic driver */
@@ -1698,239 +1664,6 @@ EXPORT_SYMBOL(usb_serial_port_softint);
 #endif
 
 
-#ifdef CONFIG_USB_SERIAL_CONSOLE
-/*
- * ------------------------------------------------------------
- * USB Serial console driver
- *
- * Much of the code here is copied from drivers/char/serial.c
- * and implements a phony serial console in the same way that
- * serial.c does so that in case some software queries it,
- * it will get the same results.
- *
- * Things that are different from the way the serial port code
- * does things, is that we call the lower level usb-serial
- * driver code to initialize the device, and we set the initial
- * console speeds based on the command line arguments.
- * ------------------------------------------------------------
- */
-
-#if 0
-static kdev_t usb_console_device(struct console *co)
-{
-	return mk_kdev(SERIAL_TTY_MAJOR, co->index);	/* TBD */
-}
-#endif
-
-/*
- * The parsing of the command line works exactly like the
- * serial.c code, except that the specifier is "ttyUSB" instead
- * of "ttyS".
- */
-static int __init usb_console_setup(struct console *co, char *options)
-{
-	struct usbcons_info *info = &usbcons_info;
-	int baud = 9600;
-	int bits = 8;
-	int parity = 'n';
-	int doflow = 0;
-	int cflag = CREAD | HUPCL | CLOCAL;
-	char *s;
-	struct usb_serial *serial;
-	struct usb_serial_port *port;
-	int retval = 0;
-	struct tty_struct *tty;
-	struct termios *termios;
-
-	dbg ("%s", __FUNCTION__);
-
-	if (options) {
-		baud = simple_strtoul(options, NULL, 10);
-		s = options;
-		while (*s >= '0' && *s <= '9')
-			s++;
-		if (*s)	parity = *s++;
-		if (*s)	bits   = *s++ - '0';
-		if (*s)	doflow = (*s++ == 'r');
-	}
-
-	/* build a cflag setting */
-	switch (baud) {
-		case 1200:
-			cflag |= B1200;
-			break;
-		case 2400:
-			cflag |= B2400;
-			break;
-		case 4800:
-			cflag |= B4800;
-			break;
-		case 19200:
-			cflag |= B19200;
-			break;
-		case 38400:
-			cflag |= B38400;
-			break;
-		case 57600:
-			cflag |= B57600;
-			break;
-		case 115200:
-			cflag |= B115200;
-			break;
-		case 9600:
-		default:
-			cflag |= B9600;
-			/*
-			 * Set this to a sane value to prevent a divide error
-			 */
-			baud  = 9600;
-			break;
-	}
-	switch (bits) {
-		case 7:
-			cflag |= CS7;
-			break;
-		default:
-		case 8:
-			cflag |= CS8;
-			break;
-	}
-	switch (parity) {
-		case 'o': case 'O':
-			cflag |= PARODD;
-			break;
-		case 'e': case 'E':
-			cflag |= PARENB;
-			break;
-	}
-	co->cflag = cflag;
-
-	/* grab the first serial port that happens to be connected */
-	serial = get_serial_by_minor (0);
-	if (serial_paranoia_check (serial, __FUNCTION__)) {
-		/* no device is connected yet, sorry :( */
-		err ("No USB device connected to ttyUSB0");
-		return -ENODEV;
-	}
-
-	port = &serial->port[0];
-	down (&port->sem);
-	port->tty = NULL;
-
-	info->port = port;
-	 
-	++port->open_count;
-	if (port->open_count == 1) {
-		/* only call the device specific open if this 
-		 * is the first time the port is opened */
-		if (serial->type->open)
-			retval = serial->type->open(port, NULL);
-		else
-			retval = generic_open(port, NULL);
-		if (retval)
-			port->open_count = 0;
-	}
-
-	up (&port->sem);
-
-	if (retval) {
-		err ("could not open USB console port");
-		return retval;
-	}
-
-	if (serial->type->set_termios) {
-		/* build up a fake tty structure so that the open call has something
-		 * to look at to get the cflag value */
-		tty = kmalloc (sizeof (*tty), GFP_KERNEL);
-		if (!tty) {
-			err ("no more memory");
-			return -ENOMEM;
-		}
-		termios = kmalloc (sizeof (*termios), GFP_KERNEL);
-		if (!termios) {
-			err ("no more memory");
-			kfree (tty);
-			return -ENOMEM;
-		}
-		memset (tty, 0x00, sizeof(*tty));
-		memset (termios, 0x00, sizeof(*termios));
-		termios->c_cflag = cflag;
-		tty->termios = termios;
-		port->tty = tty;
-
-		/* set up the initial termios settings */
-		serial->type->set_termios(port, NULL);
-		port->tty = NULL;
-		kfree (termios);
-		kfree (tty);
-	}
-
-	return retval;
-}
-
-static void usb_console_write(struct console *co, const char *buf, unsigned count)
-{
-	static struct usbcons_info *info = &usbcons_info;
-	struct usb_serial_port *port = info->port;
-	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);
-	int retval = -ENODEV;
-
-	if (!serial || !port)
-		return;
-
-	if (count == 0)
-		return;
-
-	down (&port->sem);
-
-	dbg("%s - port %d, %d byte(s)", __FUNCTION__, port->number, count);
-
-	if (!port->open_count) {
-		dbg ("%s - port not opened", __FUNCTION__);
-		goto exit;
-	}
-
-	/* pass on to the driver specific version of this function if it is available */
-	if (serial->type->write)
-		retval = serial->type->write(port, 0, buf, count);
-	else
-		retval = generic_write(port, 0, buf, count);
-
-exit:
-	up (&port->sem);
-	dbg("%s - return value (if we had one): %d", __FUNCTION__, retval);
-}
-
-#if 0
-/*
- * Receive character from the serial port
- */
-static int usb_console_wait_key(struct console *co)
-{
-	static struct usbcons_info *info = &usbcons_info;
-	int c = 0;
-
-	dbg("%s", __FUNCTION__);
-
-	/* maybe use generic_read_bulk_callback ??? */
-
-	return c;
-}
-#endif
-
-static struct console usbcons = {
-	.name =		"ttyUSB",			/* only [8] */
-	.write =	usb_console_write,
-#if 0
-	.device =	usb_console_device,		/* TBD */
-	.wait_key =	usb_console_wait_key,		/* TBD */
-#endif
-	.setup =	usb_console_setup,
-	.flags =	CON_PRINTBUFFER,
-	.index =	-1,
-};
-
-#endif /* CONFIG_USB_SERIAL_CONSOLE */
 
 
 /* Module information */

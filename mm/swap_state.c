@@ -105,7 +105,6 @@ void __delete_from_swap_cache(struct page *page)
 	BUG_ON(!PageLocked(page));
 	BUG_ON(!PageSwapCache(page));
 	BUG_ON(PageWriteback(page));
-	ClearPageDirty(page);
 	__remove_from_page_cache(page);
 	INC_CACHE_INFO(del_total);
 }
@@ -146,30 +145,30 @@ int add_to_swap(struct page * page)
 		pf_flags = current->flags;
 		current->flags &= ~PF_MEMALLOC;
 		current->flags |= PF_NOWARN;
-		ClearPageUptodate(page);		/* why? */
 
 		/*
 		 * Add it to the swap cache and mark it dirty
-		 * (adding to the page cache will clear the dirty
-		 * and uptodate bits, so we need to do it again)
 		 */
-		switch (add_to_swap_cache(page, entry)) {
+		switch (add_to_page_cache(page, &swapper_space, entry.val)) {
 		case 0:				/* Success */
 			current->flags = pf_flags;
 			SetPageUptodate(page);
+			ClearPageDirty(page);
 			set_page_dirty(page);
-			swap_free(entry);
+			INC_CACHE_INFO(add_total);
 			return 1;
-		case -ENOMEM:			/* radix-tree allocation */
+		case -EEXIST:
+			/* Raced with "speculative" read_swap_cache_async */
+			current->flags = pf_flags;
+			INC_CACHE_INFO(exist_race);
+			swap_free(entry);
+			continue;
+		default:
+			/* -ENOMEM radix-tree allocation failure */
 			current->flags = pf_flags;
 			swap_free(entry);
 			return 0;
-		default:			/* ENOENT: raced */
-			break;
 		}
-		/* Raced with "speculative" read_swap_cache_async */
-		current->flags = pf_flags;
-		swap_free(entry);
 	}
 }
 
@@ -203,33 +202,13 @@ int move_to_swap_cache(struct page *page, swp_entry_t entry)
 	void **pslot;
 	int err;
 
-	if (!mapping)
-		BUG();
-
-	if (!swap_duplicate(entry)) {
-		INC_CACHE_INFO(noent_race);
-		return -ENOENT;
-	}
-
 	write_lock(&swapper_space.page_lock);
 	write_lock(&mapping->page_lock);
 
 	err = radix_tree_reserve(&swapper_space.page_tree, entry.val, &pslot);
 	if (!err) {
-		/* Remove it from the page cache */
 		__remove_from_page_cache(page);
-
-		/* Add it to the swap cache */
 		*pslot = page;
-		/*
-		 * This code used to clear PG_uptodate, PG_error, PG_arch1,
-		 * PG_referenced and PG_checked.  What _should_ it clear?
-		 */
-		ClearPageUptodate(page);
-		ClearPageReferenced(page);
-
-		SetPageLocked(page);
-		ClearPageDirty(page);
 		___add_to_page_cache(page, &swapper_space, entry.val);
 	}
 
@@ -237,21 +216,21 @@ int move_to_swap_cache(struct page *page, swp_entry_t entry)
 	write_unlock(&swapper_space.page_lock);
 
 	if (!err) {
+		if (!swap_duplicate(entry))
+			BUG();
+		/* shift page from clean_pages to dirty_pages list */
+		BUG_ON(PageDirty(page));
+		set_page_dirty(page);
 		INC_CACHE_INFO(add_total);
-		return 0;
-	}
-
-	swap_free(entry);
-
-	if (err == -EEXIST)
+	} else if (err == -EEXIST)
 		INC_CACHE_INFO(exist_race);
-
 	return err;
 }
 
 int move_from_swap_cache(struct page *page, unsigned long index,
 		struct address_space *mapping)
 {
+	swp_entry_t entry;
 	void **pslot;
 	int err;
 
@@ -259,44 +238,27 @@ int move_from_swap_cache(struct page *page, unsigned long index,
 	BUG_ON(PageWriteback(page));
 	BUG_ON(page_has_buffers(page));
 
+	entry.val = page->index;
+
 	write_lock(&swapper_space.page_lock);
 	write_lock(&mapping->page_lock);
 
 	err = radix_tree_reserve(&mapping->page_tree, index, &pslot);
 	if (!err) {
-		swp_entry_t entry;
-
-		entry.val = page->index;
 		__delete_from_swap_cache(page);
-
 		*pslot = page;
-
-		/*
-		 * This code used to clear PG_uptodate, PG_error, PG_referenced,
-		 * PG_arch_1 and PG_checked.  It's not really clear why.
-		 */
-		ClearPageUptodate(page);
-		ClearPageReferenced(page);
-
-		/*
-		 * ___add_to_page_cache puts the page on ->clean_pages,
-		 * but it's dirty.  If it's on ->clean_pages, it will basically
-		 * never get written out.
-		 */
-		SetPageDirty(page);
 		___add_to_page_cache(page, mapping, index);
-		/* fix that up */
-		list_move(&page->list, &mapping->dirty_pages);
-		write_unlock(&mapping->page_lock);
-		write_unlock(&swapper_space.page_lock);
-
-		/* Do this outside ->page_lock */
-		swap_free(entry);
-		return 0;
 	}
 
 	write_unlock(&mapping->page_lock);
 	write_unlock(&swapper_space.page_lock);
+
+	if (!err) {
+		swap_free(entry);
+		/* shift page from clean_pages to dirty_pages list */
+		ClearPageDirty(page);
+		set_page_dirty(page);
+	}
 	return err;
 }
 

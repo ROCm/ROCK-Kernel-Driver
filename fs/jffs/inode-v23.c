@@ -301,7 +301,7 @@ jffs_setattr(struct dentry *dentry, struct iattr *iattr)
 		inode->i_blocks = (inode->i_size + 511) >> 9;
 
 		if (len) {
-			invalidate_inode_pages(inode);
+			invalidate_inode_pages(inode->i_mapping);
 		}
 		inode->i_ctime = CURRENT_TIME;
 		inode->i_mtime = inode->i_ctime;
@@ -1520,7 +1520,7 @@ jffs_file_write(struct file *filp, const char *buf, size_t count,
 	}
 	inode->i_ctime = inode->i_mtime = CURRENT_TIME;
 	mark_inode_dirty(inode);
-	invalidate_inode_pages(inode);
+	invalidate_inode_pages(inode->i_mapping);
 
  out_isem:
 	return err;

@@ -276,7 +276,7 @@ struct pd_unit {
 	int alt_geom;
 	int present;
 	char name[PD_NAMELEN];	/* pda, pdb, etc ... */
-	struct gendisk gd;
+	struct gendisk *gd;
 };
 
 struct pd_unit pd[PD_UNITS];
@@ -286,8 +286,6 @@ static void pd_media_check(struct pd_unit *disk);
 static void pd_doorlock(struct pd_unit *disk, int func);
 static int pd_check_media(kdev_t dev);
 static void pd_eject(struct pd_unit *disk);
-
-/*  'unit' must be defined in all functions - either as a local or a param */
 
 static char pd_scratch[512];	/* scratch block buffer */
 
@@ -368,11 +366,8 @@ static int pd_ioctl(struct inode *inode, struct file *file,
 	 unsigned int cmd, unsigned long arg)
 {
 	struct hd_geometry *geo = (struct hd_geometry *) arg;
-	int err, unit = DEVICE_NR(inode->i_rdev);
-	struct pd_unit *disk = pd + unit;
-
-	if (!disk->present)
-		return -ENODEV;
+	struct hd_geometry g;
+	struct pd_unit *disk = pd + DEVICE_NR(inode->i_rdev);
 
 	switch (cmd) {
 	case CDROMEJECT:
@@ -380,23 +375,18 @@ static int pd_ioctl(struct inode *inode, struct file *file,
 			pd_eject(disk);
 		return 0;
 	case HDIO_GETGEO:
-		if (!geo)
-			return -EINVAL;
-		err = verify_area(VERIFY_WRITE, geo, sizeof (*geo));
-		if (err)
-			return err;
-
 		if (disk->alt_geom) {
-			put_user(disk->capacity / (PD_LOG_HEADS * PD_LOG_SECTS),
-				 (short *) &geo->cylinders);
-			put_user(PD_LOG_HEADS, (char *) &geo->heads);
-			put_user(PD_LOG_SECTS, (char *) &geo->sectors);
+			g.heads = PD_LOG_HEADS;
+			g.sectors = PD_LOG_SECTS;
+			g.cylinders = disk->capacity / (g.heads * g.sectors);
 		} else {
-			put_user(disk->cylinders, (short *) &geo->cylinders);
-			put_user(disk->heads, (char *) &geo->heads);
-			put_user(disk->sectors, (char *) &geo->sectors);
+			g.heads = disk->heads;
+			g.sectors = disk->sectors;
+			g.cylinders = disk->cylinders;
 		}
-		put_user(get_start_sect(inode->i_bdev), (long *) &geo->start);
+		g.start = get_start_sect(inode->i_bdev);
+		if (copy_to_user(geo, &g, sizeof(struct hd_geometry)))
+			return -EFAULT;
 		return 0;
 	default:
 		return -EINVAL;
@@ -418,8 +408,6 @@ static int pd_check_media(kdev_t dev)
 {
 	int r, unit = DEVICE_NR(dev);
 	struct pd_unit *disk = pd + unit;
-	if (unit >= PD_UNITS || (!disk->present))
-		return -ENODEV;
 	if (!disk->removable)
 		return 0;
 	pd_media_check(disk);
@@ -432,12 +420,10 @@ static int pd_revalidate(kdev_t dev)
 {
 	int unit = DEVICE_NR(dev);
 	struct pd_unit *disk = pd + unit;
-	if (unit >= PD_UNITS || !disk->present)
-		return -ENODEV;
 	if (pd_identify(disk))
-		set_capacity(&disk->gd, disk->capacity);
+		set_capacity(disk->gd, disk->capacity);
 	else
-		set_capacity(&disk->gd, 0);
+		set_capacity(disk->gd, 0);
 	return 0;
 }
 
@@ -717,13 +703,20 @@ static int pd_detect(void)
 	}
 	for (unit = 0, disk = pd; unit < PD_UNITS; unit++, disk++) {
 		if (disk->present) {
-			strcpy(disk->gd.disk_name, disk->name);
-			disk->gd.minor_shift = PD_BITS;
-			disk->gd.fops = &pd_fops;
-			disk->gd.major = major;
-			disk->gd.first_minor = unit << PD_BITS;
-			set_capacity(&disk->gd, disk->capacity);
-			add_disk(&disk->gd);
+			struct gendisk *p = alloc_disk();
+			if (!p) {
+				disk->present = 0;
+				k--;
+				continue;
+			}
+			strcpy(p->disk_name, disk->name);
+			p->minor_shift = PD_BITS;
+			p->fops = &pd_fops;
+			p->major = major;
+			p->first_minor = unit << PD_BITS;
+			set_capacity(p, disk->capacity);
+			disk->gd = p;
+			add_disk(p);
 		}
 	}
 	if (k)
@@ -760,7 +753,7 @@ repeat:
 	pd_run = pd_req->nr_sectors;
 	pd_count = pd_req->current_nr_sectors;
 	pd_current = pd + unit;
-	if (pd_block + pd_count > get_capacity(&pd_current->gd)) {
+	if (pd_block + pd_count > get_capacity(pd_current->gd)) {
 		end_request(pd_req, 0);
 		goto repeat;
 	}
@@ -942,7 +935,10 @@ static void __exit pd_exit(void)
 	unregister_blkdev(MAJOR_NR, name);
 	for (unit = 0, disk = pd; unit < PD_UNITS; unit++, disk++) {
 		if (disk->present) {
-			del_gendisk(&disk->gd);
+			struct gendisk *p = disk->gd;
+			disk->gd = NULL;
+			del_gendisk(p);
+			put_disk(p);
 			pi_release(disk->pi);
 		}
 	}

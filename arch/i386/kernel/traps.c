@@ -144,7 +144,7 @@ void show_trace(unsigned long * stack)
 	while (((long) stack & (THREAD_SIZE-1)) != 0) {
 		addr = *stack++;
 		if (kernel_text_address(addr)) {
-			printk(" [<%08lx>]", addr);
+			printk(" [<%08lx>] ", addr);
 			print_symbol("%s\n", addr);
 		}
 	}
@@ -189,7 +189,9 @@ void show_stack(unsigned long * esp)
  */
 void dump_stack(void)
 {
-	show_stack(0);
+	unsigned long stack;
+
+	show_trace(&stack);
 }
 
 void show_registers(struct pt_regs *regs)

@@ -28,6 +28,7 @@
 #include <linux/kernel_stat.h>
 #include <linux/security.h>
 #include <linux/notifier.h>
+#include <linux/blkdev.h>
 #include <linux/delay.h>
 #include <linux/timer.h>
 
@@ -854,6 +855,9 @@ static inline void idle_tick(runqueue_t *rq)
 /*
  * This function gets called by the timer code, with HZ frequency.
  * We call it with interrupts disabled.
+ *
+ * It also gets called by the fork code, when changing the parent's
+ * timeslices.
  */
 void scheduler_tick(int user_ticks, int sys_ticks)
 {
@@ -861,11 +865,14 @@ void scheduler_tick(int user_ticks, int sys_ticks)
 	runqueue_t *rq = this_rq();
 	task_t *p = current;
 
-	run_local_timers();
 	if (p == rq->idle) {
 		/* note: this timer irq context must be accounted for as well */
 		if (irq_count() - HARDIRQ_OFFSET >= SOFTIRQ_OFFSET)
 			kstat.per_cpu_system[cpu] += sys_ticks;
+		else if (atomic_read(&nr_iowait_tasks) > 0)
+			kstat.per_cpu_iowait[cpu] += sys_ticks;
+		else
+			kstat.per_cpu_idle[cpu] += sys_ticks;
 #if CONFIG_SMP
 		idle_tick(rq);
 #endif
@@ -2103,8 +2110,6 @@ __init int migration_init(void)
  */
 spinlock_t kernel_flag __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 #endif
-
-extern void init_timers(void);
 
 void __init sched_init(void)
 {

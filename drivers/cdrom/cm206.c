@@ -1357,14 +1357,7 @@ static struct cdrom_device_info cm206_info = {
 	.name		= "cm206",
 };
 
-static struct gendisk cm206_gendisk = {
-	.major		= MAJOR_NR,
-	.first_minor	= 0,
-	.minor_shift	= 0,
-	.disk_name	= "cm206",
-	.fops		= &cm206_bdops,
-	.flags		= GENHD_FL_CD,
-};
+static struct gendisk *cm206_gendisk;
 
 /* This function probes for the adapter card. It returns the base
    address if it has found the adapter card. One can specify a base 
@@ -1419,7 +1412,7 @@ int __init cm206_init(void)
 {
 	uch e = 0;
 	long int size = sizeof(struct cm206_struct);
-	struct gendisk *disk = &cm206_gendisk;
+	struct gendisk *disk;
 
 	printk(KERN_INFO "cm206 cdrom driver " REVISION);
 	cm206_base = probe_base_port(auto_probe ? 0 : cm206_base);
@@ -1477,6 +1470,16 @@ int __init cm206_init(void)
 		printk(KERN_INFO "Cannot register for major %d!\n", MAJOR_NR);
 		goto out_blkdev;
 	}
+	disk = alloc_disk();
+	if (!disk)
+		goto out_disk;
+	disk->major = MAJOR_NR;
+	disk->first_minor = 0;
+	disk->minor_shift = 0;
+	sprintf(disk->disk_name, "cm206");
+	disk->fops = &cm206_bdops;
+	disk->flags = GENHD_FL_CD;
+	cm206_gendisk = disk;
 	cm206_info.dev = mk_kdev(MAJOR_NR, 0);
 	if (register_cdrom(&cm206_info) != 0) {
 		printk(KERN_INFO "Cannot register for cdrom %d!\n", MAJOR_NR);
@@ -1498,6 +1501,8 @@ int __init cm206_init(void)
 	return 0;
 
 out_cdrom:
+	put_disk(disk);
+out_disk:
 	unregister_blkdev(MAJOR_NR, "cm206");
 out_blkdev:
 	free_irq(cm206_irq, NULL);
@@ -1536,7 +1541,8 @@ int __cm206_init(void)
 
 void __exit cm206_exit(void)
 {
-	del_gendisk(&cm206_gendisk);
+	del_gendisk(cm206_gendisk);
+	put_disk(cm206_gendisk);
 	if (unregister_cdrom(&cm206_info)) {
 		printk("Can't unregister cdrom cm206\n");
 		return;
