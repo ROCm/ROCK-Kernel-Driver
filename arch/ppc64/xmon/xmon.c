@@ -1402,7 +1402,7 @@ static void xmon_show_stack(unsigned long sp, unsigned long lr,
 		/* Look for "regshere" marker to see if this is
 		   an exception frame. */
 		if (mread(sp + 0x60, &marker, sizeof(unsigned long))
-		    && marker == 0x7265677368657265) {
+		    && marker == 0x7265677368657265ul) {
 			if (mread(sp + 0x70, &regs, sizeof(regs))
 			    != sizeof(regs)) {
 				printf("Couldn't read registers at %lx\n",

@@ -546,7 +546,7 @@ void show_stack(struct task_struct *p, unsigned long *_sp)
 		 * We look for the "regshere" marker in the current frame.
 		 */
 		if (validate_sp(sp, p, sizeof(struct pt_regs) + 400)
-		    && _sp[12] == 0x7265677368657265) {
+		    && _sp[12] == 0x7265677368657265ul) {
 			struct pt_regs *regs = (struct pt_regs *)
 				(sp + STACK_FRAME_OVERHEAD);
 			printk("--- Exception: %lx", regs->trap);
