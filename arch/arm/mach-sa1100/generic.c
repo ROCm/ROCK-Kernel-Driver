@@ -65,10 +65,10 @@ unsigned int sa11x0_freq_to_ppcr(unsigned int khz)
 
 unsigned int sa11x0_ppcr_to_freq(unsigned int idx)
 {
-	if (idx >= NR_FREQS)
-		return 0;
-	else
-		return cclk_frequency_100khz[idx];
+	unsigned int freq = 0;
+	if (idx < NR_FREQS)
+		freq = cclk_frequency_100khz[idx] * 100;
+	return freq;
 }
 
 
