@@ -980,8 +980,10 @@ int tcp_retransmit_skb(struct sock *sk, struct sk_buff *skb)
 	if (TCP_SKB_CB(skb)->flags & TCPCB_FLAG_FIN)
 		data_end_seq--;
 
-	if (skb->len != (data_end_seq - data_seq)) {
-		if (__tcp_trim_head(sk, skb, data_end_seq - data_seq))
+	if (skb->len > (data_end_seq - data_seq)) {
+		u32 to_trim = skb->len - (data_end_seq - data_seq);
+
+		if (__tcp_trim_head(sk, skb, to_trim))
 			return -ENOMEM;
 	}		
 
