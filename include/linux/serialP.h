@@ -131,6 +131,9 @@ struct rs_multiport_struct {
  * Digital did something really horribly wrong with the OUT1 and OUT2
  * lines on at least some ALPHA's.  The failure mode is that if either
  * is cleared, the machine locks up with endless interrupts.
+ *
+ * This is still used by arch/mips/au1000/common/serial.c for some weird
+ * reason (mips != alpha!)
  */
 #define ALPHA_KLUDGE_MCR  (UART_MCR_OUT2 | UART_MCR_OUT1)
 #else
@@ -138,29 +141,8 @@ struct rs_multiport_struct {
 #endif
 
 /*
- * Structures and definitions for PCI support
+ * Definitions for PCI support.
  */
-struct pci_dev;
-struct pci_board {
-	int flags;
-	int num_ports;
-	int base_baud;
-	int uart_offset;
-	int reg_shift;
-	int (*init_fn)(struct pci_dev *dev, struct pci_board *board,
-			int enable);
-	int first_uart_offset;
-};
-
-struct pci_board_inst {
-	struct pci_board	board;
-	struct pci_dev		*dev;
-};
-
-#ifndef PCI_ANY_ID
-#define PCI_ANY_ID (~0)
-#endif
-
 #define SPCI_FL_BASE_MASK	0x0007
 #define SPCI_FL_BASE0	0x0000
 #define SPCI_FL_BASE1	0x0001

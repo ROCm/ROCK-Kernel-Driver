@@ -22,10 +22,7 @@
 #include <linux/slab.h>
 #include <linux/serial.h>
 
-/* 2.4.6 compatibility cruft - to be removed with the old serial.c code */
-#define pci_board __pci_board
 #include <linux/serialP.h>
-#undef pci_board
 
 #include <asm/bitops.h>
 #include <asm/byteorder.h>
