@@ -156,6 +156,9 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
 	 : : );
 #endif /* CONFIG_ALTIVEC */
 
+	if (!cpu_isset(smp_processor_id(), next->cpu_vm_mask))
+		cpu_set(smp_processor_id(), next->cpu_vm_mask);
+
 	/* No need to flush userspace segments if the mm doesnt change */
 	if (prev == next)
 		return;
@@ -164,7 +167,6 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
 		flush_slb(tsk, next);
 	else
 		flush_stab(tsk, next);
-	cpu_set(smp_processor_id(), next->cpu_vm_mask);
 }
 
 #define deactivate_mm(tsk,mm)	do { } while (0)
