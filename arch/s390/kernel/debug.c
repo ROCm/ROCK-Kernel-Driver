@@ -851,9 +851,17 @@ int debug_register_view(debug_info_t * id, struct debug_view *view)
 	int i;
 	unsigned long flags;
 	mode_t mode = S_IFREG;
+	struct proc_dir_entry *pde;
 
 	if (!id)
 		goto out;
+	pde = create_proc_entry(view->name, mode, id->proc_root_entry);
+	if (!pde){
+		printk(KERN_WARNING "debug: create_proc_entry() failed! Cannot register view %s/%s\n", id->name,view->name);
+		rc = -1;
+		goto out;
+	}
+
 	spin_lock_irqsave(&id->lock, flags);
 	for (i = 0; i < DEBUG_MAX_VIEWS; i++) {
 		if (id->views[i] == NULL)
@@ -864,6 +872,7 @@ int debug_register_view(debug_info_t * id, struct debug_view *view)
 			id->name,view->name);
 		printk(KERN_WARNING 
 			"debug: maximum number of views reached (%i)!\n", i);
+		remove_proc_entry(pde->name, id->proc_root_entry);
 		rc = -1;
 	}
 	else {
@@ -872,11 +881,8 @@ int debug_register_view(debug_info_t * id, struct debug_view *view)
 			mode |= S_IRUSR;
 		if (view->input_proc)
 			mode |= S_IWUSR;
-		id->proc_entries[i] = create_proc_entry(view->name, mode,
-							id->proc_root_entry);
-		if (id->proc_entries[i] != NULL)
-			id->proc_entries[i]->proc_fops = &debug_file_ops;
-		rc = 0;
+		pde->proc_fops = &debug_file_ops;
+		id->proc_entries[i] = pde;
 	}
 	spin_unlock_irqrestore(&id->lock, flags);
       out:

@@ -469,7 +469,7 @@ static struct task_struct *__devinit fork_by_hand(void)
        /* don't care about the psw and regs settings since we'll never
           reschedule the forked task. */
        memset(&regs,0,sizeof(struct pt_regs));
-       return do_fork(CLONE_VM|CLONE_IDLETASK, 0, &regs, 0, NULL, NULL);
+       return copy_process(CLONE_VM|CLONE_IDLETASK, 0, &regs, 0, NULL, NULL);
 }
 
 int __cpu_up(unsigned int cpu)
@@ -498,6 +498,7 @@ int __cpu_up(unsigned int cpu)
                 printk("failed fork for CPU %d", cpu);
 		return -EIO;
 	}
+	wake_up_forked_process(idle);
 
         /*
          * We remove it from the pidhash and the runqueue
