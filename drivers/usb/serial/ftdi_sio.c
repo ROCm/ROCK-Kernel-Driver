@@ -17,6 +17,9 @@
  * See http://ftdi-usb-sio.sourceforge.net for upto date testing info
  *	and extra documentation
  *
+ * (27/May/2004) Ian Abbott
+ *      Improved throttling code, mostly stolen from the WhiteHEAT driver.
+ *
  * (26/Mar/2004) Jan Capek
  *      Added PID's for ICD-U20/ICD-U40 - incircuit PIC debuggers from CCS Inc.
  *
@@ -584,6 +587,10 @@ static struct usb_driver ftdi_driver = {
 #define BUFSZ 512
 #define PKTSZ 64
 
+/* rx_flags */
+#define THROTTLED		0x01
+#define ACTUALLY_THROTTLED	0x02
+
 struct ftdi_private {
 	ftdi_chip_type_t chip_type;
 				/* type of the device, either SIO or FT8U232AM */
@@ -598,6 +605,8 @@ struct ftdi_private {
 	unsigned long last_dtr_rts;	/* saved modem control outputs */
         wait_queue_head_t delta_msr_wait; /* Used for TIOCMIWAIT */
  	char prev_status, diff_status;        /* Used for TIOCMIWAIT */
+	__u8 rx_flags;		/* receive state flags (throttling) */
+	spinlock_t rx_lock;	/* spinlock for receive state */
 
 	int force_baud;		/* if non-zero, force the baud rate to this value */
 	int force_rtscts;	/* if non-zero, force RTS-CTS to always be enabled */
@@ -625,6 +634,7 @@ static int  ftdi_write_room		(struct usb_serial_port *port);
 static int  ftdi_chars_in_buffer	(struct usb_serial_port *port);
 static void ftdi_write_bulk_callback	(struct urb *urb, struct pt_regs *regs);
 static void ftdi_read_bulk_callback	(struct urb *urb, struct pt_regs *regs);
+static void ftdi_process_read		(struct usb_serial_port *port);
 static void ftdi_set_termios		(struct usb_serial_port *port, struct termios * old);
 static int  ftdi_tiocmget               (struct usb_serial_port *port, struct file *file);
 static int  ftdi_tiocmset		(struct usb_serial_port *port, struct file * file, unsigned int set, unsigned int clear);
@@ -1110,6 +1120,7 @@ static int ftdi_common_startup (struct usb_serial *serial)
 	}
 	memset(priv, 0, sizeof(*priv));
 
+	spin_lock_init(&priv->rx_lock);
         init_waitqueue_head(&priv->delta_msr_wait);
 	/* This will push the characters through immediately rather
 	   than queue a task to deliver them */
@@ -1273,8 +1284,8 @@ static void ftdi_shutdown (struct usb_serial *serial)
 	 */
 
 	if (priv) {
-		kfree(priv);
 		usb_set_serial_port_data(port, NULL);
+		kfree(priv);
 	}
 } /* ftdi_shutdown */
 
@@ -1284,6 +1295,7 @@ static int  ftdi_open (struct usb_serial_port *port, struct file *filp)
 	struct termios tmp_termios;
 	struct usb_device *dev = port->serial->dev;
 	struct ftdi_private *priv = usb_get_serial_port_data(port);
+	unsigned long flags;
 	
 	int result = 0;
 	char buf[1]; /* Needed for the usb_control_msg I think */
@@ -1316,6 +1328,11 @@ static int  ftdi_open (struct usb_serial_port *port, struct file *filp)
 	if (set_rts(port, HIGH) < 0){
 		err("%s Error from RTS HIGH urb", __FUNCTION__);
 	}
+
+	/* Not throttled */
+	spin_lock_irqsave(&priv->rx_lock, flags);
+	priv->rx_flags &= ~(THROTTLED | ACTUALLY_THROTTLED);
+	spin_unlock_irqrestore(&priv->rx_lock, flags);
 
 	/* Start reading from the device */
 	usb_fill_bulk_urb(port->read_urb, dev,
@@ -1370,7 +1387,12 @@ static void ftdi_close (struct usb_serial_port *port, struct file *filp)
 	/* shutdown our bulk read */
 	if (port->read_urb) {
 		if (usb_unlink_urb (port->read_urb) < 0) {
-			err("Error unlinking read urb");
+			/* Generally, this isn't an error.  If the previous
+			   read bulk callback occurred (or is about to occur)
+			   while the port was being closed or was throtted
+			   (and is still throttled), the read urb will not
+			   have been submitted. */
+			dbg("%s - failed to unlink read urb (generally not an error)", __FUNCTION__);
 		}
 	}
 } /* ftdi_close */
@@ -1546,13 +1568,6 @@ static void ftdi_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
 	struct tty_struct *tty;
 	struct ftdi_private *priv;
-	char error_flag;
-       	unsigned char *data = urb->transfer_buffer;
-
-	int i;
-	int result;
-	int need_flip;
-	int packet_offset;
 
 	if (urb->number_of_packets > 0) {
 		err("%s transfer_buffer_length %d actual_length %d number of packets %d",__FUNCTION__,
@@ -1560,7 +1575,7 @@ static void ftdi_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 		err("%s transfer_flags %x ", __FUNCTION__,urb->transfer_flags );
 	}
 
-	dbg("%s", __FUNCTION__);
+	dbg("%s - port %d", __FUNCTION__, port->number);
 
 	if (port->open_count <= 0)
 		return;
@@ -1572,12 +1587,73 @@ static void ftdi_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 	}
 
 	priv = usb_get_serial_port_data(port);
+	if (!priv) {
+		dbg("%s - bad port private data pointer - exiting", __FUNCTION__);
+		return;
+	}
+
+	if (urb != port->read_urb) {
+		err("%s - Not my urb!", __FUNCTION__);
+	}
 
 	if (urb->status) {
 		/* This will happen at close every time so it is a dbg not an err */
 		dbg("(this is ok on close) nonzero read bulk status received: %d", urb->status);
 		return;
 	}
+
+	/* If throttled, delay receive processing until unthrottled. */
+	spin_lock(&priv->rx_lock);
+	if (priv->rx_flags & THROTTLED) {
+		dbg("Deferring read urb processing until unthrottled");
+		priv->rx_flags |= ACTUALLY_THROTTLED;
+		spin_unlock(&priv->rx_lock);
+		return;
+	}
+	spin_unlock(&priv->rx_lock);
+
+	ftdi_process_read(port);
+
+} /* ftdi_read_bulk_callback */
+
+
+static void ftdi_process_read (struct usb_serial_port *port)
+{ /* ftdi_process_read */
+	struct urb *urb;
+	struct tty_struct *tty;
+	struct ftdi_private *priv;
+	char error_flag;
+       	unsigned char *data;
+
+	int i;
+	int result;
+	int need_flip;
+	int packet_offset;
+
+	dbg("%s - port %d", __FUNCTION__, port->number);
+
+	if (port->open_count <= 0)
+		return;
+
+	tty = port->tty;
+	if (!tty) {
+		dbg("%s - bad tty pointer - exiting",__FUNCTION__);
+		return;
+	}
+
+	priv = usb_get_serial_port_data(port);
+	if (!priv) {
+		dbg("%s - bad port private data pointer - exiting", __FUNCTION__);
+		return;
+	}
+
+	urb = port->read_urb;
+	if (!urb) {
+		dbg("%s - bad read_urb pointer - exiting", __FUNCTION__);
+		return;
+	}
+
+	data = urb->transfer_buffer;
 
         /* The first two bytes of every read packet are status */
 	if (urb->actual_length > 2) {
@@ -1683,7 +1759,7 @@ static void ftdi_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 	}
 
 	return;
-} /* ftdi_read_bulk_callback */
+} /* ftdi_process_read */
 
 
 static void ftdi_break_ctl( struct usb_serial_port *port, int break_state )
@@ -2073,27 +2149,32 @@ static int ftdi_ioctl (struct usb_serial_port *port, struct file * file, unsigne
 
 static void ftdi_throttle (struct usb_serial_port *port)
 {
+	struct ftdi_private *priv = usb_get_serial_port_data(port);
+	unsigned long flags;
+
 	dbg("%s - port %d", __FUNCTION__, port->number);
-	usb_unlink_urb (port->read_urb);
+
+	spin_lock_irqsave(&priv->rx_lock, flags);
+	priv->rx_flags |= THROTTLED;
+	spin_unlock_irqrestore(&priv->rx_lock, flags);
 }
 
 
 static void ftdi_unthrottle (struct usb_serial_port *port)
 {
-	int result;
+	struct ftdi_private *priv = usb_get_serial_port_data(port);
+	int actually_throttled;
+	unsigned long flags;
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
-	port->read_urb->dev = port->serial->dev;
+	spin_lock_irqsave(&priv->rx_lock, flags);
+	actually_throttled = priv->rx_flags & ACTUALLY_THROTTLED;
+	priv->rx_flags &= ~(THROTTLED | ACTUALLY_THROTTLED);
+	spin_unlock_irqrestore(&priv->rx_lock, flags);
 
-	usb_fill_bulk_urb(port->read_urb, port->serial->dev, 
-		      usb_rcvbulkpipe(port->serial->dev, port->bulk_in_endpointAddress),
-		      port->read_urb->transfer_buffer, port->read_urb->transfer_buffer_length,
-		      ftdi_read_bulk_callback, port);
-
-	result = usb_submit_urb(port->read_urb, GFP_ATOMIC);
-	if (result)
-		err("%s - failed submitting read urb, error %d", __FUNCTION__, result);
+	if (actually_throttled)
+		ftdi_process_read(port);
 }
 
 static int __init ftdi_init (void)

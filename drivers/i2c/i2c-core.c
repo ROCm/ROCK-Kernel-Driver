@@ -28,6 +28,7 @@
 #include <linux/slab.h>
 #include <linux/i2c.h>
 #include <linux/init.h>
+#include <linux/idr.h>
 #include <linux/seq_file.h>
 #include <asm/uaccess.h>
 
@@ -35,6 +36,7 @@
 static LIST_HEAD(adapters);
 static LIST_HEAD(drivers);
 static DECLARE_MUTEX(core_lists);
+static DEFINE_IDR(i2c_adapter_idr);
 
 int i2c_device_probe(struct device *dev)
 {
@@ -113,13 +115,19 @@ static struct device_attribute dev_attr_client_name = {
  */
 int i2c_add_adapter(struct i2c_adapter *adap)
 {
-	static int nr = 0;
+	int id, res = 0;
 	struct list_head   *item;
 	struct i2c_driver  *driver;
 
 	down(&core_lists);
 
-	adap->nr = nr++;
+	if (idr_pre_get(&i2c_adapter_idr, GFP_KERNEL) == 0) {
+		res = -ENOMEM;
+		goto out_unlock;
+	}
+
+	id = idr_get_new(&i2c_adapter_idr, NULL);
+	adap->nr =  id & MAX_ID_MASK;
 	init_MUTEX(&adap->bus_lock);
 	init_MUTEX(&adap->clist_lock);
 	list_add_tail(&adap->list,&adapters);
@@ -151,10 +159,12 @@ int i2c_add_adapter(struct i2c_adapter *adap)
 			/* We ignore the return code; if it fails, too bad */
 			driver->attach_adapter(adap);
 	}
-	up(&core_lists);
 
 	dev_dbg(&adap->dev, "registered as adapter #%d\n", adap->nr);
-	return 0;
+
+ out_unlock:
+	up(&core_lists);
+	return res;
 }
 
 
@@ -207,6 +217,9 @@ int i2c_del_adapter(struct i2c_adapter *adap)
 	/* wait for sysfs to drop all references */
 	wait_for_completion(&adap->dev_released);
 	wait_for_completion(&adap->class_dev_released);
+
+	/* free dynamically allocated bus id */
+	idr_remove(&i2c_adapter_idr, adap->nr);
 
 	dev_dbg(&adap->dev, "adapter unregistered\n");
 
