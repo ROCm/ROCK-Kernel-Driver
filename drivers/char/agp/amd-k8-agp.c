@@ -49,7 +49,6 @@ static int x86_64_insert_memory(struct agp_memory *mem, off_t pg_start, int type
 	int i, j, num_entries;
 	long tmp;
 	u32 pte;
-	u64 addr;
 
 	num_entries = agp_num_entries();
 
@@ -76,9 +75,8 @@ static int x86_64_insert_memory(struct agp_memory *mem, off_t pg_start, int type
 	}
 
 	for (i = 0, j = pg_start; i < mem->page_count; i++, j++) {
-		addr = agp_bridge->driver->mask_memory(mem->memory[i], mem->type);
+		tmp = agp_bridge->driver->mask_memory(mem->memory[i], mem->type);
 
-		tmp = addr;
 		BUG_ON(tmp & 0xffffff0000000ffc);
 		pte = (tmp & 0x000000ff00000000) >> 28;
 		pte |=(tmp & 0x00000000fffff000);
