@@ -2103,6 +2103,7 @@ static dev_link_t *wl3501_attach(void)
 	if (!link)
 		goto out;
 	memset(link, 0, sizeof(struct dev_link_t));
+	init_timer(&link->release);
 	link->release.function = wl3501_release;
 	link->release.data = (unsigned long)link;
 
@@ -2129,13 +2130,9 @@ static dev_link_t *wl3501_attach(void)
 	link->conf.ConfigIndex = 1;
 	link->conf.Present = PRESENT_OPTION;
 
-	/* Allocate space for private device-specific data */
-	dev = kmalloc(sizeof(*dev) + sizeof(struct wl3501_card), GFP_KERNEL);
+	dev = alloc_etherdev(sizeof(struct wl3501_card));
 	if (!dev)
 		goto out_link;
-	memset(dev, 0, sizeof(*dev) + sizeof(struct wl3501_card));
-	ether_setup(dev);
-	dev->priv		= dev + 1;
 	dev->init		= wl3501_init;
 	dev->open		= wl3501_open;
 	dev->stop		= wl3501_close;
