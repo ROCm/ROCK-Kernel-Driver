@@ -274,14 +274,14 @@ linvfs_readdir(
 				goto done;
 			}
 			size -= dbp->d_reclen;
-			curr_offset = (loff_t)dbp->d_off;
+			curr_offset = (loff_t)dbp->d_off & 0x7fffffff;
 			dbp = nextdp(dbp);
 		}
 	}
 done:
 	if (!error) {
 		if (size == 0)
-			filp->f_pos = uio.uio_offset;
+			filp->f_pos = uio.uio_offset & 0x7fffffff;
 		else if (dbp)
 			filp->f_pos = curr_offset;
 	}
