@@ -24,16 +24,16 @@
 
 extern int get_filesystem_list(char * buf);
 
-asmlinkage long sys_mount(char *dev_name, char *dir_name, char *type,
+extern asmlinkage long sys_mount(char *dev_name, char *dir_name, char *type,
 	 unsigned long flags, void *data);
-asmlinkage long sys_mkdir(char *name, int mode);
-asmlinkage long sys_chdir(char *name);
-asmlinkage long sys_chroot(char *name);
-asmlinkage long sys_unlink(char *name);
-asmlinkage long sys_symlink(char *old, char *new);
-asmlinkage long sys_mknod(char *name, int mode, dev_t dev);
-asmlinkage long sys_umount(char *name, int flags);
-asmlinkage long sys_ioctl(int fd, int cmd, unsigned long arg);
+extern asmlinkage long sys_mkdir(const char *name, int mode);
+extern asmlinkage long sys_chdir(const char *name);
+extern asmlinkage long sys_chroot(const char *name);
+extern asmlinkage long sys_unlink(const char *name);
+extern asmlinkage long sys_symlink(const char *old, const char *new);
+extern asmlinkage long sys_mknod(const char *name, int mode, dev_t dev);
+extern asmlinkage long sys_umount(char *name, int flags);
+extern asmlinkage long sys_ioctl(int fd, int cmd, unsigned long arg);
 
 #ifdef CONFIG_BLK_DEV_INITRD
 unsigned int real_root_dev;	/* do_proc_dointvec cannot handle kdev_t */
