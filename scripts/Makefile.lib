@@ -165,7 +165,7 @@ cmd_ld = $(LD) $(LDFLAGS) $(EXTRA_LDFLAGS) $(LDFLAGS_$(@F)) \
 # ---------------------------------------------------------------------------
 
 quiet_cmd_objcopy = OBJCOPY $@
-cmd_objcopy = $(OBJCOPY) $(OBJCOPYFLAGS) $< $@
+cmd_objcopy = $(OBJCOPY) $(OBJCOPYFLAGS) $(OBJCOPYFLAGS_$(@F)) $< $@
 
 # Gzip
 # ---------------------------------------------------------------------------
