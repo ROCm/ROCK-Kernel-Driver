@@ -315,9 +315,11 @@ static int pppoatm_assign_vcc(struct atm_vcc *atmvcc, unsigned long arg)
  * This handles ioctls actually performed on our vcc - we must return
  * -ENOIOCTLCMD for any unrecognized ioctl
  */
-static int pppoatm_ioctl(struct atm_vcc *atmvcc, unsigned int cmd,
+static int pppoatm_ioctl(struct socket *sock, unsigned int cmd,
 	unsigned long arg)
 {
+	struct atm_vcc *atmvcc = ATM_SD(sock);
+
 	if (cmd != ATM_SETBACKEND && atmvcc->push != pppoatm_push)
 		return -ENOIOCTLCMD;
 	switch (cmd) {
@@ -341,15 +343,20 @@ static int pppoatm_ioctl(struct atm_vcc *atmvcc, unsigned int cmd,
 	return -ENOIOCTLCMD;
 }
 
+struct atm_ioctl pppoatm_ioctl_ops = {
+	.owner	= THIS_MODULE,
+	.ioctl	= pppoatm_ioctl,
+};
+
 static int __init pppoatm_init(void)
 {
-	pppoatm_ioctl_set(pppoatm_ioctl);
+	register_atm_ioctl(&pppoatm_ioctl_ops);
 	return 0;
 }
 
 static void __exit pppoatm_exit(void)
 {
-	pppoatm_ioctl_set(NULL);
+	deregister_atm_ioctl(&pppoatm_ioctl_ops);
 }
 
 module_init(pppoatm_init);

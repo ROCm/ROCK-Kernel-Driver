@@ -122,38 +122,6 @@ EXPORT_SYMBOL(atm_clip_ops_set);
 #endif
 #endif
 
-#if defined(CONFIG_PPPOATM) || defined(CONFIG_PPPOATM_MODULE)
-static DECLARE_MUTEX(pppoatm_ioctl_mutex);
-
-static int (*pppoatm_ioctl_hook)(struct atm_vcc *, unsigned int, unsigned long);
-
-void pppoatm_ioctl_set(int (*hook)(struct atm_vcc *, unsigned int, unsigned long))
-{
-	down(&pppoatm_ioctl_mutex);
-	pppoatm_ioctl_hook = hook;
-	up(&pppoatm_ioctl_mutex);
-}
-#ifdef CONFIG_PPPOATM_MODULE
-EXPORT_SYMBOL(pppoatm_ioctl_set);
-#endif
-#endif
-
-#if defined(CONFIG_ATM_BR2684) || defined(CONFIG_ATM_BR2684_MODULE)
-static DECLARE_MUTEX(br2684_ioctl_mutex);
-
-static int (*br2684_ioctl_hook)(struct atm_vcc *, unsigned int, unsigned long);
-
-void br2684_ioctl_set(int (*hook)(struct atm_vcc *, unsigned int, unsigned long))
-{
-	down(&br2684_ioctl_mutex);
-	br2684_ioctl_hook = hook;
-	up(&br2684_ioctl_mutex);
-}
-#ifdef CONFIG_ATM_BR2684_MODULE
-EXPORT_SYMBOL(br2684_ioctl_set);
-#endif
-#endif
-
 static DECLARE_MUTEX(ioctl_mutex);
 static LIST_HEAD(ioctl_list);
 
@@ -433,23 +401,6 @@ int vcc_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 
 	if (error != -ENOIOCTLCMD)
 		goto done;
-
-#if defined(CONFIG_PPPOATM) || defined(CONFIG_PPPOATM_MODULE)
-	down(&pppoatm_ioctl_mutex);
-	if (pppoatm_ioctl_hook)
-		error = pppoatm_ioctl_hook(vcc, cmd, arg);
-	up(&pppoatm_ioctl_mutex);
-	if (error != -ENOIOCTLCMD)
-		goto done;
-#endif
-#if defined(CONFIG_ATM_BR2684) || defined(CONFIG_ATM_BR2684_MODULE)
-	down(&br2684_ioctl_mutex);
-	if (br2684_ioctl_hook)
-		error = br2684_ioctl_hook(vcc, cmd, arg);
-	up(&br2684_ioctl_mutex);
-	if (error != -ENOIOCTLCMD)
-		goto done;
-#endif
 
 	error = atm_dev_ioctl(cmd, arg);
 
