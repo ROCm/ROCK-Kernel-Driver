@@ -210,6 +210,7 @@ static int isdn_ether_setup(isdn_net_dev *p);
 static int isdn_uihdlc_setup(isdn_net_dev *p);
 static int isdn_iptyp_setup(isdn_net_dev *p);
 
+static void isdn_rawip_receive(isdn_net_dev *p, isdn_net_local *olp, struct sk_buff *skb);
 static void isdn_ether_receive(isdn_net_dev *p, isdn_net_local *olp, struct sk_buff *skb);
 static void isdn_uihdlc_receive(isdn_net_dev *p, isdn_net_local *olp, struct sk_buff *skb);
 
@@ -1234,10 +1235,7 @@ isdn_net_receive(struct net_device *ndev, struct sk_buff *skb)
 			isdn_uihdlc_receive(lp->netdev, olp, skb);
 			return;
 		case ISDN_NET_ENCAP_RAWIP:
-			/* RAW-IP without MAC-Header */
-			olp->huptimer = 0;
-			lp->huptimer = 0;
-			skb->protocol = htons(ETH_P_IP);
+			isdn_rawip_receive(lp->netdev, olp, skb);
 			break;
 		case ISDN_NET_ENCAP_CISCOHDLCK:
 			isdn_ciscohdlck_receive(lp, skb);
@@ -2548,6 +2546,7 @@ isdn_uihdlc_receive(isdn_net_dev *p, isdn_net_local *olp,
 
 	isdn_net_reset_huptimer(lp, olp);
 	skb_pull(skb, 2);
+	skb->protocol = htons(ETH_P_IP);
 	netif_rx(skb);
 }
 
@@ -2563,7 +2562,19 @@ isdn_uihdlc_setup(isdn_net_dev *p)
 }
 
 // ISDN_NET_ENCAP_RAWIP
+// RAW-IP without MAC-Header
 // ======================================================================
+
+static void
+isdn_rawip_receive(isdn_net_dev *p, isdn_net_local *olp, 
+		   struct sk_buff *skb)
+{
+	isdn_net_local *lp = &p->local;
+
+	isdn_net_reset_huptimer(lp, olp);
+	skb->protocol = htons(ETH_P_IP);
+	netif_rx(skb);
+}
 
 static int
 isdn_rawip_setup(isdn_net_dev *p)
