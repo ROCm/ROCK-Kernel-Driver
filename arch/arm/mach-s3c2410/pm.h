@@ -14,7 +14,17 @@
  * management
 */
 
+#ifdef CONFIG_PM
+
 extern __init int s3c2410_pm_init(void);
+
+#else
+
+static inline int s3c2410_pm_init(void)
+{
+	return 0;
+}
+#endif
 
 /* configuration for the IRQ mask over sleep */
 extern unsigned long s3c_irqwake_intmask;
