@@ -676,9 +676,7 @@ error0:
 	return_VALUE(-ENODEV);
 }
 
-struct subsystem acpi_subsys = {
-	.kobj	= { .name = "acpi" },
-};
+decl_subsys(acpi,NULL);
 
 static int __init acpi_init (void)
 {
