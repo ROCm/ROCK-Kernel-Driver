@@ -887,7 +887,7 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 	 * hashval, then we run with it.
 	 */
 	if (bno > 0) {
-		error = xfs_da_read_buf(trans, dp, bno, -1, &bp, XFS_DATA_FORK);
+		error = xfs_da_read_buf(trans, dp, bno, -2, &bp, XFS_DATA_FORK);
 		if ((error != 0) && (error != EFSCORRUPTED))
 			return(error);
 		if (bp)
