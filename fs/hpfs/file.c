@@ -124,7 +124,8 @@ struct address_space_operations hpfs_aops = {
 	.bmap = _hpfs_bmap
 };
 
-ssize_t hpfs_file_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
+ssize_t hpfs_file_write(struct file *file, const char __user *buf,
+			size_t count, loff_t *ppos)
 {
 	ssize_t retval;
 

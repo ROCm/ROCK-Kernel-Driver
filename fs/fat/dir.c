@@ -663,7 +663,7 @@ int fat_dir_ioctl(struct inode * inode, struct file * filp,
 		return -EINVAL;
 	}
 
-	d1 = (struct dirent *)arg;
+	d1 = (struct dirent __user *)arg;
 	if (!access_ok(VERIFY_WRITE, d1, sizeof(struct dirent[2])))
 		return -EFAULT;
 	/*

@@ -1856,57 +1856,6 @@ static int cdrom_switch_blocksize(struct cdrom_device_info *cdi, int size)
 	return cdo->generic_packet(cdi, &cgc);
 }
 
-static int cdrom_do_cmd(struct cdrom_device_info *cdi,
-			struct cdrom_generic_command *cgc)
-{
-	struct request_sense *usense, sense;
-	unsigned char *ubuf;
-	int ret;
-
-	if (cgc->data_direction == CGC_DATA_UNKNOWN)
-		return -EINVAL;
-
-	if (cgc->buflen < 0 || cgc->buflen >= 131072)
-		return -EINVAL;
-
-	usense = cgc->sense;
-	cgc->sense = &sense;
-	if (usense && !access_ok(VERIFY_WRITE, usense, sizeof(*usense))) {
-		return -EFAULT;
-	}
-
-	ubuf = cgc->buffer;
-	if (cgc->data_direction == CGC_DATA_READ ||
-	    cgc->data_direction == CGC_DATA_WRITE) {
-		cgc->buffer = kmalloc(cgc->buflen, GFP_KERNEL);
-		if (cgc->buffer == NULL)
-			return -ENOMEM;
-	}
-
-
-	if (cgc->data_direction == CGC_DATA_READ) {
-		if (!access_ok(VERIFY_READ, ubuf, cgc->buflen)) {
-			kfree(cgc->buffer);
-			return -EFAULT;
-		}
-	} else if (cgc->data_direction == CGC_DATA_WRITE) {
-		if (copy_from_user(cgc->buffer, ubuf, cgc->buflen)) {
-			kfree(cgc->buffer);
-			return -EFAULT;
-		}
-	}
-
-	ret = cdi->ops->generic_packet(cdi, cgc);
-	__copy_to_user(usense, cgc->sense, sizeof(*usense));
-	if (!ret && cgc->data_direction == CGC_DATA_READ)
-		__copy_to_user(ubuf, cgc->buffer, cgc->buflen);
-	if (cgc->data_direction == CGC_DATA_READ ||
-	    cgc->data_direction == CGC_DATA_WRITE) {
-		kfree(cgc->buffer);
-	}
-	return ret;
-}
-
 static int mmc_ioctl(struct cdrom_device_info *cdi, unsigned int cmd,
 		     unsigned long arg)
 {		
@@ -2176,14 +2125,6 @@ static int mmc_ioctl(struct cdrom_device_info *cdi, unsigned int cmd,
 		return 0;
 		}
 
-	case CDROM_SEND_PACKET: {
-		if (!CDROM_CAN(CDC_GENERIC_PACKET))
-			return -ENOSYS;
-		cdinfo(CD_DO_IOCTL, "entering CDROM_SEND_PACKET\n"); 
-		IOCTL_IN(arg, struct cdrom_generic_command, cgc);
-		cgc.timeout = clock_t_to_jiffies(cgc.timeout);
-		return cdrom_do_cmd(cdi, &cgc);
-		}
 	case CDROM_NEXT_WRITABLE: {
 		long next = 0;
 		cdinfo(CD_DO_IOCTL, "entering CDROM_NEXT_WRITABLE\n"); 

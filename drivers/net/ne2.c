@@ -70,7 +70,7 @@ static const char *version = "ne2.c:v0.91 Nov 16 1998 Wim Dumon <wimpie@kotnet.o
 #include <linux/string.h>
 #include <linux/errno.h>
 #include <linux/init.h>
-#include <linux/mca.h>
+#include <linux/mca-legacy.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
