@@ -3872,9 +3872,10 @@ static void usb_audio_disconnect(struct usb_interface *intf)
 
 static int __init usb_audio_init(void)
 {
-	usb_register(&usb_audio_driver);
-	info(DRIVER_VERSION ":" DRIVER_DESC);
-	return 0;
+	int result = usb_register(&usb_audio_driver);
+	if (result == 0) 
+		info(DRIVER_VERSION ":" DRIVER_DESC);
+	return result;
 }
 
 
