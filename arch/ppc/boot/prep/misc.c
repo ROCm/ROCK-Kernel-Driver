@@ -132,11 +132,6 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum,
 	vga_init((unsigned char *)0xC0000000);
 #endif /* CONFIG_VGA_CONSOLE */
 
-	/* 
-	 * Find out how much memory we have.
-	 */
-	TotalMemory = get_mem_size();
-
 	/*
 	 * Tell the user where we were loaded at and where we were relocated
 	 * to for debugging this process.
@@ -214,6 +209,29 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum,
 		/* Tell the user we didn't find anything. */
 		puts("No residual data found.\n");
         }
+
+	/* First, figure out what kind of host bridge we are on.  If it's
+	 * an MPC10x, we can ask it directly how much memory it has.
+	 * Otherwise, see if the residual data has anything.  This isn't
+	 * the best way, but it can be the only way.  If there's nothing,
+	 * assume 32MB. -- Tom.
+	 */
+	/* See what our host bridge is. */
+	pci_read_config_32(0x00, 0x00, &pci_viddid);
+	pci_did = (pci_viddid & 0xffff0000) >> 16;
+	/* See if we are on an MPC10x. */
+	if (((pci_viddid & 0xffff) == PCI_VENDOR_ID_MOTOROLA)
+			&& ((pci_did == PCI_DEVICE_ID_MOTOROLA_MPC105)
+				|| (pci_did == PCI_DEVICE_ID_MOTOROLA_MPC106)
+				|| (pci_did == PCI_DEVICE_ID_MOTOROLA_MPC107)))
+		TotalMemory = get_mem_size();
+	/* If it's not, see if we have anything in the residual data. */
+	else if (residual && residual->TotalMemory)
+		TotalMemory = residual->TotalMemory;
+	/* Fall back to hard-coding 32MB. */
+	else
+		TotalMemory = 32*1024*1024;
+
 
 	/* assume the chunk below 8M is free */
 	end_avail = (char *)0x00800000;
