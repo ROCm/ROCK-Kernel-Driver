@@ -905,7 +905,6 @@ static int port_detect \
       }
    else {
       unsigned long flags;
-      scsi_register_blocked_host(sh[j]);
       sh[j]->unchecked_isa_dma = TRUE;
 
       flags=claim_dma_lock();
@@ -1910,8 +1909,6 @@ static int u14_34f_release(struct Scsi_Host *shpnt) {
 
    if (sh[j] == NULL) panic("%s: release, invalid Scsi_Host pointer.\n",
                             driver_name);
-
-   if(sh[j]->unchecked_isa_dma) scsi_deregister_blocked_host(sh[j]);
 
    for (i = 0; i < sh[j]->can_queue; i++)
       if ((&HD(j)->cp[i])->sglist) kfree((&HD(j)->cp[i])->sglist);
