@@ -790,7 +790,8 @@ running once the system is up.
 			before loading.
 			See Documentation/ramdisk.txt.
 
-	psmouse_noext	[HW,MOUSE] Disable probing for PS2 mouse protocol extensions
+	psmouse_proto=  [HW,MOUSE] Highest PS2 mouse protocol extension to
+			probe for (bare|imps|exps).
 
 	psmouse_resetafter=
 			[HW,MOUSE] Try to reset Synaptics Touchpad after so many

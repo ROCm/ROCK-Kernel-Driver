@@ -9,11 +9,9 @@
 #ifndef _SYNAPTICS_H
 #define _SYNAPTICS_H
 
-
 extern void synaptics_process_byte(struct psmouse *psmouse, struct pt_regs *regs);
+extern int synaptics_detect(struct psmouse *psmouse);
 extern int synaptics_init(struct psmouse *psmouse);
-extern int synaptics_pt_init(struct psmouse *psmouse);
-extern void synaptics_disconnect(struct psmouse *psmouse);
 
 /* synaptics queries */
 #define SYN_QUE_IDENTIFY		0x00
@@ -105,8 +103,6 @@ struct synaptics_data {
 	/* Data for normal processing */
 	unsigned int out_of_sync;		/* # of packets out of sync */
 	int old_w;				/* Previous w value */
-	
-	struct serio *ptport;			/* pass-through port */
 };
 
 #endif /* _SYNAPTICS_H */

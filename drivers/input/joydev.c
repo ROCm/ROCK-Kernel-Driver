@@ -380,10 +380,6 @@ static struct input_handle *joydev_connect(struct input_handler *handler, struct
 	struct joydev *joydev;
 	int i, j, t, minor;
 
-	/* Avoid tablets */
-        if (test_bit(EV_KEY, dev->evbit) && test_bit(BTN_TOUCH, dev->keybit))
-		return NULL;
-
 	for (minor = 0; minor < JOYDEV_MINORS && joydev_table[minor]; minor++);
 	if (minor == JOYDEV_MINORS) {
 		printk(KERN_ERR "joydev: no more free joydev devices\n");
@@ -464,6 +460,15 @@ static void joydev_disconnect(struct input_handle *handle)
 		joydev_free(joydev);
 }
 
+static struct input_device_id joydev_blacklist[] = {
+	{
+		.flags = INPUT_DEVICE_ID_MATCH_EVBIT | INPUT_DEVICE_ID_MATCH_KEYBIT,
+		.evbit = { BIT(EV_KEY) },
+		.keybit = { [LONG(BTN_TOUCH)] = BIT(BTN_TOUCH) },
+	}, 	/* Avoid itouchpads, touchscreens and tablets */
+	{ }, 	/* Terminating entry */
+};
+
 static struct input_device_id joydev_ids[] = {
 	{
 		.flags = INPUT_DEVICE_ID_MATCH_EVBIT | INPUT_DEVICE_ID_MATCH_ABSBIT,
@@ -493,6 +498,7 @@ static struct input_handler joydev_handler = {
 	.minor =	JOYDEV_MINOR_BASE,
 	.name =		"joydev",
 	.id_table =	joydev_ids,
+	.blacklist = 	joydev_blacklist,
 };
 
 static int __init joydev_init(void)

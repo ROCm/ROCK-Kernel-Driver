@@ -13,5 +13,5 @@
 struct psmouse;
 void ps2pp_process_packet(struct psmouse *psmouse);
 void ps2pp_set_800dpi(struct psmouse *psmouse);
-int ps2pp_detect_model(struct psmouse *psmouse, unsigned char *param);
+int ps2pp_detect(struct psmouse *psmouse);
 #endif

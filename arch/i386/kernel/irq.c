@@ -505,6 +505,20 @@ out:
 	return 1;
 }
 
+int can_request_irq(unsigned int irq, unsigned long irqflags)
+{
+	struct irqaction *action;
+
+	if (irq >= NR_IRQS)
+		return 0;
+	action = irq_desc[irq].action;
+	if (action) {
+		if (irqflags & action->flags & SA_SHIRQ)
+			action = NULL;
+	}
+	return !action;
+}
+
 /**
  *	request_irq - allocate an interrupt line
  *	@irq: Interrupt line to allocate

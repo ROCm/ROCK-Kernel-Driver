@@ -695,11 +695,6 @@ static struct irq_info *pirq_get_info(struct pci_dev *dev)
 	return NULL;
 }
 
-static irqreturn_t pcibios_test_irq_handler(int irq, void *dev_id, struct pt_regs *regs)
-{
-	return IRQ_NONE;
-}
-
 static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 {
 	u8 pin;
@@ -761,11 +756,8 @@ static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 		for (i = 0; i < 16; i++) {
 			if (!(mask & (1 << i)))
 				continue;
-			if (pirq_penalty[i] < pirq_penalty[newirq] &&
-			    !request_irq(i, pcibios_test_irq_handler, SA_SHIRQ, "pci-test", dev)) {
-				free_irq(i, dev);
+			if (pirq_penalty[i] < pirq_penalty[newirq] && can_request_irq(i, SA_SHIRQ))
 				newirq = i;
-			}
 		}
 	}
 	DBG(" -> newirq=%d", newirq);
