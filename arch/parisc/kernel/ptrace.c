@@ -385,7 +385,7 @@ long sys_ptrace(long request, pid_t pid, long addr, long data)
 		goto out_tsk;
 
 	default:
-		ret = -EIO;
+		ret = ptrace_request(child, request, addr, data);
 		goto out_tsk;
 	}
 
@@ -409,7 +409,8 @@ void syscall_trace(void)
 		return;
 	if (!(current->ptrace & PT_PTRACED))
 		return;
-	current->exit_code = SIGTRAP;
+	current->exit_code = SIGTRAP | ((current->ptrace & PT_TRACESYSGOOD)
+					? 0x80 : 0);
 	current->state = TASK_STOPPED;
 	notify_parent(current, SIGCHLD);
 	schedule();

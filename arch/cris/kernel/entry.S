@@ -748,6 +748,7 @@ kernel_thread:
 	/* r11 is argument 2 to clone, the flags */
 	move.d  $r12, $r11
 	or.w	LCLONE_VM, $r11
+	or.w	LCLONE_UNTRACED, $r11
 
 	/* Save FN for later.  */
 	move.d	$r10, $r12
