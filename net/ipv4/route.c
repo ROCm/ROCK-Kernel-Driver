@@ -2808,7 +2808,7 @@ int __init ip_rt_init(void)
 		goto out_enomem;
 
 #ifdef CONFIG_NET_CLS_ROUTE
-	create_proc_read_entry("rt_acct", proc_net, 0, ip_rt_acct_read, NULL);
+	create_proc_read_entry("rt_acct", 0, proc_net, ip_rt_acct_read, NULL);
 #endif
 #endif
 #ifdef CONFIG_XFRM
