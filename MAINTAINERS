@@ -1265,8 +1265,8 @@ L:	linux-hams@vger.kernel.org
 S:	Maintained
 
 NETWORK BLOCK DEVICE
-P:	Pavel Machek
-M:	pavel@atrey.karlin.mff.cuni.cz
+P:	Paul Clements
+M:	Paul.Clements@steeleye.com
 S:	Maintained
 
 NETWORK DEVICE DRIVERS
