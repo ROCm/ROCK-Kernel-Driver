@@ -1968,7 +1968,6 @@ static boolean DAC960_RegisterBlockDevice(DAC960_Controller_T *Controller)
 	struct gendisk *disk = &Controller->disks[n];
 	memset(disk, 0, sizeof(struct gendisk));
 	sprintf(names + 9 * n, "rd/c%dd%d", Controller->ControllerNumber, n);
-	disk->part = Controller->DiskPartitions + (n<<DAC960_MaxPartitionsBits);
 	disk->major = MajorNumber;
 	disk->first_minor = n << DAC960_MaxPartitionsBits;
 	disk->major_name = names + 9 * n;

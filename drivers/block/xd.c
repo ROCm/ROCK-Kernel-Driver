@@ -121,8 +121,6 @@ static unsigned int xd_bases[] __initdata =
 	0xE0000
 };
 
-static struct hd_struct xd_struct[XD_MAXDRIVES << 6];
-
 static spinlock_t xd_lock = SPIN_LOCK_UNLOCKED;
 
 extern struct block_device_operations xd_fops;
@@ -133,14 +131,12 @@ static struct gendisk xd_gendisk[2] = {
 	.first_minor =	0,
 	.major_name =	"xda",
 	.minor_shift =	6,
-	.part =		xd_struct,
 	.fops =		&xd_fops,
 },{
 	.major =	MAJOR_NR,
 	.first_minor =	64,
 	.major_name =	"xdb",
 	.minor_shift =	6,
-	.part =		xd_struct + 64,
 	.fops =		&xd_fops,
 }
 };

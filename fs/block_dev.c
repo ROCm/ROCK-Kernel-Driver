@@ -503,7 +503,6 @@ int check_disk_change(struct block_device *bdev)
 	struct block_device_operations * bdops = bdev->bd_op;
 	kdev_t dev = to_kdev_t(bdev->bd_dev);
 	struct gendisk *disk;
-	struct hd_struct *part;
 
 	if (bdops->check_media_change == NULL)
 		return 0;
@@ -517,7 +516,6 @@ int check_disk_change(struct block_device *bdev)
 		printk("VFS: busy inodes on changed media.\n");
 
 	disk = get_gendisk(dev);
-	part = disk->part + minor(dev) - disk->first_minor;
 	if (bdops->revalidate)
 		bdops->revalidate(dev);
 	if (disk && disk->minor_shift)
@@ -632,11 +630,9 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 			sector_t sect = 0;
 
 			bdev->bd_offset = 0;
-			if (g) {
-				struct hd_struct *p;
-				p = g->part + minor(dev) - g->first_minor;
-				sect = p->nr_sects;
-			} else if (blk_size[major(dev)])
+			if (g)
+				sect = get_capacity(g);
+			else if (blk_size[major(dev)])
 				sect = blk_size[major(dev)][minor(dev)] << 1;
 			bd_set_size(bdev, (loff_t)sect << 9);
 			bdi = blk_get_backing_dev_info(bdev);
@@ -653,7 +649,7 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 		if (!bdev->bd_openers) {
 			struct gendisk *g = get_gendisk(dev);
 			struct hd_struct *p;
-			p = g->part + minor(dev) - g->first_minor;
+			p = g->part + minor(dev) - g->first_minor - 1;
 			inode->i_data.backing_dev_info =
 			   bdev->bd_inode->i_data.backing_dev_info =
 			   bdev->bd_contains->bd_inode->i_data.backing_dev_info;

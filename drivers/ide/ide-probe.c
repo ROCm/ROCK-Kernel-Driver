@@ -807,7 +807,6 @@ static int init_irq (ide_hwif_t *hwif)
 static void init_gendisk (ide_hwif_t *hwif)
 {
 	struct gendisk *gd;
-	struct hd_struct *part;
 	unsigned int unit, units, minors;
 	extern devfs_handle_t ide_devfs_handle;
 	char *names;
@@ -828,20 +827,12 @@ static void init_gendisk (ide_hwif_t *hwif)
 		goto err_kmalloc_gd;
 	memset(gd, 0, MAX_DRIVES * sizeof(struct gendisk));
 
-	part  = kmalloc(minors * sizeof(struct hd_struct), GFP_KERNEL);
-	if (!part)
-		goto err_kmalloc_gd_part;
-
-	memset(part, 0, minors * sizeof(struct hd_struct));
-
 	names = kmalloc (4 * MAX_DRIVES, GFP_KERNEL);
 	if (!names)
 		goto err_kmalloc_gd_names;
 	memset(names, 0, 4 * MAX_DRIVES);
 
 	for (unit = 0; unit < units; ++unit) {
-		gd[unit].part = part + (unit << PARTN_BITS);
-		hwif->drives[unit].part = gd[unit].part;
 		gd[unit].major  = hwif->major;
 		gd[unit].first_minor = unit << PARTN_BITS;
 		sprintf(names + 4*unit, "hd%c",'a'+hwif->index*MAX_DRIVES+unit);
@@ -877,8 +868,6 @@ static void init_gendisk (ide_hwif_t *hwif)
 	return;
 
 err_kmalloc_gd_names:
-	kfree(part);
-err_kmalloc_gd_part:
 	kfree(gd);
 err_kmalloc_gd:
 	printk(KERN_WARNING "(ide::init_gendisk) Out of memory\n");

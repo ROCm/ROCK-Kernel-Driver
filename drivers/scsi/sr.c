@@ -744,31 +744,25 @@ void sr_finish()
 
 	for (i = 0; i < sr_template.nr_dev; ++i) {
 		struct gendisk *disk;
-		/* KLUDGE - will go away */
-		struct {
-			struct gendisk disk;
-			struct hd_struct part;
-		} *p;
 		Scsi_CD *cd = &scsi_CDs[i];
 		/* If we have already seen this, then skip it.  Comes up
 		 * with loadable modules. */
 		if (cd->disk)
 			continue;
-		p = kmalloc(sizeof(*p), GFP_KERNEL);
-		if (!p)
+		disk = kmalloc(sizeof(struct gendisk), GFP_KERNEL);
+		if (!disk)
 			continue;
 		if (cd->disk) {
-			kfree(p);
+			kfree(disk);
 			continue;
 		}
-		memset(p, 0, sizeof(*p));
-		p->disk.part = &p->part;
-		p->disk.major = MAJOR_NR;
-		p->disk.first_minor = i;
-		p->disk.major_name = cd->cdi.name;
-		p->disk.minor_shift = 0;
-		p->disk.fops = &sr_bdops;
-		cd->disk = disk = &p->disk;
+		memset(disk, 0, sizeof(struct gendisk));
+		disk->major = MAJOR_NR;
+		disk->first_minor = i;
+		disk->minor_shift = 0;
+		disk->major_name = cd->cdi.name;
+		disk->fops = &sr_bdops;
+		cd->disk = disk;
 		cd->capacity = 0x1fffff;
 		cd->device->sector_size = 2048;/* A guess, just in case */
 		cd->needs_sector_size = 1;

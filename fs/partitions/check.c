@@ -89,19 +89,25 @@ static int (*check_part[])(struct parsed_partitions *, struct block_device *) = 
 
 char *disk_name(struct gendisk *hd, int part, char *buf)
 {
-	if (part < 1<<hd->minor_shift && hd->part[part].de) {
-		int pos;
-
-		pos = devfs_generate_path(hd->part[part].de, buf, 64);
-		if (pos >= 0)
-			return buf + pos;
-	}
-	if (!part)
+	int pos;
+	if (!part) {
+		if (hd->disk_de) {
+			pos = devfs_generate_path(hd->disk_de, buf, 64);
+			if (pos >= 0)
+				return buf + pos;
+		}
 		sprintf(buf, "%s", hd->major_name);
-	else if (isdigit(hd->major_name[strlen(hd->major_name)-1]))
-		sprintf(buf, "%sp%d", hd->major_name, part);
-	else
-		sprintf(buf, "%s%d", hd->major_name, part);
+	} else {
+		if (hd->part[part-1].de) {
+			pos = devfs_generate_path(hd->part[part-1].de, buf, 64);
+			if (pos >= 0)
+				return buf + pos;
+		}
+		if (isdigit(hd->major_name[strlen(hd->major_name)-1]))
+			sprintf(buf, "%sp%d", hd->major_name, part);
+		else
+			sprintf(buf, "%s%d", hd->major_name, part);
+	}
 	return buf;
 }
 
@@ -144,21 +150,29 @@ static void driverfs_create_partitions(struct gendisk *hd)
 		*name = *bus_id = '\0';
 	}
 
-	dev = &p[0].hd_driverfs_dev;
+	dev = &hd->disk_dev;
 	dev->driver_data = (void *)(long)__mkdev(hd->major, hd->first_minor);
 	sprintf(dev->name, "%sdisc", name);
 	sprintf(dev->bus_id, "%sdisc", bus_id);
 	for (part=1; part < max_p; part++) {
-		dev = &p[part].hd_driverfs_dev;
+		dev = &p[part-1].hd_driverfs_dev;
 		sprintf(dev->name, "%spart%d", name, part);
 		sprintf(dev->bus_id, "%s:p%d", bus_id, part);
-		if (!p[part].nr_sects)
+		if (!p[part-1].nr_sects)
 			continue;
 		dev->driver_data =
 				(void *)(long)__mkdev(hd->major, hd->first_minor+part);
 	}
 
-	for (part=0; part < max_p; part++) {
+	dev = &hd->disk_dev;
+	dev->parent = parent;
+	if (parent)
+		dev->bus = parent->bus;
+	device_register(dev);
+	device_create_file(dev, &dev_attr_type);
+	device_create_file(dev, &dev_attr_kdev);
+
+	for (part=0; part < max_p-1; part++) {
 		dev = &p[part].hd_driverfs_dev;
 		dev->parent = parent;
 		if (parent)
@@ -174,17 +188,25 @@ static void driverfs_create_partitions(struct gendisk *hd)
 static void driverfs_remove_partitions(struct gendisk *hd)
 {
 	int max_p = 1<<hd->minor_shift;
+	struct device *dev;
 	struct hd_struct *p;
 	int part;
 
-	for (part=0, p = hd->part; part < max_p; part++, p++) {
-		struct device *dev = &p->hd_driverfs_dev;
+	for (part=1, p = hd->part; part < max_p; part++, p++) {
+		dev = &p->hd_driverfs_dev;
 		if (dev->driver_data) {
 			device_remove_file(dev, &dev_attr_type);
 			device_remove_file(dev, &dev_attr_kdev);
 			put_device(dev);	
 			dev->driver_data = NULL;
 		}
+	}
+	dev = &hd->disk_dev;
+	if (dev->driver_data) {
+		device_remove_file(dev, &dev_attr_type);
+		device_remove_file(dev, &dev_attr_kdev);
+		put_device(dev);	
+		dev->driver_data = NULL;
 	}
 }
 
@@ -227,10 +249,10 @@ static void check_partition(struct gendisk *hd, struct block_device *bdev)
 		} 
 		p = hd->part;
 		for (j = 1; j < state->limit; j++) {
-			p[j].start_sect = state->parts[j].from;
-			p[j].nr_sects = state->parts[j].size;
+			p[j-1].start_sect = state->parts[j].from;
+			p[j-1].nr_sects = state->parts[j].size;
 #if CONFIG_BLK_DEV_MD
-			if (!state->parts[j].flags)
+			if (!state->parts[j-1].flags)
 				continue;
 			md_autodetect_dev(dev+j);
 #endif
@@ -248,15 +270,15 @@ static void devfs_register_partition(struct gendisk *dev, int part)
 	struct hd_struct *p = dev->part;
 	char devname[16];
 
-	if (p[part].de)
+	if (p[part-1].de)
 		return;
-	dir = devfs_get_parent(p[0].de);
+	dir = devfs_get_parent(dev->disk_de);
 	if (!dir)
 		return;
 	if (dev->flags & GENHD_FL_REMOVABLE)
 		devfs_flags |= DEVFS_FL_REMOVABLE;
 	sprintf(devname, "part%d", part);
-	p[part].de = devfs_register (dir, devname, devfs_flags,
+	p[part-1].de = devfs_register (dir, devname, devfs_flags,
 				    dev->major, dev->first_minor + part,
 				    S_IFBLK | S_IRUSR | S_IWUSR,
 				    dev->fops, NULL);
@@ -300,10 +322,10 @@ static void devfs_create_partitions(struct gendisk *dev)
 	sprintf(symlink, "disc%d", dev->number);
 	devfs_mk_symlink (devfs_handle, symlink, DEVFS_FL_DEFAULT,
 			  dirname + pos, &slave, NULL);
-	p->de = devfs_register(dir, "disc", devfs_flags,
+	dev->disk_de = devfs_register(dir, "disc", devfs_flags,
 			    dev->major, dev->first_minor,
 			    S_IFBLK | S_IRUSR | S_IWUSR, dev->fops, NULL);
-	devfs_auto_unregister(p->de, slave);
+	devfs_auto_unregister(dev->disk_de, slave);
 	if (!(dev->flags & GENHD_FL_DEVFS))
 		devfs_auto_unregister (slave, dir);
 	for (part = 1, p++; part < max_p; part++, p++)
@@ -316,10 +338,12 @@ static void devfs_remove_partitions(struct gendisk *dev)
 {
 #ifdef CONFIG_DEVFS_FS
 	int part;
-	for (part = 1<<dev->minor_shift; part--; ) {
+	for (part = (1<<dev->minor_shift)-1; part--; ) {
 		devfs_unregister(dev->part[part].de);
 		dev->part[part].de = NULL;
 	}
+	devfs_unregister(dev->disk_de);
+	dev->disk_de = NULL;
 	devfs_dealloc_unique_number(&disc_numspace, dev->number);
 #endif
 }
@@ -363,7 +387,7 @@ void register_disk(struct gendisk *disk, kdev_t dev, unsigned minors,
 
 void update_partition(struct gendisk *disk, int part)
 {
-	struct hd_struct *p = disk->part + part;
+	struct hd_struct *p = disk->part + part - 1;
 	struct device *dev = &p->hd_driverfs_dev;
 
 	if (!p->nr_sects) {
@@ -402,7 +426,7 @@ int rescan_partitions(struct gendisk *disk, struct block_device *bdev)
 	if (res)
 		return res;
 	bdev->bd_invalidated = 0;
-	for (p = 1; p < (1<<disk->minor_shift); p++) {
+	for (p = 0; p < (1<<disk->minor_shift) - 1; p++) {
 		disk->part[p].start_sect = 0;
 		disk->part[p].nr_sects = 0;
 	}
@@ -441,22 +465,32 @@ fail:
 static int wipe_partitions(struct gendisk *disk)
 {
 	int max_p = 1 << disk->minor_shift;
+	kdev_t devp;
+	int res;
 	int p;
 
 	/* invalidate stuff */
-	for (p = max_p - 1; p >= 0; p--) {
-		kdev_t devp = mk_kdev(disk->major,disk->first_minor + p);
-		int res;
+	for (p = max_p - 1; p > 0; p--) {
+		devp = mk_kdev(disk->major,disk->first_minor + p);
 #if 0					/* %%% superfluous? */
-		if (disk->part[p].nr_sects == 0)
+		if (disk->part[p-1].nr_sects == 0)
 			continue;
 #endif
 		res = invalidate_device(devp, 1);
 		if (res)
 			return res;
-		disk->part[p].start_sect = 0;
-		disk->part[p].nr_sects = 0;
+		disk->part[p-1].start_sect = 0;
+		disk->part[p-1].nr_sects = 0;
 	}
+	devp = mk_kdev(disk->major,disk->first_minor);
+#if 0					/* %%% superfluous? */
+	if (disk->part[p].nr_sects == 0)
+		continue;
+#endif
+	res = invalidate_device(devp, 1);
+	if (res)
+		return res;
+	disk->capacity = 0;
 	return 0;
 }
 
@@ -466,4 +500,8 @@ void del_gendisk(struct gendisk *disk)
 	wipe_partitions(disk);
 	unlink_gendisk(disk);
 	devfs_remove_partitions(disk);
+	if (disk->part) {
+		kfree(disk->part);
+		disk->part = NULL;
+	}
 }

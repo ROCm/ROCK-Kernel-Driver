@@ -186,7 +186,6 @@ static struct i2ob_request *i2ob_backlog_tail[MAX_I2O_CONTROLLERS];
 
 static struct i2ob_device i2ob_dev[MAX_I2OB<<4];
 static int i2ob_dev_count = 0;
-static struct hd_struct i2ob[MAX_I2OB<<4];
 static struct gendisk i2o_disk[MAX_I2OB];
 static char i2o_names[MAX_I2OB * 8];
 
@@ -1771,7 +1770,6 @@ int i2o_block_init(void)
 		disk->major = MAJOR_NR;
 		disk->first_minor = i<<4;
 		disk->minor_shift = 4;
-		disk->part = i2ob + (i<<4);
 		disk->fops = &i2ob_fops;
 		disk->major_name = i2o_names + i*8;
 		sprintf(disk->major_name, "i2o/hd%c", 'a' + i);

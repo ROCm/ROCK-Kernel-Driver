@@ -193,8 +193,6 @@ struct mfm_info {
 
 #define MFM_DRV_INFO mfm_info[raw_cmd.dev]
 
-static struct hd_struct mfm[MFM_MAXDRIVES << 6];
-
 /* Stuff from the assembly routines */
 extern unsigned int hdc63463_baseaddress;	/* Controller base address */
 extern unsigned int hdc63463_irqpolladdress;	/* Address to read to test for int */
@@ -888,14 +886,12 @@ static struct gendisk mfm_gendisk[2] = {
 	.first_minor	= 0,
 	.major_name	= "mfma",
 	.minor_shift	= 6,
-	.part		= mfm,
 },
 {
 	.major		= MAJOR_NR,
 	.first_minor	= 64,
 	.major_name	= "mfmb",
 	.minor_shift	= 6,
-	.part		= mfm + 64,
 };
 
 static void mfm_request(void)

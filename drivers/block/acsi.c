@@ -245,7 +245,6 @@ char 			*acsi_buffer;
 unsigned long 	phys_acsi_buffer;
 
 static int NDevices;
-static struct hd_struct	acsi_part[MAX_DEV<<4];
 static char acsi_names[MAX_DEV*4];
 static int access_count[MAX_DEV];
 
@@ -1698,7 +1697,6 @@ static void acsi_geninit(void)
 		disk->first_minor = i << 4;
 		disk->major_name = acsi_names + 4*i;
 		disk->minor_shift = (acsi_info[i].type==HARDDISK)?4:0;
-		disk->part = acsi_part + (i<<4);
 		disk->fops = &acsi_fops;
 		add_gendisk(disk);
 		register_disk(disk, mk_kdev(disk->major, disk->first_minor),

@@ -35,7 +35,6 @@ struct major_info {
 	int major;
 	struct gendisk disks[DASD_PER_MAJOR];
 	char names[DASD_PER_MAJOR * 8];
-	struct hd_struct part[1<<MINORBITS];
 };
 
 /*
@@ -106,7 +105,6 @@ dasd_register_major(int major)
 		disk->minor_shift = DASD_PARTN_BITS;
 		disk->fops = &dasd_device_operations;
 		disk->flags = GENHD_FL_DEVFS;
-		disk->part = mi->part + (i << DASD_PARTN_BITS);
 	}
 
 	/* Setup block device pointers for the new major. */

@@ -84,9 +84,6 @@
 
 #define SD_DSK_ARR_LUMP 6 /* amount to over allocate sd_dsk_arr by */
 
-
-struct hd_struct *sd;
-
 static Scsi_Disk ** sd_dsk_arr;
 static rwlock_t sd_dsk_arr_lock = RW_LOCK_UNLOCKED;
 
@@ -1195,12 +1192,10 @@ static int sd_init()
 	init_mem_lth(sd_disks, sd_template.dev_max);
 	if (sd_disks)
 		zero_mem_lth(sd_disks, sd_template.dev_max);
-	init_mem_lth(sd, maxparts);
 
-	if (!sd_dsk_arr || !sd || !sd_disks)
+	if (!sd_dsk_arr || !sd_disks)
 		goto cleanup_mem;
 
-	zero_mem_lth(sd, maxparts);
 	return 0;
 
 #undef init_mem_lth
@@ -1209,8 +1204,6 @@ static int sd_init()
 cleanup_mem:
 	vfree(sd_disks);
 	sd_disks = NULL;
-	vfree(sd);
-	sd = NULL;
 	if (sd_dsk_arr) {
                 for (k = 0; k < sd_template.dev_max; ++k)
 			vfree(sd_dsk_arr[k]);
@@ -1347,7 +1340,6 @@ static int sd_attach(Scsi_Device * sdp)
 	gd->major = SD_MAJOR(dsk_nr>>4);
 	gd->first_minor = (dsk_nr & 15)<<4;
 	gd->minor_shift = 4;
-	gd->part = sd + (dsk_nr << 4);
 	gd->fops = &sd_fops;
 	if (dsk_nr > 26)
 		sprintf(p->name, "sd%c%c", 'a'+dsk_nr/26-1, 'a'+dsk_nr%26);
@@ -1465,7 +1457,6 @@ static void __exit exit_sd(void)
 			vfree(sd_dsk_arr[k]);
 		vfree(sd_dsk_arr);
 	}
-	vfree((char *) sd);
 	for (k = 0; k < N_USED_SD_MAJORS; k++) {
 		blk_dev[SD_MAJOR(k)].queue = NULL;
 		blk_clear(SD_MAJOR(k));

@@ -49,16 +49,6 @@
 
 /* Linux-specific block device functions */
 
-/* I _HATE_ the Linux block device setup more than anything else I've ever
- *  encountered, except ...
- */
-
-/* .. for the Linux partition table handling. */
-/* So why didn't you fucking go and clean it up? -- AV */
-struct hd_struct part_table[256];
-
-static struct block_device_operations nftl_fops;
-
 struct NFTLrecord *NFTLs[MAX_NFTLS];
 
 static void NFTL_setup(struct mtd_info *mtd)
@@ -150,7 +140,6 @@ static void NFTL_setup(struct mtd_info *mtd)
 	gd->major = MAJOR_NR;
 	gd->first_minor = firstfree << NFTL_PARTN_BITS;
 	gd->minor_shift = NFTL_PARTN_BITS;
-	gd->part = part_table + (firstfree << NFTL_PARTN_BITS);
 	gd->major_name = name;
 	nftl->disk = gd;
 	add_gendisk(gd);

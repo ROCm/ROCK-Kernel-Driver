@@ -102,7 +102,6 @@ static struct board_type products[] = {
 	{ 0x40580E11, "Smart Array 431",	&smart4_access },
 };
 
-static struct hd_struct * ida;
 static char *ida_names;
 static struct gendisk ida_gendisk[MAX_CTLR * NWD];
 
@@ -320,7 +319,6 @@ void cleanup_module(void)
 	}
 	devfs_find_and_unregister(NULL, "ida", 0, 0, 0, 0);
 	remove_proc_entry("cpqarray", proc_root_driver);
-	kfree(ida);
 	kfree(ida_names);
 }
 #endif /* MODULE */
@@ -346,15 +344,12 @@ int __init cpqarray_init(void)
 	printk("Found %d controller(s)\n", nr_ctlr);
 
 	/* allocate space for disk structs */
-	ida = kmalloc(sizeof(struct hd_struct)*nr_ctlr*NWD*16, GFP_KERNEL);
 	ida_names = kmalloc(nr_ctlr*NWD*10, GFP_KERNEL);
-	if (!ida || !ida_names) {
+	if (!ida_names) {
 		printk( KERN_ERR "cpqarray: out of memory");
-		kfree(ida);
 		kfree(ida_names);
 		return(num_cntlrs_reg);
 	}
-	memset(ida, 0, sizeof(struct hd_struct)*nr_ctlr*NWD*16);
 	/* 
 	 * register block devices
 	 * Find disks and fill in structs
@@ -407,7 +402,6 @@ int __init cpqarray_init(void)
 	
 			if (num_cntlrs_reg == 0) 
 			{
-				kfree(ida);
 				kfree(ida_names);
 			}
                 	return(num_cntlrs_reg);
@@ -449,7 +443,6 @@ int __init cpqarray_init(void)
 			disk->major = MAJOR_NR + i;
 			disk->first_minor = j<<NWD_SHIFT;
 			disk->minor_shift = NWD_SHIFT;
-			disk->part = ida + i*256 + (j<<NWD_SHIFT);
 			disk->flags = GENHD_FL_DEVFS;
 			disk->fops = &ida_fops; 
 			if (!drv->nr_blks)
@@ -1462,7 +1455,6 @@ static int revalidate_allvol(kdev_t dev)
 		del_gendisk(disk);
 		disk->major_name = NULL;
 	}
-	memset(ida+(ctlr*256),            0, sizeof(struct hd_struct)*NWD*16);
 	memset(hba[ctlr]->drv,            0, sizeof(drv_info_t)*NWD);
 
 	/*

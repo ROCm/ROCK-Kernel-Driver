@@ -2058,10 +2058,9 @@ void ide_unregister (unsigned int index)
 	gd = hwif->drives[0].disk;
 	if (gd) {
 		int i;
-		kfree(gd->part);
-		kfree(gd);
 		for (i = 0; i < MAX_DRIVES; i++)
 			hwif->drives[i].disk = NULL;
+		kfree(gd);
 	}
 	old_hwif		= *hwif;
 	init_hwif_data (index);	/* restore hwif data to pristine status */

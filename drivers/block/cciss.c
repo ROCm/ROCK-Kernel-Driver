@@ -750,7 +750,6 @@ static int revalidate_allvol(kdev_t dev)
          * Set the partition and block size structures for all volumes
          * on this controller to zero.  We will reread all of this data
          */
-	memset(hba[ctlr]->hd,         0, sizeof(struct hd_struct) * 256);
         memset(hba[ctlr]->drv,        0, sizeof(drive_info_struct)
 						* CISS_MAX_LUN);
         /*
@@ -2445,7 +2444,6 @@ static int __init cciss_init_one(struct pci_dev *pdev,
 		disk->first_minor = j << NWD_SHIFT;
 		disk->major_name = NULL;
 		disk->minor_shift = NWD_SHIFT;
-		disk->part = hba[i]->hd + (j << NWD_SHIFT);
 		if( !(drv->nr_blocks))
 			continue;
 		(BLK_DEFAULT_QUEUE(MAJOR_NR + i))->hardsect_size = drv->block_size;

@@ -145,8 +145,6 @@ static struct hd_i_struct hd_info[MAX_HD];
 static int NR_HD;
 #endif
 
-static struct hd_struct hd[MAX_HD<<6];
-
 static struct timer_list device_timer;
 
 #define TIMEOUT_VALUE (6*HZ)
@@ -706,14 +704,12 @@ static struct gendisk hd_gendisk[2] = {
 	.first_minor =	0,
 	.major_name =	"hda",
 	.minor_shift =	6,
-	.part =		hd,
 	.fops =		&hd_fops,
 },{
 	.major =	MAJOR_NR,
 	.first_minor =	64,
 	.major_name =	"hdb",
 	.minor_shift =	6,
-	.part =		hd + 64,
 	.fops =		&hd_fops,
 }
 };

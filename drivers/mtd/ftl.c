@@ -175,8 +175,6 @@ static struct mtd_notifier ftl_notifier = {
 #define XFER_PREPARED	0x03
 #define XFER_FAILED	0x04
 
-static struct hd_struct ftl_hd[MINOR_NR(MAX_DEV, 0, 0)];
-
 /*====================================================================*/
 
 static int ftl_ioctl(struct inode *inode, struct file *file,
@@ -1252,7 +1250,6 @@ static void ftl_notify_add(struct mtd_info *mtd)
 	disk->first_minor = device << 4;
 	disk->major_name = name;
 	disk->minor_shift = PART_BITS;
-	disk->part = ftl_hd + (device << 4);
 	disk->fops = &ftl_blk_fops;
 	partition->mtd = mtd;
 	partition->disk = disk;

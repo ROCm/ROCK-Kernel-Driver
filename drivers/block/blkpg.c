@@ -95,18 +95,18 @@ int add_partition(struct block_device *bdev, struct blkpg_partition *p)
 		return -EINVAL;
 
 	/* partition number in use? */
-	if (g->part[p->pno].nr_sects != 0)
+	if (g->part[p->pno - 1].nr_sects != 0)
 		return -EBUSY;
 
 	/* overlap? */
-	for (i = 1; i < (1<<g->minor_shift); i++)
+	for (i = 0; i < (1<<g->minor_shift) - 1; i++)
 		if (!(pstart+plength <= g->part[i].start_sect ||
 		      pstart >= g->part[i].start_sect + g->part[i].nr_sects))
 			return -EBUSY;
 
 	/* all seems OK */
-	g->part[p->pno].start_sect = pstart;
-	g->part[p->pno].nr_sects = plength;
+	g->part[p->pno - 1].start_sect = pstart;
+	g->part[p->pno - 1].nr_sects = plength;
 	update_partition(g, p->pno);
 	return 0;
 }
@@ -138,7 +138,7 @@ int del_partition(struct block_device *bdev, struct blkpg_partition *p)
   		return -EINVAL;
 
 	/* existing drive and partition? */
-	if (g->part[p->pno].nr_sects == 0)
+	if (g->part[p->pno - 1].nr_sects == 0)
 		return -ENXIO;
 
 	/* partition in use? Incomplete check for now. */
@@ -154,8 +154,8 @@ int del_partition(struct block_device *bdev, struct blkpg_partition *p)
 	fsync_bdev(bdevp);
 	invalidate_bdev(bdevp, 0);
 
-	g->part[p->pno].start_sect = 0;
-	g->part[p->pno].nr_sects = 0;
+	g->part[p->pno - 1].start_sect = 0;
+	g->part[p->pno - 1].nr_sects = 0;
 	update_partition(g, p->pno);
 	bd_release(bdevp);
 	bdput(bdevp);

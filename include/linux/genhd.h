@@ -79,11 +79,14 @@ struct gendisk {
 	struct hd_struct *part;		/* [indexed by minor] */
 	struct gendisk *next;
 	struct block_device_operations *fops;
+	sector_t capacity;
 
-	devfs_handle_t de;
-	struct device *driverfs_dev;
 	int flags;
 	int number;			/* devfs crap */
+	devfs_handle_t de;		/* more of the same */
+	devfs_handle_t disk_de;		/* piled higher and deeper */
+	struct device *driverfs_dev;
+	struct device disk_dev;
 };
 
 /* drivers/block/genhd.c */
@@ -97,11 +100,11 @@ static inline unsigned long get_start_sect(struct block_device *bdev)
 }
 static inline sector_t get_capacity(struct gendisk *disk)
 {
-	return disk->part[0].nr_sects;
+	return disk->capacity;
 }
 static inline void set_capacity(struct gendisk *disk, sector_t size)
 {
-	disk->part[0].nr_sects = size;
+	disk->capacity = size;
 }
 
 #endif  /*  __KERNEL__  */

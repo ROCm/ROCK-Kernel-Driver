@@ -159,9 +159,6 @@ static struct cardinfo cards[MM_MAXCARDS];
 static struct block_device_operations mm_fops;
 static struct timer_list battery_timer;
 
-
-static struct hd_struct mm_partitions[MM_MAXCARDS << MM_SHIFT];
-
 static int num_cards = 0;
 
 static struct gendisk mm_gendisk[MM_MAXCARDS];
@@ -1192,7 +1189,6 @@ int __init mm_init(void)
 		struct gendisk *disk = mm_gendisk + i;
 		sprintf(mm_names + i*6, "umem%c", 'a'+i);
 		spin_lock_init(&cards[i].lock);
-		disk->part  = mm_partitions + (i << MM_SHIFT);
 		disk->major = major_nr;
 		disk->first_minor  = i << MM_SHIFT;
 		disk->major_name = mm_names + i*6;

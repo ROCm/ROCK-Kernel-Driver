@@ -23,6 +23,7 @@
 #include <linux/init.h>
 #include <linux/spinlock.h>
 #include <linux/seq_file.h>
+#include <linux/slab.h>
 
 
 static rwlock_t gendisk_lock;
@@ -43,6 +44,19 @@ void
 add_gendisk(struct gendisk *gp)
 {
 	struct gendisk *sgp;
+	struct hd_struct *p = NULL;
+
+	if (gp->minor_shift) {
+		size_t size = sizeof(struct hd_struct)*((1<<gp->minor_shift)-1);
+		p = kmalloc(size, GFP_KERNEL);
+		if (!p) {
+			printk(KERN_ERR "out of memory; no partitions for %s\n",
+				gp->major_name);
+			gp->minor_shift = 0;
+		} else
+			memset(p, 0, size);
+	}
+	gp->part = p;
 
 	write_lock(&gendisk_lock);
 
@@ -148,13 +162,17 @@ static int show_partition(struct seq_file *part, void *v)
 		seq_puts(part, "major minor  #blocks  name\n\n");
 
 	/* show the full disk and all non-0 size partitions of it */
-	for (n = 0; n < 1<<sgp->minor_shift; n++) {
-		if (n && sgp->part[n].nr_sects == 0)
+	seq_printf(part, "%4d  %4d %10ld %s\n",
+		sgp->major, sgp->first_minor,
+		get_capacity(sgp) >> 1,
+		disk_name(sgp, 0, buf));
+	for (n = 0; n < (1<<sgp->minor_shift) - 1; n++) {
+		if (sgp->part[n].nr_sects == 0)
 			continue;
 		seq_printf(part, "%4d  %4d %10ld %s\n",
-			sgp->major, n + sgp->first_minor,
+			sgp->major, n + 1 + sgp->first_minor,
 			sgp->part[n].nr_sects >> 1 ,
-			disk_name(sgp, n, buf));
+			disk_name(sgp, n + 1, buf));
 	}
 
 	return 0;

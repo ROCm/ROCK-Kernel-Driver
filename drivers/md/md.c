@@ -103,11 +103,6 @@ static ctl_table raid_root_table[] = {
 	{0}
 };
 
-/*
- * these have to be allocated separately because external
- * subsystems want to have a pre-defined structure
- */
-struct hd_struct md_hd_struct[MAX_MD_DEVS];
 static void md_recover_arrays(void);
 static mdk_thread_t *md_recovery_thread;
 
@@ -1458,7 +1453,6 @@ static int do_md_run(mddev_t * mddev)
 	disk->minor_shift = 0;
 	sprintf(major_name, "md%d", mdidx(mddev));
 	disk->major_name = major_name;
-	disk->part = md_hd_struct + mdidx(mddev);
 	disk->fops = &md_fops;
 
 	mddev->pers = pers[pnum];
@@ -3178,11 +3172,10 @@ int __init md_init(void)
 		return (-1);
 	}
 	devfs_handle = devfs_mk_dir (NULL, "md", NULL);
-	/* we don't use devfs_register_series because we want to fill md_hd_struct */
 	for (minor=0; minor < MAX_MD_DEVS; ++minor) {
 		char devname[128];
 		sprintf (devname, "%u", minor);
-		md_hd_struct[minor].de = devfs_register (devfs_handle,
+		devfs_register (devfs_handle,
 			devname, DEVFS_FL_DEFAULT, MAJOR_NR, minor,
 			S_IFBLK | S_IRUSR | S_IWUSR, &md_fops, NULL);
 	}
