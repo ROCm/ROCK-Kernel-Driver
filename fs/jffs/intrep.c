@@ -3344,8 +3344,7 @@ jffs_garbage_collect_thread(void *ptr)
 	lock_kernel();
 	exit_mm(c->gc_task);
 
-	current->session = 1;
-	current->pgrp = 1;
+	set_special_pids(1, 1);
 	init_completion(&c->gc_thread_comp); /* barrier */ 
 	spin_lock_irq(&current->sighand->siglock);
 	siginitsetinv (&current->blocked, sigmask(SIGHUP) | sigmask(SIGKILL) | sigmask(SIGSTOP) | sigmask(SIGCONT));

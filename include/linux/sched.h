@@ -503,6 +503,8 @@ extern struct task_struct init_task;
 extern struct   mm_struct init_mm;
 
 extern struct task_struct *find_task_by_pid(int pid);
+extern void set_special_pids(pid_t session, pid_t pgrp);
+extern void __set_special_pids(pid_t session, pid_t pgrp);
 
 /* per-UID process charging. */
 extern struct user_struct * alloc_uid(uid_t);
