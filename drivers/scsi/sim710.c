@@ -29,7 +29,7 @@
 #include <linux/config.h>
 #include <linux/module.h>
 
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/device.h>
 #include <linux/init.h>
 #include <linux/mca.h>

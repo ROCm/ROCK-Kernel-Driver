@@ -17,7 +17,6 @@
 #include <linux/interrupt.h>
 #include <linux/fs.h>
 #include <linux/blkpg.h>
-#include <linux/blk.h>
 
 #include <asm/uaccess.h>
 

@@ -15,7 +15,7 @@
 
 #ifdef __KERNEL__
 #include <linux/bio.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/spinlock.h>
 
 /* Possible states of device */

@@ -29,7 +29,6 @@
 #include <linux/blkdev.h>
 #include <linux/elevator.h>
 #include <linux/bio.h>
-#include <linux/blk.h>
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/slab.h>

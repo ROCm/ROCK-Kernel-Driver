@@ -17,9 +17,6 @@
 #include <linux/types.h>
 #include <linux/init.h>
 #include <linux/bootmem.h>
-#ifdef CONFIG_BLK_DEV_RAM
-#include <linux/blk.h>
-#endif
 
 #include <asm/setup.h>
 #include <asm/uaccess.h>

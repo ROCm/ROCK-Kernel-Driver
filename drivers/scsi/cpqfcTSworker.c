@@ -26,7 +26,7 @@
 #include <linux/ioport.h>
 #include <linux/kernel.h>
 #include <linux/stat.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h>
 #include <linux/smp_lock.h>

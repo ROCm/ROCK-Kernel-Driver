@@ -131,7 +131,7 @@
 #include <asm/io.h>
 #include <asm/pgtable.h>
 #include <asm/byteorder.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/module.h>
 #include <linux/interrupt.h>
 

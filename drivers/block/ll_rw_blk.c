@@ -17,7 +17,7 @@
 #include <linux/module.h>
 #include <linux/backing-dev.h>
 #include <linux/bio.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/highmem.h>
 #include <linux/mm.h>
 #include <linux/kernel_stat.h>

@@ -35,7 +35,7 @@
 #include <linux/interrupt.h>  
 #include <linux/module.h>
 #include <linux/version.h> 
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/kernel.h>
 #include <linux/string.h>
 #include <linux/types.h>

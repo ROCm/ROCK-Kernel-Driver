@@ -41,7 +41,6 @@
 #include <asm/uaccess.h>
 #include <asm/io.h>
 
-#include <linux/blk.h>
 #include <linux/blkdev.h>
 #include <linux/genhd.h>
 #include <linux/completion.h>

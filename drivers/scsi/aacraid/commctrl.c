@@ -37,7 +37,7 @@
 #include <linux/spinlock.h>
 #include <linux/slab.h>
 #include <linux/completion.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <asm/semaphore.h>
 #include <asm/uaccess.h>
 #include "scsi.h"

@@ -25,7 +25,6 @@
 #include <linux/kdev_t.h>
 #include <linux/major.h>
 #include <linux/string.h>
-#include <linux/blk.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/console.h>

@@ -18,7 +18,7 @@
  *  option) any later version.
  */
 #include <linux/config.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/console.h>
 #include <linux/init.h>
 #include <linux/ioport.h>

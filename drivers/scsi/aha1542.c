@@ -38,7 +38,7 @@
 #include <linux/spinlock.h>
 #include <linux/pci.h>
 #include <linux/isapnp.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/mca.h>
 #include <linux/mca-legacy.h>
 

@@ -15,7 +15,6 @@
 #include <linux/vmalloc.h>
 #include <linux/pagemap.h>
 #include <linux/init.h>
-#include <linux/blk.h>
 #include <linux/spinlock.h>
 #include <linux/bootmem.h>
 #include <linux/fs.h>

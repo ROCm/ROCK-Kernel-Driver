@@ -38,7 +38,7 @@
 #include <linux/kernel.h>
 #include <linux/genhd.h>
 #include <linux/ps2esdi.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/mca.h>
 #include <linux/init.h>
 #include <linux/ioport.h>

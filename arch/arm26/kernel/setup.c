@@ -14,7 +14,7 @@
 #include <linux/ioport.h>
 #include <linux/delay.h>
 #include <linux/utsname.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/console.h>
 #include <linux/bootmem.h>
 #include <linux/seq_file.h>

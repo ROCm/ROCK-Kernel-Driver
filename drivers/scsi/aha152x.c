@@ -225,7 +225,7 @@
 #include <asm/irq.h>
 #include <asm/io.h>
 #include <linux/version.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include "scsi.h"
 #include "hosts.h"
 #include <asm/system.h>
@@ -241,9 +241,7 @@
 #include <linux/isapnp.h>
 #include <linux/spinlock.h>
 #include <linux/workqueue.h>
-#include <linux/blk.h>
 #include <asm/semaphore.h>
-#include <asm/io.h>
 #include <scsi/scsicam.h>
 
 #include "scsi.h"

@@ -36,7 +36,6 @@
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/types.h>
-#include <linux/blk.h>
 #include <linux/blkdev.h>
 #include <linux/delay.h>
 #include <linux/ioport.h>

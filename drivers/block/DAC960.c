@@ -23,7 +23,6 @@
 #include <linux/version.h>
 #include <linux/module.h>
 #include <linux/types.h>
-#include <linux/blk.h>
 #include <linux/blkdev.h>
 #include <linux/bio.h>
 #include <linux/completion.h>

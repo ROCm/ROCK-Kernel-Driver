@@ -9,7 +9,7 @@
 #include <linux/smp_lock.h>
 #include <linux/usb.h>
 #include <asm/atomic.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include "../../scsi/scsi.h"
 #include "../../scsi/hosts.h"
 

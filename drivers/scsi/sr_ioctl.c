@@ -4,7 +4,7 @@
 #include <linux/fs.h>
 #include <linux/errno.h>
 #include <linux/string.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/blkpg.h>
 #include <linux/cdrom.h>
 #include <asm/io.h>

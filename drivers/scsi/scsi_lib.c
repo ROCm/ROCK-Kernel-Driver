@@ -8,7 +8,7 @@
  */
 
 #include <linux/bio.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/completion.h>
 #include <linux/kernel.h>
 #include <linux/mempool.h>

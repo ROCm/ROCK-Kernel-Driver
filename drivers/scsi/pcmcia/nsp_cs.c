@@ -44,7 +44,7 @@
 #include <linux/interrupt.h>
 #include <linux/module.h>
 #include <linux/major.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/stat.h>
 
 #include <asm/io.h>

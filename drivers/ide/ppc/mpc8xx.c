@@ -27,7 +27,6 @@
 #include <linux/interrupt.h>
 #include <linux/reboot.h>
 #include <linux/init.h>
-#include <linux/blk.h>
 #include <linux/ioport.h>
 #include <linux/ide.h>
 #include <linux/bootmem.h>

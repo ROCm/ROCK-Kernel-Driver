@@ -95,7 +95,7 @@
 #include <linux/proc_fs.h>
 #include <linux/init.h>
 #include <linux/delay.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/stat.h>
 
 #include <asm/io.h>

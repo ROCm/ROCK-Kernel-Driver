@@ -167,7 +167,7 @@
 #include <linux/reboot.h>
 #include <linux/interrupt.h>
 
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/types.h>
 
 #include <scsi/sg.h>

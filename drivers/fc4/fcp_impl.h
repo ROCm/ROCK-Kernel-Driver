@@ -8,7 +8,6 @@
 #define _FCP_SCSI_H
 
 #include <linux/types.h>
-#include <linux/blk.h>
 #include "../scsi/scsi.h"
 
 #include "fc.h"

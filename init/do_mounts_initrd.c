@@ -5,6 +5,7 @@
 #include <linux/ext2_fs.h>
 #include <linux/romfs_fs.h>
 #include <linux/initrd.h>
+#include <linux/sched.h>
 
 #include "do_mounts.h"
 

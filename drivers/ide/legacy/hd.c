@@ -26,7 +26,7 @@
 /* Uncomment the following if you want verbose error reports. */
 /* #define VERBOSE_ERRORS */
 
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/errno.h>
 #include <linux/signal.h>
 #include <linux/interrupt.h>

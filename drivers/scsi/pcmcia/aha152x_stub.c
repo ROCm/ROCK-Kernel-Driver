@@ -44,7 +44,7 @@
 #include <linux/ioport.h>
 #include <scsi/scsi.h>
 #include <linux/major.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <scsi/scsi_ioctl.h>
 
 #include "scsi.h"

@@ -357,11 +357,8 @@
 #include <asm/spinlock.h>
 #endif
 
-#if LINUX_VERSION_CODE >= 0x010300
-#include <linux/blk.h>
-#else
-#include "../block/blk.h"
-#endif
+#include <linux/blkdev.h>
+
 #include "scsi.h"
 #include "hosts.h"
 #if LINUX_VERSION_CODE < 0x020503

@@ -87,8 +87,6 @@
 
 #define MAJOR_NR I2O_MAJOR
 
-#include <linux/blk.h>
-
 #define MAX_I2OB	16
 
 #define MAX_I2OB_DEPTH	8

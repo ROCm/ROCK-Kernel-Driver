@@ -1,5 +1,5 @@
 #include <linux/sched.h>		/* for capable() */
-#include <linux/blk.h>			/* for set_device_ro() */
+#include <linux/blkdev.h>
 #include <linux/blkpg.h>
 #include <linux/backing-dev.h>
 #include <linux/buffer_head.h>

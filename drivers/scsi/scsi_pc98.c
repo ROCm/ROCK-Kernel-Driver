@@ -8,7 +8,7 @@
 #include <linux/fs.h>
 #include <linux/kernel.h>
 #include <linux/genhd.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <asm/pc9800.h>
 
 #include "scsi.h"

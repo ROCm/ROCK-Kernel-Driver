@@ -84,7 +84,7 @@
 #include <linux/stat.h>
 #include <linux/interrupt.h>
 
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 
 #ifdef __sparc__
 #  include <asm/irq.h>

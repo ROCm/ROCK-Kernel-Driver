@@ -7,7 +7,7 @@
 #include <linux/types.h>
 #include <linux/stat.h>
 #include <linux/mm.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/sched.h>
 #include <linux/version.h>
 #include <linux/config.h>

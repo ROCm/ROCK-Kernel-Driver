@@ -34,7 +34,7 @@
  * are deemed to be part of the source code.
  */
 
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/interrupt.h>
 #include <linux/module.h>
 #include <linux/kernel.h>

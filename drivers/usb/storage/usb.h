@@ -45,7 +45,7 @@
 #define _USB_H_
 
 #include <linux/usb.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/smp_lock.h>
 #include <linux/completion.h>
 #include <linux/version.h>

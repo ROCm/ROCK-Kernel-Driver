@@ -15,7 +15,7 @@
  *   30-Aug-2000 RMK	Use Linux list handling and spinlocks
  */
 #include <linux/module.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/kernel.h>
 #include <linux/string.h>
 #include <linux/slab.h>
