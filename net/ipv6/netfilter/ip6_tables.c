@@ -222,7 +222,7 @@ ip6_packet_match(const struct sk_buff *skb,
 		u_int16_t hdrlen;	/* Header */
 		u_int16_t _fragoff = 0, *fp = NULL;
 
-		ptr = IPV6_HDR_LEN;
+		ptr = ((char *) ipv6 - (char *) skb->data) + IPV6_HDR_LEN;
 
 		while (ip6t_ext_hdr(currenthdr)) {
 	                /* Is there enough space for the next ext header? */

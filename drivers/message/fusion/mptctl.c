@@ -1161,7 +1161,7 @@ mptctl_getiocinfo (unsigned long arg, unsigned int data_size)
 	int			numDevices = 0;
 	unsigned int		max_id;
 	int			ii;
-	int			port;
+	unsigned int		port;
 	int			cim_rev;
 	u8			revision;
 
@@ -1204,9 +1204,7 @@ mptctl_getiocinfo (unsigned long arg, unsigned int data_size)
 		return -ENODEV;
 	}
 
-	/* Verify the data transfer size is correct.
-	 * Ignore the port setting.
-	 */
+	/* Verify the data transfer size is correct.  */
 	if (karg->hdr.maxDataSize != data_size) {
 		printk(KERN_ERR "%s@%d::mptctl_getiocinfo - "
 			"Structure size mismatch. Command not completed.\n",
@@ -1223,6 +1221,8 @@ mptctl_getiocinfo (unsigned long arg, unsigned int data_size)
 	else
 		karg->adapterType = MPT_IOCTL_INTERFACE_SCSI;
 
+	if (karg->hdr.port > 1)
+		return -EINVAL;
 	port = karg->hdr.port;
 
 	karg->port = port;
