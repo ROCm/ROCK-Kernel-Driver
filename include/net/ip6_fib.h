@@ -163,10 +163,12 @@ extern int			fib6_walk_continue(struct fib6_walker_t *w);
 
 extern int			fib6_add(struct fib6_node *root,
 					 struct rt6_info *rt,
-					 struct nlmsghdr *nlh);
+					 struct nlmsghdr *nlh,
+					 void *rtattr);
 
 extern int			fib6_del(struct rt6_info *rt,
-					 struct nlmsghdr *nlh);
+					 struct nlmsghdr *nlh,
+					 void *rtattr);
 
 extern void			inet6_rt_notify(int event, struct rt6_info *rt,
 						struct nlmsghdr *nlh);
