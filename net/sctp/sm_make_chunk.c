@@ -77,12 +77,17 @@ static const sctp_supported_addrs_param_t sat_param = {
 	{
 		SCTP_PARAM_SUPPORTED_ADDRESS_TYPES,
 		__constant_htons(SCTP_SAT_LEN),
-	},
-	{               /* types[] */
-		SCTP_PARAM_IPV4_ADDRESS,
-		SCTP_V6(SCTP_PARAM_IPV6_ADDRESS,)
 	}
 };
+
+/* gcc 3.2 doesn't allow initialization of zero-length arrays. So the above
+ * structure is split and the address types array is initialized using a
+ * fixed length array. 
+ */
+static const __u16 sat_addr_types[2] = {
+	SCTP_PARAM_IPV4_ADDRESS,
+	SCTP_V6(SCTP_PARAM_IPV6_ADDRESS,)
+};			
 
 /* RFC 2960 3.3.2 Initiation (INIT) (1)
  *
@@ -214,7 +219,10 @@ sctp_chunk_t *sctp_make_init(const sctp_association_t *asoc,
 		sctp_addto_chunk(retval, sizeof(init), &init);
 	retval->param_hdr.v =
 		sctp_addto_chunk(retval, addrs_len, addrs.v);
-	sctp_addto_chunk(retval, SCTP_SAT_LEN, &sat_param);
+
+	sctp_addto_chunk(retval, sizeof(sctp_paramhdr_t), &sat_param);
+	sctp_addto_chunk(retval, sizeof(sat_addr_types), sat_addr_types);
+
 	sctp_addto_chunk(retval, sizeof(ecap_param), &ecap_param);
 
 nodata:
