@@ -588,7 +588,9 @@ int netpoll_setup(struct netpoll *np)
 	if(np->rx_hook) {
 		unsigned long flags;
 
+#ifdef CONFIG_NETPOLL_RX
 		np->dev->netpoll_rx = 1;
+#endif
 
 		spin_lock_irqsave(&rx_list_lock, flags);
 		list_add(&np->rx_list, &rx_list);
@@ -608,7 +610,9 @@ void netpoll_cleanup(struct netpoll *np)
 
 		spin_lock_irqsave(&rx_list_lock, flags);
 		list_del(&np->rx_list);
+#ifdef CONFIG_NETPOLL_RX
 		np->dev->netpoll_rx = 0;
+#endif
 		spin_unlock_irqrestore(&rx_list_lock, flags);
 	}
 
