@@ -892,9 +892,9 @@ static int ubd_ioctl(struct inode * inode, struct file * file,
 	struct ubd *dev = inode->i_bdev->bd_disk->private_data;
 	int err;
 	struct hd_driveid ubd_id = {
-		.cyls =		0,
-		.heads =	128,
-		.sectors =	32,
+		.cyls		= 0,
+		.heads		= 128,
+		.sectors	= 32,
 	};
 
 	switch (cmd) {

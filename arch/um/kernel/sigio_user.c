@@ -52,7 +52,7 @@ void __init check_one_sigio(void (*proc)(int, int))
 {
 	struct sigaction old, new;
 	struct termios tt;
-	struct openpty_arg pty = { master : -1, slave : -1 };
+	struct openpty_arg pty = { .master = -1, .slave = -1 };
 	int master, slave, flags;
 
 	initial_thread_cb(openpty_cb, &pty);
@@ -170,15 +170,15 @@ struct pollfds {
  * synchronizes with it.
  */
 struct pollfds current_poll = {
-	poll : 		NULL,
-	size :		0,
-	used :		0
+	.poll  		= NULL,
+	.size 		= 0,
+	.used 		= 0
 };
 
 struct pollfds next_poll = {
-	poll : 		NULL,
-	size :		0,
-	used :		0
+	.poll  		= NULL,
+	.size 		= 0,
+	.used 		= 0
 };
 
 static int write_sigio_thread(void *unused)
@@ -298,9 +298,9 @@ int add_sigio_fd(int fd, int read)
 	if(read) events = POLLIN;
 	else events = POLLOUT;
 
-	next_poll.poll[n - 1] = ((struct pollfd) { fd : 	fd,
-						   events :	events,
-						   revents :	0 });
+	next_poll.poll[n - 1] = ((struct pollfd) { .fd  	= fd,
+						   .events 	= events,
+						   .revents 	= 0 });
 	update_thread();
  out:
 	sigio_unlock();
@@ -348,12 +348,12 @@ static int setup_initial_poll(int fd)
 		printk("setup_initial_poll : failed to allocate poll\n");
 		return(-1);
 	}
-	*p = ((struct pollfd) { fd : 	fd,
-				events :	POLLIN,
-				revents :	0 });
-	current_poll = ((struct pollfds) { poll :	p,
-					   used :	1,
-					   size :	1 });
+	*p = ((struct pollfd) { .fd  	= fd,
+				.events 	= POLLIN,
+				.revents 	= 0 });
+	current_poll = ((struct pollfds) { .poll 	= p,
+					   .used 	= 1,
+					   .size 	= 1 });
 	return(0);
 }
 
