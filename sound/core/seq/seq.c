@@ -35,7 +35,11 @@
 #include "seq_info.h"
 #include <sound/seq_device.h>
 
+#if defined(CONFIG_SND_SEQ_DUMMY_MODULE)
+int seq_client_load[64] = {[0] = SNDRV_SEQ_CLIENT_DUMMY, [1 ... 63] = -1};
+#else
 int seq_client_load[64] = {[0 ... 63] = -1};
+#endif
 int seq_default_timer_class = SNDRV_TIMER_CLASS_GLOBAL;
 int seq_default_timer_sclass = SNDRV_TIMER_SCLASS_NONE;
 int seq_default_timer_card = -1;
