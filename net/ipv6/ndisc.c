@@ -1326,7 +1326,7 @@ static void ndisc_redirect_rcv(struct sk_buff *skb)
 	neigh = __neigh_lookup(&nd_tbl, target, skb->dev, 1);
 	if (neigh) {
 #ifdef CONFIG_IPV6_NDISC_NEW
-		rt6_redirect(dest, &skb->nh.ipv6h->saddr, neigh, on_link);
+		rt6_redirect(dest, &skb->nh.ipv6h->saddr, neigh, lladdr, on_link);
 #else
 		if (neigh->nud_state&NUD_VALID) {
 			if (!rt6_redirect(dest, &skb->nh.ipv6h->saddr, neigh, NULL, on_link))

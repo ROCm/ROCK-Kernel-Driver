@@ -939,16 +939,17 @@ static int ip6_route_del(struct in6_rtmsg *rtmsg, struct nlmsghdr *nlh, void *_r
 /*
  *	Handle redirects
  */
-void rt6_redirect(struct in6_addr *dest, struct in6_addr *saddr,
-		  struct neighbour *neigh, int on_link)
+int rt6_redirect(struct in6_addr *dest, struct in6_addr *saddr,
+		  struct neighbour *neigh, u8 *lladdr, int on_link)
 {
 	struct rt6_info *rt, *nrt;
+	int notify;
 
 	/* Locate old route to this destination. */
 	rt = rt6_lookup(dest, NULL, neigh->dev->ifindex, 1);
 
 	if (rt == NULL)
-		return;
+		return 0;
 
 	if (neigh->dev != rt->rt6i_dev)
 		goto out;
@@ -1008,6 +1009,20 @@ source_ok:
 	/*
 	 *	We have finally decided to accept it.
 	 */
+#ifdef CONFIG_IPV6_NDISC_NEW
+	write_lock_bh(&neigh->lock);
+	notify = __neigh_update(neigh, lladdr, NUD_STALE,
+				NEIGH_UPDATE_F_IP6REDIRECT|
+				(on_link ? 0 : (NEIGH_UPDATE_F_OVERRIDE_VALID_ISROUTER|
+						NEIGH_UPDATE_F_ISROUTER)));
+#ifdef CONFIG_ARPD
+	if (notify > 0 && !neigh->parms->app_probes) {
+		write_unlock_bh(&neigh->lock);
+		neigh_app_notify(neigh);
+	} else
+#endif
+	write_unlock_bh(&neigh->lock);
+#endif
 
 	nrt = ip6_rt_copy(rt);
 	if (nrt == NULL)
@@ -1037,7 +1052,7 @@ source_ok:
 
 out:
         dst_release(&rt->u.dst);
-	return;
+	return 0;
 }
 
 /*
