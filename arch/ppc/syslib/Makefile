@@ -45,23 +45,23 @@ obj-$(CONFIG_K2)		+= i8259.o indirect_pci.o todc_time.o \
 obj-$(CONFIG_LOPEC)		+= mpc10x_common.o indirect_pci.o pci_auto.o \
 					open_pic.o i8259.o todc_time.o
 obj-$(CONFIG_MCPN765)		+= todc_time.o indirect_pci.o pci_auto.o \
-					open_pic.o i8259.o pplus_common.o
+					open_pic.o i8259.o hawk_common.o
 obj-$(CONFIG_MENF1)		+= todc_time.o i8259.o mpc10x_common.o \
 					pci_auto.o indirect_pci.o
 obj-$(CONFIG_MVME5100)		+= open_pic.o todc_time.o indirect_pci.o \
-					i8259.o pci_auto.o pplus_common.o
+					i8259.o pci_auto.o hawk_common.o
 obj-$(CONFIG_OCOTEA)		+= indirect_pci.o pci_auto.o todc_time.o
 obj-$(CONFIG_PAL4)		+= cpc700_pic.o
 obj-$(CONFIG_PCORE)		+= mpc10x_common.o todc_time.o i8259.o \
 					indirect_pci.o pci_auto.o
 obj-$(CONFIG_POWERPMC250)	+= open_pic.o mpc10x_common.o \
 					indirect_pci.o pci_auto.o
-obj-$(CONFIG_PPLUS)		+= pplus_common.o open_pic.o i8259.o \
+obj-$(CONFIG_PPLUS)		+= hawk_common.o open_pic.o i8259.o \
 				   indirect_pci.o todc_time.o pci_auto.o
 obj-$(CONFIG_PRPMC750)		+= open_pic.o indirect_pci.o pci_auto.o \
-					pplus_common.o
+					hawk_common.o
 obj-$(CONFIG_PRPMC800)		+= open_pic.o indirect_pci.o pci_auto.o \
-					pplus_common.o harrier.o
+					hawk_common.o harrier.o
 obj-$(CONFIG_SANDPOINT)		+= i8259.o open_pic.o mpc10x_common.o \
 					pci_auto.o indirect_pci.o todc_time.o
 obj-$(CONFIG_SPRUCE)		+= cpc700_pic.o indirect_pci.o pci_auto.o \
