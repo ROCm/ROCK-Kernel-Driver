@@ -2677,6 +2677,7 @@ inline unsigned int ata_host_intr (struct ata_port *ap,
 		handled = 1;
 		break;
 
+	case ATA_PROT_ATAPI:
 	case ATA_PROT_NODATA:	/* command completion, but no data xfer */
 		status = ata_busy_wait(ap, ATA_BUSY | ATA_DRQ, 1000);
 		DPRINTK("BUS_NODATA (drv_stat 0x%X)\n", status);
@@ -2837,9 +2838,16 @@ static void atapi_packet_task(void *_data)
 	      qc->scsicmd->cmnd, ap->host->max_cmd_len / 4);
 
 	/* if we are DMA'ing, irq handler takes over from here */
-	if (qc->tf.protocol == ATA_PROT_ATAPI_DMA) {
+	if (qc->tf.protocol == ATA_PROT_ATAPI_DMA)
 		ap->ops->bmdma_start(qc);	    /* initiate bmdma */
-	} else {
+
+	/* non-data commands are also handled via irq */
+	else if (qc->scsicmd->sc_data_direction == SCSI_DATA_NONE) {
+		/* do nothing */
+	}
+
+	/* PIO commands are handled by polling */
+	else {
 		ap->pio_task_state = PIO_ST;
 		queue_work(ata_wq, &ap->pio_task);
 	}
