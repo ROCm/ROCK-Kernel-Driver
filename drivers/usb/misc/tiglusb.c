@@ -60,7 +60,7 @@ static void usblp_cleanup (tiglusb_t * s)
 static int clear_device (struct usb_device *dev)
 {
 	if (usb_set_configuration (dev, dev->config[0].bConfigurationValue) < 0) {
-		printk ("tiglusb: clear_device failed\n");
+		err ("tiglusb: clear_device failed");
 		return -1;
 	}
 
@@ -74,13 +74,13 @@ static int clear_pipes (struct usb_device *dev)
 
 	pipe = usb_sndbulkpipe (dev, 1);
 	if (usb_clear_halt (dev, usb_pipeendpoint (pipe))) {
-		printk ("tiglusb: clear_pipe (r), request failed\n");
+		err("tiglusb: clear_pipe (r), request failed");
 		return -1;
 	}
 
 	pipe = usb_sndbulkpipe (dev, 2);
 	if (usb_clear_halt (dev, usb_pipeendpoint (pipe))) {
-		printk ("tiglusb: clear_pipe (w), request failed\n");
+		err ("tiglusb: clear_pipe (w), request failed");
 		return -1;
 	}
 
@@ -171,7 +171,7 @@ static ssize_t tiglusb_read (struct file *file, char *buf, size_t count, loff_t 
 	if (result == -ETIMEDOUT) {	/* NAK */
 		ret = result;
 		if (!bytes_read) {
-			printk ("quirk !\n");
+			warn ("quirk !");
 		}
 		warn ("tiglusb_read, NAK received.");
 		goto out;
@@ -233,7 +233,7 @@ static ssize_t tiglusb_write (struct file *file, const char *buf, size_t count, 
 	} else if (result == -EPIPE) {	/* STALL -- shouldn't happen */
 		warn ("CLEAR_FEATURE request to remove STALL condition.");
 		if (usb_clear_halt (s->dev, usb_pipeendpoint (pipe)))
-			warn ("send_packet, request failed\n");
+			warn ("send_packet, request failed");
 		//clear_device(s->dev);
 		ret = result;
 		goto out;
@@ -273,12 +273,12 @@ static int tiglusb_ioctl (struct inode *inode, struct file *file,
 		timeout = arg;	// timeout value in tenth of seconds
 		break;
 	case IOCTL_TIUSB_RESET_DEVICE:
-		printk (KERN_DEBUG "IOCTL_TIGLUSB_RESET_DEVICE\n");
+		dbg ("IOCTL_TIGLUSB_RESET_DEVICE");
 		if (clear_device (s->dev))
 			ret = -EIO;
 		break;
 	case IOCTL_TIUSB_RESET_PIPES:
-		printk (KERN_DEBUG "IOCTL_TIGLUSB_RESET_PIPES\n");
+		dbg ("IOCTL_TIGLUSB_RESET_PIPES");
 		if (clear_pipes (s->dev))
 			ret = -EIO;
 		break;
@@ -326,8 +326,8 @@ static void *tiglusb_probe (struct usb_device *dev, unsigned int ifnum,
 	ptiglusb_t s;
 	char name[8];
 
-	printk ("tiglusb: probing vendor id 0x%x, device id 0x%x ifnum:%d\n",
-		dev->descriptor.idVendor, dev->descriptor.idProduct, ifnum);
+	dbg ("tiglusb: probing vendor id 0x%x, device id 0x%x ifnum:%d",
+	     dev->descriptor.idVendor, dev->descriptor.idProduct, ifnum);
 
 	/* 
 	 * We don't handle multiple configurations. As of version 0x0103 of 
@@ -341,7 +341,7 @@ static void *tiglusb_probe (struct usb_device *dev, unsigned int ifnum,
 		return NULL;
 
 	if (usb_set_configuration (dev, dev->config[0].bConfigurationValue) < 0) {
-		printk ("tiglusb_probe: set_configuration failed\n");
+		err ("tiglusb_probe: set_configuration failed");
 		return NULL;
 	}
 
@@ -358,7 +358,7 @@ static void *tiglusb_probe (struct usb_device *dev, unsigned int ifnum,
 	dbg ("bound to interface: %d", ifnum);
 
 	sprintf (name, "%d", s->minor);
-	printk ("tiglusb: registering to devfs : major = %d, minor = %d, node = %s\n", TIUSB_MAJOR,
+	info ("tiglusb: registering to devfs : major = %d, minor = %d, node = %s", TIUSB_MAJOR,
 		(TIUSB_MINOR + s->minor), name);
 	s->devfs =
 	    devfs_register (devfs_handle, name, DEVFS_FL_DEFAULT, TIUSB_MAJOR,
@@ -366,7 +366,7 @@ static void *tiglusb_probe (struct usb_device *dev, unsigned int ifnum,
 			    NULL);
 
 	/* Display firmware version */
-	printk ("tiglusb: link cable version %i.%02x\n",
+	info ("tiglusb: link cable version %i.%02x",
 		dev->descriptor.bcdDevice >> 8, dev->descriptor.bcdDevice & 0xff);
 
 	return s;
@@ -377,7 +377,7 @@ static void tiglusb_disconnect (struct usb_device *dev, void *drv_context)
 	ptiglusb_t s = (ptiglusb_t) drv_context;
 
 	if (!s || !s->dev)
-		printk ("bogus disconnect");
+		warn ("bogus disconnect");
 
 	s->remove_pending = 1;
 	wake_up (&s->wait);
@@ -396,7 +396,7 @@ static void tiglusb_disconnect (struct usb_device *dev, void *drv_context)
 	/* unregister device */
 	devfs_unregister (s->devfs);
 	s->devfs = NULL;
-	printk ("tiglusb: device disconnected\n");
+	info ("tiglusb: device disconnected");
 }
 
 static struct usb_device_id tiglusb_ids[] = {
@@ -452,7 +452,7 @@ static int __init tiglusb_init (void)
 
 	/* register device */
 	if (devfs_register_chrdev (TIUSB_MAJOR, "tiglusb", &tiglusb_fops)) {
-		printk ("tiglusb: unable to get major %d\n", TIUSB_MAJOR);
+		err ("tiglusb: unable to get major %d", TIUSB_MAJOR);
 		return -EIO;
 	}
 
