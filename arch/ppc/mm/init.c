@@ -291,6 +291,8 @@ void __init MMU_init(void)
 		ppc_md.progress("MMU:exit", 0x211);
 
 #ifdef CONFIG_BOOTX_TEXT
+	/* By default, we are no longer mapped */
+       	boot_text_mapped = 0;
 	/* Must be done last, or ppc_md.progress will die. */
 	map_boot_text();
 #endif

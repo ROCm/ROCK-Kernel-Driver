@@ -141,23 +141,20 @@ __start:
 	mr	r27,r7
 	li	r24,0			/* cpu # */
 
-#ifdef CONFIG_POWER4
-/*
- * On the PPC970, we have to turn off real-mode cache inhibit
- * early, before we first turn the MMU off.
- */
-	mfspr	r0,SPRN_PVR
-	srwi	r0,r0,16
-	cmpwi	r0,0x39
-	beql	ppc970_setup_hid
-#endif /* CONFIG_POWER4 */
-
 /*
  * early_init() does the early machine identification and does
  * the necessary low-level setup and clears the BSS
  *  -- Cort <cort@fsmlabs.com>
  */
 	bl	early_init
+
+/*
+ * On POWER4, we first need to tweak some CPU configuration registers
+ * like real mode cache inhibit or exception base
+ */
+#ifdef CONFIG_POWER4
+	bl	__power4_cpu_preinit
+#endif /* CONFIG_POWER4 */
 
 #ifdef CONFIG_APUS
 /* On APUS the __va/__pa constants need to be set to the correct
@@ -1216,7 +1213,7 @@ __secondary_start_psurge99:
 __secondary_start:
 #ifdef CONFIG_PPC64BRIDGE
 	mfmsr	r0
-	clrldi	r0,r0,1		/* make sure it's in 32-bit mode */
+	clrldi	r0,r0,1			/* make sure it's in 32-bit mode */
 	SYNC
 	MTMSRD(r0)
 	isync
@@ -1278,26 +1275,15 @@ __secondary_start:
  */
 _GLOBAL(__setup_cpu_power3)
 	blr
-_GLOBAL(__setup_cpu_power4)
-	blr
-_GLOBAL(__setup_cpu_ppc970)
-	blr
 _GLOBAL(__setup_cpu_generic)
 	blr
 
-#ifndef CONFIG_6xx
+#if !defined(CONFIG_6xx) && !defined(CONFIG_POWER4)
 _GLOBAL(__save_cpu_setup)
 	blr
 _GLOBAL(__restore_cpu_setup)
-#ifdef CONFIG_POWER4
-	/* turn off real-mode cache inhibit on the PPC970 */
-	mfspr	r0,SPRN_PVR
-	srwi	r0,r0,16
-	cmpwi	r0,0x39
-	beq	ppc970_setup_hid
-#endif
 	blr
-#endif /* CONFIG_6xx */
+#endif /* !defined(CONFIG_6xx) && !defined(CONFIG_POWER4) */
 
 
 /*
@@ -1633,10 +1619,14 @@ initial_mm_power4:
 	lis	r4,0x2000		/* set pseudo-segment reg 12 */
 	ori	r5,r4,0x0ccc
 	mtsr	12,r5
+#if 0
 	ori	r5,r4,0x0888		/* set pseudo-segment reg 8 */
 	mtsr	8,r5			/* (for access to serial port) */
-	ori	r5,r4,0x0999		/* set pseudo-segment reg 8 */
+#endif
+#ifdef CONFIG_BOOTX_TEXT
+	ori	r5,r4,0x0999		/* set pseudo-segment reg 9 */
 	mtsr	9,r5			/* (for access to screen) */
+#endif
 	mfmsr	r0
 	clrldi	r0,r0,1
 	sync
@@ -1644,43 +1634,8 @@ initial_mm_power4:
 	isync
 	blr
 
-/*
- * On 970 (G5), we pre-set a few bits in HID0 & HID1
- */
-ppc970_setup_hid:
-	li	r0,0
-	sync
-	mtspr	0x3f4,r0
-	isync
-	sync
-	mtspr	0x3f6,r0
-	isync
-	mfspr	r0,SPRN_HID0
-	li	r11,1			/* clear DOZE, NAP and SLEEP */
-	rldimi	r0,r11,52,8		/* set DPM */
-	mtspr	SPRN_HID0,r0
-	mfspr	r0,SPRN_HID0
-	mfspr	r0,SPRN_HID0
-	mfspr	r0,SPRN_HID0
-	mfspr	r0,SPRN_HID0
-	mfspr	r0,SPRN_HID0
-	mfspr	r0,SPRN_HID0
-	sync
-	isync
-	mfspr	r0,SPRN_HID1
-	li	r11,0x1200		/* enable i-fetch cacheability */
-	sldi	r11,r11,44		/* and prefetch */
-	or	r0,r0,r11
-	mtspr	SPRN_HID1,r0
-	mtspr	SPRN_HID1,r0
-	isync
-	li	r0,0
-	sync
-	mtspr	0x137,0
-	isync
-	blr
 #endif /* CONFIG_POWER4 */
-
+	
 #ifdef CONFIG_8260
 /* Jump into the system reset for the rom.
  * We first disable the MMU, and then jump to the ROM reset address.

@@ -8,8 +8,7 @@
  *  as published by the Free Software Foundation; either version
  *  2 of the License, or (at your option) any later version.
  *
- *  Todo: - cleanup some coding horrors in the flash code
- *        - add support for the OF persistent properties
+ *  Todo: - add support for the OF persistent properties
  */
 #include <linux/config.h>
 #include <linux/module.h>
@@ -21,29 +20,40 @@
 #include <linux/slab.h>
 #include <linux/delay.h>
 #include <linux/errno.h>
+#include <linux/adb.h>
+#include <linux/pmu.h>
+#include <linux/bootmem.h>
+#include <linux/completion.h>
+#include <linux/spinlock.h>
 #include <asm/sections.h>
 #include <asm/io.h>
 #include <asm/system.h>
 #include <asm/prom.h>
 #include <asm/machdep.h>
 #include <asm/nvram.h>
-#include <linux/adb.h>
-#include <linux/pmu.h>
 
-#undef DEBUG
+#define DEBUG
+
+#ifdef DEBUG
+#define DBG(x...) printk(x)
+#else
+#define DBG(x...)
+#endif
 
 #define NVRAM_SIZE		0x2000	/* 8kB of non-volatile RAM */
 
 #define CORE99_SIGNATURE	0x5a
 #define CORE99_ADLER_START	0x14
 
-/* Core99 nvram is a flash */
-#define CORE99_FLASH_STATUS_DONE	0x80
-#define CORE99_FLASH_STATUS_ERR		0x38
-#define CORE99_FLASH_CMD_ERASE_CONFIRM	0xd0
-#define CORE99_FLASH_CMD_ERASE_SETUP	0x20
-#define CORE99_FLASH_CMD_RESET		0xff
-#define CORE99_FLASH_CMD_WRITE_SETUP	0x40
+/* On Core99, nvram is either a sharp, a micron or an AMD flash */
+#define SM_FLASH_STATUS_DONE	0x80
+#define SM_FLASH_STATUS_ERR		0x38
+#define SM_FLASH_CMD_ERASE_CONFIRM	0xd0
+#define SM_FLASH_CMD_ERASE_SETUP	0x20
+#define SM_FLASH_CMD_RESET		0xff
+#define SM_FLASH_CMD_WRITE_SETUP	0x40
+#define SM_FLASH_CMD_CLEAR_STATUS	0x50
+#define SM_FLASH_CMD_READ_STATUS	0x70
 
 /* CHRP NVRAM header */
 struct chrp_header {
@@ -70,21 +80,110 @@ static volatile unsigned char *nvram_data;
 static int nvram_mult, is_core_99;
 static int core99_bank = 0;
 static int nvram_partitions[3];
-
-/* FIXME: kmalloc fails to allocate the image now that I had to move it
- *        before time_init(). For now, I allocate a static buffer here
- *        but it's a waste of space on all but core99 machines
- */
-#if 0
-static char* nvram_image;
-#else
-static char nvram_image[NVRAM_SIZE] __pmacdata;
-#endif
+static spinlock_t nv_lock = SPIN_LOCK_UNLOCKED;
 
 extern int pmac_newworld;
+extern int system_running;
 
-static u8 __pmac
-chrp_checksum(struct chrp_header* hdr)
+static int (*core99_write_bank)(int bank, u8* datas);
+static int (*core99_erase_bank)(int bank);
+
+static char *nvram_image __pmacdata;
+
+
+static unsigned char __pmac core99_nvram_read_byte(int addr)
+{
+	if (nvram_image == NULL)
+		return 0xff;
+	return nvram_image[addr];
+}
+
+static void __pmac core99_nvram_write_byte(int addr, unsigned char val)
+{
+	if (nvram_image == NULL)
+		return;
+	nvram_image[addr] = val;
+}
+
+
+static unsigned char __openfirmware direct_nvram_read_byte(int addr)
+{
+	return in_8(&nvram_data[(addr & (NVRAM_SIZE - 1)) * nvram_mult]);
+}
+
+static void __openfirmware direct_nvram_write_byte(int addr, unsigned char val)
+{
+	out_8(&nvram_data[(addr & (NVRAM_SIZE - 1)) * nvram_mult], val);
+}
+
+
+static unsigned char __pmac indirect_nvram_read_byte(int addr)
+{
+	unsigned char val;
+	unsigned long flags;
+
+	spin_lock_irqsave(&nv_lock, flags);
+	out_8(nvram_addr, addr >> 5);
+	val = in_8(&nvram_data[(addr & 0x1f) << 4]);
+	spin_unlock_irqrestore(&nv_lock, flags);
+
+	return val;
+}
+
+static void __pmac indirect_nvram_write_byte(int addr, unsigned char val)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&nv_lock, flags);
+	out_8(nvram_addr, addr >> 5);
+	out_8(&nvram_data[(addr & 0x1f) << 4], val);
+	spin_unlock_irqrestore(&nv_lock, flags);
+}
+
+
+#ifdef CONFIG_ADB_PMU
+
+static void __pmac pmu_nvram_complete(struct adb_request *req)
+{
+	if (req->arg)
+		complete((struct completion *)req->arg);
+}
+
+static unsigned char __pmac pmu_nvram_read_byte(int addr)
+{
+	struct adb_request req;
+	DECLARE_COMPLETION(req_complete); 
+	
+	req.arg = system_running ? &req_complete : NULL;
+	if (pmu_request(&req, pmu_nvram_complete, 3, PMU_READ_NVRAM,
+			(addr >> 8) & 0xff, addr & 0xff))
+		return 0xff;
+	if (system_running)
+		wait_for_completion(&req_complete);
+	while (!req.complete)
+		pmu_poll();
+	return req.reply[0];
+}
+
+static void __pmac pmu_nvram_write_byte(int addr, unsigned char val)
+{
+	struct adb_request req;
+	DECLARE_COMPLETION(req_complete); 
+	
+	req.arg = system_running ? &req_complete : NULL;
+	if (pmu_request(&req, pmu_nvram_complete, 4, PMU_WRITE_NVRAM,
+			(addr >> 8) & 0xff, addr & 0xff, val))
+		return;
+	if (system_running)
+		wait_for_completion(&req_complete);
+	while (!req.complete)
+		pmu_poll();
+}
+
+#endif /* CONFIG_ADB_PMU */
+
+
+static u8 __pmac chrp_checksum(struct chrp_header* hdr)
 {
 	u8 *ptr;
 	u16 sum = hdr->signature;
@@ -95,8 +194,7 @@ chrp_checksum(struct chrp_header* hdr)
 	return sum;
 }
 
-static u32 __pmac
-core99_calc_adler(u8 *buffer)
+static u32 __pmac core99_calc_adler(u8 *buffer)
 {
 	int cnt;
 	u32 low, high;
@@ -118,86 +216,186 @@ core99_calc_adler(u8 *buffer)
 	return (high << 16) | low;
 }
 
-static u32 __pmac
-core99_check(u8* datas)
+static u32 __pmac core99_check(u8* datas)
 {
 	struct core99_header* hdr99 = (struct core99_header*)datas;
 
 	if (hdr99->hdr.signature != CORE99_SIGNATURE) {
-#ifdef DEBUG
-		printk("Invalid signature\n");
-#endif
+		DBG("Invalid signature\n");
 		return 0;
 	}
 	if (hdr99->hdr.cksum != chrp_checksum(&hdr99->hdr)) {
-#ifdef DEBUG
-		printk("Invalid checksum\n");
-#endif
+		DBG("Invalid checksum\n");
 		return 0;
 	}
 	if (hdr99->adler != core99_calc_adler(datas)) {
-#ifdef DEBUG
-		printk("Invalid adler\n");
-#endif
+		DBG("Invalid adler\n");
 		return 0;
 	}
 	return hdr99->generation;
 }
 
-static int __pmac
-core99_erase_bank(int bank)
+static int __pmac sm_erase_bank(int bank)
 {
 	int stat, i;
+	unsigned long timeout;
 
 	u8* base = (u8 *)nvram_data + core99_bank*NVRAM_SIZE;
 
-	out_8(base, CORE99_FLASH_CMD_ERASE_SETUP);
-	out_8(base, CORE99_FLASH_CMD_ERASE_CONFIRM);
-	do { stat = in_8(base); }
-	while(!(stat & CORE99_FLASH_STATUS_DONE));
-	out_8(base, CORE99_FLASH_CMD_RESET);
-	if (stat & CORE99_FLASH_STATUS_ERR) {
-		printk("nvram: flash error 0x%02x on erase !\n", stat);
-		return -ENXIO;
-	}
+       	DBG("nvram: Sharp/Micron Erasing bank %d...\n", bank);
+
+	out_8(base, SM_FLASH_CMD_ERASE_SETUP);
+	out_8(base, SM_FLASH_CMD_ERASE_CONFIRM);
+	timeout = 0;
+	do {
+		if (++timeout > 1000000) {
+			printk(KERN_ERR "nvram: Sharp/Miron flash erase timeout !\n");
+			break;
+		}
+		out_8(base, SM_FLASH_CMD_READ_STATUS);
+		stat = in_8(base);
+	} while (!(stat & SM_FLASH_STATUS_DONE));
+
+	out_8(base, SM_FLASH_CMD_CLEAR_STATUS);
+	out_8(base, SM_FLASH_CMD_RESET);
+
 	for (i=0; i<NVRAM_SIZE; i++)
 		if (base[i] != 0xff) {
-			printk("nvram: flash erase failed !\n");
+			printk(KERN_ERR "nvram: Sharp/Micron flash erase failed !\n");
 			return -ENXIO;
 		}
 	return 0;
 }
 
-static int __pmac
-core99_write_bank(int bank, u8* datas)
+static int __pmac sm_write_bank(int bank, u8* datas)
 {
 	int i, stat = 0;
+	unsigned long timeout;
 
 	u8* base = (u8 *)nvram_data + core99_bank*NVRAM_SIZE;
 
+       	DBG("nvram: Sharp/Micron Writing bank %d...\n", bank);
+
 	for (i=0; i<NVRAM_SIZE; i++) {
-		out_8(base+i, CORE99_FLASH_CMD_WRITE_SETUP);
+		out_8(base+i, SM_FLASH_CMD_WRITE_SETUP);
+		udelay(1);
 		out_8(base+i, datas[i]);
-		do { stat = in_8(base); }
-		while(!(stat & CORE99_FLASH_STATUS_DONE));
-		if (stat & CORE99_FLASH_STATUS_ERR)
+		timeout = 0;
+		do {
+			if (++timeout > 1000000) {
+				printk(KERN_ERR "nvram: Sharp/Micron flash write timeout !\n");
+				break;
+			}
+			out_8(base, SM_FLASH_CMD_READ_STATUS);
+			stat = in_8(base);
+		} while (!(stat & SM_FLASH_STATUS_DONE));
+		if (!(stat & SM_FLASH_STATUS_DONE))
 			break;
 	}
-	out_8(base, CORE99_FLASH_CMD_RESET);
-	if (stat & CORE99_FLASH_STATUS_ERR) {
-		printk("nvram: flash error 0x%02x on write !\n", stat);
-		return -ENXIO;
-	}
+	out_8(base, SM_FLASH_CMD_CLEAR_STATUS);
+	out_8(base, SM_FLASH_CMD_RESET);
 	for (i=0; i<NVRAM_SIZE; i++)
 		if (base[i] != datas[i]) {
-			printk("nvram: flash write failed !\n");
+			printk(KERN_ERR "nvram: Sharp/Micron flash write failed !\n");
 			return -ENXIO;
 		}
 	return 0;
 }
 
-static void __init
-lookup_partitions(void)
+static int __pmac amd_erase_bank(int bank)
+{
+	int i, stat = 0;
+	unsigned long timeout;
+
+	u8* base = (u8 *)nvram_data + core99_bank*NVRAM_SIZE;
+
+       	DBG("nvram: AMD Erasing bank %d...\n", bank);
+
+	/* Unlock 1 */
+	out_8(base+0x555, 0xaa);
+	udelay(1);
+	/* Unlock 2 */
+	out_8(base+0x2aa, 0x55);
+	udelay(1);
+
+	/* Sector-Erase */
+	out_8(base+0x555, 0x80);
+	udelay(1);
+	out_8(base+0x555, 0xaa);
+	udelay(1);
+	out_8(base+0x2aa, 0x55);
+	udelay(1);
+	out_8(base, 0x30);
+	udelay(1);
+
+	timeout = 0;
+	do {
+		if (++timeout > 1000000) {
+			printk(KERN_ERR "nvram: AMD flash erase timeout !\n");
+			break;
+		}
+		stat = in_8(base) ^ in_8(base);
+	} while (stat != 0);
+	
+	/* Reset */
+	out_8(base, 0xf0);
+	udelay(1);
+	
+	for (i=0; i<NVRAM_SIZE; i++)
+		if (base[i] != 0xff) {
+			printk(KERN_ERR "nvram: AMD flash erase failed !\n");
+			return -ENXIO;
+		}
+	return 0;
+}
+
+static int __pmac amd_write_bank(int bank, u8* datas)
+{
+	int i, stat = 0;
+	unsigned long timeout;
+
+	u8* base = (u8 *)nvram_data + core99_bank*NVRAM_SIZE;
+
+       	DBG("nvram: AMD Writing bank %d...\n", bank);
+
+	for (i=0; i<NVRAM_SIZE; i++) {
+		/* Unlock 1 */
+		out_8(base+0x555, 0xaa);
+		udelay(1);
+		/* Unlock 2 */
+		out_8(base+0x2aa, 0x55);
+		udelay(1);
+
+		/* Write single word */
+		out_8(base+0x555, 0xa0);
+		udelay(1);
+		out_8(base+i, datas[i]);
+		
+		timeout = 0;
+		do {
+			if (++timeout > 1000000) {
+				printk(KERN_ERR "nvram: AMD flash write timeout !\n");
+				break;
+			}
+			stat = in_8(base) ^ in_8(base);
+		} while (stat != 0);
+		if (stat != 0)
+			break;
+	}
+
+	/* Reset */
+	out_8(base, 0xf0);
+	udelay(1);
+
+	for (i=0; i<NVRAM_SIZE; i++)
+		if (base[i] != datas[i]) {
+			printk(KERN_ERR "nvram: AMD flash write failed !\n");
+			return -ENXIO;
+		}
+	return 0;
+}
+
+static void __init lookup_partitions(void)
 {
 	u8 buffer[17];
 	int i, offset;
@@ -227,15 +425,49 @@ lookup_partitions(void)
 		nvram_partitions[pmac_nvram_XPRAM] = 0x1300;
 		nvram_partitions[pmac_nvram_NR] = 0x1400;
 	}
+	DBG("nvram: OF partition at 0x%x\n", nvram_partitions[pmac_nvram_OF]);
+	DBG("nvram: XP partition at 0x%x\n", nvram_partitions[pmac_nvram_XPRAM]);
+	DBG("nvram: NR partition at 0x%x\n", nvram_partitions[pmac_nvram_NR]);
+}
+
+static void __pmac core99_nvram_sync(void)
+{
+	struct core99_header* hdr99;
+	unsigned long flags;
+
+	if (!is_core_99 || !nvram_data || !nvram_image)
+		return;
+
+	spin_lock_irqsave(&nv_lock, flags);
+	if (!memcmp(nvram_image, (u8*)nvram_data + core99_bank*NVRAM_SIZE,
+		NVRAM_SIZE))
+		goto bail;
+
+	DBG("Updating nvram...\n");
+
+	hdr99 = (struct core99_header*)nvram_image;
+	hdr99->generation++;
+	hdr99->hdr.signature = CORE99_SIGNATURE;
+	hdr99->hdr.cksum = chrp_checksum(&hdr99->hdr);
+	hdr99->adler = core99_calc_adler(nvram_image);
+	core99_bank = core99_bank ? 0 : 1;
+	if (core99_erase_bank)
+		if (core99_erase_bank(core99_bank)) {
+			printk("nvram: Error erasing bank %d\n", core99_bank);
+			goto bail;
+		}
+	if (core99_write_bank)
+		if (core99_write_bank(core99_bank, nvram_image))
+			printk("nvram: Error writing bank %d\n", core99_bank);
+ bail:
+	spin_unlock_irqrestore(&nv_lock, flags);
+
 #ifdef DEBUG
-	printk("nvram: OF partition at 0x%x\n", nvram_partitions[pmac_nvram_OF]);
-	printk("nvram: XP partition at 0x%x\n", nvram_partitions[pmac_nvram_XPRAM]);
-	printk("nvram: NR partition at 0x%x\n", nvram_partitions[pmac_nvram_NR]);
+       	mdelay(2000);
 #endif
 }
 
-void __init
-pmac_nvram_init(void)
+void __init pmac_nvram_init(void)
 {
 	struct device_node *dp;
 
@@ -256,38 +488,65 @@ pmac_nvram_init(void)
 			printk(KERN_ERR "nvram: no address\n");
 			return;
 		}
-#if 0
-		nvram_image = kmalloc(NVRAM_SIZE, GFP_KERNEL);
-		if (!nvram_image) {
-			printk(KERN_ERR "nvram: can't allocate image\n");
+		nvram_image = alloc_bootmem(NVRAM_SIZE);
+		if (nvram_image == NULL) {
+			printk(KERN_ERR "nvram: can't allocate ram image\n");
 			return;
 		}
-#endif
 		nvram_data = ioremap(dp->addrs[0].address, NVRAM_SIZE*2);
-#ifdef DEBUG
-		printk("nvram: Checking bank 0...\n");
-#endif
+		nvram_naddrs = 1; /* Make sure we get the correct case */
+
+		DBG("nvram: Checking bank 0...\n");
+
 		gen_bank0 = core99_check((u8 *)nvram_data);
 		gen_bank1 = core99_check((u8 *)nvram_data + NVRAM_SIZE);
 		core99_bank = (gen_bank0 < gen_bank1) ? 1 : 0;
-#ifdef DEBUG
-		printk("nvram: gen0=%d, gen1=%d\n", gen_bank0, gen_bank1);
-		printk("nvram: Active bank is: %d\n", core99_bank);
-#endif
+
+		DBG("nvram: gen0=%d, gen1=%d\n", gen_bank0, gen_bank1);
+		DBG("nvram: Active bank is: %d\n", core99_bank);
+
 		for (i=0; i<NVRAM_SIZE; i++)
 			nvram_image[i] = nvram_data[i + core99_bank*NVRAM_SIZE];
+
+		ppc_md.nvram_read_val	= core99_nvram_read_byte;
+		ppc_md.nvram_write_val	= core99_nvram_write_byte;
+		ppc_md.nvram_sync	= core99_nvram_sync;
+		/* 
+		 * Maybe we could be smarter here though making an exclusive list
+		 * of known flash chips is a bit nasty as older OF didn't provide us
+		 * with a useful "compatible" entry. A solution would be to really
+		 * identify the chip using flash id commands and base ourselves on
+		 * a list of known chips IDs
+		 */
+		if (device_is_compatible(dp, "amd-0137")) {
+			core99_erase_bank = amd_erase_bank;
+			core99_write_bank = amd_write_bank;
+		} else {
+			core99_erase_bank = sm_erase_bank;
+			core99_write_bank = sm_write_bank;
+		}
 	} else if (_machine == _MACH_chrp && nvram_naddrs == 1) {
 		nvram_data = ioremap(dp->addrs[0].address + isa_mem_base,
 				     dp->addrs[0].size);
 		nvram_mult = 1;
+		ppc_md.nvram_read_val	= direct_nvram_read_byte;
+		ppc_md.nvram_write_val	= direct_nvram_write_byte;
 	} else if (nvram_naddrs == 1) {
 		nvram_data = ioremap(dp->addrs[0].address, dp->addrs[0].size);
 		nvram_mult = (dp->addrs[0].size + NVRAM_SIZE - 1) / NVRAM_SIZE;
+		ppc_md.nvram_read_val	= direct_nvram_read_byte;
+		ppc_md.nvram_write_val	= direct_nvram_write_byte;
 	} else if (nvram_naddrs == 2) {
 		nvram_addr = ioremap(dp->addrs[0].address, dp->addrs[0].size);
 		nvram_data = ioremap(dp->addrs[1].address, dp->addrs[1].size);
+		ppc_md.nvram_read_val	= indirect_nvram_read_byte;
+		ppc_md.nvram_write_val	= indirect_nvram_write_byte;
 	} else if (nvram_naddrs == 0 && sys_ctrler == SYS_CTRLER_PMU) {
+#ifdef CONFIG_ADB_PMU
 		nvram_naddrs = -1;
+		ppc_md.nvram_read_val	= pmu_nvram_read_byte;
+		ppc_md.nvram_write_val	= pmu_nvram_write_byte;
+#endif /* CONFIG_ADB_PMU */
 	} else {
 		printk(KERN_ERR "Don't know how to access NVRAM with %d addresses\n",
 		       nvram_naddrs);
@@ -295,117 +554,31 @@ pmac_nvram_init(void)
 	lookup_partitions();
 }
 
-void __pmac
-pmac_nvram_update(void)
-{
-	struct core99_header* hdr99;
-
-	if (!is_core_99 || !nvram_data || !nvram_image)
-		return;
-	if (!memcmp(nvram_image, (u8*)nvram_data + core99_bank*NVRAM_SIZE,
-		NVRAM_SIZE))
-		return;
-#ifdef DEBUG
-	printk("Updating nvram...\n");
-#endif
-	hdr99 = (struct core99_header*)nvram_image;
-	hdr99->generation++;
-	hdr99->hdr.signature = CORE99_SIGNATURE;
-	hdr99->hdr.cksum = chrp_checksum(&hdr99->hdr);
-	hdr99->adler = core99_calc_adler(nvram_image);
-	core99_bank = core99_bank ? 0 : 1;
-	if (core99_erase_bank(core99_bank)) {
-		printk("nvram: Error erasing bank %d\n", core99_bank);
-		return;
-	}
-	if (core99_write_bank(core99_bank, nvram_image))
-		printk("nvram: Error writing bank %d\n", core99_bank);
-}
-
-unsigned char __pmac
-pmac_nvram_read_byte(int addr)
-{
-	switch (nvram_naddrs) {
-#ifdef CONFIG_ADB_PMU
-	case -1: {
-		struct adb_request req;
-
-		if (pmu_request(&req, NULL, 3, PMU_READ_NVRAM,
-				(addr >> 8) & 0xff, addr & 0xff))
-			break;
-		while (!req.complete)
-			pmu_poll();
-		return req.reply[0];
-	}
-#endif
-	case 1:
-		if (is_core_99)
-			return nvram_image[addr];
-		return nvram_data[(addr & (NVRAM_SIZE - 1)) * nvram_mult];
-	case 2:
-		*nvram_addr = addr >> 5;
-		eieio();
-		return nvram_data[(addr & 0x1f) << 4];
-	}
-	return 0;
-}
-
-void __pmac
-pmac_nvram_write_byte(int addr, unsigned char val)
-{
-	switch (nvram_naddrs) {
-#ifdef CONFIG_ADB_PMU
-	case -1: {
-		struct adb_request req;
-
-		if (pmu_request(&req, NULL, 4, PMU_WRITE_NVRAM,
-				(addr >> 8) & 0xff, addr & 0xff, val))
-			break;
-		while (!req.complete)
-			pmu_poll();
-		break;
-	}
-#endif
-	case 1:
-		if (is_core_99) {
-			nvram_image[addr] = val;
-			break;
-		}
-		nvram_data[(addr & (NVRAM_SIZE - 1)) * nvram_mult] = val;
-		break;
-	case 2:
-		*nvram_addr = addr >> 5;
-		eieio();
-		nvram_data[(addr & 0x1f) << 4] = val;
-		break;
-	}
-	eieio();
-}
-
-int __pmac
-pmac_get_partition(int partition)
+int __pmac pmac_get_partition(int partition)
 {
 	return nvram_partitions[partition];
 }
 
-u8 __pmac
-pmac_xpram_read(int xpaddr)
+u8 __pmac pmac_xpram_read(int xpaddr)
 {
 	int offset = nvram_partitions[pmac_nvram_XPRAM];
 
 	if (offset < 0)
-		return 0;
+		return 0xff;
 
-	return pmac_nvram_read_byte(xpaddr + offset);
+	return ppc_md.nvram_read_val(xpaddr + offset);
 }
 
-void __pmac
-pmac_xpram_write(int xpaddr, u8 data)
+void __pmac pmac_xpram_write(int xpaddr, u8 data)
 {
 	int offset = nvram_partitions[pmac_nvram_XPRAM];
 
 	if (offset < 0)
 		return;
 
-	pmac_nvram_write_byte(data, xpaddr + offset);
+	ppc_md.nvram_write_val(xpaddr + offset, data);
 }
+
+EXPORT_SYMBOL(pmac_get_partition);
+EXPORT_SYMBOL(pmac_xpram_read);
+EXPORT_SYMBOL(pmac_xpram_write);

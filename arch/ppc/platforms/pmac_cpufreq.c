@@ -22,6 +22,7 @@
 #include <linux/cpufreq.h>
 #include <linux/init.h>
 #include <linux/sysdev.h>
+#include <linux/i2c.h>
 #include <asm/prom.h>
 #include <asm/machdep.h>
 #include <asm/irq.h>
@@ -38,6 +39,14 @@
  */
 #undef DEBUG_FREQ
 
+/*
+ * There is a problem with the core cpufreq code on SMP kernels,
+ * it won't recalculate the Bogomips properly
+ */
+#ifdef CONFIG_SMP
+#warning "WARNING, CPUFREQ not recommended on SMP kernels"
+#endif
+
 extern void low_choose_750fx_pll(int pll);
 extern void low_sleep_handler(void);
 extern void openpic_suspend(struct sys_device *sysdev, u32 state);
@@ -48,7 +57,14 @@ extern void enable_kernel_fp(void);
 static unsigned int low_freq;
 static unsigned int hi_freq;
 static unsigned int cur_freq;
+
+/* Clean that up some day ... use a func ptr or at least an enum... */
 static int cpufreq_uses_pmu;
+static int cpufreq_uses_gpios;
+
+static u32 voltage_gpio;
+static u32 frequency_gpio;
+static u32 slew_done_gpio;
 
 #define PMAC_CPU_LOW_SPEED	1
 #define PMAC_CPU_HIGH_SPEED	0
@@ -65,8 +81,7 @@ static struct cpufreq_frequency_table pmac_cpu_freqs[] = {
 	{0,			CPUFREQ_TABLE_END},
 };
 
-static inline void
-wakeup_decrementer(void)
+static inline void wakeup_decrementer(void)
 {
 	set_dec(tb_ticks_per_jiffy);
 	/* No currently-supported powerbook has a 601,
@@ -76,8 +91,7 @@ wakeup_decrementer(void)
 }
 
 #ifdef DEBUG_FREQ
-static inline void
-debug_calc_bogomips(void)
+static inline void debug_calc_bogomips(void)
 {
 	/* This will cause a recalc of bogomips and display the
 	 * result. We backup/restore the value to avoid affecting the
@@ -89,17 +103,18 @@ debug_calc_bogomips(void)
 	calibrate_delay();
 	loops_per_jiffy = save_lpj;
 }
-#endif
+#endif /* DEBUG_FREQ */
 
 /* Switch CPU speed under 750FX CPU control
  */
-static int __pmac
-cpu_750fx_cpu_speed(int low_speed)
+static int __pmac cpu_750fx_cpu_speed(int low_speed)
 {
 #ifdef DEBUG_FREQ
 	printk(KERN_DEBUG "HID1, before: %x\n", mfspr(SPRN_HID1));
 #endif
+#ifdef CONFIG_6xx
 	low_choose_750fx_pll(low_speed);
+#endif
 #ifdef DEBUG_FREQ
 	printk(KERN_DEBUG "HID1, after: %x\n", mfspr(SPRN_HID1));
 	debug_calc_bogomips();
@@ -108,14 +123,53 @@ cpu_750fx_cpu_speed(int low_speed)
 	return 0;
 }
 
+/* Switch CPU speed using slewing GPIOs
+ */
+static int __pmac gpios_set_cpu_speed(unsigned int low_speed)
+{
+	int gpio;
+
+	/* If ramping up, set voltage first */
+	if (low_speed == 0) {
+		pmac_call_feature(PMAC_FTR_WRITE_GPIO, NULL, voltage_gpio, 0x05);
+		/* Delay is way too big but it's ok, we schedule */
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		schedule_timeout(HZ/100);
+	}
+
+	/* Set frequency */
+	pmac_call_feature(PMAC_FTR_WRITE_GPIO, NULL, frequency_gpio, low_speed ? 0x04 : 0x05);
+	udelay(200);
+	do {
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		schedule_timeout(1);
+		gpio = pmac_call_feature(PMAC_FTR_READ_GPIO, NULL, slew_done_gpio, 0);
+	} while((gpio & 0x02) == 0);
+
+	/* If ramping down, set voltage last */
+	if (low_speed == 1) {
+		pmac_call_feature(PMAC_FTR_WRITE_GPIO, NULL, voltage_gpio, 0x04);
+		/* Delay is way too big but it's ok, we schedule */
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		schedule_timeout(HZ/100);
+	}
+
+#ifdef DEBUG_FREQ
+	debug_calc_bogomips();
+#endif
+
+	return 0;
+}
+
 /* Switch CPU speed under PMU control
  */
-static int __pmac
-pmu_set_cpu_speed(unsigned int low_speed)
+static int __pmac pmu_set_cpu_speed(unsigned int low_speed)
 {
 	struct adb_request req;
 	unsigned long save_l2cr;
 	unsigned long save_l3cr;
+
+	preempt_disable();
 
 #ifdef DEBUG_FREQ
 	printk(KERN_DEBUG "HID1, before: %x\n", mfspr(SPRN_HID1));
@@ -197,11 +251,12 @@ pmu_set_cpu_speed(unsigned int low_speed)
 	debug_calc_bogomips();
 #endif
 
+	preempt_enable();
+
 	return 0;
 }
 
-static int __pmac
-do_set_cpu_speed(int speed_mode)
+static int __pmac do_set_cpu_speed(int speed_mode)
 {
 	struct cpufreq_freqs freqs;
 	int rc;
@@ -216,6 +271,8 @@ do_set_cpu_speed(int speed_mode)
 	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
 	if (cpufreq_uses_pmu)
 		rc = pmu_set_cpu_speed(speed_mode);
+	else if (cpufreq_uses_gpios)
+		rc = gpios_set_cpu_speed(speed_mode);
 	else
 		rc = cpu_750fx_cpu_speed(speed_mode);
 	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
@@ -224,16 +281,14 @@ do_set_cpu_speed(int speed_mode)
 	return rc;
 }
 
-static int __pmac
-pmac_cpufreq_verify(struct cpufreq_policy *policy)
+static int __pmac pmac_cpufreq_verify(struct cpufreq_policy *policy)
 {
 	return cpufreq_frequency_table_verify(policy, pmac_cpu_freqs);
 }
 
-static int __pmac
-pmac_cpufreq_target(	struct cpufreq_policy *policy,
-			unsigned int target_freq,
-			unsigned int relation)
+static int __pmac pmac_cpufreq_target(	struct cpufreq_policy *policy,
+					unsigned int target_freq,
+					unsigned int relation)
 {
 	unsigned int    newstate = 0;
 
@@ -244,15 +299,13 @@ pmac_cpufreq_target(	struct cpufreq_policy *policy,
 	return do_set_cpu_speed(newstate);
 }
 
-unsigned int __pmac
-pmac_get_one_cpufreq(int i)
+unsigned int __pmac pmac_get_one_cpufreq(int i)
 {
 	/* Supports only one CPU for now */
 	return (i == 0) ? cur_freq : 0;
 }
 
-static int __pmac
-pmac_cpufreq_cpu_init(struct cpufreq_policy *policy)
+static int __pmac pmac_cpufreq_cpu_init(struct cpufreq_policy *policy)
 {
 	if (policy->cpu != 0)
 		return -ENODEV;
@@ -264,6 +317,18 @@ pmac_cpufreq_cpu_init(struct cpufreq_policy *policy)
 	return cpufreq_frequency_table_cpuinfo(policy, &pmac_cpu_freqs[0]);
 }
 
+static u32 __pmac read_gpio(struct device_node *np)
+{
+	u32 *reg = (u32 *)get_property(np, "reg", NULL);
+
+	if (reg == NULL)
+		return 0;
+	/* That works for all keylargos but shall be fixed properly
+	 * some day...
+	 */
+	return 0x50 + (*reg);
+}
+
 static struct cpufreq_driver pmac_cpufreq_driver = {
 	.verify 	= pmac_cpufreq_verify,
 	.target 	= pmac_cpufreq_target,
@@ -272,15 +337,17 @@ static struct cpufreq_driver pmac_cpufreq_driver = {
 	.owner		= THIS_MODULE,
 };
 
+
 /* Currently, we support the following machines:
  *
+ *  - Titanium PowerBook 1Ghz (PMU based, 667Mhz & 1Ghz)
  *  - Titanium PowerBook 800 (PMU based, 667Mhz & 800Mhz)
  *  - Titanium PowerBook 500 (PMU based, 300Mhz & 500Mhz)
  *  - iBook2 500 (PMU based, 400Mhz & 500Mhz)
  *  - iBook2 700 (CPU based, 400Mhz & 700Mhz, support low voltage)
+ *  - Recent MacRISC3 machines
  */
-static int __init
-pmac_cpufreq_setup(void)
+static int __init pmac_cpufreq_setup(void)
 {
 	struct device_node	*cpunode;
 	u32			*value;
@@ -304,6 +371,74 @@ pmac_cpufreq_setup(void)
 	if (machine_is_compatible("PowerBook3,4") ||
 	    machine_is_compatible("PowerBook3,5") ||
 	    machine_is_compatible("MacRISC3")) {
+		struct device_node *volt_gpio_np = of_find_node_by_name(NULL, "voltage-gpio");
+		struct device_node *freq_gpio_np = of_find_node_by_name(NULL, "frequency-gpio");
+		struct device_node *slew_done_gpio_np = of_find_node_by_name(NULL, "slewing-done");
+
+		/*
+		 * Check to see if it's GPIO driven or PMU only
+		 *
+		 * The way we extract the GPIO address is slightly hackish, but it
+		 * works well enough for now. We need to abstract the whole GPIO
+		 * stuff sooner or later anyway
+		 */
+
+		if (volt_gpio_np)
+			voltage_gpio = read_gpio(volt_gpio_np);
+		if (freq_gpio_np)
+			frequency_gpio = read_gpio(freq_gpio_np);
+		if (slew_done_gpio_np)
+			slew_done_gpio = read_gpio(slew_done_gpio_np);
+
+		/* If we use the frequency GPIOs, calculate the min/max speeds based
+		 * on the bus frequencies
+		 */
+		if (frequency_gpio && slew_done_gpio) {
+			int lenp, rc;
+			u32 *freqs, *ratio;
+
+			freqs = (u32 *)get_property(cpunode, "bus-frequencies", &lenp);
+			lenp /= sizeof(u32);
+			if (freqs == NULL || lenp != 2) {
+				printk(KERN_ERR "cpufreq: bus-frequencies incorrect or missing\n");
+				goto out;
+			}
+			ratio = (u32 *)get_property(cpunode, "processor-to-bus-ratio*2", NULL);
+			if (ratio == NULL) {
+				printk(KERN_ERR "cpufreq: processor-to-bus-ratio*2 missing\n");
+				goto out;
+			}
+
+			/* Get the min/max bus frequencies */
+			low_freq = min(freqs[0], freqs[1]);
+			hi_freq = max(freqs[0], freqs[1]);
+
+			/* Grrrr.. It _seems_ that the device-tree is lying on the low bus
+			 * frequency, it claims it to be around 84Mhz on some models while
+			 * it appears to be approx. 101Mhz on all. Let's hack around here...
+			 * fortunately, we don't need to be too precise
+			 */
+			if (low_freq < 98000000)
+				low_freq = 101000000;
+			
+			/* Convert those to CPU core clocks */
+			low_freq = (low_freq * (*ratio)) / 2000;
+			hi_freq = (hi_freq * (*ratio)) / 2000;
+
+			/* Now we get the frequencies, we read the GPIO to see what is out current
+			 * speed
+			 */
+			rc = pmac_call_feature(PMAC_FTR_READ_GPIO, NULL, frequency_gpio, 0);
+			cur_freq = (rc & 0x01) ? hi_freq : low_freq;
+
+			has_freq_ctl = 1;
+			cpufreq_uses_gpios = 1;
+			goto out;
+		}
+
+		/* If we use the PMU, look for the min & max frequencies in the
+		 * device-tree
+		 */
 		value = (u32 *)get_property(cpunode, "min-clock-frequency", NULL);
 		if (!value)
 			goto out;
@@ -358,6 +493,11 @@ out:
 
 	pmac_cpu_freqs[CPUFREQ_LOW].frequency = low_freq;
 	pmac_cpu_freqs[CPUFREQ_HIGH].frequency = hi_freq;
+
+	printk(KERN_INFO "Registering PowerMac CPU frequency driver\n");
+	printk(KERN_INFO "Low: %d Mhz, High: %d Mhz, Boot: %d Mhz, switch method: %s\n",
+	       low_freq/1000, hi_freq/1000, cur_freq/1000,
+	       cpufreq_uses_pmu ? "PMU" : (cpufreq_uses_gpios ? "GPIOs" : "CPU"));
 
 	return cpufreq_register_driver(&pmac_cpufreq_driver);
 }

@@ -201,7 +201,7 @@ _GLOBAL(call_setup_cpu)
 	mr	r4,r24
 	bctr
 
-#ifdef CONFIG_CPU_FREQ_PMAC
+#if defined(CONFIG_CPU_FREQ_PMAC) && defined(CONFIG_6xx)
 
 /* This gets called by via-pmu.c to switch the PLL selection
  * on 750fx CPU. This function should really be moved to some
@@ -253,7 +253,7 @@ _GLOBAL(low_choose_750fx_pll)
 	mtmsr	r7
 	blr
 
-#endif /* CONFIG_CPU_FREQ_PMAC */
+#endif /* CONFIG_CPU_FREQ_PMAC && CONFIG_6xx */
 
 /* void local_save_flags_ptr(unsigned long *flags) */
 _GLOBAL(local_save_flags_ptr)

@@ -31,6 +31,7 @@ obj-$(CONFIG_PCI)		+= qspan_pci.o i8259.o
 endif
 obj-$(CONFIG_PPC_OF)		+= prom_init.o prom.o of_device.o
 obj-$(CONFIG_PPC_PMAC)		+= open_pic.o indirect_pci.o
+obj-$(CONFIG_POWER4)		+= open_pic2.o
 obj-$(CONFIG_PPC_CHRP)		+= open_pic.o indirect_pci.o i8259.o
 obj-$(CONFIG_PPC_PREP)		+= open_pic.o indirect_pci.o i8259.o
 obj-$(CONFIG_ADIR)		+= i8259.o indirect_pci.o pci_auto.o \
