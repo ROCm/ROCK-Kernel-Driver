@@ -95,6 +95,15 @@ struct e1000_adapter;
 #define E1000_RXBUFFER_8192  8192
 #define E1000_RXBUFFER_16384 16384
 
+/* Flow Control High-Watermark: 43464 bytes */
+#define E1000_FC_HIGH_THRESH 0xA9C8
+
+/* Flow Control Low-Watermark: 43456 bytes */
+#define E1000_FC_LOW_THRESH 0xA9C0
+
+/* Flow Control Pause Time: 858 usec */
+#define E1000_FC_PAUSE_TIME 0x0680
+
 /* How many Tx Descriptors do we need to call netif_wake_queue ? */
 #define E1000_TX_QUEUE_WAKE	16
 /* How many Rx Buffers do we bundle into one write to the hardware ? */
@@ -194,5 +203,6 @@ struct e1000_adapter {
 
 
 	uint32_t pci_state[16];
+	char ifname[IFNAMSIZ];
 };
 #endif /* _E1000_H_ */

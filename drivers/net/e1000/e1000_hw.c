@@ -47,9 +47,9 @@ static void e1000_lower_ee_clk(struct e1000_hw *hw, uint32_t *eecd);
 static void e1000_shift_out_ee_bits(struct e1000_hw *hw, uint16_t data, uint16_t count);
 static uint16_t e1000_shift_in_ee_bits(struct e1000_hw *hw);
 static void e1000_setup_eeprom(struct e1000_hw *hw);
-static void e1000_standby_eeprom(struct e1000_hw *hw);
 static void e1000_clock_eeprom(struct e1000_hw *hw);
 static void e1000_cleanup_eeprom(struct e1000_hw *hw);
+static void e1000_standby_eeprom(struct e1000_hw *hw);
 static int32_t e1000_id_led_init(struct e1000_hw * hw);
 
 /******************************************************************************
@@ -88,6 +88,9 @@ e1000_set_mac_type(struct e1000_hw *hw)
         break;
     case E1000_DEV_ID_82540EM:
     case E1000_DEV_ID_82540EM_LOM:
+    case E1000_DEV_ID_82540EP:
+    case E1000_DEV_ID_82540EP_LOM:
+    case E1000_DEV_ID_82540EP_LP:
         hw->mac_type = e1000_82540;
         break;
     case E1000_DEV_ID_82545EM_COPPER:
@@ -655,14 +658,17 @@ e1000_setup_copper_link(struct e1000_hw *hw)
         return -E1000_ERR_PHY;
     }
     phy_data |= M88E1000_EPSCR_TX_CLK_25;
-    /* Configure Master and Slave downshift values */
-    phy_data &= ~(M88E1000_EPSCR_MASTER_DOWNSHIFT_MASK |
-                  M88E1000_EPSCR_SLAVE_DOWNSHIFT_MASK);
-    phy_data |= (M88E1000_EPSCR_MASTER_DOWNSHIFT_1X |
-                 M88E1000_EPSCR_SLAVE_DOWNSHIFT_1X);
-    if(e1000_write_phy_reg(hw, M88E1000_EXT_PHY_SPEC_CTRL, phy_data) < 0) {
-        DEBUGOUT("PHY Write Error\n");
-        return -E1000_ERR_PHY;
+
+    if (hw->phy_revision < M88E1011_I_REV_4) {
+        /* Configure Master and Slave downshift values */
+        phy_data &= ~(M88E1000_EPSCR_MASTER_DOWNSHIFT_MASK |
+                      M88E1000_EPSCR_SLAVE_DOWNSHIFT_MASK);
+        phy_data |= (M88E1000_EPSCR_MASTER_DOWNSHIFT_1X |
+                     M88E1000_EPSCR_SLAVE_DOWNSHIFT_1X);
+        if(e1000_write_phy_reg(hw, M88E1000_EXT_PHY_SPEC_CTRL, phy_data) < 0) {
+            DEBUGOUT("PHY Write Error\n");
+            return -E1000_ERR_PHY;
+        }
     }
 
     /* SW Reset the PHY so all changes take effect */
@@ -1008,7 +1014,6 @@ e1000_phy_force_speed_duplex(struct e1000_hw *hw)
     /* Write the configured values back to the Device Control Reg. */
     E1000_WRITE_REG(hw, CTRL, ctrl);
 
-    /* Write the MII Control Register with the new PHY configuration. */
     if(e1000_read_phy_reg(hw, M88E1000_PHY_SPEC_CTRL, &phy_data) < 0) {
         DEBUGOUT("PHY Read Error\n");
         return -E1000_ERR_PHY;
@@ -1023,9 +1028,11 @@ e1000_phy_force_speed_duplex(struct e1000_hw *hw)
         return -E1000_ERR_PHY;
     }
     DEBUGOUT1("M88E1000 PSCR: %x \n", phy_data);
-    
+
     /* Need to reset the PHY or these changes will be ignored */
     mii_ctrl_reg |= MII_CR_RESET;
+
+    /* Write back the modified PHY MII control register. */
     if(e1000_write_phy_reg(hw, PHY_CTRL, mii_ctrl_reg) < 0) {
         DEBUGOUT("PHY Write Error\n");
         return -E1000_ERR_PHY;
@@ -2100,7 +2107,8 @@ e1000_detect_gig_phy(struct e1000_hw *hw)
         return -E1000_ERR_PHY;
     }
     hw->phy_id |= (uint32_t) (phy_id_low & PHY_REVISION_MASK);
-    
+    hw->phy_revision = (uint32_t) phy_id_low & ~PHY_REVISION_MASK;
+
     switch(hw->mac_type) {
     case e1000_82543:
         if(hw->phy_id == M88E1000_E_PHY_ID) match = TRUE;
@@ -2242,7 +2250,7 @@ e1000_raise_ee_clk(struct e1000_hw *hw,
                    uint32_t *eecd)
 {
     /* Raise the clock input to the EEPROM (by setting the SK bit), and then
-     * wait 50 microseconds.
+     * wait <delay> microseconds.
      */
     *eecd = *eecd | E1000_EECD_SK;
     E1000_WRITE_REG(hw, EECD, *eecd);
@@ -2331,11 +2339,11 @@ e1000_shift_in_ee_bits(struct e1000_hw *hw)
     uint32_t i;
     uint16_t data;
 
-    /* In order to read a register from the EEPROM, we need to shift 16 bits 
-     * in from the EEPROM. Bits are "shifted in" by raising the clock input to
-     * the EEPROM (setting the SK bit), and then reading the value of the "DO"
-     * bit.  During this "shifting in" process the "DI" bit should always be 
-     * clear..
+    /* In order to read a register from the EEPROM, we need to shift 'count'
+     * bits in from the EEPROM. Bits are "shifted in" by raising the clock
+     * input to the EEPROM (setting the SK bit), and then reading the value of
+     * the "DO" bit.  During this "shifting in" process the "DI" bit should
+     * always be clear.
      */
 
     eecd = E1000_READ_REG(hw, EECD);
@@ -3140,6 +3148,9 @@ e1000_setup_led(struct e1000_hw *hw)
         ledctl |= (E1000_LEDCTL_MODE_LED_OFF << E1000_LEDCTL_LED0_MODE_SHIFT);
         E1000_WRITE_REG(hw, LEDCTL, ledctl);
         break;
+    case E1000_DEV_ID_82540EP:
+    case E1000_DEV_ID_82540EP_LOM:
+    case E1000_DEV_ID_82540EP_LP:
     case E1000_DEV_ID_82540EM:
     case E1000_DEV_ID_82540EM_LOM:
     case E1000_DEV_ID_82545EM_COPPER:
@@ -3173,6 +3184,9 @@ e1000_cleanup_led(struct e1000_hw *hw)
     case E1000_DEV_ID_82544GC_LOM:
         /* No cleanup necessary */
         break;
+    case E1000_DEV_ID_82540EP:
+    case E1000_DEV_ID_82540EP_LOM:
+    case E1000_DEV_ID_82540EP_LP:
     case E1000_DEV_ID_82540EM:
     case E1000_DEV_ID_82540EM_LOM:
     case E1000_DEV_ID_82545EM_COPPER:
@@ -3223,6 +3237,9 @@ e1000_led_on(struct e1000_hw *hw)
         ctrl |= E1000_CTRL_SWDPIO0;
         E1000_WRITE_REG(hw, CTRL, ctrl);
         break;
+    case E1000_DEV_ID_82540EP:
+    case E1000_DEV_ID_82540EP_LOM:
+    case E1000_DEV_ID_82540EP_LP:
     case E1000_DEV_ID_82540EM:
     case E1000_DEV_ID_82540EM_LOM:
     case E1000_DEV_ID_82545EM_COPPER:
@@ -3270,6 +3287,9 @@ e1000_led_off(struct e1000_hw *hw)
         ctrl |= E1000_CTRL_SWDPIO0;
         E1000_WRITE_REG(hw, CTRL, ctrl);
         break;
+    case E1000_DEV_ID_82540EP:
+    case E1000_DEV_ID_82540EP_LOM:
+    case E1000_DEV_ID_82540EP_LP:
     case E1000_DEV_ID_82540EM:
     case E1000_DEV_ID_82540EM_LOM:
     case E1000_DEV_ID_82545EM_COPPER:

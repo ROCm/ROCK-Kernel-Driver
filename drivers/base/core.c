@@ -136,7 +136,7 @@ void put_device(struct device * dev)
 	list_del_init(&dev->g_list);
 	up(&device_sem);
 
-	BUG_ON((dev->state != DEVICE_GONE));
+	WARN_ON(dev->state != DEVICE_GONE);
 
 	device_del(dev);
 }
