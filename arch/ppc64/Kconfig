@@ -248,6 +248,14 @@ source "fs/Kconfig.binfmt"
 
 source "drivers/pci/Kconfig"
 
+config HOTPLUG_CPU
+	bool "Support for hot-pluggable CPUs"
+	depends on SMP && HOTPLUG && EXPERIMENTAL
+	---help---
+	  Say Y here to be able to turn CPUs off and on.
+
+	  Say N if you are unsure.
+
 source "drivers/pcmcia/Kconfig"
 
 source "drivers/pci/hotplug/Kconfig"

@@ -683,6 +683,7 @@ static struct proc_dir_entry * root_irq_dir;
 static struct proc_dir_entry * irq_dir [NR_IRQS];
 static struct proc_dir_entry * smp_affinity_entry [NR_IRQS];
 
+/* Protected by irq descriptor spinlock */
 #ifdef CONFIG_IRQ_ALL_CPUS
 cpumask_t irq_affinity [NR_IRQS] = { [0 ... NR_IRQS-1] = CPU_MASK_ALL };
 #else  /* CONFIG_IRQ_ALL_CPUS */
@@ -702,16 +703,17 @@ static int irq_affinity_read_proc (char *page, char **start, off_t off,
 static int irq_affinity_write_proc (struct file *file, const char *buffer,
 					unsigned long count, void *data)
 {
-	int irq = (long)data, full_count = count, err;
+	int irq = (long)data;
+	int ret;
 	cpumask_t new_value, tmp;
 	cpumask_t allcpus = CPU_MASK_ALL;
 
 	if (!irq_desc[irq].handler->set_affinity)
 		return -EIO;
 
-	err = cpumask_parse(buffer, count, new_value);
-	if (err)
-		return err;
+	ret = cpumask_parse(buffer, count, new_value);
+	if (ret != 0)
+		return ret;
 
 	/*
 	 * We check for CPU_MASK_ALL in xics to send irqs to all cpus.
@@ -722,18 +724,29 @@ static int irq_affinity_write_proc (struct file *file, const char *buffer,
 	cpus_and(new_value, new_value, allcpus);
 
 	/*
+	 * Grab lock here so cpu_online_map can't change, and also
+	 * protect irq_affinity[].
+	 */
+	spin_lock(&irq_desc[irq].lock);
+
+	/*
 	 * Do not allow disabling IRQs completely - it's a too easy
 	 * way to make the system unusable accidentally :-) At least
 	 * one online CPU still has to be targeted.
 	 */
 	cpus_and(tmp, new_value, cpu_online_map);
-	if (cpus_empty(tmp))
-		return -EINVAL;
+	if (cpus_empty(tmp)) {
+		ret = -EINVAL;
+		goto out;
+	}
 
 	irq_affinity[irq] = new_value;
 	irq_desc[irq].handler->set_affinity(irq, new_value);
+	ret = count;
 
-	return full_count;
+out:
+	spin_unlock(&irq_desc[irq].lock);
+	return ret;
 }
 
 static int prof_cpu_mask_read_proc (char *page, char **start, off_t off,
@@ -945,6 +958,5 @@ unsigned int real_irq_to_virt_slowpath(unsigned int real_irq)
 	return NO_IRQ;
 
 }
-
 
 #endif

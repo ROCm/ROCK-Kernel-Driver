@@ -19,6 +19,7 @@
 #include <linux/init.h>
 #include <linux/gfp.h>
 #include <linux/radix-tree.h>
+#include <linux/cpu.h>
 #include <asm/prom.h>
 #include <asm/io.h>
 #include <asm/pgtable.h>
@@ -372,6 +373,9 @@ irqreturn_t xics_ipi_action(int irq, void *dev_id, struct pt_regs *regs)
 	int cpu = smp_processor_id();
 
 	ops->qirr_info(cpu, 0xff);
+
+	WARN_ON(cpu_is_offline(cpu));
+
 	while (xics_ipi_message[cpu].value) {
 		if (test_and_clear_bit(PPC_MSG_CALL_FUNCTION,
 				       &xics_ipi_message[cpu].value)) {
@@ -514,6 +518,9 @@ nextnode:
 	if (systemcfg->platform == PLATFORM_PSERIES) {
 #ifdef CONFIG_SMP
 		for_each_cpu(i) {
+			/* FIXME: Do this dynamically! --RR */
+			if (!cpu_present_at_boot(i))
+				continue;
 			xics_per_cpu[i] = __ioremap((ulong)inodes[get_hard_smp_processor_id(i)].addr, 
 						    (ulong)inodes[get_hard_smp_processor_id(i)].size,
 						    _PAGE_NO_CACHE);
@@ -575,9 +582,7 @@ void xics_request_IPIs(void)
 
 static void xics_set_affinity(unsigned int virq, cpumask_t cpumask)
 {
-        irq_desc_t *desc = irq_desc + virq;
 	unsigned int irq;
-	unsigned long flags;
 	long status;
 	unsigned long xics_status[2];
 	unsigned long newmask;
@@ -589,14 +594,12 @@ static void xics_set_affinity(unsigned int virq, cpumask_t cpumask)
 	if (irq == XICS_IPI)
 		return;
 
-        spin_lock_irqsave(&desc->lock, flags);
-
 	status = rtas_call(ibm_get_xive, 1, 3, (void *)&xics_status, irq);
 
 	if (status) {
 		printk(KERN_ERR "xics_set_affinity: irq=%d ibm,get-xive "
 		       "returns %ld\n", irq, status);
-		goto out;
+		return;
 	}
 
 	/* For the moment only implement delivery to all cpus or one cpu */
@@ -605,7 +608,7 @@ static void xics_set_affinity(unsigned int virq, cpumask_t cpumask)
 	} else {
 		cpus_and(tmp, cpu_online_map, cpumask);
 		if (cpus_empty(tmp))
-			goto out;
+			return;
 		newmask = get_hard_smp_processor_id(first_cpu(cpumask));
 	}
 
@@ -615,9 +618,86 @@ static void xics_set_affinity(unsigned int virq, cpumask_t cpumask)
 	if (status) {
 		printk(KERN_ERR "xics_set_affinity irq=%d ibm,set-xive "
 		       "returns %ld\n", irq, status);
-		goto out;
+		return;
+	}
+}
+
+#ifdef CONFIG_HOTPLUG_CPU
+
+/* Interrupts are disabled. */
+void xics_migrate_irqs_away(void)
+{
+	int set_indicator = rtas_token("set-indicator");
+	const unsigned long giqs = 9005UL; /* Global Interrupt Queue Server */
+	unsigned long status = 0;
+	unsigned int irq, cpu = smp_processor_id();
+	unsigned long xics_status[2];
+	unsigned long flags;
+
+	BUG_ON(set_indicator == RTAS_UNKNOWN_SERVICE);
+
+	/* Reject any interrupt that was queued to us... */
+	ops->cppr_info(cpu, 0);
+	iosync();
+
+	/* Refuse any new interrupts... */
+	rtas_call(set_indicator, 3, 1, &status, giqs,
+		  hard_smp_processor_id(), 0UL);
+	WARN_ON(status != 0);
+
+	/* Allow IPIs again... */
+	ops->cppr_info(cpu, DEFAULT_PRIORITY);
+	iosync();
+
+	printk(KERN_WARNING "HOTPLUG: Migrating IRQs away\n");
+	for_each_irq(irq) {
+		irq_desc_t *desc = get_irq_desc(irq);
+
+		/* We need to get IPIs still. */
+		if (irq_offset_down(irq) == XICS_IPI)
+			continue;
+
+		/* We only need to migrate enabled IRQS */
+		if (desc == NULL || desc->handler == NULL
+		    || desc->action == NULL
+		    || desc->handler->set_affinity == NULL)
+			continue;
+
+		spin_lock_irqsave(&desc->lock, flags);
+
+		status = rtas_call(ibm_get_xive, 1, 3, (void *)&xics_status,
+				   irq);
+		if (status) {
+			printk(KERN_ERR "migrate_irqs_away: irq=%d "
+					"ibm,get-xive returns %ld\n",
+					irq, status);
+			goto unlock;
+		}
+
+		/*
+		 * We only support delivery to all cpus or to one cpu.
+		 * The irq has to be migrated only in the single cpu
+		 * case.
+		 */
+		if (xics_status[0] != get_hard_smp_processor_id(cpu))
+			goto unlock;
+
+		printk(KERN_WARNING "IRQ %d affinity broken off cpu %u\n",
+		       irq, cpu);
+
+		/* Reset affinity to all cpus */
+		xics_status[0] = default_distrib_server;
+
+		status = rtas_call(ibm_set_xive, 3, 1, NULL,
+				irq, xics_status[0], xics_status[1]);
+		if (status)
+			printk(KERN_ERR "migrate_irqs_away irq=%d "
+					"ibm,set-xive returns %ld\n",
+					irq, status);
+
+unlock:
+		spin_unlock_irqrestore(&desc->lock, flags);
 	}
 
-out:
-        spin_unlock_irqrestore(&desc->lock, flags);
 }
+#endif

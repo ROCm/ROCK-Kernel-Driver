@@ -219,6 +219,8 @@ extern void pSeries_log_error(char *buf, unsigned int err_type, int fatal);
 extern spinlock_t rtas_data_buf_lock;
 extern char rtas_data_buf[RTAS_DATA_BUF_SIZE];
 
+extern void rtas_stop_self(void);
+
 /* RMO buffer reserved for user-space RTAS use */
 extern unsigned long rtas_rmo_buf;
 
