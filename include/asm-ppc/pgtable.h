@@ -511,9 +511,21 @@ static inline void set_pte(pte_t *ptep, pte_t pte)
 #endif
 }
 
+extern void flush_hash_one_pte(pte_t *ptep);
+
+/*
+ * 2.6 calles this without flushing the TLB entry, this is wrong
+ * for our hash-based implementation, we fix that up here
+ */
 static inline int ptep_test_and_clear_young(pte_t *ptep)
 {
-	return (pte_update(ptep, _PAGE_ACCESSED, 0) & _PAGE_ACCESSED) != 0;
+	unsigned long old;
+	old = (pte_update(ptep, _PAGE_ACCESSED, 0) & _PAGE_ACCESSED);
+#if _PAGE_HASHPTE != 0
+	if (old & _PAGE_HASHPTE)
+		flush_hash_one_pte(ptep);
+#endif
+	return old != 0;
 }
 
 static inline int ptep_test_and_clear_dirty(pte_t *ptep)
