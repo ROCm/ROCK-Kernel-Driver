@@ -264,8 +264,6 @@ isdn_timer_funct(ulong dummy)
 	if (tf & ISDN_TIMER_SLOW) {
 		if (++isdn_timer_cnt2 >= ISDN_TIMER_1SEC) {
 			isdn_timer_cnt2 = 0;
-			if (tf & ISDN_TIMER_NETHANGUP)
-				isdn_net_autohup();
 			if (++isdn_timer_cnt3 >= ISDN_TIMER_RINGING) {
 				isdn_timer_cnt3 = 0;
 				if (tf & ISDN_TIMER_MODEMRING)
@@ -451,8 +449,6 @@ isdn_status_callback(isdn_ctrl * c)
 		case ISDN_STAT_BSENT:
 			if (i < 0)
 				return -1;
-			if (dev->global_flags & ISDN_GLOBAL_STOPPED)
-				return 0;
 			if (isdn_net_stat_callback(i, c))
 				return 0;
 			if (isdn_v110_stat_callback(&slot[i].iv110, c))
@@ -482,15 +478,11 @@ isdn_status_callback(isdn_ctrl * c)
 			if (i < 0)
 				return -1;
 			dbg_statcallb("ICALL: %d (%d,%ld) %s\n", i, di, c->arg, c->parm.num);
-			if (dev->global_flags & ISDN_GLOBAL_STOPPED) {
-				cmd.driver = di;
-				cmd.arg = c->arg;
-				cmd.command = ISDN_CMD_HANGUP;
-				isdn_command(&cmd);
+			if (dev->global_flags & ISDN_GLOBAL_STOPPED)
 				return 0;
-			}
+
 			/* Try to find a network-interface which will accept incoming call */
-			r = ((c->command == ISDN_STAT_ICALLW) ? 0 : isdn_net_find_icall(di, c->arg, i, &c->parm.setup));
+			r = isdn_net_find_icall(di, c->arg, i, &c->parm.setup);
 			switch (r) {
 				case 0:
 					/* No network-device replies.
@@ -550,8 +542,6 @@ isdn_status_callback(isdn_ctrl * c)
 			if (i < 0)
 				return -1;
 			dbg_statcallb("CINF: %d %s\n", i, c->parm.num);
-			if (dev->global_flags & ISDN_GLOBAL_STOPPED)
-				return 0;
 			if (strcmp(c->parm.num, "0"))
 				isdn_net_stat_callback(i, c);
 			isdn_tty_stat_callback(i, c);
@@ -574,8 +564,6 @@ isdn_status_callback(isdn_ctrl * c)
 			if (i < 0)
 				return -1;
 			dbg_statcallb("DCONN: %d\n", i);
-			if (dev->global_flags & ISDN_GLOBAL_STOPPED)
-				return 0;
 			/* Find any net-device, waiting for D-channel setup */
 			if (isdn_net_stat_callback(i, c))
 				break;
@@ -593,8 +581,6 @@ isdn_status_callback(isdn_ctrl * c)
 			if (i < 0)
 				return -1;
 			dbg_statcallb("DHUP: %d\n", i);
-			if (dev->global_flags & ISDN_GLOBAL_STOPPED)
-				return 0;
 			dev->drv[di]->online &= ~(1 << (c->arg));
 			isdn_info_update();
 			/* Signal hangup to network-devices */
@@ -611,8 +597,6 @@ isdn_status_callback(isdn_ctrl * c)
 				return -1;
 			dbg_statcallb("BCONN: %ld\n", c->arg);
 			/* Signal B-channel-connect to network-devices */
-			if (dev->global_flags & ISDN_GLOBAL_STOPPED)
-				return 0;
 			dev->drv[di]->online |= (1 << (c->arg));
 			isdn_info_update();
 			if (isdn_net_stat_callback(i, c))
@@ -625,8 +609,6 @@ isdn_status_callback(isdn_ctrl * c)
 			if (i < 0)
 				return -1;
 			dbg_statcallb("BHUP: %d\n", i);
-			if (dev->global_flags & ISDN_GLOBAL_STOPPED)
-				return 0;
 			dev->drv[di]->online &= ~(1 << (c->arg));
 			isdn_info_update();
 #ifdef CONFIG_ISDN_X25
@@ -642,8 +624,6 @@ isdn_status_callback(isdn_ctrl * c)
 			if (i < 0)
 				return -1;
 			dbg_statcallb("NODCH: %ld\n", c->arg);
-			if (dev->global_flags & ISDN_GLOBAL_STOPPED)
-				return 0;
 			if (isdn_net_stat_callback(i, c))
 				break;
 			if (isdn_tty_stat_callback(i, c))
@@ -1397,12 +1377,12 @@ isdn_ctrl_ioctl(struct inode *inode, struct file *file, uint cmd, ulong arg)
 		printk(KERN_INFO "isdn: Verbose-Level is %d\n", dev->net_verbose);
 		return 0;
 	case IIOCSETGST:
-		if (arg)
+		if (arg) {
 			dev->global_flags |= ISDN_GLOBAL_STOPPED;
-		else
+			isdn_net_hangup_all();
+		} else {
 			dev->global_flags &= ~ISDN_GLOBAL_STOPPED;
-		printk(KERN_INFO "isdn: Global Mode %s\n",
-		       (dev->global_flags & ISDN_GLOBAL_STOPPED) ? "stopped" : "running");
+		}
 		return 0;
 	case IIOCSETBRJ:
 		drvidx = -1;
@@ -1619,8 +1599,9 @@ static struct file_operations isdn_ctrl_fops =
 	.release	= isdn_ctrl_release,
 };
 
+
 /*
- * file_operations for major 43, /dev/isdn*
+ * file_operations for major 45, /dev/isdn*
  * stolen from drivers/char/misc.c
  */
 
@@ -2119,14 +2100,20 @@ isdn_slot_map_eaz2msn(int sl, char *msn)
 int
 isdn_slot_command(int sl, int cmd, isdn_ctrl *ctrl)
 {
+
 	ctrl->command = cmd;
 	ctrl->driver = isdn_slot_driver(sl);
+
 	switch (cmd) {
 	case ISDN_CMD_SETL2:
 	case ISDN_CMD_SETL3:
 	case ISDN_CMD_PROT_IO:
 		ctrl->arg &= ~0xff; ctrl->arg |= isdn_slot_channel(sl);
 		break;
+	case ISDN_CMD_DIAL:
+		if (dev->global_flags & ISDN_GLOBAL_STOPPED)
+			return -EBUSY;
+		/* fall through */
 	default:
 		ctrl->arg = isdn_slot_channel(sl);
 		break;
