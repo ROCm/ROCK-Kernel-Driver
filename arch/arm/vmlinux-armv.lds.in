@@ -87,6 +87,12 @@ SECTIONS
 		__stop___ksymtab = .;
 	}
 
+	__gpl_ksymtab : {		/* Kernel symbol table: GPL-only*/
+		__start___gpl_ksymtab = .;
+			*(__gpl_ksymtab)
+		__stop___gpl_ksymtab = .;
+	}
+
 	__kallsyms : {			/* All kernel symbols		*/
 		__start___kallsyms = .;
 			*(__kallsyms)
