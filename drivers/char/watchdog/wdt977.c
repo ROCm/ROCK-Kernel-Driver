@@ -41,6 +41,7 @@ static	int timeout = DEFAULT_TIMEOUT*60;	/* TO in seconds from user */
 static	int timeoutM = DEFAULT_TIMEOUT;		/* timeout in minutes */
 static	unsigned long timer_alive;
 static	int testmode;
+static int expect_close = 0;
 
 MODULE_PARM(timeout, "i");
 MODULE_PARM_DESC(timeout,"Watchdog timeout in seconds (60..15300), default=60");
@@ -196,6 +197,8 @@ static int wdt977_release(struct inode *inode, struct file *file)
 		clear_bit(0,&timer_alive);
 
 		printk(KERN_INFO "Wdt977 Watchdog: shutdown\n");
+	} else {
+		printk(KERN_CRIT "WDT device closed unexpectedly.  WDT will not stop!\n");
 	}
 	return 0;
 }
@@ -220,6 +223,21 @@ static ssize_t wdt977_write(struct file *file, const char *buf, size_t count, lo
 
 	if(count)
 	{
+		if (!nowayout) {
+			size_t i;
+
+			/* In case it was set long ago */
+			expect_close = 0;
+
+			for (i = 0; i != len; i++) {
+				char c;
+				if (get_user(c, data + i))
+					return -EFAULT;
+				if (c == 'V')
+					expect_close = 1;
+			}
+		}
+
 		kick_wdog();
 		return 1;
 	}
