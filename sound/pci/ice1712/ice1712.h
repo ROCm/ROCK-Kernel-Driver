@@ -329,6 +329,7 @@ struct _snd_ice1712 {
 	unsigned int pro_volumes[20];
 	unsigned int omni: 1;		/* Delta Omni I/O */
 	unsigned int vt1724: 1;
+	unsigned int ez8: 1;		/* EZ8 support */
 	unsigned int num_total_dacs;	/* total DACs */
 	unsigned int num_total_adcs;	/* total ADCs */
 	unsigned char hoontech_boxbits[4];

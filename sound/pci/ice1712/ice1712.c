@@ -41,6 +41,9 @@
  *  2003.02.20  Taksahi Iwai <tiwai@suse.de>
  *	Split vt1724 part to an independent driver.
  *	The GPIO is accessed through the callback functions now.
+ *
+ * 2004.03.31 Doug McLain <nostar@comcast.net>
+ *    Added support for Event Electronics EZ8 card to hoontech.c.
  */
 
 
@@ -81,8 +84,9 @@ MODULE_DEVICES("{"
 static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;		/* Enable this card */
-static int omni[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS-1)] = 0};	/* Delta44 & 66 Omni I/O support */
+static int omni[SNDRV_CARDS];	/* Delta44 & 66 Omni I/O support */
 static int cs8427_timeout[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS-1)] = 500}; /* CS8427 S/PDIF transciever reset timeout value in msec */
+static int ez8[SNDRV_CARDS];	/* EZ8 card */
 static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
@@ -100,6 +104,9 @@ MODULE_PARM_SYNTAX(omni, SNDRV_ENABLED "," SNDRV_ENABLE_DESC);
 module_param_array(cs8427_timeout, int, boot_devs, 0444);
 MODULE_PARM_DESC(cs8427_timeout, "Define reset timeout for cs8427 chip in msec resolution.");
 MODULE_PARM_SYNTAX(cs8427_timeout, SNDRV_ENABLED ", allows:{{1,1000}},default=500,skill:advanced");
+module_param_array(ez8, bool, boot_devs, 0444);
+MODULE_PARM_DESC(ez8, "Enable Event Electronics EZ8 support.");
+MODULE_PARM_SYNTAX(ez8, SNDRV_ENABLED "," SNDRV_ENABLE_DESC);
 
 #ifndef PCI_VENDOR_ID_ICE
 #define PCI_VENDOR_ID_ICE		0x1412
@@ -2410,6 +2417,7 @@ static int __devinit snd_ice1712_create(snd_card_t * card,
 					struct pci_dev *pci,
 					int omni,
 					int cs8427_timeout,
+					int ez8,
 					ice1712_t ** r_ice1712)
 {
 	ice1712_t *ice;
@@ -2438,6 +2446,7 @@ static int __devinit snd_ice1712_create(snd_card_t * card,
 		cs8427_timeout = 1;
 	else if (cs8427_timeout > 1000)
 		cs8427_timeout = 1000;
+	ice->ez8 = ez8 ? 1 : 0;
 	ice->cs8427_timeout = cs8427_timeout;
 	spin_lock_init(&ice->reg_lock);
 	init_MUTEX(&ice->gpio_mutex);
@@ -2558,7 +2567,7 @@ static int __devinit snd_ice1712_probe(struct pci_dev *pci,
 	strcpy(card->driver, "ICE1712");
 	strcpy(card->shortname, "ICEnsemble ICE1712");
 	
-	if ((err = snd_ice1712_create(card, pci, omni[dev], cs8427_timeout[dev], &ice)) < 0) {
+	if ((err = snd_ice1712_create(card, pci, omni[dev], cs8427_timeout[dev], ez8[dev], &ice)) < 0) {
 		snd_card_free(card);
 		return err;
 	}
