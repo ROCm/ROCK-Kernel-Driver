@@ -112,6 +112,12 @@ acpi_ex_resolve_object (
 			}
 		}
 
+		/* For copy_object, no further validation necessary */
+
+		if (walk_state->opcode == AML_COPY_OP) {
+			break;
+		}
+
 		/*
 		 * Must have a Integer, Buffer, or String
 		 */
@@ -136,7 +142,7 @@ acpi_ex_resolve_object (
 		/*
 		 * Aliases are resolved by acpi_ex_prep_operands
 		 */
-		ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Store into Alias - should never happen\n"));
+		ACPI_REPORT_ERROR (("Store into Alias - should never happen\n"));
 		status = AE_AML_INTERNAL;
 		break;
 

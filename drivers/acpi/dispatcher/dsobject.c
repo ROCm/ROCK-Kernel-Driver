@@ -582,6 +582,11 @@ acpi_ds_init_object_from_op (
 
 			obj_desc->reference.opcode = AML_ARG_OP;
 			obj_desc->reference.offset = opcode - AML_ARG_OP;
+
+#ifndef ACPI_NO_METHOD_EXECUTION
+			status = acpi_ds_method_data_get_node (AML_ARG_OP, obj_desc->reference.offset,
+					 walk_state, (struct acpi_namespace_node **) &obj_desc->reference.object);
+#endif
 			break;
 
 		default: /* Other literals, etc.. */
