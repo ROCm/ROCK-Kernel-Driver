@@ -48,4 +48,10 @@ extern inline void pcibios_penalize_isa_irq(int irq)
 /* Return the index of the PCI controller for device PDEV. */
 #define pci_controller_num(PDEV)	(0)
 
+/* The PCI address space does equal the physical memory
+ * address space.  The networking and block device layers use
+ * this boolean for bounce buffer decisions.
+ */
+#define PCI_DMA_BUS_IS_PHYS	(1)
+
 #endif /* _ASM_M68K_PCI_H */
