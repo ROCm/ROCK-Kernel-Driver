@@ -167,7 +167,7 @@ void *__wrap_malloc(int size)
 
 	if(!CAN_KMALLOC())
 		return(__real_malloc(size));
-	else if(size <= 128 * 1024) /* kmalloc is good for only 128K */
+	else if(size <= PAGE_SIZE) /* finding contiguos pages can be hard*/
 		ret = um_kmalloc(size);
 	else ret = um_vmalloc(size);
 
