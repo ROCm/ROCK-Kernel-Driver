@@ -167,6 +167,9 @@ void free_buffer_head(struct buffer_head * bh);
 void FASTCALL(unlock_buffer(struct buffer_head *bh));
 void ll_rw_block(int, int, struct buffer_head * bh[]);
 int submit_bh(int, struct buffer_head *);
+void write_boundary_block(struct block_device *bdev,
+			sector_t bblock, unsigned blocksize);
+
 extern int buffer_heads_over_limit;
 
 /*

@@ -735,6 +735,23 @@ int sync_mapping_buffers(struct address_space *mapping)
 }
 EXPORT_SYMBOL(sync_mapping_buffers);
 
+/*
+ * Called when we've recently written block `bblock', and it is known that
+ * `bblock' was for a buffer_boundary() buffer.  This means that the block at
+ * `bblock + 1' is probably a dirty indirect block.  Hunt it down and, if it's
+ * dirty, schedule it for IO.  So that indirects merge nicely with their data.
+ */
+void write_boundary_block(struct block_device *bdev,
+			sector_t bblock, unsigned blocksize)
+{
+	struct buffer_head *bh = __find_get_block(bdev, bblock + 1, blocksize);
+	if (bh) {
+		if (buffer_dirty(bh))
+			ll_rw_block(WRITE, 1, &bh);
+		put_bh(bh);
+	}
+}
+
 void mark_buffer_dirty_inode(struct buffer_head *bh, struct inode *inode)
 {
 	struct address_space *mapping = inode->i_mapping;
