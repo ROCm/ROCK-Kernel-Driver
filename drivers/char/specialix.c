@@ -1472,7 +1472,7 @@ static void sx_close(struct tty_struct * tty, struct file * filp)
 		tty->ldisc.flush_buffer(tty);
 	tty->closing = 0;
 	port->event = 0;
-	port->tty = 0;
+	port->tty = NULL;
 	if (port->blocked_open) {
 		if (port->close_delay) {
 			current->state = TASK_INTERRUPTIBLE;
@@ -1757,18 +1757,13 @@ static inline void sx_send_break(struct specialix_port * port, unsigned long len
 
 
 static inline int sx_set_serial_info(struct specialix_port * port,
-                                     struct serial_struct * newinfo)
+                                     struct serial_struct __user * newinfo)
 {
 	struct serial_struct tmp;
 	struct specialix_board *bp = port_Board(port);
 	int change_speed;
 	unsigned long flags;
-	int error;
 	
-	error = verify_area(VERIFY_READ, (void *) newinfo, sizeof(tmp));
-	if (error)
-		return error;
-
 	if (copy_from_user(&tmp, newinfo, sizeof(tmp)))
 		return -EFAULT;
 	
@@ -1813,16 +1808,11 @@ static inline int sx_set_serial_info(struct specialix_port * port,
 
 
 static inline int sx_get_serial_info(struct specialix_port * port,
-				     struct serial_struct * retinfo)
+				     struct serial_struct __user *retinfo)
 {
 	struct serial_struct tmp;
 	struct specialix_board *bp = port_Board(port);
-	int error;
 	
-	error = verify_area(VERIFY_WRITE, (void *) retinfo, sizeof(tmp));
-	if (error)
-		return error;
-
 	memset(&tmp, 0, sizeof(tmp));
 	tmp.type = PORT_CIRRUS;
 	tmp.line = port - sx_port;
@@ -1844,8 +1834,8 @@ static int sx_ioctl(struct tty_struct * tty, struct file * filp,
                     unsigned int cmd, unsigned long arg)
 {
 	struct specialix_port *port = (struct specialix_port *)tty->driver_data;
-	int error;
 	int retval;
+	void __user *argp = (void __user *)arg;
 				
 	if (sx_paranoia_check(port, tty->name, "sx_ioctl"))
 		return -ENODEV;
@@ -1867,22 +1857,20 @@ static int sx_ioctl(struct tty_struct * tty, struct file * filp,
 		sx_send_break(port, arg ? arg*(HZ/10) : HZ/4);
 		return 0;
 	 case TIOCGSOFTCAR:
-		error = verify_area(VERIFY_WRITE, (void *) arg, sizeof(long));
-		if (error)
-			return error;
-		put_user(C_CLOCAL(tty) ? 1 : 0,
-		         (unsigned long *) arg);
+		if (put_user(C_CLOCAL(tty)?1:0, (unsigned long __user *)argp))
+			return -EFAULT;
 		return 0;
 	 case TIOCSSOFTCAR:
-		get_user(arg, (unsigned long *) arg);
+		if (get_user(arg, (unsigned long __user *) argp))
+			return -EFAULT;
 		tty->termios->c_cflag =
 			((tty->termios->c_cflag & ~CLOCAL) |
 			(arg ? CLOCAL : 0));
 		return 0;
 	 case TIOCGSERIAL:	
-		return sx_get_serial_info(port, (struct serial_struct *) arg);
+		return sx_get_serial_info(port, argp);
 	 case TIOCSSERIAL:	
-		return sx_set_serial_info(port, (struct serial_struct *) arg);
+		return sx_set_serial_info(port, argp);
 	 default:
 		return -ENOIOCTLCMD;
 	}
@@ -2027,7 +2015,7 @@ static void sx_hangup(struct tty_struct * tty)
 	port->event = 0;
 	port->count = 0;
 	port->flags &= ~ASYNC_NORMAL_ACTIVE;
-	port->tty = 0;
+	port->tty = NULL;
 	wake_up_interruptible(&port->open_wait);
 }
 
