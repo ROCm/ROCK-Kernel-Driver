@@ -1623,7 +1623,7 @@ dbg( "digi_close: TOP: port=%d, open_count=%d", priv->dp_port_num, port->open_co
 			DIGI_CLOSE_TIMEOUT );
 
 		/* shutdown any outstanding bulk writes */
-		usb_unlink_urb (port->write_urb);
+		usb_kill_urb(port->write_urb);
 	}
 
 	tty->closing = 0;
@@ -1762,8 +1762,8 @@ dbg( "digi_shutdown: TOP, in_interrupt()=%ld", in_interrupt() );
 
 	/* stop reads and writes on all ports */
 	for( i=0; i<serial->type->num_ports+1; i++ ) {
-		usb_unlink_urb( serial->port[i]->read_urb );
-		usb_unlink_urb( serial->port[i]->write_urb );
+		usb_kill_urb(serial->port[i]->read_urb);
+		usb_kill_urb(serial->port[i]->write_urb);
 	}
 
 	/* free the private data structures for all ports */
