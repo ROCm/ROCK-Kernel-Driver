@@ -11,6 +11,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/sched.h>
 
 #define TIMER_IRQ 0
 

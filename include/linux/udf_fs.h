@@ -36,6 +36,8 @@
 
 #include <linux/config.h>
 
+#include <linux/config.h>
+
 #define UDF_PREALLOCATE
 #define UDF_DEFAULT_PREALLOC_BLOCKS	8
 
