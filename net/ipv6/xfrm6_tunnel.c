@@ -356,17 +356,6 @@ static int xfrm6_tunnel_output(struct sk_buff **pskb)
 
 static int xfrm6_tunnel_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_buff *skb)
 {
-	if (!pskb_may_pull(skb, sizeof(struct ipv6hdr))) 
-		return -EINVAL;
-
-	skb->mac.raw = skb->nh.raw;
-	skb->nh.raw = skb->data;
-	dst_release(skb->dst);
-	skb->dst = NULL;
-	skb->protocol = htons(ETH_P_IPV6);
-	skb->pkt_type = PACKET_HOST;
-	netif_rx(skb);
-
 	return 0;
 }
 
@@ -413,49 +402,15 @@ static int xfrm6_tunnel_rcv(struct sk_buff **pskb, unsigned int *nhoffp)
 {
 	struct sk_buff *skb = *pskb;
 	struct xfrm6_tunnel *handler = xfrm6_tunnel_handler;
-	struct xfrm_state *x = NULL;
 	struct ipv6hdr *iph = skb->nh.ipv6h;
-	int err = 0;
 	u32 spi;
 
 	/* device-like_ip6ip6_handler() */
-	if (handler) {
-		err = handler->handler(pskb, nhoffp);
-		if (!err)
-			goto out;
-	}
+	if (handler && handler->handler(pskb, nhoffp) == 0)
+		return 0;
 
 	spi = xfrm6_tunnel_spi_lookup((xfrm_address_t *)&iph->saddr);
-	x = xfrm_state_lookup((xfrm_address_t *)&iph->daddr, 
-			spi,
-			IPPROTO_IPV6, AF_INET6);
-
-	if (!x)
-		goto drop;
-
-	spin_lock(&x->lock);
-
-	if (unlikely(x->km.state != XFRM_STATE_VALID))
-		goto drop_unlock;
-
-	err = xfrm6_tunnel_input(x, NULL, skb);
-	if (err)
-		goto drop_unlock;
-
-	x->curlft.bytes += skb->len;
-	x->curlft.packets++; 
-	spin_unlock(&x->lock); 
-	xfrm_state_put(x); 
-
-out:
-	return 0;
-
-drop_unlock:
-	spin_unlock(&x->lock);
-	xfrm_state_put(x);
-drop:
-	kfree_skb(skb);
-	return -1;
+	return xfrm6_rcv_spi(pskb, nhoffp, spi);
 }
 
 static void xfrm6_tunnel_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
