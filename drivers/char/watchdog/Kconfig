@@ -204,25 +204,23 @@ config IB700_WDT
 
 	  Most people will say N.
 
-config I810_TCO
+config I8XX_TCO
 	tristate "Intel i8xx TCO timer / Watchdog"
-	depends on WATCHDOG && X86
+	depends on WATCHDOG && (X86 || IA64) && PCI
 	---help---
-	  Hardware driver for the TCO timer built into the Intel i8xx
-	  chipset family.  The TCO (Total Cost of Ownership) timer is a
-	  watchdog timer that will reboot the machine after its second
-	  expiration. The expiration time can be configured by commandline
-	  argument "i810_margin=<n>" where <n> is the counter initial value.
-	  It is decremented every 0.6 secs, the default is 50 which gives a
-	  timeout of 30 seconds and one minute until reset.
+	  Hardware driver for the TCO timer built into the Intel 82801
+	  I/O Controller Hub family.  The TCO (Total Cost of Ownership)
+	  timer is a watchdog timer that will reboot the machine after
+	  its second expiration. The expiration time can be configured
+	  with the "heartbeat" parameter.
 
 	  On some motherboards the driver may fail to reset the chipset's
 	  NO_REBOOT flag which prevents the watchdog from rebooting the
 	  machine. If this is the case you will get a kernel message like
-	  "i810tco init: failed to reset NO_REBOOT flag".
+	  "failed to reset NO_REBOOT flag, reboot disabled by hardware".
 
 	  To compile this driver as a module, choose M here: the
-	  module will be called i810-tco.
+	  module will be called i8xx_tco.
 
 config MIXCOMWD
 	tristate "Mixcom Watchdog"
