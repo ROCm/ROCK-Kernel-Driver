@@ -244,7 +244,7 @@ static int emu10k1_midi_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static ssize_t emu10k1_midi_read(struct file *file, char *buffer, size_t count, loff_t * pos)
+static ssize_t emu10k1_midi_read(struct file *file, char __user *buffer, size_t count, loff_t * pos)
 {
 	struct emu10k1_mididevice *midi_dev = (struct emu10k1_mididevice *) file->private_data;
 	ssize_t ret = 0;
@@ -319,7 +319,7 @@ static ssize_t emu10k1_midi_read(struct file *file, char *buffer, size_t count, 
 	return ret;
 }
 
-static ssize_t emu10k1_midi_write(struct file *file, const char *buffer, size_t count, loff_t * pos)
+static ssize_t emu10k1_midi_write(struct file *file, const char __user *buffer, size_t count, loff_t * pos)
 {
 	struct emu10k1_mididevice *midi_dev = (struct emu10k1_mididevice *) file->private_data;
 	struct midi_hdr *midihdr;
