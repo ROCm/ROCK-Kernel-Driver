@@ -25,5 +25,3 @@ isdn-objs-$(CONFIG_ISDN_AUDIO)		+= isdn_audio.o
 isdn-objs-$(CONFIG_ISDN_TTY_FAX)	+= isdn_ttyfax.o
 
 isdn-objs				+= $(isdn-objs-y)
-
-include $(TOPDIR)/Rules.make

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utglobal - Global variables for the ACPI subsystem
- *              $Revision: 171 $
+ *              $Revision: 172 $
  *
  *****************************************************************************/
 
@@ -176,11 +176,11 @@ const NATIVE_CHAR           *acpi_gbl_db_sleep_states[ACPI_NUM_SLEEP_STATES] = {
  */
 
 const acpi_predefined_names     acpi_gbl_pre_defined_names[] =
-{ {"_GPE",    INTERNAL_TYPE_SCOPE,        NULL},
-	{"_PR_",    INTERNAL_TYPE_SCOPE,        NULL},
+{ {"_GPE",    ACPI_TYPE_LOCAL_SCOPE,      NULL},
+	{"_PR_",    ACPI_TYPE_LOCAL_SCOPE,      NULL},
 	{"_SB_",    ACPI_TYPE_DEVICE,           NULL},
-	{"_SI_",    INTERNAL_TYPE_SCOPE,        NULL},
-	{"_TZ_",    INTERNAL_TYPE_SCOPE,        NULL},
+	{"_SI_",    ACPI_TYPE_LOCAL_SCOPE,      NULL},
+	{"_TZ_",    ACPI_TYPE_LOCAL_SCOPE,      NULL},
 	{"_REV",    ACPI_TYPE_INTEGER,          "2"},
 	{"_OS_",    ACPI_TYPE_STRING,           ACPI_OS_NAME},
 	{"_GL_",    ACPI_TYPE_MUTEX,            "0"},
@@ -225,17 +225,10 @@ const u8                        acpi_gbl_ns_properties[] =
 	ACPI_NS_NORMAL,                     /* 23 Address Handler  */
 	ACPI_NS_NEWSCOPE | ACPI_NS_LOCAL,   /* 24 Resource Desc    */
 	ACPI_NS_NEWSCOPE | ACPI_NS_LOCAL,   /* 25 Resource Field   */
-	ACPI_NS_NORMAL,                     /* 26 Def_field_defn   */
-	ACPI_NS_NORMAL,                     /* 27 Bank_field_defn  */
-	ACPI_NS_NORMAL,                     /* 28 Index_field_defn */
-	ACPI_NS_NORMAL,                     /* 29 If               */
-	ACPI_NS_NORMAL,                     /* 30 Else             */
-	ACPI_NS_NORMAL,                     /* 31 While            */
-	ACPI_NS_NEWSCOPE,                   /* 32 Scope            */
-	ACPI_NS_LOCAL,                      /* 33 Def_any          */
-	ACPI_NS_NORMAL,                     /* 34 Extra            */
-	ACPI_NS_NORMAL,                     /* 35 Data             */
-	ACPI_NS_NORMAL                      /* 36 Invalid          */
+	ACPI_NS_NEWSCOPE,                   /* 26 Scope            */
+	ACPI_NS_NORMAL,                     /* 27 Extra            */
+	ACPI_NS_NORMAL,                     /* 28 Data             */
+	ACPI_NS_NORMAL                      /* 29 Invalid          */
 };
 
 
@@ -481,17 +474,10 @@ static const NATIVE_CHAR    *acpi_gbl_ns_type_names[] = /* printable names of AC
 	/* 23 */ "Addr_handler",
 	/* 24 */ "Resource_desc",
 	/* 25 */ "Resource_fld",
-	/* 26 */ "Region_fld_dfn",
-	/* 27 */ "Bank_fld_dfn",
-	/* 28 */ "Index_fld_dfn",
-	/* 29 */ "If",
-	/* 30 */ "Else",
-	/* 31 */ "While",
-	/* 32 */ "Scope",
-	/* 33 */ "Def_any",
-	/* 34 */ "Extra",
-	/* 35 */ "Data",
-	/* 36 */ "Invalid"
+	/* 26 */ "Scope",
+	/* 27 */ "Extra",
+	/* 28 */ "Data",
+	/* 39 */ "Invalid"
 };
 
 
@@ -500,7 +486,7 @@ acpi_ut_get_type_name (
 	acpi_object_type        type)
 {
 
-	if (type > INTERNAL_TYPE_INVALID)
+	if (type > ACPI_TYPE_INVALID)
 	{
 		return ((NATIVE_CHAR *) acpi_gbl_bad_type);
 	}
@@ -563,7 +549,7 @@ acpi_ut_get_mutex_name (
  *
  * FUNCTION:    Acpi_ut_valid_object_type
  *
- * PARAMETERS:  None.
+ * PARAMETERS:  Type            - Object type to be validated
  *
  * RETURN:      TRUE if valid object type
  *
@@ -576,13 +562,11 @@ acpi_ut_valid_object_type (
 	acpi_object_type        type)
 {
 
-	if (type > ACPI_TYPE_MAX)
+	if (type > ACPI_TYPE_LOCAL_MAX)
 	{
-		if ((type < INTERNAL_TYPE_BEGIN) ||
-			(type > INTERNAL_TYPE_MAX))
-		{
-			return (FALSE);
-		}
+		/* Note: Assumes all TYPEs are contiguous (external/local) */
+
+		return (FALSE);
 	}
 
 	return (TRUE);
@@ -767,7 +751,7 @@ acpi_ut_init_globals (
 
 	acpi_gbl_root_node_struct.name.integer = ACPI_ROOT_NAME;
 	acpi_gbl_root_node_struct.descriptor = ACPI_DESC_TYPE_NAMED;
-	acpi_gbl_root_node_struct.type      = ACPI_TYPE_ANY;
+	acpi_gbl_root_node_struct.type      = ACPI_TYPE_DEVICE;
 	acpi_gbl_root_node_struct.child     = NULL;
 	acpi_gbl_root_node_struct.peer      = NULL;
 	acpi_gbl_root_node_struct.object    = NULL;

@@ -6,7 +6,6 @@ obj-$(CONFIG_UNIX)	+= unix.o
 
 unix-y			:= af_unix.o garbage.o
 unix-$(CONFIG_SYSCTL)	+= sysctl_net_unix.o
-unix-objs		:= $(unix-y)
 
 include $(TOPDIR)/Rules.make
 

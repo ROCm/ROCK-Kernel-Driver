@@ -14,5 +14,3 @@ hysdn-objs	:= hysdn_procconf.o hysdn_proclog.o boardergo.o hysdn_boot.o \
 hysdn-objs-$(CONFIG_HYSDN_CAPI) += hycapi.o
 
 hysdn-objs 	+= $(hysdn-objs-y)
-
-include $(TOPDIR)/Rules.make

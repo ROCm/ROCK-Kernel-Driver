@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acnamesp.h - Namespace subcomponent prototypes and defines
- *       $Revision: 127 $
+ *       $Revision: 129 $
  *
  *****************************************************************************/
 
@@ -178,6 +178,10 @@ void
 acpi_ns_delete_children (
 	acpi_namespace_node     *parent);
 
+int
+acpi_ns_compare_names (
+	char                    *name1,
+	char                    *name2);
 
 /*
  * Namespace modification - nsmodify
@@ -281,16 +285,12 @@ acpi_ns_get_object_value (
 
 
 /*
- * Parent/Child/Peer utility functions - nsfamily
+ * Parent/Child/Peer utility functions
  */
 
 acpi_name
 acpi_ns_find_parent_name (
 	acpi_namespace_node     *node_to_search);
-
-u8
-acpi_ns_exist_downstream_sibling (
-	acpi_namespace_node     *this_node);
 
 
 /*
@@ -397,8 +397,8 @@ acpi_ns_search_node (
 void
 acpi_ns_install_node (
 	acpi_walk_state         *walk_state,
-	acpi_namespace_node     *parent_node,   /* Parent */
-	acpi_namespace_node     *node,      /* New Child*/
+	acpi_namespace_node     *parent_node,
+	acpi_namespace_node     *node,
 	acpi_object_type        type);
 
 

@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: utdelete - object deletion and reference count utilities
- *              $Revision: 91 $
+ *              $Revision: 92 $
  *
  ******************************************************************************/
 
@@ -417,7 +417,7 @@ acpi_ut_update_object_reference (
 			break;
 
 
-		case INTERNAL_TYPE_ADDRESS_HANDLER:
+		case ACPI_TYPE_LOCAL_ADDRESS_HANDLER:
 
 			/* Must walk list of address handlers */
 
@@ -462,7 +462,7 @@ acpi_ut_update_object_reference (
 			break;
 
 
-		case INTERNAL_TYPE_REGION_FIELD:
+		case ACPI_TYPE_LOCAL_REGION_FIELD:
 
 			status = acpi_ut_create_update_state_and_push (
 					 object->field.region_obj, action, &state_list);
@@ -472,7 +472,7 @@ acpi_ut_update_object_reference (
 		   break;
 
 
-		case INTERNAL_TYPE_BANK_FIELD:
+		case ACPI_TYPE_LOCAL_BANK_FIELD:
 
 			status = acpi_ut_create_update_state_and_push (
 					 object->bank_field.bank_obj, action, &state_list);
@@ -488,7 +488,7 @@ acpi_ut_update_object_reference (
 			break;
 
 
-		case INTERNAL_TYPE_INDEX_FIELD:
+		case ACPI_TYPE_LOCAL_INDEX_FIELD:
 
 			status = acpi_ut_create_update_state_and_push (
 					 object->index_field.index_obj, action, &state_list);
@@ -505,7 +505,7 @@ acpi_ut_update_object_reference (
 
 
 		case ACPI_TYPE_REGION:
-		case INTERNAL_TYPE_REFERENCE:
+		case ACPI_TYPE_LOCAL_REFERENCE:
 		default:
 
 			/* No subobjects */

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: aclocal.h - Internal data types used across the ACPI subsystem
- *       $Revision: 176 $
+ *       $Revision: 178 $
  *
  *****************************************************************************/
 
@@ -212,7 +212,6 @@ typedef struct acpi_table_desc
 	struct acpi_table_desc  *next;
 	struct acpi_table_desc  *installed_desc;
 	acpi_table_header       *pointer;
-	void                    *base_pointer;
 	u8                      *aml_start;
 	u64                     physical_address;
 	u32                     aml_length;
@@ -655,6 +654,7 @@ typedef struct acpi_parseobj_asl
 	char                        *filename;
 	char                        *external_name;
 	char                        *namepath;
+	char                        name_seg[4];
 	u32                         extra_value;
 	u32                         column;
 	u32                         line_number;
