@@ -9,8 +9,6 @@
 
 O_TARGET := hp300.o
 
-export-objs	:= ksyms.o
-
 obj-y		:= ksyms.o config.o ints.o time.o reboot.o
 
 obj-$(CONFIG_VT)	+= hil.o
