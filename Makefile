@@ -223,9 +223,9 @@ AFLAGS_KERNEL	=
 NOSTDINC_FLAGS  = -nostdinc -iwithprefix include
 
 CPPFLAGS	:= -D__KERNEL__ -Iinclude
-CFLAGS 		:= $(CPPFLAGS) -Wall -Wstrict-prototypes -Wno-trigraphs -O2 \
+CFLAGS 		:= -Wall -Wstrict-prototypes -Wno-trigraphs -O2 \
 	  	   -fno-strict-aliasing -fno-common
-AFLAGS		:= -D__ASSEMBLY__ $(CPPFLAGS)
+AFLAGS		:= -D__ASSEMBLY__
 
 export	VERSION PATCHLEVEL SUBLEVEL EXTRAVERSION KERNELRELEASE ARCH \
 	CONFIG_SHELL TOPDIR HOSTCC HOSTCFLAGS CROSS_COMPILE AS LD CC \
@@ -280,6 +280,10 @@ export include_config := 1
 endif
 
 include arch/$(ARCH)/Makefile
+
+# Let architecture Makefiles change CPPFLAGS if needed
+CFLAGS += $(CPPFLAGS) $(CFLAGS)
+AFLAGS += $(CPPFLAGS) $(AFLAGS)
 
 core-y		+= kernel/ mm/ fs/ ipc/ security/ crypto/
 
