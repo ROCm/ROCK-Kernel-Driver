@@ -34,7 +34,7 @@ config DEBUGGER
 
 config XMON
 	bool "Include xmon kernel debugger"
-	depends on DEBUGGER
+	depends on DEBUGGER && !PPC_ISERIES
 	help
 	  Include in-kernel hooks for the xmon kernel monitor/debugger.
 	  Unless you are intending to debug the kernel, say N here.
