@@ -247,7 +247,7 @@ static int flush_read_buffer(struct sysfs_buffer * buffer, char * buf,
 	error = copy_to_user(buf,buffer->page + *ppos,count);
 	if (!error)
 		*ppos += count;
-	return error ? error : count;
+	return error ? -EFAULT : count;
 }
 
 /**
@@ -308,7 +308,7 @@ fill_write_buffer(struct sysfs_buffer * buffer, const char * buf, size_t count)
 	if (count >= PAGE_SIZE)
 		count = PAGE_SIZE - 1;
 	error = copy_from_user(buffer->page,buf,count);
-	return error ? error : count;
+	return error ? -EFAULT : count;
 }
 
 
