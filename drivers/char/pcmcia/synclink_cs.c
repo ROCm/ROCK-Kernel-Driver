@@ -438,15 +438,15 @@ static void bh_status(MGSLPC_INFO *info);
 static int tiocmget(struct tty_struct *tty, struct file *file);
 static int tiocmset(struct tty_struct *tty, struct file *file,
 		    unsigned int set, unsigned int clear);
-static int get_stats(MGSLPC_INFO *info, struct mgsl_icount *user_icount);
-static int get_params(MGSLPC_INFO *info, MGSL_PARAMS *user_params);
-static int set_params(MGSLPC_INFO *info, MGSL_PARAMS *new_params);
-static int get_txidle(MGSLPC_INFO *info, int*idle_mode);
+static int get_stats(MGSLPC_INFO *info, struct mgsl_icount __user *user_icount);
+static int get_params(MGSLPC_INFO *info, MGSL_PARAMS __user *user_params);
+static int set_params(MGSLPC_INFO *info, MGSL_PARAMS __user *new_params);
+static int get_txidle(MGSLPC_INFO *info, int __user *idle_mode);
 static int set_txidle(MGSLPC_INFO *info, int idle_mode);
 static int set_txenable(MGSLPC_INFO *info, int enable);
 static int tx_abort(MGSLPC_INFO *info);
 static int set_rxenable(MGSLPC_INFO *info, int enable);
-static int wait_events(MGSLPC_INFO *info, int *mask);
+static int wait_events(MGSLPC_INFO *info, int __user *mask);
 
 #define jiffies_from_ms(a) ((((a) * HZ)/1000)+1)
 
@@ -521,8 +521,10 @@ static dev_link_t *dev_list = NULL;
  * (gdb) to get the .text address for the add-symbol-file command.
  * This allows remote debugging of dynamically loadable modules.
  */
-static void* mgslpc_get_text_ptr(void);
-static void* mgslpc_get_text_ptr() {return mgslpc_get_text_ptr;}
+static void* mgslpc_get_text_ptr(void)
+{
+	return mgslpc_get_text_ptr;
+}
 
 static dev_link_t *mgslpc_attach(void)
 {
@@ -1955,7 +1957,7 @@ static void mgslpc_unthrottle(struct tty_struct * tty)
 
 /* get the current serial statistics
  */
-static int get_stats(MGSLPC_INFO * info, struct mgsl_icount *user_icount)
+static int get_stats(MGSLPC_INFO * info, struct mgsl_icount __user *user_icount)
 {
 	int err;
 	if (debug_level >= DEBUG_LEVEL_INFO)
@@ -1968,7 +1970,7 @@ static int get_stats(MGSLPC_INFO * info, struct mgsl_icount *user_icount)
 
 /* get the current serial parameters
  */
-static int get_params(MGSLPC_INFO * info, MGSL_PARAMS *user_params)
+static int get_params(MGSLPC_INFO * info, MGSL_PARAMS __user *user_params)
 {
 	int err;
 	if (debug_level >= DEBUG_LEVEL_INFO)
@@ -1988,7 +1990,7 @@ static int get_params(MGSLPC_INFO * info, MGSL_PARAMS *user_params)
  *
  * Returns:	0 if success, otherwise error code
  */
-static int set_params(MGSLPC_INFO * info, MGSL_PARAMS *new_params)
+static int set_params(MGSLPC_INFO * info, MGSL_PARAMS __user *new_params)
 {
  	unsigned long flags;
 	MGSL_PARAMS tmp_params;
@@ -2014,7 +2016,7 @@ static int set_params(MGSLPC_INFO * info, MGSL_PARAMS *new_params)
 	return 0;
 }
 
-static int get_txidle(MGSLPC_INFO * info, int*idle_mode)
+static int get_txidle(MGSLPC_INFO * info, int __user *idle_mode)
 {
 	int err;
 	if (debug_level >= DEBUG_LEVEL_INFO)
@@ -2037,7 +2039,7 @@ static int set_txidle(MGSLPC_INFO * info, int idle_mode)
 	return 0;
 }
 
-static int get_interface(MGSLPC_INFO * info, int*if_mode)
+static int get_interface(MGSLPC_INFO * info, int __user *if_mode)
 {
 	int err;
 	if (debug_level >= DEBUG_LEVEL_INFO)
@@ -2136,7 +2138,7 @@ static int set_rxenable(MGSLPC_INFO * info, int enable)
  *				of events triggerred,
  * 			otherwise error code
  */
-static int wait_events(MGSLPC_INFO * info, int * mask_ptr)
+static int wait_events(MGSLPC_INFO * info, int __user *mask_ptr)
 {
  	unsigned long flags;
 	int s;
@@ -2409,20 +2411,21 @@ int ioctl_common(MGSLPC_INFO *info, unsigned int cmd, unsigned long arg)
 {
 	int error;
 	struct mgsl_icount cnow;	/* kernel counter temps */
-	struct serial_icounter_struct *p_cuser;	/* user space */
+	struct serial_icounter_struct __user *p_cuser;	/* user space */
+	void __user *argp = (void __user *)arg;
 	unsigned long flags;
 	
 	switch (cmd) {
 	case MGSL_IOCGPARAMS:
-		return get_params(info,(MGSL_PARAMS *)arg);
+		return get_params(info, argp);
 	case MGSL_IOCSPARAMS:
-		return set_params(info,(MGSL_PARAMS *)arg);
+		return set_params(info, argp);
 	case MGSL_IOCGTXIDLE:
-		return get_txidle(info,(int*)arg);
+		return get_txidle(info, argp);
 	case MGSL_IOCSTXIDLE:
-		return set_txidle(info,(int)arg);
+		return set_txidle(info, (int)arg);
 	case MGSL_IOCGIF:
-		return get_interface(info,(int*)arg);
+		return get_interface(info, argp);
 	case MGSL_IOCSIF:
 		return set_interface(info,(int)arg);
 	case MGSL_IOCTXENABLE:
@@ -2432,16 +2435,16 @@ int ioctl_common(MGSLPC_INFO *info, unsigned int cmd, unsigned long arg)
 	case MGSL_IOCTXABORT:
 		return tx_abort(info);
 	case MGSL_IOCGSTATS:
-		return get_stats(info,(struct mgsl_icount*)arg);
+		return get_stats(info, argp);
 	case MGSL_IOCWAITEVENT:
-		return wait_events(info,(int*)arg);
+		return wait_events(info, argp);
 	case TIOCMIWAIT:
 		return modem_input_wait(info,(int)arg);
 	case TIOCGICOUNT:
 		spin_lock_irqsave(&info->lock,flags);
 		cnow = info->icount;
 		spin_unlock_irqrestore(&info->lock,flags);
-		p_cuser = (struct serial_icounter_struct *) arg;
+		p_cuser = argp;
 		PUT_USER(error,cnow.cts, &p_cuser->cts);
 		if (error) return error;
 		PUT_USER(error,cnow.dsr, &p_cuser->dsr);
