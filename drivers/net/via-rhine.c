@@ -81,11 +81,14 @@
 	- Add ethtool support
 	- Replace some MII-related magic numbers with constants
 	
+	LK1.1.14 (jgarzik):
+	- Merge new PCI id from 'linuxfet' driver.
+
 */
 
 #define DRV_NAME	"via-rhine"
-#define DRV_VERSION	"1.1.13"
-#define DRV_RELDATE	"Nov-17-2001"
+#define DRV_VERSION	"1.1.14"
+#define DRV_RELDATE	"Feb-12-2002"
 
 
 /* A few user-configurable values.
@@ -347,6 +350,8 @@ static struct via_rhine_chip_info via_rhine_chip_info[] __devinitdata =
 	  CanHaveMII | HasWOL },
 	{ "VIA VT3043 Rhine",    RHINE_IOTYPE, 128,
 	  CanHaveMII | ReqTxAlign }
+	{ "VIA VT6105 Rhine-III", RHINE_IOTYPE, 256,
+	  CanHaveMII | HasWOL },
 };
 
 static struct pci_device_id via_rhine_pci_tbl[] __devinitdata =
@@ -354,6 +359,7 @@ static struct pci_device_id via_rhine_pci_tbl[] __devinitdata =
 	{0x1106, 0x6100, PCI_ANY_ID, PCI_ANY_ID, 0, 0, VT86C100A},
 	{0x1106, 0x3065, PCI_ANY_ID, PCI_ANY_ID, 0, 0, VT6102},
 	{0x1106, 0x3043, PCI_ANY_ID, PCI_ANY_ID, 0, 0, VT3043},
+	{0x1106, 0x3106, PCI_ANY_ID, PCI_ANY_ID, 0, 0, VT6105},
 	{0,}			/* terminate list */
 };
 MODULE_DEVICE_TABLE(pci, via_rhine_pci_tbl);
