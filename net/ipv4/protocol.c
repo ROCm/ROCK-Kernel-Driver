@@ -91,6 +91,7 @@ int inet_del_protocol(struct inet_protocol *prot, unsigned char protocol)
 	}
 	spin_unlock_bh(&inet_proto_lock);
 
+	synchronize_net();
 
 	return ret;
 }
