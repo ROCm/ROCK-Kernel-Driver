@@ -454,7 +454,7 @@ static int v7_fill_super(struct super_block *sb, void *data, int silent)
 	sbi->s_bytesex = BYTESEX_PDP;
 	sb->u.generic_sbp = sbi;
 	
-	sb_set_blocksize(sb, BLOCK_SIZE);
+	sb_set_blocksize(sb, 512);
 
 	if ((bh = sb_bread(sb, 1)) == NULL) {
 		if (!silent)
