@@ -24,10 +24,8 @@ clean:
 
 #BTOBJS := $(HEAD) init/main.o init/version.o
 BTOBJS := $(HEAD) $(INIT)
-#BTLIBS := $(CORE_FILES_NO_BTFIX) $(FILESYSTEMS) \
-#	$(DRIVERS) $(NETWORKS)
-# Threw away drivers because they must not have btfixup definitions.
-BTLIBS := $(CORE_FILES_NO_BTFIX) $(LIBS)
+BTLIBS := $(CORE_FILES_NO_BTFIX) $(LIBS) \
+	$(DRIVERS) $(NETWORKS)
 
 # I wanted to make this depend upon BTOBJS so that a parallel
 # build would work, but this fails because $(HEAD) cannot work
