@@ -86,14 +86,14 @@ int show_sun4d_interrupts(struct seq_file *p, void *v)
 		if (!sbusl) {
 	 		action = *(i + irq_action);
 			if (!action) 
-		        	continue;
+		        	goto out;
 		} else {
 			for (j = 0; j < nsbi; j++) {
 				for (k = 0; k < 4; k++)
 					if ((action = sbus_actions [(j << 5) + (sbusl << 2) + k].action))
 						goto found_it;
 			}
-			continue;
+			goto out;
 		}
 found_it:	seq_printf(p, "%3d: ", i);
 #ifndef CONFIG_SMP
@@ -128,6 +128,7 @@ found_it:	seq_printf(p, "%3d: ", i);
 		}
 		seq_putc(p, '\n');
 	}
+out:
 	return 0;
 }
 
