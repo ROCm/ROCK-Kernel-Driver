@@ -128,10 +128,6 @@ static ssize_t dtlk_read(struct file *file, char __user *buf,
 	char ch;
 	int i = 0, retries;
 
-	/* Can't seek (pread) on the DoubleTalk.  */
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
-
 	TRACE_TEXT("(dtlk_read");
 	/*  printk("DoubleTalk PC - dtlk_read()\n"); */
 
@@ -303,6 +299,7 @@ static int dtlk_open(struct inode *inode, struct file *file)
 {
 	TRACE_TEXT("(dtlk_open");
 
+	nonseekable_open(inode, file);
 	switch (iminor(inode)) {
 	case DTLK_MINOR:
 		if (dtlk_busy)
