@@ -48,6 +48,60 @@ static int ntfs_file_open(struct inode *vi, struct file *filp)
 	return generic_file_open(vi, filp);
 }
 
+#ifdef NTFS_RW
+
+/**
+ * ntfs_file_fsync - sync a file to disk
+ * @filp:	file to be synced
+ * @dentry:	dentry describing the file to sync
+ * @datasync:	if non-zero only flush user data and not metadata
+ *
+ * Data integrity sync of a file to disk.  Used for fsync, fdatasync, and msync
+ * system calls.  This function is inspired by fs/buffer.c::file_fsync().
+ *
+ * If @datasync is false, write the mft record and all associated extent mft
+ * records as well as the $DATA attribute and then sync the block device.
+ *
+ * If @datasync is true and the attribute is non-resident, we skip the writing
+ * of the mft record and all associated extent mft records (this might still
+ * happen due to the write_inode_now() call).
+ *
+ * Also, if @datasync is true, we do not wait on the inode to be written out
+ * but we always wait on the page cache pages to be written out.
+ *
+ * Note: In the past @filp could be NULL so we ignore it as we don't need it
+ * anyway.
+ *
+ * Locking: Caller must hold i_sem on the inode.
+ *
+ * TODO: We should probably also write all attribute/index inodes associated
+ * with this inode but since we have no simple way of getting to them we ignore
+ * this problem for now.
+ */
+static int ntfs_file_fsync(struct file *filp, struct dentry *dentry,
+		int datasync)
+{
+	struct inode *vi = dentry->d_inode;
+	int err, ret = 0;
+
+	ntfs_debug("Entering for inode 0x%lx.", vi->i_ino);
+	BUG_ON(S_ISDIR(vi->i_mode));
+	if (!datasync || !NInoNonResident(NTFS_I(vi)))
+		ret = ntfs_write_inode(vi, 1);
+	write_inode_now(vi, !datasync);
+	err = sync_blockdev(vi->i_sb->s_bdev);
+	if (unlikely(err && !ret))
+		ret = err;
+	if (likely(!ret))
+		ntfs_debug("Done.");
+	else
+		ntfs_warning(vi->i_sb, "Failed to f%ssync inode 0x%lx.  Error "
+				"%u.", datasync ? "data" : "", vi->i_ino, -ret);
+	return ret;
+}
+
+#endif /* NTFS_RW */
+
 struct file_operations ntfs_file_ops = {
 	.llseek		= generic_file_llseek,	  /* Seek inside file. */
 	.read		= generic_file_read,	  /* Read from file. */
@@ -63,9 +117,7 @@ struct file_operations ntfs_file_ops = {
 						     how to use this to discard
 						     preallocated space for
 						     write opened files. */
-	/*.fsync	= ,*/			  /* Sync a file to disk.  See
-						     fs/buffer.c::sys_fsync()
-						     and file_fsync(). */
+	.fsync		= ntfs_file_fsync,	  /* Sync a file to disk. */
 	/*.aio_fsync	= ,*/			  /* Sync all outstanding async
 						     i/o operations on a
 						     kiocb. */
