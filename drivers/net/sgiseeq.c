@@ -1,10 +1,10 @@
-/* $Id: sgiseeq.c,v 1.17 2000/03/27 23:02:57 ralf Exp $
- *
+/*
  * sgiseeq.c: Seeq8003 ethernet driver for SGI machines.
  *
  * Copyright (C) 1996 David S. Miller (dm@engr.sgi.com)
  */
 #include <linux/kernel.h>
+#include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/types.h>
 #include <linux/interrupt.h>
@@ -450,20 +450,22 @@ static int sgiseeq_open(struct net_device *dev)
 	unsigned long flags;
 	int err;
 
-	save_flags(flags); cli();
-	if (request_irq(dev->irq, sgiseeq_interrupt, 0, sgiseeqstr, (void *) dev)) {
-		printk("Seeq8003: Can't get irq %d\n", dev->irq);
-		restore_flags(flags);
-		return -EAGAIN;
-	}
+	__save_and_cli(flags);
 
+	err = -EAGAIN;
+	if (request_irq(dev->irq, sgiseeq_interrupt, 0, sgiseeqstr, dev)) {
+		printk("Seeq8003: Can't get irq %d\n", dev->irq);
+		goto out;
+	}
 	err = init_seeq(dev, sp, sregs);
 	if (err)
-		return err;
+		goto out;
 
 	netif_start_queue(dev);
-	restore_flags(flags);
-	return 0;
+
+out:
+	__restore_flags(flags);
+	return err;
 }
 
 static int sgiseeq_close(struct net_device *dev)
