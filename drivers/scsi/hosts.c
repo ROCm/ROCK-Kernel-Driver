@@ -75,7 +75,7 @@ int scsi_remove_host(struct Scsi_Host *shost)
  **/
 int scsi_add_host(struct Scsi_Host *shost, struct device *dev)
 {
-	Scsi_Host_Template *sht = shost->hostt;
+	struct scsi_host_template *sht = shost->hostt;
 	int error;
 
 	printk(KERN_INFO "scsi%d : %s\n", shost->host_no,
@@ -123,7 +123,7 @@ void scsi_free_shost(struct Scsi_Host *shost)
  * Return value:
  * 	Pointer to a new Scsi_Host
  **/
-struct Scsi_Host *scsi_host_alloc(Scsi_Host_Template *sht, int privsize)
+struct Scsi_Host *scsi_host_alloc(struct scsi_host_template *sht, int privsize)
 {
 	struct Scsi_Host *shost;
 	int gfp_mask = GFP_KERNEL, rval;
@@ -219,7 +219,7 @@ struct Scsi_Host *scsi_host_alloc(Scsi_Host_Template *sht, int privsize)
 	return NULL;
 }
 
-struct Scsi_Host *scsi_register(Scsi_Host_Template *sht, int privsize)
+struct Scsi_Host *scsi_register(struct scsi_host_template *sht, int privsize)
 {
 	struct Scsi_Host *shost = scsi_host_alloc(sht, privsize);
 

@@ -49,14 +49,7 @@ struct scsi_host_cmd_pool;
  *	 used in one scatter-gather request.
  */
 
-/*
- * The Scsi_Host_Template type has all that is needed to interface with a SCSI
- * host in a device independent matter.	 There is one entry for each different
- * type of host adapter that is supported on the system.
- */
-
-typedef struct	SHT
-{
+struct scsi_host_template {
     /* Used with loadable modules so that we know when it is safe to unload */
     struct module * module;
 
@@ -91,7 +84,7 @@ typedef struct	SHT
      * passed to scsi.c in the processing of the command.  Note
      * especially that scsi_malloc/scsi_free must not be called.
      */
-    int (* detect)(struct SHT *);
+    int (* detect)(struct scsi_host_template *);
 
     /* Used with loadable modules to unload the host structures.  Note:
      * there is a default action built into the modules code which may
@@ -374,16 +367,9 @@ typedef struct	SHT
      * module_init/module_exit.
      */
     struct list_head legacy_hosts;
-} Scsi_Host_Template;
+};
 
-/*
- * The scsi_hosts array is the array containing the data for all
- * possible <supported> scsi hosts.   This is similar to the
- * Scsi_Host_Template, except that we have one entry for each
- * actual physical host adapter on the system, stored as a linked
- * list.  Note that if there are 2 aha1542 boards, then there will
- * be two Scsi_Host entries, but only 1 Scsi_Host_Template entry.
- */
+typedef struct scsi_host_template Scsi_Host_Template;
 
 struct Scsi_Host
 {
@@ -413,7 +399,7 @@ struct Scsi_Host
                                           this is true. */
     unsigned int            eh_kill:1; /* set when killing the eh thread */
     wait_queue_head_t       host_wait;
-    Scsi_Host_Template    * hostt;
+    struct scsi_host_template *hostt;
     volatile unsigned short host_busy;   /* commands actually active on low-level */
     volatile unsigned short host_failed; /* commands that failed. */
     
@@ -577,7 +563,7 @@ extern int scsi_register_interface(struct class_interface *);
 	class_interface_unregister(intf)
 
 
-extern struct Scsi_Host *scsi_host_alloc(Scsi_Host_Template *, int);
+extern struct Scsi_Host *scsi_host_alloc(struct scsi_host_template *, int);
 extern int scsi_add_host(struct Scsi_Host *, struct device *);
 extern int scsi_remove_host(struct Scsi_Host *);
 extern void scsi_host_get(struct Scsi_Host *);
@@ -585,7 +571,7 @@ extern void scsi_host_put(struct Scsi_Host *t);
 extern struct Scsi_Host *scsi_host_lookup(unsigned short);
 
 /* legacy interfaces */
-extern struct Scsi_Host *scsi_register(Scsi_Host_Template *, int);
+extern struct Scsi_Host *scsi_register(struct scsi_host_template *, int);
 extern void scsi_unregister(struct Scsi_Host *);
 
 /**
@@ -606,6 +592,6 @@ static inline Scsi_Device *scsi_find_device(struct Scsi_Host *shost,
         return NULL;
 }
 
-extern void scsi_sysfs_release_attributes(struct SHT *hostt);
+extern void scsi_sysfs_release_attributes(struct scsi_host_template *hostt);
 
 #endif

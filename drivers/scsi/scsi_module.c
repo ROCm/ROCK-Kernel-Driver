@@ -17,7 +17,7 @@
 
 static int __init init_this_scsi_driver(void)
 {
-	Scsi_Host_Template *sht = &driver_template;
+	struct scsi_host_template *sht = &driver_template;
 	struct Scsi_Host *shost;
 	struct list_head *l;
 	int error;
@@ -51,7 +51,7 @@ static int __init init_this_scsi_driver(void)
 
 static void __exit exit_this_scsi_driver(void)
 {
-	Scsi_Host_Template *sht = &driver_template;
+	struct scsi_host_template *sht = &driver_template;
 	struct Scsi_Host *shost, *s;
 
 	list_for_each_entry(shost, &sht->legacy_hosts, sht_legacy_list)

@@ -79,7 +79,7 @@ out:
 
 void scsi_proc_host_add(struct Scsi_Host *shost)
 {
-	Scsi_Host_Template *sht = shost->hostt;
+	struct scsi_host_template *sht = shost->hostt;
 	struct proc_dir_entry *p;
 	char name[10];
 
@@ -112,7 +112,7 @@ void scsi_proc_host_add(struct Scsi_Host *shost)
 
 void scsi_proc_host_rm(struct Scsi_Host *shost)
 {
-	Scsi_Host_Template *sht = shost->hostt;
+	struct scsi_host_template *sht = shost->hostt;
 	char name[10];
 
 	if (sht->proc_info) {

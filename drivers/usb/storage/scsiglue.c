@@ -360,7 +360,7 @@ static int usb_storage_proc_info (struct Scsi_Host *hostptr, char *buffer, char 
  * this defines our host template, with which we'll allocate hosts
  */
 
-struct SHT usb_stor_host_template = {
+struct scsi_host_template usb_stor_host_template = {
 	/* basic userland interface stuff */
 	.name =				"usb-storage",
 	.proc_name =			"usb-storage",
