@@ -238,7 +238,7 @@ nfsd(struct svc_rqst *rqstp)
 		printk(KERN_WARNING "nfsd: last server has exited\n");
 		if (err != SIG_NOCLEAN) {
 			printk(KERN_WARNING "nfsd: unexporting all filesystems\n");
-			nfsd_export_shutdown();
+			nfsd_export_flush();
 		}
 		nfsd_serv = NULL;
 	        nfsd_racache_shutdown();	/* release read-ahead cache */
