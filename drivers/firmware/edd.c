@@ -330,7 +330,7 @@ edd_show_legacy_max_cylinder(struct edd_device *edev, char *buf)
 	if (!info || !buf)
 		return -EINVAL;
 
-	p += snprintf(p, left, "0x%x\n", info->legacy_max_cylinder);
+	p += snprintf(p, left, "%u\n", info->legacy_max_cylinder);
 	return (p - buf);
 }
 
@@ -345,7 +345,7 @@ edd_show_legacy_max_head(struct edd_device *edev, char *buf)
 	if (!info || !buf)
 		return -EINVAL;
 
-	p += snprintf(p, left, "0x%x\n", info->legacy_max_head);
+	p += snprintf(p, left, "%u\n", info->legacy_max_head);
 	return (p - buf);
 }
 
@@ -360,7 +360,7 @@ edd_show_legacy_sectors_per_track(struct edd_device *edev, char *buf)
 	if (!info || !buf)
 		return -EINVAL;
 
-	p += snprintf(p, left, "0x%x\n", info->legacy_sectors_per_track);
+	p += snprintf(p, left, "%u\n", info->legacy_sectors_per_track);
 	return (p - buf);
 }
 
@@ -375,7 +375,7 @@ edd_show_default_cylinders(struct edd_device *edev, char *buf)
 	if (!info || !buf)
 		return -EINVAL;
 
-	p += scnprintf(p, left, "0x%x\n", info->params.num_default_cylinders);
+	p += scnprintf(p, left, "%u\n", info->params.num_default_cylinders);
 	return (p - buf);
 }
 
@@ -390,7 +390,7 @@ edd_show_default_heads(struct edd_device *edev, char *buf)
 	if (!info || !buf)
 		return -EINVAL;
 
-	p += scnprintf(p, left, "0x%x\n", info->params.num_default_heads);
+	p += scnprintf(p, left, "%u\n", info->params.num_default_heads);
 	return (p - buf);
 }
 
@@ -405,7 +405,7 @@ edd_show_default_sectors_per_track(struct edd_device *edev, char *buf)
 	if (!info || !buf)
 		return -EINVAL;
 
-	p += scnprintf(p, left, "0x%x\n", info->params.sectors_per_track);
+	p += scnprintf(p, left, "%u\n", info->params.sectors_per_track);
 	return (p - buf);
 }
 
@@ -420,7 +420,7 @@ edd_show_sectors(struct edd_device *edev, char *buf)
 	if (!info || !buf)
 		return -EINVAL;
 
-	p += scnprintf(p, left, "0x%llx\n", info->params.number_of_sectors);
+	p += scnprintf(p, left, "%llu\n", info->params.number_of_sectors);
 	return (p - buf);
 }
 
