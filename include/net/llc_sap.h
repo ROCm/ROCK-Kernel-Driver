@@ -49,9 +49,7 @@ struct llc_sap_state_ev;
 
 extern void llc_sap_assign_sock(struct llc_sap *sap, struct sock *sk);
 extern void llc_sap_unassign_sock(struct llc_sap *sap, struct sock *sk);
-extern void llc_sap_send_ev(struct llc_sap *sap, struct llc_sap_state_ev *ev);
-extern void llc_sap_rtn_pdu(struct llc_sap *sap, struct sk_buff *skb,
-			    struct llc_sap_state_ev *ev);
+extern void llc_sap_send_ev(struct llc_sap *sap, struct sk_buff *skb);
+extern void llc_sap_rtn_pdu(struct llc_sap *sap, struct sk_buff *skb);
 extern void llc_sap_send_pdu(struct llc_sap *sap, struct sk_buff *skb);
-extern struct llc_sap_state_ev *llc_sap_alloc_ev(struct llc_sap *sap);
 #endif /* LLC_SAP_H */

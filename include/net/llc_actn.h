@@ -24,25 +24,25 @@
 
 /* All station state event action functions look like this */
 typedef int (*llc_station_action_t)(struct llc_station *station,
-				    struct llc_station_state_ev *ev);
+				    struct sk_buff *skb);
 extern int llc_station_ac_start_ack_timer(struct llc_station *station,
-					  struct llc_station_state_ev *ev);
+					  struct sk_buff *skb);
 extern int llc_station_ac_set_retry_cnt_0(struct llc_station *station,
-					  struct llc_station_state_ev *ev);
+					  struct sk_buff *skb);
 extern int llc_station_ac_inc_retry_cnt_by_1(struct llc_station *station,
-					     struct llc_station_state_ev *ev);
+					     struct sk_buff *skb);
 extern int llc_station_ac_set_xid_r_cnt_0(struct llc_station *station,
-					  struct llc_station_state_ev *ev);
+					  struct sk_buff *skb);
 extern int llc_station_ac_inc_xid_r_cnt_by_1(struct llc_station *station,
-					     struct llc_station_state_ev *ev);
+					     struct sk_buff *skb);
 extern int llc_station_ac_send_null_dsap_xid_c(struct llc_station *station,
-					       struct llc_station_state_ev *ev);
+					       struct sk_buff *skb);
 extern int llc_station_ac_send_xid_r(struct llc_station *station,
-				     struct llc_station_state_ev *ev);
+				     struct sk_buff *skb);
 extern int llc_station_ac_send_test_r(struct llc_station *station,
-				      struct llc_station_state_ev *ev);
+				      struct sk_buff *skb);
 extern int llc_station_ac_report_status(struct llc_station *station,
-					struct llc_station_state_ev *ev);
+					struct sk_buff *skb);
 extern int llc_station_ac_report_status(struct llc_station *station,
-					struct llc_station_state_ev *ev);
+					struct sk_buff *skb);
 #endif /* LLC_ACTN_H */

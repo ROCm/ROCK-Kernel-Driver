@@ -27,6 +27,12 @@
 #include <net/llc_s_ev.h>
 #include <linux/trdevice.h>
 
+#if 1
+#define dprintk(args...) printk(KERN_DEBUG args)
+#else
+#define dprintk(args...)
+#endif
+
 /* function prototypes */
 static void fix_up_incoming_skb(struct sk_buff *skb);
 
@@ -46,7 +52,7 @@ int mac_send_pdu(struct sk_buff *skb)
 	int pri = GFP_ATOMIC, rc = -1;
 
 	if (!skb->dev) {
-		printk(KERN_ERR "%s: skb->dev == NULL!", __FUNCTION__);
+		dprintk(KERN_ERR "%s: skb->dev == NULL!", __FUNCTION__);
 		goto out;
 	}
 	if (skb->sk)
@@ -83,7 +89,7 @@ int mac_indicate(struct sk_buff *skb, struct net_device *dev,
 	 * receives, do not try to analyse it.
 	 */
 	if (skb->pkt_type == PACKET_OTHERHOST) {
-		printk(KERN_INFO "%s: PACKET_OTHERHOST\n", __FUNCTION__);
+		dprintk(KERN_INFO "%s: PACKET_OTHERHOST\n", __FUNCTION__);
 		goto drop;
 	}
 	skb = skb_share_check(skb, GFP_ATOMIC);
@@ -140,7 +146,8 @@ int mac_indicate(struct sk_buff *skb, struct net_device *dev,
 			rc = llc_pdu_router(llc_sk(sk)->sap, sk, skb,
 					    LLC_TYPE_2);
 		} else {
-			skb->cb[0] = LLC_PACKET;
+			dprintk(KERN_INFO "%s: add to backlog\n", __FUNCTION__);
+			llc_set_backlog_type(skb, LLC_PACKET);
 			sk_add_backlog(sk, skb);
 			rc = 0;
 		}
@@ -207,38 +214,27 @@ int llc_pdu_router(struct llc_sap *sap, struct sock* sk,
 
 	if (!pdu->dsap) {
 		struct llc_station *station = llc_station_get();
-		struct llc_station_state_ev *stat_ev =
-						  llc_station_alloc_ev(station);
-		if (stat_ev) {
-			stat_ev->type		 = LLC_STATION_EV_TYPE_PDU;
-			stat_ev->data.pdu.skb	 = skb;
-			stat_ev->data.pdu.reason = 0;
-			llc_station_send_ev(station, stat_ev);
-		} else
-			rc = -ENOMEM;
-	} else if (type == LLC_TYPE_1) {
-		struct llc_sap_state_ev *sap_ev = llc_sap_alloc_ev(sap);
+		struct llc_station_state_ev *ev = llc_station_ev(skb);
 
-		if (sap_ev) {
-			sap_ev->type		= LLC_SAP_EV_TYPE_PDU;
-			sap_ev->data.pdu.skb	= skb;
-			sap_ev->data.pdu.reason = 0;
-			llc_sap_send_ev(sap, sap_ev);
-		} else
-			rc = -ENOMEM;
+		ev->type	    = LLC_STATION_EV_TYPE_PDU;
+		ev->data.pdu.reason = 0;
+		llc_station_send_ev(station, skb);
+	} else if (type == LLC_TYPE_1) {
+		struct llc_sap_state_ev *ev = llc_sap_ev(skb);
+
+		ev->type	    = LLC_SAP_EV_TYPE_PDU;
+		ev->data.pdu.reason = 0;
+		llc_sap_send_ev(sap, skb);
 	} else if (type == LLC_TYPE_2) {
-		struct llc_conn_state_ev *conn_ev = llc_conn_alloc_ev(sk);
+		struct llc_conn_state_ev *ev = llc_conn_ev(skb);
 		struct llc_opt *llc = llc_sk(sk);
 
 		if (!llc->dev)
 			llc->dev = skb->dev;
-		if (conn_ev) {
-			conn_ev->type		 = LLC_CONN_EV_TYPE_PDU;
-			conn_ev->data.pdu.skb	 = skb;
-			conn_ev->data.pdu.reason = 0;
-			rc = llc_conn_send_ev(sk, conn_ev);
-		} else
-			rc = -ENOMEM;
+
+		ev->type	    = LLC_CONN_EV_TYPE_PDU;
+		ev->data.pdu.reason = 0;
+		rc = llc_conn_send_ev(sk, skb);
 	} else
 		rc = -EINVAL;
 	return rc;

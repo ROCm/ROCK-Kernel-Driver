@@ -58,7 +58,7 @@ union llc_stat_ev_if {
 	struct llc_stat_ev_simple_if  a;	/* 'a' for simple, easy ... */
 	struct llc_stat_ev_prim_if    prim;
 	struct llc_stat_ev_pdu_if     pdu;
-	struct llc_stat_ev_tmr_if   tmr;
+	struct llc_stat_ev_tmr_if     tmr;
 	struct llc_stat_ev_rpt_sts_if rsts;	/* report status */
 };
 
@@ -68,26 +68,32 @@ struct llc_station_state_ev {
 	struct list_head	node; /* node in station->ev_q.list */
 };
 
+static __inline__ struct llc_station_state_ev *
+					llc_station_ev(struct sk_buff *skb)
+{
+	return (struct llc_station_state_ev *)skb->cb;
+}
+
 typedef int (*llc_station_ev_t)(struct llc_station *station,
-				struct llc_station_state_ev *ev);
+				struct sk_buff *skb);
 
 extern int llc_stat_ev_enable_with_dup_addr_check(struct llc_station *station,
-					       struct llc_station_state_ev *ev);
+						  struct sk_buff *skb);
 extern int llc_stat_ev_enable_without_dup_addr_check(struct llc_station *station,
-					       struct llc_station_state_ev *ev);
+						     struct sk_buff *skb);
 extern int llc_stat_ev_ack_tmr_exp_lt_retry_cnt_max_retry(struct llc_station *
 									station,
-					       struct llc_station_state_ev *ev);
+							  struct sk_buff *skb);
 extern int llc_stat_ev_ack_tmr_exp_eq_retry_cnt_max_retry(struct llc_station *station,
-					       struct llc_station_state_ev *ev);
+							  struct sk_buff *skb);
 extern int llc_stat_ev_rx_null_dsap_xid_c(struct llc_station *station,
-					  struct llc_station_state_ev *ev);
+					  struct sk_buff *skb);
 extern int llc_stat_ev_rx_null_dsap_0_xid_r_xid_r_cnt_eq(struct llc_station *station,
-					       struct llc_station_state_ev *ev);
+							 struct sk_buff *skb);
 extern int llc_stat_ev_rx_null_dsap_1_xid_r_xid_r_cnt_eq(struct llc_station *station,
-					       struct llc_station_state_ev *ev);
+							 struct sk_buff *skb);
 extern int llc_stat_ev_rx_null_dsap_test_c(struct llc_station *station,
-					   struct llc_station_state_ev *ev);
+					   struct sk_buff *skb);
 extern int llc_stat_ev_disable_req(struct llc_station *station,
-				       struct llc_station_state_ev *ev);
+				   struct sk_buff *skb);
 #endif /* LLC_EVNT_H */

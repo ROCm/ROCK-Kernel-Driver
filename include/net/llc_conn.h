@@ -136,12 +136,10 @@ extern void llc_sock_reset(struct sock *sk);
 extern int llc_sock_init(struct sock *sk);
 
 /* Access to a connection */
-extern struct llc_conn_state_ev *llc_conn_alloc_ev(struct sock *sk);
-extern int llc_conn_send_ev(struct sock *sk, struct llc_conn_state_ev *ev);
+extern int llc_conn_send_ev(struct sock *sk, struct sk_buff *skb);
 extern void llc_conn_send_pdu(struct sock *sk, struct sk_buff *skb);
-extern void llc_conn_rtn_pdu(struct sock *sk, struct sk_buff *skb,
-			     struct llc_conn_state_ev *ev);
-extern void llc_conn_free_ev(struct llc_conn_state_ev *ev);
+extern void llc_conn_rtn_pdu(struct sock *sk, struct sk_buff *skb);
+extern void llc_conn_free_ev(struct sk_buff *skb);
 extern void llc_conn_resend_i_pdu_as_cmd(struct sock *sk, u8 nr,
 					 u8 first_p_bit);
 extern void llc_conn_resend_i_pdu_as_rsp(struct sock *sk, u8 nr,
