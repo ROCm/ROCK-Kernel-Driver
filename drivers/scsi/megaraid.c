@@ -4218,13 +4218,13 @@ static void mega_create_proc_entry (int index, struct proc_dir_entry *parent)
  * Return the disk geometry for a particular disk
  * Input:
  *   Disk *disk - Disk geometry
- *   kdev_t dev - Device node
+ *   struct block_device *dev - Device node
  *   int *geom  - Returns geometry fields
  *     geom[0] = heads
  *     geom[1] = sectors
  *     geom[2] = cylinders
  *-------------------------------------------------------------*/
-int megaraid_biosparam (Disk * disk, kdev_t dev, int *geom)
+int megaraid_biosparam (Disk * disk, struct block_device *bdev, int *geom)
 {
 	int heads, sectors, cylinders;
 	mega_host_config *megaCfg;
@@ -4251,7 +4251,7 @@ int megaraid_biosparam (Disk * disk, kdev_t dev, int *geom)
 			geom[2] = cylinders;
 	}
 	else {
-		if( mega_partsize(disk, dev, geom) == 0 ) return 0;
+		if( mega_partsize(disk, bdev, geom) == 0 ) return 0;
 
 		printk(KERN_WARNING
 				"megaraid: invalid partition on this disk on channel %d\n",
@@ -4279,7 +4279,7 @@ int megaraid_biosparam (Disk * disk, kdev_t dev, int *geom)
 }
 
 /*
- * Function : static int mega_partsize(Disk * disk, kdev_t dev, int *geom)
+ * Function : static int mega_partsize(Disk * disk, struct block_device *bdev, int *geom)
  *
  * Purpose : to determine the BIOS mapping used to create the partition
  *			table, storing the results (cyls, hds, and secs) in geom
@@ -4289,7 +4289,7 @@ int megaraid_biosparam (Disk * disk, kdev_t dev, int *geom)
  * Returns : -1 on failure, 0 on success.
  */
 static int
-mega_partsize(Disk * disk, kdev_t dev, int *geom)
+mega_partsize(Disk * disk, struct block_device *bdev, int *geom)
 {
 	struct partition *p, *largest = NULL;
 	int i, largest_cyl;
@@ -4297,7 +4297,7 @@ mega_partsize(Disk * disk, kdev_t dev, int *geom)
 	int capacity = disk->capacity;
 	unsigned char *buf;
 
-	if (!(buf = scsi_bios_ptable(dev)))
+	if (!(buf = scsi_bios_ptable(bdev)))
 		return -1;
 
 	if( *(unsigned short *)(buf + 64) == 0xAA55 ) {
@@ -4534,7 +4534,6 @@ static int megadev_ioctl (struct inode *inode, struct file *filep,
 	       unsigned int cmd, unsigned long arg)
 {
 	int adapno;
-	kdev_t dev;
 	u32 inlen;
 	struct uioctl_t ioc;
 	char *kvaddr = NULL;
@@ -4560,8 +4559,6 @@ static int megadev_ioctl (struct inode *inode, struct file *filep,
 
 	if (!inode)
 		return -EINVAL;
-
-	dev = inode->i_rdev;
 
 	if (_IOC_TYPE (cmd) != MEGAIOC_MAGIC)
 		return (-EINVAL);

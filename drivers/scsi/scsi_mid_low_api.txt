@@ -85,7 +85,7 @@ The interface functions are listed below in alphabetical order.
  *      pre-initialized with made up values just in case this function 
  *      doesn't output anything.
  **/
-    int bios_param(Scsi_Disk * sdkp, kdev_t dev, int params[3]);
+    int bios_param(Scsi_Disk * sdkp, struct block_device *bdev, int params[3]);
 
 
 /**

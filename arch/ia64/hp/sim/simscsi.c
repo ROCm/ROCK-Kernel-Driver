@@ -144,7 +144,7 @@ simscsi_reset (Scsi_Cmnd *cmd, unsigned int reset_flags)
 }
 
 int
-simscsi_biosparam (Disk *disk, kdev_t n, int ip[])
+simscsi_biosparam (Disk *disk, struct block_device *n, int ip[])
 {
 	int size = disk->capacity;
 

@@ -653,7 +653,7 @@ void inia100SCBPost(BYTE * pHcb, BYTE * pScb)
  Output         : None.
  Return         : pSRB  -       Pointer to SCSI request block.
 *****************************************************************************/
-int inia100_biosparam(Scsi_Disk * disk, kdev_t dev, int *info_array)
+int inia100_biosparam(Scsi_Disk * disk, struct block_device *dev, int *info_array)
 {
 	ORC_HCS *pHcb;		/* Point to Host adapter control block */
 	ORC_TCS *pTcb;

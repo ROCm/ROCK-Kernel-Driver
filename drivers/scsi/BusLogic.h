@@ -34,7 +34,6 @@
   of the Linux Kernel and SCSI Subsystem.
 */
 
-typedef kdev_t KernelDevice_T;
 typedef unsigned long ProcessorFlags_T;
 typedef struct pt_regs Registers_T;
 typedef struct partition PartitionTable_T;
@@ -58,7 +57,7 @@ extern int BusLogic_QueueCommand(SCSI_Command_T *,
 				 void (*CompletionRoutine)(SCSI_Command_T *));
 extern int BusLogic_AbortCommand(SCSI_Command_T *);
 extern int BusLogic_ResetCommand(SCSI_Command_T *, unsigned int);
-extern int BusLogic_BIOSDiskParameters(SCSI_Disk_T *, KernelDevice_T, int *);
+extern int BusLogic_BIOSDiskParameters(SCSI_Disk_T *, struct block_device *, int *);
 extern int BusLogic_ProcDirectoryInfo(char *, char **, off_t, int, int, int);
 
 

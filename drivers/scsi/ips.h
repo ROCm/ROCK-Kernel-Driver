@@ -56,7 +56,7 @@
    extern int ips_eh_abort(Scsi_Cmnd *);
    extern int ips_eh_reset(Scsi_Cmnd *);
    extern int ips_queue(Scsi_Cmnd *, void (*) (Scsi_Cmnd *));
-   extern int ips_biosparam(Disk *, kdev_t, int *);
+   extern int ips_biosparam(Disk *, struct block_device *, int *);
    extern const char * ips_info(struct Scsi_Host *);
    extern void do_ips(int, void *, struct pt_regs *);
 

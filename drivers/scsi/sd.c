@@ -233,10 +233,10 @@ static int sd_ioctl(struct inode * inode, struct file * filp,
 			   or driver values */
 	
 			if(host->hostt->bios_param != NULL)
-				host->hostt->bios_param(sdkp, dev,
+				host->hostt->bios_param(sdkp, inode->i_bdev,
 							&diskinfo[0]);
 			else
-				scsicam_bios_param(sdkp, dev, &diskinfo[0]);
+				scsicam_bios_param(sdkp, inode->i_bdev, &diskinfo[0]);
 			if (put_user(diskinfo[0], &loc->heads) ||
 				put_user(diskinfo[1], &loc->sectors) ||
 				put_user(diskinfo[2], &loc->cylinders) ||

@@ -31,7 +31,7 @@ int        fdomain_16x0_abort( Scsi_Cmnd * );
 const char *fdomain_16x0_info( struct Scsi_Host * );
 int        fdomain_16x0_reset( Scsi_Cmnd *, unsigned int ); 
 int        fdomain_16x0_queue( Scsi_Cmnd *, void (*done)(Scsi_Cmnd *) );
-int        fdomain_16x0_biosparam( Disk *, kdev_t, int * );
+int        fdomain_16x0_biosparam( Disk *, struct block_device *, int * );
 int        fdomain_16x0_proc_info( char *buffer, char **start, off_t offset,
 				   int length, int hostno, int inout );
 int        fdomain_16x0_release( struct Scsi_Host *shpnt );

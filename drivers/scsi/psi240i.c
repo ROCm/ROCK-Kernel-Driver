@@ -703,7 +703,7 @@ int Psi240i_Reset (Scsi_Cmnd *SCpnt, unsigned int reset_flags)
  *	Returns:		zero.
  *
  ****************************************************************/
-int Psi240i_BiosParam (Scsi_Disk *disk, kdev_t dev, int geom[])
+int Psi240i_BiosParam (Scsi_Disk *disk, struct block_device *dev, int geom[])
 	{
 	POUR_DEVICE	pdev;
 

@@ -998,7 +998,7 @@ int ppa_queuecommand(Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *))
  * be done in sd.c.  Even if it gets fixed there, this will still
  * work.
  */
-int ppa_biosparam(Disk * disk, kdev_t dev, int ip[])
+int ppa_biosparam(Disk * disk, struct block_device *dev, int ip[])
 {
     ip[0] = 0x40;
     ip[1] = 0x20;

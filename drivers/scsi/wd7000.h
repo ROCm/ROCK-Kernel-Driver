@@ -12,7 +12,6 @@
  */
 
 #include <linux/types.h>
-#include <linux/kdev_t.h>
 
 int wd7000_set_info (char *buffer, int length, struct Scsi_Host *host);
 int wd7000_proc_info (char *buffer, char **start, off_t offset, int length, int hostno, int inout);
@@ -21,7 +20,7 @@ int wd7000_command (Scsi_Cmnd *);
 int wd7000_queuecommand (Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
 int wd7000_abort (Scsi_Cmnd *);
 int wd7000_reset (Scsi_Cmnd *, unsigned int);
-int wd7000_biosparam (Disk *, kdev_t, int *);
+int wd7000_biosparam (Disk *, struct block_device *, int *);
 
 #ifndef NULL
 #define NULL 0L

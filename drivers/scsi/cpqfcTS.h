@@ -12,7 +12,7 @@ extern int cpqfcTS_abort(Scsi_Cmnd *);
 extern int cpqfcTS_reset(Scsi_Cmnd *, unsigned int);
 extern int cpqfcTS_eh_abort(Scsi_Cmnd *Cmnd);
 extern int cpqfcTS_eh_device_reset(Scsi_Cmnd *);
-extern int cpqfcTS_biosparam(Disk *, kdev_t, int[]);
+extern int cpqfcTS_biosparam(Disk *, struct block_device *, int[]);
 extern int cpqfcTS_ioctl( Scsi_Device *ScsiDev, int Cmnd, void *arg);
 
 // note: since Tachyon TS supports an extended scatter/gather

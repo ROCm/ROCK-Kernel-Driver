@@ -1699,7 +1699,7 @@ qla1280_reset(Scsi_Cmnd * cmd, unsigned int flags)
  *   Return the disk geometry for the given SCSI device.
  **************************************************************************/
 int
-qla1280_biosparam(Disk * disk, kdev_t dev, int geom[])
+qla1280_biosparam(Disk * disk, struct block_device *dev, int geom[])
 {
 	int heads, sectors, cylinders;
 
