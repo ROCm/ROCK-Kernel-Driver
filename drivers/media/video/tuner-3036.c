@@ -185,22 +185,20 @@ tuner_probe(struct i2c_adapter *adap)
 static struct i2c_driver 
 i2c_driver_tuner = 
 {
-	"sab3036",		/* name       */
-	I2C_DRIVERID_SAB3036,	/* ID         */
-        I2C_DF_NOTIFY,
-	tuner_probe,
-	tuner_detach,
-	tuner_command
+	.owner		=	THIS_MODULE,
+	.name		=	"sab3036",
+	.id		=	I2C_DRIVERID_SAB3036,
+        .flags		=	I2C_DF_NOTIFY,
+	.attach_adapter =	tuner_probe,
+	.detach_client  =	tuner_detach,
+	.command	=	tuner_command
 };
 
 static struct i2c_client client_template =
 {
-        "SAB3036",		/* name       */
-        -1,
-        0,
-        0,
-        NULL,
-        &i2c_driver_tuner
+        .name 		= "SAB3036",
+        .id 		= -1,
+        .driver		= &i2c_driver_tuner
 };
 
 int __init
