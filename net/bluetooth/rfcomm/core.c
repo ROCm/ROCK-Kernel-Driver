@@ -850,7 +850,7 @@ static int rfcomm_send_msc(struct rfcomm_session *s, int cr, u8 dlci, u8 v24_sig
 
 	msc = (void *) ptr; ptr += sizeof(*msc);
 	msc->dlci    = __addr(1, dlci);
-	msc->v24_sig = v24_sig;
+	msc->v24_sig = v24_sig | 0x01;
 
 	*ptr = __fcs(buf); ptr++;
 
@@ -1209,6 +1209,14 @@ static int rfcomm_recv_rpn(struct rfcomm_session *s, int cr, int len, struct sk_
 	}
 	/* check for sane values: ignore/accept bit_rate, 8 bits, 1 stop bit, no parity,
 	                          no flow control lines, normal XON/XOFF chars */
+	if (rpn->param_mask & RFCOMM_RPN_PM_BITRATE) {
+		bit_rate = rpn->bit_rate;
+		if (bit_rate != RFCOMM_RPN_BR_115200) {
+			BT_DBG("RPN bit rate mismatch 0x%x", bit_rate);
+			bit_rate = RFCOMM_RPN_BR_115200;
+			rpn_mask ^= RFCOMM_RPN_PM_BITRATE;
+		}
+	}
 	if (rpn->param_mask & RFCOMM_RPN_PM_DATA) {
 		data_bits = __get_rpn_data_bits(rpn->line_settings);
 		if (data_bits != RFCOMM_RPN_DATA_8) {
@@ -1234,22 +1242,25 @@ static int rfcomm_recv_rpn(struct rfcomm_session *s, int cr, int len, struct sk_
 		}
 	}
 	if (rpn->param_mask & RFCOMM_RPN_PM_FLOW) {
-		if (rpn->flow_ctrl != RFCOMM_RPN_FLOW_NONE) {
-			BT_DBG("RPN flow ctrl mismatch 0x%x", rpn->flow_ctrl);
+		flow_ctrl = rpn->flow_ctrl;
+		if (flow_ctrl != RFCOMM_RPN_FLOW_NONE) {
+			BT_DBG("RPN flow ctrl mismatch 0x%x", flow_ctrl);
 			flow_ctrl = RFCOMM_RPN_FLOW_NONE;
 			rpn_mask ^= RFCOMM_RPN_PM_FLOW;
 		}
 	}
 	if (rpn->param_mask & RFCOMM_RPN_PM_XON) {
-		if (rpn->xon_char != RFCOMM_RPN_XON_CHAR) {
-			BT_DBG("RPN XON char mismatch 0x%x", rpn->xon_char);
+		xon_char = rpn->xon_char;
+		if (xon_char != RFCOMM_RPN_XON_CHAR) {
+			BT_DBG("RPN XON char mismatch 0x%x", xon_char);
 			xon_char = RFCOMM_RPN_XON_CHAR;
 			rpn_mask ^= RFCOMM_RPN_PM_XON;
 		}
 	}
 	if (rpn->param_mask & RFCOMM_RPN_PM_XOFF) {
-		if (rpn->xoff_char != RFCOMM_RPN_XOFF_CHAR) {
-			BT_DBG("RPN XOFF char mismatch 0x%x", rpn->xoff_char);
+		xoff_char = rpn->xoff_char;
+		if (xoff_char != RFCOMM_RPN_XOFF_CHAR) {
+			BT_DBG("RPN XOFF char mismatch 0x%x", xoff_char);
 			xoff_char = RFCOMM_RPN_XOFF_CHAR;
 			rpn_mask ^= RFCOMM_RPN_PM_XOFF;
 		}
