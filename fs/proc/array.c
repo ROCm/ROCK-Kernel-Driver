@@ -322,7 +322,7 @@ int proc_pid_stat(struct task_struct *task, char * buffer)
 	if (task->sighand) {
 		spin_lock_irq(&task->sighand->siglock);
 		collect_sigign_sigcatch(task, &sigign, &sigcatch);
-		spin_lock_irq(&task->sighand->siglock);
+		spin_unlock_irq(&task->sighand->siglock);
 	}
 	read_unlock(&tasklist_lock);		
 
