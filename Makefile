@@ -199,11 +199,17 @@ ifeq ($(filter $(noconfig_targets),$(MAKECMDGOALS)),)
 
 #	If .config doesn't exist - tough luck
 
-.config:
+.config: arch/$(ARCH)/config.in $(shell find . -name Config.in)
 	@echo '***'
-	@echo '*** You have not yet configured your kernel!'
-	@echo '*** Please run some configurator (do "make xconfig" or'
-	@echo '*** "make menuconfig" or "make oldconfig" or "make config").'
+	@if [ -f $@ ]; then \
+	  echo '*** The tree was updated, so your .config may be'; \
+	  echo '*** out of date!'; \
+	else \
+	  echo '*** You have not yet configured your kernel!'; \
+	fi
+	@echo '***'
+	@echo '*** Please run some configurator (e.g. "make oldconfig" or'
+	@echo '*** "make menuconfig" or "make xconfig").'
 	@echo '***'
 	@exit 1
 
