@@ -57,6 +57,7 @@ extern int kmem_cache_destroy(kmem_cache_t *);
 extern int kmem_cache_shrink(kmem_cache_t *);
 extern void *kmem_cache_alloc(kmem_cache_t *, int);
 extern void kmem_cache_free(kmem_cache_t *, void *);
+extern unsigned int kmem_cache_size(kmem_cache_t *);
 
 extern void *kmalloc(size_t, int);
 extern void kfree(const void *);

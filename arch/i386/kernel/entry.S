@@ -689,8 +689,8 @@ ENTRY(sys_call_table)
 	.long sys_rt_sigtimedwait
 	.long sys_rt_sigqueueinfo
 	.long sys_rt_sigsuspend
-	.long sys_pread		/* 180 */
-	.long sys_pwrite
+	.long sys_pread64	/* 180 */
+	.long sys_pwrite64
 	.long sys_chown16
 	.long sys_getcwd
 	.long sys_capget

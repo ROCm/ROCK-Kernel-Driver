@@ -160,8 +160,6 @@ struct device {
 	void	(*release)(struct device * dev);
 };
 
-#define to_device(d) container_of(d, struct device, dir)
-
 static inline struct device *
 list_to_dev(struct list_head *node)
 {
@@ -179,8 +177,24 @@ g_list_to_dev(struct list_head *g_list)
  */
 extern int device_register(struct device * dev);
 
-extern int device_create_file(struct device *device, struct driver_file_entry * entry);
-extern void device_remove_file(struct device * dev, const char * name);
+
+/* driverfs interface for exporting device attributes */
+
+struct device_attribute {
+	struct attribute	attr;
+	ssize_t (*show)(struct device * dev, char * buf, size_t count, loff_t off);
+	ssize_t (*store)(struct device * dev, const char * buf, size_t count, loff_t off);
+};
+
+#define DEVICE_ATTR(_name,_str,_mode,_show,_store)	\
+struct device_attribute dev_attr_##_name = { 		\
+	.attr = {.name	= _str,	.mode	= _mode },	\
+	.show	= _show,				\
+	.store	= _store,				\
+};
+
+extern int device_create_file(struct device *device, struct device_attribute * entry);
+extern void device_remove_file(struct device * dev, struct device_attribute * attr);
 
 /*
  * Platform "fixup" functions - allow the platform to have their say

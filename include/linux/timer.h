@@ -2,6 +2,7 @@
 #define _LINUX_TIMER_H
 
 #include <linux/config.h>
+#include <linux/stddef.h>
 #include <linux/list.h>
 
 /*

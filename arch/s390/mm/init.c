@@ -189,7 +189,7 @@ void free_initmem(void)
 		totalram_pages++;
         }
         printk ("Freeing unused kernel memory: %dk freed\n",
-		(&__init_end - &__init_begin) >> 10);
+		((unsigned long)&__init_end - (unsigned long)&__init_begin) >> 10);
 }
 
 #ifdef CONFIG_BLK_DEV_INITRD

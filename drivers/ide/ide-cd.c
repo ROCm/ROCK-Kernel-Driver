@@ -305,8 +305,9 @@
 #include <linux/interrupt.h>
 #include <linux/errno.h>
 #include <linux/cdrom.h>
-#include <linux/ide.h>
 #include <linux/completion.h>
+#include <linux/hdreg.h>
+#include <linux/ide.h>
 
 #include <asm/irq.h>
 #include <asm/io.h>
@@ -1616,16 +1617,11 @@ ide_cdrom_do_request(struct ata_device *drive, struct request *rq, sector_t bloc
 
 	if (rq->flags & REQ_CMD) {
 		if (CDROM_CONFIG_FLAGS(drive)->seeking) {
-			unsigned long elpased = jiffies - info->start_seek;
-
-			if (!ata_status(drive, SEEK_STAT, 0)) {
-				if (elpased < IDECD_SEEK_TIMEOUT) {
-					ide_stall_queue(drive, IDECD_SEEK_TIMER);
-					return ATA_OP_FINISHED;
-				}
+			if (ATA_OP_READY != ata_status_poll(drive, SEEK_STAT, 0, IDECD_SEEK_TIMEOUT, rq)) {
 				printk ("%s: DSC timeout\n", drive->name);
-			}
-			CDROM_CONFIG_FLAGS(drive)->seeking = 0;
+				CDROM_CONFIG_FLAGS(drive)->seeking = 0;
+			} else
+				return ATA_OP_FINISHED;
 		}
 		if (IDE_LARGE_SEEK(info->last_block, block, IDECD_SEEK_THRESHOLD) && drive->dsc_overlap) {
 			ret = cdrom_start_seek(drive, rq, block);
@@ -2016,7 +2012,6 @@ static int cdrom_read_toc(struct ata_device *drive, struct request_sense *sense)
 	if (stat)
 		toc->capacity = 0x1fffff;
 
-	drive->channel->gd->sizes[drive->select.b.unit << PARTN_BITS] = (toc->capacity * SECTORS_PER_FRAME) >> (BLOCK_SIZE_BITS - 9);
 	drive->part[0].nr_sects = toc->capacity * SECTORS_PER_FRAME;
 
 	/* Remember that we've read this stuff. */
@@ -2882,7 +2877,6 @@ void ide_cdrom_revalidate(struct ata_device *drive)
 {
 	struct cdrom_info *info = drive->driver_data;
 	struct atapi_toc *toc;
-	int minor = drive->select.b.unit << PARTN_BITS;
 	struct request_sense sense;
 
 	cdrom_read_toc(drive, &sense);
@@ -2894,8 +2888,6 @@ void ide_cdrom_revalidate(struct ata_device *drive)
 
 	/* for general /dev/cdrom like mounting, one big disc */
 	drive->part[0].nr_sects = toc->capacity * SECTORS_PER_FRAME;
-	drive->channel->gd->sizes[minor] = toc->capacity * BLOCKS_PER_FRAME;
-	blk_size[drive->channel->major] = drive->channel->gd->sizes;
 }
 
 static sector_t ide_cdrom_capacity(struct ata_device *drive)
@@ -2914,7 +2906,7 @@ int ide_cdrom_cleanup(struct ata_device *drive)
 	struct cdrom_info *info = drive->driver_data;
 	struct cdrom_device_info *devinfo = &info->devinfo;
 
-	if (ide_unregister_subdriver (drive))
+	if (ata_unregister_device(drive))
 		return 1;
 	if (info->buffer != NULL)
 		kfree(info->buffer);
@@ -2973,7 +2965,7 @@ static void ide_cdrom_attach(struct ata_device *drive)
 		printk(KERN_ERR "%s: Can't allocate a cdrom structure\n", drive->name);
 		return;
 	}
-	if (ide_register_subdriver (drive, &ide_cdrom_driver)) {
+	if (ata_register_device(drive, &ide_cdrom_driver)) {
 		printk(KERN_ERR "%s: Failed to register the driver with ide.c\n", drive->name);
 		kfree (info);
 		return;

@@ -424,16 +424,19 @@ ergo_releasehardware(hysdn_card * card)
 int
 ergo_inithardware(hysdn_card * card)
 {
-	if (check_region(card->iobase + PCI9050_INTR_REG, 1) ||
-	    check_region(card->iobase + PCI9050_USER_IO, 1))
-		return (-1);	/* ports already in use */
-
-	card->memend = card->membase + ERG_DPRAM_PAGE_SIZE - 1;
-	if (!(card->dpram = ioremap(card->membase, ERG_DPRAM_PAGE_SIZE)))
+	if (!request_region(card->iobase + PCI9050_INTR_REG, 1, "HYSDN")) 
 		return (-1);
+	if (!request_region(card->iobase + PCI9050_USER_IO, 1, "HYSDN")) {
+		release_region(card->iobase + PCI9050_INTR_REG, 1);
+		return (-1);	/* ports already in use */
+	}
+	card->memend = card->membase + ERG_DPRAM_PAGE_SIZE - 1;
+	if (!(card->dpram = ioremap(card->membase, ERG_DPRAM_PAGE_SIZE))) {
+		release_region(card->iobase + PCI9050_INTR_REG, 1);
+		release_region(card->iobase + PCI9050_USER_IO, 1);
+		return (-1);
+	}
 
-	request_region(card->iobase + PCI9050_INTR_REG, 1, "HYSDN");
-	request_region(card->iobase + PCI9050_USER_IO, 1, "HYSDN");
 	ergo_stopcard(card);	/* disable interrupts */
 	if (request_irq(card->irq, ergo_interrupt, SA_SHIRQ, "HYSDN", card)) {
 		ergo_releasehardware(card); /* return the acquired hardware */

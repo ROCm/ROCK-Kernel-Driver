@@ -66,21 +66,18 @@ static void sub22 (char b, char c)
 	}
 }
 
+/* Assumes IRQ's are disabled or at least that no other process will
+   attempt to access the IDE registers concurrently. */
 static void tune_dtc2278(struct ata_device *drive, u8 pio)
 {
-	unsigned long flags;
-
 	pio = ata_timing_mode(drive, XFER_PIO | XFER_EPIO) - XFER_PIO_0;
 
 	if (pio >= 3) {
-		save_flags(flags);	/* all CPUs */
-		cli();			/* all CPUs */
 		/*
 		 * This enables PIO mode4 (3?) on the first interface
 		 */
 		sub22(1,0xc3);
 		sub22(0,0xa0);
-		restore_flags(flags);	/* all CPUs */
 	} else {
 		/* we don't know how to set it back again.. */
 	}

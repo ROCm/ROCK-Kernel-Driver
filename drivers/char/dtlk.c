@@ -340,7 +340,7 @@ static int __init dtlk_init(void)
 	dtlk_port_lpc = 0;
 	dtlk_port_tts = 0;
 	dtlk_busy = 0;
-	dtlk_major = devfs_register_chrdev(0, "dtlk", &dtlk_fops);
+	dtlk_major = register_chrdev(0, "dtlk", &dtlk_fops);
 	if (dtlk_major == 0) {
 		printk(KERN_ERR "DoubleTalk PC - cannot register device\n");
 		return 0;
@@ -369,7 +369,7 @@ static void __exit dtlk_cleanup (void)
 						   signals... */
 
 	dtlk_write_tts(DTLK_CLEAR);
-	devfs_unregister_chrdev(dtlk_major, "dtlk");
+	unregister_chrdev(dtlk_major, "dtlk");
 	devfs_unregister(devfs_handle);
 	release_region(dtlk_port_lpc, DTLK_IO_EXTENT);
 }

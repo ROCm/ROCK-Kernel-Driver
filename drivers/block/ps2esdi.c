@@ -43,7 +43,6 @@
 #include <linux/kernel.h>
 #include <linux/genhd.h>
 #include <linux/ps2esdi.h>
-#include <linux/devfs_fs_kernel.h>
 #include <linux/blk.h>
 #include <linux/blkpg.h>
 #include <linux/mca.h>
@@ -111,7 +110,6 @@ static u_int dma_arb_level;		/* DMA arbitration level */
 static DECLARE_WAIT_QUEUE_HEAD(ps2esdi_int);
 
 static int no_int_yet;
-static int ps2esdi_sizes[MAX_HD << 6];
 static int ps2esdi_drives;
 static struct hd_struct ps2esdi[MAX_HD << 6];
 static u_short io_base;
@@ -156,7 +154,6 @@ static struct gendisk ps2esdi_gendisk =
 	major_name:	"ed",
 	minor_shift:	6,
 	part:		ps2esdi,
-	sizes:		ps2esdi_sizes,
 	fops:		&ps2esdi_fops,
 };
 
@@ -168,7 +165,7 @@ int __init ps2esdi_init(void)
 
 	/* register the device - pass the name, major number and operations
 	   vector .                                                 */
-	if (devfs_register_blkdev(MAJOR_NR, "ed", &ps2esdi_fops)) {
+	if (register_blkdev(MAJOR_NR, "ed", &ps2esdi_fops)) {
 		printk("%s: Unable to get major number %d\n", DEVICE_NAME, MAJOR_NR);
 		return -1;
 	}
@@ -182,7 +179,7 @@ int __init ps2esdi_init(void)
 	if (error) {
 		printk(KERN_WARNING "PS2ESDI: error initialising"
 			" device, releasing resources\n");
-		devfs_unregister_blkdev(MAJOR_NR, "ed");
+		unregister_blkdev(MAJOR_NR, "ed");
 		blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
 		del_gendisk(&ps2esdi_gendisk);
 		blk_clear(MAJOR_NR);
@@ -233,7 +230,7 @@ cleanup_module(void) {
 	release_region(io_base, 4);
 	free_dma(dma_arb_level);
 	free_irq(PS2ESDI_IRQ, &ps2esdi_gendisk);
-	devfs_unregister_blkdev(MAJOR_NR, "ed");
+	unregister_blkdev(MAJOR_NR, "ed");
 	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
 	del_gendisk(&ps2esdi_gendisk);
 	blk_clear(MAJOR_NR);

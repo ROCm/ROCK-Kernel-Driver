@@ -244,13 +244,15 @@ static void compute_clocks(int pio, pio_clocks_t *clks)
 
 }
 
-/* Main tune procedure, called from tuneproc. */
+/* Main tune procedure, called from tuneproc.
+   Assumes IRQ's are disabled or at least that no other process will
+   attempt to access the IDE registers concurrently.
+*/
 static void opti621_tune_drive(struct ata_device *drive, u8 pio)
 {
 	/* primary and secondary drives share some registers,
 	 * so we have to program both drives
 	 */
-	unsigned long flags;
 	u8 pio1, pio2;
 	pio_clocks_t first, second;
 	int ax, drdy;
@@ -281,9 +283,6 @@ static void opti621_tune_drive(struct ata_device *drive, u8 pio)
 		hwif->name, ax, second.data_time, second.recovery_time, drdy);
 #endif
 
-	save_flags(flags);	/* all CPUs */
-	cli();			/* all CPUs */
-
 	reg_base = hwif->io_ports[IDE_DATA_OFFSET];
 	outb(0xc0, reg_base+CNTRL_REG);	/* allow Register-B */
 	outb(0xff, reg_base+5);		/* hmm, setupvic.exe does this ;-) */
@@ -306,8 +305,6 @@ static void opti621_tune_drive(struct ata_device *drive, u8 pio)
 
 	write_reg(misc, MISC_REG);	/* set address setup, DRDY timings,   */
 					/*  and read prefetch for both drives */
-
-	restore_flags(flags);	/* all CPUs */
 }
 
 /*

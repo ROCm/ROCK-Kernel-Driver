@@ -331,7 +331,7 @@ extern void show_free_areas(void);
 
 extern int fail_writepage(struct page *);
 struct page * shmem_nopage(struct vm_area_struct * vma, unsigned long address, int unused);
-struct file *shmem_file_setup(char * name, loff_t size);
+struct file *shmem_file_setup(char * name, loff_t size, unsigned long flags);
 extern void shmem_lock(struct file * file, int lock);
 extern int shmem_zero_setup(struct vm_area_struct *);
 
@@ -401,8 +401,6 @@ extern void swapin_readahead(swp_entry_t);
 extern int can_share_swap_page(struct page *);
 extern int remove_exclusive_swap_page(struct page *);
 
-extern void __free_pte(pte_t);
-
 /* mmap.c */
 extern void lock_vma_mappings(struct vm_area_struct *);
 extern void unlock_vma_mappings(struct vm_area_struct *);
@@ -430,7 +428,7 @@ out:
 	return ret;
 }
 
-extern int do_munmap(struct mm_struct *, unsigned long, size_t, int);
+extern int do_munmap(struct mm_struct *, unsigned long, size_t);
 
 extern unsigned long do_brk(unsigned long, unsigned long);
 

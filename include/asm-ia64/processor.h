@@ -616,7 +616,7 @@ ia64_set_lrr0 (unsigned long val)
 	asm volatile ("mov cr.lrr0=%0;; srlz.d" :: "r"(val) : "memory");
 }
 
-#define cpu_relax()	do { } while (0)
+#define cpu_relax()	barrier()
 
 
 static inline void

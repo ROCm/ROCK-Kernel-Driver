@@ -272,7 +272,6 @@ static int pd_check_media(kdev_t dev);
 static void pd_eject( int unit);
 
 static struct hd_struct pd_hd[PD_DEVS];
-static int pd_sizes[PD_DEVS];
 
 #define PD_NAMELEN	8
 
@@ -292,6 +291,7 @@ struct pd_unit {
 	int alt_geom;
 	int present;
 	char name[PD_NAMELEN];		/* pda, pdb, etc ... */
+	struct gendisk gd;
 };
 
 struct pd_unit pd[PD_UNITS];
@@ -331,9 +331,8 @@ static struct gendisk pd_gendisk = {
 	major:		PD_MAJOR,
 	major_name:	PD_NAME,
 	minor_shift:	PD_BITS,
-	part:		pd_hd,
-	sizes:		pd_sizes,
 	fops:		&pd_fops,
+	nr_real:	1,
 };
 
 static struct block_device_operations pd_fops = {
@@ -682,8 +681,8 @@ static int pd_probe_drive( int unit )
 }
 
 static int pd_detect( void )
-
-{       int	k, unit;
+{
+	int	k, unit;
 
 	k = 0;
 	if (pd_drive_count == 0) {  /* nothing spec'd - so autoprobe for 1 */
@@ -705,18 +704,19 @@ static int pd_detect( void )
                         k = unit+1;
                 } else pi_release(PI);
             }
-	for (unit=0;unit<PD_UNITS;unit++)
-		register_disk(&pd_gendisk,mk_kdev(MAJOR_NR,unit<<PD_BITS),
-				PD_PARTNS,&pd_fops,
-				PD.present?PD.capacity:0);
-
-/* We lie about the number of drives found, as the generic partition
-   scanner assumes that the drives are numbered sequentially from 0.
-   This can result in some bogus error messages if non-sequential
-   drive numbers are used.
-*/
+	for (unit=0;unit<PD_UNITS;unit++) {
+		if (PD.present) {
+			PD.gd = pd_gendisk;
+			PD.gd.first_minor = unit << PD_BITS;
+			PD.gd.part = pd_hd + (unit << PD_BITS);
+			add_gendisk(&PD.gd);
+			register_disk(&PD.gd,mk_kdev(MAJOR_NR,unit<<PD_BITS),
+					PD_PARTNS,&pd_fops,
+					PD.capacity);
+		}
+	}
 	if (k)
-		return k; 
+		return 1; 
         printk("%s: no valid drive found\n",name);
         return 0;
 }
@@ -937,10 +937,8 @@ static void do_pd_write_done( void )
 static int __init pd_init(void)
 {
 	request_queue_t * q;
-	int unit;
-
 	if (disable) return -1;
-        if (devfs_register_blkdev(MAJOR_NR,name,&pd_fops)) {
+        if (register_blkdev(MAJOR_NR,name,&pd_fops)) {
                 printk("%s: unable to get major number %d\n",
                         name,major);
                 return -1;
@@ -951,18 +949,11 @@ static int __init pd_init(void)
 
 	pd_gendisk.major = major;
 	pd_gendisk.major_name = name;
-	add_gendisk(&pd_gendisk);
-
 	printk("%s: %s version %s, major %d, cluster %d, nice %d\n",
 		name,name,PD_VERSION,major,cluster,nice);
 	pd_init_units();
-	pd_gendisk.nr_real = pd_detect();
-        if (!pd_gendisk.nr_real) {
-		devfs_unregister_blkdev(MAJOR_NR, name);
-		del_gendisk(&pd_gendisk);
-		for (unit=0; unit<PD_UNITS; unit++) 
-			if (PD.present)
-				pi_release(PI);
+        if (!pd_detect()) {
+		unregister_blkdev(MAJOR_NR, name);
 		return -1;
 	}
         return 0;
@@ -971,11 +962,12 @@ static int __init pd_init(void)
 static void __exit pd_exit(void)
 {
 	int unit;
-	devfs_unregister_blkdev(MAJOR_NR, name);
-	del_gendisk(&pd_gendisk);
+	unregister_blkdev(MAJOR_NR, name);
 	for (unit=0; unit<PD_UNITS; unit++) 
-		if (PD.present)
+		if (PD.present) {
+			del_gendisk(&PD.gd);
 			pi_release(PI);
+		}
 }
 
 MODULE_LICENSE("GPL");

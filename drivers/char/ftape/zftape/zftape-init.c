@@ -67,7 +67,7 @@ const ftape_info *zft_status;
 
 /*      Local vars.
  */
-static int busy_flag;
+static unsigned long busy_flag;
 
 static sigset_t orig_sigmask;
 
@@ -345,7 +345,7 @@ KERN_INFO
 	TRACE(ft_t_info, "zft_init @ 0x%p", zft_init);
 	TRACE(ft_t_info,
 	      "installing zftape VFS interface for ftape driver ...");
-	TRACE_CATCH(devfs_register_chrdev(QIC117_TAPE_MAJOR, "zft", &zft_cdev),);
+	TRACE_CATCH(register_chrdev(QIC117_TAPE_MAJOR, "zft", &zft_cdev),);
 
 	for (i = 0; i < 4; i++) {
 		char devname[9];
@@ -419,7 +419,7 @@ void cleanup_module(void)
 
 	TRACE_FUN(ft_t_flow);
 
-	if (devfs_unregister_chrdev(QIC117_TAPE_MAJOR, "zft") != 0) {
+	if (unregister_chrdev(QIC117_TAPE_MAJOR, "zft") != 0) {
 		TRACE(ft_t_warn, "failed");
 	} else {
 		TRACE(ft_t_info, "successful");

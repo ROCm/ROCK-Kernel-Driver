@@ -476,19 +476,22 @@ static int ser12_open(struct net_device *dev)
 	if (!dev->base_addr || dev->base_addr > 0x1000-SER12_EXTENT ||
 	    dev->irq < 2 || dev->irq > 15)
 		return -ENXIO;
-	if (check_region(dev->base_addr, SER12_EXTENT))
+	if (!request_region(dev->base_addr, SER12_EXTENT, "baycom_ser12"))
 		return -EACCES;
 	memset(&bc->modem, 0, sizeof(bc->modem));
 	bc->hdrv.par.bitrate = 1200;
-	if ((u = ser12_check_uart(dev->base_addr)) == c_uart_unknown)
+	if ((u = ser12_check_uart(dev->base_addr)) == c_uart_unknown) {
+		release_region(dev->base_addr, SER12_EXTENT);       
 		return -EIO;
+	}
 	outb(0, FCR(dev->base_addr));  /* disable FIFOs */
 	outb(0x0d, MCR(dev->base_addr));
 	outb(0, IER(dev->base_addr));
 	if (request_irq(dev->irq, ser12_interrupt, SA_INTERRUPT | SA_SHIRQ,
-			"baycom_ser12", dev))
+			"baycom_ser12", dev)) {
+		release_region(dev->base_addr, SER12_EXTENT);       
 		return -EBUSY;
-	request_region(dev->base_addr, SER12_EXTENT, "baycom_ser12");
+	}
 	/*
 	 * enable transmitter empty interrupt
 	 */

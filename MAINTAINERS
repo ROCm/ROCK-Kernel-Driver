@@ -270,6 +270,12 @@ M:	maxk@qualcomm.com
 W:	http://bluez.sf.net
 S:	Maintained
 
+BLUETOOTH SUBSYSTEM (PC Card Drivers)
+P:	Marcel Holtmann
+M:	marcel@holtmann.org
+W:	http://www.holtmann.org/linux/bluetooth/
+S:	Maintained
+
 BTTV VIDEO4LINUX DRIVER
 P:	Gerd Knorr
 M:	kraxel@bytesex.org
@@ -1487,7 +1493,7 @@ M:	perex@suse.cz
 L:	alsa-devel@alsa-project.org
 S:	Maintained
 
-SPARC:
+UltraSPARC (sparc64):
 P:	David S. Miller
 M:	davem@redhat.com
 P:	Eddie C. Dost
@@ -1499,6 +1505,9 @@ M:	anton@samba.org
 L:	sparclinux@vger.kernel.org
 L:	ultralinux@vger.kernel.org
 S:	Maintained
+
+SPARC (sparc32):
+S:	Unmaintained
 
 SPECIALIX IO8+ MULTIPORT SERIAL CARD DRIVER
 P:	Roger Wolff

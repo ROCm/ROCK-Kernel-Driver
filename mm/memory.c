@@ -41,7 +41,6 @@
 #include <linux/mman.h>
 #include <linux/swap.h>
 #include <linux/smp_lock.h>
-#include <linux/swapctl.h>
 #include <linux/iobuf.h>
 #include <linux/highmem.h>
 #include <linux/pagemap.h>
@@ -863,18 +862,19 @@ static inline void remap_pte_range(pte_t * pte, unsigned long address, unsigned 
 static inline int remap_pmd_range(struct mm_struct *mm, pmd_t * pmd, unsigned long address, unsigned long size,
 	unsigned long phys_addr, pgprot_t prot)
 {
-	unsigned long end;
+	unsigned long base, end;
 
+	base = address & PGDIR_MASK;
 	address &= ~PGDIR_MASK;
 	end = address + size;
 	if (end > PGDIR_SIZE)
 		end = PGDIR_SIZE;
 	phys_addr -= address;
 	do {
-		pte_t * pte = pte_alloc_map(mm, pmd, address);
+		pte_t * pte = pte_alloc_map(mm, pmd, base + address);
 		if (!pte)
 			return -ENOMEM;
-		remap_pte_range(pte, address, end - address, address + phys_addr, prot);
+		remap_pte_range(pte, base + address, end - address, address + phys_addr, prot);
 		pte_unmap(pte);
 		address = (address + PMD_SIZE) & PMD_MASK;
 		pmd++;
@@ -1096,23 +1096,20 @@ out_unlock:
 
 do_expand:
 	limit = current->rlim[RLIMIT_FSIZE].rlim_cur;
-	if (limit != RLIM_INFINITY) {
-		if (inode->i_size >= limit) {
-			send_sig(SIGXFSZ, current, 0);
-			goto out;
-		}
-		if (offset > limit) {
-			send_sig(SIGXFSZ, current, 0);
-			offset = limit;
-		}
-	}
+	if (limit != RLIM_INFINITY && offset > limit)
+		goto out_sig;
+	if (offset > inode->i_sb->s_maxbytes)
+		goto out;
 	inode->i_size = offset;
 
 out_truncate:
 	if (inode->i_op && inode->i_op->truncate)
 		inode->i_op->truncate(inode);
-out:
 	return 0;
+out_sig:
+	send_sig(SIGXFSZ, current, 0);
+out:
+	return -EFBIG;
 }
 
 /* 

@@ -3563,8 +3563,6 @@ static void ali_restore_regs(struct trident_card *card)
 	outl(ali_registers.global_regs[0x2c], TRID_REG(card,T4D_MISCINT));
 
 	spin_unlock_irqrestore(&card->lock, flags); 
-	
-	restore_flags(flags);
 }
 
 static int trident_suspend(struct pci_dev *dev, u32 unused)

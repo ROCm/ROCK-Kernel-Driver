@@ -5,33 +5,9 @@
  *
  * Created by David Woodhouse <dwmw2@cambridge.redhat.com>
  *
- * The original JFFS, from which the design for JFFS2 was derived,
- * was designed and implemented by Axis Communications AB.
+ * For licensing information, see the file 'LICENCE' in this directory.
  *
- * The contents of this file are subject to the Red Hat eCos Public
- * License Version 1.1 (the "Licence"); you may not use this file
- * except in compliance with the Licence.  You may obtain a copy of
- * the Licence at http://www.redhat.com/
- *
- * Software distributed under the Licence is distributed on an "AS IS"
- * basis, WITHOUT WARRANTY OF ANY KIND, either express or implied.
- * See the Licence for the specific language governing rights and
- * limitations under the Licence.
- *
- * The Original Code is JFFS2 - Journalling Flash File System, version 2
- *
- * Alternatively, the contents of this file may be used under the
- * terms of the GNU General Public License version 2 (the "GPL"), in
- * which case the provisions of the GPL are applicable instead of the
- * above.  If you wish to allow the use of your version of this file
- * only under the terms of the GPL and not to allow others to use your
- * version of this file under the RHEPL, indicate your decision by
- * deleting the provisions above and replace them with the notice and
- * other provisions required by the GPL.  If you do not delete the
- * provisions above, a recipient may use your version of this file
- * under either the RHEPL or the GPL.
- *
- * $Id: nodelist.h,v 1.68 2002/03/08 11:27:19 dwmw2 Exp $
+ * $Id: nodelist.h,v 1.74 2002/06/26 01:20:43 dwmw2 Exp $
  *
  */
 
@@ -117,6 +93,8 @@ struct jffs2_inode_cache {
 	int nlink;
 };
 
+#define INOCACHE_HASHSIZE 128
+
 struct jffs2_scan_info {
 	struct jffs2_full_dirent *dents;
 	struct jffs2_tmp_dnode_info *tmpnodes;
@@ -172,7 +150,6 @@ struct jffs2_node_frag
 	struct jffs2_full_dnode *node; /* NULL for holes */
 	uint32_t size;
 	uint32_t ofs; /* Don't really need this, but optimisation */
-	uint32_t node_ofs; /* offset within the physical node */
 };
 
 struct jffs2_eraseblock
@@ -240,6 +217,9 @@ struct jffs2_eraseblock
 #define JFFS2_RESERVED_BLOCKS_GCMERGE (JFFS2_RESERVED_BLOCKS_BASE)		/* ... merge pages when garbage collecting */
 
 
+/* How much dirty space before it goes on the very_dirty_list */
+#define VERYDIRTY(c, size) ((size) >= ((c)->sector_size / 2))
+
 #define PAD(x) (((x)+3)&~3)
 
 static inline int jffs2_raw_ref_to_inum(struct jffs2_raw_node_ref *raw)
@@ -271,6 +251,7 @@ int jffs2_reserve_space_gc(struct jffs2_sb_info *c, uint32_t minsize, uint32_t *
 int jffs2_add_physical_node_ref(struct jffs2_sb_info *c, struct jffs2_raw_node_ref *new, uint32_t len, int dirty);
 void jffs2_complete_reservation(struct jffs2_sb_info *c);
 void jffs2_mark_node_obsolete(struct jffs2_sb_info *c, struct jffs2_raw_node_ref *raw);
+void jffs2_dump_block_lists(struct jffs2_sb_info *c);
 
 /* write.c */
 int jffs2_do_new_inode(struct jffs2_sb_info *c, struct jffs2_inode_info *f, uint32_t mode, struct jffs2_raw_inode *ri);
@@ -331,6 +312,7 @@ int jffs2_decompress(unsigned char comprtype, unsigned char *cdata_in,
 
 /* scan.c */
 int jffs2_scan_medium(struct jffs2_sb_info *c);
+void jffs2_rotate_lists(struct jffs2_sb_info *c);
 
 /* build.c */
 int jffs2_do_mount_fs(struct jffs2_sb_info *c);

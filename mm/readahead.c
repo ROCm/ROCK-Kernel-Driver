@@ -14,8 +14,8 @@
 #include <linux/backing-dev.h>
 
 struct backing_dev_info default_backing_dev_info = {
-	ra_pages:	(VM_MAX_READAHEAD * 1024) / PAGE_CACHE_SIZE,
-	state:		0,
+	.ra_pages	= (VM_MAX_READAHEAD * 1024) / PAGE_CACHE_SIZE,
+	.state		= 0,
 };
 
 /*

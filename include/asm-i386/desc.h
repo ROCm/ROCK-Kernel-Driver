@@ -86,10 +86,9 @@ static inline void set_ldt_desc(unsigned int cpu, void *addr, unsigned int size)
 	_set_tssldt_desc(&cpu_gdt_table[cpu][LDT_ENTRY], (int)addr, ((size << 3)-1), 0x82);
 }
 
-#define TLS_FLAGS_MASK			0x00000003
+#define TLS_FLAGS_MASK			0x00000001
 
 #define TLS_FLAG_WRITABLE		0x00000001
-#define TLS_FLAG_CLEAR			0x00000002
 
 static inline void load_TLS_desc(struct thread_struct *t, unsigned int cpu)
 {

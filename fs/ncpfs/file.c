@@ -296,16 +296,16 @@ static int ncp_release(struct inode *inode, struct file *file) {
 
 struct file_operations ncp_file_operations =
 {
-	llseek:		remote_llseek,
-	read:		ncp_file_read,
-	write:		ncp_file_write,
-	ioctl:		ncp_ioctl,
-	mmap:		ncp_mmap,
-	release:	ncp_release,
-	fsync:		ncp_fsync,
+	.llseek		= remote_llseek,
+	.read		= ncp_file_read,
+	.write		= ncp_file_write,
+	.ioctl		= ncp_ioctl,
+	.mmap		= ncp_mmap,
+	.release	= ncp_release,
+	.fsync		= ncp_fsync,
 };
 
 struct inode_operations ncp_file_inode_operations =
 {
-	setattr:	ncp_notify_change,
+	.setattr	= ncp_notify_change,
 };

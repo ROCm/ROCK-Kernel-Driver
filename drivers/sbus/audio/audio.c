@@ -2123,7 +2123,7 @@ EXPORT_SYMBOL(sparcaudio_input_done);
 static int __init sparcaudio_init(void)
 {
 	/* Register our character device driver with the VFS. */
-	if (devfs_register_chrdev(SOUND_MAJOR, "sparcaudio", &sparcaudio_fops))
+	if (register_chrdev(SOUND_MAJOR, "sparcaudio", &sparcaudio_fops))
 		return -EIO;
 
 	devfs_handle = devfs_mk_dir (NULL, "sound", NULL);
@@ -2132,7 +2132,7 @@ static int __init sparcaudio_init(void)
 
 static void __exit sparcaudio_exit(void)
 {
-	devfs_unregister_chrdev(SOUND_MAJOR, "sparcaudio");
+	unregister_chrdev(SOUND_MAJOR, "sparcaudio");
 	devfs_unregister (devfs_handle);
 }
 

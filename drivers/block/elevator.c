@@ -220,7 +220,8 @@ void elevator_linus_merge_cleanup(request_queue_t *q, struct request *req, int c
 	}
 }
 
-void elevator_linus_merge_req(struct request *req, struct request *next)
+void elevator_linus_merge_req(request_queue_t *q, struct request *req,
+			      struct request *next)
 {
 	if (elv_linus_sequence(next) < elv_linus_sequence(req))
 		elv_linus_sequence(req) = elv_linus_sequence(next);
@@ -231,6 +232,9 @@ void elevator_linus_add_request(request_queue_t *q, struct request *rq,
 {
 	elevator_t *e = &q->elevator;
 	int lat = 0, *latency = e->elevator_data;
+
+	if (!insert_here)
+		insert_here = q->queue_head.prev;
 
 	if (!(rq->flags & REQ_BARRIER))
 		lat = latency[rq_data_dir(rq)];
@@ -318,7 +322,7 @@ void elevator_noop_add_request(request_queue_t *q, struct request *rq,
 
 struct request *elevator_noop_next_request(request_queue_t *q)
 {
-	if (!blk_queue_empty(q))
+	if (!list_empty(&q->queue_head))
 		return list_entry_rq(q->queue_head.next);
 
 	return NULL;
@@ -376,7 +380,7 @@ void elv_merge_requests(request_queue_t *q, struct request *rq,
 	elevator_t *e = &q->elevator;
 
 	if (e->elevator_merge_req_fn)
-		e->elevator_merge_req_fn(rq, next);
+		e->elevator_merge_req_fn(q, rq, next);
 }
 
 /*
@@ -431,6 +435,27 @@ void elv_remove_request(request_queue_t *q, struct request *rq)
 
 	if (e->elevator_remove_req_fn)
 		e->elevator_remove_req_fn(q, rq);
+}
+
+int elv_queue_empty(request_queue_t *q)
+{
+	elevator_t *e = &q->elevator;
+
+	if (e->elevator_queue_empty_fn)
+		return e->elevator_queue_empty_fn(q);
+
+	return list_empty(&q->queue_head);
+}
+
+inline struct list_head *elv_get_sort_head(request_queue_t *q,
+					   struct request *rq)
+{
+	elevator_t *e = &q->elevator;
+
+	if (e->elevator_get_sort_head_fn)
+		return e->elevator_get_sort_head_fn(q, rq);
+
+	return &q->queue_head;
 }
 
 elevator_t elevator_linus = {

@@ -173,17 +173,16 @@ static inline void truncate_partial_page(struct page *page, unsigned partial)
 }
 
 /*
- * AKPM: the PagePrivate test here seems a bit bogus.  It bypasses the
- * mapping's ->invalidatepage, which may still want to be called.
+ * If truncate can remove the fs-private metadata from the page, it
+ * removes the page from the LRU immediately.  This because some other thread
+ * of control (eg, sendfile) may have a reference to the page.  But dropping
+ * the final reference to an LRU page in interrupt context is illegal - it may
+ * deadlock over pagemap_lru_lock.
  */
 static void truncate_complete_page(struct page *page)
 {
-	/* Drop fs-specific data so the page might become freeable. */
-	if (PagePrivate(page) && !do_invalidatepage(page, 0)) {
-		if (current->flags & PF_INVALIDATE)
-			printk("%s: buffer heads were leaked\n",
-				current->comm);
-	}
+	if (!PagePrivate(page) || do_invalidatepage(page, 0))
+		lru_cache_del(page);
 
 	ClearPageDirty(page);
 	ClearPageUptodate(page);
@@ -1347,7 +1346,7 @@ page_not_uptodate:
 }
 
 static struct vm_operations_struct generic_file_vm_ops = {
-	nopage:		filemap_nopage,
+	.nopage		= filemap_nopage,
 };
 
 /* This is used for a general mmap of a disk file */

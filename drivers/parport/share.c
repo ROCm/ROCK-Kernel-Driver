@@ -1002,7 +1002,6 @@ int parport_claim_or_block(struct pardevice *dev)
 	/* Try to claim the port.  If this fails, we need to sleep.  */
 	r = parport_claim(dev);
 	if (r == -EAGAIN) {
-		unsigned long flags;
 #ifdef PARPORT_DEBUG_SHARING
 		printk(KERN_DEBUG "%s: parport_claim() returned -EAGAIN\n", dev->name);
 #endif

@@ -184,8 +184,8 @@
 #define __NR_rt_sigtimedwait	177
 #define __NR_rt_sigqueueinfo	178
 #define __NR_rt_sigsuspend	179
-#define __NR_pread		180
-#define __NR_pwrite		181
+#define __NR_pread64		180
+#define __NR_pwrite64		181
 #define __NR_chown		182
 #define __NR_getcwd		183
 #define __NR_capget		184
@@ -247,6 +247,7 @@
 #define __NR_futex		240
 #define __NR_sched_setaffinity	241
 #define __NR_sched_getaffinity	242
+#define __NR_set_thread_area	243
 
 /* user-visible error numbers are in the range -1 - -124: see <asm-i386/errno.h> */
 

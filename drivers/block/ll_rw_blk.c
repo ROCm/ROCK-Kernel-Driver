@@ -1253,7 +1253,7 @@ struct request *__blk_get_request(request_queue_t *q, int rw)
  *    host that is unable to accept a particular command.
  */
 void blk_insert_request(request_queue_t *q, struct request *rq,
-		int at_head, void *data)
+			int at_head, void *data)
 {
 	unsigned long flags;
 
@@ -1262,15 +1262,18 @@ void blk_insert_request(request_queue_t *q, struct request *rq,
 	 * must not attempt merges on this) and that it acts as a soft
 	 * barrier
 	 */
-	rq->flags &= REQ_QUEUED;
 	rq->flags |= REQ_SPECIAL | REQ_BARRIER;
 
 	rq->special = data;
 
 	spin_lock_irqsave(q->queue_lock, flags);
-	/* If command is tagged, release the tag */
-	if(blk_rq_tagged(rq))
+
+	/*
+	 * If command is tagged, release the tag
+	 */
+	if (blk_rq_tagged(rq))
 		blk_queue_end_tag(q, rq);
+
 	_elv_add_request(q, rq, !at_head, 0);
 	q->request_fn(q);
 	spin_unlock_irqrestore(q->queue_lock, flags);
@@ -1388,7 +1391,6 @@ static void attempt_merge(request_queue_t *q, struct request *req,
 
 	if (rq_data_dir(req) != rq_data_dir(next)
 	    || !kdev_same(req->rq_dev, next->rq_dev)
-	    || req->nr_sectors + next->nr_sectors > q->max_sectors
 	    || next->waiting || next->special)
 		return;
 
@@ -1399,15 +1401,14 @@ static void attempt_merge(request_queue_t *q, struct request *req,
 	 * counts here.
 	 */
 	if (q->merge_requests_fn(q, req, next)) {
-		elv_merge_requests(q, req, next);
-
-		blkdev_dequeue_request(next);
-
 		req->biotail->bi_next = next->bio;
 		req->biotail = next->biotail;
 
 		req->nr_sectors = req->hard_nr_sectors += next->hard_nr_sectors;
 
+		elv_merge_requests(q, req, next);
+
+		blkdev_dequeue_request(next);
 		blk_put_request(next);
 	}
 }
@@ -1415,16 +1416,18 @@ static void attempt_merge(request_queue_t *q, struct request *req,
 static inline void attempt_back_merge(request_queue_t *q, struct request *rq)
 {
 	struct list_head *next = rq->queuelist.next;
+	struct list_head *sort_head = elv_get_sort_head(q, rq);
 
-	if (next != &q->queue_head)
+	if (next != sort_head)
 		attempt_merge(q, rq, list_entry_rq(next));
 }
 
 static inline void attempt_front_merge(request_queue_t *q, struct request *rq)
 {
 	struct list_head *prev = rq->queuelist.prev;
+	struct list_head *sort_head = elv_get_sort_head(q, rq);
 
-	if (prev != &q->queue_head)
+	if (prev != sort_head)
 		attempt_merge(q, list_entry_rq(prev), rq);
 }
 
@@ -1484,7 +1487,7 @@ static int __make_request(request_queue_t *q, struct bio *bio)
 	spin_lock_irq(q->queue_lock);
 again:
 	req = NULL;
-	insert_here = q->queue_head.prev;
+	insert_here = NULL;
 
 	if (blk_queue_empty(q)) {
 		blk_plug_device(q);
@@ -1502,11 +1505,10 @@ again:
 				break;
 			}
 
-			elv_merge_cleanup(q, req, nr_sectors);
-
 			req->biotail->bi_next = bio;
 			req->biotail = bio;
 			req->nr_sectors = req->hard_nr_sectors += nr_sectors;
+			elv_merge_cleanup(q, req, nr_sectors);
 			drive_stat_acct(req, nr_sectors, 0);
 			attempt_back_merge(q, req);
 			goto out;
@@ -1517,8 +1519,6 @@ again:
 				insert_here = req->queuelist.prev;
 				break;
 			}
-
-			elv_merge_cleanup(q, req, nr_sectors);
 
 			bio->bi_next = req->bio;
 			req->bio = bio;
@@ -1532,6 +1532,7 @@ again:
 			req->hard_cur_sectors = cur_nr_sectors;
 			req->sector = req->hard_sector = sector;
 			req->nr_sectors = req->hard_nr_sectors += nr_sectors;
+			elv_merge_cleanup(q, req, nr_sectors);
 			drive_stat_acct(req, nr_sectors, 0);
 			attempt_front_merge(q, req);
 			goto out;
@@ -1600,9 +1601,7 @@ get_rq:
 	req->buffer = bio_data(bio);	/* see ->buffer comment above */
 	req->waiting = NULL;
 	req->bio = req->biotail = bio;
-	if (bio->bi_bdev)
-		req->rq_dev = to_kdev_t(bio->bi_bdev->bd_dev);
-	else	req->rq_dev = NODEV;
+	req->rq_dev = to_kdev_t(bio->bi_bdev->bd_dev);
 	add_request(q, req, insert_here);
 out:
 	if (freereq)

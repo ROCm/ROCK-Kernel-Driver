@@ -40,43 +40,47 @@
 static void pdump (void *, int);
 #endif
 
+/* Bits of HD_STATUS */
+#define ERR_STAT		0x01
+#define DRQ_STAT		0x08
+
 struct freecom_udata {
-        __u8    buffer[64];             /* Common command block. */
+        u8    buffer[64];             /* Common command block. */
 };
 typedef struct freecom_udata *freecom_udata_t;
 
 /* All of the outgoing packets are 64 bytes long. */
 struct freecom_cb_wrap {
-        __u8    Type;                   /* Command type. */
-        __u8    Timeout;                /* Timeout in seconds. */
-        __u8    Atapi[12];              /* An ATAPI packet. */
-        __u8    Filler[50];             /* Padding Data. */
+        u8    Type;                   /* Command type. */
+        u8    Timeout;                /* Timeout in seconds. */
+        u8    Atapi[12];              /* An ATAPI packet. */
+        u8    Filler[50];             /* Padding Data. */
 };
 
 struct freecom_xfer_wrap {
-        __u8    Type;                   /* Command type. */
-        __u8    Timeout;                /* Timeout in seconds. */
-        __u32   Count;                  /* Number of bytes to transfer. */
-        __u8    Pad[58];
+        u8    Type;                   /* Command type. */
+        u8    Timeout;                /* Timeout in seconds. */
+        u32   Count;                  /* Number of bytes to transfer. */
+        u8    Pad[58];
 } __attribute__ ((packed));
 
 struct freecom_ide_out {
-        __u8    Type;                   /* Type + IDE register. */
-        __u8    Pad;
-        __u16   Value;                  /* Value to write. */
-        __u8    Pad2[60];
+        u8    Type;                   /* Type + IDE register. */
+        u8    Pad;
+        u16   Value;                  /* Value to write. */
+        u8    Pad2[60];
 };
 
 struct freecom_ide_in {
-        __u8    Type;                   /* Type | IDE register. */
-        __u8    Pad[63];
+        u8    Type;                   /* Type | IDE register. */
+        u8    Pad[63];
 };
 
 struct freecom_status {
-        __u8    Status;
-        __u8    Reason;
-        __u16   Count;
-        __u8    Pad[60];
+        u8    Status;
+        u8    Reason;
+        u16   Count;
+        u8    Pad[60];
 };
 
 /* Freecom stuffs the interrupt status in the INDEX_STAT bit of the ide

@@ -903,7 +903,7 @@ int __init lp_init (void)
 		lp_table[i].timeout = 10 * HZ;
 	}
 
-	if (devfs_register_chrdev (LP_MAJOR, "lp", &lp_fops)) {
+	if (register_chrdev (LP_MAJOR, "lp", &lp_fops)) {
 		printk ("lp: unable to get major %d\n", LP_MAJOR);
 		return -EIO;
 	}
@@ -965,7 +965,7 @@ static void lp_cleanup_module (void)
 #endif
 
 	devfs_unregister (devfs_handle);
-	devfs_unregister_chrdev(LP_MAJOR, "lp");
+	unregister_chrdev(LP_MAJOR, "lp");
 	for (offset = 0; offset < LP_NO; offset++) {
 		if (lp_table[offset].dev == NULL)
 			continue;

@@ -21,36 +21,21 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
- *  $Id: uart00.c,v 1.33 2002/07/21 21:32:31 rmk Exp $
+ *  $Id: uart00.c,v 1.35 2002/07/28 10:03:28 rmk Exp $
  *
  */
 #include <linux/config.h>
 #include <linux/module.h>
-#include <linux/errno.h>
-#include <linux/signal.h>
-#include <linux/sched.h>
-#include <linux/interrupt.h>
 #include <linux/tty.h>
-#include <linux/tty_flip.h>
-#include <linux/major.h>
-#include <linux/string.h>
-#include <linux/fcntl.h>
-#include <linux/ptrace.h>
 #include <linux/ioport.h>
-#include <linux/mm.h>
-#include <linux/slab.h>
 #include <linux/init.h>
-#include <linux/circ_buf.h>
 #include <linux/serial.h>
 #include <linux/console.h>
 #include <linux/sysrq.h>
 #include <linux/pld/pld_hotswap.h>
 
-#include <asm/system.h>
 #include <asm/io.h>
 #include <asm/irq.h>
-#include <asm/uaccess.h>
-#include <asm/bitops.h>
 #include <asm/sizes.h>
 
 #if defined(CONFIG_SERIAL_UART00_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
@@ -755,7 +740,7 @@ static int __init uart00_init(void)
 {
 	int result;
 
-	printk(KERN_INFO "Serial: UART00 driver $Revision: 1.33 $\n");
+	printk(KERN_INFO "Serial: UART00 driver $Revision: 1.35 $\n");
 
 	printk(KERN_WARNING "serial_uart00:Using temporary major/minor pairs"
 		" - these WILL change in the future\n");

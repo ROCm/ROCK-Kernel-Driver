@@ -593,22 +593,14 @@ int __init init_mtdblock(void)
 	int i;
 
 	spin_lock_init(&mtdblks_lock);
-#ifdef CONFIG_DEVFS_FS
-	if (devfs_register_blkdev(MTD_BLOCK_MAJOR, DEVICE_NAME, &mtd_fops))
-	{
-		printk(KERN_NOTICE "Can't allocate major number %d for Memory Technology Devices.\n",
-			MTD_BLOCK_MAJOR);
-		return -EAGAIN;
-	}
-
-	devfs_dir_handle = devfs_mk_dir(NULL, DEVICE_NAME, NULL);
-	register_mtd_user(&notifier);
-#else
 	if (register_blkdev(MAJOR_NR,DEVICE_NAME,&mtd_fops)) {
 		printk(KERN_NOTICE "Can't allocate major number %d for Memory Technology Devices.\n",
 		       MTD_BLOCK_MAJOR);
 		return -EAGAIN;
 	}
+#ifdef CONFIG_DEVFS_FS
+	devfs_dir_handle = devfs_mk_dir(NULL, DEVICE_NAME, NULL);
+	register_mtd_user(&notifier);
 #endif
 	
 	/* We fill it in at open() time. */
@@ -630,10 +622,8 @@ static void __exit cleanup_mtdblock(void)
 #ifdef CONFIG_DEVFS_FS
 	unregister_mtd_user(&notifier);
 	devfs_unregister(devfs_dir_handle);
-	devfs_unregister_blkdev(MTD_BLOCK_MAJOR, DEVICE_NAME);
-#else
-	unregister_blkdev(MAJOR_NR,DEVICE_NAME);
 #endif
+	unregister_blkdev(MAJOR_NR,DEVICE_NAME);
 	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
 	blk_size[MAJOR_NR] = NULL;
 }

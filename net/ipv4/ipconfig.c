@@ -469,7 +469,7 @@ drop:
 
 
 /*
- *  Send RARP request packet over a signle interface.
+ *  Send RARP request packet over a single interface.
  */
 static void __init ic_rarp_send_if(struct ic_device *d)
 {

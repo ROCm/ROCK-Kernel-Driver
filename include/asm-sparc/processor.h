@@ -180,7 +180,7 @@ __out:	__ret; \
 
 extern struct task_struct *last_task_used_math;
 
-#define cpu_relax()	do { } while (0)
+#define cpu_relax()	barrier()
 
 #endif
 

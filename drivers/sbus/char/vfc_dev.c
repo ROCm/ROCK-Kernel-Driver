@@ -676,7 +676,7 @@ static int vfc_probe(void)
 	memset(vfc_dev_lst, 0, sizeof(struct vfc_dev *) * (cards + 1));
 	vfc_dev_lst[cards] = NULL;
 
-	ret = devfs_register_chrdev(VFC_MAJOR, vfcstr, &vfc_fops);
+	ret = register_chrdev(VFC_MAJOR, vfcstr, &vfc_fops);
 	if(ret) {
 		printk(KERN_ERR "Unable to get major number %d\n", VFC_MAJOR);
 		kfree(vfc_dev_lst);
@@ -732,7 +732,7 @@ void cleanup_module(void)
 {
 	struct vfc_dev **devp;
 
-	devfs_unregister_chrdev(VFC_MAJOR,vfcstr);
+	unregister_chrdev(VFC_MAJOR,vfcstr);
 
 	for (devp = vfc_dev_lst; *devp; devp++)
 		deinit_vfc_device(*devp);
