@@ -984,6 +984,8 @@ static int nfs_set_default_acl(struct inode *dir, struct inode *inode,
 	struct posix_acl *dfacl, *acl;
 	int error = 0;
 
+	if (!NFS_PROTO(dir)->getacl || !NFS_PROTO(inode)->setacls)
+		return 0;
 	dfacl = NFS_PROTO(dir)->getacl(dir, ACL_TYPE_DEFAULT);
 	if (IS_ERR(dfacl)) {
 		error = PTR_ERR(dfacl);
