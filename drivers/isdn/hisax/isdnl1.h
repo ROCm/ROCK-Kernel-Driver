@@ -113,6 +113,34 @@ xmit_data_req_b(struct BCState *bcs, struct sk_buff *skb)
 }
 
 static inline void
+xmit_data_req_d(struct IsdnCardState *cs, struct sk_buff *skb)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&cs->lock, flags);
+	if (cs->debug & DEB_DLOG_HEX)
+		LogFrame(cs, skb->data, skb->len);
+	if (cs->debug & DEB_DLOG_VERBOSE)
+		dlogframe(cs, skb, 0);
+	if (cs->tx_skb) {
+		skb_queue_tail(&cs->sq, skb);
+#ifdef L2FRAME_DEBUG
+		if (cs->debug & L1_DEB_LAPD)
+			Logl2Frame(cs, skb, "PH_DATA Queued", 0);
+#endif
+	} else {
+		cs->tx_skb = skb;
+		cs->tx_cnt = 0;
+#ifdef L2FRAME_DEBUG
+		if (cs->debug & L1_DEB_LAPD)
+			Logl2Frame(cs, skb, "PH_DATA", 0);
+#endif
+		cs->DC_Send_Data(cs);
+	}
+	spin_unlock_irqrestore(&cs->lock, flags);
+}
+
+static inline void
 xmit_pull_ind_b(struct BCState *bcs, struct sk_buff *skb)
 {
 	struct IsdnCardState *cs = bcs->cs;

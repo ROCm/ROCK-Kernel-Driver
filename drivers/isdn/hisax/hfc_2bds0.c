@@ -938,30 +938,7 @@ HFCD_l1hw(struct PStack *st, int pr, void *arg)
 	
 	switch (pr) {
 		case (PH_DATA | REQUEST):
-			if (cs->debug & DEB_DLOG_HEX)
-				LogFrame(cs, skb->data, skb->len);
-			if (cs->debug & DEB_DLOG_VERBOSE)
-				dlogframe(cs, skb, 0);
-			if (cs->tx_skb) {
-				skb_queue_tail(&cs->sq, skb);
-#ifdef L2FRAME_DEBUG		/* psa */
-				if (cs->debug & L1_DEB_LAPD)
-					Logl2Frame(cs, skb, "PH_DATA Queued", 0);
-#endif
-			} else {
-				cs->tx_skb = skb;
-				cs->tx_cnt = 0;
-#ifdef L2FRAME_DEBUG		/* psa */
-				if (cs->debug & L1_DEB_LAPD)
-					Logl2Frame(cs, skb, "PH_DATA", 0);
-#endif
-				if (!test_and_set_bit(FLG_LOCK_ATOMIC, &cs->HW_Flags)) {
-					hfc_fill_dfifo(cs);
-					test_and_clear_bit(FLG_LOCK_ATOMIC, &cs->HW_Flags);
-				} else
-					debugl1(cs, "hfc_fill_dfifo blocked");
-
-			}
+			xmit_data_req_d(cs, skb);
 			break;
 		case (PH_PULL | INDICATION):
 			if (cs->tx_skb) {
