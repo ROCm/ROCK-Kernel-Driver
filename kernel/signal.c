@@ -21,6 +21,7 @@
 #include <linux/binfmts.h>
 #include <linux/security.h>
 #include <linux/ptrace.h>
+#include <linux/suspend.h>
 #include <asm/param.h>
 #include <asm/uaccess.h>
 #include <asm/unistd.h>
@@ -1483,8 +1484,7 @@ void do_notify_parent(struct task_struct *tsk, int sig)
 	unsigned long flags;
 	struct sighand_struct *psig;
 
-	if (sig == -1)
-		BUG();
+	BUG_ON(sig == -1);
 
  	/* do_notify_parent_cldstop should have been called instead.  */
  	BUG_ON(tsk->state & (TASK_STOPPED|TASK_TRACED));
@@ -2259,6 +2259,8 @@ sys_rt_sigtimedwait(const sigset_t __user *uthese,
 		if (timeout)
 			ret = -EINTR;
 	}
+	if (current->flags & PF_FREEZE)
+		refrigerator(1);
 
 	return ret;
 }
