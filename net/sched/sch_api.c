@@ -1145,8 +1145,8 @@ reclassify:
 	return -1;
 }
 
-int psched_us_per_tick = 1;
-int psched_tick_per_us = 1;
+static int psched_us_per_tick = 1;
+static int psched_tick_per_us = 1;
 
 #ifdef CONFIG_PROC_FS
 static int psched_show(struct seq_file *seq, void *v)
