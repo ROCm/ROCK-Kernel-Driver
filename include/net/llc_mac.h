@@ -19,4 +19,11 @@
 extern int llc_rcv(struct sk_buff *skb, struct net_device *dev,
 		   struct packet_type *pt);
 extern u16 lan_hdrs_init(struct sk_buff *skb, u8 *sa, u8 *da);
+
+struct llc_sap;
+struct sk_buff;
+
+extern void llc_add_pack(int type, void (*handler)(struct llc_sap *sap,
+						   struct sk_buff *skb));
+extern void llc_remove_pack(int type);
 #endif /* LLC_MAC_H */
