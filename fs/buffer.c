@@ -378,7 +378,7 @@ out:
 }
 
 /*
- * Various filesystems appear to want __get_hash_table to be non-blocking.
+ * Various filesystems appear to want __find_get_block to be non-blocking.
  * But it's the page lock which protects the buffers.  To get around this,
  * we get exclusion from try_to_free_buffers with the blockdev mapping's
  * private_lock.
@@ -389,7 +389,7 @@ out:
  * private_lock is contended then so is mapping->page_lock).
  */
 struct buffer_head *
-__get_hash_table(struct block_device *bdev, sector_t block, int unused)
+__find_get_block(struct block_device *bdev, sector_t block, int unused)
 {
 	struct inode *bd_inode = bdev->bd_inode;
 	struct address_space *bd_mapping = bd_inode->i_mapping;
@@ -1091,7 +1091,7 @@ grow_dev_page(struct block_device *bdev, unsigned long block,
 
 	/*
 	 * Link the page to the buffers and initialise them.  Take the
-	 * lock to be atomic wrt __get_hash_table(), which does not
+	 * lock to be atomic wrt __find_get_block(), which does not
 	 * run under the page lock.
 	 */
 	spin_lock(&inode->i_mapping->private_lock);
@@ -1164,7 +1164,7 @@ __getblk(struct block_device *bdev, sector_t block, int size)
 	for (;;) {
 		struct buffer_head * bh;
 
-		bh = __get_hash_table(bdev, block, size);
+		bh = __find_get_block(bdev, block, size);
 		if (bh) {
 			touch_buffer(bh);
 			return bh;
@@ -1449,7 +1449,7 @@ void unmap_underlying_metadata(struct block_device *bdev, sector_t block)
 {
 	struct buffer_head *old_bh;
 
-	old_bh = __get_hash_table(bdev, block, 0);
+	old_bh = __find_get_block(bdev, block, 0);
 	if (old_bh) {
 #if 0	/* This happens.  Later. */
 		if (buffer_dirty(old_bh))

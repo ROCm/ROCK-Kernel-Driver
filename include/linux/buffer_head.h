@@ -160,7 +160,7 @@ int fsync_dev(kdev_t);
 int fsync_bdev(struct block_device *);
 int fsync_super(struct super_block *);
 int fsync_no_super(struct block_device *);
-struct buffer_head *__get_hash_table(struct block_device *, sector_t, int);
+struct buffer_head *__find_get_block(struct block_device *, sector_t, int);
 struct buffer_head * __getblk(struct block_device *, sector_t, int);
 void __brelse(struct buffer_head *);
 void __bforget(struct buffer_head *);
@@ -254,9 +254,9 @@ static inline struct buffer_head * sb_getblk(struct super_block *sb, int block)
 }
 
 static inline struct buffer_head *
-sb_get_hash_table(struct super_block *sb, int block)
+sb_find_get_block(struct super_block *sb, int block)
 {
-	return __get_hash_table(sb->s_bdev, block, sb->s_blocksize);
+	return __find_get_block(sb->s_bdev, block, sb->s_blocksize);
 }
 
 static inline void

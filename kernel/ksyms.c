@@ -551,7 +551,7 @@ EXPORT_SYMBOL(file_fsync);
 EXPORT_SYMBOL(fsync_buffers_list);
 EXPORT_SYMBOL(clear_inode);
 EXPORT_SYMBOL(init_special_inode);
-EXPORT_SYMBOL(__get_hash_table);
+EXPORT_SYMBOL(__find_get_block);
 EXPORT_SYMBOL(new_inode);
 EXPORT_SYMBOL(__insert_inode_hash);
 EXPORT_SYMBOL(remove_inode_hash);
