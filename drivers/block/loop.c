@@ -732,8 +732,6 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 	mapping_set_gfp_mask(inode->i_mapping,
 			     lo->old_gfp_mask & ~(__GFP_IO|__GFP_FS));
 
-	set_blocksize(bdev, lo_blocksize);
-
 	lo->lo_bio = lo->lo_biotail = NULL;
 
 	/*
@@ -752,10 +750,13 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 		blk_queue_max_sectors(lo->lo_queue, q->max_sectors);
 		blk_queue_max_phys_segments(lo->lo_queue,q->max_phys_segments);
 		blk_queue_max_hw_segments(lo->lo_queue, q->max_hw_segments);
+		blk_queue_hardsect_size(lo->lo_queue, queue_hardsect_size(q));
 		blk_queue_max_segment_size(lo->lo_queue, q->max_segment_size);
 		blk_queue_segment_boundary(lo->lo_queue, q->seg_boundary_mask);
 		blk_queue_merge_bvec(lo->lo_queue, q->merge_bvec_fn);
 	}
+
+	set_blocksize(bdev, lo_blocksize);
 
 	kernel_thread(loop_thread, lo, CLONE_KERNEL);
 	down(&lo->lo_sem);
