@@ -3,7 +3,7 @@ Devfs (Device File System) FAQ
 
 Linux Devfs (Device File System) FAQ
 Richard Gooch
-7-APR-2002
+21-JUL-2002
 
 
 Document languages:
@@ -788,6 +788,9 @@ following to set this up:
 make sure the kernel does not mount devfs at boot time
 
 
+make sure you have a correct /dev/console entry in your
+root file-system (where your disc-based /dev lives)
+
 create the /dev-state directory
 
 
@@ -1288,9 +1291,10 @@ parameters:c=1,b=2,t=3,u=4 would appear as:
 
 SCSI Generic Devices
 
-All SCSI CD-ROMs are placed under /dev/sg. A similar naming
-scheme is used as for SCSI discs. A SCSI generic device with the
-parameters:c=1,b=2,t=3,u=4 would appear as:
+The generic (aka. raw) interface for all SCSI devices are placed under
+/dev/sg. A similar naming scheme is used as for SCSI discs. A
+SCSI generic device with the parameters:c=1,b=2,t=3,u=4 would appear
+as:
 
 	/dev/sg/c1b2t3u4
 
@@ -1603,6 +1607,23 @@ mounting by volume label. If devfs is not mounted on /dev,
 then mount(8) will fail to find devices. The solution is to
 make sure that devfs is mounted on /dev. See above for how to
 do that.
+
+
+I have extra or incorrect entries in /dev
+
+You may have stale entries in your dev-state area. Check for a
+RESTORE configuration line in your devfsd configuration
+(typically /etc/devfsd.conf). If you have this line, check
+the contents of the specified directory for stale entries. Remove
+any entries which are incorrect, then reboot.
+
+
+I get "Unable to open initial console" messages at boot
+
+This usually happens when you don't have devfs automounted onto
+/dev at boot time, and there is no valid
+/dev/console entry on your root file-system. Create a valid
+/dev/console device node.
 
 
 
