@@ -1962,34 +1962,29 @@ snd_pcm_sframes_t snd_pcm_capture_rewind(snd_pcm_substream_t *substream, snd_pcm
 	return ret;
 }
 
-static int snd_pcm_playback_delay(snd_pcm_substream_t *substream, snd_pcm_sframes_t *res)
+static int snd_pcm_hwsync(snd_pcm_substream_t *substream)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
-	int err = 0;
-	snd_pcm_sframes_t n;
+	int err;
+
 	spin_lock_irq(&runtime->lock);
 	switch (runtime->status->state) {
-	case SNDRV_PCM_STATE_RUNNING:
 	case SNDRV_PCM_STATE_DRAINING:
-		if (snd_pcm_update_hw_ptr(substream) >= 0) {
-			n = snd_pcm_playback_hw_avail(runtime);
-			if (put_user(n, res))
-				err = -EFAULT;
+		if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
+			goto __badfd;
+	case SNDRV_PCM_STATE_RUNNING:
+		if ((err = snd_pcm_update_hw_ptr(substream)) < 0)
 			break;
-		} else {
-			err = SNDRV_PCM_STATE_RUNNING ? -EPIPE : -EBADFD;
-		}
-		break;
+		/* Fall through */
+	case SNDRV_PCM_STATE_PREPARED:
 	case SNDRV_PCM_STATE_SUSPENDED:
-		if (runtime->status->suspended_state == SNDRV_PCM_STATE_RUNNING) {
-			n = snd_pcm_playback_hw_avail(runtime);
-			if (put_user(n, res))
-				err = -EFAULT;
-		} else {
-			err = -EBADFD;
-		}
+		err = 0;
+		break;
+	case SNDRV_PCM_STATE_XRUN:
+		err = -EPIPE;
 		break;
 	default:
+	      __badfd:
 		err = -EBADFD;
 		break;
 	}
@@ -1997,41 +1992,43 @@ static int snd_pcm_playback_delay(snd_pcm_substream_t *substream, snd_pcm_sframe
 	return err;
 }
 		
-static int snd_pcm_capture_delay(snd_pcm_substream_t *substream, snd_pcm_sframes_t *res)
+static int snd_pcm_delay(snd_pcm_substream_t *substream, snd_pcm_sframes_t *res)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
-	int err = 0;
+	int err;
 	snd_pcm_sframes_t n;
+
 	spin_lock_irq(&runtime->lock);
 	switch (runtime->status->state) {
+	case SNDRV_PCM_STATE_DRAINING:
+		if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
+			goto __badfd;
 	case SNDRV_PCM_STATE_RUNNING:
-		if (snd_pcm_update_hw_ptr(substream) >= 0) {
-			n = snd_pcm_capture_avail(runtime);
-			if (put_user(n, res))
-				err = -EFAULT;
+		if ((err = snd_pcm_update_hw_ptr(substream)) < 0)
 			break;
-		}
 		/* Fall through */
+	case SNDRV_PCM_STATE_PREPARED:
+	case SNDRV_PCM_STATE_SUSPENDED:
+		err = 0;
+		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+			n = snd_pcm_playback_hw_avail(runtime);
+		else
+			n = snd_pcm_capture_avail(runtime);
+		if (put_user(n, res))
+			err = -EFAULT;
+		break;
 	case SNDRV_PCM_STATE_XRUN:
 		err = -EPIPE;
 		break;
-	case SNDRV_PCM_STATE_SUSPENDED:
-		if (runtime->status->suspended_state == SNDRV_PCM_STATE_RUNNING) {
-			n = snd_pcm_capture_avail(runtime);
-			if (put_user(n, res))
-				err = -EFAULT;
-		} else {
-			err = -EBADFD;
-		}
-		break;
 	default:
+	      __badfd:
 		err = -EBADFD;
 		break;
 	}
 	spin_unlock_irq(&runtime->lock);
 	return err;
 }
-
+		
 static int snd_pcm_playback_ioctl1(snd_pcm_substream_t *substream,
 				   unsigned int cmd, void *arg);
 static int snd_pcm_capture_ioctl1(snd_pcm_substream_t *substream,
@@ -2079,6 +2076,10 @@ static int snd_pcm_common_ioctl1(snd_pcm_substream_t *substream,
 		return snd_pcm_resume(substream);
 	case SNDRV_PCM_IOCTL_XRUN:
 		return snd_pcm_xrun(substream);
+	case SNDRV_PCM_IOCTL_HWSYNC:
+		return snd_pcm_hwsync(substream);
+	case SNDRV_PCM_IOCTL_DELAY:
+		return snd_pcm_delay(substream, (snd_pcm_sframes_t *) arg);
 	case SNDRV_PCM_IOCTL_HW_REFINE_OLD:
 		return snd_pcm_hw_refine_old_user(substream, (struct sndrv_pcm_hw_params_old *) arg);
 	case SNDRV_PCM_IOCTL_HW_PARAMS_OLD:
@@ -2159,8 +2160,6 @@ static int snd_pcm_playback_ioctl1(snd_pcm_substream_t *substream,
 		return snd_pcm_playback_drain(substream);
 	case SNDRV_PCM_IOCTL_DROP:
 		return snd_pcm_playback_drop(substream);
-	case SNDRV_PCM_IOCTL_DELAY:
-		return snd_pcm_playback_delay(substream, (snd_pcm_sframes_t*) arg);
 	}
 	return snd_pcm_common_ioctl1(substream, cmd, arg);
 }
@@ -2228,8 +2227,6 @@ static int snd_pcm_capture_ioctl1(snd_pcm_substream_t *substream,
 		return snd_pcm_capture_drain(substream);
 	case SNDRV_PCM_IOCTL_DROP:
 		return snd_pcm_capture_drop(substream);
-	case SNDRV_PCM_IOCTL_DELAY:
-		return snd_pcm_capture_delay(substream, (snd_pcm_sframes_t*) arg);
 	}
 	return snd_pcm_common_ioctl1(substream, cmd, arg);
 }
@@ -2326,7 +2323,9 @@ static ssize_t snd_pcm_write(struct file *file, const char *buf, size_t count, l
 	snd_pcm_runtime_t *runtime;
 	snd_pcm_sframes_t result;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 3, 0)
 	up(&file->f_dentry->d_inode->i_sem);
+#endif
 	pcm_file = snd_magic_cast(snd_pcm_file_t, file->private_data, result = -ENXIO; goto end);
 	substream = pcm_file->substream;
 	snd_assert(substream != NULL, result = -ENXIO; goto end);
@@ -2344,7 +2343,9 @@ static ssize_t snd_pcm_write(struct file *file, const char *buf, size_t count, l
 	if (result > 0)
 		result = frames_to_bytes(runtime, result);
  end:
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 3, 0)
 	down(&file->f_dentry->d_inode->i_sem);
+#endif
 	return result;
 }
 
@@ -2449,6 +2450,8 @@ unsigned int snd_pcm_playback_poll(struct file *file, poll_table * wait)
 	avail = snd_pcm_playback_avail(runtime);
 	switch (runtime->status->state) {
 	case SNDRV_PCM_STATE_RUNNING:
+	case SNDRV_PCM_STATE_PREPARED:
+	case SNDRV_PCM_STATE_PAUSED:
 		if (avail >= runtime->control->avail_min) {
 			mask = POLLOUT | POLLWRNORM;
 			break;
@@ -2457,12 +2460,6 @@ unsigned int snd_pcm_playback_poll(struct file *file, poll_table * wait)
 	case SNDRV_PCM_STATE_DRAINING:
 		mask = 0;
 		break;
-	case SNDRV_PCM_STATE_PREPARED:
-		if (avail > 0) {
-			mask = POLLOUT | POLLWRNORM;
-			break;
-		}
-		/* Fall through */
 	default:
 		mask = POLLOUT | POLLWRNORM | POLLERR;
 		break;
@@ -2491,6 +2488,8 @@ unsigned int snd_pcm_capture_poll(struct file *file, poll_table * wait)
 	avail = snd_pcm_capture_avail(runtime);
 	switch (runtime->status->state) {
 	case SNDRV_PCM_STATE_RUNNING:
+	case SNDRV_PCM_STATE_PREPARED:
+	case SNDRV_PCM_STATE_PAUSED:
 		if (avail >= runtime->control->avail_min) {
 			mask = POLLIN | POLLRDNORM;
 			break;

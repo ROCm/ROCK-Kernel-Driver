@@ -129,7 +129,7 @@ enum {
  *                                                                           *
  *****************************************************************************/
 
-#define SNDRV_PCM_VERSION		SNDRV_PROTOCOL_VERSION(2, 0, 2)
+#define SNDRV_PCM_VERSION		SNDRV_PROTOCOL_VERSION(2, 0, 3)
 
 typedef unsigned long sndrv_pcm_uframes_t;
 typedef long sndrv_pcm_sframes_t;
@@ -423,6 +423,7 @@ enum {
 	SNDRV_PCM_IOCTL_SW_PARAMS = _IOWR('A', 0x13, struct sndrv_pcm_sw_params),
 	SNDRV_PCM_IOCTL_STATUS = _IOR('A', 0x20, struct sndrv_pcm_status),
 	SNDRV_PCM_IOCTL_DELAY = _IOR('A', 0x21, sndrv_pcm_sframes_t),
+	SNDRV_PCM_IOCTL_HWSYNC = _IO('A', 0x22),
 	SNDRV_PCM_IOCTL_CHANNEL_INFO = _IOR('A', 0x32, struct sndrv_pcm_channel_info),
 	SNDRV_PCM_IOCTL_PREPARE = _IO('A', 0x40),
 	SNDRV_PCM_IOCTL_RESET = _IO('A', 0x41),

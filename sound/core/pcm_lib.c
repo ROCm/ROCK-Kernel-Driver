@@ -1854,16 +1854,11 @@ static snd_pcm_sframes_t snd_pcm_lib_write1(snd_pcm_substream_t *substream,
 		if (runtime->sleep_min == 0 && runtime->status->state == SNDRV_PCM_STATE_RUNNING)
 			snd_pcm_update_hw_ptr(substream);
 		avail = snd_pcm_playback_avail(runtime);
-		if (runtime->status->state == SNDRV_PCM_STATE_PAUSED ||
-		    runtime->status->state == SNDRV_PCM_STATE_PREPARED) {
-			if (avail < runtime->xfer_align) {
-				err = -EPIPE;
-				goto _end_unlock;
-			}
-		} else if (((avail < runtime->control->avail_min && size > avail) ||
-			    (size >= runtime->xfer_align && avail < runtime->xfer_align))) {
+		if (((avail < runtime->control->avail_min && size > avail) ||
+		   (size >= runtime->xfer_align && avail < runtime->xfer_align))) {
 			wait_queue_t wait;
 			enum { READY, SIGNALED, ERROR, SUSPENDED, EXPIRED } state;
+
 			if (nonblock) {
 				err = -EAGAIN;
 				goto _end_unlock;
@@ -1880,8 +1875,11 @@ static snd_pcm_sframes_t snd_pcm_lib_write1(snd_pcm_substream_t *substream,
 				spin_unlock_irq(&runtime->lock);
 				if (schedule_timeout(10 * HZ) == 0) {
 					spin_lock_irq(&runtime->lock);
-					state = runtime->status->state == SNDRV_PCM_STATE_SUSPENDED ? SUSPENDED : EXPIRED;
-					break;
+					if (runtime->status->state != SNDRV_PCM_STATE_PREPARED &&
+					    runtime->status->state != SNDRV_PCM_STATE_PAUSED) {
+						state = runtime->status->state == SNDRV_PCM_STATE_SUSPENDED ? SUSPENDED : EXPIRED;
+						break;
+					}
 				}
 				spin_lock_irq(&runtime->lock);
 				switch (runtime->status->state) {
@@ -1928,10 +1926,6 @@ static snd_pcm_sframes_t snd_pcm_lib_write1(snd_pcm_substream_t *substream,
 		cont = runtime->buffer_size - runtime->control->appl_ptr % runtime->buffer_size;
 		if (frames > cont)
 			frames = cont;
-		if (frames == 0 && runtime->status->state == SNDRV_PCM_STATE_PAUSED) {
-			err = -EPIPE;
-			goto _end_unlock;
-		}
 		snd_assert(frames != 0,
 			   spin_unlock_irq(&runtime->lock);
 			   return -EINVAL);
@@ -2147,14 +2141,8 @@ static snd_pcm_sframes_t snd_pcm_lib_read1(snd_pcm_substream_t *substream, void 
 		if (runtime->sleep_min == 0 && runtime->status->state == SNDRV_PCM_STATE_RUNNING)
 			snd_pcm_update_hw_ptr(substream);
 		avail = snd_pcm_capture_avail(runtime);
-		if (runtime->status->state == SNDRV_PCM_STATE_PAUSED) {
+		if (runtime->status->state == SNDRV_PCM_STATE_DRAINING) {
 			if (avail < runtime->xfer_align) {
-				err = -EPIPE;
-				goto _end_unlock;
-			}
-		} else if (runtime->status->state == SNDRV_PCM_STATE_DRAINING) {
-			if (avail < runtime->xfer_align) {
-				runtime->status->state = SNDRV_PCM_STATE_SETUP;
 				err = -EPIPE;
 				goto _end_unlock;
 			}
@@ -2162,6 +2150,7 @@ static snd_pcm_sframes_t snd_pcm_lib_read1(snd_pcm_substream_t *substream, void 
 			   (size >= runtime->xfer_align && avail < runtime->xfer_align)) {
 			wait_queue_t wait;
 			enum { READY, SIGNALED, ERROR, SUSPENDED, EXPIRED } state;
+
 			if (nonblock) {
 				err = -EAGAIN;
 				goto _end_unlock;
@@ -2178,8 +2167,11 @@ static snd_pcm_sframes_t snd_pcm_lib_read1(snd_pcm_substream_t *substream, void 
 				spin_unlock_irq(&runtime->lock);
 				if (schedule_timeout(10 * HZ) == 0) {
 					spin_lock_irq(&runtime->lock);
-					state = runtime->status->state == SNDRV_PCM_STATE_SUSPENDED ? SUSPENDED : EXPIRED;
-					break;
+					if (runtime->status->state != SNDRV_PCM_STATE_PREPARED &&
+					    runtime->status->state != SNDRV_PCM_STATE_PAUSED) {
+						state = runtime->status->state == SNDRV_PCM_STATE_SUSPENDED ? SUSPENDED : EXPIRED;
+						break;
+					}
 				}
 				spin_lock_irq(&runtime->lock);
 				switch (runtime->status->state) {
