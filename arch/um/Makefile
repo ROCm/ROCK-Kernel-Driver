@@ -63,16 +63,18 @@ ifeq ($(CONFIG_MODE_SKAS), y)
 $(SYS_HEADERS) : $(ARCH_DIR)/include/skas_ptregs.h
 endif
 
+.PHONY: linux
+
 all: linux
 
 linux: vmlinux
-	$(RM) $@
-	ln $< $@
+	ln -f $< $@
 
 define archhelp
   echo '* linux		- Binary kernel image (./linux) - for backward'
-  echo '		   compatibility only: now you can simply run'
-  echo '		   the vmlinux binary you find in the kernel root.'
+  echo '		   compatibility only, this creates a hard link to the'
+  echo '		   real kernel binary, the the "vmlinux" binary you'
+  echo '		   find in the kernel root.'
 endef
 
 prepare: $(ARCH_SYMLINKS) $(SYS_HEADERS) $(GEN_HEADERS) \
@@ -118,7 +120,8 @@ define cmd_vmlinux__
 	-Wl,-T,$(vmlinux-lds) $(vmlinux-init) \
 	-Wl,--start-group $(vmlinux-main) -Wl,--end-group \
 	-L/usr/lib -lutil \
-	$(filter-out $(vmlinux-lds) $(vmlinux-init) $(vmlinux-main) FORCE ,$^)
+	$(filter-out $(vmlinux-lds) $(vmlinux-init) $(vmlinux-main) \
+	FORCE ,$^) ; rm -f linux
 endef
 
 USER_CFLAGS := $(patsubst -I%,,$(CFLAGS))
