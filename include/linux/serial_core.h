@@ -78,6 +78,11 @@
 #define PORT_MAC_ZILOG	50	/* m68k : not yet implemented */
 #define PORT_PMAC_ZILOG	51
 
+/* SH-SCI */
+#define PORT_SCI	52
+#define PORT_SCIF	53
+#define PORT_IRDA	54
+
 #ifdef __KERNEL__
 
 #include <linux/config.h>
