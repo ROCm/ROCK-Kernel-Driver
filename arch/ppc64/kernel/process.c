@@ -43,6 +43,7 @@
 #include <asm/ppcdebug.h>
 #include <asm/machdep.h>
 #include <asm/iSeries/HvCallHpt.h>
+#include <asm/hardirq.h>
 
 struct task_struct *last_task_used_math = NULL;
 
@@ -484,4 +485,9 @@ void show_trace_task(struct task_struct *p)
 		}
 	} while (count++ < 16);
 	printk("\n");
+}
+
+void dump_stack(void)
+{
+	show_stack(NULL);
 }

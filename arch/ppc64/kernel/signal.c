@@ -213,7 +213,7 @@ int sys_rt_sigreturn(unsigned long r3, unsigned long r4, unsigned long r5,
 		     struct pt_regs *regs)
 {
 	struct rt_sigframe *rt_sf;
-	struct sigcontext_struct sigctx;
+	struct sigcontext sigctx;
 	struct sigregs *sr;
 	elf_gregset_t saved_regs;  /* an array of ELF_NGREG unsigned longs */
 	sigset_t set;
@@ -331,12 +331,12 @@ long sys_sigreturn(unsigned long r3, unsigned long r4, unsigned long r5,
 		   unsigned long r6, unsigned long r7, unsigned long r8,
 		   struct pt_regs *regs)
 {
-	struct sigcontext_struct *sc, sigctx;
+	struct sigcontext *sc, sigctx;
 	struct sigregs *sr;
 	elf_gregset_t saved_regs;  /* an array of ELF_NGREG unsigned longs */
 	sigset_t set;
 
-	sc = (struct sigcontext_struct *)(regs->gpr[1] + __SIGNAL_FRAMESIZE);
+	sc = (struct sigcontext *)(regs->gpr[1] + __SIGNAL_FRAMESIZE);
 	if (copy_from_user(&sigctx, sc, sizeof(sigctx)))
 		goto badframe;
 
@@ -391,7 +391,7 @@ static void setup_frame(struct pt_regs *regs, struct sigregs *frame,
 	struct funct_descr_entry * funct_desc_ptr;
 	unsigned long temp_ptr;
 
-	struct sigcontext_struct *sc = (struct sigcontext_struct *)newsp;
+	struct sigcontext *sc = (struct sigcontext *)newsp;
   
 	if (verify_area(VERIFY_WRITE, frame, sizeof(*frame)))
 		goto badframe;
@@ -440,7 +440,7 @@ badframe:
 static void handle_signal(unsigned long sig, siginfo_t *info, sigset_t *oldset,
 	struct pt_regs * regs, unsigned long *newspp, unsigned long frame)
 {
-	struct sigcontext_struct *sc;
+	struct sigcontext *sc;
 	struct rt_sigframe *rt_sf;
 	struct k_sigaction *ka = &current->sig->action[sig-1];
 
@@ -481,7 +481,7 @@ static void handle_signal(unsigned long sig, siginfo_t *info, sigset_t *oldset,
 	} else {
 		/* Put a sigcontext on the stack */
 		*newspp -= sizeof(*sc);
-		sc = (struct sigcontext_struct *)*newspp;
+		sc = (struct sigcontext *)*newspp;
 		if (verify_area(VERIFY_WRITE, sc, sizeof(*sc)))
 			goto badframe;
 		
