@@ -12,7 +12,7 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  *
- * $Id: xip.h,v 1.1 2004/11/05 22:41:06 nico Exp $
+ * $Id: xip.h,v 1.2 2004/12/01 15:49:10 nico Exp $
  */
 
 #ifndef __LINUX_MTD_XIP_H__
@@ -74,7 +74,15 @@
 #define xip_elapsed_since(x)	(signed)((OSCR - (x)) / 4)
 
 #else
-#error "missing IRQ and timer primitives for XIP MTD support"
+
+#warning "missing IRQ and timer primitives for XIP MTD support"
+#warning "some of the XIP MTD support code will be disabled"
+#warning "your system will therefore be unresponsive when writing or erasing flash"
+
+#define xip_irqpending()	(0)
+#define xip_currtime()		(0)
+#define xip_elapsed_since(x)	(0)
+
 #endif
 
 /*
