@@ -700,15 +700,17 @@ static int check_scsidisk_media_change(struct gendisk *disk)
 				 * check_disk_change */
 	}
 
-	/* Using Start/Stop enables differentiation between drive with
+	/* Using TEST_UNIT_READY enables differentiation between drive with
 	 * no cartridge loaded - NOT READY, drive with changed cartridge -
 	 * UNIT ATTENTION, or with same cartridge - GOOD STATUS.
-	 * This also handles drives that auto spin down. eg iomega jaz 1GB
-	 * as this will spin up the drive.
+	 *
+	 * Drives that auto spin down. eg iomega jaz 1G, will be started
+	 * by sd_spinup_disk() from sd_init_onedisk(), which happens whenever
+	 * sd_revalidate() is called.
 	 */
 	retval = -ENODEV;
 	if (scsi_block_when_processing_errors(sdp))
-		retval = scsi_ioctl(sdp, SCSI_IOCTL_START_UNIT, NULL);
+		retval = scsi_ioctl(sdp, SCSI_IOCTL_TEST_UNIT_READY, NULL);
 
 	if (retval) {		/* Unable to test, unit probably not ready.
 				 * This usually means there is no disc in the
@@ -794,10 +796,9 @@ sd_spinup_disk(struct scsi_disk *sdkp, char *diskname,
 		if (sd_media_not_present(sdkp, SRpnt))
 			return;
 
-		/* Look for non-removable devices that return NOT_READY.
+		/* Look for devices that return NOT_READY.
 		 * Issue command to spin up drive for these cases. */
-		if (the_result && !sdp->removable &&
-		    SRpnt->sr_sense_buffer[2] == NOT_READY) {
+		if (the_result && SRpnt->sr_sense_buffer[2] == NOT_READY) {
 			unsigned long time1;
 			if (!spintime) {
 				printk(KERN_NOTICE "%s: Spinning up disk...",
