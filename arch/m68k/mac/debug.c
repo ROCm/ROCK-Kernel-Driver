@@ -8,7 +8,7 @@
  * Atari debugging and serial console stuff
  *
  * Assembled of parts of former atari/config.c 97-12-18 by Roman Hodek
- *  
+ *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file COPYING in the main directory of this archive
  * for more details.
@@ -43,7 +43,7 @@ extern void mac_serial_print(const char *);
 #define DEBUG_SERIAL
 
 /*
- * These two auxiliary debug functions should go away ASAP. Only usage: 
+ * These two auxiliary debug functions should go away ASAP. Only usage:
  * before the console output is up (after head.S come some other crucial
  * setup routines :-) it permits writing 'data' to the screen as bit patterns
  * (good luck reading those). Helped to figure that the bootinfo contained
@@ -77,9 +77,9 @@ void mac_debugging_short(int pos, short num)
 	/* calculate current offset */
 	pengoffset=(unsigned char *)(mac_videobase+(150+line*2)*mac_rowbytes)
 		    +80*peng;
-	
+
 	pptr=pengoffset;
-	
+
 	for(i=0;i<8*sizeof(short);i++) /* # of bits */
 	{
 		/*        value        mask for bit i, reverse order */
@@ -112,12 +112,12 @@ void mac_debugging_long(int pos, long addr)
 		/* printk("debug: #%ld !\n", addr); */
 		return;
 	}
-	
+
 	pengoffset=(unsigned char *)(mac_videobase+(150+line*2)*mac_rowbytes)
 		    +80*peng;
-	
+
 	pptr=pengoffset;
-	
+
 	for(i=0;i<8*sizeof(long);i++) /* # of bits */
 	{
 		*pptr++ = (addr & ( 1 << (8*sizeof(long)-i-1) ) ? 0xFF : 0x00);
@@ -270,7 +270,7 @@ void mac_scca_console_write (struct console *co, const char *str,
 	for( i = 60*uSEC; i > 0; --i )		\
 	    barrier();				\
     } while(0)
-    
+
 #ifndef CONFIG_SERIAL_CONSOLE
 static void __init mac_init_scc_port( int cflag, int port )
 #else
@@ -285,17 +285,17 @@ void mac_init_scc_port( int cflag, int port )
 
 	static int clksrc_table[9] =
 		/* reg 11: 0x50 = BRG, 0x00 = RTxC, 0x28 = TRxC */
-    		{ 0x50, 0x50, 0x50, 0x50, 0x50, 0x50, 0x50, 0x00, 0x00 };
+		{ 0x50, 0x50, 0x50, 0x50, 0x50, 0x50, 0x50, 0x00, 0x00 };
 	static int clkmode_table[9] =
 		/* reg 4: 0x40 = x16, 0x80 = x32, 0xc0 = x64 */
-    		{ 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0xc0, 0x80 };
+		{ 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0xc0, 0x80 };
 	static int div_table[9] =
 		/* reg12 (BRG low) */
-    		{ 94, 62, 46, 22, 10, 4, 1, 0, 0 };
+		{ 94, 62, 46, 22, 10, 4, 1, 0, 0 };
 
     int baud = cflag & CBAUD;
     int clksrc, clkmode, div, reg3, reg5;
-    
+
     if (cflag & CBAUDEX)
 	baud += B38400;
     if (baud < B1200 || baud > B38400+2)

@@ -17,7 +17,7 @@
 /* bit 4 */
 #define INTERSIL_INT_ENABLE     0x10
 #define INTERSIL_INT_DISABLE    0x00
-                
+
 /* bit 5 */
 #define INTERSIL_MODE_NORMAL     0x00
 #define INTERSIL_MODE_TEST       0x20

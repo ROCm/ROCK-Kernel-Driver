@@ -3,7 +3,7 @@
  *
  *  Copyright (C) 1994-1996  Linus Torvalds & authors
  */
- 
+
 /* Copyright(c) 1996 Kars de Jong */
 /* Based on the ide driver from 1.2.13pl8 */
 

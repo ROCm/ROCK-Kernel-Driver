@@ -5,10 +5,10 @@ M68060 Software Package
 Production Release P1.00 -- October 10, 1994
 
 M68060 Software Package Copyright © 1993, 1994 Motorola Inc.  All rights reserved.
- 
+
 THE SOFTWARE is provided on an "AS IS" basis and without warranty.
 To the maximum extent permitted by applicable law,
-MOTOROLA DISCLAIMS ALL WARRANTIES WHETHER EXPRESS OR IMPLIED, 
+MOTOROLA DISCLAIMS ALL WARRANTIES WHETHER EXPRESS OR IMPLIED,
 INCLUDING IMPLIED WARRANTIES OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE
 and any warranty against infringement with regard to the SOFTWARE
 (INCLUDING ANY MODIFIED VERSIONS THEREOF) and any accompanying written materials.
@@ -31,7 +31,7 @@ CHANGES SINCE LAST RELEASE:
 ---------------------------
 
 1) "movep" emulation where data was being read from memory
-was reading the intermediate bytes. Emulation now only 
+was reading the intermediate bytes. Emulation now only
 reads the required bytes.
 
 2) "flogn", "flog2", and "flog10" of "1" was setting the
@@ -57,7 +57,7 @@ of the operation. This has been corrected.
 	For example, if a user executed "fsin.x ADDR,fp0" where
 	ADDR should cause a "segmentation violation", the memory read
 	requested by the package should return a failing value
-	to the package. Since the package currently ignores this 
+	to the package. Since the package currently ignores this
 	return value, the user program will continue to the
 	next instruction, and the result created in fp0 will be
 	undefined.
@@ -76,16 +76,16 @@ of the operation. This has been corrected.
 	as described in the MC68060 User's Manual.
 
 	For instruction read access errors, the info stacked is:
-		SR 	= SR at time of exception
-		PC 	= PC of instruction being emulated
+		SR	= SR at time of exception
+		PC	= PC of instruction being emulated
 		VOFF	= $4008 (stack frame format type)
 		ADDRESS	= PC of instruction being emulated
 		FSLW	= FAULT STATUS LONGWORD
 
 	The valid FSLW bits are:
-		bit 27 		= 1	(misaligned bit)
-		bit 24 		= 1	(read)
-		bit 23 		= 0	(write)
+		bit 27		= 1	(misaligned bit)
+		bit 24		= 1	(read)
+		bit 23		= 0	(write)
 		bit 22:21	= 10	(SIZE = word)
 		bit 20:19	= 00	(TT)
 		bit 18:16	= x10	(TM; x = 1 for supervisor mode)
@@ -98,15 +98,15 @@ of the operation. This has been corrected.
 	other bits.
 
 	For data read/write access errors, the info stacked is:
-		SR 	= SR at time of exception
-		PC 	= PC of instruction being emulated
+		SR	= SR at time of exception
+		PC	= PC of instruction being emulated
 		VOFF	= $4008 (stack frame format type)
 		ADDRESS	= Address of source or destination operand
 		FSLW	= FAULT STATUS LONGWORD
 
 	The valid FSLW bits are:
-		bit 27 		= 0	(misaligned bit)
-		bit 24 		= x	(read; 1 if read, 0 if write)
+		bit 27		= 0	(misaligned bit)
+		bit 24		= x	(read; 1 if read, 0 if write)
 		bit 23		= x	(write; 1 if write, 0 if read)
 		bit 22:21	= xx	(SIZE; see MC68060 User's Manual)
 		bit 20:19	= 00	(TT)

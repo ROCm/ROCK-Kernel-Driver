@@ -73,7 +73,7 @@ static inline char * strncat(char *dest, const char *src, size_t count)
 static inline char * strchr(const char * s, int c)
 {
   const char ch = c;
-  
+
   for(; *s != ch; ++s)
     if (*s == '\0')
       return( NULL );
@@ -85,7 +85,7 @@ static inline char * strchr(const char * s, int c)
 static inline char *strpbrk(const char *cs,const char *ct)
 {
   const char *sc1,*sc2;
-  
+
   for( sc1 = cs; *sc1 != '\0'; ++sc1)
     for( sc2 = ct; *sc2 != '\0'; ++sc2)
       if (*sc1 == *sc2)

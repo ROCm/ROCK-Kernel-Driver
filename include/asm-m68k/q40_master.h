@@ -1,5 +1,5 @@
-/* 
- * Q40 master Chip Control 
+/*
+ * Q40 master Chip Control
  * RTC stuff merged for compactnes..
 */
 

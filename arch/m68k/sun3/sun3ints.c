@@ -28,7 +28,7 @@ void sun3_disable_interrupts(void)
 void sun3_enable_interrupts(void)
 {
 	sun3_enable_irq(0);
-}	
+}
 
 int led_pattern[8] = {
        ~(0x80), ~(0x01),
@@ -67,7 +67,7 @@ inline void sun3_do_irq(int irq, struct pt_regs *fp)
 static irqreturn_t sun3_int7(int irq, void *dev_id, struct pt_regs *fp)
 {
 	sun3_do_irq(irq,fp);
-	if(!(kstat_cpu(0).irqs[SYS_IRQS + irq] % 2000)) 
+	if(!(kstat_cpu(0).irqs[SYS_IRQS + irq] % 2000))
 		sun3_leds(led_pattern[(kstat_cpu(0).irqs[SYS_IRQS+irq]%16000)
 			  /2000]);
 	return IRQ_HANDLED;
@@ -125,7 +125,7 @@ int show_sun3_interrupts(struct seq_file *p, void *v)
 
 	for(i = 0; i < (SUN3_INT_VECS-1); i++) {
 		if(sun3_vechandler[i] != NULL) {
-			seq_printf(p, "vec %3d: %10u %s\n", i+64, 
+			seq_printf(p, "vec %3d: %10u %s\n", i+64,
 				   vec_ints[i],
 				   (vec_names[i]) ? vec_names[i] :
 				   "sun3_vechandler");
@@ -166,12 +166,12 @@ void sun3_init_IRQ(void)
 					dev_names[i], NULL);
 	}
 
-	for(i = 0; i < 192; i++) 
+	for(i = 0; i < 192; i++)
 		sun3_vechandler[i] = NULL;
-	
+
 	sun3_vechandler[191] = sun3_vec255;
 }
-                                
+
 int sun3_request_irq(unsigned int irq, irqreturn_t (*handler)(int, void *, struct pt_regs *),
                       unsigned long flags, const char *devname, void *dev_id)
 {
@@ -181,11 +181,11 @@ int sun3_request_irq(unsigned int irq, irqreturn_t (*handler)(int, void *, struc
 			printk("sun3_request_irq: request for irq %d -- already taken!\n", irq);
 			return 1;
 		}
-		
+
 		sun3_inthandler[irq] = handler;
 		dev_ids[irq] = dev_id;
 		dev_names[irq] = devname;
-		
+
 		/* setting devname would be nice */
 		cpu_request_irq(irq, sun3_default_handler[irq], 0, devname,
 				NULL);
@@ -205,7 +205,7 @@ int sun3_request_irq(unsigned int irq, irqreturn_t (*handler)(int, void *, struc
 			vec_ids[vec] = dev_id;
 			vec_names[vec] = devname;
 			vec_ints[vec] = 0;
-			
+
 			return 0;
 		}
 	}
@@ -214,16 +214,16 @@ int sun3_request_irq(unsigned int irq, irqreturn_t (*handler)(int, void *, struc
 	return 1;
 
 }
-                        
+
 void sun3_free_irq(unsigned int irq, void *dev_id)
 {
 
 	if(irq < SYS_IRQS) {
-		if(sun3_inthandler[irq] == NULL) 
+		if(sun3_inthandler[irq] == NULL)
 			panic("sun3_free_int: attempt to free unused irq %d\n", irq);
 		if(dev_ids[irq] != dev_id)
 			panic("sun3_free_int: incorrect dev_id for irq %d\n", irq);
-		
+
 		sun3_inthandler[irq] = NULL;
 		return;
 	} else if((irq >= 64) && (irq <= 255)) {
@@ -234,12 +234,12 @@ void sun3_free_irq(unsigned int irq, void *dev_id)
 			panic("sun3_free_int: attempt to free unused vector %d\n", irq);
 		if(vec_ids[irq] != dev_id)
 			panic("sun3_free_int: incorrect dev_id for vec %d\n", irq);
-		
+
 		sun3_vechandler[vec] = NULL;
 		return;
 	} else {
 		panic("sun3_free_irq: invalid irq %d\n", irq);
-	}		
+	}
 }
 
 irqreturn_t sun3_process_int(int irq, struct pt_regs *regs)
@@ -249,7 +249,7 @@ irqreturn_t sun3_process_int(int irq, struct pt_regs *regs)
 		int vec;
 
 		vec = irq - 64;
-		if(sun3_vechandler[vec] == NULL) 
+		if(sun3_vechandler[vec] == NULL)
 			panic ("bad interrupt vector %d received\n",irq);
 
 		vec_ints[vec]++;
