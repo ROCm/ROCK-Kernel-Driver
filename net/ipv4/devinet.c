@@ -183,7 +183,10 @@ static void inetdev_destroy(struct in_device *in_dev)
 
 	in_dev->dead = 1;
 
-	ip_mc_destroy_dev(in_dev);
+	/* If the device isn't up, the multicast info isn't
+	 * initialized. */
+	if (in_dev->dev->flags & IFF_UP)
+		ip_mc_destroy_dev(in_dev);
 
 	while ((ifa = in_dev->ifa_list) != NULL) {
 		inet_del_ifa(in_dev, &in_dev->ifa_list, 0);
