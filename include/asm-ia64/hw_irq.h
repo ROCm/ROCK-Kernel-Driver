@@ -34,6 +34,8 @@ typedef u8 ia64_vector;
 #define IA64_MAX_VECTORED_IRQ		255
 #define IA64_NUM_VECTORS		256
 
+#define AUTO_ASSIGN			-1
+
 #define IA64_SPURIOUS_INT_VECTOR	0x0f
 
 /*
@@ -80,7 +82,7 @@ extern unsigned long ipi_base_addr;
 
 extern struct hw_interrupt_type irq_type_ia64_lsapic;	/* CPU-internal interrupt controller */
 
-extern int ia64_alloc_vector (void);	/* allocate a free vector */
+extern int assign_irq_vector (int irq);	/* allocate a free vector */
 extern void ia64_send_ipi (int cpu, int vector, int delivery_mode, int redirect);
 extern void register_percpu_irq (ia64_vector vec, struct irqaction *action);
 

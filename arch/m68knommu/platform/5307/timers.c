@@ -127,7 +127,7 @@ void coldfire_profile_tick(int irq, void *dummy, struct pt_regs *regs)
 
 void coldfire_profile_init(void)
 {
-	printk("PROFILE: lodging TIMER2 @ %dHz as profile timer\n", PROFILEHZ);
+	printk(KERN_INFO "PROFILE: lodging TIMER2 @ %dHz as profile timer\n", PROFILEHZ);
 
 	/* Set up TIMER 2 as high speed profile clock */
 	mcf_proftp = (volatile struct mcftimer *) (MCF_MBAR + MCFTIMER_BASE2);

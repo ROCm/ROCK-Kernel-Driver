@@ -170,6 +170,8 @@ extern void update_one_process(struct task_struct *p, unsigned long user,
 			       unsigned long system, int cpu);
 extern void scheduler_tick(int user_tick, int system);
 extern unsigned long cache_decay_ticks;
+extern const unsigned long scheduling_functions_start_here;
+extern const unsigned long scheduling_functions_end_here;
 
 
 #define	MAX_SCHEDULE_TIMEOUT	LONG_MAX
@@ -267,6 +269,18 @@ struct signal_struct {
 
 	/* thread group stop support, overloads group_exit_code too */
 	int			group_stop_count;
+
+	/* POSIX.1b Interval Timers */
+	struct list_head posix_timers;
+
+	/* job control IDs */
+	pid_t pgrp;
+	pid_t tty_old_pgrp;
+	pid_t session;
+	/* boolean value for session group leader */
+	int leader;
+
+	struct tty_struct *tty; /* NULL if no tty */
 };
 
 /*
@@ -360,6 +374,8 @@ int set_current_groups(struct group_info *group_info);
     ((gi)->blocks[(i)/NGROUPS_PER_BLOCK][(i)%NGROUPS_PER_BLOCK])
 
 
+struct audit_context;		/* See audit.c */
+
 struct task_struct {
 	volatile long state;	/* -1 unrunnable, 0 runnable, >0 stopped */
 	struct thread_info *thread_info;
@@ -396,12 +412,7 @@ struct task_struct {
 	unsigned long personality;
 	int did_exec:1;
 	pid_t pid;
-	pid_t __pgrp;		/* Accessed via process_group() */
-	pid_t tty_old_pgrp;
-	pid_t session;
 	pid_t tgid;
-	/* boolean value for session group leader */
-	int leader;
 	/* 
 	 * pointers to (original) parent process, youngest child, younger sibling,
 	 * older sibling, respectively.  (p->father can be replaced with 
@@ -425,12 +436,11 @@ struct task_struct {
 	unsigned long it_real_value, it_prof_value, it_virt_value;
 	unsigned long it_real_incr, it_prof_incr, it_virt_incr;
 	struct timer_list real_timer;
-	struct list_head posix_timers; /* POSIX.1b Interval Timers */
 	unsigned long utime, stime, cutime, cstime;
 	unsigned long nvcsw, nivcsw, cnvcsw, cnivcsw; /* context switch counts */
 	u64 start_time;
 /* mm fault and swap info: this can arguably be seen as either mm-specific or thread-specific */
-	unsigned long min_flt, maj_flt, nswap, cmin_flt, cmaj_flt, cnswap;
+	unsigned long min_flt, maj_flt, cmin_flt, cmaj_flt;
 /* process credentials */
 	uid_t uid,euid,suid,fsuid;
 	gid_t gid,egid,sgid,fsgid;
@@ -444,7 +454,6 @@ struct task_struct {
 	char comm[16];
 /* file system info */
 	int link_count, total_link_count;
-	struct tty_struct *tty; /* NULL if no tty */
 /* ipc stuff */
 	struct sysv_sem sysvsem;
 /* CPU-specific state of this task */
@@ -469,6 +478,7 @@ struct task_struct {
 	sigset_t *notifier_mask;
 	
 	void *security;
+	struct audit_context *audit_context;
 
 /* Thread group tracking */
    	u32 parent_exec_id;
@@ -497,7 +507,7 @@ struct task_struct {
 
 static inline pid_t process_group(struct task_struct *tsk)
 {
-	return tsk->group_leader->__pgrp;
+	return tsk->signal->pgrp;
 }
 
 extern void __put_task_struct(struct task_struct *tsk);
@@ -720,7 +730,7 @@ extern void exit_signal(struct task_struct *);
 extern void __exit_signal(struct task_struct *);
 extern void exit_sighand(struct task_struct *);
 extern void __exit_sighand(struct task_struct *);
-extern void exit_itimers(struct task_struct *);
+extern void exit_itimers(struct signal_struct *);
 
 extern NORET_TYPE void do_group_exit(int);
 

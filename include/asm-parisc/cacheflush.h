@@ -69,8 +69,7 @@ extern void __flush_dcache_page(struct page *page);
 
 static inline void flush_dcache_page(struct page *page)
 {
-	if (page->mapping && list_empty(&page->mapping->i_mmap) &&
-			list_empty(&page->mapping->i_mmap_shared)) {
+	if (page_mapping(page) && !mapping_mapped(page->mapping)) {
 		set_bit(PG_dcache_dirty, &page->flags);
 	} else {
 		__flush_dcache_page(page);

@@ -87,7 +87,7 @@ static int show_super(struct seq_file *m, struct super_block *sb)
 	struct reiserfs_sb_info *r = REISERFS_SB(sb);
     
 	seq_printf(m,	"state: \t%s\n"
-			"mount options: \t%s%s%s%s%s%s%s%s%s%s%s%s\n"
+			"mount options: \t%s%s%s%s%s%s%s%s%s%s%s\n"
 			"gen. counter: \t%i\n"
 			"s_kmallocs: \t%i\n"
 			"s_disk_reads: \t%i\n"
@@ -131,7 +131,6 @@ static int show_super(struct seq_file *m, struct super_block *sb)
 			reiserfs_test4( sb ) ? "TEST4 " : "",
 			have_large_tails( sb ) ? "TAILS " : have_small_tails(sb)?"SMALL_TAILS ":"NO_TAILS ",
 			replay_only( sb ) ? "REPLAY_ONLY " : "",
-			reiserfs_dont_log( sb ) ? "DONT_LOG " : "LOG ",
 			convert_reiserfs( sb ) ? "CONV " : "",
 
 			atomic_read( &r -> s_generation_counter ),
@@ -370,7 +369,6 @@ static int show_journal(struct seq_file *m, struct super_block *sb)
 			"j_first_unflushed_offset: \t%lu\n"
 			"j_last_flush_trans_id: \t%lu\n"
 			"j_trans_start_time: \t%li\n"
-			"j_journal_list_index: \t%i\n"
 			"j_list_bitmap_index: \t%i\n"
 			"j_must_wait: \t%i\n"
 			"j_next_full_flush: \t%i\n"
@@ -416,7 +414,6 @@ static int show_journal(struct seq_file *m, struct super_block *sb)
 			JF( j_first_unflushed_offset ),
 			JF( j_last_flush_trans_id ),
 			JF( j_trans_start_time ),
-			JF( j_journal_list_index ),
 			JF( j_list_bitmap_index ),
 			JF( j_must_wait ),
 			JF( j_next_full_flush ),

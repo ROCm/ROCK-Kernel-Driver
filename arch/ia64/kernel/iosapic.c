@@ -435,7 +435,7 @@ iosapic_reassign_vector (int vector)
 	    || iosapic_intr_info[vector].gsi_base || iosapic_intr_info[vector].dmode
 	    || iosapic_intr_info[vector].polarity || iosapic_intr_info[vector].trigger)
 	{
-		new_vector = ia64_alloc_vector();
+		new_vector = assign_irq_vector(AUTO_ASSIGN);
 		printk(KERN_INFO "Reassigning vector %d to %d\n", vector, new_vector);
 		memcpy(&iosapic_intr_info[new_vector], &iosapic_intr_info[vector],
 		       sizeof(struct iosapic_intr_info));
@@ -500,7 +500,7 @@ iosapic_register_intr (unsigned int gsi,
 
 	vector = gsi_to_vector(gsi);
 	if (vector < 0)
-		vector = ia64_alloc_vector();
+		vector = assign_irq_vector(AUTO_ASSIGN);
 
 	register_intr(gsi, vector, IOSAPIC_LOWEST_PRIORITY,
 		      polarity, trigger);
@@ -538,7 +538,7 @@ iosapic_register_platform_intr (u32 int_type, unsigned int gsi,
 		delivery = IOSAPIC_PMI;
 		break;
 	      case ACPI_INTERRUPT_INIT:
-		vector = ia64_alloc_vector();
+		vector = assign_irq_vector(AUTO_ASSIGN);
 		delivery = IOSAPIC_INIT;
 		break;
 	      case ACPI_INTERRUPT_CPEI:
@@ -708,7 +708,7 @@ iosapic_parse_prt (void)
 				vector = isa_irq_to_vector(gsi);
 			else
 				/* new GSI; allocate a vector for it */
-				vector = ia64_alloc_vector();
+				vector = assign_irq_vector(AUTO_ASSIGN);
 
 			register_intr(gsi, vector, IOSAPIC_LOWEST_PRIORITY, IOSAPIC_POL_LOW,
 				      IOSAPIC_LEVEL);

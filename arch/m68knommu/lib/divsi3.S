@@ -97,7 +97,7 @@ SYM (__divsi3):
 	movel	sp@(12), d1	/* d1 = divisor */
 	jpl	L1
 	negl	d1
-#ifndef __mcf5200__
+#if !(defined(__mcf5200__) || defined(__mcoldfire__))
 	negb	d2		/* change sign because divisor <0  */
 #else
 	negl	d2		/* change sign because divisor <0  */
@@ -105,7 +105,7 @@ SYM (__divsi3):
 L1:	movel	sp@(8), d0	/* d0 = dividend */
 	jpl	L2
 	negl	d0
-#ifndef __mcf5200__
+#if !(defined(__mcf5200__) || defined(__mcoldfire__))
 	negb	d2
 #else
 	negl	d2

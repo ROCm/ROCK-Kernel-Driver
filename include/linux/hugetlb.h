@@ -28,8 +28,11 @@ struct page *follow_huge_pmd(struct mm_struct *mm, unsigned long address,
 				pmd_t *pmd, int write);
 int is_aligned_hugepage_range(unsigned long addr, unsigned long len);
 int pmd_huge(pmd_t pmd);
+struct page *alloc_huge_page(void);
+void free_huge_page(struct page *);
 
-extern int htlbpage_max;
+extern unsigned long max_huge_pages;
+extern const unsigned long hugetlb_zero, hugetlb_infinity;
 
 static inline void
 mark_mm_hugetlb(struct mm_struct *mm, struct vm_area_struct *vma)
@@ -78,6 +81,8 @@ static inline unsigned long hugetlb_total_pages(void)
 #define pmd_huge(x)	0
 #define is_hugepage_only_range(addr, len)	0
 #define hugetlb_free_pgtables(tlb, prev, start, end) do { } while (0)
+#define alloc_huge_page()			({ NULL; })
+#define free_huge_page(p)			({ (void)(p); BUG(); })
 
 #ifndef HPAGE_MASK
 #define HPAGE_MASK	0		/* Keep the compiler happy */

@@ -898,11 +898,9 @@ static void cifs_copy_cache_pages(struct address_space *mapping,
 		if(list_empty(pages))
 			break;
 
-		spin_lock(&mapping->page_lock);
-		page = list_entry(pages->prev, struct page, list);
+		page = list_entry(pages->prev, struct page, lru);
 
-		list_del(&page->list);
-		spin_unlock(&mapping->page_lock);
+		list_del(&page->lru);
 
 		if (add_to_page_cache(page, mapping, page->index, GFP_KERNEL)) {
 			page_cache_release(page);
@@ -962,14 +960,10 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 	pagevec_init(&lru_pvec, 0);
 
 	for(i = 0;i<num_pages;) {
-		spin_lock(&mapping->page_lock);
-		if(list_empty(page_list)) {
-			spin_unlock(&mapping->page_lock);
+		if(list_empty(page_list))
 			break;
-		}
-		page = list_entry(page_list->prev, struct page, list);
+		page = list_entry(page_list->prev, struct page, lru);
 		offset = (loff_t)page->index << PAGE_CACHE_SHIFT;
-	        spin_unlock(&mapping->page_lock);
 
 		/* for reads over a certain size could initiate async read ahead */
 
@@ -989,12 +983,11 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 			cFYI(1,("Read error in readpages: %d",rc));
 			/* clean up remaing pages off list */
             
-			spin_lock(&mapping->page_lock);
 			while (!list_empty(page_list) && (i < num_pages)) {
-				page = list_entry(page_list->prev, struct page, list);
-				list_del(&page->list);
+				page = list_entry(page_list->prev,
+						struct page, lru);
+				list_del(&page->lru);
 			}
-			spin_unlock(&mapping->page_lock);
 			break;
 		} else if (bytes_read > 0) {
 			pSMBr = (struct smb_com_read_rsp *)smb_read_data;
@@ -1010,8 +1003,9 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 			cFYI(1,("No bytes read cleaning remaining pages off readahead list"));
 			/* BB turn off caching and do new lookup on file size at server? */
 			while (!list_empty(page_list) && (i < num_pages)) {
-				page = list_entry(page_list->prev, struct page, list);
-				list_del(&page->list);
+				page = list_entry(page_list->prev,
+						struct page, lru);
+				list_del(&page->lru);
 			}
 
 			break;

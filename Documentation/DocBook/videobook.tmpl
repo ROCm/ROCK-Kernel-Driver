@@ -176,8 +176,8 @@ int __init myradio_init(struct video_init *v)
   <para>
         The types available are
   </para>
-   <table frame=all><title>Device Types</title>
-   <tgroup cols=3 align=left>
+   <table frame="all"><title>Device Types</title>
+   <tgroup cols="3" align="left">
    <tbody>
    <row>
         <entry>VFL_TYPE_RADIO</><entry>/dev/radio{n}</><entry>
@@ -299,8 +299,8 @@ static int radio_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
         allows the applications to find out what sort of a card they have found and
         to figure out what they want to do about it. The fields in the structure are
   </para>
-   <table frame=all><title>struct video_capability fields</title>
-   <tgroup cols=2 align=left>
+   <table frame="all"><title>struct video_capability fields</title>
+   <tgroup cols="2" align="left">
    <tbody>
    <row>
         <entry>name</><entry>The device text name. This is intended for the user.</>
@@ -373,8 +373,8 @@ static int radio_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
   <para>
         The video_tuner structure has the following fields
   </para>
-   <table frame=all><title>struct video_tuner fields</title>
-   <tgroup cols=2 align=left>
+   <table frame="all"><title>struct video_tuner fields</title>
+   <tgroup cols="2" align="left">
    <tbody>
    <row>
         <entry>int tuner</><entry>The number of the tuner in question</entry>
@@ -406,8 +406,8 @@ static int radio_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
     </tgroup>
     </table>
 
-   <table frame=all><title>struct video_tuner flags</title>
-   <tgroup cols=2 align=left>
+   <table frame="all"><title>struct video_tuner flags</title>
+   <tgroup cols="2" align="left">
    <tbody>
    <row>
 	<entry>VIDEO_TUNER_PAL</><entry>A PAL TV tuner</entry>
@@ -429,8 +429,8 @@ static int radio_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
     </tgroup>
     </table>
 
-   <table frame=all><title>struct video_tuner modes</title>
-   <tgroup cols=2 align=left>
+   <table frame="all"><title>struct video_tuner modes</title>
+   <tgroup cols="2" align="left">
    <tbody>
    <row>
                 <entry>VIDEO_MODE_PAL</><entry>PAL Format</entry>
@@ -580,8 +580,8 @@ static int current_volume=0;
   <para>
         Then we fill in the video_audio structure. This has the following format
   </para>
-   <table frame=all><title>struct video_audio fields</title>
-   <tgroup cols=2 align=left>
+   <table frame="all"><title>struct video_audio fields</title>
+   <tgroup cols="2" align="left">
    <tbody>
    <row>
    <entry>audio</><entry>The input the user wishes to query</>
@@ -615,8 +615,8 @@ static int current_volume=0;
    </tgroup>
    </table>
 
-   <table frame=all><title>struct video_audio flags</title>
-   <tgroup cols=2 align=left>
+   <table frame="all"><title>struct video_audio flags</title>
+   <tgroup cols="2" align="left">
    <tbody>
    <row>
                 <entry>VIDEO_AUDIO_MUTE</><entry>The audio is currently muted. We
@@ -633,8 +633,8 @@ static int current_volume=0;
    </tgroup>
    </table>
 
-   <table frame=all><title>struct video_audio modes</title>
-   <tgroup cols=2 align=left>
+   <table frame="all"><title>struct video_audio modes</title>
+   <tgroup cols="2" align="left">
    <tbody>
    <row>
                 <entry>VIDEO_SOUND_MONO</><entry>Mono sound</entry>
@@ -862,8 +862,8 @@ static struct video_device my_camera
         We use the extra video capability flags that did not apply to the
         radio interface. The video related flags are
   </para>
-   <table frame=all><title>Capture Capabilities</title>
-   <tgroup cols=2 align=left>
+   <table frame="all"><title>Capture Capabilities</title>
+   <tgroup cols="2" align="left">
    <tbody>
    <row>
 <entry>VID_TYPE_CAPTURE</><entry>We support image capture</>
@@ -1204,8 +1204,8 @@ static int camera_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
         inputs to the video card). Our example card has a single camera input. The
         fields in the structure are
   </para>
-   <table frame=all><title>struct video_channel fields</title>
-   <tgroup cols=2 align=left>
+   <table frame="all"><title>struct video_channel fields</title>
+   <tgroup cols="2" align="left">
    <tbody>
    <row>
 
@@ -1227,8 +1227,8 @@ static int camera_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
     </tbody>
     </tgroup>
     </table>
-    <table frame=all><title>struct video_channel flags</title>
-    <tgroup cols=2 align=left>
+    <table frame="all"><title>struct video_channel flags</title>
+    <tgroup cols="2" align="left">
     <tbody>
     <row>
         <entry>VIDEO_VC_TUNER</><entry>Channel has a tuner.</entry>
@@ -1238,8 +1238,8 @@ static int camera_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
     </tbody>
     </tgroup>
     </table>
-    <table frame=all><title>struct video_channel types</title>
-    <tgroup cols=2 align=left>
+    <table frame="all"><title>struct video_channel types</title>
+    <tgroup cols="2" align="left">
     <tbody>
     <row>
         <entry>VIDEO_TYPE_TV</><entry>Television input.</entry>
@@ -1251,8 +1251,8 @@ static int camera_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
     </tbody>
     </tgroup>
     </table>
-    <table frame=all><title>struct video_channel norms</title>
-    <tgroup cols=2 align=left>
+    <table frame="all"><title>struct video_channel norms</title>
+    <tgroup cols="2" align="left">
     <tbody>
     <row>
         <entry>VIDEO_MODE_PAL</><entry>PAL encoded Television</entry>
@@ -1337,8 +1337,8 @@ static int camera_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
         for every other pixel in the image. The other common formats the interface 
         defines are
   </para>
-   <table frame=all><title>Framebuffer Encodings</title>
-   <tgroup cols=2 align=left>
+   <table frame="all"><title>Framebuffer Encodings</title>
+   <tgroup cols="2" align="left">
    <tbody>
    <row>
    <entry>GREY</><entry>Linear greyscale. This is for simple cameras and the
@@ -1475,8 +1475,8 @@ static struct video_buffer capture_fb;
         display. The video_window structure is used to describe the way the image 
         should be displayed. 
    </para>
-   <table frame=all><title>struct video_window fields</title>
-   <tgroup cols=2 align=left>
+   <table frame="all"><title>struct video_window fields</title>
+   <tgroup cols="2" align="left">
    <tbody>
    <row>
         <entry>width</><entry>The width in pixels of the desired image. The card
@@ -1512,8 +1512,8 @@ static struct video_buffer capture_fb;
     <para>
         Each clip is a struct video_clip which has the following fields
    </para>
-   <table frame=all><title>video_clip fields</title>
-   <tgroup cols=2 align=left>
+   <table frame="all"><title>video_clip fields</title>
+   <tgroup cols="2" align="left">
    <tbody>
    <row>
         <entry>x, y</><entry>Co-ordinates relative to the display</>

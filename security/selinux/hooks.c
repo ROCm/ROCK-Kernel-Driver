@@ -42,6 +42,7 @@
 #include <linux/proc_fs.h>
 #include <linux/kd.h>
 #include <linux/netfilter_ipv4.h>
+#include <linux/netfilter_ipv6.h>
 #include <net/icmp.h>
 #include <net/ip.h>		/* for sysctl_local_port_range[] */
 #include <net/tcp.h>		/* struct or_callable used in sock_rcv_skb */
@@ -59,6 +60,7 @@
 #include <net/af_unix.h>	/* for Unix socket types */
 #include <linux/parser.h>
 #include <linux/nfs_mount.h>
+#include <net/ipv6.h>
 #include <linux/hugetlb.h>
 
 #include "avc.h"
@@ -272,7 +274,7 @@ static int sk_alloc_security(struct sock *sk, int family, int priority)
 
 static void sk_free_security(struct sock *sk)
 {
-	struct task_security_struct *ssec = sk->sk_security;
+	struct sk_security_struct *ssec = sk->sk_security;
 
 	if (sk->sk_family != PF_UNIX || ssec->magic != SELINUX_MAGIC)
 		return;
@@ -2647,35 +2649,32 @@ static void selinux_task_to_inode(struct task_struct *p,
 
 #ifdef CONFIG_SECURITY_NETWORK
 
-static void selinux_parse_skb_ipv4(struct sk_buff *skb, struct avc_audit_data *ad)
+/* Returns error only if unable to parse addresses */
+static int selinux_parse_skb_ipv4(struct sk_buff *skb, struct avc_audit_data *ad)
 {
-	int dlen, ihlen;
-	struct iphdr *iph;
+	int offset, ihlen, ret;
+	struct iphdr iph;
 
-	if (skb->len < sizeof(struct iphdr))
-		goto out;
-	
-	iph = skb->nh.iph;
-	ihlen = iph->ihl * 4;
-	if (ihlen < sizeof(struct iphdr))
+	offset = skb->nh.raw - skb->data;
+	ret = skb_copy_bits(skb, offset, &iph, sizeof(iph));
+	if (ret)
 		goto out;
 
-	dlen = skb->len - ihlen;
-	ad->u.net.saddr = iph->saddr;
-	ad->u.net.daddr = iph->daddr;
+	ihlen = iph.ihl * 4;
+	if (ihlen < sizeof(iph))
+		goto out;
 
-	switch (iph->protocol) {
+	ad->u.net.v4info.saddr = iph.saddr;
+	ad->u.net.v4info.daddr = iph.daddr;
+
+	switch (iph.protocol) {
         case IPPROTO_TCP: {
-        	int offset;
         	struct tcphdr tcph;
 
-        	if (ntohs(iph->frag_off) & IP_OFFSET)
+        	if (ntohs(iph.frag_off) & IP_OFFSET)
         		break;
-        		
-		if (dlen < sizeof(tcph))
-			break;
 
-		offset = skb->nh.raw - skb->data + ihlen;
+		offset += ihlen;
 		if (skb_copy_bits(skb, offset, &tcph, sizeof(tcph)) < 0)
 			break;
 
@@ -2685,16 +2684,12 @@ static void selinux_parse_skb_ipv4(struct sk_buff *skb, struct avc_audit_data *a
         }
         
         case IPPROTO_UDP: {
-        	int offset;
         	struct udphdr udph;
         	
-        	if (ntohs(iph->frag_off) & IP_OFFSET)
+        	if (ntohs(iph.frag_off) & IP_OFFSET)
         		break;
         		
-        	if (dlen < sizeof(udph))
-        		break;
-
-		offset = skb->nh.raw - skb->data + ihlen;
+		offset += ihlen;
         	if (skb_copy_bits(skb, offset, &udph, sizeof(udph)) < 0)
         		break;	
 
@@ -2707,7 +2702,96 @@ static void selinux_parse_skb_ipv4(struct sk_buff *skb, struct avc_audit_data *a
         	break;
         }
 out:
-	return;
+	return ret;
+}
+
+#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
+
+/* Returns error only if unable to parse addresses */
+static int selinux_parse_skb_ipv6(struct sk_buff *skb, struct avc_audit_data *ad)
+{
+	u8 nexthdr;
+	int ret, offset;
+	struct ipv6hdr ipv6h;
+
+	offset = skb->nh.raw - skb->data;
+	ret = skb_copy_bits(skb, offset, &ipv6h, sizeof(ipv6h));
+	if (ret)
+		goto out;
+
+	ipv6_addr_copy(&ad->u.net.v6info.saddr, &ipv6h.saddr);
+	ipv6_addr_copy(&ad->u.net.v6info.daddr, &ipv6h.daddr);
+
+	nexthdr = ipv6h.nexthdr;
+	offset += sizeof(ipv6h);
+	offset = ipv6_skip_exthdr(skb, offset, &nexthdr,
+				  skb->tail - skb->head - offset);
+	if (offset < 0)
+		goto out;
+
+	switch (nexthdr) {
+	case IPPROTO_TCP: {
+        	struct tcphdr tcph;
+
+		if (skb_copy_bits(skb, offset, &tcph, sizeof(tcph)) < 0)
+			break;
+
+		ad->u.net.sport = tcph.source;
+		ad->u.net.dport = tcph.dest;
+		break;
+	}
+
+	case IPPROTO_UDP: {
+		struct udphdr udph;
+
+		if (skb_copy_bits(skb, offset, &udph, sizeof(udph)) < 0)
+			break;
+
+		ad->u.net.sport = udph.source;
+		ad->u.net.dport = udph.dest;
+		break;
+	}
+
+	/* includes fragments */
+	default:
+		break;
+	}
+out:
+	return ret;
+}
+
+#endif /* IPV6 */
+
+static int selinux_parse_skb(struct sk_buff *skb, struct avc_audit_data *ad,
+			     char **addrp, int *len, int src)
+{
+	int ret = 0;
+
+	switch (ad->u.net.family) {
+	case PF_INET:
+		ret = selinux_parse_skb_ipv4(skb, ad);
+		if (ret || !addrp)
+			break;
+		*len = 4;
+		*addrp = (char *)(src ? &ad->u.net.v4info.saddr :
+					&ad->u.net.v4info.daddr);
+		break;
+
+#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
+	case PF_INET6:
+		ret = selinux_parse_skb_ipv6(skb, ad);
+		if (ret || !addrp)
+			break;
+		*len = 16;
+		*addrp = (char *)(src ? &ad->u.net.v6info.saddr :
+					&ad->u.net.v6info.daddr);
+		break;
+#endif	/* IPV6 */
+	default:
+		break;
+	}
+
+	return ret;
 }
 
 /* socket security operations */
@@ -2770,6 +2854,7 @@ static void selinux_socket_post_create(struct socket *sock, int family, int type
 
 static int selinux_socket_bind(struct socket *sock, struct sockaddr *address, int addrlen)
 {
+	u16 family;
 	int err;
 
 	err = socket_has_perm(current, sock, SOCKET__BIND);
@@ -2777,19 +2862,34 @@ static int selinux_socket_bind(struct socket *sock, struct sockaddr *address, in
 		goto out;
 
 	/*
-	 * If PF_INET, check name_bind permission for the port.
+	 * If PF_INET or PF_INET6, check name_bind permission for the port.
 	 */
-	if (sock->sk->sk_family == PF_INET) {
+	family = sock->sk->sk_family;
+	if (family == PF_INET || family == PF_INET6) {
+		char *addrp;
 		struct inode_security_struct *isec;
 		struct task_security_struct *tsec;
 		struct avc_audit_data ad;
-		struct sockaddr_in *addr = (struct sockaddr_in *)address;
-		unsigned short snum = ntohs(addr->sin_port);
+		struct sockaddr_in *addr4 = NULL;
+		struct sockaddr_in6 *addr6 = NULL;
+		unsigned short snum;
 		struct sock *sk = sock->sk;
-		u32 sid, node_perm;
+		u32 sid, node_perm, addrlen;
 
 		tsec = current->security;
 		isec = SOCK_INODE(sock)->i_security;
+
+		if (family == PF_INET) {
+			addr4 = (struct sockaddr_in *)address;
+			snum = ntohs(addr4->sin_port);
+			addrlen = sizeof(addr4->sin_addr.s_addr);
+			addrp = (char *)&addr4->sin_addr.s_addr;
+		} else {
+			addr6 = (struct sockaddr_in6 *)address;
+			snum = ntohs(addr6->sin6_port);
+			addrlen = sizeof(addr6->sin6_addr.s6_addr);
+			addrp = (char *)&addr6->sin6_addr.s6_addr;
+		}
 
 		if (snum&&(snum < max(PROT_SOCK,ip_local_port_range_0) ||
 			   snum > ip_local_port_range_1)) {
@@ -2820,14 +2920,19 @@ static int selinux_socket_bind(struct socket *sock, struct sockaddr *address, in
 			break;
 		}
 		
-		err = security_node_sid(PF_INET, &addr->sin_addr.s_addr,
-		                        sizeof(addr->sin_addr.s_addr), &sid);
+		err = security_node_sid(family, addrp, addrlen, &sid);
 		if (err)
 			goto out;
 		
 		AVC_AUDIT_DATA_INIT(&ad,NET);
 		ad.u.net.sport = htons(snum);
-		ad.u.net.saddr = addr->sin_addr.s_addr;
+		ad.u.net.family = family;
+
+		if (family == PF_INET)
+			ad.u.net.v4info.saddr = addr4->sin_addr.s_addr;
+		else
+			ipv6_addr_copy(&ad.u.net.v6info.saddr, &addr6->sin6_addr);
+
 		err = avc_has_perm(isec->sid, sid,
 		                   isec->sclass, node_perm, NULL, &ad);
 		if (err)
@@ -2967,20 +3072,25 @@ static int selinux_socket_unix_may_send(struct socket *sock,
 
 static int selinux_socket_sock_rcv_skb(struct sock *sk, struct sk_buff *skb)
 {
-	int err = 0;
+	u16 family;
+	char *addrp;
+	int len, err = 0;
 	u32 netif_perm, node_perm, node_sid, recv_perm = 0;
 	struct socket *sock;
 	struct inode *inode;
 	struct net_device *dev;
-	struct iphdr *iph;
 	struct sel_netif *netif;
 	struct netif_security_struct *nsec;
 	struct inode_security_struct *isec;
 	struct avc_audit_data ad;
 
-	/* Only IPv4 is supported here at this stage */
-	if (sk->sk_family != PF_INET)
+	family = sk->sk_family;
+	if (family != PF_INET && family != PF_INET6)
 		goto out;
+
+	/* Handle mapped IPv4 packets arriving via IPv6 sockets */
+	if (family == PF_INET6 && skb->protocol == ntohs(ETH_P_IP))
+		family = PF_INET;
 
 	sock = sk->sk_socket;
 	
@@ -3026,7 +3136,13 @@ static int selinux_socket_sock_rcv_skb(struct sock *sk, struct sk_buff *skb)
 
 	AVC_AUDIT_DATA_INIT(&ad, NET);
 	ad.u.net.netif = dev->name;
-	selinux_parse_skb_ipv4(skb, &ad);
+	ad.u.net.family = family;
+
+	err = selinux_parse_skb(skb, &ad, &addrp, &len, 1);
+	if (err) {
+		sel_netif_put(netif);
+		goto out;
+	}
 
 	err = avc_has_perm(isec->sid, nsec->if_sid, SECCLASS_NETIF,
 	                   netif_perm, &nsec->avcr, &ad);
@@ -3035,8 +3151,7 @@ static int selinux_socket_sock_rcv_skb(struct sock *sk, struct sk_buff *skb)
 		goto out;
 	
 	/* Fixme: this lookup is inefficient */
-	iph = skb->nh.iph;
-	err = security_node_sid(PF_INET, &iph->saddr, sizeof(iph->saddr), &node_sid);
+	err = security_node_sid(family, addrp, len, &node_sid);
 	if (err)
 		goto out;
 	
@@ -3057,7 +3172,6 @@ static int selinux_socket_sock_rcv_skb(struct sock *sk, struct sk_buff *skb)
 		err = avc_has_perm(isec->sid, port_sid, isec->sclass,
 		                   recv_perm, NULL, &ad);
 	}
-
 out:	
 	return err;
 }
@@ -3111,18 +3225,20 @@ static void selinux_sk_free_security(struct sock *sk)
 }
 
 #ifdef CONFIG_NETFILTER
+
 static unsigned int selinux_ip_postroute_last(unsigned int hooknum,
                                               struct sk_buff **pskb,
                                               const struct net_device *in,
                                               const struct net_device *out,
-                                              int (*okfn)(struct sk_buff *))
+                                              int (*okfn)(struct sk_buff *),
+                                              u16 family)
 {
-	int err = NF_ACCEPT;
+	char *addrp;
+	int len, err = NF_ACCEPT;
 	u32 netif_perm, node_perm, node_sid, send_perm = 0;
 	struct sock *sk;
 	struct socket *sock;
 	struct inode *inode;
-	struct iphdr *iph;
 	struct sel_netif *netif;
 	struct sk_buff *skb = *pskb;
 	struct netif_security_struct *nsec;
@@ -3170,9 +3286,17 @@ static unsigned int selinux_ip_postroute_last(unsigned int hooknum,
 		break;
 	}
 
+
 	AVC_AUDIT_DATA_INIT(&ad, NET);
 	ad.u.net.netif = dev->name;
-	selinux_parse_skb_ipv4(skb, &ad);
+	ad.u.net.family = family;
+
+	err = selinux_parse_skb(skb, &ad, &addrp,
+				&len, 0) ? NF_DROP : NF_ACCEPT;
+	if (err != NF_ACCEPT) {
+		sel_netif_put(netif);
+		goto out;
+	}
 
 	err = avc_has_perm(isec->sid, nsec->if_sid, SECCLASS_NETIF,
 	                   netif_perm, &nsec->avcr, &ad) ? NF_DROP : NF_ACCEPT;
@@ -3181,8 +3305,7 @@ static unsigned int selinux_ip_postroute_last(unsigned int hooknum,
 		goto out;
 		
 	/* Fixme: this lookup is inefficient */
-	iph = skb->nh.iph;
-	err = security_node_sid(PF_INET, &iph->daddr, sizeof(iph->daddr),
+	err = security_node_sid(family, addrp, len,
 				&node_sid) ? NF_DROP : NF_ACCEPT;
 	if (err != NF_ACCEPT)
 		goto out;
@@ -3211,6 +3334,28 @@ static unsigned int selinux_ip_postroute_last(unsigned int hooknum,
 out:
 	return err;
 }
+
+static unsigned int selinux_ipv4_postroute_last(unsigned int hooknum,
+						struct sk_buff **pskb,
+						const struct net_device *in,
+						const struct net_device *out,
+						int (*okfn)(struct sk_buff *))
+{
+	return selinux_ip_postroute_last(hooknum, pskb, in, out, okfn, PF_INET);
+}
+
+#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
+
+static unsigned int selinux_ipv6_postroute_last(unsigned int hooknum,
+						struct sk_buff **pskb,
+						const struct net_device *in,
+						const struct net_device *out,
+						int (*okfn)(struct sk_buff *))
+{
+	return selinux_ip_postroute_last(hooknum, pskb, in, out, okfn, PF_INET6);
+}
+
+#endif	/* IPV6 */
 
 #endif	/* CONFIG_NETFILTER */
 
@@ -4025,13 +4170,25 @@ security_initcall(selinux_init);
 
 #if defined(CONFIG_SECURITY_NETWORK) && defined(CONFIG_NETFILTER)
 
-static struct nf_hook_ops selinux_ip_ops[] = {
-	{ .hook =	selinux_ip_postroute_last,
-	  .owner =	THIS_MODULE,
-	  .pf =		PF_INET, 
-	  .hooknum =	NF_IP_POST_ROUTING, 
-	  .priority =	NF_IP_PRI_SELINUX_LAST, },
+static struct nf_hook_ops selinux_ipv4_op = {
+	.hook =		selinux_ipv4_postroute_last,
+	.owner =	THIS_MODULE,
+	.pf =		PF_INET,
+	.hooknum =	NF_IP_POST_ROUTING,
+	.priority =	NF_IP_PRI_SELINUX_LAST,
 };
+
+#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
+
+static struct nf_hook_ops selinux_ipv6_op = {
+	.hook =		selinux_ipv6_postroute_last,
+	.owner =	THIS_MODULE,
+	.pf =		PF_INET6,
+	.hooknum =	NF_IP6_POST_ROUTING,
+	.priority =	NF_IP6_PRI_SELINUX_LAST,
+};
+
+#endif	/* IPV6 */
 
 static int __init selinux_nf_ip_init(void)
 {
@@ -4042,10 +4199,17 @@ static int __init selinux_nf_ip_init(void)
 		
 	printk(KERN_INFO "SELinux:  Registering netfilter hooks\n");
 	
-	err = nf_register_hook(&selinux_ip_ops[0]);
+	err = nf_register_hook(&selinux_ipv4_op);
 	if (err)
-		panic("SELinux: nf_register_hook 0 error %d\n", err);
+		panic("SELinux: nf_register_hook for IPv4: error %d\n", err);
 
+#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
+
+	err = nf_register_hook(&selinux_ipv6_op);
+	if (err)
+		panic("SELinux: nf_register_hook for IPv6: error %d\n", err);
+
+#endif	/* IPV6 */
 out:
 	return err;
 }

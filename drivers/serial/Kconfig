@@ -479,7 +479,7 @@ config SERIAL98_CONSOLE
 
 config SERIAL_SH_SCI
 	tristate "SH SCI(F) serial port support"
-	depends on SUPERH
+	depends on SUPERH || H8300
 	select SERIAL_CORE
 
 config SERIAL_SH_SCI_CONSOLE

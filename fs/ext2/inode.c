@@ -28,6 +28,7 @@
 #include <linux/pagemap.h>
 #include <linux/quotaops.h>
 #include <linux/module.h>
+#include <linux/writeback.h>
 #include <linux/buffer_head.h>
 #include <linux/mpage.h>
 #include "ext2.h"
@@ -1246,14 +1247,18 @@ static int ext2_update_inode(struct inode * inode, int do_sync)
 	return err;
 }
 
-void ext2_write_inode (struct inode * inode, int wait)
+void ext2_write_inode(struct inode *inode, int wait)
 {
-	ext2_update_inode (inode, wait);
+	ext2_update_inode(inode, wait);
 }
 
-int ext2_sync_inode (struct inode *inode)
+int ext2_sync_inode(struct inode *inode)
 {
-	return ext2_update_inode (inode, 1);
+	struct writeback_control wbc = {
+		.sync_mode = WB_SYNC_ALL,
+		.nr_to_write = 0,	/* sys_fsync did this */
+	};
+	return sync_inode(inode, &wbc);
 }
 
 int ext2_setattr(struct dentry *dentry, struct iattr *iattr)
@@ -1275,4 +1280,3 @@ int ext2_setattr(struct dentry *dentry, struct iattr *iattr)
 		error = ext2_acl_chmod(inode);
 	return error;
 }
-

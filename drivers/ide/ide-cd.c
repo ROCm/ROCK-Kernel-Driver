@@ -991,7 +991,7 @@ static void cdrom_buffer_sectors (ide_drive_t *drive, unsigned long sector,
 
 	/* Throw away any remaining data. */
 	while (sectors_to_transfer > 0) {
-		char dum[SECTOR_SIZE];
+		static char dum[SECTOR_SIZE];
 		HWIF(drive)->atapi_input_bytes(drive, dum, sizeof (dum));
 		--sectors_to_transfer;
 	}
@@ -1118,7 +1118,7 @@ static ide_startstop_t cdrom_read_intr (ide_drive_t *drive)
 
 	while (nskip > 0) {
 		/* We need to throw away a sector. */
-		char dum[SECTOR_SIZE];
+		static char dum[SECTOR_SIZE];
 		HWIF(drive)->atapi_input_bytes(drive, dum, sizeof (dum));
 
 		--rq->current_nr_sectors;

@@ -82,6 +82,7 @@ SECTIONS
 #endif
 	__stext = . ;
         	*(.text)
+	SCHED_TEXT
 	. = ALIGN(0x4) ;
 		*(.exit.text)
 		*(.text.*)

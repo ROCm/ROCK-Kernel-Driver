@@ -10,6 +10,7 @@
 #ifndef _LINUX_PREFETCH_H
 #define _LINUX_PREFETCH_H
 
+#include <linux/types.h>
 #include <asm/processor.h>
 #include <asm/cache.h>
 
@@ -53,5 +54,16 @@ static inline void prefetchw(const void *x) {;}
 #ifndef PREFETCH_STRIDE
 #define PREFETCH_STRIDE (4*L1_CACHE_BYTES)
 #endif
+
+static inline void prefetch_range(void *addr, size_t len)
+{
+#ifdef ARCH_HAS_PREFETCH
+	char *cp;
+	char *end = addr + len;
+
+	for (cp = addr; cp < end; cp += PREFETCH_STRIDE)
+		prefetch(cp);
+#endif
+}
 
 #endif

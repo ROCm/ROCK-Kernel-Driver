@@ -274,6 +274,7 @@ enum lock_type4 {
 #define FATTR4_WORD1_TIME_METADATA      (1 << 20)
 #define FATTR4_WORD1_TIME_MODIFY        (1 << 21)
 #define FATTR4_WORD1_TIME_MODIFY_SET    (1 << 22)
+#define FATTR4_WORD1_MOUNTED_ON_FILEID  (1 << 23)
 
 #define NFSPROC4_NULL 0
 #define NFSPROC4_COMPOUND 1

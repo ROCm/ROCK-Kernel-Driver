@@ -18,6 +18,7 @@
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
 #include <linux/blkdev.h>
+#include <linux/backing-dev.h>
 
 #include <asm/pgalloc.h>
 #include <asm/uaccess.h>
@@ -569,5 +570,9 @@ unsigned long get_unmapped_area(struct file *file, unsigned long addr,
 }
 
 void pte_chain_init(void)
+{
+}
+
+void swap_unplug_io_fn(struct backing_dev_info *)
 {
 }

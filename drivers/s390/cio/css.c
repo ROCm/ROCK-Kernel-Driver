@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/css.c
  *  driver for channel subsystem
- *   $Revision: 1.69 $
+ *   $Revision: 1.72 $
  *
  *    Copyright (C) 2002 IBM Deutschland Entwicklung GmbH,
  *			 IBM Corporation
@@ -163,11 +163,6 @@ get_subchannel_by_schid(int irq)
 					      struct device, bus_list));
 		if (!dev)
 			continue;
-		/* Skip channel paths. */
-		if (dev->release != &css_subchannel_release) {
-			put_device(dev);
-			continue;
-		}
 		sch = to_subchannel(dev);
 		if (sch->irq == irq)
 			break;
@@ -206,10 +201,16 @@ css_evaluate_subchannel(int irq, int slow)
 
 	sch = get_subchannel_by_schid(irq);
 	disc = sch ? device_is_disconnected(sch) : 0;
-	if (disc && slow)
+	if (disc && slow) {
+		if (sch)
+			put_device(&sch->dev);
 		return 0; /* Already processed. */
-	if (!disc && !slow)
+	}
+	if (!disc && !slow) {
+		if (sch)
+			put_device(&sch->dev);
 		return -EAGAIN; /* Will be done on the slow path. */
+	}
 	event = css_get_subchannel_status(sch, irq);
 	switch (event) {
 	case CIO_GONE:

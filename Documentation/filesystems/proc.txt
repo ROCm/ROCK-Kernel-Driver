@@ -38,6 +38,7 @@ Table of Contents
   2.8	/proc/sys/net/ipv4 - IPV4 settings
   2.9	Appletalk
   2.10	IPX
+  2.11	/proc/sys/fs/mqueue - POSIX message queues filesystem
 
 ------------------------------------------------------------------------------
 Preface
@@ -1813,6 +1814,30 @@ IPX.
 The /proc/net/ipx_route  table  holds  a list of IPX routes. For each route it
 gives the  destination  network, the router node (or Directly) and the network
 address of the router (or Connected) for internal networks.
+
+2.11 /proc/sys/fs/mqueue - POSIX message queues filesystem
+----------------------------------------------------------
+
+The "mqueue"  filesystem provides  the necessary kernel features to enable the
+creation of a  user space  library that  implements  the  POSIX message queues
+API (as noted by the  MSG tag in the  POSIX 1003.1-2001 version  of the System
+Interfaces specification.)
+
+The "mqueue" filesystem contains values for determining/setting  the amount of
+resources used by the file system.
+
+/proc/sys/fs/mqueue/queues_max is a read/write  file for  setting/getting  the
+maximum number of message queues allowed on the system.
+
+/proc/sys/fs/mqueue/msg_max  is  a  read/write file  for  setting/getting  the
+maximum number of messages in a queue value.  In fact it is the limiting value
+for another (user) limit which is set in mq_open invocation. This attribute of
+a queue must be less or equal then msg_max.
+
+/proc/sys/fs/mqueue/msgsize_max is  a read/write  file for setting/getting the
+maximum  message size value (it is every  message queue's attribute set during
+its creation).
+
 
 ------------------------------------------------------------------------------
 Summary

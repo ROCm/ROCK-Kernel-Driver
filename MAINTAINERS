@@ -2000,6 +2000,13 @@ M:	mulix@mulix.org
 L:	linux-kernel@vger.kernel.org
 S:	Maintained
 
+TRIVIAL PATCHES
+P:      Rusty Russell
+M:      trivial@rustcorp.com.au
+L:      linux-kernel@vger.kernel.org
+W:      http://www.kernel.org/pub/linux/kernel/people/rusty/trivial/
+S:      Maintained
+
 TMS380 TOKEN-RING NETWORK DRIVER
 P:	Adam Fritzler
 M:	mid@auk.cx

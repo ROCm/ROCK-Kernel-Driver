@@ -121,6 +121,14 @@
 /* Shouldn't this be in a header file somewhere? */
 #define	BYTES_PER_WORD		sizeof(void *)
 
+#ifndef cache_line_size
+#define cache_line_size()	L1_CACHE_BYTES
+#endif
+
+#ifndef ARCH_KMALLOC_MINALIGN
+#define ARCH_KMALLOC_MINALIGN 0
+#endif
+
 /* Legal flag mask for kmem_cache_create(). */
 #if DEBUG
 # define CREATE_MASK	(SLAB_DEBUG_INITIAL | SLAB_RED_ZONE | \
@@ -268,6 +276,7 @@ struct kmem_cache_s {
 	unsigned int		colour_off;	/* colour offset */
 	unsigned int		colour_next;	/* cache colouring */
 	kmem_cache_t		*slabp_cache;
+	unsigned int		slab_size;
 	unsigned int		dflags;		/* dynamic flags */
 
 	/* constructor func */
@@ -453,10 +462,10 @@ static int slab_break_gfp_order = BREAK_GFP_ORDER_LO;
  * global 'mem_map'. These are used to find the slab an obj belongs to.
  * With kfree(), these are used to find the cache which an obj belongs to.
  */
-#define	SET_PAGE_CACHE(pg,x)  ((pg)->list.next = (struct list_head *)(x))
-#define	GET_PAGE_CACHE(pg)    ((kmem_cache_t *)(pg)->list.next)
-#define	SET_PAGE_SLAB(pg,x)   ((pg)->list.prev = (struct list_head *)(x))
-#define	GET_PAGE_SLAB(pg)     ((struct slab *)(pg)->list.prev)
+#define	SET_PAGE_CACHE(pg,x)  ((pg)->lru.next = (struct list_head *)(x))
+#define	GET_PAGE_CACHE(pg)    ((kmem_cache_t *)(pg)->lru.next)
+#define	SET_PAGE_SLAB(pg,x)   ((pg)->lru.prev = (struct list_head *)(x))
+#define	GET_PAGE_SLAB(pg)     ((struct slab *)(pg)->lru.prev)
 
 /* These are the default caches for kmalloc. Custom caches can have other sizes. */
 struct cache_sizes malloc_sizes[] = {
@@ -490,8 +499,10 @@ static kmem_cache_t cache_cache = {
 	.objsize	= sizeof(kmem_cache_t),
 	.flags		= SLAB_NO_REAP,
 	.spinlock	= SPIN_LOCK_UNLOCKED,
-	.colour_off	= L1_CACHE_BYTES,
 	.name		= "kmem_cache",
+#if DEBUG
+	.reallen	= sizeof(kmem_cache_t),
+#endif
 };
 
 /* Guard access to the cache-chain. */
@@ -535,7 +546,7 @@ static inline struct array_cache *ac_data(kmem_cache_t *cachep)
 }
 
 /* Cal the num objs, wastage, and bytes left over for a given slab size. */
-static void cache_estimate (unsigned long gfporder, size_t size,
+static void cache_estimate (unsigned long gfporder, size_t size, size_t align,
 		 int flags, size_t *left_over, unsigned int *num)
 {
 	int i;
@@ -548,7 +559,7 @@ static void cache_estimate (unsigned long gfporder, size_t size,
 		extra = sizeof(kmem_bufctl_t);
 	}
 	i = 0;
-	while (i*size + L1_CACHE_ALIGN(base+i*extra) <= wastage)
+	while (i*size + ALIGN(base+i*extra, align) <= wastage)
 		i++;
 	if (i > 0)
 		i--;
@@ -558,7 +569,7 @@ static void cache_estimate (unsigned long gfporder, size_t size,
 
 	*num = i;
 	wastage -= i*size;
-	wastage -= L1_CACHE_ALIGN(base+i*extra);
+	wastage -= ALIGN(base+i*extra, align);
 	*left_over = wastage;
 }
 
@@ -705,16 +716,20 @@ void __init kmem_cache_init(void)
 	init_MUTEX(&cache_chain_sem);
 	INIT_LIST_HEAD(&cache_chain);
 	list_add(&cache_cache.next, &cache_chain);
+	cache_cache.colour_off = cache_line_size();
 	cache_cache.array[smp_processor_id()] = &initarray_cache.cache;
 
-	cache_estimate(0, cache_cache.objsize, 0,
-			&left_over, &cache_cache.num);
+	cache_cache.objsize = ALIGN(cache_cache.objsize, cache_line_size());
+
+	cache_estimate(0, cache_cache.objsize, cache_line_size(), 0,
+				&left_over, &cache_cache.num);
 	if (!cache_cache.num)
 		BUG();
 
 	cache_cache.colour = left_over/cache_cache.colour_off;
 	cache_cache.colour_next = 0;
-
+	cache_cache.slab_size = ALIGN(cache_cache.num*sizeof(kmem_bufctl_t) +
+				sizeof(struct slab), cache_line_size());
 
 	/* 2+3) create the kmalloc caches */
 	sizes = malloc_sizes;
@@ -728,7 +743,7 @@ void __init kmem_cache_init(void)
 		 * allow tighter packing of the smaller caches. */
 		sizes->cs_cachep = kmem_cache_create(
 			names->name, sizes->cs_size,
-			0, SLAB_HWCACHE_ALIGN, NULL, NULL);
+			ARCH_KMALLOC_MINALIGN, 0, NULL, NULL);
 		if (!sizes->cs_cachep)
 			BUG();
 
@@ -740,7 +755,7 @@ void __init kmem_cache_init(void)
 
 		sizes->cs_dmacachep = kmem_cache_create(
 			names->name_dma, sizes->cs_size,
-			0, SLAB_CACHE_DMA|SLAB_HWCACHE_ALIGN, NULL, NULL);
+			ARCH_KMALLOC_MINALIGN, SLAB_CACHE_DMA, NULL, NULL);
 		if (!sizes->cs_dmacachep)
 			BUG();
 
@@ -1056,7 +1071,7 @@ static void slab_destroy (kmem_cache_t *cachep, struct slab *slabp)
  * kmem_cache_create - Create a cache.
  * @name: A string which is used in /proc/slabinfo to identify this cache.
  * @size: The size of objects to be created in this cache.
- * @offset: The offset to use within the page.
+ * @align: The required alignment for the objects.
  * @flags: SLAB flags
  * @ctor: A constructor for the objects.
  * @dtor: A destructor for the objects.
@@ -1081,16 +1096,15 @@ static void slab_destroy (kmem_cache_t *cachep, struct slab *slabp)
  * %SLAB_NO_REAP - Don't automatically reap this cache when we're under
  * memory pressure.
  *
- * %SLAB_HWCACHE_ALIGN - Align the objects in this cache to a hardware
- * cacheline.  This can be beneficial if you're counting cycles as closely
- * as davem.
+ * %SLAB_HWCACHE_ALIGN - This flag has no effect and will be removed soon.
+ *
  */
 kmem_cache_t *
-kmem_cache_create (const char *name, size_t size, size_t offset,
+kmem_cache_create (const char *name, size_t size, size_t align,
 	unsigned long flags, void (*ctor)(void*, kmem_cache_t *, unsigned long),
 	void (*dtor)(void*, kmem_cache_t *, unsigned long))
 {
-	size_t left_over, align, slab_size;
+	size_t left_over, slab_size;
 	kmem_cache_t *cachep = NULL;
 
 	/*
@@ -1101,7 +1115,7 @@ kmem_cache_create (const char *name, size_t size, size_t offset,
 		(size < BYTES_PER_WORD) ||
 		(size > (1<<MAX_OBJ_ORDER)*PAGE_SIZE) ||
 		(dtor && !ctor) ||
-		(offset < 0 || offset > size)) {
+		(align < 0)) {
 			printk(KERN_ERR "%s: Early error in slab %s\n",
 					__FUNCTION__, name);
 			BUG();
@@ -1118,22 +1132,16 @@ kmem_cache_create (const char *name, size_t size, size_t offset,
 
 #if FORCED_DEBUG
 	/*
-	 * Enable redzoning and last user accounting, except
-	 * - for caches with forced alignment: redzoning would violate the
-	 *   alignment
-	 * - for caches with large objects, if the increased size would
-	 *   increase the object size above the next power of two: caches
-	 *   with object sizes just above a power of two have a significant
-	 *   amount of internal fragmentation
+	 * Enable redzoning and last user accounting, except for caches with
+	 * large objects, if the increased size would increase the object size
+	 * above the next power of two: caches with object sizes just above a
+	 * power of two have a significant amount of internal fragmentation.
 	 */
-	if ((size < 4096 || fls(size-1) == fls(size-1+3*BYTES_PER_WORD))
-			&& !(flags & SLAB_MUST_HWCACHE_ALIGN)) {
+	if ((size < 4096 || fls(size-1) == fls(size-1+3*BYTES_PER_WORD)))
 		flags |= SLAB_RED_ZONE|SLAB_STORE_USER;
-	}
 	flags |= SLAB_POISON;
 #endif
 #endif
-
 	/*
 	 * Always checks flags, a caller might be expecting debug
 	 * support which isn't available.
@@ -1141,15 +1149,23 @@ kmem_cache_create (const char *name, size_t size, size_t offset,
 	if (flags & ~CREATE_MASK)
 		BUG();
 
+	if (align) {
+		/* minimum supported alignment: */
+		if (align < BYTES_PER_WORD)
+			align = BYTES_PER_WORD;
+
+		/* combinations of forced alignment and advanced debugging is
+		 * not yet implemented.
+		 */
+		flags &= ~(SLAB_RED_ZONE|SLAB_STORE_USER);
+	}
+
 	/* Get cache's description obj. */
 	cachep = (kmem_cache_t *) kmem_cache_alloc(&cache_cache, SLAB_KERNEL);
 	if (!cachep)
 		goto opps;
 	memset(cachep, 0, sizeof(kmem_cache_t));
 
-#if DEBUG
-	cachep->reallen = size;
-#endif
 	/* Check that size is in terms of words.  This is needed to avoid
 	 * unaligned accesses for some archs when redzoning is used, and makes
 	 * sure any on-slab bufctl's are also correctly aligned.
@@ -1160,30 +1176,31 @@ kmem_cache_create (const char *name, size_t size, size_t offset,
 	}
 	
 #if DEBUG
+	cachep->reallen = size;
+
 	if (flags & SLAB_RED_ZONE) {
-		/*
-		 * There is no point trying to honour cache alignment
-		 * when redzoning.
-		 */
-		flags &= ~SLAB_HWCACHE_ALIGN;
+		/* redzoning only works with word aligned caches */
+		align = BYTES_PER_WORD;
+
 		/* add space for red zone words */
 		cachep->dbghead += BYTES_PER_WORD;
 		size += 2*BYTES_PER_WORD;
 	}
 	if (flags & SLAB_STORE_USER) {
-		flags &= ~SLAB_HWCACHE_ALIGN;
-		size += BYTES_PER_WORD; /* add space */
+		/* user store requires word alignment and
+		 * one word storage behind the end of the real
+		 * object.
+		 */
+		align = BYTES_PER_WORD;
+		size += BYTES_PER_WORD;
 	}
 #if FORCED_DEBUG && defined(CONFIG_DEBUG_PAGEALLOC)
-	if (size > 128 && cachep->reallen > L1_CACHE_BYTES && size < PAGE_SIZE) {
+	if (size > 128 && cachep->reallen > cache_line_size() && size < PAGE_SIZE) {
 		cachep->dbghead += PAGE_SIZE - size;
 		size = PAGE_SIZE;
 	}
 #endif
 #endif
-	align = BYTES_PER_WORD;
-	if (flags & SLAB_HWCACHE_ALIGN)
-		align = L1_CACHE_BYTES;
 
 	/* Determine if the slab management is 'on' or 'off' slab. */
 	if (size >= (PAGE_SIZE>>3))
@@ -1193,13 +1210,16 @@ kmem_cache_create (const char *name, size_t size, size_t offset,
 		 */
 		flags |= CFLGS_OFF_SLAB;
 
-	if (flags & SLAB_HWCACHE_ALIGN) {
-		/* Need to adjust size so that objs are cache aligned. */
-		/* Small obj size, can get at least two per cache line. */
+	if (!align) {
+		/* Default alignment: compile time specified l1 cache size.
+		 * Except if an object is really small, then squeeze multiple
+		 * into one cacheline.
+		 */
+		align = cache_line_size();
 		while (size <= align/2)
 			align /= 2;
-		size = (size+align-1)&(~(align-1));
 	}
+	size = ALIGN(size, align);
 
 	/* Cal size (in pages) of slabs, and the num of objs per slab.
 	 * This could be made much more intelligent.  For now, try to avoid
@@ -1209,7 +1229,7 @@ kmem_cache_create (const char *name, size_t size, size_t offset,
 	do {
 		unsigned int break_flag = 0;
 cal_wastage:
-		cache_estimate(cachep->gfporder, size, flags,
+		cache_estimate(cachep->gfporder, size, align, flags,
 						&left_over, &cachep->num);
 		if (break_flag)
 			break;
@@ -1243,7 +1263,8 @@ next:
 		cachep = NULL;
 		goto opps;
 	}
-	slab_size = L1_CACHE_ALIGN(cachep->num*sizeof(kmem_bufctl_t)+sizeof(struct slab));
+	slab_size = ALIGN(cachep->num*sizeof(kmem_bufctl_t)
+				+ sizeof(struct slab), align);
 
 	/*
 	 * If the slab has been placed off-slab, and we have enough space then
@@ -1254,14 +1275,17 @@ next:
 		left_over -= slab_size;
 	}
 
-	/* Offset must be a multiple of the alignment. */
-	offset += (align-1);
-	offset &= ~(align-1);
-	if (!offset)
-		offset = L1_CACHE_BYTES;
-	cachep->colour_off = offset;
-	cachep->colour = left_over/offset;
+	if (flags & CFLGS_OFF_SLAB) {
+		/* really off slab. No need for manual alignment */
+		slab_size = cachep->num*sizeof(kmem_bufctl_t)+sizeof(struct slab);
+	}
 
+	cachep->colour_off = cache_line_size();
+	/* Offset must be a multiple of the alignment. */
+	if (cachep->colour_off < align)
+		cachep->colour_off = align;
+	cachep->colour = left_over/cachep->colour_off;
+	cachep->slab_size = slab_size;
 	cachep->flags = flags;
 	cachep->gfpflags = 0;
 	if (flags & SLAB_CACHE_DMA)
@@ -1543,8 +1567,7 @@ static inline struct slab* alloc_slabmgmt (kmem_cache_t *cachep,
 			return NULL;
 	} else {
 		slabp = objp+colour_off;
-		colour_off += L1_CACHE_ALIGN(cachep->num *
-				sizeof(kmem_bufctl_t) + sizeof(struct slab));
+		colour_off += cachep->slab_size;
 	}
 	slabp->inuse = 0;
 	slabp->colouroff = colour_off;

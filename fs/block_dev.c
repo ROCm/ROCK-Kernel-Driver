@@ -155,8 +155,8 @@ blkdev_direct_IO(int rw, struct kiocb *iocb, const struct iovec *iov,
 	struct file *file = iocb->ki_filp;
 	struct inode *inode = file->f_mapping->host;
 
-	return blockdev_direct_IO(rw, iocb, inode, I_BDEV(inode), iov, offset,
-				nr_segs, blkdev_get_blocks, NULL);
+	return blockdev_direct_IO_no_locking(rw, iocb, inode, I_BDEV(inode),
+				iov, offset, nr_segs, blkdev_get_blocks, NULL);
 }
 
 static int blkdev_writepage(struct page *page, struct writeback_control *wbc)
@@ -796,7 +796,7 @@ struct file_operations def_blk_fops = {
 	.fsync		= block_fsync,
 	.ioctl		= block_ioctl,
 	.readv		= generic_file_readv,
-	.writev		= generic_file_writev,
+	.writev		= generic_file_write_nolock,
 	.sendfile	= generic_file_sendfile,
 };
 

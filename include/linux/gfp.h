@@ -32,9 +32,15 @@
 #define __GFP_NOFAIL	0x800	/* Retry for ever.  Cannot fail */
 #define __GFP_NORETRY	0x1000	/* Do not retry.  Might fail */
 #define __GFP_NO_GROW	0x2000	/* Slab internal usage */
+#define __GFP_COMP	0x4000	/* Add compound page metadata */
 
 #define __GFP_BITS_SHIFT 16	/* Room for 16 __GFP_FOO bits */
 #define __GFP_BITS_MASK ((1 << __GFP_BITS_SHIFT) - 1)
+
+/* if you forget to add the bitmask here kernel will crash, period */
+#define GFP_LEVEL_MASK (__GFP_WAIT|__GFP_HIGH|__GFP_IO|__GFP_FS| \
+			__GFP_COLD|__GFP_NOWARN|__GFP_REPEAT| \
+			__GFP_NOFAIL|__GFP_NORETRY|__GFP_NO_GROW|__GFP_COMP)
 
 #define GFP_ATOMIC	(__GFP_HIGH)
 #define GFP_NOIO	(__GFP_WAIT)

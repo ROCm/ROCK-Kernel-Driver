@@ -24,7 +24,7 @@ struct hpsb_tlabel_pool {
 
 #define HPSB_TPOOL_INIT(_tp)			\
 do {						\
-	CLEAR_BITMAP((_tp)->pool, 64);		\
+	bitmap_zero((_tp)->pool, 64);		\
 	spin_lock_init(&(_tp)->lock);		\
 	(_tp)->next = 0;			\
 	(_tp)->allocations = 0;			\

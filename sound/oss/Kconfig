@@ -318,7 +318,7 @@ config SOUND_MSNDCLAS
 	  See <file:Documentation/sound/oss/MultiSound> for important information
 	  about this driver.  Note that it has been discontinued, but the
 	  Voyetra Turtle Beach knowledge base entry for it is still available
-	  at <http://www.voyetra-turtle-beach.com/site/kb_ftp/790.asp>.
+	  at <http://www.turtlebeach.com/site/kb_ftp/790.asp>.
 
 comment "Compiled-in MSND Classic support requires firmware during compilation."
 	depends on SOUND_PRIME && SOUND_MSNDCLAS=y
@@ -380,7 +380,7 @@ config SOUND_MSNDPIN
 	  See <file:Documentation/sound/oss/MultiSound> for important information
 	  about this driver. Note that it has been discontinued, but the
 	  Voyetra Turtle Beach knowledge base entry for it is still available
-	  at <http://www.voyetra-turtle-beach.com/site/kb_ftp/600.asp>.
+	  at <http://www.turtlebeach.com/site/kb_ftp/600.asp>.
 
 comment "Compiled-in MSND Pinnacle support requires firmware during compilation."
 	depends on SOUND_PRIME && SOUND_MSNDPIN=y

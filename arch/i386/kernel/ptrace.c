@@ -14,6 +14,7 @@
 #include <linux/ptrace.h>
 #include <linux/user.h>
 #include <linux/security.h>
+#include <linux/audit.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
@@ -524,6 +525,15 @@ out:
 __attribute__((regparm(3)))
 void do_syscall_trace(struct pt_regs *regs, int entryexit)
 {
+	if (unlikely(current->audit_context)) {
+		if (!entryexit)
+			audit_syscall_entry(current, regs->orig_eax,
+					    regs->ebx, regs->ecx,
+					    regs->edx, regs->esi);
+		else
+			audit_syscall_exit(current, regs->eax);
+	}
+
 	if (!test_thread_flag(TIF_SYSCALL_TRACE))
 		return;
 	if (!(current->ptrace & PT_PTRACED))

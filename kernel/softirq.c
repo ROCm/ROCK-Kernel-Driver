@@ -16,6 +16,7 @@
 #include <linux/cpu.h>
 #include <linux/kthread.h>
 
+#include <asm/irq.h>
 /*
    - No shared variables, all the data are CPU local.
    - If a softirq needs serialization, let it serialize itself
@@ -69,9 +70,46 @@ static inline void wakeup_softirqd(void)
  */
 #define MAX_SOFTIRQ_RESTART 10
 
+asmlinkage void __do_softirq(void)
+{
+	struct softirq_action *h;
+	__u32 pending;
+	int max_restart = MAX_SOFTIRQ_RESTART;
+
+	pending = local_softirq_pending();
+
+	local_bh_disable();
+restart:
+	/* Reset the pending bitmask before enabling irqs */
+	local_softirq_pending() = 0;
+
+	local_irq_enable();
+
+	h = softirq_vec;
+
+	do {
+		if (pending & 1)
+			h->action(h);
+		h++;
+		pending >>= 1;
+	} while (pending);
+
+	local_irq_disable();
+
+	pending = local_softirq_pending();
+	if (pending && --max_restart)
+		goto restart;
+
+	if (pending)
+		wakeup_softirqd();
+
+	__local_bh_enable();
+}
+
+#ifndef __ARCH_HAS_DO_SOFTIRQ
+
 asmlinkage void do_softirq(void)
 {
-	int max_restart = MAX_SOFTIRQ_RESTART;
 	__u32 pending;
 	unsigned long flags;
 
@@ -82,39 +120,15 @@ asmlinkage void do_softirq(void)
 
 	pending = local_softirq_pending();
 
-	if (pending) {
-		struct softirq_action *h;
-
-		local_bh_disable();
-restart:
-		/* Reset the pending bitmask before enabling irqs */
-		local_softirq_pending() = 0;
-
-		local_irq_enable();
-
-		h = softirq_vec;
-
-		do {
-			if (pending & 1)
-				h->action(h);
-			h++;
-			pending >>= 1;
-		} while (pending);
-
-		local_irq_disable();
-
-		pending = local_softirq_pending();
-		if (pending && --max_restart)
-			goto restart;
-		if (pending)
-			wakeup_softirqd();
-		__local_bh_enable();
-	}
+	if (pending)
+		__do_softirq();
 
 	local_irq_restore(flags);
 }
 
 EXPORT_SYMBOL(do_softirq);
+
+#endif
 
 void local_bh_enable(void)
 {

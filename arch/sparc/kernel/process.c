@@ -28,6 +28,7 @@
 #include <linux/reboot.h>
 #include <linux/delay.h>
 #include <linux/pm.h>
+#include <linux/init.h>
 
 #include <asm/auxio.h>
 #include <asm/oplib.h>
@@ -693,9 +694,6 @@ pid_t kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 			   "g1", "g2", "g3", "o0", "o1", "memory", "cc");
 	return retval;
 }
-
-extern void scheduling_functions_start_here(void);
-extern void scheduling_functions_end_here(void);
 
 unsigned long get_wchan(struct task_struct *task)
 {

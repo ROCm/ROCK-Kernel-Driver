@@ -16,9 +16,9 @@ int bitmap_equal(const unsigned long *bitmap1,
 			unsigned long *bitmap2, int bits);
 void bitmap_complement(unsigned long *bitmap, int bits);
 
-static inline void bitmap_clear(unsigned long *bitmap, int bits)
+static inline void bitmap_zero(unsigned long *bitmap, int bits)
 {
-	CLEAR_BITMAP((unsigned long *)bitmap, bits);
+	memset(bitmap, 0, BITS_TO_LONGS(bits)*sizeof(unsigned long));
 }
 
 static inline void bitmap_fill(unsigned long *bitmap, int bits)

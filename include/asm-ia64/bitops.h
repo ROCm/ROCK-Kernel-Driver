@@ -236,7 +236,7 @@ __test_and_clear_bit(int nr, volatile void * addr)
 }
 
 /**
- * test_and_change_bit - Change a bit and return its new value
+ * test_and_change_bit - Change a bit and return its old value
  * @nr: Bit to set
  * @addr: Address to count from
  *

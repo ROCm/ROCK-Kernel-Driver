@@ -132,7 +132,7 @@ _GLOBAL(flush_instruction_cache)
  *   flush all bytes from start through stop-1 inclusive
  */
 
-_GLOBAL(flush_icache_range)
+_GLOBAL(__flush_icache_range)
 
 /*
  * Flush the data cache to memory 

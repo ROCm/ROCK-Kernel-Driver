@@ -414,12 +414,12 @@ void __devinit bttv_readee(struct bttv *btv, unsigned char *eedata, int addr)
 /* init + register i2c algo-bit adapter */
 int __devinit init_bttv_i2c(struct bttv *btv)
 {
-	int use_hw = (btv->id == 878) && i2c_hw;
-
 	memcpy(&btv->i2c_client, &bttv_i2c_client_template,
 	       sizeof(bttv_i2c_client_template));
 
-	if (use_hw) {
+	if (i2c_hw)
+		btv->use_i2c_hw = 1;
+	if (btv->use_i2c_hw) {
 		/* bt878 */
 		memcpy(&btv->c.i2c_adap, &bttv_i2c_adap_hw_template,
 		       sizeof(bttv_i2c_adap_hw_template));
@@ -435,12 +435,13 @@ int __devinit init_bttv_i2c(struct bttv *btv)
 
 	btv->c.i2c_adap.dev.parent = &btv->c.pci->dev;
 	snprintf(btv->c.i2c_adap.name, sizeof(btv->c.i2c_adap.name),
-		 "bt%d #%d [%s]", btv->id, btv->c.nr, use_hw ? "hw" : "sw");
+		 "bt%d #%d [%s]", btv->id, btv->c.nr,
+		 btv->use_i2c_hw ? "hw" : "sw");
 
         i2c_set_adapdata(&btv->c.i2c_adap, btv);
         btv->i2c_client.adapter = &btv->c.i2c_adap;
 
-	if (use_hw) {
+	if (btv->use_i2c_hw) {
 		btv->i2c_rc = i2c_add_adapter(&btv->c.i2c_adap);
 	} else {
 		bttv_bit_setscl(btv,1);
@@ -452,12 +453,10 @@ int __devinit init_bttv_i2c(struct bttv *btv)
 
 int __devexit fini_bttv_i2c(struct bttv *btv)
 {
-	int use_hw = (btv->id == 878) && i2c_hw;
-
 	if (0 != btv->i2c_rc)
 		return 0;
 
-	if (use_hw) {
+	if (btv->use_i2c_hw) {
 		return i2c_del_adapter(&btv->c.i2c_adap);
 	} else {
 		return i2c_bit_del_bus(&btv->c.i2c_adap);

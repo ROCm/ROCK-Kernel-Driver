@@ -464,8 +464,6 @@ out:
 /*
  * These bracket the sleeping functions..
  */
-extern void scheduling_functions_start_here(void);
-extern void scheduling_functions_end_here(void);
 #define first_sched	((unsigned long) scheduling_functions_start_here)
 #define last_sched	((unsigned long) scheduling_functions_end_here)
 
@@ -481,7 +479,7 @@ unsigned long get_wchan(struct task_struct *p)
 	 * The same comment as on the Alpha applies here, too ...
 	 */
 	pc = thread_saved_pc(p);
-	if (pc >= (unsigned long) interruptible_sleep_on && pc < (unsigned long) add_timer) {
+	if (pc >= first_sched && pc < last_sched) {
 		schedule_frame = ((unsigned long *)(long)p->thread.sp)[1];
 		return (unsigned long)((unsigned long *)schedule_frame)[1];
 	}

@@ -996,7 +996,7 @@ static void process_timeout(unsigned long __data)
  *
  * In all cases the return value is guaranteed to be non-negative.
  */
-fastcall signed long schedule_timeout(signed long timeout)
+fastcall signed long __sched schedule_timeout(signed long timeout)
 {
 	struct timer_list timer;
 	unsigned long expire;
@@ -1056,7 +1056,7 @@ asmlinkage long sys_gettid(void)
 	return current->pid;
 }
 
-static long nanosleep_restart(struct restart_block *restart)
+static long __sched nanosleep_restart(struct restart_block *restart)
 {
 	unsigned long expire = restart->arg0, now = jiffies;
 	struct timespec __user *rmtp = (struct timespec __user *) restart->arg1;

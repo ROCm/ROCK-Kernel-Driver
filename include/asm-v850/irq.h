@@ -65,4 +65,8 @@ extern void disable_irq_nosync (unsigned int irq);
 
 #endif /* !__ASSEMBLY__ */
 
+struct irqaction;
+struct pt_regs;
+int handle_IRQ_event(unsigned int, struct pt_regs *, struct irqaction *);
+
 #endif /* __V850_IRQ_H__ */

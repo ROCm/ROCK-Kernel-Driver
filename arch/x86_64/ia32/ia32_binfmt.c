@@ -272,8 +272,8 @@ do {							\
 #define load_elf_binary load_elf32_binary
 
 #define ELF_PLAT_INIT(r, load_addr)	elf32_init(r)
-#define setup_arg_pages(bprm)		ia32_setup_arg_pages(bprm)
-int ia32_setup_arg_pages(struct linux_binprm *bprm);
+#define setup_arg_pages(bprm, exec_stack)	ia32_setup_arg_pages(bprm, exec_stack)
+int ia32_setup_arg_pages(struct linux_binprm *bprm, int executable_stack);
 
 #undef start_thread
 #define start_thread(regs,new_rip,new_rsp) do { \
@@ -325,7 +325,7 @@ static void elf32_init(struct pt_regs *regs)
 	me->thread.es = __USER_DS;
 }
 
-int setup_arg_pages(struct linux_binprm *bprm)
+int setup_arg_pages(struct linux_binprm *bprm, int executable_stack)
 {
 	unsigned long stack_base;
 	struct vm_area_struct *mpnt;
@@ -354,7 +354,12 @@ int setup_arg_pages(struct linux_binprm *bprm)
 		mpnt->vm_mm = mm;
 		mpnt->vm_start = PAGE_MASK & (unsigned long) bprm->p;
 		mpnt->vm_end = IA32_STACK_TOP;
-		mpnt->vm_flags = vm_stack_flags32; 
+		if (executable_stack == EXSTACK_ENABLE_X)
+			mpnt->vm_flags = vm_stack_flags32 |  VM_EXEC;
+		else if (executable_stack == EXSTACK_DISABLE_X)
+			mpnt->vm_flags = vm_stack_flags32 & ~VM_EXEC;
+		else
+			mpnt->vm_flags = vm_stack_flags32;
  		mpnt->vm_page_prot = (mpnt->vm_flags & VM_EXEC) ? 
  			PAGE_COPY_EXEC : PAGE_COPY;
 		mpnt->vm_ops = NULL;
@@ -370,7 +375,7 @@ int setup_arg_pages(struct linux_binprm *bprm)
 		struct page *page = bprm->page[i];
 		if (page) {
 			bprm->page[i] = NULL;
-			put_dirty_page(current,page,stack_base,PAGE_COPY_EXEC);
+			put_dirty_page(current,page,stack_base,mpnt->vm_page_prot);
 		}
 		stack_base += PAGE_SIZE;
 	}

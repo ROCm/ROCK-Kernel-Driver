@@ -425,7 +425,7 @@ static int load_cyc2x(struct cycx_hw *hw, struct cycx_firmware *cfm, u32 len)
 	if (cksum != cfm->checksum) {
 		printk(KERN_ERR "%s:%s: firmware corrupted!\n",
 				modname, __FUNCTION__);
-		printk(KERN_ERR " cdsize = 0x%x (expected 0x%x)\n",
+		printk(KERN_ERR " cdsize = 0x%x (expected 0x%lx)\n",
 				len - (int)sizeof(struct cycx_firmware) - 1,
 				cfm->info.codesize);
 		printk(KERN_ERR " chksum = 0x%x (expected 0x%x)\n",

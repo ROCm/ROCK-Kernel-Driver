@@ -167,7 +167,10 @@ static void __init geode_configure(void)
 	unsigned long flags;
 	u8 ccr3, ccr4;
 	local_irq_save(flags);
-	
+
+	/* Suspend on halt power saving and enable #SUSP pin */
+	setCx86(CX86_CCR2, getCx86(CX86_CCR2) | 0x88);
+
 	ccr3 = getCx86(CX86_CCR3);
 	setCx86(CX86_CCR3, (ccr3 & 0x0f) | 0x10);	/* Enable */
 	

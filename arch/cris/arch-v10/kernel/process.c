@@ -16,6 +16,7 @@
 #include <linux/err.h>
 #include <linux/fs.h>
 #include <linux/slab.h>
+#include <linux/init.h>
 
 #ifdef CONFIG_ETRAX_GPIO
 void etrax_gpio_wake_up_check(void); /* drivers/gpio.c */
@@ -216,8 +217,6 @@ asmlinkage int sys_execve(const char *fname, char **argv, char **envp,
  * These bracket the sleeping functions..
  */
 
-extern void scheduling_functions_start_here(void);
-extern void scheduling_functions_end_here(void);
 #define first_sched     ((unsigned long) scheduling_functions_start_here)
 #define last_sched      ((unsigned long) scheduling_functions_end_here)
 

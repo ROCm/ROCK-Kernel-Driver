@@ -101,6 +101,8 @@ extern int acpi_disabled;
 extern int fallback_aper_order;
 extern int fallback_aper_force;
 extern int iommu_aperture;
+extern int iommu_aperture_disabled;
+extern int iommu_aperture_allowed;
 
 extern void smp_local_timer_interrupt(struct pt_regs * regs);
 

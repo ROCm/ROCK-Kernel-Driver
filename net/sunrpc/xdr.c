@@ -799,7 +799,7 @@ xdr_buf_subsegment(struct xdr_buf *buf, struct xdr_buf *subbuf,
 }
 
 /* obj is assumed to point to allocated memory of size at least len: */
-static int
+int
 read_bytes_from_xdr_buf(struct xdr_buf *buf, int base, void *obj, int len)
 {
 	struct xdr_buf subbuf;

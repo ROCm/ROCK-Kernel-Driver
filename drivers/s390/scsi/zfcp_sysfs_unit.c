@@ -26,7 +26,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#define ZFCP_SYSFS_UNIT_C_REVISION "$Revision: 1.23 $"
+#define ZFCP_SYSFS_UNIT_C_REVISION "$Revision: 1.24 $"
 
 #include <linux/init.h>
 #include <linux/module.h>
@@ -43,11 +43,7 @@
 void
 zfcp_sysfs_unit_release(struct device *dev)
 {
-	struct zfcp_unit *unit;
-
-	unit = dev_get_drvdata(dev);
-	zfcp_unit_dequeue(unit);
-	return;
+	kfree(dev);
 }
 
 /**

@@ -103,19 +103,6 @@ static void dragen2_reset(void)
 	);
 }
 
-int dragen2_cs8900_setup(struct net_device *dev)
-{
-	static int nbdev = 0;
-
-	if (++nbdev == 1) {
-		/* Set the ETH hardware address from its flash monitor location */
-		memcpy(dev->dev_addr, (void *) 0x400fffa, 6);
-		dev->irq = INT1_IRQ_NUM;
-		return dev->base_addr = 0x08000041;
-	}
-	return 1;					/* no more interface */
-}
-
 static void init_hardware(void)
 {
 #ifdef CONFIG_DIRECT_IO_ACCESS
@@ -185,7 +172,7 @@ static void init_hardware(void)
 
 void config_BSP(char *command, int size)
 {
-	printk("68VZ328 DragonBallVZ support (c) 2001 Lineo, Inc.\n");
+	printk(KERN_INFO "68VZ328 DragonBallVZ support (c) 2001 Lineo, Inc.\n");
 
 #if defined(CONFIG_BOOTPARAM)
 	strncpy(command, CONFIG_BOOTPARAM_STRING, size);

@@ -21,6 +21,7 @@
 #include <linux/completion.h>
 #include <linux/namespace.h>
 #include <linux/personality.h>
+#include <linux/sem.h>
 #include <linux/file.h>
 #include <linux/binfmts.h>
 #include <linux/mman.h>
@@ -31,6 +32,7 @@
 #include <linux/futex.h>
 #include <linux/ptrace.h>
 #include <linux/mount.h>
+#include <linux/audit.h>
 
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
@@ -38,9 +40,6 @@
 #include <asm/mmu_context.h>
 #include <asm/cacheflush.h>
 #include <asm/tlbflush.h>
-
-extern int copy_semundo(unsigned long clone_flags, struct task_struct *tsk);
-extern void exit_sem(struct task_struct *tsk);
 
 /* The idle threads do not count..
  * Protected by write_lock_irq(&tasklist_lock)
@@ -85,6 +84,8 @@ void __put_task_struct(struct task_struct *tsk)
 	WARN_ON(atomic_read(&tsk->usage));
 	WARN_ON(tsk == current);
 
+	if (unlikely(tsk->audit_context))
+		audit_free(tsk);
 	security_task_free(tsk);
 	free_uid(tsk->user);
 	put_group_info(tsk->group_info);
@@ -209,11 +210,14 @@ EXPORT_SYMBOL(autoremove_wake_function);
 void __init fork_init(unsigned long mempages)
 {
 #ifndef __HAVE_ARCH_TASK_STRUCT_ALLOCATOR
+#ifndef ARCH_MIN_TASKALIGN
+#define ARCH_MIN_TASKALIGN	0
+#endif
 	/* create a slab on which task_structs can be allocated */
 	task_struct_cachep =
 		kmem_cache_create("task_struct",
-				  sizeof(struct task_struct),0,
-				  SLAB_MUST_HWCACHE_ALIGN, NULL, NULL);
+				  sizeof(struct task_struct),ARCH_MIN_TASKALIGN,
+				  0, NULL, NULL);
 	if (!task_struct_cachep)
 		panic("fork_init(): cannot create task_struct SLAB cache");
 #endif
@@ -322,7 +326,7 @@ static inline int dup_mmap(struct mm_struct * mm, struct mm_struct * oldmm)
       
 			/* insert tmp into the share list, just after mpnt */
 			down(&file->f_mapping->i_shared_sem);
-			list_add_tail(&tmp->shared, &mpnt->shared);
+			list_add(&tmp->shared, &mpnt->shared);
 			up(&file->f_mapping->i_shared_sem);
 		}
 
@@ -512,7 +516,6 @@ static int copy_mm(unsigned long clone_flags, struct task_struct * tsk)
 
 	tsk->min_flt = tsk->maj_flt = 0;
 	tsk->cmin_flt = tsk->cmaj_flt = 0;
-	tsk->nswap = tsk->cnswap = 0;
 	tsk->nvcsw = tsk->nivcsw = tsk->cnvcsw = tsk->cnivcsw = 0;
 
 	tsk->mm = NULL;
@@ -812,6 +815,13 @@ static inline int copy_signal(unsigned long clone_flags, struct task_struct * ts
 	sig->group_stop_count = 0;
 	sig->curr_target = NULL;
 	init_sigpending(&sig->shared_pending);
+	INIT_LIST_HEAD(&sig->posix_timers);
+
+	sig->tty = current->signal->tty;
+	sig->pgrp = process_group(current);
+	sig->session = current->signal->session;
+	sig->leader = 0;	/* session leadership doesn't inherit */
+	sig->tty_old_pgrp = 0;
 
 	return 0;
 }
@@ -923,7 +933,6 @@ struct task_struct *copy_process(unsigned long clone_flags,
 
 	INIT_LIST_HEAD(&p->children);
 	INIT_LIST_HEAD(&p->sibling);
-	INIT_LIST_HEAD(&p->posix_timers);
 	init_waitqueue_head(&p->wait_chldexit);
 	p->vfork_done = NULL;
 	spin_lock_init(&p->alloc_lock);
@@ -937,21 +946,22 @@ struct task_struct *copy_process(unsigned long clone_flags,
 	init_timer(&p->real_timer);
 	p->real_timer.data = (unsigned long) p;
 
-	p->leader = 0;		/* session leadership doesn't inherit */
-	p->tty_old_pgrp = 0;
 	p->utime = p->stime = 0;
 	p->cutime = p->cstime = 0;
 	p->lock_depth = -1;		/* -1 = no lock */
 	p->start_time = get_jiffies_64();
 	p->security = NULL;
 	p->io_context = NULL;
+	p->audit_context = NULL;
 
 	retval = -ENOMEM;
 	if ((retval = security_task_alloc(p)))
 		goto bad_fork_cleanup;
+	if ((retval = audit_alloc(p)))
+		goto bad_fork_cleanup_security;
 	/* copy all the process information */
 	if ((retval = copy_semundo(clone_flags, p)))
-		goto bad_fork_cleanup_security;
+		goto bad_fork_cleanup_audit;
 	if ((retval = copy_files(clone_flags, p)))
 		goto bad_fork_cleanup_semundo;
 	if ((retval = copy_fs(clone_flags, p)))
@@ -1057,7 +1067,7 @@ struct task_struct *copy_process(unsigned long clone_flags,
 	if (thread_group_leader(p)) {
 		attach_pid(p, PIDTYPE_TGID, p->tgid);
 		attach_pid(p, PIDTYPE_PGID, process_group(p));
-		attach_pid(p, PIDTYPE_SID, p->session);
+		attach_pid(p, PIDTYPE_SID, p->signal->session);
 		if (p->pid)
 			__get_cpu_var(process_counts)++;
 	} else
@@ -1076,6 +1086,8 @@ bad_fork_cleanup_namespace:
 	exit_namespace(p);
 bad_fork_cleanup_mm:
 	exit_mm(p);
+	if (p->active_mm)
+		mmdrop(p->active_mm);
 bad_fork_cleanup_signal:
 	exit_signal(p);
 bad_fork_cleanup_sighand:
@@ -1086,6 +1098,8 @@ bad_fork_cleanup_files:
 	exit_files(p); /* blocking */
 bad_fork_cleanup_semundo:
 	exit_sem(p);
+bad_fork_cleanup_audit:
+	audit_free(p);
 bad_fork_cleanup_security:
 	security_task_free(p);
 bad_fork_cleanup:

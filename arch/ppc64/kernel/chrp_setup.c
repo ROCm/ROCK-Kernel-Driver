@@ -252,7 +252,7 @@ chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 
 	ppc_md.setup_arch     = chrp_setup_arch;
 	ppc_md.get_cpuinfo    = chrp_get_cpuinfo;
-	if(naca->interrupt_controller == IC_OPEN_PIC) {
+	if (naca->interrupt_controller == IC_OPEN_PIC) {
 		ppc_md.init_IRQ       = pSeries_init_openpic; 
 		ppc_md.get_irq        = openpic_get_irq;
 	} else {
@@ -267,6 +267,7 @@ chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.restart        = rtas_restart;
 	ppc_md.power_off      = rtas_power_off;
 	ppc_md.halt           = rtas_halt;
+	ppc_md.panic          = rtas_os_term;
 
 	ppc_md.get_boot_time  = pSeries_get_boot_time;
 	ppc_md.get_rtc_time   = pSeries_get_rtc_time;

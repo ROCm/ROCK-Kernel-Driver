@@ -61,9 +61,10 @@ static int linear_mergeable_bvec(request_queue_t *q, struct bio *bio, struct bio
 	mddev_t *mddev = q->queuedata;
 	dev_info_t *dev0;
 	unsigned long maxsectors, bio_sectors = bio->bi_size >> 9;
+	sector_t sector = bio->bi_sector + get_start_sect(bio->bi_bdev);
 
-	dev0 = which_dev(mddev, bio->bi_sector);
-	maxsectors = (dev0->size << 1) - (bio->bi_sector - (dev0->offset<<1));
+	dev0 = which_dev(mddev, sector);
+	maxsectors = (dev0->size << 1) - (sector - (dev0->offset<<1));
 
 	if (maxsectors < bio_sectors)
 		maxsectors = 0;
@@ -78,6 +79,20 @@ static int linear_mergeable_bvec(request_queue_t *q, struct bio *bio, struct bio
 		return 1<<31;
 	return maxsectors << 9;
 }
+
+static void linear_unplug(request_queue_t *q)
+{
+	mddev_t *mddev = q->queuedata;
+	linear_conf_t *conf = mddev_to_conf(mddev);
+	int i;
+
+	for (i=0; i < mddev->raid_disks; i++) {
+		request_queue_t *r_queue = bdev_get_queue(conf->disks[i].rdev->bdev);
+		if (r_queue->unplug_fn)
+			r_queue->unplug_fn(r_queue);
+	}
+}
+
 
 static int linear_run (mddev_t *mddev)
 {
@@ -184,6 +199,7 @@ static int linear_run (mddev_t *mddev)
 		BUG();
 
 	blk_queue_merge_bvec(mddev->queue, linear_mergeable_bvec);
+	mddev->queue->unplug_fn = linear_unplug;
 	return 0;
 
 out:

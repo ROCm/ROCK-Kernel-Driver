@@ -122,8 +122,8 @@ void __init iSeries_activate_IRQs()
 	int irq;
 	unsigned long flags;
 
-	for (irq = 0; irq < NR_IRQS; irq++) {
-		irq_desc_t *desc = &irq_desc[irq];
+	for_each_irq (irq) {
+		irq_desc_t *desc = get_irq_desc(irq);
 
 		if (desc && desc->handler && desc->handler->startup) {
 			spin_lock_irqsave(&desc->lock, flags);

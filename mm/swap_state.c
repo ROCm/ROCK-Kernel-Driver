@@ -16,28 +16,24 @@
 
 #include <asm/pgtable.h>
 
-static struct backing_dev_info swap_backing_dev_info = {
-	.ra_pages	= 0,	/* No readahead */
-	.memory_backed	= 1,	/* Does not contribute to dirty memory */
+/*
+ * swapper_space is a fiction, retained to simplify the path through
+ * vmscan's shrink_list.  Only those fields initialized below are used.
+ */
+static struct address_space_operations swap_aops = {
+	.writepage	= swap_writepage,
 };
 
-extern struct address_space_operations swap_aops;
+static struct backing_dev_info swap_backing_dev_info = {
+	.memory_backed	= 1,	/* Does not contribute to dirty memory */
+	.unplug_io_fn	= swap_unplug_io_fn,
+};
 
 struct address_space swapper_space = {
 	.page_tree	= RADIX_TREE_INIT(GFP_ATOMIC),
-	.page_lock	= SPIN_LOCK_UNLOCKED,
-	.clean_pages	= LIST_HEAD_INIT(swapper_space.clean_pages),
-	.dirty_pages	= LIST_HEAD_INIT(swapper_space.dirty_pages),
-	.io_pages	= LIST_HEAD_INIT(swapper_space.io_pages),
-	.locked_pages	= LIST_HEAD_INIT(swapper_space.locked_pages),
+	.tree_lock	= SPIN_LOCK_UNLOCKED,
 	.a_ops		= &swap_aops,
 	.backing_dev_info = &swap_backing_dev_info,
-	.i_mmap		= LIST_HEAD_INIT(swapper_space.i_mmap),
-	.i_mmap_shared	= LIST_HEAD_INIT(swapper_space.i_mmap_shared),
-	.i_shared_sem	= __MUTEX_INITIALIZER(swapper_space.i_shared_sem),
-	.truncate_count  = ATOMIC_INIT(0),
-	.private_lock	= SPIN_LOCK_UNLOCKED,
-	.private_list	= LIST_HEAD_INIT(swapper_space.private_list),
 };
 
 #define INC_CACHE_INFO(x)	do { swap_cache_info.x++; } while (0)
@@ -59,30 +55,55 @@ void show_swap_cache_info(void)
 		swap_cache_info.noent_race, swap_cache_info.exist_race);
 }
 
+/*
+ * __add_to_swap_cache resembles add_to_page_cache on swapper_space,
+ * but sets SwapCache flag and private instead of mapping and index.
+ */
+static int __add_to_swap_cache(struct page *page,
+		swp_entry_t entry, int gfp_mask)
+{
+	int error;
+
+	BUG_ON(PageSwapCache(page));
+	BUG_ON(PagePrivate(page));
+	error = radix_tree_preload(gfp_mask);
+	if (!error) {
+		page_cache_get(page);
+		spin_lock(&swapper_space.tree_lock);
+		error = radix_tree_insert(&swapper_space.page_tree,
+						entry.val, page);
+		if (!error) {
+			SetPageLocked(page);
+			SetPageSwapCache(page);
+			page->private = entry.val;
+			total_swapcache_pages++;
+			pagecache_acct(1);
+		} else
+			page_cache_release(page);
+		spin_unlock(&swapper_space.tree_lock);
+		radix_tree_preload_end();
+	}
+	return error;
+}
+
 static int add_to_swap_cache(struct page *page, swp_entry_t entry)
 {
 	int error;
 
-	if (page->mapping)
-		BUG();
 	if (!swap_duplicate(entry)) {
 		INC_CACHE_INFO(noent_race);
 		return -ENOENT;
 	}
-	error = add_to_page_cache(page, &swapper_space, entry.val, GFP_KERNEL);
+	error = __add_to_swap_cache(page, entry, GFP_KERNEL);
 	/*
 	 * Anon pages are already on the LRU, we don't run lru_cache_add here.
 	 */
-	if (error != 0) {
+	if (error) {
 		swap_free(entry);
 		if (error == -EEXIST)
 			INC_CACHE_INFO(exist_race);
 		return error;
 	}
-	if (!PageLocked(page))
-		BUG();
-	if (!PageSwapCache(page))
-		BUG();
 	INC_CACHE_INFO(add_total);
 	return 0;
 }
@@ -96,7 +117,12 @@ void __delete_from_swap_cache(struct page *page)
 	BUG_ON(!PageLocked(page));
 	BUG_ON(!PageSwapCache(page));
 	BUG_ON(PageWriteback(page));
-	__remove_from_page_cache(page);
+
+	radix_tree_delete(&swapper_space.page_tree, page->private);
+	page->private = 0;
+	ClearPageSwapCache(page);
+	total_swapcache_pages--;
+	pagecache_acct(-1);
 	INC_CACHE_INFO(del_total);
 }
 
@@ -140,8 +166,7 @@ int add_to_swap(struct page * page)
 		/*
 		 * Add it to the swap cache and mark it dirty
 		 */
-		err = add_to_page_cache(page, &swapper_space,
-					entry.val, GFP_ATOMIC);
+		err = __add_to_swap_cache(page, entry, GFP_ATOMIC);
 
 		if (pf_flags & PF_MEMALLOC)
 			current->flags |= PF_MEMALLOC;
@@ -149,8 +174,7 @@ int add_to_swap(struct page * page)
 		switch (err) {
 		case 0:				/* Success */
 			SetPageUptodate(page);
-			ClearPageDirty(page);
-			set_page_dirty(page);
+			SetPageDirty(page);
 			INC_CACHE_INFO(add_total);
 			return 1;
 		case -EEXIST:
@@ -176,82 +200,54 @@ void delete_from_swap_cache(struct page *page)
 {
 	swp_entry_t entry;
 
+	BUG_ON(!PageSwapCache(page));
 	BUG_ON(!PageLocked(page));
 	BUG_ON(PageWriteback(page));
 	BUG_ON(PagePrivate(page));
   
-	entry.val = page->index;
+	entry.val = page->private;
 
-	spin_lock(&swapper_space.page_lock);
+	spin_lock(&swapper_space.tree_lock);
 	__delete_from_swap_cache(page);
-	spin_unlock(&swapper_space.page_lock);
+	spin_unlock(&swapper_space.tree_lock);
 
 	swap_free(entry);
 	page_cache_release(page);
 }
 
+/*
+ * Strange swizzling function only for use by shmem_writepage
+ */
 int move_to_swap_cache(struct page *page, swp_entry_t entry)
 {
-	struct address_space *mapping = page->mapping;
-	int err;
-
-	spin_lock(&swapper_space.page_lock);
-	spin_lock(&mapping->page_lock);
-
-	err = radix_tree_insert(&swapper_space.page_tree, entry.val, page);
+	int err = __add_to_swap_cache(page, entry, GFP_ATOMIC);
 	if (!err) {
-		__remove_from_page_cache(page);
-		___add_to_page_cache(page, &swapper_space, entry.val);
-	}
-
-	spin_unlock(&mapping->page_lock);
-	spin_unlock(&swapper_space.page_lock);
-
-	if (!err) {
+		remove_from_page_cache(page);
+		page_cache_release(page);	/* pagecache ref */
 		if (!swap_duplicate(entry))
 			BUG();
-		/* shift page from clean_pages to dirty_pages list */
-		BUG_ON(PageDirty(page));
-		set_page_dirty(page);
+		SetPageDirty(page);
 		INC_CACHE_INFO(add_total);
 	} else if (err == -EEXIST)
 		INC_CACHE_INFO(exist_race);
 	return err;
 }
 
+/*
+ * Strange swizzling function for shmem_getpage (and shmem_unuse)
+ */
 int move_from_swap_cache(struct page *page, unsigned long index,
 		struct address_space *mapping)
 {
-	swp_entry_t entry;
-	int err;
-
-	BUG_ON(!PageLocked(page));
-	BUG_ON(PageWriteback(page));
-	BUG_ON(PagePrivate(page));
-
-	entry.val = page->index;
-
-	spin_lock(&swapper_space.page_lock);
-	spin_lock(&mapping->page_lock);
-
-	err = radix_tree_insert(&mapping->page_tree, index, page);
+	int err = add_to_page_cache(page, mapping, index, GFP_ATOMIC);
 	if (!err) {
-		__delete_from_swap_cache(page);
-		___add_to_page_cache(page, mapping, index);
-	}
-
-	spin_unlock(&mapping->page_lock);
-	spin_unlock(&swapper_space.page_lock);
-
-	if (!err) {
-		swap_free(entry);
+		delete_from_swap_cache(page);
 		/* shift page from clean_pages to dirty_pages list */
 		ClearPageDirty(page);
 		set_page_dirty(page);
 	}
 	return err;
 }
-
 
 /* 
  * If we are the only user, then try to free up the swap cache. 
@@ -310,19 +306,17 @@ void free_pages_and_swap_cache(struct page **pages, int nr)
  */
 struct page * lookup_swap_cache(swp_entry_t entry)
 {
-	struct page *found;
+	struct page *page;
 
-	found = find_get_page(&swapper_space, entry.val);
-	/*
-	 * Unsafe to assert PageSwapCache and mapping on page found:
-	 * if SMP nothing prevents swapoff from deleting this page from
-	 * the swap cache at this moment.  find_lock_page would prevent
-	 * that, but no need to change: we _have_ got the right page.
-	 */
-	INC_CACHE_INFO(find_total);
-	if (found)
+	spin_lock(&swapper_space.tree_lock);
+	page = radix_tree_lookup(&swapper_space.page_tree, entry.val);
+	if (page) {
+		page_cache_get(page);
 		INC_CACHE_INFO(find_success);
-	return found;
+	}
+	spin_unlock(&swapper_space.tree_lock);
+	INC_CACHE_INFO(find_total);
+	return page;
 }
 
 /* 
@@ -340,10 +334,14 @@ struct page * read_swap_cache_async(swp_entry_t entry)
 		/*
 		 * First check the swap cache.  Since this is normally
 		 * called after lookup_swap_cache() failed, re-calling
-		 * that would confuse statistics: use find_get_page()
-		 * directly.
+		 * that would confuse statistics.
 		 */
-		found_page = find_get_page(&swapper_space, entry.val);
+		spin_lock(&swapper_space.tree_lock);
+		found_page = radix_tree_lookup(&swapper_space.page_tree,
+						entry.val);
+		if (found_page)
+			page_cache_get(found_page);
+		spin_unlock(&swapper_space.tree_lock);
 		if (found_page)
 			break;
 

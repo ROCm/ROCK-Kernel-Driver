@@ -43,8 +43,6 @@
 #include <asm/iSeries/iSeries_pci.h>
 #endif /* CONFIG_PPC_ISERIES */
 
-#define DBG(...)
-
 static inline struct iommu_table *devnode_table(struct pci_dev *dev)
 {
 	if (!dev)
@@ -66,69 +64,17 @@ static inline struct iommu_table *devnode_table(struct pci_dev *dev)
  * Returns the virtual address of the buffer and sets dma_handle
  * to the dma address (mapping) of the first page.
  */
-void *pci_iommu_alloc_consistent(struct pci_dev *hwdev, size_t size,
+static void *pci_iommu_alloc_consistent(struct pci_dev *hwdev, size_t size,
 			   dma_addr_t *dma_handle)
 {
-	struct iommu_table *tbl;
-	void *ret = NULL;
-	dma_addr_t mapping;
-	unsigned int npages, order;
-
-	size = PAGE_ALIGN(size);
-	npages = size >> PAGE_SHIFT;
-	order = get_order(size);
-
- 	/* Client asked for way too much space.  This is checked later anyway */
-	/* It is easier to debug here for the drivers than in the tce tables.*/
-	if (order >= IOMAP_MAX_ORDER) {
-		printk("PCI_DMA: pci_alloc_consistent size too large: 0x%lx\n",
-			size);
-		return (void *)DMA_ERROR_CODE;
-	}
-
-	tbl = devnode_table(hwdev); 
-
-	if (!tbl)
-		return NULL;
-
-	/* Alloc enough pages (and possibly more) */
-	ret = (void *)__get_free_pages(GFP_ATOMIC, order);
-
-	if (!ret)
-		return NULL;
-
-	memset(ret, 0, size);
-
-	/* Set up tces to cover the allocated range */
-	mapping = iommu_alloc(tbl, ret, npages, PCI_DMA_BIDIRECTIONAL);
-
-	if (mapping == DMA_ERROR_CODE) {
-		free_pages((unsigned long)ret, order);
-		ret = NULL;
-	} else
-		*dma_handle = mapping;
-
-	return ret;
+	return iommu_alloc_consistent(devnode_table(hwdev), size, dma_handle);
 }
 
-
-void pci_iommu_free_consistent(struct pci_dev *hwdev, size_t size,
+static void pci_iommu_free_consistent(struct pci_dev *hwdev, size_t size,
 			 void *vaddr, dma_addr_t dma_handle)
 {
-	struct iommu_table *tbl;
-	unsigned int npages;
-	
-	size = PAGE_ALIGN(size);
-	npages = size >> PAGE_SHIFT;
-
-	tbl = devnode_table(hwdev); 
-
-	if (tbl) {
-		iommu_free(tbl, dma_handle, npages);
-		free_pages((unsigned long)vaddr, get_order(size));
-	}
+	iommu_free_consistent(devnode_table(hwdev), size, vaddr, dma_handle);
 }
-
 
 /* Creates TCEs for a user provided buffer.  The user buffer must be 
  * contiguous real kernel storage (not vmalloc).  The address of the buffer
@@ -136,84 +82,31 @@ void pci_iommu_free_consistent(struct pci_dev *hwdev, size_t size,
  * need not be page aligned, the dma_addr_t returned will point to the same
  * byte within the page as vaddr.
  */
-dma_addr_t pci_iommu_map_single(struct pci_dev *hwdev, void *vaddr,
-				size_t size, int direction)
+static dma_addr_t pci_iommu_map_single(struct pci_dev *hwdev, void *vaddr,
+		size_t size, enum dma_data_direction direction)
 {
-	struct iommu_table * tbl;
-	dma_addr_t dma_handle = DMA_ERROR_CODE;
-	unsigned long uaddr;
-	unsigned int npages;
-
-	BUG_ON(direction == PCI_DMA_NONE);
-
-	uaddr = (unsigned long)vaddr;
-	npages = PAGE_ALIGN(uaddr + size) - (uaddr & PAGE_MASK);
-	npages >>= PAGE_SHIFT;
-
-	tbl = devnode_table(hwdev); 
-
-	if (tbl) {
-		dma_handle = iommu_alloc(tbl, vaddr, npages, direction);
-		if (dma_handle == DMA_ERROR_CODE) {
-			if (printk_ratelimit())  {
-				printk(KERN_INFO "iommu_alloc failed, tbl %p vaddr %p npages %d\n",
-				       tbl, vaddr, npages);
-			}
-		} else 
-			dma_handle |= (uaddr & ~PAGE_MASK);
-	}
-
-	return dma_handle;
+	return iommu_map_single(devnode_table(hwdev), vaddr, size, direction);
 }
 
 
-void pci_iommu_unmap_single(struct pci_dev *hwdev, dma_addr_t dma_handle,
-		      size_t size, int direction)
+static void pci_iommu_unmap_single(struct pci_dev *hwdev, dma_addr_t dma_handle,
+		size_t size, enum dma_data_direction direction)
 {
-	struct iommu_table *tbl;
-	unsigned int npages;
-	
-	BUG_ON(direction == PCI_DMA_NONE);
-
-	npages = (PAGE_ALIGN(dma_handle + size) - (dma_handle & PAGE_MASK))
-		>> PAGE_SHIFT;
-
-	tbl = devnode_table(hwdev); 
-
-	if (tbl) 
-		iommu_free(tbl, dma_handle, npages);
+	iommu_unmap_single(devnode_table(hwdev), dma_handle, size, direction);
 }
 
 
-int pci_iommu_map_sg(struct pci_dev *pdev, struct scatterlist *sglist, int nelems,
-	       int direction)
+static int pci_iommu_map_sg(struct pci_dev *pdev, struct scatterlist *sglist,
+		int nelems, enum dma_data_direction direction)
 {
-	struct iommu_table * tbl;
-
-	BUG_ON(direction == PCI_DMA_NONE);
-
-	if (nelems == 0)
-		return 0;
-
-	tbl = devnode_table(pdev); 
-	if (!tbl)
-		return 0;
-
-	return iommu_alloc_sg(tbl, &pdev->dev, sglist, nelems, direction);
+	return iommu_map_sg(&pdev->dev, devnode_table(pdev), sglist,
+			nelems, direction);
 }
 
-void pci_iommu_unmap_sg(struct pci_dev *pdev, struct scatterlist *sglist, int nelems,
-		  int direction)
+static void pci_iommu_unmap_sg(struct pci_dev *pdev, struct scatterlist *sglist,
+		int nelems, enum dma_data_direction direction)
 {
-	struct iommu_table *tbl;
-
-	BUG_ON(direction == PCI_DMA_NONE);
-
-	tbl = devnode_table(pdev); 
-	if (!tbl)
-		return;
-
-	iommu_free_sg(tbl, sglist, nelems);
+	iommu_unmap_sg(devnode_table(pdev), sglist, nelems, direction);
 }
 
 /* We support DMA to/from any memory page via the iommu */

@@ -39,6 +39,7 @@
 #include <linux/pci.h>
 #include <linux/acpi.h>
 #include <linux/kallsyms.h>
+#include <linux/edd.h>
 #include <asm/mtrr.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
@@ -369,6 +370,30 @@ static int __init noreplacement_setup(char *s)
 
 __setup("noreplacement", noreplacement_setup); 
 
+#if defined(CONFIG_EDD) || defined(CONFIG_EDD_MODULE)
+unsigned char eddnr;
+struct edd_info edd[EDDMAXNR];
+unsigned int edd_disk80_sig;
+#ifdef CONFIG_EDD_MODULE
+EXPORT_SYMBOL(eddnr);
+EXPORT_SYMBOL(edd);
+EXPORT_SYMBOL(edd_disk80_sig);
+#endif
+/**
+ * copy_edd() - Copy the BIOS EDD information
+ *              from empty_zero_page into a safe place.
+ *
+ */
+static inline void copy_edd(void)
+{
+     eddnr = EDD_NR;
+     memcpy(edd, EDD_BUF, sizeof(edd));
+     edd_disk80_sig = DISK80_SIGNATURE;
+}
+#else
+#define copy_edd() do {} while (0)
+#endif
+
 void __init setup_arch(char **cmdline_p)
 {
 	unsigned long low_mem_size;
@@ -387,6 +412,7 @@ void __init setup_arch(char **cmdline_p)
 	rd_doload = ((RAMDISK_FLAGS & RAMDISK_LOAD_FLAG) != 0);
 #endif
 	setup_memory_region();
+	copy_edd();
 
 	if (!MOUNT_ROOT_RDONLY)
 		root_mountflags &= ~MS_RDONLY;
@@ -475,10 +501,7 @@ void __init setup_arch(char **cmdline_p)
 #endif
 	paging_init();
 
-#ifndef CONFIG_SMP
-	/* Temporary hack: disable the IO-APIC for UP Nvidia and VIA. */
 		check_ioapic();
-#endif
 #ifdef CONFIG_ACPI_BOOT
        /*
         * Initialize the ACPI boot-time table parser (gets the RSDP and SDT).
@@ -797,6 +820,9 @@ static void __init init_intel(struct cpuinfo_x86 *c)
 		c->x86_virt_bits = (eax >> 8) & 0xff;
 		c->x86_phys_bits = eax & 0xff;
 	}
+
+	if (c->x86 == 15)
+		c->x86_cache_alignment = c->x86_clflush_size * 2;
 }
 
 void __init get_cpu_vendor(struct cpuinfo_x86 *c)
@@ -831,6 +857,7 @@ void __init early_identify_cpu(struct cpuinfo_x86 *c)
 	c->x86_vendor_id[0] = '\0'; /* Unset */
 	c->x86_model_id[0] = '\0';  /* Unset */
 	c->x86_clflush_size = 64;
+	c->x86_cache_alignment = c->x86_clflush_size;
 	memset(&c->x86_capability, 0, sizeof c->x86_capability);
 
 	/* Get vendor name */
@@ -1058,6 +1085,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	if (c->x86_tlbsize > 0) 
 		seq_printf(m, "TLB size\t: %d 4K pages\n", c->x86_tlbsize);
 	seq_printf(m, "clflush size\t: %d\n", c->x86_clflush_size);
+	seq_printf(m, "cache_alignment\t: %d\n", c->x86_cache_alignment);
 
 	seq_printf(m, "address sizes\t: %u bits physical, %u bits virtual\n", 
 		   c->x86_phys_bits, c->x86_virt_bits);

@@ -363,6 +363,9 @@ extern void tty_flip_buffer_push(struct tty_struct *tty);
 extern int tty_get_baud_rate(struct tty_struct *tty);
 extern int tty_termios_baud_rate(struct termios *termios);
 
+struct semaphore;
+extern struct semaphore tty_sem;
+
 /* n_tty.c */
 extern struct tty_ldisc tty_ldisc_N_TTY;
 

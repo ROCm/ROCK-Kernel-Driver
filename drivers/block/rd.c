@@ -271,6 +271,7 @@ static int rd_ioctl(struct inode *inode, struct file *file,
 static struct backing_dev_info rd_backing_dev_info = {
 	.ra_pages	= 0,	/* No readahead */
 	.memory_backed	= 1,	/* Does not contribute to dirty memory */
+	.unplug_io_fn = default_unplug_io_fn,
 };
 
 static int rd_open(struct inode *inode, struct file *filp)

@@ -39,6 +39,7 @@ struct writeback_control {
 					   older than this */
 	long nr_to_write;		/* Write this many pages, and decrement
 					   this for each page written */
+	long pages_skipped;		/* Pages which were not written */
 	int nonblocking;		/* Don't get stuck on request queues */
 	int encountered_congestion;	/* An output: a queue is full */
 	int for_kupdate;		/* A kupdate writeback */
@@ -71,12 +72,16 @@ static inline void wait_on_inode(struct inode *inode)
  * mm/page-writeback.c
  */
 int wakeup_bdflush(long nr_pages);
+void laptop_io_completion(void);
+void laptop_sync_completion(void);
 
-/* These 5 are exported to sysctl. */
+/* These are exported to sysctl. */
 extern int dirty_background_ratio;
 extern int vm_dirty_ratio;
 extern int dirty_writeback_centisecs;
 extern int dirty_expire_centisecs;
+extern int block_dump;
+extern int laptop_mode;
 
 struct ctl_table;
 struct file;

@@ -51,3 +51,8 @@
 		*(.security_initcall.init) 				\
 		__security_initcall_end = .;				\
 	}
+
+#define SCHED_TEXT							\
+		__scheduling_functions_start_here = .;			\
+		*(.sched.text)						\
+		__scheduling_functions_end_here = .;

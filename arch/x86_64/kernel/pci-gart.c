@@ -194,6 +194,7 @@ void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
 
 	/* Kludge to make it bug-to-bug compatible with i386. i386
 	   uses the normal dma_mask for alloc_consistent. */
+	if (hwdev)
 	dma_mask &= hwdev->dma_mask;
 
  again:
@@ -849,6 +850,7 @@ fs_initcall(pci_iommu_init);
    forcesac For SAC mode for masks <40bits  (experimental)
    fullflush Flush IOMMU on each allocation (default) 
    nofullflush Don't use IOMMU fullflush
+   allowed  overwrite iommu off workarounds for specific chipsets.
    soft	 Use software bounce buffering (default for Intel machines)
 */
 __init int iommu_setup(char *opt) 
@@ -861,8 +863,12 @@ __init int iommu_setup(char *opt)
 		    no_agp = 1;
 	    if (!memcmp(p,"off", 3))
 		    no_iommu = 1;
-	    if (!memcmp(p,"force", 5))
+	    if (!memcmp(p,"force", 5)) {
 		    force_iommu = 1;
+		    iommu_aperture_allowed = 1;
+	    }
+	    if (!memcmp(p,"allowed",7))
+		    iommu_aperture_allowed = 1;
 	    if (!memcmp(p,"noforce", 7)) { 
 		    iommu_merge = 0;
 		    force_iommu = 0;

@@ -8,7 +8,7 @@
 #include <asm/ptrace.h>
 #include <asm/psr.h>
 
-	.text
+	.section .sched.text
 	.align	4
 
 	.globl		___down_read
@@ -113,6 +113,7 @@ ___down_write:
 	ba		2b
 	 restore	%l5, %g0, %g5
 
+	.text
 	.globl		___up_read
 ___up_read:
 	rd		%psr, %g3

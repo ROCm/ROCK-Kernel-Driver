@@ -12,18 +12,18 @@
 
 #ifdef CONFIG_DEVFS_FS
 extern int devfs_mk_bdev(dev_t dev, umode_t mode, const char *fmt, ...)
-	__attribute__((format (printf, 3, 4)));
+    __attribute__ ((format(printf, 3, 4)));
 extern int devfs_mk_cdev(dev_t dev, umode_t mode, const char *fmt, ...)
-	__attribute__((format (printf, 3, 4)));
+    __attribute__ ((format(printf, 3, 4)));
 extern int devfs_mk_symlink(const char *name, const char *link);
 extern int devfs_mk_dir(const char *fmt, ...)
-	__attribute__((format (printf, 1, 2)));
+    __attribute__ ((format(printf, 1, 2)));
 extern void devfs_remove(const char *fmt, ...)
-	__attribute__((format (printf, 1, 2)));
+    __attribute__ ((format(printf, 1, 2)));
 extern int devfs_register_tape(const char *name);
 extern void devfs_unregister_tape(int num);
 extern void mount_devfs_fs(void);
-#else  /*  CONFIG_DEVFS_FS  */
+#else				/*  CONFIG_DEVFS_FS  */
 static inline int devfs_mk_bdev(dev_t dev, umode_t mode, const char *fmt, ...)
 {
 	return 0;
@@ -32,9 +32,9 @@ static inline int devfs_mk_cdev(dev_t dev, umode_t mode, const char *fmt, ...)
 {
 	return 0;
 }
-static inline int devfs_mk_symlink (const char *name, const char *link)
+static inline int devfs_mk_symlink(const char *name, const char *link)
 {
-    return 0;
+	return 0;
 }
 static inline int devfs_mk_dir(const char *fmt, ...)
 {
@@ -43,16 +43,16 @@ static inline int devfs_mk_dir(const char *fmt, ...)
 static inline void devfs_remove(const char *fmt, ...)
 {
 }
-static inline int devfs_register_tape (const char *name)
+static inline int devfs_register_tape(const char *name)
 {
-    return -1;
+	return -1;
 }
 static inline void devfs_unregister_tape(int num)
 {
 }
-static inline void mount_devfs_fs (void)
+static inline void mount_devfs_fs(void)
 {
-    return;
+	return;
 }
-#endif  /*  CONFIG_DEVFS_FS  */
-#endif  /*  _LINUX_DEVFS_FS_KERNEL_H  */
+#endif				/*  CONFIG_DEVFS_FS  */
+#endif				/*  _LINUX_DEVFS_FS_KERNEL_H  */

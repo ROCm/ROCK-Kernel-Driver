@@ -184,7 +184,7 @@ config NET_SCH_INGRESS
 	  If unsure, say Y.
 
 	  To compile this code as a module, choose M here: the
-	  module will be called cls_ingress.
+	  module will be called sch_ingress.
 
 config NET_QOS
 	bool "QoS support"

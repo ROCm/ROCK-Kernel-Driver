@@ -798,7 +798,7 @@ void prom_initialize_dart_table(void)
 	 * will blow up an entire large page anyway in the kernel mapping
 	 */
 	RELOC(dart_tablebase) =
-		absolute_to_virt(lmb_alloc_base(1UL<<24, 1UL<<24, 0x80000000L));
+		abs_to_virt(lmb_alloc_base(1UL<<24, 1UL<<24, 0x80000000L));
 
 	prom_print(RELOC("Dart at: "));
 	prom_print_hex(RELOC(dart_tablebase));
@@ -1254,7 +1254,6 @@ smt_setup(void)
 {
 	char *p, *q;
 	char my_smt_enabled = SMT_DYNAMIC;
-	unsigned long my_smt_snooze_delay; 
 	ihandle prom_options = NULL;
 	char option[9];
 	unsigned long offset = reloc_offset();
@@ -1301,51 +1300,6 @@ smt_setup(void)
 	if (!found )
 		my_smt_enabled = SMT_DYNAMIC; /* default to on */
 
-	found = 0;
-	if (my_smt_enabled) {
-		if (strstr(RELOC(cmd_line), RELOC("smt-snooze-delay="))) {
-			for (q = RELOC(cmd_line); (p = strstr(q, RELOC("smt-snooze-delay="))) != 0; ) {
-				q = p + 17;
-				if (p > RELOC(cmd_line) && p[-1] != ' ')
-					continue;
-				found = 1;
-				/* Don't use simple_strtoul() because _ctype & others aren't RELOC'd */
-				my_smt_snooze_delay = 0;
-				while (*q >= '0' && *q <= '9') {
-					my_smt_snooze_delay = my_smt_snooze_delay * 10 + *q - '0';
-					q++;
-				}
-			}
-		}
-
-		if (!found) {
-			prom_options = (ihandle)call_prom(RELOC("finddevice"), 1, 1, RELOC("/options"));
-			if (prom_options != (ihandle) -1) {
-				call_prom(RELOC("getprop"), 
-					4, 1, prom_options,
-					RELOC("ibm,smt-snooze-delay"), 
-					option, 
-					sizeof(option));
-				if (option[0] != 0) {
-					found = 1;
-					/* Don't use simple_strtoul() because _ctype & others aren't RELOC'd */
-					my_smt_snooze_delay = 0;
-					q = option;
-					while (*q >= '0' && *q <= '9') {
-						my_smt_snooze_delay = my_smt_snooze_delay * 10 + *q - '0';
-						q++;
-					}
-				}
-			}
-		}
-
-		if (!found) {
-			my_smt_snooze_delay = 30000; /* default value */
-		}
-	} else {
-		my_smt_snooze_delay = 0; /* default value */
-	}
-	_naca->smt_snooze_delay = my_smt_snooze_delay;
 	_naca->smt_state = my_smt_enabled;
 }
 
@@ -2191,7 +2145,7 @@ finish_node_interrupts(struct device_node *np, unsigned long mem_start)
 			printk(KERN_CRIT "Could not allocate interrupt "
 			       "number for %s\n", np->full_name);
 		} else
-			np->intrs[i].line = openpic_to_irq(virq);
+			np->intrs[i].line = irq_offset_up(virq);
 
 		/* We offset irq numbers for the u3 MPIC by 128 in PowerMac */
 		if (systemcfg->platform == PLATFORM_POWERMAC && ic && ic->parent) {
@@ -3019,7 +2973,7 @@ static int of_finish_dynamic_node_interrupts(struct device_node *node)
 			       "number for %s\n", node->full_name);
 			return -ENOMEM;
 		}
-		node->intrs[i].line = openpic_to_irq(virq);
+		node->intrs[i].line = irq_offset_up(virq);
 		if (n > 1)
 			node->intrs[i].sense = irq[1];
 		if (n > 2) {

@@ -3,6 +3,7 @@
 #
 
 obj-y += s390mach.o sysinfo.o
-obj-y += cio/ block/ char/ net/ scsi/
+obj-y += cio/ block/ char/ crypto/ net/ scsi/
 
 drivers-y += drivers/s390/built-in.o
+

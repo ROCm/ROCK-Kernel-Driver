@@ -53,8 +53,6 @@ struct net_local {
 	struct sk_buff *skbs[MAX_SKB_BUFFERS];	/* pointers to tx-skbs */
 	int in_idx, out_idx;	/* indexes to buffer ring */
 	int sk_count;		/* number of buffers currently in ring */
-
-	int is_open;		/* flag controlling module locking */
 };				/* net_local */
 
 
@@ -81,10 +79,6 @@ net_open(struct net_device *dev)
 	struct in_device *in_dev;
 	hysdn_card *card = dev->priv;
 	int i;
-
-	if (!((struct net_local *) dev)->is_open)
-		MOD_INC_USE_COUNT;	/* increment only if interface is actually down */
-	((struct net_local *) dev)->is_open = 1;	/* device actually open */
 
 	netif_start_queue(dev);	/* start tx-queueing */
 
@@ -130,9 +124,6 @@ net_close(struct net_device *dev)
 
 	netif_stop_queue(dev);	/* disable queueing */
 
-	if (((struct net_local *) dev)->is_open)
-		MOD_DEC_USE_COUNT;	/* adjust module counter */
-	((struct net_local *) dev)->is_open = 0;
 	flush_tx_buffers((struct net_local *) dev);
 
 	return (0);		/* success */

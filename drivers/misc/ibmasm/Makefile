@@ -1,7 +1,7 @@
 
 obj-$(CONFIG_IBM_ASM) := ibmasm.o
 
-ibmasm-objs :=	module.o      \
+ibmasm-y :=	module.o      \
 		ibmasmfs.o    \
 		event.o       \
 		command.o     \
@@ -9,5 +9,7 @@ ibmasm-objs :=	module.o      \
 		heartbeat.o   \
 		r_heartbeat.o \
 		dot_command.o \
-		lowlevel.o    \
-		uart.o
+		lowlevel.o
+
+ibmasm-$(CONFIG_SERIAL_8250) += uart.o
+

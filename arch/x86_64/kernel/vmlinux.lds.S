@@ -15,6 +15,7 @@ SECTIONS
   _text = .;			/* Text and read-only data */
   .text : {
 	*(.text)
+	SCHED_TEXT
 	*(.fixup)
 	*(.gnu.warning)
 	} = 0x9090

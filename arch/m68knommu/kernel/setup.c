@@ -40,13 +40,6 @@
 #include <asm/pgtable.h>
 #endif
 
-#ifdef CONFIG_CONSOLE
-extern struct consw *conswitchp;
-#ifdef CONFIG_FRAMEBUFFER
-extern struct consw fb_con;
-#endif
-#endif
-
 unsigned long rom_length;
 unsigned long memory_start;
 unsigned long memory_end;
@@ -59,7 +52,7 @@ static void dummy_waitbut(void)
 {
 }
 
-void (*mach_sched_init) (void (*handler)(int, void *, struct pt_regs *)) = NULL;
+void (*mach_sched_init) (irqreturn_t (*handler)(int, void *, struct pt_regs *)) = NULL;
 void (*mach_tick)( void ) = NULL;
 /* machine dependent keyboard functions */
 int (*mach_keyb_init) (void) = NULL;
@@ -67,10 +60,7 @@ int (*mach_kbdrate) (struct kbd_repeat *) = NULL;
 void (*mach_kbd_leds) (unsigned int) = NULL;
 /* machine dependent irq functions */
 void (*mach_init_IRQ) (void) = NULL;
-void (*(*mach_default_handler)[]) (int, void *, struct pt_regs *) = NULL;
-int (*mach_request_irq) (unsigned int, void (*)(int, void *, struct pt_regs *),
-                         unsigned long, const char *, void *);
-void (*mach_free_irq) (unsigned int irq, void *dev_id) = NULL;
+irqreturn_t (*(*mach_default_handler)[]) (int, void *, struct pt_regs *) = NULL;
 void (*mach_enable_irq) (unsigned int) = NULL;
 void (*mach_disable_irq) (unsigned int) = NULL;
 int (*mach_get_irq_list) (struct seq_file *, void *) = NULL;
@@ -163,57 +153,57 @@ void setup_arch(char **cmdline_p)
 
 	config_BSP(&command_line[0], sizeof(command_line));
 
-	printk("\x0F\r\n\nuClinux/" CPU "\n");
+	printk(KERN_INFO "\x0F\r\n\nuClinux/" CPU "\n");
 
 #ifdef CONFIG_UCDIMM
-	printk("uCdimm by Lineo, Inc. <www.lineo.com>\n");
+	printk(KERN_INFO "uCdimm by Lineo, Inc. <www.lineo.com>\n");
 #endif
 #ifdef CONFIG_M68VZ328
-	printk("M68VZ328 support by Evan Stawnyczy <e@lineo.ca>\n");
+	printk(KERN_INFO "M68VZ328 support by Evan Stawnyczy <e@lineo.ca>\n");
 #endif
 #ifdef CONFIG_COLDFIRE
-	printk("COLDFIRE port done by Greg Ungerer, gerg@snapgear.com\n");
+	printk(KERN_INFO "COLDFIRE port done by Greg Ungerer, gerg@snapgear.com\n");
 #ifdef CONFIG_M5307
-	printk("Modified for M5307 by Dave Miller, dmiller@intellistor.com\n");
+	printk(KERN_INFO "Modified for M5307 by Dave Miller, dmiller@intellistor.com\n");
 #endif
 #ifdef CONFIG_ELITE
-	printk("Modified for M5206eLITE by Rob Scott, rscott@mtrob.fdns.net\n");
+	printk(KERN_INFO "Modified for M5206eLITE by Rob Scott, rscott@mtrob.fdns.net\n");
 #endif  
 #ifdef CONFIG_TELOS
-	printk("Modified for Omnia ToolVox by James D. Schettine, james@telos-systems.com\n");
+	printk(KERN_INFO "Modified for Omnia ToolVox by James D. Schettine, james@telos-systems.com\n");
 #endif
 #endif
-	printk("Flat model support (C) 1998,1999 Kenneth Albanowski, D. Jeff Dionne\n");
+	printk(KERN_INFO "Flat model support (C) 1998,1999 Kenneth Albanowski, D. Jeff Dionne\n");
 
 #if defined( CONFIG_PILOT ) && defined( CONFIG_M68328 )
-	printk("TRG SuperPilot FLASH card support <info@trgnet.com>\n");
+	printk(KERN_INFO "TRG SuperPilot FLASH card support <info@trgnet.com>\n");
 #endif
 
 #if defined( CONFIG_PILOT ) && defined( CONFIG_M68EZ328 )
-	printk("PalmV support by Lineo Inc. <jeff@uclinux.com>\n");
+	printk(KERN_INFO "PalmV support by Lineo Inc. <jeff@uclinux.com>\n");
 #endif
 
 #ifdef CONFIG_M68EZ328ADS
-	printk("M68EZ328ADS board support (C) 1999 Vladimir Gurevich <vgurevic@cisco.com>\n");
+	printk(KERN_INFO "M68EZ328ADS board support (C) 1999 Vladimir Gurevich <vgurevic@cisco.com>\n");
 #endif
 
 #ifdef CONFIG_ALMA_ANS
-	printk("Alma Electronics board support (C) 1999 Vladimir Gurevich <vgurevic@cisco.com>\n");
+	printk(KERN_INFO "Alma Electronics board support (C) 1999 Vladimir Gurevich <vgurevic@cisco.com>\n");
 #endif
 #if defined (CONFIG_M68360)
-	printk("QUICC port done by SED Systems <hamilton@sedsystems.ca>,\n");
-	printk("based on 2.0.38 port by Lineo Inc. <mleslie@lineo.com>.\n");
+	printk(KERN_INFO "QUICC port done by SED Systems <hamilton@sedsystems.ca>,\n");
+	printk(KERN_INFO "based on 2.0.38 port by Lineo Inc. <mleslie@lineo.com>.\n");
 #endif
 #ifdef CONFIG_DRAGEN2
-	printk("DragonEngine II board support by Georges Menie\n");
+	printk(KERN_INFO "DragonEngine II board support by Georges Menie\n");
 #endif
 
 #ifdef DEBUG
-	printk("KERNEL -> TEXT=0x%06x-0x%06x DATA=0x%06x-0x%06x "
+	printk(KERN_DEBUG "KERNEL -> TEXT=0x%06x-0x%06x DATA=0x%06x-0x%06x "
 		"BSS=0x%06x-0x%06x\n", (int) &_stext, (int) &_etext,
 		(int) &_sdata, (int) &_edata,
 		(int) &_sbss, (int) &_ebss);
-	printk("KERNEL -> ROMFS=0x%06x-0x%06x MEM=0x%06x-0x%06x "
+	printk(KERN_DEBUG "KERNEL -> ROMFS=0x%06x-0x%06x MEM=0x%06x-0x%06x "
 		"STACK=0x%06x-0x%06x\n",
 #ifdef CAT_ROMARRAY
 		(int) romarray, ((int) romarray) + romarray[2],
@@ -231,15 +221,11 @@ void setup_arch(char **cmdline_p)
 
 #ifdef DEBUG
 	if (strlen(*cmdline_p)) 
-		printk("Command line: '%s'\n", *cmdline_p);
+		printk(KERN_DEBUG "Command line: '%s'\n", *cmdline_p);
 #endif
 
-#ifdef CONFIG_CONSOLE
-#ifdef CONFIG_FRAMEBUFFER
-	conswitchp = &fb_con;
-#else
-	conswitchp = 0;
-#endif
+#if defined(CONFIG_FRAMEBUFFER_CONSOLE) && defined(CONFIG_DUMMY_CONSOLE)
+	conswitchp = &dummy_con;
 #endif
 
 	/*

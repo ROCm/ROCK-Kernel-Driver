@@ -12,6 +12,7 @@
 #include <linux/kdev_t.h>
 #include <linux/spinlock.h>
 #include <linux/init.h>
+#include <linux/in6.h>
 #include <asm/system.h>
 #include "flask.h"
 #include "av_permissions.h"
@@ -65,15 +66,27 @@ struct avc_audit_data {
 		struct {
 			char *netif;
 			struct sock *sk;
+			u16 family;
 			u16 dport;
 			u16 sport;
-			u32 daddr;
-			u32 saddr;
+			union {
+				struct {
+					u32 daddr;
+					u32 saddr;
+				} v4;
+				struct {
+					struct in6_addr daddr;
+					struct in6_addr saddr;
+				} v6;
+			} fam;
 		} net;
 		int cap;
 		int ipc_id;
 	} u;
 };
+
+#define v4info fam.v4
+#define v6info fam.v6
 
 /* Initialize an AVC audit data structure. */
 #define AVC_AUDIT_DATA_INIT(_d,_t) \
@@ -114,9 +127,10 @@ static inline void avc_cache_stats_add(int type, unsigned val)
 /*
  * AVC display support
  */
-void avc_dump_av(u16 tclass, u32 av);
-void avc_dump_query(u32 ssid, u32 tsid, u16 tclass);
-void avc_dump_cache(char *tag);
+struct audit_buffer;
+void avc_dump_av(struct audit_buffer *ab, u16 tclass, u32 av);
+void avc_dump_query(struct audit_buffer *ab, u32 ssid, u32 tsid, u16 tclass);
+void avc_dump_cache(struct audit_buffer *ab, char *tag);
 
 /*
  * AVC operations

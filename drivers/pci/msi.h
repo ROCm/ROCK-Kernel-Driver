@@ -1,6 +1,4 @@
 /*
- * File:	msi.h
- *
  * Copyright (C) 2003-2004 Intel
  * Copyright (C) Tom Long Nguyen (tom.l.nguyen@intel.com)
  */
@@ -8,9 +6,7 @@
 #ifndef MSI_H
 #define MSI_H
 
-#define MSI_AUTO -1
-#define NR_REPEATS	23
-#define NR_RESERVED_VECTORS 3 /*FIRST_DEVICE_VECTOR,FIRST_SYSTEM_VECTOR,0x80 */
+#include <asm/msi.h>
 
 /*
  * Assume the maximum number of hot plug slots supported by the system is about
@@ -22,9 +18,10 @@
  */
 #define NR_HP_RESERVED_VECTORS 	20
 
-extern int vector_irq[NR_IRQS];
+extern int vector_irq[NR_VECTORS];
 extern cpumask_t pending_irq_balance_cpumask[NR_IRQS];
 extern void (*interrupt[NR_IRQS])(void);
+extern int pci_vector_resources(int last, int nr_released);
 
 #ifdef CONFIG_SMP
 #define set_msi_irq_affinity	set_msi_affinity
@@ -34,13 +31,6 @@ extern void (*interrupt[NR_IRQS])(void);
 
 #ifndef CONFIG_IRQBALANCE
 static inline void move_msi(int vector) {}
-#endif
-
-#ifndef CONFIG_X86_IO_APIC
-static inline int get_ioapic_vector(struct pci_dev *dev) { return -1;}
-static inline void restore_ioapic_irq_handler(int irq) {}
-#else
-extern void restore_ioapic_irq_handler(int irq);
 #endif
 
 /*
@@ -85,25 +75,20 @@ extern void restore_ioapic_irq_handler(int irq);
 #define msix_mask(address)		(address | PCI_MSIX_FLAGS_BITMASK)
 #define msix_is_pending(address) 	(address & PCI_MSIX_FLAGS_PENDMASK)
 
-
 /*
  * MSI Defined Data Structures
  */
 #define MSI_ADDRESS_HEADER		0xfee
 #define MSI_ADDRESS_HEADER_SHIFT	12
 #define MSI_ADDRESS_HEADER_MASK		0xfff000
-#define MSI_TARGET_CPU_SHIFT		4
+#define MSI_ADDRESS_DEST_ID_MASK	0xfff0000f
 #define MSI_TARGET_CPU_MASK		0xff
 #define MSI_DELIVERY_MODE		0
 #define MSI_LEVEL_MODE			1	/* Edge always assert */
 #define MSI_TRIGGER_MODE		0	/* MSI is edge sensitive */
+#define MSI_PHYSICAL_MODE		0
 #define MSI_LOGICAL_MODE		1
 #define MSI_REDIRECTION_HINT_MODE	0
-#ifdef CONFIG_SMP
-#define MSI_TARGET_CPU			logical_smp_processor_id()
-#else
-#define MSI_TARGET_CPU			TARGET_CPUS
-#endif
 
 struct msg_data {
 #if defined(__LITTLE_ENDIAN_BITFIELD)

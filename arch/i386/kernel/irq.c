@@ -75,6 +75,14 @@ irq_desc_t irq_desc[NR_IRQS] __cacheline_aligned = {
 static void register_irq_proc (unsigned int irq);
 
 /*
+ * per-CPU IRQ handling stacks
+ */
+#ifdef CONFIG_4KSTACKS
+union irq_ctx *hardirq_ctx[NR_CPUS];
+union irq_ctx *softirq_ctx[NR_CPUS];
+#endif
+
+/*
  * Special irq handlers.
  */
 
@@ -126,10 +134,8 @@ struct hw_interrupt_type no_irq_type = {
 };
 
 atomic_t irq_err_count;
-#ifdef CONFIG_X86_IO_APIC
-#ifdef APIC_MISMATCH_DEBUG
+#if defined(CONFIG_X86_IO_APIC) && defined(APIC_MISMATCH_DEBUG)
 atomic_t irq_mis_count;
-#endif
 #endif
 
 /*
@@ -186,10 +192,8 @@ skip:
 		seq_putc(p, '\n');
 #endif
 		seq_printf(p, "ERR: %10u\n", atomic_read(&irq_err_count));
-#ifdef CONFIG_X86_IO_APIC
-#ifdef APIC_MISMATCH_DEBUG
+#if defined(CONFIG_X86_IO_APIC) && defined(APIC_MISMATCH_DEBUG)
 		seq_printf(p, "MIS: %10u\n", atomic_read(&irq_mis_count));
-#endif
 #endif
 	}
 	return 0;
@@ -213,7 +217,7 @@ inline void synchronize_irq(unsigned int irq)
  * waste of time and is not what some drivers would
  * prefer.
  */
-int handle_IRQ_event(unsigned int irq,
+asmlinkage int handle_IRQ_event(unsigned int irq,
 		struct pt_regs *regs, struct irqaction *action)
 {
 	int status = 1;	/* Force the "do bottom halves" bit */
@@ -436,7 +440,7 @@ asmlinkage unsigned int do_IRQ(struct pt_regs regs)
 
 		__asm__ __volatile__("andl %%esp,%0" :
 					"=r" (esp) : "0" (THREAD_SIZE - 1));
-		if (unlikely(esp < (sizeof(struct thread_info) + 1024))) {
+		if (unlikely(esp < (sizeof(struct thread_info) + STACK_WARN))) {
 			printk("do_IRQ: stack overflow: %ld\n",
 				esp - sizeof(struct thread_info));
 			dump_stack();
@@ -484,11 +488,68 @@ asmlinkage unsigned int do_IRQ(struct pt_regs regs)
 	 * useful for irq hardware that does not mask cleanly in an
 	 * SMP environment.
 	 */
+#ifdef CONFIG_4KSTACKS
+
+	for (;;) {
+		irqreturn_t action_ret;
+		u32 *isp;
+		union irq_ctx * curctx;
+		union irq_ctx * irqctx;
+
+		curctx = (union irq_ctx *) current_thread_info();
+		irqctx = hardirq_ctx[smp_processor_id()];
+
+		spin_unlock(&desc->lock);
+
+		/*
+		 * this is where we switch to the IRQ stack. However, if we are already using
+		 * the IRQ stack (because we interrupted a hardirq handler) we can't do that
+		 * and just have to keep using the current stack (which is the irq stack already
+		 * after all)
+		 */
+
+		if (curctx == irqctx)
+			action_ret = handle_IRQ_event(irq, &regs, action);
+		else {
+			/* build the stack frame on the IRQ stack */
+			isp = (u32*) ((char*)irqctx + sizeof(*irqctx));
+			irqctx->tinfo.task = curctx->tinfo.task;
+			irqctx->tinfo.previous_esp = current_stack_pointer();
+
+			*--isp = (u32) action;
+			*--isp = (u32) &regs;
+			*--isp = (u32) irq;
+
+			asm volatile(
+				"       xchgl   %%ebx,%%esp     \n"
+				"       call    handle_IRQ_event \n"
+				"       xchgl   %%ebx,%%esp     \n"
+				: "=a"(action_ret)
+				: "b"(isp)
+				: "memory", "cc", "edx", "ecx"
+			);
+
+
+		}
+		spin_lock(&desc->lock);
+		if (!noirqdebug)
+			note_interrupt(irq, desc, action_ret);
+		if (curctx != irqctx)
+			irqctx->tinfo.task = NULL;
+		if (likely(!(desc->status & IRQ_PENDING)))
+			break;
+		desc->status &= ~IRQ_PENDING;
+	}
+
+#else
+
 	for (;;) {
 		irqreturn_t action_ret;
 
 		spin_unlock(&desc->lock);
+
 		action_ret = handle_IRQ_event(irq, &regs, action);
+
 		spin_lock(&desc->lock);
 		if (!noirqdebug)
 			note_interrupt(irq, desc, action_ret);
@@ -496,6 +557,7 @@ asmlinkage unsigned int do_IRQ(struct pt_regs regs)
 			break;
 		desc->status &= ~IRQ_PENDING;
 	}
+#endif
 	desc->status &= ~IRQ_INPROGRESS;
 
 out:
@@ -1053,3 +1115,79 @@ void init_irq_proc (void)
 		register_irq_proc(i);
 }
 
+
+#ifdef CONFIG_4KSTACKS
+static char softirq_stack[NR_CPUS * THREAD_SIZE]  __attribute__((__aligned__(THREAD_SIZE)));
+static char hardirq_stack[NR_CPUS * THREAD_SIZE]  __attribute__((__aligned__(THREAD_SIZE)));
+
+/*
+ * allocate per-cpu stacks for hardirq and for softirq processing
+ */
+void irq_ctx_init(int cpu)
+{
+	union irq_ctx *irqctx;
+
+	if (hardirq_ctx[cpu])
+		return;
+
+	irqctx = (union irq_ctx*) &hardirq_stack[cpu*THREAD_SIZE];
+	irqctx->tinfo.task              = NULL;
+	irqctx->tinfo.exec_domain       = NULL;
+	irqctx->tinfo.cpu               = cpu;
+	irqctx->tinfo.preempt_count     = HARDIRQ_OFFSET;
+	irqctx->tinfo.addr_limit        = MAKE_MM_SEG(0);
+
+	hardirq_ctx[cpu] = irqctx;
+
+	irqctx = (union irq_ctx*) &softirq_stack[cpu*THREAD_SIZE];
+	irqctx->tinfo.task              = NULL;
+	irqctx->tinfo.exec_domain       = NULL;
+	irqctx->tinfo.cpu               = cpu;
+	irqctx->tinfo.preempt_count     = SOFTIRQ_OFFSET;
+	irqctx->tinfo.addr_limit        = MAKE_MM_SEG(0);
+
+	softirq_ctx[cpu] = irqctx;
+
+	printk("CPU %u irqstacks, hard=%p soft=%p\n",
+		cpu,hardirq_ctx[cpu],softirq_ctx[cpu]);
+}
+
+extern asmlinkage void __do_softirq(void);
+
+asmlinkage void do_softirq(void)
+{
+	unsigned long flags;
+	struct thread_info *curctx;
+	union irq_ctx *irqctx;
+	u32 *isp;
+
+	if (in_interrupt())
+		return;
+
+	local_irq_save(flags);
+
+	if (local_softirq_pending()) {
+		curctx = current_thread_info();
+		irqctx = softirq_ctx[smp_processor_id()];
+		irqctx->tinfo.task = curctx->task;
+		irqctx->tinfo.previous_esp = current_stack_pointer();
+
+		/* build the stack frame on the softirq stack */
+		isp = (u32*) ((char*)irqctx + sizeof(*irqctx));
+
+
+		asm volatile(
+			"       xchgl   %%ebx,%%esp     \n"
+			"       call    __do_softirq    \n"
+			"       movl    %%ebx,%%esp     \n"
+			: "=b"(isp)
+			: "0"(isp)
+			: "memory", "cc", "edx", "ecx", "eax"
+		);
+	}
+
+	local_irq_restore(flags);
+}
+
+EXPORT_SYMBOL(do_softirq);
+#endif

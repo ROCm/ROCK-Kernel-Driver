@@ -52,15 +52,18 @@ struct cx88_board cx88_boards[] = {
 		.input          = {{
 			.type   = CX88_VMUX_TELEVISION,
 			.vmux   = 0,
-			//.gpio0  = 0xff03,
-			.gpio0  = 0xff01,
+			.gpio0  = 0xff00,  // internal decoder
 		},{
 			.type   = CX88_VMUX_DEBUG,
 			.vmux   = 0,
-			.gpio0  = 0xff00,
+			.gpio0  = 0xff01,  // mono from tuner chip
 		},{
 			.type   = CX88_VMUX_COMPOSITE1,
 			.vmux   = 1,
+			.gpio0  = 0xff02,
+		},{
+			.type   = CX88_VMUX_SVIDEO,
+			.vmux   = 2,
 			.gpio0  = 0xff02,
 		}},
 		.radio = {
@@ -92,21 +95,50 @@ struct cx88_board cx88_boards[] = {
 	},
 	[CX88_BOARD_ATI_WONDER_PRO] = {
 		.name           = "ATI TV Wonder Pro",
-		.tuner_type     = UNSET,
+		.tuner_type     = 44,
 		.input          = {{
 			.type   = CX88_VMUX_TELEVISION,
 			.vmux   = 0,
+		},{
+			.type   = CX88_VMUX_COMPOSITE1,
+			.vmux   = 1,
+		},{
+			.type   = CX88_VMUX_SVIDEO,
+			.vmux   = 2,
+
 		}},
 	},
         [CX88_BOARD_WINFAST2000XP] = {
                 .name           = "Leadtek Winfast 2000XP Expert",
-                .tuner_type     = 38,
+                .tuner_type     = 44,
                 .input          = {{
                         .type   = CX88_VMUX_TELEVISION,
                         .vmux   = 0,
+			.gpio0	= 0x00F5e700,
+			.gpio1  = 0x00003004,
+			.gpio2  = 0x00F5e700,
+			.gpio3  = 0x02000000,
+		},{
+			.type   = CX88_VMUX_COMPOSITE1,
+			.vmux   = 1,
+			.gpio0	= 0x00F5c700,
+			.gpio1  = 0x00003004,
+			.gpio2  = 0x00F5c700,
+			.gpio3  = 0x02000000,
+		},{
+			.type   = CX88_VMUX_SVIDEO,
+			.vmux   = 2,
+			.gpio0	= 0x00F5c700,
+			.gpio1  = 0x00003004,
+			.gpio2  = 0x00F5c700,
+			.gpio3  = 0x02000000,
                 }},
                 .radio = {
                         .type   = CX88_RADIO,
+			.gpio0	= 0x00F5d700,
+			.gpio1  = 0x00003004,
+			.gpio2  = 0x00F5d700,
+			.gpio3  = 0x02000000,
                 },
         },
 	[CX88_BOARD_AVERTV_303] = {
@@ -127,6 +159,10 @@ struct cx88_board cx88_boards[] = {
                         .type   = CX88_VMUX_COMPOSITE1,
                         .vmux   = 1,
 		},{
+			 // temporarly for testing ...
+                        .type   = CX88_VMUX_COMPOSITE2,
+                        .vmux   = 2,
+		},{
                         .type   = CX88_VMUX_SVIDEO,
                         .vmux   = 2,
                 }},
@@ -137,6 +173,7 @@ struct cx88_board cx88_boards[] = {
 	[CX88_BOARD_WINFAST_DV2000] = {
                 .name           = "Leadtek Winfast DV2000",
                 .tuner_type     = 38,
+		.needs_tda9887  = 1,
                 .input          = {{
                         .type   = CX88_VMUX_TELEVISION,
                         .vmux   = 0,
@@ -145,6 +182,24 @@ struct cx88_board cx88_boards[] = {
                         .type   = CX88_RADIO,
                 },
         },
+        [CX88_BOARD_LEADTEK_PVR2000] = {
+                .name           = "Leadtek PVR 2000",
+                .tuner_type     = 38,
+                .input          = {{
+                        .type   = CX88_VMUX_TELEVISION,
+                        .vmux   = 0,
+                },{
+                        .type   = CX88_VMUX_COMPOSITE1,
+                        .vmux   = 1,
+                },{
+                        .type   = CX88_VMUX_SVIDEO,
+                        .vmux   = 2,
+                }},
+                .radio = {
+                        .type   = CX88_RADIO,
+                },
+        },
+
 
 };
 const unsigned int cx88_bcount = ARRAY_SIZE(cx88_boards);
@@ -178,9 +233,17 @@ struct cx88_subid cx88_subids[] = {
                 .subdevice = 0x6611,
                 .card      = CX88_BOARD_WINFAST2000XP,
 	},{
+                .subvendor = 0x107d,
+                .subdevice = 0x6613,	/* NTSC */
+                .card      = CX88_BOARD_WINFAST2000XP,
+	},{
 		.subvendor = 0x107d,
                 .subdevice = 0x6620,
                 .card      = CX88_BOARD_WINFAST_DV2000,
+        },{
+                .subvendor = 0x107d,
+                .subdevice = 0x663C,
+                .card      = CX88_BOARD_LEADTEK_PVR2000,
         },{
 		.subvendor = 0x1461,
 		.subdevice = 0x000b,
@@ -192,6 +255,34 @@ struct cx88_subid cx88_subids[] = {
 	}
 };
 const unsigned int cx88_idcount = ARRAY_SIZE(cx88_subids);
+
+
+/* ----------------------------------------------------------------------- */
+/* some leadtek specific stuff                                             */
+
+static void __devinit leadtek_eeprom(struct cx8800_dev *dev, u8 *eeprom_data)
+{
+	/* This is just for the Winfast 2000 XP board ATM; I don't have data on
+	 * any others.
+	 *
+	 * Byte 0 is 1 on the NTSC board.
+	 */
+
+	if (eeprom_data[4] != 0x7d ||
+	    eeprom_data[5] != 0x10 ||
+	    eeprom_data[7] != 0x66) {
+		printk(KERN_WARNING "%s Leadtek eeprom invalid.\n", dev->name);
+		return;
+	}
+
+	dev->has_radio  = 1;
+	dev->tuner_type = (eeprom_data[6] == 0x13) ? 43 : 38;
+
+	printk(KERN_INFO "%s: Leadtek Winfast 2000 XP config: "
+	       "tuner=%d, eeprom[0]=0x%02x\n",
+	       dev->name, dev->tuner_type, eeprom_data[0]);
+}
+
 
 /* ----------------------------------------------------------------------- */
 /* some hauppauge specific stuff                                           */
@@ -377,6 +468,11 @@ void __devinit cx88_card_setup(struct cx8800_dev *dev)
 		if (0 == dev->i2c_rc)
 			i2c_eeprom(&dev->i2c_client,eeprom,sizeof(eeprom));
 		gdi_eeprom(dev,eeprom);
+		break;
+	case CX88_BOARD_WINFAST2000XP:
+		if (0 == dev->i2c_rc)
+			i2c_eeprom(&dev->i2c_client,eeprom,sizeof(eeprom));
+		leadtek_eeprom(dev,eeprom);
 		break;
 	}
 }

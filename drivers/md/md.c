@@ -335,6 +335,8 @@ static int sync_page_io(struct block_device *bdev, sector_t sector, int size,
 	struct bio_vec vec;
 	struct completion event;
 
+	rw |= (1 << BIO_RW_SYNC);
+
 	bio_init(&bio);
 	bio.bi_io_vec = &vec;
 	vec.bv_page = page;
@@ -349,7 +351,6 @@ static int sync_page_io(struct block_device *bdev, sector_t sector, int size,
 	bio.bi_private = &event;
 	bio.bi_end_io = bi_complete;
 	submit_bio(rw, &bio);
-	blk_run_queues();
 	wait_for_completion(&event);
 
 	return test_bit(BIO_UPTODATE, &bio.bi_flags);
@@ -2716,10 +2717,9 @@ int md_thread(void * arg)
 		clear_bit(THREAD_WAKEUP, &thread->flags);
 
 		run = thread->run;
-		if (run) {
+		if (run)
 			run(thread->mddev);
-			blk_run_queues();
-		}
+
 		if (signal_pending(current))
 			flush_signals(current);
 	}
@@ -3287,8 +3287,6 @@ static void md_do_sync(mddev_t *mddev)
 		    test_bit(MD_RECOVERY_ERR, &mddev->recovery))
 			break;
 
-		blk_run_queues();
-
 	repeat:
 		if (jiffies >= mark[last_mark] + SYNC_MARK_STEP ) {
 			/* step marks */
@@ -3321,6 +3319,7 @@ static void md_do_sync(mddev_t *mddev)
 		 * about not overloading the IO subsystem. (things like an
 		 * e2fsck being done on the RAID array should execute fast)
 		 */
+		mddev->queue->unplug_fn(mddev->queue);
 		cond_resched();
 
 		currspeed = ((unsigned long)(j-mddev->resync_mark_cnt))/2/((jiffies-mddev->resync_mark)/HZ +1) +1;
@@ -3339,6 +3338,8 @@ static void md_do_sync(mddev_t *mddev)
 	 * this also signals 'finished resyncing' to md_stop
 	 */
  out:
+	mddev->queue->unplug_fn(mddev->queue);
+
 	wait_event(mddev->recovery_wait, !atomic_read(&mddev->recovery_active));
 
 	/* tell personality that we are finished */

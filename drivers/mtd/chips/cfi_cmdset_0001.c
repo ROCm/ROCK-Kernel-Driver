@@ -1575,7 +1575,7 @@ static int cfi_intelext_lock(struct mtd_info *mtd, loff_t ofs, size_t len)
 					ofs, len, DO_XXLOCK_ONEBLOCK_LOCK);
 	
 #ifdef DEBUG_LOCK_BITS
-	printk(KERN_DEBUG __FUNCTION__
+	printk(KERN_DEBUG
 	       "%s: lock status after, ret=%d\n", __FUNCTION__, ret);
 	cfi_intelext_varsize_frob(mtd, do_printlockstatus_oneblock,
 				  ofs, len, 0);

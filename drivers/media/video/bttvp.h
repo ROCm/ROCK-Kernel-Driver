@@ -25,7 +25,7 @@
 #define _BTTVP_H_
 
 #include <linux/version.h>
-#define BTTV_VERSION_CODE KERNEL_VERSION(0,9,12)
+#define BTTV_VERSION_CODE KERNEL_VERSION(0,9,14)
 
 #include <linux/types.h>
 #include <linux/wait.h>
@@ -298,6 +298,7 @@ struct bttv {
 	struct bttv_pll_info pll;
 	int triton1;
 	int gpioirq;
+	int use_i2c_hw;
 
 	/* old gpio interface */
 	wait_queue_head_t gpioq;
@@ -384,9 +385,10 @@ struct bttv {
 	struct bttv_suspend_state state;
 
 	/* stats */
+	unsigned int errors;
+	unsigned int framedrop;
 	unsigned int irq_total;
 	unsigned int irq_me;
-	unsigned int errors;
 
 	unsigned int users;
 	struct bttv_fh init;

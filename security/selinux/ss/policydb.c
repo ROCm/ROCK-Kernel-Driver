@@ -48,6 +48,45 @@ static unsigned int symtab_sizes[SYM_NUM] = {
 	16
 };
 
+struct policydb_compat_info {
+	int version;
+	int sym_num;
+	int ocon_num;
+};
+
+/* These need to be updated if SYM_NUM or OCON_NUM changes */
+static struct policydb_compat_info policydb_compat[] = {
+	{
+		.version        = POLICYDB_VERSION_BASE,
+		.sym_num        = SYM_NUM - 1,
+		.ocon_num       = OCON_NUM - 1,
+	},
+	{
+		.version        = POLICYDB_VERSION_BOOL,
+		.sym_num        = SYM_NUM,
+		.ocon_num       = OCON_NUM - 1,
+	},
+	{
+		.version        = POLICYDB_VERSION_IPV6,
+		.sym_num        = SYM_NUM,
+		.ocon_num       = OCON_NUM,
+	},
+};
+
+static struct policydb_compat_info *policydb_lookup_compat(int version)
+{
+	int i;
+	struct policydb_compat_info *info = NULL;
+
+	for (i = 0; i < sizeof(policydb_compat)/sizeof(*info); i++) {
+		if (policydb_compat[i].version == version) {
+			info = &policydb_compat[i];
+			break;
+		}
+	}
+	return info;
+}
+
 /*
  * Initialize the role table.
  */
@@ -1086,9 +1125,10 @@ int policydb_read(struct policydb *p, void *fp)
 	struct role_trans *tr, *ltr;
 	struct ocontext *l, *c, *newc;
 	struct genfs *genfs_p, *genfs, *newgenfs;
-	int i, j, rc, policy_ver, num_syms;
+	int i, j, rc, r_policyvers;
 	u32 *buf, len, len2, config, nprim, nel, nel2;
 	char *policydb_str;
+	struct policydb_compat_info *info;
 
 	config = 0;
 	mls_set_config(config);
@@ -1116,7 +1156,7 @@ int policydb_read(struct policydb *p, void *fp)
 	len = buf[1];
 	if (len != strlen(POLICYDB_STRING)) {
 		printk(KERN_ERR "security:  policydb string length %d does not "
-		       "match expected length %Zd\n",
+		       "match expected length %Zu\n",
 		       len, strlen(POLICYDB_STRING));
 		goto bad;
 	}
@@ -1151,12 +1191,15 @@ int policydb_read(struct policydb *p, void *fp)
 	for (i = 0; i < 4; i++)
 		buf[i] = le32_to_cpu(buf[i]);
 
-	policy_ver = buf[0];
-	if (policy_ver != POLICYDB_VERSION && policy_ver != POLICYDB_VERSION_COMPAT) {
-		printk(KERN_ERR "security:  policydb version %d does not match "
-		       "my version %d\n", buf[0], POLICYDB_VERSION);
-		goto bad;
+	r_policyvers = buf[0];
+	if (r_policyvers < POLICYDB_VERSION_MIN ||
+	    r_policyvers > POLICYDB_VERSION_MAX) {
+	    	printk(KERN_ERR "security:  policydb version %d does not match "
+	    	       "my version range %d-%d\n",
+	    	       buf[0], POLICYDB_VERSION_MIN, POLICYDB_VERSION_MAX);
+	    	goto bad;
 	}
+
 	if (buf[1] != config) {
 		printk(KERN_ERR "security:  policydb configuration (%s) does "
 		       "not match my configuration (%s)\n",
@@ -1165,29 +1208,26 @@ int policydb_read(struct policydb *p, void *fp)
 		goto bad;
 	}
 
-	if (policy_ver == POLICYDB_VERSION_COMPAT) {
-		if (buf[2] != (SYM_NUM - 1) || buf[3] != OCON_NUM) {
-			printk(KERN_ERR "security:  policydb table sizes (%d,%d) do "
-			       "not match mine (%d,%d)\n",
-			       buf[2], buf[3], SYM_NUM, OCON_NUM);
-			goto bad;
-		}
-		num_syms = SYM_NUM - 1;
-	} else {
-		if (buf[2] != SYM_NUM || buf[3] != OCON_NUM) {
-			printk(KERN_ERR "security:  policydb table sizes (%d,%d) do "
-			       "not match mine (%d,%d)\n",
-			       buf[2], buf[3], SYM_NUM, OCON_NUM);
-			goto bad;
-		}
-		num_syms = SYM_NUM;
+
+	info = policydb_lookup_compat(r_policyvers);
+	if (!info) {
+		printk(KERN_ERR "security:  unable to find policy compat info "
+		       "for version %d\n", r_policyvers);
+		goto bad;
+	}
+
+	if (buf[2] != info->sym_num || buf[3] != info->ocon_num) {
+		printk(KERN_ERR "security:  policydb table sizes (%d,%d) do "
+		       "not match mine (%d,%d)\n", buf[2], buf[3],
+		       info->sym_num, info->ocon_num);
+		goto bad;
 	}
 
 	rc = mls_read_nlevels(p, fp);
 	if (rc)
 		goto bad;
 
-	for (i = 0; i < num_syms; i++) {
+	for (i = 0; i < info->sym_num; i++) {
 		buf = next_entry(fp, sizeof(u32)*2);
 		if (!buf) {
 			rc = -EINVAL;
@@ -1208,7 +1248,7 @@ int policydb_read(struct policydb *p, void *fp)
 	if (rc)
 		goto bad;
 
-	if (policy_ver == POLICYDB_VERSION) {
+	if (r_policyvers >= POLICYDB_VERSION_BOOL) {
 		rc = cond_read_list(p, fp);
 		if (rc)
 			goto bad;
@@ -1281,7 +1321,7 @@ int policydb_read(struct policydb *p, void *fp)
 	if (rc)
 		goto bad;
 
-	for (i = 0; i < OCON_NUM; i++) {
+	for (i = 0; i < info->ocon_num; i++) {
 		buf = next_entry(fp, sizeof(u32));
 		if (!buf) {
 			rc = -EINVAL;
@@ -1379,6 +1419,20 @@ int policydb_read(struct policydb *p, void *fp)
 				if (rc)
 					goto bad;
 				break;
+			case OCON_NODE6: {
+				int k;
+
+				buf = next_entry(fp, sizeof(u32) * 8);
+				if (!buf)
+					goto bad;
+				for (k = 0; k < 4; k++)
+					c->u.node6.addr[k] = le32_to_cpu(buf[k]);
+				for (k = 0; k < 4; k++)
+					c->u.node6.mask[k] = le32_to_cpu(buf[k+4]);
+				if (context_read_and_validate(&c->context[0], p, fp))
+					goto bad;
+				break;
+			}
 			}
 		}
 	}
