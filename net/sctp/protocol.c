@@ -394,11 +394,11 @@ static sctp_scope_t sctp_v4_scope(union sctp_addr *addr)
 	return retval;
 }
 
-/* Event handler for inet device events.
+/* Event handler for inet address addition/deletion events.
  * Basically, whenever there is an event, we re-build our local address list.
  */
-static int sctp_netdev_event(struct notifier_block *this, unsigned long event,
-			     void *ptr)
+static int sctp_inetaddr_event(struct notifier_block *this, unsigned long event,
+			       void *ptr)
 {
 	long flags __attribute__ ((unused));
 
@@ -556,9 +556,9 @@ static struct sctp_pf sctp_pf_inet = {
 	.af            = &sctp_ipv4_specific,
 };
 
-/* Registration for netdev events.  */
-struct notifier_block sctp_netdev_notifier = {
-	.notifier_call = sctp_netdev_event,
+/* Notifier for inetaddr addition/deletion events.  */
+struct notifier_block sctp_inetaddr_notifier = {
+	.notifier_call = sctp_inetaddr_event,
 };
 
 /* Socket operations.  */
@@ -785,7 +785,10 @@ int sctp_init(void)
 	INIT_LIST_HEAD(&sctp_proto.local_addr_list);
 	sctp_proto.local_addr_lock = SPIN_LOCK_UNLOCKED;
 
-	register_inetaddr_notifier(&sctp_netdev_notifier);
+	/* Register notifiers for inet and inet6 address events. */ 
+	register_inetaddr_notifier(&sctp_inetaddr_notifier);
+	register_inet6addr_notifier(&sctp_inetaddr_notifier);
+
 	sctp_get_local_addr_list(&sctp_proto);
 
 	return 0;
@@ -815,8 +818,11 @@ void sctp_exit(void)
 	 * up all the remaining associations and all that memory.
 	 */
 
+	/* Unregister notifiers for inet and inet6 address events. */
+	unregister_inetaddr_notifier(&sctp_inetaddr_notifier);
+	unregister_inet6addr_notifier(&sctp_inetaddr_notifier);
+
 	/* Free the local address list.  */
-	unregister_inetaddr_notifier(&sctp_netdev_notifier);
 	sctp_free_local_addr_list(&sctp_proto);
 
 	/* Free the control endpoint.  */
