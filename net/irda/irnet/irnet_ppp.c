@@ -927,7 +927,7 @@ ppp_irnet_send(struct ppp_channel *	chan,
        * Jean II
        */
       DERROR(PPP_ERROR, "IrTTP doesn't like this packet !!! (0x%X)\n", ret);
-      dev_kfree_skb(skb);
+      /* irttp_data_request already free the packet */
     }
 
   DEXIT(PPP_TRACE, "\n");

@@ -206,7 +206,7 @@ int irlan_eth_xmit(struct sk_buff *skb, struct net_device *dev)
 		 * confuse do_dev_queue_xmit() in dev.c! I have
 		 * tried :-) DB 
 		 */
-		dev_kfree_skb(skb);
+		/* irttp_data_request already free the packet */
 		self->stats.tx_dropped++;
 	} else {
 		self->stats.tx_packets++;

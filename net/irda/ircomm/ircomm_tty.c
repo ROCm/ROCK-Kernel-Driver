@@ -11,6 +11,7 @@
  * Sources:       serial.c and previous IrCOMM work by Takahide Higuchi
  * 
  *     Copyright (c) 1999-2000 Dag Brattli, All Rights Reserved.
+ *     Copyright (c) 2000-2003 Jean Tourrilhes <jt@hpl.hp.com>
  *     
  *     This program is free software; you can redistribute it and/or 
  *     modify it under the terms of the GNU General Public License as 
@@ -663,8 +664,12 @@ static void ircomm_tty_do_softint(void *private_)
 	spin_unlock_irqrestore(&self->spinlock, flags);
 
 	/* Flush control buffer if any */
-	if (ctrl_skb && self->flow == FLOW_START)
-		ircomm_control_request(self->ircomm, ctrl_skb);
+	if(ctrl_skb) {
+		if(self->flow == FLOW_START)
+			ircomm_control_request(self->ircomm, ctrl_skb);
+		/* Drop reference count - see ircomm_ttp_data_request(). */
+		dev_kfree_skb(ctrl_skb);
+	}
 
 	if (tty->hw_stopped)
 		return;
@@ -678,8 +683,11 @@ static void ircomm_tty_do_softint(void *private_)
 	spin_unlock_irqrestore(&self->spinlock, flags);
 
 	/* Flush transmit buffer if any */
-	if (skb)
+	if (skb) {
 		ircomm_tty_do_event(self, IRCOMM_TTY_DATA_REQUEST, skb, NULL);
+		/* Drop reference count - see ircomm_ttp_data_request(). */
+		dev_kfree_skb(skb);
+	}
 		
 	/* Check if user (still) wants to be waken up */
 	if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) && 
@@ -1179,7 +1187,6 @@ static int ircomm_tty_data_indication(void *instance, void *sap,
 
 	if (!self->tty) {
 		IRDA_DEBUG(0, "%s(), no tty!\n", __FUNCTION__ );
-		dev_kfree_skb(skb);
 		return 0;
 	}
 
@@ -1204,7 +1211,8 @@ static int ircomm_tty_data_indication(void *instance, void *sap,
 	 * handler
 	 */
 	self->tty->ldisc.receive_buf(self->tty, skb->data, NULL, skb->len);
-	dev_kfree_skb(skb);
+
+	/* No need to kfree_skb - see ircomm_ttp_data_indication() */
 
 	return 0;
 }
@@ -1231,7 +1239,8 @@ static int ircomm_tty_control_indication(void *instance, void *sap,
 
 	irda_param_extract_all(self, skb->data+1, IRDA_MIN(skb->len-1, clen), 
 			       &ircomm_param_info);
-	dev_kfree_skb(skb);
+
+	/* No need to kfree_skb - see ircomm_control_indication() */
 
 	return 0;
 }
