@@ -17,6 +17,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
+#ifndef LINUX_SERIAL_CORE_H
+#define LINUX_SERIAL_CORE_H
 
 /*
  * The type definitions.  These are from Ted Ts'o's serial.h
@@ -96,6 +98,7 @@
 #include <linux/circ_buf.h>
 #include <linux/spinlock.h>
 #include <linux/sched.h>
+#include <linux/tty.h>
 
 struct uart_port;
 struct uart_info;
@@ -455,3 +458,5 @@ uart_handle_cts_change(struct uart_port *port, unsigned int status)
 					 !((cflag) & CLOCAL))
 
 #endif
+
+#endif /* LINUX_SERIAL_CORE_H */

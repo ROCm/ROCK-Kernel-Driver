@@ -29,7 +29,8 @@
 #include <linux/sysrq.h>
 #include <linux/serial_reg.h>
 #include <linux/serial.h>
-#include <linux/serialP.h>
+#include <linux/serial_8250.h>
+#include <linux/circ_buf.h>
 #include <linux/delay.h>
 #include <linux/device.h>
 
@@ -2174,6 +2175,55 @@ void serial8250_resume_port(int line)
 	uart_resume_port(&serial8250_reg, &serial8250_ports[line].port);
 }
 
+/*
+ * Register a set of serial devices attached to a platform device.  The
+ * list is terminated with a zero flags entry, which means we expect
+ * all entries to have at least UPF_AUTOPROBE set.
+ */
+static int __devinit serial8250_probe(struct device *dev)
+{
+	struct plat_serial8250_port *p = dev->platform_data;
+	struct uart_port port;
+
+	memset(&port, 0, sizeof(struct uart_port));
+
+	for (; p && p->flags != 0; p++) {
+		port.iobase	= p->iobase;
+		port.membase	= p->membase;
+		port.irq	= p->irq;
+		port.uartclk	= p->uartclk;
+		port.regshift	= p->regshift;
+		port.iotype	= p->iotype;
+		port.flags	= p->flags;
+		port.mapbase	= p->mapbase;
+		port.dev	= dev;
+		if (share_irqs)
+			port.flags |= UPF_SHARE_IRQ;
+		serial8250_register_port(&port);
+	}
+	return 0;
+}
+
+/*
+ * Remove a platform device.  We only remove serial ports from this
+ * platform device if it actually added any in the first place (iow,
+ * dev->platform_data is non-NULL.)
+ */
+static int __devexit serial8250_remove(struct device *dev)
+{
+	int i;
+
+	if (dev->platform_data) {
+		for (i = 0; i < UART_NR; i++) {
+			struct uart_8250_port *up = &serial8250_ports[i];
+
+			if (up->port.dev == dev)
+				serial8250_unregister_port(i);
+		}
+	}
+	return 0;
+}
+
 static int serial8250_suspend(struct device *dev, u32 state, u32 level)
 {
 	int i;
@@ -2211,7 +2261,8 @@ static int serial8250_resume(struct device *dev, u32 level)
 static struct device_driver serial8250_isa_driver = {
 	.name		= "serial8250",
 	.bus		= &platform_bus_type,
-
+	.probe		= serial8250_probe,
+	.remove		= serial8250_remove,
 	.suspend	= serial8250_suspend,
 	.resume		= serial8250_resume,
 };
