@@ -799,20 +799,13 @@ static inline void tty_line_name(struct tty_driver *driver, int index, char *p)
  * really quite straightforward.  The semaphore locking can probably be
  * relaxed for the (most common) case of reopening a tty.
  */
-static int init_dev(kdev_t device, struct tty_struct **ret_tty)
+static int init_dev(struct tty_driver *driver, int idx,
+	struct tty_struct **ret_tty)
 {
 	struct tty_struct *tty, *o_tty;
 	struct termios *tp, **tp_loc, *o_tp, **o_tp_loc;
 	struct termios *ltp, **ltp_loc, *o_ltp, **o_ltp_loc;
-	struct tty_driver *driver;	
 	int retval=0;
-	int idx;
-
-	driver = get_tty_driver(device);
-	if (!driver)
-		return -ENODEV;
-
-	idx = minor(device) - driver->minor_start;
 
 	/* 
 	 * Check whether we need to acquire the tty semaphore to avoid
@@ -845,7 +838,7 @@ static int init_dev(kdev_t device, struct tty_struct **ret_tty)
 	if(!tty)
 		goto fail_no_mem;
 	initialize_tty_struct(tty);
-	tty->device = device;
+	tty->device = mk_kdev(driver->major, driver->minor_start + idx);
 	tty->driver = driver;
 	tty->index = idx;
 	tty_line_name(driver, idx, tty->name);
@@ -1315,6 +1308,8 @@ static int tty_open(struct inode * inode, struct file * filp)
 {
 	struct tty_struct *tty;
 	int noctty, retval;
+	struct tty_driver *driver;
+	int index;
 	kdev_t device;
 	unsigned short saved_flags;
 	char	buf[64];
@@ -1351,18 +1346,14 @@ retry_open:
 	if (IS_PTMX_DEV(device)) {
 #ifdef CONFIG_UNIX98_PTYS
 		/* find a free pty. */
-		int major, minor;
-		struct tty_driver *driver;
+		int major;
 
 		/* find a device that is not in use. */
 		retval = -1;
 		for (major = 0 ; major < UNIX98_NR_MAJORS ; major++) {
 			driver = &ptm_driver[major];
-			for (minor = driver->minor_start;
-			     minor < driver->minor_start + driver->num;
-			     minor++) {
-				device = mk_kdev(driver->major, minor);
-				if (!init_dev(device, &tty))
+			for (index = 0; index < driver->num ; index++)
+				if (!init_dev(driver, index, &tty))
 					goto ptmx_found; /* ok! */
 			}
 		}
@@ -1370,14 +1361,18 @@ retry_open:
 
 	ptmx_found:
 		set_bit(TTY_PTY_LOCK, &tty->flags); /* LOCK THE SLAVE */
-		minor -= driver->minor_start;
-		devpts_pty_new(driver->other->name_base + minor, MKDEV(driver->other->major, minor + driver->other->minor_start));
+		devpts_pty_new(driver->other->name_base + index, MKDEV(driver->other->major, index + driver->other->minor_start));
 		noctty = 1;
 #else
 		return -ENODEV;
 #endif  /* CONFIG_UNIX_98_PTYS */
 	} else {
-		retval = init_dev(device, &tty);
+		driver = get_tty_driver(device);
+		if (!driver)
+			return -ENODEV;
+		index = minor(device) - driver->minor_start;
+
+		retval = init_dev(driver, index, &tty);
 		if (retval)
 			return retval;
 	}
