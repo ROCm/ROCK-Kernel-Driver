@@ -348,7 +348,7 @@ int __init zisofs_init(void)
 	return 0;
 }
 
-void __exit zisofs_cleanup(void)
+void zisofs_cleanup(void)
 {
 	if ( !initialized ) {
 		printk("zisofs_cleanup: called without initialization\n");
