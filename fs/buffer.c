@@ -81,21 +81,11 @@ init_buffer(struct buffer_head *bh, bh_end_io_t *handler, void *private)
  * Return the address of the waitqueue_head to be used for this
  * buffer_head
  */
-static wait_queue_head_t *bh_waitq_head(struct buffer_head *bh)
+wait_queue_head_t *bh_waitq_head(struct buffer_head *bh)
 {
 	return &bh_wait_queue_heads[hash_ptr(bh, BH_WAIT_TABLE_ORDER)].wqh;
 }
-
-/*
- * Wait on a buffer until someone does a wakeup on it.  Needs
- * lots of external locking.  ext3 uses this.  Fix it.
- */
-void sleep_on_buffer(struct buffer_head *bh)
-{
-	wait_queue_head_t *wq = bh_waitq_head(bh);
-	sleep_on(wq);
-}
-EXPORT_SYMBOL(sleep_on_buffer);
+EXPORT_SYMBOL(bh_waitq_head);
 
 void wake_up_buffer(struct buffer_head *bh)
 {

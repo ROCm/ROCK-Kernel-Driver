@@ -689,11 +689,14 @@ repeat:
 		 * disk then we cannot do copy-out here. */
 
 		if (jh->b_jlist == BJ_Shadow) {
+			wait_queue_head_t *wqh;
+
 			JBUFFER_TRACE(jh, "on shadow: sleep");
 			spin_unlock(&journal_datalist_lock);
 			unlock_journal(journal);
 			/* commit wakes up all shadow buffers after IO */
-			sleep_on_buffer(jh2bh(jh));
+			wqh = bh_waitq_head(jh2bh(jh));
+			wait_event(*wqh, (jh->b_jlist != BJ_Shadow));
 			lock_journal(journal);
 			goto repeat;
 		}
