@@ -156,6 +156,7 @@ struct udsl_instance_data {
 
 	/* usb device part */
 	struct usb_device *usb_dev;
+	char description [64];
 	int firmware_loaded;
 
 	/* atm device part */
@@ -698,8 +699,6 @@ static void udsl_atm_dev_close (struct atm_dev *dev)
 
 	dbg ("udsl_atm_dev_close: killing tasklet");
 	tasklet_kill (&instance->send_tasklet);
-	dbg ("udsl_atm_dev_close: freeing USB device");
-	usb_put_dev (instance->usb_dev);
 	dbg ("udsl_atm_dev_close: freeing instance");
 	kfree (instance);
 }
@@ -722,8 +721,10 @@ static int udsl_atm_proc_read (struct atm_dev *atm_dev, loff_t *pos, char *page)
 	}
 
 	if (!left--)
-		return sprintf (page, "SpeedTouch USB %s-%s (%02x:%02x:%02x:%02x:%02x:%02x)\n",
-				instance->usb_dev->bus->bus_name, instance->usb_dev->devpath,
+		return sprintf (page, "%s\n", instance->description);
+
+	if (!left--)
+		return sprintf (page, "MAC: %02x:%02x:%02x:%02x:%02x:%02x\n",
 				atm_dev->esi[0], atm_dev->esi[1], atm_dev->esi[2],
 				atm_dev->esi[3], atm_dev->esi[4], atm_dev->esi[5]);
 
@@ -734,6 +735,30 @@ static int udsl_atm_proc_read (struct atm_dev *atm_dev, loff_t *pos, char *page)
 				atomic_read (&atm_dev->stats.aal5.rx),
 				atomic_read (&atm_dev->stats.aal5.rx_err),
 				atomic_read (&atm_dev->stats.aal5.rx_drop));
+
+	if (!left--) {
+		switch (atm_dev->signal) {
+		case ATM_PHY_SIG_FOUND:
+			sprintf (page, "Line up");
+			break;
+		case ATM_PHY_SIG_LOST:
+			sprintf (page, "Line down");
+			break;
+		default:
+			sprintf (page, "Line state unknown");
+			break;
+		}
+
+		if (instance->usb_dev) {
+			if (!instance->firmware_loaded)
+				strcat (page, ", no firmware\n");
+			else
+				strcat (page, ", firmware loaded\n");
+		} else
+			strcat (page, ", disconnected\n");
+
+		return strlen (page);
+	}
 
 	return 0;
 }
@@ -867,7 +892,8 @@ static int udsl_usb_probe (struct usb_interface *intf, const struct usb_device_i
 	struct udsl_instance_data *instance;
 	unsigned char mac_str [13];
 	unsigned char mac [6];
-	int i;
+	int i, length;
+	char *buf;
 
 	dbg ("Trying device with Vendor=0x%x, Product=0x%x, ifnum %d",
 		dev->descriptor.idVendor, dev->descriptor.idProduct, ifnum);
@@ -962,7 +988,7 @@ static int udsl_usb_probe (struct usb_interface *intf, const struct usb_device_i
 
 	instance->atm_dev->ci_range.vpi_bits = ATM_CI_MAX;
 	instance->atm_dev->ci_range.vci_bits = ATM_CI_MAX;
-	instance->atm_dev->signal = ATM_PHY_SIG_LOST;
+	instance->atm_dev->signal = ATM_PHY_SIG_UNKNOWN;
 
 	/* tmp init atm device, set to 128kbit */
 	instance->atm_dev->link_rate = 128 * 1000 / 424;
@@ -976,13 +1002,33 @@ static int udsl_usb_probe (struct usb_interface *intf, const struct usb_device_i
 
 	memcpy (instance->atm_dev->esi, mac, 6);
 
-	wmb ();
+	/* device description */
+	buf = instance->description;
+	length = sizeof (instance->description);
 
+	if ((i = usb_string (dev, dev->descriptor.iProduct, buf, length)) < 0)
+		goto finish;
+
+	buf += i;
+	length -= i;
+
+	i = snprintf (buf, length, " (");
+	buf += i;
+	length -= i;
+
+	if (length <= 0 || (i = usb_make_path (dev, buf, length)) < 0)
+		goto finish;
+
+	buf += i;
+	length -= i;
+
+	snprintf (buf, length, ")");
+
+finish:
+	/* ready for ATM callbacks */
 	instance->atm_dev->dev_data = instance;
 
 	usb_set_intfdata (intf, instance);
-
-	usb_get_dev (dev);
 
 	return 0;
 
@@ -1116,8 +1162,10 @@ static void udsl_usb_disconnect (struct usb_interface *intf)
 	for (i = 0; i < UDSL_NUMBER_SND_BUFS; i++)
 		kfree (instance->all_buffers[i].base);
 
+	instance->usb_dev = NULL;
+
 	/* atm finalize */
-	shutdown_atm_dev (instance->atm_dev);
+	shutdown_atm_dev (instance->atm_dev); /* frees instance */
 }
 
 
