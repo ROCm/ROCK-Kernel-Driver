@@ -779,6 +779,8 @@ cpu_init (void)
 	/* Clear the stack memory reserved for pt_regs: */
 	memset(ia64_task_regs(current), 0, sizeof(struct pt_regs));
 
+	ia64_set_kr(IA64_KR_FPU_OWNER, 0);
+
 	/*
 	 * Initialize default control register to defer all speculative faults.  The
 	 * kernel MUST NOT depend on a particular setting of these bits (in other words,

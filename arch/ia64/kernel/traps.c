@@ -250,7 +250,7 @@ disabled_fph_fault (struct pt_regs *regs)
 		struct task_struct *fpu_owner
 			= (struct task_struct *)ia64_get_kr(IA64_KR_FPU_OWNER);
 
-		if (fpu_owner == current)
+		if (ia64_is_local_fpu_owner(current))
 			return;
 
 		if (fpu_owner)

@@ -606,7 +606,6 @@ ia64_flush_fph (struct task_struct *task)
 		task->thread.flags |= IA64_THREAD_FPH_VALID;
 		ia64_save_fpu(&task->thread.fph[0]);
 	}
-	ia64_drop_fpu(task);
 }
 
 /*
@@ -627,6 +626,7 @@ ia64_sync_fph (struct task_struct *task)
 		task->thread.flags |= IA64_THREAD_FPH_VALID;
 		memset(&task->thread.fph, 0, sizeof(task->thread.fph));
 	}
+	ia64_drop_fpu(task);
 	psr->dfh = 1;
 }
 
