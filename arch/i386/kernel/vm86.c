@@ -113,10 +113,13 @@ struct pt_regs * save_v86_state(struct kernel_vm86_regs * regs)
 		printk("vm86: could not access userspace vm86_info\n");
 		do_exit(SIGSEGV);
 	}
-	tss = init_tss + smp_processor_id();
+
+	tss = init_tss + get_cpu();
 	current->thread.esp0 = current->thread.saved_esp0;
 	load_esp0(tss, current->thread.esp0);
 	current->thread.saved_esp0 = 0;
+	put_cpu();
+
 	loadsegment(fs, current->thread.saved_fs);
 	loadsegment(gs, current->thread.saved_gs);
 	ret = KVM86->regs32;
