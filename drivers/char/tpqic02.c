@@ -169,7 +169,7 @@ static unsigned long dma_bytes_done;
 static volatile unsigned dma_mode;	/* !=0 also means DMA in use */
 static flag need_rewind = YES;
 
-static kdev_t current_tape_dev;
+static int current_type;
 static int extra_blocks_left = BLOCKS_BEYOND_EW;
 static struct timer_list tp_timer;
 
@@ -677,7 +677,7 @@ static int rdstatus(char *stp, unsigned size, char qcmd)
 	 * exception flag from previous exception which we are trying to clear.
 	 */
 
-	if (TP_DIAGS(current_tape_dev))
+	if (TP_DIAGS(current_type))
 		printk(TPQIC02_NAME ": reading status bytes: ");
 
 	for (q = stp; q < stp + size; q++) {
@@ -693,7 +693,7 @@ static int rdstatus(char *stp, unsigned size, char qcmd)
 
 		*q = inb_p(QIC02_DATA_PORT);	/* read status byte */
 
-		if (TP_DIAGS(current_tape_dev))
+		if (TP_DIAGS(current_type))
 			printk("[%1d]=0x%x  ", q - stp, (unsigned) (*q) & 0xff);
 
 		outb_p(ctlbits | QIC02_CTL_REQUEST, QIC02_CTL_PORT);	/* set request */
@@ -714,7 +714,7 @@ static int rdstatus(char *stp, unsigned size, char qcmd)
 		cpu_relax();
 	/* wait for ready */
 
-	if (TP_DIAGS(current_tape_dev))
+	if (TP_DIAGS(current_type))
 		printk("\n");
 
 	return TE_OK;
@@ -1614,7 +1614,7 @@ static irqreturn_t qic02_tape_interrupt(int irq, void *dev_id,
 
 	if (status_expect_int) {
 #ifdef WANT_EXTRA_FULL_DEBUGGING
-		if (TP_DIAGS(current_tape_dev))
+		if (TP_DIAGS(current_type))
 			printk("@");
 #endif
 		stat = inb(QIC02_STAT_PORT);	/* Knock, knock */
@@ -1726,7 +1726,7 @@ static irqreturn_t qic02_tape_interrupt(int irq, void *dev_id,
 
 static ssize_t qic02_tape_read(struct file *filp, char *buf, size_t count, loff_t * ppos)
 {
-	kdev_t dev = filp->f_dentry->d_inode->i_rdev;
+	int type = iminor(filp->f_dentry->d_inode);
 	unsigned short flags = filp->f_flags;
 	unsigned long bytes_todo, bytes_done, total_bytes_done = 0;
 	int stat;
@@ -1736,8 +1736,8 @@ static ssize_t qic02_tape_read(struct file *filp, char *buf, size_t count, loff_
 		return -ENXIO;
 	}
 
-	if (TP_DIAGS(current_tape_dev))
-		printk(TPQIC02_NAME ": request READ, minor=%x, buf=%p, count=%lx, pos=%Lx, flags=%x\n", minor(dev), buf,
+	if (TP_DIAGS(current_type))
+		printk(TPQIC02_NAME ": request READ, minor=%x, buf=%p, count=%lx, pos=%Lx, flags=%x\n", type, buf,
 		       (long) count, filp->f_pos, flags);
 
 	if (count % TAPE_BLKSIZE) {	/* Only allow mod 512 bytes at a time. */
@@ -1904,7 +1904,7 @@ static ssize_t qic02_tape_read(struct file *filp, char *buf, size_t count, loff_
  */
 static ssize_t qic02_tape_write(struct file *filp, const char *buf, size_t count, loff_t * ppos)
 {
-	kdev_t dev = filp->f_dentry->d_inode->i_rdev;
+	int type = iminor(filp->f_dentry->d_inode);
 	unsigned short flags = filp->f_flags;
 	unsigned long bytes_todo, bytes_done, total_bytes_done = 0;
 
@@ -1913,9 +1913,9 @@ static ssize_t qic02_tape_write(struct file *filp, const char *buf, size_t count
 		return -ENXIO;
 	}
 
-	if (TP_DIAGS(current_tape_dev)) {
+	if (TP_DIAGS(current_type)) {
 		printk(TPQIC02_NAME ": request WRITE, minor=%x, buf=%p, count=%lx, pos=%Lx, flags=%x\n",
-		       minor(dev), buf, (long) count, filp->f_pos, flags);
+		       type, buf, (long) count, filp->f_pos, flags);
 	}
 
 	if (count % TAPE_BLKSIZE) {	/* only allow mod 512 bytes at a time */
@@ -2070,17 +2070,18 @@ static int qic02_tape_open(struct inode *inode, struct file *filp)
 static int qic02_tape_open_no_use_count(struct inode *inode,
 					struct file *filp)
 {
-	kdev_t dev = inode->i_rdev;
+	int type = iminor(inode);
 	unsigned short flags = filp->f_flags;
 	unsigned short dens = 0;
 	int s;
 
 
-	if (TP_DIAGS(dev)) {
-		printk("qic02_tape_open: dev=%s, flags=%x     ", cdevname(dev), flags);
+	if (TP_DIAGS(type)) {
+		printk("qic02_tape_open: dev=tpqic2(%d), flags=%x     ",
+			type, flags);
 	}
 
-	if (minor(dev) == 255) {	/* special case for resetting */
+	if (type == 255) {	/* special case for resetting */
 		if (capable(CAP_SYS_ADMIN)) {
 			return (tape_reset(1) == TE_OK) ? -EAGAIN : -ENXIO;
 		} else {
@@ -2162,7 +2163,7 @@ static int qic02_tape_open_no_use_count(struct inode *inode,
 	 */
 
 	/* not allowed to do QCMD_DENS_* unless tape is rewound */
-	if ((TP_DENS(dev) != 0) && (TP_DENS(current_tape_dev) != TP_DENS(dev))) {
+	if ((TP_DENS(type) != 0) && (TP_DENS(current_type) != TP_DENS(type))) {
 		/* force rewind if minor bits have changed,
 		 * i.e. user wants to use tape in different format.
 		 * [assuming single drive operation]
@@ -2175,7 +2176,7 @@ static int qic02_tape_open_no_use_count(struct inode *inode,
 		/* density bits still the same, but TP_DIAGS bit 
 		 * may have changed.
 		 */
-		current_tape_dev = dev;
+		current_type = type;
 	}
 
 	if (need_rewind == YES) {
@@ -2212,14 +2213,14 @@ static int qic02_tape_open_no_use_count(struct inode *inode,
 	 * so we must have done a rewind by now. If not, just skip over.
 	 * Only give set density command when minor bits have changed.
 	 */
-	if (TP_DENS(current_tape_dev) == TP_DENS(dev)) {
+	if (TP_DENS(current_type) == TP_DENS(type)) {
 		return 0;
 	}
 
-	current_tape_dev = dev;
+	current_type = type;
 	need_rewind = NO;
 	if (TP_HAVE_DENS) {
-		dens = TP_DENS(dev);
+		dens = TP_DENS(type);
 	}
 
 	if (dens < sizeof(format_names) / sizeof(char *))
@@ -2227,7 +2228,7 @@ static int qic02_tape_open_no_use_count(struct inode *inode,
 	else
 		tpqputs(TPQD_REWIND, "Wait for retensioning...");
 
-	switch (TP_DENS(dev)) {
+	switch (TP_DENS(type)) {
 	case 0:		/* Minor 0 is for drives without set-density support */
 		s = 0;
 		break;
@@ -2254,7 +2255,7 @@ static int qic02_tape_open_no_use_count(struct inode *inode,
 	}
 	if (s != 0) {
 		status_dead = YES;	/* force reset */
-		current_tape_dev = NODEV;/* earlier 0xff80 */
+		current_type = 0;/* earlier 0xff80 */
 		return -EIO;
 	}
 
@@ -2264,10 +2265,10 @@ static int qic02_tape_open_no_use_count(struct inode *inode,
 
 static int qic02_tape_release(struct inode *inode, struct file *filp)
 {
-	kdev_t dev = inode->i_rdev;
+	int type = iminor(inode);
 
-	if (TP_DIAGS(dev)) {
-		printk("qic02_tape_release: dev=%s\n", cdevname(dev));
+	if (TP_DIAGS(type)) {
+		printk("qic02_tape_release: dev=tpqic2(%d)\n", type);
 	}
 
 	if (status_zombie == NO) {	/* don't rewind in zombie mode */
@@ -2283,7 +2284,7 @@ static int qic02_tape_release(struct inode *inode, struct file *filp)
 		/* Rewind only if minor number requires it AND 
 		 * read/writes have been done. ************* IS THIS CORRECT??????????
 		 */
-		if ((TP_REWCLOSE(dev)) && (status_bytes_rd | status_bytes_wr)) {
+		if (TP_REWCLOSE(type) && (status_bytes_rd | status_bytes_wr)) {
 			tpqputs(TPQD_REWIND, "release: Doing rewind...");
 			(void) do_qic_cmd(QCMD_REWIND, TIM_R);
 		}
@@ -2398,7 +2399,7 @@ static int qic02_tape_ioctl(struct inode *inode, struct file *filp, unsigned int
 	struct mtpos ioctl_tell;
 
 
-	if (TP_DIAGS(current_tape_dev))
+	if (TP_DIAGS(current_type))
 		printk(TPQIC02_NAME ": ioctl(%4x, %4lx)\n", iocmd, ioarg);
 
 	if (!inode)
@@ -2459,7 +2460,7 @@ static int qic02_tape_ioctl(struct inode *inode, struct file *filp, unsigned int
 		 * ---      tape at the beginning of the current file.
 		 */
 
-		if (TP_DIAGS(current_tape_dev))
+		if (TP_DIAGS(current_type))
 			printk("OP op=%4x, count=%4x\n", operation.mt_op, operation.mt_count);
 
 		if (operation.mt_count < 0)
@@ -2492,7 +2493,7 @@ static int qic02_tape_ioctl(struct inode *inode, struct file *filp, unsigned int
 		return 0;
 
 	} else if (c == _IOC_NR(MTIOCGET)) {
-		if (TP_DIAGS(current_tape_dev))
+		if (TP_DIAGS(current_type))
 			printk("GET ");
 
 		CHECK_IOC_SIZE(mtget);
@@ -2507,7 +2508,7 @@ static int qic02_tape_ioctl(struct inode *inode, struct file *filp, unsigned int
 			return -EFAULT;
 		return 0;
 	} else if (TP_HAVE_TELL && (c == _IOC_NR(MTIOCPOS))) {
-		if (TP_DIAGS(current_tape_dev))
+		if (TP_DIAGS(current_type))
 			printk("POS ");
 
 		CHECK_IOC_SIZE(mtpos);
@@ -2664,7 +2665,7 @@ int __init qic02_tape_init(void)
 		return -ENODEV;
 	}
 
-	current_tape_dev = mk_kdev(QIC02_TAPE_MAJOR, 0);
+	current_type = 0;
 
 #ifndef CONFIG_QIC02_DYNCONF
 	printk(TPQIC02_NAME ": IRQ %d, DMA %d, IO 0x%x, IFC %s, %s, %s\n",

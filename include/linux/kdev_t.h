@@ -90,22 +90,7 @@ static inline unsigned int kdev_val(kdev_t dev)
 	return dev.value;
 }
 
-static inline kdev_t val_to_kdev(unsigned int val)
-{
-	kdev_t dev;
-	dev.value = val;
-	return dev;
-}
-
-#define HASHDEV(dev)	(kdev_val(dev))
 #define NODEV		(mk_kdev(0,0))
-
-static inline int kdev_same(kdev_t dev1, kdev_t dev2)
-{
-	return dev1.value == dev2.value;
-}
-
-#define kdev_none(d1)	(!kdev_val(d1))
 
 /* Mask off the high bits for now.. */
 #define minor(dev)	((dev).value & 0xff)

@@ -42,7 +42,6 @@
 #include <asm/system.h>
 #include <asm/io.h>
 
-#include "ide_modes.h"
 #include "qd65xx.h"
 
 /*

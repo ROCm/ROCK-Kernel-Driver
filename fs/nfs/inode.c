@@ -620,7 +620,7 @@ nfs_zap_caches(struct inode *inode)
 	NFS_ATTRTIMEO(inode) = NFS_MINATTRTIMEO(inode);
 	NFS_ATTRTIMEO_UPDATE(inode) = jiffies;
 
-	invalidate_inode_pages(inode->i_mapping);
+	invalidate_remote_inode(inode);
 
 	memset(NFS_COOKIEVERF(inode), 0, sizeof(NFS_COOKIEVERF(inode)));
 	NFS_CACHEINV(inode);
@@ -823,14 +823,15 @@ printk("nfs_setattr: revalidate failed, error=%d\n", error);
 		goto out;
 	}
 
-	if (!S_ISREG(inode->i_mode))
+	if (!S_ISREG(inode->i_mode)) {
 		attr->ia_valid &= ~ATTR_SIZE;
-
-	filemap_fdatawrite(inode->i_mapping);
-	error = nfs_wb_all(inode);
-	filemap_fdatawait(inode->i_mapping);
-	if (error)
-		goto out;
+	} else {
+		filemap_fdatawrite(inode->i_mapping);
+		error = nfs_wb_all(inode);
+		filemap_fdatawait(inode->i_mapping);
+		if (error)
+			goto out;
+	}
 
 	error = NFS_PROTO(inode)->setattr(dentry, &fattr, attr);
 	if (error)
@@ -1205,7 +1206,7 @@ __nfs_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
 	if (invalid) {
 		nfsi->attrtimeo = NFS_MINATTRTIMEO(inode);
 		nfsi->attrtimeo_timestamp = jiffies;
-		invalidate_inode_pages(inode->i_mapping);
+		invalidate_remote_inode(inode);
 		memset(NFS_COOKIEVERF(inode), 0, sizeof(NFS_COOKIEVERF(inode)));
 	} else if (time_after(jiffies, nfsi->attrtimeo_timestamp+nfsi->attrtimeo)) {
 		if ((nfsi->attrtimeo <<= 1) > NFS_MAXATTRTIMEO(inode))

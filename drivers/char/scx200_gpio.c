@@ -29,7 +29,7 @@ MODULE_PARM_DESC(major, "Major device number");
 static ssize_t scx200_gpio_write(struct file *file, const char *data, 
 				 size_t len, loff_t *ppos)
 {
-	unsigned m = minor(file->f_dentry->d_inode->i_rdev);
+	unsigned m = iminor(file->f_dentry->d_inode);
 	size_t i;
 
 	if (ppos != &file->f_pos)
@@ -80,7 +80,7 @@ static ssize_t scx200_gpio_write(struct file *file, const char *data,
 static ssize_t scx200_gpio_read(struct file *file, char *buf,
 				size_t len, loff_t *ppos)
 {
-	unsigned m = minor(file->f_dentry->d_inode->i_rdev);
+	unsigned m = iminor(file->f_dentry->d_inode);
 	int value;
 
 	if (ppos != &file->f_pos)
@@ -95,7 +95,7 @@ static ssize_t scx200_gpio_read(struct file *file, char *buf,
 
 static int scx200_gpio_open(struct inode *inode, struct file *file)
 {
-	unsigned m = minor(inode->i_rdev);
+	unsigned m = iminor(inode);
 	if (m > 63)
 		return -EINVAL;
 	return 0;

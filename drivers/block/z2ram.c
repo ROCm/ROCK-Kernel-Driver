@@ -28,10 +28,10 @@
 #define DEVICE_NAME "Z2RAM"
 
 #include <linux/major.h>
-#include <linux/slab.h>
 #include <linux/vmalloc.h>
 #include <linux/init.h>
 #include <linux/module.h>
+#include <linux/blkdev.h>
 
 #include <asm/setup.h>
 #include <asm/bitops.h>
@@ -150,7 +150,7 @@ z2_open( struct inode *inode, struct file *filp )
 	sizeof( z2ram_map[0] );
     int rc = -ENOMEM;
 
-    device = minor( inode->i_rdev );
+    device = iminor(inode);
 
     if ( current_device != -1 && current_device != device )
     {

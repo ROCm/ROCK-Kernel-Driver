@@ -1023,7 +1023,7 @@ static int mixer_ioctl(struct es1370_state *s, unsigned int cmd, unsigned long a
 
 static int es1370_open_mixdev(struct inode *inode, struct file *file)
 {
-	unsigned int minor = minor(inode->i_rdev);
+	unsigned int minor = iminor(inode);
 	struct list_head *list;
 	struct es1370_state *s;
 
@@ -1727,7 +1727,7 @@ static int es1370_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 
 static int es1370_open(struct inode *inode, struct file *file)
 {
-	unsigned int minor = minor(inode->i_rdev);
+	unsigned int minor = iminor(inode);
 	DECLARE_WAITQUEUE(wait, current);
 	unsigned long flags;
 	struct list_head *list;
@@ -2165,7 +2165,7 @@ static int es1370_ioctl_dac(struct inode *inode, struct file *file, unsigned int
 
 static int es1370_open_dac(struct inode *inode, struct file *file)
 {
-	unsigned int minor = minor(inode->i_rdev);
+	unsigned int minor = iminor(inode);
 	DECLARE_WAITQUEUE(wait, current);
 	unsigned long flags;
 	struct list_head *list;
@@ -2408,7 +2408,7 @@ static unsigned int es1370_midi_poll(struct file *file, struct poll_table_struct
 
 static int es1370_midi_open(struct inode *inode, struct file *file)
 {
-	unsigned int minor = minor(inode->i_rdev);
+	unsigned int minor = iminor(inode);
 	DECLARE_WAITQUEUE(wait, current);
 	unsigned long flags;
 	struct list_head *list;

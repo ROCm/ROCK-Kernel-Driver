@@ -10,12 +10,11 @@
 #include <linux/errno.h>
 #include <linux/types.h>
 #include <linux/ioport.h>
-#include <linux/mm.h>
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
 #include <linux/stddef.h>
 #include <linux/slab.h>
-#include <asm/io.h>
+#include <linux/thread_info.h>
 
 /* Set EXTENT bits starting at BASE in BITMAP to value TURN_ON. */
 static void set_bitmap(unsigned long *bitmap, unsigned int base, unsigned int extent, int new_value)
@@ -118,12 +117,7 @@ asmlinkage long sys_iopl(unsigned int level, struct pt_regs regs)
 			return -EPERM;
 	}
 	regs.eflags = (regs.eflags &~ 0x3000UL) | (level << 12);
+	/* Make sure we return the long way (not sysenter) */
+	set_thread_flag(TIF_IRET);
 	return 0;
 }
-
-void eat_key(void)
-{
-	if (inb(0x60) & 1) 
-		inb(0x64);
-}
-

@@ -14,6 +14,7 @@
 #include <linux/sched.h>
 #include <linux/param.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
 #include <asm/irq.h>
 #include <asm/dma.h>
 #include <asm/traps.h>
@@ -27,7 +28,7 @@
 /***************************************************************************/
 
 void coldfire_tick(void);
-void coldfire_timer_init(void (*handler)(int, void *, struct pt_regs *));
+void coldfire_timer_init(irqreturn_t (*handler)(int, void *, struct pt_regs *));
 unsigned long coldfire_timer_offset(void);
 void coldfire_trap_init(void);
 void coldfire_reset(void);

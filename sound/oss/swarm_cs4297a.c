@@ -1537,7 +1537,7 @@ static loff_t cs4297a_llseek(struct file *file, loff_t offset, int origin)
 
 static int cs4297a_open_mixdev(struct inode *inode, struct file *file)
 {
-	int minor = MINOR(inode->i_rdev);
+	int minor = iminor(inode);
 	struct cs4297a_state *s=NULL;
 	struct list_head *entry;
 
@@ -2386,7 +2386,7 @@ static int cs4297a_release(struct inode *inode, struct file *file)
 
 static int cs4297a_open(struct inode *inode, struct file *file)
 {
-	int minor = MINOR(inode->i_rdev);
+	int minor = iminor(inode);
 	struct cs4297a_state *s=NULL;
 	struct list_head *entry;
 

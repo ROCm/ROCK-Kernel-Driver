@@ -356,11 +356,11 @@ static void cmd_free(ctlr_info_t *h, CommandList_struct *c, int got_from_pool)
  */
 static int cciss_open(struct inode *inode, struct file *filep)
 {
-	int ctlr = major(inode->i_rdev) - COMPAQ_CISS_MAJOR;
-	int dsk  = minor(inode->i_rdev) >> NWD_SHIFT;
+	int ctlr = imajor(inode) - COMPAQ_CISS_MAJOR;
+	int dsk  = iminor(inode) >> NWD_SHIFT;
 
 #ifdef CCISS_DEBUG
-	printk(KERN_DEBUG "cciss_open %x (%x:%x)\n", inode->i_rdev, ctlr, dsk);
+	printk(KERN_DEBUG "cciss_open %s (%x:%x)\n", inode->i_bdev->bd_disk->disk_name, ctlr, dsk);
 #endif /* CCISS_DEBUG */ 
 
 	if (ctlr >= MAX_CTLR || hba[ctlr] == NULL)
@@ -372,7 +372,7 @@ static int cciss_open(struct inode *inode, struct file *filep)
 	 * for "raw controller".
 	 */
 	if (hba[ctlr]->drv[dsk].nr_blocks == 0) {
-		if (minor(inode->i_rdev) != 0)
+		if (iminor(inode) != 0)
 			return -ENXIO;
 		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
@@ -386,11 +386,11 @@ static int cciss_open(struct inode *inode, struct file *filep)
  */
 static int cciss_release(struct inode *inode, struct file *filep)
 {
-	int ctlr = major(inode->i_rdev) - COMPAQ_CISS_MAJOR;
-	int dsk  = minor(inode->i_rdev) >> NWD_SHIFT;
+	int ctlr = imajor(inode) - COMPAQ_CISS_MAJOR;
+	int dsk  = iminor(inode) >> NWD_SHIFT;
 
 #ifdef CCISS_DEBUG
-	printk(KERN_DEBUG "cciss_release %x (%x:%x)\n", inode->i_rdev, ctlr, dsk);
+	printk(KERN_DEBUG "cciss_release %s (%x:%x)\n", inode->i_bdev->bd_disk->disk_name, ctlr, dsk);
 #endif /* CCISS_DEBUG */
 
 	/* fsync_dev(inode->i_rdev); */
@@ -406,8 +406,8 @@ static int cciss_release(struct inode *inode, struct file *filep)
 static int cciss_ioctl(struct inode *inode, struct file *filep, 
 		unsigned int cmd, unsigned long arg)
 {
-	int ctlr = major(inode->i_rdev) - COMPAQ_CISS_MAJOR;
-	int dsk  = minor(inode->i_rdev) >> NWD_SHIFT;
+	int ctlr = imajor(inode) - COMPAQ_CISS_MAJOR;
+	int dsk  = iminor(inode) >> NWD_SHIFT;
 
 #ifdef CCISS_DEBUG
 	printk(KERN_DEBUG "cciss_ioctl: Called with cmd=%x %lx\n", cmd, arg);
@@ -2525,6 +2525,9 @@ err_all:
 	if (!q)
 		goto err_all;
 
+	hba[i]->queue = q;
+	q->queuedata = hba[i];
+
 	/* Initialize the pdev driver private data. 
 		have it point to hba[i].  */
 	pci_set_drvdata(pdev, hba[i]);
@@ -2545,7 +2548,6 @@ err_all:
 
 	cciss_procinit(i);
 
-        q->queuedata = hba[i];
 	blk_queue_bounce_limit(q, hba[i]->pdev->dma_mask);
 
 	/* This is a hardware imposed limit. */

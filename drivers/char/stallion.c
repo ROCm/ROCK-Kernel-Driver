@@ -3078,7 +3078,7 @@ static int stl_memioctl(struct inode *ip, struct file *fp, unsigned int cmd, uns
 		(int) fp, cmd, (int) arg);
 #endif
 
-	brdnr = minor(ip->i_rdev);
+	brdnr = iminor(ip);
 	if (brdnr >= STL_MAXBRDS)
 		return(-ENODEV);
 	rc = 0;

@@ -238,14 +238,14 @@ tapechar_open (struct inode *inode, struct file *filp)
 	struct tape_device *device;
 	int minor, rc;
 
-	if (major(filp->f_dentry->d_inode->i_rdev) != tapechar_major)
+	if (imajor(filp->f_dentry->d_inode) != tapechar_major)
 		return -ENODEV;
-	minor = minor(filp->f_dentry->d_inode->i_rdev);
+	minor = iminor(filp->f_dentry->d_inode);
 	device = tape_get_device(minor / TAPE_MINORS_PER_DEV);
 	if (IS_ERR(device)) {
 		return PTR_ERR(device);
 	}
-	DBF_EVENT(6, "TCHAR:open: %x\n", minor(inode->i_rdev));
+	DBF_EVENT(6, "TCHAR:open: %x\n", iminor(inode));
 	rc = tape_open(device);
 	if (rc == 0) {
 		rc = tape_assign(device);
@@ -269,7 +269,7 @@ tapechar_release(struct inode *inode, struct file *filp)
 	struct tape_device *device;
 
 	device = (struct tape_device *) filp->private_data;
-	DBF_EVENT(6, "TCHAR:release: %x\n", minor(inode->i_rdev));
+	DBF_EVENT(6, "TCHAR:release: %x\n", iminor(inode));
 #if 0
 	// FIXME: this is broken. Either MTWEOF/MTWEOF/MTBSR is done
 	// EVERYTIME the user switches from write to something different
@@ -281,7 +281,7 @@ tapechar_release(struct inode *inode, struct file *filp)
 	/*
 	 * If this is the rewinding tape minor then rewind.
 	 */
-	if ((minor(inode->i_rdev) & 1) != 0)
+	if ((iminor(inode) & 1) != 0)
 		tape_mtop(device, MTREW, 1);
 	if (device->char_data.idal_buf != NULL) {
 		idal_buffer_free(device->char_data.idal_buf);

@@ -2043,24 +2043,23 @@ end_io:
 static inline void blk_partition_remap(struct bio *bio)
 {
 	struct block_device *bdev = bio->bi_bdev;
-	struct gendisk *disk = bdev->bd_disk;
-	struct hd_struct *p;
-	if (bdev == bdev->bd_contains)
-		return;
 
-	p = disk->part[bdev->bd_dev-MKDEV(disk->major,disk->first_minor)-1];
-	switch (bio->bi_rw) {
-	case READ:
-		p->read_sectors += bio_sectors(bio);
-		p->reads++;
-		break;
-	case WRITE:
-		p->write_sectors += bio_sectors(bio);
-		p->writes++;
-		break;
+	if (bdev != bdev->bd_contains) {
+		struct hd_struct *p = bdev->bd_part;
+
+		switch (bio->bi_rw) {
+		case READ:
+			p->read_sectors += bio_sectors(bio);
+			p->reads++;
+			break;
+		case WRITE:
+			p->write_sectors += bio_sectors(bio);
+			p->writes++;
+			break;
+		}
+		bio->bi_sector += p->start_sect;
+		bio->bi_bdev = bdev->bd_contains;
 	}
-	bio->bi_sector += bdev->bd_offset;
-	bio->bi_bdev = bdev->bd_contains;
 }
 
 /**

@@ -812,7 +812,7 @@ static unsigned int usb_midi_poll(struct file *file, struct poll_table_struct *w
 
 static int usb_midi_open(struct inode *inode, struct file *file)
 {
-	int minor = minor(inode->i_rdev);
+	int minor = iminor(inode);
 	DECLARE_WAITQUEUE(wait, current);
 	struct list_head      *devs, *mdevs;
 	struct usb_midi_state *s;

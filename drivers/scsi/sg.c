@@ -238,7 +238,7 @@ static int sg_nr_dev;
 static int
 sg_open(struct inode *inode, struct file *filp)
 {
-	int dev = minor(inode->i_rdev);
+	int dev = iminor(inode);
 	int flags = filp->f_flags;
 	Sg_device *sdp;
 	Sg_fd *sfp;

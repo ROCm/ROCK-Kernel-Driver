@@ -42,7 +42,6 @@
 #include <linux/adb.h>
 #include <linux/pmu.h>
 #endif
-#include "ide_modes.h"
 
 extern void ide_do_request(ide_hwgroup_t *hwgroup, int masked_irq);
 
@@ -942,7 +941,7 @@ pmac_ide_build_sglist(ide_drive_t *drive, struct request *rq)
 	if (hwif->sg_dma_active)
 		BUG();
 		
-	nents = blk_rq_map_sg(&drive->queue, rq, sg);
+	nents = blk_rq_map_sg(drive->queue, rq, sg);
 		
 	if (rq_data_dir(rq) == READ)
 		pmif->sg_dma_direction = PCI_DMA_FROMDEVICE;

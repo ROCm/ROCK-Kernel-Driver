@@ -51,7 +51,7 @@ struct busmouse_data {
 
 #define NR_MICE			15
 #define FIRST_MOUSE		0
-#define DEV_TO_MOUSE(dev)	MINOR_TO_MOUSE(minor(dev))
+#define DEV_TO_MOUSE(inode)	MINOR_TO_MOUSE(iminor(inode))
 #define MINOR_TO_MOUSE(minor)	((minor) - FIRST_MOUSE)
 
 /*
@@ -190,7 +190,7 @@ static int busmouse_open(struct inode *inode, struct file *file)
 	unsigned int mousedev;
 	int ret;
 
-	mousedev = DEV_TO_MOUSE(inode->i_rdev);
+	mousedev = DEV_TO_MOUSE(inode);
 	if (mousedev >= NR_MICE)
 		return -EINVAL;
 
