@@ -165,10 +165,11 @@ acpi_ev_pci_config_region_setup (
 	void                            **region_context)
 {
 	acpi_status                     status = AE_OK;
-	acpi_integer                    temp;
+	acpi_integer                    pci_value;
 	struct acpi_pci_id              *pci_id = *region_context;
 	union acpi_operand_object       *handler_obj;
-	struct acpi_namespace_node      *node;
+	struct acpi_namespace_node      *parent_node;
+	struct acpi_namespace_node      *pci_root_node;
 	union acpi_operand_object       *region_obj = (union acpi_operand_object   *) handle;
 	struct acpi_device_id           object_hID;
 
@@ -176,7 +177,7 @@ acpi_ev_pci_config_region_setup (
 	ACPI_FUNCTION_TRACE ("ev_pci_config_region_setup");
 
 
-	handler_obj = region_obj->region.addr_handler;
+	handler_obj = region_obj->region.address_space;
 	if (!handler_obj) {
 		/*
 		 * No installed handler. This shouldn't happen because the dispatch
@@ -187,45 +188,15 @@ acpi_ev_pci_config_region_setup (
 		return_ACPI_STATUS (AE_NOT_EXIST);
 	}
 
+	*region_context = NULL;
 	if (function == ACPI_REGION_DEACTIVATE) {
 		if (pci_id) {
 			ACPI_MEM_FREE (pci_id);
-			*region_context = NULL;
 		}
-
 		return_ACPI_STATUS (status);
 	}
 
-	/* Create a new context */
-
-	pci_id = ACPI_MEM_CALLOCATE (sizeof (struct acpi_pci_id));
-	if (!pci_id) {
-		return_ACPI_STATUS (AE_NO_MEMORY);
-	}
-
-	/*
-	 * For PCI Config space access, we have to pass the segment, bus,
-	 * device and function numbers.  This routine must acquire those.
-	 */
-
-	/*
-	 * First get device and function numbers from the _ADR object
-	 * in the parent's scope.
-	 */
-	node = acpi_ns_get_parent_node (region_obj->region.node);
-
-	/* Evaluate the _ADR object */
-
-	status = acpi_ut_evaluate_numeric_object (METHOD_NAME__ADR, node, &temp);
-
-	/*
-	 * The default is zero, and since the allocation above zeroed
-	 * the data, just do nothing on failure.
-	 */
-	if (ACPI_SUCCESS (status)) {
-		pci_id->device  = ACPI_HIWORD (ACPI_LODWORD (temp));
-		pci_id->function = ACPI_LOWORD (ACPI_LODWORD (temp));
-	}
+	parent_node = acpi_ns_get_parent_node (region_obj->region.node);
 
 	/*
 	 * Get the _SEG and _BBN values from the device upon which the handler
@@ -236,16 +207,16 @@ acpi_ev_pci_config_region_setup (
 	 */
 
 	/*
-	 * If the addr_handler.Node is still pointing to the root, we need
+	 * If the address_space.Node is still pointing to the root, we need
 	 * to scan upward for a PCI Root bridge and re-associate the op_region
 	 * handlers with that device.
 	 */
-	if (handler_obj->addr_handler.node == acpi_gbl_root_node) {
-		/*
-		 * Node is currently the parent object
-		 */
-		while (node != acpi_gbl_root_node) {
-			status = acpi_ut_execute_HID (node, &object_hID);
+	if (handler_obj->address_space.node == acpi_gbl_root_node) {
+		/* Start search from the parent object */
+
+		pci_root_node = parent_node;
+		while (pci_root_node != acpi_gbl_root_node) {
+			status = acpi_ut_execute_HID (pci_root_node, &object_hID);
 			if (ACPI_SUCCESS (status)) {
 				/* Got a valid _HID, check if this is a PCI root */
 
@@ -253,44 +224,89 @@ acpi_ev_pci_config_region_setup (
 						   sizeof (PCI_ROOT_HID_STRING)))) {
 					/* Install a handler for this PCI root bridge */
 
-					status = acpi_install_address_space_handler ((acpi_handle) node,
+					status = acpi_install_address_space_handler ((acpi_handle) pci_root_node,
 							   ACPI_ADR_SPACE_PCI_CONFIG,
 							   ACPI_DEFAULT_HANDLER, NULL, NULL);
 					if (ACPI_FAILURE (status)) {
-						ACPI_REPORT_ERROR (("Could not install pci_config handler for %4.4s, %s\n",
-							node->name.ascii, acpi_format_exception (status)));
+						if (status == AE_SAME_HANDLER) {
+							/*
+							 * It is OK if the handler is already installed on the root
+							 * bridge.  Still need to return a context object for the
+							 * new PCI_Config operation region, however.
+							 */
+							status = AE_OK;
+						}
+						else {
+							ACPI_REPORT_ERROR ((
+								"Could not install pci_config handler for Root Bridge %4.4s, %s\n",
+								pci_root_node->name.ascii, acpi_format_exception (status)));
+						}
 					}
 					break;
 				}
 			}
 
-			node = acpi_ns_get_parent_node (node);
+			pci_root_node = acpi_ns_get_parent_node (pci_root_node);
 		}
+
+		/* PCI root bridge not found, use namespace root node */
 	}
 	else {
-		node = handler_obj->addr_handler.node;
+		pci_root_node = handler_obj->address_space.node;
 	}
 
 	/*
-	 * The PCI segment number comes from the _SEG method
+	 * If this region is now initialized, we are done.
+	 * (install_address_space_handler could have initialized it)
 	 */
-	status = acpi_ut_evaluate_numeric_object (METHOD_NAME__SEG, node, &temp);
+	if (region_obj->region.flags & AOPOBJ_SETUP_COMPLETE) {
+		return_ACPI_STATUS (AE_OK);
+	}
+
+	/* Region is still not initialized. Create a new context */
+
+	pci_id = ACPI_MEM_CALLOCATE (sizeof (struct acpi_pci_id));
+	if (!pci_id) {
+		return_ACPI_STATUS (AE_NO_MEMORY);
+	}
+
+	/*
+	 * For PCI_Config space access, we need the segment, bus,
+	 * device and function numbers.  Acquire them here.
+	 */
+
+	/*
+	 * Get the PCI device and function numbers from the _ADR object
+	 * contained in the parent's scope.
+	 */
+	status = acpi_ut_evaluate_numeric_object (METHOD_NAME__ADR, parent_node, &pci_value);
+
+	/*
+	 * The default is zero, and since the allocation above zeroed
+	 * the data, just do nothing on failure.
+	 */
 	if (ACPI_SUCCESS (status)) {
-		pci_id->segment = ACPI_LOWORD (temp);
+		pci_id->device  = ACPI_HIWORD (ACPI_LODWORD (pci_value));
+		pci_id->function = ACPI_LOWORD (ACPI_LODWORD (pci_value));
 	}
 
-	/*
-	 * The PCI bus number comes from the _BBN method
-	 */
-	status = acpi_ut_evaluate_numeric_object (METHOD_NAME__BBN, node, &temp);
+	/* The PCI segment number comes from the _SEG method */
+
+	status = acpi_ut_evaluate_numeric_object (METHOD_NAME__SEG, pci_root_node, &pci_value);
 	if (ACPI_SUCCESS (status)) {
-		pci_id->bus = ACPI_LOWORD (temp);
+		pci_id->segment = ACPI_LOWORD (pci_value);
 	}
 
-	/*
-	 * Complete this device's pci_id
-	 */
-	acpi_os_derive_pci_id (node, region_obj->region.node, &pci_id);
+	/* The PCI bus number comes from the _BBN method */
+
+	status = acpi_ut_evaluate_numeric_object (METHOD_NAME__BBN, pci_root_node, &pci_value);
+	if (ACPI_SUCCESS (status)) {
+		pci_id->bus = ACPI_LOWORD (pci_value);
+	}
+
+	/* Complete this device's pci_id */
+
+	acpi_os_derive_pci_id (pci_root_node, region_obj->region.node, &pci_id);
 
 	*region_context = pci_id;
 	return_ACPI_STATUS (AE_OK);
@@ -451,14 +467,15 @@ acpi_ev_initialize_region (
 	node = acpi_ns_get_parent_node (region_obj->region.node);
 	space_id = region_obj->region.space_id;
 
-	region_obj->region.addr_handler = NULL;
+	/* Setup defaults */
+
+	region_obj->region.address_space = NULL;
 	region_obj2->extra.method_REG = NULL;
 	region_obj->common.flags &= ~(AOPOBJ_SETUP_COMPLETE);
 	region_obj->common.flags |= AOPOBJ_OBJECT_INITIALIZED;
 
-	/*
-	 * Find any "_REG" method associated with this region definition
-	 */
+	/* Find any "_REG" method associated with this region definition */
+
 	status = acpi_ns_search_node (*reg_name_ptr, node,
 			  ACPI_TYPE_METHOD, &method_node);
 	if (ACPI_SUCCESS (status)) {
@@ -475,29 +492,27 @@ acpi_ev_initialize_region (
 	 * ie: acpi_gbl_root_node->parent_entry being set to NULL
 	 */
 	while (node) {
-		/*
-		 * Check to see if a handler exists
-		 */
+		/* Check to see if a handler exists */
+
 		handler_obj = NULL;
 		obj_desc = acpi_ns_get_attached_object (node);
 		if (obj_desc) {
-			/*
-			 * Can only be a handler if the object exists
-			 */
+			/* Can only be a handler if the object exists */
+
 			switch (node->type) {
 			case ACPI_TYPE_DEVICE:
 
-				handler_obj = obj_desc->device.addr_handler;
+				handler_obj = obj_desc->device.address_space;
 				break;
 
 			case ACPI_TYPE_PROCESSOR:
 
-				handler_obj = obj_desc->processor.addr_handler;
+				handler_obj = obj_desc->processor.address_space;
 				break;
 
 			case ACPI_TYPE_THERMAL:
 
-				handler_obj = obj_desc->thermal_zone.addr_handler;
+				handler_obj = obj_desc->thermal_zone.address_space;
 				break;
 
 			default:
@@ -508,7 +523,7 @@ acpi_ev_initialize_region (
 			while (handler_obj) {
 				/* Is this handler of the correct type? */
 
-				if (handler_obj->addr_handler.space_id == space_id) {
+				if (handler_obj->address_space.space_id == space_id) {
 					/* Found correct handler */
 
 					ACPI_DEBUG_PRINT ((ACPI_DB_OPREGION,
@@ -523,7 +538,7 @@ acpi_ev_initialize_region (
 
 				/* Try next handler in the list */
 
-				handler_obj = handler_obj->addr_handler.next;
+				handler_obj = handler_obj->address_space.next;
 			}
 		}
 
@@ -534,9 +549,8 @@ acpi_ev_initialize_region (
 		node = acpi_ns_get_parent_node (node);
 	}
 
-	/*
-	 * If we get here, there is no handler for this region
-	 */
+	/* If we get here, there is no handler for this region */
+
 	ACPI_DEBUG_PRINT ((ACPI_DB_OPREGION,
 		"No handler for region_type %s(%X) (region_obj %p)\n",
 		acpi_ut_get_region_name (space_id), space_id, region_obj));

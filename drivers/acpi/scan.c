@@ -69,7 +69,7 @@ static void acpi_device_register(struct acpi_device * device, struct acpi_device
 		device->kobj.parent = &parent->kobj;
 	device->kobj.ktype = &ktype_acpi_ns;
 	device->kobj.kset = &acpi_namespace_kset;
-	kobject_register(&device->kobj);
+	kobject_add(&device->kobj);
 }
 
 static int
