@@ -232,4 +232,4 @@ static int __init sa1100_dram_init(void)
 	return ret;
 }
 
-core_initcall(sa1100_dram_init);
+arch_initcall(sa1100_dram_init);

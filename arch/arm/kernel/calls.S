@@ -10,7 +10,7 @@
  *  This file is included twice in entry-common.S
  */
 #ifndef NR_syscalls
-#define NR_syscalls 256
+#define NR_syscalls 288
 #else
 
 __syscall_start:
@@ -253,6 +253,24 @@ __syscall_start:
 		.long	sys_lremovexattr
 		.long	sys_fremovexattr
 		.long	sys_tkill
+		.long	sys_sendfile64
+/* 240 */	.long	sys_futex
+		.long	sys_sched_setaffinity
+		.long	sys_sched_getaffinity
+		.long	sys_io_setup
+		.long	sys_io_destroy
+/* 245 */	.long	sys_io_getevents
+		.long	sys_io_submit
+		.long	sys_io_cancel
+		.long	sys_exit_group
+		.long	sys_lookup_dcookie
+/* 250 */	.long	sys_epoll_create
+		.long	sys_epoll_ctl
+		.long	sys_epoll_wait
+	 	.long	sys_remap_file_pages
+		.long	sys_ni_syscall	/* sys_set_thread_area */
+/* 255 */	.long	sys_ni_syscall	/* sys_get_thread_area */
+ 		.long	sys_ni_syscall	/* sys_set_tid_address */
 __syscall_end:
 
 		.rept	NR_syscalls - (__syscall_end - __syscall_start) / 4

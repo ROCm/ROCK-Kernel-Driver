@@ -1,7 +1,7 @@
 /*
  *  linux/include/asm-arm/unistd.h
  *
- *  Copyright (C) 2001 Russell King
+ *  Copyright (C) 2001-2003 Russell King
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -32,7 +32,7 @@
 #define __NR_write			(__NR_SYSCALL_BASE+  4)
 #define __NR_open			(__NR_SYSCALL_BASE+  5)
 #define __NR_close			(__NR_SYSCALL_BASE+  6)
-#define __NR_waitpid			(__NR_SYSCALL_BASE+  7)
+#define __NR_waitpid			(__NR_SYSCALL_BASE+  7)	/* removed */
 #define __NR_creat			(__NR_SYSCALL_BASE+  8)
 #define __NR_link			(__NR_SYSCALL_BASE+  9)
 #define __NR_unlink			(__NR_SYSCALL_BASE+ 10)
@@ -42,8 +42,8 @@
 #define __NR_mknod			(__NR_SYSCALL_BASE+ 14)
 #define __NR_chmod			(__NR_SYSCALL_BASE+ 15)
 #define __NR_lchown			(__NR_SYSCALL_BASE+ 16)
-#define __NR_break			(__NR_SYSCALL_BASE+ 17)
-
+#define __NR_break			(__NR_SYSCALL_BASE+ 17)	/* removed */
+					/* 18 was sys_stat */
 #define __NR_lseek			(__NR_SYSCALL_BASE+ 19)
 #define __NR_getpid			(__NR_SYSCALL_BASE+ 20)
 #define __NR_mount			(__NR_SYSCALL_BASE+ 21)
@@ -56,11 +56,11 @@
 
 #define __NR_pause			(__NR_SYSCALL_BASE+ 29)
 #define __NR_utime			(__NR_SYSCALL_BASE+ 30)
-#define __NR_stty			(__NR_SYSCALL_BASE+ 31)
-#define __NR_gtty			(__NR_SYSCALL_BASE+ 32)
+#define __NR_stty			(__NR_SYSCALL_BASE+ 31)	/* removed */
+#define __NR_gtty			(__NR_SYSCALL_BASE+ 32)	/* removed */
 #define __NR_access			(__NR_SYSCALL_BASE+ 33)
 #define __NR_nice			(__NR_SYSCALL_BASE+ 34)
-#define __NR_ftime			(__NR_SYSCALL_BASE+ 35)
+#define __NR_ftime			(__NR_SYSCALL_BASE+ 35)	/* removed */
 #define __NR_sync			(__NR_SYSCALL_BASE+ 36)
 #define __NR_kill			(__NR_SYSCALL_BASE+ 37)
 #define __NR_rename			(__NR_SYSCALL_BASE+ 38)
@@ -69,22 +69,22 @@
 #define __NR_dup			(__NR_SYSCALL_BASE+ 41)
 #define __NR_pipe			(__NR_SYSCALL_BASE+ 42)
 #define __NR_times			(__NR_SYSCALL_BASE+ 43)
-#define __NR_prof			(__NR_SYSCALL_BASE+ 44)
+#define __NR_prof			(__NR_SYSCALL_BASE+ 44)	/* removed */
 #define __NR_brk			(__NR_SYSCALL_BASE+ 45)
 #define __NR_setgid			(__NR_SYSCALL_BASE+ 46)
 #define __NR_getgid			(__NR_SYSCALL_BASE+ 47)
-#define __NR_signal			(__NR_SYSCALL_BASE+ 48)
+#define __NR_signal			(__NR_SYSCALL_BASE+ 48)	/* removed */
 #define __NR_geteuid			(__NR_SYSCALL_BASE+ 49)
 #define __NR_getegid			(__NR_SYSCALL_BASE+ 50)
 #define __NR_acct			(__NR_SYSCALL_BASE+ 51)
 #define __NR_umount2			(__NR_SYSCALL_BASE+ 52)
-#define __NR_lock			(__NR_SYSCALL_BASE+ 53)
+#define __NR_lock			(__NR_SYSCALL_BASE+ 53)	/* removed */
 #define __NR_ioctl			(__NR_SYSCALL_BASE+ 54)
 #define __NR_fcntl			(__NR_SYSCALL_BASE+ 55)
-#define __NR_mpx			(__NR_SYSCALL_BASE+ 56)
+#define __NR_mpx			(__NR_SYSCALL_BASE+ 56)	/* removed */
 #define __NR_setpgid			(__NR_SYSCALL_BASE+ 57)
-#define __NR_ulimit			(__NR_SYSCALL_BASE+ 58)
-
+#define __NR_ulimit			(__NR_SYSCALL_BASE+ 58)	/* removed */
+					/* 59 was sys_olduname */
 #define __NR_umask			(__NR_SYSCALL_BASE+ 60)
 #define __NR_chroot			(__NR_SYSCALL_BASE+ 61)
 #define __NR_ustat			(__NR_SYSCALL_BASE+ 62)
@@ -93,8 +93,8 @@
 #define __NR_getpgrp			(__NR_SYSCALL_BASE+ 65)
 #define __NR_setsid			(__NR_SYSCALL_BASE+ 66)
 #define __NR_sigaction			(__NR_SYSCALL_BASE+ 67)
-#define __NR_sgetmask			(__NR_SYSCALL_BASE+ 68)
-#define __NR_ssetmask			(__NR_SYSCALL_BASE+ 69)
+#define __NR_sgetmask			(__NR_SYSCALL_BASE+ 68)	/* removed */
+#define __NR_ssetmask			(__NR_SYSCALL_BASE+ 69)	/* removed */
 #define __NR_setreuid			(__NR_SYSCALL_BASE+ 70)
 #define __NR_setregid			(__NR_SYSCALL_BASE+ 71)
 #define __NR_sigsuspend			(__NR_SYSCALL_BASE+ 72)
@@ -109,7 +109,7 @@
 #define __NR_setgroups			(__NR_SYSCALL_BASE+ 81)
 #define __NR_select			(__NR_SYSCALL_BASE+ 82)
 #define __NR_symlink			(__NR_SYSCALL_BASE+ 83)
-
+					/* 84 was sys_lstat */
 #define __NR_readlink			(__NR_SYSCALL_BASE+ 85)
 #define __NR_uselib			(__NR_SYSCALL_BASE+ 86)
 #define __NR_swapon			(__NR_SYSCALL_BASE+ 87)
@@ -123,7 +123,7 @@
 #define __NR_fchown			(__NR_SYSCALL_BASE+ 95)
 #define __NR_getpriority		(__NR_SYSCALL_BASE+ 96)
 #define __NR_setpriority		(__NR_SYSCALL_BASE+ 97)
-#define __NR_profil			(__NR_SYSCALL_BASE+ 98)
+#define __NR_profil			(__NR_SYSCALL_BASE+ 98)	/* removed */
 #define __NR_statfs			(__NR_SYSCALL_BASE+ 99)
 #define __NR_fstatfs			(__NR_SYSCALL_BASE+100)
 #define __NR_ioperm			(__NR_SYSCALL_BASE+101)
@@ -134,8 +134,8 @@
 #define __NR_stat			(__NR_SYSCALL_BASE+106)
 #define __NR_lstat			(__NR_SYSCALL_BASE+107)
 #define __NR_fstat			(__NR_SYSCALL_BASE+108)
-
-
+					/* 109 was sys_uname */
+					/* 110 was sys_iopl */
 #define __NR_vhangup			(__NR_SYSCALL_BASE+111)
 #define __NR_idle			(__NR_SYSCALL_BASE+112)
 #define __NR_syscall			(__NR_SYSCALL_BASE+113) /* syscall to call a syscall! */
@@ -152,10 +152,10 @@
 #define __NR_adjtimex			(__NR_SYSCALL_BASE+124)
 #define __NR_mprotect			(__NR_SYSCALL_BASE+125)
 #define __NR_sigprocmask		(__NR_SYSCALL_BASE+126)
-#define __NR_create_module		(__NR_SYSCALL_BASE+127)
+#define __NR_create_module		(__NR_SYSCALL_BASE+127)	/* removed */
 #define __NR_init_module		(__NR_SYSCALL_BASE+128)
 #define __NR_delete_module		(__NR_SYSCALL_BASE+129)
-#define __NR_get_kernel_syms		(__NR_SYSCALL_BASE+130)
+#define __NR_get_kernel_syms		(__NR_SYSCALL_BASE+130)	/* removed */
 #define __NR_quotactl			(__NR_SYSCALL_BASE+131)
 #define __NR_getpgid			(__NR_SYSCALL_BASE+132)
 #define __NR_fchdir			(__NR_SYSCALL_BASE+133)
@@ -191,8 +191,8 @@
 #define __NR_mremap			(__NR_SYSCALL_BASE+163)
 #define __NR_setresuid			(__NR_SYSCALL_BASE+164)
 #define __NR_getresuid			(__NR_SYSCALL_BASE+165)
-#define __NR_vm86			(__NR_SYSCALL_BASE+166)
-#define __NR_query_module		(__NR_SYSCALL_BASE+167)
+#define __NR_vm86			(__NR_SYSCALL_BASE+166)	/* removed */
+#define __NR_query_module		(__NR_SYSCALL_BASE+167)	/* removed */
 #define __NR_poll			(__NR_SYSCALL_BASE+168)
 #define __NR_nfsservctl			(__NR_SYSCALL_BASE+169)
 #define __NR_setresgid			(__NR_SYSCALL_BASE+170)
@@ -264,6 +264,24 @@
 #define __NR_lremovexattr		(__NR_SYSCALL_BASE+236)
 #define __NR_fremovexattr		(__NR_SYSCALL_BASE+237)
 #define __NR_tkill			(__NR_SYSCALL_BASE+238)
+#define __NR_sendfile64			(__NR_SYSCALL_BASE+239)
+#define __NR_futex			(__NR_SYSCALL_BASE+240)
+#define __NR_sched_setaffinity		(__NR_SYSCALL_BASE+241)
+#define __NR_sched_getaffinity		(__NR_SYSCALL_BASE+242)
+#define __NR_io_setup			(__NR_SYSCALL_BASE+243)
+#define __NR_io_destroy			(__NR_SYSCALL_BASE+244)
+#define __NR_io_getevents		(__NR_SYSCALL_BASE+245)
+#define __NR_io_submit			(__NR_SYSCALL_BASE+246)
+#define __NR_io_cancel			(__NR_SYSCALL_BASE+247)
+#define __NR_exit_group			(__NR_SYSCALL_BASE+248)
+#define __NR_lookup_dcookie		(__NR_SYSCALL_BASE+249)
+#define __NR_epoll_create		(__NR_SYSCALL_BASE+250)
+#define __NR_epoll_ctl			(__NR_SYSCALL_BASE+251)
+#define __NR_epoll_wait			(__NR_SYSCALL_BASE+252)
+#define __NR_remap_file_pages		(__NR_SYSCALL_BASE+253)
+					/* 254 for set_thread_area */
+					/* 255 for get_thread_area */
+					/* 256 for set_tid_address */
 
 /*
  * The following SWIs are ARM private.

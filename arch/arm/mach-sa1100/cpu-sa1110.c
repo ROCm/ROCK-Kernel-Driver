@@ -345,4 +345,4 @@ static int __init sa1110_clk_init(void)
 	return 0;
 }
 
-core_initcall(sa1110_clk_init);
+arch_initcall(sa1110_clk_init);
