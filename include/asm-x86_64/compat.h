@@ -128,4 +128,10 @@ static inline void *compat_ptr(compat_uptr_t uptr)
 	return (void *)(unsigned long)uptr;
 }
 
+static __inline__ void *compat_alloc_user_space(long len)
+{
+	struct pt_regs *regs = (void *)current->thread.rsp0 - sizeof(struct pt_regs); 
+	return (void *)regs->rsp - len; 
+}
+
 #endif /* _ASM_X86_64_COMPAT_H */

@@ -389,30 +389,20 @@ static int do_set_attach_filter(int fd, int level, int optname,
 				char *optval, int optlen)
 {
 	struct compat_sock_fprog *fprog32 = (struct compat_sock_fprog *)optval;
-	struct sock_fprog kfprog;
-	mm_segment_t old_fs;
-	int ret;
+	struct sock_fprog *kfprog = compat_alloc_user_space(sizeof(struct sock_fprog)); 
 	compat_uptr_t ptr;
+	u16 len;
 
 	if (!access_ok(VERIFY_READ, fprog32, sizeof(*fprog32)) ||
-	    __get_user(kfprog.len, &fprog32->len) ||
-	    __get_user(ptr, &fprog32->filter))
-		return -EFAULT;
-	kfprog.filter = compat_ptr(ptr);	
-
-	if (kfprog.len * sizeof(struct sock_filter) < kfprog.len) 
-		return -EINVAL;
-
-	if (verify_area(VERIFY_READ, kfprog.filter, 
-				    kfprog.len * sizeof(struct sock_filter)))
+	    !access_ok(VERIFY_WRITE, kfprog, sizeof(struct sock_fprog)) ||
+	    __get_user(len, &fprog32->len) ||
+	    __get_user(ptr, &fprog32->filter) ||
+	    __put_user(len, &kfprog->len) ||
+	    __put_user(compat_ptr(ptr), &kfprog->filter))
 		return -EFAULT;
 
-	old_fs = get_fs();
-	set_fs(KERNEL_DS);
-	ret = sys_setsockopt(fd, level, optname,
-			     (char *)&kfprog, sizeof(kfprog));
-	set_fs(old_fs);
-	return ret;
+	return sys_setsockopt(fd, level, optname, (char *)kfprog, 
+			      sizeof(struct sock_fprog));
 }
 
 static int do_set_icmpv6_filter(int fd, int level, int optname,

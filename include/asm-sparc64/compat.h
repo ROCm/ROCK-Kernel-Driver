@@ -120,4 +120,15 @@ static inline void *compat_ptr(compat_uptr_t uptr)
 	return (void *)(unsigned long)uptr;
 }
 
+static __inline__ void *compat_alloc_user_space(long len)
+{
+	struct pt_regs *regs = current_thread_info()->kregs;
+	unsigned long usp = regs->u_regs[UREG_I6];
+
+	if (!(test_thread_flag(TIF_32BIT)))
+		usp += STACK_BIAS;
+
+	return (void *) (usp - len);
+}
+
 #endif /* _ASM_SPARC64_COMPAT_H */
