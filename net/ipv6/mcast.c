@@ -60,7 +60,7 @@
 #include <net/addrconf.h>
 #include <net/ip6_route.h>
 
-#include <net/checksum.h>
+#include <net/ip6_checksum.h>
 
 /* Set to 3 to get tracing... */
 #define MCAST_DEBUG 2

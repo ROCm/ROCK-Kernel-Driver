@@ -37,7 +37,7 @@
 #include <net/snmp.h>
 #endif
 
-#include <net/sock.h>	/* struct sock */
+struct sock;
 
 struct inet_skb_parm
 {

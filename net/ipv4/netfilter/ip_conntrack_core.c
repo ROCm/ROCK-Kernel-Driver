@@ -28,6 +28,7 @@
 #include <linux/proc_fs.h>
 #include <linux/vmalloc.h>
 #include <net/checksum.h>
+#include <net/ip.h>
 #include <linux/stddef.h>
 #include <linux/sysctl.h>
 #include <linux/slab.h>

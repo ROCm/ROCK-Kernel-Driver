@@ -77,7 +77,7 @@
 #include <net/icmp.h>
 
 #include <net/flow.h>
-#include <net/checksum.h>
+#include <net/ip6_checksum.h>
 #include <linux/proc_fs.h>
 
 #include <linux/netfilter.h>

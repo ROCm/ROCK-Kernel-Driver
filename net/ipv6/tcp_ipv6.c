@@ -51,6 +51,7 @@
 #include <net/transp_v6.h>
 #include <net/addrconf.h>
 #include <net/ip6_route.h>
+#include <net/ip6_checksum.h>
 #include <net/inet_ecn.h>
 #include <net/protocol.h>
 #include <net/xfrm.h>
