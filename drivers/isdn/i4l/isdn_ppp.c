@@ -14,6 +14,7 @@
 #include <linux/smp_lock.h>
 #include <linux/poll.h>
 #include <linux/ppp-comp.h>
+#include <linux/if_arp.h>
 
 #include "isdn_common.h"
 #include "isdn_ppp.h"
@@ -2900,4 +2901,13 @@ static int isdn_ppp_set_compressor(struct ippp_struct *is, struct isdn_ppp_comp_
 		ipc = ipc->next;
 	}
 	return -EINVAL;
+}
+
+int isdn_ppp_setup_dev(isdn_net_dev *p)
+{
+	p->dev.type = ARPHRD_PPP;	/* change ARP type */
+	p->dev.addr_len = 0;
+	p->dev.do_ioctl = isdn_ppp_dev_ioctl;
+
+	return 0;
 }

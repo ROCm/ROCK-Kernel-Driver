@@ -106,3 +106,39 @@ struct concap_proto * isdn_concap_new( int encap )
 	}
 	return NULL;
 }
+
+void isdn_x25_encap_changed(isdn_net_dev *p, isdn_net_ioctl_cfg *cfg)
+{
+	isdn_net_local *lp = &p->local;
+	struct concap_proto * cprot = p -> cprot;
+	unsigned long flags;
+	
+	/* delete old encapsulation protocol if present ... */
+	save_flags(flags);
+	cli(); /* avoid races with incoming events trying to
+		  call cprot->pops methods */
+	if( cprot && cprot -> pops )
+		cprot -> pops -> proto_del ( cprot );
+	p -> cprot = NULL;
+	lp -> dops = NULL;
+	restore_flags(flags);
+	/* ... ,  prepare for configuration of new one ... */
+	switch ( cfg -> p_encap ){
+	case ISDN_NET_ENCAP_X25IFACE:
+		lp -> dops = &isdn_concap_reliable_dl_dops;
+	}
+	/* ... and allocate new one ... */
+	p -> cprot = isdn_concap_new( cfg -> p_encap );
+	/* p -> cprot == NULL now if p_encap is not supported
+	   by means of the concap_proto mechanism */
+	/* the protocol is not configured yet; this will
+	   happen later when isdn_net_reset() is called */
+}
+
+int isdn_x25_setup_dev(isdn_net_dev *p)
+{
+	p->dev.type = ARPHRD_X25;	/* change ARP type */
+	p->dev.addr_len = 0;
+
+	return 0;
+}

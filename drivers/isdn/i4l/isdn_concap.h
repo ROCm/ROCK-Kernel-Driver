@@ -9,6 +9,27 @@
 
 extern struct concap_device_ops isdn_concap_reliable_dl_dops;
 extern struct concap_device_ops isdn_concap_demand_dial_dops;
-extern struct concap_proto * isdn_concap_new( int );
+
+struct concap_proto *isdn_concap_new(int);
+
+#ifdef CONFIG_ISDN_X25
+
+void isdn_x25_encap_changed(isdn_net_dev *p, isdn_net_ioctl_cfg *cfg);
+int  isdn_x25_setup_dev(isdn_net_dev *p);
+
+#else
+
+static inline void
+isdn_x25_encap_changed(isdn_net_dev *p, isdn_net_ioctl_cfg *cfg)
+{
+}
+
+static inline int 
+isdn_x25_setup_dev(isdn_net_dev *p)
+{
+	printk(KERN_WARNING "ISDN: SyncPPP support not configured\n");
+	return -EINVAL;
+}
 
 
+#endif
