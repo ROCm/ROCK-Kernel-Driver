@@ -117,7 +117,10 @@ int platform_device_register(struct platform_device * pdev)
 
 	pdev->dev.bus = &platform_bus_type;
 	
-	snprintf(pdev->dev.bus_id,BUS_ID_SIZE,"%s%u",pdev->name,pdev->id);
+	if (pdev->id != -1)
+		snprintf(pdev->dev.bus_id, BUS_ID_SIZE, "%s%u", pdev->name, pdev->id);
+	else
+		strlcpy(pdev->dev.bus_id, pdev->name, BUS_ID_SIZE);
 
 	pr_debug("Registering platform device '%s'. Parent at %s\n",
 		 pdev->dev.bus_id,pdev->dev.parent->bus_id);
