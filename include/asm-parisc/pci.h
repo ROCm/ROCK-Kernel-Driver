@@ -16,28 +16,6 @@
 */
 #define PCI_MAX_BUSSES	256
 
-/* [soapbox on]
-** Who the hell can develop stuff without ASSERT or VASSERT?
-** No one understands all the modules across all platforms.
-** For linux add another dimension - processor architectures.
-**
-** This should be a standard/global macro used liberally
-** in all code. Every respectable engineer I know in HP
-** would support this argument. - grant
-** [soapbox off]
-*/
-#ifdef PCI_DEBUG
-#define ASSERT(expr) \
-	if(!(expr)) { \
-		printk("\n%s:%d: Assertion " #expr " failed!\n", \
-		       __FILE__, __LINE__); \
-		panic(#expr); \
-	}
-#else
-#define ASSERT(expr)
-#endif
-
-
 /*
 ** pci_hba_data (aka H2P_OBJECT in HP/UX)
 **

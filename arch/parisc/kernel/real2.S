@@ -12,8 +12,12 @@
 
 	.section	.bss
 	.export real_stack
+	.export real32_stack
+	.export real64_stack
 	.align	64
 real_stack:
+real32_stack:
+real64_stack:
 	.block	8192
 
 #ifdef __LP64__

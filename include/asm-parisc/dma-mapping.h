@@ -4,6 +4,7 @@
 #include <linux/mm.h>
 #include <linux/config.h>
 #include <asm/cacheflush.h>
+#include <asm/scatterlist.h>
 
 /* See Documentation/DMA-mapping.txt */
 struct hppa_dma_ops {

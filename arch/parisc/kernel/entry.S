@@ -455,20 +455,28 @@
 	/* Look up a PTE in a 2-Level scheme (faulting at each
 	 * level if the entry isn't present 
 	 *
-	 * NOTE: we use ldw even for LP64 because our pte
-	 * and pmd are allocated <4GB */
+	 * NOTE: we use ldw even for LP64, since the short pointers
+	 * can address up to 1TB
+	 */
 	.macro		L2_ptep	pmd,pte,index,va,fault
 #if PT_NLEVELS == 3
 	EXTR		\va,31-ASM_PMD_SHIFT,ASM_BITS_PER_PMD,\index
 #else
 	EXTR		\va,31-ASM_PGDIR_SHIFT,ASM_BITS_PER_PGD,\index
 #endif
-	DEP		%r0,31,PAGE_SHIFT,\pmd	/* clear offset */
+	DEP             %r0,31,PAGE_SHIFT,\pmd  /* clear offset */
 	copy		%r0,\pte
 	ldw,s		\index(\pmd),\pmd
+	bb,>=,n		\pmd,_PxD_PRESENT_BIT,\fault
+	DEP		%r0,31,PxD_FLAG_SHIFT,\pmd /* clear flags */
+	copy		\pmd,%r9
+#ifdef __LP64__
+	shld		%r9,PxD_VALUE_SHIFT,\pmd
+#else
+	shlw		%r9,PxD_VALUE_SHIFT,\pmd
+#endif
 	EXTR		\va,31-PAGE_SHIFT,ASM_BITS_PER_PTE,\index
-	bb,>=,n		\pmd,_PAGE_PRESENT_BIT,\fault
-	DEP		%r0,31,PAGE_SHIFT,\pmd	/* clear offset */
+	DEP		%r0,31,PAGE_SHIFT,\pmd  /* clear offset */
 	shladd		\index,BITS_PER_PTE_ENTRY,\pmd,\pmd
 	LDREG		%r0(\pmd),\pte		/* pmd is now pte */
 	bb,>=,n		\pte,_PAGE_PRESENT_BIT,\fault
@@ -489,10 +497,14 @@
 	copy		%r0,\pte
 	extrd,u,*=	\va,31,32,%r0
 	ldw,s		\index(\pgd),\pgd
+	extrd,u,*=	\va,31,32,%r0
+	bb,>=,n		\pgd,_PxD_PRESENT_BIT,\fault
+	extrd,u,*=	\va,31,32,%r0
+	shld		\pgd,PxD_VALUE_SHIFT,\index
+	extrd,u,*=	\va,31,32,%r0
+	copy		\index,\pgd
 	extrd,u,*<>	\va,31,32,%r0
 	ldo		ASM_PGD_PMD_OFFSET(\pgd),\pgd
-	extrd,u,*=	\va,31,32,%r0
-	bb,>=,n		\pgd,_PAGE_PRESENT_BIT,\fault
 	L2_ptep		\pgd,\pte,\index,\va,\fault
 	.endm
 
@@ -507,7 +519,7 @@
 
 	/* Set the dirty bit (and accessed bit).  No need to be
 	 * clever, this is only used from the dirty fault */
-	.macro		update_dirty	ptep,pte,tmp,tmp1
+	.macro		update_dirty	ptep,pte,tmp
 	ldi		_PAGE_ACCESSED|_PAGE_DIRTY,\tmp
 	or		\tmp,\pte,\pte
 	STREG		\pte,0(\ptep)
@@ -783,7 +795,7 @@ __kernel_thread:
 ret_from_kernel_thread:
 
 	/* Call schedule_tail first though */
-	bl	schedule_tail, %r2
+	BL	schedule_tail, %r2
 	nop
 
 	LDREG	TI_TASK-THREAD_SZ_ALGN(%r30), %r1
@@ -1441,14 +1453,14 @@ nadtlb_emulate:
 	and             %r9,%r16,%r17
 	cmpb,<>,n       %r16,%r17,nadtlb_fault /* Not fdc,fic,pdc */
 	bb,>=,n         %r9,26,nadtlb_nullify  /* m bit not set, just nullify */
-	b,l             get_register,%r25
+	BL		get_register,%r25
 	extrw,u         %r9,15,5,%r8           /* Get index register # */
 	CMPIB=,n        -1,%r1,nadtlb_fault    /* have to use slow path */
 	copy            %r1,%r24
-	b,l             get_register,%r25
+	BL		get_register,%r25
 	extrw,u         %r9,10,5,%r8           /* Get base register # */
 	CMPIB=,n        -1,%r1,nadtlb_fault    /* have to use slow path */
-	b,l             set_register,%r25
+	BL		set_register,%r25
 	add,l           %r1,%r24,%r1           /* doesn't affect c/b bits */
 
 nadtlb_nullify:
@@ -1548,7 +1560,7 @@ dbit_spin_20w:
 
 dbit_nolock_20w:
 #endif
-	update_dirty	ptp,pte,t0,t1
+	update_dirty	ptp,pte,t1
 
 	make_insert_tlb	spc,pte,prot
 		
@@ -1585,7 +1597,7 @@ dbit_spin_11:
 
 dbit_nolock_11:
 #endif
-	update_dirty	ptp,pte,t0,t1
+	update_dirty	ptp,pte,t1
 
 	make_insert_tlb_11	spc,pte,prot
 
@@ -1626,11 +1638,11 @@ dbit_spin_20:
 
 dbit_nolock_20:
 #endif
-	update_dirty	ptp,pte,t0,t1
+	update_dirty	ptp,pte,t1
 
 	make_insert_tlb	spc,pte,prot
 
-	f_extend	pte,t0
+	f_extend	pte,t1
 	
         idtlbt          pte,prot
 

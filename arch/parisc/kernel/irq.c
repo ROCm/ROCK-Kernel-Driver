@@ -121,12 +121,6 @@ struct irqaction cpu_irq_actions[IRQ_PER_REGION] = {
 #endif
 };
 
-struct irq_region_ops cpu_irq_ops = {
-	.disable_irq	= disable_cpu_irq,
-	.enable_irq	= enable_cpu_irq,
-	.mask_irq	= unmask_cpu_irq,
-	.unmask_irq	= unmask_cpu_irq
-};
 
 struct irq_region cpu0_irq_region = {
 	.ops	= {
@@ -200,8 +194,8 @@ void enable_irq(int irq)
 {
 	struct irq_region *region;
 
-	DBG_IRQ(irq, ("enable_irq(%d) %d+%d eiem 0x%lx\n", irq,
-				IRQ_REGION(irq), IRQ_OFFSET(irq), cpu_eiem));
+	DBG_IRQ(irq, ("enable_irq(%d) %d+%d EIRR 0x%lx EIEM 0x%lx\n", irq,
+				IRQ_REGION(irq), IRQ_OFFSET(irq), mfctl(23), mfctl(15)));
 	irq = irq_canonicalize(irq);
 	region = irq_region[IRQ_REGION(irq)];
 
@@ -221,8 +215,9 @@ int show_interrupts(struct seq_file *p, void *v)
 		seq_puts(p, "     ");
 #ifdef CONFIG_SMP
 		for (i = 0; i < NR_CPUS; i++)
+			if (cpu_online(i))
 #endif
-			seq_printf(p, "      CPU%02d ", i);
+				seq_printf(p, "      CPU%02d ", i);
 
 #ifdef PARISC_IRQ_CR16_COUNTS
 		seq_printf(p, "[min/avg/max] (CPU cycle counts)");
@@ -250,6 +245,7 @@ int show_interrupts(struct seq_file *p, void *v)
 		seq_printf(p, "%3d: ", irq_no);
 #ifdef CONFIG_SMP
 		for (; j < NR_CPUS; j++)
+			if (cpu_online(j))
 #endif
 		  seq_printf(p, "%10u ", kstat_cpu(j).irqs[irq_no]);
 
@@ -338,7 +334,8 @@ txn_alloc_addr(int virt_irq)
 	next_cpu++; /* assign to "next" CPU we want this bugger on */
 
 	/* validate entry */
-	while ((next_cpu < NR_CPUS) && !cpu_data[next_cpu].txn_addr)
+	while ((next_cpu < NR_CPUS) && (!cpu_data[next_cpu].txn_addr || 
+		!cpu_online(next_cpu)))
 		next_cpu++;
 
 	if (next_cpu >= NR_CPUS) 
@@ -390,7 +387,7 @@ void do_irq(struct irqaction *action, int irq, struct pt_regs * regs)
 	irq_enter();
 	++kstat_cpu(cpu).irqs[irq];
 
-	DBG_IRQ(irq, ("do_irq(%d) %d+%d\n", irq, IRQ_REGION(irq), IRQ_OFFSET(irq)));
+	DBG_IRQ(irq, ("do_irq(%d) %d+%d eiem 0x%lx\n", irq, IRQ_REGION(irq), IRQ_OFFSET(irq), cpu_eiem));
 
 	for (; action; action = action->next) {
 #ifdef PARISC_IRQ_CR16_COUNTS
@@ -460,7 +457,7 @@ void do_cpu_irq_mask(struct pt_regs *regs)
 
 #ifdef DEBUG_IRQ
 		if (eirr_val != (1UL << MAX_CPU_IRQ))
-			printk(KERN_DEBUG "do_cpu_irq_mask  %x\n", eirr_val);
+			printk(KERN_DEBUG "do_cpu_irq_mask  0x%x & 0x%x\n", eirr_val, cpu_eiem);
 #endif
 
 		/* Work our way from MSb to LSb...same order we alloc EIRs */
@@ -865,7 +862,7 @@ EXPORT_SYMBOL(probe_irq_mask);
 void __init init_IRQ(void)
 {
 	local_irq_disable();	/* PARANOID - should already be disabled */
-	mtctl(-1L, 23);		/* EIRR : clear all pending external intr */
+	mtctl(~0UL, 23);	/* EIRR : clear all pending external intr */
 #ifdef CONFIG_SMP
 	if (!cpu_eiem)
 		cpu_eiem = EIEM_MASK(IPI_IRQ) | EIEM_MASK(TIMER_IRQ);

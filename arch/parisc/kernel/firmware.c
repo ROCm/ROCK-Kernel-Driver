@@ -65,6 +65,7 @@
 
 #include <asm/page.h>
 #include <asm/pdc.h>
+#include <asm/pdcpat.h>
 #include <asm/system.h>
 #include <asm/processor.h>	/* for boot_cpu_data */
 
@@ -176,7 +177,9 @@ void __init set_firmware_width(void)
  */
 void pdc_emergency_unlock(void)
 {
-        spin_unlock(&pdc_lock);
+ 	/* Spinlock DEBUG code freaks out if we unconditionally unlock */
+        if (spin_is_locked(&pdc_lock))
+		spin_unlock(&pdc_lock);
 }
 
 
@@ -234,10 +237,10 @@ int __init pdc_chassis_info(struct pdc_chassis_info *chassis_info, void *led_inf
 #ifdef __LP64__
 int pdc_pat_chassis_send_log(unsigned long state, unsigned long data)
 {
+	int retval = 0;
+        
 	if (!is_pdc_pat())
 		return -1;
-
-	int retval = 0;
 
 	spin_lock_irq(&pdc_lock);
 	retval = mem_pdc_call(PDC_PAT_CHASSIS_LOG, PDC_PAT_CHASSIS_WRITE_LOG, __pa(&state), __pa(&data));
@@ -1146,6 +1149,49 @@ int pdc_pat_pd_get_addr_map(unsigned long *actual_len, void *mem_addr,
 
 	return retval;
 }
+
+/**
+ * pdc_pat_io_pci_cfg_read - Read PCI configuration space.
+ * @pci_addr: PCI configuration space address for which the read request is being made.
+ * @pci_size: Size of read in bytes. Valid values are 1, 2, and 4. 
+ * @mem_addr: Pointer to return memory buffer.
+ *
+ */
+int pdc_pat_io_pci_cfg_read(unsigned long pci_addr, int pci_size, u32 *mem_addr)
+{
+	int retval;
+	spin_lock_irq(&pdc_lock);
+	retval = mem_pdc_call(PDC_PAT_IO, PDC_PAT_IO_PCI_CONFIG_READ,
+					__pa(pdc_result), pci_addr, pci_size);
+	switch(pci_size) {
+		case 1: *(u8 *) mem_addr =  (u8)  pdc_result[0];
+		case 2: *(u16 *)mem_addr =  (u16) pdc_result[0];
+		case 4: *(u32 *)mem_addr =  (u32) pdc_result[0];
+	}
+	spin_unlock_irq(&pdc_lock);
+
+	return retval;
+}
+
+/**
+ * pdc_pat_io_pci_cfg_write - Retrieve information about memory address ranges.
+ * @pci_addr: PCI configuration space address for which the write  request is being made.
+ * @pci_size: Size of write in bytes. Valid values are 1, 2, and 4. 
+ * @value: Pointer to 1, 2, or 4 byte value in low order end of argument to be 
+ *         written to PCI Config space.
+ *
+ */
+int pdc_pat_io_pci_cfg_write(unsigned long pci_addr, int pci_size, u32 val)
+{
+	int retval;
+
+	spin_lock_irq(&pdc_lock);
+	retval = mem_pdc_call(PDC_PAT_IO, PDC_PAT_IO_PCI_CONFIG_WRITE,
+				pci_addr, pci_size, val);
+	spin_unlock_irq(&pdc_lock);
+
+	return retval;
+}
 #endif /* __LP64__ */
 
 
@@ -1230,29 +1276,29 @@ struct wide_stack {
 long real64_call(unsigned long fn, ...)
 {
 	va_list args;
-	extern struct wide_stack real_stack;
+	extern struct wide_stack real64_stack __attribute__ ((alias ("real_stack")));
 	extern unsigned long real64_call_asm(unsigned long *,
 					     unsigned long *, 
 					     unsigned long);
     
 	va_start(args, fn);
-	real_stack.arg0 = va_arg(args, unsigned long);
-	real_stack.arg1 = va_arg(args, unsigned long);
-	real_stack.arg2 = va_arg(args, unsigned long);
-	real_stack.arg3 = va_arg(args, unsigned long);
-	real_stack.arg4 = va_arg(args, unsigned long);
-	real_stack.arg5 = va_arg(args, unsigned long);
-	real_stack.arg6 = va_arg(args, unsigned long);
-	real_stack.arg7 = va_arg(args, unsigned long);
-	real_stack.arg8 = va_arg(args, unsigned long);
-	real_stack.arg9 = va_arg(args, unsigned long);
-	real_stack.arg10 = va_arg(args, unsigned long);
-	real_stack.arg11 = va_arg(args, unsigned long);
-	real_stack.arg12 = va_arg(args, unsigned long);
-	real_stack.arg13 = va_arg(args, unsigned long);
+	real64_stack.arg0 = va_arg(args, unsigned long);
+	real64_stack.arg1 = va_arg(args, unsigned long);
+	real64_stack.arg2 = va_arg(args, unsigned long);
+	real64_stack.arg3 = va_arg(args, unsigned long);
+	real64_stack.arg4 = va_arg(args, unsigned long);
+	real64_stack.arg5 = va_arg(args, unsigned long);
+	real64_stack.arg6 = va_arg(args, unsigned long);
+	real64_stack.arg7 = va_arg(args, unsigned long);
+	real64_stack.arg8 = va_arg(args, unsigned long);
+	real64_stack.arg9 = va_arg(args, unsigned long);
+	real64_stack.arg10 = va_arg(args, unsigned long);
+	real64_stack.arg11 = va_arg(args, unsigned long);
+	real64_stack.arg12 = va_arg(args, unsigned long);
+	real64_stack.arg13 = va_arg(args, unsigned long);
 	va_end(args);
 	
-	return real64_call_asm(&real_stack.sp, &real_stack.arg0, fn);
+	return real64_call_asm(&real64_stack.sp, &real64_stack.arg0, fn);
 }
 
 #endif /* __LP64__ */

@@ -33,12 +33,14 @@
 #include <linux/module.h>
 #include <linux/seq_file.h>
 #include <linux/slab.h>
+#include <linux/cpu.h>
 
 #include <asm/cache.h>
 #include <asm/hardware.h>	/* for register_parisc_driver() stuff */
 #include <asm/processor.h>
 #include <asm/page.h>
 #include <asm/pdc.h>
+#include <asm/pdcpat.h>
 #include <asm/irq.h>		/* for struct irq_region */
 #include <asm/parisc-device.h>
 
@@ -187,6 +189,17 @@ static int __init processor_probe(struct parisc_device *dev)
 		cpu_irq_actions[cpuid] = actions;
 	}
 #endif
+
+	/* 
+	 * Bring this CPU up now! (ignore bootstrap cpuid == 0)
+	 */
+#ifdef CONFIG_SMP
+	if (cpuid) {
+		cpu_set(cpuid, cpu_present_map);
+		cpu_up(cpuid);
+	}
+#endif
+
 	return 0;
 }
 

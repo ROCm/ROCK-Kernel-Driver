@@ -21,7 +21,7 @@
  * kernel for machines with under 4GB of memory) */
 static inline pgd_t *pgd_alloc(struct mm_struct *mm)
 {
-	pgd_t *pgd = (pgd_t *)__get_free_pages(GFP_KERNEL|GFP_DMA,
+	pgd_t *pgd = (pgd_t *)__get_free_pages(GFP_KERNEL,
 					       PGD_ALLOC_ORDER);
 	pgd_t *actual_pgd = pgd;
 
@@ -30,13 +30,15 @@ static inline pgd_t *pgd_alloc(struct mm_struct *mm)
 #ifdef __LP64__
 		actual_pgd += PTRS_PER_PGD;
 		/* Populate first pmd with allocated memory.  We mark it
-		 * with _PAGE_GATEWAY as a signal to the system that this
+		 * with PxD_FLAG_ATTACHED as a signal to the system that this
 		 * pmd entry may not be cleared. */
-		pgd_val(*actual_pgd) = (_PAGE_TABLE | _PAGE_GATEWAY) + 
-			(__u32)__pa((unsigned long)pgd);
+		__pgd_val_set(*actual_pgd, (PxD_FLAG_PRESENT | 
+				        PxD_FLAG_VALID | 
+					PxD_FLAG_ATTACHED) 
+			+ (__u32)(__pa((unsigned long)pgd) >> PxD_VALUE_SHIFT));
 		/* The first pmd entry also is marked with _PAGE_GATEWAY as
 		 * a signal that this pmd may not be freed */
-		pgd_val(*pgd) = _PAGE_GATEWAY;
+		__pgd_val_set(*pgd, PxD_FLAG_ATTACHED);
 #endif
 	}
 	return actual_pgd;
@@ -56,14 +58,13 @@ static inline void pgd_free(pgd_t *pgd)
 
 static inline void pgd_populate(struct mm_struct *mm, pgd_t *pgd, pmd_t *pmd)
 {
-	pgd_val(*pgd) = _PAGE_TABLE + (__u32)__pa((unsigned long)pmd);
+	__pgd_val_set(*pgd, (PxD_FLAG_PRESENT | PxD_FLAG_VALID) +
+		        (__u32)(__pa((unsigned long)pmd) >> PxD_VALUE_SHIFT));
 }
 
-/* NOTE: pmd must be in ZONE_DMA (<4GB) so the pgd pointer can be
- * housed in 32 bits */
 static inline pmd_t *pmd_alloc_one(struct mm_struct *mm, unsigned long address)
 {
-	pmd_t *pmd = (pmd_t *)__get_free_pages(GFP_KERNEL|__GFP_REPEAT|GFP_DMA,
+	pmd_t *pmd = (pmd_t *)__get_free_pages(GFP_KERNEL|__GFP_REPEAT,
 					       PMD_ORDER);
 	if (pmd)
 		memset(pmd, 0, PAGE_SIZE<<PMD_ORDER);
@@ -73,7 +74,7 @@ static inline pmd_t *pmd_alloc_one(struct mm_struct *mm, unsigned long address)
 static inline void pmd_free(pmd_t *pmd)
 {
 #ifdef __LP64__
-	if(pmd_val(*pmd) & _PAGE_GATEWAY)
+	if(pmd_flag(*pmd) & PxD_FLAG_ATTACHED)
 		/* This is the permanent pmd attached to the pgd;
 		 * cannot free it */
 		return;
@@ -102,23 +103,24 @@ pmd_populate_kernel(struct mm_struct *mm, pmd_t *pmd, pte_t *pte)
 #ifdef __LP64__
 	/* preserve the gateway marker if this is the beginning of
 	 * the permanent pmd */
-	if(pmd_val(*pmd) & _PAGE_GATEWAY)
-		pmd_val(*pmd) = (_PAGE_TABLE | _PAGE_GATEWAY)
-			+ (__u32)__pa((unsigned long)pte);
+	if(pmd_flag(*pmd) & PxD_FLAG_ATTACHED)
+		__pmd_val_set(*pmd, (PxD_FLAG_PRESENT |
+				 PxD_FLAG_VALID |
+				 PxD_FLAG_ATTACHED) 
+			+ (__u32)(__pa((unsigned long)pte) >> PxD_VALUE_SHIFT));
 	else
 #endif
-		pmd_val(*pmd) = _PAGE_TABLE + (__u32)__pa((unsigned long)pte);
+		__pmd_val_set(*pmd, (PxD_FLAG_PRESENT | PxD_FLAG_VALID) 
+			+ (__u32)(__pa((unsigned long)pte) >> PxD_VALUE_SHIFT));
 }
 
 #define pmd_populate(mm, pmd, pte_page) \
 	pmd_populate_kernel(mm, pmd, page_address(pte_page))
 
-/* NOTE: pte must be in ZONE_DMA (<4GB) so that the pmd pointer
- * can be housed in 32 bits */
 static inline struct page *
 pte_alloc_one(struct mm_struct *mm, unsigned long address)
 {
-	struct page *page = alloc_page(GFP_KERNEL|__GFP_REPEAT|GFP_DMA);
+	struct page *page = alloc_page(GFP_KERNEL|__GFP_REPEAT);
 	if (likely(page != NULL))
 		clear_page(page_address(page));
 	return page;
@@ -127,7 +129,7 @@ pte_alloc_one(struct mm_struct *mm, unsigned long address)
 static inline pte_t *
 pte_alloc_one_kernel(struct mm_struct *mm, unsigned long addr)
 {
-	pte_t *pte = (pte_t *)__get_free_page(GFP_KERNEL|__GFP_REPEAT|GFP_DMA);
+	pte_t *pte = (pte_t *)__get_free_page(GFP_KERNEL|__GFP_REPEAT);
 	if (likely(pte != NULL))
 		clear_page(pte);
 	return pte;
