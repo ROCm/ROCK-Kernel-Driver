@@ -1203,12 +1203,12 @@ static int writeConfigRid(struct airo_info*ai, int lock) {
 
 	ai->need_commit = 0;
 	checkThrottle(ai);
+	cfgr = ai->config;
+
 	if ((cfgr.opmode & 0xFF) == MODE_STA_IBSS)
 		ai->flags |= FLAG_ADHOC;
 	else
 		ai->flags &= ~FLAG_ADHOC;
-
-	cfgr = ai->config;
 
 	for(s = &cfgr.len; s <= &cfgr.rtsThres; s++) *s = cpu_to_le16(*s);
 
