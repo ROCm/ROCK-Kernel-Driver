@@ -160,6 +160,11 @@ struct mdk_rdev_s
 
 	int desc_nr;			/* descriptor index in the superblock */
 	int raid_disk;			/* role of device in array */
+
+	atomic_t	nr_pending;	/* number of pending requests.
+					 * only maintained for arrays that
+					 * support hot removal
+					 */
 };
 
 typedef struct mdk_personality_s mdk_personality_t;

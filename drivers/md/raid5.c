@@ -374,6 +374,7 @@ static void raid5_end_read_request (struct bio * bi)
 		md_error(conf->mddev, conf->disks[i].rdev);
 		clear_bit(R5_UPTODATE, &sh->dev[i].flags);
 	}
+	atomic_dec(&conf->disks[i].rdev->nr_pending);
 #if 0
 	/* must restore b_page before unlocking buffer... */
 	if (sh->bh_page[i] != bh->b_page) {
@@ -408,6 +409,8 @@ static void raid5_end_write_request (struct bio *bi)
 	spin_lock_irqsave(&conf->device_lock, flags);
 	if (!uptodate)
 		md_error(conf->mddev, conf->disks[i].rdev);
+
+	atomic_dec(&conf->disks[i].rdev->nr_pending);
 	
 	clear_bit(R5_LOCKED, &sh->dev[i].flags);
 	set_bit(STRIPE_HANDLE, &sh->state);
@@ -1161,18 +1164,26 @@ static void handle_stripe(struct stripe_head *sh)
 	for (i=disks; i-- ;) 
 		if (action[i]) {
 			struct bio *bi = &sh->dev[i].req;
-			struct disk_info *spare = conf->spare;
 			int skip = 0;
+			mdk_rdev_t *rdev = NULL;
 			if (action[i] == READ+1)
 				bi->bi_end_io = raid5_end_read_request;
 			else
 				bi->bi_end_io = raid5_end_write_request;
+
+			spin_lock_irq(&conf->device_lock);
 			if (conf->disks[i].operational)
-				bi->bi_bdev = conf->disks[i].rdev->bdev;
-			else if (spare && action[i] == WRITE+1)
-				bi->bi_bdev = spare->rdev->bdev;
+				rdev = conf->disks[i].rdev;
+			else if (conf->spare && action[i] == WRITE+1)
+				rdev = conf->spare->rdev;
 			else skip=1;
+			if (rdev)
+				atomic_inc(&rdev->nr_pending);
+			else	skip=1;
+			spin_unlock_irq(&conf->device_lock);
+
 			if (!skip) {
+				bi->bi_bdev = rdev->bdev;
 				PRINTK("for %ld schedule op %d on disc %d\n", sh->sector, action[i]-1, i);
 				atomic_inc(&sh->count);
 				bi->bi_sector = sh->sector;
@@ -1772,7 +1783,8 @@ static int raid5_remove_disk(mddev_t *mddev, int number)
 	spin_lock_irq(&conf->device_lock);
 
 	if (p->used_slot) {
-		if (p->operational) {
+		if (p->operational || 
+		    atomic_read(&p->rdev->nr_pending)) {
 			err = -EBUSY;
 			goto abort;
 		}

@@ -70,7 +70,7 @@ static void mp_pool_free(void *mpb, void *data)
 	kfree(mpb);
 }
 
-static int multipath_map (mddev_t *mddev, struct block_device **bdev)
+static int multipath_map (mddev_t *mddev, mdk_rdev_t **rdev)
 {
 	multipath_conf_t *conf = mddev_to_conf(mddev);
 	int i, disks = MD_SB_DISKS;
@@ -80,12 +80,17 @@ static int multipath_map (mddev_t *mddev, struct block_device **bdev)
 	 * now we use the first available disk.
 	 */
 
+	spin_lock_irq(&conf->device_lock);
 	for (i = 0; i < disks; i++) {
-		if (conf->multipaths[i].operational) {
-			*bdev = conf->multipaths[i].rdev->bdev;
-			return (0);
+		if (conf->multipaths[i].operational &&
+			conf->multipaths[i].rdev) {
+			*rdev = conf->multipaths[i].rdev;
+			atomic_inc(&(*rdev)->nr_pending);
+			spin_unlock_irq(&conf->device_lock);
+			return 0;
 		}
 	}
+	spin_unlock_irq(&conf->device_lock);
 
 	printk (KERN_ERR "multipath_map(): no more operational IO paths?\n");
 	return (-1);
@@ -126,21 +131,21 @@ void multipath_end_request(struct bio *bio)
 {
 	int uptodate = test_bit(BIO_UPTODATE, &bio->bi_flags);
 	struct multipath_bh * mp_bh = (struct multipath_bh *)(bio->bi_private);
-	multipath_conf_t *conf;
-	mdk_rdev_t *rdev;
-	if (uptodate) {
+	multipath_conf_t *conf = mddev_to_conf(mp_bh->mddev);
+	mdk_rdev_t *rdev = conf->multipaths[mp_bh->path].rdev;
+
+	if (uptodate)
 		multipath_end_bh_io(mp_bh, uptodate);
-		return;
+	else {
+		/*
+		 * oops, IO error:
+		 */
+		md_error (mp_bh->mddev, rdev);
+		printk(KERN_ERR "multipath: %s: rescheduling sector %lu\n", 
+		       bdev_partition_name(rdev->bdev), bio->bi_sector);
+		multipath_reschedule_retry(mp_bh);
 	}
-	/*
-	 * oops, IO error:
-	 */
-	conf = mddev_to_conf(mp_bh->mddev);
-	rdev = conf->multipaths[mp_bh->path].rdev;
-	md_error (mp_bh->mddev, rdev);
-	printk(KERN_ERR "multipath: %s: rescheduling sector %lu\n", 
-		 bdev_partition_name(rdev->bdev), bio->bi_sector);
-	multipath_reschedule_retry(mp_bh);
+	atomic_dec(&rdev->nr_pending);
 	return;
 }
 
@@ -154,7 +159,8 @@ static int multipath_read_balance (multipath_conf_t *conf)
 	int disk;
 
 	for (disk = 0; disk < MD_SB_DISKS; disk++)	
-		if (conf->multipaths[disk].operational)
+		if (conf->multipaths[disk].operational &&
+			conf->multipaths[disk].rdev)
 			return disk;
 	BUG();
 	return 0;
@@ -175,8 +181,11 @@ static int multipath_make_request (request_queue_t *q, struct bio * bio)
 	/*
 	 * read balancing logic:
 	 */
+	spin_lock_irq(&conf->device_lock);
 	mp_bh->path = multipath_read_balance(conf);
 	multipath = conf->multipaths + mp_bh->path;
+	atomic_inc(&multipath->rdev->nr_pending);
+	spin_unlock_irq(&conf->device_lock);
 
 	mp_bh->bio = *bio;
 	mp_bh->bio.bi_bdev = multipath->rdev->bdev;
@@ -321,7 +330,8 @@ static int multipath_remove_disk(mddev_t *mddev, int number)
 	spin_lock_irq(&conf->device_lock);
 
 	if (p->used_slot) {
-		if (p->operational) {
+		if (p->operational ||
+		    (p->rdev && atomic_read(&p->rdev->nr_pending))) {
 			printk(KERN_ERR "hot-remove-disk, slot %d is identified but is still operational!\n", number);
 			err = -EBUSY;
 			goto abort;
@@ -359,7 +369,7 @@ static void multipathd (void *data)
 	struct bio *bio;
 	unsigned long flags;
 	mddev_t *mddev;
-	struct block_device *bdev;
+	mdk_rdev_t *rdev;
 
 	for (;;) {
 		spin_lock_irqsave(&retry_list_lock, flags);
@@ -372,16 +382,16 @@ static void multipathd (void *data)
 		mddev = mp_bh->mddev;
 		bio = &mp_bh->bio;
 		bio->bi_sector = mp_bh->master_bio->bi_sector;
-		bdev = bio->bi_bdev;
 		
-		multipath_map (mddev, &bio->bi_bdev);
-		if (bio->bi_bdev == bdev) {
+		rdev = NULL;
+		if (multipath_map (mddev, &rdev)<0) {
 			printk(IO_ERROR,
 				bdev_partition_name(bio->bi_bdev), bio->bi_sector);
 			multipath_end_bh_io(mp_bh, 0);
 		} else {
 			printk(REDIRECT_SECTOR,
 				bdev_partition_name(bio->bi_bdev), bio->bi_sector);
+			bio->bi_bdev = rdev->bdev;
 			generic_make_request(bio);
 		}
 	}
