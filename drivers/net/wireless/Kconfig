@@ -53,9 +53,7 @@ config STRIP
 	  in saying Y to STRIP now, except that it makes the kernel a bit
 	  bigger.
 
-	  You can also compile this as a module ( = code which can be inserted
-	  in and removed from the running kernel whenever you want), say M
-	  here and read <file:Documentation/modules.txt>.  The module will be
+	  To compile this as a module, choose M here: the module will be
 	  called strip.
 
 config ARLAN
@@ -97,11 +95,8 @@ config WAVELAN
 	  <http://www.hpl.hp.com/personal/Jean_Tourrilhes/Linux/Tools.html>.
 	  Please read the man pages contained therein.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called wavelan.  If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt> as well
-	  as <file:Documentation/networking/net-modules.txt>.
+	  To compile this driver as a module, choose M here: the module will be
+	  called wavelan.
 
 config PCMCIA_WAVELAN
 	tristate "AT&T/Lucent old WaveLAN Pcmcia wireless support"
@@ -111,11 +106,8 @@ config PCMCIA_WAVELAN
 	  (PC-card) wireless Ethernet networking card to your computer.  This
 	  driver is for the non-IEEE-802.11 Wavelan cards.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called wavelan_cs.  If you want to compile it
-	  as a module, say M here and read <file:Documentation/modules.txt>.
-	  If unsure, say N.
+	  To compile this driver as a module, choose M here: the module will be
+	  called wavelan_cs.  If unsure, say N.
 
 config PCMCIA_NETWAVE
 	tristate "Xircom Netwave AirSurfer Pcmcia wireless support"
@@ -124,11 +116,8 @@ config PCMCIA_NETWAVE
 	  Say Y here if you intend to attach this type of PCMCIA (PC-card)
 	  wireless Ethernet networking card to your computer.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called netwave_cs.  If you want to compile it
-	  as a module, say M here and read <file:Documentation/modules.txt>.
-	  If unsure, say N.
+	  To compile this driver as a module, choose M here: the module will be
+	  called netwave_cs.  If unsure, say N.
 
 comment "Wireless 802.11 Frequency Hopping cards support"
 	depends on NET_RADIO && PCMCIA
@@ -142,11 +131,8 @@ config PCMCIA_RAYCS
 	  Please read the file <file:Documentation/networking/ray_cs.txt> for
 	  details.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called ray_cs.  If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.  If
-	  unsure, say N.
+	  To compile this driver as a module, choose M here: the module will be
+	  called ray_cs.  If unsure, say N.
 
 comment "Wireless 802.11b ISA/PCI cards support"
 	depends on NET_RADIO && (ISA || PCI || PPC_PMAC || PCMCIA)

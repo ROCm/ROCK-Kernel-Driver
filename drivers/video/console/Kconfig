@@ -51,10 +51,8 @@ config MDA_CONSOLE
 	  say Y here if your MDA card is the primary card in your system; the
 	  normal VGA driver will handle it.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted and removed from the running kernel whenever you want).
-	  The module will be called mdacon. If you want to compile it as
-	  a module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called mdacon.
 
 	  If unsure, say N.
 

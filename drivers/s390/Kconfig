@@ -49,10 +49,8 @@ config BLK_DEV_LOOP
 	  Note that this loop device has nothing to do with the loopback
 	  device used for network connections from the machine to itself.
 
-	  If you want to compile this driver as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>. The module
-	  will be called loop.
+	  To compile this driver as a module, choose M here: the
+	  module will be called loop.
 
 	  Most users will answer N here.
 
@@ -78,10 +76,8 @@ config BLK_DEV_NBD
 	  Note that this has nothing to do with the network file systems NFS
 	  or Coda; you can say N here even if you intend to use NFS or Coda.
 
-	  If you want to compile this driver as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>. The module
-	  will be called nbd.
+	  To compile this driver as a module, choose M here: the
+	  module will be called nbd.
 
 	  If unsure, say N.
 
@@ -98,10 +94,8 @@ config BLK_DEV_RAM
 	  Note that the kernel command line option "ramdisk=XX" is now
 	  obsolete. For details, read <file:Documentation/ramdisk.txt>.
 
-	  If you want to compile this as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M and read <file:Documentation/modules.txt>. The module will be
-	  called rd.
+	  To compile this driver as a module, choose M here: the
+	  module will be called rd.
 
 	  Most normal users won't need the RAM disk functionality, and can
 	  thus say N here.

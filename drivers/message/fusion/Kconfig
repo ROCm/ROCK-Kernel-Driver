@@ -29,11 +29,7 @@ config FUSION
 	  [2] In order enable capability to boot the linux kernel
 	  natively from a Fusion MPT target device, you MUST
 	  answer Y here! (currently requires CONFIG_BLK_DEV_SD)
-	  [3] This support is also available as a module ( = code
-	  which can be inserted in and removed from the running
-	  kernel whenever you want).  If you want to compile as
-	  modules, say M here and read
-	  <file:Documentation/modules.txt>.
+	  [3] To compile this support as modules, choose M here.
 
 	  If unsure, say N.
 

@@ -19,11 +19,8 @@ config I2O
 	  If you say Y here, you will get a choice of interface adapter
 	  drivers and OSM's with the following questions.
 
-	  This support is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  You will get modules called
-	  i2o_core and i2o_config.
+	  To compile this support as a module, choose M here: the
+	  modules will be called i2o_core and i2o_config.
 
 	  If unsure, say N.
 
@@ -34,10 +31,8 @@ config I2O_PCI
 	  Say Y for support of PCI bus I2O interface adapters. Currently this
 	  is the only variety supported, so you should say Y.
 
-	  This support is also available as a module called i2o_pci ( = code
-	  which can be inserted in and removed from the running kernel
-	  whenever you want). If you want to compile it as a module, say M
-	  here and read <file:Documentation/modules.txt>.
+	  To compile this support as a module, choose M here: the
+	  module will be called i2o_pci.
 
 config I2O_BLOCK
 	tristate "I2O Block OSM"
@@ -46,10 +41,8 @@ config I2O_BLOCK
 	  Include support for the I2O Block OSM. The Block OSM presents disk
 	  and other structured block devices to the operating system.
 
-	  This support is also available as a module called i2o_block ( =
-	  code which can be inserted in and removed from the running kernel
-	  whenever you want). If you want to compile it as a module, say M
-	  here and read <file:Documentation/modules.txt>.
+	  To compile this support as a module, choose M here: the
+	  module will be called i2o_block.
 
 config I2O_SCSI
 	tristate "I2O SCSI OSM"
@@ -59,10 +52,8 @@ config I2O_SCSI
 	  I2O controller. You can use both the SCSI and Block OSM together if
 	  you wish.
 
-	  This support is also available as a module called i2o_scsi ( =
-	  code which can be inserted in and removed from the running kernel
-	  whenever you want). If you want to compile it as a module, say M
-	  here and read <file:Documentation/modules.txt>.
+	  To compile this support as a module, choose M here: the
+	  module will be called i2o_scsi.
 
 config I2O_PROC
 	tristate "I2O /proc support"
@@ -72,10 +63,8 @@ config I2O_PROC
 	  able to read I2O related information from the virtual directory
 	  /proc/i2o.
 
-	  This support is also available as a module called i2o_proc ( =
-	  code which can be inserted in and removed from the running kernel
-	  whenever you want). If you want to compile it as a module, say M
-	  here and read <file:Documentation/modules.txt>.
+	  To compile this support as a module, choose M here: the
+	  module will be called i2o_proc.
 
 endmenu
 

@@ -17,8 +17,7 @@ config IP_NF_CONNTRACK
 	  enhance packet filtering (see `Connection state match support'
 	  below).
 
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 config IP_NF_FTP
 	tristate "FTP protocol support"
@@ -28,8 +27,7 @@ config IP_NF_FTP
 	  required for tracking them, and doing masquerading and other forms
 	  of Network Address Translation on them.
 
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `Y'.
+	  To compile it as a module, choose M here.  If unsure, say Y.
 
 config IP_NF_IRC
 	tristate "IRC protocol support"
@@ -44,8 +42,7 @@ config IP_NF_IRC
 	  chats.  Note that you do NOT need this extension to get files or
 	  have others initiate chats, or everything else in IRC.
 
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `Y'.
+	  To compile it as a module, choose M here.  If unsure, say Y.
 
 config IP_NF_TFTP
 	tristate "TFTP protocol support"
@@ -56,8 +53,7 @@ config IP_NF_TFTP
 	  If you are using a tftp client behind -j SNAT or -j MASQUERADING
 	  you will need this.
 
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `Y'.
+	  To compile it as a module, choose M here.  If unsure, say Y.
 
 config IP_NF_AMANDA
 	tristate "Amanda backup protocol support"
@@ -70,8 +66,7 @@ config IP_NF_AMANDA
 	  Amanda requires for communication of the backup data, messages and
 	  index.
 
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `Y'.
+	  To compile it as a module, choose M here.  If unsure, say Y.
 
 config IP_NF_QUEUE
 	tristate "Userspace queueing via NETLINK"
@@ -79,8 +74,7 @@ config IP_NF_QUEUE
 	  Netfilter has the ability to queue packets to user space: the
 	  netlink device can be used to access them using this driver.
 
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 config IP_NF_IPTABLES
 	tristate "IP tables support (required for filtering/masq/NAT)"
@@ -90,8 +84,7 @@ config IP_NF_IPTABLES
 	  etc) subsystems now use this: say `Y' or `M' here if you want to use
 	  either of those.
 
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 # The simple matches.
 config IP_NF_MATCH_LIMIT
@@ -102,8 +95,7 @@ config IP_NF_MATCH_LIMIT
 	  matched: mainly useful in combination with the LOG target ("LOG
 	  target support", below) and to avoid some Denial of Service attacks.
 
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 config IP_NF_MATCH_IPRANGE
 	tristate "IP range match support"
@@ -112,8 +104,7 @@ config IP_NF_MATCH_IPRANGE
 	  This option makes possible to match IP addresses against IP address
 	  ranges.
 
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 config IP_NF_MATCH_MAC
 	tristate "MAC address match support"
@@ -122,8 +113,7 @@ config IP_NF_MATCH_MAC
 	  MAC matching allows you to match packets based on the source
 	  Ethernet address of the packet.
 
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 config IP_NF_MATCH_PKTTYPE
 	tristate "Packet type match support"
@@ -135,8 +125,7 @@ config IP_NF_MATCH_PKTTYPE
 	  Typical usage:
 	  iptables -A INPUT -m pkttype --pkt-type broadcast -j LOG
 
-	  If you want to compile it as a module, say M here and read
-	  Documentation/modules.txt.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 config IP_NF_MATCH_MARK
 	tristate "netfilter MARK match support"
@@ -146,8 +135,7 @@ config IP_NF_MATCH_MARK
 	  `nfmark' value in the packet.  This can be set by the MARK target
 	  (see below).
 
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 config IP_NF_MATCH_MULTIPORT
 	tristate "Multiple port match support"
@@ -157,8 +145,7 @@ config IP_NF_MATCH_MULTIPORT
 	  a series of source or destination ports: normally a rule can only
 	  match a single range of ports.
 
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 config IP_NF_MATCH_TOS
 	tristate "TOS match support"
@@ -167,8 +154,7 @@ config IP_NF_MATCH_TOS
 	  TOS matching allows you to match packets based on the Type Of
 	  Service fields of the IP packet.
 
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 config IP_NF_MATCH_RECENT
 	tristate "recent match support"
@@ -180,8 +166,7 @@ config IP_NF_MATCH_RECENT
 	  Short options are available by using 'iptables -m recent -h'
 	  Official Website: <http://snowman.net/projects/ipt_recent/>
 
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 config IP_NF_MATCH_ECN
 	tristate "ECN match support"
@@ -190,8 +175,7 @@ config IP_NF_MATCH_ECN
 	  This option adds a `ECN' match, which allows you to match against
 	  the IPv4 and TCP header ECN fields.
 
-	  If you want to compile it as a module, say M here and read
-	  Documentation/modules.txt.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 config IP_NF_MATCH_DSCP
 	tristate "DSCP match support"
@@ -202,8 +186,7 @@ config IP_NF_MATCH_DSCP
 
 	  The DSCP codepoint can have any value between 0x0 and 0x4f.
 
-	  If you want to compile it as a module, say M here and read
-	  Documentation/modules.txt.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 config IP_NF_MATCH_AH_ESP
 	tristate "AH/ESP match support"
@@ -212,8 +195,7 @@ config IP_NF_MATCH_AH_ESP
 	  These two match extensions (`ah' and `esp') allow you to match a
 	  range of SPIs inside AH or ESP headers of IPSec packets.
 
-	  If you want to compile it as a module, say M here and read
-	  Documentation/modules.txt.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 config IP_NF_MATCH_LENGTH
 	tristate "LENGTH match support"
@@ -222,8 +204,7 @@ config IP_NF_MATCH_LENGTH
 	  This option allows you to match the length of a packet against a
 	  specific value or range of values.
 
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 config IP_NF_MATCH_TTL
 	tristate "TTL match support"
@@ -232,8 +213,7 @@ config IP_NF_MATCH_TTL
 	  This adds CONFIG_IP_NF_MATCH_TTL option, which enabled the user
 	  to match packets by their TTL value.
 
-	  If you want to compile it as a module, say M here and read
-	  Documentation/modules.txt.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 config IP_NF_MATCH_TCPMSS
 	tristate "tcpmss match support"
@@ -243,8 +223,7 @@ config IP_NF_MATCH_TCPMSS
 	  MSS value of TCP SYN packets, which control the maximum packet size
 	  for that connection.
 
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 config IP_NF_MATCH_HELPER
 	tristate "Helper match support"
@@ -253,8 +232,7 @@ config IP_NF_MATCH_HELPER
 	  Helper matching allows you to match packets in dynamic connections
 	  tracked by a conntrack-helper, ie. ip_conntrack_ftp
 
-	  If you want to compile it as a module, say M here and read
-	  Documentation/modules.txt.  If unsure, say `Y'.
+	  To compile it as a module, choose M here.  If unsure, say Y.
 
 config IP_NF_MATCH_STATE
 	tristate "Connection state match support"
@@ -264,8 +242,7 @@ config IP_NF_MATCH_STATE
 	  relationship to a tracked connection (ie. previous packets).  This
 	  is a powerful tool for packet classification.
 
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 config IP_NF_MATCH_CONNTRACK
 	tristate "Connection tracking match support"
@@ -277,8 +254,7 @@ config IP_NF_MATCH_CONNTRACK
 	  useful in complex configurations, such as NAT gateways with multiple
 	  internet links or tunnels.
 
-	  If you want to compile it as a module, say M here and read
-	  Documentation/modules.txt.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 config IP_NF_MATCH_OWNER
 	tristate "Owner match support"
@@ -287,8 +263,7 @@ config IP_NF_MATCH_OWNER
 	  Packet owner matching allows you to match locally-generated packets
 	  based on who created them: the user, group, process or session.
 
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 config IP_NF_MATCH_PHYSDEV
 	tristate "Physdev match support"
@@ -297,8 +272,7 @@ config IP_NF_MATCH_PHYSDEV
 	  Physdev packet matching matches against the physical bridge ports
 	  the IP packet arrived on or will leave by.
 
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 # The targets
 config IP_NF_FILTER
@@ -309,8 +283,7 @@ config IP_NF_FILTER
 	  rules for simple packet filtering at local input, forwarding and
 	  local output.  See the man page for iptables(8).
 
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 config IP_NF_TARGET_REJECT
 	tristate "REJECT target support"
@@ -320,8 +293,7 @@ config IP_NF_TARGET_REJECT
 	  error should be issued in response to an incoming packet, rather
 	  than silently being dropped.
 
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 config IP_NF_NAT
 	tristate "Full NAT"
@@ -331,8 +303,7 @@ config IP_NF_NAT
 	  forms of full Network Address Port Translation.  It is controlled by
 	  the `nat' table in iptables: see the man page for iptables(8).
 
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 config IP_NF_NAT_NEEDED
 	bool
@@ -349,8 +320,7 @@ config IP_NF_TARGET_MASQUERADE
 	  only useful for dialup accounts with dynamic IP address (ie. your IP
 	  address will be different on next dialup).
 
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 config IP_NF_TARGET_REDIRECT
 	tristate "REDIRECT target support"
@@ -361,8 +331,7 @@ config IP_NF_TARGET_REDIRECT
 	  come to the local machine instead of passing through.  This is
 	  useful for transparent proxies.
 
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 config IP_NF_TARGET_NETMAP
 	tristate "NETMAP target support"
@@ -373,8 +342,7 @@ config IP_NF_TARGET_NETMAP
 	  address part intact. It is similar to Fast NAT, except that
 	  Netfilter's connection tracking doesn't work well with Fast NAT.
 
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 config IP_NF_TARGET_SAME
 	tristate "SAME target support"
@@ -383,8 +351,7 @@ config IP_NF_TARGET_SAME
 	  This option adds a `SAME' target, which works like the standard SNAT
 	  target, but attempts to give clients the same IP for all connections.
 
-	  If you want to compile it as a module, say M here and read
-	  Documentation/modules.txt.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 config IP_NF_NAT_LOCAL
 	bool "NAT of local connections (READ HELP)"
@@ -413,8 +380,7 @@ config IP_NF_NAT_SNMP_BASIC
 
 	  This is the "basic" form of SNMP-ALG, as described in RFC 2962
 
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 config IP_NF_NAT_IRC
 	tristate
@@ -450,8 +416,7 @@ config IP_NF_MANGLE
 	  iptables(8).  This table is used for various packet alterations
 	  which can effect how the packet is routed.
 
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 config IP_NF_TARGET_TOS
 	tristate "TOS target support"
@@ -461,8 +426,7 @@ config IP_NF_TARGET_TOS
 	  the `mangle' table which alter the Type Of Service field of an IP
 	  packet prior to routing.
 
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 config IP_NF_TARGET_ECN
 	tristate "ECN target support"
@@ -476,8 +440,7 @@ config IP_NF_TARGET_ECN
 	  existing ECN blackholes on the internet, but don't want to disable
 	  ECN support in general.
 
-	  If you want to compile it as a module, say M here and read
-	  Documentation/modules.txt.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 config IP_NF_TARGET_DSCP
 	tristate "DSCP target support"
@@ -488,8 +451,7 @@ config IP_NF_TARGET_DSCP
 
 	  The DSCP codepoint can have any value between 0x0 and 0x4f.
 
-	  If you want to compile it as a module, say M here and read
-	  Documentation/modules.txt.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 config IP_NF_TARGET_MARK
 	tristate "MARK target support"
@@ -502,8 +464,7 @@ config IP_NF_TARGET_MARK
 	  key') and can also be used by other subsystems to change their
 	  behavior.
 
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 config IP_NF_TARGET_CLASSIFY
 	tristate "CLASSIFY target support"
@@ -515,8 +476,7 @@ config IP_NF_TARGET_CLASSIFY
 
   	  atm, cbq, dsmark, pfifo_fast, htb, prio
 
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 config IP_NF_TARGET_LOG
 	tristate "LOG target support"
@@ -525,8 +485,7 @@ config IP_NF_TARGET_LOG
 	  This option adds a `LOG' target, which allows you to create rules in
 	  any iptables table which records the packet header to the syslog.
 
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 config IP_NF_TARGET_ULOG
 	tristate "ULOG target support"
@@ -540,8 +499,7 @@ config IP_NF_TARGET_ULOG
 	  The apropriate userspace logging daemon (ulogd) may be obtained from
 	  http://www.gnumonks.org/projects/ulogd
 
-	  If you want to compile it as a module, say M here and read
-	  Documentation/modules.txt.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 config IP_NF_TARGET_TCPMSS
 	tristate "TCPMSS target support"
@@ -567,8 +525,7 @@ config IP_NF_TARGET_TCPMSS
 	  iptables -A FORWARD -p tcp --tcp-flags SYN,RST SYN \
 	  		 -j TCPMSS --clamp-mss-to-pmtu
 
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 config IP_NF_ARPTABLES
 	tristate "ARP tables support"
@@ -595,8 +552,7 @@ config IP_NF_COMPAT_IPCHAINS
 	  `Packet filtering').  With this enabled, you should be able to use
 	  the ipchains tool exactly as in 2.2 kernels.
 
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 config IP_NF_COMPAT_IPFWADM
 	tristate "ipfwadm (2.0-style) support"
@@ -608,8 +564,7 @@ config IP_NF_COMPAT_IPFWADM
 	  `Packet filtering').  With this enabled, you should be able to use
 	  the ipfwadm tool exactly as in 2.0 kernels.
 
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 endmenu
 

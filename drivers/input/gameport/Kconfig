@@ -16,10 +16,8 @@ config GAMEPORT
 
 	  If unsure, say Y.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called gameport. If you want to compile it as
-	  a module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called gameport.
 
 config SOUND_GAMEPORT
 	tristate
@@ -34,10 +32,8 @@ config GAMEPORT_NS558
 
 	  If unsure, say Y.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called ns558. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called ns558.
 
 config GAMEPORT_L4
 	tristate "PDPI Lightning 4 gamecard support"
@@ -45,10 +41,8 @@ config GAMEPORT_L4
 	help
 	  Say Y here if you have a PDPI Lightning 4 gamecard.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called lightning. If you want to compile it as
-	  a module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called lightning.
 
 config GAMEPORT_EMU10K1
 	tristate "SB Live and Audigy gameport support"
@@ -57,10 +51,8 @@ config GAMEPORT_EMU10K1
 	  Say Y here if you have a SoundBlaster Live! or SoundBlaster
 	  Audigy card and want to use its gameport.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called emu10k1-gp. If you want to compile it as
-	  a module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called emu10k1-gp.
 
 config GAMEPORT_VORTEX
 	tristate "Aureal Vortex, Vortex 2 gameport support"
@@ -69,10 +61,8 @@ config GAMEPORT_VORTEX
 	  Say Y here if you have an Aureal Vortex 1 or 2  card and want
 	  to use its gameport.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called vortex. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called vortex.
 
 config GAMEPORT_FM801
 	tristate "ForteMedia FM801 gameport support"

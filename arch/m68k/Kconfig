@@ -67,11 +67,8 @@ config PCMCIA
 	  for location).  Please also read the PCMCIA-HOWTO, available from
 	  <http://www.tldp.org/docs.html#howto>.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  When compiled this way, there will be modules called pcmcia_core
-	  and ds.  If you want to compile it as a module, say M here and
-	  read <file:Documentation/modules.txt>.
+	  To compile this driver as modules, choose M here: the
+	  modules will be called pcmcia_core and ds.
 
 config AMIGA
 	bool "Amiga support"
@@ -425,13 +422,11 @@ config PARPORT
 
 	  It is possible to share a single parallel port among several devices
 	  and it is safe to compile all the corresponding drivers into the
-	  kernel.  If you want to compile parallel port support as a module
-	  ( = code which can be inserted in and removed from the running
-	  kernel whenever you want), say M here and read
-	  <file:Documentation/modules.txt>.  The module will be called
-	  parport.  If you have more than one parallel port and want to
-	  specify which port and IRQ to be used by this driver at module load
-	  time, take a look at <file:Documentation/parport.txt>.
+	  kernel. To compile parallel port support as a module, choose M here:
+	  the module will be called parport.
+	  If you have more than one parallel port and want to specify which
+	  port and IRQ to be used by this driver at module load time, take a
+	  look at <file:Documentation/parport.txt>.
 
 	  If unsure, say Y.
 
@@ -460,11 +455,8 @@ config PARPORT_PC
 	  PC compatible computers and some Alphas have PC-style parallel
 	  ports.
 
-	  This code is also available as a module.  If you want to compile it
-	  as a module ( = code which can be inserted in and removed from the
-	  running kernel whenever you want), say M here and read
-	  <file:Documentation/modules.txt>.  The module will be called
-	  parport_pc.
+	  To compile this driver as a module, choose M here: the
+	  module will be called parport_pc.
 
 	  If unsure, say Y.
 
@@ -488,10 +480,8 @@ config PRINTER
 
 	  It is possible to share one parallel port among several devices
 	  (e.g. printer and ZIP drive) and it is safe to compile the
-	  corresponding drivers into the kernel.  If you want to compile this
-	  driver as a module however ( = code which can be inserted in and
-	  removed from the running kernel whenever you want), say M here and
-	  read <file:Documentation/modules.txt> and
+	  corresponding drivers into the kernel.
+	  To compile this driver as a module, choose M here and read
 	  <file:Documentation/parport.txt>.  The module will be called lp.
 
 	  If you have several parallel ports, you can specify which ports to
@@ -571,9 +561,8 @@ config SERIAL
 	  serial port drivers do not need this driver built in for them to
 	  work.)
 
-	  If you want to compile this driver as a module, say M here and read
-	  <file:Documentation/modules.txt>.  The module will be called
-	  serial.
+	  To compile this driver as a module, choose M here: the
+	  module will be called serial.
 	  [WARNING: Do not compile this driver as a module if you are using
 	  non-standard serial ports, since the configuration information will
 	  be lost when the driver is unloaded.  This limitation may be lifted
@@ -717,10 +706,8 @@ config NVRAM
 	  On Atari machines, /dev/nvram is always configured and does not need
 	  to be selected.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called nvram. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called nvram.
 
 config ATARI_MFPSER
 	tristate "Atari MFP serial support"
@@ -730,10 +717,7 @@ config ATARI_MFPSER
 	  Linux, say Y. The driver equally supports all kinds of MFP serial
 	  ports and automatically detects whether Serial1 is available.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here.
 
 	  Note for Falcon users: You also have an MFP port, it's just not
 	  wired to the outside... But you could use the port under Linux.
@@ -748,10 +732,7 @@ config ATARI_SCC
 	  two connectors for channel A (Serial2 and LAN), they are visible as
 	  two separate devices.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here.
 
 config ATARI_SCC_DMA
 	bool "Atari SCC serial DMA support"
@@ -769,10 +750,7 @@ config ATARI_MIDI
 	help
 	  If you want to use your Atari's MIDI port in Linux, say Y.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you
-	  want). If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here.
 
 config ATARI_DSP56K
 	tristate "Atari DSP56k support (EXPERIMENTAL)"
@@ -782,10 +760,7 @@ config ATARI_DSP56K
 	  driver is still experimental, and if you don't know what it is, or
 	  if you don't have this processor, just say N.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here.
 
 config AMIGA_BUILTIN_SERIAL
 	tristate "Amiga builtin serial support"
@@ -794,10 +769,7 @@ config AMIGA_BUILTIN_SERIAL
 	  If you want to use your Amiga's built-in serial port in Linux,
 	  answer Y.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you
-	  want). If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here.
 
 config WHIPPET_SERIAL
 	tristate "Hisoft Whippet PCMCIA serial support"
@@ -813,10 +785,7 @@ config MULTIFACE_III_TTY
 	  If you want to use a Multiface III card's serial port in Linux,
 	  answer Y.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here.
 
 config A2232
 	tristate "Commodore A2232 serial support (EXPERIMENTAL)"
@@ -832,8 +801,7 @@ config A2232
 
 	  This driver can be built as a module; but then "generic_serial"
 	  will also be built as a module. This has to be loaded before
-	  "ser_a2232". If you want to do this, answer M here and read
-	  "<file:Documentation/modules.txt>".
+	  "ser_a2232". If you want to do this, answer M here.
 
 config GVPIOEXT
 	tristate "GVP IO-Extender support"
@@ -1086,11 +1054,8 @@ config SOFT_WATCHDOG
 	  from some situations that the hardware watchdog will recover
 	  from. Equally it's a lot cheaper to install.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>. The module will be called
-	  softdog.
+	  To compile this driver as a module, choose M here: the
+	  module will be called softdog.
 
 config GEN_RTC
 	tristate "Generic /dev/rtc emulation" if !SUN3
@@ -1107,12 +1072,9 @@ config GEN_RTC
 	  for RTC_UIE which is required by some programs and may improve
 	  precision in some cases.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module is called genrtc. If you want to compile it as a module,
-	  say M here and read <file:Documentation/modules.txt>. To load the
-	  module automatically add 'alias char-major-10-135 genrtc' to your
-	  /etc/modules.conf
+	  To compile this driver as a module, choose M here: the
+	  module will be called genrtc. To load the module automatically
+	  add 'alias char-major-10-135 genrtc' to your /etc/modules.conf
 
 config GEN_RTC_X
 	bool "Extended RTC operation"
