@@ -2186,6 +2186,8 @@ static snd_pcm_sframes_t snd_pcm_lib_write1(snd_pcm_substream_t *substream,
 		} else {
 			runtime->control->appl_ptr = appl_ptr;
 		}
+		if (substream->ops->ack)
+			substream->ops->ack(substream);
 
 		offset += frames;
 		size -= frames;
@@ -2478,6 +2480,8 @@ static snd_pcm_sframes_t snd_pcm_lib_read1(snd_pcm_substream_t *substream, void 
 		} else {
 			runtime->control->appl_ptr = appl_ptr;
 		}
+		if (substream->ops->ack)
+			substream->ops->ack(substream);
 
 		offset += frames;
 		size -= frames;

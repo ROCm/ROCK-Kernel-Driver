@@ -44,7 +44,7 @@ MODULE_DEVICES("{{Aztech Systems,Sound Galaxy}}");
 
 static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
-static int snd_enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE;	/* Enable this card */
+static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE;	/* Enable this card */
 static long sbport[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;	/* 0x220,0x240 */
 static long wssport[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;	/* 0x530,0xe80,0xf40,0x604 */
 static int irq[SNDRV_CARDS] = SNDRV_DEFAULT_IRQ;	/* 7,9,10,11 */
@@ -300,7 +300,7 @@ static int __init alsa_card_sgalaxy_init(void)
 {
 	int dev, cards;
 
-	for (dev = cards = 0; dev < SNDRV_CARDS && snd_enable[dev]; dev++) {
+	for (dev = cards = 0; dev < SNDRV_CARDS && enable[dev]; dev++) {
 		if (snd_sgalaxy_probe(dev) >= 0)
 			cards++;
 	}
@@ -327,7 +327,7 @@ module_exit(alsa_card_sgalaxy_exit)
 
 #ifndef MODULE
 
-/* format is: snd-sgalaxy=snd_enable,index,id,
+/* format is: snd-sgalaxy=enable,index,id,
 			  sbport,wssport,
 			  irq,dma1 */
 
@@ -337,7 +337,7 @@ static int __init alsa_card_sgalaxy_setup(char *str)
 
 	if (nr_dev >= SNDRV_CARDS)
 		return 0;
-	(void)(get_option(&str,&snd_enable[nr_dev]) == 2 &&
+	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
 	       get_option(&str,&index[nr_dev]) == 2 &&
 	       get_id(&str,&id[nr_dev]) == 2 &&
 	       get_option(&str,(int *)&sbport[nr_dev]) == 2 &&

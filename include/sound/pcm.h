@@ -97,6 +97,7 @@ typedef struct _snd_pcm_ops {
 	int (*silence)(snd_pcm_substream_t *substream, int channel, 
 		       snd_pcm_uframes_t pos, snd_pcm_uframes_t count);
 	struct page *(*page)(snd_pcm_substream_t *substream, unsigned long offset);
+	int (*ack)(snd_pcm_substream_t *substream);
 } snd_pcm_ops_t;
 
 /*

@@ -107,7 +107,12 @@ static int snd_hwdep_open(struct inode *inode, struct file * file)
 #endif
 	init_waitqueue_entry(&wait, current);
 	add_wait_queue(&hw->open_wait, &wait);
+	down(&hw->open_mutex);
 	while (1) {
+		if (hw->exclusive && hw->used > 0) {
+			err = -EBUSY;
+			break;
+		}
 		err = hw->ops.open(hw, file);
 		if (err >= 0)
 			break;
@@ -127,20 +132,26 @@ static int snd_hwdep_open(struct inode *inode, struct file * file)
 	}
 	set_current_state(TASK_RUNNING);
 	remove_wait_queue(&hw->open_wait, &wait);
-	if (err >= 0)
+	if (err >= 0) {
 		file->private_data = hw;
+		hw->used++;
+	}
+	up(&hw->open_mutex);
 	return err;
 }
 
 static int snd_hwdep_release(struct inode *inode, struct file * file)
 {
-	int err;
+	int err = -ENXIO;
 	snd_hwdep_t *hw = snd_magic_cast(snd_hwdep_t, file->private_data, return -ENXIO);
+	down(&hw->open_mutex);
 	if (hw->ops.release) {
 		err = hw->ops.release(hw, file);
 		wake_up(&hw->open_wait);
-		return err;
 	}
+	if (hw->used > 0)
+		hw->used--;
+	up(&hw->open_mutex);
 	return -ENXIO;	
 }
 
@@ -166,14 +177,58 @@ static int snd_hwdep_info(snd_hwdep_t *hw, snd_hwdep_info_t *_info)
 	return 0;
 }
 
+static int snd_hwdep_dsp_status(snd_hwdep_t *hw, snd_hwdep_dsp_status_t *_info)
+{
+	snd_hwdep_dsp_status_t info;
+	int err;
+	
+	if (! hw->ops.dsp_status)
+		return -ENXIO;
+	memset(&info, 0, sizeof(info));
+	info.dsp_loaded = hw->dsp_loaded;
+	if ((err = hw->ops.dsp_status(hw, &info)) < 0)
+		return err;
+	if (copy_to_user(_info, &info, sizeof(info)))
+		return -EFAULT;
+	return 0;
+}
+
+static int snd_hwdep_dsp_load(snd_hwdep_t *hw, snd_hwdep_dsp_image_t *_info)
+{
+	snd_hwdep_dsp_image_t info;
+	int err;
+	
+	if (! hw->ops.dsp_load || ! hw->ops.dsp_status)
+		return -ENXIO;
+	memset(&info, 0, sizeof(info));
+	if (copy_from_user(&info, _info, sizeof(info)))
+		return -EFAULT;
+	/* check whether the dsp was already loaded */
+	if (hw->dsp_loaded & (1 << info.index))
+		return -EBUSY;
+	if (verify_area(VERIFY_READ, info.image, info.length))
+		return -EFAULT;
+	err = hw->ops.dsp_load(hw, &info);
+	if (err < 0)
+		return err;
+	hw->dsp_loaded |= (1 << info.index);
+	return 0;
+}
+
 static int snd_hwdep_ioctl(struct inode *inode, struct file * file,
 			   unsigned int cmd, unsigned long arg)
 {
 	snd_hwdep_t *hw = snd_magic_cast(snd_hwdep_t, file->private_data, return -ENXIO);
-	if (cmd == SNDRV_HWDEP_IOCTL_PVERSION)
+	switch (cmd) {
+	case SNDRV_HWDEP_IOCTL_PVERSION:
 		return put_user(SNDRV_HWDEP_VERSION, (int *)arg);
-	if (cmd == SNDRV_HWDEP_IOCTL_INFO)
+	case SNDRV_HWDEP_IOCTL_INFO:
 		return snd_hwdep_info(hw, (snd_hwdep_info_t *)arg);
+	case SNDRV_HWDEP_IOCTL_DSP_STATUS:
+		return snd_hwdep_dsp_status(hw, (snd_hwdep_dsp_status_t *)arg);
+	case SNDRV_HWDEP_IOCTL_DSP_LOAD:
+		return snd_hwdep_dsp_load(hw, (snd_hwdep_dsp_image_t *)arg);
+	}
 	if (hw->ops.ioctl)
 		return hw->ops.ioctl(hw, file, cmd, arg);
 	return -ENOTTY;
@@ -298,6 +353,7 @@ int snd_hwdep_new(snd_card_t * card, char *id, int device, snd_hwdep_t ** rhwdep
 		return err;
 	}
 	init_waitqueue_head(&hwdep->open_wait);
+	init_MUTEX(&hwdep->open_mutex);
 	*rhwdep = hwdep;
 	return 0;
 }

@@ -358,10 +358,18 @@ snd_seq_midisynth_register_port(snd_seq_device_t *dev)
 		if (snd_rawmidi_info_select(card, &info) >= 0)
 			strcpy(port.name, info.subname);
 		if (! port.name[0]) {
-			if (ports > 1)
-				sprintf(port.name, "MIDI %d-%d-%d", card->number, device, p);
-			else
-				sprintf(port.name, "MIDI %d-%d", card->number, device);
+			if (info.name[0]) {
+				if (ports > 1)
+					snprintf(port.name, sizeof(port.name), "%s-%d", info.name, p);
+				else
+					snprintf(port.name, sizeof(port.name), "%s", info.name);
+			} else {
+				/* last resort */
+				if (ports > 1)
+					sprintf(port.name, "MIDI %d-%d-%d", card->number, device, p);
+				else
+					sprintf(port.name, "MIDI %d-%d", card->number, device);
+			}
 		}
 		if ((info.flags & SNDRV_RAWMIDI_INFO_OUTPUT) && p < output_count)
 			port.capability |= SNDRV_SEQ_PORT_CAP_WRITE | SNDRV_SEQ_PORT_CAP_SYNC_WRITE | SNDRV_SEQ_PORT_CAP_SUBS_WRITE;
