@@ -1645,6 +1645,7 @@ static int rr_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 			printk(KERN_ERR "%s: Error reading EEPROM\n",
 			       dev->name);
 			error = -EFAULT;
+			spin_unlock_irqrestore(&rrpriv->lock, flags);
 			goto gf_out;
 		}
 		spin_unlock_irqrestore(&rrpriv->lock, flags);
