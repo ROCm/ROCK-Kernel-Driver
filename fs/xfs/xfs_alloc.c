@@ -2145,18 +2145,6 @@ xfs_alloc_put_freelist(
 	return 0;
 }
 
-static void hexdump(unsigned char *ptr, int len)
-{
-	int i;
-	for (i = 0; i < len; i++) {
-		if ((i % 20) == 0)
-			printk("%s%p: ", i > 0 ? "\n" : "", ptr + i);
-		printk("%02x ", ptr[i]);
-	}
-	printk("\n");
-}
-
-
 /*
  * Read in the allocation group header (free/alloc section).
  */
@@ -2205,7 +2193,6 @@ xfs_alloc_read_agf(
 			XFS_RANDOM_ALLOC_READ_AGF))) {
 		XFS_CORRUPTION_ERROR("xfs_alloc_read_agf",
 				     XFS_ERRLEVEL_LOW, mp, agf);
-		hexdump((void *)agf, sizeof(xfs_agf_t));
 		xfs_trans_brelse(tp, bp);
 		return XFS_ERROR(EFSCORRUPTED);
 	}
