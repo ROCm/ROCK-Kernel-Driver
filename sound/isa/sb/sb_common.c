@@ -297,6 +297,7 @@ EXPORT_SYMBOL(snd_sbdsp_create);
 EXPORT_SYMBOL(snd_sbmixer_write);
 EXPORT_SYMBOL(snd_sbmixer_read);
 EXPORT_SYMBOL(snd_sbmixer_new);
+EXPORT_SYMBOL(snd_sbmixer_add_ctl);
 
 /*
  *  INIT part

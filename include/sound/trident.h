@@ -431,7 +431,8 @@ struct _snd_trident {
         int ChanPCM;			/* max number of PCM channels */
 	int ChanPCMcnt;			/* actual number of PCM channels */
 
-	int ac97_detect;		/* 1 = AC97 in detection phase */
+	unsigned int ac97_detect: 1;	/* 1 = AC97 in detection phase */
+	unsigned int in_suspend: 1;	/* 1 during suspend/resume */
 
 	struct _snd_4dwave synth;	/* synth specific variables */
 
@@ -452,7 +453,6 @@ struct _snd_trident {
 	snd_trident_pcm_mixer_t pcm_mixer[32];
 
 	spinlock_t reg_lock;
-	snd_info_entry_t *proc_entry;
 
 	struct snd_trident_gameport *gameport;
 };
@@ -479,7 +479,7 @@ void snd_trident_write_voice_regs(trident_t * trident, snd_trident_voice_t *voic
 void snd_trident_clear_voices(trident_t * trident, unsigned short v_min, unsigned short v_max);
 
 /* TLB memory allocation */
-snd_util_memblk_t *snd_trident_alloc_pages(trident_t *trident, void *pages, dma_addr_t addr, unsigned long size);
+snd_util_memblk_t *snd_trident_alloc_pages(trident_t *trident, snd_pcm_substream_t *substream);
 int snd_trident_free_pages(trident_t *trident, snd_util_memblk_t *blk);
 snd_util_memblk_t *snd_trident_synth_alloc(trident_t *trident, unsigned int size);
 int snd_trident_synth_free(trident_t *trident, snd_util_memblk_t *blk);

@@ -23,6 +23,7 @@
 #include <sound/driver.h>
 #include <linux/delay.h>
 #include <linux/interrupt.h>
+#include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/pci.h>
 
@@ -368,7 +369,6 @@ struct _hdsp {
 	snd_card_t *card;
 	snd_pcm_t *pcm;
 	struct pci_dev *pci;
-	snd_info_entry_t *proc_entry;
 	snd_kcontrol_t *spdif_ctl;
         unsigned short mixer_matrix[HDSP_MATRIX_MIXER_SIZE];
 };
@@ -818,10 +818,18 @@ static inline int snd_hdsp_midi_input_available (hdsp_t *hdsp, int id)
 
 static inline int snd_hdsp_midi_output_possible (hdsp_t *hdsp, int id)
 {
+	int fifo_bytes_used;
+
 	if (id) {
-		return (hdsp_read(hdsp, HDSP_midiStatusOut1) & 0xff) < 128;
+		fifo_bytes_used = hdsp_read(hdsp, HDSP_midiStatusOut1) & 0xff;
 	} else {
-		return (hdsp_read(hdsp, HDSP_midiStatusOut0) & 0xff)< 128;
+		fifo_bytes_used = hdsp_read(hdsp, HDSP_midiStatusOut0) & 0xff;
+	}
+
+	if (fifo_bytes_used < 128) {
+		return  128 - fifo_bytes_used;
+	} else {
+		return 0;
 	}
 }
 
@@ -2076,27 +2084,8 @@ static void __devinit snd_hdsp_proc_init(hdsp_t *hdsp)
 {
 	snd_info_entry_t *entry;
 
-	if ((entry = snd_info_create_card_entry(hdsp->card, "hdsp", hdsp->card->proc_root)) !=
-	    NULL) {
-		entry->content = SNDRV_INFO_CONTENT_TEXT;
-		entry->private_data = hdsp;
-		entry->mode = S_IFREG | S_IRUGO | S_IWUSR;
-		entry->c.text.read_size = 256;
-		entry->c.text.read = snd_hdsp_proc_read;
-		if (snd_info_register(entry) < 0) {
-			snd_info_free_entry(entry);
-			entry = NULL;
-		}
-	}
-	hdsp->proc_entry = entry;
-}
-
-static void snd_hdsp_proc_done(hdsp_t *hdsp)
-{
-	if (hdsp->proc_entry) {
-		snd_info_unregister(hdsp->proc_entry);
-		hdsp->proc_entry = NULL;
-	}
+	if (! snd_card_proc_new(hdsp->card, "hdsp", &entry))
+		snd_info_set_text_ops(entry, hdsp, snd_hdsp_proc_read);
 }
 
 static void snd_hdsp_free_buffers(hdsp_t *hdsp)
@@ -3078,7 +3067,6 @@ static int snd_hdsp_free(hdsp_t *hdsp)
 	if (hdsp->irq >= 0)
 		free_irq(hdsp->irq, (void *)hdsp);
 
-	snd_hdsp_proc_done(hdsp);
 	snd_hdsp_free_buffers(hdsp);
 	
 	if (hdsp->iobase)

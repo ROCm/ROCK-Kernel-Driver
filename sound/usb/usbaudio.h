@@ -139,6 +139,7 @@ struct snd_usb_audio {
 	struct list_head pcm_list;	/* list of pcm streams */
 	int pcm_devs;
 
+	struct list_head midi_list;	/* list of midi interfaces */
 	int next_midi_device;
 };  
 
@@ -150,7 +151,8 @@ struct snd_usb_audio {
 #define QUIRK_MIDI_FIXED_ENDPOINT	0
 #define QUIRK_MIDI_YAMAHA		1
 #define QUIRK_MIDI_MIDIMAN		2
-#define QUIRK_ROLAND_UA100		3
+#define QUIRK_COMPOSITE			3
+#define QUIRK_AUDIO_FIXED_ENDPOINT	4
 
 typedef struct snd_usb_audio_quirk snd_usb_audio_quirk_t;
 typedef struct snd_usb_midi_endpoint_info snd_usb_midi_endpoint_info_t;
@@ -165,7 +167,7 @@ struct snd_usb_audio_quirk {
 
 /* data for QUIRK_MIDI_FIXED_ENDPOINT */
 struct snd_usb_midi_endpoint_info {
-	int16_t epnum;		/* ep number, -1 autodetect */
+	int8_t out_ep, in_ep;	/* ep number, 0 autodetect */
 	uint16_t out_cables;	/* bitmask */
 	uint16_t in_cables;	/* bitmask */
 };
@@ -175,7 +177,10 @@ struct snd_usb_midi_endpoint_info {
 /* for QUIRK_MIDI_MIDIMAN, data points to a snd_usb_midi_endpoint_info
  * structure (out_cables and in_cables only) */
 
-/* for QUIRK_ROLAND_UA100, data is NULL */
+/* for QUIRK_COMPOSITE, data points to an array of snd_usb_audio_quirk
+ * structures, terminated with .ifnum = -1 */
+
+/* for QUIRK_AUDIO_FIXED_ENDPOINT, data points to an audioformat structure */
 
 /*
  */
@@ -192,6 +197,7 @@ void *snd_usb_find_csint_desc(void *descstart, int desclen, void *after, u8 dsub
 int snd_usb_create_mixer(snd_usb_audio_t *chip, int ctrlif, unsigned char *buffer, int buflen);
 
 int snd_usb_create_midi_interface(snd_usb_audio_t *chip, struct usb_interface *iface, const snd_usb_audio_quirk_t *quirk);
+void snd_usbmidi_disconnect(struct list_head *p);
 
 /*
  * retrieve usb_interface descriptor from the host interface
@@ -206,6 +212,10 @@ int snd_usb_create_midi_interface(snd_usb_audio_t *chip, struct usb_interface *i
 
 #ifndef usb_pipe_needs_resubmit
 #define usb_pipe_needs_resubmit(pipe) 1
+#endif
+
+#ifndef snd_usb_complete_callback
+#define snd_usb_complete_callback(x) (x)
 #endif
 
 #endif /* __USBAUDIO_H */

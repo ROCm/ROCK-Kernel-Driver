@@ -51,8 +51,8 @@ config SND_RME32
 	tristate "RME Digi32, 32/8, 32 PRO"
 	depends on SND
 	help
-	  Say 'Y' or 'M' to include support for RME Digi32, Digi32/8 and
-	  Digi32 PRO audio devices.
+	  Say 'Y' or 'M' to include support for RME Digi32, Digi32 PRO and
+	  Digi32/8 (Sek'd Prodif32, Prodif96 and Prodif Gold) audio devices.
 
 config SND_RME96
 	tristate "RME Digi96, 96/8, 96/8 PRO"
@@ -116,10 +116,10 @@ config SND_ENS1371
 	  Sound Blaster PCI 64 or 128 soundcards.
 
 config SND_ES1938
-	tristate "ESS ES1938/1946 (Solo-1)"
+	tristate "ESS ES1938/1946/1969 (Solo-1)"
 	depends on SND && SOUND_GAMEPORT
 	help
-	  Say 'Y' or 'M' to include support for ESS Solo-1 (ES1938, ES1946)
+	  Say 'Y' or 'M' to include support for ESS Solo-1 (ES1938, ES1946, ES1969)
 	  soundcard.
 
 config SND_ES1968

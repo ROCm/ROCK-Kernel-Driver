@@ -204,6 +204,9 @@ static struct isapnp_card_id snd_sb16_pnpids[] __devinitdata = {
 	ISAPNP_SB16('C','T','L',0x0070,0x0001),
 	/* Sound Blaster Vibra16CL - added by ctm@ardi.com */
 	ISAPNP_SB16('C','T','L',0x0080,0x0041),
+	/* Sound Blaster 16 'value' PnP. It says model ct4130 on the pcb, */
+	/* but ct4131 on a sticker on the board.. */
+	ISAPNP_SB16('C','T','L',0x0086,0x0041),
 	/* Sound Blaster Vibra16X */
 	ISAPNP_SB16('C','T','L',0x00f0,0x0043),
 #else  /* SNDRV_SBAWE defined */

@@ -159,7 +159,6 @@ struct snd_sb_csp {
 	snd_kcontrol_t *qsound_space;
 
 	struct semaphore access_mutex;	/* locking */
-	snd_info_entry_t *proc;	/* proc interface */
 };
 
 int snd_sb_csp_new(sb_t *chip, int device, snd_hwdep_t ** rhwdep);

@@ -96,73 +96,40 @@ int snd_gf1_mem_proc_init(snd_gus_card_t * gus)
 	gus_proc_private_t *priv;
 	snd_info_entry_t *entry;
 
-	memset(&gus->gf1.rom_entries, 0, sizeof(gus->gf1.rom_entries));
-	memset(&gus->gf1.ram_entries, 0, sizeof(gus->gf1.ram_entries));
 	for (idx = 0; idx < 4; idx++) {
 		if (gus->gf1.mem_alloc.banks_8[idx].size > 0) {
 			priv = snd_magic_kcalloc(gus_proc_private_t, 0, GFP_KERNEL);
-			if (priv == NULL) {
-				snd_gf1_mem_proc_done(gus);
+			if (priv == NULL)
 				return -ENOMEM;
-			}
 			priv->gus = gus;
 			sprintf(name, "gus-ram-%i", idx);
-			entry = snd_info_create_card_entry(gus->card, name, gus->card->proc_root);
-			if (entry) {
+			if (! snd_card_proc_new(gus->card, name, &entry)) {
 				entry->content = SNDRV_INFO_CONTENT_DATA;
 				entry->private_data = priv;
 				entry->private_free = snd_gf1_mem_proc_free;
 				entry->c.ops = &snd_gf1_mem_proc_ops;
 				priv->address = gus->gf1.mem_alloc.banks_8[idx].address;
 				priv->size = entry->size = gus->gf1.mem_alloc.banks_8[idx].size;
-				if (snd_info_register(entry) < 0) {
-					snd_info_free_entry(entry);
-					entry = NULL;
-				}
 			}
-			gus->gf1.ram_entries[idx] = entry;
 		}
 	}
 	for (idx = 0; idx < 4; idx++) {
 		if (gus->gf1.rom_present & (1 << idx)) {
 			priv = snd_magic_kcalloc(gus_proc_private_t, 0, GFP_KERNEL);
-			if (priv == NULL) {
-				snd_gf1_mem_proc_done(gus);
+			if (priv == NULL)
 				return -ENOMEM;
-			}
 			priv->rom = 1;
 			priv->gus = gus;
 			sprintf(name, "gus-rom-%i", idx);
-			entry = snd_info_create_card_entry(gus->card, name, gus->card->proc_root);
-			if (entry) {
+			if (! snd_card_proc_new(gus->card, name, &entry)) {
 				entry->content = SNDRV_INFO_CONTENT_DATA;
 				entry->private_data = priv;
 				entry->private_free = snd_gf1_mem_proc_free;
 				entry->c.ops = &snd_gf1_mem_proc_ops;
 				priv->address = idx * 4096 * 1024;
 				priv->size = entry->size = gus->gf1.rom_memory;
-				if (snd_info_register(entry) < 0) {
-					snd_info_free_entry(entry);
-					entry = NULL;
-				}
 			}
-			gus->gf1.rom_entries[idx] = entry;
 		}
-	}
-	return 0;
-}
-
-int snd_gf1_mem_proc_done(snd_gus_card_t * gus)
-{
-	int idx;
-
-	for (idx = 0; idx < 4; idx++) {
-		if (gus->gf1.ram_entries[idx])
-			snd_info_unregister(gus->gf1.ram_entries[idx]);
-	}
-	for (idx = 0; idx < 4; idx++) {
-		if (gus->gf1.rom_entries[idx])
-			snd_info_unregister(gus->gf1.rom_entries[idx]);
 	}
 	return 0;
 }
