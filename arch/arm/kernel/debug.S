@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/kernel/debug-armv.S
+ *  linux/arch/arm/kernel/debug.S
  *
  *  Copyright (C) 1994-1999 Russell King
  *
