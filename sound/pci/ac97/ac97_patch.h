@@ -46,6 +46,7 @@ int patch_ad1981a(ac97_t * ac97);
 int patch_ad1981b(ac97_t * ac97);
 int patch_ad1985(ac97_t * ac97);
 int patch_alc650(ac97_t * ac97);
+int patch_alc655(ac97_t * ac97);
 int patch_cm9738(ac97_t * ac97);
 int patch_cm9739(ac97_t * ac97);
 int patch_vt1616(ac97_t * ac97);

@@ -983,6 +983,8 @@ static const snd_kcontrol_new_t snd_ac97_controls_alc650[] = {
 	/* 7: Independent Master Volume Left */
 	/* 8: reserved */
 	AC97_SINGLE("Line-In As Surround", AC97_ALC650_MULTICH, 9, 1, 0),
+	/* 10: mic, see below */
+	/* 11-13: in IEC958 controls */
 	AC97_SINGLE("Swap Surround Slot", AC97_ALC650_MULTICH, 14, 1, 0),
 #if 0 /* always set in patch_alc650 */
 	AC97_SINGLE("IEC958 Input Clock Enable", AC97_ALC650_CLOCK, 0, 1, 0),
@@ -1102,6 +1104,98 @@ int patch_alc650(ac97_t * ac97)
 			val = val | 0x100;
 		snd_ac97_write_cache(ac97, AC97_ALC650_GPIO_STATUS, val);
 	}
+
+	/* full DAC volume */
+	snd_ac97_write_cache(ac97, AC97_ALC650_SURR_DAC_VOL, 0x0808);
+	snd_ac97_write_cache(ac97, AC97_ALC650_LFE_DAC_VOL, 0x0808);
+	return 0;
+}
+
+static const snd_kcontrol_new_t snd_ac97_controls_alc655[] = {
+	AC97_SINGLE("Duplicate Front", AC97_ALC650_MULTICH, 0, 1, 0),
+	AC97_SINGLE("Line-In As Surround", AC97_ALC650_MULTICH, 9, 1, 0),
+	AC97_SINGLE("Mic As Center/LFE", AC97_ALC650_MULTICH, 10, 1, 0),
+};
+
+static int alc655_iec958_route_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo)
+{
+	static char *texts_655[3] = { "PCM", "Analog In", "IEC958 In" };
+	static char *texts_658[4] = { "PCM", "Analog1 In", "Analog2 In", "IEC958 In" };
+	ac97_t *ac97 = snd_kcontrol_chip(kcontrol);
+
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_ENUMERATED;
+	uinfo->count = 1;
+	uinfo->value.enumerated.items = ac97->spec.dev_flags ? 4 : 3;
+	if (uinfo->value.enumerated.item >= uinfo->value.enumerated.items)
+		uinfo->value.enumerated.item = uinfo->value.enumerated.items - 1;
+	strcpy(uinfo->value.enumerated.name,
+	       ac97->spec.dev_flags ?
+	       texts_658[uinfo->value.enumerated.item] :
+	       texts_655[uinfo->value.enumerated.item]);
+	return 0;
+
+}
+
+static int alc655_iec958_route_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
+{
+	ac97_t *ac97 = snd_kcontrol_chip(kcontrol);
+	unsigned short val;
+
+	val = ac97->regs[AC97_ALC650_MULTICH];
+	val = (val >> 12) & 3;
+	if (ac97->spec.dev_flags && val == 3)
+		val = 0;
+	ucontrol->value.enumerated.item[0] = val;
+	return 0;
+}
+
+static int alc655_iec958_route_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
+{
+	ac97_t *ac97 = snd_kcontrol_chip(kcontrol);
+	return snd_ac97_update_bits(ac97, AC97_ALC650_MULTICH, 3 << 12,
+				    (unsigned short)ucontrol->value.enumerated.item[0]);
+}
+
+static const snd_kcontrol_new_t snd_ac97_spdif_controls_alc655[] = {
+        AC97_SINGLE("IEC958 Capture Switch", AC97_ALC650_MULTICH, 11, 1, 0),
+        AC97_SINGLE("IEC958 Input Monitor", AC97_ALC650_MULTICH, 14, 1, 0),
+	{
+		.iface  = SNDRV_CTL_ELEM_IFACE_MIXER,
+		.name   = "IEC958 Playback Route",
+		.info   = alc655_iec958_route_info,
+		.get    = alc655_iec958_route_get,
+		.put    = alc655_iec958_route_put,
+	},
+};
+
+static int patch_alc655_specific(ac97_t * ac97)
+{
+	int err;
+
+	if ((err = patch_build_controls(ac97, snd_ac97_controls_alc655, ARRAY_SIZE(snd_ac97_controls_alc655))) < 0)
+		return err;
+	if (ac97->ext_id & AC97_EI_SPDIF) {
+		if ((err = patch_build_controls(ac97, snd_ac97_spdif_controls_alc655, ARRAY_SIZE(snd_ac97_spdif_controls_alc655))) < 0)
+			return err;
+	}
+	return 0;
+}
+
+static struct snd_ac97_build_ops patch_alc655_ops = {
+	.build_specific	= patch_alc655_specific
+};
+
+int patch_alc655(ac97_t * ac97)
+{
+	ac97->spec.dev_flags = (ac97->id == 0x414c4780); /* ALC658 */
+
+	ac97->build_ops = &patch_alc655_ops;
+
+	/* enable spdif in */
+	snd_ac97_write_cache(ac97, AC97_ALC650_CLOCK,
+			     snd_ac97_read(ac97, AC97_ALC650_MULTICH) | 0x8000);
+	snd_ac97_write_cache(ac97, AC97_ALC650_CLOCK,
+			     snd_ac97_read(ac97, AC97_ALC650_CLOCK) | 0x02);
 
 	/* full DAC volume */
 	snd_ac97_write_cache(ac97, AC97_ALC650_SURR_DAC_VOL, 0x0808);

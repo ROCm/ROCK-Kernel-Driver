@@ -112,7 +112,8 @@ static const ac97_codec_id_t snd_ac97_codec_ids[] = {
 { 0x414c4721, 0xfffffff0, "ALC650D",		patch_alc650,	NULL },
 { 0x414c4722, 0xfffffff0, "ALC650E",		patch_alc650,	NULL },
 { 0x414c4723, 0xfffffff0, "ALC650F",		patch_alc650,	NULL },
-{ 0x414c4760, 0xfffffff0, "ALC655",		patch_alc650,	NULL },
+{ 0x414c4760, 0xfffffff0, "ALC655",		patch_alc655,	NULL },
+{ 0x414c4780, 0xfffffff0, "ALC658",		patch_alc655,	NULL },
 { 0x414c4730, 0xffffffff, "ALC101",		NULL,		NULL },
 { 0x414c4740, 0xfffffff0, "ALC202",		NULL,		NULL },
 { 0x414c4750, 0xfffffff0, "ALC250",		NULL,		NULL },
@@ -2159,9 +2160,9 @@ void snd_ac97_resume(ac97_t *ac97)
 	snd_ac97_write(ac97, AC97_GENERAL_PURPOSE, 0);
 
 	snd_ac97_write(ac97, AC97_POWERDOWN, ac97->regs[AC97_POWERDOWN]);
-	snd_ac97_write(ac97, AC97_MASTER, 0x8000);
+	snd_ac97_write(ac97, AC97_MASTER, 0x8101);
 	for (i = 0; i < 10; i++) {
-		if (snd_ac97_read(ac97, AC97_MASTER) == 0x8000)
+		if (snd_ac97_read(ac97, AC97_MASTER) == 0x8101)
 			break;
 		mdelay(1);
 	}
@@ -2170,7 +2171,7 @@ __reset_ready:
 	if (ac97->init)
 		ac97->init(ac97);
 
-	is_ad18xx = (ac97->id & 0xffffff40) == AC97_ID_AD1881;
+	is_ad18xx = (ac97->flags & AC97_AD_MULTI);
 	if (is_ad18xx) {
 		/* restore the AD18xx codec configurations */
 		for (codec = 0; codec < 3; codec++) {
