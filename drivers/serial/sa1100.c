@@ -953,3 +953,4 @@ module_exit(sa1100_serial_exit);
 MODULE_AUTHOR("Deep Blue Solutions Ltd");
 MODULE_DESCRIPTION("SA1100 generic serial port driver $Revision: 1.50 $");
 MODULE_LICENSE("GPL");
+MODULE_ALIAS_CHARDEV_MAJOR(SERIAL_SA1100_MAJOR);

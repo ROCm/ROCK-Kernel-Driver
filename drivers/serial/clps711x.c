@@ -34,6 +34,7 @@
 #include <linux/console.h>
 #include <linux/sysrq.h>
 #include <linux/spinlock.h>
+#include <linux/device.h>
 
 #include <asm/hardware.h>
 #include <asm/io.h>
@@ -611,3 +612,4 @@ module_exit(clps711xuart_exit);
 MODULE_AUTHOR("Deep Blue Solutions Ltd");
 MODULE_DESCRIPTION("CLPS-711x generic serial driver $Revision: 1.42 $");
 MODULE_LICENSE("GPL");
+MODULE_ALIAS_CHARDEV(SERIAL_CLPS711X_MAJOR, SERIAL_CLPS711X_MINOR);

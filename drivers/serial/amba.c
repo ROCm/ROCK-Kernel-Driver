@@ -39,6 +39,7 @@
 #include <linux/serial.h>
 #include <linux/console.h>
 #include <linux/sysrq.h>
+#include <linux/device.h>
 
 #include <asm/io.h>
 #include <asm/irq.h>
@@ -758,3 +759,4 @@ module_exit(ambauart_exit);
 MODULE_AUTHOR("ARM Ltd/Deep Blue Solutions Ltd");
 MODULE_DESCRIPTION("ARM AMBA serial port driver $Revision: 1.41 $");
 MODULE_LICENSE("GPL");
+MODULE_ALIAS_CHARDEV(SERIAL_AMBA_MAJOR, SERIAL_AMBA_MINOR);
