@@ -60,6 +60,11 @@ extern unsigned long find_available_memory(void);
 extern void m8xx_cpm_reset(uint);
 extern void rpxfb_alloc_pages(void);
 
+void __attribute__ ((weak))
+board_init(void)
+{
+}
+
 void __init
 m8xx_setup_arch(void)
 {
@@ -102,6 +107,7 @@ m8xx_setup_arch(void)
 	}
 #endif
 #endif
+	board_init();
 }
 
 void
