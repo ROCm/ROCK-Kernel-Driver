@@ -98,13 +98,13 @@
 #include <linux/delay.h>
 #include <linux/slab.h>
 #include <linux/gameport.h>
+#include <linux/moduleparam.h>
 #include <sound/core.h>
 #include <sound/control.h>
 #include <sound/pcm.h>
 #include <sound/rawmidi.h>
 #include <sound/mpu401.h>
 #include <sound/opl3.h>
-#define SNDRV_GET_ID
 #include <sound/initval.h>
 #include "azt3328.h"
 
@@ -166,18 +166,19 @@ static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card *
 #ifdef SUPPORT_JOYSTICK
 static int joystick[SNDRV_CARDS];
 #endif
+static int boot_devs;
 
-MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for AZF3328 soundcard.");
 MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
-MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for AZF3328 soundcard.");
 MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
-MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable AZF3328 soundcard.");
 MODULE_PARM_SYNTAX(enable, SNDRV_INDEX_DESC);
 #ifdef SUPPORT_JOYSTICK
-MODULE_PARM(joystick, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(joystick, bool, boot_devs, 0444);
 MODULE_PARM_DESC(joystick, "Enable joystick for AZF3328 soundcard.");
 MODULE_PARM_SYNTAX(joystick, SNDRV_BOOLEAN_FALSE_DESC);
 #endif
@@ -1267,6 +1268,10 @@ static int snd_azf3328_free(azf3328_t *chip)
         if (chip->irq < 0)
                 goto __end_hw;
 
+	/* reset (close) mixer */
+	snd_azf3328_mixer_set_mute(chip, IDX_MIXER_PLAY_MASTER, 1); /* first mute master volume */
+	snd_azf3328_mixer_write(chip, IDX_MIXER_RESET, 0x0, WORD_VALUE);
+
         /* interrupt setup - mask everything */
 	/* FIXME */
 
@@ -1540,7 +1545,7 @@ static int __devinit snd_azf3328_probe(struct pci_dev *pci,
 	snd_azf3328_config_joystick(chip, joystick[dev]);
 #endif
 
-	pci_set_drvdata(pci, chip);
+	pci_set_drvdata(pci, card);
 	dev++;
 
 	snd_azf3328_dbgcallleave();
@@ -1549,16 +1554,8 @@ static int __devinit snd_azf3328_probe(struct pci_dev *pci,
 
 static void __devexit snd_azf3328_remove(struct pci_dev *pci)
 {
-        azf3328_t *chip = snd_magic_cast(azf3328_t, pci_get_drvdata(pci), return);
-	
 	snd_azf3328_dbgcallenter();
-
-	/* reset (close) mixer */
-	snd_azf3328_mixer_set_mute(chip, IDX_MIXER_PLAY_MASTER, 1); /* first mute master volume */
-	snd_azf3328_mixer_write(chip, IDX_MIXER_RESET, 0x0, WORD_VALUE);
-
-        if (chip)
-		snd_card_free(chip->card);
+	snd_card_free(pci_get_drvdata(pci));
 	pci_set_drvdata(pci, NULL);
 	snd_azf3328_dbgcallleave();
 }
@@ -1573,18 +1570,10 @@ static struct pci_driver driver = {
 static int __init alsa_card_azf3328_init(void)
 {
 	int err;
-	
 	snd_azf3328_dbgcallenter();
-
-	if ((err = pci_module_init(&driver)) < 0)
-	{
-#ifdef MODULE
-		printk(KERN_ERR "azt3328: no AZF3328 based soundcards found or device busy\n");
-#endif
-		return err;
-	}
+	err = pci_module_init(&driver);
 	snd_azf3328_dbgcallleave();
-	return 0;
+	return err;
 }
 
 static void __exit alsa_card_azf3328_exit(void)
@@ -1596,31 +1585,3 @@ static void __exit alsa_card_azf3328_exit(void)
 
 module_init(alsa_card_azf3328_init)
 module_exit(alsa_card_azf3328_exit)
-
-#ifndef MODULE
-
-/* format is: snd-azf3328=enable,index,id,joystick */
-
-static int __init alsa_card_azf3328_setup(char *str)
-{
-	static unsigned __initdata nr_dev = 0;
-
-	snd_azf3328_dbgcallenter();
-
-	if (nr_dev >= SNDRV_CARDS)
-		return 0;
-	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
-	       get_option(&str,&index[nr_dev]) == 2 &&
-	       get_id(&str,&id[nr_dev]) == 2
-#ifdef SUPPORT_JOYSTICK
-	       && get_option(&str,&joystick[nr_dev]) == 2
-#endif
-	       );
-	nr_dev++;
-	snd_azf3328_dbgcallleave();
-	return 1;
-}
-
-__setup("snd-azt3328=", alsa_card_azf3328_setup);
-
-#endif /* ifndef MODULE */

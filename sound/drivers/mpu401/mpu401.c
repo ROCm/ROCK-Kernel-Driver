@@ -30,9 +30,9 @@
 #ifdef CONFIG_ACPI_BUS
 #include <acpi/acpi_bus.h>
 #endif
+#include <linux/moduleparam.h>
 #include <sound/core.h>
 #include <sound/mpu401.h>
-#define SNDRV_GET_ID
 #include <sound/initval.h>
 
 #ifdef CONFIG_ACPI_BUS
@@ -55,29 +55,30 @@ static int irq[SNDRV_CARDS] = SNDRV_DEFAULT_IRQ;	/* MPU-401 IRQ */
 #ifdef CONFIG_X86_PC9800
 static int pc98ii[SNDRV_CARDS];				/* PC98-II dauther board */
 #endif
+static int boot_devs;
 
-MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for MPU-401 device.");
 MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
-MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for MPU-401 device.");
 MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
-MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable MPU-401 device.");
 MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 #ifdef USE_ACPI_PNP
-MODULE_PARM(acpipnp, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(acpipnp, bool, boot_devs, 0444);
 MODULE_PARM_DESC(acpipnp, "ACPI PnP detection for MPU-401 device.");
 MODULE_PARM_SYNTAX(acpipnp, SNDRV_ENABLED "," SNDRV_BOOLEAN_TRUE_DESC);
 #endif
-MODULE_PARM(port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+module_param_array(port, long, boot_devs, 0444);
 MODULE_PARM_DESC(port, "Port # for MPU-401 device.");
 MODULE_PARM_SYNTAX(port, SNDRV_PORT12_DESC);
-MODULE_PARM(irq, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(irq, int, boot_devs, 0444);
 MODULE_PARM_DESC(irq, "IRQ # for MPU-401 device.");
 MODULE_PARM_SYNTAX(irq, SNDRV_IRQ_DESC);
 #ifdef CONFIG_X86_PC9800
-MODULE_PARM(pc98ii, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(pc98ii, bool, boot_devs, 0444);
 MODULE_PARM_DESC(pc98ii, "Roland MPU-PC98II support.");
 MODULE_PARM_SYNTAX(pc98ii, SNDRV_BOOLEAN_FALSE_DESC);
 #endif
@@ -303,35 +304,3 @@ static void __exit alsa_card_mpu401_exit(void)
 
 module_init(alsa_card_mpu401_init)
 module_exit(alsa_card_mpu401_exit)
-
-#ifndef MODULE
-
-/* format is: snd-mpu401=enable,index,id,acpipnp[,pc98ii],port,irq */
-
-static int __init alsa_card_mpu401_setup(char *str)
-{
-	static unsigned __initdata nr_dev = 0;
-	int __attribute__ ((__unused__)) pnp = INT_MAX;
-
-	if (nr_dev >= SNDRV_CARDS)
-		return 0;
-	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
-	       get_option(&str,&index[nr_dev]) == 2 &&
-	       get_id(&str,&id[nr_dev]) == 2 &&
-	       get_option(&str,&pnp) == 2 &&
-#ifdef CONFIG_X86_PC9800
-	       get_option(&str,&pc98ii[nr_dev]) == 2 &&
-#endif
-	       get_option_long(&str,&port[nr_dev]) == 2 &&
-	       get_option(&str,&irq[nr_dev]) == 2);
-#ifdef USE_ACPI_PNP
-	if (pnp != INT_MAX)
-		acpipnp[nr_dev] = pnp;
-#endif
-	nr_dev++;
-	return 1;
-}
-
-__setup("snd-mpu401=", alsa_card_mpu401_setup);
-
-#endif /* ifndef MODULE */

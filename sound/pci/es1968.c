@@ -102,11 +102,11 @@
 #include <linux/pci.h>
 #include <linux/slab.h>
 #include <linux/gameport.h>
+#include <linux/moduleparam.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/mpu401.h>
 #include <sound/ac97_codec.h>
-#define SNDRV_GET_ID
 #include <sound/initval.h>
 
 #define chip_t es1968_t
@@ -138,36 +138,37 @@ static int enable_mpu[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 2};
 #ifdef SUPPORT_JOYSTICK
 static int joystick[SNDRV_CARDS];
 #endif
+static int boot_devs;
 
-MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for " CARD_NAME " soundcard.");
 MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
-MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for " CARD_NAME " soundcard.");
 MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
-MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable " CARD_NAME " soundcard.");
 MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
-MODULE_PARM(total_bufsize, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(total_bufsize, int, boot_devs, 0444);
 MODULE_PARM_DESC(total_bufsize, "Total buffer size in kB.");
 MODULE_PARM_SYNTAX(total_bufsize, SNDRV_ENABLED ",allows:{{1,4096}},skill:advanced");
-MODULE_PARM(pcm_substreams_p, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(pcm_substreams_p, int, boot_devs, 0444);
 MODULE_PARM_DESC(pcm_substreams_p, "PCM Playback substreams for " CARD_NAME " soundcard.");
 MODULE_PARM_SYNTAX(pcm_substreams_p, SNDRV_ENABLED ",allows:{{1,8}}");
-MODULE_PARM(pcm_substreams_c, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(pcm_substreams_c, int, boot_devs, 0444);
 MODULE_PARM_DESC(pcm_substreams_c, "PCM Capture substreams for " CARD_NAME " soundcard.");
 MODULE_PARM_SYNTAX(pcm_substreams_c, SNDRV_ENABLED ",allows:{{0,8}}");
-MODULE_PARM(clock, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(clock, int, boot_devs, 0444);
 MODULE_PARM_DESC(clock, "Clock on " CARD_NAME " soundcard.  (0 = auto-detect)");
 MODULE_PARM_SYNTAX(clock, SNDRV_ENABLED);
-MODULE_PARM(use_pm, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(use_pm, int, boot_devs, 0444);
 MODULE_PARM_DESC(use_pm, "Toggle power-management.  (0 = off, 1 = on, 2 = auto)");
-MODULE_PARM_SYNTAX(use_pm, SNDRV_ENABLED ",allows:{{0,1,2}},skill:advanced");
-MODULE_PARM(enable_mpu, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_SYNTAX(use_pm, SNDRV_ENABLED ",allows:{{0,1,2}},default:2,skill:advanced");
+module_param_array(enable_mpu, int, boot_devs, 0444);
 MODULE_PARM_DESC(enable_mpu, "Enable MPU401.  (0 = off, 1 = on, 2 = auto)");
-MODULE_PARM_SYNTAX(enable_mpu, SNDRV_ENABLED "," SNDRV_BOOLEAN_TRUE_DESC);
+MODULE_PARM_SYNTAX(enable_mpu, SNDRV_ENABLED ",allows:{{0,2}},default:2");
 #ifdef SUPPORT_JOYSTICK
-MODULE_PARM(joystick, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(joystick, bool, boot_devs, 0444);
 MODULE_PARM_DESC(joystick, "Enable joystick.");
 MODULE_PARM_SYNTAX(joystick, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
 #endif
@@ -2415,30 +2416,26 @@ static void snd_es1968_start_irq(es1968_t *chip)
 /*
  * PM support
  */
-static void es1968_suspend(es1968_t *chip)
+static int es1968_suspend(snd_card_t *card, unsigned int state)
 {
-	snd_card_t *card = chip->card;
+	es1968_t *chip = snd_magic_cast(es1968_t, card->pm_private_data, return -EINVAL);
 
 	if (! chip->do_pm)
-		return;
-
-	if (card->power_state == SNDRV_CTL_POWER_D3hot)
-		return;
+		return 0;
 
 	snd_pcm_suspend_all(chip->pcm);
+	snd_ac97_suspend(chip->ac97);
 	snd_es1968_bob_stop(chip);
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
+	return 0;
 }
 
-static void es1968_resume(es1968_t *chip)
+static int es1968_resume(snd_card_t *card, unsigned int state)
 {
-	snd_card_t *card = chip->card;
+	es1968_t *chip = snd_magic_cast(es1968_t, card->pm_private_data, return -EINVAL);
 
 	if (! chip->do_pm)
-		return;
-
-	if (card->power_state == SNDRV_CTL_POWER_D0)
-		return;
+		return 0;
 
 	/* restore all our config */
 	pci_enable_device(chip->pci);
@@ -2460,41 +2457,8 @@ static void es1968_resume(es1968_t *chip)
 		snd_es1968_bob_start(chip);
 
 	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
-}
-
-static int snd_es1968_suspend(struct pci_dev *dev, u32 state)
-{
-	es1968_t *chip = snd_magic_cast(es1968_t, pci_get_drvdata(dev), return -ENXIO);
-	es1968_suspend(chip);
 	return 0;
 }
-static int snd_es1968_resume(struct pci_dev *dev)
-{
-	es1968_t *chip = snd_magic_cast(es1968_t, pci_get_drvdata(dev), return -ENXIO);
-	es1968_resume(chip);
-	return 0;
-}
-
-/* callback */
-static int snd_es1968_set_power_state(snd_card_t *card, unsigned int power_state)
-{
-	es1968_t *chip = snd_magic_cast(es1968_t, card->power_state_private_data, return -ENXIO);
-	switch (power_state) {
-	case SNDRV_CTL_POWER_D0:
-	case SNDRV_CTL_POWER_D1:
-	case SNDRV_CTL_POWER_D2:
-		es1968_resume(chip);
-		break;
-	case SNDRV_CTL_POWER_D3hot:
-	case SNDRV_CTL_POWER_D3cold:
-		es1968_suspend(chip);
-		break;
-	default:
-		return -EINVAL;
-	}
-	return 0;
-}
-
 #endif /* CONFIG_PM */
 
 static int snd_es1968_free(es1968_t *chip)
@@ -2636,12 +2600,8 @@ static int __devinit snd_es1968_create(snd_card_t * card,
 
 	snd_es1968_chip_init(chip);
 
-#ifdef CONFIG_PM
-	if (chip->do_pm) {
-		card->set_power_state = snd_es1968_set_power_state;
-		card->power_state_private_data = chip;
-	}
-#endif
+	if (chip->do_pm)
+		snd_card_set_pm_callback(card, es1968_suspend, es1968_resume, chip);
 
 	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, chip, &ops)) < 0) {
 		snd_es1968_free(chip);
@@ -2763,16 +2723,14 @@ static int __devinit snd_es1968_probe(struct pci_dev *pci,
 		snd_card_free(card);
 		return err;
 	}
-	pci_set_drvdata(pci, chip);
+	pci_set_drvdata(pci, card);
 	dev++;
 	return 0;
 }
 
 static void __devexit snd_es1968_remove(struct pci_dev *pci)
 {
-	es1968_t *chip = snd_magic_cast(es1968_t, pci_get_drvdata(pci), return);
-	if (chip)
-		snd_card_free(chip->card);
+	snd_card_free(pci_get_drvdata(pci));
 	pci_set_drvdata(pci, NULL);
 }
 
@@ -2781,71 +2739,18 @@ static struct pci_driver driver = {
 	.id_table = snd_es1968_ids,
 	.probe = snd_es1968_probe,
 	.remove = __devexit_p(snd_es1968_remove),
-#ifdef CONFIG_PM
-	.suspend = snd_es1968_suspend,
-	.resume = snd_es1968_resume,
-#endif
+	SND_PCI_PM_CALLBACKS
 };
 
 static int __init alsa_card_es1968_init(void)
 {
-	int err;
-
-        if ((err = pci_module_init(&driver)) < 0) {
-#ifdef MODULE
-		printk(KERN_ERR "ESS Maestro soundcard not found or device busy\n");
-#endif
-		return err;
-	}
-	return 0;
+	return pci_module_init(&driver);
 }
 
 static void __exit alsa_card_es1968_exit(void)
 {
-#if 0 // do we really need this?
-	unregister_reboot_notifier(&snd_es1968_nb);
-#endif
 	pci_unregister_driver(&driver);
 }
 
 module_init(alsa_card_es1968_init)
 module_exit(alsa_card_es1968_exit)
-
-#ifndef MODULE
-
-/* format is: snd-es1968=enable,index,id,
-			 total_bufsize,
-			 pcm_substreams_p,
-			 pcm_substreams_c,
-			 clock,
-			 use_pm,
-			 enable_mpu,
-			 joystick
-*/
-
-static int __init alsa_card_es1968_setup(char *str)
-{
-	static unsigned __initdata nr_dev = 0;
-
-	if (nr_dev >= SNDRV_CARDS)
-		return 0;
-	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
-	       get_option(&str,&index[nr_dev]) == 2 &&
-	       get_id(&str,&id[nr_dev]) == 2 &&
-	       get_option(&str,&total_bufsize[nr_dev]) == 2 &&
-	       get_option(&str,&pcm_substreams_p[nr_dev]) == 2 &&
-	       get_option(&str,&pcm_substreams_c[nr_dev]) == 2 &&
-	       get_option(&str,&clock[nr_dev]) == 2 &&
-	       get_option(&str,&use_pm[nr_dev]) == 2 &&
-	       get_option(&str,&enable_mpu[nr_dev]) == 2
-#ifdef SUPPORT_JOYSTICK
-	       && get_option(&str,&joystick[nr_dev]) == 2
-#endif
-	       );
-	nr_dev++;
-	return 1;
-}
-
-__setup("snd-es1968=", alsa_card_es1968_setup);
-
-#endif /* ifndef MODULE */

@@ -7,7 +7,7 @@
 #define CARD_NAME "Aureal Advantage 3D Sound Processor"
 #define CARD_NAME_SHORT "au8810"
 
-#define NR_ADB		0x20
+#define NR_ADB		0x10
 #define NR_WT		0x00
 #define NR_SRC		0x10
 #define NR_A3D		0x10
@@ -51,13 +51,14 @@
 /* ADB */
 #define VORTEX_ADB_SR 0x28400	/* Samplerates enable/disable */
 #define VORTEX_ADB_RTBASE 0x28000
-#define VORTEX_ADB_RTBASE_SIZE (VORTEX_ADB_CHNBASE - VORTEX_ADB_RTBASE)
+#define VORTEX_ADB_RTBASE_COUNT 173
 #define VORTEX_ADB_CHNBASE 0x282b4
-#define VORTEX_ADB_CHNBASE_SIZE (ADB_MASK - VORTEX_ADB_RTBASE_SIZE)
+#define VORTEX_ADB_CHNBASE_COUNT 24
 #define 	ROUTE_MASK	0xffff
 #define		SOURCE_MASK	0xff00
 #define     ADB_MASK   0xff
 #define		ADB_SHIFT 0x8
+
 /* ADB address */
 #define		OFFSET_ADBDMA	0x00
 #define		OFFSET_SRCIN	0x40
@@ -69,10 +70,12 @@
 #define		OFFSET_SPORTIN	0x78	/* ch 0x13 */
 #define		OFFSET_SPORTOUT	0x90
 #define		OFFSET_SPDIFOUT	0x92	/* ch 0x14 check this! */
-#define		OFFSET_EQIN		0xa0
+#define		OFFSET_EQIN	0xa0
 #define		OFFSET_EQOUT	0x7e	/* 2 routes on ch 0x11 */
 #define		OFFSET_XTALKOUT	0x66	/* crosstalk canceller (source) */
 #define		OFFSET_XTALKIN	0x96	/* crosstalk canceller (sink) */
+#define		OFFSET_A3DIN	0x70	/* ADB sink. */
+#define		OFFSET_A3DOUT	0xA6	/* ADB source. 2 routes per slice = 8 */
 #define		OFFSET_EFXIN	0x80	/* ADB sink. */
 #define		OFFSET_EFXOUT	0x68	/* ADB source. */
 
@@ -89,8 +92,8 @@
 #define ADB_SPDIFOUT(x)	(x + OFFSET_SPDIFOUT)
 #define ADB_EQIN(x) (x + OFFSET_EQIN)
 #define ADB_EQOUT(x) (x + OFFSET_EQOUT)
-#define ADB_A3DOUT(x) (x + 0x50)	/* A3D blocks */
-#define ADB_A3DIN(x) (x + 0x70)
+#define ADB_A3DOUT(x) (x + OFFSET_A3DOUT)	/* 0x10 A3D blocks */
+#define ADB_A3DIN(x) (x + OFFSET_A3DIN)
 #define ADB_XTALKIN(x) (x + OFFSET_XTALKIN)
 #define ADB_XTALKOUT(x) (x + OFFSET_XTALKOUT)
 
@@ -120,20 +123,31 @@
 #define		VOL_MAX 0x7f	/* FIXME: Not confirmed! Just guessed. */
 
 /* SRC */
-#define VORTEX_SRCBLOCK_SR	0x26cc0
-#define VORTEX_SRC_CHNBASE	0x26c40
-#define VORTEX_SRC_RTBASE	0x26c00
-#define VORTEX_SRC_SOURCE	0x26cc4
-#define VORTEX_SRC_SOURCESIZE 0x26cc8
-#define VORTEX_SRC_CONVRATIO 0x26e40
-#define VORTEX_SRC_DRIFT0	0x26e80
-#define VORTEX_SRC_DRIFT1	0x26ec0
-#define VORTEX_SRC_DRIFT2	0x26f40
-#define VORTEX_SRC_U0		0x26e00
-#define VORTEX_SRC_U1		0x26f00
-#define VORTEX_SRC_U2		0x26f80
-#define VORTEX_SRC_DATA		0x26800	/* 0xc800 */
-#define VORTEX_SRC_DATA0	0x26000
+#define VORTEX_SRC_CHNBASE		0x26c40
+#define VORTEX_SRC_RTBASE		0x26c00
+#define VORTEX_SRCBLOCK_SR		0x26cc0
+#define VORTEX_SRC_SOURCE		0x26cc4
+#define VORTEX_SRC_SOURCESIZE	0x26cc8
+/* Params
+	0x26e00	: 1 U0
+	0x26e40	: 2 CR
+	0x26e80	: 3 U3
+	0x26ec0	: 4 DRIFT1
+	0x26f00 : 5 U1
+	0x26f40	: 6 DRIFT2
+	0x26f80	: 7 U2 : Target rate, direction
+*/
+
+#define VORTEX_SRC_CONVRATIO	0x26e40
+#define VORTEX_SRC_DRIFT0		0x26e80
+#define VORTEX_SRC_DRIFT1		0x26ec0
+#define VORTEX_SRC_DRIFT2		0x26f40
+#define VORTEX_SRC_U0			0x26e00
+#define		U0_SLOWLOCK		0x200
+#define VORTEX_SRC_U1			0x26f00
+#define VORTEX_SRC_U2			0x26f80
+#define VORTEX_SRC_DATA			0x26800	/* 0xc800 */
+#define VORTEX_SRC_DATA0		0x26000
 
 /* FIFO */
 #define VORTEX_FIFO_ADBCTRL 0x16100	/* Control bits. */
@@ -150,33 +164,37 @@
 //#define       FIFO_MASK       0x1f    /* at shift left 0xb */
 //#define               FIFO_SIZE       0x20
 #define 	FIFO_BITS	0x03880000
-#define VORTEX_FIFO_ADBDATA 0x14000
-#define VORTEX_FIFO_WTDATA 0x10000
+#define VORTEX_FIFO_ADBDATA	0x14000
+#define VORTEX_FIFO_WTDATA	0x10000
 
 /* CODEC */
-#define VORTEX_CODEC_CTRL 0x29184
-#define VORTEX_CODEC_EN 0x29190
+#define VORTEX_CODEC_CTRL	0x29184
+#define VORTEX_CODEC_EN		0x29190
 #define		EN_CODEC0	0x00000300
+#define 	EN_AC98		0x00000c00 /* Modem AC98 slots. */
 #define		EN_CODEC1	0x00003000
 #define		EN_CODEC	(EN_CODEC0 | EN_CODEC1)
 #define		EN_SPORT	0x00030000
 #define		EN_SPDIF	0x000c0000
-#define VORTEX_CODEC_CHN 0x29080
-#define VORTEX_CODEC_WRITE 0x00800000
-#define VORTEX_CODEC_ADDSHIFT 16
-#define VORTEX_CODEC_ADDMASK 0x7f0000	/* 0x000f0000 */
-#define VORTEX_CODEC_DATSHIFT 0
-#define VORTEX_CODEC_DATMASK 0xffff
-#define VORTEX_CODEC_IO 0x29188
+
+#define VORTEX_CODEC_CHN 	0x29080
+#define VORTEX_CODEC_WRITE	0x00800000
+#define VORTEX_CODEC_ADDSHIFT 	16
+#define VORTEX_CODEC_ADDMASK	0x7f0000	/* 0x000f0000 */
+#define VORTEX_CODEC_DATSHIFT	0
+#define VORTEX_CODEC_DATMASK	0xffff
+#define VORTEX_CODEC_IO		0x29188
 
 /* SPDIF */
-#define VORTEX_SPDIF_FLAGS		0x2205c
-#define VORTEX_SPDIF_CFG0		0x291D0
-#define VORTEX_SPDIF_CFG1		0x291D4
+#define VORTEX_SPDIF_FLAGS	0x2205c
+#define VORTEX_SPDIF_CFG0	0x291D0
+#define VORTEX_SPDIF_CFG1	0x291D4
 #define VORTEX_SPDIF_SMPRATE	0x29194
 
 /* Sample timer */
-#define VORTEX_SMP_TIME  0x29198
+#define VORTEX_SMP_TIME		0x29198
+
+#define VORTEX_MODEM_CTRL	0x291ac
 
 /* IRQ */
 #define VORTEX_IRQ_SOURCE 0x2a000	/* Interrupt source flags. */
@@ -193,19 +211,19 @@
 #define 	CTRL_IRQ_ENABLE	0x00004000
 
 /* write: Timer period config / read: TIMER IRQ ack. */
-#define VORTEX_IRQ_STAT 0x2919c
+#define VORTEX_IRQ_STAT		0x2919c
 
 /* DMA */
-#define VORTEX_ENGINE_CTRL 0x27ae8
-#define 	ENGINE_INIT 0x1380000
+#define VORTEX_ENGINE_CTRL	0x27ae8
+#define 	ENGINE_INIT	0x1380000
 
-		     /* MIDI *//* GAME. */
-#define VORTEX_MIDI_DATA 0x28800
-#define VORTEX_MIDI_CMD 0x28804	/* Write command / Read status */
+/* MIDI *//* GAME. */
+#define VORTEX_MIDI_DATA	0x28800
+#define VORTEX_MIDI_CMD		0x28804	/* Write command / Read status */
 
-#define VORTEX_CTRL2 0x2880c
+#define VORTEX_CTRL2		0x2880c
 #define		CTRL2_GAME_ADCMODE 0x40
-#define VORTEX_GAME_LEGACY 0x28808
-#define VORTEX_GAME_AXIS 0x28810
+#define VORTEX_GAME_LEGACY	0x28808
+#define VORTEX_GAME_AXIS	0x28810
 #define		AXIS_SIZE 4
 #define		AXIS_RANGE 0x1fff

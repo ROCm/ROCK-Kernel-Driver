@@ -28,17 +28,18 @@
 #include "seq_oss_timer.h"
 #include "seq_oss_event.h"
 #include <linux/init.h>
+#include <linux/moduleparam.h>
 
 /*
  * common variables
  */
-MODULE_PARM(maxqlen, "i");
+static int maxqlen = SNDRV_SEQ_OSS_MAX_QLEN;
+module_param(maxqlen, int, 0444);
 MODULE_PARM_DESC(maxqlen, "maximum queue length");
 
 static int system_client = -1; /* ALSA sequencer client number */
 static int system_port = -1;
 
-int maxqlen = SNDRV_SEQ_OSS_MAX_QLEN;
 static int num_clients;
 static seq_oss_devinfo_t *client_table[SNDRV_SEQ_OSS_MAX_CLIENTS];
 

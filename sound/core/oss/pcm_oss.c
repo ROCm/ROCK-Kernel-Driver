@@ -31,6 +31,7 @@
 #include <linux/slab.h>
 #include <linux/time.h>
 #include <linux/vmalloc.h>
+#include <linux/moduleparam.h>
 #include <sound/core.h>
 #include <sound/minors.h>
 #include <sound/pcm.h>
@@ -45,17 +46,18 @@
 static int dsp_map[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS-1)] = 0};
 static int adsp_map[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS-1)] = 1};
 static int nonblock_open;
+static int boot_devs;
 
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>, Abramo Bagnara <abramo@alsa-project.org>");
 MODULE_DESCRIPTION("PCM OSS emulation for ALSA.");
 MODULE_LICENSE("GPL");
-MODULE_PARM(dsp_map, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(dsp_map, int, boot_devs, 0444);
 MODULE_PARM_DESC(dsp_map, "PCM device number assigned to 1st OSS device.");
 MODULE_PARM_SYNTAX(dsp_map, "default:0,skill:advanced");
-MODULE_PARM(adsp_map, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(adsp_map, int, boot_devs, 0444);
 MODULE_PARM_DESC(adsp_map, "PCM device number assigned to 2nd OSS device.");
 MODULE_PARM_SYNTAX(adsp_map, "default:1,skill:advanced");
-MODULE_PARM(nonblock_open, "i");
+module_param(nonblock_open, bool, 0444);
 MODULE_PARM_DESC(nonblock_open, "Don't block opening busy PCM devices.");
 MODULE_PARM_SYNTAX(nonblock_open, "default:0,skill:advanced");
 MODULE_ALIAS_SNDRV_MINOR(SNDRV_MINOR_OSS_PCM);
@@ -2510,24 +2512,3 @@ static void __exit alsa_pcm_oss_exit(void)
 
 module_init(alsa_pcm_oss_init)
 module_exit(alsa_pcm_oss_exit)
-
-#ifndef MODULE
-
-/* format is: snd-pcm-oss=dsp_map,adsp_map[,nonblock_open] */
-
-static int __init alsa_pcm_oss_setup(char *str)
-{
-	static unsigned __initdata nr_dev = 0;
-
-	if (nr_dev >= SNDRV_CARDS)
-		return 0;
-	(void)(get_option(&str,&dsp_map[nr_dev]) == 2 &&
-	       get_option(&str,&adsp_map[nr_dev]) == 2);
-	(void)(get_option(&str,&nonblock_open) == 2);
-	nr_dev++;
-	return 1;
-}
-
-__setup("snd-pcm-oss=", alsa_pcm_oss_setup);
-
-#endif /* !MODULE */

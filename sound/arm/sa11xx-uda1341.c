@@ -62,6 +62,7 @@
 #include <linux/config.h>
 #include <sound/driver.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/init.h>
 #include <linux/errno.h>
 #include <linux/ioctl.h>
@@ -112,7 +113,7 @@ MODULE_DEVICES("{{UDA1341,iPAQ H3600 UDA1341TS}}");
 
 static char *id = NULL;	/* ID for this card */
 
-MODULE_PARM(id, "s");
+module_param(id, charp, 0444);
 MODULE_PARM_DESC(id, "ID string for SA1100/SA1111 + UDA1341TS soundcard.");
 
 #define chip_t sa11xx_uda1341_t

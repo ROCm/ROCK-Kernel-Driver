@@ -27,6 +27,7 @@
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/pci.h>
+#include <linux/moduleparam.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/ac97_codec.h>
@@ -42,7 +43,7 @@ MODULE_LICENSE("GPL");
 
 static int enable_loopback;
 
-MODULE_PARM(enable_loopback, "i");
+module_param(enable_loopback, bool, 0444);
 MODULE_PARM_DESC(enable_loopback, "Enable AC97 ADC/DAC Loopback Control");
 MODULE_PARM_SYNTAX(enable_loopback, SNDRV_BOOLEAN_FALSE_DESC);
 
@@ -2000,10 +2001,18 @@ int snd_ac97_mixer(ac97_bus_t * bus, ac97_t * _ac97, ac97_t ** rac97)
  * @ac97: the ac97 instance
  *
  * Suspends the codec, power down the chip.
+ * MASTER and HEADPHONE registers are muted but the register cache values
+ * are not changed, so that the values can be restored in snd_ac97_resume().
  */
 void snd_ac97_suspend(ac97_t *ac97)
 {
 	unsigned short power = (ac97->regs[AC97_POWERDOWN] ^ 0x8000) & ~0x8000;	/* invert EAPD */
+
+	if (ac97_is_audio(ac97)) {
+		/* some codecs have stereo mute bits */
+		snd_ac97_write(ac97, AC97_MASTER, 0x9f9f);
+		snd_ac97_write(ac97, AC97_HEADPHONE, 0x9f9f);
+	}
 
 	power |= 0x4000;	/* Headphone amplifier powerdown */
 	power |= 0x0300;	/* ADC & DAC powerdown */
@@ -2296,6 +2305,7 @@ EXPORT_SYMBOL(snd_ac97_tune_hardware);
 EXPORT_SYMBOL(snd_ac97_set_rate);
 #ifdef CONFIG_PM
 EXPORT_SYMBOL(snd_ac97_resume);
+EXPORT_SYMBOL(snd_ac97_suspend);
 #endif
 
 /*
