@@ -1071,6 +1071,7 @@ acpi_ds_delete_walk_state (
 }
 
 
+#ifdef ACPI_ENABLE_OBJECT_CACHE
 /******************************************************************************
  *
  * FUNCTION:    acpi_ds_delete_walk_state_cache
@@ -1094,5 +1095,6 @@ acpi_ds_delete_walk_state_cache (
 	acpi_ut_delete_generic_cache (ACPI_MEM_LIST_WALK);
 	return_VOID;
 }
+#endif
 
 

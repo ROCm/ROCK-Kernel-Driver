@@ -368,6 +368,7 @@ acpi_ut_delete_object_desc (
 }
 
 
+#ifdef ACPI_ENABLE_OBJECT_CACHE
 /*******************************************************************************
  *
  * FUNCTION:    acpi_ut_delete_object_cache
@@ -391,6 +392,7 @@ acpi_ut_delete_object_cache (
 	acpi_ut_delete_generic_cache (ACPI_MEM_LIST_OPERAND);
 	return_VOID;
 }
+#endif
 
 
 /*******************************************************************************
