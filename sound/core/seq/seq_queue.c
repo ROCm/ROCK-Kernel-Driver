@@ -544,10 +544,10 @@ int snd_seq_queue_use(int queueid, int client, int use)
 		return -EINVAL;
 	down(&queue->timer_mutex);
 	if (use) {
-		if (!test_and_set_bit(client, &queue->clients_bitmap))
+		if (!test_and_set_bit(client, queue->clients_bitmap))
 			queue->clients++;
 	} else {
-		if (test_and_clear_bit(client, &queue->clients_bitmap))
+		if (test_and_clear_bit(client, queue->clients_bitmap))
 			queue->clients--;
 	}
 	if (queue->clients) {
@@ -575,7 +575,7 @@ int snd_seq_queue_is_used(int queueid, int client)
 	q = queueptr(queueid);
 	if (q == NULL)
 		return -EINVAL; /* invalid queue */
-	result = test_bit(client, &q->clients_bitmap) ? 1 : 0;
+	result = test_bit(client, q->clients_bitmap) ? 1 : 0;
 	queuefree(q);
 	return result;
 }
