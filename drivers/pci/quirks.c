@@ -1,9 +1,9 @@
 /*
- * $Id: quirks.c,v 1.5 1998/05/02 19:24:14 mj Exp $
- *
  *  This file contains work-arounds for many known PCI hardware
  *  bugs.  Devices present only on certain architectures (host
  *  bridges et cetera) should be handled in arch-specific code.
+ *
+ *  Note: any quirks for hotpluggable devices must _NOT_ be declared __init.
  *
  *  Copyright (c) 1999 Martin Mares <mj@ucw.cz>
  *
@@ -1011,13 +1011,6 @@ static void __devinit quirk_pciehp_msi(struct pci_dev *pdev)
 }
 DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL,    PCI_DEVICE_ID_INTEL_SMCH,	quirk_pciehp_msi );
 
-/*
- *  The main table of quirks.
- *
- *  Note: any hooks for hotpluggable devices in this table must _NOT_
- *        be declared __init.
- */
-
 
 static void pci_do_fixups(struct pci_dev *dev, struct pci_fixup *f, struct pci_fixup *end)
 {
@@ -1038,20 +1031,23 @@ extern struct pci_fixup __end_pci_fixups_header[];
 extern struct pci_fixup __start_pci_fixups_final[];
 extern struct pci_fixup __end_pci_fixups_final[];
 
-void pci_fixup_device(int pass, struct pci_dev *dev)
+void pci_fixup_device(enum pci_fixup_pass pass, struct pci_dev *dev)
 {
 	struct pci_fixup *start, *end;
 
 	switch(pass) {
-	case PCI_FIXUP_HEADER:
+	case pci_fixup_header:
 		start = __start_pci_fixups_header;
 		end = __end_pci_fixups_header;
 		break;
 
-	case PCI_FIXUP_FINAL:
+	case pci_fixup_final:
 		start = __start_pci_fixups_final;
 		end = __end_pci_fixups_final;
 		break;
+	default:
+		/* stupid compiler warning, you would think with an enum... */
+		return;
 	}
 	pci_do_fixups(dev, start, end);
 }
