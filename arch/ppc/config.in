@@ -362,6 +362,7 @@ if [ "$CONFIG_ALL_PPC" = "y" ]; then
    bool 'Support for Open Firmware device tree in /proc' CONFIG_PROC_DEVICETREE
    bool 'Support for RTAS (RunTime Abstraction Services) in /proc' CONFIG_PPC_RTAS
    bool 'Support for PReP Residual Data' CONFIG_PREP_RESIDUAL
+   dep_bool '  Support for reading of PReP Residual Data in /proc' CONFIG_PROC_PREPRESIDUAL $CONFIG_PREP_RESIDUAL
 fi
 
 bool 'Default bootloader kernel arguments' CONFIG_CMDLINE_BOOL
@@ -574,15 +575,15 @@ if [ "$CONFIG_8260" = "y" ]; then
    source arch/ppc/8260_io/Config.in
 fi
 
-if [ "$CONFIG_4xx" = "y"]; then
+if [ "$CONFIG_4xx" = "y" ]; then
    mainmenu_option next_comment
    comment 'IBM 4xx options'
    if [ "$CONFIG_STB03xxx" = "y" ]; then
       bool 'STB IR Keyboard' CONFIG_STB_KB
       bool 'SICC Serial port' CONFIG_SERIAL_SICC
       if [ "$CONFIG_SERIAL_SICC" = "y" -a "$CONFIG_UART0_TTYS1" = "y" ]; then
-         define_bool CONFIG_UART1_DFLT_CONSOLE y	
-         define_bool CONFIG_SERIAL_SICC_CONSOLE y
+	 define_bool CONFIG_UART1_DFLT_CONSOLE y	
+	 define_bool CONFIG_SERIAL_SICC_CONSOLE y
       fi
    fi
    endmenu
@@ -621,8 +622,8 @@ if [ "$CONFIG_ALL_PPC" = "y" ]; then
 fi
 if [ "$CONFIG_4xx" = "y" -o "$CONFIG_GT64260" = "y"		\
      -o "$CONFIG_LOPEC" = "y" -o "$CONFIG_MCPN765" = "y"	\
-     -o "$CONFIG_PRPMC800" = "y" -o "$CONFIG_SANDPOINT" = "y"	\
-     -o "$CONFIG_ZX4500" = "y" ]; then
+     -o "$CONFIG_PPLUS" = "y" -o "$CONFIG_PRPMC800" = "y"	\
+     -o "$CONFIG_SANDPOINT" = "y" -o "$CONFIG_ZX4500" = "y" ]; then
    bool 'Support for early boot texts over serial port' CONFIG_SERIAL_TEXT_DEBUG
 fi
 endmenu

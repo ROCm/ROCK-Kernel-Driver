@@ -54,7 +54,7 @@ char *bootrom_cmdline = "";
 char compiled_string[] = CONFIG_CMDLINE;
 #endif
 char ramroot_string[] = "root=/dev/ram";
-char netroot_string[] = "root=/dev/nfs rw ip=auto";
+char netroot_string[] = "root=/dev/nfs rw ip=on";
 
 /* Serial port to use. */
 unsigned long com_port;
