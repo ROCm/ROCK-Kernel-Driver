@@ -224,8 +224,9 @@ static int parse_options(char *options, int *debug,
 		goto out;
 	save = 0;
 	savep = NULL;
-	for (this_char = strtok(options,","); this_char;
-	     this_char = strtok(NULL,",")) {
+	while ((this_char = strsep(&options,",")) != NULL) {
+		if (!*this_char)
+			continue;
 		if ((value = strchr(this_char,'=')) != NULL) {
 			save = *value;
 			savep = value;
