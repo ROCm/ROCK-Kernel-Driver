@@ -1,5 +1,6 @@
 /*
- * Written by: Patricia Gaughen, IBM Corporation
+ * Written by: Patricia Gaughen <gone@us.ibm.com>, IBM Corporation
+ * August 2002: added remote node KVA remap - Martin J. Bligh 
  *
  * Copyright (C) 2002, IBM Corp.
  *
@@ -19,8 +20,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
- *
- * Send feedback to <gone@us.ibm.com>
  */
 
 #include <linux/config.h>
@@ -113,35 +112,98 @@ static void __init register_bootmem_low_pages(unsigned long system_max_low_pfn)
 	}
 }
 
+#define LARGE_PAGE_BYTES (PTRS_PER_PTE * PAGE_SIZE)
+
+unsigned long node_remap_start_pfn[MAX_NUMNODES];
+unsigned long node_remap_size[MAX_NUMNODES];
+unsigned long node_remap_offset[MAX_NUMNODES];
+void *node_remap_start_vaddr[MAX_NUMNODES];
+extern void set_pmd_pfn(unsigned long vaddr, unsigned long pfn, pgprot_t flags);
+
+void __init remap_numa_kva(void)
+{
+	void *vaddr;
+	unsigned long pfn;
+	int node;
+
+	for (node = 1; node < numnodes; ++node) {
+		for (pfn=0; pfn < node_remap_size[node]; pfn += PTRS_PER_PTE) {
+			vaddr = node_remap_start_vaddr[node]+(pfn<<PAGE_SHIFT);
+			set_pmd_pfn((ulong) vaddr, 
+				node_remap_start_pfn[node] + pfn, 
+				PAGE_KERNEL_LARGE);
+		}
+	}
+}
+
+static unsigned long calculate_numa_remap_pages(void)
+{
+	int nid;
+	unsigned long size, reserve_pages = 0;
+
+	for (nid = 1; nid < numnodes; nid++) {
+		/* calculate the size of the mem_map needed in bytes */
+		size = (node_end_pfn[nid] - node_start_pfn[nid] + 1) 
+			* sizeof(struct page);
+		/* convert size to large (pmd size) pages, rounding up */
+		size = (size + LARGE_PAGE_BYTES - 1) / LARGE_PAGE_BYTES;
+		/* now the roundup is correct, convert to PAGE_SIZE pages */
+		size = size * PTRS_PER_PTE;
+		printk("Reserving %ld pages of KVA for lmem_map of node %d\n",
+				size, nid);
+		node_remap_size[nid] = size;
+		reserve_pages += size;
+		node_remap_offset[nid] = reserve_pages;
+		printk("Shrinking node %d from %ld pages to %ld pages\n",
+			nid, node_end_pfn[nid], node_end_pfn[nid] - size);
+		node_end_pfn[nid] -= size;
+		node_remap_start_pfn[nid] = node_end_pfn[nid];
+	}
+	printk("Reserving total of %ld pages for numa KVA remap\n",
+			reserve_pages);
+	return reserve_pages;
+}
+
 unsigned long __init setup_memory(void)
 {
 	int nid;
 	unsigned long bootmap_size, system_start_pfn, system_max_low_pfn;
+	unsigned long reserve_pages;
 
 	get_memcfg_numa();
+	reserve_pages = calculate_numa_remap_pages();
 
-	/*
-	 * partially used pages are not usable - thus
-	 * we are rounding upwards:
-	 */
+	/* partially used pages are not usable - thus round upwards */
 	system_start_pfn = min_low_pfn = PFN_UP(__pa(&_end));
 
 	find_max_pfn();
 	system_max_low_pfn = max_low_pfn = find_max_low_pfn();
-
 #ifdef CONFIG_HIGHMEM
-		highstart_pfn = highend_pfn = max_pfn;
-		if (max_pfn > system_max_low_pfn) {
-			highstart_pfn = system_max_low_pfn;
-		}
-		printk(KERN_NOTICE "%ldMB HIGHMEM available.\n",
-		       pages_to_mb(highend_pfn - highstart_pfn));
+	highstart_pfn = highend_pfn = max_pfn;
+	if (max_pfn > system_max_low_pfn)
+		highstart_pfn = system_max_low_pfn;
+	printk(KERN_NOTICE "%ldMB HIGHMEM available.\n",
+	       pages_to_mb(highend_pfn - highstart_pfn));
 #endif
+	system_max_low_pfn = max_low_pfn = max_low_pfn - reserve_pages;
 	printk(KERN_NOTICE "%ldMB LOWMEM available.\n",
 			pages_to_mb(system_max_low_pfn));
-	
-	for (nid = 0; nid < numnodes; nid++)
+	printk("min_low_pfn = %ld, max_low_pfn = %ld, highstart_pfn = %ld\n", 
+			min_low_pfn, max_low_pfn, highstart_pfn);
+
+	printk("Low memory ends at vaddr %08lx\n",
+			(ulong) pfn_to_kaddr(max_low_pfn));
+	for (nid = 0; nid < numnodes; nid++) {
 		allocate_pgdat(nid);
+		node_remap_start_vaddr[nid] = pfn_to_kaddr(
+			highstart_pfn - node_remap_offset[nid]);
+		printk ("node %d will remap to vaddr %08lx - %08lx\n", nid,
+			(ulong) node_remap_start_vaddr[nid],
+			(ulong) pfn_to_kaddr(highstart_pfn
+			    - node_remap_offset[nid] + node_remap_size[nid]));
+	}
+	printk("High memory starts at vaddr %08lx\n",
+			(ulong) pfn_to_kaddr(highstart_pfn));
 	for (nid = 0; nid < numnodes; nid++)
 		find_max_pfn_node(nid);
 
@@ -244,7 +306,18 @@ void __init zone_sizes_init(void)
 #endif
 			}
 		}
-		free_area_init_node(nid, NODE_DATA(nid), 0, zones_size, start, 0);
+		/*
+		 * We let the lmem_map for node 0 be allocated from the
+		 * normal bootmem allocator, but other nodes come from the
+		 * remapped KVA area - mbligh
+		 */
+		if (nid)
+			free_area_init_node(nid, NODE_DATA(nid), 
+				node_remap_start_vaddr[nid], zones_size, 
+				start, 0);
+		else
+			free_area_init_node(nid, NODE_DATA(nid), 0, 
+				zones_size, start, 0);
 	}
 	return;
 }

@@ -245,6 +245,12 @@ extern void set_highmem_pages_init(int);
 
 unsigned long __PAGE_KERNEL = _PAGE_KERNEL;
 
+#ifndef CONFIG_DISCONTIGMEM
+#define remap_numa_kva() do {} while (0)
+#else
+extern void __init remap_numa_kva(void);
+#endif
+
 static void __init pagetable_init (void)
 {
 	unsigned long vaddr;
@@ -269,6 +275,7 @@ static void __init pagetable_init (void)
 	}
 
 	kernel_physical_mapping_init(pgd_base);
+	remap_numa_kva();
 
 	/*
 	 * Fixed mappings, only the page table structure has to be
@@ -449,7 +456,11 @@ void __init mem_init(void)
 
 	set_max_mapnr_init();
 
+#ifdef CONFIG_HIGHMEM
+	high_memory = (void *) __va(highstart_pfn * PAGE_SIZE);
+#else
 	high_memory = (void *) __va(max_low_pfn * PAGE_SIZE);
+#endif
 
 	/* clear the zero-page */
 	memset(empty_zero_page, 0, PAGE_SIZE);
