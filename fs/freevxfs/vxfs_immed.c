@@ -32,12 +32,12 @@
  */
 #include <linux/fs.h>
 #include <linux/pagemap.h>
+#include <linux/namei.h>
 
 #include "vxfs.h"
 #include "vxfs_inode.h"
 
 
-static int	vxfs_immed_readlink(struct dentry *, char __user *, int);
 static int	vxfs_immed_follow_link(struct dentry *, struct nameidata *);
 
 static int	vxfs_immed_readpage(struct file *, struct page *);
@@ -49,7 +49,7 @@ static int	vxfs_immed_readpage(struct file *, struct page *);
  * but do all work directly on the inode.
  */
 struct inode_operations vxfs_immed_symlink_iops = {
-	.readlink =		vxfs_immed_readlink,
+	.readlink =		generic_readlink,
 	.follow_link =		vxfs_immed_follow_link,
 };
 
@@ -59,28 +59,6 @@ struct inode_operations vxfs_immed_symlink_iops = {
 struct address_space_operations vxfs_immed_aops = {
 	.readpage =		vxfs_immed_readpage,
 };
-
-
-/**
- * vxfs_immed_readlink - read immed symlink
- * @dp:		dentry for the link
- * @bp:		output buffer
- * @buflen:	length of @bp
- *
- * Description:
- *   vxfs_immed_readlink calls vfs_readlink to read the link
- *   described by @dp into userspace.
- *
- * Returns:
- *   Number of bytes successfully copied to userspace.
- */
-static int
-vxfs_immed_readlink(struct dentry *dp, char __user *bp, int buflen)
-{
-	struct vxfs_inode_info		*vip = VXFS_INO(dp->d_inode);
-
-	return (vfs_readlink(dp, bp, buflen, vip->vii_immed.vi_immed));
-}
 
 /**
  * vxfs_immed_follow_link - follow immed symlink
@@ -98,8 +76,8 @@ static int
 vxfs_immed_follow_link(struct dentry *dp, struct nameidata *np)
 {
 	struct vxfs_inode_info		*vip = VXFS_INO(dp->d_inode);
-
-	return (vfs_follow_link(np, vip->vii_immed.vi_immed));
+	nd_set_link(np, vip->vii_immed.vi_immed);
+	return 0;
 }
 
 /**
