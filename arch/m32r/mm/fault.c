@@ -2,12 +2,11 @@
  *  linux/arch/m32r/mm/fault.c
  *
  *  Copyright (c) 2001, 2002  Hitoshi Yamamoto, and H. Kondo
+ *  Copyright (c) 2004  Naoto Sugai, NIIBE Yutaka
  *
  *  Some code taken from i386 version.
  *    Copyright (C) 1995  Linus Torvalds
  */
-
-/* $Id$ */
 
 #include <linux/config.h>
 #include <linux/signal.h>
@@ -131,7 +130,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code,
 	 * nothing more.
 	 *
 	 * This verifies that the fault happens in kernel space
-	 * (error_code & ACE_USEMODE) == 0, and that the fault was not a
+	 * (error_code & ACE_USERMODE) == 0, and that the fault was not a
 	 * protection error (error_code & ACE_PROTECTION) == 0.
 	 */
 	if (address >= TASK_SIZE && !(error_code & ACE_USERMODE))
