@@ -98,8 +98,8 @@ void ata_input_data(ide_drive_t *drive, void *buffer, unsigned int wcount)
 	 * for handling polled ide transfers
 	 */
 
-	if (HWIF(drive)->ideproc) {
-		HWIF(drive)->ideproc(ideproc_ide_input_data, drive, buffer, wcount);
+	if (drive->channel->ideproc) {
+		drive->channel->ideproc(ideproc_ide_input_data, drive, buffer, wcount);
 		return;
 	}
 
@@ -138,8 +138,8 @@ void ata_output_data(ide_drive_t *drive, void *buffer, unsigned int wcount)
 {
 	byte io_32bit;
 
-	if (HWIF(drive)->ideproc) {
-		HWIF(drive)->ideproc(ideproc_ide_output_data, drive, buffer, wcount);
+	if (drive->channel->ideproc) {
+		drive->channel->ideproc(ideproc_ide_output_data, drive, buffer, wcount);
 		return;
 	}
 
@@ -180,8 +180,8 @@ void ata_output_data(ide_drive_t *drive, void *buffer, unsigned int wcount)
  */
 void atapi_input_bytes (ide_drive_t *drive, void *buffer, unsigned int bytecount)
 {
-	if (HWIF(drive)->ideproc) {
-		HWIF(drive)->ideproc(ideproc_atapi_input_bytes, drive, buffer, bytecount);
+	if (drive->channel->ideproc) {
+		drive->channel->ideproc(ideproc_atapi_input_bytes, drive, buffer, bytecount);
 		return;
 	}
 
@@ -200,8 +200,8 @@ void atapi_input_bytes (ide_drive_t *drive, void *buffer, unsigned int bytecount
 
 void atapi_output_bytes (ide_drive_t *drive, void *buffer, unsigned int bytecount)
 {
-	if (HWIF(drive)->ideproc) {
-		HWIF(drive)->ideproc(ideproc_atapi_output_bytes, drive, buffer, bytecount);
+	if (drive->channel->ideproc) {
+		drive->channel->ideproc(ideproc_atapi_output_bytes, drive, buffer, bytecount);
 		return;
 	}
 
@@ -243,7 +243,7 @@ int drive_is_ready(ide_drive_t *drive)
 {
 	byte stat = 0;
 	if (drive->waiting_for_dma)
-		return HWIF(drive)->dmaproc(ide_dma_test_irq, drive);
+		return drive->channel->dmaproc(ide_dma_test_irq, drive);
 #if 0
 	/* need to guarantee 400ns since last command was issued */
 	udelay(1);
@@ -374,7 +374,7 @@ ide_startstop_t ata_taskfile(ide_drive_t *drive,
 	if (handler != task_mulout_intr && handler != bio_mulout_intr) {
 		if (IDE_CONTROL_REG)
 			OUT_BYTE(drive->ctl, IDE_CONTROL_REG);	/* clear nIEN */
-		SELECT_MASK(HWIF(drive), drive, 0);
+		SELECT_MASK(drive->channel, drive, 0);
 	}
 
 	if ((id->command_set_2 & 0x0400) &&
@@ -408,7 +408,7 @@ ide_startstop_t ata_taskfile(ide_drive_t *drive,
 			return prehandler(drive, rq);
 	} else {
 		/* for dma commands we down set the handler */
-		if (drive->using_dma && !(HWIF(drive)->dmaproc(((taskfile->command == WIN_WRITEDMA) || (taskfile->command == WIN_WRITEDMA_EXT)) ? ide_dma_write : ide_dma_read, drive)));
+		if (drive->using_dma && !(drive->channel->dmaproc(((taskfile->command == WIN_WRITEDMA) || (taskfile->command == WIN_WRITEDMA_EXT)) ? ide_dma_write : ide_dma_read, drive)));
 	}
 
 	return ide_started;
@@ -1047,8 +1047,8 @@ int ide_cmd_ioctl(ide_drive_t *drive, struct inode *inode, struct file *file, un
 
 	if (!err && xfer_rate) {
 		/* active-retuning-calls future */
-		if ((HWIF(drive)->speedproc) != NULL)
-			HWIF(drive)->speedproc(drive, xfer_rate);
+		if ((drive->channel->speedproc) != NULL)
+			drive->channel->speedproc(drive, xfer_rate);
 		ide_driveid_update(drive);
 	}
 abort:

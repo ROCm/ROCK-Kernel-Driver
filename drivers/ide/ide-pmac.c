@@ -127,10 +127,10 @@ struct pmu_sleep_notifier idepmac_sleep_notifier = {
 static int
 pmac_ide_find(ide_drive_t *drive)
 {
-	ide_hwif_t *hwif = HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 	ide_ioreg_t base;
 	int i;
-	
+
 	for (i=0; i<pmac_ide_count; i++) {
 		base = pmac_ide[i].regbase;
 		if (base && base == hwif->io_ports[0])
@@ -261,8 +261,8 @@ pmac_ide_do_setfeature(ide_drive_t *drive, byte command)
 	save_flags(flags);
 	cli();
 	udelay(1);
-	SELECT_DRIVE(HWIF(drive), drive);
-	SELECT_MASK(HWIF(drive), drive, 0);
+	SELECT_DRIVE(drive->channel, drive);
+	SELECT_MASK(drive->channel, drive, 0);
 	udelay(1);
 	if(wait_for_ready(drive)) {
 		printk(KERN_ERR "pmac_ide_do_setfeature disk not ready before SET_FEATURE!\n");
@@ -510,7 +510,7 @@ pmac_ide_probe(void)
 	struct device_node *p, **pp, *removables, **rp;
 	unsigned long base;
 	int irq, big_delay;
-	ide_hwif_t *hwif;
+	struct ata_channel *hwif;
 
 	if (_machine != _MACH_Pmac)
 		return;
@@ -1097,7 +1097,7 @@ static void idepmac_wake_device(ide_drive_t *drive, int used_dma)
 		DRIVER(drive)->media_change(drive);
 
 	/* We kick the VFS too (see fix in ide.c revalidate) */
-	check_disk_change(MKDEV(HWIF(drive)->major, (drive->select.b.unit) << PARTN_BITS));
+	check_disk_change(MKDEV(drive->channel->major, (drive->select.b.unit) << PARTN_BITS));
 	
 #ifdef CONFIG_BLK_DEV_IDEDMA_PMAC
 	/* We re-enable DMA on the drive if it was active. */
@@ -1201,7 +1201,7 @@ static int idepmac_notify_sleep(struct pmu_sleep_notifier *self, int when)
 		break;
 	case PBOOK_SLEEP_NOW:
 		for (i = 0; i < pmac_ide_count; ++i) {
-			ide_hwif_t *hwif;
+			struct ata_channel *hwif;
 			ide_drive_t *drive;
 			int unlock = 0;
 
@@ -1261,8 +1261,8 @@ static int idepmac_notify_sleep(struct pmu_sleep_notifier *self, int when)
 			mdelay(IDE_WAKEUP_DELAY_MS);
 	
 		for (i = 0; i < pmac_ide_count; ++i) {
-			ide_hwif_t *hwif;
-			ide_drive_t *drive;			
+			struct ata_channel *hwif;
+			ide_drive_t *drive;
 			int j, used_dma;
 			
 			if ((base = pmac_ide[i].regbase) == 0)

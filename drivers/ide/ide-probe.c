@@ -118,7 +118,7 @@ static inline void do_identify (ide_drive_t *drive, byte cmd)
 		byte type = (id->config >> 8) & 0x1f;
 		printk("ATAPI ");
 #ifdef CONFIG_BLK_DEV_PDC4030
-		if (HWIF(drive)->channel == 1 && HWIF(drive)->chipset == ide_pdc4030) {
+		if (drive->channel->channel == 1 && drive->channel->chipset == ide_pdc4030) {
 			printk(" -- not supported on 2nd Promise port\n");
 			goto err_misc;
 		}
@@ -167,12 +167,16 @@ static inline void do_identify (ide_drive_t *drive, byte cmd)
 	 */
 	if (id->config & (1<<7))
 		drive->removable = 1;
+
 	/*
-	 * Prevent long system lockup probing later for non-existant
-	 * slave drive if the hwif is actually a flash memory card of some variety:
+	 * FIXME: This is just plain ugly or plain unnecessary.
+	 *
+	 * Prevent long system lockup probing later for non-existant slave
+	 * drive if the hwif is actually a flash memory card of some variety:
 	 */
+
 	if (drive_is_flashcard(drive)) {
-		ide_drive_t *mate = &HWIF(drive)->drives[1^drive->select.b.unit];
+		ide_drive_t *mate = &drive->channel->drives[1 ^ drive->select.b.unit];
 		if (!mate->ata_flash) {
 			mate->present = 0;
 			mate->noprobe = 1;
@@ -182,8 +186,8 @@ static inline void do_identify (ide_drive_t *drive, byte cmd)
 	printk("ATA DISK drive\n");
 
 	/* Initialize our quirk list. */
-	if (HWIF(drive)->quirkproc)
-		drive->quirk_list = HWIF(drive)->quirkproc(drive);
+	if (drive->channel->quirkproc)
+		drive->quirk_list = drive->channel->quirkproc(drive);
 
 	return;
 
@@ -232,7 +236,7 @@ static int actual_try_to_identify (ide_drive_t *drive, byte cmd)
 		OUT_BYTE(0,IDE_FEATURE_REG);	/* disable dma & overlap */
 
 #if CONFIG_BLK_DEV_PDC4030
-	if (HWIF(drive)->chipset == ide_pdc4030) {
+	if (drive->channel->chipset == ide_pdc4030) {
 		/* DC4030 hosted drives need their own identify... */
 		extern int pdc4030_identify(ide_drive_t *);
 		if (pdc4030_identify(drive)) {
@@ -270,7 +274,7 @@ static int try_to_identify (ide_drive_t *drive, byte cmd)
 	int autoprobe = 0;
 	unsigned long cookie = 0;
 
-	if (IDE_CONTROL_REG && !HWIF(drive)->irq) {
+	if (IDE_CONTROL_REG && !drive->channel->irq) {
 		autoprobe = 1;
 		cookie = probe_irq_on();
 		OUT_BYTE(drive->ctl,IDE_CONTROL_REG);	/* enable device irq */
@@ -284,9 +288,9 @@ static int try_to_identify (ide_drive_t *drive, byte cmd)
 		GET_STAT();			/* clear drive IRQ */
 		udelay(5);
 		irq = probe_irq_off(cookie);
-		if (!HWIF(drive)->irq) {
+		if (!drive->channel->irq) {
 			if (irq > 0)
-				HWIF(drive)->irq = irq;
+				drive->channel->irq = irq;
 			else	/* Mmmm.. multiple IRQs.. don't know which was ours */
 				printk("%s: IRQ probe failed (0x%lx)\n", drive->name, cookie);
 		}
@@ -314,7 +318,7 @@ static int try_to_identify (ide_drive_t *drive, byte cmd)
 static int do_probe (ide_drive_t *drive, byte cmd)
 {
 	int rc;
-	ide_hwif_t *hwif = HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 	if (drive->present) {	/* avoid waiting for inappropriate probes */
 		if ((drive->type != ATA_DISK) && (cmd == WIN_IDENTIFY))
 			return 4;
@@ -369,12 +373,12 @@ static int do_probe (ide_drive_t *drive, byte cmd)
 /*
  *
  */
-static void enable_nest (ide_drive_t *drive)
+static void enable_nest(ide_drive_t *drive)
 {
 	unsigned long timeout;
 
-	printk("%s: enabling %s -- ", HWIF(drive)->name, drive->id->model);
-	SELECT_DRIVE(HWIF(drive), drive);
+	printk("%s: enabling %s -- ", drive->channel->name, drive->id->model);
+	SELECT_DRIVE(drive->channel, drive);
 	ide_delay_50ms();
 	OUT_BYTE(EXABYTE_ENABLE_NEST, IDE_COMMAND_REG);
 	timeout = jiffies + WAIT_WORSTCASE;
@@ -427,7 +431,7 @@ static inline void probe_for_drive (ide_drive_t *drive)
  * ordered sanely.  We deal with the CONTROL register
  * separately.
  */
-static int hwif_check_regions (ide_hwif_t *hwif)
+static int hwif_check_regions(struct ata_channel *hwif)
 {
 	int region_errors = 0;
 
@@ -453,7 +457,7 @@ static int hwif_check_regions (ide_hwif_t *hwif)
 	return(region_errors);
 }
 
-static void hwif_register (ide_hwif_t *hwif)
+static void hwif_register(struct ata_channel *hwif)
 {
 	/* Register this hardware interface within the global device tree.
 	 */
@@ -503,7 +507,7 @@ static void hwif_register (ide_hwif_t *hwif)
  * This routine only knows how to look for drive units 0 and 1
  * on an interface, so any setting of MAX_DRIVES > 2 won't work here.
  */
-static void probe_hwif (ide_hwif_t *hwif)
+static void probe_hwif(struct ata_channel *hwif)
 {
 	unsigned int unit;
 	unsigned long flags;
@@ -562,7 +566,7 @@ static void probe_hwif (ide_hwif_t *hwif)
 	for (unit = 0; unit < MAX_DRIVES; ++unit) {
 		ide_drive_t *drive = &hwif->drives[unit];
 		if (drive->present) {
-			ide_tuneproc_t *tuneproc = HWIF(drive)->tuneproc;
+			ide_tuneproc_t *tuneproc = drive->channel->tuneproc;
 			if (tuneproc != NULL && drive->autotune == 1)
 				tuneproc(drive, 255);	/* auto-tune PIO mode */
 		}
@@ -583,7 +587,7 @@ static void ide_init_queue(ide_drive_t *drive)
 
 	/* IDE can do up to 128K per request, pdc4030 needs smaller limit */
 #ifdef CONFIG_BLK_DEV_PDC4030
-	if (HWIF(drive)->chipset == ide_pdc4030)
+	if (drive->channel->chipset == ide_pdc4030)
 		max_sectors = 127;
 #endif
 	blk_queue_max_sectors(q, max_sectors);
@@ -608,9 +612,10 @@ static void ide_init_queue(ide_drive_t *drive)
  *
  * This routine detects and reports such situations, but does not fix them.
  */
-static void save_match(ide_hwif_t *hwif, ide_hwif_t *new, ide_hwif_t **match)
+static void save_match(struct ata_channel *hwif, struct ata_channel *new,
+		struct ata_channel **match)
 {
-	ide_hwif_t *m = *match;
+	struct ata_channel *m = *match;
 
 	if (m && m->hwgroup && m->hwgroup != new->hwgroup) {
 		if (!new->hwgroup)
@@ -635,12 +640,12 @@ static void save_match(ide_hwif_t *hwif, ide_hwif_t *new, ide_hwif_t **match)
  * but anything else has led to problems on some machines.  We re-enable
  * interrupts as much as we can safely do in most places.
  */
-static int init_irq (ide_hwif_t *hwif)
+static int init_irq(struct ata_channel *hwif)
 {
 	unsigned long flags;
 	unsigned int index;
 	ide_hwgroup_t *hwgroup, *new_hwgroup;
-	ide_hwif_t *match = NULL;
+	struct ata_channel *match = NULL;
 
 
 	/* Allocate the buffer and potentially sleep first */
@@ -655,7 +660,7 @@ static int init_irq (ide_hwif_t *hwif)
 	 * Group up with any other hwifs that share our irq(s).
 	 */
 	for (index = 0; index < MAX_HWIFS; index++) {
-		ide_hwif_t *h = &ide_hwifs[index];
+		struct ata_channel *h = &ide_hwifs[index];
 		if (h->hwgroup) {  /* scan only initialized hwif's */
 			if (hwif->irq == h->irq) {
 				hwif->sharing_irq = h->sharing_irq = 1;
@@ -736,7 +741,7 @@ static int init_irq (ide_hwif_t *hwif)
 		ide_init_queue(drive);
 	}
 	if (!hwgroup->hwif) {
-		hwgroup->hwif = HWIF(hwgroup->drive);
+		hwgroup->hwif = hwgroup->drive->channel;
 #ifdef DEBUG
 		printk("%s : Adding missed hwif to hwgroup!!\n", hwif->name);
 #endif
@@ -770,7 +775,7 @@ static int init_irq (ide_hwif_t *hwif)
  * structures needed for the routines in genhd.c.  ide_geninit() gets called
  * somewhat later, during the partition check.
  */
-static void init_gendisk (ide_hwif_t *hwif)
+static void init_gendisk(struct ata_channel *hwif)
 {
 	struct gendisk *gd;
 	unsigned int unit, minors, i;
@@ -840,7 +845,7 @@ err_kmalloc_gd:
 	return;
 }
 
-static int hwif_init (ide_hwif_t *hwif)
+static int hwif_init(struct ata_channel *hwif)
 {
 	if (!hwif->present)
 		return 0;

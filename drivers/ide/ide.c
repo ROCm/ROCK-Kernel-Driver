@@ -223,7 +223,7 @@ int noautodma = 0;
 /*
  * This is declared extern in ide.h, for access by other IDE modules:
  */
-ide_hwif_t ide_hwifs[MAX_HWIFS];	/* master data repository */
+struct ata_channel ide_hwifs[MAX_HWIFS];	/* master data repository */
 
 #if (DISK_RECOVERY_TIME > 0)
 /*
@@ -244,19 +244,19 @@ static unsigned long read_timer (void)
 	__restore_flags(flags);	/* local CPU only */
 	return (t - i);
 }
-#endif /* DISK_RECOVERY_TIME */
+#endif
 
-static inline void set_recovery_timer (ide_hwif_t *hwif)
+static inline void set_recovery_timer(struct ata_channel *channel)
 {
 #if (DISK_RECOVERY_TIME > 0)
-	hwif->last_time = read_timer();
-#endif /* DISK_RECOVERY_TIME */
+	channel->last_time = read_timer();
+#endif
 }
 
 /*
  * Do not even *think* about calling this!
  */
-static void init_hwif_data(ide_hwif_t *hwif, unsigned int index)
+static void init_hwif_data(struct ata_channel *hwif, unsigned int index)
 {
 	static const byte ide_major[] = {
 		IDE0_MAJOR, IDE1_MAJOR, IDE2_MAJOR, IDE3_MAJOR, IDE4_MAJOR,
@@ -267,7 +267,7 @@ static void init_hwif_data(ide_hwif_t *hwif, unsigned int index)
 	hw_regs_t hw;
 
 	/* bulk initialize hwif & drive info with zeros */
-	memset(hwif, 0, sizeof(ide_hwif_t));
+	memset(hwif, 0, sizeof(struct ata_channel));
 	memset(&hw, 0, sizeof(hw_regs_t));
 
 	/* fill in any non-zero initial values */
@@ -445,13 +445,13 @@ static void ata_pre_reset (ide_drive_t *drive)
 	if (drive->using_dma) {
 		/* check the DMA crc count */
 		if (drive->crc_count) {
-			HWIF(drive)->dmaproc(ide_dma_off_quietly, drive);
-			if ((HWIF(drive)->speedproc) != NULL)
-				HWIF(drive)->speedproc(drive, ide_auto_reduce_xfer(drive));
+			drive->channel->dmaproc(ide_dma_off_quietly, drive);
+			if ((drive->channel->speedproc) != NULL)
+				drive->channel->speedproc(drive, ide_auto_reduce_xfer(drive));
 			if (drive->current_speed >= XFER_SW_DMA_0)
-				HWIF(drive)->dmaproc(ide_dma_on, drive);
+				drive->channel->dmaproc(ide_dma_on, drive);
 		} else
-			HWIF(drive)->dmaproc(ide_dma_off, drive);
+			drive->channel->dmaproc(ide_dma_off, drive);
 	}
 }
 
@@ -483,7 +483,7 @@ static ide_startstop_t ata_special (ide_drive_t *drive)
 	printk("%s: ata_special: 0x%02x\n", drive->name, s->all);
 #endif
 	if (s->b.set_tune) {
-		ide_tuneproc_t *tuneproc = HWIF(drive)->tuneproc;
+		ide_tuneproc_t *tuneproc = drive->channel->tuneproc;
 		s->b.set_tune = 0;
 		if (tuneproc != NULL)
 			tuneproc(drive, drive->tune_req);
@@ -507,9 +507,9 @@ static ide_startstop_t ata_special (ide_drive_t *drive)
 extern struct block_device_operations ide_fops[];
 
 /*
- * ide_geninit() is called exactly *once* for each interface.
+ * This is called exactly *once* for each channel.
  */
-void ide_geninit (ide_hwif_t *hwif)
+void ide_geninit(struct ata_channel *hwif)
 {
 	unsigned int unit;
 	struct gendisk *gd = hwif->gd;
@@ -542,7 +542,7 @@ static ide_startstop_t atapi_reset_pollfunc (ide_drive_t *drive)
 	ide_hwgroup_t *hwgroup = HWGROUP(drive);
 	byte stat;
 
-	SELECT_DRIVE(HWIF(drive),drive);
+	SELECT_DRIVE(drive->channel,drive);
 	udelay (10);
 
 	if (OK_STAT(stat=GET_STAT(), 0, BUSY_STAT)) {
@@ -569,7 +569,7 @@ static ide_startstop_t atapi_reset_pollfunc (ide_drive_t *drive)
 static ide_startstop_t reset_pollfunc (ide_drive_t *drive)
 {
 	ide_hwgroup_t *hwgroup = HWGROUP(drive);
-	ide_hwif_t *hwif = HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 	byte tmp;
 
 	if (!OK_STAT(tmp=GET_STAT(), 0, BUSY_STAT)) {
@@ -632,7 +632,7 @@ static ide_startstop_t do_reset1 (ide_drive_t *drive, int do_not_try_atapi)
 {
 	unsigned int unit;
 	unsigned long flags;
-	ide_hwif_t *hwif = HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 	ide_hwgroup_t *hwgroup = HWGROUP(drive);
 
 	__save_flags(flags);	/* local CPU only */
@@ -934,7 +934,7 @@ void ide_cmd (ide_drive_t *drive, byte cmd, byte nsect, ide_handler_t *handler)
 	ide_set_handler (drive, handler, WAIT_CMD, NULL);
 	if (IDE_CONTROL_REG)
 		OUT_BYTE(drive->ctl,IDE_CONTROL_REG);	/* clear nIEN */
-	SELECT_MASK(HWIF(drive),drive,0);
+	SELECT_MASK(drive->channel, drive, 0);
 	OUT_BYTE(nsect,IDE_NSECTOR_REG);
 	OUT_BYTE(cmd,IDE_COMMAND_REG);
 }
@@ -1025,7 +1025,7 @@ static ide_startstop_t start_request (ide_drive_t *drive, struct request *rq)
 	ide_startstop_t startstop;
 	unsigned long block;
 	unsigned int minor = minor(rq->rq_dev), unit = minor >> PARTN_BITS;
-	ide_hwif_t *hwif = HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 
 	BUG_ON(!(rq->flags & REQ_STARTED));
 
@@ -1199,19 +1199,17 @@ ide_startstop_t restart_request (ide_drive_t *drive)
  * ide_stall_queue() can be used by a drive to give excess bandwidth back
  * to the hwgroup by sleeping for timeout jiffies.
  */
-void ide_stall_queue (ide_drive_t *drive, unsigned long timeout)
+void ide_stall_queue(ide_drive_t *drive, unsigned long timeout)
 {
 	if (timeout > WAIT_WORSTCASE)
 		timeout = WAIT_WORSTCASE;
-	drive->sleep = timeout + jiffies;
+	drive->PADAM_sleep = timeout + jiffies;
 }
-
-#define WAKEUP(drive)	((drive)->service_start + 2 * (drive)->service_time)
 
 /*
  * choose_drive() selects the next drive which will be serviced.
  */
-static inline ide_drive_t *choose_drive (ide_hwgroup_t *hwgroup)
+static inline ide_drive_t *choose_drive(ide_hwgroup_t *hwgroup)
 {
 	ide_drive_t *drive, *best;
 
@@ -1219,18 +1217,19 @@ repeat:
 	best = NULL;
 	drive = hwgroup->drive;
 	do {
-		if (!list_empty(&drive->queue.queue_head) && (!drive->sleep || 0 <= (signed long)(jiffies - drive->sleep))) {
+		if (!list_empty(&drive->queue.queue_head) && (!drive->PADAM_sleep || 0 <= (signed long)(jiffies - drive->PADAM_sleep))) {
 			if (!best
-			 || (drive->sleep && (!best->sleep || 0 < (signed long)(best->sleep - drive->sleep)))
-			 || (!best->sleep && 0 < (signed long)(WAKEUP(best) - WAKEUP(drive))))
+			 || (drive->PADAM_sleep && (!best->PADAM_sleep || 0 < (signed long)(best->PADAM_sleep - drive->PADAM_sleep)))
+			 || (!best->PADAM_sleep && 0 < (signed long)((best->PADAM_service_start + 2 * best->PADAM_service_time)
+					 - (drive->PADAM_service_start + 2 * drive->PADAM_service_time))))
 			{
 				if (!blk_queue_plugged(&drive->queue))
 					best = drive;
 			}
 		}
 	} while ((drive = drive->next) != hwgroup->drive);
-	if (best && best->nice1 && !best->sleep && best != hwgroup->drive && best->service_time > WAIT_MIN_SLEEP) {
-		long t = (signed long)(WAKEUP(best) - jiffies);
+	if (best && best->nice1 && !best->PADAM_sleep && best != hwgroup->drive && best->PADAM_service_time > WAIT_MIN_SLEEP) {
+		long t = (signed long)((best->PADAM_service_start + 2 * best->PADAM_service_time) - jiffies);
 		if (t >= WAIT_MIN_SLEEP) {
 			/*
 			 * We *may* have some time to spare, but first let's see if
@@ -1238,9 +1237,9 @@ repeat:
 			 */
 			drive = best->next;
 			do {
-				if (!drive->sleep
-				 && 0 < (signed long)(WAKEUP(drive) - (jiffies - best->service_time))
-				 && 0 < (signed long)((jiffies + t) - WAKEUP(drive)))
+				if (!drive->PADAM_sleep
+				 && 0 < (signed long)((drive->PADAM_service_start + 2 * drive->PADAM_service_time) - (jiffies - best->PADAM_service_time))
+				 && 0 < (signed long)((jiffies + t) - (drive->PADAM_service_start + 2 * drive->PADAM_service_time)))
 				{
 					ide_stall_queue(best, min(t, 10L * WAIT_MIN_SLEEP));
 					goto repeat;
@@ -1283,8 +1282,8 @@ repeat:
  */
 static void ide_do_request(ide_hwgroup_t *hwgroup, int masked_irq)
 {
-	ide_drive_t	*drive;
-	ide_hwif_t	*hwif;
+	ide_drive_t *drive;
+	struct ata_channel *hwif;
 	ide_startstop_t	startstop;
 	struct request	*rq;
 
@@ -1299,8 +1298,8 @@ static void ide_do_request(ide_hwgroup_t *hwgroup, int masked_irq)
 			hwgroup->rq = NULL;
 			drive = hwgroup->drive;
 			do {
-				if (drive->sleep && (!sleep || 0 < (signed long)(sleep - drive->sleep)))
-					sleep = drive->sleep;
+				if (drive->PADAM_sleep && (!sleep || 0 < (signed long)(sleep - drive->PADAM_sleep)))
+					sleep = drive->PADAM_sleep;
 			} while ((drive = drive->next) != hwgroup->drive);
 			if (sleep) {
 				/*
@@ -1309,7 +1308,7 @@ static void ide_do_request(ide_hwgroup_t *hwgroup, int masked_irq)
 				 * play fairly with us, just in case there are big differences
 				 * in relative throughputs.. don't want to hog the cpu too much.
 				 */
-				if (0 < (signed long)(jiffies + WAIT_MIN_SLEEP - sleep)) 
+				if (0 < (signed long)(jiffies + WAIT_MIN_SLEEP - sleep))
 					sleep = jiffies + WAIT_MIN_SLEEP;
 #if 1
 				if (timer_pending(&hwgroup->timer))
@@ -1325,7 +1324,7 @@ static void ide_do_request(ide_hwgroup_t *hwgroup, int masked_irq)
 			}
 			return;		/* no more work for this hwgroup (for now) */
 		}
-		hwif = HWIF(drive);
+		hwif = drive->channel;
 		if (hwgroup->hwif->sharing_irq && hwif != hwgroup->hwif && hwif->io_ports[IDE_CONTROL_OFFSET]) {
 			/* set nIEN for previous hwif */
 
@@ -1336,8 +1335,8 @@ static void ide_do_request(ide_hwgroup_t *hwgroup, int masked_irq)
 		}
 		hwgroup->hwif = hwif;
 		hwgroup->drive = drive;
-		drive->sleep = 0;
-		drive->service_start = jiffies;
+		drive->PADAM_sleep = 0;
+		drive->PADAM_service_start = jiffies;
 
 		if (blk_queue_plugged(&drive->queue))
 			BUG();
@@ -1371,11 +1370,12 @@ static void ide_do_request(ide_hwgroup_t *hwgroup, int masked_irq)
 /*
  * Returns the queue which corresponds to a given device.
  */
-request_queue_t *ide_get_queue (kdev_t dev)
+request_queue_t *ide_get_queue(kdev_t dev)
 {
-	ide_hwif_t *hwif = (ide_hwif_t *)blk_dev[major(dev)].data;
+	struct ata_channel *channel = (struct ata_channel *)blk_dev[major(dev)].data;
 
-	return &hwif->drives[DEVICE_NR(dev) & 1].queue;
+	/* FIXME: ALLERT: This discriminates between master and slave! */
+	return &channel->drives[DEVICE_NR(dev) & 1].queue;
 }
 
 /*
@@ -1393,7 +1393,7 @@ void do_ide_request(request_queue_t *q)
  */
 void ide_dma_timeout_retry(ide_drive_t *drive)
 {
-	ide_hwif_t *hwif = HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 	struct request *rq;
 
 	/*
@@ -1466,7 +1466,7 @@ void ide_timer_expiry(unsigned long data)
 			printk("ide_timer_expiry: hwgroup->drive was NULL\n");
 			hwgroup->handler = NULL;
 		} else {
-			ide_hwif_t *hwif;
+			struct ata_channel *hwif;
 			ide_startstop_t startstop;
 			/* paranoia */
 			if (!test_and_set_bit(IDE_BUSY, &hwgroup->flags))
@@ -1488,7 +1488,7 @@ void ide_timer_expiry(unsigned long data)
 			 * mask the specific IRQ:
 			 */
 			spin_unlock(&ide_lock);
-			hwif  = HWIF(drive);
+			hwif  = drive->channel;
 #if DISABLE_IRQ_NOSYNC
 			disable_irq_nosync(hwif->irq);
 #else
@@ -1511,7 +1511,7 @@ void ide_timer_expiry(unsigned long data)
 					startstop = ide_error(drive, "irq timeout", GET_STAT());
 			}
 			set_recovery_timer(hwif);
-			drive->service_time = jiffies - drive->service_start;
+			drive->PADAM_service_time = jiffies - drive->PADAM_service_start;
 			enable_irq(hwif->irq);
 			spin_lock_irq(&ide_lock);
 			if (startstop == ide_stopped)
@@ -1545,10 +1545,10 @@ void ide_timer_expiry(unsigned long data)
  * accidentally invoked as a result of any valid command completion interrupt.
  *
  */
-static void unexpected_intr (int irq, ide_hwgroup_t *hwgroup)
+static void unexpected_intr(int irq, ide_hwgroup_t *hwgroup)
 {
 	byte stat;
-	ide_hwif_t *hwif = hwgroup->hwif;
+	struct ata_channel *hwif = hwgroup->hwif;
 
 	/*
 	 * handle the unexpected interrupt
@@ -1577,7 +1577,7 @@ void ide_intr (int irq, void *dev_id, struct pt_regs *regs)
 {
 	unsigned long flags;
 	ide_hwgroup_t *hwgroup = (ide_hwgroup_t *)dev_id;
-	ide_hwif_t *hwif;
+	struct ata_channel *hwif;
 	ide_drive_t *drive;
 	ide_handler_t *handler;
 	ide_startstop_t startstop;
@@ -1655,8 +1655,8 @@ void ide_intr (int irq, void *dev_id, struct pt_regs *regs)
 	 * same irq as is currently being serviced here, and Linux
 	 * won't allow another of the same (on any CPU) until we return.
 	 */
-	set_recovery_timer(HWIF(drive));
-	drive->service_time = jiffies - drive->service_start;
+	set_recovery_timer(drive->channel);
+	drive->PADAM_service_time = jiffies - drive->PADAM_service_start;
 	if (startstop == ide_stopped) {
 		if (hwgroup->handler == NULL) {	/* paranoia */
 			clear_bit(IDE_BUSY, &hwgroup->flags);
@@ -1680,7 +1680,7 @@ ide_drive_t *get_info_ptr(kdev_t i_rdev)
 	int h;
 
 	for (h = 0; h < MAX_HWIFS; ++h) {
-		ide_hwif_t  *hwif = &ide_hwifs[h];
+		struct ata_channel *hwif = &ide_hwifs[h];
 		if (hwif->present && major == hwif->major) {
 			int unit = DEVICE_NR(i_rdev);
 			if (unit < MAX_DRIVES) {
@@ -1730,13 +1730,13 @@ int ide_do_drive_cmd(ide_drive_t *drive, struct request *rq, ide_action_t action
 {
 	unsigned long flags;
 	ide_hwgroup_t *hwgroup = HWGROUP(drive);
-	unsigned int major = HWIF(drive)->major;
+	unsigned int major = drive->channel->major;
 	request_queue_t *q = &drive->queue;
 	struct list_head *queue_head = &q->queue_head;
 	DECLARE_COMPLETION(wait);
 
 #ifdef CONFIG_BLK_DEV_PDC4030
-	if (HWIF(drive)->chipset == ide_pdc4030 && rq->buffer != NULL)
+	if (drive->channel->chipset == ide_pdc4030 && rq->buffer != NULL)
 		return -ENOSYS;  /* special drive cmds not supported */
 #endif
 	rq->errors = 0;
@@ -1815,7 +1815,7 @@ int ide_revalidate_disk (kdev_t i_rdev)
  */
 void revalidate_drives(void)
 {
-	ide_hwif_t *hwif;
+	struct ata_channel *hwif;
 	ide_drive_t *drive;
 	int h;
 
@@ -1938,29 +1938,28 @@ ide_proc_entry_t generic_subdriver_entries[] = {
  * Note that we only release the standard ports, and do not even try to handle
  * any extra ports allocated for weird IDE interface chipsets.
  */
-static void hwif_unregister(ide_hwif_t *hwif)
+static void hwif_unregister(struct ata_channel *hwif)
 {
 	if (hwif->straight8) {
 		ide_release_region(hwif->io_ports[IDE_DATA_OFFSET], 8);
-		goto jump_eight;
+	} else {
+		if (hwif->io_ports[IDE_DATA_OFFSET])
+			ide_release_region(hwif->io_ports[IDE_DATA_OFFSET], 1);
+		if (hwif->io_ports[IDE_ERROR_OFFSET])
+			ide_release_region(hwif->io_ports[IDE_ERROR_OFFSET], 1);
+		if (hwif->io_ports[IDE_NSECTOR_OFFSET])
+			ide_release_region(hwif->io_ports[IDE_NSECTOR_OFFSET], 1);
+		if (hwif->io_ports[IDE_SECTOR_OFFSET])
+			ide_release_region(hwif->io_ports[IDE_SECTOR_OFFSET], 1);
+		if (hwif->io_ports[IDE_LCYL_OFFSET])
+			ide_release_region(hwif->io_ports[IDE_LCYL_OFFSET], 1);
+		if (hwif->io_ports[IDE_HCYL_OFFSET])
+			ide_release_region(hwif->io_ports[IDE_HCYL_OFFSET], 1);
+		if (hwif->io_ports[IDE_SELECT_OFFSET])
+			ide_release_region(hwif->io_ports[IDE_SELECT_OFFSET], 1);
+		if (hwif->io_ports[IDE_STATUS_OFFSET])
+			ide_release_region(hwif->io_ports[IDE_STATUS_OFFSET], 1);
 	}
-	if (hwif->io_ports[IDE_DATA_OFFSET])
-		ide_release_region(hwif->io_ports[IDE_DATA_OFFSET], 1);
-	if (hwif->io_ports[IDE_ERROR_OFFSET])
-		ide_release_region(hwif->io_ports[IDE_ERROR_OFFSET], 1);
-	if (hwif->io_ports[IDE_NSECTOR_OFFSET])
-		ide_release_region(hwif->io_ports[IDE_NSECTOR_OFFSET], 1);
-	if (hwif->io_ports[IDE_SECTOR_OFFSET])
-		ide_release_region(hwif->io_ports[IDE_SECTOR_OFFSET], 1);
-	if (hwif->io_ports[IDE_LCYL_OFFSET])
-		ide_release_region(hwif->io_ports[IDE_LCYL_OFFSET], 1);
-	if (hwif->io_ports[IDE_HCYL_OFFSET])
-		ide_release_region(hwif->io_ports[IDE_HCYL_OFFSET], 1);
-	if (hwif->io_ports[IDE_SELECT_OFFSET])
-		ide_release_region(hwif->io_ports[IDE_SELECT_OFFSET], 1);
-	if (hwif->io_ports[IDE_STATUS_OFFSET])
-		ide_release_region(hwif->io_ports[IDE_STATUS_OFFSET], 1);
-jump_eight:
 	if (hwif->io_ports[IDE_CONTROL_OFFSET])
 		ide_release_region(hwif->io_ports[IDE_CONTROL_OFFSET], 1);
 #if defined(CONFIG_AMIGA) || defined(CONFIG_MAC)
@@ -1969,16 +1968,16 @@ jump_eight:
 #endif
 }
 
-void ide_unregister(ide_hwif_t *hwif)
+void ide_unregister(struct ata_channel *hwif)
 {
 	struct gendisk *gd;
 	ide_drive_t *drive, *d;
-	ide_hwif_t *g;
+	struct ata_channel *g;
 	ide_hwgroup_t *hwgroup;
 	int irq_count = 0, unit, i;
 	unsigned long flags;
 	unsigned int p, minor;
-	ide_hwif_t old_hwif;
+	struct ata_channel old_hwif;
 
 	spin_lock_irqsave(&ide_lock, flags);
 	if (!hwif->present)
@@ -2069,7 +2068,7 @@ void ide_unregister(ide_hwif_t *hwif)
 	if (hwgroup->hwif == hwif)
 		kfree(hwgroup);
 	else
-		hwgroup->hwif = HWIF(hwgroup->drive);
+		hwgroup->hwif = hwgroup->drive->channel;
 
 #if defined(CONFIG_BLK_DEV_IDEDMA) && !defined(CONFIG_DMA_NONPCI)
 	ide_release_dma(hwif);
@@ -2176,10 +2175,11 @@ void ide_setup_ports (	hw_regs_t *hw,
  * Register an IDE interface, specifing exactly the registers etc
  * Set init=1 iff calling before probes have taken place.
  */
-int ide_register_hw(hw_regs_t *hw, ide_hwif_t **hwifp)
+int ide_register_hw(hw_regs_t *hw, struct ata_channel **hwifp)
 {
-	int h, retry = 1;
-	ide_hwif_t *hwif;
+	int h;
+	int retry = 1;
+	struct ata_channel *hwif;
 
 	do {
 		for (h = 0; h < MAX_HWIFS; ++h) {
@@ -2196,7 +2196,9 @@ int ide_register_hw(hw_regs_t *hw, ide_hwif_t **hwifp)
 		for (h = 0; h < MAX_HWIFS; ++h)
 			ide_unregister(&ide_hwifs[h]);
 	} while (retry--);
+
 	return -1;
+
 found:
 	ide_unregister(hwif);
 	if (hwif->present)
@@ -2378,8 +2380,8 @@ static int set_io_32bit(ide_drive_t *drive, int arg)
 {
 	drive->io_32bit = arg;
 #ifdef CONFIG_BLK_DEV_DTC2278
-	if (HWIF(drive)->chipset == ide_dtc2278)
-		HWIF(drive)->drives[!drive->select.b.unit].io_32bit = arg;
+	if (drive->channel->chipset == ide_dtc2278)
+		drive->channel->drives[!drive->select.b.unit].io_32bit = arg;
 #endif /* CONFIG_BLK_DEV_DTC2278 */
 	return 0;
 }
@@ -2388,9 +2390,9 @@ static int set_using_dma (ide_drive_t *drive, int arg)
 {
 	if (!drive->driver)
 		return -EPERM;
-	if (!drive->id || !(drive->id->capability & 1) || !HWIF(drive)->dmaproc)
+	if (!drive->id || !(drive->id->capability & 1) || !drive->channel->dmaproc)
 		return -EPERM;
-	if (HWIF(drive)->dmaproc(arg ? ide_dma_on : ide_dma_off, drive))
+	if (drive->channel->dmaproc(arg ? ide_dma_on : ide_dma_off, drive))
 		return -EIO;
 	return 0;
 }
@@ -2399,7 +2401,7 @@ static int set_pio_mode (ide_drive_t *drive, int arg)
 {
 	struct request rq;
 
-	if (!HWIF(drive)->tuneproc)
+	if (!drive->channel->tuneproc)
 		return -ENOSYS;
 	if (drive->special.b.set_tune)
 		return -EBUSY;
@@ -2594,15 +2596,15 @@ static int ide_ioctl (struct inode *inode, struct file *file,
 		case HDIO_GET_BUSSTATE:
 			if (!capable(CAP_SYS_ADMIN))
 				return -EACCES;
-			if (put_user(HWIF(drive)->bus_state, (long *)arg))
+			if (put_user(drive->channel->bus_state, (long *)arg))
 				return -EFAULT;
 			return 0;
 
 		case HDIO_SET_BUSSTATE:
 			if (!capable(CAP_SYS_ADMIN))
 				return -EACCES;
-			if (HWIF(drive)->busproc)
-				HWIF(drive)->busproc(drive, (int)arg);
+			if (drive->channel->busproc)
+				drive->channel->busproc(drive, (int)arg);
 			return 0;
 
 		default:
@@ -2805,7 +2807,7 @@ static int __init match_parm (char *s, const char *keywords[], int vals[], int m
 int __init ide_setup (char *s)
 {
 	int i, vals[3];
-	ide_hwif_t *hwif;
+	struct ata_channel *hwif;
 	ide_drive_t *drive;
 	unsigned int hw, unit;
 	const char max_drive = 'a' + ((MAX_HWIFS * MAX_DRIVES) - 1);
@@ -3119,7 +3121,7 @@ ide_drive_t *ide_scan_devices(byte type, const char *name, struct ata_operations
 	unsigned int unit, index, i;
 
 	for (index = 0, i = 0; index < MAX_HWIFS; ++index) {
-		ide_hwif_t *hwif = &ide_hwifs[index];
+		struct ata_channel *hwif = &ide_hwifs[index];
 		if (!hwif->present)
 			continue;
 		for (unit = 0; unit < MAX_DRIVES; ++unit) {
@@ -3157,7 +3159,7 @@ int ide_register_subdriver(ide_drive_t *drive, struct ata_operations *driver)
 	restore_flags(flags);		/* all CPUs */
 	/* FIXME: Check what this magic number is supposed to be about? */
 	if (drive->autotune != 2) {
-		if (HWIF(drive)->dmaproc != NULL) {
+		if (drive->channel->dmaproc != NULL) {
 
 			/*
 			 * Force DMAing for the beginning of the check.  Some
@@ -3167,8 +3169,8 @@ int ide_register_subdriver(ide_drive_t *drive, struct ata_operations *driver)
 			 *   PARANOIA!!!
 			 */
 
-			HWIF(drive)->dmaproc(ide_dma_off_quietly, drive);
-			HWIF(drive)->dmaproc(ide_dma_check, drive);
+			drive->channel->dmaproc(ide_dma_off_quietly, drive);
+			drive->channel->dmaproc(ide_dma_check, drive);
 		}
 		/* Only CD-ROMs and tape drives support DSC overlap. */
 		drive->dsc_overlap = (drive->next != drive
@@ -3300,7 +3302,7 @@ EXPORT_SYMBOL(get_info_ptr);
 
 static int ide_notify_reboot (struct notifier_block *this, unsigned long event, void *x)
 {
-	ide_hwif_t *hwif;
+	struct ata_channel *hwif;
 	ide_drive_t *drive;
 	int i, unit;
 
@@ -3482,12 +3484,13 @@ static int __init ata_module_init(void)
 	initializing = 0;
 
 	for (h = 0; h < MAX_HWIFS; ++h) {
-		ide_hwif_t  *hwif = &ide_hwifs[h];
-		if (hwif->present)
-			ide_geninit(hwif);
+		struct ata_channel *channel = &ide_hwifs[h];
+		if (channel->present)
+			ide_geninit(channel);
 	}
 
 	register_reboot_notifier(&ide_notifier);
+
 	return 0;
 }
 

@@ -242,7 +242,7 @@ static struct pci_dev *isa_dev;
 static void ali15x3_tune_drive (ide_drive_t *drive, byte pio)
 {
 	struct ata_timing *t;
-	ide_hwif_t *hwif = HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 	struct pci_dev *dev = hwif->pci_dev;
 	int s_time, a_time, c_time;
 	byte s_clc, a_clc, r_clc;
@@ -305,7 +305,7 @@ static void ali15x3_tune_drive (ide_drive_t *drive, byte pio)
 
 static int ali15x3_tune_chipset (ide_drive_t *drive, byte speed)
 {
-	ide_hwif_t *hwif = HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 	struct pci_dev *dev	= hwif->pci_dev;
 	byte unit		= (drive->select.b.unit & 0x01);
 	byte tmpbyte		= 0x00;
@@ -431,10 +431,10 @@ static byte ali15x3_can_ultra (ide_drive_t *drive)
 
 static int ali15x3_config_drive_for_dma(ide_drive_t *drive)
 {
-	struct hd_driveid *id		= drive->id;
-	ide_hwif_t *hwif		= HWIF(drive);
-	ide_dma_action_t dma_func	= ide_dma_on;
-	byte can_ultra_dma		= ali15x3_can_ultra(drive);
+	struct hd_driveid *id = drive->id;
+	struct ata_channel *hwif = drive->channel;
+	ide_dma_action_t dma_func = ide_dma_on;
+	byte can_ultra_dma = ali15x3_can_ultra(drive);
 
 	if ((m5229_revision<=0x20) && (drive->type != ATA_DISK))
 		return hwif->dmaproc(ide_dma_off_quietly, drive);
@@ -537,7 +537,7 @@ unsigned int __init pci_init_ali15x3(struct pci_dev *dev)
  * of UDMA66 transfers. It doesn't check the drives.
  * But see note 2 below!
  */
-unsigned int __init ata66_ali15x3 (ide_hwif_t *hwif)
+unsigned int __init ata66_ali15x3(struct ata_channel *hwif)
 {
 	struct pci_dev *dev	= hwif->pci_dev;
 	unsigned int ata66	= 0;
@@ -632,7 +632,7 @@ unsigned int __init ata66_ali15x3 (ide_hwif_t *hwif)
 	return(ata66);
 }
 
-void __init ide_init_ali15x3 (ide_hwif_t *hwif)
+void __init ide_init_ali15x3(struct ata_channel *hwif)
 {
 #ifndef CONFIG_SPARC64
 	byte ideic, inmir;
@@ -690,7 +690,7 @@ void __init ide_init_ali15x3 (ide_hwif_t *hwif)
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 }
 
-void __init ide_dmacapable_ali15x3 (ide_hwif_t *hwif, unsigned long dmabase)
+void __init ide_dmacapable_ali15x3(struct ata_channel *hwif, unsigned long dmabase)
 {
 	if ((dmabase) && (m5229_revision < 0x20)) {
 		return;

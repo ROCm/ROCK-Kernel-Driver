@@ -187,7 +187,7 @@ static byte recovery_counts[4] = {16, 16, 16, 16}; /* Recovery count (encoded) *
 /*
  * These are initialized to point at the devices we control
  */
-static ide_hwif_t  *cmd_hwif0, *cmd_hwif1;
+static struct ata_channel *cmd_hwif0, *cmd_hwif1;
 static ide_drive_t *cmd_drives[4];
 
 /*
@@ -429,7 +429,7 @@ static void __init setup_device_ptrs (void)
 	cmd_hwif0 = &ide_hwifs[0]; /* default, if not found below */
 	cmd_hwif1 = &ide_hwifs[1]; /* default, if not found below */
 	for (i = 0; i < MAX_HWIFS; i++) {
-		ide_hwif_t *hwif = &ide_hwifs[i];
+		struct ata_channel *hwif = &ide_hwifs[i];
 		if (hwif->chipset == ide_unknown || hwif->chipset == ide_generic) {
 			if (hwif->io_ports[IDE_DATA_OFFSET] == 0x1f0)
 				cmd_hwif0 = hwif;

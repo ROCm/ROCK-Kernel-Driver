@@ -331,7 +331,7 @@ static ide_startstop_t idescsi_pc_intr (ide_drive_t *drive)
 		printk ("ide-scsi: %s: DMA complete\n", drive->name);
 #endif /* IDESCSI_DEBUG_LOG */
 		pc->actually_transferred=pc->request_transfer;
-		(void) (HWIF(drive)->dmaproc(ide_dma_end, drive));
+		(void) drive->channel->dmaproc(ide_dma_end, drive);
 	}
 
 	status = GET_STAT();						/* Clear the interrupt */
@@ -434,9 +434,9 @@ static ide_startstop_t idescsi_issue_pc (ide_drive_t *drive, idescsi_pc_t *pc)
 	bcount = min(pc->request_transfer, 63 * 1024);		/* Request to transfer the entire buffer at once */
 
 	if (drive->using_dma && rq->bio)
-		dma_ok=!HWIF(drive)->dmaproc(test_bit (PC_WRITING, &pc->flags) ? ide_dma_write : ide_dma_read, drive);
+		dma_ok = !drive->channel->dmaproc(test_bit (PC_WRITING, &pc->flags) ? ide_dma_write : ide_dma_read, drive);
 
-	SELECT_DRIVE(HWIF(drive), drive);
+	SELECT_DRIVE(drive->channel, drive);
 	if (IDE_CONTROL_REG)
 		OUT_BYTE (drive->ctl,IDE_CONTROL_REG);
 	OUT_BYTE (dma_ok,IDE_FEATURE_REG);
@@ -444,8 +444,8 @@ static ide_startstop_t idescsi_issue_pc (ide_drive_t *drive, idescsi_pc_t *pc)
 	OUT_BYTE (bcount & 0xff,IDE_BCOUNTL_REG);
 
 	if (dma_ok) {
-		set_bit (PC_DMA_IN_PROGRESS, &pc->flags);
-		(void) (HWIF(drive)->dmaproc(ide_dma_begin, drive));
+		set_bit(PC_DMA_IN_PROGRESS, &pc->flags);
+		(void) drive->channel->dmaproc(ide_dma_begin, drive);
 	}
 	if (test_bit (IDESCSI_DRQ_INTERRUPT, &scsi->flags)) {
 		ide_set_handler (drive, &idescsi_transfer_pc, get_timeout(pc), NULL);

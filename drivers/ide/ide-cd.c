@@ -723,9 +723,9 @@ static ide_startstop_t cdrom_start_packet_command(ide_drive_t *drive,
 
 	if (info->dma) {
 		if (info->cmd == READ) {
-			info->dma = !HWIF(drive)->dmaproc(ide_dma_read, drive);
+			info->dma = !drive->channel->dmaproc(ide_dma_read, drive);
 		} else if (info->cmd == WRITE) {
-			info->dma = !HWIF(drive)->dmaproc(ide_dma_write, drive);
+			info->dma = !drive->channel->dmaproc(ide_dma_write, drive);
 		} else {
 			printk("ide-cd: DMA set, but not allowed\n");
 		}
@@ -742,7 +742,7 @@ static ide_startstop_t cdrom_start_packet_command(ide_drive_t *drive,
 		OUT_BYTE (drive->ctl, IDE_CONTROL_REG);
  
 	if (info->dma)
-		(void) (HWIF(drive)->dmaproc(ide_dma_begin, drive));
+		(void) drive->channel->dmaproc(ide_dma_begin, drive);
 
 	if (CDROM_CONFIG_FLAGS (drive)->drq_interrupt) {
 		ide_set_handler (drive, handler, WAIT_CMD, cdrom_timer_expiry);
@@ -899,8 +899,8 @@ static ide_startstop_t cdrom_read_intr (ide_drive_t *drive)
 	/* Check for errors. */
 	if (dma) {
 		info->dma = 0;
-		if ((dma_error = HWIF(drive)->dmaproc(ide_dma_end, drive)))
-			HWIF(drive)->dmaproc(ide_dma_off, drive);
+		if ((dma_error = drive->channel->dmaproc(ide_dma_end, drive)))
+			drive->channel->dmaproc(ide_dma_off, drive);
 	}
 
 	if (cdrom_decode_status (&startstop, drive, 0, &stat))
@@ -1476,9 +1476,9 @@ static ide_startstop_t cdrom_write_intr(ide_drive_t *drive)
 	/* Check for errors. */
 	if (dma) {
 		info->dma = 0;
-		if ((dma_error = HWIF(drive)->dmaproc(ide_dma_end, drive))) {
+		if ((dma_error = drive->channel->dmaproc(ide_dma_end, drive))) {
 			printk("ide-cd: write dma error\n");
-			HWIF(drive)->dmaproc(ide_dma_off, drive);
+			drive->channel->dmaproc(ide_dma_off, drive);
 		}
 	}
 
@@ -2021,14 +2021,14 @@ static int cdrom_read_toc(ide_drive_t *drive, struct request_sense *sense)
 
 	/* Now try to get the total cdrom capacity. */
 	minor = (drive->select.b.unit) << PARTN_BITS;
-	dev = mk_kdev(HWIF(drive)->major, minor);
+	dev = mk_kdev(drive->channel->major, minor);
 	stat = cdrom_get_last_written(dev, &toc->capacity);
 	if (stat)
 		stat = cdrom_read_capacity(drive, &toc->capacity, sense);
 	if (stat)
 		toc->capacity = 0x1fffff;
 
-	HWIF(drive)->gd->sizes[drive->select.b.unit << PARTN_BITS] = (toc->capacity * SECTORS_PER_FRAME) >> (BLOCK_SIZE_BITS - 9);
+	drive->channel->gd->sizes[drive->select.b.unit << PARTN_BITS] = (toc->capacity * SECTORS_PER_FRAME) >> (BLOCK_SIZE_BITS - 9);
 	drive->part[0].nr_sects = toc->capacity * SECTORS_PER_FRAME;
 
 	/* Remember that we've read this stuff. */
@@ -2487,7 +2487,7 @@ static int ide_cdrom_register (ide_drive_t *drive, int nslots)
 	struct cdrom_device_info *devinfo = &info->devinfo;
 	int minor = (drive->select.b.unit) << PARTN_BITS;
 
-	devinfo->dev = mk_kdev(HWIF(drive)->major, minor);
+	devinfo->dev = mk_kdev(drive->channel->major, minor);
 	devinfo->ops = &ide_cdrom_dops;
 	devinfo->mask = 0;
 	*(int *)&devinfo->speed = CDROM_STATE_FLAGS (drive)->current_speed;
@@ -2519,7 +2519,7 @@ static int ide_cdrom_register (ide_drive_t *drive, int nslots)
 	 */
 
 	devinfo->de = devfs_register(drive->de, "cd", DEVFS_FL_DEFAULT,
-				     HWIF(drive)->major, minor,
+				     drive->channel->major, minor,
 				     S_IFBLK | S_IRUGO | S_IWUGO,
 				     ide_fops, NULL);
 
@@ -2661,7 +2661,7 @@ int ide_cdrom_probe_capabilities (ide_drive_t *drive)
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (drive->using_dma)
-		(void) HWIF(drive)->dmaproc(ide_dma_verbose, drive);
+		(void) drive->channel->dmaproc(ide_dma_verbose, drive);
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 	printk("\n");
 
@@ -2684,8 +2684,8 @@ int ide_cdrom_setup (ide_drive_t *drive)
 	/*
 	 * default to read-only always and fix latter at the bottom
 	 */
-	set_device_ro(mk_kdev(HWIF(drive)->major, minor), 1);
-	set_blocksize(mk_kdev(HWIF(drive)->major, minor), CD_FRAMESIZE);
+	set_device_ro(mk_kdev(drive->channel->major, minor), 1);
+	set_blocksize(mk_kdev(drive->channel->major, minor), CD_FRAMESIZE);
 	blk_queue_hardsect_size(&drive->queue, CD_FRAMESIZE);
 
 	blk_queue_prep_rq(&drive->queue, ll_10byte_cmd_build);
@@ -2807,7 +2807,7 @@ int ide_cdrom_setup (ide_drive_t *drive)
 	nslots = ide_cdrom_probe_capabilities (drive);
 
 	if (CDROM_CONFIG_FLAGS(drive)->dvd_ram)
-		set_device_ro(mk_kdev(HWIF(drive)->major, minor), 0);
+		set_device_ro(mk_kdev(drive->channel->major, minor), 0);
 
 	if (ide_cdrom_register (drive, nslots)) {
 		printk ("%s: ide_cdrom_setup failed to register device with the cdrom driver.\n", drive->name);
@@ -2854,7 +2854,7 @@ void ide_cdrom_release (struct inode *inode, struct file *file,
 static
 int ide_cdrom_check_media_change (ide_drive_t *drive)
 {
-	return cdrom_media_changed(mk_kdev (HWIF (drive)->major,
+	return cdrom_media_changed(mk_kdev (drive->channel->major,
 			(drive->select.b.unit) << PARTN_BITS));
 }
 
@@ -2875,14 +2875,14 @@ void ide_cdrom_revalidate (ide_drive_t *drive)
 
 	/* for general /dev/cdrom like mounting, one big disc */
 	drive->part[0].nr_sects = toc->capacity * SECTORS_PER_FRAME;
-	HWIF(drive)->gd->sizes[minor] = toc->capacity * BLOCKS_PER_FRAME;
+	drive->channel->gd->sizes[minor] = toc->capacity * BLOCKS_PER_FRAME;
 
 	/*
 	 * reset block size, ide_revalidate_disk incorrectly sets it to
 	 * 1024 even for CDROM's
 	 */
-	blk_size[HWIF(drive)->major] = HWIF(drive)->gd->sizes;
-	set_blocksize(mk_kdev(HWIF(drive)->major, minor), CD_FRAMESIZE);
+	blk_size[drive->channel->major] = drive->channel->gd->sizes;
+	set_blocksize(mk_kdev(drive->channel->major, minor), CD_FRAMESIZE);
 }
 
 static

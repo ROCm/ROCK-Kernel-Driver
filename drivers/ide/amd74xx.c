@@ -226,7 +226,7 @@ static void amd_set_speed(struct pci_dev *dev, unsigned char dn, struct ata_timi
 
 static int amd_set_drive(ide_drive_t *drive, unsigned char speed)
 {
-	ide_drive_t *peer = HWIF(drive)->drives + (~drive->dn & 1);
+	ide_drive_t *peer = drive->channel->drives + (~drive->dn & 1);
 	struct ata_timing t, p;
 	int T, UT;
 
@@ -247,7 +247,7 @@ static int amd_set_drive(ide_drive_t *drive, unsigned char speed)
 
 	if (speed == XFER_UDMA_5 && amd_clock <= 33333) t.udma = 1;
 
-	amd_set_speed(HWIF(drive)->pci_dev, drive->dn, &t);
+	amd_set_speed(drive->channel->pci_dev, drive->dn, &t);
 
 	if (!drive->init_speed)	
 		drive->init_speed = speed;
@@ -263,7 +263,7 @@ static int amd_set_drive(ide_drive_t *drive, unsigned char speed)
 
 static void amd74xx_tune_drive(ide_drive_t *drive, unsigned char pio)
 {
-	if (!((amd_enabled >> HWIF(drive)->channel) & 1))
+	if (!((amd_enabled >> drive->channel->channel) & 1))
 		return;
 
 	if (pio == 255) {
@@ -287,7 +287,7 @@ int amd74xx_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 
 	if (func == ide_dma_check) {
 
-		short w80 = HWIF(drive)->udma_four;
+		short w80 = drive->channel->udma_four;
 
 		short speed = ata_timing_mode(drive,
 			XFER_PIO | XFER_EPIO | XFER_MWDMA | XFER_UDMA |
@@ -297,7 +297,7 @@ int amd74xx_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 
 		amd_set_drive(drive, speed);
 
-		func = (HWIF(drive)->autodma && (speed & XFER_MODE) != XFER_PIO)
+		func = (drive->channel->autodma && (speed & XFER_MODE) != XFER_PIO)
 			? ide_dma_on : ide_dma_off_quietly;
 	}
 
@@ -409,12 +409,12 @@ unsigned int __init pci_init_amd74xx(struct pci_dev *dev, const char *name)
 	return 0;
 }
 
-unsigned int __init ata66_amd74xx(ide_hwif_t *hwif)
+unsigned int __init ata66_amd74xx(struct ata_channel *hwif)
 {
 	return ((amd_enabled & amd_80w) >> hwif->channel) & 1;
 }
 
-void __init ide_init_amd74xx(ide_hwif_t *hwif)
+void __init ide_init_amd74xx(struct ata_channel *hwif)
 {
 	int i;
 
@@ -445,7 +445,7 @@ void __init ide_init_amd74xx(ide_hwif_t *hwif)
  * We allow the BM-DMA driver only work on enabled interfaces.
  */
 
-void __init ide_dmacapable_amd74xx(ide_hwif_t *hwif, unsigned long dmabase)
+void __init ide_dmacapable_amd74xx(struct ata_channel *hwif, unsigned long dmabase)
 {
 	if ((amd_enabled >> hwif->channel) & 1)
 		ide_setup_dma(hwif, dmabase, 8);

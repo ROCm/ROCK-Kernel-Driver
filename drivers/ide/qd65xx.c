@@ -125,11 +125,11 @@ static void qd_select (ide_drive_t *drive)
  * qd6500_compute_timing
  *
  * computes the timing value where
- * 	lower nibble represents active time,   in count of VLB clocks
- * 	upper nibble represents recovery time, in count of VLB clocks
+ *	lower nibble represents active time,   in count of VLB clocks
+ *	upper nibble represents recovery time, in count of VLB clocks
  */
 
-static byte qd6500_compute_timing (ide_hwif_t *hwif, int active_time, int recovery_time)
+static byte qd6500_compute_timing(struct ata_channel *hwif, int active_time, int recovery_time)
 {
 	byte active_cycle,recovery_cycle;
 
@@ -208,7 +208,7 @@ static int qd_timing_ok (ide_drive_t drives[])
 
 static void qd_set_timing (ide_drive_t *drive, byte timing)
 {
-	ide_hwif_t *hwif = HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 
 	drive->drive_data &= 0xff00;
 	drive->drive_data |= timing;
@@ -240,7 +240,7 @@ static void qd6500_tune_drive (ide_drive_t *drive, byte pio)
 		recovery_time = drive->id->eide_pio - 120;
 	}
 
-	qd_set_timing(drive,qd6500_compute_timing(HWIF(drive),active_time,recovery_time));
+	qd_set_timing(drive,qd6500_compute_timing(drive->channel, active_time,recovery_time));
 }
 
 /*
@@ -250,7 +250,7 @@ static void qd6500_tune_drive (ide_drive_t *drive, byte pio)
 static void qd6580_tune_drive (ide_drive_t *drive, byte pio)
 {
 	struct ata_timing *t;
-	int base = HWIF(drive)->select_data;
+	int base = drive->channel->select_data;
 	int active_time   = 175;
 	int recovery_time = 415; /* worst case values from the dos driver */
 
@@ -291,9 +291,9 @@ static void qd6580_tune_drive (ide_drive_t *drive, byte pio)
 		printk(KERN_INFO "%s: PIO mode%d\n", drive->name, pio - XFER_PIO_0);
 	}
 
-	if (!HWIF(drive)->channel && drive->type != ATA_DISK) {
+	if (!drive->channel->channel && drive->type != ATA_DISK) {
 		qd_write_reg(0x5f,QD_CONTROL_PORT);
-		printk(KERN_WARNING "%s: ATAPI: disabled read-ahead FIFO and post-write buffer on %s.\n",drive->name,HWIF(drive)->name);
+		printk(KERN_WARNING "%s: ATAPI: disabled read-ahead FIFO and post-write buffer on %s.\n",drive->name, drive->channel->name);
 	}
 
 	qd_set_timing(drive,qd6580_compute_timing(active_time,recovery_time));
@@ -348,7 +348,7 @@ int __init probe (int base)
 	index = ! (config & QD_CONFIG_IDE_BASEPORT);
 
 	if ((config & 0xf0) == QD_CONFIG_QD6500) {
-		ide_hwif_t *hwif = &ide_hwifs[index];
+		struct ata_channel *hwif = &ide_hwifs[index];
 
 		if (qd_testreg(base)) return 1;		/* bad register */
 
@@ -392,7 +392,7 @@ int __init probe (int base)
 			config, control, QD_ID3);
 
 		if (control & QD_CONTR_SEC_DISABLED) {
-			ide_hwif_t *hwif = &ide_hwifs[index];
+			struct ata_channel *hwif = &ide_hwifs[index];
 
 			/* secondary disabled */
 			printk(KERN_INFO "%s: qd6580: single IDE board\n",

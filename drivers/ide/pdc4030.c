@@ -99,7 +99,7 @@ static void promise_selectproc (ide_drive_t *drive)
 {
 	unsigned int number;
 
-	number = (HWIF(drive)->channel << 1) + drive->select.b.unit;
+	number = (drive->channel->channel << 1) + drive->select.b.unit;
 	OUT_BYTE(number,IDE_FEATURE_REG);
 }
 
@@ -155,10 +155,10 @@ void __init init_pdc4030 (void)
  * setup_pdc4030()
  * Completes the setup of a Promise DC4030 controller card, once found.
  */
-int __init setup_pdc4030 (ide_hwif_t *hwif)
+int __init setup_pdc4030(struct ata_channel *hwif)
 {
         ide_drive_t *drive;
-	ide_hwif_t *hwif2;
+	struct ata_channel *hwif2;
 	struct dc_ident ident;
 	int i;
 	ide_startstop_t startstop;
@@ -232,7 +232,7 @@ int __init setup_pdc4030 (ide_hwif_t *hwif)
 
 /* Shift the remaining interfaces down by one */
 	for (i=MAX_HWIFS-1 ; i > hwif->index+1 ; i--) {
-		ide_hwif_t *h = &ide_hwifs[i];
+		struct ata_channel *h = &ide_hwifs[i];
 
 #ifdef DEBUG
 		printk(KERN_DEBUG "Shifting i/f %d values to i/f %d\n",i-1,i);
@@ -263,7 +263,7 @@ int __init setup_pdc4030 (ide_hwif_t *hwif)
  * Tests for the presence of a DC4030 Promise card on this interface
  * Returns: 1 if found, 0 if not found
  */
-int __init detect_pdc4030(ide_hwif_t *hwif)
+int __init detect_pdc4030(struct ata_channel *hwif)
 {
 	ide_drive_t *drive = &hwif->drives[0];
 
@@ -288,7 +288,7 @@ int __init detect_pdc4030(ide_hwif_t *hwif)
 void __init ide_probe_for_pdc4030(void)
 {
 	unsigned int	index;
-	ide_hwif_t	*hwif;
+	struct ata_channel *hwif;
 
 	if (enable_promise_support == 0)
 		return;
@@ -556,7 +556,7 @@ ide_startstop_t do_pdc4030_io (ide_drive_t *drive, ide_task_t *task)
 
 	if (IDE_CONTROL_REG)
 		OUT_BYTE(drive->ctl, IDE_CONTROL_REG);  /* clear nIEN */
-	SELECT_MASK(HWIF(drive), drive, 0);
+	SELECT_MASK(drive->channel, drive, 0);
 
 	OUT_BYTE(taskfile->feature, IDE_FEATURE_REG);
 	OUT_BYTE(taskfile->sector_count, IDE_NSECTOR_REG);

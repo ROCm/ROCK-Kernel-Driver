@@ -69,7 +69,7 @@ typedef unsigned char	byte;	/* used everywhere */
 #define DMA_PIO_RETRY	1	/* retrying in PIO */
 
 #define HWIF(drive)		((drive)->channel)
-#define HWGROUP(drive)		(HWIF(drive)->hwgroup)
+#define HWGROUP(drive)		(drive->channel->hwgroup)
 
 /*
  * Definitions for accessing IDE controller registers
@@ -90,16 +90,16 @@ typedef unsigned char	byte;	/* used everywhere */
 #define IDE_FEATURE_OFFSET	IDE_ERROR_OFFSET
 #define IDE_COMMAND_OFFSET	IDE_STATUS_OFFSET
 
-#define IDE_DATA_REG		(HWIF(drive)->io_ports[IDE_DATA_OFFSET])
-#define IDE_ERROR_REG		(HWIF(drive)->io_ports[IDE_ERROR_OFFSET])
-#define IDE_NSECTOR_REG		(HWIF(drive)->io_ports[IDE_NSECTOR_OFFSET])
-#define IDE_SECTOR_REG		(HWIF(drive)->io_ports[IDE_SECTOR_OFFSET])
-#define IDE_LCYL_REG		(HWIF(drive)->io_ports[IDE_LCYL_OFFSET])
-#define IDE_HCYL_REG		(HWIF(drive)->io_ports[IDE_HCYL_OFFSET])
-#define IDE_SELECT_REG		(HWIF(drive)->io_ports[IDE_SELECT_OFFSET])
-#define IDE_STATUS_REG		(HWIF(drive)->io_ports[IDE_STATUS_OFFSET])
-#define IDE_CONTROL_REG		(HWIF(drive)->io_ports[IDE_CONTROL_OFFSET])
-#define IDE_IRQ_REG		(HWIF(drive)->io_ports[IDE_IRQ_OFFSET])
+#define IDE_DATA_REG		(drive->channel->io_ports[IDE_DATA_OFFSET])
+#define IDE_ERROR_REG		(drive->channel->io_ports[IDE_ERROR_OFFSET])
+#define IDE_NSECTOR_REG		(drive->channel->io_ports[IDE_NSECTOR_OFFSET])
+#define IDE_SECTOR_REG		(drive->channel->io_ports[IDE_SECTOR_OFFSET])
+#define IDE_LCYL_REG		(drive->channel->io_ports[IDE_LCYL_OFFSET])
+#define IDE_HCYL_REG		(drive->channel->io_ports[IDE_HCYL_OFFSET])
+#define IDE_SELECT_REG		(drive->channel->io_ports[IDE_SELECT_OFFSET])
+#define IDE_STATUS_REG		(drive->channel->io_ports[IDE_STATUS_OFFSET])
+#define IDE_CONTROL_REG		(drive->channel->io_ports[IDE_CONTROL_OFFSET])
+#define IDE_IRQ_REG		(drive->channel->io_ports[IDE_IRQ_OFFSET])
 
 #define IDE_FEATURE_REG		IDE_ERROR_REG
 #define IDE_COMMAND_REG		IDE_STATUS_REG
@@ -170,8 +170,8 @@ typedef unsigned char	byte;	/* used everywhere */
 /*
  * Check for an interrupt and acknowledge the interrupt status
  */
-struct hwif_s;
-typedef int (ide_ack_intr_t)(struct hwif_s *);
+struct ata_channel;
+typedef int (ide_ack_intr_t)(struct ata_channel *);
 
 #ifndef NO_DMA
 # define NO_DMA  255
@@ -269,7 +269,7 @@ typedef union {
 struct ide_settings_s;
 
 typedef struct ide_drive_s {
-	struct hwif_s   *channel;	/* parent pointer to the channel we are attached to  */
+	struct ata_channel *channel;	/* parent pointer to the channel we are attached to  */
 
 	unsigned int	usage;		/* current "open()" count for drive */
 	char type; /* distingiush different devices: disk, cdrom, tape, floppy, ... */
@@ -281,10 +281,16 @@ typedef struct ide_drive_s {
 	request_queue_t		 queue;	/* per device request queue */
 
 	struct ide_drive_s	*next;	/* circular list of hwgroup drives */
-	unsigned long sleep;		/* sleep until this time */
-	unsigned long service_start;	/* time we started last request */
-	unsigned long service_time;	/* service time of last request */
-	unsigned long timeout;		/* max time to wait for irq */
+
+	/* Those are directly injected jiffie values. They should go away and
+	 * we should use generic timers instead!!!
+	 */
+
+	unsigned long PADAM_sleep;		/* sleep until this time */
+	unsigned long PADAM_service_start;	/* time we started last request */
+	unsigned long PADAM_service_time;	/* service time of last request */
+	unsigned long PADAM_timeout;		/* max time to wait for irq */
+
 	special_t	special;	/* special action flags */
 	byte     keep_settings;		/* restore settings after drive reset */
 	byte     using_dma;		/* disk is using dma for read/write */
@@ -433,8 +439,8 @@ typedef void (ide_rw_proc_t) (ide_drive_t *, ide_dma_action_t);
  */
 typedef int (ide_busproc_t) (ide_drive_t *, int);
 
-typedef struct hwif_s {
-	struct hwif_s	*next;		/* for linked-list in ide_hwgroup_t */
+struct ata_channel {
+	struct ata_channel *next;	/* for linked-list in ide_hwgroup_t */
 	struct hwgroup_s *hwgroup;	/* actually (ide_hwgroup_t *) */
 	ide_ioreg_t	io_ports[IDE_NR_PORTS];	/* task file registers */
 	hw_regs_t	hw;		/* Hardware info */
@@ -455,7 +461,7 @@ typedef struct hwif_s {
 	struct scatterlist *sg_table;	/* Scatter-gather list used to build the above */
 	int sg_nents;			/* Current number of entries in it */
 	int sg_dma_direction;		/* dma transfer direction */
-	struct hwif_s	*mate;		/* other hwif from same PCI chip */
+	struct ata_channel *mate;	/* other hwif from same PCI chip */
 	unsigned long	dma_base;	/* base addr for dma ports */
 	unsigned	dma_extra;	/* extra addr for dma ports */
 	unsigned long	config_data;	/* for use by chipset-specific code */
@@ -485,13 +491,13 @@ typedef struct hwif_s {
 	ide_busproc_t	*busproc;	/* driver soft-power interface */
 	byte		bus_state;	/* power state of the IDE bus */
 	struct device	device;		/* global device tree handle */
-} ide_hwif_t;
+};
 
 /*
  * Register new hardware with ide
  */
-extern int ide_register_hw(hw_regs_t *hw, struct hwif_s **hwifp);
-extern void ide_unregister(ide_hwif_t *hwif);
+extern int ide_register_hw(hw_regs_t *hw, struct ata_channel **hwifp);
+extern void ide_unregister(struct ata_channel *hwif);
 
 /*
  * Status returned from various ide_ functions
@@ -521,7 +527,7 @@ typedef struct hwgroup_s {
 	ide_handler_t		*handler;/* irq handler, if active */
 	unsigned long		flags;	/* BUSY, SLEEPING */
 	ide_drive_t		*drive;	/* current drive */
-	ide_hwif_t		*hwif;	/* ptr to current hwif in linked-list */
+	struct ata_channel	*hwif;	/* ptr to current hwif in linked-list */
 	struct request		*rq;	/* current request */
 	struct timer_list	timer;	/* failsafe timer */
 	struct request		wrq;	/* local copy of current write rq */
@@ -580,7 +586,7 @@ typedef struct {
 #ifdef CONFIG_PROC_FS
 void proc_ide_create(void);
 void proc_ide_destroy(void);
-void destroy_proc_ide_drives(ide_hwif_t *);
+void destroy_proc_ide_drives(struct ata_channel *);
 void create_proc_ide_interfaces(void);
 void ide_add_proc_entries(struct proc_dir_entry *dir, ide_proc_entry_t *p, void *data);
 void ide_remove_proc_entries(struct proc_dir_entry *dir, ide_proc_entry_t *p);
@@ -655,15 +661,7 @@ extern int register_ata_driver(unsigned int type, struct ata_operations *driver)
 
 #define ata_ops(drive)		((drive)->driver)
 
-/*
- * ide_hwifs[] is the master data structure used to keep track
- * of just about everything in ide.c.  Whenever possible, routines
- * should be using pointers to a drive (ide_drive_t *) or
- * pointers to a hwif (ide_hwif_t *), rather than indexing this
- * structure directly (the allocation/layout may change!).
- *
- */
-extern struct hwif_s ide_hwifs[];		/* master data repository */
+extern struct ata_channel ide_hwifs[];		/* master data repository */
 extern int noautodma;
 
 /*
@@ -892,8 +890,9 @@ void ide_destroy_dmatable (ide_drive_t *drive);
 ide_startstop_t ide_dma_intr (ide_drive_t *drive);
 int check_drive_lists (ide_drive_t *drive, int good_bad);
 int ide_dmaproc (ide_dma_action_t func, ide_drive_t *drive);
-extern void ide_release_dma(ide_hwif_t *hwif);
-void ide_setup_dma (ide_hwif_t *hwif, unsigned long dmabase, unsigned int num_ports) __init;
+extern void ide_release_dma(struct ata_channel *hwif);
+extern void ide_setup_dma(struct ata_channel *hwif,
+		unsigned long dmabase, unsigned int num_ports) __init;
 #endif
 
 extern spinlock_t ide_lock;

@@ -399,8 +399,8 @@ static int check_in_drive_lists (ide_drive_t *drive, const char **list)
 
 static int pdc202xx_tune_chipset (ide_drive_t *drive, byte speed)
 {
-	ide_hwif_t *hwif	= HWIF(drive);
-	struct pci_dev *dev	= hwif->pci_dev;
+	struct ata_channel *hwif = drive->channel;
+	struct pci_dev *dev = hwif->pci_dev;
 
 	unsigned int		drive_conf;
 	int			err;
@@ -523,7 +523,7 @@ static int pdc202xx_tune_chipset (ide_drive_t *drive, byte speed)
 
 static int pdc202xx_new_tune_chipset (ide_drive_t *drive, byte speed)
 {
-	ide_hwif_t *hwif	= HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	unsigned long indexreg	= (hwif->dma_base + 1);
 	unsigned long datareg	= (hwif->dma_base + 3);
@@ -703,7 +703,7 @@ static void pdc202xx_tune_drive (ide_drive_t *drive, byte pio)
 static int config_chipset_for_dma (ide_drive_t *drive, byte ultra)
 {
 	struct hd_driveid *id	= drive->id;
-	ide_hwif_t *hwif	= HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 	struct pci_dev *dev	= hwif->pci_dev;
 	unsigned long high_16   = pci_resource_start(dev, 4);
 	unsigned long dma_base  = hwif->dma_base;
@@ -924,7 +924,7 @@ jumpbit_is_set:
 static int config_drive_xfer_rate (ide_drive_t *drive)
 {
 	struct hd_driveid *id = drive->id;
-	ide_hwif_t *hwif = HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 	ide_dma_action_t dma_func = ide_dma_off_quietly;
 
 	if (id && (id->capability & 1) && hwif->autodma) {
@@ -969,7 +969,7 @@ no_dma_set:
 		(void) config_chipset_for_pio(drive, 5);
 	}
 
-	return HWIF(drive)->dmaproc(dma_func, drive);
+	return drive->channel->dmaproc(dma_func, drive);
 }
 
 int pdc202xx_quirkproc (ide_drive_t *drive)
@@ -987,7 +987,7 @@ int pdc202xx_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 	byte newchip		= 0;
 	byte clock		= 0;
 	byte hardware48hack	= 0;
-	ide_hwif_t *hwif	= HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 	struct pci_dev *dev	= hwif->pci_dev;
 	unsigned long high_16	= pci_resource_start(dev, 4);
 	unsigned long atapi_reg	= high_16 + (hwif->channel ? 0x24 : 0x00);
@@ -1042,7 +1042,7 @@ int pdc202xx_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 				return (dma_stat & 4) == 4;
 
 			sc1d = IN_BYTE(high_16 + 0x001d);
-			if (HWIF(drive)->channel) {
+			if (drive->channel->channel) {
 				if ((sc1d & 0x50) == 0x50) goto somebody_else;
 				else if ((sc1d & 0x40) == 0x40)
 					return (dma_stat & 4) == 4;
@@ -1055,8 +1055,8 @@ somebody_else:
 			return (dma_stat & 4) == 4;	/* return 1 if INTR asserted */
 		case ide_dma_lostirq:
 		case ide_dma_timeout:
-			if (HWIF(drive)->resetproc != NULL)
-				HWIF(drive)->resetproc(drive);
+			if (drive->channel->resetproc != NULL)
+				drive->channel->resetproc(drive);
 		default:
 			break;
 	}
@@ -1071,12 +1071,12 @@ void pdc202xx_new_reset (ide_drive_t *drive)
 	OUT_BYTE(0x00,IDE_CONTROL_REG);
 	mdelay(1000);
 	printk("PDC202XX: %s channel reset.\n",
-		HWIF(drive)->channel ? "Secondary" : "Primary");
+		drive->channel->channel ? "Secondary" : "Primary");
 }
 
 void pdc202xx_reset (ide_drive_t *drive)
 {
-	unsigned long high_16	= pci_resource_start(HWIF(drive)->pci_dev, 4);
+	unsigned long high_16	= pci_resource_start(drive->channel->pci_dev, 4);
 	byte udma_speed_flag	= IN_BYTE(high_16 + 0x001f);
 
 	OUT_BYTE(udma_speed_flag | 0x10, high_16 + 0x001f);
@@ -1084,7 +1084,7 @@ void pdc202xx_reset (ide_drive_t *drive)
 	OUT_BYTE(udma_speed_flag & ~0x10, high_16 + 0x001f);
 	mdelay(2000);		/* 2 seconds ?! */
 	printk("PDC202XX: %s channel reset.\n",
-		HWIF(drive)->channel ? "Secondary" : "Primary");
+		drive->channel->channel ? "Secondary" : "Primary");
 }
 
 /*
@@ -1095,7 +1095,7 @@ void pdc202xx_reset (ide_drive_t *drive)
 static int pdc202xx_tristate (ide_drive_t * drive, int state)
 {
 #if 0
-	ide_hwif_t *hwif	= HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 	unsigned long high_16	= pci_resource_start(hwif->pci_dev, 4);
 	byte sc1f		= inb(high_16 + 0x001f);
 
@@ -1216,7 +1216,7 @@ fttk_tx_series:
 	return dev->irq;
 }
 
-unsigned int __init ata66_pdc202xx (ide_hwif_t *hwif)
+unsigned int __init ata66_pdc202xx(struct ata_channel *hwif)
 {
 	unsigned short mask = (hwif->channel) ? (1<<11) : (1<<10);
 	unsigned short CIS;
@@ -1235,7 +1235,7 @@ unsigned int __init ata66_pdc202xx (ide_hwif_t *hwif)
 	}
 }
 
-void __init ide_init_pdc202xx (ide_hwif_t *hwif)
+void __init ide_init_pdc202xx(struct ata_channel *hwif)
 {
 	hwif->tuneproc  = &pdc202xx_tune_drive;
 	hwif->quirkproc = &pdc202xx_quirkproc;

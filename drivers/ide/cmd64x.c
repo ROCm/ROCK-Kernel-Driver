@@ -211,7 +211,7 @@ static byte prefetch_masks[4] = {CNTRL_DIS_RA0, CNTRL_DIS_RA1, ARTTIM23_DIS_RA2,
 static void program_drive_counts (ide_drive_t *drive, int setup_count, int active_count, int recovery_count)
 {
 	unsigned long flags;
-	ide_drive_t *drives = HWIF(drive)->drives;
+	ide_drive_t *drives = drive->channel->drives;
 	byte temp_b;
 	static const byte setup_counts[] = {0x40, 0x40, 0x40, 0x80, 0, 0xc0};
 	static const byte recovery_counts[] =
@@ -224,7 +224,7 @@ static void program_drive_counts (ide_drive_t *drive, int setup_count, int activ
 			{ DRWTIM0, DRWTIM1 },
 			{ DRWTIM2, DRWTIM3 }
 		};
-	int channel = (int) HWIF(drive)->channel;
+	int channel = (int) drive->channel->channel;
 	int slave = (drives != drive);  /* Is this really the best way to determine this?? */
 
 	cmdprintk("program_drive_count parameters = s(%d),a(%d),r(%d),p(%d)\n", setup_count,
@@ -260,10 +260,10 @@ static void program_drive_counts (ide_drive_t *drive, int setup_count, int activ
 	 * Program the address_setup clocks into ARTTIM reg,
 	 * and then the active/recovery counts into the DRWTIM reg
 	 */
-	(void) pci_read_config_byte(HWIF(drive)->pci_dev, arttim_regs[channel][slave], &temp_b);
-	(void) pci_write_config_byte(HWIF(drive)->pci_dev, arttim_regs[channel][slave],
+	(void) pci_read_config_byte(drive->channel->pci_dev, arttim_regs[channel][slave], &temp_b);
+	(void) pci_write_config_byte(drive->channel->pci_dev, arttim_regs[channel][slave],
 		((byte) setup_count) | (temp_b & 0x3f));
-	(void) pci_write_config_byte(HWIF(drive)->pci_dev, drwtim_regs[channel][slave],
+	(void) pci_write_config_byte(drive->channel->pci_dev, drwtim_regs[channel][slave],
 		(byte) ((active_count << 4) | recovery_count));
 	cmdprintk ("Write %x to %x\n", ((byte) setup_count) | (temp_b & 0x3f), arttim_regs[channel][slave]);
 	cmdprintk ("Write %x to %x\n", (byte) ((active_count << 4) | recovery_count), drwtim_regs[channel][slave]);
@@ -333,7 +333,7 @@ static void cmd64x_tuneproc (ide_drive_t *drive, byte mode_wanted)
 		setup_count, active_count, recovery_count);
 }
 
-static byte cmd680_taskfile_timing (ide_hwif_t *hwif)
+static byte cmd680_taskfile_timing(struct ata_channel *hwif)
 {
 	struct pci_dev *dev	= hwif->pci_dev;
 	byte addr_mask		= (hwif->channel) ? 0xB2 : 0xA2;
@@ -353,7 +353,7 @@ static byte cmd680_taskfile_timing (ide_hwif_t *hwif)
 
 static void cmd680_tuneproc (ide_drive_t *drive, byte mode_wanted)
 {
-	ide_hwif_t *hwif	= HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 	struct pci_dev *dev	= hwif->pci_dev;
 	byte			drive_pci;
 	unsigned short		speedt;
@@ -394,7 +394,7 @@ static void config_cmd64x_chipset_for_pio (ide_drive_t *drive, byte set_speed)
 
 static void config_cmd680_chipset_for_pio (ide_drive_t *drive, byte set_speed)
 {
-	ide_hwif_t *hwif	= HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 	struct pci_dev *dev	= hwif->pci_dev;
 	u8 unit			= (drive->select.b.unit & 0x01);
 	u8 addr_mask		= (hwif->channel) ? 0x84 : 0x80;
@@ -420,7 +420,7 @@ static void config_cmd680_chipset_for_pio (ide_drive_t *drive, byte set_speed)
 
 static void config_chipset_for_pio (ide_drive_t *drive, byte set_speed)
 {
-        if (HWIF(drive)->pci_dev->device == PCI_DEVICE_ID_CMD_680) {
+        if (drive->channel->pci_dev->device == PCI_DEVICE_ID_CMD_680) {
 		config_cmd680_chipset_for_pio(drive, set_speed);
 	} else {
 		config_cmd64x_chipset_for_pio(drive, set_speed);
@@ -430,7 +430,7 @@ static void config_chipset_for_pio (ide_drive_t *drive, byte set_speed)
 static int cmd64x_tune_chipset (ide_drive_t *drive, byte speed)
 {
 #ifdef CONFIG_BLK_DEV_IDEDMA
-	ide_hwif_t *hwif	= HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 	struct pci_dev *dev	= hwif->pci_dev;
 	int err			= 0;
 
@@ -498,7 +498,7 @@ static int cmd64x_tune_chipset (ide_drive_t *drive, byte speed)
 
 static int cmd680_tune_chipset (ide_drive_t *drive, byte speed)
 {
-	ide_hwif_t *hwif	= HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 	struct pci_dev *dev	= hwif->pci_dev;
 	u8 addr_mask		= (hwif->channel) ? 0x84 : 0x80;
 	u8 unit			= (drive->select.b.unit & 0x01);
@@ -615,7 +615,7 @@ speed_break :
 static int config_cmd64x_chipset_for_dma (ide_drive_t *drive, unsigned int rev, byte ultra_66)
 {
 	struct hd_driveid *id	= drive->id;
-	ide_hwif_t *hwif	= HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 	struct pci_dev *dev	= hwif->pci_dev;
 
 	byte speed		= 0x00;
@@ -741,7 +741,7 @@ static int config_cmd680_chipset_for_dma (ide_drive_t *drive)
 
 static int config_chipset_for_dma (ide_drive_t *drive, unsigned int rev, byte ultra_66)
 {
-	if (HWIF(drive)->pci_dev->device == PCI_DEVICE_ID_CMD_680)
+	if (drive->channel->pci_dev->device == PCI_DEVICE_ID_CMD_680)
 		return (config_cmd680_chipset_for_dma(drive));
 	return (config_cmd64x_chipset_for_dma(drive, rev, ultra_66));
 }
@@ -749,7 +749,7 @@ static int config_chipset_for_dma (ide_drive_t *drive, unsigned int rev, byte ul
 static int cmd64x_config_drive_for_dma (ide_drive_t *drive)
 {
 	struct hd_driveid *id	= drive->id;
-	ide_hwif_t *hwif	= HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 	struct pci_dev *dev	= hwif->pci_dev;
 	unsigned int class_rev	= 0;
 	byte can_ultra_33	= 0;
@@ -822,7 +822,7 @@ fast_ata_pio:
 no_dma_set:
 		config_chipset_for_pio(drive, 1);
 	}
-	return HWIF(drive)->dmaproc(dma_func, drive);
+	return drive->channel->dmaproc(dma_func, drive);
 }
 
 static int cmd680_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
@@ -841,9 +841,9 @@ static int cmd64x_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 {
 	byte dma_stat		= 0;
 	byte dma_alt_stat	= 0;
-	byte mask		= (HWIF(drive)->channel) ? MRDMODE_INTR_CH1 : MRDMODE_INTR_CH0;
-	unsigned long dma_base	= HWIF(drive)->dma_base;
-	struct pci_dev *dev	= HWIF(drive)->pci_dev;
+	byte mask		= (drive->channel->channel) ? MRDMODE_INTR_CH1 : MRDMODE_INTR_CH0;
+	unsigned long dma_base	= drive->channel->dma_base;
+	struct pci_dev *dev	= drive->channel->pci_dev;
 	byte jack_slap		= ((dev->device == PCI_DEVICE_ID_CMD_648) || (dev->device == PCI_DEVICE_ID_CMD_649)) ? 1 : 0;
 
 	switch (func) {
@@ -856,8 +856,8 @@ static int cmd64x_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 			outb(dma_stat|6, dma_base+2);		/* clear the INTR & ERROR bits */
 			if (jack_slap) {
 				byte dma_intr	= 0;
-				byte dma_mask	= (HWIF(drive)->channel) ? ARTTIM23_INTR_CH1 : CFR_INTR_CH0;
-				byte dma_reg	= (HWIF(drive)->channel) ? ARTTIM2 : CFR;
+				byte dma_mask	= (drive->channel->channel) ? ARTTIM23_INTR_CH1 : CFR_INTR_CH0;
+				byte dma_reg	= (drive->channel->channel) ? ARTTIM2 : CFR;
 				(void) pci_read_config_byte(dev, dma_reg, &dma_intr);
 				/*
 				 * DAMN BMIDE is not connected to PCI space!
@@ -891,7 +891,7 @@ static int cmd64x_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
  */
 static int cmd646_1_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 {
-	ide_hwif_t *hwif = HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 	unsigned long dma_base = hwif->dma_base;
 	byte dma_stat;
 
@@ -917,7 +917,7 @@ static int cmd646_1_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 static int cmd680_busproc (ide_drive_t * drive, int state)
 {
 #if 0
-	ide_hwif_t *hwif	= HWIF(drive);
+	struct ata_channel *hwif	= drive->channel;
 	u8 addr_mask		= (hwif->channel) ? 0xB0 : 0xA0;
 	u32 stat_config		= 0;
 
@@ -950,7 +950,7 @@ static int cmd680_busproc (ide_drive_t * drive, int state)
 static void cmd680_reset (ide_drive_t *drive)
 {
 #if 0
-	ide_hwif_t *hwif	= HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 	u8 addr_mask		= (hwif->channel) ? 0xB0 : 0xA0;
 	byte reset		= 0;
 
@@ -1081,7 +1081,7 @@ unsigned int __init pci_init_cmd64x(struct pci_dev *dev)
 	return cmd64x_pci_init (dev);
 }
 
-unsigned int cmd680_ata66 (ide_hwif_t *hwif)
+unsigned int cmd680_ata66(struct ata_channel *hwif)
 {
 	byte ata66	= 0;
 	byte addr_mask	= (hwif->channel) ? 0xB0 : 0xA0;
@@ -1090,7 +1090,7 @@ unsigned int cmd680_ata66 (ide_hwif_t *hwif)
 	return (ata66 & 0x01) ? 1 : 0;
 }
 
-unsigned int cmd64x_ata66 (ide_hwif_t *hwif)
+unsigned int cmd64x_ata66(struct ata_channel *hwif)
 {
 	byte ata66 = 0;
 	byte mask = (hwif->channel) ? 0x02 : 0x01;
@@ -1099,7 +1099,7 @@ unsigned int cmd64x_ata66 (ide_hwif_t *hwif)
 	return (ata66 & mask) ? 1 : 0;
 }
 
-unsigned int __init ata66_cmd64x (ide_hwif_t *hwif)
+unsigned int __init ata66_cmd64x(struct ata_channel *hwif)
 {
 	struct pci_dev *dev	= hwif->pci_dev;
 	if (dev->device == PCI_DEVICE_ID_CMD_680)
@@ -1107,7 +1107,7 @@ unsigned int __init ata66_cmd64x (ide_hwif_t *hwif)
 	return cmd64x_ata66(hwif);
 }
 
-void __init ide_init_cmd64x (ide_hwif_t *hwif)
+void __init ide_init_cmd64x(struct ata_channel *hwif)
 {
 	struct pci_dev *dev	= hwif->pci_dev;
 	unsigned int class_rev;

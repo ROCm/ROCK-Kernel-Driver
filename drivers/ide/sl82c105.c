@@ -57,7 +57,7 @@ static unsigned int get_timing_sl82c105(struct ata_timing *t)
  */
 static void config_for_pio(ide_drive_t *drive, int pio, int report)
 {
-	ide_hwif_t *hwif = HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 	struct pci_dev *dev = hwif->pci_dev;
 	struct ata_timing *t;
 	unsigned short drv_ctrl = 0x909;
@@ -95,7 +95,7 @@ static void config_for_pio(ide_drive_t *drive, int pio, int report)
  */
 static int config_for_dma(ide_drive_t *drive)
 {
-	ide_hwif_t *hwif = HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 	struct pci_dev *dev = hwif->pci_dev;
 	unsigned short drv_ctrl = 0x909;
 	unsigned int reg;
@@ -120,7 +120,7 @@ static int sl82c105_check_drive(ide_drive_t *drive)
 
 	do {
 		struct hd_driveid *id = drive->id;
-		ide_hwif_t *hwif = HWIF(drive);
+		struct ata_channel *hwif = drive->channel;
 
 		if (!hwif->autodma)
 			break;
@@ -146,7 +146,7 @@ static int sl82c105_check_drive(ide_drive_t *drive)
 		}
 	} while (0);
 
-	return HWIF(drive)->dmaproc(dma_func, drive);
+	return drive->channel->dmaproc(dma_func, drive);
 }
 
 /*
@@ -232,7 +232,7 @@ unsigned int __init pci_init_sl82c105(struct pci_dev *dev)
 	return dev->irq;
 }
 
-void __init dma_init_sl82c105(ide_hwif_t *hwif, unsigned long dma_base)
+void __init dma_init_sl82c105(struct ata_channel *hwif, unsigned long dma_base)
 {
 	unsigned int rev;
 	byte dma_state;
@@ -261,7 +261,7 @@ void __init dma_init_sl82c105(ide_hwif_t *hwif, unsigned long dma_base)
 /*
  * Initialise the chip
  */
-void __init ide_init_sl82c105(ide_hwif_t *hwif)
+void __init ide_init_sl82c105(struct ata_channel *hwif)
 {
 	hwif->tuneproc = tune_sl82c105;
 }

@@ -51,7 +51,7 @@
 #include <asm/io.h>
 
 #ifdef CONFIG_BLK_DEV_PDC4030
-#define IS_PDC4030_DRIVE (HWIF(drive)->chipset == ide_pdc4030)
+#define IS_PDC4030_DRIVE (drive->channel->chipset == ide_pdc4030)
 #else
 #define IS_PDC4030_DRIVE (0)	/* auto-NULLs out pdc4030 code */
 #endif
@@ -1018,7 +1018,7 @@ static void idedisk_setup(ide_drive_t *drive)
 		}
 	}
 	for (i = 0; i < MAX_DRIVES; ++i) {
-		ide_hwif_t *hwif = HWIF(drive);
+		struct ata_channel *hwif = drive->channel;
 
 		if (drive != &hwif->drives[i])
 		    continue;
@@ -1036,7 +1036,7 @@ static void idedisk_setup(ide_drive_t *drive)
 	    sprintf(drive->device.bus_id, "%d", drvid);
 	    sprintf(drive->device.name, "ide-disk");
 	    drive->device.driver = &idedisk_devdrv;
-	    drive->device.parent = &HWIF(drive)->device;
+	    drive->device.parent = &drive->channel->device;
 	    drive->device.driver_data = drive;
 	    device_register(&drive->device);
 	}
@@ -1084,11 +1084,11 @@ static void idedisk_setup(ide_drive_t *drive)
 	if (id->buf_size)
 		printk (" w/%dKiB Cache", id->buf_size/2);
 
-	printk(", CHS=%d/%d/%d", 
+	printk(", CHS=%d/%d/%d",
 	       drive->bios_cyl, drive->bios_head, drive->bios_sect);
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (drive->using_dma)
-		(void) HWIF(drive)->dmaproc(ide_dma_verbose, drive);
+		(void) drive->channel->dmaproc(ide_dma_verbose, drive);
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 	printk("\n");
 

@@ -134,7 +134,7 @@ static void ali14xx_tune_drive (ide_drive_t *drive, byte pio)
 		drive->name, pio - XFER_PIO_0, time1, time2, param1, param2, param3, param4);
 
 	/* stuff timing parameters into controller registers */
-	driveNum = (HWIF(drive)->index << 1) + drive->select.b.unit;
+	driveNum = (drive->channel->index << 1) + drive->select.b.unit;
 	save_flags(flags);	/* all CPUs */
 	cli();			/* all CPUs */
 	outb_p(regOn, basePort);

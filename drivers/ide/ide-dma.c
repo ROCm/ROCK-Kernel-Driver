@@ -204,7 +204,7 @@ ide_startstop_t ide_dma_intr (ide_drive_t *drive)
 {
 	byte stat, dma_stat;
 
-	dma_stat = HWIF(drive)->dmaproc(ide_dma_end, drive);
+	dma_stat = drive->channel->dmaproc(ide_dma_end, drive);
 	stat = GET_STAT();			/* get drive status */
 	if (OK_STAT(stat,DRIVE_READY,drive->bad_wstat|DRQ_STAT)) {
 		if (!dma_stat) {
@@ -219,7 +219,7 @@ ide_startstop_t ide_dma_intr (ide_drive_t *drive)
 	return ide_error(drive, "dma_intr", stat);
 }
 
-static int ide_build_sglist (ide_hwif_t *hwif, struct request *rq)
+static int ide_build_sglist(struct ata_channel *hwif, struct request *rq)
 {
 	request_queue_t *q = &hwif->drives[DEVICE_NR(rq->rq_dev) & 1].queue;
 	struct scatterlist *sg = hwif->sg_table;
@@ -238,7 +238,7 @@ static int ide_build_sglist (ide_hwif_t *hwif, struct request *rq)
 	return pci_map_sg(hwif->pci_dev, sg, nents, hwif->sg_dma_direction);
 }
 
-static int ide_raw_build_sglist (ide_hwif_t *hwif, struct request *rq)
+static int ide_raw_build_sglist(struct ata_channel *hwif, struct request *rq)
 {
 	struct scatterlist *sg = hwif->sg_table;
 	int nents = 0;
@@ -285,7 +285,7 @@ static int ide_raw_build_sglist (ide_hwif_t *hwif, struct request *rq)
  */
 int ide_build_dmatable (ide_drive_t *drive, ide_dma_action_t func)
 {
-	ide_hwif_t *hwif = HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 	unsigned int *table = hwif->dmatable_cpu;
 #ifdef CONFIG_BLK_DEV_TRM290
 	unsigned int is_trm290_chipset = (hwif->chipset == ide_trm290);
@@ -371,11 +371,11 @@ int ide_build_dmatable (ide_drive_t *drive, ide_dma_action_t func)
 /* Teardown mappings after DMA has completed.  */
 void ide_destroy_dmatable (ide_drive_t *drive)
 {
-	struct pci_dev *dev = HWIF(drive)->pci_dev;
-	struct scatterlist *sg = HWIF(drive)->sg_table;
-	int nents = HWIF(drive)->sg_nents;
+	struct pci_dev *dev = drive->channel->pci_dev;
+	struct scatterlist *sg = drive->channel->sg_table;
+	int nents = drive->channel->sg_nents;
 
-	pci_unmap_sg(dev, sg, nents, HWIF(drive)->sg_dma_direction);
+	pci_unmap_sg(dev, sg, nents, drive->channel->sg_dma_direction);
 }
 
 /*
@@ -462,7 +462,7 @@ static int config_drive_for_dma (ide_drive_t *drive)
 {
 	int config_allows_dma = 1;
 	struct hd_driveid *id = drive->id;
-	ide_hwif_t *hwif = HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 
 #ifdef CONFIG_IDEDMA_ONLYDISK
 	if (drive->type != ATA_DISK)
@@ -502,7 +502,7 @@ static int config_drive_for_dma (ide_drive_t *drive)
  */
 static int dma_timer_expiry(ide_drive_t *drive)
 {
-	byte dma_stat = inb(HWIF(drive)->dma_base+2);
+	byte dma_stat = inb(drive->channel->dma_base+2);
 
 #ifdef DEBUG
 	printk("%s: dma_timer_expiry: dma status == 0x%02x\n", drive->name, dma_stat);
@@ -525,11 +525,11 @@ static void ide_toggle_bounce(ide_drive_t *drive, int on)
 {
 	u64 addr = BLK_BOUNCE_HIGH;
 
-	if (on && drive->type == ATA_DISK && HWIF(drive)->highmem) {
+	if (on && drive->type == ATA_DISK && drive->channel->highmem) {
 		if (!PCI_DMA_BUS_IS_PHYS)
 			addr = BLK_BOUNCE_ANY;
 		else
-			addr = HWIF(drive)->pci_dev->dma_mask;
+			addr = drive->channel->pci_dev->dma_mask;
 	}
 
 	blk_queue_bounce_limit(&drive->queue, addr);
@@ -553,7 +553,7 @@ static void ide_toggle_bounce(ide_drive_t *drive, int on)
  */
 int ide_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 {
-	ide_hwif_t *hwif = HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 	unsigned long dma_base = hwif->dma_base;
 	byte unit = (drive->select.b.unit & 0x01);
 	unsigned int count, reading = 0, set_high = 1;
@@ -598,7 +598,7 @@ int ide_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 			} else {
 				OUT_BYTE(reading ? WIN_READDMA : WIN_WRITEDMA, IDE_COMMAND_REG);
 			}
-			return HWIF(drive)->dmaproc(ide_dma_begin, drive);
+			return drive->channel->dmaproc(ide_dma_begin, drive);
 		case ide_dma_begin:
 			/* Note that this is done *after* the cmd has
 			 * been issued to the drive, as per the BM-IDE spec.
@@ -644,7 +644,7 @@ int ide_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 /*
  * Needed for allowing full modular support of ide-driver
  */
-void ide_release_dma(ide_hwif_t *hwif)
+void ide_release_dma(struct ata_channel *hwif)
 {
 	if (!hwif->dma_base)
 		return;
@@ -669,7 +669,7 @@ void ide_release_dma(ide_hwif_t *hwif)
 /*
  * This can be called for a dynamically installed interface. Don't __init it
  */
-void ide_setup_dma (ide_hwif_t *hwif, unsigned long dma_base, unsigned int num_ports)
+void ide_setup_dma(struct ata_channel *hwif, unsigned long dma_base, unsigned int num_ports)
 {
 	printk("    %s: BM-DMA at 0x%04lx-0x%04lx", hwif->name, dma_base, dma_base + num_ports - 1);
 	if (check_region(dma_base, num_ports)) {

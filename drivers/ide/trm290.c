@@ -141,7 +141,7 @@
 
 static void trm290_prepare_drive (ide_drive_t *drive, unsigned int use_dma)
 {
-	ide_hwif_t *hwif = HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 	unsigned int reg;
 	unsigned long flags;
 
@@ -175,7 +175,7 @@ static void trm290_selectproc (ide_drive_t *drive)
 #ifdef CONFIG_BLK_DEV_IDEDMA
 static int trm290_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 {
-	ide_hwif_t *hwif = HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 	unsigned int count, reading = 2, writing = 0;
 
 	switch (func) {
@@ -216,7 +216,7 @@ static int trm290_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 /*
  * Invoked from ide-dma.c at boot time.
  */
-void __init ide_init_trm290 (ide_hwif_t *hwif)
+void __init ide_init_trm290(struct ata_channel *hwif)
 {
 	unsigned int cfgbase = 0;
 	unsigned long flags;

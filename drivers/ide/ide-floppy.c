@@ -902,7 +902,7 @@ static ide_startstop_t idefloppy_pc_intr (ide_drive_t *drive)
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (test_bit (PC_DMA_IN_PROGRESS, &pc->flags)) {
-		if (HWIF(drive)->dmaproc(ide_dma_end, drive)) {
+		if (drive->channel->dmaproc(ide_dma_end, drive)) {
 			set_bit (PC_DMA_ERROR, &pc->flags);
 		} else {
 			pc->actually_transferred=pc->request_transfer;
@@ -945,7 +945,7 @@ static ide_startstop_t idefloppy_pc_intr (ide_drive_t *drive)
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (test_and_clear_bit (PC_DMA_IN_PROGRESS, &pc->flags)) {
 		printk (KERN_ERR "ide-floppy: The floppy wants to issue more interrupts in DMA mode\n");
-		HWIF(drive)->dmaproc(ide_dma_off, drive);
+		drive->channel->dmaproc(ide_dma_off, drive);
 		return ide_stopped;
 	}
 #endif /* CONFIG_BLK_DEV_IDEDMA */
@@ -1117,10 +1117,10 @@ static ide_startstop_t idefloppy_issue_pc (ide_drive_t *drive, idefloppy_pc_t *p
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (test_and_clear_bit (PC_DMA_ERROR, &pc->flags)) {
-		(void) HWIF(drive)->dmaproc(ide_dma_off, drive);
+		(void) drive->channel->dmaproc(ide_dma_off, drive);
 	}
 	if (test_bit (PC_DMA_RECOMMENDED, &pc->flags) && drive->using_dma)
-		dma_ok=!HWIF(drive)->dmaproc(test_bit (PC_WRITING, &pc->flags) ? ide_dma_write : ide_dma_read, drive);
+		dma_ok=!drive->channel->dmaproc(test_bit (PC_WRITING, &pc->flags) ? ide_dma_write : ide_dma_read, drive);
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 
 	if (IDE_CONTROL_REG)
@@ -1133,7 +1133,7 @@ static ide_startstop_t idefloppy_issue_pc (ide_drive_t *drive, idefloppy_pc_t *p
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (dma_ok) {							/* Begin DMA, if necessary */
 		set_bit (PC_DMA_IN_PROGRESS, &pc->flags);
-		(void) (HWIF(drive)->dmaproc(ide_dma_begin, drive));
+		(void) drive->channel->dmaproc(ide_dma_begin, drive);
 	}
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 
@@ -2004,7 +2004,7 @@ static void idefloppy_setup (ide_drive_t *drive, idefloppy_floppy_t *floppy)
 	(void) idefloppy_get_capacity (drive);
 	idefloppy_add_settings(drive);
 	for (i = 0; i < MAX_DRIVES; ++i) {
-		ide_hwif_t *hwif = HWIF(drive);
+		struct ata_channel *hwif = drive->channel;
 
 		if (drive != &hwif->drives[i]) continue;
 		hwif->gd->de_arr[i] = drive->de;

@@ -2058,7 +2058,7 @@ static ide_startstop_t idetape_pc_intr (ide_drive_t *drive)
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (test_bit (PC_DMA_IN_PROGRESS, &pc->flags)) {
-		if (HWIF(drive)->dmaproc(ide_dma_end, drive)) {
+		if (drive->channel->dmaproc(ide_dma_end, drive)) {
 			/*
 			 * A DMA error is sometimes expected. For example,
 			 * if the tape is crossing a filemark during a
@@ -2132,7 +2132,7 @@ static ide_startstop_t idetape_pc_intr (ide_drive_t *drive)
 	if (test_and_clear_bit (PC_DMA_IN_PROGRESS, &pc->flags)) {
 		printk (KERN_ERR "ide-tape: The tape wants to issue more interrupts in DMA mode\n");
 		printk (KERN_ERR "ide-tape: DMA disabled, reverting to PIO\n");
-		HWIF(drive)->dmaproc(ide_dma_off, drive);
+		drive->channel->dmaproc(ide_dma_off, drive);
 		return ide_stopped;
 	}
 #endif /* CONFIG_BLK_DEV_IDEDMA */
@@ -2309,10 +2309,10 @@ static ide_startstop_t idetape_issue_packet_command (ide_drive_t *drive, idetape
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (test_and_clear_bit (PC_DMA_ERROR, &pc->flags)) {
 		printk (KERN_WARNING "ide-tape: DMA disabled, reverting to PIO\n");
-		(void) HWIF(drive)->dmaproc(ide_dma_off, drive);
+		(void) drive->channel->dmaproc(ide_dma_off, drive);
 	}
 	if (test_bit (PC_DMA_RECOMMENDED, &pc->flags) && drive->using_dma)
-		dma_ok = !HWIF(drive)->dmaproc(test_bit (PC_WRITING, &pc->flags) ? ide_dma_write : ide_dma_read, drive);
+		dma_ok = !drive->channel->dmaproc(test_bit (PC_WRITING, &pc->flags) ? ide_dma_write : ide_dma_read, drive);
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 
 	if (IDE_CONTROL_REG)
@@ -2324,7 +2324,7 @@ static ide_startstop_t idetape_issue_packet_command (ide_drive_t *drive, idetape
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (dma_ok) {						/* Begin DMA, if necessary */
 		set_bit (PC_DMA_IN_PROGRESS, &pc->flags);
-		(void) (HWIF(drive)->dmaproc(ide_dma_begin, drive));
+		(void) drive->channel->dmaproc(ide_dma_begin, drive);
 	}
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 	if (test_bit(IDETAPE_DRQ_INTERRUPT, &tape->flags)) {
@@ -5997,13 +5997,13 @@ static void idetape_setup (ide_drive_t *drive, idetape_tape_t *tape, int minor)
 		tape->onstream = 1;
 	drive->dsc_overlap = 1;
 #ifdef CONFIG_BLK_DEV_IDEPCI
-	if (!tape->onstream && HWIF(drive)->pci_dev != NULL) {
+	if (!tape->onstream && drive->channel->pci_dev != NULL) {
 		/*
 		 * These two ide-pci host adapters appear to need DSC overlap disabled.
 		 * This probably needs further analysis.
 		 */
-		if ((HWIF(drive)->pci_dev->device == PCI_DEVICE_ID_ARTOP_ATP850UF) ||
-		    (HWIF(drive)->pci_dev->device == PCI_DEVICE_ID_TTI_HPT343)) {
+		if ((drive->channel->pci_dev->device == PCI_DEVICE_ID_ARTOP_ATP850UF) ||
+		    (drive->channel->pci_dev->device == PCI_DEVICE_ID_TTI_HPT343)) {
 			printk(KERN_INFO "ide-tape: %s: disabling DSC overlap\n", tape->name);
 		    	drive->dsc_overlap = 0;
 		}
@@ -6255,12 +6255,12 @@ int idetape_init (void)
 		idetape_chrdevs[minor].drive = drive;
 		tape->de_r =
 		    devfs_register (drive->de, "mt", DEVFS_FL_DEFAULT,
-				    HWIF(drive)->major, minor,
+				    drive->channel->major, minor,
 				    S_IFCHR | S_IRUGO | S_IWUGO,
 				    &idetape_fops, NULL);
 		tape->de_n =
 		    devfs_register (drive->de, "mtn", DEVFS_FL_DEFAULT,
-				    HWIF(drive)->major, minor + 128,
+				    drive->channel->major, minor + 128,
 				    S_IFCHR | S_IRUGO | S_IWUGO,
 				    &idetape_fops, NULL);
 		devfs_register_tape (tape->de_r);

@@ -138,7 +138,7 @@ static int ide_getdigit(char c)
 static int proc_ide_read_imodel
 	(char *page, char **start, off_t off, int count, int *eof, void *data)
 {
-	ide_hwif_t	*hwif = data;
+	struct ata_channel *hwif = data;
 	int		len;
 	const char	*name;
 
@@ -167,7 +167,7 @@ static int proc_ide_read_imodel
 static int proc_ide_read_mate
 	(char *page, char **start, off_t off, int count, int *eof, void *data)
 {
-	ide_hwif_t	*hwif = data;
+	struct ata_channel *hwif = data;
 	int		len;
 
 	if (hwif && hwif->mate && hwif->mate->present)
@@ -180,7 +180,7 @@ static int proc_ide_read_mate
 static int proc_ide_read_channel
 	(char *page, char **start, off_t off, int count, int *eof, void *data)
 {
-	ide_hwif_t	*hwif = data;
+	struct ata_channel *hwif = data;
 	int		len;
 
 	page[0] = hwif->channel ? '1' : '0';
@@ -435,7 +435,7 @@ void ide_remove_proc_entries(struct proc_dir_entry *dir, ide_proc_entry_t *p)
 	}
 }
 
-static void create_proc_ide_drives(ide_hwif_t *hwif)
+static void create_proc_ide_drives(struct ata_channel *hwif)
 {
 	int	d;
 	struct proc_dir_entry *ent;
@@ -465,7 +465,7 @@ static void create_proc_ide_drives(ide_hwif_t *hwif)
 	}
 }
 
-static void destroy_proc_ide_device(ide_hwif_t *hwif, ide_drive_t *drive)
+static void destroy_proc_ide_device(struct ata_channel *hwif, ide_drive_t *drive)
 {
 	struct ata_operations *driver = drive->driver;
 
@@ -479,7 +479,7 @@ static void destroy_proc_ide_device(ide_hwif_t *hwif, ide_drive_t *drive)
 	}
 }
 
-void destroy_proc_ide_drives(ide_hwif_t *hwif)
+void destroy_proc_ide_drives(struct ata_channel *hwif)
 {
 	int	d;
 
@@ -503,7 +503,7 @@ void create_proc_ide_interfaces(void)
 	int	h;
 
 	for (h = 0; h < MAX_HWIFS; h++) {
-		ide_hwif_t *hwif = &ide_hwifs[h];
+		struct ata_channel *hwif = &ide_hwifs[h];
 
 		if (!hwif->present)
 			continue;
@@ -522,7 +522,7 @@ static void destroy_proc_ide_interfaces(void)
 	int	h;
 
 	for (h = 0; h < MAX_HWIFS; h++) {
-		ide_hwif_t *hwif = &ide_hwifs[h];
+		struct ata_channel *hwif = &ide_hwifs[h];
 		int exist = (hwif->proc != NULL);
 #if 0
 		if (!hwif->present)

@@ -302,7 +302,7 @@ static void via_set_speed(struct pci_dev *dev, unsigned char dn, struct ata_timi
 
 static int via_set_drive(ide_drive_t *drive, unsigned char speed)
 {
-	ide_drive_t *peer = HWIF(drive)->drives + (~drive->dn & 1);
+	ide_drive_t *peer = drive->channel->drives + (~drive->dn & 1);
 	struct ata_timing t, p;
 	unsigned int T, UT;
 
@@ -328,7 +328,7 @@ static int via_set_drive(ide_drive_t *drive, unsigned char speed)
 		ata_timing_merge(&p, &t, &t, IDE_TIMING_8BIT);
 	}
 
-	via_set_speed(HWIF(drive)->pci_dev, drive->dn, &t);
+	via_set_speed(drive->channel->pci_dev, drive->dn, &t);
 
 	if (!drive->init_speed)
 		drive->init_speed = speed;
@@ -344,7 +344,7 @@ static int via_set_drive(ide_drive_t *drive, unsigned char speed)
 
 static void via82cxxx_tune_drive(ide_drive_t *drive, unsigned char pio)
 {
-	if (!((via_enabled >> HWIF(drive)->channel) & 1))
+	if (!((via_enabled >> drive->channel->channel) & 1))
 		return;
 
 	if (pio == 255) {
@@ -368,7 +368,7 @@ int via82cxxx_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 
 	if (func == ide_dma_check) {
 
-		short w80 = HWIF(drive)->udma_four;
+		short w80 = drive->channel->udma_four;
 
 		short speed = ata_timing_mode(drive,
 			XFER_PIO | XFER_EPIO | XFER_SWDMA | XFER_MWDMA |
@@ -379,7 +379,7 @@ int via82cxxx_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 
 		via_set_drive(drive, speed);
 
-		func = (HWIF(drive)->autodma && (speed & XFER_MODE) != XFER_PIO)
+		func = (drive->channel->autodma && (speed & XFER_MODE) != XFER_PIO)
 			? ide_dma_on : ide_dma_off_quietly;
 	}
 
@@ -523,12 +523,12 @@ unsigned int __init pci_init_via82cxxx(struct pci_dev *dev)
 	return 0;
 }
 
-unsigned int __init ata66_via82cxxx(ide_hwif_t *hwif)
+unsigned int __init ata66_via82cxxx(struct ata_channel *hwif)
 {
 	return ((via_enabled & via_80w) >> hwif->channel) & 1;
 }
 
-void __init ide_init_via82cxxx(ide_hwif_t *hwif)
+void __init ide_init_via82cxxx(struct ata_channel *hwif)
 {
 	int i;
 
@@ -559,7 +559,7 @@ void __init ide_init_via82cxxx(ide_hwif_t *hwif)
  * We allow the BM-DMA driver to only work on enabled interfaces.
  */
 
-void __init ide_dmacapable_via82cxxx(ide_hwif_t *hwif, unsigned long dmabase)
+void __init ide_dmacapable_via82cxxx(struct ata_channel *hwif, unsigned long dmabase)
 {
 	if ((via_enabled >> hwif->channel) & 1)
 		ide_setup_dma(hwif, dmabase, 8);
