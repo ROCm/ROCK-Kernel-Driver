@@ -196,6 +196,8 @@ static int raid0_run (mddev_t *mddev)
 	sector_t zone0_size;
 	s64 size;
 	raid0_conf_t *conf;
+	mdk_rdev_t *rdev;
+	struct list_head *tmp;
 
 	conf = vmalloc(sizeof (raid0_conf_t));
 	if (!conf)
@@ -205,15 +207,20 @@ static int raid0_run (mddev_t *mddev)
 	if (create_strip_zones (mddev)) 
 		goto out_free_conf;
 
+	/* calculate array device size */
+	mddev->array_size = 0;
+	ITERATE_RDEV(mddev,rdev,tmp)
+		mddev->array_size += rdev->size;
+
 	printk("raid0 : md_size is %llu blocks.\n", 
-		(unsigned long long)md_size[mdidx(mddev)]);
+		(unsigned long long)mddev->array_size);
 	printk("raid0 : conf->smallest->size is %llu blocks.\n",
 		(unsigned long long)conf->smallest->size);
 	{
 #if __GNUC__ < 3
 		volatile
 #endif
-		sector_t s = md_size[mdidx(mddev)];
+		sector_t s = mddev->array_size;
 		int round = sector_div(s, (unsigned long)conf->smallest->size) ? 1 : 0;
 		nb_zone = s + round;
 	}

@@ -231,6 +231,13 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
 				((v >> 10) & 0x3fffff);
 			break;
 
+		case R_SPARC_OLO10:
+			*loc32 = (*loc32 & ~0x1fff) |
+				(((v & 0x3ff) +
+				  (ELF64_R_TYPE(rel[i].r_info) >> 8))
+				 & 0x1fff);
+			break;
+
 		default:
 			printk(KERN_ERR "module %s: Unknown relocation: %x\n",
 			       me->name,

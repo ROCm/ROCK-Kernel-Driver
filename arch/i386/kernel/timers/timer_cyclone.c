@@ -28,27 +28,46 @@ static int delay_at_last_interrupt;
 #define CYCLONE_MPMC_OFFSET 0x51D0
 #define CYCLONE_MPCS_OFFSET 0x51A8
 #define CYCLONE_TIMER_FREQ 100000000
-
+#define CYCLONE_TIMER_MASK (((u64)1<<40)-1) /* 40 bit mask */
 int use_cyclone = 0;
 
 static u32* volatile cyclone_timer;	/* Cyclone MPMC0 register */
-static u32 last_cyclone_timer;
+static u32 last_cyclone_low;
+static u32 last_cyclone_high;
+static unsigned long long monotonic_base;
+static rwlock_t monotonic_lock = RW_LOCK_UNLOCKED;
+
+/* helper macro to atomically read both cyclone counter registers */
+#define read_cyclone_counter(low,high) \
+	do{ \
+		high = cyclone_timer[1]; low = cyclone_timer[0]; \
+	} while (high != cyclone_timer[1]);
+
 
 static void mark_offset_cyclone(void)
 {
 	int count;
-	spin_lock(&i8253_lock);
-	/* quickly read the cyclone timer */
-	if(cyclone_timer)
-		last_cyclone_timer = cyclone_timer[0];
+	unsigned long long this_offset, last_offset;
 
-	/* calculate delay_at_last_interrupt */
+	write_lock(&monotonic_lock);
+	last_offset = ((unsigned long long)last_cyclone_high<<32)|last_cyclone_low;
+	
+	spin_lock(&i8253_lock);
+	read_cyclone_counter(last_cyclone_low,last_cyclone_high);
+
+	/* read values for delay_at_last_interrupt */
 	outb_p(0x00, 0x43);     /* latch the count ASAP */
 
 	count = inb_p(0x40);    /* read the latched count */
 	count |= inb(0x40) << 8;
 	spin_unlock(&i8253_lock);
 
+	/* update the monotonic base value */
+	this_offset = ((unsigned long long)last_cyclone_high<<32)|last_cyclone_low;
+	monotonic_base += (this_offset - last_offset) & CYCLONE_TIMER_MASK;
+	write_unlock(&monotonic_lock);
+
+	/* calculate delay_at_last_interrupt */
 	count = ((LATCH-1) - count) * TICK_SIZE;
 	delay_at_last_interrupt = (count + LATCH/2) / LATCH;
 }
@@ -64,7 +83,7 @@ static unsigned long get_offset_cyclone(void)
 	offset = cyclone_timer[0];
 
 	/* .. relative to previous jiffy */
-	offset = offset - last_cyclone_timer;
+	offset = offset - last_cyclone_low;
 
 	/* convert cyclone ticks to microseconds */	
 	/* XXX slow, can we speed this up? */
@@ -72,6 +91,27 @@ static unsigned long get_offset_cyclone(void)
 
 	/* our adjusted time offset in microseconds */
 	return delay_at_last_interrupt + offset;
+}
+
+static unsigned long long monotonic_clock_cyclone(void)
+{
+	u32 now_low, now_high;
+	unsigned long long last_offset, this_offset, base;
+	unsigned long long ret;
+
+	/* atomically read monotonic base & last_offset */
+	read_lock_irq(&monotonic_lock);
+	last_offset = ((unsigned long long)last_cyclone_high<<32)|last_cyclone_low;
+	base = monotonic_base;
+	read_unlock_irq(&monotonic_lock);
+
+	/* Read the cyclone counter */
+	read_cyclone_counter(now_low,now_high);
+	this_offset = ((unsigned long long)now_high<<32)|now_low;
+
+	/* convert to nanoseconds */
+	ret = base + ((this_offset - last_offset)&CYCLONE_TIMER_MASK);
+	return ret * (1000000000 / CYCLONE_TIMER_FREQ);
 }
 
 static int __init init_cyclone(char* override)
@@ -194,5 +234,6 @@ struct timer_opts timer_cyclone = {
 	.init = init_cyclone, 
 	.mark_offset = mark_offset_cyclone, 
 	.get_offset = get_offset_cyclone,
+	.monotonic_clock =	monotonic_clock_cyclone,
 	.delay = delay_cyclone,
 };

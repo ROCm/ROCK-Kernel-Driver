@@ -549,7 +549,7 @@ tlb_fixup_done:
 	wr	%g0, ASI_P, %asi
 	mov	1, %g5
 	sllx	%g5, THREAD_SHIFT, %g5
-	sub	%g5, (REGWIN_SZ + STACK_BIAS), %g5
+	sub	%g5, (STACKFRAME_SZ + STACK_BIAS), %g5
 	add	%g6, %g5, %sp
 	mov	0, %fp
 

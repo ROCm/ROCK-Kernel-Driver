@@ -208,10 +208,10 @@ had ->revalidate()) add calls in ->follow_link()/->readlink().
 if at least one of the following is true:
 	* filesystem has no cross-directory rename()
 	* dcache_lock is held
-	* dparent_lock is held (shared)
 	* we know that parent had been locked (e.g. we are looking at
 ->d_parent of ->lookup() argument).
 	* we are called from ->rename().
+	* the child's ->d_lock is held
 Audit your code and add locking if needed.  Notice that any place that is
 not protected by the conditions above is risky even in the old tree - you
 had been relying on BKL and that's prone to screwups.  Old tree had quite

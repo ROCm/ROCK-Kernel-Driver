@@ -19,16 +19,16 @@ quiet_cmd_strip     = STRIP $@
 
 
 # Actual linking
-$(obj)/image: FORCE
+$(obj)/image: vmlinux FORCE
 	$(call if_changed,strip)
 	@echo '  kernel: $@ is ready'
 
-$(obj)/tftpboot.img: $(obj)/piggyback System.map $(ROOT_IMG) FORCE
+$(obj)/tftpboot.img: vmlinux $(obj)/piggyback System.map $(ROOT_IMG) FORCE
 	$(call if_changed,elftoaout)
 	$(call if_changed,piggy)
 	@echo '  kernel: $@ is ready'
 
-$(obj)/vmlinux.aout: FORCE
+$(obj)/vmlinux.aout: vmlinux FORCE
 	$(call if_changed,elftoaout)
 	@echo '  kernel: $@ is ready'
 

@@ -49,7 +49,7 @@
 #	else
 #		define Printk(x)
 #	endif
-#endif
+#endif	/* __KERNEL__ */
 
 
 struct umsdos_fake_info {
@@ -70,8 +70,7 @@ struct umsdos_dirent {
 	time_t atime;		/* Access time */
 	time_t mtime;		/* Last modification time */
 	time_t ctime;		/* Creation time */
-	dev_t rdev;		/* major and minor number of a device */
-				/* special file */
+	unsigned short rdev;	/* major and minor of a device special file */
 	umode_t mode;		/* Standard UNIX permissions bits + type of */
 	char spare[12];		/* unused bytes for future extensions */
 				/* file, see linux/stat.h */
@@ -129,34 +128,32 @@ struct umsdos_info {
 struct umsdos_ioctl {
 	struct dirent dos_dirent;
 	struct umsdos_dirent umsdos_dirent;
-	/* The following structure is used to exchange some data
-	 * with utilities (umsdos_progs/util/umsdosio.c). The first
-	 * releases were using struct stat from "sys/stat.h". This was
-	 * causing some problem for cross compilation of the kernel
-	 * Since I am not really using the structure stat, but only some field
-	 * of it, I have decided to replicate the structure here
-	 * for compatibility with the binaries out there
+	/* The following structure is used to exchange some data with
+	 * utilities (umsdos_progs/util/umsdosio.c). The first releases
+	 * were using struct stat from "sys/stat.h". This was causing
+	 * some problem for cross compilation of the kernel.
+	 * Since I am not really using the structure stat, but only
+	 * some fields of it, I have decided to replicate the structure
+	 * here for compatibility with the binaries out there.
 	 * FIXME PTW 1998, this has probably changed
 	 */
 	
 	struct {
-		dev_t st_dev;
-		unsigned short __pad1;
-		ino_t st_ino;
-		umode_t st_mode;
+		unsigned long st_dev;
+		ino_t st_ino;			/* used */
+		umode_t st_mode;		/* used */
 		nlink_t st_nlink;
 		__kernel_uid_t st_uid;
 		__kernel_gid_t st_gid;
-		dev_t st_rdev;
-		unsigned short __pad2;
-		off_t st_size;
+		unsigned long st_rdev;
+		off_t st_size;			/* used */
 		unsigned long st_blksize;
 		unsigned long st_blocks;
-		time_t st_atime;
+		time_t st_atime;		/* used */
 		unsigned long __unused1;
-		time_t st_mtime;
+		time_t st_mtime;		/* used */
 		unsigned long __unused2;
-		time_t st_ctime;
+		time_t st_ctime;		/* used */
 		unsigned long __unused3;
 		uid_t st_uid32;
 		gid_t st_gid32;

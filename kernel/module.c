@@ -974,6 +974,11 @@ static int simplify_symbols(Elf_Shdr *sechdrs,
 			/* Ok if weak.  */
 			if (ELF_ST_BIND(sym[i].st_info) == STB_WEAK)
 				break;
+#if defined(CONFIG_SPARC32) || defined(CONFIG_SPARC64)
+			/* Ok if Sparc register directive. */
+			if (ELF_ST_TYPE(sym[i].st_info) == STT_REGISTER)
+				break;
+#endif
 
 			printk(KERN_WARNING "%s: Unknown symbol %s\n",
 			       mod->name, strtab + sym[i].st_name);

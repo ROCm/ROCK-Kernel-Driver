@@ -69,6 +69,7 @@
  *	YOSHIFUJI Hideaki @USAGI and:	Support IPV6_V6ONLY socket option, which
  *	Alexey Kuznetsov:		allow both IPv4 and IPv6 sockets to bind
  *					a single port at the same time.
+ *	Derek Atkins <derek@ihtfp.com>: Add Encapulation Support
  *
  *
  *		This program is free software; you can redistribute it and/or
@@ -941,14 +942,123 @@ static void udp_close(struct sock *sk, long timeout)
 	inet_sock_release(sk);
 }
 
+/* return:
+ * 	1  if the the UDP system should process it
+ *	0  if we should drop this packet
+ * 	-1 if it should get processed by xfrm4_rcv_encap
+ */
+static int udp_encap_rcv(struct sock * sk, struct sk_buff *skb)
+{
+	struct udp_opt *up = udp_sk(sk);
+  	struct udphdr *uh = skb->h.uh;
+	struct iphdr *iph;
+	int iphlen, len;
+  
+	__u8 *udpdata = (__u8 *)uh + sizeof(struct udphdr);
+	__u32 *udpdata32 = (__u32 *)udpdata;
+	__u16 encap_type = up->encap_type;
+
+	/* if we're overly short, let UDP handle it */
+	if (udpdata > skb->tail)
+		return 1;
+
+	/* if this is not encapsulated socket, then just return now */
+	if (!encap_type)
+		return 1;
+
+	len = skb->tail - udpdata;
+
+	switch (encap_type) {
+	case UDP_ENCAP_ESPINUDP:
+		/* Check if this is a keepalive packet.  If so, eat it. */
+		if (len == 1 && udpdata[0] == 0xff) {
+			return 0;
+		} else if (len > sizeof(struct ip_esp_hdr) && udpdata32[0] != 0 ) {
+			/* ESP Packet without Non-ESP header */
+			len = sizeof(struct udphdr);
+		} else
+			/* Must be an IKE packet.. pass it through */
+			return 1;
+
+		/* At this point we are sure that this is an ESPinUDP packet,
+		 * so we need to remove 'len' bytes from the packet (the UDP
+		 * header and optional ESP marker bytes) and then modify the
+		 * protocol to ESP, and then call into the transform receiver.
+		 */
+
+		/* Now we can update and verify the packet length... */
+		iph = skb->nh.iph;
+		iphlen = iph->ihl << 2;
+		iph->tot_len = htons(ntohs(iph->tot_len) - len);
+		if (skb->len < iphlen + len) {
+			/* packet is too small!?! */
+			return 0;
+		}
+
+		/* pull the data buffer up to the ESP header and set the
+		 * transport header to point to ESP.  Keep UDP on the stack
+		 * for later.
+		 */
+		skb->h.raw = skb_pull(skb, len);
+
+		/* modify the protocol (it's ESP!) */
+		iph->protocol = IPPROTO_ESP;
+
+		/* and let the caller know to send this into the ESP processor... */
+		return -1;
+
+	default:
+		printk(KERN_INFO "udp_encap_rcv(): Unhandled UDP encap type: %u\n",
+		       encap_type);
+		return 1;
+	}
+}
+
+/* returns:
+ *  -1: error
+ *   0: success
+ *  >0: "udp encap" protocol resubmission
+ *
+ * Note that in the success and error cases, the skb is assumed to
+ * have either been requeued or freed.
+ */
 static int udp_queue_rcv_skb(struct sock * sk, struct sk_buff *skb)
 {
+	struct udp_opt *up = udp_sk(sk);
+
 	/*
 	 *	Charge it to the socket, dropping if the queue is full.
 	 */
 	if (!xfrm4_policy_check(sk, XFRM_POLICY_IN, skb)) {
 		kfree_skb(skb);
 		return -1;
+	}
+
+	if (up->encap_type) {
+		/*
+		 * This is an encapsulation socket, so let's see if this is
+		 * an encapsulated packet.
+		 * If it's a keepalive packet, then just eat it.
+		 * If it's an encapsulateed packet, then pass it to the
+		 * IPsec xfrm input and return the response
+		 * appropriately.  Otherwise, just fall through and
+		 * pass this up the UDP socket.
+		 */
+		int ret;
+
+		ret = udp_encap_rcv(sk, skb);
+		if (ret == 0) {
+			/* Eat the packet .. */
+			kfree_skb(skb);
+			return 0;
+		}
+		if (ret < 0) {
+			/* process the ESP packet */
+			ret = xfrm4_rcv_encap(skb, up->encap_type);
+			UDP_INC_STATS_BH(UdpInDatagrams);
+			return -ret;
+		}
+		/* FALLTHROUGH -- it's a UDP Packet */
 	}
 
 	if (sk->filter && skb->ip_summed != CHECKSUM_UNNECESSARY) {
@@ -996,8 +1106,13 @@ static int udp_v4_mcast_deliver(struct sk_buff *skb, struct udphdr *uh,
 			if(sknext)
 				skb1 = skb_clone(skb, GFP_ATOMIC);
 
-			if(skb1)
-				udp_queue_rcv_skb(sk, skb1);
+			if(skb1) {
+				int ret = udp_queue_rcv_skb(sk, skb1);
+				if (ret > 0)
+					/* we should probably re-process instead
+					 * of dropping packets here. */
+					kfree_skb(skb1);
+			}
 			sk = sknext;
 		} while(sknext);
 	} else
@@ -1070,8 +1185,14 @@ int udp_rcv(struct sk_buff *skb)
 	sk = udp_v4_lookup(saddr, uh->source, daddr, uh->dest, skb->dev->ifindex);
 
 	if (sk != NULL) {
-		udp_queue_rcv_skb(sk, skb);
+		int ret = udp_queue_rcv_skb(sk, skb);
 		sock_put(sk);
+
+		/* a return value > 0 means to resubmit the input, but
+		 * it it wants the return to be -protocol, or 0
+		 */
+		if (ret > 0)
+			return -ret;
 		return 0;
 	}
 
@@ -1163,6 +1284,10 @@ static int udp_setsockopt(struct sock *sk, int level, int optname,
 		}
 		break;
 		
+	case UDP_ENCAP:
+		up->encap_type = val;
+		break;
+
 	default:
 		err = -ENOPROTOOPT;
 		break;
@@ -1191,6 +1316,10 @@ static int udp_getsockopt(struct sock *sk, int level, int optname,
 	switch(optname) {
 	case UDP_CORK:
 		val = up->corkflag;
+		break;
+
+	case UDP_ENCAP:
+		val = up->encap_type;
 		break;
 
 	default:

@@ -24,7 +24,6 @@
 #include <net/checksum.h>
 #include <linux/spinlock.h>
 #include <linux/version.h>
-#include <linux/brlock.h>
 
 #define ASSERT_READ_LOCK(x) MUST_BE_READ_LOCKED(&ip_nat_lock)
 #define ASSERT_WRITE_LOCK(x) MUST_BE_WRITE_LOCKED(&ip_nat_lock)
@@ -286,8 +285,7 @@ void ip_nat_protocol_unregister(struct ip_nat_protocol *proto)
 	WRITE_UNLOCK(&ip_nat_lock);
 
 	/* Someone could be still looking at the proto in a bh. */
-	br_write_lock_bh(BR_NETPROTO_LOCK);
-	br_write_unlock_bh(BR_NETPROTO_LOCK);
+	synchronize_net();
 }
 
 static int init_or_cleanup(int init)

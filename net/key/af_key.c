@@ -11,6 +11,7 @@
  *		Alexey Kuznetsov <kuznet@ms2.inr.ac.ru>
  *		Kunihiro Ishiguro <kunihiro@ipinfusion.com>
  *		Kazunori MIYAZAWA / USAGI Project <miyazawa@linux-ipv6.org>
+ *		Derek Atkins <derek@ihtfp.com>
  */
 
 #include <linux/config.h>
@@ -345,6 +346,10 @@ static u8 sadb_ext_min_len[] = {
 	[SADB_X_EXT_KMPRIVATE]		= (u8) sizeof(struct sadb_x_kmprivate),
 	[SADB_X_EXT_POLICY]		= (u8) sizeof(struct sadb_x_policy),
 	[SADB_X_EXT_SA2]		= (u8) sizeof(struct sadb_x_sa2),
+	[SADB_X_EXT_NAT_T_TYPE]		= (u8) sizeof(struct sadb_x_nat_t_type),
+	[SADB_X_EXT_NAT_T_SPORT]	= (u8) sizeof(struct sadb_x_nat_t_port),
+	[SADB_X_EXT_NAT_T_DPORT]	= (u8) sizeof(struct sadb_x_nat_t_port),
+	[SADB_X_EXT_NAT_T_OA]		= (u8) sizeof(struct sadb_address),
 };
 
 /* Verify sadb_address_{len,prefixlen} against sa_family.  */
@@ -442,7 +447,8 @@ static int parse_exthdrs(struct sk_buff *skb, struct sadb_msg *hdr, void **ext_h
 				return -EINVAL;
 			if (ext_type == SADB_EXT_ADDRESS_SRC ||
 			    ext_type == SADB_EXT_ADDRESS_DST ||
-			    ext_type == SADB_EXT_ADDRESS_PROXY) {
+			    ext_type == SADB_EXT_ADDRESS_PROXY ||
+			    ext_type == SADB_X_EXT_NAT_T_OA) {
 				if (verify_address_len(p))
 					return -EINVAL;
 			}				
@@ -601,6 +607,7 @@ static struct sk_buff * pfkey_xfrm_state2msg(struct xfrm_state *x, int add_keys,
 	int auth_key_size = 0;
 	int encrypt_key_size = 0;
 	int sockaddr_size;
+	struct xfrm_encap_tmpl *natt = NULL;
 
 	/* address family check */
 	sockaddr_size = pfkey_sockaddr_size(x->props.family);
@@ -639,6 +646,15 @@ static struct sk_buff * pfkey_xfrm_state2msg(struct xfrm_state *x, int add_keys,
 			size += sizeof(struct sadb_key) + encrypt_key_size;
 		}
 	}
+	if (x->encap)
+		natt = x->encap;
+
+	if (natt && natt->encap_type) {
+		size += sizeof(struct sadb_x_nat_t_type);
+		size += sizeof(struct sadb_x_nat_t_port);
+		size += sizeof(struct sadb_x_nat_t_port);
+	}
+
 	skb =  alloc_skb(size + 16, GFP_ATOMIC);
 	if (skb == NULL)
 		return ERR_PTR(-ENOBUFS);
@@ -858,6 +874,34 @@ static struct sk_buff * pfkey_xfrm_state2msg(struct xfrm_state *x, int add_keys,
 	sa2->sadb_x_sa2_sequence = 0;
 	sa2->sadb_x_sa2_reqid = x->props.reqid;
 
+	if (natt && natt->encap_type) {
+		struct sadb_x_nat_t_type *n_type;
+		struct sadb_x_nat_t_port *n_port;
+
+		/* type */
+		n_type = (struct sadb_x_nat_t_type*) skb_put(skb, sizeof(*n_type));
+		n_type->sadb_x_nat_t_type_len = sizeof(*n_type)/sizeof(uint64_t);
+		n_type->sadb_x_nat_t_type_exttype = SADB_X_EXT_NAT_T_TYPE;
+		n_type->sadb_x_nat_t_type_type = natt->encap_type;
+		n_type->sadb_x_nat_t_type_reserved[0] = 0;
+		n_type->sadb_x_nat_t_type_reserved[1] = 0;
+		n_type->sadb_x_nat_t_type_reserved[2] = 0;
+
+		/* source port */
+		n_port = (struct sadb_x_nat_t_port*) skb_put(skb, sizeof (*n_port));
+		n_port->sadb_x_nat_t_port_len = sizeof(*n_port)/sizeof(uint64_t);
+		n_port->sadb_x_nat_t_port_exttype = SADB_X_EXT_NAT_T_SPORT;
+		n_port->sadb_x_nat_t_port_port = natt->encap_sport;
+		n_port->sadb_x_nat_t_port_reserved = 0;
+
+		/* dest port */
+		n_port = (struct sadb_x_nat_t_port*) skb_put(skb, sizeof (*n_port));
+		n_port->sadb_x_nat_t_port_len = sizeof(*n_port)/sizeof(uint64_t);
+		n_port->sadb_x_nat_t_port_exttype = SADB_X_EXT_NAT_T_DPORT;
+		n_port->sadb_x_nat_t_port_port = natt->encap_dport;
+		n_port->sadb_x_nat_t_port_reserved = 0;
+	}
+
 	return skb;
 }
 
@@ -1017,6 +1061,30 @@ static struct xfrm_state * pfkey_msg2xfrm_state(struct sadb_msg *hdr,
 		x->sel.prefixlen_s = addr->sadb_address_prefixlen;
 	}
 
+	if (ext_hdrs[SADB_X_EXT_NAT_T_TYPE-1]) {
+		struct sadb_x_nat_t_type* n_type;
+		struct xfrm_encap_tmpl *natt;
+
+		x->encap = kmalloc(sizeof(*x->encap), GFP_KERNEL);
+		if (!x->encap)
+			goto out;
+
+		natt = x->encap;
+		n_type = ext_hdrs[SADB_X_EXT_NAT_T_TYPE-1];
+		natt->encap_type = n_type->sadb_x_nat_t_type_type;
+
+		if (ext_hdrs[SADB_X_EXT_NAT_T_SPORT-1]) {
+			struct sadb_x_nat_t_port* n_port =
+				ext_hdrs[SADB_X_EXT_NAT_T_SPORT-1];
+			natt->encap_sport = n_port->sadb_x_nat_t_port_port;
+		}
+		if (ext_hdrs[SADB_X_EXT_NAT_T_DPORT-1]) {
+			struct sadb_x_nat_t_port* n_port =
+				ext_hdrs[SADB_X_EXT_NAT_T_DPORT-1];
+			natt->encap_dport = n_port->sadb_x_nat_t_port_port;
+		}
+	}
+
 	x->type = xfrm_get_type(proto, x->props.family);
 	if (x->type == NULL)
 		goto out;
@@ -1033,6 +1101,8 @@ out:
 		kfree(x->ealg);
 	if (x->calg)
 		kfree(x->calg);
+	if (x->encap)
+		kfree(x->encap);
 	kfree(x);
 	return ERR_PTR(-ENOBUFS);
 }
@@ -2051,7 +2121,6 @@ static int pfkey_spdflush(struct sock *sk, struct sk_buff *skb, struct sadb_msg 
 	return 0;
 }
 
-
 typedef int (*pfkey_handler)(struct sock *sk, struct sk_buff *skb,
 			     struct sadb_msg *hdr, void **ext_hdrs);
 static pfkey_handler pfkey_funcs[SADB_MAX + 1] = {
@@ -2467,6 +2536,155 @@ out:
 	return NULL;
 }
 
+static int pfkey_send_new_mapping(struct xfrm_state *x, xfrm_address_t *ipaddr, u16 sport)
+{
+	struct sk_buff *skb;
+	struct sadb_msg *hdr;
+	struct sadb_sa *sa;
+	struct sadb_address *addr;
+	struct sadb_x_nat_t_port *n_port;
+	struct sockaddr_in *sin;
+#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
+	struct sockaddr_in6 *sin6;
+#endif
+	int sockaddr_size;
+	int size;
+	__u8 satype = (x->id.proto == IPPROTO_ESP ? SADB_SATYPE_ESP : 0);
+	struct xfrm_encap_tmpl *natt = NULL;
+
+	sockaddr_size = pfkey_sockaddr_size(x->props.family);
+	if (!sockaddr_size)
+		return -EINVAL;
+
+	if (!satype)
+		return -EINVAL;
+
+	if (!x->encap)
+		return -EINVAL;
+
+	natt = x->encap;
+
+	/* Build an SADB_X_NAT_T_NEW_MAPPING message:
+	 *
+	 * HDR | SA | ADDRESS_SRC (old addr) | NAT_T_SPORT (old port) |
+	 * ADDRESS_DST (new addr) | NAT_T_DPORT (new port)
+	 */
+	
+	size = sizeof(struct sadb_msg) +
+		sizeof(struct sadb_sa) +
+		(sizeof(struct sadb_address) * 2) +
+		(sockaddr_size * 2) +
+		(sizeof(struct sadb_x_nat_t_port) * 2);
+	
+	skb =  alloc_skb(size + 16, GFP_ATOMIC);
+	if (skb == NULL)
+		return -ENOMEM;
+	
+	hdr = (struct sadb_msg *) skb_put(skb, sizeof(struct sadb_msg));
+	hdr->sadb_msg_version = PF_KEY_V2;
+	hdr->sadb_msg_type = SADB_X_NAT_T_NEW_MAPPING;
+	hdr->sadb_msg_satype = satype;
+	hdr->sadb_msg_len = size / sizeof(uint64_t);
+	hdr->sadb_msg_errno = 0;
+	hdr->sadb_msg_reserved = 0;
+	hdr->sadb_msg_seq = x->km.seq = get_acqseq();
+	hdr->sadb_msg_pid = 0;
+
+	/* SA */
+	sa = (struct sadb_sa *) skb_put(skb, sizeof(struct sadb_sa));
+	sa->sadb_sa_len = sizeof(struct sadb_sa)/sizeof(uint64_t);
+	sa->sadb_sa_exttype = SADB_EXT_SA;
+	sa->sadb_sa_spi = x->id.spi;
+	sa->sadb_sa_replay = 0;
+	sa->sadb_sa_state = 0;
+	sa->sadb_sa_auth = 0;
+	sa->sadb_sa_encrypt = 0;
+	sa->sadb_sa_flags = 0;
+
+	/* ADDRESS_SRC (old addr) */
+	addr = (struct sadb_address*)
+		skb_put(skb, sizeof(struct sadb_address)+sockaddr_size);
+	addr->sadb_address_len = 
+		(sizeof(struct sadb_address)+sockaddr_size)/
+			sizeof(uint64_t);
+	addr->sadb_address_exttype = SADB_EXT_ADDRESS_SRC;
+	addr->sadb_address_proto = 0;
+	addr->sadb_address_reserved = 0;
+	if (x->props.family == AF_INET) {
+		addr->sadb_address_prefixlen = 32;
+
+		sin = (struct sockaddr_in *) (addr + 1);
+		sin->sin_family = AF_INET;
+		sin->sin_addr.s_addr = x->props.saddr.a4;
+		sin->sin_port = 0;
+		memset(sin->sin_zero, 0, sizeof(sin->sin_zero));
+	}
+#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
+	else if (x->props.family == AF_INET6) {
+		addr->sadb_address_prefixlen = 128;
+
+		sin6 = (struct sockaddr_in6 *) (addr + 1);
+		sin6->sin6_family = AF_INET6;
+		sin6->sin6_port = 0;
+		sin6->sin6_flowinfo = 0;
+		memcpy(&sin6->sin6_addr,
+		       x->props.saddr.a6, sizeof(struct in6_addr));
+		sin6->sin6_scope_id = 0;
+	}
+#endif
+	else
+		BUG();
+
+	/* NAT_T_SPORT (old port) */
+	n_port = (struct sadb_x_nat_t_port*) skb_put(skb, sizeof (*n_port));
+	n_port->sadb_x_nat_t_port_len = sizeof(*n_port)/sizeof(uint64_t);
+	n_port->sadb_x_nat_t_port_exttype = SADB_X_EXT_NAT_T_SPORT;
+	n_port->sadb_x_nat_t_port_port = natt->encap_sport;
+	n_port->sadb_x_nat_t_port_reserved = 0;
+
+	/* ADDRESS_DST (new addr) */
+	addr = (struct sadb_address*)
+		skb_put(skb, sizeof(struct sadb_address)+sockaddr_size);
+	addr->sadb_address_len = 
+		(sizeof(struct sadb_address)+sockaddr_size)/
+			sizeof(uint64_t);
+	addr->sadb_address_exttype = SADB_EXT_ADDRESS_SRC;
+	addr->sadb_address_proto = 0;
+	addr->sadb_address_reserved = 0;
+	if (x->props.family == AF_INET) {
+		addr->sadb_address_prefixlen = 32;
+
+		sin = (struct sockaddr_in *) (addr + 1);
+		sin->sin_family = AF_INET;
+		sin->sin_addr.s_addr = ipaddr->a4;
+		sin->sin_port = 0;
+		memset(sin->sin_zero, 0, sizeof(sin->sin_zero));
+	}
+#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
+	else if (x->props.family == AF_INET6) {
+		addr->sadb_address_prefixlen = 128;
+
+		sin6 = (struct sockaddr_in6 *) (addr + 1);
+		sin6->sin6_family = AF_INET6;
+		sin6->sin6_port = 0;
+		sin6->sin6_flowinfo = 0;
+		memcpy(&sin6->sin6_addr, &ipaddr->a6, sizeof(struct in6_addr));
+		sin6->sin6_scope_id = 0;
+	}
+#endif
+	else
+		BUG();
+
+	/* NAT_T_DPORT (new port) */
+	n_port = (struct sadb_x_nat_t_port*) skb_put(skb, sizeof (*n_port));
+	n_port->sadb_x_nat_t_port_len = sizeof(*n_port)/sizeof(uint64_t);
+	n_port->sadb_x_nat_t_port_exttype = SADB_X_EXT_NAT_T_DPORT;
+	n_port->sadb_x_nat_t_port_port = sport;
+	n_port->sadb_x_nat_t_port_reserved = 0;
+
+	return pfkey_broadcast(skb, GFP_ATOMIC, BROADCAST_REGISTERED, NULL);
+}
+
 static int pfkey_sendmsg(struct kiocb *kiocb,
 			 struct socket *sock, struct msghdr *msg, int len)
 {
@@ -2632,6 +2850,7 @@ static struct xfrm_mgr pfkeyv2_mgr =
 	.notify		= pfkey_send_notify,
 	.acquire	= pfkey_send_acquire,
 	.compile_policy	= pfkey_compile_policy,
+	.new_mapping	= pfkey_send_new_mapping,
 };
 
 static void __exit ipsec_pfkey_exit(void)

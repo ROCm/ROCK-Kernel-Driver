@@ -241,7 +241,8 @@ handle_name:
 	nls_name.hash = full_name_hash(nls_name.name, nls_name.len);
 
 	/*
-	 * Note: No need for dparent_lock as i_sem is held on the parent inode.
+	 * Note: No need for dent->d_lock lock as i_sem is held on the
+	 * parent inode.
 	 */
 
 	/* Does a dentry matching the nls_name exist already? */

@@ -14,6 +14,7 @@ struct timer_opts{
 	int (*init)(char *override);
 	void (*mark_offset)(void);
 	unsigned long (*get_offset)(void);
+	unsigned long long (*monotonic_clock)(void);
 	void (*delay)(unsigned long);
 };
 
