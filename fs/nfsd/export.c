@@ -59,7 +59,6 @@ struct svc_clnthash {
 };
 static struct svc_clnthash *	clnt_hash[CLIENT_HASHMAX];
 static svc_client *		clients;
-static int			initialized;
 
 static int			hash_lock;
 static int			want_lock;
@@ -473,9 +472,6 @@ exp_getclient(struct sockaddr_in *sin)
 	struct svc_clnthash	**hp, **head, *tmp;
 	unsigned long		addr = sin->sin_addr.s_addr;
 
-	if (!initialized)
-		return NULL;
-
 	head = &clnt_hash[CLIENT_HASH(addr)];
 
 	for (hp = head; (tmp = *hp) != NULL; hp = &(tmp->h_next)) {
@@ -872,13 +868,11 @@ nfsd_export_init(void)
 	int		i;
 
 	dprintk("nfsd: initializing export module.\n");
-	if (initialized)
-		return;
+
 	for (i = 0; i < CLIENT_HASHMAX; i++)
 		clnt_hash[i] = NULL;
 	clients = NULL;
 
-	initialized = 1;
 }
 
 /*
@@ -890,8 +884,7 @@ nfsd_export_shutdown(void)
 	int	i;
 
 	dprintk("nfsd: shutting down export module.\n");
-	if (!initialized)
-		return;
+
 	if (exp_writelock() < 0) {
 		printk(KERN_WARNING "Weird: hashtable locked in exp_shutdown");
 		return;
