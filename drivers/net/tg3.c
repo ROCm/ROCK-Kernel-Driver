@@ -1678,7 +1678,7 @@ static int tg3_alloc_rx_skb(struct tg3 *tp, u32 opaque_key,
  * tg3_alloc_rx_skb for full details.
  */
 static void tg3_recycle_rx(struct tg3 *tp, u32 opaque_key,
-			   int src_idx, int dest_idx_unmasked)
+			   int src_idx, u32 dest_idx_unmasked)
 {
 	struct tg3_rx_buffer_desc *src_desc, *dest_desc;
 	struct ring_info *src_map, *dest_map;
