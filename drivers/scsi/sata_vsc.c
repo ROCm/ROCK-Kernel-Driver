@@ -260,10 +260,8 @@ static int __devinit vsc_sata_init_one (struct pci_dev *pdev, const struct pci_d
 	/*
 	 * Check if we have needed resource mapped.
 	 */
-	if (pci_resource_len(pdev, 0) == 0) {
-		rc = -ENODEV;
-		goto err_out;
-	}
+	if (pci_resource_len(pdev, 0) == 0)
+		return -ENODEV;
 
 	rc = pci_request_regions(pdev, DRV_NAME);
 	if (rc)
