@@ -144,6 +144,7 @@ struct driver_attribute {
 	struct attribute	attr;
 	ssize_t (*show)(struct device_driver *, char * buf);
 	ssize_t (*store)(struct device_driver *, const char * buf, size_t count);
+	int (*exists)(struct device_driver *);
 };
 
 #define DRIVER_ATTR(_name,_mode,_show,_store)	\
@@ -151,7 +152,17 @@ struct driver_attribute driver_attr_##_name = { 		\
 	.attr = {.name = __stringify(_name), .mode = _mode },	\
 	.show	= _show,				\
 	.store	= _store,				\
+	.exists	= NULL,				        \
 };
+
+#define DRIVER_ATTR_EXISTS(_name,_mode,_show,_store,_exists)	\
+struct driver_attribute driver_attr_##_name = { 		\
+	.attr = {.name = __stringify(_name), .mode = _mode },	\
+	.show	= _show,				\
+	.store	= _store,				\
+	.exists	= _exists,				\
+};
+
 
 extern int driver_create_file(struct device_driver *, struct driver_attribute *);
 extern void driver_remove_file(struct device_driver *, struct driver_attribute *);
