@@ -2039,7 +2039,7 @@ xfs_qm_dqcheck(
 	if (id != -1 && id != INT_GET(ddq->d_id, ARCH_CONVERT)) {
 		if (flags & XFS_QMOPT_DOWARN)
 			cmn_err(CE_ALERT,
-			"%s : ondisk-dquot 0x%x, ID mismatch: "
+			"%s : ondisk-dquot 0x%p, ID mismatch: "
 			"0x%x expected, found id 0x%x",
 			str, ddq, id, INT_GET(ddq->d_id, ARCH_CONVERT));
 		errs++;
@@ -2053,7 +2053,7 @@ xfs_qm_dqcheck(
 			    !INT_ISZERO(ddq->d_id, ARCH_CONVERT)) {
 				if (flags & XFS_QMOPT_DOWARN)
 					cmn_err(CE_ALERT,
-					"%s : Dquot ID 0x%x (0x%x) "
+					"%s : Dquot ID 0x%x (0x%p) "
 					"BLK TIMER NOT STARTED",
 					str, (int)
 					INT_GET(ddq->d_id, ARCH_CONVERT), ddq);
@@ -2067,7 +2067,7 @@ xfs_qm_dqcheck(
 			    !INT_ISZERO(ddq->d_id, ARCH_CONVERT)) {
 				if (flags & XFS_QMOPT_DOWARN)
 					cmn_err(CE_ALERT,
-					"%s : Dquot ID 0x%x (0x%x) "
+					"%s : Dquot ID 0x%x (0x%p) "
 					"INODE TIMER NOT STARTED",
 					str, (int)
 					INT_GET(ddq->d_id, ARCH_CONVERT), ddq);

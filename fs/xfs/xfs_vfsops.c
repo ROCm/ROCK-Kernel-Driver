@@ -225,7 +225,7 @@ xfs_start_flags(
 		/*
 		 * At this point the superblock has not been read
 		 * in, therefore we do not know the block size.
-		 * Before, the mount call ends we will convert
+		 * Before the mount call ends we will convert
 		 * these to FSBs.
 		 */
 		mp->m_dalign = ap->sunit;
