@@ -3938,7 +3938,7 @@ xlog_recover_finish(
 		xlog_recover_check_summary(log);
 
 		cmn_err(CE_NOTE,
-			"Ending XFS recovery on filesystem: %s (dev: %d/%d)",
+			"Ending XFS recovery on filesystem: %s (dev: %s)",
 			log->l_mp->m_fsname, XFS_BUFTARG_NAME(log->l_targ));
 		log->l_flags &= ~XLOG_RECOVERY_NEEDED;
 	} else {
