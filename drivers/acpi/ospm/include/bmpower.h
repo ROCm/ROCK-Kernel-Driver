@@ -1,7 +1,7 @@
 /*****************************************************************************
  *
  * Module name: bmpower.h
- *   $Revision: 1 $
+ *   $Revision: 9 $
  *
  *****************************************************************************/
 
@@ -41,7 +41,7 @@
 typedef struct
 {
 	BM_HANDLE           device_handle;
-	ACPI_HANDLE         acpi_handle;
+	acpi_handle         acpi_handle;
 	BM_POWER_STATE      system_level;
 	u32                 resource_order;
 	BM_POWER_STATE      state;
@@ -55,18 +55,18 @@ typedef struct
 
 /* bmpower.c */
 
-ACPI_STATUS
+acpi_status
 bm_pr_initialize (void);
 
-ACPI_STATUS
+acpi_status
 bm_pr_terminate (void);
 
-ACPI_STATUS
+acpi_status
 bm_pr_list_get_state (
 	BM_HANDLE_LIST          *resource_list,
 	BM_POWER_STATE          *power_state);
 
-ACPI_STATUS
+acpi_status
 bm_pr_list_transition (
 	BM_HANDLE_LIST          *current_list,
 	BM_HANDLE_LIST          *target_list);

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
- * Module Name: nswalk - Functions for walking the APCI namespace
- *              $Revision: 22 $
+ * Module Name: nswalk - Functions for walking the ACPI namespace
+ *              $Revision: 24 $
  *
  *****************************************************************************/
 
@@ -43,7 +43,7 @@
  *              Last_child          - Previous child that was found.
  *                                    The NEXT child will be returned
  *
- * RETURN:      ACPI_NAMESPACE_NODE - Pointer to the NEXT child or NULL if
+ * RETURN:      acpi_namespace_node - Pointer to the NEXT child or NULL if
  *                                      none is found.
  *
  * DESCRIPTION: Return the next peer object within the namespace.  If Handle
@@ -52,17 +52,19 @@
  *
  ****************************************************************************/
 
-ACPI_NAMESPACE_NODE *
+acpi_namespace_node *
 acpi_ns_get_next_object (
-	ACPI_OBJECT_TYPE8       type,
-	ACPI_NAMESPACE_NODE     *parent_node,
-	ACPI_NAMESPACE_NODE     *child_node)
+	acpi_object_type8       type,
+	acpi_namespace_node     *parent_node,
+	acpi_namespace_node     *child_node)
 {
-	ACPI_NAMESPACE_NODE     *next_node = NULL;
+	acpi_namespace_node     *next_node = NULL;
+
+
+	FUNCTION_ENTRY ();
 
 
 	if (!child_node) {
-
 		/* It's really the parent's _scope_ that we want */
 
 		if (parent_node->child) {
@@ -111,7 +113,7 @@ acpi_ns_get_next_object (
  *
  * FUNCTION:    Acpi_ns_walk_namespace
  *
- * PARAMETERS:  Type                - ACPI_OBJECT_TYPE to search for
+ * PARAMETERS:  Type                - acpi_object_type to search for
  *              Start_node          - Handle in namespace where search begins
  *              Max_depth           - Depth to which search is to reach
  *              Unlock_before_callback- Whether to unlock the NS before invoking
@@ -137,21 +139,24 @@ acpi_ns_get_next_object (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ns_walk_namespace (
-	ACPI_OBJECT_TYPE8       type,
-	ACPI_HANDLE             start_node,
+	acpi_object_type8       type,
+	acpi_handle             start_node,
 	u32                     max_depth,
 	u8                      unlock_before_callback,
 	ACPI_WALK_CALLBACK      user_function,
 	void                    *context,
 	void                    **return_value)
 {
-	ACPI_STATUS             status;
-	ACPI_NAMESPACE_NODE     *child_node;
-	ACPI_NAMESPACE_NODE     *parent_node;
-	ACPI_OBJECT_TYPE8        child_type;
+	acpi_status             status;
+	acpi_namespace_node     *child_node;
+	acpi_namespace_node     *parent_node;
+	acpi_object_type8        child_type;
 	u32                     level;
+
+
+	FUNCTION_TRACE ("Ns_walk_namespace");
 
 
 	/* Special case for the namespace Root Node */
@@ -173,13 +178,11 @@ acpi_ns_walk_namespace (
 	 * started. When Level is zero, the loop is done because we have
 	 * bubbled up to (and passed) the original parent handle (Start_entry)
 	 */
-
 	while (level > 0) {
 		/*
 		 * Get the next typed object in this scope.  Null returned
 		 * if not found
 		 */
-
 		status = AE_OK;
 		child_node = acpi_ns_get_next_object (ACPI_TYPE_ANY,
 				 parent_node,
@@ -190,7 +193,6 @@ acpi_ns_walk_namespace (
 			 * Found an object, Get the type if we are not
 			 * searching for ANY
 			 */
-
 			if (type != ACPI_TYPE_ANY) {
 				child_type = child_node->type;
 			}
@@ -200,7 +202,6 @@ acpi_ns_walk_namespace (
 				 * Found a matching object, invoke the user
 				 * callback function
 				 */
-
 				if (unlock_before_callback) {
 					acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 				}
@@ -215,17 +216,22 @@ acpi_ns_walk_namespace (
 				switch (status) {
 				case AE_OK:
 				case AE_CTRL_DEPTH:
+
 					/* Just keep going */
 					break;
 
 				case AE_CTRL_TERMINATE:
+
 					/* Exit now, with OK status */
-					return (AE_OK);
+
+					return_ACPI_STATUS (AE_OK);
 					break;
 
 				default:
+
 					/* All others are valid exceptions */
-					return (status);
+
+					return_ACPI_STATUS (status);
 					break;
 				}
 			}
@@ -238,7 +244,6 @@ acpi_ns_walk_namespace (
 			 * or if the user function has specified that the
 			 * maximum depth has been reached.
 			 */
-
 			if ((level < max_depth) && (status != AE_CTRL_DEPTH)) {
 				if (acpi_ns_get_next_object (ACPI_TYPE_ANY,
 						 child_node, 0)) {
@@ -266,7 +271,8 @@ acpi_ns_walk_namespace (
 	}
 
 	/* Complete walk, not terminated by user function */
-	return (AE_OK);
+
+	return_ACPI_STATUS (AE_OK);
 }
 
 

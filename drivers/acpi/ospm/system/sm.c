@@ -1,7 +1,7 @@
 /*****************************************************************************
  *
  * Module Name: sm.c
- *   $Revision: 16 $
+ *   $Revision: 19 $
  *
  *****************************************************************************/
 
@@ -51,6 +51,32 @@ void
 sm_print (
 	SM_CONTEXT		*system)
 {
+#ifdef ACPI_DEBUG
+	acpi_buffer		buffer;
+
+	PROC_NAME("sm_print");
+
+	buffer.length = 256;
+	buffer.pointer = acpi_os_callocate(buffer.length);
+	if (!buffer.pointer) {
+		return;
+	}
+
+	/*
+	 * Get the full pathname for this ACPI object.
+	 */
+	acpi_get_name(system->acpi_handle, ACPI_FULL_PATHNAME, &buffer);
+
+	/*
+	 * Print out basic system information.
+	 */
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "+------------------------------------------------------------\n"));
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "| System[%02x]:[%p] %s\n", system->device_handle, system->acpi_handle, buffer.pointer));
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "|   states: %cS0 %cS1 %cS2 %cS3 %cS4 %cS5\n", (system->states[0]?'+':'-'), (system->states[1]?'+':'-'), (system->states[2]?'+':'-'), (system->states[3]?'+':'-'), (system->states[4]?'+':'-'), (system->states[5]?'+':'-')));
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "+------------------------------------------------------------\n"));
+
+	acpi_os_free(buffer.pointer);
+#endif /*ACPI_DEBUG*/
 
 	return;
 }
@@ -68,19 +94,24 @@ sm_print (
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 sm_add_device(
 	BM_HANDLE		device_handle,
 	void			**context)
 {
-	ACPI_STATUS 		status = AE_OK;
+	acpi_status 		status = AE_OK;
 	BM_DEVICE		*device = NULL;
 	SM_CONTEXT		*system = NULL;
 	u8			i, type_a, type_b;
 
 
+	FUNCTION_TRACE("sm_add_device");
+
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Adding system device [%02x].\n", device_handle));
+
 	if (!context || *context) {
-		return(AE_BAD_PARAMETER);
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Invalid (NULL) context."));
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
 	/*
@@ -88,7 +119,7 @@ sm_add_device(
 	 */
 	system = acpi_os_callocate(sizeof(SM_CONTEXT));
 	if (!system) {
-		return(AE_NO_MEMORY);
+		return_ACPI_STATUS(AE_NO_MEMORY);
 	}
 
 	/*
@@ -130,7 +161,7 @@ end:
 		acpi_os_free(system);
 	}
 
-	return(status);
+	return_ACPI_STATUS(status);
 }
 
 
@@ -146,18 +177,22 @@ end:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 sm_remove_device (
 	void			**context)
 {
-	ACPI_STATUS 		status = AE_OK;
+	acpi_status 		status = AE_OK;
 	SM_CONTEXT		*system = NULL;
 
+	FUNCTION_TRACE("sm_remove_device");
+
 	if (!context || !*context) {
-		return(AE_BAD_PARAMETER);
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
 	system = (SM_CONTEXT*)*context;
+
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Removing system device [%02x].\n", system->device_handle));
 
 	status = sm_osl_remove_device(system);
 
@@ -165,7 +200,7 @@ sm_remove_device (
 
 	*context = NULL;
 
-	return(status);
+	return_ACPI_STATUS(status);
 }
 
 
@@ -185,12 +220,14 @@ sm_remove_device (
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 sm_initialize (void)
 {
-	ACPI_STATUS		status = AE_OK;
+	acpi_status		status = AE_OK;
 	BM_DEVICE_ID		criteria;
 	BM_DRIVER		driver;
+
+	FUNCTION_TRACE("sm_initialize");
 
 	MEMSET(&criteria, 0, sizeof(BM_DEVICE_ID));
 	MEMSET(&driver, 0, sizeof(BM_DRIVER));
@@ -205,7 +242,7 @@ sm_initialize (void)
 
 	status = bm_register_driver(&criteria, &driver);
 
-	return(status);
+	return_ACPI_STATUS(status);
 }
 
 
@@ -221,12 +258,14 @@ sm_initialize (void)
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 sm_terminate (void)
 {
-	ACPI_STATUS 		status = AE_OK;
+	acpi_status 		status = AE_OK;
 	BM_DEVICE_ID		criteria;
 	BM_DRIVER		driver;
+
+	FUNCTION_TRACE("sm_terminate");
 
 	MEMSET(&criteria, 0, sizeof(BM_DEVICE_ID));
 	MEMSET(&driver, 0, sizeof(BM_DRIVER));
@@ -241,7 +280,7 @@ sm_terminate (void)
 
 	status = bm_unregister_driver(&criteria, &driver);
 
-	return(status);
+	return_ACPI_STATUS(status);
 }
 
 
@@ -256,16 +295,18 @@ sm_terminate (void)
  * DESCRIPTION:
  *
  ****************************************************************************/
-ACPI_STATUS
+acpi_status
 sm_notify (
 	BM_NOTIFY		notify_type,
 	BM_HANDLE		device_handle,
 	void			**context)
 {
-	ACPI_STATUS 		status = AE_OK;
+	acpi_status 		status = AE_OK;
+
+	FUNCTION_TRACE("sm_notify");
 
 	if (!context) {
-		return(AE_BAD_PARAMETER);
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
 	switch (notify_type) {
@@ -283,7 +324,7 @@ sm_notify (
 		break;
 	}
 
-	return(status);
+	return_ACPI_STATUS(status);
 }
 
 
@@ -299,18 +340,20 @@ sm_notify (
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 sm_request (
 	BM_REQUEST		*request,
 	void			*context)
 {
-	ACPI_STATUS 		status = AE_OK;
+	acpi_status 		status = AE_OK;
+
+	FUNCTION_TRACE("sm_request");
 
 	/*
 	 * Must have a valid request structure and context.
 	 */
 	if (!request || !context) {
-		return(AE_BAD_PARAMETER);
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
 	/*
@@ -326,5 +369,5 @@ sm_request (
 
 	request->status = status;
 
-	return(status);
+	return_ACPI_STATUS(status);
 }

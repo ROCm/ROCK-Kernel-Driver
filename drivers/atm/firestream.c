@@ -1928,6 +1928,8 @@ static int __init firestream_init_one (struct pci_dev *pci_dev,
 
  err_out_free_atm_dev:
 	atm_dev_deregister(atm_dev);
+ err_out_free_fs_dev:
+ 	kfree(fs_dev);
  err_out:
 	return -ENODEV;
 }

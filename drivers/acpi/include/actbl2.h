@@ -53,7 +53,7 @@
  */
 typedef struct
 {
-	ACPI_TABLE_HEADER       header;                 /* Table header */
+	acpi_table_header       header;                 /* Table header */
 	u32                     table_offset_entry [1]; /* Array of pointers to  */
 			 /* other tables' headers */
 } RSDT_DESCRIPTOR_REV2;
@@ -64,7 +64,7 @@ typedef struct
  */
 typedef struct
 {
-	ACPI_TABLE_HEADER       header;                 /* Table header */
+	acpi_table_header       header;                 /* Table header */
 	UINT64                  table_offset_entry [1]; /* Array of pointers to  */
 			 /* other tables' headers */
 } XSDT_DESCRIPTOR_REV2;
@@ -86,7 +86,7 @@ typedef struct
 	u8                      version;                /* Version of this table */
 	u8                      reserved3 [31];         /* reserved - must be zero */
 
-} FACS_DESCRIPTOR_REV2;
+} facs_descriptor_rev2;
 
 
 /*
@@ -100,7 +100,7 @@ typedef struct
 	u8                      reserved;               /* Must be 0 */
 	UINT64                  address;                /* 64-bit address of struct or register */
 
-} ACPI_GENERIC_ADDRESS;
+} acpi_generic_address;
 
 
 /*
@@ -108,7 +108,7 @@ typedef struct
  */
 typedef struct
 {
-	ACPI_TABLE_HEADER       header;             /* table header */
+	acpi_table_header       header;             /* table header */
 	u32                     V1_firmware_ctrl;   /* 32-bit physical address of FACS */
 	u32                     V1_dsdt;            /* 32-bit physical address of DSDT */
 	u8                      reserved1;          /* System Interrupt Model isn't used in ACPI 2.0*/
@@ -163,21 +163,21 @@ typedef struct
 			   /* must be executed after writing the SLP_TYPx register. */
 	u32                     reserved6   : 18;   /* reserved - must be zero */
 
-	ACPI_GENERIC_ADDRESS    reset_register;     /* Reset register address in GAS format */
+	acpi_generic_address    reset_register;     /* Reset register address in GAS format */
 	u8                      reset_value;        /* Value to write to the Reset_register port to reset the system. */
 	u8                      reserved7[3];       /* These three bytes must be zero */
 	UINT64                  Xfirmware_ctrl;     /* 64-bit physical address of FACS */
 	UINT64                  Xdsdt;              /* 64-bit physical address of DSDT */
-	ACPI_GENERIC_ADDRESS    Xpm1a_evt_blk;      /* Extended Power Mgt 1a Acpi_event Reg Blk address */
-	ACPI_GENERIC_ADDRESS    Xpm1b_evt_blk;      /* Extended Power Mgt 1b Acpi_event Reg Blk address */
-	ACPI_GENERIC_ADDRESS    Xpm1a_cnt_blk;      /* Extended Power Mgt 1a Control Reg Blk address */
-	ACPI_GENERIC_ADDRESS    Xpm1b_cnt_blk;      /* Extended Power Mgt 1b Control Reg Blk address */
-	ACPI_GENERIC_ADDRESS    Xpm2_cnt_blk;       /* Extended Power Mgt 2 Control Reg Blk address */
-	ACPI_GENERIC_ADDRESS    Xpm_tmr_blk;        /* Extended Power Mgt Timer Ctrl Reg Blk address */
-	ACPI_GENERIC_ADDRESS    Xgpe0blk;           /* Extended General Purpose Acpi_event 0 Reg Blk address */
-	ACPI_GENERIC_ADDRESS    Xgpe1_blk;          /* Extended General Purpose Acpi_event 1 Reg Blk address */
+	acpi_generic_address    Xpm1a_evt_blk;      /* Extended Power Mgt 1a Acpi_event Reg Blk address */
+	acpi_generic_address    Xpm1b_evt_blk;      /* Extended Power Mgt 1b Acpi_event Reg Blk address */
+	acpi_generic_address    Xpm1a_cnt_blk;      /* Extended Power Mgt 1a Control Reg Blk address */
+	acpi_generic_address    Xpm1b_cnt_blk;      /* Extended Power Mgt 1b Control Reg Blk address */
+	acpi_generic_address    Xpm2_cnt_blk;       /* Extended Power Mgt 2 Control Reg Blk address */
+	acpi_generic_address    Xpm_tmr_blk;        /* Extended Power Mgt Timer Ctrl Reg Blk address */
+	acpi_generic_address    Xgpe0blk;           /* Extended General Purpose Acpi_event 0 Reg Blk address */
+	acpi_generic_address    Xgpe1_blk;          /* Extended General Purpose Acpi_event 1 Reg Blk address */
 
-}  FADT_DESCRIPTOR_REV2;
+}  fadt_descriptor_rev2;
 
 
 #pragma pack()

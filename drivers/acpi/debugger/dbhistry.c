@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dbhistry - debugger HISTORY command
- *              $Revision: 18 $
+ *              $Revision: 19 $
  *
  *****************************************************************************/
 
@@ -54,11 +54,11 @@ typedef struct history_info
 } HISTORY_INFO;
 
 
-HISTORY_INFO                history_buffer[HISTORY_SIZE];
-u16                         lo_history = 0;
-u16                         num_history = 0;
-u16                         next_history_index = 0;
-u32                         next_cmd_num = 1;
+HISTORY_INFO                acpi_gbl_history_buffer[HISTORY_SIZE];
+u16                         acpi_gbl_lo_history = 0;
+u16                         acpi_gbl_num_history = 0;
+u16                         acpi_gbl_next_history_index = 0;
+u32                         acpi_gbl_next_cmd_num = 1;
 
 
 /*******************************************************************************
@@ -81,28 +81,29 @@ acpi_db_add_to_history (
 
 	/* Put command into the next available slot */
 
-	STRCPY (history_buffer[next_history_index].command, command_line);
-	history_buffer[next_history_index].cmd_num = next_cmd_num;
+	STRCPY (acpi_gbl_history_buffer[acpi_gbl_next_history_index].command, command_line);
+
+	acpi_gbl_history_buffer[acpi_gbl_next_history_index].cmd_num = acpi_gbl_next_cmd_num;
 
 	/* Adjust indexes */
 
-	if ((num_history == HISTORY_SIZE) &&
-		(next_history_index == lo_history)) {
-		lo_history++;
-		if (lo_history >= HISTORY_SIZE) {
-			lo_history = 0;
+	if ((acpi_gbl_num_history == HISTORY_SIZE) &&
+		(acpi_gbl_next_history_index == acpi_gbl_lo_history)) {
+		acpi_gbl_lo_history++;
+		if (acpi_gbl_lo_history >= HISTORY_SIZE) {
+			acpi_gbl_lo_history = 0;
 		}
 	}
 
-	next_history_index++;
-	if (next_history_index >= HISTORY_SIZE) {
-		next_history_index = 0;
+	acpi_gbl_next_history_index++;
+	if (acpi_gbl_next_history_index >= HISTORY_SIZE) {
+		acpi_gbl_next_history_index = 0;
 	}
 
 
-	next_cmd_num++;
-	if (num_history < HISTORY_SIZE) {
-		num_history++;
+	acpi_gbl_next_cmd_num++;
+	if (acpi_gbl_num_history < HISTORY_SIZE) {
+		acpi_gbl_num_history++;
 	}
 
 }
@@ -127,12 +128,13 @@ acpi_db_display_history (void)
 	u16                     history_index;
 
 
-	history_index = lo_history;
+	history_index = acpi_gbl_lo_history;
 
 	/* Dump entire history buffer */
 
-	for (i = 0; i < num_history; i++) {
-		acpi_os_printf ("%ld %s\n", history_buffer[history_index].cmd_num, history_buffer[history_index].command);
+	for (i = 0; i < acpi_gbl_num_history; i++) {
+		acpi_os_printf ("%ld %s\n", acpi_gbl_history_buffer[history_index].cmd_num,
+				 acpi_gbl_history_buffer[history_index].command);
 
 		history_index++;
 		if (history_index >= HISTORY_SIZE) {
@@ -165,7 +167,7 @@ acpi_db_get_from_history (
 
 
 	if (command_num_arg == NULL) {
-		cmd_num = next_cmd_num - 1;
+		cmd_num = acpi_gbl_next_cmd_num - 1;
 	}
 
 	else {
@@ -175,12 +177,12 @@ acpi_db_get_from_history (
 
 	/* Search history buffer */
 
-	history_index = lo_history;
-	for (i = 0; i < num_history; i++) {
-		if (history_buffer[history_index].cmd_num == cmd_num) {
+	history_index = acpi_gbl_lo_history;
+	for (i = 0; i < acpi_gbl_num_history; i++) {
+		if (acpi_gbl_history_buffer[history_index].cmd_num == cmd_num) {
 			/* Found the commnad, return it */
 
-			return (history_buffer[history_index].command);
+			return (acpi_gbl_history_buffer[history_index].command);
 		}
 
 

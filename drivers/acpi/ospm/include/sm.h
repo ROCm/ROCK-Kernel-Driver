@@ -46,7 +46,7 @@
 typedef struct
 {
 	BM_HANDLE		device_handle;
-	ACPI_HANDLE 		acpi_handle;
+	acpi_handle 		acpi_handle;
 	u8			states[SM_MAX_SYSTEM_STATES];
 } SM_CONTEXT;
 
@@ -55,34 +55,34 @@ typedef struct
  *                              Function Prototypes
  *****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 sm_initialize (void);
 
-ACPI_STATUS
+acpi_status
 sm_terminate (void);
 
-ACPI_STATUS
+acpi_status
 sm_notify (
 	u32			notify_type,
 	u32 			device,
 	void			**context);
 
-ACPI_STATUS
+acpi_status
 sm_request(
 	BM_REQUEST		*request_info,
 	void			*context);
 
 /* System Driver OSL */
 
-ACPI_STATUS
+acpi_status
 sm_osl_add_device (
 	SM_CONTEXT		*system);
 
-ACPI_STATUS
+acpi_status
 sm_osl_remove_device (
 	SM_CONTEXT		*system);
 
-ACPI_STATUS
+acpi_status
 sm_osl_generate_event (
 	u32			event,
 	SM_CONTEXT		*system);

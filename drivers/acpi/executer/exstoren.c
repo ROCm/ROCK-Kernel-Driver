@@ -3,7 +3,7 @@
  *
  * Module Name: exstoren - AML Interpreter object store support,
  *                        Store to Node (namespace object)
- *              $Revision: 38 $
+ *              $Revision: 40 $
  *
  *****************************************************************************/
 
@@ -54,14 +54,17 @@
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_resolve_object (
-	ACPI_OPERAND_OBJECT     **source_desc_ptr,
-	ACPI_OBJECT_TYPE8       target_type,
-	ACPI_WALK_STATE         *walk_state)
+	acpi_operand_object     **source_desc_ptr,
+	acpi_object_type8       target_type,
+	acpi_walk_state         *walk_state)
 {
-	ACPI_OPERAND_OBJECT     *source_desc = *source_desc_ptr;
-	ACPI_STATUS             status = AE_OK;
+	acpi_operand_object     *source_desc = *source_desc_ptr;
+	acpi_status             status = AE_OK;
+
+
+	FUNCTION_TRACE ("Ex_resolve_object");
 
 
 	/*
@@ -108,6 +111,10 @@ acpi_ex_resolve_object (
 				/*
 				 * Conversion successful but still not a valid type
 				 */
+				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+					"Cannot assign type %s to %s (must be type Int/Str/Buf)\n",
+					acpi_ut_get_type_name ((*source_desc_ptr)->common.type),
+					acpi_ut_get_type_name (target_type)));
 				status = AE_AML_OPERAND_TYPE;
 			}
 		}
@@ -119,6 +126,7 @@ acpi_ex_resolve_object (
 		/*
 		 * Aliases are resolved by Acpi_ex_prep_operands
 		 */
+		ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Store into Alias - should never happen\n"));
 		status = AE_AML_INTERNAL;
 		break;
 
@@ -133,7 +141,7 @@ acpi_ex_resolve_object (
 		break;
 	}
 
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 
@@ -155,15 +163,18 @@ acpi_ex_resolve_object (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_store_object (
-	ACPI_OPERAND_OBJECT     *source_desc,
-	ACPI_OBJECT_TYPE8       target_type,
-	ACPI_OPERAND_OBJECT     **target_desc_ptr,
-	ACPI_WALK_STATE         *walk_state)
+	acpi_operand_object     *source_desc,
+	acpi_object_type8       target_type,
+	acpi_operand_object     **target_desc_ptr,
+	acpi_walk_state         *walk_state)
 {
-	ACPI_OPERAND_OBJECT     *target_desc = *target_desc_ptr;
-	ACPI_STATUS             status = AE_OK;
+	acpi_operand_object     *target_desc = *target_desc_ptr;
+	acpi_status             status = AE_OK;
+
+
+	FUNCTION_TRACE ("Ex_store_object");
 
 
 	/*
@@ -175,7 +186,7 @@ acpi_ex_store_object (
 	 */
 	status = acpi_ex_convert_to_target_type (target_type, &source_desc, walk_state);
 	if (ACPI_FAILURE (status)) {
-		return (status);
+		return_ACPI_STATUS (status);
 	}
 
 	/*
@@ -190,7 +201,6 @@ acpi_ex_store_object (
 		 * The target namespace node is uninitialized (has no target object),
 		 * and will take on the type of the source object
 		 */
-
 		*target_desc_ptr = source_desc;
 		break;
 
@@ -230,12 +240,15 @@ acpi_ex_store_object (
 		/*
 		 * All other types come here.
 		 */
+		ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Store into type %s not implemented\n",
+			acpi_ut_get_type_name (target_type)));
+
 		status = AE_NOT_IMPLEMENTED;
 		break;
 	}
 
 
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 

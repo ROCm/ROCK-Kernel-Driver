@@ -2,7 +2,7 @@
  *
  * Module Name: dbfileio - Debugger file I/O commands.  These can't usually
  *              be used when running the debugger in Ring 0 (Kernel mode)
- *              $Revision: 41 $
+ *              $Revision: 48 $
  *
  ******************************************************************************/
 
@@ -38,11 +38,9 @@
 	 MODULE_NAME         ("dbfileio")
 
 
-ACPI_PARSE_OBJECT           *root;
-
 #ifdef ACPI_APPLICATION
 #include <stdio.h>
-FILE                        *debug_file = NULL;
+FILE                        *acpi_gbl_debug_file = NULL;
 #endif
 
 
@@ -64,7 +62,7 @@ FILE                        *debug_file = NULL;
  *
  ******************************************************************************/
 
-ACPI_OBJECT_TYPE8
+acpi_object_type8
 acpi_db_match_argument (
 	NATIVE_CHAR             *user_argument,
 	ARGUMENT_INFO           *arguments)
@@ -78,7 +76,7 @@ acpi_db_match_argument (
 
 	for (i = 0; arguments[i].name; i++) {
 		if (STRSTR (arguments[i].name, user_argument) == arguments[i].name) {
-			return ((ACPI_OBJECT_TYPE8) i);
+			return ((acpi_object_type8) i);
 		}
 	}
 
@@ -107,11 +105,11 @@ acpi_db_close_debug_file (
 
 #ifdef ACPI_APPLICATION
 
-	if (debug_file) {
-	   fclose (debug_file);
-	   debug_file = NULL;
-	   output_to_file = FALSE;
-	   acpi_os_printf ("Debug output file %s closed\n", debug_filename);
+	if (acpi_gbl_debug_file) {
+	   fclose (acpi_gbl_debug_file);
+	   acpi_gbl_debug_file = NULL;
+	   acpi_gbl_db_output_to_file = FALSE;
+	   acpi_os_printf ("Debug output file %s closed\n", acpi_gbl_db_debug_filename);
 	}
 #endif
 
@@ -138,11 +136,11 @@ acpi_db_open_debug_file (
 #ifdef ACPI_APPLICATION
 
 	acpi_db_close_debug_file ();
-	debug_file = fopen (name, "w+");
-	if (debug_file) {
+	acpi_gbl_debug_file = fopen (name, "w+");
+	if (acpi_gbl_debug_file) {
 		acpi_os_printf ("Debug output file %s opened\n", name);
-		STRCPY (debug_filename, name);
-		output_to_file = TRUE;
+		STRCPY (acpi_gbl_db_debug_filename, name);
+		acpi_gbl_db_output_to_file = TRUE;
 	}
 	else {
 		acpi_os_printf ("Could not open debug file %s\n", name);
@@ -167,22 +165,22 @@ acpi_db_open_debug_file (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_db_load_table(
 	FILE                    *fp,
-	ACPI_TABLE_HEADER       **table_ptr,
+	acpi_table_header       **table_ptr,
 	u32                     *table_length)
 {
-	ACPI_TABLE_HEADER       table_header;
+	acpi_table_header       table_header;
 	u8                      *aml_ptr;
 	u32                     aml_length;
 	u32                     actual;
-	ACPI_STATUS             status;
+	acpi_status             status;
 
 
 	/* Read the table header */
 
-	if (fread (&table_header, 1, sizeof (table_header), fp) != sizeof (ACPI_TABLE_HEADER)) {
+	if (fread (&table_header, 1, sizeof (table_header), fp) != sizeof (acpi_table_header)) {
 		acpi_os_printf ("Couldn't read the table header\n");
 		return (AE_BAD_SIGNATURE);
 	}
@@ -204,15 +202,17 @@ acpi_db_load_table(
 		STRNCMP ((char *) table_header.signature, PSDT_SIG, 4) &&
 		STRNCMP ((char *) table_header.signature, SSDT_SIG, 4)) {
 		acpi_os_printf ("Table signature is invalid\n");
+		DUMP_BUFFER (&table_header, sizeof (acpi_table_header));
 		return (AE_ERROR);
 	}
 
 	/* Allocate a buffer for the table */
 
 	*table_length = table_header.length;
-	*table_ptr = (ACPI_TABLE_HEADER *) acpi_ut_allocate ((size_t) *table_length);
+	*table_ptr = ACPI_MEM_ALLOCATE ((size_t) *table_length);
 	if (!*table_ptr) {
-		acpi_os_printf ("Could not allocate memory for the table (size=%X)\n", table_header.length);
+		acpi_os_printf ("Could not allocate memory for ACPI table %4.4s (size=%X)\n",
+				 table_header.signature, table_header.length);
 		return (AE_NO_MEMORY);
 	}
 
@@ -238,7 +238,7 @@ acpi_db_load_table(
 
 
 	acpi_os_printf ("Error - could not read the table file\n");
-	acpi_ut_free (*table_ptr);
+	ACPI_MEM_FREE (*table_ptr);
 	*table_ptr = NULL;
 	*table_length = 0;
 
@@ -265,16 +265,18 @@ acpi_db_load_table(
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 ae_local_load_table (
-	ACPI_TABLE_HEADER       *table_ptr)
+	acpi_table_header       *table_ptr)
 {
-	ACPI_STATUS             status;
-	ACPI_TABLE_DESC         table_info;
+	acpi_status             status;
+	acpi_table_desc         table_info;
 
+
+	FUNCTION_TRACE ("Ae_local_load_table");
 
 	if (!table_ptr) {
-		return (AE_BAD_PARAMETER);
+		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
 	/* Install the new table into the local data structures */
@@ -286,7 +288,7 @@ ae_local_load_table (
 		/* Free table allocated by Acpi_tb_get_table */
 
 		acpi_tb_delete_single_table (&table_info);
-		return (status);
+		return_ACPI_STATUS (status);
 	}
 
 
@@ -295,12 +297,12 @@ ae_local_load_table (
 	if (ACPI_FAILURE (status)) {
 		/* Uninstall table and free the buffer */
 
-		acpi_tb_uninstall_table (table_info.installed_desc);
-		return (status);
+		acpi_tb_delete_acpi_table (ACPI_TABLE_DSDT);
+		return_ACPI_STATUS (status);
 	}
 #endif
 
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 
@@ -316,14 +318,14 @@ ae_local_load_table (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_db_load_acpi_table (
 	NATIVE_CHAR             *filename)
 {
 #ifdef ACPI_APPLICATION
 	FILE                    *fp;
-	ACPI_STATUS             status;
-	ACPI_TABLE_HEADER       *table_ptr;
+	acpi_status             status;
+	acpi_table_header       *table_ptr;
 	u32                     table_length;
 
 
@@ -356,11 +358,13 @@ acpi_db_load_acpi_table (
 			acpi_os_printf ("Table %4.4s is already installed\n",
 					  &table_ptr->signature);
 		}
+
 		else {
 			acpi_os_printf ("Could not install table, %s\n",
-					  acpi_ut_format_exception (status));
+					  acpi_format_exception (status));
 		}
-		acpi_ut_free (table_ptr);
+
+		ACPI_MEM_FREE (table_ptr);
 		return (status);
 	}
 

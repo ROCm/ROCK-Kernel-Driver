@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dbdisasm - parser op tree display routines
- *              $Revision: 40 $
+ *              $Revision: 48 $
  *
  ******************************************************************************/
 
@@ -44,7 +44,7 @@
 #define DB_FULL_OP_INFO     "%5.5X #%4.4X [%2.2d]  "
 
 
-NATIVE_CHAR                 *INDENT_STRING = "....";
+NATIVE_CHAR                 *acpi_gbl_db_disasm_indent = "....";
 
 
 /*******************************************************************************
@@ -61,7 +61,7 @@ NATIVE_CHAR                 *INDENT_STRING = "....";
 
 u32
 acpi_db_block_type (
-	ACPI_PARSE_OBJECT       *op)
+	acpi_parse_object       *op)
 {
 
 	switch (op->opcode) {
@@ -95,11 +95,11 @@ acpi_db_block_type (
 
 #ifdef PARSER_ONLY
 
-ACPI_STATUS
+acpi_status
 acpi_ps_display_object_pathname (
-	ACPI_PARSE_OBJECT       *op)
+	acpi_parse_object       *op)
 {
-	ACPI_PARSE_OBJECT       *target_op;
+	acpi_parse_object       *target_op;
 
 
 	/* Search parent tree up to the root if necessary */
@@ -112,7 +112,6 @@ acpi_ps_display_object_pathname (
 		 * (such as _OS_).  Rather than worry about looking up all
 		 * the predefined names, just display the name as given
 		 */
-
 		acpi_os_printf (" **** Path not found in parse tree");
 	}
 
@@ -129,12 +128,12 @@ acpi_ps_display_object_pathname (
 
 #else
 
-ACPI_STATUS
+acpi_status
 acpi_ps_display_object_pathname (
-	ACPI_PARSE_OBJECT       *op)
+	acpi_parse_object       *op)
 {
-	ACPI_STATUS             status;
-	ACPI_NAMESPACE_NODE     *node;
+	acpi_status             status;
+	acpi_namespace_node     *node;
 	NATIVE_CHAR             buffer[MAX_SHOW_ENTRY];
 	u32                     buffer_size = MAX_SHOW_ENTRY;
 
@@ -183,13 +182,13 @@ acpi_ps_display_object_pathname (
 
 void
 acpi_db_display_op (
-	ACPI_WALK_STATE         *walk_state,
-	ACPI_PARSE_OBJECT       *origin,
+	acpi_walk_state         *walk_state,
+	acpi_parse_object       *origin,
 	u32                     num_opcodes)
 {
-	ACPI_PARSE_OBJECT       *op = origin;
-	ACPI_PARSE_OBJECT       *arg;
-	ACPI_PARSE_OBJECT       *depth;
+	acpi_parse_object       *op = origin;
+	acpi_parse_object       *arg;
+	acpi_parse_object       *depth;
 	u32                     depth_count = 0;
 	u32                     last_depth = 0;
 	u32                     i;
@@ -201,7 +200,7 @@ acpi_db_display_op (
 			/* indentation */
 
 			depth_count = 0;
-			if (!opt_verbose) {
+			if (!acpi_gbl_db_opt_verbose) {
 				depth_count++;
 			}
 
@@ -226,7 +225,7 @@ acpi_db_display_op (
 			if (depth_count > last_depth) {
 				VERBOSE_PRINT ((DB_NO_OP_INFO, last_depth));
 				for (i = 0; i < last_depth; i++) {
-					acpi_os_printf (INDENT_STRING);
+					acpi_os_printf ("%s", acpi_gbl_db_disasm_indent);
 				}
 
 				if (acpi_db_block_type (op) == BLOCK_PAREN) {
@@ -243,7 +242,7 @@ acpi_db_display_op (
 				for (j = 0; j < (last_depth - depth_count); j++) {
 					VERBOSE_PRINT ((DB_NO_OP_INFO, last_depth - j));
 					for (i = 0; i < (last_depth - j - 1); i++) {
-						acpi_os_printf (INDENT_STRING);
+						acpi_os_printf ("%s", acpi_gbl_db_disasm_indent);
 					}
 
 					if (acpi_db_block_type (op) == BLOCK_PAREN) {
@@ -263,7 +262,7 @@ acpi_db_display_op (
 			/* Indent the output according to the depth count */
 
 			for (i = 0; i < depth_count; i++) {
-				acpi_os_printf (INDENT_STRING);
+				acpi_os_printf ("%s", acpi_gbl_db_disasm_indent);
 			}
 
 
@@ -275,7 +274,7 @@ acpi_db_display_op (
 
 			if ((op->opcode == AML_INT_NAMEPATH_OP && op->value.name)  &&
 				(op->parent) &&
-				(opt_verbose)) {
+				(acpi_gbl_db_opt_verbose)) {
 				acpi_ps_display_object_pathname (op);
 			}
 
@@ -298,7 +297,7 @@ acpi_db_display_op (
 		for (i = 0; i < last_depth; i++) {
 			VERBOSE_PRINT ((DB_NO_OP_INFO, last_depth - i));
 			for (j = 0; j < depth_count; j++) {
-				acpi_os_printf (INDENT_STRING);
+				acpi_os_printf ("%s", acpi_gbl_db_disasm_indent);
 			}
 			acpi_os_printf ("}\n");
 			depth_count--;
@@ -393,23 +392,25 @@ acpi_db_display_namestring (
 
 void
 acpi_db_display_path (
-	ACPI_PARSE_OBJECT       *op)
+	acpi_parse_object       *op)
 {
-	ACPI_PARSE_OBJECT       *prev;
-	ACPI_PARSE_OBJECT       *search;
+	acpi_parse_object       *prev;
+	acpi_parse_object       *search;
 	u32                     name;
 	u8                      do_dot = FALSE;
-	ACPI_PARSE_OBJECT       *name_path;
+	acpi_parse_object       *name_path;
+	const acpi_opcode_info  *op_info;
 
 
 	/* We are only interested in named objects */
 
-	if (!acpi_ps_is_node_op (op->opcode)) {
+	op_info = acpi_ps_get_opcode_info (op->opcode);
+	if (!(op_info->flags & AML_NSNODE)) {
 		return;
 	}
 
 
-	if (acpi_ps_is_create_field_op (op->opcode)) {
+	if (op_info->flags & AML_CREATE) {
 		/* Field creation - check for a fully qualified namepath */
 
 		if (op->opcode == AML_CREATE_FIELD_OP) {
@@ -443,35 +444,38 @@ acpi_db_display_path (
 			search = search->parent;
 		}
 
-		if (prev && !acpi_ps_is_field_op (search->opcode)) {
-			/* below root scope, append scope name */
+		if (prev) {
+			op_info = acpi_ps_get_opcode_info (search->opcode);
+			if (!(op_info->flags & AML_FIELD)) {
+				/* below root scope, append scope name */
 
-			if (do_dot) {
-				/* append dot */
+				if (do_dot) {
+					/* append dot */
 
-				acpi_os_printf (".");
-			}
-
-			if (acpi_ps_is_create_field_op (search->opcode)) {
-				if (op->opcode == AML_CREATE_FIELD_OP) {
-					name_path = acpi_ps_get_arg (op, 3);
+					acpi_os_printf (".");
 				}
+
+				if (op_info->flags & AML_CREATE) {
+					if (op->opcode == AML_CREATE_FIELD_OP) {
+						name_path = acpi_ps_get_arg (op, 3);
+					}
+					else {
+						name_path = acpi_ps_get_arg (op, 2);
+					}
+
+					if ((name_path) &&
+						(name_path->value.string)) {
+						acpi_os_printf ("%4.4s", name_path->value.string);
+					}
+				}
+
 				else {
-					name_path = acpi_ps_get_arg (op, 2);
+					name = acpi_ps_get_name (search);
+					acpi_os_printf ("%4.4s", &name);
 				}
 
-				if ((name_path) &&
-					(name_path->value.string)) {
-					acpi_os_printf ("%4.4s", name_path->value.string);
-				}
+				do_dot = TRUE;
 			}
-
-			else {
-				name = acpi_ps_get_name (search);
-				acpi_os_printf ("%4.4s", &name);
-			}
-
-			do_dot = TRUE;
 		}
 
 		prev = search;
@@ -496,13 +500,13 @@ acpi_db_display_path (
 
 void
 acpi_db_display_opcode (
-	ACPI_WALK_STATE         *walk_state,
-	ACPI_PARSE_OBJECT       *op)
+	acpi_walk_state         *walk_state,
+	acpi_parse_object       *op)
 {
 	u8                      *byte_data;
 	u32                     byte_count;
 	u32                     i;
-	ACPI_OPCODE_INFO        *opc = NULL;
+	const acpi_opcode_info  *op_info = NULL;
 	u32                     name;
 
 
@@ -517,12 +521,12 @@ acpi_db_display_opcode (
 
 	case AML_BYTE_OP:
 
-		if (opt_verbose) {
-			acpi_os_printf ("(u8) 0x%2.2X", op->value.integer & ACPI_UINT8_MAX);
+		if (acpi_gbl_db_opt_verbose) {
+			acpi_os_printf ("(u8) 0x%2.2X", op->value.integer8);
 		}
 
 		else {
-			acpi_os_printf ("0x%2.2X", op->value.integer & ACPI_UINT8_MAX);
+			acpi_os_printf ("0x%2.2X", op->value.integer8);
 		}
 
 		break;
@@ -530,12 +534,12 @@ acpi_db_display_opcode (
 
 	case AML_WORD_OP:
 
-		if (opt_verbose) {
-			acpi_os_printf ("(u16) 0x%4.4X", op->value.integer & ACPI_UINT16_MAX);
+		if (acpi_gbl_db_opt_verbose) {
+			acpi_os_printf ("(u16) 0x%4.4X", op->value.integer16);
 		}
 
 		else {
-			acpi_os_printf ("0x%4.4X", op->value.integer & ACPI_UINT16_MAX);
+			acpi_os_printf ("0x%4.4X", op->value.integer16);
 		}
 
 		break;
@@ -543,12 +547,27 @@ acpi_db_display_opcode (
 
 	case AML_DWORD_OP:
 
-		if (opt_verbose) {
-			acpi_os_printf ("(u32) 0x%8.8X", op->value.integer);
+		if (acpi_gbl_db_opt_verbose) {
+			acpi_os_printf ("(u32) 0x%8.8X", op->value.integer32);
 		}
 
 		else {
-			acpi_os_printf ("0x%8.8X", op->value.integer);
+			acpi_os_printf ("0x%8.8X", op->value.integer32);
+		}
+
+		break;
+
+
+	case AML_QWORD_OP:
+
+		if (acpi_gbl_db_opt_verbose) {
+			acpi_os_printf ("(UINT64) 0x%8.8X%8.8X", op->value.integer64.hi,
+					 op->value.integer64.lo);
+		}
+
+		else {
+			acpi_os_printf ("0x%8.8X%8.8X", op->value.integer64.hi,
+					 op->value.integer64.lo);
 		}
 
 		break;
@@ -588,33 +607,33 @@ acpi_db_display_opcode (
 
 	case AML_INT_NAMEDFIELD_OP:
 
-		acpi_os_printf ("Named_field (Length 0x%8.8X)  ", op->value.integer);
+		acpi_os_printf ("Named_field (Length 0x%8.8X)  ", op->value.integer32);
 		break;
 
 
 	case AML_INT_RESERVEDFIELD_OP:
 
-		acpi_os_printf ("Reserved_field (Length 0x%8.8X) ", op->value.integer);
+		acpi_os_printf ("Reserved_field (Length 0x%8.8X) ", op->value.integer32);
 		break;
 
 
 	case AML_INT_ACCESSFIELD_OP:
 
-		acpi_os_printf ("Access_field (Length 0x%8.8X) ", op->value.integer);
+		acpi_os_printf ("Access_field (Length 0x%8.8X) ", op->value.integer32);
 		break;
 
 
 	case AML_INT_BYTELIST_OP:
 
-		if (opt_verbose) {
-			acpi_os_printf ("Byte_list   (Length 0x%8.8X)  ", op->value.integer);
+		if (acpi_gbl_db_opt_verbose) {
+			acpi_os_printf ("Byte_list   (Length 0x%8.8X)  ", op->value.integer32);
 		}
 
 		else {
-			acpi_os_printf ("0x%2.2X", op->value.integer);
+			acpi_os_printf ("0x%2.2X", op->value.integer32);
 
-			byte_count = op->value.integer;
-			byte_data = ((ACPI_PARSE2_OBJECT *) op)->data;
+			byte_count = op->value.integer32;
+			byte_data = ((acpi_parse2_object *) op)->data;
 
 			for (i = 0; i < byte_count; i++) {
 				acpi_os_printf (", 0x%2.2X", byte_data[i]);
@@ -628,8 +647,8 @@ acpi_db_display_opcode (
 
 		/* Just get the opcode name and print it */
 
-		opc = acpi_ps_get_opcode_info (op->opcode);
-		acpi_os_printf ("%s", opc->name);
+		op_info = acpi_ps_get_opcode_info (op->opcode);
+		acpi_os_printf ("%s", op_info->name);
 
 
 #ifndef PARSER_ONLY
@@ -643,8 +662,7 @@ acpi_db_display_opcode (
 		break;
 	}
 
-
-	if (!opc) {
+	if (!op_info) {
 		/* If there is another element in the list, add a comma */
 
 		if (op->next) {
@@ -652,16 +670,15 @@ acpi_db_display_opcode (
 		}
 	}
 
-
 	/*
 	 * If this is a named opcode, print the associated name value
 	 */
-
-	if (op && acpi_ps_is_named_op (op->opcode)) {
+	op_info = acpi_ps_get_opcode_info (op->opcode);
+	if (op && (op_info->flags & AML_NAMED)) {
 		name = acpi_ps_get_name (op);
 		acpi_os_printf (" %4.4s", &name);
 
-		if (opt_verbose) {
+		if (acpi_gbl_db_opt_verbose) {
 			acpi_os_printf (" (Path \\");
 			acpi_db_display_path (op);
 			acpi_os_printf (")");

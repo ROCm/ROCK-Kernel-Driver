@@ -203,7 +203,7 @@ typedef struct {
  */
 typedef struct {
 	BM_HANDLE		device_handle;
-	ACPI_HANDLE		acpi_handle;
+	acpi_handle		acpi_handle;
 	char			uid[9];
 	TZ_POLICY		policy;
 } TZ_CONTEXT;
@@ -215,29 +215,29 @@ typedef struct {
 
 /* thermal_zone.c */
 
-ACPI_STATUS
+acpi_status
 tz_initialize (void);
 
-ACPI_STATUS
+acpi_status
 tz_terminate (void);
 
-ACPI_STATUS
+acpi_status
 tz_notify (
 	BM_NOTIFY               notify_type,
 	BM_HANDLE               device_handle,
 	BM_DRIVER_CONTEXT	*context);
 
-ACPI_STATUS
+acpi_status
 tz_request (
 	BM_REQUEST              *request,
 	BM_DRIVER_CONTEXT	context);
 
-ACPI_STATUS
+acpi_status
 tz_get_temperature (
 	TZ_CONTEXT              *thermal_zone,
 	u32                     *temperature);
 
-ACPI_STATUS
+acpi_status
 tz_get_thresholds (
 	TZ_CONTEXT              *thermal_zone,
 	TZ_THRESHOLD_LIST       *threshold_list);
@@ -248,11 +248,11 @@ tz_print (
 
 /* tzpolicy.c */
 
-ACPI_STATUS
+acpi_status
 tz_policy_add_device (
 	TZ_CONTEXT              *thermal_zone);
 
-ACPI_STATUS
+acpi_status
 tz_policy_remove_device (
 	TZ_CONTEXT              *thermal_zone);
 
@@ -262,15 +262,15 @@ tz_policy_check (
 
 /* Thermal Zone Driver OSL */
 
-ACPI_STATUS
+acpi_status
 tz_osl_add_device (
 	TZ_CONTEXT		*thermal_zone);
 
-ACPI_STATUS
+acpi_status
 tz_osl_remove_device (
 	TZ_CONTEXT		*thermal_zone);
 
-ACPI_STATUS
+acpi_status
 tz_osl_generate_event (
 	u32			event,
 	TZ_CONTEXT		*thermal_zone);

@@ -1,7 +1,7 @@
 /*****************************************************************************
  *
  * Module Name: bn.c
- *   $Revision: 22 $
+ *   $Revision: 25 $
  *
  *****************************************************************************/
 
@@ -52,6 +52,52 @@ void
 bn_print (
 	BN_CONTEXT		*button)
 {
+#ifdef ACPI_DEBUG
+	acpi_buffer		buffer;
+
+	PROC_NAME("bn_print");
+
+	if (!button) {
+		return;
+	}
+
+	buffer.length = 256;
+	buffer.pointer = acpi_os_callocate(buffer.length);
+	if (!buffer.pointer) {
+		return;
+	}
+
+	/*
+	 * Get the full pathname for this ACPI object.
+	 */
+	acpi_get_name(button->acpi_handle, ACPI_FULL_PATHNAME, &buffer);
+
+	/*
+	 * Print out basic button information.
+	 */
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "+------------------------------------------------------------\n"));
+
+	switch (button->type) {
+
+	case BN_TYPE_POWER_BUTTON:
+	case BN_TYPE_POWER_BUTTON_FIXED:
+		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "| Power_button[%02x]:[%p] %s\n", button->device_handle, button->acpi_handle, buffer.pointer));
+		break;
+
+	case BN_TYPE_SLEEP_BUTTON:
+	case BN_TYPE_SLEEP_BUTTON_FIXED:
+		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "| Sleep_button[%02x]:[%p] %s\n", button->device_handle, button->acpi_handle, buffer.pointer));
+		break;
+
+	case BN_TYPE_LID_SWITCH:
+		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "| Lid_switch[%02x]:[%p] %s\n", button->device_handle, button->acpi_handle, buffer.pointer));
+		break;
+	}
+
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "+------------------------------------------------------------\n"));
+
+	acpi_os_free(buffer.pointer);
+#endif /*ACPI_DEBUG*/
 
 	return;
 }
@@ -69,17 +115,22 @@ bn_print (
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bn_add_device(
 	BM_HANDLE		device_handle,
 	void			**context)
 {
-	ACPI_STATUS		status = AE_OK;
+	acpi_status		status = AE_OK;
 	BM_DEVICE		*device = NULL;
 	BN_CONTEXT		*button = NULL;
 
+	FUNCTION_TRACE("bn_add_device");
+
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Adding button device [%02x].\n", device_handle));
+
 	if (!context || *context) {
-		return(AE_BAD_PARAMETER);
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Invalid context.\n"));
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
 	/*
@@ -87,7 +138,7 @@ bn_add_device(
 	 */
 	status = bm_get_device_info( device_handle, &device );
 	if (ACPI_FAILURE(status)) {
-		return(status);
+		return_ACPI_STATUS(status);
 	}
 
 	/*
@@ -95,7 +146,7 @@ bn_add_device(
 	 */
 	button = acpi_os_callocate(sizeof(BN_CONTEXT));
 	if (!button) {
-		return(AE_NO_MEMORY);
+		return_ACPI_STATUS(AE_NO_MEMORY);
 	}
 
 	button->device_handle = device->handle;
@@ -169,7 +220,7 @@ end:
 		acpi_os_free(button);
 	}
 
-	return(status);
+	return_ACPI_STATUS(status);
 }
 
 
@@ -185,18 +236,22 @@ end:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bn_remove_device(
 	void			**context)
 {
-	ACPI_STATUS		status = AE_OK;
+	acpi_status		status = AE_OK;
 	BN_CONTEXT		*button = NULL;
 
+	FUNCTION_TRACE("bn_remove_device");
+
 	if (!context || !*context) {
-		return(AE_BAD_PARAMETER);
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
 	button = (BN_CONTEXT*)*context;
+
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Removing button device [%02x].\n", button->device_handle));
 
 	/*
 	 * Unregister for fixed-feature events.
@@ -218,7 +273,7 @@ bn_remove_device(
 
 	*context = NULL;
 
-	return(status);
+	return_ACPI_STATUS(status);
 }
 
 
@@ -239,11 +294,13 @@ bn_remove_device(
 
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bn_initialize (void)
 {
 	BM_DEVICE_ID		criteria;
 	BM_DRIVER		driver;
+
+	FUNCTION_TRACE("bn_initialize");
 
 	MEMSET(&criteria, 0, sizeof(BM_DEVICE_ID));
 	MEMSET(&driver, 0, sizeof(BM_DRIVER));
@@ -269,7 +326,7 @@ bn_initialize (void)
 	MEMCPY(criteria.hid, BN_HID_LID_SWITCH, sizeof(BN_HID_LID_SWITCH));
 	bm_register_driver(&criteria, &driver);
 
-	return(AE_OK);
+	return_ACPI_STATUS(AE_OK);
 }
 
 
@@ -285,12 +342,14 @@ bn_initialize (void)
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bn_terminate (void)
 {
-	ACPI_STATUS		status = AE_OK;
+	acpi_status		status = AE_OK;
 	BM_DEVICE_ID		criteria;
 	BM_DRIVER		driver;
+
+	FUNCTION_TRACE("bn_terminate");
 
 	MEMSET(&criteria, 0, sizeof(BM_DEVICE_ID));
 	MEMSET(&driver, 0, sizeof(BM_DRIVER));
@@ -316,7 +375,7 @@ bn_terminate (void)
 	MEMCPY(criteria.hid, BN_HID_LID_SWITCH, sizeof(BN_HID_LID_SWITCH));
 	status = bm_unregister_driver(&criteria, &driver);
 
-	return(status);
+	return_ACPI_STATUS(status);
 }
 
 
@@ -332,20 +391,24 @@ bn_terminate (void)
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bn_notify_fixed (
 	void			*context)
 {
-	ACPI_STATUS		status = AE_OK;
+	acpi_status		status = AE_OK;
+
+	FUNCTION_TRACE("bn_notify_fixed");
 
 	if (!context) {
-		return(AE_BAD_PARAMETER);
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
+
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Status change event detected.\n"));
 
 	status = bn_osl_generate_event(BN_NOTIFY_STATUS_CHANGE,
 		((BN_CONTEXT*)context));
 
-	return(status);
+	return_ACPI_STATUS(status);
 }
 
 
@@ -361,16 +424,18 @@ bn_notify_fixed (
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bn_notify (
 	BM_NOTIFY		notify_type,
 	BM_HANDLE		device_handle,
 	void			**context)
 {
-	ACPI_STATUS		status = AE_OK;
+	acpi_status		status = AE_OK;
+
+	FUNCTION_TRACE("bn_notify");
 
 	if (!context) {
-		return(AE_BAD_PARAMETER);
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
 	switch (notify_type) {
@@ -383,6 +448,7 @@ bn_notify (
 		break;
 		
 	case BN_NOTIFY_STATUS_CHANGE:
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Status change event detected.\n"));
 		status = bn_osl_generate_event(BN_NOTIFY_STATUS_CHANGE,
 			((BN_CONTEXT*)*context));
 		break;
@@ -392,7 +458,7 @@ bn_notify (
 		break;
 	}
 
-	return(status);
+	return_ACPI_STATUS(status);
 }
 
 
@@ -408,18 +474,20 @@ bn_notify (
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bn_request (
 	BM_REQUEST		*request,
 	void			*context)
 {
-	ACPI_STATUS		status = AE_OK;
+	acpi_status		status = AE_OK;
+
+	FUNCTION_TRACE("bn_request");
 
 	/*
 	 * Must have a valid request structure and context.
 	 */
 	if (!request || !context) {
-		return(AE_BAD_PARAMETER);
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
 	/*
@@ -435,5 +503,5 @@ bn_request (
 
 	request->status = status;
 
-	return(status);
+	return_ACPI_STATUS(status);
 }

@@ -1,7 +1,7 @@
 /*****************************************************************************
  *
  * Module Name: bmdriver.c
- *   $Revision: 17 $
+ *   $Revision: 21 $
  *
  *****************************************************************************/
 
@@ -39,20 +39,20 @@
  *
  * FUNCTION:    bm_get_device_power_state
  *
- * PARAMETERS:  
+ * PARAMETERS:
  *
- * RETURN:      
+ * RETURN:
  *
- * DESCRIPTION: 
+ * DESCRIPTION:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bm_get_device_power_state (
 	BM_HANDLE               device_handle,
 	BM_POWER_STATE		*state)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 	BM_NODE			*node = NULL;
 
 	FUNCTION_TRACE("bm_get_device_power_state");
@@ -89,20 +89,20 @@ bm_get_device_power_state (
  *
  * FUNCTION:    bm_set_device_power_state
  *
- * PARAMETERS:  
+ * PARAMETERS:
  *
- * RETURN:      
+ * RETURN:
  *
- * DESCRIPTION: 
+ * DESCRIPTION:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bm_set_device_power_state (
 	BM_HANDLE               device_handle,
 	BM_POWER_STATE		state)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status           status = AE_OK;
 	BM_NODE			*node = NULL;
 
 	FUNCTION_TRACE("bm_set_device_power_state");
@@ -131,28 +131,28 @@ bm_set_device_power_state (
  *
  * FUNCTION:    bm_get_device_status
  *
- * PARAMETERS:  
+ * PARAMETERS:
  *    device_handle is really an index number into the array of BM_DEVICE
  *                  structures in info_list.  This data item is passed to
  *                  the registered program's "notify" callback.  It is used
  *                  to retrieve the specific BM_DEVICE structure instance
- *                  associated with the callback.  
+ *                  associated with the callback.
  *    device_status is a pointer that receives the result of processing
  *                  the device's associated ACPI _STA.
  *
  * RETURN:
- *    The ACPI_STATUS value indicates success AE_OK or failure of the function
+ *    The acpi_status value indicates success AE_OK or failure of the function
  *
  * DESCRIPTION: Evaluates the device's ACPI _STA, if it is present.
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bm_get_device_status (
 	BM_HANDLE               device_handle,
 	BM_DEVICE_STATUS        *device_status)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status           status = AE_OK;
 	BM_NODE			*node = NULL;
 
 	FUNCTION_TRACE("bm_get_device_status");
@@ -195,7 +195,7 @@ bm_get_device_status (
 	 * Evaluate _STA:
 	 * --------------
 	 */
-	status = bm_evaluate_simple_integer(node->device.acpi_handle, "_STA", 
+	status = bm_evaluate_simple_integer(node->device.acpi_handle, "_STA",
 		&(node->device.status));
 	if (ACPI_SUCCESS(status)) {
 		*device_status = node->device.status;
@@ -216,7 +216,7 @@ bm_get_device_status (
  *                  this device's information.
  *
  * RETURN:
- *    The ACPI_STATUS value indicates success AE_OK or failure of the function
+ *    The acpi_status value indicates success AE_OK or failure of the function
  *
  * DESCRIPTION:
  *    Using the device_handle this function retrieves this device's
@@ -224,12 +224,12 @@ bm_get_device_status (
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bm_get_device_info (
 	BM_HANDLE               device_handle,
 	BM_DEVICE               **device)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status           status = AE_OK;
 	BM_NODE			*node = NULL;
 
 	FUNCTION_TRACE("bm_get_device_info");
@@ -260,7 +260,7 @@ bm_get_device_info (
  *    context       A pointer to a BM_DRIVER_CONTEXT structure instance.
  *
  * RETURN:
- *    The ACPI_STATUS value indicates success AE_OK or failure of the function
+ *    The acpi_status value indicates success AE_OK or failure of the function
  *
  * DESCRIPTION:
  *    Using the device_handle this function retrieves this device's
@@ -268,12 +268,12 @@ bm_get_device_info (
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bm_get_device_context (
 	BM_HANDLE               device_handle,
 	BM_DRIVER_CONTEXT	*context)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status           status = AE_OK;
 	BM_NODE			*node = NULL;
 
 	FUNCTION_TRACE("bm_get_device_context");
@@ -306,20 +306,20 @@ bm_get_device_context (
  *
  * FUNCTION:    bm_register_driver
  *
- * PARAMETERS:  
+ * PARAMETERS:
  *
- * RETURN:      
+ * RETURN:
  *
- * DESCRIPTION: 
+ * DESCRIPTION:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bm_register_driver (
 	BM_DEVICE_ID		*criteria,
 	BM_DRIVER		*driver)
 {
-	ACPI_STATUS             status = AE_NOT_FOUND;
+	acpi_status           status = AE_NOT_FOUND;
 	BM_HANDLE_LIST          device_list;
 	BM_NODE			*node = NULL;
 	BM_DEVICE		*device = NULL;
@@ -347,7 +347,7 @@ bm_register_driver (
 	/*
 	 * Install driver:
 	 * ----------------
-	 * For each match, record the driver information and execute the 
+	 * For each match, record the driver information and execute the
 	 * driver's Notify() funciton (if present) to notify the driver
 	 * of the device's presence.
 	 */
@@ -361,19 +361,19 @@ bm_register_driver (
 
 		device = &(node->device);
 
-		/* 
-		 * Make sure another driver hasn't already registered for 
-		 * this device. 
+		/*
+		 * Make sure another driver hasn't already registered for
+		 * this device.
 		 */
 		if (BM_IS_DRIVER_CONTROL(device)) {
-			DEBUG_PRINT(ACPI_INFO, ("Another driver has already registered for device [%02x].\n", device->handle));
+			ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Another driver has already registered for device [%02x].\n", device->handle));
 			continue;
 		}
 
-		DEBUG_PRINT(ACPI_INFO, ("Registering driver for device [%02x].\n", device->handle));
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Registering driver for device [%02x].\n", device->handle));
 
 		/* Notify driver of new device. */
-		status = driver->notify(BM_NOTIFY_DEVICE_ADDED, 
+		status = driver->notify(BM_NOTIFY_DEVICE_ADDED,
 			node->device.handle, &(node->driver.context));
 		if (ACPI_SUCCESS(status)) {
 			node->driver.notify = driver->notify;
@@ -390,20 +390,20 @@ bm_register_driver (
  *
  * FUNCTION:    bm_unregister_driver
  *
- * PARAMETERS:  
+ * PARAMETERS:
  *
- * RETURN:      
+ * RETURN:
  *
- * DESCRIPTION: 
+ * DESCRIPTION:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bm_unregister_driver (
 	BM_DEVICE_ID		*criteria,
 	BM_DRIVER		*driver)
 {
-	ACPI_STATUS             status = AE_NOT_FOUND;
+	acpi_status           status = AE_NOT_FOUND;
 	BM_HANDLE_LIST          device_list;
 	BM_NODE			*node = NULL;
 	BM_DEVICE		*device = NULL;
@@ -444,18 +444,18 @@ bm_unregister_driver (
 
 		device = &(node->device);
 
-		/* 
-		 * Make sure driver has really registered for this device. 
+		/*
+		 * Make sure driver has really registered for this device.
 		 */
 		if (!BM_IS_DRIVER_CONTROL(device)) {
-			DEBUG_PRINT(ACPI_INFO, ("Driver hasn't registered for device [%02x].\n", device->handle));
+			ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Driver hasn't registered for device [%02x].\n", device->handle));
 			continue;
 		}
 
-		DEBUG_PRINT(ACPI_INFO, ("Unregistering driver for device [%02x].\n", device->handle));
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Unregistering driver for device [%02x].\n", device->handle));
 
 		/* Notify driver of device removal. */
-		status = node->driver.notify(BM_NOTIFY_DEVICE_REMOVED, 
+		status = node->driver.notify(BM_NOTIFY_DEVICE_REMOVED,
 			node->device.handle, &(node->driver.context));
 		if (ACPI_SUCCESS(status)) {
 			node->driver.notify = NULL;

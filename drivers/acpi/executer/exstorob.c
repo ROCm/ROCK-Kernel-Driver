@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exstorob - AML Interpreter object store support, store to object
- *              $Revision: 32 $
+ *              $Revision: 37 $
  *
  *****************************************************************************/
 
@@ -51,13 +51,16 @@
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_copy_buffer_to_buffer (
-	ACPI_OPERAND_OBJECT     *source_desc,
-	ACPI_OPERAND_OBJECT     *target_desc)
+	acpi_operand_object     *source_desc,
+	acpi_operand_object     *target_desc)
 {
 	u32                     length;
 	u8                      *buffer;
+
+
+	PROC_NAME ("Ex_copy_buffer_to_buffer");
 
 
 	/*
@@ -71,7 +74,7 @@ acpi_ex_copy_buffer_to_buffer (
 	 * buffer of the proper length
 	 */
 	if (target_desc->buffer.length == 0) {
-		target_desc->buffer.pointer = acpi_ut_allocate (length);
+		target_desc->buffer.pointer = ACPI_MEM_ALLOCATE (length);
 		if (!target_desc->buffer.pointer) {
 			return (AE_NO_MEMORY);
 		}
@@ -86,16 +89,19 @@ acpi_ex_copy_buffer_to_buffer (
 	if (length <= target_desc->buffer.length) {
 		/* Clear existing buffer and copy in the new one */
 
-		MEMSET(target_desc->buffer.pointer, 0, target_desc->buffer.length);
-		MEMCPY(target_desc->buffer.pointer, buffer, length);
+		MEMSET (target_desc->buffer.pointer, 0, target_desc->buffer.length);
+		MEMCPY (target_desc->buffer.pointer, buffer, length);
 	}
 
 	else {
 		/*
 		 * Truncate the source, copy only what will fit
 		 */
-		MEMCPY(target_desc->buffer.pointer, buffer, target_desc->buffer.length);
+		MEMCPY (target_desc->buffer.pointer, buffer, target_desc->buffer.length);
 
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
+			"Truncating src buffer from %X to %X\n",
+			length, target_desc->buffer.length));
 	}
 
 	return (AE_OK);
@@ -115,13 +121,16 @@ acpi_ex_copy_buffer_to_buffer (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_copy_string_to_string (
-	ACPI_OPERAND_OBJECT     *source_desc,
-	ACPI_OPERAND_OBJECT     *target_desc)
+	acpi_operand_object     *source_desc,
+	acpi_operand_object     *target_desc)
 {
 	u32                     length;
 	u8                      *buffer;
+
+
+	FUNCTION_ENTRY ();
 
 
 	/*
@@ -136,8 +145,8 @@ acpi_ex_copy_string_to_string (
 	if (length < target_desc->string.length) {
 		/* Clear old string and copy in the new one */
 
-		MEMSET(target_desc->string.pointer, 0, target_desc->string.length);
-		MEMCPY(target_desc->string.pointer, buffer, length);
+		MEMSET (target_desc->string.pointer, 0, target_desc->string.length);
+		MEMCPY (target_desc->string.pointer, buffer, length);
 	}
 
 	else {
@@ -146,21 +155,20 @@ acpi_ex_copy_string_to_string (
 		 * large enough to hold the value
 		 */
 		if (target_desc->string.pointer &&
-			!acpi_tb_system_table_pointer (target_desc->string.pointer)) {
+		   (!(target_desc->common.flags & AOPOBJ_STATIC_POINTER))) {
 			/*
 			 * Only free if not a pointer into the DSDT
 			 */
-			acpi_ut_free(target_desc->string.pointer);
+			ACPI_MEM_FREE (target_desc->string.pointer);
 		}
 
-		target_desc->string.pointer = acpi_ut_allocate (length + 1);
+		target_desc->string.pointer = ACPI_MEM_ALLOCATE (length + 1);
 		if (!target_desc->string.pointer) {
 			return (AE_NO_MEMORY);
 		}
+
 		target_desc->string.length = length;
-
-
-		MEMCPY(target_desc->string.pointer, buffer, length);
+		MEMCPY (target_desc->string.pointer, buffer, length);
 	}
 
 	return (AE_OK);

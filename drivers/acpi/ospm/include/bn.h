@@ -73,7 +73,7 @@
 typedef struct
 {
 	BM_HANDLE		device_handle;
-	ACPI_HANDLE		acpi_handle;
+	acpi_handle		acpi_handle;
 	u32			type;
 } BN_CONTEXT;
 
@@ -82,38 +82,38 @@ typedef struct
  *                              Function Prototypes
  *****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bn_initialize (void);
 
-ACPI_STATUS
+acpi_status
 bn_terminate (void);
 
-ACPI_STATUS
+acpi_status
 bn_notify_fixed (
 	void			*context);
 
-ACPI_STATUS
+acpi_status
 bn_notify (
 	u32			notify_type,
 	u32			device,
 	void			**context);
 
-ACPI_STATUS
+acpi_status
 bn_request(
 	BM_REQUEST		*request_info,
 	void			*context);
 
 /* Button OSL */
 
-ACPI_STATUS
+acpi_status
 bn_osl_add_device (
 	BN_CONTEXT		*button);
 
-ACPI_STATUS
+acpi_status
 bn_osl_remove_device (
 	BN_CONTEXT		*button);
 
-ACPI_STATUS
+acpi_status
 bn_osl_generate_event (
 	u32			event,
 	BN_CONTEXT		*button);

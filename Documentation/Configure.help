@@ -2578,10 +2578,10 @@ CONFIG_AGP_VIA
   the GLX component for XFree86 3.3.6, which can be downloaded from
   http://utah-glx.sourceforge.net/ .
 
-AMD Irongate support
+AMD Irongate, 761, and 762 support
 CONFIG_AGP_AMD
   This option gives you AGP support for the GLX component of the
-  XFree86 4.x on AMD Irongate and 761 chipsets.
+  XFree86 4.x on AMD Irongate, 761, and 762 chipsets.
 
   For the moment, you should probably say N, unless you want to test
   the GLX component for XFree86 3.3.6, which can be downloaded from
@@ -11571,6 +11571,29 @@ CONFIG_USB_CATC
   inserted in and removed from the running kernel whenever you want).
   The module will be called catc.o. If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt>.
+
+USB Communication Class Ethernet driver
+CONFIG_USB_CDCETHER
+  This driver supports devices conforming to the Communication Device
+  Class Ethernet Control Model.  This is used in some cable modems.
+  For more details on the specification, get the Communication Device
+  Class specification from <http://www.usb.org>.
+
+  This driver should work with the following devices:
+        * Ericsson PipeRider (all variants)
+        * Motorola (DM100 and SB4100)
+        * Broadcom Cable Modem (reference design)
+        * Toshiba PCX1100U and possibly other cable modems
+
+  The device creates a network device (ethX, where X depends on what
+  other networking devices you have in use), as for a normal PCI
+  or ISA based ethernet network card.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called CDCEther.o.  If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt>.
+
 
 USB Kodak DC-2xx Camera support
 CONFIG_USB_DC2XX

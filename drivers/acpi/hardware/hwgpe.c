@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: hwgpe - Low level GPE enable/disable/clear functions
- *              $Revision: 29 $
+ *              $Revision: 32 $
  *
  *****************************************************************************/
 
@@ -49,9 +49,13 @@ void
 acpi_hw_enable_gpe (
 	u32                     gpe_number)
 {
-	u8                      in_byte;
+	u32                     in_byte;
 	u32                     register_index;
-	u8                      bit_mask;
+	u32                     bit_mask;
+
+
+	FUNCTION_ENTRY ();
+
 
 	/*
 	 * Translate GPE number to index into global registers array.
@@ -67,9 +71,10 @@ acpi_hw_enable_gpe (
 	 * Read the current value of the register, set the appropriate bit
 	 * to enable the GPE, and write out the new register.
 	 */
-	in_byte = acpi_os_in8 (acpi_gbl_gpe_registers[register_index].enable_addr);
-	acpi_os_out8 (acpi_gbl_gpe_registers[register_index].enable_addr,
-			 (u8)(in_byte | bit_mask));
+	in_byte = 0;
+	acpi_os_read_port (acpi_gbl_gpe_registers[register_index].enable_addr, &in_byte, 8);
+	acpi_os_write_port (acpi_gbl_gpe_registers[register_index].enable_addr,
+			   (in_byte | bit_mask), 8);
 }
 
 
@@ -89,9 +94,13 @@ void
 acpi_hw_disable_gpe (
 	u32                     gpe_number)
 {
-	u8                      in_byte;
+	u32                     in_byte;
 	u32                     register_index;
-	u8                      bit_mask;
+	u32                     bit_mask;
+
+
+	FUNCTION_ENTRY ();
+
 
 	/*
 	 * Translate GPE number to index into global registers array.
@@ -107,9 +116,10 @@ acpi_hw_disable_gpe (
 	 * Read the current value of the register, clear the appropriate bit,
 	 * and write out the new register value to disable the GPE.
 	 */
-	in_byte = acpi_os_in8 (acpi_gbl_gpe_registers[register_index].enable_addr);
-	acpi_os_out8 (acpi_gbl_gpe_registers[register_index].enable_addr,
-			 (u8)(in_byte & ~bit_mask));
+	in_byte = 0;
+	acpi_os_read_port (acpi_gbl_gpe_registers[register_index].enable_addr, &in_byte, 8);
+	acpi_os_write_port (acpi_gbl_gpe_registers[register_index].enable_addr,
+			 (in_byte & ~bit_mask), 8);
 }
 
 
@@ -130,7 +140,11 @@ acpi_hw_clear_gpe (
 	u32                     gpe_number)
 {
 	u32                     register_index;
-	u8                      bit_mask;
+	u32                     bit_mask;
+
+
+	FUNCTION_ENTRY ();
+
 
 	/*
 	 * Translate GPE number to index into global registers array.
@@ -146,7 +160,7 @@ acpi_hw_clear_gpe (
 	 * Write a one to the appropriate bit in the status register to
 	 * clear this GPE.
 	 */
-	acpi_os_out8 (acpi_gbl_gpe_registers[register_index].status_addr, bit_mask);
+	acpi_os_write_port (acpi_gbl_gpe_registers[register_index].status_addr, bit_mask, 8);
 }
 
 
@@ -165,11 +179,15 @@ acpi_hw_clear_gpe (
 void
 acpi_hw_get_gpe_status (
 	u32                     gpe_number,
-	ACPI_EVENT_STATUS       *event_status)
+	acpi_event_status       *event_status)
 {
-	u8                      in_byte = 0;
+	u32                     in_byte = 0;
 	u32                     register_index = 0;
-	u8                      bit_mask = 0;
+	u32                     bit_mask = 0;
+
+
+	FUNCTION_ENTRY ();
+
 
 	if (!event_status) {
 		return;
@@ -190,8 +208,8 @@ acpi_hw_get_gpe_status (
 	/*
 	 * Enabled?:
 	 */
-	in_byte = acpi_os_in8 (acpi_gbl_gpe_registers[register_index].enable_addr);
-
+	in_byte = 0;
+	acpi_os_read_port (acpi_gbl_gpe_registers[register_index].enable_addr, &in_byte, 8);
 	if (bit_mask & in_byte) {
 		(*event_status) |= ACPI_EVENT_FLAG_ENABLED;
 	}
@@ -199,8 +217,8 @@ acpi_hw_get_gpe_status (
 	/*
 	 * Set?
 	 */
-	in_byte = acpi_os_in8 (acpi_gbl_gpe_registers[register_index].status_addr);
-
+	in_byte = 0;
+	acpi_os_read_port (acpi_gbl_gpe_registers[register_index].status_addr, &in_byte, 8);
 	if (bit_mask & in_byte) {
 		(*event_status) |= ACPI_EVENT_FLAG_SET;
 	}

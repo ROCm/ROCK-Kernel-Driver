@@ -1,7 +1,7 @@
 /****************************************************************************
  *
  * Module Name: tzpolicy.c -
- *   $Revision: 27 $
+ *   $Revision: 28 $
  *
  ****************************************************************************/
 
@@ -59,12 +59,12 @@ tz_policy_run (
  *                              Internal Functions
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 set_performance_limit (
 	BM_HANDLE               device_handle,
 	u32			flag)
 {
-	ACPI_STATUS             status;
+	acpi_status             status;
 	BM_REQUEST              request;
 
 	request.status = AE_OK;
@@ -96,20 +96,23 @@ set_performance_limit (
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 tz_policy_critical(
 	TZ_CONTEXT		*tz)
 {
+	FUNCTION_TRACE("tz_policy_critical");
+
 	if (!tz || !tz->policy.critical.threshold) {
-		return(AE_BAD_PARAMETER);
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
 	if (tz->policy.temperature >=
 		tz->policy.critical.threshold->temperature) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Critical threshold reached - shutting down system.\n"));
 		/* TBD:	Need method for calling 'halt' - OSL function? */
 	}
 
-	return(AE_OK);
+	return_ACPI_STATUS(AE_OK);
 }
 
 
@@ -125,7 +128,7 @@ tz_policy_critical(
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 tz_policy_passive(
 	TZ_CONTEXT		*tz)
 {
@@ -134,8 +137,10 @@ tz_policy_passive(
 	s32			trend = 0;
 	u32			i = 0;
 
+	FUNCTION_TRACE("tz_policy_passive");
+
 	if (!tz || !tz->policy.passive.threshold) {
-		return(AE_BAD_PARAMETER);
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
 	passive = &(tz->policy.passive);
@@ -152,6 +157,11 @@ tz_policy_passive(
 			(tz->policy.temperature - last_temperature) +
 			passive->tc2 *
 			(tz->policy.temperature - passive->threshold->temperature);
+
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "trend[%d] = TC1[%d]*(temp[%d]-last[%d]) + TC2[%d]*(temp[%d]-passive[%d])\n",
+			trend, passive->tc1, tz->policy.temperature,
+			last_temperature, passive->tc2, tz->policy.temperature,
+			passive->threshold->temperature));
 
 		last_temperature = tz->policy.temperature;
 
@@ -183,7 +193,7 @@ tz_policy_passive(
 		}
 	}
 
-	return(AE_OK);
+	return_ACPI_STATUS(AE_OK);
 }
 
 
@@ -199,16 +209,18 @@ tz_policy_passive(
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 tz_policy_active(
 	TZ_CONTEXT              *tz)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 	TZ_THRESHOLD            *active = NULL;
 	u32                     i,j = 0;
 
+	FUNCTION_TRACE("tz_policy_active");
+
 	if (!tz || !tz->policy.active.threshold) {
-		return(AE_BAD_PARAMETER);
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
 	for (i = 0; i < TZ_MAX_ACTIVE_THRESHOLDS; i++) {
@@ -234,8 +246,10 @@ tz_policy_active(
 					ACPI_STATE_D0);
 
 				if (ACPI_SUCCESS(status)) {
+					ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Cooling device [%02x] now ON.\n", active->cooling_devices.handles[j]));
 				}
 				else {
+					ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Unable to turn ON cooling device [%02x].\n", active->cooling_devices.handles[j]));
 				}
 			}
 
@@ -259,8 +273,10 @@ tz_policy_active(
 					ACPI_STATE_D3);
 
 				if (ACPI_SUCCESS(status)) {
+					ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Cooling device [%02x] now OFF.\n", active->cooling_devices.handles[j]));
 				}
 				else {
+					ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Unable to turn OFF cooling device [%02x].\n", active->cooling_devices.handles[j]));
 				}
 			}
 
@@ -268,7 +284,7 @@ tz_policy_active(
 		}
 	}
 
-	return(AE_OK);
+	return_ACPI_STATUS(AE_OK);
 }
 
 
@@ -290,7 +306,7 @@ void
 tz_policy_check (
 	void                    *context)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 	TZ_CONTEXT              *tz = NULL;
 	u32                     previous_temperature = 0;
 	u32                     previous_state = 0;
@@ -298,8 +314,11 @@ tz_policy_check (
 	u32                     i = 0;
 	u32                     sleep_time = 0;
 
+	FUNCTION_TRACE("tz_policy_check");
+
 	if (!context) {
-		return;
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Invalid (NULL) context.\n"));
+		return_VOID;
 	}
 
 	tz = (TZ_CONTEXT*)context;
@@ -317,7 +336,7 @@ tz_policy_check (
 	 */
 	status = tz_get_temperature(tz, &(tz->policy.temperature));
 	if (ACPI_FAILURE(status)) {
-		return;
+		return_VOID;
 	}
 
 	/*
@@ -391,6 +410,10 @@ tz_policy_check (
 		sleep_time = WAIT_FOREVER;
 	}
 
+#ifdef ACPI_DEBUG
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Thermal_zone[%02x]: temperature[%d] state[%08x]\n", tz->device_handle, tz->policy.temperature, tz->policy.state));
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Scheduling next poll in [%d]ms.\n", sleep_time));
+#endif /*ACPI_DEBUG*/
 
 	/*
 	 * Schedule Next Poll:
@@ -415,7 +438,7 @@ tz_policy_check (
 		}
 	}
 
-	return;
+	return_VOID;
 }
 
 
@@ -435,10 +458,13 @@ void
 tz_policy_run (
 	unsigned long           data)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
+
+	FUNCTION_TRACE("tz_policy_run");
 
 	if (!data) {
-		return;
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Invalid (NULL) context.\n"));
+		return_VOID;
 	}
 
 	/*
@@ -449,9 +475,10 @@ tz_policy_run (
 	status = acpi_os_queue_for_execution(OSD_PRIORITY_GPE,
 		tz_policy_check, (void*)data);
 	if (ACPI_FAILURE(status)) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Error invoking thermal policy.\n"));
 	}
 
-	return;
+	return_VOID;
 }
 
 
@@ -467,17 +494,21 @@ tz_policy_run (
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 tz_policy_add_device (
 	TZ_CONTEXT		*tz)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 	TZ_THRESHOLD            *threshold = NULL;
 	u32                     i,j = 0;
 
+	FUNCTION_TRACE("tz_policy_add_device");
+
 	if (!tz) {
-		return(AE_BAD_PARAMETER);
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
+
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Adding policy for thermal zone [%02x].\n", tz->device_handle));
 
 	/*
 	 * Temperature:
@@ -487,7 +518,7 @@ tz_policy_add_device (
 	 */
 	status = tz_get_temperature(tz, &(tz->policy.temperature));
 	if (ACPI_FAILURE(status)) {
-		return(status);
+		return_ACPI_STATUS(status);
 	}
 
 	/*
@@ -511,7 +542,7 @@ tz_policy_add_device (
 	 */
 	status = tz_get_thresholds(tz, &(tz->policy.threshold_list));
 	if (ACPI_FAILURE(status)) {
-		return(status);
+		return_ACPI_STATUS(status);
 	}
 
 	/*
@@ -575,7 +606,7 @@ tz_policy_add_device (
 	}
 
 	if (ACPI_FAILURE(status)) {
-		return(status);
+		return_ACPI_STATUS(status);
 	}
 
 	/*
@@ -592,7 +623,7 @@ tz_policy_add_device (
 	 */
 	tz_policy_check(tz);
 
-	return(status);
+	return_ACPI_STATUS(status);
 }
 
 
@@ -608,15 +639,19 @@ tz_policy_add_device (
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 tz_policy_remove_device(
 	TZ_CONTEXT		*tz)
 {
 	u32			i = 0;
 
+	FUNCTION_TRACE("tz_remove_device");
+
 	if (!tz) {
-		return(AE_BAD_PARAMETER);
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
+
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Removing policy for thermal zone [%02x].\n", tz->device_handle));
 
 	/*
 	 * Delete the thermal zone policy timer entry, if exists.
@@ -636,5 +671,5 @@ tz_policy_remove_device(
 		}
 	}
 
-	return(AE_OK);
+	return_ACPI_STATUS(AE_OK);
 }

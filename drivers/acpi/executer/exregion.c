@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exregion - ACPI default Op_region (address space) handlers
- *              $Revision: 48 $
+ *              $Revision: 58 $
  *
  *****************************************************************************/
 
@@ -55,7 +55,7 @@
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_system_memory_space_handler (
 	u32                     function,
 	ACPI_PHYSICAL_ADDRESS   address,
@@ -64,10 +64,13 @@ acpi_ex_system_memory_space_handler (
 	void                    *handler_context,
 	void                    *region_context)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 	void                    *logical_addr_ptr = NULL;
-	ACPI_MEM_SPACE_CONTEXT  *mem_info = region_context;
+	acpi_mem_space_context  *mem_info = region_context;
 	u32                     length;
+
+
+	FUNCTION_TRACE ("Ex_system_memory_space_handler");
 
 
 	/* Validate and translate the bit width */
@@ -86,7 +89,9 @@ acpi_ex_system_memory_space_handler (
 		break;
 
 	default:
-		return (AE_AML_OPERAND_VALUE);
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Invalid System_memory width %d\n",
+			bit_width));
+		return_ACPI_STATUS (AE_AML_OPERAND_VALUE);
 		break;
 	}
 
@@ -96,15 +101,13 @@ acpi_ex_system_memory_space_handler (
 	 * Is 1) Address below the current mapping? OR
 	 *    2) Address beyond the current mapping?
 	 */
-
 	if ((address < mem_info->mapped_physical_address) ||
-		(((ACPI_INTEGER) address + length) >
-			((ACPI_INTEGER) mem_info->mapped_physical_address + mem_info->mapped_length))) {
+		(((acpi_integer) address + length) >
+			((acpi_integer) mem_info->mapped_physical_address + mem_info->mapped_length))) {
 		/*
 		 * The request cannot be resolved by the current memory mapping;
 		 * Delete the existing mapping and create a new one.
 		 */
-
 		if (mem_info->mapped_length) {
 			/* Valid mapping, delete it */
 
@@ -119,10 +122,10 @@ acpi_ex_system_memory_space_handler (
 		status = acpi_os_map_memory (address, SYSMEM_REGION_WINDOW_SIZE,
 				  (void **) &mem_info->mapped_logical_address);
 		if (ACPI_FAILURE (status)) {
-			return (status);
+			return_ACPI_STATUS (status);
 		}
 
-		/* TBD: should these pointers go to 64-bit in all cases ? */
+		/* Save the physical address and mapping size */
 
 		mem_info->mapped_physical_address = address;
 		mem_info->mapped_length = SYSMEM_REGION_WINDOW_SIZE;
@@ -137,9 +140,13 @@ acpi_ex_system_memory_space_handler (
 	/* TBD: should these pointers go to 64-bit in all cases ? */
 
 	logical_addr_ptr = mem_info->mapped_logical_address +
-			  ((ACPI_INTEGER) address - (ACPI_INTEGER) mem_info->mapped_physical_address);
+			  ((acpi_integer) address - (acpi_integer) mem_info->mapped_physical_address);
 
-	/* Perform the memory read or write */
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
+		"IO %d (%d width) Address=%8.8lX%8.8lX\n", function, bit_width,
+		HIDWORD (address), LODWORD (address)));
+
+   /* Perform the memory read or write */
 
 	switch (function) {
 
@@ -186,7 +193,7 @@ acpi_ex_system_memory_space_handler (
 		break;
 	}
 
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 
@@ -208,7 +215,7 @@ acpi_ex_system_memory_space_handler (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_system_io_space_handler (
 	u32                     function,
 	ACPI_PHYSICAL_ADDRESS   address,
@@ -217,8 +224,15 @@ acpi_ex_system_io_space_handler (
 	void                    *handler_context,
 	void                    *region_context)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 
+
+	FUNCTION_TRACE ("Ex_system_io_space_handler");
+
+
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
+		"IO %d (%d width) Address=%8.8lX%8.8lX\n", function, bit_width,
+		HIDWORD (address), LODWORD (address)));
 
 	/* Decode the function parameter */
 
@@ -226,48 +240,14 @@ acpi_ex_system_io_space_handler (
 
 	case ACPI_READ_ADR_SPACE:
 
-		switch (bit_width) {
-		/* I/O Port width */
-
-		case 8:
-			*value = (u32) acpi_os_in8 ((ACPI_IO_ADDRESS) address);
-			break;
-
-		case 16:
-			*value = (u32) acpi_os_in16 ((ACPI_IO_ADDRESS) address);
-			break;
-
-		case 32:
-			*value = acpi_os_in32 ((ACPI_IO_ADDRESS) address);
-			break;
-
-		default:
-			status = AE_AML_OPERAND_VALUE;
-		}
-
+		*value = 0;
+		status = acpi_os_read_port ((ACPI_IO_ADDRESS) address, value, bit_width);
 		break;
 
 
 	case ACPI_WRITE_ADR_SPACE:
 
-		switch (bit_width) {
-		/* I/O Port width */
-		case 8:
-			acpi_os_out8 ((ACPI_IO_ADDRESS) address, (u8) *value);
-			break;
-
-		case 16:
-			acpi_os_out16 ((ACPI_IO_ADDRESS) address, (u16) *value);
-			break;
-
-		case 32:
-			acpi_os_out32 ((ACPI_IO_ADDRESS) address, *value);
-			break;
-
-		default:
-			status = AE_AML_OPERAND_VALUE;
-		}
-
+		status = acpi_os_write_port ((ACPI_IO_ADDRESS) address, *value, bit_width);
 		break;
 
 
@@ -276,8 +256,9 @@ acpi_ex_system_io_space_handler (
 		break;
 	}
 
-	return (status);
+	return_ACPI_STATUS (status);
 }
+
 
 /*******************************************************************************
  *
@@ -297,7 +278,7 @@ acpi_ex_system_io_space_handler (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_pci_config_space_handler (
 	u32                     function,
 	ACPI_PHYSICAL_ADDRESS   address,
@@ -306,94 +287,46 @@ acpi_ex_pci_config_space_handler (
 	void                    *handler_context,
 	void                    *region_context)
 {
-	ACPI_STATUS             status = AE_OK;
-	u32                     pci_bus;
-	u32                     dev_func;
-	u8                      pci_reg;
-	ACPI_PCI_SPACE_CONTEXT  *PCIcontext;
+	acpi_status             status = AE_OK;
+	acpi_pci_id             *pci_id;
+	u16                     pci_register;
+
+
+	FUNCTION_TRACE ("Ex_pci_config_space_handler");
 
 
 	/*
 	 *  The arguments to Acpi_os(Read|Write)Pci_cfg(Byte|Word|Dword) are:
 	 *
-	 *  Seg_bus - 0xSSSSBBBB    - SSSS is the PCI bus segment
-	 *                            BBBB is the PCI bus number
+	 *  Pci_segment is the PCI bus segment range 0-31
+	 *  Pci_bus     is the PCI bus number range 0-255
+	 *  Pci_device  is the PCI device number range 0-31
+	 *  Pci_function is the PCI device function number
+	 *  Pci_register is the Config space register range 0-255 bytes
 	 *
-	 *  Dev_func - 0xDDDDFFFF   - DDDD is the PCI device number
-	 *                            FFFF is the PCI device function number
-	 *
-	 *  Reg_num - Config space register must be < 40h
-	 *
-	 *  Value - input value for write, output for read
+	 *  Value - input value for write, output address for read
 	 *
 	 */
+	pci_id      = (acpi_pci_id *) region_context;
+	pci_register = (u16) address;
 
-	PCIcontext = (ACPI_PCI_SPACE_CONTEXT *) region_context;
-
-	pci_bus = LOWORD (PCIcontext->seg) << 16;
-	pci_bus |= LOWORD (PCIcontext->bus);
-
-	dev_func = PCIcontext->dev_func;
-
-	pci_reg = (u8) address;
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
+		"IO %d (%d) Seg(%04x) Bus(%04x) Dev(%04x) Func(%04x) Reg(%04x)\n",
+		function, bit_width, pci_id->segment, pci_id->bus, pci_id->device,
+		pci_id->function, pci_register));
 
 	switch (function) {
 
 	case ACPI_READ_ADR_SPACE:
 
-		*value  = 0;
-
-		switch (bit_width) {
-		/* PCI Register width */
-
-		case 8:
-			status = acpi_os_read_pci_cfg_byte (pci_bus, dev_func, pci_reg,
-					   (u8 *) value);
-			break;
-
-		case 16:
-			status = acpi_os_read_pci_cfg_word (pci_bus, dev_func, pci_reg,
-					   (u16 *) value);
-			break;
-
-		case 32:
-			status = acpi_os_read_pci_cfg_dword (pci_bus, dev_func, pci_reg,
-					   value);
-			break;
-
-		default:
-			status = AE_AML_OPERAND_VALUE;
-
-		} /* Switch bit_width */
-
+		*value = 0;
+		status = acpi_os_read_pci_configuration (pci_id, pci_register, value, bit_width);
 		break;
 
 
 	case ACPI_WRITE_ADR_SPACE:
 
-		switch (bit_width) {
-		/* PCI Register width */
-
-		case 8:
-			status = acpi_os_write_pci_cfg_byte (pci_bus, dev_func, pci_reg,
-					 *(u8 *) value);
-			break;
-
-		case 16:
-			status = acpi_os_write_pci_cfg_word (pci_bus, dev_func, pci_reg,
-					 *(u16 *) value);
-			break;
-
-		case 32:
-			status = acpi_os_write_pci_cfg_dword (pci_bus, dev_func, pci_reg,
-					 *value);
-			break;
-
-		default:
-			status = AE_AML_OPERAND_VALUE;
-
-		} /* Switch bit_width */
-
+		status = acpi_os_write_pci_configuration (pci_id, pci_register, *value, bit_width);
 		break;
 
 
@@ -401,9 +334,8 @@ acpi_ex_pci_config_space_handler (
 
 		status = AE_BAD_PARAMETER;
 		break;
-
 	}
 
-	return (status);
+	return_ACPI_STATUS (status);
 }
 

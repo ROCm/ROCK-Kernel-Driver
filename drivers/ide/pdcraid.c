@@ -321,7 +321,6 @@ static void __init probedisk(int major, int minor,int device)
 				if (gd!=NULL) {
 					for (j=1+(minor<<gd->minor_shift);j<((minor+1)<<gd->minor_shift);j++) 
 						gd->part[j].nr_sects=0;					
-					put_gendisk(gd);
 				}
 			}
 			raid[device].disk[i].device = MKDEV(major,minor);

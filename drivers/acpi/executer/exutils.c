@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exutils - interpreter/scanner utilities
- *              $Revision: 79 $
+ *              $Revision: 84 $
  *
  *****************************************************************************/
 
@@ -25,12 +25,29 @@
  */
 
 
+/*
+ * DEFINE_AML_GLOBALS is tested in amlcode.h
+ * to determine whether certain global names should be "defined" or only
+ * "declared" in the current compilation.  This enhances maintainability
+ * by enabling a single header file to embody all knowledge of the names
+ * in question.
+ *
+ * Exactly one module of any executable should #define DEFINE_GLOBALS
+ * before #including the header files which use this convention.  The
+ * names in question will be defined and initialized in that module,
+ * and declared as extern in all other modules which #include those
+ * header files.
+ */
+
+#define DEFINE_AML_GLOBALS
+
 #include "acpi.h"
 #include "acparser.h"
 #include "acinterp.h"
 #include "amlcode.h"
 #include "acnamesp.h"
 #include "acevents.h"
+#include "acparser.h"
 
 #define _COMPONENT          ACPI_EXECUTER
 	 MODULE_NAME         ("exutils")
@@ -47,14 +64,16 @@
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_enter_interpreter (void)
 {
-	ACPI_STATUS             status;
+	acpi_status             status;
+
+	FUNCTION_TRACE ("Ex_enter_interpreter");
 
 
 	status = acpi_ut_acquire_mutex (ACPI_MTX_EXECUTE);
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 
@@ -83,10 +102,12 @@ acpi_ex_enter_interpreter (void)
 void
 acpi_ex_exit_interpreter (void)
 {
+	FUNCTION_TRACE ("Ex_exit_interpreter");
+
 
 	acpi_ut_release_mutex (ACPI_MTX_EXECUTE);
 
-	return;
+	return_VOID;
 }
 
 
@@ -102,8 +123,11 @@ acpi_ex_exit_interpreter (void)
 
 u8
 acpi_ex_validate_object_type (
-	ACPI_OBJECT_TYPE        type)
+	acpi_object_type        type)
 {
+
+	FUNCTION_ENTRY ();
+
 
 	if ((type > ACPI_TYPE_MAX && type < INTERNAL_TYPE_BEGIN) ||
 		(type > INTERNAL_TYPE_MAX)) {
@@ -131,15 +155,17 @@ acpi_ex_validate_object_type (
 
 void
 acpi_ex_truncate_for32bit_table (
-	ACPI_OPERAND_OBJECT     *obj_desc,
-	ACPI_WALK_STATE         *walk_state)
+	acpi_operand_object     *obj_desc,
+	acpi_walk_state         *walk_state)
 {
+
+	FUNCTION_ENTRY ();
+
 
 	/*
 	 * Object must be a valid number and we must be executing
 	 * a control method
 	 */
-
 	if ((!obj_desc) ||
 		(obj_desc->common.type != ACPI_TYPE_INTEGER) ||
 		(!walk_state->method_node)) {
@@ -151,7 +177,7 @@ acpi_ex_truncate_for32bit_table (
 		 * We are running a method that exists in a 32-bit ACPI table.
 		 * Truncate the value to 32 bits by zeroing out the upper 32-bit field
 		 */
-		obj_desc->integer.value &= (ACPI_INTEGER) ACPI_UINT32_MAX;
+		obj_desc->integer.value &= (acpi_integer) ACPI_UINT32_MAX;
 	}
 }
 
@@ -175,7 +201,10 @@ acpi_ex_acquire_global_lock (
 	u32                     rule)
 {
 	u8                      locked = FALSE;
-	ACPI_STATUS             status;
+	acpi_status             status;
+
+
+	FUNCTION_TRACE ("Ex_acquire_global_lock");
 
 
 	/* Only attempt lock if the Rule says so */
@@ -188,9 +217,13 @@ acpi_ex_acquire_global_lock (
 			locked = TRUE;
 		}
 
+		else {
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Could not acquire Global Lock, %s\n",
+				acpi_format_exception (status)));
+		}
 	}
 
-	return (locked);
+	return_VALUE (locked);
 }
 
 
@@ -207,10 +240,12 @@ acpi_ex_acquire_global_lock (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_release_global_lock (
 	u8                      locked_by_me)
 {
+
+	FUNCTION_TRACE ("Ex_release_global_lock");
 
 
 	/* Only attempt unlock if the caller locked it */
@@ -222,7 +257,7 @@ acpi_ex_release_global_lock (
 	}
 
 
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -239,10 +274,13 @@ acpi_ex_release_global_lock (
 
 u32
 acpi_ex_digits_needed (
-	ACPI_INTEGER            val,
+	acpi_integer            val,
 	u32                     base)
 {
 	u32                     num_digits = 0;
+
+
+	FUNCTION_TRACE ("Ex_digits_needed");
 
 
 	if (base < 1) {
@@ -251,12 +289,12 @@ acpi_ex_digits_needed (
 
 	else {
 		/*
-		 * ACPI_INTEGER is unsigned, which is why we don't worry about the '-'
+		 * acpi_integer is unsigned, which is why we don't worry about the '-'
 		 */
 		for (num_digits = 1; (val = ACPI_DIVIDE (val,base)); ++num_digits) { ; }
 	}
 
-	return (num_digits);
+	return_VALUE (num_digits);
 }
 
 
@@ -285,6 +323,9 @@ _ntohl (
 	} in;
 
 
+	FUNCTION_ENTRY ();
+
+
 	in.value = value;
 
 	out.bytes[0] = in.bytes[3];
@@ -307,12 +348,16 @@ _ntohl (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_eisa_id_to_string (
 	u32                     numeric_id,
 	NATIVE_CHAR             *out_string)
 {
 	u32                     id;
+
+
+	FUNCTION_ENTRY ();
+
 
 	/* swap to big-endian to get contiguous bits */
 
@@ -321,10 +366,10 @@ acpi_ex_eisa_id_to_string (
 	out_string[0] = (char) ('@' + ((id >> 26) & 0x1f));
 	out_string[1] = (char) ('@' + ((id >> 21) & 0x1f));
 	out_string[2] = (char) ('@' + ((id >> 16) & 0x1f));
-	out_string[3] = acpi_gbl_hex_to_ascii[(id >> 12) & 0xf];
-	out_string[4] = acpi_gbl_hex_to_ascii[(id >> 8) & 0xf];
-	out_string[5] = acpi_gbl_hex_to_ascii[(id >> 4) & 0xf];
-	out_string[6] = acpi_gbl_hex_to_ascii[id & 0xf];
+	out_string[3] = acpi_ut_hex_to_ascii_char (id, 12);
+	out_string[4] = acpi_ut_hex_to_ascii_char (id, 8);
+	out_string[5] = acpi_ut_hex_to_ascii_char (id, 4);
+	out_string[6] = acpi_ut_hex_to_ascii_char (id, 0);
 	out_string[7] = 0;
 
 	return (AE_OK);
@@ -342,17 +387,19 @@ acpi_ex_eisa_id_to_string (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_unsigned_integer_to_string (
-	ACPI_INTEGER            value,
+	acpi_integer            value,
 	NATIVE_CHAR             *out_string)
 {
 	u32                     count;
 	u32                     digits_needed;
 
 
-	digits_needed = acpi_ex_digits_needed (value, 10);
+	FUNCTION_ENTRY ();
 
+
+	digits_needed = acpi_ex_digits_needed (value, 10);
 	out_string[digits_needed] = '\0';
 
 	for (count = digits_needed; count > 0; count--) {

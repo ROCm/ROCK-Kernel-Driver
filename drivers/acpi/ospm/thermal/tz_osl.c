@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tz_osl.c
- *   $Revision: 18 $
+ *   $Revision: 21 $
  *
  *****************************************************************************/
 
@@ -51,18 +51,18 @@ static struct proc_dir_entry	*tz_proc_root = NULL;
 
 
 /****************************************************************************
- * 
+ *
  * FUNCTION:	tz_osl_proc_read_info
  *
  ****************************************************************************/
 
 static int
 tz_osl_proc_read_info (
-	char			*page, 
-	char			**start, 
-	off_t			off, 
-	int 			count, 
-	int 			*eof, 
+	char			*page,
+	char			**start,
+	off_t			off,
+	int 			count,
+	int 			*eof,
 	void			*context)
 {
 	TZ_CONTEXT		*thermal_zone = NULL;
@@ -90,18 +90,18 @@ end:
 
 
 /****************************************************************************
- * 
+ *
  * FUNCTION:	tz_osl_proc_read_status
  *
  ****************************************************************************/
 
 static int
 tz_osl_proc_read_status (
-	char			*page, 
-	char			**start, 
-	off_t			off, 
-	int 			count, 
-	int 			*eof, 
+	char			*page,
+	char			**start,
+	off_t			off,
+	int 			count,
+	int 			*eof,
 	void			*context)
 {
 	TZ_CONTEXT		*thermal_zone = NULL;
@@ -114,7 +114,7 @@ tz_osl_proc_read_status (
 
 	thermal_zone = (TZ_CONTEXT*)context;
 
-	p += sprintf(p, "Temperature:             %d (1/10th degrees Kelvin)\n", 
+	p += sprintf(p, "Temperature:             %d (1/10th degrees Kelvin)\n",
 		thermal_zone->policy.temperature);
 
 	p += sprintf(p, "State:                   ");
@@ -173,7 +173,7 @@ end:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 tz_osl_add_device(
 	TZ_CONTEXT		*thermal_zone)
 {
@@ -190,10 +190,10 @@ tz_osl_add_device(
 		return(AE_ERROR);
 	}
 
-	create_proc_read_entry(TZ_PROC_STATUS, S_IFREG | S_IRUGO, 
+	create_proc_read_entry(TZ_PROC_STATUS, S_IFREG | S_IRUGO,
 		proc_entry, tz_osl_proc_read_status, (void*)thermal_zone);
 
-	create_proc_read_entry(TZ_PROC_INFO, S_IFREG | S_IRUGO, 
+	create_proc_read_entry(TZ_PROC_INFO, S_IFREG | S_IRUGO,
 		proc_entry, tz_osl_proc_read_info, (void*)thermal_zone);
 
 	return(AE_OK);
@@ -206,7 +206,7 @@ tz_osl_add_device(
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 tz_osl_remove_device (
 	TZ_CONTEXT		*thermal_zone)
 {
@@ -235,12 +235,12 @@ tz_osl_remove_device (
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 tz_osl_generate_event (
 	u32			event,
 	TZ_CONTEXT		*thermal_zone)
 {
-	ACPI_STATUS		status = AE_OK;
+	acpi_status		status = AE_OK;
 
 	if (!thermal_zone) {
 		return(AE_BAD_PARAMETER);
@@ -249,14 +249,14 @@ tz_osl_generate_event (
 	switch (event) {
 
 	case TZ_NOTIFY_TEMPERATURE_CHANGE:
-		status = bm_osl_generate_event(thermal_zone->device_handle, 
-			TZ_PROC_ROOT, thermal_zone->uid, event, 
+		status = bm_osl_generate_event(thermal_zone->device_handle,
+			TZ_PROC_ROOT, thermal_zone->uid, event,
 			thermal_zone->policy.temperature);
 		break;
 
 	case TZ_NOTIFY_THRESHOLD_CHANGE:
 	case TZ_NOTIFY_DEVICE_LISTS_CHANGE:
-		status = bm_osl_generate_event(thermal_zone->device_handle, 
+		status = bm_osl_generate_event(thermal_zone->device_handle,
 			TZ_PROC_ROOT, thermal_zone->uid, event, 0);
 		break;
 
@@ -281,10 +281,14 @@ tz_osl_generate_event (
  *
  ****************************************************************************/
 
-static int __init 
+static int __init
 tz_osl_init (void)
 {
-	ACPI_STATUS		status = AE_OK;
+	acpi_status		status = AE_OK;
+
+	/* abort if no busmgr */
+	if (!bm_proc_root)
+		return -ENODEV;
 
 	tz_proc_root = proc_mkdir(TZ_PROC_ROOT, bm_proc_root);
 	if (!tz_proc_root) {
@@ -314,7 +318,7 @@ tz_osl_init (void)
  *
  ****************************************************************************/
 
-static void __exit 
+static void __exit
 tz_osl_cleanup (void)
 {
 	tz_terminate();

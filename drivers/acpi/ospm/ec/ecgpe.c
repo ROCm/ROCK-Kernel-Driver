@@ -1,7 +1,7 @@
 /*****************************************************************************
  *
  * Module Name: ecgpe.c
- *   $Revision: 26 $
+ *   $Revision: 28 $
  *
  *****************************************************************************/
 
@@ -52,8 +52,11 @@ ec_query_handler (
 	const char		hex[] = {'0','1','2','3','4','5','6','7','8',
 					'9','A','B','C','D','E','F'};
 
+	FUNCTION_TRACE("ec_query_handler");
+
 	if (!ec) {
-		return;
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Invalid (NULL) context.\n"));
+		return_VOID;
 	}
 
 	/*
@@ -65,9 +68,11 @@ ec_query_handler (
 	object_name[2] = hex[((ec->query_data >> 4) & 0x0F)];
 	object_name[3] = hex[(ec->query_data & 0x0F)];
 
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Evaluating [%s] for ec [%02x].\n", object_name, ec->device_handle));
+
 	bm_evaluate_object(ec->acpi_handle, object_name, NULL, NULL);
 
-	return;
+	return_VOID;
 }
 
 
@@ -87,12 +92,15 @@ void
 ec_gpe_handler (
 	void                    *context)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 	EC_CONTEXT              *ec = (EC_CONTEXT*)context;
 	EC_STATUS               ec_status = 0;
 
+	FUNCTION_TRACE("ec_gpe_handler");
+
 	if (!ec) {
-		return;
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Invalid (NULL) context.\n"));
+		return_VOID;
 	}
 
 	/* TBD: synchronize w/ transaction (ectransx). */
@@ -103,10 +111,12 @@ ec_gpe_handler (
 	 * Check the EC_SCI bit to see if this is an EC_SCI event.  If not (e.g.
 	 * OBF/IBE) just return, as we already poll to detect these events.
 	 */
-	ec_status = acpi_os_in8(ec->status_port);
+	acpi_os_read_port(ec->status_port, &ec_status, 8);
 	if (!(ec_status & EC_FLAG_SCI)) {
-		return;
+		return_VOID;
 	}
+
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "EC_SCI event detected on ec [%02x] - running query.\n", ec->device_handle));
 
 	/*
 	 * Run Query:
@@ -118,13 +128,15 @@ ec_gpe_handler (
 	status = ec_io_write(ec, ec->command_port, EC_COMMAND_QUERY,
 		EC_EVENT_OUTPUT_BUFFER_FULL);
 	if (ACPI_FAILURE(status)) {
-		return;
+		ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Unable to send 'query command' to EC.\n"));
+		return_VOID;
 	}
 
 	status = ec_io_read(ec, ec->data_port, &(ec->query_data),
 		EC_EVENT_NONE);
 	if (ACPI_FAILURE(status)) {
-		return;
+		ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Error reading query data.\n"));
+		return_VOID;
 	}
 
 	/* TBD: un-synchronize w/ transaction (ectransx). */
@@ -134,7 +146,8 @@ ec_gpe_handler (
 	 * ----------------
 	 */
 	if (!ec->query_data) {
-		return;
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Spurious EC SCI detected.\n"));
+		return_VOID;
 	}
 
 	/*
@@ -145,10 +158,11 @@ ec_gpe_handler (
 	status = acpi_os_queue_for_execution(OSD_PRIORITY_GPE,
 		ec_query_handler, ec);
 	if (ACPI_FAILURE(status)) {
-		return;
+		ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Unable to defer _Qxx method evaluation.\n"));
+		return_VOID;
 	}
 
-	return;
+	return_VOID;
 }
 
 
@@ -164,14 +178,16 @@ ec_gpe_handler (
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 ec_install_gpe_handler (
 	EC_CONTEXT              *ec)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
+
+	FUNCTION_TRACE("ec_install_gpe_handler");
 
 	if (!ec) {
-		return(AE_BAD_PARAMETER);
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
 	/*
@@ -183,7 +199,7 @@ ec_install_gpe_handler (
 	status = bm_evaluate_simple_integer(ec->acpi_handle,
 		"_GPE", &(ec->gpe_bit));
 	if (ACPI_FAILURE(status)) {
-		return(status);
+		return_ACPI_STATUS(status);
 	}
 
 	/*
@@ -194,11 +210,12 @@ ec_install_gpe_handler (
 	status = acpi_install_gpe_handler(ec->gpe_bit, ACPI_EVENT_EDGE_TRIGGERED,
 		&ec_gpe_handler, ec);
 	if (ACPI_FAILURE(status)) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "acpi_install_gpe_handler() failed for GPE bit [%02x] with status [%08x].\n", ec->gpe_bit, status));
 		ec->gpe_bit = EC_GPE_UNKNOWN;
-		return(status);
+		return_ACPI_STATUS(status);
 	}
 
-	return(status);
+	return_ACPI_STATUS(status);
 }
 
 
@@ -214,17 +231,19 @@ ec_install_gpe_handler (
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 ec_remove_gpe_handler (
 	EC_CONTEXT              *ec)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
+
+	FUNCTION_TRACE("ec_remove_gpe_handler");
 
 	if (!ec) {
-		return(AE_BAD_PARAMETER);
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
 	status = acpi_remove_gpe_handler(ec->gpe_bit, &ec_gpe_handler);
 
-	return(status);
+	return_ACPI_STATUS(status);
 }

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dsmethod - Parser/Interpreter interface - control method parsing
- *              $Revision: 63 $
+ *              $Revision: 65 $
  *
  *****************************************************************************/
 
@@ -56,30 +56,36 @@
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ds_parse_method (
-	ACPI_HANDLE             obj_handle)
+	acpi_handle             obj_handle)
 {
-	ACPI_STATUS             status;
-	ACPI_OPERAND_OBJECT     *obj_desc;
-	ACPI_PARSE_OBJECT       *op;
-	ACPI_NAMESPACE_NODE     *node;
-	ACPI_OWNER_ID           owner_id;
+	acpi_status             status;
+	acpi_operand_object     *obj_desc;
+	acpi_parse_object       *op;
+	acpi_namespace_node     *node;
+	acpi_owner_id           owner_id;
+
+
+	FUNCTION_TRACE_PTR ("Ds_parse_method", obj_handle);
 
 
 	/* Parameter Validation */
 
 	if (!obj_handle) {
-		return (AE_NULL_ENTRY);
+		return_ACPI_STATUS (AE_NULL_ENTRY);
 	}
+
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "**** Parsing [%4.4s] **** Named_obj=%p\n",
+		&((acpi_namespace_node *)obj_handle)->name, obj_handle));
 
 
 	/* Extract the method object from the method Node */
 
-	node = (ACPI_NAMESPACE_NODE *) obj_handle;
+	node = (acpi_namespace_node *) obj_handle;
 	obj_desc = node->object;
 	if (!obj_desc) {
-		return (AE_NULL_OBJECT);
+		return_ACPI_STATUS (AE_NULL_OBJECT);
 	}
 
 	 /* Create a mutex for the method if there is a concurrency limit */
@@ -90,7 +96,7 @@ acpi_ds_parse_method (
 				   obj_desc->method.concurrency,
 				   &obj_desc->method.semaphore);
 		if (ACPI_FAILURE (status)) {
-			return (status);
+			return_ACPI_STATUS (status);
 		}
 	}
 
@@ -100,7 +106,7 @@ acpi_ds_parse_method (
 	 */
 	op = acpi_ps_alloc_op (AML_METHOD_OP);
 	if (!op) {
-		return (AE_NO_MEMORY);
+		return_ACPI_STATUS (AE_NO_MEMORY);
 	}
 
 	/* Init new op with the method name and pointer back to the Node */
@@ -126,7 +132,7 @@ acpi_ds_parse_method (
 			   acpi_ds_load1_begin_op, acpi_ds_load1_end_op);
 
 	if (ACPI_FAILURE (status)) {
-		return (status);
+		return_ACPI_STATUS (status);
 	}
 
 	/* Get a new Owner_id for objects created by this method */
@@ -134,12 +140,15 @@ acpi_ds_parse_method (
 	owner_id = acpi_ut_allocate_owner_id (OWNER_TYPE_METHOD);
 	obj_desc->method.owning_id = owner_id;
 
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "**** [%4.4s] Parsed **** Named_obj=%p Op=%p\n",
+		&((acpi_namespace_node *)obj_handle)->name, obj_handle, op));
+
 	/* Install the parsed tree in the method object */
 	/* TBD: [Restructure] Obsolete field? */
 
 	acpi_ps_delete_parse_tree (op);
 
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 
@@ -161,17 +170,20 @@ acpi_ds_parse_method (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ds_begin_method_execution (
-	ACPI_NAMESPACE_NODE     *method_node,
-	ACPI_OPERAND_OBJECT     *obj_desc,
-	ACPI_NAMESPACE_NODE     *calling_method_node)
+	acpi_namespace_node     *method_node,
+	acpi_operand_object     *obj_desc,
+	acpi_namespace_node     *calling_method_node)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
+
+
+	FUNCTION_TRACE_PTR ("Ds_begin_method_execution", method_node);
 
 
 	if (!method_node) {
-		return (AE_NULL_ENTRY);
+		return_ACPI_STATUS (AE_NULL_ENTRY);
 	}
 
 
@@ -190,7 +202,7 @@ acpi_ds_begin_method_execution (
 		 */
 		if (method_node == calling_method_node) {
 			if (obj_desc->method.thread_count >= obj_desc->method.concurrency) {
-				return (AE_AML_METHOD_LIMIT);
+				return_ACPI_STATUS (AE_AML_METHOD_LIMIT);
 			}
 		}
 
@@ -209,7 +221,7 @@ acpi_ds_begin_method_execution (
 	 */
 	obj_desc->method.thread_count++;
 
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 
@@ -226,31 +238,36 @@ acpi_ds_begin_method_execution (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ds_call_control_method (
-	ACPI_WALK_LIST          *walk_list,
-	ACPI_WALK_STATE         *this_walk_state,
-	ACPI_PARSE_OBJECT       *op)
+	acpi_walk_list          *walk_list,
+	acpi_walk_state         *this_walk_state,
+	acpi_parse_object       *op)
 {
-	ACPI_STATUS             status;
-	ACPI_NAMESPACE_NODE     *method_node;
-	ACPI_OPERAND_OBJECT     *obj_desc;
-	ACPI_WALK_STATE         *next_walk_state;
-	ACPI_PARSE_STATE        *parser_state;
+	acpi_status             status;
+	acpi_namespace_node     *method_node;
+	acpi_operand_object     *obj_desc;
+	acpi_walk_state         *next_walk_state;
+	acpi_parse_state        *parser_state;
 	u32                     i;
 
+
+	FUNCTION_TRACE_PTR ("Ds_call_control_method", this_walk_state);
+
+	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH, "Execute method %p, currentstate=%p\n",
+		this_walk_state->prev_op, this_walk_state));
 
 	/*
 	 * Get the namespace entry for the control method we are about to call
 	 */
 	method_node = this_walk_state->method_call_node;
 	if (!method_node) {
-		return (AE_NULL_ENTRY);
+		return_ACPI_STATUS (AE_NULL_ENTRY);
 	}
 
 	obj_desc = acpi_ns_get_attached_object (method_node);
 	if (!obj_desc) {
-		return (AE_NULL_OBJECT);
+		return_ACPI_STATUS (AE_NULL_OBJECT);
 	}
 
 
@@ -259,7 +276,7 @@ acpi_ds_call_control_method (
 	status = acpi_ds_begin_method_execution (method_node, obj_desc,
 			  this_walk_state->method_node);
 	if (ACPI_FAILURE (status)) {
-		return (status);
+		return_ACPI_STATUS (status);
 	}
 
 	/* Create and initialize a new parser state */
@@ -267,7 +284,7 @@ acpi_ds_call_control_method (
 	parser_state = acpi_ps_create_state (obj_desc->method.pcode,
 			   obj_desc->method.pcode_length);
 	if (!parser_state) {
-		return (AE_NO_MEMORY);
+		return_ACPI_STATUS (AE_NO_MEMORY);
 	}
 
 	acpi_ps_init_scope (parser_state, NULL);
@@ -281,7 +298,7 @@ acpi_ds_call_control_method (
 	if (!next_walk_state) {
 		/* TBD: delete parser state */
 
-		return (AE_NO_MEMORY);
+		return_ACPI_STATUS (AE_NO_MEMORY);
 	}
 
 	next_walk_state->walk_type          = WALK_METHOD;
@@ -323,7 +340,7 @@ acpi_ds_call_control_method (
 
 	op = acpi_ps_alloc_op (AML_SCOPE_OP);
 	if (!op) {
-		return (AE_NO_MEMORY);
+		return_ACPI_STATUS (AE_NO_MEMORY);
 	}
 
 	status = acpi_ps_parse_aml (op, obj_desc->method.pcode,
@@ -348,7 +365,10 @@ acpi_ds_call_control_method (
 	this_walk_state->num_operands = 0;
 
 
-	return (AE_OK);
+	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH, "Starting nested execution, newstate=%p\n",
+		next_walk_state));
+
+	return_ACPI_STATUS (AE_OK);
 
 
 	/* On error, we must delete the new walk state */
@@ -356,7 +376,7 @@ acpi_ds_call_control_method (
 cleanup:
 	acpi_ds_terminate_control_method (next_walk_state);
 	acpi_ds_delete_walk_state (next_walk_state);
-	return (status);
+	return_ACPI_STATUS (status);
 
 }
 
@@ -374,12 +394,15 @@ cleanup:
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ds_restart_control_method (
-	ACPI_WALK_STATE         *walk_state,
-	ACPI_OPERAND_OBJECT     *return_desc)
+	acpi_walk_state         *walk_state,
+	acpi_operand_object     *return_desc)
 {
-	ACPI_STATUS             status;
+	acpi_status             status;
+
+
+	FUNCTION_TRACE_PTR ("Ds_restart_control_method", walk_state);
 
 
 	if (return_desc) {
@@ -391,7 +414,7 @@ acpi_ds_restart_control_method (
 			status = acpi_ds_result_push (return_desc, walk_state);
 			if (ACPI_FAILURE (status)) {
 				acpi_ut_remove_reference (return_desc);
-				return (status);
+				return_ACPI_STATUS (status);
 			}
 		}
 
@@ -405,8 +428,13 @@ acpi_ds_restart_control_method (
 
 	}
 
+	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
+		"Method=%p Return=%p Return_used?=%X Res_stack=%p State=%p\n",
+		walk_state->method_call_op, return_desc, walk_state->return_used,
+		walk_state->results, walk_state));
 
-	return (AE_OK);
+
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -424,19 +452,22 @@ acpi_ds_restart_control_method (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ds_terminate_control_method (
-	ACPI_WALK_STATE         *walk_state)
+	acpi_walk_state         *walk_state)
 {
-	ACPI_OPERAND_OBJECT     *obj_desc;
-	ACPI_NAMESPACE_NODE     *method_node;
+	acpi_operand_object     *obj_desc;
+	acpi_namespace_node     *method_node;
+
+
+	FUNCTION_TRACE_PTR ("Ds_terminate_control_method", walk_state);
 
 
 	/* The method object should be stored in the walk state */
 
 	obj_desc = walk_state->method_desc;
 	if (!obj_desc) {
-		return (AE_OK);
+		return_ACPI_STATUS (AE_OK);
 	}
 
 	/* Delete all arguments and locals */
@@ -488,7 +519,7 @@ acpi_ds_terminate_control_method (
 	}
 
 	acpi_ut_release_mutex (ACPI_MTX_PARSER);
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 

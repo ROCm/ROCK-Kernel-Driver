@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acdebug.h - ACPI/AML debugger
- *       $Revision: 44 $
+ *       $Revision: 47 $
  *
  *****************************************************************************/
 
@@ -38,50 +38,44 @@ extern NATIVE_CHAR              *optarg;
 extern u8                       *aml_ptr;
 extern u32                      aml_length;
 
-extern u8                       opt_tables;
-extern u8                       opt_disasm;
-extern u8                       opt_stats;
-extern u8                       opt_parse_jit;
-extern u8                       opt_verbose;
-extern u8                       opt_ini_methods;
+extern u8                       acpi_gbl_db_opt_tables;
+extern u8                       acpi_gbl_db_opt_disasm;
+extern u8                       acpi_gbl_db_opt_stats;
+extern u8                       acpi_gbl_db_opt_parse_jit;
+extern u8                       acpi_gbl_db_opt_verbose;
+extern u8                       acpi_gbl_db_opt_ini_methods;
 
 
-extern NATIVE_CHAR              *args[DB_MAX_ARGS];
-extern NATIVE_CHAR              line_buf[80];
-extern NATIVE_CHAR              scope_buf[40];
-extern NATIVE_CHAR              debug_filename[40];
-extern u8                       output_to_file;
-extern NATIVE_CHAR              *buffer;
-extern NATIVE_CHAR              *filename;
-extern NATIVE_CHAR              *INDENT_STRING;
+extern NATIVE_CHAR              *acpi_gbl_db_args[DB_MAX_ARGS];
+extern NATIVE_CHAR              acpi_gbl_db_line_buf[80];
+extern NATIVE_CHAR              acpi_gbl_db_scope_buf[40];
+extern NATIVE_CHAR              acpi_gbl_db_debug_filename[40];
+extern u8                       acpi_gbl_db_output_to_file;
+extern NATIVE_CHAR              *acpi_gbl_db_buffer;
+extern NATIVE_CHAR              *acpi_gbl_db_filename;
+extern NATIVE_CHAR              *acpi_gbl_db_disasm_indent;
 extern u8                       acpi_gbl_db_output_flags;
 extern u32                      acpi_gbl_db_debug_level;
 extern u32                      acpi_gbl_db_console_debug_level;
 
-extern u32                      num_names;
-extern u32                      num_methods;
-extern u32                      num_regions;
-extern u32                      num_packages;
-extern u32                      num_aliases;
-extern u32                      num_devices;
-extern u32                      num_field_defs;
-extern u32                      num_thermal_zones;
-extern u32                      num_nodes;
-extern u32                      num_grammar_elements;
-extern u32                      num_method_elements ;
-extern u32                      num_mutexes;
-extern u32                      num_power_resources;
-extern u32                      num_bank_fields ;
-extern u32                      num_index_fields;
-extern u32                      num_events;
-
-extern u32                      size_of_parse_tree;
-extern u32                      size_of_method_trees;
-extern u32                      size_of_nTes;
-extern u32                      size_of_acpi_objects;
+/*
+ * Statistic globals
+ */
+extern u16                      acpi_gbl_obj_type_count[INTERNAL_TYPE_NODE_MAX+1];
+extern u16                      acpi_gbl_node_type_count[INTERNAL_TYPE_NODE_MAX+1];
+extern u16                      acpi_gbl_obj_type_count_misc;
+extern u16                      acpi_gbl_node_type_count_misc;
+extern u32                      acpi_gbl_num_nodes;
+extern u32                      acpi_gbl_num_objects;
 
 
-#define BUFFER_SIZE             4196
+extern u32                      acpi_gbl_size_of_parse_tree;
+extern u32                      acpi_gbl_size_of_method_trees;
+extern u32                      acpi_gbl_size_of_node_entries;
+extern u32                      acpi_gbl_size_of_acpi_objects;
+
+
+#define ACPI_DEBUG_BUFFER_SIZE  4196
 
 #define DB_REDIRECTABLE_OUTPUT  0x01
 #define DB_CONSOLE_OUTPUT       0x02
@@ -105,7 +99,7 @@ typedef struct argument_info
 
 #define PARAM_LIST(pl)                  pl
 
-#define DBTEST_OUTPUT_LEVEL(lvl)        if (opt_verbose)
+#define DBTEST_OUTPUT_LEVEL(lvl)        if (acpi_gbl_db_opt_verbose)
 
 #define VERBOSE_PRINT(fp)               DBTEST_OUTPUT_LEVEL(lvl) {\
 			  acpi_os_printf PARAM_LIST(fp);}
@@ -125,10 +119,10 @@ int
 acpi_db_initialize (
 	void);
 
-ACPI_STATUS
+acpi_status
 acpi_db_single_step (
-	ACPI_WALK_STATE         *walk_state,
-	ACPI_PARSE_OBJECT       *op,
+	acpi_walk_state         *walk_state,
+	acpi_parse_object       *op,
 	u8                      op_type);
 
 
@@ -149,17 +143,17 @@ acpi_db_unload_acpi_table (
 void
 acpi_db_set_method_breakpoint (
 	NATIVE_CHAR             *location,
-	ACPI_WALK_STATE         *walk_state,
-	ACPI_PARSE_OBJECT       *op);
+	acpi_walk_state         *walk_state,
+	acpi_parse_object       *op);
 
 void
 acpi_db_set_method_call_breakpoint (
-	ACPI_PARSE_OBJECT       *op);
+	acpi_parse_object       *op);
 
 void
 acpi_db_disassemble_aml (
 	NATIVE_CHAR             *statements,
-	ACPI_PARSE_OBJECT       *op);
+	acpi_parse_object       *op);
 
 void
 acpi_db_dump_namespace (
@@ -182,12 +176,12 @@ acpi_db_set_method_data (
 	NATIVE_CHAR             *index_arg,
 	NATIVE_CHAR             *value_arg);
 
-ACPI_STATUS
+acpi_status
 acpi_db_display_objects (
 	NATIVE_CHAR             *obj_type_arg,
 	NATIVE_CHAR             *display_count_arg);
 
-ACPI_STATUS
+acpi_status
 acpi_db_find_name_in_namespace (
 	NATIVE_CHAR             *name_arg);
 
@@ -214,8 +208,8 @@ acpi_db_display_resources (
 
 void
 acpi_db_display_op (
-	ACPI_WALK_STATE         *walk_state,
-	ACPI_PARSE_OBJECT       *origin,
+	acpi_walk_state         *walk_state,
+	acpi_parse_object       *origin,
 	u32                     num_opcodes);
 
 void
@@ -224,16 +218,16 @@ acpi_db_display_namestring (
 
 void
 acpi_db_display_path (
-	ACPI_PARSE_OBJECT       *op);
+	acpi_parse_object       *op);
 
 void
 acpi_db_display_opcode (
-	ACPI_WALK_STATE         *walk_state,
-	ACPI_PARSE_OBJECT       *op);
+	acpi_walk_state         *walk_state,
+	acpi_parse_object       *op);
 
 void
 acpi_db_decode_internal_object (
-	ACPI_OPERAND_OBJECT     *obj_desc);
+	acpi_operand_object     *obj_desc);
 
 
 /*
@@ -243,7 +237,7 @@ acpi_db_decode_internal_object (
 
 void
 acpi_db_display_method_info (
-	ACPI_PARSE_OBJECT       *op);
+	acpi_parse_object       *op);
 
 void
 acpi_db_decode_and_display_object (
@@ -252,17 +246,17 @@ acpi_db_decode_and_display_object (
 
 void
 acpi_db_display_result_object (
-	ACPI_OPERAND_OBJECT     *obj_desc,
-	ACPI_WALK_STATE         *walk_state);
+	acpi_operand_object     *obj_desc,
+	acpi_walk_state         *walk_state);
 
-ACPI_STATUS
+acpi_status
 acpi_db_display_all_methods (
 	NATIVE_CHAR             *display_count_arg);
 
 void
 acpi_db_display_internal_object (
-	ACPI_OPERAND_OBJECT     *obj_desc,
-	ACPI_WALK_STATE         *walk_state);
+	acpi_operand_object     *obj_desc,
+	acpi_walk_state         *walk_state);
 
 void
 acpi_db_display_arguments (
@@ -282,8 +276,8 @@ acpi_db_display_calling_tree (
 
 void
 acpi_db_display_argument_object (
-	ACPI_OPERAND_OBJECT     *obj_desc,
-	ACPI_WALK_STATE         *walk_state);
+	acpi_operand_object     *obj_desc,
+	acpi_walk_state         *walk_state);
 
 
 /*
@@ -307,7 +301,7 @@ acpi_db_create_execution_threads (
  * dbfileio - Debugger file I/O commands
  */
 
-ACPI_OBJECT_TYPE8
+acpi_object_type8
 acpi_db_match_argument (
 	NATIVE_CHAR             *user_argument,
 	ARGUMENT_INFO           *arguments);
@@ -321,7 +315,7 @@ void
 acpi_db_open_debug_file (
 	NATIVE_CHAR             *name);
 
-ACPI_STATUS
+acpi_status
 acpi_db_load_acpi_table (
 	NATIVE_CHAR             *filename);
 
@@ -346,20 +340,20 @@ acpi_db_get_from_history (
  * dbinput - user front-end to the AML debugger
  */
 
-ACPI_STATUS
+acpi_status
 acpi_db_command_dispatch (
 	NATIVE_CHAR             *input_buffer,
-	ACPI_WALK_STATE         *walk_state,
-	ACPI_PARSE_OBJECT       *op);
+	acpi_walk_state         *walk_state,
+	acpi_parse_object       *op);
 
 void
 acpi_db_execute_thread (
 	void                    *context);
 
-ACPI_STATUS
+acpi_status
 acpi_db_user_commands (
 	NATIVE_CHAR             prompt,
-	ACPI_PARSE_OBJECT       *op);
+	acpi_parse_object       *op);
 
 
 /*
@@ -368,11 +362,11 @@ acpi_db_user_commands (
 
 void
 acpi_db_generate_statistics (
-	ACPI_PARSE_OBJECT       *root,
+	acpi_parse_object       *root,
 	u8                      is_method);
 
 
-ACPI_STATUS
+acpi_status
 acpi_db_display_statistics (
 	NATIVE_CHAR             *type_arg);
 
@@ -391,7 +385,7 @@ acpi_db_dump_buffer (
 
 void
 acpi_db_dump_object (
-	ACPI_OBJECT             *obj_desc,
+	acpi_object             *obj_desc,
 	u32                     level);
 
 void
@@ -399,11 +393,11 @@ acpi_db_prep_namestring (
 	NATIVE_CHAR             *name);
 
 
-ACPI_STATUS
+acpi_status
 acpi_db_second_pass_parse (
-	ACPI_PARSE_OBJECT       *root);
+	acpi_parse_object       *root);
 
-ACPI_NAMESPACE_NODE *
+acpi_namespace_node *
 acpi_db_local_ns_lookup (
 	NATIVE_CHAR             *name);
 

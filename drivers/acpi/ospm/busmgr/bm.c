@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: bm.c
- *   $Revision: 42 $
+ *   $Revision: 47 $
  *
  *****************************************************************************/
 
@@ -38,7 +38,7 @@
  *                                  Globals
  ****************************************************************************/
 
-extern FADT_DESCRIPTOR_REV2	acpi_fadt;
+extern fadt_descriptor_rev2	acpi_fadt;
 /* TBD: Make dynamically sizeable. */
 BM_NODE_LIST			node_list;
 
@@ -48,24 +48,24 @@ BM_NODE_LIST			node_list;
  ****************************************************************************/
 
 /*****************************************************************************
- * 
+ *
  * FUNCTION:    bm_print_object
  *
- * PARAMETERS:  
+ * PARAMETERS:
  *
- * RETURN:      
+ * RETURN:
  *
- * DESCRIPTION: 
+ * DESCRIPTION:
  *
  ****************************************************************************/
 
 void
 bm_print_object (
-	ACPI_HANDLE		acpi_handle)
+	acpi_handle		handle)
 {
-	ACPI_BUFFER		buffer;
-	ACPI_HANDLE		parent;
-	ACPI_OBJECT_TYPE	type;
+	acpi_buffer		buffer;
+	acpi_handle		parent;
+	acpi_object_type	type;
 
 	buffer.length = 256;
 	buffer.pointer = acpi_os_callocate(buffer.length);
@@ -73,22 +73,22 @@ bm_print_object (
 		return;
 	}
 
-	acpi_get_name(acpi_handle, ACPI_FULL_PATHNAME, &buffer);
-	acpi_get_parent(acpi_handle, &parent);
-	acpi_get_type(acpi_handle, &type);
+	acpi_get_name(handle, ACPI_FULL_PATHNAME, &buffer);
+	acpi_get_parent(handle, &parent);
+	acpi_get_type(handle, &type);
 
 	/*
 	 * TBD: Hack to get around scope identification problem.
 	 */
 	if (type == ACPI_TYPE_ANY) {
-		if (ACPI_SUCCESS(acpi_get_next_object(ACPI_TYPE_ANY, 
-			acpi_handle, 0, NULL))) {
+		if (ACPI_SUCCESS(acpi_get_next_object(ACPI_TYPE_ANY,
+			handle, 0, NULL))) {
 			type = INTERNAL_TYPE_SCOPE;
 		}
 	}
-    
+
 	switch (type)
-	{
+	 {
 	case INTERNAL_TYPE_SCOPE:
 		acpi_os_printf("SCOPE: ");
 		break;
@@ -142,7 +142,7 @@ bm_print_object (
 		break;
 	}
 
-	acpi_os_printf("Object[%p][%s] parent[%p].\n", acpi_handle, (char*)buffer.pointer, parent);
+	acpi_os_printf("Object[%p][%s] parent[%p].\n", handle, (char*)buffer.pointer, parent);
 
 	acpi_os_free(buffer.pointer);
 }
@@ -152,11 +152,11 @@ bm_print_object (
  *
  * FUNCTION:    bm_print_node
  *
- * PARAMETERS:  
+ * PARAMETERS:
  *
- * RETURN:      
+ * RETURN:
  *
- * DESCRIPTION: 
+ * DESCRIPTION:
  *
  ****************************************************************************/
 
@@ -166,9 +166,11 @@ bm_print_node (
 	u32                     flags)
 {
 #ifdef ACPI_DEBUG
-	ACPI_BUFFER             buffer;
+	acpi_buffer             buffer;
 	BM_DEVICE		*device = NULL;
 	char                    *type_string = NULL;
+
+	PROC_NAME("bm_print_node");
 
 	if (!node) {
 		return;
@@ -194,7 +196,7 @@ bm_print_node (
 	case BM_TYPE_SYSTEM:
 		type_string = " System";
 		break;
-	case BM_TYPE_SCOPE: 
+	case BM_TYPE_SCOPE:
 		type_string = "  Scope";
 		break;
 	case BM_TYPE_PROCESSOR:
@@ -218,27 +220,27 @@ bm_print_node (
 	}
 
 	if (!(flags & BM_PRINT_GROUP)) {
-		DEBUG_PRINT_RAW(ACPI_INFO, ("+-------------------------------------------------------------------------------\n"));
+		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "+-------------------------------------------------------------------------------\n"));
 	}
 
-	DEBUG_PRINT_RAW(ACPI_INFO, ("| %s[%02x]:[%p] flags[%02x] hid[%s] %s\n", type_string, device->handle, device->acpi_handle, device->flags, (device->id.hid[0] ? device->id.hid : "       "), buffer.pointer));
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "| %s[%02x]:[%p] flags[%02x] hid[%s] %s\n", type_string, device->handle, device->acpi_handle, device->flags, (device->id.hid[0] ? device->id.hid : "       "), buffer.pointer));
 
 	if (flags & BM_PRINT_IDENTIFICATION) {
-		DEBUG_PRINT_RAW(ACPI_INFO, ("|   identification: uid[%s] adr[%08x]\n", device->id.uid, device->id.adr));
+		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "|   identification: uid[%s] adr[%08x]\n", device->id.uid, device->id.adr));
 	}
 
 	if (flags & BM_PRINT_LINKAGE) {
-		DEBUG_PRINT_RAW(ACPI_INFO, ("|   linkage: this[%p] parent[%p] next[%p]\n", node, node->parent, node->next));
-		DEBUG_PRINT_RAW(ACPI_INFO, ("|     scope.head[%p] scope.tail[%p]\n", node->scope.head, node->scope.tail));
+		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "|   linkage: this[%p] parent[%p] next[%p]\n", node, node->parent, node->next));
+		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "|     scope.head[%p] scope.tail[%p]\n", node->scope.head, node->scope.tail));
 	}
 
 	if (flags & BM_PRINT_POWER) {
-		DEBUG_PRINT_RAW(ACPI_INFO, ("|   power: state[D%d] flags[%08x]\n", device->power.state, device->power.flags));
-		DEBUG_PRINT_RAW(ACPI_INFO, ("|     S0[%02x] S1[%02x] S2[%02x] S3[%02x] S4[%02x] S5[%02x]\n", device->power.dx_supported[0], device->power.dx_supported[1], device->power.dx_supported[2], device->power.dx_supported[3], device->power.dx_supported[4], device->power.dx_supported[5]));
+		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "|   power: state[D%d] flags[%08x]\n", device->power.state, device->power.flags));
+		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "|     S0[%02x] S1[%02x] S2[%02x] S3[%02x] S4[%02x] S5[%02x]\n", device->power.dx_supported[0], device->power.dx_supported[1], device->power.dx_supported[2], device->power.dx_supported[3], device->power.dx_supported[4], device->power.dx_supported[5]));
 	}
 
 	if (!(flags & BM_PRINT_GROUP)) {
-		DEBUG_PRINT_RAW(ACPI_INFO, ("+-------------------------------------------------------------------------------\n"));
+		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "+-------------------------------------------------------------------------------\n"));
 	}
 
 	acpi_os_free(buffer.pointer);
@@ -252,11 +254,11 @@ bm_print_node (
  *
  * FUNCTION:    bm_print_hierarchy
  *
- * PARAMETERS:  
+ * PARAMETERS:
  *
- * RETURN:      
+ * RETURN:
  *
- * DESCRIPTION: 
+ * DESCRIPTION:
  *
  ****************************************************************************/
 
@@ -268,13 +270,13 @@ bm_print_hierarchy (void)
 
 	FUNCTION_TRACE("bm_print_hierarchy");
 
-	DEBUG_PRINT_RAW(ACPI_INFO, ("+------------------------------------------------------------\n"));
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "+------------------------------------------------------------\n"));
 
 	for (i = 0; i < node_list.count; i++) {
 		bm_print_node(node_list.nodes[i], BM_PRINT_GROUP | BM_PRINT_PRESENT);
 	}
 
-	DEBUG_PRINT_RAW(ACPI_INFO, ("+------------------------------------------------------------\n"));
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "+------------------------------------------------------------\n"));
 #endif /*ACPI_DEBUG*/
 
 	return_VOID;
@@ -285,19 +287,19 @@ bm_print_hierarchy (void)
  *
  * FUNCTION:    bm_get_status
  *
- * PARAMETERS:  
+ * PARAMETERS:
  *
- * RETURN:      
+ * RETURN:
  *
- * DESCRIPTION: 
+ * DESCRIPTION:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bm_get_status (
 	BM_DEVICE		*device)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status           status = AE_OK;
 
 	if (!device) {
 		return AE_BAD_PARAMETER;
@@ -319,7 +321,7 @@ bm_get_status (
 	 * Evaluate _STA:
 	 * --------------
 	 */
-	status = bm_evaluate_simple_integer(device->acpi_handle, "_STA", 
+	status = bm_evaluate_simple_integer(device->acpi_handle, "_STA",
 		&(device->status));
 
 	return status;
@@ -330,20 +332,20 @@ bm_get_status (
  *
  * FUNCTION:    bm_get_identification
  *
- * PARAMETERS:  
+ * PARAMETERS:
  *
- * RETURN:      
+ * RETURN:
  *
- * DESCRIPTION: 
+ * DESCRIPTION:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bm_get_identification (
 	BM_DEVICE		*device)
 {
-	ACPI_STATUS             status = AE_OK;
-	ACPI_DEVICE_INFO        info;
+	acpi_status             status = AE_OK;
+	acpi_device_info        info;
 
 	if (!device) {
 		return AE_BAD_PARAMETER;
@@ -368,12 +370,12 @@ bm_get_identification (
 	}
 
 	if (info.valid & ACPI_VALID_UID) {
-		MEMCPY((void*)device->id.uid, (void*)info.unique_id, 
+		MEMCPY((void*)device->id.uid, (void*)info.unique_id,
 			sizeof(BM_DEVICE_UID));
 	}
 
 	if (info.valid & ACPI_VALID_HID) {
-		MEMCPY((void*)device->id.hid, (void*)info.hardware_id, 
+		MEMCPY((void*)device->id.hid, (void*)info.hardware_id,
 			sizeof(BM_DEVICE_HID));
 	}
 
@@ -389,19 +391,19 @@ bm_get_identification (
  *
  * FUNCTION:    bm_get_flags
  *
- * PARAMETERS:  
+ * PARAMETERS:
  *
- * RETURN:      
+ * RETURN:
  *
- * DESCRIPTION: 
+ * DESCRIPTION:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bm_get_flags (
 	BM_DEVICE		*device)
 {
-	ACPI_HANDLE             acpi_handle = NULL;
+	acpi_handle		acpi_handle = NULL;
 
 	if (!device) {
 		return AE_BAD_PARAMETER;
@@ -416,7 +418,7 @@ bm_get_flags (
 		/*
 		 * Presence of _DCK indicates a docking station.
 		 */
-		if (ACPI_SUCCESS(acpi_get_handle(device->acpi_handle, 
+		if (ACPI_SUCCESS(acpi_get_handle(device->acpi_handle,
 			"_DCK", &acpi_handle))) {
 			device->flags |= BM_FLAGS_DOCKING_STATION;
 		}
@@ -425,7 +427,7 @@ bm_get_flags (
 		 * Presence of _EJD and/or _EJx indicates 'ejectable'.
 		 * TBD: _EJx...
 		 */
-		if (ACPI_SUCCESS(acpi_get_handle(device->acpi_handle, 
+		if (ACPI_SUCCESS(acpi_get_handle(device->acpi_handle,
 			"_EJD", &acpi_handle))) {
 			device->flags |= BM_FLAGS_EJECTABLE;
 		}
@@ -433,9 +435,9 @@ bm_get_flags (
 		/*
 		 * Presence of _PR0 or _PS0 indicates 'power manageable'.
 		 */
-		if (ACPI_SUCCESS(acpi_get_handle(device->acpi_handle, 
+		if (ACPI_SUCCESS(acpi_get_handle(device->acpi_handle,
 			"_PR0", &acpi_handle)) ||
-			ACPI_SUCCESS(acpi_get_handle(device->acpi_handle, 
+			ACPI_SUCCESS(acpi_get_handle(device->acpi_handle,
 			"_PS0", &acpi_handle))) {
 			device->flags |= BM_FLAGS_POWER_CONTROL;
 		}
@@ -443,7 +445,7 @@ bm_get_flags (
 		/*
 		 * Presence of _CRS indicates 'configurable'.
 		 */
-		if (ACPI_SUCCESS(acpi_get_handle(device->acpi_handle, 
+		if (ACPI_SUCCESS(acpi_get_handle(device->acpi_handle,
 			"_CRS", &acpi_handle))) {
 			device->flags |= BM_FLAGS_CONFIGURABLE;
 		}
@@ -456,9 +458,9 @@ bm_get_flags (
 		/*
 		 * Presence of _HID or _ADR indicates 'identifiable'.
 		 */
-		if (ACPI_SUCCESS(acpi_get_handle(device->acpi_handle, 
+		if (ACPI_SUCCESS(acpi_get_handle(device->acpi_handle,
 			"_HID", &acpi_handle)) ||
-		   ACPI_SUCCESS(acpi_get_handle(device->acpi_handle, 
+		   ACPI_SUCCESS(acpi_get_handle(device->acpi_handle,
 		   "_ADR", &acpi_handle))) {
 			device->flags |= BM_FLAGS_IDENTIFIABLE;
 		}
@@ -466,7 +468,7 @@ bm_get_flags (
 		/*
 		 * Presence of _STA indicates 'dynamic status'.
 		 */
-		if (ACPI_SUCCESS(acpi_get_handle(device->acpi_handle, 
+		if (ACPI_SUCCESS(acpi_get_handle(device->acpi_handle,
 			"_STA", &acpi_handle))) {
 			device->flags |= BM_FLAGS_DYNAMIC_STATUS;
 		}
@@ -482,22 +484,22 @@ bm_get_flags (
  *
  * FUNCTION:    bm_add_namespace_device
  *
- * PARAMETERS:  
+ * PARAMETERS:
  *
- * RETURN:      
+ * RETURN:
  *
- * DESCRIPTION: 
+ * DESCRIPTION:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bm_add_namespace_device (
-	ACPI_HANDLE             acpi_handle,
-	ACPI_OBJECT_TYPE        acpi_type,
+	acpi_handle             acpi_handle,
+	acpi_object_type        acpi_type,
 	BM_NODE			*parent,
 	BM_NODE			**child)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 	BM_NODE			*node = NULL;
 	BM_DEVICE		*device = NULL;
 
@@ -533,7 +535,7 @@ bm_add_namespace_device (
 	/*
 	 * Device Type:
 	 * ------------
-	 */ 
+	 */
 	switch (acpi_type) {
 	case INTERNAL_TYPE_SCOPE:
 		device->id.type = BM_TYPE_SCOPE;
@@ -586,7 +588,7 @@ bm_add_namespace_device (
 		/*
 		 * Power Management:
 		 * -----------------
-		 * If this node doesn't provide direct power control  
+		 * If this node doesn't provide direct power control
 		 * then we inherit PM capabilities from its parent.
 		 *
 		 * TBD: Inherit!
@@ -641,21 +643,21 @@ end:
  *
  * PARAMETERS:  <none>
  *
- * RETURN:      
+ * RETURN:
  *
- * DESCRIPTION: 
+ * DESCRIPTION:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bm_enumerate_namespace (void)
 {
-	ACPI_STATUS		status = AE_OK;
-	ACPI_HANDLE             parent_handle = ACPI_ROOT_OBJECT;
-	ACPI_HANDLE             child_handle = NULL;
+	acpi_status		status = AE_OK;
+	acpi_handle             parent_handle = ACPI_ROOT_OBJECT;
+	acpi_handle             child_handle = NULL;
 	BM_NODE			*parent = NULL;
 	BM_NODE			*child = NULL;
-	ACPI_OBJECT_TYPE        acpi_type = 0;
+	acpi_object_type        acpi_type = 0;
 	u32                     level = 1;
 
 	FUNCTION_TRACE("bm_enumerate_namespace");
@@ -676,8 +678,8 @@ bm_enumerate_namespace (void)
 		status = acpi_get_next_object(ACPI_TYPE_ANY, parent_handle, child_handle, &child_handle);
 		if (ACPI_SUCCESS(status)) {
 			/*
-			 * TBD: This is a hack to get around the problem 
-			 *       identifying scope objects.  Scopes 
+			 * TBD: This is a hack to get around the problem
+			 *       identifying scope objects.  Scopes
 			 *       somehow need to be uniquely identified.
 			 */
 			status = acpi_get_type(child_handle, &acpi_type);
@@ -725,7 +727,7 @@ bm_enumerate_namespace (void)
 		else {
 			level--;
 			child_handle = parent_handle;
-			acpi_get_parent(parent_handle, 
+			acpi_get_parent(parent_handle,
 				&parent_handle);
 
 			if (parent) {
@@ -745,21 +747,21 @@ bm_enumerate_namespace (void)
  *
  * FUNCTION:    bm_add_fixed_feature_device
  *
- * PARAMETERS:  
+ * PARAMETERS:
  *
- * RETURN:      
+ * RETURN:
  *
- * DESCRIPTION: 
+ * DESCRIPTION:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bm_add_fixed_feature_device (
 	BM_NODE			*parent,
 	BM_DEVICE_TYPE		device_type,
 	char			*device_hid)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 	BM_NODE			*node = NULL;
 
 	FUNCTION_TRACE("bm_add_fixed_feature_device");
@@ -787,7 +789,7 @@ bm_add_fixed_feature_device (
 	node->device.acpi_handle = ACPI_ROOT_OBJECT;
 	node->device.id.type = BM_TYPE_FIXED_BUTTON;
 	if (device_hid) {
-		MEMCPY((void*)node->device.id.hid, device_hid, 
+		MEMCPY((void*)node->device.id.hid, device_hid,
 			sizeof(node->device.id.hid));
 	}
 	node->device.flags = BM_FLAGS_FIXED_FEATURE;
@@ -833,13 +835,13 @@ bm_add_fixed_feature_device (
  *
  * PARAMETERS:  <none>
  *
- * RETURN:      
+ * RETURN:
  *
- * DESCRIPTION: 
+ * DESCRIPTION:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bm_enumerate_fixed_features (void)
 {
 	FUNCTION_TRACE("bm_enumerate_fixed_features");
@@ -887,20 +889,20 @@ bm_enumerate_fixed_features (void)
  *
  * FUNCTION:    bm_get_handle
  *
- * PARAMETERS:  
+ * PARAMETERS:
  *
- * RETURN:      
+ * RETURN:
  *
- * DESCRIPTION: 
+ * DESCRIPTION:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bm_get_handle (
-	ACPI_HANDLE             acpi_handle,
+	acpi_handle             acpi_handle,
 	BM_HANDLE               *device_handle)
 {
-	ACPI_STATUS             status = AE_NOT_FOUND;
+	acpi_status             status = AE_NOT_FOUND;
 	u32			i = 0;
 
 	FUNCTION_TRACE("bm_get_handle");
@@ -917,7 +919,7 @@ bm_get_handle (
 	for (i=0; i<node_list.count; i++) {
 
 		if (!node_list.nodes[i]) {
-			DEBUG_PRINT(ACPI_ERROR, ("Invalid (NULL) node entry [%02x] detected.\n", device_handle));
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Invalid (NULL) node entry [%02x] detected.\n", device_handle));
 			status = AE_NULL_ENTRY;
 			break;
 		}
@@ -937,21 +939,21 @@ bm_get_handle (
  *
  * FUNCTION:    bm_get_node
  *
- * PARAMETERS:  
+ * PARAMETERS:
  *
- * RETURN:      
+ * RETURN:
  *
- * DESCRIPTION: 
+ * DESCRIPTION:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bm_get_node (
 	BM_HANDLE               device_handle,
-	ACPI_HANDLE             acpi_handle,
+	acpi_handle             acpi_handle,
 	BM_NODE			**node)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 
 	FUNCTION_TRACE("bm_get_node");
 
@@ -977,7 +979,7 @@ bm_get_node (
 	 * Valid device handle?
 	 */
 	if (device_handle > BM_HANDLES_MAX) {
-		DEBUG_PRINT(ACPI_ERROR, ("Invalid node handle [%02x] detected.\n", device_handle));
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Invalid node handle [%02x] detected.\n", device_handle));
 		return_ACPI_STATUS(AE_ERROR);
 	}
 
@@ -987,7 +989,7 @@ bm_get_node (
 	 * Valid node?
 	 */
 	if (!(*node)) {
-		DEBUG_PRINT(ACPI_ERROR, ("Invalid (NULL) node entry [%02x] detected.\n", device_handle));
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Invalid (NULL) node entry [%02x] detected.\n", device_handle));
 		return_ACPI_STATUS(AE_NULL_ENTRY);
 	}
 
@@ -1007,14 +1009,14 @@ bm_get_node (
  *
  * RETURN:      Exception code.
  *
- * DESCRIPTION: 
+ * DESCRIPTION:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bm_initialize (void)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 	u32                     start = 0;
 	u32                     stop = 0;
 	u32                     elapsed = 0;
@@ -1028,7 +1030,7 @@ bm_initialize (void)
 		return_ACPI_STATUS(status);
 	}
 
-	DEBUG_PRINT(ACPI_INFO, ("Building device hierarchy.\n"));
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Building device hierarchy.\n"));
 
 	/*
 	 * Enumerate ACPI fixed-feature devices.
@@ -1049,7 +1051,7 @@ bm_initialize (void)
 	acpi_get_timer(&stop);
 	acpi_get_timer_duration(start, stop, &elapsed);
 
-	DEBUG_PRINT(ACPI_INFO, ("Building device hierarchy took [%d] microseconds.\n", elapsed));
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Building device hierarchy took [%d] microseconds.\n", elapsed));
 
 	/*
 	 * Display hierarchy.
@@ -1059,23 +1061,23 @@ bm_initialize (void)
 	/*
 	 * Register for all standard and device-specific notifications.
 	 */
-	DEBUG_PRINT(ACPI_INFO, ("Registering for all device notifications.\n"));
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Registering for all device notifications.\n"));
 
-	status = acpi_install_notify_handler(ACPI_ROOT_OBJECT, 
+	status = acpi_install_notify_handler(ACPI_ROOT_OBJECT,
 		ACPI_SYSTEM_NOTIFY, &bm_notify, NULL);
 	if (ACPI_FAILURE(status)) {
-		DEBUG_PRINT(ACPI_ERROR, ("Unable to register for standard notifications.\n"));
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unable to register for standard notifications.\n"));
 		return_ACPI_STATUS(status);
 	}
 
-	status = acpi_install_notify_handler(ACPI_ROOT_OBJECT, 
+	status = acpi_install_notify_handler(ACPI_ROOT_OBJECT,
 		ACPI_DEVICE_NOTIFY, &bm_notify, NULL);
 	if (ACPI_FAILURE(status)) {
-		DEBUG_PRINT(ACPI_ERROR, ("Unable to register for device-specific notifications.\n"));
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unable to register for device-specific notifications.\n"));
 		return_ACPI_STATUS(status);
 	}
 
-	DEBUG_PRINT(ACPI_INFO, ("ACPI Bus Manager enabled.\n"));
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "ACPI Bus Manager enabled.\n"));
 
 	/*
 	 * Initialize built-in power resource driver.
@@ -1094,14 +1096,14 @@ bm_initialize (void)
  *
  * RETURN:      Exception code.
  *
- * DESCRIPTION: 
+ * DESCRIPTION:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bm_terminate (void)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 	u32                     i = 0;
 
 	FUNCTION_TRACE("bm_terminate");
@@ -1114,31 +1116,31 @@ bm_terminate (void)
 	/*
 	 * Unregister for all notifications.
 	 */
-	DEBUG_PRINT(ACPI_INFO, ("Unregistering for device notifications.\n"));
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Unregistering for device notifications.\n"));
 
-	status = acpi_remove_notify_handler(ACPI_ROOT_OBJECT, 
+	status = acpi_remove_notify_handler(ACPI_ROOT_OBJECT,
 		ACPI_SYSTEM_NOTIFY, &bm_notify);
 	if (ACPI_FAILURE(status)) {
-		DEBUG_PRINT(ACPI_ERROR, ("Unable to un-register for standard notifications.\n"));
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unable to un-register for standard notifications.\n"));
 	}
 
-	status = acpi_remove_notify_handler(ACPI_ROOT_OBJECT, 
+	status = acpi_remove_notify_handler(ACPI_ROOT_OBJECT,
 		ACPI_DEVICE_NOTIFY, &bm_notify);
 	if (ACPI_FAILURE(status)) {
-		DEBUG_PRINT(ACPI_ERROR, ("Unable to un-register for device-specific notifications.\n"));
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unable to un-register for device-specific notifications.\n"));
 	}
 
 	/*
 	 * Parse through the device array, freeing all entries.
 	 */
-	DEBUG_PRINT(ACPI_INFO, ("Removing device hierarchy.\n"));
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Removing device hierarchy.\n"));
 	for (i = 0; i < node_list.count; i++) {
 		if (node_list.nodes[i]) {
 			acpi_os_free(node_list.nodes[i]);
 		}
 	}
 
-	DEBUG_PRINT(ACPI_INFO, ("ACPI Bus Manager disabled.\n"));
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "ACPI Bus Manager disabled.\n"));
 
 	return_ACPI_STATUS(AE_OK);
 }

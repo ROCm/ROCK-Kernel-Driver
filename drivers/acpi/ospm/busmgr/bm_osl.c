@@ -1,7 +1,7 @@
 /*****************************************************************************
  *
  * Module Name: bm_osl.c
- *   $Revision: 11 $
+ *   $Revision: 16 $
  *
  *****************************************************************************/
 
@@ -30,6 +30,7 @@
 #include <linux/types.h>
 #include <linux/proc_fs.h>
 #include <linux/spinlock.h>
+#include <linux/poll.h>
 #include <asm/uaccess.h>
 #include <acpi.h>
 #include "bm.h"
@@ -111,7 +112,7 @@ static int event_is_open = 0;
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bm_osl_generate_event (
 	BM_HANDLE		device_handle,
 	char			*device_type,
@@ -133,12 +134,12 @@ bm_osl_generate_event (
 	if (!event)
 		goto alloc_error;
 
-	event->device_type = acpi_os_callocate(strlen(device_type) 
+	event->device_type = acpi_os_callocate(strlen(device_type)
 		+ sizeof(char));
 	if (!event->device_type)
 		goto alloc_error;
 
-	event->device_instance = acpi_os_callocate(strlen(device_instance) 
+	event->device_instance = acpi_os_callocate(strlen(device_instance)
 		+ sizeof(char));
 	if (!event->device_instance)
 		goto alloc_error;
@@ -207,71 +208,98 @@ static int bm_osl_close_event(struct inode *inode, struct file *file)
  *
  * FUNCTION:	bm_osl_read_event
  *
- * DESCRIPTION: Handles reads to the 'event' file by blocking user-mode 
+ * DESCRIPTION: Handles reads to the 'event' file by blocking user-mode
  *              threads until data (an event) is generated.
  *
  ****************************************************************************/
 static ssize_t
 bm_osl_read_event(
-	struct file		*file, 
-	char			*buf, 
-	size_t			count, 
+	struct file		*file,
+	char			*buf,
+	size_t			count,
 	loff_t			*ppos)
 {
-	char			str[BM_MAX_STRING_LENGTH];
-	int			size;
 	BM_OSL_EVENT		*event = NULL;
 	unsigned long		flags = 0;
+	static char		str[BM_MAX_STRING_LENGTH];
+	static int		chars_remaining = 0;
+	static char 		*ptr;
 
-	DECLARE_WAITQUEUE(wait, current);
-
-	if (count < BM_MAX_STRING_LENGTH) {
-		return 0;
-	}
-
-	if (list_empty(&bm_event_list)) {
-
-		set_current_state(TASK_INTERRUPTIBLE);
-		add_wait_queue(&bm_event_wait_queue, &wait);
+	if (!chars_remaining) {
+		DECLARE_WAITQUEUE(wait, current);
 
 		if (list_empty(&bm_event_list)) {
-			schedule();
+
+			if (file->f_flags & O_NONBLOCK)
+				return -EAGAIN;
+
+			set_current_state(TASK_INTERRUPTIBLE);
+			add_wait_queue(&bm_event_wait_queue, &wait);
+
+			if (list_empty(&bm_event_list)) {
+				schedule();
+			}
+
+			remove_wait_queue(&bm_event_wait_queue, &wait);
+			set_current_state(TASK_RUNNING);
+
+			if (signal_pending(current)) {
+				return -ERESTARTSYS;
+			}
 		}
 
-		remove_wait_queue(&bm_event_wait_queue, &wait);
-		set_current_state(TASK_RUNNING);
+		spin_lock_irqsave(&bm_osl_event_lock, flags);
+		event = list_entry(bm_event_list.next, BM_OSL_EVENT, list);
+		list_del(&event->list);
+		spin_unlock_irqrestore(&bm_osl_event_lock, flags);
 
-		if (signal_pending(current)) {
-			return -ERESTARTSYS;
-		}
+		chars_remaining = sprintf(str, "%s %s %08x %08x\n",
+			event->device_type, event->device_instance,
+			event->event_type, event->event_data);
+		ptr = str;
+
+		acpi_os_free(event->device_type);
+		acpi_os_free(event->device_instance);
+		acpi_os_free(event);
 	}
 
-	spin_lock_irqsave(&bm_osl_event_lock, flags);
-	event = list_entry(bm_event_list.next, BM_OSL_EVENT, list);
-	list_del(&event->list);
-	spin_unlock_irqrestore(&bm_osl_event_lock, flags);
-
-	/* BUG: buffer overrun? */
-	size = sprintf(str, "%s %s %08x %08x\n",
-		event->device_type, event->device_instance,
-		event->event_type, event->event_data);
+	if (chars_remaining < count)
+		count = chars_remaining;
 	
-	acpi_os_free(event->device_type);
-	acpi_os_free(event->device_instance);
-	acpi_os_free(event);
-
-	if (copy_to_user(buf, str, size))
+	if (copy_to_user(buf, ptr, count))
 		return -EFAULT;
 
-	*ppos += size;
+	*ppos += count;
+	chars_remaining -= count;
+	ptr += count;
 
-	return size;
+	return count;
+}
+
+/****************************************************************************
+ *
+ * FUNCTION:	bm_osl_poll_event
+ *
+ * DESCRIPTION: Handles poll() of the 'event' file by blocking user-mode 
+ *              threads until data (an event) is generated.
+ *
+ ****************************************************************************/
+static unsigned int
+bm_osl_poll_event(
+	struct file		*file, 
+	poll_table		*wait)
+{
+	poll_wait(file, &bm_event_wait_queue, wait);
+	if (!list_empty(&bm_event_list))
+		return POLLIN | POLLRDNORM;
+	return 0;
 }
 
 struct file_operations proc_event_operations = {
 	open:		bm_osl_open_event,
 	read:		bm_osl_read_event,
 	release:	bm_osl_close_event,
+	poll:		bm_osl_poll_event,	
 };
 
 /****************************************************************************
@@ -283,7 +311,11 @@ struct file_operations proc_event_operations = {
 int
 bm_osl_init(void)
 {
-	ACPI_STATUS		status = AE_OK;
+	acpi_status		status = AE_OK;
+
+	status = acpi_subsystem_status();
+	if (ACPI_FAILURE(status))
+		return -ENODEV;
 
 #ifdef ACPI_DEBUG
 	save_dbg_layer = acpi_dbg_layer;

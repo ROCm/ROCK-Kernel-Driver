@@ -53,7 +53,7 @@
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_rs_io_resource (
 	u8                      *byte_stream_buffer,
 	u32                     *bytes_consumed,
@@ -61,10 +61,13 @@ acpi_rs_io_resource (
 	u32                     *structure_size)
 {
 	u8                      *buffer = byte_stream_buffer;
-	ACPI_RESOURCE           *output_struct = (ACPI_RESOURCE *) *output_buffer;
+	acpi_resource           *output_struct = (acpi_resource *) *output_buffer;
 	u16                     temp16 = 0;
 	u8                      temp8 = 0;
-	u32                     struct_size = SIZEOF_RESOURCE (ACPI_RESOURCE_IO);
+	u32                     struct_size = SIZEOF_RESOURCE (acpi_resource_io);
+
+
+	FUNCTION_TRACE ("Rs_io_resource");
 
 
 	/*
@@ -123,7 +126,7 @@ acpi_rs_io_resource (
 	 * Return the final size of the structure
 	 */
 	*structure_size = struct_size;
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -149,7 +152,7 @@ acpi_rs_io_resource (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_rs_fixed_io_resource (
 	u8                      *byte_stream_buffer,
 	u32                     *bytes_consumed,
@@ -157,10 +160,13 @@ acpi_rs_fixed_io_resource (
 	u32                     *structure_size)
 {
 	u8                      *buffer = byte_stream_buffer;
-	ACPI_RESOURCE           *output_struct = (ACPI_RESOURCE *) *output_buffer;
+	acpi_resource           *output_struct = (acpi_resource *) *output_buffer;
 	u16                     temp16 = 0;
 	u8                      temp8 = 0;
-	u32                     struct_size = SIZEOF_RESOURCE (ACPI_RESOURCE_FIXED_IO);
+	u32                     struct_size = SIZEOF_RESOURCE (acpi_resource_fixed_io);
+
+
+	FUNCTION_TRACE ("Rs_fixed_io_resource");
 
 
 	/*
@@ -195,7 +201,7 @@ acpi_rs_fixed_io_resource (
 	 * Return the final size of the structure
 	 */
 	*structure_size = struct_size;
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -216,15 +222,18 @@ acpi_rs_fixed_io_resource (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_rs_io_stream (
-	ACPI_RESOURCE           *linked_list,
+	acpi_resource           *linked_list,
 	u8                      **output_buffer,
 	u32                     *bytes_consumed)
 {
 	u8                      *buffer = *output_buffer;
 	u16                     temp16 = 0;
 	u8                      temp8 = 0;
+
+
+	FUNCTION_TRACE ("Rs_io_stream");
 
 
 	/*
@@ -277,7 +286,7 @@ acpi_rs_io_stream (
 	 * Return the number of bytes consumed in this operation
 	 */
 	*bytes_consumed = POINTER_DIFF (buffer, *output_buffer);
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -298,15 +307,18 @@ acpi_rs_io_stream (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_rs_fixed_io_stream (
-	ACPI_RESOURCE           *linked_list,
+	acpi_resource           *linked_list,
 	u8                      **output_buffer,
 	u32                     *bytes_consumed)
 {
 	u8                      *buffer = *output_buffer;
 	u16                     temp16 = 0;
 	u8                      temp8 = 0;
+
+
+	FUNCTION_TRACE ("Rs_fixed_io_stream");
 
 
 	/*
@@ -336,7 +348,7 @@ acpi_rs_fixed_io_stream (
 	 * Return the number of bytes consumed in this operation
 	 */
 	*bytes_consumed = POINTER_DIFF (buffer, *output_buffer);
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -362,7 +374,7 @@ acpi_rs_fixed_io_stream (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_rs_dma_resource (
 	u8                      *byte_stream_buffer,
 	u32                     *bytes_consumed,
@@ -370,11 +382,14 @@ acpi_rs_dma_resource (
 	u32                     *structure_size)
 {
 	u8                      *buffer = byte_stream_buffer;
-	ACPI_RESOURCE           *output_struct = (ACPI_RESOURCE *) *output_buffer;
+	acpi_resource           *output_struct = (acpi_resource *) *output_buffer;
 	u8                      temp8 = 0;
 	u8                      index;
 	u8                      i;
-	u32                     struct_size = SIZEOF_RESOURCE (ACPI_RESOURCE_DMA);
+	u32                     struct_size = SIZEOF_RESOURCE (acpi_resource_dma);
+
+
+	FUNCTION_TRACE ("Rs_dma_resource");
 
 
 	/*
@@ -417,7 +432,7 @@ acpi_rs_dma_resource (
 	output_struct->data.dma.transfer = temp8 & 0x03;
 
 	if (0x03 == output_struct->data.dma.transfer) {
-		return (AE_BAD_DATA);
+		return_ACPI_STATUS (AE_BAD_DATA);
 	}
 
 	/*
@@ -439,7 +454,7 @@ acpi_rs_dma_resource (
 	 * Return the final size of the structure
 	 */
 	*structure_size = struct_size;
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -460,9 +475,9 @@ acpi_rs_dma_resource (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_rs_dma_stream (
-	ACPI_RESOURCE           *linked_list,
+	acpi_resource           *linked_list,
 	u8                      **output_buffer,
 	u32                     *bytes_consumed)
 {
@@ -470,6 +485,9 @@ acpi_rs_dma_stream (
 	u16                     temp16 = 0;
 	u8                      temp8 = 0;
 	u8                      index;
+
+
+	FUNCTION_TRACE ("Rs_dma_stream");
 
 
 	/*
@@ -506,6 +524,6 @@ acpi_rs_dma_stream (
 	 * Return the number of bytes consumed in this operation
 	 */
 	*bytes_consumed = POINTER_DIFF (buffer, *output_buffer);
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 

@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dbstats - Generation and display of ACPI table statistics
- *              $Revision: 40 $
+ *              $Revision: 47 $
  *
  ******************************************************************************/
 
@@ -45,6 +45,7 @@ ARGUMENT_INFO               acpi_db_stat_types [] =
 	{"MISC"},
 	{"TABLES"},
 	{"SIZES"},
+	{"STACK"},
 	{NULL}           /* Must be null terminated */
 };
 
@@ -54,23 +55,7 @@ ARGUMENT_INFO               acpi_db_stat_types [] =
 #define CMD_MISC            3
 #define CMD_TABLES          4
 #define CMD_SIZES           5
-
-
-/*
- * Statistic globals
- */
-u16                         acpi_gbl_obj_type_count[INTERNAL_TYPE_NODE_MAX+1];
-u16                         acpi_gbl_node_type_count[INTERNAL_TYPE_NODE_MAX+1];
-u16                         acpi_gbl_obj_type_count_misc;
-u16                         acpi_gbl_node_type_count_misc;
-u32                         num_nodes;
-u32                         num_objects;
-
-
-u32                         size_of_parse_tree;
-u32                         size_of_method_trees;
-u32                         size_of_node_entries;
-u32                         size_of_acpi_objects;
+#define CMD_STACK           6
 
 
 /*******************************************************************************
@@ -90,7 +75,7 @@ u32                         size_of_acpi_objects;
 
 void
 acpi_db_enumerate_object (
-	ACPI_OPERAND_OBJECT     *obj_desc)
+	acpi_operand_object     *obj_desc)
 {
 	u32                     type;
 	u32                     i;
@@ -104,7 +89,7 @@ acpi_db_enumerate_object (
 
 	/* Enumerate this object first */
 
-	num_objects++;
+	acpi_gbl_num_objects++;
 
 	type = obj_desc->common.type;
 	if (type > INTERNAL_TYPE_NODE_MAX)
@@ -172,27 +157,27 @@ acpi_db_enumerate_object (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_db_classify_one_object (
-	ACPI_HANDLE             obj_handle,
+	acpi_handle             obj_handle,
 	u32                     nesting_level,
 	void                    *context,
 	void                    **return_value)
 {
-	ACPI_NAMESPACE_NODE     *node;
-	ACPI_OPERAND_OBJECT     *obj_desc;
+	acpi_namespace_node     *node;
+	acpi_operand_object     *obj_desc;
 	u32                     type;
 
 
-	num_nodes++;
+	acpi_gbl_num_nodes++;
 
-	node = (ACPI_NAMESPACE_NODE *) obj_handle;
-	obj_desc = ((ACPI_NAMESPACE_NODE *) obj_handle)->object;
+	node = (acpi_namespace_node *) obj_handle;
+	obj_desc = ((acpi_namespace_node *) obj_handle)->object;
 
 	acpi_db_enumerate_object (obj_desc);
 
 	type = node->type;
-	if (type > INTERNAL_TYPE_INVALID)
+	if (type > INTERNAL_TYPE_NODE_MAX)
 	{
 		acpi_gbl_node_type_count_misc++;
 	}
@@ -220,10 +205,10 @@ acpi_db_classify_one_object (
 	Num_grammar_elements++;
 	Op = Acpi_ps_get_depth_next (Root, Op);
 
-	Size_of_parse_tree          = (Num_grammar_elements - Num_method_elements) * (u32) sizeof (ACPI_PARSE_OBJECT);
-	Size_of_method_trees        = Num_method_elements * (u32) sizeof (ACPI_PARSE_OBJECT);
-	Size_of_node_entries        = Num_nodes * (u32) sizeof (ACPI_NAMESPACE_NODE);
-	Size_of_acpi_objects        = Num_nodes * (u32) sizeof (ACPI_OPERAND_OBJECT);
+	Size_of_parse_tree          = (Num_grammar_elements - Num_method_elements) * (u32) sizeof (acpi_parse_object);
+	Size_of_method_trees        = Num_method_elements * (u32) sizeof (acpi_parse_object);
+	Size_of_node_entries        = Num_nodes * (u32) sizeof (acpi_namespace_node);
+	Size_of_acpi_objects        = Num_nodes * (u32) sizeof (acpi_operand_object);
 
 	*/
 }
@@ -242,18 +227,18 @@ acpi_db_classify_one_object (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_db_count_namespace_objects (
 	void)
 {
 	u32                     i;
 
 
-	num_nodes = 0;
-	num_objects = 0;
+	acpi_gbl_num_nodes = 0;
+	acpi_gbl_num_objects = 0;
 
 	acpi_gbl_obj_type_count_misc = 0;
-	for (i = 0; i < INTERNAL_TYPE_INVALID; i++)
+	for (i = 0; i < (INTERNAL_TYPE_NODE_MAX -1); i++)
 	{
 		acpi_gbl_obj_type_count [i] = 0;
 		acpi_gbl_node_type_count [i] = 0;
@@ -280,12 +265,14 @@ acpi_db_count_namespace_objects (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_db_display_statistics (
 	NATIVE_CHAR             *type_arg)
 {
 	u32                     i;
 	u32                     type;
+	u32                     outstanding;
+	u32                     size;
 
 
 	if (!acpi_gbl_DSDT)
@@ -307,17 +294,14 @@ acpi_db_display_statistics (
 		return (AE_OK);
 	}
 
-#ifndef PARSER_ONLY
-
-	acpi_db_count_namespace_objects ();
-#endif
-
 
 	switch (type)
 	{
 #ifndef PARSER_ONLY
 	case CMD_ALLOCATIONS:
+#ifdef ACPI_DBG_TRACK_ALLOCATIONS
 		acpi_ut_dump_allocation_info ();
+#endif
 		break;
 #endif
 
@@ -332,6 +316,10 @@ acpi_db_display_statistics (
 
 	case CMD_OBJECTS:
 
+#ifndef PARSER_ONLY
+
+		acpi_db_count_namespace_objects ();
+
 		acpi_os_printf ("\n_objects defined in the current namespace:\n\n");
 
 		acpi_os_printf ("%16.16s % 10.10s % 10.10s\n", "ACPI_TYPE", "NODES", "OBJECTS");
@@ -345,54 +333,55 @@ acpi_db_display_statistics (
 			acpi_gbl_node_type_count_misc, acpi_gbl_obj_type_count_misc);
 
 		acpi_os_printf ("%16.16s % 10ld% 10ld\n", "TOTALS:",
-			num_nodes, num_objects);
+			acpi_gbl_num_nodes, acpi_gbl_num_objects);
 
-
-/*
-		Acpi_os_printf ("\n");
-
-		Acpi_os_printf ("ASL/AML Grammar Usage:\n\n");
-		Acpi_os_printf ("Elements Inside Methods:....% 7ld\n", Num_method_elements);
-		Acpi_os_printf ("Elements Outside Methods:...% 7ld\n", Num_grammar_elements - Num_method_elements);
-		Acpi_os_printf ("Total Grammar Elements:.....% 7ld\n", Num_grammar_elements);
-*/
+#endif
 		break;
 
 	case CMD_MEMORY:
 
-		acpi_os_printf ("\n_dynamic Memory Estimates:\n\n");
-		acpi_os_printf ("Parse Tree without Methods:.% 7ld\n", size_of_parse_tree);
-		acpi_os_printf ("Control Method Parse Trees:.% 7ld (If parsed simultaneously)\n", size_of_method_trees);
-		acpi_os_printf ("Namespace Nodes:............% 7ld (%d nodes)\n", sizeof (ACPI_NAMESPACE_NODE) * num_nodes, num_nodes);
-		acpi_os_printf ("Named Internal Objects......% 7ld\n", size_of_acpi_objects);
-		acpi_os_printf ("State Cache size............% 7ld\n", acpi_gbl_generic_state_cache_depth * sizeof (ACPI_GENERIC_STATE));
-		acpi_os_printf ("Parse Cache size............% 7ld\n", acpi_gbl_parse_cache_depth * sizeof (ACPI_PARSE_OBJECT));
-		acpi_os_printf ("Object Cache size...........% 7ld\n", acpi_gbl_object_cache_depth * sizeof (ACPI_OPERAND_OBJECT));
-		acpi_os_printf ("Walk_state Cache size........% 7ld\n", acpi_gbl_walk_state_cache_depth * sizeof (ACPI_WALK_STATE));
+#ifdef ACPI_DBG_TRACK_ALLOCATIONS
+		acpi_os_printf ("\n----Object and Cache Statistics---------------------------------------------\n");
 
-		acpi_os_printf ("\n");
+		for (i = 0; i < ACPI_NUM_MEM_LISTS; i++)
+		{
+			acpi_os_printf ("\n%s\n", acpi_gbl_memory_lists[i].list_name);
 
-		acpi_os_printf ("Cache Statistics:\n\n");
-		acpi_os_printf ("State Cache requests........% 7ld\n", acpi_gbl_state_cache_requests);
-		acpi_os_printf ("State Cache hits............% 7ld\n", acpi_gbl_state_cache_hits);
-		acpi_os_printf ("State Cache depth...........% 7ld (%d remaining entries)\n", acpi_gbl_generic_state_cache_depth,
-				  MAX_STATE_CACHE_DEPTH - acpi_gbl_generic_state_cache_depth);
-		acpi_os_printf ("Parse Cache requests........% 7ld\n", acpi_gbl_parse_cache_requests);
-		acpi_os_printf ("Parse Cache hits............% 7ld\n", acpi_gbl_parse_cache_hits);
-		acpi_os_printf ("Parse Cache depth...........% 7ld (%d remaining entries)\n", acpi_gbl_parse_cache_depth,
-				  MAX_PARSE_CACHE_DEPTH - acpi_gbl_parse_cache_depth);
-		acpi_os_printf ("Ext Parse Cache requests....% 7ld\n", acpi_gbl_ext_parse_cache_requests);
-		acpi_os_printf ("Ext Parse Cache hits........% 7ld\n", acpi_gbl_ext_parse_cache_hits);
-		acpi_os_printf ("Ext Parse Cache depth.......% 7ld (%d remaining entries)\n", acpi_gbl_ext_parse_cache_depth,
-				  MAX_EXTPARSE_CACHE_DEPTH - acpi_gbl_ext_parse_cache_depth);
-		acpi_os_printf ("Object Cache requests.......% 7ld\n", acpi_gbl_object_cache_requests);
-		acpi_os_printf ("Object Cache hits...........% 7ld\n", acpi_gbl_object_cache_hits);
-		acpi_os_printf ("Object Cache depth..........% 7ld (%d remaining entries)\n", acpi_gbl_object_cache_depth,
-				  MAX_OBJECT_CACHE_DEPTH - acpi_gbl_object_cache_depth);
-		acpi_os_printf ("Walk_state Cache requests....% 7ld\n", acpi_gbl_walk_state_cache_requests);
-		acpi_os_printf ("Walk_state Cache hits........% 7ld\n", acpi_gbl_walk_state_cache_hits);
-		acpi_os_printf ("Walk_state Cache depth.......% 7ld (%d remaining entries)\n", acpi_gbl_walk_state_cache_depth,
-				  MAX_WALK_CACHE_DEPTH - acpi_gbl_walk_state_cache_depth);
+			if (acpi_gbl_memory_lists[i].max_cache_depth > 0)
+			{
+				acpi_os_printf ("  Cache: [Depth Max Avail Size]         % 7d % 7d % 7d % 7d B\n",
+						acpi_gbl_memory_lists[i].cache_depth,
+						acpi_gbl_memory_lists[i].max_cache_depth,
+						acpi_gbl_memory_lists[i].max_cache_depth - acpi_gbl_memory_lists[i].cache_depth,
+						(acpi_gbl_memory_lists[i].cache_depth * acpi_gbl_memory_lists[i].object_size));
+
+				acpi_os_printf ("  Cache: [Requests Hits Misses Obj_size] % 7d % 7d % 7d % 7d B\n",
+						acpi_gbl_memory_lists[i].cache_requests,
+						acpi_gbl_memory_lists[i].cache_hits,
+						acpi_gbl_memory_lists[i].cache_requests - acpi_gbl_memory_lists[i].cache_hits,
+						acpi_gbl_memory_lists[i].object_size);
+			}
+
+			outstanding = acpi_gbl_memory_lists[i].total_allocated -
+					  acpi_gbl_memory_lists[i].total_freed -
+					  acpi_gbl_memory_lists[i].cache_depth;
+
+			if (acpi_gbl_memory_lists[i].object_size)
+			{
+				size = ROUND_UP_TO_1_k (outstanding * acpi_gbl_memory_lists[i].object_size);
+			}
+			else
+			{
+				size = ROUND_UP_TO_1_k (acpi_gbl_memory_lists[i].current_total_size);
+			}
+
+			acpi_os_printf ("  Mem:   [Alloc Free Outstanding Size]  % 7d % 7d % 7d % 7d Kb\n",
+					acpi_gbl_memory_lists[i].total_allocated,
+					acpi_gbl_memory_lists[i].total_freed,
+					outstanding, size);
+		}
+#endif
+
 		break;
 
 	case CMD_MISC:
@@ -439,13 +428,24 @@ acpi_db_display_statistics (
 
 		acpi_os_printf ("\n");
 
-		acpi_os_printf ("Parse_object   %3d\n", sizeof (ACPI_PARSE_OBJECT));
-		acpi_os_printf ("Parse2_object  %3d\n", sizeof (ACPI_PARSE2_OBJECT));
-		acpi_os_printf ("Operand_object %3d\n", sizeof (ACPI_OPERAND_OBJECT));
-		acpi_os_printf ("Namespace_node %3d\n", sizeof (ACPI_NAMESPACE_NODE));
+		acpi_os_printf ("Parse_object   %3d\n", sizeof (acpi_parse_object));
+		acpi_os_printf ("Parse2_object  %3d\n", sizeof (acpi_parse2_object));
+		acpi_os_printf ("Operand_object %3d\n", sizeof (acpi_operand_object));
+		acpi_os_printf ("Namespace_node %3d\n", sizeof (acpi_namespace_node));
 
 		break;
 
+
+	case CMD_STACK:
+
+		size = acpi_gbl_entry_stack_pointer - acpi_gbl_lowest_stack_pointer;
+
+		acpi_os_printf ("\n_subsystem Stack Usage:\n\n");
+		acpi_os_printf ("Entry Stack Pointer        %X\n", acpi_gbl_entry_stack_pointer);
+		acpi_os_printf ("Lowest Stack Pointer       %X\n", acpi_gbl_lowest_stack_pointer);
+		acpi_os_printf ("Stack Use                  %X (%d)\n", size, size);
+		acpi_os_printf ("Deepest Procedure Nesting  %d\n", acpi_gbl_deepest_nesting);
+		break;
 	}
 
 	acpi_os_printf ("\n");

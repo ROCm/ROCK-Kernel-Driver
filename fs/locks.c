@@ -257,7 +257,7 @@ static int assign_type(struct file_lock *fl, int type)
 static int flock_to_posix_lock(struct file *filp, struct file_lock *fl,
 			       struct flock *l)
 {
-	loff_t start;
+	off_t start, end;
 
 	switch (l->l_whence) {
 	case 0: /*SEEK_SET*/
@@ -270,17 +270,16 @@ static int flock_to_posix_lock(struct file *filp, struct file_lock *fl,
 		start = filp->f_dentry->d_inode->i_size;
 		break;
 	default:
-		return (0);
+		return -EINVAL;
 	}
 
 	if (((start += l->l_start) < 0) || (l->l_len < 0))
-		return (0);
-	fl->fl_end = start + l->l_len - 1;
-	if (l->l_len > 0 && fl->fl_end < 0)
-		return (0);
-	if (fl->fl_end > OFFT_OFFSET_MAX)
-		return 0;
+		return -EINVAL;
+	end = start + l->l_len - 1;
+	if (l->l_len > 0 && end < 0)
+		return -EOVERFLOW;
 	fl->fl_start = start;	/* we record the absolute position */
+	fl->fl_end = end;
 	if (l->l_len == 0)
 		fl->fl_end = OFFSET_MAX;
 	
@@ -292,7 +291,7 @@ static int flock_to_posix_lock(struct file *filp, struct file_lock *fl,
 	fl->fl_insert = NULL;
 	fl->fl_remove = NULL;
 
-	return (assign_type(fl, l->l_type) == 0);
+	return assign_type(fl, l->l_type);
 }
 
 #if BITS_PER_LONG == 32
@@ -312,14 +311,14 @@ static int flock64_to_posix_lock(struct file *filp, struct file_lock *fl,
 		start = filp->f_dentry->d_inode->i_size;
 		break;
 	default:
-		return (0);
+		return -EINVAL;
 	}
 
 	if (((start += l->l_start) < 0) || (l->l_len < 0))
-		return (0);
+		return -EINVAL;
 	fl->fl_end = start + l->l_len - 1;
 	if (l->l_len > 0 && fl->fl_end < 0)
-		return (0);
+		return -EOVERFLOW;
 	fl->fl_start = start;	/* we record the absolute position */
 	if (l->l_len == 0)
 		fl->fl_end = OFFSET_MAX;
@@ -339,10 +338,10 @@ static int flock64_to_posix_lock(struct file *filp, struct file_lock *fl,
 		fl->fl_type = l->l_type;
 		break;
 	default:
-		return (0);
+		return -EINVAL;
 	}
 
-	return (1);
+	return (0);
 }
 #endif
 
@@ -1370,8 +1369,8 @@ int fcntl_getlk(unsigned int fd, struct flock *l)
 	if (!filp)
 		goto out;
 
-	error = -EINVAL;
-	if (!flock_to_posix_lock(filp, &file_lock, &flock))
+	error = flock_to_posix_lock(filp, &file_lock, &flock);
+	if (error)
 		goto out_putf;
 
 	if (filp->f_op && filp->f_op->lock) {
@@ -1460,8 +1459,8 @@ int fcntl_setlk(unsigned int fd, unsigned int cmd, struct flock *l)
 		}
 	}
 
-	error = -EINVAL;
-	if (!flock_to_posix_lock(filp, file_lock, &flock))
+	error = flock_to_posix_lock(filp, file_lock, &flock);
+	if (error)
 		goto out_putf;
 	
 	error = -EBADF;
@@ -1535,8 +1534,8 @@ int fcntl_getlk64(unsigned int fd, struct flock64 *l)
 	if (!filp)
 		goto out;
 
-	error = -EINVAL;
-	if (!flock64_to_posix_lock(filp, &file_lock, &flock))
+	error = flock64_to_posix_lock(filp, &file_lock, &flock);
+	if (error)
 		goto out_putf;
 
 	if (filp->f_op && filp->f_op->lock) {
@@ -1613,8 +1612,8 @@ int fcntl_setlk64(unsigned int fd, unsigned int cmd, struct flock64 *l)
 		}
 	}
 
-	error = -EINVAL;
-	if (!flock64_to_posix_lock(filp, file_lock, &flock))
+	error = flock64_to_posix_lock(filp, file_lock, &flock);
+	if (error)
 		goto out_putf;
 	
 	error = -EBADF;

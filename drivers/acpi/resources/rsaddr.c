@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: rsaddr - Address resource descriptors (16/32/64)
- *              $Revision: 18 $
+ *              $Revision: 19 $
  *
  ******************************************************************************/
 
@@ -53,7 +53,7 @@
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_rs_address16_resource (
 	u8                      *byte_stream_buffer,
 	u32                     *bytes_consumed,
@@ -61,13 +61,15 @@ acpi_rs_address16_resource (
 	u32                     *structure_size)
 {
 	u8                      *buffer = byte_stream_buffer;
-	ACPI_RESOURCE           *output_struct = (ACPI_RESOURCE *) *output_buffer;
+	acpi_resource           *output_struct = (acpi_resource *) *output_buffer;
 	NATIVE_CHAR             *temp_ptr;
-	u32                     struct_size = SIZEOF_RESOURCE (ACPI_RESOURCE_ADDRESS16);
+	u32                     struct_size = SIZEOF_RESOURCE (acpi_resource_address16);
 	u32                     index;
 	u16                     temp16;
 	u8                      temp8;
 
+
+	FUNCTION_TRACE ("Rs_address16_resource");
 
 	/*
 	 * Point past the Descriptor to get the number of bytes consumed
@@ -86,7 +88,7 @@ acpi_rs_address16_resource (
 
 	/* Values 0-2 are valid */
 	if (temp8 > 2) {
-		return (AE_AML_INVALID_RESOURCE_TYPE);
+		return_ACPI_STATUS (AE_AML_INVALID_RESOURCE_TYPE);
 	}
 
 	output_struct->data.address16.resource_type = temp8 & 0x03;
@@ -249,7 +251,7 @@ acpi_rs_address16_resource (
 	 * Return the final size of the structure
 	 */
 	*structure_size = struct_size;
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -270,9 +272,9 @@ acpi_rs_address16_resource (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_rs_address16_stream (
-	ACPI_RESOURCE           *linked_list,
+	acpi_resource           *linked_list,
 	u8                      **output_buffer,
 	u32                     *bytes_consumed)
 {
@@ -281,6 +283,9 @@ acpi_rs_address16_stream (
 	u8                      temp8;
 	NATIVE_CHAR             *temp_pointer = NULL;
 	u32                     actual_bytes;
+
+
+	FUNCTION_TRACE ("Rs_address16_stream");
 
 
 	/*
@@ -410,7 +415,7 @@ acpi_rs_address16_stream (
 	 */
 	actual_bytes -= 3;
 	MOVE_UNALIGNED16_TO_16 (length_field, &actual_bytes);
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -436,7 +441,7 @@ acpi_rs_address16_stream (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_rs_address32_resource (
 	u8                      *byte_stream_buffer,
 	u32                     *bytes_consumed,
@@ -444,7 +449,7 @@ acpi_rs_address32_resource (
 	u32                     *structure_size)
 {
 	u8                      *buffer;
-	ACPI_RESOURCE           *output_struct;
+	acpi_resource           *output_struct;
 	u16                     temp16;
 	u8                      temp8;
 	NATIVE_CHAR             *temp_ptr;
@@ -452,10 +457,13 @@ acpi_rs_address32_resource (
 	u32                     index;
 
 
-	buffer = byte_stream_buffer;
-	output_struct = (ACPI_RESOURCE *) *output_buffer;
+	FUNCTION_TRACE ("Rs_address32_resource");
 
-	struct_size = SIZEOF_RESOURCE (ACPI_RESOURCE_ADDRESS32);
+
+	buffer = byte_stream_buffer;
+	output_struct = (acpi_resource *) *output_buffer;
+
+	struct_size = SIZEOF_RESOURCE (acpi_resource_address32);
 
 	/*
 	 * Point past the Descriptor to get the number of bytes consumed
@@ -475,7 +483,7 @@ acpi_rs_address32_resource (
 
 	/* Values 0-2 are valid */
 	if(temp8 > 2) {
-		return (AE_AML_INVALID_RESOURCE_TYPE);
+		return_ACPI_STATUS (AE_AML_INVALID_RESOURCE_TYPE);
 	}
 
 	output_struct->data.address32.resource_type = temp8 & 0x03;
@@ -637,7 +645,7 @@ acpi_rs_address32_resource (
 	 * Return the final size of the structure
 	 */
 	*structure_size = struct_size;
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -658,9 +666,9 @@ acpi_rs_address32_resource (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_rs_address32_stream (
-	ACPI_RESOURCE           *linked_list,
+	acpi_resource           *linked_list,
 	u8                      **output_buffer,
 	u32                     *bytes_consumed)
 {
@@ -668,6 +676,9 @@ acpi_rs_address32_stream (
 	u16                     *length_field;
 	u8                      temp8;
 	NATIVE_CHAR             *temp_pointer;
+
+
+	FUNCTION_TRACE ("Rs_address32_stream");
 
 
 	buffer = *output_buffer;
@@ -797,7 +808,7 @@ acpi_rs_address32_stream (
 	 *  minus the header size (3 bytes)
 	 */
 	*length_field = (u16) (*bytes_consumed - 3);
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -823,7 +834,7 @@ acpi_rs_address32_stream (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_rs_address64_resource (
 	u8                      *byte_stream_buffer,
 	u32                     *bytes_consumed,
@@ -831,7 +842,7 @@ acpi_rs_address64_resource (
 	u32                     *structure_size)
 {
 	u8                      *buffer;
-	ACPI_RESOURCE           *output_struct;
+	acpi_resource           *output_struct;
 	u16                     temp16;
 	u8                      temp8;
 	NATIVE_CHAR             *temp_ptr;
@@ -839,10 +850,13 @@ acpi_rs_address64_resource (
 	u32                     index;
 
 
-	buffer = byte_stream_buffer;
-	output_struct = (ACPI_RESOURCE *) *output_buffer;
+	FUNCTION_TRACE ("Rs_address64_resource");
 
-	struct_size = SIZEOF_RESOURCE (ACPI_RESOURCE_ADDRESS64);
+
+	buffer = byte_stream_buffer;
+	output_struct = (acpi_resource *) *output_buffer;
+
+	struct_size = SIZEOF_RESOURCE (acpi_resource_address64);
 
 	/*
 	 * Point past the Descriptor to get the number of bytes consumed
@@ -861,7 +875,7 @@ acpi_rs_address64_resource (
 
 	/* Values 0-2 are valid */
 	if(temp8 > 2) {
-		return (AE_AML_INVALID_RESOURCE_TYPE);
+		return_ACPI_STATUS (AE_AML_INVALID_RESOURCE_TYPE);
 	}
 
 	output_struct->data.address64.resource_type = temp8 & 0x03;
@@ -1026,7 +1040,7 @@ acpi_rs_address64_resource (
 	 * Return the final size of the structure
 	 */
 	*structure_size = struct_size;
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -1047,9 +1061,9 @@ acpi_rs_address64_resource (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_rs_address64_stream (
-	ACPI_RESOURCE           *linked_list,
+	acpi_resource           *linked_list,
 	u8                      **output_buffer,
 	u32                     *bytes_consumed)
 {
@@ -1057,6 +1071,9 @@ acpi_rs_address64_stream (
 	u16                     *length_field;
 	u8                      temp8;
 	NATIVE_CHAR             *temp_pointer;
+
+
+	FUNCTION_TRACE ("Rs_address64_stream");
 
 
 	buffer = *output_buffer;
@@ -1185,6 +1202,6 @@ acpi_rs_address64_stream (
 	 * minus the header size (3 bytes)
 	 */
 	*length_field = (u16) (*bytes_consumed - 3);
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 

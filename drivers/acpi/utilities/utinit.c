@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utinit - Common ACPI subsystem initialization
- *              $Revision: 96 $
+ *              $Revision: 101 $
  *
  *****************************************************************************/
 
@@ -38,6 +38,7 @@
 #define ACPI_OFFSET(d,o)    ((u32) &(((d *)0)->o))
 #define ACPI_FADT_OFFSET(o) ACPI_OFFSET (FADT_DESCRIPTOR, o)
 
+
 /*******************************************************************************
  *
  * FUNCTION:    Acpi_ut_fadt_register_error
@@ -53,7 +54,7 @@
  *
  ******************************************************************************/
 
-static ACPI_STATUS
+static acpi_status
 acpi_ut_fadt_register_error (
 	NATIVE_CHAR             *register_name,
 	u32                     value,
@@ -81,18 +82,17 @@ acpi_ut_fadt_register_error (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ut_validate_fadt (
 	void)
 {
-	ACPI_STATUS                 status = AE_OK;
+	acpi_status                 status = AE_OK;
 
 
 	/*
 	 * Verify Fixed ACPI Description Table fields,
 	 * but don't abort on any problems, just display error
 	 */
-
 	if (acpi_gbl_FADT->pm1_evt_len < 4) {
 		status = acpi_ut_fadt_register_error ("PM1_EVT_LEN",
 				  (u32) acpi_gbl_FADT->pm1_evt_len,
@@ -134,7 +134,6 @@ acpi_ut_validate_fadt (
 
 	/* length of GPE blocks must be a multiple of 2 */
 
-
 	if (ACPI_VALID_ADDRESS (acpi_gbl_FADT->Xgpe0blk.address) &&
 		(acpi_gbl_FADT->gpe0blk_len & 1)) {
 		status = acpi_ut_fadt_register_error ("(x)GPE0_BLK_LEN",
@@ -169,19 +168,21 @@ void
 acpi_ut_terminate (void)
 {
 
+	FUNCTION_TRACE ("Ut_terminate");
+
 
 	/* Free global tables, etc. */
 
 	if (acpi_gbl_gpe0enable_register_save) {
-		acpi_ut_free (acpi_gbl_gpe0enable_register_save);
+		ACPI_MEM_FREE (acpi_gbl_gpe0enable_register_save);
 	}
 
 	if (acpi_gbl_gpe1_enable_register_save) {
-		acpi_ut_free (acpi_gbl_gpe1_enable_register_save);
+		ACPI_MEM_FREE (acpi_gbl_gpe1_enable_register_save);
 	}
 
 
-	return;
+	return_VOID;
 }
 
 
@@ -198,19 +199,24 @@ acpi_ut_terminate (void)
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ut_subsystem_shutdown (void)
 {
+
+	FUNCTION_TRACE ("Ut_subsystem_shutdown");
 
 	/* Just exit if subsystem is already shutdown */
 
 	if (acpi_gbl_shutdown) {
-		return (AE_OK);
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "ACPI Subsystem is already terminated\n"));
+		return_ACPI_STATUS (AE_OK);
 	}
 
 	/* Subsystem appears active, go ahead and shut it down */
 
 	acpi_gbl_shutdown = TRUE;
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Shutting down ACPI Subsystem...\n"));
+
 
 	/* Close the Namespace */
 
@@ -237,11 +243,12 @@ acpi_ut_subsystem_shutdown (void)
 	acpi_ps_delete_parse_cache ();
 
 	/* Debug only - display leftover memory allocation, if any */
-#ifdef ENABLE_DEBUGGER
+
+#ifdef ACPI_DBG_TRACK_ALLOCATIONS
 	acpi_ut_dump_current_allocations (ACPI_UINT32_MAX, NULL);
 #endif
 
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 

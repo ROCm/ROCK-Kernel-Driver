@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dbinput - user front-end to the AML debugger
- *              $Revision: 61 $
+ *              $Revision: 68 $
  *
  ******************************************************************************/
 
@@ -42,28 +42,43 @@
  * Globals that are specific to the debugger
  */
 
-NATIVE_CHAR             line_buf[80];
-NATIVE_CHAR             parsed_buf[80];
-NATIVE_CHAR             scope_buf[40];
-NATIVE_CHAR             debug_filename[40];
-NATIVE_CHAR             *args[DB_MAX_ARGS];
-NATIVE_CHAR             *buffer;
-NATIVE_CHAR             *filename = NULL;
-u8                      output_to_file = FALSE;
+NATIVE_CHAR                 acpi_gbl_db_line_buf[80];
+NATIVE_CHAR                 acpi_gbl_db_parsed_buf[80];
+NATIVE_CHAR                 acpi_gbl_db_scope_buf[40];
+NATIVE_CHAR                 acpi_gbl_db_debug_filename[40];
+NATIVE_CHAR                 *acpi_gbl_db_args[DB_MAX_ARGS];
+NATIVE_CHAR                 *acpi_gbl_db_buffer;
+NATIVE_CHAR                 *acpi_gbl_db_filename = NULL;
+u8                          acpi_gbl_db_output_to_file = FALSE;
 
 
-u32                     acpi_gbl_db_debug_level = 0x0FFFFFFF;
-u32                     acpi_gbl_db_console_debug_level = NORMAL_DEFAULT | TRACE_TABLES;
-u8                      acpi_gbl_db_output_flags = DB_CONSOLE_OUTPUT;
+u32                         acpi_gbl_db_debug_level = ACPI_LV_VERBOSITY2;
+u32                         acpi_gbl_db_console_debug_level = NORMAL_DEFAULT | ACPI_LV_TABLES;
+u8                          acpi_gbl_db_output_flags = DB_CONSOLE_OUTPUT;
 
 
-u8                      opt_tables      = FALSE;
-u8                      opt_disasm      = FALSE;
-u8                      opt_stats       = FALSE;
-u8                      opt_parse_jit   = FALSE;
-u8                      opt_verbose     = TRUE;
-u8                      opt_ini_methods = TRUE;
+u8                          acpi_gbl_db_opt_tables    = FALSE;
+u8                          acpi_gbl_db_opt_disasm    = FALSE;
+u8                          acpi_gbl_db_opt_stats     = FALSE;
+u8                          acpi_gbl_db_opt_parse_jit = FALSE;
+u8                          acpi_gbl_db_opt_verbose   = TRUE;
+u8                          acpi_gbl_db_opt_ini_methods = TRUE;
 
+/*
+ * Statistic globals
+ */
+u16                         acpi_gbl_obj_type_count[INTERNAL_TYPE_NODE_MAX+1];
+u16                         acpi_gbl_node_type_count[INTERNAL_TYPE_NODE_MAX+1];
+u16                         acpi_gbl_obj_type_count_misc;
+u16                         acpi_gbl_node_type_count_misc;
+u32                         acpi_gbl_num_nodes;
+u32                         acpi_gbl_num_objects;
+
+
+u32                         acpi_gbl_size_of_parse_tree;
+u32                         acpi_gbl_size_of_method_trees;
+u32                         acpi_gbl_size_of_node_entries;
+u32                         acpi_gbl_size_of_acpi_objects;
 
 /*
  * Top-level debugger commands.
@@ -125,7 +140,7 @@ enum acpi_ex_debugger_commands
 #define CMD_FIRST_VALID     2
 
 
-COMMAND_INFO                commands[] =
+const COMMAND_INFO          acpi_gbl_db_commands[] =
 { {"<NOT FOUND>",  0},
 	{"<NULL>",       0},
 	{"ALLOCATIONS",  0},
@@ -172,7 +187,7 @@ COMMAND_INFO                commands[] =
 	{"TERMINATE",    0},
 	{"THREADS",      3},
 	{"TREE",         0},
-	{"UNLOAD",       0},
+	{"UNLOAD",       1},
 	{NULL,           0}
 };
 
@@ -201,7 +216,7 @@ acpi_db_display_help (
 	{
 		acpi_os_printf ("ACPI CA Debugger Commands\n\n");
 		acpi_os_printf ("The following classes of commands are available. Help is available for\n");
-		acpi_os_printf ("each class by entering \"help <class_name>\"\n\n");
+		acpi_os_printf ("each class by entering \"Help <Class_name>\"\n\n");
 		acpi_os_printf ("  [GENERAL]       General-Purpose Commands\n");
 		acpi_os_printf ("  [NAMESPACE]     Namespace Access Commands\n");
 		acpi_os_printf ("  [METHOD]        Control Method Execution Commands\n");
@@ -233,7 +248,7 @@ acpi_db_display_help (
 		acpi_os_printf ("Stats [Allocations|Memory|Misc\n");
 		acpi_os_printf ("     |Objects|Tables]             Display namespace and memory statistics\n");
 		acpi_os_printf ("Tables                            Display info about loaded ACPI tables\n");
-		acpi_os_printf ("Unload                            Unload an ACPI table\n");
+		acpi_os_printf ("Unload <Table_sig> [Instance]     Unload an ACPI table\n");
 		acpi_os_printf ("! <Command_number>                Execute command from history buffer\n");
 		acpi_os_printf ("!!                                Execute last command again\n");
 		return;
@@ -378,14 +393,14 @@ acpi_db_get_line (
 	NATIVE_CHAR             *this;
 
 
-	STRCPY (parsed_buf, input_buffer);
-	STRUPR (parsed_buf);
+	STRCPY (acpi_gbl_db_parsed_buf, input_buffer);
+	STRUPR (acpi_gbl_db_parsed_buf);
 
-	this = parsed_buf;
+	this = acpi_gbl_db_parsed_buf;
 	for (i = 0; i < DB_MAX_ARGS; i++)
 	{
-		args[i] = acpi_db_get_next_token (this, &next);
-		if (!args[i])
+		acpi_gbl_db_args[i] = acpi_db_get_next_token (this, &next);
+		if (!acpi_gbl_db_args[i])
 		{
 			break;
 		}
@@ -396,9 +411,9 @@ acpi_db_get_line (
 
 	/* Uppercase the actual command */
 
-	if (args[0])
+	if (acpi_gbl_db_args[0])
 	{
-		STRUPR (args[0]);
+		STRUPR (acpi_gbl_db_args[0]);
 	}
 
 	count = i;
@@ -435,9 +450,9 @@ acpi_db_match_command (
 		return (CMD_NULL);
 	}
 
-	for (i = CMD_FIRST_VALID; commands[i].name; i++)
+	for (i = CMD_FIRST_VALID; acpi_gbl_db_commands[i].name; i++)
 	{
-		if (STRSTR (commands[i].name, user_command) == commands[i].name)
+		if (STRSTR (acpi_gbl_db_commands[i].name, user_command) == acpi_gbl_db_commands[i].name)
 		{
 			return (i);
 		}
@@ -463,17 +478,17 @@ acpi_db_match_command (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_db_command_dispatch (
 	NATIVE_CHAR             *input_buffer,
-	ACPI_WALK_STATE         *walk_state,
-	ACPI_PARSE_OBJECT       *op)
+	acpi_walk_state         *walk_state,
+	acpi_parse_object       *op)
 {
 	u32                     temp;
 	u32                     command_index;
 	u32                     param_count;
 	NATIVE_CHAR             *command_line;
-	ACPI_STATUS             status = AE_CTRL_TRUE;
+	acpi_status             status = AE_CTRL_TRUE;
 
 
 	/* If Acpi_terminate has been called, terminate this thread */
@@ -484,15 +499,15 @@ acpi_db_command_dispatch (
 	}
 
 	param_count = acpi_db_get_line (input_buffer);
-	command_index = acpi_db_match_command (args[0]);
+	command_index = acpi_db_match_command (acpi_gbl_db_args[0]);
 	temp = 0;
 
 	/* Verify that we have the minimum number of params */
 
-	if (param_count < commands[command_index].min_args)
+	if (param_count < acpi_gbl_db_commands[command_index].min_args)
 	{
 		acpi_os_printf ("%d parameters entered, [%s] requires %d parameters\n",
-				  param_count, commands[command_index].name, commands[command_index].min_args);
+				  param_count, acpi_gbl_db_commands[command_index].name, acpi_gbl_db_commands[command_index].min_args);
 		return (AE_CTRL_TRUE);
 	}
 
@@ -508,7 +523,10 @@ acpi_db_command_dispatch (
 		break;
 
 	case CMD_ALLOCATIONS:
+
+#ifdef ACPI_DBG_TRACK_ALLOCATIONS
 		acpi_ut_dump_current_allocations ((u32) -1, NULL);
+#endif
 		break;
 
 	case CMD_ARGS:
@@ -517,7 +535,7 @@ acpi_db_command_dispatch (
 		break;
 
 	case CMD_BREAKPOINT:
-		acpi_db_set_method_breakpoint (args[1], walk_state, op);
+		acpi_db_set_method_breakpoint (acpi_gbl_db_args[1], walk_state, op);
 		break;
 
 	case CMD_CALL:
@@ -530,11 +548,11 @@ acpi_db_command_dispatch (
 		break;
 
 	case CMD_DEBUG:
-		acpi_db_execute (args[1], &args[2], EX_SINGLE_STEP);
+		acpi_db_execute (acpi_gbl_db_args[1], &acpi_gbl_db_args[2], EX_SINGLE_STEP);
 		break;
 
 	case CMD_DUMP:
-		acpi_db_decode_and_display_object (args[1], args[2]);
+		acpi_db_decode_and_display_object (acpi_gbl_db_args[1], acpi_gbl_db_args[2]);
 		break;
 
 	case CMD_ENABLEACPI:
@@ -551,11 +569,11 @@ acpi_db_command_dispatch (
 		break;
 
 	case CMD_EXECUTE:
-		acpi_db_execute (args[1], &args[2], EX_NO_SINGLE_STEP);
+		acpi_db_execute (acpi_gbl_db_args[1], &acpi_gbl_db_args[2], EX_NO_SINGLE_STEP);
 		break;
 
 	case CMD_FIND:
-		acpi_db_find_name_in_namespace (args[1]);
+		acpi_db_find_name_in_namespace (acpi_gbl_db_args[1]);
 		break;
 
 	case CMD_GO:
@@ -564,7 +582,7 @@ acpi_db_command_dispatch (
 
 	case CMD_HELP:
 	case CMD_HELP2:
-		acpi_db_display_help (args[1]);
+		acpi_db_display_help (acpi_gbl_db_args[1]);
 		break;
 
 	case CMD_HISTORY:
@@ -572,7 +590,7 @@ acpi_db_command_dispatch (
 		break;
 
 	case CMD_HISTORY_EXE:
-		command_line = acpi_db_get_from_history (args[1]);
+		command_line = acpi_db_get_from_history (acpi_gbl_db_args[1]);
 		if (!command_line)
 		{
 			return (AE_CTRL_TRUE);
@@ -624,23 +642,23 @@ acpi_db_command_dispatch (
 		else if (param_count == 2)
 		{
 			temp = acpi_gbl_db_console_debug_level;
-			acpi_gbl_db_console_debug_level = STRTOUL (args[1], NULL, 16);
+			acpi_gbl_db_console_debug_level = STRTOUL (acpi_gbl_db_args[1], NULL, 16);
 			acpi_os_printf ("Debug Level for console output was %8.8lX, now %8.8lX\n", temp, acpi_gbl_db_console_debug_level);
 		}
 		else
 		{
 			temp = acpi_gbl_db_debug_level;
-			acpi_gbl_db_debug_level = STRTOUL (args[1], NULL, 16);
+			acpi_gbl_db_debug_level = STRTOUL (acpi_gbl_db_args[1], NULL, 16);
 			acpi_os_printf ("Debug Level for file output was %8.8lX, now %8.8lX\n", temp, acpi_gbl_db_debug_level);
 		}
 		break;
 
 	case CMD_LIST:
-		acpi_db_disassemble_aml (args[1], op);
+		acpi_db_disassemble_aml (acpi_gbl_db_args[1], op);
 		break;
 
 	case CMD_LOAD:
-		status = acpi_db_load_acpi_table (args[1]);
+		status = acpi_db_load_acpi_table (acpi_gbl_db_args[1]);
 		if (ACPI_FAILURE (status))
 		{
 			return (status);
@@ -656,40 +674,40 @@ acpi_db_command_dispatch (
 		break;
 
 	case CMD_METHODS:
-		acpi_db_display_objects ("METHOD", args[1]);
+		acpi_db_display_objects ("METHOD", acpi_gbl_db_args[1]);
 		break;
 
 	case CMD_NAMESPACE:
-		acpi_db_dump_namespace (args[1], args[2]);
+		acpi_db_dump_namespace (acpi_gbl_db_args[1], acpi_gbl_db_args[2]);
 		break;
 
 	case CMD_NOTIFY:
-		temp = STRTOUL (args[2], NULL, 0);
-		acpi_db_send_notify (args[1], temp);
+		temp = STRTOUL (acpi_gbl_db_args[2], NULL, 0);
+		acpi_db_send_notify (acpi_gbl_db_args[1], temp);
 		break;
 
 	case CMD_OBJECT:
-		acpi_db_display_objects (STRUPR (args[1]), args[2]);
+		acpi_db_display_objects (STRUPR (acpi_gbl_db_args[1]), acpi_gbl_db_args[2]);
 		break;
 
 	case CMD_OPEN:
-		acpi_db_open_debug_file (args[1]);
+		acpi_db_open_debug_file (acpi_gbl_db_args[1]);
 		break;
 
 	case CMD_OWNER:
-		acpi_db_dump_namespace_by_owner (args[1], args[2]);
+		acpi_db_dump_namespace_by_owner (acpi_gbl_db_args[1], acpi_gbl_db_args[2]);
 		break;
 
 	case CMD_PREFIX:
-		acpi_db_set_scope (args[1]);
+		acpi_db_set_scope (acpi_gbl_db_args[1]);
 		break;
 
 	case CMD_REFERENCES:
-		acpi_db_find_references (args[1]);
+		acpi_db_find_references (acpi_gbl_db_args[1]);
 		break;
 
 	case CMD_RESOURCES:
-		acpi_db_display_resources (args[1]);
+		acpi_db_display_resources (acpi_gbl_db_args[1]);
 		break;
 
 	case CMD_RESULTS:
@@ -697,11 +715,11 @@ acpi_db_command_dispatch (
 		break;
 
 	case CMD_SET:
-		acpi_db_set_method_data (args[1], args[2], args[3]);
+		acpi_db_set_method_data (acpi_gbl_db_args[1], acpi_gbl_db_args[2], acpi_gbl_db_args[3]);
 		break;
 
 	case CMD_STATS:
-		acpi_db_display_statistics (args[1]);
+		acpi_db_display_statistics (acpi_gbl_db_args[1]);
 		break;
 
 	case CMD_STOP:
@@ -709,7 +727,7 @@ acpi_db_command_dispatch (
 		break;
 
 	case CMD_TABLES:
-		acpi_db_display_table_info (args[1]);
+		acpi_db_display_table_info (acpi_gbl_db_args[1]);
 		break;
 
 	case CMD_TERMINATE:
@@ -722,7 +740,7 @@ acpi_db_command_dispatch (
 		break;
 
 	case CMD_THREADS:
-		acpi_db_create_execution_threads (args[1], args[2], args[3]);
+		acpi_db_create_execution_threads (acpi_gbl_db_args[1], acpi_gbl_db_args[2], acpi_gbl_db_args[3]);
 		break;
 
 	case CMD_TREE:
@@ -730,7 +748,7 @@ acpi_db_command_dispatch (
 		break;
 
 	case CMD_UNLOAD:
-		acpi_db_unload_acpi_table (args[1], args[2]);
+		acpi_db_unload_acpi_table (acpi_gbl_db_args[1], acpi_gbl_db_args[2]);
 		break;
 
 	case CMD_EXIT:
@@ -741,7 +759,7 @@ acpi_db_command_dispatch (
 			return (AE_CTRL_TERMINATE);
 		}
 
-		if (!output_to_file)
+		if (!acpi_gbl_db_output_to_file)
 		{
 			acpi_dbg_level = DEBUG_DEFAULT;
 		}
@@ -785,7 +803,7 @@ void
 acpi_db_execute_thread (
 	void                    *context)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 
 
 	while (status != AE_CTRL_TERMINATE)
@@ -794,7 +812,7 @@ acpi_db_execute_thread (
 		acpi_gbl_step_to_next_call = FALSE;
 
 		acpi_ut_acquire_mutex (ACPI_MTX_DEBUG_CMD_READY);
-		status = acpi_db_command_dispatch (line_buf, NULL, NULL);
+		status = acpi_db_command_dispatch (acpi_gbl_db_line_buf, NULL, NULL);
 		acpi_ut_release_mutex (ACPI_MTX_DEBUG_CMD_COMPLETE);
 	}
 }
@@ -817,13 +835,13 @@ void
 acpi_db_single_thread (
 	void)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 
 
 	acpi_gbl_method_executing = FALSE;
 	acpi_gbl_step_to_next_call = FALSE;
 
-	status = acpi_db_command_dispatch (line_buf, NULL, NULL);
+	status = acpi_db_command_dispatch (acpi_gbl_db_line_buf, NULL, NULL);
 }
 
 
@@ -841,12 +859,12 @@ acpi_db_single_thread (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_db_user_commands (
 	NATIVE_CHAR             prompt,
-	ACPI_PARSE_OBJECT       *op)
+	acpi_parse_object       *op)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 
 
 	/* TBD: [Restructure] Need a separate command line buffer for step mode */
@@ -870,7 +888,7 @@ acpi_db_user_commands (
 
 		/* Get the user input line */
 
-		acpi_os_get_line (line_buf);
+		acpi_os_get_line (acpi_gbl_db_line_buf);
 
 
 		/* Check for single or multithreaded debug */
@@ -881,7 +899,6 @@ acpi_db_user_commands (
 			 * Signal the debug thread that we have a command to execute,
 			 * and wait for the command to complete.
 			 */
-
 			acpi_ut_release_mutex (ACPI_MTX_DEBUG_CMD_READY);
 			acpi_ut_acquire_mutex (ACPI_MTX_DEBUG_CMD_COMPLETE);
 		}

@@ -44,6 +44,20 @@
 #define ACPI_MUTEX_SEM              1
 
 
+/* Functions for Acpi_os_signal */
+
+#define ACPI_SIGNAL_FATAL           0
+#define ACPI_SIGNAL_BREAKPOINT      1
+
+typedef struct acpi_fatal_info
+{
+	u32                     type;
+	u32                     code;
+	u32                     argument;
+
+} ACPI_SIGNAL_FATAL_INFO;
+
+
 /*
  * Types specific to the OS service interfaces
  */
@@ -61,38 +75,43 @@ void (*OSD_EXECUTION_CALLBACK) (
  * OSL Initialization and shutdown primitives
  */
 
-ACPI_STATUS
+acpi_status
 acpi_os_initialize (
 	void);
 
-ACPI_STATUS
+acpi_status
 acpi_os_terminate (
 	void);
+
+acpi_status
+acpi_os_get_root_pointer (
+	u32                     flags,
+	ACPI_PHYSICAL_ADDRESS   *rsdp_physical_address);
 
 
 /*
  * Synchronization primitives
  */
 
-ACPI_STATUS
+acpi_status
 acpi_os_create_semaphore (
 	u32                     max_units,
 	u32                     initial_units,
-	ACPI_HANDLE             *out_handle);
+	acpi_handle             *out_handle);
 
-ACPI_STATUS
+acpi_status
 acpi_os_delete_semaphore (
-	ACPI_HANDLE             handle);
+	acpi_handle             handle);
 
-ACPI_STATUS
+acpi_status
 acpi_os_wait_semaphore (
-	ACPI_HANDLE             handle,
+	acpi_handle             handle,
 	u32                     units,
 	u32                     timeout);
 
-ACPI_STATUS
+acpi_status
 acpi_os_signal_semaphore (
-	ACPI_HANDLE             handle,
+	acpi_handle             handle,
 	u32                     units);
 
 
@@ -112,7 +131,7 @@ void
 acpi_os_free (
 	void *                  memory);
 
-ACPI_STATUS
+acpi_status
 acpi_os_map_memory (
 	ACPI_PHYSICAL_ADDRESS   physical_address,
 	u32                     length,
@@ -123,7 +142,7 @@ acpi_os_unmap_memory (
 	void                    *logical_address,
 	u32                     length);
 
-ACPI_STATUS
+acpi_status
 acpi_os_get_physical_address (
 	void                    *logical_address,
 	ACPI_PHYSICAL_ADDRESS   *physical_address);
@@ -133,13 +152,13 @@ acpi_os_get_physical_address (
  * Interrupt handlers
  */
 
-ACPI_STATUS
+acpi_status
 acpi_os_install_interrupt_handler (
 	u32                     interrupt_number,
 	OSD_HANDLER             service_routine,
 	void                    *context);
 
-ACPI_STATUS
+acpi_status
 acpi_os_remove_interrupt_handler (
 	u32                     interrupt_number,
 	OSD_HANDLER             service_routine);
@@ -153,7 +172,7 @@ u32
 acpi_os_get_thread_id (
 	void);
 
-ACPI_STATUS
+acpi_status
 acpi_os_queue_for_execution (
 	u32                     priority,
 	OSD_EXECUTION_CALLBACK  function,
@@ -165,130 +184,69 @@ acpi_os_sleep (
 	u32                     milliseconds);
 
 void
-acpi_os_sleep_usec (
+acpi_os_stall (
 	u32                     microseconds);
 
 
 /*
- * Platform/Hardware independent I/O interfaces
+ * Platform and hardware-independent I/O interfaces
  */
 
-u8
-acpi_os_in8 (
-	ACPI_IO_ADDRESS         in_port);
+acpi_status
+acpi_os_read_port (
+	ACPI_IO_ADDRESS         address,
+	void                    *value,
+	u32                     width);
 
 
-u16
-acpi_os_in16 (
-	ACPI_IO_ADDRESS         in_port);
-
-u32
-acpi_os_in32 (
-	ACPI_IO_ADDRESS         in_port);
-
-void
-acpi_os_out8 (
-	ACPI_IO_ADDRESS         out_port,
-	u8                      value);
-
-void
-acpi_os_out16 (
-	ACPI_IO_ADDRESS         out_port,
-	u16                     value);
-
-void
-acpi_os_out32 (
-	ACPI_IO_ADDRESS         out_port,
-	u32                     value);
+acpi_status
+acpi_os_write_port (
+	ACPI_IO_ADDRESS         address,
+	NATIVE_UINT             value,
+	u32                     width);
 
 
 /*
- * Platform/Hardware independent physical memory interfaces
+ * Platform and hardware-independent physical memory interfaces
  */
 
-u8
-acpi_os_mem_in8 (
-	ACPI_PHYSICAL_ADDRESS   in_addr);
+acpi_status
+acpi_os_read_memory (
+	ACPI_PHYSICAL_ADDRESS   address,
+	void                    *value,
+	u32                     width);
 
-u16
-acpi_os_mem_in16 (
-	ACPI_PHYSICAL_ADDRESS   in_addr);
 
-u32
-acpi_os_mem_in32 (
-	ACPI_PHYSICAL_ADDRESS   in_addr);
-
-void
-acpi_os_mem_out8 (
-	ACPI_PHYSICAL_ADDRESS   out_addr,
-	u8                      value);
-
-void
-acpi_os_mem_out16 (
-	ACPI_PHYSICAL_ADDRESS   out_addr,
-	u16                     value);
-
-void
-acpi_os_mem_out32 (
-	ACPI_PHYSICAL_ADDRESS   out_addr,
-	u32                     value);
+acpi_status
+acpi_os_write_memory (
+	ACPI_PHYSICAL_ADDRESS   address,
+	NATIVE_UINT             value,
+	u32                     width);
 
 
 /*
- * Standard access to PCI configuration space
+ * Platform and hardware-independent PCI configuration space access
  */
 
-ACPI_STATUS
-acpi_os_read_pci_cfg_byte (
-	u32                     bus,
-	u32                     device_function,
+acpi_status
+acpi_os_read_pci_configuration (
+	acpi_pci_id             *pci_id,
 	u32                     register,
-	u8                      *value);
-
-ACPI_STATUS
-acpi_os_read_pci_cfg_word (
-	u32                     bus,
-	u32                     device_function,
-	u32                     register,
-	u16                     *value);
-
-ACPI_STATUS
-acpi_os_read_pci_cfg_dword (
-	u32                     bus,
-	u32                     device_function,
-	u32                     register,
-	u32                     *value);
-
-ACPI_STATUS
-acpi_os_write_pci_cfg_byte (
-	u32                     bus,
-	u32                     device_function,
-	u32                     register,
-	u8                      value);
-
-ACPI_STATUS
-acpi_os_write_pci_cfg_word (
-	u32                     bus,
-	u32                     device_function,
-	u32                     register,
-	u16                     value);
+	void                    *value,
+	u32                     width);
 
 
-ACPI_STATUS
-acpi_os_write_pci_cfg_dword (
-	u32                     bus,
-	u32                     device_function,
+acpi_status
+acpi_os_write_pci_configuration (
+	acpi_pci_id             *pci_id,
 	u32                     register,
-	u32                     value);
+	NATIVE_UINT             value,
+	u32                     width);
 
 
 /*
  * Miscellaneous
  */
-
-ACPI_STATUS
-acpi_os_breakpoint (
-	NATIVE_CHAR             *message);
 
 u8
 acpi_os_readable (
@@ -305,6 +263,10 @@ u32
 acpi_os_get_timer (
 	void);
 
+acpi_status
+acpi_os_signal (
+	u32                     function,
+	void                    *info);
 
 /*
  * Debug print routines

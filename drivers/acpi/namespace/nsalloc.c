@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: nsalloc - Namespace allocation and deletion utilities
- *              $Revision: 50 $
+ *              $Revision: 56 $
  *
  ******************************************************************************/
 
@@ -37,33 +37,36 @@
  *
  * FUNCTION:    Acpi_ns_create_node
  *
- * PARAMETERS:
+ * PARAMETERS:  Acpi_name       - Name of the new node
  *
  * RETURN:      None
  *
- * DESCRIPTION:
+ * DESCRIPTION: Create a namespace node
  *
  ******************************************************************************/
 
-ACPI_NAMESPACE_NODE *
+acpi_namespace_node *
 acpi_ns_create_node (
-	u32                     acpi_name)
+	u32                     name)
 {
-	ACPI_NAMESPACE_NODE     *node;
+	acpi_namespace_node     *node;
 
 
-	node = acpi_ut_callocate (sizeof (ACPI_NAMESPACE_NODE));
+	FUNCTION_TRACE ("Ns_create_node");
+
+
+	node = ACPI_MEM_CALLOCATE (sizeof (acpi_namespace_node));
 	if (!node) {
-		return (NULL);
+		return_PTR (NULL);
 	}
 
-	INCREMENT_NAME_TABLE_METRICS (sizeof (ACPI_NAMESPACE_NODE));
+	ACPI_MEM_TRACKING (acpi_gbl_memory_lists[ACPI_MEM_LIST_NSNODE].total_allocated++);
 
 	node->data_type      = ACPI_DESC_TYPE_NAMED;
-	node->name           = acpi_name;
+	node->name           = name;
 	node->reference_count = 1;
 
-	return (node);
+	return_PTR (node);
 }
 
 
@@ -71,21 +74,24 @@ acpi_ns_create_node (
  *
  * FUNCTION:    Acpi_ns_delete_node
  *
- * PARAMETERS:
+ * PARAMETERS:  Node            - Node to be deleted
  *
  * RETURN:      None
  *
- * DESCRIPTION:
+ * DESCRIPTION: Delete a namespace node
  *
  ******************************************************************************/
 
 void
 acpi_ns_delete_node (
-	ACPI_NAMESPACE_NODE     *node)
+	acpi_namespace_node     *node)
 {
-	ACPI_NAMESPACE_NODE     *parent_node;
-	ACPI_NAMESPACE_NODE     *prev_node;
-	ACPI_NAMESPACE_NODE     *next_node;
+	acpi_namespace_node     *parent_node;
+	acpi_namespace_node     *prev_node;
+	acpi_namespace_node     *next_node;
+
+
+	FUNCTION_TRACE_PTR ("Ns_delete_node", node);
 
 
 	parent_node = acpi_ns_get_parent_object (node);
@@ -109,20 +115,17 @@ acpi_ns_delete_node (
 	}
 
 
-	DECREMENT_NAME_TABLE_METRICS (sizeof (ACPI_NAMESPACE_NODE));
+	ACPI_MEM_TRACKING (acpi_gbl_memory_lists[ACPI_MEM_LIST_NSNODE].total_freed++);
 
 	/*
 	 * Detach an object if there is one
 	 */
-
 	if (node->object) {
 		acpi_ns_detach_object (node);
 	}
 
-	acpi_ut_free (node);
-
-
-	return;
+	ACPI_MEM_FREE (node);
+	return_VOID;
 }
 
 
@@ -132,7 +135,7 @@ acpi_ns_delete_node (
  *
  * PARAMETERS:  Walk_state      - Current state of the walk
  *              Parent_node     - The parent of the new Node
- *              Node        - The new Node to install
+ *              Node            - The new Node to install
  *              Type            - ACPI object type of the new Node
  *
  * RETURN:      None
@@ -143,13 +146,16 @@ acpi_ns_delete_node (
 
 void
 acpi_ns_install_node (
-	ACPI_WALK_STATE         *walk_state,
-	ACPI_NAMESPACE_NODE     *parent_node,   /* Parent */
-	ACPI_NAMESPACE_NODE     *node,      /* New Child*/
-	ACPI_OBJECT_TYPE8       type)
+	acpi_walk_state         *walk_state,
+	acpi_namespace_node     *parent_node,   /* Parent */
+	acpi_namespace_node     *node,          /* New Child*/
+	acpi_object_type8       type)
 {
 	u16                     owner_id = TABLE_ID_DSDT;
-	ACPI_NAMESPACE_NODE     *child_node;
+	acpi_namespace_node     *child_node;
+
+
+	FUNCTION_TRACE ("Ns_install_node");
 
 
 	/*
@@ -203,6 +209,8 @@ acpi_ns_install_node (
 		 * We will fill in the actual type when the
 		 * real definition is found later.
 		 */
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "[%4.4s] is a forward reference\n",
+			&node->name));
 	}
 
 	/*
@@ -226,6 +234,9 @@ acpi_ns_install_node (
 		node->type = (u8) type;
 	}
 
+	ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "%4.4s added to %p at %p\n",
+		&node->name, parent_node, node));
+
 	/*
 	 * Increment the reference count(s) of all parents up to
 	 * the root!
@@ -234,7 +245,7 @@ acpi_ns_install_node (
 		node->reference_count++;
 	}
 
-	return;
+	return_VOID;
 }
 
 
@@ -253,22 +264,25 @@ acpi_ns_install_node (
 
 void
 acpi_ns_delete_children (
-	ACPI_NAMESPACE_NODE     *parent_node)
+	acpi_namespace_node     *parent_node)
 {
-	ACPI_NAMESPACE_NODE     *child_node;
-	ACPI_NAMESPACE_NODE     *next_node;
+	acpi_namespace_node     *child_node;
+	acpi_namespace_node     *next_node;
 	u8                      flags;
 
 
+	FUNCTION_TRACE_PTR ("Ns_delete_children", parent_node);
+
+
 	if (!parent_node) {
-		return;
+		return_VOID;
 	}
 
 	/* If no children, all done! */
 
 	child_node = parent_node->child;
 	if (!child_node) {
-		return;
+		return_VOID;
 	}
 
 	/*
@@ -282,20 +296,26 @@ acpi_ns_delete_children (
 
 		/* Grandchildren should have all been deleted already */
 
+		if (child_node->child) {
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Found a grandchild! P=%X C=%X\n",
+				parent_node, child_node));
+		}
 
 		/* Now we can free this child object */
 
-		DECREMENT_NAME_TABLE_METRICS (sizeof (ACPI_NAMESPACE_NODE));
+		ACPI_MEM_TRACKING (acpi_gbl_memory_lists[ACPI_MEM_LIST_NSNODE].total_freed++);
+
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Object %p, Remaining %X\n",
+			child_node, acpi_gbl_current_node_count));
 
 		/*
 		 * Detach an object if there is one
 		 */
-
 		if (child_node->object) {
 			acpi_ns_detach_object (child_node);
 		}
 
-		acpi_ut_free (child_node);
+		ACPI_MEM_FREE (child_node);
 
 		/* And move on to the next child in the list */
 
@@ -308,7 +328,7 @@ acpi_ns_delete_children (
 
 	parent_node->child = NULL;
 
-	return;
+	return_VOID;
 }
 
 
@@ -316,7 +336,7 @@ acpi_ns_delete_children (
  *
  * FUNCTION:    Acpi_ns_delete_namespace_subtree
  *
- * PARAMETERS:  None.
+ * PARAMETERS:  Parent_node     - Root of the subtree to be deleted
  *
  * RETURN:      None.
  *
@@ -325,17 +345,20 @@ acpi_ns_delete_children (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ns_delete_namespace_subtree (
-	ACPI_NAMESPACE_NODE     *parent_node)
+	acpi_namespace_node     *parent_node)
 {
-	ACPI_NAMESPACE_NODE     *child_node;
-	ACPI_OPERAND_OBJECT     *obj_desc;
+	acpi_namespace_node     *child_node;
+	acpi_operand_object     *obj_desc;
 	u32                     level;
 
 
+	FUNCTION_TRACE ("Ns_delete_namespace_subtree");
+
+
 	if (!parent_node) {
-		return (AE_OK);
+		return_ACPI_STATUS (AE_OK);
 	}
 
 
@@ -346,13 +369,11 @@ acpi_ns_delete_namespace_subtree (
 	 * Traverse the tree of objects until we bubble back up
 	 * to where we started.
 	 */
-
 	while (level > 0) {
 		/*
 		 * Get the next typed object in this scope.
 		 * Null returned if not found
 		 */
-
 		child_node = acpi_ns_get_next_object (ACPI_TYPE_ANY, parent_node,
 				 child_node);
 		if (child_node) {
@@ -360,7 +381,6 @@ acpi_ns_delete_namespace_subtree (
 			 * Found an object - delete the object within
 			 * the Value field
 			 */
-
 			obj_desc = acpi_ns_get_attached_object (child_node);
 			if (obj_desc) {
 				acpi_ns_detach_object (child_node);
@@ -375,7 +395,6 @@ acpi_ns_delete_namespace_subtree (
 				 * There is at least one child of this object,
 				 * visit the object
 				 */
-
 				level++;
 				parent_node   = child_node;
 				child_node    = 0;
@@ -406,7 +425,7 @@ acpi_ns_delete_namespace_subtree (
 	}
 
 
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -415,7 +434,7 @@ acpi_ns_delete_namespace_subtree (
  * FUNCTION:    Acpi_ns_remove_reference
  *
  * PARAMETERS:  Node           - Named object whose reference count is to be
- *                                decremented
+ *                               decremented
  *
  * RETURN:      None.
  *
@@ -427,9 +446,12 @@ acpi_ns_delete_namespace_subtree (
 
 static void
 acpi_ns_remove_reference (
-	ACPI_NAMESPACE_NODE     *node)
+	acpi_namespace_node     *node)
 {
-	ACPI_NAMESPACE_NODE     *next_node;
+	acpi_namespace_node     *next_node;
+
+
+	FUNCTION_ENTRY ();
 
 
 	/*
@@ -462,9 +484,9 @@ acpi_ns_remove_reference (
  *
  * FUNCTION:    Acpi_ns_delete_namespace_by_owner
  *
- * PARAMETERS:  None.
+ * PARAMETERS:  Owner_id    - All nodes with this owner will be deleted
  *
- * RETURN:      None.
+ * RETURN:      Status
  *
  * DESCRIPTION: Delete entries within the namespace that are owned by a
  *              specific ID.  Used to delete entire ACPI tables.  All
@@ -472,14 +494,17 @@ acpi_ns_remove_reference (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ns_delete_namespace_by_owner (
 	u16                     owner_id)
 {
-	ACPI_NAMESPACE_NODE     *child_node;
+	acpi_namespace_node     *child_node;
 	u32                     level;
-	ACPI_OPERAND_OBJECT     *obj_desc;
-	ACPI_NAMESPACE_NODE     *parent_node;
+	acpi_operand_object     *obj_desc;
+	acpi_namespace_node     *parent_node;
+
+
+	FUNCTION_TRACE ("Ns_delete_namespace_by_owner");
 
 
 	parent_node = acpi_gbl_root_node;
@@ -490,13 +515,11 @@ acpi_ns_delete_namespace_by_owner (
 	 * Traverse the tree of objects until we bubble back up
 	 * to where we started.
 	 */
-
 	while (level > 0) {
 		/*
 		 * Get the next typed object in this scope.
 		 * Null returned if not found
 		 */
-
 		child_node = acpi_ns_get_next_object (ACPI_TYPE_ANY, parent_node,
 				 child_node);
 
@@ -506,7 +529,6 @@ acpi_ns_delete_namespace_by_owner (
 				 * Found an object - delete the object within
 				 * the Value field
 				 */
-
 				obj_desc = acpi_ns_get_attached_object (child_node);
 				if (obj_desc) {
 					acpi_ns_detach_object (child_node);
@@ -555,7 +577,7 @@ acpi_ns_delete_namespace_by_owner (
 	}
 
 
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 

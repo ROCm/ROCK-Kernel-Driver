@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acstruct.h - Internal structs
- *       $Revision: 3 $
+ *       $Revision: 5 $
  *
  *****************************************************************************/
 
@@ -48,34 +48,34 @@
 
 typedef struct acpi_walk_state
 {
-	u8                      data_type;                          /* To differentiate various internal objs */\
-	ACPI_OWNER_ID           owner_id;                           /* Owner of objects created during the walk */
+	u8                      data_type;                          /* To differentiate various internal objs MUST BE FIRST!*/\
+	acpi_owner_id           owner_id;                           /* Owner of objects created during the walk */
 	u8                      last_predicate;                     /* Result of last predicate */
 	u8                      next_op_info;                       /* Info about Next_op */
 	u8                      num_operands;                       /* Stack pointer for Operands[] array */
 	u8                      current_result;                     /* */
 
 	struct acpi_walk_state  *next;                              /* Next Walk_state in list */
-	ACPI_PARSE_OBJECT       *origin;                            /* Start of walk [Obsolete] */
+	acpi_parse_object       *origin;                            /* Start of walk [Obsolete] */
 
 /* TBD: Obsolete with removal of WALK procedure ? */
-	ACPI_PARSE_OBJECT       *prev_op;                           /* Last op that was processed */
-	ACPI_PARSE_OBJECT       *next_op;                           /* next op to be processed */
+	acpi_parse_object       *prev_op;                           /* Last op that was processed */
+	acpi_parse_object       *next_op;                           /* next op to be processed */
 
 
-	ACPI_GENERIC_STATE      *results;                           /* Stack of accumulated results */
-	ACPI_GENERIC_STATE      *control_state;                     /* List of control states (nested IFs) */
-	ACPI_GENERIC_STATE      *scope_info;                        /* Stack of nested scopes */
-	ACPI_PARSE_STATE        *parser_state;                      /* Current state of parser */
+	acpi_generic_state      *results;                           /* Stack of accumulated results */
+	acpi_generic_state      *control_state;                     /* List of control states (nested IFs) */
+	acpi_generic_state      *scope_info;                        /* Stack of nested scopes */
+	acpi_parse_state        *parser_state;                      /* Current state of parser */
 	u8                      *aml_last_while;
-	ACPI_OPCODE_INFO        *op_info;                           /* Info on current opcode */
-	ACPI_PARSE_DOWNWARDS    descending_callback;
-	ACPI_PARSE_UPWARDS      ascending_callback;
+	const acpi_opcode_info  *op_info;                           /* Info on current opcode */
+	acpi_parse_downwards    descending_callback;
+	acpi_parse_upwards      ascending_callback;
 
 	union acpi_operand_obj  *return_desc;                       /* Return object, if any */
 	union acpi_operand_obj  *method_desc;                       /* Method descriptor if running a method */
 	struct acpi_node        *method_node;                       /* Method Node if running a method */
-	ACPI_PARSE_OBJECT       *method_call_op;                    /* Method_call Op if running a method */
+	acpi_parse_object       *method_call_op;                    /* Method_call Op if running a method */
 	struct acpi_node        *method_call_node;                  /* Called method Node*/
 	union acpi_operand_obj  *operands[OBJ_NUM_OPERANDS];        /* Operands passed to the interpreter */
 	struct acpi_node        arguments[MTH_NUM_ARGS];            /* Control method arguments */
@@ -93,7 +93,7 @@ typedef struct acpi_walk_state
 	u32                     method_breakpoint;
 
 
-} ACPI_WALK_STATE;
+} acpi_walk_state;
 
 
 /*
@@ -103,10 +103,10 @@ typedef struct acpi_walk_state
 typedef struct acpi_walk_list
 {
 
-	ACPI_WALK_STATE         *walk_state;
+	acpi_walk_state         *walk_state;
 	ACPI_OBJECT_MUTEX       acquired_mutex_list;               /* List of all currently acquired mutexes */
 
-} ACPI_WALK_LIST;
+} acpi_walk_list;
 
 
 /* Info used by Acpi_ps_init_objects */
@@ -119,7 +119,7 @@ typedef struct acpi_init_walk_info
 	u16                     op_region_init;
 	u16                     field_init;
 	u16                     object_count;
-	ACPI_TABLE_DESC         *table_desc;
+	acpi_table_desc         *table_desc;
 
 } ACPI_INIT_WALK_INFO;
 
@@ -131,7 +131,7 @@ typedef struct acpi_device_walk_info
 	u16                     device_count;
 	u16                     num_STA;
 	u16                     num_INI;
-	ACPI_TABLE_DESC         *table_desc;
+	acpi_table_desc         *table_desc;
 
 } ACPI_DEVICE_WALK_INFO;
 

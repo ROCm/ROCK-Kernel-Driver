@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: rsxface - Public interfaces to the resource manager
- *              $Revision: 13 $
+ *              $Revision: 14 $
  *
  ******************************************************************************/
 
@@ -56,19 +56,22 @@
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_get_irq_routing_table (
-	ACPI_HANDLE             device_handle,
-	ACPI_BUFFER             *ret_buffer)
+	acpi_handle             device_handle,
+	acpi_buffer             *ret_buffer)
 {
-	ACPI_STATUS             status;
+	acpi_status             status;
+
+
+	FUNCTION_TRACE ("Acpi_get_irq_routing_table ");
 
 
 	/* Ensure that ACPI has been initialized */
 
 	ACPI_IS_INITIALIZATION_COMPLETE (status);
 	if (ACPI_FAILURE (status)) {
-		return (status);
+		return_ACPI_STATUS (status);
 	}
 
 	/*
@@ -80,11 +83,11 @@ acpi_get_irq_routing_table (
 	if ((!device_handle)        ||
 		(!ret_buffer)           ||
 		((!ret_buffer->pointer) && (ret_buffer->length))) {
-		return (AE_BAD_PARAMETER);
+		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
 	status = acpi_rs_get_prt_method_data (device_handle, ret_buffer);
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 
@@ -112,19 +115,22 @@ acpi_get_irq_routing_table (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_get_current_resources (
-	ACPI_HANDLE             device_handle,
-	ACPI_BUFFER             *ret_buffer)
+	acpi_handle             device_handle,
+	acpi_buffer             *ret_buffer)
 {
-	ACPI_STATUS             status;
+	acpi_status             status;
+
+
+	FUNCTION_TRACE ("Acpi_get_current_resources");
 
 
 	/* Ensure that ACPI has been initialized */
 
 	ACPI_IS_INITIALIZATION_COMPLETE (status);
 	if (ACPI_FAILURE (status)) {
-		return (status);
+		return_ACPI_STATUS (status);
 	}
 
 	/*
@@ -136,11 +142,11 @@ acpi_get_current_resources (
 	if ((!device_handle)        ||
 		(!ret_buffer)           ||
 		((ret_buffer->length) && (!ret_buffer->pointer))) {
-		return (AE_BAD_PARAMETER);
+		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
 	status = acpi_rs_get_crs_method_data (device_handle, ret_buffer);
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 
@@ -165,19 +171,22 @@ acpi_get_current_resources (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_get_possible_resources (
-	ACPI_HANDLE             device_handle,
-	ACPI_BUFFER             *ret_buffer)
+	acpi_handle             device_handle,
+	acpi_buffer             *ret_buffer)
 {
-	ACPI_STATUS             status;
+	acpi_status             status;
+
+
+	FUNCTION_TRACE ("Acpi_get_possible_resources");
 
 
 	/* Ensure that ACPI has been initialized */
 
 	ACPI_IS_INITIALIZATION_COMPLETE (status);
 	if (ACPI_FAILURE (status)) {
-		return (status);
+		return_ACPI_STATUS (status);
 	}
 
 	/*
@@ -189,11 +198,11 @@ acpi_get_possible_resources (
 	if ((!device_handle)        ||
 		(!ret_buffer)           ||
 		((ret_buffer->length) && (!ret_buffer->pointer))) {
-		return (AE_BAD_PARAMETER);
+		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
 	status = acpi_rs_get_prs_method_data (device_handle, ret_buffer);
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 
@@ -215,19 +224,22 @@ acpi_get_possible_resources (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_set_current_resources (
-	ACPI_HANDLE             device_handle,
-	ACPI_BUFFER             *in_buffer)
+	acpi_handle             device_handle,
+	acpi_buffer             *in_buffer)
 {
-	ACPI_STATUS             status;
+	acpi_status             status;
+
+
+	FUNCTION_TRACE ("Acpi_set_current_resources");
 
 
 	/* Ensure that ACPI has been initialized */
 
 	ACPI_IS_INITIALIZATION_COMPLETE (status);
 	if (ACPI_FAILURE (status)) {
-		return (status);
+		return_ACPI_STATUS (status);
 	}
 
 	/*
@@ -237,9 +249,9 @@ acpi_set_current_resources (
 		(!in_buffer)          ||
 		(!in_buffer->pointer) ||
 		(!in_buffer->length)) {
-		return (AE_BAD_PARAMETER);
+		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
 	status = acpi_rs_set_srs_method_data (device_handle, in_buffer);
-	return (status);
+	return_ACPI_STATUS (status);
 }

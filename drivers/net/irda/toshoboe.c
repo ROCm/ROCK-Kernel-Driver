@@ -945,9 +945,9 @@ static struct pci_driver toshoboe_pci_driver = {
 };
 
 int __init
-toshoboe_init (void) {
-  pci_module_init(&toshoboe_pci_driver);
-  return 0;
+toshoboe_init (void)
+{
+  return pci_module_init(&toshoboe_pci_driver);
 }
 
 void

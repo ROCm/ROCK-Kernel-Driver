@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acnamesp.h - Namespace subcomponent prototypes and defines
- *       $Revision: 106 $
+ *       $Revision: 107 $
  *
  *****************************************************************************/
 
@@ -29,11 +29,11 @@
 
 /* To search the entire name space, pass this as Search_base */
 
-#define NS_ALL                  ((ACPI_HANDLE)0)
+#define NS_ALL                  ((acpi_handle)0)
 
 /*
  * Elements of Acpi_ns_properties are bit significant
- * and should be one-to-one with values of ACPI_OBJECT_TYPE
+ * and should be one-to-one with values of acpi_object_type
  */
 #define NSP_NORMAL              0
 #define NSP_NEWSCOPE            1   /* a definition of this type opens a name scope */
@@ -62,40 +62,40 @@
 #define NS_WALK_NO_UNLOCK       FALSE
 
 
-ACPI_STATUS
+acpi_status
 acpi_ns_load_namespace (
 	void);
 
-ACPI_STATUS
+acpi_status
 acpi_ns_initialize_objects (
 	void);
 
-ACPI_STATUS
+acpi_status
 acpi_ns_initialize_devices (
 	void);
 
 
 /* Namespace init - nsxfinit */
 
-ACPI_STATUS
+acpi_status
 acpi_ns_init_one_device (
-	ACPI_HANDLE             obj_handle,
+	acpi_handle             obj_handle,
 	u32                     nesting_level,
 	void                    *context,
 	void                    **return_value);
 
-ACPI_STATUS
+acpi_status
 acpi_ns_init_one_object (
-	ACPI_HANDLE             obj_handle,
+	acpi_handle             obj_handle,
 	u32                     level,
 	void                    *context,
 	void                    **return_value);
 
 
-ACPI_STATUS
+acpi_status
 acpi_ns_walk_namespace (
-	ACPI_OBJECT_TYPE8       type,
-	ACPI_HANDLE             start_object,
+	acpi_object_type8       type,
+	acpi_handle             start_object,
 	u32                     max_depth,
 	u8                      unlock_before_callback,
 	ACPI_WALK_CALLBACK      user_function,
@@ -103,38 +103,38 @@ acpi_ns_walk_namespace (
 	void                    **return_value);
 
 
-ACPI_NAMESPACE_NODE *
+acpi_namespace_node *
 acpi_ns_get_next_object (
-	ACPI_OBJECT_TYPE8       type,
-	ACPI_NAMESPACE_NODE     *parent,
-	ACPI_NAMESPACE_NODE     *child);
+	acpi_object_type8       type,
+	acpi_namespace_node     *parent,
+	acpi_namespace_node     *child);
 
 
-ACPI_STATUS
+acpi_status
 acpi_ns_delete_namespace_by_owner (
 	u16                     table_id);
 
 
 /* Namespace loading - nsload */
 
-ACPI_STATUS
+acpi_status
 acpi_ns_one_complete_parse (
 	u32                     pass_number,
-	ACPI_TABLE_DESC         *table_desc);
+	acpi_table_desc         *table_desc);
 
-ACPI_STATUS
+acpi_status
 acpi_ns_parse_table (
-	ACPI_TABLE_DESC         *table_desc,
-	ACPI_NAMESPACE_NODE     *scope);
+	acpi_table_desc         *table_desc,
+	acpi_namespace_node     *scope);
 
-ACPI_STATUS
+acpi_status
 acpi_ns_load_table (
-	ACPI_TABLE_DESC         *table_desc,
-	ACPI_NAMESPACE_NODE     *node);
+	acpi_table_desc         *table_desc,
+	acpi_namespace_node     *node);
 
-ACPI_STATUS
+acpi_status
 acpi_ns_load_table_by_type (
-	ACPI_TABLE_TYPE         table_type);
+	acpi_table_type         table_type);
 
 
 /*
@@ -142,19 +142,19 @@ acpi_ns_load_table_by_type (
  */
 
 
-ACPI_STATUS
+acpi_status
 acpi_ns_root_initialize (
 	void);
 
-ACPI_STATUS
+acpi_status
 acpi_ns_lookup (
-	ACPI_GENERIC_STATE      *scope_info,
+	acpi_generic_state      *scope_info,
 	NATIVE_CHAR             *name,
-	ACPI_OBJECT_TYPE8       type,
-	OPERATING_MODE          interpreter_mode,
+	acpi_object_type8       type,
+	operating_mode          interpreter_mode,
 	u32                     flags,
-	ACPI_WALK_STATE         *walk_state,
-	ACPI_NAMESPACE_NODE     **ret_node);
+	acpi_walk_state         *walk_state,
+	acpi_namespace_node     **ret_node);
 
 
 /*
@@ -162,38 +162,38 @@ acpi_ns_lookup (
  */
 
 
-ACPI_NAMESPACE_NODE *
+acpi_namespace_node *
 acpi_ns_create_node (
-	u32                     acpi_name);
+	u32                     name);
 
 void
 acpi_ns_delete_node (
-	ACPI_NAMESPACE_NODE     *node);
+	acpi_namespace_node     *node);
 
-ACPI_STATUS
+acpi_status
 acpi_ns_delete_namespace_subtree (
-	ACPI_NAMESPACE_NODE     *parent_handle);
+	acpi_namespace_node     *parent_handle);
 
 void
 acpi_ns_detach_object (
-	ACPI_NAMESPACE_NODE     *node);
+	acpi_namespace_node     *node);
 
 void
 acpi_ns_delete_children (
-	ACPI_NAMESPACE_NODE     *parent);
+	acpi_namespace_node     *parent);
 
 
 /*
  * Namespace modification - nsmodify
  */
 
-ACPI_STATUS
+acpi_status
 acpi_ns_unload_namespace (
-	ACPI_HANDLE             handle);
+	acpi_handle             handle);
 
-ACPI_STATUS
+acpi_status
 acpi_ns_delete_subtree (
-	ACPI_HANDLE             start_handle);
+	acpi_handle             start_handle);
 
 
 /*
@@ -202,17 +202,17 @@ acpi_ns_delete_subtree (
 
 void
 acpi_ns_dump_tables (
-	ACPI_HANDLE             search_base,
+	acpi_handle             search_base,
 	u32                     max_depth);
 
 void
 acpi_ns_dump_entry (
-	ACPI_HANDLE             handle,
+	acpi_handle             handle,
 	u32                     debug_level);
 
-ACPI_STATUS
+acpi_status
 acpi_ns_dump_pathname (
-	ACPI_HANDLE             handle,
+	acpi_handle             handle,
 	NATIVE_CHAR             *msg,
 	u32                     level,
 	u32                     component);
@@ -223,58 +223,58 @@ acpi_ns_dump_root_devices (
 
 void
 acpi_ns_dump_objects (
-	ACPI_OBJECT_TYPE8       type,
+	acpi_object_type8       type,
 	u32                     max_depth,
 	u32                     ownder_id,
-	ACPI_HANDLE             start_handle);
+	acpi_handle             start_handle);
 
 
 /*
  * Namespace evaluation functions - nseval
  */
 
-ACPI_STATUS
+acpi_status
 acpi_ns_evaluate_by_handle (
-	ACPI_NAMESPACE_NODE     *prefix_node,
-	ACPI_OPERAND_OBJECT     **params,
-	ACPI_OPERAND_OBJECT     **return_object);
+	acpi_namespace_node     *prefix_node,
+	acpi_operand_object     **params,
+	acpi_operand_object     **return_object);
 
-ACPI_STATUS
+acpi_status
 acpi_ns_evaluate_by_name (
 	NATIVE_CHAR             *pathname,
-	ACPI_OPERAND_OBJECT     **params,
-	ACPI_OPERAND_OBJECT     **return_object);
+	acpi_operand_object     **params,
+	acpi_operand_object     **return_object);
 
-ACPI_STATUS
+acpi_status
 acpi_ns_evaluate_relative (
-	ACPI_NAMESPACE_NODE     *prefix_node,
+	acpi_namespace_node     *prefix_node,
 	NATIVE_CHAR             *pathname,
-	ACPI_OPERAND_OBJECT     **params,
-	ACPI_OPERAND_OBJECT     **return_object);
+	acpi_operand_object     **params,
+	acpi_operand_object     **return_object);
 
-ACPI_STATUS
+acpi_status
 acpi_ns_execute_control_method (
-	ACPI_NAMESPACE_NODE     *method_node,
-	ACPI_OPERAND_OBJECT     **params,
-	ACPI_OPERAND_OBJECT     **return_obj_desc);
+	acpi_namespace_node     *method_node,
+	acpi_operand_object     **params,
+	acpi_operand_object     **return_obj_desc);
 
-ACPI_STATUS
+acpi_status
 acpi_ns_get_object_value (
-	ACPI_NAMESPACE_NODE     *object_node,
-	ACPI_OPERAND_OBJECT     **return_obj_desc);
+	acpi_namespace_node     *object_node,
+	acpi_operand_object     **return_obj_desc);
 
 
 /*
  * Parent/Child/Peer utility functions - nsfamily
  */
 
-ACPI_NAME
+acpi_name
 acpi_ns_find_parent_name (
-	ACPI_NAMESPACE_NODE     *node_to_search);
+	acpi_namespace_node     *node_to_search);
 
 u8
 acpi_ns_exist_downstream_sibling (
-	ACPI_NAMESPACE_NODE     *this_node);
+	acpi_namespace_node     *this_node);
 
 
 /*
@@ -283,77 +283,77 @@ acpi_ns_exist_downstream_sibling (
 
 u32
 acpi_ns_opens_scope (
-	ACPI_OBJECT_TYPE8       type);
+	acpi_object_type8       type);
 
 NATIVE_CHAR *
 acpi_ns_get_table_pathname (
-	ACPI_NAMESPACE_NODE     *node);
+	acpi_namespace_node     *node);
 
 NATIVE_CHAR *
 acpi_ns_name_of_current_scope (
-	ACPI_WALK_STATE         *walk_state);
+	acpi_walk_state         *walk_state);
 
-ACPI_STATUS
+acpi_status
 acpi_ns_handle_to_pathname (
-	ACPI_HANDLE             obj_handle,
+	acpi_handle             obj_handle,
 	u32                     *buf_size,
 	NATIVE_CHAR             *user_buffer);
 
 u8
 acpi_ns_pattern_match (
-	ACPI_NAMESPACE_NODE     *obj_node,
+	acpi_namespace_node     *obj_node,
 	NATIVE_CHAR             *search_for);
 
 
-ACPI_STATUS
+acpi_status
 acpi_ns_get_node (
 	NATIVE_CHAR             *pathname,
-	ACPI_NAMESPACE_NODE     *in_prefix_node,
-	ACPI_NAMESPACE_NODE     **out_node);
+	acpi_namespace_node     *in_prefix_node,
+	acpi_namespace_node     **out_node);
 
 u32
 acpi_ns_get_pathname_length (
-	ACPI_NAMESPACE_NODE     *node);
+	acpi_namespace_node     *node);
 
 
 /*
  * Object management for NTEs - nsobject
  */
 
-ACPI_STATUS
+acpi_status
 acpi_ns_attach_object (
-	ACPI_NAMESPACE_NODE     *node,
-	ACPI_OPERAND_OBJECT     *object,
-	ACPI_OBJECT_TYPE8       type);
+	acpi_namespace_node     *node,
+	acpi_operand_object     *object,
+	acpi_object_type8       type);
 
 
 /*
  * Namespace searching and entry - nssearch
  */
 
-ACPI_STATUS
+acpi_status
 acpi_ns_search_and_enter (
 	u32                     entry_name,
-	ACPI_WALK_STATE         *walk_state,
-	ACPI_NAMESPACE_NODE     *node,
-	OPERATING_MODE          interpreter_mode,
-	ACPI_OBJECT_TYPE8       type,
+	acpi_walk_state         *walk_state,
+	acpi_namespace_node     *node,
+	operating_mode          interpreter_mode,
+	acpi_object_type8       type,
 	u32                     flags,
-	ACPI_NAMESPACE_NODE     **ret_node);
+	acpi_namespace_node     **ret_node);
 
-ACPI_STATUS
+acpi_status
 acpi_ns_search_node (
 	u32                     entry_name,
-	ACPI_NAMESPACE_NODE     *node,
-	ACPI_OBJECT_TYPE8       type,
-	ACPI_NAMESPACE_NODE     **ret_node);
+	acpi_namespace_node     *node,
+	acpi_object_type8       type,
+	acpi_namespace_node     **ret_node);
 
 void
 acpi_ns_install_node (
-	ACPI_WALK_STATE         *walk_state,
-	ACPI_NAMESPACE_NODE     *parent_node,   /* Parent */
-	ACPI_NAMESPACE_NODE     *node,      /* New Child*/
-	ACPI_OBJECT_TYPE8       type);
+	acpi_walk_state         *walk_state,
+	acpi_namespace_node     *parent_node,   /* Parent */
+	acpi_namespace_node     *node,      /* New Child*/
+	acpi_object_type8       type);
 
 
 /*
@@ -368,58 +368,58 @@ u8
 acpi_ns_valid_path_separator (
 	NATIVE_CHAR             sep);
 
-ACPI_OBJECT_TYPE8
+acpi_object_type8
 acpi_ns_get_type (
-	ACPI_NAMESPACE_NODE     *node);
+	acpi_namespace_node     *node);
 
 void *
 acpi_ns_get_attached_object (
-	ACPI_NAMESPACE_NODE     *node);
+	acpi_namespace_node     *node);
 
 u32
 acpi_ns_local (
-	ACPI_OBJECT_TYPE8       type);
+	acpi_object_type8       type);
 
-ACPI_STATUS
+acpi_status
 acpi_ns_build_internal_name (
 	ACPI_NAMESTRING_INFO    *info);
 
-ACPI_STATUS
+acpi_status
 acpi_ns_get_internal_name_length (
 	ACPI_NAMESTRING_INFO    *info);
 
-ACPI_STATUS
+acpi_status
 acpi_ns_internalize_name (
 	NATIVE_CHAR             *dotted_name,
 	NATIVE_CHAR             **converted_name);
 
-ACPI_STATUS
+acpi_status
 acpi_ns_externalize_name (
 	u32                     internal_name_length,
 	NATIVE_CHAR             *internal_name,
 	u32                     *converted_name_length,
 	NATIVE_CHAR             **converted_name);
 
-ACPI_NAMESPACE_NODE *
+acpi_namespace_node *
 acpi_ns_convert_handle_to_entry (
-	ACPI_HANDLE             handle);
+	acpi_handle             handle);
 
-ACPI_HANDLE
+acpi_handle
 acpi_ns_convert_entry_to_handle(
-	ACPI_NAMESPACE_NODE     *node);
+	acpi_namespace_node     *node);
 
 void
 acpi_ns_terminate (
 	void);
 
-ACPI_NAMESPACE_NODE *
+acpi_namespace_node *
 acpi_ns_get_parent_object (
-	ACPI_NAMESPACE_NODE     *node);
+	acpi_namespace_node     *node);
 
 
-ACPI_NAMESPACE_NODE *
+acpi_namespace_node *
 acpi_ns_get_next_valid_object (
-	ACPI_NAMESPACE_NODE     *node);
+	acpi_namespace_node     *node);
 
 
 #endif /* __ACNAMESP_H__ */

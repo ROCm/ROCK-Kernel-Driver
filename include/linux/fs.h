@@ -412,7 +412,6 @@ struct block_device {
 	struct inode *		bd_inode;
 	dev_t			bd_dev;  /* not a kdev_t - it's a search key */
 	int			bd_openers;
-	int			bd_cache_openers;
 	const struct block_device_operations *bd_op;
 	struct semaphore	bd_sem;	/* open/close mutex */
 	struct list_head	bd_inodes;
@@ -450,7 +449,6 @@ struct inode {
 	struct file_lock	*i_flock;
 	struct address_space	*i_mapping;
 	struct address_space	i_data;
-	int			i_mapping_overload;
 	struct dquot		*i_dquot[MAXQUOTAS];
 	/* These three should probably be a union */
 	struct list_head	i_devices;

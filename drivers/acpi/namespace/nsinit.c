@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: nsinit - namespace initialization
- *              $Revision: 25 $
+ *              $Revision: 31 $
  *
  *****************************************************************************/
 
@@ -27,6 +27,7 @@
 #include "acpi.h"
 #include "acnamesp.h"
 #include "acdispat.h"
+#include "acinterp.h"
 
 #define _COMPONENT          ACPI_NAMESPACE
 	 MODULE_NAME         ("nsinit")
@@ -45,12 +46,20 @@
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ns_initialize_objects (
 	void)
 {
-	ACPI_STATUS             status;
+	acpi_status             status;
 	ACPI_INIT_WALK_INFO     info;
+
+
+	FUNCTION_TRACE ("Ns_initialize_objects");
+
+
+	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
+		"**** Starting initialization of namespace objects ****\n"));
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_OK, "Completing Region and Field initialization:"));
 
 
 	info.field_count = 0;
@@ -65,8 +74,20 @@ acpi_ns_initialize_objects (
 	status = acpi_walk_namespace (ACPI_TYPE_ANY, ACPI_ROOT_OBJECT,
 			  ACPI_UINT32_MAX, acpi_ns_init_one_object,
 			  &info, NULL);
+	if (ACPI_FAILURE (status)) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Walk_namespace failed! %x\n", status));
+	}
 
-	return (AE_OK);
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_OK,
+		"\n%d/%d Regions, %d/%d Fields initialized (%d nodes total)\n",
+		info.op_region_init, info.op_region_count, info.field_init,
+		info.field_count, info.object_count));
+	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
+		"%d Control Methods found\n", info.method_count));
+	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
+		"%d Op Regions found\n", info.op_region_count));
+
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -76,7 +97,7 @@ acpi_ns_initialize_objects (
  *
  * PARAMETERS:  None
  *
- * RETURN:      ACPI_STATUS
+ * RETURN:      acpi_status
  *
  * DESCRIPTION: Walk the entire namespace and initialize all ACPI devices.
  *              This means running _INI on all present devices.
@@ -86,12 +107,15 @@ acpi_ns_initialize_objects (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ns_initialize_devices (
 	void)
 {
-	ACPI_STATUS             status;
+	acpi_status             status;
 	ACPI_DEVICE_WALK_INFO   info;
+
+
+	FUNCTION_TRACE ("Ns_initialize_devices");
 
 
 	info.device_count = 0;
@@ -99,12 +123,21 @@ acpi_ns_initialize_devices (
 	info.num_INI = 0;
 
 
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_OK, "Executing device _INI methods:"));
+
 	status = acpi_ns_walk_namespace (ACPI_TYPE_DEVICE, ACPI_ROOT_OBJECT,
 			  ACPI_UINT32_MAX, FALSE, acpi_ns_init_one_device, &info, NULL);
 
+	if (ACPI_FAILURE (status)) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Walk_namespace failed! %x\n", status));
+	}
 
 
-	return (status);
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_OK,
+		"\n%d Devices found: %d _STA, %d _INI\n",
+		info.device_count, info.num_STA, info.num_INI));
+
+	return_ACPI_STATUS (status);
 }
 
 
@@ -128,18 +161,21 @@ acpi_ns_initialize_devices (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ns_init_one_object (
-	ACPI_HANDLE             obj_handle,
+	acpi_handle             obj_handle,
 	u32                     level,
 	void                    *context,
 	void                    **return_value)
 {
-	ACPI_OBJECT_TYPE8       type;
-	ACPI_STATUS             status;
+	acpi_object_type8       type;
+	acpi_status             status;
 	ACPI_INIT_WALK_INFO     *info = (ACPI_INIT_WALK_INFO *) context;
-	ACPI_NAMESPACE_NODE     *node = (ACPI_NAMESPACE_NODE *) obj_handle;
-	ACPI_OPERAND_OBJECT     *obj_desc;
+	acpi_namespace_node     *node = (acpi_namespace_node *) obj_handle;
+	acpi_operand_object     *obj_desc;
+
+
+	PROC_NAME ("Ns_init_one_object");
 
 
 	info->object_count++;
@@ -153,6 +189,20 @@ acpi_ns_init_one_object (
 		return (AE_OK);
 	}
 
+	if ((type != ACPI_TYPE_REGION) &&
+		(type != ACPI_TYPE_BUFFER_FIELD)) {
+		return (AE_OK);
+	}
+
+
+	/*
+	 * Must lock the interpreter before executing AML code
+	 */
+	status = acpi_ex_enter_interpreter ();
+	if (ACPI_FAILURE (status)) {
+		return (status);
+	}
+
 	switch (type) {
 
 	case ACPI_TYPE_REGION:
@@ -164,7 +214,16 @@ acpi_ns_init_one_object (
 
 		info->op_region_init++;
 		status = acpi_ds_get_region_arguments (obj_desc);
+		if (ACPI_FAILURE (status)) {
+			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_ERROR, "\n"));
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+					"%s while getting region arguments [%4.4s]\n",
+					acpi_format_exception (status), &node->name));
+		}
 
+		if (!(acpi_dbg_level & ACPI_LV_INIT)) {
+			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_OK, "."));
+		}
 
 		break;
 
@@ -178,6 +237,15 @@ acpi_ns_init_one_object (
 
 		info->field_init++;
 		status = acpi_ds_get_buffer_field_arguments (obj_desc);
+		if (ACPI_FAILURE (status)) {
+			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_ERROR, "\n"));
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+					"%s while getting buffer field arguments [%4.4s]\n",
+					acpi_format_exception (status), &node->name));
+		}
+		if (!(acpi_dbg_level & ACPI_LV_INIT)) {
+			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_OK, "."));
+		}
 
 
 		break;
@@ -186,10 +254,12 @@ acpi_ns_init_one_object (
 		break;
 	}
 
+
 	/*
 	 * We ignore errors from above, and always return OK, since
 	 * we don't want to abort the walk on a single error.
 	 */
+	acpi_ex_exit_interpreter ();
 	return (AE_OK);
 }
 
@@ -200,7 +270,7 @@ acpi_ns_init_one_object (
  *
  * PARAMETERS:  ACPI_WALK_CALLBACK
  *
- * RETURN:      ACPI_STATUS
+ * RETURN:      acpi_status
  *
  * DESCRIPTION: This is called once per device soon after ACPI is enabled
  *              to initialize each device. It determines if the device is
@@ -208,19 +278,25 @@ acpi_ns_init_one_object (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ns_init_one_device (
-	ACPI_HANDLE             obj_handle,
+	acpi_handle             obj_handle,
 	u32                     nesting_level,
 	void                    *context,
 	void                    **return_value)
 {
-	ACPI_STATUS             status;
-	ACPI_NAMESPACE_NODE    *node;
+	acpi_status             status;
+	acpi_namespace_node    *node;
 	u32                     flags;
 	ACPI_DEVICE_WALK_INFO  *info = (ACPI_DEVICE_WALK_INFO *) context;
 
 
+	FUNCTION_TRACE ("Ns_init_one_device");
+
+
+	if (!(acpi_dbg_level & ACPI_LV_INIT)) {
+		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_OK, "."));
+	}
 
 	info->device_count++;
 
@@ -237,12 +313,12 @@ acpi_ns_init_one_device (
 	/*
 	 * Run _STA to determine if we can run _INI on the device.
 	 */
-
+	DEBUG_EXEC (acpi_ut_display_init_pathname (node, "_STA [Method]"));
 	status = acpi_ut_execute_STA (node, &flags);
 	if (ACPI_FAILURE (status)) {
 		/* Ignore error and move on to next device */
 
-		return (AE_OK);
+		return_ACPI_STATUS (AE_OK);
 	}
 
 	info->num_STA++;
@@ -250,13 +326,14 @@ acpi_ns_init_one_device (
 	if (!(flags & 0x01)) {
 		/* don't look at children of a not present device */
 
-		return(AE_CTRL_DEPTH);
+		return_ACPI_STATUS(AE_CTRL_DEPTH);
 	}
 
 
 	/*
 	 * The device is present. Run _INI.
 	 */
+	DEBUG_EXEC (acpi_ut_display_init_pathname (obj_handle, "_INI [Method]"));
 	status = acpi_ns_evaluate_relative (obj_handle, "_INI", NULL, NULL);
 	if (AE_NOT_FOUND == status) {
 		/* No _INI means device requires no initialization */
@@ -267,6 +344,14 @@ acpi_ns_init_one_device (
 	else if (ACPI_FAILURE (status)) {
 		/* Ignore error and move on to next device */
 
+#ifdef ACPI_DEBUG
+		NATIVE_CHAR *scope_name = acpi_ns_get_table_pathname (obj_handle);
+
+		ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "%s._INI failed: %s\n",
+				scope_name, acpi_format_exception (status)));
+
+		ACPI_MEM_FREE (scope_name);
+#endif
 	}
 
 	else {
@@ -275,5 +360,5 @@ acpi_ns_init_one_device (
 		info->num_INI++;
 	}
 
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }

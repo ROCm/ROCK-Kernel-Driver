@@ -45,6 +45,15 @@
 #define	CDC_ETHER_REQ_SET_REG	PIPERIDER_REQ_SET_REGS
 #define	ALIGN(x)		x __attribute__((aligned(L1_CACHE_BYTES)))
 
+#define MODE_FLAG_PROMISCUOUS   (1<<0)
+#define MODE_FLAG_ALL_MULTICAST (1<<1)
+#define MODE_FLAG_DIRECTED      (1<<2)
+#define MODE_FLAG_BROADCAST     (1<<3)
+#define MODE_FLAG_MULTICAST     (1<<4)
+
+#define SET_ETHERNET_MULTICAST_FILTER    0x40
+#define SET_ETHERNET_PACKET_FILTER       0x43
+
 typedef struct _ether_dev_t {
 	struct usb_device	*usb;
 	struct net_device	*net;
@@ -70,6 +79,7 @@ typedef struct _ether_dev_t {
 	__u8			iMACAddress;
 	__u32			bmEthernetStatistics;
 	__u16			wMaxSegmentSize;
+	__u16                   mode_flags;
 	__u16			wNumberMCFilters;
 	__u8			bNumberPowerFilters;
 	int			intr_interval;

@@ -1,7 +1,7 @@
 /*****************************************************************************
  *
  * Module Name: ec_osl.c
- *   $Revision: 6 $
+ *   $Revision: 10 $
  *
  *****************************************************************************/
 
@@ -56,6 +56,8 @@ static u32			save_dbg_layer;
 static u32			save_dbg_level;
 #endif /*ACPI_DEBUG*/
 
+extern struct proc_dir_entry	*bm_proc_root;
+
 
 /****************************************************************************
  *
@@ -69,10 +71,14 @@ static u32			save_dbg_level;
  *
  ****************************************************************************/
 
-static int __init 
+static int __init
 ec_osl_init (void)
 {
-	ACPI_STATUS		status = AE_OK;
+	acpi_status		status = AE_OK;
+
+	/* abort if no busmgr */
+	if (!bm_proc_root)
+		return -ENODEV;
 
 #ifdef ACPI_DEBUG
 	save_dbg_layer = acpi_dbg_layer;
@@ -99,7 +105,7 @@ ec_osl_init (void)
  *
  ****************************************************************************/
 
-static void __exit 
+static void __exit
 ec_osl_cleanup(void)
 {
 	ec_terminate();

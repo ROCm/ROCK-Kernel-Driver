@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exfield - ACPI AML (p-code) execution - field manipulation
- *              $Revision: 90 $
+ *              $Revision: 95 $
  *
  *****************************************************************************/
 
@@ -52,50 +52,52 @@
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_read_data_from_field (
-	ACPI_OPERAND_OBJECT     *obj_desc,
-	ACPI_OPERAND_OBJECT     **ret_buffer_desc)
+	acpi_operand_object     *obj_desc,
+	acpi_operand_object     **ret_buffer_desc)
 {
-	ACPI_STATUS             status;
-	ACPI_OPERAND_OBJECT     *buffer_desc;
+	acpi_status             status;
+	acpi_operand_object     *buffer_desc;
 	u32                     length;
 	void                    *buffer;
+
+
+	FUNCTION_TRACE_PTR ("Ex_read_data_from_field", obj_desc);
 
 
 	/* Parameter validation */
 
 	if (!obj_desc) {
-		return (AE_AML_NO_OPERAND);
+		return_ACPI_STATUS (AE_AML_NO_OPERAND);
 	}
 
 	/*
 	 * Allocate a buffer for the contents of the field.
 	 *
-	 * If the field is larger than the size of an ACPI_INTEGER, create
+	 * If the field is larger than the size of an acpi_integer, create
 	 * a BUFFER to hold it.  Otherwise, use an INTEGER.  This allows
 	 * the use of arithmetic operators on the returned value if the
 	 * field size is equal or smaller than an Integer.
 	 *
 	 * Note: Field.length is in bits.
 	 */
-
 	length = ROUND_BITS_UP_TO_BYTES (obj_desc->field.bit_length);
 
-	if (length > sizeof (ACPI_INTEGER)) {
+	if (length > sizeof (acpi_integer)) {
 		/* Field is too large for an Integer, create a Buffer instead */
 
 		buffer_desc = acpi_ut_create_internal_object (ACPI_TYPE_BUFFER);
 		if (!buffer_desc) {
-			return (AE_NO_MEMORY);
+			return_ACPI_STATUS (AE_NO_MEMORY);
 		}
 
 		/* Create the actual read buffer */
 
-		buffer_desc->buffer.pointer = acpi_ut_callocate (length);
+		buffer_desc->buffer.pointer = ACPI_MEM_CALLOCATE (length);
 		if (!buffer_desc->buffer.pointer) {
 			acpi_ut_remove_reference (buffer_desc);
-			return (AE_NO_MEMORY);
+			return_ACPI_STATUS (AE_NO_MEMORY);
 		}
 
 		buffer_desc->buffer.length = length;
@@ -107,7 +109,7 @@ acpi_ex_read_data_from_field (
 
 		buffer_desc = acpi_ut_create_internal_object (ACPI_TYPE_INTEGER);
 		if (!buffer_desc) {
-			return (AE_NO_MEMORY);
+			return_ACPI_STATUS (AE_NO_MEMORY);
 		}
 
 		length = sizeof (buffer_desc->integer.value);
@@ -147,7 +149,7 @@ acpi_ex_read_data_from_field (
 		*ret_buffer_desc = buffer_desc;
 	}
 
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 
@@ -167,20 +169,23 @@ acpi_ex_read_data_from_field (
  ******************************************************************************/
 
 
-ACPI_STATUS
+acpi_status
 acpi_ex_write_data_to_field (
-	ACPI_OPERAND_OBJECT     *source_desc,
-	ACPI_OPERAND_OBJECT     *obj_desc)
+	acpi_operand_object     *source_desc,
+	acpi_operand_object     *obj_desc)
 {
-	ACPI_STATUS             status;
+	acpi_status             status;
 	u32                     length;
 	void                    *buffer;
+
+
+	FUNCTION_TRACE_PTR ("Ex_write_data_to_field", obj_desc);
 
 
 	/* Parameter validation */
 
 	if (!source_desc || !obj_desc) {
-		return (AE_AML_NO_OPERAND);
+		return_ACPI_STATUS (AE_AML_NO_OPERAND);
 	}
 
 
@@ -204,7 +209,7 @@ acpi_ex_write_data_to_field (
 		break;
 
 	default:
-		return (AE_AML_OPERAND_TYPE);
+		return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
 	}
 
 
@@ -229,11 +234,11 @@ acpi_ex_write_data_to_field (
 		break;
 
 	default:
-		return (AE_AML_INTERNAL);
+		return_ACPI_STATUS (AE_AML_INTERNAL);
 	}
 
 
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 
@@ -252,14 +257,17 @@ acpi_ex_write_data_to_field (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_access_buffer_field (
 	u32                     mode,
-	ACPI_OPERAND_OBJECT     *obj_desc,
+	acpi_operand_object     *obj_desc,
 	void                    *buffer,
 	u32                     buffer_length)
 {
-	ACPI_STATUS             status;
+	acpi_status             status;
+
+
+	FUNCTION_TRACE_PTR ("Ex_access_buffer_field", obj_desc);
 
 
 	/*
@@ -269,14 +277,14 @@ acpi_ex_access_buffer_field (
 	if (!(obj_desc->common.flags & AOPOBJ_DATA_VALID)) {
 		status = acpi_ds_get_buffer_field_arguments (obj_desc);
 		if (ACPI_FAILURE (status)) {
-			return (status);
+			return_ACPI_STATUS (status);
 		}
 	}
 
 
 	status = acpi_ex_common_access_field (mode, obj_desc, buffer, buffer_length);
 
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 
@@ -295,15 +303,18 @@ acpi_ex_access_buffer_field (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_access_region_field (
 	u32                     mode,
-	ACPI_OPERAND_OBJECT     *obj_desc,
+	acpi_operand_object     *obj_desc,
 	void                    *buffer,
 	u32                     buffer_length)
 {
-	ACPI_STATUS             status;
+	acpi_status             status;
 	u8                      locked;
+
+
+	FUNCTION_TRACE_PTR ("Ex_access_region_field", obj_desc);
 
 
 	/*
@@ -319,7 +330,7 @@ acpi_ex_access_region_field (
 	 */
 	acpi_ex_release_global_lock (locked);
 
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 
@@ -338,15 +349,18 @@ acpi_ex_access_region_field (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_access_bank_field (
 	u32                     mode,
-	ACPI_OPERAND_OBJECT     *obj_desc,
+	acpi_operand_object     *obj_desc,
 	void                    *buffer,
 	u32                     buffer_length)
 {
-	ACPI_STATUS             status;
+	acpi_status             status;
 	u8                      locked;
+
+
+	FUNCTION_TRACE_PTR ("Ex_access_bank_field", obj_desc);
 
 
 	/*
@@ -361,7 +375,6 @@ acpi_ex_access_bank_field (
 	 * Bank_field ASL declaration. The Bank_register is always a Field in
 	 * an operation region.
 	 */
-
 	status = acpi_ex_common_access_field (ACPI_WRITE,
 			 obj_desc->bank_field.bank_register_obj,
 			 &obj_desc->bank_field.value,
@@ -383,7 +396,7 @@ cleanup:
 	 */
 	acpi_ex_release_global_lock (locked);
 
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 
@@ -402,15 +415,18 @@ cleanup:
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_access_index_field (
 	u32                     mode,
-	ACPI_OPERAND_OBJECT     *obj_desc,
+	acpi_operand_object     *obj_desc,
 	void                    *buffer,
 	u32                     buffer_length)
 {
-	ACPI_STATUS             status;
+	acpi_status             status;
 	u8                      locked;
+
+
+	FUNCTION_TRACE_PTR ("Ex_access_index_field", obj_desc);
 
 
 	/*
@@ -441,7 +457,7 @@ cleanup:
 	 */
 	acpi_ex_release_global_lock (locked);
 
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 
@@ -461,14 +477,25 @@ cleanup:
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_common_access_field (
 	u32                     mode,
-	ACPI_OPERAND_OBJECT     *obj_desc,
+	acpi_operand_object     *obj_desc,
 	void                    *buffer,
 	u32                     buffer_length)
 {
-	ACPI_STATUS             status;
+	acpi_status             status;
+
+
+	FUNCTION_TRACE_PTR ("Ex_common_access_field", obj_desc);
+
+
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Obj=%p Type=%X Buf=%p Len=%X\n",
+		obj_desc, obj_desc->common.type, buffer, buffer_length));
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Mode=%d Bit_len=%X Bit_off=%X Byte_off=%X\n",
+		mode, obj_desc->common_field.bit_length,
+		obj_desc->common_field.start_field_bit_offset,
+		obj_desc->common_field.base_byte_offset));
 
 
 	/* Perform the actual read or write of the field */
@@ -488,11 +515,12 @@ acpi_ex_common_access_field (
 
 	default:
 
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unknown I/O Mode: %X\n", mode));
 		status = AE_BAD_PARAMETER;
 		break;
 	}
 
 
-	return (status);
+	return_ACPI_STATUS (status);
 }
 

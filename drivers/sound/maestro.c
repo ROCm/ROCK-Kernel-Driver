@@ -3602,7 +3602,12 @@ static struct pci_driver maestro_pci_driver = {
 
 int __init init_maestro(void)
 {
-	pci_module_init(&maestro_pci_driver);
+	int rc;
+
+	rc = pci_module_init(&maestro_pci_driver);
+	if (rc < 0)
+		return rc;
+
 	if (register_reboot_notifier(&maestro_nb))
 		printk(KERN_WARNING "maestro: reboot notifier registration failed; may not reboot properly.\n");
 #ifdef MODULE

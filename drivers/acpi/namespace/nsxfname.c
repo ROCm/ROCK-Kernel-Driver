@@ -2,7 +2,7 @@
  *
  * Module Name: nsxfname - Public interfaces to the ACPI subsystem
  *                         ACPI Namespace oriented interfaces
- *              $Revision: 79 $
+ *              $Revision: 80 $
  *
  *****************************************************************************/
 
@@ -56,15 +56,18 @@
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_get_handle (
-	ACPI_HANDLE             parent,
-	ACPI_STRING             pathname,
-	ACPI_HANDLE             *ret_handle)
+	acpi_handle             parent,
+	acpi_string             pathname,
+	acpi_handle             *ret_handle)
 {
-	ACPI_STATUS             status;
-	ACPI_NAMESPACE_NODE     *node = NULL;
-	ACPI_NAMESPACE_NODE     *prefix_node = NULL;
+	acpi_status             status;
+	acpi_namespace_node     *node = NULL;
+	acpi_namespace_node     *prefix_node = NULL;
+
+
+	FUNCTION_ENTRY ();
 
 
 	/* Ensure that ACPI has been initialized */
@@ -117,7 +120,7 @@ acpi_get_handle (
 
 /****************************************************************************
  *
- * FUNCTION:    Acpi_get_pathname
+ * FUNCTION:    Acpi_get_name
  *
  * PARAMETERS:  Handle          - Handle to be converted to a pathname
  *              Name_type       - Full pathname or single segment
@@ -131,14 +134,14 @@ acpi_get_handle (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_get_name (
-	ACPI_HANDLE             handle,
+	acpi_handle             handle,
 	u32                     name_type,
-	ACPI_BUFFER             *ret_path_ptr)
+	acpi_buffer             *ret_path_ptr)
 {
-	ACPI_STATUS             status;
-	ACPI_NAMESPACE_NODE     *node;
+	acpi_status             status;
+	acpi_namespace_node     *node;
 
 
 	/* Ensure that ACPI has been initialized */
@@ -173,7 +176,6 @@ acpi_get_name (
 	 * Wants the single segment ACPI name.
 	 * Validate handle and convert to an Node
 	 */
-
 	acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
 	node = acpi_ns_convert_handle_to_entry (handle);
 	if (!node) {
@@ -219,17 +221,17 @@ unlock_and_exit:
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_get_object_info (
-	ACPI_HANDLE             handle,
-	ACPI_DEVICE_INFO        *info)
+	acpi_handle             handle,
+	acpi_device_info        *info)
 {
 	ACPI_DEVICE_ID          hid;
 	ACPI_DEVICE_ID          uid;
-	ACPI_STATUS             status;
+	acpi_status             status;
 	u32                     device_status = 0;
-	ACPI_INTEGER            address = 0;
-	ACPI_NAMESPACE_NODE     *node;
+	acpi_integer            address = 0;
+	acpi_namespace_node     *node;
 
 
 	/* Ensure that ACPI has been initialized */
@@ -273,7 +275,6 @@ acpi_get_object_info (
 	 * not be present.  The Info->Valid bits are used
 	 * to indicate which methods ran successfully.
 	 */
-
 	info->valid = 0;
 
 	/* Execute the _HID method and save the result */
@@ -298,7 +299,6 @@ acpi_get_object_info (
 	 * Execute the _STA method and save the result
 	 * _STA is not always present
 	 */
-
 	status = acpi_ut_execute_STA (node, &device_status);
 	if (ACPI_SUCCESS (status)) {
 		info->current_status = device_status;
@@ -309,7 +309,6 @@ acpi_get_object_info (
 	 * Execute the _ADR method and save result if successful
 	 * _ADR is not always present
 	 */
-
 	status = acpi_ut_evaluate_numeric_object (METHOD_NAME__ADR,
 			  node, &address);
 

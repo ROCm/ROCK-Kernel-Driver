@@ -388,8 +388,8 @@ int agp_unbind_memory(agp_memory * curr)
  * Driver routines - start
  * Currently this module supports the following chipsets:
  * i810, i815, 440lx, 440bx, 440gx, i840, i850, via vp3, via mvp3,
- * via kx133, via kt133, amd irongate, amd 761, ALi M1541, and generic
- * support for the SiS chipsets.
+ * via kx133, via kt133, amd irongate, amd 761, amd 762, ALi M1541,
+ * and generic support for the SiS chipsets.
  */
 
 /* Generic Agp routines - Start */
@@ -2931,9 +2931,15 @@ static struct {
 		"AMD",
 		"Irongate",
 		amd_irongate_setup },
+	{ PCI_DEVICE_ID_AMD_761_0,
+		PCI_VENDOR_ID_AMD,
+		AMD_761,
+		"AMD",
+		"761",
+		amd_irongate_setup },
 	{ PCI_DEVICE_ID_AMD_762_0,
 		PCI_VENDOR_ID_AMD,
-		AMD_IRONGATE,
+		AMD_762,
 		"AMD",
 		"AMD 760MP",
 		amd_irongate_setup },

@@ -32,101 +32,101 @@
 #define SIZE_IN_HEADER          0
 
 
-ACPI_STATUS
+acpi_status
 acpi_tb_handle_to_object (
 	u16                     table_id,
-	ACPI_TABLE_DESC         **table_desc);
+	acpi_table_desc         **table_desc);
 
 /*
  * tbconvrt - Table conversion routines
  */
 
-ACPI_STATUS
+acpi_status
 acpi_tb_convert_to_xsdt (
-	ACPI_TABLE_DESC         *table_info,
+	acpi_table_desc         *table_info,
 	u32                     *number_of_tables);
 
-ACPI_STATUS
+acpi_status
 acpi_tb_convert_table_fadt (
 	void);
 
-ACPI_STATUS
+acpi_status
 acpi_tb_build_common_facs (
-	ACPI_TABLE_DESC         *table_info);
+	acpi_table_desc         *table_info);
 
 u32
 acpi_tb_get_table_count (
 	RSDP_DESCRIPTOR         *RSDP,
-	ACPI_TABLE_HEADER       *RSDT);
+	acpi_table_header       *RSDT);
 
 /*
  * tbget - Table "get" routines
  */
 
-ACPI_STATUS
+acpi_status
 acpi_tb_get_table_ptr (
-	ACPI_TABLE_TYPE         table_type,
+	acpi_table_type         table_type,
 	u32                     instance,
-	ACPI_TABLE_HEADER       **table_ptr_loc);
+	acpi_table_header       **table_ptr_loc);
 
-ACPI_STATUS
+acpi_status
 acpi_tb_get_table (
 	ACPI_PHYSICAL_ADDRESS   physical_address,
-	ACPI_TABLE_HEADER       *buffer_ptr,
-	ACPI_TABLE_DESC         *table_info);
+	acpi_table_header       *buffer_ptr,
+	acpi_table_desc         *table_info);
 
-ACPI_STATUS
+acpi_status
 acpi_tb_verify_rsdp (
 	ACPI_PHYSICAL_ADDRESS   RSDP_physical_address);
 
-ACPI_STATUS
+acpi_status
 acpi_tb_get_table_facs (
-	ACPI_TABLE_HEADER       *buffer_ptr,
-	ACPI_TABLE_DESC         *table_info);
+	acpi_table_header       *buffer_ptr,
+	acpi_table_desc         *table_info);
 
 ACPI_PHYSICAL_ADDRESS
 acpi_tb_get_rsdt_address (
 	void);
 
-ACPI_STATUS
+acpi_status
 acpi_tb_validate_rsdt (
-	ACPI_TABLE_HEADER       *table_ptr);
+	acpi_table_header       *table_ptr);
 
-ACPI_STATUS
+acpi_status
 acpi_tb_get_table_pointer (
 	ACPI_PHYSICAL_ADDRESS   physical_address,
 	u32                     flags,
 	u32                     *size,
-	ACPI_TABLE_HEADER       **table_ptr);
+	acpi_table_header       **table_ptr);
 
 /*
  * tbgetall - Get all firmware ACPI tables
  */
 
-ACPI_STATUS
+acpi_status
 acpi_tb_get_all_tables (
 	u32                     number_of_tables,
-	ACPI_TABLE_HEADER       *buffer_ptr);
+	acpi_table_header       *buffer_ptr);
 
 
 /*
  * tbinstall - Table installation
  */
 
-ACPI_STATUS
+acpi_status
 acpi_tb_install_table (
-	ACPI_TABLE_HEADER       *table_ptr,
-	ACPI_TABLE_DESC         *table_info);
+	acpi_table_header       *table_ptr,
+	acpi_table_desc         *table_info);
 
-ACPI_STATUS
+acpi_status
 acpi_tb_recognize_table (
-	ACPI_TABLE_HEADER       *table_ptr,
-	ACPI_TABLE_DESC         *table_info);
+	acpi_table_header       *table_ptr,
+	acpi_table_desc         *table_info);
 
-ACPI_STATUS
+acpi_status
 acpi_tb_init_table_descriptor (
-	ACPI_TABLE_TYPE         table_type,
-	ACPI_TABLE_DESC         *table_info);
+	acpi_table_type         table_type,
+	acpi_table_desc         *table_info);
 
 
 /*
@@ -139,26 +139,26 @@ acpi_tb_delete_acpi_tables (
 
 void
 acpi_tb_delete_acpi_table (
-	ACPI_TABLE_TYPE         type);
+	acpi_table_type         type);
 
 void
 acpi_tb_delete_single_table (
-	ACPI_TABLE_DESC         *table_desc);
+	acpi_table_desc         *table_desc);
 
-ACPI_TABLE_DESC *
+acpi_table_desc *
 acpi_tb_uninstall_table (
-	ACPI_TABLE_DESC         *table_desc);
+	acpi_table_desc         *table_desc);
 
 void
 acpi_tb_free_acpi_tables_of_type (
-	ACPI_TABLE_DESC         *table_info);
+	acpi_table_desc         *table_info);
 
 
 /*
  * tbrsd - RSDP, RSDT utilities
  */
 
-ACPI_STATUS
+acpi_status
 acpi_tb_get_table_rsdt (
 	u32                     *number_of_tables);
 
@@ -167,9 +167,9 @@ acpi_tb_scan_memory_for_rsdp (
 	u8                      *start_address,
 	u32                     length);
 
-ACPI_STATUS
+acpi_status
 acpi_tb_find_rsdp (
-	ACPI_TABLE_DESC         *table_info,
+	acpi_table_desc         *table_info,
 	u32                     flags);
 
 
@@ -181,24 +181,24 @@ u8
 acpi_tb_system_table_pointer (
 	void                    *where);
 
-ACPI_STATUS
+acpi_status
 acpi_tb_map_acpi_table (
 	ACPI_PHYSICAL_ADDRESS   physical_address,
 	u32                     *size,
-	ACPI_TABLE_HEADER       **logical_address);
+	acpi_table_header       **logical_address);
 
-ACPI_STATUS
+acpi_status
 acpi_tb_verify_table_checksum (
-	ACPI_TABLE_HEADER       *table_header);
+	acpi_table_header       *table_header);
 
 u8
 acpi_tb_checksum (
 	void                    *buffer,
 	u32                     length);
 
-ACPI_STATUS
+acpi_status
 acpi_tb_validate_table_header (
-	ACPI_TABLE_HEADER       *table_header);
+	acpi_table_header       *table_header);
 
 
 #endif /* __ACTABLES_H__ */

@@ -1,7 +1,7 @@
 /******************************************************************************
  * 
  * Module Name: os.c - Linux OSL functions
- *		$Revision: 28 $
+ *		$Revision: 46 $
  *
  *****************************************************************************/
 
@@ -42,6 +42,14 @@
 #include <acpi.h>
 #include "driver.h"
 
+#ifdef CONFIG_ACPI_EFI
+#include <asm/efi.h>
+#endif
+
+#ifdef _IA64
+#include <asm/hw_irq.h>
+#endif 
+
 #define _COMPONENT	ACPI_OS_SERVICES
 	MODULE_NAME	("os")
 
@@ -80,19 +88,20 @@ static void *acpi_irq_context = NULL;
  *				   Functions
  *****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_os_initialize(void)
 {
 	return AE_OK;
 }
 
-ACPI_STATUS
+acpi_status
 acpi_os_terminate(void)
 {
 	if (acpi_irq_handler) {
 		acpi_os_remove_interrupt_handler(acpi_irq_irq,
 						 acpi_irq_handler);
 	}
+
 	return AE_OK;
 }
 
@@ -104,6 +113,7 @@ acpi_os_printf(const NATIVE_CHAR *fmt,...)
 	va_start(args, fmt);
 	size = acpi_os_vprintf(fmt, args);
 	va_end(args);
+
 	return size;
 }
 
@@ -138,6 +148,7 @@ acpi_os_callocate(u32 size)
 	void *ptr = acpi_os_allocate(size);
 	if (ptr)
 		memset(ptr, 0, size);
+
 	return ptr;
 }
 
@@ -147,7 +158,31 @@ acpi_os_free(void *ptr)
 	kfree(ptr);
 }
 
-ACPI_STATUS
+
+acpi_status
+acpi_os_get_root_pointer(u32 flags, ACPI_PHYSICAL_ADDRESS *phys_addr)
+{
+#ifndef CONFIG_ACPI_EFI
+	if (ACPI_FAILURE(acpi_find_root_pointer(flags, phys_addr))) {
+		printk(KERN_ERR "ACPI: System description tables not found\n");
+		return AE_ERROR;
+	}
+#else /*CONFIG_ACPI_EFI*/
+	if (efi.acpi20)
+		*phys_addr = (ACPI_PHYSICAL_ADDRESS) efi.acpi20;
+	else if (efi.acpi)
+		*phys_addr = (ACPI_PHYSICAL_ADDRESS) efi.acpi;
+	else {
+		printk(KERN_ERR "ACPI: System description tables not found\n");
+		*phys_addr = NULL;
+		return AE_ERROR;
+	}
+#endif /*CONFIG_ACPI_EFI*/
+
+	return AE_OK;
+}
+
+acpi_status
 acpi_os_map_memory(ACPI_PHYSICAL_ADDRESS phys, u32 size, void **virt)
 {
 	if (phys > ULONG_MAX) {
@@ -181,7 +216,7 @@ acpi_os_unmap_memory(void *virt, u32 size)
 		iounmap(virt);
 }
 
-ACPI_STATUS
+acpi_status
 acpi_os_get_physical_address(void *virt, ACPI_PHYSICAL_ADDRESS *phys)
 {
 	if(!phys || !virt)
@@ -198,9 +233,12 @@ acpi_irq(int irq, void *dev_id, struct pt_regs *regs)
 	(*acpi_irq_handler)(acpi_irq_context);
 }
 
-ACPI_STATUS
+acpi_status
 acpi_os_install_interrupt_handler(u32 irq, OSD_HANDLER handler, void *context)
 {
+#ifdef _IA64
+	irq = isa_irq_to_vector(irq);
+#endif /*_IA64*/
 	acpi_irq_irq = irq;
 	acpi_irq_handler = handler;
 	acpi_irq_context = context;
@@ -212,13 +250,17 @@ acpi_os_install_interrupt_handler(u32 irq, OSD_HANDLER handler, void *context)
 		printk(KERN_ERR "ACPI: SCI (IRQ%d) allocation failed\n", irq);
 		return AE_ERROR;
 	}
+
 	return AE_OK;
 }
 
-ACPI_STATUS
+acpi_status
 acpi_os_remove_interrupt_handler(u32 irq, OSD_HANDLER handler)
 {
 	if (acpi_irq_handler) {
+#ifdef _IA64
+		irq = isa_irq_to_vector(irq);
+#endif /*_IA64*/
 		free_irq(irq, acpi_irq);
 		acpi_irq_handler = NULL;
 	}
@@ -238,203 +280,298 @@ acpi_os_sleep(u32 sec, u32 ms)
 }
 
 void
-acpi_os_sleep_usec(u32 us)
+acpi_os_stall(u32 us)
 {
-	udelay(us);
+	if (us > 10000) {
+		mdelay(us / 1000);
+	}
+	else {
+		udelay(us);
+	}
 }
 
-u8
-acpi_os_in8(ACPI_IO_ADDRESS port)
+acpi_status
+acpi_os_read_port(
+	ACPI_IO_ADDRESS	port,
+	void		*value,
+	u32		width)
 {
-	return inb(port);
-}
+	u32 dummy;
 
-u16
-acpi_os_in16(ACPI_IO_ADDRESS port)
-{
-	return inw(port);
-}
+	if (!value)
+		value = &dummy;
 
-u32
-acpi_os_in32(ACPI_IO_ADDRESS port)
-{
-	return inl(port);
-}
+	switch (width)
+	{
+	case 8:
+		*(u8*)  value = inb(port);
+		break;
+	case 16:
+		*(u16*) value = inw(port);
+		break;
+	case 32:
+		*(u32*) value = inl(port);
+		break;
+	default:
+		BUG();
+	}
 
-void
-acpi_os_out8(ACPI_IO_ADDRESS port, u8 val)
-{
-	outb(val, port);
-}
-
-void
-acpi_os_out16(ACPI_IO_ADDRESS port, u16 val)
-{
-	outw(val, port);
-}
-
-void
-acpi_os_out32(ACPI_IO_ADDRESS port, u32 val)
-{
-	outl(val, port);
-}
-
-UINT8
-acpi_os_mem_in8 (ACPI_PHYSICAL_ADDRESS phys_addr)
-{
-	return (*(u8*) (u32) phys_addr);
-}
-
-UINT16
-acpi_os_mem_in16 (ACPI_PHYSICAL_ADDRESS phys_addr)
-{
-	return (*(u16*) (u32) phys_addr);
-}
-
-UINT32
-acpi_os_mem_in32 (ACPI_PHYSICAL_ADDRESS phys_addr)
-{
-	return (*(u32*) (u32) phys_addr);
-}
-
-void
-acpi_os_mem_out8 (ACPI_PHYSICAL_ADDRESS phys_addr, UINT8 value)
-{
-	*(u8*) phys_to_virt(phys_addr) = value;
-}
-
-void
-acpi_os_mem_out16 (ACPI_PHYSICAL_ADDRESS phys_addr, UINT16 value)
-{
-	*(u16*) phys_to_virt(phys_addr) = value;
-}
-
-void
-acpi_os_mem_out32 (ACPI_PHYSICAL_ADDRESS phys_addr, UINT32 value)
-{
-	*(u32*) phys_to_virt(phys_addr) = value;
-}
-
-ACPI_STATUS
-acpi_os_read_pci_cfg_byte(
-	u32 bus,
-	u32 func,
-	u32 addr,
-	u8 * val)
-{
-	int devfn = PCI_DEVFN((func >> 16) & 0xffff, func & 0xffff);
-	struct pci_dev *dev = pci_find_slot(bus & 0xffff, devfn);
-	if (!val || !dev || pci_read_config_byte(dev, addr, val))
-		return AE_ERROR;
 	return AE_OK;
 }
 
-ACPI_STATUS
-acpi_os_read_pci_cfg_word(
-	u32 bus,
-	u32 func,
-	u32 addr,
-	u16 * val)
+acpi_status
+acpi_os_write_port(
+	ACPI_IO_ADDRESS	port,
+	u32		value,
+	u32		width)
 {
-	int devfn = PCI_DEVFN((func >> 16) & 0xffff, func & 0xffff);
-	struct pci_dev *dev = pci_find_slot(bus & 0xffff, devfn);
-	if (!val || !dev || pci_read_config_word(dev, addr, val))
-		return AE_ERROR;
+	switch (width)
+	{
+	case 8:
+		outb(value, port);
+		break;
+	case 16:
+		outw(value, port);
+		break;
+	case 32:
+		outl(value, port);
+		break;
+	default:
+		BUG();
+	}
+
 	return AE_OK;
 }
 
-ACPI_STATUS
-acpi_os_read_pci_cfg_dword(
-	u32 bus,
-	u32 func,
-	u32 addr,
-	u32 * val)
+acpi_status
+acpi_os_read_memory(
+	ACPI_PHYSICAL_ADDRESS	phys_addr,
+	void			*value,
+	u32			width)
 {
-	int devfn = PCI_DEVFN((func >> 16) & 0xffff, func & 0xffff);
-	struct pci_dev *dev = pci_find_slot(bus & 0xffff, devfn);
-	if (!val || !dev || pci_read_config_dword(dev, addr, val))
-		return AE_ERROR;
+	u32 dummy;
+
+	if (!value)
+		value = &dummy;
+
+	switch (width)
+	{
+	case 8:
+		*(u8*) value = *(u8*) phys_to_virt(phys_addr);
+		break;
+	case 16:
+		*(u16*) value = *(u16*) phys_to_virt(phys_addr);
+		break;
+	case 32:
+		*(u32*) value = *(u32*) phys_to_virt(phys_addr);
+		break;
+	default:
+		BUG();
+	}
+
 	return AE_OK;
 }
 
-ACPI_STATUS
-acpi_os_write_pci_cfg_byte(
-	u32 bus,
-	u32 func,
-	u32 addr,
-	u8 val)
+acpi_status
+acpi_os_write_memory(
+	ACPI_PHYSICAL_ADDRESS	phys_addr,
+	u32			value,
+	u32			width)
 {
-	int devfn = PCI_DEVFN((func >> 16) & 0xffff, func & 0xffff);
-	struct pci_dev *dev = pci_find_slot(bus & 0xffff, devfn);
-	if (!dev || pci_write_config_byte(dev, addr, val))
-		return AE_ERROR;
+	switch (width)
+	{
+	case 8:
+		*(u8*) phys_to_virt(phys_addr) = value;
+		break;
+	case 16:
+		*(u16*) phys_to_virt(phys_addr) = value;
+		break;
+	case 32:
+		*(u32*) phys_to_virt(phys_addr) = value;
+		break;
+	default:
+		BUG();
+	}
+
 	return AE_OK;
 }
 
-ACPI_STATUS
-acpi_os_write_pci_cfg_word(
-	u32 bus,
-	u32 func,
-	u32 addr,
-	u16 val)
+
+#ifdef CONFIG_ACPI_PCI
+
+/* Architecture-dependent low-level PCI configuration access functions. */
+extern int (*pci_config_read)(int seg, int bus, int dev, int fn, int reg, int len, u32 *val);
+extern int (*pci_config_write)(int seg, int bus, int dev, int fn, int reg, int len, u32 val);
+
+acpi_status
+acpi_os_read_pci_configuration (
+	acpi_pci_id             *pci_id,
+	u32                     reg,
+	void                    *value,
+	u32                     width)
 {
-	int devfn = PCI_DEVFN((func >> 16) & 0xffff, func & 0xffff);
-	struct pci_dev *dev = pci_find_slot(bus & 0xffff, devfn);
-	if (!dev || pci_write_config_word(dev, addr, val))
+	int			result = 0;
+	if (!value)
 		return AE_ERROR;
+
+	switch (width)
+	{
+	case 8:
+		result = pci_config_read(pci_id->segment, pci_id->bus, 
+			pci_id->device, pci_id->function, reg, 1, value);
+		break;
+	case 16:
+		result = pci_config_read(pci_id->segment, pci_id->bus, 
+			pci_id->device, pci_id->function, reg, 2, value);
+		break;
+	case 32:
+		result = pci_config_read(pci_id->segment, pci_id->bus, 
+			pci_id->device, pci_id->function, reg, 4, value);
+		break;
+	default:
+		BUG();
+	}
+
+	return (result ? AE_ERROR : AE_OK);
+}
+
+acpi_status
+acpi_os_write_pci_configuration (
+	acpi_pci_id             *pci_id,
+	u32                     reg,
+	NATIVE_UINT             value,
+	u32                     width)
+{
+	int			result = 0;
+
+	switch (width)
+	{
+	case 8:
+		result = pci_config_write(pci_id->segment, pci_id->bus, 
+			pci_id->device, pci_id->function, reg, 1, value);
+		break;
+	case 16:
+		result = pci_config_write(pci_id->segment, pci_id->bus, 
+			pci_id->device, pci_id->function, reg, 2, value);
+		break;
+	case 32:
+		result = pci_config_write(pci_id->segment, pci_id->bus, 
+			pci_id->device, pci_id->function, reg, 4, value);
+		break;
+	default:
+		BUG();
+	}
+
+	return (result ? AE_ERROR : AE_OK);
+}
+
+#else /*CONFIG_ACPI_PCI*/
+
+acpi_status
+acpi_os_read_pci_configuration (
+	acpi_pci_id	*pci_id,
+	u32		reg,
+	void		*value,
+	u32		width)
+{
+	int devfn = PCI_DEVFN(pci_id->device, pci_id->function);
+	struct pci_dev *dev = pci_find_slot(pci_id->bus, devfn);
+
+	if (!value || !dev)
+		return AE_ERROR;
+
+	switch (width)
+	{
+	case 8:
+		if (pci_read_config_byte(dev, reg, (u8*) value))
+			return AE_ERROR;
+		break;
+	case 16:
+		if (pci_read_config_word(dev, reg, (u16*) value))
+			return AE_ERROR;
+		break;
+	case 32:
+		if (pci_read_config_dword(dev, reg, (u32*) value))
+			return AE_ERROR;
+		break;
+	default:
+		BUG();
+	}
+
 	return AE_OK;
 }
 
-ACPI_STATUS
-acpi_os_write_pci_cfg_dword(
-	u32 bus,
-	u32 func,
-	u32 addr,
-	u32 val)
+acpi_status
+acpi_os_write_pci_configuration (
+	acpi_pci_id	*pci_id,
+	u32		reg,
+	u32		value,
+	u32		width)
 {
-	int devfn = PCI_DEVFN((func >> 16) & 0xffff, func & 0xffff);
-	struct pci_dev *dev = pci_find_slot(bus & 0xffff, devfn);
-	if (!dev || pci_write_config_dword(dev, addr, val))
+	int devfn = PCI_DEVFN(pci_id->device, pci_id->function);
+	struct pci_dev *dev = pci_find_slot(pci_id->bus, devfn);
+
+	if (!dev)
 		return AE_ERROR;
+
+	switch (width)
+	{
+	case 8:
+		if (pci_write_config_byte(dev, reg, value))
+			return AE_ERROR;
+		break;
+	case 16:
+		if (pci_write_config_word(dev, reg, value))
+			return AE_ERROR;
+		break;
+	case 32:
+		if (pci_write_config_dword(dev, reg, value))
+			return AE_ERROR;
+		break;
+	default:
+		BUG();
+	}
+
 	return AE_OK;
 }
 
-ACPI_STATUS
+#endif /*CONFIG_ACPI_PCI*/
+
+
+acpi_status
 acpi_os_load_module (
 	char *module_name)
 {
-	FUNCTION_TRACE("acpi_os_load_module");
+	PROC_NAME("acpi_os_load_module");
 
 	if (!module_name)
-		return_ACPI_STATUS(AE_BAD_PARAMETER);
+		return AE_BAD_PARAMETER;
 
 	if (0 > request_module(module_name)) {
-		DEBUG_PRINT(ACPI_WARN, ("Unable to load module [%s].\n", module_name));
-		return_ACPI_STATUS(AE_ERROR);
+		ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Unable to load module [%s].\n", module_name));
+		return AE_ERROR;
 	}
 
-	return_ACPI_STATUS(AE_OK);
+	return AE_OK;
 }
 
-ACPI_STATUS
+acpi_status
 acpi_os_unload_module (
 	char *module_name)
 {
-	FUNCTION_TRACE("acpi_os_unload_module");
-
 	if (!module_name)
-		return_ACPI_STATUS(AE_BAD_PARAMETER);
+		return AE_BAD_PARAMETER;
 
 	/* TODO: How on Linux? */
 	/* this is done automatically for all modules with
 	use_count = 0, I think. see: MOD_INC_USE_COUNT -ASG */
 
-	return_ACPI_STATUS(AE_OK);
+	return AE_OK;
 }
 
 
 /*
- * See acpi_os_queue_for_execution(), too
+ * See acpi_os_queue_for_execution()
  */
 static int
 acpi_os_queue_exec (
@@ -442,21 +579,21 @@ acpi_os_queue_exec (
 {
 	ACPI_OS_DPC		*dpc = (ACPI_OS_DPC*)context;
 
-	FUNCTION_TRACE("acpi_os_queue_exec");
+	PROC_NAME("acpi_os_queue_exec");
 
 	daemonize();
 	strcpy(current->comm, "kacpidpc");
     
 	if (!dpc || !dpc->function)
-		return_ACPI_STATUS(AE_BAD_PARAMETER);
+		return AE_BAD_PARAMETER;
 
-	DEBUG_PRINT(ACPI_INFO, ("Executing function [%p(%p)].\n", dpc->function, dpc->context));
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Executing function [%p(%p)].\n", dpc->function, dpc->context));
 
 	dpc->function(dpc->context);
 
-	acpi_os_free(dpc);
+	kfree(dpc);
 
-	return_VALUE(1);
+	return 1;
 }
 
 static void
@@ -466,52 +603,39 @@ acpi_os_schedule_exec (
 	ACPI_OS_DPC		*dpc = NULL;
 	int			thread_pid = -1;
 
-	FUNCTION_TRACE("acpi_os_schedule_exec");
+	PROC_NAME("acpi_os_schedule_exec");
 
 	dpc = (ACPI_OS_DPC*)context;
 	if (!dpc) {
-		DEBUG_PRINT(ACPI_ERROR, ("Invalid (NULL) context.\n"));
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Invalid (NULL) context.\n"));
 		return;
 	}
 
-	DEBUG_PRINT(ACPI_INFO, ("Creating new thread to run function [%p(%p)].\n", dpc->function, dpc->context));
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Creating new thread to run function [%p(%p)].\n", dpc->function, dpc->context));
 
 	thread_pid = kernel_thread(acpi_os_queue_exec, dpc, 
 		(CLONE_FS | CLONE_FILES | SIGCHLD));
 	if (thread_pid < 0) {
-		DEBUG_PRINT(ACPI_ERROR, ("Call to kernel_thread() failed.\n"));
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Call to kernel_thread() failed.\n"));
 		acpi_os_free(dpc);
 	}
-
-	return_VOID;
 }
 
-ACPI_STATUS
+acpi_status
 acpi_os_queue_for_execution(
 	u32			priority,
 	OSD_EXECUTION_CALLBACK	function,
 	void			*context)
 {
-	ACPI_STATUS 		status = AE_OK;
+	acpi_status 		status = AE_OK;
 	ACPI_OS_DPC 		*dpc = NULL;
 
-	FUNCTION_TRACE("acpi_os_queue_for_execution");
+	PROC_NAME("acpi_os_queue_for_execution");
 
-	DEBUG_PRINT(ACPI_INFO, ("Scheduling function [%p(%p)] for deferred execution.\n", function, context));
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Scheduling function [%p(%p)] for deferred execution.\n", function, context));
 
 	if (!function)
-		return_ACPI_STATUS(AE_BAD_PARAMETER);
-
-	/*
-	 * Allocate/initialize DPC structure.  Note that this memory will be
-	 * freed by the callee.
-	 */
-	dpc = acpi_os_callocate(sizeof(ACPI_OS_DPC));
-	if (!dpc) 
-		return AE_NO_MEMORY;
-
-	dpc->function = function;
-	dpc->context = context;
+		return AE_BAD_PARAMETER;
 
 	/*
 	 * Queue via DPC:
@@ -528,48 +652,70 @@ acpi_os_queue_for_execution(
 	{
 		static struct tq_struct task;
 
+		/*
+		 * Allocate/initialize DPC structure.  Note that this memory will be
+		 * freed by the callee.
+		 */
+		dpc = kmalloc(sizeof(ACPI_OS_DPC), GFP_ATOMIC);
+		if (!dpc) 
+			return AE_NO_MEMORY;
+
+		dpc->function = function;
+		dpc->context = context;
+
 		memset(&task, 0, sizeof(struct tq_struct));
 
 		task.routine = acpi_os_schedule_exec;
 		task.data = (void*)dpc;
 
 		if (schedule_task(&task) < 0) {
-			DEBUG_PRINT(ACPI_ERROR, ("Call to schedule_task() failed.\n"));
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Call to schedule_task() failed.\n"));
 			status = AE_ERROR;
 		}
 	}
 	break;
 
 	default:
+		/*
+		 * Allocate/initialize DPC structure.  Note that this memory will be
+		 * freed by the callee.
+		 */
+		dpc = kmalloc(sizeof(ACPI_OS_DPC), GFP_KERNEL);
+		if (!dpc) 
+			return AE_NO_MEMORY;
+
+		dpc->function = function;
+		dpc->context = context;
+
 		acpi_os_schedule_exec(dpc);
 		break;
 	}
 
-	return_ACPI_STATUS(status);
+	return status;
 }
 
 
-ACPI_STATUS
+acpi_status
 acpi_os_create_semaphore(
 	u32		max_units,
 	u32		initial_units,
-	ACPI_HANDLE	*handle)
+	acpi_handle	*handle)
 {
-    struct semaphore	    *sem = NULL;
+	struct semaphore	*sem = NULL;
 
-    FUNCTION_TRACE("acpi_os_create_semaphore");
+	PROC_NAME("acpi_os_create_semaphore");
 
-    sem = acpi_os_callocate(sizeof(struct semaphore));
-    if (!sem)
-	return_ACPI_STATUS(AE_NO_MEMORY);
+	sem = acpi_os_callocate(sizeof(struct semaphore));
+	if (!sem)
+		return AE_NO_MEMORY;
 
-    sema_init(sem, initial_units);
+	sema_init(sem, initial_units);
 
-    *handle = (ACPI_HANDLE*)sem;
+	*handle = (acpi_handle*)sem;
 
-    DEBUG_PRINT(ACPI_INFO, ("Creating semaphore[%p|%d].\n", *handle, initial_units));
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Creating semaphore[%p|%d].\n", *handle, initial_units));
 
-    return_ACPI_STATUS(AE_OK);
+	return AE_OK;
 }
 
 
@@ -580,22 +726,22 @@ acpi_os_create_semaphore(
  * we at least check for blocked threads and signal/cancel them?
  */
 
-ACPI_STATUS
+acpi_status
 acpi_os_delete_semaphore(
-	ACPI_HANDLE handle)
+	acpi_handle	handle)
 {
-    struct semaphore	    *sem = (struct semaphore*)handle;
+	struct semaphore *sem = (struct semaphore*) handle;
 
-    FUNCTION_TRACE("acpi_os_delete_semaphore");
+	PROC_NAME("acpi_os_delete_semaphore");
 
-    if (!sem) 
-	return AE_BAD_PARAMETER;
+	if (!sem) 
+		return AE_BAD_PARAMETER;
 
-    DEBUG_PRINT(ACPI_INFO, ("Deleting semaphore[%p].\n", handle));
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Deleting semaphore[%p].\n", handle));
 
-    acpi_os_free(sem); sem =  NULL;
+	acpi_os_free(sem); sem =  NULL;
 
-    return_ACPI_STATUS(AE_OK);
+	return AE_OK;
 }
 
 
@@ -608,25 +754,25 @@ acpi_os_delete_semaphore(
  *
  * TODO: Support for units > 1?
  */
-ACPI_STATUS
+acpi_status
 acpi_os_wait_semaphore(
-	ACPI_HANDLE	handle,
+	acpi_handle		handle,
 	u32			units,
 	u32			timeout)
 {
-	ACPI_STATUS		status = AE_OK;
+	acpi_status		status = AE_OK;
 	struct semaphore	*sem = (struct semaphore*)handle;
 	int			ret = 0;
 
-	FUNCTION_TRACE("acpi_os_wait_semaphore");
+	PROC_NAME("acpi_os_wait_semaphore");
 
 	if (!sem || (units < 1)) 
-		return_ACPI_STATUS(AE_BAD_PARAMETER);
+		return AE_BAD_PARAMETER;
 
 	if (units > 1)
-		return_ACPI_STATUS(AE_SUPPORT);
+		return AE_SUPPORT;
 
-	DEBUG_PRINT(ACPI_INFO, ("Waiting for semaphore[%p|%d|%d]\n", handle, units, timeout));
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Waiting for semaphore[%p|%d|%d]\n", handle, units, timeout));
 
 	switch (timeout)
 	{
@@ -638,8 +784,7 @@ acpi_os_wait_semaphore(
 		 * (a.k.a. 'would block').
 		 */
 		case 0:
-		ret = down_trylock(sem);
-		if (ret < 0)
+		if(down_trylock(sem))
 			status = AE_TIME;
 		break;
 
@@ -670,67 +815,46 @@ acpi_os_wait_semaphore(
 				ret = down_trylock(sem);
 			}
 	
-			if (ret < 0)
+			if (ret != 0)
 			 status = AE_TIME;
 			}
 		break;
 	}
 
 	if (ACPI_FAILURE(status)) {
-		DEBUG_PRINT(ACPI_INFO, ("Failed to acquire semaphore[%p|%d|%d]\n", handle, units, timeout));
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Failed to acquire semaphore[%p|%d|%d]\n", handle, units, timeout));
 	}
 	else {
-		DEBUG_PRINT(ACPI_INFO, ("Acquired semaphore[%p|%d|%d]\n", handle, units, timeout));
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Acquired semaphore[%p|%d|%d]\n", handle, units, timeout));
 	}
 
-	return_ACPI_STATUS(status);
+	return status;
 }
 
 
 /*
  * TODO: Support for units > 1?
  */
-ACPI_STATUS
+acpi_status
 acpi_os_signal_semaphore(
-    ACPI_HANDLE 	    handle, 
+    acpi_handle 	    handle, 
     u32 		    units)
 {
 	struct semaphore *sem = (struct semaphore *) handle;
 
-	FUNCTION_TRACE("acpi_os_signal_semaphore");
+	PROC_NAME("acpi_os_signal_semaphore");
 
 	if (!sem || (units < 1)) 
-		return_ACPI_STATUS(AE_BAD_PARAMETER);
+		return AE_BAD_PARAMETER;
 
 	if (units > 1)
-		return_ACPI_STATUS(AE_SUPPORT);
+		return AE_SUPPORT;
 
-	DEBUG_PRINT(ACPI_INFO, ("Signaling semaphore[%p|%d]\n", handle, units));
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Signaling semaphore[%p|%d]\n", handle, units));
 
 	up(sem);
 
-	return_ACPI_STATUS(AE_OK);
-}
-
-ACPI_STATUS
-acpi_os_breakpoint(NATIVE_CHAR *msg)
-{
-	acpi_os_printf("breakpoint: %s", msg);
 	return AE_OK;
-}
-
-
-void
-acpi_os_dbg_trap(char *msg)
-
-{
-	acpi_os_printf("trap: %s", msg);
-}
-
-void
-acpi_os_dbg_assert(void *failure, void *file, u32 line, NATIVE_CHAR *msg)
-{
-	acpi_os_printf("assert: %s", msg);
 }
 
 u32
@@ -774,7 +898,37 @@ acpi_os_get_thread_id (void)
 	if (!in_interrupt())
 		return current->pid;
 
-	/*acpi_os_printf("acpi_os_get_thread_id called from interrupt level!\n");*/
-
 	return 0;
 }
+
+acpi_status
+acpi_os_signal (
+    u32		function,
+    void	*info)
+{
+	switch (function)
+	{
+	case ACPI_SIGNAL_FATAL:
+		printk(KERN_ERR "ACPI: Fatal opcode executed\n");
+		break;
+	case ACPI_SIGNAL_BREAKPOINT:
+		{
+			char *bp_info = (char*) info;
+
+			printk(KERN_ERR "ACPI breakpoint: %s\n", bp_info);
+		}
+	default:
+		break;
+	}
+
+	return AE_OK;
+}
+
+acpi_status
+acpi_os_breakpoint(NATIVE_CHAR *msg)
+{
+	acpi_os_printf("breakpoint: %s", msg);
+	
+	return AE_OK;
+}
+

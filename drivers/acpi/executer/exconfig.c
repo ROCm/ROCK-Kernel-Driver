@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exconfig - Namespace reconfiguration (Load/Unload opcodes)
- *              $Revision: 34 $
+ *              $Revision: 41 $
  *
  *****************************************************************************/
 
@@ -51,19 +51,21 @@
  *
  ****************************************************************************/
 
-static ACPI_STATUS
+static acpi_status
 acpi_ex_load_table_op (
-	ACPI_OPERAND_OBJECT     *rgn_desc,
-	ACPI_HANDLE             *ddb_handle)
+	acpi_operand_object     *rgn_desc,
+	acpi_operand_object     **ddb_handle)
 {
-	ACPI_STATUS             status;
-	ACPI_OPERAND_OBJECT     *table_desc = NULL;
+	acpi_status             status;
+	acpi_operand_object     *table_desc = NULL;
 	u8                      *table_ptr;
 	u8                      *table_data_ptr;
-	ACPI_TABLE_HEADER       table_header;
-	ACPI_TABLE_DESC         table_info;
+	acpi_table_header       table_header;
+	acpi_table_desc         table_info;
 	u32                     i;
 
+
+	FUNCTION_TRACE ("Ex_load_table");
 
 	/* TBD: [Unhandled] Object can be either a field or an opregion */
 
@@ -71,26 +73,26 @@ acpi_ex_load_table_op (
 	/* Get the table header */
 
 	table_header.length = 0;
-	for (i = 0; i < sizeof (ACPI_TABLE_HEADER); i++) {
+	for (i = 0; i < sizeof (acpi_table_header); i++) {
 		status = acpi_ev_address_space_dispatch (rgn_desc, ACPI_READ_ADR_SPACE,
 				   (ACPI_PHYSICAL_ADDRESS) i, 8,
 				   (u32 *) ((u8 *) &table_header + i));
 		if (ACPI_FAILURE (status)) {
-			return (status);
+			return_ACPI_STATUS (status);
 		}
 	}
 
 	/* Allocate a buffer for the entire table */
 
-	table_ptr = acpi_ut_allocate (table_header.length);
+	table_ptr = ACPI_MEM_ALLOCATE (table_header.length);
 	if (!table_ptr) {
-		return (AE_NO_MEMORY);
+		return_ACPI_STATUS (AE_NO_MEMORY);
 	}
 
 	/* Copy the header to the buffer */
 
-	MEMCPY (table_ptr, &table_header, sizeof (ACPI_TABLE_HEADER));
-	table_data_ptr = table_ptr + sizeof (ACPI_TABLE_HEADER);
+	MEMCPY (table_ptr, &table_header, sizeof (acpi_table_header));
+	table_data_ptr = table_ptr + sizeof (acpi_table_header);
 
 
 	/* Get the table from the op region */
@@ -113,6 +115,9 @@ acpi_ex_load_table_op (
 		(!STRNCMP (table_header.signature,
 				 acpi_gbl_acpi_table_data[ACPI_TABLE_SSDT].signature,
 				 acpi_gbl_acpi_table_data[ACPI_TABLE_SSDT].sig_length))) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+			"Table has invalid signature [%4.4s], must be SSDT or PSDT\n",
+			table_header.signature));
 		status = AE_BAD_SIGNATURE;
 		goto cleanup;
 	}
@@ -128,7 +133,7 @@ acpi_ex_load_table_op (
 
 	/* Install the new table into the local data structures */
 
-	table_info.pointer     = (ACPI_TABLE_HEADER *) table_ptr;
+	table_info.pointer     = (acpi_table_header *) table_ptr;
 	table_info.length      = table_header.length;
 	table_info.allocation  = ACPI_MEM_ALLOCATED;
 	table_info.base_pointer = table_ptr;
@@ -162,14 +167,14 @@ acpi_ex_load_table_op (
 
 	*ddb_handle = table_desc;
 
-	return (status);
+	return_ACPI_STATUS (status);
 
 
 cleanup:
 
-	acpi_ut_free (table_desc);
-	acpi_ut_free (table_ptr);
-	return (status);
+	ACPI_MEM_FREE (table_desc);
+	ACPI_MEM_FREE (table_ptr);
+	return_ACPI_STATUS (status);
 
 }
 
@@ -186,41 +191,42 @@ cleanup:
  *
  ****************************************************************************/
 
-static ACPI_STATUS
+static acpi_status
 acpi_ex_unload_table (
-	ACPI_HANDLE             ddb_handle)
+	acpi_operand_object     *ddb_handle)
 {
-	ACPI_STATUS             status = AE_NOT_IMPLEMENTED;
-	ACPI_OPERAND_OBJECT     *table_desc = (ACPI_OPERAND_OBJECT *) ddb_handle;
-	ACPI_TABLE_DESC         *table_info;
+	acpi_status             status = AE_NOT_IMPLEMENTED;
+	acpi_operand_object     *table_desc = ddb_handle;
+	acpi_table_desc         *table_info;
 
 
-	/* Validate the handle */
-	/* Although the handle is partially validated in Acpi_ex_reconfiguration(),
-	 *  when it calls Acpi_ex_resolve_operands(), the handle is more completely
-	 *  validated here.
+	FUNCTION_TRACE ("Ex_unload_table");
+
+
+	/*
+	 * Validate the handle
+	 * Although the handle is partially validated in Acpi_ex_reconfiguration(),
+	 * when it calls Acpi_ex_resolve_operands(), the handle is more completely
+	 * validated here.
 	 */
-
 	if ((!ddb_handle) ||
 		(!VALID_DESCRIPTOR_TYPE (ddb_handle, ACPI_DESC_TYPE_INTERNAL)) ||
-		(((ACPI_OPERAND_OBJECT  *)ddb_handle)->common.type !=
+		(((acpi_operand_object  *)ddb_handle)->common.type !=
 				INTERNAL_TYPE_REFERENCE)) {
-		return (AE_BAD_PARAMETER);
+		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
-
 
 	/* Get the actual table descriptor from the Ddb_handle */
 
-	table_info = (ACPI_TABLE_DESC *) table_desc->reference.object;
+	table_info = (acpi_table_desc *) table_desc->reference.object;
 
 	/*
 	 * Delete the entire namespace under this table Node
 	 * (Offset contains the Table_id)
 	 */
-
 	status = acpi_ns_delete_namespace_by_owner (table_info->table_id);
 	if (ACPI_FAILURE (status)) {
-		return (status);
+		return_ACPI_STATUS (status);
 	}
 
 	/* Delete the table itself */
@@ -231,7 +237,7 @@ acpi_ex_unload_table (
 
 	acpi_ut_remove_reference (table_desc);
 
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 
@@ -248,45 +254,30 @@ acpi_ex_unload_table (
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_reconfiguration (
 	u16                     opcode,
-	ACPI_WALK_STATE         *walk_state)
+	acpi_walk_state         *walk_state)
 {
-	ACPI_STATUS             status;
-	ACPI_OPERAND_OBJECT     *region_desc = NULL;
-	ACPI_HANDLE             *ddb_handle;
+	acpi_operand_object     **operand = &walk_state->operands[0];
+	acpi_status             status;
 
 
-	/* Resolve the operands */
+	FUNCTION_TRACE ("Ex_reconfiguration");
 
-	status = acpi_ex_resolve_operands (opcode, WALK_OPERANDS, walk_state);
-	/* Get the table handle, common for both opcodes */
+#define ddb_handle          operand[0]
+#define region_desc         operand[1]
 
-	status |= acpi_ds_obj_stack_pop_object ((ACPI_OPERAND_OBJECT **) &ddb_handle,
-			 walk_state);
 
 	switch (opcode) {
 
 	case AML_LOAD_OP:
 
-		/* Get the region or field descriptor */
-
-		status |= acpi_ds_obj_stack_pop_object (&region_desc, walk_state);
-		if (ACPI_FAILURE (status)) {
-			acpi_ut_remove_reference (region_desc);
-			return (status);
-		}
-
-		status = acpi_ex_load_table_op (region_desc, ddb_handle);
+		status = acpi_ex_load_table_op (region_desc, &ddb_handle);
 		break;
 
 
 	case AML_UNLOAD_OP:
-
-		if (ACPI_FAILURE (status)) {
-			return (status);
-		}
 
 		status = acpi_ex_unload_table (ddb_handle);
 		break;
@@ -294,11 +285,12 @@ acpi_ex_reconfiguration (
 
 	default:
 
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "bad opcode=%X\n", opcode));
 		status = AE_AML_BAD_OPCODE;
 		break;
 	}
 
 
-	return (status);
+	return_ACPI_STATUS (status);
 }
 

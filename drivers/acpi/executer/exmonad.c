@@ -1,8 +1,8 @@
 
 /******************************************************************************
  *
- * Module Name: exmonad - ACPI AML (p-code) execution for monadic operators
- *              $Revision: 99 $
+ * Module Name: exmonad - ACPI AML execution for monadic (1 operand) operators
+ *              $Revision: 111 $
  *
  *****************************************************************************/
 
@@ -51,13 +51,16 @@
  *
  ******************************************************************************/
 
-static ACPI_STATUS
+static acpi_status
 acpi_ex_get_object_reference (
-	ACPI_OPERAND_OBJECT     *obj_desc,
-	ACPI_OPERAND_OBJECT     **ret_desc,
-	ACPI_WALK_STATE         *walk_state)
+	acpi_operand_object     *obj_desc,
+	acpi_operand_object     **ret_desc,
+	acpi_walk_state         *walk_state)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
+
+
+	FUNCTION_TRACE_PTR ("Ex_get_object_reference", obj_desc);
 
 
 	if (VALID_DESCRIPTOR_TYPE (obj_desc, ACPI_DESC_TYPE_INTERNAL)) {
@@ -81,6 +84,8 @@ acpi_ex_get_object_reference (
 
 		default:
 
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "(Internal) Unknown Ref subtype %02x\n",
+				obj_desc->reference.opcode));
 			*ret_desc = NULL;
 			status = AE_AML_INTERNAL;
 			goto cleanup;
@@ -102,8 +107,12 @@ acpi_ex_get_object_reference (
 
 cleanup:
 
-	return (status);
+	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Obj=%p Ref=%p\n", obj_desc, *ret_desc));
+	return_ACPI_STATUS (status);
 }
+
+#define obj_desc            operand[0]
+#define res_desc            operand[1]
 
 
 /*******************************************************************************
@@ -119,24 +128,16 @@ cleanup:
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_monadic1 (
 	u16                     opcode,
-	ACPI_WALK_STATE         *walk_state)
+	acpi_walk_state         *walk_state)
 {
-	ACPI_OPERAND_OBJECT     *obj_desc;
-	ACPI_STATUS             status;
+	acpi_operand_object     **operand = &walk_state->operands[0];
+	acpi_status             status;
 
 
-	/* Resolve all operands */
-
-	status = acpi_ex_resolve_operands (opcode, WALK_OPERANDS, walk_state);
-	/* Get all operands */
-
-	status |= acpi_ds_obj_stack_pop_object (&obj_desc, walk_state);
-	if (ACPI_FAILURE (status)) {
-		goto cleanup;
-	}
+	FUNCTION_TRACE_PTR ("Ex_monadic1", WALK_OPERANDS);
 
 
 	/* Examine the opcode */
@@ -195,13 +196,11 @@ acpi_ex_monadic1 (
 	} /* switch */
 
 
-cleanup:
-
 	/* Always delete the operand */
 
 	acpi_ut_remove_reference (obj_desc);
 
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -218,33 +217,23 @@ cleanup:
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_monadic2_r (
 	u16                     opcode,
-	ACPI_WALK_STATE         *walk_state,
-	ACPI_OPERAND_OBJECT     **return_desc)
+	acpi_walk_state         *walk_state,
+	acpi_operand_object     **return_desc)
 {
-	ACPI_OPERAND_OBJECT     *obj_desc;
-	ACPI_OPERAND_OBJECT     *res_desc;
-	ACPI_OPERAND_OBJECT     *ret_desc = NULL;
-	ACPI_OPERAND_OBJECT     *ret_desc2 = NULL;
+	acpi_operand_object     **operand = &walk_state->operands[0];
+	acpi_operand_object     *ret_desc = NULL;
+	acpi_operand_object     *ret_desc2 = NULL;
 	u32                     res_val;
-	ACPI_STATUS             status;
+	acpi_status             status = AE_OK;
 	u32                     i;
 	u32                     j;
-	ACPI_INTEGER            digit;
+	acpi_integer            digit;
 
 
-	/* Resolve all operands */
-
-	status = acpi_ex_resolve_operands (opcode, WALK_OPERANDS, walk_state);
-	/* Get all operands */
-
-	status |= acpi_ds_obj_stack_pop_object (&res_desc, walk_state);
-	status |= acpi_ds_obj_stack_pop_object (&obj_desc, walk_state);
-	if (ACPI_FAILURE (status)) {
-		goto cleanup;
-	}
+	FUNCTION_TRACE_PTR ("Ex_monadic2_r", WALK_OPERANDS);
 
 
 	/* Create a return object of type NUMBER for most opcodes */
@@ -325,11 +314,13 @@ acpi_ex_monadic2_r (
 		for (i = 0; i < ACPI_MAX_BCD_DIGITS; i++) {
 			/* Get one BCD digit */
 
-			digit = (ACPI_INTEGER) ((obj_desc->integer.value >> (i * 4)) & 0xF);
+			digit = (acpi_integer) ((obj_desc->integer.value >> (i * 4)) & 0xF);
 
 			/* Check the range of the digit */
 
 			if (digit > 9) {
+				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "BCD digit too large: \n",
+					digit));
 				status = AE_AML_NUMERIC_OVERFLOW;
 				goto cleanup;
 			}
@@ -353,6 +344,8 @@ acpi_ex_monadic2_r (
 
 
 		if (obj_desc->integer.value > ACPI_MAX_BCD_VALUE) {
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "BCD overflow: %d\n",
+				obj_desc->integer.value));
 			status = AE_AML_NUMERIC_OVERFLOW;
 			goto cleanup;
 		}
@@ -363,7 +356,7 @@ acpi_ex_monadic2_r (
 
 			digit = obj_desc->integer.value;
 			for (j = 0; j < i; j++) {
-				digit /= 10;
+				digit = ACPI_DIVIDE (digit, 10);
 			}
 
 			/* Create the BCD digit */
@@ -384,20 +377,17 @@ acpi_ex_monadic2_r (
 		 * different than the return value stored in the result descriptor
 		 * (There are really two return values)
 		 */
-
-		if ((ACPI_NAMESPACE_NODE *) obj_desc == acpi_gbl_root_node) {
+		if ((acpi_namespace_node *) obj_desc == acpi_gbl_root_node) {
 			/*
 			 * This means that the object does not exist in the namespace,
 			 * return FALSE
 			 */
-
 			ret_desc->integer.value = 0;
 
 			/*
 			 * Must delete the result descriptor since there is no reference
 			 * being returned
 			 */
-
 			acpi_ut_remove_reference (res_desc);
 			goto cleanup;
 		}
@@ -429,27 +419,22 @@ acpi_ex_monadic2_r (
 		 * Do the store, and be careful about deleting the source object,
 		 * since the object itself may have been stored.
 		 */
-
 		status = acpi_ex_store (obj_desc, res_desc, walk_state);
 		if (ACPI_FAILURE (status)) {
 			/* On failure, just delete the Obj_desc */
 
 			acpi_ut_remove_reference (obj_desc);
+			return_ACPI_STATUS (status);
 		}
 
-		else {
-			/*
-			 * Normally, we would remove a reference on the Obj_desc parameter;
-			 * But since it is being used as the internal return object
-			 * (meaning we would normally increment it), the two cancel out,
-			 * and we simply don't do anything.
-			 */
-			*return_desc = obj_desc;
-		}
-
-		obj_desc = NULL;
-		return (status);
-
+		/*
+		 * Normally, we would remove a reference on the Obj_desc parameter;
+		 * But since it is being used as the internal return object
+		 * (meaning we would normally increment it), the two cancel out,
+		 * and we simply don't do anything.
+		 */
+		*return_desc = obj_desc;
+		return_ACPI_STATUS (status);
 		break;
 
 
@@ -457,7 +442,29 @@ acpi_ex_monadic2_r (
 
 		/* Reference, returning an Reference */
 
-		return (AE_OK);
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Debug_op should never get here!\n"));
+		return_ACPI_STATUS (AE_OK);
+		break;
+
+
+	/*
+	 * ACPI 2.0 Opcodes
+	 */
+	case AML_TO_DECSTRING_OP:
+		status = acpi_ex_convert_to_string (obj_desc, &ret_desc, 10, ACPI_UINT32_MAX, walk_state);
+		break;
+
+
+	case AML_TO_HEXSTRING_OP:
+		status = acpi_ex_convert_to_string (obj_desc, &ret_desc, 16, ACPI_UINT32_MAX, walk_state);
+		break;
+
+	case AML_TO_BUFFER_OP:
+		status = acpi_ex_convert_to_buffer (obj_desc, &ret_desc, walk_state);
+		break;
+
+	case AML_TO_INTEGER_OP:
+		status = acpi_ex_convert_to_integer (obj_desc, &ret_desc, walk_state);
 		break;
 
 
@@ -471,6 +478,8 @@ acpi_ex_monadic2_r (
 	case AML_SHIFT_LEFT_BIT_OP:
 	case AML_SHIFT_RIGHT_BIT_OP:
 
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "%s is unimplemented\n",
+				  acpi_ps_get_opcode_name (opcode)));
 		status = AE_SUPPORT;
 		goto cleanup;
 		break;
@@ -506,7 +515,7 @@ cleanup:
 	/* Set the return object and exit */
 
 	*return_desc = ret_desc;
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 
@@ -524,41 +533,24 @@ cleanup:
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_monadic2 (
 	u16                     opcode,
-	ACPI_WALK_STATE         *walk_state,
-	ACPI_OPERAND_OBJECT     **return_desc)
+	acpi_walk_state         *walk_state,
+	acpi_operand_object     **return_desc)
 {
-	ACPI_OPERAND_OBJECT     *obj_desc;
-	ACPI_OPERAND_OBJECT     *tmp_desc;
-	ACPI_OPERAND_OBJECT     *ret_desc = NULL;
-	ACPI_STATUS             resolve_status;
-	ACPI_STATUS             status;
+	acpi_operand_object     **operand = &walk_state->operands[0];
+	acpi_operand_object     *tmp_desc;
+	acpi_operand_object     *ret_desc = NULL;
+	acpi_status             status = AE_OK;
 	u32                     type;
-	ACPI_INTEGER            value;
+	acpi_integer            value;
 
 
-	/* Attempt to resolve the operands */
-
-	resolve_status = acpi_ex_resolve_operands (opcode, WALK_OPERANDS, walk_state);
-	/* Always get all operands */
-
-	status = acpi_ds_obj_stack_pop_object (&obj_desc, walk_state);
-
-	/* Now we can check the status codes */
-
-	if (ACPI_FAILURE (resolve_status)) {
-		goto cleanup;
-	}
-
-	if (ACPI_FAILURE (status)) {
-		goto cleanup;
-	}
+	FUNCTION_TRACE_PTR ("Ex_monadic2", WALK_OPERANDS);
 
 
 	/* Get the operand and decode the opcode */
-
 
 	switch (opcode) {
 
@@ -587,9 +579,8 @@ acpi_ex_monadic2 (
 		 * can be either an Node or an internal object.
 		 *
 		 * TBD: [Future] This may be the prototype code for all cases where
-		 * an Reference is expected!! 10/99
+		 * a Reference is expected!! 10/99
 		 */
-
 		if (VALID_DESCRIPTOR_TYPE (obj_desc, ACPI_DESC_TYPE_NAMED)) {
 			ret_desc = obj_desc;
 		}
@@ -599,7 +590,6 @@ acpi_ex_monadic2 (
 			 * Duplicate the Reference in a new object so that we can resolve it
 			 * without destroying the original Reference object
 			 */
-
 			ret_desc = acpi_ut_create_internal_object (INTERNAL_TYPE_REFERENCE);
 			if (!ret_desc) {
 				status = AE_NO_MEMORY;
@@ -616,9 +606,11 @@ acpi_ex_monadic2 (
 		 * Convert the Ret_desc Reference to a Number
 		 * (This deletes the original Ret_desc)
 		 */
-
 		status = acpi_ex_resolve_operands (AML_LNOT_OP, &ret_desc, walk_state);
 		if (ACPI_FAILURE (status)) {
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "%s: bad operand(s) %s\n",
+				acpi_ps_get_opcode_name (opcode), acpi_format_exception(status)));
+
 			goto cleanup;
 		}
 
@@ -655,6 +647,7 @@ acpi_ex_monadic2 (
 			case AML_ZERO_OP:
 			case AML_ONE_OP:
 			case AML_ONES_OP:
+			case AML_REVISION_OP:
 
 				/* Constants are of type Number */
 
@@ -708,7 +701,7 @@ acpi_ex_monadic2 (
 			/*
 			 * It's not a Reference, so it must be a direct name pointer.
 			 */
-			type = acpi_ns_get_type ((ACPI_NAMESPACE_NODE *) obj_desc);
+			type = acpi_ns_get_type ((acpi_namespace_node *) obj_desc);
 
 			/* Convert internal types to external types */
 
@@ -739,7 +732,7 @@ acpi_ex_monadic2 (
 	case AML_SIZE_OF_OP:
 
 		if (VALID_DESCRIPTOR_TYPE (obj_desc, ACPI_DESC_TYPE_NAMED)) {
-			obj_desc = acpi_ns_get_attached_object ((ACPI_NAMESPACE_NODE *) obj_desc);
+			obj_desc = acpi_ns_get_attached_object ((acpi_namespace_node *) obj_desc);
 		}
 
 		if (!obj_desc) {
@@ -773,6 +766,8 @@ acpi_ex_monadic2 (
 
 			default:
 
+				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Not Buf/Str/Pkg - found type %X\n",
+					obj_desc->common.type));
 				status = AE_AML_OPERAND_TYPE;
 				goto cleanup;
 			}
@@ -782,7 +777,6 @@ acpi_ex_monadic2 (
 		 * Now that we have the size of the object, create a result
 		 * object to hold the value
 		 */
-
 		ret_desc = acpi_ut_create_internal_object (ACPI_TYPE_INTEGER);
 		if (!ret_desc) {
 			status = AE_NO_MEMORY;
@@ -845,7 +839,7 @@ acpi_ex_monadic2 (
 		if (VALID_DESCRIPTOR_TYPE (obj_desc, ACPI_DESC_TYPE_NAMED)) {
 			/* Get the actual object from the Node (This is the dereference) */
 
-			ret_desc = ((ACPI_NAMESPACE_NODE *) obj_desc)->object;
+			ret_desc = ((acpi_namespace_node *) obj_desc)->object;
 
 			/* Returning a pointer to the object, add another reference! */
 
@@ -857,9 +851,11 @@ acpi_ex_monadic2 (
 			 * This must be a reference object produced by the Index
 			 * ASL operation -- check internal opcode
 			 */
-
 			if ((obj_desc->reference.opcode != AML_INDEX_OP) &&
 				(obj_desc->reference.opcode != AML_REF_OF_OP)) {
+				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unknown opcode in ref(%p) - %X\n",
+					obj_desc, obj_desc->reference.opcode));
+
 				status = AE_TYPE;
 				goto cleanup;
 			}
@@ -873,7 +869,6 @@ acpi_ex_monadic2 (
 				 * 1) A Buffer
 				 * 2) A Package
 				 */
-
 				if (obj_desc->reference.target_type == ACPI_TYPE_BUFFER_FIELD) {
 					/*
 					 * The target is a buffer, we must create a new object that
@@ -905,7 +900,6 @@ acpi_ex_monadic2 (
 					 * element of the package.  We must add another reference to
 					 * this object, however.
 					 */
-
 					ret_desc = *(obj_desc->reference.where);
 					if (!ret_desc) {
 						/*
@@ -914,6 +908,8 @@ acpi_ex_monadic2 (
 						 * severe error.
 						 */
 
+						ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "NULL package element obj %p\n",
+							obj_desc));
 						status = AE_AML_UNINITIALIZED_ELEMENT;
 						goto cleanup;
 					}
@@ -922,6 +918,8 @@ acpi_ex_monadic2 (
 				}
 
 				else {
+					ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unknown Target_type %X in obj %p\n",
+						obj_desc->reference.target_type, obj_desc));
 					status = AE_AML_OPERAND_TYPE;
 					goto cleanup;
 				}
@@ -967,6 +965,6 @@ cleanup:
 	}
 
 	*return_desc = ret_desc;
-	return (status);
+	return_ACPI_STATUS (status);
 }
 

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: bn_osl.c
- *   $Revision: 10 $
+ *   $Revision: 14 $
  *
  *****************************************************************************/
 
@@ -53,11 +53,11 @@ static struct proc_dir_entry	*bn_proc_root = NULL;
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bn_osl_add_device(
 	BN_CONTEXT		*button)
 {
-	ACPI_STATUS		status = AE_OK;
+	acpi_status		status = AE_OK;
 
 	if (!button) {
 		return(AE_BAD_PARAMETER);
@@ -99,7 +99,7 @@ bn_osl_add_device(
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bn_osl_remove_device (
 	BN_CONTEXT		*button)
 {
@@ -134,12 +134,12 @@ bn_osl_remove_device (
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bn_osl_generate_event (
 	u32			event,
 	BN_CONTEXT		*button)
 {
-	ACPI_STATUS		status = AE_OK;
+	acpi_status		status = AE_OK;
 
 	if (!button) {
 		return(AE_BAD_PARAMETER);
@@ -196,10 +196,14 @@ bn_osl_generate_event (
  *
  ****************************************************************************/
 
-static int __init 
+static int __init
 bn_osl_init (void)
 {
-	ACPI_STATUS		status = AE_OK;
+	acpi_status		status = AE_OK;
+
+	/* abort if no busmgr */
+	if (!bm_proc_root)
+		return -ENODEV;
 
 	bn_proc_root = proc_mkdir(BN_PROC_ROOT, bm_proc_root);
 	if (!bn_proc_root) {
@@ -228,7 +232,7 @@ bn_osl_init (void)
  *
  ****************************************************************************/
 
-static void __exit 
+static void __exit
 bn_osl_cleanup (void)
 {
 	bn_terminate();

@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: rsirq - IRQ resource descriptors
- *              $Revision: 17 $
+ *              $Revision: 18 $
  *
  ******************************************************************************/
 
@@ -53,7 +53,7 @@
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_rs_irq_resource (
 	u8                      *byte_stream_buffer,
 	u32                     *bytes_consumed,
@@ -61,12 +61,15 @@ acpi_rs_irq_resource (
 	u32                     *structure_size)
 {
 	u8                      *buffer = byte_stream_buffer;
-	ACPI_RESOURCE           *output_struct = (ACPI_RESOURCE *) *output_buffer;
+	acpi_resource           *output_struct = (acpi_resource *) *output_buffer;
 	u16                     temp16 = 0;
 	u8                      temp8 = 0;
 	u8                      index;
 	u8                      i;
-	u32                     struct_size = SIZEOF_RESOURCE (ACPI_RESOURCE_IRQ);
+	u32                     struct_size = SIZEOF_RESOURCE (acpi_resource_irq);
+
+
+	FUNCTION_TRACE ("Rs_irq_resource");
 
 
 	/*
@@ -127,7 +130,7 @@ acpi_rs_irq_resource (
 				 * are allowed (ACPI spec v1.0b ection 6.4.2.1),
 				 * so an error will occur if we reach this point
 				 */
-				return (AE_BAD_DATA);
+				return_ACPI_STATUS (AE_BAD_DATA);
 			}
 		}
 
@@ -156,7 +159,7 @@ acpi_rs_irq_resource (
 	 * Return the final size of the structure
 	 */
 	*structure_size = struct_size;
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -177,9 +180,9 @@ acpi_rs_irq_resource (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_rs_irq_stream (
-	ACPI_RESOURCE           *linked_list,
+	acpi_resource           *linked_list,
 	u8                      **output_buffer,
 	u32                     *bytes_consumed)
 {
@@ -188,6 +191,9 @@ acpi_rs_irq_stream (
 	u8                      temp8 = 0;
 	u8                      index;
 	u8                      IRQinfo_byte_needed;
+
+
+	FUNCTION_TRACE ("Rs_irq_stream");
 
 
 	/*
@@ -247,7 +253,7 @@ acpi_rs_irq_stream (
 	 * Return the number of bytes consumed in this operation
 	 */
 	*bytes_consumed = POINTER_DIFF (buffer, *output_buffer);
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -273,7 +279,7 @@ acpi_rs_irq_stream (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_rs_extended_irq_resource (
 	u8                      *byte_stream_buffer,
 	u32                     *bytes_consumed,
@@ -281,12 +287,15 @@ acpi_rs_extended_irq_resource (
 	u32                     *structure_size)
 {
 	u8                      *buffer = byte_stream_buffer;
-	ACPI_RESOURCE           *output_struct = (ACPI_RESOURCE *) *output_buffer;
+	acpi_resource           *output_struct = (acpi_resource *) *output_buffer;
 	u16                     temp16 = 0;
 	u8                      temp8 = 0;
 	NATIVE_CHAR             *temp_ptr;
 	u8                      index;
-	u32                     struct_size = SIZEOF_RESOURCE (ACPI_RESOURCE_EXT_IRQ);
+	u32                     struct_size = SIZEOF_RESOURCE (acpi_resource_ext_irq);
+
+
+	FUNCTION_TRACE ("Rs_extended_irq_resource");
 
 
 	/*
@@ -326,7 +335,7 @@ acpi_rs_extended_irq_resource (
 			 * are allowed (ACPI spec v1.0b ection 6.4.2.1),
 			 * so an error will occur if we reach this point
 			 */
-			return (AE_BAD_DATA);
+			return_ACPI_STATUS (AE_BAD_DATA);
 		}
 	}
 
@@ -434,7 +443,7 @@ acpi_rs_extended_irq_resource (
 	 * Return the final size of the structure
 	 */
 	*structure_size = struct_size;
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -455,9 +464,9 @@ acpi_rs_extended_irq_resource (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_rs_extended_irq_stream (
-	ACPI_RESOURCE           *linked_list,
+	acpi_resource           *linked_list,
 	u8                      **output_buffer,
 	u32                     *bytes_consumed)
 {
@@ -466,6 +475,9 @@ acpi_rs_extended_irq_stream (
 	u8                      temp8 = 0;
 	u8                      index;
 	NATIVE_CHAR             *temp_pointer = NULL;
+
+
+	FUNCTION_TRACE ("Rs_extended_irq_stream");
 
 
 	/*
@@ -544,6 +556,6 @@ acpi_rs_extended_irq_stream (
 	 * minus the header size (3 bytes)
 	 */
 	*length_field = (u16) (*bytes_consumed - 3);
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 

@@ -38,26 +38,19 @@ EXPORT_SYMBOL(acpi_in_debugger);
 EXPORT_SYMBOL(acpi_db_user_commands);
 #endif
 
+EXPORT_SYMBOL(acpi_gbl_FADT);
+
 EXPORT_SYMBOL(acpi_os_free);
-EXPORT_SYMBOL(acpi_os_breakpoint);
 EXPORT_SYMBOL(acpi_os_printf);
 EXPORT_SYMBOL(acpi_os_callocate);
 EXPORT_SYMBOL(acpi_os_sleep);
-EXPORT_SYMBOL(acpi_os_sleep_usec);
-EXPORT_SYMBOL(acpi_os_in8);
-EXPORT_SYMBOL(acpi_os_out8);
+EXPORT_SYMBOL(acpi_os_stall);
 EXPORT_SYMBOL(acpi_os_queue_for_execution);
 
 EXPORT_SYMBOL(acpi_dbg_layer);
 EXPORT_SYMBOL(acpi_dbg_level);
-EXPORT_SYMBOL(function_exit);
-EXPORT_SYMBOL(function_trace);
-EXPORT_SYMBOL(function_status_exit);
-EXPORT_SYMBOL(function_value_exit);
-EXPORT_SYMBOL(debug_print_raw);
-EXPORT_SYMBOL(debug_print_prefix);
 
-EXPORT_SYMBOL(acpi_ut_format_exception);
+EXPORT_SYMBOL(acpi_format_exception);
 
 EXPORT_SYMBOL(acpi_get_handle);
 EXPORT_SYMBOL(acpi_get_parent);
@@ -96,11 +89,20 @@ EXPORT_SYMBOL(acpi_os_create_semaphore);
 EXPORT_SYMBOL(acpi_os_delete_semaphore);
 EXPORT_SYMBOL(acpi_os_wait_semaphore);
 
-EXPORT_SYMBOL(acpi_os_in32);
-EXPORT_SYMBOL(acpi_os_out32);
+EXPORT_SYMBOL(acpi_os_read_port);
+EXPORT_SYMBOL(acpi_os_write_port);
+
 EXPORT_SYMBOL(acpi_fadt);
 EXPORT_SYMBOL(acpi_hw_register_bit_access);
 EXPORT_SYMBOL(acpi_hw_obtain_sleep_type_register_data);
 EXPORT_SYMBOL(acpi_enter_sleep_state);
 EXPORT_SYMBOL(acpi_get_system_info);
+EXPORT_SYMBOL(acpi_leave_sleep_state);
+/*EXPORT_SYMBOL(acpi_save_state_mem);*/
+/*EXPORT_SYMBOL(acpi_save_state_disk);*/
+EXPORT_SYMBOL(acpi_hw_register_read);
+EXPORT_SYMBOL(acpi_set_firmware_waking_vector);
+EXPORT_SYMBOL(acpi_subsystem_status);
 
+
+EXPORT_SYMBOL(acpi_os_signal);

@@ -1,7 +1,7 @@
 /*****************************************************************************
  *
  * Module name: bm.h
- *   $Revision: 39 $
+ *   $Revision: 41 $
  *
  *****************************************************************************/
 
@@ -80,7 +80,7 @@ typedef u32			BM_NOTIFY;
 
 /*
  * These are a higher-level abstraction of ACPI notifications, intended
- * for consumption by driver modules to facilitate PnP.
+ * for consumption by driver modules to facilitate Pn_p.
  */
 #define BM_NOTIFY_UNKNOWN	((BM_NOTIFY) 0x00)
 #define BM_NOTIFY_DEVICE_ADDED	((BM_NOTIFY) 0x01)
@@ -96,7 +96,6 @@ typedef u32			BM_HANDLE;
 #define BM_HANDLE_ROOT		((BM_HANDLE) 0x00000000)
 #define BM_HANDLE_UNKNOWN	((BM_HANDLE) 0xFFFFFFFF)
 #define BM_HANDLES_MAX		100
-
 
 
 /*
@@ -301,7 +300,7 @@ typedef struct
 typedef struct
 {
 	BM_HANDLE		handle;
-	ACPI_HANDLE		acpi_handle;
+	acpi_handle  		acpi_handle;
 	BM_DEVICE_FLAGS		flags;
 	BM_DEVICE_STATUS	status;
 	BM_DEVICE_ID		id;
@@ -328,10 +327,10 @@ typedef struct
  */
 typedef struct
 {
-	ACPI_STATUS		status;
+	acpi_status		status;
 	BM_COMMAND		command;
 	BM_HANDLE		handle;
-	ACPI_BUFFER		buffer;
+	acpi_buffer		buffer;
 } BM_REQUEST;
 
 
@@ -345,14 +344,14 @@ typedef void *			BM_DRIVER_CONTEXT;
 
 /* Notification Callback Function */
 typedef
-ACPI_STATUS (*BM_DRIVER_NOTIFY) (
+acpi_status (*BM_DRIVER_NOTIFY) (
 	BM_NOTIFY		notify_type,
 	BM_HANDLE		device_handle,
 	BM_DRIVER_CONTEXT	*context);
 
 /* Request Callback Function */
 typedef
-ACPI_STATUS (*BM_DRIVER_REQUEST) (
+acpi_status (*BM_DRIVER_REQUEST) (
 	BM_REQUEST		*request,
 	BM_DRIVER_CONTEXT	context);
 
@@ -428,30 +427,30 @@ typedef struct
 
 /* bm.c */
 
-ACPI_STATUS
+acpi_status
 bm_initialize (void);
 
-ACPI_STATUS
+acpi_status
 bm_terminate (void);
 
-ACPI_STATUS
+acpi_status
 bm_get_status (
 	BM_DEVICE		*device);
 
-ACPI_STATUS
+acpi_status
 bm_get_handle (
-	ACPI_HANDLE             acpi_handle,
+	acpi_handle             acpi_handle,
 	BM_HANDLE               *device_handle);
 
-ACPI_STATUS
+acpi_status
 bm_get_node (
 	BM_HANDLE               device_handle,
-	ACPI_HANDLE             acpi_handle,
+	acpi_handle             acpi_handle,
 	BM_NODE			**node);
 
 /* bmsearch.c */
 
-ACPI_STATUS
+acpi_status
 bm_search(
 	BM_HANDLE               device_handle,
 	BM_DEVICE_ID            *criteria,
@@ -461,118 +460,118 @@ bm_search(
 
 void
 bm_notify (
-	ACPI_HANDLE             acpi_handle,
+	acpi_handle             acpi_handle,
 	u32                     notify_value,
 	void                    *context);
 
 /* bm_request.c */
 
-ACPI_STATUS
+acpi_status
 bm_request (
 	BM_REQUEST		*request_info);
 
 /* bmdriver.c */
 
-ACPI_STATUS
+acpi_status
 bm_get_device_power_state (
 	BM_HANDLE               device_handle,
 	BM_POWER_STATE		*state);
 
-ACPI_STATUS
+acpi_status
 bm_set_device_power_state (
 	BM_HANDLE               device_handle,
 	BM_POWER_STATE		state);
 
-ACPI_STATUS
+acpi_status
 bm_get_device_status (
 	BM_HANDLE               device_handle,
 	BM_DEVICE_STATUS        *device_status);
 
-ACPI_STATUS
+acpi_status
 bm_get_device_info (
 	BM_HANDLE               device_handle,
 	BM_DEVICE		**device_info);
 
-ACPI_STATUS
+acpi_status
 bm_get_device_context (
 	BM_HANDLE               device_handle,
 	BM_DRIVER_CONTEXT	*context);
 
-ACPI_STATUS
+acpi_status
 bm_register_driver (
 	BM_DEVICE_ID		*criteria,
 	BM_DRIVER		*driver);
 
-ACPI_STATUS
+acpi_status
 bm_unregister_driver (
 	BM_DEVICE_ID		*criteria,
 	BM_DRIVER		*driver);
 
 /* bmpm.c */
 
-ACPI_STATUS
+acpi_status
 bm_get_pm_capabilities (
 	BM_NODE			*node);
 
-ACPI_STATUS
+acpi_status
 bm_get_power_state (
 	BM_NODE			*node);
 
-ACPI_STATUS
+acpi_status
 bm_set_power_state (
 	BM_NODE			*node,
 	BM_POWER_STATE          target_state);
 
 /* bmpower.c */
 
-ACPI_STATUS
+acpi_status
 bm_pr_initialize (void);
 
-ACPI_STATUS
+acpi_status
 bm_pr_terminate (void);
 	
 /* bmutils.c */
 
-ACPI_STATUS
+acpi_status
 bm_cast_buffer (
-	ACPI_BUFFER             *buffer,
+	acpi_buffer             *buffer,
 	void                    **pointer,
 	u32                     length);
 
-ACPI_STATUS
+acpi_status
 bm_copy_to_buffer (
-	ACPI_BUFFER             *buffer,
+	acpi_buffer             *buffer,
 	void                    *data,
 	u32                     length);
 
-ACPI_STATUS
+acpi_status
 bm_extract_package_data (
-	ACPI_OBJECT             *package,
-	ACPI_BUFFER             *format,
-	ACPI_BUFFER             *buffer);
+	acpi_object             *package,
+	acpi_buffer             *format,
+	acpi_buffer             *buffer);
 
-ACPI_STATUS
+acpi_status
 bm_evaluate_object (
-	ACPI_HANDLE             acpi_handle,
-	ACPI_STRING             pathname,
-	ACPI_OBJECT_LIST        *arguments,
-	ACPI_BUFFER             *buffer);
+	acpi_handle             acpi_handle,
+	acpi_string             pathname,
+	acpi_object_list        *arguments,
+	acpi_buffer             *buffer);
 
-ACPI_STATUS
+acpi_status
 bm_evaluate_simple_integer (
-	ACPI_HANDLE             acpi_handle,
-	ACPI_STRING             pathname,
+	acpi_handle             acpi_handle,
+	acpi_string             pathname,
 	u32                     *data);
 
-ACPI_STATUS
+acpi_status
 bm_evaluate_reference_list (
-	ACPI_HANDLE             acpi_handle,
-	ACPI_STRING             pathname,
+	acpi_handle             acpi_handle,
+	acpi_string             pathname,
 	BM_HANDLE_LIST          *reference_list);
 
 /* ACPI Bus Driver OSL */
 
-ACPI_STATUS
+acpi_status
 bm_osl_generate_event (
 	BM_HANDLE		device_handle,
 	char			*device_type,

@@ -1,7 +1,7 @@
 /*****************************************************************************
  *
  * Module Name: ecmain.c
- *   $Revision: 26 $
+ *   $Revision: 28 $
  *
  *****************************************************************************/
 
@@ -51,6 +51,11 @@ void
 ec_print (
 	EC_CONTEXT              *ec)
 {
+#ifdef ACPI_DEBUG
+	acpi_buffer             buffer;
+#endif /*ACPI_DEBUG*/
+
+	PROC_NAME("ec_print");
 
 	if (!ec) {
 		return;
@@ -58,6 +63,28 @@ ec_print (
 
 	acpi_os_printf("EC: found, GPE %d\n", ec->gpe_bit);
 
+#ifdef ACPI_DEBUG
+	buffer.length = 256;
+	buffer.pointer = acpi_os_callocate(buffer.length);
+	if (!buffer.pointer) {
+		return;
+	}
+
+	/*
+	 * Get the full pathname for this ACPI object.
+	 */
+	acpi_get_name(ec->acpi_handle, ACPI_FULL_PATHNAME, &buffer);
+
+	/*
+	 * Print out basic thermal zone information.
+	 */
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "+------------------------------------------------------------\n"));
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "| Embedded_controller[%02x]:[%p] %s\n", ec->device_handle, ec->acpi_handle, buffer.pointer));
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "|   gpe_bit[%02x] status/command_port[%02x] data_port[%02x]\n", ec->gpe_bit, ec->status_port, ec->data_port));
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "+------------------------------------------------------------\n"));
+
+	acpi_os_free(buffer.pointer);
+#endif /*ACPI_DEBUG*/
 
 	return;
 }
@@ -76,16 +103,18 @@ ec_print (
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 ec_get_port_values(
 	EC_CONTEXT              *ec)
 {
-	ACPI_STATUS             status = AE_OK;
-	ACPI_BUFFER             buffer;
-	ACPI_RESOURCE           *resource = NULL;
+	acpi_status             status = AE_OK;
+	acpi_buffer             buffer;
+	acpi_resource           *resource = NULL;
+
+	FUNCTION_TRACE("ec_get_port_values");
 
 	if (!ec) {
-		return(AE_BAD_PARAMETER);
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
 	buffer.length = 0;
@@ -93,12 +122,12 @@ ec_get_port_values(
 
 	status = acpi_get_current_resources(ec->acpi_handle, &buffer);
 	if (status != AE_BUFFER_OVERFLOW) {
-		return(status);
+		return_ACPI_STATUS(status);
 	}
 
 	buffer.pointer = acpi_os_callocate(buffer.length);
 	if (!buffer.pointer) {
-		return(AE_NO_MEMORY);
+		return_ACPI_STATUS(AE_NO_MEMORY);
 	}
 
 	status = acpi_get_current_resources(ec->acpi_handle, &buffer);
@@ -106,7 +135,7 @@ ec_get_port_values(
 		goto end;
 	}
 
-	resource = (ACPI_RESOURCE *) buffer.pointer;
+	resource = (acpi_resource *) buffer.pointer;
 	ec->data_port = resource->data.io.min_base_address;
 
 	resource = NEXT_RESOURCE(resource);
@@ -116,7 +145,7 @@ ec_get_port_values(
 end:
 	acpi_os_free(buffer.pointer);
 
-	return(status);
+	return_ACPI_STATUS(status);
 }
 
 
@@ -132,19 +161,23 @@ end:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 ec_add_device(
 	BM_HANDLE               device_handle,
 	void                    **context)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 	BM_DEVICE		*device = NULL;
 	EC_CONTEXT              *ec = NULL;
 	u8                      gpe_handler = FALSE;
 	u8                      space_handler = FALSE;
 
+	FUNCTION_TRACE("ec_add_device");
+
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Adding EC device [%02x].\n", device_handle));
+
 	if (!context || *context) {
-		return(AE_BAD_PARAMETER);
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
 	/*
@@ -152,7 +185,7 @@ ec_add_device(
 	 */
 	status = bm_get_device_info(device_handle, &device);
 	if (ACPI_FAILURE(status)) {
-		return(status);
+		return_ACPI_STATUS(status);
 	}
 
 	/*
@@ -160,7 +193,7 @@ ec_add_device(
 	 */
 	ec = acpi_os_callocate(sizeof(EC_CONTEXT));
 	if (!ec) {
-		return(AE_NO_MEMORY);
+		return_ACPI_STATUS(AE_NO_MEMORY);
 	}
 
 	ec->device_handle = device->handle;
@@ -183,6 +216,7 @@ ec_add_device(
 		ec->use_global_lock = 0;
 	}
 	else if (ACPI_FAILURE(status)) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "EC _GLK failed\n"));
 		goto end;
 	}
 
@@ -243,7 +277,7 @@ end:
 		acpi_os_free(ec);
 	}
 
-	return(status);
+	return_ACPI_STATUS(status);
 }
 
 
@@ -259,18 +293,22 @@ end:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 ec_remove_device(
 	void                    **context)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 	EC_CONTEXT              *ec = NULL;
 
+	FUNCTION_TRACE("ec_remove_device");
+
 	if (!context || !*context) {
-		return(AE_BAD_PARAMETER);
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
 	ec = (EC_CONTEXT*)*context;
+
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Removing EC device [%02x].\n", ec->device_handle));
 
 	ec_remove_space_handler(ec);
 
@@ -284,7 +322,7 @@ ec_remove_device(
 
 	*context = NULL;
 
-	return(status);
+	return_ACPI_STATUS(status);
 }
 
 
@@ -304,12 +342,14 @@ ec_remove_device(
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 ec_initialize (void)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 	BM_DEVICE_ID		criteria;
 	BM_DRIVER		driver;
+
+	FUNCTION_TRACE("ec_initialize");
 
 	MEMSET(&criteria, 0, sizeof(BM_DEVICE_ID));
 	MEMSET(&driver, 0, sizeof(BM_DRIVER));
@@ -324,7 +364,7 @@ ec_initialize (void)
 
 	status = bm_register_driver(&criteria, &driver);
 
-	return(status);
+	return_ACPI_STATUS(status);
 }
 
 
@@ -340,12 +380,14 @@ ec_initialize (void)
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 ec_terminate(void)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 	BM_DEVICE_ID		criteria;
 	BM_DRIVER		driver;
+
+	FUNCTION_TRACE("ec_terminate");
 
 	MEMSET(&criteria, 0, sizeof(BM_DEVICE_ID));
 	MEMSET(&driver, 0, sizeof(BM_DRIVER));
@@ -360,7 +402,7 @@ ec_terminate(void)
 
 	status = bm_unregister_driver(&criteria, &driver);
 
-	return(status);
+	return_ACPI_STATUS(status);
 }
 
 
@@ -376,13 +418,15 @@ ec_terminate(void)
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 ec_notify (
 	BM_NOTIFY               notify,
 	BM_HANDLE               device_handle,
 	void                    **context)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
+
+	FUNCTION_TRACE("ec_notify");
 
 	switch (notify) {
 
@@ -399,7 +443,7 @@ ec_notify (
 		break;
 	}
 
-	return(status);
+	return_ACPI_STATUS(status);
 }
 
 
@@ -415,20 +459,22 @@ ec_notify (
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 ec_request (
 	BM_REQUEST              *request,
 	void                    *context)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 	EC_REQUEST              *ec_request = NULL;
 	EC_CONTEXT              *ec = NULL;
+
+	FUNCTION_TRACE("ec_request");
 
 	/*
 	 * Must have a valid request structure and context.
 	 */
 	if (!request || !context)
-		return(AE_BAD_PARAMETER);
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 
 	/*
 	 * buffer must contain a valid EC_REQUEST structure.
@@ -436,7 +482,7 @@ ec_request (
 	status = bm_cast_buffer(&(request->buffer), (void**)&ec_request,
 		sizeof(EC_REQUEST));
 	if (ACPI_FAILURE(status))
-		return(status);
+		return_ACPI_STATUS(status);
 
 	/*
 	 * context contains information specific to this EC.
@@ -448,5 +494,5 @@ ec_request (
 	 */
 	status = ec_transaction(ec, ec_request);
 
-	return(status);
+	return_ACPI_STATUS(status);
 }

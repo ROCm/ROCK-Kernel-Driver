@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utxface - External interfaces for "global" ACPI functions
- *              $Revision: 72 $
+ *              $Revision: 80 $
  *
  *****************************************************************************/
 
@@ -31,6 +31,7 @@
 #include "acinterp.h"
 #include "amlcode.h"
 #include "acdebug.h"
+#include "acexcep.h"
 
 
 #define _COMPONENT          ACPI_UTILITIES
@@ -50,11 +51,16 @@
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_initialize_subsystem (
 	void)
 {
-	ACPI_STATUS             status;
+	acpi_status             status;
+
+	FUNCTION_TRACE ("Acpi_initialize_subsystem");
+
+
+	DEBUG_EXEC(acpi_ut_init_stack_ptr_trace ());
 
 
 	/* Initialize all globals used by the subsystem */
@@ -66,8 +72,8 @@ acpi_initialize_subsystem (
 	status = acpi_os_initialize ();
 	if (ACPI_FAILURE (status)) {
 		REPORT_ERROR (("OSD failed to initialize, %s\n",
-			acpi_ut_format_exception (status)));
-		return (status);
+			acpi_format_exception (status)));
+		return_ACPI_STATUS (status);
 	}
 
 	/* Create the default mutex objects */
@@ -75,8 +81,8 @@ acpi_initialize_subsystem (
 	status = acpi_ut_mutex_initialize ();
 	if (ACPI_FAILURE (status)) {
 		REPORT_ERROR (("Global mutex creation failure, %s\n",
-			acpi_ut_format_exception (status)));
-		return (status);
+			acpi_format_exception (status)));
+		return_ACPI_STATUS (status);
 	}
 
 	/*
@@ -87,8 +93,8 @@ acpi_initialize_subsystem (
 	status = acpi_ns_root_initialize ();
 	if (ACPI_FAILURE (status)) {
 		REPORT_ERROR (("Namespace initialization failure, %s\n",
-			acpi_ut_format_exception (status)));
-		return (status);
+			acpi_format_exception (status)));
+		return_ACPI_STATUS (status);
 	}
 
 
@@ -96,7 +102,7 @@ acpi_initialize_subsystem (
 
 	DEBUGGER_EXEC (acpi_db_initialize ());
 
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 
@@ -113,18 +119,21 @@ acpi_initialize_subsystem (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_enable_subsystem (
 	u32                     flags)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
+
+
+	FUNCTION_TRACE ("Acpi_enable_subsystem");
 
 
 	/* Sanity check the FADT for valid values */
 
 	status = acpi_ut_validate_fadt ();
 	if (ACPI_FAILURE (status)) {
-		return (status);
+		return_ACPI_STATUS (status);
 	}
 
 	/*
@@ -132,33 +141,37 @@ acpi_enable_subsystem (
 	 * installed unless other handlers have already been
 	 * installed via the Install_address_space_handler interface
 	 */
-
 	if (!(flags & ACPI_NO_ADDRESS_SPACE_INIT)) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[Init] Installing default address space handlers\n"));
+
 		status = acpi_ev_install_default_address_space_handlers ();
 		if (ACPI_FAILURE (status)) {
-			return (status);
+			return_ACPI_STATUS (status);
 		}
 	}
 
 	/*
 	 * We must initialize the hardware before we can enable ACPI.
 	 */
-
 	if (!(flags & ACPI_NO_HARDWARE_INIT)) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[Init] Initializing ACPI hardware\n"));
+
 		status = acpi_hw_initialize ();
 		if (ACPI_FAILURE (status)) {
-			return (status);
+			return_ACPI_STATUS (status);
 		}
 	}
 
 	/*
 	 * Enable ACPI on this platform
 	 */
-
 	if (!(flags & ACPI_NO_ACPI_ENABLE)) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[Init] Going into ACPI mode\n"));
+
 		status = acpi_enable ();
 		if (ACPI_FAILURE (status)) {
-			return (status);
+			ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Acpi_enable failed.\n"));
+			return_ACPI_STATUS (status);
 		}
 	}
 
@@ -168,11 +181,12 @@ acpi_enable_subsystem (
 	 * ANY control methods SAFELY.  Any control method can require ACPI hardware
 	 * support, so the hardware MUST be initialized before execution!
 	 */
-
 	if (!(flags & ACPI_NO_EVENT_INIT)) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[Init] Initializing ACPI events\n"));
+
 		status = acpi_ev_initialize ();
 		if (ACPI_FAILURE (status)) {
-			return (status);
+			return_ACPI_STATUS (status);
 		}
 	}
 
@@ -181,11 +195,12 @@ acpi_enable_subsystem (
 	 * Initialize all device objects in the namespace
 	 * This runs the _STA and _INI methods.
 	 */
-
 	if (!(flags & ACPI_NO_DEVICE_INIT)) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[Init] Initializing ACPI Devices\n"));
+
 		status = acpi_ns_initialize_devices ();
 		if (ACPI_FAILURE (status)) {
-			return (status);
+			return_ACPI_STATUS (status);
 		}
 	}
 
@@ -195,16 +210,18 @@ acpi_enable_subsystem (
 	 * runs the executable AML that is part of the declaration of Op_regions
 	 * and Fields.
 	 */
-
 	if (!(flags & ACPI_NO_OBJECT_INIT)) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[Init] Initializing ACPI Objects\n"));
+
 		status = acpi_ns_initialize_objects ();
 		if (ACPI_FAILURE (status)) {
-			return (status);
+			return_ACPI_STATUS (status);
 		}
 	}
 
+	acpi_gbl_startup_flags |= ACPI_INITIALIZED_OK;
 
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 
@@ -220,17 +237,20 @@ acpi_enable_subsystem (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_terminate (void)
 {
-	ACPI_STATUS             status;
+	acpi_status             status;
+
+
+	FUNCTION_TRACE ("Acpi_terminate");
 
 
 	/* Ensure that ACPI has been initialized */
 
 	ACPI_IS_INITIALIZATION_COMPLETE (status);
 	if (ACPI_FAILURE (status)) {
-		return (status);
+		return_ACPI_STATUS (status);
 	}
 
 	/* Terminate the AML Debugger if present */
@@ -255,7 +275,33 @@ acpi_terminate (void)
 
 	acpi_os_terminate ();
 
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
+}
+
+
+/*****************************************************************************
+ *
+ * FUNCTION:    Acpi_subsystem_status
+ *
+ * PARAMETERS:  None
+ *
+ * RETURN:      Status of the ACPI subsystem
+ *
+ * DESCRIPTION: Other drivers that use the ACPI subsystem should call this
+ *              before making any other calls, to ensure the subsystem initial-
+ *              ized successfully.
+ *
+ ****************************************************************************/
+
+acpi_status
+acpi_subsystem_status (void)
+{
+	if (acpi_gbl_startup_flags & ACPI_INITIALIZED_OK) {
+		return (AE_OK);
+	}
+	else {
+		return (AE_ERROR);
+	}
 }
 
 
@@ -278,20 +324,23 @@ acpi_terminate (void)
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_get_system_info (
-	ACPI_BUFFER             *out_buffer)
+	acpi_buffer             *out_buffer)
 {
-	ACPI_SYSTEM_INFO        *info_ptr;
+	acpi_system_info        *info_ptr;
 	u32                     i;
-	ACPI_STATUS             status;
+	acpi_status             status;
+
+
+	FUNCTION_TRACE ("Acpi_get_system_info");
 
 
 	/* Ensure that ACPI has been initialized */
 
 	ACPI_IS_INITIALIZATION_COMPLETE (status);
 	if (ACPI_FAILURE (status)) {
-		return (status);
+		return_ACPI_STATUS (status);
 	}
 
 	/*
@@ -299,24 +348,24 @@ acpi_get_system_info (
 	 */
 	if ((!out_buffer)         ||
 		(!out_buffer->pointer)) {
-		return (AE_BAD_PARAMETER);
+		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
-	if (out_buffer->length < sizeof (ACPI_SYSTEM_INFO)) {
+	if (out_buffer->length < sizeof (acpi_system_info)) {
 		/*
 		 *  Caller's buffer is too small
 		 */
-		out_buffer->length = sizeof (ACPI_SYSTEM_INFO);
+		out_buffer->length = sizeof (acpi_system_info);
 
-		return (AE_BUFFER_OVERFLOW);
+		return_ACPI_STATUS (AE_BUFFER_OVERFLOW);
 	}
 
 
 	/*
 	 *  Set return length and get data
 	 */
-	out_buffer->length = sizeof (ACPI_SYSTEM_INFO);
-	info_ptr = (ACPI_SYSTEM_INFO *) out_buffer->pointer;
+	out_buffer->length = sizeof (acpi_system_info);
+	info_ptr = (acpi_system_info *) out_buffer->pointer;
 
 	info_ptr->acpi_ca_version   = ACPI_CA_VERSION;
 
@@ -352,125 +401,7 @@ acpi_get_system_info (
 		info_ptr->table_info[i].count = acpi_gbl_acpi_tables[i].count;
 	}
 
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 
-/******************************************************************************
- *
- * FUNCTION:    Acpi_format_exception
- *
- * PARAMETERS:  Out_buffer      - a pointer to a buffer to receive the
- *                                exception name
- *
- * RETURN:      Status          - the status of the call
- *
- * DESCRIPTION: This function translates an ACPI exception into an ASCII string.
- *
- ******************************************************************************/
-
-ACPI_STATUS
-acpi_format_exception (
-	ACPI_STATUS             exception,
-	ACPI_BUFFER             *out_buffer)
-{
-	u32                     length;
-	NATIVE_CHAR             *formatted_exception;
-
-
-	/*
-	 *  Must have a valid buffer
-	 */
-	if ((!out_buffer)         ||
-		(!out_buffer->pointer)) {
-		return (AE_BAD_PARAMETER);
-	}
-
-
-	/* Convert the exception code (Handles bad exception codes) */
-
-	formatted_exception = acpi_ut_format_exception (exception);
-
-	/*
-	 * Get length of string and check if it will fit in caller's buffer
-	 */
-
-	length = STRLEN (formatted_exception);
-	if (out_buffer->length < length) {
-		out_buffer->length = length;
-		return (AE_BUFFER_OVERFLOW);
-	}
-
-
-	/* Copy the string, all done */
-
-	STRCPY (out_buffer->pointer, formatted_exception);
-
-	return (AE_OK);
-}
-
-
-/*****************************************************************************
- *
- * FUNCTION:    Acpi_allocate
- *
- * PARAMETERS:  Size                - Size of the allocation
- *
- * RETURN:      Address of the allocated memory on success, NULL on failure.
- *
- * DESCRIPTION: The subsystem's equivalent of malloc.
- *              External front-end to the Ut* memory manager
- *
- ****************************************************************************/
-
-void *
-acpi_allocate (
-	u32                     size)
-{
-
-	return (acpi_ut_allocate (size));
-}
-
-
-/*****************************************************************************
- *
- * FUNCTION:    Acpi_callocate
- *
- * PARAMETERS:  Size                - Size of the allocation
- *
- * RETURN:      Address of the allocated memory on success, NULL on failure.
- *
- * DESCRIPTION: The subsystem's equivalent of calloc.
- *              External front-end to the Ut* memory manager
- *
- ****************************************************************************/
-
-void *
-acpi_callocate (
-	u32                     size)
-{
-
-	return (acpi_ut_callocate (size));
-}
-
-
-/*****************************************************************************
- *
- * FUNCTION:    Acpi_free
- *
- * PARAMETERS:  Address             - Address of the memory to deallocate
- *
- * RETURN:      None
- *
- * DESCRIPTION: Frees the memory at Address
- *              External front-end to the Ut* memory manager
- *
- ****************************************************************************/
-
-void
-acpi_free (
-	void                    *address)
-{
-
-	acpi_ut_free (address);
-}

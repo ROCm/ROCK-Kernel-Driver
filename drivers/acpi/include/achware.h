@@ -34,19 +34,19 @@
 /* Prototypes */
 
 
-ACPI_STATUS
+acpi_status
 acpi_hw_initialize (
 	void);
 
-ACPI_STATUS
+acpi_status
 acpi_hw_shutdown (
 	void);
 
-ACPI_STATUS
+acpi_status
 acpi_hw_initialize_system_info (
 	void);
 
-ACPI_STATUS
+acpi_status
 acpi_hw_set_mode (
 	u32                     mode);
 
@@ -82,14 +82,14 @@ acpi_hw_register_write (
 u32
 acpi_hw_low_level_read (
 	u32                     width,
-	ACPI_GENERIC_ADDRESS    *reg,
+	acpi_generic_address    *reg,
 	u32                     offset);
 
 void
 acpi_hw_low_level_write (
 	u32                     width,
 	u32                     value,
-	ACPI_GENERIC_ADDRESS    *reg,
+	acpi_generic_address    *reg,
 	u32                     offset);
 
 void
@@ -118,11 +118,11 @@ acpi_hw_clear_gpe (
 void
 acpi_hw_get_gpe_status (
 	u32                     gpe_number,
-	ACPI_EVENT_STATUS       *event_status);
+	acpi_event_status       *event_status);
 
 /* Sleep Prototypes */
 
-ACPI_STATUS
+acpi_status
 acpi_hw_obtain_sleep_type_register_data (
 	u8                      sleep_state,
 	u8                      *slp_typ_a,
@@ -131,15 +131,15 @@ acpi_hw_obtain_sleep_type_register_data (
 
 /* ACPI Timer prototypes */
 
-ACPI_STATUS
+acpi_status
 acpi_get_timer_resolution (
 	u32                     *resolution);
 
-ACPI_STATUS
+acpi_status
 acpi_get_timer (
 	u32                     *ticks);
 
-ACPI_STATUS
+acpi_status
 acpi_get_timer_duration (
 	u32                     start_ticks,
 	u32                     end_ticks,

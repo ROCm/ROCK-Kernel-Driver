@@ -59,6 +59,7 @@ enum chipset_type {
 	AMD_GENERIC,
 	AMD_IRONGATE,
 	AMD_761,
+	AMD_762,
 	ALI_M1541,
 	ALI_M1621,
 	ALI_M1631,

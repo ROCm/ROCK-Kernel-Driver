@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: bt.h
- *   $Revision: 13 $
+ *   $Revision: 16 $
  *
  *****************************************************************************/
 
@@ -33,17 +33,17 @@
 
 
 /*****************************************************************************
- *                            Types & Other Defines
+ *                Types & Other Defines
  *****************************************************************************/
 
 /*! [Begin] no source code translation */
 
 #define BT_UNKNOWN		0xFFFFFFFF
-#define BT_POWER_UNITS_DEFAULT	"?"
-#define BT_POWER_UNITS_WATTS	"mW"
+#define BT_POWER_UNITS_DEFAULT  "?"
+#define BT_POWER_UNITS_WATTS    "mW"
 #define BT_POWER_UNITS_AMPS	"mA"
 
-/*! [End] no source code translation */
+/*! [End] no source code translation !*/
 
 /*
  * Battery Notifications:
@@ -57,7 +57,7 @@
  * Hardware IDs:
  * -------------
  */
-#define BT_HID_CM_BATTERY	"PNP0C0A"
+#define BT_HID_CM_BATTERY   "PNP0C0A"
 
 
 /*
@@ -66,19 +66,20 @@
  */
 typedef struct
 {
-	u32			power_unit;
-	u32			design_capacity;
-	u32			last_full_capacity;
-	u32			battery_technology;
-	u32			design_voltage;
-	u32			design_capacity_warning;
-	u32			design_capacity_low;
-	u32			battery_capacity_granularity_1;
-	u32			battery_capacity_granularity_2;
-	ACPI_STRING 		model_number;
-	ACPI_STRING 		serial_number;
-	ACPI_STRING 		battery_type;
-	ACPI_STRING 		oem_info;
+	u32             power_unit;
+	u32             design_capacity;
+	u32             last_full_capacity;
+	u32             battery_technology;
+	u32             design_voltage;
+	u32             design_capacity_warning;
+	u32             design_capacity_low;
+	u32             battery_capacity_granularity_1;
+	u32             battery_capacity_granularity_2;
+	acpi_string     model_number;
+	acpi_string     serial_number;
+	acpi_string     battery_type;
+	acpi_string     oem_info;
+
 } BT_BATTERY_INFO;
 
 
@@ -88,10 +89,11 @@ typedef struct
  */
 typedef struct
 {
-	u32			state;
-	u32			present_rate;
-	u32			remaining_capacity;
-	u32			present_voltage;
+	u32         state;
+	u32         present_rate;
+	u32         remaining_capacity;
+	u32         present_voltage;
+
 } BT_BATTERY_STATUS;
 
 
@@ -101,61 +103,62 @@ typedef struct
  */
 typedef struct
 {
-	BM_HANDLE		device_handle;
-	ACPI_HANDLE 		acpi_handle;
-	char			uid[9];
-	ACPI_STRING 		power_units;
-	BOOLEAN 		is_present;
+	BM_HANDLE       device_handle;
+	acpi_handle     acpi_handle;
+	char            uid[9];
+	acpi_string     power_units;
+	u8              is_present;
+
 } BT_CONTEXT;
 
 
 /*****************************************************************************
- *                              Function Prototypes
+ *              Function Prototypes
  *****************************************************************************/
 
 /* bt.c */
 
-ACPI_STATUS
+acpi_status
 bt_initialize (void);
 
-ACPI_STATUS
+acpi_status
 bt_terminate (void);
 
-ACPI_STATUS
+acpi_status
 bt_notify (
-	u32			notify_type,
-	u32			device,
-	void			**context);
+	u32         notify_type,
+	u32         device,
+	void        **context);
 
-ACPI_STATUS
+acpi_status
 bt_request(
-	BM_REQUEST		*request_info,
-	void			*context);
+	BM_REQUEST  *request_info,
+	void        *context);
 
-ACPI_STATUS
+acpi_status
 bt_get_status (
-	BT_CONTEXT		*battery,
-	BT_BATTERY_STATUS	**battery_status);
+	BT_CONTEXT			*battery,
+	BT_BATTERY_STATUS   **battery_status);
 
-ACPI_STATUS
+acpi_status
 bt_get_info (
-	BT_CONTEXT		*battery,
-	BT_BATTERY_INFO 	**battery_info);
+	BT_CONTEXT      *battery,
+	BT_BATTERY_INFO **battery_info);
 
 /* Battery OSL */
 
-ACPI_STATUS
+acpi_status
 bt_osl_add_device (
-	BT_CONTEXT		*battery);
+	BT_CONTEXT      *battery);
 
-ACPI_STATUS
+acpi_status
 bt_osl_remove_device (
-	BT_CONTEXT		*battery);
+	BT_CONTEXT      *battery);
 
-ACPI_STATUS
+acpi_status
 bt_osl_generate_event (
-	u32			event,
-	BT_CONTEXT		*battery);
+	u32         event,
+	BT_CONTEXT      *battery);
 
 
-#endif	/* __BT_H__ */
+#endif  /* __BT_H__ */

@@ -264,7 +264,7 @@ nfs_lock(struct file *filp, int cmd, struct file_lock *fl)
 
 	/* Fake OK code if mounted without NLM support */
 	if (NFS_SERVER(inode)->flags & NFS_MOUNT_NONLM) {
-		if (cmd == F_GETLK)
+		if (IS_GETLK(cmd))
 			status = LOCK_USE_CLNT;
 		goto out_ok;
 	}
@@ -304,7 +304,7 @@ nfs_lock(struct file *filp, int cmd, struct file_lock *fl)
 	 * This makes locking act as a cache coherency point.
 	 */
  out_ok:
-	if ((cmd == F_SETLK || cmd == F_SETLKW) && fl->fl_type != F_UNLCK) {
+	if ((IS_SETLK(cmd) || IS_SETLKW(cmd)) && fl->fl_type != F_UNLCK) {
 		filemap_fdatasync(inode->i_mapping);
 		down(&inode->i_sem);
 		nfs_wb_all(inode);      /* we may have slept */

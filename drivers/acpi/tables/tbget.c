@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tbget - ACPI Table get* routines
- *              $Revision: 48 $
+ *              $Revision: 55 $
  *
  *****************************************************************************/
 
@@ -50,22 +50,25 @@
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_tb_get_table_ptr (
-	ACPI_TABLE_TYPE         table_type,
+	acpi_table_type         table_type,
 	u32                     instance,
-	ACPI_TABLE_HEADER       **table_ptr_loc)
+	acpi_table_header       **table_ptr_loc)
 {
-	ACPI_TABLE_DESC         *table_desc;
+	acpi_table_desc         *table_desc;
 	u32                     i;
 
 
+	FUNCTION_TRACE ("Tb_get_table_ptr");
+
+
 	if (!acpi_gbl_DSDT) {
-		return (AE_NO_ACPI_TABLES);
+		return_ACPI_STATUS (AE_NO_ACPI_TABLES);
 	}
 
 	if (table_type > ACPI_TABLE_MAX) {
-		return (AE_BAD_PARAMETER);
+		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
 
@@ -79,7 +82,7 @@ acpi_tb_get_table_ptr (
 		 * Will be null if no table is present
 		 */
 		*table_ptr_loc = acpi_gbl_acpi_tables[table_type].pointer;
-		return (AE_OK);
+		return_ACPI_STATUS (AE_OK);
 	}
 
 
@@ -87,7 +90,7 @@ acpi_tb_get_table_ptr (
 	 * Check for instance out of range
 	 */
 	if (instance > acpi_gbl_acpi_tables[table_type].count) {
-		return (AE_NOT_EXIST);
+		return_ACPI_STATUS (AE_NOT_EXIST);
 	}
 
 	/* Walk the list to get the desired table
@@ -106,7 +109,7 @@ acpi_tb_get_table_ptr (
 
 	*table_ptr_loc = table_desc->pointer;
 
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -125,21 +128,24 @@ acpi_tb_get_table_ptr (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_tb_get_table (
 	ACPI_PHYSICAL_ADDRESS   physical_address,
-	ACPI_TABLE_HEADER       *buffer_ptr,
-	ACPI_TABLE_DESC         *table_info)
+	acpi_table_header       *buffer_ptr,
+	acpi_table_desc         *table_info)
 {
-	ACPI_TABLE_HEADER       *table_header = NULL;
-	ACPI_TABLE_HEADER       *full_table = NULL;
+	acpi_table_header       *table_header = NULL;
+	acpi_table_header       *full_table = NULL;
 	u32                     size;
 	u8                      allocation;
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
+
+
+	FUNCTION_TRACE ("Tb_get_table");
 
 
 	if (!table_info) {
-		return (AE_BAD_PARAMETER);
+		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
 
@@ -147,20 +153,19 @@ acpi_tb_get_table (
 		/*
 		 * Getting data from a buffer, not BIOS tables
 		 */
-
 		table_header = buffer_ptr;
 		status = acpi_tb_validate_table_header (table_header);
 		if (ACPI_FAILURE (status)) {
 			/* Table failed verification, map all errors to BAD_DATA */
 
-			return (AE_BAD_DATA);
+			return_ACPI_STATUS (AE_BAD_DATA);
 		}
 
 		/* Allocate buffer for the entire table */
 
-		full_table = acpi_ut_allocate (table_header->length);
+		full_table = ACPI_MEM_ALLOCATE (table_header->length);
 		if (!full_table) {
-			return (AE_NO_MEMORY);
+			return_ACPI_STATUS (AE_NO_MEMORY);
 		}
 
 		/* Copy the entire table (including header) to the local buffer */
@@ -183,7 +188,7 @@ acpi_tb_get_table (
 
 		status = acpi_tb_map_acpi_table (physical_address, &size, &full_table);
 		if (ACPI_FAILURE (status)) {
-			return (status);
+			return_ACPI_STATUS (status);
 		}
 
 		/* Save allocation type */
@@ -199,7 +204,7 @@ acpi_tb_get_table (
 	table_info->allocation  = allocation;
 	table_info->base_pointer = full_table;
 
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 
@@ -217,14 +222,19 @@ acpi_tb_get_table (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_tb_get_all_tables (
 	u32                     number_of_tables,
-	ACPI_TABLE_HEADER       *table_ptr)
+	acpi_table_header       *table_ptr)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 	u32                     index;
-	ACPI_TABLE_DESC         table_info;
+	acpi_table_desc         table_info;
+
+
+	FUNCTION_TRACE ("Tb_get_all_tables");
+
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Number of tables: %d\n", number_of_tables));
 
 
 	/*
@@ -232,11 +242,10 @@ acpi_tb_get_all_tables (
 	 * This will NOT include the FACS and DSDT - we must get
 	 * them after the loop
 	 */
-
 	for (index = 0; index < number_of_tables; index++) {
 		/* Clear the Table_info each time */
 
-		MEMSET (&table_info, 0, sizeof (ACPI_TABLE_DESC));
+		MEMSET (&table_info, 0, sizeof (acpi_table_desc));
 
 		/* Get the table via the XSDT */
 
@@ -253,7 +262,7 @@ acpi_tb_get_all_tables (
 		/* However, abort on serious errors */
 
 		if (ACPI_FAILURE (status)) {
-			return (status);
+			return_ACPI_STATUS (status);
 		}
 
 		/* Recognize and install the table */
@@ -265,7 +274,6 @@ acpi_tb_get_all_tables (
 			 * error.  Just get as many tables as we can, later we will
 			 * determine if there are enough tables to continue.
 			 */
-
 			acpi_tb_uninstall_table (&table_info);
 		}
 	}
@@ -277,7 +285,7 @@ acpi_tb_get_all_tables (
 	 */
 	status = acpi_tb_convert_table_fadt ();
 	if (ACPI_FAILURE (status)) {
-		return (status);
+		return_ACPI_STATUS (status);
 	}
 
 
@@ -290,56 +298,59 @@ acpi_tb_get_all_tables (
 	 *
 	 */
 
-
 	/*
 	 * Get the FACS (must have the FADT first, from loop above)
 	 * Acpi_tb_get_table_facs will fail if FADT pointer is not valid
 	 */
-
 	status = acpi_tb_get_table_facs (table_ptr, &table_info);
 	if (ACPI_FAILURE (status)) {
-		return (status);
+		return_ACPI_STATUS (status);
 	}
-
 
 	/* Install the FACS */
 
 	status = acpi_tb_install_table (table_ptr, &table_info);
 	if (ACPI_FAILURE (status)) {
-		return (status);
+		return_ACPI_STATUS (status);
 	}
 
 	/*
 	 * Create the common FACS pointer table
 	 * (Contains pointers to the original table)
 	 */
-
 	status = acpi_tb_build_common_facs (&table_info);
 	if (ACPI_FAILURE (status)) {
-		return (status);
+		return_ACPI_STATUS (status);
 	}
 
 
 	/*
 	 * Get the DSDT (We know that the FADT is valid now)
 	 */
-
 	status = acpi_tb_get_table ((ACPI_PHYSICAL_ADDRESS) ACPI_GET_ADDRESS (acpi_gbl_FADT->Xdsdt),
 			  table_ptr, &table_info);
 	if (ACPI_FAILURE (status)) {
-		return (status);
+		return_ACPI_STATUS (status);
 	}
 
 	/* Install the DSDT */
 
 	status = acpi_tb_install_table (table_ptr, &table_info);
 	if (ACPI_FAILURE (status)) {
-		return (status);
+		return_ACPI_STATUS (status);
 	}
 
 	/* Dump the DSDT Header */
 
+	ACPI_DEBUG_PRINT ((ACPI_DB_TABLES, "Hex dump of DSDT Header:\n"));
+	DUMP_BUFFER ((u8 *) acpi_gbl_DSDT, sizeof (acpi_table_header));
+
 	/* Dump the entire DSDT */
+
+	ACPI_DEBUG_PRINT ((ACPI_DB_TABLES,
+		"Hex dump of DSDT (After header), size %d (%x)\n",
+		acpi_gbl_DSDT->length, acpi_gbl_DSDT->length));
+	DUMP_BUFFER ((u8 *) (acpi_gbl_DSDT + 1), acpi_gbl_DSDT->length);
 
 	/*
 	 * Initialize the capabilities flags.
@@ -352,7 +363,7 @@ acpi_tb_get_all_tables (
 
 	acpi_tb_delete_acpi_table (ACPI_TABLE_RSDP);
 
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 
@@ -368,13 +379,16 @@ acpi_tb_get_all_tables (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_tb_verify_rsdp (
 	ACPI_PHYSICAL_ADDRESS   rsdp_physical_address)
 {
-	ACPI_TABLE_DESC         table_info;
-	ACPI_STATUS             status;
+	acpi_table_desc         table_info;
+	acpi_status             status;
 	u8                      *table_ptr;
+
+
+	FUNCTION_TRACE ("Tb_verify_rsdp");
 
 
 	/*
@@ -383,7 +397,7 @@ acpi_tb_verify_rsdp (
 	status = acpi_os_map_memory (rsdp_physical_address, sizeof (RSDP_DESCRIPTOR),
 			  (void **) &table_ptr);
 	if (ACPI_FAILURE (status)) {
-		return (status);
+		return_ACPI_STATUS (status);
 	}
 
 	/*
@@ -407,7 +421,7 @@ acpi_tb_verify_rsdp (
 
 	/* The RSDP supplied is OK */
 
-	table_info.pointer     = (ACPI_TABLE_HEADER *) table_ptr;
+	table_info.pointer     = (acpi_table_header *) table_ptr;
 	table_info.length      = sizeof (RSDP_DESCRIPTOR);
 	table_info.allocation  = ACPI_MEM_MAPPED;
 	table_info.base_pointer = table_ptr;
@@ -423,14 +437,14 @@ acpi_tb_verify_rsdp (
 	/* Save the RSDP in a global for easy access */
 
 	acpi_gbl_RSDP = (RSDP_DESCRIPTOR *) table_info.pointer;
-	return (status);
+	return_ACPI_STATUS (status);
 
 
 	/* Error exit */
 cleanup:
 
 	acpi_os_unmap_memory (table_ptr, sizeof (RSDP_DESCRIPTOR));
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 
@@ -453,6 +467,9 @@ acpi_tb_get_rsdt_address (void)
 	ACPI_PHYSICAL_ADDRESS   physical_address;
 
 
+	FUNCTION_ENTRY ();
+
+
 	/*
 	 * For RSDP revision 0 or 1, we use the RSDT.
 	 * For RSDP revision 2 (and above), we use the XSDT
@@ -471,7 +488,6 @@ acpi_tb_get_rsdt_address (void)
 				   ACPI_GET_ADDRESS (acpi_gbl_RSDP->xsdt_physical_address);
 	}
 
-
 	return (physical_address);
 }
 
@@ -488,11 +504,14 @@ acpi_tb_get_rsdt_address (void)
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_tb_validate_rsdt (
-	ACPI_TABLE_HEADER       *table_ptr)
+	acpi_table_header       *table_ptr)
 {
 	u32                     no_match;
+
+
+	PROC_NAME ("Tb_validate_rsdt");
 
 
 	/*
@@ -513,6 +532,12 @@ acpi_tb_validate_rsdt (
 		/* Invalid RSDT or XSDT signature */
 
 		REPORT_ERROR (("Invalid signature where RSDP indicates RSDT/XSDT should be located\n"));
+
+		DUMP_BUFFER (acpi_gbl_RSDP, 20);
+
+		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_ERROR,
+			"RSDT/XSDT signature at %X is invalid\n",
+			acpi_gbl_RSDP->rsdt_physical_address));
 
 		return (AE_BAD_SIGNATURE);
 	}
@@ -535,14 +560,17 @@ acpi_tb_validate_rsdt (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_tb_get_table_pointer (
 	ACPI_PHYSICAL_ADDRESS   physical_address,
 	u32                     flags,
 	u32                     *size,
-	ACPI_TABLE_HEADER       **table_ptr)
+	acpi_table_header       **table_ptr)
 {
-	ACPI_STATUS             status;
+	acpi_status             status;
+
+
+	FUNCTION_ENTRY ();
 
 
 	if ((flags & ACPI_MEMORY_MODE) == ACPI_LOGICAL_ADDRESSING) {
@@ -552,7 +580,7 @@ acpi_tb_get_table_pointer (
 
 	else {
 		*size = 0;
-		*table_ptr = (ACPI_TABLE_HEADER *) (ACPI_TBLPTR) physical_address;
+		*table_ptr = (acpi_table_header *) (ACPI_TBLPTR) physical_address;
 
 		status = AE_OK;
 	}
@@ -573,18 +601,25 @@ acpi_tb_get_table_pointer (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_tb_get_table_rsdt (
 	u32                     *number_of_tables)
 {
-	ACPI_TABLE_DESC         table_info;
-	ACPI_STATUS             status;
+	acpi_table_desc         table_info;
+	acpi_status             status;
 	ACPI_PHYSICAL_ADDRESS   physical_address;
+
+
+	FUNCTION_TRACE ("Tb_get_table_rsdt");
 
 
 	/*
 	 * Get the RSDT from the RSDP
 	 */
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
+		"RSDP located at %p, RSDT physical=%8.8lX%8.8lX \n",
+		acpi_gbl_RSDP, HIDWORD(acpi_gbl_RSDP->rsdt_physical_address),
+		LODWORD(acpi_gbl_RSDP->rsdt_physical_address)));
 
 
 	physical_address = acpi_tb_get_rsdt_address ();
@@ -594,7 +629,9 @@ acpi_tb_get_table_rsdt (
 
 	status = acpi_tb_get_table (physical_address, NULL, &table_info);
 	if (ACPI_FAILURE (status)) {
-		return (status);
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Could not get the RSDT, %s\n",
+			acpi_format_exception (status)));
+		return_ACPI_STATUS (status);
 	}
 
 
@@ -602,7 +639,7 @@ acpi_tb_get_table_rsdt (
 
 	status = acpi_tb_validate_rsdt (table_info.pointer);
 	if (ACPI_FAILURE (status)) {
-		return (status);
+		return_ACPI_STATUS (status);
 	}
 
 
@@ -617,19 +654,21 @@ acpi_tb_get_table_rsdt (
 
 	status = acpi_tb_convert_to_xsdt (&table_info, number_of_tables);
 	if (ACPI_FAILURE (status)) {
-		return (status);
+		return_ACPI_STATUS (status);
 	}
 
 	/* Save the table pointers and allocation info */
 
 	status = acpi_tb_init_table_descriptor (ACPI_TABLE_XSDT, &table_info);
 	if (ACPI_FAILURE (status)) {
-		return (status);
+		return_ACPI_STATUS (status);
 	}
 
-	acpi_gbl_XSDT = (XSDT_DESCRIPTOR *) table_info.pointer;
+	acpi_gbl_XSDT = (xsdt_descriptor *) table_info.pointer;
 
-	return (status);
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "XSDT located at %p\n", acpi_gbl_XSDT));
+
+	return_ACPI_STATUS (status);
 }
 
 
@@ -650,21 +689,24 @@ acpi_tb_get_table_rsdt (
  *
  *****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_tb_get_table_facs (
-	ACPI_TABLE_HEADER       *buffer_ptr,
-	ACPI_TABLE_DESC         *table_info)
+	acpi_table_header       *buffer_ptr,
+	acpi_table_desc         *table_info)
 {
-	ACPI_TABLE_HEADER       *table_ptr = NULL;
+	acpi_table_header       *table_ptr = NULL;
 	u32                     size;
 	u8                      allocation;
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
+
+
+	FUNCTION_TRACE ("Tb_get_table_facs");
 
 
 	/* Must have a valid FADT pointer */
 
 	if (!acpi_gbl_FADT) {
-		return (AE_NO_ACPI_TABLES);
+		return_ACPI_STATUS (AE_NO_ACPI_TABLES);
 	}
 
 	size = sizeof (FACS_DESCRIPTOR);
@@ -673,9 +715,9 @@ acpi_tb_get_table_facs (
 		 * Getting table from a file -- allocate a buffer and
 		 * read the table.
 		 */
-		table_ptr = acpi_ut_allocate (size);
+		table_ptr = ACPI_MEM_ALLOCATE (size);
 		if(!table_ptr) {
-			return (AE_NO_MEMORY);
+			return_ACPI_STATUS (AE_NO_MEMORY);
 		}
 
 		MEMCPY (table_ptr, buffer_ptr, size);
@@ -691,7 +733,7 @@ acpi_tb_get_table_facs (
 		status = acpi_tb_map_acpi_table ((ACPI_PHYSICAL_ADDRESS) ACPI_GET_ADDRESS (acpi_gbl_FADT->Xfirmware_ctrl),
 				   &size, &table_ptr);
 		if (ACPI_FAILURE (status)) {
-			return (status);
+			return_ACPI_STATUS (status);
 		}
 
 		/* Save allocation type */
@@ -707,6 +749,6 @@ acpi_tb_get_table_facs (
 	table_info->allocation  = allocation;
 	table_info->base_pointer = table_ptr;
 
-	return (status);
+	return_ACPI_STATUS (status);
 }
 

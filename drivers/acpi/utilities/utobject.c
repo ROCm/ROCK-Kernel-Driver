@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utobject - ACPI object create/delete/size/cache routines
- *              $Revision: 46 $
+ *              $Revision: 55 $
  *
  *****************************************************************************/
 
@@ -37,7 +37,7 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    _Ut_create_internal_object
+ * FUNCTION:    Acpi_ut_create_internal_object_dbg
  *
  * PARAMETERS:  Address             - Address of the memory to deallocate
  *              Component           - Component type of caller
@@ -57,23 +57,26 @@
  *
  ******************************************************************************/
 
-ACPI_OPERAND_OBJECT  *
-_ut_create_internal_object (
+acpi_operand_object  *
+acpi_ut_create_internal_object_dbg (
 	NATIVE_CHAR             *module_name,
 	u32                     line_number,
 	u32                     component_id,
-	ACPI_OBJECT_TYPE8       type)
+	acpi_object_type8       type)
 {
-	ACPI_OPERAND_OBJECT     *object;
+	acpi_operand_object     *object;
+
+
+	FUNCTION_TRACE_STR ("Ut_create_internal_object_dbg", acpi_ut_get_type_name (type));
 
 
 	/* Allocate the raw object descriptor */
 
-	object = _ut_allocate_object_desc (module_name, line_number, component_id);
+	object = acpi_ut_allocate_object_desc_dbg (module_name, line_number, component_id);
 	if (!object) {
 		/* Allocation failure */
 
-		return (NULL);
+		return_PTR (NULL);
 	}
 
 	/* Save the object type in the object descriptor */
@@ -86,8 +89,7 @@ _ut_create_internal_object (
 
 	/* Any per-type initialization should go here */
 
-
-	return (object);
+	return_PTR (object);
 }
 
 
@@ -97,7 +99,7 @@ _ut_create_internal_object (
  *
  * PARAMETERS:  Operand             - Object to be validated
  *
- * RETURN:      Validate a pointer to be an ACPI_OPERAND_OBJECT
+ * RETURN:      Validate a pointer to be an acpi_operand_object
  *
  ******************************************************************************/
 
@@ -112,12 +114,15 @@ acpi_ut_valid_internal_object (
 	/* Check for a null pointer */
 
 	if (!object) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
+			"**** Null Object Ptr\n"));
 		return (FALSE);
 	}
 
 	/* Check for a pointer within one of the ACPI tables */
 
 	if (acpi_tb_system_table_pointer (object)) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "**** Object %p is a Pcode Ptr\n", object));
 		return (FALSE);
 	}
 
@@ -126,14 +131,26 @@ acpi_ut_valid_internal_object (
 	if (!VALID_DESCRIPTOR_TYPE (object, ACPI_DESC_TYPE_INTERNAL)) {
 		/* Not an ACPI internal object, do some further checking */
 
+		if (VALID_DESCRIPTOR_TYPE (object, ACPI_DESC_TYPE_NAMED)) {
+			ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
+				"**** Obj %p is a named obj, not ACPI obj\n", object));
+		}
 
+		else if (VALID_DESCRIPTOR_TYPE (object, ACPI_DESC_TYPE_PARSER)) {
+			ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
+				"**** Obj %p is a parser obj, not ACPI obj\n", object));
+		}
 
+		else {
+			ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
+				"**** Obj %p is of unknown type\n", object));
+		}
 
 		return (FALSE);
 	}
 
 
-	/* The object appears to be a valid ACPI_OPERAND_OBJECT  */
+	/* The object appears to be a valid acpi_operand_object  */
 
 	return (TRUE);
 }
@@ -141,7 +158,7 @@ acpi_ut_valid_internal_object (
 
 /*******************************************************************************
  *
- * FUNCTION:    _Ut_allocate_object_desc
+ * FUNCTION:    Acpi_ut_allocate_object_desc_dbg
  *
  * PARAMETERS:  Module_name         - Caller's module name (for error output)
  *              Line_number         - Caller's line number (for error output)
@@ -156,61 +173,34 @@ acpi_ut_valid_internal_object (
  ******************************************************************************/
 
 void *
-_ut_allocate_object_desc (
+acpi_ut_allocate_object_desc_dbg (
 	NATIVE_CHAR             *module_name,
 	u32                     line_number,
 	u32                     component_id)
 {
-	ACPI_OPERAND_OBJECT     *object;
+	acpi_operand_object     *object;
 
 
-	acpi_ut_acquire_mutex (ACPI_MTX_CACHES);
+	FUNCTION_TRACE ("Ut_allocate_object_desc_dbg");
 
-	acpi_gbl_object_cache_requests++;
 
-	/* Check the cache first */
+	object = acpi_ut_acquire_from_cache (ACPI_MEM_LIST_OPERAND);
+	if (!object) {
+		_REPORT_ERROR (module_name, line_number, component_id,
+				  ("Could not allocate an object descriptor\n"));
 
-	if (acpi_gbl_object_cache) {
-		/* There is an object available, use it */
-
-		object = acpi_gbl_object_cache;
-		acpi_gbl_object_cache = object->cache.next;
-		object->cache.next = NULL;
-
-		acpi_gbl_object_cache_hits++;
-		acpi_gbl_object_cache_depth--;
-
-		acpi_ut_release_mutex (ACPI_MTX_CACHES);
+		return_PTR (NULL);
 	}
 
-	else {
-		/* The cache is empty, create a new object */
-
-		acpi_ut_release_mutex (ACPI_MTX_CACHES);
-
-		/* Attempt to allocate new descriptor */
-
-		object = _ut_callocate (sizeof (ACPI_OPERAND_OBJECT), component_id,
-				  module_name, line_number);
-		if (!object) {
-			/* Allocation failed */
-
-			_REPORT_ERROR (module_name, line_number, component_id,
-					  ("Could not allocate an object descriptor\n"));
-
-			return (NULL);
-		}
-
-		/* Memory allocation metrics - compiled out in non debug mode. */
-
-		INCREMENT_OBJECT_METRICS (sizeof (ACPI_OPERAND_OBJECT));
-	}
 
 	/* Mark the descriptor type */
 
 	object->common.data_type = ACPI_DESC_TYPE_INTERNAL;
 
-	return (object);
+	ACPI_DEBUG_PRINT ((ACPI_DB_ALLOCATIONS, "%p Size %X\n",
+			object, sizeof (acpi_operand_object)));
+
+	return_PTR (object);
 }
 
 
@@ -228,52 +218,22 @@ _ut_allocate_object_desc (
 
 void
 acpi_ut_delete_object_desc (
-	ACPI_OPERAND_OBJECT     *object)
+	acpi_operand_object     *object)
 {
+	FUNCTION_TRACE_PTR ("Ut_delete_object_desc", object);
 
 
-	/* Make sure that the object isn't already in the cache */
-
-	if (object->common.data_type == (ACPI_DESC_TYPE_INTERNAL | ACPI_CACHED_OBJECT)) {
-		return;
-	}
-
-	/* Object must be an ACPI_OPERAND_OBJECT  */
+	/* Object must be an acpi_operand_object  */
 
 	if (object->common.data_type != ACPI_DESC_TYPE_INTERNAL) {
-		return;
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+			"Obj %p is not an ACPI object\n", object));
+		return_VOID;
 	}
 
+	acpi_ut_release_to_cache (ACPI_MEM_LIST_OPERAND, object);
 
-	/* If cache is full, just free this object */
-
-	if (acpi_gbl_object_cache_depth >= MAX_OBJECT_CACHE_DEPTH) {
-		/*
-		 * Memory allocation metrics.  Call the macro here since we only
-		 * care about dynamically allocated objects.
-		 */
-		DECREMENT_OBJECT_METRICS (sizeof (ACPI_OPERAND_OBJECT));
-
-		acpi_ut_free (object);
-		return;
-	}
-
-	acpi_ut_acquire_mutex (ACPI_MTX_CACHES);
-
-	/* Clear the entire object.  This is important! */
-
-	MEMSET (object, 0, sizeof (ACPI_OPERAND_OBJECT));
-	object->common.data_type = ACPI_DESC_TYPE_INTERNAL | ACPI_CACHED_OBJECT;
-
-	/* Put the object at the head of the global cache list */
-
-	object->cache.next = acpi_gbl_object_cache;
-	acpi_gbl_object_cache = object;
-	acpi_gbl_object_cache_depth++;
-
-
-	acpi_ut_release_mutex (ACPI_MTX_CACHES);
-	return;
+	return_VOID;
 }
 
 
@@ -294,77 +254,11 @@ void
 acpi_ut_delete_object_cache (
 	void)
 {
-	ACPI_OPERAND_OBJECT     *next;
+	FUNCTION_TRACE ("Ut_delete_object_cache");
 
 
-	/* Traverse the global cache list */
-
-	while (acpi_gbl_object_cache) {
-		/* Delete one cached state object */
-
-		next = acpi_gbl_object_cache->cache.next;
-		acpi_gbl_object_cache->cache.next = NULL;
-
-		/*
-		 * Memory allocation metrics.  Call the macro here since we only
-		 * care about dynamically allocated objects.
-		 */
-		DECREMENT_OBJECT_METRICS (sizeof (ACPI_OPERAND_OBJECT));
-
-		acpi_ut_free (acpi_gbl_object_cache);
-		acpi_gbl_object_cache = next;
-		acpi_gbl_object_cache_depth--;
-	}
-
-	return;
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    Acpi_ut_init_static_object
- *
- * PARAMETERS:  Obj_desc            - Pointer to a "static" object - on stack
- *                                    or in the data segment.
- *
- * RETURN:      None.
- *
- * DESCRIPTION: Initialize a static object.  Sets flags to disallow dynamic
- *              deletion of the object.
- *
- ******************************************************************************/
-
-void
-acpi_ut_init_static_object (
-	ACPI_OPERAND_OBJECT     *obj_desc)
-{
-
-
-	if (!obj_desc) {
-		return;
-	}
-
-
-	/*
-	 * Clear the entire descriptor
-	 */
-	MEMSET ((void *) obj_desc, 0, sizeof (ACPI_OPERAND_OBJECT));
-
-
-	/*
-	 * Initialize the header fields
-	 * 1) This is an ACPI_OPERAND_OBJECT  descriptor
-	 * 2) The size is the full object (worst case)
-	 * 3) The flags field indicates static allocation
-	 * 4) Reference count starts at one (not really necessary since the
-	 *    object can't be deleted, but keeps everything sane)
-	 */
-
-	obj_desc->common.data_type      = ACPI_DESC_TYPE_INTERNAL;
-	obj_desc->common.flags          = AOPOBJ_STATIC_ALLOCATION;
-	obj_desc->common.reference_count = 1;
-
-	return;
+	acpi_ut_delete_generic_cache (ACPI_MEM_LIST_OPERAND);
+	return_VOID;
 }
 
 
@@ -385,32 +279,35 @@ acpi_ut_init_static_object (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ut_get_simple_object_size (
-	ACPI_OPERAND_OBJECT     *internal_object,
+	acpi_operand_object     *internal_object,
 	u32                     *obj_length)
 {
 	u32                     length;
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
+
+
+	FUNCTION_TRACE_PTR ("Ut_get_simple_object_size", internal_object);
 
 
 	/* Handle a null object (Could be a uninitialized package element -- which is legal) */
 
 	if (!internal_object) {
 		*obj_length = 0;
-		return (AE_OK);
+		return_ACPI_STATUS (AE_OK);
 	}
 
 
 	/* Start with the length of the Acpi object */
 
-	length = sizeof (ACPI_OBJECT);
+	length = sizeof (acpi_object);
 
 	if (VALID_DESCRIPTOR_TYPE (internal_object, ACPI_DESC_TYPE_NAMED)) {
 		/* Object is a named object (reference), just return the length */
 
 		*obj_length = (u32) ROUND_UP_TO_NATIVE_WORD (length);
-		return (status);
+		return_ACPI_STATUS (status);
 	}
 
 
@@ -452,6 +349,9 @@ acpi_ut_get_simple_object_size (
 		 * this means an object reference
 		 */
 		if (internal_object->reference.opcode != AML_INT_NAMEPATH_OP) {
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+				"Unsupported Reference opcode=%X in object %p\n",
+				internal_object->reference.opcode, internal_object));
 			status = AE_TYPE;
 		}
 
@@ -467,6 +367,8 @@ acpi_ut_get_simple_object_size (
 
 	default:
 
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unsupported type=%X in object %p\n",
+			internal_object->common.type, internal_object));
 		status = AE_TYPE;
 		break;
 	}
@@ -480,7 +382,7 @@ acpi_ut_get_simple_object_size (
 	 */
 	*obj_length = (u32) ROUND_UP_TO_NATIVE_WORD (length);
 
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 
@@ -496,15 +398,15 @@ acpi_ut_get_simple_object_size (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ut_get_element_length (
 	u8                      object_type,
-	ACPI_OPERAND_OBJECT     *source_object,
-	ACPI_GENERIC_STATE      *state,
+	acpi_operand_object     *source_object,
+	acpi_generic_state      *state,
 	void                    *context)
 {
-	ACPI_STATUS             status = AE_OK;
-	ACPI_PKG_INFO           *info = (ACPI_PKG_INFO *) context;
+	acpi_status             status = AE_OK;
+	acpi_pkg_info           *info = (acpi_pkg_info *) context;
 	u32                     object_space;
 
 
@@ -557,13 +459,16 @@ acpi_ut_get_element_length (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ut_get_package_object_size (
-	ACPI_OPERAND_OBJECT     *internal_object,
+	acpi_operand_object     *internal_object,
 	u32                     *obj_length)
 {
-	ACPI_STATUS             status;
-	ACPI_PKG_INFO           info;
+	acpi_status             status;
+	acpi_pkg_info           info;
+
+
+	FUNCTION_TRACE_PTR ("Ut_get_package_object_size", internal_object);
 
 
 	info.length      = 0;
@@ -578,13 +483,13 @@ acpi_ut_get_package_object_size (
 	 * just add the length of the package objects themselves.
 	 * Round up to the next machine word.
 	 */
-	info.length += ROUND_UP_TO_NATIVE_WORD (sizeof (ACPI_OBJECT)) *
+	info.length += ROUND_UP_TO_NATIVE_WORD (sizeof (acpi_object)) *
 			  info.num_packages;
 
 	/* Return the total package length */
 
 	*obj_length = info.length;
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 
@@ -602,12 +507,15 @@ acpi_ut_get_package_object_size (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ut_get_object_size(
-	ACPI_OPERAND_OBJECT     *internal_object,
+	acpi_operand_object     *internal_object,
 	u32                     *obj_length)
 {
-	ACPI_STATUS             status;
+	acpi_status             status;
+
+
+	FUNCTION_ENTRY ();
 
 
 	if ((VALID_DESCRIPTOR_TYPE (internal_object, ACPI_DESC_TYPE_INTERNAL)) &&

@@ -1,8 +1,8 @@
 
 /******************************************************************************
  *
- * Name: acobject.h - Definition of ACPI_OPERAND_OBJECT  (Internal object only)
- *       $Revision: 89 $
+ * Name: acobject.h - Definition of acpi_operand_object  (Internal object only)
+ *       $Revision: 90 $
  *
  *****************************************************************************/
 
@@ -29,12 +29,12 @@
 
 
 /*
- * The ACPI_OPERAND_OBJECT  is used to pass AML operands from the dispatcher
+ * The acpi_operand_object  is used to pass AML operands from the dispatcher
  * to the interpreter, and to keep track of the various handlers such as
  * address space handlers and notify handlers.  The object is a constant
  * size in order to allow them to be cached and reused.
  *
- * All variants of the ACPI_OPERAND_OBJECT  are defined with the same
+ * All variants of the acpi_operand_object  are defined with the same
  * sequence of field types, with fields that are not used in a particular
  * variant being named "Reserved".  This is not strictly necessary, but
  * may in some circumstances simplify understanding if these structures
@@ -60,15 +60,17 @@
 
 #define ACPI_OBJECT_COMMON_HEADER           /* SIZE/ALIGNMENT: 32-bits plus trailing 8-bit flag */\
 	u8                          data_type;          /* To differentiate various internal objs */\
-	u8                          type;               /* ACPI_OBJECT_TYPE */\
+	u8                          type;               /* acpi_object_type */\
 	u16                         reference_count;    /* For object deletion management */\
 	u8                          flags; \
 
 /* Defines for flag byte above */
 
 #define AOPOBJ_STATIC_ALLOCATION    0x1
-#define AOPOBJ_DATA_VALID           0x2
-#define AOPOBJ_INITIALIZED          0x4
+#define AOPOBJ_STATIC_POINTER       0x2
+#define AOPOBJ_DATA_VALID           0x4
+#define AOPOBJ_ZERO_CONST           0x4
+#define AOPOBJ_INITIALIZED          0x8
 
 
 /*
@@ -122,7 +124,7 @@ typedef struct /* NUMBER - has value */
 {
 	ACPI_OBJECT_COMMON_HEADER
 
-	ACPI_INTEGER                value;
+	acpi_integer                value;
 
 } ACPI_OBJECT_INTEGER;
 
@@ -193,7 +195,7 @@ typedef struct /* METHOD */
 
 	u8                          concurrency;
 	u8                          thread_count;
-	ACPI_OWNER_ID               owning_id;
+	acpi_owner_id               owning_id;
 
 } ACPI_OBJECT_METHOD;
 
@@ -222,7 +224,7 @@ typedef struct /* REGION */
 	union acpi_operand_obj      *extra;             /* Pointer to executable AML (in region definition) */
 
 	union acpi_operand_obj      *addr_handler;      /* Handler for system notifies */
-	ACPI_NAMESPACE_NODE         *node;              /* containing object */
+	acpi_namespace_node         *node;              /* containing object */
 	union acpi_operand_obj      *next;
 
 } ACPI_OBJECT_REGION;
@@ -324,7 +326,7 @@ typedef struct /* BUFFER FIELD */
 	ACPI_COMMON_FIELD_INFO
 
 	union acpi_operand_obj      *extra;             /* Pointer to executable AML (in field definition) */
-	ACPI_NAMESPACE_NODE         *node;              /* Parent (containing) object node */
+	acpi_namespace_node         *node;              /* Parent (containing) object node */
 	union acpi_operand_obj      *buffer_obj;        /* Containing Buffer object */
 
 } ACPI_OBJECT_BUFFER_FIELD;
@@ -338,7 +340,7 @@ typedef struct /* NOTIFY HANDLER */
 {
 	ACPI_OBJECT_COMMON_HEADER
 
-	ACPI_NAMESPACE_NODE         *node;               /* Parent device */
+	acpi_namespace_node         *node;               /* Parent device */
 	ACPI_NOTIFY_HANDLER         handler;
 	void                        *context;
 
@@ -358,7 +360,7 @@ typedef struct /* ADDRESS HANDLER */
 	u16                         hflags;
 	ACPI_ADR_SPACE_HANDLER      handler;
 
-	ACPI_NAMESPACE_NODE         *node;              /* Parent device */
+	acpi_namespace_node         *node;              /* Parent device */
 	void                        *context;
 	ACPI_ADR_SPACE_SETUP        setup;
 	union acpi_operand_obj      *region_list;       /* regions using this handler */
@@ -380,8 +382,8 @@ typedef struct /* Reference - Local object type */
 	u16                         opcode;
 	u32                         offset;             /* Used for Arg_op, Local_op, and Index_op */
 
-	void                        *object;            /* Name_op=>HANDLE to obj, Index_op=>ACPI_OPERAND_OBJECT */
-	ACPI_NAMESPACE_NODE         *node;
+	void                        *object;            /* Name_op=>HANDLE to obj, Index_op=>acpi_operand_object */
+	acpi_namespace_node         *node;
 	union acpi_operand_obj      **where;
 
 } ACPI_OBJECT_REFERENCE;
@@ -402,7 +404,7 @@ typedef struct /* EXTRA */
 	u16                         word_fill1;
 	u32                         pcode_length;
 	u8                          *pcode;
-	ACPI_NAMESPACE_NODE         *method_REG;        /* _REG method for this region (if any) */
+	acpi_namespace_node         *method_REG;        /* _REG method for this region (if any) */
 	void                        *region_context;    /* Region-specific data */
 
 } ACPI_OBJECT_EXTRA;
@@ -410,7 +412,7 @@ typedef struct /* EXTRA */
 
 /******************************************************************************
  *
- * ACPI_OPERAND_OBJECT  Descriptor - a giant union of all of the above
+ * acpi_operand_object  Descriptor - a giant union of all of the above
  *
  *****************************************************************************/
 
@@ -440,6 +442,6 @@ typedef union acpi_operand_obj
 	ACPI_OBJECT_ADDR_HANDLER    addr_handler;
 	ACPI_OBJECT_EXTRA           extra;
 
-} ACPI_OPERAND_OBJECT;
+} acpi_operand_object;
 
 #endif /* _ACOBJECT_H */

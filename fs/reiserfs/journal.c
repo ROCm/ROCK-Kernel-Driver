@@ -746,6 +746,8 @@ reiserfs_panic(s, "journal-539: flush_commit_list: BAD count(%d) > orig_commit_l
   }
   atomic_set(&(jl->j_commit_flushing), 0) ;
   wake_up(&(jl->j_commit_wait)) ;
+  
+  s->s_dirt = 1 ;
   return 0 ;
 }
 
@@ -2378,7 +2380,6 @@ int flush_old_commits(struct super_block *p_s_sb, int immediate) {
   int count = 0;
   int start ; 
   time_t now ; 
-  int keep_dirty = 0 ;
   struct reiserfs_transaction_handle th ; 
 
   start =  SB_JOURNAL_LIST_INDEX(p_s_sb) ;
@@ -2387,10 +2388,6 @@ int flush_old_commits(struct super_block *p_s_sb, int immediate) {
   /* safety check so we don't flush while we are replaying the log during mount */
   if (SB_JOURNAL_LIST_INDEX(p_s_sb) < 0) {
     return 0  ;
-  }
-  if (!strcmp(current->comm, "kupdate")) {
-    immediate = 0 ;
-    keep_dirty = 1 ;
   }
   /* starting with oldest, loop until we get to the start */
   i = (SB_JOURNAL_LIST_INDEX(p_s_sb) + 1) % JOURNAL_LIST_COUNT ;
@@ -2416,7 +2413,6 @@ int flush_old_commits(struct super_block *p_s_sb, int immediate) {
     reiserfs_prepare_for_journal(p_s_sb, SB_BUFFER_WITH_SB(p_s_sb), 1) ;
     journal_mark_dirty(&th, p_s_sb, SB_BUFFER_WITH_SB(p_s_sb)) ;
     do_journal_end(&th, p_s_sb,1, COMMIT_NOW) ;
-    keep_dirty = 0 ;
   } else if (immediate) { /* belongs above, but I wanted this to be very explicit as a special case.  If they say to 
                              flush, we must be sure old transactions hit the disk too. */
     journal_join(&th, p_s_sb, 1) ;
@@ -2424,8 +2420,8 @@ int flush_old_commits(struct super_block *p_s_sb, int immediate) {
     journal_mark_dirty(&th, p_s_sb, SB_BUFFER_WITH_SB(p_s_sb)) ;
     do_journal_end(&th, p_s_sb,1, COMMIT_NOW | WAIT) ;
   }
-  keep_dirty |= reiserfs_journal_kupdate(p_s_sb) ;
-  return keep_dirty ;
+  reiserfs_journal_kupdate(p_s_sb) ;
+  return 0 ;
 }
 
 /*

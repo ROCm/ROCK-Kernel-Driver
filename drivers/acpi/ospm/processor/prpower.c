@@ -1,7 +1,7 @@
 /*****************************************************************************
  *
  * Module Name: prpower.c
- *   $Revision: 25 $
+ *   $Revision: 30 $
  *
  *****************************************************************************/
 
@@ -27,6 +27,7 @@
 /* TBD: Linux specific */
 #include <linux/sched.h>
 #include <linux/pm.h>
+#include <asm/io.h>
 
 #include <acpi.h>
 #include <bm.h>
@@ -40,10 +41,15 @@
  *                                  Globals
  ****************************************************************************/
 
-extern FADT_DESCRIPTOR_REV2	acpi_fadt;
+extern fadt_descriptor_rev2	acpi_fadt;
 static u32			last_idle_jiffies = 0;
 static PR_CONTEXT		*processor_list[NR_CPUS];
 static void			(*pr_pm_idle_save)(void) = NULL;
+static u8			bm_control = 0;
+
+
+/* Used for PIIX4 errata handling. */
+unsigned short			acpi_piix4_bmisx = 0;
 
 
 /****************************************************************************
@@ -67,7 +73,11 @@ pr_power_activate_state (
 	PR_CONTEXT		*processor,
 	u32			next_state)
 {
+
+	PROC_NAME("pr_power_activate_state");
+
 	if (!processor) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Invalid (NULL) context.\n"));
 		return;
 	}
 
@@ -124,6 +134,8 @@ pr_power_idle (void)
 	u32			start_ticks, end_ticks, time_elapsed;
 	PR_CONTEXT		*processor = NULL;
 
+	PROC_NAME("pr_power_idle");
+
 	processor = processor_list[smp_processor_id()];
 
 	if (!processor || processor->power.active_state == PR_C0) {
@@ -131,21 +143,6 @@ pr_power_idle (void)
 	}
 
 	next_state = processor->power.active_state;
-
-	/*
-	 * Log BM Activity:
-	 * ----------------
-	 * Read BM_STS and record its value for later use by C3 policy.
-	 * Note that we save the BM_STS values for the last 32 call to
-	 * this function (cycles).  Also note that we must clear BM_STS
-	 * if set (sticky).
-	 */
-	processor->power.bm_activity <<= 1;
-	if (acpi_hw_register_bit_access(ACPI_READ, ACPI_MTX_DO_NOT_LOCK, BM_STS)) {
-		processor->power.bm_activity |= 1;
-		acpi_hw_register_bit_access(ACPI_WRITE, ACPI_MTX_DO_NOT_LOCK,
-			BM_STS, 1);
-	}
 
 	/*
 	 * Check OS Idleness:
@@ -165,6 +162,37 @@ pr_power_idle (void)
 		}
 	}
 
+	disable();
+
+	/*
+	 * Log BM Activity:
+	 * ----------------
+	 * Read BM_STS and record its value for later use by C3 policy.
+	 * (Note that we save the BM_STS values for the last 32 cycles).
+	 */
+	if (bm_control) {
+		processor->power.bm_activity <<= 1;
+		if (acpi_hw_register_bit_access(ACPI_READ, ACPI_MTX_DO_NOT_LOCK, BM_STS)) {
+			processor->power.bm_activity |= 1;
+			acpi_hw_register_bit_access(ACPI_WRITE, ACPI_MTX_DO_NOT_LOCK,
+				BM_STS, 1);
+		}
+		else if (acpi_piix4_bmisx) {
+			/*
+			 * PIIX4 Errata:
+			 * -------------
+			 * This code is a workaround for errata #18 "C3 Power State/
+			 * BMIDE and Type-F DMA Livelock" from the July '01 PIIX4
+			 * specification update.  Note that BM_STS doesn't always
+			 * reflect the true state of bus mastering activity; forcing
+			 * us to manually check the BMIDEA bit of each IDE channel.
+			 */
+			if ((inb_p(acpi_piix4_bmisx + 0x02) & 0x01) ||
+				(inb_p(acpi_piix4_bmisx + 0x0A) & 0x01))
+				processor->power.bm_activity |= 1;
+		}
+	}
+
 	c_state = &(processor->power.state[processor->power.active_state]);
 
 	c_state->utilization++;
@@ -177,21 +205,17 @@ pr_power_idle (void)
 	switch (processor->power.active_state) {
 
 	case PR_C1:
-		/* See how long we're asleep for */
-		acpi_get_timer(&start_ticks);
 		/* Invoke C1 */
 		enable(); halt();
-		/* Compute time elapsed */
-		acpi_get_timer(&end_ticks);
+		/* no C1 time measurement, so just enter some number of times */
+		time_elapsed = 0xFFFFFFFF;
 		break;
 
 	case PR_C2:
-		/* Interrupts must be disabled during C2 transitions */
-		disable();
 		/* See how long we're asleep for */
 		acpi_get_timer(&start_ticks);
 		/* Invoke C2 */
-		acpi_os_in8(processor->power.p_lvl2);
+		acpi_os_read_port(processor->power.p_lvl2, NULL, 8);
 		/* Dummy op - must do something useless after P_LVL2 read */
 		acpi_hw_register_bit_access(ACPI_READ, ACPI_MTX_DO_NOT_LOCK,
 			BM_STS);
@@ -199,18 +223,17 @@ pr_power_idle (void)
 		acpi_get_timer(&end_ticks);
 		/* Re-enable interrupts */
 		enable();
+		acpi_get_timer_duration(start_ticks, end_ticks, &time_elapsed);
 		break;
 
 	case PR_C3:
-		/* Interrupts must be disabled during C3 transitions */
-		disable();
 		/* Disable bus master arbitration */
 		acpi_hw_register_bit_access(ACPI_WRITE, ACPI_MTX_DO_NOT_LOCK,
 			ARB_DIS, 1);
 		/* See how long we're asleep for */
 		acpi_get_timer(&start_ticks);
-		/* Invoke C2 */
-		acpi_os_in8(processor->power.p_lvl3);
+		/* Invoke C3 */
+		acpi_os_read_port(processor->power.p_lvl3, NULL, 8);
 		/* Dummy op - must do something useless after P_LVL3 read */
 		acpi_hw_register_bit_access(ACPI_READ, ACPI_MTX_DO_NOT_LOCK,
 			BM_STS);
@@ -221,25 +244,20 @@ pr_power_idle (void)
 			ARB_DIS, 0);
 		/* Re-enable interrupts */
 		enable();
+		acpi_get_timer_duration(start_ticks, end_ticks, &time_elapsed);
 		break;
 
 	default:
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Attempt to use unsupported power state C%d.\n", processor->power.active_state));
+		enable();
 		break;
 	}
-
-	/*
-	 * Compute the amount of time asleep (in the Cx state).
-	 *
-	 * TBD: Convert time_threshold to PM timer ticks initially to
-	 *      avoid having to do the math (acpi_get_timer_duration).
-	 */
-	acpi_get_timer_duration(start_ticks, end_ticks, &time_elapsed);
 
 	/*
 	 * Promotion?
 	 * ----------
 	 * Track the number of successful sleeps (time asleep is greater
-	 * than time_threshold) and promote when count_threashold is
+	 * than time_threshold) and promote when count_threshold is
 	 * reached.
 	 */
 	if ((c_state->promotion.target_state) && 	
@@ -256,7 +274,7 @@ pr_power_idle (void)
 			 * by this state's promotion policy, prevents
 			 * promotions from occuring.
 			 */
-			if (!(processor->power.bm_activity &
+			if (bm_control && !(processor->power.bm_activity &
 				c_state->promotion.bm_threshold)) {
 				next_state = c_state->promotion.target_state;
 			}
@@ -287,8 +305,8 @@ pr_power_idle (void)
 		 * state's promotion policy, causes an immediate demotion
 		 * to occur.
 		 */
-		if (processor->power.bm_activity &
-			c_state->demotion.bm_threshold) {
+		if (bm_control && (processor->power.bm_activity &
+			c_state->demotion.bm_threshold)) {
 			next_state = c_state->demotion.target_state;
 		}
 	}
@@ -335,12 +353,14 @@ pr_power_idle (void)
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 pr_power_set_default_policy (
 	PR_CONTEXT                 *processor)
 {
+	FUNCTION_TRACE("pr_power_set_default_policy");
+
 	if (!processor) {
-		return(AE_BAD_PARAMETER);
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
 	/*
@@ -367,7 +387,7 @@ pr_power_set_default_policy (
 	else {
 		processor->power.active_state =
 			processor->power.default_state = PR_C0;
-		return(AE_OK);
+		return_ACPI_STATUS(AE_OK);
 	}
 
 	/*
@@ -382,7 +402,7 @@ pr_power_set_default_policy (
 		 * of transition).  Demote from C2 to C1 anytime we're
 		 * asleep in C2 for less than this time.
 		 */
-		processor->power.state[PR_C1].promotion.count_threshold = 1;
+		processor->power.state[PR_C1].promotion.count_threshold = 10;
 		processor->power.state[PR_C1].promotion.time_threshold =
 			2 * processor->power.state[PR_C2].latency;
 		processor->power.state[PR_C1].promotion.target_state = PR_C2;
@@ -423,7 +443,7 @@ pr_power_set_default_policy (
 			PR_C2;
 	}
 
-	return(AE_OK);
+	return_ACPI_STATUS(AE_OK);
 }
 
 /*****************************************************************************
@@ -444,12 +464,14 @@ pr_power_set_default_policy (
  *         by different CPUs results in lowest common denominator).
  */
 
-ACPI_STATUS
+acpi_status
 pr_power_add_device (
 	PR_CONTEXT                 *processor)
 {
+	FUNCTION_TRACE("pr_power_add_device");
+
 	if (!processor) {
-		return(AE_BAD_PARAMETER);
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
 	/*
@@ -517,11 +539,8 @@ pr_power_add_device (
 #ifdef CONFIG_SMP
 	if (smp_num_cpus == 1) {
 #endif /*CONFIG_SMP*/
-		if ((acpi_fadt.plvl3_lat <= PR_MAX_C3_LATENCY) &&
-			(acpi_fadt.V1_pm2_cnt_blk && acpi_fadt.pm2_cnt_len)) {
-			/* TBD: Resolve issue with C3 and HDD corruption. */
-			processor->power.state[PR_C3].is_valid = FALSE;
-			/* processor->power.state[PR_C3].is_valid = TRUE;*/
+		if ((acpi_fadt.plvl3_lat <= PR_MAX_C3_LATENCY) && bm_control) {
+			processor->power.state[PR_C3].is_valid = TRUE;
 			processor->power.p_lvl3 = processor->pblk.address + 5;
 		}
 #ifdef CONFIG_SMP
@@ -546,7 +565,7 @@ pr_power_add_device (
 	 */
 	processor_list[processor->uid] = processor;
 
-	return(AE_OK);
+	return_ACPI_STATUS(AE_OK);
 }
 
 
@@ -562,21 +581,23 @@ pr_power_add_device (
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 pr_power_remove_device (
 	PR_CONTEXT              *processor)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
+
+	FUNCTION_TRACE("pr_power_remove_device");
 
 	if (!processor) {
-		return(AE_BAD_PARAMETER);
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
 	MEMSET(&(processor->power), 0, sizeof(PR_POWER));
 
 	processor_list[processor->uid] = NULL;
 
-	return(status);
+	return_ACPI_STATUS(status);
 }
 
 
@@ -592,15 +613,23 @@ pr_power_remove_device (
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 pr_power_initialize (void)
 {
 	u32			i = 0;
+
+	FUNCTION_TRACE("pr_power_initialize");
 
 	/* TBD: Linux-specific. */
 	for (i=0; i<NR_CPUS; i++) {
 		processor_list[i] = NULL;
 	}
+
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Max CPUs[%d], this CPU[%d].\n", NR_CPUS, smp_processor_id()));
+
+	/* only use C3 if we can control busmastering */
+	if (acpi_fadt.V1_pm2_cnt_blk && acpi_fadt.pm2_cnt_len)
+		bm_control = 1;
 
 	/*
 	 * Install idle handler.
@@ -610,7 +639,7 @@ pr_power_initialize (void)
 	pr_pm_idle_save = pm_idle;
 	pm_idle = pr_power_idle;
 
-	return(AE_OK);
+	return_ACPI_STATUS(AE_OK);
 }
 
 
@@ -626,9 +655,11 @@ pr_power_initialize (void)
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 pr_power_terminate (void)
 {
+	FUNCTION_TRACE("pr_power_terminate");
+
 	/*
 	 * Remove idle handler.
 	 *
@@ -636,5 +667,5 @@ pr_power_terminate (void)
 	 */
 	pm_idle = pr_pm_idle_save;
 
-	return(AE_OK);
+	return_ACPI_STATUS(AE_OK);
 }

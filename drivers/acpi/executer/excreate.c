@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: excreate - Named object creation
- *              $Revision: 63 $
+ *              $Revision: 66 $
  *
  *****************************************************************************/
 
@@ -66,16 +66,19 @@
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_create_buffer_field (
 	u8                      *aml_ptr,
 	u32                     aml_length,
-	ACPI_NAMESPACE_NODE     *node,
-	ACPI_WALK_STATE         *walk_state)
+	acpi_namespace_node     *node,
+	acpi_walk_state         *walk_state)
 {
-	ACPI_STATUS             status;
-	ACPI_OPERAND_OBJECT     *obj_desc;
-	ACPI_OPERAND_OBJECT     *tmp_desc;
+	acpi_status             status;
+	acpi_operand_object     *obj_desc;
+	acpi_operand_object     *tmp_desc;
+
+
+	FUNCTION_TRACE ("Ex_create_buffer_field");
 
 
 	/* Create the descriptor */
@@ -90,7 +93,6 @@ acpi_ex_create_buffer_field (
 	/*
 	 * Allocate a method object for this field unit
 	 */
-
 	obj_desc->buffer_field.extra = acpi_ut_create_internal_object (
 			   INTERNAL_TYPE_EXTRA);
 	if (!obj_desc->buffer_field.extra) {
@@ -103,7 +105,6 @@ acpi_ex_create_buffer_field (
 	 * opcode and operands -- since the buffer and index
 	 * operands must be evaluated.
 	 */
-
 	obj_desc->buffer_field.extra->extra.pcode     = aml_ptr;
 	obj_desc->buffer_field.extra->extra.pcode_length = aml_length;
 	obj_desc->buffer_field.node = node;
@@ -135,15 +136,21 @@ acpi_ex_create_buffer_field (
 			 * There is an existing object here;  delete it and zero out the
 			 * object field within the Node
 			 */
+			DUMP_PATHNAME (node,
+				"Ex_create_buffer_field: Removing Current Reference",
+				ACPI_LV_BFIELD, _COMPONENT);
+
+			DUMP_ENTRY (node, ACPI_LV_BFIELD);
+			DUMP_STACK_ENTRY (tmp_desc);
 
 			acpi_ut_remove_reference (tmp_desc);
-			acpi_ns_attach_object ((ACPI_NAMESPACE_NODE *) node, NULL,
+			acpi_ns_attach_object ((acpi_namespace_node *) node, NULL,
 					 ACPI_TYPE_ANY);
 		}
 
 		/* Set the type to ANY (or the store below will fail) */
 
-		((ACPI_NAMESPACE_NODE *) node)->type = ACPI_TYPE_ANY;
+		((acpi_namespace_node *) node)->type = ACPI_TYPE_ANY;
 
 		break;
 
@@ -156,7 +163,7 @@ acpi_ex_create_buffer_field (
 
 	/* Store constructed field descriptor in result location */
 
-	status = acpi_ex_store (obj_desc, (ACPI_OPERAND_OBJECT *) node,
+	status = acpi_ex_store (obj_desc, (acpi_operand_object *) node,
 			  walk_state);
 
 	/*
@@ -168,7 +175,7 @@ acpi_ex_create_buffer_field (
 	}
 
 
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 
 
 cleanup:
@@ -182,7 +189,7 @@ cleanup:
 		obj_desc = NULL;
 	}
 
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 
@@ -199,22 +206,22 @@ cleanup:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_create_alias (
-	ACPI_WALK_STATE         *walk_state)
+	acpi_walk_state         *walk_state)
 {
-	ACPI_NAMESPACE_NODE     *source_node;
-	ACPI_NAMESPACE_NODE     *alias_node;
-	ACPI_STATUS             status;
+	acpi_namespace_node     *source_node;
+	acpi_namespace_node     *alias_node;
+	acpi_status             status;
+
+
+	FUNCTION_TRACE ("Ex_create_alias");
 
 
 	/* Get the source/alias operands (both namespace nodes) */
 
-	status = acpi_ds_obj_stack_pop_object ((ACPI_OPERAND_OBJECT **) &source_node,
-			 walk_state);
-	if (ACPI_FAILURE (status)) {
-		return (status);
-	}
+	source_node = (acpi_namespace_node *) walk_state->operands[walk_state->num_operands -1];
+	walk_state->num_operands--;
 
 	/*
 	 * Don't pop it, it gets removed in the calling routine
@@ -241,7 +248,7 @@ acpi_ex_create_alias (
 
 	/* Since both operands are Nodes, we don't need to delete them */
 
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 
@@ -257,15 +264,16 @@ acpi_ex_create_alias (
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_create_event (
-	ACPI_WALK_STATE         *walk_state)
+	acpi_walk_state         *walk_state)
 {
-	ACPI_STATUS             status;
-	ACPI_OPERAND_OBJECT     *obj_desc;
+	acpi_status             status;
+	acpi_operand_object     *obj_desc;
 
 
- BREAKPOINT3;
+	FUNCTION_TRACE ("Ex_create_event");
+
 
 	obj_desc = acpi_ut_create_internal_object (ACPI_TYPE_EVENT);
 	if (!obj_desc) {
@@ -297,7 +305,7 @@ acpi_ex_create_event (
 
 cleanup:
 
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 
@@ -314,21 +322,22 @@ cleanup:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_create_mutex (
-	ACPI_WALK_STATE         *walk_state)
+	acpi_walk_state         *walk_state)
 {
-	ACPI_STATUS             status = AE_OK;
-	ACPI_OPERAND_OBJECT     *sync_desc;
-	ACPI_OPERAND_OBJECT     *obj_desc;
+	acpi_status             status = AE_OK;
+	acpi_operand_object     *sync_desc;
+	acpi_operand_object     *obj_desc;
+
+
+	FUNCTION_TRACE_PTR ("Ex_create_mutex", WALK_OPERANDS);
 
 
 	/* Get the operand */
 
-	status = acpi_ds_obj_stack_pop_object (&sync_desc, walk_state);
-	if (ACPI_FAILURE (status)) {
-		return (status);
-	}
+	sync_desc = walk_state->operands[walk_state->num_operands -1];
+	walk_state->num_operands--;
 
 	/* Attempt to allocate a new object */
 
@@ -365,7 +374,7 @@ cleanup:
 
 	acpi_ut_remove_reference (sync_desc);
 
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 
@@ -384,16 +393,19 @@ cleanup:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_create_region (
 	u8                      *aml_ptr,
 	u32                     aml_length,
 	u8                      region_space,
-	ACPI_WALK_STATE         *walk_state)
+	acpi_walk_state         *walk_state)
 {
-	ACPI_STATUS             status;
-	ACPI_OPERAND_OBJECT     *obj_desc;
-	ACPI_NAMESPACE_NODE     *node;
+	acpi_status             status;
+	acpi_operand_object     *obj_desc;
+	acpi_namespace_node     *node;
+
+
+	FUNCTION_TRACE ("Ex_create_region");
 
 
 	/*
@@ -403,13 +415,16 @@ acpi_ex_create_region (
 	if ((region_space >= NUM_REGION_TYPES) &&
 		(region_space < USER_REGION_BEGIN)) {
 		REPORT_ERROR (("Invalid Address_space type %X\n", region_space));
-		return (AE_AML_INVALID_SPACE_ID);
+		return_ACPI_STATUS (AE_AML_INVALID_SPACE_ID);
 	}
+
+	ACPI_DEBUG_PRINT ((ACPI_DB_LOAD, "Region Type - %s (%X)\n",
+			  acpi_ut_get_region_name (region_space), region_space));
 
 
 	/* Get the Node from the object stack  */
 
-	node = (ACPI_NAMESPACE_NODE *) acpi_ds_obj_stack_get_value (0, walk_state);
+	node = (acpi_namespace_node *) acpi_ds_obj_stack_get_value (0, walk_state);
 
 	/* Create the region descriptor */
 
@@ -422,7 +437,6 @@ acpi_ex_create_region (
 	/*
 	 * Allocate a method object for this region.
 	 */
-
 	obj_desc->region.extra = acpi_ut_create_internal_object (
 			 INTERNAL_TYPE_EXTRA);
 	if (!obj_desc->region.extra) {
@@ -434,7 +448,6 @@ acpi_ex_create_region (
 	 * Remember location in AML stream of address & length
 	 * operands since they need to be evaluated at run time.
 	 */
-
 	obj_desc->region.extra->extra.pcode      = aml_ptr;
 	obj_desc->region.extra->extra.pcode_length = aml_length;
 
@@ -460,7 +473,6 @@ acpi_ex_create_region (
 	 * If we have a valid region, initialize it
 	 * Namespace is NOT locked at this point.
 	 */
-
 	status = acpi_ev_initialize_region (obj_desc, FALSE);
 
 	if (ACPI_FAILURE (status)) {
@@ -487,7 +499,7 @@ cleanup:
 		}
 	}
 
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 
@@ -505,19 +517,22 @@ cleanup:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_create_processor (
-	ACPI_PARSE_OBJECT       *op,
-	ACPI_NAMESPACE_NODE     *processor_node)
+	acpi_parse_object       *op,
+	acpi_namespace_node     *processor_node)
 {
-	ACPI_STATUS             status;
-	ACPI_PARSE_OBJECT       *arg;
-	ACPI_OPERAND_OBJECT     *obj_desc;
+	acpi_status             status;
+	acpi_parse_object       *arg;
+	acpi_operand_object     *obj_desc;
+
+
+	FUNCTION_TRACE_PTR ("Ex_create_processor", op);
 
 
 	obj_desc = acpi_ut_create_internal_object (ACPI_TYPE_PROCESSOR);
 	if (!obj_desc) {
-		return (AE_NO_MEMORY);
+		return_ACPI_STATUS (AE_NO_MEMORY);
 	}
 
 	/* Install the new processor object in the parent Node */
@@ -526,14 +541,14 @@ acpi_ex_create_processor (
 			   (u8) ACPI_TYPE_PROCESSOR);
 	if (ACPI_FAILURE (status)) {
 		acpi_ut_delete_object_desc (obj_desc);
-		return (status);
+		return_ACPI_STATUS (status);
 	}
 
 	/* Get first arg and verify existence */
 
 	arg = op->value.arg;
 	if (!arg) {
-		return (AE_AML_NO_OPERAND);
+		return_ACPI_STATUS (AE_AML_NO_OPERAND);
 	}
 
 	/* First arg is the Processor ID */
@@ -544,7 +559,7 @@ acpi_ex_create_processor (
 
 	arg = arg->next;
 	if (!arg) {
-		return (AE_AML_NO_OPERAND);
+		return_ACPI_STATUS (AE_AML_NO_OPERAND);
 	}
 
 	/* Second arg is the PBlock Address */
@@ -555,13 +570,13 @@ acpi_ex_create_processor (
 
 	arg = arg->next;
 	if (!arg) {
-		return (AE_AML_NO_OPERAND);
+		return_ACPI_STATUS (AE_AML_NO_OPERAND);
 	}
 
 	/* Third arg is the PBlock Length */
 
 	obj_desc->processor.length = (u8) arg->value.integer;
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -579,19 +594,22 @@ acpi_ex_create_processor (
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_create_power_resource (
-	ACPI_PARSE_OBJECT       *op,
-	ACPI_NAMESPACE_NODE     *power_node)
+	acpi_parse_object       *op,
+	acpi_namespace_node     *power_node)
 {
-	ACPI_STATUS             status;
-	ACPI_PARSE_OBJECT       *arg;
-	ACPI_OPERAND_OBJECT     *obj_desc;
+	acpi_status             status;
+	acpi_parse_object       *arg;
+	acpi_operand_object     *obj_desc;
+
+
+	FUNCTION_TRACE_PTR ("Ex_create_power_resource", op);
 
 
 	obj_desc = acpi_ut_create_internal_object (ACPI_TYPE_POWER);
 	if (!obj_desc) {
-		return (AE_NO_MEMORY);
+		return_ACPI_STATUS (AE_NO_MEMORY);
 	}
 
 	/* Install the new power resource object in the parent Node */
@@ -599,7 +617,7 @@ acpi_ex_create_power_resource (
 	status = acpi_ns_attach_object (power_node, obj_desc,
 			  (u8) ACPI_TYPE_POWER);
 	if (ACPI_FAILURE (status)) {
-		return(status);
+		return_ACPI_STATUS(status);
 	}
 
 
@@ -607,7 +625,7 @@ acpi_ex_create_power_resource (
 
 	arg = op->value.arg;
 	if (!arg) {
-		return (AE_AML_NO_OPERAND);
+		return_ACPI_STATUS (AE_AML_NO_OPERAND);
 	}
 
 	/* First arg is the System_level */
@@ -618,14 +636,14 @@ acpi_ex_create_power_resource (
 
 	arg = arg->next;
 	if (!arg) {
-		return (AE_AML_NO_OPERAND);
+		return_ACPI_STATUS (AE_AML_NO_OPERAND);
 	}
 
 	/* Second arg is the PBlock Address */
 
 	obj_desc->power_resource.resource_order = (u16) arg->value.integer;
 
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -644,22 +662,25 @@ acpi_ex_create_power_resource (
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_create_method (
 	u8                      *aml_ptr,
 	u32                     aml_length,
 	u32                     method_flags,
-	ACPI_NAMESPACE_NODE     *method)
+	acpi_namespace_node     *method)
 {
-	ACPI_OPERAND_OBJECT     *obj_desc;
-	ACPI_STATUS             status;
+	acpi_operand_object     *obj_desc;
+	acpi_status             status;
+
+
+	FUNCTION_TRACE_PTR ("Ex_create_method", method);
 
 
 	/* Create a new method object */
 
 	obj_desc = acpi_ut_create_internal_object (ACPI_TYPE_METHOD);
 	if (!obj_desc) {
-	   return (AE_NO_MEMORY);
+	   return_ACPI_STATUS (AE_NO_MEMORY);
 	}
 
 	/* Get the method's AML pointer/length from the Op */
@@ -671,7 +692,6 @@ acpi_ex_create_method (
 	 * First argument is the Method Flags (contains parameter count for the
 	 * method)
 	 */
-
 	obj_desc->method.method_flags = (u8) method_flags;
 	obj_desc->method.param_count = (u8) (method_flags &
 			  METHOD_FLAGS_ARG_COUNT);
@@ -700,7 +720,7 @@ acpi_ex_create_method (
 		acpi_ut_delete_object_desc (obj_desc);
 	}
 
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 

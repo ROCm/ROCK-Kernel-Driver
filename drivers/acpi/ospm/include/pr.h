@@ -171,7 +171,7 @@ typedef struct
 typedef struct
 {
 	BM_HANDLE               device_handle;
-	ACPI_HANDLE             acpi_handle;
+	acpi_handle             acpi_handle;
 	u32                     uid;
 	PR_PBLOCK               pblk;
 	PR_POWER		power;
@@ -185,19 +185,19 @@ typedef struct
 
 /* processor.c */
 
-ACPI_STATUS
+acpi_status
 pr_initialize(void);
 
-ACPI_STATUS
+acpi_status
 pr_terminate(void);
 
-ACPI_STATUS
+acpi_status
 pr_notify (
 	BM_NOTIFY               notify_type,
 	BM_HANDLE               device_handle,
 	void                    **context);
 
-ACPI_STATUS
+acpi_status
 pr_request(
 	BM_REQUEST		*request,
 	void                    *context);
@@ -207,56 +207,56 @@ pr_request(
 void
 pr_power_idle (void);
 
-ACPI_STATUS
+acpi_status
 pr_power_add_device (
 	PR_CONTEXT              *processor);
 
-ACPI_STATUS
+acpi_status
 pr_power_remove_device (
 	PR_CONTEXT              *processor);
 
-ACPI_STATUS
+acpi_status
 pr_power_initialize (void);
 
-ACPI_STATUS
+acpi_status
 pr_power_terminate (void);
 
 /* prperf.c */
 
-ACPI_STATUS
+acpi_status
 pr_perf_get_state (
 	PR_CONTEXT              *processor,
 	u32                     *state);
 
-ACPI_STATUS
+acpi_status
 pr_perf_set_state (
 	PR_CONTEXT              *processor,
 	u32                     state);
 
-ACPI_STATUS
+acpi_status
 pr_perf_set_limit (
 	PR_CONTEXT              *processor,
 	u32                     limit);
 
-ACPI_STATUS
+acpi_status
 pr_perf_add_device (
 	PR_CONTEXT              *processor);
 
-ACPI_STATUS
+acpi_status
 pr_perf_remove_device (
 	PR_CONTEXT              *processor);
 
 /* Processor Driver OSL */
 
-ACPI_STATUS
+acpi_status
 pr_osl_add_device (
 	PR_CONTEXT		*processor);
 
-ACPI_STATUS
+acpi_status
 pr_osl_remove_device (
 	PR_CONTEXT		*processor);
 
-ACPI_STATUS
+acpi_status
 pr_osl_generate_event (
 	u32			event,
 	PR_CONTEXT		*processor);

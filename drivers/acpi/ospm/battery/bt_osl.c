@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: bt_osl.c
- *   $Revision: 18 $
+ *   $Revision: 22 $
  *
  *****************************************************************************/
 
@@ -56,18 +56,18 @@ static struct proc_dir_entry	*bt_proc_root = NULL;
 
 
 /****************************************************************************
- * 
+ *
  * FUNCTION:	bt_osl_proc_read_info
  *
  ****************************************************************************/
 
 static int
 bt_osl_proc_read_info (
-	char			*page, 
-	char			**start, 
-	off_t			off, 
-	int 			count, 
-	int 			*eof, 
+	char			*page,
+	char			**start,
+	off_t			off,
+	int 			count,
+	int 			*eof,
 	void			*context)
 {
 	BT_CONTEXT		*battery = NULL;
@@ -106,17 +106,17 @@ bt_osl_proc_read_info (
 		p += sprintf(p, "Design Capacity:         unknown\n");
 	}
 	else {
-		p += sprintf(p, "Design Capacity:         %d %sh\n", 
-			 battery_info->design_capacity, 
+		p += sprintf(p, "Design Capacity:         %d %sh\n",
+			 battery_info->design_capacity,
 			 battery->power_units);
 	}
 	
 	if (battery_info->last_full_capacity == BT_UNKNOWN) {
 		p += sprintf(p, "Last Full Capacity:      unknown\n");
-	} 
+	}
 	else {
-		p += sprintf(p, "Last Full Capacity:      %d %sh\n", 
-			 battery_info->last_full_capacity, 
+		p += sprintf(p, "Last Full Capacity:      %d %sh\n",
+			 battery_info->last_full_capacity,
 			 battery->power_units);
 	}
 
@@ -134,29 +134,29 @@ bt_osl_proc_read_info (
 		p += sprintf(p, "Design Voltage:          unknown\n");
 	}
 	else {
-		p += sprintf(p, "Design Voltage:          %d mV\n", 
+		p += sprintf(p, "Design Voltage:          %d mV\n",
 			 battery_info->design_voltage);
 	}
 	
 	p += sprintf(p, "Design Capacity Warning: %d %sh\n",
-		battery_info->design_capacity_warning, 
+		battery_info->design_capacity_warning,
 		battery->power_units);
 	p += sprintf(p, "Design Capacity Low:     %d %sh\n",
-		battery_info->design_capacity_low, 
+		battery_info->design_capacity_low,
 		battery->power_units);
 	p += sprintf(p, "Capacity Granularity 1:  %d %sh\n",
-		battery_info->battery_capacity_granularity_1, 
+		battery_info->battery_capacity_granularity_1,
 		battery->power_units);
 	p += sprintf(p, "Capacity Granularity 2:  %d %sh\n",
-		battery_info->battery_capacity_granularity_2, 
+		battery_info->battery_capacity_granularity_2,
 		battery->power_units);
-	p += sprintf(p, "Model Number:            %s\n", 
+	p += sprintf(p, "Model Number:            %s\n",
 		battery_info->model_number);
-	p += sprintf(p, "Serial Number:           %s\n", 
+	p += sprintf(p, "Serial Number:           %s\n",
 		battery_info->serial_number);
-	p += sprintf(p, "Battery Type:            %s\n", 
+	p += sprintf(p, "Battery Type:            %s\n",
 		battery_info->battery_type);
-	p += sprintf(p, "OEM Info:                %s\n", 
+	p += sprintf(p, "OEM Info:                %s\n",
 		battery_info->oem_info);
 	
 end:
@@ -174,18 +174,18 @@ end:
 
 
 /****************************************************************************
- * 
+ *
  * FUNCTION:	bt_osl_proc_read_status
  *
  ****************************************************************************/
 
 static int
 bt_osl_proc_read_status (
-	char			*page, 
-	char			**start, 
-	off_t			off, 
-	int 			count, 
-	int 			*eof, 
+	char			*page,
+	char			**start,
+	off_t			off,
+	int 			count,
+	int 			*eof,
 	void			*context)
 {
 	BT_CONTEXT		*battery = NULL;
@@ -226,7 +226,7 @@ bt_osl_proc_read_status (
 	 */
 
 	if (!battery_status->state) {
-		p += sprintf(p, "State:                   ok\n"); 
+		p += sprintf(p, "State:                   ok\n");
 	}
 	else {
 		if (battery_status->state & 0x1)
@@ -242,7 +242,7 @@ bt_osl_proc_read_status (
 	}
 	else {
 		p += sprintf(p, "Present Rate:            %d %s\n",
-			battery_status->present_rate, 
+			battery_status->present_rate,
 			battery->power_units);
 	}
 
@@ -251,7 +251,7 @@ bt_osl_proc_read_status (
 	}
 	else {
 		p += sprintf(p, "Remaining Capacity:      %d %sh\n",
-			battery_status->remaining_capacity, 
+			battery_status->remaining_capacity,
 			battery->power_units);
 	}
 
@@ -283,7 +283,7 @@ end:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bt_osl_add_device(
 	BT_CONTEXT		*battery)
 {
@@ -305,10 +305,10 @@ bt_osl_add_device(
 		return(AE_ERROR);
 	}
 
-	create_proc_read_entry(BT_PROC_STATUS, S_IFREG | S_IRUGO, 
+	create_proc_read_entry(BT_PROC_STATUS, S_IFREG | S_IRUGO,
 		proc_entry, bt_osl_proc_read_status, (void*)battery);
 
-	create_proc_read_entry(BT_PROC_INFO, S_IFREG | S_IRUGO, 
+	create_proc_read_entry(BT_PROC_INFO, S_IFREG | S_IRUGO,
 		proc_entry, bt_osl_proc_read_info, (void*)battery);
 
 	return(AE_OK);
@@ -321,7 +321,7 @@ bt_osl_add_device(
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bt_osl_remove_device (
 	BT_CONTEXT		*battery)
 {
@@ -350,12 +350,12 @@ bt_osl_remove_device (
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bt_osl_generate_event (
 	u32			event,
 	BT_CONTEXT		*battery)
 {
-	ACPI_STATUS		status = AE_OK;
+	acpi_status		status = AE_OK;
 
 	if (!battery) {
 		return(AE_BAD_PARAMETER);
@@ -365,7 +365,7 @@ bt_osl_generate_event (
 
 	case BT_NOTIFY_STATUS_CHANGE:
 	case BT_NOTIFY_INFORMATION_CHANGE:
-		status = bm_osl_generate_event(battery->device_handle, 
+		status = bm_osl_generate_event(battery->device_handle,
 			BT_PROC_ROOT, battery->uid, event, 0);
 		break;
 
@@ -390,10 +390,14 @@ bt_osl_generate_event (
  *
  ****************************************************************************/
 
-static int __init 
+static int __init
 bt_osl_init (void)
 {
-	ACPI_STATUS		status = AE_OK;
+	acpi_status		status = AE_OK;
+
+	/* abort if no busmgr */
+	if (!bm_proc_root)
+		return -ENODEV;
 
 	bt_proc_root = proc_mkdir(BT_PROC_ROOT, bm_proc_root);
 	if (!bt_proc_root) {
@@ -422,7 +426,7 @@ bt_osl_init (void)
  *
  ****************************************************************************/
 
-static void __exit 
+static void __exit
 bt_osl_cleanup (void)
 {
 	bt_terminate();

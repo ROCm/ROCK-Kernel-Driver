@@ -417,12 +417,13 @@ static int initrd_release(struct inode *inode,struct file *file)
 {
 	extern void free_initrd_mem(unsigned long, unsigned long);
 
+	lock_kernel();
 	if (!--initrd_users) {
 		free_initrd_mem(initrd_start, initrd_end);
 		initrd_start = 0;
-		inode->i_bdev->bd_cache_openers--;
-		blkdev_put(inode->i_bdev, BDEV_FILE);
 	}
+	unlock_kernel();
+	blkdev_put(inode->i_bdev, BDEV_FILE);
 	return 0;
 }
 
@@ -457,7 +458,6 @@ static int rd_open(struct inode * inode, struct file * filp)
 	if (rd_bdev[unit] == NULL) {
 		rd_bdev[unit] = bdget(kdev_t_to_nr(inode->i_rdev));
 		rd_bdev[unit]->bd_openers++;
-		rd_bdev[unit]->bd_cache_openers++;
 		rd_bdev[unit]->bd_inode->i_mapping->a_ops = &ramdisk_aops;
 	}
 
@@ -487,11 +487,8 @@ static void __exit rd_cleanup (void)
 	for (i = 0 ; i < NUM_RAMDISKS; i++) {
 		struct block_device *bdev = rd_bdev[i];
 		rd_bdev[i] = NULL;
-		if (bdev) {
-			bdev->bd_cache_openers--;
-			truncate_inode_pages(bdev->bd_inode->i_mapping, 0);
+		if (bdev)
 			blkdev_put(bdev, BDEV_FILE);
-		}
 		destroy_buffers(MKDEV(MAJOR_NR, i));
 	}
 

@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dbxface - AML Debugger external interfaces
- *              $Revision: 37 $
+ *              $Revision: 41 $
  *
  ******************************************************************************/
 
@@ -54,17 +54,19 @@
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_db_single_step (
-	ACPI_WALK_STATE         *walk_state,
-	ACPI_PARSE_OBJECT       *op,
+	acpi_walk_state         *walk_state,
+	acpi_parse_object       *op,
 	u8                      op_type)
 {
-	ACPI_PARSE_OBJECT       *next;
-	ACPI_STATUS             status = AE_OK;
+	acpi_parse_object       *next;
+	acpi_status             status = AE_OK;
 	u32                     original_debug_level;
-	ACPI_PARSE_OBJECT       *display_op;
+	acpi_parse_object       *display_op;
 
+
+	FUNCTION_ENTRY ();
 
 	/* Is there a breakpoint set? */
 
@@ -81,12 +83,10 @@ acpi_db_single_step (
 		}
 	}
 
-
 	/*
 	 * Check if this is an opcode that we are interested in --
 	 * namely, opcodes that have arguments
 	 */
-
 	if (op->opcode == AML_INT_NAMEDFIELD_OP) {
 		return (AE_OK);
 	}
@@ -109,16 +109,14 @@ acpi_db_single_step (
 		}
 	}
 
-
 	/*
 	 * Under certain debug conditions, display this opcode and its operands
 	 */
-
-	if ((output_to_file)                    ||
+	if ((acpi_gbl_db_output_to_file)        ||
 		(acpi_gbl_cm_single_step)           ||
-		(acpi_dbg_level & TRACE_PARSE)) {
-		if ((output_to_file)                ||
-			(acpi_dbg_level & TRACE_PARSE)) {
+		(acpi_dbg_level & ACPI_LV_PARSE)) {
+		if ((acpi_gbl_db_output_to_file)    ||
+			(acpi_dbg_level & ACPI_LV_PARSE)) {
 			acpi_os_printf ("\n[Aml_debug] Next AML Opcode to execute:\n");
 		}
 
@@ -127,9 +125,8 @@ acpi_db_single_step (
 		 * and disable parser trace output for the duration of the display because
 		 * we don't want the extraneous debug output)
 		 */
-
 		original_debug_level = acpi_dbg_level;
-		acpi_dbg_level &= ~(TRACE_PARSE | TRACE_FUNCTIONS);
+		acpi_dbg_level &= ~(ACPI_LV_PARSE | ACPI_LV_FUNCTIONS);
 		next = op->next;
 		op->next = NULL;
 
@@ -160,14 +157,12 @@ acpi_db_single_step (
 			/* TBD */
 		}
 
-
 		/* Restore everything */
 
 		op->next = next;
 		acpi_os_printf ("\n");
 		acpi_dbg_level = original_debug_level;
-   }
-
+	}
 
 	/* If we are not single stepping, just continue executing the method */
 
@@ -180,7 +175,6 @@ acpi_db_single_step (
 	 * If we are executing a step-to-call command,
 	 * Check if this is a method call.
 	 */
-
 	if (acpi_gbl_step_to_next_call) {
 		if (op->opcode != AML_INT_METHODCALL_OP) {
 			/* Not a method call, just keep executing */
@@ -198,7 +192,6 @@ acpi_db_single_step (
 	 * If the next opcode is a method call, we will "step over" it
 	 * by default.
 	 */
-
 	if (op->opcode == AML_INT_METHODCALL_OP) {
 		acpi_gbl_cm_single_step = FALSE; /* No more single step while executing called method */
 
@@ -244,14 +237,13 @@ acpi_db_single_step (
 
 			/* Get the user input line */
 
-			acpi_os_get_line (line_buf);
+			acpi_os_get_line (acpi_gbl_db_line_buf);
 		}
 
-		status = acpi_db_command_dispatch (line_buf, walk_state, op);
+		status = acpi_db_command_dispatch (acpi_gbl_db_line_buf, walk_state, op);
 	}
 
 	/* Acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE); */
-
 
 	/* User commands complete, continue execution of the interrupted method */
 
@@ -278,12 +270,12 @@ acpi_db_initialize (void)
 
 	/* Init globals */
 
-	buffer = acpi_os_allocate (BUFFER_SIZE);
+	acpi_gbl_db_buffer = acpi_os_allocate (ACPI_DEBUG_BUFFER_SIZE);
 
 	/* Initial scope is the root */
 
-	scope_buf [0] = '\\';
-	scope_buf [1] = 0;
+	acpi_gbl_db_scope_buf [0] = '\\';
+	acpi_gbl_db_scope_buf [1] = 0;
 
 
 	/*
@@ -291,7 +283,6 @@ acpi_db_initialize (void)
 	 * a separate thread so that the front end can be in another address
 	 * space, environment, or even another machine.
 	 */
-
 	if (acpi_gbl_debugger_configuration & DEBUGGER_MULTI_THREADED) {
 		/* These were created with one unit, grab it */
 
@@ -303,12 +294,11 @@ acpi_db_initialize (void)
 		acpi_os_queue_for_execution (0, acpi_db_execute_thread, NULL);
 	}
 
-	if (!opt_verbose) {
-		INDENT_STRING = "    ";
-		opt_disasm = TRUE;
-		opt_stats = FALSE;
+	if (!acpi_gbl_db_opt_verbose) {
+		acpi_gbl_db_disasm_indent = " ";
+		acpi_gbl_db_opt_disasm = TRUE;
+		acpi_gbl_db_opt_stats = FALSE;
 	}
-
 
 	return (0);
 }

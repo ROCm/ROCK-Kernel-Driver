@@ -29,15 +29,26 @@
 #include <linux/module.h>
 #include "CDCEther.h"
 
-static const char *version = __FILE__ ": v0.98.4 4 July 2001 Brad Hards and another";
+static const char *version = __FILE__ ": v0.98.5 22 Sep 2001 Brad Hards and another";
 
-// We will attempt to probe anything that is in the
-// communication device class...
-// We will sort through them later.
+/* We need to be selective about what we try to match on, to avoiding loading for a CDC
+ * ACM (ISDN or PSTN) modem */
 static struct usb_device_id CDCEther_ids[] = {
-	{ USB_DEVICE_INFO(2, 0, 0) },
-	{ }
+        { match_flags: (USB_DEVICE_ID_MATCH_INT_CLASS | USB_DEVICE_ID_MATCH_INT_SUBCLASS),
+          bInterfaceClass: USB_CLASS_COMM, bInterfaceSubClass: 6},
+        { } /* Terminating null entry */
 };
+
+/* 
+ * module parameter that provides an alternate upper limit on the 
+ * number of multicast filters we use, with a default to use all
+ * the filters available to us. Note that the actual number used
+ * is the lesser of this parameter and the number returned in the
+ * descriptor for the particular device. See Table 41 of the CDC
+ * spec for more info on the descriptor limit.
+ */
+static int multicast_filter_limit = 32767;
+
 
 //////////////////////////////////////////////////////////////////////////////
 // Callback routines from USB device /////////////////////////////////////////
@@ -409,32 +420,83 @@ static int CDCEther_ioctl( struct net_device *net, struct ifreq *rq, int cmd )
 	}
 }
 
+static void CDC_SetEthernetPacketFilter (ether_dev_t *ether_dev)
+{
+	usb_control_msg(ether_dev->usb,
+			usb_sndctrlpipe(ether_dev->usb, 0),
+			SET_ETHERNET_PACKET_FILTER, /* request */
+			USB_TYPE_CLASS | USB_DIR_OUT | USB_RECIP_INTERFACE, /* request type */
+			cpu_to_le16(ether_dev->mode_flags), /* value */
+			cpu_to_le16((u16)ether_dev->comm_interface), /* index */
+			NULL,
+			0, /* size */
+			HZ); /* timeout */
+}	
+
+
 static void CDCEther_set_multicast( struct net_device *net )
 {
 	ether_dev_t *ether_dev = net->priv;
+	int i;
+	__u8 *buff;
+	
 
 	// Tell the kernel to stop sending us frames while we get this
 	// all set up.
 	netif_stop_queue(net);
 
-	// Do what we are told.
-	if (net->flags & IFF_PROMISC) {
-		// TODO - Turn on promiscuous mode
-		info( "%s: Promiscuous mode enabled", net->name);
-	} else if (net->flags & IFF_ALLMULTI){
-		// TODO - Here we need to tell the device to block ALL multicast traffic.
-		info("%s: set allmulti", net->name);
-	} else if (net->mc_count > ether_dev->wNumberMCFilters)	{
-		// TODO - Here we need to set multicast filters, but
-		// There are more than our limit...  Hmm...
-		info("%s: set too many MC filters", net->name);
-	} else {
-		// TODO - Here we are supposed to set SOME of the multicast filters.
-		// I must learn how to do this...
-		//info("%s: set Rx mode", net->name);
+      /* Note: do not reorder, GCC is clever about common statements. */
+        if (net->flags & IFF_PROMISC) {
+                /* Unconditionally log net taps. */
+                info( "%s: Promiscuous mode enabled", net->name);
+		ether_dev->mode_flags = MODE_FLAG_PROMISCUOUS |
+			MODE_FLAG_ALL_MULTICAST |
+			MODE_FLAG_DIRECTED |
+			MODE_FLAG_BROADCAST |
+			MODE_FLAG_MULTICAST;
+        } else if (net->mc_count > ether_dev->wNumberMCFilters) {
+                /* Too many to filter perfectly -- accept all multicasts. */
+		info("%s: set too many MC filters, using allmulti", net->name);
+		ether_dev->mode_flags = MODE_FLAG_ALL_MULTICAST |
+			MODE_FLAG_DIRECTED |
+			MODE_FLAG_BROADCAST |
+			MODE_FLAG_MULTICAST;
+	} else if (net->flags & IFF_ALLMULTI) {
+                /* Filter in software */
+		info("%s: using allmulti", net->name);
+		ether_dev->mode_flags = MODE_FLAG_ALL_MULTICAST |
+			MODE_FLAG_DIRECTED |
+			MODE_FLAG_BROADCAST |
+			MODE_FLAG_MULTICAST;
+        } else {
+		/* do multicast filtering in hardware */
+                struct dev_mc_list *mclist;
+		info("%s: set multicast filters", net->name);
+		ether_dev->mode_flags = MODE_FLAG_ALL_MULTICAST |
+			MODE_FLAG_DIRECTED |
+			MODE_FLAG_BROADCAST |
+			MODE_FLAG_MULTICAST;
+		buff = kmalloc(6 * net->mc_count, in_interrupt() ? GFP_ATOMIC : GFP_KERNEL);
+                for (i = 0, mclist = net->mc_list;
+		     mclist && i < net->mc_count;
+                     i++, mclist = mclist->next) {
+			memcpy(&mclist->dmi_addr, &buff[i * 6], 6);
+		}
+		usb_control_msg(ether_dev->usb,
+				usb_sndctrlpipe(ether_dev->usb, 0),
+				SET_ETHERNET_MULTICAST_FILTER, /* request */
+				USB_TYPE_CLASS | USB_DIR_OUT | USB_RECIP_INTERFACE, /* request type */
+				cpu_to_le16(net->mc_count), /* value */
+				cpu_to_le16((u16)ether_dev->comm_interface), /* index */
+				buff,
+				(6* net->mc_count), /* size */
+				HZ); /* timeout */
+		kfree(buff);
 	}
-
-	// Tell the kernel to start giving frames to us again.
+ 
+	CDC_SetEthernetPacketFilter(ether_dev);
+	
+        // Tell the kernel to start giving frames to us again.
 	netif_wake_queue(net);
 }
 
@@ -545,6 +607,9 @@ static int parse_ethernet_functional_descriptor( int *bFunctionLength,
 	ether_dev->bmEthernetStatistics = data[1] + (data[2] << 8) + (data[3] << 16) + (data[4] << 24);
 	ether_dev->wMaxSegmentSize = data[5] + (data[6] << 8);
 	ether_dev->wNumberMCFilters = (data[7] + (data[8] << 8)) & 0x00007FFF;
+	if (ether_dev->wNumberMCFilters > multicast_filter_limit) {
+		ether_dev->wNumberMCFilters = multicast_filter_limit;
+		}	
 	ether_dev->bNumberPowerFilters = data[9];
 	
 	// We've seen one of these now.
@@ -1272,6 +1337,9 @@ module_exit( CDCEther_exit );
 MODULE_AUTHOR("Brad Hards and another");
 MODULE_DESCRIPTION("USB CDC Ethernet driver");
 MODULE_LICENSE("GPL");
+
+MODULE_PARM (multicast_filter_limit, "i");
+MODULE_PARM_DESC (multicast_filter_limit, "CDCEther maximum number of filtered multicast addresses");
 
 MODULE_DEVICE_TABLE (usb, CDCEther_ids);
 

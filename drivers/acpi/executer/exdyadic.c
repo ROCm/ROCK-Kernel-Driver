@@ -1,7 +1,7 @@
 /******************************************************************************
  *
- * Module Name: exdyadic - ACPI AML (p-code) execution for dyadic operators
- *              $Revision: 77 $
+ * Module Name: exdyadic - ACPI AML execution for dyadic (2-operand) operators
+ *              $Revision: 88 $
  *
  *****************************************************************************/
 
@@ -41,8 +41,9 @@
  *
  * FUNCTION:    Acpi_ex_do_concatenate
  *
- * PARAMETERS:  *Obj_desc       - Object to be converted.  Must be an
- *                                Integer, Buffer, or String
+ * PARAMETERS:  *Obj_desc           - Object to be converted.  Must be an
+ *                                    Integer, Buffer, or String
+ *              Walk_state          - Current walk state
  *
  * RETURN:      Status
  *
@@ -50,19 +51,22 @@
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_do_concatenate (
-	ACPI_OPERAND_OBJECT     *obj_desc,
-	ACPI_OPERAND_OBJECT     *obj_desc2,
-	ACPI_OPERAND_OBJECT     **actual_ret_desc,
-	ACPI_WALK_STATE         *walk_state)
+	acpi_operand_object     *obj_desc,
+	acpi_operand_object     *obj_desc2,
+	acpi_operand_object     **actual_ret_desc,
+	acpi_walk_state         *walk_state)
 {
-	ACPI_STATUS             status;
+	acpi_status             status;
 	u32                     i;
-	ACPI_INTEGER            this_integer;
-	ACPI_OPERAND_OBJECT     *ret_desc;
+	acpi_integer            this_integer;
+	acpi_operand_object     *ret_desc;
 	NATIVE_CHAR             *new_buf;
-	u32                     integer_size = sizeof (ACPI_INTEGER);
+	u32                     integer_size = sizeof (acpi_integer);
+
+
+	FUNCTION_ENTRY ();
 
 
 	/*
@@ -95,7 +99,7 @@ acpi_ex_do_concatenate (
 		/* Need enough space for two integers */
 
 		ret_desc->buffer.length = integer_size * 2;
-		new_buf = acpi_ut_callocate (ret_desc->buffer.length);
+		new_buf = ACPI_MEM_CALLOCATE (ret_desc->buffer.length);
 		if (!new_buf) {
 			REPORT_ERROR
 				(("Ex_do_concatenate: Buffer allocation failure\n"));
@@ -133,7 +137,7 @@ acpi_ex_do_concatenate (
 
 		/* Operand1 is string  */
 
-		new_buf = acpi_ut_allocate (obj_desc->string.length +
+		new_buf = ACPI_MEM_ALLOCATE (obj_desc->string.length +
 				  obj_desc2->string.length + 1);
 		if (!new_buf) {
 			REPORT_ERROR
@@ -163,7 +167,7 @@ acpi_ex_do_concatenate (
 			return (AE_NO_MEMORY);
 		}
 
-		new_buf = acpi_ut_allocate (obj_desc->buffer.length +
+		new_buf = ACPI_MEM_ALLOCATE (obj_desc->buffer.length +
 				  obj_desc2->buffer.length);
 		if (!new_buf) {
 			REPORT_ERROR
@@ -208,6 +212,7 @@ cleanup:
  * FUNCTION:    Acpi_ex_dyadic1
  *
  * PARAMETERS:  Opcode              - The opcode to be executed
+ *              Walk_state          - Current walk state
  *
  * RETURN:      Status
  *
@@ -218,47 +223,35 @@ cleanup:
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_dyadic1 (
 	u16                     opcode,
-	ACPI_WALK_STATE         *walk_state)
+	acpi_walk_state         *walk_state)
 {
-	ACPI_OPERAND_OBJECT     *obj_desc = NULL;
-	ACPI_OPERAND_OBJECT     *val_desc = NULL;
-	ACPI_NAMESPACE_NODE     *node;
-	ACPI_STATUS             status = AE_OK;
+	acpi_operand_object     **operand = &walk_state->operands[0];
+	acpi_namespace_node     *node;
+	acpi_status             status = AE_OK;
 
 
-	/* Resolve all operands */
-
-	status = acpi_ex_resolve_operands (opcode, WALK_OPERANDS, walk_state);
-	/* Get the operands */
-
-	status |= acpi_ds_obj_stack_pop_object (&val_desc, walk_state);
-	status |= acpi_ds_obj_stack_pop_object (&obj_desc, walk_state);
-	if (ACPI_FAILURE (status)) {
-		/* Invalid parameters on object stack  */
-
-		goto cleanup;
-	}
+	FUNCTION_TRACE_PTR ("Ex_dyadic1", WALK_OPERANDS);
 
 
 	/* Examine the opcode */
 
 	switch (opcode) {
 
-	/* Def_notify  :=  Notify_op   Notify_object   Notify_value */
+	/* Def_notify  :=  Notify_op   (0)Notify_object   (1)Notify_value */
 
 	case AML_NOTIFY_OP:
 
 		/* The Obj_desc is actually an Node */
 
-		node = (ACPI_NAMESPACE_NODE *) obj_desc;
-		obj_desc = NULL;
+		node = (acpi_namespace_node *) operand[0];
+		operand[0] = NULL;
 
 		/* Object must be a device or thermal zone */
 
-		if (node && val_desc) {
+		if (node && operand[1]) {
 			switch (node->type) {
 			case ACPI_TYPE_DEVICE:
 			case ACPI_TYPE_THERMAL:
@@ -270,12 +263,14 @@ acpi_ex_dyadic1 (
 				 * from this thread -- because handlers may in turn run other
 				 * control methods.
 				 */
-
 				status = acpi_ev_queue_notify_request (node,
-						 (u32) val_desc->integer.value);
+						 (u32) operand[1]->integer.value);
 				break;
 
 			default:
+				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unexpected notify object type %X\n",
+					operand[0]->common.type));
+
 				status = AE_AML_OPERAND_TYPE;
 				break;
 			}
@@ -289,15 +284,13 @@ acpi_ex_dyadic1 (
 	}
 
 
-cleanup:
-
 	/* Always delete both operands */
 
-	acpi_ut_remove_reference (val_desc);
-	acpi_ut_remove_reference (obj_desc);
+	acpi_ut_remove_reference (operand[1]);
+	acpi_ut_remove_reference (operand[0]);
 
 
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 
@@ -306,6 +299,8 @@ cleanup:
  * FUNCTION:    Acpi_ex_dyadic2_r
  *
  * PARAMETERS:  Opcode              - The opcode to be executed
+ *              Walk_state          - Current walk state
+ *              Return_desc         - Where to store the return object
  *
  * RETURN:      Status
  *
@@ -316,38 +311,19 @@ cleanup:
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_dyadic2_r (
 	u16                     opcode,
-	ACPI_WALK_STATE         *walk_state,
-	ACPI_OPERAND_OBJECT     **return_desc)
+	acpi_walk_state         *walk_state,
+	acpi_operand_object     **return_desc)
 {
-	ACPI_OPERAND_OBJECT     *obj_desc   = NULL;
-	ACPI_OPERAND_OBJECT     *obj_desc2  = NULL;
-	ACPI_OPERAND_OBJECT     *res_desc   = NULL;
-	ACPI_OPERAND_OBJECT     *res_desc2  = NULL;
-	ACPI_OPERAND_OBJECT     *ret_desc   = NULL;
-	ACPI_OPERAND_OBJECT     *ret_desc2  = NULL;
-	ACPI_STATUS             status      = AE_OK;
-	u32                     num_operands = 3;
+	acpi_operand_object     **operand = &walk_state->operands[0];
+	acpi_operand_object     *ret_desc   = NULL;
+	acpi_operand_object     *ret_desc2  = NULL;
+	acpi_status             status      = AE_OK;
 
 
-	/* Resolve all operands */
-
-	status = acpi_ex_resolve_operands (opcode, WALK_OPERANDS, walk_state);
-	/* Get all operands */
-
-	if (AML_DIVIDE_OP == opcode) {
-		num_operands = 4;
-		status |= acpi_ds_obj_stack_pop_object (&res_desc2, walk_state);
-	}
-
-	status |= acpi_ds_obj_stack_pop_object (&res_desc, walk_state);
-	status |= acpi_ds_obj_stack_pop_object (&obj_desc2, walk_state);
-	status |= acpi_ds_obj_stack_pop_object (&obj_desc, walk_state);
-	if (ACPI_FAILURE (status)) {
-		goto cleanup;
-	}
+	FUNCTION_TRACE_U32 ("Ex_dyadic2_r", opcode);
 
 
 	/* Create an internal return object if necessary */
@@ -360,6 +336,7 @@ acpi_ex_dyadic2_r (
 	case AML_BIT_NOR_OP:
 	case AML_BIT_XOR_OP:
 	case AML_DIVIDE_OP:
+	case AML_MOD_OP:
 	case AML_MULTIPLY_OP:
 	case AML_SHIFT_LEFT_OP:
 	case AML_SHIFT_RIGHT_OP:
@@ -378,15 +355,14 @@ acpi_ex_dyadic2_r (
 	/*
 	 * Execute the opcode
 	 */
-
 	switch (opcode) {
 
 	/* Def_add :=  Add_op  Operand1    Operand2    Result  */
 
 	case AML_ADD_OP:
 
-		ret_desc->integer.value = obj_desc->integer.value +
-				 obj_desc2->integer.value;
+		ret_desc->integer.value = operand[0]->integer.value +
+				  operand[1]->integer.value;
 		break;
 
 
@@ -394,8 +370,8 @@ acpi_ex_dyadic2_r (
 
 	case AML_BIT_AND_OP:
 
-		ret_desc->integer.value = obj_desc->integer.value &
-				 obj_desc2->integer.value;
+		ret_desc->integer.value = operand[0]->integer.value &
+				  operand[1]->integer.value;
 		break;
 
 
@@ -403,8 +379,8 @@ acpi_ex_dyadic2_r (
 
 	case AML_BIT_NAND_OP:
 
-		ret_desc->integer.value = ~(obj_desc->integer.value &
-				   obj_desc2->integer.value);
+		ret_desc->integer.value = ~(operand[0]->integer.value &
+				 operand[1]->integer.value);
 		break;
 
 
@@ -412,8 +388,8 @@ acpi_ex_dyadic2_r (
 
 	case AML_BIT_OR_OP:
 
-		ret_desc->integer.value = obj_desc->integer.value |
-				 obj_desc2->integer.value;
+		ret_desc->integer.value = operand[0]->integer.value |
+				  operand[1]->integer.value;
 		break;
 
 
@@ -421,8 +397,8 @@ acpi_ex_dyadic2_r (
 
 	case AML_BIT_NOR_OP:
 
-		ret_desc->integer.value = ~(obj_desc->integer.value |
-				   obj_desc2->integer.value);
+		ret_desc->integer.value = ~(operand[0]->integer.value |
+				 operand[1]->integer.value);
 		break;
 
 
@@ -430,8 +406,8 @@ acpi_ex_dyadic2_r (
 
 	case AML_BIT_XOR_OP:
 
-		ret_desc->integer.value = obj_desc->integer.value ^
-				 obj_desc2->integer.value;
+		ret_desc->integer.value = operand[0]->integer.value ^
+				  operand[1]->integer.value;
 		break;
 
 
@@ -439,9 +415,9 @@ acpi_ex_dyadic2_r (
 
 	case AML_DIVIDE_OP:
 
-		if (!obj_desc2->integer.value) {
+		if (!operand[1]->integer.value) {
 			REPORT_ERROR
-				(("Ex_dyadic2_r/Divide_op: Divide by zero\n"));
+				(("Divide_op: Divide by zero\n"));
 
 			status = AE_AML_DIVIDE_BY_ZERO;
 			goto cleanup;
@@ -455,13 +431,32 @@ acpi_ex_dyadic2_r (
 
 		/* Remainder (modulo) */
 
-		ret_desc->integer.value  = ACPI_MODULO (obj_desc->integer.value,
-				  obj_desc2->integer.value);
+		ret_desc->integer.value  = ACPI_MODULO (operand[0]->integer.value,
+				  operand[1]->integer.value);
 
 		/* Result (what we used to call the quotient) */
 
-		ret_desc2->integer.value = ACPI_DIVIDE (obj_desc->integer.value,
-				  obj_desc2->integer.value);
+		ret_desc2->integer.value = ACPI_DIVIDE (operand[0]->integer.value,
+				  operand[1]->integer.value);
+		break;
+
+
+	/* Def_mod  :=  Mod_op Dividend Divisor Remainder */
+
+	case AML_MOD_OP:    /* ACPI 2.0 */
+
+		if (!operand[1]->integer.value) {
+			REPORT_ERROR
+				(("Mod_op: Divide by zero\n"));
+
+			status = AE_AML_DIVIDE_BY_ZERO;
+			goto cleanup;
+		}
+
+		/* Remainder (modulo) */
+
+		ret_desc->integer.value  = ACPI_MODULO (operand[0]->integer.value,
+				  operand[1]->integer.value);
 		break;
 
 
@@ -469,8 +464,8 @@ acpi_ex_dyadic2_r (
 
 	case AML_MULTIPLY_OP:
 
-		ret_desc->integer.value = obj_desc->integer.value *
-				 obj_desc2->integer.value;
+		ret_desc->integer.value = operand[0]->integer.value *
+				  operand[1]->integer.value;
 		break;
 
 
@@ -478,8 +473,8 @@ acpi_ex_dyadic2_r (
 
 	case AML_SHIFT_LEFT_OP:
 
-		ret_desc->integer.value = obj_desc->integer.value <<
-				 obj_desc2->integer.value;
+		ret_desc->integer.value = operand[0]->integer.value <<
+				  operand[1]->integer.value;
 		break;
 
 
@@ -487,8 +482,8 @@ acpi_ex_dyadic2_r (
 
 	case AML_SHIFT_RIGHT_OP:
 
-		ret_desc->integer.value = obj_desc->integer.value >>
-				 obj_desc2->integer.value;
+		ret_desc->integer.value = operand[0]->integer.value >>
+				  operand[1]->integer.value;
 		break;
 
 
@@ -496,15 +491,14 @@ acpi_ex_dyadic2_r (
 
 	case AML_SUBTRACT_OP:
 
-		ret_desc->integer.value = obj_desc->integer.value -
-				 obj_desc2->integer.value;
+		ret_desc->integer.value = operand[0]->integer.value -
+				  operand[1]->integer.value;
 		break;
 
 
 	/* Def_concat  :=  Concat_op   Data1   Data2   Result  */
 
 	case AML_CONCAT_OP:
-
 
 		/*
 		 * Convert the second operand if necessary.  The first operand
@@ -513,18 +507,17 @@ acpi_ex_dyadic2_r (
 		 * guaranteed to be either Integer/String/Buffer by the operand
 		 * resolution mechanism above.
 		 */
-
-		switch (obj_desc->common.type) {
+		switch (operand[0]->common.type) {
 		case ACPI_TYPE_INTEGER:
-			status = acpi_ex_convert_to_integer (&obj_desc2, walk_state);
+			status = acpi_ex_convert_to_integer (operand[1], &operand[1], walk_state);
 			break;
 
 		case ACPI_TYPE_STRING:
-			status = acpi_ex_convert_to_string (&obj_desc2, walk_state);
+			status = acpi_ex_convert_to_string (operand[1], &operand[1], 16, ACPI_UINT32_MAX, walk_state);
 			break;
 
 		case ACPI_TYPE_BUFFER:
-			status = acpi_ex_convert_to_buffer (&obj_desc2, walk_state);
+			status = acpi_ex_convert_to_buffer (operand[1], &operand[1], walk_state);
 			break;
 
 		default:
@@ -541,10 +534,28 @@ acpi_ex_dyadic2_r (
 		 * (Both are Integer, String, or Buffer), and we can now perform the
 		 * concatenation.
 		 */
-		status = acpi_ex_do_concatenate (obj_desc, obj_desc2, &ret_desc, walk_state);
+		status = acpi_ex_do_concatenate (operand[0], operand[1], &ret_desc, walk_state);
 		if (ACPI_FAILURE (status)) {
 			goto cleanup;
 		}
+		break;
+
+
+	/* Def_to_string := Buffer, Length, Result */
+
+	case AML_TO_STRING_OP:  /* ACPI 2.0 */
+
+		status = acpi_ex_convert_to_string (operand[0], &ret_desc, 16,
+				  (u32) operand[1]->integer.value, walk_state);
+		break;
+
+
+	/* Def_concat_res := Buffer, Buffer, Result */
+
+	case AML_CONCAT_RES_OP:  /* ACPI 2.0 */
+
+		status = AE_NOT_IMPLEMENTED;
+		goto cleanup;
 		break;
 
 
@@ -558,25 +569,28 @@ acpi_ex_dyadic2_r (
 
 
 	/*
-	 * Store the result of the operation (which is now in Obj_desc) into
+	 * Store the result of the operation (which is now in Operand[0]) into
 	 * the result descriptor, or the location pointed to by the result
-	 * descriptor (Res_desc).
+	 * descriptor (Operand[2]).
 	 */
-
-	status = acpi_ex_store (ret_desc, res_desc, walk_state);
+	status = acpi_ex_store (ret_desc, operand[2], walk_state);
 	if (ACPI_FAILURE (status)) {
 		goto cleanup;
 	}
 
 	if (AML_DIVIDE_OP == opcode) {
-		status = acpi_ex_store (ret_desc2, res_desc2, walk_state);
+		status = acpi_ex_store (ret_desc2, operand[3], walk_state);
 
 		/*
 		 * Since the remainder is not returned, remove a reference to
 		 * the object we created earlier
 		 */
+		acpi_ut_remove_reference (ret_desc);
+		*return_desc = ret_desc2;
+	}
 
-		acpi_ut_remove_reference (ret_desc2);
+	else {
+		*return_desc = ret_desc;
 	}
 
 
@@ -584,8 +598,8 @@ cleanup:
 
 	/* Always delete the operands */
 
-	acpi_ut_remove_reference (obj_desc);
-	acpi_ut_remove_reference (obj_desc2);
+	acpi_ut_remove_reference (operand[0]);
+	acpi_ut_remove_reference (operand[1]);
 
 
 	/* Delete return object on error */
@@ -593,8 +607,8 @@ cleanup:
 	if (ACPI_FAILURE (status)) {
 		/* On failure, delete the result ops */
 
-		acpi_ut_remove_reference (res_desc);
-		acpi_ut_remove_reference (res_desc2);
+		acpi_ut_remove_reference (operand[2]);
+		acpi_ut_remove_reference (operand[3]);
 
 		if (ret_desc) {
 			/* And delete the internal return object */
@@ -606,8 +620,7 @@ cleanup:
 
 	/* Set the return object and exit */
 
-	*return_desc = ret_desc;
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 
@@ -616,6 +629,8 @@ cleanup:
  * FUNCTION:    Acpi_ex_dyadic2_s
  *
  * PARAMETERS:  Opcode              - The opcode to be executed
+ *              Walk_state          - Current walk state
+ *              Return_desc         - Where to store the return object
  *
  * RETURN:      Status
  *
@@ -625,30 +640,18 @@ cleanup:
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_dyadic2_s (
 	u16                     opcode,
-	ACPI_WALK_STATE         *walk_state,
-	ACPI_OPERAND_OBJECT     **return_desc)
+	acpi_walk_state         *walk_state,
+	acpi_operand_object     **return_desc)
 {
-	ACPI_OPERAND_OBJECT     *obj_desc;
-	ACPI_OPERAND_OBJECT     *time_desc;
-	ACPI_OPERAND_OBJECT     *ret_desc = NULL;
-	ACPI_STATUS             status;
+	acpi_operand_object     **operand = &walk_state->operands[0];
+	acpi_operand_object     *ret_desc = NULL;
+	acpi_status             status;
 
 
-	/* Resolve all operands */
-
-	status = acpi_ex_resolve_operands (opcode, WALK_OPERANDS, walk_state);
-	/* Get all operands */
-
-	status |= acpi_ds_obj_stack_pop_object (&time_desc, walk_state);
-	status |= acpi_ds_obj_stack_pop_object (&obj_desc, walk_state);
-	if (ACPI_FAILURE (status)) {
-		/* Invalid parameters on object stack  */
-
-		goto cleanup;
-	}
+	FUNCTION_TRACE_PTR ("Ex_dyadic2_s", WALK_OPERANDS);
 
 
 	/* Create the internal return object */
@@ -672,7 +675,7 @@ acpi_ex_dyadic2_s (
 
 	case AML_ACQUIRE_OP:
 
-		status = acpi_ex_acquire_mutex (time_desc, obj_desc, walk_state);
+		status = acpi_ex_acquire_mutex (operand[1], operand[0], walk_state);
 		break;
 
 
@@ -680,7 +683,7 @@ acpi_ex_dyadic2_s (
 
 	case AML_WAIT_OP:
 
-		status = acpi_ex_system_wait_event (time_desc, obj_desc);
+		status = acpi_ex_system_wait_event (operand[1], operand[0]);
 		break;
 
 
@@ -696,7 +699,6 @@ acpi_ex_dyadic2_s (
 	 * Return a boolean indicating if operation timed out
 	 * (TRUE) or not (FALSE)
 	 */
-
 	if (status == AE_TIME) {
 		ret_desc->integer.value = ACPI_INTEGER_MAX;  /* TRUE, op timed out */
 		status = AE_OK;
@@ -707,8 +709,8 @@ cleanup:
 
 	/* Delete params */
 
-	acpi_ut_remove_reference (time_desc);
-	acpi_ut_remove_reference (obj_desc);
+	acpi_ut_remove_reference (operand[1]);
+	acpi_ut_remove_reference (operand[0]);
 
 	/* Delete return object on error */
 
@@ -722,7 +724,7 @@ cleanup:
 	/* Set the return object and exit */
 
 	*return_desc = ret_desc;
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 
@@ -731,6 +733,8 @@ cleanup:
  * FUNCTION:    Acpi_ex_dyadic2
  *
  * PARAMETERS:  Opcode              - The opcode to be executed
+ *              Walk_state          - Current walk state
+ *              Return_desc         - Where to store the return object
  *
  * RETURN:      Status
  *
@@ -742,31 +746,19 @@ cleanup:
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_dyadic2 (
 	u16                     opcode,
-	ACPI_WALK_STATE         *walk_state,
-	ACPI_OPERAND_OBJECT     **return_desc)
+	acpi_walk_state         *walk_state,
+	acpi_operand_object     **return_desc)
 {
-	ACPI_OPERAND_OBJECT     *obj_desc;
-	ACPI_OPERAND_OBJECT     *obj_desc2;
-	ACPI_OPERAND_OBJECT     *ret_desc = NULL;
-	ACPI_STATUS             status;
+	acpi_operand_object     **operand = &walk_state->operands[0];
+	acpi_operand_object     *ret_desc = NULL;
+	acpi_status             status = AE_OK;
 	u8                      lboolean;
 
 
-	/* Resolve all operands */
-
-	status = acpi_ex_resolve_operands (opcode, WALK_OPERANDS, walk_state);
-	/* Get all operands */
-
-	status |= acpi_ds_obj_stack_pop_object (&obj_desc2, walk_state);
-	status |= acpi_ds_obj_stack_pop_object (&obj_desc, walk_state);
-	if (ACPI_FAILURE (status)) {
-		/* Invalid parameters on object stack  */
-
-		goto cleanup;
-	}
+	FUNCTION_TRACE_PTR ("Ex_dyadic2", WALK_OPERANDS);
 
 
 	/* Create the internal return object */
@@ -780,7 +772,6 @@ acpi_ex_dyadic2 (
 	/*
 	 * Execute the Opcode
 	 */
-
 	lboolean = FALSE;
 	switch (opcode) {
 
@@ -788,8 +779,8 @@ acpi_ex_dyadic2 (
 
 	case AML_LAND_OP:
 
-		lboolean = (u8) (obj_desc->integer.value &&
-				  obj_desc2->integer.value);
+		lboolean = (u8) (operand[0]->integer.value &&
+				  operand[1]->integer.value);
 		break;
 
 
@@ -797,8 +788,8 @@ acpi_ex_dyadic2 (
 
 	case AML_LEQUAL_OP:
 
-		lboolean = (u8) (obj_desc->integer.value ==
-				  obj_desc2->integer.value);
+		lboolean = (u8) (operand[0]->integer.value ==
+				  operand[1]->integer.value);
 		break;
 
 
@@ -806,8 +797,8 @@ acpi_ex_dyadic2 (
 
 	case AML_LGREATER_OP:
 
-		lboolean = (u8) (obj_desc->integer.value >
-				  obj_desc2->integer.value);
+		lboolean = (u8) (operand[0]->integer.value >
+				  operand[1]->integer.value);
 		break;
 
 
@@ -815,8 +806,8 @@ acpi_ex_dyadic2 (
 
 	case AML_LLESS_OP:
 
-		lboolean = (u8) (obj_desc->integer.value <
-				  obj_desc2->integer.value);
+		lboolean = (u8) (operand[0]->integer.value <
+				  operand[1]->integer.value);
 		break;
 
 
@@ -824,8 +815,17 @@ acpi_ex_dyadic2 (
 
 	case AML_LOR_OP:
 
-		lboolean = (u8) (obj_desc->integer.value ||
-				  obj_desc2->integer.value);
+		lboolean = (u8) (operand[0]->integer.value ||
+				  operand[1]->integer.value);
+		break;
+
+
+	/* Def_copy := Source, Destination */
+
+	case AML_COPY_OP:   /* ACPI 2.0 */
+
+		status = AE_NOT_IMPLEMENTED;
+		goto cleanup;
 		break;
 
 
@@ -852,8 +852,8 @@ cleanup:
 
 	/* Always delete operands */
 
-	acpi_ut_remove_reference (obj_desc);
-	acpi_ut_remove_reference (obj_desc2);
+	acpi_ut_remove_reference (operand[0]);
+	acpi_ut_remove_reference (operand[1]);
 
 
 	/* Delete return object on error */
@@ -868,7 +868,7 @@ cleanup:
 	/* Set the return object and exit */
 
 	*return_desc = ret_desc;
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 

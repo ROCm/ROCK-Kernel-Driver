@@ -64,9 +64,9 @@
  * constant if the underlying tables are changed
  */
 #define RSDT_DESCRIPTOR         RSDT_DESCRIPTOR_REV2
-#define XSDT_DESCRIPTOR         XSDT_DESCRIPTOR_REV2
-#define FACS_DESCRIPTOR         FACS_DESCRIPTOR_REV2
-#define FADT_DESCRIPTOR         FADT_DESCRIPTOR_REV2
+#define xsdt_descriptor         XSDT_DESCRIPTOR_REV2
+#define FACS_DESCRIPTOR         facs_descriptor_rev2
+#define FADT_DESCRIPTOR         fadt_descriptor_rev2
 
 
 #pragma pack(1)
@@ -104,7 +104,7 @@ typedef struct  /* ACPI common table header */
 	NATIVE_CHAR             asl_compiler_id [4];    /* ASL compiler vendor ID */
 	u32                     asl_compiler_revision;  /* ASL compiler revision number */
 
-} ACPI_TABLE_HEADER;
+} acpi_table_header;
 
 
 typedef struct  /* Common FACS for internal use */
@@ -113,12 +113,12 @@ typedef struct  /* Common FACS for internal use */
 	UINT64                  *firmware_waking_vector;
 	u8                      vector_width;
 
-} ACPI_COMMON_FACS;
+} acpi_common_facs;
 
 
 typedef struct  /* APIC Table */
 {
-	ACPI_TABLE_HEADER       header;                 /* table header */
+	acpi_table_header       header;                 /* table header */
 	u32                     local_apic_address;     /* Physical address for accessing local APICs */
 	u32                     PCATcompat      : 1;    /* a one indicates system also has dual 8259s */
 	u32                     reserved1       : 31;
@@ -166,7 +166,7 @@ typedef struct  /* IO APIC */
 */
 typedef struct  /* Smart Battery Description Table */
 {
-	ACPI_TABLE_HEADER       header;
+	acpi_table_header       header;
 	u32                     warning_level;
 	u32                     low_level;
 	u32                     critical_level;

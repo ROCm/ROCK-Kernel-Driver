@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exmutex - ASL Mutex Acquire/Release functions
- *              $Revision: 5 $
+ *              $Revision: 7 $
  *
  *****************************************************************************/
 
@@ -49,7 +49,7 @@
 
 void
 acpi_ex_unlink_mutex (
-	ACPI_OPERAND_OBJECT     *obj_desc)
+	acpi_operand_object     *obj_desc)
 {
 
 	if (obj_desc->mutex.next) {
@@ -76,8 +76,8 @@ acpi_ex_unlink_mutex (
 
 void
 acpi_ex_link_mutex (
-	ACPI_OPERAND_OBJECT     *obj_desc,
-	ACPI_OPERAND_OBJECT     *list_head)
+	acpi_operand_object     *obj_desc,
+	acpi_operand_object     *list_head)
 {
 
 	/* This object will be the first object in the list */
@@ -110,17 +110,19 @@ acpi_ex_link_mutex (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_acquire_mutex (
-	ACPI_OPERAND_OBJECT     *time_desc,
-	ACPI_OPERAND_OBJECT     *obj_desc,
-	ACPI_WALK_STATE         *walk_state)
+	acpi_operand_object     *time_desc,
+	acpi_operand_object     *obj_desc,
+	acpi_walk_state         *walk_state)
 {
-	ACPI_STATUS             status;
+	acpi_status             status;
 
+
+	FUNCTION_TRACE_PTR ("Ex_acquire_mutex", obj_desc);
 
 	if (!obj_desc) {
-		return (AE_BAD_PARAMETER);
+		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
 	/*
@@ -128,7 +130,7 @@ acpi_ex_acquire_mutex (
 	 * mutex.  This mechanism provides some deadlock prevention
 	 */
 	if (walk_state->current_sync_level > obj_desc->mutex.sync_level) {
-		return (AE_AML_MUTEX_ORDER);
+		return_ACPI_STATUS (AE_AML_MUTEX_ORDER);
 	}
 
 	/*
@@ -137,7 +139,7 @@ acpi_ex_acquire_mutex (
 	 */
 	if (obj_desc->mutex.owner == walk_state) {
 		obj_desc->mutex.acquisition_depth++;
-		return (AE_OK);
+		return_ACPI_STATUS (AE_OK);
 	}
 
 	/* Acquire the mutex, wait if necessary */
@@ -146,7 +148,7 @@ acpi_ex_acquire_mutex (
 	if (ACPI_FAILURE (status)) {
 		/* Includes failure from a timeout on Time_desc */
 
-		return (status);
+		return_ACPI_STATUS (status);
 	}
 
 	/* Have the mutex, update mutex and walk info */
@@ -157,10 +159,10 @@ acpi_ex_acquire_mutex (
 
 	/* Link the mutex to the walk state for force-unlock at method exit */
 
-	acpi_ex_link_mutex (obj_desc, (ACPI_OPERAND_OBJECT *)
+	acpi_ex_link_mutex (obj_desc, (acpi_operand_object *)
 			 &(walk_state->walk_list->acquired_mutex_list));
 
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -176,28 +178,31 @@ acpi_ex_acquire_mutex (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_release_mutex (
-	ACPI_OPERAND_OBJECT     *obj_desc,
-	ACPI_WALK_STATE         *walk_state)
+	acpi_operand_object     *obj_desc,
+	acpi_walk_state         *walk_state)
 {
-	ACPI_STATUS             status;
+	acpi_status             status;
+
+
+	FUNCTION_TRACE ("Ex_release_mutex");
 
 
 	if (!obj_desc) {
-		return (AE_BAD_PARAMETER);
+		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
-	/*  The mutex must have been previously acquired in order to release it */
+	/* The mutex must have been previously acquired in order to release it */
 
 	if (!obj_desc->mutex.owner) {
-		return (AE_AML_MUTEX_NOT_ACQUIRED);
+		return_ACPI_STATUS (AE_AML_MUTEX_NOT_ACQUIRED);
 	}
 
 	/* The Mutex is owned, but this thread must be the owner */
 
 	if (obj_desc->mutex.owner != walk_state) {
-		return (AE_AML_NOT_OWNER);
+		return_ACPI_STATUS (AE_AML_NOT_OWNER);
 	}
 
 	/*
@@ -205,7 +210,7 @@ acpi_ex_release_mutex (
 	 * equal to the current sync level
 	 */
 	if (obj_desc->mutex.sync_level > walk_state->current_sync_level) {
-		return (AE_AML_MUTEX_ORDER);
+		return_ACPI_STATUS (AE_AML_MUTEX_ORDER);
 	}
 
 	/*
@@ -215,7 +220,7 @@ acpi_ex_release_mutex (
 	if (obj_desc->mutex.acquisition_depth != 0) {
 		/* Just decrement the depth and return */
 
-		return (AE_OK);
+		return_ACPI_STATUS (AE_OK);
 	}
 
 
@@ -232,7 +237,7 @@ acpi_ex_release_mutex (
 
 	acpi_ex_unlink_mutex (obj_desc);
 
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 
@@ -248,12 +253,15 @@ acpi_ex_release_mutex (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_release_all_mutexes (
-	ACPI_OPERAND_OBJECT     *list_head)
+	acpi_operand_object     *list_head)
 {
-	ACPI_OPERAND_OBJECT     *next = list_head->mutex.next;
-	ACPI_OPERAND_OBJECT     *this;
+	acpi_operand_object     *next = list_head->mutex.next;
+	acpi_operand_object     *this;
+
+
+	FUNCTION_ENTRY ();
 
 
 	/*

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: bmrequest.c
- *   $Revision: 12 $
+ *   $Revision: 16 $
  *
  *****************************************************************************/
 
@@ -39,20 +39,20 @@
  *
  * FUNCTION:    bm_generate_request
  *
- * PARAMETERS:  
+ * PARAMETERS:
  *
- * RETURN:      
+ * RETURN:
  *
- * DESCRIPTION: 
+ * DESCRIPTION:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bm_generate_request (
 	BM_NODE			*node,
 	BM_REQUEST		*request)
 {
-	ACPI_STATUS		status = AE_OK;
+	acpi_status             status = AE_OK;
 	BM_DEVICE		*device = NULL;
 
 	FUNCTION_TRACE("bm_generate_request");
@@ -64,7 +64,7 @@ bm_generate_request (
 	device = &(node->device);
 
 	if (!BM_IS_DRIVER_CONTROL(device)) {
-		DEBUG_PRINT(ACPI_WARN, ("No driver installed for device [%02x].\n", device->handle));
+		ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "No driver installed for device [%02x].\n", device->handle));
 		return_ACPI_STATUS(AE_NOT_EXIST);
 	}
 
@@ -78,19 +78,19 @@ bm_generate_request (
  *
  * FUNCTION:    bm_request
  *
- * PARAMETERS:  
+ * PARAMETERS:
  *
- * RETURN:      
+ * RETURN:
  *
- * DESCRIPTION: 
+ * DESCRIPTION:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bm_request (
 	BM_REQUEST              *request)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 	BM_NODE			*node = NULL;
 	BM_DEVICE		*device = NULL;
 
@@ -103,7 +103,7 @@ bm_request (
 		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
-	DEBUG_PRINT(ACPI_INFO, ("Received request for device [%02x] command [%02x].\n", request->handle, request->command));
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Received request for device [%02x] command [%02x].\n", request->handle, request->command));
 
 	/*
 	 * Resolve the node.
@@ -137,15 +137,15 @@ bm_request (
 		if (ACPI_FAILURE(status)) {
 			break;
 		}
-		status = bm_copy_to_buffer(&(request->buffer), 
+		status = bm_copy_to_buffer(&(request->buffer),
 			&(device->power.state), sizeof(BM_POWER_STATE));
 		break;
 
 	case BM_COMMAND_SET_POWER_STATE:
-	{
+	 {
 		BM_POWER_STATE *power_state = NULL;
 
-		status = bm_cast_buffer(&(request->buffer), 
+		status = bm_cast_buffer(&(request->buffer),
 			(void**)&power_state, sizeof(BM_POWER_STATE));
 		if (ACPI_FAILURE(status)) {
 			break;

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: evxfevnt - External Interfaces, ACPI event disable/enable
- *              $Revision: 33 $
+ *              $Revision: 36 $
  *
  *****************************************************************************/
 
@@ -47,32 +47,40 @@
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_enable (void)
 {
-	ACPI_STATUS             status;
+	acpi_status             status;
+
+
+	FUNCTION_TRACE ("Acpi_enable");
 
 
 	/* Make sure we've got ACPI tables */
 
 	if (!acpi_gbl_DSDT) {
-		return (AE_NO_ACPI_TABLES);
+		ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "No ACPI tables present!\n"));
+		return_ACPI_STATUS (AE_NO_ACPI_TABLES);
 	}
 
 	/* Make sure the BIOS supports ACPI mode */
 
 	if (SYS_MODE_LEGACY == acpi_hw_get_mode_capabilities()) {
-		return (AE_ERROR);
+		ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Only legacy mode supported!\n"));
+		return_ACPI_STATUS (AE_ERROR);
 	}
 
 	/* Transition to ACPI mode */
 
 	status = acpi_hw_set_mode (SYS_MODE_ACPI);
 	if (ACPI_FAILURE (status)) {
-		return (status);
+		ACPI_DEBUG_PRINT ((ACPI_DB_FATAL, "Could not transition to ACPI mode.\n"));
+		return_ACPI_STATUS (status);
 	}
 
-	return (status);
+	ACPI_DEBUG_PRINT ((ACPI_DB_OK, "Transition to ACPI mode successful\n"));
+
+	return_ACPI_STATUS (status);
 }
 
 
@@ -89,24 +97,28 @@ acpi_enable (void)
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_disable (void)
 {
-	ACPI_STATUS             status;
+	acpi_status             status;
+
+
+	FUNCTION_TRACE ("Acpi_disable");
 
 
 	/* Ensure that ACPI has been initialized */
 
 	ACPI_IS_INITIALIZATION_COMPLETE (status);
 	if (ACPI_FAILURE (status)) {
-		return (status);
+		return_ACPI_STATUS (status);
 	}
 
 	/* Restore original mode  */
 
 	status = acpi_hw_set_mode (acpi_gbl_original_mode);
 	if (ACPI_FAILURE (status)) {
-		return (status);
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unable to transition to original mode"));
+		return_ACPI_STATUS (status);
 	}
 
 	/* Unload the SCI interrupt handler  */
@@ -114,7 +126,7 @@ acpi_disable (void)
 	acpi_ev_remove_sci_handler ();
 	acpi_ev_restore_acpi_state ();
 
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 
@@ -131,20 +143,23 @@ acpi_disable (void)
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_enable_event (
 	u32                     event,
 	u32                     type)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 	u32                     register_id;
+
+
+	FUNCTION_TRACE ("Acpi_enable_event");
 
 
 	/* Ensure that ACPI has been initialized */
 
 	ACPI_IS_INITIALIZATION_COMPLETE (status);
 	if (ACPI_FAILURE (status)) {
-		return (status);
+		return_ACPI_STATUS (status);
 	}
 
 	/* The Type must be either Fixed Acpi_event or GPE */
@@ -177,7 +192,7 @@ acpi_enable_event (
 			break;
 
 		default:
-			return (AE_BAD_PARAMETER);
+			return_ACPI_STATUS (AE_BAD_PARAMETER);
 			break;
 		}
 
@@ -185,11 +200,12 @@ acpi_enable_event (
 		 * Enable the requested fixed event (by writing a one to the
 		 * enable register bit)
 		 */
-
 		acpi_hw_register_bit_access (ACPI_WRITE, ACPI_MTX_LOCK, register_id, 1);
 
 		if (1 != acpi_hw_register_bit_access(ACPI_READ, ACPI_MTX_LOCK, register_id)) {
-			return (AE_NO_HARDWARE_RESPONSE);
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+				"Fixed event bit clear when it should be set\n"));
+			return_ACPI_STATUS (AE_NO_HARDWARE_RESPONSE);
 		}
 
 		break;
@@ -201,7 +217,7 @@ acpi_enable_event (
 
 		if ((event > ACPI_GPE_MAX) ||
 			(acpi_gbl_gpe_valid[event] == ACPI_GPE_INVALID)) {
-			return (AE_BAD_PARAMETER);
+			return_ACPI_STATUS (AE_BAD_PARAMETER);
 		}
 
 
@@ -217,7 +233,7 @@ acpi_enable_event (
 	}
 
 
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 
@@ -234,20 +250,23 @@ acpi_enable_event (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_disable_event (
 	u32                     event,
 	u32                     type)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 	u32                     register_id;
+
+
+	FUNCTION_TRACE ("Acpi_disable_event");
 
 
 	/* Ensure that ACPI has been initialized */
 
 	ACPI_IS_INITIALIZATION_COMPLETE (status);
 	if (ACPI_FAILURE (status)) {
-		return (status);
+		return_ACPI_STATUS (status);
 	}
 
 	/* The Type must be either Fixed Acpi_event or GPE */
@@ -280,7 +299,7 @@ acpi_disable_event (
 			break;
 
 		default:
-			return (AE_BAD_PARAMETER);
+			return_ACPI_STATUS (AE_BAD_PARAMETER);
 			break;
 		}
 
@@ -288,11 +307,12 @@ acpi_disable_event (
 		 * Disable the requested fixed event (by writing a zero to the
 		 * enable register bit)
 		 */
-
 		acpi_hw_register_bit_access (ACPI_WRITE, ACPI_MTX_LOCK, register_id, 0);
 
 		if (0 != acpi_hw_register_bit_access(ACPI_READ, ACPI_MTX_LOCK, register_id)) {
-			return (AE_NO_HARDWARE_RESPONSE);
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+				"Fixed event bit set when it should be clear,\n"));
+			return_ACPI_STATUS (AE_NO_HARDWARE_RESPONSE);
 		}
 
 		break;
@@ -304,7 +324,7 @@ acpi_disable_event (
 
 		if ((event > ACPI_GPE_MAX) ||
 			(acpi_gbl_gpe_valid[event] == ACPI_GPE_INVALID)) {
-			return (AE_BAD_PARAMETER);
+			return_ACPI_STATUS (AE_BAD_PARAMETER);
 		}
 
 		/* Disable the requested GPE number */
@@ -317,7 +337,7 @@ acpi_disable_event (
 		status = AE_BAD_PARAMETER;
 	}
 
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 
@@ -334,20 +354,23 @@ acpi_disable_event (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_clear_event (
 	u32                     event,
 	u32                     type)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 	u32                     register_id;
+
+
+	FUNCTION_TRACE ("Acpi_clear_event");
 
 
 	/* Ensure that ACPI has been initialized */
 
 	ACPI_IS_INITIALIZATION_COMPLETE (status);
 	if (ACPI_FAILURE (status)) {
-		return (status);
+		return_ACPI_STATUS (status);
 	}
 
 	/* The Type must be either Fixed Acpi_event or GPE */
@@ -380,7 +403,7 @@ acpi_clear_event (
 			break;
 
 		default:
-			return (AE_BAD_PARAMETER);
+			return_ACPI_STATUS (AE_BAD_PARAMETER);
 			break;
 		}
 
@@ -388,7 +411,6 @@ acpi_clear_event (
 		 * Clear the requested fixed event (By writing a one to the
 		 * status register bit)
 		 */
-
 		acpi_hw_register_bit_access (ACPI_WRITE, ACPI_MTX_LOCK, register_id, 1);
 		break;
 
@@ -399,7 +421,7 @@ acpi_clear_event (
 
 		if ((event > ACPI_GPE_MAX) ||
 			(acpi_gbl_gpe_valid[event] == ACPI_GPE_INVALID)) {
-			return (AE_BAD_PARAMETER);
+			return_ACPI_STATUS (AE_BAD_PARAMETER);
 		}
 
 
@@ -412,7 +434,7 @@ acpi_clear_event (
 		status = AE_BAD_PARAMETER;
 	}
 
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 
@@ -432,25 +454,28 @@ acpi_clear_event (
  ******************************************************************************/
 
 
-ACPI_STATUS
+acpi_status
 acpi_get_event_status (
 	u32                     event,
 	u32                     type,
-	ACPI_EVENT_STATUS       *event_status)
+	acpi_event_status       *event_status)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 	u32                     register_id;
+
+
+	FUNCTION_TRACE ("Acpi_get_event_status");
 
 
 	/* Ensure that ACPI has been initialized */
 
 	ACPI_IS_INITIALIZATION_COMPLETE (status);
 	if (ACPI_FAILURE (status)) {
-		return (status);
+		return_ACPI_STATUS (status);
 	}
 
 	if (!event_status) {
-		return (AE_BAD_PARAMETER);
+		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
 
@@ -484,7 +509,7 @@ acpi_get_event_status (
 			break;
 
 		default:
-			return (AE_BAD_PARAMETER);
+			return_ACPI_STATUS (AE_BAD_PARAMETER);
 			break;
 		}
 
@@ -500,7 +525,7 @@ acpi_get_event_status (
 
 		if ((event > ACPI_GPE_MAX) ||
 			(acpi_gbl_gpe_valid[event] == ACPI_GPE_INVALID)) {
-			return (AE_BAD_PARAMETER);
+			return_ACPI_STATUS (AE_BAD_PARAMETER);
 		}
 
 
@@ -514,7 +539,6 @@ acpi_get_event_status (
 		status = AE_BAD_PARAMETER;
 	}
 
-
-	return (status);
+	return_ACPI_STATUS (status);
 }
 

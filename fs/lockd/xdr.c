@@ -91,6 +91,7 @@ nlm_decode_fh(u32 *p, struct nfs_fh *f)
 		return NULL;
 	}
 	f->size = NFS2_FHSIZE;
+	memset(f->data, 0, sizeof(f->data));
 	memcpy(f->data, p, NFS2_FHSIZE);
 	return p + XDR_QUADLEN(NFS2_FHSIZE);
 }

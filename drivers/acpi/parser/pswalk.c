@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: pswalk - Parser routines to walk parsed op tree(s)
- *              $Revision: 55 $
+ *              $Revision: 56 $
  *
  *****************************************************************************/
 
@@ -49,16 +49,19 @@
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ps_get_next_walk_op (
-	ACPI_WALK_STATE         *walk_state,
-	ACPI_PARSE_OBJECT       *op,
-	ACPI_PARSE_UPWARDS      ascending_callback)
+	acpi_walk_state         *walk_state,
+	acpi_parse_object       *op,
+	acpi_parse_upwards      ascending_callback)
 {
-	ACPI_PARSE_OBJECT       *next;
-	ACPI_PARSE_OBJECT       *parent;
-	ACPI_PARSE_OBJECT       *grand_parent;
-	ACPI_STATUS             status;
+	acpi_parse_object       *next;
+	acpi_parse_object       *parent;
+	acpi_parse_object       *grand_parent;
+	acpi_status             status;
+
+
+	FUNCTION_TRACE_PTR ("Ps_get_next_walk_op", op);
 
 
 	/* Check for a argument only if we are descending in the tree */
@@ -74,7 +77,7 @@ acpi_ps_get_next_walk_op (
 			walk_state->next_op     = next;
 			walk_state->next_op_info = NEXT_OP_DOWNWARD;
 
-			return (AE_OK);
+			return_ACPI_STATUS (AE_OK);
 		}
 
 
@@ -82,7 +85,6 @@ acpi_ps_get_next_walk_op (
 		 * No more children, this Op is complete.  Save Next and Parent
 		 * in case the Op object gets deleted by the callback routine
 		 */
-
 		next    = op->next;
 		parent  = op->parent;
 
@@ -97,14 +99,13 @@ acpi_ps_get_next_walk_op (
 			walk_state->prev_op     = op;
 			walk_state->next_op     = NULL;
 
-			return (status);
+			return_ACPI_STATUS (status);
 		}
 
 		/*
 		 * Check for a sibling to the current op.  A sibling means
 		 * we are still going "downward" in the tree.
 		 */
-
 		if (next) {
 			/* There is a sibling, it will be next */
 
@@ -114,9 +115,8 @@ acpi_ps_get_next_walk_op (
 
 			/* Continue downward */
 
-			return (status);
+			return_ACPI_STATUS (status);
 		}
-
 
 		/*
 		 * Drop into the loop below because we are moving upwards in
@@ -129,7 +129,6 @@ acpi_ps_get_next_walk_op (
 		 * We are resuming a walk, and we were (are) going upward in the tree.
 		 * So, we want to drop into the parent loop below.
 		 */
-
 		parent = op;
 	}
 
@@ -156,7 +155,7 @@ acpi_ps_get_next_walk_op (
 			walk_state->prev_op     = parent;
 			walk_state->next_op     = NULL;
 
-			return (status);
+			return_ACPI_STATUS (status);
 		}
 
 		/*
@@ -170,7 +169,7 @@ acpi_ps_get_next_walk_op (
 			walk_state->next_op     = next;
 			walk_state->next_op_info = NEXT_OP_DOWNWARD;
 
-			return (status);
+			return_ACPI_STATUS (status);
 		}
 
 		/* No siblings, no errors, just move up one more level in the tree */
@@ -186,7 +185,7 @@ acpi_ps_get_next_walk_op (
 
 	walk_state->next_op     = NULL;
 
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -205,10 +204,10 @@ acpi_ps_get_next_walk_op (
  *
  ******************************************************************************/
 
-static ACPI_STATUS
+static acpi_status
 acpi_ps_delete_completed_op (
-	ACPI_WALK_STATE         *state,
-	ACPI_PARSE_OBJECT       *op)
+	acpi_walk_state         *state,
+	acpi_parse_object       *op)
 {
 
 	acpi_ps_free_op (op);
@@ -230,14 +229,17 @@ acpi_ps_delete_completed_op (
 
 void
 acpi_ps_delete_parse_tree (
-	ACPI_PARSE_OBJECT       *subtree_root)
+	acpi_parse_object       *subtree_root)
 {
-	ACPI_WALK_STATE         *walk_state;
-	ACPI_WALK_LIST          walk_list;
+	acpi_walk_state         *walk_state;
+	acpi_walk_list          walk_list;
+
+
+	FUNCTION_TRACE_PTR ("Ps_delete_parse_tree", subtree_root);
 
 
 	if (!subtree_root) {
-		return;
+		return_VOID;
 	}
 
 	/* Create and initialize a new walk list */
@@ -248,7 +250,7 @@ acpi_ps_delete_parse_tree (
 
 	walk_state = acpi_ds_create_walk_state (TABLE_ID_DSDT, NULL, NULL, &walk_list);
 	if (!walk_state) {
-		return;
+		return_VOID;
 	}
 
 	walk_state->parser_state        = NULL;
@@ -274,10 +276,10 @@ acpi_ps_delete_parse_tree (
 
 	/* We are done with this walk */
 
-	acpi_ex_release_all_mutexes ((ACPI_OPERAND_OBJECT *) &walk_list.acquired_mutex_list);
+	acpi_ex_release_all_mutexes ((acpi_operand_object *) &walk_list.acquired_mutex_list);
 	acpi_ds_delete_walk_state (walk_state);
 
-	return;
+	return_VOID;
 }
 
 

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: psxface - Parser external interfaces
- *              $Revision: 44 $
+ *              $Revision: 47 $
  *
  *****************************************************************************/
 
@@ -36,7 +36,7 @@
 	 MODULE_NAME         ("psxface")
 
 
-/*****************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_psx_execute
  *
@@ -52,36 +52,39 @@
  *
  * DESCRIPTION: Execute a control method
  *
- ****************************************************************************/
+ ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_psx_execute (
-	ACPI_NAMESPACE_NODE     *method_node,
-	ACPI_OPERAND_OBJECT     **params,
-	ACPI_OPERAND_OBJECT     **return_obj_desc)
+	acpi_namespace_node     *method_node,
+	acpi_operand_object     **params,
+	acpi_operand_object     **return_obj_desc)
 {
-	ACPI_STATUS             status;
-	ACPI_OPERAND_OBJECT     *obj_desc;
+	acpi_status             status;
+	acpi_operand_object     *obj_desc;
 	u32                     i;
-	ACPI_PARSE_OBJECT       *op;
+	acpi_parse_object       *op;
+
+
+	FUNCTION_TRACE ("Psx_execute");
 
 
 	/* Validate the Node and get the attached object */
 
 	if (!method_node) {
-		return (AE_NULL_ENTRY);
+		return_ACPI_STATUS (AE_NULL_ENTRY);
 	}
 
 	obj_desc = acpi_ns_get_attached_object (method_node);
 	if (!obj_desc) {
-		return (AE_NULL_OBJECT);
+		return_ACPI_STATUS (AE_NULL_OBJECT);
 	}
 
 	/* Init for new method, wait on concurrency semaphore */
 
 	status = acpi_ds_begin_method_execution (method_node, obj_desc, NULL);
 	if (ACPI_FAILURE (status)) {
-		return (status);
+		return_ACPI_STATUS (status);
 	}
 
 	if (params) {
@@ -89,7 +92,6 @@ acpi_psx_execute (
 		 * The caller "owns" the parameters, so give each one an extra
 		 * reference
 		 */
-
 		for (i = 0; params[i]; i++) {
 			acpi_ut_add_reference (params[i]);
 		}
@@ -99,12 +101,15 @@ acpi_psx_execute (
 	 * Perform the first pass parse of the method to enter any
 	 * named objects that it creates into the namespace
 	 */
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
+		"**** Begin Method Execution **** Entry=%p obj=%p\n",
+		method_node, obj_desc));
 
 	/* Create and init a Root Node */
 
 	op = acpi_ps_alloc_op (AML_SCOPE_OP);
 	if (!op) {
-		return (AE_NO_MEMORY);
+		return_ACPI_STATUS (AE_NO_MEMORY);
 	}
 
 	status = acpi_ps_parse_aml (op, obj_desc->method.pcode,
@@ -118,7 +123,7 @@ acpi_psx_execute (
 
 	op = acpi_ps_alloc_op (AML_SCOPE_OP);
 	if (!op) {
-		return (AE_NO_MEMORY);
+		return_ACPI_STATUS (AE_NO_MEMORY);
 	}
 
 
@@ -147,17 +152,19 @@ acpi_psx_execute (
 
 
 	/*
-	 * Normal exit is with Status == AE_RETURN_VALUE when a Return_op has been
-	 * executed, or with Status == AE_PENDING at end of AML block (end of
-	 * Method code)
+	 * If the method has returned an object, signal this to the caller with
+	 * a control exception code
 	 */
-
 	if (*return_obj_desc) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Method returned Obj_desc=%X\n",
+			*return_obj_desc));
+		DUMP_STACK_ENTRY (*return_obj_desc);
+
 		status = AE_CTRL_RETURN_VALUE;
 	}
 
 
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 

@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exxface - External interpreter interfaces
- *              $Revision: 27 $
+ *              $Revision: 29 $
  *
  *****************************************************************************/
 
@@ -32,6 +32,7 @@
 #define _COMPONENT          ACPI_EXECUTER
 	 MODULE_NAME         ("exxface")
 
+#if 0
 
 /*
  * DEFINE_AML_GLOBALS is tested in amlcode.h
@@ -69,30 +70,33 @@
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_execute_method (
-	ACPI_NAMESPACE_NODE     *method_node,
-	ACPI_OPERAND_OBJECT     **params,
-	ACPI_OPERAND_OBJECT     **return_obj_desc)
+	acpi_namespace_node     *method_node,
+	acpi_operand_object     **params,
+	acpi_operand_object     **return_obj_desc)
 {
-	ACPI_STATUS             status;
+	acpi_status             status;
+
+
+	FUNCTION_TRACE ("Ex_execute_method");
 
 
 	/*
 	 * The point here is to lock the interpreter and call the low
 	 * level execute.
 	 */
-
 	status = acpi_ex_enter_interpreter ();
 	if (ACPI_FAILURE (status)) {
-		return (status);
+		return_ACPI_STATUS (status);
 	}
 
 	status = acpi_psx_execute (method_node, params, return_obj_desc);
 
 	acpi_ex_exit_interpreter ();
 
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 
+#endif

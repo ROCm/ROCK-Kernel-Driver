@@ -1,7 +1,7 @@
 /*****************************************************************************
  *
  * Module Name: tz.c
- *   $Revision: 38 $
+ *   $Revision: 40 $
  *
  *****************************************************************************/
 
@@ -58,6 +58,69 @@ void
 tz_print (
 	TZ_CONTEXT		*thermal_zone)
 {
+#ifdef ACPI_DEBUG
+	acpi_buffer		buffer;
+	u32			i,j = 0;
+	TZ_THRESHOLD            *threshold = NULL;
+
+	PROC_NAME("tz_print");
+
+	if (!thermal_zone) {
+		return;
+	}
+
+	buffer.length = 256;
+	buffer.pointer = acpi_os_callocate(buffer.length);
+	if (!buffer.pointer) {
+		return;
+	}
+
+	/*
+	 * Get the full pathname for this ACPI object.
+	 */
+	acpi_get_name(thermal_zone->acpi_handle, ACPI_FULL_PATHNAME, &buffer);
+
+	/*
+	 * Print out basic thermal zone information.
+	 */
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "+------------------------------------------------------------\n"));
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "| Thermal_zone[%02x]:[%p] %s\n", thermal_zone->device_handle, thermal_zone->acpi_handle, buffer.pointer));
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "|   temperature[%d] state[%08x]\n", thermal_zone->policy.temperature, thermal_zone->policy.state));
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "|   cooling_mode[%08x] polling_freq[%d]\n", thermal_zone->policy.cooling_mode, thermal_zone->policy.polling_freq));
+
+	for (i=0; i<thermal_zone->policy.threshold_list.count; i++) {
+
+		threshold = &(thermal_zone->policy.threshold_list.thresholds[i]);
+
+		switch (threshold->type) {
+		case TZ_THRESHOLD_CRITICAL:
+			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "|   critical[%d]\n", threshold->temperature));
+			break;
+		case TZ_THRESHOLD_PASSIVE:
+			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "|   passive[%d]: tc1[%d] tc2[%d] tsp[%d]\n", threshold->temperature, thermal_zone->policy.passive.tc1, thermal_zone->policy.passive.tc2, thermal_zone->policy.passive.tsp));
+			break;
+		case TZ_THRESHOLD_ACTIVE:
+			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "|   active[%d]: index[%d]\n", threshold->temperature, threshold->index));
+			break;
+		default:
+			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "|   unknown[%d]\n", threshold->temperature));
+			break;
+		}
+
+		if (threshold->cooling_devices.count > 0) {
+			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "|     cooling_devices"));
+			for (j=0; (j<threshold->cooling_devices.count && j<10); j++) {
+				ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "[%02x]", threshold->cooling_devices.handles[j]));
+			}
+			
+			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "\n"));
+		}
+	}
+
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "+------------------------------------------------------------\n"));
+
+	acpi_os_free(buffer.pointer);
+#endif /*ACPI_DEBUG*/
 
 	return;
 }
@@ -75,15 +138,17 @@ tz_print (
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 tz_get_temperature (
 	TZ_CONTEXT              *thermal_zone,
 	u32                     *temperature)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
+
+	FUNCTION_TRACE("tz_get_temperature");
 
 	if (!thermal_zone || !temperature) {
-		return(AE_BAD_PARAMETER);
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
 	/*
@@ -92,7 +157,7 @@ tz_get_temperature (
 	status = bm_evaluate_simple_integer(thermal_zone->acpi_handle,
 		"_TMP", temperature);
 
-	return(status);
+	return_ACPI_STATUS(status);
 }
 
 
@@ -108,29 +173,31 @@ tz_get_temperature (
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 tz_set_cooling_preference (
 	TZ_CONTEXT              *thermal_zone,
 	TZ_COOLING_MODE         cooling_mode)
 {
-	ACPI_STATUS             status = AE_OK;
-	ACPI_OBJECT_LIST        arg_list;
-	ACPI_OBJECT             arg0;
+	acpi_status             status = AE_OK;
+	acpi_object_list        arg_list;
+	acpi_object             arg0;
+
+	FUNCTION_TRACE("tz_set_cooling_preference");
 
 	if (!thermal_zone || ((cooling_mode != TZ_COOLING_MODE_ACTIVE) &&
 		(cooling_mode != TZ_COOLING_MODE_PASSIVE))) {
-		return(AE_BAD_PARAMETER);
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
 	/*
 	 * Build the argument list, which simply consists of the current
 	 * cooling preference.
 	 */
-	MEMSET(&arg_list, 0, sizeof(ACPI_OBJECT));
+	MEMSET(&arg_list, 0, sizeof(acpi_object));
 	arg_list.count = 1;
 	arg_list.pointer = &arg0;
 
-	MEMSET(&arg0, 0, sizeof(ACPI_OBJECT));
+	MEMSET(&arg0, 0, sizeof(acpi_object));
 	arg0.type = ACPI_TYPE_INTEGER;
 	arg0.integer.value = cooling_mode;
 
@@ -140,7 +207,7 @@ tz_set_cooling_preference (
 	status = acpi_evaluate_object(thermal_zone->acpi_handle, "_SCP",
 		&arg_list, NULL);
 
-	return(status);
+	return_ACPI_STATUS(status);
 }
 
 
@@ -156,15 +223,17 @@ tz_set_cooling_preference (
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 tz_get_single_threshold (
 	TZ_CONTEXT              *thermal_zone,
 	TZ_THRESHOLD            *threshold)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
+
+	FUNCTION_TRACE("tz_get_single_threshold");
 
 	if (!thermal_zone || !threshold) {
-		return(AE_BAD_PARAMETER);
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
 	switch (threshold->type) {
@@ -229,7 +298,7 @@ tz_get_single_threshold (
 		break;
 	}
 
-	return(status);
+	return_ACPI_STATUS(status);
 }
 
 
@@ -240,7 +309,7 @@ tz_get_single_threshold (
  * PARAMETERS:  thermal_zone          - Identifies the thermal zone to parse.
  *              buffer      - Output buffer.
  *
- * RETURN:      ACPI_STATUS result code.
+ * RETURN:      acpi_status result code.
  *
  * DESCRIPTION: Builds a TZ_THRESHOLD_LIST structure containing information
  *              on all thresholds for a given thermal zone.
@@ -250,21 +319,23 @@ tz_get_single_threshold (
  *              This simplifies parsing of thresholds by allowing a maximum
  *              threshold list size to be computed (and enforced) -- which
  *              allows all thresholds to be parsed in a single pass (since
- *              memory must be contiguous when returned in the ACPI_BUFFER).
+ *              memory must be contiguous when returned in the acpi_buffer).
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 tz_get_thresholds (
 	TZ_CONTEXT              *thermal_zone,
 	TZ_THRESHOLD_LIST       *threshold_list)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 	TZ_THRESHOLD            *threshold = NULL;
 	u32                     i = 0;
 
+	FUNCTION_TRACE("tz_get_thresholds");
+
 	if (!thermal_zone || !threshold_list) {
-		return(AE_BAD_PARAMETER);
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
 	threshold_list->count = 0;
@@ -282,7 +353,7 @@ tz_get_thresholds (
 		(threshold_list->count)++;
 	}
 	else {
-		return(status);
+		return_ACPI_STATUS(status);
 	}
 
 
@@ -323,7 +394,7 @@ tz_get_thresholds (
 		}
 	}
 
-	return(AE_OK);
+	return_ACPI_STATUS(AE_OK);
 }
 
 
@@ -339,19 +410,24 @@ tz_get_thresholds (
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 tz_add_device (
 	BM_HANDLE               device_handle,
 	void                    **context)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 	TZ_CONTEXT              *thermal_zone = NULL;
 	BM_DEVICE		*device = NULL;
-	ACPI_HANDLE             tmp_handle = NULL;
+	acpi_handle             tmp_handle = NULL;
 	static u32		zone_count = 0;
 
+	FUNCTION_TRACE("tz_add_device");
+
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Adding thermal zone [%02x].\n", device_handle));
+
 	if (!context || *context) {
-		return(AE_BAD_PARAMETER);
+		ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Invalid context for device [%02x].\n", device_handle));
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
 	/*
@@ -359,7 +435,7 @@ tz_add_device (
 	 */
 	status = bm_get_device_info(device_handle, &device);
 	if (ACPI_FAILURE(status)) {
-		return(status);
+		return_ACPI_STATUS(status);
 	}
 
 	/*
@@ -410,7 +486,7 @@ end:
 		acpi_os_free(thermal_zone);
 	}
 
-	return(status);
+	return_ACPI_STATUS(status);
 }
 
 
@@ -426,18 +502,22 @@ end:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 tz_remove_device (
 	void			**context)
 {
-	ACPI_STATUS		status = AE_OK;
+	acpi_status		status = AE_OK;
 	TZ_CONTEXT		*thermal_zone = NULL;
 
+	FUNCTION_TRACE("tz_remove_device");
+
 	if (!context || !*context) {
-		return(AE_BAD_PARAMETER);
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
 	thermal_zone = (TZ_CONTEXT*)(*context);
+
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Removing thermal zone [%02x].\n", thermal_zone->device_handle));
 
 	status = tz_osl_remove_device(thermal_zone);
 
@@ -448,12 +528,12 @@ tz_remove_device (
 	 */
 	status = tz_policy_remove_device(thermal_zone);
 	if (ACPI_FAILURE(status)) {
-		return(status);
+		return_ACPI_STATUS(status);
 	}
 
 	acpi_os_free(thermal_zone);
 
-	return(status);
+	return_ACPI_STATUS(status);
 }
 
 
@@ -473,12 +553,14 @@ tz_remove_device (
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 tz_initialize (void)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 	BM_DEVICE_ID		criteria;
 	BM_DRIVER		driver;
+
+	FUNCTION_TRACE("tz_initialize");
 
 	MEMSET(&criteria, 0, sizeof(BM_DEVICE_ID));
 	MEMSET(&driver, 0, sizeof(BM_DRIVER));
@@ -493,7 +575,7 @@ tz_initialize (void)
 
 	status = bm_register_driver(&criteria, &driver);
 
-	return(status);
+	return_ACPI_STATUS(status);
 }
 
 
@@ -509,12 +591,14 @@ tz_initialize (void)
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 tz_terminate (void)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 	BM_DEVICE_ID		criteria;
 	BM_DRIVER		driver;
+
+	FUNCTION_TRACE("tz_terminate");
 
 	MEMSET(&criteria, 0, sizeof(BM_DEVICE_ID));
 	MEMSET(&driver, 0, sizeof(BM_DRIVER));
@@ -529,7 +613,7 @@ tz_terminate (void)
 
 	status = bm_unregister_driver(&criteria, &driver);
 
-	return(status);
+	return_ACPI_STATUS(status);
 }
 
 
@@ -544,17 +628,19 @@ tz_terminate (void)
  * DESCRIPTION:
  *
  ****************************************************************************/
-ACPI_STATUS
+acpi_status
 tz_notify (
 	BM_NOTIFY               notify_type,
 	BM_HANDLE               device_handle,
 	void                    **context)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 	TZ_CONTEXT		*thermal_zone = NULL;
 
+	FUNCTION_TRACE("tz_notify");
+
 	if (!context) {
-		return(AE_BAD_PARAMETER);
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
 	thermal_zone = (TZ_CONTEXT*)*context;
@@ -570,6 +656,7 @@ tz_notify (
 		break;
 
 	case TZ_NOTIFY_TEMPERATURE_CHANGE:
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Temperature (_TMP) change event detected.\n"));
 		/* -------------------------------------------- */
 		/* TBD: Remove when policy moves to user-mode. */
 		tz_policy_check(*context);
@@ -583,6 +670,7 @@ tz_notify (
 		break;
 
 	case TZ_NOTIFY_THRESHOLD_CHANGE:
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Threshold (_SCP) change event detected.\n"));
 		/* -------------------------------------------- */
 		/* TBD: Remove when policy moves to user-mode. */
 		status = tz_policy_remove_device(thermal_zone);
@@ -594,6 +682,7 @@ tz_notify (
 		break;
 
 	case TZ_NOTIFY_DEVICE_LISTS_CHANGE:
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Device lists (_ALx, _PSL, _TZD) change event detected.\n"));
 		/* -------------------------------------------- */
 		/* TBD: Remove when policy moves to user-mode. */
 		status = tz_policy_remove_device(thermal_zone);
@@ -609,7 +698,7 @@ tz_notify (
 		break;
 	}
 
-	return(status);
+	return_ACPI_STATUS(status);
 }
 
 
@@ -625,19 +714,21 @@ tz_notify (
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 tz_request (
 	BM_REQUEST		*request,
 	void                    *context)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 	TZ_CONTEXT              *thermal_zone = NULL;
+
+	FUNCTION_TRACE("tz_request");
 
 	/*
 	 * Must have a valid request structure and context.
 	 */
 	if (!request || !context) {
-		return(AE_BAD_PARAMETER);
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
 	thermal_zone = (TZ_CONTEXT*)context;
@@ -655,5 +746,5 @@ tz_request (
 
 	request->status = status;
 
-	return(status);
+	return_ACPI_STATUS(status);
 }

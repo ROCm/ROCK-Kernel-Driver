@@ -1,6 +1,5 @@
 #
 # Makefile for the Linux ACPI interpreter
-# (It's a mess, but it's all here for a reason.)
 # 
 
 O_TARGET := acpi.o
@@ -22,9 +21,12 @@ acpi-subdirs := utilities dispatcher events hardware \
 		executer namespace parser resources tables
 
 ifdef CONFIG_ACPI_DEBUG
-  ACPI_CFLAGS += -DACPI_DEBUG -Wno-unused #-DENABLE_DEBUGGER
+  ACPI_CFLAGS += -DACPI_DEBUG -Wno-unused
+endif
 
-  #acpi-subdirs += debugger
+ifdef CONFIG_ACPI_DEBUGGER
+  ACPI_CFLAGS += -DENABLE_DEBUGGER
+  acpi-subdirs += debugger
 endif
 
 EXTRA_CFLAGS += $(ACPI_CFLAGS)

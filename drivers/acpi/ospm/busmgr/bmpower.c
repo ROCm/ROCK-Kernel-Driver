@@ -1,7 +1,7 @@
 /****************************************************************************
  *
  * Module Name: bmpower.c - Driver for ACPI Power Resource 'devices'
- *   $Revision: 14 $
+ *   $Revision: 19 $
  *
  ****************************************************************************/
 
@@ -25,7 +25,7 @@
 
 /*
  * TBD: 1. Sequencing of power resource list transitions.
- *	2. Global serialization of power resource transtions (see ACPI 
+ *	2. Global serialization of power resource transtions (see ACPI
  *         spec section 7.1.2/7.1.3).
  *      3. Better error handling.
  */
@@ -44,13 +44,13 @@
  *                             Function Prototypes
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bm_pr_notify (
 	BM_NOTIFY               notify_type,
 	BM_HANDLE               device_handle,
 	void                    **context);
 	
-ACPI_STATUS
+acpi_status
 bm_pr_request (
 	BM_REQUEST		*request,
 	void                    *context);
@@ -64,19 +64,21 @@ bm_pr_request (
  *
  * FUNCTION:    bm_pr_print
  *
- * PARAMETERS:  
+ * PARAMETERS:
  *
- * RETURN:      
+ * RETURN:
  *
- * DESCRIPTION: 
+ * DESCRIPTION:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bm_pr_print (
 	BM_POWER_RESOURCE	*pr)
 {
-	ACPI_BUFFER             buffer;
+	acpi_buffer             buffer;
+
+	PROC_NAME("bm_pr_print");
 
 	if (!pr) {
 		return(AE_BAD_PARAMETER);
@@ -92,11 +94,11 @@ bm_pr_print (
 
 	acpi_os_printf("Power Resource: found\n");
 
-	DEBUG_PRINT_RAW(ACPI_INFO, ("+------------------------------------------------------------\n"));
-	DEBUG_PRINT_RAW(ACPI_INFO, ("| PowerResource[%02x]:[%p] %s\n", pr->device_handle, pr->acpi_handle, buffer.pointer));
-	DEBUG_PRINT_RAW(ACPI_INFO, ("|   system_level[S%d] resource_order[%d]\n", pr->system_level, pr->resource_order));
-	DEBUG_PRINT_RAW(ACPI_INFO, ("|   state[D%d] reference_count[%d]\n", pr->state, pr->reference_count));
-	DEBUG_PRINT_RAW(ACPI_INFO, ("+------------------------------------------------------------\n"));
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "+------------------------------------------------------------\n"));
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "| Power_resource[%02x]:[%p] %s\n", pr->device_handle, pr->acpi_handle, buffer.pointer));
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "|   system_level[S%d] resource_order[%d]\n", pr->system_level, pr->resource_order));
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "|   state[D%d] reference_count[%d]\n", pr->state, pr->reference_count));
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "+------------------------------------------------------------\n"));
 
 	acpi_os_free(buffer.pointer);
 
@@ -108,19 +110,19 @@ bm_pr_print (
  *
  * FUNCTION:    bm_pr_get_state
  *
- * PARAMETERS:  
+ * PARAMETERS:
  *
- * RETURN:      
+ * RETURN:
  *
- * DESCRIPTION: 
+ * DESCRIPTION:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bm_pr_get_state (
 	BM_POWER_RESOURCE	*pr)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 	BM_DEVICE_STATUS        device_status = BM_STATUS_UNKNOWN;
 
 	FUNCTION_TRACE("bm_pr_get_state");
@@ -131,7 +133,7 @@ bm_pr_get_state (
 
 	pr->state = ACPI_STATE_UNKNOWN;
 
-	/* 
+	/*
 	 * Evaluate _STA:
 	 * --------------
 	 * Evalute _STA to determine whether the power resource is ON or OFF.
@@ -140,21 +142,21 @@ bm_pr_get_state (
 	 */
 	status = bm_get_device_status(pr->device_handle, &device_status);
 	if (ACPI_FAILURE(status)) {
-		DEBUG_PRINT(ACPI_ERROR, ("Error reading status for power resource [%02x].\n", pr->device_handle));
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Error reading status for power resource [%02x].\n", pr->device_handle));
 		return_ACPI_STATUS(status);
 	}
 
 	/*
-	 * Mask off all bits but the first as some systems return non-standard 
+	 * Mask off all bits but the first as some systems return non-standard
 	 * values (e.g. 0x51).
 	 */
 	switch (device_status & 0x01) {
 	case 0:
-		DEBUG_PRINT(ACPI_INFO, ("Power resource [%02x] is OFF.\n", pr->device_handle));
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Power resource [%02x] is OFF.\n", pr->device_handle));
 		pr->state = ACPI_STATE_D3;
 		break;
 	case 1:
-		DEBUG_PRINT(ACPI_INFO, ("Power resource [%02x] is ON.\n", pr->device_handle));
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Power resource [%02x] is ON.\n", pr->device_handle));
 		pr->state = ACPI_STATE_D0;
 		break;
 	}
@@ -167,20 +169,20 @@ bm_pr_get_state (
  *
  * FUNCTION:    bm_pr_set_state
  *
- * PARAMETERS:  
+ * PARAMETERS:
  *
- * RETURN:      
+ * RETURN:
  *
- * DESCRIPTION: 
+ * DESCRIPTION:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bm_pr_set_state (
 	BM_POWER_RESOURCE	*pr,
 	BM_POWER_STATE          target_state)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 
 	FUNCTION_TRACE("bm_pr_set_state");
 
@@ -194,19 +196,19 @@ bm_pr_set_state (
 	}
 
 	if (target_state == pr->state) {
-		DEBUG_PRINT(ACPI_INFO, ("Power resource [%02x] already at target power state [D%d].\n", pr->device_handle, pr->state));
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Power resource [%02x] already at target power state [D%d].\n", pr->device_handle, pr->state));
 		return_ACPI_STATUS(AE_OK);
 	}
 
 	switch (target_state) {
 
 	case ACPI_STATE_D0:
-		DEBUG_PRINT(ACPI_INFO, ("Turning power resource [%02x] ON.\n", pr->device_handle));
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Turning power resource [%02x] ON.\n", pr->device_handle));
 		status = bm_evaluate_object(pr->acpi_handle, "_ON", NULL, NULL);
 		break;
 
 	case ACPI_STATE_D3:
-		DEBUG_PRINT(ACPI_INFO, ("Turning power resource [%02x] OFF.\n", pr->device_handle));
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Turning power resource [%02x] OFF.\n", pr->device_handle));
 		status = bm_evaluate_object(pr->acpi_handle, "_OFF", NULL, NULL);
 		break;
 
@@ -228,20 +230,20 @@ bm_pr_set_state (
  *
  * FUNCTION:    bm_pr_list_get_state
  *
- * PARAMETERS:  
+ * PARAMETERS:
  *
- * RETURN:      
+ * RETURN:
  *
- * DESCRIPTION: 
+ * DESCRIPTION:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bm_pr_list_get_state (
 	BM_HANDLE_LIST          *pr_list,
 	BM_POWER_STATE          *power_state)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 	BM_POWER_RESOURCE	*pr = NULL;
 	u32                     i = 0;
 
@@ -263,7 +265,7 @@ bm_pr_list_get_state (
 	 * -----------------------------
 	 * The current state of a list of power resources is ON if all
 	 * power resources are currently in the ON state.  In other words,
-	 * if any power resource in the list is OFF then the collection 
+	 * if any power resource in the list is OFF then the collection
 	 * isn't fully ON.
 	 */
 	for (i = 0; i < pr_list->count; i++) {
@@ -271,7 +273,7 @@ bm_pr_list_get_state (
 		status = bm_get_device_context(pr_list->handles[i],
 			(BM_DRIVER_CONTEXT*)(&pr));
 		if (ACPI_FAILURE(status)) {
-			DEBUG_PRINT(ACPI_WARN, ("Invalid reference to power resource [%02x].\n", pr_list->handles[i]));
+			ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Invalid reference to power resource [%02x].\n", pr_list->handles[i]));
 			(*power_state) = ACPI_STATE_UNKNOWN;
 			break;
 		}
@@ -296,20 +298,20 @@ bm_pr_list_get_state (
  *
  * FUNCTION:    bm_pr_list_transition
  *
- * PARAMETERS:  
+ * PARAMETERS:
  *
- * RETURN:      
+ * RETURN:
  *
- * DESCRIPTION: 
+ * DESCRIPTION:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bm_pr_list_transition (
 	BM_HANDLE_LIST          *current_list,
 	BM_HANDLE_LIST          *target_list)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 	BM_POWER_RESOURCE	*pr = NULL;
 	u32                     i = 0;
 
@@ -322,16 +324,16 @@ bm_pr_list_transition (
 	/*
 	 * Reference Target:
 	 * -----------------
-	 * Reference all resources for the target power state first (so 
-	 * the device doesn't get turned off while transitioning).  Power 
+	 * Reference all resources for the target power state first (so
+	 * the device doesn't get turned off while transitioning).  Power
 	 * resources that aren't on (new reference count of 1) are turned on.
 	 */
 	for (i = 0; i < target_list->count; i++) {
 
-		status = bm_get_device_context(target_list->handles[i], 
+		status = bm_get_device_context(target_list->handles[i],
 			(BM_DRIVER_CONTEXT*)(&pr));
 		if (ACPI_FAILURE(status)) {
-			DEBUG_PRINT(ACPI_WARN, ("Invalid reference to power resource [%02x].\n", target_list->handles[i]));
+			ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Invalid reference to power resource [%02x].\n", target_list->handles[i]));
 			continue;
 		}
 
@@ -340,7 +342,7 @@ bm_pr_list_transition (
 			status = bm_pr_set_state(pr, ACPI_STATE_D0);
 			if (ACPI_FAILURE(status)) {
 				/* TBD: How do we handle this? */
-				DEBUG_PRINT(ACPI_WARN, ("Unable to change power state for power resource [%02x].\n", target_list->handles[i]));
+				ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Unable to change power state for power resource [%02x].\n", target_list->handles[i]));
 			}
 		}
 	}
@@ -349,15 +351,15 @@ bm_pr_list_transition (
 	 * Dereference Current:
 	 * --------------------
 	 * Dereference all resources for the current power state.  Power
-	 * resources no longer referenced (new reference count of 0) are 
+	 * resources no longer referenced (new reference count of 0) are
 	 * turned off.
 	 */
 	for (i = 0; i < current_list->count; i++) {
 
-		status = bm_get_device_context(current_list->handles[i], 
+		status = bm_get_device_context(current_list->handles[i],
 			(BM_DRIVER_CONTEXT*)(&pr));
 		if (ACPI_FAILURE(status)) {
-			DEBUG_PRINT(ACPI_WARN, ("Invalid reference to power resource [%02x].\n", target_list->handles[i]));
+			ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Invalid reference to power resource [%02x].\n", target_list->handles[i]));
 			continue;
 		}
 
@@ -366,7 +368,7 @@ bm_pr_list_transition (
 			status = bm_pr_set_state(pr, ACPI_STATE_D3);
 			if (ACPI_FAILURE(status)) {
 				/* TBD: How do we handle this? */
-				DEBUG_PRINT(ACPI_ERROR, ("Unable to change power state for power resource [%02x].\n", current_list->handles[i]));
+				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unable to change power state for power resource [%02x].\n", current_list->handles[i]));
 			}
 		}
 	}
@@ -379,34 +381,34 @@ bm_pr_list_transition (
  *
  * FUNCTION:    bm_pr_add_device
  *
- * PARAMETERS:  
+ * PARAMETERS:
  *
- * RETURN:      
+ * RETURN:
  *
- * DESCRIPTION: 
+ * DESCRIPTION:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bm_pr_add_device (
 	BM_HANDLE               device_handle,
 	void                    **context)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 	BM_POWER_RESOURCE	*pr = NULL;
 	BM_DEVICE		*device = NULL;
-	ACPI_BUFFER		buffer;
-	ACPI_OBJECT		acpi_object;
+	acpi_buffer		buffer;
+	acpi_object		acpi_object;
 
 	FUNCTION_TRACE("bm_pr_add_device");
 
-	DEBUG_PRINT(ACPI_INFO, ("Adding power resource [%02x].\n", device_handle));
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Adding power resource [%02x].\n", device_handle));
 
 	if (!context || *context) {
 		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
-	buffer.length = sizeof(ACPI_OBJECT);
+	buffer.length = sizeof(acpi_object);
 	buffer.pointer = &acpi_object;
 
 	/*
@@ -428,7 +430,7 @@ bm_pr_add_device (
 	pr->device_handle = device->handle;
 	pr->acpi_handle = device->acpi_handle;
 
-	/* 
+	/*
 	 * Get information on this power resource.
 	 */
 	status = acpi_evaluate_object(pr->acpi_handle, NULL, NULL, &buffer);
@@ -463,19 +465,19 @@ end:
  *
  * FUNCTION:    bm_pr_remove_device
  *
- * PARAMETERS:  
+ * PARAMETERS:
  *
- * RETURN:      
+ * RETURN:
  *
- * DESCRIPTION: 
+ * DESCRIPTION:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bm_pr_remove_device (
 	void                    **context)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 	BM_POWER_RESOURCE	*pr = NULL;
 
 	FUNCTION_TRACE("bm_pr_remove_device");
@@ -486,7 +488,7 @@ bm_pr_remove_device (
 
 	pr = (BM_POWER_RESOURCE*)*context;
 
-	DEBUG_PRINT(ACPI_INFO, ("Removing power resource [%02x].\n", pr->device_handle));
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Removing power resource [%02x].\n", pr->device_handle));
 
 	acpi_os_free(pr);
 
@@ -506,14 +508,14 @@ bm_pr_remove_device (
  *
  * RETURN:
  *
- * DESCRIPTION: 
+ * DESCRIPTION:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bm_pr_initialize (void)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 	BM_DEVICE_ID		criteria;
 	BM_DRIVER		driver;
 
@@ -537,18 +539,18 @@ bm_pr_initialize (void)
  *
  * FUNCTION:    bm_pr_terminate
  *
- * PARAMETERS:  
+ * PARAMETERS:
  *
  * RETURN:	
  *
- * DESCRIPTION: 
+ * DESCRIPTION:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bm_pr_terminate (void)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 	BM_DEVICE_ID		criteria;
 	BM_DRIVER		driver;
 
@@ -572,21 +574,21 @@ bm_pr_terminate (void)
  *
  * FUNCTION:    bm_pr_notify
  *
- * PARAMETERS:  
+ * PARAMETERS:
  *
  * RETURN:	
  *
- * DESCRIPTION: 
+ * DESCRIPTION:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bm_pr_notify (
 	BM_NOTIFY               notify_type,
 	BM_HANDLE               device_handle,
 	void                    **context)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 
 	FUNCTION_TRACE("bm_pr_notify");
 
@@ -613,20 +615,20 @@ bm_pr_notify (
  *
  * FUNCTION:    bm_pr_request
  *
- * PARAMETERS:  
+ * PARAMETERS:
  *
- * RETURN:      
+ * RETURN:
  *
- * DESCRIPTION: 
+ * DESCRIPTION:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bm_pr_request (
 	BM_REQUEST		*request,
 	void                    *context)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 	BM_POWER_RESOURCE	*pr = NULL;
 
 	FUNCTION_TRACE("bm_pr_request");
@@ -658,6 +660,5 @@ bm_pr_request (
 
 	return_ACPI_STATUS(status);
 }
-
 
 

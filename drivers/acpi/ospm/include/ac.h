@@ -56,7 +56,7 @@
 typedef struct
 {
 	BM_HANDLE		device_handle;
-	ACPI_HANDLE		acpi_handle;
+	acpi_handle		acpi_handle;
 	char			uid[9];
 	u32 			is_online;
 } AC_CONTEXT;
@@ -66,34 +66,34 @@ typedef struct
  *                              Function Prototypes
  *****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 ac_initialize (void);
 
-ACPI_STATUS
+acpi_status
 ac_terminate (void);
 
-ACPI_STATUS
+acpi_status
 ac_notify (
 	u32			notify_type,
 	u32 			device,
 	void			**context);
 
-ACPI_STATUS
+acpi_status
 ac_request(
 	BM_REQUEST		*request_info,
 	void			*context);
 
 /* AC Adapter Driver OSL */
 
-ACPI_STATUS
+acpi_status
 ac_osl_add_device (
 	AC_CONTEXT		*ac_adapter);
 
-ACPI_STATUS
+acpi_status
 ac_osl_remove_device (
 	AC_CONTEXT		*ac_adapter);
 
-ACPI_STATUS
+acpi_status
 ac_osl_generate_event (
 	u32			event,
 	AC_CONTEXT		*ac_adapter);

@@ -1,7 +1,7 @@
 /*****************************************************************************
  *
  * Module Name: bt.c
- *   $Revision: 24 $
+ *   $Revision: 27 $
  *
  *****************************************************************************/
 
@@ -51,6 +51,37 @@ void
 bt_print (
 	BT_CONTEXT		*battery)
 {
+#ifdef ACPI_DEBUG
+	acpi_buffer 		buffer;
+
+	PROC_NAME("bt_print");
+
+	if (!battery) {
+		return;
+	}
+
+	buffer.length = 256;
+	buffer.pointer = acpi_os_callocate(buffer.length);
+	if (!buffer.pointer) {
+		return;
+	}
+
+	/*
+	 * Get the full pathname for this ACPI object.
+	 */
+	acpi_get_name(battery->acpi_handle, ACPI_FULL_PATHNAME, &buffer);
+
+	/*
+	 * Print out basic battery information.
+	 */
+
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "+------------------------------------------------------------\n"));
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "| Battery[%02x]:[%p] %s\n", battery->device_handle, battery->acpi_handle, buffer.pointer));
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "|   uid[%s] is_present[%d] power_units[%s]\n", battery->uid, battery->is_present, battery->power_units));
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "+------------------------------------------------------------\n"));
+
+	acpi_os_free(buffer.pointer);
+#endif /*ACPI_DEBUG*/
 
 	return;
 }
@@ -70,20 +101,22 @@ bt_print (
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bt_get_info (
 	BT_CONTEXT		*battery,
 	BT_BATTERY_INFO 	**battery_info)
 {
-	ACPI_STATUS 		status = AE_OK;
-	ACPI_BUFFER 		bif_buffer, package_format, package_data;
-	ACPI_OBJECT 		*package = NULL;
+	acpi_status 		status = AE_OK;
+	acpi_buffer 		bif_buffer, package_format, package_data;
+	acpi_object 		*package = NULL;
+
+	FUNCTION_TRACE("bt_get_info");
 
 	if (!battery || !battery_info || *battery_info) {
-		return(AE_BAD_PARAMETER);
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
-	MEMSET(&bif_buffer, 0, sizeof(ACPI_BUFFER));
+	MEMSET(&bif_buffer, 0, sizeof(acpi_buffer));
 
 	/*
 	 * Evalute _BIF:
@@ -93,7 +126,7 @@ bt_get_info (
 	status = bm_evaluate_object(battery->acpi_handle, "_BIF", NULL,
 		&bif_buffer);
 	if (ACPI_FAILURE(status)) {
-		return(status);
+		return_ACPI_STATUS(status);
 	}
 
 	/*
@@ -106,7 +139,7 @@ bt_get_info (
 	 * bif_buffer size).
 	 */
 	status = bm_cast_buffer(&bif_buffer, (void**)&package,
-		sizeof(ACPI_OBJECT));
+		sizeof(acpi_object));
 	if (ACPI_FAILURE(status)) {
 		goto end;
 	}
@@ -114,7 +147,7 @@ bt_get_info (
 	package_format.length = sizeof("NNNNNNNNNSSSS");
 	package_format.pointer = "NNNNNNNNNSSSS";
 
-	MEMSET(&package_data, 0, sizeof(ACPI_BUFFER));
+	MEMSET(&package_data, 0, sizeof(acpi_buffer));
 
 	status = bm_extract_package_data(package, &package_format,
 		&package_data);
@@ -127,7 +160,7 @@ bt_get_info (
 
 	package_data.pointer = acpi_os_callocate(package_data.length);
 	if (!package_data.pointer) {
-		return(AE_NO_MEMORY);
+		return_ACPI_STATUS(AE_NO_MEMORY);
 	}
 
 	status = bm_extract_package_data(package, &package_format,
@@ -142,7 +175,7 @@ bt_get_info (
 end:
 	acpi_os_free(bif_buffer.pointer);
 
-	return(status);
+	return_ACPI_STATUS(status);
 }
 
 
@@ -158,20 +191,22 @@ end:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bt_get_status (
 	BT_CONTEXT		*battery,
 	BT_BATTERY_STATUS	**battery_status)
 {
-	ACPI_STATUS 		status = AE_OK;
-	ACPI_BUFFER 		bst_buffer, package_format, package_data;
-	ACPI_OBJECT 		*package = NULL;
+	acpi_status 		status = AE_OK;
+	acpi_buffer 		bst_buffer, package_format, package_data;
+	acpi_object 		*package = NULL;
+
+	FUNCTION_TRACE("bt_get_status");
 
 	if (!battery || !battery_status || *battery_status) {
-		return(AE_BAD_PARAMETER);
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
-	MEMSET(&bst_buffer, 0, sizeof(ACPI_BUFFER));
+	MEMSET(&bst_buffer, 0, sizeof(acpi_buffer));
 
 	/*
 	 * Evalute _BST:
@@ -181,7 +216,7 @@ bt_get_status (
 	status = bm_evaluate_object(battery->acpi_handle, "_BST",
 		NULL, &bst_buffer);
 	if (ACPI_FAILURE(status)) {
-		return(status);
+		return_ACPI_STATUS(status);
 	}
 
 	/*
@@ -194,7 +229,7 @@ bt_get_status (
 	 * size).
 	 */
 	status = bm_cast_buffer(&bst_buffer, (void**)&package,
-		sizeof(ACPI_OBJECT));
+		sizeof(acpi_object));
 	if (ACPI_FAILURE(status)) {
 		goto end;
 	}
@@ -202,7 +237,7 @@ bt_get_status (
 	package_format.length = sizeof("NNNN");
 	package_format.pointer = "NNNN";
 
-	MEMSET(&package_data, 0, sizeof(ACPI_BUFFER));
+	MEMSET(&package_data, 0, sizeof(acpi_buffer));
 
 	status = bm_extract_package_data(package, &package_format,
 		&package_data);
@@ -215,7 +250,7 @@ bt_get_status (
 
 	package_data.pointer = acpi_os_callocate(package_data.length);
 	if (!package_data.pointer) {
-		return(AE_NO_MEMORY);
+		return_ACPI_STATUS(AE_NO_MEMORY);
 	}
 
 	status = bm_extract_package_data(package, &package_format,
@@ -230,7 +265,7 @@ bt_get_status (
 end:
 	acpi_os_free(bst_buffer.pointer);
 
-	return(status);
+	return_ACPI_STATUS(status);
 }
 
 
@@ -246,17 +281,19 @@ end:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bt_check_device (
 	BT_CONTEXT		*battery)
 {
-	ACPI_STATUS 		status = AE_OK;
+	acpi_status 		status = AE_OK;
 	BM_DEVICE_STATUS	battery_status = BM_STATUS_UNKNOWN;
 	u32 			was_present = FALSE;
 	BT_BATTERY_INFO 	*battery_info = NULL;
 
+	FUNCTION_TRACE("bt_check_device");
+
 	if (!battery) {
-		return(AE_BAD_PARAMETER);
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
 	was_present = battery->is_present;
@@ -268,13 +305,16 @@ bt_check_device (
 	 */
 	status = bm_get_device_status(battery->device_handle, &battery_status);
 	if (ACPI_FAILURE(status)) {
-		return(status);
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Unable to get battery status.\n"));
+		return_ACPI_STATUS(status);
 	}
 
 	if (battery_status & BM_STATUS_BATTERY_PRESENT) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Battery socket occupied.\n"));
 		battery->is_present = TRUE;
 	}
 	else {
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Battery socket not occupied.\n"));
 		battery->is_present = FALSE;
 	}
 
@@ -283,6 +323,8 @@ bt_check_device (
 	 * -----------------
 	 */
 	if (!was_present && battery->is_present) {
+
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Battery insertion detected.\n"));
 
 		/*
 		 * Units of Power?
@@ -303,10 +345,11 @@ bt_check_device (
 	 * --------------------
 	 */
 	else if (was_present && !battery->is_present) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Battery removal detected.\n"));
 		battery->power_units = BT_POWER_UNITS_DEFAULT;
 	}
 
-	return(status);
+	return_ACPI_STATUS(status);
 }
 
 
@@ -322,17 +365,21 @@ bt_check_device (
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bt_add_device (
 	BM_HANDLE		device_handle,
 	void			**context)
 {
-	ACPI_STATUS 		status = AE_OK;
+	acpi_status 		status = AE_OK;
 	BM_DEVICE		*device = NULL;
 	BT_CONTEXT		*battery = NULL;
 
+	FUNCTION_TRACE("bt_add_device");
+
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Adding battery device [%02x].\n", device_handle));
+
 	if (!context || *context) {
-		return(AE_BAD_PARAMETER);
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
 	/*
@@ -340,7 +387,7 @@ bt_add_device (
 	 */
 	status = bm_get_device_info(device_handle, &device);
 	if (ACPI_FAILURE(status)) {
-		return(status);
+		return_ACPI_STATUS(status);
 	}
 
 	/*
@@ -348,7 +395,7 @@ bt_add_device (
 	 */
 	battery = acpi_os_callocate(sizeof(BT_CONTEXT));
 	if (!battery) {
-		return(AE_NO_MEMORY);
+		return_ACPI_STATUS(AE_NO_MEMORY);
 	}
 
 	battery->device_handle = device->handle;
@@ -380,7 +427,7 @@ end:
 		acpi_os_free(battery);
 	}
 
-	return(status);
+	return_ACPI_STATUS(status);
 }
 
 
@@ -396,18 +443,22 @@ end:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bt_remove_device (
 	void			**context)
 {
-	ACPI_STATUS 		status = AE_OK;
+	acpi_status 		status = AE_OK;
 	BT_CONTEXT		*battery = NULL;
 
+	FUNCTION_TRACE("bt_remove_device");
+
 	if (!context || !*context) {
-		return(AE_BAD_PARAMETER);
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
 	battery = (BT_CONTEXT*)*context;
+
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Removing battery device [%02x].\n", battery->device_handle));
 
 	bt_osl_remove_device(battery);
 
@@ -415,7 +466,7 @@ bt_remove_device (
 
 	*context = NULL;
 
-	return(status);
+	return_ACPI_STATUS(status);
 }
 
 
@@ -435,12 +486,14 @@ bt_remove_device (
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bt_initialize (void)
 {
-	ACPI_STATUS		status = AE_OK;
+	acpi_status		status = AE_OK;
 	BM_DEVICE_ID		criteria;
 	BM_DRIVER		driver;
+
+	FUNCTION_TRACE("bt_initialize");
 
 	MEMSET(&criteria, 0, sizeof(BM_DEVICE_ID));
 	MEMSET(&driver, 0, sizeof(BM_DRIVER));
@@ -455,7 +508,7 @@ bt_initialize (void)
 
 	status = bm_register_driver(&criteria, &driver);
 
-	return(status);
+	return_ACPI_STATUS(status);
 }
 
 
@@ -471,12 +524,14 @@ bt_initialize (void)
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bt_terminate (void)
 {
-	ACPI_STATUS		status = AE_OK;
+	acpi_status		status = AE_OK;
 	BM_DEVICE_ID		criteria;
 	BM_DRIVER		driver;
+
+	FUNCTION_TRACE("bt_terminate");
 
 	MEMSET(&criteria, 0, sizeof(BM_DEVICE_ID));
 	MEMSET(&driver, 0, sizeof(BM_DRIVER));
@@ -491,7 +546,7 @@ bt_terminate (void)
 
 	status = bm_unregister_driver(&criteria, &driver);
 
-	return(status);
+	return_ACPI_STATUS(status);
 }
 
 
@@ -507,16 +562,18 @@ bt_terminate (void)
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bt_notify (
 	BM_NOTIFY		notify_type,
 	BM_HANDLE		device_handle,
 	void			**context)
 {
-	ACPI_STATUS 		status = AE_OK;
+	acpi_status 		status = AE_OK;
+
+	FUNCTION_TRACE("bt_notify");
 
 	if (!context) {
-		return(AE_BAD_PARAMETER);
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
 	switch (notify_type) {
@@ -530,11 +587,13 @@ bt_notify (
 		break;
 
 	case BT_NOTIFY_STATUS_CHANGE:
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Status change (_BST) event detected.\n"));
 		status = bt_osl_generate_event(notify_type,
 			((BT_CONTEXT*)*context));
 		break;
 
 	case BT_NOTIFY_INFORMATION_CHANGE:
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Information change (_BIF) event detected.\n"));
 		status = bt_check_device((BT_CONTEXT*)*context);
 		if (ACPI_SUCCESS(status)) {
 			status = bt_osl_generate_event(notify_type,
@@ -547,7 +606,7 @@ bt_notify (
 		break;
 	}
 
-	return(status);
+	return_ACPI_STATUS(status);
 }
 
 
@@ -563,18 +622,20 @@ bt_notify (
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bt_request (
 	BM_REQUEST		*request,
 	void			*context)
 {
-	ACPI_STATUS 		status = AE_OK;
+	acpi_status 		status = AE_OK;
+
+	FUNCTION_TRACE("bt_request");
 
 	/*
 	 * Must have a valid request structure and context.
 	 */
 	if (!request || !context)
-		return(AE_BAD_PARAMETER);
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 
 	/*
 	 * Handle request:
@@ -589,5 +650,5 @@ bt_request (
 
 	request->status = status;
 
-	return(status);
+	return_ACPI_STATUS(status);
 }

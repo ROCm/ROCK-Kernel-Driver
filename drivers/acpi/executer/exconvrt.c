@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exconvrt - Object conversion routines
- *              $Revision: 13 $
+ *              $Revision: 22 $
  *
  *****************************************************************************/
 
@@ -51,31 +51,36 @@
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_convert_to_integer (
-	ACPI_OPERAND_OBJECT     **obj_desc,
-	ACPI_WALK_STATE         *walk_state)
+	acpi_operand_object     *obj_desc,
+	acpi_operand_object     **result_desc,
+	acpi_walk_state         *walk_state)
 {
 	u32                     i;
-	ACPI_OPERAND_OBJECT     *ret_desc;
+	acpi_operand_object     *ret_desc;
 	u32                     count;
 	char                    *pointer;
-	ACPI_INTEGER            result;
-	u32                     integer_size = sizeof (ACPI_INTEGER);
+	acpi_integer            result;
+	u32                     integer_size = sizeof (acpi_integer);
 
 
-	switch ((*obj_desc)->common.type) {
+	FUNCTION_ENTRY ();
+
+
+	switch (obj_desc->common.type) {
 	case ACPI_TYPE_INTEGER:
+		*result_desc = obj_desc;
 		return (AE_OK);
 
 	case ACPI_TYPE_STRING:
-		pointer = (*obj_desc)->string.pointer;
-		count = (*obj_desc)->string.length;
+		pointer = obj_desc->string.pointer;
+		count   = obj_desc->string.length;
 		break;
 
 	case ACPI_TYPE_BUFFER:
-		pointer = (char *) (*obj_desc)->buffer.pointer;
-		count = (*obj_desc)->buffer.length;
+		pointer = (char *) obj_desc->buffer.pointer;
+		count   = obj_desc->buffer.length;
 		break;
 
 	default:
@@ -122,7 +127,7 @@ acpi_ex_convert_to_integer (
 	/*
 	 * String conversion is different than Buffer conversion
 	 */
-	switch ((*obj_desc)->common.type) {
+	switch (obj_desc->common.type) {
 	case ACPI_TYPE_STRING:
 
 		/* TBD: Need to use 64-bit STRTOUL */
@@ -131,7 +136,6 @@ acpi_ex_convert_to_integer (
 		 * Convert string to an integer
 		 * String must be hexadecimal as per the ACPI specification
 		 */
-
 		result = STRTOUL (pointer, NULL, 16);
 		break;
 
@@ -148,7 +152,7 @@ acpi_ex_convert_to_integer (
 			 * Little endian is used, meaning that the first byte of the buffer
 			 * is the LSB of the integer
 			 */
-			result |= (((ACPI_INTEGER) pointer[i]) << (i * 8));
+			result |= (((acpi_integer) pointer[i]) << (i * 8));
 		}
 
 		break;
@@ -158,12 +162,13 @@ acpi_ex_convert_to_integer (
 
 	ret_desc->integer.value = result;
 
-	if (walk_state->opcode != AML_STORE_OP) {
-		acpi_ut_remove_reference (*obj_desc);
+	if (*result_desc == obj_desc) {
+		if (walk_state->opcode != AML_STORE_OP) {
+			acpi_ut_remove_reference (obj_desc);
+		}
 	}
 
-	*obj_desc = ret_desc;
-
+	*result_desc = ret_desc;
 	return (AE_OK);
 }
 
@@ -182,18 +187,22 @@ acpi_ex_convert_to_integer (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_convert_to_buffer (
-	ACPI_OPERAND_OBJECT     **obj_desc,
-	ACPI_WALK_STATE         *walk_state)
+	acpi_operand_object     *obj_desc,
+	acpi_operand_object     **result_desc,
+	acpi_walk_state         *walk_state)
 {
-	ACPI_OPERAND_OBJECT     *ret_desc;
+	acpi_operand_object     *ret_desc;
 	u32                     i;
-	u32                     integer_size = sizeof (ACPI_INTEGER);
+	u32                     integer_size = sizeof (acpi_integer);
 	u8                      *new_buf;
 
 
-	switch ((*obj_desc)->common.type) {
+	FUNCTION_ENTRY ();
+
+
+	switch (obj_desc->common.type) {
 	case ACPI_TYPE_INTEGER:
 
 		/*
@@ -218,7 +227,7 @@ acpi_ex_convert_to_buffer (
 		/* Need enough space for one integers */
 
 		ret_desc->buffer.length = integer_size;
-		new_buf = acpi_ut_callocate (integer_size);
+		new_buf = ACPI_MEM_CALLOCATE (integer_size);
 		if (!new_buf) {
 			REPORT_ERROR
 				(("Ex_dyadic2_r/Concat_op: Buffer allocation failure\n"));
@@ -229,24 +238,29 @@ acpi_ex_convert_to_buffer (
 		/* Copy the integer to the buffer */
 
 		for (i = 0; i < integer_size; i++) {
-			new_buf[i] = (u8) ((*obj_desc)->integer.value >> (i * 8));
+			new_buf[i] = (u8) (obj_desc->integer.value >> (i * 8));
 		}
 		ret_desc->buffer.pointer = new_buf;
 
 		/* Return the new buffer descriptor */
 
-		if (walk_state->opcode != AML_STORE_OP) {
-			acpi_ut_remove_reference (*obj_desc);
+		if (*result_desc == obj_desc) {
+			if (walk_state->opcode != AML_STORE_OP) {
+				acpi_ut_remove_reference (obj_desc);
+			}
 		}
-		*obj_desc = ret_desc;
+
+		*result_desc = ret_desc;
 		break;
 
 
 	case ACPI_TYPE_STRING:
+		*result_desc = obj_desc;
 		break;
 
 
 	case ACPI_TYPE_BUFFER:
+		*result_desc = obj_desc;
 		break;
 
 
@@ -256,6 +270,98 @@ acpi_ex_convert_to_buffer (
    }
 
 	return (AE_OK);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_ex_convert_ascii
+ *
+ * PARAMETERS:  Integer
+ *
+ * RETURN:      Actual string length
+ *
+ * DESCRIPTION: Convert an ACPI Integer to a hex string
+ *
+ ******************************************************************************/
+
+u32
+acpi_ex_convert_to_ascii (
+	acpi_integer            integer,
+	u32                     base,
+	u8                      *string)
+{
+	u32                     i;
+	u32                     j;
+	u32                     k = 0;
+	u8                      hex_digit;
+	acpi_integer            digit;
+	u8                      leading_zero = TRUE;
+	u32                     length = sizeof (acpi_integer);
+
+
+	FUNCTION_ENTRY ();
+
+
+	switch (base) {
+	case 10:
+
+		for (i = ACPI_MAX_DECIMAL_DIGITS; i > 0 ; i--) {
+			/* Divide by nth factor of 10 */
+
+			digit = integer;
+			for (j = 1; j < i; j++) {
+				digit = ACPI_DIVIDE (digit, 10);
+			}
+
+			/* Create the decimal digit */
+
+			if (digit != 0) {
+				leading_zero = FALSE;
+			}
+
+			if (!leading_zero) {
+				string[k] = (u8) (ASCII_ZERO + ACPI_MODULO (digit, 10));
+				k++;
+			}
+		}
+		break;
+
+	case 16:
+
+		/* Copy the integer to the buffer */
+
+		for (i = 0, j = ((length * 2) -1); i < (length * 2); i++, j--) {
+
+			hex_digit = acpi_ut_hex_to_ascii_char (integer, (j * 4));
+			if (hex_digit != ASCII_ZERO) {
+				leading_zero = FALSE;
+			}
+
+			if (!leading_zero) {
+				string[k] = hex_digit;
+				k++;
+			}
+		}
+		break;
+
+	default:
+		break;
+	}
+
+	/*
+	 * Since leading zeros are supressed, we must check for the case where
+	 * the integer equals 0.
+	 *
+	 * Finally, null terminate the string and return the length
+	 */
+	if (!k) {
+		string [0] = ASCII_ZERO;
+		k = 1;
+	}
+	string [k] = 0;
+
+	return (k);
 }
 
 
@@ -273,29 +379,28 @@ acpi_ex_convert_to_buffer (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_convert_to_string (
-	ACPI_OPERAND_OBJECT     **obj_desc,
-	ACPI_WALK_STATE         *walk_state)
+	acpi_operand_object     *obj_desc,
+	acpi_operand_object     **result_desc,
+	u32                     base,
+	u32                     max_length,
+	acpi_walk_state         *walk_state)
 {
-	ACPI_OPERAND_OBJECT     *ret_desc;
+	acpi_operand_object     *ret_desc;
 	u32                     i;
 	u32                     index;
-	u32                     integer_size = sizeof (ACPI_INTEGER);
+	u32                     string_length;
+	u32                     integer_size = sizeof (acpi_integer);
 	u8                      *new_buf;
 	u8                      *pointer;
 
 
-	switch ((*obj_desc)->common.type) {
-	case ACPI_TYPE_INTEGER:
+	FUNCTION_ENTRY ();
 
-		/*
-		 * Create a new String
-		 */
-		ret_desc = acpi_ut_create_internal_object (ACPI_TYPE_STRING);
-		if (!ret_desc) {
-			return (AE_NO_MEMORY);
-		}
+
+	switch (obj_desc->common.type) {
+	case ACPI_TYPE_INTEGER:
 
 		/* Handle both ACPI 1.0 and ACPI 2.0 Integer widths */
 
@@ -308,42 +413,9 @@ acpi_ex_convert_to_string (
 			integer_size = sizeof (u32);
 		}
 
-		/* Need enough space for one ASCII integer plus null terminator */
-
-		ret_desc->string.length = (integer_size * 2) + 1;
-		new_buf = acpi_ut_callocate (ret_desc->string.length);
-		if (!new_buf) {
-			REPORT_ERROR
-				(("Ex_convert_to_string: Buffer allocation failure\n"));
-			acpi_ut_remove_reference (ret_desc);
-			return (AE_NO_MEMORY);
-		}
-
-		/* Copy the integer to the buffer */
-
-		for (i = 0; i < (integer_size * 2); i++) {
-			new_buf[i] = acpi_gbl_hex_to_ascii [((*obj_desc)->integer.value >> (i * 4)) & 0xF];
-		}
-
-		/* Null terminate */
-
-		new_buf [i] = 0;
-		ret_desc->buffer.pointer = new_buf;
-
-		/* Return the new buffer descriptor */
-
-		if (walk_state->opcode != AML_STORE_OP) {
-			acpi_ut_remove_reference (*obj_desc);
-		}
-		*obj_desc = ret_desc;
-
-		return (AE_OK);
-
-
-	case ACPI_TYPE_BUFFER:
-
-		if (((*obj_desc)->buffer.length * 3) > ACPI_MAX_STRING_CONVERSION) {
-			return (AE_AML_STRING_LIMIT);
+		string_length = integer_size * 2;
+		if (base == 10) {
+			string_length = ACPI_MAX_DECIMAL_DIGITS;
 		}
 
 		/*
@@ -356,8 +428,72 @@ acpi_ex_convert_to_string (
 
 		/* Need enough space for one ASCII integer plus null terminator */
 
-		ret_desc->string.length = (*obj_desc)->buffer.length * 3;
-		new_buf = acpi_ut_callocate (ret_desc->string.length + 1);
+		new_buf = ACPI_MEM_CALLOCATE (string_length + 1);
+		if (!new_buf) {
+			REPORT_ERROR
+				(("Ex_convert_to_string: Buffer allocation failure\n"));
+			acpi_ut_remove_reference (ret_desc);
+			return (AE_NO_MEMORY);
+		}
+
+
+		/* Convert */
+
+		i = acpi_ex_convert_to_ascii (obj_desc->integer.value, base, new_buf);
+
+		/* Null terminate at the correct place */
+
+		if (max_length < i) {
+			new_buf[max_length] = 0;
+			ret_desc->string.length = max_length;
+		}
+		else {
+			new_buf [i] = 0;
+			ret_desc->string.length = i;
+		}
+
+		ret_desc->buffer.pointer = new_buf;
+
+		/* Return the new buffer descriptor */
+
+		if (*result_desc == obj_desc) {
+			if (walk_state->opcode != AML_STORE_OP) {
+				acpi_ut_remove_reference (obj_desc);
+			}
+		}
+
+		*result_desc = ret_desc;
+		break;
+
+
+	case ACPI_TYPE_BUFFER:
+
+		string_length = obj_desc->buffer.length * 3;
+		if (base == 10) {
+			string_length = obj_desc->buffer.length * 4;
+		}
+
+		if (max_length > ACPI_MAX_STRING_CONVERSION) {
+			if (string_length > ACPI_MAX_STRING_CONVERSION) {
+				return (AE_AML_STRING_LIMIT);
+			}
+		}
+
+		/*
+		 * Create a new string object
+		 */
+		ret_desc = acpi_ut_create_internal_object (ACPI_TYPE_STRING);
+		if (!ret_desc) {
+			return (AE_NO_MEMORY);
+		}
+
+		/* String length is the lesser of the Max or the actual length */
+
+		if (max_length < string_length) {
+			string_length = max_length;
+		}
+
+		new_buf = ACPI_MEM_CALLOCATE (string_length + 1);
 		if (!new_buf) {
 			REPORT_ERROR
 				(("Ex_convert_to_string: Buffer allocation failure\n"));
@@ -368,30 +504,45 @@ acpi_ex_convert_to_string (
 		/*
 		 * Convert each byte of the buffer to two ASCII characters plus a space.
 		 */
-		pointer = (*obj_desc)->buffer.pointer;
+		pointer = obj_desc->buffer.pointer;
 		index = 0;
-		for (i = 0; i < (*obj_desc)->buffer.length; i++) {
-			new_buf[index + 0] = acpi_gbl_hex_to_ascii [pointer[i] & 0x0F];
-			new_buf[index + 1] = acpi_gbl_hex_to_ascii [(pointer[i] >> 4) & 0x0F];
-			new_buf[index + 2] = ' ';
-			index += 3;
+		for (i = 0, index = 0; i < obj_desc->buffer.length; i++) {
+			index = acpi_ex_convert_to_ascii (pointer[i], base, &new_buf[index]);
+
+			new_buf[index] = ' ';
+			index++;
 		}
 
 		/* Null terminate */
 
-		new_buf [index] = 0;
+		new_buf [index-1] = 0;
 		ret_desc->buffer.pointer = new_buf;
+		ret_desc->string.length = STRLEN ((char *) new_buf);
+
 
 		/* Return the new buffer descriptor */
 
-		if (walk_state->opcode != AML_STORE_OP) {
-			acpi_ut_remove_reference (*obj_desc);
+		if (*result_desc == obj_desc) {
+			if (walk_state->opcode != AML_STORE_OP) {
+				acpi_ut_remove_reference (obj_desc);
+			}
 		}
-		*obj_desc = ret_desc;
+
+		*result_desc = ret_desc;
 		break;
 
 
 	case ACPI_TYPE_STRING:
+
+		if (max_length >= obj_desc->string.length) {
+			*result_desc = obj_desc;
+		}
+
+		else {
+			/* Must copy the string first and then truncate it */
+
+			return (AE_NOT_IMPLEMENTED);
+		}
 		break;
 
 
@@ -417,20 +568,22 @@ acpi_ex_convert_to_string (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_convert_to_target_type (
-	ACPI_OBJECT_TYPE8       destination_type,
-	ACPI_OPERAND_OBJECT     **obj_desc,
-	ACPI_WALK_STATE         *walk_state)
+	acpi_object_type8       destination_type,
+	acpi_operand_object     **obj_desc,
+	acpi_walk_state         *walk_state)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
+
+
+	FUNCTION_TRACE ("Ex_convert_to_target_type");
 
 
 	/*
 	 * If required by the target,
 	 * perform implicit conversion on the source before we store it.
 	 */
-
 	switch (GET_CURRENT_ARG_TYPE (walk_state->op_info->runtime_args)) {
 	case ARGI_SIMPLE_TARGET:
 	case ARGI_FIXED_TARGET:
@@ -447,6 +600,10 @@ acpi_ex_convert_to_target_type (
 			/* No conversion allowed for these types */
 
 			if (destination_type != (*obj_desc)->common.type) {
+				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+					"Target does not allow conversion of type %s to %s\n",
+					acpi_ut_get_type_name ((*obj_desc)->common.type),
+					acpi_ut_get_type_name (destination_type)));
 				status = AE_TYPE;
 			}
 		}
@@ -464,7 +621,7 @@ acpi_ex_convert_to_target_type (
 			 * These types require an Integer operand.  We can convert
 			 * a Buffer or a String to an Integer if necessary.
 			 */
-			status = acpi_ex_convert_to_integer (obj_desc, walk_state);
+			status = acpi_ex_convert_to_integer (*obj_desc, obj_desc, walk_state);
 			break;
 
 
@@ -474,7 +631,7 @@ acpi_ex_convert_to_target_type (
 			 * The operand must be a String.  We can convert an
 			 * Integer or Buffer if necessary
 			 */
-			status = acpi_ex_convert_to_string (obj_desc, walk_state);
+			status = acpi_ex_convert_to_string (*obj_desc, obj_desc, 16, ACPI_UINT32_MAX, walk_state);
 			break;
 
 
@@ -484,7 +641,7 @@ acpi_ex_convert_to_target_type (
 			 * The operand must be a String.  We can convert an
 			 * Integer or Buffer if necessary
 			 */
-			status = acpi_ex_convert_to_buffer (obj_desc, walk_state);
+			status = acpi_ex_convert_to_buffer (*obj_desc, obj_desc, walk_state);
 			break;
 		}
 		break;
@@ -498,6 +655,11 @@ acpi_ex_convert_to_target_type (
 
 
 	default:
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+			"Unknown Target type ID 0x%X Op %s Dest_type %s\n",
+			GET_CURRENT_ARG_TYPE (walk_state->op_info->runtime_args),
+			walk_state->op_info->name, acpi_ut_get_type_name (destination_type)));
+
 		status = AE_AML_INTERNAL;
 	}
 
@@ -512,7 +674,7 @@ acpi_ex_convert_to_target_type (
 		status = AE_OK;
 	}
 
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 

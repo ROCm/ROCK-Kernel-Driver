@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Name: hwtimer.c - ACPI Power Management Timer Interface
- *              $Revision: 10 $
+ *              $Revision: 12 $
  *
  *****************************************************************************/
 
@@ -43,32 +43,36 @@
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_get_timer_resolution (
 	u32                     *resolution)
 {
-	ACPI_STATUS             status;
+	acpi_status             status;
+
+
+	FUNCTION_TRACE ("Acpi_get_timer_resolution");
 
 
 	/* Ensure that ACPI has been initialized */
 
 	ACPI_IS_INITIALIZATION_COMPLETE (status);
 	if (ACPI_FAILURE (status)) {
-		return (status);
+		return_ACPI_STATUS (status);
 	}
 
 	if (!resolution) {
-		return (AE_BAD_PARAMETER);
+		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
 	if (0 == acpi_gbl_FADT->tmr_val_ext) {
 		*resolution = 24;
 	}
+
 	else {
 		*resolution = 32;
 	}
 
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -84,27 +88,31 @@ acpi_get_timer_resolution (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_get_timer (
 	u32                     *ticks)
 {
-	ACPI_STATUS             status;
+	acpi_status             status;
+
+
+	FUNCTION_TRACE ("Acpi_get_timer");
 
 
 	/* Ensure that ACPI has been initialized */
 
 	ACPI_IS_INITIALIZATION_COMPLETE (status);
 	if (ACPI_FAILURE (status)) {
-		return (status);
+		return_ACPI_STATUS (status);
 	}
 
 	if (!ticks) {
-		return (AE_BAD_PARAMETER);
+		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
-	*ticks = acpi_os_in32 ((ACPI_IO_ADDRESS) ACPI_GET_ADDRESS (acpi_gbl_FADT->Xpm_tmr_blk.address));
+	acpi_os_read_port ((ACPI_IO_ADDRESS)
+		ACPI_GET_ADDRESS (acpi_gbl_FADT->Xpm_tmr_blk.address), ticks, 32);
 
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -134,7 +142,7 @@ acpi_get_timer (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_get_timer_duration (
 	u32                     start_ticks,
 	u32                     end_ticks,
@@ -147,8 +155,11 @@ acpi_get_timer_duration (
 	u32                     remainder = 0;
 
 
+	FUNCTION_TRACE ("Acpi_get_timer_duration");
+
+
 	if (!time_elapsed) {
-		return (AE_BAD_PARAMETER);
+		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
 	/*
@@ -159,19 +170,24 @@ acpi_get_timer_duration (
 	if (start_ticks < end_ticks) {
 		delta_ticks = end_ticks - start_ticks;
 	}
+
 	else if (start_ticks > end_ticks) {
 		/* 24-bit Timer */
+
 		if (0 == acpi_gbl_FADT->tmr_val_ext) {
 			delta_ticks = (((0x00FFFFFF - start_ticks) + end_ticks) & 0x00FFFFFF);
 		}
+
 		/* 32-bit Timer */
+
 		else {
 			delta_ticks = (0xFFFFFFFF - start_ticks) + end_ticks;
 		}
 	}
+
 	else {
 		*time_elapsed = 0;
-		return (AE_OK);
+		return_ACPI_STATUS (AE_OK);
 	}
 
 	/*
@@ -200,22 +216,26 @@ acpi_get_timer_duration (
 	 */
 
 	/* Step #1 */
+
 	seconds = delta_ticks / PM_TIMER_FREQUENCY;
 	remainder = delta_ticks % PM_TIMER_FREQUENCY;
 
 	/* Step #2 */
+
 	milliseconds = (remainder * 1000) / PM_TIMER_FREQUENCY;
 	remainder = (remainder * 1000) % PM_TIMER_FREQUENCY;
 
 	/* Step #3 */
+
 	microseconds = (remainder * 1000) / PM_TIMER_FREQUENCY;
 
 	/* Step #4 */
+
 	*time_elapsed = seconds * 1000000;
 	*time_elapsed += milliseconds * 1000;
 	*time_elapsed += microseconds;
 
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 

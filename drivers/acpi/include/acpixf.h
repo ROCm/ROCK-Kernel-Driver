@@ -31,38 +31,41 @@
 #include "actbl.h"
 
 
-/*
+ /*
  * Global interfaces
  */
 
-ACPI_STATUS
+acpi_status
 acpi_initialize_subsystem (
 	void);
 
-ACPI_STATUS
+acpi_status
 acpi_enable_subsystem (
 	u32                     flags);
 
-ACPI_STATUS
+acpi_status
 acpi_terminate (
 	void);
 
-ACPI_STATUS
+acpi_status
+acpi_subsystem_status (
+	void);
+
+acpi_status
 acpi_enable (
 	void);
 
-ACPI_STATUS
+acpi_status
 acpi_disable (
 	void);
 
-ACPI_STATUS
-acpi_get_system_info(
-	ACPI_BUFFER             *ret_buffer);
+acpi_status
+acpi_get_system_info (
+	acpi_buffer             *ret_buffer);
 
-ACPI_STATUS
+const char *
 acpi_format_exception (
-	ACPI_STATUS             exception,
-	ACPI_BUFFER             *out_buffer);
+	acpi_status             exception);
 
 
 /*
@@ -86,262 +89,236 @@ acpi_free (
  * ACPI table manipulation interfaces
  */
 
-ACPI_STATUS
+acpi_status
 acpi_find_root_pointer (
+	u32                     flags,
 	ACPI_PHYSICAL_ADDRESS   *rsdp_physical_address);
 
-ACPI_STATUS
+acpi_status
 acpi_load_tables (
-	ACPI_PHYSICAL_ADDRESS   rsdp_physical_address);
+	void);
 
-ACPI_STATUS
+acpi_status
 acpi_load_table (
-	ACPI_TABLE_HEADER       *table_ptr);
+	acpi_table_header       *table_ptr);
 
-ACPI_STATUS
+acpi_status
 acpi_unload_table (
-	ACPI_TABLE_TYPE         table_type);
+	acpi_table_type         table_type);
 
-ACPI_STATUS
+acpi_status
 acpi_get_table_header (
-	ACPI_TABLE_TYPE         table_type,
+	acpi_table_type         table_type,
 	u32                     instance,
-	ACPI_TABLE_HEADER       *out_table_header);
+	acpi_table_header       *out_table_header);
 
-ACPI_STATUS
+acpi_status
 acpi_get_table (
-	ACPI_TABLE_TYPE         table_type,
+	acpi_table_type         table_type,
 	u32                     instance,
-	ACPI_BUFFER             *ret_buffer);
+	acpi_buffer             *ret_buffer);
 
-ACPI_STATUS
+acpi_status
 acpi_get_firmware_table (
-	ACPI_STRING             signature,
+	acpi_string             signature,
 	u32                     instance,
 	u32                     flags,
-	ACPI_TABLE_HEADER       **table_pointer);
+	acpi_table_header       **table_pointer);
 
 
 /*
  * Namespace and name interfaces
  */
 
-ACPI_STATUS
+acpi_status
 acpi_walk_namespace (
-	ACPI_OBJECT_TYPE        type,
-	ACPI_HANDLE             start_object,
+	acpi_object_type        type,
+	acpi_handle             start_object,
 	u32                     max_depth,
 	ACPI_WALK_CALLBACK      user_function,
 	void                    *context,
 	void *                  *return_value);
 
-ACPI_STATUS
+acpi_status
 acpi_get_devices (
 	NATIVE_CHAR             *HID,
 	ACPI_WALK_CALLBACK      user_function,
 	void                    *context,
 	void                    **return_value);
 
-ACPI_STATUS
+acpi_status
 acpi_get_name (
-	ACPI_HANDLE             handle,
+	acpi_handle             handle,
 	u32                     name_type,
-	ACPI_BUFFER             *ret_path_ptr);
+	acpi_buffer             *ret_path_ptr);
 
-ACPI_STATUS
+acpi_status
 acpi_get_handle (
-	ACPI_HANDLE             parent,
-	ACPI_STRING             pathname,
-	ACPI_HANDLE             *ret_handle);
+	acpi_handle             parent,
+	acpi_string             pathname,
+	acpi_handle             *ret_handle);
 
 
 /*
  * Object manipulation and enumeration
  */
 
-ACPI_STATUS
+acpi_status
 acpi_evaluate_object (
-	ACPI_HANDLE             object,
-	ACPI_STRING             pathname,
-	ACPI_OBJECT_LIST        *parameter_objects,
-	ACPI_BUFFER             *return_object_buffer);
+	acpi_handle             object,
+	acpi_string             pathname,
+	acpi_object_list        *parameter_objects,
+	acpi_buffer             *return_object_buffer);
 
-ACPI_STATUS
+acpi_status
 acpi_get_object_info (
-	ACPI_HANDLE             device,
-	ACPI_DEVICE_INFO        *info);
+	acpi_handle             device,
+	acpi_device_info        *info);
 
-ACPI_STATUS
+acpi_status
 acpi_get_next_object (
-	ACPI_OBJECT_TYPE        type,
-	ACPI_HANDLE             parent,
-	ACPI_HANDLE             child,
-	ACPI_HANDLE             *out_handle);
+	acpi_object_type        type,
+	acpi_handle             parent,
+	acpi_handle             child,
+	acpi_handle             *out_handle);
 
-ACPI_STATUS
+acpi_status
 acpi_get_type (
-	ACPI_HANDLE             object,
-	ACPI_OBJECT_TYPE        *out_type);
+	acpi_handle             object,
+	acpi_object_type        *out_type);
 
-ACPI_STATUS
+acpi_status
 acpi_get_parent (
-	ACPI_HANDLE             object,
-	ACPI_HANDLE             *out_handle);
+	acpi_handle             object,
+	acpi_handle             *out_handle);
 
 
 /*
  * Event handler interfaces
  */
 
-ACPI_STATUS
+acpi_status
 acpi_install_fixed_event_handler (
 	u32                     acpi_event,
 	ACPI_EVENT_HANDLER      handler,
 	void                    *context);
 
-ACPI_STATUS
+acpi_status
 acpi_remove_fixed_event_handler (
 	u32                     acpi_event,
 	ACPI_EVENT_HANDLER      handler);
 
-ACPI_STATUS
+acpi_status
 acpi_install_notify_handler (
-	ACPI_HANDLE             device,
+	acpi_handle             device,
 	u32                     handler_type,
 	ACPI_NOTIFY_HANDLER     handler,
 	void                    *context);
 
-ACPI_STATUS
+acpi_status
 acpi_remove_notify_handler (
-	ACPI_HANDLE             device,
+	acpi_handle             device,
 	u32                     handler_type,
 	ACPI_NOTIFY_HANDLER     handler);
 
-ACPI_STATUS
+acpi_status
 acpi_install_address_space_handler (
-	ACPI_HANDLE             device,
+	acpi_handle             device,
 	ACPI_ADR_SPACE_TYPE     space_id,
 	ACPI_ADR_SPACE_HANDLER  handler,
 	ACPI_ADR_SPACE_SETUP    setup,
 	void                    *context);
 
-ACPI_STATUS
+acpi_status
 acpi_remove_address_space_handler (
-	ACPI_HANDLE             device,
+	acpi_handle             device,
 	ACPI_ADR_SPACE_TYPE     space_id,
 	ACPI_ADR_SPACE_HANDLER  handler);
 
-ACPI_STATUS
+acpi_status
 acpi_install_gpe_handler (
 	u32                     gpe_number,
 	u32                     type,
 	ACPI_GPE_HANDLER        handler,
 	void                    *context);
 
-ACPI_STATUS
+acpi_status
 acpi_acquire_global_lock (
 	void);
 
-ACPI_STATUS
+acpi_status
 acpi_release_global_lock (
 	void);
 
-ACPI_STATUS
+acpi_status
 acpi_remove_gpe_handler (
 	u32                     gpe_number,
 	ACPI_GPE_HANDLER        handler);
 
-ACPI_STATUS
+acpi_status
 acpi_enable_event (
 	u32                     acpi_event,
 	u32                     type);
 
-ACPI_STATUS
+acpi_status
 acpi_disable_event (
 	u32                     acpi_event,
 	u32                     type);
 
-ACPI_STATUS
+acpi_status
 acpi_clear_event (
 	u32                     acpi_event,
 	u32                     type);
 
-ACPI_STATUS
+acpi_status
 acpi_get_event_status (
 	u32                     acpi_event,
 	u32                     type,
-	ACPI_EVENT_STATUS       *event_status);
+	acpi_event_status       *event_status);
 
 /*
  * Resource interfaces
  */
 
-ACPI_STATUS
+acpi_status
 acpi_get_current_resources(
-	ACPI_HANDLE             device_handle,
-	ACPI_BUFFER             *ret_buffer);
+	acpi_handle             device_handle,
+	acpi_buffer             *ret_buffer);
 
-ACPI_STATUS
+acpi_status
 acpi_get_possible_resources(
-	ACPI_HANDLE             device_handle,
-	ACPI_BUFFER             *ret_buffer);
+	acpi_handle             device_handle,
+	acpi_buffer             *ret_buffer);
 
-ACPI_STATUS
+acpi_status
 acpi_set_current_resources (
-	ACPI_HANDLE             device_handle,
-	ACPI_BUFFER             *in_buffer);
+	acpi_handle             device_handle,
+	acpi_buffer             *in_buffer);
 
-ACPI_STATUS
+acpi_status
 acpi_get_irq_routing_table (
-	ACPI_HANDLE             bus_device_handle,
-	ACPI_BUFFER             *ret_buffer);
+	acpi_handle             bus_device_handle,
+	acpi_buffer             *ret_buffer);
 
 
 /*
  * Hardware (ACPI device) interfaces
  */
 
-ACPI_STATUS
+acpi_status
 acpi_set_firmware_waking_vector (
 	ACPI_PHYSICAL_ADDRESS   physical_address);
 
-ACPI_STATUS
+acpi_status
 acpi_get_firmware_waking_vector (
 	ACPI_PHYSICAL_ADDRESS   *physical_address);
 
-ACPI_STATUS
+acpi_status
 acpi_enter_sleep_state (
 	u8 sleep_state);
 
-ACPI_STATUS
-acpi_get_processor_throttling_info (
-	ACPI_HANDLE             processor_handle,
-	ACPI_BUFFER             *user_buffer);
-
-ACPI_STATUS
-acpi_set_processor_throttling_state (
-	ACPI_HANDLE             processor_handle,
-	u32                     throttle_state);
-
-ACPI_STATUS
-acpi_get_processor_throttling_state (
-	ACPI_HANDLE             processor_handle,
-	u32                     *throttle_state);
-
-ACPI_STATUS
-acpi_get_processor_cx_info (
-	ACPI_HANDLE             processor_handle,
-	ACPI_BUFFER             *user_buffer);
-
-ACPI_STATUS
-acpi_set_processor_sleep_state (
-	ACPI_HANDLE             processor_handle,
-	u32                     cx_state);
-
-ACPI_STATUS
-acpi_processor_sleep (
-	ACPI_HANDLE             processor_handle,
-	u32                     *pm_timer_ticks);
-
+acpi_status
+acpi_leave_sleep_state (
+	u8 sleep_state);
 
 #endif /* __ACXFACE_H__ */

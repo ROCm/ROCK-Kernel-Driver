@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dbcmds - debug commands and output routines
- *              $Revision: 60 $
+ *              $Revision: 65 $
  *
  ******************************************************************************/
 
@@ -47,7 +47,7 @@
  * These object types map directly to the ACPI_TYPES
  */
 
-ARGUMENT_INFO               acpi_db_object_types [] =
+ARGUMENT_INFO         acpi_db_object_types [] =
 { {"ANY"},
 	{"NUMBERS"},
 	{"STRINGS"},
@@ -81,15 +81,15 @@ ARGUMENT_INFO               acpi_db_object_types [] =
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_db_walk_for_references (
-	ACPI_HANDLE             obj_handle,
+	acpi_handle             obj_handle,
 	u32                     nesting_level,
 	void                    *context,
 	void                    **return_value)
 {
-	ACPI_OPERAND_OBJECT     *obj_desc = (ACPI_OPERAND_OBJECT *) context;
-	ACPI_NAMESPACE_NODE     *node = (ACPI_NAMESPACE_NODE *) obj_handle;
+	acpi_operand_object     *obj_desc = (acpi_operand_object *) context;
+	acpi_namespace_node     *node = (acpi_namespace_node *) obj_handle;
 
 
 	/* Check for match against the namespace node itself */
@@ -131,12 +131,12 @@ void
 acpi_db_find_references (
 	NATIVE_CHAR             *object_arg)
 {
-	ACPI_OPERAND_OBJECT     *obj_desc;
+	acpi_operand_object     *obj_desc;
 
 
 	/* Convert string to object pointer */
 
-	obj_desc = (ACPI_OPERAND_OBJECT *) STRTOUL (object_arg, NULL, 16);
+	obj_desc = (acpi_operand_object *) STRTOUL (object_arg, NULL, 16);
 
 	/* Search all nodes in namespace */
 
@@ -221,13 +221,14 @@ acpi_db_unload_acpi_table (
 	NATIVE_CHAR             *instance_arg)
 {
 	u32                     i;
-	ACPI_STATUS             status;
+	acpi_status             status;
 
 
 	/* Search all tables for the target type */
 
 	for (i = 0; i < NUM_ACPI_TABLES; i++) {
-		if (!STRNCMP (table_arg, acpi_gbl_acpi_table_data[i].signature, acpi_gbl_acpi_table_data[i].sig_length)) {
+		if (!STRNCMP (table_arg, acpi_gbl_acpi_table_data[i].signature,
+				acpi_gbl_acpi_table_data[i].sig_length)) {
 			/* Found the table, unload it */
 
 			status = acpi_unload_table (i);
@@ -235,7 +236,8 @@ acpi_db_unload_acpi_table (
 				acpi_os_printf ("[%s] unloaded and uninstalled\n", table_arg);
 			}
 			else {
-				acpi_os_printf ("%s, while unloading [%s]\n", acpi_ut_format_exception (status), table_arg);
+				acpi_os_printf ("%s, while unloading [%s]\n",
+					acpi_format_exception (status), table_arg);
 			}
 
 			return;
@@ -264,8 +266,8 @@ acpi_db_unload_acpi_table (
 void
 acpi_db_set_method_breakpoint (
 	NATIVE_CHAR             *location,
-	ACPI_WALK_STATE         *walk_state,
-	ACPI_PARSE_OBJECT       *op)
+	acpi_walk_state         *walk_state,
+	acpi_parse_object       *op)
 {
 	u32                     address;
 
@@ -304,7 +306,7 @@ acpi_db_set_method_breakpoint (
 
 void
 acpi_db_set_method_call_breakpoint (
-	ACPI_PARSE_OBJECT       *op)
+	acpi_parse_object       *op)
 {
 
 
@@ -335,7 +337,7 @@ acpi_db_set_method_call_breakpoint (
 void
 acpi_db_disassemble_aml (
 	NATIVE_CHAR             *statements,
-	ACPI_PARSE_OBJECT       *op)
+	acpi_parse_object       *op)
 {
 	u32                     num_statements = 8;
 
@@ -373,7 +375,7 @@ acpi_db_dump_namespace (
 	NATIVE_CHAR             *start_arg,
 	NATIVE_CHAR             *depth_arg)
 {
-	ACPI_HANDLE             subtree_entry = acpi_gbl_root_node;
+	acpi_handle             subtree_entry = acpi_gbl_root_node;
 	u32                     max_depth = ACPI_UINT32_MAX;
 
 
@@ -383,8 +385,8 @@ acpi_db_dump_namespace (
 		/* Check if numeric argument, must be a Node */
 
 		if ((start_arg[0] >= 0x30) && (start_arg[0] <= 0x39)) {
-			subtree_entry = (ACPI_HANDLE) STRTOUL (start_arg, NULL, 16);
-			if (!acpi_os_readable (subtree_entry, sizeof (ACPI_NAMESPACE_NODE))) {
+			subtree_entry = (acpi_handle) STRTOUL (start_arg, NULL, 16);
+			if (!acpi_os_readable (subtree_entry, sizeof (acpi_namespace_node))) {
 				acpi_os_printf ("Address %p is invalid in this address space\n", subtree_entry);
 				return;
 			}
@@ -443,7 +445,7 @@ acpi_db_dump_namespace_by_owner (
 	NATIVE_CHAR             *owner_arg,
 	NATIVE_CHAR             *depth_arg)
 {
-	ACPI_HANDLE             subtree_entry = acpi_gbl_root_node;
+	acpi_handle             subtree_entry = acpi_gbl_root_node;
 	u32                     max_depth = ACPI_UINT32_MAX;
 	u16                     owner_id;
 
@@ -488,7 +490,7 @@ acpi_db_send_notify (
 	NATIVE_CHAR             *name,
 	u32                     value)
 {
-	ACPI_NAMESPACE_NODE     *node;
+	acpi_namespace_node     *node;
 
 
 	/* Translate name to an Named object */
@@ -541,8 +543,8 @@ acpi_db_set_method_data (
 	NATIVE_CHAR             type;
 	u32                     index;
 	u32                     value;
-	ACPI_WALK_STATE         *walk_state;
-	ACPI_OPERAND_OBJECT     *obj_desc;
+	acpi_walk_state         *walk_state;
+	acpi_operand_object     *obj_desc;
 
 
 	/* Validate Type_arg */
@@ -631,20 +633,20 @@ acpi_db_set_method_data (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_db_walk_for_specific_objects (
-	ACPI_HANDLE             obj_handle,
+	acpi_handle             obj_handle,
 	u32                     nesting_level,
 	void                    *context,
 	void                    **return_value)
 {
-	ACPI_OPERAND_OBJECT     *obj_desc;
-	ACPI_STATUS             status;
+	acpi_operand_object     *obj_desc;
+	acpi_status             status;
 	u32                     buf_size;
 	NATIVE_CHAR             buffer[64];
 
 
-	obj_desc = ((ACPI_NAMESPACE_NODE *)obj_handle)->object;
+	obj_desc = ((acpi_namespace_node *)obj_handle)->object;
 	buf_size = sizeof (buffer) / sizeof (*buffer);
 
 	/* Get and display the full pathname to this object */
@@ -707,12 +709,12 @@ acpi_db_walk_for_specific_objects (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_db_display_objects (
 	NATIVE_CHAR             *obj_type_arg,
 	NATIVE_CHAR             *display_count_arg)
 {
-	ACPI_OBJECT_TYPE8       type;
+	acpi_object_type8       type;
 
 
 	/* Get the object type */
@@ -751,14 +753,14 @@ acpi_db_display_objects (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_db_walk_and_match_name (
-	ACPI_HANDLE             obj_handle,
+	acpi_handle             obj_handle,
 	u32                     nesting_level,
 	void                    *context,
 	void                    **return_value)
 {
-	ACPI_STATUS             status;
+	acpi_status             status;
 	NATIVE_CHAR             *requested_name = (NATIVE_CHAR *) context;
 	u32                     i;
 	u32                     buf_size;
@@ -771,7 +773,7 @@ acpi_db_walk_and_match_name (
 		/* Wildcard support */
 
 		if ((requested_name[i] != '?') &&
-			(requested_name[i] != ((NATIVE_CHAR *) (&((ACPI_NAMESPACE_NODE *) obj_handle)->name))[i])) {
+			(requested_name[i] != ((NATIVE_CHAR *) (&((acpi_namespace_node *) obj_handle)->name))[i])) {
 			/* No match, just exit */
 
 			return (AE_OK);
@@ -790,7 +792,7 @@ acpi_db_walk_and_match_name (
 
 	else {
 		acpi_os_printf ("%32s (%p) - %s\n", buffer, obj_handle,
-			acpi_ut_get_type_name (((ACPI_NAMESPACE_NODE *) obj_handle)->type));
+			acpi_ut_get_type_name (((acpi_namespace_node *) obj_handle)->type));
 	}
 
 	return (AE_OK);
@@ -810,7 +812,7 @@ acpi_db_walk_and_match_name (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_db_find_name_in_namespace (
 	NATIVE_CHAR             *name_arg)
 {
@@ -849,7 +851,7 @@ acpi_db_set_scope (
 {
 
 	if (!name || name[0] == 0) {
-		acpi_os_printf ("Current scope: %s\n", scope_buf);
+		acpi_os_printf ("Current scope: %s\n", acpi_gbl_db_scope_buf);
 		return;
 	}
 
@@ -858,16 +860,16 @@ acpi_db_set_scope (
 	/* TBD: [Future] Validate scope here */
 
 	if (name[0] == '\\') {
-		STRCPY (scope_buf, name);
-		STRCAT (scope_buf, "\\");
+		STRCPY (acpi_gbl_db_scope_buf, name);
+		STRCAT (acpi_gbl_db_scope_buf, "\\");
 	}
 
 	else {
-		STRCAT (scope_buf, name);
-		STRCAT (scope_buf, "\\");
+		STRCAT (acpi_gbl_db_scope_buf, name);
+		STRCAT (acpi_gbl_db_scope_buf, "\\");
 	}
 
-	acpi_os_printf ("New scope: %s\n", scope_buf);
+	acpi_os_printf ("New scope: %s\n", acpi_gbl_db_scope_buf);
 }
 
 
@@ -888,21 +890,22 @@ acpi_db_display_resources (
 	NATIVE_CHAR             *object_arg)
 {
 #ifndef _IA16
-	ACPI_OPERAND_OBJECT     *obj_desc;
-	ACPI_STATUS             status;
-	ACPI_BUFFER             return_obj;
+	acpi_operand_object     *obj_desc;
+	acpi_status             status;
+	acpi_buffer             return_obj;
 
 
 	acpi_db_set_output_destination (DB_REDIRECTABLE_OUTPUT);
 
 	/* Convert string to object pointer */
 
-	obj_desc = (ACPI_OPERAND_OBJECT *) STRTOUL (object_arg, NULL, 16);
+	obj_desc = (acpi_operand_object *) STRTOUL (object_arg, NULL, 16);
 
 	/* Prepare for a return object of arbitrary size */
 
-	return_obj.pointer          = buffer;
-	return_obj.length           = BUFFER_SIZE;
+	return_obj.pointer          = acpi_gbl_db_buffer;
+	return_obj.length           = ACPI_DEBUG_BUFFER_SIZE;
+
 
 	/* _PRT */
 
@@ -910,69 +913,75 @@ acpi_db_display_resources (
 
 	status = acpi_evaluate_object (obj_desc, "_PRT", NULL, &return_obj);
 	if (ACPI_FAILURE (status)) {
-		acpi_os_printf ("Could not obtain _PRT: %s\n", acpi_ut_format_exception (status));
-		goto go_cRS;
+		acpi_os_printf ("Could not obtain _PRT: %s\n", acpi_format_exception (status));
+		goto get_crs;
 	}
 
-	return_obj.pointer          = buffer;
-	return_obj.length           = BUFFER_SIZE;
+	return_obj.pointer          = acpi_gbl_db_buffer;
+	return_obj.length           = ACPI_DEBUG_BUFFER_SIZE;
 
 	status = acpi_get_irq_routing_table (obj_desc, &return_obj);
 	if (ACPI_FAILURE (status)) {
-		acpi_os_printf ("Get_irq_routing_table failed: %s\n", acpi_ut_format_exception (status));
-		goto go_cRS;
+		acpi_os_printf ("Get_irq_routing_table failed: %s\n", acpi_format_exception (status));
+	}
+
+	else {
+		acpi_rs_dump_irq_list ((u8 *) acpi_gbl_db_buffer);
 	}
 
 
-	acpi_rs_dump_irq_list((u8 *)buffer);
-
 	/* _CRS */
-go_cRS:
+
+get_crs:
 	acpi_os_printf ("Evaluating _CRS\n");
 
-	return_obj.pointer          = buffer;
-	return_obj.length           = BUFFER_SIZE;
+	return_obj.pointer          = acpi_gbl_db_buffer;
+	return_obj.length           = ACPI_DEBUG_BUFFER_SIZE;
 
 	status = acpi_evaluate_object (obj_desc, "_CRS", NULL, &return_obj);
 	if (ACPI_FAILURE (status)) {
-		acpi_os_printf ("Could not obtain _CRS: %s\n", acpi_ut_format_exception (status));
-		goto go_pRS;
+		acpi_os_printf ("Could not obtain _CRS: %s\n", acpi_format_exception (status));
+		goto get_prs;
 	}
 
-	return_obj.pointer          = buffer;
-	return_obj.length           = BUFFER_SIZE;
+	return_obj.pointer          = acpi_gbl_db_buffer;
+	return_obj.length           = ACPI_DEBUG_BUFFER_SIZE;
 
 	status = acpi_get_current_resources (obj_desc, &return_obj);
 	if (ACPI_FAILURE (status)) {
-		acpi_os_printf ("Acpi_get_current_resources failed: %s\n", acpi_ut_format_exception (status));
-		goto go_pRS;
+		acpi_os_printf ("Acpi_get_current_resources failed: %s\n", acpi_format_exception (status));
 	}
 
-	acpi_rs_dump_resource_list ((ACPI_RESOURCE *) buffer);
+	else {
+		acpi_rs_dump_resource_list ((acpi_resource *) acpi_gbl_db_buffer);
+	}
+
 
 	/* _PRS */
-go_pRS:
+
+get_prs:
 	acpi_os_printf ("Evaluating _PRS\n");
 
-	return_obj.pointer          = buffer;
-	return_obj.length           = BUFFER_SIZE;
+	return_obj.pointer          = acpi_gbl_db_buffer;
+	return_obj.length           = ACPI_DEBUG_BUFFER_SIZE;
 
 	status = acpi_evaluate_object (obj_desc, "_PRS", NULL, &return_obj);
 	if (ACPI_FAILURE (status)) {
-		acpi_os_printf ("Could not obtain _PRS: %s\n", acpi_ut_format_exception (status));
+		acpi_os_printf ("Could not obtain _PRS: %s\n", acpi_format_exception (status));
 		goto cleanup;
 	}
 
-	return_obj.pointer          = buffer;
-	return_obj.length           = BUFFER_SIZE;
+	return_obj.pointer          = acpi_gbl_db_buffer;
+	return_obj.length           = ACPI_DEBUG_BUFFER_SIZE;
 
 	status = acpi_get_possible_resources (obj_desc, &return_obj);
 	if (ACPI_FAILURE (status)) {
-		acpi_os_printf ("Acpi_get_possible_resources failed: %s\n", acpi_ut_format_exception (status));
-		goto cleanup;
+		acpi_os_printf ("Acpi_get_possible_resources failed: %s\n", acpi_format_exception (status));
 	}
 
-	acpi_rs_dump_resource_list ((ACPI_RESOURCE *) buffer);
+	else {
+		acpi_rs_dump_resource_list ((acpi_resource *) acpi_gbl_db_buffer);
+	}
 
 
 cleanup:

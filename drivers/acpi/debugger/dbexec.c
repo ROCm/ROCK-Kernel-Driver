@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dbexec - debugger control method execution
- *              $Revision: 26 $
+ *              $Revision: 34 $
  *
  ******************************************************************************/
 
@@ -41,7 +41,7 @@
 	 MODULE_NAME         ("dbexec")
 
 
-DB_METHOD_INFO              info;
+db_method_info              acpi_gbl_db_method_info;
 
 
 /*******************************************************************************
@@ -57,18 +57,18 @@ DB_METHOD_INFO              info;
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_db_execute_method (
-	DB_METHOD_INFO          *info,
-	ACPI_BUFFER             *return_obj)
+	db_method_info          *info,
+	acpi_buffer             *return_obj)
 {
-	ACPI_STATUS             status;
-	ACPI_OBJECT_LIST        param_objects;
-	ACPI_OBJECT             params[MTH_NUM_ARGS];
+	acpi_status             status;
+	acpi_object_list        param_objects;
+	acpi_object             params[MTH_NUM_ARGS];
 	u32                     i;
 
 
-	if (output_to_file && !acpi_dbg_level) {
+	if (acpi_gbl_db_output_to_file && !acpi_dbg_level) {
 		acpi_os_printf ("Warning: debug output is not enabled!\n");
 	}
 
@@ -100,8 +100,8 @@ acpi_db_execute_method (
 
 	/* Prepare for a return object of arbitrary size */
 
-	return_obj->pointer          = buffer;
-	return_obj->length           = BUFFER_SIZE;
+	return_obj->pointer          = acpi_gbl_db_buffer;
+	return_obj->length           = ACPI_DEBUG_BUFFER_SIZE;
 
 
 	/* Do the actual method execution */
@@ -129,7 +129,7 @@ acpi_db_execute_method (
 
 void
 acpi_db_execute_setup (
-	DB_METHOD_INFO          *info)
+	db_method_info          *info)
 {
 
 	/* Catenate the current scope to the supplied name */
@@ -137,7 +137,7 @@ acpi_db_execute_setup (
 	info->pathname[0] = 0;
 	if ((info->name[0] != '\\') &&
 		(info->name[0] != '/')) {
-		STRCAT (info->pathname, scope_buf);
+		STRCAT (info->pathname, acpi_gbl_db_scope_buf);
 	}
 
 	STRCAT (info->pathname, info->name);
@@ -156,6 +156,40 @@ acpi_db_execute_setup (
 
 		acpi_db_set_output_destination (DB_REDIRECTABLE_OUTPUT);
 	}
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_db_get_outstanding_allocations
+ *
+ * PARAMETERS:  None
+ *
+ * RETURN:      Current global allocation count minus cache entries
+ *
+ * DESCRIPTION: Determine the current number of "outstanding" allocations --
+ *              those allocations that have not been freed and also are not
+ *              in one of the various object caches.
+ *
+ ******************************************************************************/
+
+u32
+acpi_db_get_outstanding_allocations (void)
+{
+	u32                     i;
+	u32                     outstanding = 0;
+
+
+#ifdef ACPI_DBG_TRACK_ALLOCATIONS
+
+	for (i = ACPI_MEM_LIST_FIRST_CACHE_LIST; i < ACPI_NUM_MEM_LISTS; i++) {
+		outstanding += (acpi_gbl_memory_lists[i].total_allocated -
+				  acpi_gbl_memory_lists[i].total_freed -
+				  acpi_gbl_memory_lists[i].cache_depth);
+	}
+#endif
+
+	return (outstanding);
 }
 
 
@@ -180,21 +214,51 @@ acpi_db_execute (
 	NATIVE_CHAR             **args,
 	u32                     flags)
 {
-	ACPI_STATUS             status;
-	ACPI_BUFFER             return_obj;
+	acpi_status             status;
+	acpi_buffer             return_obj;
 
 
-	info.name = name;
-	info.args = args;
-	info.flags = flags;
+#ifdef ACPI_DEBUG
+	u32                     previous_allocations;
+	u32                     allocations;
 
-	acpi_db_execute_setup (&info);
-	status = acpi_db_execute_method (&info, &return_obj);
 
+	/* Memory allocation tracking */
+
+	previous_allocations = acpi_db_get_outstanding_allocations ();
+#endif
+
+	acpi_gbl_db_method_info.name = name;
+	acpi_gbl_db_method_info.args = args;
+	acpi_gbl_db_method_info.flags = flags;
+
+	acpi_db_execute_setup (&acpi_gbl_db_method_info);
+	status = acpi_db_execute_method (&acpi_gbl_db_method_info, &return_obj);
+
+	/*
+	 * Allow any handlers in separate threads to complete.
+	 * (Such as Notify handlers invoked from AML executed above).
+	 */
+	acpi_os_sleep (0, 10);
+
+
+#ifdef ACPI_DEBUG
+
+	/* Memory allocation tracking */
+
+	allocations = acpi_db_get_outstanding_allocations () - previous_allocations;
+
+	acpi_db_set_output_destination (DB_DUPLICATE_OUTPUT);
+
+	if (allocations > 0) {
+		acpi_os_printf ("Outstanding: %ld allocations after execution\n",
+				  allocations);
+	}
+#endif
 
 	if (ACPI_FAILURE (status)) {
 		acpi_os_printf ("Execution of %s failed with status %s\n",
-			info.pathname, acpi_ut_format_exception (status));
+			acpi_gbl_db_method_info.pathname, acpi_format_exception (status));
 	}
 
 	else {
@@ -202,7 +266,7 @@ acpi_db_execute (
 
 		if (return_obj.length) {
 			acpi_os_printf ("Execution of %s returned object %p Buflen %X\n",
-				info.pathname, return_obj.pointer, return_obj.length);
+				acpi_gbl_db_method_info.pathname, return_obj.pointer, return_obj.length);
 			acpi_db_dump_object (return_obj.pointer, 1);
 		}
 	}
@@ -228,10 +292,10 @@ void
 acpi_db_method_thread (
 	void                    *context)
 {
-	ACPI_STATUS             status;
-	DB_METHOD_INFO          *info = context;
+	acpi_status             status;
+	db_method_info          *info = context;
 	u32                     i;
-	ACPI_BUFFER             return_obj;
+	acpi_buffer             return_obj;
 
 
 	for (i = 0; i < info->num_loops; i++) {
@@ -244,7 +308,6 @@ acpi_db_method_thread (
 			}
 		}
 	}
-
 
 	/* Signal our completion */
 
@@ -272,11 +335,11 @@ acpi_db_create_execution_threads (
 	NATIVE_CHAR             *num_loops_arg,
 	NATIVE_CHAR             *method_name_arg)
 {
-	ACPI_STATUS             status;
+	acpi_status             status;
 	u32                     num_threads;
 	u32                     num_loops;
 	u32                     i;
-	ACPI_HANDLE             thread_gate;
+	acpi_handle             thread_gate;
 
 
 	/* Get the arguments */
@@ -294,19 +357,19 @@ acpi_db_create_execution_threads (
 
 	status = acpi_os_create_semaphore (1, 0, &thread_gate);
 	if (ACPI_FAILURE (status)) {
-		acpi_os_printf ("Could not create semaphore, %s\n", acpi_ut_format_exception (status));
+		acpi_os_printf ("Could not create semaphore, %s\n", acpi_format_exception (status));
 		return;
 	}
 
 	/* Setup the context to be passed to each thread */
 
-	info.name = method_name_arg;
-	info.args = NULL;
-	info.flags = 0;
-	info.num_loops = num_loops;
-	info.thread_gate = thread_gate;
+	acpi_gbl_db_method_info.name = method_name_arg;
+	acpi_gbl_db_method_info.args = NULL;
+	acpi_gbl_db_method_info.flags = 0;
+	acpi_gbl_db_method_info.num_loops = num_loops;
+	acpi_gbl_db_method_info.thread_gate = thread_gate;
 
-	acpi_db_execute_setup (&info);
+	acpi_db_execute_setup (&acpi_gbl_db_method_info);
 
 
 	/* Create the threads */
@@ -314,7 +377,7 @@ acpi_db_create_execution_threads (
 	acpi_os_printf ("Creating %X threads to execute %X times each\n", num_threads, num_loops);
 
 	for (i = 0; i < (num_threads); i++) {
-		acpi_os_queue_for_execution (OSD_PRIORITY_MED, acpi_db_method_thread, &info);
+		acpi_os_queue_for_execution (OSD_PRIORITY_MED, acpi_db_method_thread, &acpi_gbl_db_method_info);
 	}
 
 

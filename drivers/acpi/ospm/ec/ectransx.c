@@ -1,7 +1,7 @@
 /*****************************************************************************
  *
  * Module Name: ectransx.c
- *   $Revision: 21 $
+ *   $Revision: 24 $
  *
  *****************************************************************************/
 
@@ -43,7 +43,7 @@
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 ec_io_wait (
 	EC_CONTEXT              *ec,
 	EC_EVENT                wait_event)
@@ -66,21 +66,21 @@ ec_io_wait (
 
 	case EC_EVENT_OUTPUT_BUFFER_FULL:
 		do {
-			ec_status = acpi_os_in8(ec->status_port);
+			acpi_os_read_port(ec->status_port, &ec_status, 8);
 			if (ec_status & EC_FLAG_OUTPUT_BUFFER) {
 				return(AE_OK);
 			}
-			acpi_os_sleep_usec(10);
+			acpi_os_stall(10);
 		} while (--i>0);
 		break;
 
 	case EC_EVENT_INPUT_BUFFER_EMPTY:
 		do {
-			ec_status = acpi_os_in8(ec->status_port);
+			acpi_os_read_port(ec->status_port, &ec_status, 8);
 			if (!(ec_status & EC_FLAG_INPUT_BUFFER)) {
 				return(AE_OK);
 			}
-			acpi_os_sleep_usec(10);
+			acpi_os_stall(10);
 		} while (--i>0);
 		break;
 	}
@@ -101,20 +101,20 @@ ec_io_wait (
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 ec_io_read (
 	EC_CONTEXT              *ec,
 	ACPI_IO_ADDRESS         io_port,
 	u8                      *data,
 	EC_EVENT                wait_event)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 
 	if (!ec || !data) {
 		return(AE_BAD_PARAMETER);
 	}
 
-	*data = acpi_os_in8(io_port);
+	acpi_os_read_port(io_port, (u32*) data, 8);
 
 	if (wait_event) {
 		status = ec_io_wait(ec, wait_event);
@@ -136,20 +136,20 @@ ec_io_read (
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 ec_io_write (
 	EC_CONTEXT              *ec,
 	ACPI_IO_ADDRESS         io_port,
 	u8                      data,
 	EC_EVENT                wait_event)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 
 	if (!ec) {
 		return(AE_BAD_PARAMETER);
 	}
 
-	acpi_os_out8(io_port, data);
+	acpi_os_write_port(io_port, data, 8);
 
 	if (wait_event) {
 		status = ec_io_wait(ec, wait_event);
@@ -171,35 +171,40 @@ ec_io_write (
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 ec_read (
 	EC_CONTEXT              *ec,
 	u8                      address,
 	u8                      *data)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
+
+	FUNCTION_TRACE("ec_read");
 
 	if (!ec || !data) {
-		return(AE_BAD_PARAMETER);
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
 	if (ec->use_global_lock) {
 		status = acpi_acquire_global_lock();
 		if (ACPI_FAILURE(status)) {
-			return(status);
+			ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Could not acquire Global Lock\n"));
+			return_ACPI_STATUS(status);
 		}
 	}
 
 	status = ec_io_write(ec, ec->command_port, EC_COMMAND_READ,
 		EC_EVENT_INPUT_BUFFER_EMPTY);
 	if (ACPI_FAILURE(status)) {
-		return(status);
+		ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Unable to send 'read command' to EC.\n"));
+		return_ACPI_STATUS(status);
 	}
 
 	status = ec_io_write(ec, ec->data_port, address,
 		EC_EVENT_OUTPUT_BUFFER_FULL);
 	if (ACPI_FAILURE(status)) {
-		return(status);
+		ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Unable to send 'read address' to EC.\n"));
+		return_ACPI_STATUS(status);
 	}
 
 	status = ec_io_read(ec, ec->data_port, data, EC_EVENT_NONE);
@@ -208,7 +213,9 @@ ec_read (
 		acpi_release_global_lock();
 	}
 
-	return(status);
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Read data [%02x] from address [%02x] on ec [%02x].\n", (*data), address, ec->device_handle));
+
+	return_ACPI_STATUS(status);
 }
 
 
@@ -224,47 +231,55 @@ ec_read (
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 ec_write (
 	EC_CONTEXT              *ec,
 	u8                      address,
 	u8                      data)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
+
+	FUNCTION_TRACE("ec_write");
 
 	if (!ec)
-		return(AE_BAD_PARAMETER);
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 
 	if (ec->use_global_lock) {
 		status = acpi_acquire_global_lock();
 		if (ACPI_FAILURE(status)) {
-			return(status);
+			ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Could not acquire Global Lock\n"));
+			return_ACPI_STATUS(status);
 		}
 	}
 
 	status = ec_io_write(ec, ec->command_port, EC_COMMAND_WRITE,
 		EC_EVENT_INPUT_BUFFER_EMPTY);
 	if (ACPI_FAILURE(status)) {
-		return(status);
+		ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Unable to send 'write command' to EC.\n"));
+		return_ACPI_STATUS(status);
 	}
 
 	status = ec_io_write(ec, ec->data_port, address,
 		EC_EVENT_INPUT_BUFFER_EMPTY);
 	if (ACPI_FAILURE(status)) {
-		return(status);
+		ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Unable to send 'write address' to EC.\n"));
+		return_ACPI_STATUS(status);
 	}
 
 	status = ec_io_write(ec, ec->data_port, data,
 		EC_EVENT_INPUT_BUFFER_EMPTY);
 	if (ACPI_FAILURE(status)) {
-		return(status);
+		ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Unable to send 'write data' to EC.\n"));
+		return_ACPI_STATUS(status);
 	}
 
 	if (ec->use_global_lock) {
 		acpi_release_global_lock();
 	}
 
-	return(status);
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Wrote data [%02x] to address [%02x] on ec [%02x].\n", data, address, ec->device_handle));
+
+	return_ACPI_STATUS(status);
 }
 
 
@@ -280,15 +295,17 @@ ec_write (
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 ec_transaction (
 	EC_CONTEXT              *ec,
 	EC_REQUEST              *request)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
+
+	FUNCTION_TRACE("ec_transaction");
 
 	if (!ec || !request) {
-		return(AE_BAD_PARAMETER);
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
 	/*
@@ -296,7 +313,7 @@ ec_transaction (
 	 */
 	status = acpi_os_wait_semaphore(ec->mutex, 1, EC_DEFAULT_TIMEOUT);
 	if (ACPI_FAILURE(status)) {
-		return(status);
+		return_ACPI_STATUS(status);
 	}
 
 	/*
@@ -322,5 +339,5 @@ ec_transaction (
 	 */
 	acpi_os_signal_semaphore(ec->mutex, 1);
 
-	return(status);
+	return_ACPI_STATUS(status);
 }

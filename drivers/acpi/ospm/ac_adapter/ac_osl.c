@@ -1,7 +1,7 @@
 /*****************************************************************************
  *
  * Module Name: ac_osl.c
- *   $Revision: 7 $
+ *   $Revision: 9 $
  *
  *****************************************************************************/
 
@@ -62,7 +62,7 @@ ac_osl_proc_read_status (
 	int 			*eof,
 	void			*context)
 {
-	ACPI_STATUS 		status = AE_OK;
+	acpi_status 		status = AE_OK;
 	AC_CONTEXT		*ac_adapter = NULL;
 	char			*p = page;
 	int			len;
@@ -86,11 +86,11 @@ ac_osl_proc_read_status (
 	}
 
 	if (ac_adapter->is_online) {
-		p += sprintf(p, "Status:                  %s\n", 
+		p += sprintf(p, "Status:                  %s\n",
 			AC_ON_LINE);
 	}
 	else {
-		p += sprintf(p, "Status:                  %s\n", 
+		p += sprintf(p, "Status:                  %s\n",
 			AC_OFF_LINE);
 	}
 
@@ -112,7 +112,7 @@ end:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 ac_osl_add_device(
 	AC_CONTEXT		*ac_adapter)
 {
@@ -129,7 +129,7 @@ ac_osl_add_device(
 		return(AE_ERROR);
 	}
 
-	create_proc_read_entry(AC_PROC_STATUS, S_IFREG | S_IRUGO, 
+	create_proc_read_entry(AC_PROC_STATUS, S_IFREG | S_IRUGO,
 		proc_entry, ac_osl_proc_read_status, (void*)ac_adapter);
 
 	return(AE_OK);
@@ -142,7 +142,7 @@ ac_osl_add_device(
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 ac_osl_remove_device (
 	AC_CONTEXT		*ac_adapter)
 {
@@ -168,12 +168,12 @@ ac_osl_remove_device (
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 ac_osl_generate_event (
 	u32			event,
 	AC_CONTEXT		*ac_adapter)
 {
-	ACPI_STATUS		status = AE_OK;
+	acpi_status		status = AE_OK;
 
 	if (!ac_adapter) {
 		return(AE_BAD_PARAMETER);
@@ -182,7 +182,7 @@ ac_osl_generate_event (
 	switch (event) {
 
 	case AC_NOTIFY_STATUS_CHANGE:
-		status = bm_osl_generate_event(ac_adapter->device_handle, 
+		status = bm_osl_generate_event(ac_adapter->device_handle,
 			AC_PROC_ROOT, ac_adapter->uid, event, 0);
 		break;
 
@@ -207,10 +207,10 @@ ac_osl_generate_event (
  *
  ****************************************************************************/
 
-static int __init 
+static int __init
 ac_osl_init (void)
 {
-	ACPI_STATUS		status = AE_OK;
+	acpi_status		status = AE_OK;
 
 	ac_proc_root = proc_mkdir(AC_PROC_ROOT, bm_proc_root);
 	if (!ac_proc_root) {
@@ -240,7 +240,7 @@ ac_osl_init (void)
  *
  ****************************************************************************/
 
-static void __exit 
+static void __exit
 ac_osl_cleanup (void)
 {
 	ac_terminate();

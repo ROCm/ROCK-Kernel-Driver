@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exresolv - AML Interpreter object resolution
- *              $Revision: 95 $
+ *              $Revision: 99 $
  *
  *****************************************************************************/
 
@@ -53,40 +53,47 @@
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_get_buffer_field_value (
-	ACPI_OPERAND_OBJECT     *obj_desc,
-	ACPI_OPERAND_OBJECT     *result_desc)
+	acpi_operand_object     *obj_desc,
+	acpi_operand_object     *result_desc)
 {
-	ACPI_STATUS             status;
+	acpi_status             status;
 	u32                     mask;
 	u8                      *location;
+
+
+	FUNCTION_TRACE ("Ex_get_buffer_field_value");
 
 
 	/*
 	 * Parameter validation
 	 */
 	if (!obj_desc) {
-		return (AE_AML_NO_OPERAND);
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Internal - null field pointer\n"));
+		return_ACPI_STATUS (AE_AML_NO_OPERAND);
 	}
 
 	if (!(obj_desc->common.flags & AOPOBJ_DATA_VALID)) {
 		status = acpi_ds_get_buffer_field_arguments (obj_desc);
 		if (ACPI_FAILURE (status)) {
-			return (status);
+			return_ACPI_STATUS (status);
 		}
 	}
 
 	if (!obj_desc->buffer_field.buffer_obj) {
-		return (AE_AML_INTERNAL);
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Internal - null container pointer\n"));
+		return_ACPI_STATUS (AE_AML_INTERNAL);
 	}
 
 	if (ACPI_TYPE_BUFFER != obj_desc->buffer_field.buffer_obj->common.type) {
-		return (AE_AML_OPERAND_TYPE);
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Internal - container is not a Buffer\n"));
+		return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
 	}
 
 	if (!result_desc) {
-		return (AE_AML_INTERNAL);
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Internal - null result pointer\n"));
+		return_ACPI_STATUS (AE_AML_INTERNAL);
 	}
 
 
@@ -123,7 +130,15 @@ acpi_ex_get_buffer_field_value (
 	result_desc->integer.value =
 		(result_desc->integer.value >> obj_desc->buffer_field.start_field_bit_offset) & mask;
 
-	return (AE_OK);
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
+		"** Read from buffer %p byte %ld bit %d width %d addr %p mask %08lx val %08lx\n",
+		obj_desc->buffer_field.buffer_obj->buffer.pointer,
+		obj_desc->buffer_field.base_byte_offset,
+		obj_desc->buffer_field.start_field_bit_offset,
+		obj_desc->buffer_field.bit_length,
+		location, mask, result_desc->integer.value));
+
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -132,8 +147,8 @@ acpi_ex_get_buffer_field_value (
  * FUNCTION:    Acpi_ex_resolve_to_value
  *
  * PARAMETERS:  **Stack_ptr         - Points to entry on Obj_stack, which can
- *                                    be either an (ACPI_OPERAND_OBJECT *)
- *                                    or an ACPI_HANDLE.
+ *                                    be either an (acpi_operand_object *)
+ *                                    or an acpi_handle.
  *              Walk_state          - Current method state
  *
  * RETURN:      Status
@@ -142,28 +157,32 @@ acpi_ex_get_buffer_field_value (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_resolve_to_value (
-	ACPI_OPERAND_OBJECT     **stack_ptr,
-	ACPI_WALK_STATE         *walk_state)
+	acpi_operand_object     **stack_ptr,
+	acpi_walk_state         *walk_state)
 {
-	ACPI_STATUS             status;
+	acpi_status             status;
+
+
+	FUNCTION_TRACE_PTR ("Ex_resolve_to_value", stack_ptr);
 
 
 	if (!stack_ptr || !*stack_ptr) {
-		return (AE_AML_NO_OPERAND);
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Internal - null pointer\n"));
+		return_ACPI_STATUS (AE_AML_NO_OPERAND);
 	}
 
 
 	/*
 	 * The entity pointed to by the Stack_ptr can be either
-	 * 1) A valid ACPI_OPERAND_OBJECT, or
-	 * 2) A ACPI_NAMESPACE_NODE (Named_obj)
+	 * 1) A valid acpi_operand_object, or
+	 * 2) A acpi_namespace_node (Named_obj)
 	 */
 	if (VALID_DESCRIPTOR_TYPE (*stack_ptr, ACPI_DESC_TYPE_INTERNAL)) {
 		status = acpi_ex_resolve_object_to_value (stack_ptr, walk_state);
 		if (ACPI_FAILURE (status)) {
-			return (status);
+			return_ACPI_STATUS (status);
 		}
 	}
 
@@ -172,15 +191,16 @@ acpi_ex_resolve_to_value (
 	 * was called (i.e., we can't use an _else_ here.)
 	 */
 	if (VALID_DESCRIPTOR_TYPE (*stack_ptr, ACPI_DESC_TYPE_NAMED)) {
-		status = acpi_ex_resolve_node_to_value ((ACPI_NAMESPACE_NODE **) stack_ptr,
+		status = acpi_ex_resolve_node_to_value ((acpi_namespace_node **) stack_ptr,
 				  walk_state);
 		if (ACPI_FAILURE (status)) {
-			return (status);
+			return_ACPI_STATUS (status);
 		}
 	}
 
 
-	return (AE_OK);
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Resolved object %p\n", *stack_ptr));
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -199,21 +219,24 @@ acpi_ex_resolve_to_value (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_resolve_object_to_value (
-	ACPI_OPERAND_OBJECT     **stack_ptr,
-	ACPI_WALK_STATE         *walk_state)
+	acpi_operand_object     **stack_ptr,
+	acpi_walk_state         *walk_state)
 {
-	ACPI_STATUS             status = AE_OK;
-	ACPI_OPERAND_OBJECT     *stack_desc;
+	acpi_status             status = AE_OK;
+	acpi_operand_object     *stack_desc;
 	void                    *temp_node;
-	ACPI_OPERAND_OBJECT     *obj_desc;
+	acpi_operand_object     *obj_desc;
 	u16                     opcode;
+
+
+	FUNCTION_TRACE ("Ex_resolve_object_to_value");
 
 
 	stack_desc = *stack_ptr;
 
-	/* This is an ACPI_OPERAND_OBJECT  */
+	/* This is an acpi_operand_object  */
 
 	switch (stack_desc->common.type) {
 
@@ -251,7 +274,7 @@ acpi_ex_resolve_object_to_value (
 			status = acpi_ds_method_data_get_value (opcode,
 					  stack_desc->reference.offset, walk_state, &obj_desc);
 			if (ACPI_FAILURE (status)) {
-				return (status);
+				return_ACPI_STATUS (status);
 			}
 
 			/*
@@ -261,35 +284,55 @@ acpi_ex_resolve_object_to_value (
 			acpi_ut_remove_reference (stack_desc);
 			*stack_ptr = obj_desc;
 
+			ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "[Arg/Local %d] Value_obj is %p\n",
+				stack_desc->reference.offset, obj_desc));
 			break;
 
 
 		/*
-		 * TBD: [Restructure] These next three opcodes change the type of
-		 * the object, which is actually a no-no.
+		 * For constants, we must change the reference/constant object
+		 * to a real integer object
 		 */
 		case AML_ZERO_OP:
-
-			stack_desc->common.type = (u8) ACPI_TYPE_INTEGER;
-			stack_desc->integer.value = 0;
-			break;
-
-
 		case AML_ONE_OP:
-
-			stack_desc->common.type = (u8) ACPI_TYPE_INTEGER;
-			stack_desc->integer.value = 1;
-			break;
-
-
 		case AML_ONES_OP:
+		case AML_REVISION_OP:
 
-			stack_desc->common.type = (u8) ACPI_TYPE_INTEGER;
-			stack_desc->integer.value = ACPI_INTEGER_MAX;
+			/* Create a new integer object */
 
-			/* Truncate value if we are executing from a 32-bit ACPI table */
+			obj_desc = acpi_ut_create_internal_object (ACPI_TYPE_INTEGER);
+			if (!obj_desc) {
+				return_ACPI_STATUS (AE_NO_MEMORY);
+			}
 
-			acpi_ex_truncate_for32bit_table (stack_desc, walk_state);
+			switch (opcode) {
+			case AML_ZERO_OP:
+				obj_desc->integer.value = 0;
+				break;
+
+			case AML_ONE_OP:
+				obj_desc->integer.value = 1;
+				break;
+
+			case AML_ONES_OP:
+				obj_desc->integer.value = ACPI_INTEGER_MAX;
+
+				/* Truncate value if we are executing from a 32-bit ACPI table */
+
+				acpi_ex_truncate_for32bit_table (obj_desc, walk_state);
+				break;
+
+			case AML_REVISION_OP:
+				obj_desc->integer.value = ACPI_CA_VERSION;
+				break;
+			}
+
+			/*
+			 * Remove a reference from the original reference object
+			 * and put the new object in its place
+			 */
+			acpi_ut_remove_reference (stack_desc);
+			*stack_ptr = obj_desc;
 			break;
 
 
@@ -320,6 +363,9 @@ acpi_ex_resolve_object_to_value (
 					 * A NULL object descriptor means an unitialized element of
 					 * the package, can't dereference it
 					 */
+					ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+						"Attempt to deref an Index to NULL pkg element Idx=%p\n",
+						stack_desc));
 					status = AE_AML_UNINITIALIZED_ELEMENT;
 				}
 				break;
@@ -327,6 +373,9 @@ acpi_ex_resolve_object_to_value (
 			default:
 				/* Invalid reference object */
 
+				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+					"Unknown Target_type %X in Index/Reference obj %p\n",
+					stack_desc->reference.target_type, stack_desc));
 				status = AE_AML_INTERNAL;
 				break;
 			}
@@ -342,6 +391,8 @@ acpi_ex_resolve_object_to_value (
 
 		default:
 
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unknown Reference object subtype %02X in %p\n",
+				opcode, stack_desc));
 			status = AE_AML_INTERNAL;
 			break;
 
@@ -354,7 +405,7 @@ acpi_ex_resolve_object_to_value (
 
 		obj_desc = acpi_ut_create_internal_object (ACPI_TYPE_ANY);
 		if (!obj_desc) {
-			return (AE_NO_MEMORY);
+			return_ACPI_STATUS (AE_NO_MEMORY);
 		}
 
 		status = acpi_ex_get_buffer_field_value (stack_desc, obj_desc);
@@ -371,7 +422,7 @@ acpi_ex_resolve_object_to_value (
 
 		obj_desc = acpi_ut_create_internal_object (ACPI_TYPE_ANY);
 		if (!obj_desc) {
-			return (AE_NO_MEMORY);
+			return_ACPI_STATUS (AE_NO_MEMORY);
 		}
 
 		/* TBD: WRONG! */
@@ -395,7 +446,7 @@ acpi_ex_resolve_object_to_value (
 	}   /* switch (Stack_desc->Common.Type) */
 
 
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 

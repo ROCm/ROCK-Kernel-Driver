@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: rscalc - Calculate stream and list lengths
- *              $Revision: 30 $
+ *              $Revision: 32 $
  *
  ******************************************************************************/
 
@@ -49,15 +49,18 @@
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_rs_calculate_byte_stream_length (
-	ACPI_RESOURCE           *linked_list,
+	acpi_resource           *linked_list,
 	u32                     *size_needed)
 {
 	u32                     byte_stream_size_needed = 0;
 	u32                     segment_size;
-	ACPI_RESOURCE_EXT_IRQ   *ex_irq = NULL;
+	acpi_resource_ext_irq   *ex_irq = NULL;
 	u8                      done = FALSE;
+
+
+	FUNCTION_TRACE ("Rs_calculate_byte_stream_length");
 
 
 	while (!done) {
@@ -239,7 +242,7 @@ acpi_rs_calculate_byte_stream_length (
 			 * If we get here, everything is out of sync,
 			 * so exit with an error
 			 */
-			return (AE_AML_INVALID_RESOURCE_TYPE);
+			return_ACPI_STATUS (AE_AML_INVALID_RESOURCE_TYPE);
 			break;
 
 		} /* switch (Linked_list->Id) */
@@ -252,7 +255,7 @@ acpi_rs_calculate_byte_stream_length (
 		/*
 		 * Point to the next object
 		 */
-		linked_list = POINTER_ADD (ACPI_RESOURCE,
+		linked_list = POINTER_ADD (acpi_resource,
 				  linked_list, linked_list->length);
 	}
 
@@ -260,7 +263,7 @@ acpi_rs_calculate_byte_stream_length (
 	 * This is the data the caller needs
 	 */
 	*size_needed = byte_stream_size_needed;
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -282,7 +285,7 @@ acpi_rs_calculate_byte_stream_length (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_rs_calculate_list_length (
 	u8                      *byte_stream_buffer,
 	u32                     byte_stream_buffer_length,
@@ -302,6 +305,9 @@ acpi_rs_calculate_list_length (
 	u8                      additional_bytes;
 
 
+	FUNCTION_TRACE ("Rs_calculate_list_length");
+
+
 	while (bytes_parsed < byte_stream_buffer_length) {
 		/*
 		 * The next byte in the stream is the resource type
@@ -315,7 +321,7 @@ acpi_rs_calculate_list_length (
 			 */
 			bytes_consumed = 12;
 
-			structure_size = SIZEOF_RESOURCE (ACPI_RESOURCE_MEM24);
+			structure_size = SIZEOF_RESOURCE (acpi_resource_mem24);
 			break;
 
 
@@ -334,7 +340,7 @@ acpi_rs_calculate_list_length (
 			 */
 			temp16 = (u16) ROUND_UP_TO_32_bITS (temp16);
 
-			structure_size = SIZEOF_RESOURCE (ACPI_RESOURCE_VENDOR) +
+			structure_size = SIZEOF_RESOURCE (acpi_resource_vendor) +
 					   (temp16 * sizeof (u8));
 			break;
 
@@ -346,7 +352,7 @@ acpi_rs_calculate_list_length (
 
 			bytes_consumed = 20;
 
-			structure_size = SIZEOF_RESOURCE (ACPI_RESOURCE_MEM32);
+			structure_size = SIZEOF_RESOURCE (acpi_resource_mem32);
 			break;
 
 
@@ -356,7 +362,7 @@ acpi_rs_calculate_list_length (
 			 */
 			bytes_consumed = 12;
 
-			structure_size = SIZEOF_RESOURCE (ACPI_RESOURCE_FIXED_MEM32);
+			structure_size = SIZEOF_RESOURCE (acpi_resource_fixed_mem32);
 			break;
 
 
@@ -393,7 +399,7 @@ acpi_rs_calculate_list_length (
 			 */
 			temp8 = (u8) ROUND_UP_TO_64_bITS (temp8);
 
-			structure_size = SIZEOF_RESOURCE (ACPI_RESOURCE_ADDRESS64) +
+			structure_size = SIZEOF_RESOURCE (acpi_resource_address64) +
 					   (temp8 * sizeof (u8));
 			break;
 
@@ -431,7 +437,7 @@ acpi_rs_calculate_list_length (
 			 */
 			temp8 = (u8) ROUND_UP_TO_32_bITS (temp8);
 
-			structure_size = SIZEOF_RESOURCE (ACPI_RESOURCE_ADDRESS32) +
+			structure_size = SIZEOF_RESOURCE (acpi_resource_address32) +
 					   (temp8 * sizeof (u8));
 			break;
 
@@ -469,7 +475,7 @@ acpi_rs_calculate_list_length (
 			 */
 			temp8 = (u8) ROUND_UP_TO_32_bITS (temp8);
 
-			structure_size = SIZEOF_RESOURCE (ACPI_RESOURCE_ADDRESS16) +
+			structure_size = SIZEOF_RESOURCE (acpi_resource_address16) +
 					   (temp8 * sizeof (u8));
 			break;
 
@@ -522,7 +528,7 @@ acpi_rs_calculate_list_length (
 			 */
 			temp8 = (u8) ROUND_UP_TO_32_bITS (temp8);
 
-			structure_size = SIZEOF_RESOURCE (ACPI_RESOURCE_EXT_IRQ) +
+			structure_size = SIZEOF_RESOURCE (acpi_resource_ext_irq) +
 					   (additional_bytes * sizeof (u8)) +
 					   (temp8 * sizeof (u8));
 			break;
@@ -562,7 +568,7 @@ acpi_rs_calculate_list_length (
 				temp16 >>= 1;
 			}
 
-			structure_size = SIZEOF_RESOURCE (ACPI_RESOURCE_IO) +
+			structure_size = SIZEOF_RESOURCE (acpi_resource_io) +
 					   (number_of_interrupts * sizeof (u32));
 			break;
 
@@ -592,7 +598,7 @@ acpi_rs_calculate_list_length (
 				temp8 >>= 1;
 			}
 
-			structure_size = SIZEOF_RESOURCE (ACPI_RESOURCE_DMA) +
+			structure_size = SIZEOF_RESOURCE (acpi_resource_dma) +
 					   (number_of_channels * sizeof (u32));
 			break;
 
@@ -612,7 +618,7 @@ acpi_rs_calculate_list_length (
 				bytes_consumed = 1;
 			}
 
-			structure_size = SIZEOF_RESOURCE (ACPI_RESOURCE_START_DPF);
+			structure_size = SIZEOF_RESOURCE (acpi_resource_start_dpf);
 			break;
 
 
@@ -630,7 +636,7 @@ acpi_rs_calculate_list_length (
 			 * IO Port Resource
 			 */
 			bytes_consumed = 8;
-			structure_size = SIZEOF_RESOURCE (ACPI_RESOURCE_IO);
+			structure_size = SIZEOF_RESOURCE (acpi_resource_io);
 			break;
 
 
@@ -639,7 +645,7 @@ acpi_rs_calculate_list_length (
 			 * Fixed IO Port Resource
 			 */
 			bytes_consumed = 4;
-			structure_size = SIZEOF_RESOURCE (ACPI_RESOURCE_FIXED_IO);
+			structure_size = SIZEOF_RESOURCE (acpi_resource_fixed_io);
 			break;
 
 
@@ -657,7 +663,7 @@ acpi_rs_calculate_list_length (
 			 * Ensure a 32-bit boundary for the structure
 			 */
 			temp8 = (u8) ROUND_UP_TO_32_bITS (temp8);
-			structure_size = SIZEOF_RESOURCE (ACPI_RESOURCE_VENDOR) +
+			structure_size = SIZEOF_RESOURCE (acpi_resource_vendor) +
 					   (temp8 * sizeof (u8));
 			break;
 
@@ -677,7 +683,7 @@ acpi_rs_calculate_list_length (
 			 * If we get here, everything is out of sync,
 			 *  so exit with an error
 			 */
-			return (AE_AML_INVALID_RESOURCE_TYPE);
+			return_ACPI_STATUS (AE_AML_INVALID_RESOURCE_TYPE);
 			break;
 		}
 
@@ -699,7 +705,7 @@ acpi_rs_calculate_list_length (
 	 * This is the data the caller needs
 	 */
 	*size_needed = buffer_size;
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -720,19 +726,22 @@ acpi_rs_calculate_list_length (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_rs_calculate_pci_routing_table_length (
-	ACPI_OPERAND_OBJECT     *package_object,
+	acpi_operand_object     *package_object,
 	u32                     *buffer_size_needed)
 {
 	u32                     number_of_elements;
 	u32                     temp_size_needed = 0;
-	ACPI_OPERAND_OBJECT     **top_object_list;
+	acpi_operand_object     **top_object_list;
 	u32                     index;
-	ACPI_OPERAND_OBJECT     *package_element;
-	ACPI_OPERAND_OBJECT     **sub_object_list;
+	acpi_operand_object     *package_element;
+	acpi_operand_object     **sub_object_list;
 	u8                      name_found;
 	u32                     table_index;
+
+
+	FUNCTION_TRACE ("Rs_calculate_pci_routing_table_length");
 
 
 	number_of_elements = package_object->package.count;
@@ -781,7 +790,7 @@ acpi_rs_calculate_pci_routing_table_length (
 			}
 		}
 
-		temp_size_needed += (sizeof (PCI_ROUTING_TABLE) - 4);
+		temp_size_needed += (sizeof (pci_routing_table) - 4);
 
 		/*
 		 * Was a String type found?
@@ -814,7 +823,7 @@ acpi_rs_calculate_pci_routing_table_length (
 		temp_size_needed = ROUND_UP_TO_64_bITS (temp_size_needed);
 
 		/*
-		 * Point to the next ACPI_OPERAND_OBJECT
+		 * Point to the next acpi_operand_object
 		 */
 		top_object_list++;
 	}
@@ -823,6 +832,6 @@ acpi_rs_calculate_pci_routing_table_length (
 	/*
 	 * Adding an extra element to the end of the list, essentially a NULL terminator
 	 */
-	*buffer_size_needed = temp_size_needed + sizeof (PCI_ROUTING_TABLE);
-	return (AE_OK);
+	*buffer_size_needed = temp_size_needed + sizeof (pci_routing_table);
+	return_ACPI_STATUS (AE_OK);
 }

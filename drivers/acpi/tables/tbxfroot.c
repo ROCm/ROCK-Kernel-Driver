@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tbxfroot - Find the root ACPI table (RSDT)
- *              $Revision: 39 $
+ *              $Revision: 49 $
  *
  *****************************************************************************/
 
@@ -40,6 +40,7 @@
  * FUNCTION:    Acpi_find_root_pointer
  *
  * PARAMETERS:  **Rsdp_physical_address     - Where to place the RSDP address
+ *              Flags                       - Logical/Physical addressing
  *
  * RETURN:      Status, Physical address of the RSDP
  *
@@ -47,24 +48,29 @@
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_find_root_pointer (
+	u32                     flags,
 	ACPI_PHYSICAL_ADDRESS   *rsdp_physical_address)
 {
-	ACPI_TABLE_DESC         table_info;
-	ACPI_STATUS             status;
+	acpi_table_desc         table_info;
+	acpi_status             status;
+
+
+	FUNCTION_TRACE ("Acpi_find_root_pointer");
 
 
 	/* Get the RSDP */
 
-	status = acpi_tb_find_rsdp (&table_info, ACPI_LOGICAL_ADDRESSING);
+	status = acpi_tb_find_rsdp (&table_info, flags);
 	if (ACPI_FAILURE (status)) {
-		return (AE_NO_ACPI_TABLES);
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "RSDP structure not found\n"));
+		return_ACPI_STATUS (AE_NO_ACPI_TABLES);
 	}
 
 	*rsdp_physical_address = table_info.physical_address;
 
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -90,6 +96,9 @@ acpi_tb_scan_memory_for_rsdp (
 	u8                      *mem_rover;
 
 
+	FUNCTION_TRACE ("Tb_scan_memory_for_rsdp");
+
+
 	/* Search from given start addr for the requested length  */
 
 	for (offset = 0, mem_rover = start_address;
@@ -103,13 +112,17 @@ acpi_tb_scan_memory_for_rsdp (
 			acpi_tb_checksum (mem_rover, RSDP_CHECKSUM_LENGTH) == 0) {
 			/* If so, we have found the RSDP */
 
-			return (mem_rover);
+			ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
+				"RSDP located at physical address %p\n",mem_rover));
+			return_PTR (mem_rover);
 		}
 	}
 
 	/* Searched entire block, no RSDP was found */
 
-	return (NULL);
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO,"Searched entire block, no RSDP was found.\n"));
+
+	return_PTR (NULL);
 }
 
 
@@ -132,15 +145,18 @@ acpi_tb_scan_memory_for_rsdp (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_tb_find_rsdp (
-	ACPI_TABLE_DESC         *table_info,
+	acpi_table_desc         *table_info,
 	u32                     flags)
 {
 	u8                      *table_ptr;
 	u8                      *mem_rover;
 	UINT64                  phys_addr;
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
+
+
+	FUNCTION_TRACE ("Tb_find_rsdp");
 
 
 	/*
@@ -153,7 +169,7 @@ acpi_tb_find_rsdp (
 		status = acpi_os_map_memory (LO_RSDP_WINDOW_BASE, LO_RSDP_WINDOW_SIZE,
 				  (void **) &table_ptr);
 		if (ACPI_FAILURE (status)) {
-			return (status);
+			return_ACPI_STATUS (status);
 		}
 
 		mem_rover = acpi_tb_scan_memory_for_rsdp (table_ptr, LO_RSDP_WINDOW_SIZE);
@@ -167,7 +183,7 @@ acpi_tb_find_rsdp (
 
 			table_info->physical_address = phys_addr;
 
-			return (AE_OK);
+			return_ACPI_STATUS (AE_OK);
 		}
 
 		/*
@@ -176,7 +192,7 @@ acpi_tb_find_rsdp (
 		status = acpi_os_map_memory (HI_RSDP_WINDOW_BASE, HI_RSDP_WINDOW_SIZE,
 				  (void **) &table_ptr);
 		if (ACPI_FAILURE (status)) {
-			return (status);
+			return_ACPI_STATUS (status);
 		}
 
 		mem_rover = acpi_tb_scan_memory_for_rsdp (table_ptr, HI_RSDP_WINDOW_SIZE);
@@ -190,7 +206,7 @@ acpi_tb_find_rsdp (
 
 			table_info->physical_address = phys_addr;
 
-			return (AE_OK);
+			return_ACPI_STATUS (AE_OK);
 		}
 	}
 
@@ -208,7 +224,7 @@ acpi_tb_find_rsdp (
 			/* Found it, return the physical address */
 
 			table_info->physical_address = (ACPI_TBLPTR) mem_rover;
-			return (AE_OK);
+			return_ACPI_STATUS (AE_OK);
 		}
 
 		/*
@@ -220,14 +236,14 @@ acpi_tb_find_rsdp (
 			/* Found it, return the physical address */
 
 			table_info->physical_address = (ACPI_TBLPTR) mem_rover;
-			return (AE_OK);
+			return_ACPI_STATUS (AE_OK);
 		}
 	}
 
 
 	/* RSDP signature was not found */
 
-	return (AE_NOT_FOUND);
+	return_ACPI_STATUS (AE_NOT_FOUND);
 }
 
 
@@ -253,18 +269,17 @@ acpi_tb_find_rsdp (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_get_firmware_table (
-	ACPI_STRING             signature,
+	acpi_string             signature,
 	u32                     instance,
 	u32                     flags,
-	ACPI_TABLE_HEADER       **table_pointer)
+	acpi_table_header       **table_pointer)
 {
 	ACPI_PHYSICAL_ADDRESS   physical_address;
-	ACPI_TABLE_DESC         table_info;
-	ACPI_TABLE_HEADER       *rsdt_ptr;
-	ACPI_TABLE_HEADER       *table_ptr;
-	ACPI_STATUS             status;
+	acpi_table_header       *rsdt_ptr;
+	acpi_table_header       *table_ptr;
+	acpi_status             status;
 	u32                     rsdt_size;
 	u32                     table_size;
 	u32                     table_count;
@@ -272,11 +287,13 @@ acpi_get_firmware_table (
 	u32                     j;
 
 
+	FUNCTION_TRACE ("Acpi_get_firmware_table");
+
+
 	/*
 	 * Ensure that at least the table manager is initialized.  We don't
 	 * require that the entire ACPI subsystem is up for this interface
 	 */
-
 
 	/*
 	 *  If we have a buffer, we must have a length too
@@ -284,17 +301,23 @@ acpi_get_firmware_table (
 	if ((instance == 0)                 ||
 		(!signature)                    ||
 		(!table_pointer)) {
-		return (AE_BAD_PARAMETER);
+		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
-	/* Get the RSDP by scanning low memory */
+	/* Get the RSDP */
 
-	status = acpi_tb_find_rsdp (&table_info, flags);
+	status = acpi_os_get_root_pointer (flags, &physical_address);
 	if (ACPI_FAILURE (status)) {
-		return (AE_NO_ACPI_TABLES);
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "RSDP  not found\n"));
+		return_ACPI_STATUS (AE_NO_ACPI_TABLES);
 	}
 
-	acpi_gbl_RSDP = (RSDP_DESCRIPTOR *) table_info.pointer;
+	acpi_gbl_RSDP = (RSDP_DESCRIPTOR *) (ACPI_TBLPTR) physical_address;
+
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
+		"RSDP located at %p, RSDT physical=%8.8lX%8.8lX \n",
+		acpi_gbl_RSDP, HIDWORD(acpi_gbl_RSDP->rsdt_physical_address),
+		LODWORD(acpi_gbl_RSDP->rsdt_physical_address)));
 
 
 	/* Get the RSDT and validate it */
@@ -302,7 +325,7 @@ acpi_get_firmware_table (
 	physical_address = acpi_tb_get_rsdt_address ();
 	status = acpi_tb_get_table_pointer (physical_address, flags, &rsdt_size, &rsdt_ptr);
 	if (ACPI_FAILURE (status)) {
-		return (status);
+		return_ACPI_STATUS (status);
 	}
 
 	status = acpi_tb_validate_rsdt (rsdt_ptr);
@@ -328,7 +351,7 @@ acpi_get_firmware_table (
 		}
 		else {
 			physical_address = (ACPI_PHYSICAL_ADDRESS)
-				ACPI_GET_ADDRESS (((XSDT_DESCRIPTOR *) rsdt_ptr)->table_offset_entry[i]);
+				ACPI_GET_ADDRESS (((xsdt_descriptor *) rsdt_ptr)->table_offset_entry[i]);
 		}
 
 		/* Get addressibility if necessary */
@@ -368,7 +391,7 @@ cleanup:
 	if (rsdt_size) {
 		acpi_os_unmap_memory (rsdt_ptr, rsdt_size);
 	}
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 

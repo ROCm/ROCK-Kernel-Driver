@@ -1,7 +1,7 @@
 /*****************************************************************************
  *
  * Module Name: pr.c
- *   $Revision: 30 $
+ *   $Revision: 32 $
  *
  *****************************************************************************/
 
@@ -37,7 +37,7 @@
  *                                  Globals
  ****************************************************************************/
 
-extern FADT_DESCRIPTOR_REV2	acpi_fadt;
+extern fadt_descriptor_rev2	acpi_fadt;
 
 
 /****************************************************************************
@@ -60,6 +60,33 @@ void
 pr_print (
 	PR_CONTEXT              *processor)
 {
+#ifdef ACPI_DEBUG
+	acpi_buffer             buffer;
+
+	PROC_NAME("pr_print");
+
+	buffer.length = 256;
+	buffer.pointer = acpi_os_callocate(buffer.length);
+	if (!buffer.pointer) {
+		return;
+	}
+
+	/*
+	 * Get the full pathname for this ACPI object.
+	 */
+	acpi_get_name(processor->acpi_handle, ACPI_FULL_PATHNAME, &buffer);
+
+	/*
+	 * Print out basic processor information.
+	 */
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "+------------------------------------------------------------\n"));
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "| Processor[%02x]:[%p] uid[%02x] %s\n", processor->device_handle, processor->acpi_handle, processor->uid, buffer.pointer));
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "|   power: %cC0 %cC1 %cC2[%d] %cC3[%d]\n", (processor->power.state[0].is_valid?'+':'-'), (processor->power.state[1].is_valid?'+':'-'), (processor->power.state[2].is_valid?'+':'-'), processor->power.state[2].latency, (processor->power.state[3].is_valid?'+':'-'), processor->power.state[3].latency));
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "|   performance: states[%d]\n", processor->performance.state_count));
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "+------------------------------------------------------------\n"));
+
+	acpi_os_free(buffer.pointer);
+#endif /* ACPI_DEBUG */
 
 	return;
 }
@@ -77,26 +104,28 @@ pr_print (
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 pr_add_device(
 	BM_HANDLE		device_handle,
 	void			**context)
 {
-	ACPI_STATUS		status = AE_OK;
+	acpi_status		status = AE_OK;
 	PR_CONTEXT		*processor = NULL;
 	BM_DEVICE		*device = NULL;
-	ACPI_BUFFER		buffer;
-	ACPI_OBJECT		acpi_object;
+	acpi_buffer		buffer;
+	acpi_object		acpi_object;
 	static u32		processor_count = 0;
 
 
+	FUNCTION_TRACE("pr_add_device");
+
 	if (!context || *context) {
-		return(AE_BAD_PARAMETER);
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
 	status = bm_get_device_info(device_handle, &device);
 	if (ACPI_FAILURE(status)) {
-		return(status);
+		return_ACPI_STATUS(status);
 	}
 
 	processor = acpi_os_callocate(sizeof(PR_CONTEXT));
@@ -111,9 +140,9 @@ pr_add_device(
 	 * Processor Block:
 	 * ----------------
 	 */
-	MEMSET(&acpi_object, 0, sizeof(ACPI_OBJECT));
+	MEMSET(&acpi_object, 0, sizeof(acpi_object));
 
-	buffer.length = sizeof(ACPI_OBJECT);
+	buffer.length = sizeof(acpi_object);
 	buffer.pointer = &acpi_object;
 
 	status = acpi_evaluate_object(processor->acpi_handle, NULL, NULL, &buffer);
@@ -162,7 +191,7 @@ end:
 		acpi_os_free(processor);
 	}
 
-	return(status);
+	return_ACPI_STATUS(status);
 }
 
 
@@ -178,18 +207,22 @@ end:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 pr_remove_device (
 	void			**context)
 {
-	ACPI_STATUS		status = AE_OK;
+	acpi_status		status = AE_OK;
 	PR_CONTEXT		*processor= NULL;
 
+	FUNCTION_TRACE("pr_remove_device");
+
 	if (!context || !*context) {
-		return(AE_BAD_PARAMETER);
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
 	processor = (PR_CONTEXT*)(*context);
+
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Removing processor device [%02x].\n", processor->device_handle));
 
 	pr_osl_remove_device(processor);
 
@@ -199,7 +232,7 @@ pr_remove_device (
 
 	acpi_os_free(processor);
 
-	return(status);
+	return_ACPI_STATUS(status);
 }
 
 
@@ -219,12 +252,14 @@ pr_remove_device (
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 pr_initialize (void)
 {
-	ACPI_STATUS		status = AE_OK;
+	acpi_status		status = AE_OK;
 	BM_DEVICE_ID		criteria;
 	BM_DRIVER		driver;
+
+	FUNCTION_TRACE("pr_initialize");
 
 	MEMSET(&criteria, 0, sizeof(BM_DEVICE_ID));
 	MEMSET(&driver, 0, sizeof(BM_DRIVER));
@@ -234,7 +269,7 @@ pr_initialize (void)
 	 */
 	status = pr_power_initialize();
 	if (ACPI_FAILURE(status)) {
-		return(status);
+		return_ACPI_STATUS(status);
 	}
 
 	/*
@@ -247,7 +282,7 @@ pr_initialize (void)
 
 	status = bm_register_driver(&criteria, &driver);
 
-	return(status);
+	return_ACPI_STATUS(status);
 }
 
 
@@ -263,12 +298,14 @@ pr_initialize (void)
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 pr_terminate (void)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 	BM_DEVICE_ID		criteria;
 	BM_DRIVER		driver;
+
+	FUNCTION_TRACE("pr_terminate");
 
 	MEMSET(&criteria, 0, sizeof(BM_DEVICE_ID));
 	MEMSET(&driver, 0, sizeof(BM_DRIVER));
@@ -278,7 +315,7 @@ pr_terminate (void)
 	 */
 	status = pr_power_terminate();
 	if (ACPI_FAILURE(status)) {
-		return(status);
+		return_ACPI_STATUS(status);
 	}
 
 	/*
@@ -291,7 +328,7 @@ pr_terminate (void)
 
 	status = bm_unregister_driver(&criteria, &driver);
 
-	return(status);
+	return_ACPI_STATUS(status);
 }
 
 
@@ -307,14 +344,16 @@ pr_terminate (void)
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 pr_notify (
 	BM_NOTIFY		notify_type,
 	BM_HANDLE		device_handle,
 	void			**context)
 {
-	ACPI_STATUS		status = AE_OK;
+	acpi_status		status = AE_OK;
 	PR_CONTEXT		*processor = NULL;
+
+	FUNCTION_TRACE("pr_notify");
 
 	processor = (PR_CONTEXT*)*context;
 
@@ -329,6 +368,7 @@ pr_notify (
 		break;
 
 	case PR_NOTIFY_PERF_STATES:
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Performance states change event detected on processor [%02x].\n", device_handle));
 		/* TBD: Streamline (this is simple but overkill). */
 		status = pr_perf_remove_device(processor);
 		if (ACPI_SUCCESS(status)) {
@@ -341,6 +381,7 @@ pr_notify (
 		break;
 
 	case PR_NOTIFY_POWER_STATES:
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Power states change event detected on processor [%02x].\n", device_handle));
 		/* TBD: Streamline (this is simple but overkill). */
 		status = pr_power_remove_device(processor);
 		if (ACPI_SUCCESS(status)) {
@@ -357,7 +398,7 @@ pr_notify (
 		break;
 	}
 
-	return(status);
+	return_ACPI_STATUS(status);
 }
 
 
@@ -373,19 +414,21 @@ pr_notify (
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 pr_request (
 	BM_REQUEST		*request,
 	void			*context)
 {
-	ACPI_STATUS		status = AE_OK;
+	acpi_status		status = AE_OK;
 	PR_CONTEXT		*processor = NULL;
+
+	FUNCTION_TRACE("pr_request");
 
 	/*
 	 * Must have a valid request structure and context.
 	 */
 	if (!request || !context) {
-		return(AE_BAD_PARAMETER);
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
 	processor = (PR_CONTEXT*)context;
@@ -450,5 +493,5 @@ pr_request (
 
 	request->status = status;
 
-	return(status);
+	return_ACPI_STATUS(status);
 }

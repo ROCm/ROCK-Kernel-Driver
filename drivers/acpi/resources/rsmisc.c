@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: rsmisc - Miscellaneous resource descriptors
- *              $Revision: 15 $
+ *              $Revision: 16 $
  *
  ******************************************************************************/
 
@@ -53,15 +53,18 @@
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_rs_end_tag_resource (
 	u8                      *byte_stream_buffer,
 	u32                     *bytes_consumed,
 	u8                      **output_buffer,
 	u32                     *structure_size)
 {
-	ACPI_RESOURCE           *output_struct = (ACPI_RESOURCE *) *output_buffer;
+	acpi_resource           *output_struct = (acpi_resource *) *output_buffer;
 	u32                     struct_size = ACPI_RESOURCE_LENGTH;
+
+
+	FUNCTION_TRACE ("Rs_end_tag_resource");
 
 
 	/*
@@ -83,7 +86,7 @@ acpi_rs_end_tag_resource (
 	 * Return the final size of the structure
 	 */
 	*structure_size = struct_size;
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -104,14 +107,17 @@ acpi_rs_end_tag_resource (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_rs_end_tag_stream (
-	ACPI_RESOURCE           *linked_list,
+	acpi_resource           *linked_list,
 	u8                      **output_buffer,
 	u32                     *bytes_consumed)
 {
 	u8                      *buffer = *output_buffer;
 	u8                      temp8 = 0;
+
+
+	FUNCTION_TRACE ("Rs_end_tag_stream");
 
 
 	/*
@@ -133,7 +139,7 @@ acpi_rs_end_tag_stream (
 	 * Return the number of bytes consumed in this operation
 	 */
 	*bytes_consumed = POINTER_DIFF (buffer, *output_buffer);
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -159,7 +165,7 @@ acpi_rs_end_tag_stream (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_rs_vendor_resource (
 	u8                      *byte_stream_buffer,
 	u32                     *bytes_consumed,
@@ -167,11 +173,14 @@ acpi_rs_vendor_resource (
 	u32                     *structure_size)
 {
 	u8                      *buffer = byte_stream_buffer;
-	ACPI_RESOURCE           *output_struct = (ACPI_RESOURCE *) *output_buffer;
+	acpi_resource           *output_struct = (acpi_resource *) *output_buffer;
 	u16                     temp16 = 0;
 	u8                      temp8 = 0;
 	u8                      index;
-	u32                     struct_size = SIZEOF_RESOURCE (ACPI_RESOURCE_VENDOR);
+	u32                     struct_size = SIZEOF_RESOURCE (acpi_resource_vendor);
+
+
+	FUNCTION_TRACE ("Rs_vendor_resource");
 
 
 	/*
@@ -239,7 +248,7 @@ acpi_rs_vendor_resource (
 	 * Return the final size of the structure
 	 */
 	*structure_size = struct_size;
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -260,9 +269,9 @@ acpi_rs_vendor_resource (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_rs_vendor_stream (
-	ACPI_RESOURCE           *linked_list,
+	acpi_resource           *linked_list,
 	u8                      **output_buffer,
 	u32                     *bytes_consumed)
 {
@@ -270,6 +279,9 @@ acpi_rs_vendor_stream (
 	u16                     temp16 = 0;
 	u8                      temp8 = 0;
 	u8                      index;
+
+
+	FUNCTION_TRACE ("Rs_vendor_stream");
 
 
 	/*
@@ -315,7 +327,7 @@ acpi_rs_vendor_stream (
 	 * Return the number of bytes consumed in this operation
 	 */
 	*bytes_consumed = POINTER_DIFF (buffer, *output_buffer);
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -341,7 +353,7 @@ acpi_rs_vendor_stream (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_rs_start_dependent_functions_resource (
 	u8                      *byte_stream_buffer,
 	u32                     *bytes_consumed,
@@ -349,9 +361,12 @@ acpi_rs_start_dependent_functions_resource (
 	u32                     *structure_size)
 {
 	u8                      *buffer = byte_stream_buffer;
-	ACPI_RESOURCE          *output_struct = (ACPI_RESOURCE *) *output_buffer;
+	acpi_resource          *output_struct = (acpi_resource *) *output_buffer;
 	u8                      temp8 = 0;
-	u32                     struct_size = SIZEOF_RESOURCE (ACPI_RESOURCE_START_DPF);
+	u32                     struct_size = SIZEOF_RESOURCE (acpi_resource_start_dpf);
+
+
+	FUNCTION_TRACE ("Rs_start_dependent_functions_resource");
 
 
 	/*
@@ -376,7 +391,7 @@ acpi_rs_start_dependent_functions_resource (
 		output_struct->data.start_dpf.compatibility_priority = temp8 & 0x03;
 
 		if (3 == output_struct->data.start_dpf.compatibility_priority) {
-			return (AE_AML_ERROR);
+			return_ACPI_STATUS (AE_AML_ERROR);
 		}
 
 		/*
@@ -385,7 +400,7 @@ acpi_rs_start_dependent_functions_resource (
 		output_struct->data.start_dpf.performance_robustness = (temp8 >> 2) & 0x03;
 
 		if (3 == output_struct->data.start_dpf.performance_robustness) {
-			return (AE_AML_ERROR);
+			return_ACPI_STATUS (AE_AML_ERROR);
 		}
 	}
 
@@ -406,7 +421,7 @@ acpi_rs_start_dependent_functions_resource (
 	 * Return the final size of the structure
 	 */
 	*structure_size = struct_size;
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -432,15 +447,18 @@ acpi_rs_start_dependent_functions_resource (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_rs_end_dependent_functions_resource (
 	u8                      *byte_stream_buffer,
 	u32                     *bytes_consumed,
 	u8                      **output_buffer,
 	u32                     *structure_size)
 {
-	ACPI_RESOURCE           *output_struct = (ACPI_RESOURCE *) *output_buffer;
+	acpi_resource           *output_struct = (acpi_resource *) *output_buffer;
 	u32                     struct_size = ACPI_RESOURCE_LENGTH;
+
+
+	FUNCTION_TRACE ("Rs_end_dependent_functions_resource");
 
 
 	/*
@@ -462,7 +480,7 @@ acpi_rs_end_dependent_functions_resource (
 	 * Return the final size of the structure
 	 */
 	*structure_size = struct_size;
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -483,14 +501,17 @@ acpi_rs_end_dependent_functions_resource (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_rs_start_dependent_functions_stream (
-	ACPI_RESOURCE           *linked_list,
+	acpi_resource           *linked_list,
 	u8                      **output_buffer,
 	u32                     *bytes_consumed)
 {
 	u8                      *buffer = *output_buffer;
 	u8                      temp8 = 0;
+
+
+	FUNCTION_TRACE ("Rs_start_dependent_functions_stream");
 
 
 	/*
@@ -524,7 +545,7 @@ acpi_rs_start_dependent_functions_stream (
 	 * Return the number of bytes consumed in this operation
 	 */
 	*bytes_consumed = POINTER_DIFF (buffer, *output_buffer);
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -545,14 +566,17 @@ acpi_rs_start_dependent_functions_stream (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_rs_end_dependent_functions_stream (
-	ACPI_RESOURCE           *linked_list,
+	acpi_resource           *linked_list,
 	u8                      **output_buffer,
 	u32                     *bytes_consumed
 	)
 {
 	u8                      *buffer = *output_buffer;
+
+
+	FUNCTION_TRACE ("Rs_end_dependent_functions_stream");
 
 
 	/*
@@ -565,6 +589,6 @@ acpi_rs_end_dependent_functions_stream (
 	 * Return the number of bytes consumed in this operation
 	 */
 	*bytes_consumed = POINTER_DIFF (buffer, *output_buffer);
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 

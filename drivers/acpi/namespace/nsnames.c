@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: nsnames - Name manipulation and search
- *              $Revision: 59 $
+ *              $Revision: 63 $
  *
  ******************************************************************************/
 
@@ -50,13 +50,16 @@
 
 NATIVE_CHAR *
 acpi_ns_get_table_pathname (
-	ACPI_NAMESPACE_NODE     *node)
+	acpi_namespace_node     *node)
 {
 	NATIVE_CHAR             *name_buffer;
 	u32                     size;
-	ACPI_NAME               name;
-	ACPI_NAMESPACE_NODE     *child_node;
-	ACPI_NAMESPACE_NODE     *parent_node;
+	acpi_name               name;
+	acpi_namespace_node     *child_node;
+	acpi_namespace_node     *parent_node;
+
+
+	FUNCTION_TRACE_PTR ("Ns_get_table_pathname", node);
 
 
 	if (!acpi_gbl_root_node || !node) {
@@ -64,7 +67,7 @@ acpi_ns_get_table_pathname (
 		 * If the name space has not been initialized,
 		 * this function should not have been called.
 		 */
-		return (NULL);
+		return_PTR (NULL);
 	}
 
 	child_node = node->child;
@@ -84,10 +87,10 @@ acpi_ns_get_table_pathname (
 
 	/* Allocate a buffer to be returned to caller */
 
-	name_buffer = acpi_ut_callocate (size + 1);
+	name_buffer = ACPI_MEM_CALLOCATE (size + 1);
 	if (!name_buffer) {
 		REPORT_ERROR (("Ns_get_table_pathname: allocation failure\n"));
-		return (NULL);
+		return_PTR (NULL);
 	}
 
 
@@ -107,8 +110,11 @@ acpi_ns_get_table_pathname (
 
 	name_buffer[--size] = AML_ROOT_PREFIX;
 
+	if (size != 0) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Bad pointer returned; size=%X\n", size));
+	}
 
-	return (name_buffer);
+	return_PTR (name_buffer);
 }
 
 
@@ -126,10 +132,14 @@ acpi_ns_get_table_pathname (
 
 u32
 acpi_ns_get_pathname_length (
-	ACPI_NAMESPACE_NODE     *node)
+	acpi_namespace_node     *node)
 {
 	u32                     size;
-	ACPI_NAMESPACE_NODE     *next_node;
+	acpi_namespace_node     *next_node;
+
+
+	FUNCTION_ENTRY ();
+
 
 	/*
 	 * Compute length of pathname as 5 * number of name segments.
@@ -168,18 +178,21 @@ acpi_ns_get_pathname_length (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ns_handle_to_pathname (
-	ACPI_HANDLE             target_handle,
+	acpi_handle             target_handle,
 	u32                     *buf_size,
 	NATIVE_CHAR             *user_buffer)
 {
-	ACPI_STATUS             status = AE_OK;
-	ACPI_NAMESPACE_NODE     *node;
+	acpi_status             status = AE_OK;
+	acpi_namespace_node     *node;
 	u32                     path_length;
 	u32                     user_buf_size;
-	ACPI_NAME               name;
+	acpi_name               name;
 	u32                     size;
+
+
+	FUNCTION_TRACE_PTR ("Ns_handle_to_pathname", target_handle);
 
 
 	if (!acpi_gbl_root_node) {
@@ -187,13 +200,12 @@ acpi_ns_handle_to_pathname (
 		 * If the name space has not been initialized,
 		 * this function should not have been called.
 		 */
-
-		return (AE_NO_NAMESPACE);
+		return_ACPI_STATUS (AE_NO_NAMESPACE);
 	}
 
 	node = acpi_ns_convert_handle_to_entry (target_handle);
 	if (!node) {
-		return (AE_BAD_PARAMETER);
+		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
 
@@ -239,11 +251,12 @@ acpi_ns_handle_to_pathname (
 	 * Overlay the "." preceding the first segment with
 	 * the root name "\"
 	 */
-
 	user_buffer[size] = '\\';
 
+	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Len=%X, %s \n", path_length, user_buffer));
+
 exit:
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 

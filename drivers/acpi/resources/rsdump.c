@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: rsdump - Functions to display the resource structures.
- *              $Revision: 20 $
+ *              $Revision: 23 $
  *
  ******************************************************************************/
 
@@ -31,6 +31,8 @@
 	 MODULE_NAME         ("rsdump")
 
 
+#ifdef ACPI_DEBUG
+
 /*******************************************************************************
  *
  * FUNCTION:    Acpi_rs_dump_irq
@@ -45,10 +47,13 @@
 
 void
 acpi_rs_dump_irq (
-	ACPI_RESOURCE_DATA      *data)
+	acpi_resource_data      *data)
 {
-	ACPI_RESOURCE_IRQ       *irq_data = (ACPI_RESOURCE_IRQ *) data;
+	acpi_resource_irq       *irq_data = (acpi_resource_irq *) data;
 	u8                      index = 0;
+
+
+	FUNCTION_ENTRY ();
 
 
 	acpi_os_printf ("IRQ Resource\n");
@@ -87,10 +92,13 @@ acpi_rs_dump_irq (
 
 void
 acpi_rs_dump_dma (
-	ACPI_RESOURCE_DATA      *data)
+	acpi_resource_data      *data)
 {
-	ACPI_RESOURCE_DMA       *dma_data = (ACPI_RESOURCE_DMA *) data;
+	acpi_resource_dma       *dma_data = (acpi_resource_dma *) data;
 	u8                      index = 0;
+
+
+	FUNCTION_ENTRY ();
 
 
 	acpi_os_printf ("DMA Resource\n");
@@ -164,13 +172,15 @@ acpi_rs_dump_dma (
 
 void
 acpi_rs_dump_start_dependent_functions (
-	ACPI_RESOURCE_DATA          *data)
+	acpi_resource_data          *data)
 {
-	ACPI_RESOURCE_START_DPF     *sdf_data = (ACPI_RESOURCE_START_DPF *) data;
+	acpi_resource_start_dpf     *sdf_data = (acpi_resource_start_dpf *) data;
+
+
+	FUNCTION_ENTRY ();
 
 
 	acpi_os_printf ("Start Dependent Functions Resource\n");
-
 
 	switch (sdf_data->compatibility_priority) {
 	case GOOD_CONFIGURATION:
@@ -227,9 +237,12 @@ acpi_rs_dump_start_dependent_functions (
 
 void
 acpi_rs_dump_io (
-	ACPI_RESOURCE_DATA      *data)
+	acpi_resource_data      *data)
 {
-	ACPI_RESOURCE_IO        *io_data = (ACPI_RESOURCE_IO *) data;
+	acpi_resource_io        *io_data = (acpi_resource_io *) data;
+
+
+	FUNCTION_ENTRY ();
 
 
 	acpi_os_printf ("Io Resource\n");
@@ -267,9 +280,12 @@ acpi_rs_dump_io (
 
 void
 acpi_rs_dump_fixed_io (
-	ACPI_RESOURCE_DATA      *data)
+	acpi_resource_data      *data)
 {
-	ACPI_RESOURCE_FIXED_IO  *fixed_io_data = (ACPI_RESOURCE_FIXED_IO *) data;
+	acpi_resource_fixed_io  *fixed_io_data = (acpi_resource_fixed_io *) data;
+
+
+	FUNCTION_ENTRY ();
 
 
 	acpi_os_printf ("Fixed Io Resource\n");
@@ -297,10 +313,13 @@ acpi_rs_dump_fixed_io (
 
 void
 acpi_rs_dump_vendor_specific (
-	ACPI_RESOURCE_DATA      *data)
+	acpi_resource_data      *data)
 {
-	ACPI_RESOURCE_VENDOR    *vendor_data = (ACPI_RESOURCE_VENDOR *) data;
+	acpi_resource_vendor    *vendor_data = (acpi_resource_vendor *) data;
 	u16                     index = 0;
+
+
+	FUNCTION_ENTRY ();
 
 
 	acpi_os_printf ("Vendor Specific Resource\n");
@@ -330,9 +349,12 @@ acpi_rs_dump_vendor_specific (
 
 void
 acpi_rs_dump_memory24 (
-	ACPI_RESOURCE_DATA      *data)
+	acpi_resource_data      *data)
 {
-	ACPI_RESOURCE_MEM24     *memory24_data = (ACPI_RESOURCE_MEM24 *) data;
+	acpi_resource_mem24     *memory24_data = (acpi_resource_mem24 *) data;
+
+
+	FUNCTION_ENTRY ();
 
 
 	acpi_os_printf ("24-Bit Memory Range Resource\n");
@@ -372,9 +394,12 @@ acpi_rs_dump_memory24 (
 
 void
 acpi_rs_dump_memory32 (
-	ACPI_RESOURCE_DATA      *data)
+	acpi_resource_data      *data)
 {
-	ACPI_RESOURCE_MEM32     *memory32_data = (ACPI_RESOURCE_MEM32 *) data;
+	acpi_resource_mem32     *memory32_data = (acpi_resource_mem32 *) data;
+
+
+	FUNCTION_ENTRY ();
 
 
 	acpi_os_printf ("32-Bit Memory Range Resource\n");
@@ -414,9 +439,12 @@ acpi_rs_dump_memory32 (
 
 void
 acpi_rs_dump_fixed_memory32 (
-	ACPI_RESOURCE_DATA          *data)
+	acpi_resource_data          *data)
 {
-	ACPI_RESOURCE_FIXED_MEM32   *fixed_memory32_data = (ACPI_RESOURCE_FIXED_MEM32 *) data;
+	acpi_resource_fixed_mem32   *fixed_memory32_data = (acpi_resource_fixed_mem32 *) data;
+
+
+	FUNCTION_ENTRY ();
 
 
 	acpi_os_printf ("32-Bit Fixed Location Memory Range Resource\n");
@@ -450,9 +478,12 @@ acpi_rs_dump_fixed_memory32 (
 
 void
 acpi_rs_dump_address16 (
-	ACPI_RESOURCE_DATA      *data)
+	acpi_resource_data      *data)
 {
-	ACPI_RESOURCE_ADDRESS16 *address16_data = (ACPI_RESOURCE_ADDRESS16 *) data;
+	acpi_resource_address16 *address16_data = (acpi_resource_address16 *) data;
+
+
+	FUNCTION_ENTRY ();
 
 
 	acpi_os_printf ("16-Bit Address Space Resource\n");
@@ -590,9 +621,12 @@ acpi_rs_dump_address16 (
 
 void
 acpi_rs_dump_address32 (
-	ACPI_RESOURCE_DATA      *data)
+	acpi_resource_data      *data)
 {
-	ACPI_RESOURCE_ADDRESS32 *address32_data = (ACPI_RESOURCE_ADDRESS32 *) data;
+	acpi_resource_address32 *address32_data = (acpi_resource_address32 *) data;
+
+
+	FUNCTION_ENTRY ();
 
 
 	acpi_os_printf ("32-Bit Address Space Resource\n");
@@ -729,9 +763,12 @@ acpi_rs_dump_address32 (
 
 void
 acpi_rs_dump_address64 (
-	ACPI_RESOURCE_DATA      *data)
+	acpi_resource_data      *data)
 {
-	ACPI_RESOURCE_ADDRESS64 *address64_data = (ACPI_RESOURCE_ADDRESS64 *) data;
+	acpi_resource_address64 *address64_data = (acpi_resource_address64 *) data;
+
+
+	FUNCTION_ENTRY ();
 
 
 	acpi_os_printf ("64-Bit Address Space Resource\n");
@@ -868,10 +905,13 @@ acpi_rs_dump_address64 (
 
 void
 acpi_rs_dump_extended_irq (
-	ACPI_RESOURCE_DATA      *data)
+	acpi_resource_data      *data)
 {
-	ACPI_RESOURCE_EXT_IRQ   *ext_irq_data = (ACPI_RESOURCE_EXT_IRQ *) data;
+	acpi_resource_ext_irq   *ext_irq_data = (acpi_resource_ext_irq *) data;
 	u8                      index = 0;
+
+
+	FUNCTION_ENTRY ();
 
 
 	acpi_os_printf ("Extended IRQ Resource\n");
@@ -926,13 +966,16 @@ acpi_rs_dump_extended_irq (
 
 void
 acpi_rs_dump_resource_list (
-	ACPI_RESOURCE       *resource)
+	acpi_resource       *resource)
 {
 	u8                  count = 0;
 	u8                  done = FALSE;
 
 
-	if (acpi_dbg_level & TRACE_RESOURCES && _COMPONENT & acpi_dbg_layer) {
+	FUNCTION_ENTRY ();
+
+
+	if (acpi_dbg_level & ACPI_LV_RESOURCES && _COMPONENT & acpi_dbg_layer) {
 		while (!done) {
 			acpi_os_printf ("Resource structure %x.\n", count++);
 
@@ -1006,7 +1049,7 @@ acpi_rs_dump_resource_list (
 
 			}
 
-			resource = POINTER_ADD (ACPI_RESOURCE, resource, resource->length);
+			resource = POINTER_ADD (acpi_resource, resource, resource->length);
 		}
 	}
 
@@ -1032,11 +1075,14 @@ acpi_rs_dump_irq_list (
 	u8                  *buffer = route_table;
 	u8                  count = 0;
 	u8                  done = FALSE;
-	PCI_ROUTING_TABLE   *prt_element;
+	pci_routing_table   *prt_element;
 
 
-	if (acpi_dbg_level & TRACE_RESOURCES && _COMPONENT & acpi_dbg_layer) {
-		prt_element = (PCI_ROUTING_TABLE *) buffer;
+	FUNCTION_ENTRY ();
+
+
+	if (acpi_dbg_level & ACPI_LV_RESOURCES && _COMPONENT & acpi_dbg_layer) {
+		prt_element = (pci_routing_table *) buffer;
 
 		while (!done) {
 			acpi_os_printf ("PCI IRQ Routing Table structure %X.\n", count++);
@@ -1053,7 +1099,7 @@ acpi_rs_dump_irq_list (
 
 			buffer += prt_element->length;
 
-			prt_element = (PCI_ROUTING_TABLE *) buffer;
+			prt_element = (pci_routing_table *) buffer;
 
 			if(0 == prt_element->length) {
 				done = TRUE;
@@ -1063,4 +1109,6 @@ acpi_rs_dump_irq_list (
 
 	return;
 }
+
+#endif
 

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: pstree - Parser op tree manipulation/traversal/search
- *              $Revision: 30 $
+ *              $Revision: 32 $
  *
  *****************************************************************************/
 
@@ -45,13 +45,16 @@
  *
  ******************************************************************************/
 
-ACPI_PARSE_OBJECT *
+acpi_parse_object *
 acpi_ps_get_arg (
-	ACPI_PARSE_OBJECT       *op,
+	acpi_parse_object       *op,
 	u32                     argn)
 {
-	ACPI_PARSE_OBJECT       *arg = NULL;
-	ACPI_OPCODE_INFO        *op_info;
+	acpi_parse_object       *arg = NULL;
+	const acpi_opcode_info  *op_info;
+
+
+	FUNCTION_ENTRY ();
 
 
 	/* Get the info structure for this opcode */
@@ -98,11 +101,14 @@ acpi_ps_get_arg (
 
 void
 acpi_ps_append_arg (
-	ACPI_PARSE_OBJECT       *op,
-	ACPI_PARSE_OBJECT       *arg)
+	acpi_parse_object       *op,
+	acpi_parse_object       *arg)
 {
-	ACPI_PARSE_OBJECT       *prev_arg;
-	ACPI_OPCODE_INFO        *op_info;
+	acpi_parse_object       *prev_arg;
+	const acpi_opcode_info  *op_info;
+
+
+	FUNCTION_ENTRY ();
 
 
 	if (!op) {
@@ -167,11 +173,14 @@ acpi_ps_append_arg (
  *
  ******************************************************************************/
 
-ACPI_PARSE_OBJECT *
+acpi_parse_object *
 acpi_ps_get_child (
-	ACPI_PARSE_OBJECT       *op)
+	acpi_parse_object       *op)
 {
-	ACPI_PARSE_OBJECT       *child = NULL;
+	acpi_parse_object       *child = NULL;
+
+
+	FUNCTION_ENTRY ();
 
 
 	switch (op->opcode) {
@@ -229,14 +238,17 @@ acpi_ps_get_child (
  *
  ******************************************************************************/
 
-ACPI_PARSE_OBJECT *
+acpi_parse_object *
 acpi_ps_get_depth_next (
-	ACPI_PARSE_OBJECT       *origin,
-	ACPI_PARSE_OBJECT       *op)
+	acpi_parse_object       *origin,
+	acpi_parse_object       *op)
 {
-	ACPI_PARSE_OBJECT       *next = NULL;
-	ACPI_PARSE_OBJECT       *parent;
-	ACPI_PARSE_OBJECT       *arg;
+	acpi_parse_object       *next = NULL;
+	acpi_parse_object       *parent;
+	acpi_parse_object       *arg;
+
+
+	FUNCTION_ENTRY ();
 
 
 	if (!op) {

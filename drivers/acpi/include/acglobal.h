@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acglobal.h - Declarations for global variables
- *       $Revision: 101 $
+ *       $Revision: 106 $
  *
  *****************************************************************************/
 
@@ -40,8 +40,6 @@
 #endif
 
 
-extern      NATIVE_CHAR                 *msg_acpi_error_break;
-
 /*****************************************************************************
  *
  * Debug support
@@ -52,7 +50,6 @@ extern      NATIVE_CHAR                 *msg_acpi_error_break;
 
 extern      u32                         acpi_dbg_level;
 extern      u32                         acpi_dbg_layer;
-
 
 /* Procedure nesting level for debug output */
 
@@ -75,10 +72,10 @@ extern      u32                         acpi_gbl_nesting_level;
  *
  */
 ACPI_EXTERN RSDP_DESCRIPTOR             *acpi_gbl_RSDP;
-ACPI_EXTERN XSDT_DESCRIPTOR             *acpi_gbl_XSDT;
+ACPI_EXTERN xsdt_descriptor             *acpi_gbl_XSDT;
 ACPI_EXTERN FADT_DESCRIPTOR             *acpi_gbl_FADT;
-ACPI_EXTERN ACPI_TABLE_HEADER           *acpi_gbl_DSDT;
-ACPI_EXTERN ACPI_COMMON_FACS            *acpi_gbl_FACS;
+ACPI_EXTERN acpi_table_header           *acpi_gbl_DSDT;
+ACPI_EXTERN acpi_common_facs            *acpi_gbl_FACS;
 
 /*
  * Since there may be multiple SSDTs and PSDTS, a single pointer is not
@@ -89,7 +86,7 @@ ACPI_EXTERN ACPI_COMMON_FACS            *acpi_gbl_FACS;
 /*
  * ACPI Table info arrays
  */
-extern      ACPI_TABLE_DESC             acpi_gbl_acpi_tables[NUM_ACPI_TABLES];
+extern      acpi_table_desc             acpi_gbl_acpi_tables[NUM_ACPI_TABLES];
 extern      ACPI_TABLE_SUPPORT          acpi_gbl_acpi_table_data[NUM_ACPI_TABLES];
 
 /*
@@ -107,16 +104,13 @@ ACPI_EXTERN ACPI_MUTEX_INFO             acpi_gbl_acpi_mutex_info [NUM_MTX];
  ****************************************************************************/
 
 
+ACPI_EXTERN ACPI_MEMORY_LIST            acpi_gbl_memory_lists[ACPI_NUM_MEM_LISTS];
+ACPI_EXTERN ACPI_OBJECT_NOTIFY_HANDLER  acpi_gbl_drv_notify;
+ACPI_EXTERN ACPI_OBJECT_NOTIFY_HANDLER  acpi_gbl_sys_notify;
 ACPI_EXTERN u8                         *acpi_gbl_gpe0enable_register_save;
 ACPI_EXTERN u8                         *acpi_gbl_gpe1_enable_register_save;
-ACPI_EXTERN ACPI_WALK_STATE            *acpi_gbl_breakpoint_walk;
-ACPI_EXTERN ACPI_GENERIC_STATE         *acpi_gbl_generic_state_cache;
-ACPI_EXTERN ACPI_PARSE_OBJECT          *acpi_gbl_parse_cache;
-ACPI_EXTERN ACPI_PARSE2_OBJECT         *acpi_gbl_ext_parse_cache;
-ACPI_EXTERN ACPI_OPERAND_OBJECT        *acpi_gbl_object_cache;
-ACPI_EXTERN ACPI_WALK_STATE            *acpi_gbl_walk_state_cache;
-ACPI_EXTERN ACPI_HANDLE                 acpi_gbl_global_lock_semaphore;
-
+ACPI_EXTERN acpi_walk_state            *acpi_gbl_breakpoint_walk;
+ACPI_EXTERN acpi_handle                 acpi_gbl_global_lock_semaphore;
 
 ACPI_EXTERN u32                         acpi_gbl_global_lock_thread_count;
 ACPI_EXTERN u32                         acpi_gbl_restore_acpi_chipset;
@@ -124,45 +118,22 @@ ACPI_EXTERN u32                         acpi_gbl_original_mode;
 ACPI_EXTERN u32                         acpi_gbl_edge_level_save;
 ACPI_EXTERN u32                         acpi_gbl_irq_enable_save;
 ACPI_EXTERN u32                         acpi_gbl_rsdp_original_location;
-
-ACPI_EXTERN u32                         acpi_gbl_state_cache_requests;
-ACPI_EXTERN u32                         acpi_gbl_state_cache_hits;
-ACPI_EXTERN u32                         acpi_gbl_parse_cache_requests;
-ACPI_EXTERN u32                         acpi_gbl_parse_cache_hits;
-ACPI_EXTERN u32                         acpi_gbl_ext_parse_cache_requests;
-ACPI_EXTERN u32                         acpi_gbl_ext_parse_cache_hits;
-ACPI_EXTERN u32                         acpi_gbl_object_cache_requests;
-ACPI_EXTERN u32                         acpi_gbl_object_cache_hits;
-ACPI_EXTERN u32                         acpi_gbl_walk_state_cache_requests;
-ACPI_EXTERN u32                         acpi_gbl_walk_state_cache_hits;
 ACPI_EXTERN u32                         acpi_gbl_ns_lookup_count;
 ACPI_EXTERN u32                         acpi_gbl_ps_find_count;
-
-
-ACPI_EXTERN u16                         acpi_gbl_generic_state_cache_depth;
-ACPI_EXTERN u16                         acpi_gbl_parse_cache_depth;
-ACPI_EXTERN u16                         acpi_gbl_ext_parse_cache_depth;
-ACPI_EXTERN u16                         acpi_gbl_object_cache_depth;
-ACPI_EXTERN u16                         acpi_gbl_walk_state_cache_depth;
 ACPI_EXTERN u16                         acpi_gbl_pm1_enable_register_save;
 ACPI_EXTERN u16                         acpi_gbl_next_table_owner_id;
 ACPI_EXTERN u16                         acpi_gbl_next_method_owner_id;
-
 ACPI_EXTERN u8                          acpi_gbl_debugger_configuration;
 ACPI_EXTERN u8                          acpi_gbl_global_lock_acquired;
 ACPI_EXTERN u8                          acpi_gbl_step_to_next_call;
 ACPI_EXTERN u8                          acpi_gbl_acpi_hardware_present;
 ACPI_EXTERN u8                          acpi_gbl_global_lock_present;
 
-ACPI_EXTERN ACPI_OBJECT_NOTIFY_HANDLER  acpi_gbl_drv_notify;
-ACPI_EXTERN ACPI_OBJECT_NOTIFY_HANDLER  acpi_gbl_sys_notify;
-
-
 extern u8                               acpi_gbl_shutdown;
 extern u32                              acpi_gbl_system_flags;
 extern u32                              acpi_gbl_startup_flags;
-extern u8                               acpi_gbl_decode_to8bit[8];
-extern NATIVE_CHAR                      acpi_gbl_hex_to_ascii[16];
+extern const u8                         acpi_gbl_decode_to8bit[8];
+extern const NATIVE_CHAR                *acpi_gbl_db_sleep_states[ACPI_NUM_SLEEP_STATES];
 
 
 /*****************************************************************************
@@ -175,20 +146,20 @@ extern NATIVE_CHAR                      acpi_gbl_hex_to_ascii[16];
 #define NUM_PREDEFINED_NAMES            9
 
 
-ACPI_EXTERN ACPI_NAMESPACE_NODE         acpi_gbl_root_node_struct;
-ACPI_EXTERN ACPI_NAMESPACE_NODE        *acpi_gbl_root_node;
+ACPI_EXTERN acpi_namespace_node         acpi_gbl_root_node_struct;
+ACPI_EXTERN acpi_namespace_node        *acpi_gbl_root_node;
 
-extern u8                               acpi_gbl_ns_properties[NUM_NS_TYPES];
-extern PREDEFINED_NAMES                 acpi_gbl_pre_defined_names [NUM_PREDEFINED_NAMES];
-
-
-/* Used to detect memory leaks (DEBUG ONLY) */
+extern const u8                         acpi_gbl_ns_properties[NUM_NS_TYPES];
+extern const predefined_names           acpi_gbl_pre_defined_names [NUM_PREDEFINED_NAMES];
 
 #ifdef ACPI_DEBUG
-ACPI_EXTERN ACPI_ALLOCATION_INFO        *acpi_gbl_head_alloc_ptr;
-ACPI_EXTERN ACPI_ALLOCATION_INFO        *acpi_gbl_tail_alloc_ptr;
+ACPI_EXTERN u32                         acpi_gbl_current_node_count;
+ACPI_EXTERN u32                         acpi_gbl_current_node_size;
+ACPI_EXTERN u32                         acpi_gbl_max_concurrent_node_count;
+ACPI_EXTERN u32                         acpi_gbl_entry_stack_pointer;
+ACPI_EXTERN u32                         acpi_gbl_lowest_stack_pointer;
+ACPI_EXTERN u32                         acpi_gbl_deepest_nesting;
 #endif
-
 
 /*****************************************************************************
  *
@@ -197,13 +168,11 @@ ACPI_EXTERN ACPI_ALLOCATION_INFO        *acpi_gbl_tail_alloc_ptr;
  ****************************************************************************/
 
 
-ACPI_EXTERN ACPI_WALK_LIST             *acpi_gbl_current_walk_list;
+ACPI_EXTERN acpi_walk_list             *acpi_gbl_current_walk_list;
 
-/*
- * Table of Address Space handlers
- */
+/* Address Space handlers */
+
 ACPI_EXTERN ACPI_ADR_SPACE_INFO         acpi_gbl_address_spaces[ACPI_NUM_ADDRESS_SPACES];
-
 
 /* Control method single step flag */
 
@@ -216,16 +185,7 @@ ACPI_EXTERN u8                          acpi_gbl_cm_single_step;
  *
  ****************************************************************************/
 
-ACPI_EXTERN ACPI_PARSE_OBJECT           *acpi_gbl_parsed_namespace_root;
-
-/*****************************************************************************
- *
- * Hardware globals
- *
- ****************************************************************************/
-
-extern ACPI_C_STATE_HANDLER             acpi_hw_cx_handlers[MAX_CX_STATES];
-extern u32                              acpi_hw_active_cx_state;
+ACPI_EXTERN acpi_parse_object           *acpi_gbl_parsed_namespace_root;
 
 
 /*****************************************************************************
@@ -235,11 +195,10 @@ extern u32                              acpi_hw_active_cx_state;
  ****************************************************************************/
 
 ACPI_EXTERN ACPI_FIXED_EVENT_INFO       acpi_gbl_fixed_event_handlers[ACPI_NUM_FIXED_EVENTS];
-
-ACPI_EXTERN ACPI_HANDLE                 acpi_gbl_gpe_obj_handle;
+ACPI_EXTERN acpi_handle                 acpi_gbl_gpe_obj_handle;
 ACPI_EXTERN u32                         acpi_gbl_gpe_register_count;
-ACPI_EXTERN ACPI_GPE_REGISTERS          *acpi_gbl_gpe_registers;
-ACPI_EXTERN ACPI_GPE_LEVEL_INFO         *acpi_gbl_gpe_info;
+ACPI_EXTERN ACPI_GPE_REGISTERS         *acpi_gbl_gpe_registers;
+ACPI_EXTERN acpi_gpe_level_info        *acpi_gbl_gpe_info;
 
 /*
  * Gpe validation and translation table
@@ -267,28 +226,6 @@ ACPI_EXTERN u32                         acpi_gbl_event_count[ACPI_NUM_FIXED_EVEN
 #ifdef ENABLE_DEBUGGER
 ACPI_EXTERN u8                          acpi_gbl_method_executing;
 ACPI_EXTERN u8                          acpi_gbl_db_terminate_threads;
-#endif
-
-/* Memory allocation metrics - Debug Only! */
-
-#ifdef ACPI_DEBUG
-
-ACPI_EXTERN u32                         acpi_gbl_current_alloc_size;
-ACPI_EXTERN u32                         acpi_gbl_current_alloc_count;
-ACPI_EXTERN u32                         acpi_gbl_running_alloc_size;
-ACPI_EXTERN u32                         acpi_gbl_running_alloc_count;
-ACPI_EXTERN u32                         acpi_gbl_max_concurrent_alloc_size;
-ACPI_EXTERN u32                         acpi_gbl_max_concurrent_alloc_count;
-ACPI_EXTERN u32                         acpi_gbl_current_object_count;
-ACPI_EXTERN u32                         acpi_gbl_current_object_size;
-ACPI_EXTERN u32                         acpi_gbl_max_concurrent_object_count;
-ACPI_EXTERN u32                         acpi_gbl_max_concurrent_object_size;
-ACPI_EXTERN u32                         acpi_gbl_running_object_count;
-ACPI_EXTERN u32                         acpi_gbl_running_object_size;
-ACPI_EXTERN u32                         acpi_gbl_current_node_count;
-ACPI_EXTERN u32                         acpi_gbl_current_node_size;
-ACPI_EXTERN u32                         acpi_gbl_max_concurrent_node_count;
-
 #endif
 
 

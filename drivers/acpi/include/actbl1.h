@@ -34,7 +34,7 @@
 /*************************************/
 typedef struct
 {
-	ACPI_TABLE_HEADER       header;                 /* Table header */
+	acpi_table_header       header;                 /* Table header */
 	u32                     table_offset_entry [1]; /* Array of pointers to other */
 			 /* ACPI tables */
 } RSDT_DESCRIPTOR_REV1;
@@ -55,7 +55,7 @@ typedef struct
 	u32                     reserved1       : 31;   /* must be 0 */
 	u8                      resverved3 [40];        /* reserved - must be zero */
 
-} FACS_DESCRIPTOR_REV1;
+} facs_descriptor_rev1;
 
 
 /************************************/
@@ -64,7 +64,7 @@ typedef struct
 /************************************/
 typedef struct
 {
-	ACPI_TABLE_HEADER       header;                 /* table header */
+	acpi_table_header       header;                 /* table header */
 	u32                     firmware_ctrl;          /* Physical address of FACS */
 	u32                     dsdt;                   /* Physical address of DSDT */
 	u8                      model;                  /* System Interrupt Model */
@@ -114,7 +114,7 @@ typedef struct
 	u32                     tmr_val_ext     : 1;    /* tmr_val is 32 bits */
 	u32                     reserved5       : 23;   /* reserved - must be zero */
 
-}  FADT_DESCRIPTOR_REV1;
+}  fadt_descriptor_rev1;
 
 #pragma pack()
 

@@ -1,7 +1,7 @@
 /*****************************************************************************
  *
  * Module Name: prperf.c
- *              $Revision: 16 $
+ *              $Revision: 19 $
  *
  *****************************************************************************/
 
@@ -41,7 +41,7 @@
  *                                  Globals
  ****************************************************************************/
 
-extern FADT_DESCRIPTOR_REV2	acpi_fadt;
+extern fadt_descriptor_rev2	acpi_fadt;
 const u32			POWER_OF_2[] = {1,2,4,8,16,32,64,128,256,512};
 
 
@@ -57,19 +57,21 @@ const u32			POWER_OF_2[] = {1,2,4,8,16,32,64,128,256,512};
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 pr_perf_get_frequency (
 	PR_CONTEXT		*processor,
 	u32			*frequency) {
-	ACPI_STATUS		status = AE_OK;
+	acpi_status		status = AE_OK;
+
+	FUNCTION_TRACE("pr_perf_get_frequency");
 
 	if (!processor || !frequency) {
-		return(AE_BAD_PARAMETER);
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
 	/* TBD: Generic method to calculate processor frequency. */
 
-	return(status);
+	return_ACPI_STATUS(status);
 }
 
 
@@ -87,7 +89,7 @@ pr_perf_get_frequency (
 
 /* TBD:	Include support for _real_ performance states (not just throttling). */
 
-ACPI_STATUS
+acpi_status
 pr_perf_get_state (
 	PR_CONTEXT              *processor,
 	u32                     *state)
@@ -96,16 +98,18 @@ pr_perf_get_state (
 	u32                     duty_mask = 0;
 	u32                     duty_cycle = 0;
 
+	FUNCTION_TRACE("pr_perf_get_state");
+
 	if (!processor || !state) {
-		return(AE_BAD_PARAMETER);
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
 	if (processor->performance.state_count == 1) {
 		*state = 0;
-		return(AE_OK);
+		return_ACPI_STATUS(AE_OK);
 	}
 
-	pblk_value = acpi_os_in32(processor->pblk.address);
+	acpi_os_read_port(processor->pblk.address, &pblk_value, 32);
 
 	/*
 	 * Throttling Enabled?
@@ -133,7 +137,9 @@ pr_perf_get_state (
 		*state = 0;
 	}
 
-	return(AE_OK);
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Processor [%02x] is at performance state [%d%%].\n", processor->device_handle, processor->performance.state[*state].performance));
+
+	return_ACPI_STATUS(AE_OK);
 }
 
 
@@ -153,7 +159,7 @@ pr_perf_get_state (
 
 /* TBD: Includes support for _real_ performance states (not just throttling). */
 
-ACPI_STATUS
+acpi_status
 pr_perf_set_state (
 	PR_CONTEXT              *processor,
 	u32                     state)
@@ -163,16 +169,18 @@ pr_perf_set_state (
 	u32                     duty_cycle = 0;
 	u32                     i = 0;
 
+	FUNCTION_TRACE ("pr_perf_set_state");
+
 	if (!processor) {
-		return(AE_BAD_PARAMETER);
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
 	if (state > (processor->performance.state_count - 1)) {
-		return(AE_BAD_DATA);
+		return_ACPI_STATUS(AE_BAD_DATA);
 	}
 
 	if (processor->performance.state_count == 1) {
-		return(AE_OK);
+		return_ACPI_STATUS(AE_OK);
 	}
 
 	/*
@@ -200,10 +208,10 @@ pr_perf_set_state (
 	 * Got to turn it off before you can change the duty_cycle value.
 	 * Throttling is disabled by writing a 0 to bit 4.
 	 */
-	pblk_value = acpi_os_in32(processor->pblk.address);
+	acpi_os_read_port(processor->pblk.address, &pblk_value, 32);
 	if (pblk_value & 0x00000010) {
 		pblk_value &= 0xFFFFFFEF;
-		acpi_os_out32(processor->pblk.address, pblk_value);
+		acpi_os_write_port(processor->pblk.address, pblk_value, 32);
 	}
 
 	/*
@@ -213,7 +221,7 @@ pr_perf_set_state (
 	 */
 	pblk_value &= duty_mask;
 	pblk_value |= duty_cycle;
-	acpi_os_out32(processor->pblk.address, pblk_value);
+	acpi_os_write_port(processor->pblk.address, pblk_value, 32);
 
 	/*
 	 * Enable Throttling:
@@ -222,10 +230,12 @@ pr_perf_set_state (
 	 */
 	if (state) {
 		pblk_value |= 0x00000010;
-		acpi_os_out32(processor->pblk.address, pblk_value);
+		acpi_os_write_port(processor->pblk.address, pblk_value, 32);
 	}
 
-	return(AE_OK);
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Processor [%02x] set to performance state [%d%%].\n", processor->device_handle, processor->performance.state[state].performance));
+
+	return_ACPI_STATUS(AE_OK);
 }
 
 
@@ -241,16 +251,18 @@ pr_perf_set_state (
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 pr_perf_set_limit (
 	PR_CONTEXT              *processor,
 	u32                     limit)
 {
-	ACPI_STATUS		status = AE_OK;
+	acpi_status		status = AE_OK;
 	PR_PERFORMANCE		*performance = NULL;
 
+	FUNCTION_TRACE ("pr_perf_set_limit");
+
 	if (!processor) {
-		return(AE_BAD_PARAMETER);
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
 	performance = &(processor->performance);
@@ -285,7 +297,7 @@ pr_perf_set_limit (
 		break;
 
 	default:
-		return(AE_BAD_DATA);
+		return_ACPI_STATUS(AE_BAD_DATA);
 		break;
 	}
 
@@ -293,7 +305,9 @@ pr_perf_set_limit (
 		performance->thermal_limit = limit;
 	}
 
-	return(status);
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Processor [%02x] thermal performance limit set to [%d%%].\n", processor->device_handle, processor->performance.state[performance->active_state].performance));
+
+	return_ACPI_STATUS(status);
 }
 
 
@@ -317,17 +331,19 @@ pr_perf_set_limit (
 
 /* TBD: Support duty_cycle values that span bit 4. */
 
-ACPI_STATUS
+acpi_status
 pr_perf_add_device (
 	PR_CONTEXT              *processor)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 	u32                     i = 0;
 	u32                     performance_step = 0;
 	u32                     percentage = 0;
 
+	FUNCTION_TRACE("pr_perf_add_device");
+
 	if (!processor) {
-		return(AE_BAD_PARAMETER);
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
 	/*
@@ -390,7 +406,7 @@ pr_perf_add_device (
 	status = pr_perf_get_state(processor,
 		&(processor->performance.active_state));
 
-	return(status);
+	return_ACPI_STATUS(status);
 }
 
 
@@ -406,18 +422,20 @@ pr_perf_add_device (
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 pr_perf_remove_device (
 	PR_CONTEXT              *processor)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
+
+	FUNCTION_TRACE("pr_perf_remove_device");
 
 	if (!processor) {
-		return(AE_BAD_PARAMETER);
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
 	MEMSET(&(processor->performance), 0, sizeof(PR_PERFORMANCE));
 
-	return(status);
+	return_ACPI_STATUS(status);
 }
 

@@ -53,7 +53,7 @@
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_rs_memory24_resource (
 	u8                      *byte_stream_buffer,
 	u32                     *bytes_consumed,
@@ -61,10 +61,13 @@ acpi_rs_memory24_resource (
 	u32                     *structure_size)
 {
 	u8                      *buffer = byte_stream_buffer;
-	ACPI_RESOURCE           *output_struct = (ACPI_RESOURCE *) *output_buffer;
+	acpi_resource           *output_struct = (acpi_resource *) *output_buffer;
 	u16                     temp16 = 0;
 	u8                      temp8 = 0;
-	u32                     struct_size = SIZEOF_RESOURCE (ACPI_RESOURCE_MEM24);
+	u32                     struct_size = SIZEOF_RESOURCE (acpi_resource_mem24);
+
+
+	FUNCTION_TRACE ("Rs_memory24_resource");
 
 
 	/*
@@ -120,7 +123,7 @@ acpi_rs_memory24_resource (
 	 * Return the final size of the structure
 	 */
 	*structure_size = struct_size;
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -141,15 +144,18 @@ acpi_rs_memory24_resource (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_rs_memory24_stream (
-	ACPI_RESOURCE           *linked_list,
+	acpi_resource           *linked_list,
 	u8                      **output_buffer,
 	u32                     *bytes_consumed)
 {
 	u8                      *buffer = *output_buffer;
 	u16                     temp16 = 0;
 	u8                      temp8 = 0;
+
+
+	FUNCTION_TRACE ("Rs_memory24_stream");
 
 
 	/*
@@ -200,7 +206,7 @@ acpi_rs_memory24_stream (
 	 * Return the number of bytes consumed in this operation
 	 */
 	*bytes_consumed = POINTER_DIFF (buffer, *output_buffer);
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -226,7 +232,7 @@ acpi_rs_memory24_stream (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_rs_memory32_range_resource (
 	u8                      *byte_stream_buffer,
 	u32                     *bytes_consumed,
@@ -234,10 +240,13 @@ acpi_rs_memory32_range_resource (
 	u32                     *structure_size)
 {
 	u8                      *buffer = byte_stream_buffer;
-	ACPI_RESOURCE           *output_struct = (ACPI_RESOURCE *) *output_buffer;
+	acpi_resource           *output_struct = (acpi_resource *) *output_buffer;
 	u16                     temp16 = 0;
 	u8                      temp8 = 0;
-	u32                     struct_size = SIZEOF_RESOURCE (ACPI_RESOURCE_MEM32);
+	u32                     struct_size = SIZEOF_RESOURCE (acpi_resource_mem32);
+
+
+	FUNCTION_TRACE ("Rs_memory32_range_resource");
 
 
 	/*
@@ -303,7 +312,7 @@ acpi_rs_memory32_range_resource (
 	 * Return the final size of the structure
 	 */
 	*structure_size = struct_size;
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -329,7 +338,7 @@ acpi_rs_memory32_range_resource (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_rs_fixed_memory32_resource (
 	u8                      *byte_stream_buffer,
 	u32                     *bytes_consumed,
@@ -337,10 +346,13 @@ acpi_rs_fixed_memory32_resource (
 	u32                     *structure_size)
 {
 	u8                      *buffer = byte_stream_buffer;
-	ACPI_RESOURCE           *output_struct = (ACPI_RESOURCE *) *output_buffer;
+	acpi_resource           *output_struct = (acpi_resource *) *output_buffer;
 	u16                     temp16 = 0;
 	u8                      temp8 = 0;
-	u32                     struct_size = SIZEOF_RESOURCE (ACPI_RESOURCE_FIXED_MEM32);
+	u32                     struct_size = SIZEOF_RESOURCE (acpi_resource_fixed_mem32);
+
+
+	FUNCTION_TRACE ("Rs_fixed_memory32_resource");
 
 
 	/*
@@ -383,7 +395,7 @@ acpi_rs_fixed_memory32_resource (
 	 * Return the final size of the structure
 	 */
 	*structure_size = struct_size;
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -404,15 +416,18 @@ acpi_rs_fixed_memory32_resource (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_rs_memory32_range_stream (
-	ACPI_RESOURCE           *linked_list,
+	acpi_resource           *linked_list,
 	u8                      **output_buffer,
 	u32                     *bytes_consumed)
 {
 	u8                      *buffer = *output_buffer;
 	u16                     temp16 = 0;
 	u8                      temp8 = 0;
+
+
+	FUNCTION_TRACE ("Rs_memory32_range_stream");
 
 
 	/*
@@ -464,7 +479,7 @@ acpi_rs_memory32_range_stream (
 	 * Return the number of bytes consumed in this operation
 	 */
 	*bytes_consumed = POINTER_DIFF (buffer, *output_buffer);
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -485,15 +500,18 @@ acpi_rs_memory32_range_stream (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_rs_fixed_memory32_stream (
-	ACPI_RESOURCE           *linked_list,
+	acpi_resource           *linked_list,
 	u8                      **output_buffer,
 	u32                     *bytes_consumed)
 {
 	u8                      *buffer = *output_buffer;
 	u16                     temp16 = 0;
 	u8                      temp8 = 0;
+
+
+	FUNCTION_TRACE ("Rs_fixed_memory32_stream");
 
 
 	/*
@@ -535,6 +553,6 @@ acpi_rs_fixed_memory32_stream (
 	 * Return the number of bytes consumed in this operation
 	 */
 	*bytes_consumed = POINTER_DIFF (buffer, *output_buffer);
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 

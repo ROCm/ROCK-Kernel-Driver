@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Name: hwsleep.c - ACPI Hardware Sleep/Wake Interface
- *              $Revision: 12 $
+ *              $Revision: 21 $
  *
  *****************************************************************************/
 
@@ -45,16 +45,18 @@
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_set_firmware_waking_vector (
 	ACPI_PHYSICAL_ADDRESS physical_address)
 {
+
+	FUNCTION_TRACE ("Acpi_set_firmware_waking_vector");
 
 
 	/* Make sure that we have an FACS */
 
 	if (!acpi_gbl_FACS) {
-		return (AE_NO_ACPI_TABLES);
+		return_ACPI_STATUS (AE_NO_ACPI_TABLES);
 	}
 
 	/* Set the vector */
@@ -66,7 +68,7 @@ acpi_set_firmware_waking_vector (
 		*acpi_gbl_FACS->firmware_waking_vector = physical_address;
 	}
 
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -84,20 +86,22 @@ acpi_set_firmware_waking_vector (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_get_firmware_waking_vector (
 	ACPI_PHYSICAL_ADDRESS *physical_address)
 {
 
+	FUNCTION_TRACE ("Acpi_get_firmware_waking_vector");
+
 
 	if (!physical_address) {
-		return (AE_BAD_PARAMETER);
+		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
 	/* Make sure that we have an FACS */
 
 	if (!acpi_gbl_FACS) {
-		return (AE_NO_ACPI_TABLES);
+		return_ACPI_STATUS (AE_NO_ACPI_TABLES);
 	}
 
 	/* Get the vector */
@@ -109,7 +113,7 @@ acpi_get_firmware_waking_vector (
 		*physical_address = *acpi_gbl_FACS->firmware_waking_vector;
 	}
 
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 /******************************************************************************
@@ -124,23 +128,25 @@ acpi_get_firmware_waking_vector (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_enter_sleep_state (
 	u8                  sleep_state)
 {
-	ACPI_STATUS         status;
-	ACPI_OBJECT_LIST    arg_list;
-	ACPI_OBJECT         arg;
+	acpi_status         status;
+	acpi_object_list    arg_list;
+	acpi_object         arg;
 	u8                  type_a;
 	u8                  type_b;
 	u16                 PM1_acontrol;
 	u16                 PM1_bcontrol;
 
 
+	FUNCTION_TRACE ("Acpi_enter_sleep_state");
+
+
 	/*
 	 * _PSW methods could be run here to enable wake-on keyboard, LAN, etc.
 	 */
-
 	status = acpi_hw_obtain_sleep_type_register_data (sleep_state, &type_a, &type_b);
 	if (!ACPI_SUCCESS (status)) {
 		return status;
@@ -156,38 +162,109 @@ acpi_enter_sleep_state (
 	arg.type = ACPI_TYPE_INTEGER;
 	arg.integer.value = sleep_state;
 
-	acpi_evaluate_object(NULL, "\\_PTS", &arg_list, NULL);
-	acpi_evaluate_object(NULL, "\\_GTS", &arg_list, NULL);
+	acpi_evaluate_object (NULL, "\\_PTS", &arg_list, NULL);
+	acpi_evaluate_object (NULL, "\\_GTS", &arg_list, NULL);
 
 	/* clear wake status */
 
-	acpi_hw_register_bit_access(ACPI_WRITE, ACPI_MTX_LOCK, WAK_STS, 1);
+	acpi_hw_register_bit_access (ACPI_WRITE, ACPI_MTX_LOCK, WAK_STS, 1);
 
-	disable();
+	disable ();
 
-	PM1_acontrol = (u16) acpi_hw_register_read(ACPI_MTX_LOCK, PM1_CONTROL);
+	/* TODO: disable all non-wake GPEs here */
+
+	PM1_acontrol = (u16) acpi_hw_register_read (ACPI_MTX_LOCK, PM1_CONTROL);
+
+	ACPI_DEBUG_PRINT ((ACPI_DB_OK, "Entering S%d\n", sleep_state));
 
 	/* mask off SLP_EN and SLP_TYP fields */
-	PM1_acontrol &= 0xC3FF;
+
+	PM1_acontrol &= ~(SLP_TYPE_X_MASK | SLP_EN_MASK);
 	PM1_bcontrol = PM1_acontrol;
 
 	/* mask in SLP_TYP */
+
 	PM1_acontrol |= (type_a << acpi_hw_get_bit_shift (SLP_TYPE_X_MASK));
 	PM1_bcontrol |= (type_b << acpi_hw_get_bit_shift (SLP_TYPE_X_MASK));
 
-	/* write #1: fill in SLP_TYPE data */
-	acpi_hw_register_write(ACPI_MTX_LOCK, PM1_a_CONTROL, PM1_acontrol);
-	acpi_hw_register_write(ACPI_MTX_LOCK, PM1_b_CONTROL, PM1_bcontrol);
+	/* write #1: fill in SLP_TYP data */
+
+	acpi_hw_register_write (ACPI_MTX_LOCK, PM1_a_CONTROL, PM1_acontrol);
+	acpi_hw_register_write (ACPI_MTX_LOCK, PM1_b_CONTROL, PM1_bcontrol);
 
 	/* mask in SLP_EN */
+
 	PM1_acontrol |= (1 << acpi_hw_get_bit_shift (SLP_EN_MASK));
 	PM1_bcontrol |= (1 << acpi_hw_get_bit_shift (SLP_EN_MASK));
 
-	/* write #2: the whole tamale */
-	acpi_hw_register_write(ACPI_MTX_LOCK, PM1_a_CONTROL, PM1_acontrol);
-	acpi_hw_register_write(ACPI_MTX_LOCK, PM1_b_CONTROL, PM1_bcontrol);
+	/* flush caches */
 
-	enable();
+	wbinvd();
 
-	return (AE_OK);
+	/* write #2: SLP_TYP + SLP_EN */
+
+	acpi_hw_register_write (ACPI_MTX_LOCK, PM1_a_CONTROL, PM1_acontrol);
+	acpi_hw_register_write (ACPI_MTX_LOCK, PM1_b_CONTROL, PM1_bcontrol);
+
+	/*
+	 * Wait a second, then try again. This is to get S4/5 to work on all machines.
+	 */
+	if (sleep_state > ACPI_STATE_S3) {
+		acpi_os_stall(1000000);
+
+		acpi_hw_register_write (ACPI_MTX_LOCK, PM1_CONTROL,
+			(1 << acpi_hw_get_bit_shift (SLP_EN_MASK)));
+	}
+
+	/* wait until we enter sleep state */
+
+	do {
+		acpi_os_stall(10000);
+	}
+	while (!acpi_hw_register_bit_access (ACPI_READ, ACPI_MTX_LOCK, WAK_STS));
+
+	enable ();
+
+	return_ACPI_STATUS (AE_OK);
+}
+
+/******************************************************************************
+ *
+ * FUNCTION:    Acpi_leave_sleep_state
+ *
+ * PARAMETERS:  Sleep_state         - Which sleep state we just exited
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Perform OS-independent ACPI cleanup after a sleep
+ *
+ ******************************************************************************/
+
+acpi_status
+acpi_leave_sleep_state (
+	u8                  sleep_state)
+{
+	acpi_object_list    arg_list;
+	acpi_object         arg;
+
+
+	FUNCTION_TRACE ("Acpi_leave_sleep_state");
+
+
+	MEMSET (&arg_list, 0, sizeof(arg_list));
+	arg_list.count = 1;
+	arg_list.pointer = &arg;
+
+	MEMSET (&arg, 0, sizeof(arg));
+	arg.type = ACPI_TYPE_INTEGER;
+	arg.integer.value = sleep_state;
+
+	acpi_evaluate_object (NULL, "\\_BFS", &arg_list, NULL);
+	acpi_evaluate_object (NULL, "\\_WAK", &arg_list, NULL);
+
+	/* _WAK returns stuff - do we want to look at it? */
+
+	/* Re-enable GPEs */
+
+	return_ACPI_STATUS (AE_OK);
 }

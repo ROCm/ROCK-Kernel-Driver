@@ -42,11 +42,6 @@
 #include "acpi.h"
 #include "driver.h"
 
-#ifdef CONFIG_ACPI_KERNEL_CONFIG
-#include <asm/efi.h>
-#define ACPI_USE_EFI
-#endif
-
 
 #define _COMPONENT	OS_DEPENDENT
 	MODULE_NAME	("driver")
@@ -61,9 +56,8 @@ static int acpi_disabled = 0;
 int
 acpi_init(void)
 {
-	ACPI_PHYSICAL_ADDRESS	rsdp_phys;
-	ACPI_BUFFER		buffer;
-	ACPI_SYSTEM_INFO	sys_info;
+	acpi_buffer		buffer;
+	acpi_system_info	sys_info;
 
 	if (PM_IS_ACTIVE()) {
 		printk(KERN_NOTICE "ACPI: APM is already active, exiting\n");
@@ -81,18 +75,8 @@ acpi_init(void)
 		return -ENODEV;
 	}
 
-#ifndef ACPI_USE_EFI
-	if (!ACPI_SUCCESS(acpi_find_root_pointer(&rsdp_phys))) {
-		printk(KERN_ERR "ACPI: System description tables not found\n");
-		return -ENODEV;
-	}
-#else
-	rsdp_phys = efi.acpi;
-#endif
-
 	/* from this point on, on error we must call acpi_terminate() */
-
-	if (!ACPI_SUCCESS(acpi_load_tables(rsdp_phys))) {
+	if (!ACPI_SUCCESS(acpi_load_tables())) {
 		printk(KERN_ERR "ACPI: System description table load failed\n");
 		acpi_terminate();
 		return -ENODEV;

@@ -1,7 +1,7 @@
 /*****************************************************************************
  *
  * Module Name: bmnotify.c
- *   $Revision: 17 $
+ *   $Revision: 21 $
  *
  *****************************************************************************/
 
@@ -40,20 +40,20 @@
  *
  * FUNCTION:    bm_generate_notify
  *
- * PARAMETERS:  
+ * PARAMETERS:
  *
- * RETURN:      
+ * RETURN:
  *
- * DESCRIPTION: 
+ * DESCRIPTION:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bm_generate_notify (
 	BM_NODE			*node,
 	u32			notify_type)
 {
-	ACPI_STATUS		status = AE_OK;
+	acpi_status		status = AE_OK;
 	BM_DEVICE		*device = NULL;
 
 	FUNCTION_TRACE("bm_generate_notify");
@@ -64,14 +64,14 @@ bm_generate_notify (
 
 	device = &(node->device);
 
-	DEBUG_PRINT(ACPI_INFO, ("Sending notify [%02x] to device [%02x].\n", notify_type, node->device.handle));
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Sending notify [%02x] to device [%02x].\n", notify_type, node->device.handle));
 
 	if (!BM_IS_DRIVER_CONTROL(device)) {
-		DEBUG_PRINT(ACPI_INFO, ("No driver installed for device [%02x].\n", device->handle));
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "No driver installed for device [%02x].\n", device->handle));
 		return_ACPI_STATUS(AE_NOT_EXIST);
 	}
 
-	status = node->driver.notify(notify_type, node->device.handle, 
+	status = node->driver.notify(notify_type, node->device.handle,
 		&(node->driver.context));
 
 	return_ACPI_STATUS(status);
@@ -82,20 +82,20 @@ bm_generate_notify (
  *
  * FUNCTION:    bm_device_check
  *
- * PARAMETERS:  
+ * PARAMETERS:
  *
- * RETURN:      
+ * RETURN:
  *
- * DESCRIPTION: 
+ * DESCRIPTION:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bm_device_check (
 	BM_NODE			*node,
 	u32			*status_change)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 	BM_DEVICE		*device = NULL;
 	BM_DEVICE_STATUS	old_status = BM_STATUS_UNKNOWN;
 
@@ -145,7 +145,7 @@ bm_device_check (
 	 * Device Insertion?
 	 * -----------------
 	 */
-	if ((device->status & BM_STATUS_PRESENT) && 
+	if ((device->status & BM_STATUS_PRESENT) &&
 		!(old_status & BM_STATUS_PRESENT)) {
 		/* TBD: Make sure driver is loaded, and if not, load. */
 		status = bm_generate_notify(node, BM_NOTIFY_DEVICE_ADDED);
@@ -155,7 +155,7 @@ bm_device_check (
 	 * Device Removal?
 	 * ---------------
 	 */
-	else if (!(device->status & BM_STATUS_PRESENT) && 
+	else if (!(device->status & BM_STATUS_PRESENT) &&
 		(old_status & BM_STATUS_PRESENT)) {
 		/* TBD: Unload driver if last device instance. */
 		status = bm_generate_notify(node, BM_NOTIFY_DEVICE_REMOVED);
@@ -169,19 +169,19 @@ bm_device_check (
  *
  * FUNCTION:    bm_bus_check
  *
- * PARAMETERS:  
+ * PARAMETERS:
  *
- * RETURN:      
+ * RETURN:
  *
- * DESCRIPTION: 
+ * DESCRIPTION:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bm_bus_check (
 	BM_NODE			*parent_node)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 	u32			status_change = FALSE;
 
 	FUNCTION_TRACE("bm_bus_check");
@@ -218,21 +218,21 @@ bm_bus_check (
  *
  * FUNCTION:    bm_notify
  *
- * PARAMETERS:  
+ * PARAMETERS:
  *
- * RETURN:      
+ * RETURN:
  *
- * DESCRIPTION: 
+ * DESCRIPTION:
  *
  ****************************************************************************/
 
 void
 bm_notify (
-	ACPI_HANDLE             acpi_handle,
+	acpi_handle             acpi_handle,
 	u32                     notify_value,
 	void                    *context)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 	BM_NODE			*node = NULL;
 
 	FUNCTION_TRACE("bm_notify");
@@ -242,14 +242,14 @@ bm_notify (
 	 */
 	status = bm_get_node(0, acpi_handle, &node);
 	if (ACPI_FAILURE(status)) {
-		DEBUG_PRINT(ACPI_INFO, ("Recieved notify [%02x] for unknown device [%p].\n", notify_value, acpi_handle));
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Recieved notify [%02x] for unknown device [%p].\n", notify_value, acpi_handle));
 		return_VOID;
 	}
 
 	/*
 	 * Device-Specific or Standard?
 	 * ----------------------------
-	 * Device-specific notifies are forwarded to the control module's 
+	 * Device-specific notifies are forwarded to the control module's
 	 * notify() function for processing.  Standard notifies are handled
 	 * internally.
 	 */
@@ -260,48 +260,48 @@ bm_notify (
 		switch (notify_value) {
 
 		case BM_NOTIFY_BUS_CHECK:
-			DEBUG_PRINT(ACPI_INFO, ("Received BUS CHECK notification for device [%02x].\n", node->device.handle));
+			ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Received BUS CHECK notification for device [%02x].\n", node->device.handle));
 			status = bm_bus_check(node);
 			break;
 
 		case BM_NOTIFY_DEVICE_CHECK:
-			DEBUG_PRINT(ACPI_INFO, ("Received DEVICE CHECK notification for device [%02x].\n", node->device.handle));
+			ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Received DEVICE CHECK notification for device [%02x].\n", node->device.handle));
 			status = bm_device_check(node, NULL);
 			break;
 
 		case BM_NOTIFY_DEVICE_WAKE:
-			DEBUG_PRINT(ACPI_INFO, ("Received DEVICE WAKE notification for device [%02x].\n", node->device.handle));
+			ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Received DEVICE WAKE notification for device [%02x].\n", node->device.handle));
 			/* TBD */
 			break;
 
 		case BM_NOTIFY_EJECT_REQUEST:
-			DEBUG_PRINT(ACPI_INFO, ("Received EJECT REQUEST notification for device [%02x].\n", node->device.handle));
+			ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Received EJECT REQUEST notification for device [%02x].\n", node->device.handle));
 			/* TBD */
 			break;
 
 		case BM_NOTIFY_DEVICE_CHECK_LIGHT:
-			DEBUG_PRINT(ACPI_INFO, ("Received DEVICE CHECK LIGHT notification for device [%02x].\n", node->device.handle));
+			ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Received DEVICE CHECK LIGHT notification for device [%02x].\n", node->device.handle));
 			/* TBD: Exactly what does the 'light' mean? */
 			status = bm_device_check(node, NULL);
 			break;
 
 		case BM_NOTIFY_FREQUENCY_MISMATCH:
-			DEBUG_PRINT(ACPI_INFO, ("Received FREQUENCY MISMATCH notification for device [%02x].\n", node->device.handle));
+			ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Received FREQUENCY MISMATCH notification for device [%02x].\n", node->device.handle));
 			/* TBD */
 			break;
 
 		case BM_NOTIFY_BUS_MODE_MISMATCH:
-			DEBUG_PRINT(ACPI_INFO, ("Received BUS MODE MISMATCH notification for device [%02x].\n", node->device.handle));
+			ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Received BUS MODE MISMATCH notification for device [%02x].\n", node->device.handle));
 			/* TBD */
 			break;
 
 		case BM_NOTIFY_POWER_FAULT:
-			DEBUG_PRINT(ACPI_INFO, ("Received POWER FAULT notification.\n"));
+			ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Received POWER FAULT notification.\n"));
 			/* TBD */
 			break;
 
 		default:
-			DEBUG_PRINT(ACPI_INFO, ("Received unknown/unsupported notification.\n"));
+			ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Received unknown/unsupported notification.\n"));
 			break;
 		}
 	}

@@ -521,17 +521,15 @@ static void refill_inactive(int nr_pages)
 
 		page = list_entry(entry, struct page, lru);
 		entry = entry->prev;
-		if (PageTestandClearReferenced(page))
+		if (PageTestandClearReferenced(page)) {
+			list_del(&page->lru);
+			list_add(&page->lru, &active_list);
 			continue;
+		}
 
 		del_page_from_active_list(page);
 		add_page_to_inactive_list(page);
 	}
-
-	/* move active list to between "entry" and "entry->next" */
-	__list_del(active_list.prev, active_list.next);
-	__list_add(&active_list, entry, entry->next);
-
 	spin_unlock(&pagemap_lru_lock);
 }
 

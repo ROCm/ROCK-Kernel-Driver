@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exfldio - Aml Field I/O
- *              $Revision: 57 $
+ *              $Revision: 64 $
  *
  *****************************************************************************/
 
@@ -51,24 +51,24 @@
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_setup_field (
-	ACPI_OPERAND_OBJECT     *obj_desc,
+	acpi_operand_object     *obj_desc,
 	u32                     field_datum_byte_offset)
 {
-	ACPI_STATUS             status = AE_OK;
-	ACPI_OPERAND_OBJECT     *rgn_desc;
+	acpi_status             status = AE_OK;
+	acpi_operand_object     *rgn_desc;
 
 
-	/* Parameter validation */
+	FUNCTION_TRACE_U32 ("Ex_setup_field", field_datum_byte_offset);
+
 
 	rgn_desc = obj_desc->common_field.region_obj;
-	if (!obj_desc || !rgn_desc) {
-		return (AE_AML_NO_OPERAND);
-	}
 
 	if (ACPI_TYPE_REGION != rgn_desc->common.type) {
-		return (AE_AML_OPERAND_TYPE);
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Needed Region, found type %x %s\n",
+			rgn_desc->common.type, acpi_ut_get_type_name (rgn_desc->common.type)));
+		return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
 	}
 
 
@@ -80,7 +80,7 @@ acpi_ex_setup_field (
 
 		status = acpi_ds_get_region_arguments (rgn_desc);
 		if (ACPI_FAILURE (status)) {
-			return (status);
+			return_ACPI_STATUS (status);
 		}
 	}
 
@@ -99,16 +99,25 @@ acpi_ex_setup_field (
 			 * than the region itself.  For example, a region of length one
 			 * byte, and a field with Dword access specified.
 			 */
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+				"Field access width (%d bytes) too large for region size (%X)\n",
+				obj_desc->common_field.access_byte_width, rgn_desc->region.length));
 		}
 
 		/*
 		 * Offset rounded up to next multiple of field width
 		 * exceeds region length, indicate an error
 		 */
-		return (AE_AML_REGION_LIMIT);
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+			"Field base+offset+width %X+%X+%X exceeds region size (%X bytes) field=%p region=%p\n",
+			obj_desc->common_field.base_byte_offset, field_datum_byte_offset,
+			obj_desc->common_field.access_byte_width,
+			rgn_desc->region.length, obj_desc, rgn_desc));
+
+		return_ACPI_STATUS (AE_AML_REGION_LIMIT);
 	}
 
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -125,16 +134,19 @@ acpi_ex_setup_field (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_read_field_datum (
-	ACPI_OPERAND_OBJECT     *obj_desc,
+	acpi_operand_object     *obj_desc,
 	u32                     field_datum_byte_offset,
 	u32                     *value)
 {
-	ACPI_STATUS             status;
-	ACPI_OPERAND_OBJECT     *rgn_desc;
+	acpi_status             status;
+	acpi_operand_object     *rgn_desc;
 	ACPI_PHYSICAL_ADDRESS   address;
 	u32                     local_value;
+
+
+	FUNCTION_TRACE_U32 ("Ex_read_field_datum", field_datum_byte_offset);
 
 
 	if (!value) {
@@ -174,7 +186,7 @@ acpi_ex_read_field_datum (
 		 */
 		status = acpi_ex_setup_field (obj_desc, field_datum_byte_offset);
 		if (ACPI_FAILURE (status)) {
-			return (status);
+			return_ACPI_STATUS (status);
 		}
 
 
@@ -189,23 +201,43 @@ acpi_ex_read_field_datum (
 		address = rgn_desc->region.address + obj_desc->common_field.base_byte_offset +
 				 field_datum_byte_offset;
 
+		ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD, "Region %s(%X) width %X base:off %X:%X at %8.8lX%8.8lX\n",
+			acpi_ut_get_region_name (rgn_desc->region.space_id),
+			rgn_desc->region.space_id, obj_desc->common_field.access_bit_width,
+			obj_desc->common_field.base_byte_offset, field_datum_byte_offset,
+			HIDWORD(address), LODWORD(address)));
+
 
 		/* Invoke the appropriate Address_space/Op_region handler */
 
 		status = acpi_ev_address_space_dispatch (rgn_desc, ACPI_READ_ADR_SPACE,
 				  address, obj_desc->common_field.access_bit_width, value);
+		if (status == AE_NOT_IMPLEMENTED) {
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Region %s(%X) not implemented\n",
+				acpi_ut_get_region_name (rgn_desc->region.space_id),
+				rgn_desc->region.space_id));
+		}
 
+		else if (status == AE_NOT_EXIST) {
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Region %s(%X) has no handler\n",
+				acpi_ut_get_region_name (rgn_desc->region.space_id),
+				rgn_desc->region.space_id));
+		}
 		break;
 
 
 	default:
 
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "%p, wrong source type - %s\n",
+			obj_desc, acpi_ut_get_type_name (obj_desc->common.type)));
 		status = AE_AML_INTERNAL;
 		break;
 	}
 
 
-	return (status);
+	ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD, "Returned value=%08lX \n", *value));
+
+	return_ACPI_STATUS (status);
 }
 
 
@@ -233,6 +265,9 @@ acpi_ex_get_buffer_datum(
 	u32                     byte_granularity,
 	u32                     offset)
 {
+
+	FUNCTION_ENTRY ();
+
 
 	switch (byte_granularity) {
 	case ACPI_FIELD_BYTE_GRANULARITY:
@@ -275,6 +310,9 @@ acpi_ex_set_buffer_datum (
 	u32                     offset)
 {
 
+	FUNCTION_ENTRY ();
+
+
 	switch (byte_granularity) {
 	case ACPI_FIELD_BYTE_GRANULARITY:
 		((u8 *) buffer) [offset] = (u8) merged_datum;
@@ -304,13 +342,13 @@ acpi_ex_set_buffer_datum (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_extract_from_field (
-	ACPI_OPERAND_OBJECT     *obj_desc,
+	acpi_operand_object     *obj_desc,
 	void                    *buffer,
 	u32                     buffer_length)
 {
-	ACPI_STATUS             status;
+	acpi_status             status;
 	u32                     field_datum_byte_offset;
 	u32                     datum_offset;
 	u32                     previous_raw_datum;
@@ -320,17 +358,28 @@ acpi_ex_extract_from_field (
 	u32                     datum_count;
 
 
+	FUNCTION_TRACE ("Ex_extract_from_field");
+
+
 	/*
 	 * The field must fit within the caller's buffer
 	 */
 	byte_field_length = ROUND_BITS_UP_TO_BYTES (obj_desc->common_field.bit_length);
 	if (byte_field_length > buffer_length) {
-		return (AE_BUFFER_OVERFLOW);
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Field size %X (bytes) too large for buffer (%X)\n",
+			byte_field_length, buffer_length));
+
+		return_ACPI_STATUS (AE_BUFFER_OVERFLOW);
 	}
 
 	/* Convert field byte count to datum count, round up if necessary */
 
 	datum_count = ROUND_UP_TO (byte_field_length, obj_desc->common_field.access_byte_width);
+
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
+		"Byte_len=%x, Datum_len=%x, Bit_gran=%x, Byte_gran=%x\n",
+		byte_field_length, datum_count, obj_desc->common_field.access_bit_width,
+		obj_desc->common_field.access_byte_width));
 
 
 	/*
@@ -347,7 +396,7 @@ acpi_ex_extract_from_field (
 
 	status = acpi_ex_read_field_datum (obj_desc, field_datum_byte_offset, &previous_raw_datum);
 	if (ACPI_FAILURE (status)) {
-		return (status);
+		return_ACPI_STATUS (status);
 	}
 
 
@@ -370,7 +419,7 @@ acpi_ex_extract_from_field (
 		acpi_ex_set_buffer_datum (merged_datum, buffer, obj_desc->common_field.access_byte_width,
 				datum_offset);
 
-		return (AE_OK);
+		return_ACPI_STATUS (AE_OK);
 	}
 
 
@@ -396,7 +445,7 @@ acpi_ex_extract_from_field (
 			 */
 			status = acpi_ex_read_field_datum (obj_desc, field_datum_byte_offset, &this_raw_datum);
 			if (ACPI_FAILURE (status)) {
-				return (status);
+				return_ACPI_STATUS (status);
 			}
 		}
 
@@ -453,7 +502,7 @@ acpi_ex_extract_from_field (
 	}
 
 
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -470,15 +519,18 @@ acpi_ex_extract_from_field (
  *
  ******************************************************************************/
 
-static ACPI_STATUS
+static acpi_status
 acpi_ex_write_field_datum (
-	ACPI_OPERAND_OBJECT     *obj_desc,
+	acpi_operand_object     *obj_desc,
 	u32                     field_datum_byte_offset,
 	u32                     value)
 {
-	ACPI_STATUS             status = AE_OK;
-	ACPI_OPERAND_OBJECT     *rgn_desc = NULL;
+	acpi_status             status = AE_OK;
+	acpi_operand_object     *rgn_desc = NULL;
 	ACPI_PHYSICAL_ADDRESS   address;
+
+
+	FUNCTION_TRACE_U32 ("Ex_write_field_datum", field_datum_byte_offset);
 
 
 	/*
@@ -508,7 +560,7 @@ acpi_ex_write_field_datum (
 		 */
 		status = acpi_ex_setup_field (obj_desc, field_datum_byte_offset);
 		if (ACPI_FAILURE (status)) {
-			return (status);
+			return_ACPI_STATUS (status);
 		}
 
 		/*
@@ -523,24 +575,45 @@ acpi_ex_write_field_datum (
 				 obj_desc->common_field.base_byte_offset +
 				 field_datum_byte_offset;
 
+		ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD,
+			"Store %X in Region %s(%X) at %8.8lX%8.8lX width %X\n",
+			value, acpi_ut_get_region_name (rgn_desc->region.space_id),
+			rgn_desc->region.space_id, HIDWORD(address), LODWORD(address),
+			obj_desc->common_field.access_bit_width));
+
 		/* Invoke the appropriate Address_space/Op_region handler */
 
 		status = acpi_ev_address_space_dispatch (rgn_desc, ACPI_WRITE_ADR_SPACE,
 				  address, obj_desc->common_field.access_bit_width, &value);
 
+		if (status == AE_NOT_IMPLEMENTED) {
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+				"**** Region type %s(%X) not implemented\n",
+				acpi_ut_get_region_name (rgn_desc->region.space_id),
+				rgn_desc->region.space_id));
+		}
 
+		else if (status == AE_NOT_EXIST) {
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+				"**** Region type %s(%X) does not have a handler\n",
+				acpi_ut_get_region_name (rgn_desc->region.space_id),
+				rgn_desc->region.space_id));
+		}
 
 		break;
 
 
 	default:
 
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "%p, wrong source type - %s\n",
+			obj_desc, acpi_ut_get_type_name (obj_desc->common.type)));
 		status = AE_AML_INTERNAL;
 		break;
 	}
 
 
-	return (status);
+	ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD, "Value written=%08lX \n", value));
+	return_ACPI_STATUS (status);
 }
 
 
@@ -557,16 +630,19 @@ acpi_ex_write_field_datum (
  *
  ******************************************************************************/
 
-static ACPI_STATUS
+static acpi_status
 acpi_ex_write_field_datum_with_update_rule (
-	ACPI_OPERAND_OBJECT     *obj_desc,
+	acpi_operand_object     *obj_desc,
 	u32                     mask,
 	u32                     field_value,
 	u32                     field_datum_byte_offset)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 	u32                     merged_value;
 	u32                     current_value;
+
+
+	FUNCTION_TRACE ("Ex_write_field_datum_with_update_rule");
 
 
 	/* Start with the new bits  */
@@ -617,7 +693,10 @@ acpi_ex_write_field_datum_with_update_rule (
 
 
 		default:
-			return (AE_AML_OPERAND_VALUE);
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+				"Write_with_update_rule: Unknown Update_rule setting: %x\n",
+				obj_desc->common_field.update_rule));
+			return_ACPI_STATUS (AE_AML_OPERAND_VALUE);
 			break;
 		}
 	}
@@ -628,7 +707,10 @@ acpi_ex_write_field_datum_with_update_rule (
 	status = acpi_ex_write_field_datum (obj_desc, field_datum_byte_offset,
 			  merged_value);
 
-	return (status);
+	ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD, "Mask %X Datum_offset %X Value %X, Merged_value %X\n",
+		mask, field_datum_byte_offset, field_value, merged_value));
+
+	return_ACPI_STATUS (status);
 }
 
 
@@ -645,13 +727,13 @@ acpi_ex_write_field_datum_with_update_rule (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_insert_into_field (
-	ACPI_OPERAND_OBJECT     *obj_desc,
+	acpi_operand_object     *obj_desc,
 	void                    *buffer,
 	u32                     buffer_length)
 {
-	ACPI_STATUS             status;
+	acpi_status             status;
 	u32                     field_datum_byte_offset;
 	u32                     datum_offset;
 	u32                     mask;
@@ -662,6 +744,9 @@ acpi_ex_insert_into_field (
 	u32                     datum_count;
 
 
+	FUNCTION_TRACE ("Ex_insert_into_field");
+
+
 	/*
 	 * Incoming buffer must be at least as long as the field, we do not
 	 * allow "partial" field writes.  We do not care if the buffer is
@@ -670,14 +755,22 @@ acpi_ex_insert_into_field (
 	 */
 	byte_field_length = ROUND_BITS_UP_TO_BYTES (obj_desc->common_field.bit_length);
 	if (buffer_length < byte_field_length) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Buffer length %X too small for field %X\n",
+			buffer_length, byte_field_length));
+
 		/* TBD: Need a better error code */
 
-		return (AE_BUFFER_OVERFLOW);
+		return_ACPI_STATUS (AE_BUFFER_OVERFLOW);
 	}
 
 	/* Convert byte count to datum count, round up if necessary */
 
 	datum_count = ROUND_UP_TO (byte_field_length, obj_desc->common_field.access_byte_width);
+
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
+		"Byte_len=%x, Datum_len=%x, Bit_gran=%x, Byte_gran=%x\n",
+		byte_field_length, datum_count, obj_desc->common_field.access_bit_width,
+		obj_desc->common_field.access_byte_width));
 
 
 	/*
@@ -725,14 +818,14 @@ acpi_ex_insert_into_field (
 	status = acpi_ex_write_field_datum_with_update_rule (obj_desc, mask, merged_datum,
 			   field_datum_byte_offset);
 	if (ACPI_FAILURE (status)) {
-		return (status);
+		return_ACPI_STATUS (status);
 	}
 
 	/* If the entire field fits within one datum, we are done. */
 
 	if ((datum_count == 1) &&
 	   (obj_desc->common_field.access_flags & AFIELD_SINGLE_DATUM)) {
-		return (AE_OK);
+		return_ACPI_STATUS (AE_OK);
 	}
 
 	/*
@@ -799,7 +892,7 @@ acpi_ex_insert_into_field (
 			status = acpi_ex_write_field_datum_with_update_rule (obj_desc, mask,
 					  merged_datum, field_datum_byte_offset);
 			if (ACPI_FAILURE (status)) {
-				return (status);
+				return_ACPI_STATUS (status);
 			}
 		}
 
@@ -809,7 +902,7 @@ acpi_ex_insert_into_field (
 			status = acpi_ex_write_field_datum (obj_desc,
 					  field_datum_byte_offset, merged_datum);
 			if (ACPI_FAILURE (status)) {
-				return (status);
+				return_ACPI_STATUS (status);
 			}
 		}
 
@@ -821,7 +914,7 @@ acpi_ex_insert_into_field (
 	}
 
 
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 

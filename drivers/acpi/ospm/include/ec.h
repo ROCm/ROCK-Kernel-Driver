@@ -1,7 +1,7 @@
 /*****************************************************************************
  *
  * Module Name: ec.h
- *   $Revision: 15 $
+ *   $Revision: 19 $
  *
  *****************************************************************************/
 
@@ -76,7 +76,7 @@ typedef u8			EC_COMMAND;
  *  +--------------- <Reserved>
  *
  */
-typedef u8			EC_STATUS;
+typedef u32			EC_STATUS;
 
 #define EC_FLAG_OUTPUT_BUFFER	((EC_STATUS) 0x01)
 #define EC_FLAG_INPUT_BUFFER	((EC_STATUS) 0x02)
@@ -88,7 +88,7 @@ typedef u8			EC_STATUS;
  * EC_EVENT:
  * ---------
  */
-typedef u8			EC_EVENT;
+typedef u32			EC_EVENT;
 
 #define EC_EVENT_UNKNOWN	((EC_EVENT) 0x00)
 #define EC_EVENT_NONE		((EC_EVENT) 0x00)
@@ -123,14 +123,14 @@ typedef struct
 typedef struct
 {
 	BM_HANDLE               device_handle;
-	ACPI_HANDLE             acpi_handle;
+	acpi_handle             acpi_handle;
 	u32                     gpe_bit;
 	u32			status_port;
 	u32			command_port;
 	u32			data_port;
 	u32			use_global_lock;
 	u8                      query_data;
-	ACPI_HANDLE             mutex;
+	acpi_handle             mutex;
 } EC_CONTEXT;
 
 
@@ -140,38 +140,38 @@ typedef struct
 
 /* ec.c */
 
-ACPI_STATUS
+acpi_status
 ec_initialize(void);
 
-ACPI_STATUS
+acpi_status
 ec_terminate(void);
 
-ACPI_STATUS
+acpi_status
 ec_notify (
 	u32                     notify_type,
 	u32                     device,
 	void                    **context);
 
-ACPI_STATUS
+acpi_status
 ec_request(
 	BM_REQUEST              *request_info,
 	void                    *context);
 
 /* ectransx.c */
 
-ACPI_STATUS
+acpi_status
 ec_transaction (
 	EC_CONTEXT              *ec,
 	EC_REQUEST              *ec_request);
 
-ACPI_STATUS
+acpi_status
 ec_io_read (
 	EC_CONTEXT              *ec,
 	u32         		io_port,
 	u8                      *data,
 	EC_EVENT                wait_event);
 
-ACPI_STATUS
+acpi_status
 ec_io_write (
 	EC_CONTEXT              *ec,
 	u32         		io_port,
@@ -180,21 +180,21 @@ ec_io_write (
 
 /* ecgpe.c */
 
-ACPI_STATUS
+acpi_status
 ec_install_gpe_handler (
 	EC_CONTEXT              *ec);
 
-ACPI_STATUS
+acpi_status
 ec_remove_gpe_handler (
 	EC_CONTEXT              *ec);
 
 /* ecspace.c */
 
-ACPI_STATUS
+acpi_status
 ec_install_space_handler (
 	EC_CONTEXT              *ec);
 
-ACPI_STATUS
+acpi_status
 ec_remove_space_handler (
 	EC_CONTEXT              *ec);
 

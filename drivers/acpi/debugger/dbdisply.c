@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dbdisply - debug display commands
- *              $Revision: 45 $
+ *              $Revision: 52 $
  *
  ******************************************************************************/
 
@@ -97,9 +97,9 @@ acpi_db_get_pointer (
 
 void
 acpi_db_dump_parser_descriptor (
-	ACPI_PARSE_OBJECT       *op)
+	acpi_parse_object       *op)
 {
-	ACPI_OPCODE_INFO        *info;
+	const acpi_opcode_info  *info;
 
 
 	info = acpi_ps_get_opcode_info (op->opcode);
@@ -135,11 +135,11 @@ acpi_db_decode_and_display_object (
 	NATIVE_CHAR             *output_type)
 {
 	void                    *obj_ptr;
-	ACPI_NAMESPACE_NODE     *node;
+	acpi_namespace_node     *node;
 	u32                     display = DB_BYTE_DISPLAY;
 	NATIVE_CHAR             buffer[80];
-	ACPI_BUFFER             ret_buf;
-	ACPI_STATUS             status;
+	acpi_buffer             ret_buf;
+	acpi_status             status;
 	u32                     size;
 
 
@@ -180,7 +180,7 @@ acpi_db_decode_and_display_object (
 		if (VALID_DESCRIPTOR_TYPE ((obj_ptr), ACPI_DESC_TYPE_NAMED)) {
 			/* This is a Node */
 
-			if (!acpi_os_readable (obj_ptr, sizeof (ACPI_NAMESPACE_NODE))) {
+			if (!acpi_os_readable (obj_ptr, sizeof (acpi_namespace_node))) {
 				acpi_os_printf ("Cannot read entire Named object at address %p\n", obj_ptr);
 				return;
 			}
@@ -192,26 +192,26 @@ acpi_db_decode_and_display_object (
 		else if (VALID_DESCRIPTOR_TYPE ((obj_ptr), ACPI_DESC_TYPE_INTERNAL)) {
 			/* This is an ACPI OBJECT */
 
-			if (!acpi_os_readable (obj_ptr, sizeof (ACPI_OPERAND_OBJECT))) {
+			if (!acpi_os_readable (obj_ptr, sizeof (acpi_operand_object))) {
 				acpi_os_printf ("Cannot read entire ACPI object at address %p\n", obj_ptr);
 				return;
 			}
 
-			acpi_ut_dump_buffer (obj_ptr, sizeof (ACPI_OPERAND_OBJECT), display, ACPI_UINT32_MAX);
+			acpi_ut_dump_buffer (obj_ptr, sizeof (acpi_operand_object), display, ACPI_UINT32_MAX);
 			acpi_ex_dump_object_descriptor (obj_ptr, 1);
 		}
 
 		else if (VALID_DESCRIPTOR_TYPE ((obj_ptr), ACPI_DESC_TYPE_PARSER)) {
 			/* This is an Parser Op object */
 
-			if (!acpi_os_readable (obj_ptr, sizeof (ACPI_PARSE_OBJECT))) {
+			if (!acpi_os_readable (obj_ptr, sizeof (acpi_parse_object))) {
 				acpi_os_printf ("Cannot read entire Parser object at address %p\n", obj_ptr);
 				return;
 			}
 
 
-			acpi_ut_dump_buffer (obj_ptr, sizeof (ACPI_PARSE_OBJECT), display, ACPI_UINT32_MAX);
-			acpi_db_dump_parser_descriptor ((ACPI_PARSE_OBJECT *) obj_ptr);
+			acpi_ut_dump_buffer (obj_ptr, sizeof (acpi_parse_object), display, ACPI_UINT32_MAX);
+			acpi_db_dump_parser_descriptor ((acpi_parse_object *) obj_ptr);
 		}
 
 		else {
@@ -249,22 +249,22 @@ dump_nte:
 		acpi_os_printf ("Object Pathname: %s\n", ret_buf.pointer);
 	}
 
-	if (!acpi_os_readable (node, sizeof (ACPI_NAMESPACE_NODE))) {
+	if (!acpi_os_readable (node, sizeof (acpi_namespace_node))) {
 		acpi_os_printf ("Invalid Named object at address %p\n", node);
 		return;
 	}
 
-	acpi_ut_dump_buffer ((void *) node, sizeof (ACPI_NAMESPACE_NODE), display, ACPI_UINT32_MAX);
+	acpi_ut_dump_buffer ((void *) node, sizeof (acpi_namespace_node), display, ACPI_UINT32_MAX);
 	acpi_ex_dump_node (node, 1);
 
 	if (node->object) {
 		acpi_os_printf ("\n_attached Object (%p):\n", node->object);
-		if (!acpi_os_readable (node->object, sizeof (ACPI_OPERAND_OBJECT))) {
+		if (!acpi_os_readable (node->object, sizeof (acpi_operand_object))) {
 			acpi_os_printf ("Invalid internal ACPI Object at address %p\n", node->object);
 			return;
 		}
 
-		acpi_ut_dump_buffer (node->object, sizeof (ACPI_OPERAND_OBJECT), display, ACPI_UINT32_MAX);
+		acpi_ut_dump_buffer (node->object, sizeof (acpi_operand_object), display, ACPI_UINT32_MAX);
 		acpi_ex_dump_object_descriptor (node->object, 1);
 	}
 }
@@ -284,7 +284,7 @@ dump_nte:
 
 void
 acpi_db_decode_internal_object (
-	ACPI_OPERAND_OBJECT     *obj_desc)
+	acpi_operand_object     *obj_desc)
 {
 	u32                     i;
 
@@ -297,15 +297,30 @@ acpi_db_decode_internal_object (
 
 	switch (obj_desc->common.type) {
 	case ACPI_TYPE_INTEGER:
-		acpi_os_printf (" %.8X", obj_desc->integer.value);
+
+		acpi_os_printf (" %.8X%.8X", HIDWORD (obj_desc->integer.value),
+				 LODWORD (obj_desc->integer.value));
 		break;
+
 
 	case ACPI_TYPE_STRING:
-		acpi_os_printf ("(%d) \"%.16s\"...",
+
+		acpi_os_printf ("(%d) \"%.24s",
 				obj_desc->string.length, obj_desc->string.pointer);
+
+		if (obj_desc->string.length > 24)
+		{
+			acpi_os_printf ("...");
+		}
+		else
+		{
+			acpi_os_printf ("\"");
+		}
 		break;
 
+
 	case ACPI_TYPE_BUFFER:
+
 		acpi_os_printf ("(%d)", obj_desc->buffer.length);
 		for (i = 0; (i < 8) && (i < obj_desc->buffer.length); i++) {
 			acpi_os_printf (" %2.2X", obj_desc->buffer.pointer[i]);
@@ -330,8 +345,8 @@ acpi_db_decode_internal_object (
 
 void
 acpi_db_display_internal_object (
-	ACPI_OPERAND_OBJECT     *obj_desc,
-	ACPI_WALK_STATE         *walk_state)
+	acpi_operand_object     *obj_desc,
+	acpi_walk_state         *walk_state)
 {
 	u8                      type;
 
@@ -352,18 +367,17 @@ acpi_db_display_internal_object (
 
 	else if (VALID_DESCRIPTOR_TYPE (obj_desc, ACPI_DESC_TYPE_NAMED)) {
 		acpi_os_printf ("<Node>          Name %4.4s Type-%s",
-				  &((ACPI_NAMESPACE_NODE *)obj_desc)->name,
-				  acpi_ut_get_type_name (((ACPI_NAMESPACE_NODE *) obj_desc)->type));
-		if (((ACPI_NAMESPACE_NODE *) obj_desc)->flags & ANOBJ_METHOD_ARG) {
+				  &((acpi_namespace_node *)obj_desc)->name,
+				  acpi_ut_get_type_name (((acpi_namespace_node *) obj_desc)->type));
+		if (((acpi_namespace_node *) obj_desc)->flags & ANOBJ_METHOD_ARG) {
 			acpi_os_printf (" [Method Arg]");
 		}
-		if (((ACPI_NAMESPACE_NODE *) obj_desc)->flags & ANOBJ_METHOD_LOCAL) {
+		if (((acpi_namespace_node *) obj_desc)->flags & ANOBJ_METHOD_LOCAL) {
 			acpi_os_printf (" [Method Local]");
 		}
 	}
 
 	else if (VALID_DESCRIPTOR_TYPE (obj_desc, ACPI_DESC_TYPE_INTERNAL)) {
-		acpi_os_printf ("<Obj> ");
 		type = obj_desc->common.type;
 		if (type > INTERNAL_TYPE_MAX) {
 			acpi_os_printf (" Type %x [Invalid Type]", type);
@@ -376,29 +390,35 @@ acpi_db_display_internal_object (
 		case INTERNAL_TYPE_REFERENCE:
 			switch (obj_desc->reference.opcode) {
 			case AML_ZERO_OP:
-				acpi_os_printf ("[Const]   Number %.8X", 0);
+				acpi_os_printf ("[Const]         Zero (0) [Null Target]", 0);
 				break;
 
 			case AML_ONES_OP:
-				acpi_os_printf ("[Const]   Number %.8X", ACPI_UINT32_MAX);
+				acpi_os_printf ("[Const]         Ones (0xFFFFFFFFFFFFFFFF) [No Limit]");
 				break;
 
 			case AML_ONE_OP:
-				acpi_os_printf ("[Const]   Number %.8X", 1);
+				acpi_os_printf ("[Const]         One (1)");
+				break;
+
+			case AML_REVISION_OP:
+				acpi_os_printf ("[Const]         Revision (%X)", ACPI_CA_VERSION);
 				break;
 
 			case AML_LOCAL_OP:
-				acpi_os_printf ("[Local%d] ", obj_desc->reference.offset);
+				acpi_os_printf ("[Local%d]", obj_desc->reference.offset);
 				if (walk_state) {
 					obj_desc = walk_state->local_variables[obj_desc->reference.offset].object;
+					acpi_os_printf (" %p", obj_desc);
 					acpi_db_decode_internal_object (obj_desc);
 				}
 				break;
 
 			case AML_ARG_OP:
-				acpi_os_printf ("[Arg%d]   ", obj_desc->reference.offset);
+				acpi_os_printf ("[Arg%d] ", obj_desc->reference.offset);
 				if (walk_state) {
 					obj_desc = walk_state->arguments[obj_desc->reference.offset].object;
+					acpi_os_printf (" %p", obj_desc);
 					acpi_db_decode_internal_object (obj_desc);
 				}
 				break;
@@ -419,6 +439,7 @@ acpi_db_display_internal_object (
 			break;
 
 		default:
+			acpi_os_printf ("<Obj> ");
 			acpi_os_printf ("         ");
 			acpi_db_decode_internal_object (obj_desc);
 			break;
@@ -447,14 +468,14 @@ acpi_db_display_internal_object (
 
 void
 acpi_db_display_method_info (
-	ACPI_PARSE_OBJECT       *start_op)
+	acpi_parse_object       *start_op)
 {
-	ACPI_WALK_STATE         *walk_state;
-	ACPI_OPERAND_OBJECT     *obj_desc;
-	ACPI_NAMESPACE_NODE     *node;
-	ACPI_PARSE_OBJECT       *root_op;
-	ACPI_PARSE_OBJECT       *op;
-	ACPI_OPCODE_INFO        *op_info;
+	acpi_walk_state         *walk_state;
+	acpi_operand_object     *obj_desc;
+	acpi_namespace_node     *node;
+	acpi_parse_object       *root_op;
+	acpi_parse_object       *op;
+	const acpi_opcode_info  *op_info;
 	u32                     num_ops = 0;
 	u32                     num_operands = 0;
 	u32                     num_operators = 0;
@@ -559,9 +580,9 @@ void
 acpi_db_display_locals (void)
 {
 	u32                     i;
-	ACPI_WALK_STATE         *walk_state;
-	ACPI_OPERAND_OBJECT     *obj_desc;
-	ACPI_NAMESPACE_NODE     *node;
+	acpi_walk_state         *walk_state;
+	acpi_operand_object     *obj_desc;
+	acpi_namespace_node     *node;
 
 
 	walk_state = acpi_ds_get_current_walk_state (acpi_gbl_current_walk_list);
@@ -600,11 +621,11 @@ void
 acpi_db_display_arguments (void)
 {
 	u32                     i;
-	ACPI_WALK_STATE         *walk_state;
-	ACPI_OPERAND_OBJECT     *obj_desc;
+	acpi_walk_state         *walk_state;
+	acpi_operand_object     *obj_desc;
 	u32                     num_args;
 	u32                     concurrency;
-	ACPI_NAMESPACE_NODE     *node;
+	acpi_namespace_node     *node;
 
 
 	walk_state = acpi_ds_get_current_walk_state (acpi_gbl_current_walk_list);
@@ -645,10 +666,10 @@ void
 acpi_db_display_results (void)
 {
 	u32                     i;
-	ACPI_WALK_STATE         *walk_state;
-	ACPI_OPERAND_OBJECT     *obj_desc;
+	acpi_walk_state         *walk_state;
+	acpi_operand_object     *obj_desc;
 	u32                     num_results = 0;
-	ACPI_NAMESPACE_NODE     *node;
+	acpi_namespace_node     *node;
 
 
 	walk_state = acpi_ds_get_current_walk_state (acpi_gbl_current_walk_list);
@@ -690,8 +711,8 @@ void
 acpi_db_display_calling_tree (void)
 {
 	u32                     i;
-	ACPI_WALK_STATE         *walk_state;
-	ACPI_NAMESPACE_NODE     *node;
+	acpi_walk_state         *walk_state;
+	acpi_namespace_node     *node;
 
 
 	walk_state = acpi_ds_get_current_walk_state (acpi_gbl_current_walk_list);
@@ -729,15 +750,14 @@ acpi_db_display_calling_tree (void)
 
 void
 acpi_db_display_result_object (
-	ACPI_OPERAND_OBJECT     *obj_desc,
-	ACPI_WALK_STATE         *walk_state)
+	acpi_operand_object     *obj_desc,
+	acpi_walk_state         *walk_state)
 {
 
 	/* TBD: [Future] We don't always want to display the result.
 	 * For now, only display if single stepping
 	 * however, this output is very useful in other contexts also
 	 */
-
 	if (!acpi_gbl_cm_single_step) {
 		return;
 	}
@@ -763,8 +783,8 @@ acpi_db_display_result_object (
 
 void
 acpi_db_display_argument_object (
-	ACPI_OPERAND_OBJECT     *obj_desc,
-	ACPI_WALK_STATE         *walk_state)
+	acpi_operand_object     *obj_desc,
+	acpi_walk_state         *walk_state)
 {
 
 

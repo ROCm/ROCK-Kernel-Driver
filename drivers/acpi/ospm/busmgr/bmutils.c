@@ -1,7 +1,7 @@
 /*****************************************************************************
  *
  * Module Name: bmutils.c
- *   $Revision: 28 $
+ *   $Revision: 38 $
  *
  *****************************************************************************/
 
@@ -47,23 +47,25 @@
  *
  * FUNCTION:    bm_print_eval_error
  *
- * PARAMETERS:  
+ * PARAMETERS:
  *
- * RETURN:      
+ * RETURN:
  *
- * DESCRIPTION: 
+ * DESCRIPTION:
  *
  ****************************************************************************/
 
 void
 bm_print_eval_error (
 	u32                     debug_level,
-	ACPI_HANDLE             acpi_handle,
-	ACPI_STRING             pathname,
-	ACPI_STATUS             status)
+	acpi_handle             handle,
+	acpi_string             pathname,
+	acpi_status             status)
 {
-	ACPI_BUFFER             buffer;
-	ACPI_STRING             status_string = NULL;
+	acpi_buffer		buffer;
+	acpi_status		local_status;
+
+	PROC_NAME("bm_print_eval_error");
 
 	buffer.length = 256;
 	buffer.pointer = acpi_os_callocate(buffer.length);
@@ -71,19 +73,20 @@ bm_print_eval_error (
 		return;
 	}
 
-	status_string = acpi_ut_format_exception(status);
-
-	status = acpi_get_name(acpi_handle, ACPI_FULL_PATHNAME, &buffer);
-	if (ACPI_FAILURE(status)) {
-		DEBUG_PRINT(debug_level, ("Evaluate object [%p], %s\n", acpi_handle, status_string));
+	local_status = acpi_get_name(handle, ACPI_FULL_PATHNAME, &buffer);
+	if (ACPI_FAILURE(local_status)) {
+		ACPI_DEBUG_PRINT((ACPI_DEBUG_LEVEL(debug_level), "Evaluate object [%p], %s\n", handle,
+			acpi_format_exception(status)));
 		return;
 	}
 
 	if (pathname) {
-		DEBUG_PRINT(ACPI_INFO, ("Evaluate object [%s.%s], %s\n", buffer.pointer, pathname, status_string));
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Evaluate object [%s.%s], %s\n", buffer.pointer, pathname,
+			acpi_format_exception(status)));
 	}
 	else {
-		DEBUG_PRINT(ACPI_INFO, ("Evaluate object [%s], %s\n", buffer.pointer, status_string));
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Evaluate object [%s], %s\n", buffer.pointer,
+			acpi_format_exception(status)));
 	}
 
 	acpi_os_free(buffer.pointer);
@@ -94,17 +97,17 @@ bm_print_eval_error (
  *
  * FUNCTION:    bm_copy_to_buffer
  *
- * PARAMETERS:  
+ * PARAMETERS:
  *
- * RETURN:      
+ * RETURN:
  *
- * DESCRIPTION: 
+ * DESCRIPTION:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bm_copy_to_buffer (
-	ACPI_BUFFER             *buffer,
+	acpi_buffer             *buffer,
 	void                    *data,
 	u32                     length)
 {
@@ -130,17 +133,17 @@ bm_copy_to_buffer (
  *
  * FUNCTION:    bm_cast_buffer
  *
- * PARAMETERS:  
+ * PARAMETERS:
  *
- * RETURN:      
+ * RETURN:
  *
- * DESCRIPTION: 
+ * DESCRIPTION:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bm_cast_buffer (
-	ACPI_BUFFER             *buffer,
+	acpi_buffer             *buffer,
 	void                    **pointer,
 	u32                     length)
 {
@@ -164,11 +167,11 @@ bm_cast_buffer (
  *
  * FUNCTION:    bm_extract_package_data
  *
- * PARAMETERS:  
+ * PARAMETERS:
  *
- * RETURN:      
+ * RETURN:
  *
- * DESCRIPTION: 
+ * DESCRIPTION:
  *
  ****************************************************************************/
 
@@ -178,18 +181,18 @@ bm_cast_buffer (
  *       (e.g. toshiba _BIF)
  */
 
-ACPI_STATUS
+acpi_status
 bm_extract_package_data (
-	ACPI_OBJECT             *package,
-	ACPI_BUFFER             *package_format,
-	ACPI_BUFFER             *buffer)
+	acpi_object             *package,
+	acpi_buffer             *package_format,
+	acpi_buffer             *buffer)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 	u8                      *head = NULL;
 	u8                      *tail = NULL;
 	u8                      **pointer = NULL;
 	u32                     tail_offset = 0;
-	ACPI_OBJECT             *element = NULL;
+	acpi_object             *element = NULL;
 	u32                     size_required = 0;
 	char*                   format = NULL;
 	u32                     format_count = 0;
@@ -199,7 +202,7 @@ bm_extract_package_data (
 
 	if (!package || (package->type != ACPI_TYPE_PACKAGE) ||
 		(package->package.count == 0) || !package_format ||
-		(package_format->length < 1) || 
+		(package_format->length < 1) ||
 		(!package_format->pointer) || !buffer) {
 		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
@@ -207,7 +210,7 @@ bm_extract_package_data (
 	format_count = package_format->length - 1;
 
 	if (format_count > package->package.count) {
-		DEBUG_PRINT(ACPI_WARN, ("Format specifies more objects [%d] than exist in package [%d].", format_count, package->package.count));
+		ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Format specifies more objects [%d] than exist in package [%d].", format_count, package->package.count));
 		return_ACPI_STATUS(AE_BAD_DATA);
 	}
 
@@ -224,16 +227,16 @@ bm_extract_package_data (
 		case ACPI_TYPE_INTEGER:
 			switch (format[i]) {
 			case 'N':
-				size_required += sizeof(ACPI_INTEGER);
-				tail_offset += sizeof(ACPI_INTEGER);
+				size_required += sizeof(acpi_integer);
+				tail_offset += sizeof(acpi_integer);
 				break;
 			case 'S':
-				size_required += sizeof(u8*) + 
-					sizeof(ACPI_INTEGER) + 1;
-				tail_offset += sizeof(ACPI_INTEGER);
+				size_required += sizeof(u8*) +
+					sizeof(acpi_integer) + 1;
+				tail_offset += sizeof(acpi_integer);
 				break;
 			default:
-				DEBUG_PRINT(ACPI_WARN, ("Invalid package element [%d]: got number, expecing [%c].\n", i, format[i]));
+				ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Invalid package element [%d]: got number, expecing [%c].\n", i, format[i]));
 				return_ACPI_STATUS(AE_BAD_DATA);
 				break;
 			}
@@ -243,17 +246,17 @@ bm_extract_package_data (
 		case ACPI_TYPE_BUFFER:
 			switch (format[i]) {
 			case 'S':
-				size_required += sizeof(u8*) + 
+				size_required += sizeof(u8*) +
 					element->string.length + 1;
 				tail_offset += sizeof(u8*);
 				break;
 			case 'B':
-				size_required += sizeof(u8*) + 
+				size_required += sizeof(u8*) +
 					element->buffer.length;
 				tail_offset += sizeof(u8*);
 				break;
 			default:
-				DEBUG_PRINT(ACPI_WARN, ("Invalid package element [%d] got string/buffer, expecing [%c].\n", i, format[i]));
+				ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Invalid package element [%d] got string/buffer, expecing [%c].\n", i, format[i]));
 				return_ACPI_STATUS(AE_BAD_DATA);
 				break;
 			}
@@ -293,17 +296,17 @@ bm_extract_package_data (
 		case ACPI_TYPE_INTEGER:
 			switch (format[i]) {
 			case 'N':
-				*((ACPI_INTEGER*)head) = 
+				*((acpi_integer*)head) =
 					element->integer.value;
-				head += sizeof(ACPI_INTEGER);
+				head += sizeof(acpi_integer);
 				break;
 			case 'S':
 				pointer = (u8**)head;
 				*pointer = tail;
-				*((ACPI_INTEGER*)tail) = 
+				*((acpi_integer*)tail) =
 					element->integer.value;
-				head += sizeof(ACPI_INTEGER*);
-				tail += sizeof(ACPI_INTEGER);
+				head += sizeof(acpi_integer*);
+				tail += sizeof(acpi_integer);
 				/* NULL terminate string */
 				*tail = 0;
 				tail++;
@@ -320,7 +323,7 @@ bm_extract_package_data (
 			case 'S':
 				pointer = (u8**)head;
 				*pointer = tail;
-				memcpy(tail, element->string.pointer, 
+				memcpy(tail, element->string.pointer,
 					element->string.length);
 				head += sizeof(u8*);
 				tail += element->string.length;
@@ -331,7 +334,7 @@ bm_extract_package_data (
 			case 'B':
 				pointer = (u8**)head;
 				*pointer = tail;
-				memcpy(tail, element->buffer.pointer, 
+				memcpy(tail, element->buffer.pointer,
 					element->buffer.length);
 				head += sizeof(u8*);
 				tail += element->buffer.length;
@@ -358,26 +361,26 @@ bm_extract_package_data (
  *
  * FUNCTION:    bm_evaluate_object
  *
- * PARAMETERS:  
+ * PARAMETERS:
  *
  * RETURN:      AE_OK
- *              AE_BUFFER_OVERFLOW  Evaluated object returned data, but 
+ *              AE_BUFFER_OVERFLOW  Evaluated object returned data, but
  *                                  caller did not provide buffer.
  *
  * DESCRIPTION: Helper for acpi_evaluate_object that handles buffer
- *              allocation.  Note that the caller is responsible for 
+ *              allocation.  Note that the caller is responsible for
  *              freeing buffer->pointer!
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bm_evaluate_object (
-	ACPI_HANDLE             acpi_handle,
-	ACPI_STRING             pathname,
-	ACPI_OBJECT_LIST        *arguments,
-	ACPI_BUFFER             *buffer)
+	acpi_handle             handle,
+	acpi_string             pathname,
+	acpi_object_list        *arguments,
+	acpi_buffer             *buffer)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 
 	FUNCTION_TRACE("bm_evaluate_object");
 
@@ -389,11 +392,11 @@ bm_evaluate_object (
 	/*
 	 * Evalute Object:
 	 * ---------------
-	 * The first attempt is just to get the size of the object data 
-	 * (that is unless there's no return data, e.g. _INI); the second 
+	 * The first attempt is just to get the size of the object data
+	 * (that is unless there's no return data, e.g. _INI); the second
 	 * gets the data.
 	 */
-	status = acpi_evaluate_object(acpi_handle, pathname, arguments, buffer);
+	status = acpi_evaluate_object(handle, pathname, arguments, buffer);
 	if (ACPI_SUCCESS(status)) {
 		return_ACPI_STATUS(status);
 	}
@@ -406,17 +409,17 @@ bm_evaluate_object (
 		}
 
 		/* Re-evaluate -- this time it should work */
-		status = acpi_evaluate_object(acpi_handle, pathname, 
+		status = acpi_evaluate_object(handle, pathname,
 			arguments, buffer);
 	}
 
 	if (ACPI_FAILURE(status)) {
 		if (status != AE_NOT_FOUND) {
-			DEBUG_EVAL_ERROR(ACPI_WARN, acpi_handle, pathname, 
+			DEBUG_EVAL_ERROR(ACPI_LV_WARN, handle, pathname,
 				status);
 		}
 		if (buffer && buffer->pointer) {
-			acpi_os_free(buffer->pointer); 
+			acpi_os_free(buffer->pointer);
 			buffer->pointer = NULL;
 			buffer->length = 0;
 		}
@@ -430,23 +433,23 @@ bm_evaluate_object (
  *
  * FUNCTION:    bm_evaluate_simple_integer
  *
- * PARAMETERS:  
+ * PARAMETERS:
  *
- * RETURN:      
+ * RETURN:
  *
- * DESCRIPTION: 
+ * DESCRIPTION:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bm_evaluate_simple_integer (
-	ACPI_HANDLE             acpi_handle,
-	ACPI_STRING             pathname,
+	acpi_handle             handle,
+	acpi_string             pathname,
 	u32                     *data)
 {
-	ACPI_STATUS             status = AE_OK;
-	ACPI_OBJECT             *element = NULL;
-	ACPI_BUFFER             buffer;
+	acpi_status             status = AE_OK;
+	acpi_object             *element = NULL;
+	acpi_buffer             buffer;
 
 	FUNCTION_TRACE("bm_evaluate_simple_integer");
 
@@ -454,14 +457,16 @@ bm_evaluate_simple_integer (
 		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
-	MEMSET(&buffer, 0, sizeof(ACPI_BUFFER));
+	MEMSET(&buffer, 0, sizeof(acpi_buffer));
 
 	/*
 	 * Evaluate Object:
 	 * ----------------
 	 */
-	status = bm_evaluate_object(acpi_handle, pathname, NULL, &buffer);
+	status = bm_evaluate_object(handle, pathname, NULL, &buffer);
 	if (ACPI_FAILURE(status)) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "failed to evaluate object (%s)\n",
+			acpi_format_exception(status)));
 		goto end;
 	}
 
@@ -469,16 +474,16 @@ bm_evaluate_simple_integer (
 	 * Validate Data:
 	 * --------------
 	 */
-	status = bm_cast_buffer(&buffer, (void**)&element, 
-		sizeof(ACPI_OBJECT));
+	status = bm_cast_buffer(&buffer, (void**)&element,
+		sizeof(acpi_object));
 	if (ACPI_FAILURE(status)) {
-		DEBUG_EVAL_ERROR(ACPI_WARN, acpi_handle, pathname, status);
+		DEBUG_EVAL_ERROR(ACPI_LV_WARN, handle, pathname, status);
 		goto end;
 	}
 
 	if (element->type != ACPI_TYPE_INTEGER) {
 		status = AE_BAD_DATA;
-		DEBUG_EVAL_ERROR(ACPI_WARN, acpi_handle, pathname, status);
+		DEBUG_EVAL_ERROR(ACPI_LV_WARN, handle, pathname, status);
 		goto end;
 	}
 
@@ -495,25 +500,25 @@ end:
  *
  * FUNCTION:    bm_evaluate_reference_list
  *
- * PARAMETERS:  
+ * PARAMETERS:
  *
- * RETURN:      
+ * RETURN:
  *
- * DESCRIPTION: 
+ * DESCRIPTION:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status  
 bm_evaluate_reference_list (
-	ACPI_HANDLE             acpi_handle,
-	ACPI_STRING             pathname,
+	acpi_handle             handle,
+	acpi_string             pathname,
 	BM_HANDLE_LIST          *reference_list)
 {
-	ACPI_STATUS             status = AE_OK;
-	ACPI_OBJECT             *package = NULL;
-	ACPI_OBJECT             *element = NULL;
-	ACPI_HANDLE		reference_handle = NULL;
-	ACPI_BUFFER             buffer;
+	acpi_status             status = AE_OK;
+	acpi_object             *package = NULL;
+	acpi_object             *element = NULL;
+	acpi_handle  		reference_handle = NULL;
+	acpi_buffer             buffer;
 	u32                     i = 0;
 
 	FUNCTION_TRACE("bm_evaluate_reference_list");
@@ -522,13 +527,13 @@ bm_evaluate_reference_list (
 		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
-	MEMSET(&buffer, 0, sizeof(ACPI_BUFFER));
+	MEMSET(&buffer, 0, sizeof(acpi_buffer));
 
 	/*
 	 * Evaluate Object:
 	 * ----------------
 	 */
-	status = bm_evaluate_object(acpi_handle, pathname, NULL, &buffer);
+	status = bm_evaluate_object(handle, pathname, NULL, &buffer);
 	if (ACPI_FAILURE(status)) {
 		goto end;
 	}
@@ -537,16 +542,16 @@ bm_evaluate_reference_list (
 	 * Validate Package:
 	 * -----------------
 	 */
-	status = bm_cast_buffer(&buffer, (void**)&package, 
-		sizeof(ACPI_OBJECT));
+	status = bm_cast_buffer(&buffer, (void**)&package,
+		sizeof(acpi_object));
 	if (ACPI_FAILURE(status)) {
-		DEBUG_EVAL_ERROR(ACPI_WARN, acpi_handle, pathname, status);
+		DEBUG_EVAL_ERROR(ACPI_LV_WARN, handle, pathname, status);
 		goto end;
 	}
 
 	if (package->type != ACPI_TYPE_PACKAGE) {
 		status = AE_BAD_DATA;
-		DEBUG_EVAL_ERROR(ACPI_WARN, acpi_handle, pathname, status);
+		DEBUG_EVAL_ERROR(ACPI_LV_WARN, handle, pathname, status);
 		goto end;
 	}
 
@@ -564,37 +569,37 @@ bm_evaluate_reference_list (
 
 		if (!element || (element->type != ACPI_TYPE_STRING)) {
 			status = AE_BAD_DATA;
-			DEBUG_PRINT(ACPI_WARN, ("Invalid element in package (not a device reference).\n"));
-			DEBUG_EVAL_ERROR(ACPI_WARN, acpi_handle, pathname, status);
+			ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Invalid element in package (not a device reference).\n"));
+			DEBUG_EVAL_ERROR (ACPI_LV_WARN, handle, pathname, status);
 			break;
 		}
 
 		/*
 		 * Resolve reference string (e.g. "\_PR_.CPU_") to an
-		 * ACPI_HANDLE.
+		 * acpi_handle.
 		 */
-		status = acpi_get_handle(acpi_handle, 
+		status = acpi_get_handle(handle,
 			element->string.pointer, &reference_handle);
 		if (ACPI_FAILURE(status)) {
 			status = AE_BAD_DATA;
-			DEBUG_PRINT(ACPI_WARN, ("Unable to resolve device reference [%s].\n", element->string.pointer));
-			DEBUG_EVAL_ERROR(ACPI_WARN, acpi_handle, pathname, status);
+			ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Unable to resolve device reference [%s].\n", element->string.pointer));
+			DEBUG_EVAL_ERROR (ACPI_LV_WARN, handle, pathname, status);
 			break;
 		}
 
 		/*
-		 * Resolve ACPI_HANDLE to BM_HANDLE.
+		 * Resolve acpi_handle to BM_HANDLE.
 		 */
-		status = bm_get_handle(reference_handle, 
+		status = bm_get_handle(reference_handle,
 			&(reference_list->handles[i]));
 		if (ACPI_FAILURE(status)) {
 			status = AE_BAD_DATA;
-			DEBUG_PRINT(ACPI_WARN, ("Unable to resolve device reference for [%p].\n", reference_handle));
-			DEBUG_EVAL_ERROR(ACPI_WARN, acpi_handle, pathname, status);
+			ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Unable to resolve device reference for [%p].\n", reference_handle));
+			DEBUG_EVAL_ERROR (ACPI_LV_WARN, handle, pathname, status);
 			break;
 		}
 
-		DEBUG_PRINT(ACPI_INFO, ("Resolved reference [%s]->[%p]->[%02x]\n", element->string.pointer, reference_handle, reference_list->handles[i]));
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Resolved reference [%s]->[%p]->[%02x]\n", element->string.pointer, reference_handle, reference_list->handles[i]));
 
 		(reference_list->count)++;
 	}

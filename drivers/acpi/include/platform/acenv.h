@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acenv.h - Generation environment specific items
- *       $Revision: 75 $
+ *       $Revision: 76 $
  *
  *****************************************************************************/
 
@@ -62,7 +62,7 @@
  */
 #ifdef ACPI_DEBUG
 #ifndef _IA16
-#define ACPI_DEBUG_TRACK_ALLOCATIONS
+#define ACPI_DBG_TRACK_ALLOCATIONS
 #endif
 #endif
 

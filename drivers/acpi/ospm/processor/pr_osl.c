@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: pr_osl.c
- *   $Revision: 14 $
+ *   $Revision: 18 $
  *
  *****************************************************************************/
 
@@ -29,6 +29,7 @@
 #include <linux/init.h>
 #include <linux/types.h>
 #include <linux/proc_fs.h>
+#include <linux/pci.h>
 #include <acpi.h>
 #include <bm.h>
 #include "pr.h"
@@ -45,21 +46,22 @@ MODULE_LICENSE("GPL");
 
 extern struct proc_dir_entry	*bm_proc_root;
 static struct proc_dir_entry	*pr_proc_root = NULL;
+extern unsigned short		acpi_piix4_bmisx;
 
 
 /****************************************************************************
- * 
+ *
  * FUNCTION:	pr_osl_proc_read_status
  *
  ****************************************************************************/
 
 static int
 pr_osl_proc_read_status (
-	char			*page, 
-	char			**start, 
-	off_t			off, 
-	int 			count, 
-	int 			*eof, 
+	char			*page,
+	char			**start,
+	off_t			off,
+	int 			count,
+	int 			*eof,
 	void			*context)
 {
 	PR_CONTEXT		*processor = NULL;
@@ -72,10 +74,10 @@ pr_osl_proc_read_status (
 
 	processor = (PR_CONTEXT*)context;
 
-	p += sprintf(p, "Bus Mastering Activity:  %08x\n", 
+	p += sprintf(p, "Bus Mastering Activity:  %08x\n",
 		processor->power.bm_activity);
 
-	p += sprintf(p, "C-State Utilization:     C1[%d] C2[%d] C3[%d]\n", 
+	p += sprintf(p, "C-State Utilization:     C1[%d] C2[%d] C3[%d]\n",
 		processor->power.state[PR_C1].utilization,
 		processor->power.state[PR_C2].utilization,
 		processor->power.state[PR_C3].utilization);
@@ -93,18 +95,18 @@ end:
 
 
 /****************************************************************************
- * 
+ *
  * FUNCTION:	pr_osl_proc_read_info
  *
  ****************************************************************************/
 
 static int
 pr_osl_proc_read_info (
-	char			*page, 
-	char			**start, 
-	off_t			off, 
-	int 			count, 
-	int 			*eof, 
+	char			*page,
+	char			**start,
+	off_t			off,
+	int 			count,
+	int 			*eof,
 	void			*context)
 {
 	PR_CONTEXT		*processor = NULL;
@@ -137,7 +139,7 @@ end:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 pr_osl_add_device(
 	PR_CONTEXT		*processor)
 {
@@ -160,6 +162,9 @@ pr_osl_add_device(
 		printk(", throttling states: %d", processor->performance.state_count);
 	}
 
+	if (acpi_piix4_bmisx)
+		printk(", PIIX workaround active");
+
 	printk("\n");
 
 	sprintf(processor_uid, "%d", processor->uid);
@@ -169,10 +174,10 @@ pr_osl_add_device(
 		return(AE_ERROR);
 	}
 
-	create_proc_read_entry(PR_PROC_STATUS, S_IFREG | S_IRUGO, 
+	create_proc_read_entry(PR_PROC_STATUS, S_IFREG | S_IRUGO,
 		proc_entry, pr_osl_proc_read_status, (void*)processor);
 
-	create_proc_read_entry(PR_PROC_INFO, S_IFREG | S_IRUGO, 
+	create_proc_read_entry(PR_PROC_INFO, S_IFREG | S_IRUGO,
 		proc_entry, pr_osl_proc_read_info, (void*)processor);
 
 	return(AE_OK);
@@ -185,7 +190,7 @@ pr_osl_add_device(
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 pr_osl_remove_device (
 	PR_CONTEXT		*processor)
 {
@@ -214,12 +219,12 @@ pr_osl_remove_device (
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 pr_osl_generate_event (
 	u32			event,
 	PR_CONTEXT		*processor)
 {
-	ACPI_STATUS		status = AE_OK;
+	acpi_status		status = AE_OK;
 	char			processor_uid[16];
 
 	if (!processor) {
@@ -231,7 +236,7 @@ pr_osl_generate_event (
 	case PR_NOTIFY_PERF_STATES:
 	case PR_NOTIFY_POWER_STATES:
 		sprintf(processor_uid, "%d", processor->uid);
-		status = bm_osl_generate_event(processor->device_handle, 
+		status = bm_osl_generate_event(processor->device_handle,
 			PR_PROC_ROOT, processor_uid, event, 0);
 		break;
 
@@ -241,6 +246,34 @@ pr_osl_generate_event (
 	}
 
 	return(status);
+}
+
+
+/****************************************************************************
+ *                              Errata Handling
+ ****************************************************************************/
+
+void acpi_pr_errata (void)
+{
+	struct pci_dev		*dev = NULL;
+
+	while ((dev = pci_find_subsys(PCI_VENDOR_ID_INTEL, PCI_ANY_ID, 
+		PCI_ANY_ID, PCI_ANY_ID, dev))) {
+		switch (dev->device) {
+		case PCI_DEVICE_ID_INTEL_82801BA_8:	/* PIIX4U4 */
+		case PCI_DEVICE_ID_INTEL_82801BA_9:	/* PIIX4U3 */
+		case PCI_DEVICE_ID_INTEL_82451NX:	/* PIIX4NX */
+		case PCI_DEVICE_ID_INTEL_82372FB_1:	/* PIIX4U2 */
+		case PCI_DEVICE_ID_INTEL_82801AA_1:	/* PIIX4U */
+		case PCI_DEVICE_ID_INTEL_82443MX_1:	/* PIIX4E2 */
+		case PCI_DEVICE_ID_INTEL_82801AB_1:	/* PIIX4E */
+		case PCI_DEVICE_ID_INTEL_82371AB:	/* PIIX4 */
+			acpi_piix4_bmisx = pci_resource_start(dev, 4);
+			return;
+		}
+	}
+
+	return;
 }
 
 
@@ -256,10 +289,16 @@ pr_osl_generate_event (
  *
  ****************************************************************************/
 
-static int __init 
+static int __init
 pr_osl_init (void)
 {
-	ACPI_STATUS		status = AE_OK;
+	acpi_status		status = AE_OK;
+
+	/* abort if no busmgr */
+	if (!bm_proc_root)
+		return -ENODEV;
+
+	acpi_pr_errata();
 
 	pr_proc_root = proc_mkdir(PR_PROC_ROOT, bm_proc_root);
 	if (!pr_proc_root) {
@@ -289,7 +328,7 @@ pr_osl_init (void)
  *
  ****************************************************************************/
 
-static void __exit 
+static void __exit
 pr_osl_cleanup (void)
 {
 	pr_terminate();

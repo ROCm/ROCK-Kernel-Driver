@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exprep - ACPI AML (p-code) execution - field prep utilities
- *              $Revision: 90 $
+ *              $Revision: 95 $
  *
  *****************************************************************************/
 
@@ -43,7 +43,7 @@
  * PARAMETERS:  Access          - Encoded field access bits
  *              Length          - Field length.
  *
- * RETURN:      Field granularity (8, 16, or 32)
+ * RETURN:      Field granularity (8, 16, 32 or 64)
  *
  * DESCRIPTION: Decode the Access_type bits of a field definition.
  *
@@ -52,11 +52,16 @@
 static u32
 acpi_ex_decode_field_access_type (
 	u32                     access,
-	u16                     length)
+	u16                     length,
+	u32                     *alignment)
 {
+	PROC_NAME ("Ex_decode_field_access_type");
+
 
 	switch (access) {
 	case ACCESS_ANY_ACC:
+
+		*alignment = 8;
 
 		/* Use the length to set the access type */
 
@@ -79,24 +84,31 @@ acpi_ex_decode_field_access_type (
 		break;
 
 	case ACCESS_BYTE_ACC:
+		*alignment = 8;
 		return (8);
 		break;
 
 	case ACCESS_WORD_ACC:
+		*alignment = 16;
 		return (16);
 		break;
 
 	case ACCESS_DWORD_ACC:
+		*alignment = 32;
 		return (32);
 		break;
 
 	case ACCESS_QWORD_ACC:  /* ACPI 2.0 */
+		*alignment = 64;
 		return (64);
 		break;
 
 	default:
 		/* Invalid field access type */
 
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+			"Unknown field access type %x\n",
+			access));
 		return (0);
 	}
 }
@@ -120,15 +132,19 @@ acpi_ex_decode_field_access_type (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_prep_common_field_object (
-	ACPI_OPERAND_OBJECT     *obj_desc,
+	acpi_operand_object     *obj_desc,
 	u8                      field_flags,
 	u32                     field_bit_position,
 	u32                     field_bit_length)
 {
 	u32                     access_bit_width;
+	u32                     alignment;
 	u32                     nearest_byte_address;
+
+
+	FUNCTION_TRACE ("Ex_prep_common_field_object");
 
 
 	/*
@@ -147,13 +163,20 @@ acpi_ex_prep_common_field_object (
 
 	obj_desc->common_field.bit_length = (u16) field_bit_length;
 
-	/* Decode the access type so we can compute offsets */
-
+	/*
+	 * Decode the access type so we can compute offsets.  The access type gives
+	 * two pieces of information - the width of each field access and the
+	 * necessary alignment of the access.  For Any_acc, the width used is the
+	 * largest necessary/possible in an attempt to access the whole field in one
+	 * I/O operation.  However, for Any_acc, the alignment is 8. For all other
+	 * access types (Byte, Word, Dword, Qword), the width is the same as the
+	 * alignment.
+	 */
 	access_bit_width = acpi_ex_decode_field_access_type (
 			   ((field_flags & ACCESS_TYPE_MASK) >> ACCESS_TYPE_SHIFT),
-			   obj_desc->field.bit_length);
+			   obj_desc->field.bit_length, &alignment);
 	if (!access_bit_width) {
-		return (AE_AML_OPERAND_VALUE);
+		return_ACPI_STATUS (AE_AML_OPERAND_VALUE);
 	}
 
 	/* Setup width (access granularity) fields */
@@ -164,9 +187,10 @@ acpi_ex_prep_common_field_object (
 	if (obj_desc->common.type == ACPI_TYPE_BUFFER_FIELD) {
 		/*
 		 * Buffer_field access can be on any byte boundary, so the
-		 * granularity is always 8
+		 * alignment is always 8 (regardless of any alignment implied by the
+		 * field access type.)
 		 */
-		access_bit_width = 8;
+		alignment = 8;
 	}
 
 
@@ -177,7 +201,7 @@ acpi_ex_prep_common_field_object (
 	 */
 	nearest_byte_address                      = ROUND_BITS_DOWN_TO_BYTES (field_bit_position);
 	obj_desc->common_field.base_byte_offset   = ROUND_DOWN (nearest_byte_address,
-			   DIV_8 (access_bit_width));
+			   DIV_8 (alignment));
 
 	/*
 	 * Start_field_bit_offset is the offset of the first bit of the field within a field datum.
@@ -213,7 +237,7 @@ acpi_ex_prep_common_field_object (
 	}
 
 
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -229,51 +253,62 @@ acpi_ex_prep_common_field_object (
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Construct an ACPI_OPERAND_OBJECT  of type Def_field and
+ * DESCRIPTION: Construct an acpi_operand_object  of type Def_field and
  *              connect it to the parent Node.
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_prep_region_field_value (
-	ACPI_NAMESPACE_NODE     *node,
-	ACPI_HANDLE             region_node,
+	acpi_namespace_node     *node,
+	acpi_handle             region_node,
 	u8                      field_flags,
 	u32                     field_bit_position,
 	u32                     field_bit_length)
 {
-	ACPI_OPERAND_OBJECT     *obj_desc;
+	acpi_operand_object     *obj_desc;
 	u32                     type;
-	ACPI_STATUS             status;
+	acpi_status             status;
+
+
+	FUNCTION_TRACE ("Ex_prep_region_field_value");
 
 
 	/* Parameter validation */
 
 	if (!region_node) {
-		return (AE_AML_NO_OPERAND);
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Null Region_node\n"));
+		return_ACPI_STATUS (AE_AML_NO_OPERAND);
 	}
 
 	type = acpi_ns_get_type (region_node);
 	if (type != ACPI_TYPE_REGION) {
-		return (AE_AML_OPERAND_TYPE);
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Needed Region, found type %X %s\n",
+			type, acpi_ut_get_type_name (type)));
+		return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
 	}
 
 	/* Allocate a new object */
 
 	obj_desc = acpi_ut_create_internal_object (INTERNAL_TYPE_REGION_FIELD);
 	if (!obj_desc) {
-		return (AE_NO_MEMORY);
+		return_ACPI_STATUS (AE_NO_MEMORY);
 	}
 
 
 	/* Obj_desc and Region valid */
+
+	DUMP_OPERANDS ((acpi_operand_object  **) &node, IMODE_EXECUTE,
+			  "Ex_prep_region_field_value", 1, "case Region_field");
+	DUMP_OPERANDS ((acpi_operand_object  **) &region_node, IMODE_EXECUTE,
+			  "Ex_prep_region_field_value", 1, "case Region_field");
 
 	/* Initialize areas of the object that are common to all fields */
 
 	status = acpi_ex_prep_common_field_object (obj_desc, field_flags,
 			  field_bit_position, field_bit_length);
 	if (ACPI_FAILURE (status)) {
-		return (status);
+		return_ACPI_STATUS (status);
 	}
 
 	/* Initialize areas of the object that are specific to this field type */
@@ -287,13 +322,20 @@ acpi_ex_prep_region_field_value (
 
 	/* Debug info */
 
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Bitoff=%X Off=%X Gran=%X Region %p\n",
+		obj_desc->field.start_field_bit_offset, obj_desc->field.base_byte_offset,
+		obj_desc->field.access_bit_width, obj_desc->field.region_obj));
+
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "set Named_obj %p (%4.4s) val = %p\n",
+		node, &(node->name), obj_desc));
+
 
 	/*
 	 * Store the constructed descriptor (Obj_desc) into the parent Node,
 	 * preserving the current type of that Named_obj.
 	 */
 	status = acpi_ns_attach_object (node, obj_desc, (u8) acpi_ns_get_type (node));
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 
@@ -316,47 +358,58 @@ acpi_ex_prep_region_field_value (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_prep_bank_field_value (
-	ACPI_NAMESPACE_NODE     *node,
-	ACPI_NAMESPACE_NODE     *region_node,
-	ACPI_NAMESPACE_NODE     *bank_register_node,
+	acpi_namespace_node     *node,
+	acpi_namespace_node     *region_node,
+	acpi_namespace_node     *bank_register_node,
 	u32                     bank_val,
 	u8                      field_flags,
 	u32                     field_bit_position,
 	u32                     field_bit_length)
 {
-	ACPI_OPERAND_OBJECT     *obj_desc;
+	acpi_operand_object     *obj_desc;
 	u32                     type;
-	ACPI_STATUS             status;
+	acpi_status             status;
+
+
+	FUNCTION_TRACE ("Ex_prep_bank_field_value");
 
 
 	/* Parameter validation */
 
 	if (!region_node) {
-		return (AE_AML_NO_OPERAND);
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Null Region_node\n"));
+		return_ACPI_STATUS (AE_AML_NO_OPERAND);
 	}
 
 	type = acpi_ns_get_type (region_node);
 	if (type != ACPI_TYPE_REGION) {
-		return (AE_AML_OPERAND_TYPE);
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Needed Region, found type %X %s\n",
+			type, acpi_ut_get_type_name (type)));
+		return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
 	}
 
 	/* Allocate a new object */
 
 	obj_desc = acpi_ut_create_internal_object (INTERNAL_TYPE_BANK_FIELD);
 	if (!obj_desc) {
-		return (AE_NO_MEMORY);
+		return_ACPI_STATUS (AE_NO_MEMORY);
 	}
 
 	/*  Obj_desc and Region valid   */
+
+	DUMP_OPERANDS ((acpi_operand_object  **) &node, IMODE_EXECUTE,
+			  "Ex_prep_bank_field_value", 1, "case Bank_field");
+	DUMP_OPERANDS ((acpi_operand_object  **) &region_node, IMODE_EXECUTE,
+			  "Ex_prep_bank_field_value", 1, "case Bank_field");
 
 	/* Initialize areas of the object that are common to all fields */
 
 	status = acpi_ex_prep_common_field_object (obj_desc, field_flags,
 			  field_bit_position, field_bit_length);
 	if (ACPI_FAILURE (status)) {
-		return (status);
+		return_ACPI_STATUS (status);
 	}
 
 	/* Initialize areas of the object that are specific to this field type */
@@ -372,13 +425,21 @@ acpi_ex_prep_bank_field_value (
 
 	/* Debug info */
 
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Bit_off=%X Off=%X Gran=%X Region %p Bank_reg %p\n",
+		obj_desc->bank_field.start_field_bit_offset, obj_desc->bank_field.base_byte_offset,
+		obj_desc->field.access_bit_width, obj_desc->bank_field.region_obj,
+		obj_desc->bank_field.bank_register_obj));
+
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Set Named_obj %p (%4.4s) val=%p\n",
+		node, &(node->name), obj_desc));
+
 
 	/*
 	 * Store the constructed descriptor (Obj_desc) into the parent Node,
 	 * preserving the current type of that Named_obj.
 	 */
 	status = acpi_ns_attach_object (node, obj_desc, (u8) acpi_ns_get_type (node));
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 
@@ -395,35 +456,39 @@ acpi_ex_prep_bank_field_value (
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Construct an ACPI_OPERAND_OBJECT  of type Index_field and
+ * DESCRIPTION: Construct an acpi_operand_object  of type Index_field and
  *              connect it to the parent Node.
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ex_prep_index_field_value (
-	ACPI_NAMESPACE_NODE     *node,
-	ACPI_NAMESPACE_NODE     *index_reg,
-	ACPI_NAMESPACE_NODE     *data_reg,
+	acpi_namespace_node     *node,
+	acpi_namespace_node     *index_reg,
+	acpi_namespace_node     *data_reg,
 	u8                      field_flags,
 	u32                     field_bit_position,
 	u32                     field_bit_length)
 {
-	ACPI_OPERAND_OBJECT     *obj_desc;
-	ACPI_STATUS             status;
+	acpi_operand_object     *obj_desc;
+	acpi_status             status;
+
+
+	FUNCTION_TRACE ("Ex_prep_index_field_value");
 
 
 	/* Parameter validation */
 
 	if (!index_reg || !data_reg) {
-		return (AE_AML_NO_OPERAND);
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Null handle\n"));
+		return_ACPI_STATUS (AE_AML_NO_OPERAND);
 	}
 
 	/* Allocate a new object descriptor */
 
 	obj_desc = acpi_ut_create_internal_object (INTERNAL_TYPE_INDEX_FIELD);
 	if (!obj_desc) {
-		return (AE_NO_MEMORY);
+		return_ACPI_STATUS (AE_NO_MEMORY);
 	}
 
 	/* Initialize areas of the object that are common to all fields */
@@ -431,7 +496,7 @@ acpi_ex_prep_index_field_value (
 	status = acpi_ex_prep_common_field_object (obj_desc, field_flags,
 			  field_bit_position, field_bit_length);
 	if (ACPI_FAILURE (status)) {
-		return (status);
+		return_ACPI_STATUS (status);
 	}
 
 	/* Initialize areas of the object that are specific to this field type */
@@ -448,12 +513,20 @@ acpi_ex_prep_index_field_value (
 
 	/* Debug info */
 
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "bitoff=%X off=%X gran=%X Index %p Data %p\n",
+		obj_desc->index_field.start_field_bit_offset, obj_desc->index_field.base_byte_offset,
+		obj_desc->field.access_bit_width, obj_desc->index_field.index_obj,
+		obj_desc->index_field.data_obj));
+
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "set Named_obj %p (%4.4s) val = %p\n",
+		node, &(node->name), obj_desc));
+
 
 	/*
 	 * Store the constructed descriptor (Obj_desc) into the parent Node,
 	 * preserving the current type of that Named_obj.
 	 */
 	status = acpi_ns_attach_object (node, obj_desc, (u8) acpi_ns_get_type (node));
-	return (status);
+	return_ACPI_STATUS (status);
 }
 

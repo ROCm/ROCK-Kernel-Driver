@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: utmisc - common utility procedures
- *              $Revision: 42 $
+ *              $Revision: 50 $
  *
  ******************************************************************************/
 
@@ -60,6 +60,9 @@ acpi_ut_valid_acpi_name (
 	u32                     i;
 
 
+	FUNCTION_ENTRY ();
+
+
 	for (i = 0; i < ACPI_NAME_SIZE; i++) {
 		if (!((name_ptr[i] == '_') ||
 			  (name_ptr[i] >= 'A' && name_ptr[i] <= 'Z') ||
@@ -67,7 +70,6 @@ acpi_ut_valid_acpi_name (
 			return (FALSE);
 		}
 	}
-
 
 	return (TRUE);
 }
@@ -90,10 +92,13 @@ acpi_ut_valid_acpi_character (
 	NATIVE_CHAR             character)
 {
 
+	FUNCTION_ENTRY ();
+
 	return ((u8)   ((character == '_') ||
 			   (character >= 'A' && character <= 'Z') ||
 			   (character >= '0' && character <= '9')));
 }
+
 
 /*******************************************************************************
  *
@@ -112,6 +117,9 @@ acpi_ut_strupr (
 	NATIVE_CHAR             *src_string)
 {
 	NATIVE_CHAR             *string;
+
+
+	FUNCTION_ENTRY ();
 
 
 	/* Walk entire string, uppercasing the letters */
@@ -137,12 +145,15 @@ acpi_ut_strupr (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ut_mutex_initialize (
 	void)
 {
 	u32                     i;
-	ACPI_STATUS             status;
+	acpi_status             status;
+
+
+	FUNCTION_TRACE ("Ut_mutex_initialize");
 
 
 	/*
@@ -151,11 +162,11 @@ acpi_ut_mutex_initialize (
 	for (i = 0; i < NUM_MTX; i++) {
 		status = acpi_ut_create_mutex (i);
 		if (ACPI_FAILURE (status)) {
-			return (status);
+			return_ACPI_STATUS (status);
 		}
 	}
 
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -178,6 +189,9 @@ acpi_ut_mutex_terminate (
 	u32                     i;
 
 
+	FUNCTION_TRACE ("Ut_mutex_terminate");
+
+
 	/*
 	 * Delete each predefined mutex object
 	 */
@@ -185,7 +199,7 @@ acpi_ut_mutex_terminate (
 		acpi_ut_delete_mutex (i);
 	}
 
-	return;
+	return_VOID;
 }
 
 
@@ -201,15 +215,18 @@ acpi_ut_mutex_terminate (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ut_create_mutex (
 	ACPI_MUTEX_HANDLE       mutex_id)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
+
+
+	FUNCTION_TRACE_U32 ("Ut_create_mutex", mutex_id);
 
 
 	if (mutex_id > MAX_MTX) {
-		return (AE_BAD_PARAMETER);
+		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
 
@@ -220,7 +237,7 @@ acpi_ut_create_mutex (
 		acpi_gbl_acpi_mutex_info[mutex_id].use_count = 0;
 	}
 
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 
@@ -236,15 +253,18 @@ acpi_ut_create_mutex (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ut_delete_mutex (
 	ACPI_MUTEX_HANDLE       mutex_id)
 {
-	ACPI_STATUS             status;
+	acpi_status             status;
+
+
+	FUNCTION_TRACE_U32 ("Ut_delete_mutex", mutex_id);
 
 
 	if (mutex_id > MAX_MTX) {
-		return (AE_BAD_PARAMETER);
+		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
 
@@ -253,7 +273,7 @@ acpi_ut_delete_mutex (
 	acpi_gbl_acpi_mutex_info[mutex_id].mutex = NULL;
 	acpi_gbl_acpi_mutex_info[mutex_id].owner_id = ACPI_MUTEX_NOT_ACQUIRED;
 
-	return (status);
+	return_ACPI_STATUS (status);
 }
 
 
@@ -269,11 +289,11 @@ acpi_ut_delete_mutex (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ut_acquire_mutex (
 	ACPI_MUTEX_HANDLE       mutex_id)
 {
-	ACPI_STATUS             status;
+	acpi_status             status;
 	u32                     i;
 	u32                     this_thread_id;
 
@@ -297,22 +317,43 @@ acpi_ut_acquire_mutex (
 	for (i = mutex_id; i < MAX_MTX; i++) {
 		if (acpi_gbl_acpi_mutex_info[i].owner_id == this_thread_id) {
 			if (i == mutex_id) {
+				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+						"Mutex [%s] already acquired by this thread [%X]\n",
+						acpi_ut_get_mutex_name (mutex_id), this_thread_id));
+
 				return (AE_ALREADY_ACQUIRED);
 			}
+
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+					"Invalid acquire order: Thread %X owns [%s], wants [%s]\n",
+					this_thread_id, acpi_ut_get_mutex_name (i),
+					acpi_ut_get_mutex_name (mutex_id)));
 
 			return (AE_ACQUIRE_DEADLOCK);
 		}
 	}
 
 
+	ACPI_DEBUG_PRINT ((ACPI_DB_MUTEX,
+			 "Thread %X attempting to acquire Mutex [%s]\n",
+			 this_thread_id, acpi_ut_get_mutex_name (mutex_id)));
+
 	status = acpi_os_wait_semaphore (acpi_gbl_acpi_mutex_info[mutex_id].mutex,
 			   1, WAIT_FOREVER);
 
 	if (ACPI_SUCCESS (status)) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_MUTEX, "Thread %X acquired Mutex [%s]\n",
+				 this_thread_id, acpi_ut_get_mutex_name (mutex_id)));
+
 		acpi_gbl_acpi_mutex_info[mutex_id].use_count++;
 		acpi_gbl_acpi_mutex_info[mutex_id].owner_id = this_thread_id;
 	}
 
+	else {
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Thread %X could not acquire Mutex [%s] %s\n",
+				 this_thread_id, acpi_ut_get_mutex_name (mutex_id),
+				 acpi_format_exception (status)));
+	}
 
 	return (status);
 }
@@ -330,11 +371,11 @@ acpi_ut_acquire_mutex (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ut_release_mutex (
 	ACPI_MUTEX_HANDLE       mutex_id)
 {
-	ACPI_STATUS             status;
+	acpi_status             status;
 	u32                     i;
 	u32                     this_thread_id;
 
@@ -343,6 +384,10 @@ acpi_ut_release_mutex (
 
 
 	this_thread_id = acpi_os_get_thread_id ();
+	ACPI_DEBUG_PRINT ((ACPI_DB_MUTEX,
+		"Thread %X releasing Mutex [%s]\n", this_thread_id,
+		acpi_ut_get_mutex_name (mutex_id)));
+
 	if (mutex_id > MAX_MTX) {
 		return (AE_BAD_PARAMETER);
 	}
@@ -352,6 +397,10 @@ acpi_ut_release_mutex (
 	 * Mutex must be acquired in order to release it!
 	 */
 	if (acpi_gbl_acpi_mutex_info[mutex_id].owner_id == ACPI_MUTEX_NOT_ACQUIRED) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+				"Mutex [%s] is not acquired, cannot release\n",
+				acpi_ut_get_mutex_name (mutex_id)));
+
 		return (AE_NOT_ACQUIRED);
 	}
 
@@ -368,6 +417,10 @@ acpi_ut_release_mutex (
 				continue;
 			}
 
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+					"Invalid release order: owns [%s], releasing [%s]\n",
+					acpi_ut_get_mutex_name (i), acpi_ut_get_mutex_name (mutex_id)));
+
 			return (AE_RELEASE_DEADLOCK);
 		}
 	}
@@ -379,6 +432,15 @@ acpi_ut_release_mutex (
 
 	status = acpi_os_signal_semaphore (acpi_gbl_acpi_mutex_info[mutex_id].mutex, 1);
 
+	if (ACPI_FAILURE (status)) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Thread %X could not release Mutex [%s] %s\n",
+				 this_thread_id, acpi_ut_get_mutex_name (mutex_id),
+				 acpi_format_exception (status)));
+	}
+	else {
+		ACPI_DEBUG_PRINT ((ACPI_DB_MUTEX, "Thread %X released Mutex [%s]\n",
+				 this_thread_id, acpi_ut_get_mutex_name (mutex_id)));
+	}
 
 	return (status);
 }
@@ -398,13 +460,16 @@ acpi_ut_release_mutex (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ut_create_update_state_and_push (
-	ACPI_OPERAND_OBJECT     *object,
+	acpi_operand_object     *object,
 	u16                     action,
-	ACPI_GENERIC_STATE      **state_list)
+	acpi_generic_state      **state_list)
 {
-	ACPI_GENERIC_STATE       *state;
+	acpi_generic_state       *state;
+
+
+	FUNCTION_ENTRY ();
 
 
 	/* Ignore null objects; these are expected */
@@ -438,14 +503,17 @@ acpi_ut_create_update_state_and_push (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ut_create_pkg_state_and_push (
 	void                    *internal_object,
 	void                    *external_object,
 	u16                     index,
-	ACPI_GENERIC_STATE      **state_list)
+	acpi_generic_state      **state_list)
 {
-	ACPI_GENERIC_STATE       *state;
+	acpi_generic_state       *state;
+
+
+	FUNCTION_ENTRY ();
 
 
 	state = acpi_ut_create_pkg_state (internal_object, external_object, index);
@@ -474,15 +542,18 @@ acpi_ut_create_pkg_state_and_push (
 
 void
 acpi_ut_push_generic_state (
-	ACPI_GENERIC_STATE      **list_head,
-	ACPI_GENERIC_STATE      *state)
+	acpi_generic_state      **list_head,
+	acpi_generic_state      *state)
 {
+	FUNCTION_TRACE ("Ut_push_generic_state");
+
+
 	/* Push the state object onto the front of the list (stack) */
 
 	state->common.next = *list_head;
 	*list_head = state;
 
-	return;
+	return_VOID;
 }
 
 
@@ -498,11 +569,14 @@ acpi_ut_push_generic_state (
  *
  ******************************************************************************/
 
-ACPI_GENERIC_STATE *
+acpi_generic_state *
 acpi_ut_pop_generic_state (
-	ACPI_GENERIC_STATE      **list_head)
+	acpi_generic_state      **list_head)
 {
-	ACPI_GENERIC_STATE      *state;
+	acpi_generic_state      *state;
+
+
+	FUNCTION_TRACE ("Ut_pop_generic_state");
 
 
 	/* Remove the state object at the head of the list (stack) */
@@ -514,7 +588,7 @@ acpi_ut_pop_generic_state (
 		*list_head = state->common.next;
 	}
 
-	return (state);
+	return_PTR (state);
 }
 
 
@@ -531,47 +605,20 @@ acpi_ut_pop_generic_state (
  *
  ******************************************************************************/
 
-ACPI_GENERIC_STATE *
+acpi_generic_state *
 acpi_ut_create_generic_state (void)
 {
-	ACPI_GENERIC_STATE      *state;
+	acpi_generic_state      *state;
 
 
-	acpi_ut_acquire_mutex (ACPI_MTX_CACHES);
+	FUNCTION_ENTRY ();
 
-	acpi_gbl_state_cache_requests++;
 
-	/* Check the cache first */
-
-	if (acpi_gbl_generic_state_cache) {
-		/* There is an object available, use it */
-
-		state = acpi_gbl_generic_state_cache;
-		acpi_gbl_generic_state_cache = state->common.next;
-		state->common.next = NULL;
-
-		acpi_gbl_state_cache_hits++;
-		acpi_gbl_generic_state_cache_depth--;
-
-		acpi_ut_release_mutex (ACPI_MTX_CACHES);
-
-	}
-
-	else {
-		/* The cache is empty, create a new object */
-
-		acpi_ut_release_mutex (ACPI_MTX_CACHES);
-
-		state = acpi_ut_callocate (sizeof (ACPI_GENERIC_STATE));
-	}
+	state = acpi_ut_acquire_from_cache (ACPI_MEM_LIST_STATE);
 
 	/* Initialize */
 
 	if (state) {
-		/* Always zero out the object before init */
-
-		MEMSET (state, 0, sizeof (ACPI_GENERIC_STATE));
-
 		state->common.data_type = ACPI_DESC_TYPE_STATE;
 	}
 
@@ -595,12 +642,15 @@ acpi_ut_create_generic_state (void)
  *
  ******************************************************************************/
 
-ACPI_GENERIC_STATE *
+acpi_generic_state *
 acpi_ut_create_update_state (
-	ACPI_OPERAND_OBJECT     *object,
+	acpi_operand_object     *object,
 	u16                     action)
 {
-	ACPI_GENERIC_STATE      *state;
+	acpi_generic_state      *state;
+
+
+	FUNCTION_TRACE_PTR ("Ut_create_update_state", object);
 
 
 	/* Create the generic state object */
@@ -615,7 +665,7 @@ acpi_ut_create_update_state (
 	state->update.object = object;
 	state->update.value  = action;
 
-	return (state);
+	return_PTR (state);
 }
 
 
@@ -635,13 +685,16 @@ acpi_ut_create_update_state (
  *
  ******************************************************************************/
 
-ACPI_GENERIC_STATE *
+acpi_generic_state *
 acpi_ut_create_pkg_state (
 	void                    *internal_object,
 	void                    *external_object,
 	u16                     index)
 {
-	ACPI_GENERIC_STATE      *state;
+	acpi_generic_state      *state;
+
+
+	FUNCTION_TRACE_PTR ("Ut_create_pkg_state", internal_object);
 
 
 	/* Create the generic state object */
@@ -653,12 +706,12 @@ acpi_ut_create_pkg_state (
 
 	/* Init fields specific to the update struct */
 
-	state->pkg.source_object = (ACPI_OPERAND_OBJECT *) internal_object;
+	state->pkg.source_object = (acpi_operand_object *) internal_object;
 	state->pkg.dest_object  = external_object;
 	state->pkg.index        = index;
 	state->pkg.num_packages = 1;
 
-	return (state);
+	return_PTR (state);
 }
 
 
@@ -675,11 +728,14 @@ acpi_ut_create_pkg_state (
  *
  ******************************************************************************/
 
-ACPI_GENERIC_STATE *
+acpi_generic_state *
 acpi_ut_create_control_state (
 	void)
 {
-	ACPI_GENERIC_STATE      *state;
+	acpi_generic_state      *state;
+
+
+	FUNCTION_TRACE ("Ut_create_control_state");
 
 
 	/* Create the generic state object */
@@ -694,7 +750,7 @@ acpi_ut_create_control_state (
 
 	state->common.state = CONTROL_CONDITIONAL_EXECUTING;
 
-	return (state);
+	return_PTR (state);
 }
 
 
@@ -713,35 +769,13 @@ acpi_ut_create_control_state (
 
 void
 acpi_ut_delete_generic_state (
-	ACPI_GENERIC_STATE      *state)
+	acpi_generic_state      *state)
 {
-
-	/* If cache is full, just free this state object */
-
-	if (acpi_gbl_generic_state_cache_depth >= MAX_STATE_CACHE_DEPTH) {
-		acpi_ut_free (state);
-	}
-
-	/* Otherwise put this object back into the cache */
-
-	else {
-		acpi_ut_acquire_mutex (ACPI_MTX_CACHES);
-
-		/* Clear the state */
-
-		MEMSET (state, 0, sizeof (ACPI_GENERIC_STATE));
-		state->common.data_type = ACPI_DESC_TYPE_STATE;
-
-		/* Put the object at the head of the global cache list */
-
-		state->common.next = acpi_gbl_generic_state_cache;
-		acpi_gbl_generic_state_cache = state;
-		acpi_gbl_generic_state_cache_depth++;
+	FUNCTION_TRACE ("Ut_delete_generic_state");
 
 
-		acpi_ut_release_mutex (ACPI_MTX_CACHES);
-	}
-	return;
+	acpi_ut_release_to_cache (ACPI_MEM_LIST_STATE, state);
+	return_VOID;
 }
 
 
@@ -762,21 +796,11 @@ void
 acpi_ut_delete_generic_state_cache (
 	void)
 {
-	ACPI_GENERIC_STATE      *next;
+	FUNCTION_TRACE ("Ut_delete_generic_state_cache");
 
 
-	/* Traverse the global cache list */
-
-	while (acpi_gbl_generic_state_cache) {
-		/* Delete one cached state object */
-
-		next = acpi_gbl_generic_state_cache->common.next;
-		acpi_ut_free (acpi_gbl_generic_state_cache);
-		acpi_gbl_generic_state_cache = next;
-		acpi_gbl_generic_state_cache_depth--;
-	}
-
-	return;
+	acpi_ut_delete_generic_cache (ACPI_MEM_LIST_STATE);
+	return_VOID;
 }
 
 
@@ -792,19 +816,22 @@ acpi_ut_delete_generic_state_cache (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ut_resolve_package_references (
-	ACPI_OPERAND_OBJECT     *obj_desc)
+	acpi_operand_object     *obj_desc)
 {
 	u32                     count;
-	ACPI_OPERAND_OBJECT     *sub_object;
+	acpi_operand_object     *sub_object;
+
+
+	FUNCTION_TRACE ("Ut_resolve_package_references");
 
 
 	if (obj_desc->common.type != ACPI_TYPE_PACKAGE) {
 		/* The object must be a package */
 
 		REPORT_ERROR (("Must resolve Package Refs on a Package\n"));
-		return(AE_ERROR);
+		return_ACPI_STATUS(AE_ERROR);
 	}
 
 	/*
@@ -831,9 +858,48 @@ acpi_ut_resolve_package_references (
 		}
 	}
 
-	return(AE_OK);
+	return_ACPI_STATUS(AE_OK);
 }
 
+#ifdef ACPI_DEBUG
+
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_ut_display_init_pathname
+ *
+ * PARAMETERS:  Obj_handle          - Handle whose pathname will be displayed
+ *              Path                - Additional path string to be appended
+ *
+ * RETURN:      acpi_status
+ *
+ * DESCRIPTION: Display full pathnbame of an object, DEBUG ONLY
+ *
+ ******************************************************************************/
+
+void
+acpi_ut_display_init_pathname (
+	acpi_handle             obj_handle,
+	char                    *path)
+{
+	acpi_status             status;
+	u32                     length = 128;
+	char                    buffer[128];
+
+
+	PROC_NAME ("Ut_display_init_pathname");
+
+
+	status = acpi_ns_handle_to_pathname (obj_handle, &length, buffer);
+	if (ACPI_SUCCESS (status)) {
+		if (path) {
+			ACPI_DEBUG_PRINT ((ACPI_DB_INIT, "%s.%s\n", buffer, path));
+		}
+		else {
+			ACPI_DEBUG_PRINT ((ACPI_DB_INIT, "%s\n", buffer));
+		}
+	}
+}
+#endif
 
 /*******************************************************************************
  *
@@ -847,28 +913,31 @@ acpi_ut_resolve_package_references (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_ut_walk_package_tree (
-	ACPI_OPERAND_OBJECT     *source_object,
+	acpi_operand_object     *source_object,
 	void                    *target_object,
 	ACPI_PKG_CALLBACK       walk_callback,
 	void                    *context)
 {
-	ACPI_STATUS             status = AE_OK;
-	ACPI_GENERIC_STATE      *state_list = NULL;
-	ACPI_GENERIC_STATE      *state;
+	acpi_status             status = AE_OK;
+	acpi_generic_state      *state_list = NULL;
+	acpi_generic_state      *state;
 	u32                     this_index;
-	ACPI_OPERAND_OBJECT     *this_source_obj;
+	acpi_operand_object     *this_source_obj;
+
+
+	FUNCTION_TRACE ("Ut_walk_package_tree");
 
 
 	state = acpi_ut_create_pkg_state (source_object, target_object, 0);
 	if (!state) {
-		return (AE_NO_MEMORY);
+		return_ACPI_STATUS (AE_NO_MEMORY);
 	}
 
 	while (state) {
 		this_index    = state->pkg.index;
-		this_source_obj = (ACPI_OPERAND_OBJECT *)
+		this_source_obj = (acpi_operand_object *)
 				  state->pkg.source_object->package.elements[this_index];
 
 		/*
@@ -890,7 +959,7 @@ acpi_ut_walk_package_tree (
 			if (ACPI_FAILURE (status)) {
 				/* TBD: must delete package created up to this point */
 
-				return (status);
+				return_ACPI_STATUS (status);
 			}
 
 			state->pkg.index++;
@@ -914,7 +983,7 @@ acpi_ut_walk_package_tree (
 					 * package just add the length of the package objects
 					 * and exit
 					 */
-					return (AE_OK);
+					return_ACPI_STATUS (AE_OK);
 				}
 
 				/*
@@ -933,7 +1002,7 @@ acpi_ut_walk_package_tree (
 			if (ACPI_FAILURE (status)) {
 				/* TBD: must delete package created up to this point */
 
-				return (status);
+				return_ACPI_STATUS (status);
 			}
 
 
@@ -950,7 +1019,7 @@ acpi_ut_walk_package_tree (
 			if (!state) {
 				/* TBD: must delete package created up to this point */
 
-				return (AE_NO_MEMORY);
+				return_ACPI_STATUS (AE_NO_MEMORY);
 			}
 		}
 	}
@@ -958,13 +1027,12 @@ acpi_ut_walk_package_tree (
 	/* We should never get here */
 
 	return (AE_AML_INTERNAL);
-
 }
 
 
 /*******************************************************************************
  *
- * FUNCTION:    _Report_error
+ * FUNCTION:    Acpi_ut_report_error
  *
  * PARAMETERS:  Module_name         - Caller's module name (for error output)
  *              Line_number         - Caller's line number (for error output)
@@ -978,7 +1046,7 @@ acpi_ut_walk_package_tree (
  ******************************************************************************/
 
 void
-_report_error (
+acpi_ut_report_error (
 	NATIVE_CHAR             *module_name,
 	u32                     line_number,
 	u32                     component_id)
@@ -991,7 +1059,7 @@ _report_error (
 
 /*******************************************************************************
  *
- * FUNCTION:    _Report_warning
+ * FUNCTION:    Acpi_ut_report_warning
  *
  * PARAMETERS:  Module_name         - Caller's module name (for error output)
  *              Line_number         - Caller's line number (for error output)
@@ -1005,7 +1073,7 @@ _report_error (
  ******************************************************************************/
 
 void
-_report_warning (
+acpi_ut_report_warning (
 	NATIVE_CHAR             *module_name,
 	u32                     line_number,
 	u32                     component_id)
@@ -1017,7 +1085,7 @@ _report_warning (
 
 /*******************************************************************************
  *
- * FUNCTION:    _Report_info
+ * FUNCTION:    Acpi_ut_report_info
  *
  * PARAMETERS:  Module_name         - Caller's module name (for error output)
  *              Line_number         - Caller's line number (for error output)
@@ -1031,7 +1099,7 @@ _report_warning (
  ******************************************************************************/
 
 void
-_report_info (
+acpi_ut_report_info (
 	NATIVE_CHAR             *module_name,
 	u32                     line_number,
 	u32                     component_id)

@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dbutils - AML debugger utilities
- *              $Revision: 37 $
+ *              $Revision: 43 $
  *
  ******************************************************************************/
 
@@ -62,7 +62,7 @@ acpi_db_set_output_destination (
 	acpi_gbl_db_output_flags = (u8) output_flags;
 
 	if (output_flags & DB_REDIRECTABLE_OUTPUT) {
-		if (output_to_file) {
+		if (acpi_gbl_db_output_to_file) {
 			acpi_dbg_level = acpi_gbl_db_debug_level;
 		}
 	}
@@ -91,7 +91,7 @@ acpi_db_dump_buffer (
 
 	acpi_os_printf ("\n_location %X:\n", address);
 
-	acpi_dbg_level |= TRACE_TABLES;
+	acpi_dbg_level |= ACPI_LV_TABLES;
 	acpi_ut_dump_buffer ((u8 *) address, 64, DB_BYTE_DISPLAY, ACPI_UINT32_MAX);
 }
 
@@ -111,7 +111,7 @@ acpi_db_dump_buffer (
 
 void
 acpi_db_dump_object (
-	ACPI_OBJECT             *obj_desc,
+	acpi_object             *obj_desc,
 	u32                     level)
 {
 	u32                     i;
@@ -129,12 +129,14 @@ acpi_db_dump_object (
 	switch (obj_desc->type) {
 	case ACPI_TYPE_ANY:
 
-		acpi_os_printf ("[Object Reference] Value: %p\n", obj_desc->reference.handle);
+		acpi_os_printf ("[Object Reference] = %p\n", obj_desc->reference.handle);
 		break;
 
 
 	case ACPI_TYPE_INTEGER:
-		acpi_os_printf ("[Number] Value: %ld (%lX)\n", obj_desc->integer.value, obj_desc->integer.value);
+
+		acpi_os_printf ("[Integer] = %X%8.8X\n", HIDWORD (obj_desc->integer.value),
+				 LODWORD (obj_desc->integer.value));
 		break;
 
 
@@ -150,7 +152,7 @@ acpi_db_dump_object (
 
 	case ACPI_TYPE_BUFFER:
 
-		acpi_os_printf ("[Buffer] Value: ");
+		acpi_os_printf ("[Buffer] = ");
 		acpi_ut_dump_buffer ((u8 *) obj_desc->buffer.pointer, obj_desc->buffer.length, DB_DWORD_DISPLAY, _COMPONENT);
 		break;
 
@@ -166,16 +168,22 @@ acpi_db_dump_object (
 
 
 	case INTERNAL_TYPE_REFERENCE:
-		acpi_os_printf ("[Object Reference] Value: %p\n", obj_desc->reference.handle);
+
+		acpi_os_printf ("[Object Reference] = %p\n", obj_desc->reference.handle);
 		break;
 
+
 	case ACPI_TYPE_PROCESSOR:
+
 		acpi_os_printf ("[Processor]\n");
 		break;
 
+
 	case ACPI_TYPE_POWER:
+
 		acpi_os_printf ("[Power Resource]\n");
 		break;
+
 
 	default:
 
@@ -247,15 +255,15 @@ acpi_db_prep_namestring (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_db_second_pass_parse (
-	ACPI_PARSE_OBJECT       *root)
+	acpi_parse_object       *root)
 {
-	ACPI_PARSE_OBJECT       *op = root;
-	ACPI_PARSE2_OBJECT      *method;
-	ACPI_PARSE_OBJECT       *search_op;
-	ACPI_PARSE_OBJECT       *start_op;
-	ACPI_STATUS             status = AE_OK;
+	acpi_parse_object       *op = root;
+	acpi_parse2_object      *method;
+	acpi_parse_object       *search_op;
+	acpi_parse_object       *start_op;
+	acpi_status             status = AE_OK;
 	u32                     base_aml_offset;
 
 
@@ -263,7 +271,7 @@ acpi_db_second_pass_parse (
 
 	while (op) {
 		if (op->opcode == AML_METHOD_OP) {
-			method = (ACPI_PARSE2_OBJECT *) op;
+			method = (acpi_parse2_object *) op;
 			status = acpi_ps_parse_aml (op, method->data, method->length, 0,
 					 NULL, NULL, NULL, acpi_ds_load1_begin_op, acpi_ds_load1_end_op);
 
@@ -311,13 +319,13 @@ acpi_db_second_pass_parse (
  *
  ******************************************************************************/
 
-ACPI_NAMESPACE_NODE *
+acpi_namespace_node *
 acpi_db_local_ns_lookup (
 	NATIVE_CHAR             *name)
 {
 	NATIVE_CHAR             *internal_path;
-	ACPI_STATUS             status;
-	ACPI_NAMESPACE_NODE     *node = NULL;
+	acpi_status             status;
+	acpi_namespace_node     *node = NULL;
 
 
 	acpi_db_prep_namestring (name);
@@ -339,11 +347,11 @@ acpi_db_local_ns_lookup (
 			   NS_NO_UPSEARCH | NS_DONT_OPEN_SCOPE, NULL, &node);
 
 	if (ACPI_FAILURE (status)) {
-		acpi_os_printf ("Could not locate name: %s %s\n", name, acpi_ut_format_exception (status));
+		acpi_os_printf ("Could not locate name: %s %s\n", name, acpi_format_exception (status));
 	}
 
 
-	acpi_ut_free (internal_path);
+	ACPI_MEM_FREE (internal_path);
 
 	return (node);
 }

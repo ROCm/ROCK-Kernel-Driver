@@ -61,7 +61,7 @@ typedef struct  /* Root System Descriptor Pointer */
 /*****************************************/
 typedef struct
 {
-	ACPI_TABLE_HEADER   header;                 /* Table header */
+	acpi_table_header   header;                 /* Table header */
 	u32                 reserved_pad;           /* IA64 alignment, must be 0 */
 	UINT64              table_offset_entry [1]; /* Array of pointers to other */
 			   /* tables' headers */
@@ -84,7 +84,7 @@ typedef struct
 	u32                 reserved1     : 31;   /* must be 0 */
 	u8                  reserved3 [28];       /* reserved - must be zero */
 
-} FACS_DESCRIPTOR_REV071;
+} facs_descriptor_rev071;
 
 
 /******************************************/
@@ -93,7 +93,7 @@ typedef struct
 /******************************************/
 typedef struct
 {
-	ACPI_TABLE_HEADER   header;             /* table header */
+	acpi_table_header   header;             /* table header */
 	u32                 reserved_pad;       /* IA64 alignment, must be 0 */
 	UINT64              firmware_ctrl;      /* 64-bit Physical address of FACS */
 	UINT64              dsdt;               /* 64-bit Physical address of DSDT */
@@ -139,7 +139,7 @@ typedef struct
 	u32                 dock_cap    : 1;    /* Supports Docking */
 	u32                 reserved6   : 22;    /* reserved - must be zero */
 
-}  FADT_DESCRIPTOR_REV071;
+}  fadt_descriptor_rev071;
 
 #pragma pack()
 

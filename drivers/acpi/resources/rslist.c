@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: rslist - Linked list utilities
- *              $Revision: 17 $
+ *              $Revision: 19 $
  *
  ******************************************************************************/
 
@@ -49,6 +49,9 @@ acpi_rs_get_resource_type (
 	u8                      resource_start_byte)
 {
 
+	FUNCTION_ENTRY ();
+
+
 	/*
 	 * Determine if this is a small or large resource
 	 */
@@ -91,19 +94,22 @@ acpi_rs_get_resource_type (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_rs_byte_stream_to_list (
 	u8                      *byte_stream_buffer,
 	u32                     byte_stream_buffer_length,
 	u8                      **output_buffer)
 {
-	ACPI_STATUS             status;
+	acpi_status             status;
 	u32                     bytes_parsed = 0;
 	u8                      resource_type = 0;
 	u32                     bytes_consumed = 0;
 	u8                      **buffer = output_buffer;
 	u32                     structure_size = 0;
 	u8                      end_tag_processed = FALSE;
+
+
+	FUNCTION_TRACE ("Rs_byte_stream_to_list");
 
 
 	while (bytes_parsed < byte_stream_buffer_length &&
@@ -269,7 +275,7 @@ acpi_rs_byte_stream_to_list (
 
 
 		if (!ACPI_SUCCESS(status)) {
-			return (status);
+			return_ACPI_STATUS (status);
 		}
 
 		/*
@@ -293,10 +299,10 @@ acpi_rs_byte_stream_to_list (
 	 * Check the reason for exiting the while loop
 	 */
 	if (TRUE != end_tag_processed) {
-		return (AE_AML_ERROR);
+		return_ACPI_STATUS (AE_AML_ERROR);
 	}
 
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -321,16 +327,19 @@ acpi_rs_byte_stream_to_list (
  *
  ******************************************************************************/
 
-ACPI_STATUS
+acpi_status
 acpi_rs_list_to_byte_stream (
-	ACPI_RESOURCE           *linked_list,
+	acpi_resource           *linked_list,
 	u32                     byte_stream_size_needed,
 	u8                      **output_buffer)
 {
-	ACPI_STATUS             status;
+	acpi_status             status;
 	u8                      *buffer = *output_buffer;
 	u32                     bytes_consumed = 0;
 	u8                      done = FALSE;
+
+
+	FUNCTION_TRACE ("Rs_list_to_byte_stream");
 
 
 	while (!done) {
@@ -465,7 +474,7 @@ acpi_rs_list_to_byte_stream (
 
 
 		if (!ACPI_SUCCESS(status)) {
-			return (status);
+			return_ACPI_STATUS (status);
 		}
 
 		/*
@@ -476,10 +485,10 @@ acpi_rs_list_to_byte_stream (
 		/*
 		 * Point to the next object
 		 */
-		linked_list = POINTER_ADD (ACPI_RESOURCE,
+		linked_list = POINTER_ADD (acpi_resource,
 				  linked_list, linked_list->length);
 	}
 
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 

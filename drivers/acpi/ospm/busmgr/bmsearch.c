@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: bmsearch.c
- *   $Revision: 13 $
+ *   $Revision: 16 $
  *
  *****************************************************************************/
 
@@ -40,15 +40,15 @@
  *
  * FUNCTION:    bm_compare
  *
- * PARAMETERS:  
+ * PARAMETERS:
  *
- * RETURN:      
+ * RETURN:
  *
- * DESCRIPTION: 
+ * DESCRIPTION:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bm_compare (
 	BM_DEVICE               *device,
 	BM_DEVICE_ID            *criteria)
@@ -57,7 +57,7 @@ bm_compare (
 		return AE_BAD_PARAMETER;
 	}
 
-	/* 
+	/*
 	 * Present?
 	 * --------
 	 * We're only going to match on devices that are present.
@@ -67,22 +67,22 @@ bm_compare (
 		return AE_NOT_FOUND;
 	}
 
-	/* 
+	/*
 	 * Type?
 	 */
 	if (criteria->type && (criteria->type != device->id.type)) {
 		return AE_NOT_FOUND;
 	}
 
-	/* 
+	/*
 	 * HID?
 	 */
-	if ((criteria->hid[0]) && (0 != STRNCMP(criteria->hid, 
+	if ((criteria->hid[0]) && (0 != STRNCMP(criteria->hid,
 		device->id.hid, sizeof(BM_DEVICE_HID)))) {
 		return AE_NOT_FOUND;
 	}
 
-	/* 
+	/*
 	 * ADR?
 	 */
 	if ((criteria->adr) && (criteria->adr != device->id.adr)) {
@@ -97,24 +97,24 @@ bm_compare (
  *
  * FUNCTION:    bm_search
  *
- * PARAMETERS:  
+ * PARAMETERS:
  *
  * RETURN:      AE_BAD_PARAMETER- invalid input parameter
  *              AE_NOT_EXIST    - start_device_handle doesn't exist
  *              AE_NOT_FOUND    - no matches to Search_info.criteria found
  *              AE_OK           - success
  *
- * DESCRIPTION: 
+ * DESCRIPTION:
  *
  ****************************************************************************/
 
-ACPI_STATUS
+acpi_status
 bm_search(
 	BM_HANDLE               device_handle,
 	BM_DEVICE_ID            *criteria,
 	BM_HANDLE_LIST          *results)
 {
-	ACPI_STATUS             status = AE_OK;
+	acpi_status             status = AE_OK;
 	BM_NODE			*node = NULL;
 
 	FUNCTION_TRACE("bm_search");
@@ -149,7 +149,7 @@ bm_search(
 		if (node->scope.head) {
 			status = bm_compare(&(node->device), criteria);
 			if (ACPI_SUCCESS(status)) {
-				results->handles[results->count++] = 
+				results->handles[results->count++] =
 					node->device.handle;
 			}
 			node = node->scope.head;
@@ -163,16 +163,16 @@ bm_search(
 		else {
 			status = bm_compare(&(node->device), criteria);
 			if (ACPI_SUCCESS(status)) {
-				results->handles[results->count++] = 
+				results->handles[results->count++] =
 					node->device.handle;
 			}
 
 			/*
 			 * Locate Next Device:
 			 * -------------------
-			 * The next node is either a peer at this level 
-			 * (node->next is valid), or we work are way back 
-			 * up the tree until we either find a non-parsed 
+			 * The next node is either a peer at this level
+			 * (node->next is valid), or we work are way back
+			 * up the tree until we either find a non-parsed
 			 * peer or hit the top (node->parent is NULL).
 			 */
 			while (!node->next && node->parent) {
