@@ -73,6 +73,11 @@ mcore-$(CONFIG_X86_BIGSMP)	:= mach-default
 mflags-$(CONFIG_X86_SUMMIT) := -Iinclude/asm-i386/mach-summit
 mcore-$(CONFIG_X86_SUMMIT)  := mach-default
 
+# generic subarchitecture
+mflags-$(CONFIG_X86_GENERICARCH) := -Iinclude/asm-i386/mach-generic
+mcore-$(CONFIG_X86_GENERICARCH) := mach-default
+core-$(CONFIG_X86_GENERICARCH) += arch/i386/mach-generic/
+
 # default subarch .h files
 mflags-y += -Iinclude/asm-i386/mach-default
 

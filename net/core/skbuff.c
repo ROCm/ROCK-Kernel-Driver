@@ -126,9 +126,6 @@ struct sk_buff *alloc_skb(unsigned int size, int gfp_mask)
 	struct sk_buff *skb;
 	u8 *data;
 
-	if (gfp_mask & __GFP_WAIT)
-		might_sleep();
-
 	/* Get the HEAD */
 	skb = kmem_cache_alloc(skbuff_head_cache,
 			       gfp_mask & ~__GFP_DMA);

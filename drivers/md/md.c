@@ -1111,8 +1111,10 @@ static void export_array(mddev_t *mddev)
 
 static void print_desc(mdp_disk_t *desc)
 {
+	char b[BDEVNAME_SIZE];
+
 	printk(" DISK<N:%d,%s(%d,%d),R:%d,S:%d>\n", desc->number,
-		partition_name(MKDEV(desc->major,desc->minor)),
+		__bdevname(MKDEV(desc->major, desc->minor), b),
 		desc->major,desc->minor,desc->raid_disk,desc->state);
 }
 
@@ -1294,6 +1296,7 @@ repeat:
  */
 static mdk_rdev_t *md_import_device(dev_t newdev, int super_format, int super_minor)
 {
+	char b[BDEVNAME_SIZE];
 	int err;
 	mdk_rdev_t *rdev;
 	sector_t size;
@@ -1301,7 +1304,7 @@ static mdk_rdev_t *md_import_device(dev_t newdev, int super_format, int super_mi
 	rdev = (mdk_rdev_t *) kmalloc(sizeof(*rdev), GFP_KERNEL);
 	if (!rdev) {
 		printk(KERN_ERR "md: could not alloc mem for %s!\n", 
-			partition_name(newdev));
+			__bdevname(newdev, b));
 		return ERR_PTR(-ENOMEM);
 	}
 	memset(rdev, 0, sizeof(*rdev));
@@ -1312,7 +1315,7 @@ static mdk_rdev_t *md_import_device(dev_t newdev, int super_format, int super_mi
 	err = lock_rdev(rdev, newdev);
 	if (err) {
 		printk(KERN_ERR "md: could not lock %s.\n",
-			partition_name(newdev));
+			__bdevname(newdev, b));
 		goto abort_free;
 	}
 	rdev->desc_nr = -1;
@@ -1840,6 +1843,7 @@ static void autorun_devices(void)
 
 static int autostart_array(dev_t startdev)
 {
+	char b[BDEVNAME_SIZE];
 	int err = -EINVAL, i;
 	mdp_super_t *sb = NULL;
 	mdk_rdev_t *start_rdev = NULL, *rdev;
@@ -1847,7 +1851,7 @@ static int autostart_array(dev_t startdev)
 	start_rdev = md_import_device(startdev, 0, 0);
 	if (IS_ERR(start_rdev)) {
 		printk(KERN_WARNING "md: could not import %s!\n",
-			partition_name(startdev));
+			__bdevname(startdev, b));
 		return err;
 	}
 
@@ -1884,7 +1888,7 @@ static int autostart_array(dev_t startdev)
 		if (IS_ERR(rdev)) {
 			printk(KERN_WARNING "md: could not import %s,"
 				" trying to run array nevertheless.\n",
-				partition_name(dev));
+				__bdevname(dev, b));
 			continue;
 		}
 		list_add(&rdev->same_set, &pending_raid_disks);
@@ -2116,6 +2120,7 @@ static int add_new_disk(mddev_t * mddev, mdu_disk_info_t *info)
 
 static int hot_generate_error(mddev_t * mddev, dev_t dev)
 {
+	char b[BDEVNAME_SIZE];
 	struct request_queue *q;
 	mdk_rdev_t *rdev;
 
@@ -2123,7 +2128,7 @@ static int hot_generate_error(mddev_t * mddev, dev_t dev)
 		return -ENODEV;
 
 	printk(KERN_INFO "md: trying to generate %s error in md%d ... \n",
-		partition_name(dev), mdidx(mddev));
+		__bdevname(dev, b), mdidx(mddev));
 
 	rdev = find_rdev(mddev, dev);
 	if (!rdev) {
@@ -2151,13 +2156,14 @@ static int hot_generate_error(mddev_t * mddev, dev_t dev)
 
 static int hot_remove_disk(mddev_t * mddev, dev_t dev)
 {
+	char b[BDEVNAME_SIZE];
 	mdk_rdev_t *rdev;
 
 	if (!mddev->pers)
 		return -ENODEV;
 
 	printk(KERN_INFO "md: trying to remove %s from md%d ... \n",
-		partition_name(dev), mdidx(mddev));
+		__bdevname(dev, b), mdidx(mddev));
 
 	rdev = find_rdev(mddev, dev);
 	if (!rdev)
@@ -2178,6 +2184,7 @@ busy:
 
 static int hot_add_disk(mddev_t * mddev, dev_t dev)
 {
+	char b[BDEVNAME_SIZE];
 	int err;
 	unsigned int size;
 	mdk_rdev_t *rdev;
@@ -2186,7 +2193,7 @@ static int hot_add_disk(mddev_t * mddev, dev_t dev)
 		return -ENODEV;
 
 	printk(KERN_INFO "md: trying to hot-add %s to md%d ... \n",
-		partition_name(dev), mdidx(mddev));
+		__bdevname(dev, b), mdidx(mddev));
 
 	if (mddev->major_version != 0) {
 		printk(KERN_WARNING "md%d: HOT_ADD may only be used with"
@@ -2344,6 +2351,7 @@ static int set_disk_faulty(mddev_t *mddev, dev_t dev)
 static int md_ioctl(struct inode *inode, struct file *file,
 			unsigned int cmd, unsigned long arg)
 {
+	char b[BDEVNAME_SIZE];
 	unsigned int minor;
 	int err = 0;
 	struct hd_geometry *loc = (struct hd_geometry *) arg;
@@ -2403,7 +2411,7 @@ static int md_ioctl(struct inode *inode, struct file *file,
 		err = autostart_array(arg);
 		if (err) {
 			printk(KERN_WARNING "md: autostart %s failed!\n",
-				partition_name(arg));
+				__bdevname(arg, b));
 			goto abort;
 		}
 		goto done;
@@ -3516,6 +3524,7 @@ void md_autodetect_dev(dev_t dev)
 
 static void autostart_arrays(void)
 {
+	char b[BDEVNAME_SIZE];
 	mdk_rdev_t *rdev;
 	int i;
 
@@ -3527,7 +3536,7 @@ static void autostart_arrays(void)
 		rdev = md_import_device(dev,0, 0);
 		if (IS_ERR(rdev)) {
 			printk(KERN_ALERT "md: could not import %s!\n",
-				partition_name(dev));
+				__bdevname(dev, b));
 			continue;
 		}
 		if (rdev->faulty) {

@@ -894,9 +894,6 @@ void input_close_device(struct input_handle *);
 int input_accept_process(struct input_handle *handle, struct file *file);
 int input_flush_device(struct input_handle* handle, struct file* file);
 
-/* will go away once devfs_register gets sanitized */
-void input_register_minor(char *name, int minor, int minor_base);
-
 void input_event(struct input_dev *dev, unsigned int type, unsigned int code, int value);
 
 #define input_report_key(a,b,c) input_event(a, EV_KEY, b, !!(c))

@@ -1562,6 +1562,52 @@ int devfs_mk_bdev(dev_t dev, umode_t mode, const char *fmt, ...)
 EXPORT_SYMBOL(devfs_mk_bdev);
 
 
+int devfs_mk_cdev(dev_t dev, umode_t mode, const char *fmt, ...)
+{
+	struct devfs_entry *dir = NULL, *de;
+	char buf[64];
+	va_list args;
+	int error, n;
+
+	if (!S_ISCHR(mode)) {
+		printk(KERN_WARNING "%s: invalide mode (%u) for %s\n",
+				__FUNCTION__, mode, buf);
+		return -EINVAL;
+	}
+
+	va_start(args, fmt);
+	n = vsnprintf(buf, 64, fmt, args);
+	if (n >= 64 || !buf[0]) {
+		printk(KERN_WARNING "%s: invalid format string\n",
+				__FUNCTION__);
+		return -EINVAL;
+	}
+
+	de = _devfs_prepare_leaf(&dir, buf, mode);
+	if (!de) {
+		printk(KERN_WARNING "%s: could not prepare leaf for %s\n",
+				__FUNCTION__, buf);
+		return -ENOMEM;		/* could be more accurate... */
+	}
+
+	de->u.cdev.dev = dev;
+
+	error = _devfs_append_entry(dir, de, NULL);
+	if (error) {
+		printk(KERN_WARNING "%s: could not append to parent for %s\n",
+				__FUNCTION__, buf);
+		goto out;
+	}
+
+	devfsd_notify(de, DEVFSD_NOTIFY_REGISTERED);
+ out:
+	devfs_put(dir);
+	return error;
+}
+
+EXPORT_SYMBOL(devfs_mk_cdev);
+
+
 /**
  *	_devfs_unhook - Unhook a device entry from its parents list
  *	@de: The entry to unhook.

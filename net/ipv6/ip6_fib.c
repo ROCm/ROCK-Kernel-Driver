@@ -593,7 +593,7 @@ out:
 
 #ifdef CONFIG_IPV6_SUBTREES
 	/* Subtree creation failed, probably main tree node
-	   is orphan. If it is, shot it.
+	   is orphan. If it is, shoot it.
 	 */
 st_failure:
 	if (fn && !(fn->fn_flags&RTN_RTINFO|RTN_ROOT))
@@ -953,7 +953,7 @@ int fib6_del(struct rt6_info *rt, struct nlmsghdr *nlh)
 
 #if RT6_DEBUG >= 2
 	if (rt->u.dst.obsolete>0) {
-		BUG_TRAP(fn==NULL || rt->u.dst.obsolete<=0);
+		BUG_TRAP(fn==NULL);
 		return -ENOENT;
 	}
 #endif
@@ -979,7 +979,7 @@ int fib6_del(struct rt6_info *rt, struct nlmsghdr *nlh)
 }
 
 /*
- *	Tree transversal function.
+ *	Tree traversal function.
  *
  *	Certainly, it is not interrupt safe.
  *	However, it is internally reenterable wrt itself and fib6_add/fib6_del.
@@ -1179,14 +1179,14 @@ static int fib6_age(struct rt6_info *rt, void *arg)
 	 */
 
 	if (rt->rt6i_flags&RTF_EXPIRES && rt->rt6i_expires) {
-		if ((long)(now - rt->rt6i_expires) > 0) {
+		if (time_after(now, rt->rt6i_expires)) {
 			RT6_TRACE("expiring %p\n", rt);
 			return -1;
 		}
 		gc_args.more++;
 	} else if (rt->rt6i_flags & RTF_CACHE) {
 		if (atomic_read(&rt->u.dst.__refcnt) == 0 &&
-		    (long)(now - rt->u.dst.lastuse) >= gc_args.timeout) {
+		    time_after_eq(now, rt->u.dst.lastuse + gc_args.timeout)) {
 			RT6_TRACE("aging clone %p\n", rt);
 			return -1;
 		}

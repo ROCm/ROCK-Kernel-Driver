@@ -643,9 +643,7 @@ static _INLINE_ void check_modem_status(struct esp_struct *info)
 #ifdef SERIAL_DEBUG_OPEN
 			printk("scheduling hangup...");
 #endif
-			MOD_INC_USE_COUNT;
-			if (schedule_task(&info->tqueue_hangup) == 0)
-				MOD_DEC_USE_COUNT;
+			schedule_task(&info->tqueue_hangup);
 		}
 	}
 }
@@ -811,7 +809,6 @@ static void do_serial_hangup(void *private_)
 	tty = info->tty;
 	if (tty)
 		tty_hangup(tty);
-	MOD_DEC_USE_COUNT;
 }
 
 /*
@@ -2132,7 +2129,7 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 	info->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CALLOUT_ACTIVE|
 			 ASYNC_CLOSING);
 	wake_up_interruptible(&info->close_wait);
-out:	MOD_DEC_USE_COUNT;
+out:
 	restore_flags(flags);
 }
 
@@ -2375,7 +2372,6 @@ static int esp_open(struct tty_struct *tty, struct file * filp)
 #ifdef SERIAL_DEBUG_OPEN
 	printk("esp_open %s, count = %d\n", tty->name, info->count);
 #endif
-	MOD_INC_USE_COUNT;
 	info->count++;
 	tty->driver_data = info;
 	info->tty = tty;
@@ -2551,6 +2547,7 @@ int __init espserial_init(void)
 	
 	memset(&esp_driver, 0, sizeof(struct tty_driver));
 	esp_driver.magic = TTY_DRIVER_MAGIC;
+	esp_driver.owner = THIS_MODULE;
 	esp_driver.name = "ttyP";
 	esp_driver.major = ESP_IN_MAJOR;
 	esp_driver.minor_start = 0;

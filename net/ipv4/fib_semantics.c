@@ -406,7 +406,7 @@ static int fib_check_nh(const struct rtmsg *r, struct fib_info *fi, struct fib_n
 			if (!(dev->flags&IFF_UP))
 				return -ENETDOWN;
 			nh->nh_dev = dev;
-			atomic_inc(&dev->refcnt);
+			dev_hold(dev);
 			nh->nh_scope = RT_SCOPE_LINK;
 			return 0;
 		}
@@ -429,7 +429,7 @@ static int fib_check_nh(const struct rtmsg *r, struct fib_info *fi, struct fib_n
 		nh->nh_oif = FIB_RES_OIF(res);
 		if ((nh->nh_dev = FIB_RES_DEV(res)) == NULL)
 			goto out;
-		atomic_inc(&nh->nh_dev->refcnt);
+		dev_hold(nh->nh_dev);
 		err = -ENETDOWN;
 		if (!(nh->nh_dev->flags & IFF_UP))
 			goto out;
@@ -451,7 +451,7 @@ out:
 			return -ENETDOWN;
 		}
 		nh->nh_dev = in_dev->dev;
-		atomic_inc(&nh->nh_dev->refcnt);
+		dev_hold(nh->nh_dev);
 		nh->nh_scope = RT_SCOPE_HOST;
 		in_dev_put(in_dev);
 	}

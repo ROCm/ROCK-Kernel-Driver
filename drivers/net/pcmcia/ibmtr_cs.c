@@ -127,7 +127,7 @@ static dev_link_t *dev_list;
 
 extern int ibmtr_probe(struct net_device *dev);
 extern int trdev_init(struct net_device *dev);
-extern void tok_interrupt (int irq, void *dev_id, struct pt_regs *regs);
+extern irqreturn_t tok_interrupt (int irq, void *dev_id, struct pt_regs *regs);
 
 /*====================================================================*/
 

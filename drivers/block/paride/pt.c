@@ -914,15 +914,12 @@ static int __init pt_init(void)
 	devfs_mk_dir ("pt");
 	for (unit=0;unit<PT_UNITS;unit++)
 		if (PT.present) {
-			char name[16];
-			sprintf(name, "pt/%d", unit);
-			devfs_register(NULL, name, DEVFS_FL_DEFAULT,
-			       major, unit, S_IFCHR | S_IRUSR | S_IWUSR,
-			       &pt_fops, NULL);
-			sprintf(name, "pt/%dn", unit);
-			devfs_register(NULL, name, DEVFS_FL_DEFAULT,
-			       major, 128 + unit, S_IFCHR | S_IRUSR | S_IWUSR,
-			       &pt_fops, NULL);
+			devfs_mk_cdev(MKDEV(major, unit),
+					S_IFCHR | S_IRUSR | S_IWUSR,
+					"pt/%d", unit);
+			devfs_mk_cdev(MKDEV(major, unit + 128),
+					S_IFCHR | S_IRUSR | S_IWUSR,
+					"pt/%dn", unit);
 		}
 	return 0;
 }

@@ -1332,6 +1332,7 @@ int __init dz_init(void)
 
 	memset(&serial_driver, 0, sizeof(struct tty_driver));
 	serial_driver.magic = TTY_DRIVER_MAGIC;
+	serial_driver.owner = THIS_MODULE;
 #if (LINUX_VERSION_CODE > 0x2032D && defined(CONFIG_DEVFS_FS))
 	serial_driver.name = "ttyS";
 #else
@@ -1425,8 +1426,8 @@ int __init dz_init(void)
 		printk("ttyS%02d at 0x%08x (irq = %d)\n", info->line,
 		       info->port, SERIAL);
 
-		tty_register_device(&serial_driver, info->line);
-		tty_register_device(&callout_driver, info->line);
+		tty_register_device(&serial_driver, info->line, NULL);
+		tty_register_device(&callout_driver, info->line, NULL);
 	}
 
 	/* Reset the chip */

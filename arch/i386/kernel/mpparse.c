@@ -73,7 +73,9 @@ static unsigned int __initdata num_processors;
 /* Bitmask of physically existing CPUs */
 unsigned long phys_cpu_present_map;
 
+#ifndef CONFIG_X86_GENERICARCH
 int x86_summit = 0;
+#endif
 u8 bios_cpu_apicid[NR_CPUS] = { [0 ... NR_CPUS-1] = BAD_APICID };
 
 /*

@@ -123,7 +123,7 @@ static inline int __prepare_ICR2 (unsigned int mask)
 	return SET_APIC_DEST_FIELD(mask);
 }
 
-static inline void __send_IPI_shortcut(unsigned int shortcut, int vector)
+inline void __send_IPI_shortcut(unsigned int shortcut, int vector)
 {
 	/*
 	 * Subtle. In the case of the 'never do double writes' workaround
@@ -155,7 +155,7 @@ void send_IPI_self(int vector)
 	__send_IPI_shortcut(APIC_DEST_SELF, vector);
 }
 
-static inline void send_IPI_mask_bitmask(int mask, int vector)
+inline void send_IPI_mask_bitmask(int mask, int vector)
 {
 	unsigned long cfg;
 	unsigned long flags;
@@ -186,7 +186,7 @@ static inline void send_IPI_mask_bitmask(int mask, int vector)
 	local_irq_restore(flags);
 }
 
-static inline void send_IPI_mask_sequence(int mask, int vector)
+inline void send_IPI_mask_sequence(int mask, int vector)
 {
 	unsigned long cfg, flags;
 	unsigned int query_cpu, query_mask;

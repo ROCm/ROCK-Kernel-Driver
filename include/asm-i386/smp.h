@@ -87,11 +87,17 @@ extern inline int any_online_cpu(unsigned int mask)
 	return -1;
 }
 #ifdef CONFIG_X86_LOCAL_APIC
-static __inline int hard_smp_processor_id(void)
+
+#ifdef APIC_DEFINITION
+extern int hard_smp_processor_id(void);
+#else
+#include <mach_apic.h>
+static inline int hard_smp_processor_id(void)
 {
 	/* we don't want to mark this access volatile - bad code generation */
 	return GET_APIC_ID(*(unsigned long *)(APIC_BASE+APIC_ID));
 }
+#endif
 
 static __inline int logical_smp_processor_id(void)
 {

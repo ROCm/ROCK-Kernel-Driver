@@ -206,8 +206,8 @@ extern int leases_enable, dir_notify_enable, lease_break_time;
 #include <asm/semaphore.h>
 #include <asm/byteorder.h>
 
+/* Used to be a macro which just called the function, now just a function */
 extern void update_atime (struct inode *);
-#define UPDATE_ATIME(inode) update_atime (inode)
 
 extern void inode_init(unsigned long);
 extern void mnt_init(unsigned long);
@@ -1113,6 +1113,10 @@ extern int filemap_flush(struct address_space *);
 extern int filemap_fdatawait(struct address_space *);
 extern void sync_supers(void);
 extern void sync_filesystems(int wait);
+extern void emergency_sync(void);
+extern void emergency_remount(void);
+extern int do_remount_sb(struct super_block *sb, int flags,
+			void *data, int force);
 extern sector_t bmap(struct inode *, sector_t);
 extern int setattr_mask(unsigned int);
 extern int notify_change(struct dentry *, struct iattr *);

@@ -1214,7 +1214,6 @@ static struct file_operations fb_fops = {
 int
 register_framebuffer(struct fb_info *fb_info)
 {
-	char name_buf[12];
 	int i;
 
 	if (num_registered_fb == FB_MAX)
@@ -1242,10 +1241,9 @@ register_framebuffer(struct fb_info *fb_info)
 	spin_lock_init(&fb_info->pixmap.lock);
 
 	registered_fb[i] = fb_info;
-	sprintf(name_buf, "fb/%d", i);
-	devfs_register(NULL, name_buf, DEVFS_FL_DEFAULT,
-			FB_MAJOR, i, S_IFCHR | S_IRUGO | S_IWUGO,
-			&fb_fops, NULL);
+
+	devfs_mk_cdev(MKDEV(FB_MAJOR, i),
+			S_IFCHR | S_IRUGO | S_IWUGO, "fb/%d", i);
 	return 0;
 }
 

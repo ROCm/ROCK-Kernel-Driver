@@ -62,6 +62,13 @@ int (*pppoatm_ioctl_hook)(struct atm_vcc *, unsigned int, unsigned long);
 EXPORT_SYMBOL(pppoatm_ioctl_hook);
 #endif
 
+#if defined(CONFIG_ATM_BR2684) || defined(CONFIG_ATM_BR2684_MODULE)
+int (*br2684_ioctl_hook)(struct atm_vcc *, unsigned int, unsigned long);
+#ifdef CONFIG_ATM_BR2684_MODULE
+EXPORT_SYMBOL(br2684_ioctl_hook);
+#endif
+#endif
+
 #include "resources.h"		/* atm_find_dev */
 #include "common.h"		/* prototypes */
 #include "protocols.h"		/* atm_init_<transport> */
@@ -120,7 +127,6 @@ int atm_create(struct socket *sock,int protocol,int family)
 	vcc->vpi = vcc->vci = 0; /* no VCI/VPI yet */
 	vcc->atm_options = vcc->aal_options = 0;
 	init_waitqueue_head(&vcc->sleep);
-	skb_queue_head_init(&vcc->listenq);
 	sk->sleep = &vcc->sleep;
 	sock->sk = sk;
 	return 0;
@@ -489,7 +495,7 @@ unsigned int atm_poll(struct file *file,struct socket *sock,poll_table *wait)
 	vcc = ATM_SD(sock);
 	poll_wait(file,&vcc->sleep,wait);
 	mask = 0;
-	if (skb_peek(&vcc->sk->receive_queue) || skb_peek(&vcc->listenq))
+	if (skb_peek(&vcc->sk->receive_queue))
 		mask |= POLLIN | POLLRDNORM;
 	if (test_bit(ATM_VF_RELEASED,&vcc->flags) ||
 	    test_bit(ATM_VF_CLOSE,&vcc->flags))
@@ -781,6 +787,13 @@ int atm_ioctl(struct socket *sock,unsigned int cmd,unsigned long arg)
 #if defined(CONFIG_PPPOATM) || defined(CONFIG_PPPOATM_MODULE)
 	if (pppoatm_ioctl_hook) {
 		ret_val = pppoatm_ioctl_hook(vcc, cmd, arg);
+		if (ret_val != -ENOIOCTLCMD)
+			goto done;
+	}
+#endif
+#if defined(CONFIG_ATM_BR2684) || defined(CONFIG_ATM_BR2684_MODULE)
+	if (br2684_ioctl_hook) {
+		ret_val = br2684_ioctl_hook(vcc, cmd, arg);
 		if (ret_val != -ENOIOCTLCMD)
 			goto done;
 	}

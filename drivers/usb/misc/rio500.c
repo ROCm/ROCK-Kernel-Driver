@@ -38,7 +38,6 @@
 #include <linux/spinlock.h>
 #include <linux/usb.h>
 #include <linux/smp_lock.h>
-#include <linux/devfs_fs_kernel.h>
 
 #include "rio500_usb.h"
 
@@ -49,11 +48,7 @@
 #define DRIVER_AUTHOR "Cesar Miquel <miquel@df.uba.ar>"
 #define DRIVER_DESC "USB Rio 500 driver"
 
-#ifdef CONFIG_USB_DYNAMIC_MINORS
-	#define RIO_MINOR	0
-#else
-	#define RIO_MINOR	64
-#endif
+#define RIO_MINOR	64
 
 /* stall/wait timeout for rio */
 #define NAK_TIMEOUT (HZ)
@@ -68,7 +63,6 @@ struct rio_usb_data {
         unsigned int ifnum;             /* Interface number of the USB device */
         int isopen;                     /* nz if open */
         int present;                    /* Device is present on the bus */
-	int minor;			/* minor number assigned to us */
         char *obuf, *ibuf;              /* transfer buffers */
         char bulk_in_ep, bulk_out_ep;   /* Endpoint assignments */
         wait_queue_head_t wait_q;       /* for timeouts */
@@ -444,6 +438,13 @@ file_operations usb_rio_fops = {
 	.release =	close_rio,
 };
 
+static struct usb_class_driver usb_rio_class = {
+	.name =		"usb/rio500%d",
+	.fops =		&usb_rio_fops,
+	.mode =		S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP,
+	.minor_base =	RIO_MINOR,
+};
+
 static int probe_rio(struct usb_interface *intf,
 		     const struct usb_device_id *id)
 {
@@ -453,7 +454,7 @@ static int probe_rio(struct usb_interface *intf,
 
 	info("USB Rio found at address %d", dev->devnum);
 
-	retval = usb_register_dev(&usb_rio_fops, RIO_MINOR, 1, &rio->minor);
+	retval = usb_register_dev(intf, &usb_rio_class);
 	if (retval) {
 		err("Not able to get a minor for this device.");
 		return -ENOMEM;
@@ -464,22 +465,18 @@ static int probe_rio(struct usb_interface *intf,
 
 	if (!(rio->obuf = (char *) kmalloc(OBUF_SIZE, GFP_KERNEL))) {
 		err("probe_rio: Not enough memory for the output buffer");
+		usb_deregister_dev(intf, &usb_rio_class);
 		return -ENOMEM;
 	}
 	dbg("probe_rio: obuf address:%p", rio->obuf);
 
 	if (!(rio->ibuf = (char *) kmalloc(IBUF_SIZE, GFP_KERNEL))) {
 		err("probe_rio: Not enough memory for the input buffer");
+		usb_deregister_dev(intf, &usb_rio_class);
 		kfree(rio->obuf);
 		return -ENOMEM;
 	}
 	dbg("probe_rio: ibuf address:%p", rio->ibuf);
-
-	devfs_register(NULL, "usb/rio500",
-				    DEVFS_FL_DEFAULT, USB_MAJOR,
-				    RIO_MINOR,
-				    S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP |
-				    S_IWGRP, &usb_rio_fops, NULL);
 
 	init_MUTEX(&(rio->lock));
 
@@ -493,8 +490,7 @@ static void disconnect_rio(struct usb_interface *intf)
 
 	usb_set_intfdata (intf, NULL);
 	if (rio) {
-		devfs_remove("usb/rio500");
-		usb_deregister_dev(1, rio->minor);
+		usb_deregister_dev(intf, &usb_rio_class);
 
 		down(&(rio->lock));
 		if (rio->isopen) {

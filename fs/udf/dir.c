@@ -98,7 +98,7 @@ int udf_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	}
 
 	result = do_udf_readdir(dir, filp, filldir, dirent);
-	UPDATE_ATIME(dir);
+	update_atime(dir);
 	unlock_kernel();
  	return result;
 }

@@ -200,10 +200,8 @@ static struct capiminor *capiminor_alloc(struct capi20_appl *ap, u32 ncci)
 	unsigned int minor = 0;
 	unsigned long flags;
   
-  	MOD_INC_USE_COUNT;
 	mp = kmalloc(sizeof(*mp), GFP_ATOMIC);
   	if (!mp) {
-  		MOD_DEC_USE_COUNT;
   		printk(KERN_ERR "capi: can't alloc capiminor\n");
 		return 0;
 	}
@@ -249,7 +247,6 @@ static void capiminor_free(struct capiminor *mp)
 	skb_queue_purge(&mp->outqueue);
 	capiminor_del_all_ack(mp);
 	kfree(mp);
-	MOD_DEC_USE_COUNT;
 }
 
 struct capiminor *capiminor_find(unsigned int minor)
@@ -1280,6 +1277,7 @@ static int capinc_tty_init(void)
 	
 	memset(drv, 0, sizeof(struct tty_driver));
 	drv->magic = TTY_DRIVER_MAGIC;
+	drv->owner = THIS_MODULE;
 	drv->driver_name = "capi_nc";
 	drv->name = "capi/";
 	drv->major = capi_ttymajor;
@@ -1460,7 +1458,6 @@ static int __init capi_init(void)
 	char *p;
 	char *compileinfo;
 
-	MOD_INC_USE_COUNT;
 
 	if ((p = strchr(revision, ':')) != 0 && p[1]) {
 		strncpy(rev, p + 2, sizeof(rev));
@@ -1472,19 +1469,17 @@ static int __init capi_init(void)
 
 	if (register_chrdev(capi_major, "capi20", &capi_fops)) {
 		printk(KERN_ERR "capi20: unable to get major %d\n", capi_major);
-		MOD_DEC_USE_COUNT;
 		return -EIO;
 	}
 
-	devfs_register (NULL, "isdn/capi20", DEVFS_FL_DEFAULT,
-			capi_major, 0, S_IFCHR | S_IRUSR | S_IWUSR,
-			&capi_fops, NULL);
+	devfs_mk_cdev(MKDEV(capi_major, 0), S_IFCHR | S_IRUSR | S_IWUSR,
+			"isdn/capi20");
+
 	printk(KERN_NOTICE "capi20: started up with major %d\n", capi_major);
 
 #ifdef CONFIG_ISDN_CAPI_MIDDLEWARE
 	if (capinc_tty_init() < 0) {
 		unregister_chrdev(capi_major, "capi20");
-		MOD_DEC_USE_COUNT;
 		return -ENOMEM;
 	}
 #endif /* CONFIG_ISDN_CAPI_MIDDLEWARE */
@@ -1503,7 +1498,6 @@ static int __init capi_init(void)
 	printk(KERN_NOTICE "capi20: Rev %s: started up with major %d%s\n",
 				rev, capi_major, compileinfo);
 
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 

@@ -65,19 +65,16 @@ config X86_NUMAQ
 
 config X86_SUMMIT
 	bool "Summit/EXA (IBM x440)"
+	depends on SMP
 	help
 	  This option is needed for IBM systems that use the Summit/EXA chipset.
 	  In particular, it is needed for the x440.
 
 	  If you don't have one of these computers, you should say N here.
 
-config ACPI_SRAT
-	bool
-	default y
-	depends on NUMA && X86_SUMMIT
-
 config X86_BIGSMP
 	bool "Support for other sub-arch SMP systems with more than 8 CPUs"
+	depends on SMP
 	help
 	  This option is needed for the systems that have more than 8 CPUs
 	  and if the system is not of any sub-arch type above.
@@ -95,8 +92,24 @@ config X86_VISWS
 	  A kernel compiled for the Visual Workstation will not run on PCs
 	  and vice versa. See <file:Documentation/sgi-visws.txt> for details.
 
+config X86_GENERICARCH
+       bool "Generic architecture (Summit, bigsmp, default)"
+       depends on SMP
+       help
+          This option compiles in the Summit, bigsmp, default subarchitectures.
+	  It is intended for a generic binary kernel.
+
 endchoice
 
+config ACPI_SRAT
+	bool
+	default y
+	depends on NUMA && (X86_SUMMIT || X86_GENERICARCH)
+
+config X86_CYCLONE_TIMER
+       bool 
+       default y
+       depends on X86_SUMMIT || X86_GENERICARCH
 
 choice
 	prompt "Processor family"
@@ -666,7 +679,7 @@ config X86_PAE
 # Common NUMA Features
 config NUMA
 	bool "Numa Memory Allocation Support"
-	depends on SMP && HIGHMEM64G && (X86_PC || X86_NUMAQ || (X86_SUMMIT && ACPI && !ACPI_HT_ONLY))
+	depends on SMP && HIGHMEM64G && (X86_PC || X86_NUMAQ || X86_GENERICARCH || (X86_SUMMIT && ACPI && !ACPI_HT_ONLY))
 	default n if X86_PC
 	default y if (X86_NUMAQ || X86_SUMMIT)
 
@@ -764,7 +777,7 @@ config HAVE_DEC_LOCK
 # Summit needs it only when NUMA is on
 config BOOT_IOREMAP
 	bool
-	depends on (X86_SUMMIT && NUMA)
+	depends on ((X86_SUMMIT || X86_GENERICARCH) && NUMA)
 	default y
 
 endmenu

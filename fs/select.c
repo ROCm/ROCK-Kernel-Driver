@@ -176,7 +176,7 @@ int do_select(int n, fd_set_bits *fds, long *timeout)
 {
 	struct poll_wqueues table;
 	poll_table *wait;
-	int retval, i, off;
+	int retval, i;
 	long __timeout = *timeout;
 
  	spin_lock(&current->files->file_lock);
@@ -193,38 +193,58 @@ int do_select(int n, fd_set_bits *fds, long *timeout)
 		wait = NULL;
 	retval = 0;
 	for (;;) {
-		set_current_state(TASK_INTERRUPTIBLE);
-		for (i = 0 ; i < n; i++) {
-			unsigned long bit = BIT(i);
-			unsigned long mask;
-			struct file *file;
+		unsigned long *rinp, *routp, *rexp, *inp, *outp, *exp;
 
-			off = i / __NFDBITS;
-			if (!(bit & BITS(fds, off)))
+		set_current_state(TASK_INTERRUPTIBLE);
+
+		inp = fds->in; outp = fds->out; exp = fds->ex;
+		rinp = fds->res_in; routp = fds->res_out; rexp = fds->res_ex;
+
+		for (i = 0; i < n; ++rinp, ++routp, ++rexp) {
+			unsigned long in, out, ex, all_bits, bit = 1, mask, j;
+			unsigned long res_in = 0, res_out = 0, res_ex = 0;
+			struct file_operations *f_op = NULL;
+			struct file *file = NULL;
+
+			in = *inp++; out = *outp++; ex = *exp++;
+			all_bits = in | out | ex;
+			if (all_bits == 0) {
+				i += __NFDBITS;
 				continue;
-			file = fget(i);
-			mask = POLLNVAL;
-			if (file) {
-				mask = DEFAULT_POLLMASK;
-				if (file->f_op && file->f_op->poll)
-					mask = file->f_op->poll(file, wait);
-				fput(file);
 			}
-			if ((mask & POLLIN_SET) && ISSET(bit, __IN(fds,off))) {
-				SET(bit, __RES_IN(fds,off));
-				retval++;
-				wait = NULL;
+
+			for (j = 0; j < __NFDBITS; ++j, ++i, bit <<= 1) {
+				if (i >= n)
+					break;
+				if (!(bit & all_bits))
+					continue;
+				file = fget(i);
+				if (file) {
+					f_op = file->f_op;
+					mask = DEFAULT_POLLMASK;
+					if (f_op && f_op->poll)
+						mask = (*f_op->poll)(file, retval ? NULL : wait);
+					fput(file);
+					if ((mask & POLLIN_SET) && (in & bit)) {
+						res_in |= bit;
+						retval++;
+					}
+					if ((mask & POLLOUT_SET) && (out & bit)) {
+						res_out |= bit;
+						retval++;
+					}
+					if ((mask & POLLEX_SET) && (ex & bit)) {
+						res_ex |= bit;
+						retval++;
+					}
+				}
 			}
-			if ((mask & POLLOUT_SET) && ISSET(bit, __OUT(fds,off))) {
-				SET(bit, __RES_OUT(fds,off));
-				retval++;
-				wait = NULL;
-			}
-			if ((mask & POLLEX_SET) && ISSET(bit, __EX(fds,off))) {
-				SET(bit, __RES_EX(fds,off));
-				retval++;
-				wait = NULL;
-			}
+			if (res_in)
+				*rinp = res_in;
+			if (res_out)
+				*routp = res_out;
+			if (res_ex)
+				*rexp = res_ex;
 		}
 		wait = NULL;
 		if (retval || !__timeout || signal_pending(current))

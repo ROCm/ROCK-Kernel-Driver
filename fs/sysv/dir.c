@@ -116,7 +116,7 @@ static int sysv_readdir(struct file * filp, void * dirent, filldir_t filldir)
 
 done:
 	filp->f_pos = (n << PAGE_CACHE_SHIFT) | offset;
-	UPDATE_ATIME(inode);
+	update_atime(inode);
 	unlock_kernel();
 	return 0;
 }

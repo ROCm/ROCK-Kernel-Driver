@@ -392,12 +392,9 @@ static int __init cosa_init(void)
 	}
 	devfs_mk_dir("cosa");
 	for (i=0; i<nr_cards; i++) {
-		char name[16];
-		sprintf(name, "cosa/%d", i);
-		devfs_register(NULL, name, DEVFS_FL_DEFAULT,
-			       cosa_major, i,
-			       S_IFCHR | S_IRUSR | S_IWUSR,
-			       &cosa_fops, NULL);
+		devfs_mk_cdev(MKDEV(cosa_major, i),
+				S_IFCHR|S_IRUSR|S_IWUSR,
+				"cosa/%d", i);
 	}
 	return 0;
 }

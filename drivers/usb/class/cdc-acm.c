@@ -653,7 +653,7 @@ static int acm_probe (struct usb_interface *intf,
 		usb_driver_claim_interface(&acm_driver, acm->iface + 0, acm);
 		usb_driver_claim_interface(&acm_driver, acm->iface + 1, acm);
 
-		tty_register_device(&acm_tty_driver, minor);
+		tty_register_device(&acm_tty_driver, minor, &intf->dev);
 
 		acm_table[minor] = acm;
 		usb_set_intfdata (intf, acm);
