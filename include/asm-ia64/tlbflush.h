@@ -70,12 +70,10 @@ flush_tlb_page (struct vm_area_struct *vma, unsigned long addr)
 static inline void
 flush_tlb_pgtables (struct mm_struct *mm, unsigned long start, unsigned long end)
 {
-	struct vm_area_struct vma;
-
-	if (REGION_NUMBER(start) != REGION_NUMBER(end))
-		printk("flush_tlb_pgtables: can't flush across regions!!\n");
-	vma.vm_mm = mm;
-	flush_tlb_range(&vma, ia64_thash(start), ia64_thash(end));
+	/*
+	 * Deprecated.  The virtual page table is now flushed via the normal gather/flush
+	 * interface (see tlb.h).
+	 */
 }
 
 #define flush_tlb_kernel_range(start, end)	flush_tlb_all()	/* XXX fix me */
