@@ -417,7 +417,8 @@ extern void scsi_setup_cmd_retry(Scsi_Cmnd *SCpnt);
 extern void scsi_io_completion(Scsi_Cmnd * SCpnt, int good_sectors,
 			       int block_sectors);
 extern int scsi_queue_insert(struct scsi_cmnd *cmd, int reason);
-extern request_queue_t *scsi_alloc_queue(struct Scsi_Host *shost);
+extern void scsi_queue_next_request(request_queue_t *q, struct scsi_cmnd *cmd);
+extern request_queue_t *scsi_alloc_queue(struct scsi_device *sdev);
 extern void scsi_free_queue(request_queue_t *q);
 extern int scsi_init_queue(void);
 extern void scsi_exit_queue(void);
@@ -531,6 +532,16 @@ extern struct list_head scsi_dev_info_list;
 extern int scsi_dev_info_list_add_str(char *);
 
 /*
+ * scsi_target: representation of a scsi target, for now, this is only
+ * used for single_lun devices. If no one has active IO to the target,
+ * starget_sdev_user is NULL, else it points to the active sdev.
+ */
+struct scsi_target {
+	struct scsi_device *starget_sdev_user;
+	unsigned int starget_refcnt;
+};
+
+/*
  *  The scsi_device struct contains what we know about each given scsi
  *  device.
  *
@@ -554,8 +565,10 @@ struct scsi_device {
 	struct Scsi_Host *host;
 	request_queue_t *request_queue;
 	volatile unsigned short device_busy;	/* commands actually active on low-level */
+	spinlock_t sdev_lock;           /* also the request queue_lock */
 	spinlock_t list_lock;
 	struct list_head cmd_list;	/* queue of in use SCSI Command structures */
+	struct list_head starved_entry;
         Scsi_Cmnd *current_cmnd;	/* currently active command */
 	unsigned short queue_depth;	/* How deep of a queue we want */
 	unsigned short last_queue_full_depth; /* These two are used by */
@@ -586,6 +599,7 @@ struct scsi_device {
 	unsigned char current_tag;	/* current tag */
 //	unsigned char sync_min_period;	/* Not less than this period */
 //	unsigned char sync_max_offset;	/* Not greater than this offset */
+	struct scsi_target      *sdev_target;   /* used only for single_lun */
 
 	unsigned online:1;
 	unsigned writeable:1;
@@ -616,8 +630,6 @@ struct scsi_device {
 					 * because we did a bus reset. */
 	unsigned ten:1;		/* support ten byte read / write */
 	unsigned remap:1;	/* support remapping  */
-	unsigned starved:1;	/* unable to process commands because
-				   host busy */
 //	unsigned sync:1;	/* Sync transfer state, managed by host */
 //	unsigned wide:1;	/* WIDE transfer state, managed by host */
 
