@@ -35,7 +35,7 @@ snd_seq_oss_ioctl(seq_oss_devinfo_t *dp, unsigned int cmd, unsigned long carg)
 	struct synth_info inf;
 	struct midi_info minf;
 	unsigned char ev[8];
-	void *arg = (void*)carg;
+	void __user *arg = (void __user *)carg;
 	snd_seq_event_t tmpev;
 
 	switch (cmd) {

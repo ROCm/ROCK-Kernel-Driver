@@ -135,8 +135,8 @@ int snd_seq_oss_delete_client(void);
 int snd_seq_oss_open(struct file *file, int level);
 void snd_seq_oss_release(seq_oss_devinfo_t *dp);
 int snd_seq_oss_ioctl(seq_oss_devinfo_t *dp, unsigned int cmd, unsigned long arg);
-int snd_seq_oss_read(seq_oss_devinfo_t *dev, char *buf, int count);
-int snd_seq_oss_write(seq_oss_devinfo_t *dp, const char *buf, int count, struct file *opt);
+int snd_seq_oss_read(seq_oss_devinfo_t *dev, char __user *buf, int count);
+int snd_seq_oss_write(seq_oss_devinfo_t *dp, const char __user *buf, int count, struct file *opt);
 unsigned int snd_seq_oss_poll(seq_oss_devinfo_t *dp, struct file *file, poll_table * wait);
 
 void snd_seq_oss_reset(seq_oss_devinfo_t *dp);
