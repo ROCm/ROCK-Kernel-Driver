@@ -330,12 +330,15 @@ ENTRY(alt_dtlb_miss)
 (p8)	br.cond.dptk dtlb_fault
 #endif
 	extr.u r23=r21,IA64_PSR_CPL0_BIT,2	// extract psr.cpl
+	and r22=IA64_ISR_CODE_MASK,r20		// get the isr.code field
 	tbit.nz p6,p7=r20,IA64_ISR_SP_BIT	// is speculation bit on?
-	and r19=r19,r16		// clear ed, reserved bits, and PTE control bits
-	shr.u r18=r16,57	// move address bit 61 to bit 4
+	shr.u r18=r16,57			// move address bit 61 to bit 4
+	and r19=r19,r16				// clear ed, reserved bits, and PTE control bits
+	tbit.nz p9,p0=r20,IA64_ISR_NA_BIT	// is non-access bit on?
 	;;
 	andcm r18=0x10,r18	// bit 4=~address-bit(61)
 	cmp.ne p8,p0=r0,r23
+(p9)	cmp.eq.or.andcm p6,p7=IA64_ISR_CODE_LFETCH,r22	// check isr.code field
 (p8)	br.cond.spnt page_fault
 
 	dep r21=-1,r21,IA64_PSR_ED_BIT,1

@@ -154,6 +154,7 @@
 #define IA64_ISR_SP_BIT		36	/* speculative load exception */
 #define IA64_ISR_RS_BIT		37	/* mandatory register-stack exception */
 #define IA64_ISR_IR_BIT		38	/* invalid register frame exception */
+#define IA64_ISR_CODE_MASK	0xf
 
 #define IA64_ISR_X	(__IA64_UL(1) << IA64_ISR_X_BIT)
 #define IA64_ISR_W	(__IA64_UL(1) << IA64_ISR_W_BIT)
@@ -162,6 +163,14 @@
 #define IA64_ISR_SP	(__IA64_UL(1) << IA64_ISR_SP_BIT)
 #define IA64_ISR_RS	(__IA64_UL(1) << IA64_ISR_RS_BIT)
 #define IA64_ISR_IR	(__IA64_UL(1) << IA64_ISR_IR_BIT)
+
+/* ISR code field for non-access instructions */
+#define IA64_ISR_CODE_TPA	0
+#define IA64_ISR_CODE_FC	1
+#define IA64_ISR_CODE_PROBE	2
+#define IA64_ISR_CODE_TAK	3
+#define IA64_ISR_CODE_LFETCH	4
+#define IA64_ISR_CODE_PROBEF	5
 
 #define IA64_THREAD_FPH_VALID	(__IA64_UL(1) << 0)	/* floating-point high state valid? */
 #define IA64_THREAD_DBG_VALID	(__IA64_UL(1) << 1)	/* debug registers valid? */
