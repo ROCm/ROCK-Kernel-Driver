@@ -702,6 +702,7 @@ struct pcibr_list_s {
 
 struct sn_flush_device_list {
 	int bus;
+	int slot;
 	int pin;
 	struct bar_list {
 		unsigned long start;

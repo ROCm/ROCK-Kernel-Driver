@@ -213,6 +213,10 @@ sn_dma_flush_init(unsigned long start, unsigned long end, int idx, int pin, int 
 	if (flush_nasid_list[nasid].widget_p == NULL) {
 		flush_nasid_list[nasid].widget_p = (struct sn_flush_device_list **)kmalloc((HUB_WIDGET_ID_MAX+1) *
 			sizeof(struct sn_flush_device_list *), GFP_KERNEL);
+		if (flush_nasid_list[nasid].widget_p <= 0) {
+			printk("sn_dma_flush_init: Cannot allocate memory for nasid list\n");
+			return;
+		}
 		memset(flush_nasid_list[nasid].widget_p, 0, (HUB_WIDGET_ID_MAX+1) * sizeof(struct sn_flush_device_list *));
 	}
 	if (bwin > 0) {
@@ -240,22 +244,28 @@ sn_dma_flush_init(unsigned long start, unsigned long end, int idx, int pin, int 
 	if (flush_nasid_list[nasid].widget_p[wid_num] == NULL) {
 		flush_nasid_list[nasid].widget_p[wid_num] = (struct sn_flush_device_list *)kmalloc(
 			DEV_PER_WIDGET * sizeof (struct sn_flush_device_list), GFP_KERNEL);
+		if (flush_nasid_list[nasid].widget_p[wid_num] <= 0) {
+			printk("sn_dma_flush_init: Cannot allocate memory for nasid sub-list\n");
+			return;
+		}
 		memset(flush_nasid_list[nasid].widget_p[wid_num], 0, 
 			DEV_PER_WIDGET * sizeof (struct sn_flush_device_list));
 		p = &flush_nasid_list[nasid].widget_p[wid_num][0];
 		for (i=0; i<DEV_PER_WIDGET;i++) {
 			p->bus = -1;
 			p->pin = -1;
+			p->slot = -1;
 			p++;
 		}
 	}
 
 	p = &flush_nasid_list[nasid].widget_p[wid_num][0];
 	for (i=0;i<DEV_PER_WIDGET; i++) {
-		if (p->pin == pin && p->bus == bus) break;
+		if (p->pin == pin && p->bus == bus && p->slot == slot) break;
 		if (p->pin < 0) {
 			p->pin = pin;
 			p->bus = bus;
+			p->slot = slot;
 			break;
 		}
 		p++;
