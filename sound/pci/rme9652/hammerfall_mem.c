@@ -48,9 +48,9 @@
 
 /* export */
 
-static int snd_enable[8] = {1,1,1,1,1,1,1,1};
-MODULE_PARM(snd_enable, "1-" __MODULE_STRING(HAMMERFALL_CARDS) "i");
-MODULE_PARM_DESC(snd_enable, "Enable cards to allocate buffers for.");
+static int enable[8] = {1,1,1,1,1,1,1,1};
+MODULE_PARM(enable, "1-" __MODULE_STRING(HAMMERFALL_CARDS) "i");
+MODULE_PARM_DESC(enable, "Enable cards to allocate buffers for.");
 
 MODULE_AUTHOR("Winfried Ritsch, Paul Barton-Davis <pbd@op.net>");
 MODULE_DESCRIPTION("Memory allocator for RME Hammerfall");
@@ -236,7 +236,7 @@ static int __init alsa_hammerfall_mem_init(void)
 		if (pci->vendor != 0x10ee || (pci->device != 0x3fc4 && pci->device != 0x3fc5)) 
 			continue;
 
-		if (!snd_enable[i])
+		if (!enable[i])
 			continue;
 
 		for (k = 0; k < 2; ++k) {

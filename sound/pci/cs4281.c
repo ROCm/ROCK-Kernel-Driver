@@ -45,23 +45,23 @@ MODULE_LICENSE("GPL");
 MODULE_CLASSES("{sound}");
 MODULE_DEVICES("{{Cirrus Logic,CS4281}}");
 
-static int snd_index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
-static char *snd_id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
-static int snd_enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable switches */
-static int snd_dual_codec[SNDRV_CARDS];	/* dual codec */
+static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
+static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
+static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable switches */
+static int dual_codec[SNDRV_CARDS];	/* dual codec */
 
-MODULE_PARM(snd_index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_index, "Index value for CS4281 soundcard.");
-MODULE_PARM_SYNTAX(snd_index, SNDRV_INDEX_DESC);
-MODULE_PARM(snd_id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
-MODULE_PARM_DESC(snd_id, "ID string for CS4281 soundcard.");
-MODULE_PARM_SYNTAX(snd_id, SNDRV_ID_DESC);
-MODULE_PARM(snd_enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_enable, "Enable CS4281 soundcard.");
-MODULE_PARM_SYNTAX(snd_enable, SNDRV_ENABLE_DESC);
-MODULE_PARM(snd_dual_codec, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_dual_codec, "Secondary Codec ID (0 = disabled).");
-MODULE_PARM_SYNTAX(snd_dual_codec, SNDRV_ENABLED ",allows:{{0,3}}");
+MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(index, "Index value for CS4281 soundcard.");
+MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
+MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+MODULE_PARM_DESC(id, "ID string for CS4281 soundcard.");
+MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
+MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(enable, "Enable CS4281 soundcard.");
+MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
+MODULE_PARM(dual_codec, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(dual_codec, "Secondary Codec ID (0 = disabled).");
+MODULE_PARM_SYNTAX(dual_codec, SNDRV_ENABLED ",allows:{{0,3}}");
 
 /*
  *
@@ -1479,7 +1479,7 @@ static int __devinit snd_cs4281_create(snd_card_t * card,
 	chip->ba1_addr = pci_resource_start(pci, 1);
 	pci_set_master(pci);
 	if (dual_codec < 0 || dual_codec > 3) {
-		snd_printk(KERN_ERR "invalid snd_dual_codec option %d\n", dual_codec);
+		snd_printk(KERN_ERR "invalid dual_codec option %d\n", dual_codec);
 		dual_codec = 0;
 	}
 	chip->dual_codec = dual_codec;
@@ -1990,7 +1990,7 @@ static void snd_cs4281_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 
 static int __devinit snd_cs4281_probe(struct pci_dev *pci,
-				      const struct pci_device_id *id)
+				      const struct pci_device_id *pci_id)
 {
 	static int dev;
 	snd_card_t *card;
@@ -2000,16 +2000,16 @@ static int __devinit snd_cs4281_probe(struct pci_dev *pci,
 
         if (dev >= SNDRV_CARDS)
                 return -ENODEV;
-	if (!snd_enable[dev]) {
+	if (!enable[dev]) {
 		dev++;
 		return -ENOENT;
 	}
 
-	card = snd_card_new(snd_index[dev], snd_id[dev], THIS_MODULE, 0);
+	card = snd_card_new(index[dev], id[dev], THIS_MODULE, 0);
 	if (card == NULL)
 		return -ENOMEM;
 
-	if ((err = snd_cs4281_create(card, pci, &chip, snd_dual_codec[dev])) < 0) {
+	if ((err = snd_cs4281_create(card, pci, &chip, dual_codec[dev])) < 0) {
 		snd_card_free(card);
 		return err;
 	}
@@ -2253,7 +2253,7 @@ module_exit(alsa_card_cs4281_exit)
 
 #ifndef MODULE
 
-/* format is: snd-cs4281=snd_enable,snd_index,snd_id */
+/* format is: snd-cs4281=enable,index,id */
 
 static int __init alsa_card_cs4281_setup(char *str)
 {
@@ -2261,9 +2261,9 @@ static int __init alsa_card_cs4281_setup(char *str)
 
 	if (nr_dev >= SNDRV_CARDS)
 		return 0;
-	(void)(get_option(&str,&snd_enable[nr_dev]) == 2 &&
-	       get_option(&str,&snd_index[nr_dev]) == 2 &&
-	       get_id(&str,&snd_id[nr_dev]) == 2);
+	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
+	       get_option(&str,&index[nr_dev]) == 2 &&
+	       get_id(&str,&id[nr_dev]) == 2);
 	nr_dev++;
 	return 1;
 }

@@ -76,7 +76,7 @@ int snd_info_check_reserved_words(const char *str)
 
 #ifdef CONFIG_PROC_FS
 
-extern int snd_major;
+extern int major;
 extern struct file_operations snd_fops;
 
 static DECLARE_MUTEX(info_mutex);
@@ -885,8 +885,8 @@ static void snd_info_device_fill_inode(struct inode *inode, int fill)
 	entry = (snd_info_entry_t *) de->data;
 	if (entry == NULL)
 		return;
-	inode->i_gid = snd_device_gid;
-	inode->i_uid = snd_device_uid;
+	inode->i_gid = device_gid;
+	inode->i_uid = device_uid;
 	inode->i_rdev = MKDEV(entry->c.device.major, entry->c.device.minor);
 }
 
@@ -907,16 +907,16 @@ snd_info_entry_t *snd_info_create_device(const char *name, unsigned int number, 
 #ifdef CONFIG_DEVFS_FS
 	char dname[32];
 #endif
-	unsigned short major = number >> 16;
+	unsigned short _major = number >> 16;
 	unsigned short minor = (unsigned short) number;
 	snd_info_entry_t *entry;
 	struct proc_dir_entry *p = NULL;
 
-	if (!major)
-		major = snd_major;
+	if (!_major)
+		_major = major;
 	if (!mode)
 		mode = S_IFCHR | S_IRUGO | S_IWUGO;
-	mode &= (snd_device_mode & (S_IRUGO | S_IWUGO)) | S_IFCHR | S_IFBLK;
+	mode &= (device_mode & (S_IRUGO | S_IWUGO)) | S_IFCHR | S_IFBLK;
 	entry = snd_info_create_module_entry(THIS_MODULE, name, NULL);
 	if (entry == NULL)
 		return NULL;
@@ -940,8 +940,8 @@ snd_info_entry_t *snd_info_create_device(const char *name, unsigned int number, 
 		snd_info_free_entry(entry);
 		return NULL;
 	}
-	p->gid = snd_device_gid;
-	p->uid = snd_device_uid;
+	p->gid = device_gid;
+	p->uid = device_uid;
 	p->data = (void *) entry;
 	entry->p = p;
 	up(&info_mutex);
