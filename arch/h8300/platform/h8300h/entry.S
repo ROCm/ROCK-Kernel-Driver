@@ -236,7 +236,7 @@ SYMBOL_NAME_LABEL(system_call)
 	mov.l	@(LER3:16,sp),er2
 	jsr	@er4
 	mov.l	er0,@(LER0:16,sp)		/* save the return value */
-	jsr	SYMBOL_NAME(syscall_trace)
+	jsr	@SYMBOL_NAME(syscall_trace)
 
 SYMBOL_NAME_LABEL(ret_from_signal)
 
@@ -253,7 +253,7 @@ SYMBOL_NAME_LABEL(ret_from_exception)
 1:
 	mov.l	@(TI_FLAGS:16,er2),er1
 	btst	#TIF_NEED_RESCHED,r1l
-	bne	@SYMBOL_NAME(reschedule):16
+	bne	SYMBOL_NAME(reschedule):16
 	mov.l	sp,er1
 	subs	#4,er1			/* adjust retpc */
 	mov.l	er2,er0
@@ -273,7 +273,7 @@ SYMBOL_NAME_LABEL(reschedule)
 SYMBOL_NAME_LABEL(ret_from_fork)
 	mov.l	er2,er0
 	jsr	@SYMBOL_NAME(schedule_tail)
-	jmp	@SYMBOL_NAME_LABEL(ret_from_exception)	
+	jmp	@SYMBOL_NAME(ret_from_exception)	
 
 SYMBOL_NAME_LABEL(resume)
 	/*

@@ -105,6 +105,7 @@ gpio_table:
 	;; PBDDR
 	.byte	0x00,0x00
 
+	.section .rodata
 __target_name:	
 	.asciz	"generic"
 	
