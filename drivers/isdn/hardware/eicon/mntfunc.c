@@ -1,4 +1,4 @@
-/* $Id: mntfunc.c,v 1.16 2003/09/18 06:57:17 schindler Exp $
+/* $Id: mntfunc.c,v 1.19 2004/01/09 21:22:03 armin Exp $
  *
  * Driver for Eicon DIVA Server ISDN cards.
  * Maint module
@@ -148,11 +148,14 @@ static void DIVA_EXIT_FUNCTION disconnect_didd(void)
 /*
  * read/write maint
  */
-int maint_read_write(void *buf)
+int maint_read_write(void *buf, int count)
 {
 	byte data[128];
 	dword cmd, id, mask;
 	int ret = 0;
+
+	if (count < (3 * sizeof(dword)))
+		return (-EFAULT);
 
 	if (diva_os_copy_from_user(NULL, (void *) &data[0],
 				   buf, 3 * sizeof(dword))) {
@@ -166,7 +169,7 @@ int maint_read_write(void *buf)
 	switch (cmd) {
 	case DITRACE_CMD_GET_DRIVER_INFO:
 		if ((ret = diva_get_driver_info(id, data, sizeof(data))) > 0) {
-			if (diva_os_copy_to_user
+			if ((count < ret) || diva_os_copy_to_user
 			    (NULL, buf, (void *) &data[0], ret))
 				ret = -EFAULT;
 		} else {
@@ -176,7 +179,7 @@ int maint_read_write(void *buf)
 
 	case DITRACE_READ_DRIVER_DBG_MASK:
 		if ((ret = diva_get_driver_dbg_mask(id, (byte *) data)) > 0) {
-			if (diva_os_copy_to_user
+			if ((count < ret) || diva_os_copy_to_user
 			    (NULL, buf, (void *) &data[0], ret))
 				ret = -EFAULT;
 		} else {
@@ -209,7 +212,7 @@ int maint_read_write(void *buf)
 						ret = size;
 						memcpy(pbuf, pmsg, size);
 						diva_maint_ack_message(1, &old_irql);
-						if (diva_os_copy_to_user (NULL, buf,
+						if ((count < size) || diva_os_copy_to_user (NULL, buf,
 						     (void *) pbuf, size))
 							ret = -EFAULT;
 						diva_os_free_tbuffer(0, pbuf);
@@ -265,7 +268,7 @@ int maint_read_write(void *buf)
 			pbuf[written++] = 0;
 			pbuf[written++] = 0;
 
-			if (diva_os_copy_to_user(NULL, buf, (void *) pbuf, written)) {
+			if ((count < written) || diva_os_copy_to_user(NULL, buf, (void *) pbuf, written)) {
 				ret = -EFAULT;
 			} else {
 				ret = written;
