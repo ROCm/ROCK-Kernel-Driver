@@ -55,7 +55,8 @@
 #include "scsi_logging.h"
 #include "scsi_debug.h"
 
-static const char * scsi_debug_version_str = "Version: 1.71 (20031007)";
+#define SCSI_DEBUG_VERSION "1.73"
+static const char * scsi_debug_version_date = "20040517";
 
 /* Additional Sense Code (ASC) used */
 #define NO_ADDED_SENSE 0x0
@@ -76,11 +77,13 @@ static const char * scsi_debug_version_str = "Version: 1.71 (20031007)";
 /* With these defaults, this driver will make 1 host with 1 target
  * (id 0) containing 1 logical unit (lun 0). That is 1 device.
  */
+#define DEF_DELAY   1
 #define DEF_DEV_SIZE_MB   8
 #define DEF_EVERY_NTH   0
-#define DEF_DELAY   1
-#define DEF_SCSI_LEVEL   3
+#define DEF_NUM_PARTS   0
 #define DEF_OPTS   0
+#define DEF_SCSI_LEVEL   3
+#define DEF_PTYPE   0
 
 /* bit mask values for scsi_debug_opts */
 #define SCSI_DEBUG_OPT_NOISE   1
@@ -101,19 +104,21 @@ static const char * scsi_debug_version_str = "Version: 1.71 (20031007)";
  * or "peripheral device" addressing (value 0) */
 #define SAM2_LUN_ADDRESS_METHOD 0
 
+static int scsi_debug_add_host = DEF_NUM_HOST;
+static int scsi_debug_delay = DEF_DELAY;
 static int scsi_debug_dev_size_mb = DEF_DEV_SIZE_MB;
+static int scsi_debug_every_nth = DEF_EVERY_NTH;
+static int scsi_debug_max_luns = DEF_MAX_LUNS;
+static int scsi_debug_num_parts = DEF_NUM_PARTS;
 static int scsi_debug_num_tgts = DEF_NUM_TGTS; /* targets per host */
 static int scsi_debug_opts = DEF_OPTS;
-static int scsi_debug_every_nth = DEF_EVERY_NTH;
-static int scsi_debug_cmnd_count = 0;
-static int scsi_debug_delay = DEF_DELAY;
-static int scsi_debug_max_luns = DEF_MAX_LUNS;
 static int scsi_debug_scsi_level = DEF_SCSI_LEVEL;
-static int scsi_debug_add_host = DEF_NUM_HOST;
+static int scsi_debug_ptype = DEF_PTYPE; /* SCSI peripheral type (0==disk) */
+
+static int scsi_debug_cmnd_count = 0;
 
 #define DEV_READONLY(TGT)      (0)
 #define DEV_REMOVEABLE(TGT)    (0)
-#define PERIPH_DEVICE_TYPE(TGT) (TYPE_DISK);
 
 static unsigned long sdebug_store_size;	/* in bytes */
 static sector_t sdebug_capacity;	/* in sectors */
@@ -128,6 +133,8 @@ static int sdebug_sectors_per;		/* sectors per cylinder */
 #define POW2_SECT_SIZE 9
 #define SECT_SIZE (1 << POW2_SECT_SIZE)
 #define SECT_SIZE_PER(TGT) SECT_SIZE
+
+#define SDEBUG_MAX_PARTS 4
 
 #define SDEBUG_SENSE_LEN 32
 
@@ -239,7 +246,8 @@ static int check_reset(struct scsi_cmnd * SCpnt,
 static int schedule_resp(struct scsi_cmnd * cmnd, 
 			 struct sdebug_dev_info * devip, 
 			 done_funct_t done, int scsi_result, int delta_jiff);
-static void init_all_queued(void);
+static void __init sdebug_build_parts(unsigned char * ramp);
+static void __init init_all_queued(void);
 static void stop_all_queued(void);
 static int stop_queued_cmnd(struct scsi_cmnd * cmnd);
 static int inquiry_evpd_83(unsigned char * arr, int dev_id_num,
@@ -249,6 +257,8 @@ static void do_remove_driverfs_files(void);
 
 static int sdebug_add_adapter(void);
 static void sdebug_remove_adapter(void);
+static void sdebug_max_tgts_luns(void);
+
 static struct device pseudo_primary;
 static struct bus_type pseudo_lld_bus;
 
@@ -545,7 +555,7 @@ static int resp_inquiry(unsigned char * cmd, int target, unsigned char * buff,
 		       "< alloc_length=%d\n", bufflen, (int)cmd[4]);
 	memset(buff, 0, bufflen);
 	memset(arr, 0, SDEBUG_MAX_INQ_ARR_SZ);
-	pq_pdt = PERIPH_DEVICE_TYPE(target);
+	pq_pdt = (scsi_debug_ptype & 0x1f);
 	arr[0] = pq_pdt;
 	if (0x2 & cmd[1]) {  /* CMDDT bit set */
 		mk_sense_buffer(devip, ILLEGAL_REQUEST, INVALID_FIELD_IN_CDB,
@@ -980,6 +990,18 @@ static struct sdebug_dev_info * devInfoReg(struct scsi_device * sdev)
 				open_devip = devip;
 		}
 	}
+	if (NULL == open_devip) { /* try and make a new one */
+		open_devip = kmalloc(sizeof(*open_devip),GFP_KERNEL);
+		if (NULL == open_devip) {
+			printk(KERN_ERR "%s: out of memory at line %d\n",
+				__FUNCTION__, __LINE__);
+			return NULL;
+		}
+		memset(open_devip, 0, sizeof(*open_devip));
+		open_devip->sdbg_host = sdbg_host;
+		list_add_tail(&open_devip->dev_list,
+		&sdbg_host->dev_info_list);
+	}
         if (open_devip) {
 		open_devip->channel = sdev->channel;
 		open_devip->target = sdev->id;
@@ -1138,7 +1160,7 @@ static void stop_all_queued(void)
 }
 
 /* Initializes timers in queued array */
-static void init_all_queued(void)
+static void __init init_all_queued(void)
 {
 	unsigned long iflags;
 	int k;
@@ -1152,6 +1174,56 @@ static void init_all_queued(void)
 		sqcp->a_cmnd = NULL;
 	}
 	spin_unlock_irqrestore(&queued_arr_lock, iflags);
+}
+
+static void __init sdebug_build_parts(unsigned char * ramp)
+{
+	struct partition * pp;
+	int starts[SDEBUG_MAX_PARTS + 2];
+	int sectors_per_part, num_sectors, k;
+	int heads_by_sects, start_sec, end_sec;
+
+	/* assume partition table already zeroed */
+	if ((scsi_debug_num_parts < 1) || (sdebug_store_size < 1048576))
+		return;
+	if (scsi_debug_num_parts > SDEBUG_MAX_PARTS) {
+		scsi_debug_num_parts = SDEBUG_MAX_PARTS;
+		printk(KERN_WARNING "scsi_debug:build_parts: reducing "
+				    "partitions to %d\n", SDEBUG_MAX_PARTS);
+	}
+	num_sectors = (int)(sdebug_store_size / SECT_SIZE);
+	sectors_per_part = (num_sectors - sdebug_sectors_per)
+			   / scsi_debug_num_parts;
+	heads_by_sects = sdebug_heads * sdebug_sectors_per;
+        starts[0] = sdebug_sectors_per;
+	for (k = 1; k < scsi_debug_num_parts; ++k)
+		starts[k] = ((k * sectors_per_part) / heads_by_sects)
+			    * heads_by_sects;
+	starts[scsi_debug_num_parts] = num_sectors;
+	starts[scsi_debug_num_parts + 1] = 0;
+
+	ramp[510] = 0x55;	/* magic partition markings */
+	ramp[511] = 0xAA;
+	pp = (struct partition *)(ramp + 0x1be);
+	for (k = 0; starts[k + 1]; ++k, ++pp) {
+		start_sec = starts[k]; 
+		end_sec = starts[k + 1] - 1; 
+		pp->boot_ind = 0;
+
+		pp->cyl = start_sec / heads_by_sects;
+		pp->head = (start_sec - (pp->cyl * heads_by_sects))
+			   / sdebug_sectors_per;
+		pp->sector = (start_sec % sdebug_sectors_per) + 1;
+
+		pp->end_cyl = end_sec / heads_by_sects;
+		pp->end_head = (end_sec - (pp->end_cyl * heads_by_sects))
+			       / sdebug_sectors_per;
+		pp->end_sector = (end_sec % sdebug_sectors_per) + 1;
+
+		pp->start_sect = start_sec;
+		pp->nr_sects = end_sec - start_sec + 1;
+		pp->sys_ind = 0x83;	/* plain Linux partition */
+	}
 }
 
 static int schedule_resp(struct scsi_cmnd * cmnd, 
@@ -1221,36 +1293,41 @@ static int schedule_resp(struct scsi_cmnd * cmnd,
  * of sysfs parameters (which module_param doesn't yet support).
  * Sysfs parameters defined explicitly below. 
  */
-module_param_named(num_tgts, scsi_debug_num_tgts, int, 0);
-module_param_named(max_luns, scsi_debug_max_luns, int, 0);
-module_param_named(scsi_level, scsi_debug_scsi_level, int, 0);
-module_param_named(dev_size_mb, scsi_debug_dev_size_mb, int, 0);
-module_param_named(opts, scsi_debug_opts, int, 0); /* perm=0644 */
-module_param_named(every_nth, scsi_debug_every_nth, int, 0);
-module_param_named(delay, scsi_debug_delay, int, 0); /* perm=0644 */
 module_param_named(add_host, scsi_debug_add_host, int, 0); /* perm=0644 */
+module_param_named(delay, scsi_debug_delay, int, 0); /* perm=0644 */
+module_param_named(dev_size_mb, scsi_debug_dev_size_mb, int, 0);
+module_param_named(every_nth, scsi_debug_every_nth, int, 0);
+module_param_named(max_luns, scsi_debug_max_luns, int, 0);
+module_param_named(num_parts, scsi_debug_num_parts, int, 0);
+module_param_named(num_tgts, scsi_debug_num_tgts, int, 0);
+module_param_named(opts, scsi_debug_opts, int, 0); /* perm=0644 */
+module_param_named(ptype, scsi_debug_ptype, int, 0);
+module_param_named(scsi_level, scsi_debug_scsi_level, int, 0);
 
 MODULE_AUTHOR("Eric Youngdale + Douglas Gilbert");
 MODULE_DESCRIPTION("SCSI debug adapter driver");
 MODULE_LICENSE("GPL");
+MODULE_VERSION(SCSI_DEBUG_VERSION);
 
-MODULE_PARM_DESC(num_tgts, "number of SCSI targets per host to simulate");
-MODULE_PARM_DESC(max_luns, "number of SCSI LUNs per target to simulate");
-MODULE_PARM_DESC(scsi_level, "SCSI level to simulate");
-MODULE_PARM_DESC(dev_size_mb, "size in MB of ram shared by devs");
-MODULE_PARM_DESC(opts, "1->noise, 2->medium_error, 4->...");
-MODULE_PARM_DESC(every_nth, "timeout every nth command(def=100)");
-MODULE_PARM_DESC(delay, "# of jiffies to delay response(def=1)");
 MODULE_PARM_DESC(add_host, "0..127 hosts allowed(def=1)");
+MODULE_PARM_DESC(delay, "# of jiffies to delay response(def=1)");
+MODULE_PARM_DESC(dev_size_mb, "size in MB of ram shared by devs");
+MODULE_PARM_DESC(every_nth, "timeout every nth command(def=100)");
+MODULE_PARM_DESC(max_luns, "number of SCSI LUNs per target to simulate");
+MODULE_PARM_DESC(num_parts, "number of partitions(def=0)");
+MODULE_PARM_DESC(num_tgts, "number of SCSI targets per host to simulate");
+MODULE_PARM_DESC(opts, "1->noise, 2->medium_error, 4->...");
+MODULE_PARM_DESC(ptype, "SCSI peripheral type(def=0[disk])");
+MODULE_PARM_DESC(scsi_level, "SCSI level to simulate");
 
 
 static char sdebug_info[256];
 
 static const char * scsi_debug_info(struct Scsi_Host * shp)
 {
-	sprintf(sdebug_info, "scsi_debug, %s, num_tgts=%d, "
-		"dev_size_mb=%d, opts=0x%x", scsi_debug_version_str,
-		scsi_debug_num_tgts, scsi_debug_dev_size_mb,
+	sprintf(sdebug_info, "scsi_debug, version %s [%s], "
+		"dev_size_mb=%d, opts=0x%x", SCSI_DEBUG_VERSION,
+		scsi_debug_version_date, scsi_debug_dev_size_mb, 
 		scsi_debug_opts);
 	return sdebug_info;
 }
@@ -1282,14 +1359,15 @@ static int scsi_debug_proc_info(struct Scsi_Host *host, char *buffer, char **sta
 		return length;
 	}
 	begin = 0;
-	pos = len = sprintf(buffer, "scsi_debug adapter driver, %s\n"
+	pos = len = sprintf(buffer, "scsi_debug adapter driver, version "
+	    "%s [%s]\n"
 	    "num_tgts=%d, shared (ram) size=%d MB, opts=0x%x, "
 	    "every_nth=%d(curr:%d)\n"
 	    "delay=%d, max_luns=%d, scsi_level=%d\n"
 	    "sector_size=%d bytes, cylinders=%d, heads=%d, sectors=%d\n"
 	    "number of aborts=%d, device_reset=%d, bus_resets=%d, " 
 	    "host_resets=%d\n",
-	    scsi_debug_version_str, scsi_debug_num_tgts, 
+	    SCSI_DEBUG_VERSION, scsi_debug_version_date, scsi_debug_num_tgts,
 	    scsi_debug_dev_size_mb, scsi_debug_opts, scsi_debug_every_nth,
 	    scsi_debug_cmnd_count, scsi_debug_delay,
 	    scsi_debug_max_luns, scsi_debug_scsi_level,
@@ -1357,6 +1435,23 @@ opts_done:
 DRIVER_ATTR(opts, S_IRUGO | S_IWUSR, sdebug_opts_show, 
 	    sdebug_opts_store)
 
+static ssize_t sdebug_ptype_show(struct device_driver * ddp, char * buf) 
+{
+        return scnprintf(buf, PAGE_SIZE, "%d\n", scsi_debug_ptype);
+}
+static ssize_t sdebug_ptype_store(struct device_driver * ddp, 
+				  const char * buf, size_t count)
+{
+        int n;
+
+	if ((count > 0) && (1 == sscanf(buf, "%d", &n)) && (n >= 0)) {
+		scsi_debug_ptype = n;
+		return count;
+	}
+	return -EINVAL;
+}
+DRIVER_ATTR(ptype, S_IRUGO | S_IWUSR, sdebug_ptype_show, sdebug_ptype_store) 
+
 static ssize_t sdebug_num_tgts_show(struct device_driver * ddp, char * buf) 
 {
         return scnprintf(buf, PAGE_SIZE, "%d\n", scsi_debug_num_tgts);
@@ -1368,6 +1463,7 @@ static ssize_t sdebug_num_tgts_store(struct device_driver * ddp,
 
 	if ((count > 0) && (1 == sscanf(buf, "%d", &n)) && (n >= 0)) {
 		scsi_debug_num_tgts = n;
+		sdebug_max_tgts_luns();
 		return count;
 	}
 	return -EINVAL;
@@ -1380,6 +1476,12 @@ static ssize_t sdebug_dev_size_mb_show(struct device_driver * ddp, char * buf)
         return scnprintf(buf, PAGE_SIZE, "%d\n", scsi_debug_dev_size_mb);
 }
 DRIVER_ATTR(dev_size_mb, S_IRUGO, sdebug_dev_size_mb_show, NULL) 
+
+static ssize_t sdebug_num_parts_show(struct device_driver * ddp, char * buf) 
+{
+        return scnprintf(buf, PAGE_SIZE, "%d\n", scsi_debug_num_parts);
+}
+DRIVER_ATTR(num_parts, S_IRUGO, sdebug_num_parts_show, NULL) 
 
 static ssize_t sdebug_every_nth_show(struct device_driver * ddp, char * buf) 
 {
@@ -1411,6 +1513,7 @@ static ssize_t sdebug_max_luns_store(struct device_driver * ddp,
 
 	if ((count > 0) && (1 == sscanf(buf, "%d", &n)) && (n >= 0)) {
 		scsi_debug_max_luns = n;
+		sdebug_max_tgts_luns();
 		return count;
 	}
 	return -EINVAL;
@@ -1463,26 +1566,30 @@ DRIVER_ATTR(add_host, S_IRUGO | S_IWUSR, sdebug_add_host_show,
 
 static void do_create_driverfs_files()
 {
+	driver_create_file(&sdebug_driverfs_driver, &driver_attr_add_host);
 	driver_create_file(&sdebug_driverfs_driver, &driver_attr_delay);
-	driver_create_file(&sdebug_driverfs_driver, &driver_attr_opts);
-	driver_create_file(&sdebug_driverfs_driver, &driver_attr_num_tgts);
 	driver_create_file(&sdebug_driverfs_driver, &driver_attr_dev_size_mb);
 	driver_create_file(&sdebug_driverfs_driver, &driver_attr_every_nth);
 	driver_create_file(&sdebug_driverfs_driver, &driver_attr_max_luns);
+	driver_create_file(&sdebug_driverfs_driver, &driver_attr_num_tgts);
+	driver_create_file(&sdebug_driverfs_driver, &driver_attr_num_parts);
+	driver_create_file(&sdebug_driverfs_driver, &driver_attr_ptype);
+	driver_create_file(&sdebug_driverfs_driver, &driver_attr_opts);
 	driver_create_file(&sdebug_driverfs_driver, &driver_attr_scsi_level);
-	driver_create_file(&sdebug_driverfs_driver, &driver_attr_add_host);
 }
 
 static void do_remove_driverfs_files()
 {
-	driver_remove_file(&sdebug_driverfs_driver, &driver_attr_add_host);
 	driver_remove_file(&sdebug_driverfs_driver, &driver_attr_scsi_level);
+	driver_remove_file(&sdebug_driverfs_driver, &driver_attr_opts);
+	driver_remove_file(&sdebug_driverfs_driver, &driver_attr_ptype);
+	driver_remove_file(&sdebug_driverfs_driver, &driver_attr_num_parts);
+	driver_remove_file(&sdebug_driverfs_driver, &driver_attr_num_tgts);
 	driver_remove_file(&sdebug_driverfs_driver, &driver_attr_max_luns);
 	driver_remove_file(&sdebug_driverfs_driver, &driver_attr_every_nth);
 	driver_remove_file(&sdebug_driverfs_driver, &driver_attr_dev_size_mb);
-	driver_remove_file(&sdebug_driverfs_driver, &driver_attr_num_tgts);
-	driver_remove_file(&sdebug_driverfs_driver, &driver_attr_opts);
 	driver_remove_file(&sdebug_driverfs_driver, &driver_attr_delay);
+	driver_remove_file(&sdebug_driverfs_driver, &driver_attr_add_host);
 }
 
 static int __init scsi_debug_init(void)
@@ -1491,6 +1598,8 @@ static int __init scsi_debug_init(void)
 	int host_to_add;
 	int k;
 
+	if (scsi_debug_dev_size_mb < 1)
+		scsi_debug_dev_size_mb = 1;  /* force minimum 1 MB ramdisk */
 	sdebug_store_size = (unsigned long)scsi_debug_dev_size_mb * 1048576;
 	sdebug_capacity = sdebug_store_size / SECT_SIZE;
 
@@ -1518,6 +1627,8 @@ static int __init scsi_debug_init(void)
 		return -ENOMEM;
 	}
 	memset(fake_storep, 0, sz);
+	if (scsi_debug_num_parts > 0)
+		sdebug_build_parts(fake_storep);
 
 	init_all_queued();
 
@@ -1736,4 +1847,22 @@ static int sdebug_driver_remove(struct device * dev)
 
         scsi_host_put(sdbg_host->shost);
         return 0;
+}
+
+static void sdebug_max_tgts_luns(void)
+{
+	struct sdebug_host_info * sdbg_host;
+	struct Scsi_Host *hpnt;
+
+	spin_lock(&sdebug_host_list_lock);
+	list_for_each_entry(sdbg_host, &sdebug_host_list, host_list) {
+		hpnt = sdbg_host->shost;
+		if ((hpnt->this_id >= 0) &&
+		    (scsi_debug_num_tgts > hpnt->this_id))
+			hpnt->max_id = scsi_debug_num_tgts + 1;
+		else
+			hpnt->max_id = scsi_debug_num_tgts;
+		hpnt->max_lun = scsi_debug_max_luns;
+	}
+	spin_unlock(&sdebug_host_list_lock);
 }

@@ -17,9 +17,6 @@ static int scsi_debug_host_reset(struct scsi_cmnd *);
 static int scsi_debug_proc_info(struct Scsi_Host *, char *, char **, off_t, int, int);
 static const char * scsi_debug_info(struct Scsi_Host *);
 
-/*
- * This driver is written for the lk 2.5 series
- */
 #define SCSI_DEBUG_CANQUEUE  255 	/* needs to be >= 1 */
 
 #define SCSI_DEBUG_MAX_CMD_LEN 16
