@@ -1220,6 +1220,7 @@ static int udsl_usb_probe (struct usb_interface *intf, const struct usb_device_i
 
 finish:
 	/* ready for ATM callbacks */
+	wmb ();
 	instance->atm_dev->dev_data = instance;
 
 	usb_set_intfdata (intf, instance);
@@ -1358,6 +1359,7 @@ static void udsl_usb_disconnect (struct usb_interface *intf)
 	for (i = 0; i < UDSL_NUM_SND_BUFS; i++)
 		kfree (instance->send_buffers [i].base);
 
+	wmb ();
 	instance->usb_dev = NULL;
 
 	/* ATM finalize */
