@@ -1030,6 +1030,9 @@ void move_irq(int irq)
 	irq_desc_t *desc = irq_descp(irq);
 	int redir = test_bit(irq, pending_irq_redir);
 
+	if (unlikely(!desc->handler->set_affinity))
+		return;
+
 	if (!cpus_empty(pending_irq_cpumask[irq])) {
 		cpus_and(tmp, pending_irq_cpumask[irq], cpu_online_map);
 		if (unlikely(!cpus_empty(tmp))) {
