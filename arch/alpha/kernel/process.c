@@ -191,26 +191,13 @@ machine_power_off(void)
 	common_shutdown(LINUX_REBOOT_CMD_POWER_OFF, NULL);
 }
 
+/* Used by sysrq-p, among others.  I don't believe r9-r15 are ever
+   saved in the context it's used.  */
+
 void
-show_regs(struct pt_regs * regs)
+show_regs(struct pt_regs *regs)
 {
-	printk("\n");
-	printk("Pid: %d, comm: %20s\n", current->pid, current->comm);
-	printk("ps: %04lx pc: [<%016lx>] CPU %d    %s\n",
-	       regs->ps, regs->pc, smp_processor_id(), print_tainted());
-	printk("rp: [<%016lx>] sp: %p\n", regs->r26, regs+1);
-	printk(" r0: %016lx  r1: %016lx  r2: %016lx  r3: %016lx\n",
-	       regs->r0, regs->r1, regs->r2, regs->r3);
-	printk(" r4: %016lx  r5: %016lx  r6: %016lx  r7: %016lx\n",
-	       regs->r4, regs->r5, regs->r6, regs->r7);
-	printk(" r8: %016lx r16: %016lx r17: %016lx r18: %016lx\n",
-	       regs->r8, regs->r16, regs->r17, regs->r18);
-	printk("r19: %016lx r20: %016lx r21: %016lx r22: %016lx\n",
-	       regs->r19, regs->r20, regs->r21, regs->r22);
-	printk("r23: %016lx r24: %016lx r25: %016lx r26: %016lx\n",
-	       regs->r23, regs->r24, regs->r25, regs->r26);
-	printk("r27: %016lx r28: %016lx r29: %016lx hae: %016lx\n",
-	       regs->r27, regs->r28, regs->gp, regs->hae);
+	dik_show_regs(regs, 0);
 }
 
 /*
