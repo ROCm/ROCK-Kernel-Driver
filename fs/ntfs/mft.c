@@ -205,9 +205,9 @@ static int ntfs_mft_readpage(struct file *file, struct page *page)
 			vcn_ofs = ((VCN)iblock << blocksize_bits) &
 					vol->cluster_size_mask;
 			/* Convert the vcn to the corresponding lcn. */
-			read_lock(&ni->run_list.lock);
+			down_read(&ni->run_list.lock);
 			lcn = vcn_to_lcn(ni->run_list.rl, vcn);
-			read_unlock(&ni->run_list.lock);
+			up_read(&ni->run_list.lock);
 			if (lcn >= 0) {
 				/* Setup buffer head to correct block. */
 				bh->b_dev = vi->i_dev;

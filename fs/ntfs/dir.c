@@ -539,12 +539,10 @@ static int ntfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	}
 	if (filp->f_pos == 1) {
 		ntfs_debug("Calling filldir for .. with len 2, f_pos 0x1, "
-				"inode 0x%Lx, DT_DIR.",
-				(unsigned long long)NTFS_I(
-				filp->f_dentry->d_parent->d_inode)->mft_no);
+				"inode 0x%lx, DT_DIR.",
+				parent_ino(filp->f_dentry));
 		rc = filldir(dirent, "..", 2, filp->f_pos,
-				filp->f_dentry->d_parent->d_inode->i_ino,
-				DT_DIR);
+				parent_ino(filp->f_dentry), DT_DIR);
 		if (rc)
 			goto done;
 		filp->f_pos++;

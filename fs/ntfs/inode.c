@@ -77,13 +77,13 @@ static void __ntfs_init_inode(struct super_block *sb, ntfs_inode *ni)
 	memset(ni, 0, sizeof(ntfs_inode));
 	atomic_set(&ni->count, 1);
 	ni->vol = NULL;
-	INIT_RUN_LIST(&ni->run_list);
+	init_run_list(&ni->run_list);
 	init_rwsem(&ni->mrec_lock);
 	atomic_set(&ni->mft_count, 0);
 	ni->page = NULL;
 	ni->attr_list = NULL;
-	INIT_RUN_LIST(&ni->attr_list_rl);
-	INIT_RUN_LIST(&ni->_IDM(bmp_rl));
+	init_run_list(&ni->attr_list_rl);
+	init_run_list(&ni->_IDM(bmp_rl));
 	init_MUTEX(&ni->extent_lock);
 	ni->_INE(base_ntfs_ino) = NULL;
 	ni->vol = NTFS_SB(sb);
@@ -1304,17 +1304,17 @@ void __ntfs_clear_inode(ntfs_inode *ni)
 		kfree(ni->_INE(extent_ntfs_inos));
 	}
 	/* Free all alocated memory. */
-	write_lock(&ni->run_list.lock);
+	down_write(&ni->run_list.lock);
 	ntfs_free(ni->run_list.rl);
 	ni->run_list.rl = NULL;
-	write_unlock(&ni->run_list.lock);
+	up_write(&ni->run_list.lock);
 
 	ntfs_free(ni->attr_list);
 
-	write_lock(&ni->attr_list_rl.lock);
+	down_write(&ni->attr_list_rl.lock);
 	ntfs_free(ni->attr_list_rl.rl);
 	ni->attr_list_rl.rl = NULL;
-	write_unlock(&ni->attr_list_rl.lock);
+	up_write(&ni->attr_list_rl.lock);
 }
 
 void ntfs_clear_inode(ntfs_inode *ni)
@@ -1342,9 +1342,9 @@ void ntfs_clear_big_inode(struct inode *vi)
 	__ntfs_clear_inode(ni);
 
 	if (S_ISDIR(vi->i_mode)) {
-		write_lock(&ni->_IDM(bmp_rl).lock);
+		down_write(&ni->_IDM(bmp_rl).lock);
 		ntfs_free(ni->_IDM(bmp_rl).rl);
-		write_unlock(&ni->_IDM(bmp_rl).lock);
+		up_write(&ni->_IDM(bmp_rl).lock);
 	}
 	return;
 }

@@ -831,7 +831,7 @@ int map_run_list(ntfs_inode *ni, VCN vcn)
 	}
 
 	/* Lock the run list. */
-	write_lock(&ni->run_list.lock);
+	down_write(&ni->run_list.lock);
 
 	/* Make sure someone else didn't do the work while we were spinning. */
 	if (likely(vcn_to_lcn(ni->run_list.rl, vcn) <= LCN_RL_NOT_MAPPED)) {
@@ -849,7 +849,7 @@ int map_run_list(ntfs_inode *ni, VCN vcn)
 	}
 
 	/* Unlock the run list. */
-	write_unlock(&ni->run_list.lock);
+	up_write(&ni->run_list.lock);
 	
 	put_attr_search_ctx(ctx);
 

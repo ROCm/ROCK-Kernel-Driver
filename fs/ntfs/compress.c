@@ -569,9 +569,9 @@ retry_remap:
 			// TODO: AIA
 		}
 		/* Find lcn of vcn and convert it into blocks. */
-		read_lock(&ni->run_list.lock);
+		down_read(&ni->run_list.lock);
 		lcn = vcn_to_lcn(ni->run_list.rl, vcn);
-		read_unlock(&ni->run_list.lock);
+		up_read(&ni->run_list.lock);
 		ntfs_debug("Reading vcn = 0x%Lx, lcn = 0x%Lx.",
 				(long long)vcn, (long long)lcn);
 		if (lcn < 0) {

@@ -100,9 +100,9 @@ int ntfs_file_get_block(struct inode *vi, const sector_t blk,
 retry_remap:
 
 	/* Convert the vcn to the corresponding logical cluster number (lcn). */
-	read_lock(&ni->run_list.lock);
+	down_read(&ni->run_list.lock);
 	lcn = vcn_to_lcn(ni->run_list.rl, vcn);
-	read_unlock(&ni->run_list.lock);
+	up_read(&ni->run_list.lock);
 	/* Successful remap. */
 	if (lcn >= 0) {
 		/* Setup the buffer head to describe the correct block. */
@@ -297,9 +297,9 @@ static int ntfs_mftbmp_get_block(ntfs_volume *vol, const sector_t blk,
 		ntfs_debug("Done.");
 		return 0;
 	}
-	read_lock(&vol->mftbmp_rl.lock);
+	down_read(&vol->mftbmp_rl.lock);
 	lcn = vcn_to_lcn(vol->mftbmp_rl.rl, vcn);
-	read_unlock(&vol->mftbmp_rl.lock);
+	up_read(&vol->mftbmp_rl.lock);
 	ntfs_debug("lcn = 0x%Lx.", (long long)lcn);
 	if (lcn < 0LL) {
 		ntfs_error(vol->sb, "Returning -EIO, lcn = 0x%Lx.",

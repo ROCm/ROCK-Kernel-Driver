@@ -30,14 +30,17 @@ ToDo:
 	  locked or RACE. load_attribute_list() which we call without any locks
 	  held already performs such an optimization but that is no longer
 	  possible when using the spinlock on the run lists as this would sleep
-	  in between. Either need different type of optimization as above or
-	  need to change the read/write spinlock to a read/write semaphore.
+	  in between. But now we have a semaphore so are ok. Update
+	  load_attribute_list to use the semaphore so can be called outside
+	  read_inode, too. Apply the same optimization where desired.
 
 tng-0.0.9 - Work in progress
 
 	- Add kill_super, just keeping up with the vfs changes in the kernel.
+	- Repeat some changes from tng-0.0.8 that somehow got lost on the way
+	  from the CVS import into BitKeeper.
 
-tng-0.0.8 - 08/03/2002 - BitKeeper ChangeSet 1.386
+tng-0.0.8 - 08/03/2002 - Now using BitKeeper, http://linux-ntfs.bkbits.net/
 
 	- Replace bdevname(sb->s_dev) with sb->s_id.
 	- Remove now superfluous new-line characters in all callers of
@@ -100,11 +103,13 @@ tng-0.0.8 - 08/03/2002 - BitKeeper ChangeSet 1.386
 	  which is then referenced but not copied.
 	- Rename run_list structure to run_list_element and create a new
 	  run_list structure containing a pointer to a run_list_element
-	  structure and a read/write spinlock. Adapt all usesrs of run lists
+	  structure and a read/write semaphore. Adapt all users of run lists
 	  to new scheme and take and release the lock as needed. This fixes a
 	  nasty race as the run_list changes even when inodes are locked for
 	  reading and even when the inode isn't locked at all, so we really
-	  needed the serialization.
+	  needed the serialization. We use a semaphore rather than a spinlock
+	  as memory allocations can sleep and doing everything GFP_ATOMIC
+	  would be silly.
 	- Cleanup read_inode() removing all code checking for lowest_vcn != 0.
 	  This can never happen due to the nature of lookup_attr() and how we
 	  support attribute lists. If it did happen it would imply the inode
@@ -112,6 +117,7 @@ tng-0.0.8 - 08/03/2002 - BitKeeper ChangeSet 1.386
 	- Check for lowest_vcn != 0 in ntfs_read_inode() and mark the inode as
 	  bad if found.
 	- Update to 2.5.6-pre2 changes in struct address_space.
+	- Use parent_ino() when accessing d_parent inode number in dir.c.
 	- Import Sourceforge CVS repository into BitKeeper repository:
 		http://linux-ntfs.bkbits.net/ntfs-tng-2.5
 	- Update fs/Makefile, fs/Config.help, fs/Config.in, and

@@ -30,6 +30,12 @@
 #include "types.h"
 #include "layout.h"
 
+static inline void init_run_list(run_list *rl)
+{
+	rl->rl = NULL;
+	init_rwsem(&rl->lock);
+}
+
 typedef enum {
 	LCN_HOLE		= -1,	/* Keep this as highest value or die! */
 	LCN_RL_NOT_MAPPED	= -2,

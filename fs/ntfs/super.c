@@ -1130,10 +1130,10 @@ void ntfs_put_super(struct super_block *vfs_sb)
 	vol->mftbmp_mapping.a_ops = NULL;
 	vol->mftbmp_mapping.host = NULL;
 	up_write(&vol->mftbmp_lock);
-	write_lock(&vol->mftbmp_rl.lock);
+	down_write(&vol->mftbmp_rl.lock);
 	ntfs_free(vol->mftbmp_rl.rl);
 	vol->mftbmp_rl.rl = NULL;
-	write_unlock(&vol->mftbmp_rl.lock);
+	up_write(&vol->mftbmp_rl.lock);
 	vol->upcase_len = 0;
 	/*
 	 * Decrease the number of mounts and destroy the global default upcase
@@ -1507,7 +1507,7 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	INIT_LIST_HEAD(&vol->mftbmp_mapping.i_mmap_shared);
 #endif
 	spin_lock_init(&vol->mftbmp_mapping.i_shared_lock);
-	INIT_RUN_LIST(&vol->mftbmp_rl);
+	init_run_list(&vol->mftbmp_rl);
 	vol->mftmirr_ino = NULL;
 	vol->lcnbmp_ino = NULL;
 	init_rwsem(&vol->lcnbmp_lock);

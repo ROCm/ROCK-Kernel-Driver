@@ -67,18 +67,8 @@ typedef struct {	/* In memory vcn to lcn mapping structure element. */
  */
 typedef struct {
 	run_list_element *rl;
-	rwlock_t lock;
+	struct rw_semaphore lock;
 } run_list;
-
-#define RUN_LIST_INIT		{ NULL, RW_LOCK_UNLOCKED }
-
-#define RUN_LIST(name)		run_list name = RUN_LIST_INIT
-
-#define INIT_RUN_LIST(runlist)	do {					\
-					run_list *___rl = runlist;	\
-					___rl->rl = NULL;		\
-					___rl->lock = RW_LOCK_UNLOCKED; \
-				} while (0)
 
 typedef enum {
 	FALSE = 0,
