@@ -130,14 +130,15 @@ struct inode *driverfs_get_inode(struct super_block *sb, int mode, int dev)
 
 static int driverfs_mknod(struct inode *dir, struct dentry *dentry, int mode, int dev)
 {
-	struct inode *inode = driverfs_get_inode(dir->i_sb, mode, dev);
-	int error = -EPERM;
+	struct inode *inode;
+	int error = -ENOSPC;
 
 	if (dentry->d_inode)
 		return -EEXIST;
 
 	/* only allow create if ->d_fsdata is not NULL (so we can assume it 
 	 * comes from the driverfs API below. */
+	inode = driverfs_get_inode(dir->i_sb, mode, dev);
 	if (inode) {
 		d_instantiate(dentry, inode);
 		dget(dentry);
