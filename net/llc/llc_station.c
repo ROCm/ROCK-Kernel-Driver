@@ -29,65 +29,55 @@
 #include <net/llc_s_st.h>
 #include <net/llc_proc.h>
 
-/* static function prototypes */
-static void llc_station_service_events(struct llc_station *station);
-static void llc_station_free_ev(struct llc_station *station,
-				struct sk_buff *skb);
-static void llc_station_send_pdus(struct llc_station *station);
-static u16 llc_station_next_state(struct llc_station *station,
-				  struct sk_buff *skb);
-static u16 llc_exec_station_trans_actions(struct llc_station *station,
-					  struct llc_station_state_trans *trans,
-					  struct sk_buff *skb);
-static struct llc_station_state_trans *
-			     llc_find_station_trans(struct llc_station *station,
-						    struct sk_buff *skb);
-
 static struct llc_station llc_main_station;
 
 /**
- *	llc_station_state_process: queue event and try to process queue.
+ *	llc_exec_station_trans_actions - executes actions for transition
+ *	@station: Address of the station
+ *	@trans: Address of the transition
+ *	@skb: Address of the event that caused the transition
+ *
+ *	Executes actions of a transition of the station state machine. Returns
+ *	0 if all actions complete successfully, nonzero otherwise.
+ */
+static u16 llc_exec_station_trans_actions(struct llc_station *station,
+					  struct llc_station_state_trans *trans,
+					  struct sk_buff *skb)
+{
+	u16 rc = 0;
+	llc_station_action_t *next_action = trans->ev_actions;
+
+	for (; next_action && *next_action; next_action++)
+		if ((*next_action)(station, skb))
+			rc = 1;
+	return rc;
+}
+
+/**
+ *	llc_find_station_trans - finds transition for this event
  *	@station: Address of the station
  *	@skb: Address of the event
  *
- *	Queues an event (on the station event queue) for handling by the
- *	station state machine and attempts to process any queued-up events.
+ *	Search thru events of the current state of the station until list
+ *	exhausted or it's obvious that the event is not valid for the current
+ *	state. Returns the address of the transition if cound, %NULL otherwise.
  */
-void llc_station_state_process(struct llc_station *station, struct sk_buff *skb)
+static struct llc_station_state_trans *
+			llc_find_station_trans(struct llc_station *station,
+					       struct sk_buff *skb)
 {
-	spin_lock_bh(&station->ev_q.lock);
-	skb_queue_tail(&station->ev_q.list, skb);
-	llc_station_service_events(station);
-	spin_unlock_bh(&station->ev_q.lock);
-}
+	int i = 0;
+	struct llc_station_state_trans *rc = NULL;
+	struct llc_station_state_trans **next_trans;
+	struct llc_station_state *curr_state =
+				&llc_station_state_table[station->state - 1];
 
-/**
- *	llc_station_send_pdu - queues PDU to send
- *	@station: Address of the station
- *	@skb: Address of the PDU
- *
- *	Queues a PDU to send to the MAC layer.
- */
-void llc_station_send_pdu(struct llc_station *station, struct sk_buff *skb)
-{
-	skb_queue_tail(&station->mac_pdu_q, skb);
-	llc_station_send_pdus(station);
-}
-
-/**
- *	llc_station_send_pdus - tries to send queued PDUs
- *	@station: Address of the station
- *
- *	Tries to send any PDUs queued in the station mac_pdu_q to the MAC
- *	layer.
- */
-static void llc_station_send_pdus(struct llc_station *station)
-{
-	struct sk_buff *skb;
-
-	while ((skb = skb_dequeue(&station->mac_pdu_q)) != NULL)
-		if (dev_queue_xmit(skb))
+	for (next_trans = curr_state->transitions; next_trans[i]->ev; i++)
+		if (!next_trans[i]->ev(station, skb)) {
+			rc = next_trans[i];
 			break;
+		}
+	return rc;
 }
 
 /**
@@ -104,26 +94,6 @@ static void llc_station_free_ev(struct llc_station *station,
 
 	if (ev->type == LLC_STATION_EV_TYPE_PDU)
 		kfree_skb(skb);
-}
-
-/**
- *	llc_station_service_events - service events in the queue
- *	@station: Address of the station
- *
- *	Get an event from the station event queue (if any); attempt to service
- *	the event; if event serviced, get the next event (if any) on the event
- *	queue; if event not service, re-queue the event on the event queue and
- *	attempt to service the next event; when serviced all events in queue,
- *	finished; if don't transition to different state, just service all
- *	events once; if transition to new state, service all events again.
- *	Caller must hold station->ev_q.lock.
- */
-static void llc_station_service_events(struct llc_station *station)
-{
-	struct sk_buff *skb;
-
-	while ((skb = skb_dequeue(&station->ev_q.list)) != NULL)
-		llc_station_next_state(station, skb);
 }
 
 /**
@@ -165,52 +135,68 @@ out:
 }
 
 /**
- *	llc_find_station_trans - finds transition for this event
+ *	llc_station_service_events - service events in the queue
  *	@station: Address of the station
- *	@skb: Address of the event
  *
- *	Search thru events of the current state of the station until list
- *	exhausted or it's obvious that the event is not valid for the current
- *	state. Returns the address of the transition if cound, %NULL otherwise.
+ *	Get an event from the station event queue (if any); attempt to service
+ *	the event; if event serviced, get the next event (if any) on the event
+ *	queue; if event not service, re-queue the event on the event queue and
+ *	attempt to service the next event; when serviced all events in queue,
+ *	finished; if don't transition to different state, just service all
+ *	events once; if transition to new state, service all events again.
+ *	Caller must hold station->ev_q.lock.
  */
-static struct llc_station_state_trans *
-			llc_find_station_trans(struct llc_station *station,
-					       struct sk_buff *skb)
+static void llc_station_service_events(struct llc_station *station)
 {
-	int i = 0;
-	struct llc_station_state_trans *rc = NULL;
-	struct llc_station_state_trans **next_trans;
-	struct llc_station_state *curr_state =
-				&llc_station_state_table[station->state - 1];
+	struct sk_buff *skb;
 
-	for (next_trans = curr_state->transitions; next_trans[i]->ev; i++)
-		if (!next_trans[i]->ev(station, skb)) {
-			rc = next_trans[i];
-			break;
-		}
-	return rc;
+	while ((skb = skb_dequeue(&station->ev_q.list)) != NULL)
+		llc_station_next_state(station, skb);
 }
 
 /**
- *	llc_exec_station_trans_actions - executes actions for transition
+ *	llc_station_state_process: queue event and try to process queue.
  *	@station: Address of the station
- *	@trans: Address of the transition
- *	@skb: Address of the event that caused the transition
+ *	@skb: Address of the event
  *
- *	Executes actions of a transition of the station state machine. Returns
- *	0 if all actions complete successfully, nonzero otherwise.
+ *	Queues an event (on the station event queue) for handling by the
+ *	station state machine and attempts to process any queued-up events.
  */
-static u16 llc_exec_station_trans_actions(struct llc_station *station,
-					  struct llc_station_state_trans *trans,
-					  struct sk_buff *skb)
+void llc_station_state_process(struct llc_station *station, struct sk_buff *skb)
 {
-	u16 rc = 0;
-	llc_station_action_t *next_action = trans->ev_actions;
+	spin_lock_bh(&station->ev_q.lock);
+	skb_queue_tail(&station->ev_q.list, skb);
+	llc_station_service_events(station);
+	spin_unlock_bh(&station->ev_q.lock);
+}
 
-	for (; next_action && *next_action; next_action++)
-		if ((*next_action)(station, skb))
-			rc = 1;
-	return rc;
+/**
+ *	llc_station_send_pdus - tries to send queued PDUs
+ *	@station: Address of the station
+ *
+ *	Tries to send any PDUs queued in the station mac_pdu_q to the MAC
+ *	layer.
+ */
+static void llc_station_send_pdus(struct llc_station *station)
+{
+	struct sk_buff *skb;
+
+	while ((skb = skb_dequeue(&station->mac_pdu_q)) != NULL)
+		if (dev_queue_xmit(skb))
+			break;
+}
+
+/**
+ *	llc_station_send_pdu - queues PDU to send
+ *	@station: Address of the station
+ *	@skb: Address of the PDU
+ *
+ *	Queues a PDU to send to the MAC layer.
+ */
+void llc_station_send_pdu(struct llc_station *station, struct sk_buff *skb)
+{
+	skb_queue_tail(&station->mac_pdu_q, skb);
+	llc_station_send_pdus(station);
 }
 
 /*
