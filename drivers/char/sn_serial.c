@@ -82,7 +82,6 @@ static DECLARE_TASKLET(sn_sal_tasklet, sn_sal_tasklet_action, 0);
 static unsigned long sn_interrupt_timeout;
 
 extern u64 master_node_bedrock_address;
-
 static int sn_debug_printf(const char *fmt, ...);
 
 #undef DEBUG
@@ -105,7 +104,7 @@ struct sn_sal_ops {
 static struct sn_sal_ops *sn_func;
 
 /* Prototypes */
-static void __init sn_sal_serial_console_init(void);
+int __init sn_sal_serial_console_init(void);
 static int snt_hw_puts(const char *, int);
 static int snt_poll_getc(void);
 static int snt_poll_input_pending(void);
@@ -921,9 +920,6 @@ sn_sal_module_init(void)
 		printk(KERN_ERR "sn_serial: Unable to register tty driver\n");
 		return retval;
 	}
-#ifdef CONFIG_SGI_L1_SERIAL_CONSOLE
-	sn_sal_serial_console_init();
-#endif	/* CONFIG_SGI_L1_SERIAL_CONSOLE */
 	return 0;
 }
 
@@ -952,6 +948,7 @@ static void
 sn_sal_console_write(struct console *co, const char *s, unsigned count)
 {
 	unsigned long flags;
+	const char *s1;
 
 	BUG_ON(!sn_sal_is_asynch);
 
@@ -959,15 +956,36 @@ sn_sal_console_write(struct console *co, const char *s, unsigned count)
 	 * oops, kdb, panic, etc.  make sure they get it. */
 	if (spin_is_locked(&sn_sal_lock)) {
 		synch_flush_xmit();
+		/* Output '\r' before each '\n' */
+		while ((s1 = memchr(s, '\n', count)) != NULL) {
+			sn_func->sal_puts(s, s1 - s);
+			sn_func->sal_puts("\r\n", 2);
+			count -= s1 + 1 - s;
+			s = s1 + 1;
+		}
 		sn_func->sal_puts(s, count);
 	}
 	else if (in_interrupt()) {
 		spin_lock_irqsave(&sn_sal_lock, flags);
 		synch_flush_xmit();
 		spin_unlock_irqrestore(&sn_sal_lock, flags);
+		/* Output '\r' before each '\n' */
+		while ((s1 = memchr(s, '\n', count)) != NULL) {
+			sn_func->sal_puts(s, s1 - s);
+			sn_func->sal_puts("\r\n", 2);
+			count -= s1 + 1 - s;
+			s = s1 + 1;
+		}
 		sn_func->sal_puts(s, count);
 	}
 	else
+		/* Output '\r' before each '\n' */
+		while ((s1 = memchr(s, '\n', count)) != NULL) {
+			sn_sal_write(NULL, 0, s, s1 - s);
+			sn_sal_write(NULL, 0, "\r\n", 2);
+			count -= s1 + 1 - s;
+			s = s1 + 1;
+		}
 		sn_sal_write(NULL, 0, s, count);
 }
 
@@ -993,7 +1011,7 @@ static struct console sal_console = {
 	.index = -1
 };
 
-static void __init
+int __init
 sn_sal_serial_console_init(void)
 {
 	if (ia64_platform_is("sn2")) {
@@ -1001,6 +1019,8 @@ sn_sal_serial_console_init(void)
 		sn_debug_printf("sn_sal_serial_console_init : register console\n");
 		register_console(&sal_console);
 	}
+	return 0;
 }
+console_initcall(sn_sal_serial_console_init);
 
 #endif /* CONFIG_SGI_L1_SERIAL_CONSOLE */

@@ -248,6 +248,9 @@
 #define __NR_clock_nanosleep		1256
 #define __NR_fstatfs64			1257
 #define __NR_statfs64			1258
+#define __NR_reserved1			1259	/* reserved for NUMA interface */
+#define __NR_reserved2			1260	/* reserved for NUMA interface */
+#define __NR_reserved3			1261	/* reserved for NUMA interface */
 
 #ifdef __KERNEL__
 
