@@ -426,7 +426,7 @@ nfsd_open(struct svc_rqst *rqstp, struct svc_fh *fhp, int type,
 {
 	struct dentry	*dentry;
 	struct inode	*inode;
-	int		flags = O_RDONLY|O_LARGEFILE, mode = FMODE_READ, err;
+	int		flags = O_RDONLY|O_LARGEFILE, err;
 
 	/*
 	 * If we get here, then the client has already done an "open",
@@ -463,14 +463,12 @@ nfsd_open(struct svc_rqst *rqstp, struct svc_fh *fhp, int type,
 			goto out_nfserr;
 
 		flags = O_WRONLY|O_LARGEFILE;
-		mode  = FMODE_WRITE;
 
 		DQUOT_INIT(inode);
 	}
 
-	err = init_private_file(filp, dentry, mode);
+	err = open_private_file(filp, dentry, flags);
 	if (!err) {
-		filp->f_flags = flags;
 		filp->f_vfsmnt = fhp->fh_export->ex_mnt;
 	} else if (access & MAY_WRITE)
 		put_write_access(inode);
@@ -491,8 +489,7 @@ nfsd_close(struct file *filp)
 	struct dentry	*dentry = filp->f_dentry;
 	struct inode	*inode = dentry->d_inode;
 
-	if (filp->f_op->release)
-		filp->f_op->release(inode, filp);
+	close_private_file(filp);
 	if (filp->f_mode & FMODE_WRITE)
 		put_write_access(inode);
 }
