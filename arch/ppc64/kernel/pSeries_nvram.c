@@ -29,7 +29,7 @@
 #include <asm/machdep.h>
 
 static unsigned int nvram_size;
-static unsigned int nvram_fetch, nvram_store;
+static int nvram_fetch, nvram_store;
 static char nvram_buf[NVRW_CNT];	/* assume this is in the first 4GB */
 static spinlock_t nvram_lock = SPIN_LOCK_UNLOCKED;
 
@@ -41,7 +41,7 @@ static ssize_t pSeries_nvram_read(char *buf, size_t count, loff_t *index)
 	unsigned long flags;
 	char *p = buf;
 
-	if (nvram_size == 0 || nvram_fetch)
+	if (nvram_size == 0 || nvram_fetch == RTAS_UNKNOWN_SERVICE)
 		return -ENODEV;
 
 	if (*index >= nvram_size)
@@ -83,7 +83,7 @@ static ssize_t pSeries_nvram_write(char *buf, size_t count, loff_t *index)
 	unsigned long flags;
 	const char *p = buf;
 
-	if (nvram_size == 0 || nvram_store)
+	if (nvram_size == 0 || nvram_store == RTAS_UNKNOWN_SERVICE)
 		return -ENODEV;
 
 	if (*index >= nvram_size)
