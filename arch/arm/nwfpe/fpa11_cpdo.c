@@ -22,17 +22,15 @@
 #include "fpa11.h"
 #include "fpopcode.h"
 
-unsigned int SingleCPDO(const unsigned int opcode, FPREG * rfd);
-unsigned int DoubleCPDO(const unsigned int opcode, FPREG * rfd);
-unsigned int ExtendedCPDO(const unsigned int opcode, FPREG * rfd);
+unsigned int SingleCPDO(const unsigned int opcode, FPREG * rFd);
+unsigned int DoubleCPDO(const unsigned int opcode, FPREG * rFd);
+unsigned int ExtendedCPDO(const unsigned int opcode, FPREG * rFd);
 
 unsigned int EmulateCPDO(const unsigned int opcode)
 {
 	FPA11 *fpa11 = GET_FPA11();
 	FPREG *rFd;
 	unsigned int nType, nDest, nRc;
-
-	//printk("EmulateCPDO(0x%08x)\n",opcode);
 
 	/* Get the destination size.  If not valid let Linux perform
 	   an invalid instruction trap. */

@@ -43,8 +43,6 @@ unsigned int EmulateCPRT(const unsigned int opcode)
 {
 	unsigned int nRc = 1;
 
-	//printk("EmulateCPRT(0x%08x)\n",opcode);
-
 	if (opcode & 0x800000) {
 		/* This is some variant of a comparison (PerformComparison will
 		   sort out which one).  Since most of the other CPRT
@@ -179,7 +177,6 @@ static unsigned int __inline__ PerformComparisonOperation(floatx80 Fn, floatx80 
 }
 
 /* This instruction sets the flags N, Z, C, V in the FPSR. */
-
 static unsigned int PerformComparison(const unsigned int opcode)
 {
 	FPA11 *fpa11 = GET_FPA11();
@@ -188,8 +185,6 @@ static unsigned int PerformComparison(const unsigned int opcode)
 	int e_flag = opcode & 0x400000;	/* 1 if CxFE */
 	int n_flag = opcode & 0x200000;	/* 1 if CNxx */
 	unsigned int flags = 0;
-
-	//printk("PerformComparison(0x%08x)\n",opcode);
 
 	Fn = getFn(opcode);
 	Fm = getFm(opcode);
