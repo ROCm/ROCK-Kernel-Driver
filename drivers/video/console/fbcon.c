@@ -740,7 +740,6 @@ static const char *fbcon_startup(void)
 	DPRINTK("res:    %dx%d-%d\n", info->var.xres,
 		info->var.yres,
 		info->var.bits_per_pixel);
-	con_set_default_unimap(vc->vc_num);
 
 #ifdef CONFIG_ATARI
 	if (MACH_IS_ATARI) {
@@ -820,6 +819,7 @@ static void fbcon_init(struct vc_data *vc, int init)
 {
 	struct fb_info *info = registered_fb[(int) con2fb_map[vc->vc_num]];
 	struct vc_data **default_mode = vc->vc_display_fg;
+	struct vc_data *svc = *default_mode;
 	struct display *t, *p = &fb_display[vc->vc_num];
 	int display_fg = (*default_mode)->vc_num;
 	int logo = 1, new_rows, new_cols, rows, cols, charcnt = 256;
@@ -846,7 +846,6 @@ static void fbcon_init(struct vc_data *vc, int init)
 		p->userfont = t->userfont;
 		if (p->userfont)
 			REFCOUNT(p->fontdata)++;
-		con_copy_unimap(vc->vc_num, display_fg);
 	}
 	if (p->userfont)
 		charcnt = FNTCHARCNT(p->fontdata);
@@ -859,6 +858,11 @@ static void fbcon_init(struct vc_data *vc, int init)
 		if (vc->vc_can_do_color)
 			vc->vc_complement_mask <<= 1;
 	}
+
+	if (!*svc->vc_uni_pagedir_loc)
+		con_set_default_unimap(display_fg);
+	if (!*vc->vc_uni_pagedir_loc)
+		con_copy_unimap(vc->vc_num, display_fg);
 
 	cols = vc->vc_cols;
 	rows = vc->vc_rows;
@@ -1072,6 +1076,7 @@ static void fbcon_set_disp(struct fb_info *info, struct vc_data *vc)
 {
 	struct display *p = &fb_display[vc->vc_num], *t;
 	struct vc_data **default_mode = vc->vc_display_fg;
+	struct vc_data *svc = *default_mode;
 	int display_fg = (*default_mode)->vc_num;
 	int rows, cols, charcnt = 256;
 
@@ -1086,7 +1091,6 @@ static void fbcon_set_disp(struct fb_info *info, struct vc_data *vc)
 		p->userfont = t->userfont;
 		if (p->userfont)
 			REFCOUNT(p->fontdata)++;
-		con_copy_unimap(vc->vc_num, display_fg);
 	}
 	if (p->userfont)
 		charcnt = FNTCHARCNT(p->fontdata);
@@ -1100,6 +1104,12 @@ static void fbcon_set_disp(struct fb_info *info, struct vc_data *vc)
 		if (vc->vc_can_do_color)
 			vc->vc_complement_mask <<= 1;
 	}
+
+	if (!*svc->vc_uni_pagedir_loc)
+		con_set_default_unimap(display_fg);
+	if (!*vc->vc_uni_pagedir_loc)
+		con_copy_unimap(vc->vc_num, display_fg);
+
 	cols = info->var.xres / vc->vc_font.width;
 	rows = info->var.yres / vc->vc_font.height;
 	vc_resize(vc->vc_num, cols, rows);
