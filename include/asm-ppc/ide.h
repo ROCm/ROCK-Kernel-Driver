@@ -57,33 +57,6 @@ static __inline__ unsigned long ide_default_io_base(int index)
 	return 0;
 }
 
-/*
- * This is only used for PC-style IDE controllers (e.g. as on PReP)
- * or for PCI IDE devices, not for other types of IDE interface such
- * as the pmac IDE interfaces.
- */
-static __inline__ void ide_init_hwif_ports(hw_regs_t *hw,
-					   unsigned long data_port,
-					   unsigned long ctrl_port, int *irq)
-{
-	unsigned long reg = data_port;
-	int i;
-
-	for (i = IDE_DATA_OFFSET; i <= IDE_STATUS_OFFSET; i++)
-		hw->io_ports[i] = reg++;
-	if (ctrl_port) {
-		hw->io_ports[IDE_CONTROL_OFFSET] = ctrl_port;
-	} else {
-		hw->io_ports[IDE_CONTROL_OFFSET] =
-			hw->io_ports[IDE_DATA_OFFSET] + 0x206;
-	}
-	if (irq != NULL)
-		*irq = 0;
-	hw->io_ports[IDE_IRQ_OFFSET] = 0;
-	if (ppc_ide_md.ide_init_hwif != NULL)
-		ppc_ide_md.ide_init_hwif(hw, data_port, ctrl_port, irq);
-}
-
 #ifdef CONFIG_PCI
 #define ide_init_default_irq(base)	(0)
 #else
