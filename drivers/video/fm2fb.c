@@ -356,7 +356,6 @@ int __init fm2fb_init(void)
 	disp.cmap.start = 0;
 	disp.cmap.len = 0;
 	disp.cmap.red = disp.cmap.green = disp.cmap.blue = disp.cmap.transp = NULL;
-	disp.screen_base = (char *)fm2fb_mem;
 	disp.visual = fb_fix.visual;
 	disp.type = fb_fix.type;
 	disp.type_aux = fb_fix.type_aux;
@@ -376,6 +375,7 @@ int __init fm2fb_init(void)
 	strcpy(fb_info.modename, fb_fix.id);
 	fb_info.node = NODEV;
 	fb_info.fbops = &fm2fb_ops;
+	fb_info.screen_base = (char *)fm2fb_mem;
 	fb_info.currcon = -1;
 	fb_info.disp = &disp;
 	fb_info.fontname[0] = '\0';

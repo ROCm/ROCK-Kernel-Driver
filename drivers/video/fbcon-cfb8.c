@@ -52,8 +52,8 @@ void fbcon_cfb8_bmove(struct display *p, int sy, int sx, int dy, int dx,
     u8 *src,*dst;
 
     if (sx == 0 && dx == 0 && width * fontwidth(p) == bytes) {
-	fb_memmove(p->screen_base + dy * linesize,
-		  p->screen_base + sy * linesize,
+	fb_memmove(p->fb_info->screen_base + dy * linesize,
+		  p->fb_info->screen_base + sy * linesize,
 		  height * linesize);
 	return;
     }
@@ -63,16 +63,16 @@ void fbcon_cfb8_bmove(struct display *p, int sy, int sx, int dy, int dx,
     	sx *= fontwidth(p); dx *= fontwidth(p); width *= fontwidth(p);
     }
     if (dy < sy || (dy == sy && dx < sx)) {
-	src = p->screen_base + sy * linesize + sx;
-	dst = p->screen_base + dy * linesize + dx;
+	src = p->fb_info->screen_base + sy * linesize + sx;
+	dst = p->fb_info->screen_base + dy * linesize + dx;
 	for (rows = height * fontheight(p) ; rows-- ;) {
 	    fb_memmove(dst, src, width);
 	    src += bytes;
 	    dst += bytes;
 	}
     } else {
-	src = p->screen_base + (sy+height) * linesize + sx - bytes;
-	dst = p->screen_base + (dy+height) * linesize + dx - bytes;
+	src = p->fb_info->screen_base + (sy+height) * linesize + sx - bytes;
+	dst = p->fb_info->screen_base + (dy+height) * linesize + dx - bytes;
 	for (rows = height * fontheight(p) ; rows-- ;) {
 	    fb_memmove(dst, src, width);
 	    src -= bytes;
@@ -97,7 +97,7 @@ void fbcon_cfb8_clear(struct vc_data *conp, struct display *p, int sy, int sx,
     int bytes=p->next_line,lines=height * fontheight(p);
     u8 bgx;
 
-    dest = p->screen_base + sy * fontheight(p) * bytes + sx * fontwidth(p);
+    dest = p->fb_info->screen_base + sy * fontheight(p) * bytes + sx * fontwidth(p);
 
     bgx=attr_bgcol_ec(p,conp);
 
@@ -115,7 +115,7 @@ void fbcon_cfb8_putc(struct vc_data *conp, struct display *p, int c, int yy,
     int bytes=p->next_line,rows;
     u32 eorx,fgx,bgx;
 
-    dest = p->screen_base + yy * fontheight(p) * bytes + xx * fontwidth(p);
+    dest = p->fb_info->screen_base + yy * fontheight(p) * bytes + xx * fontwidth(p);
     if (fontwidth(p) <= 8)
 	cdat = p->fontdata + (c & p->charmask) * fontheight(p);
     else
@@ -162,7 +162,7 @@ void fbcon_cfb8_putcs(struct vc_data *conp, struct display *p,
     int rows,bytes=p->next_line;
     u32 eorx, fgx, bgx;
 
-    dest0 = p->screen_base + yy * fontheight(p) * bytes + xx * fontwidth(p);
+    dest0 = p->fb_info->screen_base + yy * fontheight(p) * bytes + xx * fontwidth(p);
     c = scr_readw(s);
     fgx = attr_fgcol(p, c);
     bgx = attr_bgcol(p, c);
@@ -219,7 +219,7 @@ void fbcon_cfb8_revc(struct display *p, int xx, int yy)
     u8 *dest;
     int bytes=p->next_line, rows;
 
-    dest = p->screen_base + yy * fontheight(p) * bytes + xx * fontwidth(p);
+    dest = p->fb_info->screen_base + yy * fontheight(p) * bytes + xx * fontwidth(p);
     for (rows = fontheight(p) ; rows-- ; dest += bytes) {
     	switch (fontwidth(p)) {
     	case 16: fb_writel(fb_readl(dest+12) ^ 0x0f0f0f0f, dest+12); /* fall thru */
@@ -244,10 +244,9 @@ void fbcon_cfb8_clear_margins(struct vc_data *conp, struct display *p,
     bgx=attr_bgcol_ec(p,conp);
 
     if (!bottom_only && (right_width = p->var.xres-right_start))
-	rectfill(p->screen_base+right_start, right_width, p->var.yres_virtual,
-		 bgx, bytes);
+	rectfill(p->fb_info->screen_base+right_start, right_width, p->var.yres_virtual, bgx, bytes);
     if ((bottom_width = p->var.yres-bottom_start))
-	rectfill(p->screen_base+(p->var.yoffset+bottom_start)*bytes,
+	rectfill(p->fb_info->screen_base+(p->var.yoffset+bottom_start)*bytes,
 		 right_start, bottom_width, bgx, bytes);
 }
 

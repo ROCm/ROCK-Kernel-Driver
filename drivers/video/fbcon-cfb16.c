@@ -47,8 +47,8 @@ void fbcon_cfb16_bmove(struct display *p, int sy, int sx, int dy, int dx,
     u8 *src, *dst;
 
     if (sx == 0 && dx == 0 && width * fontwidth(p) * 2 == bytes) {
-	fb_memmove(p->screen_base + dy * linesize,
-		  p->screen_base + sy * linesize,
+	fb_memmove(p->fb_info->screen_base + dy * linesize,
+		  p->fb_info->screen_base + sy * linesize,
 		  height * linesize);
 	return;
     }
@@ -62,16 +62,16 @@ void fbcon_cfb16_bmove(struct display *p, int sy, int sx, int dy, int dx,
 	width *= fontwidth(p)*2;
     }
     if (dy < sy || (dy == sy && dx < sx)) {
-	src = p->screen_base + sy * linesize + sx;
-	dst = p->screen_base + dy * linesize + dx;
+	src = p->fb_info->screen_base + sy * linesize + sx;
+	dst = p->fb_info->screen_base + dy * linesize + dx;
 	for (rows = height * fontheight(p); rows--;) {
 	    fb_memmove(dst, src, width);
 	    src += bytes;
 	    dst += bytes;
 	}
     } else {
-	src = p->screen_base + (sy+height) * linesize + sx - bytes;
-	dst = p->screen_base + (dy+height) * linesize + dx - bytes;
+	src = p->fb_info->screen_base + (sy+height) * linesize + sx - bytes;
+	dst = p->fb_info->screen_base + (dy+height) * linesize + dx - bytes;
 	for (rows = height * fontheight(p); rows--;) {
 	    fb_memmove(dst, src, width);
 	    src -= bytes;
@@ -108,7 +108,7 @@ void fbcon_cfb16_clear(struct vc_data *conp, struct display *p, int sy, int sx,
     int bytes = p->next_line, lines = height * fontheight(p);
     u32 bgx;
 
-    dest = p->screen_base + sy * fontheight(p) * bytes + sx * fontwidth(p) * 2;
+    dest = p->fb_info->screen_base + sy * fontheight(p) * bytes + sx * fontwidth(p) * 2;
 
     bgx = ((u16 *)p->dispsw_data)[attr_bgcol_ec(p, conp)];
 
@@ -126,7 +126,7 @@ void fbcon_cfb16_putc(struct vc_data *conp, struct display *p, int c, int yy,
     int bytes = p->next_line, rows;
     u32 eorx, fgx, bgx;
 
-    dest = p->screen_base + yy * fontheight(p) * bytes + xx * fontwidth(p) * 2;
+    dest = p->fb_info->screen_base + yy * fontheight(p) * bytes + xx * fontwidth(p) * 2;
 
     fgx = ((u16 *)p->dispsw_data)[attr_fgcol(p, c)];
     bgx = ((u16 *)p->dispsw_data)[attr_bgcol(p, c)];
@@ -177,7 +177,7 @@ void fbcon_cfb16_putcs(struct vc_data *conp, struct display *p,
     int rows, bytes = p->next_line;
     u32 eorx, fgx, bgx;
 
-    dest0 = p->screen_base + yy * fontheight(p) * bytes + xx * fontwidth(p) * 2;
+    dest0 = p->fb_info->screen_base + yy * fontheight(p) * bytes + xx * fontwidth(p) * 2;
     c = scr_readw(s);
     fgx = ((u16 *)p->dispsw_data)[attr_fgcol(p, c)];
     bgx = ((u16 *)p->dispsw_data)[attr_bgcol(p, c)];
@@ -233,7 +233,7 @@ void fbcon_cfb16_revc(struct display *p, int xx, int yy)
     u8 *dest;
     int bytes = p->next_line, rows;
 
-    dest = p->screen_base + yy * fontheight(p) * bytes + xx * fontwidth(p)*2;
+    dest = p->fb_info->screen_base + yy * fontheight(p) * bytes + xx * fontwidth(p)*2;
     for (rows = fontheight(p); rows--; dest += bytes) {
 	switch (fontwidth(p)) {
 	case 16:
@@ -268,10 +268,10 @@ void fbcon_cfb16_clear_margins(struct vc_data *conp, struct display *p,
     bgx = ((u16 *)p->dispsw_data)[attr_bgcol_ec(p, conp)];
 
     if (!bottom_only && (right_width = p->var.xres-right_start))
-	rectfill(p->screen_base+right_start*2, right_width,
+	rectfill(p->fb_info->screen_base+right_start*2, right_width,
 		 p->var.yres_virtual, bgx, bytes);
     if ((bottom_width = p->var.yres-bottom_start))
-	rectfill(p->screen_base+(p->var.yoffset+bottom_start)*bytes,
+	rectfill(p->fb_info->screen_base+(p->var.yoffset+bottom_start)*bytes,
 		 right_start, bottom_width, bgx, bytes);
 }
 

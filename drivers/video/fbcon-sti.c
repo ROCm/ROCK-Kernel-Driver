@@ -158,20 +158,20 @@ fbcon_sti_bmove(struct display *p, int sy, int sx,
 	u_int rows;
 
 	if (sx == 0 && dx == 0 && width == p->next_line) {
-		src = p->screen_base+sy*fontheight(p)*width;
-		dest = p->screen_base+dy*fontheight(p)*width;
+		src = p->fb_info->screen_base+sy*fontheight(p)*width;
+		dest = p->fb_info->screen_base+dy*fontheight(p)*width;
 		memcpy_fromhp_tohp(dest, src, height*fontheight(p)*width);
 	} else if (dy <= sy) {
-		src = p->screen_base+sy*fontheight(p)*p->next_line+sx;
-		dest = p->screen_base+dy*fontheight(p)*p->next_line+dx;
+		src = p->fb_info->screen_base+sy*fontheight(p)*p->next_line+sx;
+		dest = p->fb_info->screen_base+dy*fontheight(p)*p->next_line+dx;
 		for (rows = height*fontheight(p); rows--;) {
 			memcpy_fromhp_tohp(dest, src, width);
 			src += p->next_line;
 			dest += p->next_line;
 		}
 	} else {
-		src = p->screen_base+((sy+height)*fontheight(p)-1)*p->next_line+sx;
-		dest = p->screen_base+((dy+height)*fontheight(p)-1)*p->next_line+dx;
+		src = p->fb_info->screen_base+((sy+height)*fontheight(p)-1)*p->next_line+sx;
+		dest = p->fb_info->screen_base+((dy+height)*fontheight(p)-1)*p->next_line+dx;
 		for (rows = height*fontheight(p); rows--;) {
 			memcpy_fromhp_tohp(dest, src, width);
 			src -= p->next_line;
@@ -190,7 +190,7 @@ fbcon_sti_clear(struct vc_data *conp,
 	u_int rows;
 	int inverse = conp ? attr_reverse(p,conp->vc_video_erase_char) : 0;
 
-	dest = p->screen_base+sy*fontheight(p)*p->next_line+sx;
+	dest = p->fb_info->screen_base+sy*fontheight(p)*p->next_line+sx;
 
 	if (sx == 0 && width == p->next_line) {
 		if (inverse)
@@ -213,7 +213,7 @@ static void fbcon_sti_putc(struct vc_data *conp,
 	u_int rows, bold, revs, underl;
 	u8 d;
 
-	dest = p->screen_base+yy*fontheight(p)*p->next_line+xx;
+	dest = p->fb_info->screen_base+yy*fontheight(p)*p->next_line+xx;
 	cdat = p->fontdata+(c&p->charmask)*fontheight(p);
 	bold = attr_bold(p,c);
 	revs = attr_reverse(p,c);
@@ -248,11 +248,11 @@ static void fbcon_sti_putcs(struct vc_data *conp,
 	}	
 
 
-	dest0 = p->screen_base+yy*fontheight(p)*p->next_line+xx;
+	dest0 = p->fb_info->screen_base+yy*fontheight(p)*p->next_line+xx;
 	if(((u32)dest0&0xf0000000)!=0xf0000000) {
 		printk("refusing to putcs %p %p %p %d %d %d (%p) %p = %p + %d * %d * %ld + %d\n",
 			conp, p, s, count, yy, xx, __builtin_return_address(0),
-			dest0, p->screen_base, yy, fontheight(p), p->next_line,
+			dest0, p->fb_info->screen_base, yy, fontheight(p), p->next_line,
 			xx);
 		return;
 	}	
@@ -286,7 +286,7 @@ static void fbcon_sti_revc(struct display *p,
 	u_int rows;
 
 
-	dest = p->screen_base+yy*fontheight(p)*p->next_line+xx;
+	dest = p->fb_info->screen_base+yy*fontheight(p)*p->next_line+xx;
 	for (rows = fontheight(p); rows--; dest += p->next_line) {
 		d = readb_hp(dest);
 		writeb_hp (~d, dest);
@@ -311,7 +311,7 @@ fbcon_sti_clear_margins(struct vc_data *conp,
 	bottom = conp->vc_rows + p->yscroll;
 	if (bottom >= p->vrows)
 		bottom -= p->vrows;
-	dest = p->screen_base + bottom * fontheight(p) * p->next_line;
+	dest = p->fb_info->screen_base + bottom * fontheight(p) * p->next_line;
 	if (inverse)
 		memset_tohp(dest, 0xffffffff, height * p->next_line);
 	else
