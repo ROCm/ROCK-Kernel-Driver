@@ -550,9 +550,7 @@ static int usb_device_match (struct device *dev, struct device_driver *drv)
 		return 0;
 
 	intf = to_usb_interface(dev);
-
 	usb_drv = to_usb_driver(drv);
-	id = usb_drv->id_table;
 	
 	id = usb_match_id (intf, usb_drv->id_table);
 	if (id)
