@@ -673,11 +673,8 @@ static int proc_bulk(struct dev_state *ps, void __user *arg)
 		usb_lock_device(dev);
 	}
 	kfree(tbuf);
-	if (i < 0) {
-		dev_warn(&dev->dev, "usbfs: USBDEVFS_BULK failed "
-			 "ep 0x%x len %u ret %d\n", bulk.ep, bulk.len, i);
+	if (i < 0)
 		return i;
-	}
 	return len2;
 }
 

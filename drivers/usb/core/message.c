@@ -65,12 +65,18 @@ static int usb_start_wait_urb(struct urb *urb, int timeout, int* actual_length)
 		status = urb->status;
 		/* note:  HCDs return ETIMEDOUT for other reasons too */
 		if (status == -ECONNRESET) {
-			dev_warn(&urb->dev->dev,
-				"%s timed out on ep%d%s\n",
+			dev_dbg(&urb->dev->dev,
+				"%s timed out on ep%d%s len=%d/%d\n",
 				current->comm,
 				usb_pipeendpoint(urb->pipe),
-				usb_pipein(urb->pipe) ? "in" : "out");
-			status = -ETIMEDOUT;
+				usb_pipein(urb->pipe) ? "in" : "out",
+				urb->actual_length,
+				urb->transfer_buffer_length
+				);
+			if (urb->actual_length > 0)
+				status = 0;
+			else
+				status = -ETIMEDOUT;
 		}
 		if (timeout > 0)
 			del_timer_sync(&timer);

@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 1999-2003 Petko Manolov (petkan@users.sourceforge.net)
+ *  Copyright (c) 1999-2005 Petko Manolov (petkan@users.sourceforge.net)
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -47,7 +47,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v0.5.12 (2005/01/13)"
+#define DRIVER_VERSION "v0.6.12 (2005/01/13)"
 #define DRIVER_AUTHOR "Petko Manolov <petkan@users.sourceforge.net>"
 #define DRIVER_DESC "Pegasus/Pegasus II USB Ethernet driver"
 
@@ -301,20 +301,20 @@ static int read_mii_word(pegasus_t * pegasus, __u8 phy, __u8 indx, __u16 * regd)
 	if (i < REG_TIMEOUT) {
 		get_registers(pegasus, PhyData, 2, &regdi);
 		*regd = le16_to_cpu(regdi);
-		return 0;
+		return 1;
 	}
 	warn("%s: failed", __FUNCTION__);
 
-	return 1;
+	return 0;
 }
 
 static int mdio_read(struct net_device *dev, int phy_id, int loc)
 {
 	pegasus_t *pegasus = (pegasus_t *) netdev_priv(dev);
-	int res;
+	__le16 res;
 
-	read_mii_word(pegasus, phy_id, loc, (u16 *) & res);
-	return res & 0xffff;
+	read_mii_word(pegasus, phy_id, loc, &res);
+	return (int)res;
 }
 
 static int write_mii_word(pegasus_t * pegasus, __u8 phy, __u8 indx, __u16 regd)
@@ -636,7 +636,7 @@ goon:
 
 	return;
 
-      tl_sched:
+tl_sched:
 	tasklet_schedule(&pegasus->rx_tl);
 }
 
@@ -845,14 +845,14 @@ static inline void get_interrupt_interval(pegasus_t * pegasus)
 static void set_carrier(struct net_device *net)
 {
 	pegasus_t *pegasus = netdev_priv(net);
-	short tmp;
+	__le16 tmp;
 
-	read_mii_word(pegasus, pegasus->phy, MII_BMSR, &tmp);
+	if (read_mii_word(pegasus, pegasus->phy, MII_BMSR, &tmp))
+		return;
 	if (tmp & BMSR_LSTATUS)
 		netif_carrier_on(net);
 	else
 		netif_carrier_off(net);
-
 }
 
 static void free_all_urbs(pegasus_t * pegasus)
@@ -997,8 +997,7 @@ pegasus_set_wol(struct net_device *dev, struct ethtool_wolinfo *wol)
 	return set_register(pegasus, WakeupControl, reg78);
 }
 
-static inline void
-pegasus_reset_wol(struct net_device *dev)
+static inline void pegasus_reset_wol(struct net_device *dev)
 {
 	struct ethtool_wolinfo wol;
 	
@@ -1009,10 +1008,17 @@ pegasus_reset_wol(struct net_device *dev)
 static int
 pegasus_get_settings(struct net_device *dev, struct ethtool_cmd *ecmd)
 {
-	pegasus_t *pegasus = netdev_priv(dev);
+	pegasus_t *pegasus;
+
+	if (in_atomic())
+		return 0;
+
+	pegasus = netdev_priv(dev);
 	mii_ethtool_gset(&pegasus->mii, ecmd);
+
 	return 0;
 }
+
 static int
 pegasus_set_settings(struct net_device *dev, struct ethtool_cmd *ecmd)
 {
@@ -1149,6 +1155,20 @@ static inline void setup_pegasus_II(pegasus_t * pegasus)
 		set_register(pegasus, Reg81, 2);
 }
 
+
+struct workqueue_struct *pegasus_workqueue = NULL;
+#define CARRIER_CHECK_DELAY (2 * HZ)
+
+void check_carrier(void *data)
+{
+	pegasus_t *pegasus = data;
+	set_carrier(pegasus->net);
+	if (!(pegasus->flags & PEGASUS_UNPLUG)) {
+		queue_delayed_work(pegasus_workqueue, &pegasus->carrier_check,
+			CARRIER_CHECK_DELAY);
+	}
+}
+
 static int pegasus_probe(struct usb_interface *intf,
 			 const struct usb_device_id *id)
 {
@@ -1174,6 +1194,8 @@ static int pegasus_probe(struct usb_interface *intf,
 		goto out1;
 
 	tasklet_init(&pegasus->rx_tl, rx_fixup, (unsigned long) pegasus);
+
+	INIT_WORK(&pegasus->carrier_check, check_carrier, pegasus);
 
 	pegasus->usb = dev;
 	pegasus->net = net;
@@ -1212,12 +1234,14 @@ static int pegasus_probe(struct usb_interface *intf,
 		dev_warn(&intf->dev, "can't locate MII phy, using default\n");
 		pegasus->phy = 1;
 	}
+	pegasus->mii.phy_id = pegasus->phy;
 	usb_set_intfdata(intf, pegasus);
 	SET_NETDEV_DEV(net, &intf->dev);
 	pegasus_reset_wol(net);
 	res = register_netdev(net);
 	if (res)
 		goto out3;
+	queue_delayed_work(pegasus_workqueue, &pegasus->carrier_check, CARRIER_CHECK_DELAY);
 	pr_info("%s: %s\n", net->name, usb_dev_id[dev_index].name);
 	return 0;
 
@@ -1239,11 +1263,12 @@ static void pegasus_disconnect(struct usb_interface *intf)
 
 	usb_set_intfdata(intf, NULL);
 	if (!pegasus) {
-		warn("unregistering non-existant device");
+		warn("unregistering non-existent device");
 		return;
 	}
 
 	pegasus->flags |= PEGASUS_UNPLUG;
+	cancel_delayed_work(&pegasus->carrier_check);
 	unregister_netdev(pegasus->net);
 	usb_put_dev(interface_to_usbdev(intf));
 	free_all_urbs(pegasus);
@@ -1253,7 +1278,7 @@ static void pegasus_disconnect(struct usb_interface *intf)
 	free_netdev(pegasus->net);
 }
 
-static int pegasus_suspend (struct usb_interface *intf, u32 state)
+static int pegasus_suspend (struct usb_interface *intf, pm_message_t state)
 {
 	struct pegasus *pegasus = usb_get_intfdata(intf);
 	
@@ -1281,11 +1306,15 @@ static struct usb_driver pegasus_driver = {
 static int __init pegasus_init(void)
 {
 	pr_info("%s: %s, " DRIVER_DESC "\n", driver_name, DRIVER_VERSION);
+	pegasus_workqueue = create_singlethread_workqueue("pegasus");
+	if (!pegasus_workqueue)
+		return -ENOMEM;
 	return usb_register(&pegasus_driver);
 }
 
 static void __exit pegasus_exit(void)
 {
+	destroy_workqueue(pegasus_workqueue);
 	usb_deregister(&pegasus_driver);
 }
 

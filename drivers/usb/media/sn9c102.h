@@ -53,11 +53,11 @@
 /*****************************************************************************/
 
 #define SN9C102_MODULE_NAME     "V4L2 driver for SN9C10x PC Camera Controllers"
-#define SN9C102_MODULE_AUTHOR   "(C) 2004 Luca Risolia"
+#define SN9C102_MODULE_AUTHOR   "(C) 2004-2005 Luca Risolia"
 #define SN9C102_AUTHOR_EMAIL    "<luca.risolia@studio.unibo.it>"
 #define SN9C102_MODULE_LICENSE  "GPL"
-#define SN9C102_MODULE_VERSION  "1:1.22"
-#define SN9C102_MODULE_VERSION_CODE  KERNEL_VERSION(1, 0, 22)
+#define SN9C102_MODULE_VERSION  "1:1.24"
+#define SN9C102_MODULE_VERSION_CODE  KERNEL_VERSION(1, 0, 24)
 
 enum sn9c102_bridge {
 	BRIDGE_SN9C101 = 0x01,

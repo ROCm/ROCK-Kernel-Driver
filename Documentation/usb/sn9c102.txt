@@ -210,8 +210,8 @@ There are other four entries in the directory above for each registered camera:
 SN9C10x bridge, while the other two control the sensor chip. "reg" and
 "i2c_reg" hold the values of the current register index where the following
 reading/writing operations are addressed at through "val" and "i2c_val". Their
-use is not intended for end-users. Note that "i2c_reg" and "i2c_val" won't be
-created if the sensor does not actually support the standard I2C protocol or
+use is not intended for end-users. Note that "i2c_reg" and "i2c_val" will not
+be created if the sensor does not actually support the standard I2C protocol or
 its registers are not 8-bit long. Also, remember that you must be logged in as
 root before writing to them.
 
@@ -341,15 +341,8 @@ TAS5130D1B  Taiwan Advanced Sensor Corporation
 All the available control settings of each image sensor are supported through
 the V4L2 interface.
 
-If you think your camera is based on the above hardware and is not actually
-listed in the above table, you may try to add the specific USB VendorID and
-ProductID identifiers to the sn9c102_id_table[] in the file "sn9c102_sensor.h";
-then compile, load the module again and look at the kernel output.
-If this works, please send an email to the author reporting the kernel
-messages, so that a new entry in the list of supported devices can be added.
-
 Donations of new models for further testing and support would be much
-appreciated. Non-available hardware won't be supported by the author of this
+appreciated. Non-available hardware will not be supported by the author of this
 driver.
 
 

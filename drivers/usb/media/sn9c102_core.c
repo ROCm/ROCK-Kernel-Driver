@@ -164,8 +164,8 @@ sn9c102_request_buffers(struct sn9c102_device* cam, u32 count,
 	struct v4l2_rect* r = &(cam->sensor->cropcap.bounds);
 	const size_t imagesize = cam->module_param.force_munmap ||
 	                         io == IO_READ ?
-	                         (p->width * p->height * p->priv)/8 :
-	                         (r->width * r->height * p->priv)/8;
+	                         (p->width * p->height * p->priv) / 8 :
+	                         (r->width * r->height * p->priv) / 8;
 	void* buff = NULL;
 	u32 i;
 
@@ -499,6 +499,7 @@ static void sn9c102_urb_complete(struct urb *urb, struct pt_regs* regs)
 {
 	struct sn9c102_device* cam = urb->context;
 	struct sn9c102_frame_t** f;
+	size_t imagesize;
 	unsigned long lock_flags;
 	u8 i;
 	int err = 0;
@@ -516,8 +517,13 @@ static void sn9c102_urb_complete(struct urb *urb, struct pt_regs* regs)
 		wake_up_interruptible(&cam->wait_stream);
 	}
 
-	if ((cam->state & DEV_DISCONNECTED)||(cam->state & DEV_MISCONFIGURED))
+	if (cam->state & DEV_DISCONNECTED)
 		return;
+
+	if (cam->state & DEV_MISCONFIGURED) {
+		wake_up_interruptible(&cam->wait_frame);
+		return;
+	}
 
 	if (cam->stream == STREAM_OFF || list_empty(&cam->inqueue))
 		goto resubmit_urb;
@@ -525,6 +531,10 @@ static void sn9c102_urb_complete(struct urb *urb, struct pt_regs* regs)
 	if (!(*f))
 		(*f) = list_entry(cam->inqueue.next, struct sn9c102_frame_t,
 		                  frame);
+
+	imagesize = (cam->sensor->pix_format.width *
+	             cam->sensor->pix_format.height *
+	             cam->sensor->pix_format.priv) / 8;
 
 	for (i = 0; i < urb->number_of_packets; i++) {
 		unsigned int img, len, status;
@@ -560,11 +570,10 @@ end_of_frame:
 				if (eof)
 					img = (eof > pos) ? eof - pos - 1 : 0;
 
-				if ((*f)->buf.bytesused+img>(*f)->buf.length) {
+				if ((*f)->buf.bytesused+img > imagesize) {
 					u32 b = (*f)->buf.bytesused + img -
-					        (*f)->buf.length;
-					img = (*f)->buf.length - 
-					      (*f)->buf.bytesused;
+					        imagesize;
+					img = imagesize - (*f)->buf.bytesused;
 					DBG(3, "Expected EOF not found: "
 					       "video frame cut")
 					if (eof)
@@ -580,7 +589,7 @@ end_of_frame:
 
 				(*f)->buf.bytesused += img;
 
-				if ((*f)->buf.bytesused == (*f)->buf.length ||
+				if ((*f)->buf.bytesused == imagesize ||
 				    (cam->sensor->pix_format.pixelformat ==
 				                V4L2_PIX_FMT_SN9C10X && eof)) {
 					u32 b = (*f)->buf.bytesused;
@@ -1558,7 +1567,8 @@ sn9c102_read(struct file* filp, char __user * buf, size_t count, loff_t* f_pos)
 		err = wait_event_interruptible
 		      ( cam->wait_frame, 
 		        (!list_empty(&cam->outqueue)) ||
-		        (cam->state & DEV_DISCONNECTED) );
+		        (cam->state & DEV_DISCONNECTED) ||
+			(cam->state & DEV_MISCONFIGURED) );
 		if (err) {
 			up(&cam->fileop_sem);
 			return err;
@@ -1566,6 +1576,10 @@ sn9c102_read(struct file* filp, char __user * buf, size_t count, loff_t* f_pos)
 		if (cam->state & DEV_DISCONNECTED) {
 			up(&cam->fileop_sem);
 			return -ENODEV;
+		}
+		if (cam->state & DEV_MISCONFIGURED) {
+			up(&cam->fileop_sem);
+			return -EIO;
 		}
 	}
 
@@ -1615,7 +1629,8 @@ static unsigned int sn9c102_poll(struct file *filp, poll_table *wait)
 	}
 
 	if (cam->io == IO_NONE) {
-		if (!sn9c102_request_buffers(cam, 2, IO_READ)) {
+		if (!sn9c102_request_buffers(cam, cam->nreadbuffers,
+		                             IO_READ)) {
 			DBG(1, "poll() failed, not enough memory")
 			goto error;
 		}
@@ -1729,7 +1744,7 @@ static int sn9c102_mmap(struct file* filp, struct vm_area_struct *vma)
 }
 
 
-static int sn9c102_v4l2_ioctl(struct inode* inode, struct file* filp,
+static int sn9c102_ioctl_v4l2(struct inode* inode, struct file* filp,
                               unsigned int cmd, void __user * arg)
 {
 	struct sn9c102_device* cam = video_get_drvdata(video_devdata(filp));
@@ -1970,7 +1985,7 @@ static int sn9c102_v4l2_ioctl(struct inode* inode, struct file* filp,
 			return -EFAULT;
 		}
 
-		if (cam->module_param.force_munmap)
+		if (cam->module_param.force_munmap || cam->io == IO_READ)
 			sn9c102_release_buffers(cam);
 
 		err = sn9c102_set_crop(cam, rect);
@@ -1990,7 +2005,7 @@ static int sn9c102_v4l2_ioctl(struct inode* inode, struct file* filp,
 		s->pix_format.height = rect->height/scale;
 		memcpy(&(s->_rect), rect, sizeof(*rect));
 
-		if (cam->module_param.force_munmap &&
+		if ((cam->module_param.force_munmap || cam->io == IO_READ) &&
 		    nbuffers != sn9c102_request_buffers(cam, nbuffers,
 		                                        cam->io)) {
 			cam->state |= DEV_MISCONFIGURED;
@@ -2146,7 +2161,7 @@ static int sn9c102_v4l2_ioctl(struct inode* inode, struct file* filp,
 			return -EFAULT;
 		}
 
-		if (cam->module_param.force_munmap)
+		if (cam->module_param.force_munmap  || cam->io == IO_READ)
 			sn9c102_release_buffers(cam);
 
 		err += sn9c102_set_pix_format(cam, pix);
@@ -2168,7 +2183,7 @@ static int sn9c102_v4l2_ioctl(struct inode* inode, struct file* filp,
 		memcpy(pfmt, pix, sizeof(*pix));
 		memcpy(&(s->_rect), &rect, sizeof(rect));
 
-		if (cam->module_param.force_munmap &&
+		if ((cam->module_param.force_munmap  || cam->io == IO_READ) &&
 		    nbuffers != sn9c102_request_buffers(cam, nbuffers,
 		                                        cam->io)) {
 			cam->state |= DEV_MISCONFIGURED;
@@ -2346,11 +2361,14 @@ static int sn9c102_v4l2_ioctl(struct inode* inode, struct file* filp,
 			err = wait_event_interruptible
 			      ( cam->wait_frame, 
 			        (!list_empty(&cam->outqueue)) ||
-			        (cam->state & DEV_DISCONNECTED) );
+			        (cam->state & DEV_DISCONNECTED) ||
+			        (cam->state & DEV_MISCONFIGURED) );
 			if (err)
 				return err;
 			if (cam->state & DEV_DISCONNECTED)
 				return -ENODEV;
+			if (cam->state & DEV_MISCONFIGURED)
+				return -EIO;
 		}
 
 		spin_lock_irqsave(&cam->queue_lock, lock_flags);
@@ -2495,7 +2513,7 @@ static int sn9c102_ioctl(struct inode* inode, struct file* filp,
 		return -EIO;
 	}
 
-	err = sn9c102_v4l2_ioctl(inode, filp, cmd, (void __user *)arg);
+	err = sn9c102_ioctl_v4l2(inode, filp, cmd, (void __user *)arg);
 
 	up(&cam->fileop_sem);
 

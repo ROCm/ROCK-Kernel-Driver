@@ -74,7 +74,7 @@ module_param(old_scheme_first, bool, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(old_scheme_first,
 		 "start with the old device initialization scheme");
 
-static int use_both_schemes = 0;
+static int use_both_schemes = 1;
 module_param(use_both_schemes, bool, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(use_both_schemes,
 		"try the other device initialization scheme if the "
@@ -1126,6 +1126,8 @@ static void get_string(struct usb_device *udev, char **string, int index)
 		return;
 	if (usb_string(udev, index, buf, 256) > 0)
 		*string = buf;
+	else
+		kfree(buf);
 }
 
 
@@ -2187,24 +2189,35 @@ hub_port_init (struct usb_hub *hub, struct usb_device *udev, int port1,
 				retval = -ENOMEM;
 				continue;
 			}
-			buf->bMaxPacketSize0 = 0;
 
 			/* Use a short timeout the first time through,
 			 * so that recalcitrant full-speed devices with
 			 * 8- or 16-byte ep0-maxpackets won't slow things
 			 * down tremendously by NAKing the unexpectedly
-			 * early status stage.  Also, retry on length 0
-			 * or stall; some devices are flakey.
+			 * early status stage.  Also, retry on all errors;
+			 * some devices are flakey.
 			 */
 			for (j = 0; j < 3; ++j) {
+				buf->bMaxPacketSize0 = 0;
 				r = usb_control_msg(udev, usb_rcvaddr0pipe(),
 					USB_REQ_GET_DESCRIPTOR, USB_DIR_IN,
 					USB_DT_DEVICE << 8, 0,
 					buf, GET_DESCRIPTOR_BUFSIZE,
 					(i ? HZ * USB_CTRL_GET_TIMEOUT : HZ));
-				if (r == 0 || r == -EPIPE)
-					continue;
-				if (r < 0)
+				switch (buf->bMaxPacketSize0) {
+				case 8: case 16: case 32: case 64:
+					if (buf->bDescriptorType ==
+							USB_DT_DEVICE) {
+						r = 0;
+						break;
+					}
+					/* FALL THROUGH */
+				default:
+					if (r == 0)
+						r = -EPROTO;
+					break;
+				}
+				if (r == 0)
 					break;
 			}
 			udev->descriptor.bMaxPacketSize0 =
@@ -2220,10 +2233,7 @@ hub_port_init (struct usb_hub *hub, struct usb_device *udev, int port1,
 				retval = -ENODEV;
 				goto fail;
 			}
-			switch (udev->descriptor.bMaxPacketSize0) {
-			case 64: case 32: case 16: case 8:
-				break;
-			default:
+			if (r) {
 				dev_err(&udev->dev, "device descriptor "
 						"read/%s, error %d\n",
 						"64", r);

@@ -103,14 +103,15 @@ static int change_outputs(struct phidget_interfacekit *kit, int output_num, int 
 		}
 	}
 
-	dev_dbg(&kit->udev->dev, "data: %02x %02x\n", buffer[0], buffer[1]);
+	dev_dbg(&kit->udev->dev, "sending data: %02x\n", buffer[0]);
 
 	retval = usb_control_msg(kit->udev,
 			 usb_sndctrlpipe(kit->udev, 0),
 			 0x09, 0x21, 0x0200, 0x0000, buffer, 4, 2 * HZ);
 
 	if (retval != 4)
-		dev_err(&kit->udev->dev, "retval = %d\n", retval);
+		dev_err(&kit->udev->dev, "usb_control_msg returned %d\n", 
+				retval);
 	kfree(buffer);
 
 	return retval < 0 ? retval : 0;
@@ -328,7 +329,7 @@ static ssize_t show_output##value(struct device *dev, char *buf)	\
 	struct usb_interface *intf = to_usb_interface(dev);		\
 	struct phidget_interfacekit *kit = usb_get_intfdata(intf);	\
 									\
-	return sprintf(buf, "%d\n", kit->outputs[value - 1 ]);		\
+	return sprintf(buf, "%d\n", kit->outputs[value - 1]);		\
 }									\
 static DEVICE_ATTR(output##value, S_IWUGO | S_IRUGO,			\
 		show_output##value, set_output##value);
@@ -440,11 +441,13 @@ static int interfacekit_probe(struct usb_interface *intf, const struct usb_devic
 		return -EIO;
 	}
 
-	if (ifkit->outputs == 8) {
+	if (ifkit->outputs >= 4) {
 		device_create_file(&intf->dev, &dev_attr_output1);
 		device_create_file(&intf->dev, &dev_attr_output2);
 		device_create_file(&intf->dev, &dev_attr_output3);
 		device_create_file(&intf->dev, &dev_attr_output4);
+	}
+	if (ifkit->outputs == 8) {
 		device_create_file(&intf->dev, &dev_attr_output5);
 		device_create_file(&intf->dev, &dev_attr_output6);
 		device_create_file(&intf->dev, &dev_attr_output7);
@@ -483,7 +486,7 @@ static int interfacekit_probe(struct usb_interface *intf, const struct usb_devic
 		device_create_file(&intf->dev, &dev_attr_lcd);
 
 	dev_info(&intf->dev, "USB PhidgetInterfaceKit %d/%d/%d attached\n",
-			ifkit->inputs, ifkit->outputs, ifkit->sensors);
+			ifkit->sensors, ifkit->inputs, ifkit->outputs);
 
 	return 0;
 }
@@ -497,15 +500,17 @@ static void interfacekit_disconnect(struct usb_interface *interface)
 	if (!kit)
 		return;
 
-	if (kit->ifkit->outputs == MAX_INTERFACES) {
+	if (kit->ifkit->outputs >= 4) {
 		device_remove_file(&interface->dev, &dev_attr_output1);
 		device_remove_file(&interface->dev, &dev_attr_output2);
 		device_remove_file(&interface->dev, &dev_attr_output3);
 		device_remove_file(&interface->dev, &dev_attr_output4);
+	}
+	if (kit->ifkit->outputs == 8) {
 		device_remove_file(&interface->dev, &dev_attr_output5);
 		device_remove_file(&interface->dev, &dev_attr_output6);
 		device_remove_file(&interface->dev, &dev_attr_output7);
-		device_remove_file(&interface->dev, &dev_attr_output7);
+		device_remove_file(&interface->dev, &dev_attr_output8);
 	}
 
 	if (kit->ifkit->inputs >= 4) {
@@ -536,10 +541,10 @@ static void interfacekit_disconnect(struct usb_interface *interface)
 		device_remove_file(&interface->dev, &dev_attr_sensor8);
 	}
 	if (kit->ifkit->has_lcd)
-		device_create_file(&interface->dev, &dev_attr_lcd);
+		device_remove_file(&interface->dev, &dev_attr_lcd);
 
 	dev_info(&interface->dev, "USB PhidgetInterfaceKit %d/%d/%d detached\n",
-		kit->ifkit->inputs, kit->ifkit->outputs, kit->ifkit->sensors);
+		kit->ifkit->sensors, kit->ifkit->inputs, kit->ifkit->outputs);
 
 	usb_kill_urb(kit->irq);
 	usb_free_urb(kit->irq);

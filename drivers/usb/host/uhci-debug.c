@@ -17,6 +17,8 @@
 
 #include "uhci-hcd.h"
 
+static struct dentry *uhci_debugfs_root = NULL;
+
 /* Handle REALLY large printk's so we don't overflow buffers */
 static inline void lprintk(char *buf)
 {
@@ -497,8 +499,6 @@ static int uhci_sprint_schedule(struct uhci_hcd *uhci, char *buf, int len)
 
 #define MAX_OUTPUT	(64 * 1024)
 
-static struct dentry *uhci_debugfs_root = NULL;
-
 struct uhci_debug {
 	int size;
 	char *data;
@@ -579,4 +579,9 @@ static struct file_operations uhci_debug_operations = {
 	.read =		uhci_debug_read,
 	.release =	uhci_debug_release,
 };
+
+#else	/* CONFIG_DEBUG_FS */
+
+#define uhci_debug_operations (* (struct file_operations *) NULL)
+
 #endif
