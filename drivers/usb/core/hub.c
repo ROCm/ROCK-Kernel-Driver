@@ -692,6 +692,9 @@ static int hub_port_status(struct usb_device *dev, int port,
 	struct usb_hub *hub = usb_get_intfdata(dev->actconfig->interface[0]);
 	int ret;
 
+	if (!hub)
+		return -ENODEV;
+
 	ret = get_port_status(dev, port + 1, &hub->status->port);
 	if (ret < 0)
 		dev_err (hubdev (dev),
