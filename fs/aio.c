@@ -1075,10 +1075,8 @@ static int io_submit_one(struct kioctx *ctx, struct iocb *user_iocb,
 
 	if (likely(-EIOCBQUEUED == ret))
 		return 0;
-	if (ret >= 0) {
-		aio_complete(req, ret, 0);
-		return 0;
-	}
+	aio_complete(req, ret, 0);
+	return 0;
 
 out_put_req:
 	aio_put_req(req);
