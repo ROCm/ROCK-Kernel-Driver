@@ -413,8 +413,8 @@ struct ipr_ioasa_af_dasd {
 }__attribute__((packed, aligned (4)));
 
 struct ipr_ioasa_gpdd {
-	u8 device_end_state;
-	u8 device_bus_phase;
+	u8 end_state;
+	u8 bus_phase;
 	u16 reserved;
 	u32 ioa_data[23];
 }__attribute__((packed, aligned (4)));
@@ -457,7 +457,7 @@ struct ipr_ioasa {
 		struct ipr_ioasa_af_dasd dasd;
 		struct ipr_ioasa_gpdd gpdd;
 		struct ipr_ioasa_raw raw;
-	};
+	} u;
 }__attribute__((packed, aligned (4)));
 
 struct ipr_mode_parm_hdr {
@@ -617,7 +617,7 @@ struct ipr_hostrcb_error {
 		struct ipr_hostrcb_type_02_error type_02_error;
 		struct ipr_hostrcb_type_03_error type_03_error;
 		struct ipr_hostrcb_type_04_error type_04_error;
-	};
+	} u;
 }__attribute__((packed, aligned (4)));
 
 struct ipr_hostrcb_raw {
@@ -662,7 +662,7 @@ struct ipr_hcam {
 		struct ipr_hostrcb_error error;
 		struct ipr_hostrcb_cfg_ch_not ccn;
 		struct ipr_hostrcb_raw raw;
-	};
+	} u;
 }__attribute__((packed, aligned (4)));
 
 struct ipr_hostrcb {
@@ -785,7 +785,7 @@ struct ipr_trace_entry {
 		u32 ioasc;
 		u32 add_data;
 		u32 res_addr;
-	};
+	} u;
 };
 
 struct ipr_sglist {
@@ -940,7 +940,7 @@ struct ipr_cmnd {
 		struct ipr_resource_entry *res;
 		struct ipr_cmnd *sibling;
 		struct scsi_device *sdev;
-	};
+	} u;
 
 	struct ipr_ioa_cfg *ioa_cfg;
 };

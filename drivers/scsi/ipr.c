@@ -406,7 +406,7 @@ static void ipr_trc_hook(struct ipr_cmnd *ipr_cmd,
 	trace_entry->type = type;
 	trace_entry->cmd_index = ipr_cmd->cmd_index;
 	trace_entry->res_handle = ipr_cmd->ioarcb.res_handle;
-	trace_entry->add_data = add_data;
+	trace_entry->u.add_data = add_data;
 }
 #else
 #define ipr_trc_hook(ipr_cmd, type, add_data) do { } while(0)
@@ -447,7 +447,7 @@ static void ipr_reinit_ipr_cmnd(struct ipr_cmnd *ipr_cmd)
 static void ipr_init_ipr_cmnd(struct ipr_cmnd *ipr_cmd)
 {
 	ipr_reinit_ipr_cmnd(ipr_cmd);
-	ipr_cmd->scratch = 0;
+	ipr_cmd->u.scratch = 0;
 	init_timer(&ipr_cmd->timer);
 }
 
@@ -676,8 +676,8 @@ static void ipr_do_req(struct ipr_cmnd *ipr_cmd,
  **/
 static void ipr_internal_cmd_done(struct ipr_cmnd *ipr_cmd)
 {
-	if (ipr_cmd->sibling)
-		ipr_cmd->sibling = NULL;
+	if (ipr_cmd->u.sibling)
+		ipr_cmd->u.sibling = NULL;
 	else
 		complete(&ipr_cmd->completion);
 }
@@ -729,7 +729,7 @@ static void ipr_send_hcam(struct ipr_ioa_cfg *ioa_cfg, u8 type,
 		list_add_tail(&ipr_cmd->queue, &ioa_cfg->pending_q);
 		list_add_tail(&hostrcb->queue, &ioa_cfg->hostrcb_pending_q);
 
-		ipr_cmd->hostrcb = hostrcb;
+		ipr_cmd->u.hostrcb = hostrcb;
 		ioarcb = &ipr_cmd->ioarcb;
 
 		ioarcb->res_handle = cpu_to_be32(IPR_IOA_RES_HANDLE);
@@ -794,7 +794,7 @@ static void ipr_handle_config_change(struct ipr_ioa_cfg *ioa_cfg,
 	struct ipr_config_table_entry *cfgte;
 	u32 is_ndn = 1;
 
-	cfgte = &hostrcb->hcam.ccn.cfgte;
+	cfgte = &hostrcb->hcam.u.ccn.cfgte;
 
 	list_for_each_entry(res, &ioa_cfg->used_res_q, queue) {
 		if (!memcmp(&res->cfgte.res_addr, &cfgte->res_addr,
@@ -852,7 +852,7 @@ static void ipr_handle_config_change(struct ipr_ioa_cfg *ioa_cfg,
 static void ipr_process_ccn(struct ipr_cmnd *ipr_cmd)
 {
 	struct ipr_ioa_cfg *ioa_cfg = ipr_cmd->ioa_cfg;
-	struct ipr_hostrcb *hostrcb = ipr_cmd->hostrcb;
+	struct ipr_hostrcb *hostrcb = ipr_cmd->u.hostrcb;
 	u32 ioasc = be32_to_cpu(ipr_cmd->ioasa.ioasc);
 
 	list_del(&hostrcb->queue);
@@ -902,7 +902,8 @@ static void ipr_log_vpd(struct ipr_std_inq_vpids *vpids, u8 *serial_num)
 static void ipr_log_cache_error(struct ipr_ioa_cfg *ioa_cfg,
 				struct ipr_hostrcb *hostrcb)
 {
-	struct ipr_hostrcb_type_02_error *error = &hostrcb->hcam.error.type_02_error;
+	struct ipr_hostrcb_type_02_error *error =
+		&hostrcb->hcam.u.error.u.type_02_error;
 
 	ipr_err("-----Current Configuration-----\n");
 	ipr_err("Cache Directory Card Information:\n");
@@ -937,14 +938,15 @@ static void ipr_log_config_error(struct ipr_ioa_cfg *ioa_cfg,
 {
 	int errors_logged, i;
 	struct ipr_hostrcb_device_data_entry *dev_entry;
+	struct ipr_hostrcb_type_03_error *error;
 
-	errors_logged = be32_to_cpu(hostrcb->hcam.error.type_03_error.errors_logged);
+	error = &hostrcb->hcam.u.error.u.type_03_error;
+	errors_logged = be32_to_cpu(error->errors_logged);
 
 	ipr_err("Device Errors Detected/Logged: %d/%d\n",
-		be32_to_cpu(hostrcb->hcam.error.type_03_error.errors_detected),
-		errors_logged);
+		be32_to_cpu(error->errors_detected), errors_logged);
 
-	dev_entry = hostrcb->hcam.error.type_03_error.dev_entry;
+	dev_entry = error->dev_entry;
 
 	for (i = 0; i < errors_logged; i++, dev_entry++) {
 		ipr_err_separator;
@@ -996,7 +998,7 @@ static void ipr_log_array_error(struct ipr_ioa_cfg *ioa_cfg,
 
 	memset(zero_sn, '0', IPR_SERIAL_NUM_LEN);
 
-	error = &hostrcb->hcam.error.type_04_error;
+	error = &hostrcb->hcam.u.error.u.type_04_error;
 
 	ipr_err_separator;
 
@@ -1074,10 +1076,10 @@ static void ipr_log_generic_error(struct ipr_ioa_cfg *ioa_cfg,
 
 	for (i = 0; i < ioa_data_len / 4; i += 4) {
 		ipr_err("%08X: %08X %08X %08X %08X\n", i*4,
-			be32_to_cpu(hostrcb->hcam.raw.data[i]),
-			be32_to_cpu(hostrcb->hcam.raw.data[i+1]),
-			be32_to_cpu(hostrcb->hcam.raw.data[i+2]),
-			be32_to_cpu(hostrcb->hcam.raw.data[i+3]));
+			be32_to_cpu(hostrcb->hcam.u.raw.data[i]),
+			be32_to_cpu(hostrcb->hcam.u.raw.data[i+1]),
+			be32_to_cpu(hostrcb->hcam.u.raw.data[i+2]),
+			be32_to_cpu(hostrcb->hcam.u.raw.data[i+3]));
 	}
 }
 
@@ -1125,13 +1127,13 @@ static void ipr_handle_log_data(struct ipr_ioa_cfg *ioa_cfg,
 	if (hostrcb->hcam.notifications_lost == IPR_HOST_RCB_NOTIFICATIONS_LOST)
 		dev_err(&ioa_cfg->pdev->dev, "Error notifications lost\n");
 
-	ioasc = be32_to_cpu(hostrcb->hcam.error.failing_dev_ioasc);
+	ioasc = be32_to_cpu(hostrcb->hcam.u.error.failing_dev_ioasc);
 
 	if (ioasc == IPR_IOASC_BUS_WAS_RESET ||
 	    ioasc == IPR_IOASC_BUS_WAS_RESET_BY_OTHER) {
 		/* Tell the midlayer we had a bus reset so it will handle the UA properly */
 		scsi_report_bus_reset(ioa_cfg->host,
-				      hostrcb->hcam.error.failing_dev_res_addr.bus);
+				      hostrcb->hcam.u.error.failing_dev_res_addr.bus);
 	}
 
 	error_index = ipr_get_error(ioasc);
@@ -1139,8 +1141,8 @@ static void ipr_handle_log_data(struct ipr_ioa_cfg *ioa_cfg,
 	if (!ipr_error_table[error_index].log_hcam)
 		return;
 
-	if (ipr_is_device(&hostrcb->hcam.error.failing_dev_res_addr)) {
-		ipr_res_err(ioa_cfg, hostrcb->hcam.error.failing_dev_res_addr,
+	if (ipr_is_device(&hostrcb->hcam.u.error.failing_dev_res_addr)) {
+		ipr_res_err(ioa_cfg, hostrcb->hcam.u.error.failing_dev_res_addr,
 			    "%s\n", ipr_error_table[error_index].error);
 	} else {
 		dev_err(&ioa_cfg->pdev->dev, "%s\n",
@@ -1192,7 +1194,7 @@ static void ipr_handle_log_data(struct ipr_ioa_cfg *ioa_cfg,
 static void ipr_process_error(struct ipr_cmnd *ipr_cmd)
 {
 	struct ipr_ioa_cfg *ioa_cfg = ipr_cmd->ioa_cfg;
-	struct ipr_hostrcb *hostrcb = ipr_cmd->hostrcb;
+	struct ipr_hostrcb *hostrcb = ipr_cmd->u.hostrcb;
 	u32 ioasc = be32_to_cpu(ipr_cmd->ioasa.ioasc);
 
 	list_del(&hostrcb->queue);
@@ -3012,10 +3014,10 @@ static void ipr_bus_reset_done(struct ipr_cmnd *ipr_cmd)
 	 * If abort has not completed, indicate the reset has, else call the
 	 * abort's done function to wake the sleeping eh thread
 	 */
-	if (ipr_cmd->sibling->sibling)
-		ipr_cmd->sibling->sibling = NULL;
+	if (ipr_cmd->u.sibling->u.sibling)
+		ipr_cmd->u.sibling->u.sibling = NULL;
 	else
-		ipr_cmd->sibling->done(ipr_cmd->sibling);
+		ipr_cmd->u.sibling->done(ipr_cmd->u.sibling);
 
 	list_add_tail(&ipr_cmd->queue, &ioa_cfg->free_q);
 	LEAVE;
@@ -3046,10 +3048,10 @@ static void ipr_abort_timeout(struct ipr_cmnd *ipr_cmd)
 		return;
 	}
 
-	ipr_sdev_err(ipr_cmd->sdev, "Abort timed out. Resetting bus\n");
+	ipr_sdev_err(ipr_cmd->u.sdev, "Abort timed out. Resetting bus\n");
 	reset_cmd = ipr_get_free_ipr_cmnd(ioa_cfg);
-	ipr_cmd->sibling = reset_cmd;
-	reset_cmd->sibling = ipr_cmd;
+	ipr_cmd->u.sibling = reset_cmd;
+	reset_cmd->u.sibling = ipr_cmd;
 	reset_cmd->ioarcb.res_handle = ipr_cmd->ioarcb.res_handle;
 	cmd_pkt = &reset_cmd->ioarcb.cmd_pkt;
 	cmd_pkt->request_type = IPR_RQTYPE_IOACMD;
@@ -3108,7 +3110,7 @@ static int ipr_cancel_op(struct scsi_cmnd * scsi_cmd)
 	cmd_pkt->cdb[3] = (ioarcb_addr >> 16) & 0xff;
 	cmd_pkt->cdb[4] = (ioarcb_addr >> 8) & 0xff;
 	cmd_pkt->cdb[5] = ioarcb_addr & 0xff;
-	ipr_cmd->sdev = scsi_cmd->device;
+	ipr_cmd->u.sdev = scsi_cmd->device;
 
 	ipr_sdev_err(scsi_cmd->device, "Aborting command: %02X\n", scsi_cmd->cmnd[0]);
 	ipr_send_blocking_cmd(ipr_cmd, ipr_abort_timeout, IPR_ABORT_TASK_TIMEOUT);
@@ -3575,12 +3577,12 @@ static void ipr_dump_ioasa(struct ipr_ioa_cfg *ioa_cfg,
 	ipr_sdev_err(ipr_cmd->scsi_cmd->device, "%s\n",
 		     ipr_error_table[error_index].error);
 
-	if ((ioasa->gpdd.device_end_state <= ARRAY_SIZE(ipr_gpdd_dev_end_states)) &&
-	    (ioasa->gpdd.device_bus_phase <= ARRAY_SIZE(ipr_gpdd_dev_bus_phases))) {
+	if ((ioasa->u.gpdd.end_state <= ARRAY_SIZE(ipr_gpdd_dev_end_states)) &&
+	    (ioasa->u.gpdd.bus_phase <=  ARRAY_SIZE(ipr_gpdd_dev_bus_phases))) {
 		ipr_sdev_err(ipr_cmd->scsi_cmd->device,
 			     "Device End state: %s Phase: %s\n",
-			     ipr_gpdd_dev_end_states[ioasa->gpdd.device_end_state],
-			     ipr_gpdd_dev_bus_phases[ioasa->gpdd.device_bus_phase]);
+			     ipr_gpdd_dev_end_states[ioasa->u.gpdd.end_state],
+			     ipr_gpdd_dev_bus_phases[ioasa->u.gpdd.bus_phase]);
 	}
 
 	if (sizeof(struct ipr_ioasa) < be16_to_cpu(ioasa->ret_stat_len))
@@ -3624,7 +3626,7 @@ static void ipr_gen_sense(struct ipr_cmnd *ipr_cmd)
 
 	if (ipr_is_vset_device(res) &&
 	    ioasc == IPR_IOASC_MED_DO_NOT_REALLOC &&
-	    ioasa->vset.failing_lba_hi != 0) {
+	    ioasa->u.vset.failing_lba_hi != 0) {
 		sense_buf[0] = 0x72;
 		sense_buf[1] = IPR_IOASC_SENSE_KEY(ioasc);
 		sense_buf[2] = IPR_IOASC_SENSE_CODE(ioasc);
@@ -3635,14 +3637,14 @@ static void ipr_gen_sense(struct ipr_cmnd *ipr_cmd)
 		sense_buf[9] = 0x0A;
 		sense_buf[10] = 0x80;
 
-		failing_lba = be32_to_cpu(ioasa->vset.failing_lba_hi);
+		failing_lba = be32_to_cpu(ioasa->u.vset.failing_lba_hi);
 
 		sense_buf[12] = (failing_lba & 0xff000000) >> 24;
 		sense_buf[13] = (failing_lba & 0x00ff0000) >> 16;
 		sense_buf[14] = (failing_lba & 0x0000ff00) >> 8;
 		sense_buf[15] = failing_lba & 0x000000ff;
 
-		failing_lba = be32_to_cpu(ioasa->vset.failing_lba_lo);
+		failing_lba = be32_to_cpu(ioasa->u.vset.failing_lba_lo);
 
 		sense_buf[16] = (failing_lba & 0xff000000) >> 24;
 		sense_buf[17] = (failing_lba & 0x00ff0000) >> 16;
@@ -3674,9 +3676,9 @@ static void ipr_gen_sense(struct ipr_cmnd *ipr_cmd)
 		} else {
 			if (ioasc == IPR_IOASC_MED_DO_NOT_REALLOC) {
 				if (ipr_is_vset_device(res))
-					failing_lba = be32_to_cpu(ioasa->vset.failing_lba_lo);
+					failing_lba = be32_to_cpu(ioasa->u.vset.failing_lba_lo);
 				else
-					failing_lba = be32_to_cpu(ioasa->dasd.failing_lba);
+					failing_lba = be32_to_cpu(ioasa->u.dasd.failing_lba);
 
 				sense_buf[0] |= 0x80;	/* Or in the Valid bit */
 				sense_buf[3] = (failing_lba & 0xff000000) >> 24;
@@ -4123,7 +4125,7 @@ static int ipr_set_supported_devs(struct ipr_cmnd *ipr_cmd)
 	struct ipr_supported_device *supp_dev = &ioa_cfg->vpd_cbs->supp_dev;
 	struct ipr_ioadl_desc *ioadl = ipr_cmd->ioadl;
 	struct ipr_ioarcb *ioarcb = &ipr_cmd->ioarcb;
-	struct ipr_resource_entry *res = ipr_cmd->res;
+	struct ipr_resource_entry *res = ipr_cmd->u.res;
 
 	ipr_cmd->job_step = ipr_ioa_reset_done;
 
@@ -4131,7 +4133,7 @@ static int ipr_set_supported_devs(struct ipr_cmnd *ipr_cmd)
 		if (!ipr_is_af_dasd_device(res))
 			continue;
 
-		ipr_cmd->res = res;
+		ipr_cmd->u.res = res;
 		ipr_set_sup_dev_dflt(supp_dev, &res->cfgte.std_inq_data.vpids);
 
 		ioarcb->res_handle = cpu_to_be32(IPR_IOA_RES_HANDLE);
@@ -4372,8 +4374,8 @@ static int ipr_ioafp_mode_select_page28(struct ipr_cmnd *ipr_cmd)
 			      length);
 
 	ipr_cmd->job_step = ipr_set_supported_devs;
-	ipr_cmd->res = list_entry(ioa_cfg->used_res_q.next,
-				  struct ipr_resource_entry, queue);
+	ipr_cmd->u.res = list_entry(ioa_cfg->used_res_q.next,
+				    struct ipr_resource_entry, queue);
 
 	ipr_do_req(ipr_cmd, ipr_reset_ioa_job, ipr_timeout, IPR_INTERNAL_TIMEOUT);
 
@@ -5028,8 +5030,8 @@ static int ipr_reset_wait_to_start_bist(struct ipr_cmnd *ipr_cmd)
 	struct ipr_ioa_cfg *ioa_cfg = ipr_cmd->ioa_cfg;
 	int rc = IPR_RC_JOB_RETURN;
 
-	if (!ipr_reset_allowed(ioa_cfg) && ipr_cmd->time_left) {
-		ipr_cmd->time_left -= IPR_CHECK_FOR_RESET_TIMEOUT;
+	if (!ipr_reset_allowed(ioa_cfg) && ipr_cmd->u.time_left) {
+		ipr_cmd->u.time_left -= IPR_CHECK_FOR_RESET_TIMEOUT;
 		ipr_reset_start_timer(ipr_cmd, IPR_CHECK_FOR_RESET_TIMEOUT);
 	} else {
 		ipr_cmd->job_step = ipr_reset_start_bist;
@@ -5068,7 +5070,7 @@ static int ipr_reset_alert(struct ipr_cmnd *ipr_cmd)
 		ipr_cmd->job_step = ipr_reset_start_bist;
 	}
 
-	ipr_cmd->time_left = IPR_WAIT_FOR_RESET_TIMEOUT;
+	ipr_cmd->u.time_left = IPR_WAIT_FOR_RESET_TIMEOUT;
 	ipr_reset_start_timer(ipr_cmd, IPR_CHECK_FOR_RESET_TIMEOUT);
 
 	LEAVE;
@@ -5154,7 +5156,7 @@ static int ipr_reset_ucode_download(struct ipr_cmnd *ipr_cmd)
 static int ipr_reset_shutdown_ioa(struct ipr_cmnd *ipr_cmd)
 {
 	struct ipr_ioa_cfg *ioa_cfg = ipr_cmd->ioa_cfg;
-	enum ipr_shutdown_type shutdown_type = ipr_cmd->shutdown_type;
+	enum ipr_shutdown_type shutdown_type = ipr_cmd->u.shutdown_type;
 	unsigned long timeout;
 	int rc = IPR_RC_JOB_CONTINUE;
 
@@ -5195,7 +5197,7 @@ static int ipr_reset_shutdown_ioa(struct ipr_cmnd *ipr_cmd)
 static void ipr_reset_ioa_job(struct ipr_cmnd *ipr_cmd)
 {
 	u32 rc, ioasc;
-	unsigned long scratch = ipr_cmd->scratch;
+	unsigned long scratch = ipr_cmd->u.scratch;
 	struct ipr_ioa_cfg *ioa_cfg = ipr_cmd->ioa_cfg;
 
 	do {
@@ -5221,7 +5223,7 @@ static void ipr_reset_ioa_job(struct ipr_cmnd *ipr_cmd)
 		}
 
 		ipr_reinit_ipr_cmnd(ipr_cmd);
-		ipr_cmd->scratch = scratch;
+		ipr_cmd->u.scratch = scratch;
 		rc = ipr_cmd->job_step(ipr_cmd);
 	} while(rc == IPR_RC_JOB_CONTINUE);
 }
@@ -5253,7 +5255,7 @@ static void _ipr_initiate_ioa_reset(struct ipr_ioa_cfg *ioa_cfg,
 	ipr_cmd = ipr_get_free_ipr_cmnd(ioa_cfg);
 	ioa_cfg->reset_cmd = ipr_cmd;
 	ipr_cmd->job_step = job_step;
-	ipr_cmd->shutdown_type = shutdown_type;
+	ipr_cmd->u.shutdown_type = shutdown_type;
 
 	ipr_reset_ioa_job(ipr_cmd);
 }
