@@ -550,6 +550,7 @@ static int ipip6_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 			skb_set_owner_w(new_skb, skb->sk);
 		dev_kfree_skb(skb);
 		skb = new_skb;
+		iph6 = skb->nh.ipv6h;
 	}
 
 	skb->nh.raw = skb_push(skb, sizeof(struct iphdr));
