@@ -159,6 +159,7 @@ typedef struct window_t {
 
 struct config_t;
 struct region_t;
+struct pcmcia_callback;
 
 struct pcmcia_socket {
 	struct module			*owner;
@@ -215,6 +216,7 @@ struct pcmcia_socket {
 
 	/* pcmcia (16-bit) */
 	struct pcmcia_bus_socket	*pcmcia;
+	struct pcmcia_callback		*callback;
 
 	/* cardbus (32-bit) */
 #ifdef CONFIG_CARDBUS

@@ -112,7 +112,7 @@ typedef struct user_info_t {
 /* Socket state information */
 struct pcmcia_bus_socket {
 	atomic_t		refcount;
-	client_handle_t		handle;
+	struct pcmcia_callback	callback;
 	int			state;
 	user_info_t		*user;
 	int			req_pending, req_result;
@@ -484,14 +484,12 @@ static void handle_removal(void *data)
     
 ======================================================================*/
 
-static int ds_event(event_t event, int priority,
-		    event_callback_args_t *args)
+static int ds_event(struct pcmcia_socket *skt, event_t event, int priority)
 {
-    struct pcmcia_bus_socket *s;
+    struct pcmcia_bus_socket *s = skt->pcmcia;
 
     ds_dbg(1, "ds_event(0x%06x, %d, 0x%p)\n",
-	  event, priority, args->client_handle);
-    s = args->client_data;
+	  event, priority, s);
     
     switch (event) {
 	
@@ -1082,8 +1080,6 @@ static struct file_operations ds_fops = {
 static int __devinit pcmcia_bus_add_socket(struct class_device *class_dev)
 {
 	struct pcmcia_socket *socket = class_dev->class_data;
-	client_reg_t client_reg;
-	bind_req_t bind;
 	struct pcmcia_bus_socket *s;
 	int ret;
 
@@ -1107,34 +1103,17 @@ static int __devinit pcmcia_bus_add_socket(struct class_device *class_dev)
 	s->parent = socket;
 
 	/* Set up hotline to Card Services */
-	client_reg.dev_info = bind.dev_info = &dev_info;
-
-	bind.Socket = socket;
-	bind.Function = BIND_FN_ALL;
-	ret = pcmcia_bind_device(&bind);
-	if (ret != CS_SUCCESS) {
-		cs_error(NULL, BindDevice, ret);
-		kfree(s);
-		return -EINVAL;
-	}
-
-	client_reg.Attributes = INFO_MASTER_CLIENT;
-	client_reg.EventMask =
-		CS_EVENT_CARD_INSERTION | CS_EVENT_CARD_REMOVAL |
-		CS_EVENT_RESET_PHYSICAL | CS_EVENT_CARD_RESET |
-		CS_EVENT_EJECTION_REQUEST | CS_EVENT_INSERTION_REQUEST |
-		CS_EVENT_PM_SUSPEND | CS_EVENT_PM_RESUME;
-	client_reg.event_handler = &ds_event;
-	client_reg.Version = 0x0210;
-	client_reg.event_callback_args.client_data = s;
-	ret = pcmcia_register_client(&s->handle, &client_reg);
-	if (ret != CS_SUCCESS) {
-		cs_error(NULL, RegisterClient, ret);
-		kfree(s);
-		return -EINVAL;
-	}
-
+	s->callback.owner = THIS_MODULE;
+	s->callback.event = &ds_event;
 	socket->pcmcia = s;
+
+	ret = pccard_register_pcmcia(socket, &s->callback);
+	if (ret) {
+		printk(KERN_ERR "PCMCIA registration PCCard core failed for socket %p\n", socket);
+		pcmcia_put_bus_socket(s);
+		socket->pcmcia = NULL;
+		return (ret);
+	}
 
 	return 0;
 }
@@ -1147,9 +1126,9 @@ static void pcmcia_bus_remove_socket(struct class_device *class_dev)
 	if (!socket || !socket->pcmcia)
 		return;
 
-	flush_scheduled_work();
+	pccard_register_pcmcia(socket, NULL);
 
-	pcmcia_deregister_client(socket->pcmcia->handle);
+	flush_scheduled_work();
 
 	socket->pcmcia->state |= DS_SOCKET_DEAD;
 	pcmcia_put_bus_socket(socket->pcmcia);

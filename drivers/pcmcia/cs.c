@@ -349,8 +349,6 @@ static void free_regions(memory_handle_t *list)
     }
 }
 
-static int send_event(struct pcmcia_socket *s, event_t event, int priority);
-
 static void shutdown_socket(struct pcmcia_socket *s)
 {
     client_t **c;
@@ -402,6 +400,26 @@ static void shutdown_socket(struct pcmcia_socket *s)
     
 ======================================================================*/
 
+
+static int pcmcia_send_event(struct pcmcia_socket *s, event_t event, int priority)
+{
+	int ret;
+
+	if (!s->callback)
+		return 0;
+	if (!try_module_get(s->callback->owner))
+		return 0;
+
+	ret = s->callback->event(s, event, priority);
+
+	module_put(s->callback->owner);
+
+	return ret;
+}
+
+
+/* NOTE: send_event needs to be called with skt->sem held. */
+
 static int send_event(struct pcmcia_socket *s, event_t event, int priority)
 {
     client_t *client = s->clients;
@@ -411,6 +429,11 @@ static int send_event(struct pcmcia_socket *s, event_t event, int priority)
     ret = 0;
     if (s->state & SOCKET_CARDBUS)
 	    return 0;
+
+    ret = pcmcia_send_event(s, event, priority);
+    if (ret)
+	    return (ret);
+
     for (; client; client = client->next) { 
 	if (client->state & (CLIENT_UNBOUND|CLIENT_STALE))
 	    continue;
@@ -1362,6 +1385,34 @@ int pcmcia_register_client(client_handle_t *handle, client_reg_t *req)
     up(&s->skt_sem);
     return CS_OUT_OF_RESOURCE;
 } /* register_client */
+
+/* register pcmcia_callback */
+int pccard_register_pcmcia(struct pcmcia_socket *s, struct pcmcia_callback *c)
+{
+        int ret = 0;
+
+	/* s->skt_sem also protects s->callback */
+	down(&s->skt_sem);
+
+	if (c) {
+		/* registration */
+		if (s->callback) {
+			ret = -EBUSY;
+			goto err;
+		}
+
+		s->callback = c;
+
+		if ((s->state & (SOCKET_PRESENT|SOCKET_CARDBUS)) == SOCKET_PRESENT)
+			pcmcia_send_event(s, CS_EVENT_CARD_INSERTION, CS_EVENT_PRI_LOW);
+	} else
+		s->callback = NULL;
+ err:
+	up(&s->skt_sem);
+
+	return ret;
+}
+EXPORT_SYMBOL(pccard_register_pcmcia);
 
 /*====================================================================*/
 

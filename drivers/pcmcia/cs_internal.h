@@ -173,6 +173,14 @@ int pccard_reset_card(struct pcmcia_socket *skt);
 int pccard_get_status(struct pcmcia_socket *s, unsigned int function, cs_status_t *status);
 int pccard_access_configuration_register(struct pcmcia_socket *s, unsigned int function, conf_reg_t *reg);
 
+
+struct pcmcia_callback{
+	struct module	*owner;
+	int		(*event) (struct pcmcia_socket *s, event_t event, int priority);
+};
+
+int pccard_register_pcmcia(struct pcmcia_socket *s, struct pcmcia_callback *c);
+
 #define cs_socket_name(skt)	((skt)->dev.class_id)
 
 #ifdef DEBUG
