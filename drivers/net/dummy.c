@@ -112,7 +112,7 @@ static int __init dummy_init_one(int index)
 	return err;
 }
 
-static void __exit dummy_free_one(int index) 
+static void dummy_free_one(int index)
 {
 	unregister_netdev(dummies[index]);
 	free_netdev(dummies[index]);
