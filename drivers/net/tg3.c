@@ -6932,7 +6932,7 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 	if (tp->pci_chip_rev_id == CHIPREV_ID_5704_A0)
 		tp->tg3_flags2 |= TG3_FLG2_PHY_5704_A0_BUG;
 
-	/* Note: 5750 also needs this flag set to improve bit error rate. */
+	/* Note: 5705 also needs this flag set to improve bit error rate. */
 	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705)
 		tp->tg3_flags2 |= TG3_FLG2_PHY_BER_BUG;
 
