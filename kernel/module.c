@@ -51,6 +51,20 @@
 /* If this is set, the section belongs in the init part of the module */
 #define INIT_OFFSET_MASK (1UL << (BITS_PER_LONG-1))
 
+/* Allow unsupported modules switch. */ 
+#ifdef UNSUPPORTED_MODULES
+int unsupported = UNSUPPORTED_MODULES;
+#else
+int unsupported = 2;  /* don't warn when loading unsupported modules. */
+#endif
+
+static int __init unsupported_setup(char *str)
+{
+	get_option(&str, &unsupported);
+	return 1;
+}
+__setup("unsupported=", unsupported_setup);
+
 /* Protects module list */
 static spinlock_t modlist_lock = SPIN_LOCK_UNLOCKED;
 
@@ -1509,7 +1523,7 @@ static struct module *load_module(void __user *umod,
 {
 	Elf_Ehdr *hdr;
 	Elf_Shdr *sechdrs;
-	char *secstrings, *args, *modmagic, *strtab = NULL;
+	char *secstrings, *args, *modmagic, *strtab = NULL, *supported;
 	unsigned int i, symindex = 0, strindex = 0, setupindex, exindex,
 		exportindex, modindex, obsparmindex, infoindex, gplindex,
 		crcindex, gplcrcindex, versindex, pcpuindex;
@@ -1622,6 +1636,29 @@ static struct module *load_module(void __user *umod,
 		       mod->name, modmagic, vermagic);
 		err = -ENOEXEC;
 		goto free_hdr;
+	}
+
+	supported = get_modinfo(sechdrs, infoindex, "supported");
+	if (supported) {
+		if (!strcmp(supported, "external"))
+			tainted |= TAINT_EXTERNAL_SUPPORT;
+		else if (strcmp(supported, "yes"))
+			supported = NULL;
+	}
+	if (!supported) {
+		if (unsupported == 0) {
+			printk(KERN_WARNING "%s: unsupported module, refusing "
+			       "to load. To override, echo "
+			       "1 > /proc/sys/kernel/unsupported\n",
+			       mod->name);
+			err = -ENOEXEC;
+			goto free_hdr;
+		}
+		tainted |= TAINT_NO_SUPPORT;
+		if (unsupported == 1) {
+			printk(KERN_WARNING "%s: unsupported module, tainting "
+			       "kernel.\n", mod->name);
+		}
 	}
 
 	/* Now copy in args */

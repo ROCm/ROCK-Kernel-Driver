@@ -136,6 +136,7 @@ enum
 	KERN_MAXTIMESLICE=66,	/* int: nice -20 max timeslice */
 	KERN_MINTIMESLICE=67,	/* int: nice +19 min timeslice */
 	KERN_HZ=68,		/* unsigned long: internal kernel HZ */
+	KERN_UNSUPPORTED=69,	/* int: allow loading of unsupported modules */
 };
 
 

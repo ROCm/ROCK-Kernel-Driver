@@ -131,6 +131,7 @@ extern void bust_spinlocks(int yes);
 extern int oops_in_progress;		/* If set, an oops, panic(), BUG() or die() is in progress */
 extern int panic_on_oops;
 extern int tainted;
+extern int unsupported;
 extern const char *print_tainted(void);
 
 /* Values used for system_state */
@@ -146,6 +147,8 @@ extern enum system_states {
 #define TAINT_FORCED_MODULE		(1<<1)
 #define TAINT_UNSAFE_SMP		(1<<2)
 #define TAINT_FORCED_RMMOD		(1<<3)
+#define TAINT_NO_SUPPORT		(1<<4)
+#define TAINT_EXTERNAL_SUPPORT		(1<<5)
 
 extern void dump_stack(void);
 

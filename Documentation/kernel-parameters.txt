@@ -1208,6 +1208,12 @@ running once the system is up.
 
 	stram_swap=	[HW,M68k]
 
+	unsupported	Allow loading of unsupported kernel modules:
+			0 = only allow supported modules,
+			1 = warn when loading unsupported modules,
+			2 = don't warn.
+			
+
 	swiotlb=	[IA-64] Number of I/O TLB slabs
  
 	switches=	[HW,M68k]
