@@ -162,9 +162,6 @@ static int dtSplitRoot(tid_t tid, struct inode *ip,
 static int dtDeleteUp(tid_t tid, struct inode *ip, struct metapage * fmp,
 		      dtpage_t * fp, struct btstack * btstack);
 
-static int dtSearchNode(struct inode *ip,
-			s64 lmxaddr, pxd_t * kpxd, struct btstack * btstack);
-
 static int dtRelink(tid_t tid, struct inode *ip, dtpage_t * p);
 
 static int dtReadFirst(struct inode *ip, struct btstack * btstack);
@@ -2380,7 +2377,7 @@ static int dtDeleteUp(tid_t tid, struct inode *ip,
 	return 0;
 }
 
-
+#ifdef _NOTYET
 /*
  * NAME:        dtRelocate()
  *
@@ -2575,7 +2572,6 @@ int dtRelocate(tid_t tid, struct inode *ip, s64 lmxaddr, pxd_t * opxd,
 	return rc;
 }
 
-
 /*
  * NAME:	dtSearchNode()
  *
@@ -2677,7 +2673,7 @@ static int dtSearchNode(struct inode *ip, s64 lmxaddr, pxd_t * kpxd,
 
 	goto loop;
 }
-
+#endif /* _NOTYET */
 
 /*
  *	dtRelink()
@@ -2933,7 +2929,7 @@ struct jfs_dirent {
 /*
  * function to determine next variable-sized jfs_dirent in buffer
  */
-inline struct jfs_dirent *next_jfs_dirent(struct jfs_dirent *dirent)
+static inline struct jfs_dirent *next_jfs_dirent(struct jfs_dirent *dirent)
 {
 	return (struct jfs_dirent *)
 		((char *)dirent +
