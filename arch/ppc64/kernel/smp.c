@@ -390,8 +390,7 @@ static inline int __devinit smp_startup_cpu(unsigned int lcpu)
 	}
 
 	/* Fixup atomic count: it exited inside IRQ handler. */
-	((struct task_struct *)paca[lcpu].xCurrent)->thread_info->preempt_count
-		= 0;
+	paca[lcpu].xCurrent->thread_info->preempt_count	= 0;
 	/* Fixup SLB round-robin so next segment (kernel) goes in segment 0 */
 	paca[lcpu].xStab_data.next_round_robin = 0;
 
@@ -817,7 +816,7 @@ static void __init smp_create_idle(unsigned int cpu)
 	init_idle(p, cpu);
 	unhash_process(p);
 
-	paca[cpu].xCurrent = (u64)p;
+	paca[cpu].xCurrent = p;
 	current_set[cpu] = p->thread_info;
 }
 
@@ -869,7 +868,7 @@ void __devinit smp_prepare_boot_cpu(void)
 	/* cpu_possible is set up in prom.c */
 	cpu_set(boot_cpuid, cpu_online_map);
 
-	paca[boot_cpuid].xCurrent = (u64)current;
+	paca[boot_cpuid].xCurrent = current;
 	current_set[boot_cpuid] = current->thread_info;
 }
 

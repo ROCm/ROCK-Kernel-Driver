@@ -29,15 +29,15 @@ void rwsemtrace(struct rw_semaphore *sem, const char *str)
 
 /*
  * handle the lock being released whilst there are processes blocked on it that can now run
- * - if we come here, then:
- *   - the 'active part' of the count (&0x0000ffff) reached zero but has been re-incremented
+ * - if we come here from up_xxxx(), then:
+ *   - the 'active part' of the count (&0x0000ffff) had reached zero (but may have changed)
  *   - the 'waiting part' of the count (&0xffff0000) is negative (and will still be so)
  *   - there must be someone on the queue
  * - the spinlock must be held by the caller
  * - woken process blocks are discarded from the list after having task zeroed
- * - writers are only woken if wakewrite is non-zero
+ * - writers are only woken if downgrading is false
  */
-static inline struct rw_semaphore *__rwsem_do_wake(struct rw_semaphore *sem, int wakewrite)
+static inline struct rw_semaphore *__rwsem_do_wake(struct rw_semaphore *sem, int downgrading)
 {
 	struct rwsem_waiter *waiter;
 	struct task_struct *tsk;
@@ -46,10 +46,12 @@ static inline struct rw_semaphore *__rwsem_do_wake(struct rw_semaphore *sem, int
 
 	rwsemtrace(sem,"Entering __rwsem_do_wake");
 
-	if (!wakewrite)
+	if (downgrading)
 		goto dont_wake_writers;
 
-	/* only wake someone up if we can transition the active part of the count from 0 -> 1 */
+	/* if we came through an up_xxxx() call, we only only wake someone up
+	 * if we can transition the active part of the count from 0 -> 1
+	 */
  try_again:
 	oldcount = rwsem_atomic_update(RWSEM_ACTIVE_BIAS,sem) - RWSEM_ACTIVE_BIAS;
 	if (oldcount & RWSEM_ACTIVE_MASK)
@@ -78,9 +80,10 @@ static inline struct rw_semaphore *__rwsem_do_wake(struct rw_semaphore *sem, int
 	if (waiter->flags & RWSEM_WAITING_FOR_WRITE)
 		goto out;
 
-	/* grant an infinite number of read locks to the readers at the front of the queue
-	 * - note we increment the 'active part' of the count by the number of readers (less one
-	 *   for the activity decrement we've already done) before waking any processes up
+	/* grant an infinite number of read locks to the readers at the front
+	 * of the queue
+	 * - note we increment the 'active part' of the count by the number of
+	 *   readers before waking any processes up
 	 */
  readers_only:
 	woken = 0;
@@ -95,8 +98,10 @@ static inline struct rw_semaphore *__rwsem_do_wake(struct rw_semaphore *sem, int
 	} while (waiter->flags & RWSEM_WAITING_FOR_READ);
 
 	loop = woken;
-	woken *= RWSEM_ACTIVE_BIAS-RWSEM_WAITING_BIAS;
-	woken -= RWSEM_ACTIVE_BIAS;
+	woken *= RWSEM_ACTIVE_BIAS - RWSEM_WAITING_BIAS;
+	if (!downgrading)
+		woken -= RWSEM_ACTIVE_BIAS; /* we'd already done one increment
+					     * earlier */
 	rwsem_atomic_add(woken,sem);
 
 	next = sem->wait_list.next;
@@ -150,7 +155,7 @@ static inline struct rw_semaphore *rwsem_down_failed_common(struct rw_semaphore 
 	 * - it might even be this process, since the waker takes a more active part
 	 */
 	if (!(count & RWSEM_ACTIVE_MASK))
-		sem = __rwsem_do_wake(sem,1);
+		sem = __rwsem_do_wake(sem, 0);
 
 	spin_unlock(&sem->wait_lock);
 
@@ -201,7 +206,7 @@ struct rw_semaphore fastcall __sched *rwsem_down_write_failed(struct rw_semaphor
 
 /*
  * handle waking up a waiter on the semaphore
- * - up_read has decremented the active part of the count if we come here
+ * - up_read/up_write has decremented the active part of the count if we come here
  */
 struct rw_semaphore fastcall *rwsem_wake(struct rw_semaphore *sem)
 {
@@ -211,7 +216,7 @@ struct rw_semaphore fastcall *rwsem_wake(struct rw_semaphore *sem)
 
 	/* do nothing if list empty */
 	if (!list_empty(&sem->wait_list))
-		sem = __rwsem_do_wake(sem,1);
+		sem = __rwsem_do_wake(sem, 0);
 
 	spin_unlock(&sem->wait_lock);
 
@@ -233,7 +238,7 @@ struct rw_semaphore fastcall *rwsem_downgrade_wake(struct rw_semaphore *sem)
 
 	/* do nothing if list empty */
 	if (!list_empty(&sem->wait_list))
-		sem = __rwsem_do_wake(sem,0);
+		sem = __rwsem_do_wake(sem, 1);
 
 	spin_unlock(&sem->wait_lock);
 

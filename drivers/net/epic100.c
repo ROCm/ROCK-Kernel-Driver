@@ -66,12 +66,15 @@
 	LK1.1.14 (Kryzsztof Halasa):
 	* fix spurious bad initializations
 	* pound phy a la SMSC's app note on the subject
+	
+	AC1.1.14ac
+	* fix power up/down for ethtool that broke in 1.11
 
 */
 
 #define DRV_NAME        "epic100"
-#define DRV_VERSION     "1.11+LK1.1.14"
-#define DRV_RELDATE     "Aug 4, 2002"
+#define DRV_VERSION     "1.11+LK1.1.14+AC1.1.14"
+#define DRV_RELDATE     "June 2, 2004"
 
 /* The user-configurable values.
    These may be modified when a driver module is loaded.*/
@@ -1424,6 +1427,27 @@ static void netdev_set_msglevel(struct net_device *dev, u32 value)
 	debug = value;
 }
 
+static int ethtool_begin(struct net_device *dev)
+{
+	unsigned long ioaddr = dev->base_addr;
+	/* power-up, if interface is down */
+	if (! netif_running(dev)) {
+		outl(0x0200, ioaddr + GENCTL);
+		outl((inl(ioaddr + NVCTL) & ~0x003C) | 0x4800, ioaddr + NVCTL);
+	}
+	return 0;
+}
+
+static void ethtool_complete(struct net_device *dev)
+{
+	unsigned long ioaddr = dev->base_addr;
+	/* power-down, if interface is down */
+	if (! netif_running(dev)) {
+		outl(0x0008, ioaddr + GENCTL);
+		outl((inl(ioaddr + NVCTL) & ~0x483C) | 0x0000, ioaddr + NVCTL);
+	}
+}
+
 static struct ethtool_ops netdev_ethtool_ops = {
 	.get_drvinfo		= netdev_get_drvinfo,
 	.get_settings		= netdev_get_settings,
@@ -1434,6 +1458,8 @@ static struct ethtool_ops netdev_ethtool_ops = {
 	.set_msglevel		= netdev_set_msglevel,
 	.get_sg			= ethtool_op_get_sg,
 	.get_tx_csum		= ethtool_op_get_tx_csum,
+	.begin			= ethtool_begin,
+	.complete		= ethtool_complete
 };
 
 static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
