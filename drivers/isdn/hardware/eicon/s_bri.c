@@ -45,15 +45,16 @@ static void bri_cpu_trapped (PISDN_ADAPTER IoAdapter) {
  word *Xlog ;
  dword   regs[4], i, size ;
  Xdesc   xlogDesc ;
+ byte *Port;
 /*
  * first read pointers and trap frame
  */
  if ( !(Xlog = (word *)diva_os_malloc (0, MAX_XLOG_SIZE)) )
   return ;
- addrHi =   IoAdapter->port
-   + ((IoAdapter->Properties.Bus == BUS_PCI) ? M_PCI_ADDRH : ADDRH) ;
- addrLo = IoAdapter->port + ADDR ;
- ioaddr = IoAdapter->port + DATA ;
+ Port = DIVA_OS_MEM_ATTACH_PORT(IoAdapter);
+ addrHi =   Port + ((IoAdapter->Properties.Bus == BUS_PCI) ? M_PCI_ADDRH : ADDRH) ;
+ addrLo = Port + ADDR ;
+ ioaddr = Port + DATA ;
  outpp (addrHi,  0) ;
  outppw (addrLo, 0) ;
  for ( i = 0 ; i < 0x100 ; Xlog[i++] = inppw(ioaddr) ) ;
@@ -95,21 +96,28 @@ static void bri_cpu_trapped (PISDN_ADAPTER IoAdapter) {
  outpp  (addrHi, (byte)((BRI_UNCACHED_ADDR (IoAdapter->MemoryBase + IoAdapter->MemorySize -
                                             BRI_SHARED_RAM_SIZE)) >> 16)) ;
  outppw (addrLo, 0x00) ;
+ DIVA_OS_MEM_DETACH_PORT(IoAdapter, Port);
 }
 /* ---------------------------------------------------------------------
    Reset hardware
   --------------------------------------------------------------------- */
 static void reset_bri_hardware (PISDN_ADAPTER IoAdapter) {
- outpp (IoAdapter->ctlReg, 0x00) ;
+ byte *p = DIVA_OS_MEM_ATTACH_CTLREG(IoAdapter);
+ outpp (p, 0x00) ;
+ DIVA_OS_MEM_DETACH_CTLREG(IoAdapter, p);
 }
 /* ---------------------------------------------------------------------
    Halt system
   --------------------------------------------------------------------- */
 static void stop_bri_hardware (PISDN_ADAPTER IoAdapter) {
- if (IoAdapter->reset) {
-  outpp (IoAdapter->reset, 0x00) ; /* disable interrupts ! */
+ byte *p = DIVA_OS_MEM_ATTACH_RESET(IoAdapter);
+ if (p) {
+  outpp (p, 0x00) ; /* disable interrupts ! */
  }
- outpp (IoAdapter->ctlReg, 0x00) ;    /* clear int, halt cpu */
+ DIVA_OS_MEM_DETACH_RESET(IoAdapter, p);
+ p = DIVA_OS_MEM_ATTACH_CTLREG(IoAdapter);
+ outpp (p, 0x00) ;    /* clear int, halt cpu */
+ DIVA_OS_MEM_DETACH_CTLREG(IoAdapter, p);
 }
 #if !defined(DIVA_USER_MODE_CARD_CONFIG) /* { */
 /* ---------------------------------------------------------------------
@@ -121,6 +129,7 @@ static dword bri_protocol_load (PISDN_ADAPTER IoAdapter) {
  byte*  addrHi, *addrLo, *ioaddr ;
  char   *FileName = &IoAdapter->Protocol[0] ;
  dword   Addr, i ;
+ byte *Port;
  /* -------------------------------------------------------------------
    Try to load protocol code. 'File' points to memory location
    that does contain entire protocol code
@@ -173,10 +182,10 @@ static dword bri_protocol_load (PISDN_ADAPTER IoAdapter) {
   DBG_FTL(("Protocol code '%s' too big (%ld)", FileName, FileLength))
   return (0) ;
  }
- addrHi =   IoAdapter->port
-        + ((IoAdapter->Properties.Bus == BUS_PCI) ? M_PCI_ADDRH : ADDRH) ;
- addrLo = IoAdapter->port + ADDR ;
- ioaddr = IoAdapter->port + DATA ;
+ Port = DIVA_OS_MEM_ATTACH_PORT(IoAdapter);
+ addrHi =   Port + ((IoAdapter->Properties.Bus == BUS_PCI) ? M_PCI_ADDRH : ADDRH) ;
+ addrLo = Port + ADDR ;
+ ioaddr = Port + DATA ;
 /*
  * set start address for download (use autoincrement mode !)
  */
@@ -204,12 +213,14 @@ static dword bri_protocol_load (PISDN_ADAPTER IoAdapter) {
   test = inppw (ioaddr) ;
   if ( test != File[i/2] )
   {
+   DIVA_OS_MEM_DETACH_PORT(IoAdapter, Port);
    DBG_FTL(("%s: Memory test failed! (%d - 0x%04X/0x%04X)",
             IoAdapter->Properties.Name, i, test, File[i/2]))
    xdiFreeFile (File);
    return (0) ;
   }
  }
+ DIVA_OS_MEM_DETACH_PORT(IoAdapter, Port);
  xdiFreeFile (File);
  return (FileLength) ;
 }
@@ -290,6 +301,7 @@ static dword bri_telindus_load (PISDN_ADAPTER IoAdapter, char *DspTelindusFile)
  t_dsp_portable_desc  download_table[DSP_MAX_DOWNLOAD_COUNT] ;
  word                 download_count ;
  dword                FileLength ;
+ byte *Port;
  if (!pinfo) {
   DBG_ERR (("A: out of memory s_bri at %d", __LINE__))
   return (0);
@@ -299,11 +311,11 @@ static dword bri_telindus_load (PISDN_ADAPTER IoAdapter, char *DspTelindusFile)
   return (0) ;
  }
  FileLength     = fp->sysFileSize ;
+ Port = DIVA_OS_MEM_ATTACH_PORT(IoAdapter);
  pinfo->IoAdapter = IoAdapter ;
- pinfo->AddrLo    = IoAdapter->port + ADDR ;
- pinfo->AddrHi    = IoAdapter->port +\
-     (IoAdapter->Properties.Bus == BUS_PCI ? M_PCI_ADDRH : ADDRH);
- pinfo->Data = (word*)(IoAdapter->port + DATA) ;
+ pinfo->AddrLo    = Port + ADDR ;
+ pinfo->AddrHi    = Port + (IoAdapter->Properties.Bus == BUS_PCI ? M_PCI_ADDRH : ADDRH);
+ pinfo->Data = (word*)(Port + DATA) ;
  pinfo->DownloadPos = (IoAdapter->DspCodeBaseAddr +\
            sizeof(dword) + sizeof(download_table) + 3) & (~3) ;
  fp->sysLoadDesc = (void *)pinfo;
@@ -317,6 +329,7 @@ static dword bri_telindus_load (PISDN_ADAPTER IoAdapter, char *DspTelindusFile)
                         &download_count, NULL, &download_table[0]) ;
  if ( error )
  {
+  DIVA_OS_MEM_DETACH_PORT(IoAdapter, Port);
   DBG_FTL(("download file error: %s", error))
   OsCloseFile (fp) ;
   diva_os_free (0, pinfo);
@@ -335,23 +348,25 @@ static dword bri_telindus_load (PISDN_ADAPTER IoAdapter, char *DspTelindusFile)
  * copy download table to board
  */
  outppw_buffer (pinfo->Data, &download_table[0], sizeof(download_table)) ;
+ DIVA_OS_MEM_DETACH_PORT(IoAdapter, Port);
  diva_os_free (0, pinfo);
  return (FileLength) ;
 }
 /******************************************************************************/
 static int load_bri_hardware (PISDN_ADAPTER IoAdapter) {
  dword   i ;
- byte*  addrHi, *addrLo, *ioaddr ;
+ byte*  addrHi, *addrLo, *ioaddr, *p ;
  dword   test ;
+ byte *Port;
  if ( IoAdapter->Properties.Card != CARD_MAE )
  {
   return (FALSE) ;
  }
- addrHi =   IoAdapter->port \
-    + ((IoAdapter->Properties.Bus==BUS_PCI) ? M_PCI_ADDRH : ADDRH);
- addrLo = IoAdapter->port + ADDR ;
- ioaddr = IoAdapter->port + DATA ;
  reset_bri_hardware (IoAdapter) ;
+ Port = DIVA_OS_MEM_ATTACH_PORT(IoAdapter);
+ addrHi =   Port + ((IoAdapter->Properties.Bus==BUS_PCI) ? M_PCI_ADDRH : ADDRH);
+ addrLo = Port + ADDR ;
+ ioaddr = Port + DATA ;
  diva_os_wait (100);
 /*
  * recover
@@ -366,6 +381,7 @@ static int load_bri_hardware (PISDN_ADAPTER IoAdapter) {
           IoAdapter->MemorySize - BRI_SHARED_RAM_SIZE)) >> 16)) ;
  outppw (addrLo, 0) ;
  for ( i = 0 ; i < 0x8000 ; outppw (ioaddr, 0), ++i ) ;
+ DIVA_OS_MEM_DETACH_PORT(IoAdapter, Port);
  diva_os_wait (100) ;
 /*
  * download protocol and dsp files
@@ -396,6 +412,11 @@ static int load_bri_hardware (PISDN_ADAPTER IoAdapter) {
    return (FALSE) ;
   break ;
  }
+
+ Port = DIVA_OS_MEM_ATTACH_PORT(IoAdapter);
+ addrHi =   Port + ((IoAdapter->Properties.Bus==BUS_PCI) ? M_PCI_ADDRH : ADDRH);
+ addrLo = Port + ADDR ;
+ ioaddr = Port + DATA ;
 /*
  * clear signature
  */
@@ -408,13 +429,20 @@ static int load_bri_hardware (PISDN_ADAPTER IoAdapter) {
  * copy parameters
  */
  diva_configure_protocol (IoAdapter);
+ DIVA_OS_MEM_DETACH_PORT(IoAdapter, Port);
 /*
  * start the protocol code
  */
- outpp (IoAdapter->ctlReg, 0x08) ;
+ p = DIVA_OS_MEM_ATTACH_CTLREG(IoAdapter);
+ outpp (p, 0x08) ;
+ DIVA_OS_MEM_DETACH_CTLREG(IoAdapter, p);
 /*
  * wait for signature (max. 3 seconds)
  */
+ Port = DIVA_OS_MEM_ATTACH_PORT(IoAdapter);
+ addrHi =   Port + ((IoAdapter->Properties.Bus==BUS_PCI) ? M_PCI_ADDRH : ADDRH);
+ addrLo = Port + ADDR ;
+ ioaddr = Port + DATA ;
  for ( i = 0 ; i < 300 ; ++i )
  {
   diva_os_wait (10) ;
@@ -424,11 +452,13 @@ static int load_bri_hardware (PISDN_ADAPTER IoAdapter) {
   test = (dword)inppw (ioaddr) ;
   if ( test == 0x4447 )
   {
+   DIVA_OS_MEM_DETACH_PORT(IoAdapter, Port);
    DBG_TRC(("Protocol startup time %d.%02d seconds",
             (i / 100), (i % 100) ))
    return (TRUE) ;
   }
  }
+ DIVA_OS_MEM_DETACH_PORT(IoAdapter, Port);
  DBG_FTL(("%s: Adapter selftest failed (0x%04X)!",
           IoAdapter->Properties.Name, test))
  bri_cpu_trapped (IoAdapter) ;
@@ -441,12 +471,18 @@ static int load_bri_hardware (PISDN_ADAPTER IoAdapter) {
 #endif /* } */
 /******************************************************************************/
 static int bri_ISR (struct _ISDN_ADAPTER* IoAdapter) {
- if ( !(inpp (IoAdapter->ctlReg) & 0x01) )
+ byte *p;
+
+ p = DIVA_OS_MEM_ATTACH_CTLREG(IoAdapter);
+ if ( !(inpp (p) & 0x01) ) {
+  DIVA_OS_MEM_DETACH_CTLREG(IoAdapter, p);
   return (0) ;
+ }
  /*
   clear interrupt line
   */
- outpp (IoAdapter->ctlReg, 0x08) ;
+ outpp (p, 0x08) ;
+ DIVA_OS_MEM_DETACH_CTLREG(IoAdapter, p);
  IoAdapter->IrqCount++ ;
  if ( IoAdapter->Initialized ) {
   diva_os_schedule_soft_isr (&IoAdapter->isr_soft_isr);
@@ -457,11 +493,16 @@ static int bri_ISR (struct _ISDN_ADAPTER* IoAdapter) {
   Disable IRQ in the card hardware
   -------------------------------------------------------------------------- */
 static void disable_bri_interrupt (PISDN_ADAPTER IoAdapter) {
- if ( IoAdapter->reset )
+ byte *p;
+ p = DIVA_OS_MEM_ATTACH_RESET(IoAdapter);
+ if ( p )
  {
-  outpp (IoAdapter->reset, 0x00) ; /* disable interrupts ! */
+  outpp (p, 0x00) ; /* disable interrupts ! */
  }
- outpp (IoAdapter->ctlReg, 0x00) ; /* clear int, halt cpu */
+ DIVA_OS_MEM_DETACH_RESET(IoAdapter, p);
+ p = DIVA_OS_MEM_ATTACH_CTLREG(IoAdapter);
+ outpp (p, 0x00) ; /* clear int, halt cpu */
+ DIVA_OS_MEM_DETACH_CTLREG(IoAdapter, p);
 }
 /* -------------------------------------------------------------------------
   Fill card entry points

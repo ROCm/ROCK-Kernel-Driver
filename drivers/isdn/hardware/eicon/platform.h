@@ -106,6 +106,36 @@
 #define _cdecl
 #endif
 
+#define MEM_TYPE_RAM		0
+#define MEM_TYPE_PORT		1
+#define MEM_TYPE_PROM		2
+#define MEM_TYPE_CTLREG		3
+#define MEM_TYPE_RESET		4
+#define MEM_TYPE_CFG		5
+#define MEM_TYPE_ADDRESS	6
+#define MEM_TYPE_CONFIG		7
+#define MEM_TYPE_CONTROL	8
+
+#define DIVA_OS_MEM_ATTACH_RAM(a)	((a)->ram)
+#define DIVA_OS_MEM_ATTACH_PORT(a)	((a)->port)
+#define DIVA_OS_MEM_ATTACH_PROM(a)	((a)->prom)
+#define DIVA_OS_MEM_ATTACH_CTLREG(a)	((a)->ctlReg)
+#define DIVA_OS_MEM_ATTACH_RESET(a)	((a)->reset)
+#define DIVA_OS_MEM_ATTACH_CFG(a)	((a)->cfg)
+#define DIVA_OS_MEM_ATTACH_ADDRESS(a)	((a)->Address)
+#define DIVA_OS_MEM_ATTACH_CONFIG(a)	((a)->Config)
+#define DIVA_OS_MEM_ATTACH_CONTROL(a)	((a)->Control)
+
+#define DIVA_OS_MEM_DETACH_RAM(a, x)	do { } while(0)
+#define DIVA_OS_MEM_DETACH_PORT(a, x)	do { } while(0)
+#define DIVA_OS_MEM_DETACH_PROM(a, x)	do { } while(0)
+#define DIVA_OS_MEM_DETACH_CTLREG(a, x)	do { } while(0)
+#define DIVA_OS_MEM_DETACH_RESET(a, x)	do { } while(0)
+#define DIVA_OS_MEM_DETACH_CFG(a, x)	do { } while(0)
+#define DIVA_OS_MEM_DETACH_ADDRESS(a, x)	do { } while(0)
+#define DIVA_OS_MEM_DETACH_CONFIG(a, x)	do { } while(0)
+#define DIVA_OS_MEM_DETACH_CONTROL(a, x)	do { } while(0)
+
 #if !defined(DIM)
 #define DIM(array)  (sizeof (array)/sizeof ((array)[0]))
 #endif

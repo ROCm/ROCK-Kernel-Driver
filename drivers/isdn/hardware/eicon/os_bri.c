@@ -1,4 +1,4 @@
-/* $Id: os_bri.c,v 1.1.2.2 2001/02/12 20:23:46 armin Exp $ */
+/* $Id: os_bri.c,v 1.18 2003/06/21 17:10:29 schindler Exp $ */
 
 #include "platform.h"
 #include "debuglib.h"
@@ -46,6 +46,27 @@ static int diva_bri_start_adapter(PISDN_ADAPTER IoAdapter,
 				  dword start_address, dword features);
 static int diva_bri_stop_adapter(diva_os_xdi_adapter_t * a);
 
+static void diva_bri_set_addresses(diva_os_xdi_adapter_t * a)
+{
+	a->resources.pci.mem_type_id[MEM_TYPE_RAM] = 0;
+	a->resources.pci.mem_type_id[MEM_TYPE_CFG] = 1;
+	a->resources.pci.mem_type_id[MEM_TYPE_ADDRESS] = 2;
+	a->resources.pci.mem_type_id[MEM_TYPE_RESET] = 1;
+	a->resources.pci.mem_type_id[MEM_TYPE_PORT] = 2;
+	a->resources.pci.mem_type_id[MEM_TYPE_CTLREG] = 2;
+	
+	a->xdi_adapter.ram = a->resources.pci.addr[0];
+	a->xdi_adapter.cfg = a->resources.pci.addr[1];
+	a->xdi_adapter.Address = a->resources.pci.addr[2];
+
+	a->xdi_adapter.reset = a->xdi_adapter.cfg;
+	a->xdi_adapter.port = a->xdi_adapter.Address;
+
+	a->xdi_adapter.ctlReg = a->xdi_adapter.port + M_PCI_RESET;
+
+	a->xdi_adapter.reset += 0x4C;	/* PLX 9050 !! */
+}
+
 /*
 **  BAR0 - MEM Addr  - 0x80  - NOT USED
 **  BAR1 - I/O Addr  - 0x80
@@ -58,6 +79,7 @@ int diva_bri_init_card(diva_os_xdi_adapter_t * a)
 	word cmd = 0, cmd_org;
 	byte Bus, Slot;
 	void *hdev;
+	byte *p;
 
 	/*
 	   Set properties
@@ -123,7 +145,7 @@ int diva_bri_init_card(diva_os_xdi_adapter_t * a)
 	       Map and register resources
 	     */
 	    if (!(a->resources.pci.addr[0] =
-		 divasa_remap_pci_bar(a->resources.pci.bar[0],
+		 divasa_remap_pci_bar(a, 0, a->resources.pci.bar[0],
 				      bri_bar_length[0]))) {
 		DBG_ERR(("A: BRI, can't map BAR[0]"))
 		diva_bri_cleanup_adapter(a);
@@ -133,8 +155,8 @@ int diva_bri_init_card(diva_os_xdi_adapter_t * a)
 	sprintf(&a->port_name[0], "BRI %02x:%02x",
 		a->resources.pci.bus, a->resources.pci.func);
 
-	if (diva_os_register_io_port(1, a->resources.pci.bar[1],
-				     bri_bar_length[1], &a->port_name[0])) {
+	if (diva_os_register_io_port(a, 1, a->resources.pci.bar[1],
+				     bri_bar_length[1], &a->port_name[0], 1)) {
 		DBG_ERR(("A: BRI, can't register BAR[1]"))
 		diva_bri_cleanup_adapter(a);
 		return (-1);
@@ -142,14 +164,19 @@ int diva_bri_init_card(diva_os_xdi_adapter_t * a)
 	a->resources.pci.addr[1] = (void *) (unsigned long) a->resources.pci.bar[1];
 	a->resources.pci.length[1] = bri_bar_length[1];
 
-	if (diva_os_register_io_port(1, a->resources.pci.bar[2],
-				     bar2_length, &a->port_name[0])) {
+	if (diva_os_register_io_port(a, 1, a->resources.pci.bar[2],
+				     bar2_length, &a->port_name[0], 2)) {
 		DBG_ERR(("A: BRI, can't register BAR[2]"))
 		diva_bri_cleanup_adapter(a);
 		return (-1);
 	}
 	a->resources.pci.addr[2] = (void *) (unsigned long) a->resources.pci.bar[2];
 	a->resources.pci.length[2] = bar2_length;
+
+	/*
+	   Set all memory areas
+	 */
+	diva_bri_set_addresses(a);
 
 	/*
 	   Get Serial Number
@@ -210,15 +237,9 @@ int diva_bri_init_card(diva_os_xdi_adapter_t * a)
 	a->interface.cleanup_adapter_proc = diva_bri_cleanup_adapter;
 	a->interface.cmd_proc = diva_bri_cmd_card_proc;
 
-	a->xdi_adapter.cfg = a->resources.pci.addr[1];
-	a->xdi_adapter.Address = a->resources.pci.addr[2];
-
-	a->xdi_adapter.reset = a->xdi_adapter.cfg;
-	a->xdi_adapter.port = a->xdi_adapter.Address;
-
-	a->xdi_adapter.ctlReg = a->xdi_adapter.port + M_PCI_RESET;
-	a->xdi_adapter.reset += 0x4C;	/* PLX 9050 !! */
-	outpp(a->xdi_adapter.reset, 0x41);
+	p = DIVA_OS_MEM_ATTACH_RESET(&a->xdi_adapter);
+	outpp(p, 0x41);
+	DIVA_OS_MEM_DETACH_RESET(&a->xdi_adapter, p);
 
 	prepare_maestra_functions(&a->xdi_adapter);
 
@@ -268,11 +289,11 @@ static int diva_bri_cleanup_adapter(diva_os_xdi_adapter_t * a)
 
 	for (i = 1; i < 3; i++) {
 		if (a->resources.pci.addr[i] && a->resources.pci.bar[i]) {
-			diva_os_register_io_port(0,
+			diva_os_register_io_port(a, 0,
 						 a->resources.pci.bar[i],
 						 a->resources.pci.
 						 length[i],
-						 &a->port_name[0]);
+						 &a->port_name[0], i);
 			a->resources.pci.addr[i] = 0;
 			a->resources.pci.bar[i] = 0;
 		}
@@ -314,18 +335,20 @@ static dword diva_bri_get_serial_number(diva_os_xdi_adapter_t * a)
 	byte *confIO;
 	word serHi, serLo, *confMem;
 
-	confIO = (byte *) a->resources.pci.addr[1];
+	confIO = (byte *) DIVA_OS_MEM_ATTACH_CFG(&a->xdi_adapter);
 	serHi = (word) (inppw(&confIO[0x22]) & 0x0FFF);
 	serLo = (word) (inppw(&confIO[0x26]) & 0x0FFF);
 	serNo = ((dword) serHi << 16) | (dword) serLo;
+	DIVA_OS_MEM_DETACH_CFG(&a->xdi_adapter, confIO);
 
 	if ((serNo == 0) || (serNo == 0xFFFFFFFF)) {
 		DBG_FTL(("W: BRI use BAR[0] to get card serial number"))
 
-		confMem = (word *) a->resources.pci.addr[0];
+		confMem = (word *) DIVA_OS_MEM_ATTACH_RAM(&a->xdi_adapter);
 		serHi = (word) (READ_WORD(&confMem[0x11]) & 0x0FFF);
 		serLo = (word) (READ_WORD(&confMem[0x13]) & 0x0FFF);
 		serNo = (((dword) serHi) << 16) | ((dword) serLo);
+		DIVA_OS_MEM_DETACH_RAM(&a->xdi_adapter, confMem);
 	}
 
 	DBG_LOG(("Serial Number=%ld", serNo))
@@ -342,9 +365,9 @@ static int diva_bri_reregister_io(diva_os_xdi_adapter_t * a)
 	int i;
 
 	for (i = 1; i < 3; i++) {
-		diva_os_register_io_port(0, a->resources.pci.bar[i],
+		diva_os_register_io_port(a, 0, a->resources.pci.bar[i],
 					 a->resources.pci.length[i],
-					 &a->port_name[0]);
+					 &a->port_name[0], i);
 		a->resources.pci.addr[i] = 0;
 	}
 
@@ -352,9 +375,9 @@ static int diva_bri_reregister_io(diva_os_xdi_adapter_t * a)
 		(long) a->xdi_adapter.serialNo);
 
 	for (i = 1; i < 3; i++) {
-		if (diva_os_register_io_port(1, a->resources.pci.bar[i],
+		if (diva_os_register_io_port(a, 1, a->resources.pci.bar[i],
 					     a->resources.pci.length[i],
-					     &a->port_name[0])) {
+					     &a->port_name[0], i)) {
 			DBG_ERR(("A: failed to reregister BAR[%d]", i))
 			return (-1);
 		}
@@ -493,6 +516,7 @@ static int diva_bri_reset_adapter(PISDN_ADAPTER IoAdapter)
 {
 	byte *addrHi, *addrLo, *ioaddr;
 	dword i;
+	byte *Port;
 
 	if (!IoAdapter->port) {
 		return (-1);
@@ -501,13 +525,13 @@ static int diva_bri_reset_adapter(PISDN_ADAPTER IoAdapter)
 		DBG_ERR(("A: A(%d) can't reset BRI adapter - please stop first",
 			 IoAdapter->ANum)) return (-1);
 	}
-	addrHi =
-	    IoAdapter->port +
-	    ((IoAdapter->Properties.Bus == BUS_PCI) ? M_PCI_ADDRH : ADDRH);
-	addrLo = IoAdapter->port + ADDR;
-	ioaddr = IoAdapter->port + DATA;
 	(*(IoAdapter->rstFnc)) (IoAdapter);
 	diva_os_wait(100);
+	Port = DIVA_OS_MEM_ATTACH_PORT(IoAdapter);
+	addrHi = Port +
+	    ((IoAdapter->Properties.Bus == BUS_PCI) ? M_PCI_ADDRH : ADDRH);
+	addrLo = Port + ADDR;
+	ioaddr = Port + DATA;
 	/*
 	   recover
 	 */
@@ -539,6 +563,8 @@ static int diva_bri_reset_adapter(PISDN_ADAPTER IoAdapter)
 	outpp(addrHi, (byte) 0);
 	outppw(addrLo, (word) 0);
 	outppw(ioaddr, (word) 0);
+
+	DIVA_OS_MEM_DETACH_PORT(IoAdapter, Port);
 
 	/*
 	   Forget all outstanding entities
@@ -578,16 +604,17 @@ diva_bri_write_sdram_block(PISDN_ADAPTER IoAdapter,
 			   dword address, const byte * data, dword length)
 {
 	byte *addrHi, *addrLo, *ioaddr;
+	byte *Port;
 
 	if (!IoAdapter->port) {
 		return (-1);
 	}
 
-	addrHi =
-	    IoAdapter->port +
+	Port = DIVA_OS_MEM_ATTACH_PORT(IoAdapter);
+	addrHi = Port +
 	    ((IoAdapter->Properties.Bus == BUS_PCI) ? M_PCI_ADDRH : ADDRH);
-	addrLo = IoAdapter->port + ADDR;
-	ioaddr = IoAdapter->port + DATA;
+	addrLo = Port + ADDR;
+	ioaddr = Port + DATA;
 
 	while (length--) {
 		outpp(addrHi, (word) (address >> 16));
@@ -596,6 +623,7 @@ diva_bri_write_sdram_block(PISDN_ADAPTER IoAdapter,
 		address++;
 	}
 
+	DIVA_OS_MEM_DETACH_PORT(IoAdapter, Port);
 	return (0);
 }
 
@@ -603,6 +631,7 @@ static int
 diva_bri_start_adapter(PISDN_ADAPTER IoAdapter,
 		       dword start_address, dword features)
 {
+	byte *Port;
 	dword i, test;
 	byte *addrHi, *addrLo, *ioaddr;
 	int started = 0;
@@ -621,11 +650,11 @@ diva_bri_start_adapter(PISDN_ADAPTER IoAdapter,
 	sprintf(IoAdapter->Name, "A(%d)", (int) IoAdapter->ANum);
 	DBG_LOG(("A(%d) start BRI", IoAdapter->ANum))
 
-	    addrHi =
-	    IoAdapter->port +
+	Port = DIVA_OS_MEM_ATTACH_PORT(IoAdapter);
+	addrHi = Port +
 	    ((IoAdapter->Properties.Bus == BUS_PCI) ? M_PCI_ADDRH : ADDRH);
-	addrLo = IoAdapter->port + ADDR;
-	ioaddr = IoAdapter->port + DATA;
+	addrLo = Port + ADDR;
+	ioaddr = Port + DATA;
 
 	outpp(addrHi,
 	      (byte) (
@@ -633,12 +662,20 @@ diva_bri_start_adapter(PISDN_ADAPTER IoAdapter,
 		       BRI_SHARED_RAM_SIZE) >> 16));
 	outppw(addrLo, 0x1e);
 	outppw(ioaddr, 0x00);
+	DIVA_OS_MEM_DETACH_PORT(IoAdapter, Port);
 
 	/*
 	   start the protocol code
 	 */
-	outpp(IoAdapter->ctlReg, 0x08);
+	Port = DIVA_OS_MEM_ATTACH_CTLREG(IoAdapter);
+	outpp(Port, 0x08);
+	DIVA_OS_MEM_DETACH_CTLREG(IoAdapter, Port);
 
+	Port = DIVA_OS_MEM_ATTACH_PORT(IoAdapter);
+	addrHi = Port +
+	    ((IoAdapter->Properties.Bus == BUS_PCI) ? M_PCI_ADDRH : ADDRH);
+	addrLo = Port + ADDR;
+	ioaddr = Port + DATA;
 	/*
 	   wait for signature (max. 3 seconds)
 	 */
@@ -659,6 +696,7 @@ diva_bri_start_adapter(PISDN_ADAPTER IoAdapter,
 			break;
 		}
 	}
+	DIVA_OS_MEM_DETACH_PORT(IoAdapter, Port);
 
 	if (!started) {
 		DBG_FTL(("A: A(%d) %s: Adapter selftest failed 0x%04X",
@@ -677,7 +715,9 @@ diva_bri_start_adapter(PISDN_ADAPTER IoAdapter,
 	a->ReadyInt = 1;
 
 	if (IoAdapter->reset) {
-		outpp(IoAdapter->reset, 0x41);
+		Port = DIVA_OS_MEM_ATTACH_RESET(IoAdapter);
+		outpp(Port, 0x41);
+		DIVA_OS_MEM_DETACH_RESET(IoAdapter, Port);
 	}
 
 	a->ram_out(a, &PR_RAM->ReadyInt, 1);

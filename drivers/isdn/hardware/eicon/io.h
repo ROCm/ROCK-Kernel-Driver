@@ -40,14 +40,6 @@ typedef struct {
  PISDN_ADAPTER QuadroAdapter[4] ;
 } ADAPTER_LIST_ENTRY, *PADAPTER_LIST_ENTRY ;
 /* --------------------------------------------------------------------------
-  Special OS memory support structures
-  -------------------------------------------------------------------------- */
-#define MAX_MAPPED_ENTRIES 8
-typedef struct {
- void  * Address;
- dword    Length;
-} ADAPTER_MEMORY ;
-/* --------------------------------------------------------------------------
   Configuration of XDI clients carried by XDI
   -------------------------------------------------------------------------- */
 #define DIVA_XDI_CAPI_CFG_1_DYNAMIC_L1_ON      0x01
@@ -71,7 +63,6 @@ struct _ISDN_ADAPTER {
  /*
   remember mapped memory areas
  */
- ADAPTER_MEMORY     MappedMemory[MAX_MAPPED_ENTRIES] ;
  CARD_PROPERTIES     Properties ;
  dword               cardType ;
  dword               protocol_id ;       /* configured protocol identifier */
@@ -97,6 +88,8 @@ struct _ISDN_ADAPTER {
  dword               MemoryBase ;
  dword               MemorySize ;
  byte       *Address ;
+ byte                *Config ;
+ byte                *Control ;
  byte       *reset ;
  byte       *port ;
  byte       *ram ;
