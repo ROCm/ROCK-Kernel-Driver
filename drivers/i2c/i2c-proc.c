@@ -69,7 +69,7 @@ int i2c_detect(struct i2c_adapter *adapter,
 				      ((this_force->force[j] == SENSORS_ANY_I2C_BUS) && !is_isa)) &&
 				      (addr == this_force->force[j + 1]) ) {
 					dev_dbg(&adapter->dev, "found force parameter for adapter %d, addr %04x\n", adapter_id, addr);
-					if ((err = found_proc(adapter, addr, 0, this_force->kind)))
+					if ((err = found_proc(adapter, addr, this_force->kind)))
 						return err;
 					found = 1;
 				}
@@ -162,7 +162,7 @@ int i2c_detect(struct i2c_adapter *adapter,
 		   whether there is some client here at all! */
 		if (is_isa ||
 		    (i2c_smbus_xfer (adapter, addr, 0, 0, 0, I2C_SMBUS_QUICK, NULL) >= 0))
-			if ((err = found_proc(adapter, addr, 0, -1)))
+			if ((err = found_proc(adapter, addr, -1)))
 				return err;
 	}
 	return 0;

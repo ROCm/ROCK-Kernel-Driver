@@ -328,8 +328,7 @@ struct i2c_address_data {
   SENSORS_INSMOD
 
 typedef int i2c_found_addr_proc(struct i2c_adapter *adapter,
-				    int addr, unsigned short flags,
-				    int kind);
+				    int addr, int kind);
 
 /* Detect function. It iterates over all possible addresses itself. For
    SMBus addresses, it will only call found_proc if some client is connected
