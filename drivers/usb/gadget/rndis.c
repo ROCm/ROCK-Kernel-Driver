@@ -252,6 +252,19 @@ static int gen_ndis_query_resp (int configNr, u32 OID, rndis_resp_t *r)
 		retval = 0;
 		break;
 
+	/* The RNDIS specification is incomplete/wrong.   Some versions
+	 * of MS-Windows expect OIDs that aren't specified there.  Other
+	 * versions emit undefined RNDIS messages. DOCUMENT ALL THESE!
+	 */
+	case OID_GEN_MAC_OPTIONS:		/* from WinME */
+		DEBUG("%s: OID_GEN_MAC_OPTIONS\n", __FUNCTION__);
+		length = 4;
+		*((u32 *) resp + 6) = __constant_cpu_to_le32(
+			  NDIS_MAC_OPTION_RECEIVE_SERIALIZED
+			| NDIS_MAC_OPTION_FULL_DUPLEX);
+		retval = 0;
+		break;
+
 	/* statistics OIDs (table 4-2) */
 		
 	/* mandatory */
@@ -1044,6 +1057,10 @@ int rndis_msg_parser (u8 configNr, u8 *buf)
 						 buf);
 		
 	default: 
+		/* At least Windows XP emits some undefined RNDIS messages.
+		 * In one case those messages seemed to relate to the host
+		 * suspending itself.
+		 */
 		printk (KERN_WARNING
 			"%s: unknown RNDIS message 0x%08X len %d\n", 
 			__FUNCTION__ , MsgType, MsgLength);
