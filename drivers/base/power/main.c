@@ -66,7 +66,7 @@ void device_pm_set_parent(struct device * dev, struct device * parent)
 	dev->power.pm_parent = parent;
 	device_pm_hold(parent);
 }
-EXPORT_SYMBOL(device_pm_set_parent);
+EXPORT_SYMBOL_GPL(device_pm_set_parent);
 
 int device_pm_add(struct device * dev)
 {
