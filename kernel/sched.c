@@ -2465,15 +2465,12 @@ void __preempt_spin_lock(spinlock_t *lock)
 		_raw_spin_lock(lock);
 		return;
 	}
-
-	while (!_raw_spin_trylock(lock)) {
-		if (need_resched()) {
-			preempt_enable_no_resched();
-			__cond_resched();
-			preempt_disable();
-		}
-		cpu_relax();
-	}
+	do {
+		preempt_enable();
+		while (spin_is_locked(lock))
+			cpu_relax();
+		preempt_disable();
+	} while (!_raw_spin_trylock(lock));
 }
 
 void __preempt_write_lock(rwlock_t *lock)
@@ -2483,13 +2480,11 @@ void __preempt_write_lock(rwlock_t *lock)
 		return;
 	}
 
-	while (!_raw_write_trylock(lock)) {
-		if (need_resched()) {
-			preempt_enable_no_resched();
-			__cond_resched();
-			preempt_disable();
-		}
-		cpu_relax();
-	}
+	do {
+		preempt_enable();
+		while (rwlock_is_locked(lock))
+			cpu_relax();
+		preempt_disable();
+	} while (!_raw_write_trylock(lock));
 }
 #endif
