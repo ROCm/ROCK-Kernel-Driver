@@ -65,41 +65,6 @@ static void __init smp_dump_qct(void)
 }
 
 /*
- * for each node mark the regions
- *        TOPOFMEM = hi_shrd_mem_start + hi_shrd_mem_size
- *
- * need to be very careful to not mark 1024+ as belonging
- * to node 0. will want 1027 to show as belonging to node 1
- * example:
- *  TOPOFMEM = 1024
- * 1024 >> 8 = 4 (subtract 1 for starting at 0]
- * tmpvar = TOPOFMEM - 256 = 768
- * 1024 >> 8 = 4 (subtract 1 for starting at 0]
- * 
- */
-static void __init initialize_physnode_map(void)
-{
-	int nid;
-	unsigned int topofmem, cur;
-	struct eachquadmem *eq;
- 	struct sys_cfg_data *scd =
-		(struct sys_cfg_data *)__va(SYS_CFG_DATA_PRIV_ADDR);
-
-	
-	for(nid = 0; nid < numnodes; nid++) {
-		if(scd->quads_present31_0 & (1 << nid)) {
-			eq = &scd->eq[nid];
-			cur = eq->hi_shrd_mem_start;
-			topofmem = eq->hi_shrd_mem_start + eq->hi_shrd_mem_size;
-			while (cur < topofmem) {
-				physnode_map[cur >> 8] = (s8) nid;
-				cur ++;
-			}
-		}
-	}
-}
-
-/*
  * Unlike Summit, we don't really care to let the NUMA-Q
  * fall back to flat mode.  Don't compile for NUMA-Q
  * unless you really need it!
@@ -107,6 +72,5 @@ static void __init initialize_physnode_map(void)
 int __init get_memcfg_numaq(void)
 {
 	smp_dump_qct();
-	initialize_physnode_map();
 	return 1;
 }
