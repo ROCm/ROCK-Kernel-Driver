@@ -21,7 +21,11 @@
  *   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  */
 
- /* SMB/CIFS PDU handling routines here - except for leftovers in connect.c */
+ /* SMB/CIFS PDU handling routines here - except for leftovers in connect.c   */
+ /* These are mostly routines that operate on a pathname, or on a tree id     */
+ /* (mounted volume), but there are eight handle based routines which must be */
+ /* treated slightly different for reconnection purposes since we never want  */
+ /* to reuse a stale file handle and the caller knows the file handle */
 
 #include <linux/fs.h>
 #include <linux/kernel.h>
@@ -37,38 +41,108 @@ static struct {
 	int index;
 	char *name;
 } protocols[] = {
-	{
-	CIFS_PROT, "\2NT LM 0.12"}, {
-	BAD_PROT, "\2"}
+	{CIFS_PROT, "\2NT LM 0.12"}, 
+	{BAD_PROT, "\2"}
 };
 
-int
+
+/* Mark as invalid, all open files on tree connections since they
+   were closed when session to server was lost */
+static void mark_open_files_invalid(struct cifsTconInfo * pTcon)
+{
+	struct cifsFileInfo *open_file = NULL;
+	struct list_head * tmp;
+	struct list_head * tmp1;
+
+/* list all files open on tree connection and mark them invalid */
+	write_lock(&GlobalSMBSeslock);
+	list_for_each_safe(tmp, tmp1, &pTcon->openFileList) {
+		open_file = list_entry(tmp,struct cifsFileInfo, tlist);
+		if(open_file) {
+			open_file->invalidHandle = TRUE;
+		}
+	}
+	write_unlock(&GlobalSMBSeslock);
+	/* BB Add call to invalidate_inodes(sb) for all superblocks mounted to this tcon */
+}
+
+static int
 smb_init(int smb_command, int wct, struct cifsTconInfo *tcon,
 	 void **request_buf /* returned */ ,
 	 void **response_buf /* returned */ )
 {
 	int rc = 0;
 
-	if(tcon && (tcon->tidStatus == CifsNeedReconnect)) {
-		rc = -EIO;
-		if(tcon->ses) {
-			struct nls_table *nls_codepage = load_nls_default();
+	/* SMBs NegProt, SessSetup, uLogoff do not have tcon yet so
+	   check for tcp and smb session status done differently
+	   for those three - in the calling routine */
+	if(tcon) {
+		if((tcon->ses) && (tcon->ses->server)){
+			struct nls_table *nls_codepage;
+				/* Give Demultiplex thread up to 10 seconds to 
+					reconnect, should be greater than cifs socket
+					timeout which is 7 seconds */
+			while(tcon->ses->server->tcpStatus == CifsNeedReconnect) {
+				wait_event_interruptible_timeout(tcon->ses->server->response_q,
+					(tcon->ses->server->tcpStatus == CifsGood), 10 * HZ);
+				if(tcon->ses->server->tcpStatus == CifsNeedReconnect) {
+					/* on "soft" mounts we wait once */
+					if((tcon->retry == FALSE) || 
+					   (tcon->ses->status == CifsExiting)) {
+						cFYI(1,("gave up waiting on reconnect in smb_init"));
+						return -EHOSTDOWN;
+					} /* else "hard" mount - keep retrying until 
+					process is killed or server comes back up */
+				} else /* TCP session is reestablished now */
+					break;
+				 
+			}
+			
+			nls_codepage = load_nls_default();
+		/* need to prevent multiple threads trying to
+		simultaneously reconnect the same SMB session */
+			down(&tcon->ses->sesSem);
 			if(tcon->ses->status == CifsNeedReconnect)
-				rc = setup_session(0, tcon->ses, nls_codepage);
-			if(!rc) {
+				rc = cifs_setup_session(0, tcon->ses, nls_codepage);
+			if(!rc && (tcon->tidStatus == CifsNeedReconnect)) {
+				mark_open_files_invalid(tcon);
 				rc = CIFSTCon(0, tcon->ses, tcon->treeName, tcon,
 					nls_codepage);
+				up(&tcon->ses->sesSem);
+				if(rc == 0)
+					atomic_inc(&tconInfoReconnectCount);
+
 				cFYI(1, ("reconnect tcon rc = %d", rc));
-				if(!rc)
-					reopen_files(tcon,nls_codepage);
+				/* Removed call to reopen open files here - 
+					it is safer (and faster) to reopen files
+					one at a time as needed in read and write */
+
+				/* Check if handle based operation so we 
+					know whether we can continue or not without
+					returning to caller to reset file handle */
+				switch(smb_command) {
+					case SMB_COM_READ_ANDX:
+					case SMB_COM_WRITE_ANDX:
+					case SMB_COM_CLOSE:
+					case SMB_COM_FIND_CLOSE2:
+					case SMB_COM_LOCKING_ANDX: {
+						unload_nls(nls_codepage);
+						return -EAGAIN;
+					}
+				}
+			} else {
+				up(&tcon->ses->sesSem);
 			}
 			unload_nls(nls_codepage);
+
+		} else {
+			return -EIO;
 		}
 	}
 	if(rc)
 		return rc;
 
-	*request_buf = buf_get();
+	*request_buf = cifs_buf_get();
 	if (request_buf == 0) {
 		return -ENOMEM;
 	}
@@ -98,7 +172,6 @@ CIFSSMBNegotiate(unsigned int xid, struct cifsSesInfo *ses)
 		rc = -EIO;
 		return rc;
 	}
-
 	rc = smb_init(SMB_COM_NEGOTIATE, 0, 0 /* no tcon yet */ ,
 		      (void **) &pSMB, (void **) &pSMBr);
 	if (rc)
@@ -120,11 +193,11 @@ CIFSSMBNegotiate(unsigned int xid, struct cifsSesInfo *ses)
 	if (rc == 0) {
 		server->secMode = pSMBr->SecurityMode;	
 		server->secType = NTLM; /* BB override default for NTLMv2 or krb*/
-        /* one byte - no need to convert this or EncryptionKeyLen from le,*/
+		/* one byte - no need to convert this or EncryptionKeyLen from le,*/
 		server->maxReq = le16_to_cpu(pSMBr->MaxMpxCount);
 		/* probably no need to store and check maxvcs */
 		server->maxBuf =
-		    min(le32_to_cpu(pSMBr->MaxBufferSize),
+			min(le32_to_cpu(pSMBr->MaxBufferSize),
 			(__u32) CIFS_MAX_MSGSIZE + MAX_CIFS_HDR_SIZE);
 		server->maxRw = le32_to_cpu(pSMBr->MaxRawSize);
 		cFYI(0, ("Max buf = %d ", ses->server->maxBuf));
@@ -172,7 +245,6 @@ CIFSSMBNegotiate(unsigned int xid, struct cifsSesInfo *ses)
 							 pSMBr->ByteCount -
 							 16, &server->secType);
 			}
-
 		} else
 			server->capabilities &= ~CAP_EXTENDED_SECURITY;
 		if(sign_CIFS_PDUs == FALSE) {        
@@ -187,7 +259,7 @@ CIFSSMBNegotiate(unsigned int xid, struct cifsSesInfo *ses)
 				
 	}
 	if (pSMB)
-		buf_release(pSMB);
+		cifs_buf_release(pSMB);
 	return rc;
 }
 
@@ -218,12 +290,19 @@ CIFSSMBTDis(const int xid, struct cifsTconInfo *tcon)
 		return -EBUSY;
 	}
 
+	/* No need to return error on this operation if tid invalidated and 
+	closed on server already e.g. due to tcp session crashing */
+	if(tcon->tidStatus == CifsNeedReconnect) {
+		up(&tcon->tconSem);
+		return 0;  
+	}
+
 /* BB remove (from server) list of shares - but with smp safety  BB */
 /* BB is ses active - do we need to check here - but how? BB */
-    if((tcon->ses == 0) || (tcon->ses->server == 0)) {    
-        up(&tcon->tconSem);
-        return -EIO;
-    }
+	if((tcon->ses == 0) || (tcon->ses->server == 0)) {    
+		up(&tcon->tconSem);
+		return -EIO;
+	}
 
 	rc = smb_init(SMB_COM_TREE_DISCONNECT, 0, tcon,
 		      (void **) &smb_buffer, (void **) &smb_buffer_response);
@@ -237,8 +316,14 @@ CIFSSMBTDis(const int xid, struct cifsTconInfo *tcon)
 		cFYI(1, (" Tree disconnect failed %d", rc));
 
 	if (smb_buffer)
-		buf_release(smb_buffer);
+		cifs_buf_release(smb_buffer);
 	up(&tcon->tconSem);
+
+	/* No need to return error on this operation if tid invalidated and 
+	closed on server already e.g. due to tcp session crashing */
+	if (rc == -EAGAIN)
+		rc = 0;
+
 	return rc;
 }
 
@@ -251,9 +336,8 @@ CIFSSMBLogoff(const int xid, struct cifsSesInfo *ses)
 	int length;
 
 	cFYI(1, ("In SMBLogoff for session disconnect"));
-
 	if (ses)
-		down(&ses->sesSem); /* check this sem more places */
+		down(&ses->sesSem);
 	else
 		return -EIO;
 
@@ -266,8 +350,8 @@ CIFSSMBLogoff(const int xid, struct cifsSesInfo *ses)
 	rc = smb_init(SMB_COM_LOGOFF_ANDX, 2, 0 /* no tcon anymore */,
 		 (void **) &pSMB, (void **) &smb_buffer_response);
 
-        if(ses->server->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
-                pSMB->hdr.Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
+	if(ses->server->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
+		pSMB->hdr.Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
 
 	if (rc) {
 		up(&ses->sesSem);
@@ -285,8 +369,14 @@ CIFSSMBLogoff(const int xid, struct cifsSesInfo *ses)
 			ses->server->tcpStatus = CifsExiting;
 	}
 	if (pSMB)
-		buf_release(pSMB);
+		cifs_buf_release(pSMB);
 	up(&ses->sesSem);
+
+	/* if session dead then we do not need to do ulogoff,
+		since server closed smb session, no sense reporting 
+		error */
+	if (rc == -EAGAIN)
+		rc = 0;
 	return rc;
 }
 
@@ -300,6 +390,7 @@ CIFSSMBDelFile(const int xid, struct cifsTconInfo *tcon,
 	int bytes_returned;
 	int name_len;
 
+DelFileRetry:
 	rc = smb_init(SMB_COM_DELETE, 1, tcon, (void **) &pSMB,
 		      (void **) &pSMBr);
 	if (rc)
@@ -329,7 +420,10 @@ CIFSSMBDelFile(const int xid, struct cifsTconInfo *tcon,
 		cFYI(1, ("Error in RMFile = %d", rc));
 	}
 	if (pSMB)
-		buf_release(pSMB);
+		cifs_buf_release(pSMB);
+	if (rc == -EAGAIN)
+		goto DelFileRetry;
+
 	return rc;
 }
 
@@ -344,7 +438,7 @@ CIFSSMBRmDir(const int xid, struct cifsTconInfo *tcon,
 	int name_len;
 
 	cFYI(1, ("In CIFSSMBRmDir"));
-
+RmDirRetry:
 	rc = smb_init(SMB_COM_DELETE_DIRECTORY, 0, tcon, (void **) &pSMB,
 		      (void **) &pSMBr);
 	if (rc)
@@ -372,7 +466,9 @@ CIFSSMBRmDir(const int xid, struct cifsTconInfo *tcon,
 		cFYI(1, ("Error in RMDir = %d", rc));
 	}
 	if (pSMB)
-		buf_release(pSMB);
+		cifs_buf_release(pSMB);
+	if (rc == -EAGAIN)
+		goto RmDirRetry;
 	return rc;
 }
 
@@ -387,7 +483,7 @@ CIFSSMBMkDir(const int xid, struct cifsTconInfo *tcon,
 	int name_len;
 
 	cFYI(1, ("In CIFSSMBMkDir"));
-
+MkDirRetry:
 	rc = smb_init(SMB_COM_CREATE_DIRECTORY, 0, tcon, (void **) &pSMB,
 		      (void **) &pSMBr);
 	if (rc)
@@ -415,8 +511,9 @@ CIFSSMBMkDir(const int xid, struct cifsTconInfo *tcon,
 		cFYI(1, ("Error in Mkdir = %d", rc));
 	}
 	if (pSMB)
-		buf_release(pSMB);
-
+		cifs_buf_release(pSMB);
+	if (rc == -EAGAIN)
+		goto MkDirRetry;
 	return rc;
 }
 
@@ -433,6 +530,7 @@ CIFSSMBOpen(const int xid, struct cifsTconInfo *tcon,
 	int bytes_returned;
 	int name_len;
 
+openRetry:
 	rc = smb_init(SMB_COM_NT_CREATE_ANDX, 24, tcon, (void **) &pSMB,
 		      (void **) &pSMBr);
 	if (rc)
@@ -501,8 +599,9 @@ CIFSSMBOpen(const int xid, struct cifsTconInfo *tcon,
 		}
 	}
 	if (pSMB)
-		buf_release(pSMB);
-
+		cifs_buf_release(pSMB);
+	if (rc == -EAGAIN)
+		goto openRetry;
 	return rc;
 }
 
@@ -527,9 +626,9 @@ CIFSSMBRead(const int xid, struct cifsTconInfo *tcon,
 	if (rc)
 		return rc;
 
-        /* tcon and ses pointer are checked in smb_init */
-        if (tcon->ses->server == NULL)
-                return -ECONNABORTED;
+	/* tcon and ses pointer are checked in smb_init */
+	if (tcon->ses->server == NULL)
+		return -ECONNABORTED;
 
 	pSMB->AndXCommand = 0xFF;	/* none */
 	pSMB->Fid = netfid;
@@ -567,10 +666,13 @@ CIFSSMBRead(const int xid, struct cifsTconInfo *tcon,
 	}
 	if (pSMB) {
 		if(*buf)
-			buf_release(pSMB);
+			cifs_buf_release(pSMB);
 		else
 			*buf = (char *)pSMB;
 	}
+
+	/* Note: On -EAGAIN error only caller can retry on handle based calls 
+		since file handle passed in no longer valid */
 	return rc;
 }
 
@@ -623,7 +725,10 @@ CIFSSMBWrite(const int xid, struct cifsTconInfo *tcon,
 		*nbytes = le16_to_cpu(pSMBr->Count);
 
 	if (pSMB)
-		buf_release(pSMB);
+		cifs_buf_release(pSMB);
+
+	/* Note: On -EAGAIN error only caller can retry on handle based calls 
+		since file handle passed in no longer valid */
 
 	return rc;
 }
@@ -639,9 +744,9 @@ CIFSSMBLock(const int xid, struct cifsTconInfo *tcon,
 	LOCK_RSP *pSMBr = NULL;
 	int bytes_returned;
 	int timeout = 0;
+	__u64 temp;
 
-	cFYI(1, ("In CIFSSMBLock"));
-
+	cFYI(1, ("In CIFSSMBLock - timeout %d numLock %d",waitFlag,numLock));
 	rc = smb_init(SMB_COM_LOCKING_ANDX, 8, tcon, (void **) &pSMB,
 		      (void **) &pSMBr);
 	if (rc)
@@ -649,6 +754,12 @@ CIFSSMBLock(const int xid, struct cifsTconInfo *tcon,
 
 	if(lockType == LOCKING_ANDX_OPLOCK_RELEASE) {
 		timeout = -1; /* no response expected */
+		pSMB->Timeout = 0;
+	} else if (waitFlag == TRUE) {
+		timeout = 3;  /* blocking operation, no timeout */
+		pSMB->Timeout = -1; /* blocking - do not time out */
+	} else {
+		pSMB->Timeout = 0;
 	}
 
 	pSMB->NumberOfLocks = cpu_to_le32(numLock);
@@ -658,8 +769,12 @@ CIFSSMBLock(const int xid, struct cifsTconInfo *tcon,
 	pSMB->Fid = smb_file_id; /* netfid stays le */
 
 	pSMB->Locks[0].Pid = cpu_to_le16(current->tgid);
-	pSMB->Locks[0].Length = cpu_to_le64(len);
-	pSMB->Locks[0].Offset = cpu_to_le64(offset);
+	temp = cpu_to_le64(len);
+	pSMB->Locks[0].LengthLow = (__u32)(len & 0xFFFFFFFF);
+	pSMB->Locks[0].LengthHigh =  (__u32)(len>>32);
+	temp = cpu_to_le64(offset);
+	pSMB->Locks[0].OffsetLow = (__u32)(offset & 0xFFFFFFFF);
+	pSMB->Locks[0].OffsetHigh = (__u32)(offset>>32);
 	pSMB->ByteCount = sizeof (LOCKING_ANDX_RANGE);
 	pSMB->hdr.smb_buf_length += pSMB->ByteCount;
 	pSMB->ByteCount = cpu_to_le16(pSMB->ByteCount);
@@ -671,8 +786,10 @@ CIFSSMBLock(const int xid, struct cifsTconInfo *tcon,
 		cERROR(1, ("Send error in Lock = %d", rc));
 	}
 	if (pSMB)
-		buf_release(pSMB);
+		cifs_buf_release(pSMB);
 
+	/* Note: On -EAGAIN error only caller can retry on handle based calls 
+	since file handle passed in no longer valid */
 	return rc;
 }
 
@@ -685,8 +802,11 @@ CIFSSMBClose(const int xid, struct cifsTconInfo *tcon, int smb_file_id)
 	int bytes_returned;
 	cFYI(1, ("In CIFSSMBClose"));
 
+/* do not retry on dead session on close */
 	rc = smb_init(SMB_COM_CLOSE, 3, tcon, (void **) &pSMB,
 		      (void **) &pSMBr);
+	if(rc == -EAGAIN)
+		return 0;
 	if (rc)
 		return rc;
 
@@ -699,7 +819,11 @@ CIFSSMBClose(const int xid, struct cifsTconInfo *tcon, int smb_file_id)
 		cERROR(1, ("Send error in Close = %d", rc));
 	}
 	if (pSMB)
-		buf_release(pSMB);
+		cifs_buf_release(pSMB);
+
+	/* Since session is dead, file will be closed on server already */
+	if(rc == -EAGAIN)
+		rc = 0;
 
 	return rc;
 }
@@ -716,7 +840,7 @@ CIFSSMBRename(const int xid, struct cifsTconInfo *tcon,
 	int name_len, name_len2;
 
 	cFYI(1, ("In CIFSSMBRename"));
-
+renameRetry:
 	rc = smb_init(SMB_COM_RENAME, 1, tcon, (void **) &pSMB,
 		      (void **) &pSMBr);
 	if (rc)
@@ -766,7 +890,10 @@ CIFSSMBRename(const int xid, struct cifsTconInfo *tcon,
 		cFYI(1, ("Send error in rename = %d", rc));
 	}
 	if (pSMB)
-		buf_release(pSMB);
+		cifs_buf_release(pSMB);
+
+	if (rc == -EAGAIN)
+		goto renameRetry;
 
 	return rc;
 }
@@ -774,17 +901,16 @@ CIFSSMBRename(const int xid, struct cifsTconInfo *tcon,
 int CIFSSMBRenameOpenFile(const int xid,struct cifsTconInfo *pTcon, 
 		int netfid, char * target_name, const struct nls_table * nls_codepage) 
 {
-        struct smb_com_transaction2_sfi_req *pSMB  = NULL;
-        struct smb_com_transaction2_sfi_rsp *pSMBr = NULL;
+	struct smb_com_transaction2_sfi_req *pSMB  = NULL;
+	struct smb_com_transaction2_sfi_rsp *pSMBr = NULL;
 	struct set_file_rename * rename_info;
-        char *data_offset;
+	char *data_offset;
 	char dummy_string[30];
-        int rc = 0;
-        int bytes_returned = 0;
+	int rc = 0;
+	int bytes_returned = 0;
 	int len_of_str;
 
         cFYI(1, ("Rename to File by handle"));
-
         rc = smb_init(SMB_COM_TRANSACTION2, 15, pTcon, (void **) &pSMB,
                       (void **) &pSMBr);
         if (rc)
@@ -840,7 +966,11 @@ int CIFSSMBRenameOpenFile(const int xid,struct cifsTconInfo *pTcon,
 	}
 
 	if (pSMB)
-                buf_release(pSMB);
+                cifs_buf_release(pSMB);
+
+	/* Note: On -EAGAIN error only caller can retry on handle based calls
+		since file handle passed in no longer valid */
+
 	return rc;
 }
 
@@ -859,7 +989,7 @@ CIFSUnixCreateSymLink(const int xid, struct cifsTconInfo *tcon,
 	int bytes_returned = 0;
 
 	cFYI(1, ("In Symlink Unix style"));
-
+createSymLinkRetry:
 	rc = smb_init(SMB_COM_TRANSACTION2, 15, tcon, (void **) &pSMB,
 		      (void **) &pSMBr);
 	if (rc)
@@ -929,7 +1059,11 @@ CIFSUnixCreateSymLink(const int xid, struct cifsTconInfo *tcon,
 	}
 
 	if (pSMB)
-		buf_release(pSMB);
+		cifs_buf_release(pSMB);
+
+	if (rc == -EAGAIN)
+		goto createSymLinkRetry;
+
 	return rc;
 }
 
@@ -947,7 +1081,7 @@ CIFSUnixCreateHardLink(const int xid, struct cifsTconInfo *tcon,
 	int bytes_returned = 0;
 
 	cFYI(1, ("In Create Hard link Unix style"));
-
+createHardLinkRetry:
 	rc = smb_init(SMB_COM_TRANSACTION2, 15, tcon, (void **) &pSMB,
 		      (void **) &pSMBr);
 	if (rc)
@@ -1014,7 +1148,10 @@ CIFSUnixCreateHardLink(const int xid, struct cifsTconInfo *tcon,
 	}
 
 	if (pSMB)
-		buf_release(pSMB);
+		cifs_buf_release(pSMB);
+	if (rc == -EAGAIN)
+		goto createHardLinkRetry;
+
 	return rc;
 }
 
@@ -1030,6 +1167,7 @@ CIFSCreateHardLink(const int xid, struct cifsTconInfo *tcon,
 	int name_len, name_len2;
 
 	cFYI(1, ("In CIFSCreateHardLink"));
+winCreateHardLinkRetry:
 
 	rc = smb_init(SMB_COM_NT_RENAME, 4, tcon, (void **) &pSMB,
 		      (void **) &pSMBr);
@@ -1081,7 +1219,9 @@ CIFSCreateHardLink(const int xid, struct cifsTconInfo *tcon,
 		cFYI(1, ("Send error in hard link (NT rename) = %d", rc));
 	}
 	if (pSMB)
-		buf_release(pSMB);
+		cifs_buf_release(pSMB);
+	if (rc == -EAGAIN)
+		goto winCreateHardLinkRetry;
 
 	return rc;
 }
@@ -1100,6 +1240,8 @@ CIFSSMBUnixQuerySymLink(const int xid, struct cifsTconInfo *tcon,
 	int name_len;
 
 	cFYI(1, ("In QPathSymLinkInfo (Unix) for path %s", searchName));
+
+querySymLinkRetry:
 	rc = smb_init(SMB_COM_TRANSACTION2, 15, tcon, (void **) &pSMB,
 		      (void **) &pSMBr);
 	if (rc)
@@ -1174,7 +1316,9 @@ CIFSSMBUnixQuerySymLink(const int xid, struct cifsTconInfo *tcon,
 		}
 	}
 	if (pSMB)
-		buf_release(pSMB);
+		cifs_buf_release(pSMB);
+	if (rc == -EAGAIN)
+		goto querySymLinkRetry;
 	return rc;
 }
 
@@ -1256,7 +1400,11 @@ CIFSSMBQueryReparseLinkInfo(const int xid, struct cifsTconInfo *tcon,
 		}
 	}
 	if (pSMB)
-		buf_release(pSMB);
+		cifs_buf_release(pSMB);
+
+	/* Note: On -EAGAIN error only caller can retry on handle based calls
+		since file handle passed in no longer valid */
+
 	return rc;
 }
 
@@ -1274,6 +1422,7 @@ CIFSSMBQPathInfo(const int xid, struct cifsTconInfo *tcon,
 	int name_len;
 
 	cFYI(1, ("In QPathInfo path %s", searchName));
+QPathInfoRetry:
 	rc = smb_init(SMB_COM_TRANSACTION2, 15, tcon, (void **) &pSMB,
 		      (void **) &pSMBr);
 	if (rc)
@@ -1334,7 +1483,10 @@ CIFSSMBQPathInfo(const int xid, struct cifsTconInfo *tcon,
 		    rc = -ENOMEM;
 	}
 	if (pSMB)
-		buf_release(pSMB);
+		cifs_buf_release(pSMB);
+	if (rc == -EAGAIN)
+		goto QPathInfoRetry;
+
 	return rc;
 }
 
@@ -1352,6 +1504,7 @@ CIFSSMBUnixQPathInfo(const int xid, struct cifsTconInfo *tcon,
 	int name_len;
 
 	cFYI(1, ("In QPathInfo (Unix) the path %s", searchName));
+UnixQPathInfoRetry:
 	rc = smb_init(SMB_COM_TRANSACTION2, 15, tcon, (void **) &pSMB,
 		      (void **) &pSMBr);
 	if (rc)
@@ -1413,7 +1566,10 @@ CIFSSMBUnixQPathInfo(const int xid, struct cifsTconInfo *tcon,
 		}
 	}
 	if (pSMB)
-		buf_release(pSMB);
+		cifs_buf_release(pSMB);
+	if (rc == -EAGAIN)
+		goto UnixQPathInfoRetry;
+
 	return rc;
 }
 
@@ -1430,6 +1586,7 @@ CIFSFindSingle(const int xid, struct cifsTconInfo *tcon,
 	int name_len;
 
 	cFYI(1, ("In FindUnique"));
+findUniqueRetry:
 	rc = smb_init(SMB_COM_TRANSACTION2, 15, tcon, (void **) &pSMB,
 		      (void **) &pSMBr);
 	if (rc)
@@ -1487,7 +1644,10 @@ CIFSFindSingle(const int xid, struct cifsTconInfo *tcon,
 		/* BB fill in */
 	}
 	if (pSMB)
-		buf_release(pSMB);
+		cifs_buf_release(pSMB);
+	if (rc == -EAGAIN)
+		goto findUniqueRetry;
+
 	return rc;
 }
 
@@ -1507,6 +1667,7 @@ CIFSFindFirst(const int xid, struct cifsTconInfo *tcon,
 	int name_len;
 
 	cFYI(1, ("In FindFirst"));
+findFirstRetry:
 	rc = smb_init(SMB_COM_TRANSACTION2, 15, tcon, (void **) &pSMB,
 		      (void **) &pSMBr);
 	if (rc)
@@ -1590,7 +1751,11 @@ CIFSFindFirst(const int xid, struct cifsTconInfo *tcon,
 		memcpy(findData, response_data, le16_to_cpu(pSMBr->DataCount));
 	}
 	if (pSMB)
-		buf_release(pSMB);
+		cifs_buf_release(pSMB);
+
+	if (rc == -EAGAIN)
+		goto findFirstRetry;
+
 	return rc;
 }
 
@@ -1608,6 +1773,7 @@ CIFSFindNext(const int xid, struct cifsTconInfo *tcon,
 	int bytes_returned;
 
 	cFYI(1, ("In FindNext"));
+
 	if(resume_file_name == NULL) {
 		return -EIO;
 	}
@@ -1690,7 +1856,11 @@ CIFSFindNext(const int xid, struct cifsTconInfo *tcon,
 		memcpy(findData, response_data, le16_to_cpu(pSMBr->DataCount));
 	}
 	if (pSMB)
-		buf_release(pSMB);
+		cifs_buf_release(pSMB);
+
+	/* Note: On -EAGAIN error only caller can retry on handle based calls
+		since file handle passed in no longer valid */
+
 	return rc;
 }
 
@@ -1701,10 +1871,14 @@ CIFSFindClose(const int xid, struct cifsTconInfo *tcon, const __u16 searchHandle
 	FINDCLOSE_REQ *pSMB = NULL;
 	CLOSE_RSP *pSMBr = NULL;
 	int bytes_returned;
-	cFYI(1, ("In CIFSSMBFindClose"));
 
+	cFYI(1, ("In CIFSSMBFindClose"));
 	rc = smb_init(SMB_COM_FIND_CLOSE2, 1, tcon, (void **) &pSMB,
 		      (void **) &pSMBr);
+	/* no sense returning error if session restarted
+		file handle has been closed */
+	if(rc == -EAGAIN)
+		return 0;
 	if (rc)
 		return rc;
 
@@ -1716,7 +1890,11 @@ CIFSFindClose(const int xid, struct cifsTconInfo *tcon, const __u16 searchHandle
 		cERROR(1, ("Send error in FindClose = %d", rc));
 	}
 	if (pSMB)
-		buf_release(pSMB);
+		cifs_buf_release(pSMB);
+
+	/* Since session is dead, search handle closed on server already */
+	if (rc == -EAGAIN)
+		rc = 0;
 
 	return rc;
 }
@@ -1743,7 +1921,7 @@ CIFSGetDFSRefer(const int xid, struct cifsSesInfo *ses,
 	cFYI(1, ("In GetDFSRefer the path %s", searchName));
 	if (ses == NULL)
 		return -ENODEV;
-
+getDFSRetry:
 	rc = smb_init(SMB_COM_TRANSACTION2, 15, 0, (void **) &pSMB,
 		      (void **) &pSMBr);
 	if (rc)
@@ -1874,7 +2052,11 @@ CIFSGetDFSRefer(const int xid, struct cifsSesInfo *ses,
 
 	}
 	if (pSMB)
-		buf_release(pSMB);
+		cifs_buf_release(pSMB);
+
+	if (rc == -EAGAIN)
+		goto getDFSRetry;
+
 	return rc;
 }
 
@@ -1890,7 +2072,7 @@ CIFSSMBQFSInfo(const int xid, struct cifsTconInfo *tcon,
 	int bytes_returned = 0;
 
 	cFYI(1, ("In QFSInfo"));
-
+QFSInfoRetry:
 	rc = smb_init(SMB_COM_TRANSACTION2, 15, tcon, (void **) &pSMB,
 		      (void **) &pSMBr);
 	if (rc)
@@ -1951,7 +2133,11 @@ CIFSSMBQFSInfo(const int xid, struct cifsTconInfo *tcon,
 		}
 	}
 	if (pSMB)
-		buf_release(pSMB);
+		cifs_buf_release(pSMB);
+
+	if (rc == -EAGAIN)
+		goto QFSInfoRetry;
+
 	return rc;
 }
 
@@ -1967,6 +2153,7 @@ CIFSSMBQFSAttributeInfo(int xid, struct cifsTconInfo *tcon,
 	int bytes_returned = 0;
 
 	cFYI(1, ("In QFSAttributeInfo"));
+QFSAttributeRetry:
 	rc = smb_init(SMB_COM_TRANSACTION2, 15, tcon, (void **) &pSMB,
 		      (void **) &pSMBr);
 	if (rc)
@@ -2013,7 +2200,11 @@ CIFSSMBQFSAttributeInfo(int xid, struct cifsTconInfo *tcon,
 		}
 	}
 	if (pSMB)
-		buf_release(pSMB);
+		cifs_buf_release(pSMB);
+
+	if (rc == -EAGAIN)
+		goto QFSAttributeRetry;
+
 	return rc;
 }
 
@@ -2029,7 +2220,7 @@ CIFSSMBQFSDeviceInfo(int xid, struct cifsTconInfo *tcon,
 	int bytes_returned = 0;
 
 	cFYI(1, ("In QFSDeviceInfo"));
-
+QFSDeviceRetry:
 	rc = smb_init(SMB_COM_TRANSACTION2, 15, tcon, (void **) &pSMB,
 		      (void **) &pSMBr);
 	if (rc)
@@ -2078,7 +2269,12 @@ CIFSSMBQFSDeviceInfo(int xid, struct cifsTconInfo *tcon,
 		}
 	}
 	if (pSMB)
-		buf_release(pSMB);
+		cifs_buf_release(pSMB);
+
+	if (rc == -EAGAIN)
+		goto QFSDeviceRetry;
+
+
 	return rc;
 }
 
@@ -2094,6 +2290,7 @@ CIFSSMBQFSUnixInfo(int xid, struct cifsTconInfo *tcon,
 	int bytes_returned = 0;
 
 	cFYI(1, ("In QFSUnixInfo"));
+QFSUnixRetry:
 	rc = smb_init(SMB_COM_TRANSACTION2, 15, tcon, (void **) &pSMB,
 		      (void **) &pSMBr);
 	if (rc)
@@ -2140,7 +2337,12 @@ CIFSSMBQFSUnixInfo(int xid, struct cifsTconInfo *tcon,
 		}
 	}
 	if (pSMB)
-		buf_release(pSMB);
+		cifs_buf_release(pSMB);
+
+	if (rc == -EAGAIN)
+		goto QFSUnixRetry;
+
+
 	return rc;
 }
 
@@ -2162,7 +2364,7 @@ CIFSSMBSetEOF(int xid, struct cifsTconInfo *tcon, char *fileName,
 	int bytes_returned = 0;
 
 	cFYI(1, ("In SetEOF"));
-
+SetEOFRetry:
 	rc = smb_init(SMB_COM_TRANSACTION2, 15, tcon, (void **) &pSMB,
 		      (void **) &pSMBr);
 	if (rc)
@@ -2232,7 +2434,11 @@ CIFSSMBSetEOF(int xid, struct cifsTconInfo *tcon, char *fileName,
 	}
 
 	if (pSMB)
-		buf_release(pSMB);
+		cifs_buf_release(pSMB);
+
+	if (rc == -EAGAIN)
+		goto SetEOFRetry;
+
 	return rc;
 }
 
@@ -2248,8 +2454,7 @@ CIFSSMBSetFileSize(const int xid, struct cifsTconInfo *tcon, __u64 size,
 	int bytes_returned = 0;
 	__u32 tmp;
 
-	cFYI(1, ("SetFileSize (via SetFileInfo)"));
-
+	cFYI(1, ("SetFileSize (via SetFileInfo) %lld",size));
 	rc = smb_init(SMB_COM_TRANSACTION2, 15, tcon, (void **) &pSMB,
 		      (void **) &pSMBr);
 	if (rc)
@@ -2318,7 +2523,11 @@ CIFSSMBSetFileSize(const int xid, struct cifsTconInfo *tcon, __u64 size,
 	}
 
 	if (pSMB)
-		buf_release(pSMB);
+		cifs_buf_release(pSMB);
+
+	/* Note: On -EAGAIN error only caller can retry on handle based calls 
+		since file handle passed in no longer valid */
+
 	return rc;
 }
 
@@ -2335,6 +2544,7 @@ CIFSSMBSetTimes(int xid, struct cifsTconInfo *tcon, char *fileName,
 
 	cFYI(1, ("In SetTimes"));
 
+SetTimesRetry:
 	rc = smb_init(SMB_COM_TRANSACTION2, 15, tcon, (void **) &pSMB,
 		      (void **) &pSMBr);
 	if (rc)
@@ -2392,7 +2602,11 @@ CIFSSMBSetTimes(int xid, struct cifsTconInfo *tcon, char *fileName,
 	}
 
 	if (pSMB)
-		buf_release(pSMB);
+		cifs_buf_release(pSMB);
+
+	if (rc == -EAGAIN)
+		goto SetTimesRetry;
+
 	return rc;
 }
 
@@ -2409,7 +2623,7 @@ CIFSSMBUnixSetPerms(const int xid, struct cifsTconInfo *tcon,
 	FILE_UNIX_BASIC_INFO *data_offset;
 
 	cFYI(1, ("In SetUID/GID/Mode"));
-
+setPermsRetry:
 	rc = smb_init(SMB_COM_TRANSACTION2, 15, tcon, (void **) &pSMB,
 		      (void **) &pSMBr);
 	if (rc)
@@ -2470,6 +2684,8 @@ CIFSSMBUnixSetPerms(const int xid, struct cifsTconInfo *tcon,
 	}
 
 	if (pSMB)
-		buf_release(pSMB);
+		cifs_buf_release(pSMB);
+	if (rc == -EAGAIN)
+		goto setPermsRetry;
 	return rc;
 }

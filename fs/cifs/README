@@ -1,30 +1,30 @@
-The CIFS VFS support for Linux supports many advanced network filesystem
-features such as heirarchical dfs like namespace, hardlinks, locking and more.
-It was designed to comply with the SNIA CIFS Technical Reference (which supersedes
-the 1992 X/Open SMB Standard) as well as to perform best practice practical
-interoperability with Windows 2000, Windows XP, Samba and equivalent 
+The CIFS VFS support for Linux supports many advanced network filesystem 
+features such as heirarchical dfs like namespace, hardlinks, locking and more.  
+It was designed to comply with the SNIA CIFS Technical Reference (which 
+supersedes the 1992 X/Open SMB Standard) as well as to perform best practice 
+practical interoperability with Windows 2000, Windows XP, Samba and equivalent 
 servers.  
 
-For questions or bug reports please contact sfrench@samba.org (sfrench@us.ibm.com)
+For questions or bug reports please contact:
+    sfrench@samba.org (sfrench@us.ibm.com) 
 
 Build instructions:
 ==================
 For Linux 2.4:
-1a) Get the linux kernel source with cifs vfs already in it
-from bitkeeper via bk://cifs.bkbits.net/linux-2.4
-or
-1b) Get the kernel source (e.g.from http://www.kernel.org)
+1) Get the kernel source (e.g.from http://www.kernel.org)
 and download the cifs vfs source (see the project page
 at http://us1.samba.org/samba/Linux_CIFS_client.html)
 and change directory into the top of the kernel directory
 then patch the kernel (e.g. "patch -p1 < cifs_24.patch") 
 to add the cifs vfs to your kernel configure options if
 it has not already been added (e.g. current SuSE and UL
-users do not need to do not need that patch since the cifs vfs is
+users do not need to apply the cifs_24.patch since the cifs vfs is
 already in the kernel configure menu) and then
 mkdir linux/fs/cifs and then copy the current cifs vfs files from
 the cifs download to your kernel build directory e.g.
+
 	cp <cifs_download_dir>/fs/cifs/* to <kernel_download_dir>/fs/cifs
+	
 2) make menuconfig (or make xconfig)
 3) select cifs from within the network filesystem choices
 4) save and exit
@@ -53,56 +53,105 @@ would simply type "make install").
 
 If you do not have the utility mount.cifs (in the Samba 3.0 source tree and on 
 the CIFS VFS web site) copy it to the same directory in which mount.smbfs and 
-similar files reside (usually /sbin).  Although the helper software is required, 
-mount.cifs is recommended.  Eventually the Samba 3.0 utility program "net" 
-may also be helpful since it may someday provide easier mount syntax for users used 
-to Windows e.g.
-	 net use <mount point> <UNC name or cifs URL> 	 
-Note that running Winbind on all of your Linux clients is useful in 
-in mapping Uids and Gids consistently to the proper network user.
+similar files reside (usually /sbin).  Although the helper software is not  
+required, mount.cifs is recommended.  Eventually the Samba 3.0 utility program 
+"net" may also be helpful since it may someday provide easier mount syntax for
+users who are used to Windows e.g.  net use <mount point> <UNC name or cifs URL>  
+Note that running the Winbind pam/nss module (logon service) on all of your
+Linux clients is useful in mapping Uids and Gids consistently across the
+domain to the proper network user.  The mount.cifs mount helper can be
+trivially built from Samba 3.0 or later source e.g. by executing:
 
-Samba Considerations
-====================
-To get the maximum benefit from the CIFS VFS, we recommend using a server that
-supports the SNIA CIFS Unix Extensions standard (e.g. Samba 2.2.5 or later or 
-Samba 3.0) but the CIFS vfs works fine with a wide variety of CIFS servers. 
-Note that uid, gid and file permissions will display default values if you do
-not have a server that supports the Unix extensions for CIFS (such as Samba 2.2.3 or
-later).   To enable the Unix CIFS Extensions in the Samba server, add the line:
+	gcc samba/source/client/mount.cifs.c -o mount.cifs
+
+Note that when the mount.cifs utility is run suid (allowing user mounts), 
+in order to reduce risks, the "nosuid" mount flag is passed in on mount to
+disallow execution of an suid program mounted on the remote target.
+When mount is executed as root, nosuid is not passed in by default,
+and execution of suid programs on the remote target would be enabled
+by default. This can be changed, as with nfs and other filesystems, 
+by simply specifying "nosuid" among the mount options. For user mounts 
+though to be able to pass the suid flag to mount requires rebuilding 
+mount.cifs with the following flag: 
+ 
+        gcc samba/source/client/mount.cifs.c -DCIFS_ALLOW_USR_SUID -o mount.cifs
+
+There is a corresponding manual page for cifs mounting in the Samba 3.0 and
+later source tree in docs/manpages/mount.cifs.8 
+
+Samba Considerations 
+==================== 
+To get the maximum benefit from the CIFS VFS, we recommend using a server that 
+supports the SNIA CIFS Unix Extensions standard (e.g.  Samba 2.2.5 or later or 
+Samba 3.0) but the CIFS vfs works fine with a wide variety of CIFS servers.  
+Note that uid, gid and file permissions will display default values if you do 
+not have a server that supports the Unix extensions for CIFS (such as Samba 
+2.2.5 or later).  To enable the Unix CIFS Extensions in the Samba server, add 
+the line: 
+
 	unix extensions = yes
-to your smb.conf file on the server.  Note that the following smb.conf settings are
-also useful (on the Samba server) when the majority of clients are Unix
-or Linux:
+	
+to your smb.conf file on the server.  Note that the following smb.conf settings 
+are also useful (on the Samba server) when the majority of clients are Unix or 
+Linux: 
+
 	case sensitive = yes
-	delete readonly = yes
-Some administrators also change the "map archive" and the "create mask" parameters
-from their default values.  Creating special devices (mknod) remotely may require
-specifying a mkdev function to Samba. For more information on these see the manual  
-pages ("man smb.conf") on the Samba server system.  Note that the cifs vfs, unlike the
-smbfs vfs, does not read the smb.conf on the client system (the few optional settings
-are passed in on mount via -o parameters instead).  Note that Samba 2.2.7 or later
-includes a fix that allows the CIFS VFS to delete open files (required for strict
-POSIX compliance).  Windows Servers already supported this feature.
+	delete readonly = yes 
+ 
+Some administrators also change the "map archive" and the "create mask" 
+parameters from their default values.  Creating special devices (mknod) remotely 
+may require specifying a mkdev function to Samba.  For more information on these 
+see the manual pages ("man smb.conf") on the Samba server system.  Note that the 
+cifs vfs, unlike the smbfs vfs, does not read the smb.conf on the client system 
+(the few optional settings are passed in on mount via -o parameters instead).  
+Note that Samba 2.2.7 or later includes a fix that allows the CIFS VFS to delete 
+open files (required for strict POSIX compliance).  Windows Servers already 
+supported this feature.  
 
 Use instructions:
 ================
-Once the CIFS VFS support is built into the kernel or installed as a module (cifs.o),
-you can use mount syntax like the following to access Samba or Windows servers:
+Once the CIFS VFS support is built into the kernel or installed as a module 
+(cifs.o), you can use mount syntax like the following to access Samba or Windows 
+servers: 
+
   mount -t cifs //9.53.216.11/e$ /mnt -o user=myname,pass=mypassword
-after -o the following cifs vfs specific options are supported:
+
+Before -o the option -v may be specified to make the mount.cifs
+mount helper display the mount steps more verbosely.  
+After -o the following commonly used cifs vfs specific options
+are supported:
+
   user=<username>
   pass=<password>
   domain=<domain name>
-TCP names (in addition to ip addresses) will be available when the mount helper
-(mount.cifs) is complete
+  
+Other cifs mount options are described below.  Use of TCP names (in addition to
+ip addresses) is available if the mount helper (mount.cifs) is installed. If
+you do not trust the server to which are mounted, or if you do not have
+cifs signing enabled (and the physical network is insecure), consider use
+of the standard mount options "noexec" and "nosuid" to reduce the risk of 
+running an altered binary on your local system (downloaded from a hostile server
+or altered by a hostile router).
+
+When using the mount helper mount.cifs, passwords may be specified via alternate
+mechanisms, instead of specifying it after -o using the normal "pass=" syntax
+on the command line:
+1) By including it in a credential file. Specify credentials=filename as one
+of the mount options. Credential files contain two lines
+        username=someuser
+        password=your_password
+2) By specifying the password in the PASSWD environment variable (similarly
+the user name can be taken from the USER environment variable).
+
+If no password is provided, mount.cifs will prompt for password entry
 
 Restrictions
 ============
-Servers must support the NTLM SMB dialect (which is the most recent, supported by Samba
-and Windows NT, 2000 and XP and many other SMB/CIFS servers) and servers must support
-either "pure-TCP" (port 445 TCP/IP CIFS connections) or RFC 1001/1002 support for
-"Netbios-Over-TCP/IP."  Neither of these is likely to be a problem as most servers
-support this.  IPv6 support is planned for the future.  
+Servers must support the NTLM SMB dialect (which is the most recent, supported 
+by Samba and Windows NT, 2000 and XP and many other SMB/CIFS servers) and 
+servers must support either "pure-TCP" (port 445 TCP/IP CIFS connections) or RFC 
+1001/1002 support for "Netbios-Over-TCP/IP." Neither of these is likely to be a 
+problem as most servers support this.  IPv6 support is planned for the future.  
 
 CIFS VFS Mount Options
 ======================
@@ -141,54 +190,91 @@ A partial list of the supported mount options follows:
   ro		mount network share read-only
   version	used to distinguish different versions of the
 		mount helper utility (not typically needed)
+  sep		if first mount option (after the -o), overrides
+		the comma as the separator between the mount
+		parms. e.g.
+			-o user=myname,password=mypassword,domain=mydom
+		could be passed instead with period as the separator by
+			-o sep=.user=myname.password=mypassword.domain=mydom
+		this might be useful when comma is contained within username
+		or password or domain. This option is less important
+		when the cifs mount helper cifs.mount (version 1.1 or later)
+		is used.
+  nosuid        Do not allow remote executables with the suid bit 
+		program to be executed.  This is only meaningful for mounts
+		to servers such as Samba which support the CIFS Unix Extensions.
+		If you do not trust the servers in your network (your mount
+		targets) it is recommended that you specify this option for
+		greater security.
+  suid          Allow remote files on this mountpoint with suid enabled to 
+		be executed (default for mounts when executed as root,
+		nosuid is default for user mounts).
+  credentials   (allow valid when the cifs mount helper, mount.cifs, is
+		installed. Specifies the name of the credential file which 
+		will be read to obtain the userid and password.
 
 Misc /proc/fs/cifs Flags and Debug Info
 =======================================
 Informational pseudo-files:
-  DebugData		Displays information about active CIFS sessions
-  SimultaneousOps       Counter which holds maximum number of
+DebugData		Displays information about active CIFS sessions
+SimultaneousOps		Counter which holds maximum number of
 			simultaneous outstanding SMB/CIFS requests.
-  Stats			Lists summary resource usage information
+Stats			Lists summary resource usage information
 
 Configuration pseudo-files:
-  MultiuserMount	If set to one, more than one CIFS session to 
+MultiuserMount		If set to one, more than one CIFS session to 
 			the same server ip address can be established
 			if more than one uid accesses the same mount
 			point and if the uids user/password mapping
 			information is available. (default is 0)
-  PacketSigningEnabled  If set to one, cifs packet signing is enabled
+PacketSigningEnabled	If set to one, cifs packet signing is enabled
 			and will be used if the server requires 
 			it.  If set to two, cifs packet signing is
 			required even if the server considers packet
 			signing optional. (default 1)
-  cifsFYI		If set to one, additional debug information is
+cifsFYI			If set to one, additional debug information is
 			logged to the system error log. (default 0)
-  ExtendedSecurity	If set to one, SPNEGO session establishment
+ExtendedSecurity	If set to one, SPNEGO session establishment
 			is allowed which enables more advanced 
 			secure CIFS session establishment (default 0)
-  NTLMV2Enabled		If set to one, more secure password hashes
+NTLMV2Enabled		If set to one, more secure password hashes
 			are used when the server supports them and
 			when kerberos is not negotiated (default 0)
-  traceSMB		If set to one, debug information is logged to the
+traceSMB		If set to one, debug information is logged to the
 			system error log with the start of smb requests
 			and responses (default 0)
-  LookupCacheEnable     If set to one, inode information is kept cached
+LookupCacheEnable	If set to one, inode information is kept cached
 			for one second improving performance of lookups
 			(default 1)
-  OplockEnabled		If set to one, safe distributed caching enabled.
+OplockEnabled		If set to one, safe distributed caching enabled.
 			(default 1)
+LinuxExtensionsEnabled	If set to one then the client will attempt to
+			use the CIFS "UNIX" extensions which are optional
+			protocol enhancements that allow CIFS servers
+			to return accurate UID/GID information as well
+			as support symbolic links. If you use servers
+			such as Samba that support the CIFS Unix
+			extensions but do not want to use symbolic link
+			support and want to map the uid and gid fields 
+			to values supplied at mount (rather than the 
+			actual values, then set this to zero. (default 1)
 
-These experimental features and tracing can be enabled by changing flags in /proc/fs/cifs
-(after the cifs module has been installed or built into the kernel, e.g. insmod cifs). 
-To enable a feature set it to 1 e.g. to enable tracing to the kernel message log
-type:
+These experimental features and tracing can be enabled by changing flags in 
+/proc/fs/cifs (after the cifs module has been installed or built into the 
+kernel, e.g.  insmod cifs).  To enable a feature set it to 1 e.g.  to enable 
+tracing to the kernel message log type: 
+
 	echo 1 > /proc/fs/cifs/cifsFYI
+	
 and for more extensive tracing including the start of smb requests and responses
+
 	echo 1 > /proc/fs/cifs/traceSMB
-Also note that "cat /proc/fs/cifs/DebugData" will display some information about the
-active sessions and the shares that are mounted. NTLMv2 enablement and packet
-signing will not work since they the implementation is not quite complete. Do not enable
-these flags unless you are doing specific testing.  Enabling extended security works to
-Windows 2000 Workstations and XP but not to Windows 2000 server or Samba since it does not
-usually send "raw NTLMSSP" (instead it sends NTLMSSP encapsulated in SPNEGO/GSSAPI, which
-support is not complete in the CIFS VFS yet).
+	
+Also note that "cat /proc/fs/cifs/DebugData" will display some information about 
+the active sessions and the shares that are mounted.  Note: NTLMv2 enablement 
+will not work since they its implementation is not quite complete yet.
+Do not alter these configuration values unless you are doing specific testing.  
+Enabling extended security works to Windows 2000 Workstations and XP but not to 
+Windows 2000 server or Samba since it does not usually send "raw NTLMSSP" 
+(instead it sends NTLMSSP encapsulated in SPNEGO/GSSAPI, which support is not 
+complete in the CIFS VFS yet).  

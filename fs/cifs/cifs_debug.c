@@ -88,9 +88,26 @@ cifs_debug_data_read(char *buf, char **beginBuffer, off_t offset,
 				i, ses->serverName, ses->serverDomain, atomic_read(&ses->inUse),
 				ses->serverOS, ses->serverNOS, ses->capabilities,ses->status,ses->server->tcpStatus);
 		buf += length;
-		if(ses->server)
+		if(ses->server) {
 			buf += sprintf(buf, "\n\tLocal Users To Same Server: %d SecMode: 0x%x",
 				atomic_read(&ses->server->socketUseCount),ses->server->secMode);
+			
+			/* length = sprintf(buf, "\nMIDs: \n");
+			buf += length;
+
+			spin_lock(&GlobalMid_Lock);
+			list_for_each(tmp1, &ses->server->pending_mid_q) {
+				mid_entry = list_entry(tmp1, struct
+					mid_q_entry,
+					qhead);
+				if(mid_entry) {
+					length = sprintf(buf,"State: %d com: %d pid: %d tsk: %p\n",mid_entry->midState,mid_entry->command,mid_entry->pid,mid_entry->tsk);
+					buf += length;
+				}
+			}
+			spin_unlock(&GlobalMid_Lock); */
+		}
+
 	}
 	read_unlock(&GlobalSMBSeslock);
 	sprintf(buf, "\n");
@@ -127,8 +144,10 @@ cifs_debug_data_read(char *buf, char **beginBuffer, off_t offset,
 			buf += sprintf(buf, "\tDISCONNECTED ");
 	}
 	read_unlock(&GlobalSMBSeslock);
+
 	length = sprintf(buf, "\n");
 	buf += length;
+
 	*eof = 1;
 	/* BB add code to dump additional info such as TCP session info now */
 	/*
@@ -177,6 +196,9 @@ cifs_stats_read(char *buf, char **beginBuffer, off_t offset,
 	item_length = 
 		sprintf(buf,"Active Operations (MIDs in use): %d\n",midCount.counter);
 	length += item_length;
+	buf += item_length;
+	item_length = sprintf(buf,"%d sessions and %d shares reconnected after failure\n",tcpSesReconnectCount.counter,tconInfoReconnectCount.counter);
+	length += item_length;
 
 	return length;
 }
@@ -201,6 +223,8 @@ static read_proc_t packet_signing_enabled_read;
 static write_proc_t packet_signing_enabled_write;
 static read_proc_t quotaEnabled_read;
 static write_proc_t quotaEnabled_write;
+static read_proc_t linuxExtensionsEnabled_read;
+static write_proc_t linuxExtensionsEnabled_write;
 
 void
 cifs_proc_init(void)
@@ -213,62 +237,67 @@ cifs_proc_init(void)
 
 	proc_fs_cifs->owner = THIS_MODULE;
 	create_proc_read_entry("DebugData", 0, proc_fs_cifs,
-			       cifs_debug_data_read, 0);
+				cifs_debug_data_read, 0);
 
 	create_proc_read_entry("SimultaneousOps", 0, proc_fs_cifs,
-			       cifs_total_xid_read, 0);
+				cifs_total_xid_read, 0);
 
 	create_proc_read_entry("Stats", 0, proc_fs_cifs,
-			       cifs_stats_read, 0);
+				cifs_stats_read, 0);
 
 	pde = create_proc_read_entry("cifsFYI", 0, proc_fs_cifs,
-				     cifsFYI_read, 0);
+				cifsFYI_read, 0);
 	if (pde)
 		pde->write_proc = cifsFYI_write;
 
 	pde =
 	    create_proc_read_entry("traceSMB", 0, proc_fs_cifs,
-				   traceSMB_read, 0);
+				traceSMB_read, 0);
 	if (pde)
 		pde->write_proc = traceSMB_write;
 
 	pde = create_proc_read_entry("OplockEnabled", 0, proc_fs_cifs,
-				     oplockEnabled_read, 0);
+				oplockEnabled_read, 0);
 	if (pde)
 		pde->write_proc = oplockEnabled_write;
 
-        pde = create_proc_read_entry("QuotaEnabled", 0, proc_fs_cifs,
-                                     quotaEnabled_read, 0);
-        if (pde)
-                pde->write_proc = quotaEnabled_write;
+	pde = create_proc_read_entry("QuotaEnabled", 0, proc_fs_cifs,
+				quotaEnabled_read, 0);
+	if (pde)
+		pde->write_proc = quotaEnabled_write;
+
+	pde = create_proc_read_entry("LinuxExtensionsEnabled", 0, proc_fs_cifs,
+				linuxExtensionsEnabled_read, 0);
+	if (pde)
+		pde->write_proc = linuxExtensionsEnabled_write;
 
 	pde =
 	    create_proc_read_entry("MultiuserMount", 0, proc_fs_cifs,
-				   multiuser_mount_read, 0);
+				multiuser_mount_read, 0);
 	if (pde)
 		pde->write_proc = multiuser_mount_write;
 
 	pde =
 	    create_proc_read_entry("ExtendedSecurity", 0, proc_fs_cifs,
-				   extended_security_read, 0);
+				extended_security_read, 0);
 	if (pde)
 		pde->write_proc = extended_security_write;
 
 	pde =
-	create_proc_read_entry("LookupCacheEnable", 0, proc_fs_cifs,
-		lookupFlag_read, 0);
+	create_proc_read_entry("LookupCacheEnabled", 0, proc_fs_cifs,
+				lookupFlag_read, 0);
 	if (pde)
 		pde->write_proc = lookupFlag_write;
 
 	pde =
 	    create_proc_read_entry("NTLMV2Enabled", 0, proc_fs_cifs,
-				   ntlmv2_enabled_read, 0);
+				ntlmv2_enabled_read, 0);
 	if (pde)
 		pde->write_proc = ntlmv2_enabled_write;
 
 	pde =
 	    create_proc_read_entry("PacketSigningEnabled", 0, proc_fs_cifs,
-				   packet_signing_enabled_read, 0);
+				packet_signing_enabled_read, 0);
 	if (pde)
 		pde->write_proc = packet_signing_enabled_write;
 }
@@ -283,12 +312,15 @@ cifs_proc_clean(void)
 	remove_proc_entry("cifsFYI", proc_fs_cifs);
 	remove_proc_entry("TraceSMB", proc_fs_cifs);
 	remove_proc_entry("SimultaneousOps", proc_fs_cifs);
-	remove_proc_entry("TotalOps", proc_fs_cifs);
+	remove_proc_entry("Stats", proc_fs_cifs);
 	remove_proc_entry("MultiuserMount", proc_fs_cifs);
 	remove_proc_entry("OplockEnabled", proc_fs_cifs);
 	remove_proc_entry("NTLMV2Enabled",proc_fs_cifs);
 	remove_proc_entry("ExtendedSecurity",proc_fs_cifs);
 	remove_proc_entry("PacketSigningEnabled",proc_fs_cifs);
+	remove_proc_entry("LinuxExtensionsEnabled",proc_fs_cifs);
+	remove_proc_entry("QuotaEnabled",proc_fs_cifs);
+	remove_proc_entry("LookupCacheEnabled",proc_fs_cifs);
 	remove_proc_entry("cifs", proc_root_fs);
 }
 
@@ -406,6 +438,46 @@ quotaEnabled_write(struct file *file, const char *buffer,
                 quotaEnabled = 0;
         else if (c == '1' || c == 'y' || c == 'Y')
                 quotaEnabled = 1;
+
+        return count;
+}
+
+static int
+linuxExtensionsEnabled_read(char *page, char **start, off_t off,
+                   int count, int *eof, void *data)
+{
+        int len;
+
+        len = sprintf(page, "%d\n", linuxExtEnabled);
+/* could also check if quotas are enabled in kernel
+	as a whole first */
+        len -= off;
+        *start = page + off;
+
+        if (len > count)
+                len = count;
+        else
+                *eof = 1;
+
+        if (len < 0)
+                len = 0;
+
+        return len;
+}
+static int
+linuxExtensionsEnabled_write(struct file *file, const char *buffer,
+                    unsigned long count, void *data)
+{
+        char c;
+        int rc;
+
+        rc = get_user(c, buffer);
+        if (rc)
+                return rc;
+        if (c == '0' || c == 'n' || c == 'N')
+                linuxExtEnabled = 0;
+        else if (c == '1' || c == 'y' || c == 'Y')
+                linuxExtEnabled = 1;
 
         return count;
 }

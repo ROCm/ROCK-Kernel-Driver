@@ -3,7 +3,7 @@
    Version 1.9.
    a implementation of MD4 designed for use in the SMB authentication protocol
    Copyright (C) Andrew Tridgell 1997-1998.
-   Modified by Steve French (sfrench@us.ibm.com) 2002
+   Modified by Steve French (sfrench@us.ibm.com) 2002-2003
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -21,13 +21,7 @@
 */
 #include <linux/module.h>
 #include <linux/fs.h>
-
-/* NOTE: This code makes no attempt to be fast! 
-
-   It assumes that a int is at least 32 bits long
-*/
-
-static __u32 A, B, C, D;
+/* NOTE: This code makes no attempt to be fast! */
 
 static __u32
 F(__u32 X, __u32 Y, __u32 Z)
@@ -54,25 +48,26 @@ lshift(__u32 x, int s)
 	return ((x << s) & 0xFFFFFFFF) | (x >> (32 - s));
 }
 
-#define ROUND1(a,b,c,d,k,s) a = lshift(a + F(b,c,d) + X[k], s)
-#define ROUND2(a,b,c,d,k,s) a = lshift(a + G(b,c,d) + X[k] + (__u32)0x5A827999,s)
-#define ROUND3(a,b,c,d,k,s) a = lshift(a + H(b,c,d) + X[k] + (__u32)0x6ED9EBA1,s)
+#define ROUND1(a,b,c,d,k,s) (*a) = lshift((*a) + F(*b,*c,*d) + X[k], s)
+#define ROUND2(a,b,c,d,k,s) (*a) = lshift((*a) + G(*b,*c,*d) + X[k] + (__u32)0x5A827999,s)
+#define ROUND3(a,b,c,d,k,s) (*a) = lshift((*a) + H(*b,*c,*d) + X[k] + (__u32)0x6ED9EBA1,s)
 
 /* this applies md4 to 64 byte chunks */
 static void
-mdfour64(__u32 * M)
+mdfour64(__u32 * M, __u32 * A, __u32 *B, __u32 * C, __u32 *D)
 {
 	int j;
 	__u32 AA, BB, CC, DD;
 	__u32 X[16];
 
+
 	for (j = 0; j < 16; j++)
 		X[j] = M[j];
 
-	AA = A;
-	BB = B;
-	CC = C;
-	DD = D;
+	AA = *A;
+	BB = *B;
+	CC = *C;
+	DD = *D;
 
 	ROUND1(A, B, C, D, 0, 3);
 	ROUND1(D, A, B, C, 1, 7);
@@ -125,15 +120,15 @@ mdfour64(__u32 * M)
 	ROUND3(C, D, A, B, 7, 11);
 	ROUND3(B, C, D, A, 15, 15);
 
-	A += AA;
-	B += BB;
-	C += CC;
-	D += DD;
+	*A += AA;
+	*B += BB;
+	*C += CC;
+	*D += DD;
 
-	A &= 0xFFFFFFFF;
-	B &= 0xFFFFFFFF;
-	C &= 0xFFFFFFFF;
-	D &= 0xFFFFFFFF;
+	*A &= 0xFFFFFFFF;
+	*B &= 0xFFFFFFFF;
+	*C &= 0xFFFFFFFF;
+	*D &= 0xFFFFFFFF;
 
 	for (j = 0; j < 16; j++)
 		X[j] = 0;
@@ -166,15 +161,14 @@ mdfour(unsigned char *out, unsigned char *in, int n)
 	__u32 M[16];
 	__u32 b = n * 8;
 	int i;
-
-	A = 0x67452301;
-	B = 0xefcdab89;
-	C = 0x98badcfe;
-	D = 0x10325476;
+	__u32 A = 0x67452301;
+	__u32 B = 0xefcdab89;
+	__u32 C = 0x98badcfe;
+	__u32 D = 0x10325476;
 
 	while (n > 64) {
 		copy64(M, in);
-		mdfour64(M);
+		mdfour64(M,&A,&B, &C, &D);
 		in += 64;
 		n -= 64;
 	}
@@ -187,13 +181,13 @@ mdfour(unsigned char *out, unsigned char *in, int n)
 	if (n <= 55) {
 		copy4(buf + 56, b);
 		copy64(M, buf);
-		mdfour64(M);
+		mdfour64(M, &A, &B, &C, &D);
 	} else {
 		copy4(buf + 120, b);
 		copy64(M, buf);
-		mdfour64(M);
+		mdfour64(M, &A, &B, &C, &D);
 		copy64(M, buf + 64);
-		mdfour64(M);
+		mdfour64(M, &A, &B, &C, &D);
 	}
 
 	for (i = 0; i < 128; i++)

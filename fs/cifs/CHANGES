@@ -1,3 +1,72 @@
+Version 1.05
+------------
+fixes to cifs_readpages for fsx test case
+Version 1.04
+------------
+Fix caching data integrity bug when extending file size especially when no
+oplock on file.  Fix spurious logging of valid already parsed mount options
+that are parsed outside of the cifs vfs such as nosuid.
+
+
+Version 1.03
+------------
+Connect to server when port number override not specified, and tcp port
+unitialized.  Reset search to restart at correct file when kernel routine
+filldir returns error during large directory searches (readdir). 
+
+Version 1.02
+------------
+Fix caching problem when files opened by multiple clients in which 
+page cache could contain stale data, and write through did
+not occur often enough while file was still open when read ahead
+(read oplock) not allowed.  Treat "sep=" when first mount option
+as an overrride of comma as the default separator between mount
+options. 
+
+Version 1.01
+------------
+Allow passwords longer than 16 bytes. Allow null password string.
+
+Version 1.00
+------------
+Gracefully clean up failed mounts when attempting to mount to servers such as
+Windows 98 that terminate tcp sessions during prototocol negotiation.  Handle
+embedded commas in mount parsing of passwords.
+
+Version 0.99
+------------
+Invalidate local inode cached pages on oplock break and when last file
+instance is closed so that the client does not continue using stale local
+copy rather than later modified server copy of file.  Do not reconnect
+when server drops the tcp session prematurely before negotiate
+protocol response.  Fix oops in roepen_file when dentry freed.  Allow
+the support for CIFS Unix Extensions to be disabled via proc interface.
+
+Version 0.98
+------------
+Fix hang in commit_write during reconnection of open files under heavy load.
+Fix unload_nls oops in a mount failure path. Serialize writes to same socket
+which also fixes any possible races when cifs signatures are enabled in SMBs
+being sent out of signature sequence number order.    
+
+Version 0.97
+------------
+Fix byte range locking bug (endian problem) causing bad offset and
+length.
+
+Version 0.96
+------------
+Fix oops (in send_sig) caused by CIFS unmount code trying to
+wake up the demultiplex thread after it had exited. Do not log
+error on harmless oplock release of closed handle.
+
+Version 0.95
+------------
+Fix unsafe global variable usage and password hash failure on gcc 3.3.1
+Fix problem reconnecting secondary mounts to same server after session 
+failure.  Fix invalid dentry - race in mkdir when directory gets created
+by another client between the lookup and mkdir.
+ 
 Version 0.94
 ------------
 Fix to list processing in reopen_files. Fix reconnection when server hung

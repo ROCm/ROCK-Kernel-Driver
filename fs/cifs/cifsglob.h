@@ -16,6 +16,7 @@
  * 
  */
 #include <linux/in.h>
+#include <linux/in6.h>
 #include "cifs_fs_sb.h"
 /*
  * The sizes of various internal tables and strings
@@ -55,6 +56,10 @@
 #define TRUE 1
 #endif
 
+#ifndef XATTR_DOS_ATTRIB
+#define XATTR_DOS_ATTRIB "user.DOSATTRIB"
+#endif
+
 /*
  * This information is kept on every Server we know about.
  *
@@ -83,6 +88,13 @@ enum securityEnum {
 	Kerberos		/* Kerberos via SPNEGO */
 };
 
+enum protocolEnum {
+	IPV4 = 0,
+	IPV6,
+	SCTP
+	/* Netbios frames protocol not supported at this time */
+};
+
 /*
  *****************************************************************
  * Except the CIFS PDUs themselves all the
@@ -94,13 +106,16 @@ struct TCP_Server_Info {
 	char server_Name[SERVER_NAME_LEN_WITH_NULL];	/* 15 chars + X'20'in 16th */
 	char unicode_server_Name[SERVER_NAME_LEN_WITH_NULL * 2];	/* Unicode version of server_Name */
 	struct socket *ssocket;
-	struct sockaddr_in sockAddr;
+	union {
+		struct sockaddr_in sockAddr;
+		struct sockaddr_in6 sockAddr6;
+	} addr;
 	wait_queue_head_t response_q;
 	struct list_head pending_mid_q;
 	void *Server_NlsInfo;	/* BB - placeholder for future NLS info  */
 	unsigned short server_codepage;	/* codepage for the server    */
 	unsigned long ip_address;	/* IP addr for the server if known     */
-	unsigned long svType;	/* computer type                       */
+	enum protocolEnum protocolType;	
 	char versionMajor;
 	char versionMinor;
 	int svlocal:1;		/* local server or remote */
@@ -161,7 +176,7 @@ struct cifsSesInfo {
 	char serverName[SERVER_NAME_LEN_WITH_NULL * 2];	/* BB make bigger for tcp names - will ipv6 and sctp addresses fit here?? */
 	char userName[MAX_USERNAME_SIZE + 1];
 	char domainName[MAX_USERNAME_SIZE + 1];
-	char password_with_pad[CIFS_ENCPWD_SIZE];
+	char * password;
 };
 
 /*
@@ -175,13 +190,14 @@ struct cifsTconInfo {
 	struct cifsSesInfo *ses;	/* pointer to session associated with */
 	char treeName[MAX_TREE_SIZE + 1]; /* UNC name of resource (in ASCII not UTF) */
 	char *nativeFileSystem;
-	__u16 tid;		/* The 2 byte transaction id */
+	__u16 tid;		/* The 2 byte tree id */
 	__u16 Flags;		/* optional support bits */
 	enum statusEnum tidStatus;
-	atomic_t useCount;	/* how many mounts (explicit or implicit refer to this share */
+	atomic_t useCount;	/* how many mounts (explicit or implicit) to this share */
 	FILE_SYSTEM_DEVICE_INFO fsDevInfo;
-	FILE_SYSTEM_ATTRIBUTE_INFO fsAttrInfo;	/* note file system name may be truncated - but very unlikely */
+	FILE_SYSTEM_ATTRIBUTE_INFO fsAttrInfo;	/* ok if file system name truncated */
 	FILE_SYSTEM_UNIX_INFO fsUnixInfo;
+	int retry:1;
 	/* BB add field for back pointer to sb struct? */
 };
 
@@ -213,6 +229,7 @@ struct cifsFileInfo {
 	int closePend:1;	/* file is marked to close */
 	int emptyDir:1;
 	int invalidHandle:1;  /* file closed via session abend */
+	struct semaphore fh_sem; /* prevents reopen race after dead ses*/
 	char * search_resume_name;
 	unsigned int resume_name_length;
 	__u32 resume_key;
@@ -274,6 +291,7 @@ struct oplock_q_entry {
 #define   MID_REQUEST_ALLOCATED 1
 #define   MID_REQUEST_SUBMITTED 2
 #define   MID_RESPONSE_RECEIVED 4
+#define   MID_RETRY_NEEDED      8 /* session closed while this request out */
 
 struct servers_not_supported { /* @z4a */
 	struct servers_not_supported *next1;  /* @z4a */
@@ -313,7 +331,7 @@ struct servers_not_supported { /* @z4a */
  *  ----------
  *  sesSem     operations on smb session
  *  tconSem    operations on tree connection
- *  i_sem      inode operations 
+ *  fh_sem      file handle reconnection operations 
  *
  ****************************************************************************/
 
@@ -358,6 +376,9 @@ GLOBAL_EXTERN char Local_System_Name[15];
 GLOBAL_EXTERN atomic_t sesInfoAllocCount;
 GLOBAL_EXTERN atomic_t tconInfoAllocCount;
 
+GLOBAL_EXTERN atomic_t tcpSesReconnectCount;
+GLOBAL_EXTERN atomic_t tconInfoReconnectCount;
+
 /* Various Debug counters to remove someday (BB) */
 GLOBAL_EXTERN atomic_t bufAllocCount;
 GLOBAL_EXTERN atomic_t midCount;
@@ -374,4 +395,6 @@ GLOBAL_EXTERN unsigned int extended_security;	/* if on, session setup sent
 				with more secure ntlmssp2 challenge/resp */
 GLOBAL_EXTERN unsigned int ntlmv2_support;  /* better optional password hash */
 GLOBAL_EXTERN unsigned int sign_CIFS_PDUs;  /* enable smb packet signing */
+GLOBAL_EXTERN unsigned int linuxExtEnabled;  /* enable Linux/Unix CIFS extensions */
+
 

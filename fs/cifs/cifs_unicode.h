@@ -58,25 +58,10 @@ extern signed char UniLowerTable[512];
 extern struct UniCaseRange UniLowerRange[];
 #endif				/* UNIUPR_NOLOWER */
 
-/*
- *      directory entry argument
- */
-struct component_name {
-	int namlen;
-	wchar_t *name;
-};
-
 #ifdef __KERNEL__
 int cifs_strfromUCS_le(char *, const wchar_t *, int, const struct nls_table *);
 int cifs_strtoUCS(wchar_t *, const char *, int, const struct nls_table *);
-
-int cifs_UCSname(struct component_name *, struct dentry *,
-		 const struct nls_table *);
-
-void toUpper(const struct nls_table *, char *);
 #endif
-
-#define free_UCSname(COMP) kfree((COMP)->name)
 
 /*
  * UniStrcat:  Concatenate the second string to the first

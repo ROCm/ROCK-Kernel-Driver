@@ -25,25 +25,6 @@
 #include "cifs_debug.h"
 
 /*
- * NAME:	toUpper()
- *
- * FUNCTION:	Upper case ASCII string (in place) using the current codepage
- *
- */
-
-void
-toUpper(const struct nls_table *n, char *mixed_string)
-{
-	unsigned int i;
-	char temp;
-
-	for (i = 0; i < strlen(mixed_string); i++) {
-		temp = mixed_string[i];
-		mixed_string[i] = n->charset2upper[(int) temp];
-	}
-}
-
-/*
  * NAME:	cifs_strfromUCS()
  *
  * FUNCTION:	Convert little-endian unicode string to character string
@@ -104,28 +85,3 @@ cifs_strtoUCS(wchar_t * to, const char *from, int len,
 	return i;
 }
 
-/*
- * NAME:	get_UCSname2()
- *
- * FUNCTION:	Allocate and translate to unicode string
- *
- */
-/*int
-get_UCSname2(struct component_name *uniName, struct dentry *dentry,
-	    struct nls_table *nls_tab)
-{
-	int length = dentry->d_name.len;
-
-	if (length > 255)
-		return ENAMETOOLONG;
-
-	uniName->name = kmalloc((length + 1) * sizeof (wchar_t), GFP_KERNEL);
-
-	if (uniName->name == NULL)
-		return ENOSPC;
-
-	uniName->namlen = cifs_strtoUCS(uniName->name, dentry->d_name.name,
-					length, nls_tab);
-
-	return 0;
-} */

@@ -30,8 +30,8 @@ struct statfs;
  *****************************************************************
  */
 
-extern struct smb_hdr *buf_get(void);
-extern void buf_release(void *);
+extern struct smb_hdr *cifs_buf_get(void);
+extern void cifs_buf_release(void *);
 extern int smb_send(struct socket *, struct smb_hdr *,
 			unsigned int /* length */ , struct sockaddr *);
 extern unsigned int _GetXid(void);
@@ -41,7 +41,6 @@ extern void _FreeXid(unsigned int);
 extern char *build_path_from_dentry(struct dentry *);
 extern char *build_wildcard_path_from_dentry(struct dentry *direntry);
 extern void renew_parental_timestamps(struct dentry *direntry);
-extern void *kcalloc(size_t mem, int type);
 extern int SendReceive(const unsigned int /* xid */ , struct cifsSesInfo *,
 			struct smb_hdr * /* input */ ,
 			struct smb_hdr * /* out */ ,
@@ -61,12 +60,6 @@ struct oplock_q_entry * AllocOplockQEntry(struct inode *, u16, struct cifsTconIn
 void DeleteOplockQEntry(struct oplock_q_entry *);
 extern struct timespec cifs_NTtimeToUnix(u64 /* utc nanoseconds since 1601 */ );
 extern u64 cifs_UnixTimeToNT(struct timespec);
-extern void RevUcode_to_Ucode(char *revUnicode, char *UnicodeName);
-extern void Ucode_to_RevUcode(char *Unicode, char *revUnicodeName);
-extern void RevUcode_to_Ucode_with_Len(char *revUnicode, char *UnicodeName,
-			int Len);
-extern void Ucode_to_RevUcode_with_Len(char *Unicode, char *revUnicodeName,
-			int Len);
 extern int cifs_get_inode_info(struct inode **pinode,
 			const unsigned char *search_path, 
 			FILE_ALL_INFO * pfile_info,
@@ -75,21 +68,9 @@ extern int cifs_get_inode_info_unix(struct inode **pinode,
 			const unsigned char *search_path,
 			struct super_block *sb);
 
-extern int reopen_files(struct cifsTconInfo *, struct nls_table *);
-extern int setup_session(unsigned int xid, struct cifsSesInfo *pSesInfo, 
+extern int cifs_setup_session(unsigned int xid, struct cifsSesInfo *pSesInfo, 
 			struct nls_table * nls_info);
 extern int CIFSSMBNegotiate(unsigned int xid, struct cifsSesInfo *ses);
-extern int CIFSSessSetup(unsigned int xid, struct cifsSesInfo *ses,
-			char *ntlm_session_key, const struct nls_table *);
-extern int CIFSSpnegoSessSetup(unsigned int xid, struct cifsSesInfo *ses,
-			char *SecurityBlob,int SecurityBlobLength,
-			const struct nls_table *);
-extern int CIFSNTLMSSPNegotiateSessSetup(unsigned int xid,
-			struct cifsSesInfo *ses, int  *ntlmv2_flag,
-			const struct nls_table *);
-extern int CIFSNTLMSSPAuthSessSetup(unsigned int xid,
-			struct cifsSesInfo *ses, char *ntlm_session_key,
-			int ntlmv2_flag, const struct nls_table *);
 
 extern int CIFSTCon(unsigned int xid, struct cifsSesInfo *ses,
 			const char *tree, struct cifsTconInfo *tcon,
@@ -224,7 +205,6 @@ extern void sesInfoFree(struct cifsSesInfo *);
 extern struct cifsTconInfo *tconInfoAlloc(void);
 extern void tconInfoFree(struct cifsTconInfo *);
 
-extern int cifs_demultiplex_thread(struct TCP_Server_Info *);
 extern int cifs_reconnect(struct TCP_Server_Info *server);
 
 extern int cifs_sign_smb(struct smb_hdr *, struct cifsSesInfo *,__u32 *);

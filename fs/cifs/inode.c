@@ -125,7 +125,7 @@ cifs_get_inode_info_unix(struct inode **pinode,
 		inode->i_nlink = le64_to_cpu(findData.Nlinks);
 		findData.NumOfBytes = le64_to_cpu(findData.NumOfBytes);
 		findData.EndOfFile = le64_to_cpu(findData.EndOfFile);
-		inode->i_size = findData.EndOfFile;
+		i_size_write(inode,findData.EndOfFile);
 /* blksize needs to be multiple of two. So safer to default to blksize
 	and blkbits set in superblock so 2**blkbits and blksize will match */
 /*		inode->i_blksize =
@@ -272,7 +272,7 @@ cifs_get_inode_info(struct inode **pinode, const unsigned char *search_path,
 				inode->i_mode &= ~(S_IWUGO);
    /* BB add code here - validate if device or weird share or device type? */
 		}
-		inode->i_size = le64_to_cpu(pfindData->EndOfFile);
+		i_size_write(inode,le64_to_cpu(pfindData->EndOfFile));
 		pfindData->AllocationSize = le64_to_cpu(pfindData->AllocationSize);
 		inode->i_blocks =
 	                (inode->i_blksize - 1 + pfindData->AllocationSize) >> inode->i_blkbits;
@@ -426,6 +426,7 @@ cifs_mkdir(struct inode *inode, struct dentry *direntry, int mode)
 	rc = CIFSSMBMkDir(xid, pTcon, full_path, cifs_sb->local_nls);
 	if (rc) {
 		cFYI(1, ("cifs_mkdir returned 0x%x ", rc));
+		d_drop(direntry);
 	} else {
 		inode->i_nlink++;
 		if (pTcon->ses->capabilities & CAP_UNIX)
@@ -479,7 +480,7 @@ cifs_rmdir(struct inode *inode, struct dentry *direntry)
 
 	if (!rc) {
 		inode->i_nlink--;
-		direntry->d_inode->i_size = 0;
+		i_size_write(direntry->d_inode,0);
 		direntry->d_inode->i_nlink = 0;
 	}
 
@@ -530,17 +531,17 @@ cifs_rename(struct inode *source_inode, struct dentry *source_direntry,
 	}
 
 	if((rc == -EIO)||(rc == -EEXIST)) {
-                int oplock = FALSE;
-                __u16 netfid;
+		int oplock = FALSE;
+		__u16 netfid;
 
-                rc = CIFSSMBOpen(xid, pTcon, fromName, FILE_OPEN, GENERIC_READ,
-                                CREATE_NOT_DIR,
-                                &netfid, &oplock, NULL, cifs_sb_source->local_nls);
-                if(rc==0) {
-                        CIFSSMBRenameOpenFile(xid,pTcon,netfid,
-                                toName, cifs_sb_source->local_nls);
-                        CIFSSMBClose(xid, pTcon, netfid);
-                }
+		rc = CIFSSMBOpen(xid, pTcon, fromName, FILE_OPEN, GENERIC_READ,
+					CREATE_NOT_DIR,
+					&netfid, &oplock, NULL, cifs_sb_source->local_nls);
+		if(rc==0) {
+			CIFSSMBRenameOpenFile(xid,pTcon,netfid,
+					toName, cifs_sb_source->local_nls);
+			CIFSSMBClose(xid, pTcon, netfid);
+		}
 	}
 	if (fromName)
 		kfree(fromName);
@@ -559,6 +560,21 @@ cifs_revalidate(struct dentry *direntry)
 	char *full_path;
 	struct cifs_sb_info *cifs_sb;
 	struct cifsInodeInfo *cifsInode;
+	loff_t local_size;
+	struct timespec local_mtime;
+	int invalidate_inode = FALSE;
+
+	if(direntry->d_inode == NULL)
+		return -ENOENT;
+
+	cifsInode = CIFS_I(direntry->d_inode);
+
+	if(cifsInode == NULL)
+		return -ENOENT;
+
+	/* no sense revalidating inode info on file that no one can write */
+	if(CIFS_I(direntry->d_inode)->clientCanCacheRead)
+		return rc;
 
 	xid = GetXid();
 
@@ -571,10 +587,6 @@ cifs_revalidate(struct dentry *direntry)
 	      direntry->d_inode->i_count.counter, direntry,
 	      direntry->d_time, jiffies));
 
-
-	cifsInode = CIFS_I(direntry->d_inode);
-	/* BB add check - do not need to revalidate oplocked files */
-
 	if (time_before(jiffies, cifsInode->time + HZ) && lookupCacheEnabled) {
 	    if((S_ISREG(direntry->d_inode->i_mode) == 0) || 
 			(direntry->d_inode->i_nlink == 1)) {  
@@ -586,6 +598,10 @@ cifs_revalidate(struct dentry *direntry)
 			cFYI(1,("Have to revalidate file due to hardlinks"));
 		}            
 	}
+	
+	/* save mtime and size */
+	local_mtime = direntry->d_inode->i_mtime;
+	local_size  = direntry->d_inode->i_size;
 
 	if (cifs_sb->tcon->ses->capabilities & CAP_UNIX) {
 		rc = cifs_get_inode_info_unix(&direntry->d_inode, full_path,
@@ -606,8 +622,43 @@ cifs_revalidate(struct dentry *direntry)
 	}
 	/* should we remap certain errors, access denied?, to zero */
 
-	/* BB if not oplocked, invalidate inode pages if mtime has changed */
+	/* if not oplocked, we invalidate inode pages if mtime 
+	   or file size had changed on server */
 
+	if(timespec_equal(&local_mtime,&direntry->d_inode->i_mtime) && 
+		(local_size == direntry->d_inode->i_size)) {
+		cFYI(1,("cifs_revalidate - inode unchanged"));
+	} else {
+		/* file may have changed on server */
+		if(cifsInode->clientCanCacheRead) {
+			/* no need to invalidate inode pages since we were
+			   the only ones who could have modified the file and
+			   the server copy is staler than ours */
+		} else {
+			invalidate_inode = TRUE;
+		}
+	}
+
+
+	/* need to write out dirty pages here  */
+	down(&direntry->d_inode->i_sem);
+	if(direntry->d_inode->i_mapping) {
+		/* do we need to lock inode until after invalidate completes below? */
+		filemap_fdatawrite(direntry->d_inode->i_mapping);
+	}
+	if(invalidate_inode) {
+		filemap_fdatawait(direntry->d_inode->i_mapping);
+		/* may eventually have to do this for open files too */
+		if(list_empty(&(cifsInode->openFileList))) {
+			/* Has changed on server - flush read ahead pages */
+			cFYI(1,("Invalidating read ahead data on closed file"));
+			invalidate_remote_inode(direntry->d_inode);
+		}
+	}
+
+
+	up(&direntry->d_inode->i_sem);
+	
 	if (full_path)
 		kfree(full_path);
 	FreeXid(xid);
@@ -623,78 +674,25 @@ int cifs_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *stat
 	return err;
 }
 
-void
-cifs_truncate_file(struct inode *inode)
-{				/* BB remove - may not need this function after all BB */
-	int xid;
-	int rc = 0;
-	struct cifsFileInfo *open_file = NULL;
-	struct cifs_sb_info *cifs_sb;
-	struct cifsTconInfo *pTcon;
-	struct cifsInodeInfo *cifsInode;
-	struct dentry *dirent;
-	char *full_path = NULL;   
-
-	xid = GetXid();
-
-	cifs_sb = CIFS_SB(inode->i_sb);
-	pTcon = cifs_sb->tcon;
-
-	if (list_empty(&inode->i_dentry)) {
-		cERROR(1,
-		       ("Can not get pathname from empty dentry in inode 0x%p ",
-			inode));
-		FreeXid(xid);
-		return;
-	}
-	dirent = list_entry(inode->i_dentry.next, struct dentry, d_alias);
-	if (dirent) {
-		full_path = build_path_from_dentry(dirent);
-		rc = CIFSSMBSetEOF(xid, pTcon, full_path, inode->i_size,FALSE,
-				   cifs_sb->local_nls);
-		cFYI(1,(" SetEOF (truncate) rc = %d",rc));
-		if(rc == -ETXTBSY) {        
-			cifsInode = CIFS_I(inode);
-			if(!list_empty(&(cifsInode->openFileList))) {            
-				open_file = list_entry(cifsInode->openFileList.next,
-					struct cifsFileInfo, flist);           
-            /* We could check if file is open for writing first */
-				 rc = CIFSSMBSetFileSize(xid, pTcon, inode->i_size,
-					open_file->netfid,open_file->pid,FALSE);
-			} else {
-				  cFYI(1,(" No open files to get file handle from"));
-			}
-		}
-		if (!rc)
-			CIFSSMBSetEOF(xid,pTcon,full_path,inode->i_size,TRUE,cifs_sb->local_nls);
-           /* allocation size setting seems optional so ignore return code */
-	}
-	if (full_path)
-		kfree(full_path);
-	FreeXid(xid);
-	return;
-}
-
-static int cifs_trunc_page(struct address_space *mapping, loff_t from)
+static int cifs_truncate_page(struct address_space *mapping, loff_t from)
 {
-        pgoff_t index = from >> PAGE_CACHE_SHIFT;
-        unsigned offset = from & (PAGE_CACHE_SIZE-1);
-        struct page *page;
-        char *kaddr;
-        int rc = 0;
+	pgoff_t index = from >> PAGE_CACHE_SHIFT;
+	unsigned offset = from & (PAGE_CACHE_SIZE-1);
+	struct page *page;
+	char *kaddr;
+	int rc = 0;
 
-        page = grab_cache_page(mapping, index);
-        if (!page)
-                return -ENOMEM;
+	page = grab_cache_page(mapping, index);
+	if (!page)
+		return -ENOMEM;
 
-        kaddr = kmap_atomic(page, KM_USER0);
-        memset(kaddr + offset, 0, PAGE_CACHE_SIZE - offset);
-        flush_dcache_page(page);
-        kunmap_atomic(kaddr, KM_USER0);
-        set_page_dirty(page);
-        unlock_page(page);
-        page_cache_release(page);
-        return rc;
+	kaddr = kmap_atomic(page, KM_USER0);
+	memset(kaddr + offset, 0, PAGE_CACHE_SIZE - offset);
+	flush_dcache_page(page);
+	kunmap_atomic(kaddr, KM_USER0);
+	unlock_page(page);
+	page_cache_release(page);
+	return rc;
 }
 
 int
@@ -705,6 +703,7 @@ cifs_setattr(struct dentry *direntry, struct iattr *attrs)
 	struct cifsTconInfo *pTcon;
 	char *full_path = NULL;
 	int rc = -EACCES;
+	int found = FALSE;
 	struct cifsFileInfo *open_file = NULL;
 	FILE_BASIC_INFO time_buf;
 	int set_time = FALSE;
@@ -712,6 +711,7 @@ cifs_setattr(struct dentry *direntry, struct iattr *attrs)
 	__u64 uid = 0xFFFFFFFFFFFFFFFFULL;
 	__u64 gid = 0xFFFFFFFFFFFFFFFFULL;
 	struct cifsInodeInfo *cifsInode;
+	struct list_head * tmp;
 
 	xid = GetXid();
 
@@ -726,32 +726,63 @@ cifs_setattr(struct dentry *direntry, struct iattr *attrs)
 
 	/* BB check if we need to refresh inode from server now ? BB */
 
-	cFYI(1, (" Changing attributes 0x%x", attrs->ia_valid));
+	/* need to flush data before changing file size on server */
+	filemap_fdatawrite(direntry->d_inode->i_mapping); 
+	filemap_fdatawait(direntry->d_inode->i_mapping);
 
 	if (attrs->ia_valid & ATTR_SIZE) {
-		rc = CIFSSMBSetEOF(xid, pTcon, full_path, attrs->ia_size,FALSE,
-				   cifs_sb->local_nls);
-		cFYI(1,(" SetEOF (setattrs) rc = %d",rc));
+		read_lock(&GlobalSMBSeslock); 
+		/* To avoid spurious oplock breaks from server, in the case
+			of inodes that we already have open, avoid doing path
+			based setting of file size if we can do it by handle.
+			This keeps our caching token (oplock) and avoids
+			timeouts when the local oplock break takes longer to flush
+			writebehind data than the SMB timeout for the SetPathInfo 
+			request would allow */
+		list_for_each(tmp, &cifsInode->openFileList) {            
+			open_file = list_entry(tmp,struct cifsFileInfo, flist);
+			/* We check if file is open for writing first */
+			if((open_file->pfile) &&
+				((open_file->pfile->f_flags & O_RDWR) || 
+				 (open_file->pfile->f_flags & O_WRONLY))) {
+				if(open_file->invalidHandle == FALSE) {
+					/* we found a valid, writeable network file 
+					handle to use to try to set the file size */
+					__u16 nfid = open_file->netfid;
+					__u32 npid = open_file->pid;
+					read_unlock(&GlobalSMBSeslock);
+					found = TRUE;
+					rc = CIFSSMBSetFileSize(xid, pTcon, attrs->ia_size,
+					   nfid,npid,FALSE);
+					cFYI(1,("SetFileSize by handle (setattrs) rc = %d",rc));
+				/* Do not need reopen and retry on EAGAIN since we will
+					retry by pathname below */
 
-		if(rc == -ETXTBSY) {
-			if(!list_empty(&(cifsInode->openFileList))) {            
-				open_file = list_entry(cifsInode->openFileList.next, 
-					   struct cifsFileInfo, flist);           
-    /* We could check if file is open for writing first */
-				rc = CIFSSMBSetFileSize(xid, pTcon, attrs->ia_size,
-					   open_file->netfid,open_file->pid,FALSE);           
-			} else {
-				cFYI(1,(" No open files to get file handle from"));
+					break;  /* now that we found one valid file handle no
+						sense continuing to loop trying others */
+				}
 			}
 		}
-        /*  For Allocation Size - do not need to call the following
-            it did not hurt if it fails but why bother */
-	/*	CIFSSMBSetEOF(xid, pTcon, full_path, attrs->ia_size, TRUE, cifs_sb->local_nls);*/
+		if(found == FALSE) {
+			read_unlock(&GlobalSMBSeslock);
+		}
+
+
+		if(rc != 0) {
+			/* Set file size by pathname rather than by handle either
+			because no valid, writeable file handle for it was found or
+			because there was an error setting it by handle */
+			rc = CIFSSMBSetEOF(xid, pTcon, full_path, attrs->ia_size,FALSE,
+				   cifs_sb->local_nls);
+			cFYI(1,(" SetEOF by path (setattrs) rc = %d",rc));
+		}
+        
+	/*  Server is ok setting allocation size implicitly - no need to call: */
+	/*CIFSSMBSetEOF(xid, pTcon, full_path, attrs->ia_size, TRUE, cifs_sb->local_nls);*/
+
 		if (rc == 0) {
 			rc = vmtruncate(direntry->d_inode, attrs->ia_size);
-			cifs_trunc_page(direntry->d_inode->i_mapping, direntry->d_inode->i_size); 
-
-/*          cFYI(1,("truncate_page to 0x%lx \n",direntry->d_inode->i_size)); */
+			cifs_truncate_page(direntry->d_inode->i_mapping, direntry->d_inode->i_size);
 		}
 	}
 	if (attrs->ia_valid & ATTR_UID) {
@@ -816,6 +847,8 @@ cifs_setattr(struct dentry *direntry, struct iattr *attrs)
 		/* BB what if setting one attribute fails  
 			(such as size) but time setting works */
 		time_buf.CreationTime = 0;	/* do not change */
+		/* In the future we should experiment - try setting timestamps
+			 via Handle (SetFileInfo) instead of by path */
 		rc = CIFSSMBSetTimes(xid, pTcon, full_path, &time_buf,
 				cifs_sb->local_nls);
 	}
@@ -831,8 +864,7 @@ cifs_setattr(struct dentry *direntry, struct iattr *attrs)
 void
 cifs_delete_inode(struct inode *inode)
 {
-	/* Note: called without the big kernel filelock - remember spinlocks! */
 	cFYI(1, ("In cifs_delete_inode, inode = 0x%p ", inode));
-	/* may have to add back in when safe distributed caching of
-             directories via e.g. FindNotify added */
+	/* may have to add back in if and when safe distributed caching of
+		directories added e.g. via FindNotify */
 }

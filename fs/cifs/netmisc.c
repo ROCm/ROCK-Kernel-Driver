@@ -128,7 +128,7 @@ const struct smb_to_posix_error mapping_table_ERRHRD[] = {
 /* BB add address family, change rc to status flag and return *//* also see inet_pton */
 /* To identify v4 vs. v6 - 1) check for colon (v6 only) 2) then call inet_pton to parse for bad address  */
 int
-inet_addr(char *cp)
+cifs_inet_addr(char *cp)
 {
 	struct in_addr address;
 	int value;

@@ -727,8 +727,10 @@ typedef struct smb_com_read_rsp {
 typedef struct locking_andx_range {
 	__u16 Pid;
 	__u16 Pad;
-	__u64 Offset;
-	__u64 Length;
+	__u32 OffsetHigh;
+	__u32 OffsetLow;
+	__u32 LengthHigh;
+	__u32 LengthLow;
 } LOCKING_ANDX_RANGE;
 
 #define LOCKING_ANDX_SHARED_LOCK     0x01
@@ -1101,10 +1103,10 @@ typedef struct smb_com_transaction2_spi_rsp {
 } TRANSACTION2_SPI_RSP;
 
 struct set_file_rename {
-        __u32 overwrite;   /* 1 = overwrite dest */
-        __u32 root_fid;   /* zero */
+	__u32 overwrite;   /* 1 = overwrite dest */
+	__u32 root_fid;   /* zero */
 	__u32 target_name_len;
-        char  target_name[0];  /* Must be unicode */
+	char  target_name[0];  /* Must be unicode */
 };
 
 struct smb_com_transaction2_sfi_req {
