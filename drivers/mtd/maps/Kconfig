@@ -1,5 +1,5 @@
 # drivers/mtd/maps/Kconfig
-# $Id: Kconfig,v 1.40 2004/12/09 20:01:05 holindho Exp $
+# $Id: Kconfig,v 1.42 2005/01/05 16:59:50 dwmw2 Exp $
 
 menu "Mapping drivers for chip access"
 	depends on MTD!=n
@@ -159,7 +159,7 @@ config MTD_VMAX
 
 config MTD_SCx200_DOCFLASH
 	tristate "Flash device mapped with DOCCS on NatSemi SCx200"
-	depends on X86 && MTD_CFI
+	depends on X86 && MTD_CFI && MTD_PARTITIONS
 	help
 	  Enable support for a flash chip mapped using the DOCCS signal on a
 	  National Semiconductor SCx200 processor.
@@ -407,7 +407,7 @@ config MTD_REDWOOD
 
 config MTD_CHESTNUT
 	tristate "CFI Flash devices mapped on IBM 750FX or IBM 750GX Eval Boards"
-	depends on MTD_CFI && PPC32 && CHESTNUT
+	depends on MTD_CFI && PPC32 && CHESTNUT && MTD_PARTITIONS
 	help
 	  This enables access routines for the flash chips on the IBM
 	  750FX and 750GX Eval Boards. If you have one of these boards and

@@ -1,5 +1,5 @@
 # drivers/mtd/nand/Kconfig
-# $Id: Kconfig,v 1.25 2004/11/29 22:40:45 dwmw2 Exp $
+# $Id: Kconfig,v 1.26 2005/01/05 12:42:24 dwmw2 Exp $
 
 menu "NAND Flash Device Drivers"
 	depends on MTD!=n
@@ -198,7 +198,7 @@ config MTD_NAND_DISKONCHIP_BBTWRITE
  
  config MTD_NAND_NANDSIM
  	bool "Support for NAND Flash Simulator"
- 	depends on MTD_NAND
+ 	depends on MTD_NAND && MTD_PARTITIONS
 
 	help
 	  The simulator may simulate verious NAND flash chips for the
