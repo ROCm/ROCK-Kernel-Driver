@@ -7002,6 +7002,9 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 	tp->pci_hdr_type     = (cacheline_sz_reg >> 16) & 0xff;
 	tp->pci_bist         = (cacheline_sz_reg >> 24) & 0xff;
 
+	if (pci_find_capability(tp->pdev, PCI_CAP_ID_EXP) != 0)
+		tp->tg3_flags2 |= TG3_FLG2_PCI_EXPRESS;
+
 	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5703 &&
 	    tp->pci_lat_timer < 64) {
 		tp->pci_lat_timer = 64;
