@@ -77,24 +77,6 @@ static void autofs4_update_usage(struct dentry *dentry)
 	}
 }
 
-static void autofs4_check_pwd(struct file *file, struct file *fp)
-{
-	struct dentry *pwd = file->f_dentry;
-	struct dentry *new_pwd = fp->f_dentry;
-	struct vfsmount *new_mnt = fp->f_vfsmnt;
-
-	/* dentry is a pwd of mountpoint so move to it */
-	if (current->fs->pwd == pwd)
-		set_fs_pwd(current->fs, new_mnt, new_pwd);
-
-	/* dentry is root of a chrooted mountpoint so move to it */
-	if (current->fs->root == pwd) {
-		set_fs_root(current->fs, new_mnt, new_pwd);
-		/* alternate os ABI not supported  */
-		/* set_fs_altroot(); */
-	}
-}
-
 /*
  * From 2.4 kernel readdir.c
  */
@@ -186,7 +168,7 @@ static int autofs4_dir_open(struct inode *inode, struct file *file)
 		if (!empty)
 			d_invalidate(dentry);
 
-		nd.flags = LOOKUP_CONTINUE;
+		nd.flags = LOOKUP_DIRECTORY;
 		status = (dentry->d_op->d_revalidate)(dentry, &nd);
 
 		if (!status)
@@ -206,7 +188,6 @@ static int autofs4_dir_open(struct inode *inode, struct file *file)
 			file->private_data = NULL;
 			return status;
 		}
-		autofs4_check_pwd(file, fp);
 		file->private_data = fp;
 	}
 out:
@@ -326,7 +307,8 @@ static int try_to_fill_dentry(struct dentry *dentry,
 			return 1;
 		}
 	/* Trigger mount for path component or follow link */
-	} else if (flags & LOOKUP_CONTINUE || current->link_count) {
+	} else if (flags & (LOOKUP_CONTINUE | LOOKUP_DIRECTORY) ||
+			current->link_count) {
 		DPRINTK(("try_to_fill_entry: waiting for mount name=%.*s\n",
 			dentry->d_name.len, dentry->d_name.name));
 
@@ -343,35 +325,6 @@ static int try_to_fill_dentry(struct dentry *dentry,
 			spin_unlock(&dentry->d_lock);
 			return 0;
 		}
-	/* also for chdir or chroot so subsequent path walks work properly */
-	} else if (dentry == current->fs->pwd || dentry == current->fs->root) {
-		struct vfsmount *mnt;
-
-		DPRINTK(("try_to_fill_entry: waiting for mount name=%.*s\n",
-			 dentry->d_name.len, dentry->d_name.name));
-
-		spin_lock(&dentry->d_lock);
-		dentry->d_flags |= DCACHE_AUTOFS_PENDING;
-		spin_unlock(&dentry->d_lock);
-		status = autofs4_wait(sbi, dentry, NFY_MOUNT);
-
-		DPRINTK(("try_to_fill_entry: mount done status=%d\n", status));
-
-		if ( status ) {
-			spin_lock(&dentry->d_lock);
-			dentry->d_flags &= ~DCACHE_AUTOFS_PENDING;
-			spin_unlock(&dentry->d_lock);
-			return 0;
-		}
-
-		if (dentry == current->fs->pwd) {
-			mnt = lookup_mnt(current->fs->pwdmnt, dentry);
-			set_fs_pwd(current->fs, mnt, mnt->mnt_root);
-		} else {
-			mnt = lookup_mnt(current->fs->rootmnt, dentry);
-			set_fs_root(current->fs, mnt, mnt->mnt_root);
-		}
-		mntput(mnt);
 	}
 
 	/* We don't update the usages for the autofs daemon itself, this

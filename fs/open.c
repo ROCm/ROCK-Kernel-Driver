@@ -517,15 +517,10 @@ asmlinkage long sys_chdir(const char __user * filename)
 {
 	struct nameidata nd;
 	int error;
-	struct vfsmount *old_mnt;
-	struct dentry *old_dentry;
 
 	error = __user_walk(filename, LOOKUP_FOLLOW|LOOKUP_DIRECTORY, &nd);
 	if (error)
 		goto out;
-
-	old_mnt = mntget(current->fs->pwdmnt);
-	old_dentry = dget(current->fs->pwd);
 
 	error = permission(nd.dentry->d_inode,MAY_EXEC,&nd);
 	if (error)
@@ -533,27 +528,7 @@ asmlinkage long sys_chdir(const char __user * filename)
 
 	set_fs_pwd(current->fs, nd.mnt, nd.dentry);
 
-	/*
-	 * if we chdir to an autofs4 mount point we must get in early
-	 * for subsequent path_walks to work properly.
-	 */
-	if (nd.dentry->d_op && nd.dentry->d_op->d_revalidate) {
-		int res;
-
-		res = nd.dentry->d_op->d_revalidate(nd.dentry, &nd);
-		if (res) {
-			error = permission(current->fs->pwd->d_inode, MAY_EXEC, &nd);
-			if (!error)
-				goto dput_and_out;
-		} else
-			error = -ENOENT;
-
-		set_fs_pwd(current->fs, old_mnt, old_dentry);
-	}
-
 dput_and_out:
-	mntput(old_mnt);
-	dput(old_dentry);
 	path_release(&nd);
 out:
 	return error;
@@ -593,15 +568,10 @@ asmlinkage long sys_chroot(const char __user * filename)
 {
 	struct nameidata nd;
 	int error;
-	struct vfsmount *old_mnt;
-	struct dentry *old_dentry;
 
 	error = __user_walk(filename, LOOKUP_FOLLOW | LOOKUP_DIRECTORY | LOOKUP_NOALT, &nd);
 	if (error)
 		goto out;
-
-	old_mnt = mntget(current->fs->pwdmnt);
-	old_dentry = dget(current->fs->pwd);
 
 	error = permission(nd.dentry->d_inode,MAY_EXEC,&nd);
 	if (error)
@@ -612,31 +582,9 @@ asmlinkage long sys_chroot(const char __user * filename)
 		goto dput_and_out;
 
 	set_fs_root(current->fs, nd.mnt, nd.dentry);
-
-	/*
-	 * if we chroot to an autofs4 mount point we must get in early
-	 * for subsequent path_walks to work properly.
-	 */
-	if (nd.dentry->d_op && nd.dentry->d_op->d_revalidate) {
-		int res;
-
-		res = nd.dentry->d_op->d_revalidate(nd.dentry, &nd);
-		if (res) {
-			error = permission(current->fs->pwd->d_inode, MAY_EXEC, &nd);
-			if (!error)
-				goto valid;
-		} else
-			error = -ENOENT;
-
-		set_fs_root(current->fs, old_mnt, old_dentry);
-		goto dput_and_out;
-	}
-valid:
 	set_fs_altroot();
 	error = 0;
 dput_and_out:
-	mntput(old_mnt);
-	dput(old_dentry);
 	path_release(&nd);
 out:
 	return error;
