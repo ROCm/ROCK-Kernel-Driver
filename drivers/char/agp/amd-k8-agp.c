@@ -23,6 +23,19 @@
 /* Will need to be increased if hammer ever goes >8-way. */
 #define MAX_HAMMER_GARTS   8
 
+/* PTE bits. */
+#define GPTE_VALID	1
+#define GPTE_COHERENT	2
+
+/* Aperture control register bits. */
+#define GARTEN		1<<0
+#define DISGARTCPU	1<<4
+#define DISGARTIO	1<<5
+
+/* GART cache control register bits. */
+#define INVGART		1<<0
+#define GARTPTEERR	1<<1
+
 static int nr_garts;
 static struct pci_dev * hammers[MAX_HAMMER_GARTS];
 
@@ -34,7 +47,7 @@ static void flush_x86_64_tlb(struct pci_dev *dev)
 	u32 tmp;
 
 	pci_read_config_dword (dev, AMD_X86_64_GARTCACHECTL, &tmp);
-	tmp |= 1<<0;
+	tmp |= INVGART;
 	pci_write_config_dword (dev, AMD_X86_64_GARTCACHECTL, tmp);
 }
 
@@ -80,7 +93,7 @@ static int x86_64_insert_memory(struct agp_memory *mem, off_t pg_start, int type
 		BUG_ON(tmp & 0xffffff0000000ffc);
 		pte = (tmp & 0x000000ff00000000) >> 28;
 		pte |=(tmp & 0x00000000fffff000);
-		pte |= 1<<1|1<<0;
+		pte |= GPTE_VALID | GPTE_COHERENT;
 
 		agp_bridge->gatt_table[j] = pte;
 	}
@@ -162,8 +175,8 @@ static u64 amd_x86_64_configure (struct pci_dev *hammer, u64 gatt_table)
 
 	/* Enable GART translation for this hammer. */
 	pci_read_config_dword(hammer, AMD_X86_64_GARTAPERTURECTL, &tmp);
-	tmp &= 0x3f;
-	tmp |= 1<<0;
+	tmp |= GARTEN;
+	tmp &= ~(DISGARTCPU | DISGARTIO);
 	pci_write_config_dword(hammer, AMD_X86_64_GARTAPERTURECTL, tmp);
 
 	/* keep CPU's coherent. */
