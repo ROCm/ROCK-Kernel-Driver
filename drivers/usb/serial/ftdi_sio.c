@@ -392,7 +392,7 @@ static struct usb_device_id id_table_HE_TIRA1 [] = {
 };
 
 
-static __devinitdata struct usb_device_id id_table_combined [] = {
+static struct usb_device_id id_table_combined [] = {
 	{ USB_DEVICE(FTDI_VID, FTDI_SIO_PID) },
 	{ USB_DEVICE(FTDI_VID, FTDI_8U232AM_PID) },
 	{ USB_DEVICE(FTDI_VID, FTDI_RELAIS_PID) },

@@ -158,7 +158,7 @@ struct ax8817x_info {
 };
 
 
-const struct usb_device_id ax8817x_id_table[] __devinitdata = {
+const struct usb_device_id ax8817x_id_table[] = {
 	/* Linksys USB200M */
       {USB_DEVICE(0x077b, 0x2226), driver_info:0x00130103},
 	/* Hawking UF200, TRENDnet TU2-ET100 */

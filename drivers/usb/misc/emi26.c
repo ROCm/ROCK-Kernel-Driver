@@ -201,7 +201,7 @@ wraperr:
 	return err;
 }
 
-static __devinitdata struct usb_device_id id_table [] = {
+static struct usb_device_id id_table [] = {
 	{ USB_DEVICE(EMI26_VENDOR_ID, EMI26_PRODUCT_ID) },
 	{ }                                             /* Terminating entry */
 };
@@ -231,7 +231,7 @@ struct usb_driver emi26_driver = {
 	.name		= "emi26 - firmware loader",
 	.probe		= emi26_probe,
 	.disconnect	= emi26_disconnect,
-	.id_table	= NULL,
+	.id_table	= id_table,
 };
 
 static int __init emi26_init (void)

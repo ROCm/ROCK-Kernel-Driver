@@ -2503,7 +2503,7 @@ static const struct hc_driver uhci_driver = {
 	.hub_control =		uhci_hub_control,
 };
 
-static const struct pci_device_id __devinitdata uhci_pci_ids[] = { {
+static const struct pci_device_id uhci_pci_ids[] = { {
 
 	/* handle any USB UHCI controller */
 	.class = 		((PCI_CLASS_SERIAL_USB << 8) | 0x00),
