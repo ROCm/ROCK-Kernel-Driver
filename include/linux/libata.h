@@ -392,6 +392,8 @@ extern void ata_tf_load_pio(struct ata_port *ap, struct ata_taskfile *tf);
 extern void ata_tf_load_mmio(struct ata_port *ap, struct ata_taskfile *tf);
 extern void ata_tf_read_pio(struct ata_port *ap, struct ata_taskfile *tf);
 extern void ata_tf_read_mmio(struct ata_port *ap, struct ata_taskfile *tf);
+extern void ata_tf_to_fis(struct ata_taskfile *tf, u8 *fis, u8 pmp);
+extern void ata_tf_from_fis(u8 *fis, struct ata_taskfile *tf);
 extern u8 ata_check_status_pio(struct ata_port *ap);
 extern u8 ata_check_status_mmio(struct ata_port *ap);
 extern void ata_exec_command_pio(struct ata_port *ap, struct ata_taskfile *tf);
