@@ -848,7 +848,7 @@ eicon_alloccard(int Type, int membase, int irq, char *id, int card_id)
 			ISDN_FEATURE_P_UNKNOWN;
 		card->interface.hl_hdrlen = 20;
 		card->ptype = ISDN_PTYPE_UNKNOWN;
-		strncpy(card->interface.id, id, sizeof(card->interface.id) - 1);
+		strlcpy(card->interface.id, id, sizeof(card->interface.id));
 		card->myid = -1;
 		card->type = Type;
 		switch (Type) {

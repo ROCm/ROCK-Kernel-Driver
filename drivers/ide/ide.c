@@ -1398,7 +1398,7 @@ int ide_replace_subdriver (ide_drive_t *drive, const char *driver)
 		goto abort;
 	if (DRIVER(drive)->cleanup(drive))
 		goto abort;
-	strncpy(drive->driver_req, driver, 9);
+	strlcpy(drive->driver_req, driver, sizeof(drive->driver_req));
 	if (ata_attach(drive)) {
 		spin_lock(&drives_lock);
 		list_del_init(&drive->list);
@@ -1838,7 +1838,7 @@ int __init ide_setup (char *s)
 		hwif = &ide_hwifs[hw];
 		drive = &hwif->drives[unit];
 		if (strncmp(s + 4, "ide-", 4) == 0) {
-			strncpy(drive->driver_req, s + 4, 9);
+			strlcpy(drive->driver_req, s + 4, sizeof(drive->driver_req));
 			goto done;
 		}
 		/*

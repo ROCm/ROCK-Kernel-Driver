@@ -129,8 +129,7 @@ extern struct list_head zft_vtbl;
 #define DUMP_VOLINFO(level, desc, info)					\
 {									\
 	char tmp[21];							\
-	strncpy(tmp, desc, 20);						\
-	tmp[20] = '\0';							\
+	strlcpy(tmp, desc, sizeof(tmp));				\
 	TRACE(level, "Volume %d:\n"					\
 	      KERN_INFO "description  : %s\n"				\
 	      KERN_INFO "first segment: %d\n"				\

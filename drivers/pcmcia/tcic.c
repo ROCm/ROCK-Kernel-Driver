@@ -527,7 +527,7 @@ static int __init init_tcic(void)
     tcic_data.nsock = sockets;
     tcic_class_data.dev = &tcic_device.dev;
     tcic_class_data.class_data = &tcic_data;
-    strncpy(tcic_class_data.class_id, "tcic-pcmcia", BUS_ID_SIZE);
+    strlcpy(tcic_class_data.class_id, "tcic-pcmcia", BUS_ID_SIZE);
     
     platform_device_register(&tcic_device);
     class_device_register(&tcic_class_data);

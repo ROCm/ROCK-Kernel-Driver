@@ -1820,8 +1820,7 @@ static void __init in2000_setup(char *str, int *ints)
 	int i;
 	char *p1, *p2;
 
-	strncpy(setup_buffer, str, SETUP_BUFFER_SIZE);
-	setup_buffer[SETUP_BUFFER_SIZE - 1] = '\0';
+	strlcpy(setup_buffer, str, SETUP_BUFFER_SIZE);
 	p1 = setup_buffer;
 	i = 0;
 	while (*p1 && (i < MAX_SETUP_ARGS)) {

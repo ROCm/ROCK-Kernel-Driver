@@ -2915,7 +2915,7 @@ ctc_new_device(struct ccwgroup_device *cgdev)
 
 	ctc_add_attributes(&cgdev->dev);
 
-	strncpy(privptr->fsm->name, dev->name, sizeof (privptr->fsm->name));
+	strlcpy(privptr->fsm->name, dev->name, sizeof (privptr->fsm->name));
 
 	print_banner();
 

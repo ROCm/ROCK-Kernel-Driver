@@ -736,10 +736,8 @@ static int register_pio_HBA(long base, struct get_conf *gc, Scsi_Host_Template *
 	memset(hd->ccb, 0, (sizeof(struct eata_ccb) * ntohs(gc->queuesiz)));
 	memset(hd->reads, 0, sizeof(unsigned long) * 26);
 
-	strncpy(SD(sh)->vendor, &buff[8], 8);
-	SD(sh)->vendor[8] = 0;
-	strncpy(SD(sh)->name, &buff[16], 17);
-	SD(sh)->name[17] = 0;
+	strlcpy(SD(sh)->vendor, &buff[8], sizeof(SD(sh)->vendor));
+	strlcpy(SD(sh)->name, &buff[16], sizeof(SD(sh)->name));
 	SD(sh)->revision[0] = buff[32];
 	SD(sh)->revision[1] = buff[33];
 	SD(sh)->revision[2] = buff[34];

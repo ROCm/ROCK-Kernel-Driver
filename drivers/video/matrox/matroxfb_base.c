@@ -2364,7 +2364,7 @@ int __init matroxfb_setup(char *options) {
 		else if (!strncmp(this_opt, "vesa:", 5))
 			vesa = simple_strtoul(this_opt+5, NULL, 0);
 		else if (!strncmp(this_opt, "font:", 5))
-			strncpy(fontname, this_opt+5, sizeof(fontname)-1);
+			strlcpy(fontname, this_opt+5, sizeof(fontname));
 		else if (!strncmp(this_opt, "maxclk:", 7))
 			maxclk = simple_strtoul(this_opt+7, NULL, 0);
 		else if (!strncmp(this_opt, "fh:", 3))
@@ -2374,7 +2374,7 @@ int __init matroxfb_setup(char *options) {
 		else if (!strncmp(this_opt, "mem:", 4))
 			mem = simple_strtoul(this_opt+4, NULL, 0);
 		else if (!strncmp(this_opt, "mode:", 5))
-			strncpy(videomode, this_opt+5, sizeof(videomode)-1);
+			strlcpy(videomode, this_opt+5, sizeof(videomode));
 		else if (!strncmp(this_opt, "dfp:", 4)) {
 			dfp_type = simple_strtoul(this_opt+4, NULL, 0);
 			dfp = 1;
@@ -2454,7 +2454,7 @@ int __init matroxfb_setup(char *options) {
 			else if (!strcmp(this_opt, "dfp"))
 				dfp = value;
 			else {
-				strncpy(videomode, this_opt, sizeof(videomode)-1);
+				strlcpy(videomode, this_opt, sizeof(videomode));
 			}
 		}
 	}

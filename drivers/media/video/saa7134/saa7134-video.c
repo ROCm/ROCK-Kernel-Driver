@@ -1501,7 +1501,7 @@ static int video_do_ioctl(struct inode *inode, struct file *file,
 		
 		memset(cap,0,sizeof(*cap));
                 strcpy(cap->driver, "saa7134");
-		strncpy(cap->card, saa7134_boards[dev->board].name,
+		strlcpy(cap->card, saa7134_boards[dev->board].name,
 			sizeof(cap->card));
 		sprintf(cap->bus_info,"PCI:%s",dev->pci->slot_name);
 		cap->version = SAA7134_VERSION_CODE;
@@ -1733,7 +1733,7 @@ static int video_do_ioctl(struct inode *inode, struct file *file,
 			memset(f,0,sizeof(*f));
 			f->index = index;
 			f->type  = type;
-			strncpy(f->description,formats[index].name,31);
+			strlcpy(f->description,formats[index].name,sizeof(f->description));
 			f->pixelformat = formats[index].fourcc;
 			break;
 		case V4L2_BUF_TYPE_VBI_CAPTURE:
@@ -1901,7 +1901,7 @@ static int radio_do_ioctl(struct inode *inode, struct file *file,
 
 		memset(cap,0,sizeof(*cap));
                 strcpy(cap->driver, "saa7134");
-		strncpy(cap->card, saa7134_boards[dev->board].name,
+		strlcpy(cap->card, saa7134_boards[dev->board].name,
 			sizeof(cap->card));
 		sprintf(cap->bus_info,"PCI:%s",dev->pci->slot_name);
 		cap->version = SAA7134_VERSION_CODE;

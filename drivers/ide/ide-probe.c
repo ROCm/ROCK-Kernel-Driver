@@ -693,7 +693,7 @@ static void hwif_register (ide_hwif_t *hwif)
 	u32 i = 0;
 
 	/* register with global device tree */
-	strncpy(hwif->gendev.bus_id,hwif->name,BUS_ID_SIZE);
+	strlcpy(hwif->gendev.bus_id,hwif->name,BUS_ID_SIZE);
 	snprintf(hwif->gendev.name,DEVICE_NAME_SIZE,"IDE Controller");
 	hwif->gendev.driver_data = hwif;
 	if (hwif->pci_dev)

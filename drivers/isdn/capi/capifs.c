@@ -234,8 +234,7 @@ static int __init capifs_init(void)
 	int err;
 
 	if ((p = strchr(revision, ':')) != 0 && p[1]) {
-		strncpy(rev, p + 2, sizeof(rev));
-		rev[sizeof(rev)-1] = 0;
+		strlcpy(rev, p + 2, sizeof(rev));
 		if ((p = strchr(rev, '$')) != 0 && p > rev)
 		   *(p-1) = 0;
 	} else

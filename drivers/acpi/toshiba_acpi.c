@@ -108,8 +108,7 @@ snscanf(const char* str, int n, const char* format, ...)
 	int result;
 	char* str2 = kmalloc(n + 1, GFP_KERNEL);
 	if (str2 == 0) return 0;
-	strncpy(str2, str, n);
-	str2[n] = 0;
+	strlcpy(str2, str, n);
 	va_start(args, format);
 	result = vsscanf(str2, format, args);
 	va_end(args);

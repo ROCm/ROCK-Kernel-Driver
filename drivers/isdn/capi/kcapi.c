@@ -631,14 +631,14 @@ u16 capi20_get_manufacturer(u32 contr, u8 buf[CAPI_MANUFACTURER_LEN])
 	struct capi_ctr *card;
 
 	if (contr == 0) {
-		strncpy(buf, capi_manufakturer, CAPI_MANUFACTURER_LEN);
+		strlcpy(buf, capi_manufakturer, sizeof(buf));
 		return CAPI_NOERROR;
 	}
 	card = get_capi_ctr_by_nr(contr);
 	if (!card || card->cardstate != CARD_RUNNING) 
 		return CAPI_REGNOTINSTALLED;
 
-	strncpy(buf, card->manu, CAPI_MANUFACTURER_LEN);
+	strlcpy(buf, card->manu, sizeof(buf));
 	return CAPI_NOERROR;
 }
 
@@ -667,14 +667,14 @@ u16 capi20_get_serial(u32 contr, u8 serial[CAPI_SERIAL_LEN])
 	struct capi_ctr *card;
 
 	if (contr == 0) {
-		strncpy(serial, driver_serial, CAPI_SERIAL_LEN);
+		strlcpy(serial, driver_serial, sizeof(serial));
 		return CAPI_NOERROR;
 	}
 	card = get_capi_ctr_by_nr(contr);
 	if (!card || card->cardstate != CARD_RUNNING) 
 		return CAPI_REGNOTINSTALLED;
 
-	strncpy((void *) serial, card->serial, CAPI_SERIAL_LEN);
+	strlcpy((void *) serial, card->serial, sizeof(serial));
 	return CAPI_NOERROR;
 }
 
@@ -873,8 +873,7 @@ static int __init kcapi_init(void)
         kcapi_proc_init();
 
 	if ((p = strchr(revision, ':')) != 0 && p[1]) {
-		strncpy(rev, p + 2, sizeof(rev));
-		rev[sizeof(rev)-1] = 0;
+		strlcpy(rev, p + 2, sizeof(rev));
 		if ((p = strchr(rev, '$')) != 0 && p > rev)
 		   *(p-1) = 0;
 	} else

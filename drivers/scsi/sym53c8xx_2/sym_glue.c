@@ -1987,7 +1987,7 @@ sym_attach (Scsi_Host_Template *tpnt, int unit, sym_device *dev)
 	/*
 	 *  Edit its name.
 	 */
-	strncpy(np->s.chip_name, dev->chip.name, sizeof(np->s.chip_name)-1);
+	strlcpy(np->s.chip_name, dev->chip.name, sizeof(np->s.chip_name));
 	sprintf(np->s.inst_name, "sym%d", np->s.unit);
 
 	/*

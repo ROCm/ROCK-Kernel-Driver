@@ -335,7 +335,7 @@ static void avma1cs_config(dev_link_t *link)
 
 	devname[0] = 0;
 	if( !first_tuple(handle, &tuple, &parse) && parse.version_1.ns > 1 ) {
-	    strncpy(devname,parse.version_1.str + parse.version_1.ofs[1], 
+	    strlcpy(devname,parse.version_1.str + parse.version_1.ofs[1], 
 			sizeof(devname));
 	}
 	/*

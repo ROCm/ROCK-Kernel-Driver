@@ -1541,8 +1541,10 @@ static struct rioVersion	stVersion;
 struct rioVersion *
 RIOVersid(void)
 {
-    strncpy(stVersion.version, "RIO driver for linux V1.0", 255);
-    strncpy(stVersion.buildDate, __DATE__, 255);
+    strlcpy(stVersion.version, "RIO driver for linux V1.0",
+	    sizeof(stVersion.version));
+    strlcpy(stVersion.buildDate, __DATE__,
+	    sizeof(stVersion.buildDate));
 
     return &stVersion;
 }
