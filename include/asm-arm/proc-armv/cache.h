@@ -29,43 +29,54 @@
  */
 
 /*
- * Generic I + D cache
+ * These are private to the dma-mapping API.  Do not use directly.
+ * Their sole purpose is to ensure that data held in the cache
+ * is visible to DMA, or data written by DMA to system memory is
+ * visible to the CPU.
  */
-#define flush_cache_all()						\
-	do {								\
-		cpu_cache_clean_invalidate_all();			\
-	} while (0)
-
-/* This is always called for current->mm */
-#define flush_cache_mm(_mm)						\
-	do {								\
-		if ((_mm) == current->active_mm)			\
-			cpu_cache_clean_invalidate_all();		\
-	} while (0)
-
-#define flush_cache_range(_vma,_start,_end)				\
-	do {								\
-		if ((_vma)->vm_mm == current->active_mm)		\
-			cpu_cache_clean_invalidate_range((_start), (_end), 1); \
-	} while (0)
-
-#define flush_cache_page(_vma,_vmaddr)					\
-	do {								\
-		if ((_vma)->vm_mm == current->active_mm) {		\
-			cpu_cache_clean_invalidate_range((_vmaddr),	\
-				(_vmaddr) + PAGE_SIZE,			\
-				((_vma)->vm_flags & VM_EXEC));		\
-		} \
-	} while (0)
+#define dmac_inv_range			cpu_dcache_invalidate_range
+#define dmac_clean_range		cpu_dcache_clean_range
+#define dmac_flush_range(_s,_e)		cpu_cache_clean_invalidate_range((_s),(_e),0)
 
 /*
- * D cache only
+ * Convert calls to our calling convention.
  */
+#define flush_cache_all()		cpu_cache_clean_invalidate_all()
 
-#define invalidate_dcache_range(_s,_e)	cpu_dcache_invalidate_range((_s),(_e))
-#define clean_dcache_range(_s,_e)	cpu_dcache_clean_range((_s),(_e))
-#define flush_dcache_range(_s,_e)	cpu_cache_clean_invalidate_range((_s),(_e),0)
+static inline void flush_cache_mm(struct mm_struct *mm)
+{
+	if (current->active_mm == mm)
+		cpu_cache_clean_invalidate_all();
+}
 
+static inline void
+flush_cache_range(struct vm_area_struct *vma, unsigned long start, unsigned long end)
+{
+	if (current->active_mm == vma->vm_mm)
+		cpu_cache_clean_invalidate_range(start & PAGE_MASK,
+					PAGE_ALIGN(end), vma->vm_flags);
+}
+
+static inline void
+flush_cache_page(struct vm_area_struct *vma, unsigned long user_addr)
+{
+	if (current->active_mm == vma->vm_mm) {
+		unsigned long addr = user_addr & PAGE_MASK;
+		cpu_cache_clean_invalidate_range(addr, addr + PAGE_SIZE,
+				vma->vm_flags & VM_EXEC);
+	}
+}
+
+/*
+ * Perform necessary cache operations to ensure that data previously
+ * stored within this range of addresses can be executed by the CPU.
+ */
+#define flush_icache_range(s,e)		cpu_icache_invalidate_range(s,e)
+
+/*
+ * Perform necessary cache operations to ensure that the TLB will
+ * see data written in the specified area.
+ */
 #define clean_dcache_area(start,size) \
 	cpu_cache_clean_invalidate_range((unsigned long)start, \
 					 ((unsigned long)start) + size, 0);
@@ -104,18 +115,3 @@ static inline void flush_dcache_page(struct page *page)
  * duplicate cache flushing elsewhere performed by flush_dcache_page().
  */
 #define flush_icache_page(vma,page)	do { } while (0)
-
-/*
- * I cache coherency stuff.
- *
- * This *is not* just icache.  It is to make data written to memory
- * consistent such that instructions fetched from the region are what
- * we expect.
- *
- * This generally means that we have to clean out the Dcache and write
- * buffers, and maybe flush the Icache in the specified range.
- */
-#define flush_icache_range(_s,_e)					\
-	do {								\
-		cpu_icache_invalidate_range((_s), (_e));		\
-	} while (0)
