@@ -71,7 +71,8 @@ static struct super_block *alloc_super(void)
 		atomic_set(&s->s_active, 1);
 		sema_init(&s->s_vfs_rename_sem,1);
 		sema_init(&s->s_dquot.dqio_sem, 1);
-		init_rwsem(&s->s_dquot.dqoff_sem);
+		sema_init(&s->s_dquot.dqonoff_sem, 1);
+		init_rwsem(&s->s_dquot.dqptr_sem);
 		s->s_maxbytes = MAX_NON_LFS;
 		s->dq_op = sb_dquot_ops;
 		s->s_qcop = sb_quotactl_ops;
