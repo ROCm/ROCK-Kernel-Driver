@@ -195,7 +195,7 @@ static unsigned int cpufreq_p4_get_frequency(struct cpuinfo_x86 *c)
 
 	if (speedstep_detect_processor() == SPEEDSTEP_PROCESSOR_P4M) {
 		printk(KERN_WARNING PFX "Warning: Pentium 4-M detected. "
-		       "The speedstep-ich or acpi cpufreq modules offers "
+		       "The speedstep-ich or acpi cpufreq modules offer "
 		       "voltage scaling in addition of frequency scaling. "
 		       "You should use either one instead of p4-clockmod, "
 		       "if possible.\n");
