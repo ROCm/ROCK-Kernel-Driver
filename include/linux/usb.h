@@ -767,7 +767,6 @@ typedef void (*usb_complete_t)(struct urb *);
 /**
  * struct urb - USB Request Block
  * @urb_list: For use by current owner of the URB.
- * @next: Used to link ISO requests into rings.
  * @pipe: Holds endpoint number, direction, type, and max packet size.
  *	Create these values with the eight macros available;
  *	usb_{snd,rcv}TYPEpipe(dev,endpoint), where the type is "ctrl"
@@ -827,7 +826,7 @@ typedef void (*usb_complete_t)(struct urb *);
  *
  * Initialization:
  *
- * All URBs submitted must initialize dev, pipe, next (may be null),
+ * All URBs submitted must initialize dev, pipe,
  * transfer_flags (may be zero), complete, timeout (may be zero).
  * The USB_ASYNC_UNLINK transfer flag affects later invocations of
  * the usb_unlink_urb() routine.
@@ -873,7 +872,9 @@ typedef void (*usb_complete_t)(struct urb *);
  * the quality of service is only "best effort".  Callers provide specially
  * allocated URBs, with number_of_packets worth of iso_frame_desc structures
  * at the end.  Each such packet is an individual ISO transfer.  Isochronous
- * URBs are normally submitted with urb->next fields set up as a ring, so
+ * URBs are normally queued (no flag like USB_BULK_QUEUE is needed) so that
+ * transfers are at least double buffered, and then explicitly resubmitted
+ * in completion handlers, so
  * that data (such as audio or video) streams at as constant a rate as the
  * host controller scheduler can support.
  *
@@ -891,14 +892,15 @@ typedef void (*usb_complete_t)(struct urb *);
  * When completion callback is invoked for non-isochronous URBs, the
  * actual_length field tells how many bytes were transferred.
  *
- * For interrupt and isochronous URBs, the URB provided to the callback
+ * For interrupt URBs, the URB provided to the callback
  * function is still "owned" by the USB core subsystem unless the status
  * indicates that the URB has been unlinked.  Completion handlers should
  * not modify such URBs until they have been unlinked.
  *
  * ISO transfer status is reported in the status and actual_length fields
  * of the iso_frame_desc array, and the number of errors is reported in
- * error_count.
+ * error_count.  Completion callbacks for ISO transfers will normally
+ * (re)submit URBs to ensure a constant transfer rate.
  */
 struct urb
 {
@@ -906,7 +908,6 @@ struct urb
 	atomic_t count;			/* reference count of the URB */
 	void *hcpriv;			/* private data for host controller */
 	struct list_head urb_list;	/* list pointer to all active urbs */
-	struct urb *next; 		/* (in) pointer to next URB */
 	struct usb_device *dev; 	/* (in) pointer to associated device */
 	unsigned int pipe;		/* (in) pipe information */
 	int status;			/* (return) non-ISO status */

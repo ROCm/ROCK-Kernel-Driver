@@ -100,9 +100,6 @@
 //                   NO serviceable parts below!
 /*--------------------------------------------------------------------------*/
 
-// How much URBs with ->next are walked
-#define MAX_NEXT_COUNT 2048
-
 static struct uhci *devs = NULL;
 
 /* used by userspace UHCI data structure dumper */

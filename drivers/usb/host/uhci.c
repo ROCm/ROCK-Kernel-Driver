@@ -106,8 +106,6 @@ static void wakeup_hc(struct uhci *uhci);
 /* to make sure it doesn't hog all of the bandwidth */
 #define DEPTH_INTERVAL	5
 
-#define MAX_URB_LOOP	2048		/* Maximum number of linked URB's */
-
 /*
  * Technically, updating td->status here is a race, but it's not really a
  * problem. The worst that can happen is that we set the IOC bit again
@@ -2296,8 +2294,7 @@ static void uhci_call_completion(struct urb *urb)
 	struct urb_priv *urbp;
 	struct usb_device *dev = urb->dev;
 	struct uhci *uhci = (struct uhci *)dev->bus->hcpriv;
-	int is_ring = 0, killed, resubmit_interrupt, status;
-	struct urb *nurb;
+	int killed, resubmit_interrupt, status;
 	unsigned long flags;
 
 	spin_lock_irqsave(&urb->lock, flags);
@@ -2312,29 +2309,6 @@ static void uhci_call_completion(struct urb *urb)
 			urb->status == -ECONNRESET);
 	resubmit_interrupt = (usb_pipetype(urb->pipe) == PIPE_INTERRUPT &&
 			urb->interval);
-
-	nurb = urb->next;
-	if (nurb && !killed) {
-		int count = 0;
-
-		while (nurb && nurb != urb && count < MAX_URB_LOOP) {
-			if (nurb->status == -ENOENT ||
-			    nurb->status == -ECONNABORTED ||
-			    nurb->status == -ECONNRESET) {
-				killed = 1;
-				break;
-			}
-
-			nurb = nurb->next;
-			count++;
-		}
-
-		if (count == MAX_URB_LOOP)
-			err("uhci_call_completion: too many linked URB's, loop? (first loop)");
-
-		/* Check to see if chain is a ring */
-		is_ring = (nurb == urb);
-	}
 
 	if (urbp->transfer_buffer_dma_handle)
 		pci_dma_sync_single(uhci->dev, urbp->transfer_buffer_dma_handle,
@@ -2370,15 +2344,10 @@ static void uhci_call_completion(struct urb *urb)
 		urb->dev = dev;
 		uhci_reset_interrupt(urb);
 	} else {
-		if (is_ring && !killed) {
-			urb->dev = dev;
-			uhci_submit_urb(urb, GFP_ATOMIC);
-		} else {
-			/* We decrement the usage count after we're done */
-			/*  with everything */
-			usb_put_dev(dev);
-			usb_put_urb(urb);
-		}
+		/* We decrement the usage count after we're done */
+		/*  with everything */
+		usb_put_dev(dev);
+		usb_put_urb(urb);
 	}
 }
 

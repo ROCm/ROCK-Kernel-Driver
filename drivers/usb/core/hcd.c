@@ -1407,11 +1407,6 @@ static int hcd_submit_urb (struct urb *urb, int mem_flags)
 	if (urb->transfer_buffer_length < 0)
 		return -EINVAL;
 
-	if (urb->next) {
-		warn ("use explicit queuing not urb->next");
-		return -EINVAL;
-	}
-
 #ifdef DEBUG
 	/* stuff that drivers shouldn't do, but which shouldn't
 	 * cause problems in HCDs if they get it wrong.
@@ -1785,10 +1780,6 @@ static void hcd_irq (int irq, void *__hcd, struct pt_regs * r)
  * HCDs must not use this for periodic URBs that are still scheduled
  * and will be reissued.  They should just call their completion handlers
  * until the urb is returned to the device driver by unlinking.
- *
- * NOTE that no urb->next processing is done, even for isochronous URBs.
- * ISO streaming functionality can be achieved by having completion handlers
- * re-queue URBs.  Such explicit queuing doesn't discard error reports.
  */
 void usb_hcd_giveback_urb (struct usb_hcd *hcd, struct urb *urb)
 {
