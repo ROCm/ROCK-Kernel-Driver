@@ -620,12 +620,13 @@ void flush_icache_page(struct vm_area_struct *vma, struct page *page)
 	}
 }
 
-void clear_user_page(void *page, unsigned long vaddr)
+void clear_user_page(void *page, unsigned long vaddr, struct page *pg)
 {
 	clear_page(page);
 }
 
-void copy_user_page(void *vto, void *vfrom, unsigned long vaddr)
+void copy_user_page(void *vto, void *vfrom, unsigned long vaddr,
+		    struct page *pg)
 {
 	copy_page(vto, vfrom);
 	__flush_dcache_icache(vto);
