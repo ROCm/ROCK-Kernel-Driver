@@ -23,7 +23,7 @@ static ssize_t node_read_cpumap(struct sys_device * dev, char * buf)
 	int len;
 
 	/* 2004/06/03: buf currently PAGE_SIZE, need > 1 char per 4 bits. */
-	BUILD_BUG_ON(NR_CPUS/4 > PAGE_SIZE/2);
+	BUILD_BUG_ON(MAX_NUMNODES/4 > PAGE_SIZE/2);
 
 	len = cpumask_scnprintf(buf, PAGE_SIZE-1, mask);
 	len += sprintf(buf + len, "\n");
@@ -118,7 +118,7 @@ static ssize_t node_read_distance(struct sys_device * dev, char * buf)
 	int i;
 
 	/* buf currently PAGE_SIZE, need ~4 chars per node */
-	BUILD_BUG_ON(NR_NODES*4 > PAGE_SIZE/2);
+	BUILD_BUG_ON(MAX_NUMNODES*4 > PAGE_SIZE/2);
 
 	for (i = 0; i < numnodes; i++)
 		len += sprintf(buf + len, "%s%d", i ? " " : "", node_distance(nid, i));

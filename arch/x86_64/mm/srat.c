@@ -13,8 +13,12 @@
 #include <linux/acpi.h>
 #include <linux/mmzone.h>
 #include <linux/bitmap.h>
+#include <linux/module.h>
+#include <linux/topology.h>
 #include <asm/proto.h>
 #include <asm/numa.h>
+
+static struct acpi_table_slit *acpi_slit;
 
 static DECLARE_BITMAP(nodes_parsed, MAX_NUMNODES) __initdata;
 static struct node nodes[MAX_NUMNODES] __initdata;
@@ -77,7 +81,7 @@ static __init inline int srat_disabled(void)
 /* Callback for SLIT parsing */
 void __init acpi_numa_slit_init(struct acpi_table_slit *slit)
 {
-	/* ignored for now */
+	acpi_slit = slit;
 }
 
 /* Callback for Proximity Domain -> LAPIC mapping */
@@ -180,3 +184,26 @@ int __init acpi_scan_nodes(unsigned long start, unsigned long end)
 	numa_init_array();
 	return 0;
 }
+
+int node_to_pxm(int n)
+{
+       int i;
+       if (pxm2node[n] == n)
+               return n;
+       for (i = 0; i < 256; i++)
+               if (pxm2node[i] == n)
+                       return i;
+       return 0;
+}
+
+int __node_distance(int a, int b)
+{
+	int index;
+
+	if (!acpi_slit)
+		return a == b ? 10 : 20;
+	index = acpi_slit->localities * node_to_pxm(a);
+	return acpi_slit->entry[index + node_to_pxm(b)];
+}
+
+EXPORT_SYMBOL(__node_distance);
