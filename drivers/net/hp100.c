@@ -2862,7 +2862,7 @@ static int __init hp100_eisa_probe (struct device *gendev)
 	SET_MODULE_OWNER(dev);
 	SET_NETDEV_DEV(dev, &edev->dev);
 
-	err = hp100_probe1(dev, edev->base_addr, HP100_BUS_EISA, NULL);
+	err = hp100_probe1(dev, edev->base_addr + 0xC38, HP100_BUS_EISA, NULL);
 	if (err)
 		goto out1;
 

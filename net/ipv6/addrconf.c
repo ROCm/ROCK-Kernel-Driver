@@ -2673,26 +2673,6 @@ static int inet6_dump_ifaddr(struct sk_buff *skb, struct netlink_callback *cb)
 				goto done;
 		}
 #endif
-		/* multicast address */
-		for (ifmca = idev->mc_list; ifmca; 
-		     ifmca = ifmca->next, ip_idx++) {
-			if (ip_idx < s_ip_idx)
-				continue;
-			if ((err = inet6_fill_ifmcaddr(skb, ifmca, 
-			    NETLINK_CB(cb->skb).pid, 
-			    cb->nlh->nlmsg_seq, RTM_NEWADDR)) <= 0) 
-				goto done;
-		}
-		/* anycast address */
-		for (ifaca = idev->ac_list; ifaca;
-		     ifaca = ifaca->aca_next, ip_idx++) {
-			if (ip_idx < s_ip_idx)
-				continue;
-			if ((err = inet6_fill_ifacaddr(skb, ifaca, 
-			    NETLINK_CB(cb->skb).pid, 
-			    cb->nlh->nlmsg_seq, RTM_NEWADDR)) <= 0) 
-				goto done;
-		}
 		read_unlock_bh(&idev->lock);
 		in6_dev_put(idev);
 	}

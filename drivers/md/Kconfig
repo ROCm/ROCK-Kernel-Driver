@@ -162,14 +162,6 @@ config BLK_DEV_DM
 
 	  If unsure, say N.
 
-config DM_IOCTL_V4
-	bool "ioctl interface version 4"
-	depends on BLK_DEV_DM
-	default y
-	---help---
-	  Recent tools use a new version of the ioctl interface, only
-          select this option if you intend using such tools.
-
 config DM_CRYPT
 	tristate "Crypt target support"
 	depends on BLK_DEV_DM && EXPERIMENTAL

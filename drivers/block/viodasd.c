@@ -38,7 +38,6 @@
 #include <linux/errno.h>
 #include <linux/init.h>
 #include <linux/string.h>
-#include <linux/device.h>
 #include <linux/dma-mapping.h>
 #include <linux/completion.h>
 
@@ -76,8 +75,6 @@ static spinlock_t	viodasd_spinlock = SPIN_LOCK_UNLOCKED;
 #define VIOMAXBLOCKDMA		12
 
 #define DEVICE_NO(cell)	((struct viodasd_device *)(cell) - &viodasd_devices[0])
-
-extern struct device *iSeries_vio_dev;
 
 struct open_data {
 	u64	disk_size;

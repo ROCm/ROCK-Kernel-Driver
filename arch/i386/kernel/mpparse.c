@@ -1156,7 +1156,7 @@ void __init mp_parse_prt (void)
 			continue;
 		}
 		if ((1<<bit) & mp_ioapic_routing[ioapic].pin_programmed[idx]) {
-			printk(KERN_DEBUG "Pin %d-%d already programmed\n",
+			Dprintk(KERN_DEBUG "Pin %d-%d already programmed\n",
 				mp_ioapic_routing[ioapic].apic_id, ioapic_pin);
  			entry->irq = acpi_irq_to_vector(irq);
 			continue;

@@ -41,29 +41,6 @@ static void irlap_wd_timer_expired(void* data);
 static void irlap_backoff_timer_expired(void* data);
 static void irlap_media_busy_expired(void* data); 
 
-/*
- * Function irda_start_timer (timer, timeout)
- *
- *    Start an IrDA timer
- *
- */
-void irda_start_timer(struct timer_list *ptimer, int timeout, void *data,
-		      TIMER_CALLBACK callback) 
-{
-	/* 
-	 * For most architectures void * is the same as unsigned long, but
-	 * at least we try to use void * as long as possible. Since the 
-	 * timer functions use unsigned long, we cast the function here
-	 */
-	ptimer->function = (void (*)(unsigned long)) callback;
-	ptimer->data = (unsigned long) data;
-	
-	/* Set new value for timer (update or add timer).
-	 * We use mod_timer() because it's more efficient and also
-	 * safer with respect to race conditions - Jean II */
-	mod_timer(ptimer, jiffies + timeout);
-}
-
 void irlap_start_slot_timer(struct irlap_cb *self, int timeout)
 {
 	irda_start_timer(&self->slot_timer, timeout, (void *) self, 

@@ -38,6 +38,7 @@
 #include <linux/profile.h>
 #include <linux/rcupdate.h>
 #include <linux/moduleparam.h>
+#include <linux/kallsyms.h>
 #include <linux/writeback.h>
 #include <linux/cpu.h>
 #include <linux/efi.h>
@@ -510,8 +511,11 @@ static void __init do_initcalls(void)
 	for (call = &__initcall_start; call < &__initcall_end; call++) {
 		char *msg;
 
-		if (initcall_debug)
-			printk("calling initcall 0x%p\n", *call);
+		if (initcall_debug) {
+			printk(KERN_DEBUG "Calling initcall 0x%p", *call);
+			print_symbol(": %s()", (unsigned long) *call);
+			printk("\n");
+		}
 
 		(*call)();
 

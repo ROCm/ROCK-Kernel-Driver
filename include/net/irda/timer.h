@@ -71,8 +71,18 @@ struct lap_cb;
 
 typedef void (*TIMER_CALLBACK)(void *);
 
-void irda_start_timer(struct timer_list *ptimer, int timeout, void* data,
-		      TIMER_CALLBACK callback);
+static inline void irda_start_timer(struct timer_list *ptimer, int timeout, 
+				    void* data, TIMER_CALLBACK callback)
+{
+	ptimer->function = (void (*)(unsigned long)) callback;
+	ptimer->data = (unsigned long) data;
+	
+	/* Set new value for timer (update or add timer).
+	 * We use mod_timer() because it's more efficient and also
+	 * safer with respect to race conditions - Jean II */
+	mod_timer(ptimer, jiffies + timeout);
+}
+
 
 void irlap_start_slot_timer(struct irlap_cb *self, int timeout);
 void irlap_start_query_timer(struct irlap_cb *self, int timeout);

@@ -522,7 +522,7 @@ asmlinkage int printk(const char *fmt, ...)
 			log_level_unknown = 1;
 	}
 
-	if (!cpu_online(smp_processor_id())) {
+	if (!cpu_online(smp_processor_id()) && !system_running) {
 		/*
 		 * Some console drivers may assume that per-cpu resources have
 		 * been allocated.  So don't allow them to be called by this

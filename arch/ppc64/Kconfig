@@ -300,10 +300,6 @@ config VIOCD
 	  If you are running Linux on an IBM iSeries system and you want to
 	  read a CD drive owned by OS/400, say Y here.
 
-config VIOCD_AZTECH
-	bool "iSeries Virtual CD Aztech emulation"
-	depends on VIOCD
-
 config VIOTAPE
 	tristate "iSeries Virtual Tape Support"
 	help

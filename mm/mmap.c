@@ -222,8 +222,8 @@ __vma_link_list(struct mm_struct *mm, struct vm_area_struct *vma,
 	}
 }
 
-static void __vma_link_rb(struct mm_struct *mm, struct vm_area_struct *vma,
-			struct rb_node **rb_link, struct rb_node *rb_parent)
+void __vma_link_rb(struct mm_struct *mm, struct vm_area_struct *vma,
+		struct rb_node **rb_link, struct rb_node *rb_parent)
 {
 	rb_link_node(&vma->vm_rb, rb_parent, rb_link);
 	rb_insert_color(&vma->vm_rb, &mm->mm_rb);
@@ -1403,22 +1403,6 @@ out:
 }
 
 EXPORT_SYMBOL(do_brk);
-
-/* Build the RB tree corresponding to the VMA list. */
-void build_mmap_rb(struct mm_struct * mm)
-{
-	struct vm_area_struct * vma;
-	struct rb_node ** rb_link, * rb_parent;
-
-	mm->mm_rb = RB_ROOT;
-	rb_link = &mm->mm_rb.rb_node;
-	rb_parent = NULL;
-	for (vma = mm->mmap; vma; vma = vma->vm_next) {
-		__vma_link_rb(mm, vma, rb_link, rb_parent);
-		rb_parent = &vma->vm_rb;
-		rb_link = &rb_parent->rb_right;
-	}
-}
 
 /* Release all mmaps. */
 void exit_mmap(struct mm_struct *mm)

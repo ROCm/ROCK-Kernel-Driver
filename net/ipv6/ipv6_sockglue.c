@@ -437,6 +437,7 @@ done:
 	case MCAST_MSFILTER:
 	{
 		extern int sysctl_optmem_max;
+		extern int sysctl_mld_max_msf;
 		struct group_filter *gsf;
 
 		if (optlen < GROUP_FILTER_SIZE(0))
@@ -455,8 +456,14 @@ done:
 			kfree(gsf);
 			break;
 		}
-		if (GROUP_FILTER_SIZE(gsf->gf_numsrc) < GROUP_FILTER_SIZE(0) ||
-		    GROUP_FILTER_SIZE(gsf->gf_numsrc) > optlen) {
+		/* numsrc >= (4G-140)/128 overflow in 32 bits */
+		if (gsf->gf_numsrc >= 0x1ffffffU ||
+		    gsf->gf_numsrc > sysctl_mld_max_msf) {
+			kfree(gsf);
+			retv = -ENOBUFS;
+			break;
+		}
+		if (GROUP_FILTER_SIZE(gsf->gf_numsrc) > optlen) {
 			kfree(gsf);
 			retv = -EINVAL;
 			break;

@@ -110,7 +110,7 @@ acpi_ns_evaluate_relative (
 
 	status = acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
 	if (ACPI_FAILURE (status)) {
-		return_ACPI_STATUS (status);
+		goto cleanup;
 	}
 
 	prefix_node = acpi_ns_map_handle_to_node (handle);
@@ -197,7 +197,7 @@ acpi_ns_evaluate_by_name (
 
 	status = acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
 	if (ACPI_FAILURE (status)) {
-		return_ACPI_STATUS (status);
+		goto cleanup;
 	}
 
 	/* Lookup the name in the namespace */

@@ -396,6 +396,7 @@ fh_compose(struct svc_fh *fhp, struct svc_export *exp, struct dentry *dentry, st
 				 */
 				mk_fsid_v0(datap, ex_dev,
 					exp->ex_dentry->d_inode->i_ino);
+				break;
 			case 1:
 				/* fsid_type 1 == 4 bytes filesystem id */
 				mk_fsid_v1(datap, exp->ex_fsid);

@@ -335,6 +335,14 @@ struct inode *hfsplus_new_inode(struct super_block *sb, int mode)
 	init_MUTEX(&HFSPLUS_I(inode).extents_lock);
 	atomic_set(&HFSPLUS_I(inode).opencnt, 0);
 	HFSPLUS_I(inode).flags = 0;
+	memset(HFSPLUS_I(inode).first_extents, 0, sizeof(hfsplus_extent_rec));
+	memset(HFSPLUS_I(inode).cached_extents, 0, sizeof(hfsplus_extent_rec));
+	HFSPLUS_I(inode).alloc_blocks = 0;
+	HFSPLUS_I(inode).first_blocks = 0;
+	HFSPLUS_I(inode).cached_start = 0;
+	HFSPLUS_I(inode).cached_blocks = 0;
+	HFSPLUS_I(inode).phys_size = 0;
+	HFSPLUS_I(inode).rsrc_inode = 0;
 	if (S_ISDIR(inode->i_mode)) {
 		inode->i_size = 2;
 		HFSPLUS_SB(sb).folder_count++;
@@ -346,14 +354,6 @@ struct inode *hfsplus_new_inode(struct super_block *sb, int mode)
 		inode->i_fop = &hfsplus_file_operations;
 		inode->i_mapping->a_ops = &hfsplus_aops;
 		HFSPLUS_I(inode).clump_blocks = HFSPLUS_SB(sb).data_clump_blocks;
-		memset(HFSPLUS_I(inode).first_extents, 0, sizeof(hfsplus_extent_rec));
-		memset(HFSPLUS_I(inode).cached_extents, 0, sizeof(hfsplus_extent_rec));
-		HFSPLUS_I(inode).alloc_blocks = 0;
-		HFSPLUS_I(inode).first_blocks = 0;
-		HFSPLUS_I(inode).cached_start = 0;
-		HFSPLUS_I(inode).cached_blocks = 0;
-		HFSPLUS_I(inode).phys_size = 0;
-		HFSPLUS_I(inode).rsrc_inode = 0;
 	} else if (S_ISLNK(inode->i_mode)) {
 		HFSPLUS_SB(sb).file_count++;
 		inode->i_op = &page_symlink_inode_operations;
