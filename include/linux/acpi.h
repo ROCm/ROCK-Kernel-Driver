@@ -483,15 +483,15 @@ static inline int acpi_blacklisted(void)
  * 2: C2 okay, but not C3 etc.
  */
 
-extern unsigned int acpi_cstate_limit;
+extern unsigned int max_cstate;
 
 static inline unsigned int acpi_get_cstate_limit(void)
 {
-	return acpi_cstate_limit;
+	return max_cstate;
 }
 static inline void acpi_set_cstate_limit(unsigned int new_limit)
 {
-	acpi_cstate_limit = new_limit;
+	max_cstate = new_limit;
 	return;
 }
 #else
