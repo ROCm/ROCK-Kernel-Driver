@@ -615,8 +615,8 @@ rx_next:
 		if (cpr16(IntrStatus) & cp_rx_intr_mask)
 			goto rx_status_loop;
 
-		cpw16_f(IntrMask, cp_intr_mask);
 		netif_rx_complete(dev);
+		cpw16_f(IntrMask, cp_intr_mask);
 
 		return 0;	/* done */
 	}

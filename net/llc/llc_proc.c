@@ -48,8 +48,6 @@ static struct sock *llc_get_sk_idx(loff_t pos)
 			--pos;
 		}
 		read_unlock_bh(&sap->sk_list.lock);
-		if (!pos)
-			break;
 	}
 	sk = NULL;
 found:

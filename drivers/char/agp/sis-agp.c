@@ -142,6 +142,10 @@ static struct agp_device_ids sis_agp_device_ids[] __devinitdata =
 		.chipset_name	= "655",
 	},
 	{
+		.device_id	= PCI_DEVICE_ID_SI_661,
+		.chipset_name	= "661",
+	},
+	{
 		.device_id	= PCI_DEVICE_ID_SI_730,
 		.chipset_name	= "730",
 	},
@@ -154,12 +158,20 @@ static struct agp_device_ids sis_agp_device_ids[] __devinitdata =
 		.chipset_name	= "740",
 	},
 	{
+		.device_id	= PCI_DEVICE_ID_SI_741,
+		.chipset_name	= "741",
+	},
+	{
 		.device_id	= PCI_DEVICE_ID_SI_745,
 		.chipset_name	= "745",
 	},
 	{
 		.device_id	= PCI_DEVICE_ID_SI_746,
 		.chipset_name	= "746",
+	},
+	{
+		.device_id	= PCI_DEVICE_ID_SI_760,
+		.chipset_name	= "760",
 	},
 	{ }, /* dummy final entry, always present */
 };

@@ -234,9 +234,8 @@ W:	http://www.canb.auug.org.au/~sfr/
 S:	Supported
 
 APPLETALK NETWORK LAYER
-P:	Jay Schulist
-M:	jschlst@samba.org
-L:	linux-atalk@lists.netspace.org
+P:	Arnaldo Carvalho de Melo
+M:	acme@conectiva.com.br
 S:	Maintained
 
 ARM26 ARCHITECTURE
