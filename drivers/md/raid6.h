@@ -20,6 +20,7 @@
 
 #include <linux/module.h>
 #include <linux/stddef.h>
+#include <linux/compiler.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/errno.h>
@@ -45,11 +46,15 @@ extern const char raid6_empty_zero_page[PAGE_SIZE];
 #else /* ! __KERNEL__ */
 /* Used for testing in user space */
 
-#include <stddef.h>
-#include <sys/types.h>
-#include <inttypes.h>
 #include <errno.h>
+#include <inttypes.h>
+#include <limits.h>
+#include <stddef.h>
 #include <sys/mman.h>
+#include <sys/types.h>
+
+/* Not standard, but glibc defines it */
+#define BITS_PER_LONG __WORDSIZE
 
 typedef uint8_t  u8;
 typedef uint16_t u16;
@@ -63,26 +68,12 @@ extern const char raid6_empty_zero_page[PAGE_SIZE];
 
 #define __init
 #define __exit
+#define __attribute_const__ __attribute__((const))
 
 #define preempt_enable()
 #define preempt_disable()
 
 #endif /* __KERNEL__ */
-
-/* Change this from BITS_PER_LONG if there is something better... */
-#if BITS_PER_LONG == 64
-# define NBYTES(x) ((x) * 0x0101010101010101UL)
-# define NSIZE  8
-# define NSHIFT 3
-# define NSTRING "64"
-typedef u64 unative_t;
-#else
-# define NBYTES(x) ((x) * 0x01010101U)
-# define NSIZE  4
-# define NSHIFT 2
-# define NSTRING "32"
-typedef u32 unative_t;
-#endif
 
 /* Routine choices */
 struct raid6_calls {

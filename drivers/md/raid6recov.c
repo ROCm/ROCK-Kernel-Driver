@@ -117,7 +117,7 @@ void raid6_dual_recov(int disks, size_t bytes, int faila, int failb, void **ptrs
 		} else {
 			/* data+Q failure.  Reconstruct data from P,
 			   then rebuild syndrome. */
-			/* FIX */
+			/* NOT IMPLEMENTED - equivalent to RAID-5 */
 		}
 	} else {
 		if ( failb == disks-2 ) {
