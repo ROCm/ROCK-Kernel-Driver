@@ -1747,7 +1747,7 @@ void devfs_remove(const char *fmt, ...)
  *	else a negative error code.
  */
 
-int devfs_generate_path (devfs_handle_t de, char *path, int buflen)
+static int devfs_generate_path (devfs_handle_t de, char *path, int buflen)
 {
     int pos;
 #define NAMEOF(de) ( (de)->mode ? (de)->name : (de)->u.name )
@@ -1867,7 +1867,6 @@ EXPORT_SYMBOL(devfs_unregister);
 EXPORT_SYMBOL(devfs_mk_symlink);
 EXPORT_SYMBOL(devfs_mk_dir);
 EXPORT_SYMBOL(devfs_remove);
-EXPORT_SYMBOL(devfs_generate_path);
 
 
 /**
