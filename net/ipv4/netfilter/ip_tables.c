@@ -1452,7 +1452,7 @@ ipt_unregister_match(struct ipt_match *match)
 	up(&ipt_mutex);
 }
 
-int ipt_register_table(struct ipt_table *table)
+int ipt_register_table(struct ipt_table *table, const struct ipt_replace *repl)
 {
 	int ret;
 	struct ipt_table_info *newinfo;
@@ -1460,17 +1460,17 @@ int ipt_register_table(struct ipt_table *table)
 		= { 0, 0, 0, { 0 }, { 0 }, { } };
 
 	newinfo = vmalloc(sizeof(struct ipt_table_info)
-			  + SMP_ALIGN(table->table->size) * NR_CPUS);
+			  + SMP_ALIGN(repl->size) * NR_CPUS);
 	if (!newinfo)
 		return -ENOMEM;
 
-	memcpy(newinfo->entries, table->table->entries, table->table->size);
+	memcpy(newinfo->entries, repl->entries, repl->size);
 
 	ret = translate_table(table->name, table->valid_hooks,
-			      newinfo, table->table->size,
-			      table->table->num_entries,
-			      table->table->hook_entry,
-			      table->table->underflow);
+			      newinfo, repl->size,
+			      repl->num_entries,
+			      repl->hook_entry,
+			      repl->underflow);
 	if (ret != 0) {
 		vfree(newinfo);
 		return ret;

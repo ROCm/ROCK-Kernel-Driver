@@ -124,7 +124,6 @@ static struct
 
 static struct ip6t_table packet_mangler = {
 	.name		= "mangle",
-	.table		= &initial_table.repl,
 	.valid_hooks	= MANGLE_VALID_HOOKS,
 	.lock		= RW_LOCK_UNLOCKED,
 	.me		= THIS_MODULE,
@@ -233,7 +232,7 @@ static int __init init(void)
 	int ret;
 
 	/* Register table */
-	ret = ip6t_register_table(&packet_mangler);
+	ret = ip6t_register_table(&packet_mangler, &initial_table.repl);
 	if (ret < 0)
 		return ret;
 

@@ -440,9 +440,6 @@ struct ipt_table
 	/* A unique name... */
 	char name[IPT_TABLE_MAXNAMELEN];
 
-	/* Seed table: copied in register_table */
-	struct ipt_replace *table;
-
 	/* What hooks you will enter on */
 	unsigned int valid_hooks;
 
@@ -478,7 +475,8 @@ struct ipt_error
 	struct ipt_error_target target;
 };
 
-extern int ipt_register_table(struct ipt_table *table);
+extern int ipt_register_table(struct ipt_table *table,
+			      const struct ipt_replace *repl);
 extern void ipt_unregister_table(struct ipt_table *table);
 extern unsigned int ipt_do_table(struct sk_buff **pskb,
 				 unsigned int hook,

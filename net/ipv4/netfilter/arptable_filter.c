@@ -141,7 +141,6 @@ static struct
 
 static struct arpt_table packet_filter = {
 	.name		= "filter",
-	.table		= &initial_table.repl,
 	.valid_hooks	= FILTER_VALID_HOOKS,
 	.lock		= RW_LOCK_UNLOCKED,
 	.private	= NULL,
@@ -184,7 +183,7 @@ static int __init init(void)
 	int ret, i;
 
 	/* Register table */
-	ret = arpt_register_table(&packet_filter);
+	ret = arpt_register_table(&packet_filter, &initial_table.repl);
 	if (ret < 0)
 		return ret;
 
