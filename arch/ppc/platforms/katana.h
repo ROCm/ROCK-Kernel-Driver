@@ -8,9 +8,9 @@
  * Based on code done by Rabeeh Khoury - rabeeh@galileo.co.il
  * Based on code done by Mark A. Greer <mgreer@mvista.com>
  *
- * This program is free software; you can redistribute  it and/or modify it
- * under  the terms of  the GNU General  Public License as published by the
- * Free Software Foundation;  either version 2 of the  License, or (at your
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the
+ * Free Software Foundation; either version 2 of the License, or (at your
  * option) any later version.
  */
 
@@ -107,6 +107,8 @@
 #define KATANA_CPLD_RST_CMD_HR			0x01
 
 #define KATANA_CPLD_BD_CFG_0_SYSCLK_MASK	0xc0
+#define KATANA_CPLD_BD_CFG_0_SYSCLK_200		0x00
+#define KATANA_CPLD_BD_CFG_0_SYSCLK_166		0x80
 #define KATANA_CPLD_BD_CFG_0_SYSCLK_133		0xc0
 #define KATANA_CPLD_BD_CFG_0_SYSCLK_100		0x40
 
@@ -170,8 +172,8 @@
 #define KATANA_PRODUCT_ID_750i			0x02
 #define KATANA_PRODUCT_ID_752i			0x04
 
-#define KATANA_ETH_TX_QUEUE_SIZE		1050
-#define KATANA_ETH_RX_QUEUE_SIZE		450
+#define KATANA_ETH_TX_QUEUE_SIZE		800
+#define KATANA_ETH_RX_QUEUE_SIZE		400
 
 #define	KATANA_ETH_PORT_CONFIG_VALUE			\
 	ETH_UNICAST_NORMAL_MODE			|	\
