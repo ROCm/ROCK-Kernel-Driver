@@ -485,6 +485,14 @@ static inline void scsi_host_put(struct Scsi_Host *h)
 #define ia64_platform_is(foo)		(!strcmp(x, platform_name))
 #endif
 
+
+#define IS_ISP1040(ha) (ha->pdev->device == PCI_DEVICE_ID_QLOGIC_ISP1020)
+#define IS_ISP1x40(ha) (ha->pdev->device == PCI_DEVICE_ID_QLOGIC_ISP1020 || \
+			ha->pdev->device == PCI_DEVICE_ID_QLOGIC_ISP1240)
+#define IS_ISP1x160(ha)        (ha->pdev->device == PCI_DEVICE_ID_QLOGIC_ISP10160 || \
+				ha->pdev->device == PCI_DEVICE_ID_QLOGIC_ISP12160)
+
+
 static int qla1280_probe_one(struct pci_dev *, const struct pci_device_id *);
 static void qla1280_remove_one(struct pci_dev *);
 
@@ -1384,15 +1392,9 @@ qla1280_set_target_parameters(struct scsi_qla_host *ha, int bus, int target)
 	uint8_t mr;
 	uint16_t mb[MAILBOX_REGISTER_COUNT];
 	struct nvram *nv;
-	int is1x160, status;
+	int status;
 
 	nv = &ha->nvram;
-
-	if (ha->pdev->device == PCI_DEVICE_ID_QLOGIC_ISP12160 ||
-	    ha->pdev->device == PCI_DEVICE_ID_QLOGIC_ISP10160)
-		is1x160 = 1;
-	else
-		is1x160 = 0;
 
 	mr = BIT_3 | BIT_2 | BIT_1 | BIT_0;
 
@@ -1403,17 +1405,16 @@ qla1280_set_target_parameters(struct scsi_qla_host *ha, int bus, int target)
 
 	mb[2] = (nv->bus[bus].target[target].parameter.c << 8);
 
-	if (is1x160)
-		mb[3] =	nv->bus[bus].target[target].flags.flags1x160.sync_offset << 8;
-	else
-		mb[3] =	nv->bus[bus].target[target].flags.flags1x80.sync_offset << 8;
-	mb[3] |= nv->bus[bus].target[target].sync_period;
-
-	if (is1x160) {
+	if (IS_ISP1x160(ha)) {
 		mb[2] |= nv->bus[bus].target[target].ppr_1x160.flags.enable_ppr << 5;
-		mb[6] =	nv->bus[bus].target[target].ppr_1x160.flags.ppr_options << 8;
-		mb[6] |= nv->bus[bus].target[target].ppr_1x160.flags.ppr_bus_width;
+		mb[3] =	(nv->bus[bus].target[target].flags.flags1x160.sync_offset << 8) |
+			 nv->bus[bus].target[target].sync_period;
+		mb[6] =	(nv->bus[bus].target[target].ppr_1x160.flags.ppr_options << 8) |
+			 nv->bus[bus].target[target].ppr_1x160.flags.ppr_bus_width;
 		mr |= BIT_6;
+	} else {
+		mb[3] =	(nv->bus[bus].target[target].flags.flags1x80.sync_offset << 8) |
+			 nv->bus[bus].target[target].sync_period;
 	}
 
 	status = qla1280_mailbox_command(ha, mr, &mb[0]);
@@ -1476,8 +1477,7 @@ qla1280_slave_configure(struct scsi_device *device)
 	    (driver_setup.wide_mask &&
 	     (~driver_setup.wide_mask & (1 << target))))
 		nv->bus[bus].target[target].parameter.f.enable_wide = 0;
-	if (ha->pdev->device == PCI_DEVICE_ID_QLOGIC_ISP12160 ||
-	    ha->pdev->device == PCI_DEVICE_ID_QLOGIC_ISP10160) {
+	if (IS_ISP1x160(ha)) {
 		if (driver_setup.no_ppr ||
 		    (driver_setup.ppr_mask &&
 		     (~driver_setup.ppr_mask & (1 << target))))
@@ -2289,18 +2289,12 @@ qla1280_nvram_config(struct scsi_qla_host *ha)
 {
 	struct device_reg *reg = ha->iobase;
 	struct nvram *nv;
-	int is1x160, status = 0;
+	int status = 0;
 	int bus, target, lun;
 	uint16_t mb[MAILBOX_REGISTER_COUNT];
 	uint16_t mask;
 
 	ENTER("qla1280_nvram_config");
-
-	if (ha->pdev->device == PCI_DEVICE_ID_QLOGIC_ISP12160 ||
-	    ha->pdev->device == PCI_DEVICE_ID_QLOGIC_ISP10160)
-		is1x160 = 1;
-	else
-		is1x160 = 0;
 
 	nv = &ha->nvram;
 	if (!ha->nvram_valid) {
@@ -2325,7 +2319,7 @@ qla1280_nvram_config(struct scsi_qla_host *ha)
 		 */
 		nv->isp_config.c = 0x44;
 
-		if (is1x160)
+		if (IS_ISP1x160(ha))
 			nv->isp_parameter = 0x01;
 
 		for (bus = 0; bus < MAX_BUSES; bus++) {
@@ -2357,7 +2351,7 @@ qla1280_nvram_config(struct scsi_qla_host *ha)
 					disconnect_allowed = 1;
 				nv->bus[bus].target[target].execution_throttle=
 					nv->bus[bus].max_queue_depth - 1;
-				if (is1x160) {
+				if (IS_ISP1x160(ha)) {
 					nv->bus[bus].target[target].flags.
 						flags1x160.device_enable = 1;
 					nv->bus[bus].target[target].flags.
@@ -2558,16 +2552,18 @@ qla1280_nvram_config(struct scsi_qla_host *ha)
 			nv->bus[bus].target[target].parameter.f.
 				stop_queue_on_check = 0;
 
-			if (is1x160)
+			if (IS_ISP1x160(ha)) {
 				nv->bus[bus].target[target].ppr_1x160.
 					flags.enable_ppr = 0;
+			}
+
 			/*
 			 * No sync, wide, etc. while probing
 			 */
 			mb[2] = (nv->bus[bus].target[target].parameter.c << 8)&
 				~(TP_SYNC /*| TP_WIDE | TP_PPR*/);
 
-			if (is1x160)
+			if (IS_ISP1x160(ha))
 				mb[3] =	nv->bus[bus].target[target].flags.flags1x160.sync_offset << 8;
 			else
 				mb[3] =	nv->bus[bus].target[target].flags.flags1x80.sync_offset << 8;
@@ -2579,7 +2575,7 @@ qla1280_nvram_config(struct scsi_qla_host *ha)
 			 * determined that the target actually supports it
 			 */
 #if 0
-			if (is1x160) {
+			if (IS_ISP1x160(ha)) {
 				mb[2] |= nv->bus[bus].target[target].ppr_1x160.flags.enable_ppr << 5;
 
 				mb[6] =	nv->bus[bus].target[target].ppr_1x160.flags.ppr_options << 8;
@@ -2596,7 +2592,7 @@ qla1280_nvram_config(struct scsi_qla_host *ha)
 				ha->bus_settings[bus].qtag_enables |= mb[0];
 
 			/* Save Device enable flag. */
-			if (is1x160) {
+			if (IS_ISP1x160(ha)) {
 				if (nv->bus[bus].target[target].flags.flags1x160.device_enable)
 					ha->bus_settings[bus].device_enables |= mb[0];
 				ha->bus_settings[bus].lun_disables |= 0;
