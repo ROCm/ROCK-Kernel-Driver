@@ -446,7 +446,6 @@ static int ibmtr_event(event_t event, int priority,
 	    struct tok_info *priv = netdev_priv(dev);
 	    priv->sram_virt |= 1;
 	    netif_device_detach(dev);
-	    ibmtr_release(link);
         }
         break;
     case CS_EVENT_CARD_INSERTION:
