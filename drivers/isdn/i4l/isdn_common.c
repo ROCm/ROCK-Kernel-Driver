@@ -34,6 +34,9 @@ MODULE_LICENSE("GPL");
 
 isdn_dev *dev;
 
+static void isdn_lock_driver(struct isdn_driver *drv);
+static void isdn_unlock_driver(struct isdn_driver *drv);
+
 static void isdn_register_devfs(int);
 static void isdn_unregister_devfs(int);
 
@@ -109,6 +112,9 @@ do_event_cb(struct isdn_slot *slot, int pr, void *arg)
 static int
 slot_bind(struct fsm_inst *fi, int pr, void *arg)
 {
+	struct isdn_slot *slot = fi->userdata;
+	
+	isdn_lock_driver(slot->drv);
 	fsm_change_state(fi, ST_SLOT_BOUND);
 
 	return 0;
@@ -287,6 +293,7 @@ slot_icall(struct fsm_inst *fi, int pr, void *arg)
 	isdn_ctrl *ctrl = arg;
 	int retval;
 
+	isdn_lock_driver(slot->drv);
 	fsm_change_state(fi, ST_SLOT_IN);
 	slot_debug(fi, "ICALL: %s\n", ctrl->parm.num);
 	if (dev->global_flags & ISDN_GLOBAL_STOPPED)
@@ -311,6 +318,7 @@ slot_in_dhup(struct fsm_inst *fi, int pr, void *arg)
 {
 	struct isdn_slot *slot = fi->userdata;
 
+	isdn_unlock_driver(slot->drv);
 	fsm_change_state(fi, ST_SLOT_NULL);
 	do_event_cb(slot, pr, arg);
 	return 0;
@@ -322,6 +330,8 @@ slot_unbind(struct fsm_inst *fi, int pr, void *arg)
 	struct isdn_slot *slot = fi->userdata;
 	isdn_ctrl cmd;
 
+	isdn_unlock_driver(slot->drv);
+	fsm_change_state(fi, ST_SLOT_NULL);
 	strcpy(slot->num, "???");
 	cmd.parm.num[0] = '\0';
 	isdn_slot_command(slot, ISDN_CMD_SETEAZ, &cmd);
@@ -521,6 +531,9 @@ get_drv_by_nr(int di)
 {
 	unsigned long flags;
 	struct isdn_driver *drv;
+	
+	if (di < 0)
+		return NULL;
 
 	spin_lock_irqsave(&drivers_lock, flags);
 	drv = drivers[di];
@@ -977,62 +990,26 @@ static isdn_divert_if *divert_if; /* = NULL */
 
 static int isdn_wildmat(char *s, char *p);
 
-void
-isdn_lock_drivers(void)
+static void
+isdn_lock_driver(struct isdn_driver *drv)
 {
 	isdn_ctrl cmd;
-	unsigned long flags;
-	int i;
 
-	spin_lock_irqsave(&drivers_lock, flags);
-	for (i = 0; i < ISDN_MAX_DRIVERS; i++) {
-		if (!drivers[i])
-			continue;
-
-		cmd.driver = i;
-		cmd.arg = 0;
-		cmd.command = ISDN_CMD_LOCK;
-		__drv_command(drivers[i], &cmd);
-		drivers[i]->locks++;
-	}
-	spin_unlock_irqrestore(&drivers_lock, flags);
+	cmd.driver = drv->di;
+	cmd.arg = 0;
+	cmd.command = ISDN_CMD_LOCK;
+	__drv_command(drv, &cmd);
 }
 
-void
-isdn_MOD_INC_USE_COUNT(void)
-{
-	MOD_INC_USE_COUNT;
-	isdn_lock_drivers();
-}
-
-void
-isdn_unlock_drivers(void)
+static void
+isdn_unlock_driver(struct isdn_driver *drv)
 {
 	isdn_ctrl cmd;
-	unsigned long flags;
-	int i;
 
-	spin_lock_irqsave(&drivers_lock, flags);
-	for (i = 0; i < ISDN_MAX_DRIVERS; i++) {
-		if (!drivers[i])
-			continue;
-
-		if (drivers[i]->locks > 0) {
-			cmd.driver = i;
-			cmd.arg = 0;
-			cmd.command = ISDN_CMD_UNLOCK;
-			__drv_command(drivers[i], &cmd);
-			drivers[i]->locks--;
-		}
-	}
-	spin_unlock_irqrestore(&drivers_lock, flags);
-}
-
-void
-isdn_MOD_DEC_USE_COUNT(void)
-{
-	MOD_DEC_USE_COUNT;
-	isdn_unlock_drivers();
+	cmd.driver = drv->di;
+	cmd.arg = 0;
+	cmd.command = ISDN_CMD_UNLOCK;
+	__drv_command(drv, &cmd);
 }
 
 #if defined(ISDN_DEBUG_NET_DUMP) || defined(ISDN_DEBUG_MODEM_DUMP)
@@ -1461,47 +1438,42 @@ static struct file_operations isdn_status_fops =
  */
 
 static int
-isdn_ctrl_open(struct inode *ino, struct file *filep)
+isdn_ctrl_open(struct inode *ino, struct file *file)
 {
 	unsigned int minor = minor(ino->i_rdev);
 	int drvidx = isdn_minor2drv(minor - ISDN_MINOR_CTRL);
-	int retval = 0;
+	struct isdn_driver *drv;
 
-	if (drvidx < 0) {
-		retval = -ENODEV;
-		goto out;
-	}
-	isdn_lock_drivers();
+	drv = get_drv_by_nr(drvidx);
+	if (!drv)
+		return -ENODEV;
 
- out:
-	return retval;
+	isdn_lock_driver(drv);
+
+	file->private_data = drv;
+	return 0;
 }
 
 static int
-isdn_ctrl_release(struct inode *ino, struct file *filep)
+isdn_ctrl_release(struct inode *ino, struct file *file)
 {
-	unsigned int minor = minor(ino->i_rdev);
-	int drvidx = isdn_minor2drv(minor - ISDN_MINOR_CTRL);
+	struct isdn_driver *drv = file->private_data;
 
-	if (drvidx < 0) {
-		isdn_BUG();
-		goto out;
-	}
 	if (dev->profd == current)
 		dev->profd = NULL;
 
-	isdn_unlock_drivers();
+	isdn_unlock_driver(drv);
+	put_drv(drv);
 
- out:
 	return 0;
 }
 
 static ssize_t
 isdn_ctrl_read(struct file *file, char *buf, size_t count, loff_t * off)
 {
-	DECLARE_WAITQUEUE(wait, current);
+	struct isdn_driver *drv = file->private_data;
 	unsigned int minor = minor(file->f_dentry->d_inode->i_rdev);
-	int drvidx = isdn_minor2drv(minor - ISDN_MINOR_CTRL);
+	DECLARE_WAITQUEUE(wait, current);
 	unsigned long flags;
 	int len = 0;
 
@@ -1509,18 +1481,14 @@ isdn_ctrl_read(struct file *file, char *buf, size_t count, loff_t * off)
 	if (off != &file->f_pos)
 		return -ESPIPE;
 
-	if (drvidx < 0) {
-		isdn_BUG();
-		return -ENODEV;
-	}
-	if (!drivers[drvidx]->interface->readstat) {
+	if (!drv->interface->readstat) {
 		isdn_BUG();
 		return 0;
 	}
- 	add_wait_queue(&drivers[drvidx]->st_waitq, &wait);
+ 	add_wait_queue(&drv->st_waitq, &wait);
 	for (;;) {
 		spin_lock_irqsave(&stat_lock, flags);
-		len = drivers[drvidx]->stavail;
+		len = drv->stavail;
 		spin_unlock_irqrestore(&stat_lock, flags);
 		if (len > 0)
 			break;
@@ -1535,7 +1503,7 @@ isdn_ctrl_read(struct file *file, char *buf, size_t count, loff_t * off)
 		schedule();
 	}
 	__set_current_state(TASK_RUNNING);
-	remove_wait_queue(&drivers[drvidx]->st_waitq, &wait);
+	remove_wait_queue(&drv->st_waitq, &wait);
 	
 	if (len < 0)
 		return len;
@@ -1543,15 +1511,15 @@ isdn_ctrl_read(struct file *file, char *buf, size_t count, loff_t * off)
 	if (count > len)
 		count = len;
 		
-	len = drivers[drvidx]->interface->readstat(buf, count, 1, drvidx,
-					       isdn_minor2chan(minor));
+	len = drv->interface->readstat(buf, count, 1, drv->di,
+				       isdn_minor2chan(minor));
 
 	spin_lock_irqsave(&stat_lock, flags);
 	if (len) {
-		drivers[drvidx]->stavail -= len;
+		drv->stavail -= len;
 	} else {
 		isdn_BUG();
-		drivers[drvidx]->stavail = 0;
+		drv->stavail = 0;
 	}
 	spin_unlock_irqrestore(&stat_lock, flags);
 
@@ -1562,24 +1530,20 @@ isdn_ctrl_read(struct file *file, char *buf, size_t count, loff_t * off)
 static ssize_t
 isdn_ctrl_write(struct file *file, const char *buf, size_t count, loff_t *off)
 {
-	uint minor = minor(file->f_dentry->d_inode->i_rdev);
-	int drvidx;
+	struct isdn_driver *drv = file->private_data;
+	unsigned int minor = minor(file->f_dentry->d_inode->i_rdev);
 	int retval;
 
 	if (off != &file->f_pos)
 		return -ESPIPE;
 
-	drvidx = isdn_minor2drv(minor - ISDN_MINOR_CTRL);
-	if (drvidx < 0) {
-		retval = -ENODEV;
-		goto out;
-	}
-	if (!drivers[drvidx]->interface->writecmd) {
+	if (!drv->interface->writecmd) {
 		retval = -EINVAL;
 		goto out;
 	}
-	retval = drivers[drvidx]->interface->
-		writecmd(buf, count, 1, drvidx, isdn_minor2chan(minor - ISDN_MINOR_CTRL));
+	retval = drv->interface->
+		writecmd(buf, count, 1, drv->di, 
+			 isdn_minor2chan(minor - ISDN_MINOR_CTRL));
 
  out:
 	return retval;
@@ -1588,18 +1552,12 @@ isdn_ctrl_write(struct file *file, const char *buf, size_t count, loff_t *off)
 static unsigned int
 isdn_ctrl_poll(struct file *file, poll_table *wait)
 {
+	struct isdn_driver *drv = file->private_data;
 	unsigned int mask = 0;
-	unsigned int minor = minor(file->f_dentry->d_inode->i_rdev);
-	int drvidx;
 
-	drvidx = isdn_minor2drv(minor - ISDN_MINOR_CTRL);
-	if (drvidx < 0)
-		/* driver deregistered while file open */
-		return POLLHUP;
-
-	poll_wait(file, &drivers[drvidx]->st_waitq, wait);
+	poll_wait(file, &drv->st_waitq, wait);
 	mask = POLLOUT | POLLWRNORM;
-	if (drivers[drvidx]->stavail)
+	if (drv->stavail)
 		mask |= POLLIN | POLLRDNORM;
 
 	return mask;

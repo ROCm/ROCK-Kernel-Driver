@@ -9,8 +9,12 @@
 
 #define ISDN_TTY_STAT_DEBUG
 #define ISDN_DEBUG_MODEM_HUP
+#define ISDN_DEBUG_MODEM_VOICE
+#define ISDN_DEBUG_MODEM_OPEN
+#define ISDN_DEBUG_MODEM_IOCTL
+#define ISDN_DEBUG_MODEM_ICALL
 
-#include <linux/config.h>
+#include <linux/module.h>
 #include <linux/isdn.h>
 #include "isdn_common.h"
 #include "isdn_tty.h"
@@ -1129,7 +1133,6 @@ isdn_tty_startup(modem_info * info)
 		return 0;
 	save_flags(flags);
 	cli();
-	isdn_MOD_INC_USE_COUNT();
 #ifdef ISDN_DEBUG_MODEM_OPEN
 	printk(KERN_DEBUG "starting up ttyi%d ...\n", info->line);
 #endif
@@ -1167,7 +1170,6 @@ isdn_tty_shutdown(modem_info * info)
 #endif
 	save_flags(flags);
 	cli();                  /* Disable interrupts */
-	isdn_MOD_DEC_USE_COUNT();
 	info->msr &= ~UART_MSR_RI;
 	if (!info->tty || (info->tty->termios->c_cflag & HUPCL)) {
 		info->mcr &= ~(UART_MCR_DTR | UART_MCR_RTS);
@@ -1758,8 +1760,11 @@ static int
 isdn_tty_open(struct tty_struct *tty, struct file *filp)
 {
 	modem_info *info;
-	int retval,
-	 line;
+	int retval, line;
+
+	/* FIXME. This is not unload-race free AFAICS */
+
+	MOD_INC_USE_COUNT;
 
 	line = minor(tty->device) - tty->driver.minor_start;
 	if (line < 0 || line > ISDN_MAX_CHANNELS)
@@ -1818,7 +1823,8 @@ isdn_tty_close(struct tty_struct *tty, struct file *filp)
 	ulong timeout;
 
 	if (!info || isdn_tty_paranoia_check(info, tty->device, "isdn_tty_close"))
-		return;
+		goto out;
+
 	save_flags(flags);
 	cli();
 	if (tty_hung_up_p(filp)) {
@@ -1826,7 +1832,7 @@ isdn_tty_close(struct tty_struct *tty, struct file *filp)
 #ifdef ISDN_DEBUG_MODEM_OPEN
 		printk(KERN_DEBUG "isdn_tty_close return after tty_hung_up_p\n");
 #endif
-		return;
+		goto out;
 	}
 	if ((tty->count == 1) && (info->count != 1)) {
 		/*
@@ -1850,7 +1856,7 @@ isdn_tty_close(struct tty_struct *tty, struct file *filp)
 #ifdef ISDN_DEBUG_MODEM_OPEN
 		printk(KERN_DEBUG "isdn_tty_close after info->count != 0\n");
 #endif
-		return;
+		goto out;
 	}
 	info->flags |= ISDN_ASYNC_CLOSING;
 	/*
@@ -1905,6 +1911,8 @@ isdn_tty_close(struct tty_struct *tty, struct file *filp)
 #ifdef ISDN_DEBUG_MODEM_OPEN
 	printk(KERN_DEBUG "isdn_tty_close normal exit\n");
 #endif
+ out:
+	MOD_DEC_USE_COUNT;
 }
 
 /*
