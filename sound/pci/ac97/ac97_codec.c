@@ -1978,12 +1978,12 @@ int snd_ac97_mixer(ac97_bus_t * bus, ac97_t * _ac97, ac97_t ** rac97)
 	}
 	/* make sure the proper powerdown bits are cleared */
 	if (ac97->scaps) {
-		reg = snd_ac97_read(ac97, AC97_EXTENDED_ID);
+		reg = snd_ac97_read(ac97, AC97_EXTENDED_STATUS);
 		if (ac97->scaps & AC97_SCAP_SURROUND_DAC) 
 			reg &= ~AC97_EA_PRJ;
 		if (ac97->scaps & AC97_SCAP_CENTER_LFE_DAC) 
 			reg &= ~(AC97_EA_PRI | AC97_EA_PRK);
-		snd_ac97_write_cache(ac97, AC97_EXTENDED_ID, reg);
+		snd_ac97_write_cache(ac97, AC97_EXTENDED_STATUS, reg);
 	}
 	snd_ac97_proc_init(ac97);
 	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, ac97, &ops)) < 0) {
