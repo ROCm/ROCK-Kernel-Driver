@@ -33,6 +33,7 @@
 
 #include "opl4_local.h"
 #include <linux/init.h>
+#include <linux/moduleparam.h>
 #include <sound/initval.h>
 
 MODULE_AUTHOR("Clemens Ladisch <clemens@ladisch.de>");
@@ -42,7 +43,7 @@ MODULE_CLASSES("{sound}");
 
 int volume_boost = 8;
 
-MODULE_PARM(volume_boost, "i");
+module_param(volume_boost, int, 0444);
 MODULE_PARM_DESC(volume_boost, "Additional volume for OPL4 wavetable sounds.");
 MODULE_PARM_SYNTAX(volume_boost, "default:8");
 

@@ -24,8 +24,8 @@
 #include <linux/init.h>
 #include <linux/time.h>
 #include <linux/pnp.h>
+#include <linux/moduleparam.h>
 #include <sound/core.h>
-#define SNDRV_GET_ID
 #include <sound/initval.h>
 #include <sound/sb.h>
 
@@ -45,23 +45,24 @@ static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_ISAPNP; /* Enable this car
 static long port[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;	/* PnP setup */
 static int irq[SNDRV_CARDS] = SNDRV_DEFAULT_IRQ;	/* Pnp setup */
 static int dma8[SNDRV_CARDS] = SNDRV_DEFAULT_DMA;	/* PnP setup */
+static int boot_devs;
 
-MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for es968 based soundcard.");
 MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
-MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for es968 based soundcard.");
 MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
-MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable es968 based soundcard.");
 MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
-MODULE_PARM(port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+module_param_array(port, long, boot_devs, 0444);
 MODULE_PARM_DESC(port, "Port # for es968 driver.");
 MODULE_PARM_SYNTAX(port, SNDRV_PORT12_DESC);
-MODULE_PARM(irq, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(irq, int, boot_devs, 0444);
 MODULE_PARM_DESC(irq, "IRQ # for es968 driver.");
 MODULE_PARM_SYNTAX(irq, SNDRV_IRQ_DESC);
-MODULE_PARM(dma8, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(dma8, int, boot_devs, 0444);
 MODULE_PARM_DESC(dma8, "8-bit DMA # for es968 driver.");
 MODULE_PARM_SYNTAX(dma8, SNDRV_DMA8_DESC);
 
@@ -242,28 +243,3 @@ static void __exit alsa_card_es968_exit(void)
 
 module_init(alsa_card_es968_init)
 module_exit(alsa_card_es968_exit)
-
-#ifndef MODULE
-
-/* format is: snd-es968=enable,index,id,
-			port,irq,dma1 */
-
-static int __init alsa_card_es968_setup(char *str)
-{
-	static unsigned __initdata nr_dev = 0;
-
-	if (nr_dev >= SNDRV_CARDS)
-		return 0;
-	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
-	       get_option(&str,&index[nr_dev]) == 2 &&
-	       get_id(&str,&id[nr_dev]) == 2 &&
-	       get_option_long(&str,&port[nr_dev]) == 2 &&
-	       get_option(&str,&irq[nr_dev]) == 2 &&
-	       get_option(&str,&dma8[nr_dev]) == 2);
-	nr_dev++;
-	return 1;
-}
-
-__setup("snd-es968=", alsa_card_es968_setup);
-
-#endif /* ifndef MODULE */

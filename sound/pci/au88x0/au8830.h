@@ -45,7 +45,7 @@
 #define VORTEX_ADBDMA_START 0x27c00	/* Which subbuffer starts */
 
 #define VORTEX_ADBDMA_STATUS 0x27A90	/* stored at AdbDma->this_10 / 2 DWORD in size. */
-/* Starting at MSB, each pair seem to be the current DMA page. */
+/* Starting at the MSB, each pair of bits seem to be the current DMA page. */
 /* This current page bits are consistent (same value) with VORTEX_ADBDMA_STAT) */
 
 /* DMA */
@@ -65,9 +65,9 @@
 /* ADB */
 #define VORTEX_ADB_SR 0x28400	/* Samplerates enable/disable */
 #define VORTEX_ADB_RTBASE 0x28000
-#define VORTEX_ADB_RTBASE_SIZE (VORTEX_ADB_CHNBASE - VORTEX_ADB_RTBASE)
+#define VORTEX_ADB_RTBASE_COUNT 173
 #define VORTEX_ADB_CHNBASE 0x282b4
-#define VORTEX_ADB_CHNBASE_SIZE (ADB_MASK - VORTEX_ADB_RTBASE_SIZE)
+#define VORTEX_ADB_CHNBASE_COUNT 24
 #define 	ROUTE_MASK	0xffff
 #define		SOURCE_MASK	0xff00
 #define     ADB_MASK   0xff
@@ -147,7 +147,7 @@
 #define VORTEX_SRC_RTBASE		0x26c00
 #define VORTEX_SRCBLOCK_SR		0x26cc0
 #define VORTEX_SRC_SOURCE		0x26cc4
-#define VORTEX_SRC_SOURCESIZE	0x26cc4
+#define VORTEX_SRC_SOURCESIZE	0x26cc8
 /* Params
 	0x26e00	: 1 U0
 	0x26e40	: 2 CR

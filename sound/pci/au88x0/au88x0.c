@@ -19,7 +19,7 @@
 #include <linux/pci.h>
 #include <linux/slab.h>
 #include <linux/interrupt.h>
-#define SNDRV_GET_ID
+#include <linux/moduleparam.h>
 #include <sound/initval.h>
 
 // module parameters (see "Module Parameters")
@@ -27,17 +27,18 @@ static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;
 static int pcifix[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 255 };
+static int boot_devs;
 
-MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for " CARD_NAME " soundcard.");
 MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
-MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for " CARD_NAME " soundcard.");
 MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
-MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable " CARD_NAME " soundcard.");
 MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
-MODULE_PARM(pcifix, "1-255i");
+module_param_array(pcifix, int, boot_devs, 0444);
 MODULE_PARM_DESC(pcifix, "Enable VIA-workaround for " CARD_NAME " soundcard.");
 MODULE_PARM_SYNTAX(pcifix,
 		   SNDRV_ENABLED
@@ -48,80 +49,72 @@ MODULE_CLASSES("{sound}");
 MODULE_LICENSE("GPL");
 MODULE_DEVICES("{{Aureal Semiconductor Inc., Aureal Vortex Sound Processor}}");
 
-#ifndef MODULE
-/* format is: snd-mychip=enable,index,id */
-static int __init alsa_card_vortex_setup(char *str)
-{
-	static unsigned __initdata nr_dev = 0;
+MODULE_DEVICE_TABLE(pci, snd_vortex_ids);
 
-	if (nr_dev >= SNDRV_CARDS)
-		return 0;
-	(void)(get_option(&str, &enable[nr_dev]) == 2 &&
-	       get_option(&str, &index[nr_dev]) == 2 &&
-	       get_id(&str, &id[nr_dev]) == 2);
-	nr_dev++;
-	return 1;
+static void vortex_fix_latency(struct pci_dev *vortex)
+{
+	int rc;
+	if (!(rc = pci_write_config_byte(vortex, 0x40, 0xff))) {
+			printk(KERN_INFO CARD_NAME
+			       ": vortex latency is 0xff\n");
+	} else {
+		printk(KERN_WARNING CARD_NAME
+				": could not set vortex latency: pci error 0x%x\n", rc);
+	}
 }
 
-__setup("snd-au88x0=", alsa_card_vortex_setup);
-#endif				/* ifndef MODULE */
+static void vortex_fix_agp_bridge(struct pci_dev *via)
+{
+	int rc;
+	u8 value;
 
-MODULE_DEVICE_TABLE(pci, snd_vortex_ids);
+	/*
+	 * only set the bit (Extend PCI#2 Internal Master for
+	 * Efficient Handling of Dummy Requests) if the can
+	 * read the config and it is not already set
+	 */
+
+	if (!(rc = pci_read_config_byte(via, 0x42, &value))
+			&& ((value & 0x10)
+				|| !(rc = pci_write_config_byte(via, 0x42, value | 0x10)))) {
+		printk(KERN_INFO CARD_NAME
+				": bridge config is 0x%x\n", value | 0x10);
+	} else {
+		printk(KERN_WARNING CARD_NAME
+				": could not set vortex latency: pci error 0x%x\n", rc);
+	}
+}
 
 static void __devinit snd_vortex_workaround(struct pci_dev *vortex, int fix)
 {
-	struct pci_dev *via = NULL;
-	int rc;
+	struct pci_dev *via;
 
 	/* autodetect if workarounds are required */
-	while ((via = pci_find_device(PCI_VENDOR_ID_VIA,
-				      PCI_DEVICE_ID_VIA_8365_1, via))) {
-		if (fix == 255) {
-			printk(KERN_INFO CARD_NAME
-			       ": detected VIA KT133/KM133. activating workaround...\n");
-			fix = 3;	// do latency and via bridge workaround
+	if (fix == 255) {
+		/* VIA KT133 */
+		via = pci_find_device(PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_8365_1, NULL);
+		/* VIA Apollo */
+		if (via == NULL) {
+			via = pci_find_device(PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_82C598_1, NULL);
 		}
-		break;
-	}
-
-	/* do not do anything if autodetection was enabled and found no VIA */
-	if (fix == 255)
-		return;
-
-	/* fix vortex latency */
-	if (fix & 0x01) {
-		if (!(rc = pci_write_config_byte(vortex, 0x40, 0xff))) {
-			printk(KERN_INFO CARD_NAME
-			       ": vortex latency is 0xff\n");
-		} else {
-			printk(KERN_WARNING CARD_NAME
-			       ": could not set vortex latency: pci error 0x%x\n",
-			       rc);
+		/* AMD Irongate */
+		if (via == NULL) {
+			via = pci_find_device(PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_FE_GATE_7007, NULL);
 		}
-	}
-
-	/* fix via agp bridge */
-	if (via && (fix & 0x02)) {
-		u8 value;
-
-		/*
-		 * only set the bit (Extend PCI#2 Internal Master for
-		 * Efficient Handling of Dummy Requests) if the can
-		 * read the config and it is not already set
-		 */
-
-		if (!(rc = pci_read_config_byte(via, 0x42, &value))
-		    && ((value & 0x10)
-			|| !(rc =
-			     pci_write_config_byte(via, 0x42, value | 0x10)))) {
-
-			printk(KERN_INFO CARD_NAME
-			       ": bridge config is 0x%x\n", value | 0x10);
-		} else {
-			printk(KERN_WARNING CARD_NAME
-			       ": could not set vortex latency: pci error 0x%x\n",
-			       rc);
+		if (via) {
+			printk(KERN_INFO CARD_NAME ": Activating latency workaround...\n");
+			vortex_fix_latency(vortex);
+			vortex_fix_agp_bridge(via);
 		}
+	} else {
+		if (fix & 0x1)
+			vortex_fix_latency(vortex);
+		if ((fix & 0x2) && (via = pci_find_device(PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_8365_1, NULL)))
+			vortex_fix_agp_bridge(via);
+		if ((fix & 0x4) && (via = pci_find_device(PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_82C598_1, NULL)))
+			vortex_fix_agp_bridge(via);
+		if ((fix & 0x8) && (via = pci_find_device(PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_FE_GATE_7007, NULL)))
+			vortex_fix_agp_bridge(via);
 	}
 }
 
@@ -370,7 +363,7 @@ snd_vortex_probe(struct pci_dev *pci, const struct pci_device_id *pci_id)
 		return err;
 	}
 	// (7)
-	pci_set_drvdata(pci, chip);
+	pci_set_drvdata(pci, card);
 	dev++;
 	vortex_connect_default(chip, 1);
 	vortex_enable_int(chip);
@@ -380,16 +373,8 @@ snd_vortex_probe(struct pci_dev *pci, const struct pci_device_id *pci_id)
 // destructor -- see "Destructor" sub-section
 static void __devexit snd_vortex_remove(struct pci_dev *pci)
 {
-	vortex_t *vortex = snd_magic_cast(vortex_t,
-					  pci_get_drvdata(pci), return);
-
-	if (vortex) {
-		// Release ALSA stuff.
-		snd_card_free(vortex->card);
-		// Free Vortex struct.
-		pci_set_drvdata(pci, NULL);
-	} else
-		printk("snd_vortex_remove called more than one time!\n");
+	snd_card_free(pci_get_drvdata(pci));
+	pci_set_drvdata(pci, NULL);
 }
 
 // pci_driver definition
@@ -403,16 +388,7 @@ static struct pci_driver driver = {
 // initialization of the module
 static int __init alsa_card_vortex_init(void)
 {
-	int err;
-
-	if ((err = pci_module_init(&driver)) < 0) {
-#ifdef MODULE
-		printk(KERN_ERR "Aureal soundcard not found "
-		       "or device busy\n");
-#endif
-		return err;
-	}
-	return 0;
+	return pci_module_init(&driver);
 }
 
 // clean up the module

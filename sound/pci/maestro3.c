@@ -39,13 +39,13 @@
 #include <linux/pci.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
+#include <linux/moduleparam.h>
 #include <sound/core.h>
 #include <sound/info.h>
 #include <sound/control.h>
 #include <sound/pcm.h>
 #include <sound/mpu401.h>
 #include <sound/ac97_codec.h>
-#define SNDRV_GET_ID
 #include <sound/initval.h>
 
 MODULE_AUTHOR("Zach Brown <zab@zabbo.net>, Takashi Iwai <tiwai@suse.de>");
@@ -63,20 +63,21 @@ static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP; /* all enabled */
 static int external_amp[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 1};
 static int amp_gpio[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = -1};
+static int boot_devs;
 
-MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for " CARD_NAME " soundcard.");
 MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
-MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for " CARD_NAME " soundcard.");
 MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
-MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable this soundcard.");
 MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
-MODULE_PARM(external_amp, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(external_amp, bool, boot_devs, 0444);
 MODULE_PARM_DESC(external_amp, "Enable external amp for " CARD_NAME " soundcard.");
 MODULE_PARM_SYNTAX(external_amp, SNDRV_ENABLED "," SNDRV_BOOLEAN_TRUE_DESC);
-MODULE_PARM(amp_gpio, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(amp_gpio, int, boot_devs, 0444);
 MODULE_PARM_DESC(amp_gpio, "GPIO pin number for external amp. (default = -1)");
 MODULE_PARM_SYNTAX(amp_gpio, SNDRV_ENABLED);
 
@@ -2410,18 +2411,16 @@ static int snd_m3_free(m3_t *chip)
  * APM support
  */
 #ifdef CONFIG_PM
-
-static void m3_suspend(m3_t *chip)
+static int m3_suspend(snd_card_t *card, unsigned int state)
 {
-	snd_card_t *card = chip->card;
+	m3_t *chip = snd_magic_cast(m3_t, card->pm_private_data, return -EINVAL);
 	int i, index;
 
 	if (chip->suspend_mem == NULL)
-		return;
-	if (card->power_state == SNDRV_CTL_POWER_D3hot)
-		return;
+		return 0;
 
 	snd_pcm_suspend_all(chip->pcm);
+	snd_ac97_suspend(chip->ac97);
 
 	big_mdelay(10); /* give the assp a chance to idle.. */
 
@@ -2440,17 +2439,16 @@ static void m3_suspend(m3_t *chip)
 	snd_m3_outw(chip, 0xffff, 0x54);
 	snd_m3_outw(chip, 0xffff, 0x56);
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
+	return 0;
 }
 
-static void m3_resume(m3_t *chip)
+static int m3_resume(snd_card_t *card, unsigned int state)
 {
-	snd_card_t *card = chip->card;
+	m3_t *chip = snd_magic_cast(m3_t, card->pm_private_data, return -EINVAL);
 	int i, index;
 
 	if (chip->suspend_mem == NULL)
-		return;
-	if (card->power_state == SNDRV_CTL_POWER_D0)
-		return;
+		return 0;
 
 	/* first lets just bring everything back. .*/
 	snd_m3_outw(chip, 0, 0x54);
@@ -2481,41 +2479,8 @@ static void m3_resume(m3_t *chip)
 	snd_m3_amp_enable(chip, 1);
 
 	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
-}
-
-static int snd_m3_suspend(struct pci_dev *pci, u32 state)
-{
-	m3_t *chip = snd_magic_cast(m3_t, pci_get_drvdata(pci), return -ENXIO);
-	m3_suspend(chip);
 	return 0;
 }
-static int snd_m3_resume(struct pci_dev *pci)
-{
-	m3_t *chip = snd_magic_cast(m3_t, pci_get_drvdata(pci), return -ENXIO);
-	m3_resume(chip);
-	return 0;
-}
-
-/* callback */
-static int snd_m3_set_power_state(snd_card_t *card, unsigned int power_state)
-{
-	m3_t *chip = snd_magic_cast(m3_t, card->power_state_private_data, return -ENXIO);
-	switch (power_state) {
-	case SNDRV_CTL_POWER_D0:
-	case SNDRV_CTL_POWER_D1:
-	case SNDRV_CTL_POWER_D2:
-		m3_resume(chip);
-		break;
-	case SNDRV_CTL_POWER_D3hot:
-	case SNDRV_CTL_POWER_D3cold:
-		m3_suspend(chip);
-		break;
-	default:
-		return -EINVAL;
-	}
-	return 0;
-}
-
 #endif /* CONFIG_PM */
 
 
@@ -2651,11 +2616,9 @@ snd_m3_create(snd_card_t *card, struct pci_dev *pci,
 #ifdef CONFIG_PM
 	chip->suspend_mem = vmalloc(sizeof(u16) * (REV_B_CODE_MEMORY_LENGTH + REV_B_DATA_MEMORY_LENGTH));
 	if (chip->suspend_mem == NULL)
-		snd_printk("can't allocate apm buffer\n");
-	else {
-		card->set_power_state = snd_m3_set_power_state;
-		card->power_state_private_data = chip;
-	}
+		snd_printk(KERN_WARNING "can't allocate apm buffer\n");
+	else
+		snd_card_set_pm_callback(card, m3_suspend, m3_resume, chip);
 #endif
 
 	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, chip, &ops)) < 0) {
@@ -2738,16 +2701,14 @@ snd_m3_probe(struct pci_dev *pci, const struct pci_device_id *pci_id)
 		printk(KERN_WARNING "maestro3: no midi support.\n");
 #endif
 
-	pci_set_drvdata(pci, chip);
+	pci_set_drvdata(pci, card);
 	dev++;
 	return 0;
 }
 
 static void __devexit snd_m3_remove(struct pci_dev *pci)
 {
-	m3_t *chip = snd_magic_cast(m3_t, pci_get_drvdata(pci), return);
-	if (chip)
-		snd_card_free(chip->card);
+	snd_card_free(pci_get_drvdata(pci));
 	pci_set_drvdata(pci, NULL);
 }
 
@@ -2756,23 +2717,12 @@ static struct pci_driver driver = {
 	.id_table = snd_m3_ids,
 	.probe = snd_m3_probe,
 	.remove = __devexit_p(snd_m3_remove),
-#ifdef CONFIG_PM
-	.suspend = snd_m3_suspend,
-	.resume = snd_m3_resume,
-#endif
+	SND_PCI_PM_CALLBACKS
 };
 	
 static int __init alsa_card_m3_init(void)
 {
-	int err;
-
-	if ((err = pci_module_init(&driver)) < 0) {
-#ifdef MODULE
-		printk(KERN_ERR "Maestro3/Allegro soundcard not found or device busy\n");
-#endif
-		return err;
-	}
-	return 0;
+	return pci_module_init(&driver);
 }
 
 static void __exit alsa_card_m3_exit(void)
@@ -2782,26 +2732,3 @@ static void __exit alsa_card_m3_exit(void)
 
 module_init(alsa_card_m3_init)
 module_exit(alsa_card_m3_exit)
-
-#ifndef MODULE
-
-/* format is: snd-maestro3=enable,index,id,external_amp,amp_gpio */
-
-static int __init alsa_card_maestro3_setup(char *str)
-{
-	static unsigned __initdata nr_dev = 0;
-
-	if (nr_dev >= SNDRV_CARDS)
-		return 0;
-	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
-	       get_option(&str,&index[nr_dev]) == 2 &&
-	       get_id(&str,&id[nr_dev]) == 2 &&
-	       get_option(&str,&external_amp[nr_dev]) == 2 &&
-	       get_option(&str,&amp_gpio[nr_dev]) == 2);
-	nr_dev++;
-	return 1;
-}
-
-__setup("snd-maestro3=", alsa_card_maestro3_setup);
-
-#endif /* ifndef MODULE */

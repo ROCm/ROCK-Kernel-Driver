@@ -30,6 +30,7 @@
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/pnp.h>
+#include <linux/moduleparam.h>
 #include <sound/core.h>
 #ifdef CS4231
 #include <sound/cs4231.h>
@@ -48,7 +49,6 @@
 #endif
 #define SNDRV_LEGACY_FIND_FREE_IRQ
 #define SNDRV_LEGACY_FIND_FREE_DMA
-#define SNDRV_GET_ID
 #include <sound/initval.h>
 
 MODULE_AUTHOR("Massimo Piccioni <dafastidio@libero.it>");
@@ -84,38 +84,38 @@ static int dma1 = SNDRV_DEFAULT_DMA1;		/* 0,1,3 */
 static int dma2 = SNDRV_DEFAULT_DMA1;		/* 0,1,3 */
 #endif	/* CS4231 || OPTi93X */
 
-MODULE_PARM(index, "i");
+module_param(index, int, 0444);
 MODULE_PARM_DESC(index, "Index value for opti9xx based soundcard.");
 MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
-MODULE_PARM(id, "s");
+module_param(id, charp, 0444);
 MODULE_PARM_DESC(id, "ID string for opti9xx based soundcard.");
 MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
-//MODULE_PARM(enable, "i");
+//module_param(enable, bool, 0444);
 //MODULE_PARM_DESC(enable, "Enable opti9xx soundcard.");
 //MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
-MODULE_PARM(isapnp, "i");
+module_param(isapnp, bool, 0444);
 MODULE_PARM_DESC(isapnp, "Enable ISA PnP detection for specified soundcard.");
 MODULE_PARM_SYNTAX(isapnp, SNDRV_ISAPNP_DESC);
-MODULE_PARM(port, "l");
+module_param(port, long, 0444);
 MODULE_PARM_DESC(port, "WSS port # for opti9xx driver.");
 MODULE_PARM_SYNTAX(port, SNDRV_PORT_DESC);
-MODULE_PARM(mpu_port, "l");
+module_param(mpu_port, long, 0444);
 MODULE_PARM_DESC(mpu_port, "MPU-401 port # for opti9xx driver.");
 MODULE_PARM_SYNTAX(mpu_port, SNDRV_PORT_DESC);
-MODULE_PARM(fm_port, "l");
+module_param(fm_port, long, 0444);
 MODULE_PARM_DESC(fm_port, "FM port # for opti9xx driver.");
 MODULE_PARM_SYNTAX(fm_port, SNDRV_PORT_DESC);
-MODULE_PARM(irq, "i");
+module_param(irq, int, 0444);
 MODULE_PARM_DESC(irq, "WSS irq # for opti9xx driver.");
 MODULE_PARM_SYNTAX(irq, SNDRV_IRQ_DESC);
-MODULE_PARM(mpu_irq, "i");
+module_param(mpu_irq, int, 0444);
 MODULE_PARM_DESC(mpu_irq, "MPU-401 irq # for opti9xx driver.");
 MODULE_PARM_SYNTAX(mpu_irq, SNDRV_IRQ_DESC);
-MODULE_PARM(dma1, "i");
+module_param(dma1, int, 0444);
 MODULE_PARM_DESC(dma1, "1st dma # for opti9xx driver.");
 MODULE_PARM_SYNTAX(dma1, SNDRV_DMA_DESC);
 #if defined(CS4231) || defined(OPTi93X)
-MODULE_PARM(dma2, "i");
+module_param(dma2, int, 0444);
 MODULE_PARM_DESC(dma2, "2nd dma # for opti9xx driver.");
 MODULE_PARM_SYNTAX(dma2, SNDRV_DMA_DESC);
 #endif	/* CS4231 || OPTi93X */
@@ -2253,47 +2253,3 @@ static void __exit alsa_card_opti9xx_exit(void)
 
 module_init(alsa_card_opti9xx_init)
 module_exit(alsa_card_opti9xx_exit)
-
-#ifndef MODULE
-
-/* format is: snd-opti9xx=enable,index,id,isapnp,
-			  port,mpu_port,fm_port,
-			  irq,mpu_irq,
-			  dma1,[dma2] */
-
-static int __init alsa_card_opti9xx_setup(char *str)
-{
-	int __attribute__ ((__unused__)) enable = 1;
-	int __attribute__ ((__unused__)) pnp = INT_MAX;
-
-	(void)(get_option(&str,&enable) == 2 &&
-	       get_option(&str,&index) == 2 &&
-	       get_id(&str,&id) == 2 &&
-	       get_option(&str,&pnp) == 2 &&
-	       get_option_long(&str,&port) == 2 &&
-	       get_option_long(&str,&mpu_port) == 2 &&
-	       get_option_long(&str,&fm_port) == 2 &&
-	       get_option(&str,&irq) == 2 &&
-	       get_option(&str,&mpu_irq) == 2 &&
-	       get_option(&str,&dma1) == 2
-#if defined(CS4231) || defined(OPTi93X)
-	       &&
-	       get_option(&str,&dma2) == 2
-#endif
-	       );
-#ifdef CONFIG_PNP
-	if (pnp != INT_MAX)
-		isapnp = pnp;
-#endif
-	return 1;
-}
-
-#if defined(OPTi93X)
-__setup("snd-opti93x=", alsa_card_opti9xx_setup);
-#elif defined(CS4231)
-__setup("snd-opti92x-cs4231=", alsa_card_opti9xx_setup);
-#else
-__setup("snd-opti92x-ad1848=", alsa_card_opti9xx_setup);
-#endif
-
-#endif /* ifndef MODULE */

@@ -617,6 +617,12 @@ static void vortex_Vort3D(vortex_t * v, int en)
 static void vortex_Vort3D_connect(vortex_t * v, int en)
 {
 	int i;
+	
+// Disable AU8810 routes, since they seem to be wrong (in au8810.h).
+#ifdef CHIP_AU8810
+	return;
+#endif
+	
 #if 1
 	/* Alloc Xtalk mixin resources */
 	v->mixxtlk[0] =
