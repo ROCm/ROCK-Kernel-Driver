@@ -351,7 +351,7 @@ static void sdladrv_cleanup(void)
 }
 
 module_init(sdladrv_init);
-module_cleanup(sdladrv_cleanup);
+module_exit(sdladrv_cleanup);
 #endif
 
 /******* Kernel APIs ********************************************************/
