@@ -218,9 +218,6 @@ void sys_device_unregister(struct sys_device * sysdev)
 		if (drv->remove)
 			drv->remove(sysdev);
 	}
-
-	list_del_init(&sysdev->entry);
-
 	up_write(&system_subsys.rwsem);
 
 	kobject_unregister(&sysdev->kobj);
