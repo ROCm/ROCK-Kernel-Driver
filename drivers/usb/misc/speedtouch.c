@@ -690,15 +690,9 @@ static int udsl_atm_send (struct atm_vcc *vcc, struct sk_buff *skb)
 }
 
 
-/************
-**   ATM   **
-************/
-
-/***************************************************************************
-*
-* init functions
-*
-****************************************************************************/
+/**********
+**  ATM  **
+**********/
 
 static void udsl_atm_dev_close (struct atm_dev *dev)
 {
@@ -717,13 +711,6 @@ static void udsl_atm_dev_close (struct atm_dev *dev)
 	kfree (instance);
 	dev->dev_data = NULL;
 }
-
-
-/***************************************************************************
-*
-* ATM helper functions
-*
-****************************************************************************/
 
 static int udsl_atm_proc_read (struct atm_dev *atm_dev, loff_t *pos, char *page)
 {
@@ -777,13 +764,6 @@ static int udsl_atm_proc_read (struct atm_dev *atm_dev, loff_t *pos, char *page)
 
 	return 0;
 }
-
-
-/***************************************************************************
-*
-* SAR driver entries
-*
-****************************************************************************/
 
 static int udsl_atm_open (struct atm_vcc *vcc, short vpi, int vci)
 {
@@ -866,9 +846,9 @@ static int udsl_atm_ioctl (struct atm_dev *dev, unsigned int cmd, void *arg)
 }
 
 
-/************
-**   USB   **
-************/
+/**********
+**  USB  **
+**********/
 
 static int udsl_usb_ioctl (struct usb_interface *intf, unsigned int code, void *user_data)
 {
@@ -1180,11 +1160,9 @@ static void udsl_usb_disconnect (struct usb_interface *intf)
 }
 
 
-/***************************************************************************
-*
-* Driver Init
-*
-****************************************************************************/
+/***********
+**  init  **
+***********/
 
 static int __init udsl_usb_init (void)
 {
@@ -1215,13 +1193,11 @@ MODULE_DESCRIPTION (DRIVER_DESC);
 MODULE_LICENSE ("GPL");
 
 
-#ifdef DEBUG_PACKET
-/*******************************************************************************
-*
-* Debug
-*
-*******************************************************************************/
+/************
+**  debug  **
+************/
 
+#ifdef DEBUG_PACKET
 static int udsl_print_packet (const unsigned char *data, int len)
 {
 	unsigned char buffer [256];
@@ -1237,5 +1213,4 @@ static int udsl_print_packet (const unsigned char *data, int len)
 	}
 	return i;
 }
-
-#endif				/* PACKETDEBUG */
+#endif
