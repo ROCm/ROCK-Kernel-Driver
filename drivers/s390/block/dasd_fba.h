@@ -1,3 +1,14 @@
+/* 
+ * File...........: linux/drivers/s390/block/dasd_fba.h
+ * Author(s)......: Holger Smolinski <Holger.Smolinski@de.ibm.com>
+ * Bugreports.to..: <Linux390@de.ibm.com>
+ * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
+ *
+ * $Revision: 1.4 $
+ *
+ * History of changes 
+ * 
+ */
 
 #ifndef DASD_FBA_H
 #define DASD_FBA_H
@@ -71,6 +82,4 @@ typedef
 
     dasd_fba_characteristics_t;
 
-int dasd_fba_init(void);
-void dasd_fba_cleanup(void);
 #endif				/* DASD_FBA_H */

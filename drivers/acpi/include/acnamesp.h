@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acnamesp.h - Namespace subcomponent prototypes and defines
- *       $Revision: 129 $
+ *       $Revision: 131 $
  *
  *****************************************************************************/
 
@@ -210,7 +210,7 @@ acpi_ns_dump_entry (
 	acpi_handle             handle,
 	u32                     debug_level);
 
-acpi_status
+void
 acpi_ns_dump_pathname (
 	acpi_handle             handle,
 	NATIVE_CHAR             *msg,
@@ -429,6 +429,21 @@ acpi_ns_report_error (
 	u32                     component_id,
 	char                    *internal_name,
 	acpi_status             lookup_status);
+
+void
+acpi_ns_report_method_error (
+	NATIVE_CHAR             *module_name,
+	u32                     line_number,
+	u32                     component_id,
+	char                    *message,
+	acpi_namespace_node     *node,
+	char                    *path,
+	acpi_status             lookup_status);
+
+void
+acpi_ns_print_node_pathname (
+	acpi_namespace_node     *node,
+	NATIVE_CHAR             *msg);
 
 acpi_status
 acpi_ns_build_internal_name (

@@ -10,6 +10,7 @@
 
 #include <linux/config.h>
 #include <linux/version.h>
+#include <linux/module.h>
 #include <linux/kmod.h>
 #include <linux/bootmem.h>
 #include <linux/err.h>
@@ -17,6 +18,7 @@
 #include <linux/slab.h>
 #include <linux/spinlock.h>
 #include <linux/interrupt.h>
+#include <linux/timer.h>
 #include <asm/s390_ext.h>
 
 #include "sclp.h"
@@ -29,7 +31,7 @@
  * different behaviour); otherwise we use the default
  * settings in sclp_data.init_ioctls
  */
-#define	 USE_VM_DETECTION
+#define USE_VM_DETECTION
 
 /* Structure for register_early_external_interrupt. */
 static ext_int_info_t ext_int_info_hwc;
@@ -53,11 +55,20 @@ static char sclp_read_sccb[PAGE_SIZE] __attribute__((__aligned__(PAGE_SIZE)));
 /* sccb for write mask sccb */
 static char sclp_init_sccb[PAGE_SIZE] __attribute__((__aligned__(PAGE_SIZE)));
 
+/* Timer for init mask retries. */
+static struct timer_list retry_timer;
+
 static unsigned long sclp_status = 0;
 /* some status flags */
 #define SCLP_INIT		0
 #define SCLP_RUNNING		1
 #define SCLP_READING		2
+
+#define SCLP_INIT_POLL_INTERVAL	1
+
+#define SCLP_COMMAND_INITIATED	0
+#define SCLP_BUSY		2
+#define SCLP_NOT_OPERATIONAL	3
 
 /*
  * assembler instruction for Service Call
@@ -86,7 +97,7 @@ __service_call(sclp_cmdw_t command, void *sccb)
 	 *	      new SCCB unchanged
 	 * cc == 3:   SCLP function not operational
 	 */
-	if (cc == 3)
+	if (cc == SCLP_NOT_OPERATIONAL)
 		return -EIO;
 	/*
 	 * We set the SCLP_RUNNING bit for cc 2 as well because if
@@ -94,7 +105,7 @@ __service_call(sclp_cmdw_t command, void *sccb)
 	 * that has to complete first
 	 */
 	set_bit(SCLP_RUNNING, &sclp_status);
-	if (cc == 2)
+	if (cc == SCLP_BUSY)
 		return -EBUSY;
 	return 0;
 }
@@ -130,6 +141,7 @@ __sclp_start_request(void)
 static int
 sclp_process_evbufs(struct sccb_header *sccb)
 {
+	int result;
 	unsigned long flags;
 	struct evbuf_header *evbuf;
 	struct list_head *l;
@@ -137,8 +149,10 @@ sclp_process_evbufs(struct sccb_header *sccb)
 
 	spin_lock_irqsave(&sclp_lock, flags);
 	evbuf = (struct evbuf_header *) (sccb + 1);
-	while ((void *) evbuf < (void *) sccb + sccb->length) {
+	result = 0;
+	while ((addr_t) evbuf < (addr_t) sccb + sccb->length) {
 		/* check registered event */
+		t = NULL;
 		list_for_each(l, &sclp_reg_list) {
 			t = list_entry(l, struct sclp_register, list);
 			if (t->receive_mask & (1 << (32 - evbuf->type))) {
@@ -146,10 +160,47 @@ sclp_process_evbufs(struct sccb_header *sccb)
 					t->receiver_fn(evbuf);
 				break;
 			}
+			else
+				t = NULL;
 		}
+		/* Check for unrequested event buffer */
+		if (t == NULL)
+			result = -ENOSYS;
+		evbuf = (struct evbuf_header *)
+				((addr_t) evbuf + evbuf->length);
 	}
 	spin_unlock_irqrestore(&sclp_lock, flags);
-	return -ENOSYS;
+	return result;
+}
+
+char *
+sclp_error_message(u16 rc)
+{
+	static struct {
+		u16 code; char *msg;
+	} sclp_errors[] = {
+		{ 0x0000, "No response code stored (machine malfunction)" },
+		{ 0x0020, "Normal Completion" },
+		{ 0x0040, "SCLP equipment check" },
+		{ 0x0100, "SCCB boundary violation" },
+		{ 0x01f0, "Invalid command" },
+		{ 0x0220, "Normal Completion; suppressed buffers pending" },
+		{ 0x0300, "Insufficient SCCB length" },
+		{ 0x0340, "Contained SCLP equipment check" },
+		{ 0x05f0, "Target resource in improper state" },
+		{ 0x40f0, "Invalid function code/not installed" },
+		{ 0x60f0, "No buffers stored" },
+		{ 0x62f0, "No buffers stored; suppressed buffers pending" },
+		{ 0x70f0, "Invalid selection mask" },
+		{ 0x71f0, "Event buffer exceeds available space" },
+		{ 0x72f0, "Inconsistent lengths" },
+		{ 0x73f0, "Event buffer syntax error" }
+	};
+	int i;
+	for (i = 0; i < sizeof(sclp_errors)/sizeof(sclp_errors[0]); i++)
+		if (rc == sclp_errors[i].code)
+			return sclp_errors[i].msg;
+	return "Invalid response code";
 }
 
 /*
@@ -158,44 +209,23 @@ sclp_process_evbufs(struct sccb_header *sccb)
 static void
 sclp_unconditional_read_cb(struct sclp_req *read_req, void *data)
 {
-	static struct {
-		u16 code; char *msg;
-	} errors[] = {
-		{ 0x0040, "SCLP equipment check" },
-		{ 0x0100, "SCCB boundary violation" },
-		{ 0x01f0, "invalid command" },
-		{ 0x0300, "insufficient SCCB length" },
-		{ 0x40f0, "invalid function code" },
-		{ 0x60f0, "got interrupt but no data found" },
-		{ 0x62f0, "got interrupt but no data found" },
-		{ 0x70f0, "invalid selection mask" }
-	};
 	struct sccb_header *sccb;
-	char *errmsg;
-	int i;
 
 	sccb = read_req->sccb;
 	if (sccb->response_code == 0x0020 ||
 	    sccb->response_code == 0x0220) {
-		/* normal read completion, event buffers stored in sccb */
-		if (sclp_process_evbufs(sccb) == 0) {
-			clear_bit(SCLP_READING, &sclp_status);
-			return;
-		}
-		errmsg = "invalid response code";
-	} else {
-		errmsg = NULL;
-		for (i = 0; i < sizeof(errors)/sizeof(errors[0]); i++)
-			if (sccb->response_code == errors[i].code) {
-				errmsg = errors[i].msg;
-				break;
-			}
-		if (errmsg == NULL)
-			errmsg = "invalid response code";
+		if (sclp_process_evbufs(sccb) != 0)
+			printk(KERN_WARNING SCLP_CORE_PRINT_HEADER
+			       "unconditional read: "
+			       "unrequested event buffer received.\n");
 	}
-	printk(KERN_WARNING SCLP_CORE_PRINT_HEADER
-	       "unconditional read: %s (response code =0x%x).\n",
-	       errmsg, sccb->response_code);
+
+	if (sccb->response_code != 0x0020)
+		printk(KERN_WARNING SCLP_CORE_PRINT_HEADER
+		       "unconditional read: %s (response code=0x%x).\n",
+		       sclp_error_message(sccb->response_code),
+		       sccb->response_code);
+
 	clear_bit(SCLP_READING, &sclp_status);
 }
 
@@ -209,7 +239,7 @@ __sclp_unconditional_read(void)
 	struct sclp_req *read_req;
 
 	/*
-	 * Don´t try to initiate Unconditional Read if we are not able to
+	 * Don't try to initiate Unconditional Read if we are not able to
 	 * receive anything
 	 */
 	if (sclp_receive_mask == 0)
@@ -217,13 +247,13 @@ __sclp_unconditional_read(void)
 	/* Don't try reading if a read is already outstanding */
 	if (test_and_set_bit(SCLP_READING, &sclp_status))
 		return;
-	/* Initialise read sccb */
+	/* Initialize read sccb */
 	sccb = (struct sccb_header *) sclp_read_sccb;
 	clear_page(sccb);
 	sccb->length = PAGE_SIZE;
 	sccb->function_code = 0;	/* unconditional read */
 	sccb->control_mask[2] = 0x80;	/* variable length response */
-	/* stick the request structure to the end of the page */
+	/* Initialize request structure */
 	read_req = &sclp_read_req;
 	read_req->command = SCLP_CMDW_READDATA;
 	read_req->status = SCLP_REQ_QUEUED;
@@ -232,6 +262,11 @@ __sclp_unconditional_read(void)
 	/* Add read request to the head of queue */
 	list_add(&read_req->list, &sclp_req_queue);
 }
+
+/* Bit masks to interpret external interruption parameter contents. */
+#define EXT_INT_SCCB_MASK		0xfffffff8
+#define EXT_INT_STATECHANGE_PENDING	0x00000002
+#define EXT_INT_EVBUF_PENDING		0x00000001
 
 /*
  * Handler for service-signal external interruptions
@@ -242,15 +277,14 @@ sclp_interrupt_handler(struct pt_regs *regs, __u16 code)
 	u32 ext_int_param, finished_sccb, evbuf_pending;
 	struct list_head *l;
 	struct sclp_req *req, *tmp;
-	int cpu;
 
-	cpu = smp_processor_id();
 	ext_int_param = S390_lowcore.ext_params;
-	finished_sccb = ext_int_param & -8U;
-	evbuf_pending = ext_int_param & 1;
+	finished_sccb = ext_int_param & EXT_INT_SCCB_MASK;
+	evbuf_pending = ext_int_param & (EXT_INT_EVBUF_PENDING |
+					 EXT_INT_STATECHANGE_PENDING);
 	irq_enter();
 	/*
-	 * Only do request callsbacks if sclp is initialised.
+	 * Only do request callbacks if sclp is initialized.
 	 * This avoids strange effects for a pending request
 	 * from before the last re-ipl.
 	 */
@@ -326,8 +360,8 @@ sclp_sync_wait(void)
 }
 
 /*
- * Queue a request to the tail of the ccw_queue. Start the I/O if
- * possible.
+ * Queue an SCLP request. Request will immediately be processed if queue is
+ * empty.
  */
 void
 sclp_add_request(struct sclp_req *req)
@@ -391,17 +425,17 @@ sclp_state_change(struct evbuf_header *evbuf)
 	scbuf = (struct sclp_statechangebuf *) evbuf;
 
 	if (scbuf->validity_sclp_receive_mask) {
-		if (scbuf->mask_length != 4)
+		if (scbuf->mask_length != sizeof(sccb_mask_t))
 			printk(KERN_WARNING SCLP_CORE_PRINT_HEADER
 			       "state change event with mask length %i\n",
 			       scbuf->mask_length);
 		else
-			/* set new send mask */
+			/* set new receive mask */
 			sclp_receive_mask = scbuf->sclp_receive_mask;
 	}
 
 	if (scbuf->validity_sclp_send_mask) {
-		if (scbuf->mask_length != 4)
+		if (scbuf->mask_length != sizeof(sccb_mask_t))
 			printk(KERN_WARNING SCLP_CORE_PRINT_HEADER
 			       "state change event with mask length %i\n",
 			       scbuf->mask_length);
@@ -496,6 +530,8 @@ struct init_sccb {
 	sccb_mask_t sclp_receive_mask;
 } __attribute__((packed));
 
+static void sclp_init_mask_retry(unsigned long);
+
 static int
 sclp_init_mask(void)
 {
@@ -557,11 +593,32 @@ sclp_init_mask(void)
 			spin_lock_irqsave(&sclp_lock, flags);
 		} while (rc == -EBUSY);
 	}
-	sclp_receive_mask = sccb->sclp_receive_mask;
-	sclp_send_mask = sccb->sclp_send_mask;
-	__sclp_notify_state_change();
+	if (sccb->header.response_code != 0x0020) {
+		/* WRITEMASK failed - we cannot rely on receiving a state
+		   change event, so initially, polling is the only alternative
+		   for us to ever become operational. */
+		if (!timer_pending(&retry_timer) ||
+		    !mod_timer(&retry_timer,
+			       jiffies + SCLP_INIT_POLL_INTERVAL*HZ)) {
+			retry_timer.function = sclp_init_mask_retry;
+			retry_timer.data = 0;
+			retry_timer.expires = jiffies +
+				SCLP_INIT_POLL_INTERVAL*HZ;
+			add_timer(&retry_timer);
+		}
+	} else {
+		sclp_receive_mask = sccb->sclp_receive_mask;
+		sclp_send_mask = sccb->sclp_send_mask;
+		__sclp_notify_state_change();
+	}
 	spin_unlock_irqrestore(&sclp_lock, flags);
 	return 0;
+}
+
+static void
+sclp_init_mask_retry(unsigned long data) 
+{
+	sclp_init_mask();
 }
 
 /*
@@ -573,7 +630,7 @@ sclp_init(void)
 	int rc;
 
 	if (test_bit(SCLP_INIT, &sclp_status))
-		/* Already initialised. */
+		/* Already initialized. */
 		return 0;
 
 	/*
@@ -600,6 +657,7 @@ sclp_init(void)
 	 */
 	ctl_set_bit(0, 9);
 
+	init_timer(&retry_timer);
 	/* do the initial write event mask */
 	rc = sclp_init_mask();
 	if (rc == 0) {
@@ -616,6 +674,15 @@ sclp_init(void)
 	return rc;
 }
 
+/*
+ * Register the SCLP event listener identified by REG. Return 0 on success.
+ * Some error codes and their meaning:
+ *
+ *  -ENODEV = SCLP interface is not supported on this machine
+ *   -EBUSY = there is already a listener registered for the requested
+ *            event type
+ *     -EIO = SCLP interface is currently not operational
+ */
 int
 sclp_register(struct sclp_register *reg)
 {
@@ -650,6 +717,9 @@ sclp_register(struct sclp_register *reg)
 	return 0;
 }
 
+/*
+ * Unregister the SCLP event listener identified by REG.
+ */
 void
 sclp_unregister(struct sclp_register *reg)
 {
@@ -661,3 +731,7 @@ sclp_unregister(struct sclp_register *reg)
 	sclp_init_mask();
 }
 
+EXPORT_SYMBOL(sclp_add_request);
+EXPORT_SYMBOL(sclp_sync_wait);
+EXPORT_SYMBOL(sclp_register);
+EXPORT_SYMBOL(sclp_unregister);

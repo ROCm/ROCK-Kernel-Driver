@@ -61,7 +61,7 @@ unsigned long    cache_decay_ticks = 0;
 extern char vmhalt_cmd[];
 extern char vmpoff_cmd[];
 
-extern void reipl(unsigned long devno);
+extern void do_reipl(unsigned long devno);
 
 static sigp_ccode smp_ext_bitcall(int, ec_bit_sig);
 static void smp_ext_bitcall_others(ec_bit_sig);
@@ -217,7 +217,10 @@ static void do_machine_restart(void * __unused)
 		 * interrupted by an external interrupt and s390irq
 		 * locks are always held disabled).
 		 */
-		reipl(S390_lowcore.ipl_device);
+		if (MACHINE_IS_VM)
+			cpcmd ("IPL", NULL, 0);
+		else
+			do_reipl (0x10000 | S390_lowcore.ipl_device);
 	}
 	signal_processor(smp_processor_id(), sigp_stop);
 }
@@ -477,7 +480,7 @@ static struct task_struct *__devinit fork_by_hand(void)
        /* don't care about the psw and regs settings since we'll never
           reschedule the forked task. */
        memset(&regs,0,sizeof(struct pt_regs));
-       return do_fork(CLONE_VM|CLONE_IDLETASK, 0, &regs, 0, NULL);
+       return do_fork(CLONE_VM|CLONE_IDLETASK, 0, &regs, 0, NULL, NULL);
 }
 
 int __cpu_up(unsigned int cpu)

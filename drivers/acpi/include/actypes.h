@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: actypes.h - Common data types for the entire ACPI subsystem
- *       $Revision: 241 $
+ *       $Revision: 242 $
  *
  *****************************************************************************/
 
@@ -861,11 +861,6 @@ typedef struct
 	u8                          *mapped_logical_address;
 	ACPI_SIZE                   mapped_length;
 } acpi_mem_space_context;
-
-
-/* Sleep states */
-
-#define ACPI_NUM_SLEEP_STATES           7
 
 
 /*

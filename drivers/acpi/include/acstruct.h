@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acstruct.h - Internal structs
- *       $Revision: 20 $
+ *       $Revision: 21 $
  *
  *****************************************************************************/
 
@@ -71,16 +71,16 @@ typedef struct acpi_walk_state
 
 
 	u8                      *aml_last_while;
-	struct acpi_node        arguments[MTH_NUM_ARGS];            /* Control method arguments */
+	struct acpi_node        arguments[ACPI_METHOD_NUM_ARGS];    /* Control method arguments */
 	union acpi_operand_obj  **caller_return_desc;
 	acpi_generic_state      *control_state;                     /* List of control states (nested IFs) */
-	struct acpi_node        local_variables[MTH_NUM_LOCALS];    /* Control method locals */
+	struct acpi_node        local_variables[ACPI_METHOD_NUM_LOCALS];    /* Control method locals */
 	struct acpi_node        *method_call_node;                  /* Called method Node*/
 	acpi_parse_object       *method_call_op;                    /* Method_call Op if running a method */
 	union acpi_operand_obj  *method_desc;                       /* Method descriptor if running a method */
 	struct acpi_node        *method_node;                       /* Method Node if running a method */
 	acpi_parse_object       *op;                                /* Current parser op */
-	union acpi_operand_obj  *operands[OBJ_NUM_OPERANDS+1];      /* Operands passed to the interpreter (+1 for NULL terminator) */
+	union acpi_operand_obj  *operands[ACPI_OBJ_NUM_OPERANDS+1];      /* Operands passed to the interpreter (+1 for NULL terminator) */
 	const acpi_opcode_info  *op_info;                           /* Info on current opcode */
 	acpi_parse_object       *origin;                            /* Start of walk [Obsolete] */
 	union acpi_operand_obj  **params;

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utcopy - Internal to external object translation utilities
- *              $Revision: 106 $
+ *              $Revision: 107 $
  *
  *****************************************************************************/
 
@@ -625,8 +625,23 @@ acpi_ut_copy_simple_object (
 		dest_desc->buffer.node = NULL;
 		dest_desc->common.flags = source_desc->common.flags;
 
-		/* Fall through to common string/buffer case */
-		/*lint -fallthrough */
+		/*
+		 * Allocate and copy the actual buffer if and only if:
+		 * 1) There is a valid buffer (length > 0)
+		 * 2) The buffer is not static (not in an ACPI table) (in this case,
+		 *    the actual pointer was already copied above)
+		 */
+		if ((source_desc->buffer.length) &&
+			(!(source_desc->common.flags & AOPOBJ_STATIC_POINTER))) {
+			dest_desc->buffer.pointer = ACPI_MEM_ALLOCATE (source_desc->buffer.length);
+			if (!dest_desc->buffer.pointer) {
+				return (AE_NO_MEMORY);
+			}
+
+			ACPI_MEMCPY (dest_desc->buffer.pointer, source_desc->buffer.pointer,
+					  source_desc->buffer.length);
+		}
+		break;
 
 	case ACPI_TYPE_STRING:
 
@@ -638,13 +653,13 @@ acpi_ut_copy_simple_object (
 		 */
 		if ((source_desc->string.length) &&
 			(!(source_desc->common.flags & AOPOBJ_STATIC_POINTER))) {
-			dest_desc->string.pointer = ACPI_MEM_ALLOCATE (source_desc->string.length);
+			dest_desc->string.pointer = ACPI_MEM_ALLOCATE (source_desc->string.length + 1);
 			if (!dest_desc->string.pointer) {
 				return (AE_NO_MEMORY);
 			}
 
 			ACPI_MEMCPY (dest_desc->string.pointer, source_desc->string.pointer,
-					  source_desc->string.length);
+					  source_desc->string.length + 1);
 		}
 		break;
 

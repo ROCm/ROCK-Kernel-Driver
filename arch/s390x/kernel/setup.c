@@ -47,6 +47,7 @@
  */
 unsigned int console_mode = 0;
 unsigned int console_device = -1;
+unsigned int console_irq = -1;
 unsigned long memory_size = 0;
 unsigned long machine_flags = 0;
 struct { unsigned long addr, size, type; } memory_chunk[16] = { { 0 } };
@@ -187,6 +188,10 @@ static void __init conmode_default(void)
 	char *ptr;
 
         if (MACHINE_IS_VM) {
+		cpcmd("QUERY CONSOLE", query_buffer, 1024);
+		console_device = simple_strtoul(query_buffer + 5, NULL, 16);
+		ptr = strstr(query_buffer, "SUBCHANNEL =");
+		console_irq = simple_strtoul(ptr + 13, NULL, 16);
 		cpcmd("QUERY TERM", query_buffer, 1024);
 		ptr = strstr(query_buffer, "CONMODE");
 		/*
@@ -245,9 +250,13 @@ void (*_machine_power_off)(void) = machine_power_off_smp;
 /*
  * Reboot, halt and power_off routines for non SMP.
  */
+extern void do_reipl(unsigned long devno);
 static void do_machine_restart_nonsmp(char * __unused)
 {
-	reipl(S390_lowcore.ipl_device);
+	if (MACHINE_IS_VM)
+		cpcmd ("IPL", NULL, 0);
+	else
+		do_reipl (0x10000 | S390_lowcore.ipl_device);
 }
 
 static void do_machine_halt_nonsmp(void)

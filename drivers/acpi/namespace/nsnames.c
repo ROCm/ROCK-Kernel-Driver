@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: nsnames - Name manipulation and search
- *              $Revision: 79 $
+ *              $Revision: 80 $
  *
  ******************************************************************************/
 
@@ -86,7 +86,7 @@ acpi_ns_build_external_path (
 		/* Prefix name with the path separator */
 
 		index--;
-		name_buffer[index] = PATH_SEPARATOR;
+		name_buffer[index] = ACPI_PATH_SEPARATOR;
 	}
 
 	/* Overwrite final separator with the root prefix character */
@@ -180,7 +180,7 @@ acpi_ns_get_pathname_length (
 	next_node = node;
 
 	while (next_node && (next_node != acpi_gbl_root_node)) {
-		size += PATH_SEGMENT_LENGTH;
+		size += ACPI_PATH_SEGMENT_LENGTH;
 		next_node = acpi_ns_get_parent_node (next_node);
 	}
 

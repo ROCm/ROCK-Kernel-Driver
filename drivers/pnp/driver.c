@@ -34,46 +34,30 @@ static int compare_func(const char *ida, const char *idb)
 	return 1;
 }
 
-int compare_pnp_id(struct list_head *id_list, const char *id)
+int compare_pnp_id(struct pnp_id *pos, const char *id)
 {
-	struct list_head *pos;
-	if (!id_list || !id || (strlen(id) != 7))
+	if (!pos || !id || (strlen(id) != 7))
 		return 0;
 	if (memcmp(id,"ANYDEVS",7)==0)
 		return 1;
-	list_for_each(pos,id_list){
-		struct pnp_id *pnp_id = to_pnp_id(pos);
-		if (memcmp(pnp_id->id,id,3)==0)
-			if (compare_func(pnp_id->id,id)==1)
+	while (pos){
+		if (memcmp(pos->id,id,3)==0)
+			if (compare_func(pos->id,id)==1)
 				return 1;
+		pos = pos->next;
 	}
 	return 0;
 }
 
-static const struct pnp_id * match_card(struct pnp_driver *drv, struct pnp_card *card)
+static const struct pnp_device_id * match_device(struct pnp_driver *drv, struct pnp_dev *dev)
 {
-	const struct pnp_id *drv_card_id = drv->card_id_table;
-	if (!drv)
-		return NULL;
-	if (!card)
-		return NULL;
-	while (*drv_card_id->id){
-		if (compare_pnp_id(&card->ids,drv_card_id->id))
-			return drv_card_id;
-		drv_card_id++;
-	}
-	return NULL;
-}
-
-static const struct pnp_id * match_device(struct pnp_driver *drv, struct pnp_dev *dev)
-{
-	const struct pnp_id *drv_id = drv->id_table;
+	const struct pnp_device_id *drv_id = drv->id_table;
 	if (!drv)
 		return NULL;
 	if (!dev)
 		return NULL;
 	while (*drv_id->id){
-		if (compare_pnp_id(&dev->ids,drv_id->id))
+		if (compare_pnp_id(dev->id,drv_id->id))
 			return drv_id;
 		drv_id++;
 	}
@@ -85,32 +69,23 @@ static int pnp_device_probe(struct device *dev)
 	int error = 0;
 	struct pnp_driver *pnp_drv;
 	struct pnp_dev *pnp_dev;
-	const struct pnp_id *card_id = NULL;
-	const struct pnp_id *dev_id = NULL;
+	const struct pnp_device_id *dev_id = NULL;
 	pnp_dev = to_pnp_dev(dev);
 	pnp_drv = to_pnp_driver(dev->driver);
+
 	pnp_dbg("pnp: match found with the PnP device '%s' and the driver '%s'", dev->bus_id,pnp_drv->name);
 
 	if (pnp_dev->active == 0)
 		if(pnp_activate_dev(pnp_dev)<0)
 			return -1;
 	if (pnp_drv->probe && pnp_dev->active) {
-		if (pnp_dev->card && pnp_drv->card_id_table){
-			card_id = match_card(pnp_drv, pnp_dev->card);
-			if (card_id != NULL)
-				dev_id = match_device(pnp_drv, pnp_dev);
-			if (dev_id != NULL)
-				error = pnp_drv->probe(pnp_dev, card_id, dev_id);
-		}
-		else{
-			dev_id = match_device(pnp_drv, pnp_dev);
-			if (dev_id != NULL)
-				error = pnp_drv->probe(pnp_dev, card_id, dev_id);
-		}
-		if (error >= 0){
-			pnp_dev->driver = pnp_drv;
-			error = 0;
-		}
+		dev_id = match_device(pnp_drv, pnp_dev);
+		if (dev_id != NULL)
+			error = pnp_drv->probe(pnp_dev, dev_id);
+	}
+	if (error >= 0){
+		pnp_dev->driver = pnp_drv;
+		error = 0;
 	}
 	return error;
 }
@@ -133,9 +108,6 @@ static int pnp_bus_match(struct device *dev, struct device_driver *drv)
 {
 	struct pnp_dev * pnp_dev = to_pnp_dev(dev);
 	struct pnp_driver * pnp_drv = to_pnp_driver(drv);
-	if (pnp_dev->card && pnp_drv->card_id_table
-	    && match_card(pnp_drv, pnp_dev->card) == NULL)
-		return 0;
 	if (match_device(pnp_drv, pnp_dev) == NULL)
 		return 0;
 	return 1;
@@ -174,8 +146,8 @@ int pnp_register_driver(struct pnp_driver *drv)
 
 void pnp_unregister_driver(struct pnp_driver *drv)
 {
-	pnp_dbg("the driver '%s' has been unregistered", drv->name);
 	driver_unregister(&drv->driver);
+	pnp_dbg("the driver '%s' has been unregistered", drv->name);
 }
 
 /**
@@ -187,23 +159,19 @@ void pnp_unregister_driver(struct pnp_driver *drv)
 
 int pnp_add_id(struct pnp_id *id, struct pnp_dev *dev)
 {
+	struct pnp_id *ptr;
 	if (!id)
 		return -EINVAL;
 	if (!dev)
 		return -EINVAL;
-	list_add_tail(&id->id_list,&dev->ids);
+	ptr = dev->id;
+	while (ptr && ptr->next)
+		ptr = ptr->next;
+	if (ptr)
+		ptr->next = id;
+	else
+		dev->id = id;
 	return 0;
-}
-
-void pnp_free_ids(struct pnp_dev *dev)
-{
-	struct list_head *pos;
-	if (!dev)
-		return;
-	list_for_each(pos,&dev->ids){
-		struct pnp_id *pnp_id = to_pnp_id(pos);
-		kfree(pnp_id);
-	}
 }
 
 EXPORT_SYMBOL(pnp_register_driver);

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exfield - ACPI AML (p-code) execution - field manipulation
- *              $Revision: 115 $
+ *              $Revision: 116 $
  *
  *****************************************************************************/
 
@@ -56,7 +56,7 @@ acpi_ex_read_data_from_field (
 {
 	acpi_status             status;
 	acpi_operand_object     *buffer_desc;
-	u32                     length;
+	ACPI_SIZE               length;
 	void                    *buffer;
 	u8                      locked;
 
@@ -118,7 +118,7 @@ acpi_ex_read_data_from_field (
 	 *
 	 * Note: Field.length is in bits.
 	 */
-	length = ACPI_ROUND_BITS_UP_TO_BYTES (obj_desc->field.bit_length);
+	length = (ACPI_SIZE) ACPI_ROUND_BITS_UP_TO_BYTES (obj_desc->field.bit_length);
 	if (length > acpi_gbl_integer_byte_width) {
 		/* Field is too large for an Integer, create a Buffer instead */
 
@@ -143,7 +143,7 @@ acpi_ex_read_data_from_field (
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD,
 		"Obj=%p Type=%X Buf=%p Len=%X\n",
-		obj_desc, ACPI_GET_OBJECT_TYPE (obj_desc), buffer, length));
+		obj_desc, ACPI_GET_OBJECT_TYPE (obj_desc), buffer, (u32) length));
 	ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD,
 		"Field_write: Bit_len=%X Bit_off=%X Byte_off=%X\n",
 		obj_desc->common_field.bit_length,
@@ -156,7 +156,7 @@ acpi_ex_read_data_from_field (
 
 	/* Read from the field */
 
-	status = acpi_ex_extract_from_field (obj_desc, buffer, length);
+	status = acpi_ex_extract_from_field (obj_desc, buffer, (u32) length);
 	acpi_ex_release_global_lock (locked);
 
 

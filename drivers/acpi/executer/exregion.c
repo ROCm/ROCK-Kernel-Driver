@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exregion - ACPI default Op_region (address space) handlers
- *              $Revision: 80 $
+ *              $Revision: 81 $
  *
  *****************************************************************************/
 
@@ -133,8 +133,8 @@ acpi_ex_system_memory_space_handler (
 		 * constrain the maximum mapping size to something reasonable.
 		 */
 		window_size = (ACPI_SIZE) ((mem_info->address + mem_info->length) - address);
-		if (window_size > SYSMEM_REGION_WINDOW_SIZE) {
-			window_size = SYSMEM_REGION_WINDOW_SIZE;
+		if (window_size > ACPI_SYSMEM_REGION_WINDOW_SIZE) {
+			window_size = ACPI_SYSMEM_REGION_WINDOW_SIZE;
 		}
 
 		/* Create a new mapping starting at the address given */

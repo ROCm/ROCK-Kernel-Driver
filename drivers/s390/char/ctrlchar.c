@@ -9,6 +9,7 @@
 
 #include <linux/config.h>
 #include <linux/stddef.h>
+#include <asm/errno.h>
 #include <linux/sysrq.h>
 #include <linux/ctype.h>
 
@@ -20,7 +21,7 @@ static int ctrlchar_sysrq_key;
 static void
 ctrlchar_handle_sysrq(void *tty)
 {
-	handle_sysrq(ctrlchar_sysrq_key, NULL, tty);
+	handle_sysrq(ctrlchar_sysrq_key, NULL, (struct tty_struct *) tty);
 }
 
 static DECLARE_WORK(ctrlchar_work, ctrlchar_handle_sysrq, 0);
@@ -39,7 +40,7 @@ static DECLARE_WORK(ctrlchar_work, ctrlchar_handle_sysrq, 0);
  *         with CTRLCHAR_CTRL
  */
 unsigned int
-ctrlchar_handle(const char *buf, int len, struct tty_struct *tty)
+ctrlchar_handle(const unsigned char *buf, int len, struct tty_struct *tty)
 {
 	if ((len < 2) || (len > 3))
 		return CTRLCHAR_NONE;

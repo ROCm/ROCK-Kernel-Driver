@@ -11,6 +11,9 @@
  * functions may not be called from interrupt context. In particular
  * dasd_get_device is a no-no from interrupt context.
  *
+ * $Revision: 1.11 $
+ *
+ * History of changes 
  * 05/04/02 split from dasd.c, code restructuring.
  */
 
@@ -20,7 +23,6 @@
 #include <linux/init.h>
 
 #include <asm/debug.h>
-#include <asm/irq.h>
 #include <asm/uaccess.h>
 
 /* This is ugly... */
@@ -84,9 +86,11 @@ __setup ("dasd=", dasd_call_setup);
  * Read a device number from a string. The number is always in hex,
  * a leading 0x is accepted.
  */
-int
+static inline int
 dasd_devno(char *str, char **endp)
 {
+	int val;
+ 
 	/* remove leading '0x' */
 	if (*str == '0') {
 		str++;
@@ -96,7 +100,10 @@ dasd_devno(char *str, char **endp)
 	/* We require at least one hex digit */
 	if (!isxdigit(*str))
 		return -EINVAL;
-	return simple_strtoul(str, endp, 16);
+	val = simple_strtoul(str, endp, 16);
+	if ((val > 0xFFFF) || (val < 0))
+		return -EINVAL;
+	return val;
 }
 
 /*
@@ -104,7 +111,7 @@ dasd_devno(char *str, char **endp)
  * only one: "ro" for read-only devices. The default feature set
  * is empty (value 0).
  */
-int
+static inline int
 dasd_feature_list(char *str, char **endp)
 {
 	int features, len, rc;
@@ -260,64 +267,12 @@ dasd_add_range(int from, int to, int features)
 			devmap->devindex = devindex;
 			devmap->devno = devno;
 			devmap->features = features;
-			devmap->devreg = NULL;
 			devmap->device = NULL;
 			list_add(&devmap->devindex_list,
 				 &dasd_devindex_hashlists[devindex & 255]);
 			list_add(&devmap->devno_list,
 				 &dasd_devno_hashlists[devno & 255]);
 		}
-		if (devmap->devreg == NULL) {
-			/* The devreg is missing. */
-			devmap->devreg = (devreg_t *)
-				kmalloc(sizeof(devreg_t), GFP_KERNEL);
-			if (devmap->devreg == NULL)
-				return -ENOMEM;
-			memset(devmap->devreg, sizeof(devreg_t), 0);
-			devmap->devreg->ci.devno = devno;
-			devmap->devreg->flag = DEVREG_TYPE_DEVNO;
-			devmap->devreg->oper_func = dasd_oper_handler;
-			s390_device_register(devmap->devreg);
-		}
-	}
-	spin_unlock(&dasd_devmap_lock);
-	return 0;
-}
-
-/*
- * Removes the devreg_t structures for a range of devices. This does
- * NOT remove the range itself. The mapping between devno and kdevs
- * for the devices is remembered until dasd_forget_ranges() is called.
- */
-static int
-dasd_clear_range(int from, int to)
-{
-	int devno;
-
-	if (from > to) {
-		MESSAGE(KERN_ERR,
-			"Invalid device range %04x-%04x", from, to);
-		return -EINVAL;
-	}
-	spin_lock(&dasd_devmap_lock);
-	for (devno = from; devno <= to; devno++) {
-		struct list_head *l;
-		dasd_devmap_t *devmap = NULL;
-		/* Find previous devmap for device number i */
-		list_for_each(l, &dasd_devno_hashlists[devno & 255]) {
-			devmap = list_entry(l, dasd_devmap_t, devno_list);
-			if (devmap->devno == devno)
-				break;
-		}
-		if (devmap == NULL)
-			continue;
-		if (devmap->device != NULL)
-			BUG();
-		if (devmap->devreg == NULL)
-			continue;
-		s390_device_unregister(devmap->devreg);
-		kfree(devmap->devreg);
-		devmap->devreg = NULL;
 	}
 	spin_unlock(&dasd_devmap_lock);
 	return 0;
@@ -340,11 +295,6 @@ dasd_forget_ranges(void)
 			devmap = list_entry(l, dasd_devmap_t, devno_list);
 			if (devmap->device != NULL)
 				BUG();
-			if (devmap->devreg != NULL) {
-				s390_device_unregister(devmap->devreg);
-				kfree(devmap->devreg);
-				devmap->devreg = NULL;
-			}
 			list_del(&devmap->devindex_list);
 			list_del(&devmap->devno_list);
 			kfree(devmap);
@@ -404,52 +354,6 @@ dasd_devmap_from_devindex(int devindex)
 }
 
 /*
- * Find the devmap for a device by its irq line.
- */
-dasd_devmap_t *
-dasd_devmap_from_irq(int irq)
-{
-	struct list_head *l;
-	dasd_devmap_t *devmap, *tmp;
-	int i;
-
-	devmap = NULL;
-	spin_lock(&dasd_devmap_lock);
-	for (i = 0; (i < 256) && (devmap == NULL); i++) {
-		list_for_each(l, &dasd_devno_hashlists[i & 255]) {
-			tmp = list_entry(l, dasd_devmap_t, devno_list);
-			if (tmp->device != NULL &&
-			    tmp->device->devinfo.irq == irq) {
-				devmap = tmp;
-				break;
-			}
-		}
-	}
-	spin_unlock(&dasd_devmap_lock);
-	return devmap;
-}
-
-/*
- * Find the devmap for a device corresponding to a block_device.
- */
-dasd_devmap_t *
-dasd_devmap_from_bdev(struct block_device *bdev)
-{
-	kdev_t kdev = to_kdev_t(bdev->bd_dev);
-	int devindex;
-
-	/* Find the devindex for kdev. */
-	devindex = dasd_gendisk_major_index(major(kdev));
-	if (devindex < 0)
-		/* No such major -> no devmap */
-		return NULL;
-	devindex += minor(kdev) >> DASD_PARTN_BITS;
-
-	/* Now find the devmap by the devindex. */
-	return dasd_devmap_from_devindex(devindex);
-}
-
-/*
  * Find the device structure for device number devno. If it does not
  * exists yet, allocate it. Increase the reference counter in the device
  * structure and return a pointer to it.
@@ -479,6 +383,8 @@ dasd_get_device(dasd_devmap_t *devmap)
 	} else
 		devmap->device = device;
 	atomic_inc(&device->ref_count);
+	device->ro_flag = (devmap->features & DASD_FEATURE_READONLY) ? 1 : 0;
+	device->use_diag_flag = 1;
 	spin_unlock(&dasd_devmap_lock);
 	return device;
 }
@@ -523,9 +429,3 @@ dasd_devmap_exit(void)
 {
 	dasd_forget_ranges();
 }
-
-EXPORT_SYMBOL(dasd_devmap_from_devno);
-EXPORT_SYMBOL(dasd_devmap_from_devindex);
-EXPORT_SYMBOL(dasd_devmap_from_irq);
-EXPORT_SYMBOL(dasd_get_device);
-EXPORT_SYMBOL(dasd_put_device);

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dswstate - Dispatcher parse tree walk management routines
- *              $Revision: 70 $
+ *              $Revision: 71 $
  *
  *****************************************************************************/
 
@@ -65,7 +65,7 @@ acpi_ds_result_insert (
 		return (AE_NOT_EXIST);
 	}
 
-	if (index >= OBJ_NUM_OPERANDS) {
+	if (index >= ACPI_OBJ_NUM_OPERANDS) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 			"Index out of range: %X Obj=%p State=%p Num=%X\n",
 			index, object, walk_state, state->results.num_results));
@@ -124,7 +124,7 @@ acpi_ds_result_remove (
 		return (AE_NOT_EXIST);
 	}
 
-	if (index >= OBJ_MAX_OPERAND) {
+	if (index >= ACPI_OBJ_MAX_OPERAND) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 			"Index out of range: %X State=%p Num=%X\n",
 			index, walk_state, state->results.num_results));
@@ -196,7 +196,7 @@ acpi_ds_result_pop (
 
 	state->results.num_results--;
 
-	for (index = OBJ_NUM_OPERANDS; index; index--) {
+	for (index = ACPI_OBJ_NUM_OPERANDS; index; index--) {
 		/* Check for a valid result object */
 
 		if (state->results.obj_desc [index -1]) {
@@ -312,7 +312,7 @@ acpi_ds_result_push (
 		return (AE_AML_INTERNAL);
 	}
 
-	if (state->results.num_results == OBJ_NUM_OPERANDS) {
+	if (state->results.num_results == ACPI_OBJ_NUM_OPERANDS) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 			"Result stack overflow: Obj=%p State=%p Num=%X\n",
 			object, walk_state, state->results.num_results));
@@ -440,7 +440,7 @@ acpi_ds_obj_stack_delete_all (
 
 	/* The stack size is configurable, but fixed */
 
-	for (i = 0; i < OBJ_NUM_OPERANDS; i++) {
+	for (i = 0; i < ACPI_OBJ_NUM_OPERANDS; i++) {
 		if (walk_state->operands[i]) {
 			acpi_ut_remove_reference (walk_state->operands[i]);
 			walk_state->operands[i] = NULL;
@@ -474,7 +474,7 @@ acpi_ds_obj_stack_push (
 
 	/* Check for stack overflow */
 
-	if (walk_state->num_operands >= OBJ_NUM_OPERANDS) {
+	if (walk_state->num_operands >= ACPI_OBJ_NUM_OPERANDS) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 			"overflow! Obj=%p State=%p #Ops=%X\n",
 			object, walk_state, walk_state->num_operands));
@@ -922,7 +922,7 @@ acpi_ds_init_aml_walk (
 
 		/* Init the method arguments */
 
-		status = acpi_ds_method_data_init_args (params, MTH_NUM_ARGS, walk_state);
+		status = acpi_ds_method_data_init_args (params, ACPI_METHOD_NUM_ARGS, walk_state);
 		if (ACPI_FAILURE (status)) {
 			return_ACPI_STATUS (status);
 		}

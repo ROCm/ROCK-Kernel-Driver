@@ -157,7 +157,7 @@ void pnp_fixup_device(struct pnp_dev *dev)
 	int i = 0;
 
 	while (*pnp_fixups[i].id) {
-		if (compare_pnp_id(&dev->ids,pnp_fixups[i].id)) {
+		if (compare_pnp_id(dev->id,pnp_fixups[i].id)) {
 			pnp_dbg("Calling quirk for %s",
 		                  dev->dev.bus_id);
 			pnp_fixups[i].quirk_function(dev);

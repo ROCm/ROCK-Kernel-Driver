@@ -37,6 +37,7 @@ extern unsigned long machine_flags;
  */
 extern unsigned int console_mode;
 extern unsigned int console_device;
+extern unsigned int console_irq;
 
 #define CONSOLE_IS_UNDEFINED	(console_mode == 0)
 #define CONSOLE_IS_SCLP		(console_mode == 1)

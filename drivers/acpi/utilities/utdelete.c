@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: utdelete - object deletion and reference count utilities
- *              $Revision: 92 $
+ *              $Revision: 93 $
  *
  ******************************************************************************/
 
@@ -329,7 +329,7 @@ acpi_ut_update_ref_count (
 	 * Sanity check the reference count, for debug purposes only.
 	 * (A deleted object will have a huge reference count)
 	 */
-	if (count > MAX_REFERENCE_COUNT) {
+	if (count > ACPI_MAX_REFERENCE_COUNT) {
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_WARN,
 			"**** Warning **** Large Reference Count (%X) in object %p\n\n",

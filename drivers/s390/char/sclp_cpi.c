@@ -130,7 +130,7 @@ cpi_prepare_req(void)
 	req = (struct sclp_req *) kmalloc(sizeof(struct sclp_req), GFP_KERNEL);
 	if (req == NULL)
 		return ERR_PTR(-ENOMEM);
-	sccb = (struct cpi_sccb *) get_free_page(GFP_KERNEL);
+	sccb = (struct cpi_sccb *) __get_free_page(GFP_KERNEL);
 	if (sccb == NULL) {
 		kfree(req);
 		return ERR_PTR(-ENOMEM);
@@ -227,6 +227,7 @@ cpi_module_init(void)
 		rc = 0;
 
 	cpi_free_req(req);
+	sclp_unregister(&sclp_cpi_event);
 
 	return rc;
 }

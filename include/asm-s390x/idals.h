@@ -15,9 +15,17 @@
 
 #include <linux/config.h>
 #include <linux/errno.h>
-#include <asm/irq.h>
+#include <linux/err.h>
+#include <linux/types.h>
+#include <linux/slab.h>
+#include <asm/cio.h>
+#include <asm/uaccess.h>
 
+#ifdef CONFIG_ARCH_S390X
 #define IDA_SIZE_LOG 12 /* 11 for 2k , 12 for 4k */
+#else
+#define IDA_SIZE_LOG 11 /* 11 for 2k , 12 for 4k */
+#endif
 #define IDA_BLOCK_SIZE (1L<<IDA_SIZE_LOG)
 
 /*
@@ -76,7 +84,7 @@ idal_create_words(unsigned long *idaws, void *vaddr, unsigned int length)
  * If necessary it allocates an IDAL and sets the appropriate flags.
  */
 static inline int
-set_normalized_cda(ccw1_t * ccw, void *vaddr)
+set_normalized_cda(struct ccw1 * ccw, void *vaddr)
 {
 #if defined (CONFIG_ARCH_S390X)
 	unsigned int nridaws;
@@ -103,7 +111,7 @@ set_normalized_cda(ccw1_t * ccw, void *vaddr)
  * Releases any allocated IDAL related to the CCW.
  */
 static inline void
-clear_normalized_cda(ccw1_t * ccw)
+clear_normalized_cda(struct ccw1 * ccw)
 {
 #if defined(CONFIG_ARCH_S390X)
 	if (ccw->flags & CCW_FLAG_IDA) {
@@ -112,6 +120,140 @@ clear_normalized_cda(ccw1_t * ccw)
 	}
 #endif
 	ccw->cda = 0;
+}
+
+/*
+ * Idal buffer extension
+ */
+struct idal_buffer {
+	size_t size;
+	size_t page_order;
+	void *data[0];
+};
+
+/*
+ * Allocate an idal buffer
+ */
+static inline struct idal_buffer *
+idal_buffer_alloc(size_t size, int page_order)
+{
+	struct idal_buffer *ib;
+	int nr_chunks, nr_ptrs, i;
+
+	nr_ptrs = (size + IDA_BLOCK_SIZE - 1) >> IDA_SIZE_LOG;
+	nr_chunks = (4096 << page_order) >> IDA_SIZE_LOG;
+	ib = kmalloc(sizeof(struct idal_buffer) + nr_ptrs*sizeof(void *),
+		     GFP_DMA | GFP_KERNEL);
+	if (ib == NULL)
+		return ERR_PTR(-ENOMEM);
+	ib->size = size;
+	ib->page_order = page_order;
+	for (i = 0; i < nr_ptrs; i++) {
+		if ((i & (nr_chunks - 1)) != 0) {
+			ib->data[i] = ib->data[i-1] + IDA_BLOCK_SIZE;
+			continue;
+		}
+		ib->data[i] = (void *)
+			__get_free_pages(GFP_KERNEL, page_order);
+		if (ib->data[i] != NULL)
+			continue;
+		// Not enough memory
+		while (i >= nr_chunks) {
+			i -= nr_chunks;
+			free_pages((unsigned long) ib->data[i],
+				   ib->page_order);
+		}
+		kfree(ib);
+		return ERR_PTR(-ENOMEM);
+	}
+	return ib;
+}
+
+/*
+ * Free an idal buffer.
+ */
+static inline void
+idal_buffer_free(struct idal_buffer *ib)
+{
+	int nr_chunks, nr_ptrs, i;
+
+	nr_ptrs = (ib->size + IDA_BLOCK_SIZE - 1) >> IDA_SIZE_LOG;
+	nr_chunks = (4096 << ib->page_order) >> IDA_SIZE_LOG;
+	for (i = 0; i < nr_ptrs; i += nr_chunks)
+		free_pages((unsigned long) ib->data[i], ib->page_order);
+	kfree(ib);
+}
+
+/*
+ * Test if a idal list is really needed.
+ */
+static inline int
+__idal_buffer_is_needed(struct idal_buffer *ib)
+{
+#ifdef CONFIG_ARCH_S390X
+	return ib->size > (4096 << ib->page_order) ||
+		idal_is_needed(ib->data[0], ib->size);
+#else
+	return ib->size > (4096 << ib->page_order);
+#endif
+}
+
+/*
+ * Set channel data address to idal buffer.
+ */
+static inline void
+idal_buffer_set_cda(struct idal_buffer *ib, struct ccw1 *ccw)
+{
+	if (__idal_buffer_is_needed(ib)) {
+		// setup idals;
+		ccw->cda = (u32)(addr_t) ib->data;
+		ccw->flags |= CCW_FLAG_IDA;
+	} else
+		// we do not need idals - use direct addressing
+		ccw->cda = (u32)(addr_t) ib->data[0];
+	ccw->count = ib->size;
+}
+
+/*
+ * Copy count bytes from an idal buffer to user memory
+ */
+static inline size_t
+idal_buffer_to_user(struct idal_buffer *ib, void *to, size_t count)
+{
+	size_t left;
+	int i;
+
+	if (count > ib->size)
+		BUG();
+	for (i = 0; count > IDA_BLOCK_SIZE; i++) {
+		left = copy_to_user(to, ib->data[i], IDA_BLOCK_SIZE);
+		if (left)
+			return left + count - IDA_BLOCK_SIZE;
+		(addr_t) to += IDA_BLOCK_SIZE;
+		count -= IDA_BLOCK_SIZE;
+	}
+	return copy_to_user(to, ib->data[i], count);
+}
+
+/*
+ * Copy count bytes from user memory to an idal buffer
+ */
+static inline size_t
+idal_buffer_from_user(struct idal_buffer *ib, const void *from, size_t count)
+{
+	size_t left;
+	int i;
+
+	if (count > ib->size)
+		BUG();
+	for (i = 0; count > IDA_BLOCK_SIZE; i++) {
+		left = copy_from_user(ib->data[i], from, IDA_BLOCK_SIZE);
+		if (left)
+			return left + count - IDA_BLOCK_SIZE;
+		(addr_t) from += IDA_BLOCK_SIZE;
+		count -= IDA_BLOCK_SIZE;
+	}
+	return copy_from_user(ib->data[i], from, count);
 }
 
 #endif

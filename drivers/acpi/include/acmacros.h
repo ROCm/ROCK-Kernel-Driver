@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acmacros.h - C macros for the entire subsystem.
- *       $Revision: 130 $
+ *       $Revision: 133 $
  *
  *****************************************************************************/
 
@@ -367,6 +367,8 @@
 												acpi_os_printf ACPI_PARAM_LIST(fp);}
 #define ACPI_REPORT_NSERROR(s,e)            acpi_ns_report_error(_THIS_MODULE,__LINE__,_COMPONENT, s, e);
 
+#define ACPI_REPORT_METHOD_ERROR(s,n,p,e)   acpi_ns_report_method_error(_THIS_MODULE,__LINE__,_COMPONENT, s, n, p, e);
+
 #else
 
 #define ACPI_REPORT_INFO(fp)                {acpi_ut_report_info("ACPI",__LINE__,_COMPONENT); \
@@ -376,6 +378,8 @@
 #define ACPI_REPORT_WARNING(fp)             {acpi_ut_report_warning("ACPI",__LINE__,_COMPONENT); \
 												acpi_os_printf ACPI_PARAM_LIST(fp);}
 #define ACPI_REPORT_NSERROR(s,e)            acpi_ns_report_error("ACPI",__LINE__,_COMPONENT, s, e);
+
+#define ACPI_REPORT_METHOD_ERROR(s,n,p,e)   acpi_ns_report_method_error("ACPI",__LINE__,_COMPONENT, s, n, p, e);
 
 #endif
 
@@ -394,7 +398,7 @@
 
 #ifdef ACPI_DEBUG_OUTPUT
 
-#define ACPI_MODULE_NAME(name)               static char *_THIS_MODULE = name;
+#define ACPI_MODULE_NAME(name)               static char ACPI_UNUSED_VAR *_THIS_MODULE = name;
 
 /*
  * Function entry tracing.
@@ -454,7 +458,7 @@
 
 #define ACPI_DUMP_ENTRY(a,b)            acpi_ns_dump_entry (a,b)
 #define ACPI_DUMP_TABLES(a,b)           acpi_ns_dump_tables(a,b)
-#define ACPI_DUMP_PATHNAME(a,b,c,d)     (void) acpi_ns_dump_pathname(a,b,c,d)
+#define ACPI_DUMP_PATHNAME(a,b,c,d)     acpi_ns_dump_pathname(a,b,c,d)
 #define ACPI_DUMP_RESOURCE_LIST(a)      acpi_rs_dump_resource_list(a)
 #define ACPI_DUMP_BUFFER(a,b)           acpi_ut_dump_buffer((u8 *)a,b,DB_BYTE_DISPLAY,_COMPONENT)
 #define ACPI_BREAK_MSG(a)               acpi_os_signal (ACPI_SIGNAL_BREAKPOINT,(a))

@@ -1,5 +1,5 @@
 /*
- * $Id: ctctty.c,v 1.8 2001/05/16 16:28:31 felfert Exp $
+ * $Id: ctctty.c,v 1.9 2002/12/02 15:25:13 aberg Exp $
  *
  * CTC / ESCON network driver, tty interface.
  *
@@ -34,23 +34,6 @@
 #endif
 #include "ctctty.h"
 
-#if LINUX_VERSION_CODE < 0x020212
-typedef struct wait_queue wait_queue_t;
-typedef struct wait_queue *wait_queue_head_t;
-#define DECLARE_WAITQUEUE(wait, current) \
-	struct wait_queue wait = { current, NULL }
-#define init_waitqueue_head(x) *(x)=NULL
-#define __set_current_state(state_value) \
-	do { current->state = state_value; } while (0)
-#ifdef __SMP__
-#define set_current_state(state_value) \
-	do { __set_current_state(state_value); mb(); } while (0)
-#else
-#define set_current_state(state_value) __set_current_state(state_value)
-#endif
-#define init_MUTEX(x) *(x)=MUTEX
-#endif
-
 #define CTC_TTY_MAJOR       43
 #define CTC_TTY_MAX_DEVICES 64
 
@@ -78,7 +61,7 @@ typedef struct {
   int			line;
   int			count;		 /* # of fd on device              */
   int			blocked_open;	 /* # of blocked opens             */
-  net_device            *netdev;
+  struct net_device     *netdev;
   struct sk_buff_head   tx_queue;        /* transmit queue                 */
   struct sk_buff_head   rx_queue;        /* receive queue                  */
   struct tty_struct 	*tty;            /* Pointer to corresponding tty   */
@@ -113,8 +96,6 @@ static char *ctc_ttyname = "ctc/" CTC_TTY_NAME "%d";
 #else
 static char *ctc_ttyname = CTC_TTY_NAME;
 #endif
-
-static char *ctc_tty_revision = "$Revision: 1.8 $";
 
 static __u32 ctc_tty_magic = CTC_ASYNC_MAGIC;
 static int ctc_tty_shuttingdown = 0;
@@ -195,7 +176,7 @@ ctc_tty_readmodem(ctc_tty_info *info)
 }
 
 void
-ctc_tty_setcarrier(net_device *netdev, int on)
+ctc_tty_setcarrier(struct net_device *netdev, int on)
 {
 	int i;
 
@@ -896,8 +877,8 @@ ctc_tty_block_til_ready(struct tty_struct *tty, struct file *filp, ctc_tty_info 
 	if (tty_hung_up_p(filp) ||
 	    (info->flags & CTC_ASYNC_CLOSING)) {
 		if (info->flags & CTC_ASYNC_CLOSING)
-#warning: FIXME [kj] Using sleep_on derivative, is racy. consider using wait_event instead
-			interruptible_sleep_on(&info->close_wait);
+			wait_event(info->close_wait, 
+				   !(info->flags & CTC_ASYNC_CLOSING));
 #ifdef MODEM_DO_RESTART
 		if (info->flags & CTC_ASYNC_HUP_NOTIFY)
 			return -EAGAIN;
@@ -1094,7 +1075,7 @@ ctc_tty_close(struct tty_struct *tty, struct file *filp)
 	 * line status register.
 	 */
 	if (info->flags & CTC_ASYNC_INITIALIZED) {
-		tty_wait_until_sent(tty, 3000);	/* 30 seconds timeout */
+		tty_wait_until_sent(tty, 30*HZ); /* 30 seconds timeout */
 		/*
 		 * Before we drop DTR, make sure the UART transmitter
 		 * has completely drained; this is especially
@@ -1104,7 +1085,7 @@ ctc_tty_close(struct tty_struct *tty, struct file *filp)
 		while (!(info->lsr & UART_LSR_TEMT)) {
 			set_current_state(TASK_INTERRUPTIBLE);
 			spin_unlock_irqrestore(&ctc_tty_lock, flags);
-			schedule_timeout(20);
+			schedule_timeout(HZ/2);
 			spin_lock_irqsave(&ctc_tty_lock, flags);
 			if (time_after(jiffies,timeout))
 				break;
@@ -1119,7 +1100,7 @@ ctc_tty_close(struct tty_struct *tty, struct file *filp)
 	tty->closing = 0;
 	if (info->blocked_open) {
 		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(50);
+		schedule_timeout(HZ/2);
 		wake_up_interruptible(&info->open_wait);
 	}
 	info->flags &= ~(CTC_ASYNC_NORMAL_ACTIVE | CTC_ASYNC_CLOSING);
@@ -1250,7 +1231,7 @@ ctc_tty_init(void)
 }
 
 int
-ctc_tty_register_netdev(net_device *dev) {
+ctc_tty_register_netdev(struct net_device *dev) {
 	int ttynum;
 	char *err;
 	char *p;
@@ -1282,7 +1263,7 @@ ctc_tty_register_netdev(net_device *dev) {
 }
 
 void
-ctc_tty_unregister_netdev(net_device *dev) {
+ctc_tty_unregister_netdev(struct net_device *dev) {
 	int i;
 	unsigned long saveflags;
 	ctc_tty_info *info = NULL;
@@ -1302,16 +1283,13 @@ ctc_tty_unregister_netdev(net_device *dev) {
 }
 
 void
-ctc_tty_cleanup(int final) {
+ctc_tty_cleanup(void) {
 	unsigned long saveflags;
 	
 	spin_lock_irqsave(&ctc_tty_lock, saveflags);
 	ctc_tty_shuttingdown = 1;
-	if (final) {
-		kfree(driver);
-		driver = NULL;
-	} else {
-		tty_unregister_driver(&driver->ctc_tty_device);
-	}
+	tty_unregister_driver(&driver->ctc_tty_device);
+	kfree(driver);
+	driver = NULL;
 	spin_unlock_irqrestore(&ctc_tty_lock, saveflags);
 }

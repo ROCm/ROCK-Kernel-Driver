@@ -3,7 +3,7 @@
  *
  * Module Name: hwregs - Read/write access functions for the various ACPI
  *                       control and status registers.
- *              $Revision: 134 $
+ *              $Revision: 137 $
  *
  ******************************************************************************/
 
@@ -142,6 +142,9 @@ acpi_get_sleep_type_data (
 	status = acpi_ns_evaluate_by_name ((NATIVE_CHAR *) acpi_gbl_db_sleep_states[sleep_state],
 			  NULL, &obj_desc);
 	if (ACPI_FAILURE (status)) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "%s while evaluating Sleep_state [%s]\n",
+			acpi_format_exception (status), acpi_gbl_db_sleep_states[sleep_state]));
+
 		return_ACPI_STATUS (status);
 	}
 
@@ -184,8 +187,8 @@ acpi_get_sleep_type_data (
 	}
 
 	if (ACPI_FAILURE (status)) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Bad Sleep object %p type %s\n",
-			obj_desc, acpi_ut_get_object_type_name (obj_desc)));
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "While evaluating Sleep_state [%s], bad Sleep object %p type %s\n",
+			acpi_gbl_db_sleep_states[sleep_state], obj_desc, acpi_ut_get_object_type_name (obj_desc)));
 	}
 
 	acpi_ut_remove_reference (obj_desc);

@@ -33,12 +33,7 @@
 #define UNKNOWN_DEV 0x3000
 
 
-static const struct pnp_id pnp_card_table[] = {
-	{	"ANYDEVS",		0	},
-	{	"",			0	}
-};
-
-static const struct pnp_id pnp_dev_table[] = {
+static const struct pnp_device_id pnp_dev_table[] = {
 	/* Archtek America Corp. */
 	/* Archtek SmartLink Modem 3334BT Plug & Play */
 	{	"AAC000F",		0	},
@@ -316,6 +311,8 @@ static const struct pnp_id pnp_dev_table[] = {
 	{	"",			0	}
 };
 
+MODULE_DEVICE_TABLE(pnp, pnp_dev_table);
+
 static void inline avoid_irq_share(struct pnp_dev *dev)
 {
 	unsigned int map = 0x1FF8;
@@ -384,7 +381,7 @@ static int serial_pnp_guess_board(struct pnp_dev *dev, int *flags)
 }
 
 static int
-serial_pnp_probe(struct pnp_dev * dev, const struct pnp_id *card_id, const struct pnp_id *dev_id)
+serial_pnp_probe(struct pnp_dev * dev, const struct pnp_device_id *dev_id)
 {
 	struct serial_struct serial_req;
 	int ret, line, flags = dev_id->driver_data;
@@ -393,10 +390,10 @@ serial_pnp_probe(struct pnp_dev * dev, const struct pnp_id *card_id, const struc
 	if (flags & SPCI_FL_NO_SHIRQ)
 		avoid_irq_share(dev);
 	memset(&serial_req, 0, sizeof(serial_req));
-	serial_req.irq = dev->irq_resource[0].start;
-	serial_req.port = pci_resource_start(dev, 0);
+	serial_req.irq = pnp_irq(dev,0);
+	serial_req.port = pnp_port_start(dev, 0);
 	if (HIGH_BITS_OFFSET)
-		serial_req.port = dev->resource[0].start >> HIGH_BITS_OFFSET;
+		serial_req.port = pnp_port_start(dev, 0) >> HIGH_BITS_OFFSET;
 #ifdef SERIAL_DEBUG_PNP
 	printk("Setup PNP port: port %x, irq %d, type %d\n",
 	       serial_req.port, serial_req.irq, serial_req.io_type);
@@ -407,7 +404,7 @@ serial_pnp_probe(struct pnp_dev * dev, const struct pnp_id *card_id, const struc
 	line = register_serial(&serial_req);
 
 	if (line >= 0)
-		dev->driver_data = (void *)(line + 1);
+		pnp_set_drvdata(dev, (void *)(line + 1));
 	return line >= 0 ? 0 : -ENODEV;
 
 }
@@ -419,7 +416,6 @@ static void serial_pnp_remove(struct pnp_dev * dev)
 
 static struct pnp_driver serial_pnp_driver = {
 	.name		= "serial",
-	.card_id_table	= pnp_card_table,
 	.id_table	= pnp_dev_table,
 	.probe		= serial_pnp_probe,
 	.remove		= serial_pnp_remove,
@@ -442,5 +438,3 @@ EXPORT_NO_SYMBOLS;
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Generic 8250/16x50 PnP serial driver");
-/* FIXME */
-/*MODULE_DEVICE_TABLE(pnpbios, pnp_dev_table);*/

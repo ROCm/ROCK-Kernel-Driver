@@ -54,6 +54,8 @@ sclp_make_buffer(void *page, unsigned short columns, unsigned short htab)
 	 */
 	buffer = ((struct sclp_buffer *) ((addr_t) sccb + PAGE_SIZE)) - 1;
 	buffer->sccb = sccb;
+	buffer->retry_count = 0;
+	init_timer(&buffer->retry_timer);
 	buffer->mto_number = 0;
 	buffer->mto_char_sum = 0;
 	buffer->current_line = NULL;
@@ -87,14 +89,11 @@ sclp_unmake_buffer(struct sclp_buffer *buffer)
 }
 
 /*
- * Creates a new Message Text Object with enough room for str_len
- * characters. This function will create a new sccb for buffering
- * the mto if the current buffer sccb is full. A full buffer sccb
- * is submitted for output.
- * Returns a pointer to the start of the string in the mto.
+ * Initialize a new Message Text Object (MTO) at the end of the provided buffer
+ * with enough room for max_len characters. Return 0 on success.
  */
 static int
-sclp_create_mto(struct sclp_buffer *buffer, int max_len)
+sclp_initialize_mto(struct sclp_buffer *buffer, int max_len)
 {
 	struct write_sccb *sccb;
 	struct mto *mto;
@@ -109,7 +108,7 @@ sclp_create_mto(struct sclp_buffer *buffer, int max_len)
 		return -ENOMEM;
 
 	/* find address of new message text object */
-	mto = (struct mto *)(((unsigned long) sccb) + sccb->header.length);
+	mto = (struct mto *)(((addr_t) sccb) + sccb->header.length);
 
 	/*
 	 * fill the new Message-Text Object,
@@ -128,11 +127,11 @@ sclp_create_mto(struct sclp_buffer *buffer, int max_len)
 }
 
 /*
- * Add the mto created with sclp_create_mto to the buffer sccb using
- * the str_len parameter as the real length of the string.
+ * Finalize MTO initialized by sclp_initialize_mto(), updating the sizes of
+ * MTO, enclosing MDB, event buffer and SCCB.
  */
 static void
-sclp_add_mto(struct sclp_buffer *buffer)
+sclp_finalize_mto(struct sclp_buffer *buffer)
 {
 	struct write_sccb *sccb;
 	struct mto *mto;
@@ -147,7 +146,7 @@ sclp_add_mto(struct sclp_buffer *buffer)
 
 	/* find address of new message text object */
 	sccb = buffer->sccb;
-	mto = (struct mto *)(((unsigned long) sccb) + sccb->header.length);
+	mto = (struct mto *)(((addr_t) sccb) + sccb->header.length);
 
 	/* set size of message text object */
 	mto->length = mto_size;
@@ -169,23 +168,6 @@ sclp_add_mto(struct sclp_buffer *buffer)
 	buffer->mto_char_sum += str_len;
 }
 
-void
-sclp_move_current_line(struct sclp_buffer *to, struct sclp_buffer *from)
-{
-	if (from->current_line == NULL)
-		return;
-	if (sclp_create_mto(to, from->columns) != 0)
-		return;
-	if (from->current_length > 0) {
-		memcpy(to->current_line,
-		       from->current_line - from->current_length,
-		       from->current_length);
-		to->current_line += from->current_length;
-		to->current_length = from->current_length;
-	}
-	from->current_line = NULL;
-}
-
 /*
  * processing of a message including escape characters,
  * returns number of characters written to the output sccb
@@ -195,7 +177,7 @@ sclp_move_current_line(struct sclp_buffer *to, struct sclp_buffer *from)
  */
 int
 sclp_write(struct sclp_buffer *buffer,
-	   const char *msg, int count, int from_user)
+	   const unsigned char *msg, int count, int from_user)
 {
 	int spaces, i_msg;
 	char ch;
@@ -203,7 +185,7 @@ sclp_write(struct sclp_buffer *buffer,
 
 	/*
 	 * parse msg for escape sequences (\t,\v ...) and put formated
-	 * msg into an mto (created by sclp_create_mto).
+	 * msg into an mto (created by sclp_initialize_mto).
 	 *
 	 * We have to do this work ourselfs because there is no support for
 	 * these characters on the native machine and only partial support
@@ -235,11 +217,11 @@ sclp_write(struct sclp_buffer *buffer,
 		case '\n':	/* new line, line feed (ASCII)	*/
 			/* check if new mto needs to be created */
 			if (buffer->current_line == NULL) {
-				rc = sclp_create_mto(buffer, 0);
+				rc = sclp_initialize_mto(buffer, 0);
 				if (rc)
 					return i_msg;
 			}
-			sclp_add_mto(buffer);
+			sclp_finalize_mto(buffer);
 			break;
 		case '\a':	/* bell, one for several times	*/
 			/* set SCLP sound alarm bit in General Object */
@@ -249,7 +231,8 @@ sclp_write(struct sclp_buffer *buffer,
 		case '\t':	/* horizontal tabulator	 */
 			/* check if new mto needs to be created */
 			if (buffer->current_line == NULL) {
-				rc = sclp_create_mto(buffer, buffer->columns);
+				rc = sclp_initialize_mto(buffer,
+							 buffer->columns);
 				if (rc)
 					return i_msg;
 			}
@@ -268,8 +251,9 @@ sclp_write(struct sclp_buffer *buffer,
 			/* = new line, leading spaces */
 			if (buffer->current_line != NULL) {
 				spaces = buffer->current_length;
-				sclp_add_mto(buffer);
-				rc = sclp_create_mto(buffer, buffer->columns);
+				sclp_finalize_mto(buffer);
+				rc = sclp_initialize_mto(buffer,
+							 buffer->columns);
 				if (rc)
 					return i_msg;
 				memset(buffer->current_line, 0x40, spaces);
@@ -277,10 +261,11 @@ sclp_write(struct sclp_buffer *buffer,
 				buffer->current_length = spaces;
 			} else {
 				/* one an empty line this is the same as \n */
-				rc = sclp_create_mto(buffer, buffer->columns);
+				rc = sclp_initialize_mto(buffer,
+							 buffer->columns);
 				if (rc)
 					return i_msg;
-				sclp_add_mto(buffer);
+				sclp_finalize_mto(buffer);
 			}
 			break;
 		case '\b':	/* backspace  */
@@ -296,7 +281,7 @@ sclp_write(struct sclp_buffer *buffer,
 		case 0x00:	/* end of string  */
 			/* transfer current line to SCCB */
 			if (buffer->current_line != NULL)
-				sclp_add_mto(buffer);
+				sclp_finalize_mto(buffer);
 			/* skip the rest of the message including the 0 byte */
 			i_msg = count;
 			break;
@@ -306,7 +291,8 @@ sclp_write(struct sclp_buffer *buffer,
 				break;
 			/* check if new mto needs to be created */
 			if (buffer->current_line == NULL) {
-				rc = sclp_create_mto(buffer, buffer->columns);
+				rc = sclp_initialize_mto(buffer,
+							 buffer->columns);
 				if (rc)
 					return i_msg;
 			}
@@ -317,7 +303,7 @@ sclp_write(struct sclp_buffer *buffer,
 		/* check if current mto is full */
 		if (buffer->current_line != NULL &&
 		    buffer->current_length >= buffer->columns)
-			sclp_add_mto(buffer);
+			sclp_finalize_mto(buffer);
 	}
 
 	/* return number of processed characters */
@@ -361,7 +347,7 @@ sclp_set_columns(struct sclp_buffer *buffer, unsigned short columns)
 	buffer->columns = columns;
 	if (buffer->current_line != NULL &&
 	    buffer->current_length > buffer->columns)
-		sclp_add_mto(buffer);
+		sclp_finalize_mto(buffer);
 }
 
 void
@@ -377,12 +363,61 @@ int
 sclp_rw_init(void)
 {
 	static int init_done = 0;
+	int rc;
 
 	if (init_done)
 		return 0;
-	init_done = 1;
-	return sclp_register(&sclp_rw_event);
+
+	rc = sclp_register(&sclp_rw_event);
+	if (rc == 0)
+		init_done = 1;
+	return rc;
 }
+
+#define	SCLP_EVBUF_PROCESSED	0x80
+
+/*
+ * Traverse array of event buffers contained in SCCB and remove all buffers
+ * with a set "processed" flag. Return the number of unprocessed buffers.
+ */
+static int
+sclp_remove_processed(struct sccb_header *sccb)
+{
+	struct evbuf_header *evbuf;
+	int unprocessed;
+	u16 remaining;
+
+	evbuf = (struct evbuf_header *) (sccb + 1);
+	unprocessed = 0;
+	remaining = sccb->length - sizeof(struct sccb_header);
+	while (remaining > 0) {
+		remaining -= evbuf->length;
+		if (evbuf->flags & SCLP_EVBUF_PROCESSED) {
+			sccb->length -= evbuf->length;
+			memcpy((void *) evbuf,
+			       (void *) ((addr_t) evbuf + evbuf->length),
+			       remaining);
+		} else {
+			unprocessed++;
+			evbuf = (struct evbuf_header *)
+					((addr_t) evbuf + evbuf->length);
+		}
+	}
+
+	return unprocessed;
+}
+
+static void
+sclp_buffer_retry(unsigned long data)
+{
+	struct sclp_buffer *buffer = (struct sclp_buffer *) data;
+	buffer->request.status = SCLP_REQ_FILLED;
+	buffer->sccb->header.response_code = 0x0000;
+	sclp_add_request(&buffer->request);
+}
+
+#define SCLP_BUFFER_MAX_RETRY		5
+#define	SCLP_BUFFER_RETRY_INTERVAL	2
 
 /*
  * second half of Write Event Data-function that has to be done after
@@ -391,32 +426,68 @@ sclp_rw_init(void)
 static void
 sclp_writedata_callback(struct sclp_req *request, void *data)
 {
+	int rc;
 	struct sclp_buffer *buffer;
 	struct write_sccb *sccb;
 
 	buffer = (struct sclp_buffer *) data;
 	sccb = buffer->sccb;
 
-	/* FIXME: proper error handling */
+	if (request->status == SCLP_REQ_FAILED) {
+		if (buffer->callback != NULL)
+			buffer->callback(buffer, -EIO);
+		return;
+	}
 	/* check SCLP response code and choose suitable action	*/
 	switch (sccb->header.response_code) {
 	case 0x0020 :
-		/* normal completion, buffer processed, message(s) sent */
+		/* Normal completion, buffer processed, message(s) sent */
+		rc = 0;
 		break;
 
-	case 0x0340:	/* contained SCLP equipment check */
-	case 0x40F0:	/* function code disabled in SCLP receive mask */
+	case 0x0340: /* Contained SCLP equipment check */
+		if (buffer->retry_count++ > SCLP_BUFFER_MAX_RETRY) {
+			rc = -EIO;
+			break;
+		}
+		/* remove processed buffers and requeue rest */
+		if (sclp_remove_processed((struct sccb_header *) sccb) > 0) {
+			/* not all buffers were processed */
+			sccb->header.response_code = 0x0000;
+			buffer->request.status = SCLP_REQ_FILLED;
+			sclp_add_request(request);
+			return;
+		}
+		rc = 0;
 		break;
+
+	case 0x0040: /* SCLP equipment check */
+	case 0x05f0: /* Target resource in improper state */
+		if (buffer->retry_count++ > SCLP_BUFFER_MAX_RETRY) {
+			rc = -EIO;
+			break;
+		}
+		/* wait some time, then retry request */
+		buffer->retry_timer.function = sclp_buffer_retry;
+		buffer->retry_timer.data = (unsigned long) buffer;
+		buffer->retry_timer.expires = jiffies +
+						SCLP_BUFFER_RETRY_INTERVAL*HZ;
+		add_timer(&buffer->retry_timer);
+		return;
+
 	default:
-		/* sclp_free_sccb(sccb); */
+		if (sccb->header.response_code == 0x71f0)
+			rc = -ENOMEM;
+		else
+			rc = -EINVAL;
 		printk(KERN_WARNING SCLP_RW_PRINT_HEADER
-		       "write event data failed "
-		       "(response code: 0x%x SCCB address %p).\n",
-		       sccb->header.response_code, sccb);
+		       "sclp_writedata_callback: %s (response code=0x%x).\n",
+		       sclp_error_message(sccb->header.response_code),
+		       sccb->header.response_code);
 		break;
 	}
 	if (buffer->callback != NULL)
-		buffer->callback(buffer, sccb->header.response_code);
+		buffer->callback(buffer, rc);
 }
 
 /*
@@ -431,10 +502,10 @@ sclp_emit_buffer(struct sclp_buffer *buffer,
 
 	/* add current line if there is one */
 	if (buffer->current_line != NULL)
-		sclp_add_mto(buffer);
+		sclp_finalize_mto(buffer);
 
 	/* Are there messages in the output buffer ? */
-	if (buffer->mto_number <= 0)
+	if (buffer->mto_number == 0)
 		return;
 
 	sccb = buffer->sccb;

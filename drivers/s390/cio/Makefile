@@ -2,11 +2,18 @@
 # Makefile for the S/390 common i/o drivers
 #
 
-obj-y := cio_debug.o # make sure this always comes first
-obj-y += airq.o blacklist.o cio.o ioinfo.o misc.o requestirq.o s390io.o chsc.o
+obj-y += airq.o blacklist.o chsc.o cio.o css.o requestirq.o 
+export-objs += airq.o css.o chsc.o cio.o requestirq.o
 
-obj-$(CONFIG_PROC_FS) += proc.o
+ccw_device-objs += device.o device_fsm.o device_ops.o
+ccw_device-objs += device_id.o device_pgid.o device_status.o
+obj-y += ccw_device.o
+export-objs += device.o device_ops.o 
 
-export-objs += airq.o cio.o ioinfo.o requestirq.o s390io.o
+obj-$(CONFIG_CCWGROUP) += ccwgroup.o
+export-objs += ccwgroup.o
+
+obj-$(CONFIG_QDIO) += qdio.o
+export-objs += qdio.o
 
 include $(TOPDIR)/Rules.make

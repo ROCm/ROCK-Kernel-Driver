@@ -2973,7 +2973,7 @@ static int __init parport_pc_init_superio(int autoirq, int autodma) {return 0;}
 #endif /* CONFIG_PCI */
 
 #ifdef CONFIG_PNP
-static const struct pnp_id pnp_dev_table[] = {
+static const struct pnp_device_id pnp_dev_table[] = {
 	/* Standard LPT Printer Port */
 	{.id = "PNP0400", .driver_data = 0},
 	/* ECP Printer Port */
@@ -2984,7 +2984,6 @@ static const struct pnp_id pnp_dev_table[] = {
 /* we only need the pnp layer to activate the device, at least for now */
 static struct pnp_driver parport_pc_pnp_driver = {
 	.name		= "parport_pc",
-	.card_id_table	= NULL,
 	.id_table	= pnp_dev_table,
 };
 #else

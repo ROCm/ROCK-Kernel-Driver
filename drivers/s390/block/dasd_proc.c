@@ -9,16 +9,19 @@
  *
  * /proc interface for the dasd driver.
  *
+ * $Revision: 1.17 $
+ *
+ * History of changes
  * 05/04/02 split from dasd.c, code restructuring.
  */
 
 #include <linux/config.h>
 #include <linux/version.h>
 #include <linux/ctype.h>
+#include <linux/seq_file.h>
 #include <linux/vmalloc.h>
 
 #include <asm/debug.h>
-#include <asm/irq.h>
 #include <asm/uaccess.h>
 
 /* This is ugly... */
@@ -26,47 +29,9 @@
 
 #include "dasd_int.h"
 
-typedef struct {
-	char *data;
-	int len;
-} tempinfo_t;
-
 static struct proc_dir_entry *dasd_proc_root_entry = NULL;
-static struct proc_dir_entry *dasd_devices_entry;
-static struct proc_dir_entry *dasd_statistics_entry;
-
-static ssize_t
-dasd_generic_read(struct file *file, char *user_buf, size_t user_len,
-		  loff_t * offset)
-{
-	loff_t len;
-	tempinfo_t *p_info = (tempinfo_t *) file->private_data;
-
-	if (*offset >= p_info->len)
-		return 0;	/* EOF */
-	len = p_info->len - *offset;
-	if (user_len < len)
-		len = user_len;
-	if (copy_to_user(user_buf, &(p_info->data[*offset]), len))
-		return -EFAULT;
-	(*offset) += len;
-	return len;		/* number of bytes "read" */
-}
-
-static int
-dasd_generic_close (struct inode *inode, struct file *file)
-{
-	tempinfo_t *info;
-
-	info = (tempinfo_t *) file->private_data;
-	file->private_data = NULL;
-	if (info) {
-		if (info->data)
-			vfree (info->data);
-		kfree (info);
-	}
-	return 0;
-}
+static struct proc_dir_entry *dasd_devices_entry = NULL;
+static struct proc_dir_entry *dasd_statistics_entry = NULL;
 
 static inline char *
 dasd_get_user_string(const char *user_buf, size_t user_len)
@@ -88,189 +53,121 @@ dasd_get_user_string(const char *user_buf, size_t user_len)
 	return buffer;
 }
 
-static ssize_t
-dasd_devices_write(struct file *file, const char *user_buf,
-		   size_t user_len, loff_t * offset)
+static int
+dasd_devices_show(struct seq_file *m, void *v)
 {
-	char *buffer, *str;
-	int add_or_set;
-	int from, to, features;
-
-	buffer = dasd_get_user_string(user_buf, user_len);
-	MESSAGE(KERN_INFO, "/proc/dasd/devices: '%s'", buffer);
-
-	/* Scan for "add " or "set ". */
-	for (str = buffer; isspace(*str); str++);
-	if (strncmp(str, "add", 3) == 0 && isspace(str[3]))
-		add_or_set = 0;
-	else if (strncmp(str, "set", 3) == 0 && isspace(str[3]))
-		add_or_set = 1;
-	else
-		goto out_error;
-	for (str = str + 4; isspace(*str); str++);
-
-	/* Scan for "device " and "range=" and ignore it. This is sick. */
-	if (strncmp(str, "device", 6) == 0 && isspace(str[6]))
-		for (str = str + 6; isspace(*str); str++);
-	if (strncmp(str, "range=", 6) == 0) 
-		for (str = str + 6; isspace(*str); str++);
-
-	/* Scan device number range and feature string. */
-	to = from = dasd_devno(str, &str);
-	if (*str == '-') {
-		str++;
-		to = dasd_devno(str, &str);
-	}
-	features = dasd_feature_list(str, &str);
-	/* Negative numbers in from/to/features indicate errors */
-	if (from < 0 || to < 0 || from > 65546 || to > 65536 || features < 0)
-		goto out_error;
-
-	if (add_or_set == 0) {
-		dasd_add_range(from, to, features);
-		dasd_enable_devices(from, to);
-	} else {
-		for (; isspace(*str); str++);
-		if (strcmp(str, "on") == 0)
-			dasd_enable_devices(from, to);
-		else if (strcmp(str, "off") == 0)
-			dasd_disable_devices(from, to);
-		else
-			goto out_error;
-	}
-	kfree(buffer);
-	return user_len;
-out_error:
-	MESSAGE(KERN_WARNING,
-		"/proc/dasd/devices: range parse error in '%s'",
-		buffer);
-	kfree(buffer);
-	return -EINVAL;
-}
-
-static inline int
-dasd_devices_print(dasd_devmap_t *devmap, char *str)
-{
+	dasd_devmap_t *devmap;
 	dasd_device_t *device;
 	char *substr;
-	int len;
 
-	device = dasd_get_device(devmap);
+	devmap = dasd_devmap_from_devindex((unsigned long) v - 1);
+	device = (devmap != NULL) ?
+		dasd_get_device(devmap) : ERR_PTR(-ENODEV);
 	if (IS_ERR(device))
 		return 0;
 	/* Print device number. */
-	len = sprintf(str, "%04x", devmap->devno);
+	seq_printf(m, "%04x", devmap->devno);
 	/* Print discipline string. */
 	if (device != NULL && device->discipline != NULL)
-		len += sprintf(str + len, "(%s)", device->discipline->name);
+		seq_printf(m, "(%s)", device->discipline->name);
 	else
-		len += sprintf(str + len, "(none)");
+		seq_printf(m, "(none)");
 	/* Print kdev. */
-	len += sprintf(str + len, " at (%3d:%3d)",
-		       device->gdp->major, device->gdp->first_minor);
+	seq_printf(m, " at (%3d:%3d)",
+		   device->gdp->major, device->gdp->first_minor);
 	/* Print device name. */
-	len += sprintf(str + len, " is %-7s", device->gdp->disk_name);
+	seq_printf(m, " is %-7s", device->gdp->disk_name);
 	/* Print devices features. */
-	substr = (devmap->features & DASD_FEATURE_READONLY) ? "(ro)" : " ";
-	len += sprintf(str + len, "%4s: ", substr);
+	substr = device->ro_flag ? "(ro)" : " ";
+	seq_printf(m, "%4s: ", substr);
 	/* Print device status information. */
-	if (device == NULL) {
-		len += sprintf(str + len, "unknown");
-		dasd_put_device(devmap);
-		return len;
-	}
-	switch (device->state) {
+	switch ((device != NULL) ? device->state : -1) {
+	case -1:
+		seq_printf(m, "unknown");
+		break;
 	case DASD_STATE_NEW:
-		len += sprintf(str + len, "new");
+		seq_printf(m, "new");
 		break;
 	case DASD_STATE_KNOWN:
-		len += sprintf(str + len, "detected");
+		seq_printf(m, "detected");
 		break;
 	case DASD_STATE_BASIC:
-		len += sprintf(str + len, "basic");
+		seq_printf(m, "basic");
 		break;
 	case DASD_STATE_ACCEPT:
-		len += sprintf(str + len, "accepted");
+		seq_printf(m, "accepted");
 		break;
 	case DASD_STATE_READY:
 	case DASD_STATE_ONLINE:
-		if (device->state < DASD_STATE_ONLINE)
-			len += sprintf(str + len, "fenced ");
-		else
-			len += sprintf(str + len, "active ");
+		seq_printf(m, "active ");
 		if (dasd_check_blocksize(device->bp_block))
-			len += sprintf(str + len, "n/f	 ");
+			seq_printf(m, "n/f	 ");
 		else
-			len += sprintf(str + len,
-				       "at blocksize: %d, %ld blocks, %ld MB",
-				       device->bp_block, device->blocks,
-				       ((device->bp_block >> 9) *
-					device->blocks) >> 11);
+			seq_printf(m,
+				   "at blocksize: %d, %ld blocks, %ld MB",
+				   device->bp_block, device->blocks,
+				   ((device->bp_block >> 9) *
+				    device->blocks) >> 11);
 		break;
 	default:
-		len += sprintf(str + len, "no stat");
+		seq_printf(m, "no stat");
 		break;
 	}
 	dasd_put_device(devmap);
-	return len;
-}
-
-static int
-dasd_devices_open(struct inode *inode, struct file *file)
-{
-	tempinfo_t *info;
-	int size, len;
-	int devindex;
-
-	info = (tempinfo_t *) kmalloc(sizeof (tempinfo_t), GFP_KERNEL);
-	if (info == NULL) {
-		MESSAGE(KERN_WARNING, "%s",
-			"No memory available for data (tempinfo)");
-		return -ENOMEM;
-
-	}
-
-	size = dasd_max_devindex * 128;
-	info->data = (char *) vmalloc (size);
-	if (size && info->data == NULL) {
-		MESSAGE(KERN_WARNING, "%s",
-			"No memory available for data (info->data)");
-		kfree(info);
-		return -ENOMEM;
-	}
-	file->private_data = (void *) info;
-
-	DBF_EVENT(DBF_NOTICE,
-		  "procfs-area: %p, size 0x%x allocated", info->data, size);
-
-	len = 0;
-	for (devindex = 0; devindex < dasd_max_devindex; devindex++) {
-		dasd_devmap_t *devmap;
-
-		devmap = dasd_devmap_from_devindex(devindex);
-		len += dasd_devices_print(devmap, info->data + len);
-		if (dasd_probeonly)
-			len += sprintf(info->data + len, "(probeonly)");
-		len += sprintf(info->data + len, "\n");
-	}
-	info->len = len;
-	if (len > size) {
-		printk("len = %i, size = %i\n", len, size);
-		BUG();
-	}
+	if (dasd_probeonly)
+		seq_printf(m, "(probeonly)");
+	seq_printf(m, "\n");
 	return 0;
 }
 
-static struct file_operations dasd_devices_file_ops = {
-	.owner = THIS_MODULE,
-	.read = dasd_generic_read,		/* read */
-	.write = dasd_devices_write,	/* write */
-	.open = dasd_devices_open,		/* open */
-	.release = dasd_generic_close,	/* close */
+static void *dasd_devices_start(struct seq_file *m, loff_t *pos)
+{
+	if (*pos >= dasd_max_devindex)
+		return NULL;
+	return (void *)((unsigned long) *pos + 1);
+}
+
+static void *dasd_devices_next(struct seq_file *m, void *v, loff_t *pos)
+{
+	++*pos;
+	return dasd_devices_start(m, pos);
+}
+
+static void dasd_devices_stop(struct seq_file *m, void *v)
+{
+}
+
+static struct seq_operations dasd_devices_seq_ops = {
+	.start		= dasd_devices_start,
+	.next		= dasd_devices_next,
+	.stop		= dasd_devices_stop,
+	.show		= dasd_devices_show,
 };
 
-static struct inode_operations dasd_devices_inode_ops = {
+static int dasd_devices_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &dasd_devices_seq_ops);
+}
+
+static struct file_operations dasd_devices_file_ops = {
+	.open		= dasd_devices_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= seq_release,
 };
+
+static inline int
+dasd_calc_metrics(char *page, char **start, off_t off,
+		  int count, int *eof, int len)
+{
+	len = (len > off) ? len - off : 0;
+	if (len > count)
+		len = count;
+	if (len < count)
+		*eof = 1;
+	*start = page + off;
+	return len;
+}
 
 static inline char *
 dasd_statistics_array(char *str, int *array, int shift)
@@ -287,48 +184,28 @@ dasd_statistics_array(char *str, int *array, int shift)
 }
 
 static int
-dasd_statistics_open(struct inode *inode, struct file *file)
+dasd_statistics_read(char *page, char **start, off_t off,
+		     int count, int *eof, void *data)
 {
-	tempinfo_t *info;
+	unsigned long len;
 #ifdef CONFIG_DASD_PROFILE
 	dasd_profile_info_t *prof;
 	char *str;
 	int shift;
-#endif
 
-	info = (tempinfo_t *) kmalloc(sizeof (tempinfo_t), GFP_KERNEL);
-	if (info == NULL) {
-		MESSAGE(KERN_WARNING, "%s",
-			"No memory available for data (tempinfo)");
-		return -ENOMEM;
-	}
-
-	file->private_data = (void *) info;
-	/* FIXME! determine space needed in a better way */
-	info->data = (char *) vmalloc (PAGE_SIZE);
-
-	if (info->data == NULL) {
-		MESSAGE(KERN_WARNING, "%s",
-			"No memory available for data (info->data)");
-		kfree(info);
-		file->private_data = NULL;
-		return -ENOMEM;
-	}
-#ifdef CONFIG_DASD_PROFILE
 	/* check for active profiling */
 	if (dasd_profile_level == DASD_PROFILE_OFF) {
-		info->len = sprintf(info->data,
-				    "Statistics are off - they might be "
+		len = sprintf(page, "Statistics are off - they might be "
 				    "switched on using 'echo set on > "
 				    "/proc/dasd/statistics'\n");
-		return 0;
+		return dasd_calc_metrics(page, start, off, count, eof, len);
 	}
 
 	prof = &dasd_global_profile;
 	/* prevent couter 'overflow' on output */
 	for (shift = 0; (prof->dasd_io_reqs >> shift) > 9999999; shift++);
 
-	str = info->data;
+	str = page;
 	str += sprintf(str, "%d dasd I/O requests\n", prof->dasd_io_reqs);
 	str += sprintf(str, "with %d sectors(512B each)\n",
 		       prof->dasd_io_sects);
@@ -358,22 +235,22 @@ dasd_statistics_open(struct inode *inode, struct file *file)
 	str = dasd_statistics_array(str, prof->dasd_io_time3, shift);
 	str += sprintf(str, "# of req in chanq at enqueuing (1..32) \n");
 	str = dasd_statistics_array(str, prof->dasd_io_nr_req, shift);
-
-	info->len = str - info->data;
+	len = str - page;
 #else
-	info->len = sprintf(info->data,
-			    "Statistics are not activated in this kernel\n");
+	len = sprintf(page, "Statistics are not activated in this kernel\n");
 #endif
-	return 0;
+	return dasd_calc_metrics(page, start, off, count, eof, len);
 }
 
-static ssize_t
+static int
 dasd_statistics_write(struct file *file, const char *user_buf,
-		      size_t user_len, loff_t * offset)
+		      unsigned long user_len, void *data)
 {
 #ifdef CONFIG_DASD_PROFILE
 	char *buffer, *str;
 
+	if (user_len > 65536)
+		user_len = 65536;
 	buffer = dasd_get_user_string(user_buf, user_len);
 	MESSAGE(KERN_INFO, "/proc/dasd/statictics: '%s'", buffer);
 
@@ -415,31 +292,22 @@ out_error:
 #endif				/* CONFIG_DASD_PROFILE */
 }
 
-static struct file_operations dasd_statistics_file_ops = {
-	.owner	= THIS_MODULE,
-	.read	= dasd_generic_read,	/* read */
-	.write	= dasd_statistics_write,	/* write */
-	.open	= dasd_statistics_open,	/* open */
-	.release = dasd_generic_close,	/* close */
-};
-
-static struct inode_operations dasd_statistics_inode_ops = {
-};
-
 int
 dasd_proc_init(void)
 {
 	dasd_proc_root_entry = proc_mkdir("dasd", &proc_root);
+	dasd_proc_root_entry->owner = THIS_MODULE;
 	dasd_devices_entry = create_proc_entry("devices",
 					       S_IFREG | S_IRUGO | S_IWUSR,
 					       dasd_proc_root_entry);
 	dasd_devices_entry->proc_fops = &dasd_devices_file_ops;
-	dasd_devices_entry->proc_iops = &dasd_devices_inode_ops;
+	dasd_devices_entry->owner = THIS_MODULE;
 	dasd_statistics_entry = create_proc_entry("statistics",
 						  S_IFREG | S_IRUGO | S_IWUSR,
 						  dasd_proc_root_entry);
-	dasd_statistics_entry->proc_fops = &dasd_statistics_file_ops;
-	dasd_statistics_entry->proc_iops = &dasd_statistics_inode_ops;
+	dasd_statistics_entry->read_proc = dasd_statistics_read;
+	dasd_statistics_entry->write_proc = dasd_statistics_write;
+	dasd_statistics_entry->owner = THIS_MODULE;
 	return 0;
 }
 

@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: utmisc - common utility procedures
- *              $Revision: 87 $
+ *              $Revision: 90 $
  *
  ******************************************************************************/
 
@@ -200,39 +200,66 @@ acpi_ut_set_integer_width (
  * FUNCTION:    Acpi_ut_display_init_pathname
  *
  * PARAMETERS:  Obj_handle          - Handle whose pathname will be displayed
- *              Path                - Additional path string to be appended
+ *              Path                - Additional path string to be appended.
+ *                                      (NULL if no extra path)
  *
  * RETURN:      acpi_status
  *
- * DESCRIPTION: Display full pathnbame of an object, DEBUG ONLY
+ * DESCRIPTION: Display full pathname of an object, DEBUG ONLY
  *
  ******************************************************************************/
 
 void
 acpi_ut_display_init_pathname (
-	acpi_handle             obj_handle,
+	u8                      type,
+	acpi_namespace_node     *obj_handle,
 	char                    *path)
 {
 	acpi_status             status;
 	acpi_buffer             buffer;
 
 
-	ACPI_FUNCTION_NAME ("Ut_display_init_pathname");
+	ACPI_FUNCTION_ENTRY ();
 
+
+	/* Only print the path if the appropriate debug level is enabled */
+
+	if (!(acpi_dbg_level & ACPI_LV_INIT_NAMES)) {
+		return;
+	}
+
+	/* Get the full pathname to the node */
 
 	buffer.length = ACPI_ALLOCATE_LOCAL_BUFFER;
-
 	status = acpi_ns_handle_to_pathname (obj_handle, &buffer);
-	if (ACPI_SUCCESS (status)) {
-		if (path) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_INIT, "%s.%s\n", (char *) buffer.pointer, path));
-		}
-		else {
-			ACPI_DEBUG_PRINT ((ACPI_DB_INIT, "%s\n", (char *) buffer.pointer));
-		}
-
-		ACPI_MEM_FREE (buffer.pointer);
+	if (ACPI_FAILURE (status)) {
+		return;
 	}
+
+	/* Print what we're doing */
+
+	switch (type) {
+	case ACPI_TYPE_METHOD:
+		acpi_os_printf ("Executing  ");
+		break;
+
+	default:
+		acpi_os_printf ("Initializing ");
+		break;
+	}
+
+	/* Print the object type and pathname */
+
+	acpi_os_printf ("%-12s %s", acpi_ut_get_type_name (type), (char *) buffer.pointer);
+
+	/* Extra path is used to append names like _STA, _INI, etc. */
+
+	if (path) {
+		acpi_os_printf (".%s", path);
+	}
+	acpi_os_printf ("\n");
+
+	ACPI_MEM_FREE (buffer.pointer);
 }
 #endif
 

@@ -61,16 +61,18 @@ extern struct proc_dir_entry	*proc_net_rpc;
 
 #else
 
-static inline void svc_proc_unregister(const char *p) {}
-static inline struct proc_dir_entry*svc_proc_register(struct svc_stat *s)
-{
-	return NULL;
-}
+static inline struct proc_dir_entry *rpc_proc_register(struct rpc_stat *s) { return NULL; }
+static inline void rpc_proc_unregister(const char *p) {}
+static inline int rpc_proc_read(char *a, char **b, off_t c, int d, int *e, void *f) { return 0; }
+static inline void rpc_proc_zero(struct rpc_program *p) {}
 
-static inline int svc_proc_read(char *a, char **b, off_t c, int d, int *e, void *f)
-{
-	return 0;
-}
+static inline struct proc_dir_entry *svc_proc_register(struct svc_stat *s) { return NULL; }
+static inline void svc_proc_unregister(const char *p) {}
+static inline int svc_proc_read(char *a, char **b, off_t c, int d, int *e, void *f) { return 0; }
+static inline void svc_proc_zero(struct svc_program *p) {}
+
+#define proc_net_rpc NULL
+
 #endif
 
 #endif /* _LINUX_SUNRPC_STATS_H */

@@ -75,6 +75,19 @@
 #define PNPMSG_POWER_OFF		0x41
 #define PNPMSG_PNP_OS_ACTIVE		0x42
 #define PNPMSG_PNP_OS_INACTIVE		0x43
+/*
+ * Plug and Play BIOS flags
+ */
+#define PNP_NO_DISABLE		0x0001
+#define PNP_NO_CONFIG		0x0002
+#define PNP_OUTPUT		0x0004
+#define PNP_INPUT		0x0008
+#define PNP_BOOTABLE		0x0010
+#define PNP_DOCK		0x0020
+#define PNP_REMOVABLE		0x0040
+#define pnp_is_static(x) (x->flags & 0x0100) == 0x0000
+#define pnp_is_dynamic(x) x->flags & 0x0080
+
 /* 0x8000 through 0xffff are OEM defined */
 
 #pragma pack(1)

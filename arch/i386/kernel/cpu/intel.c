@@ -3,8 +3,9 @@
 #include <linux/string.h>
 #include <linux/bitops.h>
 #include <linux/smp.h>
+#include <linux/thread_info.h>
+
 #include <asm/processor.h>
-#include <asm/thread_info.h>
 #include <asm/msr.h>
 #include <asm/uaccess.h>
 

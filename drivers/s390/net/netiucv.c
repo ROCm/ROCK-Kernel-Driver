@@ -1,10 +1,12 @@
 /*
- * $Id: netiucv.c,v 1.17 2002/02/12 21:52:20 felfert Exp $
+ * $Id: netiucv.c,v 1.12 2002/11/26 16:00:54 mschwide Exp $
  *
  * IUCV network driver
  *
  * Copyright (C) 2001 IBM Deutschland Entwicklung GmbH, IBM Corporation
  * Author(s): Fritz Elfert (elfert@de.ibm.com, felfert@millenux.com)
+ *
+ * Driverfs integration and all bugs therein by Cornelia Huck(cohuck@de.ibm.com)
  *
  * Documentation used:
  *  the source of the original IUCV driver by:
@@ -28,7 +30,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * RELEASE-TAG: IUCV network driver $Revision: 1.17 $
+ * RELEASE-TAG: IUCV network driver $Revision: 1.12 $
  *
  */
 
@@ -45,7 +47,7 @@
 
 #include <linux/signal.h>
 #include <linux/string.h>
-#include <linux/proc_fs.h>
+#include <linux/device.h>
 
 #include <linux/ip.h>
 #include <linux/if_arp.h>
@@ -137,11 +139,7 @@ typedef struct netiucv_priv_t {
 	unsigned long           tbusy;
 	fsm_instance            *fsm;
         iucv_connection         *conn;
-	struct proc_dir_entry   *proc_dentry;
-	struct proc_dir_entry   *proc_stat_entry;
-	struct proc_dir_entry   *proc_buffer_entry;
-	struct proc_dir_entry   *proc_user_entry;
-	int                     proc_registered;
+	struct platform_device  pldev;
 } netiucv_priv;
 
 /**
@@ -540,7 +538,7 @@ netiucv_unpack_skb(iucv_connection *conn, struct sk_buff *pskb)
 		skb->protocol = pskb->protocol;
 		pskb->ip_summed = CHECKSUM_UNNECESSARY;
 		netif_rx(skb);
-#warning FIXME: [kj] Net drivers should set dev->last_rx immediately after netif_rx
+		dev->last_rx = jiffies;
 		privptr->stats.rx_packets++;
 		privptr->stats.rx_bytes += skb->len;
 		skb_pull(pskb, header->next);
@@ -1255,167 +1253,29 @@ netiucv_change_mtu (net_device * dev, int new_mtu)
 	return 0;
 }
 
-
 /**
- * procfs related structures and routines
+ * attributes in sysfs
  *****************************************************************************/
-
-static net_device *
-find_netdev_by_ino(struct proc_dir_entry *pde)
-{
-	iucv_connection *conn = connections;
-	net_device *dev = NULL;
-	netiucv_priv *privptr;
-
-	while (conn) {
-		if (conn->netdev != dev) {
-			dev = conn->netdev;
-			privptr = (netiucv_priv *)dev->priv;
-
-			if ((privptr->proc_buffer_entry == pde) ||
-			    (privptr->proc_user_entry == pde)   ||
-			    (privptr->proc_stat_entry == pde)     )
-				return dev;
-		}
-		conn = conn->next;
-	}
-	return NULL;
-}
-
 #define CTRL_BUFSIZE 40
 
-static int
-netiucv_buffer_open(struct inode *inode, struct file *file)
+static ssize_t
+user_show (struct device *dev, char *buf, size_t count, loff_t off)
 {
-	file->private_data = kmalloc(CTRL_BUFSIZE, GFP_KERNEL);
-	if (file->private_data == NULL)
-		return -ENOMEM;
-	MOD_INC_USE_COUNT;
-	return 0;
-}
+	netiucv_priv *priv = dev->driver_data;
 
-static int
-netiucv_buffer_close(struct inode *inode, struct file *file)
-{
-	kfree(file->private_data);
-	MOD_DEC_USE_COUNT;
-	return 0;
+	return off ? 0 : snprintf(buf, count, "%s\n", 
+				  netiucv_printname(priv->conn->userid));
 }
 
 static ssize_t
-netiucv_buffer_write(struct file *file, const char *buf, size_t count,
-			   loff_t *off)
+user_write (struct device *dev, const char *buf, size_t count, loff_t off)
 {
-	struct proc_dir_entry *pde = PDE(file->f_dentry->d_inode);
-	net_device   *dev;
-	netiucv_priv *privptr;
-	char         *e;
-	int          bs1;
-	char         tmp[CTRL_BUFSIZE];
-
-	if (!(dev = find_netdev_by_ino(pde)))
-		return -ENODEV;
-	if (off != &file->f_pos)
-		return -ESPIPE;
-
-	privptr = (netiucv_priv *)dev->priv;
-
-	if (count >= 39)
-		return -EINVAL;
-
-	if (copy_from_user(tmp, buf, count))
-		return -EFAULT;
-	tmp[count+1] = '\0';
-	bs1 = simple_strtoul(tmp, &e, 0);
-
-	if ((bs1 > NETIUCV_BUFSIZE_MAX) ||
-	    (e && (!isspace(*e))))
-		return -EINVAL;
-	if ((dev->flags & IFF_RUNNING) &&
-	    (bs1 < (dev->mtu + NETIUCV_HDRLEN + 2)))
-		return -EINVAL;
-	if (bs1 < (576 + NETIUCV_HDRLEN + NETIUCV_HDRLEN))
-		return -EINVAL;
-
-
-	privptr->conn->max_buffsize = bs1;
-	if (!(dev->flags & IFF_RUNNING))
-		dev->mtu = bs1 - NETIUCV_HDRLEN - NETIUCV_HDRLEN;
-	privptr->conn->flags |= CONN_FLAGS_BUFSIZE_CHANGED;
-
-	return count;
-}
-
-static ssize_t
-netiucv_buffer_read(struct file *file, char *buf, size_t count, loff_t *off)
-{
-	struct proc_dir_entry *pde = PDE(file->f_dentry->d_inode);
-	char *sbuf = (char *)file->private_data;
-	net_device *dev;
-	netiucv_priv *privptr;
-	ssize_t ret = 0;
-	char *p = sbuf;
-	int l;
-
-	if (!(dev = find_netdev_by_ino(pde)))
-		return -ENODEV;
-	if (off != &file->f_pos)
-		return -ESPIPE;
-
-	privptr = (netiucv_priv *)dev->priv;
-
-	if (file->f_pos == 0)
-		sprintf(sbuf, "%d\n", privptr->conn->max_buffsize);
-
-	l = strlen(sbuf);
-	p = sbuf;
-	if (file->f_pos < l) {
-		p += file->f_pos;
-		l = strlen(p);
-		ret = (count > l) ? l : count;
-		if (copy_to_user(buf, p, ret))
-			return -EFAULT;
-	}
-	file->f_pos += ret;
-	return ret;
-}
-
-static int
-netiucv_user_open(struct inode *inode, struct file *file)
-{
-	file->private_data = kmalloc(CTRL_BUFSIZE, GFP_KERNEL);
-	if (file->private_data == NULL)
-		return -ENOMEM;
-	MOD_INC_USE_COUNT;
-	return 0;
-}
-
-static int
-netiucv_user_close(struct inode *inode, struct file *file)
-{
-	kfree(file->private_data);
-	MOD_DEC_USE_COUNT;
-	return 0;
-}
-
-static ssize_t
-netiucv_user_write(struct file *file, const char *buf, size_t count,
-			   loff_t *off)
-{
-	struct proc_dir_entry *pde = PDE(file->f_dentry->d_inode);
-	net_device   *dev;
-	netiucv_priv *privptr;
+	netiucv_priv *priv = dev->driver_data;
+	struct net_device *ndev = container_of((void *)priv, struct net_device, priv);
 	int          i;
 	char         *p;
 	char         tmp[CTRL_BUFSIZE];
 	char         user[9];
-
-	if (!(dev = find_netdev_by_ino(pde)))
-		return -ENODEV;
-	if (off != &file->f_pos)
-		return -ESPIPE;
-
-	privptr = (netiucv_priv *)dev->priv;
 
 	if (count >= 39)
 		return -EINVAL;
@@ -1432,235 +1292,272 @@ netiucv_user_write(struct file *file, const char *buf, size_t count,
 		user[i++] = *p;
 	}
 
-	if (memcmp(user, privptr->conn->userid, 8) != 0) {
+	if (memcmp(user, priv->conn->userid, 8) != 0) {
 		/* username changed */
-		if (dev->flags & IFF_RUNNING)
+		if (ndev->flags & IFF_RUNNING)
 			return -EBUSY;
 	}
-	memcpy(privptr->conn->userid, user, 9);
+	memcpy(priv->conn->userid, user, 9);
+	return count;
+
+}
+
+static DEVICE_ATTR(user, 0644, user_show, user_write);
+
+static ssize_t
+buffer_show (struct device *dev, char *buf, size_t count, loff_t off)
+{
+	netiucv_priv *priv = dev->driver_data;
+
+	return off ? 0 : snprintf(buf, count, "%d\n", 
+				  priv->conn->max_buffsize);
+}
+
+static ssize_t
+buffer_write (struct device *dev, const char *buf, size_t count, loff_t off)
+{
+	netiucv_priv *priv = dev->driver_data;
+	struct net_device *ndev = container_of((void *)priv, struct net_device, priv);
+	char         *e;
+	int          bs1;
+	char         tmp[CTRL_BUFSIZE];
+
+	if (count >= 39)
+		return -EINVAL;
+
+	if (copy_from_user(tmp, buf, count))
+		return -EFAULT;
+	tmp[count+1] = '\0';
+	bs1 = simple_strtoul(tmp, &e, 0);
+
+	if ((bs1 > NETIUCV_BUFSIZE_MAX) ||
+	    (e && (!isspace(*e))))
+		return -EINVAL;
+	if ((ndev->flags & IFF_RUNNING) &&
+	    (bs1 < (ndev->mtu + NETIUCV_HDRLEN + 2)))
+		return -EINVAL;
+	if (bs1 < (576 + NETIUCV_HDRLEN + NETIUCV_HDRLEN))
+		return -EINVAL;
+
+
+	priv->conn->max_buffsize = bs1;
+	if (!(ndev->flags & IFF_RUNNING))
+		ndev->mtu = bs1 - NETIUCV_HDRLEN - NETIUCV_HDRLEN;
+	priv->conn->flags |= CONN_FLAGS_BUFSIZE_CHANGED;
+
+	return count;
+
+}
+
+static DEVICE_ATTR(buffer, 0644, buffer_show, buffer_write);
+
+static ssize_t
+dev_fsm_show (struct device *dev, char *buf, size_t count, loff_t off)
+{
+	netiucv_priv *priv = dev->driver_data;
+	
+	return off ? 0 : snprintf(buf, count, "%s\n",
+				  fsm_getstate_str(priv->fsm));
+}
+
+static DEVICE_ATTR(device_fsm_state, 0444, dev_fsm_show, NULL);
+
+static ssize_t
+conn_fsm_show (struct device *dev, char *buf, size_t count, loff_t off)
+{
+	netiucv_priv *priv = dev->driver_data;
+	
+	return off ? 0 : snprintf(buf, count, "%s\n",
+				  fsm_getstate_str(priv->conn->fsm));
+}
+
+static DEVICE_ATTR(connection_fsm_state, 0444, conn_fsm_show, NULL);
+
+static ssize_t
+maxmulti_show (struct device *dev, char *buf, size_t count, loff_t off)
+{
+	netiucv_priv *priv = dev->driver_data;
+	
+	return off ? 0 : snprintf(buf, count, "%ld\n",
+				  priv->conn->prof.maxmulti);
+}
+
+static ssize_t
+maxmulti_write (struct device *dev, const char *buf, size_t count, loff_t off)
+{
+	netiucv_priv *priv = dev->driver_data;
+	
+	priv->conn->prof.maxmulti = 0;
 	return count;
 }
 
+static DEVICE_ATTR(max_tx_buffer_used, 0644, maxmulti_show, maxmulti_write);
+
 static ssize_t
-netiucv_user_read(struct file *file, char *buf, size_t count, loff_t *off)
+maxcq_show (struct device *dev, char *buf, size_t count, loff_t off)
 {
-	struct proc_dir_entry *pde = PDE(file->f_dentry->d_inode);
-	char *sbuf = (char *)file->private_data;
-	net_device *dev;
-	netiucv_priv *privptr;
-	ssize_t ret = 0;
-	char *p = sbuf;
-	int l;
-
-	if (!(dev = find_netdev_by_ino(pde)))
-		return -ENODEV;
-	if (off != &file->f_pos)
-		return -ESPIPE;
-
-	privptr = (netiucv_priv *)dev->priv;
-
-
-	if (file->f_pos == 0)
-		sprintf(sbuf, "%s\n",
-			netiucv_printname(privptr->conn->userid));
-
-	l = strlen(sbuf);
-	p = sbuf;
-	if (file->f_pos < l) {
-		p += file->f_pos;
-		l = strlen(p);
-		ret = (count > l) ? l : count;
-		if (copy_to_user(buf, p, ret))
-			return -EFAULT;
-	}
-	file->f_pos += ret;
-	return ret;
-}
-
-#define STATS_BUFSIZE 2048
-
-static int
-netiucv_stat_open(struct inode *inode, struct file *file)
-{
-	file->private_data = kmalloc(STATS_BUFSIZE, GFP_KERNEL);
-	if (file->private_data == NULL)
-		return -ENOMEM;
-	MOD_INC_USE_COUNT;
-	return 0;
-}
-
-static int
-netiucv_stat_close(struct inode *inode, struct file *file)
-{
-	kfree(file->private_data);
-	MOD_DEC_USE_COUNT;
-	return 0;
+	netiucv_priv *priv = dev->driver_data;
+	
+	return off ? 0 : snprintf(buf, count, "%ld\n",
+				  priv->conn->prof.maxcqueue);
 }
 
 static ssize_t
-netiucv_stat_write(struct file *file, const char *buf, size_t count, loff_t *off)
+maxcq_write (struct device *dev, const char *buf, size_t count, loff_t off)
 {
-	struct proc_dir_entry *pde = PDE(file->f_dentry->d_inode);
-	net_device *dev;
-	netiucv_priv *privptr;
-
-	if (!(dev = find_netdev_by_ino(pde)))
-		return -ENODEV;
-	privptr = (netiucv_priv *)dev->priv;
-	privptr->conn->prof.maxmulti = 0;
-	privptr->conn->prof.maxcqueue = 0;
-	privptr->conn->prof.doios_single = 0;
-	privptr->conn->prof.doios_multi = 0;
-	privptr->conn->prof.txlen = 0;
-	privptr->conn->prof.tx_time = 0;
+	netiucv_priv *priv = dev->driver_data;
+	
+	priv->conn->prof.maxcqueue = 0;
 	return count;
 }
 
+static DEVICE_ATTR(max_chained_skbs, 0644, maxcq_show, maxcq_write);
+
 static ssize_t
-netiucv_stat_read(struct file *file, char *buf, size_t count, loff_t *off)
+sdoio_show (struct device *dev, char *buf, size_t count, loff_t off)
 {
-	struct proc_dir_entry *pde = PDE(file->f_dentry->d_inode);
-	char *sbuf = (char *)file->private_data;
-	net_device *dev;
-	netiucv_priv *privptr;
-	ssize_t ret = 0;
-	char *p = sbuf;
-	int l;
+	netiucv_priv *priv = dev->driver_data;
+	
+	return off ? 0 : snprintf(buf, count, "%ld\n",
+				  priv->conn->prof.doios_single);
+}
 
-	if (!(dev = find_netdev_by_ino(pde)))
-		return -ENODEV;
-	if (off != &file->f_pos)
-		return -ESPIPE;
+static ssize_t
+sdoio_write (struct device *dev, const char *buf, size_t count, loff_t off)
+{
+	netiucv_priv *priv = dev->driver_data;
+	
+	priv->conn->prof.doios_single = 0;
+	return count;
+}
 
-	privptr = (netiucv_priv *)dev->priv;
+static DEVICE_ATTR(tx_single_write_ops, 0644, sdoio_show, sdoio_write);
 
-	if (file->f_pos == 0) {
-		p += sprintf(p, "Device FSM state: %s\n",
-			     fsm_getstate_str(privptr->fsm));
-		p += sprintf(p, "Connection FSM state: %s\n",
-			     fsm_getstate_str(privptr->conn->fsm));
-		p += sprintf(p, "Max. TX buffer used: %ld\n",
-			     privptr->conn->prof.maxmulti);
-		p += sprintf(p, "Max. chained SKBs: %ld\n",
-			     privptr->conn->prof.maxcqueue);
-		p += sprintf(p, "TX single write ops: %ld\n",
-			     privptr->conn->prof.doios_single);
-		p += sprintf(p, "TX multi write ops: %ld\n",
-			     privptr->conn->prof.doios_multi);
-		p += sprintf(p, "Netto bytes written: %ld\n",
-			     privptr->conn->prof.txlen);
-		p += sprintf(p, "Max. TX IO-time: %ld\n",
-			     privptr->conn->prof.tx_time);
+static ssize_t
+mdoio_show (struct device *dev, char *buf, size_t count, loff_t off)
+{
+	netiucv_priv *priv = dev->driver_data;
+	
+	return off ? 0 : snprintf(buf, count, "%ld\n",
+				  priv->conn->prof.doios_multi);
+}
+
+static ssize_t
+mdoio_write (struct device *dev, const char *buf, size_t count, loff_t off)
+{
+	netiucv_priv *priv = dev->driver_data;
+	
+	priv->conn->prof.doios_multi = 0;
+	return count;
+}
+
+static DEVICE_ATTR(tx_multi_write_ops, 0644, mdoio_show, mdoio_write);
+
+static ssize_t
+txlen_show (struct device *dev, char *buf, size_t count, loff_t off)
+{
+	netiucv_priv *priv = dev->driver_data;
+	
+	return off ? 0 : snprintf(buf, count, "%ld\n",
+				  priv->conn->prof.txlen);
+}
+
+static ssize_t
+txlen_write (struct device *dev, const char *buf, size_t count, loff_t off)
+{
+	netiucv_priv *priv = dev->driver_data;
+	
+	priv->conn->prof.txlen = 0;
+	return count;
+}
+
+static DEVICE_ATTR(netto_bytes, 0644, txlen_show, txlen_write);
+
+static ssize_t
+txtime_show (struct device *dev, char *buf, size_t count, loff_t off)
+{
+	netiucv_priv *priv = dev->driver_data;
+	
+	return off ? 0 : snprintf(buf, count, "%ld\n",
+				  priv->conn->prof.tx_time);
+}
+
+static ssize_t
+txtime_write (struct device *dev, const char *buf, size_t count, loff_t off)
+{
+	netiucv_priv *priv = dev->driver_data;
+	
+	priv->conn->prof.tx_time = 0;
+	return count;
+}
+
+static DEVICE_ATTR(max_tx_io_time, 0644, txtime_show, txtime_write);
+
+static inline int
+netiucv_add_files(struct device *dev)
+{
+	int ret = 0;
+
+	if ((ret = device_create_file(dev, &dev_attr_user)) ||
+	    (ret = device_create_file(dev, &dev_attr_buffer)) ||
+	    (ret = device_create_file(dev, &dev_attr_device_fsm_state)) ||
+	    (ret = device_create_file(dev, &dev_attr_connection_fsm_state)) ||
+	    (ret = device_create_file(dev, &dev_attr_max_tx_buffer_used)) ||
+	    (ret = device_create_file(dev, &dev_attr_max_chained_skbs)) ||
+	    (ret = device_create_file(dev, &dev_attr_tx_single_write_ops)) ||
+	    (ret = device_create_file(dev, &dev_attr_tx_multi_write_ops)) ||
+	    (ret = device_create_file(dev, &dev_attr_netto_bytes)) ||
+	    (ret = device_create_file(dev, &dev_attr_max_tx_io_time))) {
+		device_remove_file(dev, &dev_attr_netto_bytes);
+		device_remove_file(dev, &dev_attr_tx_multi_write_ops);
+		device_remove_file(dev, &dev_attr_tx_single_write_ops);
+		device_remove_file(dev, &dev_attr_max_chained_skbs);
+		device_remove_file(dev, &dev_attr_max_tx_buffer_used);
+		device_remove_file(dev, &dev_attr_connection_fsm_state);
+		device_remove_file(dev, &dev_attr_device_fsm_state);
+		device_remove_file(dev, &dev_attr_buffer);
+		device_remove_file(dev, &dev_attr_user);
 	}
-	l = strlen(sbuf);
-	p = sbuf;
-	if (file->f_pos < l) {
-		p += file->f_pos;
-		l = strlen(p);
-		ret = (count > l) ? l : count;
-		if (copy_to_user(buf, p, ret))
-			return -EFAULT;
-	}
-	file->f_pos += ret;
 	return ret;
 }
 
-static struct file_operations netiucv_stat_fops = {
-	.read    = netiucv_stat_read,
-	.write   = netiucv_stat_write,
-	.open    = netiucv_stat_open,
-	.release = netiucv_stat_close,
-};
-
-static struct file_operations netiucv_buffer_fops = {
-	.read    = netiucv_buffer_read,
-	.write   = netiucv_buffer_write,
-	.open    = netiucv_buffer_open,
-	.release = netiucv_buffer_close,
-};
-
-static struct file_operations netiucv_user_fops = {
-	.read    = netiucv_user_read,
-	.write   = netiucv_user_write,
-	.open    = netiucv_user_open,
-	.release = netiucv_user_close,
-};
-
-static struct proc_dir_entry *netiucv_dir = NULL;
-static struct proc_dir_entry *netiucv_template = NULL;
-
-/**
- * Create the driver's main directory /proc/net/iucv
- */
-static void
-netiucv_proc_create_main(void)
+static int
+netiucv_register_device(struct net_device *ndev, int ifno)
 {
-	/**
-	 * If not registered, register main proc dir-entry now
-	 */
-	if (!netiucv_dir)
-		netiucv_dir = proc_mkdir("iucv", proc_net);
+	netiucv_priv *priv = ndev->priv;
+	struct platform_device *pldev = &priv->pldev;
+	int ret;
+	char *str = "netiucv";
+
+	snprintf(pldev->dev.name, DEVICE_NAME_SIZE, 
+		 "%s%x", str, ifno);
+	pldev->name = str;
+	pldev->id = ifno;
+
+	ret = platform_device_register(pldev);
+
+	if (ret)
+		return ret;
+
+	ret = netiucv_add_files(&pldev->dev);
+
+	if (ret) 
+		platform_device_unregister(pldev);
+	else
+		pldev->dev.driver_data = priv;
+	return ret;
 }
 
 #ifdef MODULE
-/**
- * Destroy /proc/net/iucv
- */
 static void
-netiucv_proc_destroy_main(void)
+netiucv_unregister_device(struct net_device *ndev)
 {
-	remove_proc_entry("iucv", proc_net);
+	netiucv_priv *priv = (netiucv_priv*)ndev->priv;
+	struct platform_device *pldev = &priv->pldev;
+	
+	platform_device_unregister(pldev);
 }
-#endif MODULE
-
-/**
- * Create a device specific subdirectory in /proc/net/iucv/ with the
- * same name like the device. In that directory, create 3 entries
- * "statistics", "buffersize" and "username".
- *
- * @param dev The device for which the subdirectory should be created.
- *
- */
-static void
-netiucv_proc_create_sub(net_device *dev) {
-	netiucv_priv *privptr = dev->priv;
-
-	privptr->proc_dentry = proc_mkdir(dev->name, netiucv_dir);
-	privptr->proc_stat_entry =
-		create_proc_entry("statistics",
-				  S_IFREG | S_IRUSR | S_IWUSR,
-				  privptr->proc_dentry);
-	privptr->proc_stat_entry->proc_fops = &netiucv_stat_fops;
-	privptr->proc_buffer_entry =
-		create_proc_entry("buffersize",
-				  S_IFREG | S_IRUSR | S_IWUSR,
-				  privptr->proc_dentry);
-	privptr->proc_buffer_entry->proc_fops = &netiucv_buffer_fops;
-	privptr->proc_user_entry =
-		create_proc_entry("username",
-				  S_IFREG | S_IRUSR | S_IWUSR,
-				  privptr->proc_dentry);
-	privptr->proc_user_entry->proc_fops = &netiucv_user_fops;
-	privptr->proc_registered = 1;
-}
-
-
-/**
- * Destroy a device specific subdirectory.
- *
- * @param privptr Pointer to device private data.
- */
-static void
-netiucv_proc_destroy_sub(netiucv_priv *privptr) {
-	if (!privptr->proc_registered)
-		return;
-	remove_proc_entry("statistics", privptr->proc_dentry);
-	remove_proc_entry("buffersize", privptr->proc_dentry);
-	remove_proc_entry("username", privptr->proc_dentry);
-	remove_proc_entry(privptr->proc_dentry->name, netiucv_dir);
-	privptr->proc_registered = 0;
-}
-
+#endif
 
 /**
  * Allocate and initialize a new connection structure.
@@ -1813,7 +1710,6 @@ netiucv_free_netdevice(net_device *dev)
 			netiucv_remove_connection(privptr->conn);
 		if (privptr->fsm)
 			kfree_fsm(privptr->fsm);
-		netiucv_proc_destroy_sub(privptr);
 		kfree(privptr);
 	}
 	kfree(dev);
@@ -1822,7 +1718,7 @@ netiucv_free_netdevice(net_device *dev)
 static void
 netiucv_banner(void)
 {
-	char vbuf[] = "$Revision: 1.17 $";
+	char vbuf[] = "$Revision: 1.12 $";
 	char *version = vbuf;
 
 	if ((version = strchr(version, ':'))) {
@@ -1858,9 +1754,9 @@ netiucv_exit(void)
 	while (connections) {
 		net_device *dev = connections->netdev;
 		unregister_netdev(dev);
+		netiucv_unregister_device(dev);
 		netiucv_free_netdevice(dev);
 	}
-	netiucv_proc_destroy_main();
 
 	printk(KERN_INFO "NETIUCV driver unloaded\n");
 	return;
@@ -1877,7 +1773,6 @@ netiucv_init(void)
 	int i = 0;
 	char username[10];
 
-	netiucv_proc_create_main();
 	while (p) {
 		if (isalnum(*p)) {
 			username[i++] = *p++;
@@ -1915,7 +1810,7 @@ netiucv_init(void)
 							netiucv_free_netdevice(dev);
 						} else {
 							printk(KERN_INFO "%s: '%s'\n", dev->name, netiucv_printname(username));
-							netiucv_proc_create_sub(dev);
+							netiucv_register_device(dev, ifno);
 							ifno++;
 						}
 					}						

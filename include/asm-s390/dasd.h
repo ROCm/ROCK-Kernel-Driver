@@ -8,6 +8,8 @@
  * any future changes wrt the API will result in a change of the APIVERSION reported
  * to userspace by the DASDAPIVER-ioctl
  *
+ * $Revision: 1.3 $
+ *
  * History of changes (starts July 2000)
  * 05/04/01 created by moving the kernel interface to drivers/s390/block/dasd_int.h
  * 12/06/01 DASD_API_VERSION 2 - binary compatible to 0 (new BIODASDINFO2)
@@ -224,8 +226,6 @@ typedef struct attrib_data_t {
 #define BIODASDSLCK    _IO(DASD_IOCTL_LETTER,4) /* steal lock */
 /* reset profiling information of a device */
 #define BIODASDPRRST   _IO(DASD_IOCTL_LETTER,5)
-/* enable PAV */
-#define BIODASDENAPAV  _IO(DASD_IOCTL_LETTER,6)
 
 
 /* retrieve API version number */

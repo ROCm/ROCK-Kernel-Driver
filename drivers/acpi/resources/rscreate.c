@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: rscreate - Create resource lists/tables
- *              $Revision: 61 $
+ *              $Revision: 62 $
  *
  ******************************************************************************/
 
@@ -286,9 +286,9 @@ acpi_rs_create_pci_routing_table (
 
 			ACPI_STRCPY (user_prt->source, obj_desc->string.pointer);
 
-			/* Add to the Length field the length of the string */
+			/* Add to the Length field the length of the string (add 1 for terminator) */
 
-			user_prt->length += obj_desc->string.length;
+			user_prt->length += obj_desc->string.length + 1;
 			break;
 
 

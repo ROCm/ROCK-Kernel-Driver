@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dsmthdat - control method arguments and local variables
- *              $Revision: 66 $
+ *              $Revision: 67 $
  *
  ******************************************************************************/
 
@@ -68,7 +68,7 @@ acpi_ds_method_data_init (
 
 	/* Init the method arguments */
 
-	for (i = 0; i < MTH_NUM_ARGS; i++) {
+	for (i = 0; i < ACPI_METHOD_NUM_ARGS; i++) {
 		ACPI_MOVE_UNALIGNED32_TO_32 (&walk_state->arguments[i].name,
 				 NAMEOF_ARG_NTE);
 		walk_state->arguments[i].name.integer |= (i << 24);
@@ -79,7 +79,7 @@ acpi_ds_method_data_init (
 
 	/* Init the method locals */
 
-	for (i = 0; i < MTH_NUM_LOCALS; i++) {
+	for (i = 0; i < ACPI_METHOD_NUM_LOCALS; i++) {
 		ACPI_MOVE_UNALIGNED32_TO_32 (&walk_state->local_variables[i].name,
 				 NAMEOF_LOCAL_NTE);
 
@@ -118,7 +118,7 @@ acpi_ds_method_data_delete_all (
 
 	/* Detach the locals */
 
-	for (index = 0; index < MTH_NUM_LOCALS; index++) {
+	for (index = 0; index < ACPI_METHOD_NUM_LOCALS; index++) {
 		if (walk_state->local_variables[index].object) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Deleting Local%d=%p\n",
 					index, walk_state->local_variables[index].object));
@@ -131,7 +131,7 @@ acpi_ds_method_data_delete_all (
 
 	/* Detach the arguments */
 
-	for (index = 0; index < MTH_NUM_ARGS; index++) {
+	for (index = 0; index < ACPI_METHOD_NUM_ARGS; index++) {
 		if (walk_state->arguments[index].object) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Deleting Arg%d=%p\n",
 					index, walk_state->arguments[index].object));
@@ -182,7 +182,7 @@ acpi_ds_method_data_init_args (
 
 	/* Copy passed parameters into the new method stack frame  */
 
-	while ((index < MTH_NUM_ARGS) && (index < max_param_count) && params[index]) {
+	while ((index < ACPI_METHOD_NUM_ARGS) && (index < max_param_count) && params[index]) {
 		/*
 		 * A valid parameter.
 		 * Store the argument in the method/walk descriptor
@@ -230,9 +230,9 @@ acpi_ds_method_data_get_node (
 	switch (opcode) {
 	case AML_LOCAL_OP:
 
-		if (index > MTH_MAX_LOCAL) {
+		if (index > ACPI_METHOD_MAX_LOCAL) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Local index %d is invalid (max %d)\n",
-				index, MTH_MAX_LOCAL));
+				index, ACPI_METHOD_MAX_LOCAL));
 			return_ACPI_STATUS (AE_AML_INVALID_INDEX);
 		}
 
@@ -243,9 +243,9 @@ acpi_ds_method_data_get_node (
 
 	case AML_ARG_OP:
 
-		if (index > MTH_MAX_ARG) {
+		if (index > ACPI_METHOD_MAX_ARG) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Arg index %d is invalid (max %d)\n",
-				index, MTH_MAX_ARG));
+				index, ACPI_METHOD_MAX_ARG));
 			return_ACPI_STATUS (AE_AML_INVALID_INDEX);
 		}
 

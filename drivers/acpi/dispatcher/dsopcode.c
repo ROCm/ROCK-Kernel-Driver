@@ -2,7 +2,7 @@
  *
  * Module Name: dsopcode - Dispatcher Op Region support and handling of
  *                         "control" opcodes
- *              $Revision: 83 $
+ *              $Revision: 84 $
  *
  *****************************************************************************/
 
@@ -173,7 +173,7 @@ acpi_ds_get_buffer_field_arguments (
 	extra_desc = acpi_ns_get_secondary_object (obj_desc);
 	node = obj_desc->buffer_field.node;
 
-	ACPI_DEBUG_EXEC(acpi_ut_display_init_pathname (node, " [Field]"));
+	ACPI_DEBUG_EXEC(acpi_ut_display_init_pathname (ACPI_TYPE_BUFFER_FIELD, node, NULL));
 	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[%4.4s] Buffer_field JIT Init\n",
 		node->name.ascii));
 
@@ -317,7 +317,7 @@ acpi_ds_get_region_arguments (
 
 	node = obj_desc->region.node;
 
-	ACPI_DEBUG_EXEC(acpi_ut_display_init_pathname (node, " [Operation Region]"));
+	ACPI_DEBUG_EXEC(acpi_ut_display_init_pathname (ACPI_TYPE_REGION, node, NULL));
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[%4.4s] Op_region Init at AML %p\n",
 		node->name.ascii, extra_desc->extra.aml_start));
