@@ -52,6 +52,7 @@
 #include <asm/isa.h>
 #endif
 #include <asm/a.out.h>
+#include <asm/ns87303.h>
 
 struct poll {
 	int fd;
@@ -373,3 +374,6 @@ EXPORT_SYMBOL(kbd_pt_regs);
 #ifdef CONFIG_DEBUG_BUGVERBOSE
 EXPORT_SYMBOL(do_BUG);
 #endif
+
+/* for ns8703 */
+EXPORT_SYMBOL(ns87303_lock);
