@@ -73,9 +73,15 @@ pxa_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 void __init time_init(void)
 {
+	struct timespec tv;
+
 	gettimeoffset = pxa_gettimeoffset;
 	set_rtc = pxa_set_rtc;
-	xtime.tv_sec = pxa_get_rtc_time();
+
+	tv.tv_nsec = 0;
+	tv.tv_sec = pxa_get_rtc_time();
+	do_settimeofday(&tv);
+
 	timer_irq.handler = pxa_timer_interrupt;
 	OSMR0 = 0;		/* set initial match at 0 */
 	OSSR = 0xf;		/* clear status on all timers */
