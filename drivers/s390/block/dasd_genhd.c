@@ -7,9 +7,9 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999-2001
  *
- * Dealing with devices registered to multiple major numbers.
+ * gendisk related functions for the dasd driver.
  *
- * $Revision: 1.38 $
+ * $Revision: 1.41 $
  */
 
 #include <linux/config.h>
@@ -24,116 +24,26 @@
 
 #include "dasd_int.h"
 
-static spinlock_t dasd_major_lock = SPIN_LOCK_UNLOCKED;
-static struct list_head dasd_major_info = LIST_HEAD_INIT(dasd_major_info);
-
-struct major_info {
-	struct list_head list;
-	int major;
-};
-
-/*
- * Register major number for the dasd driver. Call with DASD_MAJOR to
- * setup the static dasd device major 94 or with 0 to allocated a major
- * dynamically.
- */
-static int
-dasd_register_major(int major)
-{
-	struct major_info *mi;
-	int new_major;
-
-	/* Allocate major info structure. */
-	mi = kmalloc(sizeof(struct major_info), GFP_KERNEL);
-
-	/* Check if one of the allocations failed. */
-	if (mi == NULL) {
-		MESSAGE(KERN_WARNING, "%s",
-			"Cannot get memory to allocate another "
-			"major number");
-		return -ENOMEM;
-	}
-
-	/* Register block device. */
-	new_major = register_blkdev(major, "dasd");
-	if (new_major < 0) {
-		kfree(mi);
-		return new_major;
-	}
-	if (major != 0)
-		new_major = major;
-
-	/* Initialize major info structure. */
-	mi->major = new_major;
-
-	/* Insert the new major info structure into dasd_major_info list. */
-	spin_lock(&dasd_major_lock);
-	list_add_tail(&mi->list, &dasd_major_info);
-	spin_unlock(&dasd_major_lock);
-
-	return 0;
-}
-
-static void
-dasd_unregister_major(struct major_info * mi)
-{
-	int rc;
-
-	if (mi == NULL)
-		return;
-
-	/* Delete the major info from dasd_major_info. */
-	spin_lock(&dasd_major_lock);
-	list_del(&mi->list);
-	spin_unlock(&dasd_major_lock);
-
-	rc = unregister_blkdev(mi->major, "dasd");
-	if (rc < 0)
-		MESSAGE(KERN_WARNING,
-			"Cannot unregister from major no %d, rc = %d",
-			mi->major, rc);
-
-	/* Free memory. */
-	kfree(mi);
-}
-
 /*
  * Allocate and register gendisk structure for device.
  */
 int
 dasd_gendisk_alloc(struct dasd_device *device)
 {
-	struct major_info *mi;
 	struct gendisk *gdp;
-	int index, len, rc;
+	int len;
 
-	/* Make sure the major for this device exists. */
-	mi = NULL;
-	while (1) {
-		spin_lock(&dasd_major_lock);
-		index = device->devindex;
-		list_for_each_entry(mi, &dasd_major_info, list) {
-			if (index < DASD_PER_MAJOR)
-				break;
-			index -= DASD_PER_MAJOR;
-		}
-		spin_unlock(&dasd_major_lock);
-		if (index < DASD_PER_MAJOR)
-			break;
-		rc = dasd_register_major(0);
-		if (rc) {
-			DBF_EXC(DBF_ALERT, "%s", "out of major numbers!");
-			return rc;
-		}
-	}
-	
+	/* Make sure the minor for this device exists. */
+	if (device->devindex >= DASD_PER_MAJOR)
+		return -EBUSY;
+
 	gdp = alloc_disk(1 << DASD_PARTN_BITS);
 	if (!gdp)
 		return -ENOMEM;
 
 	/* Initialize gendisk structure. */
-	gdp->major = mi->major;
-	gdp->first_minor = index << DASD_PARTN_BITS;
+	gdp->major = DASD_MAJOR;
+	gdp->first_minor = device->devindex << DASD_PARTN_BITS;
 	gdp->fops = &dasd_device_operations;
 	gdp->driverfs_dev = &device->cdev->dev;
 
@@ -153,8 +63,7 @@ dasd_gendisk_alloc(struct dasd_device *device)
 	}
 	len += sprintf(gdp->disk_name + len, "%c", 'a'+(device->devindex%26));
 
- 	sprintf(gdp->devfs_name, "dasd/%04x",
-		_ccw_device_get_device_number(device->cdev));
+ 	sprintf(gdp->devfs_name, "dasd/%s", device->cdev->dev.bus_id);
 
 	if (device->ro_flag)
 		set_disk_ro(gdp, 1);
@@ -173,6 +82,7 @@ void
 dasd_gendisk_free(struct dasd_device *device)
 {
 	del_gendisk(device->gdp);
+	device->gdp->queue = 0;
 	put_disk(device->gdp);
 	device->gdp = 0;
 }
@@ -221,7 +131,7 @@ dasd_gendisk_init(void)
 	int rc;
 
 	/* Register to static dasd major 94 */
-	rc = dasd_register_major(DASD_MAJOR);
+	rc = register_blkdev(DASD_MAJOR, "dasd");
 	if (rc != 0) {
 		MESSAGE(KERN_WARNING,
 			"Couldn't register successfully to "
@@ -234,10 +144,5 @@ dasd_gendisk_init(void)
 void
 dasd_gendisk_exit(void)
 {
-	struct list_head *l, *n;
-
-	spin_lock(&dasd_major_lock);
-	list_for_each_safe(l, n, &dasd_major_info)
-		dasd_unregister_major(list_entry(l, struct major_info, list));
-	spin_unlock(&dasd_major_lock);
+	unregister_blkdev(DASD_MAJOR, "dasd");
 }
