@@ -673,12 +673,13 @@ static int __init sanity_check(struct suspend_header *sh)
 	return 0;
 }
 
-static int __init bdev_read_page(struct block_device *bdev, 
-				 long pos, void *buf)
+static struct block_device * resume_bdev;
+
+static int __init bdev_read_page(long pos, void *buf)
 {
 	struct buffer_head *bh;
 	BUG_ON (pos%PAGE_SIZE);
-	bh = __bread(bdev, pos/PAGE_SIZE, PAGE_SIZE);
+	bh = __bread(resume_bdev, pos/PAGE_SIZE, PAGE_SIZE);
 	if (!bh || (!bh->b_data)) {
 		return -1;
 	}
@@ -690,24 +691,24 @@ static int __init bdev_read_page(struct block_device *bdev,
 
 extern dev_t __init name_to_dev_t(const char *line);
 
-static int __init read_suspend_image(struct block_device *bdev, 
-				     union diskpage *cur)
+static int __init read_suspend_image(void)
 {
 	swp_entry_t next;
 	int i, nr_pgdir_pages;
+	union diskpage *cur;
+	int error = 0;
+
+	cur = (union diskpage *)get_zeroed_page(GFP_ATOMIC);
+	if (!cur)
+		return -ENOMEM;
 
 #define PREPARENEXT \
 	{	next = cur->link.next; \
 		next.val = swp_offset(next) * PAGE_SIZE; \
         }
 
-	if (bdev_read_page(bdev, 0, cur)) return -EIO;
-
-	if ((!memcmp("SWAP-SPACE",cur->swh.magic.magic,10)) ||
-	    (!memcmp("SWAPSPACE2",cur->swh.magic.magic,10))) {
-		printk(KERN_ERR "%sThis is normal swap space\n", name_resume );
-		return -EINVAL;
-	}
+	if ((error = bdev_read_page(0, cur)))
+		goto Done;
 
 	PREPARENEXT; /* We have to read next position before we overwrite it */
 
@@ -715,18 +716,25 @@ static int __init read_suspend_image(struct block_device *bdev,
 		memcpy(cur->swh.magic.magic,"SWAP-SPACE",10);
 	else if (!memcmp("S2",cur->swh.magic.magic,2))
 		memcpy(cur->swh.magic.magic,"SWAPSPACE2",10);
-	else {
-		printk("swsusp: %s: Unable to find suspended-data signature (%.10s - misspelled?\n", 
-			name_resume, cur->swh.magic.magic);
-		return -EFAULT;
+	else if ((!memcmp("SWAP-SPACE",cur->swh.magic.magic,10)) ||
+		 (!memcmp("SWAPSPACE2",cur->swh.magic.magic,10))) {
+		printk(KERN_ERR "swsusp: Partition is normal swap space\n");
+		error = -EINVAL;
+		goto Done;
+	} else {
+		printk(KERN_ERR "swsusp: Invalid partition type.\n");
+		error = -EINVAL;
+		goto Done;
 	}
 
 	printk( "%sSignature found, resuming\n", name_resume );
 	MDELAY(1000);
 
-	if (bdev_read_page(bdev, next.val, cur)) return -EIO;
-	if (sanity_check(&cur->sh)) 	/* Is this same machine? */	
-		return -EPERM;
+	if ((error = bdev_read_page(next.val, cur)))
+		goto Done;
+ 	/* Is this same machine? */
+	if ((error = sanity_check(&cur->sh)))
+		goto Done;
 	PREPARENEXT;
 
 	pagedir_save = cur->sh.suspend_pagedir;
@@ -735,8 +743,10 @@ static int __init read_suspend_image(struct block_device *bdev,
 	pagedir_order = get_bitmask_order(nr_pgdir_pages);
 
 	pagedir_nosave = (suspend_pagedir_t *)__get_free_pages(GFP_ATOMIC, pagedir_order);
-	if (!pagedir_nosave)
-		return -ENOMEM;
+	if (!pagedir_nosave) {
+		error = -ENOMEM;
+		goto Done;
+	}
 
 	PRINTK( "%sReading pagedir, ", name_resume );
 
@@ -744,15 +754,17 @@ static int __init read_suspend_image(struct block_device *bdev,
 	for (i=nr_pgdir_pages-1; i>=0; i--) {
 		BUG_ON (!next.val);
 		cur = (union diskpage *)((char *) pagedir_nosave)+i;
-		if (bdev_read_page(bdev, next.val, cur)) return -EIO;
+		error = bdev_read_page(next.val, cur);
+		if (error)
+			goto FreePagedir;
 		PREPARENEXT;
 	}
 	BUG_ON (next.val);
 
-	if (relocate_pagedir())
-		return -ENOMEM;
-	if (check_pagedir())
-		return -ENOMEM;
+	if ((error = relocate_pagedir()))
+		goto FreePagedir;
+	if ((error = check_pagedir()))
+		goto FreePagedir;
 
 	printk( "Reading image data (%d pages): ", nr_copy_pages );
 	for(i=0; i < nr_copy_pages; i++) {
@@ -761,11 +773,18 @@ static int __init read_suspend_image(struct block_device *bdev,
 			printk( "." );
 		/* You do not need to check for overlaps...
 		   ... check_pagedir already did this work */
-		if (bdev_read_page(bdev, swp_offset(swap_address) * PAGE_SIZE, (char *)((pagedir_nosave+i)->address)))
-			return -EIO;
+		error = bdev_read_page(swp_offset(swap_address) * PAGE_SIZE,
+				       (char *)((pagedir_nosave+i)->address));
+		if (error)
+			goto FreePagedir;
 	}
 	printk( "|\n" );
-	return 0;
+ Done:
+	free_page((unsigned long)cur);
+	return error;
+ FreePagedir:
+	free_pages((unsigned long)pagedir_nosave,pagedir_order);
+	goto Done;
 }
 
 /**
@@ -804,7 +823,6 @@ int swsusp_write(void)
 
 int __init swsusp_read(void)
 {
-	union diskpage *cur;
 	int error;
 	char b[BDEVNAME_SIZE];
 
@@ -815,19 +833,13 @@ int __init swsusp_read(void)
 	printk("swsusp: Resume From Partition: %s, Device: %s\n", 
 	       resume_file, __bdevname(resume_device, b));
 
-	cur = (union diskpage *)get_zeroed_page(GFP_ATOMIC);
-	if (cur) {
-		struct block_device *bdev;
-		bdev = open_by_devnum(resume_device, FMODE_READ, BDEV_RAW);
-		if (!IS_ERR(bdev)) {
-			set_blocksize(bdev, PAGE_SIZE);
-			error = read_suspend_image(bdev, cur);
-			blkdev_put(bdev, BDEV_RAW);
-		} else
-			error = PTR_ERR(bdev);
-		free_page((unsigned long)cur);
+	resume_bdev = open_by_devnum(resume_device, FMODE_READ, BDEV_RAW);
+	if (!IS_ERR(resume_bdev)) {
+		set_blocksize(resume_bdev, PAGE_SIZE);
+		error = read_suspend_image();
+		blkdev_put(resume_bdev, BDEV_RAW);
 	} else
-		error = -ENOMEM;
+		error = PTR_ERR(resume_bdev);
 
 	if (!error)
 		PRINTK("Reading resume file was successful\n");
