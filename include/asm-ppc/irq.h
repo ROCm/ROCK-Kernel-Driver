@@ -3,7 +3,6 @@
 #define _ASM_IRQ_H
 
 #include <linux/config.h>
-#include <linux/sched.h>
 #include <asm/machdep.h>		/* ppc_md */
 #include <asm/atomic.h>
 

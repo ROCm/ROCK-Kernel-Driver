@@ -107,6 +107,9 @@ int hfs_mdb_get(struct super_block *sb)
 	}
 
 	size = min(HFS_SB(sb)->alloc_blksz, (u32)PAGE_SIZE);
+	/* size must be a multiple of 512 */
+	while (size & (size - 1))
+		size -= HFS_SECTOR_SIZE;
 	sect = be16_to_cpu(mdb->drAlBlSt) + part_start;
 	/* align block size to first sector */
 	while (sect & ((size - 1) >> HFS_SECTOR_SIZE_BITS))
@@ -119,7 +122,6 @@ int hfs_mdb_get(struct super_block *sb)
 		printk("hfs_fs: unable to set blocksize to %u\n", size);
 		goto out;
 	}
-	printk("bs: %u\n", size);
 
 	bh = sb_bread512(sb, part_start + HFS_MDB_BLK, mdb);
 	if (!bh)
@@ -201,13 +203,20 @@ int hfs_mdb_get(struct super_block *sb)
 	}
 
 	attrib = mdb->drAtrb;
-	if (!(attrib & cpu_to_be16(HFS_SB_ATTRIB_CLEAN))) {
-		hfs_warn("hfs_fs: WARNING: mounting unclean filesystem.\n");
+	if (!(attrib & cpu_to_be16(HFS_SB_ATTRIB_UNMNT))
+	    || (attrib & cpu_to_be16(HFS_SB_ATTRIB_INCNSTNT))) {
+		hfs_warn("HFS-fs warning: Filesystem was not cleanly unmounted, "
+			 "running fsck.hfs is recommended.  mounting read-only.\n");
+		sb->s_flags |= MS_RDONLY;
+	}
+	if ((attrib & cpu_to_be16(HFS_SB_ATTRIB_SLOCK))) {
+		hfs_warn("HFS-fs: Filesystem is marked locked, mounting read-only.\n");
 		sb->s_flags |= MS_RDONLY;
 	}
 	if (!(sb->s_flags & MS_RDONLY)) {
 		/* Mark the volume uncleanly unmounted in case we crash */
-		mdb->drAtrb = attrib & cpu_to_be16(~HFS_SB_ATTRIB_CLEAN);
+		mdb->drAtrb = attrib & cpu_to_be16(~HFS_SB_ATTRIB_UNMNT);
+		mdb->drAtrb = attrib | cpu_to_be16(HFS_SB_ATTRIB_INCNSTNT);
 		mdb->drWrCnt = cpu_to_be32(be32_to_cpu(mdb->drWrCnt) + 1);
 		mdb->drLsMod = hfs_mtime();
 
@@ -276,7 +285,8 @@ void hfs_mdb_commit(struct super_block *sb)
 		hfs_inode_write_fork(HFS_SB(sb)->cat_tree->inode, mdb->drCTExtRec,
 				     &mdb->drCTFlSize, NULL);
 		memcpy(HFS_SB(sb)->alt_mdb, HFS_SB(sb)->mdb, HFS_SECTOR_SIZE);
-		HFS_SB(sb)->alt_mdb->drAtrb |= cpu_to_be16(HFS_SB_ATTRIB_CLEAN);
+		HFS_SB(sb)->alt_mdb->drAtrb |= cpu_to_be16(HFS_SB_ATTRIB_UNMNT);
+		HFS_SB(sb)->alt_mdb->drAtrb &= cpu_to_be16(~HFS_SB_ATTRIB_INCNSTNT);
 		mark_buffer_dirty(HFS_SB(sb)->alt_mdb_bh);
 		hfs_buffer_sync(HFS_SB(sb)->alt_mdb_bh);
 	}
@@ -315,7 +325,8 @@ void hfs_mdb_close(struct super_block *sb)
 	/* update volume attributes */
 	if (sb->s_flags & MS_RDONLY)
 		return;
-	HFS_SB(sb)->mdb->drAtrb |= cpu_to_be16(HFS_SB_ATTRIB_CLEAN);
+	HFS_SB(sb)->mdb->drAtrb |= cpu_to_be16(HFS_SB_ATTRIB_UNMNT);
+	HFS_SB(sb)->mdb->drAtrb &= cpu_to_be16(~HFS_SB_ATTRIB_INCNSTNT);
 	mark_buffer_dirty(HFS_SB(sb)->mdb_bh);
 }
 

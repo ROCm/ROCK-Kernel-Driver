@@ -234,9 +234,9 @@ out:
 static void hfsplus_get_perms(struct inode *inode, struct hfsplus_perm *perms, int dir)
 {
 	struct super_block *sb = inode->i_sb;
-	int mode;
+	u16 mode;
 
-	mode = be32_to_cpu(perms->mode) & 0xffff;
+	mode = be16_to_cpu(perms->mode);
 
 	inode->i_uid = be32_to_cpu(perms->owner);
 	if (!inode->i_uid && !mode)
@@ -254,11 +254,31 @@ static void hfsplus_get_perms(struct inode *inode, struct hfsplus_perm *perms, i
 		mode = S_IFREG | ((S_IRUGO|S_IWUGO) &
 			~(HFSPLUS_SB(sb).umask));
 	inode->i_mode = mode;
+
+	HFSPLUS_I(inode).rootflags = perms->rootflags;
+	HFSPLUS_I(inode).userflags = perms->userflags;
+	if (perms->rootflags & HFSPLUS_FLG_IMMUTABLE)
+		inode->i_flags |= S_IMMUTABLE;
+	else
+		inode->i_flags &= ~S_IMMUTABLE;
+	if (perms->rootflags & HFSPLUS_FLG_APPEND)
+		inode->i_flags |= S_APPEND;
+	else
+		inode->i_flags &= ~S_APPEND;
 }
 
 static void hfsplus_set_perms(struct inode *inode, struct hfsplus_perm *perms)
 {
-	perms->mode = cpu_to_be32(inode->i_mode);
+	if (inode->i_flags & S_IMMUTABLE)
+		perms->rootflags |= HFSPLUS_FLG_IMMUTABLE;
+	else
+		perms->rootflags &= ~HFSPLUS_FLG_IMMUTABLE;
+	if (inode->i_flags & S_APPEND)
+		perms->rootflags |= HFSPLUS_FLG_APPEND;
+	else
+		perms->rootflags &= ~HFSPLUS_FLG_APPEND;
+	perms->userflags = HFSPLUS_I(inode).userflags;
+	perms->mode = cpu_to_be16(inode->i_mode);
 	perms->owner = cpu_to_be32(inode->i_uid);
 	perms->group = cpu_to_be32(inode->i_gid);
 	perms->dev = cpu_to_be32(HFSPLUS_I(inode).dev);
@@ -328,6 +348,7 @@ struct file_operations hfsplus_file_operations = {
 	.fsync		= file_fsync,
 	.open		= hfsplus_file_open,
 	.release	= hfsplus_file_release,
+	.ioctl          = hfsplus_ioctl,
 };
 
 struct inode *hfsplus_new_inode(struct super_block *sb, int mode)
@@ -550,6 +571,10 @@ void hfsplus_cat_write_inode(struct inode *inode)
 		if (S_ISCHR(inode->i_mode) || S_ISBLK(inode->i_mode))
 			HFSPLUS_I(inode).dev = kdev_t_to_nr(inode->i_rdev);
 		hfsplus_set_perms(inode, &file->permissions);
+		if ((file->permissions.rootflags | file->permissions.userflags) & HFSPLUS_FLG_IMMUTABLE)
+			file->flags |= cpu_to_be16(HFSPLUS_FILE_LOCKED);
+		else
+			file->flags &= cpu_to_be16(~HFSPLUS_FILE_LOCKED);
 		file->access_date = hfsp_ut2mt(inode->i_atime);
 		file->content_mod_date = hfsp_ut2mt(inode->i_mtime);
 		file->attribute_mod_date = hfsp_ut2mt(inode->i_ctime);

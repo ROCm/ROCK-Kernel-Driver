@@ -60,9 +60,15 @@ struct hfsplus_unistr {
 struct hfsplus_perm {
 	u32 owner;
 	u32 group;
-	u32 mode;
+	u8  rootflags;
+	u8  userflags;
+	u16 mode;
 	u32 dev;
 } __packed;
+
+#define HFSPLUS_FLG_NODUMP	0x01
+#define HFSPLUS_FLG_IMMUTABLE	0x02
+#define HFSPLUS_FLG_APPEND	0x04
 
 /* A single contiguous area of a file */
 struct hfsplus_extent {
@@ -272,10 +278,8 @@ struct hfsplus_cat_file {
 } __packed;
 
 /* File attribute bits */
-#define kHFSFileLockedBit       0x0000
-#define kHFSFileLockedMask      0x0001
-#define kHFSThreadExistsBit     0x0001
-#define kHFSThreadExistsMask    0x0002
+#define HFSPLUS_FILE_LOCKED		0x0001
+#define HFSPLUS_FILE_THREAD_EXISTS	0x0002
 
 /* HFS+ catalog thread (part of a cat_entry) */
 struct hfsplus_cat_thread {

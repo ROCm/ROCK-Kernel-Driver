@@ -936,7 +936,7 @@ int  radeon_match_mode(struct radeonfb_info *rinfo,
 		 * (though I may be proven wrong...)
 		 */
 		if (has_rmx == 0 && rinfo->mon1_modedb)
-			if (fb_validate_mode(src, rinfo->info))
+			if (fb_validate_mode((struct fb_var_screeninfo *)src, rinfo->info))
 				return -EINVAL;
 		return 0;
 	}

@@ -54,7 +54,17 @@ static void hfsplus_cat_build_key_uni(hfsplus_btree_key *key, u32 parent,
 
 static void hfsplus_set_perms(struct inode *inode, struct hfsplus_perm *perms)
 {
-	perms->mode = cpu_to_be32(inode->i_mode);
+	if (inode->i_flags & S_IMMUTABLE)
+		perms->rootflags |= HFSPLUS_FLG_IMMUTABLE;
+	else
+		perms->rootflags &= ~HFSPLUS_FLG_IMMUTABLE;
+	if (inode->i_flags & S_APPEND)
+		perms->rootflags |= HFSPLUS_FLG_APPEND;
+	else
+		perms->rootflags &= ~HFSPLUS_FLG_APPEND;
+	HFSPLUS_I(inode).rootflags = perms->rootflags;
+	HFSPLUS_I(inode).userflags = perms->userflags;
+	perms->mode = cpu_to_be16(inode->i_mode);
 	perms->owner = cpu_to_be32(inode->i_uid);
 	perms->group = cpu_to_be32(inode->i_gid);
 }
@@ -82,14 +92,16 @@ static int hfsplus_cat_build_record(hfsplus_cat_entry *entry, u32 cnid, struct i
 		file = &entry->file;
 		memset(file, 0, sizeof(*file));
 		file->type = cpu_to_be16(HFSPLUS_FILE);
+		file->flags = cpu_to_be16(HFSPLUS_FILE_THREAD_EXISTS);
 		file->id = cpu_to_be32(cnid);
 		file->create_date = file->content_mod_date =
-			file->attribute_mod_date = file->access_date =
-			hfsp_now2mt();
+			file->attribute_mod_date = file->access_date = hfsp_now2mt();
 		if (cnid == inode->i_ino) {
 			hfsplus_set_perms(inode, &file->permissions);
 			file->user_info.fdType = cpu_to_be32(HFSPLUS_SB(inode->i_sb).type);
 			file->user_info.fdCreator = cpu_to_be32(HFSPLUS_SB(inode->i_sb).creator);
+			if ((file->permissions.rootflags | file->permissions.userflags) & HFSPLUS_FLG_IMMUTABLE)
+				file->flags |= cpu_to_be16(HFSPLUS_FILE_LOCKED);
 		} else {
 			file->user_info.fdType = cpu_to_be32(HFSP_HARDLINK_TYPE);
 			file->user_info.fdCreator = cpu_to_be32(HFSP_HFSPLUS_CREATOR);

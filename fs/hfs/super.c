@@ -106,6 +106,26 @@ static int hfs_statfs(struct super_block *sb, struct kstatfs *buf)
 	return 0;
 }
 
+int hfs_remount(struct super_block *sb, int *flags, char *data)
+{
+	if ((*flags & MS_RDONLY) == (sb->s_flags & MS_RDONLY))
+		return 0;
+	if (!(*flags & MS_RDONLY)) {
+		if (!(HFS_SB(sb)->mdb->drAtrb & cpu_to_be16(HFS_SB_ATTRIB_UNMNT))
+		    || (HFS_SB(sb)->mdb->drAtrb & cpu_to_be16(HFS_SB_ATTRIB_INCNSTNT))) {
+			printk("HFS-fs warning: Filesystem was not cleanly unmounted, "
+			       "running fsck.hfs is recommended.  leaving read-only.\n");
+			sb->s_flags |= MS_RDONLY;
+			*flags |= MS_RDONLY;
+		} else if (HFS_SB(sb)->mdb->drAtrb & cpu_to_be16(HFS_SB_ATTRIB_SLOCK)) {
+			printk("HFS-fs: Filesystem is marked locked, leaving read-only.\n");
+			sb->s_flags |= MS_RDONLY;
+			*flags |= MS_RDONLY;
+		}
+	}
+	return 0;
+}
+
 static struct inode *hfs_alloc_inode(struct super_block *sb)
 {
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
@@ -138,6 +158,7 @@ static struct super_operations hfs_super_operations = {
 	.put_super	= hfs_put_super,
 	.write_super	= hfs_write_super,
 	.statfs		= hfs_statfs,
+	.remount_fs     = hfs_remount,
 };
 
 /*

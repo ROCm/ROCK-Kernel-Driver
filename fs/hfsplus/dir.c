@@ -488,6 +488,7 @@ struct inode_operations hfsplus_dir_inode_operations = {
 struct file_operations hfsplus_dir_operations = {
 	.read		= generic_read_dir,
 	.readdir	= hfsplus_readdir,
+	.ioctl          = hfsplus_ioctl,
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
 	.llseek		= hfsplus_seek_dir,
 #else

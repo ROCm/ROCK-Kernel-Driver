@@ -161,8 +161,6 @@ struct hfsplus_sb_info {
 
 
 struct hfsplus_inode_info {
-	/* Device number in hfsplus_permissions in catalog */
-	u32 dev;
 	struct semaphore extents_lock;
 	u32 clump_blocks, alloc_blocks;
 	/* Allocation extents from catalog record or volume header */
@@ -174,6 +172,12 @@ struct hfsplus_inode_info {
 
 	struct inode *rsrc_inode;
 	unsigned long flags;
+
+	/* Device number in hfsplus_permissions in catalog */
+	u32 dev;
+	/* BSD system and user file flags */
+	u8 rootflags;
+	u8 userflags;
 
 	struct list_head open_dir_list;
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
@@ -253,6 +257,21 @@ typedef long sector_t;
 #endif
 
 /*
+ * definitions for ext2 flag ioctls (linux really needs a generic
+ * interface for this).
+ */
+
+/* ext2 ioctls (EXT2_IOC_GETFLAGS and EXT2_IOC_SETFLAGS) to support
+ * chattr/lsattr */
+#define HFSPLUS_IOC_EXT2_GETFLAGS	_IOR('f', 1, long)
+#define HFSPLUS_IOC_EXT2_SETFLAGS	_IOW('f', 2, long)
+
+#define EXT2_FLAG_IMMUTABLE		0x00000010 /* Immutable file */
+#define EXT2_FLAG_APPEND		0x00000020 /* writes to file may only append */
+#define EXT2_FLAG_NODUMP		0x00000040 /* do not dump file */
+
+
+/*
  * Functions in any *.c used in other files
  */
 
@@ -325,6 +344,7 @@ void hfsplus_file_truncate(struct inode *);
 
 /* inode.c */
 extern struct address_space_operations hfsplus_aops;
+extern struct address_space_operations hfsplus_btree_aops;
 
 void hfsplus_inode_read_fork(struct inode *, struct hfsplus_fork_raw *);
 void hfsplus_inode_write_fork(struct inode *, struct hfsplus_fork_raw *);
@@ -333,7 +353,9 @@ void hfsplus_cat_write_inode(struct inode *);
 struct inode *hfsplus_new_inode(struct super_block *, int);
 void hfsplus_delete_inode(struct inode *);
 
-extern struct address_space_operations hfsplus_btree_aops;
+/* ioctl.c */
+int hfsplus_ioctl(struct inode *inode, struct file *filp, unsigned int cmd,
+		  unsigned long arg);
 
 /* options.c */
 int parse_options(char *, struct hfsplus_sb_info *);

@@ -31,10 +31,11 @@
 /* Meanings of the drAtrb field of the MDB,
  * Reference: _Inside Macintosh: Files_ p. 2-61
  */
-#define HFS_SB_ATTRIB_HLOCK	0x0080
-#define HFS_SB_ATTRIB_CLEAN	0x0100
-#define HFS_SB_ATTRIB_SPARED	0x0200
-#define HFS_SB_ATTRIB_SLOCK	0x8000
+#define HFS_SB_ATTRIB_HLOCK	(1 << 7)
+#define HFS_SB_ATTRIB_UNMNT	(1 << 8)
+#define HFS_SB_ATTRIB_SPARED	(1 << 9)
+#define HFS_SB_ATTRIB_INCNSTNT	(1 << 11)
+#define HFS_SB_ATTRIB_SLOCK	(1 << 15)
 
 /* Some special File ID numbers */
 #define HFS_POR_CNID		1	/* Parent Of the Root */

@@ -339,42 +339,6 @@ struct fb_info;
 struct device;
 struct file;
 
-	/*
-	 * Framebuffer clients. Currently, this is only used
-	 * by fbcon to get notified of events on the framebuffer,
-	 * though that should be extended to the userland interface
-	 * some way.
-	 * 
-	 * We should also add more callbacks to better deal with
-	 * hotplug displays (add/removal notification). This is
-	 * not to replaced by a device class, though it could be
-	 * wrapped in a device interface according to the driver
-	 * model, I have to think more about it.
-	 * 
-	 * Locking rules: The callback should not take the console
-	 * semaphore explicitely (call acquire_console_sem()) as it
-	 * will typically already be owned.
-	 * 
-	 */ 
-struct fb_client_ops {	
-	struct module *owner;
-
-	/* Userland initiated mode change */
-	void	(*mode_changed)(void *data, struct fb_info *info);
-	/* The device is beeing suspended, do not access from
-	 * that point
-	 */
-	void	(*suspended)(void *data, struct fb_info *info);
-	/* The device is back to life, refresh screen
-	 */
-	void	(*resumed)(void *data, struct fb_info *info);
-};
-
-struct fb_client {
-	struct list_head	link;
-	struct fb_client_ops	*ops;
-	void			*data;
-};
 /*
  * Register/unregister for framebuffer events
  */
