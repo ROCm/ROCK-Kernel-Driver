@@ -3051,6 +3051,8 @@ static struct pci_device_id he_pci_tbl[] = {
 	{ 0, }
 };
 
+MODULE_DEVICE_TABLE(pci, he_pci_tbl);
+
 static struct pci_driver he_driver = {
 	.name =		"he",
 	.probe =	he_init_one,

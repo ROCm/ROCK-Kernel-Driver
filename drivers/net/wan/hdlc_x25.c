@@ -23,6 +23,8 @@
 #include <linux/rtnetlink.h>
 #include <linux/hdlc.h>
 
+#include <net/x25device.h>
+
 /* These functions are callbacks called by LAPB layer */
 
 static void x25_connect_disconnect(struct net_device *dev, int reason, int code)
@@ -38,11 +40,7 @@ static void x25_connect_disconnect(struct net_device *dev, int reason, int code)
 	ptr = skb_put(skb, 1);
 	*ptr = code;
 
-	skb->dev = dev;
-	skb->protocol = htons(ETH_P_X25);
-	skb->mac.raw = skb->data;
-	skb->pkt_type = PACKET_HOST;
-
+	skb->protocol = x25_type_trans(skb, dev);
 	netif_rx(skb);
 }
 
@@ -74,11 +72,7 @@ static int x25_data_indication(struct net_device *dev, struct sk_buff *skb)
 	ptr  = skb->data;
 	*ptr = 0;
 
-	skb->dev = dev;
-	skb->protocol = htons(ETH_P_X25);
-	skb->mac.raw = skb->data;
-	skb->pkt_type = PACKET_HOST;
-
+	skb->protocol = x25_type_trans(skb, dev);
 	return netif_rx(skb);
 }
 
