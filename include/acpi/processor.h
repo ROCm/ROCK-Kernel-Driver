@@ -134,6 +134,16 @@ struct acpi_processor {
 	struct acpi_processor_limit limit;
 };
 
+struct acpi_processor_errata {
+	u8			smp;
+	struct {
+		u8			throttle:1;
+		u8			fdma:1;
+		u8			reserved:6;
+		u32			bmisx;
+	}			piix4;
+};
+
 extern int acpi_processor_register_performance (
 	struct acpi_processor_performance * performance,
 	unsigned int cpu);
@@ -149,6 +159,7 @@ int acpi_processor_notify_smm(struct module *calling_module);
 
 /* for communication between multiple parts of the processor kernel module */
 extern struct acpi_processor	*processors[NR_CPUS];
+extern struct acpi_processor_errata errata;
 
 /* in processor_perflib.c */
 #ifdef CONFIG_CPU_FREQ
@@ -168,5 +179,16 @@ static inline int acpi_processor_ppc_has_changed(struct acpi_processor *pr) {
 	return 0;
 }
 #endif /* CONFIG_CPU_FREQ */
+
+/* in processor_throttling.c */
+int acpi_processor_get_throttling_info (struct acpi_processor *pr);
+int acpi_processor_set_throttling (struct acpi_processor *pr, int state);
+int acpi_processor_throttling_open_fs(struct inode *inode, struct file *file);
+ssize_t acpi_processor_write_throttling (
+        struct file		*file,
+        const char		__user *buffer,
+        size_t			count,
+        loff_t			*data);
+extern struct file_operations acpi_processor_throttling_fops;
 
 #endif

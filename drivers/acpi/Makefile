@@ -31,7 +31,7 @@ obj-$(CONFIG_ACPI_INTERPRETER)	+= osl.o utils.o \
 #
 processor_tmp-objs	+= processor.o
 ifdef CONFIG_CPU_FREQ
-processor_tmp-objs	+= processor_perflib.o
+processor_tmp-objs	+= processor_perflib.o processor_throttling.o
 endif
 
 obj-$(CONFIG_ACPI_BUS)		+= sleep/
