@@ -325,6 +325,11 @@ copy_thread (int nr, unsigned long clone_flags,
 
 	/* copy parts of thread_struct: */
 	p->thread.ksp = (unsigned long) child_stack - 16;
+
+	/* stop some PSR bits from being inherited: */
+	child_ptregs->cr_ipsr =  ((child_ptregs->cr_ipsr | IA64_PSR_BITS_TO_SET)
+				  & ~IA64_PSR_BITS_TO_CLEAR);
+
 	/*
 	 * NOTE: The calling convention considers all floating point
 	 * registers in the high partition (fph) to be scratch.  Since
