@@ -96,7 +96,7 @@ void __devinit cpu_init (void)
          * Force FPU initialization:
          */
         clear_thread_flag(TIF_USEDFPU);
-        current->used_math = 0;
+        clear_used_math();
 
         /* Setup active_mm for idle_task  */
         atomic_inc(&init_mm.mm_count);

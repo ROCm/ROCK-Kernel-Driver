@@ -383,7 +383,7 @@ ia32_setup_sigcontext(struct sigcontext_ia32 __user *sc, struct _fpstate_ia32 __
 	if (tmp < 0)
 	  err = -EFAULT;
 	else { 
-		current->used_math = 0;
+		clear_used_math();
 		stts();
 	  err |= __put_user((u32)(u64)(tmp ? fpstate : NULL), &sc->fpstate);
 	}

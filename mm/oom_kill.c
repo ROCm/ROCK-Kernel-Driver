@@ -151,7 +151,8 @@ static struct task_struct * select_bad_process(void)
 			 * This is in the process of releasing memory so wait it
 			 * to finish before killing some other task by mistake.
 			 */
-			if ((p->memdie || (p->flags & PF_EXITING)) && !(p->flags & PF_DEAD))
+			if ((unlikely(test_tsk_thread_flag(p, TIF_MEMDIE)) || (p->flags & PF_EXITING)) &&
+			    !(p->flags & PF_DEAD))
 				return ERR_PTR(-1UL);
 			if (p->flags & PF_SWAPOFF)
 				return p;
@@ -195,7 +196,7 @@ static void __oom_kill_task(task_t *p)
 	 * exit() and clear out its resources quickly...
 	 */
 	p->time_slice = HZ;
-	p->memdie = 1;
+	set_tsk_thread_flag(p, TIF_MEMDIE);
 
 	/* This process has hardware access, be more careful. */
 	if (cap_t(p->cap_effective) & CAP_TO_MASK(CAP_SYS_RAWIO)) {

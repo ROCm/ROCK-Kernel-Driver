@@ -77,6 +77,7 @@ register struct thread_info *__current_thread_info __asm__("$8");
 #define TIF_UAC_NOPRINT		6	/* see sysinfo.h */
 #define TIF_UAC_NOFIX		7
 #define TIF_UAC_SIGBUS		8
+#define TIF_MEMDIE		9
 
 #define _TIF_SYSCALL_TRACE	(1<<TIF_SYSCALL_TRACE)
 #define _TIF_NOTIFY_RESUME	(1<<TIF_NOTIFY_RESUME)

@@ -186,7 +186,7 @@ restore_sigcontext_fpu(struct pt_regs *regs, struct sigcontext __user *sc)
 	int fpvalid;
 
 	err |= __get_user (fpvalid, &sc->sc_fpvalid);
-	current->used_math = fpvalid;
+	conditional_used_math(fpvalid);
 	if (! fpvalid)
 		return err;
 
@@ -207,7 +207,7 @@ setup_sigcontext_fpu(struct pt_regs *regs, struct sigcontext __user *sc)
 	int err = 0;
 	int fpvalid;
 
-	fpvalid = current->used_math;
+	fpvalid = !!used_math();
 	err |= __put_user(fpvalid, &sc->sc_fpvalid);
 	if (! fpvalid)
 		return err;
@@ -222,7 +222,7 @@ setup_sigcontext_fpu(struct pt_regs *regs, struct sigcontext __user *sc)
 
 	err |= __copy_to_user(&sc->sc_fpregs[0], &current->thread.fpu.hard,
 			      (sizeof(long long) * 32) + (sizeof(int) * 1));
-	current->used_math = 0;
+	clear_used_math();
 
 	return err;
 }

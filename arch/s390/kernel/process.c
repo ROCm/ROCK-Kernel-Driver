@@ -216,8 +216,7 @@ void exit_thread(void)
 
 void flush_thread(void)
 {
-
-        current->used_math = 0;
+	clear_used_math();
 	clear_tsk_thread_flag(current, TIF_USEDFPU);
 }
 
