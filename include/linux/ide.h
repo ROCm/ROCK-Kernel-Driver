@@ -1098,7 +1098,7 @@ typedef struct ide_driver_s {
 	ide_startstop_t	(*do_request)(ide_drive_t *, struct request *, sector_t);
 	int		(*end_request)(ide_drive_t *, int, int);
 	ide_startstop_t	(*error)(ide_drive_t *, struct request *rq, u8, u8);
-	ide_startstop_t	(*abort)(ide_drive_t *, const char *);
+	ide_startstop_t	(*abort)(ide_drive_t *, struct request *rq);
 	int		(*ioctl)(ide_drive_t *, struct inode *, struct file *, unsigned int, unsigned long);
 	void		(*pre_reset)(ide_drive_t *);
 	sector_t	(*capacity)(ide_drive_t *);
@@ -1155,6 +1155,8 @@ ide_startstop_t __ide_error(ide_drive_t *, struct request *, u8, u8);
  * (drive, msg, status)
  */
 ide_startstop_t ide_error (ide_drive_t *drive, const char *msg, byte stat);
+
+ide_startstop_t __ide_abort(ide_drive_t *, struct request *);
 
 /*
  * Abort a running command on the controller triggering the abort

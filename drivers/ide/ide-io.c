@@ -572,6 +572,15 @@ ide_startstop_t ide_error (ide_drive_t *drive, const char *msg, u8 stat)
 
 EXPORT_SYMBOL_GPL(ide_error);
 
+ide_startstop_t __ide_abort(ide_drive_t *drive, struct request *rq)
+{
+	if (drive->media != ide_disk)
+		rq->errors |= ERROR_RESET;
+
+	DRIVER(drive)->end_request(drive, 0, 0);
+	return ide_stopped;
+}
+
 /**
  *	ide_abort	-	abort pending IDE operatins
  *	@drive: drive the error occurred on
@@ -588,28 +597,19 @@ EXPORT_SYMBOL_GPL(ide_error);
  
 ide_startstop_t ide_abort(ide_drive_t *drive, const char *msg)
 {
-	ide_hwif_t *hwif;
 	struct request *rq;
 
 	if (drive == NULL || (rq = HWGROUP(drive)->rq) == NULL)
 		return ide_stopped;
 
-	hwif = HWIF(drive);
 	/* retry only "normal" I/O: */
-	if (rq->flags & (REQ_DRIVE_CMD | REQ_DRIVE_TASK)) {
-		rq->errors = 1;
-		ide_end_drive_cmd(drive, BUSY_STAT, 0);
-		return ide_stopped;
-	}
-	if (rq->flags & REQ_DRIVE_TASKFILE) {
+	if (rq->flags & (REQ_DRIVE_CMD | REQ_DRIVE_TASK | REQ_DRIVE_TASKFILE)) {
 		rq->errors = 1;
 		ide_end_drive_cmd(drive, BUSY_STAT, 0);
 		return ide_stopped;
 	}
 
-	rq->errors |= ERROR_RESET;
-	DRIVER(drive)->end_request(drive, 0, 0);
-	return ide_stopped;
+	return drive->driver->abort(drive, rq);
 }
 
 /**

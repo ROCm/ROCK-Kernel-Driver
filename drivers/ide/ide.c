@@ -1560,8 +1560,9 @@ int generic_ide_ioctl(struct file *file, struct block_device *bdev,
 			 */
 
 			spin_lock_irqsave(&ide_lock, flags);
-			
-			DRIVER(drive)->abort(drive, "drive reset");
+
+			ide_abort(drive, "drive reset");
+
 			if(HWGROUP(drive)->handler)
 				BUG();
 				
@@ -2099,9 +2100,9 @@ static int default_attach (ide_drive_t *drive)
 	return 0;
 }
 
-static ide_startstop_t default_abort (ide_drive_t *drive, const char *msg)
+static ide_startstop_t default_abort(ide_drive_t *drive, struct request *rq)
 {
-	return ide_abort(drive, msg);
+	return __ide_abort(drive, rq);
 }
 
 static ide_startstop_t default_start_power_step(ide_drive_t *drive,
