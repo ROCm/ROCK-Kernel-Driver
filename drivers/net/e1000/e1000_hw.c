@@ -3445,7 +3445,6 @@ e1000_read_eeprom(struct e1000_hw *hw,
     uint32_t i = 0;
 
     DEBUGFUNC("e1000_read_eeprom");
-
     /* A check for invalid values:  offset too large, too many words, and not
      * enough words.
      */
@@ -5216,3 +5215,4 @@ e1000_enable_mng_pass_thru(struct e1000_hw *hw)
     }
     return FALSE;
 }
+

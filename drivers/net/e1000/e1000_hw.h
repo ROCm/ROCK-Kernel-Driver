@@ -1043,7 +1043,6 @@ struct e1000_hw {
 
 #define E1000_EEPROM_SWDPIN0   0x0001   /* SWDPIN 0 EEPROM Value */
 #define E1000_EEPROM_LED_LOGIC 0x0020   /* Led Logic Word */
-
 /* Register Bit Masks */
 /* Device Control */
 #define E1000_CTRL_FD       0x00000001  /* Full duplex.0=half; 1=full */

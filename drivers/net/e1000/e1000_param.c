@@ -235,7 +235,7 @@ struct e1000_option {
 
 static int __devinit
 e1000_validate_option(int *value, struct e1000_option *opt,
-	struct e1000_adapter *adapter)
+		struct e1000_adapter *adapter)
 {
 	if(*value == OPTION_UNSET) {
 		*value = opt->def;
@@ -256,7 +256,7 @@ e1000_validate_option(int *value, struct e1000_option *opt,
 	case range_option:
 		if(*value >= opt->arg.r.min && *value <= opt->arg.r.max) {
 			DPRINTK(PROBE, INFO,
-				"%s set to %i\n", opt->name, *value);
+					"%s set to %i\n", opt->name, *value);
 			return 0;
 		}
 		break;
@@ -449,8 +449,7 @@ e1000_check_options(struct e1000_adapter *adapter)
 			DPRINTK(PROBE, INFO, "%s turned off\n", opt.name);
 			break;
 		case 1:
-			DPRINTK(PROBE, INFO,
-				"%s set to dynamic mode\n", opt.name);
+			DPRINTK(PROBE, INFO, "%s set to dynamic mode\n", opt.name);
 			break;
 		default:
 			e1000_validate_option(&adapter->itr, &opt, adapter);
@@ -493,8 +492,9 @@ e1000_check_fiber_options(struct e1000_adapter *adapter)
 		       "parameter ignored\n");
 	}
 	if((AutoNeg[bd] != OPTION_UNSET) && (AutoNeg[bd] != 0x20)) {
-		DPRINTK(PROBE, INFO, "AutoNeg other than Full/1000 is "
-		       "not valid for fiber adapters, parameter ignored\n");
+		DPRINTK(PROBE, INFO, "AutoNeg other than 1000/Full is "
+				 "not valid for fiber adapters, "
+				 "parameter ignored\n");
 	}
 }
 
@@ -611,24 +611,24 @@ e1000_check_copper_options(struct e1000_adapter *adapter)
 		break;
 	case HALF_DUPLEX:
 		DPRINTK(PROBE, INFO, "Half Duplex specified without Speed\n");
-		DPRINTK(PROBE, INFO,
-			"Using Autonegotiation at Half Duplex only\n");
+		DPRINTK(PROBE, INFO, "Using Autonegotiation at "
+			"Half Duplex only\n");
 		adapter->hw.autoneg = adapter->fc_autoneg = 1;
 		adapter->hw.autoneg_advertised = ADVERTISE_10_HALF |
 		                                 ADVERTISE_100_HALF;
 		break;
 	case FULL_DUPLEX:
 		DPRINTK(PROBE, INFO, "Full Duplex specified without Speed\n");
-		DPRINTK(PROBE, INFO,
-			"Using Autonegotiation at Full Duplex only\n");
+		DPRINTK(PROBE, INFO, "Using Autonegotiation at "
+			"Full Duplex only\n");
 		adapter->hw.autoneg = adapter->fc_autoneg = 1;
 		adapter->hw.autoneg_advertised = ADVERTISE_10_FULL |
 		                                 ADVERTISE_100_FULL |
 		                                 ADVERTISE_1000_FULL;
 		break;
 	case SPEED_10:
-		DPRINTK(PROBE, INFO,
-			"10 Mbps Speed specified without Duplex\n");
+		DPRINTK(PROBE, INFO, "10 Mbps Speed specified "
+			"without Duplex\n");
 		DPRINTK(PROBE, INFO, "Using Autonegotiation at 10 Mbps only\n");
 		adapter->hw.autoneg = adapter->fc_autoneg = 1;
 		adapter->hw.autoneg_advertised = ADVERTISE_10_HALF |
@@ -647,10 +647,10 @@ e1000_check_copper_options(struct e1000_adapter *adapter)
 		adapter->hw.autoneg_advertised = 0;
 		break;
 	case SPEED_100:
-		DPRINTK(PROBE, INFO,
-			"100 Mbps Speed specified without Duplex\n");
-		DPRINTK(PROBE, INFO,
-			"Using Autonegotiation at 100 Mbps only\n");
+		DPRINTK(PROBE, INFO, "100 Mbps Speed specified "
+			"without Duplex\n");
+		DPRINTK(PROBE, INFO, "Using Autonegotiation at "
+			"100 Mbps only\n");
 		adapter->hw.autoneg = adapter->fc_autoneg = 1;
 		adapter->hw.autoneg_advertised = ADVERTISE_100_HALF |
 		                                 ADVERTISE_100_FULL;
@@ -668,10 +668,11 @@ e1000_check_copper_options(struct e1000_adapter *adapter)
 		adapter->hw.autoneg_advertised = 0;
 		break;
 	case SPEED_1000:
+		DPRINTK(PROBE, INFO, "1000 Mbps Speed specified without "
+			"Duplex\n");
 		DPRINTK(PROBE, INFO,
-			"1000 Mbps Speed specified without Duplex\n");
-		DPRINTK(PROBE, INFO,
-		       "Using Autonegotiation at 1000 Mbps Full Duplex only\n");
+			"Using Autonegotiation at 1000 Mbps "
+			"Full Duplex only\n");
 		adapter->hw.autoneg = adapter->fc_autoneg = 1;
 		adapter->hw.autoneg_advertised = ADVERTISE_1000_FULL;
 		break;
@@ -679,7 +680,8 @@ e1000_check_copper_options(struct e1000_adapter *adapter)
 		DPRINTK(PROBE, INFO,
 			"Half Duplex is not supported at 1000 Mbps\n");
 		DPRINTK(PROBE, INFO,
-		       "Using Autonegotiation at 1000 Mbps Full Duplex only\n");
+			"Using Autonegotiation at 1000 Mbps "
+			"Full Duplex only\n");
 		adapter->hw.autoneg = adapter->fc_autoneg = 1;
 		adapter->hw.autoneg_advertised = ADVERTISE_1000_FULL;
 		break;
@@ -696,8 +698,8 @@ e1000_check_copper_options(struct e1000_adapter *adapter)
 	/* Speed, AutoNeg and MDI/MDI-X must all play nice */
 	if (e1000_validate_mdi_setting(&(adapter->hw)) < 0) {
 		DPRINTK(PROBE, INFO,
-		       "Speed, AutoNeg and MDI-X specifications are "
-		       "incompatible. Setting MDI-X to a compatible value.\n");
+			"Speed, AutoNeg and MDI-X specifications are "
+			"incompatible. Setting MDI-X to a compatible value.\n");
 	}
 }
 
