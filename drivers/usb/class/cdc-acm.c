@@ -569,6 +569,8 @@ static int acm_probe (struct usb_interface *intf,
 				break;
 			case CDC_COUNTRY_TYPE: /* maybe somehow export */
 				break; /* for now we ignore it */
+			case CDC_HEADER_TYPE: /* maybe check version */ 
+				break; /* for now we ignore it */ 
 			case CDC_AC_MANAGEMENT_TYPE:
 				ac_management_function = buffer[3];
 				break;
@@ -580,7 +582,7 @@ static int acm_probe (struct usb_interface *intf,
 				break;
 				
 			default:
-				err("Ignoring extra header");
+				err("Ignoring extra header, type %d, length %d", buffer[2], buffer[0]);
 				break;
 			}
 next_desc:
