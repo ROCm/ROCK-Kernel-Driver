@@ -449,12 +449,16 @@ static int usX2Y_urbs_allocate(snd_usX2Y_substream_t *subs)
 	int i;
 	int is_playback = subs == subs->usX2Y->substream[SNDRV_PCM_STREAM_PLAYBACK];
 	struct usb_device *dev = subs->usX2Y->chip.dev;
+	struct usb_host_endpoint *ep;
 
 	snd_assert(!subs->prepared, return 0);
 
 	if (is_playback) {	/* allocate a temporary buffer for playback */
 		subs->datapipe = usb_sndisocpipe(dev, subs->endpoint);
-		subs->maxpacksize = dev->epmaxpacketout[subs->endpoint];
+		ep = dev->ep_out[subs->endpoint];
+		if (!ep)
+			return -EINVAL;
+		subs->maxpacksize = ep->desc.wMaxPacketSize;
 		if (NULL == subs->tmpbuf) {
 			subs->tmpbuf = kcalloc(NRPACKS, subs->maxpacksize, GFP_KERNEL);
 			if (NULL == subs->tmpbuf) {
@@ -464,7 +468,10 @@ static int usX2Y_urbs_allocate(snd_usX2Y_substream_t *subs)
 		}
 	} else {
 		subs->datapipe = usb_rcvisocpipe(dev, subs->endpoint);
-		subs->maxpacksize = dev->epmaxpacketin[subs->endpoint];
+		ep = dev->ep_in[subs->endpoint];
+		if (!ep)
+			return -EINVAL;
+		subs->maxpacksize = ep->desc.wMaxPacketSize;
 	}
 
 	/* allocate and initialize data urbs */
