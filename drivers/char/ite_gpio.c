@@ -140,7 +140,7 @@ int ite_gpio_in_status(__u32 device, __u32 mask, volatile __u32 *data)
 {
 	int ret=-1;
 
-	if (MAX_GPIO_LINE > *data >= 0) 
+	if ((MAX_GPIO_LINE > *data) && (*data >= 0)) 
 		ret=ite_gpio_irq_pending[*data];
  
 	DEB(printk("ite_gpio_in_status %d ret=%d\n",*data, ret));

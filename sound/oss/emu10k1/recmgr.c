@@ -29,19 +29,28 @@
  **********************************************************************
  */
 
+#include <asm/delay.h>
 #include "8010.h"
 #include "recmgr.h"
+
+void emu10k1_reset_record(struct emu10k1_card *card, struct wavein_buffer *buffer)
+{
+	DPF(2, "emu10k1_reset_record()\n");
+
+	sblive_writeptr(card, buffer->sizereg, 0, ADCBS_BUFSIZE_NONE);
+
+	sblive_writeptr(card, buffer->sizereg, 0, buffer->sizeregval);	
+
+	while (sblive_readptr(card, buffer->idxreg, 0))
+		udelay(5);
+}
 
 void emu10k1_start_record(struct emu10k1_card *card, struct wavein_buffer *buffer)
 {
 	DPF(2, "emu10k1_start_record()\n");
 
-	sblive_writeptr(card, buffer->sizereg, 0, buffer->sizeregval);
-
 	if (buffer->adcctl)
 		sblive_writeptr(card, ADCCR, 0, buffer->adcctl);
-
-	return;
 }
 
 void emu10k1_stop_record(struct emu10k1_card *card, struct wavein_buffer *buffer)
@@ -51,10 +60,6 @@ void emu10k1_stop_record(struct emu10k1_card *card, struct wavein_buffer *buffer
 	/* Disable record transfer */
 	if (buffer->adcctl)
 		sblive_writeptr(card, ADCCR, 0, 0);
-
-	sblive_writeptr(card, buffer->sizereg, 0, ADCBS_BUFSIZE_NONE);
-
-	return;
 }
 
 void emu10k1_set_record_src(struct emu10k1_card *card, struct wiinst *wiinst)
@@ -130,9 +135,7 @@ void emu10k1_set_record_src(struct emu10k1_card *card, struct wiinst *wiinst)
 		break;
 	}
 
-	DPD(2, "bus addx: %#x\n", buffer->dma_handle);
+	DPD(2, "bus addx: %#lx\n", (unsigned long) buffer->dma_handle);
 
-	sblive_writeptr(card, buffer->addrreg, 0, buffer->dma_handle);
-
-	return;
+	sblive_writeptr(card, buffer->addrreg, 0, (u32)buffer->dma_handle);
 }

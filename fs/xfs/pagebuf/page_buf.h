@@ -169,8 +169,8 @@ typedef page_buf_bmap_t pb_bmap_t;
  * This buffer structure is used by the page cache buffer management routines
  * to refer to an assembly of pages forming a logical buffer.  The actual
  * I/O is performed with buffer_head or bio structures, as required by drivers,
- * for drivers which do not understand this structure. The buffer structure is
- * used on temporary basis only, and discarded when released.  
+ * for drivers which do not understand this structure.	The buffer structure is
+ * used on temporary basis only, and discarded when released.
  *
  * The real data storage is recorded in the page cache.	 Metadata is
  * hashed to the inode for the block device on which the file system resides.
@@ -245,6 +245,13 @@ extern page_buf_t *pagebuf_get(		/* allocate a buffer		*/
 		page_buf_flags_t);	/* PBF_LOCK, PBF_READ,		*/
 					/* PBF_ASYNC			*/	
 
+extern page_buf_t *pagebuf_lookup(
+		struct pb_target *,
+		loff_t,			/* starting offset of range	*/
+		size_t,			/* length of range		*/
+		page_buf_flags_t);	/* PBF_READ, PBF_WRITE,		*/
+					/* PBF_FORCEIO, _PBF_LOCKABLE	*/
+
 extern page_buf_t *pagebuf_get_empty(	/* allocate pagebuf struct with */
 					/*  no memory or disk address	*/
 		struct pb_target *);	/* mount point "fake" inode	*/
@@ -300,6 +307,7 @@ static inline int pagebuf_geterror(page_buf_t *pb)
 
 extern void pagebuf_iodone(		/* mark buffer I/O complete	*/
 		page_buf_t *,		/* buffer to mark		*/
+		int,			/* use data/log helper thread.	*/
 		int);			/* run completion locally, or in
 					 * a helper thread. 		*/
 

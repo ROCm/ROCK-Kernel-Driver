@@ -121,9 +121,7 @@ bhv_lookup_unlocked(bhv_head_t *bhp, void *ops)
 {
 	bhv_desc_t	*bdp;
 
-	BHV_READ_LOCK(bhp);
 	bdp = bhv_lookup(bhp, ops);
-	BHV_READ_UNLOCK(bhp);
 
 	return bdp;
 }
@@ -140,18 +138,12 @@ bhv_base_unlocked(bhv_head_t *bhp)
 {
 	bhv_desc_t	*curdesc;
 
-	BHV_READ_LOCK(bhp);
 	for (curdesc = bhp->bh_first;
 	     curdesc != NULL;
 	     curdesc = curdesc->bd_next) {
-
-		if (curdesc->bd_next == NULL) {
-			BHV_READ_UNLOCK(bhp);
+		if (curdesc->bd_next == NULL)
 			return curdesc;
-		}
 	}
-
-	BHV_READ_UNLOCK(bhp);
 	return NULL;
 }
 

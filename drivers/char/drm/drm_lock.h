@@ -29,7 +29,6 @@
  *    Gareth Hughes <gareth@valinux.com>
  */
 
-#define __NO_VERSION__
 #include "drmP.h"
 
 int DRM(block)(struct inode *inode, struct file *filp, unsigned int cmd,

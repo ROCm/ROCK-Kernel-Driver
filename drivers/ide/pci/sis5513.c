@@ -424,6 +424,7 @@ static char* get_slaves_info(char* buffer)
 static int sis_get_info (char *buffer, char **addr, off_t offset, int count)
 {
 	char *p = buffer;
+	int len;
 	u8 reg;
 	u16 reg2, reg3;
 
@@ -494,7 +495,10 @@ static int sis_get_info (char *buffer, char **addr, off_t offset, int count)
 	p = get_masters_info(p);
 	p = get_slaves_info(p);
 
-	return p-buffer;
+	len = (p - buffer) - offset;
+	*addr = buffer + offset;
+	
+	return len > count ? count : len;
 }
 #endif /* defined(DISPLAY_SIS_TIMINGS) && defined(CONFIG_PROC_FS) */
 

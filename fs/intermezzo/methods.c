@@ -40,7 +40,6 @@
 #include <linux/smp_lock.h>
 #include <linux/blkdev.h>
 #include <linux/init.h>
-#define __NO_VERSION__
 #include <linux/module.h>
 
 #include <linux/fsfilter.h>

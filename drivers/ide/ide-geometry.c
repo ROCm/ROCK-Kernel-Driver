@@ -129,7 +129,7 @@ int ide_xlate_1024 (struct block_device *bdev, int xparm, int ptheads, const cha
 	set_capacity(drive->disk, current_capacity(drive));
 
 	if (ret)
-		printk(KERN_INFO "%s%s [%d/%d/%d]", msg, msg1,
+		printk("%s%s [%d/%d/%d]", msg, msg1,
 		       drive->bios_cyl, drive->bios_head, drive->bios_sect);
 	return ret;
 }

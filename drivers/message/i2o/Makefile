@@ -5,7 +5,6 @@
 # In the future, some of these should be built conditionally.
 #
 
-obj-$(CONFIG_I2O_PCI)	+= i2o_pci.o
 obj-$(CONFIG_I2O)	+= i2o_core.o i2o_config.o
 obj-$(CONFIG_I2O_BLOCK)	+= i2o_block.o
 obj-$(CONFIG_I2O_SCSI)	+= i2o_scsi.o

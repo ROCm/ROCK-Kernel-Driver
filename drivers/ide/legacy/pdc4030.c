@@ -256,12 +256,11 @@ int __init setup_pdc4030(ide_hwif_t *hwif)
 		if (!ident.current_tm[i+2].cyl)
 			hwif2->drives[i].noprobe = 1;
 	}
-#ifndef HWIF_PROBE_CLASSIC_METHOD
+
 	probe_hwif_init(&ide_hwifs[hwif->index]);
 	probe_hwif_init(&ide_hwifs[hwif2->index]);
-#endif /* HWIF_PROBE_CLASSIC_METHOD */
 
-        return 1;
+	return 1;
 }
 
 /*

@@ -152,13 +152,6 @@ typedef bhv_identity_t bhv_position_t;
 #define BHV_IDENTITY(bdp)	((bhv_identity_t *)(bdp)->bd_ops)
 #define BHV_POSITION(bdp)	(BHV_IDENTITY(bdp)->bi_position)
 
-
-#define BHV_READ_LOCK(bhp)
-#define BHV_READ_UNLOCK(bhp)
-#define BHV_NOT_READ_LOCKED(bhp)	1
-#define BHV_IS_WRITE_LOCKED(bhp)	1
-#define BHV_NOT_WRITE_LOCKED(bhp)	1
-
 extern void bhv_head_init(bhv_head_t *, char *);
 extern void bhv_head_destroy(bhv_head_t *);
 extern void bhv_head_reinit(bhv_head_t *);
@@ -179,8 +172,6 @@ extern void bhv_insert_initial(bhv_head_t *, bhv_desc_t *);
 	(bdp)->bd_ops = ops;				\
 	(bdp)->bd_next = NULL;				\
  }
-
-#define BHV_DESC_INIT(so,A,B)	bhv_desc_init(&(so->so_bhv),so,A,B)
 
 /*
  * Remove a behavior descriptor from a behavior chain.

@@ -126,11 +126,7 @@ typedef struct _MWAVE_IPC {
 	BOOLEAN bIsEnabled;
 	BOOLEAN bIsHere;
 	/* entry spin lock */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 	wait_queue_head_t ipc_wait_queue;
-#else
-	struct wait_queue *ipc_wait_queue;
-#endif
 } MWAVE_IPC;
 
 typedef struct _MWAVE_DEVICE_DATA {
@@ -143,7 +139,6 @@ typedef struct _MWAVE_DEVICE_DATA {
 	BOOLEAN bDSPReset;
 	MWAVE_IPC IPCs[16];
 	BOOLEAN bMwaveDevRegistered;
-	BOOLEAN bProcEntryCreated;
 	short sLine;
 
 } MWAVE_DEVICE_DATA, *pMWAVE_DEVICE_DATA;

@@ -499,6 +499,19 @@ static __init int broken_ps2_resume(struct dmi_blacklist *d)
 	return 0;
 }
 
+/*
+ *	Exploding PnPBIOS. Don't yet know if its the BIOS or us for
+ *	some entries
+ */
+
+static __init int exploding_pnp_bios(struct dmi_blacklist *d)
+{
+	printk(KERN_WARNING "%s detected. Disabling PnPBIOS\n", d->ident);
+	dmi_broken |= BROKEN_PNP_BIOS;
+	return 0;
+}
+
+
 
 /*
  *	Simple "print if true" callback
@@ -686,6 +699,13 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			MATCH(DMI_BIOS_VENDOR, "Phoenix Technologies LTD"),
 			MATCH(DMI_BIOS_VERSION, "WXPO1Z3"),
 			MATCH(DMI_BIOS_DATE, "10/26/01"), NO_MATCH
+			} },
+			
+	{ exploding_pnp_bios, "Higraded P14H", {	/* BIOSPnP problem */
+			MATCH(DMI_BIOS_VENDOR, "American Megatrends Inc."),
+			MATCH(DMI_BIOS_VERSION, "07.00T"),
+			MATCH(DMI_SYS_VENDOR, "Higraded"),
+			MATCH(DMI_PRODUCT_NAME, "P14H")
 			} },
 
 	/* Machines which have problems handling enabled local APICs */

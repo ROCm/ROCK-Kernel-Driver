@@ -1101,6 +1101,7 @@ int xfrm_lookup(struct dst_entry **dst_p, struct flowi *fl,
 	case AF_INET6:
 		/* Still not clear... */
 	default:
+		/* nothing */;
 	}
 
 restart:

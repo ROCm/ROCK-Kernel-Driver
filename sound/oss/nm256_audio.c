@@ -19,7 +19,6 @@
  *		Ported to 2.4 PCI API.
  */
 
-#define __NO_VERSION__
 #include <linux/pci.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>

@@ -1,9 +1,7 @@
 /*
  * Exported symbols for audio driver.
- * __NO_VERSION__ because this is still part of sound.o.
  */
 
-#define __NO_VERSION__
 #include <linux/module.h>
 
 char audio_syms_symbol;

@@ -69,13 +69,14 @@ struct wiinst
 	u16 fxwc;
 };
 
-#define WAVEIN_MAXBUFSIZE         65536
-#define WAVEIN_MINBUFSIZE	  368
+#define WAVEIN_MAXBUFSIZE	65536
+#define WAVEIN_MINBUFSIZE	368
 
-#define WAVEIN_DEFAULTFRAGLEN     100 
-#define WAVEIN_DEFAULTBUFLEN      1000
+#define WAVEIN_DEFAULTFRAGLEN	100 
+#define WAVEIN_DEFAULTBUFLEN	1000
 
-#define WAVEIN_MINFRAGSHIFT   	  8 
+#define WAVEIN_MINFRAGSHIFT	8 
+#define WAVEIN_MINFRAGS		2
 
 int emu10k1_wavein_open(struct emu10k1_wavedevice *);
 void emu10k1_wavein_close(struct emu10k1_wavedevice *);

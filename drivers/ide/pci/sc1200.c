@@ -87,6 +87,7 @@ static int sc1200_get_info (char *buffer, char **addr, off_t offset, int count)
 {
 	char *p = buffer;
 	unsigned long bibma = pci_resource_start(bmide_dev, 4);
+	int len;
 	u8  c0 = 0, c1 = 0;
 
 	/*
@@ -111,7 +112,10 @@ static int sc1200_get_info (char *buffer, char **addr, off_t offset, int count)
 	p += sprintf(p, "DMA\n");
 	p += sprintf(p, "PIO\n");
 
-	return p-buffer;
+	len = (p - buffer) - offset;
+	*addr = buffer + offset;
+	
+	return len > count ? count : len;
 }
 #endif /* DISPLAY_SC1200_TIMINGS && CONFIG_PROC_FS */
 

@@ -3367,7 +3367,7 @@ parse_power(struct ess_card *card, struct pci_dev *pcidev)
 	/* check to see if we have a capabilities list in
 		the config register */
 	pci_read_config_word(pcidev, PCI_STATUS, &w);
-	if(! w & PCI_STATUS_CAP_LIST) return 0;
+	if(!(w & PCI_STATUS_CAP_LIST)) return 0;
 
 	/* walk the list, starting at the head. */
 	pci_read_config_byte(pcidev,PCI_CAPABILITY_LIST,&next);

@@ -550,7 +550,7 @@ static void SMP_TIMER_NAME(neigh_periodic_timer)(unsigned long arg)
 	write_lock(&tbl->lock);
 
 	/*
-	 *	periodicly recompute ReachableTime from random function
+	 *	periodically recompute ReachableTime from random function
 	 */
 
 	if (now - tbl->last_rand > 300 * HZ) {

@@ -766,7 +766,9 @@ linvfs_put_super(
 	vfs_t			*vfsp = LINVFS_GET_VFS(sb);
 	int			error;
 
-	VFS_DOUNMOUNT(vfsp, 0, NULL, NULL, error);
+	VFS_SYNC(vfsp, SYNC_ATTR|SYNC_DELWRI, NULL, error);
+	if (error == 0)
+		VFS_UNMOUNT(vfsp, 0, NULL, error);
 	if (error) {
 		printk("XFS unmount got error %d\n", error);
 		printk("%s: vfsp/0x%p left dangling!\n", __FUNCTION__, vfsp);

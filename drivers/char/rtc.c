@@ -47,7 +47,7 @@
 
 #define RTC_VERSION		"1.11"
 
-#define RTC_IO_EXTENT	0x10	/* Only really two ports, but...	*/
+#define RTC_IO_EXTENT	0x8
 
 /*
  *	Note that *all* calls to CMOS_READ and CMOS_WRITE are done with

@@ -5,13 +5,3 @@ config DVB_CORE
 	  DVB core utility functions for device handling, software fallbacks etc.
 
 	  Say Y when you have a DVB card and want to use it. If unsure say N.
-
-config DVB_DEVFS_ONLY
-	bool "devfs only"
-	depends on DVB_CORE=y && DEVFS_FS
-	help
-	  Drop support for old major/minor device scheme and support only devfs 
-	  systems. This saves some code.
-
-	  If unsure say N.
-

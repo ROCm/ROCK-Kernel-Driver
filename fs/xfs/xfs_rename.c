@@ -467,9 +467,6 @@ xfs_rename(
 		}
 		target_ip_dropped = 1;
 
-		/* Do this test while we still hold the locks */
-		target_link_zero = (target_ip)->i_d.di_nlink==0;
-
 		if (src_is_directory) {
 			/*
 			 * Drop the link from the old "." entry.
@@ -480,6 +477,9 @@ xfs_rename(
 				goto abort_return;
 			}
 		}
+
+		/* Do this test while we still hold the locks */
+		target_link_zero = (target_ip)->i_d.di_nlink==0;
 
 	} /* target_ip != NULL */
 

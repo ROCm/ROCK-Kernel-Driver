@@ -38,7 +38,7 @@ int emu10k1_find_control_gpr(struct patch_manager *mgr, const char *patch_name, 
         struct dsp_patch *patch;
 	struct dsp_rpatch *rpatch;
 	char s[PATCH_NAME_SIZE + 4];
-	u32 *gpr_used;
+	unsigned long *gpr_used;
 	int i;
 
 	DPD(2, "emu10k1_find_control_gpr(): %s %s\n", patch_name, gpr_name);
@@ -103,7 +103,7 @@ void emu10k1_set_oss_vol(struct emu10k1_card *card, int oss_mixer,
 
 	card->ac97.mixer_state[oss_mixer] = (right << 8) | left;
 
-	if (!card->isaps)
+	if (!card->is_aps)
 		card->ac97.write_mixer(&card->ac97, oss_mixer, left, right);
 	
 	emu10k1_set_volume_gpr(card, card->mgr.ctrl_gpr[oss_mixer][0], left,
@@ -171,9 +171,8 @@ void emu10k1_set_volume_gpr(struct emu10k1_card *card, int addr, s32 vol, int sc
 {
 	struct patch_manager *mgr = &card->mgr;
 	unsigned long flags;
-	int muting;
 
-	const s32 log2lin[5] ={                  //  attenuation (dB)
+	static const s32 log2lin[4] ={           //  attenuation (dB)
 		0x7fffffff,                      //       0.0         
 		0x7fffffff * 0.840896415253715 , //       1.5          
 		0x7fffffff * 0.707106781186548,  //       3.0
@@ -183,12 +182,10 @@ void emu10k1_set_volume_gpr(struct emu10k1_card *card, int addr, s32 vol, int sc
 	if (addr < 0)
 		return;
 
-	muting = (scale == 0x10) ? 0x7f: scale;
-	
 	vol = (100 - vol ) * scale / 100;
 
 	// Thanks to the comp.dsp newsgroup for this neat trick:
-	vol = (vol >= muting) ? 0 : (log2lin[vol & 3] >> (vol >> 2));
+	vol = (vol >= scale) ? 0 : (log2lin[vol & 3] >> (vol >> 2));
 
 	spin_lock_irqsave(&mgr->lock, flags);
 	emu10k1_set_control_gpr(card, addr, vol, 0);

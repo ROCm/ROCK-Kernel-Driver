@@ -24,7 +24,6 @@
  * Super block/filesystem wide operations
  */
 
-#define __NO_VERSION__
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
