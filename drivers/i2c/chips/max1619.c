@@ -38,7 +38,6 @@ static unsigned short normal_i2c[] = { I2C_CLIENT_END };
 static unsigned short normal_i2c_range[] = { 0x18, 0x1a, 0x29, 0x2b,
 						0x4c, 0x4e, I2C_CLIENT_END };
 static unsigned int normal_isa[] = { I2C_CLIENT_ISA_END };
-static unsigned int normal_isa_range[] = { I2C_CLIENT_ISA_END };
 
 /*
  * Insmod parameters

@@ -93,14 +93,6 @@ int i2c_detect(struct i2c_adapter *adapter,
 					found = 1;
 				}
 			}
-			for (i = 0; !found && (address_data->normal_isa_range[i] != I2C_CLIENT_ISA_END); i += 3) {
-				if ((addr >= address_data->normal_isa_range[i]) &&
-				    (addr <= address_data->normal_isa_range[i + 1]) &&
-				    ((addr - address_data->normal_isa_range[i]) % address_data->normal_isa_range[i + 2] == 0)) {
-					dev_dbg(&adapter->dev, "found normal isa_range entry for adapter %d, addr %04x", adapter_id, addr);
-					found = 1;
-				}
-			}
 		} else {
 			for (i = 0; !found && (address_data->normal_i2c[i] != I2C_CLIENT_END); i += 1) {
 				if (addr == address_data->normal_i2c[i]) {

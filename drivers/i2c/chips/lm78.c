@@ -30,7 +30,6 @@
 static unsigned short normal_i2c[] = { I2C_CLIENT_END };
 static unsigned short normal_i2c_range[] = { 0x20, 0x2f, I2C_CLIENT_END };
 static unsigned int normal_isa[] = { 0x0290, I2C_CLIENT_ISA_END };
-static unsigned int normal_isa_range[] = { I2C_CLIENT_ISA_END };
 
 /* Insmod parameters */
 SENSORS_INSMOD_3(lm78, lm78j, lm79);

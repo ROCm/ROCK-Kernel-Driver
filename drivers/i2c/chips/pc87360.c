@@ -45,7 +45,6 @@
 static unsigned short normal_i2c[] = { I2C_CLIENT_END };
 static unsigned short normal_i2c_range[] = { I2C_CLIENT_END };
 static unsigned int normal_isa[] = { 0, I2C_CLIENT_ISA_END };
-static unsigned int normal_isa_range[] = { I2C_CLIENT_ISA_END };
 static struct i2c_force_data forces[] = {{ NULL }};
 static u8 devid;
 static unsigned int extra_isa[3];
@@ -56,7 +55,6 @@ static struct i2c_address_data addr_data = {
 	.normal_i2c		= normal_i2c,
 	.normal_i2c_range	= normal_i2c_range,
 	.normal_isa		= normal_isa,
-	.normal_isa_range	= normal_isa_range,
 	.forces			= forces,
 };
 

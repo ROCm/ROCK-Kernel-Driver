@@ -47,7 +47,6 @@
 static unsigned short normal_i2c[] = { 0x2c, 0x2d, I2C_CLIENT_END };
 static unsigned short normal_i2c_range[] = { I2C_CLIENT_END };
 static unsigned int normal_isa[] = { I2C_CLIENT_ISA_END };
-static unsigned int normal_isa_range[] = { I2C_CLIENT_ISA_END };
 
 /* Insmod parameters */
 SENSORS_INSMOD_2(gl518sm_r00, gl518sm_r80);
