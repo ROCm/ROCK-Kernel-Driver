@@ -105,7 +105,7 @@ static int b1pcmcia_add_card(unsigned int port, unsigned irq,
 	cinfo->capi_ctrl.procinfo      = b1pcmcia_procinfo;
 	cinfo->capi_ctrl.ctr_read_proc = b1ctl_read_proc;
 	strcpy(cinfo->capi_ctrl.name, card->name);
-	SET_MODULE_OWNER(&cinfo->capi_ctrl);
+	cinfo->capi_ctrl.owner = THIS_MODULE;
 
 	retval = attach_capi_ctr(&cinfo->capi_ctrl);
 	if (retval) {

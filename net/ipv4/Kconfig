@@ -125,13 +125,6 @@ config IP_ROUTE_VERBOSE
 	  handled by the klogd daemon which is responsible for kernel messages
 	  ("man klogd").
 
-config IP_ROUTE_LARGE_TABLES
-	bool "IP: large routing tables"
-	depends on IP_ADVANCED_ROUTER
-	help
-	  If you have routing zones that grow to more than about 64 entries,
-	  you may want to say Y here to speed up the routing process.
-
 config IP_PNP
 	bool "IP: kernel level autoconfiguration"
 	depends on INET

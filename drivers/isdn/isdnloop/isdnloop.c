@@ -1450,7 +1450,7 @@ isdnloop_initcard(char *id)
 		return (isdnloop_card *) 0;
 	}
 	memset((char *) card, 0, sizeof(isdnloop_card));
-	SET_MODULE_OWNER(&card->interface);
+	card->interface.owner = THIS_MODULE;
 	card->interface.channels = ISDNLOOP_BCH;
 	card->interface.hl_hdrlen  = 1; /* scratch area for storing ack flag*/ 
 	card->interface.maxbufsize = 4000;

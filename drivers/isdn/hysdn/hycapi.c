@@ -778,7 +778,7 @@ hycapi_capi_create(hysdn_card *card)
 		ctrl->procinfo      = hycapi_procinfo;
 		ctrl->ctr_read_proc = hycapi_read_proc;
 		strcpy(ctrl->name, cinfo->cardname);
-		SET_MODULE_OWNER(ctrl);
+		ctrl->owner = THIS_MODULE;
 
 		retval = attach_capi_ctr(ctrl);
 		if (retval) {

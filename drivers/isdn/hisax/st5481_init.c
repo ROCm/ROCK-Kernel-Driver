@@ -80,7 +80,7 @@ static int probe_st5481(struct usb_interface *intf,
 	adapter->number_of_leds = number_of_leds;
 	adapter->usb_dev = dev;
 
-	SET_MODULE_OWNER(&adapter->hisax_d_if);
+	adapter->hisax_d_if.owner = THIS_MODULE;
 	adapter->hisax_d_if.ifc.priv = adapter;
 	adapter->hisax_d_if.ifc.l2l1 = st5481_d_l2l1;
 

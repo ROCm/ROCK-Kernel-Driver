@@ -7,6 +7,8 @@
 #ifndef _NET_FLOW_H
 #define _NET_FLOW_H
 
+#include <linux/in6.h>
+
 struct flowi {
 	int	oif;
 	int	iif;
@@ -21,8 +23,8 @@ struct flowi {
 		} ip4_u;
 		
 		struct {
-			struct in6_addr *	daddr;
-			struct in6_addr *	saddr;
+			struct in6_addr		daddr;
+			struct in6_addr		saddr;
 			__u32			flowlabel;
 		} ip6_u;
 

@@ -80,7 +80,7 @@ void ipv6_local_error(struct sock *sk, int err, struct flowi *fl, u32 info)
 
 	iph = (struct ipv6hdr*)skb_put(skb, sizeof(struct ipv6hdr));
 	skb->nh.ipv6h = iph;
-	ipv6_addr_copy(&iph->daddr, fl->fl6_dst);
+	ipv6_addr_copy(&iph->daddr, &fl->fl6_dst);
 
 	serr = SKB_EXT_ERR(skb);
 	serr->ee.ee_errno = err;
@@ -297,7 +297,8 @@ int datagram_send_ctl(struct msghdr *msg, struct flowi *fl,
 					goto exit_f;
 				}
 
-				fl->fl6_src = &src_info->ipi6_addr;
+				ipv6_addr_copy(&fl->fl6_src,
+					       &src_info->ipi6_addr);
 			}
 
 			break;
