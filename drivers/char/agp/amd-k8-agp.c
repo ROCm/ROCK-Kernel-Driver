@@ -20,35 +20,6 @@
 #include <linux/agp_backend.h>
 #include "agp.h"
 
-static u_int64_t pci_read64 (struct pci_dev *dev, int reg)
-{
-	union {
-		u64 full;
-		struct {
-			u32 high;
-			u32 low;
-		} split;
-	} tmp;
-	pci_read_config_dword(dev, reg, &tmp.split.high);
-	pci_read_config_dword(dev, reg+4, &tmp.split.low);
-	return tmp.full;
-}
-
-static void pci_write64 (struct pci_dev *dev, int reg, u64 value)
-{
-	union {
-		u64 full;
-		struct {
-			u32 high;
-			u32 low;
-		} split;
-	} tmp;
-	tmp.full = value;
-	pci_write_config_dword(dev, reg, tmp.split.high);
-	pci_write_config_dword(dev, reg+4, tmp.split.low);
-}
-
-
 static int x86_64_insert_memory(agp_memory * mem, off_t pg_start, int type)
 {
 	int i, j, num_entries;
@@ -222,9 +193,6 @@ static struct aper_size_info_32 amd_8151_sizes[7] =
 static int amd_8151_configure(void)
 {
 	struct pci_dev *dev, *hammer=NULL;
-	int current_size;
-	int tmp, tmp2, i;
-	u64 aperbar;
 	unsigned long gatt_bus = virt_to_phys(agp_bridge->gatt_table_real);
 
 	/* Configure AGP regs in each x86-64 host bridge. */
@@ -242,44 +210,8 @@ static int amd_8151_configure(void)
 		}
 	}
 
-	if (hammer == NULL) {
+	if (hammer == NULL)
 		return -ENODEV;
-	}
-
-	/* Shadow x86-64 registers into 8151 registers. */
-
-	dev = agp_bridge->dev;
-	if (!dev) 
-		return -ENODEV;
-
-	current_size = amd_x86_64_fetch_size();
-
-	pci_read_config_dword(dev, AMD_8151_APERTURESIZE, &tmp);
-	tmp &= ~(0xfff);
-
-	/* translate x86-64 size bits to 8151 size bits*/
-	for (i=0 ; i<7; i++) {
-		if (amd_8151_sizes[i].size == current_size)
-			tmp |= (amd_8151_sizes[i].size_value) << 3;
-	}
-	pci_write_config_dword(dev, AMD_8151_APERTURESIZE, tmp);
-
-	pci_read_config_dword (hammer, AMD_X86_64_GARTAPERTUREBASE, &tmp);
-	aperbar = pci_read64 (dev, AMD_8151_VMAPERTURE);
-	aperbar |= (tmp & 0x7fff) <<25;
-	aperbar &= 0x000000ffffffffff;
-	aperbar |= 1<<2;	/* This address is a 64bit ptr FIXME: Make conditional in 32bit mode */
-	pci_write64 (dev, AMD_8151_VMAPERTURE, aperbar);
-
-	pci_read_config_dword(dev, AMD_8151_AGP_CTL , &tmp);
-	tmp &= ~(AMD_8151_GTLBEN | AMD_8151_APEREN);
-	
-	pci_read_config_dword(hammer, AMD_X86_64_GARTAPERTURECTL, &tmp2);
-	if (tmp2 & AMD_X86_64_GARTEN)
-		tmp |= AMD_8151_APEREN;
-	// FIXME: bit 7 of AMD_8151_AGP_CTL (GTLBEN) must be copied if set.
-	// But where is it set ?
-	pci_write_config_dword(dev, AMD_8151_AGP_CTL, tmp);
 
 	return 0;
 }
@@ -298,15 +230,6 @@ static void amd_8151_cleanup(void)
 			pci_read_config_dword (dev, AMD_X86_64_GARTAPERTURECTL, &tmp);
 			tmp &= ~(AMD_X86_64_GARTEN);
 			pci_write_config_dword (dev, AMD_X86_64_GARTAPERTURECTL, tmp);
-		}
-
-		/* Now shadow the disable in the 8151 */
-		if (dev->vendor == PCI_VENDOR_ID_AMD &&
-			dev->device == PCI_DEVICE_ID_AMD_8151_0) {
-
-			pci_read_config_dword (dev, AMD_8151_AGP_CTL, &tmp);
-			tmp &= ~(AMD_8151_APEREN);	
-			pci_write_config_dword (dev, AMD_8151_AGP_CTL, tmp);
 		}
 	}
 }
