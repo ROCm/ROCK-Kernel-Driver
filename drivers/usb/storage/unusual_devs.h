@@ -605,8 +605,8 @@ UNUSUAL_DEV( 0x0a17, 0x0004, 0x1000, 0x1000,
 /* Submitted by Per Winkvist <per.winkvist@uk.com> */
 UNUSUAL_DEV( 0x0a17, 0x006, 0x1000, 0x9009,
                 "Pentax",
-                "Optio S",
-                US_SC_8070, US_PR_CBI, NULL,
+                "Optio S/S4",
+                US_SC_DEVICE, US_PR_DEVICE, NULL,
                 US_FL_FIX_INQUIRY ),
 		
 #ifdef CONFIG_USB_STORAGE_ISD200
