@@ -245,10 +245,6 @@ static void coda_clear_inode(struct inode *inode)
 {
 	struct coda_inode_info *cii = ITOC(inode);
 
-        CDEBUG(D_SUPER, " inode->ino: %ld, count: %d\n", 
-	       inode->i_ino, atomic_read(&inode->i_count));        
-	CDEBUG(D_DOWNCALL, "clearing inode: %ld, %x\n", inode->i_ino, cii->c_flags);
-
 	if (cii->c_container) BUG();
 	
         list_del_init(&cii->c_cilist);
@@ -264,9 +260,9 @@ int coda_notify_change(struct dentry *de, struct iattr *iattr)
 	
         memset(&vattr, 0, sizeof(vattr)); 
 
+	inode->i_ctime = CURRENT_TIME;
         coda_iattr_to_vattr(iattr, &vattr);
         vattr.va_type = C_VNON; /* cannot set type */
-	CDEBUG(D_SUPER, "vattr.va_mode %o\n", vattr.va_mode);
 
 	/* Venus is responsible for truncating the container-file!!! */
 	error = venus_setattr(inode->i_sb, coda_i2f(inode), &vattr);
@@ -275,7 +271,6 @@ int coda_notify_change(struct dentry *de, struct iattr *iattr)
 	        coda_vattr_to_iattr(inode, &vattr); 
 		coda_cache_clear_inode(inode);
 	}
-	CDEBUG(D_SUPER, "inode.i_mode %o, error %d\n", inode->i_mode, error);
 
 	return error;
 }

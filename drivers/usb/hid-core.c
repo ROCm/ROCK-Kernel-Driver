@@ -1048,6 +1048,7 @@ static void hid_irq_out(struct urb *urb)
 
 	if (hid->outhead != hid->outtail) {
 		hid_submit_out(hid);
+		spin_unlock_irqrestore(&hid->outlock, flags);
 		return;
 	}
 
@@ -1079,6 +1080,7 @@ static void hid_ctrl(struct urb *urb)
 
 	if (hid->ctrlhead != hid->ctrltail) {
 		hid_submit_ctrl(hid);
+		spin_unlock_irqrestore(&hid->ctrllock, flags);
 		return;
 	}
 

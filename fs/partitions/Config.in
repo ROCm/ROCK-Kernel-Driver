@@ -38,7 +38,7 @@ else
    fi
    if [ "$CONFIG_AMIGA" != "y" -a "$CONFIG_ATARI" != "y" -a \
         "$CONFIG_MAC" != "y" -a "$CONFIG_SGI_IP22" != "y" -a \
-	"$CONFIG_SGI_IP27" != "y" ]; then
+	"$CONFIG_ARM" != "y" -a "$CONFIG_SGI_IP27" != "y" ]; then
       define_bool CONFIG_MSDOS_PARTITION y
    fi
    if [ "$CONFIG_AMIGA" = "y" -o "$CONFIG_AFFS_FS" = "y" ]; then

@@ -41,6 +41,7 @@
 #include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/smp.h>
+#include <linux/module.h>
 
 #include <asm/io.h>
 #include <asm/smp.h>

@@ -352,7 +352,7 @@ struct transaction_s
 	 */
 	struct journal_head *	t_async_datalist;
 	
-	/* Doubly-linked circular list of all forget buffers (superceded
+	/* Doubly-linked circular list of all forget buffers (superseded
            buffers which we can un-checkpoint once this transaction
            commits) */
 	struct journal_head *	t_forget;
@@ -793,7 +793,7 @@ extern int journal_blocks_per_page(struct inode *inode);
 #define BJ_SyncData	1	/* Normal data: flush before commit */
 #define BJ_AsyncData	2	/* writepage data: wait on it before commit */
 #define BJ_Metadata	3	/* Normal journaled metadata */
-#define BJ_Forget	4	/* Buffer superceded by this transaction */
+#define BJ_Forget	4	/* Buffer superseded by this transaction */
 #define BJ_IO		5	/* Buffer is for temporary IO use */
 #define BJ_Shadow	6	/* Buffer contents being shadowed to the log */
 #define BJ_LogCtl	7	/* Buffer contains log descriptors */

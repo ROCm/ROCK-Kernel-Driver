@@ -207,7 +207,8 @@ static int __init acq_init(void)
 	printk("WDT driver for Acquire single board computer initialising.\n");
 
 	spin_lock_init(&acq_lock);
-	misc_register(&acq_miscdev);
+	if (misc_register(&acq_miscdev))
+		return -ENODEV;
 	request_region(WDT_STOP, 1, "Acquire WDT");
 	request_region(WDT_START, 1, "Acquire WDT");
 	register_reboot_notifier(&acq_notifier);

@@ -341,7 +341,9 @@ static cache_sizes_t cache_sizes[] = {
 	{    32,	NULL, NULL},
 #endif
 	{    64,	NULL, NULL},
+	{    96,	NULL, NULL},
 	{   128,	NULL, NULL},
+	{   192,	NULL, NULL},
 	{   256,	NULL, NULL},
 	{   512,	NULL, NULL},
 	{  1024,	NULL, NULL},
@@ -364,7 +366,9 @@ static struct {
 	CN("size-32"),
 #endif
 	CN("size-64"),
+	CN("size-96"),
 	CN("size-128"),
+	CN("size-192"),
 	CN("size-256"),
 	CN("size-512"),
 	CN("size-1024"),

@@ -53,7 +53,7 @@ int sr_read_sector(int minor, int lba, int blksize, unsigned char *dest);
 int sr_is_xa(int minor);
 
 /* sr_vendor.c */
-void sr_vendor_init(int minor);
+void sr_vendor_init(Scsi_CD *);
 int sr_cd_check(struct cdrom_device_info *);
 int sr_set_blocklength(int minor, int blocklength);
 

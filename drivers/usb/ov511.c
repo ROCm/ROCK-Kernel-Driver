@@ -1,7 +1,7 @@
 /*
  * OmniVision OV511 Camera-to-USB Bridge Driver
  *
- * Copyright (c) 1999-2001 Mark W. McClelland
+ * Copyright (c) 1999-2002 Mark W. McClelland
  * Original decompression code Copyright 1998-2000 OmniVision Technologies
  * Many improvements by Bret Wallach <bwallac1@san.rr.com>
  * Color fixes by by Orion Sky Lawlor <olawlor@acm.org> (2/26/2000)
@@ -10,6 +10,8 @@
  * Changes by Claudio Matsuoka <claudio@conectiva.com>
  * Original SAA7111A code by Dave Perks <dperks@ibm.net>
  * Kernel I2C interface adapted from nt1003 driver
+ * URB error messages from pwc driver by Nemosoft
+ * generic_ioctl() code from videodev.c by Gerd Knorr and Alan Cox
  *
  * Based on the Linux CPiA driver written by Peter Pregler,
  * Scott J. Bertin and Johannes Erdfelt.
@@ -53,21 +55,34 @@
 	#include <asm/cpufeature.h>
 #endif
 
+/* A new implementation of the V4L 1 API exists that gives drivers direct
+ * access to file_operations. The old API is compatible with all 2.2 and 2.4
+ * kernels, and all 2.5 kernels through 2.5.5 (at least).
+ *
+ * Remove this #define to enable the new API
+ *
+ * Note: This has nothing to do with the V4L 2 API.
+ */
+#define OV511_OLD_V4L
+
 #include "ov511.h"
 
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v1.49 for Linux 2.5"
+#define DRIVER_VERSION "v1.53 for Linux 2.5"
 #define EMAIL "mmcclell@bigfoot.com"
 #define DRIVER_AUTHOR "Mark McClelland <mmcclell@bigfoot.com> & Bret Wallach \
 	& Orion Sky Lawlor <olawlor@acm.org> & Kevin Moore & Charl P. Botha \
 	<cpbotha@ieee.org> & Claudio Matsuoka <claudio@conectiva.com>"
-#define DRIVER_DESC "OV511 USB Camera Driver"
+#define DRIVER_DESC "ov511 USB Camera Driver"
 
 #define OV511_I2C_RETRIES 3
 #define ENABLE_Y_QUANTABLE 1
 #define ENABLE_UV_QUANTABLE 1
+
+/* If you change this, you must also change the MODULE_PARM definition */
+#define OV511_MAX_UNIT_VIDEO 16
 
 /* Pixel count * 3 bytes for RGB */
 #define MAX_FRAME_SIZE(w, h) ((w) * (h) * 3)
@@ -78,128 +93,55 @@
 
 #define FATAL_ERROR(rc) ((rc) < 0 && (rc) != -EPERM)
 
-/* PARAMETER VARIABLES: */
-/* (See ov511.txt for detailed descriptions of these.) */
+/**********************************************************************
+ * Module Parameters
+ * (See ov511.txt for detailed descriptions of these)
+ **********************************************************************/
 
-/* Sensor automatically changes brightness */
-static int autobright = 1;
-
-/* Sensor automatically changes gain */
-static int autogain = 1;
-
-/* Sensor automatically changes exposure */
-static int autoexp = 1;
-
-/* 0=no debug messages
- * 1=init/detection/unload and other significant messages,
- * 2=some warning messages
- * 3=config/control function calls
- * 4=most function calls and data parsing messages
- * 5=highly repetitive mesgs
- * NOTE: This should be changed to 0, 1, or 2 for production kernels
- */
-static int debug; /* = 0 */
-
-/* Fix vertical misalignment of red and blue at 640x480 */
-static int fix_rgb_offset; /* = 0 */
-
-/* Snapshot mode enabled flag */
-static int snapshot; /* = 0 */
-
-/* Force image to be read in RGB instead of BGR. This option allow
- * programs that expect RGB data (e.g. gqcam) to work with this driver. */
-static int force_rgb; /* = 0 */
-
-/* Number of seconds before inactive buffers are deallocated */
-static int buf_timeout = 5;
-
-/* Number of cameras to stream from simultaneously */
-static int cams = 1;
-
-/* Enable compression. Needs a fast (>300 MHz) CPU. */
-static int compress; /* = 0 */
-
-/* Display test pattern - doesn't work yet either */
-static int testpat; /* = 0 */
-
-/* Setting this to 1 will make the sensor output GBR422 instead of YUV420. Only
- * affects RGB24 mode. */
-static int sensor_gbr; /* = 0 */
-
-/* Dump raw pixel data. */
-static int dumppix; /* = 0 */
-
-/* LED policy. Only works on some OV511+ cameras. 0=off, 1=on (default), 2=auto
- * (on when open) */
-static int led = 1;
-
-/* Set this to 1 to dump the bridge register contents after initialization */
-static int dump_bridge; /* = 0 */
-
-/* Set this to 1 to dump the sensor register contents after initialization */
-static int dump_sensor; /* = 0 */
-
-/* Temporary option for debugging "works, but no image" problem. Prints the
- * first 12 bytes of data (potentially a packet header) in each isochronous
- * data frame. */
-static int printph; /* = 0 */
-
-/* Compression parameters - I'm not exactly sure what these do yet */
-static int phy = 0x1f;
-static int phuv = 0x05;
-static int pvy = 0x06;
-static int pvuv = 0x06;
-static int qhy = 0x14;
-static int qhuv = 0x03;
-static int qvy = 0x04;
-static int qvuv = 0x04;
-
-/* Light frequency. Set to 50 or 60 (Hz), or zero for default settings */
-static int lightfreq; /* = 0 */
-
-/* Set this to 1 to enable banding filter by default. Compensates for
- * alternating horizontal light/dark bands caused by (usually fluorescent)
- * lights */
-static int bandingfilter; /* = 0 */
+/* These variables (and all static globals) default to zero */
+static int autobright		= 1;
+static int autogain		= 1;
+static int autoexp		= 1;
+static int debug;
+static int fix_rgb_offset;
+static int snapshot;
+static int force_rgb;
+static int buf_timeout		= 5;
+static int cams			= 1;
+static int compress;
+static int testpat;
+static int sensor_gbr;
+static int dumppix;
+static int led 			= 1;
+static int dump_bridge;
+static int dump_sensor;
+static int printph;
+static int phy			= 0x1f;
+static int phuv			= 0x05;
+static int pvy			= 0x06;
+static int pvuv			= 0x06;
+static int qhy			= 0x14;
+static int qhuv			= 0x03;
+static int qvy			= 0x04;
+static int qvuv			= 0x04;
+static int lightfreq;
+static int bandingfilter;
 
 /* Pixel clock divisor */
-static int clockdiv = -1;
+static int clockdiv		= -1;
 
 /* Isoc packet size */
-static int packetsize = -1;
+static int packetsize		= -1;
 
 /* Frame drop register (16h) */
-static int framedrop = -1;
+static int framedrop		= -1;
 
-/* Allows picture settings (brightness, hue, etc...) to take effect immediately,
- * even in the middle of a frame. This reduces the time to change settings, but
- * can ruin frames during the change. Only affects OmniVision sensors. */
-static int fastset; /* = 0 */
-
-/* Forces the palette to a specific value. If an application requests a
- * different palette, it will be rejected. */
-static int force_palette; /* = 0 */
-
-/* Set tuner type, if not autodetected */
-static int tuner = -1;
-
-/* Allows proper exposure of objects that are illuminated from behind. Only
- * affects OmniVision sensors. */
-static int backlight; /* = 0 */
-
-/* If you change this, you must also change the MODULE_PARM definition */
-#define OV511_MAX_UNIT_VIDEO 16
-
-/* Allows specified minor numbers to be forced. They will be assigned in the
- * order that devices are detected. Note that you cannot specify 0 as a minor
- * number. If you do not specify any, the next available one will be used. This
- * requires kernel 2.4.5 or later. */
+static int fastset;
+static int force_palette;
+static int tuner		= -1;
+static int backlight;
 static int unit_video[OV511_MAX_UNIT_VIDEO];
-
-/* Remove zero-padding from uncompressed incoming data. This will compensate for
- * the blocks of corruption that appear when the camera cannot keep up with the
- * speed of the USB bus (eg. at low frame resolutions) */
-static int remove_zeros; /* = 0 */
+static int remove_zeros;
 
 MODULE_PARM(autobright, "i");
 MODULE_PARM_DESC(autobright, "Sensor automatically changes brightness");
@@ -289,6 +231,10 @@ MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
 
+/**********************************************************************
+ * Miscellaneous Globals
+ **********************************************************************/
+
 static struct usb_driver ov511_driver;
 
 static struct ov51x_decomp_ops *ov511_decomp_ops;
@@ -303,20 +249,28 @@ static int i2c_detect_tries = 5;
 /* MMX support is present in kernel and CPU. Checked upon decomp module load. */
 static int ov51x_mmx_available;
 
-/* Function prototypes */
-static void ov51x_clear_snapshot(struct usb_ov511 *);
-static int ov51x_check_snapshot(struct usb_ov511 *);
-static inline int sensor_get_picture(struct usb_ov511 *, 
-				     struct video_picture *);
-static int sensor_get_exposure(struct usb_ov511 *, unsigned char *);
-static int ov51x_control_ioctl(struct inode *, struct file *, unsigned int,
-			       unsigned long);
+static __devinitdata struct usb_device_id device_table [] = {
+	{ USB_DEVICE(VEND_OMNIVISION, PROD_OV511) },
+	{ USB_DEVICE(VEND_OMNIVISION, PROD_OV511PLUS) },
+	{ USB_DEVICE(VEND_OMNIVISION, PROD_OV518) },
+	{ USB_DEVICE(VEND_OMNIVISION, PROD_OV518PLUS) },
+	{ USB_DEVICE(VEND_MATTEL, PROD_ME2CAM) },
+	{ }  /* Terminating entry */
+};
+
+MODULE_DEVICE_TABLE (usb, device_table);
+
+static unsigned char yQuanTable511[] = OV511_YQUANTABLE;
+static unsigned char uvQuanTable511[] = OV511_UVQUANTABLE;
+static unsigned char yQuanTable518[] = OV518_YQUANTABLE;
+static unsigned char uvQuanTable518[] = OV518_UVQUANTABLE;
 
 /**********************************************************************
- * List of known OV511-based cameras
+ * Symbolic Names
  **********************************************************************/
 
-static struct cam_list clist[] = {
+/* Known OV511-based cameras */
+static struct symbolic_list camlist[] = {
 	{   0, "Generic Camera (no ID)" },
 	{   1, "Mustek WCam 3X" },
 	{   3, "D-Link DSB-C300" },
@@ -336,46 +290,78 @@ static struct cam_list clist[] = {
 	{  -1, NULL }
 };
 
-static __devinitdata struct usb_device_id device_table [] = {
-	{ USB_DEVICE(VEND_OMNIVISION, PROD_OV511) },
-	{ USB_DEVICE(VEND_OMNIVISION, PROD_OV511PLUS) },
-	{ USB_DEVICE(VEND_OMNIVISION, PROD_OV518) },
-	{ USB_DEVICE(VEND_OMNIVISION, PROD_OV518PLUS) },
-	{ USB_DEVICE(VEND_MATTEL, PROD_ME2CAM) },
-	{ }  /* Terminating entry */
-};
-
-MODULE_DEVICE_TABLE (usb, device_table);
-
-#if defined(CONFIG_PROC_FS) && defined(CONFIG_VIDEO_PROC_FS)
-static struct palette_list plist[] = {
+/* Video4Linux1 Palettes */
+static struct symbolic_list v4l1_plist[] = {
 	{ VIDEO_PALETTE_GREY,	"GREY" },
-	{ VIDEO_PALETTE_HI240,  "HI240" },
-	{ VIDEO_PALETTE_RGB565, "RGB565" },
+	{ VIDEO_PALETTE_HI240,	"HI240" },
+	{ VIDEO_PALETTE_RGB565,	"RGB565" },
 	{ VIDEO_PALETTE_RGB24,	"RGB24" },
 	{ VIDEO_PALETTE_RGB32,	"RGB32" },
-	{ VIDEO_PALETTE_RGB555, "RGB555" },
-	{ VIDEO_PALETTE_YUV422, "YUV422" },
-	{ VIDEO_PALETTE_YUYV,   "YUYV" },
-	{ VIDEO_PALETTE_UYVY,   "UYVY" },
-	{ VIDEO_PALETTE_YUV420, "YUV420" },
-	{ VIDEO_PALETTE_YUV411, "YUV411" },
-	{ VIDEO_PALETTE_RAW,    "RAW" },
+	{ VIDEO_PALETTE_RGB555,	"RGB555" },
+	{ VIDEO_PALETTE_YUV422,	"YUV422" },
+	{ VIDEO_PALETTE_YUYV,	"YUYV" },
+	{ VIDEO_PALETTE_UYVY,	"UYVY" },
+	{ VIDEO_PALETTE_YUV420,	"YUV420" },
+	{ VIDEO_PALETTE_YUV411,	"YUV411" },
+	{ VIDEO_PALETTE_RAW,	"RAW" },
 	{ VIDEO_PALETTE_YUV422P,"YUV422P" },
 	{ VIDEO_PALETTE_YUV411P,"YUV411P" },
 	{ VIDEO_PALETTE_YUV420P,"YUV420P" },
 	{ VIDEO_PALETTE_YUV410P,"YUV410P" },
 	{ -1, NULL }
 };
-#endif
 
-static unsigned char yQuanTable511[] = OV511_YQUANTABLE;
-static unsigned char uvQuanTable511[] = OV511_UVQUANTABLE;
-static unsigned char yQuanTable518[] = OV518_YQUANTABLE;
-static unsigned char uvQuanTable518[] = OV518_UVQUANTABLE;
+static struct symbolic_list brglist[] = {
+	{ BRG_OV511,		"OV511" },
+	{ BRG_OV511PLUS,	"OV511+" },
+	{ BRG_OV518,		"OV518" },
+	{ BRG_OV518PLUS,	"OV518+" },
+	{ -1, NULL }
+};
+
+static struct symbolic_list senlist[] = {
+	{ SEN_OV76BE,	"OV76BE" },
+	{ SEN_OV7610,	"OV7610" },
+	{ SEN_OV7620,	"OV7620" },
+	{ SEN_OV7620AE,	"OV7620AE" },
+	{ SEN_OV6620,	"OV6620" },
+	{ SEN_OV6630,	"OV6630" },
+	{ SEN_OV6630AE,	"OV6630AE" },
+	{ SEN_OV6630AF,	"OV6630AF" },
+	{ SEN_OV8600,	"OV8600" },
+	{ SEN_KS0127,	"KS0127" },
+	{ SEN_KS0127B,	"KS0127B" },
+	{ SEN_SAA7111A,	"SAA7111A" },
+	{ -1, NULL }
+};
+
+/* URB error codes: */
+static struct symbolic_list urb_errlist[] = {
+	{ -ENOSR,	"Buffer error (overrun)" },
+	{ -EPIPE,	"Stalled (device not responding)" },
+	{ -EOVERFLOW,	"Babble (bad cable?)" },
+	{ -EPROTO,	"Bit-stuff error (bad cable?)" },
+	{ -EILSEQ,	"CRC/Timeout" },
+	{ -ETIMEDOUT,	"NAK (device does not respond)" },
+	{ -1, NULL }
+};
 
 /**********************************************************************
+ * Prototypes
+ **********************************************************************/
+
+static void ov51x_clear_snapshot(struct usb_ov511 *);
+static int ov51x_check_snapshot(struct usb_ov511 *);
+static inline int sensor_get_picture(struct usb_ov511 *, 
+				     struct video_picture *);
+static int sensor_get_exposure(struct usb_ov511 *, unsigned char *);
+static int ov51x_control_ioctl(struct inode *, struct file *, unsigned int,
+			       unsigned long);
+
+/**********************************************************************
+ *
  * Memory management
+ *
  **********************************************************************/
 
 /* Here we want the physical address of the memory.
@@ -453,7 +439,7 @@ ov511_read_proc_info(char *page, char **start, off_t off, int count, int *eof,
 		     void *data)
 {
 	char *out = page;
-	int i, j, len;
+	int i, len;
 	struct usb_ov511 *ov = data;
 	struct video_picture p;
 	unsigned char exp;
@@ -469,8 +455,7 @@ ov511_read_proc_info(char *page, char **start, off_t off, int count, int *eof,
 
 	out += sprintf(out, "driver_version  : %s\n", DRIVER_VERSION);
 	out += sprintf(out, "custom_id       : %d\n", ov->customid);
-	out += sprintf(out, "model           : %s\n", ov->desc ?
-		       clist[ov->desc].description : "unknown");
+	out += sprintf(out, "model           : %s\n", ov->desc);
 	out += sprintf(out, "streaming       : %s\n", YES_NO(ov->streaming));
 	out += sprintf(out, "grabbing        : %s\n", YES_NO(ov->grabbing));
 	out += sprintf(out, "compress        : %s\n", YES_NO(ov->compress));
@@ -491,36 +476,16 @@ ov511_read_proc_info(char *page, char **start, off_t off, int count, int *eof,
 			       ov->frame[i].depth);
 		out += sprintf(out, "  size          : %d %d\n",
 			       ov->frame[i].width, ov->frame[i].height);
-		out += sprintf(out, "  format        : ");
-		for (j = 0; plist[j].num >= 0; j++) {
-			if (plist[j].num == ov->frame[i].format) {
-				out += sprintf(out, "%s\n", plist[j].name);
-				break;
-			}
-		}
-		if (plist[j].num < 0)
-			out += sprintf(out, "unknown\n");
+		out += sprintf(out, "  format        : %s\n",
+			       symbolic(v4l1_plist, ov->frame[i].format));
 		out += sprintf(out, "  data_buffer   : 0x%p\n",
 			       ov->frame[i].data);
 	}
 	out += sprintf(out, "snap_enabled    : %s\n", YES_NO(ov->snap_enabled));
 	out += sprintf(out, "bridge          : %s\n",
-		       ov->bridge == BRG_OV511 ? "OV511" :
-			ov->bridge == BRG_OV511PLUS ? "OV511+" :
-			ov->bridge == BRG_OV518 ? "OV518" :
-			ov->bridge == BRG_OV518PLUS ? "OV518+" :
-			"unknown");
+		       symbolic(brglist, ov->bridge));
 	out += sprintf(out, "sensor          : %s\n",
-		       ov->sensor == SEN_OV6620 ? "OV6620" :
-			ov->sensor == SEN_OV6630 ? "OV6630" :
-			ov->sensor == SEN_OV7610 ? "OV7610" :
-			ov->sensor == SEN_OV7620 ? "OV7620" :
-			ov->sensor == SEN_OV7620AE ? "OV7620AE" :
-			ov->sensor == SEN_OV8600 ? "OV8600" :
-			ov->sensor == SEN_KS0127 ? "KS0127" :
-			ov->sensor == SEN_KS0127B ? "KS0127B" :
-			ov->sensor == SEN_SAA7111A ? "SAA7111A" :
-			"unknown");
+		       symbolic(senlist, ov->sensor));
 	out += sprintf(out, "packet_size     : %d\n", ov->packet_size);
 	out += sprintf(out, "framebuffer     : 0x%p\n", ov->fbuf);
 
@@ -582,89 +547,91 @@ ov511_read_proc_button(char *page, char **start, off_t off, int count, int *eof,
 }
 
 static void 
-create_proc_ov511_cam(struct usb_ov511 *ov511)
+create_proc_ov511_cam(struct usb_ov511 *ov)
 {
-	char dirname[4];
+	char dirname[10];
 
-	if (!ov511_proc_entry || !ov511)
+	if (!ov511_proc_entry || !ov)
 		return;
 
 	/* Create per-device directory */
-	sprintf(dirname, "%d", ov511->vdev.minor);
+	snprintf(dirname, 10, "%d", ov->vdev.minor);
 	PDEBUG(4, "creating /proc/video/ov511/%s/", dirname);
-	ov511->proc_devdir = create_proc_entry(dirname, S_IFDIR,
-		ov511_proc_entry);
-	if (!ov511->proc_devdir)
+	ov->proc_devdir = create_proc_entry(dirname, S_IFDIR, ov511_proc_entry);
+	if (!ov->proc_devdir)
 		return;
+	ov->proc_devdir->owner = THIS_MODULE;
 
 	/* Create "info" entry (human readable device information) */
 	PDEBUG(4, "creating /proc/video/ov511/%s/info", dirname);
-	ov511->proc_info = create_proc_read_entry("info",
-		S_IFREG|S_IRUGO|S_IWUSR, ov511->proc_devdir,
-		ov511_read_proc_info, ov511);
-	if (!ov511->proc_info)
+	ov->proc_info = create_proc_read_entry("info", S_IFREG|S_IRUGO|S_IWUSR,
+		ov->proc_devdir, ov511_read_proc_info, ov);
+	if (!ov->proc_info)
 		return;
+	ov->proc_info->owner = THIS_MODULE;
 
 	/* Don't create it if old snapshot mode on (would cause race cond.) */
 	if (!snapshot) {
 		/* Create "button" entry (snapshot button status) */
 		PDEBUG(4, "creating /proc/video/ov511/%s/button", dirname);
-		ov511->proc_button = create_proc_read_entry("button",
-			S_IFREG|S_IRUGO|S_IWUSR, ov511->proc_devdir,
-			ov511_read_proc_button, ov511);
-		if (!ov511->proc_button)
+		ov->proc_button = create_proc_read_entry("button",
+			S_IFREG|S_IRUGO|S_IWUSR, ov->proc_devdir,
+			ov511_read_proc_button, ov);
+		if (!ov->proc_button)
 			return;
 	}
+	ov->proc_button->owner = THIS_MODULE;
 
 	/* Create "control" entry (ioctl() interface) */
 	PDEBUG(4, "creating /proc/video/ov511/%s/control", dirname);
 	lock_kernel();
-	ov511->proc_control = create_proc_entry("control",
-		S_IFREG|S_IRUGO|S_IWUSR, ov511->proc_devdir);
-	if (!ov511->proc_control) {
+	ov->proc_control = create_proc_entry("control",	S_IFREG|S_IRUGO|S_IWUSR,
+		ov->proc_devdir);
+	if (!ov->proc_control) {
 		unlock_kernel();
 		return;
 	}
-	ov511->proc_control->data = ov511;
-	ov511->proc_control->proc_fops = &ov511_control_fops;
+	ov->proc_control->owner = THIS_MODULE;
+	ov->proc_control->data = ov;
+	ov->proc_control->proc_fops = &ov511_control_fops;
 	unlock_kernel();
 }
 
 static void 
-destroy_proc_ov511_cam(struct usb_ov511 *ov511)
+destroy_proc_ov511_cam(struct usb_ov511 *ov)
 {
-	char dirname[4];
+	char dirname[10];
 	
-	if (!ov511 || !ov511->proc_devdir)
+	if (!ov || !ov->proc_devdir)
 		return;
 
-	sprintf(dirname, "%d", ov511->vdev.minor);
+	snprintf(dirname, 10, "%d", ov->vdev.minor);
 
 	/* Destroy "control" entry */
-	if (ov511->proc_control) {
+	if (ov->proc_control) {
 		PDEBUG(4, "destroying /proc/video/ov511/%s/control", dirname);
-		remove_proc_entry("control", ov511->proc_devdir);
-		ov511->proc_control = NULL;
+		remove_proc_entry("control", ov->proc_devdir);
+		ov->proc_control = NULL;
 	}
 
 	/* Destroy "button" entry */
-	if (ov511->proc_button) {
+	if (ov->proc_button) {
 		PDEBUG(4, "destroying /proc/video/ov511/%s/button", dirname);
-		remove_proc_entry("button", ov511->proc_devdir);
-		ov511->proc_button = NULL;
+		remove_proc_entry("button", ov->proc_devdir);
+		ov->proc_button = NULL;
 	}
 
 	/* Destroy "info" entry */
-	if (ov511->proc_info) {
+	if (ov->proc_info) {
 		PDEBUG(4, "destroying /proc/video/ov511/%s/info", dirname);
-		remove_proc_entry("info", ov511->proc_devdir);
-		ov511->proc_info = NULL;
+		remove_proc_entry("info", ov->proc_devdir);
+		ov->proc_info = NULL;
 	}
 
 	/* Destroy per-device directory */
 	PDEBUG(4, "destroying /proc/video/ov511/%s/", dirname);
 	remove_proc_entry(dirname, ov511_proc_entry);
-	ov511->proc_devdir = NULL;
+	ov->proc_devdir = NULL;
 }
 
 static void 
@@ -724,7 +691,7 @@ reg_w(struct usb_ov511 *ov, unsigned char reg, unsigned char value)
 	up(&ov->cbuf_lock);
 
 	if (rc < 0)
-		err("reg write: error %d", rc);
+		err("reg write: error %d: %s", rc, symbolic(urb_errlist, rc));
 
 	return rc;
 }
@@ -746,7 +713,7 @@ reg_r(struct usb_ov511 *ov, unsigned char reg)
 	PDEBUG(5, "0x%02X:0x%02X", reg, ov->cbuf[0]);
 	
 	if (rc < 0)
-		err("reg read: error %d", rc);
+		err("reg read: error %d: %s", rc, symbolic(urb_errlist, rc));
 	else
 		rc = ov->cbuf[0];	
 
@@ -805,7 +772,8 @@ ov518_reg_w32(struct usb_ov511 *ov, unsigned char reg, u32 val, int n)
 	up(&ov->cbuf_lock);
 
 	if (rc < 0)
-		err("reg write multiple: error %d", rc);
+		err("reg write multiple: error %d: %s", rc,
+		    symbolic(urb_errlist, rc));
 
 	return rc;
 }
@@ -937,21 +905,17 @@ ov518_i2c_write_internal(struct usb_ov511 *ov,
 
 	/* Select camera register */
 	rc = reg_w(ov, R51x_I2C_SADDR_3, reg);
-	if (rc < 0) goto error;
+	if (rc < 0) return rc;
 
 	/* Write "value" to I2C data port of OV511 */
 	rc = reg_w(ov, R51x_I2C_DATA, value);
-	if (rc < 0) goto error;
+	if (rc < 0) return rc;
 
 	/* Initiate 3-byte write cycle */
 	rc = reg_w(ov, R518_I2C_CTL, 0x01);
-	if (rc < 0) goto error;
+	if (rc < 0) return rc;
 
 	return 0;
-
-error:
-	err("ov518 i2c write: error %d", rc);
-	return rc;
 }
 
 /* NOTE: Do not call this function directly! */
@@ -968,19 +932,19 @@ ov511_i2c_write_internal(struct usb_ov511 *ov,
 	for (retries = OV511_I2C_RETRIES; ; ) {
 		/* Select camera register */
 		rc = reg_w(ov, R51x_I2C_SADDR_3, reg);
-		if (rc < 0) goto error;
+		if (rc < 0) return rc;
 
 		/* Write "value" to I2C data port of OV511 */
 		rc = reg_w(ov, R51x_I2C_DATA, value);	
-		if (rc < 0) goto error;
+		if (rc < 0) return rc;
 
 		/* Initiate 3-byte write cycle */
 		rc = reg_w(ov, R511_I2C_CTL, 0x01);
-		if (rc < 0) goto error;
+		if (rc < 0) return rc;
 
 		do rc = reg_r(ov, R511_I2C_CTL);
 		while (rc > 0 && ((rc&1) == 0)); /* Retry until idle */
-		if (rc < 0) goto error;
+		if (rc < 0) return rc;
 
 		if ((rc&2) == 0) /* Ack? */
 			break;
@@ -990,16 +954,11 @@ ov511_i2c_write_internal(struct usb_ov511 *ov,
 #endif
 		if (--retries < 0) {
 			err("i2c write retries exhausted");
-			rc = -1;
-			goto error;
+			return -1;
 		}
 	}
 
 	return 0;
-
-error:
-	err("i2c write: error %d", rc);
-	return rc;
 }
 
 /* NOTE: Do not call this function directly!
@@ -1014,25 +973,21 @@ ov518_i2c_read_internal(struct usb_ov511 *ov, unsigned char reg)
 
 	/* Select camera register */
 	rc = reg_w(ov, R51x_I2C_SADDR_2, reg);
-	if (rc < 0) goto error;
+	if (rc < 0) return rc;
 
 	/* Initiate 2-byte write cycle */
 	rc = reg_w(ov, R518_I2C_CTL, 0x03);
-	if (rc < 0) goto error;
+	if (rc < 0) return rc;
 
 	/* Initiate 2-byte read cycle */
 	rc = reg_w(ov, R518_I2C_CTL, 0x05);
-	if (rc < 0) goto error;
+	if (rc < 0) return rc;
 
 	value = reg_r(ov, R51x_I2C_DATA);
 
 	PDEBUG(5, "0x%02X:0x%02X", reg, value);
 
 	return value;
-
-error:
-	err("ov518 i2c read: error %d", rc);
-	return rc;
 }
 
 /* NOTE: Do not call this function directly!
@@ -1046,15 +1001,15 @@ ov511_i2c_read_internal(struct usb_ov511 *ov, unsigned char reg)
 	for (retries = OV511_I2C_RETRIES; ; ) {
 		/* Select camera register */
 		rc = reg_w(ov, R51x_I2C_SADDR_2, reg);
-		if (rc < 0) goto error;
+		if (rc < 0) return rc;
 
 		/* Initiate 2-byte write cycle */
 		rc = reg_w(ov, R511_I2C_CTL, 0x03);
-		if (rc < 0) goto error;
+		if (rc < 0) return rc;
 
 		do rc = reg_r(ov, R511_I2C_CTL);
 		while (rc > 0 && ((rc&1) == 0)); /* Retry until idle */
-		if (rc < 0) goto error;
+		if (rc < 0) return rc;
 
 		if ((rc&2) == 0) /* Ack? */
 			break;
@@ -1064,8 +1019,7 @@ ov511_i2c_read_internal(struct usb_ov511 *ov, unsigned char reg)
 
 		if (--retries < 0) {
 			err("i2c write retries exhausted");
-			rc = -1;
-			goto error;
+			return -1;
 		}
 	}
 
@@ -1073,23 +1027,22 @@ ov511_i2c_read_internal(struct usb_ov511 *ov, unsigned char reg)
 	for (retries = OV511_I2C_RETRIES; ; ) {
 		/* Initiate 2-byte read cycle */
 		rc = reg_w(ov, R511_I2C_CTL, 0x05);
-		if (rc < 0) goto error;
+		if (rc < 0) return rc;
 
 		do rc = reg_r(ov, R511_I2C_CTL);
 		while (rc > 0 && ((rc&1) == 0)); /* Retry until idle */
-		if (rc < 0) goto error;
+		if (rc < 0) return rc;
 
 		if ((rc&2) == 0) /* Ack? */
 			break;
 
 		/* I2C abort */	
 		rc = reg_w(ov, R511_I2C_CTL, 0x10);
-		if (rc < 0) goto error;
+		if (rc < 0) return rc;
 
 		if (--retries < 0) {
 			err("i2c read retries exhausted");
-			rc = -1;
-			goto error;
+			return -1;
 		}
 	}
 
@@ -1100,13 +1053,9 @@ ov511_i2c_read_internal(struct usb_ov511 *ov, unsigned char reg)
 	/* This is needed to make i2c_w() work */
 	rc = reg_w(ov, R511_I2C_CTL, 0x05);
 	if (rc < 0)
-		goto error;
+		return rc;
 	
 	return value;
-
-error:
-	err("i2c read: error %d", rc);
-	return rc;
 }
 
 /* returns: negative is error, pos or zero is data */
@@ -1311,22 +1260,17 @@ write_regvals(struct usb_ov511 *ov, struct ov511_regvals * pRegvals)
 	while (pRegvals->bus != OV511_DONE_BUS) {
 		if (pRegvals->bus == OV511_REG_BUS) {
 			if ((rc = reg_w(ov, pRegvals->reg, pRegvals->val)) < 0)
-				goto error;
+				return rc;
 		} else if (pRegvals->bus == OV511_I2C_BUS) {
 			if ((rc = i2c_w(ov, pRegvals->reg, pRegvals->val)) < 0)
-				goto error;
+				return rc;
 		} else {
 			err("Bad regval array");
-			rc = -1;
-			goto error;
+			return -1;
 		}
 		pRegvals++;
 	}
 	return 0;
-
-error:
-	err("write regvals: error %d", rc);
-	return rc;
 }
 
 #ifdef OV511_DEBUG 
@@ -2394,13 +2338,13 @@ get_depth(int palette)
 {
 	switch (palette) {
 	case VIDEO_PALETTE_GREY:    return 8;
+	case VIDEO_PALETTE_YUV420:  return 12;
+	case VIDEO_PALETTE_YUV420P: return 12; /* Planar */
 	case VIDEO_PALETTE_RGB565:  return 16;
 	case VIDEO_PALETTE_RGB24:   return 24;  
 	case VIDEO_PALETTE_YUV422:  return 16;
 	case VIDEO_PALETTE_YUYV:    return 16;
-	case VIDEO_PALETTE_YUV420:  return 12;
 	case VIDEO_PALETTE_YUV422P: return 16; /* Planar */
-	case VIDEO_PALETTE_YUV420P: return 12; /* Planar */
 	default:		    return 0;  /* Invalid format */
 	}
 }
@@ -2803,11 +2747,11 @@ ov518_mode_init_regs(struct usb_ov511 *ov,
 //		/* Here I'm assuming that snapshot size == image size.
 //		 * I hope that's always true. --claudio
 //		 */
-//		pxcnt = sub_flag ? (ov511->subw >> 3) - 1 : mlist[i].pxcnt;
-//		lncnt = sub_flag ? (ov511->subh >> 3) - 1 : mlist[i].lncnt;
+//		pxcnt = sub_flag ? (ov->subw >> 3) - 1 : mlist[i].pxcnt;
+//		lncnt = sub_flag ? (ov->subh >> 3) - 1 : mlist[i].lncnt;
 //
-//		reg_w(ov511, 0x12, pxcnt);
-//		reg_w(ov511, 0x13, lncnt);
+//		reg_w(ov, 0x12, pxcnt);
+//		reg_w(ov, 0x13, lncnt);
 
 		/******** Set the mode ********/		
 
@@ -3475,6 +3419,7 @@ decompress(struct usb_ov511 *ov, struct ov511_frame *frame,
 		int ret = ov->decomp_ops->decomp_400(
 			pIn0,
 			pOut0,
+			frame->compbuf,
 			frame->rawwidth,
 			frame->rawheight,
 			frame->bytes_recvd);
@@ -3483,6 +3428,7 @@ decompress(struct usb_ov511 *ov, struct ov511_frame *frame,
 		int ret = ov->decomp_ops->decomp_420(
 			pIn0,
 			pOut0,
+			frame->compbuf,
 			frame->rawwidth,
 			frame->rawheight,
 			frame->bytes_recvd);
@@ -3682,7 +3628,7 @@ ov51x_postprocess(struct usb_ov511 *ov, struct ov511_frame *frame)
 		memset(frame->data, 0, 
 			MAX_DATA_SIZE(ov->maxwidth, ov->maxheight));
 		PDEBUG(4, "Dumping %d bytes", frame->bytes_recvd);
-		memmove(frame->data, frame->rawdata, frame->bytes_recvd);
+		memcpy(frame->data, frame->rawdata, frame->bytes_recvd);
 		return;
 	}
 
@@ -3719,7 +3665,7 @@ ov51x_postprocess(struct usb_ov511 *ov, struct ov511_frame *frame)
 
 	/* Deinterlace frame, if necessary */
 	if (ov->sensor == SEN_SAA7111A && frame->rawheight == 480) {
-		memmove(frame->rawdata, frame->tempdata,
+		memcpy(frame->rawdata, frame->tempdata,
 			MAX_RAW_DATA_SIZE(frame->width, frame->height));
 		deinterlace(frame, RAWFMT_YUV420, frame->rawdata,
 		            frame->tempdata);
@@ -3747,18 +3693,19 @@ ov51x_postprocess(struct usb_ov511 *ov, struct ov511_frame *frame)
 		break;
 	case VIDEO_PALETTE_YUV420:
 	case VIDEO_PALETTE_YUV420P:
-		memmove(frame->data, frame->tempdata,
+		memcpy(frame->data, frame->tempdata,
 			MAX_RAW_DATA_SIZE(frame->width, frame->height));
 		break;
 	case VIDEO_PALETTE_YUV422P:
 		/* Data is converted in place, so copy it in advance */
-		memmove(frame->data, frame->tempdata,
+		memcpy(frame->data, frame->tempdata,
 			MAX_RAW_DATA_SIZE(frame->width, frame->height));
 
 		yuv420p_to_yuv422p(frame, frame->data);
 		break;
 	default:
-		err("Cannot convert data to this format");
+		err("Cannot convert data to %s",
+		    symbolic(v4l1_plist, frame->format));
 	}
 
 	if (fix_rgb_offset)
@@ -3771,324 +3718,64 @@ ov51x_postprocess(struct usb_ov511 *ov, struct ov511_frame *frame)
  *
  **********************************************************************/
 
-static int 
-ov511_move_data(struct usb_ov511 *ov, struct urb *urb)
+static inline void 
+ov511_move_data(struct usb_ov511 *ov, unsigned char *in, int n)
 {
-	unsigned char *cdata;
-	int data_size, num, offset, i, totlen = 0;
-	int aPackNum[FRAMES_PER_DESC];
-	struct ov511_frame *frame;
+	int num, offset;
+	int pnum = in[ov->packet_size - 1];		/* Get packet number */
+	int max_raw = MAX_RAW_DATA_SIZE(ov->maxwidth, ov->maxheight);
+	struct ov511_frame *frame = &ov->frame[ov->curframe];
 	struct timeval *ts;
 
-	PDEBUG(5, "Moving %d packets", urb->number_of_packets);
+	/* SOF/EOF packets have 1st to 8th bytes zeroed and the 9th
+	 * byte non-zero. The EOF packet has image width/height in the
+	 * 10th and 11th bytes. The 9th byte is given as follows:
+	 *
+	 * bit 7: EOF
+	 *     6: compression enabled
+	 *     5: 422/420/400 modes
+	 *     4: 422/420/400 modes
+	 *     3: 1
+	 *     2: snapshot button on
+	 *     1: snapshot frame
+	 *     0: even/odd field
+	 */
 
-	data_size = ov->packet_size - 1;
-
-	for (i = 0; i < urb->number_of_packets; i++) {
-		int n = urb->iso_frame_desc[i].actual_length;
-		int st = urb->iso_frame_desc[i].status;
-
-		urb->iso_frame_desc[i].actual_length = 0;
-		urb->iso_frame_desc[i].status = 0;
-
-		cdata = urb->transfer_buffer + urb->iso_frame_desc[i].offset;
-
-		aPackNum[i] = n ? cdata[ov->packet_size - 1] : -1;
-
-		if (!n || ov->curframe == -1)
-			continue;
-
-		if (st)
-			PDEBUG(2, "data error: [%d] len=%d, status=%d", i, n, st);
-
-		frame = &ov->frame[ov->curframe];
-
-		/* SOF/EOF packets have 1st to 8th bytes zeroed and the 9th
-		 * byte non-zero. The EOF packet has image width/height in the
-		 * 10th and 11th bytes. The 9th byte is given as follows:
-		 *
-		 * bit 7: EOF
-		 *     6: compression enabled
-		 *     5: 422/420/400 modes
-		 *     4: 422/420/400 modes
-		 *     3: 1
-		 *     2: snapshot button on
-		 *     1: snapshot frame
-		 *     0: even/odd field
-		 */
-
-		if (printph) {
-			info("packet header (%3d): %2x %2x %2x %2x %2x %2x %2x %2x %2x %2x %2x %2x",
-				cdata[ov->packet_size - 1],
-				cdata[0], cdata[1], cdata[2], cdata[3], cdata[4], cdata[5],
-				cdata[6], cdata[7], cdata[8], cdata[9], cdata[10], cdata[11]);
-		}
-
-		/* Check for SOF/EOF packet */
-		if ((cdata[0] | cdata[1] | cdata[2] | cdata[3] |
-		     cdata[4] | cdata[5] | cdata[6] | cdata[7]) ||
-		     (~cdata[8] & 0x08))
-			goto check_middle;
-
-		/* Frame end */
-		if (cdata[8] & 0x80) {
-			ts = (struct timeval *)(frame->data 
-			      + MAX_FRAME_SIZE(ov->maxwidth, ov->maxheight));
-			do_gettimeofday(ts);
-
-			/* Get the actual frame size from the EOF header */
-			frame->rawwidth = ((int)(cdata[9]) + 1) * 8;
-			frame->rawheight = ((int)(cdata[10]) + 1) * 8;
-
-	 		PDEBUG(4, "Frame end, curframe = %d, packnum=%d, hw=%d, vw=%d, recvd=%d",
-				ov->curframe,
-				(int)(cdata[ov->packet_size - 1]),
-				frame->rawwidth,
-				frame->rawheight,
-				frame->bytes_recvd);
-
-			/* Validate the header data */
-			RESTRICT_TO_RANGE(frame->rawwidth, ov->minwidth, ov->maxwidth);
-			RESTRICT_TO_RANGE(frame->rawheight, ov->minheight, ov->maxheight);
-
-			/* Don't allow byte count to exceed buffer size */
-			RESTRICT_TO_RANGE(frame->bytes_recvd,
-					  8, 
-					  MAX_RAW_DATA_SIZE(ov->maxwidth,
-					                    ov->maxheight));
-
-			if (frame->scanstate == STATE_LINES) {
-		    		int iFrameNext;
-
-				frame->grabstate = FRAME_DONE;	// FIXME: Is this right?
-
-				if (waitqueue_active(&frame->wq)) {
-					frame->grabstate = FRAME_DONE;
-					wake_up_interruptible(&frame->wq);
-				}
-
-				/* If next frame is ready or grabbing,
-                                 * point to it */
-				iFrameNext = (ov->curframe + 1) % OV511_NUMFRAMES;
-				if (ov->frame[iFrameNext].grabstate == FRAME_READY
-				    || ov->frame[iFrameNext].grabstate == FRAME_GRABBING) {
-					ov->curframe = iFrameNext;
-					ov->frame[iFrameNext].scanstate = STATE_SCANNING;
-				} else {
-					if (frame->grabstate == FRAME_DONE) {
-						PDEBUG(4, "Frame done! congratulations");
-					} else {
-						PDEBUG(4, "Frame not ready? state = %d",
-							ov->frame[iFrameNext].grabstate);
-					}
-
-					ov->curframe = -1;
-				}
-			} else {
-				PDEBUG(5, "Frame done, but not scanning");
-			}
-			/* Image corruption caused by misplaced frame->segment = 0
-			 * fixed by carlosf@conectiva.com.br
-			 */
-		} else {
-			/* Frame start */
-			PDEBUG(4, "Frame start, framenum = %d", ov->curframe);
-
-			/* Check to see if it's a snapshot frame */
-			/* FIXME?? Should the snapshot reset go here? Performance? */
-			if (cdata[8] & 0x02) {
-				frame->snapshot = 1;
-				PDEBUG(3, "snapshot detected");
-			}
-
-			frame->scanstate = STATE_LINES;
-			frame->bytes_recvd = 0;
-			frame->compressed = cdata[8] & 0x40;
-		}
-
-check_middle:
-		/* Are we in a frame? */
-		if (frame->scanstate != STATE_LINES) {
-			PDEBUG(5, "Not in a frame; packet skipped");
-			continue;
-		}
-
-#if 0
-		/* Skip packet if first 9 bytes are zero. These are common, so
-		 * we use a less expensive test here instead of later */
-		if (frame->compressed) {
-			int b, skip = 1;
-
-			for (b = 0; b < 9; b++) { 
-				if (cdata[b])
-					skip=0;
-			}
-
-			if (skip) {
-				PDEBUG(5, "Skipping packet (all zero)");
-				continue;
-			}
-		}
-#endif
-		/* If frame start, skip header */
-		if (frame->bytes_recvd == 0)
-			offset = 9;
-		else
-			offset = 0;
-
-		num = n - offset - 1;
-
-		/* Dump all data exactly as received */
-		if (dumppix == 2) {
-			frame->bytes_recvd += n - 1;
-			if (frame->bytes_recvd <= MAX_RAW_DATA_SIZE(ov->maxwidth, ov->maxheight))
-				memmove(frame->rawdata + frame->bytes_recvd - (n - 1),
-					&cdata[0], n - 1);
-			else
-				PDEBUG(3, "Raw data buffer overrun!! (%d)",
-					frame->bytes_recvd
-					- MAX_RAW_DATA_SIZE(ov->maxwidth,
-							    ov->maxheight));
-		} else if (!frame->compressed && !remove_zeros) {
-			frame->bytes_recvd += num;
-			if (frame->bytes_recvd <= MAX_RAW_DATA_SIZE(ov->maxwidth, ov->maxheight))
-				memmove(frame->rawdata + frame->bytes_recvd - num,
-					&cdata[offset], num);
-			else
-				PDEBUG(3, "Raw data buffer overrun!! (%d)",
-					frame->bytes_recvd
-					- MAX_RAW_DATA_SIZE(ov->maxwidth,
-							    ov->maxheight));
-		} else { /* Remove all-zero FIFO lines (aligned 32-byte blocks) */
-			int b, in = 0, allzero, copied=0;
-			if (offset) {
-				frame->bytes_recvd += 32 - offset;	// Bytes out
-				memmove(frame->rawdata,
-					&cdata[offset], 32 - offset);
-				in += 32;
-			}
-
-			while (in < n - 1) {
-				allzero = 1;
-				for (b = 0; b < 32; b++) {
-					if (cdata[in + b]) {
-						allzero = 0;
-						break;
-					}
-				}
-
-				if (allzero) {
-					/* Don't copy it */
-				} else {
-					if (frame->bytes_recvd + copied + 32
-					    <= MAX_RAW_DATA_SIZE(ov->maxwidth, ov->maxheight)) {
-						memmove(frame->rawdata + frame->bytes_recvd + copied,
-							&cdata[in], 32);
-						copied += 32;
-					} else {
-						PDEBUG(3, "Raw data buffer overrun!!");
-					}
-				}
-				in += 32;
-			}
-
-			frame->bytes_recvd += copied;
-		}
-
+	if (printph) {
+		info("ph(%3d): %2x %2x %2x %2x %2x %2x %2x %2x %2x %2x %2x %2x",
+		     pnum, in[0], in[1], in[2], in[3], in[4], in[5], in[6],
+		     in[7], in[8], in[9], in[10], in[11]);
 	}
 
-	PDEBUG(5, "pn: %d %d %d %d %d %d %d %d %d %d",
-		aPackNum[0], aPackNum[1], aPackNum[2], aPackNum[3], aPackNum[4],
-		aPackNum[5],aPackNum[6], aPackNum[7], aPackNum[8], aPackNum[9]);
+	/* Check for SOF/EOF packet */
+	if ((in[0] | in[1] | in[2] | in[3] | in[4] | in[5] | in[6] | in[7]) ||
+	    (~in[8] & 0x08))
+		goto check_middle;
 
-	return totlen;
-}
-
-static int 
-ov518_move_data(struct usb_ov511 *ov, struct urb *urb)
-{
-	unsigned char *cdata;
-	int i, data_size, totlen = 0;
-	struct ov511_frame *frame;
-	struct timeval *ts;
-
-	PDEBUG(5, "Moving %d packets", urb->number_of_packets);
-
-	/* OV518(+) has no packet numbering */
-	data_size = ov->packet_size;
-
-	for (i = 0; i < urb->number_of_packets; i++) {
-		int n = urb->iso_frame_desc[i].actual_length;
-		int st = urb->iso_frame_desc[i].status;
-
-		urb->iso_frame_desc[i].actual_length = 0;
-		urb->iso_frame_desc[i].status = 0;
-
-		cdata = urb->transfer_buffer + urb->iso_frame_desc[i].offset;
-
-		if (!n) {
-			PDEBUG(4, "Zero-length packet");
-			continue;
-		}
-
-		if (ov->curframe == -1) {
-			PDEBUG(4, "No frame currently active");
-			continue;
-		}
-
-		if (st)
-			PDEBUG(2, "data error: [%d] len=%d, status=%d", i, n, st);
-
-		frame = &ov->frame[ov->curframe];
-
-		if (printph) {
-			info("packet header: %2x %2x %2x %2x %2x %2x %2x %2x %2x %2x %2x %2x",
-				cdata[0], cdata[1], cdata[2], cdata[3], cdata[4], cdata[5],
-				cdata[6], cdata[7], cdata[8], cdata[9], cdata[10], cdata[11]);
-		}
-
-		/* A false positive here is likely, until OVT gives me
-		 * the definitive SOF/EOF format */
-		if ((!(cdata[0] | cdata[1] | cdata[2] | cdata[3] |
-		      cdata[5])) && cdata[6]) {
-			
-			if (frame->scanstate == STATE_LINES) {
-				PDEBUG(4, "Detected frame end/start");
-				goto eof;
-			} else { //scanstate == STATE_SCANNING
-				/* Frame start */
-				PDEBUG(4, "Frame start, framenum = %d", ov->curframe);
-				goto sof;
-			}
-		} else {
-			goto check_middle;
-		}
-	
-eof:
-		ts = (struct timeval *)(frame->data
+	/* Frame end */
+	if (in[8] & 0x80) {
+		ts = (struct timeval *)(frame->data 
 		      + MAX_FRAME_SIZE(ov->maxwidth, ov->maxheight));
 		do_gettimeofday(ts);
 
- 		PDEBUG(4, "Frame end, curframe = %d, hw=%d, vw=%d, recvd=%d",
-			ov->curframe,
-			(int)(cdata[9]), (int)(cdata[10]), frame->bytes_recvd);
+		/* Get the actual frame size from the EOF header */
+		frame->rawwidth = ((int)(in[9]) + 1) * 8;
+		frame->rawheight = ((int)(in[10]) + 1) * 8;
 
-		// FIXME: Since we don't know the header formats yet,
-		// there is no way to know what the actual image size is
-		frame->rawwidth = frame->width;
-		frame->rawheight = frame->height;
+ 		PDEBUG(4, "Frame end, frame=%d, pnum=%d, w=%d, h=%d, recvd=%d",
+			ov->curframe, pnum, frame->rawwidth, frame->rawheight,
+			frame->bytes_recvd);
 
 		/* Validate the header data */
 		RESTRICT_TO_RANGE(frame->rawwidth, ov->minwidth, ov->maxwidth);
-		RESTRICT_TO_RANGE(frame->rawheight, ov->minheight, ov->maxheight);
+		RESTRICT_TO_RANGE(frame->rawheight, ov->minheight,
+				  ov->maxheight);
 
 		/* Don't allow byte count to exceed buffer size */
-		RESTRICT_TO_RANGE(frame->bytes_recvd,
-				  8, 
-				  MAX_RAW_DATA_SIZE(ov->maxwidth, ov->maxheight));
+		RESTRICT_TO_RANGE(frame->bytes_recvd, 8, max_raw);
 
 		if (frame->scanstate == STATE_LINES) {
-	    		int iFrameNext;
+	    		int nextf;
 
 			frame->grabstate = FRAME_DONE;	// FIXME: Is this right?
 
@@ -4099,115 +3786,277 @@ eof:
 
 			/* If next frame is ready or grabbing,
 			 * point to it */
-			iFrameNext = (ov->curframe + 1) % OV511_NUMFRAMES;
-			if (ov->frame[iFrameNext].grabstate == FRAME_READY
-			    || ov->frame[iFrameNext].grabstate == FRAME_GRABBING) {
-				ov->curframe = iFrameNext;
-				ov->frame[iFrameNext].scanstate = STATE_SCANNING;
-				frame = &ov->frame[iFrameNext];
+			nextf = (ov->curframe + 1) % OV511_NUMFRAMES;
+			if (ov->frame[nextf].grabstate == FRAME_READY
+			    || ov->frame[nextf].grabstate == FRAME_GRABBING) {
+				ov->curframe = nextf;
+				ov->frame[nextf].scanstate = STATE_SCANNING;
 			} else {
 				if (frame->grabstate == FRAME_DONE) {
-					PDEBUG(4, "Frame done! congratulations");
+					PDEBUG(4, "** Frame done **");
 				} else {
 					PDEBUG(4, "Frame not ready? state = %d",
-						ov->frame[iFrameNext].grabstate);
+						ov->frame[nextf].grabstate);
 				}
 
 				ov->curframe = -1;
-				PDEBUG(4, "SOF dropped (no active frame)");
-				continue;  /* Nowhere to store this frame */
 			}
+		} else {
+			PDEBUG(5, "Frame done, but not scanning");
 		}
 		/* Image corruption caused by misplaced frame->segment = 0
 		 * fixed by carlosf@conectiva.com.br
 		 */
-sof:
-		PDEBUG(4, "Starting capture on frame %d", frame->framenum);
-// Snapshot not reverse-engineered yet.
-#if 0
+	} else {
+		/* Frame start */
+		PDEBUG(4, "Frame start, framenum = %d", ov->curframe);
+
 		/* Check to see if it's a snapshot frame */
 		/* FIXME?? Should the snapshot reset go here? Performance? */
-		if (cdata[8] & 0x02) {
+		if (in[8] & 0x02) {
 			frame->snapshot = 1;
 			PDEBUG(3, "snapshot detected");
 		}
-#endif
+
 		frame->scanstate = STATE_LINES;
 		frame->bytes_recvd = 0;
+		frame->compressed = in[8] & 0x40;
+	}
+
+check_middle:
+	/* Are we in a frame? */
+	if (frame->scanstate != STATE_LINES) {
+		PDEBUG(5, "Not in a frame; packet skipped");
+		return;
+	}
+
+	/* If frame start, skip header */
+	if (frame->bytes_recvd == 0)
+		offset = 9;
+	else
+		offset = 0;
+
+	num = n - offset - 1;
+
+	/* Dump all data exactly as received */
+	if (dumppix == 2) {
+		frame->bytes_recvd += n - 1;
+		if (frame->bytes_recvd <= max_raw)
+			memcpy(frame->rawdata + frame->bytes_recvd - (n - 1),
+				in, n - 1);
+		else
+			PDEBUG(3, "Raw data buffer overrun!! (%d)",
+				frame->bytes_recvd - max_raw);
+	} else if (!frame->compressed && !remove_zeros) {
+		frame->bytes_recvd += num;
+		if (frame->bytes_recvd <= max_raw)
+			memcpy(frame->rawdata + frame->bytes_recvd - num,
+				in + offset, num);
+		else
+			PDEBUG(3, "Raw data buffer overrun!! (%d)",
+				frame->bytes_recvd - max_raw);
+	} else { /* Remove all-zero FIFO lines (aligned 32-byte blocks) */
+		int b, read = 0, allzero, copied = 0;
+		if (offset) {
+			frame->bytes_recvd += 32 - offset;	// Bytes out
+			memcpy(frame->rawdata,	in + offset, 32 - offset);
+			read += 32;
+		}
+
+		while (read < n - 1) {
+			allzero = 1;
+			for (b = 0; b < 32; b++) {
+				if (in[read + b]) {
+					allzero = 0;
+					break;
+				}
+			}
+
+			if (allzero) {
+				/* Don't copy it */
+			} else {
+				if (frame->bytes_recvd + copied + 32 <= max_raw)
+				{
+					memcpy(frame->rawdata
+						+ frame->bytes_recvd + copied,
+						in + read, 32);
+					copied += 32;
+				} else {
+					PDEBUG(3, "Raw data buffer overrun!!");
+				}
+			}
+			read += 32;
+		}
+
+		frame->bytes_recvd += copied;
+	}
+}
+
+static inline void 
+ov518_move_data(struct usb_ov511 *ov, unsigned char *in, int n)
+{
+	int max_raw = MAX_RAW_DATA_SIZE(ov->maxwidth, ov->maxheight);
+	struct ov511_frame *frame = &ov->frame[ov->curframe];
+	struct timeval *ts;
+
+	if (printph) {
+		info("ph: %2x %2x %2x %2x %2x %2x %2x %2x %2x %2x %2x %2x",
+		     in[0], in[1], in[2], in[3], in[4], in[5], in[6], in[7],
+		     in[8], in[9], in[10], in[11]);
+	}
+
+	/* A false positive here is likely, until OVT gives me
+	 * the definitive SOF/EOF format */
+	if ((!(in[0] | in[1] | in[2] | in[3] | in[5])) && in[6]) {
+		if (frame->scanstate == STATE_LINES) {
+			PDEBUG(4, "Detected frame end/start");
+			goto eof;
+		} else { //scanstate == STATE_SCANNING
+			/* Frame start */
+			PDEBUG(4, "Frame start, framenum = %d", ov->curframe);
+			goto sof;
+		}
+	} else {
+		goto check_middle;
+	}
+
+eof:
+	ts = (struct timeval *)(frame->data
+	      + MAX_FRAME_SIZE(ov->maxwidth, ov->maxheight));
+	do_gettimeofday(ts);
+
+	PDEBUG(4, "Frame end, curframe = %d, hw=%d, vw=%d, recvd=%d",
+		ov->curframe,
+		(int)(in[9]), (int)(in[10]), frame->bytes_recvd);
+
+	// FIXME: Since we don't know the header formats yet,
+	// there is no way to know what the actual image size is
+	frame->rawwidth = frame->width;
+	frame->rawheight = frame->height;
+
+	/* Validate the header data */
+	RESTRICT_TO_RANGE(frame->rawwidth, ov->minwidth, ov->maxwidth);
+	RESTRICT_TO_RANGE(frame->rawheight, ov->minheight, ov->maxheight);
+
+	/* Don't allow byte count to exceed buffer size */
+	RESTRICT_TO_RANGE(frame->bytes_recvd, 8, max_raw);
+
+	if (frame->scanstate == STATE_LINES) {
+    		int nextf;
+
+		frame->grabstate = FRAME_DONE;	// FIXME: Is this right?
+
+		if (waitqueue_active(&frame->wq)) {
+			frame->grabstate = FRAME_DONE;
+			wake_up_interruptible(&frame->wq);
+		}
+
+		/* If next frame is ready or grabbing,
+		 * point to it */
+		nextf = (ov->curframe + 1) % OV511_NUMFRAMES;
+		if (ov->frame[nextf].grabstate == FRAME_READY
+		    || ov->frame[nextf].grabstate == FRAME_GRABBING) {
+			ov->curframe = nextf;
+			ov->frame[nextf].scanstate = STATE_SCANNING;
+			frame = &ov->frame[nextf];
+		} else {
+			if (frame->grabstate == FRAME_DONE) {
+				PDEBUG(4, "** Frame done **");
+			} else {
+				PDEBUG(4, "Frame not ready? state = %d",
+				       ov->frame[nextf].grabstate);
+			}
+
+			ov->curframe = -1;
+			PDEBUG(4, "SOF dropped (no active frame)");
+			return;  /* Nowhere to store this frame */
+		}
+	}
+sof:
+	PDEBUG(4, "Starting capture on frame %d", frame->framenum);
+
+// Snapshot not reverse-engineered yet.
+#if 0
+	/* Check to see if it's a snapshot frame */
+	/* FIXME?? Should the snapshot reset go here? Performance? */
+	if (in[8] & 0x02) {
+		frame->snapshot = 1;
+		PDEBUG(3, "snapshot detected");
+	}
+#endif
+	frame->scanstate = STATE_LINES;
+	frame->bytes_recvd = 0;
 //		frame->compressed = 1;
 
 check_middle:
-		/* Are we in a frame? */
-		if (frame->scanstate != STATE_LINES) {
-			PDEBUG(4, "scanstate: no SOF yet");
-			continue;
-		}
-
-		/* Dump all data exactly as received */
-		if (dumppix == 2) {
-			frame->bytes_recvd += n;
-			if (frame->bytes_recvd <= MAX_RAW_DATA_SIZE(ov->maxwidth, ov->maxheight))
-				memmove(frame->rawdata + frame->bytes_recvd - n,
-					&cdata[0], n);
-			else
-				PDEBUG(3, "Raw data buffer overrun!! (%d)",
-					frame->bytes_recvd
-					- MAX_RAW_DATA_SIZE(ov->maxwidth,
-							    ov->maxheight));
-		} else {
-			/* All incoming data are divided into 8-byte segments. If the
-			 * segment contains all zero bytes, it must be skipped. These
-			 * zero-segments allow the OV518 to mainain a constant data rate
-			 * regardless of the effectiveness of the compression. Segments
-			 * are aligned relative to the beginning of each isochronous
-			 * packet. The first segment is a header (the decompressor
-			 * skips it later).
-			 */
-
-			int b, in = 0, allzero, copied=0;
-
-			while (in < n) {
-				allzero = 1;
-				for (b = 0; b < 8; b++) {
-					if (cdata[in + b]) {
-						allzero = 0;
-						break;
-					}
-				}
-
-				if (allzero) {
-				/* Don't copy it */
-				} else {
-					if (frame->bytes_recvd + copied + 8
-					    <= MAX_RAW_DATA_SIZE(ov->maxwidth, ov->maxheight)) {
-						memmove(frame->rawdata + frame->bytes_recvd + copied,
-							&cdata[in], 8);
-						copied += 8;
-					} else {
-						PDEBUG(3, "Raw data buffer overrun!!");
-					}
-				}
-				in += 8;
-			}
-			frame->bytes_recvd += copied;
-		}
+	/* Are we in a frame? */
+	if (frame->scanstate != STATE_LINES) {
+		PDEBUG(4, "scanstate: no SOF yet");
+		return;
 	}
 
-	return totlen;
+	/* Dump all data exactly as received */
+	if (dumppix == 2) {
+		frame->bytes_recvd += n;
+		if (frame->bytes_recvd <= max_raw)
+			memcpy(frame->rawdata + frame->bytes_recvd - n, in, n);
+		else
+			PDEBUG(3, "Raw data buffer overrun!! (%d)",
+				frame->bytes_recvd - max_raw);
+	} else {
+		/* All incoming data are divided into 8-byte segments. If the
+		 * segment contains all zero bytes, it must be skipped. These
+		 * zero-segments allow the OV518 to mainain a constant data rate
+		 * regardless of the effectiveness of the compression. Segments
+		 * are aligned relative to the beginning of each isochronous
+		 * packet. The first segment is a header (the decompressor
+		 * skips it later).
+		 */
+
+		int b, read = 0, allzero, copied = 0;
+
+		while (read < n) {
+			allzero = 1;
+			for (b = 0; b < 8; b++) {
+				if (in[read + b]) {
+					allzero = 0;
+					break;
+				}
+			}
+
+			if (allzero) {
+			/* Don't copy it */
+			} else {
+				if (frame->bytes_recvd + copied + 8 <= max_raw)
+				{
+					memcpy(frame->rawdata 
+						+ frame->bytes_recvd + copied,
+						in + read, 8);
+					copied += 8;
+				} else {
+					PDEBUG(3, "Raw data buffer overrun!!");
+				}
+			}
+			read += 8;
+		}
+		frame->bytes_recvd += copied;
+	}
 }
 
 static void 
 ov51x_isoc_irq(struct urb *urb)
 {
-	int len;
+	int i;
 	struct usb_ov511 *ov;
+	struct ov511_sbuf *sbuf;
 
 	if (!urb->context) {
 		PDEBUG(4, "no context");
 		return;
 	}
 
-	ov = (struct usb_ov511 *) urb->context;
+	sbuf = urb->context;
+	ov = sbuf->ov;
 
 	if (!ov || !ov->dev || !ov->user) {
 		PDEBUG(4, "no device, or not open");
@@ -4219,16 +4068,52 @@ ov51x_isoc_irq(struct urb *urb)
 		return;
 	}
 
+        if (urb->status == -ENOENT || urb->status == -ECONNRESET) {
+                PDEBUG(4, "URB unlinked");
+                return;
+        }
+
+	if (urb->status != -EINPROGRESS && urb->status != 0) {
+		err("ERROR: urb->status=%d: %s", urb->status,
+		    symbolic(urb_errlist, urb->status));
+		return;
+	}
+
 	/* Copy the data received into our frame buffer */
-	if (ov->curframe >= 0) {
-		if (ov->bclass == BCL_OV511)
-			len = ov511_move_data(ov, urb);
-		else if (ov->bclass == BCL_OV518)
-			len = ov518_move_data(ov, urb);
-		else
-			err("Unknown bridge device (%d)", ov->bridge);
-	} else if (waitqueue_active(&ov->wq)) {
-		wake_up_interruptible(&ov->wq);
+	PDEBUG(5, "sbuf[%d]: Moving %d packets", sbuf->n,
+	       urb->number_of_packets);
+	for (i = 0; i < urb->number_of_packets; i++) {
+		/* Warning: Don't call *_move_data() if no frame active! */
+		if (ov->curframe >= 0) {
+			int n = urb->iso_frame_desc[i].actual_length;
+			int st = urb->iso_frame_desc[i].status;
+			unsigned char *cdata;
+
+			urb->iso_frame_desc[i].actual_length = 0;
+			urb->iso_frame_desc[i].status = 0;
+
+			cdata = urb->transfer_buffer
+				+ urb->iso_frame_desc[i].offset;
+
+			if (!n) {
+				PDEBUG(4, "Zero-length packet");
+				continue;
+			}
+
+			if (st)
+				PDEBUG(2, "data error: [%d] len=%d, status=%d",
+				       i, n, st);
+
+			if (ov->bclass == BCL_OV511)
+				ov511_move_data(ov, cdata, n);
+			else if (ov->bclass == BCL_OV518)
+				ov518_move_data(ov, cdata, n);
+			else
+				err("Unknown bridge device (%d)", ov->bridge);
+
+		} else if (waitqueue_active(&ov->wq)) {
+			wake_up_interruptible(&ov->wq);
+		}
 	}
 
 	urb->dev = ov->dev;
@@ -4297,14 +4182,13 @@ ov51x_init_isoc(struct usb_ov511 *ov)
 
 	for (n = 0; n < OV511_NUMSBUF; n++) {
 		urb = usb_alloc_urb(FRAMES_PER_DESC, GFP_KERNEL);
-	
 		if (!urb) {
 			err("init isoc: usb_alloc_urb ret. NULL");
 			return -ENOMEM;
 		}
 		ov->sbuf[n].urb = urb;
 		urb->dev = ov->dev;
-		urb->context = ov;
+		urb->context = &ov->sbuf[n];
 		urb->pipe = usb_rcvisocpipe(ov->dev, OV511_ENDPOINT_ADDRESS);
 		urb->transfer_flags = USB_ISO_ASAP;
 		urb->transfer_buffer = ov->sbuf[n].data;
@@ -4334,10 +4218,23 @@ ov51x_init_isoc(struct usb_ov511 *ov)
 }
 
 static void 
-ov51x_stop_isoc(struct usb_ov511 *ov)
+ov51x_unlink_isoc(struct usb_ov511 *ov)
 {
 	int n;
 
+	/* Unschedule all of the iso td's */
+	for (n = OV511_NUMSBUF - 1; n >= 0; n--) {
+		if (ov->sbuf[n].urb) {
+			usb_unlink_urb(ov->sbuf[n].urb);
+			usb_free_urb(ov->sbuf[n].urb);
+			ov->sbuf[n].urb = NULL;
+		}
+	}
+}
+
+static void 
+ov51x_stop_isoc(struct usb_ov511 *ov)
+{
 	if (!ov->streaming || !ov->dev)
 		return;
 
@@ -4347,15 +4244,7 @@ ov51x_stop_isoc(struct usb_ov511 *ov)
 
 	ov->streaming = 0;
 
-	/* Unschedule all of the iso td's */
-	for (n = OV511_NUMSBUF - 1; n >= 0; n--) {
-		if (ov->sbuf[n].urb) {
-			ov->sbuf[n].urb->next = NULL;
-			usb_unlink_urb(ov->sbuf[n].urb);
-			usb_free_urb(ov->sbuf[n].urb);
-			ov->sbuf[n].urb = NULL;
-		}
-	}
+	ov51x_unlink_isoc(ov);
 }
 
 static int 
@@ -4409,89 +4298,6 @@ ov51x_new_frame(struct usb_ov511 *ov, int framenum)
  *
  ***************************************************************************/
 
-static int 
-ov51x_alloc(struct usb_ov511 *ov)
-{
-	int i;
-	const int w = ov->maxwidth;
-	const int h = ov->maxheight;
-	const int data_bufsize = OV511_NUMFRAMES * MAX_DATA_SIZE(w, h);
-	const int raw_bufsize = OV511_NUMFRAMES * MAX_RAW_DATA_SIZE(w, h);
-
-	PDEBUG(4, "entered");
-	down(&ov->buf_lock);
-
-	if (ov->buf_state == BUF_PEND_DEALLOC) {
-		ov->buf_state = BUF_ALLOCATED;
-		del_timer(&ov->buf_timer);
-	}
-
-	if (ov->buf_state == BUF_ALLOCATED)
-		goto out;
-
-	ov->fbuf = rvmalloc(data_bufsize);
-	if (!ov->fbuf)
-		goto error;
-
-	ov->rawfbuf = vmalloc(raw_bufsize);
-	if (!ov->rawfbuf) {
-		rvfree(ov->fbuf, data_bufsize);
-		ov->fbuf = NULL;
-		goto error;
-	}
-	memset(ov->rawfbuf, 0, raw_bufsize);
-
-	ov->tempfbuf = vmalloc(raw_bufsize);
-	if (!ov->tempfbuf) {
-		vfree(ov->rawfbuf);
-		ov->rawfbuf = NULL;
-		rvfree(ov->fbuf, data_bufsize);
-		ov->fbuf = NULL;
-		goto error;
-	}
-	memset(ov->tempfbuf, 0, raw_bufsize);
-
-	for (i = 0; i < OV511_NUMSBUF; i++) {
-		ov->sbuf[i].data = kmalloc(FRAMES_PER_DESC *
-			MAX_FRAME_SIZE_PER_DESC, GFP_KERNEL);
-		if (!ov->sbuf[i].data) {
-			while (--i) {
-				kfree(ov->sbuf[i].data);
-				ov->sbuf[i].data = NULL;
-			}
-			vfree(ov->tempfbuf);
-			ov->tempfbuf = NULL;
-			vfree(ov->rawfbuf);
-			ov->rawfbuf = NULL;
-			rvfree(ov->fbuf, data_bufsize);
-			ov->fbuf = NULL;
-
-			goto error;
-		}
-		PDEBUG(4, "sbuf[%d] @ %p", i, ov->sbuf[i].data);
-	}
-
-	for (i = 0; i < OV511_NUMFRAMES; i++) {
-		ov->frame[i].data = ov->fbuf + i * MAX_DATA_SIZE(w, h);
-		ov->frame[i].rawdata = ov->rawfbuf 
-		 + i * MAX_RAW_DATA_SIZE(w, h);
-		ov->frame[i].tempdata = ov->tempfbuf 
-		 + i * MAX_RAW_DATA_SIZE(w, h);
-		PDEBUG(4, "frame[%d] @ %p", i, ov->frame[i].data);
-	}
-
-	ov->buf_state = BUF_ALLOCATED;
-out:
-	up(&ov->buf_lock);
-	PDEBUG(4, "leaving");
-	return 0;
-error:
-	ov->buf_state = BUF_NOT_ALLOCATED;
-	up(&ov->buf_lock);
-	PDEBUG(4, "errored");
-	return -ENOMEM;
-}
-
 /* 
  * - You must acquire buf_lock before entering this function.
  * - Because this code will free any non-null pointer, you must be sure to null
@@ -4530,11 +4336,87 @@ ov51x_do_dealloc(struct usb_ov511 *ov)
 		ov->frame[i].data = NULL;
 		ov->frame[i].rawdata = NULL;
 		ov->frame[i].tempdata = NULL;
+		if (ov->frame[i].compbuf) {
+			free_page((unsigned long) ov->frame[i].compbuf);
+			ov->frame[i].compbuf = NULL;
+		}
 	}
 
 	PDEBUG(4, "buffer memory deallocated");
 	ov->buf_state = BUF_NOT_ALLOCATED;
 	PDEBUG(4, "leaving");
+}
+
+static int 
+ov51x_alloc(struct usb_ov511 *ov)
+{
+	int i;
+	const int w = ov->maxwidth;
+	const int h = ov->maxheight;
+	const int data_bufsize = OV511_NUMFRAMES * MAX_DATA_SIZE(w, h);
+	const int raw_bufsize = OV511_NUMFRAMES * MAX_RAW_DATA_SIZE(w, h);
+
+	PDEBUG(4, "entered");
+	down(&ov->buf_lock);
+
+	if (ov->buf_state == BUF_PEND_DEALLOC) {
+		ov->buf_state = BUF_ALLOCATED;
+		del_timer(&ov->buf_timer);
+	}
+
+	if (ov->buf_state == BUF_ALLOCATED)
+		goto out;
+
+	ov->fbuf = rvmalloc(data_bufsize);
+	if (!ov->fbuf)
+		goto error;
+
+	ov->rawfbuf = vmalloc(raw_bufsize);
+	if (!ov->rawfbuf)
+		goto error;
+
+	memset(ov->rawfbuf, 0, raw_bufsize);
+
+	ov->tempfbuf = vmalloc(raw_bufsize);
+	if (!ov->tempfbuf)
+		goto error;
+
+	memset(ov->tempfbuf, 0, raw_bufsize);
+
+	for (i = 0; i < OV511_NUMSBUF; i++) {
+		ov->sbuf[i].data = kmalloc(FRAMES_PER_DESC *
+			MAX_FRAME_SIZE_PER_DESC, GFP_KERNEL);
+		if (!ov->sbuf[i].data)
+			goto error;
+
+		PDEBUG(4, "sbuf[%d] @ %p", i, ov->sbuf[i].data);
+	}
+
+	for (i = 0; i < OV511_NUMFRAMES; i++) {
+		ov->frame[i].data = ov->fbuf + i * MAX_DATA_SIZE(w, h);
+		ov->frame[i].rawdata = ov->rawfbuf 
+		 + i * MAX_RAW_DATA_SIZE(w, h);
+		ov->frame[i].tempdata = ov->tempfbuf 
+		 + i * MAX_RAW_DATA_SIZE(w, h);
+
+		ov->frame[i].compbuf = 
+		 (unsigned char *) __get_free_page(GFP_KERNEL);
+		if (!ov->frame[i].compbuf)
+			goto error;
+
+		PDEBUG(4, "frame[%d] @ %p", i, ov->frame[i].data);
+	}
+
+	ov->buf_state = BUF_ALLOCATED;
+out:
+	up(&ov->buf_lock);
+	PDEBUG(4, "leaving");
+	return 0;
+error:
+	ov51x_do_dealloc(ov);
+	up(&ov->buf_lock);
+	PDEBUG(4, "errored");
+	return -ENOMEM;
 }
 
 static void 
@@ -4585,9 +4467,16 @@ ov51x_dealloc(struct usb_ov511 *ov, int now)
  *
  ***************************************************************************/
 
+#ifdef OV511_OLD_V4L
 static int 
 ov51x_v4l1_open(struct video_device *vdev, int flags)
 {
+#else
+static int 
+ov51x_v4l1_open(struct inode *inode, struct file *file)
+{
+	struct video_device *vdev = video_devdata(file);
+#endif
 	struct usb_ov511 *ov = vdev->priv;
 	int err, i;
 
@@ -4639,9 +4528,16 @@ out:
 	return err;
 }
 
+#ifdef OV511_OLD_V4L
 static void 
 ov51x_v4l1_close(struct video_device *vdev)
 {
+#else
+static int 
+ov51x_v4l1_close(struct inode *inode, struct file *file)
+{
+	struct video_device *vdev = video_devdata(file);
+#endif
 	struct usb_ov511 *ov = vdev->priv;
 
 	PDEBUG(4, "ov511_close");
@@ -4674,32 +4570,19 @@ ov51x_v4l1_close(struct video_device *vdev)
 		kfree(ov);
 		ov = NULL;
 	}
-}
 
-static int 
-ov51x_v4l1_init_done(struct video_device *vdev)
-{
-#if defined(CONFIG_PROC_FS) && defined(CONFIG_VIDEO_PROC_FS)
-	create_proc_ov511_cam(vdev->priv);
-#endif
-
+#ifdef OV511_OLD_V4L
+	return;
+#else
 	return 0;
-}
-
-static long 
-ov51x_v4l1_write(struct video_device *vdev, const char *buf,
-		 unsigned long count, int noblock)
-{
-	return -EINVAL;
+#endif
 }
 
 /* Do not call this function directly! */
 static int 
-ov51x_v4l1_ioctl_internal(struct video_device *vdev, unsigned int cmd,
+ov51x_v4l1_ioctl_internal(struct usb_ov511 *ov, unsigned int cmd,
 			  void *arg)
 {
-	struct usb_ov511 *ov = vdev->priv;
-
 	PDEBUG(5, "IOCtl: 0x%X", cmd);
 
 	if (!ov->dev)
@@ -4708,95 +4591,79 @@ ov51x_v4l1_ioctl_internal(struct video_device *vdev, unsigned int cmd,
 	switch (cmd) {
 	case VIDIOCGCAP:
 	{
-		struct video_capability b;
+		struct video_capability *b = arg;
 
 		PDEBUG(4, "VIDIOCGCAP");
 
-		memset(&b, 0, sizeof(b));
-		sprintf(b.name, "%s USB Camera",
-			ov->bridge == BRG_OV511 ? "OV511" :
-			ov->bridge == BRG_OV511PLUS ? "OV511+" :
-			ov->bridge == BRG_OV518 ? "OV518" :
-			ov->bridge == BRG_OV518PLUS ? "OV518+" :
-			"unknown");
-		b.type = VID_TYPE_CAPTURE | VID_TYPE_SUBCAPTURE;
+		memset(b, 0, sizeof(struct video_capability));
+		sprintf(b->name, "%s USB Camera",
+			symbolic(brglist, ov->bridge));
+		b->type = VID_TYPE_CAPTURE | VID_TYPE_SUBCAPTURE;
 		if (ov->has_tuner)
-			b.type |= VID_TYPE_TUNER;
-		b.channels = ov->num_inputs;
-		b.audios = ov->has_audio_proc ? 1:0;
-		b.maxwidth = ov->maxwidth;
-		b.maxheight = ov->maxheight;
-		b.minwidth = ov->minwidth;
-		b.minheight = ov->minheight;
+			b->type |= VID_TYPE_TUNER;
+		b->channels = ov->num_inputs;
+		b->audios = ov->has_audio_proc ? 1:0;
+		b->maxwidth = ov->maxwidth;
+		b->maxheight = ov->maxheight;
+		b->minwidth = ov->minwidth;
+		b->minheight = ov->minheight;
 
-		if (copy_to_user(arg, &b, sizeof(b)))
-			return -EFAULT;
-				
 		return 0;
 	}
 	case VIDIOCGCHAN:
 	{
-		struct video_channel v;
+		struct video_channel *v = arg;
 
 		PDEBUG(4, "VIDIOCGCHAN");
 
-		if (copy_from_user(&v, arg, sizeof(v)))
-			return -EFAULT;
-
-		if ((unsigned)(v.channel) >= ov->num_inputs) {
-			err("Invalid channel (%d)", v.channel);
+		if ((unsigned)(v->channel) >= ov->num_inputs) {
+			err("Invalid channel (%d)", v->channel);
 			return -EINVAL;
 		}
 
-		v.norm = ov->norm;
-		v.type = (ov->has_tuner) ? VIDEO_TYPE_TV : VIDEO_TYPE_CAMERA;
-		v.flags = (ov->has_tuner) ? VIDEO_VC_TUNER : 0;
-		v.flags |= (ov->has_audio_proc) ? VIDEO_VC_AUDIO : 0;
-//		v.flags |= (ov->has_decoder) ? VIDEO_VC_NORM : 0;
-		v.tuners = (ov->has_tuner) ? 1:0;
-		decoder_get_input_name(ov, v.channel, v.name);
+		v->norm = ov->norm;
+		v->type = (ov->has_tuner) ? VIDEO_TYPE_TV : VIDEO_TYPE_CAMERA;
+		v->flags = (ov->has_tuner) ? VIDEO_VC_TUNER : 0;
+		v->flags |= (ov->has_audio_proc) ? VIDEO_VC_AUDIO : 0;
+//		v->flags |= (ov->has_decoder) ? VIDEO_VC_NORM : 0;
+		v->tuners = (ov->has_tuner) ? 1:0;
+		decoder_get_input_name(ov, v->channel, v->name);
 
-		if (copy_to_user(arg, &v, sizeof(v)))
-			return -EFAULT;
-				
 		return 0;
 	}
 	case VIDIOCSCHAN:
 	{
-		struct video_channel v;
+		struct video_channel *v = arg;
 		int err;
 
 		PDEBUG(4, "VIDIOCSCHAN");
 
-		if (copy_from_user(&v, arg, sizeof(v)))
-			return -EFAULT;
-
 		/* Make sure it's not a camera */
 		if (!ov->has_decoder) {
-			if (v.channel == 0)
+			if (v->channel == 0)
 				return 0;
 			else
 				return -EINVAL;
 		}
 
-		if (v.norm != VIDEO_MODE_PAL &&
-		    v.norm != VIDEO_MODE_NTSC &&
-		    v.norm != VIDEO_MODE_SECAM &&
-		    v.norm != VIDEO_MODE_AUTO) {
-			err("Invalid norm (%d)", v.norm);
+		if (v->norm != VIDEO_MODE_PAL &&
+		    v->norm != VIDEO_MODE_NTSC &&
+		    v->norm != VIDEO_MODE_SECAM &&
+		    v->norm != VIDEO_MODE_AUTO) {
+			err("Invalid norm (%d)", v->norm);
 			return -EINVAL;
 		}
 
-		if ((unsigned)(v.channel) >= ov->num_inputs) {
-			err("Invalid channel (%d)", v.channel);
+		if ((unsigned)(v->channel) >= ov->num_inputs) {
+			err("Invalid channel (%d)", v->channel);
 			return -EINVAL;
 		}
 
-		err = decoder_set_input(ov, v.channel);
+		err = decoder_set_input(ov, v->channel);
 		if (err)
 			return err;
 
-		err = decoder_set_norm(ov, v.norm);
+		err = decoder_set_norm(ov, v->norm);
 		if (err)
 			return err;
 
@@ -4804,43 +4671,37 @@ ov51x_v4l1_ioctl_internal(struct video_device *vdev, unsigned int cmd,
 	}
 	case VIDIOCGPICT:
 	{
-		struct video_picture p;
+		struct video_picture *p = arg;
 
 		PDEBUG(4, "VIDIOCGPICT");
 
-		memset(&p, 0, sizeof(p));
-
-		if (sensor_get_picture(ov, &p))
+		memset(p, 0, sizeof(struct video_picture));
+		if (sensor_get_picture(ov, p))
 			return -EIO;
-
-		if (copy_to_user(arg, &p, sizeof(p)))
-			return -EFAULT;
 
 		return 0;
 	}
 	case VIDIOCSPICT:
 	{
-		struct video_picture p;
+		struct video_picture *p = arg;
 		int i;
 
 		PDEBUG(4, "VIDIOCSPICT");
 
-		if (copy_from_user(&p, arg, sizeof(p)))
-			return -EFAULT;
-
-		if (!get_depth(p.palette))
+		if (!get_depth(p->palette))
 			return -EINVAL;
 
-		if (sensor_set_picture(ov, &p))
+		if (sensor_set_picture(ov, p))
 			return -EIO;
 
-		if (force_palette && p.palette != force_palette) {
-			info("Palette rejected (%d)", p.palette);
+		if (force_palette && p->palette != force_palette) {
+			info("Palette rejected (%s)",
+			     symbolic(v4l1_plist, p->palette));
 			return -EINVAL;
 		}
 
 		// FIXME: Format should be independent of frames
-		if (p.palette != ov->frame[0].format) {
+		if (p->palette != ov->frame[0].format) {
 			PDEBUG(4, "Detected format change");
 
 			/* If we're collecting previous frame wait
@@ -4849,79 +4710,73 @@ ov51x_v4l1_ioctl_internal(struct video_device *vdev, unsigned int cmd,
 			if (signal_pending(current)) return -EINTR;
 
 			mode_init_regs(ov, ov->frame[0].width,
-				ov->frame[0].height, p.palette, ov->sub_flag);
+				ov->frame[0].height, p->palette, ov->sub_flag);
 		}
 
-		PDEBUG(4, "Setting depth=%d, palette=%d", p.depth, p.palette);
+		PDEBUG(4, "Setting depth=%d, palette=%s",
+		       p->depth, symbolic(v4l1_plist, p->palette));
+
 		for (i = 0; i < OV511_NUMFRAMES; i++) {
-			ov->frame[i].depth = p.depth;
-			ov->frame[i].format = p.palette;
+			ov->frame[i].depth = p->depth;
+			ov->frame[i].format = p->palette;
 		}
 
 		return 0;
 	}
 	case VIDIOCGCAPTURE:
 	{
-		int vf;
+		int *vf = arg;
 
 		PDEBUG(4, "VIDIOCGCAPTURE");
 
-		if (copy_from_user(&vf, arg, sizeof(vf)))
-			return -EFAULT;
-		ov->sub_flag = vf;
+		ov->sub_flag = *vf;
 		return 0;
 	}
 	case VIDIOCSCAPTURE:
 	{
-		struct video_capture vc;
+		struct video_capture *vc = arg;
 
 		PDEBUG(4, "VIDIOCSCAPTURE");
 
-		if (copy_from_user(&vc, arg, sizeof(vc)))
-			return -EFAULT;
-		if (vc.flags)
+		if (vc->flags)
 			return -EINVAL;
-		if (vc.decimation)
+		if (vc->decimation)
 			return -EINVAL;
 
-		vc.x &= ~3L;
-		vc.y &= ~1L;
-		vc.y &= ~31L;
+		vc->x &= ~3L;
+		vc->y &= ~1L;
+		vc->y &= ~31L;
 
-		if (vc.width == 0)
-			vc.width = 32;
+		if (vc->width == 0)
+			vc->width = 32;
 
-		vc.height /= 16;
-		vc.height *= 16;
-		if (vc.height == 0)
-			vc.height = 16;
+		vc->height /= 16;
+		vc->height *= 16;
+		if (vc->height == 0)
+			vc->height = 16;
 
-		ov->subx = vc.x;
-		ov->suby = vc.y;
-		ov->subw = vc.width;
-		ov->subh = vc.height;
+		ov->subx = vc->x;
+		ov->suby = vc->y;
+		ov->subw = vc->width;
+		ov->subh = vc->height;
 
 		return 0;
 	}
 	case VIDIOCSWIN:
 	{
-		struct video_window vw;
+		struct video_window *vw = arg;
 		int i, result;
 
-		if (copy_from_user(&vw, arg, sizeof(vw)))
-			return -EFAULT;
-
-		PDEBUG(4, "VIDIOCSWIN: width=%d, height=%d",
-			vw.width, vw.height);
+		PDEBUG(4, "VIDIOCSWIN: %dx%d", vw->width, vw->height);
 
 #if 0
-		if (vw.flags)
+		if (vw->flags)
 			return -EINVAL;
-		if (vw.clipcount)
+		if (vw->clipcount)
 			return -EINVAL;
-		if (vw.height != ov->maxheight)
+		if (vw->height != ov->maxheight)
 			return -EINVAL;
-		if (vw.width != ov->maxwidth)
+		if (vw->width != ov->maxwidth)
 			return -EINVAL;
 #endif
 
@@ -4930,140 +4785,132 @@ ov51x_v4l1_ioctl_internal(struct video_device *vdev, unsigned int cmd,
 		interruptible_sleep_on(&ov->wq);
 		if (signal_pending(current)) return -EINTR;
 
-		result = mode_init_regs(ov, vw.width, vw.height,
+		result = mode_init_regs(ov, vw->width, vw->height,
 			ov->frame[0].format, ov->sub_flag);
 		if (result < 0)
 			return result;
 
 		for (i = 0; i < OV511_NUMFRAMES; i++) {
-			ov->frame[i].width = vw.width;
-			ov->frame[i].height = vw.height;
+			ov->frame[i].width = vw->width;
+			ov->frame[i].height = vw->height;
 		}
 
 		return 0;
 	}
 	case VIDIOCGWIN:
 	{
-		struct video_window vw;
+		struct video_window *vw = arg;
 
-		memset(&vw, 0, sizeof(vw));
-		vw.x = 0;		/* FIXME */
-		vw.y = 0;
-		vw.width = ov->frame[0].width;
-		vw.height = ov->frame[0].height;
-		vw.flags = 30;
+		memset(vw, 0, sizeof(struct video_window));
+		vw->x = 0;		/* FIXME */
+		vw->y = 0;
+		vw->width = ov->frame[0].width;
+		vw->height = ov->frame[0].height;
+		vw->flags = 30;
 
-		PDEBUG(4, "VIDIOCGWIN: %dx%d", vw.width, vw.height);
-
-		if (copy_to_user(arg, &vw, sizeof(vw)))
-			return -EFAULT;
+		PDEBUG(4, "VIDIOCGWIN: %dx%d", vw->width, vw->height);
 
 		return 0;
 	}
 	case VIDIOCGMBUF:
 	{
-		struct video_mbuf vm;
+		struct video_mbuf *vm = arg;
 		int i;
 
 		PDEBUG(4, "VIDIOCGMBUF");
 
-		memset(&vm, 0, sizeof(vm));
-		vm.size = OV511_NUMFRAMES
-			* MAX_DATA_SIZE(ov->maxwidth, ov->maxheight);
-		vm.frames = OV511_NUMFRAMES;
+		memset(vm, 0, sizeof(struct video_mbuf));
+		vm->size = OV511_NUMFRAMES
+			   * MAX_DATA_SIZE(ov->maxwidth, ov->maxheight);
+		vm->frames = OV511_NUMFRAMES;
 
-		vm.offsets[0] = 0;
+		vm->offsets[0] = 0;
 		for (i = 1; i < OV511_NUMFRAMES; i++) {
-			vm.offsets[i] = vm.offsets[i-1]
+			vm->offsets[i] = vm->offsets[i-1]
 			   + MAX_DATA_SIZE(ov->maxwidth, ov->maxheight);
 		}
-
-		if (copy_to_user((void *)arg, (void *)&vm, sizeof(vm)))
-			return -EFAULT;
 
 		return 0;
 	}
 	case VIDIOCMCAPTURE:
 	{
-		struct video_mmap vm;
+		struct video_mmap *vm = arg;
 		int ret, depth;
+		unsigned int f = vm->frame;
 
-		if (copy_from_user((void *)&vm, (void *)arg, sizeof(vm)))
-			return -EFAULT;
+		PDEBUG(4, "VIDIOCMCAPTURE: frame: %d, %dx%d, %s", f, vm->width,
+			vm->height, symbolic(v4l1_plist, vm->format));
 
-		PDEBUG(4, "CMCAPTURE");
-		PDEBUG(4, "frame: %d, size: %dx%d, format: %d",
-			vm.frame, vm.width, vm.height, vm.format);
-
-		depth = get_depth(vm.format);
+		depth = get_depth(vm->format);
 		if (!depth) {
-			err("VIDIOCMCAPTURE: invalid format (%d)", vm.format);
+			err("VIDIOCMCAPTURE: invalid format (%s)",
+			    symbolic(v4l1_plist, vm->format));
 			return -EINVAL;
 		}
 
-		if ((unsigned)vm.frame >= OV511_NUMFRAMES) {
-			err("VIDIOCMCAPTURE: invalid frame (%d)", vm.frame);
+		if (f >= OV511_NUMFRAMES) {
+			err("VIDIOCMCAPTURE: invalid frame (%d)", f);
 			return -EINVAL;
 		}
 
-		if (vm.width > ov->maxwidth 
-		    || vm.height > ov->maxheight) {
+		if (vm->width > ov->maxwidth 
+		    || vm->height > ov->maxheight) {
 			err("VIDIOCMCAPTURE: requested dimensions too big");
 			return -EINVAL;
 		}
 
-		if (ov->frame[vm.frame].grabstate == FRAME_GRABBING) {
+		if (ov->frame[f].grabstate == FRAME_GRABBING) {
 			PDEBUG(4, "VIDIOCMCAPTURE: already grabbing");
 			return -EBUSY;
 		}
 
-		if (force_palette && vm.format != force_palette) {
-			info("palette rejected (%d)", vm.format);
+		if (force_palette && (vm->format != force_palette)) {
+			info("palette rejected (%s)",
+			     symbolic(v4l1_plist, vm->format));
 			return -EINVAL;
 		}
 
-		if ((ov->frame[vm.frame].width != vm.width) ||
-		    (ov->frame[vm.frame].height != vm.height) ||
-		    (ov->frame[vm.frame].format != vm.format) ||
-		    (ov->frame[vm.frame].sub_flag != ov->sub_flag) ||
-		    (ov->frame[vm.frame].depth != depth)) {
+		if ((ov->frame[f].width != vm->width) ||
+		    (ov->frame[f].height != vm->height) ||
+		    (ov->frame[f].format != vm->format) ||
+		    (ov->frame[f].sub_flag != ov->sub_flag) ||
+		    (ov->frame[f].depth != depth)) {
 			PDEBUG(4, "VIDIOCMCAPTURE: change in image parameters");
 
 			/* If we're collecting previous frame wait
 			   before changing modes */
 			interruptible_sleep_on(&ov->wq);
 			if (signal_pending(current)) return -EINTR;
-			ret = mode_init_regs(ov, vm.width, vm.height,
-				vm.format, ov->sub_flag);
+			ret = mode_init_regs(ov, vm->width, vm->height,
+				vm->format, ov->sub_flag);
 #if 0
 			if (ret < 0) {
 				PDEBUG(1, "Got error while initializing regs ");
 				return ret;
 			}
 #endif
-			ov->frame[vm.frame].width = vm.width;
-			ov->frame[vm.frame].height = vm.height;
-			ov->frame[vm.frame].format = vm.format;
-			ov->frame[vm.frame].sub_flag = ov->sub_flag;
-			ov->frame[vm.frame].depth = depth;
+			ov->frame[f].width = vm->width;
+			ov->frame[f].height = vm->height;
+			ov->frame[f].format = vm->format;
+			ov->frame[f].sub_flag = ov->sub_flag;
+			ov->frame[f].depth = depth;
 		}
 
 		/* Mark it as ready */
-		ov->frame[vm.frame].grabstate = FRAME_READY;
+		ov->frame[f].grabstate = FRAME_READY;
 
-		PDEBUG(4, "VIDIOCMCAPTURE: renewing frame %d", vm.frame);
+		PDEBUG(4, "VIDIOCMCAPTURE: renewing frame %d", f);
 
-		return ov51x_new_frame(ov, vm.frame);
+		return ov51x_new_frame(ov, f);
 	}
 	case VIDIOCSYNC:
 	{
-		int fnum, rc;
+		unsigned int fnum = *((unsigned int *) arg);
 		struct ov511_frame *frame;
+		int rc;
 
-		if (copy_from_user((void *)&fnum, arg, sizeof(int)))
-			return -EFAULT;
 
-		if ((unsigned)fnum >= OV511_NUMFRAMES) {
+		if (fnum >= OV511_NUMFRAMES) {
 			err("VIDIOCSYNC: invalid frame (%d)", fnum);
 			return -EINVAL;
 		}
@@ -5125,123 +4972,104 @@ redo:
 	}
 	case VIDIOCGFBUF:
 	{
-		struct video_buffer vb;
+		struct video_buffer *vb = arg;
 
-		PDEBUG(4, "VIDIOCSCHAN");
+		PDEBUG(4, "VIDIOCGFBUF");
 
-		memset(&vb, 0, sizeof(vb));
-		vb.base = NULL;	/* frame buffer not supported, not used */
-
-		if (copy_to_user((void *)arg, (void *)&vb, sizeof(vb)))
-			return -EFAULT;
+		memset(vb, 0, sizeof(struct video_buffer));
 
 		return 0;
 	}
 	case VIDIOCGUNIT:
 	{
-		struct video_unit vu;
+		struct video_unit *vu = arg;
 
 		PDEBUG(4, "VIDIOCGUNIT");
 
-		memset(&vu, 0, sizeof(vu));
+		memset(vu, 0, sizeof(struct video_unit));
 
-		vu.video = ov->vdev.minor;	/* Video minor */
-		vu.vbi = VIDEO_NO_UNIT;		/* VBI minor */
-		vu.radio = VIDEO_NO_UNIT;	/* Radio minor */
-		vu.audio = VIDEO_NO_UNIT;	/* Audio minor */
-		vu.teletext = VIDEO_NO_UNIT;	/* Teletext minor */
-
-		if (copy_to_user((void *)arg, (void *)&vu, sizeof(vu)))
-			return -EFAULT;
+		vu->video = ov->vdev.minor;
+		vu->vbi = VIDEO_NO_UNIT;
+		vu->radio = VIDEO_NO_UNIT;
+		vu->audio = VIDEO_NO_UNIT;
+		vu->teletext = VIDEO_NO_UNIT;
 
 		return 0;
 	}
 	case VIDIOCGTUNER:
 	{
-		struct video_tuner v;
+		struct video_tuner *v = arg;
 
 		PDEBUG(4, "VIDIOCGTUNER");
 
-		if (copy_from_user(&v, arg, sizeof(v)))
-			return -EFAULT;
-
-		if (!ov->has_tuner || v.tuner)	// Only tuner 0
+		if (!ov->has_tuner || v->tuner)	// Only tuner 0
 			return -EINVAL;
 
-		strcpy(v.name, "Television");
+		strcpy(v->name, "Television");
 
 		// FIXME: Need a way to get the real values
-		v.rangelow = 0;
-		v.rangehigh = ~0;
+		v->rangelow = 0;
+		v->rangehigh = ~0;
 
-		v.flags = VIDEO_TUNER_PAL | VIDEO_TUNER_NTSC |
-		    VIDEO_TUNER_SECAM;
-		v.mode = 0; 		/* FIXME:  Not sure what this is yet */
-		v.signal = 0xFFFF;	/* unknown */
+		v->flags = VIDEO_TUNER_PAL | VIDEO_TUNER_NTSC
+			   | VIDEO_TUNER_SECAM;
+		v->mode = 0; 		/* FIXME:  Not sure what this is yet */
+		v->signal = 0xFFFF;	/* unknown */
 
-		call_i2c_clients(ov, cmd, &v);
-
-		if (copy_to_user(arg, &v, sizeof(v)))
-			return -EFAULT;
+		call_i2c_clients(ov, cmd, v);
 
 		return 0;
 	}
 	case VIDIOCSTUNER:
 	{
-		struct video_tuner v;
+		struct video_tuner *v = arg;
 		int err;
 
 		PDEBUG(4, "VIDIOCSTUNER");
 
-		if (copy_from_user(&v, arg, sizeof(v)))
-			return -EFAULT;
-
 		/* Only no or one tuner for now */
-		if (!ov->has_tuner || v.tuner)
+		if (!ov->has_tuner || v->tuner)
 			return -EINVAL;
 
 		/* and it only has certain valid modes */
-		if (v.mode != VIDEO_MODE_PAL &&
-		    v.mode != VIDEO_MODE_NTSC &&
-		    v.mode != VIDEO_MODE_SECAM) return -EOPNOTSUPP;
+		if (v->mode != VIDEO_MODE_PAL &&
+		    v->mode != VIDEO_MODE_NTSC &&
+		    v->mode != VIDEO_MODE_SECAM)
+			return -EOPNOTSUPP;
 
 		/* Is this right/necessary? */
-		err = decoder_set_norm(ov, v.mode);
+		err = decoder_set_norm(ov, v->mode);
 		if (err)
 			return err;
 
-		call_i2c_clients(ov, cmd, &v);
+		call_i2c_clients(ov, cmd, v);
 
 		return 0;
 	}
 	case VIDIOCGFREQ:
 	{
-		unsigned long v = ov->freq;
+		unsigned long v = *((unsigned long *) arg);
 
 		PDEBUG(4, "VIDIOCGFREQ");
 
 		if (!ov->has_tuner)
 			return -EINVAL;
+
+		v = ov->freq;
 #if 0
 		/* FIXME: this is necessary for testing */
 		v = 46*16;
 #endif
-		if (copy_to_user(arg, &v, sizeof(v)))
-			return -EFAULT;
-
 		return 0;
 	}
 	case VIDIOCSFREQ:
 	{
-		unsigned long v;
+		unsigned long v = *((unsigned long *) arg);
+
+		PDEBUG(4, "VIDIOCSFREQ: %lx", v);
 
 		if (!ov->has_tuner)
 			return -EINVAL;
-
-		if (copy_from_user(&v, arg, sizeof(v)))
-			return -EFAULT;
-
-		PDEBUG(4, "VIDIOCSFREQ: %lx", v);
 
 		ov->freq = v;
 		call_i2c_clients(ov, cmd, &v);
@@ -5262,25 +5090,110 @@ redo:
 	return 0;
 }
 
+#ifdef OV511_OLD_V4L
+/* This is implemented as video_generic_ioctl() in the new V4L's videodev.c */
+int
+ov51x_v4l1_generic_ioctl(struct video_device *vdev, unsigned int cmd, void *arg)
+{
+	char	sbuf[128];
+	void    *mbuf = NULL;
+	void	*parg = NULL;
+	int	err  = -EINVAL;
+	
+	/*  Copy arguments into temp kernel buffer  */
+	switch (_IOC_DIR(cmd)) {
+	case _IOC_NONE:
+		parg = arg;
+		break;
+	case _IOC_READ: /* some v4l ioctls are marked wrong ... */
+	case _IOC_WRITE:
+	case (_IOC_WRITE | _IOC_READ):
+		if (_IOC_SIZE(cmd) <= sizeof(sbuf)) {
+			parg = sbuf;
+		} else {
+			/* too big to allocate from stack */
+			mbuf = kmalloc(_IOC_SIZE(cmd), GFP_KERNEL);
+			if (NULL == mbuf)
+				return -ENOMEM;
+			parg = mbuf;
+		}
+		
+		err = -EFAULT;
+		if (copy_from_user(parg, arg, _IOC_SIZE(cmd)))
+			goto out;
+		break;
+	}
+
+	err = ov51x_v4l1_ioctl_internal(vdev->priv, cmd, parg);
+	if (err == -ENOIOCTLCMD)
+		err = -EINVAL;
+	if (err < 0)
+		goto out;
+
+	/*  Copy results into user buffer  */
+	switch (_IOC_DIR(cmd))
+	{
+	case _IOC_READ:
+	case (_IOC_WRITE | _IOC_READ):
+		if (copy_to_user(arg, parg, _IOC_SIZE(cmd)))
+			err = -EFAULT;
+		break;
+	}
+
+out:
+	if (mbuf)
+		kfree(mbuf);
+	return err;
+}
+
 static int 
 ov51x_v4l1_ioctl(struct video_device *vdev, unsigned int cmd, void *arg)
 {
-	int rc;
 	struct usb_ov511 *ov = vdev->priv;
+	int rc;
 
 	if (down_interruptible(&ov->lock))
 		return -EINTR;
 
-	rc = ov51x_v4l1_ioctl_internal(vdev, cmd, arg);
+	rc = ov51x_v4l1_generic_ioctl(vdev, cmd, arg);
 
 	up(&ov->lock);
 	return rc;
 }
 
+#else	/* If new V4L API */
+
+static int 
+ov51x_v4l1_ioctl(struct inode *inode, struct file *file,
+		 unsigned int cmd, void *arg)
+{
+	struct video_device *vdev = video_devdata(file);
+	struct usb_ov511 *ov = vdev->priv;
+	int rc;
+
+	if (down_interruptible(&ov->lock))
+		return -EINTR;
+
+	rc = ov51x_v4l1_ioctl_internal(ov, cmd, arg);
+
+	up(&ov->lock);
+	return rc;
+}
+#endif	/* OV511_OLD_V4L */
+
+#ifdef OV511_OLD_V4L
 static inline long 
 ov51x_v4l1_read(struct video_device *vdev, char *buf, unsigned long count,
 		int noblock)
 {
+#else
+static inline int 
+ov51x_v4l1_read(struct file *file, char *buf, size_t cnt, loff_t *ppos)
+{
+	struct video_device *vdev = video_devdata(file);
+	int noblock = file->f_flags&O_NONBLOCK;
+	unsigned long count = cnt;
+#endif
 	struct usb_ov511 *ov = vdev->priv;
 	int i, rc = 0, frmx = -1;
 	struct ov511_frame *frame;
@@ -5429,12 +5342,23 @@ error:
 	return rc;
 }
 
-static int 
+static int
+#ifdef OV511_OLD_V4L
 ov51x_v4l1_mmap(struct vm_area_struct *vma, struct video_device *vdev,
 		const char *adr, unsigned long size)
 {
-	struct usb_ov511 *ov = vdev->priv;
 	unsigned long start = (unsigned long)adr;
+
+#else	/* New V4L API */
+
+ov51x_v4l1_mmap(struct file *file, struct vm_area_struct *vma)
+{
+	struct video_device *vdev = video_devdata(file);
+	unsigned long start = vma->vm_start;
+	unsigned long size  = vma->vm_end - vma->vm_start;
+#endif	/* OV511_OLD_V4L */
+
+	struct usb_ov511 *ov = vdev->priv;
 	unsigned long page, pos;
 
 	if (ov->dev == NULL)
@@ -5453,7 +5377,8 @@ ov51x_v4l1_mmap(struct vm_area_struct *vma, struct video_device *vdev,
 	pos = (unsigned long)ov->fbuf;
 	while (size > 0) {
 		page = kvirt_to_pa(pos);
-		if (remap_page_range(vma, start, page, PAGE_SIZE, PAGE_SHARED)) {
+		if (remap_page_range(vma, start, page, PAGE_SIZE,
+				     PAGE_SHARED)) {
 			up(&ov->lock);
 			return -EAGAIN;
 		}
@@ -5469,6 +5394,7 @@ ov51x_v4l1_mmap(struct vm_area_struct *vma, struct video_device *vdev,
 	return 0;
 }
 
+#ifdef OV511_OLD_V4L
 static struct video_device vdev_template = {
 	owner:		THIS_MODULE,
 	name:		"OV511 USB Camera",
@@ -5477,11 +5403,31 @@ static struct video_device vdev_template = {
 	open:		ov51x_v4l1_open,
 	close:		ov51x_v4l1_close,
 	read:		ov51x_v4l1_read,
-	write:		ov51x_v4l1_write,
 	ioctl:		ov51x_v4l1_ioctl,
 	mmap:		ov51x_v4l1_mmap,
-	initialize:	ov51x_v4l1_init_done,
 };
+
+#else	/* New V4L API */
+
+static struct file_operations ov511_fops = {
+	owner:		THIS_MODULE,
+	open:		ov51x_v4l1_open,
+	release:       	ov51x_v4l1_close,
+	read:		ov51x_v4l1_read,
+	mmap:		ov51x_v4l1_mmap,
+	ioctl:          video_generic_ioctl,
+	llseek:         no_llseek,
+};
+
+static struct video_device vdev_template = {
+	owner:		THIS_MODULE,
+	name:		"OV511 USB Camera",
+	type:		VID_TYPE_CAPTURE,
+	hardware:	VID_HARDWARE_OV511,
+	fops:           &ov511_fops,
+	kernel_ioctl:	ov51x_v4l1_ioctl,
+};
+#endif	/* OV511_OLD_V4L */
 
 #if defined(CONFIG_PROC_FS) && defined(CONFIG_VIDEO_PROC_FS)
 static int 
@@ -5497,7 +5443,7 @@ ov51x_control_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	if (!pde)
 		return -ENOENT;
 
-	ov = (struct usb_ov511 *) pde->data;
+	ov = pde->data;
 	if (!ov)
 		return -ENODEV;
 
@@ -6067,19 +6013,18 @@ ov6xx0_configure(struct usb_ov511 *ov)
 	if (rc < 0) {
 		err("Error detecting sensor type");
 		return -1;
-	} else if ((rc & 3) == 0) {
-		info("Sensor is an OV6630");
-		ov->sensor = SEN_OV6630;
-	} else if ((rc & 3) == 1) {
-		info("Sensor is an OV6620");
-		ov->sensor = SEN_OV6620;
-	} else if ((rc & 3) == 2) {
-		info("Sensor is an OV6630AE");
-		ov->sensor = SEN_OV6630;
-	} else if ((rc & 3) == 3) {
-		info("Sensor is an OV6630AF");
-		ov->sensor = SEN_OV6630;
 	} 
+
+	if ((rc & 3) == 0)
+		ov->sensor = SEN_OV6630;
+	else if ((rc & 3) == 1)
+		ov->sensor = SEN_OV6620;
+	else if ((rc & 3) == 2)
+		ov->sensor = SEN_OV6630;
+	else if ((rc & 3) == 3)
+		ov->sensor = SEN_OV6630;
+
+	info("Sensor is an %s", symbolic(senlist, ov->sensor));
 
 	/* Set sensor-specific vars */
 	ov->maxwidth = 352;
@@ -6165,7 +6110,7 @@ ks0127_configure(struct usb_ov511 *ov)
 
 /* This initializes the SAA7111A video decoder. */
 static int 
-saa7111a_configure(struct usb_ov511 *ov511)
+saa7111a_configure(struct usb_ov511 *ov)
 {
 	int rc;
 
@@ -6210,44 +6155,44 @@ saa7111a_configure(struct usb_ov511 *ov511)
 #endif
 
 	/* Set sensor-specific vars */
-	ov511->maxwidth = 640;
-	ov511->maxheight = 480;		/* Even/Odd fields */
-	ov511->minwidth = 320;
-	ov511->minheight = 240;		/* Even field only */
+	ov->maxwidth = 640;
+	ov->maxheight = 480;		/* Even/Odd fields */
+	ov->minwidth = 320;
+	ov->minheight = 240;		/* Even field only */
 
-	ov511->has_decoder = 1;
-	ov511->num_inputs = 8;
-	ov511->norm = VIDEO_MODE_AUTO;
-	ov511->stop_during_set = 0;	/* Decoder guarantees stable image */
+	ov->has_decoder = 1;
+	ov->num_inputs = 8;
+	ov->norm = VIDEO_MODE_AUTO;
+	ov->stop_during_set = 0;	/* Decoder guarantees stable image */
 
 	/* Decoder doesn't change these values, so we use these instead of
 	 * acutally reading the registers (which doesn't work) */
-	ov511->brightness = 0x80 << 8;
-	ov511->contrast = 0x40 << 9;
-	ov511->colour = 0x40 << 9;
-	ov511->hue = 32768;
+	ov->brightness = 0x80 << 8;
+	ov->contrast = 0x40 << 9;
+	ov->colour = 0x40 << 9;
+	ov->hue = 32768;
 
 	PDEBUG(4, "Writing SAA7111A registers");
-	if (write_regvals(ov511, aRegvalsNormSAA7111A))
+	if (write_regvals(ov, aRegvalsNormSAA7111A))
 		return -1;
 
 	/* Detect version of decoder. This must be done after writing the
          * initial regs or the decoder will lock up. */
-	rc = i2c_r(ov511, 0x00);
+	rc = i2c_r(ov, 0x00);
 
 	if (rc < 0) {
 		err("Error detecting sensor version");
 		return -1;
 	} else {
 		info("Sensor is an SAA7111A (version 0x%x)", rc);
-		ov511->sensor = SEN_SAA7111A;
+		ov->sensor = SEN_SAA7111A;
 	}
 
 	// FIXME: Fix this for OV518(+)
 	/* Latch to negative edge of clock. Otherwise, we get incorrect
 	 * colors and jitter in the digital signal. */
-	if (ov511->bclass == BCL_OV511)
-		reg_w(ov511, 0x11, 0x00);
+	if (ov->bclass == BCL_OV511)
+		reg_w(ov, 0x11, 0x00);
 	else
 		warn("SAA7111A not yet supported with OV518/OV518+");
 
@@ -6258,8 +6203,6 @@ saa7111a_configure(struct usb_ov511 *ov511)
 static int 
 ov511_configure(struct usb_ov511 *ov)
 {
-	int i;
-
 	static struct ov511_regvals aRegvalsInit511[] = {
 		{ OV511_REG_BUS, R51x_SYS_RESET,	0x7f },
 	 	{ OV511_REG_BUS, R51x_SYS_INIT,		0x01 },
@@ -6301,24 +6244,18 @@ ov511_configure(struct usb_ov511 *ov)
 		goto error;
 	}
 
-	ov->desc = -1;
 	PDEBUG (1, "CustomID = %d", ov->customid);
-	for (i = 0; clist[i].id >= 0; i++) {
-		if (ov->customid == clist[i].id) {
-			info("model: %s", clist[i].description);
-			ov->desc = i;
-			break;
-		}
-	}
+	ov->desc = symbolic(camlist, ov->customid);
+	info("model: %s", ov->desc);
 
-	if (clist[i].id == -1) {
+	if (0 == strcmp(ov->desc, NOT_DEFINED_STR)) {
 		err("Camera type (%d) not recognized", ov->customid);
 		err("Please notify " EMAIL " of the name,");
 		err("manufacturer, model, and this number of your camera.");
 		err("Also include the output of the detection process.");
 	} 
 
-	if (clist[i].id == 6) {	/* USB Life TV (NTSC) */
+	if (ov->customid == 6) {	/* USB Life TV (NTSC) */
 		ov->tuner_type = 8;		/* Temic 4036FY5 3X 1981 */
 	}
 
@@ -6545,7 +6482,6 @@ error:
  *
  ***************************************************************************/
 
-/* 2.2.x compatibility */
 static void *
 ov51x_probe(struct usb_device *dev, unsigned int ifnum,
 	    const struct usb_device_id *id)
@@ -6592,29 +6528,24 @@ ov51x_probe(struct usb_device *dev, unsigned int ifnum,
 
 	switch (dev->descriptor.idProduct) {
 	case PROD_OV511:
-		info("USB OV511 camera found");
 		ov->bridge = BRG_OV511;
 		ov->bclass = BCL_OV511;
 		break;
 	case PROD_OV511PLUS:
-		info("USB OV511+ camera found");
 		ov->bridge = BRG_OV511PLUS;
 		ov->bclass = BCL_OV511;
 		break;
 	case PROD_OV518:
-		info("USB OV518 camera found");
 		ov->bridge = BRG_OV518;
 		ov->bclass = BCL_OV518;
 		break;
 	case PROD_OV518PLUS:
-		info("USB OV518+ camera found");
 		ov->bridge = BRG_OV518PLUS;
 		ov->bclass = BCL_OV518;
 		break;
 	case PROD_ME2CAM:
 		if (dev->descriptor.idVendor != VEND_MATTEL)
 			goto error;
-		info("Intel Play Me2Cam (OV511+) found");
 		ov->bridge = BRG_OV511PLUS;
 		ov->bclass = BCL_OV511;
 		break;
@@ -6622,6 +6553,8 @@ ov51x_probe(struct usb_device *dev, unsigned int ifnum,
 		err("Unknown product ID 0x%x", dev->descriptor.idProduct);
 		goto error_dealloc;
 	}
+
+	info("USB %s video device found", symbolic(brglist, ov->bridge));
 
 	/* Workaround for some applications that want data in RGB
 	 * instead of BGR. */
@@ -6654,6 +6587,12 @@ ov51x_probe(struct usb_device *dev, unsigned int ifnum,
 	for (i = 0; i < OV511_NUMFRAMES; i++) {
 		ov->frame[i].framenum = i;
 		init_waitqueue_head(&ov->frame[i].wq);
+	}
+
+	for (i = 0; i < OV511_NUMSBUF; i++) {
+		ov->sbuf[i].ov = ov;
+		spin_lock_init(&ov->sbuf[i].lock);
+		ov->sbuf[i].n = i;
 	}
 
 	/* Unnecessary? (This is done on open(). Need to make sure variables
@@ -6690,11 +6629,13 @@ ov51x_probe(struct usb_device *dev, unsigned int ifnum,
 
 	info("Device registered on minor %d", ov->vdev.minor);
 
+#if defined(CONFIG_PROC_FS) && defined(CONFIG_VIDEO_PROC_FS)
+	create_proc_ov511_cam(ov);
+#endif
+
      	return ov;
 
 error:
-	err("Camera initialization failed");
-
 #if defined(CONFIG_PROC_FS) && defined(CONFIG_VIDEO_PROC_FS)
 	/* Safe to call even if entry doesn't exist */
 	destroy_proc_ov511_cam(ov);
@@ -6707,9 +6648,6 @@ error:
 		up(&ov->cbuf_lock);
 	}
 
-	usb_driver_release_interface(&ov511_driver,
-		&dev->actconfig->interface[ov->iface]);
-
 error_dealloc:
 	if (ov) {
 		kfree(ov);
@@ -6717,6 +6655,7 @@ error_dealloc:
 	}
 
 error_out:
+	err("Camera initialization failed");
 	return NULL;
 }
 
@@ -6749,22 +6688,12 @@ ov51x_disconnect(struct usb_device *dev, void *ptr)
 
 	ov->streaming = 0;
 
-	/* Unschedule all of the iso td's */
-	for (n = OV511_NUMSBUF - 1; n >= 0; n--) {
-		if (ov->sbuf[n].urb) {
-			ov->sbuf[n].urb->next = NULL;
-			usb_unlink_urb(ov->sbuf[n].urb);
-			usb_free_urb(ov->sbuf[n].urb);
-			ov->sbuf[n].urb = NULL;
-		}
-	}
+	ov51x_unlink_isoc(ov);
 
 #if defined(CONFIG_PROC_FS) && defined(CONFIG_VIDEO_PROC_FS)
         destroy_proc_ov511_cam(ov);
 #endif
 
-	usb_driver_release_interface(&ov511_driver,
-		&ov->dev->actconfig->interface[ov->iface]);
 	ov->dev = NULL;
 
 	/* Free the memory */

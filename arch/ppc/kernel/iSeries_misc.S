@@ -29,7 +29,7 @@
 	.align	5
 
 #ifdef CONFIG_SMP
-	.comm	hash_table_lock,4
+	.comm	mmu_hash_lock,4
 #endif /* CONFIG_SMP */
 
 _GLOBAL(is_msr_enabled)

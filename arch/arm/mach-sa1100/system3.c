@@ -58,6 +58,7 @@
 
 #include "generic.h"
 #include "sa1111.h"
+#include <asm/hardware/sa1111.h>
 
 #define DEBUG 1
 
@@ -74,19 +75,17 @@
 /* init funcs */
 static void __init fixup_system3(struct machine_desc *desc,
 		struct param_struct *params, char **cmdline, struct meminfo *mi);
-static void __init get_system3_scr(void);
 static int __init system3_init(void);
 static void __init system3_init_irq(void);
 static void __init system3_map_io(void);
 
-static void system3_IRQ_demux( int irq, void *dev_id, struct pt_regs *regs );
-static int system3_get_mctrl(struct uart_port *port);
+static u_int system3_get_mctrl(struct uart_port *port);
 static void system3_set_mctrl(struct uart_port *port, u_int mctrl);
 static void system3_uart_pm(struct uart_port *port, u_int state, u_int oldstate);
 static int sdram_notifier(struct notifier_block *nb, unsigned long event, void *data);
 
-static int system3_lcd_power(int on);
-static int system3_backlight_power(int on);
+static void system3_lcd_power(int on);
+static void system3_backlight_power(int on);
 
 extern void convert_to_tag_list(struct param_struct *params, int mem_init);
 
@@ -101,9 +100,9 @@ extern void convert_to_tag_list(struct param_struct *params, int mem_init);
 
 static struct map_desc system3_io_desc[] __initdata = {
  /* virtual     physical    length      domain     r  w  c  b */
-  { 0xe8000000, 0x00000000, 0x01000000, DOMAIN_IO, 1, 1, 0, 0 }, /* Flash bank 0 */
-  { 0xf3000000, 0x10000000, 0x00100000, DOMAIN_IO, 1, 1, 0, 0 }, /* System Registers */
-  { 0xf4000000, 0x40000000, 0x00100000, DOMAIN_IO, 1, 1, 0, 0 }, /* SA-1111 */
+  { 0xe8000000, 0x00000000,		0x01000000, DOMAIN_IO, 0, 1, 0, 0 }, /* Flash bank 0 */
+  { 0xf3000000, PT_CPLD_BASE,	0x00100000, DOMAIN_IO, 0, 1, 0, 0 }, /* System Registers */
+  { 0xf4000000, PT_SA1111_BASE,	0x00100000, DOMAIN_IO, 0, 1, 0, 0 }, /* SA-1111 */
   LAST_DESC
 };
 
@@ -111,12 +110,6 @@ static struct sa1100_port_fns system3_port_fns __initdata = {
 	set_mctrl:	system3_set_mctrl,
 	get_mctrl:	system3_get_mctrl,
 	pm:		system3_uart_pm,
-};
-
-static struct irqaction system3_irq = {
-	name:		"PT Digital Board SA1111 IRQ",
-	handler:	system3_IRQ_demux,
-	flags:		SA_INTERRUPT
 };
 
 static struct notifier_block system3_clkchg_block = {
@@ -145,56 +138,82 @@ static void __init system3_map_io(void)
 /*********************************************************************
  * Install IRQ handler
  */
-static void system3_IRQ_demux( int irq, void *dev_id, struct pt_regs *regs )
+static void
+system3_irq_handler(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
 {
 	u_char irr;
 
-	for(;;){
-		//irr = PTCPLD_REG_IRQSR & (PT_IRQ_LAN | PT_IRQ_USAR | PT_IRQ_SA1111);
-		irr = PT_IRQSR & (PT_IRQ_LAN | PT_IRQ_SA1111);
+	//DPRINTK( "irq=%d, desc=%p, regs=%p\n", irq, desc, regs );
 
-		irr ^= (PT_IRQ_LAN);
-		if (!irr) break;
+	while (1) {
+		struct irqdesc *d;
 
-		if( irr & PT_IRQ_LAN )
-			do_IRQ(IRQ_SYSTEM3_SMC9196, regs);
+		/*
+		 * Acknowledge the parent IRQ.
+		 */
+		desc->chip->ack(irq);
 
-#if 0
-		/* Highspeed Serial Bus not yet used */
-		if( irr & PT_IRQ_USAR )
-			do_IRQ(PT_USAR_IRQ, regs);
+		/*
+		 * Read the interrupt reason register.  Let's have all
+		 * active IRQ bits high.  Note: there is a typo in the
+		 * Neponset user's guide for the SA1111 IRR level.
+		 */
+		//irr = PT_IRQSR & (PT_IRR_LAN | PT_IRR_SA1111);
+		irr = PT_IRQSR & (PT_IRR_SA1111);
+
+		/* SMC IRQ is low-active, so "switch" bit over */
+		//irr ^= (PT_IRR_LAN);
+
+		//DPRINTK( "irr=0x%02x\n", irr );
+
+		if ((irr & (PT_IRR_LAN | PT_IRR_SA1111)) == 0)
+			break;
+
+		/*
+		 * Since there is no individual mask, we have to
+		 * mask the parent IRQ.  This is safe, since we'll
+		 * recheck the register for any pending IRQs.
+		 */
+		if (irr & (PT_IRR_LAN)) {
+			desc->chip->mask(irq);
+
+			if (irr & PT_IRR_LAN) {
+				//DPRINTK( "SMC9196, irq=%d\n", IRQ_SYSTEM3_SMC9196 );
+				d = irq_desc + IRQ_SYSTEM3_SMC9196;
+				d->handle(IRQ_SYSTEM3_SMC9196, d, regs);
+			}
+
+#if 0 /* no SSP yet on system 4 */
+			if (irr & IRR_USAR) {
+				d = irq_desc + IRQ_NEPONSET_USAR;
+				d->handle(IRQ_NEPONSET_USAR, d, regs);
+			}
 #endif
 
-		if( irr & PT_IRQ_SA1111 )
-			sa1111_IRQ_demux(irq, dev_id, regs);
+			desc->chip->unmask(irq);
+		}
+
+		if (irr & PT_IRR_SA1111) {
+			//DPRINTK( "SA1111, irq=%d\n", IRQ_SYSTEM3_SA1111 );
+			d = irq_desc + IRQ_SYSTEM3_SA1111;
+			d->handle(IRQ_SYSTEM3_SA1111, d, regs);
+		}
 	}
 }
 
-
 static void __init system3_init_irq(void)
 {
-	int irq;
+	/*
+	 * Install handler for GPIO25.
+	 */
+	set_irq_type(IRQ_GPIO25, IRQT_RISING);
+	set_irq_chained_handler(IRQ_GPIO25, system3_irq_handler);
 
-	DPRINTK( "%s\n", "START" );
-
-	/* SA1111 IRQ not routed to a GPIO. */
-	sa1111_init_irq(-1);
-
-	/* setup extra IRQs */
-	irq = IRQ_SYSTEM3_SMC9196;
-	irq_desc[irq].valid	= 1;
-	irq_desc[irq].probe_ok	= 1;
-
-#if 0
-	/* Highspeed Serial Bus not yet used */
-	irq = PT_USAR_IRQ;
-	irq_desc[irq].valid	= 1;
-	irq_desc[irq].probe_ok	= 1;
-#endif
-
-	/* IRQ by CPLD */
-	set_GPIO_IRQ_edge( GPIO_GPIO(25), GPIO_RISING_EDGE );
-	setup_arm_irq( IRQ_GPIO25, &system3_irq );
+	/*
+	 * install eth irq
+	 */
+	set_irq_handler(IRQ_SYSTEM3_SMC9196, do_simple_IRQ);
+	set_irq_flags(IRQ_SYSTEM3_SMC9196, IRQF_VALID | IRQF_PROBE);
 }
 
 /**********************************************************************
@@ -270,7 +289,7 @@ static void system3_set_mctrl(struct uart_port *port, u_int mctrl)
 	}
 }
 
-static int system3_get_mctrl(struct uart_port *port)
+static u_int system3_get_mctrl(struct uart_port *port)
 {
 	u_int ret = 0;
 	u_int irqsr = PT_IRQSR;
@@ -358,12 +377,8 @@ static void system3_lcd_brightness(unsigned char value)
 
 static void system3_lcd_power(int on)
 {
-#error why is backlight stuff here???
 	if (on) {
 		system3_lcd_on();
-		system3_lcd_backlight_on();
-		system3_lcd_contrast(0x95);
-		system3_lcd_brightness(240);
 	} else {
 		system3_lcd_off();
 	}
@@ -407,10 +422,12 @@ static int __init system3_init(void)
 	 */
 	sa1110_mb_disable();
 
+	system3_init_irq();
+
 	/*
 	 * Probe for a SA1111.
 	 */
-	ret = sa1111_probe(0x40000000);
+	ret = sa1111_probe(PT_SA1111_BASE);
 	if (ret < 0) {
 		printk( KERN_WARNING"PT Digital Board: no SA1111 found!\n" );
 		goto DONE;
@@ -443,7 +460,11 @@ static int __init system3_init(void)
 	 */
 	sa1110_mb_enable();
 
-	system3_init_irq();
+	/*
+	 * Initialise SA1111 IRQs
+	 */
+	sa1111_init_irq(IRQ_SYSTEM3_SA1111);
+
 
 #if defined( CONFIG_CPU_FREQ )
 	ret = cpufreq_register_notifier(&system3_clkchg_block);
@@ -452,6 +473,7 @@ static int __init system3_init(void)
 		goto DONE;
 	}
 #endif
+
 
 	ret = 0;
 DONE:

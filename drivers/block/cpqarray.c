@@ -1179,7 +1179,7 @@ static int ida_ioctl(struct inode *inode, struct file *filep, unsigned int cmd, 
 	case BLKROSET:
 	case BLKROGET:
 	case BLKPG:
-		return blk_ioctl(inode->i_rdev, cmd, arg);
+		return blk_ioctl(inode->i_bdev, cmd, arg);
 
 	default:
 		return -EINVAL;

@@ -358,19 +358,10 @@ asmlinkage long sys_access(const char * filename, int mode)
 
 asmlinkage long sys_chdir(const char * filename)
 {
-	int error;
 	struct nameidata nd;
-	char *name;
+	int error;
 
-	name = getname(filename);
-	error = PTR_ERR(name);
-	if (IS_ERR(name))
-		goto out;
-
-	error = 0;
-	if (path_init(name,LOOKUP_POSITIVE|LOOKUP_FOLLOW|LOOKUP_DIRECTORY,&nd))
-		error = path_walk(name, &nd);
-	putname(name);
+	error = __user_walk(filename, LOOKUP_FOLLOW|LOOKUP_DIRECTORY, &nd);
 	if (error)
 		goto out;
 
@@ -418,19 +409,10 @@ out:
 
 asmlinkage long sys_chroot(const char * filename)
 {
-	int error;
 	struct nameidata nd;
-	char *name;
+	int error;
 
-	name = getname(filename);
-	error = PTR_ERR(name);
-	if (IS_ERR(name))
-		goto out;
-
-	path_init(name, LOOKUP_POSITIVE | LOOKUP_FOLLOW |
-		      LOOKUP_DIRECTORY | LOOKUP_NOALT, &nd);
-	error = path_walk(name, &nd);	
-	putname(name);
+	error = __user_walk(filename, LOOKUP_FOLLOW | LOOKUP_DIRECTORY | LOOKUP_NOALT, &nd);
 	if (error)
 		goto out;
 

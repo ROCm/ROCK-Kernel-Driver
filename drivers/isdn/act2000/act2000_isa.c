@@ -178,7 +178,8 @@ act2000_isa_config_port(act2000_card * card, unsigned short portbase)
                 card->flags &= ~ACT2000_FLAGS_PVALID;
         }
         if (!check_region(portbase, ISA_REGION)) {
-                request_region(portbase, ACT2000_PORTLEN, card->regname);
+                if (request_region(portbase, ACT2000_PORTLEN, card->regname) == NULL)
+			return -EIO;
                 card->port = portbase;
                 card->flags |= ACT2000_FLAGS_PVALID;
                 return 0;

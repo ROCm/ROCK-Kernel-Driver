@@ -1812,7 +1812,7 @@ static int startup(struct mgsl_struct * info)
 	/* Allocate and claim adapter resources */
 	retval = mgsl_claim_resources(info);
 	
-	/* perform existance check and diagnostics */
+	/* perform existence check and diagnostics */
 	if ( !retval )
 		retval = mgsl_adapter_test(info);
 		

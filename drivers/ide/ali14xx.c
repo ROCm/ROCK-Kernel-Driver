@@ -1,6 +1,4 @@
 /*
- *  linux/drivers/ide/ali14xx.c		Version 0.03	Feb 09, 1996
- *
  *  Copyright (C) 1996  Linus Torvalds & author (see below)
  */
 
@@ -36,8 +34,6 @@
  * advertised as supporting mode 4.  (I've been running a WDC AC21200 in
  * mode 4 for a while now with no trouble.)  -Derek
  */
-
-#undef REALLY_SLOW_IO           /* most systems can safely undef this */
 
 #include <linux/types.h>
 #include <linux/kernel.h>

@@ -78,12 +78,4 @@ void snd_wrapper_vfree(void *);
 
 #include "sndmagic.h"
 
-/*
- * Temporary hack, until linux/init.h is fixed.
- */
-#include <linux/init.h>
-#ifndef __devexit_p
-#define __devexit_p(x) x
-#endif
-
 #endif /* __SOUND_DRIVER_H */

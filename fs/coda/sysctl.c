@@ -37,26 +37,18 @@ static struct ctl_table_header *fs_table_header;
 
 #define FS_CODA         1       /* Coda file system */
 
-#define CODA_DEBUG  	 1	 /* control debugging */
-#define CODA_ENTRY	 2       /* control enter/leave pattern */
 #define CODA_TIMEOUT    3       /* timeout on upcalls to become intrble */
-#define CODA_MC         4       /* use/do not use the access cache */
 #define CODA_HARD       5       /* mount type "hard" or "soft" */
 #define CODA_VFS 	 6       /* vfs statistics */
 #define CODA_UPCALL 	 7       /* upcall statistics */
-#define CODA_PERMISSION	 8       /* permission statistics */
 #define CODA_CACHE_INV 	 9       /* cache invalidation statistics */
 #define CODA_FAKE_STATFS 10	 /* don't query venus for actual cache usage */
 
 static ctl_table coda_table[] = {
-	{CODA_DEBUG, "debug", &coda_debug, sizeof(int), 0644, NULL, &proc_dointvec},
-	{CODA_ENTRY, "printentry", &coda_print_entry, sizeof(int), 0644, NULL, &proc_dointvec},
- 	{CODA_MC, "accesscache", &coda_access_cache, sizeof(int), 0644, NULL, &proc_dointvec}, 
  	{CODA_TIMEOUT, "timeout", &coda_timeout, sizeof(int), 0644, NULL, &proc_dointvec},
  	{CODA_HARD, "hard", &coda_hard, sizeof(int), 0644, NULL, &proc_dointvec},
  	{CODA_VFS, "vfs_stats", NULL, 0, 0644, NULL, &do_reset_coda_vfs_stats},
  	{CODA_UPCALL, "upcall_stats", NULL, 0, 0644, NULL, &do_reset_coda_upcall_stats},
- 	{CODA_PERMISSION, "permission_stats", NULL, 0, 0644, NULL, &do_reset_coda_permission_stats},
  	{CODA_CACHE_INV, "cache_inv_stats", NULL, 0, 0644, NULL, &do_reset_coda_cache_inv_stats},
  	{CODA_FAKE_STATFS, "fake_statfs", &coda_fake_statfs, sizeof(int), 0600, NULL, &proc_dointvec},
 	{ 0 }
@@ -68,7 +60,6 @@ static ctl_table fs_table[] = {
 };
 
 struct coda_vfs_stats		coda_vfs_stat;
-struct coda_permission_stats	coda_permission_stat;
 struct coda_cache_inv_stats	coda_cache_inv_stat;
 struct coda_upcall_stats_entry  coda_upcall_stat[CODA_NCALLS];
 struct coda_upcallstats         coda_callstats;
@@ -126,11 +117,6 @@ void reset_coda_upcall_stats( void )
 	memset( &coda_upcall_stat, 0, sizeof( coda_upcall_stat ) );
 }
 
-void reset_coda_permission_stats( void )
-{
-	memset( &coda_permission_stat, 0, sizeof( coda_permission_stat ) );
-}
-
 void reset_coda_cache_inv_stats( void )
 {
 	memset( &coda_cache_inv_stat, 0, sizeof( coda_cache_inv_stat ) );
@@ -141,7 +127,6 @@ void do_time_stats( struct coda_upcall_stats_entry * pentry,
 		    unsigned long runtime )
 {
 	unsigned long time = runtime;	/* time in us */
-	CDEBUG(D_SPECIAL, "time: %ld\n", time);
 
 	if ( pentry->count == 0 ) {
 		pentry->time_sum = pentry->time_squared_sum = 0;
@@ -248,21 +233,6 @@ int do_reset_coda_upcall_stats( ctl_table * table, int write,
                         coda_upcall_timestamping = (c == '1');
                 }
 		reset_coda_upcall_stats();
-
-		filp->f_pos += *lenp;
-	} else {
-		*lenp = 0;
-	}
-
-	return 0;
-}
-
-int do_reset_coda_permission_stats( ctl_table * table, int write, 
-				    struct file * filp, void * buffer, 
-				    size_t * lenp )
-{
-	if ( write ) {
-		reset_coda_permission_stats();
 
 		filp->f_pos += *lenp;
 	} else {
@@ -394,35 +364,6 @@ int coda_upcall_stats_get_info( char * buffer, char ** start, off_t offset,
 	return len;
 }
 
-int coda_permission_stats_get_info( char * buffer, char ** start, off_t offset,
-				    int length)
-{
-	int len=0;
-	off_t begin;
-	struct coda_permission_stats * ps = & coda_permission_stat;
-  
-	/* this works as long as we are below 1024 characters! */
-	len += sprintf( buffer,
-			"Coda permission statistics\n"
-			"==========================\n\n"
-			"count\t\t%9d\n"
-			"hit count\t%9d\n",
-
-			ps->count,
-			ps->hit_count );
-  
-	begin = offset;
-	*start = buffer + begin;
-	len -= begin;
-
-	if ( len > length )
-		len = length;
-	if ( len < 0 )
-		len = 0;
-
-	return len;
-}
-
 int coda_cache_inv_stats_get_info( char * buffer, char ** start, off_t offset,
 				   int length)
 {
@@ -484,7 +425,6 @@ void coda_sysctl_init()
 	memset(&coda_callstats, 0, sizeof(coda_callstats));
 	reset_coda_vfs_stats();
 	reset_coda_upcall_stats();
-	reset_coda_permission_stats();
 	reset_coda_cache_inv_stats();
 
 #ifdef CONFIG_PROC_FS
@@ -493,7 +433,6 @@ void coda_sysctl_init()
 		proc_fs_coda->owner = THIS_MODULE;
 		coda_proc_create("vfs_stats", coda_vfs_stats_get_info);
 		coda_proc_create("upcall_stats", coda_upcall_stats_get_info);
-		coda_proc_create("permission_stats", coda_permission_stats_get_info);
 		coda_proc_create("cache_inv_stats", coda_cache_inv_stats_get_info);
 	}
 #endif
@@ -516,7 +455,6 @@ void coda_sysctl_clean()
 
 #if CONFIG_PROC_FS
         remove_proc_entry("cache_inv_stats", proc_fs_coda);
-        remove_proc_entry("permission_stats", proc_fs_coda);
         remove_proc_entry("upcall_stats", proc_fs_coda);
         remove_proc_entry("vfs_stats", proc_fs_coda);
 	remove_proc_entry("coda", proc_root_fs);

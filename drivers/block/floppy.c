@@ -3449,7 +3449,7 @@ static int fd_ioctl(struct inode *inode, struct file *filp, unsigned int cmd,
 		case BLKROSET:
 		case BLKROGET:
 		case BLKFLSBUF:
-			return blk_ioctl(device, cmd, param);
+			return blk_ioctl(inode->i_bdev, cmd, param);
 	}
 	type = TYPE(device);
 	drive = DRIVE(device);

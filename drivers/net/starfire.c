@@ -96,13 +96,19 @@
 	LK1.3.5 (jgarzik)
 	- ethtool NWAY_RST, GLINK, [GS]MSGLVL support
 
+	LK1.3.6:
+	- Sparc64 support and fixes (Ion Badulescu)
+	- Better stats and error handling (Ion Badulescu)
+	- Use new pci_set_mwi() PCI API function (jgarzik)
+
 TODO:
 	- implement tx_timeout() properly
+	- VLAN support
 */
 
 #define DRV_NAME	"starfire"
-#define DRV_VERSION	"1.03+LK1.3.5"
-#define DRV_RELDATE	"November 17, 2001"
+#define DRV_VERSION	"1.03+LK1.3.6"
+#define DRV_RELDATE	"March 7, 2002"
 
 #include <linux/version.h>
 #include <linux/module.h>
@@ -128,8 +134,11 @@ TODO:
  * for this driver to really use the firmware. Note that Rx/Tx
  * hardware TCP checksumming is not possible without the firmware.
  *
- * I'm currently [Feb 2001] talking to Adaptec about this redistribution
- * issue. Stay tuned...
+ * If Adaptec could allow redistribution of the firmware (even in binary
+ * format), life would become a lot easier. Unfortunately, I've lost my
+ * Adaptec contacts, so progress on this front is rather unlikely to
+ * occur. If anybody from Adaptec reads this and can help with this matter,
+ * please let me know...
  */
 #undef HAS_FIRMWARE
 /*
@@ -609,7 +618,10 @@ static int __devinit starfire_init_one(struct pci_dev *pdev,
 	long ioaddr;
 	int drv_flags, io_size;
 	int boguscnt;
+#ifndef HAVE_PCI_SET_MWI
+	u16 cmd;
 	u8 cache;
+#endif
 
 /* when built into the kernel, we only print version if device is found */
 #ifndef MODULE
@@ -644,14 +656,25 @@ static int __devinit starfire_init_one(struct pci_dev *pdev,
 		goto err_out_free_netdev;
 	}
 
-	ioaddr = (long) ioremap (ioaddr, io_size);
+	/* ioremap is borken in Linux-2.2.x/sparc64 */
+#if !defined(CONFIG_SPARC64) || LINUX_VERSION_CODE > 0x20300
+	ioaddr = (long) ioremap(ioaddr, io_size);
 	if (!ioaddr) {
 		printk (KERN_ERR DRV_NAME " %d: cannot remap 0x%x @ 0x%lx, aborting\n",
 			card_idx, io_size, ioaddr);
 		goto err_out_free_res;
 	}
+#endif /* !CONFIG_SPARC64 || Linux 2.3.0+ */
 
-	pci_set_master (pdev);
+	pci_set_master(pdev);
+
+#ifdef HAVE_PCI_SET_MWI
+	pci_set_mwi(pdev);
+#else
+	/* enable MWI -- it vastly improves Rx performance on sparc64 */
+	pci_read_config_word(pdev, PCI_COMMAND, &cmd);
+	cmd |= PCI_COMMAND_INVALIDATE;
+	pci_write_config_word(pdev, PCI_COMMAND, cmd);
 
 	/* set PCI cache size */
 	pci_read_config_byte(pdev, PCI_CACHE_LINE_SIZE, &cache);
@@ -662,6 +685,7 @@ static int __devinit starfire_init_one(struct pci_dev *pdev,
 		pci_write_config_byte(pdev, PCI_CACHE_LINE_SIZE,
 				      SMP_CACHE_BYTES >> 2);
 	}
+#endif
 
 #ifdef ZEROCOPY
 	/* Starfire can do SG and TCP/UDP checksumming */
@@ -670,7 +694,7 @@ static int __devinit starfire_init_one(struct pci_dev *pdev,
 
 	/* Serial EEPROM reads are hidden by the hardware. */
 	for (i = 0; i < 6; i++)
-		dev->dev_addr[i] = readb(ioaddr + EEPROMCtrl + 20-i);
+		dev->dev_addr[i] = readb(ioaddr + EEPROMCtrl + 20 - i);
 
 #if ! defined(final_version) /* Dump the EEPROM contents during development. */
 	if (debug > 4)
@@ -932,7 +956,7 @@ static int netdev_open(struct net_device *dev)
 
 	/* Fill both the unused Tx SA register and the Rx perfect filter. */
 	for (i = 0; i < 6; i++)
-		writeb(dev->dev_addr[i], ioaddr + StationAddr + 5-i);
+		writeb(dev->dev_addr[i], ioaddr + StationAddr + 5 - i);
 	for (i = 0; i < 16; i++) {
 		u16 *eaddrs = (u16 *)dev->dev_addr;
 		long setup_frm = ioaddr + PerfFilterTable + i * 16;
@@ -979,9 +1003,9 @@ static int netdev_open(struct net_device *dev)
 #ifdef HAS_FIRMWARE
 	/* Load Rx/Tx firmware into the frame processors */
 	for (i = 0; i < FIRMWARE_RX_SIZE * 2; i++)
-		writel(cpu_to_le32(firmware_rx[i]), ioaddr + RxGfpMem + i * 4);
+		writel(firmware_rx[i], ioaddr + RxGfpMem + i * 4);
 	for (i = 0; i < FIRMWARE_TX_SIZE * 2; i++)
-		writel(cpu_to_le32(firmware_tx[i]), ioaddr + TxGfpMem + i * 4);
+		writel(firmware_tx[i], ioaddr + TxGfpMem + i * 4);
 	/* Enable the Rx and Tx units, and the Rx/Tx frame processors. */
 	writel(0x003F, ioaddr + GenCtrl);
 #else  /* not HAS_FIRMWARE */
@@ -1156,8 +1180,8 @@ static int start_tx(struct sk_buff *skb, struct net_device *dev)
 
 	np->tx_ring[entry].first_addr = cpu_to_le32(np->tx_info[entry].first_mapping);
 #ifdef ZEROCOPY
-	np->tx_ring[entry].first_len = cpu_to_le32(skb_first_frag_len(skb));
-	np->tx_ring[entry].total_len = cpu_to_le32(skb->len);
+	np->tx_ring[entry].first_len = cpu_to_le16(skb_first_frag_len(skb));
+	np->tx_ring[entry].total_len = cpu_to_le16(skb->len);
 	/* Add "| TxDescIntr" to generate Tx-done interrupts. */
 	np->tx_ring[entry].status = cpu_to_le32(TxDescID | TxCRCEn);
 	np->tx_ring[entry].nbufs = cpu_to_le32(skb_shinfo(skb)->nr_frags + 1);
@@ -1170,8 +1194,10 @@ static int start_tx(struct sk_buff *skb, struct net_device *dev)
 		np->tx_ring[entry].status |= cpu_to_le32(TxRingWrap | TxDescIntr);
 
 #ifdef ZEROCOPY
-	if (skb->ip_summed == CHECKSUM_HW)
+	if (skb->ip_summed == CHECKSUM_HW) {
 		np->tx_ring[entry].status |= cpu_to_le32(TxCalTCP);
+		np->stats.tx_compressed++;
+	}
 #endif /* ZEROCOPY */
 
 	if (debug > 5) {
@@ -1449,6 +1475,7 @@ static int netdev_rx(struct net_device *dev)
 #if defined(full_rx_status) || defined(csum_rx_status)
 		if (le32_to_cpu(np->rx_done_q[np->rx_done].status2) & 0x01000000) {
 			skb->ip_summed = CHECKSUM_UNNECESSARY;
+			np->stats.rx_compressed++;
 		}
 		/*
 		 * This feature doesn't seem to be working, at least
@@ -1580,12 +1607,17 @@ static void netdev_error(struct net_device *dev, int intr_status)
 		printk(KERN_NOTICE "%s: Increasing Tx FIFO threshold to %d bytes\n",
 		       dev->name, np->tx_threshold * 16);
 	}
-	if ((intr_status & ~(IntrNormalMask | IntrAbnormalSummary | IntrLinkChange | IntrStatsMax | IntrTxDataLow | IntrPCIPad)) && debug)
+	if (intr_status & IntrRxGFPDead) {
+		np->stats.rx_fifo_errors++;
+		np->stats.rx_errors++;
+	}
+	if (intr_status & (IntrNoTxCsum | IntrDMAErr)) {
+		np->stats.tx_fifo_errors++;
+		np->stats.tx_errors++;
+	}
+	if ((intr_status & ~(IntrNormalMask | IntrAbnormalSummary | IntrLinkChange | IntrStatsMax | IntrTxDataLow | IntrRxGFPDead | IntrNoTxCsum | IntrPCIPad)) && debug)
 		printk(KERN_ERR "%s: Something Wicked happened! %4.4x.\n",
 		       dev->name, intr_status);
-	/* Hmmmmm, it's not clear how to recover from DMA faults. */
-	if (intr_status & IntrDMAErr)
-		np->stats.tx_fifo_errors++;
 }
 
 

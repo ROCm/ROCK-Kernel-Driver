@@ -1122,9 +1122,10 @@ irnet_disconnect_indication(void *	instance,
       irttp_close_tsap(self->tsap);
       self->tsap = NULL;
 
-      /* Flush (drain) ppp_generic Tx queue (most often we have blocked it) */
+      /* Cleanup & close the PPP channel, which will kill pppd and the rest */
       if(self->ppp_open)
-	ppp_output_wakeup(&self->chan);
+	ppp_unregister_channel(&self->chan);
+      self->ppp_open = 0;
     }
   /* Cleanup the socket in case we want to reconnect */
   self->stsap_sel = 0;

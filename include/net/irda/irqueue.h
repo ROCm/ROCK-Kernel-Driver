@@ -49,8 +49,8 @@
 #define HASHBIN_SIZE   8
 #define HASHBIN_MASK   0x7
 
-#ifndef ALIGN 
-#define ALIGN __attribute__((aligned))
+#ifndef IRDA_ALIGN 
+#define IRDA_ALIGN __attribute__((aligned))
 #endif
 
 #define Q_NULL { NULL, NULL, "", 0 }
@@ -75,8 +75,8 @@ typedef struct hashbin_t {
 	__u32      magic;
 	int        hb_type;
 	int        hb_size;
-	spinlock_t hb_mutex[HASHBIN_SIZE] ALIGN;
-	irda_queue_t   *hb_queue[HASHBIN_SIZE] ALIGN;
+	spinlock_t hb_mutex[HASHBIN_SIZE] IRDA_ALIGN;
+	irda_queue_t   *hb_queue[HASHBIN_SIZE] IRDA_ALIGN;
 
 	irda_queue_t* hb_current;
 } hashbin_t;

@@ -113,24 +113,6 @@ unsigned long __max_memory;
 /* max amount of low RAM to map in */
 unsigned long __max_low_memory = MAX_LOW_MEM;
 
-int do_check_pgt_cache(int low, int high)
-{
-	int freed = 0;
-	if (pgtable_cache_size > high) {
-		do {
-                        if (pgd_quicklist) {
-				free_pgd_slow(get_pgd_fast());
-				freed++;
-			}
-			if (pte_quicklist) {
-				pte_free_slow(pte_alloc_one_fast(NULL, 0));
-				freed++;
-			}
-		} while (pgtable_cache_size > low);
-	}
-	return freed;
-}
-
 void show_mem(void)
 {
 	int i,free = 0,total = 0,reserved = 0;
@@ -160,7 +142,6 @@ void show_mem(void)
 	printk("%d reserved pages\n",reserved);
 	printk("%d pages shared\n",shared);
 	printk("%d pages swap cached\n",cached);
-	printk("%d pages in page table cache\n",(int)pgtable_cache_size);
 	show_buffers();
 }
 
@@ -396,9 +377,11 @@ void __init paging_init(void)
 
 #ifdef CONFIG_HIGHMEM
 	map_page(PKMAP_BASE, 0, 0);	/* XXX gross */
-	pkmap_page_table = pte_offset(pmd_offset(pgd_offset_k(PKMAP_BASE), PKMAP_BASE), PKMAP_BASE);
+	pkmap_page_table = pte_offset_kernel(pmd_offset(pgd_offset_k
+			(PKMAP_BASE), PKMAP_BASE), PKMAP_BASE);
 	map_page(KMAP_FIX_BEGIN, 0, 0);	/* XXX gross */
-	kmap_pte = pte_offset(pmd_offset(pgd_offset_k(KMAP_FIX_BEGIN), KMAP_FIX_BEGIN), KMAP_FIX_BEGIN);
+	kmap_pte = pte_offset_kernel(pmd_offset(pgd_offset_k
+			(KMAP_FIX_BEGIN), KMAP_FIX_BEGIN), KMAP_FIX_BEGIN);
 	kmap_prot = PAGE_KERNEL;
 #endif /* CONFIG_HIGHMEM */
 
@@ -588,10 +571,12 @@ void flush_dcache_page(struct page *page)
 
 void flush_icache_page(struct vm_area_struct *vma, struct page *page)
 {
+	unsigned long phys;
+
 	if (page->mapping && !PageReserved(page)
 	    && !test_bit(PG_arch_1, &page->flags)) {
-		__flush_dcache_icache(kmap(page));
-		kunmap(page);
+		phys = ((page - mem_map) << PAGE_SHIFT) + PPC_MEMSTART;
+		__flush_dcache_icache_phys(phys);
 		set_bit(PG_arch_1, &page->flags);
 	}
 }

@@ -81,6 +81,8 @@
 #define SIOCGMIIREG	0x8948		/* Read MII PHY register.	*/
 #define SIOCSMIIREG	0x8949		/* Write MII PHY register.	*/
 
+#define SIOCWANDEV	0x894A		/* get/set netdev parameters	*/
+
 /* ARP cache control calls. */
 		    /*  0x8950 - 0x8952  * obsolete calls, don't re-use */
 #define SIOCDARP	0x8953		/* delete ARP table entry	*/

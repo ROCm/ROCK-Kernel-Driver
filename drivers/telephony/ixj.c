@@ -3450,7 +3450,7 @@ static void ixj_write_cidcw(IXJ *j)
 	j->cidcw_wait = 0;
 	if(!j->flags.cidcw_ack) {
 		if(ixjdebug & 0x0200) {
-			printk("IXJ cidcw phone%d did not recieve ACK from display %ld\n", j->board, jiffies);
+			printk("IXJ cidcw phone%d did not receive ACK from display %ld\n", j->board, jiffies);
 		}
 		ixj_post_cid(j);
 		if(j->cid_play_flag) {

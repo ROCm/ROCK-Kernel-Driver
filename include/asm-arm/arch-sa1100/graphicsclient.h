@@ -76,15 +76,6 @@
 #define IRQ_GC_UART1_CTS       IRQ_GPIO16
 #define IRQ_GC_UART2_CTS       IRQ_GPIO17
 
-#ifndef __ASSEMBLY__
-struct gc_uart_ctrl_data_t {
-  int cts_gpio;
-  int cts_prev_state;
-  struct uart_info *info;
-  struct uart_port *port;
-};
-#endif /* __ASSEMBLY__ */
-
 /* LEDs */
 
 #define ADS_LED0	GPIO_GPIO20		/* on-board D22 */

@@ -148,25 +148,18 @@ if [ "$CONFIG_NET_ETHERNET" = "y" ]; then
    fi
    if [ "$CONFIG_NET_PCI" = "y" ]; then
       dep_tristate '    AMD PCnet32 PCI support' CONFIG_PCNET32 $CONFIG_PCI
-      dep_tristate '    Adaptec Starfire support (EXPERIMENTAL)' CONFIG_ADAPTEC_STARFIRE $CONFIG_PCI $CONFIG_EXPERIMENTAL
+      dep_tristate '    Adaptec Starfire/DuraLAN support' CONFIG_ADAPTEC_STARFIRE $CONFIG_PCI
       if [ "$CONFIG_ISA" = "y" -o "$CONFIG_EISA" = "y" ]; then
 	 dep_tristate '    Ansel Communications EISA 3200 support (EXPERIMENTAL)' CONFIG_AC3200 $CONFIG_EXPERIMENTAL
       fi
 
       dep_tristate '    Apricot Xen-II on board Ethernet' CONFIG_APRICOT $CONFIG_ISA
       dep_tristate '    CS89x0 support' CONFIG_CS89x0 $CONFIG_ISA
-      dep_tristate '    Early DECchip Tulip (dc2104x) PCI support (EXPERIMENTAL)' CONFIG_DE2104X $CONFIG_PCI $CONFIG_EXPERIMENTAL
-      dep_tristate '    DECchip Tulip (dc2114x) PCI support' CONFIG_TULIP $CONFIG_PCI
-      if [ "$CONFIG_TULIP" = "y" -o "$CONFIG_TULIP" = "m" ]; then
-         dep_bool '      New bus configuration (EXPERIMENTAL)' CONFIG_TULIP_MWI $CONFIG_EXPERIMENTAL
-         bool '      Use PCI shared mem for NIC registers' CONFIG_TULIP_MMIO
-      fi
       if [ "$CONFIG_PCI" = "y" -o "$CONFIG_EISA" = "y" ]; then
-         tristate '    Generic DECchip & DIGITAL EtherWORKS PCI/EISA' CONFIG_DE4X5
          tristate '    Digi Intl. RightSwitch SE-X support' CONFIG_DGRS
       fi
-      dep_tristate '    Davicom DM910x/DM980x support' CONFIG_DM9102 $CONFIG_PCI
-      dep_tristate '    EtherExpressPro/100 support' CONFIG_EEPRO100 $CONFIG_PCI
+      dep_tristate '    EtherExpressPro/100 support (eepro100, original Becker driver)' CONFIG_EEPRO100 $CONFIG_PCI
+      dep_tristate '    EtherExpressPro/100 support (e100, Alternate Intel driver)' CONFIG_E100 $CONFIG_PCI
       dep_tristate '    Mylex EISA LNE390A/B support (EXPERIMENTAL)' CONFIG_LNE390 $CONFIG_EISA $CONFIG_EXPERIMENTAL
       dep_tristate '    Myson MTD-8xx PCI Ethernet support' CONFIG_FEALNX $CONFIG_PCI
       dep_tristate '    National Semiconductor DP8381x series PCI Ethernet support' CONFIG_NATSEMI $CONFIG_PCI
@@ -190,7 +183,6 @@ if [ "$CONFIG_NET_ETHERNET" = "y" ]; then
       fi
       dep_tristate '    VIA Rhine support' CONFIG_VIA_RHINE $CONFIG_PCI
       dep_mbool '      Use MMIO instead of PIO (EXPERIMENTAL)' CONFIG_VIA_RHINE_MMIO $CONFIG_VIA_RHINE $CONFIG_EXPERIMENTAL
-      dep_tristate '    Winbond W89c840 Ethernet support' CONFIG_WINBOND_840 $CONFIG_PCI
       if [ "$CONFIG_OBSOLETE" = "y" ]; then
 	 dep_bool '    Zenith Z-Note support (EXPERIMENTAL)' CONFIG_ZNET $CONFIG_ISA
       fi
@@ -237,6 +229,7 @@ dep_tristate 'National Semiconduct DP83820 support' CONFIG_NS83820 $CONFIG_PCI
 dep_tristate 'Packet Engines Hamachi GNIC-II support' CONFIG_HAMACHI $CONFIG_PCI
 dep_tristate 'Packet Engines Yellowfin Gigabit-NIC support (EXPERIMENTAL)' CONFIG_YELLOWFIN $CONFIG_PCI $CONFIG_EXPERIMENTAL
 dep_tristate 'SysKonnect SK-98xx support' CONFIG_SK98LIN $CONFIG_PCI
+dep_tristate 'Broadcom Tigon3 support' CONFIG_TIGON3 $CONFIG_PCI
 
 endmenu
 
@@ -326,6 +319,9 @@ fi
 
 source drivers/net/wan/Config.in
 
+if [ "$CONFIG_PCI" = "y" -o "$CONFIG_EISA" = "y" -o "$CONFIG_CARDBUS" != "n" ]; then
+   source drivers/net/tulip/Config.in
+fi
 if [ "$CONFIG_HOTPLUG" = "y" -a "$CONFIG_PCMCIA" != "n" ]; then
    source drivers/net/pcmcia/Config.in
 fi

@@ -35,11 +35,6 @@
 int ext2_sync_file(struct file * file, struct dentry *dentry, int datasync)
 {
 	struct inode *inode = dentry->d_inode;
-	return ext2_fsync_inode(inode, datasync);
-}
-
-int ext2_fsync_inode(struct inode *inode, int datasync)
-{
 	int err;
 	
 	err  = fsync_inode_buffers(inode);

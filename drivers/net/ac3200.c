@@ -346,9 +346,11 @@ static int mem[MAX_AC32_CARDS];
 MODULE_PARM(io, "1-" __MODULE_STRING(MAX_AC32_CARDS) "i");
 MODULE_PARM(irq, "1-" __MODULE_STRING(MAX_AC32_CARDS) "i");
 MODULE_PARM(mem, "1-" __MODULE_STRING(MAX_AC32_CARDS) "i");
-MODULE_PARM_DESC(io, "ac3200 I/O base adress(es)");
-MODULE_PARM_DESC(irq, "ac3200 IRQ number(s)");
-MODULE_PARM_DESC(mem, "ac3200 Memory base address(es)");
+MODULE_PARM_DESC(io, "I/O base adress(es)");
+MODULE_PARM_DESC(irq, "IRQ number(s)");
+MODULE_PARM_DESC(mem, "Memory base address(es)");
+MODULE_DESCRIPTION("Ansel AC3200 EISA ethernet driver");
+MODULE_LICENSE("GPL");
 
 int
 init_module(void)
@@ -395,7 +397,6 @@ cleanup_module(void)
 	}
 }
 #endif /* MODULE */
-MODULE_LICENSE("GPL");
 
 
 /*

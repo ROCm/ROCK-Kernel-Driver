@@ -98,11 +98,15 @@ pgd_t *get_pgd_slow(struct mm_struct *mm)
 		if (!new_pmd)
 			goto no_pmd;
 
-		new_pte = pte_alloc(mm, new_pmd, 0);
+		new_pte = pte_alloc_map(mm, new_pmd, 0);
 		if (!new_pte)
 			goto no_pte;
 
+		init_pmd = pmd_offset(init_pgd, 0);
+		init_pte = pte_offset_map_nested(init_pmd, 0);
 		set_pte(new_pte, *init_pte);
+		pte_unmap_nested(init_pte);
+		pte_unmap(new_pte);
 
 		spin_unlock(&mm->page_table_lock);
 	}
@@ -138,7 +142,7 @@ no_pgd:
 void free_pgd_slow(pgd_t *pgd)
 {
 	pmd_t *pmd;
-	pte_t *pte;
+	struct page *pte;
 
 	if (!pgd)
 		return;
@@ -153,7 +157,7 @@ void free_pgd_slow(pgd_t *pgd)
 		goto free;
 	}
 
-	pte = pte_offset(pmd, 0);
+	pte = pmd_page(*pmd);
 	pmd_clear(pmd);
 	pte_free(pte);
 	pmd_free(pmd);
@@ -198,7 +202,7 @@ alloc_init_page(unsigned long virt, unsigned long phys, int domain, int prot)
 
 		set_pmd(pmdp, __mk_pmd(ptep, PMD_TYPE_TABLE | PMD_DOMAIN(domain)));
 	}
-	ptep = pte_offset(pmdp, virt);
+	ptep = pte_offset_kernel(pmdp, virt);
 
 	set_pte(ptep, mk_pte_phys(phys, __pgprot(prot)));
 }
@@ -224,6 +228,20 @@ static void __init create_mapping(struct map_desc *md)
 	unsigned long virt, length;
 	int prot_sect, prot_pte;
 	long off;
+
+	if (md->prot_read && md->prot_write &&
+	    !md->cacheable && !md->bufferable) {
+		printk(KERN_WARNING "Security risk: creating user "
+		       "accessible mapping for 0x%08lx at 0x%08lx\n",
+		       md->physical, md->virtual);
+	}
+
+	if (md->virtual != vectors_base() && md->virtual < PAGE_OFFSET) {
+		printk(KERN_WARNING "MM: not creating mapping for "
+		       "0x%08lx at 0x%08lx in user region\n",
+		       md->physical, md->virtual);
+		return;
+	}
 
 	prot_pte = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
 		   (md->prot_read  ? L_PTE_USER       : 0) |

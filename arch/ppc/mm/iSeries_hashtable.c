@@ -39,7 +39,7 @@
 
 int iSeries_hpt_loaded;
 
-static spinlock_t hash_table_lock = SPIN_LOCK_UNLOCKED;
+static spinlock_t mmu_hash_lock = SPIN_LOCK_UNLOCKED;
 
 extern unsigned long htab_reloads;	// Defined in ppc/kernel/ppc_htab.c
 extern unsigned long htab_evicts;
@@ -159,10 +159,10 @@ int iSeries_create_hpte( unsigned long access, unsigned long va )
 	
 	access |= _PAGE_PRESENT;		// _PAGE_PRESENT also needed
 
-	spin_lock( &hash_table_lock );
+	spin_lock( &mmu_hash_lock );
 	// check if pte is in the required state
 	if ( ( access & ~(pte_val(*pt)) ) ) {
-		spin_unlock( &hash_table_lock );
+		spin_unlock( &mmu_hash_lock );
 		return 1;
 	}
 
@@ -177,18 +177,18 @@ int iSeries_create_hpte( unsigned long access, unsigned long va )
 		      va, 
 		      pte_val(*pt));
 
-	spin_unlock( &hash_table_lock );
+	spin_unlock( &mmu_hash_lock );
 	return 0;
 }
 
 void add_hash_page(unsigned context, unsigned long va, pte_t *ptep)
 {
-	spin_lock( &hash_table_lock );
+	spin_lock( &mmu_hash_lock );
 	pte_update(ptep,0,_PAGE_HASHPTE);
 	__create_hpte(CTX_TO_VSID(context, va), 
 		      va, 
 		      pte_val(*ptep));
-	spin_unlock( &hash_table_lock );
+	spin_unlock( &mmu_hash_lock );
 }
 
 int flush_hash_page(unsigned context, unsigned long va, pte_t *ptep)
@@ -208,7 +208,7 @@ int flush_hash_page(unsigned context, unsigned long va, pte_t *ptep)
 	hpte1Ptr = hpte0Ptr + 1;
 	*hpte0Ptr = *hpte1Ptr = 0;
   
-	spin_lock( &hash_table_lock );
+	spin_lock( &mmu_hash_lock );
 	rtnIndex = HvCallHpt_findValid( &hpte, vpn );
   
 	if ( hpte.v ) {
@@ -217,7 +217,7 @@ int flush_hash_page(unsigned context, unsigned long va, pte_t *ptep)
 		rc = 0;
 	} else
 		rc = 1;
-	spin_unlock( &hash_table_lock );
+	spin_unlock( &mmu_hash_lock );
 	return rc;
 }
 

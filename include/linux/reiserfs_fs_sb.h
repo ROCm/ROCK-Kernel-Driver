@@ -454,6 +454,5 @@ int reiserfs_resize(struct super_block *, unsigned long) ;
 #define SB_JOURNAL_MAX_COMMIT_AGE(s) (SB_JOURNAL(s)->s_journal_max_commit_age)
 #define SB_JOURNAL_MAX_TRANS_AGE(s)  (SB_JOURNAL(s)->s_journal_max_trans_age)
 #define SB_JOURNAL_DEV(s)            (SB_JOURNAL(s)->j_dev)
-  
 
 #endif	/* _LINUX_REISER_FS_SB */

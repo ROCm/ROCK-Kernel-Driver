@@ -39,7 +39,8 @@
 #define IO_SPACE_LIMIT 0xffff
 
 #define XQUAD_PORTIO_BASE 0xfe400000
-#define XQUAD_PORTIO_LEN  0x40000   /* 256k per quad. Only remapping 1st */
+#define XQUAD_PORTIO_QUAD 0x40000  /* 256k per quad. */
+#define XQUAD_PORTIO_LEN  0x80000  /* Only remapping first 2 quads */
 
 #ifdef __KERNEL__
 
@@ -261,34 +262,46 @@ static inline void out##s(unsigned x value, unsigned short port) {
 __asm__ __volatile__ ("out" #s " %" s1 "0,%" s2 "1"
 
 #ifdef CONFIG_MULTIQUAD
-/* Make the default portio routines operate on quad 0 for now */
-#define __OUT(s,s1,x) \
-__OUT1(s##_local,x) __OUT2(s,s1,"w") : : "a" (value), "Nd" (port)); } \
-__OUT1(s##_p_local,x) __OUT2(s,s1,"w") __FULL_SLOW_DOWN_IO : : "a" (value), "Nd" (port));} \
-__OUTQ0(s,s,x) \
-__OUTQ0(s,s##_p,x) 
-#else
-#define __OUT(s,s1,x) \
-__OUT1(s,x) __OUT2(s,s1,"w") : : "a" (value), "Nd" (port)); } \
-__OUT1(s##_p,x) __OUT2(s,s1,"w") __FULL_SLOW_DOWN_IO : : "a" (value), "Nd" (port));} 
-#endif /* CONFIG_MULTIQUAD */
-
-#ifdef CONFIG_MULTIQUAD
-#define __OUTQ0(s,ss,x)    /* Do the equivalent of the portio op on quad 0 */ \
+#define __OUTQ(s,ss,x)    /* Do the equivalent of the portio op on quads */ \
 static inline void out##ss(unsigned x value, unsigned short port) { \
 	if (xquad_portio) \
 		write##s(value, (unsigned long) xquad_portio + port); \
 	else               /* We're still in early boot, running on quad 0 */ \
 		out##ss##_local(value, port); \
-} 
+} \
+static inline void out##ss##_quad(unsigned x value, unsigned short port, int quad) { \
+	if (xquad_portio) \
+		write##s(value, (unsigned long) xquad_portio + (XQUAD_PORTIO_QUAD*quad)\
+			+ port); \
+}
 
-#define __INQ0(s,ss)       /* Do the equivalent of the portio op on quad 0 */ \
+#define __INQ(s,ss)       /* Do the equivalent of the portio op on quads */ \
 static inline RETURN_TYPE in##ss(unsigned short port) { \
 	if (xquad_portio) \
 		return read##s((unsigned long) xquad_portio + port); \
 	else               /* We're still in early boot, running on quad 0 */ \
 		return in##ss##_local(port); \
+} \
+static inline RETURN_TYPE in##ss##_quad(unsigned short port, int quad) { \
+	if (xquad_portio) \
+		return read##s((unsigned long) xquad_portio + (XQUAD_PORTIO_QUAD*quad)\
+			+ port); \
+	else\
+		return 0;\
 }
+#endif /* CONFIG_MULTIQUAD */
+
+#ifndef CONFIG_MULTIQUAD
+#define __OUT(s,s1,x) \
+__OUT1(s,x) __OUT2(s,s1,"w") : : "a" (value), "Nd" (port)); } \
+__OUT1(s##_p,x) __OUT2(s,s1,"w") __FULL_SLOW_DOWN_IO : : "a" (value), "Nd" (port));} 
+#else
+/* Make the default portio routines operate on quad 0 */
+#define __OUT(s,s1,x) \
+__OUT1(s##_local,x) __OUT2(s,s1,"w") : : "a" (value), "Nd" (port)); } \
+__OUT1(s##_p_local,x) __OUT2(s,s1,"w") __FULL_SLOW_DOWN_IO : : "a" (value), "Nd" (port));} \
+__OUTQ(s,s,x) \
+__OUTQ(s,s##_p,x) 
 #endif /* CONFIG_MULTIQUAD */
 
 #define __IN1(s) \
@@ -297,16 +310,17 @@ static inline RETURN_TYPE in##s(unsigned short port) { RETURN_TYPE _v;
 #define __IN2(s,s1,s2) \
 __asm__ __volatile__ ("in" #s " %" s2 "1,%" s1 "0"
 
-#ifdef CONFIG_MULTIQUAD
-#define __IN(s,s1,i...) \
-__IN1(s##_local) __IN2(s,s1,"w") : "=a" (_v) : "Nd" (port) ,##i ); return _v; } \
-__IN1(s##_p_local) __IN2(s,s1,"w") __FULL_SLOW_DOWN_IO : "=a" (_v) : "Nd" (port) ,##i ); return _v; } \
-__INQ0(s,s) \
-__INQ0(s,s##_p) 
-#else
+#ifndef CONFIG_MULTIQUAD
 #define __IN(s,s1,i...) \
 __IN1(s) __IN2(s,s1,"w") : "=a" (_v) : "Nd" (port) ,##i ); return _v; } \
 __IN1(s##_p) __IN2(s,s1,"w") __FULL_SLOW_DOWN_IO : "=a" (_v) : "Nd" (port) ,##i ); return _v; } 
+#else
+/* Make the default portio routines operate on quad 0 */
+#define __IN(s,s1,i...) \
+__IN1(s##_local) __IN2(s,s1,"w") : "=a" (_v) : "Nd" (port) ,##i ); return _v; } \
+__IN1(s##_p_local) __IN2(s,s1,"w") __FULL_SLOW_DOWN_IO : "=a" (_v) : "Nd" (port) ,##i ); return _v; } \
+__INQ(s,s) \
+__INQ(s,s##_p) 
 #endif /* CONFIG_MULTIQUAD */
 
 #define __INS(s) \

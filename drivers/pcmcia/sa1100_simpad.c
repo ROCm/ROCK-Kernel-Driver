@@ -6,10 +6,11 @@
  */
 #include <linux/kernel.h>
 #include <linux/sched.h>
+#include <linux/init.h>
 
 #include <asm/hardware.h>
 #include <asm/irq.h>
-#include <asm/arch/pcmcia.h>
+#include "sa1100_generic.h"
  
 extern long get_cs3_shadow(void);
 extern void set_cs3_bit(int value); 
@@ -19,9 +20,6 @@ extern void clear_cs3_bit(int value);
 static int simpad_pcmcia_init(struct pcmcia_init *init){
   int irq, res;
 
-  /* set GPIO_CF_CD & GPIO_CF_IRQ as inputs */
-  GPDR &= ~(GPIO_CF_CD|GPIO_CF_IRQ);
-  
   set_cs3_bit(PCMCIA_RESET);
   clear_cs3_bit(PCMCIA_BUFF_DIS);
   clear_cs3_bit(PCMCIA_RESET);
@@ -29,8 +27,8 @@ static int simpad_pcmcia_init(struct pcmcia_init *init){
   clear_cs3_bit(VCC_3V_EN|VCC_5V_EN|EN0|EN1);
 
   /* Set transition detect */
-  set_GPIO_IRQ_edge( GPIO_CF_CD, GPIO_BOTH_EDGES );
-  set_GPIO_IRQ_edge( GPIO_CF_IRQ, GPIO_FALLING_EDGE );
+  set_irq_type( IRQ_GPIO_CF_CD, IRQT_NOEDGE );
+  set_irq_type( IRQ_GPIO_CF_IRQ, IRQT_FALLING );
 
   /* Register interrupts */
   irq = IRQ_GPIO_CF_CD;
@@ -41,8 +39,9 @@ static int simpad_pcmcia_init(struct pcmcia_init *init){
   return 2;
 
 irq_err:
-  printk( KERN_ERR "%s: Request for IRQ %lu failed\n", __FUNCTION__, irq );
-  return -1;
+  printk( KERN_ERR "%s: request for IRQ%d failed (%d)\n",
+	 __FUNCTION__, irq, res);
+  return res;
 }
 
 static int simpad_pcmcia_shutdown(void)
@@ -112,7 +111,7 @@ static int simpad_pcmcia_configure_socket(const struct pcmcia_configure
 
   if(configure->sock==0) return 0;
 
-  save_flags_cli(flags);
+  local_irq_save(flags);
 
   /* Murphy: see table of MIC2562a-1 */
 
@@ -135,22 +134,51 @@ static int simpad_pcmcia_configure_socket(const struct pcmcia_configure
     printk(KERN_ERR "%s(): unrecognized Vcc %u\n", __FUNCTION__,
 	   configure->vcc);
     clear_cs3_bit(VCC_3V_EN|VCC_5V_EN|EN0|EN1);
-    restore_flags(flags);
+    local_irq_restore(flags);
     return -1;
   }
 
   /* Silently ignore Vpp, output enable, speaker enable. */
 
-  restore_flags(flags);
+  local_irq_restore(flags);
 
   return 0;
 }
 
-struct pcmcia_low_level simpad_pcmcia_ops = { 
-  simpad_pcmcia_init,
-  simpad_pcmcia_shutdown,
-  simpad_pcmcia_socket_state,
-  simpad_pcmcia_get_irq_info,
-  simpad_pcmcia_configure_socket
+static int simpad_pcmcia_socket_init(int sock)
+{
+  set_irq_type(IRQ_GPIO_CF_CD, IRQT_BOTHEDGE);
+  return 0;
+}
+
+static int simpad_pcmcia_socket_suspend(int sock)
+{
+  set_irq_type(IRQ_GPIO_CF_CD, IRQT_NOEDGE);
+  return 0;
+}
+
+static struct pcmcia_low_level simpad_pcmcia_ops = { 
+  init:			simpad_pcmcia_init,
+  shutdown:		simpad_pcmcia_shutdown,
+  socket_state:		simpad_pcmcia_socket_state,
+  get_irq_info:		simpad_pcmcia_get_irq_info,
+  configure_socket:	simpad_pcmcia_configure_socket,
+
+  socket_init:		simpad_pcmcia_socket_init,
+  socket_suspend:	simpad_pcmcia_socket_suspend,
 };
 
+int __init pcmcia_simpad_init(void)
+{
+	int ret = -ENODEV;
+
+	if (machine_is_simpad())
+		ret = sa1100_register_pcmcia(&simpad_pcmcia_ops);
+
+	return ret;
+}
+
+void __exit pcmcia_simpad_exit(void)
+{
+	sa1100_unregister_pcmcia(&simpad_pcmcia_ops);
+}

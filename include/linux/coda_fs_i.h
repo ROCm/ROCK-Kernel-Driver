@@ -34,6 +34,7 @@ struct coda_inode_info {
 #define C_PURGE       0x8
 
 int coda_cnode_make(struct inode **, struct ViceFid *, struct super_block *);
+struct inode *coda_iget(struct super_block *sb, struct ViceFid *fid, struct coda_vattr *attr);
 int coda_cnode_makectl(struct inode **inode, struct super_block *sb);
 struct inode *coda_fid_to_inode(ViceFid *fid, struct super_block *sb);
 void coda_replace_fid(struct inode *, ViceFid *, ViceFid *);

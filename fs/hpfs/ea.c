@@ -9,8 +9,8 @@
 #include <linux/string.h>
 #include "hpfs_fn.h"
 
-/* Remove external extended attributes. ano specifies wheter a is a 
-   direct sector where eas start or an anode */
+/* Remove external extended attributes. ano specifies whether a is a 
+   direct sector where eas starts or an anode */
 
 void hpfs_ea_ext_remove(struct super_block *s, secno a, int ano, unsigned len)
 {

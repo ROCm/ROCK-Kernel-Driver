@@ -1,10 +1,5 @@
 /*
- *  linux/drivers/ide/ht6560b.c		Version 0.07	Feb  1, 2000
- *
  *  Copyright (C) 1995-2000  Linus Torvalds & author (see below)
- */
-
-/*
  *
  *  Version 0.01        Initial version hacked out of ide.c
  *
@@ -35,8 +30,6 @@
  */
 
 #define HT6560B_VERSION "v0.07"
-
-#undef REALLY_SLOW_IO		/* most systems can safely undef this */
 
 #include <linux/types.h>
 #include <linux/kernel.h>

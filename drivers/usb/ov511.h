@@ -10,8 +10,8 @@
 
 #ifdef OV511_DEBUG
 	#define PDEBUG(level, fmt, args...) \
-		if (debug >= (level)) info("[" __PRETTY_FUNCTION__ ":%d] " fmt,\
-		__LINE__ , ## args)
+		if (debug >= (level)) info("[%s:%d] " fmt, \
+		__PRETTY_FUNCTION__, __LINE__ , ## args)
 #else
 	#define PDEBUG(level, fmt, args...) do {} while(0)
 #endif
@@ -243,6 +243,16 @@
 
 #define OV511_ENDPOINT_ADDRESS	1	/* Isoc endpoint number */
 
+#define OV511_NUMFRAMES	2
+#if OV511_NUMFRAMES > VIDEO_MAX_FRAME
+	#error "OV511_NUMFRAMES is too high"
+#endif
+
+#define OV511_NUMSBUF		2
+
+/* Control transfers use up to 4 bytes */
+#define OV511_CBUF_SIZE		4
+
 /* Bridge types */
 enum {
 	BRG_UNKNOWN,
@@ -376,9 +386,14 @@ struct ov511_i2c_struct {
 			       struct ov511_i2c_struct)
 /* ------------- End IOCTL interface -------------- */
 
+struct usb_ov511;		/* Forward declaration */
+
 struct ov511_sbuf {
-	char *data;
+	struct usb_ov511 *ov;
+	unsigned char *data;
 	struct urb *urb;
+	spinlock_t lock;
+	int n;
 };
 
 enum {
@@ -401,9 +416,10 @@ struct ov511_regvals {
 
 struct ov511_frame {
 	int framenum;		/* Index of this frame */
-	char *data;		/* Frame buffer */
-	char *tempdata;		/* Temp buffer for multi-stage conversions */
-	char *rawdata;		/* Raw camera data buffer */
+	unsigned char *data;	/* Frame buffer */
+	unsigned char *tempdata; /* Temp buffer for multi-stage conversions */
+	unsigned char *rawdata;	/* Raw camera data buffer */
+	unsigned char *compbuf;	/* Temp buffer for decompressor */
 
 	int depth;		/* Bytes per pixel */
 	int width;		/* Width application is expecting */
@@ -428,26 +444,19 @@ struct ov511_frame {
 	int snapshot;		/* True if frame was a snapshot */
 };
 
-#define DECOMP_INTERFACE_VER 2
+#define DECOMP_INTERFACE_VER 3
 
 /* Compression module operations */
 struct ov51x_decomp_ops {
-	int (*decomp_400)(unsigned char *, unsigned char *, int, int, int);
-	int (*decomp_420)(unsigned char *, unsigned char *, int, int, int);
-	int (*decomp_422)(unsigned char *, unsigned char *, int, int, int);
+	int (*decomp_400)(unsigned char *, unsigned char *, unsigned char *,
+			  int, int, int);
+	int (*decomp_420)(unsigned char *, unsigned char *, unsigned char *,
+			  int, int, int);
+	int (*decomp_422)(unsigned char *, unsigned char *, unsigned char *,
+			  int, int, int);
 	void (*decomp_lock)(void);
 	void (*decomp_unlock)(void);
 };
-
-#define OV511_NUMFRAMES	2
-#if OV511_NUMFRAMES > VIDEO_MAX_FRAME
-	#error "OV511_NUMFRAMES is too high"
-#endif
-
-#define OV511_NUMSBUF		2
-
-/* Control transfers use up to 4 bytes */
-#define OV511_CBUF_SIZE		4
 
 struct usb_ov511 {
 	struct video_device vdev;
@@ -456,7 +465,7 @@ struct usb_ov511 {
 	struct usb_device *dev;
 
 	int customid;
-	int desc;
+	char *desc;
 	unsigned char iface;
 
 	/* Determined by sensor type */
@@ -490,9 +499,9 @@ struct usb_ov511 {
 	int lightfreq;		/* Power (lighting) frequency */
 	int bandfilt;		/* Banding filter enabled flag */
 
-	char *fbuf;		/* Videodev buffer area */
-	char *tempfbuf;		/* Temporary (intermediate) buffer area */
-	char *rawfbuf;		/* Raw camera data buffer area */
+	unsigned char *fbuf;	/* Videodev buffer area */
+	unsigned char *tempfbuf; /* Temporary (intermediate) buffer area */
+	unsigned char *rawfbuf;	/* Raw camera data buffer area */
 
 	int sub_flag;		/* Pix Array subcapture on flag */
 	int subx;		/* Pix Array subcapture x offset */
@@ -556,15 +565,28 @@ struct usb_ov511 {
 	struct semaphore cbuf_lock;
 };
 
-struct cam_list {
-	int id;
-	char *description;
-};
-
-struct palette_list {
+/* Used to represent a list of values and their respective symbolic names */
+struct symbolic_list {
 	int num;
 	char *name;
 };
+
+#define NOT_DEFINED_STR "Unknown"
+
+/* Returns the name of the matching element in the symbolic_list array. The
+ * end of the list must be marked with an element that has a NULL name.
+ */
+static inline char * 
+symbolic(struct symbolic_list list[], int num)
+{
+	int i;
+
+	for (i = 0; list[i].name != NULL; i++)
+			if (list[i].num == num)
+				return (list[i].name);
+
+	return (NOT_DEFINED_STR);
+}
 
 struct mode_list_518 {
 	int width;

@@ -28,10 +28,7 @@
 
 /******************************************************************************
  * IDE driver configuration options (play with these as desired):
- *
- * REALLY_SLOW_IO can be defined in ide.c and ide-cd.c, if necessary
  */
-#undef REALLY_FAST_IO			/* define if ide ports are perfect */
 #define INITIAL_MULT_COUNT	0	/* off=0; on=2,4,8,16,32, etc.. */
 
 #ifndef SUPPORT_SLOW_DATA_PORTS		/* 1 to support slow data ports */
@@ -49,32 +46,12 @@
 #ifndef FANCY_STATUS_DUMPS		/* 1 for human-readable drive errors */
 #define FANCY_STATUS_DUMPS	1	/* 0 to reduce kernel size */
 #endif
-
-#ifdef CONFIG_BLK_DEV_CMD640
-#if 0	/* change to 1 when debugging cmd640 problems */
-void cmd640_dump_regs (void);
-#define CMD640_DUMP_REGS cmd640_dump_regs() /* for debugging cmd640 chipset */
-#endif
-#endif  /* CONFIG_BLK_DEV_CMD640 */
-
 #ifndef DISABLE_IRQ_NOSYNC
 #define DISABLE_IRQ_NOSYNC	0
 #endif
 
 /*
- * IDE_DRIVE_CMD is used to implement many features of the hdparm utility
- */
-#define IDE_DRIVE_CMD			99	/* (magic) undef to reduce kernel size*/
-
-#define IDE_DRIVE_TASK			98
-
-/*
- * IDE_DRIVE_TASKFILE is used to implement many features needed for raw tasks
- */
-#define IDE_DRIVE_TASKFILE		97
-
-/*
- *  "No user-serviceable parts" beyond this point  :)
+ *  "No user-serviceable parts" beyond this point
  *****************************************************************************/
 
 typedef unsigned char	byte;	/* used everywhere */
@@ -90,13 +67,6 @@ typedef unsigned char	byte;	/* used everywhere */
  * state flags
  */
 #define DMA_PIO_RETRY	1	/* retrying in PIO */
-
-/*
- * Ensure that various configuration flags have compatible settings
- */
-#ifdef REALLY_SLOW_IO
-#undef REALLY_FAST_IO
-#endif
 
 #define HWIF(drive)		((drive)->hwif)
 #define HWGROUP(drive)		(HWIF(drive)->hwgroup)
@@ -192,33 +162,17 @@ typedef unsigned char	byte;	/* used everywhere */
 #define PARTN_BITS	6	/* number of minor dev bits for partitions */
 #define PARTN_MASK	((1<<PARTN_BITS)-1)	/* a useful bit mask */
 #define MAX_DRIVES	2	/* per interface; 2 assumed by lots of code */
-#define CASCADE_DRIVES	8	/* per interface; 8|2 assumed by lots of code */
 #define SECTOR_SIZE	512
 #define SECTOR_WORDS	(SECTOR_SIZE / 4)	/* number of 32bit words per sector */
-#define IDE_LARGE_SEEK(b1,b2,t)	(((b1) > (b2) + (t)) || ((b2) > (b1) + (t)))
-#define IDE_MIN(a,b)	((a)<(b) ? (a):(b))
-#define IDE_MAX(a,b)	((a)>(b) ? (a):(b))
-
-#ifndef SPLIT_WORD
-#  define SPLIT_WORD(W,HB,LB) ((HB)=(W>>8), (LB)=(W-((W>>8)<<8)))
-#endif
-#ifndef MAKE_WORD
-#  define MAKE_WORD(W,HB,LB) ((W)=((HB<<8)+LB))
-#endif
-
 
 /*
  * Timeouts for various operations:
  */
 #define WAIT_DRQ	(5*HZ/100)	/* 50msec - spec allows up to 20ms */
-#if defined(CONFIG_APM) || defined(CONFIG_APM_MODULE)
-#define WAIT_READY	(5*HZ)		/* 5sec - some laptops are very slow */
-#else
-#define WAIT_READY	(3*HZ/100)	/* 30msec - should be instantaneous */
-#endif /* CONFIG_APM || CONFIG_APM_MODULE */
-#define WAIT_PIDENTIFY	(10*HZ)	/* 10sec  - should be less than 3ms (?), if all ATAPI CD is closed at boot */
-#define WAIT_WORSTCASE	(30*HZ)	/* 30sec  - worst case when spinning up */
-#define WAIT_CMD	(10*HZ)	/* 10sec  - maximum wait for an IRQ to happen */
+#define WAIT_READY	(5*HZ)		/* 5sec   - some laptops are very slow */
+#define WAIT_PIDENTIFY	(10*HZ)		/* 10sec  - should be less than 3ms (?), if all ATAPI CD is closed at boot */
+#define WAIT_WORSTCASE	(30*HZ)		/* 30sec  - worst case when spinning up */
+#define WAIT_CMD	(10*HZ)		/* 10sec  - maximum wait for an IRQ to happen */
 #define WAIT_MIN_SLEEP	(2*HZ/100)	/* 20msec - minimum sleep time */
 
 #define SELECT_DRIVE(hwif,drive)				\
@@ -228,39 +182,11 @@ typedef unsigned char	byte;	/* used everywhere */
 	OUT_BYTE((drive)->select.all, hwif->io_ports[IDE_SELECT_OFFSET]); \
 }
 
-#define SELECT_INTERRUPT(hwif,drive)				\
-{								\
-	if (hwif->intrproc)					\
-		hwif->intrproc(drive);				\
-	else							\
-		OUT_BYTE((drive)->ctl|2, hwif->io_ports[IDE_CONTROL_OFFSET]);	\
-}
-
 #define SELECT_MASK(hwif,drive,mask)				\
 {								\
 	if (hwif->maskproc)					\
 		hwif->maskproc(drive,mask);			\
 }
-
-#define SELECT_READ_WRITE(hwif,drive,func)			\
-{								\
-	if (hwif->rwproc)					\
-		hwif->rwproc(drive,func);			\
-}
-
-#define QUIRK_LIST(hwif,drive)					\
-{								\
-	if (hwif->quirkproc)					\
-		(drive)->quirk_list = hwif->quirkproc(drive);	\
-}
-
-#define HOST(hwif,chipset)					\
-{								\
-	return ((hwif)->chipset == chipset) ? 1 : 0;		\
-}
-
-#define IDE_DEBUG(lineno) \
-	printk("%s,%s,line=%d\n", __FILE__, __FUNCTION__, (lineno))
 
 /*
  * Check for an interrupt and acknowledge the interrupt status
@@ -269,19 +195,31 @@ struct hwif_s;
 typedef int (ide_ack_intr_t)(struct hwif_s *);
 
 #ifndef NO_DMA
-#define NO_DMA  255
+# define NO_DMA  255
 #endif
 
 /*
- * hwif_chipset_t is used to keep track of the specific hardware
- * chipset used by each IDE interface, if known.
+ * This is used to keep track of the specific hardware chipset used by each IDE
+ * interface, if known. Please note that we don't discriminate between
+ * different PCI host chips here.
  */
-typedef enum {  ide_unknown,    ide_generic,    ide_pci,
-                ide_cmd640,     ide_dtc2278,    ide_ali14xx,
-                ide_qd65xx,     ide_umc8672,    ide_ht6560b,
-                ide_pdc4030,    ide_rz1000,     ide_trm290,
-                ide_cmd646,     ide_cy82c693,   ide_4drives,
-                ide_pmac,       ide_etrax100
+typedef enum {
+	ide_unknown,
+	ide_generic,
+	ide_pci,
+        ide_cmd640,
+	ide_dtc2278,
+	ide_ali14xx,
+	ide_qd65xx,
+	ide_umc8672,
+	ide_ht6560b,
+	ide_pdc4030,
+	ide_rz1000,
+	ide_trm290,
+	ide_cmd646,
+	ide_cy82c693,
+	ide_pmac,
+	ide_etrax100
 } hwif_chipset_t;
 
 
@@ -309,7 +247,7 @@ int ide_register_hw(hw_regs_t *hw, struct hwif_s **hwifp);
 /*
  * Set up hw_regs_t structure before calling ide_register_hw (optional)
  */
-void ide_setup_ports(	hw_regs_t *hw,
+void ide_setup_ports(hw_regs_t *hw,
 			ide_ioreg_t base,
 			int *offsets,
 			ide_ioreg_t ctrl,
@@ -320,28 +258,16 @@ void ide_setup_ports(	hw_regs_t *hw,
 #include <asm/ide.h>
 
 /*
- * If the arch-dependant ide.h did not declare/define any OUT_BYTE
- * or IN_BYTE functions, we make some defaults here.
+ * If the arch-dependant ide.h did not declare/define any OUT_BYTE or IN_BYTE
+ * functions, we make some defaults here. The only architecture currently
+ * needing this is Cris.
  */
 
-#ifndef HAVE_ARCH_OUT_BYTE
-#ifdef REALLY_FAST_IO
-#define OUT_BYTE(b,p)          outb((b),(p))
-#define OUT_WORD(w,p)          outw((w),(p))
-#else
-#define OUT_BYTE(b,p)          outb_p((b),(p))
-#define OUT_WORD(w,p)          outw_p((w),(p))
-#endif
-#endif
-
-#ifndef HAVE_ARCH_IN_BYTE
-#ifdef REALLY_FAST_IO
-#define IN_BYTE(p)             (byte)inb(p)
-#define IN_WORD(p)             (short)inw(p)
-#else
-#define IN_BYTE(p)             (byte)inb_p(p)
-#define IN_WORD(p)             (short)inw_p(p)
-#endif
+#ifndef HAVE_ARCH_IN_OUT
+# define OUT_BYTE(b,p)		outb((b),(p))
+# define OUT_WORD(w,p)		outw((w),(p))
+# define IN_BYTE(p)		(u8)inb(p)
+# define IN_WORD(p)		(u16)inw(p)
 #endif
 
 /*
@@ -370,6 +296,7 @@ typedef union {
 struct ide_settings_s;
 
 typedef struct ide_drive_s {
+	unsigned int	usage;		/* current "open()" count for drive */
 	char type; /* distingiush different devices: disk, cdrom, tape, floppy, ... */
 
 	/* NOTE: If we had proper separation between channel and host chip, we
@@ -388,14 +315,14 @@ typedef struct ide_drive_s {
 	byte     using_dma;		/* disk is using dma for read/write */
 	byte	 retry_pio;		/* retrying dma capable host in pio */
 	byte	 state;			/* retry state */
-	byte     waiting_for_dma;	/* dma currently in progress */
 	byte     unmask;		/* flag: okay to unmask other irqs */
 	byte     slow;			/* flag: slow data port */
 	byte     bswap;			/* flag: byte swap data */
 	byte     dsc_overlap;		/* flag: DSC overlap */
 	byte     nice1;			/* flag: give potential excess bandwidth */
+	unsigned waiting_for_dma: 1;	/* dma currently in progress */
 	unsigned present	: 1;	/* drive is physically present */
-	unsigned noprobe 	: 1;	/* from:  hdx=noprobe */
+	unsigned noprobe	: 1;	/* from:  hdx=noprobe */
 	unsigned busy		: 1;	/* currently doing revalidate_disk() */
 	unsigned removable	: 1;	/* 1 if need to do check_media_change */
 	unsigned forced_geom	: 1;	/* 1 if hdx=c,h,s was given at boot */
@@ -422,7 +349,6 @@ typedef struct ide_drive_s {
 	byte		bad_wstat;	/* used for ignoring WRERR_STAT */
 	byte		nowerr;		/* used for ignoring WRERR_STAT */
 	byte		sect0;		/* offset of first sector for DM6:DDO */
-	unsigned int	usage;		/* current "open()" count for drive */
 	byte		head;		/* "real" number of heads */
 	byte		sect;		/* "real" sectors per track */
 	byte		bios_head;	/* BIOS/fdisk/LILO number of heads */
@@ -555,12 +481,12 @@ typedef struct hwif_s {
 	unsigned long	select_data;	/* for use by chipset-specific code */
 	struct proc_dir_entry *proc;	/* /proc/ide/ directory entry */
 	int		irq;		/* our irq number */
-	byte		major;		/* our major number */
-	char 		name[80];	/* name of interface */
-	byte		index;		/* 0 for ide0; 1 for ide1; ... */
+	int		major;		/* our major number */
+	char		name[80];	/* name of interface */
+	int		index;		/* 0 for ide0; 1 for ide1; ... */
 	hwif_chipset_t	chipset;	/* sub-module for tuning.. */
 	unsigned	noprobe    : 1;	/* don't probe for this interface */
-	unsigned	present    : 1;	/* this interface exists */
+	unsigned	present    : 1;	/* there is a device on this interface */
 	unsigned	serialized : 1;	/* serialized operation with mate hwif */
 	unsigned	sharing_irq: 1;	/* 1 = sharing irq with another hwif */
 	unsigned	reset      : 1;	/* reset after probe */
@@ -705,21 +631,19 @@ struct ata_operations {
 	unsigned busy: 1; /* FIXME: this will go soon away... */
 	int (*cleanup)(ide_drive_t *);
 	int (*standby)(ide_drive_t *);
-	int (*flushcache)(ide_drive_t *);
 	ide_startstop_t	(*do_request)(ide_drive_t *, struct request *, unsigned long);
 	int (*end_request)(ide_drive_t *drive, int uptodate);
 
 	int (*ioctl)(ide_drive_t *, struct inode *, struct file *, unsigned int, unsigned long);
 	int (*open)(struct inode *, struct file *, ide_drive_t *);
 	void (*release)(struct inode *, struct file *, ide_drive_t *);
-	int (*media_change)(ide_drive_t *);
+	int (*check_media_change)(ide_drive_t *);
 	void (*revalidate)(ide_drive_t *);
 
 	void (*pre_reset)(ide_drive_t *);
 	unsigned long (*capacity)(ide_drive_t *);
 	ide_startstop_t	(*special)(ide_drive_t *);
-	ide_proc_entry_t		*proc;
-	int (*driver_reinit)(ide_drive_t *);
+	ide_proc_entry_t *proc;
 };
 
 /* Alas, no aliases. Too much hassle with bringing module.h everywhere */
@@ -734,6 +658,7 @@ do {	\
 		__MOD_DEC_USE_COUNT((ata)->owner);	\
 } while(0)
 
+extern unsigned long ata_capacity(ide_drive_t *drive);
 
 /* FIXME: Actually implement and use them as soon as possible!  to make the
  * ide_scan_devices() go away! */
@@ -819,16 +744,6 @@ int ide_xlate_1024 (kdev_t, int, int, const char *);
 ide_drive_t *get_info_ptr (kdev_t i_rdev);
 
 /*
- * Return the current idea about the total capacity of this drive.
- */
-unsigned long current_capacity (ide_drive_t *drive);
-
-/*
- * Revalidate (read partition tables)
- */
-extern void ide_revalidate_drive (ide_drive_t *drive);
-
-/*
  * Start a reset operation for an IDE interface.
  * The caller should return immediately after invoking this.
  */
@@ -892,18 +807,9 @@ int ide_do_drive_cmd (ide_drive_t *drive, struct request *rq, ide_action_t actio
 
 /*
  * Clean up after success/failure of an explicit drive cmd.
- * stat/err are used only when (HWGROUP(drive)->rq->cmd == IDE_DRIVE_CMD).
- * stat/err are used only when (HWGROUP(drive)->rq->cmd == IDE_DRIVE_TASK_MASK).
  */
 void ide_end_drive_cmd (ide_drive_t *drive, byte stat, byte err);
 
-/*
- * Issue ATA command and wait for completion. use for implementing commands in kernel
- */
-int ide_wait_cmd (ide_drive_t *drive, int cmd, int nsect, int feature, int sectors, byte *buf);
-
-int ide_wait_cmd_task (ide_drive_t *drive, byte *buf);
- 
 typedef struct ide_task_s {
 	task_ioreg_t		tfRegister[8];
 	task_ioreg_t		hobRegister[8];
@@ -941,15 +847,7 @@ void do_taskfile (ide_drive_t *drive, struct hd_drive_task_hdr *taskfile, struct
  */
 
 ide_startstop_t set_multmode_intr (ide_drive_t *drive);
-ide_startstop_t set_geometry_intr (ide_drive_t *drive);
-ide_startstop_t recal_intr (ide_drive_t *drive);
 ide_startstop_t task_no_data_intr (ide_drive_t *drive);
-ide_startstop_t task_in_intr (ide_drive_t *drive);
-ide_startstop_t task_mulin_intr (ide_drive_t *drive);
-ide_startstop_t pre_task_out_intr (ide_drive_t *drive, struct request *rq);
-ide_startstop_t task_out_intr (ide_drive_t *drive);
-ide_startstop_t task_mulout_intr (ide_drive_t *drive);
-void ide_init_drive_taskfile (struct request *rq);
 
 int ide_wait_taskfile (ide_drive_t *drive, struct hd_drive_task_hdr *taskfile, struct hd_drive_hob_hdr *hobfile, byte *buf);
 
@@ -960,13 +858,8 @@ ide_handler_t * ide_handler_parser (struct hd_drive_task_hdr *taskfile, struct h
 /* Expects args is a full set of TF registers and parses the command type */
 int ide_cmd_type_parser (ide_task_t *args);
 
-int ide_taskfile_ioctl (ide_drive_t *drive, struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg);
 int ide_cmd_ioctl (ide_drive_t *drive, struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg);
 int ide_task_ioctl (ide_drive_t *drive, struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg);
-
-#ifdef CONFIG_PKT_TASK_IOCTL
-int pkt_taskfile_ioctl (ide_drive_t *drive, struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg);
-#endif /* CONFIG_PKT_TASK_IOCTL */
 
 void ide_delay_50ms (void);
 
@@ -994,14 +887,16 @@ void ide_stall_queue (ide_drive_t *drive, unsigned long timeout);
 /*
  * ide_get_queue() returns the queue which corresponds to a given device.
  */
-request_queue_t *ide_get_queue (kdev_t dev);
+request_queue_t *ide_get_queue(kdev_t dev);
 
 /*
  * CompactFlash cards and their brethern pretend to be removable hard disks,
  * but they never have a slave unit, and they don't have doorlock mechanisms.
- * This test catches them, and is invoked elsewhere when setting appropriate config bits.
+ * This test catches them, and is invoked elsewhere when setting appropriate
+ * config bits.
  */
-int drive_is_flashcard (ide_drive_t *drive);
+
+extern int drive_is_flashcard(ide_drive_t *drive);
 
 int ide_spin_wait_hwgroup (ide_drive_t *drive);
 void ide_timer_expiry (unsigned long data);
@@ -1041,26 +936,23 @@ extern int ide_unregister_subdriver(ide_drive_t *drive);
 #define ON_BOARD		1
 #define NEVER_BOARD		0
 #ifdef CONFIG_BLK_DEV_OFFBOARD
-#  define OFF_BOARD		ON_BOARD
-#else /* CONFIG_BLK_DEV_OFFBOARD */
-#  define OFF_BOARD		NEVER_BOARD
-#endif /* CONFIG_BLK_DEV_OFFBOARD */
+# define OFF_BOARD		ON_BOARD
+#else
+# define OFF_BOARD		NEVER_BOARD
+#endif
 
 void __init ide_scan_pcibus(int scan_direction);
 #endif
 #ifdef CONFIG_BLK_DEV_IDEDMA
-#define BAD_DMA_DRIVE		0
-#define GOOD_DMA_DRIVE		1
+# define BAD_DMA_DRIVE		0
+# define GOOD_DMA_DRIVE		1
 int ide_build_dmatable (ide_drive_t *drive, ide_dma_action_t func);
 void ide_destroy_dmatable (ide_drive_t *drive);
 ide_startstop_t ide_dma_intr (ide_drive_t *drive);
 int check_drive_lists (ide_drive_t *drive, int good_bad);
-int report_drive_dmaing (ide_drive_t *drive);
 int ide_dmaproc (ide_dma_action_t func, ide_drive_t *drive);
 int ide_release_dma (ide_hwif_t *hwif);
 void ide_setup_dma (ide_hwif_t *hwif, unsigned long dmabase, unsigned int num_ports) __init;
-/* FIXME spilt this up into a get and set function */
-extern unsigned long ide_get_or_set_dma_base (ide_hwif_t *hwif, int extra, const char *name) __init;
 #endif
 
 extern spinlock_t ide_lock;

@@ -63,7 +63,6 @@ extern void ext2_set_link(struct inode *, struct ext2_dir_entry_2 *, struct page
 
 /* fsync.c */
 extern int ext2_sync_file (struct file *, struct dentry *, int);
-extern int ext2_fsync_inode (struct inode *, int);
 
 /* ialloc.c */
 extern struct inode * ext2_new_inode (struct inode *, int);

@@ -23,6 +23,7 @@
 #include <linux/kmod.h>		/* for hotplug_path */
 #include <linux/bitops.h>
 #include <linux/delay.h>
+#include <linux/cache.h>
 
 #include <asm/page.h>
 #include <asm/dma.h>	/* isa_dma_bridge_buggy */
@@ -848,6 +849,100 @@ pci_set_master(struct pci_dev *dev)
 	pcibios_set_master(dev);
 }
 
+/**
+ * pdev_set_mwi - arch helper function for pcibios_set_mwi
+ * @dev: the PCI device for which MWI is enabled
+ *
+ * Helper function for implementation the arch-specific pcibios_set_mwi
+ * function.  Originally copied from drivers/net/acenic.c.
+ * Copyright 1998-2001 by Jes Sorensen, <jes@trained-monkey.org>.
+ *
+ * RETURNS: An appriopriate -ERRNO error value on eror, or zero for success.
+ */
+int
+pdev_set_mwi(struct pci_dev *dev)
+{
+	int rc = 0;
+	u8 cache_size;
+
+	/*
+	 * Looks like this is necessary to deal with on all architectures,
+	 * even this %$#%$# N440BX Intel based thing doesn't get it right.
+	 * Ie. having two NICs in the machine, one will have the cache
+	 * line set at boot time, the other will not.
+	 */
+	pci_read_config_byte(dev, PCI_CACHE_LINE_SIZE, &cache_size);
+	cache_size <<= 2;
+	if (cache_size != SMP_CACHE_BYTES) {
+		printk(KERN_WARNING "PCI: %s PCI cache line size set incorrectly "
+		       "(%i bytes) by BIOS/FW, ",
+		       dev->slot_name, cache_size);
+		if (cache_size > SMP_CACHE_BYTES) {
+			printk("expecting %i\n", SMP_CACHE_BYTES);
+			rc = -EINVAL;
+		} else {
+			printk("correcting to %i\n", SMP_CACHE_BYTES);
+			pci_write_config_byte(dev, PCI_CACHE_LINE_SIZE,
+					      SMP_CACHE_BYTES >> 2);
+		}
+	}
+
+	return rc;
+}
+
+/**
+ * pci_set_mwi - enables memory-write-validate PCI transaction
+ * @dev: the PCI device for which MWI is enabled
+ *
+ * Enables the Memory-Write-Invalidate transaction in %PCI_COMMAND,
+ * and then calls @pcibios_set_mwi to do the needed arch specific
+ * operations or a generic mwi-prep function.
+ *
+ * RETURNS: An appriopriate -ERRNO error value on eror, or zero for success.
+ */
+int
+pci_set_mwi(struct pci_dev *dev)
+{
+	int rc;
+	u16 cmd;
+
+#ifdef HAVE_ARCH_PCI_MWI
+	rc = pcibios_set_mwi(dev);
+#else
+	rc = pdev_set_mwi(dev);
+#endif
+
+	if (rc)
+		return rc;
+
+	pci_read_config_word(dev, PCI_COMMAND, &cmd);
+	if (! (cmd & PCI_COMMAND_INVALIDATE)) {
+		DBG("PCI: Enabling Mem-Wr-Inval for device %s\n", dev->slot_name);
+		cmd |= PCI_COMMAND_INVALIDATE;
+		pci_write_config_word(dev, PCI_COMMAND, cmd);
+	}
+	
+	return 0;
+}
+
+/**
+ * pci_clear_mwi - disables Memory-Write-Invalidate for device dev
+ * @dev: the PCI device to disable
+ *
+ * Disables PCI Memory-Write-Invalidate transaction on the device
+ */
+void
+pci_clear_mwi(struct pci_dev *dev)
+{
+	u16 cmd;
+
+	pci_read_config_word(dev, PCI_COMMAND, &cmd);
+	if (cmd & PCI_COMMAND_INVALIDATE) {
+		cmd &= ~PCI_COMMAND_INVALIDATE;
+		pci_write_config_word(dev, PCI_COMMAND, cmd);
+	}
+}
+
 int
 pci_set_dma_mask(struct pci_dev *dev, u64 mask)
 {
@@ -966,7 +1061,7 @@ static void pci_read_bases(struct pci_dev *dev, unsigned int howmany, int rom)
 	}
 }
 
-void __devinit  pci_read_bridge_bases(struct pci_bus *child)
+void __devinit pci_read_bridge_bases(struct pci_bus *child)
 {
 	struct pci_dev *dev = child->self;
 	u8 io_base_lo, io_limit_lo;
@@ -1057,7 +1152,7 @@ void __devinit  pci_read_bridge_bases(struct pci_bus *child)
 	}
 }
 
-static struct pci_bus * __devinit  pci_alloc_bus(void)
+static struct pci_bus * __devinit pci_alloc_bus(void)
 {
 	struct pci_bus *b;
 
@@ -1392,7 +1487,7 @@ unsigned int __devinit pci_do_scan_bus(struct pci_bus *bus)
 	return max;
 }
 
-int __devinit  pci_bus_exists(const struct list_head *list, int nr)
+int __devinit pci_bus_exists(const struct list_head *list, int nr)
 {
 	const struct list_head *l;
 
@@ -1404,7 +1499,7 @@ int __devinit  pci_bus_exists(const struct list_head *list, int nr)
 	return 0;
 }
 
-struct pci_bus * __devinit  pci_alloc_primary_bus(int bus)
+struct pci_bus * __devinit pci_alloc_primary_bus(int bus)
 {
 	struct pci_bus *b;
 
@@ -1431,7 +1526,7 @@ struct pci_bus * __devinit  pci_alloc_primary_bus(int bus)
 	return b;
 }
 
-struct pci_bus * __devinit  pci_scan_bus(int bus, struct pci_ops *ops, void *sysdata)
+struct pci_bus * __devinit pci_scan_bus(int bus, struct pci_ops *ops, void *sysdata)
 {
 	struct pci_bus *b = pci_alloc_primary_bus(bus);
 	if (b) {
@@ -1965,7 +2060,7 @@ static int __devinit pci_init(void)
 	return 0;
 }
 
-static int __devinit  pci_setup(char *str)
+static int __devinit pci_setup(char *str)
 {
 	while (str) {
 		char *k = strchr(str, ',');
@@ -2002,6 +2097,9 @@ EXPORT_SYMBOL(pci_find_device);
 EXPORT_SYMBOL(pci_find_slot);
 EXPORT_SYMBOL(pci_find_subsys);
 EXPORT_SYMBOL(pci_set_master);
+EXPORT_SYMBOL(pci_set_mwi);
+EXPORT_SYMBOL(pci_clear_mwi);
+EXPORT_SYMBOL(pdev_set_mwi);
 EXPORT_SYMBOL(pci_set_dma_mask);
 EXPORT_SYMBOL(pci_dac_set_dma_mask);
 EXPORT_SYMBOL(pci_assign_resource);
@@ -2019,10 +2117,12 @@ EXPORT_SYMBOL(pci_announce_device_to_drivers);
 EXPORT_SYMBOL(pci_add_new_bus);
 EXPORT_SYMBOL(pci_do_scan_bus);
 EXPORT_SYMBOL(pci_scan_slot);
+#ifdef CONFIG_PROC_FS
 EXPORT_SYMBOL(pci_proc_attach_device);
 EXPORT_SYMBOL(pci_proc_detach_device);
 EXPORT_SYMBOL(pci_proc_attach_bus);
 EXPORT_SYMBOL(pci_proc_detach_bus);
+#endif
 #endif
 
 EXPORT_SYMBOL(pci_set_power_state);

@@ -119,7 +119,7 @@ static int __init snd_sgalaxy_setup_wss(unsigned long port, int irq, int dma)
 	static int dma_bits[] = {1, 2, 0, 3};
 	int tmp, tmp1;
 
-	unsigned int flags;
+	unsigned long flags;
 
 	if ((tmp = inb(port + 3)) == 0xff)
 	{

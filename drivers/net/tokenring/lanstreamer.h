@@ -56,11 +56,36 @@
  * 
  *  12/10/99 - Alpha Release 0.1.0
  *            First release to the public
+ *  08/15/01 - Added ioctl() definitions and others - Kent Yoder <yoder1@us.ibm.com>
  *
  */
 
+#if STREAMER_IOCTL && (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0))
+#include <asm/ioctl.h>
+#define IOCTL_PRINT_RX_BUFS   SIOCDEVPRIVATE
+#define IOCTL_PRINT_TX_BUFS   SIOCDEVPRIVATE+1
+#define IOCTL_RX_CMD          SIOCDEVPRIVATE+2
+#define IOCTL_TX_CMD          SIOCDEVPRIVATE+3
+#define IOCTL_PRINT_REGISTERS SIOCDEVPRIVATE+4
+#define IOCTL_PRINT_BDAS      SIOCDEVPRIVATE+5
+#define IOCTL_SPIN_LOCK_TEST  SIOCDEVPRIVATE+6
+#define IOCTL_SISR_MASK       SIOCDEVPRIVATE+7
+#endif
+
+/* MAX_INTR - the maximum number of times we can loop
+ * inside the interrupt function before returning
+ * control to the OS (maximum value is 256)
+ */
+#define MAX_INTR 5
+
+#define CLS 0x0C
+#define MLR 0x86
+#define LTR 0x0D
+
 #define BCTL 0x60
 #define BCTL_SOFTRESET (1<<15)
+#define BCTL_RX_FIFO_8 (1<<1)
+#define BCTL_TX_FIFO_8 (1<<3)
 
 #define GPR 0x4a
 #define GPR_AUTOSENSE (1<<2)
@@ -89,6 +114,7 @@
 #define SISR_MASK_RUM 0x58
 
 #define SISR_MI (1<<15)
+#define SISR_SERR_ERR (1<<14)
 #define SISR_TIMER (1<<11)
 #define SISR_LAP_PAR_ERR (1<<10)
 #define SISR_LAP_ACC_ERR (1<<9)
@@ -218,7 +244,13 @@
 /* Streamer defaults for buffers */
 
 #define STREAMER_RX_RING_SIZE 16	/* should be a power of 2 */
-#define STREAMER_TX_RING_SIZE 8	/* should be a power of 2 */
+/* Setting the number of TX descriptors to 1 is a workaround for an
+ * undocumented hardware problem with the lanstreamer board. Setting
+ * this to something higher may slightly increase the throughput you
+ * can get from the card, but at the risk of locking up the box. - 
+ * <yoder1@us.ibm.com>
+ */
+#define STREAMER_TX_RING_SIZE 1	/* should be a power of 2 */
 
 #define PKT_BUF_SZ 4096		/* Default packet size */
 

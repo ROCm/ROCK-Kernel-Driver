@@ -480,3 +480,28 @@ int wipe_partitions(kdev_t dev)
 
 	return 0;
 }
+
+/*
+ * Make sure that a proposed subpartition is strictly contained inside
+ * the parent partition.  If all is well, call add_gd_partition().
+ */
+int
+check_and_add_subpartition(struct gendisk *hd, int super_minor, int minor,
+			   int sub_start, int sub_size)
+{
+	int start = hd->part[super_minor].start_sect;
+	int size = hd->part[super_minor].nr_sects;
+
+	if (start == sub_start && size == sub_size) {
+		/* full parent partition, we have it already */
+		return 0;
+	}
+
+	if (start <= sub_start && start+size >= sub_start+sub_size) {
+		add_gd_partition(hd, minor, sub_start, sub_size);
+		return 1;
+	}
+
+	printk("bad subpartition - ignored\n");
+	return 0;
+}

@@ -18,6 +18,10 @@
 #include <linux/isapnp.h>
 #include <linux/string.h>
 
+#if 0
+#define ISAPNP_DEBUG
+#endif
+
 static void __init quirk_awe32_resources(struct pci_dev *dev)
 {
 	struct isapnp_port *port, *port2, *port3;
@@ -139,8 +143,10 @@ void isapnp_fixup_device(struct pci_dev *dev)
 	while (isapnp_fixups[i].vendor != 0) {
 		if ((isapnp_fixups[i].vendor == dev->vendor) &&
 		    (isapnp_fixups[i].device == dev->device)) {
+#ifdef ISAPNP_DEBUG
 			printk(KERN_DEBUG "isapnp: Calling quirk for %02x:%02x\n",
 			       dev->bus->number, dev->devfn);
+#endif
 			isapnp_fixups[i].quirk_function(dev);
 		}
 		i++;

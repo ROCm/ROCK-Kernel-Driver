@@ -54,8 +54,8 @@ typedef __u32 magic_t;
 #define IRDA_MIN(a, b) (((a) < (b)) ? (a) : (b))
 #endif
 
-#ifndef ALIGN
-#  define ALIGN __attribute__((aligned))
+#ifndef IRDA_ALIGN
+#  define IRDA_ALIGN __attribute__((aligned))
 #endif
 #ifndef PACK
 #  define PACK __attribute__((packed))

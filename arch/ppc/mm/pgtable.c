@@ -39,10 +39,6 @@ unsigned long ioremap_base;
 unsigned long ioremap_bot;
 int io_bat_index;
 
-#ifndef CONFIG_SMP
-struct pgtable_cache_struct quicklists;
-#endif
-
 #if defined(CONFIG_6xx) || defined(CONFIG_POWER3)
 #define HAVE_BATS	1
 #endif
@@ -173,12 +169,12 @@ map_page(unsigned long va, unsigned long pa, int flags)
 	/* Use upper 10 bits of VA to index the first level map */
 	pd = pmd_offset(pgd_offset_k(va), va);
 	/* Use middle 10 bits of VA to index the second-level map */
-	pg = pte_alloc(&init_mm, pd, va);
+	pg = pte_alloc_kernel(&init_mm, pd, va);
 	if (pg != 0) {
 		err = 0;
 		set_pte(pg, mk_pte_phys(pa & PAGE_MASK, __pgprot(flags)));
 		if (mem_init_done)
-			flush_HPTE(0, va, pg);
+			flush_HPTE(0, va, pmd_val(*pd));
 	}
 	spin_unlock(&init_mm.page_table_lock);
 	return err;
@@ -272,10 +268,11 @@ get_pteptr(struct mm_struct *mm, unsigned long addr, pte_t **ptep)
         if (pgd) {
                 pmd = pmd_offset(pgd, addr & PAGE_MASK);
                 if (pmd_present(*pmd)) {
-                        pte = pte_offset(pmd, addr & PAGE_MASK);
+                        pte = pte_offset_map(pmd, addr & PAGE_MASK);
                         if (pte) {
 				retval = 1;
 				*ptep = pte;
+				/* XXX caller needs to do pte_unmap, yuck */
                         }
                 }
         }
@@ -312,8 +309,10 @@ unsigned long iopa(unsigned long addr)
 		mm = &init_mm;
 	
 	pa = 0;
-	if (get_pteptr(mm, addr, &pte))
+	if (get_pteptr(mm, addr, &pte)) {
 		pa = (pte_val(*pte) & PAGE_MASK) | (addr & ~PAGE_MASK);
+		pte_unmap(pte);
+	}
 
 	return(pa);
 }

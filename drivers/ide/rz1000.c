@@ -1,10 +1,6 @@
 /*
- *  linux/drivers/ide/rz1000.c		Version 0.05	December 8, 1997
- *
  *  Copyright (C) 1995-1998  Linus Torvalds & author (see below)
- */
-
-/*
+ *
  *  Principal Author:  mlord@pobox.com (Mark Lord)
  *
  *  See linux/MAINTAINERS for address of current maintainer.
@@ -14,8 +10,6 @@
  *
  *  Dunno if this fixes both ports, or only the primary port (?).
  */
-
-#undef REALLY_SLOW_IO		/* most systems can safely undef this */
 
 #include <linux/config.h> /* for CONFIG_BLK_DEV_IDEPCI */
 #include <linux/types.h>
