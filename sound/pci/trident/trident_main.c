@@ -3052,29 +3052,49 @@ static int __devinit snd_trident_mixer(trident_t * trident, int pcm_spdif_device
 	}
 	if (trident->device == TRIDENT_DEVICE_ID_NX || trident->device == TRIDENT_DEVICE_ID_SI7018) {
 
-		if ((err = snd_ctl_add(card, kctl = snd_ctl_new1(&snd_trident_spdif_control, trident))) < 0)
+		kctl = snd_ctl_new1(&snd_trident_spdif_control, trident);
+		if (kctl == NULL) {
+			err = -ENOMEM;
 			goto __out;
+		}
 		if (trident->ac97->ext_id & AC97_EI_SPDIF)
 			kctl->id.index++;
 		if (trident->ac97_sec && (trident->ac97_sec->ext_id & AC97_EI_SPDIF))
 			kctl->id.index++;
 		idx = kctl->id.index;
+		if ((err = snd_ctl_add(card, kctl)) < 0)
+			goto __out;
 		kctl->put(kctl, uctl);
 
-		if ((err = snd_ctl_add(card, kctl = snd_ctl_new1(&snd_trident_spdif_default, trident))) < 0)
+		kctl = snd_ctl_new1(&snd_trident_spdif_default, trident);
+		if (kctl == NULL) {
+			err = -ENOMEM;
 			goto __out;
+		}
 		kctl->id.index = idx;
 		kctl->id.device = pcm_spdif_device;
+		if ((err = snd_ctl_add(card, kctl)) < 0)
+			goto __out;
 
-		if ((err = snd_ctl_add(card, kctl = snd_ctl_new1(&snd_trident_spdif_mask, trident))) < 0)
+		kctl = snd_ctl_new1(&snd_trident_spdif_mask, trident);
+		if (kctl == NULL) {
+			err = -ENOMEM;
 			goto __out;
+		}
 		kctl->id.index = idx;
 		kctl->id.device = pcm_spdif_device;
+		if ((err = snd_ctl_add(card, kctl)) < 0)
+			goto __out;
 
-		if ((err = snd_ctl_add(card, kctl = snd_ctl_new1(&snd_trident_spdif_stream, trident))) < 0)
+		kctl = snd_ctl_new1(&snd_trident_spdif_stream, trident);
+		if (kctl == NULL) {
+			err = -ENOMEM;
 			goto __out;
+		}
 		kctl->id.index = idx;
 		kctl->id.device = pcm_spdif_device;
+		if ((err = snd_ctl_add(card, kctl)) < 0)
+			goto __out;
 		trident->spdif_pcm_ctl = kctl;
 	}
 

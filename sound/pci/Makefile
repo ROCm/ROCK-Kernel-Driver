@@ -4,6 +4,7 @@
 #
 
 snd-als4000-objs := als4000.o
+snd-atiixp-objs := atiixp.o
 snd-azt3328-objs := azt3328.o
 snd-bt87x-objs := bt87x.o
 snd-cmipci-objs := cmipci.o
@@ -22,6 +23,7 @@ snd-via82xx-objs := via82xx.o
 
 # Toplevel Module Dependency
 obj-$(CONFIG_SND_ALS4000) += snd-als4000.o
+obj-$(CONFIG_SND_ATIIXP) += snd-atiixp.o
 obj-$(CONFIG_SND_AZT3328) += snd-azt3328.o
 obj-$(CONFIG_SND_BT87X) += snd-bt87x.o
 obj-$(CONFIG_SND_CMIPCI) += snd-cmipci.o
@@ -38,4 +40,16 @@ obj-$(CONFIG_SND_RME96) += snd-rme96.o
 obj-$(CONFIG_SND_SONICVIBES) += snd-sonicvibes.o
 obj-$(CONFIG_SND_VIA82XX) += snd-via82xx.o
 
-obj-$(CONFIG_SND) += ac97/ ali5451/ cs46xx/ emu10k1/ korg1212/ nm256/ rme9652/ trident/ ymfpci/ ice1712/ vx222/
+obj-$(CONFIG_SND) += \
+	ac97/ \
+	ali5451/ \
+	cs46xx/ \
+	emu10k1/ \
+	ice1712/ \
+	korg1212/ \
+	mixart/ \
+	nm256/ \
+	rme9652/ \
+	trident/ \
+	ymfpci/ \
+	vx222/

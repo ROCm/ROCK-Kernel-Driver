@@ -23,5 +23,6 @@ obj-$(CONFIG_SND_EMU10K1) += snd-ac97-codec.o
 obj-$(CONFIG_SND_NM256) += snd-ac97-codec.o
 obj-$(CONFIG_SND_TRIDENT) += snd-ac97-codec.o
 obj-$(CONFIG_SND_YMFPCI) += snd-ac97-codec.o
+obj-$(CONFIG_SND_ATIIXP) += snd-ac97-codec.o
 
 obj-m := $(sort $(obj-m))

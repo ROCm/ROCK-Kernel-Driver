@@ -9,6 +9,12 @@ config SND_ALI5451
 	help
 	  Say 'Y' or 'M' to include support for ALI PCI Audio M5451 sound core.
 
+config SND_ATIIXP
+	tristate "ATI IXP 150/200/250"
+	depends on SND
+	help
+	  Say 'Y' or 'M' to include support for ATI IXP 150/200/250 AC97 controller.
+
 config SND_AZT3328
 	tristate "Aztech AZF3328 / PCI168 (EXPERIMENTAL)"
 	depends on SND && EXPERIMENTAL
@@ -54,6 +60,12 @@ config SND_KORG1212
 	depends on SND
 	help
 	  Say 'Y' or 'M' to include support for Korg 1212IO.
+
+config SND_MIXART
+	tristate "Digigram miXart"
+	depends on SND
+	help
+	  Say 'Y' or 'M' to include support for Digigram miXart soundcard.
 
 config SND_NM256
 	tristate "NeoMagic NM256AV/ZX"
@@ -154,9 +166,10 @@ config SND_FM801
 	help
 	  Say 'Y' or 'M' to include support for ForteMedia FM801 based soundcards.
 
-config CONFIG_SND_FM801_TEA575X
+config SND_FM801_TEA575X
 	tristate "ForteMedia FM801 + TEA5757 tuner"
-	depends on SND_FM801 && CONFIG_VIDEO_DEV
+	depends on SND_FM801
+        select VIDEO_DEV
 	help
 	  Say 'Y' or 'M' to include support for ForteMedia FM801 based soundcards
           with TEA5757 tuner connected to GPIO1-3 pins (Media Forte SF256-PCS-02).
