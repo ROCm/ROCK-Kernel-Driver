@@ -49,9 +49,9 @@ static struct tcf_ipt *tcf_ipt_ht[MY_TAB_SIZE];
 static rwlock_t ipt_lock = RW_LOCK_UNLOCKED;
 
 /* ovewrride the defaults */
-#define tcf_st  tcf_ipt
-#define tcf_t_lock   ipt_lock
-#define tcf_ht tcf_ipt_ht
+#define tcf_st		tcf_ipt
+#define tcf_t_lock	ipt_lock
+#define tcf_ht		tcf_ipt_ht
 
 #include <net/pkt_act.h>
 
@@ -73,8 +73,8 @@ init_targ(struct tcf_ipt *p)
 
 	if (t->u.kernel.target->checkentry
 	    && !t->u.kernel.target->checkentry(p->tname, NULL, t->data,
-					       t->u.target_size
-					       - sizeof (*t), p->hook)) {
+					       t->u.target_size - sizeof(*t),
+					       p->hook)) {
 		DPRINTK("ip_tables: check failed for `%s'.\n",
 			t->u.kernel.target->name);
 		module_put(t->u.kernel.target->me);
@@ -85,7 +85,8 @@ init_targ(struct tcf_ipt *p)
 }
 
 static int
-tcf_ipt_init(struct rtattr *rta, struct rtattr *est, struct tc_action *a, int ovr, int bind)
+tcf_ipt_init(struct rtattr *rta, struct rtattr *est, struct tc_action *a,
+             int ovr, int bind)
 {
 	struct ipt_entry_target *t;
 	unsigned h;
@@ -95,12 +96,9 @@ tcf_ipt_init(struct rtattr *rta, struct rtattr *est, struct tc_action *a, int ov
 	u32 index = 0;
 	u32 hook = 0;
 
-	if (NULL == a || NULL == rta ||
-	    (rtattr_parse(tb, TCA_IPT_MAX, RTA_DATA(rta), RTA_PAYLOAD(rta)) <
-	     0)) {
+	if (a == NULL || rta == NULL ||
+	    rtattr_parse(tb, TCA_IPT_MAX, RTA_DATA(rta), RTA_PAYLOAD(rta)) < 0)
 		return -1;
-	}
-
 
 	if (tb[TCA_IPT_INDEX - 1]) {
 		index = *(u32 *) RTA_DATA(tb[TCA_IPT_INDEX - 1]);
@@ -114,22 +112,19 @@ tcf_ipt_init(struct rtattr *rta, struct rtattr *est, struct tc_action *a, int ov
 			p->bindcnt += 1;
 			p->refcnt += 1;
 		}
-		if (ovr) {
+		if (ovr)
 			goto override;
-		}
 		spin_unlock(&p->lock);
 		return ret;
 	}
 
-	if (NULL == tb[TCA_IPT_TARG - 1] || NULL == tb[TCA_IPT_HOOK - 1]) {
+	if (tb[TCA_IPT_TARG - 1] == NULL || tb[TCA_IPT_HOOK - 1] == NULL)
 		return -1;
-	}
 
-	p = kmalloc(sizeof (*p), GFP_KERNEL);
+	p = kmalloc(sizeof(*p), GFP_KERNEL);
 	if (p == NULL)
 		return -1;
-
-	memset(p, 0, sizeof (*p));
+	memset(p, 0, sizeof(*p));
 	p->refcnt = 1;
 	ret = 1;
 	spin_lock_init(&p->lock);
@@ -184,7 +179,7 @@ override:
 		}
 	}
 
-	if (0 > init_targ(p)) {
+	if (init_targ(p) < 0) {
 		if (ovr) {
 			printk("ipt policy messed up 2 \n");
 			spin_unlock(&p->lock);
@@ -217,7 +212,7 @@ override:
 	p->next = tcf_ipt_ht[h];
 	tcf_ipt_ht[h] = p;
 	write_unlock_bh(&ipt_lock);
-	a->priv = (void *) p;
+	a->priv = p;
 	return ret;
 
 }
@@ -225,8 +220,8 @@ override:
 static int
 tcf_ipt_cleanup(struct tc_action *a, int bind)
 {
-	struct tcf_ipt *p;
-	p = PRIV(a,ipt);
+	struct tcf_ipt *p = PRIV(a,ipt);
+
 	if (NULL != p) {
 		struct ipt_entry_target *t = p->t;
 		if (t && t->u.kernel.target)
@@ -240,14 +235,11 @@ static int
 tcf_ipt(struct sk_buff **pskb, struct tc_action *a)
 {
 	int ret = 0, result = 0;
-	struct tcf_ipt *p;
+	struct tcf_ipt *p = PRIV(a, ipt);
 	struct sk_buff *skb = *pskb;
 
-	p = PRIV(a,ipt);
-
-	if (NULL == p || NULL == skb) {
+	if (p == NULL || skb == NULL)
 		return -1;
-	}
 
 	spin_lock(&p->lock);
 
@@ -256,16 +248,15 @@ tcf_ipt(struct sk_buff **pskb, struct tc_action *a)
 	p->bstats.packets++;
 
 	if (skb_cloned(skb) ) {
-		if (pskb_expand_head(skb, 0, 0, GFP_ATOMIC)) {
+		if (pskb_expand_head(skb, 0, 0, GFP_ATOMIC))
 			return -1;
-		}
 	}
 	/* yes, we have to worry about both in and out dev
 	 worry later - danger - this API seems to have changed
 	 from earlier kernels */
 
 	ret = p->t->u.kernel.target->target(&skb, skb->dev, NULL,
-					    p->hook, p->t->data, (void *)NULL);
+					    p->hook, p->t->data, NULL);
 	switch (ret) {
 	case NF_ACCEPT:
 		result = TC_ACT_OK;
@@ -295,11 +286,9 @@ tcf_ipt_dump(struct sk_buff *skb, struct tc_action *a, int bind, int ref)
 	struct tcf_t tm;
 	struct tc_cnt c;
 	unsigned char *b = skb->tail;
+	struct tcf_ipt *p = PRIV(a, ipt);
 
-	struct tcf_ipt *p;
-
-	p = PRIV(a,ipt);
-	if (NULL == p) {
+	if (p == NULL) {
 		printk("BUG: tcf_ipt_dump called with NULL params\n");
 		goto rtattr_failure;
 	}
@@ -309,8 +298,7 @@ tcf_ipt_dump(struct sk_buff *skb, struct tc_action *a, int bind, int ref)
 	*/
 
 	t = kmalloc(p->t->u.user.target_size, GFP_ATOMIC);
-
-	if (NULL == t)
+	if (t == NULL)
 		goto rtattr_failure;
 
 	c.bindcnt = p->bindcnt - bind;
@@ -320,10 +308,10 @@ tcf_ipt_dump(struct sk_buff *skb, struct tc_action *a, int bind, int ref)
 
 	DPRINTK("\ttcf_ipt_dump tablename %s length %d\n", p->tname,
 		strlen(p->tname));
-	DPRINTK
-	    ("\tdump target name %s size %d size user %d data[0] %x data[1] %x\n",
-	     p->t->u.kernel.target->name, p->t->u.target_size, p->t->u.user.target_size,
-	     p->t->data[0], p->t->data[1]);
+	DPRINTK("\tdump target name %s size %d size user %d "
+	        "data[0] %x data[1] %x\n", p->t->u.kernel.target->name,
+	        p->t->u.target_size, p->t->u.user.target_size,
+	        p->t->data[0], p->t->data[1]);
 	RTA_PUT(skb, TCA_IPT_TARG, p->t->u.user.target_size, t);
 	RTA_PUT(skb, TCA_IPT_INDEX, 4, &p->index);
 	RTA_PUT(skb, TCA_IPT_HOOK, 4, &p->hook);
@@ -341,7 +329,6 @@ tcf_ipt_dump(struct sk_buff *skb, struct tc_action *a, int bind, int ref)
 }
 
 static struct tc_action_ops act_ipt_ops = {
-	.next		=	NULL,
 	.kind		=	"ipt",
 	.type		=	TCA_ACT_IPT,
 	.capab		=	TCA_CAP_NONE,
