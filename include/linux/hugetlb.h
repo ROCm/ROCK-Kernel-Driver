@@ -73,10 +73,27 @@ static inline int is_vm_hugetlb_page(struct vm_area_struct *vma)
 
 #ifdef CONFIG_HUGETLBFS
 struct hugetlbfs_config {
-        uid_t   uid;
-        gid_t   gid;
-        umode_t mode;
+	uid_t   uid;
+	gid_t   gid;
+	umode_t mode;
+	long	nr_blocks;
+	long	nr_inodes;
 };
+
+struct hugetlbfs_sb_info {
+	long	max_blocks;   /* blocks allowed */
+	long	free_blocks;  /* blocks free */
+	long	max_inodes;   /* inodes allowed */
+	long	free_inodes;  /* inodes free */
+	spinlock_t	stat_lock;
+};
+
+static inline struct hugetlbfs_sb_info *HUGETLBFS_SB(struct super_block *sb)
+{
+	return sb->s_fs_info;
+}
+
+#define PSEUDO_DIRENT_SIZE	20
 
 extern struct file_operations hugetlbfs_file_operations;
 extern struct vm_operations_struct hugetlb_vm_ops;

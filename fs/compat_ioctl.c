@@ -2277,7 +2277,7 @@ struct mtd_oob_buf32 {
 #define MEMWRITEOOB32 	_IOWR('M',3,struct mtd_oob_buf32)
 #define MEMREADOOB32 	_IOWR('M',4,struct mtd_oob_buf32)
 
-static int mtd_rw_oob(unsigned int fd, unsigned int cmd, unsigned long arg)
+int mtd_rw_oob(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
 	struct mtd_oob_buf	*buf = compat_alloc_user_space(sizeof(*buf));
 	struct mtd_oob_buf32	*buf32 = (struct mtd_oob_buf32 *) arg;

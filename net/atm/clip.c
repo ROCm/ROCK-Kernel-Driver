@@ -140,8 +140,8 @@ static void idle_timer_check(unsigned long dummy)
 					DPRINTK("releasing vcc %p->%p of "
 					    "entry %p\n",clip_vcc,clip_vcc->vcc,
 					    entry);
-					atm_async_release_vcc(clip_vcc->vcc,
-					    -ETIMEDOUT);
+					vcc_release_async(clip_vcc->vcc,
+							  -ETIMEDOUT);
 				}
 			if (entry->vccs ||
 			    time_before(jiffies, entry->expires)) {

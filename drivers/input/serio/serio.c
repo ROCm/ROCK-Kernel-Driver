@@ -58,6 +58,7 @@ struct serio_event {
 	struct list_head node;
 };
 
+static DECLARE_MUTEX(serio_sem);
 static LIST_HEAD(serio_list);
 static LIST_HEAD(serio_dev_list);
 static LIST_HEAD(serio_event_list);
@@ -90,9 +91,11 @@ void serio_handle_events(void)
 
 		switch (event->type) {
 			case SERIO_RESCAN :
+				down(&serio_sem);
 				if (event->serio->dev && event->serio->dev->disconnect)
 					event->serio->dev->disconnect(event->serio);
 				serio_find_dev(event->serio);
+				up(&serio_sem);
 				break;
 			default:
 				break;
@@ -153,30 +156,37 @@ irqreturn_t serio_interrupt(struct serio *serio,
 
 void serio_register_port(struct serio *serio)
 {
+	down(&serio_sem);
 	list_add_tail(&serio->node, &serio_list);
 	serio_find_dev(serio);
+	up(&serio_sem);
 }
 
 void serio_unregister_port(struct serio *serio)
 {
+	down(&serio_sem);
 	list_del_init(&serio->node);
 	if (serio->dev && serio->dev->disconnect)
 		serio->dev->disconnect(serio);
+	up(&serio_sem);
 }
 
 void serio_register_device(struct serio_dev *dev)
 {
 	struct serio *serio;
+	down(&serio_sem);
 	list_add_tail(&dev->node, &serio_dev_list);
 	list_for_each_entry(serio, &serio_list, node)
 		if (!serio->dev && dev->connect)
 			dev->connect(serio, dev);
+	up(&serio_sem);
 }
 
 void serio_unregister_device(struct serio_dev *dev)
 {
 	struct serio *serio;
 
+	down(&serio_sem);
 	list_del_init(&dev->node);
 
 	list_for_each_entry(serio, &serio_list, node) {
@@ -184,8 +194,10 @@ void serio_unregister_device(struct serio_dev *dev)
 			dev->disconnect(serio);
 		serio_find_dev(serio);
 	}
+	up(&serio_sem);
 }
 
+/* called from serio_dev->connect/disconnect methods under serio_sem */
 int serio_open(struct serio *serio, struct serio_dev *dev)
 {
 	if (serio->open(serio))
@@ -194,6 +206,7 @@ int serio_open(struct serio *serio, struct serio_dev *dev)
 	return 0;
 }
 
+/* called from serio_dev->connect/disconnect methods under serio_sem */
 void serio_close(struct serio *serio)
 {
 	serio->close(serio);

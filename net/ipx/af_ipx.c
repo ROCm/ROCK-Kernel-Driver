@@ -142,7 +142,6 @@ static void ipx_remove_socket(struct sock *sk)
 	spin_lock_bh(&intrfc->if_sklist_lock);
 	sk_del_node_init(sk);
 	spin_unlock_bh(&intrfc->if_sklist_lock);
-	sock_put(sk);
 	ipxitf_put(intrfc);
 out:
 	return;
@@ -229,7 +228,6 @@ unlock:
 static void ipxitf_insert_socket(struct ipx_interface *intrfc, struct sock *sk)
 {
 	ipxitf_hold(intrfc);
-	sock_hold(sk);
 	spin_lock_bh(&intrfc->if_sklist_lock);
 	ipx_sk(sk)->intrfc = intrfc;
 	sk_add_node(sk, &intrfc->if_sklist);
@@ -269,7 +267,7 @@ static struct sock *ipxitf_find_socket(struct ipx_interface *intrfc,
 
 #ifdef CONFIG_IPX_INTERN
 static struct sock *ipxitf_find_internal_socket(struct ipx_interface *intrfc,
-						unsigned char *node,
+						unsigned char *ipx_node,
 						unsigned short port)
 {
 	struct sock *s;
@@ -282,7 +280,7 @@ static struct sock *ipxitf_find_internal_socket(struct ipx_interface *intrfc,
 		struct ipx_opt *ipxs = ipx_sk(s);
 
 		if (ipxs->port == port &&
-		    !memcmp(node, ipxs->node, IPX_NODE_LEN))
+		    !memcmp(ipx_node, ipxs->node, IPX_NODE_LEN))
 			goto found;
 	}
 	s = NULL;

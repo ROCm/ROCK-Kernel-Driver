@@ -120,8 +120,7 @@
 
 #define NVIRT_CHAN		4	/* # of virtual channels to represent
 					   up to 60 logical drives */
-
-typedef struct {
+struct mbox_out {
 	/* 0x0 */ u8 cmd;
 	/* 0x1 */ u8 cmdid;
 	/* 0x2 */ u16 numsectors;
@@ -130,12 +129,20 @@ typedef struct {
 	/* 0xC */ u8 logdrv;
 	/* 0xD */ u8 numsgelements;
 	/* 0xE */ u8 resvd;
+} __attribute__ ((packed));
+
+struct mbox_in {
 	/* 0xF */ volatile u8 busy;
 	/* 0x10 */ volatile u8 numstatus;
 	/* 0x11 */ volatile u8 status;
 	/* 0x12 */ volatile u8 completed[MAX_FIRMWARE_STATUS];
 	volatile u8 poll;
 	volatile u8 ack;
+} __attribute__ ((packed));
+
+typedef struct {
+	struct mbox_out	m_out;
+	struct mbox_in	m_in;
 } __attribute__ ((packed)) mbox_t;
 
 typedef struct {
@@ -1001,7 +1008,6 @@ static irqreturn_t megaraid_isr_iomapped(int, void *, struct pt_regs *);
 static void mega_free_scb(adapter_t *, scb_t *);
 
 static int megaraid_release (struct Scsi_Host *);
-static int megaraid_command (Scsi_Cmnd *);
 static int megaraid_abort(Scsi_Cmnd *);
 static int megaraid_reset(Scsi_Cmnd *);
 static int megaraid_abort_and_reset(adapter_t *, Scsi_Cmnd *, int);

@@ -3078,9 +3078,9 @@ static long sctp_get_port_local(struct sock *sk, union sctp_addr *addr)
 	 */
 success:
 	inet_sk(sk)->num = snum;
-	if (!sk->sk_prev) {
+	if (!sctp_sk(sk)->bind_hash) {
 		sk_add_bind_node(sk, &pp->sk_list);
-		sk->sk_prev = (struct sock *) pp;
+		sctp_sk(sk)->bind_hash = pp;
 	}
 	ret = 0;
 
@@ -3328,7 +3328,7 @@ static struct sctp_bind_bucket *sctp_bucket_create(
 /* Caller must hold hashbucket lock for this tb with local BH disabled */
 static void sctp_bucket_destroy(struct sctp_bind_bucket *pp)
 {
-	if (!hlist_empty(&pp->sk_list)) {
+	if (hlist_empty(&pp->sk_list)) {
 		if (pp->next)
 			pp->next->pprev = pp->pprev;
 		*(pp->pprev) = pp->next;
@@ -3345,9 +3345,9 @@ static __inline__ void __sctp_put_port(struct sock *sk)
 	struct sctp_bind_bucket *pp;
 
 	sctp_spin_lock(&head->lock);
-	pp = (struct sctp_bind_bucket *)sk->sk_prev;
-	hlist_del(&sk->sk_bind_node);
-	sk->sk_prev = NULL;
+	pp = sctp_sk(sk)->bind_hash;
+	__sk_del_bind_node(sk);
+	sctp_sk(sk)->bind_hash = NULL;
 	inet_sk(sk)->num = 0;
 	sctp_bucket_destroy(pp);
 	sctp_spin_unlock(&head->lock);

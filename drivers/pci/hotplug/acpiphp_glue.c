@@ -1,9 +1,9 @@
 /*
  * ACPI PCI HotPlug glue functions to ACPI CA subsystem
  *
- * Copyright (c) 2002 Takayoshi Kochi (t-kouchi@cq.jp.nec.com)
+ * Copyright (c) 2002,2003 Takayoshi Kochi (t-kochi@bq.jp.nec.com)
  * Copyright (c) 2002 Hiroshi Aono (h-aono@ap.jp.nec.com)
- * Copyright (c) 2002 NEC Corporation
+ * Copyright (c) 2002,2003 NEC Corporation
  *
  * All rights reserved.
  *
@@ -22,7 +22,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * Send feedback to <t-kouchi@cq.jp.nec.com>
+ * Send feedback to <t-kochi@bq.jp.nec.com>
  *
  */
 
@@ -204,7 +204,6 @@ register_slot (acpi_handle handle, u32 lvl, void *context, void **rv)
 
 	if (ACPI_FAILURE(status)) {
 		err("failed to register interrupt notify handler\n");
-		kfree(newfunc);
 		return status;
 	}
 
@@ -617,9 +616,8 @@ find_p2p_bridge (acpi_handle handle, u32 lvl, void *context, void **rv)
 
 
 /* find hot-pluggable slots, and then find P2P bridge */
-static int add_bridges(struct acpi_device *device)
+static int add_bridge(acpi_handle handle)
 {
-	acpi_handle *handle = device->handle;
 	acpi_status status;
 	unsigned long tmp;
 	int seg, bus;
@@ -670,6 +668,12 @@ static int add_bridges(struct acpi_device *device)
 		warn("find_p2p_bridge faied (error code = 0x%x)\n",status);
 
 	return 0;
+}
+
+
+static void remove_bridge (acpi_handle handle)
+{
+	/* No-op for now .. */
 }
 
 
@@ -725,9 +729,7 @@ static int power_off_slot (struct acpiphp_slot *slot)
 	list_for_each (l, &slot->funcs) {
 		func = list_entry(l, struct acpiphp_func, sibling);
 
-		if (func->flags & FUNC_HAS_PS3) {
-			dbg("%s: executing _PS3 on %s\n", __FUNCTION__,
-			    func->pci_dev->slot_name);
+		if (func->flags & (FUNC_HAS_PS3 | FUNC_EXISTS)) {
 			status = acpi_evaluate_object(func->handle, "_PS3", NULL, NULL);
 			if (ACPI_FAILURE(status)) {
 				warn("%s: _PS3 failed\n", __FUNCTION__);
@@ -740,10 +742,8 @@ static int power_off_slot (struct acpiphp_slot *slot)
 	list_for_each (l, &slot->funcs) {
 		func = list_entry(l, struct acpiphp_func, sibling);
 
-		if (func->flags & FUNC_HAS_EJ0) {
-			dbg("%s: executing _EJ0 on %s\n", __FUNCTION__,
-			    func->pci_dev->slot_name);
-
+		/* We don't want to call _EJ0 on non-existing functions. */
+		if (func->flags & (FUNC_HAS_EJ0 | FUNC_EXISTS)) {
 			/* _EJ0 method take one argument */
 			arg_list.count = 1;
 			arg_list.pointer = &arg;
@@ -756,6 +756,7 @@ static int power_off_slot (struct acpiphp_slot *slot)
 				retval = -1;
 				goto err_exit;
 			}
+			func->flags &= (~FUNC_EXISTS);
 		}
 	}
 
@@ -835,6 +836,8 @@ static int enable_device (struct acpiphp_slot *slot)
 		retval = acpiphp_configure_function(func);
 		if (retval)
 			goto err_exit;
+
+		func->flags |= FUNC_EXISTS;
 	}
 
 	slot->flags |= SLOT_ENABLED;
@@ -1029,13 +1032,10 @@ static void handle_hotplug_event_func (acpi_handle handle, u32 type, void *conte
 	}
 }
 
-static struct acpi_driver acpi_pci_hp_driver = {
-	.name =		"pci_hp",
-	.class =	"",
-	.ids =		ACPI_PCI_HOST_HID,
-	.ops =	{
-		.add =	add_bridges,
-	}
+
+static struct acpi_pci_driver acpi_pci_hp_driver = {
+	.add =		add_bridge,
+	.remove =	remove_bridge,
 };
 
 /**
@@ -1044,17 +1044,15 @@ static struct acpi_driver acpi_pci_hp_driver = {
  */
 int acpiphp_glue_init (void)
 {
-	acpi_status status;
+	int num;
 
 	if (list_empty(&pci_root_buses))
 		return -1;
 
-	status = acpi_bus_register_driver(&acpi_pci_hp_driver);
+	num = acpi_pci_register_driver(&acpi_pci_hp_driver);
 
-	if (ACPI_FAILURE(status)) {
-		err("%s: acpi_walk_namespace() failed\n", __FUNCTION__);
+	if (num <= 0)
 		return -1;
-	}
 
 	return 0;
 }
@@ -1296,7 +1294,7 @@ u8 acpiphp_get_power_status (struct acpiphp_slot *slot)
 
 /*
  * attention LED ON: 1
- *              OFF: 0
+ *		OFF: 0
  *
  * TBD
  * no direct attention led status information via ACPI

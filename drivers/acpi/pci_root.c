@@ -23,8 +23,6 @@
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  */
 
-#include <linux/config.h>
-
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/init.h>
@@ -45,8 +43,6 @@ ACPI_MODULE_NAME		("pci_root")
 #define ACPI_PCI_ROOT_HID		"PNP0A03"
 #define ACPI_PCI_ROOT_DRIVER_NAME	"ACPI PCI Root Bridge Driver"
 #define ACPI_PCI_ROOT_DEVICE_NAME	"PCI Root Bridge"
-
-extern struct pci_ops *pci_root_ops;
 
 static int acpi_pci_root_add (struct acpi_device *device);
 static int acpi_pci_root_remove (struct acpi_device *device, int type);
@@ -250,6 +246,8 @@ acpi_pci_root_add (
 	switch (status) {
 	case AE_OK:
 		root->id.segment = (u16) value;
+		printk("_SEG exists! Unsupported. Abort.\n");
+		BUG();
 		break;
 	case AE_NOT_FOUND:
 		ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
@@ -311,12 +309,7 @@ acpi_pci_root_add (
 	 * PCI namespace does not get created until this call is made (and 
 	 * thus the root bridge's pci_dev does not exist).
 	 */
-#ifdef CONFIG_X86
 	root->bus = pcibios_scan_root(root->id.bus);
-#else
-	root->bus = pcibios_scan_root(root->handle,
-	                              root->id.segment, root->id.bus);
-#endif
 	if (!root->bus) {
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, 
 			"Bus %02x:%02x not present in PCI namespace\n", 

@@ -1251,7 +1251,7 @@ static unsigned long __get_nr_free_mft_records(ntfs_volume *vol)
  *
  * Return 0 on success or -errno on error.
  */
-static int ntfs_statfs(struct super_block *sb, struct statfs *sfs)
+static int ntfs_statfs(struct super_block *sb, struct kstatfs *sfs)
 {
 	ntfs_volume *vol = NTFS_SB(sb);
 	s64 size;

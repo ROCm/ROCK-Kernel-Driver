@@ -822,19 +822,19 @@ xor_alpha_prefetch_5:						\n\
 ");
 
 static struct xor_block_template xor_block_alpha = {
-	name: "alpha",
-	do_2: xor_alpha_2,
-	do_3: xor_alpha_3,
-	do_4: xor_alpha_4,
-	do_5: xor_alpha_5,
+	.name	= "alpha",
+	.do_2	= xor_alpha_2,
+	.do_3	= xor_alpha_3,
+	.do_4	= xor_alpha_4,
+	.do_5	= xor_alpha_5,
 };
 
 static struct xor_block_template xor_block_alpha_prefetch = {
-	name: "alpha prefetch",
-	do_2: xor_alpha_prefetch_2,
-	do_3: xor_alpha_prefetch_3,
-	do_4: xor_alpha_prefetch_4,
-	do_5: xor_alpha_prefetch_5,
+	.name	= "alpha prefetch",
+	.do_2	= xor_alpha_prefetch_2,
+	.do_3	= xor_alpha_prefetch_3,
+	.do_4	= xor_alpha_prefetch_4,
+	.do_5	= xor_alpha_prefetch_5,
 };
 
 /* For grins, also test the generic routines.  */

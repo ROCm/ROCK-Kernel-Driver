@@ -235,18 +235,17 @@ powertecscsi_set_proc_info(struct Scsi_Host *host, char *buffer, int length)
  *		        of the required information.
  *	      offset  - offset into information that we have read upto.
  *	      length  - length of buffer
- *	      host_no - host number to return information for
  *	      inout   - 0 for reading, 1 for writing.
  * Returns  : length of data written to buffer.
  */
 int powertecscsi_proc_info(struct Scsi_Host *host, char *buffer, char **start, off_t offset,
-			    int length, int host_no, int inout)
+			    int length, int inout)
 {
 	struct powertec_info *info;
 	char *p = buffer;
 	int pos;
 
-	If (inout == 1)
+	if (inout == 1)
 		return powertecscsi_set_proc_info(host, buffer, length);
 
 	info = (struct powertec_info *)host->hostdata;
@@ -296,7 +295,6 @@ static Scsi_Host_Template powertecscsi_template = {
 	.proc_info			= powertecscsi_proc_info,
 	.name				= "PowerTec SCSI",
 	.info				= powertecscsi_info,
-	.command			= fas216_command,
 	.queuecommand			= fas216_queue_command,
 	.eh_host_reset_handler		= fas216_eh_host_reset,
 	.eh_bus_reset_handler		= fas216_eh_bus_reset,

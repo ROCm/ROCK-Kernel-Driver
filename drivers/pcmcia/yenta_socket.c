@@ -1,5 +1,5 @@
 /*
- * Regular cardbus driver ("yenta")
+ * Regular cardbus driver ("yenta_socket")
  *
  * (C) Copyright 1999, 2000 Linus Torvalds
  *
@@ -25,7 +25,7 @@
 
 #include <asm/io.h>
 
-#include "yenta.h"
+#include "yenta_socket.h"
 #include "i82365.h"
 
 

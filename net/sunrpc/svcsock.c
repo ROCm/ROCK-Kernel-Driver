@@ -681,8 +681,17 @@ svc_tcp_listen_data_ready(struct sock *sk, int count_unused)
 	dprintk("svc: socket %p TCP (listen) state change %d\n",
 			sk, sk->sk_state);
 
-	if  (sk->sk_state != TCP_ESTABLISHED) {
-		/* Aborted connection, SYN_RECV or whatever... */
+	if  (sk->sk_state != TCP_LISTEN) {
+		/*
+		 * This callback may called twice when a new connection
+		 * is established as a child socket inherits everything
+		 * from a parent LISTEN socket.
+		 * 1) data_ready method of the parent socket will be called
+		 *    when one of child sockets become ESTABLISHED.
+		 * 2) data_ready method of the child socket may be called
+		 *    when it receives data before the socket is accepted.
+		 * In case of 2, we should ignore it silently.
+		 */
 		goto out;
 	}
 	if (!(svsk = (struct svc_sock *) sk->sk_user_data)) {
@@ -1060,6 +1069,8 @@ svc_tcp_init(struct svc_sock *svsk)
 
 		set_bit(SK_CHNGBUF, &svsk->sk_flags);
 		set_bit(SK_DATA, &svsk->sk_flags);
+		if (sk->sk_state != TCP_ESTABLISHED) 
+			set_bit(SK_CLOSE, &svsk->sk_flags);
 	}
 }
 
@@ -1211,7 +1222,6 @@ svc_recv(struct svc_serv *serv, struct svc_rqst *rqstp, long timeout)
 	}
 
 	rqstp->rq_secure  = ntohs(rqstp->rq_addr.sin_port) < 1024;
-	rqstp->rq_userset = 0;
 	rqstp->rq_chandle.defer = svc_defer;
 
 	if (serv->sv_stats)
@@ -1443,7 +1453,7 @@ svc_makesock(struct svc_serv *serv, int protocol, unsigned short port)
 static void svc_revisit(struct cache_deferred_req *dreq, int too_many)
 {
 	struct svc_deferred_req *dr = container_of(dreq, struct svc_deferred_req, handle);
-	struct svc_serv *serv = dr->serv;
+	struct svc_serv *serv = dreq->owner;
 	struct svc_sock *svsk;
 
 	if (too_many) {
@@ -1481,7 +1491,7 @@ svc_defer(struct cache_req *req)
 		if (dr == NULL)
 			return NULL;
 
-		dr->serv = rqstp->rq_server;
+		dr->handle.owner = rqstp->rq_server;
 		dr->prot = rqstp->rq_prot;
 		dr->addr = rqstp->rq_addr;
 		dr->argslen = rqstp->rq_arg.len >> 2;

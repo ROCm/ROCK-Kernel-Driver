@@ -263,7 +263,7 @@ static struct stats dx_show_leaf(struct dx_hash_info *hinfo, struct ext3_dir_ent
 	unsigned names = 0, space = 0;
 	char *base = (char *) de;
 	struct dx_hash_info h = *hinfo;
-	
+
 	printk("names: ");
 	while ((char *) de < base + size)
 	{
@@ -546,7 +546,7 @@ static int htree_dirblock_to_tree(struct file *dir_file,
 	dxtrace(printk("In htree dirblock_to_tree: block %d\n", block));
 	if (!(bh = ext3_bread (NULL, dir, block, 0, &err)))
 		return err;
-	
+
 	de = (struct ext3_dir_entry_2 *) bh->b_data;
 	top = (struct ext3_dir_entry_2 *) ((char *) de +
 					   dir->i_sb->s_blocksize -
@@ -588,11 +588,11 @@ int ext3_htree_fill_tree(struct file *dir_file, __u32 start_hash,
 	int count = 0;
 	int ret;
 	__u32 hashval;
-	
+
 	dxtrace(printk("In htree_fill_tree, start hash: %x:%x\n", start_hash,
 		       start_minor_hash));
 	dir = dir_file->f_dentry->d_inode;
-	if (!(EXT3_I(dir)->i_flags & EXT3_INDEX_FL)) {	
+	if (!(EXT3_I(dir)->i_flags & EXT3_INDEX_FL)) {
 		hinfo.hash_version = EXT3_SB(dir->i_sb)->s_def_hash_version;
 		hinfo.seed = EXT3_SB(dir->i_sb)->s_hash_seed;
 		count = htree_dirblock_to_tree(dir_file, dir, 0, &hinfo,
@@ -663,7 +663,7 @@ static int dx_make_map (struct ext3_dir_entry_2 *de, int size,
 	int count = 0;
 	char *base = (char *) de;
 	struct dx_hash_info h = *hinfo;
-	
+
 	while ((char *) de < base + size)
 	{
 		if (de->name_len && de->inode) {
@@ -798,8 +798,6 @@ static inline int search_dirblock(struct buffer_head * bh,
  * The returned buffer_head has ->b_count elevated.  The caller is expected
  * to brelse() it when appropriate.
  */
-
-	
 static struct buffer_head * ext3_find_entry (struct dentry *dentry,
 					struct ext3_dir_entry_2 ** res_dir)
 {
@@ -903,7 +901,7 @@ restart:
 		start = 0;
 		goto restart;
 	}
-		
+
 cleanup_and_exit:
 	/* Clean up the read-ahead blocks */
 	for (; ra_ptr < ra_max; ra_ptr++)
@@ -926,7 +924,7 @@ static struct buffer_head * ext3_dx_find_entry(struct dentry *dentry,
 	int namelen = dentry->d_name.len;
 	const u8 *name = dentry->d_name.name;
 	struct inode *dir = dentry->d_parent->d_inode;
-	
+
 	sb = dir->i_sb;
 	if (!(frame = dx_probe (dentry, 0, &hinfo, frames, err)))
 		return NULL;
@@ -963,7 +961,7 @@ static struct buffer_head * ext3_dx_find_entry(struct dentry *dentry,
 			goto errout;
 		}
 	} while (retval == 1);
-	
+
 	*err = -ENOENT;
 errout:
 	dxtrace(printk("%s not found\n", name));
@@ -981,7 +979,6 @@ static struct dentry *ext3_lookup(struct inode * dir, struct dentry *dentry)
 	if (dentry->d_name.len > EXT3_NAME_LEN)
 		return ERR_PTR(-ENAMETOOLONG);
 
-	lock_kernel();
 	bh = ext3_find_entry(dentry, &de);
 	inode = NULL;
 	if (bh) {
@@ -989,12 +986,9 @@ static struct dentry *ext3_lookup(struct inode * dir, struct dentry *dentry)
 		brelse (bh);
 		inode = iget(dir->i_sb, ino);
 
-		if (!inode) {
-			unlock_kernel();
+		if (!inode)
 			return ERR_PTR(-EACCES);
-		}
 	}
-	unlock_kernel();
 	if (inode)
 		return d_splice_alias(inode, dentry);
 	d_add(dentry, inode);
@@ -1015,17 +1009,13 @@ struct dentry *ext3_get_parent(struct dentry *child)
 	dotdot.d_name.len = 2;
 	dotdot.d_parent = child; /* confusing, isn't it! */
 
-	lock_kernel();
 	bh = ext3_find_entry(&dotdot, &de);
 	inode = NULL;
-	if (!bh) {
-		unlock_kernel();
+	if (!bh)
 		return ERR_PTR(-ENOENT);
-	}
 	ino = le32_to_cpu(de->inode);
 	brelse(bh);
 	inode = iget(child->d_inode->i_sb, ino);
-	unlock_kernel();
 
 	if (!inode)
 		return ERR_PTR(-EACCES);
@@ -1199,7 +1189,7 @@ static int add_dirent_to_buf(handle_t *handle, struct dentry *dentry,
 	unsigned short	reclen;
 	int		nlen, rlen, err;
 	char		*top;
-	
+
 	reclen = EXT3_DIR_REC_LEN(namelen);
 	if (!de) {
 		de = (struct ext3_dir_entry_2 *)bh->b_data;
@@ -1231,7 +1221,7 @@ static int add_dirent_to_buf(handle_t *handle, struct dentry *dentry,
 		brelse(bh);
 		return err;
 	}
-	
+
 	/* By now the buffer is marked for journaling */
 	nlen = EXT3_DIR_REC_LEN(de->name_len);
 	rlen = le16_to_cpu(de->rec_len);
@@ -1294,7 +1284,7 @@ static int make_indexed_dir(handle_t *handle, struct dentry *dentry,
 	unsigned	blocksize;
 	struct dx_hash_info hinfo;
 	u32		block;
-		
+
 	blocksize =  dir->i_sb->s_blocksize;
 	dxtrace(printk("Creating index\n"));
 	retval = ext3_journal_get_write_access(handle, bh);
@@ -1304,7 +1294,7 @@ static int make_indexed_dir(handle_t *handle, struct dentry *dentry,
 		return retval;
 	}
 	root = (struct dx_root *) bh->b_data;
-		
+
 	EXT3_I(dir)->i_flags |= EXT3_INDEX_FL;
 	bh2 = ext3_append (handle, dir, &block, &retval);
 	if (!(bh2)) {
@@ -1487,13 +1477,13 @@ static int ext3_dx_add_entry(handle_t *handle, struct dentry *dentry,
 			unsigned icount1 = icount/2, icount2 = icount - icount1;
 			unsigned hash2 = dx_get_hash(entries + icount1);
 			dxtrace(printk("Split index %i/%i\n", icount1, icount2));
-				
+
 			BUFFER_TRACE(frame->bh, "get_write_access"); /* index root */
 			err = ext3_journal_get_write_access(handle,
 							     frames[0].bh);
 			if (err)
 				goto journal_error;
-				
+
 			memcpy ((char *) entries2, (char *) (entries + icount1),
 				icount2 * sizeof(struct dx_entry));
 			dx_set_count (entries, icount1);
@@ -1543,7 +1533,7 @@ static int ext3_dx_add_entry(handle_t *handle, struct dentry *dentry,
 	err = add_dirent_to_buf(handle, dentry, inode, de, bh);
 	bh = 0;
 	goto cleanup;
-	
+
 journal_error:
 	ext3_std_error(dir->i_sb, err);
 cleanup:
@@ -1639,13 +1629,10 @@ static int ext3_create (struct inode * dir, struct dentry * dentry, int mode)
 	struct inode * inode;
 	int err;
 
-	lock_kernel();
 	handle = ext3_journal_start(dir, EXT3_DATA_TRANS_BLOCKS +
 					EXT3_INDEX_EXTRA_TRANS_BLOCKS + 3);
-	if (IS_ERR(handle)) {
-		unlock_kernel();
+	if (IS_ERR(handle))
 		return PTR_ERR(handle);
-	}
 
 	if (IS_DIRSYNC(dir))
 		handle->h_sync = 1;
@@ -1655,14 +1642,10 @@ static int ext3_create (struct inode * dir, struct dentry * dentry, int mode)
 	if (!IS_ERR(inode)) {
 		inode->i_op = &ext3_file_inode_operations;
 		inode->i_fop = &ext3_file_operations;
-		if (ext3_should_writeback_data(inode))
-			inode->i_mapping->a_ops = &ext3_writeback_aops;
-		else
-			inode->i_mapping->a_ops = &ext3_aops;
+		ext3_set_aops(inode);
 		err = ext3_add_nondir(handle, dentry, inode);
 	}
 	ext3_journal_stop(handle);
-	unlock_kernel();
 	return err;
 }
 
@@ -1673,13 +1656,10 @@ static int ext3_mknod (struct inode * dir, struct dentry *dentry,
 	struct inode *inode;
 	int err;
 
-	lock_kernel();
 	handle = ext3_journal_start(dir, EXT3_DATA_TRANS_BLOCKS +
 			 		EXT3_INDEX_EXTRA_TRANS_BLOCKS + 3);
-	if (IS_ERR(handle)) {
-		unlock_kernel();
+	if (IS_ERR(handle))
 		return PTR_ERR(handle);
-	}
 
 	if (IS_DIRSYNC(dir))
 		handle->h_sync = 1;
@@ -1694,7 +1674,6 @@ static int ext3_mknod (struct inode * dir, struct dentry *dentry,
 		err = ext3_add_nondir(handle, dentry, inode);
 	}
 	ext3_journal_stop(handle);
-	unlock_kernel();
 	return err;
 }
 
@@ -1709,13 +1688,10 @@ static int ext3_mkdir(struct inode * dir, struct dentry * dentry, int mode)
 	if (dir->i_nlink >= EXT3_LINK_MAX)
 		return -EMLINK;
 
-	lock_kernel();
 	handle = ext3_journal_start(dir, EXT3_DATA_TRANS_BLOCKS +
 					EXT3_INDEX_EXTRA_TRANS_BLOCKS + 3);
-	if (IS_ERR(handle)) {
-		unlock_kernel();
+	if (IS_ERR(handle))
 		return PTR_ERR(handle);
-	}
 
 	if (IS_DIRSYNC(dir))
 		handle->h_sync = 1;
@@ -1768,7 +1744,6 @@ static int ext3_mkdir(struct inode * dir, struct dentry * dentry, int mode)
 	d_instantiate(dentry, inode);
 out_stop:
 	ext3_journal_stop(handle);
-	unlock_kernel();
 	return err;
 }
 
@@ -1854,7 +1829,7 @@ int ext3_orphan_add(handle_t *handle, struct inode *inode)
 	struct super_block *sb = inode->i_sb;
 	struct ext3_iloc iloc;
 	int err = 0, rc;
-	
+
 	lock_super(sb);
 	if (!list_empty(&EXT3_I(inode)->i_orphan))
 		goto out_unlock;
@@ -1875,7 +1850,7 @@ int ext3_orphan_add(handle_t *handle, struct inode *inode)
 	err = ext3_journal_get_write_access(handle, EXT3_SB(sb)->s_sbh);
 	if (err)
 		goto out_unlock;
-	
+
 	err = ext3_reserve_inode_write(handle, inode, &iloc);
 	if (err)
 		goto out_unlock;
@@ -1993,12 +1968,9 @@ static int ext3_rmdir (struct inode * dir, struct dentry *dentry)
 	struct ext3_dir_entry_2 * de;
 	handle_t *handle;
 
-	lock_kernel();
 	handle = ext3_journal_start(dir, EXT3_DELETE_TRANS_BLOCKS);
-	if (IS_ERR(handle)) {
-		unlock_kernel();
+	if (IS_ERR(handle))
 		return PTR_ERR(handle);
-	}
 
 	retval = -ENOENT;
 	bh = ext3_find_entry (dentry, &de);
@@ -2042,7 +2014,6 @@ static int ext3_rmdir (struct inode * dir, struct dentry *dentry)
 end_rmdir:
 	ext3_journal_stop(handle);
 	brelse (bh);
-	unlock_kernel();
 	return retval;
 }
 
@@ -2054,12 +2025,9 @@ static int ext3_unlink(struct inode * dir, struct dentry *dentry)
 	struct ext3_dir_entry_2 * de;
 	handle_t *handle;
 
-	lock_kernel();
 	handle = ext3_journal_start(dir, EXT3_DELETE_TRANS_BLOCKS);
-	if (IS_ERR(handle)) {
-		unlock_kernel();
+	if (IS_ERR(handle))
 		return PTR_ERR(handle);
-	}
 
 	if (IS_DIRSYNC(dir))
 		handle->h_sync = 1;
@@ -2075,7 +2043,7 @@ static int ext3_unlink(struct inode * dir, struct dentry *dentry)
 	retval = -EIO;
 	if (le32_to_cpu(de->inode) != inode->i_ino)
 		goto end_unlink;
-	
+
 	if (!inode->i_nlink) {
 		ext3_warning (inode->i_sb, "ext3_unlink",
 			      "Deleting nonexistent file (%lu), %d",
@@ -2097,7 +2065,6 @@ static int ext3_unlink(struct inode * dir, struct dentry *dentry)
 
 end_unlink:
 	ext3_journal_stop(handle);
-	unlock_kernel();
 	brelse (bh);
 	return retval;
 }
@@ -2113,13 +2080,10 @@ static int ext3_symlink (struct inode * dir,
 	if (l > dir->i_sb->s_blocksize)
 		return -ENAMETOOLONG;
 
-	lock_kernel();
 	handle = ext3_journal_start(dir, EXT3_DATA_TRANS_BLOCKS +
 			 		EXT3_INDEX_EXTRA_TRANS_BLOCKS + 5);
-	if (IS_ERR(handle)) {
-		unlock_kernel();
+	if (IS_ERR(handle))
 		return PTR_ERR(handle);
-	}
 
 	if (IS_DIRSYNC(dir))
 		handle->h_sync = 1;
@@ -2131,10 +2095,7 @@ static int ext3_symlink (struct inode * dir,
 
 	if (l > sizeof (EXT3_I(inode)->i_data)) {
 		inode->i_op = &ext3_symlink_inode_operations;
-		if (ext3_should_writeback_data(inode))
-			inode->i_mapping->a_ops = &ext3_writeback_aops;
-		else
-			inode->i_mapping->a_ops = &ext3_aops;
+		ext3_set_aops(inode);
 		/*
 		 * page_symlink() calls into ext3_prepare/commit_write.
 		 * We have a transaction open.  All is sweetness.  It also sets
@@ -2156,7 +2117,6 @@ static int ext3_symlink (struct inode * dir,
 	err = ext3_add_nondir(handle, dentry, inode);
 out_stop:
 	ext3_journal_stop(handle);
-	unlock_kernel();
 	return err;
 }
 
@@ -2167,18 +2127,13 @@ static int ext3_link (struct dentry * old_dentry,
 	struct inode *inode = old_dentry->d_inode;
 	int err;
 
-	lock_kernel();
-	if (inode->i_nlink >= EXT3_LINK_MAX) {
-		unlock_kernel();
+	if (inode->i_nlink >= EXT3_LINK_MAX)
 		return -EMLINK;
-	}
 
 	handle = ext3_journal_start(dir, EXT3_DATA_TRANS_BLOCKS +
 					EXT3_INDEX_EXTRA_TRANS_BLOCKS);
-	if (IS_ERR(handle)) {
-		unlock_kernel();
+	if (IS_ERR(handle))
 		return PTR_ERR(handle);
-	}
 
 	if (IS_DIRSYNC(dir))
 		handle->h_sync = 1;
@@ -2189,7 +2144,6 @@ static int ext3_link (struct dentry * old_dentry,
 
 	err = ext3_add_nondir(handle, dentry, inode);
 	ext3_journal_stop(handle);
-	unlock_kernel();
 	return err;
 }
 
@@ -2212,13 +2166,10 @@ static int ext3_rename (struct inode * old_dir, struct dentry *old_dentry,
 
 	old_bh = new_bh = dir_bh = NULL;
 
-	lock_kernel();
 	handle = ext3_journal_start(old_dir, 2 * EXT3_DATA_TRANS_BLOCKS +
 			 		EXT3_INDEX_EXTRA_TRANS_BLOCKS + 2);
-	if (IS_ERR(handle)) {
-		unlock_kernel();
+	if (IS_ERR(handle))
 		return PTR_ERR(handle);
-	}
 
 	if (IS_DIRSYNC(old_dir) || IS_DIRSYNC(new_dir))
 		handle->h_sync = 1;
@@ -2298,7 +2249,7 @@ static int ext3_rename (struct inode * old_dir, struct dentry *old_dentry,
 		 */
 		struct buffer_head *old_bh2;
 		struct ext3_dir_entry_2 *old_de2;
-		
+
 		old_bh2 = ext3_find_entry(old_dentry, &old_de2);
 		if (old_bh2) {
 			retval = ext3_delete_entry(handle, old_dir,
@@ -2346,7 +2297,6 @@ end_rename:
 	brelse (old_bh);
 	brelse (new_bh);
 	ext3_journal_stop(handle);
-	unlock_kernel();
 	return retval;
 }
 
@@ -2364,9 +2314,9 @@ struct inode_operations ext3_dir_inode_operations = {
 	.mknod		= ext3_mknod,
 	.rename		= ext3_rename,
 	.setattr	= ext3_setattr,
-	.setxattr	= ext3_setxattr,	
-	.getxattr	= ext3_getxattr,	
-	.listxattr	= ext3_listxattr,	
+	.setxattr	= ext3_setxattr,
+	.getxattr	= ext3_getxattr,
+	.listxattr	= ext3_listxattr,
 	.removexattr	= ext3_removexattr,
 	.permission	= ext3_permission,
 };
@@ -2378,6 +2328,4 @@ struct inode_operations ext3_special_inode_operations = {
 	.listxattr	= ext3_listxattr,
 	.removexattr	= ext3_removexattr,
 	.permission	= ext3_permission,
-};
-
- 
+}; 

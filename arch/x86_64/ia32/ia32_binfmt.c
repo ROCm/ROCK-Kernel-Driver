@@ -30,10 +30,12 @@
 #define AT_SYSINFO 32
 #define AT_SYSINFO_EHDR		33
 
+#if 0 /* disabled for now because the code has still problems */
 #define ARCH_DLINFO do {  \
 	NEW_AUX_ENT(AT_SYSINFO, (u32)(u64)VSYSCALL32_VSYSCALL); \
 	NEW_AUX_ENT(AT_SYSINFO_EHDR, VSYSCALL32_BASE);    \
 } while(0)
+#endif
 
 struct file;
 struct elf_phdr; 

@@ -310,14 +310,17 @@ int cache_clean(void)
 		cp = & current_detail->hash_table[current_index];
 		ch = *cp;
 		for (; ch; cp= & ch->next, ch= *cp) {
-			if (atomic_read(&ch->refcnt))
-				continue;
-			if (ch->expiry_time < get_seconds()
-			    || ch->last_refresh < current_detail->flush_time
-				)
-				break;
 			if (current_detail->nextcheck > ch->expiry_time)
 				current_detail->nextcheck = ch->expiry_time+1;
+			if (ch->expiry_time >= get_seconds()
+			    && ch->last_refresh >= current_detail->flush_time
+				)
+				continue;
+			if (test_and_clear_bit(CACHE_PENDING, &ch->flags))
+				queue_loose(current_detail, ch);
+
+			if (atomic_read(&ch->refcnt))
+				continue;
 		}
 		if (ch) {
 			cache_get(ch);
@@ -464,6 +467,31 @@ void cache_revisit_request(struct cache_head *item)
 		dreq = list_entry(pending.next, struct cache_deferred_req, recent);
 		list_del_init(&dreq->recent);
 		dreq->revisit(dreq, 0);
+	}
+}
+
+void cache_clean_deferred(void *owner)
+{
+	struct cache_deferred_req *dreq, *tmp;
+	struct list_head pending;
+
+
+	INIT_LIST_HEAD(&pending);
+	spin_lock(&cache_defer_lock);
+	
+	list_for_each_entry_safe(dreq, tmp, &cache_defer_list, recent) {
+		if (dreq->owner == owner) {
+			list_del(&dreq->hash);
+			list_move(&dreq->recent, &pending);
+			cache_defer_cnt--;
+		}
+	}
+	spin_unlock(&cache_defer_lock);
+
+	while (!list_empty(&pending)) {
+		dreq = list_entry(pending.next, struct cache_deferred_req, recent);
+		list_del_init(&dreq->recent);
+		dreq->revisit(dreq, 1);
 	}
 }
 

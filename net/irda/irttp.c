@@ -1408,7 +1408,7 @@ struct tsap_cb *irttp_dup(struct tsap_cb *orig, void *instance)
 	spin_lock_irqsave(&irttp->tsaps->hb_spinlock, flags);
 
 	/* Find the old instance */
-	if (!hashbin_find(irttp->tsaps, (int) orig, NULL)) {
+	if (!hashbin_find(irttp->tsaps, (long) orig, NULL)) {
 		IRDA_DEBUG(0, "%s(), unable to find TSAP\n", __FUNCTION__);
 		spin_unlock_irqrestore(&irttp->tsaps->hb_spinlock, flags);
 		return NULL;

@@ -68,8 +68,8 @@ int llc_stat_ev_rx_null_dsap_xid_c(struct llc_station *station,
 	struct llc_pdu_un *pdu = llc_pdu_un_hdr(skb);
 
 	return ev->type == LLC_STATION_EV_TYPE_PDU &&
-	       !LLC_PDU_IS_CMD(pdu) &&			/* command PDU */
-	       !LLC_PDU_TYPE_IS_U(pdu) &&		/* U type PDU */
+	       LLC_PDU_IS_CMD(pdu) &&			/* command PDU */
+	       LLC_PDU_TYPE_IS_U(pdu) &&		/* U type PDU */
 	       LLC_U_PDU_CMD(pdu) == LLC_1_PDU_CMD_XID &&
 	       !pdu->dsap ? 0 : 1;			/* NULL DSAP value */
 }
@@ -81,8 +81,8 @@ int llc_stat_ev_rx_null_dsap_0_xid_r_xid_r_cnt_eq(struct llc_station *station,
 	struct llc_pdu_un *pdu = llc_pdu_un_hdr(skb);
 
 	return ev->type == LLC_STATION_EV_TYPE_PDU &&
-	       !LLC_PDU_IS_RSP(pdu) &&			/* response PDU */
-	       !LLC_PDU_TYPE_IS_U(pdu) &&		/* U type PDU */
+	       LLC_PDU_IS_RSP(pdu) &&			/* response PDU */
+	       LLC_PDU_TYPE_IS_U(pdu) &&		/* U type PDU */
 	       LLC_U_PDU_RSP(pdu) == LLC_1_PDU_CMD_XID &&
 	       !pdu->dsap &&				/* NULL DSAP value */
 	       !station->xid_r_count ? 0 : 1;
@@ -95,8 +95,8 @@ int llc_stat_ev_rx_null_dsap_1_xid_r_xid_r_cnt_eq(struct llc_station *station,
 	struct llc_pdu_un *pdu = llc_pdu_un_hdr(skb);
 
 	return ev->type == LLC_STATION_EV_TYPE_PDU &&
-	       !LLC_PDU_IS_RSP(pdu) &&			/* response PDU */
-	       !LLC_PDU_TYPE_IS_U(pdu) &&		/* U type PDU */
+	       LLC_PDU_IS_RSP(pdu) &&			/* response PDU */
+	       LLC_PDU_TYPE_IS_U(pdu) &&		/* U type PDU */
 	       LLC_U_PDU_RSP(pdu) == LLC_1_PDU_CMD_XID &&
 	       !pdu->dsap &&				/* NULL DSAP value */
 	       station->xid_r_count == 1 ? 0 : 1;
@@ -109,8 +109,8 @@ int llc_stat_ev_rx_null_dsap_test_c(struct llc_station *station,
 	struct llc_pdu_un *pdu = llc_pdu_un_hdr(skb);
 
 	return ev->type == LLC_STATION_EV_TYPE_PDU &&
-	       !LLC_PDU_IS_CMD(pdu) &&			/* command PDU */
-	       !LLC_PDU_TYPE_IS_U(pdu) &&		/* U type PDU */
+	       LLC_PDU_IS_CMD(pdu) &&			/* command PDU */
+	       LLC_PDU_TYPE_IS_U(pdu) &&		/* U type PDU */
 	       LLC_U_PDU_CMD(pdu) == LLC_1_PDU_CMD_TEST &&
 	       !pdu->dsap ? 0 : 1;			/* NULL DSAP */
 }

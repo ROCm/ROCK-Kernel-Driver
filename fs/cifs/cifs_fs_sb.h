@@ -24,5 +24,9 @@ struct cifs_sb_info {
 	struct nls_table *local_nls;
 	unsigned int rsize;
 	unsigned int wsize;
+	uid_t	mnt_uid;
+	gid_t	mnt_gid;
+	mode_t	mnt_file_mode;
+	mode_t	mnt_dir_mode;
 };
 #endif				/* _CIFS_FS_SB_H */

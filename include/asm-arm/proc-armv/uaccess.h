@@ -87,10 +87,18 @@ static inline void set_fs (mm_segment_t fs)
 	: "r" (x), "r" (__pu_addr), "i" (-EFAULT)		\
 	: "cc")
 
+#ifndef __ARMEB__
+#define	__reg_oper0	"%R2"
+#define	__reg_oper1	"%Q2"
+#else
+#define	__reg_oper0	"%Q2"
+#define	__reg_oper1	"%R2"
+#endif
+
 #define __put_user_asm_dword(x,__pu_addr,err)			\
 	__asm__ __volatile__(					\
-	"1:	strt	%Q2, [%1], #4\n"			\
-	"2:	strt	%R2, [%1], #0\n"			\
+	"1:	strt	" __reg_oper1 ", [%1], #4\n"		\
+	"2:	strt	" __reg_oper0 ", [%1], #0\n"		\
 	"3:\n"							\
 	"	.section .fixup,\"ax\"\n"			\
 	"	.align	2\n"					\

@@ -27,6 +27,7 @@
 #include <linux/pagemap.h>
 #include <linux/bootmem.h>
 #include <linux/slab.h>
+#include <linux/proc_fs.h>
 
 #include <asm/processor.h>
 #include <asm/system.h>
@@ -425,6 +426,8 @@ static void __init set_max_mapnr_init(void)
 extern void set_max_mapnr_init(void);
 #endif /* !CONFIG_DISCONTIGMEM */
 
+static struct kcore_list kcore_mem, kcore_vmalloc; 
+
 void __init mem_init(void)
 {
 	extern int ppro_with_ram_bug(void);
@@ -476,6 +479,10 @@ void __init mem_init(void)
 	codesize =  (unsigned long) &_etext - (unsigned long) &_text;
 	datasize =  (unsigned long) &_edata - (unsigned long) &_etext;
 	initsize =  (unsigned long) &__init_end - (unsigned long) &__init_begin;
+
+	kclist_add(&kcore_mem, __va(0), max_low_pfn << PAGE_SHIFT); 
+	kclist_add(&kcore_vmalloc, (void *)VMALLOC_START, 
+		   VMALLOC_END-VMALLOC_START);
 
 	printk(KERN_INFO "Memory: %luk/%luk available (%dk kernel code, %dk reserved, %dk data, %dk init, %ldk highmem)\n",
 		(unsigned long) nr_free_pages() << (PAGE_SHIFT-10),

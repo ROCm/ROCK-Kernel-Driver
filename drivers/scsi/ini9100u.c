@@ -147,7 +147,6 @@ static Scsi_Host_Template driver_template = {
 	.name		= i91u_REVID,
 	.detect		= i91u_detect,
 	.release	= i91u_release,
-	.command	= i91u_command,
 	.queuecommand	= i91u_queue,
 	.abort		= i91u_abort,
 	.reset		= i91u_reset,
@@ -555,15 +554,6 @@ int i91u_queue(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 	i91uBuildSCB(pHCB, pSCB, SCpnt);
 	tul_exec_scb(pHCB, pSCB);	/* Start execute SCB            */
 	return (0);
-}
-
-/*
- *  We only support command in interrupt-driven fashion
- */
-int i91u_command(Scsi_Cmnd * SCpnt)
-{
-	printk("i91u: interrupt driven driver; use i91u_queue()\n");
-	return -1;
 }
 
 /*

@@ -26,9 +26,6 @@
 
 #include <linux/irq.h>
 
-/* When we have things working, we can switch to always use
-   IOAPIC. --pavel */
-
 /*
  * Common place to define all x86 IRQ vectors
  *

@@ -1186,24 +1186,6 @@ static int fd_mcs_queue(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 	return 0;
 }
 
-static void internal_done(Scsi_Cmnd * SCpnt)
-{
-	/* flag it done */
-	SCpnt->host_scribble = (unsigned char *) 1;
-}
-
-int fd_mcs_command(Scsi_Cmnd * SCpnt)
-{
-	fd_mcs_queue(SCpnt, internal_done);
-	/* host_scribble is used for status here */
-	SCpnt->host_scribble = NULL;
-	while (!SCpnt->host_scribble) {
-		cpu_relax();
-		barrier();
-	}
-	return SCpnt->result;
-}
-
 #if DEBUG_ABORT || DEBUG_RESET
 static void fd_mcs_print_info(Scsi_Cmnd * SCpnt)
 {
@@ -1431,7 +1413,6 @@ static Scsi_Host_Template driver_template = {
 	.detect				= fd_mcs_detect,
 	.release			= fd_mcs_release,
 	.info				= fd_mcs_info,
-	.command			= fd_mcs_command,
 	.queuecommand   		= fd_mcs_queue, 
 	.eh_abort_handler		= fd_mcs_abort,
 	.eh_bus_reset_handler		= fd_mcs_bus_reset,

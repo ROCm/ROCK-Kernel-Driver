@@ -12,13 +12,12 @@
    Copyright 1992 - 2003 Kai Makisara
    email Kai.Makisara@kolumbus.fi
 
-   Last modified: Sun Apr 13 10:17:18 2003 by makisara
    Some small formal changes - aeb, 950809
 
    Last modified: 18-JAN-1998 Richard Gooch <rgooch@atnf.csiro.au> Devfs support
  */
 
-static char *verstr = "20030413";
+static char *verstr = "20030622";
 
 #include <linux/module.h>
 
@@ -1555,6 +1554,7 @@ static ssize_t
 				}
 			} else {
 				filp->f_pos -= do_count;
+				count += do_count;
 				STps->drv_block = (-1);		/* Too cautious? */
 				retval = (-EIO);
 			}
@@ -3673,22 +3673,6 @@ static int __init st_setup(char *str)
 __setup("st=", st_setup);
 
 #endif
-
-/* Driverfs file support */
-static ssize_t st_device_kdev_read(struct device *dev, char *page)
-{
-	kdev_t kdev; 
-	kdev.value=(unsigned long)dev->driver_data;
-	return sprintf(page, "%x\n",kdev.value);
-}
-static DEVICE_ATTR(kdev,S_IRUGO,st_device_kdev_read,NULL);
-
-static ssize_t st_device_type_read(struct device *ev, char * page)
-{
-	return sprintf (page, "CHR\n");
-}
-static DEVICE_ATTR(type,S_IRUGO,st_device_type_read,NULL);
-
 
 static struct file_operations st_fops =
 {

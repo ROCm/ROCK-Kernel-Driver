@@ -181,7 +181,7 @@ static void skb_clone_fraglist(struct sk_buff *skb)
 		skb_get(list);
 }
 
-static void skb_release_data(struct sk_buff *skb)
+void skb_release_data(struct sk_buff *skb)
 {
 	if (!skb->cloned ||
 	    atomic_dec_and_test(&(skb_shinfo(skb)->dataref))) {
@@ -410,64 +410,6 @@ struct sk_buff *skb_copy(const struct sk_buff *skb, int gfp_mask)
 
 	copy_skb_header(n, skb);
 	return n;
-}
-
-/* Keep head the same: replace data */
-int skb_linearize(struct sk_buff *skb, int gfp_mask)
-{
-	unsigned int size;
-	u8 *data;
-	long offset;
-	struct skb_shared_info *ninfo;
-	int headerlen = skb->data - skb->head;
-	int expand = (skb->tail + skb->data_len) - skb->end;
-
-	if (skb_shared(skb))
-		BUG();
-
-	if (expand <= 0)
-		expand = 0;
-
-	size = skb->end - skb->head + expand;
-	size = SKB_DATA_ALIGN(size);
-	data = kmalloc(size + sizeof(struct skb_shared_info), gfp_mask);
-	if (!data)
-		return -ENOMEM;
-
-	/* Copy entire thing */
-	if (skb_copy_bits(skb, -headerlen, data, headerlen + skb->len))
-		BUG();
-
-	/* Set up shinfo */
-	ninfo = (struct skb_shared_info*)(data + size);
-	atomic_set(&ninfo->dataref, 1);
-	ninfo->tso_size = skb_shinfo(skb)->tso_size;
-	ninfo->tso_segs = skb_shinfo(skb)->tso_segs;
-	ninfo->nr_frags = 0;
-	ninfo->frag_list = NULL;
-
-	/* Offset between the two in bytes */
-	offset = data - skb->head;
-
-	/* Free old data. */
-	skb_release_data(skb);
-
-	skb->head = data;
-	skb->end  = data + size;
-
-	/* Set up new pointers */
-	skb->h.raw   += offset;
-	skb->nh.raw  += offset;
-	skb->mac.raw += offset;
-	skb->tail    += offset;
-	skb->data    += offset;
-
-	/* We are no longer a clone, even if we were. */
-	skb->cloned    = 0;
-
-	skb->tail     += skb->data_len;
-	skb->data_len  = 0;
-	return 0;
 }
 
 

@@ -182,8 +182,8 @@ static void nmi_cpu_shutdown(void * dummy)
 static void nmi_shutdown(void)
 {
 	nmi_enabled = 0;
-	unset_nmi_callback();
 	on_each_cpu(nmi_cpu_shutdown, NULL, 0, 1);
+	unset_nmi_callback();
 	enable_lapic_nmi_watchdog();
 }
 

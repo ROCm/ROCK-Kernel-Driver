@@ -23,16 +23,26 @@
 #include <linux/mc146818rtc.h>
 #include <linux/kernel_stat.h>
 #include <linux/module.h>
+#include <linux/nmi.h>
 #include <linux/sysdev.h>
 
 #include <asm/smp.h>
 #include <asm/mtrr.h>
 #include <asm/mpspec.h>
+#include <asm/nmi.h>
 
 unsigned int nmi_watchdog = NMI_NONE;
 static unsigned int nmi_hz = HZ;
 unsigned int nmi_perfctr_msr;	/* the MSR to reset in NMI handler */
 extern void show_registers(struct pt_regs *regs);
+
+/* nmi_active:
+ * +1: the lapic NMI watchdog is active, but can be disabled
+ *  0: the lapic NMI watchdog has not been set up, and cannot
+ *     be enabled
+ * -1: the lapic NMI watchdog is disabled, but can be enabled
+ */
+static int nmi_active;
 
 #define K7_EVNTSEL_ENABLE	(1 << 22)
 #define K7_EVNTSEL_INT		(1 << 20)
@@ -91,6 +101,7 @@ int __init check_nmi_watchdog (void)
 			continue;
 		if (nmi_count(cpu) - prev_nmi_count[cpu] <= 5) {
 			printk("CPU#%d: NMI appears to be stuck!\n", cpu);
+			nmi_active = 0;
 			return -1;
 		}
 	}
@@ -131,20 +142,14 @@ static int __init setup_nmi_watchdog(char *str)
 	 * We can enable the IO-APIC watchdog
 	 * unconditionally.
 	 */
-	if (nmi == NMI_IO_APIC)
+	if (nmi == NMI_IO_APIC) {
+		nmi_active = 1;
 		nmi_watchdog = nmi;
+	}
 	return 1;
 }
 
 __setup("nmi_watchdog=", setup_nmi_watchdog);
-
-/* nmi_active:
- * +1: the lapic NMI watchdog is active, but can be disabled
- *  0: the lapic NMI watchdog has not been set up, and cannot
- *     be enabled
- * -1: the lapic NMI watchdog is disabled, but can be enabled
- */
-static int nmi_active;
 
 void disable_lapic_nmi_watchdog(void)
 {
@@ -176,6 +181,27 @@ void enable_lapic_nmi_watchdog(void)
 	if (nmi_active < 0) {
 		nmi_watchdog = NMI_LOCAL_APIC;
 		setup_apic_nmi_watchdog();
+	}
+}
+
+void disable_timer_nmi_watchdog(void)
+{
+	if ((nmi_watchdog != NMI_IO_APIC) || (nmi_active <= 0))
+		return;
+
+	disable_irq(0);
+	unset_nmi_callback();
+	nmi_active = -1;
+	nmi_watchdog = NMI_NONE;
+}
+
+void enable_timer_nmi_watchdog(void)
+{
+	if (nmi_active < 0) {
+		nmi_watchdog = NMI_IO_APIC;
+		touch_nmi_watchdog();
+		nmi_active = 1;
+		enable_irq(0);
 	}
 }
 
@@ -429,3 +455,5 @@ void nmi_watchdog_tick (struct pt_regs * regs)
 EXPORT_SYMBOL(nmi_watchdog);
 EXPORT_SYMBOL(disable_lapic_nmi_watchdog);
 EXPORT_SYMBOL(enable_lapic_nmi_watchdog);
+EXPORT_SYMBOL(disable_timer_nmi_watchdog);
+EXPORT_SYMBOL(enable_timer_nmi_watchdog);

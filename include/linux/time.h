@@ -130,7 +130,8 @@ static __inline__ unsigned long
 timeval_to_jiffies(struct timeval *value)
 {
 	unsigned long sec = value->tv_sec;
-	long usec = value->tv_usec + TICK_USEC - 1;
+	long usec = value->tv_usec 
+		+ ((TICK_NSEC + 1000UL/2) / 1000UL) - 1;
 
 	if (sec >= MAX_SEC_IN_JIFFIES){
 		sec = MAX_SEC_IN_JIFFIES;

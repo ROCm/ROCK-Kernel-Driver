@@ -524,7 +524,7 @@ pci_scan_device(struct pci_bus *bus, int devfn)
 	}
 	device_initialize(&dev->dev);
 	dev->dev.release = pci_release_dev;
-	pci_get_dev(dev);
+	pci_dev_get(dev);
 
 	pci_name_device(dev);
 

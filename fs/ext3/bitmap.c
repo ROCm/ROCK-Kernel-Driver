@@ -16,7 +16,7 @@ unsigned long ext3_count_free (struct buffer_head * map, unsigned int numchars)
 {
 	unsigned int i;
 	unsigned long sum = 0;
-	
+
 	if (!map) 
 		return (0);
 	for (i = 0; i < numchars; i++)

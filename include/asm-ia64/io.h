@@ -424,6 +424,6 @@ extern void __ia64_memset_c_io (unsigned long, unsigned long, long);
  * which is precisely what we want.
  */
 extern unsigned long ia64_max_iommu_merge_mask;
-#define BIO_VMERGE_BOUNDARY	(0UL)//(ia64_max_iommu_merge_mask + 1)
+#define BIO_VMERGE_BOUNDARY	(ia64_max_iommu_merge_mask + 1)
 
 #endif /* _ASM_IA64_IO_H */

@@ -148,9 +148,14 @@ extern void sched_init(void);
 extern void init_idle(task_t *idle, int cpu);
 
 extern void show_state(void);
-extern void show_trace(unsigned long *stack);
-extern void show_stack(unsigned long *stack);
 extern void show_regs(struct pt_regs *);
+
+/*
+ * TASK is a pointer to the task whose backtrace we want to see (or NULL for current
+ * task), SP is the stack pointer of the first frame that should be shown in the back
+ * trace (or NULL if the entire call-chain of the task should be shown).
+ */
+extern void show_stack(struct task_struct *task, unsigned long *sp);
 
 void io_schedule(void);
 long io_schedule_timeout(long timeout);
@@ -478,9 +483,12 @@ do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
 #define PF_LESS_THROTTLE 0x01000000	/* Throttle me less: I clena memory */
 
 #ifdef CONFIG_SMP
-extern void set_cpus_allowed(task_t *p, unsigned long new_mask);
+extern int set_cpus_allowed(task_t *p, unsigned long new_mask);
 #else
-# define set_cpus_allowed(p, new_mask) do { } while (0)
+static inline int set_cpus_allowed(task_t *p, unsigned long new_mask)
+{
+	return 0;
+}
 #endif
 
 #ifdef CONFIG_NUMA
@@ -504,10 +512,9 @@ void yield(void);
  */
 extern struct exec_domain	default_exec_domain;
 
-#ifndef __HAVE_ARCH_TASK_STRUCT_ALLOCATOR
-# ifndef INIT_THREAD_SIZE
-#  define INIT_THREAD_SIZE	2048*sizeof(long)
-# endif
+#ifndef INIT_THREAD_SIZE
+# define INIT_THREAD_SIZE	2048*sizeof(long)
+#endif
 
 union thread_union {
 	struct thread_info thread_info;
@@ -515,9 +522,6 @@ union thread_union {
 };
 
 extern union thread_union init_thread_union;
-
-#endif /* !__HAVE_ARCH_TASK_STRUCT_ALLOCATOR */
-
 extern struct task_struct init_task;
 
 extern struct   mm_struct init_mm;

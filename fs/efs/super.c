@@ -278,7 +278,7 @@ out_no_fs:
 	return -EINVAL;
 }
 
-int efs_statfs(struct super_block *s, struct statfs *buf) {
+int efs_statfs(struct super_block *s, struct kstatfs *buf) {
 	struct efs_sb_info *sb = SUPER_INFO(s);
 
 	buf->f_type    = EFS_SUPER_MAGIC;	/* efs magic number */

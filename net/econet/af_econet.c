@@ -96,8 +96,7 @@ struct ec_cb
 static void econet_remove_socket(struct hlist_head *list, struct sock *sk)
 {
 	write_lock_bh(&econet_lock);
-	if (sk_del_node_init(sk))
-		sock_put(sk);
+	sk_del_node_init(sk);
 	write_unlock_bh(&econet_lock);
 }
 
@@ -105,7 +104,6 @@ static void econet_insert_socket(struct hlist_head *list, struct sock *sk)
 {
 	write_lock_bh(&econet_lock);
 	sk_add_node(sk, list);
-	sock_hold(sk);
 	write_unlock_bh(&econet_lock);
 }
 

@@ -43,6 +43,7 @@
 #include <linux/nfsd/nfsd.h>
 #include <linux/nfsd/cache.h>
 #include <linux/mount.h>
+#include <linux/workqueue.h>
 #include <linux/nfs4.h>
 #include <linux/nfsd/state.h>
 #include <linux/nfsd/xdr4.h>
@@ -54,6 +55,7 @@ time_t boot_time;
 static u32 current_clientid = 1;
 static u32 current_ownerid = 0;
 static u32 current_fileid = 0;
+static u32 nfs4_init = 0;
 
 /* debug counters */
 u32 list_add_perfile = 0; 
@@ -105,11 +107,28 @@ static void release_stateid(struct nfs4_stateid *stp);
  *
  * unconf_str_hastbl[] and unconf_id_hashtbl[] hold unconfirmed 
  * setclientid info.
+ *
+ * client_lru holds client queue ordered by nfs4_client.cl_time
+ * for lease renewal.
  */
 static struct list_head	conf_id_hashtbl[CLIENT_HASH_SIZE];
 static struct list_head	conf_str_hashtbl[CLIENT_HASH_SIZE];
 static struct list_head	unconf_str_hashtbl[CLIENT_HASH_SIZE];
 static struct list_head	unconf_id_hashtbl[CLIENT_HASH_SIZE];
+static struct list_head client_lru;
+
+static inline void
+renew_client(struct nfs4_client *clp)
+{
+	/*
+	* Move client to the end to the LRU list.
+	*/
+	dprintk("renewing client (clientid %08x/%08x)\n", 
+			clp->cl_clientid.cl_boot, 
+			clp->cl_clientid.cl_id);
+	list_move_tail(&clp->cl_lru, &client_lru);
+	clp->cl_time = get_seconds();
+}
 
 /* SETCLIENTID and SETCLIENTID_CONFIRM Helper functions */
 static int
@@ -160,6 +179,7 @@ expire_client(struct nfs4_client *clp)
 	dprintk("NFSD: expire_client\n");
 	list_del(&clp->cl_idhash);
 	list_del(&clp->cl_strhash);
+	list_del(&clp->cl_lru);
 	while (!list_empty(&clp->cl_perclient)) {
 		sop = list_entry(clp->cl_perclient.next, struct nfs4_stateowner, so_perclient);
 		release_stateowner(sop);
@@ -176,6 +196,7 @@ create_client(struct xdr_netobj name) {
 	INIT_LIST_HEAD(&clp->cl_idhash);
 	INIT_LIST_HEAD(&clp->cl_strhash);
 	INIT_LIST_HEAD(&clp->cl_perclient);
+	INIT_LIST_HEAD(&clp->cl_lru);
 out:
 	return clp;
 }
@@ -264,6 +285,8 @@ add_to_unconfirmed(struct nfs4_client *clp, unsigned int strhashval)
 	list_add(&clp->cl_strhash, &unconf_str_hashtbl[strhashval]);
 	idhashval = clientid_hashval(clp->cl_clientid.cl_id);
 	list_add(&clp->cl_idhash, &unconf_id_hashtbl[idhashval]);
+	list_add_tail(&clp->cl_lru, &client_lru);
+	clp->cl_time = get_seconds();
 }
 
 void
@@ -271,13 +294,13 @@ move_to_confirmed(struct nfs4_client *clp, unsigned int idhashval)
 {
 	unsigned int strhashval;
 
-	printk("ANDROS: move_to_confirm nfs4_client %p\n", clp);
 	list_del_init(&clp->cl_strhash);
 	list_del_init(&clp->cl_idhash);
 	list_add(&clp->cl_idhash, &conf_id_hashtbl[idhashval]);
 	strhashval = clientstr_hashval(clp->cl_name.data, 
 			clp->cl_name.len);
 	list_add(&clp->cl_strhash, &conf_str_hashtbl[strhashval]);
+	renew_client(clp);
 }
 
 /*
@@ -940,9 +963,7 @@ instantiate_new_owner:
 	open->op_stateowner = sop;
 	status = nfs_ok;
 renew:
-	/* XXX implement LRU and state recovery thread 
-	 * renew will place nfs4_client at end of LRU 
-	 */
+	renew_client(sop->so_client);
 out:
 	up(&client_sema); /*XXX need finer grained locking */
 	return status;
@@ -1048,13 +1069,98 @@ out_free:
 	kfree(stp);
 	goto out;
 }
+static struct work_struct laundromat_work;
+static void laundromat_main(void *);
+static DECLARE_WORK(laundromat_work, laundromat_main, NULL);
+
+int 
+nfsd4_renew(clientid_t *clid)
+{
+	struct nfs4_client *clp;
+	struct list_head *pos, *next;
+	unsigned int idhashval;
+	int status;
+
+	down(&client_sema);
+	printk("process_renew(%08x/%08x): starting\n", 
+			clid->cl_boot, clid->cl_id);
+	status = nfserr_stale_clientid;
+	if (STALE_CLIENTID(clid))
+		goto out;
+	status = nfs_ok;
+	idhashval = clientid_hashval(clid->cl_id);
+	list_for_each_safe(pos, next, &conf_id_hashtbl[idhashval]) {
+		clp = list_entry(pos, struct nfs4_client, cl_idhash);
+		if (!cmp_clid(&clp->cl_clientid, clid))
+			continue;
+		renew_client(clp);
+		goto out;
+	}
+	list_for_each_safe(pos, next, &unconf_id_hashtbl[idhashval]) {
+		clp = list_entry(pos, struct nfs4_client, cl_idhash);
+		if (!cmp_clid(&clp->cl_clientid, clid))
+			continue;
+		renew_client(clp);
+	goto out;
+	}
+	/*
+	* Couldn't find an nfs4_client for this clientid.  
+	* Presumably this is because the client took too long to 
+	* RENEW, so return NFS4ERR_EXPIRED.
+	*/
+	printk("nfsd4_renew: clientid not found!\n");
+	status = nfserr_expired;
+out:
+	up(&client_sema);
+	return status;
+}
+
+time_t
+nfs4_laundromat(void)
+{
+	struct nfs4_client *clp;
+	struct list_head *pos, *next;
+	time_t cutoff = get_seconds() - NFSD_LEASE_TIME;
+	time_t t, return_val = NFSD_LEASE_TIME;
+
+	down(&client_sema);
+
+	dprintk("NFSD: laundromat service - starting, examining clients\n");
+	list_for_each_safe(pos, next, &client_lru) {
+		clp = list_entry(pos, struct nfs4_client, cl_lru);
+		if (time_after((unsigned long)clp->cl_time, (unsigned long)cutoff)) {
+			t = clp->cl_time - cutoff;
+			if (return_val > t)
+				return_val = t;
+			break;
+		}
+		dprintk("NFSD: purging unused client (clientid %08x)\n",
+			clp->cl_clientid.cl_id);
+		expire_client(clp);
+	}
+	if (return_val < NFSD_LAUNDROMAT_MINTIMEOUT)
+		return_val = NFSD_LAUNDROMAT_MINTIMEOUT;
+	up(&client_sema); 
+	return return_val;
+}
+
+void
+laundromat_main(void *not_used)
+{
+	time_t t;
+
+	t = nfs4_laundromat();
+	dprintk("NFSD: laundromat_main - sleeping for %ld seconds\n", t);
+	schedule_delayed_work(&laundromat_work, t*HZ);
+}
 
 void 
 nfs4_state_init(void)
 {
-	struct timespec 	tv;
 	int i;
 
+	if (nfs4_init)
+		return;
 	for (i = 0; i < CLIENT_HASH_SIZE; i++) {
 		INIT_LIST_HEAD(&conf_id_hashtbl[i]);
 		INIT_LIST_HEAD(&conf_str_hashtbl[i]);
@@ -1067,9 +1173,13 @@ nfs4_state_init(void)
 	for (i = 0; i < OWNER_HASH_SIZE; i++) {
 		INIT_LIST_HEAD(&ownerstr_hashtbl[i]);
 	}
+	INIT_LIST_HEAD(&client_lru);
 	init_MUTEX(&client_sema);
-	tv = CURRENT_TIME;
-	boot_time = tv.tv_sec;
+	boot_time = get_seconds();
+	INIT_WORK(&laundromat_work,laundromat_main, NULL);
+	schedule_delayed_work(&laundromat_work, NFSD_LEASE_TIME*HZ);
+	nfs4_init = 1;
+
 }
 
 static void
@@ -1089,6 +1199,9 @@ __nfs4_state_shutdown(void)
 		}
 	}
 	release_all_files();
+	cancel_delayed_work(&laundromat_work);
+	flush_scheduled_work();
+	nfs4_init = 0;
 	dprintk("NFSD: list_add_perfile %d list_del_perfile %d\n",
 			list_add_perfile, list_del_perfile);
 	dprintk("NFSD: add_perclient %d del_perclient %d\n",

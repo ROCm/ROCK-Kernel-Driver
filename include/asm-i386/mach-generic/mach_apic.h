@@ -13,7 +13,6 @@
 #define apic_id_registered (genapic->apic_id_registered)
 #define init_apic_ldr (genapic->init_apic_ldr)
 #define ioapic_phys_id_map (genapic->ioapic_phys_id_map)
-#define enable_apic_mode (genapic->enable_apic_mode)
 #define clustered_apic_check (genapic->clustered_apic_check) 
 #define multi_timer_check (genapic->multi_timer_check)
 #define apicid_to_node (genapic->apicid_to_node)
@@ -26,5 +25,6 @@
 #define check_phys_apicid_present (genapic->check_phys_apicid_present)
 #define check_apicid_used (genapic->check_apicid_used)
 #define cpu_mask_to_apicid (genapic->cpu_mask_to_apicid)
+#define enable_apic_mode (genapic->enable_apic_mode)
 
 #endif /* __ASM_MACH_APIC_H */

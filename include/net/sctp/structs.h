@@ -313,6 +313,7 @@ struct sctp_opt {
 	/* What is our base endpointer? */
 	struct sctp_endpoint *ep;
 
+	struct sctp_bind_bucket *bind_hash;
 	/* Various Socket Options.  */
 	__u16 default_stream;
 	__u32 default_ppid;

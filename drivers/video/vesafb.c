@@ -51,7 +51,11 @@ static struct fb_info fb_info;
 static u32 pseudo_palette[17];
 
 static int             inverse   = 0;
+#ifndef CONFIG_ISA
+static int             mtrr      = 1;
+#else
 static int             mtrr      = 0;
+#endif
 
 static int             pmi_setpal = 0;	/* pmi for palette changes ??? */
 static int             ypan       = 0;  /* 0..nothing, 1..ypan, 2..ywrap */

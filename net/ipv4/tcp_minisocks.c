@@ -301,15 +301,15 @@ static void __tcp_tw_hashdance(struct sock *sk, struct tcp_tw_bucket *tw)
 	 */
 	bhead = &tcp_bhash[tcp_bhashfn(inet_sk(sk)->num)];
 	spin_lock(&bhead->lock);
-	tw->tw_tb = (struct tcp_bind_bucket *)sk->sk_prev;
-	BUG_TRAP(sk->sk_prev);
+	tw->tw_tb = tcp_sk(sk)->bind_hash;
+	BUG_TRAP(tcp_sk(sk)->bind_hash);
 	tw_add_bind_node(tw, &tw->tw_tb->owners);
 	spin_unlock(&bhead->lock);
 
 	write_lock(&ehead->lock);
 
 	/* Step 2: Remove SK from established hash. */
-	if (sk_del_node_init(sk))
+	if (__sk_del_node_init(sk))
 		sock_prot_dec_use(sk->sk_prot);
 
 	/* Step 3: Hash TW into TIMEWAIT half of established hash table. */
@@ -620,7 +620,7 @@ struct sock *tcp_create_openreq_child(struct sock *sk, struct open_request *req,
 
 		/* SANITY */
 		sk_node_init(&newsk->sk_node);
-		newsk->sk_prev = NULL;
+		tcp_sk(newsk)->bind_hash = NULL;
 
 		/* Clone the TCP header template */
 		inet_sk(newsk)->dport = req->rmt_port;

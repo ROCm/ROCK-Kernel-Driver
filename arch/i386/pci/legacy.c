@@ -31,14 +31,14 @@ static void __devinit pcibios_fixup_peer_bridges(void)
 		if (pci_bus_exists(&pci_root_buses, n))
 			continue;
 		bus->number = n;
-		bus->ops = pci_root_ops;
+		bus->ops = &pci_root_ops;
 		dev->bus = bus;
 		for (dev->devfn=0; dev->devfn<256; dev->devfn += 8)
 			if (!pci_read_config_word(dev, PCI_VENDOR_ID, &l) &&
 			    l != 0x0000 && l != 0xffff) {
 				DBG("Found device at %02x:%02x [%04x]\n", n, dev->devfn, l);
 				printk(KERN_INFO "PCI: Discovered peer bus %02x\n", n);
-				pci_scan_bus(n, pci_root_ops, NULL);
+				pci_scan_bus(n, &pci_root_ops, NULL);
 				break;
 			}
 	}
@@ -49,7 +49,7 @@ exit:
 
 static int __init pci_legacy_init(void)
 {
-	if (!pci_root_ops) {
+	if (!raw_pci_ops) {
 		printk("PCI: System does not support PCI\n");
 		return 0;
 	}

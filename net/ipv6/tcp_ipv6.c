@@ -225,9 +225,9 @@ tb_not_found:
 		tb->fastreuse = 0;
 
 success:
-	if (!sk->sk_prev)
+	if (!tcp_sk(sk)->bind_hash)
 		tcp_bind_hash(sk, tb, snum);
-	BUG_TRAP(sk->sk_prev == (struct sock *)tb);
+	BUG_TRAP(tcp_sk(sk)->bind_hash == tb);
 	ret = 0;
 
 fail_unlock:
@@ -1947,7 +1947,7 @@ static int tcp_v6_destroy_sock(struct sock *sk)
 	__skb_queue_purge(&tp->ucopy.prequeue);
 
 	/* Clean up a referenced TCP bind bucket. */
-	if (sk->sk_prev)
+	if (tcp_sk(sk)->bind_hash)
 		tcp_put_port(sk);
 
 	/* If sendmsg cached page exists, toss it. */

@@ -262,7 +262,7 @@ cumanascsi1_probe(struct expansion_card *ec, const struct ecard_id *id)
 	struct Scsi_Host *host;
 	int ret = -ENOMEM;
 
-	host = scsi_register(&cumanascsi_template, sizeof(struct NCR5380_hostdata));
+	host = scsi_host_alloc(&cumanascsi_template, sizeof(struct NCR5380_hostdata));
 	if (!host)
 		goto out;
 
@@ -304,7 +304,7 @@ cumanascsi1_probe(struct expansion_card *ec, const struct ecard_id *id)
  out_release:
 	release_region(host->io_port, host->n_io_port);
  out_free:
-	scsi_unregister(host);
+	scsi_host_put(host);
  out:
 	return ret;
 }
@@ -318,7 +318,7 @@ static void __devexit cumanascsi1_remove(struct expansion_card *ec)
 	scsi_remove_host(host);
 	free_irq(host->irq, host);
 	release_region(host->io_port, host->n_io_port);
-	scsi_unregister(host);
+	scsi_host_put(host);
 }
 
 static const struct ecard_id cumanascsi1_cids[] = {

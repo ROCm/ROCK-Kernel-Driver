@@ -16,6 +16,7 @@
 
 #include <linux/config.h>
 #include <linux/kernel.h>
+#include <linux/compiler.h>
 #include <linux/time.h>
 #include <linux/cache.h>
 
@@ -802,12 +803,9 @@ static inline void skb_fill_page_desc(struct sk_buff *skb, int i, struct page *p
 	skb_shinfo(skb)->nr_frags = i+1;
 }
 
-#define SKB_PAGE_ASSERT(skb) do { if (skb_shinfo(skb)->nr_frags) \
-					BUG(); } while (0)
-#define SKB_FRAG_ASSERT(skb) do { if (skb_shinfo(skb)->frag_list) \
-					BUG(); } while (0)
-#define SKB_LINEAR_ASSERT(skb) do { if (skb_is_nonlinear(skb)) \
-					BUG(); } while (0)
+#define SKB_PAGE_ASSERT(skb) 	BUG_ON(skb_shinfo(skb)->nr_frags)
+#define SKB_FRAG_ASSERT(skb) 	BUG_ON(skb_shinfo(skb)->frag_list)
+#define SKB_LINEAR_ASSERT(skb)  BUG_ON(skb_is_nonlinear(skb))
 
 /*
  *	Add data to an sk_buff
@@ -836,7 +834,7 @@ static inline unsigned char *skb_put(struct sk_buff *skb, unsigned int len)
 	SKB_LINEAR_ASSERT(skb);
 	skb->tail += len;
 	skb->len  += len;
-	if (skb->tail>skb->end)
+	if (unlikely(skb->tail>skb->end))
 		skb_over_panic(skb, len, current_text_addr());
 	return tmp;
 }
@@ -861,7 +859,7 @@ static inline unsigned char *skb_push(struct sk_buff *skb, unsigned int len)
 {
 	skb->data -= len;
 	skb->len  += len;
-	if (skb->data<skb->head)
+	if (unlikely(skb->data<skb->head))
 		skb_under_panic(skb, len, current_text_addr());
 	return skb->data;
 }
@@ -869,8 +867,7 @@ static inline unsigned char *skb_push(struct sk_buff *skb, unsigned int len)
 static inline char *__skb_pull(struct sk_buff *skb, unsigned int len)
 {
 	skb->len -= len;
-	if (skb->len < skb->data_len)
-		BUG();
+	BUG_ON(skb->len < skb->data_len);
 	return skb->data += len;
 }
 
@@ -1127,13 +1124,16 @@ static inline struct sk_buff *skb_padto(struct sk_buff *skb, unsigned int len)
  *	If there is no free memory -ENOMEM is returned, otherwise zero
  *	is returned and the old skb data released.
  */
-int skb_linearize(struct sk_buff *skb, int gfp);
+extern int __skb_linearize(struct sk_buff *skb, int gfp);
+static inline int __deprecated skb_linearize(struct sk_buff *skb, int gfp)
+{
+	return __skb_linearize(skb, gfp);
+}
 
 static inline void *kmap_skb_frag(const skb_frag_t *frag)
 {
 #ifdef CONFIG_HIGHMEM
-	if (in_irq())
-		BUG();
+	BUG_ON(in_irq());
 
 	local_bh_disable();
 #endif
@@ -1149,9 +1149,9 @@ static inline void kunmap_skb_frag(void *vaddr)
 }
 
 #define skb_queue_walk(queue, skb) \
-		for (skb = (queue)->next;			\
+		for (skb = (queue)->next, prefetch(skb->next);	\
 		     (skb != (struct sk_buff *)(queue));	\
-		     skb = skb->next)
+		     skb = skb->next, prefetch(skb->next))
 
 
 extern struct sk_buff *skb_recv_datagram(struct sock *sk, unsigned flags,

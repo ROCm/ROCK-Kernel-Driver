@@ -25,7 +25,7 @@ struct iovec;
 struct nameidata;
 struct pipe_inode_info;
 struct poll_table_struct;
-struct statfs;
+struct kstatfs;
 struct vm_area_struct;
 struct vfsmount;
 
@@ -781,7 +781,7 @@ struct super_operations {
 	int (*sync_fs)(struct super_block *sb, int wait);
 	void (*write_super_lockfs) (struct super_block *);
 	void (*unlockfs) (struct super_block *);
-	int (*statfs) (struct super_block *, struct statfs *);
+	int (*statfs) (struct super_block *, struct kstatfs *);
 	int (*remount_fs) (struct super_block *, int *, char *);
 	void (*clear_inode) (struct inode *);
 	void (*umount_begin) (struct super_block *);
@@ -960,7 +960,7 @@ extern struct vfsmount *kern_mount(struct file_system_type *);
 extern int may_umount(struct vfsmount *);
 extern long do_mount(char *, char *, char *, unsigned long, void *);
 
-extern int vfs_statfs(struct super_block *, struct statfs *);
+extern int vfs_statfs(struct super_block *, struct kstatfs *);
 
 /* Return value for VFS lock functions - tells locks.c to lock conventionally
  * REALLY kosha for root NFS and nfs_lock
@@ -1278,7 +1278,7 @@ extern int dcache_dir_close(struct inode *, struct file *);
 extern loff_t dcache_dir_lseek(struct file *, loff_t, int);
 extern int dcache_readdir(struct file *, void *, filldir_t);
 extern int simple_getattr(struct vfsmount *, struct dentry *, struct kstat *);
-extern int simple_statfs(struct super_block *, struct statfs *);
+extern int simple_statfs(struct super_block *, struct kstatfs *);
 extern int simple_link(struct dentry *, struct inode *, struct dentry *);
 extern int simple_unlink(struct inode *, struct dentry *);
 extern int simple_rmdir(struct inode *, struct dentry *);

@@ -3,13 +3,15 @@
 # Check whether linker can handle cross-segment @segrel():
 #
 CC=$1
-OBJDUMP=$2
+LD=$2
+OBJDUMP=$3
 dir=$(dirname $0)
 tmp=${TMPDIR:-/tmp}
 out=$tmp/out$$
-$CC -nostdlib -static -Wl,-T$dir/check-segrel.lds $dir/check-segrel.S -o $out
+$CC -c $dir/check-segrel.S -o $out.o
+$LD -static -T$dir/check-segrel.lds $out.o -o $out
 res=$($OBJDUMP --full --section .rodata $out | fgrep 000 | cut -f3 -d' ')
-rm -f $out
+rm -f $out $out.o
 if [ $res != 00000a00 ]; then
     echo " -DHAVE_BUGGY_SEGREL"
     cat >&2 <<EOF

@@ -530,7 +530,7 @@ int do_rename(struct presto_file_set *fset, struct dentry *old_dir,
               struct dentry *old_dentry, struct dentry *new_dir,
               struct dentry *new_dentry, struct lento_vfs_context *info);
 int presto_do_statfs (struct presto_file_set *fset,
-                      struct statfs * buf);
+                      struct kstatfs * buf);
 
 int lento_setattr(const char *name, struct iattr *iattr,
                   struct lento_vfs_context *info);

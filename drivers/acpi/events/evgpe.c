@@ -186,11 +186,13 @@ acpi_ev_gpe_detect (
 			}
 
 			ACPI_DEBUG_PRINT ((ACPI_DB_INTERRUPTS,
-				"GPE block at %8.8X%8.8X - Values: Enable %02X Status %02X\n",
+				"GPE pair: Status %8.8X%8.8X = %02X, Enable %8.8X%8.8X = %02X\n",
+				ACPI_HIDWORD (gpe_register_info->status_address.address),
+				ACPI_LODWORD (gpe_register_info->status_address.address),
+				gpe_register_info->status,
 				ACPI_HIDWORD (gpe_register_info->enable_address.address),
 				ACPI_LODWORD (gpe_register_info->enable_address.address),
-				gpe_register_info->enable,
-				gpe_register_info->status));
+				gpe_register_info->enable));
 
 			/* First check if there is anything active at all in this register */
 

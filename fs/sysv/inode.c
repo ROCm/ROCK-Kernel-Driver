@@ -75,7 +75,7 @@ static void sysv_put_super(struct super_block *sb)
 	kfree(sbi);
 }
 
-static int sysv_statfs(struct super_block *sb, struct statfs *buf)
+static int sysv_statfs(struct super_block *sb, struct kstatfs *buf)
 {
 	struct sysv_sb_info *sbi = SYSV_SB(sb);
 

@@ -698,7 +698,7 @@ cciss_scsi_detect(int ctlr)
 {
 	struct Scsi_Host *sh;
 
-	sh = scsi_register(&cciss_driver_template, sizeof(struct ctlr_info *));
+	sh = scsi_host_alloc(&cciss_driver_template, sizeof(struct ctlr_info *));
 	if (sh == NULL)
 		return 0;
 
@@ -1357,7 +1357,7 @@ cciss_unregister_scsi(int ctlr)
 	if (sa->registered) {
 		spin_unlock_irqrestore(CCISS_LOCK(ctlr), flags);
 		scsi_remove_host(sa->scsi_host);
-		scsi_unregister(sa->scsi_host);
+		scsi_host_put(sa->scsi_host);
 		spin_lock_irqsave(CCISS_LOCK(ctlr), flags);
 	}
 

@@ -930,7 +930,7 @@ static void mld_gq_start_timer(struct inet6_dev *idev)
 
 	idev->mc_gq_running = 1;
 	if (!mod_timer(&idev->mc_gq_timer, jiffies+tv+2))
-		atomic_inc(&idev->refcnt);
+		in6_dev_hold(idev);
 }
 
 static void mld_ifc_start_timer(struct inet6_dev *idev, int delay)
@@ -938,7 +938,7 @@ static void mld_ifc_start_timer(struct inet6_dev *idev, int delay)
 	int tv = net_random() % delay;
 
 	if (!mod_timer(&idev->mc_ifc_timer, jiffies+tv+2))
-		atomic_inc(&idev->refcnt);
+		in6_dev_hold(idev);
 }
 
 /*
@@ -1037,7 +1037,7 @@ int igmp6_event_query(struct sk_buff *skb)
 		/* cancel the interface change timer */
 		idev->mc_ifc_count = 0;
 		if (del_timer(&idev->mc_ifc_timer))
-			atomic_dec(&idev->refcnt);
+			__in6_dev_put(idev);
 		/* clear deleted report items */
 		mld_clear_delrec(idev);
 	} else if (len >= 28) {
@@ -1321,8 +1321,17 @@ static struct sk_buff *add_grec(struct sk_buff *skb, struct ifmcaddr6 *pmc,
 		if (type == MLD2_ALLOW_NEW_SOURCES ||
 		    type == MLD2_BLOCK_OLD_SOURCES)
 			return skb;
-		if (pmc->mca_crcount || isquery)
+		if (pmc->mca_crcount || isquery) {
+			/* make sure we have room for group header and at
+			 * least one source.
+			 */
+			if (skb && AVAILABLE(skb) < sizeof(struct mld2_grec)+
+			    sizeof(struct in6_addr)) {
+				mld_sendpack(skb);
+				skb = 0; /* add_grhead will get a new one */
+			}
 			skb = add_grhead(skb, pmc, type, &pgr);
+		}
 		return skb;
 	}
 	pmr = skb ? (struct mld2_report *)skb->h.raw : 0;
@@ -1895,6 +1904,7 @@ static void mld_gq_timer_expire(unsigned long data)
 
 	idev->mc_gq_running = 0;
 	mld_send_report(idev, 0);
+	__in6_dev_put(idev);
 }
 
 static void mld_ifc_timer_expire(unsigned long data)
@@ -1907,6 +1917,7 @@ static void mld_ifc_timer_expire(unsigned long data)
 		if (idev->mc_ifc_count)
 			mld_ifc_start_timer(idev, idev->mc_maxdelay);
 	}
+	__in6_dev_put(idev);
 }
 
 static void mld_ifc_event(struct inet6_dev *idev)
@@ -1945,10 +1956,10 @@ void ipv6_mc_down(struct inet6_dev *idev)
 	read_lock_bh(&idev->lock);
 	idev->mc_ifc_count = 0;
 	if (del_timer(&idev->mc_ifc_timer))
-		atomic_dec(&idev->refcnt);
+		__in6_dev_put(idev);
 	idev->mc_gq_running = 0;
 	if (del_timer(&idev->mc_gq_timer))
-		atomic_dec(&idev->refcnt);
+		__in6_dev_put(idev);
 
 	for (i = idev->mc_list; i; i=i->next)
 		igmp6_group_dropped(i);

@@ -290,7 +290,10 @@ struct ehci_qtd {
 	size_t			length;			/* length of buffer */
 } __attribute__ ((aligned (32)));
 
-#define QTD_MASK cpu_to_le32 (~0x1f)	/* mask NakCnt+T in qh->hw_alt_next */
+/* mask NakCnt+T in qh->hw_alt_next */
+#define QTD_MASK __constant_cpu_to_le32 (~0x1f)
+
+#define IS_SHORT_READ(token) (QTD_LENGTH (token) != 0 && QTD_PID (token) == 1)
 
 /*-------------------------------------------------------------------------*/
 

@@ -54,6 +54,7 @@
 #include <linux/jiffies.h>
 #include <asm/uaccess.h>
 #include <asm/div64.h>
+#include <linux/blkdev.h> /* sector_div */
 
 /*
  * These constants control the amount of freespace that suspend and
@@ -100,9 +101,11 @@ static void acct_timeout(unsigned long unused)
  */
 static int check_free_space(struct file *file)
 {
-	struct statfs sbuf;
+	struct kstatfs sbuf;
 	int res;
 	int act;
+	sector_t resume;
+	sector_t suspend;
 
 	spin_lock(&acct_globals.lock);
 	res = acct_globals.active;
@@ -113,10 +116,15 @@ static int check_free_space(struct file *file)
 	/* May block */
 	if (vfs_statfs(file->f_dentry->d_inode->i_sb, &sbuf))
 		return res;
+	suspend = sbuf.f_blocks * SUSPEND;
+	resume = sbuf.f_blocks * RESUME;
 
-	if (sbuf.f_bavail <= SUSPEND * sbuf.f_blocks / 100)
+	sector_div(suspend, 100);
+	sector_div(resume, 100);
+
+	if (sbuf.f_bavail <= suspend)
 		act = -1;
-	else if (sbuf.f_bavail >= RESUME * sbuf.f_blocks / 100)
+	else if (sbuf.f_bavail >= resume)
 		act = 1;
 	else
 		act = 0;

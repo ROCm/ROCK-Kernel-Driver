@@ -102,8 +102,6 @@ static void storage_disconnect(struct usb_interface *iface);
 /* The entries in this table, except for final ones here
  * (USB_MASS_STORAGE_CLASS and the empty entry), correspond,
  * line for line with the entries of us_unsuaul_dev_list[].
- * For now, we duplicate idVendor and idProduct in us_unsual_dev_list,
- * just to avoid alignment bugs.
  */
 
 #define UNUSUAL_DEV(id_vendor, id_product, bcdDeviceMin, bcdDeviceMax, \
@@ -328,13 +326,13 @@ static int usb_stor_control_thread(void * __us)
 		scsi_lock(host);
 
 		/* has the command been aborted *already* ? */
-		if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
+		if (us->sm_state == US_STATE_ABORTING) {
 			us->srb->result = DID_ABORT << 16;
 			goto SkipForAbort;
 		}
 
 		/* set the state and release the lock */
-		atomic_set(&us->sm_state, US_STATE_RUNNING);
+		us->sm_state = US_STATE_RUNNING;
 		scsi_unlock(host);
 
 		/* lock the device pointers */
@@ -353,7 +351,7 @@ static int usb_stor_control_thread(void * __us)
 		 */
 		else if (us->srb->device->id && 
 				!(us->flags & US_FL_SCM_MULT_TARG)) {
-			US_DEBUGP("Bad target number (%d/%d)\n",
+			US_DEBUGP("Bad target number (%d:%d)\n",
 				  us->srb->device->id, us->srb->device->lun);
 			us->srb->result = DID_BAD_TARGET << 16;
 		}
@@ -404,12 +402,12 @@ static int usb_stor_control_thread(void * __us)
 		 * sm_state == US_STATE_ABORTING, not srb->result == DID_ABORT,
 		 * because an abort request might be received after all the
 		 * USB processing was complete. */
-		if (atomic_read(&us->sm_state) == US_STATE_ABORTING)
+		if (us->sm_state == US_STATE_ABORTING)
 			complete(&(us->notify));
 
 		/* empty the queue, reset the state, and release the lock */
 		us->srb = NULL;
-		atomic_set(&us->sm_state, US_STATE_IDLE);
+		us->sm_state = US_STATE_IDLE;
 		scsi_unlock(host);
 	} /* for (;;) */
 
@@ -424,10 +422,13 @@ static int usb_stor_control_thread(void * __us)
  ***********************************************************************/
 
 /* Get the unusual_devs entries and the string descriptors */
-static void get_device_info(struct us_data *us,
-			struct us_unusual_dev *unusual_dev)
+static void get_device_info(struct us_data *us, int id_index)
 {
 	struct usb_device *dev = us->pusb_dev;
+	struct usb_host_interface *altsetting =
+		&us->pusb_intf->altsetting[us->pusb_intf->act_altsetting];
+	struct us_unusual_dev *unusual_dev = &us_unusual_dev_list[id_index];
+	struct usb_device_id *id = &storage_usb_ids[id_index];
 
 	if (unusual_dev->vendorName)
 		US_DEBUGP("Vendor: %s\n", unusual_dev->vendorName);
@@ -436,9 +437,39 @@ static void get_device_info(struct us_data *us,
 
 	/* Store the entries */
 	us->unusual_dev = unusual_dev;
-	us->subclass = unusual_dev->useProtocol;
-	us->protocol = unusual_dev->useTransport;
+	us->subclass = (unusual_dev->useProtocol == US_SC_DEVICE) ?
+			altsetting->desc.bInterfaceSubClass :
+			unusual_dev->useProtocol;
+	us->protocol = (unusual_dev->useTransport == US_PR_DEVICE) ?
+			altsetting->desc.bInterfaceProtocol :
+			unusual_dev->useTransport;
 	us->flags = unusual_dev->flags;
+
+	/* Log a message if a non-generic unusual_dev entry contains an
+	 * unnecessary subclass or protocol override.  This may stimulate
+	 * reports from users that will help us remove unneeded entries
+	 * from the unusual_devs.h table.
+	 */
+	if (id->idVendor || id->idProduct) {
+		static char *msgs[3] = {
+			"an unneeded SubClass entry",
+			"an unneeded Protocol entry",
+			"unneeded SubClass and Protocol entries"};
+		int msg = -1;
+
+		if (unusual_dev->useProtocol != US_SC_DEVICE &&
+			us->subclass == altsetting->desc.bInterfaceSubClass)
+			msg += 1;
+		if (unusual_dev->useTransport != US_PR_DEVICE &&
+			us->protocol == altsetting->desc.bInterfaceProtocol)
+			msg += 2;
+		if (msg >= 0)
+			printk(KERN_NOTICE USB_STORAGE "This device "
+				"(%04x,%04x) has %s in unusual_devs.h\n"
+				"   Please send a copy of this message to "
+				"<linux-usb-devel@lists.sourceforge.net>\n",
+				id->idVendor, id->idProduct, msgs[msg]);
+	}
 
 	/* Read the device's string descriptors */
 	if (dev->descriptor.iManufacturer)
@@ -447,7 +478,7 @@ static void get_device_info(struct us_data *us,
 	if (dev->descriptor.iProduct)
 		usb_string(dev, dev->descriptor.iProduct, 
 			   us->product, sizeof(us->product));
-	if (dev->descriptor.iSerialNumber && !(us->flags & US_FL_IGNORE_SER))
+	if (dev->descriptor.iSerialNumber)
 		usb_string(dev, dev->descriptor.iSerialNumber, 
 			   us->serial, sizeof(us->serial));
 
@@ -698,13 +729,6 @@ static int usb_stor_acquire_resources(struct us_data *us)
 		return -ENOMEM;
 	}
 
-	US_DEBUGP("Allocating scatter-gather request block\n");
-	us->current_sg = kmalloc(sizeof(*us->current_sg), GFP_KERNEL);
-	if (!us->current_sg) {
-		US_DEBUGP("allocation failed\n");
-		return -ENOMEM;
-	}
-
 	/* Lock the device while we carry out the next two operations */
 	down(&us->dev_semaphore);
 
@@ -720,7 +744,7 @@ static int usb_stor_acquire_resources(struct us_data *us)
 	up(&us->dev_semaphore);
 
 	/* Start up our control thread */
-	atomic_set(&us->sm_state, US_STATE_IDLE);
+	us->sm_state = US_STATE_IDLE;
 	p = kernel_thread(usb_stor_control_thread, us, CLONE_VM);
 	if (p < 0) {
 		printk(KERN_WARNING USB_STORAGE 
@@ -736,7 +760,7 @@ static int usb_stor_acquire_resources(struct us_data *us)
 	 * Since this is a new device, we need to register a SCSI
 	 * host definition with the higher SCSI layers.
 	 */
-	us->host = scsi_register(&usb_stor_host_template, sizeof(us));
+	us->host = scsi_host_alloc(&usb_stor_host_template, sizeof(us));
 	if (!us->host) {
 		printk(KERN_WARNING USB_STORAGE
 			"Unable to register the scsi host\n");
@@ -772,7 +796,7 @@ void usb_stor_release_resources(struct us_data *us)
 	/* Finish the SCSI host removal sequence */
 	if (us->host) {
 		(struct us_data *) us->host->hostdata[0] = NULL;
-		scsi_unregister(us->host);
+		scsi_host_put(us->host);
 	}
 
 	/* Kill the control thread
@@ -782,7 +806,7 @@ void usb_stor_release_resources(struct us_data *us)
 	 */
 	if (us->pid) {
 		US_DEBUGP("-- sending exit command to thread\n");
-		BUG_ON(atomic_read(&us->sm_state) != US_STATE_IDLE);
+		BUG_ON(us->sm_state != US_STATE_IDLE);
 		us->srb = NULL;
 		up(&(us->sema));
 		wait_for_completion(&(us->notify));
@@ -800,8 +824,6 @@ void usb_stor_release_resources(struct us_data *us)
 	}
 
 	/* Free the USB control blocks */
-	if (us->current_sg)
-		kfree(us->current_sg);
 	if (us->current_urb)
 		usb_free_urb(us->current_urb);
 	if (us->dr)
@@ -852,7 +874,7 @@ static int storage_probe(struct usb_interface *intf,
 	 * of the match from the usb_device_id table, so we can find the
 	 * corresponding entry in the private table.
 	 */
-	get_device_info(us, &us_unusual_dev_list[id_index]);
+	get_device_info(us, id_index);
 
 #ifdef CONFIG_USB_STORAGE_SDDR09
 	if (us->protocol == US_PR_EUSB_SDDR09 ||

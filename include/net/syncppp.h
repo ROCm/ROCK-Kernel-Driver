@@ -48,6 +48,7 @@ struct sppp
 	struct timer_list	pp_timer;
 	struct net_device	*pp_if;
 	char		pp_link_state;	/* Link status */
+	spinlock_t      lock;
 };
 
 struct ppp_device

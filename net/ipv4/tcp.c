@@ -1909,7 +1909,7 @@ void tcp_destroy_sock(struct sock *sk)
 	BUG_TRAP(sk_unhashed(sk));
 
 	/* If it has not 0 inet_sk(sk)->num, it must be bound */
-	BUG_TRAP(!inet_sk(sk)->num || sk->sk_prev);
+	BUG_TRAP(!inet_sk(sk)->num || tcp_sk(sk)->bind_hash);
 
 #ifdef TCP_DEBUG
 	if (sk->sk_zapped) {
@@ -2164,7 +2164,7 @@ int tcp_disconnect(struct sock *sk, int flags)
 	tcp_sack_reset(tp);
 	__sk_dst_reset(sk);
 
-	BUG_TRAP(!inet->num || sk->sk_prev);
+	BUG_TRAP(!inet->num || tp->bind_hash);
 
 	sk->sk_error_report(sk);
 	return err;

@@ -61,7 +61,12 @@ struct cpuinfo_x86 boot_cpu_data = { 0, 0, 0, 0, -1, 1, 0, 0, -1 };
 unsigned long mmu_cr4_features;
 EXPORT_SYMBOL_GPL(mmu_cr4_features);
 
-int acpi_disabled __initdata = 0;
+#ifdef CONFIG_ACPI_HT_ONLY
+int acpi_disabled = 1;
+#else
+int acpi_disabled = 0;
+#endif
+EXPORT_SYMBOL(acpi_disabled);
 
 int MCA_bus;
 /* for MCA, but anyone else can use it if they want */
@@ -96,7 +101,6 @@ extern void dmi_scan_machine(void);
 extern void generic_apic_probe(char *);
 extern int root_mountflags;
 extern char _text, _etext, _edata, _end;
-extern int blk_nohighio;
 
 unsigned long saved_videomode;
 
@@ -514,6 +518,10 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 		/* "acpi=off" disables both ACPI table parsing and interpreter init */
 		if (c == ' ' && !memcmp(from, "acpi=off", 8))
 			acpi_disabled = 1;
+
+		/* "acpismp=force" turns on ACPI again */
+		else if (!memcmp(from, "acpismp=force", 14))
+			acpi_disabled = 0;
 
 		/*
 		 * highmem=size forces highmem to be exactly 'size' bytes.
@@ -994,15 +1002,6 @@ void __init setup_arch(char **cmdline_p)
 #endif
 #endif
 }
-
-static int __init highio_setup(char *str)
-{
-	printk("i386: disabling HIGHMEM block I/O\n");
-	blk_nohighio = 1;
-	return 1;
-}
-__setup("nohighio", highio_setup);
- 
 
 #include "setup_arch_post.h"
 /*

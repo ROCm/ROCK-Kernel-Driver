@@ -46,6 +46,7 @@ MODULE_LICENSE("GPL");
 MODULE_PARM(gc, "2-6i");
 MODULE_PARM(gc_2,"2-6i");
 MODULE_PARM(gc_3,"2-6i");
+MODULE_PARM(gc_psx_delay, "i");
 
 #define GC_SNES		1
 #define GC_NES		2
@@ -213,7 +214,7 @@ static void gc_multi_read_packet(struct gc *gc, int length, unsigned char *data)
  *	
  */
 
-#define GC_PSX_DELAY	60		/* 60 usec */
+#define GC_PSX_DELAY	25		/* 25 usec */
 #define GC_PSX_LENGTH	8		/* talk to the controller in bytes */
 
 #define GC_PSX_MOUSE	1		/* Mouse */
@@ -230,6 +231,7 @@ static void gc_multi_read_packet(struct gc *gc, int length, unsigned char *data)
 #define GC_PSX_ID(x)	((x) >> 4)	/* High nibble is device type */
 #define GC_PSX_LEN(x)	((x) & 0xf)	/* Low nibble is length in words */
 
+static int gc_psx_delay = GC_PSX_DELAY;
 static short gc_psx_abs[] = { ABS_X, ABS_Y, ABS_RX, ABS_RY, ABS_HAT0X, ABS_HAT0Y };
 static short gc_psx_btn[] = { BTN_TL, BTN_TR, BTN_TL2, BTN_TR2, BTN_A, BTN_B, BTN_X, BTN_Y,
 				BTN_START, BTN_SELECT, BTN_THUMBL, BTN_THUMBR };
@@ -246,10 +248,10 @@ static int gc_psx_command(struct gc *gc, int b)
 	for (i = 0; i < 8; i++, b >>= 1) {
 		cmd = (b & 1) ? GC_PSX_COMMAND : 0;
 		parport_write_data(gc->pd->port, cmd | GC_PSX_POWER);
-		udelay(GC_PSX_DELAY);
+		udelay(gc_psx_delay);
 		data |= ((parport_read_status(gc->pd->port) ^ 0x80) & gc->pads[GC_PSX]) ? (1 << i) : 0;
 		parport_write_data(gc->pd->port, cmd | GC_PSX_CLOCK | GC_PSX_POWER);
-		udelay(GC_PSX_DELAY);
+		udelay(gc_psx_delay);
 	}
 	return data;
 }
@@ -265,9 +267,9 @@ static int gc_psx_read_packet(struct gc *gc, unsigned char *data)
 	unsigned long flags;
 
 	parport_write_data(gc->pd->port, GC_PSX_CLOCK | GC_PSX_SELECT | GC_PSX_POWER);	/* Select pad */
-	udelay(GC_PSX_DELAY * 2);
+	udelay(gc_psx_delay * 2);
 	parport_write_data(gc->pd->port, GC_PSX_CLOCK | GC_PSX_POWER);			/* Deselect, begin command */
-	udelay(GC_PSX_DELAY * 2);
+	udelay(gc_psx_delay * 2);
 
 	local_irq_save(flags);
 
@@ -649,9 +651,15 @@ static int __init gc_setup_3(char *str)
 	for (i = 0; i <= ints[0] && i < 6; i++) gc_3[i] = ints[i + 1];
 	return 1;
 }
+static int __init gc_psx_setup(char *str)
+{
+        get_option(&str, &gc_psx_delay);
+        return 1;
+}
 __setup("gc=", gc_setup);
 __setup("gc_2=", gc_setup_2);
 __setup("gc_3=", gc_setup_3);
+__setup("gc_psx_delay=", gc_psx_setup);
 #endif
 
 int __init gc_init(void)

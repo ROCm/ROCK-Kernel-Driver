@@ -267,7 +267,7 @@ config BLK_DEV_IDESCSI
 
 config IDE_TASK_IOCTL
 	bool "IDE Taskfile Access"
-	depends on BLK_DEV_IDE
+	depends on BLK_DEV_IDE && BROKEN
 	help
 	  This is a direct raw access to the media.  It is a complex but
 	  elegant solution to test and validate the domain of the hardware and

@@ -103,7 +103,6 @@ static Scsi_Host_Template driver_template = {
 	.name				= "Iomega VPI0 (ppa) interface",
 	.detect				= ppa_detect,
 	.release			= ppa_release,
-	.command			= ppa_command,
 	.queuecommand			= ppa_queuecommand,
 	.eh_abort_handler		= ppa_abort,
 	.eh_bus_reset_handler		= ppa_reset,
@@ -759,39 +758,6 @@ static int ppa_completion(Scsi_Cmnd * cmd)
 	    return 0;
     }
     return 1;			/* FINISH_RETURN */
-}
-
-/* deprecated synchronous interface */
-int ppa_command(Scsi_Cmnd * cmd)
-{
-    static int first_pass = 1;
-    int host_no = cmd->device->host->unique_id;
-
-    if (first_pass) {
-	printk("ppa: using non-queuing interface\n");
-	first_pass = 0;
-    }
-    if (ppa_hosts[host_no].cur_cmd) {
-	printk("PPA: bug in ppa_command\n");
-	return 0;
-    }
-    ppa_hosts[host_no].failed = 0;
-    ppa_hosts[host_no].jstart = jiffies;
-    ppa_hosts[host_no].cur_cmd = cmd;
-    cmd->result = DID_ERROR << 16;	/* default return code */
-    cmd->SCp.phase = 0;
-
-    ppa_pb_claim(host_no);
-
-    while (ppa_engine(&ppa_hosts[host_no], cmd))
-	schedule();
-
-    if (cmd->SCp.phase)		/* Only disconnect if we have connected */
-	ppa_disconnect(cmd->device->host->unique_id);
-
-    ppa_pb_release(host_no);
-    ppa_hosts[host_no].cur_cmd = 0;
-    return cmd->result;
 }
 
 /*

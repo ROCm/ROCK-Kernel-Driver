@@ -211,15 +211,13 @@ static int unix_mkname(struct sockaddr_un * sunaddr, int len, unsigned *hashp)
 
 static void __unix_remove_socket(struct sock *sk)
 {
-	if (sk_del_node_init(sk))
-		__sock_put(sk);
+	sk_del_node_init(sk);
 }
 
 static void __unix_insert_socket(struct hlist_head *list, struct sock *sk)
 {
 	BUG_TRAP(sk_unhashed(sk));
 	sk_add_node(sk, list);
-	sock_hold(sk);
 }
 
 static inline void unix_remove_socket(struct sock *sk)

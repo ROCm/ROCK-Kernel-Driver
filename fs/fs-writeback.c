@@ -49,9 +49,6 @@ void __mark_inode_dirty(struct inode *inode, int flags)
 {
 	struct super_block *sb = inode->i_sb;
 
-	if (!sb)
-		return;		/* swapper_space */
-
 	/*
 	 * Don't do this for I_DIRTY_PAGES - that doesn't actually
 	 * dirty the inode itself
@@ -90,9 +87,12 @@ void __mark_inode_dirty(struct inode *inode, int flags)
 		 * Only add valid (hashed) inodes to the superblock's
 		 * dirty list.  Add blockdev inodes as well.
 		 */
-		if ((hlist_unhashed(&inode->i_hash) || (inode->i_state & (I_FREEING|I_CLEAR)))
-		    && !S_ISBLK(inode->i_mode))
-			goto out;
+		if (!S_ISBLK(inode->i_mode)) {
+			if (hlist_unhashed(&inode->i_hash))
+				goto out;
+			if (inode->i_state & (I_FREEING|I_CLEAR))
+				goto out;
+		}
 
 		/*
 		 * If the inode was already on s_dirty or s_io, don't
@@ -369,6 +369,9 @@ writeback_inodes(struct writeback_control *wbc)
  *
  * A finite limit is set on the number of pages which will be written.
  * To prevent infinite livelock of sys_sync().
+ *
+ * We add in the number of potentially dirty inodes, because each inode write
+ * can dirty pagecache in the underlying blockdev.
  */
 void sync_inodes_sb(struct super_block *sb, int wait)
 {
@@ -382,7 +385,9 @@ void sync_inodes_sb(struct super_block *sb, int wait)
 
 	get_page_state(&ps);
 	wbc.nr_to_write = ps.nr_dirty + ps.nr_unstable +
-		(ps.nr_dirty + ps.nr_unstable) / 4;
+			(inodes_stat.nr_inodes - inodes_stat.nr_unused) +
+			ps.nr_dirty + ps.nr_unstable;
+	wbc.nr_to_write += wbc.nr_to_write / 2;		/* Bit more for luck */
 	spin_lock(&inode_lock);
 	sync_sb_inodes(sb, &wbc);
 	spin_unlock(&inode_lock);

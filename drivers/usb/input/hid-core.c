@@ -215,7 +215,7 @@ static int hid_add_field(struct hid_parser *parser, unsigned report_type, unsign
 		return -1;
 	}
 
-	if (parser->global.logical_maximum <= parser->global.logical_minimum) {
+	if (parser->global.logical_maximum < parser->global.logical_minimum) {
 		dbg("logical range invalid %d %d", parser->global.logical_minimum, parser->global.logical_maximum);
 		return -1;
 	}
@@ -674,7 +674,6 @@ static struct hid_device *hid_parse_report(__u8 *start, unsigned size)
 
 		if (item.format != HID_ITEM_FORMAT_SHORT) {
 			dbg("unexpected long global item");
-			kfree(device->rdesc);
 			kfree(device->collection);
 			hid_free_device(device);
 			kfree(parser);
@@ -684,7 +683,6 @@ static struct hid_device *hid_parse_report(__u8 *start, unsigned size)
 		if (dispatch_type[item.type](parser, &item)) {
 			dbg("item %u %u %u %u parsing failed\n",
 				item.format, (unsigned)item.size, (unsigned)item.type, (unsigned)item.tag);
-			kfree(device->rdesc);
 			kfree(device->collection);
 			hid_free_device(device);
 			kfree(parser);
@@ -694,7 +692,6 @@ static struct hid_device *hid_parse_report(__u8 *start, unsigned size)
 		if (start == end) {
 			if (parser->collection_stack_ptr) {
 				dbg("unbalanced collection at end of report description");
-				kfree(device->rdesc);
 				kfree(device->collection);
 				hid_free_device(device);
 				kfree(parser);
@@ -702,7 +699,6 @@ static struct hid_device *hid_parse_report(__u8 *start, unsigned size)
 			}
 			if (parser->local.delimiter_depth) {
 				dbg("unbalanced delimiter at end of report description");
-				kfree(device->rdesc);
 				kfree(device->collection);
 				hid_free_device(device);
 				kfree(parser);
@@ -714,7 +710,6 @@ static struct hid_device *hid_parse_report(__u8 *start, unsigned size)
 	}
 
 	dbg("item fetching failed at offset %d\n", (int)(end - start));
-	kfree(device->rdesc);
 	kfree(device->collection);
 	hid_free_device(device);
 	kfree(parser);
@@ -1518,7 +1513,7 @@ static struct hid_device *usb_hid_configure(struct usb_interface *intf)
 			usb_fill_int_urb(hid->urbin, dev, pipe, hid->inbuf, 0,
 					 hid_irq_in, hid, endpoint->bInterval);
 			hid->urbin->transfer_dma = hid->inbuf_dma;
-			hid->urbin->transfer_flags |= URB_NO_DMA_MAP;
+			hid->urbin->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
 		} else {
 			if (hid->urbout)
 				continue;
@@ -1528,7 +1523,7 @@ static struct hid_device *usb_hid_configure(struct usb_interface *intf)
 			usb_fill_bulk_urb(hid->urbout, dev, pipe, hid->outbuf, 0,
 					  hid_irq_out, hid);
 			hid->urbout->transfer_dma = hid->outbuf_dma;
-			hid->urbout->transfer_flags |= URB_NO_DMA_MAP;
+			hid->urbout->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
 		}
 	}
 
@@ -1577,7 +1572,8 @@ static struct hid_device *usb_hid_configure(struct usb_interface *intf)
 			     hid->ctrlbuf, 1, hid_ctrl, hid);
 	hid->urbctrl->setup_dma = hid->cr_dma;
 	hid->urbctrl->transfer_dma = hid->ctrlbuf_dma;
-	hid->urbctrl->transfer_flags |= URB_NO_DMA_MAP;
+	hid->urbctrl->transfer_flags |= (URB_NO_TRANSFER_DMA_MAP
+				| URB_NO_SETUP_DMA_MAP);
 
 	return hid;
 

@@ -9,20 +9,10 @@
 #ifndef _SYNAPTICS_H
 #define _SYNAPTICS_H
 
-#ifdef CONFIG_MOUSE_PS2_SYNAPTICS
 
 extern void synaptics_process_byte(struct psmouse *psmouse, struct pt_regs *regs);
 extern int synaptics_init(struct psmouse *psmouse);
 extern void synaptics_disconnect(struct psmouse *psmouse);
-
-#else
-
-static inline void synaptics_process_byte(struct psmouse *psmouse, struct pt_regs *regs) {}
-static inline int synaptics_init(struct psmouse *psmouse) { return -1; }
-static inline void synaptics_disconnect(struct psmouse *psmouse) {}
-
-#endif
-
 
 /* synaptics queries */
 #define SYN_QUE_IDENTIFY		0x00

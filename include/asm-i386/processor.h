@@ -468,6 +468,7 @@ extern void prepare_to_copy(struct task_struct *tsk);
 extern int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags);
 
 extern unsigned long thread_saved_pc(struct task_struct *tsk);
+void show_trace(struct task_struct *task, unsigned long *stack);
 
 unsigned long get_wchan(struct task_struct *p);
 #define KSTK_EIP(tsk)	(((unsigned long *)(4096+(unsigned long)(tsk)->thread_info))[1019])
