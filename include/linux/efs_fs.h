@@ -29,6 +29,7 @@ static const char cprt[] = "EFS: "EFS_VERSION" - (c) 1999 Al Smith <Al.Smith@aes
 
 #include <linux/fs.h>
 #include <linux/efs_fs_i.h>
+#include <linux/efs_fs_sb.h>
 #include <linux/efs_dir.h>
 
 #ifndef MIN
@@ -42,7 +43,11 @@ static inline struct efs_inode_info *INODE_INFO(struct inode *inode)
 {
 	return list_entry(inode, struct efs_inode_info, vfs_inode);
 }
-#define SUPER_INFO(s)				&((s)->u.efs_sb)
+
+static inline struct efs_sb_info *SUPER_INFO(struct super_block *sb)
+{
+	return sb->u.generic_sbp;
+}
 
 extern struct inode_operations efs_dir_inode_operations;
 extern struct file_operations efs_dir_operations;

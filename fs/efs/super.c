@@ -70,10 +70,17 @@ static void destroy_inodecache(void)
 		printk(KERN_INFO "efs_inode_cache: not all structures were freed\n");
 }
 
+void efs_put_super(struct super_block *s)
+{
+	kfree(s->u.generic_sbp);
+	s->u.generic_sbp = NULL;
+}
+
 static struct super_operations efs_superblock_operations = {
 	alloc_inode:	efs_alloc_inode,
 	destroy_inode:	efs_destroy_inode,
 	read_inode:	efs_read_inode,
+	put_super:	efs_put_super,
 	statfs:		efs_statfs,
 };
 
@@ -205,7 +212,11 @@ int efs_fill_super(struct super_block *s, void *d, int silent)
 	struct efs_sb_info *sb;
 	struct buffer_head *bh;
 
- 	sb = SUPER_INFO(s);
+ 	sb = kmalloc(sizeof(struct efs_sb_info), GFP_KERNEL);
+	if (!sb)
+		return -ENOMEM;
+	s->u.generic_sbp = sb;
+	memset(sb, 0, sizeof(struct efs_sb_info));
  
 	s->s_magic		= EFS_SUPER_MAGIC;
 	sb_set_blocksize(s, EFS_BLOCKSIZE);
@@ -263,6 +274,8 @@ int efs_fill_super(struct super_block *s, void *d, int silent)
 
 out_no_fs_ul:
 out_no_fs:
+	s->u.generic_sbp = NULL;
+	kfree(sb);
 	return -EINVAL;
 }
 
