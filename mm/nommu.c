@@ -568,6 +568,6 @@ unsigned long get_unmapped_area(struct file *file, unsigned long addr,
 	return -ENOMEM;
 }
 
-void pte_chain_init(void)
+void anon_vma_init(void)
 {
 }

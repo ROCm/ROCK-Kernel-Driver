@@ -39,6 +39,22 @@ extern int page_cluster;
  * mmap() functions).
  */
 
+typedef struct anon_vma_s {
+	/* This serializes the accesses to the vma list. */
+	spinlock_t anon_vma_lock;
+
+	/*
+	 * This is a list of anonymous "related" vmas,
+	 * to scan if one of the pages pointing to this
+	 * anon_vma needs to be unmapped.
+	 * After we unlink the last vma we must garbage collect
+	 * the object if the list is empty because we're
+	 * guaranteed no page can be pointing to this anon_vma
+	 * if there's no vma anymore.
+	 */
+	struct list_head anon_vma_head;
+} anon_vma_t;
+
 /*
  * This struct defines a memory VMM memory area. There is one of these
  * per VM-area/task.  A VM area is any part of the process virtual memory
@@ -68,6 +84,19 @@ struct vm_area_struct {
 	 * for shm areas, the list of attaches, otherwise unused.
 	 */
 	struct list_head shared;
+
+	/*
+	 * The same vma can be both queued into the i_mmap and in a
+	 * anon_vma too, for example after a cow in
+	 * a MAP_PRIVATE file mapping. However only the MAP_PRIVATE
+	 * will go both in the i_mmap and anon_vma. A MAP_SHARED
+	 * will only be in the i_mmap_shared and a MAP_ANONYMOUS (file = 0)
+	 * will only be queued only in the anon_vma.
+	 * The list is serialized by the anon_vma->lock.
+	 */
+	struct list_head anon_vma_node;
+	/* Serialized by the mmap_sem */
+	anon_vma_t * anon_vma;
 
 	/* Function pointers to deal with this struct. */
 	struct vm_operations_struct * vm_ops;
@@ -178,16 +207,32 @@ struct page {
 	page_flags_t flags;		/* atomic flags, some possibly
 					   updated asynchronously */
 	atomic_t count;			/* Usage count, see below. */
-	struct address_space *mapping;	/* The inode (or ...) we belong to. */
 	pgoff_t index;			/* Our offset within mapping. */
 	struct list_head lru;		/* Pageout list, eg. active_list;
 					   protected by zone->lru_lock !! */
-	union {
-		struct pte_chain *chain;/* Reverse pte mapping pointer.
-					 * protected by PG_chainlock */
-		pte_addr_t direct;
-		int mapcount;
-	} pte;
+
+	/*
+	 * Address space of this page.
+	 * A page can be either mapped to a file or to be anonymous
+	 * memory, so using the union is optimal here. The PG_anon
+	 * bitflag tells if this is anonymous or a file-mapping.
+	 * If PG_anon is clear we use the as.mapping otherwise we
+	 * use the as.anon_vma.
+	 * The inode address space if it's a file mapping.
+	 * An anon_vma object if it's an anymous mapping.
+	 * The anon_vma can't go away under us if we hold the
+	 * PG_maplock.
+	 */
+	 struct address_space * mapping;
+
+	/*
+	 * Number of ptes mapping this page.
+	 * It's serialized by PG_maplock.
+	 * This is needed only to maintain the nr_mapped global info
+	 * so it would be nice to drop it.
+	 */
+	unsigned long mapcount;		
+
 	unsigned long private;		/* mapping-private opaque data */
 
 	/*
@@ -402,13 +447,11 @@ void page_address_init(void);
 #endif
 
 /*
- * Return true if this page is mapped into pagetables.  Subtle: test pte.direct
- * rather than pte.chain.  Because sometimes pte.direct is 64-bit, and .chain
- * is only 32-bit.
+ * Return true if this page is mapped into pagetables.
  */
 static inline int page_mapped(struct page *page)
 {
-	return page->pte.direct != 0;
+	return page->mapcount;
 }
 
 /*
@@ -463,7 +506,8 @@ extern int handle_mm_fault(struct mm_struct *mm,struct vm_area_struct *vma, unsi
 extern int make_pages_present(unsigned long addr, unsigned long end);
 extern int access_process_vm(struct task_struct *tsk, unsigned long addr, void *buf, int len, int write);
 void put_dirty_page(struct task_struct *tsk, struct page *page,
-			unsigned long address, pgprot_t prot);
+		    unsigned long address, pgprot_t prot,
+		    struct vm_area_struct *vma);
 
 int get_user_pages(struct task_struct *tsk, struct mm_struct *mm, unsigned long start,
 		int len, int write, int force, struct page **pages, struct vm_area_struct **vmas);
@@ -474,6 +518,7 @@ extern long do_mprotect(struct mm_struct *mm, unsigned long start,
 int __set_page_dirty_buffers(struct page *page);
 int __set_page_dirty_nobuffers(struct page *page);
 int set_page_dirty_lock(struct page *page);
+int FASTCALL(set_page_dirty(struct page *page));
 int clear_page_dirty_for_io(struct page *page);
 
 /*
@@ -499,21 +544,16 @@ struct shrinker;
 extern struct shrinker *set_shrinker(int, shrinker_t);
 extern void remove_shrinker(struct shrinker *shrinker);
 
-/*
- * If the mapping doesn't provide a set_page_dirty a_op, then
- * just fall through and assume that it wants buffer_heads.
- * FIXME: make the method unconditional.
- */
-static inline int set_page_dirty(struct page *page)
+static inline struct address_space * page_mapping(struct page * page)
 {
-	if (page->mapping) {
-		int (*spd)(struct page *);
+	extern struct address_space swapper_space;
+	struct address_space * mapping = NULL;
 
-		spd = page->mapping->a_ops->set_page_dirty;
-		if (spd)
-			return (*spd)(page);
-	}
-	return __set_page_dirty_buffers(page);
+	if (unlikely(PageSwapCache(page)))
+		mapping = &swapper_space;
+	else if (!PageAnon(page))
+		mapping = page->mapping;
+	return mapping;
 }
 
 extern long do_mprotect(struct mm_struct *mm, unsigned long start, 

@@ -90,9 +90,13 @@ static void bad_page(const char *function, struct page *page)
 			1 << PG_lru	|
 			1 << PG_active	|
 			1 << PG_dirty	|
+			1 << PG_swapcache	|
+			1 << PG_anon	|
+			1 << PG_maplock	|
 			1 << PG_writeback);
 	set_page_count(page, 0);
 	page->mapping = NULL;
+	page->mapcount = 0;
 }
 
 #if !defined(CONFIG_HUGETLB_PAGE) && !defined(CONFIG_CRASH_DUMP) \
@@ -218,8 +222,7 @@ static inline void __free_pages_bulk (struct page *page, struct page *base,
 
 static inline void free_pages_check(const char *function, struct page *page)
 {
-	if (	page_mapped(page) ||
-		page->mapping != NULL ||
+	if (	page->mapping != NULL ||
 		page_count(page) != 0 ||
 		(page->flags & (
 			1 << PG_lru	|
@@ -228,12 +231,13 @@ static inline void free_pages_check(const char *function, struct page *page)
 			1 << PG_active	|
 			1 << PG_reclaim	|
 			1 << PG_slab	|
+			1 << PG_swapcache	|
+			1 << PG_anon	|
+			1 << PG_maplock	|
 			1 << PG_writeback )))
 		bad_page(function, page);
 	if (PageDirty(page))
 		ClearPageDirty(page);
-	if (PageAnon(page))
-		ClearPageAnon(page);
 }
 
 /*
@@ -331,7 +335,7 @@ static inline void set_page_refs(struct page *page, int order)
  */
 static void prep_new_page(struct page *page, int order)
 {
-	if (page->mapping || page_mapped(page) ||
+	if (page->mapping ||
 	    (page->flags & (
 			1 << PG_private	|
 			1 << PG_locked	|
@@ -339,6 +343,9 @@ static void prep_new_page(struct page *page, int order)
 			1 << PG_active	|
 			1 << PG_dirty	|
 			1 << PG_reclaim	|
+			1 << PG_anon	|
+			1 << PG_maplock	|
+			1 << PG_swapcache	|
 			1 << PG_writeback )))
 		bad_page(__FUNCTION__, page);
 

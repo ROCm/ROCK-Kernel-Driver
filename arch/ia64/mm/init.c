@@ -128,8 +128,10 @@ ia64_init_addr_space (void)
 		vma->vm_page_prot = protection_map[VM_DATA_DEFAULT_FLAGS & 0x7];
 		vma->vm_flags = VM_READ|VM_WRITE|VM_MAYREAD|VM_MAYWRITE|VM_GROWSUP;
 		vma->vm_ops = NULL;
-		vma->vm_pgoff = 0;
+		vma->vm_pgoff = vma->vm_start >> PAGE_SHIFT;
 		vma->vm_file = NULL;
+		/* insert_vm_struct takes care of anon_vma_node */
+		vma->anon_vma = NULL;
 		vma->vm_private_data = NULL;
 		insert_vm_struct(current->mm, vma);
 	}

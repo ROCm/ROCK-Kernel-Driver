@@ -142,8 +142,16 @@ static inline unsigned long get_page_cache_size(void)
 static inline void ___add_to_page_cache(struct page *page,
 		struct address_space *mapping, unsigned long index)
 {
-	page->mapping = mapping;
-	page->index = index;
+	extern struct address_space swapper_space;
+
+	if (likely(mapping != &swapper_space)) {
+		BUG_ON(PageAnon(page));
+		page->mapping = mapping;
+		page->index = index;
+	} else {
+		SetPageSwapCache(page);
+		page->private = index;
+	}
 
 	mapping->nrpages++;
 	pagecache_acct(1);

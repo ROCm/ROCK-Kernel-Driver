@@ -15,7 +15,6 @@
 #include <linux/swap.h>
 #include <linux/fs.h>
 #include <linux/highmem.h>
-#include <linux/rmap-locking.h>
 #include <linux/security.h>
 
 #include <asm/uaccess.h>
@@ -81,7 +80,7 @@ static inline pte_t *alloc_one_pte_map(struct mm_struct *mm, unsigned long addr)
 
 static int
 copy_one_pte(struct vm_area_struct *vma, unsigned long old_addr,
-	     pte_t *src, pte_t *dst, struct pte_chain **pte_chainp)
+	     pte_t *src, pte_t *dst)
 {
 	int error = 0;
 	pte_t pte;
@@ -91,8 +90,6 @@ copy_one_pte(struct vm_area_struct *vma, unsigned long old_addr,
 		page = pte_page(*src);
 
 	if (!pte_none(*src)) {
-		if (page)
-			page_remove_rmap(page, src);
 		pte = ptep_clear_flush(vma, old_addr, src);
 		if (!dst) {
 			/* No dest?  We must put it back. */
@@ -100,8 +97,6 @@ copy_one_pte(struct vm_area_struct *vma, unsigned long old_addr,
 			error++;
 		}
 		set_pte(dst, pte);
-		if (page)
-			*pte_chainp = page_add_rmap(page, dst, *pte_chainp);
 	}
 	return error;
 }
@@ -113,13 +108,7 @@ move_one_page(struct vm_area_struct *vma, unsigned long old_addr,
 	struct mm_struct *mm = vma->vm_mm;
 	int error = 0;
 	pte_t *src, *dst;
-	struct pte_chain *pte_chain;
 
-	pte_chain = pte_chain_alloc(GFP_KERNEL);
-	if (!pte_chain) {
-		error = -ENOMEM;
-		goto out;
-	}
 	spin_lock(&mm->page_table_lock);
 	src = get_one_pte_map_nested(mm, old_addr);
 	if (src) {
@@ -140,15 +129,12 @@ move_one_page(struct vm_area_struct *vma, unsigned long old_addr,
 		 * page_table_lock, we should re-check the src entry...
 		 */
 		if (src) {
-			error = copy_one_pte(vma, old_addr, src,
-						dst, &pte_chain);
+			error = copy_one_pte(vma, old_addr, src, dst);
 			pte_unmap_nested(src);
 		}
 		pte_unmap(dst);
 	}
 	spin_unlock(&mm->page_table_lock);
-	pte_chain_free(pte_chain);
-out:
 	return error;
 }
 
@@ -190,12 +176,17 @@ static unsigned long move_vma(struct vm_area_struct *vma,
 	unsigned long addr, unsigned long old_len, unsigned long new_len,
 	unsigned long new_addr)
 {
+#if VMA_MERGING_FIXUP
 	struct mm_struct *mm = vma->vm_mm;
 	struct vm_area_struct *new_vma, *next, *prev;
+#else
+	struct vm_area_struct *new_vma;
+#endif
 	int allocated_vma;
 	int split = 0;
 
 	new_vma = NULL;
+#if VMA_MERGING_FIXUP
 	next = find_vma_prev(mm, new_addr, &prev);
 	if (next) {
 		if (prev && prev->vm_end == new_addr &&
@@ -237,6 +228,7 @@ static unsigned long move_vma(struct vm_area_struct *vma,
 			new_vma = prev;
 		}
 	}
+#endif
 
 	allocated_vma = 0;
 	if (!new_vma) {

@@ -25,7 +25,6 @@
 #include <asm/machdep.h>
 #include <asm/cputable.h>
 #include <asm/tlb.h>
-#include <asm/rmap.h>
 
 #include <linux/sysctl.h>
 

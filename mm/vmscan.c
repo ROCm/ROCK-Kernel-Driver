@@ -28,7 +28,7 @@
 #include <linux/mm_inline.h>
 #include <linux/pagevec.h>
 #include <linux/backing-dev.h>
-#include <linux/rmap-locking.h>
+#include <linux/objrmap.h>
 #include <linux/topology.h>
 
 #include <asm/pgalloc.h>
@@ -171,10 +171,10 @@ static int shrink_slab(unsigned long scanned, unsigned int gfp_mask)
 	return 0;
 }
 
-/* Must be called with page's pte_chain_lock held. */
+/* Must be called with page's page_map_lock held. */
 static inline int page_mapping_inuse(struct page *page)
 {
-	struct address_space *mapping = page->mapping;
+	struct address_space *mapping = page_mapping(page);
 
 	/* Page is in somebody's page tables. */
 	if (page_mapped(page))
@@ -231,7 +231,7 @@ static void handle_write_error(struct address_space *mapping,
 				struct page *page, int error)
 {
 	lock_page(page);
-	if (page->mapping == mapping) {
+	if (page_mapping(page) == mapping) {
 		if (error == -ENOSPC)
 			set_bit(AS_ENOSPC, &mapping->flags);
 		else
@@ -275,15 +275,15 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask, int *nr_scanned)
 		if (PageWriteback(page))
 			goto keep_locked;
 
-		pte_chain_lock(page);
+		page_map_lock(page);
 		referenced = page_referenced(page);
 		if (referenced && page_mapping_inuse(page)) {
 			/* In active use or really unfreeable.  Activate it. */
-			pte_chain_unlock(page);
+			page_map_unlock(page);
 			goto activate_locked;
 		}
 
-		mapping = page->mapping;
+		mapping = page_mapping(page);
 
 #ifdef CONFIG_SWAP
 		/*
@@ -293,11 +293,11 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask, int *nr_scanned)
 		 * XXX: implement swap clustering ?
 		 */
 		if (page_mapped(page) && !mapping && !PagePrivate(page)) {
-			pte_chain_unlock(page);
+			page_map_unlock(page);
 			if (!add_to_swap(page))
 				goto activate_locked;
-			pte_chain_lock(page);
-			mapping = page->mapping;
+			page_map_lock(page);
+			mapping = page_mapping(page);
 		}
 #endif /* CONFIG_SWAP */
 
@@ -311,16 +311,16 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask, int *nr_scanned)
 		if (page_mapped(page) && mapping) {
 			switch (try_to_unmap(page)) {
 			case SWAP_FAIL:
-				pte_chain_unlock(page);
+				page_map_unlock(page);
 				goto activate_locked;
 			case SWAP_AGAIN:
-				pte_chain_unlock(page);
+				page_map_unlock(page);
 				goto keep_locked;
 			case SWAP_SUCCESS:
 				; /* try to free the page below */
 			}
 		}
-		pte_chain_unlock(page);
+		page_map_unlock(page);
 
 		/*
 		 * If the page is dirty, only perform writeback if that write
@@ -422,7 +422,7 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask, int *nr_scanned)
 
 #ifdef CONFIG_SWAP
 		if (PageSwapCache(page)) {
-			swp_entry_t swap = { .val = page->index };
+			swp_entry_t swap = { .val = page->private };
 			__delete_from_swap_cache(page);
 			spin_unlock_irq(&mapping->tree_lock);
 			swap_free(swap);
@@ -651,19 +651,19 @@ refill_inactive_zone(struct zone *zone, const int nr_pages_in,
 				list_add(&page->lru, &l_active);
 				continue;
 			}
-			pte_chain_lock(page);
+			page_map_lock(page);
 			if (page_referenced(page)) {
-				pte_chain_unlock(page);
+				page_map_unlock(page);
 				list_add(&page->lru, &l_active);
 				continue;
 			}
-			pte_chain_unlock(page);
+			page_map_unlock(page);
 		}
 		/*
 		 * FIXME: need to consider page_count(page) here if/when we
 		 * reap orphaned pages via the LRU (Daniel's locking stuff)
 		 */
-		if (total_swap_pages == 0 && !page->mapping &&
+		if (total_swap_pages == 0 && !page_mapping(page) &&
 						!PagePrivate(page)) {
 			list_add(&page->lru, &l_active);
 			continue;

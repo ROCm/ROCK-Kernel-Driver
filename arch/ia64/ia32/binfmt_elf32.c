@@ -79,9 +79,10 @@ ia64_elf32_init (struct pt_regs *regs)
 		vma->vm_page_prot = PAGE_SHARED;
 		vma->vm_flags = VM_READ|VM_MAYREAD;
 		vma->vm_ops = &ia32_shared_page_vm_ops;
-		vma->vm_pgoff = 0;
+		vma->vm_pgoff = vma->vm_start >> PAGE_SHIFT;
 		vma->vm_file = NULL;
 		vma->vm_private_data = NULL;
+		vma->anon_vma = NULL;
 		down_write(&current->mm->mmap_sem);
 		{
 			insert_vm_struct(current->mm, vma);
@@ -101,8 +102,9 @@ ia64_elf32_init (struct pt_regs *regs)
 		vma->vm_page_prot = PAGE_SHARED;
 		vma->vm_flags = VM_READ|VM_WRITE|VM_MAYREAD|VM_MAYWRITE;
 		vma->vm_ops = NULL;
-		vma->vm_pgoff = 0;
+		vma->vm_pgoff = vma->vm_start >> PAGE_SHIFT;
 		vma->vm_file = NULL;
+		vma->anon_vma = NULL;
 		vma->vm_private_data = NULL;
 		down_write(&current->mm->mmap_sem);
 		{
@@ -181,8 +183,9 @@ ia32_setup_arg_pages (struct linux_binprm *bprm)
 		mpnt->vm_page_prot = PAGE_COPY;
 		mpnt->vm_flags = VM_STACK_FLAGS;
 		mpnt->vm_ops = NULL;
-		mpnt->vm_pgoff = 0;
+		mpnt->vm_pgoff = mpnt->vm_start >> PAGE_SHIFT;
 		mpnt->vm_file = NULL;
+		mpnt->anon_vma = NULL;
 		mpnt->vm_private_data = 0;
 		insert_vm_struct(current->mm, mpnt);
 		current->mm->total_vm = (mpnt->vm_end - mpnt->vm_start) >> PAGE_SHIFT;
@@ -192,7 +195,7 @@ ia32_setup_arg_pages (struct linux_binprm *bprm)
 		struct page *page = bprm->page[i];
 		if (page) {
 			bprm->page[i] = NULL;
-			put_dirty_page(current, page, stack_base, PAGE_COPY);
+			put_dirty_page(current, page, stack_base, PAGE_COPY, mpnt);
 		}
 		stack_base += PAGE_SIZE;
 	}

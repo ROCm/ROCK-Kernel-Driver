@@ -21,7 +21,7 @@
 #include <linux/seq_file.h>
 #include <linux/init.h>
 #include <linux/module.h>
-#include <linux/rmap-locking.h>
+#include <linux/objrmap.h>
 #include <linux/security.h>
 #include <linux/backing-dev.h>
 
@@ -304,7 +304,7 @@ static int exclusive_swap_page(struct page *page)
 	struct swap_info_struct * p;
 	swp_entry_t entry;
 
-	entry.val = page->index;
+	entry.val = page->private;
 	p = swap_info_get(entry);
 	if (p) {
 		/* Is the only swap cache user the cache itself? */
@@ -372,7 +372,7 @@ int remove_exclusive_swap_page(struct page *page)
 	if (page_count(page) != 2) /* 2: us + cache */
 		return 0;
 
-	entry.val = page->index;
+	entry.val = page->private;
 	p = swap_info_get(entry);
 	if (!p)
 		return 0;
@@ -442,20 +442,20 @@ void free_swap_and_cache(swp_entry_t entry)
 /* vma->vm_mm->page_table_lock is held */
 static void
 unuse_pte(struct vm_area_struct *vma, unsigned long address, pte_t *dir,
-	swp_entry_t entry, struct page *page, struct pte_chain **pte_chainp)
+	swp_entry_t entry, struct page *page)
 {
 	vma->vm_mm->rss++;
 	get_page(page);
 	set_pte(dir, pte_mkold(mk_pte(page, vma->vm_page_prot)));
-	SetPageAnon(page);
-	*pte_chainp = page_add_rmap(page, dir, *pte_chainp);
+	BUG_ON(!vma->anon_vma);
+	page_add_rmap(page, vma, address, 1);
 	swap_free(entry);
 }
 
 /* vma->vm_mm->page_table_lock is held */
 static int unuse_pmd(struct vm_area_struct * vma, pmd_t *dir,
 	unsigned long address, unsigned long size, unsigned long offset,
-	swp_entry_t entry, struct page *page, struct pte_chain **pte_chainp)
+	swp_entry_t entry, struct page *page)
 {
 	pte_t * pte;
 	unsigned long end;
@@ -481,7 +481,7 @@ static int unuse_pmd(struct vm_area_struct * vma, pmd_t *dir,
 		 */
 		if (unlikely(pte_same(*pte, swp_pte))) {
 			unuse_pte(vma, offset + address, pte,
-					entry, page, pte_chainp);
+					entry, page);
 			pte_unmap(pte);
 			return 1;
 		}
@@ -495,7 +495,7 @@ static int unuse_pmd(struct vm_area_struct * vma, pmd_t *dir,
 /* vma->vm_mm->page_table_lock is held */
 static int unuse_pgd(struct vm_area_struct * vma, pgd_t *dir,
 	unsigned long address, unsigned long size,
-	swp_entry_t entry, struct page *page, struct pte_chain **pte_chainp)
+	swp_entry_t entry, struct page *page)
 {
 	pmd_t * pmd;
 	unsigned long offset, end;
@@ -517,7 +517,7 @@ static int unuse_pgd(struct vm_area_struct * vma, pgd_t *dir,
 		BUG();
 	do {
 		if (unuse_pmd(vma, pmd, address, end - address,
-				offset, entry, page, pte_chainp))
+				offset, entry, page))
 			return 1;
 		address = (address + PMD_SIZE) & PMD_MASK;
 		pmd++;
@@ -527,7 +527,7 @@ static int unuse_pgd(struct vm_area_struct * vma, pgd_t *dir,
 
 /* vma->vm_mm->page_table_lock is held */
 static int unuse_vma(struct vm_area_struct * vma, pgd_t *pgdir,
-	swp_entry_t entry, struct page *page, struct pte_chain **pte_chainp)
+	swp_entry_t entry, struct page *page)
 {
 	unsigned long start = vma->vm_start, end = vma->vm_end;
 
@@ -535,7 +535,7 @@ static int unuse_vma(struct vm_area_struct * vma, pgd_t *pgdir,
 		BUG();
 	do {
 		if (unuse_pgd(vma, pgdir, start, end - start,
-				entry, page, pte_chainp))
+				entry, page))
 			return 1;
 		start = (start + PGDIR_SIZE) & PGDIR_MASK;
 		pgdir++;
@@ -547,11 +547,6 @@ static int unuse_process(struct mm_struct * mm,
 			swp_entry_t entry, struct page* page)
 {
 	struct vm_area_struct* vma;
-	struct pte_chain *pte_chain;
-
-	pte_chain = pte_chain_alloc(GFP_KERNEL);
-	if (!pte_chain)
-		return -ENOMEM;
 
 	/*
 	 * Go through process' page directory.
@@ -559,11 +554,10 @@ static int unuse_process(struct mm_struct * mm,
 	spin_lock(&mm->page_table_lock);
 	for (vma = mm->mmap; vma; vma = vma->vm_next) {
 		pgd_t * pgd = pgd_offset(mm, vma->vm_start);
-		if (unuse_vma(vma, pgd, entry, page, &pte_chain))
+		if (unuse_vma(vma, pgd, entry, page))
 			break;
 	}
 	spin_unlock(&mm->page_table_lock);
-	pte_chain_free(pte_chain);
 	return 0;
 }
 
@@ -1056,7 +1050,7 @@ int page_queue_congested(struct page *page)
 
 	bdi = page->mapping->backing_dev_info;
 	if (PageSwapCache(page)) {
-		swp_entry_t entry = { .val = page->index };
+		swp_entry_t entry = { .val = page->private };
 		struct swap_info_struct *sis;
 
 		sis = get_swap_info_struct(swp_type(entry));

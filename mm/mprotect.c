@@ -106,6 +106,8 @@ change_protection(struct vm_area_struct *vma, unsigned long start,
 	spin_unlock(&current->mm->page_table_lock);
 	return;
 }
+
+#if VMA_MERGING_FIXUP
 /*
  * Try to merge a vma with the previous flag, return 1 if successful or 0 if it
  * was impossible.
@@ -149,6 +151,7 @@ mprotect_attempt_merge(struct vm_area_struct *vma, struct vm_area_struct *prev,
 	spin_unlock(&mm->page_table_lock);
 	return 1;
 }
+#endif
 
 static int
 mprotect_fixup(struct vm_area_struct *vma, struct vm_area_struct **pprev,
@@ -184,6 +187,7 @@ mprotect_fixup(struct vm_area_struct *vma, struct vm_area_struct **pprev,
 	newprot = protection_map[newflags & 0xf];
 
 	if (start == vma->vm_start) {
+#if VMA_MERGING_FIXUP
 		/*
 		 * Try to merge with the previous vma.
 		 */
@@ -191,6 +195,7 @@ mprotect_fixup(struct vm_area_struct *vma, struct vm_area_struct **pprev,
 			vma = *pprev;
 			goto success;
 		}
+#endif
 	} else {
 		error = split_vma(mm, vma, start, 1);
 		if (error)
@@ -212,7 +217,9 @@ mprotect_fixup(struct vm_area_struct *vma, struct vm_area_struct **pprev,
 	vma->vm_flags = newflags;
 	vma->vm_page_prot = newprot;
 	spin_unlock(&mm->page_table_lock);
+#if VMA_MERGING_FIXUP
 success:
+#endif
 	change_protection(vma, start, end, newprot);
 	return 0;
 
@@ -315,6 +322,7 @@ do_mprotect(struct mm_struct *mm, unsigned long start, size_t len,
 		}
 	}
 
+#if VMA_MERGING_FIXUP
 	if (next && prev->vm_end == next->vm_start &&
 			can_vma_merge(next, prev->vm_flags) &&
 			!prev->vm_file && !(prev->vm_flags & VM_SHARED)) {
@@ -326,6 +334,7 @@ do_mprotect(struct mm_struct *mm, unsigned long start, size_t len,
 		kmem_cache_free(vm_area_cachep, next);
 		prev->vm_mm->map_count--;
 	}
+#endif
 out:
 	up_write(&mm->mmap_sem);
 	return error;

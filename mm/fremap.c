@@ -12,7 +12,7 @@
 #include <linux/mman.h>
 #include <linux/pagemap.h>
 #include <linux/swapops.h>
-#include <linux/rmap-locking.h>
+#include <linux/objrmap.h>
 #include <linux/module.h>
 
 #include <asm/mmu_context.h>
@@ -36,7 +36,7 @@ static inline void zap_pte(struct mm_struct *mm, struct vm_area_struct *vma,
 			if (!PageReserved(page)) {
 				if (pte_dirty(pte))
 					set_page_dirty(page);
-				page_remove_rmap(page, ptep);
+				page_remove_rmap(page);
 				page_cache_release(page);
 				mm->rss--;
 			}
@@ -60,26 +60,6 @@ int install_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	pgd_t *pgd;
 	pmd_t *pmd;
 	pte_t pte_val;
-	struct pte_chain *pte_chain;
-	unsigned long pgidx;
-
-	pte_chain = pte_chain_alloc(GFP_KERNEL);
-	if (!pte_chain)
-		goto err;
-
-	/*
-	 * Convert this page to anon for objrmap if it's nonlinear
-	 */
-	pgidx = (addr - vma->vm_start) >> PAGE_SHIFT;
-	pgidx += vma->vm_pgoff;
-	pgidx >>= PAGE_CACHE_SHIFT - PAGE_SHIFT;
-	if (!PageAnon(page) && (page->index != pgidx)) {
-		lock_page(page);
-		err = page_convert_anon(page);
-		unlock_page(page);
-		if (err < 0)
-			goto err_free;
-	}
 
 	pgd = pgd_offset(mm, addr);
 	spin_lock(&mm->page_table_lock);
@@ -97,7 +77,7 @@ int install_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	mm->rss++;
 	flush_icache_page(vma, page);
 	set_pte(pte, mk_pte(page, prot));
-	pte_chain = page_add_rmap(page, pte, pte_chain);
+	page_add_rmap(page, vma, addr, 0);
 	pte_val = *pte;
 	pte_unmap(pte);
 	update_mmu_cache(vma, addr, pte_val);
@@ -105,9 +85,6 @@ int install_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	err = 0;
 err_unlock:
 	spin_unlock(&mm->page_table_lock);
-err_free:
-	pte_chain_free(pte_chain);
-err:
 	return err;
 }
 EXPORT_SYMBOL(install_page);

@@ -60,8 +60,8 @@ static int add_to_swap_cache(struct page *page, swp_entry_t entry)
 {
 	int error;
 
-	if (page->mapping)
-		BUG();
+	BUG_ON(page_mapping(page));
+	BUG_ON(PageSwapCache(page));
 	if (!swap_duplicate(entry)) {
 		INC_CACHE_INFO(noent_race);
 		return -ENOENT;
@@ -71,15 +71,14 @@ static int add_to_swap_cache(struct page *page, swp_entry_t entry)
 	 * Anon pages are already on the LRU, we don't run lru_cache_add here.
 	 */
 	if (error != 0) {
+		BUG_ON(PageSwapCache(page));
 		swap_free(entry);
 		if (error == -EEXIST)
 			INC_CACHE_INFO(exist_race);
 		return error;
 	}
-	if (!PageLocked(page))
-		BUG();
-	if (!PageSwapCache(page))
-		BUG();
+	BUG_ON(!PageLocked(page));
+	BUG_ON(!PageSwapCache(page));
 	INC_CACHE_INFO(add_total);
 	return 0;
 }
@@ -177,7 +176,7 @@ void delete_from_swap_cache(struct page *page)
 	BUG_ON(PageWriteback(page));
 	BUG_ON(PagePrivate(page));
   
-	entry.val = page->index;
+	entry.val = page->private;
 
 	spin_lock_irq(&swapper_space.tree_lock);
 	__delete_from_swap_cache(page);
@@ -189,8 +188,11 @@ void delete_from_swap_cache(struct page *page)
 
 int move_to_swap_cache(struct page *page, swp_entry_t entry)
 {
-	struct address_space *mapping = page->mapping;
+	struct address_space *mapping = page_mapping(page);
 	int err;
+
+	BUG_ON(PageAnon(page));
+	BUG_ON(PageSwapCache(page));
 
 	spin_lock_irq(&swapper_space.tree_lock);
 	spin_lock(&mapping->tree_lock);
@@ -225,7 +227,7 @@ int move_from_swap_cache(struct page *page, unsigned long index,
 	BUG_ON(PageWriteback(page));
 	BUG_ON(PagePrivate(page));
 
-	entry.val = page->index;
+	entry.val = page->private;
 
 	spin_lock_irq(&swapper_space.tree_lock);
 	spin_lock(&mapping->tree_lock);

@@ -69,13 +69,13 @@
 #define PG_private		12	/* Has something at ->private */
 #define PG_writeback		13	/* Page is under writeback */
 #define PG_nosave		14	/* Used for system suspend/resume */
-#define PG_chainlock		15	/* lock bit for ->pte_chain */
+#define PG_maplock		15	/* lock bit for ->as.anon_vma and ->mapcount */
 
-#define PG_direct		16	/* ->pte_chain points directly at pte */
 #define PG_mappedtodisk		17	/* Has blocks allocated on-disk */
 #define PG_reclaim		18	/* To be reclaimed asap */
 #define PG_compound		19	/* Part of a compound page */
 #define PG_anon			20	/* Anonymous page */
+#define PG_swapcache		21	/* SwapCache page */
 
 
 /*
@@ -280,12 +280,6 @@ extern void get_full_page_state(struct page_state *ret);
 #define ClearPageNosave(page)		clear_bit(PG_nosave, &(page)->flags)
 #define TestClearPageNosave(page)	test_and_clear_bit(PG_nosave, &(page)->flags)
 
-#define PageDirect(page)	test_bit(PG_direct, &(page)->flags)
-#define SetPageDirect(page)	set_bit(PG_direct, &(page)->flags)
-#define TestSetPageDirect(page)	test_and_set_bit(PG_direct, &(page)->flags)
-#define ClearPageDirect(page)		clear_bit(PG_direct, &(page)->flags)
-#define TestClearPageDirect(page)	test_and_clear_bit(PG_direct, &(page)->flags)
-
 #define PageMappedToDisk(page)	test_bit(PG_mappedtodisk, &(page)->flags)
 #define SetPageMappedToDisk(page) set_bit(PG_mappedtodisk, &(page)->flags)
 #define ClearPageMappedToDisk(page) clear_bit(PG_mappedtodisk, &(page)->flags)
@@ -303,13 +297,10 @@ extern void get_full_page_state(struct page_state *ret);
 #define SetPageAnon(page)	set_bit(PG_anon, &(page)->flags)
 #define ClearPageAnon(page)	clear_bit(PG_anon, &(page)->flags)
 
-/*
- * The PageSwapCache predicate doesn't use a PG_flag at this time,
- * but it may again do so one day.
- */
 #ifdef CONFIG_SWAP
-extern struct address_space swapper_space;
-#define PageSwapCache(page) ((page)->mapping == &swapper_space)
+#define PageSwapCache(page)	test_bit(PG_swapcache, &(page)->flags)
+#define SetPageSwapCache(page)	set_bit(PG_swapcache, &(page)->flags)
+#define ClearPageSwapCache(page) clear_bit(PG_swapcache, &(page)->flags)
 #else
 #define PageSwapCache(page) 0
 #endif

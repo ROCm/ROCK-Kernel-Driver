@@ -100,17 +100,23 @@
  */
 void __remove_from_page_cache(struct page *page)
 {
-	struct address_space *mapping = page->mapping;
+	struct address_space *mapping = page_mapping(page);
 
-	radix_tree_delete(&mapping->page_tree, page->index);
-	page->mapping = NULL;
+	if (likely(!PageSwapCache(page))) {
+		BUG_ON(PageAnon(page));
+		radix_tree_delete(&mapping->page_tree, page->index);
+		page->mapping = NULL;
+	} else {
+		radix_tree_delete(&mapping->page_tree, page->private);
+		ClearPageSwapCache(page);
+	}
 	mapping->nrpages--;
 	pagecache_acct(-1);
 }
 
 void remove_from_page_cache(struct page *page)
 {
-	struct address_space *mapping = page->mapping;
+	struct address_space *mapping = page_mapping(page);
 
 	if (unlikely(!PageLocked(page)))
 		PAGE_BUG(page);
@@ -125,7 +131,7 @@ static inline int sync_page(struct page *page)
 	struct address_space *mapping;
 	
 	smp_mb();
-	mapping = page->mapping;
+	mapping = page_mapping(page);
 	if (mapping && mapping->a_ops && mapping->a_ops->sync_page)
 		return mapping->a_ops->sync_page(page);
 	return 0;
@@ -506,6 +512,7 @@ repeat:
 			spin_lock_irq(&mapping->tree_lock);
 
 			/* Has the page been truncated while we slept? */
+			BUG_ON(PageAnon(page));
 			if (page->mapping != mapping || page->index != offset) {
 				unlock_page(page);
 				page_cache_release(page);
@@ -783,7 +790,7 @@ page_not_up_to_date:
 		}
 
 		/* Did it get unhashed before we got the lock? */
-		if (!page->mapping) {
+		if (!page_mapping(page)) {
 			unlock_page(page);
 			page_cache_release(page);
 			continue;

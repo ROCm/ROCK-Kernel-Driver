@@ -6,6 +6,16 @@
  * Address space accounting code	<alan@redhat.com>
  */
 
+/*
+ * All modifications to vm_start/vm_pgoff must happen
+ * under the semaphore (for file mappings) and under the
+ * anon_vma->anon_vma_lock (for anon mappings), to serialize
+ * against truncate and other objrmap users. See move_vma_start.
+ *
+ * We take the page_table_lock then the PG_maplock and finally
+ * the anon_vma_lock (fork requires that ordering).
+ */
+
 #include <linux/slab.h>
 #include <linux/shm.h>
 #include <linux/mman.h>
@@ -21,6 +31,7 @@
 #include <linux/profile.h>
 #include <linux/module.h>
 #include <linux/mount.h>
+#include <linux/objrmap.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgalloc.h>
@@ -63,7 +74,7 @@ EXPORT_SYMBOL(vm_committed_space);
 /*
  * Requires inode->i_mapping->i_shared_sem
  */
-static inline void
+static void
 __remove_shared_vm_struct(struct vm_area_struct *vma, struct inode *inode)
 {
 	if (inode) {
@@ -272,6 +283,7 @@ __vma_link(struct mm_struct *mm, struct vm_area_struct *vma,
 	__vma_link_list(mm, vma, prev, rb_parent);
 	__vma_link_rb(mm, vma, rb_link, rb_parent);
 	__vma_link_file(vma);
+	__anon_vma_link(vma);
 }
 
 static void vma_link(struct mm_struct *mm, struct vm_area_struct *vma,
@@ -285,7 +297,9 @@ static void vma_link(struct mm_struct *mm, struct vm_area_struct *vma,
 
 	if (mapping)
 		down(&mapping->i_shared_sem);
+	anon_vma_lock(vma);
 	__vma_link(mm, vma, prev, rb_link, rb_parent);
+	anon_vma_unlock(vma);
 	if (mapping)
 		up(&mapping->i_shared_sem);
 
@@ -334,20 +348,15 @@ static inline int is_mergeable_vma(struct vm_area_struct *vma,
 	return 1;
 }
 
-/* requires that the relevant i_shared_sem be held by the caller */
+/*
+ * Requires that the relevant i_shared_sem and anon_vma_lock
+ * be held by the caller.
+ */
 static void move_vma_start(struct vm_area_struct *vma, unsigned long addr)
 {
-	struct inode *inode = NULL;
-	
-	if (vma->vm_file)
-		inode = vma->vm_file->f_dentry->d_inode;
-	if (inode)
-		__remove_shared_vm_struct(vma, inode);
-	/* If no vm_file, perhaps we should always keep vm_pgoff at 0?? */
-	vma->vm_pgoff += (long)(addr - vma->vm_start) >> PAGE_SHIFT;
+	/* we must update pgoff even if no vm_file for the anon_vma */
+	vma->vm_pgoff += (long) (addr - vma->vm_start) >> PAGE_SHIFT;
 	vma->vm_start = addr;
-	if (inode)
-		__vma_link_file(vma);
 }
 
 /*
@@ -359,15 +368,28 @@ static void move_vma_start(struct vm_area_struct *vma, unsigned long addr)
  * wrap, nor mmaps which cover the final page at index -1UL.
  */
 static int
-can_vma_merge_before(struct vm_area_struct *vma, unsigned long vm_flags,
-	struct file *file, unsigned long vm_pgoff, unsigned long size)
+can_vma_merge_before(struct vm_area_struct *prev,
+		     struct vm_area_struct *vma, unsigned long vm_flags,
+		     struct file *file, unsigned long vm_pgoff, unsigned long size)
 {
-	if (is_mergeable_vma(vma, file, vm_flags)) {
-		if (!file)
-			return 1;	/* anon mapping */
-		if (vma->vm_pgoff == vm_pgoff + size)
+	if (is_mergeable_vma(vma, file, vm_flags))
+		if (vma->vm_pgoff == vm_pgoff + size) {
+			if (prev) {
+				/*
+				 * We can fill an hole only if the two
+				 * anonymous mappings are queued in the same
+				 * anon_vma, or if one of them is "direct"
+				 * and it can be queued in the existing
+				 * anon_vma.
+				 *
+				 * Must check this even if file != NULL
+				 * for MAP_PRIVATE mappings.
+				 */
+				return ((!vma->anon_vma || !prev->anon_vma) ||
+					(vma->anon_vma == prev->anon_vma));
+			}
 			return 1;
-	}
+		}
 	return 0;
 }
 
@@ -381,9 +403,6 @@ can_vma_merge_after(struct vm_area_struct *vma, unsigned long vm_flags,
 {
 	if (is_mergeable_vma(vma, file, vm_flags)) {
 		unsigned long vma_size;
-
-		if (!file)
-			return 1;	/* anon mapping */
 
 		vma_size = (vma->vm_end - vma->vm_start) >> PAGE_SHIFT;
 		if (vma->vm_pgoff + vma_size == vm_pgoff)
@@ -423,30 +442,43 @@ static int vma_merge(struct mm_struct *mm, struct vm_area_struct *prev,
 	 * Can it merge with the predecessor?
 	 */
 	if (prev->vm_end == addr &&
-			is_mergeable_vma(prev, file, vm_flags) &&
 			can_vma_merge_after(prev, vm_flags, file, pgoff)) {
 		struct vm_area_struct *next;
-		int need_up = 0;
 
-		if (unlikely(file && prev->vm_next &&
-				prev->vm_next->vm_file == file)) {
-			down(i_shared_sem);
-			need_up = 1;
-		}
+		/*
+		 * this can happen outside the i_shared_sem and outside
+		 * the anon_vma_lock since it only enlarge the size of
+		 * the vma, there are no ptes mapped in this new extended
+		 * region anyways.
+		 */
 		prev->vm_end = end;
 
 		/*
 		 * OK, it did.  Can we now merge in the successor as well?
 		 */
 		next = prev->vm_next;
+		/* next cannot change under us, it's serialized by the mmap_sem */
 		if (next && prev->vm_end == next->vm_start &&
-				can_vma_merge_before(next, vm_flags, file,
+				can_vma_merge_before(prev, next, vm_flags, file,
 					pgoff, (end - addr) >> PAGE_SHIFT)) {
+			/*
+			 * the vm_end extension on the right can happen as usual
+			 * outside the i_shared_sem/anon_vma_lock.
+			 */
 			prev->vm_end = next->vm_end;
+
+			/* serialized by the mmap_sem */
 			__vma_unlink(mm, next, prev);
+
+			if (file)
+				down(i_shared_sem);
 			__remove_shared_vm_struct(next, inode);
-			if (need_up)
+			if (file)
 				up(i_shared_sem);
+
+			/* the anon_vma_lock is taken inside */
+			anon_vma_merge(prev, next);
+
 			if (file)
 				fput(file);
 
@@ -454,8 +486,6 @@ static int vma_merge(struct mm_struct *mm, struct vm_area_struct *prev,
 			kmem_cache_free(vm_area_cachep, next);
 			return 1;
 		}
-		if (need_up)
-			up(i_shared_sem);
 		return 1;
 	}
 
@@ -465,13 +495,15 @@ static int vma_merge(struct mm_struct *mm, struct vm_area_struct *prev,
 	prev = prev->vm_next;
 	if (prev) {
  merge_next:
-		if (!can_vma_merge_before(prev, vm_flags, file,
+		if (!can_vma_merge_before(NULL, prev, vm_flags, file,
 				pgoff, (end - addr) >> PAGE_SHIFT))
 			return 0;
 		if (end == prev->vm_start) {
 			if (file)
 				down(i_shared_sem);
+			anon_vma_lock(prev);
 			move_vma_start(prev, addr);
+			anon_vma_unlock(prev);
 			if (file)
 				up(i_shared_sem);
 			return 1;
@@ -594,6 +626,7 @@ unsigned long __do_mmap_pgoff(struct mm_struct *mm, struct file * file,
 		case MAP_SHARED:
 			break;
 		}
+		pgoff = addr >> PAGE_SHIFT;
 	}
 
 	error = security_file_mmap(file, prot, flags);
@@ -633,7 +666,7 @@ munmap_back:
 	/* Can we just expand an old anonymous mapping? */
 	if (!file && !(vm_flags & VM_SHARED) && rb_parent)
 		if (vma_merge(mm, prev, rb_parent, addr, addr + len,
-					vm_flags, NULL, 0))
+					vm_flags, NULL, pgoff))
 			goto out;
 
 	/*
@@ -657,6 +690,7 @@ munmap_back:
 	vma->vm_private_data = NULL;
 	vma->vm_next = NULL;
 	INIT_LIST_HEAD(&vma->shared);
+	vma->anon_vma = NULL;
 
 	if (file) {
 		error = -EINVAL;
@@ -1115,6 +1149,9 @@ static void unmap_vma(struct mm_struct *mm, struct vm_area_struct *area)
 		area->vm_ops->close(area);
 	if (area->vm_file)
 		fput(area->vm_file);
+
+	anon_vma_unlink(area);
+
 	kmem_cache_free(vm_area_cachep, area);
 }
 
@@ -1225,6 +1262,7 @@ int split_vma(struct mm_struct * mm, struct vm_area_struct * vma,
 	if (mapping)
 		down(&mapping->i_shared_sem);
 	spin_lock(&mm->page_table_lock);
+	anon_vma_lock(vma);
 
 	if (new_below)
 		move_vma_start(vma, addr);
@@ -1233,6 +1271,7 @@ int split_vma(struct mm_struct * mm, struct vm_area_struct * vma,
 
 	__insert_vm_struct(mm, new);
 
+	anon_vma_unlock(vma);
 	spin_unlock(&mm->page_table_lock);
 	if (mapping)
 		up(&mapping->i_shared_sem);
@@ -1337,6 +1376,7 @@ unsigned long do_brk(unsigned long addr, unsigned long len)
 	struct vm_area_struct * vma, * prev;
 	unsigned long flags;
 	struct rb_node ** rb_link, * rb_parent;
+	unsigned long pgoff;
 
 	len = PAGE_ALIGN(len);
 	if (!len)
@@ -1379,9 +1419,11 @@ unsigned long do_brk(unsigned long addr, unsigned long len)
 
 	flags = VM_DATA_DEFAULT_FLAGS | VM_ACCOUNT | mm->def_flags;
 
+	pgoff = addr >> PAGE_SHIFT;
+
 	/* Can we just expand an old anonymous mapping? */
 	if (rb_parent && vma_merge(mm, prev, rb_parent, addr, addr + len,
-					flags, NULL, 0))
+					flags, NULL, pgoff))
 		goto out;
 
 	/*
@@ -1399,10 +1441,11 @@ unsigned long do_brk(unsigned long addr, unsigned long len)
 	vma->vm_flags = flags;
 	vma->vm_page_prot = protection_map[flags & 0x0f];
 	vma->vm_ops = NULL;
-	vma->vm_pgoff = 0;
+	vma->vm_pgoff = pgoff;
 	vma->vm_file = NULL;
 	vma->vm_private_data = NULL;
 	INIT_LIST_HEAD(&vma->shared);
+	vma->anon_vma = NULL;
 
 	vma_link(mm, vma, prev, rb_link, rb_parent);
 
@@ -1462,6 +1505,7 @@ void exit_mmap(struct mm_struct *mm)
 		}
 		if (vma->vm_file)
 			fput(vma->vm_file);
+		anon_vma_unlink(vma);
 		kmem_cache_free(vm_area_cachep, vma);
 		vma = next;
 	}

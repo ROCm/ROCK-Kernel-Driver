@@ -1176,7 +1176,7 @@ int videobuf_mmap_mapper(struct vm_area_struct *vma,
 	map->end      = vma->vm_end;
 	map->q        = q;
 	vma->vm_ops   = &videobuf_vm_ops;
-	vma->vm_flags |= VM_DONTEXPAND;
+	vma->vm_flags |= VM_DONTEXPAND | VM_RESERVED;
 	vma->vm_flags &= ~VM_IO; /* using shared anonymous pages */
 	vma->vm_private_data = map;
 	dprintk(1,"mmap %p: %08lx-%08lx pgoff %08lx bufs %d-%d\n",

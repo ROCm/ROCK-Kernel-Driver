@@ -31,6 +31,7 @@
 #include <linux/futex.h>
 #include <linux/ptrace.h>
 #include <linux/mount.h>
+#include <linux/objrmap.h>
 
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
@@ -335,6 +336,8 @@ static inline int dup_mmap(struct mm_struct * mm, struct mm_struct * oldmm)
 			list_add_tail(&tmp->shared, &mpnt->shared);
 			up(&file->f_mapping->i_shared_sem);
 		}
+
+		anon_vma_link(tmp);
 
 		/*
 		 * Link in the new vma and copy the page table entries:

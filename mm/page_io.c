@@ -32,7 +32,7 @@ get_swap_bio(int gfp_flags, struct page *page, bio_end_io_t end_io)
 		swp_entry_t entry;
 
 		BUG_ON(!PageSwapCache(page));
-		entry.val = page->index;
+		entry.val = page->private;
 		sis = get_swap_info_struct(swp_type(entry));
 
 		bio->bi_sector = map_swap_page(sis, swp_offset(entry)) *
@@ -150,9 +150,9 @@ int rw_swap_page_sync(int rw, swp_entry_t entry, struct page *page)
 
 	lock_page(page);
 
-	BUG_ON(page->mapping);
-	page->mapping = &swapper_space;
-	page->index = entry.val;
+	BUG_ON(page_mapping(page));
+	SetPageSwapCache(page);
+	page->private = entry.val;
 
 	if (rw == READ) {
 		ret = swap_readpage(NULL, page);
@@ -161,7 +161,7 @@ int rw_swap_page_sync(int rw, swp_entry_t entry, struct page *page)
 		ret = swap_writepage(page, &swap_wbc);
 		wait_on_page_writeback(page);
 	}
-	page->mapping = NULL;
+	ClearPageSwapCache(page);
 	if (ret == 0 && (!PageUptodate(page) || PageError(page)))
 		ret = -EIO;
 	return ret;

@@ -2271,9 +2271,11 @@ pfm_smpl_buffer_alloc(struct task_struct *task, pfm_context_t *ctx, unsigned lon
 	vma->vm_flags	     = VM_READ| VM_MAYREAD |VM_RESERVED|VM_DONTCOPY;
 	vma->vm_page_prot    = PAGE_READONLY; /* XXX may need to change */
 	vma->vm_ops	     = &pfm_vm_ops;
-	vma->vm_pgoff	     = 0;
+	vma->vm_pgoff	     = vma->vm_start >> PAGE_SHIFT;
 	vma->vm_file	     = NULL;
 	vma->vm_private_data = ctx;	/* information needed by the pfm_vm_close() function */
+	/* insert_vm_struct takes care of anon_vma_node */
+	vma->anon_vma = NULL;
 
 	/*
 	 * Now we have everything we need and we can initialize

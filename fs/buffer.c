@@ -852,7 +852,7 @@ EXPORT_SYMBOL(mark_buffer_dirty_inode);
  */
 int __set_page_dirty_buffers(struct page *page)
 {
-	struct address_space * const mapping = page->mapping;
+	struct address_space * const mapping = page_mapping(page);
 	int ret = 0;
 
 	if (mapping == NULL) {
@@ -880,10 +880,10 @@ int __set_page_dirty_buffers(struct page *page)
 
 	if (!TestSetPageDirty(page)) {
 		spin_lock_irq(&mapping->tree_lock);
-		if (page->mapping) {	/* Race with truncate? */
+		if (page_mapping(page)) {	/* Race with truncate? */
 			if (!mapping->backing_dev_info->memory_backed)
 				inc_page_state(nr_dirty);
-			radix_tree_tag_set(&mapping->page_tree, page->index,
+			radix_tree_tag_set(&mapping->page_tree, !PageSwapCache(page) ? page->index : page->private,
 						PAGECACHE_TAG_DIRTY);
 		}
 		spin_unlock_irq(&mapping->tree_lock);
@@ -1590,8 +1590,7 @@ int try_to_release_page(struct page *page, int gfp_mask)
 {
 	struct address_space * const mapping = page->mapping;
 
-	if (!PageLocked(page))
-		BUG();
+	BUG_ON(!PageLocked(page));
 	if (PageWriteback(page))
 		return 0;
 	
