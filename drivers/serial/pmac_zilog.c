@@ -273,7 +273,7 @@ static struct tty_struct *pmz_receive_chars(struct uart_pmac_port *uap,
 			uap->flags &= ~PMACZILOG_FLAG_BREAK;
 		}
 
-#ifdef CONFIG_MAGIC_SYSRQ
+#if defined(CONFIG_MAGIC_SYSRQ) && defined(CONFIG_SERIAL_CORE_CONSOLE)
 #ifdef USE_CTRL_O_SYSRQ
 		/* Handle the SysRq ^O Hack */
 		if (ch == '\x0f') {
@@ -289,7 +289,7 @@ static struct tty_struct *pmz_receive_chars(struct uart_pmac_port *uap,
 			if (swallow)
 				goto next_char;
  		}
-#endif /* CONFIG_MAGIC_SYSRQ */
+#endif /* CONFIG_MAGIC_SYSRQ && CONFIG_SERIAL_CORE_CONSOLE */
 
 		/* A real serial line, record the character and status.  */
 		if (drop)
@@ -1603,7 +1603,7 @@ static int pmz_suspend(struct macio_dev *mdev, u32 pm_state)
 		return 0;
 	}
 
-	if (pm_state == mdev->ofdev.dev.power_state || pm_state < 2)
+	if (pm_state == mdev->ofdev.dev.power.power_state || pm_state < 2)
 		return 0;
 
 	pmz_debug("suspend, switching to state %d\n", pm_state);
@@ -1647,7 +1647,7 @@ static int pmz_suspend(struct macio_dev *mdev, u32 pm_state)
 
 	pmz_debug("suspend, switching complete\n");
 
-	mdev->ofdev.dev.power_state = pm_state;
+	mdev->ofdev.dev.power.power_state = pm_state;
 
 	return 0;
 }
@@ -1663,7 +1663,7 @@ static int pmz_resume(struct macio_dev *mdev)
 	if (uap == NULL)
 		return 0;
 
-	if (mdev->ofdev.dev.power_state == 0)
+	if (mdev->ofdev.dev.power.power_state == 0)
 		return 0;
 	
 	pmz_debug("resume, switching to state 0\n");
@@ -1716,7 +1716,7 @@ static int pmz_resume(struct macio_dev *mdev)
 
 	pmz_debug("resume, switching complete\n");
 
-	mdev->ofdev.dev.power_state = 0;
+	mdev->ofdev.dev.power.power_state = 0;
 
 	return 0;
 }
