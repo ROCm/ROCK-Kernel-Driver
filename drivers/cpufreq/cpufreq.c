@@ -453,6 +453,24 @@ static ssize_t show_scaling_available_governors (struct cpufreq_policy * policy,
 	i += sprintf(&buf[i], "\n");
 	return i;
 }
+/**
+ * show_affected_cpus - show the CPUs affected by each transition
+ */
+static ssize_t show_affected_cpus (struct cpufreq_policy * policy, char *buf)
+{
+	ssize_t i = 0;
+	unsigned int cpu;
+
+	for_each_cpu_mask(cpu, policy->cpus) {
+		if (i)
+			i += scnprintf(&buf[i], (PAGE_SIZE - i - 2), " ");
+		i += scnprintf(&buf[i], (PAGE_SIZE - i - 2), "%u", cpu);
+		if (i >= (PAGE_SIZE - 5))
+		    break;
+	}
+	i += sprintf(&buf[i], "\n");
+	return i;
+}
 
 
 #define define_one_ro(_name) \
@@ -480,6 +498,7 @@ define_one_ro(cpuinfo_max_freq);
 define_one_ro(scaling_available_governors);
 define_one_ro(scaling_driver);
 define_one_ro(scaling_cur_freq);
+define_one_ro(affected_cpus);
 define_one_rw(scaling_min_freq);
 define_one_rw(scaling_max_freq);
 define_one_rw(scaling_governor);
@@ -489,6 +508,7 @@ static struct attribute * default_attrs[] = {
 	&cpuinfo_max_freq.attr,
 	&scaling_min_freq.attr,
 	&scaling_max_freq.attr,
+	&affected_cpus.attr,
 	&scaling_governor.attr,
 	&scaling_driver.attr,
 	&scaling_available_governors.attr,
