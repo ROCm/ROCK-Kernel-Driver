@@ -4238,7 +4238,7 @@ int __init floppy_init(void)
 		}
 
 		disks[dr]->major = FLOPPY_MAJOR;
-		disks[dr]->first_minor = TOMINOR(i);
+		disks[dr]->first_minor = TOMINOR(dr);
 		disks[dr]->fops = &floppy_fops;
 		sprintf(disks[dr]->disk_name, "fd%d", dr);
 
