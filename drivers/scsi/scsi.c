@@ -402,7 +402,7 @@ struct scsi_cmnd *scsi_get_command(struct scsi_device *dev, int gfp_mask)
 {
 	struct scsi_cmnd *cmd = __scsi_get_command(dev->host, gfp_mask);
 
-	if (likely(cmd)) {
+	if (likely(cmd != NULL)) {
 		memset(cmd, 0, sizeof(*cmd));
 		cmd->device = dev;
 		cmd->state = SCSI_STATE_UNUSED;
@@ -437,7 +437,7 @@ void scsi_put_command(struct scsi_cmnd *cmd)
 	}
 	spin_unlock_irqrestore(&shost->free_list_lock, flags);
 
-	if (likely(cmd))
+	if (likely(cmd != NULL))
 		kmem_cache_free(shost->cmd_pool->slab, cmd);
 }
 
