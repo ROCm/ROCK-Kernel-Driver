@@ -24,9 +24,6 @@
 
 #include "kcopyd.h"
 
-/* FIXME: this is only needed for the DMERR macros */
-#include "dm.h"
-
 static struct workqueue_struct *_kcopyd_wq;
 static struct work_struct _kcopyd_work;
 
