@@ -168,7 +168,7 @@ static void longhaul_setstate (unsigned int clock_ratio_index)
 		break;
 
 	/*
-	 * Longhaul v3. (Ezra-T [C5M], Nehemiag [C5N])
+	 * Longhaul v3. (Ezra-T [C5M], Nehemiah [C5N])
 	 * This can also do voltage scaling, but see above.
 	 * Ezra-T was alleged to do FSB scaling too, but it never worked in practice.
 	 */
