@@ -98,33 +98,11 @@ dch_l2l1(struct PStack *st, int pr, void *arg)
 			xmit_data_req_d(cs, skb);
 			break;
 		case (PH_PULL |INDICATION):
-			if (cs->tx_skb) {
-				if (cs->debug & L1_DEB_WARN)
-					debugl1(cs, " l2l1 tx_skb exist this shouldn't happen");
-				skb_queue_tail(&cs->sq, skb);
-				break;
-			}
-			if (cs->debug & DEB_DLOG_HEX)     LogFrame(cs, skb->data, skb->len);
-			if (cs->debug & DEB_DLOG_VERBOSE) dlogframe(cs, skb, 0);
-			cs->tx_skb = skb;
-			cs->tx_cnt = 0;
-#ifdef L2FRAME_DEBUG
-			if (cs->debug & L1_DEB_LAPD) Logl2Frame(cs, skb, "PH_DATA_PULLED", 0);
-#endif
-			dch_fill_fifo(cs);
+			xmit_pull_ind_d(cs, skb);
 			break;
-      
 		case (PH_PULL | REQUEST):
-#ifdef L2FRAME_DEBUG
-			if (cs->debug & L1_DEB_LAPD) debugl1(cs, "-> PH_REQUEST_PULL");
-#endif
-			if (!cs->tx_skb) {
-				clear_bit(FLG_L1_PULL_REQ, &st->l1.Flags);
-				st->l2.l1l2(st, PH_PULL | CONFIRM, NULL);
-			} else
-				set_bit(FLG_L1_PULL_REQ, &st->l1.Flags);
+			xmit_pull_req_d(st);
 			break;
-
 		case (HW_RESET | REQUEST):
 		case (HW_ENABLE | REQUEST):
 			ph_command(cs, IPACX_CMD_TIM);
@@ -459,7 +437,7 @@ bch_l2l1(struct PStack *st, int pr, void *arg)
 			xmit_pull_ind_b(st->l1.bcs, skb);
 			break;
 		case (PH_PULL | REQUEST):
-			xmit_pull_req_b(st, skb);
+			xmit_pull_req_b(st);
 			break;
 		case (PH_ACTIVATE | REQUEST):
 			set_bit(BC_FLG_ACTIV, &st->l1.bcs->Flag);

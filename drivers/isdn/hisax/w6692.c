@@ -434,35 +434,11 @@ W6692_l1hw(struct PStack *st, int pr, void *arg)
 		case (PH_DATA | REQUEST):
 			xmit_data_req_d(cs, skb);
 			break;
-		case (PH_PULL | INDICATION):
-			if (cs->tx_skb) {
-				if (cs->debug & L1_DEB_WARN)
-					debugl1(cs, " l2l1 tx_skb exist this shouldn't happen");
-				skb_queue_tail(&cs->sq, skb);
-				break;
-			}
-			if (cs->debug & DEB_DLOG_HEX)
-				LogFrame(cs, skb->data, skb->len);
-			if (cs->debug & DEB_DLOG_VERBOSE)
-				dlogframe(cs, skb, 0);
-			cs->tx_skb = skb;
-			cs->tx_cnt = 0;
-#ifdef L2FRAME_DEBUG		/* psa */
-			if (cs->debug & L1_DEB_LAPD)
-				Logl2Frame(cs, skb, "PH_DATA_PULLED", 0);
-#endif
-			W6692_fill_fifo(cs);
+		case (PH_PULL |INDICATION):
+			xmit_pull_ind_d(cs, skb);
 			break;
 		case (PH_PULL | REQUEST):
-#ifdef L2FRAME_DEBUG		/* psa */
-			if (cs->debug & L1_DEB_LAPD)
-				debugl1(cs, "-> PH_REQUEST_PULL");
-#endif
-			if (!cs->tx_skb) {
-				test_and_clear_bit(FLG_L1_PULL_REQ, &st->l1.Flags);
-				L1L2(st, PH_PULL | CONFIRM, NULL);
-			} else
-				test_and_set_bit(FLG_L1_PULL_REQ, &st->l1.Flags);
+			xmit_pull_req_d(st);
 			break;
 		case (HW_RESET | REQUEST):
 			if ((cs->dc.w6692.ph_state == W_L1IND_DRD))
@@ -597,7 +573,7 @@ W6692_l2l1(struct PStack *st, int pr, void *arg)
 			xmit_pull_ind_b(st->l1.bcs, skb);
 			break;
 		case (PH_PULL | REQUEST):
-			xmit_pull_req_b(st, skb);
+			xmit_pull_req_b(st);
 			break;
 		case (PH_ACTIVATE | REQUEST):
 			test_and_set_bit(BC_FLG_ACTIV, &st->l1.bcs->Flag);

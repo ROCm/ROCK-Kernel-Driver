@@ -397,34 +397,10 @@ ICC_l1hw(struct PStack *st, int pr, void *arg)
 			xmit_data_req_d(cs, skb);
 			break;
 		case (PH_PULL |INDICATION):
-			if (cs->tx_skb) {
-				if (cs->debug & L1_DEB_WARN)
-					debugl1(cs, " l2l1 tx_skb exist this shouldn't happen");
-				skb_queue_tail(&cs->sq, skb);
-				break;
-			}
-			if (cs->debug & DEB_DLOG_HEX)
-				LogFrame(cs, skb->data, skb->len);
-			if (cs->debug & DEB_DLOG_VERBOSE)
-				dlogframe(cs, skb, 0);
-			cs->tx_skb = skb;
-			cs->tx_cnt = 0;
-#ifdef L2FRAME_DEBUG		/* psa */
-			if (cs->debug & L1_DEB_LAPD)
-				Logl2Frame(cs, skb, "PH_DATA_PULLED", 0);
-#endif
-			icc_fill_fifo(cs);
+			xmit_pull_ind_d(cs, skb);
 			break;
 		case (PH_PULL | REQUEST):
-#ifdef L2FRAME_DEBUG		/* psa */
-			if (cs->debug & L1_DEB_LAPD)
-				debugl1(cs, "-> PH_REQUEST_PULL");
-#endif
-			if (!cs->tx_skb) {
-				test_and_clear_bit(FLG_L1_PULL_REQ, &st->l1.Flags);
-				L1L2(st, PH_PULL | CONFIRM, NULL);
-			} else
-				test_and_set_bit(FLG_L1_PULL_REQ, &st->l1.Flags);
+			xmit_pull_req_d(st);
 			break;
 		case (HW_RESET | REQUEST):
 			if ((cs->dc.icc.ph_state == ICC_IND_EI1) ||

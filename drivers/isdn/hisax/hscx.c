@@ -104,7 +104,7 @@ hscx_l2l1(struct PStack *st, int pr, void *arg)
 			xmit_pull_ind_b(st->l1.bcs, skb);
 			break;
 		case (PH_PULL | REQUEST):
-			xmit_pull_req_b(st, skb);
+			xmit_pull_req_b(st);
 			break;
 		case (PH_ACTIVATE | REQUEST):
 			test_and_set_bit(BC_FLG_ACTIV, &st->l1.bcs->Flag);

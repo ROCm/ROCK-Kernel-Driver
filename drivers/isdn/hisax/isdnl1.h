@@ -158,10 +158,34 @@ xmit_pull_ind_b(struct BCState *bcs, struct sk_buff *skb)
 	spin_unlock_irqrestore(&cs->lock, flags);
 }
 
+static inline void
+xmit_pull_ind_d(struct IsdnCardState *cs, struct sk_buff *skb)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&cs->lock, flags);
+	if (cs->tx_skb) {
+		WARN_ON(1);
+	} else {
+		if (cs->debug & DEB_DLOG_HEX)
+			LogFrame(cs, skb->data, skb->len);
+		if (cs->debug & DEB_DLOG_VERBOSE)
+			dlogframe(cs, skb, 0);
+#ifdef L2FRAME_DEBUG
+		if (cs->debug & L1_DEB_LAPD)
+			Logl2Frame(cs, skb, "PH_DATA_PULLED", 0);
+#endif
+		cs->tx_skb = skb;
+		cs->tx_cnt = 0;
+		cs->DC_Send_Data(cs);
+	}
+	spin_unlock_irqrestore(&cs->lock, flags);
+}
+
 /* If busy, the PH_PULL | CONFIRM scheduling is handled under
  * the card lock by xmit_ready_b() above, so no race */
 static inline void
-xmit_pull_req_b(struct PStack *st, struct sk_buff *skb)
+xmit_pull_req_b(struct PStack *st)
 {
 	struct BCState *bcs = st->l1.bcs;
 	struct IsdnCardState *cs = bcs->cs;
@@ -170,6 +194,29 @@ xmit_pull_req_b(struct PStack *st, struct sk_buff *skb)
 
 	spin_lock_irqsave(&cs->lock, flags);
 	if (bcs->tx_skb) {
+		set_bit(FLG_L1_PULL_REQ, &st->l1.Flags);
+		busy = 1;
+	}
+	spin_unlock_irqrestore(&cs->lock, flags);
+	if (!busy)
+		L1L2(st, PH_PULL | CONFIRM, NULL);
+}
+
+/* If busy, the PH_PULL | CONFIRM scheduling is handled under
+ * the card lock by xmit_ready_d() above, so no race */
+static inline void
+xmit_pull_req_d(struct PStack *st)
+{
+	struct IsdnCardState *cs = st->l1.hardware;
+	unsigned long flags;
+	int busy = 0;
+
+#ifdef L2FRAME_DEBUG
+	if (cs->debug & L1_DEB_LAPD)
+		debugl1(cs, "-> PH_REQUEST_PULL");
+#endif
+	spin_lock_irqsave(&cs->lock, flags);
+	if (cs->tx_skb) {
 		set_bit(FLG_L1_PULL_REQ, &st->l1.Flags);
 		busy = 1;
 	}
