@@ -287,189 +287,6 @@ static ide_startstop_t ide_do_rw_disk (ide_drive_t *drive, struct request *rq, s
 		return __ide_do_rw_disk(drive, rq, block);
 }
 
-static u8 idedisk_dump_status (ide_drive_t *drive, const char *msg, u8 stat)
-{
-	ide_hwif_t *hwif = HWIF(drive);
-	unsigned long flags;
-	u8 err = 0;
-
-	local_irq_set(flags);
-	printk("%s: %s: status=0x%02x", drive->name, msg, stat);
-	printk(" { ");
-	if (stat & BUSY_STAT)
-		printk("Busy ");
-	else {
-		if (stat & READY_STAT)	printk("DriveReady ");
-		if (stat & WRERR_STAT)	printk("DeviceFault ");
-		if (stat & SEEK_STAT)	printk("SeekComplete ");
-		if (stat & DRQ_STAT)	printk("DataRequest ");
-		if (stat & ECC_STAT)	printk("CorrectedError ");
-		if (stat & INDEX_STAT)	printk("Index ");
-		if (stat & ERR_STAT)	printk("Error ");
-	}
-	printk("}");
-	printk("\n");
-	if ((stat & (BUSY_STAT|ERR_STAT)) == ERR_STAT) {
-		err = hwif->INB(IDE_ERROR_REG);
-		printk("%s: %s: error=0x%02x", drive->name, msg, err);
-		printk(" { ");
-		if (err & ABRT_ERR)	printk("DriveStatusError ");
-		if (err & ICRC_ERR)
-			printk("Bad%s ", (err & ABRT_ERR) ? "CRC" : "Sector");
-		if (err & ECC_ERR)	printk("UncorrectableError ");
-		if (err & ID_ERR)	printk("SectorIdNotFound ");
-		if (err & TRK0_ERR)	printk("TrackZeroNotFound ");
-		if (err & MARK_ERR)	printk("AddrMarkNotFound ");
-		printk("}");
-		if ((err & (BBD_ERR | ABRT_ERR)) == BBD_ERR ||
-		    (err & (ECC_ERR|ID_ERR|MARK_ERR))) {
-			if (drive->addressing == 1) {
-				__u64 sectors = 0;
-				u32 low = 0, high = 0;
-				low = ide_read_24(drive);
-				hwif->OUTB(drive->ctl|0x80, IDE_CONTROL_REG);
-				high = ide_read_24(drive);
-				sectors = ((__u64)high << 24) | low;
-				printk(", LBAsect=%llu, high=%d, low=%d",
-				       (unsigned long long) sectors,
-				       high, low);
-			} else {
-				u8 cur = hwif->INB(IDE_SELECT_REG);
-				if (cur & 0x40) {	/* using LBA? */
-					printk(", LBAsect=%ld", (unsigned long)
-					 ((cur&0xf)<<24)
-					 |(hwif->INB(IDE_HCYL_REG)<<16)
-					 |(hwif->INB(IDE_LCYL_REG)<<8)
-					 | hwif->INB(IDE_SECTOR_REG));
-				} else {
-					printk(", CHS=%d/%d/%d",
-					 (hwif->INB(IDE_HCYL_REG)<<8) +
-					  hwif->INB(IDE_LCYL_REG),
-					  cur & 0xf,
-					  hwif->INB(IDE_SECTOR_REG));
-				}
-			}
-			if (HWGROUP(drive) && HWGROUP(drive)->rq)
-				printk(", sector=%llu",
-					(unsigned long long)HWGROUP(drive)->rq->sector);
-		}
-	}
-	printk("\n");
-	{
-		struct request *rq;
-		unsigned char opcode = 0;
-		int found = 0;
-
-		spin_lock(&ide_lock);
-		rq = HWGROUP(drive)->rq;
-		spin_unlock(&ide_lock);
-		if (!rq)
-			goto out;
-		if (rq->flags & (REQ_DRIVE_CMD | REQ_DRIVE_TASK)) {
-			char *args = rq->buffer;
-			if (args) {
-				opcode = args[0];
-				found = 1;
-			}
-		} else if (rq->flags & REQ_DRIVE_TASKFILE) {
-			ide_task_t *args = rq->special;
-			if (args) {
-				task_struct_t *tf = (task_struct_t *) args->tfRegister;
-				opcode = tf->command;
-				found = 1;
-			}
-		}
-		printk("ide: failed opcode was: ");
-		if (!found)
-			printk("unknown\n");
-		else
-			printk("0x%02x\n", opcode);
-	}
-out:
-	local_irq_restore(flags);
-	return err;
-}
-
-static ide_startstop_t idedisk_error (ide_drive_t *drive, const char *msg, u8 stat)
-{
-	ide_hwif_t *hwif;
-	struct request *rq;
-	u8 err;
-
-	err = idedisk_dump_status(drive, msg, stat);
-
-	if (drive == NULL || (rq = HWGROUP(drive)->rq) == NULL)
-		return ide_stopped;
-
-	hwif = HWIF(drive);
-	/* retry only "normal" I/O: */
-	if (rq->flags & (REQ_DRIVE_CMD | REQ_DRIVE_TASK | REQ_DRIVE_TASKFILE)) {
-		rq->errors = 1;
-		ide_end_drive_cmd(drive, stat, err);
-		return ide_stopped;
-	}
-
-	if (stat & BUSY_STAT || ((stat & WRERR_STAT) && !drive->nowerr)) {
-		/* other bits are useless when BUSY */
-		rq->errors |= ERROR_RESET;
-	} else if (stat & ERR_STAT) {
-		/* err has different meaning on cdrom and tape */
-		if (err == ABRT_ERR) {
-			if (drive->select.b.lba &&
-			    /* some newer drives don't support WIN_SPECIFY */
-			    hwif->INB(IDE_COMMAND_REG) == WIN_SPECIFY)
-				return ide_stopped;
-		} else if ((err & BAD_CRC) == BAD_CRC) {
-			/* UDMA crc error, just retry the operation */
-			drive->crc_count++;
-		} else if (err & (BBD_ERR | ECC_ERR)) {
-			/* retries won't help these */
-			rq->errors = ERROR_MAX;
-		} else if (err & TRK0_ERR) {
-			/* help it find track zero */
-			rq->errors |= ERROR_RECAL;
-		}
-	}
-	if ((stat & DRQ_STAT) && rq_data_dir(rq) == READ)
-		try_to_flush_leftover_data(drive);
-	if (hwif->INB(IDE_STATUS_REG) & (BUSY_STAT|DRQ_STAT)) {
-		/* force an abort */
-		hwif->OUTB(WIN_IDLEIMMEDIATE,IDE_COMMAND_REG);
-	}
-	if (rq->errors >= ERROR_MAX || blk_noretry_request(rq))
-		DRIVER(drive)->end_request(drive, 0, 0);
-	else {
-		if ((rq->errors & ERROR_RESET) == ERROR_RESET) {
-			++rq->errors;
-			return ide_do_reset(drive);
-		}
-		if ((rq->errors & ERROR_RECAL) == ERROR_RECAL)
-			drive->special.b.recalibrate = 1;
-		++rq->errors;
-	}
-	return ide_stopped;
-}
-
-static ide_startstop_t idedisk_abort(ide_drive_t *drive, const char *msg)
-{
-	ide_hwif_t *hwif;
-	struct request *rq;
-
-	if (drive == NULL || (rq = HWGROUP(drive)->rq) == NULL)
-		return ide_stopped;
-
-	hwif = HWIF(drive);
-
-	if (rq->flags & (REQ_DRIVE_CMD | REQ_DRIVE_TASK | REQ_DRIVE_TASKFILE)) {
-		rq->errors = 1;
-		ide_end_drive_cmd(drive, BUSY_STAT, 0);
-		return ide_stopped;
-	}
-
-	DRIVER(drive)->end_request(drive, 0, 0);
-	return ide_stopped;
-}
-
 /*
  * Queries for true maximum capacity of the drive.
  * Returns maximum LBA address (> 0) of the drive, 0 if failed.
@@ -1358,9 +1175,6 @@ static ide_driver_t idedisk_driver = {
 	.supports_dsc_overlap	= 0,
 	.cleanup		= idedisk_cleanup,
 	.do_request		= ide_do_rw_disk,
-	.sense			= idedisk_dump_status,
-	.error			= idedisk_error,
-	.abort			= idedisk_abort,
 	.pre_reset		= idedisk_pre_reset,
 	.capacity		= idedisk_capacity,
 	.special		= idedisk_special,
@@ -1434,7 +1248,7 @@ static int idedisk_media_changed(struct gendisk *disk)
 static int idedisk_revalidate_disk(struct gendisk *disk)
 {
 	ide_drive_t *drive = disk->private_data;
-	set_capacity(disk, current_capacity(drive));
+	set_capacity(disk, idedisk_capacity(drive));
 	return 0;
 }
 
@@ -1478,7 +1292,7 @@ static int idedisk_attach(ide_drive_t *drive)
 	strcpy(g->devfs_name, drive->devfs_name);
 	g->driverfs_dev = &drive->gendev;
 	g->flags = drive->removable ? GENHD_FL_REMOVABLE : 0;
-	set_capacity(g, current_capacity(drive));
+	set_capacity(g, idedisk_capacity(drive));
 	g->fops = &idedisk_ops;
 	add_disk(g);
 	return 0;
