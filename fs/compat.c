@@ -326,8 +326,12 @@ static void free_ioctl(struct ioctl_trans *t)
 
 int register_ioctl32_conversion(unsigned int cmd, int (*handler)(unsigned int, unsigned int, unsigned long, struct file *))
 {
-	struct ioctl_trans *t;
+	struct ioctl_trans *t, *new;
 	unsigned long hash = ioctl32_hash(cmd);
+
+	new = kmalloc(sizeof(struct ioctl_trans), GFP_KERNEL);
+	if (!new)
+		return -ENOMEM;
 
 	lock_kernel(); 
 	for (t = (struct ioctl_trans *)ioctl32_hash_table[hash];
@@ -336,6 +340,7 @@ int register_ioctl32_conversion(unsigned int cmd, int (*handler)(unsigned int, u
 		if (t->cmd == cmd) {
 			printk("Trying to register duplicated ioctl32 handler %x\n", cmd);
 			unlock_kernel();
+			kfree(new);
 			return -EINVAL; 
 		}
 	} 
@@ -344,11 +349,7 @@ int register_ioctl32_conversion(unsigned int cmd, int (*handler)(unsigned int, u
 		t = ioctl_free_list; 
 		ioctl_free_list = t->next; 
 	} else { 
-		t = kmalloc(sizeof(struct ioctl_trans), GFP_KERNEL); 
-		if (!t) { 
-			unlock_kernel();
-			return -ENOMEM;
-		}
+		t = new;
 	}
 	
 	t->next = NULL;
@@ -357,6 +358,8 @@ int register_ioctl32_conversion(unsigned int cmd, int (*handler)(unsigned int, u
 	ioctl32_insert_translation(t);
 
 	unlock_kernel();
+	if (t != new) 
+		kfree(new);
 	return 0;
 }
 
@@ -437,15 +440,15 @@ asmlinkage long compat_sys_ioctl(unsigned int fd, unsigned int cmd, unsigned lon
 		goto out;
 	}
 
+	lock_kernel();
+
 	t = (struct ioctl_trans *)ioctl32_hash_table [ioctl32_hash (cmd)];
 
 	while (t && t->cmd != cmd)
 		t = (struct ioctl_trans *)t->next;
 	if (t) {
 		if (t->handler) { 
-			lock_kernel();
 			error = t->handler(fd, cmd, arg, filp);
-			unlock_kernel();
 		} else
 			error = sys_ioctl(fd, cmd, arg);
 	} else if (cmd >= SIOCDEVPRIVATE && cmd <= (SIOCDEVPRIVATE + 15)) {
@@ -476,6 +479,7 @@ asmlinkage long compat_sys_ioctl(unsigned int fd, unsigned int cmd, unsigned lon
 		}
 		error = audit_result(-EINVAL);
 	}
+	unlock_kernel();
 out:
 	fput(filp);
 out2:

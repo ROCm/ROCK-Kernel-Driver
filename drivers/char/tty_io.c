@@ -1372,14 +1372,24 @@ retry_open:
 #ifdef CONFIG_UNIX98_PTYS
 	if (device == MKDEV(TTYAUX_MAJOR,2)) {
 		/* find a device that is not in use. */
-		static int next_ptmx_dev = 0;
+		static int next_ptmx_dev = MAX_PREFERRED_PTY;
 		retval = -1;
 		driver = ptm_driver;
+		/* first, try for a pty < 256 for old glibc that doesn't support
+		 * larger pts numbers */
+		for (index = 0; index < MAX_PREFERRED_PTY && driver->refcount < pty_limit; index++) {
+			if (!init_dev(driver, index, &tty)) 
+				goto ptmx_found;
+		}
+		/* nothing below MAX_PREFERRED_PTY, try something higher */
 		while (driver->refcount < pty_limit) {
 			index = next_ptmx_dev;
 			next_ptmx_dev = (next_ptmx_dev+1) % driver->num;
-			if (!init_dev(driver, index, &tty))
+			if (!next_ptmx_dev) 
+				next_ptmx_dev = MAX_PREFERRED_PTY;
+			if (!init_dev(driver, index, &tty)) {
 				goto ptmx_found; /* ok! */
+			}
 		}
 		return -EIO; /* no free ptys */
 	ptmx_found:
