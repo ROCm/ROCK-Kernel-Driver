@@ -10,9 +10,10 @@
 
 #include <asm/ptrace.h>
 
-struct sigcontext_struct {
+struct sigcontext {
 	unsigned long	_unused[4];
 	int		signal;
+	int		_pad0;
 	unsigned long	handler;
 	unsigned long	oldmask;
 	struct pt_regs 	*regs;

@@ -104,7 +104,7 @@ sys_ipc (uint call, int first, int second, long third, void *ptr, long fifth)
 						(struct ipc_kludge *) ptr,
 						sizeof (tmp))))
 				break;
-			ret = sys_msgrcv (first, (struct msgbuf *)(unsigned long)tmp.msgp,
+			ret = sys_msgrcv (first, (struct msgbuf *)tmp.msgp,
 						second, tmp.msgtyp, third);
 			break;
 		}
