@@ -2,7 +2,6 @@
 #include <linux/module.h>
 #include <linux/kmod.h>		/* for hotplug_path */
 
-extern struct list_head pci_drivers;
 extern int pci_announce_device(struct pci_driver *drv, struct pci_dev *dev);
 
 #ifndef FALSE
@@ -61,7 +60,7 @@ pci_announce_device_to_drivers(struct pci_dev *dev)
 {
 	struct list_head *ln;
 
-	for(ln=pci_drivers.next; ln != &pci_drivers; ln=ln->next) {
+	for(ln=pci_bus_type.drivers.next; ln != &pci_bus_type.drivers; ln=ln->next) {
 		struct pci_driver *drv = list_entry(ln, struct pci_driver, node);
 		if (drv->remove && pci_announce_device(drv, dev))
 			break;

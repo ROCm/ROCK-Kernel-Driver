@@ -10,8 +10,6 @@
  *  Registration of PCI drivers and handling of hot-pluggable devices.
  */
 
-LIST_HEAD(pci_drivers);
-
 /**
  * pci_match_device - Tell if a PCI device structure has a matching PCI device id structure
  * @ids: array of PCI device id structures to search in
@@ -61,77 +59,30 @@ out:
 	return ret;
 }
 
-/**
- * pci_register_driver - register a new pci driver
- * @drv: the driver structure to register
- * 
- * Adds the driver structure to the list of registered drivers
- * Returns the number of pci devices which were claimed by the driver
- * during registration.  The driver remains registered even if the
- * return value is zero.
- */
-int
-pci_register_driver(struct pci_driver *drv)
-{
-	struct pci_dev *dev;
-	int count = 0;
 
-	list_add_tail(&drv->node, &pci_drivers);
-	pci_for_each_dev(dev) {
-		if (!pci_dev_driver(dev))
-			count += pci_announce_device(drv, dev);
-	}
-	return count;
+static int pci_device_probe(struct device * dev)
+{
+	int error = 0;
+
+	struct pci_driver * drv = list_entry(dev->driver,struct pci_driver,driver);
+	struct pci_dev * pci_dev = list_entry(dev,struct pci_dev,dev);
+
+	if (drv->probe)
+		error = drv->probe(pci_dev,NULL);
+	printk("%s: returning %d\n",__FUNCTION__,error);
+	return error > 0 ? 0 : -ENODEV;
 }
 
-/**
- * pci_unregister_driver - unregister a pci driver
- * @drv: the driver structure to unregister
- * 
- * Deletes the driver structure from the list of registered PCI drivers,
- * gives it a chance to clean up by calling its remove() function for
- * each device it was responsible for, and marks those devices as
- * driverless.
- */
-
-void
-pci_unregister_driver(struct pci_driver *drv)
+static int pci_device_remove(struct device * dev, u32 flags)
 {
-	struct pci_dev *dev;
+	struct pci_dev * pci_dev = list_entry(dev,struct pci_dev,dev);
 
-	list_del(&drv->node);
-	pci_for_each_dev(dev) {
-		if (dev->driver == drv) {
-			if (drv->remove)
-				drv->remove(dev);
-			dev->driver = NULL;
-		}
+	if (dev->driver) {
+		struct pci_driver * drv = list_entry(dev->driver,struct pci_driver,driver);
+		if (drv->remove)
+			drv->remove(pci_dev);
 	}
-}
-
-static struct pci_driver pci_compat_driver = {
-	name: "compat"
-};
-
-/**
- * pci_dev_driver - get the pci_driver of a device
- * @dev: the device to query
- *
- * Returns the appropriate pci_driver structure or %NULL if there is no 
- * registered driver for the device.
- */
-struct pci_driver *
-pci_dev_driver(const struct pci_dev *dev)
-{
-	if (dev->driver)
-		return dev->driver;
-	else {
-		int i;
-		for(i=0; i<=PCI_ROM_RESOURCE; i++)
-			if (dev->resource[i].flags & IORESOURCE_BUSY)
-				return &pci_compat_driver;
-	}
-	return NULL;
+	return 0;
 }
 
 static int pci_device_suspend(struct device * dev, u32 state, u32 level)
@@ -159,10 +110,93 @@ static int pci_device_resume(struct device * dev, u32 level)
 	return 0;
 }
 
-struct device_driver pci_device_driver = {
-	suspend:	pci_device_suspend,
-	resume:		pci_device_resume,
+/**
+ * pci_register_driver - register a new pci driver
+ * @drv: the driver structure to register
+ * 
+ * Adds the driver structure to the list of registered drivers
+ * Returns the number of pci devices which were claimed by the driver
+ * during registration.  The driver remains registered even if the
+ * return value is zero.
+ */
+int
+pci_register_driver(struct pci_driver *drv)
+{
+	int count = 0;
+	struct pci_dev * dev;
+
+	/* initialize common driver fields */
+	drv->driver.name = drv->name;
+	drv->driver.bus = &pci_bus_type;
+	drv->driver.probe = pci_device_probe;
+	drv->driver.resume = pci_device_resume;
+	drv->driver.suspend = pci_device_suspend;
+	drv->driver.remove = pci_device_remove;
+
+	/* register with core */
+	count = driver_register(&drv->driver);
+
+	pci_for_each_dev(dev) {
+		if (!pci_dev_driver(dev))
+			pci_announce_device(drv, dev);
+	}
+	return count ? count : 1;
+}
+
+/**
+ * pci_unregister_driver - unregister a pci driver
+ * @drv: the driver structure to unregister
+ * 
+ * Deletes the driver structure from the list of registered PCI drivers,
+ * gives it a chance to clean up by calling its remove() function for
+ * each device it was responsible for, and marks those devices as
+ * driverless.
+ */
+
+void
+pci_unregister_driver(struct pci_driver *drv)
+{
+	list_t * node;
+	
+	node = drv->driver.devices.next;
+
+	while (node != &drv->driver.devices) {
+		struct device * dev = list_entry(node,struct device,driver_list);
+		struct pci_dev * pci_dev = list_entry(dev,struct pci_dev,dev);
+
+		if (drv->remove)
+			drv->remove(pci_dev);
+		pci_dev->driver = NULL;
+		dev->driver = NULL;
+		list_del_init(&dev->driver_list);
+	}
+	put_driver(&drv->driver);
+}
+
+static struct pci_driver pci_compat_driver = {
+	name: "compat"
 };
+
+/**
+ * pci_dev_driver - get the pci_driver of a device
+ * @dev: the device to query
+ *
+ * Returns the appropriate pci_driver structure or %NULL if there is no 
+ * registered driver for the device.
+ */
+struct pci_driver *
+pci_dev_driver(const struct pci_dev *dev)
+{
+	if (dev->driver)
+		return dev->driver;
+	else {
+		int i;
+		for(i=0; i<=PCI_ROM_RESOURCE; i++)
+			if (dev->resource[i].flags & IORESOURCE_BUSY)
+				return &pci_compat_driver;
+	}
+	return NULL;
+}
 
 struct bus_type pci_bus_type = {
 	name:	"pci",
