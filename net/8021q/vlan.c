@@ -229,11 +229,12 @@ static int unregister_vlan_dev(struct net_device *real_dev,
 			if (real_dev->features &
 			    (NETIF_F_HW_VLAN_RX | NETIF_F_HW_VLAN_FILTER)) {
 				real_dev->vlan_rx_kill_vid(real_dev, vlan_id);
-			} else {
-				br_write_lock(BR_NETPROTO_LOCK);
-				grp->vlan_devices[vlan_id] = NULL;
-				br_write_unlock(BR_NETPROTO_LOCK);
 			}
+
+			br_write_lock(BR_NETPROTO_LOCK);
+			grp->vlan_devices[vlan_id] = NULL;
+			br_write_unlock(BR_NETPROTO_LOCK);
+
 
 			/* Caller unregisters (and if necessary, puts)
 			 * VLAN device, but we get rid of the reference to
