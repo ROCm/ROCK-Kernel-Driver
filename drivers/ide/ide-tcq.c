@@ -501,8 +501,10 @@ static int ide_tcq_configure(ide_drive_t *drive)
 	 * bit 14 and 1 must be set in word 83 of the device id to indicate
 	 * support for dma queued protocol, and bit 15 must be cleared
 	 */
-	if ((drive->id->command_set_2 & tcq_bits) ^ tcq_mask)
+	if ((drive->id->command_set_2 & tcq_bits) ^ tcq_mask) {
+		printk(KERN_INFO "%s: TCQ not supported\n", drive->name);
 		return -EIO;
+	}
 
 	args = kmalloc(sizeof(*args), GFP_ATOMIC);
 	if (!args)
@@ -655,21 +657,24 @@ static int ide_tcq_check_blacklist(ide_drive_t *drive)
 
 int __ide_dma_queued_on(ide_drive_t *drive)
 {
+	ide_hwif_t *hwif = HWIF(drive);
+
+	if (drive->media != ide_disk)
+		return 1;
 	if (!drive->using_dma)
 		return 1;
-	if (HWIF(drive)->chipset == ide_pdc4030)
+	if (hwif->chipset == ide_pdc4030)
 		return 1;
 	if (ide_tcq_check_blacklist(drive)) {
 		printk(KERN_WARNING "%s: tcq forbidden by blacklist\n",
 					drive->name);
 		return 1;
 	}
-	if (drive->next != drive) {
+	if (hwif->drives[0].present && hwif->drives[1].present) {
 		printk(KERN_WARNING "%s: only one drive on a channel supported"
 					" for tcq\n", drive->name);
 		return 1;
 	}
-
 	if (ata_pending_commands(drive)) {
 		printk(KERN_WARNING "ide-tcq; can't toggle tcq feature on "
 					"busy drive\n");
@@ -681,6 +686,8 @@ int __ide_dma_queued_on(ide_drive_t *drive)
 
 int __ide_dma_queued_off(ide_drive_t *drive)
 {
+	if (drive->media != ide_disk)
+		return 1;
 	if (ata_pending_commands(drive)) {
 		printk("ide-tcq; can't toggle tcq feature on busy drive\n");
 		return 1;

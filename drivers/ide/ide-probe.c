@@ -634,64 +634,8 @@ static inline u8 probe_for_drive (ide_drive_t *drive)
 	return drive->present;
 }
 
-static int hwif_check_region(ide_hwif_t *hwif, unsigned long addr, int num)
-{
-	int err;
-	
-	if(hwif->mmio)
-		err = check_mem_region(addr, num);
-	else
-		err = check_region(addr, num);
-		
-	if(err)
-	{
-		printk("%s: %s resource 0x%lX-0x%lX not free.\n",
-			hwif->name, hwif->mmio?"MMIO":"I/O", addr, addr+num-1);
-	}
-	return err;
-}
-	
-
-/**
- *	hwif_check_regions	-	check resources for IDE
- *	@hwif: interface to use
- *
- *	Checks if all the needed resources for an interface are free
- *	providing the interface is PIO. Right now core IDE code does
- *	this work which is deeply wrong. MMIO leaves it to the controller
- *	driver, PIO will migrate this way over time
- */
- 
-static int hwif_check_regions (ide_hwif_t *hwif)
-{
-	u32 i		= 0;
-	int addr_errs	= 0;
-
-	if (hwif->mmio == 2)
-		return 0;
-	addr_errs  = hwif_check_region(hwif, hwif->io_ports[IDE_DATA_OFFSET], 1);
-	for (i = IDE_ERROR_OFFSET; i <= IDE_STATUS_OFFSET; i++)
-		addr_errs += hwif_check_region(hwif, hwif->io_ports[i], 1);
-	if (hwif->io_ports[IDE_CONTROL_OFFSET])
-		addr_errs += hwif_check_region(hwif, hwif->io_ports[IDE_CONTROL_OFFSET], 1);
-#if defined(CONFIG_AMIGA) || defined(CONFIG_MAC)
-	if (hwif->io_ports[IDE_IRQ_OFFSET])
-		addr_errs += hwif_check_region(hwif, hwif->io_ports[IDE_IRQ_OFFSET], 1);
-#endif /* (CONFIG_AMIGA) || (CONFIG_MAC) */
-	/* If any errors are return, we drop the hwif interface. */
-	hwif->straight8 = 0;
-	return(addr_errs);
-}
-
-//EXPORT_SYMBOL(hwif_check_regions);
-
-#define hwif_request_region(addr, num, name)	\
-	((hwif->mmio) ? request_mem_region((addr),(num),(name)) : request_region((addr),(num),(name)))
-
 static void hwif_register (ide_hwif_t *hwif)
 {
-	u32 i = 0;
-
 	/* register with global device tree */
 	strlcpy(hwif->gendev.bus_id,hwif->name,BUS_ID_SIZE);
 	snprintf(hwif->gendev.name,DEVICE_NAME_SIZE,"IDE Controller");
@@ -701,24 +645,6 @@ static void hwif_register (ide_hwif_t *hwif)
 	else
 		hwif->gendev.parent = NULL; /* Would like to do = &device_legacy */
 	device_register(&hwif->gendev);
-
-	if (hwif->mmio == 2)
-		return;
-	if (hwif->io_ports[IDE_CONTROL_OFFSET])
-		hwif_request_region(hwif->io_ports[IDE_CONTROL_OFFSET], 1, hwif->name);
-#if defined(CONFIG_AMIGA) || defined(CONFIG_MAC)
-	if (hwif->io_ports[IDE_IRQ_OFFSET])
-		hwif_request_region(hwif->io_ports[IDE_IRQ_OFFSET], 1, hwif->name);
-#endif /* (CONFIG_AMIGA) || (CONFIG_MAC) */
-	if (((unsigned long)hwif->io_ports[IDE_DATA_OFFSET] | 7) ==
-	    ((unsigned long)hwif->io_ports[IDE_STATUS_OFFSET])) {
-		hwif_request_region(hwif->io_ports[IDE_DATA_OFFSET], 8, hwif->name);
-		hwif->straight8 = 1;
-		return;
-	}
-
-	for (i = IDE_DATA_OFFSET; i <= IDE_STATUS_OFFSET; i++)
-		hwif_request_region(hwif->io_ports[i], 1, hwif->name);
 }
 
 //EXPORT_SYMBOL(hwif_register);
@@ -778,7 +704,7 @@ void probe_hwif (ide_hwif_t *hwif)
 #ifdef CONFIG_BLK_DEV_PDC4030
 	    (hwif->chipset != ide_pdc4030 || hwif->channel == 0) &&
 #endif /* CONFIG_BLK_DEV_PDC4030 */
-	    (hwif_check_regions(hwif))) {
+	    (ide_hwif_request_regions(hwif))) {
 		u16 msgout = 0;
 		for (unit = 0; unit < MAX_DRIVES; ++unit) {
 			ide_drive_t *drive = &hwif->drives[unit];
@@ -868,6 +794,11 @@ void probe_hwif (ide_hwif_t *hwif)
 	 */
 	if (irqd)
 		enable_irq(irqd);
+
+	if (!hwif->present) {
+		ide_hwif_release_regions(hwif);
+		return;
+	}
 
 	for (unit = 0; unit < MAX_DRIVES; ++unit) {
 		ide_drive_t *drive = &hwif->drives[unit];
@@ -983,7 +914,6 @@ static void ide_init_queue(ide_drive_t *drive)
 	 
 	blk_init_queue(q, do_ide_request, &ide_lock);
 	q->queuedata = HWGROUP(drive);
-	drive->queue_setup = 1;
 	blk_queue_segment_boundary(q, 0xffff);
 
 	if (!hwif->rqsize)
@@ -1005,10 +935,6 @@ static void ide_init_queue(ide_drive_t *drive)
 static void ide_init_drive(ide_drive_t *drive)
 {
 	ide_toggle_bounce(drive, 1);
-
-#ifdef CONFIG_BLK_DEV_IDE_TCQ_DEFAULT
-	HWIF(drive)->ide_dma_queued_on(drive);
-#endif
 }
 
 /*
