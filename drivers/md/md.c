@@ -1345,6 +1345,8 @@ static int do_md_run(mddev_t * mddev)
 	struct list_head *tmp;
 	mdk_rdev_t *rdev;
 	struct gendisk *disk;
+	char *major_name;
+
 
 	if (list_empty(&mddev->disks)) {
 		MD_BUG();
@@ -1454,15 +1456,16 @@ static int do_md_run(mddev_t * mddev)
 	if (!disk)
 		return -ENOMEM;
 	memset(disk, 0, sizeof(struct gendisk));
-	disk->major_name = kmalloc(6, GFP_KERNEL);
-	if (!disk->major_name) {
+	major_name = kmalloc(6, GFP_KERNEL);
+	if (!major_name) {
 		kfree(disk);
 		return -ENOMEM;
 	}
 	disk->major = MD_MAJOR;
 	disk->first_minor = mdidx(mddev);
 	disk->minor_shift = 0;
-	sprintf(disk->major_name, "md%d", mdidx(mddev));
+	sprintf(major_name, "md%d", mdidx(mddev));
+	disk->major_name = major_name;
 	disk->part = md_hd_struct + mdidx(mddev);
 	disk->nr_real = 1;
 	disk->fops = &md_fops;
