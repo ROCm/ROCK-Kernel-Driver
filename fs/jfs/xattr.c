@@ -738,11 +738,7 @@ static int can_set_xattr(struct inode *inode, const char *name,
 	    (!S_ISDIR(inode->i_mode) || inode->i_mode &S_ISVTX))
 		return -EPERM;
 
-#ifdef CONFIG_JFS_POSIX_ACL
-	return jfs_permission(inode, MAY_WRITE, NULL);
-#else
 	return permission(inode, MAY_WRITE, NULL);
-#endif
 }
 
 int __jfs_setxattr(struct inode *inode, const char *name, const void *value,
@@ -901,13 +897,9 @@ int jfs_setxattr(struct dentry *dentry, const char *name, const void *value,
 
 static int can_get_xattr(struct inode *inode, const char *name)
 {
-#ifdef CONFIG_JFS_POSIX_ACL
 	if(strncmp(name, XATTR_SYSTEM_PREFIX, XATTR_SYSTEM_PREFIX_LEN) == 0)
 		return 0;
-	return jfs_permission(inode, MAY_READ, NULL);
-#else
 	return permission(inode, MAY_READ, NULL);
-#endif
 }
 
 ssize_t __jfs_getxattr(struct inode *inode, const char *name, void *data,
