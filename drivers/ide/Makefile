@@ -10,7 +10,8 @@
 
 O_TARGET := idedriver.o
 
-export-objs	:= ide-taskfile.o ide.o ide-features.o ide-probe.o quirks.o pcidma.o tcq.o ataraid.o
+export-objs	:= ide-taskfile.o ide.o ide-features.o ide-probe.o quirks.o pcidma.o tcq.o \
+		   atapi.o ataraid.o
 
 obj-y		:=
 obj-m		:=
@@ -20,6 +21,7 @@ obj-$(CONFIG_BLK_DEV_HD)	+= hd.o
 obj-$(CONFIG_BLK_DEV_IDE)       += ide-mod.o
 obj-$(CONFIG_BLK_DEV_IDECS)     += ide-cs.o
 obj-$(CONFIG_BLK_DEV_IDEDISK)   += ide-disk.o
+obj-$(CONFIG_ATAPI)		+= atapi.o
 obj-$(CONFIG_BLK_DEV_IDECD)     += ide-cd.o
 obj-$(CONFIG_BLK_DEV_IDETAPE)   += ide-tape.o
 obj-$(CONFIG_BLK_DEV_IDEFLOPPY) += ide-floppy.o

@@ -130,6 +130,13 @@ if [ "$CONFIG_BLK_DEV_IDE" != "n" ]; then
         "$CONFIG_BLK_DEV_IDEDMA_ICS" = "y" ]; then
       bool '  IGNORE word93 Validation BITS' CONFIG_IDEDMA_IVB
    fi
+   
+   if [ "$CONFIG_BLK_DEV_IDECD" != "n" -o \
+        "$CONFIG_BLK_DEV_IDETAPE" != "n" -o \
+        "$CONFIG_BLK_DEV_IDEFLOPPY" != "n" -o \
+        "$CONFIG_BLK_DEV_IDESCSI" != "n" ]; then
+	define_bool  CONFIG_ATAPI y
+   fi
 else
    bool 'Old hard disk (MFM/RLL/IDE) driver' CONFIG_BLK_DEV_HD_ONLY
    define_bool CONFIG_BLK_DEV_HD $CONFIG_BLK_DEV_HD_ONLY
