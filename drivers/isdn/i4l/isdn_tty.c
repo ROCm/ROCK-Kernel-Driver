@@ -626,7 +626,6 @@ isdn_tty_dial(char *n, modem_info * info, atemu * m)
 	int usg = ISDN_USAGE_MODEM;
 	int si = 7;
 	int l2 = m->mdmreg[REG_L2PROT];
-	isdn_ctrl cmd;
 	ulong flags;
 	int i;
 	int j;
@@ -656,36 +655,29 @@ isdn_tty_dial(char *n, modem_info * info, atemu * m)
 		restore_flags(flags);
 		isdn_tty_modem_result(RESULT_NO_DIALTONE, info);
 	} else {
+		struct dial_info dial = {
+			.l2_proto = l2,
+			.l3_proto = m->mdmreg[REG_L3PROT],
+			.si1      = si,
+			.si2      = m->mdmreg[REG_SI2],
+			.msn      = m->msn,
+			.phone    = n,
+		};
 		info->isdn_slot = i;
 		isdn_slot_set_m_idx(i, info->line);
 		info->last_dir = 1;
-		strcpy(info->last_num, n);
-		isdn_slot_set_usage(i, isdn_slot_usage(i) | ISDN_USAGE_OUTGOING);
-		restore_flags(flags);
-		isdn_slot_command(info->isdn_slot, ISDN_CMD_CLREAZ, &cmd);
-		strcpy(cmd.parm.num, isdn_slot_map_eaz2msn(info->isdn_slot, m->msn));
-		isdn_slot_command(info->isdn_slot, ISDN_CMD_SETEAZ, &cmd);
 		info->last_l2 = l2;
-		cmd.arg = l2 << 8;
-		isdn_slot_command(info->isdn_slot, ISDN_CMD_SETL2, &cmd);
-		cmd.arg = m->mdmreg[REG_L3PROT] << 8;
+		strcpy(info->last_num, n);
+		restore_flags(flags);
 #ifdef CONFIG_ISDN_TTY_FAX
 		if (l2 == ISDN_PROTO_L2_FAX) {
-			cmd.parm.fax = info->fax;
+			dial.fax = info->fax;
 			info->fax->direction = ISDN_TTY_FAX_CONN_OUT;
 		}
 #endif
-		isdn_slot_command(info->isdn_slot, ISDN_CMD_SETL3, &cmd);
-		sprintf(cmd.parm.setup.phone, "%s", n);
-		sprintf(cmd.parm.setup.eazmsn, "%s",
-			isdn_slot_map_eaz2msn(info->isdn_slot, m->msn));
-		cmd.parm.setup.si1 = si;
-		cmd.parm.setup.si2 = m->mdmreg[REG_SI2];
 		info->dialing = 1;
 		info->emu.carrierwait = 0;
-		strcpy(isdn_slot_num(i), n);
-		isdn_info_update();
-		isdn_slot_command(info->isdn_slot, ISDN_CMD_DIAL, &cmd);
+		isdn_slot_dial(info->isdn_slot, &dial);
 		isdn_timer_ctrl(ISDN_TIMER_CARRIER, 1);
 	}
 }
@@ -852,9 +844,6 @@ isdn_tty_resume(char *id, modem_info * info, atemu * m)
 		info->last_dir = 1;
 //		strcpy(info->last_num, n);
 		restore_flags(flags);
-		isdn_slot_command(info->isdn_slot, ISDN_CMD_CLREAZ, &cmd);
-		strcpy(cmd.parm.num, isdn_slot_map_eaz2msn(info->isdn_slot, m->msn));
-		isdn_slot_command(info->isdn_slot, ISDN_CMD_SETEAZ, &cmd);
 		info->last_l2 = l2;
 		cmd.arg = l2 << 8;
 		isdn_slot_command(info->isdn_slot, ISDN_CMD_SETL2, &cmd);
@@ -930,9 +919,6 @@ isdn_tty_send_msg(modem_info * info, atemu * m, char *msg)
 		isdn_slot_set_usage(i, isdn_slot_usage(i) | ISDN_USAGE_OUTGOING);
 		info->last_dir = 1;
 		restore_flags(flags);
-		isdn_slot_command(info->isdn_slot, ISDN_CMD_CLREAZ, &cmd);
-		strcpy(cmd.parm.num, isdn_slot_map_eaz2msn(info->isdn_slot, m->msn));
-		isdn_slot_command(info->isdn_slot, ISDN_CMD_SETEAZ, &cmd);
 		info->last_l2 = l2;
 		cmd.arg = l2 << 8;
 		isdn_slot_command(info->isdn_slot, ISDN_CMD_SETL2, &cmd);

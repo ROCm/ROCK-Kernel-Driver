@@ -529,7 +529,6 @@ static void do_pre_smp_initcalls(void)
 	extern int migration_init(void);
 	extern int spawn_ksoftirqd(void);
 
-	migration_init();
 	spawn_ksoftirqd();
 }
 

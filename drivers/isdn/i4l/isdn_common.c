@@ -19,6 +19,7 @@
 #include <linux/vmalloc.h>
 #include <linux/isdn.h>
 #include <linux/smp_lock.h>
+#include <linux/ctype.h>
 #include "isdn_common.h"
 #include "isdn_tty.h"
 #include "isdn_net.h"
@@ -2164,6 +2165,53 @@ isdn_slot_command(int sl, int cmd, isdn_ctrl *ctrl)
 	ctrl->arg &= 0xff; ctrl->arg |= isdn_slot_channel(sl);
 	
 	return isdn_command(ctrl);
+}
+
+int
+isdn_slot_dial(int sl, struct dial_info *dial)
+{
+	isdn_ctrl cmd;
+	int retval;
+	char *msn = isdn_slot_map_eaz2msn(sl, dial->msn);
+
+	/* check for DOV */
+	if (dial->si1 == 7 && tolower(dial->phone[0]) == 'v') { /* DOV call */
+		dial->si1 = 1;
+		dial->phone++; /* skip v/V */
+	}
+
+	strcpy(isdn_slot_num(sl), dial->phone);
+	isdn_slot_set_usage(sl, isdn_slot_usage(sl) | ISDN_USAGE_OUTGOING);
+
+	retval = isdn_slot_command(sl, ISDN_CMD_CLREAZ, &cmd);
+	if (retval)
+		return retval;
+
+	strcpy(cmd.parm.num, msn);
+	retval = isdn_slot_command(sl, ISDN_CMD_SETEAZ, &cmd);
+
+	cmd.arg = dial->l2_proto << 8;
+	cmd.parm.fax = dial->fax;
+	retval = isdn_slot_command(sl, ISDN_CMD_SETL2, &cmd);
+	if (retval)
+		return retval;
+
+	cmd.arg = dial->l3_proto << 8;
+	retval = isdn_slot_command(sl, ISDN_CMD_SETL3, &cmd);
+	if (retval)
+		return retval;
+
+	cmd.parm.setup.si1 = dial->si1;
+	cmd.parm.setup.si2 = dial->si2;
+	strcpy(cmd.parm.setup.eazmsn, msn);
+	strcpy(cmd.parm.setup.phone, dial->phone);
+
+	printk(KERN_INFO "ISDN: slot %d: Dialing %s -> %s (SI %d/%d) (B %d/%d)\n",
+	       sl, cmd.parm.setup.eazmsn, cmd.parm.setup.phone,
+	       cmd.parm.setup.si1, cmd.parm.setup.si2,
+	       dial->l2_proto, dial->l3_proto);
+
+	return isdn_slot_command(sl, ISDN_CMD_DIAL, &cmd);
 }
 
 void

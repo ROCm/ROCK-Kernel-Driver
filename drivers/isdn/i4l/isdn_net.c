@@ -556,6 +556,124 @@ isdn_net_stat_callback(int idx, isdn_ctrl *c)
 	return 0;
 }
 
+/* Initiate dialout. Set phone-number-pointer to first number
+ * of interface.
+ */
+static int
+init_dialout(isdn_net_local *lp)
+{
+	unsigned long flags;
+
+	save_flags(flags);
+	cli();
+	lp->dial = lp->phone[1];
+	restore_flags(flags);
+
+	if (!lp->dial) {
+		printk(KERN_WARNING "%s: phone number deleted?\n",
+		       lp->name);
+		isdn_net_hangup(&lp->netdev->dev);
+		return 0;
+	}
+	if (lp->dialtimeout > 0 &&
+	    (lp->dialstarted == 0 || 
+	     time_after(jiffies, lp->dialstarted + lp->dialtimeout + lp->dialwait))) {
+		lp->dialstarted = jiffies;
+		lp->dialwait_timer = 0;
+	}
+	lp->dialstate = 2;
+	return 1;
+}
+
+/* Setup interface, dial current phone-number, switch to next number.
+ * If list of phone-numbers is exhausted, increment
+ * retry-counter.
+ */
+static int
+do_dialout(isdn_net_local *lp)
+{
+	unsigned long flags;
+
+	if(dev->global_flags & ISDN_GLOBAL_STOPPED || (ISDN_NET_DIALMODE(*lp) == ISDN_NET_DM_OFF)) {
+		char *s;
+		if (dev->global_flags & ISDN_GLOBAL_STOPPED)
+			s = "dial suppressed: isdn system stopped";
+		else
+			s = "dial suppressed: dialmode `off'";
+		isdn_net_unreachable(&lp->netdev->dev, 0, s);
+		isdn_net_hangup(&lp->netdev->dev);
+		return 0;
+	}
+
+	save_flags(flags);
+	cli();
+	if (!lp->dial) {
+		restore_flags(flags);
+		printk(KERN_WARNING "%s: phone number deleted?\n",
+		       lp->name);
+		isdn_net_hangup(&lp->netdev->dev);
+		return 0;
+	}
+	if (!strncmp(lp->dial->num, "LEASED", strlen("LEASED"))) {
+		restore_flags(flags);
+		lp->dialstate = 4;
+		printk(KERN_INFO "%s: Open leased line ...\n", lp->name);
+	} else {
+		struct dial_info dial = {
+			.l2_proto = lp->l2_proto,
+			.l3_proto = lp->l3_proto,
+			.si1      = 7,
+			.si2      = 0,
+			.msn      = lp->msn,
+			.phone    = lp->dial->num,
+		};
+		if(lp->dialtimeout > 0) {
+			if (time_after(jiffies, lp->dialstarted + lp->dialtimeout)) {
+				restore_flags(flags);
+				lp->dialwait_timer = jiffies + lp->dialwait;
+				lp->dialstarted = 0;
+				isdn_net_unreachable(&lp->netdev->dev, 0, "dial: timed out");
+				isdn_net_hangup(&lp->netdev->dev);
+				return 0;
+			}
+		}
+		/*
+		 * Switch to next number or back to start if at end of list.
+		 */
+		if (!(lp->dial = (isdn_net_phone *) lp->dial->next)) {
+			lp->dial = lp->phone[1];
+			lp->dialretry++;
+			
+			if (lp->dialretry > lp->dialmax) {
+				restore_flags(flags);
+				if (lp->dialtimeout == 0) {
+					lp->dialwait_timer = jiffies + lp->dialwait;
+					lp->dialstarted = 0;
+					isdn_net_unreachable(&lp->netdev->dev, 0, "dial: tried all numbers dialmax times");
+				}
+				isdn_net_hangup(&lp->netdev->dev);
+				return 0;
+			}
+		}
+		restore_flags(flags);
+		lp->dtimer = 0;
+		isdn_slot_dial(lp->isdn_slot, &dial);
+	}
+	lp->huptimer = 0;
+	lp->outgoing = 1;
+	if (lp->chargeint) {
+		lp->hupflags |= ISDN_HAVECHARGE;
+		lp->hupflags &= ~ISDN_WAITCHARGE;
+	} else {
+		lp->hupflags |= ISDN_WAITCHARGE;
+		lp->hupflags &= ~ISDN_HAVECHARGE;
+	}
+	lp->dialstate =
+		(lp->cbdelay &&
+		 (lp->flags & ISDN_NET_CBOUT)) ? 12 : 4;
+	return 1;
+}
+
 /*
  * Perform dialout for net-interfaces and timeout-handling for
  * D-Channel-up and B-Channel-up Messages.
@@ -571,11 +689,9 @@ isdn_net_dial(void)
 {
 	isdn_net_dev *p = dev->netdev;
 	int anymore = 0;
-	unsigned long flags;
 	isdn_ctrl cmd;
-        u_char *phone_number;
 
-	while (p) {
+	for (p = dev->netdev; p; p = p->next) {
 		isdn_net_local *lp = p->local;
 
 #ifdef ISDN_DEBUG_NET_DIAL
@@ -583,234 +699,106 @@ isdn_net_dial(void)
 			printk(KERN_DEBUG "%s: dialstate=%d\n", lp->name, lp->dialstate);
 #endif
 		switch (lp->dialstate) {
-			case 0:
-				/* Nothing to do for this interface */
-				break;
-			case 1:
-				/* Initiate dialout. Set phone-number-pointer to first number
-				 * of interface.
-				 */
-				save_flags(flags);
-				cli();
-				lp->dial = lp->phone[1];
-				restore_flags(flags);
-				if (!lp->dial) {
-					printk(KERN_WARNING "%s: phone number deleted?\n",
-					       lp->name);
-					isdn_net_hangup(&p->dev);
-					break;
-				}
-				anymore = 1;
-
-				if(lp->dialtimeout > 0)
-					if(lp->dialstarted == 0 || time_after(jiffies, lp->dialstarted + lp->dialtimeout + lp->dialwait)) {
-						lp->dialstarted = jiffies;
-						lp->dialwait_timer = 0;
-					}
-
-				lp->dialstate++;
-				/* Fall through */
-			case 2:
-				/* Prepare dialing. Clear EAZ, then set EAZ. */
-				isdn_slot_command(lp->isdn_slot, ISDN_CMD_CLREAZ, &cmd);
-				sprintf(cmd.parm.num, "%s", isdn_slot_map_eaz2msn(lp->isdn_slot, lp->msn));
-				isdn_slot_command(lp->isdn_slot, ISDN_CMD_SETEAZ, &cmd);
-				lp->dialretry = 0;
-				anymore = 1;
-				lp->dialstate++;
-				/* Fall through */
-			case 3:
-				/* Setup interface, dial current phone-number, switch to next number.
-				 * If list of phone-numbers is exhausted, increment
-				 * retry-counter.
-				 */
-				if(dev->global_flags & ISDN_GLOBAL_STOPPED || (ISDN_NET_DIALMODE(*lp) == ISDN_NET_DM_OFF)) {
-					char *s;
-					if (dev->global_flags & ISDN_GLOBAL_STOPPED)
-						s = "dial suppressed: isdn system stopped";
-					else
-						s = "dial suppressed: dialmode `off'";
-					isdn_net_unreachable(&p->dev, 0, s);
-					isdn_net_hangup(&p->dev);
-					break;
-				}
-				cmd.arg = lp->l2_proto << 8;
-				isdn_slot_command(lp->isdn_slot, ISDN_CMD_SETL2, &cmd);
-				cmd.arg = lp->l3_proto << 8;
-				isdn_slot_command(lp->isdn_slot, ISDN_CMD_SETL3, &cmd);
-				save_flags(flags);
-				cli();
-				if (!lp->dial) {
-					restore_flags(flags);
-					printk(KERN_WARNING "%s: phone number deleted?\n",
-					       lp->name);
-					isdn_net_hangup(&p->dev);
-					break;
-				}
-				if (!strncmp(lp->dial->num, "LEASED", strlen("LEASED"))) {
-					restore_flags(flags);
-					lp->dialstate = 4;
-					printk(KERN_INFO "%s: Open leased line ...\n", lp->name);
-				} else {
-					if(lp->dialtimeout > 0)
-						if (time_after(jiffies, lp->dialstarted + lp->dialtimeout)) {
-							restore_flags(flags);
-							lp->dialwait_timer = jiffies + lp->dialwait;
-							lp->dialstarted = 0;
-							isdn_net_unreachable(&p->dev, 0, "dial: timed out");
-							isdn_net_hangup(&p->dev);
-							break;
-						}
-
-					cmd.parm.setup.si2 = 0;
-
-                                        /* check for DOV */
-                                        phone_number = lp->dial->num;
-                                        if ((*phone_number == 'v') ||
-					    (*phone_number == 'V')) { /* DOV call */
-                                                cmd.parm.setup.si1 = 1;
-                                        } else { /* DATA call */
-                                                cmd.parm.setup.si1 = 7;
-					}
-
-					strcpy(cmd.parm.setup.phone, phone_number);
-					/*
-					 * Switch to next number or back to start if at end of list.
-					 */
-					if (!(lp->dial = (isdn_net_phone *) lp->dial->next)) {
-						lp->dial = lp->phone[1];
-						lp->dialretry++;
-
-						if (lp->dialretry > lp->dialmax) {
-							restore_flags(flags);
-							if (lp->dialtimeout == 0) {
-								lp->dialwait_timer = jiffies + lp->dialwait;
-								lp->dialstarted = 0;
-								isdn_net_unreachable(&p->dev, 0, "dial: tried all numbers dialmax times");
-							}
-							isdn_net_hangup(&p->dev);
-							break;
-						}
-					}
-					restore_flags(flags);
-					sprintf(cmd.parm.setup.eazmsn, "%s",
-						isdn_slot_map_eaz2msn(lp->isdn_slot, lp->msn));
-					if (lp->isdn_slot >= 0) {
-						strcpy(isdn_slot_num(lp->isdn_slot), cmd.parm.setup.phone);
-						isdn_slot_set_usage(lp->isdn_slot, isdn_slot_usage(lp->isdn_slot) | ISDN_USAGE_OUTGOING);
-					}
-					printk(KERN_INFO "%s: dialing %d %s... %s\n", lp->name,
-					       lp->dialretry, cmd.parm.setup.phone,
-					       (cmd.parm.setup.si1 == 1) ? "DOV" : "");
-					lp->dtimer = 0;
-#ifdef ISDN_DEBUG_NET_DIAL
-					printk(KERN_DEBUG "dial: d=%d c=%d\n", lp->isdn_device,
-					       lp->isdn_channel);
-#endif
-					isdn_slot_command(lp->isdn_slot, ISDN_CMD_DIAL, &cmd);
-				}
-				lp->huptimer = 0;
-				lp->outgoing = 1;
-				if (lp->chargeint) {
-					lp->hupflags |= ISDN_HAVECHARGE;
-					lp->hupflags &= ~ISDN_WAITCHARGE;
-				} else {
-					lp->hupflags |= ISDN_WAITCHARGE;
-					lp->hupflags &= ~ISDN_HAVECHARGE;
-				}
-				anymore = 1;
-				lp->dialstate =
-				    (lp->cbdelay &&
-				     (lp->flags & ISDN_NET_CBOUT)) ? 12 : 4;
-				break;
-			case 4:
-				/* Wait for D-Channel-connect.
-				 * If timeout, switch back to state 3.
-				 * Dialmax-handling moved to state 3.
-				 */
-				if (lp->dtimer++ > ISDN_TIMER_DTIMEOUT10)
+		case 0:
+			/* Nothing to do for this interface */
+			break;
+		case 1:
+			anymore = init_dialout(lp);
+			/* Fall through */
+		case 2:
+			lp->dialretry = 0;
+			anymore = 1;
+			lp->dialstate++;
+			/* Fall through */
+		case 3:
+			anymore = do_dialout(lp);
+			break;
+		case 4:
+			/* Wait for D-Channel-connect.
+			 * If timeout, switch back to state 3.
+			 * Dialmax-handling moved to state 3.
+			 */
+			if (lp->dtimer++ > ISDN_TIMER_DTIMEOUT10)
 					lp->dialstate = 3;
+			anymore = 1;
+			break;
+		case 5:
+			/* Got D-Channel-Connect, send B-Channel-request */
+			anymore = 1;
+			lp->dtimer = 0;
+			lp->dialstate++;
+			isdn_slot_command(lp->isdn_slot, ISDN_CMD_ACCEPTB, &cmd);
+			break;
+		case 6:
+			/* Wait for B- or D-Channel-connect. If timeout,
+			 * switch back to state 3.
+			 */
+#ifdef ISDN_DEBUG_NET_DIAL
+			printk(KERN_DEBUG "dialtimer2: %d\n", lp->dtimer);
+#endif
+			if (lp->dtimer++ > ISDN_TIMER_DTIMEOUT10)
+				lp->dialstate = 3;
+			anymore = 1;
+			break;
+		case 7:
+			/* Got incoming Call, setup L2 and L3 protocols,
+			 * then wait for D-Channel-connect
+			 */
+#ifdef ISDN_DEBUG_NET_DIAL
+			printk(KERN_DEBUG "dialtimer4: %d\n", lp->dtimer);
+#endif
+			cmd.arg = lp->l2_proto << 8;
+			isdn_slot_command(lp->isdn_slot, ISDN_CMD_SETL2, &cmd);
+			cmd.arg = lp->l3_proto << 8;
+			isdn_slot_command(lp->isdn_slot, ISDN_CMD_SETL3, &cmd);
+			if (lp->dtimer++ > ISDN_TIMER_DTIMEOUT15)
+				isdn_net_hangup(&p->dev);
+			else {
 				anymore = 1;
-				break;
-			case 5:
-				/* Got D-Channel-Connect, send B-Channel-request */
-				anymore = 1;
-				lp->dtimer = 0;
 				lp->dialstate++;
-				isdn_slot_command(lp->isdn_slot, ISDN_CMD_ACCEPTB, &cmd);
-				break;
-			case 6:
-				/* Wait for B- or D-Channel-connect. If timeout,
-				 * switch back to state 3.
-				 */
+			}
+			break;
+		case 9:
+			/* Got incoming D-Channel-Connect, send B-Channel-request */
+			isdn_slot_command(lp->isdn_slot, ISDN_CMD_ACCEPTB, &cmd);
+			anymore = 1;
+			lp->dtimer = 0;
+			lp->dialstate++;
+			break;
+		case 8:
+		case 10:
+			/*  Wait for B- or D-channel-connect */
 #ifdef ISDN_DEBUG_NET_DIAL
-				printk(KERN_DEBUG "dialtimer2: %d\n", lp->dtimer);
+			printk(KERN_DEBUG "dialtimer4: %d\n", lp->dtimer);
 #endif
-				if (lp->dtimer++ > ISDN_TIMER_DTIMEOUT10)
-					lp->dialstate = 3;
+			if (lp->dtimer++ > ISDN_TIMER_DTIMEOUT10)
+				isdn_net_hangup(&p->dev);
+			else
 				anymore = 1;
-				break;
-			case 7:
-				/* Got incoming Call, setup L2 and L3 protocols,
-				 * then wait for D-Channel-connect
-				 */
-#ifdef ISDN_DEBUG_NET_DIAL
-				printk(KERN_DEBUG "dialtimer4: %d\n", lp->dtimer);
-#endif
-				cmd.arg = lp->l2_proto << 8;
-				isdn_slot_command(lp->isdn_slot, ISDN_CMD_SETL2, &cmd);
-				cmd.arg = lp->l3_proto << 8;
-				isdn_slot_command(lp->isdn_slot, ISDN_CMD_SETL3, &cmd);
-				if (lp->dtimer++ > ISDN_TIMER_DTIMEOUT15)
-					isdn_net_hangup(&p->dev);
-				else {
-					anymore = 1;
-					lp->dialstate++;
-				}
-				break;
-			case 9:
-				/* Got incoming D-Channel-Connect, send B-Channel-request */
-				isdn_slot_command(lp->isdn_slot, ISDN_CMD_ACCEPTB, &cmd);
-				anymore = 1;
+			break;
+		case 11:
+			/* Callback Delay */
+			if (lp->dtimer++ > lp->cbdelay)
+				lp->dialstate = 1;
+			anymore = 1;
+			break;
+		case 12:
+			/* Remote does callback. Hangup after cbdelay, then wait for incoming
+			 * call (in state 4).
+			 */
+			if (lp->dtimer++ > lp->cbdelay) {
+				printk(KERN_INFO "%s: hangup waiting for callback ...\n", lp->name);
 				lp->dtimer = 0;
-				lp->dialstate++;
-				break;
-			case 8:
-			case 10:
-				/*  Wait for B- or D-channel-connect */
-#ifdef ISDN_DEBUG_NET_DIAL
-				printk(KERN_DEBUG "dialtimer4: %d\n", lp->dtimer);
-#endif
-				if (lp->dtimer++ > ISDN_TIMER_DTIMEOUT10)
-					isdn_net_hangup(&p->dev);
-				else
-					anymore = 1;
-				break;
-			case 11:
-				/* Callback Delay */
-				if (lp->dtimer++ > lp->cbdelay)
-					lp->dialstate = 1;
-				anymore = 1;
-				break;
-			case 12:
-				/* Remote does callback. Hangup after cbdelay, then wait for incoming
-				 * call (in state 4).
-				 */
-				if (lp->dtimer++ > lp->cbdelay)
-				{
-					printk(KERN_INFO "%s: hangup waiting for callback ...\n", lp->name);
-					lp->dtimer = 0;
-					lp->dialstate = 4;
-					isdn_slot_command(lp->isdn_slot, ISDN_CMD_HANGUP, &cmd);
-					isdn_slot_all_eaz(lp->isdn_slot);
-				}
-				anymore = 1;
-				break;
-			default:
-				printk(KERN_WARNING "isdn_net: Illegal dialstate %d for device %s\n",
-				       lp->dialstate, lp->name);
+				lp->dialstate = 4;
+				isdn_slot_command(lp->isdn_slot, ISDN_CMD_HANGUP, &cmd);
+				isdn_slot_all_eaz(lp->isdn_slot);
+			}
+			anymore = 1;
+			break;
+		default:
+			printk(KERN_WARNING "isdn_net: Illegal dialstate %d for device %s\n",
+			       lp->dialstate, lp->name);
 		}
-		p = (isdn_net_dev *) p->next;
 	}
 	isdn_timer_ctrl(ISDN_TIMER_NETDIAL, anymore);
 }

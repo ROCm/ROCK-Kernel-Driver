@@ -42,10 +42,21 @@ extern int isdn_add_channels(driver *, int, int, int);
 extern void isdn_dumppkt(char *, u_char *, int, int);
 #endif
 
+struct dial_info {
+	int            l2_proto;
+	int            l3_proto;
+	struct T30_s  *fax;
+	unsigned char  si1;
+	unsigned char  si2;
+	unsigned char *msn;
+	unsigned char *phone;
+};
+
 extern int   isdn_get_free_slot(int, int, int, int, int, char *);
 extern void  isdn_slot_free(int slot, int usage);
 extern void  isdn_slot_all_eaz(int slot);
 extern int   isdn_slot_command(int slot, int cmd, isdn_ctrl *);
+extern int   isdn_slot_dial(int slot, struct dial_info *dial);
 extern char *isdn_slot_map_eaz2msn(int slot, char *msn);
 extern int   isdn_slot_write(int slot, struct sk_buff *);
 extern int   isdn_slot_readbchan(int slot, u_char *, u_char *, int);
