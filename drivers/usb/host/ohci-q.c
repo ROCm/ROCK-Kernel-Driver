@@ -206,8 +206,8 @@ static int ed_schedule (struct ohci_hcd *ohci, struct ed *ed)
 	default:
 		branch = balance (ohci, ed->interval, ed->load);
 		if (branch < 0) {
-			dbg ("%s: ERR %d, interval %d msecs, load %d",
-				ohci->hcd.self.bus_name,
+			dev_dbg (*ohci->hcd.controller,
+				"ERR %d, interval %d msecs, load %d\n",
 				branch, ed->interval, ed->load);
 			// FIXME if there are TDs queued, fail them!
 			return branch;
@@ -786,7 +786,8 @@ ed_halted (struct ohci_hcd *ohci, struct td *td, int cc, struct td *rev)
 	}
 
 	/* help for troubleshooting: */
-	dbg ("urb %p usb-%s-%s ep-%d-%s cc %d --> status %d",
+	dev_dbg (urb->dev->dev,
+		"urb %p usb-%s-%s ep-%d-%s cc %d --> status %d\n",
 		urb,
 		urb->dev->bus->bus_name, urb->dev->devpath,
 		usb_pipeendpoint (urb->pipe),
