@@ -226,7 +226,6 @@ static char *Copy_buffer;
 static void mfm_seek(void);
 static void mfm_rerequest(void);
 static void mfm_request(void);
-static int mfm_reread_partitions(kdev_t dev);
 static void mfm_specify (void);
 static void issue_request(int dev, unsigned int block, unsigned int nsect,
 			  struct request *req);
@@ -1165,40 +1164,30 @@ static int mfm_ioctl(struct inode *inode, struct file *file, u_int cmd, u_long a
 {
 	struct hd_geometry *geo = (struct hd_geometry *) arg;
 	kdev_t dev;
-	int device, major, minor, err;
+	int device, minor, err;
 
 	if (!inode || !(dev = inode->i_rdev))
 		return -EINVAL;
 
-	major = major(dev);
 	minor = minor(dev);
 
 	device = DEVICE_NR(minor(inode->i_rdev)), err;
 	if (device >= mfm_drives)
 		return -EINVAL;
 
-	switch (cmd) {
-	case HDIO_GETGEO:
-		if (!arg)
-			return -EINVAL;
-		if (put_user (mfm_info[device].heads, &geo->heads))
-			return -EFAULT;
-		if (put_user (mfm_info[device].sectors, &geo->sectors))
-			return -EFAULT;
-		if (put_user (mfm_info[device].cylinders, &geo->cylinders))
-			return -EFAULT;
-		if (put_user (mfm[minor].start_sect, &geo->start))
-			return -EFAULT;
-		return 0;
-
-	case BLKRRPART:
-		if (!capable(CAP_SYS_ADMIN))
-			return -EACCES;
-		return mfm_reread_partitions(dev);
-
-	default:
+	if (cmd != HDIO_GETGEO)
 		return -EINVAL;
-	}
+	if (!arg)
+		return -EINVAL;
+	if (put_user (mfm_info[device].heads, &geo->heads))
+		return -EFAULT;
+	if (put_user (mfm_info[device].sectors, &geo->sectors))
+		return -EFAULT;
+	if (put_user (mfm_info[device].cylinders, &geo->cylinders))
+		return -EFAULT;
+	if (put_user (mfm[minor].start_sect, &geo->start))
+		return -EFAULT;
+	return 0;
 }
 
 static int mfm_open(struct inode *inode, struct file *file)
@@ -1257,14 +1246,14 @@ static struct gendisk mfm_gendisk[2] = {
 {
 	.major		= MAJOR_NR,
 	.first_minor	= 0,
-	.major_name	= "mfm",
+	.major_name	= "mfma",
 	.minor_shift	= 6,
 	.part		= mfm,
 },
 {
 	.major		= MAJOR_NR,
 	.first_minor	= 64,
-	.major_name	= "mfm",
+	.major_name	= "mfmb",
 	.minor_shift	= 6,
 	.part		= mfm + 64,
 };
@@ -1393,25 +1382,6 @@ int mfm_init (void)
 	lastspecifieddrive = -1;
 
 	mfm_geninit();
-	return 0;
-}
-
-/*
- * This routine is called to flush all partitions and partition tables
- * for a changed MFM disk, and then re-read the new partition table.
- */
-static int mfm_reread_partitions(kdev_t dev)
-{
-	unsigned int unit = DEVICE_NR(minor(dev));
-	kdev_t device = mk_kdev(MAJOR_NR, unit << mfm_gendisk.minor_shift);
-	int err = dev_lock_part(device);
-	if (err)
-		return err;
-	wipe_partitions(device);
-	/* Divide by 2, since sectors are 2 times smaller than usual ;-) */
-	grok_partitions(device, mfm_info[unit].heads *
-		    mfm_info[unit].cylinders * mfm_info[unit].sectors / 2);
-	dev_unlock_part(device);
 	return 0;
 }
 
