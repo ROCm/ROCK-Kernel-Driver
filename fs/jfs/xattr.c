@@ -640,7 +640,7 @@ static int ea_put(struct inode *inode, struct ea_buffer *ea_buf, int new_size)
 }
 
 static int can_set_xattr(struct inode *inode, const char *name,
-			 const void *value, size_t value_len)
+			 void *value, size_t value_len)
 {
 	if (IS_RDONLY(inode))
 		return -EROFS;
@@ -650,7 +650,7 @@ static int can_set_xattr(struct inode *inode, const char *name,
 
 	if((strncmp(name, XATTR_USER_PREFIX, XATTR_USER_PREFIX_LEN) != 0) &&
 	   (strncmp(name, XATTR_OS2_PREFIX, XATTR_OS2_PREFIX_LEN) != 0))
-		return -ENOTSUP;
+		return -EOPNOTSUPP;
 
 	if (!S_ISREG(inode->i_mode) &&
 	    (!S_ISDIR(inode->i_mode) || inode->i_mode &S_ISVTX))
@@ -659,7 +659,7 @@ static int can_set_xattr(struct inode *inode, const char *name,
 	return permission(inode, MAY_WRITE);
 }
 
-int __jfs_setxattr(struct inode *inode, const char *name, const void *value,
+int __jfs_setxattr(struct inode *inode, const char *name, void *value,
 		   size_t value_len, int flags)
 {
 	struct jfs_ea_list *ealist;
@@ -798,7 +798,7 @@ int __jfs_setxattr(struct inode *inode, const char *name, const void *value,
 	return rc;
 }
 
-int jfs_setxattr(struct dentry *dentry, const char *name, const void *value,
+int jfs_setxattr(struct dentry *dentry, const char *name, void *value,
 		 size_t value_len, int flags)
 {
 	if (value == NULL) {	/* empty EA, do not remove */
