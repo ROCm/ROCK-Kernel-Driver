@@ -274,12 +274,12 @@ checkSMB(struct smb_hdr *smb, __u16 mid, int length)
 	cFYI(0,
 	     ("Entering checkSMB with Length: %x, smb_buf_length: %x ",
 	      length, ntohl(smb->smb_buf_length)));
-	if ((length < 2 + sizeof (struct smb_hdr))
+	if (((unsigned int)length < 2 + sizeof (struct smb_hdr))
 	    || (4 + ntohl(smb->smb_buf_length) >
 		CIFS_MAX_MSGSIZE + MAX_CIFS_HDR_SIZE)) {
-		if (length < 2 + sizeof (struct smb_hdr)) {
+		if ((unsigned int)length < 2 + sizeof (struct smb_hdr)) {
 			cERROR(1, ("Length less than 2 + sizeof smb_hdr "));
-			if ((length >= sizeof (struct smb_hdr) - 1)
+			if (((unsigned int)length >= sizeof (struct smb_hdr) - 1)
 			    && (smb->Status.CifsError != 0))
 				return 0;	/* some error cases do not return wct and bcc */
 
@@ -298,7 +298,7 @@ checkSMB(struct smb_hdr *smb, __u16 mid, int length)
 		return 1;
 
 	if ((4 + ntohl(smb->smb_buf_length) != smbCalcSize(smb))
-	    || (4 + ntohl(smb->smb_buf_length) != length)) {
+	    || (4 + ntohl(smb->smb_buf_length) != (unsigned int)length)) {
 		return 0;
 	} else {
 		cERROR(1, ("smbCalcSize %x ", smbCalcSize(smb)));

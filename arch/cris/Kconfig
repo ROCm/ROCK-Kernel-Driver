@@ -515,6 +515,8 @@ config ETRAX_POWERBUTTON_BIT
 
 endmenu
 
+source "drivers/base/Kconfig"
+
 # bring in Etrax built-in drivers
 source "arch/cris/drivers/Kconfig"
 

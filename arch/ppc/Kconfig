@@ -1163,6 +1163,8 @@ config PIN_TLB
 	depends on ADVANCED_OPTIONS && 8xx
 endmenu
 
+source "drivers/base/Kconfig"
+
 source "drivers/mtd/Kconfig"
 
 source "drivers/pnp/Kconfig"

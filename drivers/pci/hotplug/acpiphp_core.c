@@ -5,8 +5,8 @@
  * Copyright (c) 2001 Greg Kroah-Hartman (greg@kroah.com)
  * Copyright (c) 2001 IBM Corp.
  * Copyright (c) 2002 Hiroshi Aono (h-aono@ap.jp.nec.com)
- * Copyright (c) 2002 Takayoshi Kochi (t-kouchi@cq.jp.nec.com)
- * Copyright (c) 2002 NEC Corporation
+ * Copyright (c) 2002,2003 Takayoshi Kochi (t-kochi@bq.jp.nec.com)
+ * Copyright (c) 2002,2003 NEC Corporation
  *
  * All rights reserved.
  *
@@ -26,8 +26,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
  * Send feedback to <gregkh@us.ibm.com>,
- *                  <h-aono@ap.jp.nec.com>,
- *		    <t-kouchi@cq.jp.nec.com>
+ *		    <t-kochi@bq.jp.nec.com>
  *
  */
 
@@ -57,7 +56,7 @@ int acpiphp_debug;
 static int num_slots;
 
 #define DRIVER_VERSION	"0.4"
-#define DRIVER_AUTHOR	"Greg Kroah-Hartman <gregkh@us.ibm.com>, Takayoshi Kochi <t-kouchi@cq.jp.nec.com>"
+#define DRIVER_AUTHOR	"Greg Kroah-Hartman <gregkh@us.ibm.com>, Takayoshi Kochi <t-kochi@bq.jp.nec.com>"
 #define DRIVER_DESC	"ACPI Hot Plug PCI Controller Driver"
 
 MODULE_AUTHOR(DRIVER_AUTHOR);
@@ -376,10 +375,8 @@ static int init_acpi (void)
  */
 static void make_slot_name (struct slot *slot)
 {
-	snprintf(slot->hotplug_slot->name, SLOT_NAME_SIZE, "ACPI%d-%02x:%02x",
-		 slot->acpi_slot->sun,
-		 slot->acpi_slot->bridge->bus,
-		 slot->acpi_slot->device);
+	snprintf(slot->hotplug_slot->name, SLOT_NAME_SIZE, "%u",
+		 slot->acpi_slot->sun);
 }
 
 /**

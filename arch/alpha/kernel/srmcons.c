@@ -291,6 +291,7 @@ srmcons_init(void)
 		driver->type = TTY_DRIVER_TYPE_SYSTEM;
 		driver->subtype = SYSTEM_TYPE_SYSCONS;
 		driver->init_termios = tty_std_termios;
+		tty_set_operations(driver, &srmcons_ops);
 		err = tty_register_driver(driver);
 		if (err) {
 			put_tty_driver(driver);

@@ -44,11 +44,14 @@
  * Address valid if:
  *  - "addr" doesn't have any high-bits set
  *  - AND "size" doesn't have any high-bits set
- *  - AND "addr+size" doesn't have any high-bits set
  *  - OR we are in kernel mode.
+ *
+ * We dont have to check for high bits in (addr+size) because the first
+ * two checks force the maximum result to be below the start of the
+ * kernel region.
  */
 #define __access_ok(addr,size,segment) \
-	(((segment).seg & (addr | size | (addr+size))) == 0)
+	(((segment).seg & (addr | size )) == 0)
 
 #define access_ok(type,addr,size) \
 	__access_ok(((unsigned long)(addr)),(size),get_fs())

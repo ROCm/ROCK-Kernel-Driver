@@ -104,8 +104,8 @@ static void pnp_free_ids(struct pnp_dev *dev)
 static void pnp_release_device(struct device *dmdev)
 {
 	struct pnp_dev * dev = to_pnp_dev(dmdev);
-	if (dev->possible)
-		pnp_free_resources(dev->possible);
+	pnp_free_option(dev->independent);
+	pnp_free_option(dev->dependent);
 	pnp_free_ids(dev);
 	kfree(dev);
 }
@@ -122,7 +122,7 @@ int __pnp_add_device(struct pnp_dev *dev)
 	list_add_tail(&dev->global_list, &pnp_global);
 	list_add_tail(&dev->protocol_list, &dev->protocol->devices);
 	spin_unlock(&pnp_lock);
-	pnp_auto_config_dev(dev);
+
 	ret = device_register(&dev->dev);
 	if (ret == 0)
 		pnp_interface_attach_device(dev);

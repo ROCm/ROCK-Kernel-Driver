@@ -76,9 +76,14 @@ acpi_ev_valid_gpe_event (
 
 	/* No need for spin lock since we are not changing any list elements */
 
+	/* Walk the GPE interrupt levels */
+
 	gpe_xrupt_block = acpi_gbl_gpe_xrupt_list_head;
 	while (gpe_xrupt_block) {
 		gpe_block = gpe_xrupt_block->gpe_block_list_head;
+
+		/* Walk the GPE blocks on this interrupt level */
+
 		while (gpe_block) {
 			if ((&gpe_block->event_info[0] <= gpe_event_info) &&
 				(&gpe_block->event_info[((acpi_size) gpe_block->register_count) * 8] > gpe_event_info)) {
@@ -155,7 +160,7 @@ unlock_and_exit:
  *
  * PARAMETERS:  Callback from walk_namespace
  *
- * RETURN:      None
+ * RETURN:      Status
  *
  * DESCRIPTION: Called from acpi_walk_namespace. Expects each object to be a
  *              control method under the _GPE portion of the namespace.
@@ -164,10 +169,10 @@ unlock_and_exit:
  *
  *              The name of each GPE control method is of the form:
  *                  "_Lnn" or "_Enn"
- *              Where:
- *                  L      - means that the GPE is level triggered
- *                  E      - means that the GPE is edge triggered
- *                  nn     - is the GPE number [in HEX]
+ *                  Where:
+ *                      L      - means that the GPE is level triggered
+ *                      E      - means that the GPE is edge triggered
+ *                      nn     - is the GPE number [in HEX]
  *
  ******************************************************************************/
 
@@ -196,7 +201,8 @@ acpi_ev_save_method_info (
 	name[ACPI_NAME_SIZE] = 0;
 
 	/*
-	 * Edge/Level determination is based on the 2nd character of the method name
+	 * Edge/Level determination is based on the 2nd character
+	 * of the method name
 	 */
 	switch (name[1]) {
 	case 'L':
@@ -249,15 +255,14 @@ acpi_ev_save_method_info (
 	gpe_event_info->flags    = type;
 	gpe_event_info->method_node = (struct acpi_namespace_node *) obj_handle;
 
-	/*
-	 * Enable the GPE (SCIs should be disabled at this point)
-	 */
+	/* Enable the GPE (SCIs should be disabled at this point) */
+
 	status = acpi_hw_enable_gpe (gpe_event_info);
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
 	}
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+	ACPI_DEBUG_PRINT ((ACPI_DB_LOAD,
 		"Registered GPE method %s as GPE number 0x%.2X\n",
 		name, gpe_number));
 	return_ACPI_STATUS (AE_OK);
@@ -867,8 +872,8 @@ acpi_ev_gpe_initialize (void)
 			}
 
 			/*
-			 * GPE0 and GPE1 do not have to be contiguous in the GPE number space,
-			 * But, GPE0 always starts at zero.
+			 * GPE0 and GPE1 do not have to be contiguous in the GPE number
+			 * space. However, GPE0 always starts at GPE number zero.
 			 */
 			gpe_number_max = acpi_gbl_FADT->gpe1_base +
 					   ((register_count1 * ACPI_GPE_REGISTER_WIDTH) - 1);

@@ -714,12 +714,6 @@ void ndisc_recv_ns(struct sk_buff *skb)
 	struct inet6_ifaddr *ifp;
 	struct neighbour *neigh;
 
-	if (skb->len < sizeof(struct nd_msg)) {
-		if (net_ratelimit())
-			printk(KERN_WARNING "ICMP NS: packet too short\n");
-		return;
-	}
-
 	if (ipv6_addr_type(&msg->target)&IPV6_ADDR_MULTICAST) {
 		if (net_ratelimit())
 			printk(KERN_WARNING "ICMP NS: target address is multicast\n");
@@ -1410,7 +1404,12 @@ static void pndisc_redo(struct sk_buff *skb)
 
 int ndisc_rcv(struct sk_buff *skb)
 {
-	struct nd_msg *msg = (struct nd_msg *) skb->h.raw;
+	struct nd_msg *msg;
+
+	if (!pskb_may_pull(skb, skb->len))
+		return 0;
+
+	msg = (struct nd_msg *) skb->h.raw;
 
 	__skb_push(skb, skb->data-skb->h.raw);
 

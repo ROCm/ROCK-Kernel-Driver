@@ -515,6 +515,8 @@ config PM
 endmenu
 
 
+source "drivers/base/Kconfig"
+
 source "drivers/mtd/Kconfig"
 
 source "drivers/parport/Kconfig"
