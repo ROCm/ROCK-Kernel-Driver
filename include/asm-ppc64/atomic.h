@@ -41,6 +41,7 @@ static __inline__ int atomic_add_return(int a, atomic_t *v)
 	int t;
 
 	__asm__ __volatile__(
+	EIEIO_ON_SMP
 "1:	lwarx	%0,0,%2		# atomic_add_return\n\
 	add	%0,%1,%0\n\
 	stwcx.	%0,0,%2\n\
@@ -72,6 +73,7 @@ static __inline__ int atomic_sub_return(int a, atomic_t *v)
 	int t;
 
 	__asm__ __volatile__(
+	EIEIO_ON_SMP
 "1:	lwarx	%0,0,%2		# atomic_sub_return\n\
 	subf	%0,%1,%0\n\
 	stwcx.	%0,0,%2\n\
@@ -103,6 +105,7 @@ static __inline__ int atomic_inc_return(atomic_t *v)
 	int t;
 
 	__asm__ __volatile__(
+	EIEIO_ON_SMP
 "1:	lwarx	%0,0,%1		# atomic_inc_return\n\
 	addic	%0,%0,1\n\
 	stwcx.	%0,0,%1\n\
@@ -134,6 +137,7 @@ static __inline__ int atomic_dec_return(atomic_t *v)
 	int t;
 
 	__asm__ __volatile__(
+	EIEIO_ON_SMP
 "1:	lwarx	%0,0,%1		# atomic_dec_return\n\
 	addic	%0,%0,-1\n\
 	stwcx.	%0,0,%1\n\
@@ -158,6 +162,7 @@ static __inline__ int atomic_dec_if_positive(atomic_t *v)
 	int t;
 
 	__asm__ __volatile__(
+	EIEIO_ON_SMP
 "1:	lwarx	%0,0,%1		# atomic_dec_if_positive\n\
 	addic.	%0,%0,-1\n\
 	blt-	2f\n\
