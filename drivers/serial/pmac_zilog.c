@@ -352,13 +352,14 @@ static void pmz_status_handle(struct uart_pmac_port *uap, struct pt_regs *regs)
 		/* The Zilog just gives us an interrupt when DCD/CTS/etc. change.
 		 * But it does not tell us which bit has changed, we have to keep
 		 * track of this ourselves.
+		 * The CTS input is inverted for some reason.  -- paulus
 		 */
-		if ((status & DCD) ^ uap->prev_status)
+		if ((status ^ uap->prev_status) & DCD)
 			uart_handle_dcd_change(&uap->port,
 					       (status & DCD));
-		if ((status & CTS) ^ uap->prev_status)
+		if ((status ^ uap->prev_status) & CTS)
 			uart_handle_cts_change(&uap->port,
-					       (status & CTS));
+					       !(status & CTS));
 
 		wake_up_interruptible(&uap->port.info->delta_msr_wait);
 	}
@@ -595,7 +596,7 @@ static unsigned int pmz_get_mctrl(struct uart_port *port)
 		ret |= TIOCM_CAR;
 	if (status & SYNC_HUNT)
 		ret |= TIOCM_DSR;
-	if (status & CTS)
+	if (!(status & CTS))
 		ret |= TIOCM_CTS;
 
 	return ret;
