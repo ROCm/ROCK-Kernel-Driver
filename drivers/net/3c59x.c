@@ -1297,6 +1297,13 @@ static int __devinit vortex_probe1(struct device *gendev,
 		for (i = 0; i < 6; i++)
 			printk("%c%2.2x", i ? ':' : ' ', dev->dev_addr[i]);
 	}
+	/* Unfortunately an all zero eeprom passes the checksum and this
+	   gets found in the wild in failure cases. Crypto is hard 8) */
+	if (!is_valid_ether_addr(dev->dev_addr)) {
+		retval = -EINVAL;
+		printk(KERN_ERR "*** EEPROM MAC address is invalid.\n");
+		goto free_ring;	/* With every pack */
+	}
 	EL3WINDOW(2);
 	for (i = 0; i < 6; i++)
 		outb(dev->dev_addr[i], ioaddr + i);
