@@ -21,14 +21,6 @@
    SOFTWARE IS DISCLAIMED.
 */
 
-/* 
-   RPN support    -    Dirk Husemann <hud@zurich.ibm.com>
-*/
-
-/*
- * $Id: rfcomm.h,v 1.29 2002/10/02 20:26:17 maxk Exp $
- */
-
 #ifndef __RFCOMM_H
 #define __RFCOMM_H
 
