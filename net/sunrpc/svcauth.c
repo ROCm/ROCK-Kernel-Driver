@@ -173,12 +173,12 @@ auth_domain_lookup(struct auth_domain *item, int set)
 		tmp = container_of(*hp, struct auth_domain, h);
 		if (!auth_domain_match(tmp, item))
 			continue;
-		cache_get(&tmp->h);
-		if (!set)
+		if (!set) {
+			cache_get(&tmp->h);
 			goto out_noset;
+		}
 		*hp = tmp->h.next;
 		tmp->h.next = NULL;
-		clear_bit(CACHE_HASHED, &tmp->h.flags);
 		auth_domain_drop(&tmp->h, &auth_domain_cache);
 		goto out_set;
 	}
@@ -187,9 +187,9 @@ auth_domain_lookup(struct auth_domain *item, int set)
 		goto out_nada;
 	auth_domain_cache.entries++;
 out_set:
-	set_bit(CACHE_HASHED, &item->h.flags);
 	item->h.next = *head;
 	*head = &item->h;
+	cache_get(&item->h);
 	write_unlock(&auth_domain_cache.hash_lock);
 	cache_fresh(&auth_domain_cache, &item->h, item->h.expiry_time);
 	cache_get(&item->h);

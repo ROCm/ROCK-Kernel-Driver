@@ -321,12 +321,10 @@ static int cache_clean(void)
 			if (test_and_clear_bit(CACHE_PENDING, &ch->flags))
 				queue_loose(current_detail, ch);
 
-			if (!atomic_read(&ch->refcnt))
+			if (atomic_read(&ch->refcnt) == 1)
 				break;
 		}
 		if (ch) {
-			cache_get(ch);
-			clear_bit(CACHE_HASHED, &ch->flags);
 			*cp = ch->next;
 			ch->next = NULL;
 			current_detail->entries--;
