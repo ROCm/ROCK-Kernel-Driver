@@ -195,8 +195,6 @@ struct agp_bridge_driver via_agp3_driver = {
 	.free_by_type		= agp_generic_free_by_type,
 	.agp_alloc_page		= agp_generic_alloc_page,
 	.agp_destroy_page	= agp_generic_destroy_page,
-	.suspend		= agp_generic_suspend,
-	.resume			= agp_generic_resume,
 };
 
 struct agp_bridge_driver via_driver = {
@@ -220,8 +218,6 @@ struct agp_bridge_driver via_driver = {
 	.free_by_type		= agp_generic_free_by_type,
 	.agp_alloc_page		= agp_generic_alloc_page,
 	.agp_destroy_page	= agp_generic_destroy_page,
-	.suspend		= agp_generic_suspend,
-	.resume			= agp_generic_resume,
 };
 
 static struct agp_device_ids via_agp_device_ids[] __initdata =

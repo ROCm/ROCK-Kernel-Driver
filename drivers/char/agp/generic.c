@@ -671,20 +671,6 @@ int agp_generic_create_gatt_table(void)
 }
 EXPORT_SYMBOL(agp_generic_create_gatt_table);
 
-int agp_generic_suspend(void)
-{
-	return 0;
-}
-EXPORT_SYMBOL(agp_generic_suspend);
-
-
-void agp_generic_resume(void)
-{
-	return;
-}
-EXPORT_SYMBOL(agp_generic_resume);
-
-
 int agp_generic_free_gatt_table(void)
 {
 	int page_order;

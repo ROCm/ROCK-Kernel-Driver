@@ -263,8 +263,6 @@ struct agp_bridge_driver nvidia_driver = {
 	.free_by_type		= agp_generic_free_by_type,
 	.agp_alloc_page		= agp_generic_alloc_page,
 	.agp_destroy_page	= agp_generic_destroy_page,
-	.suspend		= agp_generic_suspend,
-	.resume			= agp_generic_resume,
 };
 
 static int __init agp_nvidia_probe(struct pci_dev *pdev,

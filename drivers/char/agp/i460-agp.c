@@ -551,8 +551,6 @@ struct agp_bridge_driver intel_i460_driver = {
 #endif
 	.alloc_by_type		= agp_generic_alloc_by_type,
 	.free_by_type		= agp_generic_free_by_type,
-	.suspend		= agp_generic_suspend,
-	.resume			= agp_generic_resume,
 	.cant_use_aperture	= 1,
 };
 

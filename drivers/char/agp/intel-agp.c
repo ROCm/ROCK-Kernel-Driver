@@ -782,11 +782,6 @@ static int intel_845_configure(void)
 	return 0;
 }
 
-static void intel_845_resume(void)
-{
-	intel_845_configure();
-}
-
 static int intel_850_configure(void)
 {
 	u32 temp;
@@ -908,11 +903,6 @@ static unsigned long intel_mask_memory(unsigned long addr, int type)
 	return addr | agp_bridge->driver->masks[0].mask;
 }
 
-static void intel_resume(void)
-{
-	intel_configure();
-}
-
 /* Setup function */
 static struct gatt_mask intel_generic_masks[] =
 {
@@ -976,8 +966,6 @@ struct agp_bridge_driver intel_generic_driver = {
 	.free_by_type		= agp_generic_free_by_type,
 	.agp_alloc_page		= agp_generic_alloc_page,
 	.agp_destroy_page	= agp_generic_destroy_page,
-	.suspend		= agp_generic_suspend,
-	.resume			= intel_resume,
 };
 
 struct agp_bridge_driver intel_810_driver = {
@@ -1002,8 +990,6 @@ struct agp_bridge_driver intel_810_driver = {
 	.free_by_type		= intel_i810_free_by_type,
 	.agp_alloc_page		= agp_generic_alloc_page,
 	.agp_destroy_page	= agp_generic_destroy_page,
-	.suspend		= agp_generic_suspend,
-	.resume			= agp_generic_resume,
 };
 
 
@@ -1028,8 +1014,6 @@ struct agp_bridge_driver intel_815_driver = {
 	.free_by_type		= agp_generic_free_by_type,
 	.agp_alloc_page		= agp_generic_alloc_page,
 	.agp_destroy_page	= agp_generic_destroy_page,
-	.suspend		= agp_generic_suspend,
-	.resume			= agp_generic_resume,
 };
 
 struct agp_bridge_driver intel_830_driver = {
@@ -1054,8 +1038,6 @@ struct agp_bridge_driver intel_830_driver = {
 	.free_by_type		= intel_i810_free_by_type,
 	.agp_alloc_page		= agp_generic_alloc_page,
 	.agp_destroy_page	= agp_generic_destroy_page,
-	.suspend		= agp_generic_suspend,
-	.resume			= agp_generic_resume,
 };
 
 
@@ -1080,8 +1062,6 @@ struct agp_bridge_driver intel_820_driver = {
 	.free_by_type		= agp_generic_free_by_type,
 	.agp_alloc_page		= agp_generic_alloc_page,
 	.agp_destroy_page	= agp_generic_destroy_page,
-	.suspend		= agp_generic_suspend,
-	.resume			= agp_generic_resume,
 };
 
 struct agp_bridge_driver intel_830mp_driver = {
@@ -1105,8 +1085,6 @@ struct agp_bridge_driver intel_830mp_driver = {
 	.free_by_type		= agp_generic_free_by_type,
 	.agp_alloc_page		= agp_generic_alloc_page,
 	.agp_destroy_page	= agp_generic_destroy_page,
-	.suspend		= agp_generic_suspend,
-	.resume			= agp_generic_resume,
 };
 
 struct agp_bridge_driver intel_840_driver = {
@@ -1130,8 +1108,6 @@ struct agp_bridge_driver intel_840_driver = {
 	.free_by_type		= agp_generic_free_by_type,
 	.agp_alloc_page		= agp_generic_alloc_page,
 	.agp_destroy_page	= agp_generic_destroy_page,
-	.suspend		= agp_generic_suspend,
-	.resume			= agp_generic_resume,
 };
 
 struct agp_bridge_driver intel_845_driver = {
@@ -1155,8 +1131,6 @@ struct agp_bridge_driver intel_845_driver = {
 	.free_by_type		= agp_generic_free_by_type,
 	.agp_alloc_page		= agp_generic_alloc_page,
 	.agp_destroy_page	= agp_generic_destroy_page,
-	.suspend		= agp_generic_suspend,
-	.resume			= intel_845_resume,
 };
 
 struct agp_bridge_driver intel_850_driver = {
@@ -1180,8 +1154,6 @@ struct agp_bridge_driver intel_850_driver = {
 	.free_by_type		= agp_generic_free_by_type,
 	.agp_alloc_page		= agp_generic_alloc_page,
 	.agp_destroy_page	= agp_generic_destroy_page,
-	.suspend		= agp_generic_suspend,
-	.resume			= agp_generic_resume,
 };
 
 struct agp_bridge_driver intel_860_driver = {
@@ -1205,8 +1177,6 @@ struct agp_bridge_driver intel_860_driver = {
 	.free_by_type		= agp_generic_free_by_type,
 	.agp_alloc_page		= agp_generic_alloc_page,
 	.agp_destroy_page	= agp_generic_destroy_page,
-	.suspend		= agp_generic_suspend,
-	.resume			= agp_generic_resume,
 };
 
 struct agp_bridge_driver intel_7505_driver = {
@@ -1230,8 +1200,6 @@ struct agp_bridge_driver intel_7505_driver = {
 	.free_by_type		= agp_generic_free_by_type,
 	.agp_alloc_page		= agp_generic_alloc_page,
 	.agp_destroy_page	= agp_generic_destroy_page,
-	.suspend		= agp_generic_suspend,
-	.resume			= agp_generic_resume,
 };
 
 static int find_i810(u16 device, const char *name)
@@ -1436,6 +1404,23 @@ static void __devexit agp_intel_remove(struct pci_dev *pdev)
 	agp_put_bridge(bridge);
 }
 
+static int agp_intel_suspend(struct pci_dev *dev, u32 state)
+{
+	return 0;
+}
+
+static int agp_intel_resume(struct pci_dev *pdev)
+{
+	struct agp_bridge_data *bridge = pci_get_drvdata(pdev);
+
+	if (bridge->driver == &intel_generic_driver)
+		intel_configure();
+	else if (bridge->driver == &intel_845_driver)
+		intel_845_configure();
+
+	return 0;
+}
+
 static struct pci_device_id agp_intel_pci_table[] __initdata = {
 	{
 	.class		= (PCI_CLASS_BRIDGE_HOST << 8),
@@ -1455,6 +1440,8 @@ static struct __initdata pci_driver agp_intel_pci_driver = {
 	.id_table	= agp_intel_pci_table,
 	.probe		= agp_intel_probe,
 	.remove		= agp_intel_remove,
+	.suspend	= agp_intel_suspend,
+	.resume		= agp_intel_resume,
 };
 
 /* intel_agp_init() must not be declared static for explicit
