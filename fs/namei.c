@@ -1648,7 +1648,7 @@ int vfs_unlink(struct inode *dir, struct dentry *dentry)
 		error = -EBUSY;
 	else {
 		error = security_inode_unlink(dir, dentry);
-		if (error)
+		if (!error)
 			error = dir->i_op->unlink(dir, dentry);
 	}
 	up(&dentry->d_inode->i_sem);
