@@ -83,9 +83,7 @@
 #define _PAGE_WRITETHRU	0x040UL	/* W: cache write-through */
 #define _PAGE_DIRTY	0x080UL	/* C: page changed */
 #define _PAGE_ACCESSED	0x100UL	/* R: page referenced */
-#if 0
-#define _PAGE_HPTENOIX	0x200UL /* software: pte HPTE slot unknown */
-#endif
+#define _PAGE_FILE	0x200UL /* software: pte holds file offset */
 #define _PAGE_HASHPTE	0x400UL	/* software: pte has an associated HPTE */
 #define _PAGE_EXEC	0x800UL	/* software: i-cache coherence required */
 #define _PAGE_SECONDARY 0x8000UL /* software: HPTE is in secondary group */
@@ -234,6 +232,7 @@ static inline int pte_write(pte_t pte) { return pte_val(pte) & _PAGE_RW;}
 static inline int pte_exec(pte_t pte)  { return pte_val(pte) & _PAGE_EXEC;}
 static inline int pte_dirty(pte_t pte) { return pte_val(pte) & _PAGE_DIRTY;}
 static inline int pte_young(pte_t pte) { return pte_val(pte) & _PAGE_ACCESSED;}
+static inline int pte_file(pte_t pte) { return pte_val(pte) & _PAGE_FILE;}
 
 static inline void pte_uncache(pte_t pte) { pte_val(pte) |= _PAGE_NO_CACHE; }
 static inline void pte_cache(pte_t pte)   { pte_val(pte) &= ~_PAGE_NO_CACHE; }
@@ -349,11 +348,14 @@ struct vm_area_struct;
 extern void update_mmu_cache(struct vm_area_struct *, unsigned long, pte_t);
 
 /* Encode and de-code a swap entry */
-#define __swp_type(entry)		(((entry).val >> 1) & 0x3f)
-#define __swp_offset(entry)		((entry).val >> 8)
-#define __swp_entry(type, offset)	((swp_entry_t) { ((type) << 1) | ((offset) << 8) })
-#define __pte_to_swp_entry(pte)		((swp_entry_t) { pte_val(pte) >> PTE_SHIFT })
-#define __swp_entry_to_pte(x)		((pte_t) { (x).val << PTE_SHIFT })
+#define __swp_type(entry)	(((entry).val >> 1) & 0x3f)
+#define __swp_offset(entry)	((entry).val >> 8)
+#define __swp_entry(type, offset) ((swp_entry_t) { ((type) << 1) | ((offset) << 8) })
+#define __pte_to_swp_entry(pte)	((swp_entry_t) { pte_val(pte) >> PTE_SHIFT })
+#define __swp_entry_to_pte(x)	((pte_t) { (x).val << PTE_SHIFT })
+#define pte_to_pgoff(pte)	(pte_val(pte) >> PTE_SHIFT)
+#define pgoff_to_pte(off)	((pte_t) {((off) << PTE_SHIFT)|_PAGE_FILE})
+#define PTE_FILE_MAX_BITS	(BITS_PER_LONG - PTE_SHIFT)
 
 /*
  * kern_addr_valid is intended to indicate whether an address is a valid
