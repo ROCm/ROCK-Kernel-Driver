@@ -1808,13 +1808,6 @@ int do_munmap(struct mm_struct *mm, unsigned long start, size_t len)
 		return 0;
 	/* we have  start < mpnt->vm_end  */
 
-	if (is_vm_hugetlb_page(mpnt)) {
-		int ret = is_aligned_hugepage_range(start, len);
-
-		if (ret)
-			return ret;
-	}
-
 	/* if it doesn't overlap, we have nothing.. */
 	end = start + len;
 	if (mpnt->vm_start >= end)
@@ -1828,6 +1821,8 @@ int do_munmap(struct mm_struct *mm, unsigned long start, size_t len)
 	 * places tmp vma above, and higher split_vma places tmp vma below.
 	 */
 	if (start > mpnt->vm_start) {
+		if (is_vm_hugetlb_page(mpnt) && (start & ~HPAGE_MASK))
+			return -EINVAL;
 		if (split_vma(mm, mpnt, start, 0))
 			return -ENOMEM;
 		prev = mpnt;
@@ -1836,6 +1831,8 @@ int do_munmap(struct mm_struct *mm, unsigned long start, size_t len)
 	/* Does it split the last one? */
 	last = find_vma(mm, end);
 	if (last && end > last->vm_start) {
+		if (is_vm_hugetlb_page(last) && (end & ~HPAGE_MASK))
+			return -EINVAL;
 		if (split_vma(mm, last, end, 1))
 			return -ENOMEM;
 	}
