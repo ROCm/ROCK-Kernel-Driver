@@ -1833,7 +1833,7 @@ static int __make_request(request_queue_t *q, struct bio *bio)
 
 	barrier = test_bit(BIO_RW_BARRIER, &bio->bi_rw);
 
-	ra = bio_flagged(bio, BIO_RW_AHEAD) || current->flags & PF_READAHEAD;
+	ra = bio->bi_rw & (1 << BIO_RW_AHEAD);
 
 again:
 	insert_here = NULL;
