@@ -82,9 +82,10 @@ void fbcon_accel_putcs(struct vc_data *vc, struct display *p,
 	unsigned short charmask = p->charmask;
 	unsigned int width = ((fontwidth(p)+7)>>3);
 	struct fb_image image;
+	u16 c = scr_readw(s);
 
-	image.fg_color = attr_fgcol(p, *s);
-	image.bg_color = attr_bgcol(p, *s);
+	image.fg_color = attr_fgcol(p, c);
+	image.bg_color = attr_bgcol(p, c);
 	image.dx = xx * fontwidth(p);
 	image.dy = yy * fontheight(p);
 	image.width = fontwidth(p);

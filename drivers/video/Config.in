@@ -313,20 +313,16 @@ if [ "$CONFIG_FB" = "y" ]; then
 	    define_tristate CONFIG_FBCON_CFB16 m
 	 fi
       fi
-      if [ "$CONFIG_FB_ATY" = "y" -o "$CONFIG_FB_VIRTUAL" = "y" -o \
-	   "$CONFIG_FB_CLGEN" = "y" -o "$CONFIG_FB_VESA" = "y" -o \
+      if [ "$CONFIG_FB_CYBER2000" = "y" -o "$CONFIG_FB_VOODOO1" = "y" -o \
+	   "$CONFIG_FB_CLGEN" = "y" -o "$CONFIG_FB_PVR2" = "y" -o \
 	   "$CONFIG_FB_MATROX" = "y" -o "$CONFIG_FB_PM2" = "y" -o \
-           "$CONFIG_FB_ATY128" = "y" -o "$CONFIG_FB_RADEON" = "y" -o \
-	   "$CONFIG_FB_CYBER2000" = "y" -o "$CONFIG_FB_PVR2" = "y" -o \
-	   "$CONFIG_FB_VOODOO1" = "y" -o "$CONFIG_FB_NEOMAGIC" = "y" ]; then
+           "$CONFIG_FB_ATY128" = "y" -o "$CONFIG_FB_RADEON" = "y" ]; then 
 	 define_tristate CONFIG_FBCON_CFB24 y
       else
-	 if [ "$CONFIG_FB_ATY" = "m" -o "$CONFIG_FB_VIRTUAL" = "m" -o \
-	      "$CONFIG_FB_CLGEN" = "m" -o "$CONFIG_FB_VESA" = "m" -o \
+	 if [ "$CONFIG_FB_CLGEN" = "m" -o "$CONFIG_FB_VOODOO1" = "m" -o \ 
 	      "$CONFIG_FB_MATROX" = "m" -o "$CONFIG_FB_PM2" = "m" -o \
 	      "$CONFIG_FB_ATY128" = "m" -o "$CONFIG_FB_RADEON" = "m" -o \
-	      "$CONFIG_FB_CYBER2000" = "m" -o "$CONFIG_FB_PVR2" = "m" -o \
-	      "$CONFIG_FB_VOODOO1" = "m" -o "$CONFIG_FB_NEOMAGIC" = "y" ]; then
+	      "$CONFIG_FB_CYBER2000" = "m" -o "$CONFIG_FB_PVR2" = "m" ]; then 
 	    define_tristate CONFIG_FBCON_CFB24 m
 	 fi
       fi
@@ -365,7 +361,8 @@ if [ "$CONFIG_FB" = "y" ]; then
 	 if [ "$CONFIG_FB_NEOMAGIC" = "m" -o "$CONFIG_FB_HIT" = "m" -o \
 	      "$CONFIG_FB_G364" = "m" -o "$CONFIG_FB_VIRTUAL" = "m" -o \
 	      "$CONFIG_FB_CLPS711X" = "m" -o "$CONFIG_FB_3DFX" = "m" -o \
-	      "$CONFIG_FB_RIVA" = "m" -o "$CONFIG_FB_SGIVW" = "m" ]; then 
+	      "$CONFIG_FB_RIVA" = "m" -o "$CONFIG_FB_SGIVW" = "m" -o \
+	      "$CONFIG_FB_ATY" = "m" ]; then 
 	    define_tristate CONFIG_FBCON_ACCEL m
          fi       
       fi

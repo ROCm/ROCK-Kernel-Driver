@@ -29,8 +29,6 @@
 #include <asm/io.h>
 #include <asm/hd64461.h>
 
-#include <video/fbcon.h>
-
 static struct fb_var_screeninfo hitfb_var __initdata = {
 	.activate =	FB_ACTIVATE_NOW,
 	.height =	-1,
@@ -46,7 +44,6 @@ static struct fb_fix_screeninfo hitfb_fix __initdata = {
 };
 
 static u16 pseudo_palette[17];
-static struct display display;
 struct fb_info fb_info;
 
 static int hitfb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
@@ -126,8 +123,6 @@ static int hitfb_setcolreg(unsigned regno, unsigned red, unsigned green,
 static struct fb_ops hitfb_ops = {
 	.owner		= THIS_MODULE,
 	.fb_set_var	= gen_set_var,
-	.fb_get_cmap	= gen_get_cmap,
-	.fb_set_cmap	= gen_set_cmap,
 	.fb_check_var	= hitfb_check_var,
 	.fb_set_par	= hitfb_set_par,
 	.fb_setcolreg	= hitfb_setcolreg,
@@ -167,12 +162,6 @@ int __init hitfb_init(void)
 	fb_info.pseudo_palette 	= pseudo_palette;	
 	fb_info.flags 		= FBINFO_FLAG_DEFAULT;
     	
-	strcpy(fb_info.modename, fb_info.fix.id);
-	fb_info.currcon = -1;
-	fb_info.disp = &display;
-	fb_info.changevar = NULL;
-	fb_info.switch_con = gen_switch;
-	fb_info.updatevar = gen_update_var;
 	fb_info.screen_base = (void *) hitfb_fix.smem_start;
 
 	size = (fb_info.var.bits_per_pixel == 8) ? 256 : 16;
