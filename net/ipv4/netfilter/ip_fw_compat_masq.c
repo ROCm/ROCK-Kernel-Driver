@@ -35,16 +35,15 @@
 unsigned int
 do_masquerade(struct sk_buff **pskb, const struct net_device *dev)
 {
-	struct iphdr *iph = (*pskb)->nh.iph;
 	struct ip_nat_info *info;
 	enum ip_conntrack_info ctinfo;
 	struct ip_conntrack *ct;
 	unsigned int ret;
 
 	/* Sorry, only ICMP, TCP and UDP. */
-	if (iph->protocol != IPPROTO_ICMP
-	    && iph->protocol != IPPROTO_TCP
-	    && iph->protocol != IPPROTO_UDP)
+	if ((*pskb)->nh.iph->protocol != IPPROTO_ICMP
+	    && (*pskb)->nh.iph->protocol != IPPROTO_TCP
+	    && (*pskb)->nh.iph->protocol != IPPROTO_UDP)
 		return NF_DROP;
 
 	/* Feed it to connection tracking; in fact we're in NF_IP_FORWARD,
@@ -68,7 +67,7 @@ do_masquerade(struct sk_buff **pskb, const struct net_device *dev)
 	/* Setup the masquerade, if not already */
 	if (!info->initialized) {
 		u_int32_t newsrc;
-		struct flowi fl = { .nl_u = { .ip4_u = { .daddr = iph->daddr } } };
+		struct flowi fl = { .nl_u = { .ip4_u = { .daddr = (*pskb)->nh.iph->daddr } } };
 		struct rtable *rt;
 		struct ip_nat_multi_range range;
 
@@ -124,19 +123,18 @@ unsigned int
 check_for_demasq(struct sk_buff **pskb)
 {
 	struct ip_conntrack_tuple tuple;
-	struct iphdr *iph = (*pskb)->nh.iph;
 	struct ip_conntrack_protocol *protocol;
 	struct ip_conntrack_tuple_hash *h;
 	enum ip_conntrack_info ctinfo;
 	struct ip_conntrack *ct;
 	int ret;
 
-	protocol = ip_ct_find_proto(iph->protocol);
+	protocol = ip_ct_find_proto((*pskb)->nh.iph->protocol);
 
 	/* We don't feed packets to conntrack system unless we know
            they're part of an connection already established by an
            explicit masq command. */
-	switch (iph->protocol) {
+	switch ((*pskb)->nh.iph->protocol) {
 	case IPPROTO_ICMP:
 		/* ICMP errors. */
 		ct = icmp_error_track(*pskb, &ctinfo, NF_IP_PRE_ROUTING);
@@ -146,12 +144,6 @@ check_for_demasq(struct sk_buff **pskb)
 			   server here (== DNAT).  Do SNAT icmp manips
 			   in POST_ROUTING handling. */
 			if (CTINFO2DIR(ctinfo) == IP_CT_DIR_REPLY) {
-				/* FIXME: Remove once NAT handled non-linear.
-				 */
-				if (skb_is_nonlinear(*pskb)
-				    && skb_linearize(*pskb, GFP_ATOMIC) != 0)
-					return NF_DROP;
-
 				icmp_reply_translation(pskb, ct,
 						       NF_IP_PRE_ROUTING,
 						       CTINFO2DIR(ctinfo));
@@ -166,7 +158,7 @@ check_for_demasq(struct sk_buff **pskb)
 	case IPPROTO_UDP:
 		IP_NF_ASSERT(((*pskb)->nh.iph->frag_off & htons(IP_OFFSET)) == 0);
 
-		if (!get_tuple(iph, *pskb, iph->ihl*4, &tuple, protocol)) {
+		if (!get_tuple((*pskb)->nh.iph, *pskb, (*pskb)->nh.iph->ihl*4, &tuple, protocol)) {
 			if (net_ratelimit())
 				printk("ip_fw_compat_masq: Can't get tuple\n");
 			return NF_ACCEPT;

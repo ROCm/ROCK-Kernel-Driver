@@ -717,9 +717,12 @@ manip_pkt(u_int16_t proto,
 	iph = (void *)(*pskb)->data + iphdroff;
 
 	/* Manipulate protcol part. */
-	if (!find_nat_proto(proto)->manip_pkt(pskb, iphdroff + iph->ihl*4,
+	if (!find_nat_proto(proto)->manip_pkt(pskb,
+					      iphdroff + iph->ihl*4,
 					      manip, maniptype))
 		return 0;
+
+	iph = (void *)(*pskb)->data + iphdroff;
 
 	if (maniptype == IP_NAT_MANIP_SRC) {
 		iph->check = ip_nat_cheat_check(~iph->saddr, manip->ip,
@@ -952,6 +955,8 @@ icmp_reply_translation(struct sk_buff **pskb,
 	READ_UNLOCK(&ip_nat_lock);
 
 	hdrlen = (*pskb)->nh.iph->ihl * 4;
+
+	inside = (void *)(*pskb)->data + (*pskb)->nh.iph->ihl*4;
 
 	inside->icmp.checksum = 0;
 	inside->icmp.checksum = csum_fold(skb_checksum(*pskb, hdrlen,
