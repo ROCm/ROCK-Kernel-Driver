@@ -467,22 +467,26 @@ rtas_halt(void)
         rtas_power_off();
 }
 
-void
-rtas_os_term(char *str)
+/* Must be in the RMO region, so we place it here */
+static char rtas_os_term_buf[2048];
+
+void rtas_os_term(char *str)
 {
 	long status;
-	char buf[1035];
 
-	sprintf(buf, "OS panic: %s", str);
+	snprintf(rtas_os_term_buf, 2048, "OS panic: %s", str);
+
 	do {
-		status = rtas_call(rtas_token("ibm,os-term"), 1, 1, NULL, __pa(buf));
+		status = rtas_call(rtas_token("ibm,os-term"), 1, 1, NULL,
+				   __pa(rtas_os_term_buf));
+
 		if (status == RTAS_BUSY)
 			udelay(1);
 		else if (status != 0)
-			printk(KERN_EMERG "ibm,os-term call failed %ld\n", status);
-	} while (status != RTAS_BUSY);
+			printk(KERN_EMERG "ibm,os-term call failed %ld\n",
+			       status);
+	} while (status == RTAS_BUSY);
 }
-
 
 unsigned long rtas_rmo_buf = 0;
 
