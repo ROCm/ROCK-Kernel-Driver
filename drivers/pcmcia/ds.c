@@ -1102,7 +1102,7 @@ static int ds_ioctl(struct inode * inode, struct file * file,
     void __user *uarg = (char __user *)arg;
     u_int size;
     int ret, err;
-    ds_ioctl_arg_t buf;
+    ds_ioctl_arg_t *buf;
     user_info_t *user;
 
     ds_dbg(2, "ds_ioctl(socket %d, %#x, %#lx)\n", iminor(inode), cmd, arg);
@@ -1136,54 +1136,58 @@ static int ds_ioctl(struct inode * inode, struct file * file,
 	    return err;
 	}
     }
+    buf = kmalloc(sizeof(ds_ioctl_arg_t), GFP_KERNEL);
+    if (!buf)
+	return -ENOMEM;
     
     err = ret = 0;
     
-    if (cmd & IOC_IN) __copy_from_user((char *)&buf, uarg, size);
+    if (cmd & IOC_IN) __copy_from_user((char *)buf, uarg, size);
     
     switch (cmd) {
     case DS_ADJUST_RESOURCE_INFO:
-	ret = pcmcia_adjust_resource_info(&buf.adjust);
+	ret = pcmcia_adjust_resource_info(&buf->adjust);
 	break;
     case DS_GET_CARD_SERVICES_INFO:
-	ret = pcmcia_get_card_services_info(&buf.servinfo);
+	ret = pcmcia_get_card_services_info(&buf->servinfo);
 	break;
     case DS_GET_CONFIGURATION_INFO:
-	if (buf.config.Function && 
-	   (buf.config.Function >= s->parent->functions))
+	if (buf->config.Function &&
+	   (buf->config.Function >= s->parent->functions))
 	    ret = CS_BAD_ARGS;
 	else
-	    ret = pccard_get_configuration_info(s->parent, buf.config.Function, &buf.config);
+	    ret = pccard_get_configuration_info(s->parent,
+			buf->config.Function, &buf->config);
 	break;
     case DS_GET_FIRST_TUPLE:
 	pcmcia_validate_mem(s->parent);
-	ret = pccard_get_first_tuple(s->parent, BIND_FN_ALL, &buf.tuple);
+	ret = pccard_get_first_tuple(s->parent, BIND_FN_ALL, &buf->tuple);
 	break;
     case DS_GET_NEXT_TUPLE:
-	ret = pccard_get_next_tuple(s->parent, BIND_FN_ALL, &buf.tuple);
+	ret = pccard_get_next_tuple(s->parent, BIND_FN_ALL, &buf->tuple);
 	break;
     case DS_GET_TUPLE_DATA:
-	buf.tuple.TupleData = buf.tuple_parse.data;
-	buf.tuple.TupleDataMax = sizeof(buf.tuple_parse.data);
-	ret = pccard_get_tuple_data(s->parent, &buf.tuple);
+	buf->tuple.TupleData = buf->tuple_parse.data;
+	buf->tuple.TupleDataMax = sizeof(buf->tuple_parse.data);
+	ret = pccard_get_tuple_data(s->parent, &buf->tuple);
 	break;
     case DS_PARSE_TUPLE:
-	buf.tuple.TupleData = buf.tuple_parse.data;
-	ret = pccard_parse_tuple(&buf.tuple, &buf.tuple_parse.parse);
+	buf->tuple.TupleData = buf->tuple_parse.data;
+	ret = pccard_parse_tuple(&buf->tuple, &buf->tuple_parse.parse);
 	break;
     case DS_RESET_CARD:
 	ret = pccard_reset_card(s->parent);
 	break;
     case DS_GET_STATUS:
-	if (buf.status.Function && 
-	   (buf.status.Function >= s->parent->functions))
+	if (buf->status.Function &&
+	   (buf->status.Function >= s->parent->functions))
 	    ret = CS_BAD_ARGS;
 	else
-	ret = pccard_get_status(s->parent, buf.status.Function, &buf.status);
+	ret = pccard_get_status(s->parent, buf->status.Function, &buf->status);
 	break;
     case DS_VALIDATE_CIS:
 	pcmcia_validate_mem(s->parent);
-	ret = pccard_validate_cis(s->parent, BIND_FN_ALL, &buf.cisinfo);
+	ret = pccard_validate_cis(s->parent, BIND_FN_ALL, &buf->cisinfo);
 	break;
     case DS_SUSPEND_CARD:
 	ret = pcmcia_suspend_card(s->parent);
@@ -1198,49 +1202,60 @@ static int ds_ioctl(struct inode * inode, struct file * file,
 	err = pcmcia_insert_card(s->parent);
 	break;
     case DS_ACCESS_CONFIGURATION_REGISTER:
-	if ((buf.conf_reg.Action == CS_WRITE) && !capable(CAP_SYS_ADMIN))
-	    return -EPERM;
-	if (buf.conf_reg.Function && 
-	   (buf.conf_reg.Function >= s->parent->functions))
+	if ((buf->conf_reg.Action == CS_WRITE) && !capable(CAP_SYS_ADMIN)) {
+	    err = -EPERM;
+	    goto free_out;
+	}
+	if (buf->conf_reg.Function &&
+	   (buf->conf_reg.Function >= s->parent->functions))
 	    ret = CS_BAD_ARGS;
 	else
-	    ret = pccard_access_configuration_register(s->parent, buf.conf_reg.Function, &buf.conf_reg);
+	    ret = pccard_access_configuration_register(s->parent,
+			buf->conf_reg.Function, &buf->conf_reg);
 	break;
     case DS_GET_FIRST_REGION:
-        ret = pccard_get_first_region(s->parent, &buf.region);
+        ret = pccard_get_first_region(s->parent, &buf->region);
 	break;
     case DS_GET_NEXT_REGION:
-	ret = pccard_get_next_region(s->parent, &buf.region);
+	ret = pccard_get_next_region(s->parent, &buf->region);
 	break;
     case DS_GET_FIRST_WINDOW:
-	ret = pcmcia_get_window(s->parent, &buf.win_info.handle, 0, &buf.win_info.window);
+	ret = pcmcia_get_window(s->parent, &buf->win_info.handle, 0,
+			&buf->win_info.window);
 	break;
     case DS_GET_NEXT_WINDOW:
-	ret = pcmcia_get_window(s->parent, &buf.win_info.handle, buf.win_info.handle->index + 1, &buf.win_info.window);
+	ret = pcmcia_get_window(s->parent, &buf->win_info.handle,
+			buf->win_info.handle->index + 1, &buf->win_info.window);
 	break;
     case DS_GET_MEM_PAGE:
-	ret = pcmcia_get_mem_page(buf.win_info.handle,
-			   &buf.win_info.map);
+	ret = pcmcia_get_mem_page(buf->win_info.handle,
+			   &buf->win_info.map);
 	break;
     case DS_REPLACE_CIS:
-	ret = pcmcia_replace_cis(s->parent, &buf.cisdump);
+	ret = pcmcia_replace_cis(s->parent, &buf->cisdump);
 	break;
     case DS_BIND_REQUEST:
-	if (!capable(CAP_SYS_ADMIN)) return -EPERM;
-	err = bind_request(s, &buf.bind_info);
+	if (!capable(CAP_SYS_ADMIN)) {
+		err = -EPERM;
+		goto free_out;
+	}
+	err = bind_request(s, &buf->bind_info);
 	break;
     case DS_GET_DEVICE_INFO:
-	err = get_device_info(s, &buf.bind_info, 1);
+	err = get_device_info(s, &buf->bind_info, 1);
 	break;
     case DS_GET_NEXT_DEVICE:
-	err = get_device_info(s, &buf.bind_info, 0);
+	err = get_device_info(s, &buf->bind_info, 0);
 	break;
     case DS_UNBIND_REQUEST:
 	err = 0;
 	break;
     case DS_BIND_MTD:
-	if (!capable(CAP_SYS_ADMIN)) return -EPERM;
-	err = bind_mtd(s, &buf.mtd_info);
+	if (!capable(CAP_SYS_ADMIN)) {
+		err = -EPERM;
+		goto free_out;
+	}
+	err = bind_mtd(s, &buf->mtd_info);
 	break;
     default:
 	err = -EINVAL;
@@ -1268,11 +1283,12 @@ static int ds_ioctl(struct inode * inode, struct file * file,
     }
 
     if (cmd & IOC_OUT) {
-        if (__copy_to_user(uarg, (char *)&buf, size))
+        if (__copy_to_user(uarg, (char *)buf, size))
             err = -EFAULT;
     }
 
-
+free_out:
+    kfree(buf);
     return err;
 } /* ds_ioctl */
 
