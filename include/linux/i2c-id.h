@@ -194,7 +194,7 @@
 #define I2C_ALGO_MPC8XX 0x110000	/* MPC8xx PowerPC I2C algorithm */
 #define I2C_ALGO_OCP    0x120000	/* IBM or otherwise On-chip I2C algorithm */
 #define I2C_ALGO_BITHS	0x130000	/* enhanced bit style adapters	*/
-#define I2C_ALGO_OCP_IOP3XX  0x140000	/* XSCALE IOP3XX On-chip I2C alg */
+#define I2C_ALGO_IOP3XX	0x140000	/* XSCALE IOP3XX On-chip I2C alg */
 #define I2C_ALGO_PCA	0x150000	/* PCA 9564 style adapters	*/
 
 #define I2C_ALGO_SIBYTE 0x150000	/* Broadcom SiByte SOCs		*/
@@ -270,7 +270,7 @@
 #define I2C_HW_SGI_MACE	0x01
 
 /* --- XSCALE on-chip adapters                          */
-#define I2C_HW_IOP321 0x00
+#define I2C_HW_IOP3XX 0x00
 
 /* --- SMBus only adapters						*/
 #define I2C_HW_SMBUS_PIIX4	0x00
