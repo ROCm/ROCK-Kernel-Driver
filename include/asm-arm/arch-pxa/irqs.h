@@ -11,7 +11,7 @@
  */
 
 #define PXA_IRQ_SKIP	7	/* The first 7 IRQs are not yet used */
-#define PXA_IRQ(x)		((x) - PXA_IRQ_SKIP)
+#define PXA_IRQ(x)	((x) - PXA_IRQ_SKIP)
 
 #define IRQ_HWUART	PXA_IRQ(7)	/* HWUART Transmit/Receive/Error */
 #define	IRQ_GPIO0	PXA_IRQ(8)	/* GPIO0 Edge Detect */
@@ -45,7 +45,7 @@
 
 #define IRQ_TO_GPIO_2_80(i)	\
 			((i) - PXA_IRQ(32) + 2)
-#define IRQ_TO_GPIO(i)	((i) - (((i) > IRQ_GPIO1) ? IRQ_GPIO(2) : IRQ_GPIO(0)))
+#define IRQ_TO_GPIO(i)	((i) - (((i) > IRQ_GPIO1) ? IRQ_GPIO(2) - 2 : IRQ_GPIO(0)))
 
 /*
  * The next 16 interrupts are for board specific purposes.  Since
@@ -129,8 +129,10 @@
 #define LUBBOCK_IRQ(x)		(IRQ_BOARD_START + (x))
 #define LUBBOCK_SD_IRQ		LUBBOCK_IRQ(0)
 #define LUBBOCK_SA1111_IRQ	LUBBOCK_IRQ(1)
-#define LUBBOCK_USB_IRQ		LUBBOCK_IRQ(2)
+#define LUBBOCK_USB_IRQ		LUBBOCK_IRQ(2)  /* usb connect */
 #define LUBBOCK_ETH_IRQ		LUBBOCK_IRQ(3)
 #define LUBBOCK_UCB1400_IRQ	LUBBOCK_IRQ(4)
 #define LUBBOCK_BB_IRQ		LUBBOCK_IRQ(5)
+#define LUBBOCK_USB_DISC_IRQ	LUBBOCK_IRQ(6)  /* usb disconnect */
+#define LUBBOCK_LAST_IRQ	LUBBOCK_IRQ(6)
 
