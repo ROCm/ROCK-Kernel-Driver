@@ -37,9 +37,7 @@
 /* 4K page size, but our output routines, use some slack for overruns */
 #define PROC_BLOCK_SIZE (3*1024)
 
-/* XXX: this shouldn't really be exposed to drivers. */
-struct proc_dir_entry *proc_scsi;
-EXPORT_SYMBOL(proc_scsi);
+static struct proc_dir_entry *proc_scsi;
 
 /* Protect sht->present and sht->proc_dir */
 static DECLARE_MUTEX(global_host_template_sem);
@@ -235,106 +233,28 @@ static ssize_t proc_scsi_write(struct file *file, const char __user *buf,
 	char *buffer, *p;
 	int err;
 
-	if (!buf || length>PAGE_SIZE)
+	if (!buf || length > PAGE_SIZE)
 		return -EINVAL;
 
 	buffer = (char *)__get_free_page(GFP_KERNEL);
 	if (!buffer)
 		return -ENOMEM;
-	if (copy_from_user(buffer, buf, length)) {
-		err =-EFAULT;
+
+	err = -EFAULT;
+	if (copy_from_user(buffer, buf, length))
 		goto out;
-	}
 
 	err = -EINVAL;
-
 	if (length < PAGE_SIZE)
 		buffer[length] = '\0';
 	else if (buffer[PAGE_SIZE-1])
 		goto out;
 
-	if (length < 11 || strncmp("scsi", buffer, 4))
-		goto out;
-
-#ifdef CONFIG_SCSI_LOGGING
-	/*
-	 * Usage: echo "scsi log token #N" > /proc/scsi/scsi
-	 * where token is one of [error,scan,mlqueue,mlcomplete,llqueue,
-	 * llcomplete,hlqueue,hlcomplete]
-	 */
-	if (!strncmp("log", buffer + 5, 3)) {
-		char *token;
-		unsigned int level;
-
-		p = buffer + 9;
-		token = p;
-		while (*p != ' ' && *p != '\t' && *p != '\0') {
-			p++;
-		}
-
-		if (*p == '\0') {
-			if (strncmp(token, "all", 3) == 0) {
-				/*
-				 * Turn on absolutely everything.
-				 */
-				scsi_logging_level = ~0;
-			} else if (strncmp(token, "none", 4) == 0) {
-				/*
-				 * Turn off absolutely everything.
-				 */
-				scsi_logging_level = 0;
-			} else {
-				goto out;
-			}
-		} else {
-			*p++ = '\0';
-
-			level = simple_strtoul(p, NULL, 0);
-
-			/*
-			 * Now figure out what to do with it.
-			 */
-			if (strcmp(token, "error") == 0) {
-				SCSI_SET_ERROR_RECOVERY_LOGGING(level);
-			} else if (strcmp(token, "timeout") == 0) {
-				SCSI_SET_TIMEOUT_LOGGING(level);
-			} else if (strcmp(token, "scan") == 0) {
-				SCSI_SET_SCAN_BUS_LOGGING(level);
-			} else if (strcmp(token, "mlqueue") == 0) {
-				SCSI_SET_MLQUEUE_LOGGING(level);
-			} else if (strcmp(token, "mlcomplete") == 0) {
-				SCSI_SET_MLCOMPLETE_LOGGING(level);
-			} else if (strcmp(token, "llqueue") == 0) {
-				SCSI_SET_LLQUEUE_LOGGING(level);
-			} else if (strcmp(token, "llcomplete") == 0) {
-				SCSI_SET_LLCOMPLETE_LOGGING(level);
-			} else if (strcmp(token, "hlqueue") == 0) {
-				SCSI_SET_HLQUEUE_LOGGING(level);
-			} else if (strcmp(token, "hlcomplete") == 0) {
-				SCSI_SET_HLCOMPLETE_LOGGING(level);
-			} else if (strcmp(token, "ioctl") == 0) {
-				SCSI_SET_IOCTL_LOGGING(level);
-			} else {
-				goto out;
-			}
-		}
-
-		printk(KERN_INFO "scsi logging level set to 0x%8.8x\n", scsi_logging_level);
-	}
-#endif	/* CONFIG_SCSI_LOGGING */
-
 	/*
 	 * Usage: echo "scsi add-single-device 0 1 2 3" >/proc/scsi/scsi
 	 * with  "0 1 2 3" replaced by your "Host Channel Id Lun".
-	 * Consider this feature BETA.
-	 *     CAUTION: This is not for hotplugging your peripherals. As
-	 *     SCSI was not designed for this you could damage your
-	 *     hardware !
-	 * However perhaps it is legal to switch on an
-	 * already connected device. It is perhaps not
-	 * guaranteed this device doesn't corrupt an ongoing data transfer.
 	 */
-	if (!strncmp("add-single-device", buffer + 5, 17)) {
+	if (!strncmp("scsi add-single-device", buffer, 22)) {
 		p = buffer + 23;
 
 		host = simple_strtoul(p, &p, 0);
@@ -345,18 +265,12 @@ static ssize_t proc_scsi_write(struct file *file, const char __user *buf,
 		err = scsi_add_single_device(host, channel, id, lun);
 		if (err >= 0)
 			err = length;
+
 	/*
 	 * Usage: echo "scsi remove-single-device 0 1 2 3" >/proc/scsi/scsi
 	 * with  "0 1 2 3" replaced by your "Host Channel Id Lun".
-	 *
-	 * Consider this feature pre-BETA.
-	 *
-	 *     CAUTION: This is not for hotplugging your peripherals. As
-	 *     SCSI was not designed for this you could damage your
-	 *     hardware and thoroughly confuse the SCSI subsystem.
-	 *
 	 */
-	} else if (!strncmp("remove-single-device", buffer + 5, 20)) {
+	} else if (!strncmp("scsi remove-single-device", buffer, 25)) {
 		p = buffer + 26;
 
 		host = simple_strtoul(p, &p, 0);
@@ -366,8 +280,8 @@ static ssize_t proc_scsi_write(struct file *file, const char __user *buf,
 
 		err = scsi_remove_single_device(host, channel, id, lun);
 	}
-out:
-	
+
+ out:
 	free_page((unsigned long)buffer);
 	return err;
 }

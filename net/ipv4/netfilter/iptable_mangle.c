@@ -14,6 +14,10 @@
 #include <net/route.h>
 #include <linux/ip.h>
 
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Netfilter Core Team <coreteam@netfilter.org>");
+MODULE_DESCRIPTION("iptables mangle table");
+
 #define MANGLE_VALID_HOOKS ((1 << NF_IP_PRE_ROUTING) | \
 			    (1 << NF_IP_LOCAL_IN) | \
 			    (1 << NF_IP_FORWARD) | \
@@ -267,4 +271,3 @@ static void __exit fini(void)
 
 module_init(init);
 module_exit(fini);
-MODULE_LICENSE("GPL");

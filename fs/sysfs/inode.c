@@ -33,7 +33,6 @@ struct inode * sysfs_new_inode(mode_t mode)
 		inode->i_gid = current->fsgid;
 		inode->i_blksize = PAGE_CACHE_SIZE;
 		inode->i_blocks = 0;
-		inode->i_rdev = NODEV;
 		inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
 		inode->i_mapping->a_ops = &sysfs_aops;
 		inode->i_mapping->backing_dev_info = &sysfs_backing_dev_info;
@@ -97,8 +96,8 @@ void sysfs_hash_and_remove(struct dentry * dir, const char * name)
 			pr_debug("sysfs: Removing %s (%d)\n", victim->d_name.name,
 				 atomic_read(&victim->d_count));
 
-			simple_unlink(dir->d_inode,victim);
 			d_delete(victim);
+			simple_unlink(dir->d_inode,victim);
 		}
 		/*
 		 * Drop reference from sysfs_get_dentry() above.

@@ -760,7 +760,7 @@ setup_sedlbauer(struct IsdnCard *card)
 						printk(KERN_ERR "Sedlbauer PnP:some resources are missing %ld/%lx\n",
 						       pnp_irq(pd, 0), pnp_port_start(pd, 0));
 						pnp_device_detach(pd);
-						goto err;
+						return 0;
 					}
 					card->para[1] = pnp_port_start(pd, 0);
 					card->para[0] = pnp_irq(pd, 0);
@@ -777,7 +777,7 @@ setup_sedlbauer(struct IsdnCard *card)
 					}
 				} else {
 					printk(KERN_ERR "Sedlbauer PnP: PnP error card found, no device\n");
-					goto err;
+					return 0;
 				}
 			}
 			pdev++;

@@ -35,6 +35,7 @@
 #include <linux/writeback.h>
 #include <linux/hugetlb.h>
 #include <linux/security.h>
+#include <linux/initrd.h>
 #include <asm/uaccess.h>
 
 #ifdef CONFIG_ROOT_NFS

@@ -128,7 +128,7 @@ static int i460_fetch_size (void)
 	if (temp & I460_BAPBASE_ENABLE)
 		i460.dynamic_apbase = INTEL_I460_BAPBASE;
 	else
-		i460.dynamic_apbase = INTEL_I460_APBASE;
+		i460.dynamic_apbase = AGP_APBASE;
 
 	for (i = 0; i < agp_bridge->driver->num_aperture_sizes; i++) {
 		/*

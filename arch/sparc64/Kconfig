@@ -5,6 +5,9 @@
 
 mainmenu "Linux/UltraSPARC Kernel Configuration"
 
+config 64BIT
+	def_bool y
+
 config MMU
 	bool
 	default y
@@ -362,29 +365,6 @@ config SUN_OPENPROMFS
 	  whenever you want), say M here and read
 	  <file:Documentation/modules.txt>.
 	  The module will be called openpromfs.  If unsure, say M.
-
-config KCORE_ELF
-	bool
-	depends on PROC_FS
-	default y
-	---help---
-	  If you enabled support for /proc file system then the file
-	  /proc/kcore will contain the kernel core image. This can be used
-	  in gdb:
-
-	  $ cd /usr/src/linux ; gdb vmlinux /proc/kcore
-
-	  You have two choices here: ELF and A.OUT. Selecting ELF will make
-	  /proc/kcore appear in ELF core format as defined by the Executable
-	  and Linking Format specification. Selecting A.OUT will choose the
-	  old "a.out" format which may be necessary for some old versions
-	  of binutils or on some architectures.
-
-	  This is especially useful if you have compiled the kernel with the
-	  "-g" option to preserve debugging information. It is mainly used
-	  for examining kernel data structures on the live kernel so if you
-	  don't understand what this means or are not a kernel hacker, just
-	  leave it at its default value ELF.
 
 config SPARC32_COMPAT
 	bool "Kernel support for Linux/Sparc 32bit binary compatibility"

@@ -1445,7 +1445,7 @@ static int rme96xx_ioctl(struct inode *in, struct file *file, unsigned int cmd, 
 
 static int rme96xx_open(struct inode *in, struct file *f)
 {
-	int minor = minor(in->i_rdev);
+	int minor = iminor(in);
 	struct list_head *list;
 	int devnum;
 	rme96xx_info *s;
@@ -1769,7 +1769,7 @@ static struct file_operations rme96xx_audio_fops = {
 
 static int rme96xx_mixer_open(struct inode *inode, struct file *file)
 {
-	int minor = minor(inode->i_rdev);
+	int minor = iminor(inode);
 	struct list_head *list;
 	rme96xx_info *s;
 

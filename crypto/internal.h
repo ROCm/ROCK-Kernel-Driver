@@ -15,6 +15,7 @@
 #include <linux/highmem.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
+#include <linux/kmod.h>
 #include <asm/hardirq.h>
 #include <asm/kmap_types.h>
 
@@ -48,15 +49,12 @@ static inline void *crypto_tfm_ctx(struct crypto_tfm *tfm)
 
 struct crypto_alg *crypto_alg_lookup(const char *name);
 
-#ifdef CONFIG_KMOD
-void crypto_alg_autoload(const char *name);
-struct crypto_alg *crypto_alg_mod_lookup(const char *name);
-#else
+/* A far more intelligent version of this is planned.  For now, just
+ * try an exact match on the name of the algorithm. */
 static inline struct crypto_alg *crypto_alg_mod_lookup(const char *name)
 {
-	return crypto_alg_lookup(name);
+	return try_then_request_module(crypto_alg_lookup(name), name);
 }
-#endif
 
 #ifdef CONFIG_CRYPTO_HMAC
 int crypto_alloc_hmac_block(struct crypto_tfm *tfm);

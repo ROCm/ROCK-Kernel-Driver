@@ -1306,7 +1306,7 @@ static int make_indexed_dir(handle_t *handle, struct dentry *dentry,
 
 	/* The 0th block becomes the root, move the dirents out */
 	fde = &root->dotdot;
-	de = (struct ext3_dir_entry_2 *)((char *)fde + fde->rec_len);
+	de = (struct ext3_dir_entry_2 *)((char *)fde + le16_to_cpu(fde->rec_len));
 	len = ((char *) root) + blocksize - (char *) de;
 	memcpy (data1, de, len);
 	de = (struct ext3_dir_entry_2 *) data1;
@@ -1658,6 +1658,9 @@ static int ext3_mknod (struct inode * dir, struct dentry *dentry,
 	handle_t *handle;
 	struct inode *inode;
 	int err;
+
+	if (!old_valid_dev(rdev))
+		return -EINVAL;
 
 	handle = ext3_journal_start(dir, EXT3_DATA_TRANS_BLOCKS +
 			 		EXT3_INDEX_EXTRA_TRANS_BLOCKS + 3);

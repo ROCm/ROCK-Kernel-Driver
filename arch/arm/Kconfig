@@ -542,39 +542,15 @@ config CPU_FREQ_SA1100
 	bool
 	depends on CPU_FREQ && SA1100_LART
 	default y
+	select CPU_FREQ_DEFAULT_GOV_USERSPACE
+	select CPU_FREQ_24_API if SYSCTL
 
 config CPU_FREQ_SA1110
 	bool
 	depends on CPU_FREQ && (SA1100_ASSABET || SA1100_CERF || SA1100_PT_SYSTEM3)
 	default y
-
-if (CPU_FREQ_SA1100 || CPU_FREQ_SA1110)
-
-config CPU_FREQ_GOV_USERSPACE
-	tristate
-	depends on CPU_FREQ
-	default y
-
-config CPU_FREQ_24_API
-	bool
-	depends on CPU_FREQ_GOV_USERSPACE && SYSCTL
-	default y
-
-config CPU_FREQ_PROC_INTF
-	tristate "/proc/cpufreq interface (deprecated)"
-	depends on CPU_FREQ && PROC_FS
-	help
-	  This enables the /proc/cpufreq interface for controlling
-	  CPUFreq. Please note that it is recommended to use the sysfs
-	  interface instead (which is built automatically).
-
-	  For details, take a look at linux/Documentation/cpufreq.
-
-	  If in doubt, say N.
-
-endif
-
-# CPUfreq on Integrator can use the generic cpufreq core
+	select CPU_FREQ_DEFAULT_GOV_USERSPACE
+	select CPU_FREQ_24_API if SYSCTL
 
 config CPU_FREQ_INTEGRATOR
 	tristate "CPUfreq driver for ARM Integrator CPUs"
@@ -587,7 +563,7 @@ config CPU_FREQ_INTEGRATOR
 
 	  If in doubt, say Y.
 
-if (CPU_FREQ_INTEGRATOR)
+if (CPU_FREQ_INTEGRATOR) || (CPU_FREQ_SA1110) || (CPU_FREQ_SA1100)
 
 source "drivers/cpufreq/Kconfig"
 
@@ -653,39 +629,6 @@ config FPE_FASTFPE
 	  for scientific calculations, but you have to check this for yourself.
 	  If you do not feel you need a faster FP emulation you should better
 	  choose NWFPE.
-
-choice
-	prompt "Kernel core (/proc/kcore) format"
-	default KCORE_ELF
-
-config KCORE_ELF
-	bool "ELF"
-	---help---
-	  If you enabled support for /proc file system then the file
-	  /proc/kcore will contain the kernel core image. This can be used
-	  in gdb:
-
-	  $ cd /usr/src/linux ; gdb vmlinux /proc/kcore
-
-	  You have two choices here: ELF and A.OUT. Selecting ELF will make
-	  /proc/kcore appear in ELF core format as defined by the Executable
-	  and Linking Format specification. Selecting A.OUT will choose the
-	  old "a.out" format which may be necessary for some old versions
-	  of binutils or on some architectures.
-
-	  This is especially useful if you have compiled the kernel with the
-	  "-g" option to preserve debugging information. It is mainly used
-	  for examining kernel data structures on the live kernel so if you
-	  don't understand what this means or are not a kernel hacker, just
-	  leave it at its default value ELF.
-
-config KCORE_AOUT
-	bool "A.OUT"
-	help
-	  Not necessary unless you're using a very out-of-date binutils
-	  version.  You probably want KCORE_ELF.
-
-endchoice
 
 source "fs/Kconfig.binfmt"
 

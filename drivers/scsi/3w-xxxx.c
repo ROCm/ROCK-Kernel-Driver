@@ -174,7 +174,7 @@
 #include <linux/module.h>
 
 MODULE_AUTHOR ("3ware Inc.");
-#ifdef __SMP__
+#ifdef CONFIG_SMP
 MODULE_DESCRIPTION ("3ware Storage Controller Linux Driver (SMP)");
 #else
 MODULE_DESCRIPTION ("3ware Storage Controller Linux Driver");
@@ -628,7 +628,7 @@ static int tw_chrdev_ioctl(struct inode *inode, struct file *file, unsigned int 
 	unsigned long *cpu_addr;
 	TW_New_Ioctl *tw_ioctl;
 	TW_Passthru *passthru;
-	TW_Device_Extension *tw_dev = tw_device_extension_list[minor(inode->i_rdev)];
+	TW_Device_Extension *tw_dev = tw_device_extension_list[iminor(inode)];
 	int retval = -EFAULT;
 
 	dprintk(KERN_WARNING "3w-xxxx: tw_chrdev_ioctl()\n");
@@ -786,7 +786,7 @@ static int tw_chrdev_open(struct inode *inode, struct file *file)
 
 	dprintk(KERN_WARNING "3w-xxxx: tw_ioctl_open()\n");
 
-	minor_number = minor(inode->i_rdev);
+	minor_number = iminor(inode);
 	if (minor_number >= tw_device_extension_count)
 		return -ENODEV;
 

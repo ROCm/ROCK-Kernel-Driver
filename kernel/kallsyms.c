@@ -189,9 +189,11 @@ static int update_iter(struct kallsym_iter *iter, loff_t pos)
 	if (pos < iter->pos)
 		reset_iter(iter);
 
-	/* We need to iterate through the previous symbols. */
-	for (; iter->pos <= pos; iter->pos++)
+	/* We need to iterate through the previous symbols: can be slow */
+	for (; iter->pos != pos; iter->pos++) {
 		get_ksymbol_core(iter);
+		cond_resched();
+	}
 	return 1;
 }
 
@@ -280,8 +282,7 @@ int __init kallsyms_init(void)
 {
 	struct proc_dir_entry *entry;
 
-	/* root-only: could chew up lots of cpu by read, seek back, read... */
-	entry = create_proc_entry("kallsyms", 0400, NULL);
+	entry = create_proc_entry("kallsyms", 0444, NULL);
 	if (entry)
 		entry->proc_fops = &kallsyms_operations;
 	return 0;

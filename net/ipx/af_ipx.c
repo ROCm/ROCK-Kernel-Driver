@@ -1365,6 +1365,7 @@ static int ipx_create(struct socket *sock, int protocol)
 			atomic_read(&ipx_sock_nr));
 #endif
 	sock_init_data(sock, sk);
+	sk_set_owner(sk, THIS_MODULE);
 	sk->sk_no_check = 1;		/* Checksum off by default */
 	rc = 0;
 out:
@@ -1939,10 +1940,6 @@ extern void destroy_8023_client(struct datalink_proto *);
 
 static unsigned char ipx_8022_type = 0xE0;
 static unsigned char ipx_snap_id[5] = { 0x0, 0x0, 0x0, 0x81, 0x37 };
-static char ipx_banner[] __initdata =
-	KERN_INFO "NET4: Linux IPX 0.51 for NET4.0\n"
-	KERN_INFO "IPX Portions Copyright (c) 1995 Caldera, Inc.\n" \
-	KERN_INFO "IPX Portions Copyright (c) 2000-2003 Conectiva, Inc.\n";
 static char ipx_EII_err_msg[] __initdata =
 	KERN_CRIT "IPX: Unable to register with Ethernet II\n";
 static char ipx_8023_err_msg[] __initdata =
@@ -1979,7 +1976,6 @@ static int __init ipx_init(void)
 	register_netdevice_notifier(&ipx_dev_notifier);
 	ipx_register_sysctl();
 	ipx_proc_init();
-	printk(ipx_banner);
 	return 0;
 }
 
@@ -2020,3 +2016,4 @@ static void __exit ipx_proto_finito(void)
 module_init(ipx_init);
 module_exit(ipx_proto_finito);
 MODULE_LICENSE("GPL");
+MODULE_ALIAS_NETPROTO(PF_IPX);

@@ -26,6 +26,7 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 #include <linux/init.h>
 #include <linux/compile.h>
 #include <linux/version.h>
@@ -41,75 +42,59 @@
 /**************************************************/
 /* globals and useful constants                   */
 
-static char *IKCONFIG_NAME = "ikconfig";
-static char *IKCONFIG_VERSION = "0.5";
+static const char IKCONFIG_NAME[] = "ikconfig";
+static const char IKCONFIG_VERSION[] = "0.6";
 
-static int ikconfig_current_size = 0;
-static struct proc_dir_entry *ikconfig_dir, *current_config, *built_with;
-
-static int
-ikconfig_permission_current(struct inode *inode, int op, struct nameidata *nd)
-{
-	/* anyone can read the device, no one can write to it */
-	return (op == MAY_READ) ? 0 : -EACCES;
-}
+static int ikconfig_size;
+static struct proc_dir_entry *ikconfig_dir;
 
 static ssize_t
-ikconfig_output_current(struct file *file, char *buf,
-			 size_t len, loff_t * offset)
+ikconfig_read(struct file *file, char __user *buf, 
+		   size_t len, loff_t *offset)
 {
-	int i, limit;
-	int cnt;
+	loff_t pos = *offset;
+	ssize_t count;
+	
+	if (pos >= ikconfig_size)
+		return 0;
 
-	limit = (ikconfig_current_size > len) ? len : ikconfig_current_size;
-	for (i = file->f_pos, cnt = 0;
-	     i < ikconfig_current_size && cnt < limit; i++, cnt++) {
-		if (put_user(ikconfig_config[i], buf + cnt))
-			return -EFAULT;
-	}
-	file->f_pos = i;
-	return cnt;
+	count = min(len, (size_t)(ikconfig_size - pos));
+	if(copy_to_user(buf, ikconfig_config + pos, count))
+		return -EFAULT;
+
+	*offset += count;
+	return count;
 }
 
-static int
-ikconfig_open_current(struct inode *inode, struct file *file)
-{
-	if (file->f_mode & FMODE_READ) {
-		inode->i_size = ikconfig_current_size;
-		file->f_pos = 0;
-	}
-	return 0;
-}
-
-static int
-ikconfig_close_current(struct inode *inode, struct file *file)
-{
-	return 0;
-}
-
-static struct file_operations ikconfig_file_ops = {
-	.read = ikconfig_output_current,
-	.open = ikconfig_open_current,
-	.release = ikconfig_close_current,
-};
-
-static struct inode_operations ikconfig_inode_ops = {
-	.permission = ikconfig_permission_current,
+static struct file_operations config_fops = {
+	.owner = THIS_MODULE,
+	.read  = ikconfig_read,
 };
 
 /***************************************************/
-/* proc_read_built_with: let people read the info  */
+/* built_with_show: let people read the info  */
 /* we have on the tools used to build this kernel  */
 
-static int
-proc_read_built_with(char *page, char **start,
-		     off_t off, int count, int *eof, void *data)
+static int builtwith_show(struct seq_file *seq, void *v)
 {
-	*eof = 1;
-	return sprintf(page,
-			"Kernel:    %s\nCompiler:  %s\nVersion_in_Makefile: %s\n",
-			ikconfig_built_with, LINUX_COMPILER, UTS_RELEASE);
+	seq_printf(seq, 
+		   "Kernel:    %s\nCompiler:  %s\nVersion_in_Makefile: %s\n",
+		   ikconfig_built_with, LINUX_COMPILER, UTS_RELEASE);
+	return 0;
 }
+
+static int built_with_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, builtwith_show, PDE(inode)->data);
+}
+	
+static struct file_operations builtwith_fops = {
+	.owner = THIS_MODULE,
+	.open  = built_with_open,
+	.read  = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+};	
 
 /***************************************************/
 /* ikconfig_init: start up everything we need to */
@@ -117,41 +102,33 @@ proc_read_built_with(char *page, char **start,
 int __init
 ikconfig_init(void)
 {
-	int result = 0;
+	struct proc_dir_entry *entry;
 
 	printk(KERN_INFO "ikconfig %s with /proc/ikconfig\n",
 	       IKCONFIG_VERSION);
 
 	/* create the ikconfig directory */
 	ikconfig_dir = proc_mkdir(IKCONFIG_NAME, NULL);
-	if (ikconfig_dir == NULL) {
-		result = -ENOMEM;
+	if (ikconfig_dir == NULL) 
 		goto leave;
-	}
 	ikconfig_dir->owner = THIS_MODULE;
 
 	/* create the current config file */
-	current_config = create_proc_entry("config", S_IFREG | S_IRUGO,
-					   ikconfig_dir);
-	if (current_config == NULL) {
-		result = -ENOMEM;
+	entry = create_proc_entry("config", S_IFREG | S_IRUGO, ikconfig_dir);
+	if (!entry)
 		goto leave2;
-	}
-	current_config->proc_iops = &ikconfig_inode_ops;
-	current_config->proc_fops = &ikconfig_file_ops;
-	current_config->owner = THIS_MODULE;
-	ikconfig_current_size = strlen(ikconfig_config);
-	current_config->size = ikconfig_current_size;
+
+	entry->proc_fops = &config_fops;
+	entry->size = ikconfig_size = strlen(ikconfig_config);
 
 	/* create the "built with" file */
-	built_with = create_proc_read_entry("built_with", 0444, ikconfig_dir,
-					    proc_read_built_with, NULL);
-	if (built_with == NULL) {
-		result = -ENOMEM;
+	entry = create_proc_entry("built_with", S_IFREG | S_IRUGO,
+				  ikconfig_dir);
+	if (!entry)
 		goto leave3;
-	}
-	built_with->owner = THIS_MODULE;
-	goto leave;
+	entry->proc_fops = &builtwith_fops;
+
+	return 0;
 
 leave3:
 	/* remove the file from proc */
@@ -162,7 +139,7 @@ leave2:
 	remove_proc_entry(IKCONFIG_NAME, NULL);
 
 leave:
-	return result;
+	return -ENOMEM;
 }
 
 /***************************************************/

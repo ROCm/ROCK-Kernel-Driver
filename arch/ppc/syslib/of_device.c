@@ -15,8 +15,8 @@
  * Used by a driver to check whether an of_device present in the
  * system is in its list of supported devices. 
  */
-const struct of_match *
-of_match_device(const struct of_match *matches, const struct of_device *dev)
+const struct of_match * of_match_device(const struct of_match *matches,
+					const struct of_device *dev)
 {
 	if (!dev->node)
 		return NULL;
@@ -38,8 +38,7 @@ of_match_device(const struct of_match *matches, const struct of_device *dev)
 	return NULL;
 }
 
-static int
-of_platform_bus_match(struct device *dev, struct device_driver *drv) 
+static int of_platform_bus_match(struct device *dev, struct device_driver *drv) 
 {
 	struct of_device * of_dev = to_of_device(dev);
 	struct of_platform_driver * of_drv = to_of_platform_driver(drv);
@@ -51,21 +50,27 @@ of_platform_bus_match(struct device *dev, struct device_driver *drv)
 	return of_match_device(matches, of_dev) != NULL;
 }
 
-struct bus_type of_platform_bus_type = {
-       name:	"of_platform",
-       match:	of_platform_bus_match,
-};
-
-static int __init
-of_bus_driver_init(void)
+struct of_device *of_dev_get(struct of_device *dev)
 {
-	return bus_register(&of_platform_bus_type);
+	struct device *tmp;
+
+	if (!dev)
+		return NULL;
+	tmp = get_device(&dev->dev);
+	if (tmp)
+		return to_of_device(tmp);
+	else
+		return NULL;
 }
 
-postcore_initcall(of_bus_driver_init);
+void of_dev_put(struct of_device *dev)
+{
+	if (dev)
+		put_device(&dev->dev);
+}
 
-static int
-of_device_probe(struct device *dev)
+
+static int of_device_probe(struct device *dev)
 {
 	int error = -ENODEV;
 	struct of_platform_driver *drv;
@@ -78,22 +83,18 @@ of_device_probe(struct device *dev)
 	if (!drv->probe)
 		return error;
 
-/*	if (!try_module_get(driver->owner)) {
-		printk(KERN_ERR "Can't get a module reference for %s\n", driver->name);
-		return error;
-	}
-*/
+	of_dev_get(of_dev);
+
 	match = of_match_device(drv->match_table, of_dev);
 	if (match)
 		error = drv->probe(of_dev, match);
-/*
- 	module_put(driver->owner);
-*/	
+	if (error)
+		of_dev_put(of_dev);
+
 	return error;
 }
 
-static int
-of_device_remove(struct device *dev)
+static int of_device_remove(struct device *dev)
 {
 	struct of_device * of_dev = to_of_device(dev);
 	struct of_platform_driver * drv = to_of_platform_driver(of_dev->dev.driver);
@@ -103,32 +104,43 @@ of_device_remove(struct device *dev)
 	return 0;
 }
 
-static int
-of_device_suspend(struct device *dev, u32 state, u32 level)
+static int of_device_suspend(struct device *dev, u32 state)
 {
 	struct of_device * of_dev = to_of_device(dev);
 	struct of_platform_driver * drv = to_of_platform_driver(of_dev->dev.driver);
 	int error = 0;
 
 	if (drv && drv->suspend)
-		error = drv->suspend(of_dev, state, level);
+		error = drv->suspend(of_dev, state);
 	return error;
 }
 
-static int
-of_device_resume(struct device * dev, u32 level)
+static int of_device_resume(struct device * dev)
 {
 	struct of_device * of_dev = to_of_device(dev);
 	struct of_platform_driver * drv = to_of_platform_driver(of_dev->dev.driver);
 	int error = 0;
 
 	if (drv && drv->resume)
-		error = drv->resume(of_dev, level);
+		error = drv->resume(of_dev);
 	return error;
 }
 
-int
-of_register_driver(struct of_platform_driver *drv)
+struct bus_type of_platform_bus_type = {
+       .name	= "of_platform",
+       .match	= of_platform_bus_match,
+       .suspend	= of_device_suspend,
+       .resume	= of_device_resume,
+};
+
+static int __init of_bus_driver_init(void)
+{
+	return bus_register(&of_platform_bus_type);
+}
+
+postcore_initcall(of_bus_driver_init);
+
+int of_register_driver(struct of_platform_driver *drv)
 {
 	int count = 0;
 
@@ -136,8 +148,6 @@ of_register_driver(struct of_platform_driver *drv)
 	drv->driver.name = drv->name;
 	drv->driver.bus = &of_platform_bus_type;
 	drv->driver.probe = of_device_probe;
-	drv->driver.resume = of_device_resume;
-	drv->driver.suspend = of_device_suspend;
 	drv->driver.remove = of_device_remove;
 
 	/* register with core */
@@ -145,15 +155,13 @@ of_register_driver(struct of_platform_driver *drv)
 	return count ? count : 1;
 }
 
-void
-of_unregister_driver(struct of_platform_driver *drv)
+void of_unregister_driver(struct of_platform_driver *drv)
 {
 	driver_unregister(&drv->driver);
 }
 
 
-static ssize_t
-dev_show_devspec(struct device *dev, char *buf)
+static ssize_t dev_show_devspec(struct device *dev, char *buf)
 {
 	struct of_device *ofdev;
 
@@ -163,8 +171,22 @@ dev_show_devspec(struct device *dev, char *buf)
 
 static DEVICE_ATTR(devspec, S_IRUGO, dev_show_devspec, NULL);
 
-int
-of_device_register(struct of_device *ofdev)
+/**
+ * of_release_dev - free an of device structure when all users of it are finished.
+ * @dev: device that's been disconnected
+ *
+ * Will be called only by the device core when all users of this of device are
+ * done.
+ */
+void of_release_dev(struct device *dev)
+{
+	struct of_device *ofdev;
+
+        ofdev = to_of_device(dev);
+	kfree(ofdev);
+}
+
+int of_device_register(struct of_device *ofdev)
 {
 	int rc;
 	struct of_device **odprop;
@@ -197,21 +219,20 @@ of_device_register(struct of_device *ofdev)
 	return 0;
 }
 
-void
-of_device_unregister(struct of_device *ofdev)
+void of_device_unregister(struct of_device *ofdev)
 {
 	struct of_device **odprop;
 
 	device_remove_file(&ofdev->dev, &dev_attr_devspec);
-	device_unregister(&ofdev->dev);
 
 	odprop = (struct of_device **)get_property(ofdev->node, "linux,device", NULL);
 	if (odprop)
 		*odprop = NULL;
+
+	device_unregister(&ofdev->dev);
 }
 
-struct of_device*
-of_platform_device_create(struct device_node *np, const char *bus_id)
+struct of_device* of_platform_device_create(struct device_node *np, const char *bus_id)
 {
 	struct of_device *dev;
 	u32 *reg;
@@ -226,6 +247,7 @@ of_platform_device_create(struct device_node *np, const char *bus_id)
 	dev->dev.dma_mask = &dev->dma_mask;
 	dev->dev.parent = NULL;
 	dev->dev.bus = &of_platform_bus_type;
+	dev->dev.release = of_release_dev;
 
 	reg = (u32 *)get_property(np, "reg", NULL);
 	strlcpy(dev->dev.bus_id, bus_id, BUS_ID_SIZE);
@@ -244,4 +266,7 @@ EXPORT_SYMBOL(of_register_driver);
 EXPORT_SYMBOL(of_unregister_driver);
 EXPORT_SYMBOL(of_device_register);
 EXPORT_SYMBOL(of_device_unregister);
+EXPORT_SYMBOL(of_dev_get);
+EXPORT_SYMBOL(of_dev_put);
 EXPORT_SYMBOL(of_platform_device_create);
+EXPORT_SYMBOL(of_release_dev);

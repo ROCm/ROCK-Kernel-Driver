@@ -104,7 +104,6 @@
 
 #include <asm/io.h>
 
-#include "ide_modes.h"
 #include "opti621.h"
 
 #define OPTI621_MAX_PIO 3

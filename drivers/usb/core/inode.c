@@ -4,7 +4,7 @@
  *	inode.c  --  Inode/Dentry functions for the USB device file system.
  *
  *	Copyright (C) 2000 Thomas Sailer (sailer@ife.ee.ethz.ch)
- *	Copyright (c) 2001,2002 Greg Kroah-Hartman (greg@kroah.com)
+ *	Copyright (C) 2001,2002 Greg Kroah-Hartman (greg@kroah.com)
  *
  *	This program is free software; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
@@ -152,7 +152,6 @@ static struct inode *usbfs_get_inode (struct super_block *sb, int mode, dev_t de
 		inode->i_gid = current->fsgid;
 		inode->i_blksize = PAGE_CACHE_SIZE;
 		inode->i_blocks = 0;
-		inode->i_rdev = NODEV;
 		inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
 		switch (mode & S_IFMT) {
 		default:

@@ -66,7 +66,6 @@
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
 #include <linux/module.h>
-#include <linux/version.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/errno.h>
@@ -75,7 +74,6 @@
 #include <linux/delay.h>	/* for mdelay */
 #include <linux/interrupt.h>	/* needed for in_interrupt() proto */
 #include <linux/reboot.h>	/* notifier code */
-#include <linux/nmi.h>
 #include "../../scsi/scsi.h"
 #include "../../scsi/hosts.h"
 
@@ -3077,7 +3075,6 @@ mptscsih_tm_pending_wait(MPT_SCSI_HOST * hd)
 			break;
 		}
 		spin_unlock_irqrestore(&hd->ioc->FreeQlock, flags);
-		touch_nmi_watchdog(); 
 		mdelay(250);
 	} while (--loop_count);
 
@@ -3332,9 +3329,8 @@ mptscsih_slave_configure(Scsi_Device *device)
 		device, device->id, device->lun, device->channel));
 	dsprintk((KERN_INFO "sdtr %d wdtr %d ppr %d inq length=%d\n",
 		device->sdtr, device->wdtr, device->ppr, device->inquiry_len));
-	dsprintk(("tagged %d queue %d simple %d ordered %d\n",
-		device->tagged_supported, device->tagged_queue,
-		device->simple_tags, device->ordered_tags));
+	dsprintk(("tagged %d simple %d ordered %d\n",
+		device->tagged_supported, device->simple_tags, device->ordered_tags));
 
 	/*	set target parameters, queue depths, set dv flags ?  */
 	if (hd && (hd->Targets != NULL)) {

@@ -28,44 +28,44 @@ extern void heartbeat_bigsur(void);
 extern void init_bigsur_IRQ(void);
 
 struct sh_machine_vector mv_bigsur __initmv = {
-	mv_nr_irqs:		NR_IRQS,     // Defined in <asm/irq.h>
-	mv_inb:			bigsur_inb,
-	mv_inw:			bigsur_inw,
-	mv_inl:			bigsur_inl,
-	mv_outb:		bigsur_outb,
-	mv_outw:		bigsur_outw,
-	mv_outl:		bigsur_outl,
+	.mv_nr_irqs		= NR_IRQS,     // Defined in <asm/irq.h>
+	.mv_inb			= bigsur_inb,
+	.mv_inw			= bigsur_inw,
+	.mv_inl			= bigsur_inl,
+	.mv_outb		= bigsur_outb,
+	.mv_outw		= bigsur_outw,
+	.mv_outl		= bigsur_outl,
 
-	mv_inb_p:		bigsur_inb_p,
-	mv_inw_p:		bigsur_inw,
-	mv_inl_p:		bigsur_inl,
-	mv_outb_p:		bigsur_outb_p,
-	mv_outw_p:		bigsur_outw,
-	mv_outl_p:		bigsur_outl,
+	.mv_inb_p		= bigsur_inb_p,
+	.mv_inw_p		= bigsur_inw,
+	.mv_inl_p		= bigsur_inl,
+	.mv_outb_p		= bigsur_outb_p,
+	.mv_outw_p		= bigsur_outw,
+	.mv_outl_p		= bigsur_outl,
 
-	mv_insb:		bigsur_insb,
-	mv_insw:		bigsur_insw,
-	mv_insl:		bigsur_insl,
-	mv_outsb:		bigsur_outsb,
-	mv_outsw:		bigsur_outsw,
-	mv_outsl:		bigsur_outsl,
+	.mv_insb		= bigsur_insb,
+	.mv_insw		= bigsur_insw,
+	.mv_insl		= bigsur_insl,
+	.mv_outsb		= bigsur_outsb,
+	.mv_outsw		= bigsur_outsw,
+	.mv_outsl		= bigsur_outsl,
 
-	mv_readb:		generic_readb,
-	mv_readw:		generic_readw,
-	mv_readl:		generic_readl,
-	mv_writeb:		generic_writeb,
-	mv_writew:		generic_writew,
-	mv_writel:		generic_writel,
+	.mv_readb		= generic_readb,
+	.mv_readw		= generic_readw,
+	.mv_readl		= generic_readl,
+	.mv_writeb		= generic_writeb,
+	.mv_writew		= generic_writew,
+	.mv_writel		= generic_writel,
 
-	mv_ioremap:		generic_ioremap,
-	mv_iounmap:		generic_iounmap,
+	.mv_ioremap		= generic_ioremap,
+	.mv_iounmap		= generic_iounmap,
 
-	mv_isa_port2addr:	bigsur_isa_port2addr,
-	mv_irq_demux:       bigsur_irq_demux,
+	.mv_isa_port2addr	= bigsur_isa_port2addr,
+	.mv_irq_demux       = bigsur_irq_demux,
 
-	mv_init_irq:		init_bigsur_IRQ,
+	.mv_init_irq		= init_bigsur_IRQ,
 #ifdef CONFIG_HEARTBEAT
-	mv_heartbeat:		heartbeat_bigsur,
+	.mv_heartbeat		= heartbeat_bigsur,
 #endif
 
 };

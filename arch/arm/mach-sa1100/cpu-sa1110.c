@@ -270,8 +270,12 @@ static int sa1110_target(struct cpufreq_policy *policy,
 	 * We wait 20ms to be safe.
 	 */
 	sdram_set_refresh(2);
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(20 * HZ / 1000);
+	if (!irqs_disabled()) {
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		schedule_timeout(20 * HZ / 1000);
+	} else {
+		mdelay(20);
+	}
 
 	/*
 	 * Reprogram the DRAM timings with interrupts disabled, and
@@ -317,7 +321,7 @@ static int __init sa1110_cpu_init(struct cpufreq_policy *policy)
 	if (policy->cpu != 0)
 		return -EINVAL;
 	policy->cur = policy->min = policy->max = sa11x0_getspeed();
-	policy->policy = CPUFREQ_POLICY_POWERSAVE;
+	policy->governor = CPUFREQ_DEFAULT_GOVERNOR;
 	policy->cpuinfo.min_freq = 59000;
 	policy->cpuinfo.max_freq = 287000;
 	policy->cpuinfo.transition_latency = CPUFREQ_ETERNAL;

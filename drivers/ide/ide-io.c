@@ -54,8 +54,6 @@
 #include <asm/io.h>
 #include <asm/bitops.h>
 
-#include "ide_modes.h"
-
 #if (DISK_RECOVERY_TIME > 0)
 
 #error So the User Has To Fix the Compilation And Stop Hacking Port 0x43. Does anyone ever use this anyway ??
@@ -1389,7 +1387,7 @@ int ide_do_drive_cmd (ide_drive_t *drive, struct request *rq, ide_action_t actio
 	unsigned long flags;
 	ide_hwgroup_t *hwgroup = HWGROUP(drive);
 	DECLARE_COMPLETION(wait);
-	int insert_end = 1, err;
+	int where = ELEVATOR_INSERT_BACK, err;
 	int must_wait = (action == ide_wait || action == ide_head_wait);
 
 #ifdef CONFIG_BLK_DEV_PDC4030
@@ -1421,10 +1419,10 @@ int ide_do_drive_cmd (ide_drive_t *drive, struct request *rq, ide_action_t actio
 	spin_lock_irqsave(&ide_lock, flags);
 	if (action == ide_preempt || action == ide_head_wait) {
 		hwgroup->rq = NULL;
-		insert_end = 0;
+		where = ELEVATOR_INSERT_FRONT;
 		rq->flags |= REQ_PREEMPT;
 	}
-	__elv_add_request(drive->queue, rq, insert_end, 0);
+	__elv_add_request(drive->queue, rq, where, 0);
 	ide_do_request(hwgroup, IDE_NO_IRQ);
 	spin_unlock_irqrestore(&ide_lock, flags);
 

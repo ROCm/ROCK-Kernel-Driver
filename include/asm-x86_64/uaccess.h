@@ -256,12 +256,12 @@ static inline int __copy_from_user(void *dst, const void *src, unsigned size)
 	case 10:
 	       	__get_user_asm(*(u64*)dst,(u64*)src,ret,"q","","=r",16);
 		if (ret) return ret;
-		__get_user_asm(*(u16*)(8+dst),(u16*)(8+src),ret,"w","w","=r",2);
+		__get_user_asm(*(u16*)(8+(char*)dst),(u16*)(8+(char*)src),ret,"w","w","=r",2);
 		return ret; 
 	case 16:
 		__get_user_asm(*(u64*)dst,(u64*)src,ret,"q","","=r",16);
 		if (ret) return ret;
-		__get_user_asm(*(u64*)(8+dst),(u64*)(8+src),ret,"q","","=r",8);
+		__get_user_asm(*(u64*)(8+(char*)dst),(u64*)(8+(char*)src),ret,"q","","=r",8);
 		return ret; 
 	default:
 		return copy_user_generic(dst,src,size); 

@@ -319,7 +319,7 @@ config SOUND_TRIDENT
 
 config SOUND_MSNDCLAS
 	tristate "Support for Turtle Beach MultiSound Classic, Tahiti, Monterey"
-	depends on SOUND_PRIME!=n && SOUND
+	depends on SOUND_PRIME!=n && SOUND && !STANDALONE
 	help
 	  Say M here if you have a Turtle Beach MultiSound Classic, Tahiti or
 	  Monterey (not for the Pinnacle or Fiji).
@@ -334,7 +334,7 @@ comment "Compiled-in MSND Classic support requires firmware during compilation."
 
 config MSNDCLAS_HAVE_BOOT
 	bool
-	depends on SOUND_MSNDCLAS=y
+	depends on SOUND_MSNDCLAS=y && !STANDALONE
 	default y
 
 config MSNDCLAS_INIT_FILE
@@ -383,7 +383,7 @@ config MSNDCLAS_IO
 
 config SOUND_MSNDPIN
 	tristate "Support for Turtle Beach MultiSound Pinnacle, Fiji"
-	depends on SOUND_PRIME!=n && SOUND
+	depends on SOUND_PRIME!=n && SOUND && !STANDALONE
 	help
 	  Say M here if you have a Turtle Beach MultiSound Pinnacle or Fiji.
 	  See <file:Documentation/sound/oss/MultiSound> for important information
@@ -714,7 +714,7 @@ config SOUND_TRIX
 
 config TRIX_HAVE_BOOT
 	bool "Have TRXPRO.HEX firmware file"
-	depends on SOUND_TRIX=y
+	depends on SOUND_TRIX=y && !STANDALONE
 	help
 	  The MediaTrix AudioTrix Pro has an on-board microcontroller which
 	  needs to be initialized by downloading the code from the file
@@ -869,7 +869,7 @@ config PSS_MIXER
 
 config PSS_HAVE_BOOT
 	bool "Have DSPxxx.LD firmware file"
-	depends on SOUND_PSS
+	depends on SOUND_PSS && !STANDALONE
 	help
 	  If you have the DSPxxx.LD file or SYNTH.LD file for you card, say Y
 	  to include this file. Without this file the synth device (OPL) may
@@ -940,7 +940,7 @@ config SOUND_MAUI
 
 config MAUI_HAVE_BOOT
 	bool "Have OSWF.MOT firmware file"
-	depends on SOUND_MAUI=y
+	depends on SOUND_MAUI=y && !STANDALONE
 	help
 	  Turtle Beach Maui and Tropez sound cards have a microcontroller
 	  which needs to be initialized prior to use. OSWF.MOT is a file
@@ -1145,10 +1145,18 @@ config SOUND_ALI5455
 config SOUND_FORTE
 	tristate "ForteMedia FM801 driver"
 	depends on SOUND_PRIME!=n && PCI
+	help
+	  Say Y or M if you want driver support for the ForteMedia FM801 PCI
+	  audio controller (Abit AU10, Genius Sound Maker, HP Workstation
+	  zx2000, and others).
 
 config SOUND_RME96XX
 	tristate "RME Hammerfall (RME96XX) support"
 	depends on SOUND_PRIME!=n && PCI
+	help
+	  Say Y or M if you have a Hammerfall or Hammerfall light
+	  multichannel card from RME. If you want to acess advanced
+	  features of the card, read Documentation/sound/rme96xx.
 
 config SOUND_AD1980
 	tristate "AD1980 front/back switch plugin"

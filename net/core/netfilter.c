@@ -101,7 +101,7 @@ int nf_register_sockopt(struct nf_sockopt_ops *reg)
 	if (down_interruptible(&nf_sockopt_mutex) != 0)
 		return -EINTR;
 
-	for (i = nf_sockopts.next; i != &nf_sockopts; i = i->next) {
+	list_for_each(i, &nf_sockopts) {
 		struct nf_sockopt_ops *ops = (struct nf_sockopt_ops *)i;
 		if (ops->pf == reg->pf
 		    && (overlap(ops->set_optmin, ops->set_optmax, 
@@ -296,7 +296,7 @@ static int nf_sockopt(struct sock *sk, int pf, int val,
 	if (down_interruptible(&nf_sockopt_mutex) != 0)
 		return -EINTR;
 
-	for (i = nf_sockopts.next; i != &nf_sockopts; i = i->next) {
+	list_for_each(i, &nf_sockopts) {
 		ops = (struct nf_sockopt_ops *)i;
 		if (ops->pf == pf) {
 			if (get) {
@@ -430,7 +430,7 @@ static int nf_queue(struct sk_buff *skb,
 {
 	int status;
 	struct nf_info *info;
-#if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
+#ifdef CONFIG_BRIDGE_NETFILTER
 	struct net_device *physindev = NULL;
 	struct net_device *physoutdev = NULL;
 #endif
@@ -467,7 +467,7 @@ static int nf_queue(struct sk_buff *skb,
 	if (indev) dev_hold(indev);
 	if (outdev) dev_hold(outdev);
 
-#if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
+#ifdef CONFIG_BRIDGE_NETFILTER
 	if (skb->nf_bridge) {
 		physindev = skb->nf_bridge->physindev;
 		if (physindev) dev_hold(physindev);
@@ -483,7 +483,7 @@ static int nf_queue(struct sk_buff *skb,
 		/* James M doesn't say fuck enough. */
 		if (indev) dev_put(indev);
 		if (outdev) dev_put(outdev);
-#if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
+#ifdef CONFIG_BRIDGE_NETFILTER
 		if (physindev) dev_put(physindev);
 		if (physoutdev) dev_put(physoutdev);
 #endif
@@ -560,7 +560,7 @@ void nf_reinject(struct sk_buff *skb, struct nf_info *info,
 	/* Release those devices we held, or Alexey will kill me. */
 	if (info->indev) dev_put(info->indev);
 	if (info->outdev) dev_put(info->outdev);
-#if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
+#ifdef CONFIG_BRIDGE_NETFILTER
 	if (skb->nf_bridge) {
 		if (skb->nf_bridge->physindev)
 			dev_put(skb->nf_bridge->physindev);

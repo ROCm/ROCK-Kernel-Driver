@@ -31,7 +31,7 @@ int __init register_memblk(struct memblk *memblk, int num, struct node *root)
 	if (!error) 
 		error = sysfs_create_link(&root->sysdev.kobj,
 					  &memblk->sysdev.kobj,
-					  memblk->sysdev.kobj.name);
+					  kobject_name(&memblk->sysdev.kobj));
 	return error;
 }
 

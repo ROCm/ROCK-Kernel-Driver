@@ -38,7 +38,7 @@ physid_mask_t phys_cpu_present_map;
 void __init MP_processor_info (struct mpc_config_processor *m)
 {
  	int ver, logical_apicid;
-	cpumask_t apic_cpus;
+	physid_mask_t apic_cpus;
  	
 	if (!(m->mpc_cpuflag & CPU_ENABLED))
 		return;

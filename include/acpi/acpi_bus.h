@@ -26,7 +26,6 @@
 #ifndef __ACPI_BUS_H__
 #define __ACPI_BUS_H__
 
-#include <linux/version.h>
 #include <linux/kobject.h>
 
 #include <acpi/acpi.h>

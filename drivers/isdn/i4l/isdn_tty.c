@@ -132,7 +132,7 @@ static int
 isdn_tty_readbchan(struct modem_info *info, u_char * buf, u_char * fp, int len)
 {
 	int count;
-	int count_pull;
+	u_int count_pull;
 	int count_put;
 	int dflag;
 	struct sk_buff *skb;
@@ -179,7 +179,7 @@ isdn_tty_readbchan(struct modem_info *info, u_char * buf, u_char * fp, int len)
 #endif
 			/* No DLE's in buff, so simply copy it */
 			dflag = 1;
-			if ((count_pull = skb->len) > len) {
+			if ((int)(count_pull = skb->len) > len) {
 				count_pull = len;
 				dflag = 0;
 			}
@@ -315,7 +315,7 @@ isdn_tty_rcv_skb(struct isdn_slot *slot, struct sk_buff *skb)
 				skb_pull(skb, 4);
 	}
 #ifdef CONFIG_ISDN_AUDIO
-	if (skb_headroom(skb) < sizeof(isdn_audio_skb)) {
+	if ((size_t)skb_headroom(skb) < sizeof(isdnaudio_header)) {
 		printk(KERN_WARNING
 		       "isdn_audio: insufficient skb_headroom, dropping\n");
 		kfree_skb(skb);
@@ -381,7 +381,7 @@ isdn_tty_rcv_skb(struct isdn_slot *slot, struct sk_buff *skb)
 			    );
 	restore_flags(flags);
 	/* Schedule dequeuing */
-	if (dev->modempoll && info->rcvsched)
+	if ((get_isdn_dev())->modempoll && info->rcvsched)
 		mod_timer(&info->read_timer, jiffies + 4);
 	return 1;
 }
@@ -1728,9 +1728,6 @@ isdn_tty_open(struct tty_struct *tty, struct file *filp)
 	modem_info *info;
 	int retval, line;
 
-	/* FIXME. This is not unload-race free AFAICS */
-
-	MOD_INC_USE_COUNT;
 
 	line = tty->index;
 	if (line < 0 || line > ISDN_MAX_CHANNELS)
@@ -1738,6 +1735,10 @@ isdn_tty_open(struct tty_struct *tty, struct file *filp)
 	info = &isdn_mdm.info[line];
 	if (isdn_tty_paranoia_check(info, tty->name, "isdn_tty_open"))
 		return -ENODEV;
+	if (!try_module_get(info->owner)) {
+		printk(KERN_WARNING "%s: cannot reserve module\n", __FUNCTION__);
+		return -ENODEV;
+	}
 #ifdef ISDN_DEBUG_MODEM_OPEN
 	printk(KERN_DEBUG "isdn_tty_open %s, count = %d\n", tty->name,
 	       info->count);
@@ -1753,6 +1754,7 @@ isdn_tty_open(struct tty_struct *tty, struct file *filp)
 #ifdef ISDN_DEBUG_MODEM_OPEN
 		printk(KERN_DEBUG "isdn_tty_open return after startup\n");
 #endif
+		module_put(info->owner);
 		return retval;
 	}
 	retval = isdn_tty_block_til_ready(tty, filp, info);
@@ -1760,12 +1762,13 @@ isdn_tty_open(struct tty_struct *tty, struct file *filp)
 #ifdef ISDN_DEBUG_MODEM_OPEN
 		printk(KERN_DEBUG "isdn_tty_open return after isdn_tty_block_til_ready \n");
 #endif
+		module_put(info->owner);
 		return retval;
 	}
 #ifdef ISDN_DEBUG_MODEM_OPEN
 	printk(KERN_DEBUG "isdn_tty_open ttyi%d successful...\n", info->line);
 #endif
-	dev->modempoll++;
+	(get_isdn_dev())->modempoll++;
 #ifdef ISDN_DEBUG_MODEM_OPEN
 	printk(KERN_DEBUG "isdn_tty_open normal exit\n");
 #endif
@@ -1779,9 +1782,12 @@ isdn_tty_close(struct tty_struct *tty, struct file *filp)
 	ulong flags;
 	ulong timeout;
 
-	if (!info || isdn_tty_paranoia_check(info, tty->name, "isdn_tty_close"))
+	if (!info)
+		return;
+	if (isdn_tty_paranoia_check(info, tty->name, "isdn_tty_close"))
 		goto out;
 
+	#warning need fixing /kkeil
 	save_flags(flags);
 	cli();
 	if (tty_hung_up_p(filp)) {
@@ -1838,7 +1844,7 @@ isdn_tty_close(struct tty_struct *tty, struct file *filp)
 				break;
 		}
 	}
-	dev->modempoll--;
+	(get_isdn_dev())->modempoll--;
 	isdn_tty_shutdown(info);
 	if (tty->driver->flush_buffer)
 		tty->driver->flush_buffer(tty);
@@ -1859,7 +1865,7 @@ isdn_tty_close(struct tty_struct *tty, struct file *filp)
 	printk(KERN_DEBUG "isdn_tty_close normal exit\n");
 #endif
  out:
-	MOD_DEC_USE_COUNT;
+	module_put(info->owner);
 }
 
 /*
@@ -1982,8 +1988,8 @@ modem_write_profile(atemu * m)
 	memcpy(m->profile, m->mdmreg, ISDN_MODEM_NUMREG);
 	memcpy(m->pmsn, m->msn, ISDN_MSNLEN);
 	memcpy(m->plmsn, m->lmsn, ISDN_LMSNLEN);
-	if (dev->profd)
-		kill_pg_info(SIGIO, SEND_SIG_PRIV, dev->profd->pgrp);
+	if ((get_isdn_dev())->profd)
+		kill_pg_info(SIGIO, SEND_SIG_PRIV, (get_isdn_dev())->profd->pgrp);
 }
 
 static struct tty_operations modem_ops = {
@@ -2036,6 +2042,7 @@ isdn_tty_init(void)
 			return -3;
 		}
 #endif
+		info->owner = THIS_MODULE;
 		init_MUTEX(&info->write_sem);
 		sprintf(info->last_cause, "0000");
 		sprintf(info->last_num, "none");
@@ -2224,7 +2231,7 @@ isdn_tty_find_icall(struct isdn_slot *slot, setup_parm *setup)
 			printk(KERN_DEBUG "m_fi: match1 wret=%d\n", wret);
 			printk(KERN_DEBUG "m_fi: sl=%d flags=%08lx drv=%d ch=%d usg=%d\n", sl,
 			       info->flags, info->isdn_driver, info->isdn_channel,
-			       dev->usage[idx]);
+			       slot->usage);
 #endif
 			if (
 #ifndef FIX_FILE_TRANSFER
@@ -2457,7 +2464,7 @@ isdn_tty_at_cout(char *msg, modem_info * info)
 	    (!skb_queue_empty(&info->rpqueue)))) {
 		skb = alloc_skb(strlen(msg)
 #ifdef CONFIG_ISDN_AUDIO
-			+ sizeof(isdn_audio_skb)
+			+ sizeof(isdnaudio_header)
 #endif
 			, GFP_ATOMIC);
 		if (!skb) {
@@ -2465,7 +2472,7 @@ isdn_tty_at_cout(char *msg, modem_info * info)
 			return;
 		}
 #ifdef CONFIG_ISDN_AUDIO
-		skb_reserve(skb, sizeof(isdn_audio_skb));
+		skb_reserve(skb, sizeof(isdnaudio_header));
 #endif
 		sp = skb_put(skb, strlen(msg));
 #ifdef CONFIG_ISDN_AUDIO
@@ -2500,7 +2507,7 @@ isdn_tty_at_cout(char *msg, modem_info * info)
 		isdn_tty_queue_tail(info, skb, skb->len);
 		restore_flags(flags);
 		/* Schedule dequeuing */
-		if (dev->modempoll && info->rcvsched)
+		if ((get_isdn_dev())->modempoll && info->rcvsched)
 			mod_timer(&info->read_timer, jiffies + 4);
 	} else {
 		restore_flags(flags);
@@ -3285,7 +3292,7 @@ isdn_tty_cmd_PLUSF(char **p, modem_info * info)
 #ifdef CONFIG_ISDN_TTY_FAX
 					case '1':
 						p[0]++;
-						if (!(dev->global_features &
+						if (!((get_isdn_dev())->global_features &
 							ISDN_FEATURE_L3_FCLASS1))
 							PARSE_ERROR1;
 						m->mdmreg[REG_SI1] = 1;
@@ -3296,7 +3303,7 @@ isdn_tty_cmd_PLUSF(char **p, modem_info * info)
 						break;
 					case '2':
 						p[0]++;
-						if (!(dev->global_features &
+						if (!((get_isdn_dev())->global_features &
 							ISDN_FEATURE_L3_FCLASS2))
 							PARSE_ERROR1;
 						m->mdmreg[REG_SI1] = 1;
@@ -3318,10 +3325,10 @@ isdn_tty_cmd_PLUSF(char **p, modem_info * info)
 						p[0]++;
 						strcpy(rs, "\r\n0,");
 #ifdef CONFIG_ISDN_TTY_FAX
-						if (dev->global_features &
+						if ((get_isdn_dev())->global_features &
 							ISDN_FEATURE_L3_FCLASS1)
 							strcat(rs, "1,");
-						if (dev->global_features &
+						if ((get_isdn_dev())->global_features &
 							ISDN_FEATURE_L3_FCLASS2)
 							strcat(rs, "2,");
 #endif

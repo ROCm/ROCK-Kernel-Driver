@@ -70,12 +70,12 @@ MODULE_LICENSE("GPL");
 static int load_cyc2x(struct cycx_hw *hw, struct cycx_firmware *cfm, u32 len);
 static void cycx_bootcfg(struct cycx_hw *hw);
 
-static int reset_cyc2x(u32 addr);
-static int detect_cyc2x(u32 addr);
+static int reset_cyc2x(void *addr);
+static int detect_cyc2x(void *addr);
 
 /* Miscellaneous functions */
 static void delay_cycx(int sec);
-static int get_option_index(u32 *optlist, u32 optval);
+static int get_option_index(long *optlist, long optval);
 static u16 checksum(u8 *buf, u32 len);
 
 #define wait_cyc(addr) cycx_exec(addr + CMD_OFFSET)
@@ -92,14 +92,14 @@ static char copyright[] = "(c) 1998-2003 Arnaldo Carvalho de Melo "
  * These are arrays of configuration options used by verification routines.
  * The first element of each array is its size (i.e. number of options).
  */
-static u32 cyc2x_dpmbase_options[] = {
+static long cyc2x_dpmbase_options[] = {
 	20,
 	0xA0000, 0xA4000, 0xA8000, 0xAC000, 0xB0000, 0xB4000, 0xB8000,
 	0xBC000, 0xC0000, 0xC4000, 0xC8000, 0xCC000, 0xD0000, 0xD4000,
 	0xD8000, 0xDC000, 0xE0000, 0xE4000, 0xE8000, 0xEC000
 };
 
-static u32 cycx_2x_irq_options[]  = { 7, 3, 5, 9, 10, 11, 12, 15 };
+static long cycx_2x_irq_options[]  = { 7, 3, 5, 9, 10, 11, 12, 15 };
 
 /* Kernel Loadable Module Entry Points */
 /* Module 'insert' entry point.
@@ -137,7 +137,7 @@ void cycx_drv_cleanup(void)
 EXPORT_SYMBOL(cycx_setup);
 int cycx_setup(struct cycx_hw *hw, void *cfm, u32 len)
 {
-	unsigned long dpmbase = hw->dpmbase;
+	long dpmbase = (long)hw->dpmbase;
 	int err;
 
 	/* Verify IRQ configuration options */
@@ -147,17 +147,17 @@ int cycx_setup(struct cycx_hw *hw, void *cfm, u32 len)
 	}
 
 	/* Setup adapter dual-port memory window and test memory */
-	if (!hw->dpmbase) {
+	if (!dpmbase) {
 		printk(KERN_ERR "%s: you must specify the dpm address!\n",
 				modname);
  		return -EINVAL;
-	} else if (!get_option_index(cyc2x_dpmbase_options, hw->dpmbase)) {
+	} else if (!get_option_index(cyc2x_dpmbase_options, dpmbase)) {
 		printk(KERN_ERR "%s: memory address 0x%lX is invalid!\n",
 				modname, dpmbase);
 		return -EINVAL;
 	}
 
-	hw->dpmbase = (u32)ioremap(dpmbase, CYCX_WINDOWSIZE);
+	hw->dpmbase = ioremap(dpmbase, CYCX_WINDOWSIZE);
 	hw->dpmsize = CYCX_WINDOWSIZE;
 
 	if (!detect_cyc2x(hw->dpmbase)) {
@@ -181,8 +181,7 @@ int cycx_setup(struct cycx_hw *hw, void *cfm, u32 len)
 EXPORT_SYMBOL(cycx_down);
 int cycx_down(struct cycx_hw *hw)
 {
-	iounmap((u32 *)hw->dpmbase);
-
+	iounmap(hw->dpmbase);
 	return 0;
 }
 
@@ -204,7 +203,7 @@ void cycx_intr(struct cycx_hw *hw)
  * o Set exec flag.
  * o Busy-wait until flag is reset. */
 EXPORT_SYMBOL(cycx_exec);
-int cycx_exec(u32 addr)
+int cycx_exec(void *addr)
 {
 	u16 i = 0;
 	/* wait till addr content is zeroed */
@@ -250,7 +249,7 @@ int cycx_poke(struct cycx_hw *hw, u32 addr, void *buf, u32 len)
 /* Load Aux Routines */
 /* Reset board hardware.
    return 1 if memory exists at addr and 0 if not. */
-static int memory_exists(u32 addr)
+static int memory_exists(void *addr)
 {
 	int tries = 0;
 
@@ -268,9 +267,9 @@ static int memory_exists(u32 addr)
 }
 
 /* Load reset code. */
-static void reset_load(u32 addr, u8 *buffer, u32 cnt)
+static void reset_load(void *addr, u8 *buffer, u32 cnt)
 {
-	u32 pt_code = addr + RESET_OFFSET;
+	void *pt_code = addr + RESET_OFFSET;
 	u16 i; /*, j; */
 
 	for (i = 0 ; i < cnt ; i++) {
@@ -282,7 +281,7 @@ static void reset_load(u32 addr, u8 *buffer, u32 cnt)
 /* Load buffer using boot interface.
  * o copy data from buffer to Cyclom-X memory
  * o wait for reset code to copy it to right portion of memory */
-static int buffer_load(u32 addr, u8 *buffer, u32 cnt)
+static int buffer_load(void *addr, u8 *buffer, u32 cnt)
 {
 	memcpy_toio(addr + DATA_OFFSET, buffer, cnt);
 	writew(GEN_BOOT_DAT, addr + CMD_OFFSET);
@@ -291,7 +290,7 @@ static int buffer_load(u32 addr, u8 *buffer, u32 cnt)
 }
 
 /* Set up entry point and kick start Cyclom-X CPU. */
-static void cycx_start(u32 addr)
+static void cycx_start(void *addr)
 {
 	/* put in 0x30 offset the jump instruction to the code entry point */
 	writeb(0xea, addr + 0x30);
@@ -305,9 +304,9 @@ static void cycx_start(u32 addr)
 }
 
 /* Load and boot reset code. */
-static void cycx_reset_boot(u32 addr, u8 *code, u32 len)
+static void cycx_reset_boot(void *addr, u8 *code, u32 len)
 {
-	u32 pt_start = addr + START_OFFSET;
+	void *pt_start = addr + START_OFFSET;
 
 	writeb(0xea, pt_start++); /* jmp to f000:3f00 */
 	writeb(0x00, pt_start++);
@@ -322,9 +321,9 @@ static void cycx_reset_boot(u32 addr, u8 *code, u32 len)
 }
 
 /* Load data.bin file through boot (reset) interface. */
-static int cycx_data_boot(u32 addr, u8 *code, u32 len)
+static int cycx_data_boot(void *addr, u8 *code, u32 len)
 {
-	u32 pt_boot_cmd = addr + CMD_OFFSET;
+	void *pt_boot_cmd = addr + CMD_OFFSET;
 	u32 i;
 
 	/* boot buffer lenght */
@@ -353,9 +352,9 @@ static int cycx_data_boot(u32 addr, u8 *code, u32 len)
 
 
 /* Load code.bin file through boot (reset) interface. */
-static int cycx_code_boot(u32 addr, u8 *code, u32 len)
+static int cycx_code_boot(void *addr, u8 *code, u32 len)
 {
-	u32 pt_boot_cmd = addr + CMD_OFFSET;
+	void *pt_boot_cmd = addr + CMD_OFFSET;
 	u32 i;
 
 	/* boot buffer lenght */
@@ -392,7 +391,7 @@ static int load_cyc2x(struct cycx_hw *hw, struct cycx_firmware *cfm, u32 len)
 	u8 *reset_image,
 	   *data_image,
 	   *code_image;
-	u32 pt_cycld = hw->dpmbase + 0x400;
+	void *pt_cycld = hw->dpmbase + 0x400;
 	u16 cksum;
 
 	/* Announce */
@@ -426,7 +425,7 @@ static int load_cyc2x(struct cycx_hw *hw, struct cycx_firmware *cfm, u32 len)
 	if (cksum != cfm->checksum) {
 		printk(KERN_ERR "%s:%s: firmware corrupted!\n",
 				modname, __FUNCTION__);
-		printk(KERN_ERR " cdsize = 0x%x (expected 0x%lx)\n",
+		printk(KERN_ERR " cdsize = 0x%lx (expected 0x%lx)\n",
 				len - sizeof(struct cycx_firmware) - 1,
 				cfm->info.codesize);
 		printk(KERN_ERR " chksum = 0x%x (expected 0x%x)\n",
@@ -435,9 +434,7 @@ static int load_cyc2x(struct cycx_hw *hw, struct cycx_firmware *cfm, u32 len)
 	}
 
 	/* If everything is ok, set reset, data and code pointers */
-
-	img_hdr = (struct cycx_fw_header *)(((u8 *)cfm) +
-					    sizeof(struct cycx_firmware) - 1);
+	img_hdr = (struct cycx_fw_header *)&cfm->image;
 #ifdef FIRMWARE_DEBUG
 	printk(KERN_INFO "%s:%s: image sizes\n", __FUNCTION__, modname);
 	printk(KERN_INFO " reset=%lu\n", img_hdr->reset_size);
@@ -526,7 +523,7 @@ static void cycx_bootcfg(struct cycx_hw *hw)
  *	Return 1 if detected o.k. or 0 if failed.
  *	Note:	This test is destructive! Adapter will be left in shutdown
  *		state after the test. */
-static int detect_cyc2x(u32 addr)
+static int detect_cyc2x(void *addr)
 {
 	reset_cyc2x(addr);
 
@@ -536,7 +533,7 @@ static int detect_cyc2x(u32 addr)
 /* Miscellaneous */
 /* Get option's index into the options list.
  *	Return option's index (1 .. N) or zero if option is invalid. */
-static int get_option_index(u32 *optlist, u32 optval)
+static int get_option_index(long *optlist, long optval)
 {
 	int i = 1;
 
@@ -548,7 +545,7 @@ static int get_option_index(u32 *optlist, u32 optval)
 }
 
 /* Reset adapter's CPU. */
-static int reset_cyc2x(u32 addr)
+static int reset_cyc2x(void *addr)
 {
 	writeb(0, addr + RST_ENABLE);
 	delay_cycx(2);

@@ -57,6 +57,7 @@ extern void __up (struct semaphore * sem);
 
 extern inline void down (struct semaphore * sem)
 {
+	might_sleep();
 	if (atomic_dec_return (&sem->count) < 0)
 		__down (sem);
 }
@@ -64,6 +65,7 @@ extern inline void down (struct semaphore * sem)
 extern inline int down_interruptible (struct semaphore * sem)
 {
 	int ret = 0;
+	might_sleep();
 	if (atomic_dec_return (&sem->count) < 0)
 		ret = __down_interruptible (sem);
 	return ret;

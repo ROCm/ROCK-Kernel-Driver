@@ -107,6 +107,7 @@ static inline int down_interruptible(struct semaphore * sem)
 	CHECK_MAGIC(sem->__magic);
 #endif
 
+	might_sleep();
 	if (atomic_dec_return(&sem->count) < 0)
 		ret = __down_interruptible(sem);
 	return ret;

@@ -1326,7 +1326,7 @@ static int make_request (request_queue_t *q, struct bio * bi)
 			(unsigned long long)new_sector, 
 			(unsigned long long)logical_sector);
 
-		sh = get_active_stripe(conf, new_sector, pd_idx, 0/*(bi->bi_rw&RWA_MASK)*/);
+		sh = get_active_stripe(conf, new_sector, pd_idx, (bi->bi_rw&RWA_MASK));
 		if (sh) {
 
 			add_stripe_bio(sh, bi, dd_idx, (bi->bi_rw&RW_MASK));
@@ -1334,7 +1334,12 @@ static int make_request (request_queue_t *q, struct bio * bi)
 			raid5_plug_device(conf);
 			handle_stripe(sh);
 			release_stripe(sh);
+		} else {
+			/* cannot get stripe for read-ahead, just give-up */
+			clear_bit(BIO_UPTODATE, &bi->bi_flags);
+			break;
 		}
+			
 	}
 	spin_lock_irq(&conf->device_lock);
 	if (--bi->bi_phys_segments == 0) {

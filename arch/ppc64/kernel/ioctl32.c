@@ -725,7 +725,7 @@ static int do_usbdevfs_discsignal(unsigned int fd, unsigned int cmd, unsigned lo
 #define IOCTL_TABLE_START \
 	struct ioctl_trans ioctl_start[] = {
 #define IOCTL_TABLE_END \
-	}; struct ioctl_trans ioctl_end[0];
+	};
 
 IOCTL_TABLE_START
 #include <linux/compat_ioctl.h>
@@ -763,3 +763,5 @@ HANDLE_IOCTL(USBDEVFS_REAPURB32, do_usbdevfs_reapurb)
 HANDLE_IOCTL(USBDEVFS_REAPURBNDELAY32, do_usbdevfs_reapurb)
 HANDLE_IOCTL(USBDEVFS_DISCSIGNAL32, do_usbdevfs_discsignal)
 IOCTL_TABLE_END
+
+int ioctl_table_size = ARRAY_SIZE(ioctl_start);

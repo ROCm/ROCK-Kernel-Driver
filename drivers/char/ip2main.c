@@ -2733,7 +2733,7 @@ static
 ssize_t
 ip2_ipl_read(struct file *pFile, char *pData, size_t count, loff_t *off )
 {
-	unsigned int minor = minor( pFile->f_dentry->d_inode->i_rdev );
+	unsigned int minor = iminor(pFile->f_dentry->d_inode);
 	int rc = 0;
 
 #ifdef IP2DEBUG_IPL
@@ -2863,7 +2863,7 @@ ip2_ipl_write(struct file *pFile, const char *pData, size_t count, loff_t *off)
 static int
 ip2_ipl_ioctl ( struct inode *pInode, struct file *pFile, UINT cmd, ULONG arg )
 {
-	unsigned int iplminor = minor(pInode->i_rdev);
+	unsigned int iplminor = iminor(pInode);
 	int rc = 0;
 	ULONG *pIndex = (ULONG*)arg;
 	i2eBordStrPtr pB = i2BoardPtrTable[iplminor / 4];
@@ -2998,7 +2998,7 @@ ip2_ipl_ioctl ( struct inode *pInode, struct file *pFile, UINT cmd, ULONG arg )
 static int
 ip2_ipl_open( struct inode *pInode, struct file *pFile )
 {
-	unsigned int iplminor = minor(pInode->i_rdev);
+	unsigned int iplminor = iminor(pInode);
 	i2eBordStrPtr pB;
 	i2ChanStrPtr  pCh;
 

@@ -252,8 +252,6 @@ int expand_bal;		/* Balance factor for expanding (not volume!) */
 
 /*** Low level stuff *********************************************************/
 
-static void PMacOpen(void);
-static void PMacRelease(void);
 static void *PMacAlloc(unsigned int size, int flags);
 static void PMacFree(void *ptr, unsigned int size);
 static int PMacIrqInit(void);
@@ -493,17 +491,6 @@ awacs_tumbler_cleanup(void)
 /*
  * PCI PowerMac, with AWACS, Screamer, Burgundy, DACA or Tumbler and DBDMA.
  */
-
-static void PMacOpen(void)
-{
-	MOD_INC_USE_COUNT;
-}
-
-static void PMacRelease(void)
-{
-	MOD_DEC_USE_COUNT;
-}
-
 static void *PMacAlloc(unsigned int size, int flags)
 {
 	return kmalloc(size, flags);
@@ -2428,8 +2415,7 @@ static SETTINGS def_soft = {
 static MACHINE machPMac = {
 	.name		= awacs_name,
 	.name2		= "PowerMac Built-in Sound",
-	.open		= PMacOpen,
-	.release	= PMacRelease,
+	.owner		= THIS_MODULE,
 	.dma_alloc	= PMacAlloc,
 	.dma_free	= PMacFree,
 	.irqinit	= PMacIrqInit,

@@ -226,7 +226,7 @@ static int shared_resources_initialised;
      *  Mid level stuff
      */
 
-struct sound_settings dmasound;
+struct sound_settings dmasound = { .lock = SPIN_LOCK_UNLOCKED };
 
 static inline void sound_silence(void)
 {
@@ -327,7 +327,8 @@ static struct {
 
 static int mixer_open(struct inode *inode, struct file *file)
 {
-	dmasound.mach.open();
+	if (!try_module_get(dmasound.mach.owner))
+		return -ENODEV;
 	mixer.busy = 1;
 	return 0;
 }
@@ -336,7 +337,7 @@ static int mixer_release(struct inode *inode, struct file *file)
 {
 	lock_kernel();
 	mixer.busy = 0;
-	dmasound.mach.release();
+	module_put(dmasound.mach.owner);
 	unlock_kernel();
 	return 0;
 }
@@ -374,7 +375,7 @@ static struct file_operations mixer_fops =
 	.release	= mixer_release,
 };
 
-static void __init mixer_init(void)
+static void mixer_init(void)
 {
 #ifndef MODULE
 	int mixer_unit;
@@ -869,31 +870,29 @@ static int sq_open(struct inode *inode, struct file *file)
 {
 	int rc;
 
-	dmasound.mach.open();
+	if (!try_module_get(dmasound.mach.owner))
+		return -ENODEV;
 
-	if ((rc = write_sq_open(file))) { /* checks the f_mode */
-		dmasound.mach.release();
-		return rc;
-	}
+	rc = write_sq_open(file); /* checks the f_mode */
+	if (rc)
+		goto out;
 #ifdef HAS_RECORD
 	if (dmasound.mach.record) {
-		if ((rc = read_sq_open(file))) { /* checks the f_mode */
-			dmasound.mach.release();
-			return rc;
-		}
+		rc = read_sq_open(file); /* checks the f_mode */
+		if (rc)
+			goto out;
 	} else { /* no record function installed; in compat mode */
 		if (file->f_mode & FMODE_READ) {
 			/* TODO: if O_RDWR, release any resources grabbed by write part */
-			dmasound.mach.release() ;
-			/* I think this is what is required by open(2) */
-			return -ENXIO ;
+			rc = -ENXIO;
+			goto out;
 		}
 	}
 #else /* !HAS_RECORD */
 	if (file->f_mode & FMODE_READ) {
 		/* TODO: if O_RDWR, release any resources grabbed by write part */
-		dmasound.mach.release() ;
-		return -ENXIO ; /* I think this is what is required by open(2) */
+		rc = -ENXIO ; /* I think this is what is required by open(2) */
+		goto out;
 	}
 #endif /* HAS_RECORD */
 
@@ -904,7 +903,7 @@ static int sq_open(struct inode *inode, struct file *file)
 	  O_RDONLY and dsp1 could be opened O_WRONLY
 	*/
 
-	dmasound.minDev = minor(inode->i_rdev) & 0x0f;
+	dmasound.minDev = iminor(inode) & 0x0f;
 
 	/* OK. - we should make some attempt at consistency. At least the H'ware
 	   options should be set with a valid mode.  We will make it that the LL
@@ -931,6 +930,9 @@ static int sq_open(struct inode *inode, struct file *file)
 #endif
 
 	return 0;
+ out:
+	module_put(dmasound.mach.owner);
+	return rc;
 }
 
 static void sq_reset_output(void)
@@ -1050,7 +1052,7 @@ static int sq_release(struct inode *inode, struct file *file)
 		dmasound.hard = dmasound.mach.default_hard ;
 	}
 
-	dmasound.mach.release();
+	module_put(dmasound.mach.owner);
 
 #if 0 /* blocking open() */
 	/* Wake up a process waiting for the queue being released.
@@ -1339,7 +1341,7 @@ static struct file_operations sq_fops =
 #endif
 };
 
-static int __init sq_init(void)
+static int sq_init(void)
 {
 #ifndef MODULE
 	int sq_unit;
@@ -1349,7 +1351,6 @@ static int __init sq_init(void)
 	if (dmasound.mach.record)
 		sq_fops.read = sq_read ;
 #endif
-	spin_lock_init(&dmasound.lock);
 	sq_unit = register_sound_dsp(&sq_fops, -1);
 	if (sq_unit < 0) {
 		printk(KERN_ERR "dmasound_core: couldn't register fops\n") ;
@@ -1448,7 +1449,8 @@ static int state_open(struct inode *inode, struct file *file)
 	if (state.busy)
 		return -EBUSY;
 
-	dmasound.mach.open();
+	if (!try_module_get(dmasound.mach.owner))
+		return -ENODEV;
 	state.ptr = 0;
 	state.busy = 1;
 
@@ -1530,7 +1532,7 @@ static int state_release(struct inode *inode, struct file *file)
 {
 	lock_kernel();
 	state.busy = 0;
-	dmasound.mach.release();
+	module_put(dmasound.mach.owner);
 	unlock_kernel();
 	return 0;
 }
@@ -1557,7 +1559,7 @@ static struct file_operations state_fops = {
 	.release	= state_release,
 };
 
-static int __init state_init(void)
+static int state_init(void)
 {
 #ifndef MODULE
 	int state_unit;
@@ -1576,7 +1578,7 @@ static int __init state_init(void)
      *  This function is called by _one_ chipset-specific driver
      */
 
-int __init dmasound_init(void)
+int dmasound_init(void)
 {
 	int res ;
 #ifdef MODULE
@@ -1647,7 +1649,7 @@ void dmasound_deinit(void)
 
 #else /* !MODULE */
 
-static int __init dmasound_setup(char *str)
+static int dmasound_setup(char *str)
 {
 	int ints[6], size;
 

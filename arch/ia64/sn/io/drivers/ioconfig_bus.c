@@ -24,7 +24,7 @@
 #include <asm/sn/invent.h>
 #include <asm/sn/hcl.h>
 #include <asm/sn/labelcl.h>
-#include <asm//sn/sn_sal.h>
+#include <asm/sn/sn_sal.h>
 #include <asm/sn/addrs.h>
 #include <asm/sn/ioconfig_bus.h>
 
@@ -157,7 +157,7 @@ build_moduleid_table(char *file_contents, struct ascii_moduleid *table)
 	char *name;
 	char *temp;
 	char *next;
-	char *current;
+	char *curr;
 	char *line;
 	struct ascii_moduleid *moduleid;
 
@@ -166,10 +166,10 @@ build_moduleid_table(char *file_contents, struct ascii_moduleid *table)
 	name = kmalloc(125, GFP_KERNEL);
 	memset(name, 0, 125);
 	moduleid = table;
-	current = file_contents;
-	while (nextline(current, &next, line)){
+	curr = file_contents;
+	while (nextline(curr, &next, line)){
 
-		DBG("current 0x%lx next 0x%lx\n", current, next);
+		DBG("curr 0x%lx next 0x%lx\n", curr, next);
 
 		temp = line;
 		/*
@@ -182,7 +182,7 @@ build_moduleid_table(char *file_contents, struct ascii_moduleid *table)
 				break;
 
 		if (*temp == '\n') {
-			current = next;
+			curr = next;
 			memset(line, 0, 256);
 			continue;
 		}
@@ -191,7 +191,7 @@ build_moduleid_table(char *file_contents, struct ascii_moduleid *table)
 		 * Skip comment lines
 		 */
 		if (*temp == '#') {
-			current = next;
+			curr = next;
 			memset(line, 0, 256);
 			continue;
 		}
@@ -204,7 +204,7 @@ build_moduleid_table(char *file_contents, struct ascii_moduleid *table)
 		DBG("Found %s\n", name);
 		moduleid++;
 		free_entry++;
-		current = next;
+		curr = next;
 		memset(line, 0, 256);
 	}
 
@@ -346,9 +346,9 @@ static int ioconfig_bus_close(struct inode * inode, struct file * filp)
 }
 
 struct file_operations ioconfig_bus_fops = {
-	ioctl:ioconfig_bus_ioctl,
-	open:ioconfig_bus_open,		/* open */
-	release:ioconfig_bus_close	/* release */
+	.ioctl = ioconfig_bus_ioctl,
+	.open = ioconfig_bus_open,		/* open */
+	.release = ioconfig_bus_close	/* release */
 };
 
 

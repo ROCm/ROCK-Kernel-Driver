@@ -433,6 +433,7 @@ static int nr_create(struct socket *sock, int protocol)
 	nr = nr_sk(sk);
 
 	sock_init_data(sock, sk);
+	sk_set_owner(sk, THIS_MODULE);
 
 	sock->ops    = &nr_proto_ops;
 	sk->sk_protocol = protocol;
@@ -473,6 +474,7 @@ static struct sock *nr_make_new(struct sock *osk)
 	nr = nr_sk(sk);
 
 	sock_init_data(NULL, sk);
+	sk_set_owner(sk, THIS_MODULE);
 
 	sk->sk_type     = osk->sk_type;
 	sk->sk_socket   = osk->sk_socket;
@@ -1458,6 +1460,7 @@ MODULE_PARM_DESC(nr_ndevs, "number of NET/ROM devices");
 MODULE_AUTHOR("Jonathan Naylor G4KLX <g4klx@g4klx.demon.co.uk>");
 MODULE_DESCRIPTION("The amateur radio NET/ROM network and transport layer protocol");
 MODULE_LICENSE("GPL");
+MODULE_ALIAS_NETPROTO(PF_NETROM);
 
 static void __exit nr_exit(void)
 {

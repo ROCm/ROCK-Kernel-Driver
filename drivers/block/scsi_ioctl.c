@@ -68,7 +68,7 @@ static int blk_do_rq(request_queue_t *q, struct block_device *bdev,
 
 	rq->flags |= REQ_NOMERGE;
 	rq->waiting = &wait;
-	elv_add_request(q, rq, 1, 1);
+	elv_add_request(q, rq, ELEVATOR_INSERT_BACK, 1);
 	generic_unplug_device(q);
 	wait_for_completion(&wait);
 
@@ -438,11 +438,7 @@ int scsi_cmd_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long ar
 			err = sg_emulated_host(q, (int *) arg);
 			break;
 		case SG_IO:
-			err = bd_claim(bdev, current);
-			if (err)
-				break;
 			err = sg_io(q, bdev, (struct sg_io_hdr *) arg);
-			bd_release(bdev);
 			break;
 		/*
 		 * old junk scsi send command ioctl
@@ -452,11 +448,7 @@ int scsi_cmd_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long ar
 			if (!arg)
 				break;
 
-			err = bd_claim(bdev, current);
-			if (err)
-				break;
 			err = sg_scsi_ioctl(q, bdev, (Scsi_Ioctl_Command *)arg);
-			bd_release(bdev);
 			break;
 		case CDROMCLOSETRAY:
 			close = 1;

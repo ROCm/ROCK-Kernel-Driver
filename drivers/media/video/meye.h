@@ -312,7 +312,7 @@ struct meye {
 
 	struct meye_queue grabq;	/* queue for buffers to be grabbed */
 
-	struct video_device video_dev;	/* video device parameters */
+	struct video_device *video_dev;	/* video device parameters */
 	struct video_picture picture;	/* video picture parameters */
 	struct meye_params params;	/* additional parameters */
 #ifdef CONFIG_PM

@@ -5954,6 +5954,9 @@ static int sbpcd_media_changed(struct cdrom_device_info *cdi, int disc_nr)
 }
 
 MODULE_LICENSE("GPL");
+/* FIXME: Old modules.conf claims MATSUSHITA_CDROM2_MAJOR and CDROM3, but
+   AFAICT this doesn't support those majors, so why? --RR 30 Jul 2003 */
+MODULE_ALIAS_BLOCKDEV_MAJOR(MATSUSHITA_CDROM_MAJOR);
 
 /*==========================================================================*/
 /*

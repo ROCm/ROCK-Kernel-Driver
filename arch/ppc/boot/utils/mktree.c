@@ -86,7 +86,7 @@ int main(int argc, char *argv[])
 	}
 
 	cksum = 0;
-	cp = (uint *)&bt;
+	cp = (void *)&bt;
 	for (i=0; i<sizeof(bt)/sizeof(uint); i++)
 		cksum += *cp++;
 	

@@ -218,7 +218,7 @@
 *    interrupt time.
 *  - digi_write_bulk_callback() and digi_read_bulk_callback() are
 *    called directly from interrupts.  Hence spin_lock_irqsave()
-*    and spin_lock_irqrestore() are used in the rest of the code
+*    and spin_unlock_irqrestore() are used in the rest of the code
 *    for any locks they acquire.
 *  - digi_write_bulk_callback() gets the port lock before waking up
 *    processes sleeping on the port write_wait.  It also schedules
@@ -571,7 +571,7 @@ static struct usb_serial_device_type digi_acceleport_4_device = {
 *
 *  Do spin_unlock_irqrestore and interruptible_sleep_on_timeout
 *  so that wake ups are not lost if they occur between the unlock
-*  and the sleep.  In other words, spin_lock_irqrestore and
+*  and the sleep.  In other words, spin_unlock_irqrestore and
 *  interruptible_sleep_on_timeout are "atomic" with respect to
 *  wake ups.  This is used to implement condition variables.
 */
@@ -2045,11 +2045,24 @@ opcode, line, status, val );
 
 static int __init digi_init (void)
 {
-	usb_serial_register (&digi_acceleport_2_device);
-	usb_serial_register (&digi_acceleport_4_device);
-	usb_register (&digi_driver);
+	int retval;
+	retval = usb_serial_register(&digi_acceleport_2_device);
+	if (retval)
+		goto failed_acceleport_2_device;
+	retval = usb_serial_register(&digi_acceleport_4_device);
+	if (retval) 
+		goto failed_acceleport_4_device;
+	retval = usb_register(&digi_driver);
+	if (retval)
+		goto failed_usb_register;
 	info(DRIVER_VERSION ":" DRIVER_DESC);
 	return 0;
+failed_usb_register:
+	usb_serial_deregister(&digi_acceleport_4_device);
+failed_acceleport_4_device:
+	usb_serial_deregister(&digi_acceleport_2_device);
+failed_acceleport_2_device:
+	return retval;
 }
 
 

@@ -296,7 +296,7 @@ int bio_add_page(struct bio *bio, struct page *page, unsigned int len,
 		 unsigned int offset)
 {
 	request_queue_t *q = bdev_get_queue(bio->bi_bdev);
-	int fail_segments = 0, retried_segments = 0;
+	int retried_segments = 0;
 	struct bio_vec *bvec;
 
 	/*
@@ -315,18 +315,15 @@ int bio_add_page(struct bio *bio, struct page *page, unsigned int len,
 	 * we might lose a segment or two here, but rather that than
 	 * make this too complex.
 	 */
-retry_segments:
-	if (bio_phys_segments(q, bio) >= q->max_phys_segments
-	    || bio_hw_segments(q, bio) >= q->max_hw_segments)
-		fail_segments = 1;
 
-	if (fail_segments) {
+	while (bio_phys_segments(q, bio) >= q->max_phys_segments
+	    || bio_hw_segments(q, bio) >= q->max_hw_segments) {
+
 		if (retried_segments)
 			return 0;
 
 		bio->bi_flags &= ~(1 << BIO_SEG_VALID);
 		retried_segments = 1;
-		goto retry_segments;
 	}
 
 	/*
@@ -793,10 +790,6 @@ static void __init biovec_init_pools(void)
 					mempool_free_slab, bp->slab);
 		if (!bp->pool)
 			panic("biovec: can't init mempool\n");
-
-		printk("biovec pool[%d]: %3d bvecs: %3d entries (%d bytes)\n",
-						i, bp->nr_vecs, pool_entries,
-						size);
 	}
 }
 
@@ -809,8 +802,6 @@ static int __init init_bio(void)
 	bio_pool = mempool_create(BIO_POOL_SIZE, mempool_alloc_slab, mempool_free_slab, bio_slab);
 	if (!bio_pool)
 		panic("bio: can't create mempool\n");
-
-	printk("BIO: pool of %d setup, %ZuKb (%Zd bytes/bio)\n", BIO_POOL_SIZE, BIO_POOL_SIZE * sizeof(struct bio) >> 10, sizeof(struct bio));
 
 	biovec_init_pools();
 

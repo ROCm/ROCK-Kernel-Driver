@@ -1066,7 +1066,7 @@ forte_dsp_ioctl (struct inode *inode, struct file *file, unsigned int cmd,
 
 		spin_unlock_irq (&chip->lock);
 
-		return copy_to_user ((void *) arg, &abi, sizeof (abi));
+		return copy_to_user ((void *) arg, &abi, sizeof (abi)) ? -EFAULT : 0;
 
 	case SNDCTL_DSP_GETIPTR:
 		DPRINTK ("%s: GETIPTR\n", __FUNCTION__);
@@ -1087,7 +1087,7 @@ forte_dsp_ioctl (struct inode *inode, struct file *file, unsigned int cmd,
 
 		spin_unlock_irq (&chip->lock);
 
-		return copy_to_user ((void *) arg, &cinfo, sizeof (cinfo));
+		return copy_to_user ((void *) arg, &cinfo, sizeof (cinfo)) ? -EFAULT : 0;
 
         case SNDCTL_DSP_GETOSPACE:
 		if (!wr)
@@ -1115,7 +1115,7 @@ forte_dsp_ioctl (struct inode *inode, struct file *file, unsigned int cmd,
 
 		spin_unlock_irq (&chip->lock);
 		
-		return copy_to_user ((void *) arg, &abi, sizeof (abi));
+		return copy_to_user ((void *) arg, &abi, sizeof (abi)) ? -EFAULT : 0;
 
 	case SNDCTL_DSP_GETOPTR:
 		if (!wr)
@@ -1134,7 +1134,7 @@ forte_dsp_ioctl (struct inode *inode, struct file *file, unsigned int cmd,
 
 		spin_unlock_irq (&chip->lock);
 
-		return copy_to_user ((void *) arg, &cinfo, sizeof (cinfo));
+		return copy_to_user ((void *) arg, &cinfo, sizeof (cinfo)) ? -EFAULT : 0;
 
 	case SNDCTL_DSP_GETODELAY:
 		if (!wr)

@@ -14,7 +14,6 @@
 #include <linux/slab.h>
 #include <linux/module.h>
 #include <linux/sysctl.h>
-#include <linux/config.h>
 #include <rxrpc/types.h>
 #include <rxrpc/rxrpc.h>
 #include <asm/errno.h>

@@ -685,7 +685,7 @@ int __devinit acenic_probe (ACE_PROBE_ARG)
 		}
 
 		if (pci_enable_device(pdev)) {
-			kfree(dev);
+			free_netdev(dev);
 			continue;
 		}
 
@@ -733,7 +733,7 @@ int __devinit acenic_probe (ACE_PROBE_ARG)
 
 		if (register_netdev(dev)) {
 			printk(KERN_ERR "acenic: device registration failed\n");
-			kfree(dev);
+			free_netdev(dev);
 			continue;
 		}
 
@@ -793,7 +793,7 @@ int __devinit acenic_probe (ACE_PROBE_ARG)
 			printk(KERN_ERR "%s: Driver compiled without Tigon I"
 			       " support - NIC disabled\n", dev->name);
 			ace_init_cleanup(dev);
-			kfree(dev);
+			free_netdev(dev);
 			continue;
 		}
 #endif
@@ -803,7 +803,7 @@ int __devinit acenic_probe (ACE_PROBE_ARG)
 			 * ace_allocate_descriptors() calls
 			 * ace_init_cleanup() on error.
 			 */
-			kfree(dev);
+			free_netdev(dev);
 			continue;
 		}
 
@@ -820,7 +820,7 @@ int __devinit acenic_probe (ACE_PROBE_ARG)
 			/*
 			 * ace_init() calls ace_init_cleanup() on error.
 			 */
-			kfree(dev);
+			free_netdev(dev);
 			continue;
 		}
 

@@ -377,7 +377,7 @@ static int zf_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 static int zf_open(struct inode *inode, struct file *file)
 {
-	switch(minor(inode->i_rdev)){
+	switch(iminor(inode)){
 		case WATCHDOG_MINOR:
 			spin_lock(&zf_lock);
 			if(zf_is_open){
@@ -402,7 +402,7 @@ static int zf_open(struct inode *inode, struct file *file)
 
 static int zf_close(struct inode *inode, struct file *file)
 {
-	if(minor(inode->i_rdev) == WATCHDOG_MINOR){
+	if(iminor(inode) == WATCHDOG_MINOR){
 
 		if(zf_expect_close){
 			zf_timer_off();

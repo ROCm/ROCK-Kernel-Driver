@@ -39,7 +39,6 @@
 #include <linux/poll.h>
 #include <linux/fcntl.h>
 #include <linux/init.h>
-#include <linux/skbuff.h>
 #include <linux/interrupt.h>
 #include <linux/socket.h>
 #include <linux/skbuff.h>
@@ -114,7 +113,7 @@ static void rfcomm_sk_state_change(struct rfcomm_dlc *d, int err)
 /* ---- Socket functions ---- */
 static struct sock *__rfcomm_get_sock_by_addr(u8 channel, bdaddr_t *src)
 {
-	struct sock *sk;
+	struct sock *sk = NULL;
 	struct hlist_node *node;
 
 	sk_for_each(sk, node, &rfcomm_sk_list.head) {
@@ -131,7 +130,7 @@ static struct sock *__rfcomm_get_sock_by_addr(u8 channel, bdaddr_t *src)
  */
 static struct sock *__rfcomm_get_sock_by_channel(int state, u8 channel, bdaddr_t *src)
 {
-	struct sock *sk, *sk1 = NULL;
+	struct sock *sk = NULL, *sk1 = NULL;
 	struct hlist_node *node;
 
 	sk_for_each(sk, node, &rfcomm_sk_list.head) {

@@ -302,7 +302,9 @@ void agp_remove_bridge(struct agp_bridge_data *bridge)
 EXPORT_SYMBOL_GPL(agp_remove_bridge);
 
 int agp_off;
+int agp_try_unsupported_boot;
 EXPORT_SYMBOL(agp_off);
+EXPORT_SYMBOL(agp_try_unsupported_boot);
 
 static int __init agp_init(void)
 {
@@ -320,6 +322,8 @@ static __init int agp_setup(char *s)
 {
 	if (!strcmp(s,"off"))
 		agp_off = 1;
+	if (!strcmp(s,"try_unsupported"))
+		agp_try_unsupported_boot = 1;
 	return 1;	
 }
 __setup("agp=", agp_setup);
@@ -327,6 +331,7 @@ __setup("agp=", agp_setup);
 MODULE_AUTHOR("Dave Jones <davej@codemonkey.org.uk>");
 MODULE_DESCRIPTION("AGP GART driver");
 MODULE_LICENSE("GPL and additional rights");
+MODULE_ALIAS_MISCDEV(AGPGART_MINOR);
 
 module_init(agp_init);
 module_exit(agp_exit);

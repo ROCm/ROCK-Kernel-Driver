@@ -132,8 +132,8 @@ config TUN
 	  If you don't know what to use this for, you don't need it.
 
 config ETHERTAP
-	tristate "Ethertap network tap (OBSOLETE)"
-	depends on NETDEVICES && EXPERIMENTAL
+	tristate "Ethertap network tap"
+	depends on NETDEVICES && EXPERIMENTAL && NETLINK_DEV
 	---help---
 	  If you say Y here (and have said Y to "Kernel/User network link
 	  driver", above) and create a character special file /dev/tap0 with
@@ -502,7 +502,7 @@ config NET_SB1250_MAC
 
 config SGI_IOC3_ETH
 	bool "SGI IOC3 Ethernet"
-	depends on NET_ETHERNET && (IA64_SGI_SN1 || SGI_IP27)
+	depends on NET_ETHERNET && SGI_IP27
 	help
 	  If you have a network (Ethernet) card of this type, say Y and read
 	  the Ethernet-HOWTO, available from
@@ -704,7 +704,7 @@ config ELMC
 
 config ELMC_II
 	tristate "3c527 \"EtherLink/MC 32\" support (EXPERIMENTAL)"
-	depends on NET_VENDOR_3COM && MCA && EXPERIMENTAL
+	depends on NET_VENDOR_3COM && MCA && EXPERIMENTAL && BROKEN_ON_SMP
 	help
 	  If you have a network (Ethernet) card of this type, say Y and read
 	  the Ethernet-HOWTO, available from
@@ -882,7 +882,7 @@ config NET_VENDOR_RACAL
 
 config NI5010
 	tristate "NI5010 support (EXPERIMENTAL)"
-	depends on NET_VENDOR_RACAL && ISA && EXPERIMENTAL
+	depends on NET_VENDOR_RACAL && ISA && EXPERIMENTAL && BROKEN_ON_SMP
 	---help---
 	  If you have a network (Ethernet) card of this type, say Y and read
 	  the Ethernet-HOWTO, available from
@@ -1221,7 +1221,7 @@ config NE2K_CBUS_NEC108
 
 config SKMC
 	tristate "SKnet MCA support"
-	depends on NET_ETHERNET && MCA
+	depends on NET_ETHERNET && MCA && BROKEN
 	---help---
 	  These are Micro Channel Ethernet adapters. You need to say Y to "MCA
 	  support" in order to use this driver.  Supported cards are the SKnet
@@ -2670,7 +2670,7 @@ config NET_FC
 
 config IPHASE5526
 	tristate "Interphase 5526 Tachyon chipset based adapter support"
-	depends on NET_FC && SCSI && PCI
+	depends on NET_FC && SCSI && PCI && BROKEN
 	help
 	  Say Y here if you have a Fibre Channel adaptor of this kind.
 

@@ -32,8 +32,8 @@
 #include <asm/setup.h>
 #include <asm/tlb.h>
 
-//#include <asm/arch.h>
 #include <asm/map.h>
+
 
 #define TABLE_SIZE	PTRS_PER_PTE * sizeof(pte_t))
 
@@ -41,6 +41,9 @@ struct mmu_gather mmu_gathers[NR_CPUS];
 
 extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
 extern char _stext, _text, _etext, _end, __init_begin, __init_end;
+#ifdef CONFIG_XIP_KERNEL
+extern char _endtext, _sdata;
+#endif
 extern unsigned long phys_initrd_start;
 extern unsigned long phys_initrd_size;
 
@@ -152,6 +155,7 @@ static void __init
 find_memend_and_nodes(struct meminfo *mi, struct node_info *np)
 {
 	unsigned int memend_pfn = 0;
+
 	numnodes = 1;
 
 	np->bootmap_pages = 0;
@@ -187,45 +191,6 @@ find_memend_and_nodes(struct meminfo *mi, struct node_info *np)
 }
 
 /*
- * Reserve the various regions of node 0
- */
-static __init void reserve_node_zero(unsigned int bootmap_pfn, unsigned int bootmap_pages)
-{
-	pg_data_t *pgdat = NODE_DATA(0);
-
-	/*
-	 * Register the kernel text and data with bootmem.
-	 * Note that this can only be in node 0.
-	 */
-	reserve_bootmem_node(pgdat, __pa(&_stext), &_end - &_stext);
-
-	/*
-	 * And don't forget to reserve the allocator bitmap,
-	 * which will be freed later.
-	 */
-	reserve_bootmem_node(pgdat, bootmap_pfn << PAGE_SHIFT,
-			     bootmap_pages << PAGE_SHIFT);
-
-	/*
-	 * These should likewise go elsewhere.  They pre-reserve
-	 * the screen memory region at the start of main system
-	 * memory.
-	 */
-	reserve_bootmem_node(pgdat, 0x02000000, 0x00080000);
-	
-#ifdef CONFIG_BLK_DEV_INITRD
-	initrd_start = phys_initrd_start;
-	initrd_end = initrd_start + phys_initrd_size;
-	
-	/* Achimedes machines only have one node, so initrd is in node 0 */
-        reserve_bootmem_node(pgdat, __pa(initrd_start),
-                                     initrd_end - initrd_start); 
-#endif
-
-}
-
-
-/*
  * Initialise the bootmem allocator for all nodes.  This is called
  * early during the architecture specific initialisation.
  */
@@ -233,6 +198,7 @@ void __init bootmem_init(struct meminfo *mi)
 {
 	struct node_info node_info;
 	unsigned int bootmap_pfn;
+	pg_data_t *pgdat = NODE_DATA(0);
 
 	find_memend_and_nodes(mi, &node_info);
 
@@ -247,18 +213,54 @@ void __init bootmem_init(struct meminfo *mi)
 	/*
 	 * Initialise the bootmem allocator.
 	 */
-	init_bootmem_node(NODE_DATA(node), bootmap_pfn, node_info.start, node_info.end);
+	init_bootmem_node(pgdat, bootmap_pfn, node_info.start, node_info.end);
 
  	/*
 	 * Register all available RAM in this node with the bootmem allocator. 
 	 */
-	free_bootmem_node(NODE_DATA(node), mi->bank->start, mi->bank->size);
+	free_bootmem_node(pgdat, mi->bank->start, mi->bank->size);
 
-	/* 
-	 * Reserve ram for stuff like initrd, video, kernel, etc.
-	 */
+        /*
+         * Register the kernel text and data with bootmem.
+         * Note: with XIP we dont register .text since
+         * its in ROM.
+         */
+#ifdef CONFIG_XIP_KERNEL
+        reserve_bootmem_node(pgdat, __pa(&_sdata), &_end - &_sdata);
+#else
+        reserve_bootmem_node(pgdat, __pa(&_stext), &_end - &_stext);
+#endif
 
-	reserve_node_zero(bootmap_pfn, node_info.bootmap_pages);
+        /*
+         * And don't forget to reserve the allocator bitmap,
+         * which will be freed later.
+         */
+        reserve_bootmem_node(pgdat, bootmap_pfn << PAGE_SHIFT,
+                             node_info.bootmap_pages << PAGE_SHIFT);
+
+        /*
+         * These should likewise go elsewhere.  They pre-reserve
+         * the screen memory region at the start of main system
+         * memory. FIXME - screen RAM is not 512K!
+         */
+        reserve_bootmem_node(pgdat, 0x02000000, 0x00080000);
+
+#ifdef CONFIG_BLK_DEV_INITRD
+        initrd_start = phys_initrd_start;
+        initrd_end = initrd_start + phys_initrd_size;
+
+        /* Achimedes machines only have one node, so initrd is in node 0 */
+#ifdef CONFIG_XIP_KERNEL
+	/* Only reserve initrd space if it is in RAM */
+        if(initrd_start && initrd_start < 0x03000000){
+#else
+        if(initrd_start){
+#endif
+                reserve_bootmem_node(pgdat, __pa(initrd_start),
+                                             initrd_end - initrd_start);
+	}
+#endif   /* CONFIG_BLK_DEV_INITRD */
+
 
 }
 
@@ -299,16 +301,15 @@ void __init paging_init(struct meminfo *mi)
 
 	pgdat = NODE_DATA(0);
 	bdata = pgdat->bdata;
-
 	zone_size[0] = bdata->node_low_pfn -
 			(bdata->node_boot_start >> PAGE_SHIFT);
 	if (!zone_size[0])
 		BUG();
 
 	free_area_init_node(0, pgdat, 0, zone_size,
-			bdata->node_boot_start >> PAGE_SHIFT, 0);
+			bdata->node_boot_start >> PAGE_SHIFT, zhole_size);
 
-	mem_map = contig_page_data.node_mem_map;
+	mem_map = NODE_DATA(0)->node_mem_map;
 
 	/*
 	 * finish off the bad pages once
@@ -345,8 +346,15 @@ void __init mem_init(void)
 	pg_data_t *pgdat = NODE_DATA(0);
 	extern int sysctl_overcommit_memory;
 
-	datapages = &_end - &_etext;
+
+	/* Note: data pages includes BSS */
+#ifdef CONFIG_XIP_KERNEL
+	codepages = &_endtext - &_text;
+	datapages = &_end - &_sdata;
+#else
 	codepages = &_etext - &_text;
+	datapages = &_end - &_etext;
+#endif
 	initpages = &__init_end - &__init_begin;
 
 	high_memory = (void *)__va(meminfo.end);
@@ -356,15 +364,14 @@ void __init mem_init(void)
 	if (pgdat->node_spanned_pages != 0)
 		totalram_pages += free_all_bootmem_node(pgdat);
 
-	printk(KERN_INFO "Memory:");
-
 	num_physpages = meminfo.bank[0].size >> PAGE_SHIFT;
 
-	printk(" = %luMB total\n", num_physpages >> (20 - PAGE_SHIFT));
+	printk(KERN_INFO "Memory: %luMB total\n", num_physpages >> (20 - PAGE_SHIFT));
 	printk(KERN_NOTICE "Memory: %luKB available (%dK code, "
 		"%dK data, %dK init)\n",
 		(unsigned long) nr_free_pages() << (PAGE_SHIFT-10),
 		codepages >> 10, datapages >> 10, initpages >> 10);
+
 	/*
 	 * Turn on overcommit on tiny machines
 	 */
@@ -374,11 +381,12 @@ void __init mem_init(void)
 	}
 }
 
-void free_initmem(void)
-{
+void free_initmem(void){
+#ifndef CONFIG_XIP_KERNEL
 	free_area((unsigned long)(&__init_begin),
 		  (unsigned long)(&__init_end),
 		  "init");
+#endif
 }
 
 #ifdef CONFIG_BLK_DEV_INITRD
@@ -387,7 +395,12 @@ static int keep_initrd;
 
 void free_initrd_mem(unsigned long start, unsigned long end)
 {
+#ifdef CONFIG_XIP_KERNEL
+	/* Only bin initrd if it is in RAM... */
+	if(!keep_initrd && start < 0x03000000)
+#else
 	if (!keep_initrd)
+#endif
 		free_area(start, end, "initrd");
 }
 

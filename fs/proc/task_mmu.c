@@ -91,13 +91,13 @@ static int show_map(struct seq_file *m, void *v)
 	}
 
 	seq_printf(m, "%08lx-%08lx %c%c%c%c %08lx %02x:%02x %lu %n",
-		map->vm_start,
-		map->vm_end,
+			map->vm_start,
+			map->vm_end,
 			flags & VM_READ ? 'r' : '-',
 			flags & VM_WRITE ? 'w' : '-',
 			flags & VM_EXEC ? 'x' : '-',
 			flags & VM_MAYSHARE ? 's' : 'p',
-		map->vm_pgoff << PAGE_SHIFT,
+			map->vm_pgoff << PAGE_SHIFT,
 			MAJOR(dev), MINOR(dev), ino, &len);
 
 	if (map->vm_file) {

@@ -1,7 +1,7 @@
 /* SCTP kernel reference Implementation
+ * (C) Copyright IBM Corp. 2001, 2003
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
- * Copyright (c) 2001-2003 International Business Machines Corp.
  * Copyright (c) 2001 Intel Corp.
  * Copyright (c) 2001 La Monte H.P. Yarroll
  *
@@ -42,6 +42,7 @@
  *    Sridhar Samudrala	    <sri@us.ibm.com>
  *    Daisy Chang	    <daisyc@us.ibm.com>
  *    Ryan Layer	    <rmlayer@us.ibm.com>
+ *    Kevin Gao             <kevin.gao@intel.com>
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -1154,4 +1155,24 @@ int sctp_assoc_set_bind_addr_from_cookie(struct sctp_association *asoc,
 
 	return sctp_raw_to_bind_addrs(&asoc->base.bind_addr, raw, var_size3,
 				      asoc->ep->base.bind_addr.port, gfp);
+}
+
+/* Lookup laddr in the bind address list of an association. */ 
+int sctp_assoc_lookup_laddr(struct sctp_association *asoc, 
+			    const union sctp_addr *laddr)
+{
+	int found;
+
+	sctp_read_lock(&asoc->base.addr_lock);
+	if ((asoc->base.bind_addr.port == ntohs(laddr->v4.sin_port)) &&
+	    sctp_bind_addr_match(&asoc->base.bind_addr, laddr,
+			         sctp_sk(asoc->base.sk))) {
+		found = 1;
+		goto out;
+	}
+
+	found = 0;
+out:
+	sctp_read_unlock(&asoc->base.addr_lock);
+	return found;
 }

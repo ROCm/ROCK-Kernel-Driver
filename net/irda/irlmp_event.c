@@ -586,6 +586,8 @@ static int irlmp_state_connect(struct lsap_cb *self, IRLMP_EVENT event,
 		hashbin_insert(self->lap->lsaps, (irda_queue_t *) self,
 			       (long) self, NULL);
 
+		set_bit(0, &self->connected);	/* TRUE */
+
 		irlmp_send_lcf_pdu(self->lap, self->dlsap_sel,
 				   self->slsap_sel, CONNECT_CNF, skb);
 
@@ -599,10 +601,13 @@ static int irlmp_state_connect(struct lsap_cb *self, IRLMP_EVENT event,
 		IRDA_DEBUG(0, "%s() WATCHDOG_TIMEOUT!\n",  __FUNCTION__);
 
 		/* Disconnect, get out... - Jean II */
+		self->lap = NULL;
 		self->dlsap_sel = LSAP_ANY;
 		irlmp_next_lsap_state(self, LSAP_DISCONNECTED);
 		break;
 	default:
+		/* LM_LAP_DISCONNECT_INDICATION : Should never happen, we
+		 * are *not* yet bound to the IrLAP link. Jean II */
 		IRDA_DEBUG(0, "%s(), Unknown event %s on LSAP %#02x\n", 
 			   __FUNCTION__, irlmp_event[event], self->slsap_sel);
 		break;
@@ -659,6 +664,7 @@ static int irlmp_state_connect_pend(struct lsap_cb *self, IRLMP_EVENT event,
 		IRDA_DEBUG(0, "%s() WATCHDOG_TIMEOUT!\n",  __FUNCTION__);
 
 		/* Go back to disconnected mode, keep the socket waiting */
+		self->lap = NULL;
 		self->dlsap_sel = LSAP_ANY;
 		if(self->conn_skb)
 			dev_kfree_skb(self->conn_skb);
@@ -666,6 +672,8 @@ static int irlmp_state_connect_pend(struct lsap_cb *self, IRLMP_EVENT event,
 		irlmp_next_lsap_state(self, LSAP_DISCONNECTED);
 		break;
 	default:
+		/* LM_LAP_DISCONNECT_INDICATION : Should never happen, we
+		 * are *not* yet bound to the IrLAP link. Jean II */
 		IRDA_DEBUG(0, "%s(), Unknown event %s on LSAP %#02x\n",
 			   __FUNCTION__, irlmp_event[event], self->slsap_sel);
 		break;
@@ -721,6 +729,8 @@ static int irlmp_state_dtr(struct lsap_cb *self, IRLMP_EVENT event,
 		irlmp_send_lcf_pdu(self->lap, self->dlsap_sel, self->slsap_sel,
 				   DISCONNECT, skb);
 		irlmp_next_lsap_state(self, LSAP_DISCONNECTED);
+		/* Called only from irlmp_disconnect_request(), will
+		 * unbind from LAP over there. Jean II */
 
 		/* Try to close the LAP connection if its still there */
 		if (self->lap) {

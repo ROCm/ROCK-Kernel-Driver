@@ -1078,7 +1078,7 @@ out_passthru:
 		put_user(host->ctlr_sig, (int*)arg);
 		return 0;
 	case IDAREVALIDATEVOLS:
-		if (minor(inode->i_rdev) != 0)
+		if (iminor(inode) != 0)
 			return -ENXIO;
 		return revalidate_allvol(host);
 	case IDADRIVERVERSION:

@@ -1813,3 +1813,4 @@ module_init(sjcd_init);
 module_exit(sjcd_exit);
 
 MODULE_LICENSE("GPL");
+MODULE_ALIAS_BLOCKDEV_MAJOR(SANYO_CDROM_MAJOR);

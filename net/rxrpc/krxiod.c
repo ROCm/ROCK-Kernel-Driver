@@ -9,7 +9,6 @@
  * 2 of the License, or (at your option) any later version.
  */
 
-#include <linux/version.h>
 #include <linux/sched.h>
 #include <linux/completion.h>
 #include <linux/spinlock.h>

@@ -46,7 +46,6 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 
-#include "ide_modes.h"
 #include "pdc202xx_old.h"
 
 #define PDC202_DEBUG_CABLE	0
@@ -748,9 +747,6 @@ static void __init init_hwif_pdc202xx (ide_hwif_t *hwif)
 	hwif->autodma = 0;
 	hwif->tuneproc  = &config_chipset_for_pio;
 	hwif->quirkproc = &pdc202xx_quirkproc;
-
-	if (hwif->pci_dev->device == PCI_DEVICE_ID_PROMISE_20265)
-		hwif->no_lba48 = (hwif->channel) ? 0 : 1;
 
 	if (hwif->pci_dev->device != PCI_DEVICE_ID_PROMISE_20246) {
 		hwif->busproc   = &pdc202xx_tristate;

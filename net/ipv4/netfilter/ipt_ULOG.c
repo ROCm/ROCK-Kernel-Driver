@@ -36,7 +36,6 @@
  */
 
 #include <linux/module.h>
-#include <linux/version.h>
 #include <linux/config.h>
 #include <linux/spinlock.h>
 #include <linux/socket.h>
@@ -46,7 +45,6 @@
 #include <linux/netlink.h>
 #include <linux/netdevice.h>
 #include <linux/mm.h>
-#include <linux/socket.h>
 #include <linux/netfilter_ipv4/ip_tables.h>
 #include <linux/netfilter_ipv4/ipt_ULOG.h>
 #include <linux/netfilter_ipv4/lockhelp.h>
@@ -55,7 +53,7 @@
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Harald Welte <laforge@gnumonks.org>");
-MODULE_DESCRIPTION("IP tables userspace logging module");
+MODULE_DESCRIPTION("iptables userspace logging module");
 
 #define ULOG_NL_EVENT		111		/* Harald's favorite number */
 #define ULOG_MAXNLGROUPS	32		/* numer of nlgroups */

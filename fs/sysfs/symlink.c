@@ -102,6 +102,7 @@ int sysfs_create_link(struct kobject * kobj, struct kobject * target, char * nam
 		error = sysfs_symlink(dentry->d_inode,d,path);
 	else
 		error = PTR_ERR(d);
+	dput(d);
 	up(&dentry->d_inode->i_sem);
 	kfree(path);
 	return error;

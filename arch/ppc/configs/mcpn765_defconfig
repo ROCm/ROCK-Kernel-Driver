@@ -19,6 +19,7 @@ CONFIG_SYSVIPC=y
 CONFIG_SYSCTL=y
 CONFIG_LOG_BUF_SHIFT=14
 # CONFIG_EMBEDDED is not set
+CONFIG_KALLSYMS=y
 CONFIG_FUTEX=y
 CONFIG_EPOLL=y
 
@@ -74,8 +75,8 @@ CONFIG_HIGHMEM=y
 CONFIG_PCI=y
 CONFIG_PCI_DOMAINS=y
 CONFIG_KCORE_ELF=y
-CONFIG_BINFMT_ELF=y
 CONFIG_KERNEL_ELF=y
+CONFIG_BINFMT_ELF=y
 # CONFIG_BINFMT_MISC is not set
 # CONFIG_PCI_LEGACY_PROC is not set
 # CONFIG_PCI_NAMES is not set
@@ -104,6 +105,11 @@ CONFIG_TASK_SIZE=0x80000000
 CONFIG_BOOT_LOAD=0x00800000
 
 #
+# Generic Driver Options
+#
+# CONFIG_FW_LOADER is not set
+
+#
 # Memory Technology Devices (MTD)
 #
 # CONFIG_MTD is not set
@@ -122,10 +128,12 @@ CONFIG_BOOT_LOAD=0x00800000
 # CONFIG_BLK_DEV_DAC960 is not set
 # CONFIG_BLK_DEV_UMEM is not set
 CONFIG_BLK_DEV_LOOP=y
+# CONFIG_BLK_DEV_CRYPTOLOOP is not set
 # CONFIG_BLK_DEV_NBD is not set
 CONFIG_BLK_DEV_RAM=y
 CONFIG_BLK_DEV_RAM_SIZE=4096
 CONFIG_BLK_DEV_INITRD=y
+# CONFIG_LBD is not set
 
 #
 # Multi-device support (RAID and LVM)
@@ -133,12 +141,12 @@ CONFIG_BLK_DEV_INITRD=y
 # CONFIG_MD is not set
 
 #
-# ATA/IDE/MFM/RLL support
+# ATA/ATAPI/MFM/RLL support
 #
 # CONFIG_IDE is not set
 
 #
-# SCSI support
+# SCSI device support
 #
 # CONFIG_SCSI is not set
 
@@ -318,11 +326,6 @@ CONFIG_NET_PCI=y
 # Graphics support
 #
 # CONFIG_FB is not set
-
-#
-# Old CD-ROM drivers (not SCSI, not IDE)
-#
-# CONFIG_CD_NO_IDESCSI is not set
 
 #
 # Input device support
@@ -526,7 +529,6 @@ CONFIG_MSDOS_PARTITION=y
 # Kernel hacking
 #
 # CONFIG_DEBUG_KERNEL is not set
-# CONFIG_KALLSYMS is not set
 # CONFIG_SERIAL_TEXT_DEBUG is not set
 
 #

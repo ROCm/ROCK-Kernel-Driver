@@ -236,7 +236,8 @@ static int reint_mknod(struct kml_rec *rec, struct file *dir,
                        struct lento_vfs_context *info)
 {
         struct run_ctxt saved_ctxt;
-        int     error, dev;
+        int     error;
+	dev_t dev;
 
         ENTRY;
 
@@ -245,7 +246,7 @@ static int reint_mknod(struct kml_rec *rec, struct file *dir,
         info->updated_time.tv_nsec = rec->new_objectv->pv_ctime_nsec;
         kmlreint_pre_secure(rec, dir, &saved_ctxt);
 
-        dev = rec->rdev ?: MKDEV(rec->major, rec->minor);
+        dev = rec->rdev ? old_decode_dev(rec->rdev) : MKDEV(rec->major, rec->minor);
 
         error = lento_mknod(rec->path, rec->mode, dev, info);
         pop_ctxt(&saved_ctxt); 

@@ -1744,7 +1744,6 @@ static struct inet_protocol pim_protocol = {
  
 void __init ip_mr_init(void)
 {
-	printk(KERN_INFO "Linux IP multicast router 0.06 plus PIM-SM\n");
 	mrt_cachep = kmem_cache_create("ip_mrt_cache",
 				       sizeof(struct mfc_cache),
 				       0, SLAB_HWCACHE_ALIGN,

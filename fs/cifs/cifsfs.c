@@ -28,7 +28,6 @@
 #include <linux/mount.h>
 #include <linux/slab.h>
 #include <linux/init.h>
-#include <linux/version.h>
 #include <linux/list.h>
 #include <linux/seq_file.h>
 #include <linux/vfs.h>
@@ -598,10 +597,12 @@ static int cifs_oplock_thread(void * dummyarg)
 				netfid = oplock_item->netfid;
 				DeleteOplockQEntry(oplock_item);
 				write_unlock(&GlobalMid_Lock);
-				rc = filemap_fdatawrite(inode->i_mapping);
-				if(rc)
-					CIFS_I(inode)->write_behind_rc 
-						= rc;
+				if (S_ISREG(inode->i_mode))
+					rc = filemap_fdatawrite(inode->i_mapping);
+				else
+					rc = 0;
+				if (rc)
+					CIFS_I(inode)->write_behind_rc = rc;
 				cFYI(1,("Oplock flush inode %p rc %d",inode,rc));
 				rc = CIFSSMBLock(0, pTcon, netfid,
 					0 /* len */ , 0 /* offset */, 0, 

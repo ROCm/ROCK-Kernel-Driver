@@ -32,7 +32,6 @@
 #include <linux/config.h>
 #include <linux/module.h>
 
-#include <linux/version.h>
 #include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
@@ -574,3 +573,4 @@ module_exit(hci_uart_cleanup);
 MODULE_AUTHOR("Maxim Krasnyansky <maxk@qualcomm.com>");
 MODULE_DESCRIPTION("Bluetooth HCI UART driver ver " VERSION);
 MODULE_LICENSE("GPL");
+MODULE_ALIAS_LDISC(N_HCI);

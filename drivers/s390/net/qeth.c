@@ -9765,19 +9765,19 @@ qeth_procfile_ioctl(struct inode *inode, struct file *file,
 };
 
 static struct file_operations qeth_procfile_fops = {
-	ioctl:qeth_procfile_ioctl,
-	read:qeth_procfile_read,
-	open:qeth_procfile_open,
-	release:qeth_procfile_release,
+	.ioctl = qeth_procfile_ioctl,
+	.read = qeth_procfile_read,
+	.open = qeth_procfile_open,
+	.release = qeth_procfile_release,
 };
 
 static struct proc_dir_entry *qeth_proc_file;
 
 static struct file_operations qeth_ipato_procfile_fops = {
-	read:qeth_procfile_read,	/* same as above! */
-	write:qeth_ipato_procfile_write,
-	open:qeth_ipato_procfile_open,
-	release:qeth_procfile_release	/* same as above! */
+	.read = qeth_procfile_read,	/* same as above! */
+	.write = qeth_ipato_procfile_write,
+	.open = qeth_ipato_procfile_open,
+	.release = qeth_procfile_release	/* same as above! */
 };
 
 static struct proc_dir_entry *qeth_ipato_proc_file;

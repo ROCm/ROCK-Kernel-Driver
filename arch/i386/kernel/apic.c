@@ -34,6 +34,7 @@
 #include <asm/pgalloc.h>
 #include <asm/desc.h>
 #include <asm/arch_hooks.h>
+#include <asm/hpet.h>
 
 #include <mach_apic.h>
 
@@ -779,7 +780,8 @@ static unsigned int __init get_8254_timer_count(void)
 	return count;
 }
 
-void __init wait_8254_wraparound(void)
+/* next tick in 8254 can be caught by catching timer wraparound */
+static void __init wait_8254_wraparound(void)
 {
 	unsigned int curr_count, prev_count=~0;
 	int delta;
@@ -799,6 +801,12 @@ void __init wait_8254_wraparound(void)
 
 	} while (delta < 300);
 }
+
+/*
+ * Default initialization for 8254 timers. If we use other timers like HPET,
+ * we override this later
+ */
+void (*wait_timer_tick)(void) = wait_8254_wraparound;
 
 /*
  * This function sets up the local APIC timer, with a timeout of
@@ -841,7 +849,7 @@ static void setup_APIC_timer(unsigned int clocks)
 	/*
 	 * Wait for IRQ0's slice:
 	 */
-	wait_8254_wraparound();
+	wait_timer_tick();
 
 	__setup_APIC_LVTT(clocks);
 
@@ -884,7 +892,7 @@ int __init calibrate_APIC_clock(void)
 	 * (the current tick might have been already half done)
 	 */
 
-	wait_8254_wraparound();
+	wait_timer_tick();
 
 	/*
 	 * We wrapped around just now. Let's start:
@@ -897,7 +905,7 @@ int __init calibrate_APIC_clock(void)
 	 * Let's wait LOOPS wraprounds:
 	 */
 	for (i = 0; i < LOOPS; i++)
-		wait_8254_wraparound();
+		wait_timer_tick();
 
 	tt2 = apic_read(APIC_TMCCT);
 	if (cpu_has_tsc)

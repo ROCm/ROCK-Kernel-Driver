@@ -167,8 +167,10 @@ struct agp_bridge_data {
 
 #define PGE_EMPTY(b, p)	(!(p) || (p) == (unsigned long) (b)->scratch_page)
 
-/* intel register */
-#define INTEL_APBASE	0x10
+/* Chipset independant registers (from AGP Spec) */
+#define AGP_APBASE	0x10
+
+/* Intel registers */
 #define INTEL_APSIZE	0xb4
 #define INTEL_ATTBASE	0xb8
 #define INTEL_AGPCTRL	0xb0
@@ -176,7 +178,6 @@ struct agp_bridge_data {
 #define INTEL_ERRSTS	0x91
 
 /* Intel 460GX Registers */
-#define INTEL_I460_APBASE		0x10
 #define INTEL_I460_BAPBASE		0x98
 #define INTEL_I460_GXBCTL		0xa0
 #define INTEL_I460_AGPSIZ		0xa2
@@ -184,7 +185,7 @@ struct agp_bridge_data {
 #define INTEL_I460_GATT_VALID		(1UL << 24)
 #define INTEL_I460_GATT_COHERENT	(1UL << 25)
 
-/* intel i830 registers */
+/* Intel i830 registers */
 #define I830_GMCH_CTRL			0x52
 #define I830_GMCH_ENABLED		0x4
 #define I830_GMCH_MEM_MASK		0x1
@@ -218,31 +219,31 @@ struct agp_bridge_data {
 #define I852_GME			0x2
 #define I852_GM				0x5
 
-/* intel 815 register */
+/* Intel 815 register */
 #define INTEL_815_APCONT	0x51
 #define INTEL_815_ATTBASE_MASK	~0x1FFFFFFF
 
-/* intel i820 registers */
+/* Intel i820 registers */
 #define INTEL_I820_RDCR		0x51
 #define INTEL_I820_ERRSTS	0xc8
 
-/* intel i840 registers */
+/* Intel i840 registers */
 #define INTEL_I840_MCHCFG	0x50
 #define INTEL_I840_ERRSTS	0xc8
  
-/* intel i845 registers */
+/* Intel i845 registers */
 #define INTEL_I845_AGPM		0x51
 #define INTEL_I845_ERRSTS	0xc8
 
-/* intel i850 registers */
+/* Intel i850 registers */
 #define INTEL_I850_MCHCFG	0x50
 #define INTEL_I850_ERRSTS	0xc8
 
-/* intel i860 registers */
+/* Intel i860 registers */
 #define INTEL_I860_MCHCFG	0x50
 #define INTEL_I860_ERRSTS	0xc8
 
-/* intel i810 registers */
+/* Intel i810 registers */
 #define I810_GMADDR		0x10
 #define I810_MMADDR		0x14
 #define I810_PTE_BASE		0x10000
@@ -261,7 +262,6 @@ struct agp_bridge_data {
 #define I810_DRAM_ROW_0_SDRAM	0x00000001
 
 /* Intel 7505 registers */
-#define INTEL_I7505_NAPBASELO	0x10
 #define INTEL_I7505_APSIZE	0x74
 #define INTEL_I7505_NCAPID	0x60
 #define INTEL_I7505_NISTAT	0x6c
@@ -271,26 +271,23 @@ struct agp_bridge_data {
 #define INTEL_I7505_MCHCFG	0x50
 
 /* VIA register */
-#define VIA_APBASE	0x10
 #define VIA_GARTCTRL	0x80
 #define VIA_APSIZE	0x84
 #define VIA_ATTBASE	0x88
 
 /* VIA KT400 */
 #define VIA_AGP3_GARTCTRL	0x90
-#define VIA_AGP3_APSIZE	0x94
+#define VIA_AGP3_APSIZE		0x94
 #define VIA_AGP3_ATTBASE	0x98
-#define VIA_AGPSEL	0xfd
+#define VIA_AGPSEL		0xfd
 
 /* SiS registers */
-#define SIS_APBASE	0x10
 #define SIS_ATTBASE	0x90
 #define SIS_APSIZE	0x94
 #define SIS_TLBCNTRL	0x97
 #define SIS_TLBFLUSH	0x98
 
 /* AMD registers */
-#define AMD_APBASE	0x10
 #define AMD_MMBASE	0x14
 #define AMD_APSIZE	0xac
 #define AMD_MODECNTL	0xb0
@@ -300,24 +297,14 @@ struct agp_bridge_data {
 #define AMD_TLBFLUSH	0x0c	/* In mmio region (32-bit register) */
 #define AMD_CACHEENTRY	0x10	/* In mmio region (32-bit register) */
 
-#define AMD_8151_APSIZE	0xb4
-#define AMD_8151_GARTBLOCK	0xb8
-
-#define AMD_X86_64_GARTAPERTURECTL	0x90
-#define AMD_X86_64_GARTAPERTUREBASE	0x94
-#define AMD_X86_64_GARTTABLEBASE	0x98
-#define AMD_X86_64_GARTCACHECTL		0x9c
-#define AMD_X86_64_GARTEN	1<<0
-
-#define AMD_8151_VMAPERTURE		0x10
-#define AMD_8151_AGP_CTL		0xb0
-#define AMD_8151_APERTURESIZE	0xb4
-#define AMD_8151_GARTPTR		0xb8
-#define AMD_8151_GTLBEN	1<<7
-#define AMD_8151_APEREN	1<<8
+/* AMD64 registers */
+#define AMD64_GARTAPERTURECTL	0x90
+#define AMD64_GARTAPERTUREBASE	0x94
+#define AMD64_GARTTABLEBASE	0x98
+#define AMD64_GARTCACHECTL		0x9c
+#define AMD64_GARTEN		(1<<0)
 
 /* ALi registers */
-#define ALI_APBASE			0x10
 #define ALI_AGPCTRL			0xb8
 #define ALI_ATTBASE			0xbc
 #define ALI_TLBCTRL			0xc0
@@ -327,19 +314,17 @@ struct agp_bridge_data {
 #define ALI_CACHE_FLUSH_EN		0x100
 
 /* ATI register */
-#define ATI_APBASE                  0x10
-#define ATI_GART_MMBASE_ADDR        0x14
-#define ATI_RS100_APSIZE            0xac
-#define ATI_RS300_APSIZE            0xf8
-#define ATI_RS100_IG_AGPMODE        0xb0
-#define ATI_RS300_IG_AGPMODE        0xfc
+#define ATI_GART_MMBASE_ADDR	0x14
+#define ATI_RS100_APSIZE	0xac
+#define ATI_RS300_APSIZE	0xf8
+#define ATI_RS100_IG_AGPMODE	0xb0
+#define ATI_RS300_IG_AGPMODE	0xfc
 
-#define ATI_GART_FEATURE_ID         0x00
-#define ATI_GART_BASE               0x04
-#define ATI_GART_CACHE_SZBASE       0x08
-#define ATI_GART_CACHE_CNTRL        0x0c
-#define ATI_GART_CACHE_ENTRY_CNTRL  0x10
-
+#define ATI_GART_FEATURE_ID		0x00
+#define ATI_GART_BASE			0x04
+#define ATI_GART_CACHE_SZBASE		0x08
+#define ATI_GART_CACHE_CNTRL		0x0c
+#define ATI_GART_CACHE_ENTRY_CNTRL	0x10
 
 /* Serverworks Registers */
 #define SVWRKS_APSIZE		0x10
@@ -368,6 +353,17 @@ struct agp_bridge_data {
 #define HP_ZX1_TCNFG		0x318
 #define HP_ZX1_PDIR_BASE	0x320
 #define HP_ZX1_CACHE_FLUSH	0x428
+
+/* NVIDIA registers */
+#define NVIDIA_0_APSIZE		0x80
+#define NVIDIA_1_WBC		0xf0
+#define NVIDIA_2_GARTCTRL	0xd0
+#define NVIDIA_2_APBASE		0xd8
+#define NVIDIA_2_APLIMIT	0xdc
+#define NVIDIA_2_ATTBASE(i)	(0xe0 + (i) * 4)
+#define NVIDIA_3_APBASE		0x50
+#define NVIDIA_3_APLIMIT	0x54
+
 
 struct agp_device_ids {
 	unsigned short device_id; /* first, to make table easier to read */
@@ -407,6 +403,7 @@ void get_agp_version(struct agp_bridge_data *bridge);
 unsigned long agp_generic_mask_memory(unsigned long addr, int type);
 
 extern int agp_off;
+extern int agp_try_unsupported_boot;
 
 /* Standard agp registers */
 #define AGPSTAT			0x4

@@ -729,7 +729,7 @@ void netjet_fill_dma(struct BCState *bcs)
 
 static void write_raw(struct BCState *bcs, u_int *buf, int cnt) {
 	u_int mask, val, *p=buf;
-	u_int i, s_cnt;
+	int i, s_cnt;
         
         if (cnt <= 0)
         	return;

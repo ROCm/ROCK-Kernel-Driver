@@ -281,6 +281,14 @@ S: Code 930.5, Goddard Space Flight Center
 S: Greenbelt, Maryland 20771
 S: USA
 
+N: Daniele Bellucci
+E: bellucda@tiscali.it
+D: Various Janitor work.
+W: http://web.tiscali.it/bellucda
+S: Via Delle Palme, 9
+S: Terni 05100
+S: Italy
+
 N: Randolph Bentson
 E: bentson@grieg.seaslug.org
 W: http://www.aa.net/~bentson/
@@ -1279,14 +1287,13 @@ S: Germany
 
 N: Christoph Hellwig
 E: hch@infradead.org
-E: hch@sgi.com
 D: all kinds of driver, filesystem & core kernel hacking
 D: freevxfs driver
 D: sysvfs maintainer
 D: chief codingstyle nitpicker
-S: Auweg 38
-S: 85748 Garching
-S: Germany
+S: Ampferstr. 50 / 4
+S: 6020 Innsbruck
+S: Austria
 
 N: Richard Henderson
 E: rth@twiddle.net

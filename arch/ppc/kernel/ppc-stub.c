@@ -106,6 +106,7 @@
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
 
+#include <asm/cacheflush.h>
 #include <asm/system.h>
 #include <asm/signal.h>
 #include <asm/kgdb.h>
@@ -136,7 +137,7 @@ static const char hexchars[]="0123456789abcdef";
 /* typedef void (*trapfunc_t)(void); */
 
 static void kgdb_fault_handler(struct pt_regs *regs);
-static void handle_exception (struct pt_regs *regs);
+static int handle_exception (struct pt_regs *regs);
 
 #if 0
 /* Install an exception handler for kgdb */
@@ -186,7 +187,7 @@ hex(unsigned char ch)
  * return 0.
  */
 static unsigned char *
-mem2hex(char *mem, char *buf, int count)
+mem2hex(const char *mem, char *buf, int count)
 {
 	unsigned char ch;
 	unsigned short tmp_s;
@@ -460,14 +461,12 @@ static void kgdb_fault_handler(struct pt_regs *regs)
 
 int kgdb_bpt(struct pt_regs *regs)
 {
-	handle_exception(regs);
-	return 1;
+	return handle_exception(regs);
 }
 
 int kgdb_sstep(struct pt_regs *regs)
 {
-	handle_exception(regs);
-	return 1;
+	return handle_exception(regs);
 }
 
 void kgdb(struct pt_regs *regs)
@@ -477,16 +476,14 @@ void kgdb(struct pt_regs *regs)
 
 int kgdb_iabr_match(struct pt_regs *regs)
 {
-	printk("kgdb doesn't support iabr, what?!?\n");
-	handle_exception(regs);
-	return 1;
+	printk(KERN_ERR "kgdb doesn't support iabr, what?!?\n");
+	return handle_exception(regs);
 }
 
 int kgdb_dabr_match(struct pt_regs *regs)
 {
-	printk("kgdb doesn't support dabr, what?!?\n");
-	handle_exception(regs);
-	return 1;
+	printk(KERN_ERR "kgdb doesn't support dabr, what?!?\n");
+	return handle_exception(regs);
 }
 
 /* Convert the hardware trap type code to a unix signal number. */
@@ -559,7 +556,7 @@ static int computeSignal(unsigned int tt)
 /*
  * This function does all command processing for interfacing to gdb.
  */
-static void
+static int
 handle_exception (struct pt_regs *regs)
 {
 	int sigval;
@@ -568,14 +565,19 @@ handle_exception (struct pt_regs *regs)
 	char *ptr;
 	unsigned int msr;
 
+	/* We don't handle user-mode breakpoints. */
+	if (user_mode(regs))
+		return 0;
+
 	if (debugger_fault_handler) {
 		debugger_fault_handler(regs);
 		panic("kgdb longjump failed!\n");
 	}
 	if (kgdb_active) {
-		printk("interrupt while in kgdb, returning\n");
-		return;
+		printk(KERN_ERR "interrupt while in kgdb, returning\n");
+		return 0;
 	}
+
 	kgdb_active = 1;
 	kgdb_started = 1;
 
@@ -783,7 +785,7 @@ handle_exception (struct pt_regs *regs)
 				printk("remcomInBuffer: %s\n", remcomInBuffer);
 				printk("remcomOutBuffer: %s\n", remcomOutBuffer);
 			}
-			return;
+			return 1;
 
 		case 's':
 			kgdb_flush_cache_all();
@@ -800,7 +802,7 @@ handle_exception (struct pt_regs *regs)
 				printk("remcomInBuffer: %s\n", remcomInBuffer);
 				printk("remcomOutBuffer: %s\n", remcomOutBuffer);
 			}
-			return;
+			return 1;
 
 		case 'r':		/* Reset (if user process..exit ???)*/
 			panic("kgdb reset.");
@@ -828,11 +830,11 @@ breakpoint(void)
 		return;
 	}
 
-	asm("	.globl breakinst
-	     breakinst: .long 0x7d821008
-	    ");
+	asm("	.globl breakinst	\n\
+	     breakinst: .long 0x7d821008");
 }
 
+#ifdef CONFIG_KGDB_CONSOLE
 /* Output string in GDB O-packet format if GDB has connected. If nothing
    output, returns 0 (caller must then handle output). */
 int
@@ -852,3 +854,4 @@ kgdb_output_string (const char* s, unsigned int count)
 
 	return 1;
 }
+#endif

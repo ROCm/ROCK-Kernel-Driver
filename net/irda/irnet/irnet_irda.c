@@ -320,6 +320,8 @@ irnet_discover_next_daddr(irnet_socket *	self)
   /* Create a new IAP instance */
   self->iriap = iriap_open(LSAP_ANY, IAS_CLIENT, self,
 			   irnet_discovervalue_confirm);
+  if(self->iriap == NULL)
+    return -ENOMEM;
 
   /* Next discovery - before the call to avoid races */
   self->disco_index++;
@@ -394,7 +396,8 @@ irnet_discover_daddr_and_lsap_sel(irnet_socket *	self)
   if(ret)
     {
       /* Close IAP */
-      iriap_close(self->iriap);
+      if(self->iriap)
+	iriap_close(self->iriap);
       self->iriap = NULL;
 
       /* Cleanup our copy of the discovery log */

@@ -215,7 +215,10 @@ running once the system is up.
 			when calculating gettimeofday(). If specicified timesource
 			is not avalible, it defaults to PIT. 
 			Format: { pit | tsc | cyclone | ... }
-			
+
+	hpet=		[IA-32,HPET] option to disable HPET and use PIT.
+			Format: disable
+
 	cm206=		[HW,CD]
 			Format: { auto | [<io>,][<irq>] }
 

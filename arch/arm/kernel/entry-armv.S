@@ -15,10 +15,12 @@
  */
 #include <linux/config.h>
 #include <linux/init.h>
-#include "entry-header.S"
+
 #include <asm/thread_info.h>
 #include <asm/glue.h>
+#include <asm/ptrace.h>
 
+#include "entry-header.S"
 
 #ifdef IOC_BASE
 /* IOC / IOMD based hardware */
@@ -770,8 +772,8 @@ __irq_svc:	sub	sp, sp, #S_FRAME_SIZE
 preempt_return:
 		ldr	r0, [r8, #TI_PREEMPT]		@ read preempt value
 		teq	r0, r7
-		strne	r0, [r0, -r0]			@ bug()
 		str	r9, [r8, #TI_PREEMPT]		@ restore preempt count
+		strne	r0, [r0, -r0]			@ bug()
 #endif
 		ldr	r0, [sp, #S_PSR]		@ irqs are already disabled
 		msr	spsr, r0
@@ -906,8 +908,8 @@ __irq_usr:	sub	sp, sp, #S_FRAME_SIZE
 #ifdef CONFIG_PREEMPT
 		ldr	r0, [r8, #TI_PREEMPT]
 		teq	r0, r7
-		strne	r0, [r0, -r0]
 		str	r9, [r8, #TI_PREEMPT]
+		strne	r0, [r0, -r0]
 		mov	tsk, r8
 #else
 		get_thread_info tsk

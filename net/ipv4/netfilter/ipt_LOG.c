@@ -13,6 +13,10 @@
 #include <linux/netfilter_ipv4/ip_tables.h>
 #include <linux/netfilter_ipv4/ipt_LOG.h>
 
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Netfilter Core Team <coreteam@netfilter.org>");
+MODULE_DESCRIPTION("iptables syslog logging module");
+
 #if 0
 #define DEBUGP printk
 #else
@@ -329,7 +333,7 @@ ipt_log_target(struct sk_buff **pskb,
 	       loginfo->prefix,
 	       in ? in->name : "",
 	       out ? out->name : "");
-#if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
+#ifdef CONFIG_BRIDGE_NETFILTER
 	if ((*pskb)->nf_bridge) {
 		struct net_device *physindev = (*pskb)->nf_bridge->physindev;
 		struct net_device *physoutdev = (*pskb)->nf_bridge->physoutdev;
@@ -413,4 +417,3 @@ static void __exit fini(void)
 
 module_init(init);
 module_exit(fini);
-MODULE_LICENSE("GPL");

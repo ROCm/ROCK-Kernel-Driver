@@ -171,7 +171,7 @@ __vxfs_iget(ino_t ino, struct inode *ilistp)
 	return NULL;
 
 fail:
-	printk(KERN_WARNING "vxfs: unable to read inode %ld\n", ino);
+	printk(KERN_WARNING "vxfs: unable to read inode %ld\n", (unsigned long)ino);
 	vxfs_put_page(pp);
 	return NULL;
 }
@@ -333,7 +333,7 @@ vxfs_read_inode(struct inode *ip)
 		} else
 			ip->i_op = &vxfs_immed_symlink_iops;
 	} else
-		init_special_inode(ip, ip->i_mode, vip->vii_rdev);
+		init_special_inode(ip, ip->i_mode, old_decode_dev(vip->vii_rdev));
 
 	return;
 }

@@ -19,7 +19,6 @@
  *
  *  adfs regular file handling primitives           
  */
-#include <linux/version.h>
 #include <linux/errno.h>
 #include <linux/fs.h>
 #include <linux/fcntl.h>

@@ -139,6 +139,7 @@ static int esi_reset(struct sir_dev *dev)
 MODULE_AUTHOR("Dag Brattli <dagb@cs.uit.no>");
 MODULE_DESCRIPTION("Extended Systems JetEye PC dongle driver");
 MODULE_LICENSE("GPL");
+MODULE_ALIAS("irda-dongle-1"); /* IRDA_ESI_DONGLE */
 
 module_init(esi_sir_init);
 module_exit(esi_sir_cleanup);

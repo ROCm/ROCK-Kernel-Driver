@@ -36,6 +36,9 @@
 #include <asm/system.h>
 #include <asm/irqchip.h>
 
+//FIXME - this ought to be in a header IMO
+void __init arc_init_irq(void);
+
 /*
  * Maximum IRQ count.  Currently, this is arbitary.  However, it should
  * not be set too low to prevent false triggering.  Conversely, if it

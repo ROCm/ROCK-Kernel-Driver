@@ -13,7 +13,6 @@
 #define _LINUX_AFS_VNODE_H
 
 #include <linux/fs.h>
-#include <linux/version.h>
 #include "server.h"
 #include "kafstimod.h"
 

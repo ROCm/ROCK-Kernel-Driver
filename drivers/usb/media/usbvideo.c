@@ -37,24 +37,9 @@
 static int video_nr = -1;
 MODULE_PARM(video_nr, "i");
 
-#warning please convert me from procfs to sysfs
-#define USES_PROC_FS 0
 /*
  * Local prototypes.
  */
-#if USES_PROC_FS
-static void usbvideo_procfs_level1_create(struct usbvideo *ut);
-static void usbvideo_procfs_level1_destroy(struct usbvideo *ut);
-static void usbvideo_procfs_level2_create(struct uvd *uvd);
-static void usbvideo_procfs_level2_destroy(struct uvd *uvd);
-static int usbvideo_default_procfs_read_proc(
-	char *page, char **start, off_t off, int count,
-	int *eof, void *data);
-static int usbvideo_default_procfs_write_proc(
-	struct file *file, const char *buffer, 
-	unsigned long count, void *data);
-#endif
-
 static void usbvideo_Disconnect(struct usb_interface *intf);
 static void usbvideo_CameraRelease(struct uvd *uvd);
 
@@ -813,24 +798,7 @@ int usbvideo_register(
 		cams->cb.startDataPump = usbvideo_StartDataPump;
 	if (cams->cb.stopDataPump == NULL)
 		cams->cb.stopDataPump = usbvideo_StopDataPump;
-#if USES_PROC_FS
-	/*
-	 * If both /proc fs callbacks are NULL then we assume that the driver
-	 * does not need procfs services at all. Leave them NULL.
-	 */
-	cams->uses_procfs = (cams->cb.procfs_read != NULL) || (cams->cb.procfs_write == NULL);
-	if (cams->uses_procfs) {
-		if (cams->cb.procfs_read == NULL)
-			cams->cb.procfs_read = usbvideo_default_procfs_read_proc;
-		if (cams->cb.procfs_write == NULL)
-			cams->cb.procfs_write = usbvideo_default_procfs_write_proc;
-	}
-#else /* !USES_PROC_FS */
-	/* Report a warning so that user knows why there is no /proc entries */
-	if ((cams->cb.procfs_read != NULL) || (cams->cb.procfs_write == NULL)) {
-		dbg("%s: /proc fs support requested but not configured!", __FUNCTION__);
-	}
-#endif
+
 	cams->num_cameras = num_cams;
 	cams->cam = (struct uvd *) &cams[1];
 	cams->md_module = md;
@@ -870,13 +838,6 @@ int usbvideo_register(
 	cams->usbdrv.probe = cams->cb.probe;
 	cams->usbdrv.disconnect = cams->cb.disconnect;
 	cams->usbdrv.id_table = id_table;
-
-#if USES_PROC_FS
-	if (cams->uses_procfs) {
-		dbg("%s: Creating /proc filesystem entries.", __FUNCTION__);
-		usbvideo_procfs_level1_create(cams);
-	}
-#endif
 
 	/*
 	 * Update global handle to usbvideo. This is very important
@@ -919,13 +880,6 @@ void usbvideo_Deregister(struct usbvideo **pCams)
 		err("%s: cams == NULL", __FUNCTION__);
 		return;
 	}
-
-#if USES_PROC_FS
-	if (cams->uses_procfs) {
-		dbg("%s: Deregistering filesystem entries.", __FUNCTION__);
-		usbvideo_procfs_level1_destroy(cams);
-	}
-#endif
 
 	dbg("%s: Deregistering %s driver.", __FUNCTION__, cams->drvName);
 	usb_deregister(&cams->usbdrv);
@@ -1040,14 +994,6 @@ static void usbvideo_CameraRelease(struct uvd *uvd)
 		err("%s: Illegal call", __FUNCTION__);
 		return;
 	}
-
-#if USES_PROC_FS
-	assert(uvd->handle != NULL);
-	if (uvd->handle->uses_procfs) {
-		dbg("%s: Removing /proc/%s/ filesystem entries.", __FUNCTION__, uvd->handle->drvName);
-		usbvideo_procfs_level2_destroy(uvd);
-	}
-#endif
 
 	RingQueue_Free(&uvd->dp);
 	if (VALID_CALLBACK(uvd, userFree))
@@ -1199,17 +1145,6 @@ int usbvideo_RegisterVideoDevice(struct uvd *uvd)
 	info("%s on /dev/video%d: canvas=%s videosize=%s",
 	     (uvd->handle != NULL) ? uvd->handle->drvName : "???",
 	     uvd->vdev.minor, tmp2, tmp1);
-
-#if USES_PROC_FS
-	assert(uvd->handle != NULL);
-	if (uvd->handle->uses_procfs) {
-		if (uvd->debug > 0) {
-			info("%s: Creating /proc/video/%s/ filesystem entries.",
-			     __FUNCTION__, uvd->handle->drvName);
-		}
-		usbvideo_procfs_level2_create(uvd);
-	}
-#endif
 
 	usb_get_dev(uvd->dev);
 	return 0;
@@ -1665,7 +1600,7 @@ static ssize_t usbvideo_v4l_read(struct file *file, char *buf,
 		return -EFAULT;
 
 	if (uvd->debug >= 1)
-		info("%s: %d. bytes, noblock=%d.", __FUNCTION__, count, noblock);
+		info("%s: %Zd. bytes, noblock=%d.", __FUNCTION__, count, noblock);
 
 	down(&uvd->lock);	
 
@@ -1783,7 +1718,7 @@ static ssize_t usbvideo_v4l_read(struct file *file, char *buf,
 	/* Update last read position */
 	frame->seqRead_Index += count;
 	if (uvd->debug >= 1) {
-		err("%s: {copy} count used=%d, new seqRead_Index=%ld",
+		err("%s: {copy} count used=%Zd, new seqRead_Index=%ld",
 			__FUNCTION__, count, frame->seqRead_Index);
 	}
 
@@ -2345,130 +2280,4 @@ static void usbvideo_SoftwareContrastAdjustment(struct uvd *uvd,
 	}
 }
 
-/*
- * /proc interface
- *
- * We will be creating directories and entries under /proc/video using
- * external 'video_proc_entry' directory which is exported by videodev.o
- * module. Within that directory we will create $driver/ directory to
- * uniquely and uniformly refer to our specific $driver. Within that
- * directory we will finally create an entry that is named after the
- * video device node - video3, for example. The format of that file
- * is determined by callbacks that the minidriver may provide. If no
- * callbacks are provided (neither read nor write) then we don't create
- * the entry.
- *
- * Here is a sample directory entry: /proc/video/ibmcam/video3
- *
- * The "file" video3 (in example above) is readable and writeable, in
- * theory. If the minidriver provides callbacks to do reading and
- * writing then both those procedures are supported. However if the
- * driver leaves callbacks in default (NULL) state the default
- * read and write handlers are used. The default read handler reports
- * that the driver does not support /proc fs. The default write handler
- * returns error code on any write attempt.
- */
-
-#if USES_PROC_FS
-
-extern struct proc_dir_entry *video_proc_entry;
-
-static void usbvideo_procfs_level1_create(struct usbvideo *ut)
-{
-	if (ut == NULL) {
-		err("%s: ut == NULL", __FUNCTION__);
-		return;
-	}
-	if (video_proc_entry == NULL) {
-		err("%s: /proc/video/ doesn't exist.", __FUNCTION__);
-		return;
-	}
-	ut->procfs_dEntry = create_proc_entry(ut->drvName, S_IFDIR, video_proc_entry);
-	if (ut->procfs_dEntry != NULL) {
-		if (ut->md_module != NULL)
-			ut->procfs_dEntry->owner = ut->md_module;
-	} else {
-		err("%s: Unable to initialize /proc/video/%s", __FUNCTION__, ut->drvName);
-	}
-}
-
-static void usbvideo_procfs_level1_destroy(struct usbvideo *ut)
-{
-	if (ut == NULL) {
-		err("%s: ut == NULL", __FUNCTION__);
-		return;
-	}
-	if (ut->procfs_dEntry != NULL) {
-		remove_proc_entry(ut->drvName, video_proc_entry);
-		ut->procfs_dEntry = NULL;
-	}
-}
-
-static void usbvideo_procfs_level2_create(struct uvd *uvd)
-{
-	if (uvd == NULL) {
-		err("%s: uvd == NULL", __FUNCTION__);
-		return;
-	}
-	assert(uvd->handle != NULL);
-	if (uvd->handle->procfs_dEntry == NULL) {
-		err("%s: uvd->handle->procfs_dEntry == NULL", __FUNCTION__);
-		return;
-	}
-
-	sprintf(uvd->videoName, "video%d", uvd->vdev.minor);
-	uvd->procfs_vEntry = create_proc_entry(
-		uvd->videoName,
-		S_IFREG | S_IRUGO | S_IWUSR,
-		uvd->handle->procfs_dEntry);
-	if (uvd->procfs_vEntry != NULL) {
-		uvd->procfs_vEntry->data = uvd;
-		uvd->procfs_vEntry->read_proc = uvd->handle->cb.procfs_read;
-		uvd->procfs_vEntry->write_proc = uvd->handle->cb.procfs_write;
-	} else {
-		err("%s: Failed to create entry \"%s\"", __FUNCTION__, uvd->videoName);
-	}
-}
-
-static void usbvideo_procfs_level2_destroy(struct uvd *uvd)
-{
-	if (uvd == NULL) {
-		err("%s: uvd == NULL", __FUNCTION__);
-		return;
-	}
-	if (uvd->procfs_vEntry != NULL) {
-		remove_proc_entry(uvd->videoName, uvd->procfs_vEntry);
-		uvd->procfs_vEntry = NULL;
-	}
-}
-
-static int usbvideo_default_procfs_read_proc(
-	char *page, char **start, off_t off, int count,
-	int *eof, void *data)
-{
-	char *out = page;
-	int len;
-	
-	/* Stay under PAGE_SIZE or else */
-	out += sprintf(out, "This driver does not support /proc services.\n");
-	len = out - page;
-	len -= off;
-	if (len < count) {
-		*eof = 1;
-		if (len <= 0)
-			return 0;
-	} else
-		len = count;
-	*start = page + off;
-	return len;	
-}
-
-static int usbvideo_default_procfs_write_proc(
-	struct file *file, const char *buffer, 
-	unsigned long count, void *data)
-{
-	return -EINVAL;
-}
-
-#endif /* USES_PROC_FS */
 MODULE_LICENSE("GPL");

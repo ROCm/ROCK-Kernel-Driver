@@ -815,6 +815,17 @@ config BLK_DEV_IDE_PMAC
 	  most of the recent Apple Power Macintoshes and PowerBooks.
 	  If unsure, say Y.
 
+config BLK_DEV_IDE_PMAC_ATA100FIRST
+	bool "Probe internal ATA/100 (Kauai) first"
+	depends on BLK_DEV_IDE_PMAC
+	help
+	  This option will cause the ATA/100 controller found in UniNorth2
+	  based machines (Windtunnel PowerMac, Aluminium PowerBooks, ...)
+	  to be probed before the ATA/66 and ATA/33 controllers. Without
+	  these, those machine used to have the hard disk on hdc and the
+	  CD-ROM on hda. This option changes this to more natural hda for
+	  hard disk and hdc for CD-ROM.
+
 config BLK_DEV_IDEDMA_PMAC
 	bool "PowerMac IDE DMA support"
 	depends on BLK_DEV_IDE_PMAC
@@ -823,6 +834,13 @@ config BLK_DEV_IDEDMA_PMAC
 	  Power Macintoshes and PowerBooks to use DMA (direct memory access)
 	  to transfer data to and from memory.  Saying Y is safe and improves
 	  performance.
+
+config BLK_DEV_IDE_PMAC_BLINK
+	bool "Blink laptop LED on drive activity"
+	depends on BLK_DEV_IDE_PMAC && ADB_PMU
+	help
+	  This option enables the use of the sleep LED as a hard drive
+	  activity LED.
 
 config BLK_DEV_IDEDMA_PMAC_AUTO
 	bool "Use DMA by default"

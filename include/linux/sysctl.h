@@ -604,7 +604,8 @@ enum {
 	DEV_HWMON=2,
 	DEV_PARPORT=3,
 	DEV_RAID=4,
-	DEV_MAC_HID=5
+	DEV_MAC_HID=5,
+	DEV_SCSI=6,
 };
 
 /* /proc/sys/dev/cdrom */
@@ -663,6 +664,11 @@ enum {
 	DEV_MAC_HID_MOUSE_BUTTON2_KEYCODE=4,
 	DEV_MAC_HID_MOUSE_BUTTON3_KEYCODE=5,
 	DEV_MAC_HID_ADB_MOUSE_SENDS_KEYCODES=6
+};
+
+/* /proc/sys/dev/scsi */
+enum {
+	DEV_SCSI_LOGGING_LEVEL=1,
 };
 
 /* /proc/sys/abi */

@@ -6,6 +6,10 @@
 
 #include <linux/netfilter_ipv6/ip6_tables.h>
 
+MODULE_DESCRIPTION("IPv6 EUI64 address checking match");
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Andras Kis-Szabo <kisza@sch.bme.hu>");
+
 static int
 match(const struct sk_buff *skb,
       const struct net_device *in,
@@ -88,6 +92,3 @@ static void __exit fini(void)
 
 module_init(init);
 module_exit(fini);
-MODULE_DESCRIPTION("IPv6 EUI64 address checking match");
-MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Andras Kis-Szabo <kisza@sch.bme.hu>");

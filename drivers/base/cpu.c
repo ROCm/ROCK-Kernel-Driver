@@ -12,6 +12,7 @@
 struct sysdev_class cpu_sysdev_class = {
 	set_kset_name("cpu"),
 };
+EXPORT_SYMBOL(cpu_sysdev_class);
 
 
 /*

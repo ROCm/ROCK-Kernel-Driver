@@ -77,23 +77,8 @@
  *  should be enough).
  */
 
-#if	defined	__i386__
-#define __READ_BARRIER()	\
-		__asm__ volatile("lock; addl $0,0(%%esp)": : :"memory")
-#define __WRITE_BARRIER()	__asm__ volatile ("": : :"memory")
-#elif	defined	__powerpc__
-#define __READ_BARRIER()	__asm__ volatile("eieio; sync" : : : "memory")
-#define __WRITE_BARRIER()	__asm__ volatile("eieio; sync" : : : "memory")
-#elif	defined	__ia64__
-#define __READ_BARRIER()	__asm__ volatile("mf.a; mf" : : : "memory")
-#define __WRITE_BARRIER()	__asm__ volatile("mf.a; mf" : : : "memory")
-#elif	defined	__alpha__
-#define __READ_BARRIER()	__asm__ volatile("mb": : :"memory")
-#define __WRITE_BARRIER()	__asm__ volatile("mb": : :"memory")
-#else
-#define __READ_BARRIER()	mb()
-#define __WRITE_BARRIER()	mb()
-#endif
+#define __READ_BARRIER()	rmb()
+#define __WRITE_BARRIER()	wmb()
 
 #ifndef MEMORY_READ_BARRIER
 #define MEMORY_READ_BARRIER()	__READ_BARRIER()

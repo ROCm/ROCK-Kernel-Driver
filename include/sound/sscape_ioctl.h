@@ -14,6 +14,8 @@ struct sscape_microcode
 };
 
 #define SND_SSCAPE_LOAD_BOOTB  _IOWR('P', 100, struct sscape_bootblock)
-#define SND_SSCAPE_LOAD_MCODE  _IOW('P', 101, struct sscape_microcode)
+
+/* This ioctl is marked bad because the type is bigger than the IOCTL description */
+#define SND_SSCAPE_LOAD_MCODE  _IOW_BAD('P', 101, struct sscape_microcode)
 
 #endif

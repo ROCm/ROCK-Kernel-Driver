@@ -48,7 +48,7 @@ MODULE_PARM(debugmode, "i");
 struct capidrv_contr {
 
 	struct capidrv_contr *next;
-
+	struct module *owner;
 	u32 contrnr;
 	char name[20];
 
@@ -1816,7 +1816,7 @@ static int if_sendbuf(int id, int channel, int doack, struct sk_buff *skb)
 	capidrv_bchan *bchan;
 	capidrv_ncci *nccip;
 	int len = skb->len;
-	size_t msglen;
+	int msglen;
 	u16 errcode;
 	u16 datahandle;
 
@@ -1844,7 +1844,7 @@ static int if_sendbuf(int id, int channel, int doack, struct sk_buff *skb)
 			      0	/* Flags */
 	    );
 
-	if (capidrv_add_ack(nccip, datahandle, doack ? skb->len : -1) < 0)
+	if (capidrv_add_ack(nccip, datahandle, doack ? (int)skb->len : -1) < 0)
 	   return 0;
 
 	capi_cmsg2message(&sendcmsg, sendcmsg.buf);
@@ -1990,16 +1990,18 @@ static int capidrv_addcontr(u16 contr, struct capi_profile *profp)
 	char id[20];
 	int i;
 
-	MOD_INC_USE_COUNT;
-
 	sprintf(id, "capidrv-%d", contr);
+	if (!try_module_get(THIS_MODULE)) {
+		printk(KERN_WARNING "capidrv: (%s) Could not reserve module\n", id);
+		return -1;
+	}
 	if (!(card = (capidrv_contr *) kmalloc(sizeof(capidrv_contr), GFP_ATOMIC))) {
 		printk(KERN_WARNING
 		 "capidrv: (%s) Could not allocate contr-struct.\n", id);
-		MOD_DEC_USE_COUNT;
 		return -1;
 	}
 	memset(card, 0, sizeof(capidrv_contr));
+	card->owner = THIS_MODULE;
 	init_timer(&card->listentimer);
 	strcpy(card->name, id);
 	card->contrnr = contr;
@@ -2008,8 +2010,8 @@ static int capidrv_addcontr(u16 contr, struct capi_profile *profp)
 	if (!card->bchans) {
 		printk(KERN_WARNING
 		"capidrv: (%s) Could not allocate bchan-structs.\n", id);
+		module_put(card->owner);
 		kfree(card);
-		MOD_DEC_USE_COUNT;
 		return -1;
 	}
 	card->interface.channels = profp->nbchannel;
@@ -2042,8 +2044,8 @@ static int capidrv_addcontr(u16 contr, struct capi_profile *profp)
 	if (!register_isdn(&card->interface)) {
 		printk(KERN_ERR "capidrv: Unable to register contr %s\n", id);
 		kfree(card->bchans);
+		module_put(card->owner);
 		kfree(card);
-		MOD_DEC_USE_COUNT;
 		return -1;
 	}
 	card->myid = card->interface.channels;
@@ -2096,6 +2098,7 @@ static int capidrv_delcontr(u16 contr)
 		printk(KERN_ERR "capidrv: delcontr: no contr %u\n", contr);
 		return -1;
 	}
+	#warning FIXME: maybe a race condition the card should be removed here from global list /kkeil
 	spin_unlock_irqrestore(&global_lock, flags);
 
 	del_timer(&card->listentimer);
@@ -2153,12 +2156,9 @@ static int capidrv_delcontr(u16 contr)
 	}
 	spin_unlock_irqrestore(&global_lock, flags);
 
+	module_put(card->owner);
 	printk(KERN_INFO "%s: now down.\n", card->name);
-
 	kfree(card);
-
-	MOD_DEC_USE_COUNT;
-
 	return 0;
 }
 
@@ -2245,8 +2245,6 @@ static int __init capidrv_init(void)
 	u32 ncontr, contr;
 	u16 errcode;
 
-	MOD_INC_USE_COUNT;
-
 	if ((p = strchr(revision, ':')) != 0 && p[1]) {
 		strncpy(rev, p + 2, sizeof(rev));
 		rev[sizeof(rev)-1] = 0;
@@ -2262,7 +2260,6 @@ static int __init capidrv_init(void)
 	global.ap.recv_message = capidrv_recv_message;
 	errcode = capi20_register(&global.ap);
 	if (errcode) {
-		MOD_DEC_USE_COUNT;
 		return -EIO;
 	}
 
@@ -2271,7 +2268,6 @@ static int __init capidrv_init(void)
 	errcode = capi20_get_profile(0, &profile);
 	if (errcode != CAPI_NOERROR) {
 		capi20_release(&global.ap);
-		MOD_DEC_USE_COUNT;
 		return -EIO;
 	}
 
@@ -2285,8 +2281,6 @@ static int __init capidrv_init(void)
 	proc_init();
 
 	printk(KERN_NOTICE "capidrv: Rev %s: loaded\n", rev);
-	MOD_DEC_USE_COUNT;
-
 	return 0;
 }
 

@@ -130,7 +130,7 @@ acpi_request_vector (u32 int_type)
 	int vector = -1;
 
 	if (int_type < ACPI_MAX_PLATFORM_INTERRUPTS) {
-		/* correctable platform error interrupt */
+		/* corrected platform error interrupt */
 		vector = platform_intr_list[int_type];
 	} else
 		printk(KERN_ERR "acpi_request_vector(): invalid interrupt type\n");
@@ -603,11 +603,13 @@ acpi_boot_init (void)
 		printk(KERN_ERR PREFIX "Can't find FADT\n");
 
 #ifdef CONFIG_SMP
-	smp_boot_data.cpu_count = available_cpus;
 	if (available_cpus == 0) {
 		printk(KERN_INFO "ACPI: Found 0 CPUS; assuming 1\n");
+		printk(KERN_INFO "CPU 0 (0x%04x)", hard_smp_processor_id());
+		smp_boot_data.cpu_phys_id[available_cpus] = hard_smp_processor_id();
 		available_cpus = 1; /* We've got at least one of these, no? */
 	}
+	smp_boot_data.cpu_count = available_cpus;
 
 	smp_build_cpu_map();
 # ifdef CONFIG_NUMA

@@ -61,11 +61,6 @@
 #include <net/route.h>
 #include <linux/atalk.h>
 
-#ifdef CONFIG_PROC_FS
-extern void aarp_register_proc_fs(void);
-extern void aarp_unregister_proc_fs(void);
-#endif
-
 extern void aarp_cleanup_module(void);
 
 extern void aarp_probe_network(struct atalk_iface *atif);
@@ -183,13 +178,12 @@ static void atalk_destroy_timer(unsigned long data)
 {
 	struct sock *sk = (struct sock *)data;
 
-	if (!atomic_read(&sk->sk_wmem_alloc) &&
-	    !atomic_read(&sk->sk_rmem_alloc) && sock_flag(sk, SOCK_DEAD))
-		sock_put(sk);
-	else {
+	if (atomic_read(&sk->sk_wmem_alloc) ||
+	    atomic_read(&sk->sk_rmem_alloc)) {
 		sk->sk_timer.expires = jiffies + SOCK_DESTROY_TIME;
 		add_timer(&sk->sk_timer);
-	}
+	} else
+		sock_put(sk);
 }
 
 static inline void atalk_destroy_socket(struct sock *sk)
@@ -197,16 +191,15 @@ static inline void atalk_destroy_socket(struct sock *sk)
 	atalk_remove_socket(sk);
 	skb_queue_purge(&sk->sk_receive_queue);
 
-	if (!atomic_read(&sk->sk_wmem_alloc) &&
-	    !atomic_read(&sk->sk_rmem_alloc) && sock_flag(sk, SOCK_DEAD))
-		sock_put(sk);
-	else {
+	if (atomic_read(&sk->sk_wmem_alloc) ||
+	    atomic_read(&sk->sk_rmem_alloc)) {
 		init_timer(&sk->sk_timer);
 		sk->sk_timer.expires	= jiffies + SOCK_DESTROY_TIME;
 		sk->sk_timer.function	= atalk_destroy_timer;
 		sk->sk_timer.data	= (unsigned long)sk;
 		add_timer(&sk->sk_timer);
-	}
+	} else
+		sock_put(sk);
 }
 
 /**************************************************************************\
@@ -239,6 +232,7 @@ static void atif_drop_device(struct net_device *dev)
 	while ((tmp = *iface) != NULL) {
 		if (tmp->dev == dev) {
 			*iface = tmp->next;
+			dev_put(dev);
 			kfree(tmp);
 			dev->atalk_ptr = NULL;
 		} else
@@ -255,6 +249,7 @@ static struct atalk_iface *atif_add_device(struct net_device *dev,
 	if (!iface)
 		goto out;
 
+	dev_hold(dev);
 	iface->dev = dev;
 	dev->atalk_ptr = iface;
 	iface->address = *sa;
@@ -616,6 +611,7 @@ static int atrtr_delete(struct atalk_addr * addr)
 		    (!(tmp->flags&RTF_GATEWAY) ||
 		     tmp->target.s_node == addr->s_node)) {
 			*r = tmp->next;
+			dev_put(tmp->dev);
 			kfree(tmp);
 			goto out;
 		}
@@ -640,6 +636,7 @@ void atrtr_device_down(struct net_device *dev)
 	while ((tmp = *r) != NULL) {
 		if (tmp->dev == dev) {
 			*r = tmp->next;
+			dev_put(dev);
 			kfree(tmp);
 		} else
 			r = &tmp->next;
@@ -935,24 +932,95 @@ static int atrtr_ioctl(unsigned int cmd, void *arg)
  * Checksum: This is 'optional'. It's quite likely also a good
  * candidate for assembler hackery 8)
  */
-unsigned short atalk_checksum(struct ddpehdr *ddp, int len)
+static unsigned long atalk_sum_partial(const unsigned char *data, 
+				       int len, unsigned long sum)
 {
-	unsigned long sum = 0;	/* Assume unsigned long is >16 bits */
-	unsigned char *data = (unsigned char *)ddp;
-
-	len  -= 4;		/* skip header 4 bytes */
-	data += 4;
-
 	/* This ought to be unwrapped neatly. I'll trust gcc for now */
 	while (len--) {
-		sum += *data;
+		sum += *data++;
 		sum <<= 1;
-		if (sum & 0x10000) {
-			sum++;
-			sum &= 0xFFFF;
-		}
-		data++;
+		sum = ((sum >> 16) + sum) & 0xFFFF;
 	}
+	return sum;
+}
+
+/*  Checksum skb data --  similar to skb_checksum  */
+static unsigned long atalk_sum_skb(const struct sk_buff *skb, int offset,
+				   int len, unsigned long sum)
+{
+	int start = skb_headlen(skb);
+	int i, copy;
+
+	/* checksum stuff in header space */
+	if ( (copy = start - offset) > 0) {
+		if (copy > len)
+			copy = len;
+		sum = atalk_sum_partial(skb->data + offset, copy, sum);
+		if ( (len -= copy) == 0) 
+			return sum;
+
+		offset += copy;
+	}
+
+	/* checksum stuff in frags */
+	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
+		int end;
+
+		BUG_TRAP(start <= offset + len);
+
+		end = start + skb_shinfo(skb)->frags[i].size;
+		if ((copy = end - offset) > 0) {
+			u8 *vaddr;
+			skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
+
+			if (copy > len)
+				copy = len;
+			vaddr = kmap_skb_frag(frag);
+			sum = atalk_sum_partial(vaddr + frag->page_offset +
+						  offset - start, copy, sum);
+			kunmap_skb_frag(vaddr);
+
+			if (!(len -= copy))
+				return sum;
+			offset += copy;
+		}
+		start = end;
+	}
+
+	if (skb_shinfo(skb)->frag_list) {
+		struct sk_buff *list = skb_shinfo(skb)->frag_list;
+
+		for (; list; list = list->next) {
+			int end;
+
+			BUG_TRAP(start <= offset + len);
+
+			end = start + list->len;
+			if ((copy = end - offset) > 0) {
+				if (copy > len)
+					copy = len;
+				sum = atalk_sum_skb(list, offset - start,
+						    copy, sum);
+				if ((len -= copy) == 0)
+					return sum;
+				offset += copy;
+			}
+			start = end;
+		}
+	}
+
+	BUG_ON(len > 0);
+
+	return sum;
+}
+
+static unsigned short atalk_checksum(const struct sk_buff *skb, int len)
+{
+	unsigned long sum;
+
+	/* skip header 4 bytes */
+	sum = atalk_sum_skb(skb, 4, len-4, 0);
+
 	/* Use 0xFFFF for 0. 0 itself means none */
 	return sum ? htons((unsigned short)sum) : 0xFFFF;
 }
@@ -983,6 +1051,8 @@ static int atalk_create(struct socket *sock, int protocol)
 	rc = 0;
 	sock->ops = &atalk_dgram_ops;
 	sock_init_data(sock, sk);
+	sk_set_owner(sk, THIS_MODULE);
+
 	/* Checksums on by default */
 	sk->sk_zapped = 1;
 out:
@@ -998,10 +1068,7 @@ static int atalk_release(struct socket *sock)
 	struct sock *sk = sock->sk;
 
 	if (sk) {
-		if (!sock_flag(sk, SOCK_DEAD)) {
-			sk->sk_state_change(sk);
-			sock_set_flag(sk, SOCK_DEAD);
-		}
+		sock_orphan(sk);
 		sock->sk = NULL;
 		atalk_destroy_socket(sk);
 	}
@@ -1335,25 +1402,27 @@ free_it:
 static int atalk_rcv(struct sk_buff *skb, struct net_device *dev,
 		     struct packet_type *pt)
 {
-	struct ddpehdr *ddp = ddp_hdr(skb);
+	struct ddpehdr *ddp;
 	struct sock *sock;
 	struct atalk_iface *atif;
 	struct sockaddr_at tosat;
         int origlen;
         struct ddpebits ddphv;
 
-	/* Size check */
-	if (skb->len < sizeof(*ddp))
+	/* Don't mangle buffer if shared */
+	if (!(skb = skb_share_check(skb, GFP_ATOMIC))) 
+		goto out;
+		
+	/* Size check and make sure header is contiguous */
+	if (!pskb_may_pull(skb, sizeof(*ddp)))
 		goto freeit;
+
+	ddp = ddp_hdr(skb);
 
 	/*
 	 *	Fix up the length field	[Ok this is horrible but otherwise
 	 *	I end up with unions of bit fields and messy bit field order
 	 *	compiler/endian dependencies..]
-	 *
-	 *	FIXME: This is a write to a shared object. Granted it
-	 *	happens to be safe BUT.. (Its safe as user space will not
-	 *	run until we put it back)
 	 */
 	*((__u16 *)&ddphv) = ntohs(*((__u16 *)ddp));
 
@@ -1374,7 +1443,7 @@ static int atalk_rcv(struct sk_buff *skb, struct net_device *dev,
 	 * valid for net byte orders all over the networking code...
 	 */
 	if (ddp->deh_sum &&
-	    atalk_checksum(ddp, ddphv.deh_len) != ddp->deh_sum)
+	    atalk_checksum(skb, ddphv.deh_len) != ddp->deh_sum)
 		/* Not a valid AppleTalk frame - dustbin time */
 		goto freeit;
 
@@ -1433,14 +1502,16 @@ static int ltalk_rcv(struct sk_buff *skb, struct net_device *dev,
 
 		if (!ap || skb->len < sizeof(struct ddpshdr))
 			goto freeit;
+
+		/* Don't mangle buffer if shared */
+		if (!(skb = skb_share_check(skb, GFP_ATOMIC))) 
+			return 0;
+
 		/*
 		 * The push leaves us with a ddephdr not an shdr, and
 		 * handily the port bytes in the right place preset.
 		 */
-
-		skb_push(skb, sizeof(*ddp) - 4);
-		/* FIXME: use skb->cb to be able to use shared skbs */
-		ddp = (struct ddpehdr *)skb->data;
+		ddp = (struct ddpehdr *) skb_push(skb, sizeof(*ddp) - 4);
 
 		/* Now fill in the long header */
 
@@ -1592,7 +1663,7 @@ static int atalk_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr 
 	if (sk->sk_no_check == 1)
 		ddp->deh_sum = 0;
 	else
-		ddp->deh_sum = atalk_checksum(ddp, len + sizeof(*ddp));
+		ddp->deh_sum = atalk_checksum(skb, len + sizeof(*ddp));
 
 	/*
 	 * Loopback broadcast packets to non gateway targets (ie routes
@@ -1801,11 +1872,13 @@ static struct notifier_block ddp_notifier = {
 struct packet_type ltalk_packet_type = {
 	.type		= __constant_htons(ETH_P_LOCALTALK),
 	.func		= ltalk_rcv,
+	.data		= (void *)1,
 };
 
 struct packet_type ppptalk_packet_type = {
 	.type		= __constant_htons(ETH_P_PPPTALK),
 	.func		= atalk_rcv,
+	.data		= (void *)1,
 };
 
 static unsigned char ddp_snap_id[] = { 0x08, 0x00, 0x07, 0x80, 0x9B };
@@ -1815,8 +1888,6 @@ EXPORT_SYMBOL(aarp_send_ddp);
 EXPORT_SYMBOL(atrtr_get_dev);
 EXPORT_SYMBOL(atalk_find_dev_addr);
 
-static char atalk_banner[] __initdata =
-	KERN_INFO "NET4: AppleTalk 0.20 for Linux NET4.0\n";
 static char atalk_err_snap[] __initdata =
 	KERN_CRIT "Unable to register DDP with SNAP.\n";
 
@@ -1834,23 +1905,16 @@ static int __init atalk_init(void)
 	register_netdevice_notifier(&ddp_notifier);
 	aarp_proto_init();
 	atalk_proc_init();
-#ifdef CONFIG_PROC_FS
-	aarp_register_proc_fs();
-#endif /* CONFIG_PROC_FS */
 	atalk_register_sysctl();
-	printk(atalk_banner);
 	return 0;
 }
 module_init(atalk_init);
 
 /*
- * Note on MOD_{INC,DEC}_USE_COUNT:
- *
- * Use counts are incremented/decremented when
- * sockets are created/deleted.
- *
- * AppleTalk interfaces are not incremented until atalkd is run
- * and are only decremented when they are downed.
+ * No explicit module reference count manipulation is needed in the
+ * protocol. Socket layer sets module reference count for us
+ * and interfaces reference counting is done
+ * by the network device layer.
  *
  * Ergo, before the AppleTalk module can be removed, all AppleTalk
  * sockets be closed from user space.
@@ -1861,9 +1925,6 @@ static void __exit atalk_exit(void)
 	atalk_unregister_sysctl();
 #endif /* CONFIG_SYSCTL */
 	atalk_proc_exit();
-#ifdef CONFIG_PROC_FS
-	aarp_unregister_proc_fs();
-#endif /* CONFIG_PROC_FS */
 	aarp_cleanup_module();	/* General aarp clean-up. */
 	unregister_netdevice_notifier(&ddp_notifier);
 	dev_remove_pack(&ltalk_packet_type);
@@ -1875,4 +1936,5 @@ module_exit(atalk_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Alan Cox <Alan.Cox@linux.org>");
-MODULE_DESCRIPTION("AppleTalk 0.20 for Linux NET4.0\n");
+MODULE_DESCRIPTION("AppleTalk 0.20\n");
+MODULE_ALIAS_NETPROTO(PF_APPLETALK);

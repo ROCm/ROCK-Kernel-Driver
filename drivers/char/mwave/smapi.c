@@ -46,7 +46,6 @@
 *	First release to the public
 */
 
-#include <linux/version.h>
 #include <linux/kernel.h>
 #include <linux/mc146818rtc.h>	/* CMOS defines */
 #include "smapi.h"

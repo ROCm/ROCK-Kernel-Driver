@@ -838,7 +838,7 @@ elsa_probe(struct IsdnCardState *cs, struct IsdnCard *card)
 		cs->hw.elsa.status |= ELSA_BAD_PWR;
 	}
 	switch (cs->subtyp) {
-	case ELSA_PCFPRO: bytecnt = 16;	break;
+		case ELSA_PCFPRO: bytecnt = 16;	break;
 	}
 	if (!request_io(&cs->rs, cs->hw.elsa.base, bytecnt, "elsa isdn"))
 		goto err;

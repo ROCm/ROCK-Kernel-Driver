@@ -53,8 +53,6 @@
 
 #include <asm/io.h>
 
-#include "ide_modes.h"
-
 /* #define DEBUG */  /* remove comments for DEBUG messages */
 
 /*

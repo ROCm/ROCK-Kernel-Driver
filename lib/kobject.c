@@ -48,7 +48,7 @@ static int populate_dir(struct kobject * kobj)
 static int create_dir(struct kobject * kobj)
 {
 	int error = 0;
-	if (strlen(kobj->name)) {
+	if (kobject_name(kobj)) {
 		error = sysfs_create_dir(kobj);
 		if (!error) {
 			if ((error = populate_dir(kobj)))
@@ -76,7 +76,7 @@ static int get_kobj_path_length(struct kset *kset, struct kobject *kobj)
 	 * Add 1 to strlen for leading '/' of each level.
 	 */
 	do {
-		length += strlen (parent->name) + 1;
+		length += strlen(kobject_name(parent)) + 1;
 		parent = parent->parent;
 	} while (parent);
 	return length;
@@ -88,10 +88,10 @@ static void fill_kobj_path(struct kset *kset, struct kobject *kobj, char *path, 
 
 	--length;
 	for (parent = kobj; parent; parent = parent->parent) {
-		int cur = strlen (parent->name);
+		int cur = strlen(kobject_name(parent));
 		/* back up enough to print this name with '/' */
 		length -= cur;
-		strncpy (path + length, parent->name, cur);
+		strncpy (path + length, kobject_name(parent), cur);
 		*(path + --length) = '/';
 	}
 
@@ -254,11 +254,12 @@ int kobject_add(struct kobject * kobj)
 
 	if (!(kobj = kobject_get(kobj)))
 		return -ENOENT;
-
+	if (!kobj->k_name)
+		kobj->k_name = kobj->name;
 	parent = kobject_get(kobj->parent);
 
 	pr_debug("kobject %s: registering. parent: %s, set: %s\n",
-		 kobj->name, parent ? parent->name : "<NULL>", 
+		 kobject_name(kobj), parent ? kobject_name(parent) : "<NULL>", 
 		 kobj->kset ? kobj->kset->kobj.name : "<NULL>" );
 
 	if (kobj->kset) {
@@ -305,13 +306,64 @@ int kobject_register(struct kobject * kobj)
 		error = kobject_add(kobj);
 		if (error) {
 			printk("kobject_register failed for %s (%d)\n",
-			       kobj->name,error);
+			       kobject_name(kobj),error);
 			dump_stack();
 		}
 	} else
 		error = -EINVAL;
 	return error;
 }
+
+
+/**
+ *	kobject_set_name - Set the name of an object
+ *	@kobj:	object.
+ *	@name:	name. 
+ *
+ *	If strlen(name) < KOBJ_NAME_LEN, then use a dynamically allocated
+ *	string that @kobj->k_name points to. Otherwise, use the static 
+ *	@kobj->name array.
+ */
+
+int kobject_set_name(struct kobject * kobj, const char * fmt, ...)
+{
+	int error = 0;
+	int limit = KOBJ_NAME_LEN;
+	int need;
+	va_list args;
+
+	va_start(args,fmt);
+	/* 
+	 * First, try the static array 
+	 */
+	need = vsnprintf(kobj->name,limit,fmt,args);
+	if (need < limit) 
+		kobj->k_name = kobj->name;
+	else {
+		/* 
+		 * Need more space? Allocate it and try again 
+		 */
+		kobj->k_name = kmalloc(need,GFP_KERNEL);
+		if (!kobj->k_name) {
+			error = -ENOMEM;
+			goto Done;
+		}
+		limit = need;
+		need = vsnprintf(kobj->k_name,limit,fmt,args);
+
+		/* Still? Give up. */
+		if (need > limit) {
+			kfree(kobj->k_name);
+			error = -EFAULT;
+		}
+	}
+ Done:
+	va_end(args);
+	return error;
+}
+
+EXPORT_SYMBOL(kobject_set_name);
+
 
 /**
  *	kobject_rename - change the name of an object
@@ -360,7 +412,7 @@ void kobject_del(struct kobject * kobj)
 
 void kobject_unregister(struct kobject * kobj)
 {
-	pr_debug("kobject %s: unregistering\n",kobj->name);
+	pr_debug("kobject %s: unregistering\n",kobject_name(kobj));
 	kobject_del(kobj);
 	kobject_put(kobj);
 }
@@ -392,7 +444,10 @@ void kobject_cleanup(struct kobject * kobj)
 	struct kobj_type * t = get_ktype(kobj);
 	struct kset * s = kobj->kset;
 
-	pr_debug("kobject %s: cleaning up\n",kobj->name);
+	pr_debug("kobject %s: cleaning up\n",kobject_name(kobj));
+	if (kobj->k_name != kobj->name)
+		kfree(kobj->k_name);
+	kobj->k_name = NULL;
 	if (t && t->release)
 		t->release(kobj);
 	if (s)
@@ -488,7 +543,7 @@ struct kobject * kset_find_obj(struct kset * kset, const char * name)
 	down_read(&kset->subsys->rwsem);
 	list_for_each(entry,&kset->list) {
 		struct kobject * k = to_kobj(entry);
-		if (!strcmp(k->name,name)) {
+		if (!strcmp(kobject_name(k),name)) {
 			ret = k;
 			break;
 		}

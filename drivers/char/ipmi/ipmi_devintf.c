@@ -110,7 +110,7 @@ static struct ipmi_user_hndl ipmi_hndlrs =
 
 static int ipmi_open(struct inode *inode, struct file *file)
 {
-	int                      if_num = minor(inode->i_rdev);
+	int                      if_num = iminor(inode);
 	int                      rv;
 	struct ipmi_file_private *priv;
 

@@ -698,7 +698,7 @@ static int agp_release(struct inode *inode, struct file *file)
 
 static int agp_open(struct inode *inode, struct file *file)
 {
-	int minor = minor(inode->i_rdev);
+	int minor = iminor(inode);
 	struct agp_file_private *priv;
 	struct agp_client *client;
 	int rc = -ENXIO;
@@ -1097,4 +1097,3 @@ void agp_frontend_cleanup(void)
 {
 	misc_deregister(&agp_miscdev);
 }
-

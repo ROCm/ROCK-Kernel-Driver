@@ -1,7 +1,7 @@
 /*
  *   fs/cifs/inode.c
  *
- *   Copyright (c) International Business Machines  Corp., 2002
+ *   Copyright (C) International Business Machines  Corp., 2002,2003
  *   Author(s): Steve French (sfrench@us.ibm.com)
  *
  *   This library is free software; you can redistribute it and/or modify
@@ -154,7 +154,7 @@ cifs_get_inode_info_unix(struct inode **pinode,
 		} else {
 			cFYI(1, (" Init special inode "));
 			init_special_inode(inode, inode->i_mode,
-					   kdev_t_to_nr(inode->i_rdev));
+					   inode->i_rdev);
 		}
 	}
 	FreeXid(xid);
@@ -298,7 +298,7 @@ cifs_get_inode_info(struct inode **pinode, const unsigned char *search_path,
 			inode->i_op = &cifs_symlink_inode_ops;
 		} else {
 			init_special_inode(inode, inode->i_mode,
-					   kdev_t_to_nr(inode->i_rdev));
+					   inode->i_rdev);
 		}
 	}
 	if(buf)
@@ -345,6 +345,8 @@ cifs_unlink(struct inode *inode, struct dentry *direntry)
 
 	if (!rc) {
 		direntry->d_inode->i_nlink--;
+	} else if (rc == -ENOENT) {
+		d_drop(direntry);
 	} else if (rc == -ETXTBSY) {
 		int oplock = FALSE;
 		__u16 netfid;
@@ -585,12 +587,24 @@ cifs_revalidate(struct dentry *direntry)
 		}            
 	}
 
-	if (cifs_sb->tcon->ses->capabilities & CAP_UNIX)
-		cifs_get_inode_info_unix(&direntry->d_inode, full_path,
+	if (cifs_sb->tcon->ses->capabilities & CAP_UNIX) {
+		rc = cifs_get_inode_info_unix(&direntry->d_inode, full_path,
 					 direntry->d_sb);
-	else
-		cifs_get_inode_info(&direntry->d_inode, full_path, NULL,
+		if(rc) {
+			cFYI(1,("error on getting revalidate info %d",rc));
+/*			if(rc != -ENOENT)
+				rc = 0; */ /* BB should we cache info on certain errors? */
+		}
+	} else {
+		rc = cifs_get_inode_info(&direntry->d_inode, full_path, NULL,
 				    direntry->d_sb);
+		if(rc) {
+			cFYI(1,("error on getting revalidate info %d",rc));
+/*			if(rc != -ENOENT)
+				rc = 0; */  /* BB should we cache info on certain errors? */
+		}
+	}
+	/* should we remap certain errors, access denied?, to zero */
 
 	/* BB if not oplocked, invalidate inode pages if mtime has changed */
 

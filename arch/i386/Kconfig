@@ -408,6 +408,20 @@ config HUGETLB_PAGE
 
 	  Otherwise, say N.
 
+config HPET_TIMER
+	bool "HPET Timer Support"
+	help
+	  This enables the use of the HPET for the kernel's internal timer.
+	  HPET is the next generation timer replacing legacy 8254s.
+	  You can safely choose Y here.  However, HPET will only be
+	  activated if the platform and the BIOS support this feature.
+	  Otherwise the 8254 will be used for timing services.
+
+	  Choose N to continue using the legacy 8254 timer.
+
+config HPET_EMULATE_RTC
+	def_bool HPET_TIMER && RTC=y
+
 config SMP
 	bool "Symmetric multi-processing support"
 	---help---
@@ -1155,40 +1169,6 @@ endmenu
 
 
 menu "Executable file formats"
-
-choice
-	prompt "Kernel core (/proc/kcore) format"
-	depends on PROC_FS
-	default KCORE_ELF
-
-config KCORE_ELF
-	bool "ELF"
-	---help---
-	  If you enabled support for /proc file system then the file
-	  /proc/kcore will contain the kernel core image. This can be used
-	  in gdb:
-
-	  $ cd /usr/src/linux ; gdb vmlinux /proc/kcore
-
-	  You have two choices here: ELF and A.OUT. Selecting ELF will make
-	  /proc/kcore appear in ELF core format as defined by the Executable
-	  and Linking Format specification. Selecting A.OUT will choose the
-	  old "a.out" format which may be necessary for some old versions
-	  of binutils or on some architectures.
-
-	  This is especially useful if you have compiled the kernel with the
-	  "-g" option to preserve debugging information. It is mainly used
-	  for examining kernel data structures on the live kernel so if you
-	  don't understand what this means or are not a kernel hacker, just
-	  leave it at its default value ELF.
-
-config KCORE_AOUT
-	bool "A.OUT"
-	help
-	  Not necessary unless you're using a very out-of-date binutils
-	  version.  You probably want KCORE_ELF.
-
-endchoice
 
 source "fs/Kconfig.binfmt"
 

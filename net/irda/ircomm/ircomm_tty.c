@@ -441,7 +441,6 @@ static int ircomm_tty_open(struct tty_struct *tty, struct file *filp)
 			return -ERESTARTSYS;
 		}
 
-		/* MOD_DEC_USE_COUNT; "info->tty" will cause this? */
 #ifdef SERIAL_DO_RESTART
 		return ((self->flags & ASYNC_HUP_NOTIFY) ?
 			-EAGAIN : -ERESTARTSYS);
@@ -469,7 +468,6 @@ static int ircomm_tty_open(struct tty_struct *tty, struct file *filp)
 
 	ret = ircomm_tty_block_til_ready(self, filp);
 	if (ret) {
-		/* MOD_DEC_USE_COUNT; "info->tty" will cause this? */
 		IRDA_DEBUG(2, 
 		      "%s(), returning after block_til_ready with %d\n", __FUNCTION__ ,
 		      ret);

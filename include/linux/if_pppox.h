@@ -67,9 +67,9 @@ struct sockaddr_pppox {
  *
  ********************************************************************/
 
-#define PPPOEIOCSFWD	_IOW(0xB1 ,0, sizeof(struct sockaddr_pppox))
+#define PPPOEIOCSFWD	_IOW(0xB1 ,0, size_t)
 #define PPPOEIOCDFWD	_IO(0xB1 ,1)
-/*#define PPPOEIOCGFWD	_IOWR(0xB1,2, sizeof(struct sockaddr_pppox))*/
+/*#define PPPOEIOCGFWD	_IOWR(0xB1,2, size_t)*/
 
 /* Codes to identify message types */
 #define PADI_CODE	0x09

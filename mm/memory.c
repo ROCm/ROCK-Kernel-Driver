@@ -43,8 +43,8 @@
 #include <linux/swap.h>
 #include <linux/highmem.h>
 #include <linux/pagemap.h>
-#include <linux/vcache.h>
 #include <linux/rmap-locking.h>
+#include <linux/module.h>
 #include <linux/init.h>
 
 #include <asm/pgalloc.h>
@@ -822,17 +822,18 @@ static void zeromap_pte_range(pte_t * pte, unsigned long address,
 static inline int zeromap_pmd_range(struct mm_struct *mm, pmd_t * pmd, unsigned long address,
                                     unsigned long size, pgprot_t prot)
 {
-	unsigned long end;
+	unsigned long base, end;
 
+	base = address & PGDIR_MASK;
 	address &= ~PGDIR_MASK;
 	end = address + size;
 	if (end > PGDIR_SIZE)
 		end = PGDIR_SIZE;
 	do {
-		pte_t * pte = pte_alloc_map(mm, pmd, address);
+		pte_t * pte = pte_alloc_map(mm, pmd, base + address);
 		if (!pte)
 			return -ENOMEM;
-		zeromap_pte_range(pte, address, end - address, prot);
+		zeromap_pte_range(pte, base + address, end - address, prot);
 		pte_unmap(pte);
 		address = (address + PMD_SIZE) & PMD_MASK;
 		pmd++;
@@ -972,7 +973,6 @@ static inline void establish_pte(struct vm_area_struct * vma, unsigned long addr
 static inline void break_cow(struct vm_area_struct * vma, struct page * new_page, unsigned long address, 
 		pte_t *page_table)
 {
-	invalidate_vcache(address, vma->vm_mm, new_page);
 	flush_cache_page(vma, address);
 	establish_pte(vma, address, page_table, pte_mkwrite(pte_mkdirty(mk_pte(new_page, vma->vm_page_prot))));
 }
@@ -1150,6 +1150,7 @@ void invalidate_mmap_range(struct address_space *mapping,
 		invalidate_mmap_range_list(&mapping->i_mmap_shared, hba, hlen);
 	up(&mapping->i_shared_sem);
 }
+EXPORT_SYMBOL_GPL(invalidate_mmap_range);
 
 /*
  * Handle all mappings that got truncated by a "truncate()"
@@ -1399,7 +1400,7 @@ do_no_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	struct address_space *mapping = NULL;
 	pte_t entry;
 	struct pte_chain *pte_chain;
-	int sequence;
+	int sequence = 0;
 	int ret;
 
 	if (!vma->vm_ops || !vma->vm_ops->nopage)
@@ -1447,7 +1448,7 @@ retry:
 	 * invalidated this page.  If invalidate_mmap_range got called,
 	 * retry getting the page.
 	 */
-	if (mapping && 
+	if (mapping &&
 	      (unlikely(sequence != atomic_read(&mapping->truncate_count)))) {
 		sequence = atomic_read(&mapping->truncate_count);
 		spin_unlock(&mm->page_table_lock);
@@ -1468,7 +1469,8 @@ retry:
 	 */
 	/* Only go through if we didn't race with anybody else... */
 	if (pte_none(*page_table)) {
-		++mm->rss;
+		if (!PageReserved(new_page))
+			++mm->rss;
 		flush_icache_page(vma, new_page);
 		entry = mk_pte(new_page, vma->vm_page_prot);
 		if (write_access)

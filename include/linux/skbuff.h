@@ -98,7 +98,7 @@ struct nf_ct_info {
 	struct nf_conntrack *master;
 };
 
-#if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
+#ifdef CONFIG_BRIDGE_NETFILTER
 struct nf_bridge_info {
 	atomic_t use;
 	struct net_device *physindev;
@@ -244,7 +244,7 @@ struct sk_buff {
 #ifdef CONFIG_NETFILTER_DEBUG
         unsigned int		nf_debug;
 #endif
-#if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
+#ifdef CONFIG_BRIDGE_NETFILTER
 	struct nf_bridge_info	*nf_bridge;
 #endif
 #endif /* CONFIG_NETFILTER */
@@ -389,6 +389,7 @@ static inline int skb_shared(struct sk_buff *skb)
  */
 static inline struct sk_buff *skb_share_check(struct sk_buff *skb, int pri)
 {
+	might_sleep_if(pri & __GFP_WAIT);
 	if (skb_shared(skb)) {
 		struct sk_buff *nskb = skb_clone(skb, pri);
 		kfree_skb(skb);
@@ -419,6 +420,7 @@ static inline struct sk_buff *skb_share_check(struct sk_buff *skb, int pri)
  */
 static inline struct sk_buff *skb_unshare(struct sk_buff *skb, int pri)
 {
+	might_sleep_if(pri & __GFP_WAIT);
 	if (skb_cloned(skb)) {
 		struct sk_buff *nskb = skb_copy(skb, pri);
 		kfree_skb(skb);	/* Free our shared copy */
@@ -1195,7 +1197,7 @@ static inline void nf_conntrack_get(struct nf_ct_info *nfct)
 		atomic_inc(&nfct->master->use);
 }
 
-#if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
+#ifdef CONFIG_BRIDGE_NETFILTER
 static inline void nf_bridge_put(struct nf_bridge_info *nf_bridge)
 {
 	if (nf_bridge && atomic_dec_and_test(&nf_bridge->use))

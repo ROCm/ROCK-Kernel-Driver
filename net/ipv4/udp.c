@@ -1349,64 +1349,65 @@ struct proto udp_prot = {
 /* ------------------------------------------------------------------------ */
 #ifdef CONFIG_PROC_FS
 
-static __inline__ struct sock *udp_get_bucket(struct seq_file *seq, loff_t *pos)
+static struct sock *udp_get_first(struct seq_file *seq)
 {
-	int i;
 	struct sock *sk;
-	struct hlist_node *node;
-	loff_t l = *pos;
 	struct udp_iter_state *state = seq->private;
 
-	for (; state->bucket < UDP_HTABLE_SIZE; ++state->bucket) {
-		i = 0;
+	for (state->bucket = 0; state->bucket < UDP_HTABLE_SIZE; ++state->bucket) {
+		struct hlist_node *node;
 		sk_for_each(sk, node, &udp_hash[state->bucket]) {
-			if (sk->sk_family != state->family) {
-				++i;
-				continue;
-			}
-			if (l--) {
-				++i;
-				continue;
-			}
-			*pos = i;
-			goto out;
+			if (sk->sk_family == state->family)
+				goto found;
 		}
 	}
 	sk = NULL;
-out:
+found:
 	return sk;
+}
+
+static struct sock *udp_get_next(struct seq_file *seq, struct sock *sk)
+{
+	struct udp_iter_state *state = seq->private;
+
+	do {
+		sk = sk_next(sk);
+try_again:
+		;
+	} while (sk && sk->sk_family != state->family);
+
+	if (!sk && ++state->bucket < UDP_HTABLE_SIZE) {
+		sk = sk_head(&udp_hash[state->bucket]);
+		goto try_again;
+	}
+	return sk;
+}
+
+static struct sock *udp_get_idx(struct seq_file *seq, loff_t pos)
+{
+	struct sock *sk = udp_get_first(seq);
+
+	if (sk)
+		while(pos && (sk = udp_get_next(seq, sk)) != NULL)
+			--pos;
+	return pos ? NULL : sk;
 }
 
 static void *udp_seq_start(struct seq_file *seq, loff_t *pos)
 {
 	read_lock(&udp_hash_lock);
-	return *pos ? udp_get_bucket(seq, pos) : (void *)1;
+	return *pos ? udp_get_idx(seq, *pos-1) : (void *)1;
 }
 
 static void *udp_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 {
 	struct sock *sk;
-	struct hlist_node *node;
-	struct udp_iter_state *state;
 
-	if (v == (void *)1) {
-		sk = udp_get_bucket(seq, pos);
-		goto out;
-	}
+	if (v == (void *)1)
+		sk = udp_get_idx(seq, 0);
+	else
+		sk = udp_get_next(seq, v);
 
-	state = seq->private;
-
-	sk = v;
-	sk_for_each_continue(sk, node)
-		if (sk->sk_family == state->family)
-			goto out;
-
-	if (++state->bucket >= UDP_HTABLE_SIZE) 
-		goto out;
-
-	*pos = 0;
-	sk = udp_get_bucket(seq, pos);
-out:
 	++*pos;
 	return sk;
 }

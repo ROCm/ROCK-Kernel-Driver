@@ -290,7 +290,7 @@ int presto_settime(struct presto_file_set *fset,
 void izo_get_rollback_data(struct inode *inode, struct izo_rollback_data *rb)
 {
         rb->rb_mode = (__u32)inode->i_mode;
-        rb->rb_rdev = (__u32)kdev_t_to_nr(inode->i_rdev);
+        rb->rb_rdev = (__u32)old_encode_dev(inode->i_rdev);
         rb->rb_uid  = (__u64)inode->i_uid;
         rb->rb_gid  = (__u64)inode->i_gid;
 }
@@ -743,7 +743,7 @@ int presto_do_link(struct presto_file_set *fset, struct dentry *old_dentry,
                 goto exit_lock;
 
         error = -EXDEV;
-        if (dir->d_inode->i_sb->s_dev != inode->i_sb->s_dev)
+        if (dir->d_inode->i_sb != inode->i_sb)
                 goto exit_lock;
 
         /*
@@ -1800,7 +1800,7 @@ int presto_rename_dir(struct presto_file_set *fset, struct dentry *old_parent,
         if (error)
                 return error;
 
-        if (new_dir->i_sb->s_dev != old_dir->i_sb->s_dev)
+        if (new_dir->i_sb != old_dir->i_sb)
                 return -EXDEV;
 
         if (!new_dentry->d_inode)
@@ -1881,7 +1881,7 @@ int presto_rename_other(struct presto_file_set *fset, struct dentry *old_parent,
         if (error)
                 return error;
 
-        if (new_dir->i_sb->s_dev != old_dir->i_sb->s_dev)
+        if (new_dir->i_sb != old_dir->i_sb)
                 return -EXDEV;
 
         if (!new_dentry->d_inode)

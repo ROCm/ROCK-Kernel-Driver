@@ -41,7 +41,6 @@
 
 #include <net/irda/irda.h>
 #include <net/irda/irda_device.h>
-#include <net/irda/irtty.h>
 
 #ifndef NDEBUG
 	#undef IRDA_DEBUG
@@ -336,6 +335,7 @@ int ma600_reset(struct irda_task *task)
 MODULE_AUTHOR("Leung <95Etwl@alumni.ee.ust.hk> http://www.engsvr.ust/~eetwl95");
 MODULE_DESCRIPTION("MA600 dongle driver version 0.1");
 MODULE_LICENSE("GPL");
+MODULE_ALIAS("irda-dongle-11"); /* IRDA_MA600_DONGLE */
 		
 /*
  * Function init_module (void)

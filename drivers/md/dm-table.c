@@ -312,7 +312,7 @@ static int lookup_device(const char *path, dev_t *dev)
 		goto out;
 	}
 
-	*dev = kdev_t_to_nr(inode->i_rdev);
+	*dev = inode->i_rdev;
 
  out:
 	path_release(&nd);

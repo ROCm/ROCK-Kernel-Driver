@@ -25,7 +25,6 @@
 
 #include <net/irda/irda.h>
 #include <net/irda/irda_device.h>
-#include <net/irda/irtty.h>
 
 static int  mcp2120_reset(struct irda_task *task);
 static void mcp2120_open(dongle_t *self, struct qos_info *qos);
@@ -223,7 +222,7 @@ static int mcp2120_reset(struct irda_task *task)
 MODULE_AUTHOR("Felix Tang <tangf@eyetap.org>");
 MODULE_DESCRIPTION("Microchip MCP2120");
 MODULE_LICENSE("GPL");
-
+MODULE_ALIAS("irda-dongle-9"); /* IRDA_MCP2120_DONGLE */
 	
 /*
  * Function init_module (void)

@@ -35,6 +35,7 @@
 #include <asm/assembler.h>
 #include <asm/constants.h>
 #include <asm/procinfo.h>
+#include <asm/ptrace.h>
 #include <asm/hardware.h>
 
 /*

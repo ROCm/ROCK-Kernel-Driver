@@ -38,6 +38,7 @@
 #include <linux/root_dev.h>
 #include <linux/pci.h>
 #include <linux/acpi.h>
+#include <linux/kallsyms.h>
 #include <asm/mtrr.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
@@ -197,6 +198,12 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 		if (!memcmp(from, "acpi=off", 8))
 			acpi_disabled = 1;
 
+		if (!memcmp(from, "acpi=force", 10)) { 
+			/* add later when we do DMI horrors: */
+			/* acpi_force = 1; */	
+			acpi_disabled = 0;
+		}
+
 		if (!memcmp(from, "disableapic", 11))
 			disable_apic = 1;
 
@@ -240,6 +247,71 @@ static void __init contig_initmem_init(void)
 } 
 #endif
 
+/* Use inline assembly to define this because the nops are defined 
+   as inline assembly strings in the include files and we cannot 
+   get them easily into strings. */
+asm("\t.data\nk8nops: " 
+    K8_NOP1 K8_NOP2 K8_NOP3 K8_NOP4 K8_NOP5 K8_NOP6
+    K8_NOP7 K8_NOP8); 
+    
+extern unsigned char k8nops[];
+static unsigned char *k8_nops[ASM_NOP_MAX+1] = { 
+     NULL,
+     k8nops,
+     k8nops + 1,
+     k8nops + 1 + 2,
+     k8nops + 1 + 2 + 3,
+     k8nops + 1 + 2 + 3 + 4,
+     k8nops + 1 + 2 + 3 + 4 + 5,
+     k8nops + 1 + 2 + 3 + 4 + 5 + 6,
+     k8nops + 1 + 2 + 3 + 4 + 5 + 6 + 7,
+}; 
+
+/* Replace instructions with better alternatives for this CPU type.
+
+   This runs before SMP is initialized to avoid SMP problems with
+   self modifying code. This implies that assymetric systems where
+   APs have less capabilities than the boot processor are not handled. 
+   In this case boot with "noreplacement". */ 
+void apply_alternatives(void *start, void *end) 
+{ 
+	struct alt_instr *a; 
+	int diff, i, k;
+	for (a = start; (void *)a < end; a++) { 
+		if (!boot_cpu_has(a->cpuid))
+			continue;
+
+		BUG_ON(a->replacementlen > a->instrlen); 
+		__inline_memcpy(a->instr, a->replacement, a->replacementlen); 
+		diff = a->instrlen - a->replacementlen; 
+
+		/* Pad the rest with nops */
+		for (i = a->replacementlen; diff > 0; diff -= k, i += k) {
+			k = diff;
+			if (k > ASM_NOP_MAX)
+				k = ASM_NOP_MAX;
+			__inline_memcpy(a->instr + i, k8_nops[k], k); 
+		} 
+	}
+} 
+
+static int no_replacement __initdata = 0; 
+ 
+void __init alternative_instructions(void)
+{
+	extern struct alt_instr __alt_instructions[], __alt_instructions_end[];
+	if (no_replacement) 
+		return;
+	apply_alternatives(__alt_instructions, __alt_instructions_end);
+}
+
+static int __init noreplacement_setup(char *s)
+{ 
+     no_replacement = 1; 
+     return 0; 
+} 
+
+__setup("noreplacement", noreplacement_setup); 
 
 void __init setup_arch(char **cmdline_p)
 {
@@ -382,7 +454,7 @@ void __init setup_arch(char **cmdline_p)
 
 	/* Will likely break when you have unassigned resources with more
 	   than 4GB memory and bridges that don't support more than 4GB. 
-	   Doing it properly would require to allocate GFP_DMA memory
+	   Doing it properly would require to use pci_alloc_consistent
 	   in this case. */
 	low_mem_size = ((end_pfn << PAGE_SHIFT) + 0xfffff) & ~0xfffff;
 	if (low_mem_size > pci_mem_start)
@@ -455,11 +527,17 @@ static void __init display_cacheinfo(struct cpuinfo_x86 *c)
 static int __init init_amd(struct cpuinfo_x86 *c)
 {
 	int r;
+	int level;
 
 	/* Bit 31 in normal CPUID used for nonstandard 3DNow ID;
 	   3DNow is IDd by bit 31 in extended CPUID (1*32+31) anyway */
 	clear_bit(0*32+31, &c->x86_capability);
 	
+	/* C-stepping K8? */
+	level = cpuid_eax(1);
+	if ((level >= 0x0f48 && level < 0x0f50) || level >= 0x0f58)
+		set_bit(X86_FEATURE_K8_C, &c->x86_capability);
+
 	r = get_model_name(c);
 	if (!r) { 
 		switch (c->x86) { 

@@ -399,6 +399,33 @@ static void sctp_v6_to_sk_daddr(union sctp_addr *addr, struct sock *sk)
 	}
 }
 
+/* Initialize a sctp_addr from an address parameter. */
+static void sctp_v6_from_addr_param(union sctp_addr *addr,
+				    union sctp_addr_param *param,
+				    __u16 port, int iif)
+{
+	addr->v6.sin6_family = AF_INET6;
+	addr->v6.sin6_port = port;
+	addr->v6.sin6_flowinfo = 0; /* BUG */
+	ipv6_addr_copy(&addr->v6.sin6_addr, &param->v6.addr);
+	addr->v6.sin6_scope_id = iif;
+}
+
+/* Initialize an address parameter from a sctp_addr and return the length
+ * of the address parameter.
+ */
+static int sctp_v6_to_addr_param(const union sctp_addr *addr,
+				 union sctp_addr_param *param)
+{
+	int length = sizeof(sctp_ipv6addr_param_t);
+
+	param->v6.param_hdr.type = SCTP_PARAM_IPV6_ADDRESS;
+	param->v6.param_hdr.length = ntohs(length);
+	ipv6_addr_copy(&param->v6.addr, &addr->v6.sin6_addr);
+
+	return length;
+}
+
 /* Initialize a sctp_addr from a dst_entry. */
 static void sctp_v6_dst_saddr(union sctp_addr *addr, struct dst_entry *dst,
 			      unsigned short port)
@@ -903,6 +930,8 @@ static struct sctp_af sctp_ipv6_specific = {
 	.from_sk         = sctp_v6_from_sk,
 	.to_sk_saddr     = sctp_v6_to_sk_saddr,
 	.to_sk_daddr     = sctp_v6_to_sk_daddr,
+	.from_addr_param = sctp_v6_from_addr_param,
+	.to_addr_param   = sctp_v6_to_addr_param,
 	.dst_saddr       = sctp_v6_dst_saddr,
 	.cmp_addr        = sctp_v6_cmp_addr,
 	.scope           = sctp_v6_scope,

@@ -40,7 +40,6 @@
 #include <linux/proc_fs.h>
 #include <linux/stat.h>
 #include <linux/init.h>
-#include <linux/version.h>
 
 #include <linux/inet.h>
 #include <linux/netdevice.h>
@@ -724,8 +723,6 @@ static int __init inet6_init(void)
 #endif
 #endif
 
-	printk(KERN_INFO "IPv6 v0.8 for NET4.0\n");
-
 	if (sizeof(struct inet6_skb_parm) > sizeof(dummy_skb->cb))
 	{
 		printk(KERN_CRIT "inet6_proto_init: size fault\n");
@@ -893,3 +890,5 @@ static void inet6_exit(void)
 }
 module_exit(inet6_exit);
 #endif /* MODULE */
+
+MODULE_ALIAS_NETPROTO(PF_INET6);

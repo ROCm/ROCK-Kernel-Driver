@@ -688,7 +688,7 @@ static struct list_head	ownerstr_hashtbl[OWNER_HASH_SIZE];
 #define OPENSTATEID_HASH_MASK              (OPENSTATEID_HASH_SIZE - 1)
 
 #define file_hashval(x) \
-        ((unsigned int)((x)->dev + (x)->ino + (x)->generation) & FILE_HASH_MASK)
+        hash_ptr(x, FILE_HASH_BITS)
 #define openstateid_hashval(owner_id, file_id)  \
         (((owner_id) + (file_id)) & OPENSTATEID_HASH_MASK)
 
@@ -697,13 +697,13 @@ static struct list_head openstateid_hashtbl[OPENSTATEID_HASH_SIZE];
 
 /* OPEN Share state helper functions */
 static inline struct nfs4_file *
-alloc_init_file(unsigned int hashval, nfs4_ino_desc_t *ino) {
+alloc_init_file(unsigned int hashval, struct inode *ino) {
 	struct nfs4_file *fp;
 	if ((fp = kmalloc(sizeof(struct nfs4_file),GFP_KERNEL))) {
 		INIT_LIST_HEAD(&fp->fi_hash);
 		INIT_LIST_HEAD(&fp->fi_perfile);
 		list_add(&fp->fi_hash, &file_hashtbl[hashval]);
-		memcpy(&fp->fi_ino, ino, sizeof(nfs4_ino_desc_t));
+		fp->fi_inode = igrab(ino);
 		fp->fi_id = current_fileid++;
 		alloc_file++;
 		return fp;
@@ -841,11 +841,12 @@ release_file(struct nfs4_file *fp)
 {
 	free_file++;
 	list_del_init(&fp->fi_hash);
+	iput(fp->fi_inode);
 	kfree(fp);
 }	
 
 void
-release_open_state(struct nfs4_stateid *stp)
+release_open_state(struct nfs4_stateid *stp, struct nfsd4_close *cl)
 {
 	struct nfs4_stateowner *sop = stp->st_stateowner;
 	struct nfs4_file *fp = stp->st_file;
@@ -860,6 +861,7 @@ release_open_state(struct nfs4_stateid *stp)
 	 */
 	if (sop->so_confirmed && list_empty(&sop->so_peropenstate)) {
 		release_stateowner(sop);
+		cl->cl_stateowner = NULL;
 	}
 	/* unused nfs4_file's are releseed. XXX slab cache? */
 	if (list_empty(&fp->fi_perfile)) {
@@ -911,13 +913,13 @@ verify_clientid(struct nfs4_client **client, clientid_t *clid) {
 
 /* search file_hashtbl[] for file */
 static int
-find_file(unsigned int hashval, nfs4_ino_desc_t *ino, struct nfs4_file **fp) {
+find_file(unsigned int hashval, struct inode *ino, struct nfs4_file **fp) {
 	struct list_head *pos, *next;
 	struct nfs4_file *local = NULL;
 
 	list_for_each_safe(pos, next, &file_hashtbl[hashval]) {
 		local = list_entry(pos, struct nfs4_file, fi_hash);
-		if(!memcmp(&local->fi_ino, ino, sizeof(nfs4_ino_desc_t))) {
+		if (local->fi_inode == ino) {
 			*fp = local;
 			return(1);
 		}
@@ -934,24 +936,10 @@ test_share(struct nfs4_stateid *stp, struct nfsd4_open *open) {
 	return 1;
 }
 
-static inline void
-nfs4_init_ino(nfs4_ino_desc_t *ino, struct svc_fh *fhp)
-{
-	struct inode *inode;
-	if (!fhp->fh_dentry)
-		BUG();
-	inode = fhp->fh_dentry->d_inode;
-	if (!inode)
-		BUG();
-	ino->dev = inode->i_sb->s_dev;
-	ino->ino = inode->i_ino;
-	ino->generation = inode->i_generation;
-}
-
 int
 nfs4_share_conflict(struct svc_fh *current_fh, unsigned int deny_type)
 {
-	nfs4_ino_desc_t ino;
+	struct inode *ino = current_fh->fh_dentry->d_inode;
 	unsigned int fi_hashval;
 	struct nfs4_file *fp;
 	struct nfs4_stateid *stp;
@@ -959,9 +947,8 @@ nfs4_share_conflict(struct svc_fh *current_fh, unsigned int deny_type)
 
 	dprintk("NFSD: nfs4_share_conflict\n");
 
-	nfs4_init_ino(&ino, current_fh);
-	fi_hashval = file_hashval(&ino);
-	if (find_file(fi_hashval, &ino, &fp)) {
+	fi_hashval = file_hashval(ino);
+	if (find_file(fi_hashval, ino, &fp)) {
 	/* Search for conflicting share reservations */
 		list_for_each_safe(pos, next, &fp->fi_perfile) {
 			stp = list_entry(pos, struct nfs4_stateid, st_perfile);
@@ -1084,7 +1071,7 @@ nfsd4_process_open2(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nf
 	struct iattr iattr;
 	struct nfs4_stateowner *sop = open->op_stateowner;
 	struct nfs4_file *fp;
-	nfs4_ino_desc_t ino;
+	struct inode *ino;
 	unsigned int fi_hashval;
 	struct list_head *pos, *next;
 	struct nfs4_stateid *stq, *stp = NULL;
@@ -1094,11 +1081,11 @@ nfsd4_process_open2(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nf
 	if (!sop)
 		goto out;
 
-	nfs4_init_ino(&ino, current_fh);
+	ino = current_fh->fh_dentry->d_inode;
 
 	down(&client_sema); /*XXX need finer grained locking */
-	fi_hashval = file_hashval(&ino);
-	if (find_file(fi_hashval, &ino, &fp)) {
+	fi_hashval = file_hashval(ino);
+	if (find_file(fi_hashval, ino, &fp)) {
 		/* Search for conflicting share reservations */
 		status = nfserr_share_denied;
 		list_for_each_safe(pos, next, &fp->fi_perfile) {
@@ -1113,7 +1100,7 @@ nfsd4_process_open2(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nf
 	} else {
 	/* No nfs4_file found; allocate and init a new one */
 		status = nfserr_resource;
-		if ((fp = alloc_init_file(fi_hashval, &ino)) == NULL)
+		if ((fp = alloc_init_file(fi_hashval, ino)) == NULL)
 			goto out;
 	}
 
@@ -1172,6 +1159,9 @@ nfsd4_process_open2(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nf
 	open->op_delegate_type = NFS4_OPEN_DELEGATE_NONE;
 	status = nfs_ok;
 out:
+	if (fp && list_empty(&fp->fi_perfile))
+		release_file(fp);
+
 	/*
 	* To finish the open response, we just need to set the rflags.
 	*/
@@ -1494,7 +1484,7 @@ nfsd4_open_confirm(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfs
 	struct nfs4_stateid *stp;
 
 	dprintk("NFSD: nfsd4_open_confirm on file %.*s\n",
-			current_fh->fh_dentry->d_name.len,
+			(int)current_fh->fh_dentry->d_name.len,
 			current_fh->fh_dentry->d_name.name);
 	oc->oc_stateowner = NULL;
 	down(&client_sema); /* XXX need finer grained locking */
@@ -1528,7 +1518,7 @@ nfsd4_open_downgrade(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct n
 	struct nfs4_stateid *stp;
 
 	dprintk("NFSD: nfsd4_open_downgrade on file %.*s\n", 
-			current_fh->fh_dentry->d_name.len, 
+			(int)current_fh->fh_dentry->d_name.len,
 			current_fh->fh_dentry->d_name.name);
 
 	down(&client_sema); /* XXX need finer grained locking */
@@ -1567,7 +1557,7 @@ nfsd4_close(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_clos
 	struct nfs4_stateid *stp;
 
 	dprintk("NFSD: nfsd4_close on file %.*s\n", 
-			current_fh->fh_dentry->d_name.len, 
+			(int)current_fh->fh_dentry->d_name.len,
 			current_fh->fh_dentry->d_name.name);
 
 	down(&client_sema); /* XXX need finer grained locking */
@@ -1584,7 +1574,7 @@ nfsd4_close(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_clos
 	memcpy(&close->cl_stateid, &stp->st_stateid, sizeof(stateid_t));
 
 	/* release_open_state() calls nfsd_close() if needed */
-	release_open_state(stp);
+	release_open_state(stp,close);
 out:
 	up(&client_sema);
 	return status;

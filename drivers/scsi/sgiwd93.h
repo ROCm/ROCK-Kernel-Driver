@@ -6,10 +6,6 @@
 #ifndef _SGIWD93_H
 #define _SGIWD93_H
 
-#ifndef NULL
-#define NULL        0
-#endif
-
 #ifndef CMD_PER_LUN
 #define CMD_PER_LUN 8
 #endif

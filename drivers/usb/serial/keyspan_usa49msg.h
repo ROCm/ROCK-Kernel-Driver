@@ -1,7 +1,7 @@
 /*
 	usa49msg.h
 
-	Copyright (c) 1998-2000 InnoSys Incorporated.  All Rights Reserved
+	Copyright (C) 1998-2000 InnoSys Incorporated.  All Rights Reserved
 	This file is available under a BSD-style copyright
 
 	Keyspan USB Async Firmware to run on Anchor EZ-USB
@@ -15,7 +15,7 @@
    	disclaimer.  The following copyright notice must appear immediately at
    	the beginning of all source files:
 
-        	Copyright (c) 1998-2000 InnoSys Incorporated.  All Rights Reserved
+        	Copyright (C) 1998-2000 InnoSys Incorporated.  All Rights Reserved
 
         	This file is available under a BSD-style copyright
 

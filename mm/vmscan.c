@@ -80,25 +80,6 @@ static long total_memory;
 #endif
 
 /*
- * exponentially decaying average
- */
-static inline int expavg(int avg, int val)
-{
-	return ((val - avg) >> 1) + avg;
-}
-
-static void zone_adj_pressure(struct zone *zone, int priority)
-{
-	zone->pressure = expavg(zone->pressure,
-			(DEF_PRIORITY - priority) << 10);
-}
-
-static int pressure_to_priority(int pressure)
-{
-	return DEF_PRIORITY - (pressure >> 10);
-}
-
-/*
  * The list of shrinker callbacks used by to apply pressure to
  * ageable caches.
  */
@@ -646,7 +627,7 @@ refill_inactive_zone(struct zone *zone, const int nr_pages_in,
 	 * `distress' is a measure of how much trouble we're having reclaiming
 	 * pages.  0 -> no problems.  100 -> great trouble.
 	 */
-	distress = 100 >> pressure_to_priority(zone->pressure);
+	distress = 100 >> zone->prev_priority;
 
 	/*
 	 * The point of this algorithm is to decide when to start reclaiming
@@ -830,6 +811,9 @@ shrink_caches(struct zone *classzone, int priority, int *total_scanned,
 		int nr_mapped = 0;
 		int max_scan;
 
+		if (zone->free_pages < zone->pages_high)
+			zone->temp_priority = priority;
+
 		if (zone->all_unreclaimable && priority != DEF_PRIORITY)
 			continue;	/* Let kswapd poll it */
 
@@ -843,10 +827,8 @@ shrink_caches(struct zone *classzone, int priority, int *total_scanned,
 		ret += shrink_zone(zone, max_scan, gfp_mask,
 				to_reclaim, &nr_mapped, ps, priority);
 		*total_scanned += max_scan + nr_mapped;
-		if (ret >= nr_pages) {
-			zone_adj_pressure(zone, priority);
+		if (ret >= nr_pages)
 			break;
-		}
 	}
 	return ret;
 }
@@ -880,6 +862,9 @@ int try_to_free_pages(struct zone *cz,
 
 	inc_page_state(allocstall);
 
+	for (zone = cz; zone >= cz->zone_pgdat->node_zones; --zone)
+		zone->temp_priority = DEF_PRIORITY;
+
 	for (priority = DEF_PRIORITY; priority >= 0; priority--) {
 		int total_scanned = 0;
 		struct page_state ps;
@@ -912,9 +897,9 @@ int try_to_free_pages(struct zone *cz,
 	}
 	if ((gfp_mask & __GFP_FS) && !(gfp_mask & __GFP_NORETRY))
 		out_of_memory();
-	for (zone = cz; zone >= cz->zone_pgdat->node_zones; -- zone)
-		zone_adj_pressure(zone, -1);
 out:
+	for (zone = cz; zone >= cz->zone_pgdat->node_zones; --zone)
+		zone->prev_priority = zone->temp_priority;
 	return ret;
 }
 
@@ -945,6 +930,12 @@ static int balance_pgdat(pg_data_t *pgdat, int nr_pages, struct page_state *ps)
 
 	inc_page_state(pageoutrun);
 
+	for (i = 0; i < pgdat->nr_zones; i++) {
+		struct zone *zone = pgdat->node_zones + i;
+
+		zone->temp_priority = DEF_PRIORITY;
+	}
+
 	for (priority = DEF_PRIORITY; priority; priority--) {
 		int all_zones_ok = 1;
 
@@ -961,11 +952,10 @@ static int balance_pgdat(pg_data_t *pgdat, int nr_pages, struct page_state *ps)
 				to_reclaim = min(to_free, SWAP_CLUSTER_MAX*8);
 			} else {			/* Zone balancing */
 				to_reclaim = zone->pages_high-zone->free_pages;
-				if (to_reclaim <= 0) {
-					zone_adj_pressure(zone, priority);
+				if (to_reclaim <= 0)
 					continue;
-				}
 			}
+			zone->temp_priority = priority;
 			all_zones_ok = 0;
 			max_scan = zone->nr_inactive >> priority;
 			if (max_scan < to_reclaim * 2)
@@ -989,13 +979,11 @@ static int balance_pgdat(pg_data_t *pgdat, int nr_pages, struct page_state *ps)
 		if (to_free > 0)
 			blk_congestion_wait(WRITE, HZ/10);
 	}
-	if (priority < 0) {
-		for (i = 0; i < pgdat->nr_zones; i++) {
-			struct zone *zone = pgdat->node_zones + i;
 
-			if (zone->free_pages < zone->pages_high)
-				zone_adj_pressure(zone, -1);
-		}
+	for (i = 0; i < pgdat->nr_zones; i++) {
+		struct zone *zone = pgdat->node_zones + i;
+
+		zone->prev_priority = zone->temp_priority;
 	}
 	return nr_pages - to_free;
 }

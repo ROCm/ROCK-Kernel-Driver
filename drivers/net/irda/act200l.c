@@ -25,7 +25,6 @@
 
 #include <net/irda/irda.h>
 #include <net/irda/irda_device.h>
-#include <net/irda/irtty.h>
 
 static int  act200l_reset(struct irda_task *task);
 static void act200l_open(dongle_t *self, struct qos_info *qos);
@@ -280,6 +279,7 @@ static int act200l_reset(struct irda_task *task)
 MODULE_AUTHOR("SHIMIZU Takuya <tshimizu@ga2.so-net.ne.jp>");
 MODULE_DESCRIPTION("ACTiSYS ACT-IR200L dongle driver");
 MODULE_LICENSE("GPL");
+MODULE_ALIAS("irda-dongle-10"); /* IRDA_ACT200L_DONGLE */
 
 /*
  * Function init_module (void)

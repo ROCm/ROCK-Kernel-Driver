@@ -47,8 +47,8 @@ atomic_t ipi_sent;
 DEFINE_PER_CPU(unsigned int, prof_multiplier);
 DEFINE_PER_CPU(unsigned int, prof_counter);
 unsigned long cache_decay_ticks = HZ/100;
-unsigned long cpu_online_map = cpumask_of_cpu(0);
-unsigned long cpu_possible_map = 1UL;
+cpumask_t cpu_online_map;
+cpumask_t cpu_possible_map;
 int smp_hw_index[NR_CPUS];
 struct thread_info *secondary_ti;
 
@@ -336,7 +336,7 @@ static void __devinit smp_store_cpu_info(int id)
 
 void __init smp_prepare_cpus(unsigned int max_cpus)
 {
-	int num_cpus;
+	int num_cpus, i;
 
 	/* Fixup boot cpu */
         smp_store_cpu_info(smp_processor_id());
@@ -350,7 +350,8 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 
 	/* Probe platform for CPUs: always linear. */
 	num_cpus = smp_ops->probe();
-	cpu_possible_map = (1 << num_cpus)-1;
+	for (i = 0; i < num_cpus; ++i)
+		cpu_set(i, cpu_possible_map);
 
 	/* Backup CPU 0 state */
 	__save_cpu_setup();

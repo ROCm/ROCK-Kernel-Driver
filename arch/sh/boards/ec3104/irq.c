@@ -169,13 +169,13 @@ static void shutdown_ec3104_irq(unsigned int irq)
 }
 
 static struct hw_interrupt_type ec3104_int = {
-        typename:       "EC3104",
-        enable:         enable_ec3104_irq,
-        disable:        disable_ec3104_irq,
-        ack:            mask_and_ack_ec3104_irq,
-        end:            end_ec3104_irq,
-        startup:        startup_ec3104_irq,
-        shutdown:       shutdown_ec3104_irq,
+        .typename       = "EC3104",
+        .enable         = enable_ec3104_irq,
+        .disable        = disable_ec3104_irq,
+        .ack            = mask_and_ack_ec3104_irq,
+        .end            = end_ec3104_irq,
+        .startup        = startup_ec3104_irq,
+        .shutdown       = shutdown_ec3104_irq,
 };
 
 /* Yuck.  the _demux API is ugly */

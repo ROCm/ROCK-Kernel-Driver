@@ -40,18 +40,12 @@ static int idedefault_attach(ide_drive_t *drive);
 
 /*
  *	IDE subdriver functions, registered with ide.c
- *
- *	idedefault *must* support DMA because it will be
- *	attached before the other drivers are loaded and
- *	we don't want to lose the DMA status at probe
- *	time.
  */
 
 ide_driver_t idedefault_driver = {
 	.name		=	"ide-default",
 	.version	=	IDEDEFAULT_VERSION,
 	.attach		=	idedefault_attach,
-	.supports_dma	=	1,
 	.drives		=	LIST_HEAD_INIT(idedefault_driver.drives)
 };
 

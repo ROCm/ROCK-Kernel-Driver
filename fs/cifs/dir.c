@@ -3,7 +3,7 @@
  *
  *   vfs operations that deal with dentries
  * 
- *   Copyright (c) International Business Machines  Corp., 2002
+ *   Copyright (C) International Business Machines  Corp., 2002,2003
  *   Author(s): Steve French (sfrench@us.ibm.com)
  *
  *   This library is free software; you can redistribute it and/or modify
@@ -134,6 +134,7 @@ cifs_create(struct inode *inode, struct dentry *direntry, int mode,
 	struct inode *newinode = NULL;
 	struct cifsFileInfo * pCifsFile = NULL;
 	struct cifsInodeInfo * pCifsInode;
+	int disposition = FILE_OVERWRITE_IF;
 
 	xid = GetXid();
 
@@ -151,6 +152,16 @@ cifs_create(struct inode *inode, struct dentry *direntry, int mode,
 			desiredAccess = GENERIC_WRITE;
 		else if ((nd->intent.open.flags & O_ACCMODE) == O_RDWR)
 			desiredAccess = GENERIC_ALL;
+
+		if((nd->intent.open.flags & (O_CREAT | O_EXCL)) == (O_CREAT | O_EXCL))
+			disposition = FILE_CREATE;
+		else if((nd->intent.open.flags & (O_CREAT | O_TRUNC)) == (O_CREAT | O_TRUNC))
+			disposition = FILE_OVERWRITE_IF;
+		else if((nd->intent.open.flags & O_CREAT) == O_CREAT)
+			disposition = FILE_OPEN_IF;
+		else {
+			cFYI(1,("Create flag not set in create function"));
+		}
 	}
 
 	/* BB add processing to set equivalent of mode - e.g. via CreateX with ACLs */
@@ -158,7 +169,7 @@ cifs_create(struct inode *inode, struct dentry *direntry, int mode,
 		oplock = REQ_OPLOCK;
 
 	buf = kmalloc(sizeof(FILE_ALL_INFO),GFP_KERNEL);
-	rc = CIFSSMBOpen(xid, pTcon, full_path, FILE_OVERWRITE_IF,
+	rc = CIFSSMBOpen(xid, pTcon, full_path, disposition,
 			 desiredAccess, CREATE_NOT_DIR,
 			 &fileHandle, &oplock, buf, cifs_sb->local_nls);
 	if (rc) {
@@ -205,7 +216,7 @@ cifs_create(struct inode *inode, struct dentry *direntry, int mode,
 				memset((char *)pCifsFile, 0,
 				       sizeof (struct cifsFileInfo));
 				pCifsFile->netfid = fileHandle;
-				pCifsFile->pid = current->pid;
+				pCifsFile->pid = current->tgid;
 				pCifsFile->pInode = newinode;
 				/* pCifsFile->pfile = file; */ /* put in at open time */
 				write_lock(&GlobalSMBSeslock);
@@ -254,6 +265,9 @@ int cifs_mknod(struct inode *inode, struct dentry *direntry, int mode, dev_t dev
 	char *full_path = NULL;
 	struct inode * newinode = NULL;
 
+	if (!old_valid_dev(device_number))
+		return -EINVAL;
+
 	xid = GetXid();
 
 	cifs_sb = CIFS_SB(inode->i_sb);
@@ -297,6 +311,9 @@ cifs_lookup(struct inode *parent_dir_inode, struct dentry *direntry, struct name
 	     (" parent inode = 0x%p name is: %s and dentry = 0x%p",
 	      parent_dir_inode, direntry->d_name.name, direntry));
 
+	if(nd) {  /* BB removeme */
+		cFYI(1,("In lookup nd flags 0x%x open intent flags 0x%x",nd->flags,nd->intent.open.flags));
+	} /* BB removeme BB */
 	/* BB Add check of incoming data - e.g. frame not longer than maximum SMB - let server check the namelen BB */
 
 	/* check whether path exists */

@@ -47,6 +47,9 @@
 #include <asm/tlbflush.h>
 
 extern int acpi_disabled;
+int acpi_lapic = 0;
+int acpi_ioapic = 0;
+extern int disable_apic;
 
 #define PREFIX			"ACPI: "
 
@@ -75,8 +78,6 @@ __acpi_map_table (
 } 	      
 
 #ifdef CONFIG_X86_LOCAL_APIC
-
-int acpi_lapic;
 
 static u64 acpi_lapic_addr __initdata = APIC_DEFAULT_PHYS_BASE;
 
@@ -164,8 +165,6 @@ acpi_parse_lapic_nmi (
 #endif /*CONFIG_X86_LOCAL_APIC*/
 
 #ifdef CONFIG_X86_IO_APIC
-
-int acpi_ioapic;
 
 static int __init
 acpi_parse_ioapic (
@@ -292,11 +291,33 @@ acpi_find_rsdp (void)
 	return rsdp_phys;
 }
 
+/*
+ * acpi_boot_init()
+ *  called from setup_arch(), always.
+ *     1. maps ACPI tables for later use
+ *     2. enumerates lapics
+ *     3. enumerates io-apics
+ *
+ * side effects:
+ *     acpi_lapic = 1 if LAPIC found
+ *     acpi_ioapic = 1 if IOAPIC found
+ *     if (acpi_lapic && acpi_ioapic) smp_found_config = 1;
+ *     if acpi_blacklisted() acpi_disabled = 1;
+ *     acpi_irq_model=...
+ *     ...
+ *
+ * return value: (currently ignored)
+ *     0: success
+ *     !0: failure
+ */
 
 int __init
 acpi_boot_init (void)
 {
 	int			result = 0;
+
+	if (acpi_disabled)
+		return 1;
 
 	/*
 	 * The default interrupt routing model is PIC (8259).  This gets
@@ -316,9 +337,7 @@ acpi_boot_init (void)
 		printk(KERN_WARNING PREFIX "BIOS listed in blacklist, disabling ACPI support\n");
 		acpi_disabled = 1;
 		return result;
-	} else
-               printk(KERN_NOTICE PREFIX "BIOS not listed in blacklist\n");
-
+	}
 
 	extern int disable_apic;
 	if (disable_apic)
@@ -390,6 +409,25 @@ acpi_boot_init (void)
 	 * I/O APIC 
 	 * --------
 	 */
+
+       /*
+        * ACPI interpreter is required to complete interrupt setup,
+        * so if it is off, don't enumerate the io-apics with ACPI.
+        * If MPS is present, it will handle them,
+        * otherwise the system will stay in PIC mode
+        */
+        if (acpi_disabled) {
+               return 1;
+	}
+
+	/*
+	 * if "noapic" boot option, don't look for IO-APICs
+	 */
+	if (disable_apic) {
+		printk(KERN_INFO PREFIX "Skipping IOAPIC probe "
+		       "due to 'noapic' option.\n");
+		return 1;
+	}
 
 	result = acpi_table_parse_madt(ACPI_MADT_IOAPIC, acpi_parse_ioapic);
 	if (!result) { 

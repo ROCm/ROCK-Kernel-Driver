@@ -1454,7 +1454,7 @@ scsi_mode_sense(struct scsi_device *sdev, int dbd, int modepage,
 		unsigned char *buffer, int len, int timeout, int retries,
 		struct scsi_mode_data *data)
 {
-	struct scsi_request *sreq = scsi_allocate_request(sdev);
+	struct scsi_request *sreq = scsi_allocate_request(sdev, GFP_KERNEL);
 	int ret;
 
 	if (!sreq)

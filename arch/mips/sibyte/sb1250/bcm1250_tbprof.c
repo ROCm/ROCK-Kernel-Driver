@@ -253,7 +253,7 @@ static int sbprof_tb_open(struct inode *inode, struct file *filp)
 {
 	int minor;
 
-	minor = minor(inode->i_rdev);
+	minor = iminor(inode);
 	if (minor != 0) {
 		return -ENODEV;
 	}
@@ -278,7 +278,7 @@ static int sbprof_tb_release(struct inode *inode, struct file *filp)
 {
 	int minor;
 
-	minor = minor(inode->i_rdev);
+	minor = iminor(inode);
 	if (minor != 0 || !sbp.open) {
 		return -ENODEV;
 	}

@@ -50,7 +50,7 @@ struct i2c_driver keywest_driver = {
 
 
 #ifndef i2c_device_name
-#define i2c_device_name(x)	((x)->dev.name)
+#define i2c_device_name(x)	((x)->name)
 #endif
 
 static int keywest_attach_adapter(struct i2c_adapter *adapter)

@@ -758,7 +758,7 @@ static int
 isdn_net_getphone(isdn_net_ioctl_phone * phone, char *phones)
 {
 	isdn_net_dev *idev = isdn_net_findif(phone->name);
-	int count = 0;
+	u_int count = 0;
 	char *buf = (char *)__get_free_page(GFP_KERNEL);
 	struct isdn_net_phone *n;
 
@@ -837,7 +837,7 @@ isdn_net_force_hangup(char *name) // FIXME rename?
 	if (!idev)
 		return -ENODEV;
 
-	if (idev->isdn_slot < 0)
+	if (idev->isdn_slot == NULL)
 		return -ENOTCONN;
 
 	isdn_net_hangup(idev);
@@ -1186,7 +1186,7 @@ isdn_net_unbind_channel(isdn_net_dev *idev)
 {
 	isdn_net_local *mlp = idev->mlp;
 
-	if (idev->isdn_slot < 0) {
+	if (idev->isdn_slot == NULL) {
 		isdn_BUG();
 		return;
 	}
@@ -1344,7 +1344,7 @@ isdn_net_autodial(struct sk_buff *skb, struct net_device *ndev)
 		goto discard;
 
 	/* Log packet, which triggered dialing */
-	if (dev->net_verbose)
+	if ((get_isdn_dev())->net_verbose)
 		isdn_net_log_skb(skb, idev);
 
  stop_queue:
@@ -1497,12 +1497,13 @@ isdn_net_dev_icall(isdn_net_dev *idev, struct isdn_slot *slot,
 int
 isdn_net_find_icall(struct isdn_slot *slot, setup_parm *setup)
 {
-	isdn_net_local *lp;
-	isdn_net_dev *idev;
-	char *nr, *eaz;
-	unsigned char si1, si2;
-	int retval;
-	unsigned long flags;
+	isdn_net_local	*lp;
+	isdn_net_dev	*idev;
+	char		*nr, *eaz;
+	unsigned char	si1, si2;
+	int		retval;
+	int		verbose = (get_isdn_dev())->net_verbose;
+	unsigned long	flags;
 
 	/* fix up calling number */
 	if (!setup->phone[0]) {
@@ -1522,14 +1523,14 @@ isdn_net_find_icall(struct isdn_slot *slot, setup_parm *setup)
 	}
 	si1 = setup->si1;
 	si2 = setup->si2;
-	if (dev->net_verbose > 1)
+	if (verbose > 1)
 		printk(KERN_INFO "isdn_net: call from %s,%d,%d -> %s\n", 
 		       nr, si1, si2, eaz);
 	/* check service indicator */
         /* Accept DATA and VOICE calls at this stage
 	   local eaz is checked later for allowed call types */
         if ((si1 != 7) && (si1 != 1)) {
-                if (dev->net_verbose > 1)
+                if (verbose > 1)
                         printk(KERN_INFO "isdn_net: "
 			       "Service-Indicator not 1 or 7, ignored\n");
                 return 0;
@@ -1558,7 +1559,7 @@ isdn_net_find_icall(struct isdn_slot *slot, setup_parm *setup)
 	}
 	spin_unlock_irqrestore(&running_devs_lock, flags);
 	if (!retval) {
-		if (dev->net_verbose)
+		if (verbose)
 			printk(KERN_INFO "isdn_net: call "
 			       "from %s -> %s ignored\n", nr, eaz);
 	}
@@ -2174,10 +2175,10 @@ isdn_net_bsent(isdn_net_dev *idev, isdn_ctrl *c)
 int
 isdn_net_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 {
-	isdn_net_dev *idev;
-	isdn_net_local *mlp = ndev->priv;
-	unsigned long flags;
-	int retval;
+	isdn_net_dev	*idev;
+	isdn_net_local	*mlp = ndev->priv;
+	unsigned long	flags;
+	int		retval;
 
 	ndev->trans_start = jiffies;
 
@@ -2208,7 +2209,7 @@ isdn_net_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 		idev->last_jiffies = jiffies;
 		idev->transcount = 0;
 	}
-	if (dev->net_verbose > 3)
+	if ((get_isdn_dev())->net_verbose > 3)
 		printk(KERN_DEBUG "%s: %d bogocps\n", idev->name, idev->cps);
 
 	if (idev->cps > mlp->triggercps) {

@@ -10,15 +10,15 @@ obj-${CONFIG_EISA_PCI_EISA}     += pci_eisa.o
 # so leave it at the end of the list.
 obj-${CONFIG_EISA_VIRTUAL_ROOT} += virtual_root.o
 
-clean-files:= devlist.h
 
 # Ugly hack to get DEVICE_NAME_SIZE value...
-DEVICE_NAME_SIZE:=$(shell awk '$$1=="\#define" && $$2=="DEVICE_NAME_SIZE" {print $$3-1}' $(srctree)/include/linux/device.h)
+DEVICE_NAME_SIZE =$(shell awk '$$1=="\#define" && $$2=="DEVICE_NAME_SIZE" {print $$3-1}' $(srctree)/include/linux/device.h)
 
 $(obj)/eisa-bus.o: $(obj)/devlist.h
 
-$(obj)/devlist.h: $(src)/eisa.ids $(srctree)/include/linux/device.h
-	sed -e '/^#/D' -e 's/^\([[:alnum:]]\{7\}\) \+"\([^"]\{1,$(DEVICE_NAME_SIZE)\}\).*"/EISA_DEVINFO ("\1", "\2"),/' $< > $@
+quiet_cmd_eisaid = GEN     $@
+      cmd_eisaid = sed -e '/^\#/D' -e 's/^\([[:alnum:]]\{7\}\) \+"\([^"]\{1,$(DEVICE_NAME_SIZE)\}\).*"/EISA_DEVINFO ("\1", "\2"),/' $< > $@
 
-$(src)/eisa.ids:
-	touch $@
+clean-files := devlist.h
+$(obj)/devlist.h: $(src)/eisa.ids include/linux/device.h
+	$(call cmd,eisaid)

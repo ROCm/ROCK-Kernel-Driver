@@ -63,11 +63,10 @@ config AGP_AMD
 	  You should say Y here if you use XFree86 3.3.6 or 4.x and want to
 	  use GLX or DRI.  If unsure, say N.
 
-# RED-PEN this option is misnamed, it's not 8151 specific
-config AGP_AMD_8151
-	tristate "AMD Opteron/Athlon64 on-CPU GART support"
+config AGP_AMD64
+	tristate "AMD Opteron/Athlon64 on-CPU GART support" if !GART_IOMMU
 	depends on AGP && X86
-	default GART_IOMMU
+	default y if GART_IOMMU
 	help
 	  This option gives you AGP support for the GLX component of
 	  XFree86 4.x using the on-CPU northbridge of the AMD Athlon64/Opteron CPUs.

@@ -1,7 +1,7 @@
 /*
  * USB Keyspan PDA Firmware
  *
- * Copyright (c) 1999, 2000 Brian Warner	<warner@lothar.com>
+ * Copyright (C) 1999, 2000 Brian Warner	<warner@lothar.com>
  *
  *	This program is free software; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by

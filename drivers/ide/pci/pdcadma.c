@@ -24,7 +24,6 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 
-#include "ide_modes.h"
 #include "pdcadma.h"
 
 #if defined(DISPLAY_PDCADMA_TIMINGS) && defined(CONFIG_PROC_FS)

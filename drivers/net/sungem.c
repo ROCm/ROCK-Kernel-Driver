@@ -1,7 +1,7 @@
 /* $Id: sungem.c,v 1.44.2.22 2002/03/13 01:18:12 davem Exp $
  * sungem.c: Sun GEM ethernet driver.
  *
- * Copyright (C) 2000, 2001, 2002 David S. Miller (davem@redhat.com)
+ * Copyright (C) 2000, 2001, 2002, 2003 David S. Miller (davem@redhat.com)
  * 
  * Support for Apple GMAC and assorted PHYs by
  * Benjamin Herrenscmidt (benh@kernel.crashing.org)
@@ -70,8 +70,8 @@
 			 SUPPORTED_1000baseT_Half | SUPPORTED_1000baseT_Full)
 
 #define DRV_NAME	"sungem"
-#define DRV_VERSION	"0.97"
-#define DRV_RELDATE	"3/20/02"
+#define DRV_VERSION	"0.98"
+#define DRV_RELDATE	"8/24/03"
 #define DRV_AUTHOR	"David S. Miller (davem@redhat.com)"
 
 static char version[] __devinitdata =
@@ -2317,177 +2317,126 @@ static void gem_set_multicast(struct net_device *dev)
 	spin_unlock_irq(&gp->lock);
 }
 
-/* Eventually add support for changing the advertisement
- * on autoneg.
- */
-static int gem_ethtool_ioctl(struct net_device *dev, void *ep_user)
+static void gem_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
 {
 	struct gem *gp = dev->priv;
-	struct ethtool_cmd ecmd;
+  
+	strcpy(info->driver, DRV_NAME);
+	strcpy(info->version, DRV_VERSION);
+	strcpy(info->bus_info, pci_name(gp->pdev));
+}
+  
+static int gem_get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
+{
+	struct gem *gp = dev->priv;
 
-	if (copy_from_user(&ecmd, ep_user, sizeof(ecmd)))
-		return -EFAULT;
-		
-	switch(ecmd.cmd) {
-        case ETHTOOL_GDRVINFO: {
-		struct ethtool_drvinfo info = { .cmd = ETHTOOL_GDRVINFO };
+	if (gp->phy_type == phy_mii_mdio0 ||
+	    gp->phy_type == phy_mii_mdio1) {
+		if (gp->phy_mii.def)
+			cmd->supported = gp->phy_mii.def->features;
+		else
+			cmd->supported = (SUPPORTED_10baseT_Half |
+					  SUPPORTED_10baseT_Full);
 
-		strncpy(info.driver, DRV_NAME, ETHTOOL_BUSINFO_LEN);
-		strncpy(info.version, DRV_VERSION, ETHTOOL_BUSINFO_LEN);
-		info.fw_version[0] = '\0';
-		strncpy(info.bus_info, pci_name(gp->pdev), ETHTOOL_BUSINFO_LEN);
-		info.regdump_len = 0; /*SUNGEM_NREGS;*/
+		/* XXX hardcoded stuff for now */
+		cmd->port = PORT_MII;
+		cmd->transceiver = XCVR_EXTERNAL;
+		cmd->phy_address = 0; /* XXX fixed PHYAD */
 
-		if (copy_to_user(ep_user, &info, sizeof(info)))
-			return -EFAULT;
+		/* Return current PHY settings */
+		spin_lock_irq(&gp->lock);
+		cmd->autoneg = gp->want_autoneg;
+		cmd->speed = gp->phy_mii.speed;
+		cmd->duplex = gp->phy_mii.duplex;			
+		cmd->advertising = gp->phy_mii.advertising;
 
-		return 0;
-	}
-
-	case ETHTOOL_GSET:
-		if (gp->phy_type == phy_mii_mdio0 ||
-	     	    gp->phy_type == phy_mii_mdio1) {
-	     	    	if (gp->phy_mii.def)
-	     	    		ecmd.supported = gp->phy_mii.def->features;
-	     	    	else
-	     	    		ecmd.supported = SUPPORTED_10baseT_Half | SUPPORTED_10baseT_Full;
-
-			/* XXX hardcoded stuff for now */
-			ecmd.port = PORT_MII;
-			ecmd.transceiver = XCVR_EXTERNAL;
-			ecmd.phy_address = 0; /* XXX fixed PHYAD */
-
-			/* Return current PHY settings */
-			spin_lock_irq(&gp->lock);
-			ecmd.autoneg = gp->want_autoneg;
-			ecmd.speed = gp->phy_mii.speed;
-			ecmd.duplex = gp->phy_mii.duplex;			
-			ecmd.advertising = gp->phy_mii.advertising;
-			/* If we started with a forced mode, we don't have a default
-			 * advertise set, we need to return something sensible so
-			 * userland can re-enable autoneg properly */
-			if (ecmd.advertising == 0)
-				ecmd.advertising = ecmd.supported;
-			spin_unlock_irq(&gp->lock);
-		} else { // XXX PCS ?
-	     	    ecmd.supported =
+		/* If we started with a forced mode, we don't have a default
+		 * advertise set, we need to return something sensible so
+		 * userland can re-enable autoneg properly.
+		 */
+		if (cmd->advertising == 0)
+			cmd->advertising = cmd->supported;
+		spin_unlock_irq(&gp->lock);
+	} else { // XXX PCS ?
+		cmd->supported =
 			(SUPPORTED_10baseT_Half | SUPPORTED_10baseT_Full |
 			 SUPPORTED_100baseT_Half | SUPPORTED_100baseT_Full |
 			 SUPPORTED_Autoneg);
-		    ecmd.advertising = ecmd.supported;
-		}
-		if (copy_to_user(ep_user, &ecmd, sizeof(ecmd)))
-			return -EFAULT;
-		return 0;
-
-	case ETHTOOL_SSET:
-		/* Verify the settings we care about. */
-		if (ecmd.autoneg != AUTONEG_ENABLE &&
-		    ecmd.autoneg != AUTONEG_DISABLE)
-			return -EINVAL;
-
-		if (ecmd.autoneg == AUTONEG_ENABLE &&
-		    ecmd.advertising == 0)
-		    	return -EINVAL;
-
-		if (ecmd.autoneg == AUTONEG_DISABLE &&
-		    ((ecmd.speed != SPEED_1000 &&
-		      ecmd.speed != SPEED_100 &&
-		      ecmd.speed != SPEED_10) ||
-		     (ecmd.duplex != DUPLEX_HALF &&
-		      ecmd.duplex != DUPLEX_FULL)))
-			return -EINVAL;
-	      
-		/* Apply settings and restart link process. */
-		spin_lock_irq(&gp->lock);
-		gem_begin_auto_negotiation(gp, &ecmd);
-		spin_unlock_irq(&gp->lock);
-
-		return 0;
-
-	case ETHTOOL_NWAY_RST:
-		if (!gp->want_autoneg)
-			return -EINVAL;
-
-		/* Restart link process. */
-		spin_lock_irq(&gp->lock);
-		gem_begin_auto_negotiation(gp, NULL);
-		spin_unlock_irq(&gp->lock);
-
-		return 0;
-
-	case ETHTOOL_GWOL:
-	case ETHTOOL_SWOL:
-		break; /* todo */
-
-	/* get link status */
-	case ETHTOOL_GLINK: {
-		struct ethtool_value edata = { .cmd = ETHTOOL_GLINK };
-
-		edata.data = (gp->lstate == link_up);
-		if (copy_to_user(ep_user, &edata, sizeof(edata)))
-			return -EFAULT;
-		return 0;
+		cmd->advertising = cmd->supported;
+		cmd->speed = 0;
+		cmd->duplex = cmd->port = cmd->phy_address =
+			cmd->transceiver = cmd->autoneg = 0;
 	}
+	cmd->maxtxpkt = cmd->maxrxpkt = 0;
 
-	/* get message-level */
-	case ETHTOOL_GMSGLVL: {
-		struct ethtool_value edata = { .cmd = ETHTOOL_GMSGLVL };
-
-		edata.data = gp->msg_enable;
-		if (copy_to_user(ep_user, &edata, sizeof(edata)))
-			return -EFAULT;
-		return 0;
-	}
-
-	/* set message-level */
-	case ETHTOOL_SMSGLVL: {
-		struct ethtool_value edata;
-
-		if (copy_from_user(&edata, ep_user, sizeof(edata)))
-			return -EFAULT;
-		gp->msg_enable = edata.data;
-		return 0;
-	}
-
-#if 0
-	case ETHTOOL_GREGS: {
-		struct ethtool_regs regs;
-		u32 *regbuf;
-		int r = 0;
-
-		if (copy_from_user(&regs, useraddr, sizeof(regs)))
-			return -EFAULT;
-		
-		if (regs.len > SUNGEM_NREGS) {
-			regs.len = SUNGEM_NREGS;
-		}
-		regs.version = 0;
-		if (copy_to_user(useraddr, &regs, sizeof(regs)))
-			return -EFAULT;
-
-		if (!gp->hw_running)
-			return -ENODEV;
-		useraddr += offsetof(struct ethtool_regs, data);
-
-		/* Use kmalloc to avoid bloating the stack */
-		regbuf = kmalloc(4 * SUNGEM_NREGS, GFP_KERNEL);
-		if (!regbuf)
-			return -ENOMEM;
-		spin_lock_irq(&np->lock);
-		gem_get_regs(gp, regbuf);
-		spin_unlock_irq(&np->lock);
-
-		if (copy_to_user(useraddr, regbuf, regs.len*sizeof(u32)))
-			r = -EFAULT;
-		kfree(regbuf);
-		return r;
-	}
-#endif	
-	};
-
-	return -EOPNOTSUPP;
+	return 0;
 }
+
+static int gem_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
+{
+	struct gem *gp = dev->priv;
+
+	/* Verify the settings we care about. */
+	if (cmd->autoneg != AUTONEG_ENABLE &&
+	    cmd->autoneg != AUTONEG_DISABLE)
+		return -EINVAL;
+
+	if (cmd->autoneg == AUTONEG_ENABLE &&
+	    cmd->advertising == 0)
+		return -EINVAL;
+
+	if (cmd->autoneg == AUTONEG_DISABLE &&
+	    ((cmd->speed != SPEED_1000 &&
+	      cmd->speed != SPEED_100 &&
+	      cmd->speed != SPEED_10) ||
+	     (cmd->duplex != DUPLEX_HALF &&
+	      cmd->duplex != DUPLEX_FULL)))
+		return -EINVAL;
+	      
+	/* Apply settings and restart link process. */
+	spin_lock_irq(&gp->lock);
+	gem_begin_auto_negotiation(gp, cmd);
+	spin_unlock_irq(&gp->lock);
+
+	return 0;
+}
+
+static int gem_nway_reset(struct net_device *dev)
+{
+	struct gem *gp = dev->priv;
+
+	if (!gp->want_autoneg)
+		return -EINVAL;
+
+	/* Restart link process. */
+	spin_lock_irq(&gp->lock);
+	gem_begin_auto_negotiation(gp, NULL);
+	spin_unlock_irq(&gp->lock);
+
+	return 0;
+}
+
+static u32 gem_get_msglevel(struct net_device *dev)
+{
+	struct gem *gp = dev->priv;
+	return gp->msg_enable;
+}
+  
+static void gem_set_msglevel(struct net_device *dev, u32 value)
+{
+	struct gem *gp = dev->priv;
+	gp->msg_enable = value;
+}
+  
+static struct ethtool_ops gem_ethtool_ops = {
+	.get_drvinfo		= gem_get_drvinfo,
+	.get_link		= ethtool_op_get_link,
+	.get_settings		= gem_get_settings,
+	.set_settings		= gem_set_settings,
+	.nway_reset		= gem_nway_reset,
+	.get_msglevel		= gem_get_msglevel,
+	.set_msglevel		= gem_set_msglevel,
+};
 
 static int gem_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
@@ -2501,10 +2450,6 @@ static int gem_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	down(&gp->pm_sem);
 	
 	switch (cmd) {
-	case SIOCETHTOOL:
-		rc = gem_ethtool_ioctl(dev, ifr->ifr_data);
-		break;
-
 	case SIOCGMIIPHY:		/* Get address of MII PHY in use. */
 		data->phy_id = gp->mii_phy_addr;
 		/* Fallthrough... */
@@ -2677,7 +2622,7 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 		if (err) {
 			printk(KERN_ERR PFX "No usable DMA configuration, "
 			       "aborting.\n");
-			return err;
+			goto err_disable_device;
 		}
 		pci_using_dac = 0;
 	}
@@ -2688,20 +2633,23 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 	if ((pci_resource_flags(pdev, 0) & IORESOURCE_IO) != 0) {
 		printk(KERN_ERR PFX "Cannot find proper PCI device "
 		       "base address, aborting.\n");
-		return -ENODEV;
+		err = -ENODEV;
+		goto err_disable_device;
 	}
 
 	dev = alloc_etherdev(sizeof(*gp));
 	if (!dev) {
 		printk(KERN_ERR PFX "Etherdev alloc failed, aborting.\n");
-		return -ENOMEM;
+		err = -ENOMEM;
+		goto err_disable_device;
 	}
 	SET_MODULE_OWNER(dev);
 	SET_NETDEV_DEV(dev, &pdev->dev);
 
 	gp = dev->priv;
 
-	if (pci_request_regions(pdev, dev->name)) {
+	err = pci_request_regions(pdev, dev->name);
+	if (err) {
 		printk(KERN_ERR PFX "Cannot obtain PCI resources, "
 		       "aborting.\n");
 		goto err_out_free_netdev;
@@ -2735,6 +2683,7 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 	if (gp->regs == 0UL) {
 		printk(KERN_ERR PFX "Cannot map device registers, "
 		       "aborting.\n");
+		err = -EIO;
 		goto err_out_free_res;
 	}
 
@@ -2758,8 +2707,10 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 	/* By default, we start with autoneg */
 	gp->want_autoneg = 1;
 	
-	if (gem_check_invariants(gp))
+	if (gem_check_invariants(gp)) {
+		err = -ENODEV;
 		goto err_out_iounmap;
+	}
 
 	/* It is guaranteed that the returned buffer will be at least
 	 * PAGE_SIZE aligned.
@@ -2770,6 +2721,7 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 	if (!gp->init_block) {
 		printk(KERN_ERR PFX "Cannot allocate init block, "
 		       "aborting.\n");
+		err = -ENOMEM;
 		goto err_out_iounmap;
 	}
 
@@ -2782,6 +2734,7 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 	if (register_netdev(dev)) {
 		printk(KERN_ERR PFX "Cannot register net device, "
 		       "aborting.\n");
+		err = -ENOMEM;
 		goto err_out_free_consistent;
 	}
 
@@ -2812,6 +2765,7 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 	dev->get_stats = gem_get_stats;
 	dev->set_multicast_list = gem_set_multicast;
 	dev->do_ioctl = gem_ioctl;
+	dev->ethtool_ops = &gem_ethtool_ops;
 	dev->tx_timeout = gem_tx_timeout;
 	dev->watchdog_timeo = 5 * HZ;
 	dev->change_mtu = gem_change_mtu;
@@ -2850,9 +2804,10 @@ err_out_free_res:
 	pci_release_regions(pdev);
 
 err_out_free_netdev:
-	kfree(dev);
-
-	return -ENODEV;
+	free_netdev(dev);
+err_disable_device:
+	pci_disable_device(pdev);
+	return err;
 
 }
 

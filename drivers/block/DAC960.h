@@ -2063,38 +2063,6 @@ extern int DAC960_KernelIOCTL(unsigned int Request, void *Argument);
 #define DAC960_MaxPartitions			8
 #define DAC960_MaxPartitionsBits		3
 
-
-/*
-  Define macros to extract the Controller Number, Logical Drive Number, and
-  Partition Number from a Kernel Device, and to construct a Major Number, Minor
-  Number, and Kernel Device from the Controller Number, Logical Drive Number,
-  and Partition Number.  There is one Major Number assigned to each Controller.
-  The associated Minor Number is divided into the Logical Drive Number and
-  Partition Number.
-*/
-
-#define DAC960_ControllerNumber(Device) \
-  (major(Device) - DAC960_MAJOR)
-
-#define DAC960_LogicalDriveNumber(Device) \
-  (minor(Device) >> DAC960_MaxPartitionsBits)
-
-#define DAC960_MajorNumber(ControllerNumber) \
-  (DAC960_MAJOR + (ControllerNumber))
-
-#define DAC960_MinorNumber(LogicalDriveNumber, PartitionNumber) \
-   (((LogicalDriveNumber) << DAC960_MaxPartitionsBits) | (PartitionNumber))
-
-#define DAC960_MinorCount			(DAC960_MaxLogicalDrives \
-						 * DAC960_MaxPartitions)
-
-#define DAC960_KernelDevice(ControllerNumber,				       \
-			    LogicalDriveNumber,				       \
-			    PartitionNumber)				       \
-   mk_kdev(DAC960_MajorNumber(ControllerNumber),				       \
-	 DAC960_MinorNumber(LogicalDriveNumber, PartitionNumber))
-
-
 /*
   Define the DAC960 Controller fixed Block Size and Block Size Bits.
 */
@@ -4138,8 +4106,6 @@ static irqreturn_t DAC960_P_InterruptHandler(int, void *, struct pt_regs *);
 static void DAC960_V1_QueueMonitoringCommand(DAC960_Command_T *);
 static void DAC960_V2_QueueMonitoringCommand(DAC960_Command_T *);
 static void DAC960_MonitoringTimerFunction(unsigned long);
-static int DAC960_UserIOCTL(struct inode *, struct file *,
-			    unsigned int, unsigned long);
 static void DAC960_Message(DAC960_MessageLevel_T, unsigned char *,
 			   DAC960_Controller_T *, ...);
 static void DAC960_CreateProcEntries(DAC960_Controller_T *);

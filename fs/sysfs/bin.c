@@ -168,6 +168,7 @@ int sysfs_create_bin_file(struct kobject * kobj, struct bin_attribute * attr)
 			dentry->d_inode->i_size = attr->size;
 			dentry->d_inode->i_fop = &bin_fops;
 		}
+		dput(dentry);
 	} else
 		error = PTR_ERR(dentry);
 	up(&parent->d_inode->i_sem);

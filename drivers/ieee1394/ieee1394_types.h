@@ -4,7 +4,6 @@
 
 #include <linux/kernel.h>
 #include <linux/types.h>
-#include <linux/version.h>
 #include <linux/list.h>
 #include <linux/init.h>
 #include <linux/spinlock.h>
@@ -16,10 +15,6 @@
 
 /* The great kdev_t changeover in 2.5.x */
 #include <linux/kdev_t.h>
-#ifndef minor
-#define minor(dev) MINOR(dev)
-#endif
-
 
 /* Transaction Label handling */
 struct hpsb_tlabel_pool {

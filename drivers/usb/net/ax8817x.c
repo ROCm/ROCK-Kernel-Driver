@@ -75,7 +75,6 @@
 #include <linux/mii.h>
 #include <linux/crc32.h>
 #include <asm/uaccess.h>
-#include <linux/version.h>
 
 /* Version Information */
 #define DRIVER_VERSION "v2.0.2"

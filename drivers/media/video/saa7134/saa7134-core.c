@@ -705,8 +705,10 @@ static int __devinit saa7134_initdev(struct pci_dev *pci_dev,
 	int err;
 
 	dev = kmalloc(sizeof(*dev),GFP_KERNEL);
-	if (NULL == dev)
-		return -ENOMEM;
+	if (NULL == dev) {
+		err = -ENOMEM;
+		goto fail0;
+	}
 	memset(dev,0,sizeof(*dev));
 
 	/* pci init */
@@ -783,6 +785,11 @@ static int __devinit saa7134_initdev(struct pci_dev *pci_dev,
 		goto fail1;
 	}
 	dev->lmmio = ioremap(pci_resource_start(pci_dev,0), 0x1000);
+	if (!dev->lmmio) {
+		printk(KERN_ERR "Unable to remap memory.\n");
+		err = -ENOMEM;
+		goto fail2;
+	}
 	dev->bmmio = (__u8*)dev->lmmio;
 
 	/* register i2c bus */
@@ -798,7 +805,7 @@ static int __devinit saa7134_initdev(struct pci_dev *pci_dev,
 	if (err < 0) {
 		printk(KERN_ERR "%s: can't get IRQ %d\n",
 		       dev->name,pci_dev->irq);
-		goto fail2;
+		goto fail3;
 	}
 
 	/* load i2c helpers */
@@ -814,7 +821,7 @@ static int __devinit saa7134_initdev(struct pci_dev *pci_dev,
 	if (err < 0) {
 		printk(KERN_INFO "%s: can't register video device\n",
 		       dev->name);
-		goto fail3;
+		goto fail4;
 	}
 	printk(KERN_INFO "%s: registered device video%d [v4l2]\n",
 	       dev->name,dev->video_dev.minor & 0x1f);
@@ -826,7 +833,7 @@ static int __devinit saa7134_initdev(struct pci_dev *pci_dev,
 		if (err < 0) {
 			printk(KERN_INFO "%s: can't register video device\n",
 			       dev->name);
-			goto fail4;
+			goto fail5;
 		}
 		printk(KERN_INFO "%s: registered device video%d [ts]\n",
 		       dev->name,dev->ts_dev.minor & 0x1f);
@@ -836,7 +843,7 @@ static int __devinit saa7134_initdev(struct pci_dev *pci_dev,
 	dev->vbi_dev.priv = dev;
 	err = video_register_device(&dev->vbi_dev,VFL_TYPE_VBI,vbi_nr);
 	if (err < 0)
-		goto fail5;
+		goto fail6;
 	printk(KERN_INFO "%s: registered device vbi%d\n",
 	       dev->name,dev->vbi_dev.minor & 0x1f);
 
@@ -845,7 +852,7 @@ static int __devinit saa7134_initdev(struct pci_dev *pci_dev,
 	if (card_has_radio(dev)) {
 		err = video_register_device(&dev->radio_dev,VFL_TYPE_RADIO,radio_nr);
 		if (err < 0)
-			goto fail6;
+			goto fail7;
 		printk(KERN_INFO "%s: registered device radio%d\n",
 		       dev->name,dev->radio_dev.minor & 0x1f);
 	}
@@ -859,7 +866,7 @@ static int __devinit saa7134_initdev(struct pci_dev *pci_dev,
 			err = dev->oss.minor_dsp =
 				register_sound_dsp(&saa7134_dsp_fops,dsp_nr);
 			if (err < 0) {
-				goto fail7;
+				goto fail8;
 			}
 			printk(KERN_INFO "%s: registered device dsp%d\n",
 			       dev->name,dev->oss.minor_dsp >> 4);
@@ -867,7 +874,7 @@ static int __devinit saa7134_initdev(struct pci_dev *pci_dev,
 			err = dev->oss.minor_mixer =
 				register_sound_mixer(&saa7134_mixer_fops,mixer_nr);
 			if (err < 0)
-				goto fail8;
+				goto fail9;
 			printk(KERN_INFO "%s: registered device mixer%d\n",
 			       dev->name,dev->oss.minor_mixer >> 4);
 		}
@@ -880,7 +887,7 @@ static int __devinit saa7134_initdev(struct pci_dev *pci_dev,
 	saa7134_devcount++;
 	return 0;
 
- fail8:
+ fail9:
 	switch (dev->pci->device) {
 	case PCI_DEVICE_ID_PHILIPS_SAA7134:
 	case PCI_DEVICE_ID_PHILIPS_SAA7133:
@@ -889,20 +896,19 @@ static int __devinit saa7134_initdev(struct pci_dev *pci_dev,
 			unregister_sound_dsp(dev->oss.minor_dsp);
 		break;
 	}
- fail7:
+ fail8:
 	if (card_has_radio(dev))
 		video_unregister_device(&dev->radio_dev);
- fail6:
+ fail7:
 	video_unregister_device(&dev->vbi_dev);
- fail5:
+ fail6:
  	if (card_has_ts(dev))
   		video_unregister_device(&dev->ts_dev);
- fail4:
+ fail5:
 	video_unregister_device(&dev->video_dev);
- fail3:
-	saa7134_i2c_unregister(dev);
+ fail4:
 	free_irq(pci_dev->irq, dev);
- fail2:
+ fail3:
 	switch (dev->pci->device) {
 	case PCI_DEVICE_ID_PHILIPS_SAA7134:
 	case PCI_DEVICE_ID_PHILIPS_SAA7133:
@@ -915,10 +921,14 @@ static int __devinit saa7134_initdev(struct pci_dev *pci_dev,
 	saa7134_vbi_fini(dev);
 	saa7134_video_fini(dev);
 	saa7134_tvaudio_fini(dev);
+	iounmap (dev->lmmio);
+	saa7134_i2c_unregister(dev);
+ fail2:
 	release_mem_region(pci_resource_start(pci_dev,0),
 			   pci_resource_len(pci_dev,0));
  fail1:
 	kfree(dev);
+ fail0:
 	return err;
 }
 
@@ -954,7 +964,7 @@ static void __devexit saa7134_finidev(struct pci_dev *pci_dev)
 	saa7134_vbi_fini(dev);
 	saa7134_video_fini(dev);
 	saa7134_tvaudio_fini(dev);
-	saa7134_i2c_unregister(dev);
+	iounmap(dev->lmmio);
 
 	/* release ressources */
 	free_irq(pci_dev->irq, dev);

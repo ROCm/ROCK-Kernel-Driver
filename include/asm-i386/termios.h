@@ -58,6 +58,7 @@ struct termio {
 #define N_HCI		15  /* Bluetooth HCI UART */
 
 #ifdef __KERNEL__
+#include <linux/module.h>
 
 /*	intr=^C		quit=^\		erase=del	kill=^U
 	eof=^D		vtime=\0	vmin=\1		sxtc=\0

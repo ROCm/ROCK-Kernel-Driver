@@ -53,6 +53,7 @@
 
 /* Config registers for the '39x (in the logical device bank) */
 #define CFG_39X_LDN	0x07	/* Logical device number (Super I/O bank) */
+#define CFG_39X_SIOCF1	0x21	/* SuperI/O Config */
 #define CFG_39X_ACT	0x30	/* Device activation */
 #define CFG_39X_BASEH	0x60	/* Device base address (high bits) */
 #define CFG_39X_BASEL	0x61	/* Device base address (low bits) */

@@ -890,7 +890,7 @@ stifb_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 {
 	unsigned long p = *ppos;
 	struct inode *inode = file->f_dentry->d_inode;
-	int fbidx = minor(inode->i_rdev);
+	int fbidx = iminor(inode);
 	struct fb_info *info = registered_fb[fbidx];
 	char tmpbuf[TMPBUFLEN];
 
@@ -922,7 +922,7 @@ static ssize_t
 stifb_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 {
 	struct inode *inode = file->f_dentry->d_inode;
-	int fbidx = minor(inode->i_rdev);
+	int fbidx = iminor(inode);
 	struct fb_info *info = registered_fb[fbidx];
 	unsigned long p = *ppos;
 	size_t c;

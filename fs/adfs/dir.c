@@ -10,7 +10,6 @@
  *  Common directory handling for ADFS
  */
 #include <linux/config.h>
-#include <linux/version.h>
 #include <linux/errno.h>
 #include <linux/fs.h>
 #include <linux/adfs_fs.h>

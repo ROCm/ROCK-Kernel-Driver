@@ -184,7 +184,7 @@ static int vfc_open(struct inode *inode, struct file *file)
 	struct vfc_dev *dev;
 
 	spin_lock(&vfc_dev_lock);
-	dev = vfc_get_dev_ptr(MINOR(inode->i_rdev));
+	dev = vfc_get_dev_ptr(iminor(inode));
 	if (dev == NULL) {
 		spin_unlock(&vfc_dev_lock);
 		return -ENODEV;
@@ -215,7 +215,7 @@ static int vfc_release(struct inode *inode,struct file *file)
 	struct vfc_dev *dev;
 
 	spin_lock(&vfc_dev_lock);
-	dev = vfc_get_dev_ptr(MINOR(inode->i_rdev));
+	dev = vfc_get_dev_ptr(iminor(inode));
 	if (!dev || !dev->busy) {
 		spin_unlock(&vfc_dev_lock);
 		return -EINVAL;
@@ -557,7 +557,7 @@ static int vfc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	unsigned int tmp;
 	struct vfc_dev *dev;
 
-	dev = vfc_get_dev_ptr(MINOR(inode->i_rdev));
+	dev = vfc_get_dev_ptr(iminor(inode));
 	if(dev == NULL)
 		return -ENODEV;
 	
@@ -602,7 +602,7 @@ static int vfc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		VFC_IOCTL_DEBUG_PRINTK(("vfc%d: IOCTL(VFCRDINFO)\n", dev->instance));
 		break;
 	default:
-		ret = vfc_debug(vfc_get_dev_ptr(MINOR(inode->i_rdev)),
+		ret = vfc_debug(vfc_get_dev_ptr(iminor(inode)),
 				cmd, arg);
 		break;
 	};
@@ -616,7 +616,7 @@ static int vfc_mmap(struct inode *inode, struct file *file,
 	unsigned int map_size, ret, map_offset;
 	struct vfc_dev *dev;
 	
-	dev = vfc_get_dev_ptr(MINOR(inode->i_rdev));
+	dev = vfc_get_dev_ptr(iminor(inode));
 	if(dev == NULL)
 		return -ENODEV;
 

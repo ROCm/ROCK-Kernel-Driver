@@ -707,7 +707,7 @@ retry:
 		goto retry;
 	}
 
-	msq->q_lspid = current->pid;
+	msq->q_lspid = current->tgid;
 	msq->q_stime = get_seconds();
 
 	if(!pipelined_send(msq,msg)) {
@@ -801,7 +801,7 @@ retry:
 		list_del(&msg->m_list);
 		msq->q_qnum--;
 		msq->q_rtime = get_seconds();
-		msq->q_lrpid = current->pid;
+		msq->q_lrpid = current->tgid;
 		msq->q_cbytes -= msg->m_ts;
 		atomic_sub(msg->m_ts,&msg_bytes);
 		atomic_dec(&msg_hdrs);

@@ -43,7 +43,7 @@ static int sis_configure(void)
 
 	current_size = A_SIZE_8(agp_bridge->current_size);
 	pci_write_config_byte(agp_bridge->dev, SIS_TLBCNTRL, 0x05);
-	pci_read_config_dword(agp_bridge->dev, SIS_APBASE, &temp);
+	pci_read_config_dword(agp_bridge->dev, AGP_APBASE, &temp);
 	agp_bridge->gart_bus_addr = (temp & PCI_BASE_ADDRESS_MEM_MASK);
 	pci_write_config_dword(agp_bridge->dev, SIS_ATTBASE,
 			       agp_bridge->gatt_bus_addr);

@@ -1,5 +1,7 @@
 #ifndef _LINUX_MISCDEVICE_H
 #define _LINUX_MISCDEVICE_H
+#include <linux/module.h>
+#include <linux/major.h>
 
 #define BUSMOUSE_MINOR 0
 #define PSMOUSE_MINOR  1
@@ -48,4 +50,7 @@ struct miscdevice
 extern int misc_register(struct miscdevice * misc);
 extern int misc_deregister(struct miscdevice * misc);
 
+#define MODULE_ALIAS_MISCDEV(minor)				\
+	MODULE_ALIAS("char-major-" __stringify(MISC_MAJOR)	\
+	"-" __stringify(minor))
 #endif

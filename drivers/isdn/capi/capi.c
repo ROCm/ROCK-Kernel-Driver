@@ -58,12 +58,16 @@ MODULE_LICENSE("GPL");
 
 int capi_major = 68;		/* allocated */
 #ifdef CONFIG_ISDN_CAPI_MIDDLEWARE
+#define CAPINC_NR_PORTS	32
+#define CAPINC_MAX_PORTS	256
 int capi_ttymajor = 191;
+int capi_ttyminors = CAPINC_NR_PORTS;
 #endif /* CONFIG_ISDN_CAPI_MIDDLEWARE */
 
 MODULE_PARM(capi_major, "i");
 #ifdef CONFIG_ISDN_CAPI_MIDDLEWARE
 MODULE_PARM(capi_ttymajor, "i");
+MODULE_PARM(capi_ttyminors, "i");
 #endif /* CONFIG_ISDN_CAPI_MIDDLEWARE */
 
 /* -------- defines ------------------------------------------------- */
@@ -412,7 +416,7 @@ gen_data_b3_resp_for(struct capiminor *mp, struct sk_buff *skb)
 static int handle_recv_skb(struct capiminor *mp, struct sk_buff *skb)
 {
 	struct sk_buff *nskb;
-	unsigned int datalen;
+	int datalen;
 	u16 errcode, datahandle;
 
 	datalen = skb->len - CAPIMSG_LEN(skb->data);
@@ -552,12 +556,12 @@ static void capi_recv_message(struct capi20_appl *ap, struct sk_buff *skb)
 	struct capincci *np;
 	u32 ncci;
 
-	if (CAPIMSG_COMMAND(skb->data) == CAPI_CONNECT_B3_CONF) {
+	if (CAPIMSG_CMD(skb->data) == CAPI_CONNECT_B3_CONF) {
 		u16 info = CAPIMSG_U16(skb->data, 12); // Info field
 		if (info == 0)
 			capincci_alloc(cdev, CAPIMSG_NCCI(skb->data));
 	}
-	if (CAPIMSG_COMMAND(skb->data) == CAPI_CONNECT_B3_IND) {
+	if (CAPIMSG_CMD(skb->data) == CAPI_CONNECT_B3_IND) {
 		capincci_alloc(cdev, CAPIMSG_NCCI(skb->data));
 	}
 	if (CAPIMSG_COMMAND(skb->data) != CAPI_DATA_B3) {
@@ -688,7 +692,7 @@ capi_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 	}
 	mlen = CAPIMSG_LEN(skb->data);
 	if (CAPIMSG_CMD(skb->data) == CAPI_DATA_B3_REQ) {
-		if (mlen + CAPIMSG_DATALEN(skb->data) != count) {
+		if ((size_t)(mlen + CAPIMSG_DATALEN(skb->data)) != count) {
 			kfree_skb(skb);
 			return -EINVAL;
 		}
@@ -700,7 +704,7 @@ capi_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 	}
 	CAPIMSG_SETAPPID(skb->data, cdev->ap.applid);
 
-	if (CAPIMSG_COMMAND(skb->data) == CAPI_DISCONNECT_B3_RESP) {
+	if (CAPIMSG_CMD(skb->data) == CAPI_DISCONNECT_B3_RESP) {
 		capincci_free(cdev, CAPIMSG_NCCI(skb->data));
 			
 	}
@@ -964,7 +968,7 @@ static int capinc_tty_open(struct tty_struct * tty, struct file * file)
 {
 	struct capiminor *mp;
 
-	if ((mp = capiminor_find(minor(file->f_dentry->d_inode->i_rdev))) == 0)
+	if ((mp = capiminor_find(iminor(file->f_dentry->d_inode))) == 0)
 		return -ENXIO;
 	if (mp->nccip == 0)
 		return -ENXIO;
@@ -1262,7 +1266,6 @@ static int capinc_tty_read_proc(char *page, char **start, off_t off,
 	return 0;
 }
 
-#define CAPINC_NR_PORTS 256
 static struct tty_driver *capinc_tty_driver;
 
 static struct tty_operations capinc_ops = {
@@ -1289,8 +1292,14 @@ static struct tty_operations capinc_ops = {
 
 static int capinc_tty_init(void)
 {
-	struct tty_driver *drv = alloc_tty_driver(CAPINC_NR_PORTS);
+	struct tty_driver *drv;
+	
+	if (capi_ttyminors > CAPINC_MAX_PORTS)
+		capi_ttyminors = CAPINC_MAX_PORTS;
+	if (capi_ttyminors <= 0)
+		capi_ttyminors = CAPINC_NR_PORTS;
 
+	drv = alloc_tty_driver(capi_ttyminors);
 	if (!drv)
 		return -ENOMEM;
 
@@ -1454,7 +1463,6 @@ static int __init capi_init(void)
 	char *p;
 	char *compileinfo;
 
-
 	if ((p = strchr(revision, ':')) != 0 && p[1]) {
 		strlcpy(rev, p + 2, sizeof(rev));
 		if ((p = strchr(rev, '$')) != 0 && p > rev)
@@ -1469,8 +1477,6 @@ static int __init capi_init(void)
 
 	devfs_mk_cdev(MKDEV(capi_major, 0), S_IFCHR | S_IRUSR | S_IWUSR,
 			"isdn/capi20");
-
-	printk(KERN_NOTICE "capi20: started up with major %d\n", capi_major);
 
 #ifdef CONFIG_ISDN_CAPI_MIDDLEWARE
 	if (capinc_tty_init() < 0) {

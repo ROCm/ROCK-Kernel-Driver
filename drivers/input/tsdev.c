@@ -96,7 +96,7 @@ static int tsdev_fasync(int fd, struct file *file, int on)
 
 static int tsdev_open(struct inode *inode, struct file *file)
 {
-	int i = minor(inode->i_rdev) - TSDEV_MINOR_BASE;
+	int i = iminor(inode) - TSDEV_MINOR_BASE;
 	struct tsdev_list *list;
 
 	if (i >= TSDEV_MINORS || !tsdev_table[i])

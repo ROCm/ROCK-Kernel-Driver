@@ -255,7 +255,7 @@ static void as_remove_merge_hints(request_queue_t *q, struct as_rq *arq)
 {
 	as_del_arq_hash(arq);
 
-	if (q->last_merge == &arq->request->queuelist)
+	if (q->last_merge == arq->request)
 		q->last_merge = NULL;
 }
 
@@ -709,6 +709,14 @@ static int as_can_break_anticipation(struct as_data *ad, struct as_rq *arq)
 		return 1;
 	}
 
+	if (aic->seek_samples == 0 || aic->ttime_samples == 0) {
+		/*
+		 * Process has just started IO so default to not anticipate.
+		 * Maybe should be smarter.
+		 */
+		return 1;
+	}
+
 	if (aic->ttime_mean > ad->antic_expire) {
 		/* the process thinks too much between requests */
 		return 1;
@@ -902,12 +910,7 @@ static void as_completed_request(request_queue_t *q, struct request *rq)
 	struct as_rq *arq = RQ_DATA(rq);
 	struct as_io_context *aic;
 
-	if (unlikely(!blk_fs_request(rq)))
-		return;
-
-	WARN_ON(blk_fs_request(rq) && arq->state == AS_RQ_NEW);
-
-	if (arq->state != AS_RQ_DISPATCHED)
+	if (unlikely(arq->state != AS_RQ_DISPATCHED))
 		return;
 
 	if (ad->changed_batch && ad->nr_dispatched == 1) {
@@ -1027,7 +1030,7 @@ static void as_remove_request(request_queue_t *q, struct request *rq)
 {
 	struct as_rq *arq = RQ_DATA(rq);
 
-	if (unlikely(!blk_fs_request(rq)))
+	if (unlikely(arq->state == AS_RQ_NEW))
 		return;
 
 	if (!arq) {
@@ -1333,9 +1336,9 @@ static void as_requeue_request(request_queue_t *q, struct request *rq)
 			atomic_inc(&arq->io_context->aic->nr_dispatched);
 	} else
 		WARN_ON(blk_fs_request(rq)
-				&& (!(rq->flags & REQ_HARDBARRIER)) );
+			&& (!(rq->flags & (REQ_HARDBARRIER|REQ_SOFTBARRIER))) );
 
-	list_add_tail(&rq->queuelist, ad->dispatch);
+	list_add(&rq->queuelist, ad->dispatch);
 
 	/* Stop anticipating - let this request get through */
 	as_antic_stop(ad);
@@ -1344,45 +1347,39 @@ static void as_requeue_request(request_queue_t *q, struct request *rq)
 }
 
 static void
-as_insert_request(request_queue_t *q, struct request *rq,
-			struct list_head *insert_here)
+as_insert_request(request_queue_t *q, struct request *rq, int where)
 {
 	struct as_data *ad = q->elevator.elevator_data;
 	struct as_rq *arq = RQ_DATA(rq);
 
-	if (unlikely(rq->flags & REQ_HARDBARRIER)) {
-		q->last_merge = NULL;
+	switch (where) {
+		case ELEVATOR_INSERT_BACK:
+			while (ad->next_arq[REQ_SYNC])
+				as_move_to_dispatch(ad, ad->next_arq[REQ_SYNC]);
 
-		while (ad->next_arq[REQ_SYNC])
-			as_move_to_dispatch(ad, ad->next_arq[REQ_SYNC]);
-
-		while (ad->next_arq[REQ_ASYNC])
-			as_move_to_dispatch(ad, ad->next_arq[REQ_ASYNC]);
-	}
-
-	if (unlikely(!blk_fs_request(rq))) {
-		if (!insert_here)
-			insert_here = ad->dispatch->prev;
-
-		list_add(&rq->queuelist, insert_here);
-
-		/* Stop anticipating - let this request get through */
-		if (!list_empty(ad->dispatch)
-			&& (ad->antic_status == ANTIC_WAIT_REQ
-				|| ad->antic_status == ANTIC_WAIT_NEXT))
+			while (ad->next_arq[REQ_ASYNC])
+				as_move_to_dispatch(ad, ad->next_arq[REQ_ASYNC]);
+			list_add_tail(&rq->queuelist, ad->dispatch);
+			break;
+		case ELEVATOR_INSERT_FRONT:
+			list_add(&rq->queuelist, ad->dispatch);
 			as_antic_stop(ad);
-
-		return;
+			break;
+		case ELEVATOR_INSERT_SORT:
+			BUG_ON(!blk_fs_request(rq));
+			as_add_request(ad, arq);
+			break;
+		default:
+			printk("%s: bad insert point %d\n", __FUNCTION__,where);
+			return;
 	}
 
 	if (rq_mergeable(rq)) {
 		as_add_arq_hash(ad, arq);
 
 		if (!q->last_merge)
-			q->last_merge = &rq->queuelist;
+			q->last_merge = rq;
 	}
-
-	as_add_request(ad, arq);
 }
 
 /*
@@ -1430,7 +1427,7 @@ as_latter_request(request_queue_t *q, struct request *rq)
 }
 
 static int
-as_merge(request_queue_t *q, struct list_head **insert, struct bio *bio)
+as_merge(request_queue_t *q, struct request **req, struct bio *bio)
 {
 	struct as_data *ad = q->elevator.elevator_data;
 	sector_t rb_key = bio->bi_sector + bio_sectors(bio);
@@ -1442,7 +1439,7 @@ as_merge(request_queue_t *q, struct list_head **insert, struct bio *bio)
 	 */
 	ret = elv_try_last_merge(q, bio);
 	if (ret != ELEVATOR_NO_MERGE) {
-		__rq = list_entry_rq(q->last_merge);
+		__rq = q->last_merge;
 		goto out_insert;
 	}
 
@@ -1474,11 +1471,11 @@ as_merge(request_queue_t *q, struct list_head **insert, struct bio *bio)
 
 	return ELEVATOR_NO_MERGE;
 out:
-	q->last_merge = &__rq->queuelist;
+	q->last_merge = __rq;
 out_insert:
 	if (ret)
 		as_hot_arq_hash(ad, RQ_DATA(__rq));
-	*insert = &__rq->queuelist;
+	*req = __rq;
 	return ret;
 }
 
@@ -1506,7 +1503,7 @@ static void as_merged_request(request_queue_t *q, struct request *req)
 		 */
 	}
 
-	q->last_merge = &req->queuelist;
+	q->last_merge = req;
 }
 
 static void

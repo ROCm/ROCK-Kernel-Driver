@@ -673,14 +673,10 @@ static int mtrr_ioctl32(unsigned int fd, unsigned int cmd, unsigned long arg)
 	return err;
 } 
 
-#define REF_SYMBOL(handler) if (0) (void)handler;
-#define HANDLE_IOCTL2(cmd,handler) REF_SYMBOL(handler);  asm volatile(".quad %P0, " #handler ",0"::"i" (cmd)); 
-#define HANDLE_IOCTL(cmd,handler) HANDLE_IOCTL2(cmd,handler)
+#define HANDLE_IOCTL(cmd,handler) { (cmd), (ioctl_trans_handler_t)(handler) }, 
 #define COMPATIBLE_IOCTL(cmd) HANDLE_IOCTL(cmd,sys_ioctl)
-#define IOCTL_TABLE_START void ioctl_dummy(void) { asm volatile("\n.global ioctl_start\nioctl_start:\n\t" );
-#define IOCTL_TABLE_END  asm volatile("\n.global ioctl_end;\nioctl_end:\n"); }
 
-IOCTL_TABLE_START
+struct ioctl_trans ioctl_start[] = { 
 #include <linux/compat_ioctl.h>
 #define DECLARES
 #include "compat_ioctl.c"
@@ -763,5 +759,7 @@ HANDLE_IOCTL(MTRRIOC32_SET_PAGE_ENTRY, mtrr_ioctl32)
 HANDLE_IOCTL(MTRRIOC32_DEL_PAGE_ENTRY, mtrr_ioctl32)
 HANDLE_IOCTL(MTRRIOC32_GET_PAGE_ENTRY, mtrr_ioctl32)
 HANDLE_IOCTL(MTRRIOC32_KILL_PAGE_ENTRY, mtrr_ioctl32)
-IOCTL_TABLE_END
+}; 
+
+int ioctl_table_size = ARRAY_SIZE(ioctl_start);
 

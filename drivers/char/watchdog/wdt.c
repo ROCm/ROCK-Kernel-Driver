@@ -290,7 +290,7 @@ static ssize_t wdt_read(struct file *file, char *buf, size_t count, loff_t *ptr)
 	if (ptr != &file->f_pos)
 		return -ESPIPE;
 
-	switch(minor(file->f_dentry->d_inode->i_rdev))
+	switch(iminor(file->f_dentry->d_inode))
 	{
 		case TEMP_MINOR:
 			c*=11;
@@ -373,7 +373,7 @@ static int wdt_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
  
 static int wdt_open(struct inode *inode, struct file *file)
 {
-	switch(minor(inode->i_rdev))
+	switch(iminor(inode))
 	{
 		case WATCHDOG_MINOR:
 			if(test_and_set_bit(0, &wdt_is_open))
@@ -413,7 +413,7 @@ static int wdt_open(struct inode *inode, struct file *file)
  
 static int wdt_release(struct inode *inode, struct file *file)
 {
-	if(minor(inode->i_rdev)==WATCHDOG_MINOR)
+	if(iminor(inode)==WATCHDOG_MINOR)
 	{
 		if (expect_close) {
 			inb_p(WDT_DC);		/* Disable counters */
@@ -579,4 +579,6 @@ module_exit(wdt_exit);
 
 MODULE_AUTHOR("Alan Cox");
 MODULE_DESCRIPTION("Driver for ISA ICS watchdog cards (WDT500/501)");
+MODULE_ALIAS_MISCDEV(WATCHDOG_MINOR);
+MODULE_ALIAS_MISCDEV(TEMP_MINOR);
 MODULE_LICENSE("GPL");

@@ -103,7 +103,7 @@ static char *strL2Event[] =
 	"EV_L2_FRAME_ERROR",
 };
 
-static int l2addrsize(struct Layer2 *l2);
+static u_int l2addrsize(struct Layer2 *l2);
 
 static void
 set_peer_busy(struct Layer2 *l2) {
@@ -178,14 +178,14 @@ clear_exception(struct Layer2 *l2)
 	clear_peer_busy(l2);
 }
 
-inline int
+inline u_int
 l2headersize(struct Layer2 *l2, int ui)
 {
 	return (((test_bit(FLG_MOD128, &l2->flag) && (!ui)) ? 2 : 1) +
 		(test_bit(FLG_LAPD, &l2->flag) ? 2 : 1));
 }
 
-inline int
+inline u_int
 l2addrsize(struct Layer2 *l2)
 {
 	return (test_bit(FLG_LAPD, &l2->flag) ? 2 : 1);
@@ -295,7 +295,7 @@ IsRNR(u8 * data, struct PStack *st)
 int
 iframe_error(struct PStack *st, struct sk_buff *skb)
 {
-	int i = l2addrsize(&st->l2) + (test_bit(FLG_MOD128, &st->l2.flag) ? 2 : 1);
+	u_int i = l2addrsize(&st->l2) + (test_bit(FLG_MOD128, &st->l2.flag) ? 2 : 1);
 	int rsp = *skb->data & 0x2;
 
 	if (test_bit(FLG_ORIG, &st->l2.flag))
@@ -360,7 +360,7 @@ UI_error(struct PStack *st, struct sk_buff *skb)
 int
 FRMR_error(struct PStack *st, struct sk_buff *skb)
 {
-	int headers = l2addrsize(&st->l2) + 1;
+	u_int headers = l2addrsize(&st->l2) + 1;
 	u8 *datap = skb->data + headers;
 	int rsp = *skb->data & 0x2;
 
@@ -1066,8 +1066,8 @@ l2_got_iframe(struct FsmInst *fi, int event, void *arg)
 	struct PStack *st = fi->userdata;
 	struct sk_buff *skb = arg;
 	struct Layer2 *l2 = &(st->l2);
-	int PollFlag, ns, i;
-	unsigned int nr;
+	int PollFlag, i;
+	unsigned int nr, ns;
 
 	i = l2addrsize(l2);
 	if (test_bit(FLG_MOD128, &l2->flag)) {
@@ -1251,8 +1251,7 @@ l2_pull_iqueue(struct FsmInst *fi, int event, void *arg)
 	struct sk_buff *skb, *oskb;
 	struct Layer2 *l2 = &st->l2;
 	u8 header[MAX_HEADER_LEN];
-	int i;
-	int unsigned p1;
+	int unsigned p1, i;
 	unsigned long flags;
 
 	if (!cansend(st))
@@ -1632,7 +1631,7 @@ isdnl2_l1l2(struct PStack *st, int pr, void *arg)
 {
 	struct sk_buff *skb = arg;
 	u8 *datap;
-	int ret = 1, len;
+	u_int ret = 1, len;
 	int c = 0;
 
 	switch (pr) {

@@ -1234,9 +1234,10 @@ static void udf_fill_inode(struct inode *inode, struct buffer_head *bh)
 
 		if (dsea)
 		{
-			init_special_inode(inode, inode->i_mode,
-				((le32_to_cpu(dsea->majorDeviceIdent)) << 8) |
-				(le32_to_cpu(dsea->minorDeviceIdent) & 0xFF));
+			init_special_inode(inode, inode->i_mode, MKDEV(
+				le32_to_cpu(dsea->majorDeviceIdent),
+				le32_to_cpu(dsea->minorDeviceIdent)
+			));
 			/* Developer ID ??? */
 			udf_release_data(tbh);
 		}
@@ -1392,8 +1393,8 @@ udf_update_inode(struct inode *inode, int do_sync)
 		strcpy(eid->ident, UDF_ID_DEVELOPER);
 		eid->identSuffix[0] = UDF_OS_CLASS_UNIX;
 		eid->identSuffix[1] = UDF_OS_ID_LINUX;
-		dsea->majorDeviceIdent = kdev_t_to_nr(inode->i_rdev) >> 8;
-		dsea->minorDeviceIdent = kdev_t_to_nr(inode->i_rdev) & 0xFF;
+		dsea->majorDeviceIdent = cpu_to_le32(imajor(inode));
+		dsea->minorDeviceIdent = cpu_to_le32(iminor(inode));
 		mark_buffer_dirty_inode(tbh, inode);
 		udf_release_data(tbh);
 	}

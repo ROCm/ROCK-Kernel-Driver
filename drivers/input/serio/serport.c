@@ -24,6 +24,7 @@
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
 MODULE_DESCRIPTION("Input device TTY line discipline");
 MODULE_LICENSE("GPL");
+MODULE_ALIAS_LDISC(N_MOUSE);
 
 #define SERPORT_BUSY	1
 
@@ -200,12 +201,12 @@ static struct tty_ldisc serport_ldisc = {
 
 static int __init serport_init(void)
 {
-        if (tty_register_ldisc(N_MOUSE, &serport_ldisc)) {
-                printk(KERN_ERR "serport.c: Error registering line discipline.\n");
-		return -ENODEV;
-	}
+	int retval;
+	retval = tty_register_ldisc(N_MOUSE, &serport_ldisc);
+	if (retval)
+		printk(KERN_ERR "serport.c: Error registering line discipline.\n");
 
-	return  0;
+	return  retval;
 }
 
 static void __exit serport_exit(void)

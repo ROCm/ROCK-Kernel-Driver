@@ -900,6 +900,7 @@ static void set_rx_mode(struct net_device *dev);
 static int vortex_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
 static void vortex_tx_timeout(struct net_device *dev);
 static void acpi_set_WOL(struct net_device *dev);
+static struct ethtool_ops vortex_ethtool_ops;
 
 /* This driver uses 'options' to pass the media type, full-duplex flag, etc. */
 /* Option count limit only -- unlimited interfaces are supported. */
@@ -1445,6 +1446,7 @@ static int __devinit vortex_probe1(struct device *gendev,
 	dev->stop = vortex_close;
 	dev->get_stats = vortex_get_stats;
 	dev->do_ioctl = vortex_ioctl;
+	dev->ethtool_ops = &vortex_ethtool_ops;
 	dev->set_multicast_list = set_rx_mode;
 	dev->tx_timeout = vortex_tx_timeout;
 	dev->watchdog_timeo = (watchdog * HZ) / 1000;
@@ -1466,7 +1468,7 @@ free_ring:
 free_region:
 	if (vp->must_free_region)
 		release_region(ioaddr, vci->io_size);
-	kfree (dev);
+	free_netdev(dev);
 	printk(KERN_ERR PFX "vortex_probe1 fails.  Returns %d\n", retval);
 out:
 	return retval;
@@ -2816,37 +2818,27 @@ static void update_stats(long ioaddr, struct net_device *dev)
 }
 
 
-static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
+static void vortex_get_drvinfo(struct net_device *dev,
+					struct ethtool_drvinfo *info)
 {
 	struct vortex_private *vp = dev->priv;
-	u32 ethcmd;
-		
-	if (copy_from_user(&ethcmd, useraddr, sizeof(ethcmd)))
-		return -EFAULT;
 
-        switch (ethcmd) {
-        case ETHTOOL_GDRVINFO: {
-		struct ethtool_drvinfo info = {ETHTOOL_GDRVINFO};
-		strcpy(info.driver, DRV_NAME);
-		strcpy(info.version, DRV_VERSION);
-		if (VORTEX_PCI(vp))
-			strcpy(info.bus_info, pci_name(VORTEX_PCI(vp)));
-		else {
-			if (VORTEX_EISA(vp))
-				sprintf (info.bus_info, vp->gendev->bus_id);
-			else
-				sprintf(info.bus_info, "EISA 0x%lx %d",
-						dev->base_addr, dev->irq);
-		}
-		if (copy_to_user(useraddr, &info, sizeof(info)))
-			return -EFAULT;
-		return 0;
+	strcpy(info->driver, DRV_NAME);
+	strcpy(info->version, DRV_VERSION);
+	if (VORTEX_PCI(vp)) {
+		strcpy(info->bus_info, pci_name(VORTEX_PCI(vp)));
+	} else {
+		if (VORTEX_EISA(vp))
+			sprintf(info->bus_info, vp->gendev->bus_id);
+		else
+			sprintf(info->bus_info, "EISA 0x%lx %d",
+					dev->base_addr, dev->irq);
 	}
-
-        }
-	
-	return -EOPNOTSUPP;
 }
+
+static struct ethtool_ops vortex_ethtool_ops = {
+	.get_drvinfo =		vortex_get_drvinfo,
+};
 
 static int vortex_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
@@ -2857,9 +2849,6 @@ static int vortex_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	int retval;
 
 	switch(cmd) {
-	case SIOCETHTOOL:
-		return netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
-
 	case SIOCGMIIPHY:		/* Get address of MII PHY in use. */
 		data->phy_id = phy;
 

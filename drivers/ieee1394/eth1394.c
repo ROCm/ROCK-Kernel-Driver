@@ -89,7 +89,7 @@
 #define TRACE() printk(KERN_ERR "%s:%s[%d] ---- TRACE\n", driver_name, __FUNCTION__, __LINE__)
 
 static char version[] __devinitdata =
-	"$Rev: 1020 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 1043 $ Ben Collins <bcollins@debian.org>";
 
 struct fragment_info {
 	struct list_head list;
@@ -1349,21 +1349,20 @@ static int ether1394_send_packet(struct packet_task *ptask, unsigned int tx_len)
 					       ptask->dest_node,
 					       ptask->addr, ptask->skb->data,
 					       tx_len)) {
-		goto fail;
+		free_hpsb_packet(packet);
+		return -1;
 	}
 
 	ptask->packet = packet;
 	hpsb_set_packet_complete_task(ptask->packet, ether1394_complete_cb,
 				      ptask);
 
-	if (hpsb_send_packet(packet))
-		return 0;
-
-fail:
-	if (packet)
+	if (!hpsb_send_packet(packet)) {
 		ether1394_free_packet(packet);
+		return -1;
+	}
 
-	return -1;
+	return 0;
 }
 
 
@@ -1600,7 +1599,7 @@ static int ether1394_ethtool_ioctl(struct net_device *dev, void *useraddr)
 		case ETHTOOL_GDRVINFO: {
 			struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
 			strcpy (info.driver, driver_name);
-			strcpy (info.version, "$Rev: 1020 $");
+			strcpy (info.version, "$Rev: 1043 $");
 			/* FIXME XXX provide sane businfo */
 			strcpy (info.bus_info, "ieee1394");
 			if (copy_to_user (useraddr, &info, sizeof (info)))

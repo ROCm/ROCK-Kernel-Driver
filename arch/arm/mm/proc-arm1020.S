@@ -30,6 +30,7 @@
 #include <asm/assembler.h>
 #include <asm/constants.h>
 #include <asm/procinfo.h>
+#include <asm/ptrace.h>
 #include <asm/hardware.h>
 
 /*
@@ -78,7 +79,7 @@ ENTRY(cpu_arm1020_proc_fin)
 	stmfd	sp!, {lr}
 	mov	ip, #PSR_F_BIT | PSR_I_BIT | SVC_MODE
 	msr	cpsr_c, ip
-	bl	cpu_arm1020_cache_clean_invalidate_all
+	bl	arm1020_flush_kern_cache_all
 	mrc	p15, 0, r0, c1, c0, 0		@ ctrl register
 	bic	r0, r0, #0x1000 		@ ...i............
 	bic	r0, r0, #0x000e 		@ ............wca.

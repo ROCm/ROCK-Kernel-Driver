@@ -3,14 +3,14 @@
 #
 
 menu "IPv6: Netfilter Configuration"
-	depends on INET && EXPERIMENTAL && IPV6!=n && NETFILTER
+	depends on INET && IPV6!=n && NETFILTER
 
 #tristate 'Connection tracking (required for masq/NAT)' CONFIG_IP6_NF_CONNTRACK
 #if [ "$CONFIG_IP6_NF_CONNTRACK" != "n" ]; then
 #  dep_tristate '  FTP protocol support' CONFIG_IP6_NF_FTP $CONFIG_IP6_NF_CONNTRACK
 #fi
 config IP6_NF_QUEUE
-	tristate "Userspace queueing via NETLINK (EXPERIMENTAL)"
+	tristate "Userspace queueing via NETLINK"
 	---help---
 
 	  This option adds a queue handler to the kernel for IPv6
@@ -62,7 +62,7 @@ config IP6_NF_MATCH_MAC
 
 config IP6_NF_MATCH_RT
 	tristate "Routing header match support"
-	depends on IP6_NF_IPTABLES && EXPERIMENTAL
+	depends on IP6_NF_IPTABLES
 	help
 	  rt matching allows you to match packets based on the routing
 	  header of the packet.
@@ -72,7 +72,7 @@ config IP6_NF_MATCH_RT
 
 config IP6_NF_MATCH_OPTS
 	tristate "Hop-by-hop and Dst opts header match support"
-	depends on IP6_NF_IPTABLES && EXPERIMENTAL
+	depends on IP6_NF_IPTABLES
 	help
 	  This allows one to match packets based on the hop-by-hop
 	  and destination options headers of a packet.
@@ -82,7 +82,7 @@ config IP6_NF_MATCH_OPTS
 
 config IP6_NF_MATCH_FRAG
 	tristate "Fragmentation header match support"
-	depends on IP6_NF_IPTABLES && EXPERIMENTAL
+	depends on IP6_NF_IPTABLES
 	help
 	  frag matching allows you to match packets based on the fragmentation
 	  header of the packet.
@@ -112,7 +112,7 @@ config IP6_NF_MATCH_MULTIPORT
 	  <file:Documentation/modules.txt>.  If unsure, say `N'.
 
 config IP6_NF_MATCH_OWNER
-	tristate "Owner match support (EXPERIMENTAL)"
+	tristate "Owner match support"
 	depends on IP6_NF_IPTABLES
 	help
 	  Packet owner matching allows you to match locally-generated packets
@@ -134,8 +134,8 @@ config IP6_NF_MATCH_MARK
 	  <file:Documentation/modules.txt>.  If unsure, say `N'.
 
 config IP6_NF_MATCH_IPV6HEADER
-	tristate "IPv6 Extension Headers Match (EXPERIMENTAL)"
-	depends on IP6_NF_IPTABLES && EXPERIMENTAL
+	tristate "IPv6 Extension Headers Match"
+	depends on IP6_NF_IPTABLES
 	help
 	  This module allows one to match packets based upon
 	  the ipv6 extension headers.
@@ -144,8 +144,8 @@ config IP6_NF_MATCH_IPV6HEADER
 	  <file:Documentation/modules.txt>.  If unsure, say `N'.
 
 config IP6_NF_MATCH_AHESP
-	tristate "AH/ESP match support (EXPERIMENTAL)"
-	depends on IP6_NF_IPTABLES && EXPERIMENTAL
+	tristate "AH/ESP match support"
+	depends on IP6_NF_IPTABLES
 	help
 	  This module allows one to match AH and ESP packets.
 
@@ -163,7 +163,7 @@ config IP6_NF_MATCH_LENGTH
 	  Documentation/modules.txt.  If unsure, say `N'.
 
 config IP6_NF_MATCH_EUI64
-	tristate "EUI64 address check (EXPERIMENTAL)"
+	tristate "EUI64 address check"
 	depends on IP6_NF_IPTABLES
 	help
 	  This module performs checking on the IPv6 source address

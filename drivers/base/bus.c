@@ -241,7 +241,8 @@ void device_bind_driver(struct device * dev)
 	pr_debug("bound device '%s' to driver '%s'\n",
 		 dev->bus_id,dev->driver->name);
 	list_add_tail(&dev->driver_list,&dev->driver->devices);
-	sysfs_create_link(&dev->driver->kobj,&dev->kobj,dev->kobj.name);
+	sysfs_create_link(&dev->driver->kobj,&dev->kobj,
+			  kobject_name(&dev->kobj));
 }
 
 
@@ -363,7 +364,7 @@ void device_release_driver(struct device * dev)
 {
 	struct device_driver * drv = dev->driver;
 	if (drv) {
-		sysfs_remove_link(&drv->kobj,dev->kobj.name);
+		sysfs_remove_link(&drv->kobj,kobject_name(&dev->kobj));
 		list_del_init(&dev->driver_list);
 		device_detach_shutdown(dev);
 		if (drv->remove)
@@ -447,10 +448,8 @@ int bus_add_driver(struct device_driver * drv)
 
 	if (bus) {
 		pr_debug("bus %s: add driver %s\n",bus->name,drv->name);
-
-		strlcpy(drv->kobj.name,drv->name,KOBJ_NAME_LEN);
+		kobject_set_name(&drv->kobj,drv->name);
 		drv->kobj.kset = &bus->drivers;
-
 		if ((error = kobject_register(&drv->kobj))) {
 			put_bus(bus);
 			return error;
@@ -557,15 +556,15 @@ struct bus_type * find_bus(char * name)
  */
 int bus_register(struct bus_type * bus)
 {
-	strlcpy(bus->subsys.kset.kobj.name,bus->name,KOBJ_NAME_LEN);
+	kobject_set_name(&bus->subsys.kset.kobj,bus->name);
 	subsys_set_kset(bus,bus_subsys);
 	subsystem_register(&bus->subsys);
 
-	strlcpy(bus->devices.kobj.name, "devices", KOBJ_NAME_LEN);
+	kobject_set_name(&bus->devices.kobj, "devices");
 	bus->devices.subsys = &bus->subsys;
 	kset_register(&bus->devices);
 
-	strlcpy(bus->drivers.kobj.name, "drivers", KOBJ_NAME_LEN);
+	kobject_set_name(&bus->drivers.kobj, "drivers");
 	bus->drivers.subsys = &bus->subsys;
 	bus->drivers.ktype = &ktype_driver;
 	kset_register(&bus->drivers);

@@ -66,6 +66,9 @@ config 6xx
 config 40x
 	bool "40x"
 
+config 44x
+	bool "44x"
+
 config POWER3
 	bool "POWER3"
 
@@ -73,6 +76,11 @@ config 8xx
 	bool "8xx"
 
 endchoice
+
+config PTE_64BIT
+	bool
+	depends on 44x
+	default y
 
 source arch/ppc/platforms/4xx/Kconfig
 
@@ -766,8 +774,8 @@ config MCA
 	  RS/6000 machines are currently not supported by Linux.
 
 config PCI
-	bool "PCI support" if 4xx || 8260
-	default y if !4xx && !8260 && !8xx && !APUS
+	bool "PCI support" if 40x || 8260
+	default y if !40x && !8260 && !8xx && !APUS
 	default PCI_PERMEDIA if !4xx && !8260 && !8xx && APUS
 	default PCI_QSPAN if !4xx && !8260 && 8xx
 	help
@@ -794,22 +802,6 @@ config PCI_QSPAN
 config PCI_PERMEDIA
 	bool "PCI for Permedia2"
 	depends on !4xx && !8xx && APUS
-
-# only elf supported, a.out is not -- Cort
-config KCORE_ELF
-	bool
-	depends on PROC_FS
-	default y
-	help
-	  If you enabled support for /proc file system then the file
-	  /proc/kcore will contain the kernel core image in ELF format. This
-	  can be used in gdb:
-
-	  $ cd /usr/src/linux ; gdb vmlinux /proc/kcore
-
-	  This is especially useful if you have compiled the kernel with the
-	  "-g" option to preserve debugging information. It is mainly used
-	  for examining kernel data structures on the live kernel.
 
 config KERNEL_ELF
 	bool
@@ -1159,6 +1151,7 @@ config BOOT_LOAD_BOOL
 config BOOT_LOAD
 	hex "Link/load address for booting" if BOOT_LOAD_BOOL
 	default "0x00400000" if 40x || 8xx || 8260
+	default "0x01000000" if 44x
 	default "0x00800000"
 
 config PIN_TLB
@@ -1277,16 +1270,11 @@ config MAC_FLOPPY
 	  floppy controller, say Y here. Most commonly found in PowerMacs.
 
 config MAC_SERIAL
-	tristate "Support for PowerMac serial ports"
+	tristate "Support for PowerMac serial ports (OBSOLETE DRIVER)"
 	depends on PPC_PMAC
 	help
-	  If you have Macintosh style serial ports (8 pin mini-DIN), say Y
-	  here. If you also have regular serial ports and enable the driver
-	  for them, you can't currently use the serial console feature.
-
-config SERIAL_CONSOLE
-	bool "Support for console on serial port"
-	depends on PPC_PMAC && MAC_SERIAL=y
+	  This driver is obsolete. Use CONFIG_SERIAL_PMACZILOG in
+	  "Character devices --> Serial drivers --> PowerMac z85c30" option.
 
 config ADB
 	bool "Apple Desktop Bus (ADB) support"
@@ -1426,20 +1414,12 @@ config DEBUG_SPINLOCK_SLEEP
 config KGDB
 	bool "Include kgdb kernel debugger"
 	depends on DEBUG_KERNEL
+	select DEBUG_INFO
 	help
 	  Include in-kernel hooks for kgdb, the Linux kernel source level
 	  debugger.  See <http://kgdb.sourceforge.net/> for more information.
 	  Unless you are intending to debug the kernel, say N here.
 
-config DEBUG_INFO
-	bool "Compile the kernel with debug info"
-	depends on DEBUG_KERNEL
-	help
-          If you say Y here the resulting kernel image will include
-	  debugging info resulting in a larger kernel image.
-	  Say Y here only if you plan to use gdb to debug the kernel.
-	  If you don't debug the kernel, you can say N.
-	  
 choice
 	prompt "Serial Port"
 	depends on KGDB
@@ -1459,6 +1439,14 @@ config KGDB_TTYS3
 
 endchoice
 
+config KGDB_CONSOLE
+	bool "Enable serial console thru kgdb port"
+	depends on KGDB && 8xx || 8260
+	help
+	  If you enable this, all serial console messages will be sent
+	  over the gdb stub.
+	  If unsure, say N.
+
 config XMON
 	bool "Include xmon kernel debugger"
 	depends on DEBUG_KERNEL
@@ -1474,18 +1462,16 @@ config BDI_SWITCH
 	  Unless you are intending to debug the kernel with one of these
 	  machines, say N here.
 
-config MORE_COMPILE_OPTIONS
-	bool "Add any additional compile options"
-	depends on DEBUG_KERNEL && (KGDB || XMON || BDI_SWITCH)
+config DEBUG_INFO
+	bool "Compile the kernel with debug info"
+	depends on DEBUG_KERNEL
+	default y if BDI_SWITCH || XMON
 	help
-	  If you want to add additional CFLAGS to the kernel build, such as -g
-	  for KGDB or the BDI2000, enable this option and then enter what you
-	  would like to add in the next question.
-
-config COMPILE_OPTIONS
-	string "Additional compile arguments"
-	depends on MORE_COMPILE_OPTIONS
-	default "-g -ggdb"
+          If you say Y here the resulting kernel image will include
+	  debugging info resulting in a larger kernel image.
+	  Say Y here only if you plan to use some sort of debugger to
+	  debug the kernel.
+	  If you don't debug the kernel, you can say N.
 
 config BOOTX_TEXT
 	bool "Support for early boot text console (BootX or OpenFirmware only)"

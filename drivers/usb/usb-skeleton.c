@@ -1,7 +1,7 @@
 /*
  * USB Skeleton driver - 1.1
  *
- * Copyright (c) 2001-2003 Greg Kroah-Hartman (greg@kroah.com)
+ * Copyright (C) 2001-2003 Greg Kroah-Hartman (greg@kroah.com)
  *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License as
@@ -229,7 +229,7 @@ static int skel_open (struct inode *inode, struct file *file)
 
 	dbg("%s", __FUNCTION__);
 
-	subminor = minor (inode->i_rdev);
+	subminor = iminor(inode);
 
 	/* prevent disconnects */
 	down (&disconnect_sem);
@@ -295,7 +295,7 @@ static int skel_release (struct inode *inode, struct file *file)
 	if (atomic_read (&dev->write_busy))
 		wait_for_completion (&dev->write_finished);
 
-	dev->open = 0;
+	--dev->open;
 
 	if (!dev->present) {
 		/* the device was unplugged before the file was released */
@@ -677,10 +677,10 @@ static int __init usb_skel_init(void)
 
 	/* register this driver with the USB subsystem */
 	result = usb_register(&skel_driver);
-	if (result < 0) {
+	if (result) {
 		err("usb_register failed. Error number %d",
 		    result);
-		return -1;
+		return result;
 	}
 
 	info(DRIVER_DESC " " DRIVER_VERSION);

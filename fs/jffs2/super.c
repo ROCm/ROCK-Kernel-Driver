@@ -14,7 +14,6 @@
 #include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
-#include <linux/version.h>
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/list.h>
@@ -174,7 +173,7 @@ static struct super_block *jffs2_get_sb(struct file_system_type *fs_type,
 	int err;
 	struct nameidata nd;
 	int mtdnr;
-	kdev_t dev;
+	dev_t dev;
 
 	if (!dev_name)
 		return ERR_PTR(-EINVAL);
@@ -240,14 +239,14 @@ static struct super_block *jffs2_get_sb(struct file_system_type *fs_type,
 	dev = nd.dentry->d_inode->i_rdev;
 	path_release(&nd);
 
-	if (major(dev) != MTD_BLOCK_MAJOR) {
+	if (MAJOR(dev) != MTD_BLOCK_MAJOR) {
 		if (!(flags & MS_VERBOSE)) /* Yes I mean this. Strangely */
 			printk(KERN_NOTICE "Attempt to mount non-MTD device \"%s\" as JFFS2\n",
 			       dev_name);
 		return ERR_PTR(-EINVAL);
 	}
 
-	return jffs2_get_sb_mtdnr(fs_type, flags, dev_name, data, minor(dev));
+	return jffs2_get_sb_mtdnr(fs_type, flags, dev_name, data, MINOR(dev));
 }
 
 

@@ -4922,7 +4922,7 @@ static ssize_t idetape_chrdev_write (struct file *file, const char *buf,
 	struct inode *inode = file->f_dentry->d_inode;
 	ide_drive_t *drive = file->private_data;
 	idetape_tape_t *tape = drive->driver_data;
-	unsigned int minor = minor(inode->i_rdev);
+	unsigned int minor = iminor(inode);
 	ssize_t retval, actually_written = 0;
 	int position;
 
@@ -5568,7 +5568,7 @@ ok:
  */
 static int idetape_chrdev_open (struct inode *inode, struct file *filp)
 {
-	unsigned int minor = minor(inode->i_rdev), i = minor & ~0xc0;
+	unsigned int minor = iminor(inode), i = minor & ~0xc0;
 	ide_drive_t *drive;
 	idetape_tape_t *tape;
 	idetape_pc_t pc;
@@ -5649,7 +5649,7 @@ static int idetape_chrdev_release (struct inode *inode, struct file *filp)
 	ide_drive_t *drive = filp->private_data;
 	idetape_tape_t *tape;
 	idetape_pc_t pc;
-	unsigned int minor = minor(inode->i_rdev);
+	unsigned int minor = iminor(inode);
 
 	lock_kernel();
 	tape = drive->driver_data;
@@ -6316,7 +6316,6 @@ static ide_driver_t idetape_driver = {
 	.version		= IDETAPE_VERSION,
 	.media			= ide_tape,
 	.busy			= 1,
-	.supports_dma		= 1,
 	.supports_dsc_overlap 	= 1,
 	.cleanup		= idetape_cleanup,
 	.do_request		= idetape_do_request,

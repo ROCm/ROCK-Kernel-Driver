@@ -115,6 +115,7 @@ MODULE_PARM(v4l2,"i");
 MODULE_DESCRIPTION("bttv - v4l/v4l2 driver module for bt848/878 based cards");
 MODULE_AUTHOR("Ralph Metzler & Marcus Metzler & Gerd Knorr");
 MODULE_LICENSE("GPL");
+MODULE_ALIAS_CHARDEV_MAJOR(VIDEO_MAJOR);
 
 /* kernel args */
 #ifndef MODULE
@@ -2758,7 +2759,7 @@ static unsigned int bttv_poll(struct file *file, poll_table *wait)
 
 static int bttv_open(struct inode *inode, struct file *file)
 {
-	int minor = minor(inode->i_rdev);
+	int minor = iminor(inode);
 	struct bttv *btv = NULL;
 	struct bttv_fh *fh;
 	enum v4l2_buf_type type = 0;
@@ -2894,7 +2895,7 @@ struct video_device bttv_vbi_template =
 
 static int radio_open(struct inode *inode, struct file *file)
 {
-	int minor = minor(inode->i_rdev);
+	int minor = iminor(inode);
 	struct bttv *btv = NULL;
 	u32 v = 400*16;
 	unsigned int i;

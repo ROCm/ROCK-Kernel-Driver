@@ -1068,7 +1068,7 @@ static int rs_8xx_write(struct tty_struct * tty, int from_user,
 	volatile cbd_t *bdp;
 	unsigned char	*cp;
 
-#ifdef CONFIG_KGDB
+#ifdef CONFIG_KGDB_CONSOLE
         /* Try to let stub handle output. Returns true if it did. */ 
         if (kgdb_output_string(buf, count))
             return ret;
@@ -2271,7 +2271,7 @@ static void my_console_write(int idx, const char *s,
 static void serial_console_write(struct console *c, const char *s,
 				unsigned count)
 {
-#ifdef CONFIG_KGDB
+#ifdef CONFIG_KGDB_CONSOLE
 	/* Try to let stub handle output. Returns true if it did. */ 
 	if (kgdb_output_string(s, count))
 		return;

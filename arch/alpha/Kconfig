@@ -11,6 +11,9 @@ config ALPHA
 	  now Hewlett-Packard.  The Alpha Linux project has a home page at
 	  <http://www.alphalinux.org/>.
 
+config 64BIT
+	def_bool y
+
 config MMU
 	bool
 	default y
@@ -596,40 +599,6 @@ config HOTPLUG
 	  to use devices as you hotplug them.
 
 source "drivers/pcmcia/Kconfig"
-
-choice
-	prompt "Kernel core (/proc/kcore) format"
-	depends on PROC_FS
-	default KCORE_ELF
-
-config KCORE_ELF
-	bool "ELF"
-	---help---
-	  If you enabled support for /proc file system then the file
-	  /proc/kcore will contain the kernel core image. This can be used
-	  in gdb:
-
-	  $ cd /usr/src/linux ; gdb vmlinux /proc/kcore
-
-	  You have two choices here: ELF and A.OUT. Selecting ELF will make
-	  /proc/kcore appear in ELF core format as defined by the Executable
-	  and Linking Format specification. Selecting A.OUT will choose the
-	  old "a.out" format which may be necessary for some old versions
-	  of binutils or on some architectures.
-
-	  This is especially useful if you have compiled the kernel with the
-	  "-g" option to preserve debugging information. It is mainly used
-	  for examining kernel data structures on the live kernel so if you
-	  don't understand what this means or are not a kernel hacker, just
-	  leave it at its default value ELF.
-
-config KCORE_AOUT
-	bool "A.OUT"
-	help
-	  Not necessary unless you're using a very out-of-date binutils
-	  version.  You probably want KCORE_ELF.
-
-endchoice
 
 config SRM_ENV
 	tristate "SRM environment through procfs"

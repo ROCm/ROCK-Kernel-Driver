@@ -57,9 +57,11 @@ enum {	SLEEP_SAVE_SP = 0,
 int pm_do_suspend(void)
 {
 	unsigned long sleep_save[SLEEP_SAVE_SIZE];
+	unsigned long delta, gpio;
 
 	/* preserve current time */
-	RCNR = xtime.tv_sec;
+	delta = xtime.tv_sec - RCNR;
+	gpio = GPLR;
 
 	/* save vital registers */
 	SAVE(OSCR);
@@ -112,6 +114,9 @@ int pm_do_suspend(void)
 
 	RESTORE(Ser1SDCR0);
 
+	GPSR = gpio;
+	GPCR = ~gpio;
+
 	/*
 	 * Clear the peripheral sleep-hold bit.
 	 */
@@ -125,7 +130,7 @@ int pm_do_suspend(void)
 	RESTORE(OIER);
 
 	/* restore current time */
-	xtime.tv_sec = RCNR;
+	xtime.tv_sec = RCNR + delta;
 
 	return 0;
 }

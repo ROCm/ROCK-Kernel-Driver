@@ -155,6 +155,9 @@ EXPORT_SYMBOL(_outsl_ns);
 EXPORT_SYMBOL(iopa);
 EXPORT_SYMBOL(mm_ptov);
 EXPORT_SYMBOL(ioremap);
+#ifdef CONFIG_44x
+EXPORT_SYMBOL(ioremap64);
+#endif
 EXPORT_SYMBOL(__ioremap);
 EXPORT_SYMBOL(iounmap);
 EXPORT_SYMBOL(ioremap_bot);	/* aka VMALLOC_END */
@@ -200,6 +203,7 @@ EXPORT_SYMBOL(flush_dcache_range);
 EXPORT_SYMBOL(flush_icache_user_range);
 EXPORT_SYMBOL(flush_dcache_page);
 EXPORT_SYMBOL(flush_tlb_kernel_range);
+EXPORT_SYMBOL(flush_tlb_page);
 #ifdef CONFIG_ALTIVEC
 EXPORT_SYMBOL(last_task_used_altivec);
 EXPORT_SYMBOL(giveup_altivec);
@@ -259,6 +263,15 @@ EXPORT_SYMBOL(release_OF_resource);
 EXPORT_SYMBOL(pci_busdev_to_OF_node);
 EXPORT_SYMBOL(pci_device_to_OF_node);
 EXPORT_SYMBOL(pci_device_from_OF_node);
+EXPORT_SYMBOL(of_find_node_by_name);
+EXPORT_SYMBOL(of_find_node_by_type);
+EXPORT_SYMBOL(of_find_compatible_node);
+EXPORT_SYMBOL(of_find_node_by_path);
+EXPORT_SYMBOL(of_find_all_nodes);
+EXPORT_SYMBOL(of_get_parent);
+EXPORT_SYMBOL(of_get_next_child);
+EXPORT_SYMBOL(of_node_get);
+EXPORT_SYMBOL(of_node_put);
 #endif /* CONFIG_PPC_OF */
 #if defined(CONFIG_BOOTX_TEXT)
 EXPORT_SYMBOL(btext_update_display);
@@ -343,7 +356,7 @@ EXPORT_SYMBOL(debugger_fault_handler);
 EXPORT_SYMBOL(cpm_install_handler);
 EXPORT_SYMBOL(cpm_free_handler);
 #endif /* CONFIG_8xx */
-#if defined(CONFIG_8xx) || defined(CONFIG_40x)
+#if defined(CONFIG_8xx) || defined(CONFIG_4xx)
 EXPORT_SYMBOL(__res);
 #endif
 #if defined(CONFIG_8xx)

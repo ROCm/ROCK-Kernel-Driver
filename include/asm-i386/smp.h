@@ -32,7 +32,6 @@
  */
  
 extern void smp_alloc_memory(void);
-extern physid_mask_t phys_cpu_present_map;
 extern int pic_mode;
 extern int smp_num_siblings;
 extern int cpu_sibling_map[];

@@ -1946,7 +1946,7 @@ static ssize_t saa_write(struct file *file, const char *buf,
 static int saa_open(struct inode *inode, struct file *file)
 {
 	struct saa7146 *saa = NULL;
-	unsigned int minor = minor(inode->i_rdev);
+	unsigned int minor = iminor(inode);
 	int i;
 
 	for (i = 0; i < SAA7146_MAX; i++) {

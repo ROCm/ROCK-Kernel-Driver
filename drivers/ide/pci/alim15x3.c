@@ -37,7 +37,6 @@
 
 #include <asm/io.h>
 
-#include "ide_modes.h"
 #include "alim15x3.h"
 
 /*

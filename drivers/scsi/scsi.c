@@ -113,26 +113,21 @@ const char *const scsi_device_types[MAX_SCSI_DEVICE_CODE] = {
  *
  * Purpose:     Allocate a request descriptor.
  *
- * Arguments:   device    - device for which we want a request
+ * Arguments:   device		- device for which we want a request
+ *		gfp_mask	- allocation flags passed to kmalloc
  *
  * Lock status: No locks assumed to be held.  This function is SMP-safe.
  *
  * Returns:     Pointer to request block.
- *
- * Notes:       With the new queueing code, it becomes important
- *              to track the difference between a command and a
- *              request.  A request is a pending item in the queue that
- *              has not yet reached the top of the queue.
- *
- * XXX(hch):	Need to add a gfp_mask argument.
  */
-struct scsi_request *scsi_allocate_request(struct scsi_device *sdev)
+struct scsi_request *scsi_allocate_request(struct scsi_device *sdev,
+					   int gfp_mask)
 {
 	const int offset = ALIGN(sizeof(struct scsi_request), 4);
 	const int size = offset + sizeof(struct request);
 	struct scsi_request *sreq;
   
-	sreq = kmalloc(size, GFP_ATOMIC);
+	sreq = kmalloc(size, gfp_mask);
 	if (likely(sreq != NULL)) {
 		memset(sreq, 0, size);
 		sreq->sr_request = (struct request *)(((char *)sreq) + offset);
@@ -1006,9 +1001,12 @@ static int __init init_scsi(void)
 	error = scsi_init_hosts();
 	if (error)
 		goto cleanup_devlist;
-	error = scsi_sysfs_register();
+	error = scsi_init_sysctl();
 	if (error)
 		goto cleanup_hosts;
+	error = scsi_sysfs_register();
+	if (error)
+		goto cleanup_sysctl;
 
 	for (i = 0; i < NR_CPUS; i++)
 		INIT_LIST_HEAD(&done_q[i]);
@@ -1018,6 +1016,8 @@ static int __init init_scsi(void)
 	printk(KERN_NOTICE "SCSI subsystem initialized\n");
 	return 0;
 
+cleanup_sysctl:
+	scsi_exit_sysctl();
 cleanup_hosts:
 	scsi_exit_hosts();
 cleanup_devlist:
@@ -1034,6 +1034,7 @@ cleanup_queue:
 static void __exit exit_scsi(void)
 {
 	scsi_sysfs_unregister();
+	scsi_exit_sysctl();
 	scsi_exit_hosts();
 	scsi_exit_devinfo();
 	devfs_remove("scsi");

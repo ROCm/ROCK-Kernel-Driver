@@ -1,12 +1,12 @@
 #include <linux/config.h>
 
-#ifdef CONFIG_ROM_KERNEL
+#ifdef CONFIG_XIP_KERNEL
 
-#include "vmlinux-armo-rom.lds.in"
+#include "vmlinux-arm26-xip.lds.in"
 
 #else
 
-#include "vmlinux-armo.lds.in"
+#include "vmlinux-arm26.lds.in"
 
 #endif
 

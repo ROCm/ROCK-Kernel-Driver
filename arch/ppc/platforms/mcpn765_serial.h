@@ -30,7 +30,8 @@
 #endif
 
 /* Rate for the 1.8432 Mhz clock for the onboard serial chip */
-#define BASE_BAUD ( 1843200 / 16 )
+#define BASE_BAUD	( 1843200 / 16 )
+#define UART_CLK	1843200
 
 #ifdef CONFIG_SERIAL_DETECT_IRQ
 #define STD_COM_FLAGS (ASYNC_BOOT_AUTOCONF|ASYNC_SKIP_TEST|ASYNC_AUTO_IRQ)

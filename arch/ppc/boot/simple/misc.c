@@ -25,6 +25,9 @@
 #include <asm/processor.h>
 #include <asm/mmu.h>
 #include <asm/bootinfo.h>
+#ifdef CONFIG_44x
+#include <asm/ibm4xx.h>
+#endif
 
 #include "nonstdio.h"
 #include "zlib.h"
@@ -79,6 +82,16 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum)
 
 	serial_fixups();
 	com_port = serial_init(0, NULL);
+
+#ifdef CONFIG_44x
+	/* Reset MAL */
+	mtdcr(DCRN_MALCR(DCRN_MAL_BASE), MALCR_MMSR);
+	/* Wait for reset */
+	while (mfdcr(DCRN_MALCR(DCRN_MAL_BASE)) & MALCR_MMSR) {};
+	/* Reset EMAC */
+	*(volatile unsigned long *)PPC44x_EMAC0_MR0 = 0x20000000;
+	__asm__ __volatile__("eieio");
+#endif
 
 #if defined(CONFIG_LOPEC) || defined(CONFIG_PAL4)
 	/*
@@ -251,4 +264,11 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum)
 	serial_close(com_port);
 
 	return (struct bi_record *)rec_loc;
+}
+
+/* Allow decompress_kernel to be hooked into.  This is the default. */
+void * __attribute__ ((weak))
+load_kernel(unsigned long load_addr, int num_words, unsigned long cksum)
+{
+		return decompress_kernel(load_addr, num_words, cksum);
 }

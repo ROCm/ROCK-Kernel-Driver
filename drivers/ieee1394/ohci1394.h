@@ -21,8 +21,6 @@
 #ifndef _OHCI1394_H
 #define _OHCI1394_H
 
-#include <asm/io.h>
-
 #include "ieee1394_types.h"
 #include <asm/io.h>
 

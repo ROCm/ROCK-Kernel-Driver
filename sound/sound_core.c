@@ -483,7 +483,7 @@ static struct sound_unit *__look_for_unit(int chain, int unit)
 int soundcore_open(struct inode *inode, struct file *file)
 {
 	int chain;
-	int unit = minor(inode->i_rdev);
+	int unit = iminor(inode);
 	struct sound_unit *s;
 	struct file_operations *new_fops = NULL;
 

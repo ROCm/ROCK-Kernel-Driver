@@ -1728,7 +1728,7 @@ static int au1000_ioctl(struct inode *inode, struct file *file,
 		if (count < 0)
 			count = 0;
 		cinfo.blocks = count >> s->dma_adc.fragshift;
-		return copy_to_user((void *) arg, &cinfo, sizeof(cinfo));
+		return copy_to_user((void *) arg, &cinfo, sizeof(cinfo)) ? -EFAULT : 0;
 
 	case SNDCTL_DSP_GETOPTR:
 		if (!(file->f_mode & FMODE_READ))
@@ -1751,7 +1751,7 @@ static int au1000_ioctl(struct inode *inode, struct file *file,
 		if (count < 0)
 			count = 0;
 		cinfo.blocks = count >> s->dma_dac.fragshift;
-		return copy_to_user((void *) arg, &cinfo, sizeof(cinfo));
+		return copy_to_user((void *) arg, &cinfo, sizeof(cinfo)) ? -EFAULT : 0;
 
 	case SNDCTL_DSP_GETBLKSIZE:
 		if (file->f_mode & FMODE_WRITE)
@@ -1842,7 +1842,7 @@ static int au1000_ioctl(struct inode *inode, struct file *file,
 
 static int  au1000_open(struct inode *inode, struct file *file)
 {
-	int             minor = MINOR(inode->i_rdev);
+	int             minor = iminor(inode);
 	DECLARE_WAITQUEUE(wait, current);
 	struct au1000_state *s = &au1000_state;
 	int             ret;

@@ -17,6 +17,8 @@
 #include "security.h"
 #include "objsec.h"
 
+extern int selinux_enabled;
+
 /* Check whether a task is allowed to use a security operation. */
 int task_has_security(struct task_struct *tsk,
 		      u32 perms)
@@ -587,7 +589,7 @@ static struct file_system_type sel_fs_type = {
 
 static int __init init_sel_fs(void)
 {
-	return register_filesystem(&sel_fs_type);
+	return selinux_enabled ? register_filesystem(&sel_fs_type) : 0;
 }
 
 __initcall(init_sel_fs);

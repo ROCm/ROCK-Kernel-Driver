@@ -16,6 +16,8 @@
 #include <asm/msr.h>
 #include <asm/pda.h>
 
+extern void alternative_instructions(void);
+
 static void __init check_bugs(void)
 {
 	identify_cpu(&boot_cpu_data);
@@ -23,4 +25,5 @@ static void __init check_bugs(void)
 	printk("CPU: ");
 	print_cpu_info(&boot_cpu_data);
 #endif
+	alternative_instructions(); 
 }

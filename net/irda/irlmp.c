@@ -89,6 +89,15 @@ int __init irlmp_init(void)
 	irlmp->links = hashbin_new(HB_LOCK);
 	irlmp->unconnected_lsaps = hashbin_new(HB_LOCK);
 	irlmp->cachelog = hashbin_new(HB_NOLOCK);
+
+	if ((irlmp->clients == NULL) ||
+	    (irlmp->services == NULL) ||
+	    (irlmp->links == NULL) ||
+	    (irlmp->unconnected_lsaps == NULL) ||
+	    (irlmp->cachelog == NULL)) {
+		return -ENOMEM;
+	}
+
 	spin_lock_init(&irlmp->cachelog->hb_spinlock);
 
 	irlmp->free_lsap_sel = 0x10; /* Reserved 0x00-0x0f */
@@ -287,10 +296,15 @@ void irlmp_register_link(struct irlap_cb *irlap, __u32 saddr, notify_t *notify)
 	lap->magic = LMP_LAP_MAGIC;
 	lap->saddr = saddr;
 	lap->daddr = DEV_ADDR_ANY;
-	lap->lsaps = hashbin_new(HB_LOCK);
 #ifdef CONFIG_IRDA_CACHE_LAST_LSAP
 	lap->cache.valid = FALSE;
 #endif
+	lap->lsaps = hashbin_new(HB_LOCK);
+	if (lap->lsaps == NULL) {
+		WARNING("%s(), unable to kmalloc lsaps\n", __FUNCTION__);
+		kfree(lap);
+		return;
+	}
 
 	lap->lap_state = LAP_STANDBY;
 
@@ -321,15 +335,23 @@ void irlmp_unregister_link(__u32 saddr)
 
 	IRDA_DEBUG(4, "%s()\n", __FUNCTION__);
 
+	/* We must remove ourselves from the hashbin *first*. This ensure
+	 * that no more LSAPs will be open on this link and no discovery
+	 * will be triggered anymore. Jean II */
 	link = hashbin_remove(irlmp->links, saddr, NULL);
 	if (link) {
 		ASSERT(link->magic == LMP_LAP_MAGIC, return;);
 
+		/* Kill all the LSAPs on this link. Jean II */
+		link->reason = LAP_DISC_INDICATION;
+		link->daddr = DEV_ADDR_ANY;
+		irlmp_do_lap_event(link, LM_LAP_DISCONNECT_INDICATION, NULL);
+
 		/* Remove all discoveries discovered at this link */
 		irlmp_expire_discoveries(irlmp->cachelog, link->saddr, TRUE);
 
+		/* Final cleanup */
 		del_timer(&link->idle_timer);
-
 		link->magic = 0;
 		kfree(link);
 	}
@@ -532,7 +554,8 @@ int irlmp_connect_response(struct lsap_cb *self, struct sk_buff *userdata)
 	ASSERT(self->magic == LMP_LSAP_MAGIC, return -1;);
 	ASSERT(userdata != NULL, return -1;);
 
-	set_bit(0, &self->connected);	/* TRUE */
+	/* We set the connected bit and move the lsap to the connected list
+	 * in the state machine itself. Jean II */
 
 	IRDA_DEBUG(2, "%s(), slsap_sel=%02x, dlsap_sel=%02x\n",
 		   __FUNCTION__, self->slsap_sel, self->dlsap_sel);
@@ -604,13 +627,17 @@ struct lsap_cb *irlmp_dup(struct lsap_cb *orig, void *instance)
 
 	spin_lock_irqsave(&irlmp->unconnected_lsaps->hb_spinlock, flags);
 
-	/* Only allowed to duplicate unconnected LSAP's */
-	if (!hashbin_find(irlmp->unconnected_lsaps, (long) orig, NULL)) {
-		IRDA_DEBUG(0, "%s(), unable to find LSAP\n", __FUNCTION__);
+	/* Only allowed to duplicate unconnected LSAP's, and only LSAPs
+	 * that have received a connect indication. Jean II */
+	if ((!hashbin_find(irlmp->unconnected_lsaps, (long) orig, NULL)) ||
+	    (orig->lap == NULL)) {
+		IRDA_DEBUG(0, "%s(), invalid LSAP (wrong state)\n",
+			   __FUNCTION__);
 		spin_unlock_irqrestore(&irlmp->unconnected_lsaps->hb_spinlock,
 				       flags);
 		return NULL;
 	}
+
 	/* Allocate a new instance */
 	new = kmalloc(sizeof(struct lsap_cb), GFP_ATOMIC);
 	if (!new)  {
@@ -635,8 +662,8 @@ struct lsap_cb *irlmp_dup(struct lsap_cb *orig, void *instance)
 	hashbin_insert(irlmp->unconnected_lsaps, (irda_queue_t *) new,
 		       (long) new, NULL);
 
-	/* Make sure that we invalidate the cache */
 #ifdef CONFIG_IRDA_CACHE_LAST_LSAP
+	/* Make sure that we invalidate the LSAP cache */
 	new->lap->cache.valid = FALSE;
 #endif /* CONFIG_IRDA_CACHE_LAST_LSAP */
 

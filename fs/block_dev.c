@@ -197,10 +197,79 @@ static int block_fsync(struct file *filp, struct dentry *dentry, int datasync)
  * pseudo-fs
  */
 
+static spinlock_t bdev_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
+static kmem_cache_t * bdev_cachep;
+
+struct bdev_inode {
+	struct block_device bdev;
+	struct inode vfs_inode;
+};
+
+static inline struct bdev_inode *BDEV_I(struct inode *inode)
+{
+	return container_of(inode, struct bdev_inode, vfs_inode);
+}
+
+static struct inode *bdev_alloc_inode(struct super_block *sb)
+{
+	struct bdev_inode *ei = kmem_cache_alloc(bdev_cachep, SLAB_KERNEL);
+	if (!ei)
+		return NULL;
+	return &ei->vfs_inode;
+}
+
+static void bdev_destroy_inode(struct inode *inode)
+{
+	kmem_cache_free(bdev_cachep, BDEV_I(inode));
+}
+
+static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
+{
+	struct bdev_inode *ei = (struct bdev_inode *) foo;
+	struct block_device *bdev = &ei->bdev;
+
+	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
+	    SLAB_CTOR_CONSTRUCTOR)
+	{
+		memset(bdev, 0, sizeof(*bdev));
+		sema_init(&bdev->bd_sem, 1);
+		INIT_LIST_HEAD(&bdev->bd_inodes);
+		INIT_LIST_HEAD(&bdev->bd_list);
+		inode_init_once(&ei->vfs_inode);
+	}
+}
+
+static inline void __bd_forget(struct inode *inode)
+{
+	list_del_init(&inode->i_devices);
+	inode->i_bdev = NULL;
+	inode->i_mapping = &inode->i_data;
+}
+
+static void bdev_clear_inode(struct inode *inode)
+{
+	struct block_device *bdev = &BDEV_I(inode)->bdev;
+	struct list_head *p;
+	spin_lock(&bdev_lock);
+	while ( (p = bdev->bd_inodes.next) != &bdev->bd_inodes ) {
+		__bd_forget(list_entry(p, struct inode, i_devices));
+	}
+	list_del_init(&bdev->bd_list);
+	spin_unlock(&bdev_lock);
+}
+
+static struct super_operations bdev_sops = {
+	.statfs = simple_statfs,
+	.alloc_inode = bdev_alloc_inode,
+	.destroy_inode = bdev_destroy_inode,
+	.drop_inode = generic_delete_inode,
+	.clear_inode = bdev_clear_inode,
+};
+
 static struct super_block *bd_get_sb(struct file_system_type *fs_type,
 	int flags, const char *dev_name, void *data)
 {
-	return get_sb_pseudo(fs_type, "bdev:", NULL, 0x62646576);
+	return get_sb_pseudo(fs_type, "bdev:", &bdev_sops, 0x62646576);
 }
 
 static struct file_system_type bd_type = {
@@ -212,51 +281,15 @@ static struct file_system_type bd_type = {
 static struct vfsmount *bd_mnt;
 struct super_block *blockdev_superblock;
 
-/*
- * bdev cache handling - shamelessly stolen from inode.c
- * We use smaller hashtable, though.
- */
-
-#define HASH_BITS	6
-#define HASH_SIZE	(1UL << HASH_BITS)
-#define HASH_MASK	(HASH_SIZE-1)
-static struct list_head bdev_hashtable[HASH_SIZE];
-static spinlock_t bdev_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
-static kmem_cache_t * bdev_cachep;
-
-#define alloc_bdev() \
-	 ((struct block_device *) kmem_cache_alloc(bdev_cachep, SLAB_KERNEL))
-#define destroy_bdev(bdev) kmem_cache_free(bdev_cachep, (bdev))
-
-static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
-{
-	struct block_device * bdev = (struct block_device *) foo;
-
-	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
-	    SLAB_CTOR_CONSTRUCTOR)
-	{
-		memset(bdev, 0, sizeof(*bdev));
-		sema_init(&bdev->bd_sem, 1);
-		INIT_LIST_HEAD(&bdev->bd_inodes);
-	}
-}
-
 void __init bdev_cache_init(void)
 {
-	int i, err;
-	struct list_head *head = bdev_hashtable;
-
-	i = HASH_SIZE;
-	do {
-		INIT_LIST_HEAD(head);
-		head++;
-		i--;
-	} while (i);
-
+	int err;
 	bdev_cachep = kmem_cache_create("bdev_cache",
-					 sizeof(struct block_device),
-					 0, SLAB_HWCACHE_ALIGN, init_once,
-					 NULL);
+					sizeof(struct bdev_inode),
+					0,
+					SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT,
+					init_once,
+					NULL);
 	if (!bdev_cachep)
 		panic("Cannot create bdev_cache SLAB cache");
 	err = register_filesystem(&bd_type);
@@ -272,137 +305,96 @@ void __init bdev_cache_init(void)
 /*
  * Most likely _very_ bad one - but then it's hardly critical for small
  * /dev and can be fixed when somebody will need really large one.
+ * Keep in mind that it will be fed through icache hash function too.
  */
 static inline unsigned long hash(dev_t dev)
 {
-	unsigned long tmp = dev;
-	tmp = tmp + (tmp >> HASH_BITS) + (tmp >> HASH_BITS*2);
-	return tmp & HASH_MASK;
+	return MAJOR(dev)+MINOR(dev);
 }
 
-static struct block_device *bdfind(dev_t dev, struct list_head *head)
+static int bdev_test(struct inode *inode, void *data)
 {
-	struct list_head *p;
-	struct block_device *bdev;
-	list_for_each(p, head) {
-		bdev = list_entry(p, struct block_device, bd_hash);
-		if (bdev->bd_dev != dev)
-			continue;
-		atomic_inc(&bdev->bd_count);
-		return bdev;
-	}
-	return NULL;
+	return BDEV_I(inode)->bdev.bd_dev == *(dev_t *)data;
 }
+
+static int bdev_set(struct inode *inode, void *data)
+{
+	BDEV_I(inode)->bdev.bd_dev = *(dev_t *)data;
+	return 0;
+}
+
+static LIST_HEAD(all_bdevs);
 
 struct block_device *bdget(dev_t dev)
 {
-	struct list_head * head = bdev_hashtable + hash(dev);
-	struct block_device *bdev, *new_bdev;
-	spin_lock(&bdev_lock);
-	bdev = bdfind(dev, head);
-	spin_unlock(&bdev_lock);
-	if (bdev)
-		return bdev;
-	new_bdev = alloc_bdev();
-	if (new_bdev) {
-		struct inode *inode = new_inode(bd_mnt->mnt_sb);
-		if (inode) {
-			kdev_t kdev = to_kdev_t(dev);
+	struct block_device *bdev;
+	struct inode *inode;
 
-			atomic_set(&new_bdev->bd_count,1);
-			new_bdev->bd_dev = dev;
-			new_bdev->bd_contains = NULL;
-			new_bdev->bd_inode = inode;
-			new_bdev->bd_block_size = (1 << inode->i_blkbits);
-			new_bdev->bd_part_count = 0;
-			new_bdev->bd_invalidated = 0;
-			inode->i_mode = S_IFBLK;
-			inode->i_rdev = kdev;
-			inode->i_bdev = new_bdev;
-			inode->i_data.a_ops = &def_blk_aops;
-			mapping_set_gfp_mask(&inode->i_data, GFP_USER);
-			inode->i_data.backing_dev_info = &default_backing_dev_info;
-			spin_lock(&bdev_lock);
-			bdev = bdfind(dev, head);
-			if (!bdev) {
-				list_add(&new_bdev->bd_hash, head);
-				spin_unlock(&bdev_lock);
-				return new_bdev;
-			}
-			spin_unlock(&bdev_lock);
-			iput(new_bdev->bd_inode);
-		}
-		destroy_bdev(new_bdev);
+	inode = iget5_locked(bd_mnt->mnt_sb, hash(dev),
+			bdev_test, bdev_set, &dev);
+
+	if (!inode)
+		return NULL;
+
+	bdev = &BDEV_I(inode)->bdev;
+
+	if (inode->i_state & I_NEW) {
+		bdev->bd_contains = NULL;
+		bdev->bd_inode = inode;
+		bdev->bd_block_size = (1 << inode->i_blkbits);
+		bdev->bd_part_count = 0;
+		bdev->bd_invalidated = 0;
+		inode->i_mode = S_IFBLK;
+		inode->i_rdev = dev;
+		inode->i_bdev = bdev;
+		inode->i_data.a_ops = &def_blk_aops;
+		mapping_set_gfp_mask(&inode->i_data, GFP_USER);
+		inode->i_data.backing_dev_info = &default_backing_dev_info;
+		spin_lock(&bdev_lock);
+		list_add(&bdev->bd_list, &all_bdevs);
+		spin_unlock(&bdev_lock);
+		unlock_new_inode(inode);
 	}
 	return bdev;
 }
 
 long nr_blockdev_pages(void)
 {
+	struct list_head *p;
 	long ret = 0;
-	int i;
-
 	spin_lock(&bdev_lock);
-	for (i = 0; i < ARRAY_SIZE(bdev_hashtable); i++) {
-		struct list_head *head = &bdev_hashtable[i];
-		struct list_head *lh;
-
-		if (head == NULL)
-			continue;
-		list_for_each(lh, head) {
-			struct block_device *bdev;
-
-			bdev = list_entry(lh, struct block_device, bd_hash);
-			ret += bdev->bd_inode->i_mapping->nrpages;
-		}
+	list_for_each(p, &all_bdevs) {
+		struct block_device *bdev;
+		bdev = list_entry(p, struct block_device, bd_list);
+		ret += bdev->bd_inode->i_mapping->nrpages;
 	}
 	spin_unlock(&bdev_lock);
 	return ret;
 }
 
-static inline void __bd_forget(struct inode *inode)
-{
-	list_del_init(&inode->i_devices);
-	inode->i_bdev = NULL;
-	inode->i_mapping = &inode->i_data;
-}
-
 void bdput(struct block_device *bdev)
 {
-	if (atomic_dec_and_lock(&bdev->bd_count, &bdev_lock)) {
-		struct list_head *p;
-		if (bdev->bd_openers)
-			BUG();
-		list_del(&bdev->bd_hash);
-		while ( (p = bdev->bd_inodes.next) != &bdev->bd_inodes ) {
-			__bd_forget(list_entry(p, struct inode, i_devices));
-		}
-		spin_unlock(&bdev_lock);
-		iput(bdev->bd_inode);
-		destroy_bdev(bdev);
-	}
+	iput(bdev->bd_inode);
 }
  
 int bd_acquire(struct inode *inode)
 {
 	struct block_device *bdev;
 	spin_lock(&bdev_lock);
-	if (inode->i_bdev) {
-		atomic_inc(&inode->i_bdev->bd_count);
+	if (inode->i_bdev && igrab(inode->i_bdev->bd_inode)) {
 		spin_unlock(&bdev_lock);
 		return 0;
 	}
 	spin_unlock(&bdev_lock);
-	bdev = bdget(kdev_t_to_nr(inode->i_rdev));
+	bdev = bdget(inode->i_rdev);
 	if (!bdev)
 		return -ENOMEM;
 	spin_lock(&bdev_lock);
-	if (!inode->i_bdev) {
-		inode->i_bdev = bdev;
-		inode->i_mapping = bdev->bd_inode->i_mapping;
-		list_add(&inode->i_devices, &bdev->bd_inodes);
-	} else if (inode->i_bdev != bdev)
-		BUG();
+	if (inode->i_bdev)
+		__bd_forget(inode);
+	inode->i_bdev = bdev;
+	inode->i_mapping = bdev->bd_inode->i_mapping;
+	list_add(&inode->i_devices, &bdev->bd_inodes);
 	spin_unlock(&bdev_lock);
 	return 0;
 }
@@ -548,7 +540,6 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 				if (ret)
 					goto out_first;
 			}
-			bdev->bd_offset = 0;
 			if (!bdev->bd_openers) {
 				bd_set_size(bdev,(loff_t)get_capacity(disk)<<9);
 				bdi = blk_get_backing_dev_info(bdev);
@@ -580,7 +571,8 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 				ret = -ENXIO;
 				goto out_first;
 			}
-			bdev->bd_offset = p->start_sect;
+			kobject_get(&p->kobj);
+			bdev->bd_part = p;
 			bd_set_size(bdev, (loff_t) p->nr_sects << 9);
 			up(&whole->bd_sem);
 		}
@@ -701,6 +693,10 @@ int blkdev_put(struct block_device *bdev, int kind)
 		put_disk(disk);
 		module_put(owner);
 
+		if (bdev->bd_contains != bdev) {
+			kobject_put(&bdev->bd_part->kobj);
+			bdev->bd_part = NULL;
+		}
 		bdev->bd_disk = NULL;
 		bdev->bd_inode->i_data.backing_dev_info = &default_backing_dev_info;
 		if (bdev != bdev->bd_contains) {

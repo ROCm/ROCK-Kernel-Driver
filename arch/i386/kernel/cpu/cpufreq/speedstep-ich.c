@@ -299,8 +299,7 @@ static int speedstep_cpu_init(struct cpufreq_policy *policy)
 		(speed / 1000));
 
 	/* cpuinfo and default policy values */
-	policy->policy = (speed == speedstep_freqs[SPEEDSTEP_LOW].frequency) ? 
-		CPUFREQ_POLICY_POWERSAVE : CPUFREQ_POLICY_PERFORMANCE;
+	policy->governor = CPUFREQ_DEFAULT_GOVERNOR;
 	policy->cpuinfo.transition_latency = CPUFREQ_ETERNAL;
 	policy->cur = speed;
 
@@ -309,7 +308,7 @@ static int speedstep_cpu_init(struct cpufreq_policy *policy)
 
 
 static struct cpufreq_driver speedstep_driver = {
-	.name		= "speedstep",
+	.name		= "speedstep-ich",
 	.verify 	= speedstep_verify,
 	.target 	= speedstep_target,
 	.init		= speedstep_cpu_init,

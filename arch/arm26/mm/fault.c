@@ -123,7 +123,7 @@ __do_user_fault(struct task_struct *tsk, unsigned long addr,
 	show_pte(tsk->mm, addr);
 	show_regs(regs);
 	//dump_backtrace(regs, tsk); // FIXME ARM32 dropped this - why?
-	while(1);
+	while(1); //FIXME - hack to stop debug going nutso
 #endif
 
 	tsk->thread.address = addr;
@@ -212,7 +212,7 @@ int do_page_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 	tsk = current;
 	mm  = tsk->mm;
 
-	printk("do_page_fault: pid: %d\n", tsk->pid);
+	printk("do_page_fault: pid: %d      %08x\n", tsk->pid, addr);
 	/*
 	 * If we're in an interrupt or have no user
 	 * context, we must not take the fault..
@@ -241,6 +241,7 @@ int do_page_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 	/*
 	 * If we are in kernel mode at this point, we
 	 * have no context to handle this fault with.
+         * FIXME - is this test right?
 	 */
 	if (!user_mode(regs)){
 		goto no_context;

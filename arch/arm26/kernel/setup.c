@@ -58,6 +58,10 @@ extern void squash_mem_tags(struct tag *tag);
 extern void bootmem_init(struct meminfo *);
 extern int root_mountflags;
 extern int _stext, _text, _etext, _edata, _end;
+#ifdef CONFIG_XIP_KERNEL
+extern int _endtext, _sdata;
+#endif
+
 
 unsigned int processor_id;
 unsigned int __machine_arch_type;
@@ -121,6 +125,7 @@ static void __init setup_processor(void)
 	for (list = &__proc_info_begin; list < &__proc_info_end ; list++)
 		if ((processor_id & list->cpu_mask) == list->cpu_val)
 			break;
+
 	/*
 	 * If processor type is unrecognised, then we
 	 * can do nothing...
@@ -220,7 +225,11 @@ request_standard_resources(struct meminfo *mi)
 
 	kernel_code.start  = init_mm.start_code;
 	kernel_code.end    = init_mm.end_code - 1;
+#ifdef CONFIG_XIP_KERNEL
+	kernel_data.start  = init_mm.start_data;
+#else
 	kernel_data.start  = init_mm.end_code;
+#endif
 	kernel_data.end    = init_mm.brk - 1;
 
 	for (i = 0; i < mi->nr_banks; i++) {
@@ -304,12 +313,12 @@ __tagtable(ATAG_MEM, parse_tag_mem32);
 
 #if defined(CONFIG_DUMMY_CONSOLE)
 struct screen_info screen_info = {
- orig_video_lines:	30,
- orig_video_cols:	80,
- orig_video_mode:	0,
- orig_video_ega_bx:	0,
- orig_video_isVGA:	1,
- orig_video_points:	8
+ .orig_video_lines	= 30,
+ .orig_video_cols	= 80,
+ .orig_video_mode	= 0,
+ .orig_video_ega_bx	= 0,
+ .orig_video_isVGA	= 1,
+ .orig_video_points	= 8
 };
 
 static int __init parse_tag_videotext(const struct tag *tag)
@@ -456,7 +465,10 @@ void __init setup_arch(char **cmdline_p)
 	else
 		machine_name = "UNKNOWN";
 
-	//FIXME - this may need altering when we get ROM images working
+	//FIXME - the tag struct is always copied here but this is a block
+	// of RAM that is accidentally reserved along with video RAM. perhaps
+	// it would be a good idea to explicitly reserve this?
+
 	tags = (struct tag *)0x0207c000;
 
 	/*
@@ -474,7 +486,12 @@ void __init setup_arch(char **cmdline_p)
 	}
 
 	init_mm.start_code = (unsigned long) &_text;
+#ifndef CONFIG_XIP_KERNEL
 	init_mm.end_code   = (unsigned long) &_etext;
+#else
+	init_mm.end_code   = (unsigned long) &_endtext;
+	init_mm.start_data   = (unsigned long) &_sdata;
+#endif
 	init_mm.end_data   = (unsigned long) &_edata;
 	init_mm.brk	   = (unsigned long) &_end;
 

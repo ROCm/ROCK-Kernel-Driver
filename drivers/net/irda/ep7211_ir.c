@@ -120,6 +120,7 @@ static void __exit ep7211_ir_cleanup(void)
 MODULE_AUTHOR("Jon McClintock <jonm@bluemug.com>");
 MODULE_DESCRIPTION("EP7211 I/R driver");
 MODULE_LICENSE("GPL");
+MODULE_ALIAS("irda-dongle-8"); /* IRDA_EP7211_IR */
 		
 module_init(ep7211_ir_init);
 module_exit(ep7211_ir_cleanup);

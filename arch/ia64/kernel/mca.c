@@ -1225,7 +1225,7 @@ ia64_mca_cpe_int_caller(int cpe_irq, void *arg, struct pt_regs *ptregs)
 
 	ia64_mca_cpe_int_handler(cpe_irq, arg, ptregs);
 
-	for (++cpuid ; !cpu_online(cpuid) && cpuid < NR_CPUS ; cpuid++);
+	for (++cpuid ; cpuid < NR_CPUS && !cpu_online(cpuid) ; cpuid++);
 
 	if (cpuid < NR_CPUS) {
 		platform_send_ipi(cpuid, IA64_CPEP_VECTOR, IA64_IPI_DM_INT, 0);

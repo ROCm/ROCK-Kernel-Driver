@@ -65,6 +65,7 @@
 #define PT_TRACE_EXIT	0x00000200
 
 #define PT_TRACE_MASK	0x000003f4
+#define PT_SINGLESTEP	0x80000000	/* single stepping (used on ARM) */
 
 #include <linux/compiler.h>		/* For unlikely.  */
 #include <linux/sched.h>		/* For struct task_struct.  */

@@ -55,14 +55,13 @@
 #include <asm/dma.h>
 #include <asm/uaccess.h>
 
-static const char devname[] = "dlci";
 static const char version[] = "DLCI driver v0.35, 4 Jan 1997, mike.mclagan@linux.org";
 
-static struct net_device *open_dev[CONFIG_DLCI_COUNT];
-
+static LIST_HEAD(dlci_devs);
+static spinlock_t dlci_dev_lock = SPIN_LOCK_UNLOCKED;
 static char *basename[16];
 
-int dlci_init(struct net_device *dev);
+static void dlci_setup(struct net_device *);
 
 /* allow FRAD's to register their name as a valid FRAD */
 int register_frad(const char *name)
@@ -115,6 +114,7 @@ int unregister_frad(const char *name)
 
 	return(0);
 }
+EXPORT_SYMBOL(unregister_frad);
 
 /* 
  * these encapsulate the RFC 1490 requirements as well as 
@@ -168,6 +168,14 @@ static void dlci_receive(struct sk_buff *skb, struct net_device *dev)
 	int					process, header;
 
 	dlp = dev->priv;
+	if (!pskb_may_pull(skb, sizeof(*hdr))) {
+		printk(KERN_NOTICE "%s: invalid data no header\n",
+		       dev->name);
+		dlp->stats.rx_errors++;
+		kfree_skb(skb);
+		return;
+	}
+
 	hdr = (struct frhdr *) skb->data;
 	process = 0;
 	header = 0;
@@ -277,7 +285,7 @@ static int dlci_transmit(struct sk_buff *skb, struct net_device *dev)
 	return(ret);
 }
 
-int dlci_config(struct net_device *dev, struct dlci_conf *conf, int get)
+static int dlci_config(struct net_device *dev, struct dlci_conf *conf, int get)
 {
 	struct dlci_conf	config;
 	struct dlci_local	*dlp;
@@ -311,7 +319,7 @@ int dlci_config(struct net_device *dev, struct dlci_conf *conf, int get)
 	return(0);
 }
 
-int dlci_dev_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
+static int dlci_dev_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
 	struct dlci_local *dlp;
 
@@ -401,21 +409,23 @@ static struct net_device_stats *dlci_get_stats(struct net_device *dev)
 	return(&dlp->stats);
 }
 
-int dlci_add(struct dlci_add *dlci)
+static int dlci_add(struct dlci_add *dlci)
 {
-	struct net_device		*master, *slave;
+	struct net_device	*master, *slave;
 	struct dlci_local	*dlp;
 	struct frad_local	*flp;
 	int			err, i;
-	char			buf[10];
+
 
 	/* validate slave device */
-	slave = __dev_get_by_name(dlci->devname);
+	slave = dev_get_by_name(dlci->devname);
 	if (!slave)
 		return(-ENODEV);
 
-	if (slave->type != ARPHRD_FRAD)
+	if (slave->type != ARPHRD_FRAD) {
+		dev_put(slave);
 		return(-EINVAL);
+	}
 
 	/* check for registration */
 	for (i=0;i<sizeof(basename) / sizeof(char *); i++)
@@ -424,33 +434,22 @@ int dlci_add(struct dlci_add *dlci)
 			 (strlen(dlci->devname) > strlen(basename[i])))
 			break;
 
-	if (i == sizeof(basename) / sizeof(char *))
+	if (i == sizeof(basename) / sizeof(char *)) {
+		dev_put(slave);
 		return(-EINVAL);
-
-	/* check for too many open devices : should this be dynamic ? */
-	for(i=0;i<CONFIG_DLCI_COUNT;i++)
-		if (!open_dev[i])
-			break;
-
-	if (i == CONFIG_DLCI_COUNT)
-		return(-ENOSPC);  /*  #### Alan: Comments on this?? */
+	}
 
 	/* create device name */
-	sprintf(buf, "%s%02i", devname, i);
-
-	master = kmalloc(sizeof(*master), GFP_KERNEL);
-	if (!master)
+	master = alloc_netdev( sizeof(struct dlci_local), "dlci%d",
+			      dlci_setup);
+	if (!master) {
+		dev_put(slave);
 		return(-ENOMEM);
-
-	memset(master, 0, sizeof(*master));
-
-	strcpy(master->name, buf);
-	master->init = dlci_init;
-	master->flags = 0;
+	}
 
 	err = register_netdev(master);
-	if (err < 0)
-	{
+	if (err < 0) {
+		dev_put(slave);
 		kfree(master);
 		return(err);
 	}
@@ -459,64 +458,65 @@ int dlci_add(struct dlci_add *dlci)
 
 	dlp = (struct dlci_local *) master->priv;
 	dlp->slave = slave;
+	dlp->master = master;
 
 	flp = slave->priv;
 	err = flp ? (*flp->assoc)(slave, master) : -EINVAL;
 	if (err < 0)
 	{
 		unregister_netdev(master);
-		kfree(master->priv);
-		kfree(master);
+		dev_put(slave);
+		free_netdev(master);
 		return(err);
 	}
 
-	strcpy(dlci->devname, buf);
-	open_dev[i] = master;
-	MOD_INC_USE_COUNT;
+	strcpy(dlci->devname, master->name);
+
+	spin_lock_bh(&dlci_dev_lock);
+	list_add(&dlp->list, &dlci_devs);
+	spin_unlock_bh(&dlci_dev_lock);
+
 	return(0);
 }
 
-int dlci_del(struct dlci_add *dlci)
+static int dlci_del(struct dlci_add *dlci)
 {
 	struct dlci_local	*dlp;
 	struct frad_local	*flp;
-	struct net_device		*master, *slave;
-	int			i, err;
+	struct net_device	*master, *slave;
+	int			err;
 
 	/* validate slave device */
 	master = __dev_get_by_name(dlci->devname);
 	if (!master)
 		return(-ENODEV);
 
-	if (netif_running(master))
+	if (netif_running(master)) {
 		return(-EBUSY);
+	}
 
 	dlp = master->priv;
 	slave = dlp->slave;
 	flp = slave->priv;
 
 	err = (*flp->deassoc)(slave, master);
-	if (err)
+	if (err) 
 		return(err);
+
+
+	spin_lock_bh(&dlci_dev_lock);
+	list_del(&dlp->list);
+	spin_unlock_bh(&dlci_dev_lock);
 
 	unregister_netdev(master);
 
-	for(i=0;i<CONFIG_DLCI_COUNT;i++)
-		if (master == open_dev[i])
-			break;
-
-	if (i<CONFIG_DLCI_COUNT)
-		open_dev[i] = NULL;
-
-	kfree(master->priv);
+	dev_put(slave);
 	free_netdev(master);
-
-	MOD_DEC_USE_COUNT;
 
 	return(0);
 }
 
-int dlci_ioctl(unsigned int cmd, void *arg)
+static int dlci_ioctl(unsigned int cmd, void *arg)
 {
 	struct dlci_add add;
 	int err;
@@ -548,16 +548,9 @@ int dlci_ioctl(unsigned int cmd, void *arg)
 	return(err);
 }
 
-int dlci_init(struct net_device *dev)
+static void dlci_setup(struct net_device *dev)
 {
-	struct dlci_local *dlp;
-
-	dev->priv = kmalloc(sizeof(struct dlci_local), GFP_KERNEL);
-	if (!dev->priv)
-		return(-ENOMEM);
-
-	memset(dev->priv, 0, sizeof(struct dlci_local));
-	dlp = dev->priv;
+	struct dlci_local *dlp = dev->priv;
 
 	dev->flags		= 0;
 	dev->open		= dlci_open;
@@ -573,9 +566,7 @@ int dlci_init(struct net_device *dev)
 	dev->type		= ARPHRD_DLCI;
 	dev->hard_header_len	= sizeof(struct frhdr);
 	dev->addr_len		= sizeof(short);
-	memset(dev->dev_addr, 0, sizeof(dev->dev_addr));
 
-	return(0);
 }
 
 int __init init_dlci(void)
@@ -584,9 +575,6 @@ int __init init_dlci(void)
 	dlci_ioctl_set(dlci_ioctl);
 
 	printk("%s.\n", version);
-	
-	for(i=0;i<CONFIG_DLCI_COUNT;i++)
-		open_dev[i] = NULL;
 
 	for(i=0;i<sizeof(basename) / sizeof(char *);i++)
 		basename[i] = NULL;
@@ -596,7 +584,16 @@ int __init init_dlci(void)
 
 void __exit dlci_exit(void)
 {
+	struct dlci_local	*dlp, *nxt;
+	
 	dlci_ioctl_set(NULL);
+
+	list_for_each_entry_safe(dlp, nxt, &dlci_devs, list) {
+		unregister_netdev(dlp->master);
+		dev_put(dlp->slave);
+		free_netdev(dlp->master);
+	}
+
 }
 
 module_init(init_dlci);

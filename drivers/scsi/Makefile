@@ -127,7 +127,8 @@ scsi_mod-y			+= scsi.o hosts.o scsi_ioctl.o constants.o \
 				   scsicam.o scsi_error.o scsi_lib.o \
 				   scsi_scan.o scsi_syms.o scsi_sysfs.o \
 				   scsi_devinfo.o
-scsi_mod-$(CONFIG_PROC_FS)	+= scsi_proc.o
+scsi_mod-$(CONFIG_SYSCTL)	+= scsi_sysctl.o
+scsi_mod-$(CONFIG_SCSI_PROC_FS)	+= scsi_proc.o
 scsi_mod-$(CONFIG_X86_PC9800)	+= scsi_pc98.o
 			
 sd_mod-objs	:= sd.o

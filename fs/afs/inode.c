@@ -68,7 +68,6 @@ static int afs_inode_map_status(afs_vnode_t *vnode)
 	inode->i_nlink		= vnode->status.nlink;
 	inode->i_uid		= vnode->status.owner;
 	inode->i_gid		= 0;
-	inode->i_rdev		= NODEV;
 	inode->i_size		= vnode->status.size;
 	inode->i_atime.tv_sec		= inode->i_mtime.tv_sec = inode->i_ctime.tv_sec = vnode->status.mtime_server;
 	inode->i_atime.tv_nsec = 

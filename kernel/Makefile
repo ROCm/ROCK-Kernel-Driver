@@ -15,13 +15,9 @@ obj-$(CONFIG_UID16) += uid16.o
 obj-$(CONFIG_MODULES) += ksyms.o module.o
 obj-$(CONFIG_KALLSYMS) += kallsyms.o
 obj-$(CONFIG_PM) += power/
-obj-$(CONFIG_CPU_FREQ) += cpufreq.o
 obj-$(CONFIG_BSD_PROCESS_ACCT) += acct.o
 obj-$(CONFIG_COMPAT) += compat.o
 obj-$(CONFIG_IKCONFIG) += configs.o
-
-# files to be removed upon make clean
-clean-files := ikconfig.h
 
 ifneq ($(CONFIG_IA64),y)
 # According to Alan Modra <alan@linuxcare.com.au>, the -fno-omit-frame-pointer is
@@ -32,8 +28,12 @@ ifneq ($(CONFIG_IA64),y)
 CFLAGS_sched.o := $(PROFILING) -fno-omit-frame-pointer
 endif
 
-$(obj)/ikconfig.h: scripts/mkconfigs .config Makefile
-	$(CONFIG_SHELL) scripts/mkconfigs .config Makefile > $(obj)/ikconfig.h
+quiet_cmd_ikconfig = IKCFG   $@
+      cmd_ikconfig = $(CONFIG_SHELL) $< .config $(srctree)/Makefile > $@
 
-$(obj)/configs.o: $(obj)/ikconfig.h $(obj)/configs.c \
-		include/linux/version.h include/linux/compile.h
+targets += ikconfig.h
+
+$(obj)/ikconfig.h: scripts/mkconfigs .config Makefile FORCE
+	$(call if_changed,ikconfig)
+
+$(obj)/configs.o: $(obj)/ikconfig.h

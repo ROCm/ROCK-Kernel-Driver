@@ -1095,7 +1095,7 @@ int irttp_connect_request(struct tsap_cb *self, __u8 dtsap_sel,
 		 *  headers
 		 */
 		ASSERT(skb_headroom(userdata) >= TTP_MAX_HEADER,
-		       { dev_kfree_skb(tx_skb); return -1; } );
+		       { dev_kfree_skb(userdata); return -1; } );
 	}
 
 	/* Initialize connection parameters */
@@ -1341,7 +1341,8 @@ int irttp_connect_response(struct tsap_cb *self, __u32 max_sdu_size,
 		 *  Check that the client has reserved enough space for
 		 *  headers
 		 */
-		ASSERT(skb_headroom(tx_skb) >= TTP_MAX_HEADER, return -1;);
+		ASSERT(skb_headroom(userdata) >= TTP_MAX_HEADER,
+		       { dev_kfree_skb(userdata); return -1; } );
 	}
 
 	self->avail_credit = 0;
@@ -1363,8 +1364,8 @@ int irttp_connect_response(struct tsap_cb *self, __u32 max_sdu_size,
 
 	/* SAR enabled? */
 	if (max_sdu_size > 0) {
-		ASSERT(skb_headroom(tx_skb) >= (TTP_MAX_HEADER+TTP_SAR_HEADER),
-		       return -1;);
+		ASSERT(skb_headroom(tx_skb) >= (TTP_MAX_HEADER + TTP_SAR_HEADER),
+		       { dev_kfree_skb(tx_skb); return -1; } );
 
 		/* Insert TTP header with SAR parameters */
 		frame = skb_push(tx_skb, TTP_HEADER+TTP_SAR_HEADER);
@@ -1428,9 +1429,16 @@ struct tsap_cb *irttp_dup(struct tsap_cb *orig, void *instance)
 	/* We don't need the old instance any more */
 	spin_unlock_irqrestore(&irttp->tsaps->hb_spinlock, flags);
 
+	/* Try to dup the LSAP (may fail if we were too slow) */
+	new->lsap = irlmp_dup(orig->lsap, new);
+	if (!new->lsap) {
+		IRDA_DEBUG(0, "%s(), dup failed!\n", __FUNCTION__);
+		kfree(new);
+		return NULL;
+	}
+
 	/* Not everything should be copied */
 	new->notify.instance = instance;
-	new->lsap = irlmp_dup(orig->lsap, new);
 	init_timer(&new->todo_timer);
 
 	skb_queue_head_init(&new->rx_queue);

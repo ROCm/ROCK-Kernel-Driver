@@ -217,33 +217,35 @@ struct usb_interface *usb_ifnum_to_if(struct usb_device *dev, unsigned ifnum)
 
 /**
  * usb_epnum_to_ep_desc - get the endpoint object with a given endpoint number
- * @dev: the device whose current configuration is considered
- * @epnum: the desired endpoint
+ * @dev: the device whose current configuration+altsettings is considered
+ * @epnum: the desired endpoint, masked with USB_DIR_IN as appropriate.
  *
  * This walks the device descriptor for the currently active configuration,
  * and returns a pointer to the endpoint with that particular endpoint
  * number, or null.
  *
- * Note that interface descriptors are not required to assign endpont
- * numbers sequentially, so that it would be incorrect to assume that
- * the first endpoint in that descriptor corresponds to interface zero.
+ * Note that interface descriptors are not required to list endpoint
+ * numbers in any standardized order, so that it would be wrong to
+ * assume that ep2in precedes either ep5in, ep2out, or even ep1out.
  * This routine helps device drivers avoid such mistakes.
  */
 struct usb_endpoint_descriptor *
 usb_epnum_to_ep_desc(struct usb_device *dev, unsigned epnum)
 {
-	int i, j, k;
+	int i, k;
 
-	for (i = 0; i < dev->actconfig->desc.bNumInterfaces; i++)
-		for (j = 0; j < dev->actconfig->interface[i]->num_altsetting; j++)
-			for (k = 0; k < dev->actconfig->interface[i]->
-				altsetting[j].desc.bNumEndpoints; k++)
-				if (epnum == dev->actconfig->interface[i]->
-						altsetting[j].endpoint[k]
-						.desc.bEndpointAddress)
-					return &dev->actconfig->interface[i]->
-						altsetting[j].endpoint[k]
-						.desc;
+	for (i = 0; i < dev->actconfig->desc.bNumInterfaces; i++) {
+		struct usb_interface		*intf;
+		struct usb_host_interface	*alt;
+
+		/* only endpoints in current altseting are active */
+		intf = dev->actconfig->interface[i];
+		alt = intf->altsetting + intf->act_altsetting;
+
+		for (k = 0; k < alt->desc.bNumEndpoints; k++)
+			if (epnum == alt->endpoint[k].desc.bEndpointAddress)
+				return &alt->endpoint[k].desc;
+	}
 
 	return NULL;
 }
@@ -991,8 +993,8 @@ int usb_set_address(struct usb_device *dev)
  *
  * This call is synchronous, and may not be used in an interrupt context.
  *
- * Only hub drivers (including virtual root hub drivers for host
- * controllers) should ever call this.
+ * Only the hub driver should ever call this; root hub registration
+ * uses it only indirectly.
  */
 #define NEW_DEVICE_RETRYS	2
 #define SET_ADDRESS_RETRYS	2
@@ -1417,11 +1419,46 @@ void usb_buffer_unmap_sg (struct usb_device *dev, unsigned pipe,
 			usb_pipein (pipe) ? DMA_FROM_DEVICE : DMA_TO_DEVICE);
 }
 
+static int usb_device_suspend(struct device *dev, u32 state)
+{
+	struct usb_interface *intf;
+	struct usb_driver *driver;
+
+	if ((dev->driver == &usb_generic_driver) || 
+	    (dev->driver_data == &usb_generic_driver_data))
+		return 0;
+
+	intf = to_usb_interface(dev);
+	driver = to_usb_driver(dev->driver);
+
+	if (driver && driver->suspend)
+		return driver->suspend(intf, state);
+	return 0;
+}
+
+static int usb_device_resume(struct device *dev)
+{
+	struct usb_interface *intf;
+	struct usb_driver *driver;
+
+	if ((dev->driver == &usb_generic_driver) || 
+	    (dev->driver_data == &usb_generic_driver_data))
+		return 0;
+
+	intf = to_usb_interface(dev);
+	driver = to_usb_driver(dev->driver);
+
+	if (driver && driver->resume)
+		return driver->resume(intf);
+	return 0;
+}
 
 struct bus_type usb_bus_type = {
 	.name =		"usb",
 	.match =	usb_device_match,
 	.hotplug =	usb_hotplug,
+	.suspend =	usb_device_suspend,
+	.resume =	usb_device_resume,
 };
 
 #ifndef MODULE
@@ -1509,7 +1546,6 @@ EXPORT_SYMBOL(usb_match_id);
 EXPORT_SYMBOL(usb_find_interface);
 EXPORT_SYMBOL(usb_ifnum_to_if);
 
-EXPORT_SYMBOL(usb_new_device);
 EXPORT_SYMBOL(usb_reset_device);
 EXPORT_SYMBOL(usb_disconnect);
 

@@ -807,7 +807,7 @@ static int yam_seq_show(struct seq_file *seq, void *v)
 	seq_printf(seq, "  RxInt    %u\n", yp->nb_rxint);
 	seq_printf(seq, "  RxOver   %lu\n", yp->stats.rx_fifo_errors);
 	seq_printf(seq, "\n");
-
+	return 0;
 }
 
 static struct seq_operations yam_seqops = {

@@ -423,11 +423,18 @@ static int __init sc520_wdt_init(void)
 
 	wdtmrctl = (__u16 *)((char *)wdtmrctl + OFFS_WDTMRCTL);
 	wdtmrctl = ioremap((unsigned long)wdtmrctl, 2);
+	if (!wdtmrctl) {
+		printk (KERN_ERR PFX "Unable to remap memory.\n");
+		rc = -ENOMEM;
+		goto err_out_notifier;
+	}
 	printk(KERN_INFO PFX "WDT driver for SC520 initialised. timeout=%d sec (nowayout=%d)\n",
 		timeout,nowayout);
 
 	return 0;
 
+err_out_notifier:
+	unregister_reboot_notifier(&wdt_notifier);
 err_out_miscdev:
 	misc_deregister(&wdt_miscdev);
 err_out_region2:

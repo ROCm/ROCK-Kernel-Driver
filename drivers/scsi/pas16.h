@@ -123,10 +123,6 @@ static int pas16_bus_reset(Scsi_Cmnd *);
 static int pas16_host_reset(Scsi_Cmnd *);
 static int pas16_device_reset(Scsi_Cmnd *);
 
-#ifndef NULL
-#define NULL 0
-#endif
-
 #ifndef CMD_PER_LUN
 #define CMD_PER_LUN 2
 #endif

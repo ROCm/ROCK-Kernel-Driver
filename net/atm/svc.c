@@ -513,6 +513,7 @@ out:
 
 static struct proto_ops svc_proto_ops = {
 	.family =	PF_ATMSVC,
+	.owner =	THIS_MODULE,
 
 	.release =	svc_release,
 	.bind =		svc_bind,
@@ -549,6 +550,7 @@ static int svc_create(struct socket *sock,int protocol)
 static struct net_proto_family svc_family_ops = {
 	.family = PF_ATMSVC,
 	.create = svc_create,
+	.owner = THIS_MODULE,
 };
 
 

@@ -183,7 +183,7 @@ start_ldr:
 	mr	r4,r7		/* Program length */
 	mr	r5,r6		/* Checksum */
 	mr	r6,r11		/* Residual data */
-	bl	decompress_kernel
+	bl	load_kernel
 
 	/*
 	 * Make sure the kernel knows we don't have things set in

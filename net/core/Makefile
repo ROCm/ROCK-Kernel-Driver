@@ -11,6 +11,5 @@ obj-y		     += flow.o dev.o ethtool.o net-sysfs.o dev_mcast.o dst.o \
 
 obj-$(CONFIG_NETFILTER) += netfilter.o
 obj-$(CONFIG_NET_DIVERT) += dv.o
-obj-$(CONFIG_NET_PROFILE) += profile.o
 obj-$(CONFIG_NET_PKTGEN) += pktgen.o
 obj-$(CONFIG_NET_RADIO) += wireless.o

@@ -6,7 +6,6 @@
  */
 #include <linux/types.h>
 #include <linux/sched.h>
-#include <linux/thread_info.h>
 
 #define COMPAT_USER_HZ	100
 

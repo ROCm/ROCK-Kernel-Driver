@@ -1,6 +1,7 @@
 /*
  *  AMD K7 Powernow driver.
  *  (C) 2003 Dave Jones <davej@codemonkey.org.uk> on behalf of SuSE Labs.
+ *  (C) 2003 Dave Jones <davej@redhat.com>
  *
  *  Licensed under the terms of the GNU GPL License version 2.
  *  Based upon datasheets & sample CPUs kindly provided by AMD.
@@ -325,6 +326,8 @@ static int powernow_decode_bios (int maxfid, int startvid)
 						p+=2;
 				}
 			}
+			printk (KERN_INFO PFX "No PST tables match this cpuid (0x%x)\n", etuple);
+			printk ("This is indicative of a broken BIOS. Email davej@redhat.com\n");
 			return -EINVAL;
 		}
 		p++;
@@ -372,7 +375,7 @@ static int __init powernow_cpu_init (struct cpufreq_policy *policy)
 	printk (KERN_INFO PFX "Minimum speed %d MHz. Maximum speed %d MHz.\n",
 				minimum_speed, maximum_speed);
 
-	policy->policy = CPUFREQ_POLICY_PERFORMANCE;
+	policy->governor = CPUFREQ_DEFAULT_GOVERNOR;
 	policy->cpuinfo.transition_latency = latency;
 	policy->cur = maximum_speed;
 

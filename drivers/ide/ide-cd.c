@@ -794,16 +794,16 @@ static int cdrom_decode_status(ide_drive_t *drive, int good_stat, int *stat_ret)
 			   request or data protect error.*/
 			ide_dump_status (drive, "command error", stat);
 			do_end_request = 1;
-		} else if ((err & ~ABRT_ERR) != 0) {
-			/* Go to the default handler
-			   for other errors. */
-			DRIVER(drive)->error(drive, "cdrom_decode_status",stat);
-			return 1;
 		} else if (sense_key == MEDIUM_ERROR) {
 			/* No point in re-trying a zillion times on a bad 
 			 * sector...  If we got here the error is not correctable */
 			ide_dump_status (drive, "media error (bad sector)", stat);
 			do_end_request = 1;
+		} else if ((err & ~ABRT_ERR) != 0) {
+			/* Go to the default handler
+			   for other errors. */
+			DRIVER(drive)->error(drive, "cdrom_decode_status",stat);
+			return 1;
 		} else if ((++rq->errors > ERROR_MAX)) {
 			/* We've racked up too many retries.  Abort. */
 			do_end_request = 1;
@@ -3318,7 +3318,6 @@ static ide_driver_t ide_cdrom_driver = {
 	.version		= IDECD_VERSION,
 	.media			= ide_cdrom,
 	.busy			= 0,
-	.supports_dma		= 1,
 	.supports_dsc_overlap	= 1,
 	.cleanup		= ide_cdrom_cleanup,
 	.do_request		= ide_do_rw_cdrom,

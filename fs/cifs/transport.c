@@ -23,7 +23,6 @@
 #include <linux/list.h>
 #include <linux/wait.h>
 #include <linux/net.h>
-#include <linux/version.h>
 #include <asm/uaccess.h>
 #include <asm/processor.h>
 #include "cifspdu.h"

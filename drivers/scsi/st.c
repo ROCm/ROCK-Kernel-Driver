@@ -140,8 +140,8 @@ DEB( static int debugging = DEBUG; )
 #define ST_TIMEOUT (900 * HZ)
 #define ST_LONG_TIMEOUT (14000 * HZ)
 
-#define TAPE_NR(x) (minor(x) & ~(-1 << ST_MODE_SHIFT))
-#define TAPE_MODE(x) ((minor(x) & ST_MODE_MASK) >> ST_MODE_SHIFT)
+#define TAPE_NR(x) (iminor(x) & ~(-1 << ST_MODE_SHIFT))
+#define TAPE_MODE(x) ((iminor(x) & ST_MODE_MASK) >> ST_MODE_SHIFT)
 
 /* Internal ioctl to set both density (uppermost 8 bits) and blocksize (lower
    24 bits) */
@@ -374,7 +374,7 @@ static Scsi_Request *
 	unsigned char *bp;
 
 	if (SRpnt == NULL) {
-		SRpnt = scsi_allocate_request(STp->device);
+		SRpnt = scsi_allocate_request(STp->device, GFP_ATOMIC);
 		if (SRpnt == NULL) {
 			DEBC( printk(KERN_ERR "%s: Can't get SCSI request.\n",
 				     tape_name(STp)); );
@@ -786,7 +786,7 @@ static int check_tape(Scsi_Tape *STp, struct file *filp)
 	ST_partstat *STps;
 	char *name = tape_name(STp);
 	struct inode *inode = filp->f_dentry->d_inode;
-	int mode = TAPE_MODE(inode->i_rdev);
+	int mode = TAPE_MODE(inode);
 
 	STp->ready = ST_READY;
 
@@ -980,7 +980,7 @@ static int st_open(struct inode *inode, struct file *filp)
 	int i, retval = (-EIO);
 	Scsi_Tape *STp;
 	ST_partstat *STps;
-	int dev = TAPE_NR(inode->i_rdev);
+	int dev = TAPE_NR(inode);
 	char *name;
 
 	write_lock(&st_dev_arr_lock);
@@ -1004,7 +1004,7 @@ static int st_open(struct inode *inode, struct file *filp)
 	}
 	STp->in_use = 1;
 	write_unlock(&st_dev_arr_lock);
-	STp->rew_at_close = STp->autorew_dev = (minor(inode->i_rdev) & 0x80) == 0;
+	STp->rew_at_close = STp->autorew_dev = (iminor(inode) & 0x80) == 0;
 
 
 	if (!scsi_block_when_processing_errors(STp->device)) {

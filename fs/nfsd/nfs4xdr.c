@@ -1631,6 +1631,8 @@ nfsd4_encode_close(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_clos
 		WRITEMEM(&close->cl_stateid.si_opaque, sizeof(stateid_opaque_t));
 		ADJUST_ARGS();
 	}
+	if ((close->cl_stateowner) && (close->cl_stateowner->so_confirmed))
+		close->cl_stateowner->so_seqid++;
 }
 
 
@@ -1767,6 +1769,8 @@ nfsd4_encode_open(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_open 
 	default:
 		BUG();
 	}
+
+	ENCODE_SEQID_OP_TAIL(open->op_stateowner);
 }
 
 static int

@@ -255,7 +255,7 @@ inline int
 write_modem(struct BCState *bcs) {
 	int ret=0;
 	struct IsdnCardState *cs = bcs->cs;
-	int count, len, fp;
+	u_int count, len, fp;
 	unsigned long flags;
 	
 	if (!bcs->tx_skb)
@@ -435,8 +435,8 @@ close_elsastate(struct BCState *bcs)
 }
 
 void
-modem_write_cmd(struct IsdnCardState *cs, u8 *buf, int len) {
-	int count, fp;
+modem_write_cmd(struct IsdnCardState *cs, u8 *buf, u_int len) {
+	u_int count, fp;
 	u8 *msg = buf;
 	unsigned long flags;
 	

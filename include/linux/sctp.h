@@ -1,7 +1,7 @@
 /* SCTP kernel reference Implementation
+ * (C) Copyright IBM Corp. 2001, 2003
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
- * Copyright (c) 2001-2002 International Business Machines, Corp.
  * Copyright (c) 2001 Intel Corp.
  * Copyright (c) 2001 Nokia, Inc.
  * Copyright (c) 2001 La Monte H.P. Yarroll
@@ -42,6 +42,8 @@
  *    randall@sctp.chicago.il.us
  *    kmorneau@cisco.com
  *    qxie1@email.mot.com
+ *    Sridhar Samudrala <sri@us.ibm.com>
+ *    Kevin Gao <kevin.gao@intel.com>
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -507,6 +509,11 @@ typedef struct sctp_cwr_chunk {
  *	The ASCONF Parameter Response is used in the ASCONF-ACK to
  *	report status of ASCONF processing.
  */
+typedef struct sctp_addip_param {
+	sctp_paramhdr_t	param_hdr;
+	__u32		crr_id;	
+}sctp_addip_param_t __attribute__((packed));
+
 typedef struct sctp_addiphdr {
 	__u32	serial;
 	__u8	params[0];

@@ -302,7 +302,8 @@ static void
 l3_1tr6_info(struct l3_process *pc, u8 pr, void *arg)
 {
 	u8 *p;
-	int i, tmpcharge = 0;
+	u_int i;
+	int tmpcharge = 0;
 	char a_charge[8], tmp[32];
 	struct sk_buff *skb = arg;
 
@@ -400,7 +401,8 @@ l3_1tr6_disc(struct l3_process *pc, u8 pr, void *arg)
 {
 	struct sk_buff *skb = arg;
 	u8 *p;
-	int i, tmpcharge = 0;
+	u_int i;
+	int tmpcharge = 0;
 	char a_charge[8], tmp[32];
 
 	StopAllL3Timer(pc);
@@ -753,7 +755,8 @@ static struct stateentry manstatelist[] =
 static void
 up1tr6(struct PStack *st, int pr, void *arg)
 {
-	int i, mt, cr;
+	u_int i;
+	int mt, cr;
 	struct l3_process *proc;
 	struct sk_buff *skb = arg;
 	char tmp[80];
@@ -868,7 +871,8 @@ up1tr6(struct PStack *st, int pr, void *arg)
 static void
 down1tr6(struct PStack *st, int pr, void *arg)
 {
-	int i, cr;
+	u_int i;
+	int cr;
 	struct l3_process *proc;
 	struct Channel *chan;
 	char tmp[80];
@@ -915,7 +919,7 @@ down1tr6(struct PStack *st, int pr, void *arg)
 static void
 man1tr6(struct PStack *st, int pr, void *arg)
 {
-        int i;
+        u_int i;
         struct l3_process *proc = arg;
  
         if (!proc) {

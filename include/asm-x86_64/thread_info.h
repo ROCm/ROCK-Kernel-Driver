@@ -60,7 +60,7 @@ struct thread_info {
 static inline struct thread_info *current_thread_info(void)
 { 
 	struct thread_info *ti;
-	ti = (void *)read_pda(kernelstack) + PDA_STACKOFFSET - THREAD_SIZE;
+	ti = (void *)(read_pda(kernelstack) + PDA_STACKOFFSET - THREAD_SIZE);
 	return ti; 
 }
 

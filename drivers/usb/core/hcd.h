@@ -73,6 +73,7 @@ struct usb_hcd {	/* usb_bus.hcpriv points to this */
 	 * hardware info/state
 	 */
 	struct hc_driver	*driver;	/* hw-specific hooks */
+	unsigned		saw_irq : 1;
 	int			irq;		/* irq allocated */
 	void			*regs;		/* device memory/io */
 	struct device		*controller;	/* handle to hardware */
@@ -89,13 +90,11 @@ struct usb_hcd {	/* usb_bus.hcpriv points to this */
 
 	int			state;
 #	define	__ACTIVE		0x01
-#	define	__SLEEPY		0x02
 #	define	__SUSPEND		0x04
 #	define	__TRANSIENT		0x80
 
 #	define	USB_STATE_HALT		0
 #	define	USB_STATE_RUNNING	(__ACTIVE)
-#	define	USB_STATE_READY		(__ACTIVE|__SLEEPY)
 #	define	USB_STATE_QUIESCING	(__SUSPEND|__TRANSIENT|__ACTIVE)
 #	define	USB_STATE_RESUMING	(__SUSPEND|__TRANSIENT)
 #	define	USB_STATE_SUSPENDED	(__SUSPEND)

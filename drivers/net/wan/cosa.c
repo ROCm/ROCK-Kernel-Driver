@@ -357,11 +357,7 @@ static void debug_status_out(struct cosa_data *cosa, int status);
 
 /* ---------- Initialization stuff ---------- */
 
-#ifdef MODULE
-int init_module(void)
-#else
 static int __init cosa_init(void)
-#endif
 {
 	int i;
 
@@ -398,9 +394,9 @@ static int __init cosa_init(void)
 	}
 	return 0;
 }
+module_init(cosa_init);
 
-#ifdef MODULE
-void cleanup_module (void)
+static void __exit cosa_exit(void)
 {
 	struct cosa_data *cosa;
 	int i;
@@ -424,7 +420,7 @@ void cleanup_module (void)
 	}
 	unregister_chrdev(cosa_major, "cosa");
 }
-#endif
+module_exit(cosa_exit);
 
 /*
  * This function should register all the net devices needed for the
@@ -513,7 +509,6 @@ static int cosa_probe(int base, int irq, int dma)
 	if (irq < 0) {
 		unsigned long irqs;
 /*		printk(KERN_INFO "IRQ autoprobe\n"); */
-		sti();
 		irqs = probe_irq_on();
 		/* 
 		 * Enable interrupt on tx buffer empty (it sure is) 
@@ -624,6 +619,7 @@ static void sppp_channel_init(struct channel_data *chan)
 	if (register_netdev(d) == -1) {
 		printk(KERN_WARNING "%s: register_netdev failed.\n", d->name);
 		sppp_detach(chan->pppdev.dev);
+		free_netdev(chan->pppdev.dev);
 		return;
 	}
 }
@@ -632,7 +628,7 @@ static void sppp_channel_delete(struct channel_data *chan)
 {
 	sppp_detach(chan->pppdev.dev);
 	unregister_netdev(chan->pppdev.dev);
-	free_netdev(chan->ppp.dev);
+	free_netdev(chan->pppdev.dev);
 }
 
 static int cosa_sppp_open(struct net_device *d)
@@ -658,7 +654,6 @@ static int cosa_sppp_open(struct net_device *d)
 	chan->rx_done = sppp_rx_done;
 	chan->usage=-1;
 	chan->cosa->usage++;
-	MOD_INC_USE_COUNT;
 	spin_unlock_irqrestore(&chan->cosa->lock, flags);
 
 	err = sppp_open(d);
@@ -666,7 +661,6 @@ static int cosa_sppp_open(struct net_device *d)
 		spin_lock_irqsave(&chan->cosa->lock, flags);
 		chan->usage=0;
 		chan->cosa->usage--;
-		MOD_DEC_USE_COUNT;
 		
 		spin_unlock_irqrestore(&chan->cosa->lock, flags);
 		return err;
@@ -726,7 +720,6 @@ static int cosa_sppp_close(struct net_device *d)
 	}
 	chan->usage=0;
 	chan->cosa->usage--;
-	MOD_DEC_USE_COUNT;
 	spin_unlock_irqrestore(&chan->cosa->lock, flags);
 	return 0;
 }
@@ -961,12 +954,12 @@ static int cosa_open(struct inode *inode, struct file *file)
 	unsigned long flags;
 	int n;
 
-	if ((n=minor(file->f_dentry->d_inode->i_rdev)>>CARD_MINOR_BITS)
+	if ((n=iminor(file->f_dentry->d_inode)>>CARD_MINOR_BITS)
 		>= nr_cards)
 		return -ENODEV;
 	cosa = cosa_cards+n;
 
-	if ((n=minor(file->f_dentry->d_inode->i_rdev)
+	if ((n=iminor(file->f_dentry->d_inode)
 		& ((1<<CARD_MINOR_BITS)-1)) >= cosa->nchannels)
 		return -ENODEV;
 	chan = cosa->chan + n;
@@ -1009,7 +1002,7 @@ static struct fasync_struct *fasync[256] = { NULL, };
 /* To be done ... */
 static int cosa_fasync(struct inode *inode, struct file *file, int on)
 {
-        int port = MINOR(inode->i_rdev);
+        int port = iminor(inode);
         int rv = fasync_helper(inode, file, on, &fasync[port]);
         return rv < 0 ? rv : 0;
 }
@@ -1187,21 +1180,6 @@ static int cosa_ioctl_common(struct cosa_data *cosa,
 		return cosa_gettype(cosa, (char *)arg);
 	case COSAIORIDSTR:
 		return cosa_getidstr(cosa, (char *)arg);
-/*
- * These two are _very_ugly_hack_(tm). Don't even look at this.
- * Implementing this saved me few reboots after some process segfaulted
- * inside this module.
- */
-#ifdef MODULE
-#if 0
-	case COSAIOMINC:
-		MOD_INC_USE_COUNT;
-		return 0;
-	case COSAIOMDEC:
-		MOD_DEC_USE_COUNT;
-		return 0;
-#endif
-#endif
 	case COSAIONRCARDS:
 		return nr_cards;
 	case COSAIONRCHANS:

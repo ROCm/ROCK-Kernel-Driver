@@ -119,7 +119,7 @@ static int
 ipppd_open(struct inode *ino, struct file *file)
 {
 	unsigned long flags;
-	unsigned int minor = minor(ino->i_rdev) - ISDN_MINOR_PPP;
+	unsigned int minor = iminor(ino) - ISDN_MINOR_PPP;
 	struct ipppd *ipppd;
 
 	ipppd = kmalloc(sizeof(*ipppd), GFP_KERNEL);

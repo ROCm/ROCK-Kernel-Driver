@@ -2138,7 +2138,7 @@ static int mixer_ioctl(struct ess_card *card, unsigned int cmd, unsigned long ar
 /* --------------------------------------------------------------------- */
 static int ess_open_mixdev(struct inode *inode, struct file *file)
 {
-	unsigned int minor = minor(inode->i_rdev);
+	unsigned int minor = iminor(inode);
 	struct ess_card *card = NULL;
 	struct pci_dev *pdev = NULL;
 	struct pci_driver *drvr;
@@ -2983,7 +2983,7 @@ free_buffers(struct ess_state *s)
 static int 
 ess_open(struct inode *inode, struct file *file)
 {
-	unsigned int minor = minor(inode->i_rdev);
+	unsigned int minor = iminor(inode);
 	struct ess_state *s = NULL;
 	unsigned char fmtm = ~0, fmts = 0;
 	struct pci_dev *pdev = NULL;

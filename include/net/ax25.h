@@ -314,7 +314,7 @@ extern int  ax25_check_iframes_acked(ax25_cb *, unsigned short);
 /* ax25_route.c */
 extern void ax25_rt_device_down(struct net_device *);
 extern int  ax25_rt_ioctl(unsigned int, void *);
-extern int  ax25_rt_get_info(char *, char **, off_t, int);
+extern struct file_operations ax25_route_fops;
 extern int  ax25_rt_autobind(ax25_cb *, ax25_address *);
 extern ax25_route *ax25_rt_find_route(ax25_route *, ax25_address *,
 	struct net_device *);
@@ -373,7 +373,7 @@ extern unsigned long ax25_display_timer(struct timer_list *);
 extern int  ax25_uid_policy;
 extern ax25_address *ax25_findbyuid(uid_t);
 extern int  ax25_uid_ioctl(int, struct sockaddr_ax25 *);
-extern int  ax25_uid_get_info(char *, char **, off_t, int);
+extern struct file_operations ax25_uid_fops;
 extern void ax25_uid_free(void);
 
 /* sysctl_net_ax25.c */

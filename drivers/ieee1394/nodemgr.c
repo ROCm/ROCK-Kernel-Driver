@@ -22,7 +22,6 @@
 
 #include "ieee1394_types.h"
 #include "ieee1394.h"
-#include "nodemgr.h"
 #include "hosts.h"
 #include "ieee1394_transactions.h"
 #include "highlevel.h"
@@ -1304,12 +1303,14 @@ static void nodemgr_update_node(struct node_entry *ne, quadlet_t busoptions,
 		 * unregister all the unit directories. */
 		nodemgr_remove_node_uds(ne);
 
+		/* With all the ud's gone, mark the generation current,
+		 * this way the probe will succeed. */
+		ne->generation = generation;
+
 		/* This will re-register our unitdir's */
 		nodemgr_process_config_rom (hi, ne, busoptions);
-	}
-
-	/* Since that's done, we can declare this record current */
-	ne->generation = generation;
+	} else
+		ne->generation = generation;
 
 	/* Update unit_dirs with attached drivers */
 	bus_for_each_dev(&ieee1394_bus_type, NULL, ne,

@@ -75,7 +75,6 @@ struct disk_stats {
 	unsigned read_merges, write_merges;
 	unsigned read_ticks, write_ticks;
 	unsigned io_ticks;
-	int in_flight;
 	unsigned time_in_queue;
 };
 	
@@ -101,6 +100,7 @@ struct gendisk {
 
 	unsigned sync_io;		/* RAID */
 	unsigned long stamp, stamp_idle;
+	int in_flight;
 #ifdef	CONFIG_SMP
 	struct disk_stats *dkstats;
 #else
@@ -197,7 +197,7 @@ extern void rand_initialize_disk(struct gendisk *disk);
 
 static inline sector_t get_start_sect(struct block_device *bdev)
 {
-	return bdev->bd_offset;
+	return bdev->bd_contains == bdev ? 0 : bdev->bd_part->start_sect;
 }
 static inline sector_t get_capacity(struct gendisk *disk)
 {

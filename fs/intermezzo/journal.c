@@ -391,13 +391,11 @@ static inline char *log_version(char *buf, struct presto_version *pv)
 static inline char *log_rollback(char *buf, struct izo_rollback_data *rb)
 {
         struct izo_rollback_data rollback;
-
-        memcpy(&rollback, rb, sizeof(rollback));
         
-        rollback.rb_mode = HTON__u32(rollback.rb_mode);
-        rollback.rb_rdev = HTON__u32(rollback.rb_rdev);
-        rollback.rb_uid = HTON__u64(rollback.rb_uid);
-        rollback.rb_gid = HTON__u64(rollback.rb_gid);
+        rollback.rb_mode = HTON__u32(rb->rb_mode);
+        rollback.rb_rdev = HTON__u32(rb->rb_rdev);
+        rollback.rb_uid = HTON__u64(rb->rb_uid);
+        rollback.rb_gid = HTON__u64(rb->rb_gid);
 
         return logit(buf, &rollback, sizeof(rollback));
 }

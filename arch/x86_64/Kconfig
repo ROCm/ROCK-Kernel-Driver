@@ -16,6 +16,9 @@ config X86_64
 	  Port to the x86-64 architecture. x86-64 is a 64-bit extension to the
 	  classical 32-bit x86 architecture. For details see http://www.x86-64.org
 
+config 64BIT
+	def_bool y
+
 config X86
 	bool
 	default y
@@ -369,11 +372,6 @@ endmenu
 
 
 menu "Executable file formats / Emulations"
-
-config KCORE_ELF
-	bool
-	depends on PROC_FS
-	default y
 
 source "fs/Kconfig.binfmt"
 

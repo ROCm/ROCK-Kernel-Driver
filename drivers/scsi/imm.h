@@ -96,17 +96,17 @@
 
 static char *IMM_MODE_STRING[] =
 {
-    "Autodetect",
-    "SPP",
-    "PS/2",
-    "EPP 8 bit",
-    "EPP 16 bit",
+	[IMM_AUTODETECT] = "Autodetect",
+	[IMM_NIBBLE]	 = "SPP",
+	[IMM_PS2]	 = "PS/2",
+	[IMM_EPP_8]	 = "EPP 8 bit",
 #ifdef CONFIG_SCSI_IZIP_EPP16
-    "EPP 16 bit",
+	[IMM_EPP_16]	 = "EPP 16 bit",
 #else
-    "EPP 32 bit",
+	[IMM_EPP_32]	 = "EPP 32 bit",
 #endif
-    "Unknown"};
+	[IMM_UNKNOWN]	 = "Unknown",
+};
 
 /* This is a global option */
 int imm_sg = SG_ALL;		/* enable/disable scatter-gather. */

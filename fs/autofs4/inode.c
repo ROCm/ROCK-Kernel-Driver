@@ -298,7 +298,6 @@ struct inode *autofs4_get_inode(struct super_block *sb,
 	}
 	inode->i_blksize = PAGE_CACHE_SIZE;
 	inode->i_blocks = 0;
-	inode->i_rdev = NODEV;
 	inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
 
 	if (S_ISDIR(inf->mode)) {

@@ -90,7 +90,7 @@ asmlinkage u32 sunos_mmap(u32 addr, u32 len, u32 prot, u32 flags, u32 fd, u32 of
 		if (!file)
 			goto out;
 		inode = file->f_dentry->d_inode;
-		if (minor(inode->i_rdev) == MEM_MAJOR && minor(inode->i_rdev) == 5) {
+		if (imajor(inode) == MEM_MAJOR && iminor(inode) == 5) {
 			flags |= MAP_ANONYMOUS;
 			fput(file);
 			file = NULL;

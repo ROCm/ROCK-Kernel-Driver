@@ -372,7 +372,7 @@ static ssize_t disk_stats_read(struct gendisk * disk, char *page)
 		disk_stat_read(disk, write_merges),
 		(unsigned long long)disk_stat_read(disk, write_sectors),
 		jiffies_to_msec(disk_stat_read(disk, write_ticks)),
-		disk_stat_read(disk, in_flight), 
+		disk->in_flight,
 		jiffies_to_msec(disk_stat_read(disk, io_ticks)),
 		jiffies_to_msec(disk_stat_read(disk, time_in_queue)));
 }
@@ -492,7 +492,7 @@ static int diskstats_show(struct seq_file *s, void *v)
 		disk_stat_read(gp, writes), disk_stat_read(gp, write_merges),
 		(unsigned long long)disk_stat_read(gp, write_sectors),
 		jiffies_to_msec(disk_stat_read(gp, write_ticks)),
-		disk_stat_read(gp, in_flight),
+		gp->in_flight,
 		jiffies_to_msec(disk_stat_read(gp, io_ticks)),
 		jiffies_to_msec(disk_stat_read(gp, time_in_queue)));
 
@@ -576,13 +576,10 @@ EXPORT_SYMBOL(put_disk);
 
 void set_device_ro(struct block_device *bdev, int flag)
 {
-	struct gendisk *disk = bdev->bd_disk;
-	if (bdev->bd_contains != bdev) {
-		int part = bdev->bd_dev - MKDEV(disk->major, disk->first_minor);
-		struct hd_struct *p = disk->part[part-1];
-		if (p) p->policy = flag;
-	} else
-		disk->policy = flag;
+	if (bdev->bd_contains != bdev)
+		bdev->bd_part->policy = flag;
+	else
+		bdev->bd_disk->policy = flag;
 }
 
 void set_disk_ro(struct gendisk *disk, int flag)
@@ -595,17 +592,12 @@ void set_disk_ro(struct gendisk *disk, int flag)
 
 int bdev_read_only(struct block_device *bdev)
 {
-	struct gendisk *disk;
 	if (!bdev)
 		return 0;
-	disk = bdev->bd_disk;
-	if (bdev->bd_contains != bdev) {
-		int part = bdev->bd_dev - MKDEV(disk->major, disk->first_minor);
-		struct hd_struct *p = disk->part[part-1];
-		if (p) return p->policy;
-		return 0;
-	} else
-		return disk->policy;
+	else if (bdev->bd_contains != bdev)
+		return bdev->bd_part->policy;
+	else
+		return bdev->bd_disk->policy;
 }
 
 int invalidate_partition(struct gendisk *disk, int index)

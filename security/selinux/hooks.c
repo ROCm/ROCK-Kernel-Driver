@@ -73,6 +73,15 @@ static int __init enforcing_setup(char *str)
 __setup("enforcing=", enforcing_setup);
 #endif
 
+int selinux_enabled = 0;
+
+static int __init selinux_enabled_setup(char *str)
+{
+	selinux_enabled = simple_strtol(str, NULL, 0);
+	return 1;
+}
+__setup("selinux=", selinux_enabled_setup);
+
 /* Original (dummy) security module. */
 static struct security_operations *original_ops = NULL;
 
@@ -1332,31 +1341,19 @@ static int selinux_netlink_recv(struct sk_buff *skb)
 
 static int selinux_bprm_alloc_security(struct linux_binprm *bprm)
 {
-	int rc;
+	struct bprm_security_struct *bsec;
 
-	/* Make sure that the secondary module doesn't use the
-	   bprm->security field, since we do not yet support chaining
-	   of multiple security structures on the field.  Neither
-	   the dummy nor the capability module use the field.  The owlsm
-	   module uses the field if CONFIG_OWLSM_FD is enabled. */
-	rc = secondary_ops->bprm_alloc_security(bprm);
-	if (rc)
-		return rc;
-	if (bprm->security) {
-		printk(KERN_WARNING "%s: no support yet for chaining on the "
-		       "security field by secondary modules.\n", __FUNCTION__);
-		/* Release the secondary module's security object. */
-		secondary_ops->bprm_free_security(bprm);
-		/* Unregister the secondary module to prevent problems
-		   with subsequent binprm hooks. This will revert to the
-		   original (dummy) module for the secondary operations. */
-		rc = security_ops->unregister_security("unknown", secondary_ops);
-		if (rc)
-			return rc;
-		printk(KERN_WARNING "%s: Unregistered the secondary security "
-		       "module.\n", __FUNCTION__);
-	}
-	bprm->security = NULL;
+	bsec = kmalloc(sizeof(struct bprm_security_struct), GFP_KERNEL);
+	if (!bsec)
+		return -ENOMEM;
+
+	memset(bsec, 0, sizeof *bsec);
+	bsec->magic = SELINUX_MAGIC;
+	bsec->bprm = bprm;
+	bsec->sid = SECINITSID_UNLABELED;
+	bsec->set = 0;
+
+	bprm->security = bsec;
 	return 0;
 }
 
@@ -1365,6 +1362,7 @@ static int selinux_bprm_set_security(struct linux_binprm *bprm)
 	struct task_security_struct *tsec;
 	struct inode *inode = bprm->file->f_dentry->d_inode;
 	struct inode_security_struct *isec;
+	struct bprm_security_struct *bsec;
 	u32 newsid;
 	struct avc_audit_data ad;
 	int rc;
@@ -1373,15 +1371,16 @@ static int selinux_bprm_set_security(struct linux_binprm *bprm)
 	if (rc)
 		return rc;
 
-	if (bprm->sh_bang || bprm->security)
-		/* The security field should already be set properly. */
+	bsec = bprm->security;
+
+	if (bsec->set)
 		return 0;
 
 	tsec = current->security;
 	isec = inode->i_security;
 
 	/* Default to the current task SID. */
-	bprm->security = (void *)tsec->sid;
+	bsec->sid = tsec->sid;
 
 	/* Reset create SID on execve. */
 	tsec->create_sid = 0;
@@ -1427,9 +1426,10 @@ static int selinux_bprm_set_security(struct linux_binprm *bprm)
 			return rc;
 
 		/* Set the security field to the new SID. */
-		bprm->security = (void*) newsid;
+		bsec->sid = newsid;
 	}
 
+	bsec->set = 1;
 	return 0;
 }
 
@@ -1463,8 +1463,9 @@ static int selinux_bprm_secureexec (struct linux_binprm *bprm)
 
 static void selinux_bprm_free_security(struct linux_binprm *bprm)
 {
-	/* Nothing to do - not dynamically allocated. */
-	return;
+	struct bprm_security_struct *bsec = bprm->security;
+	bprm->security = NULL;
+	kfree(bsec);
 }
 
 /* Derived from fs/exec.c:flush_old_files. */
@@ -1509,6 +1510,7 @@ static inline void flush_unauthorized_files(struct files_struct * files)
 static void selinux_bprm_compute_creds(struct linux_binprm *bprm)
 {
 	struct task_security_struct *tsec, *psec;
+	struct bprm_security_struct *bsec;
 	u32 sid;
 	struct av_decision avd;
 	int rc;
@@ -1517,9 +1519,8 @@ static void selinux_bprm_compute_creds(struct linux_binprm *bprm)
 
 	tsec = current->security;
 
-	sid = (u32)bprm->security;
-	if (!sid)
-		sid = tsec->sid;
+	bsec = bprm->security;
+	sid = bsec->sid;
 
 	tsec->osid = tsec->sid;
 	if (tsec->sid != sid) {
@@ -2057,9 +2058,11 @@ static int selinux_file_fcntl(struct file *file, unsigned int cmd,
 		case F_GETLK:
 		case F_SETLK:
 	        case F_SETLKW:
+#if BITS_PER_LONG == 32
 	        case F_GETLK64:
 		case F_SETLK64:
 	        case F_SETLKW64:
+#endif
 			if (!file->f_dentry || !file->f_dentry->d_inode) {
 				err = -EINVAL;
 				break;
@@ -3112,9 +3115,8 @@ static int selinux_getprocattr(struct task_struct *p,
 			       char *name, void *value, size_t size)
 {
 	struct task_security_struct *tsec;
-	u32 sid;
+	u32 sid, len;
 	char *context;
-	size_t len;
 	int error;
 
 	if (current != p) {
@@ -3353,6 +3355,11 @@ struct security_operations selinux_ops = {
 __init int selinux_init(void)
 {
 	struct task_security_struct *tsec;
+
+	if (!selinux_enabled) {
+		printk(KERN_INFO "SELinux:  Not enabled at boot.\n");
+		return 0;
+	}
 
 	printk(KERN_INFO "SELinux:  Initializing.\n");
 

@@ -12,6 +12,8 @@
 #include <linux/wait.h>
 #include <linux/mempool.h>
 #include <linux/bio.h>
+#include <linux/module.h>
+#include <linux/stringify.h>
 
 #include <asm/scatterlist.h>
 
@@ -243,6 +245,7 @@ typedef void (unplug_fn) (void *q);
 
 struct bio_vec;
 typedef int (merge_bvec_fn) (request_queue_t *, struct bio *, struct bio_vec *);
+typedef void (activity_fn) (void *data, int rw);
 
 enum blk_queue_state {
 	Queue_down,
@@ -267,7 +270,7 @@ struct request_queue
 	 * Together with queue_head for cacheline sharing
 	 */
 	struct list_head	queue_head;
-	struct list_head	*last_merge;
+	struct request		*last_merge;
 	elevator_t		elevator;
 
 	/*
@@ -283,6 +286,7 @@ struct request_queue
 	prep_rq_fn		*prep_rq_fn;
 	unplug_fn		*unplug_fn;
 	merge_bvec_fn		*merge_bvec_fn;
+	activity_fn		*activity_fn;
 
 	/*
 	 * Auto-unplugging state
@@ -299,6 +303,8 @@ struct request_queue
 	 * ll_rw_blk doesn't touch it.
 	 */
 	void			*queuedata;
+
+	void			*activity_data;
 
 	/*
 	 * queue needs bounce pages for pages above this limit
@@ -504,6 +510,7 @@ extern void blk_start_queue(request_queue_t *q);
 extern void blk_stop_queue(request_queue_t *q);
 extern void __blk_stop_queue(request_queue_t *q);
 extern void blk_run_queue(request_queue_t *q);
+extern void blk_queue_activity_fn(request_queue_t *, activity_fn *, void *);
 
 static inline request_queue_t *bdev_get_queue(struct block_device *bdev)
 {
@@ -666,6 +673,11 @@ void kblockd_flush(void);
 } \
 )
 #endif 
- 
+
+#define MODULE_ALIAS_BLOCKDEV(major,minor) \
+	MODULE_ALIAS("block-major-" __stringify(major) "-" __stringify(minor))
+#define MODULE_ALIAS_BLOCKDEV_MAJOR(major) \
+	MODULE_ALIAS("block-major-" __stringify(major) "-*")
+
 
 #endif

@@ -136,7 +136,8 @@ MODULE_PARM(pass_through, "i");
 MODULE_PARM_DESC(pass_through,
 		 "Pass TV signal through to TV-out when idling");
 
-int debug = 1;
+static int debug = 1;
+int *zr_debug = &debug;
 MODULE_PARM(debug, "i");
 MODULE_PARM_DESC(debug, "Debug level (0-4)");
 
@@ -153,7 +154,7 @@ MODULE_DEVICE_TABLE(pci, zr36067_pci_tbl);
 
 #define dprintk(num, format, args...) \
 	do { \
-		if (debug >= num) \
+		if (*zr_debug >= num) \
 			printk(format, ##args); \
 	} while (0)
 
@@ -623,6 +624,7 @@ static int
 zoran_i2c_getsda (void *data)
 {
 	struct zoran *zr = (struct zoran *) data;
+
 	return (btread(ZR36057_I2CBR) >> 1) & 1;
 }
 
@@ -630,6 +632,7 @@ static int
 zoran_i2c_getscl (void *data)
 {
 	struct zoran *zr = (struct zoran *) data;
+
 	return btread(ZR36057_I2CBR) & 1;
 }
 
@@ -638,6 +641,7 @@ zoran_i2c_setsda (void *data,
 		  int   state)
 {
 	struct zoran *zr = (struct zoran *) data;
+
 	if (state)
 		zr->i2cbr |= 2;
 	else
@@ -650,6 +654,7 @@ zoran_i2c_setscl (void *data,
 		  int   state)
 {
 	struct zoran *zr = (struct zoran *) data;
+
 	if (state)
 		zr->i2cbr |= 1;
 	else
@@ -766,6 +771,7 @@ zoran_check_jpg_settings (struct zoran              *zr,
 			  struct zoran_jpg_settings *settings)
 {
 	int err = 0, err0 = 0;
+
 	dprintk(4,
 		KERN_DEBUG
 		"%s: check_jpg_settings() - dec: %d, Hdcm: %d, Vdcm: %d, Tdcm: %d\n",
@@ -977,7 +983,7 @@ test_interrupts (struct zoran *zr)
 	if (timeout) {
 		dprintk(1, ": time spent: %d\n", 1 * HZ - timeout);
 	}
-	if (debug > 1)
+	if (*zr_debug > 1)
 		print_interrupts(zr);
 	btwrite(icr, ZR36057_ICR);
 }
@@ -986,6 +992,7 @@ static int __devinit
 zr36057_init (struct zoran *zr)
 {
 	unsigned long mem;
+	void *vdev;
 	unsigned mem_needed;
 	int j;
 	int two = 2;
@@ -1040,11 +1047,16 @@ zr36057_init (struct zoran *zr)
 	 * in case allocation fails */
 	mem_needed = BUZ_NUM_STAT_COM * 4;
 	mem = (unsigned long) kmalloc(mem_needed, GFP_KERNEL);
-	if (!mem) {
+	vdev = (void *) kmalloc(sizeof(struct video_device), GFP_KERNEL);
+	if (!mem || !vdev) {
 		dprintk(1,
 			KERN_ERR
 			"%s: zr36057_init() - kmalloc (STAT_COM) failed\n",
 			ZR_DEVNAME(zr));
+		if (vdev)
+			kfree(vdev);
+		if (mem)
+			kfree((void *)mem);
 		return -ENOMEM;
 	}
 	memset((void *) mem, 0, mem_needed);
@@ -1056,17 +1068,19 @@ zr36057_init (struct zoran *zr)
 	/*
 	 *   Now add the template and register the device unit.
 	 */
-	memcpy(&zr->video_dev, &zoran_template, sizeof(zoran_template));
-	strcpy(zr->video_dev.name, ZR_DEVNAME(zr));
-	if (video_register_device
-	    (&zr->video_dev, VFL_TYPE_GRABBER, video_nr) < 0) {
+	zr->video_dev = vdev;
+	memcpy(zr->video_dev, &zoran_template, sizeof(zoran_template));
+	strcpy(zr->video_dev->name, ZR_DEVNAME(zr));
+	if (video_register_device(zr->video_dev, VFL_TYPE_GRABBER,
+				  video_nr) < 0) {
 		zoran_unregister_i2c(zr);
 		kfree((void *) zr->stat_com);
+		kfree(vdev);
 		return -1;
 	}
 
 	zoran_init_hardware(zr);
-	if (debug > 2)
+	if (*zr_debug > 2)
 		detect_guest_activity(zr);
 	test_interrupts(zr);
 	if (!pass_through) {
@@ -1109,7 +1123,14 @@ zoran_release (struct zoran *zr)
 	kfree((void *) zr->stat_com);
 	zoran_proc_cleanup(zr);
 	iounmap(zr->zr36057_mem);
-	video_unregister_device(&zr->video_dev);
+	pci_disable_device(zr->pci_dev);
+	video_unregister_device(zr->video_dev);
+}
+
+void
+zoran_vdev_release (struct video_device *vdev)
+{
+	kfree(vdev);
 }
 
 static struct videocodec_master * __devinit
@@ -1207,6 +1228,7 @@ find_zr36057 (void)
 		} else {
 			int i;
 			unsigned short ss_vendor, ss_device;
+
 			ss_vendor = zr->pci_dev->subsystem_vendor;
 			ss_device = zr->pci_dev->subsystem_device;
 			dprintk(1,
@@ -1467,6 +1489,7 @@ static int __init
 init_dc10_cards (void)
 {
 	int i;
+
 	memset(zoran, 0, sizeof(zoran));
 	printk(KERN_INFO "Zoran MJPEG board driver version %d.%d.%d\n",
 	       MAJOR_VERSION, MINOR_VERSION, RELEASE_VERSION);
@@ -1523,6 +1546,7 @@ init_dc10_cards (void)
 	/* take care of Natoma chipset and a revision 1 zr36057 */
 	for (i = 0; i < zoran_num; i++) {
 		struct zoran *zr = &zoran[i];
+
 		if (pci_pci_problems & PCIPCI_NATOMA && zr->revision <= 1) {
 			zr->jpg_buffers.need_contiguous = 1;
 			dprintk(1,
@@ -1546,6 +1570,7 @@ static void __exit
 unload_dc10_cards (void)
 {
 	int i;
+
 	for (i = 0; i < zoran_num; i++)
 		zoran_release(&zoran[i]);
 }
