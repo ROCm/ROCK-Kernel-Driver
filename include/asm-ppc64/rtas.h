@@ -198,7 +198,7 @@ extern void pSeries_log_error(char *buf, unsigned int err_type, int fatal);
 /* All the types and not flags */
 #define ERR_TYPE_MASK	(ERR_TYPE_RTAS_LOG | ERR_TYPE_KERNEL_PANIC)
 
-#define RTAS_ERR KERN_ERR "RTAS: "
+#define RTAS_DEBUG KERN_DEBUG "RTAS: "
  
 #define RTAS_ERROR_LOG_MAX 2048
  
