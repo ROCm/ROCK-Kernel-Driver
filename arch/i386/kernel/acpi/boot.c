@@ -450,10 +450,12 @@ unsigned int acpi_register_gsi(u32 gsi, int edge_level, int active_high_low)
 		static u16 irq_mask;
 		extern void eisa_set_level_irq(unsigned int irq);
 
-		if ((gsi < 16) && !((1 << gsi) & irq_mask)) {
-			Dprintk(KERN_DEBUG PREFIX "Setting GSI %u as level-triggered\n", gsi);
-			irq_mask |= (1 << gsi);
-			eisa_set_level_irq(gsi);
+		if (edge_level == ACPI_LEVEL_SENSITIVE) {
+			if ((gsi < 16) && !((1 << gsi) & irq_mask)) {
+				Dprintk(KERN_DEBUG PREFIX "Setting GSI %u as level-triggered\n", gsi);
+				irq_mask |= (1 << gsi);
+				eisa_set_level_irq(gsi);
+			}
 		}
 	}
 #endif
