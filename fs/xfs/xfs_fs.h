@@ -69,12 +69,14 @@ struct fsxattr {
  * There should be a one-to-one correspondence between these flags and the
  * XFS_DIFLAG_s.
  */
-#define XFS_XFLAG_REALTIME	0x00000001
-#define XFS_XFLAG_PREALLOC	0x00000002
+#define XFS_XFLAG_REALTIME	0x00000001	/* data in realtime volume */
+#define XFS_XFLAG_PREALLOC	0x00000002	/* preallocated file extents */
+#define XFS_XFLAG_IMMUTABLE	0x00000008	/* file cannot be modified */
+#define XFS_XFLAG_APPEND	0x00000010	/* all writes append */
+#define XFS_XFLAG_SYNC		0x00000020	/* all writes synchronous */
+#define XFS_XFLAG_NOATIME	0x00000040	/* do not update access time */
+#define XFS_XFLAG_NODUMP	0x00000080	/* do not include in backups */
 #define XFS_XFLAG_HASATTR	0x80000000	/* no DIFLAG for this	*/
-#define XFS_XFLAG_ALL		\
-	( XFS_XFLAG_REALTIME|XFS_XFLAG_PREALLOC|XFS_XFLAG_HASATTR )
-
 
 /*
  * Structure for XFS_IOC_GETBMAP.

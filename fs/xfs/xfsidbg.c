@@ -78,7 +78,6 @@
 #include "xfs_rw.h"
 #include "xfs_bit.h"
 #include "xfs_quota.h"
-#include "xfs_log_recover.h"
 #include "quota/xfs_qm.h"
 
 MODULE_AUTHOR("Silicon Graphics, Inc.");
@@ -3022,6 +3021,12 @@ xfs_prdinode_core(xfs_dinode_core_t *dip, int convert)
 	static char *diflags[] = {
 		"realtime",		/* XFS_DIFLAG_REALTIME */
 		"prealloc",		/* XFS_DIFLAG_PREALLOC */
+		"newrtbm",		/* XFS_DIFLAG_NEWRTBM */
+		"immutable",		/* XFS_DIFLAG_IMMUTABLE */
+		"append",		/* XFS_DIFLAG_APPEND */
+		"sync",			/* XFS_DIFLAG_SYNC */
+		"noatime",		/* XFS_DIFLAG_NOATIME */
+		"nodump",		/* XFS_DIFLAG_NODUMP */
 		NULL
 	};
 
@@ -4687,7 +4692,7 @@ xfsidbg_xmount(xfs_mount_t *mp)
 		mp->m_attroffset, mp->m_maxicount, mp->m_inoalign_mask);
 	kdb_printf("resblks %Ld resblks_avail %Ld\n", mp->m_resblks,
 		mp->m_resblks_avail);
-#if XFS_BIG_FILESYSTEMS
+#if XFS_BIG_INUMS
 	kdb_printf(" inoadd %llx\n", (unsigned long long) mp->m_inoadd);
 #else
 	kdb_printf("\n");

@@ -43,11 +43,11 @@ struct smb_mount_data {
 struct smb_mount_data_kernel {
 	int version;
 
-	__kernel_uid_t mounted_uid;	/* Who may umount() this filesystem? */
-	__kernel_uid_t uid;
-	__kernel_gid_t gid;
-	__kernel_mode_t file_mode;
-	__kernel_mode_t dir_mode;
+	uid_t mounted_uid;	/* Who may umount() this filesystem? */
+	uid_t uid;
+	gid_t gid;
+	mode_t file_mode;
+	mode_t dir_mode;
 
 	u32 flags;
 

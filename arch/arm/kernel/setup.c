@@ -798,7 +798,7 @@ static int c_show(struct seq_file *m, void *v)
 			seq_printf(m, "Cache type\t: %s\n"
 				      "Cache clean\t: %s\n"
 				      "Cache lockdown\t: %s\n"
-				      "Cache unified\t: %s\n",
+				      "Cache format\t: %s\n",
 				   cache_types[CACHE_TYPE(cache_info)],
 				   cache_clean[CACHE_TYPE(cache_info)],
 				   cache_lockdown[CACHE_TYPE(cache_info)],

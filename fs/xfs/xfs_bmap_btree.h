@@ -108,7 +108,7 @@ typedef xfs_bmbt_rec_64_t xfs_bmbt_rec_t, xfs_bmdr_rec_t;
  * Values and macros for delayed-allocation startblock fields.
  */
 #define STARTBLOCKVALBITS	17
-#define STARTBLOCKMASKBITS	(15 + XFS_BIG_FILESYSTEMS * 20)
+#define STARTBLOCKMASKBITS	(15 + XFS_BIG_BLKNOS * 20)
 #define DSTARTBLOCKMASKBITS	(15 + 20)
 #define STARTBLOCKMASK		\
 	(((((xfs_fsblock_t)1) << STARTBLOCKMASKBITS) - 1) << STARTBLOCKVALBITS)

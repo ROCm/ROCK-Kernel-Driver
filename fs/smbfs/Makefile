@@ -32,6 +32,8 @@ proto:
 	@echo >> proto2.h " */"
 	@echo >> proto2.h ""
 	@echo >> proto2.h "struct smb_request;"
+	@echo >> proto2.h "struct sock;"
+	@echo >> proto2.h "struct statfs;"
 	@echo >> proto2.h ""
 	cproto -E "gcc -E" -e -v -I $(TOPDIR)/include -DMAKING_PROTO -D__KERNEL__ $(SRC) >> proto2.h
 	mv proto2.h proto.h

@@ -739,7 +739,7 @@ shut_us_down:
 		xfs_trans_free_items(tp, shutdown? XFS_TRANS_ABORT : 0);
 		xfs_trans_free_busy(tp);
 		xfs_trans_free(tp);
-		XFS_STATS_INC(xfsstats.xs_trans_empty);
+		XFS_STATS_INC(xs_trans_empty);
 		if (commit_lsn_p)
 			*commit_lsn_p = commit_lsn;
 		return (shutdown);
@@ -895,9 +895,9 @@ shut_us_down:
 		if (!error)
 			error = xfs_log_force(mp, commit_lsn,
 				      XFS_LOG_FORCE | XFS_LOG_SYNC);
-		XFS_STATS_INC(xfsstats.xs_trans_sync);
+		XFS_STATS_INC(xs_trans_sync);
 	} else {
-		XFS_STATS_INC(xfsstats.xs_trans_async);
+		XFS_STATS_INC(xs_trans_async);
 	}
 
 	return (error);

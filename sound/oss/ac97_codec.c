@@ -1078,6 +1078,10 @@ static int wolfson_init05(struct ac97_codec * codec)
 /* WM9711, WM9712 */
 static int wolfson_init11(struct ac97_codec * codec)
 {
+	/* stop pop's during suspend/resume */
+	codec->codec_write(codec, AC97_WM97XX_TEST,
+		codec->codec_read(codec, AC97_WM97XX_TEST) & 0xffbf);
+
 	/* set out3 volume */
 	codec->codec_write(codec, AC97_WM9711_OUT3VOL, 0x0808);
 	return 0;

@@ -192,6 +192,8 @@ xfs_cap_allow_set(
 
 	if (vp->v_vfsp->vfs_flag & VFS_RDONLY)
 		return EROFS;
+	if (vp->v_inode.i_flags & (S_IMMUTABLE|S_APPEND))
+		return EPERM;
 	if ((error = _MAC_VACCESS(vp, NULL, VWRITE)))
 		return error;
 	va.va_mask = XFS_AT_UID;
