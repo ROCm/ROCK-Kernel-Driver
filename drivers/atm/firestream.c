@@ -1722,7 +1722,7 @@ static int __init fs_init (struct fs_dev *dev)
 		}
 
 		/* Try again after 10ms. */
-		current->state = TASK_UNINTERRUPTIBLE;
+		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule_timeout ((HZ+99)/100);
 	}
 
