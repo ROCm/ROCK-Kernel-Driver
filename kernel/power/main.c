@@ -480,11 +480,13 @@ power_attr(disk);
 
 static ssize_t state_show(struct subsystem * subsys, char * buf)
 {
-	struct pm_state * state;
+	int i;
 	char * s = buf;
 
-	for (state = &pm_states[0]; state->name; state++)
-		s += sprintf(s,"%s ",state->name);
+	for (i = 0; i < PM_SUSPEND_MAX; i++) {
+		if (pm_states[i].name)
+			s += sprintf(s,"%s ",pm_states[i].name);
+	}
 	s += sprintf(s,"\n");
 	return (s - buf);
 }
