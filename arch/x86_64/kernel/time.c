@@ -746,6 +746,7 @@ static __init int late_hpet_init(void)
 	 * Register with driver.
 	 * Timer0 and Timer1 is used by platform.
 	 */
+	hd.hd_phys_address = vxtime.hpet_address;
 	hd.hd_address = (void *)fix_to_virt(FIX_HPET_BASE);
 	hd.hd_nirqs = ntimer;
 	hd.hd_flags = HPET_DATA_PLATFORM;
