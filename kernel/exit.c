@@ -49,9 +49,11 @@ static void __unhash_process(struct task_struct *p)
 
 void release_task(struct task_struct * p)
 {
+	int zap_leader;
 	task_t *leader;
 	struct dentry *proc_dentry;
- 
+
+repeat: 
 	BUG_ON(p->state < TASK_ZOMBIE);
  
 	atomic_dec(&p->user->processes);
@@ -70,10 +72,21 @@ void release_task(struct task_struct * p)
 	 * group, and the leader is zombie, then notify the
 	 * group leader's parent process. (if it wants notification.)
 	 */
+	zap_leader = 0;
 	leader = p->group_leader;
-	if (leader != p && thread_group_empty(leader) &&
-		    leader->state == TASK_ZOMBIE && leader->exit_signal != -1)
+	if (leader != p && thread_group_empty(leader) && leader->state == TASK_ZOMBIE) {
+		BUG_ON(leader->exit_signal == -1);
 		do_notify_parent(leader, leader->exit_signal);
+		/*
+		 * If we were the last child thread and the leader has
+		 * exited already, and the leader's parent ignores SIGCHLD,
+		 * then we are the one who should release the leader.
+		 *
+		 * do_notify_parent() will have marked it self-reaping in
+		 * that case.
+		 */
+		zap_leader = (leader->exit_signal == -1);
+	}
 
 	p->parent->cutime += p->utime + p->cutime;
 	p->parent->cstime += p->stime + p->cstime;
@@ -88,6 +101,10 @@ void release_task(struct task_struct * p)
 	proc_pid_flush(proc_dentry);
 	release_thread(p);
 	put_task_struct(p);
+
+	p = leader;
+	if (unlikely(zap_leader))
+		goto repeat;
 }
 
 /* we are using it only for SMP init */
