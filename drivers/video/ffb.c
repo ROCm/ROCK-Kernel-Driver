@@ -40,6 +40,7 @@ static int ffb_sync(struct fb_info *);
 static int ffb_mmap(struct fb_info *, struct file *, struct vm_area_struct *);
 static int ffb_ioctl(struct inode *, struct file *, unsigned int,
 		     unsigned long, struct fb_info *);
+static int ffb_pan_display(struct fb_var_screeninfo *, struct fb_info *);
 
 /*
  *  Frame buffer operations
@@ -49,6 +50,7 @@ static struct fb_ops ffb_ops = {
 	.owner			= THIS_MODULE,
 	.fb_setcolreg		= ffb_setcolreg,
 	.fb_blank		= ffb_blank,
+	.fb_pan_display		= ffb_pan_display,
 	.fb_fillrect		= ffb_fillrect,
 	.fb_copyarea		= ffb_copyarea,
 	.fb_imageblit		= ffb_imageblit,
@@ -481,6 +483,20 @@ static void ffb_switch_from_graph(struct ffb_par *par)
 	upa_writel(par->bg_cache, &fbc->bg);
 	FFBWait(par);
 	spin_unlock_irqrestore(&par->lock, flags);
+}
+
+static int ffb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
+{
+	struct ffb_par *par = (struct ffb_par *) info->par;
+
+	/* We just use this to catch switches out of
+	 * graphics mode.
+	 */
+	ffb_switch_from_graph(par);
+
+	if (var->xoffset || var->yoffset || var->vmode)
+		return -EINVAL;
+	return 0;
 }
 
 /**

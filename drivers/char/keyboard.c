@@ -660,9 +660,12 @@ static void k_cons(struct vc_data *vc, unsigned char value, char up_flag, struct
 
 static void k_fn(struct vc_data *vc, unsigned char value, char up_flag, struct pt_regs *regs)
 {
+	unsigned v;
+
 	if (up_flag)
 		return;
-	if (value < ARRAY_SIZE(func_table)) {
+	v = value;
+	if (v < ARRAY_SIZE(func_table)) {
 		if (func_table[value])
 			puts_queue(vc, func_table[value]);
 	} else

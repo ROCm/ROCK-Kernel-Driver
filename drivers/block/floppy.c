@@ -4409,6 +4409,7 @@ fail_queue:
 out:
 	for (i=0; i<N_DRIVE; i++)
 		put_disk(disks[i]);
+	devfs_remove("floppy");
 	return err;
 
 Enomem:

@@ -66,6 +66,8 @@ struct superblock_security_struct {
 	unsigned char initialized;      /* initialization flag */
 	unsigned char proc;             /* proc fs */
 	struct semaphore sem;
+	struct list_head isec_head;
+	spinlock_t isec_lock;
 };
 
 struct msg_security_struct {

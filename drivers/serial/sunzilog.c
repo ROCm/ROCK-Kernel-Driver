@@ -1559,7 +1559,7 @@ static void __init sunzilog_init_kbdms(struct uart_sunzilog_port *up, int channe
 		up->serio.type |= SERIO_SUNKBD;
 		up->serio.name = "zskbd";
 	} else {
-		up->serio.type |= SERIO_SUN;
+		up->serio.type |= (SERIO_SUN | (1 << 16));
 		up->serio.name = "zsms";
 	}
 	up->serio.phys = (channel == KEYBOARD_LINE ?

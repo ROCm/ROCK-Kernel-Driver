@@ -1148,8 +1148,13 @@ void update_atime(struct inode *inode)
 
 void inode_update_time(struct inode *inode, int ctime_too)
 {
-	struct timespec now = current_kernel_time();
+	struct timespec now;
 	int sync_it = 0;
+
+	if (IS_RDONLY(inode))
+		return;
+
+	now = current_kernel_time();
 
 	if (inode_times_differ(inode, &inode->i_mtime, &now))
 		sync_it = 1;

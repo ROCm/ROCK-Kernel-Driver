@@ -89,7 +89,7 @@ char * strncpy(char * dest,const char *src,size_t count)
 
 	while (count && (*dest++ = *src++) != '\0')
 		count--;
-	while (count) {
+	while (count > 1) {
 		*dest++ = 0;
 		count--;
 	}

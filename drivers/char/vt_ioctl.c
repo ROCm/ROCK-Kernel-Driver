@@ -82,8 +82,6 @@ do_kdsk_ioctl(int cmd, struct kbentry *user_kbe, int perm, struct kbd_struct *kb
 
 	if (copy_from_user(&tmp, user_kbe, sizeof(struct kbentry)))
 		return -EFAULT;
-	if (i >= NR_KEYS || s >= MAX_NR_KEYMAPS)
-		return -EINVAL;	
 
 	switch (cmd) {
 	case KDGKBENT:
@@ -208,10 +206,6 @@ do_kdgkb_ioctl(int cmd, struct kbsentry *user_kdgkb, int perm)
 		goto reterr;
 	}
 	kbs->kb_string[sizeof(kbs->kb_string)-1] = '\0';
-	if (kbs->kb_func >= MAX_NR_FUNC) {
-		ret = -EINVAL;
-		goto reterr;
-	}
 	i = kbs->kb_func;
 
 	switch (cmd) {

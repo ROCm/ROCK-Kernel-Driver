@@ -35,7 +35,7 @@ $refdata = "";
 $front = "";
 while(<SGML>){
   # Starting modes
-  if(/<legalnotice>/){
+  if(/<bookinfo>/ || /<docinfo>/){
     $mode = 1;
   }
   elsif(/<refentry>/){
@@ -51,14 +51,22 @@ while(<SGML>){
     print "Found manpage for $filename\n";
     open REF, "> $ARGV[1]/$filename.sgml" or
       die "Couldn't open output file \"$ARGV[1]/$filename.sgml\": $!\n";
-    print REF "<!DOCTYPE refentry PUBLIC \"-//Davenport//DTD DocBook V3.0//EN\">\n\n";
-    print REF "$refdata";
+    print REF <<EOF;
+<!DOCTYPE refentry PUBLIC "-//Davenport//DTD DocBook V3.0//EN">
+
+<!-- BEGINFRONTTAG: The following is front matter for the parent book -->
+$front
+<!-- ENDFRONTTAG: End front matter -->
+
+$refdata
+EOF
     $refdata = "";
   }
 
   # Extraction
   if($mode == 1){
-    $front = "$front$_";
+    chomp $_;
+    $front = "$front<!-- $_ -->\n";
   }
   elsif($mode == 2){
     $refdata = "$refdata$_";
@@ -69,16 +77,8 @@ while(<SGML>){
       print REF "<manvolnum>9</manvolnum>\n";
     }
     if(/<\/refentry>/){
-      $front =~ s/<legalnotice>//;
-      $front =~ s/<\/legalnotice>//;
       print REF <<EOF;
 <refsect1><title>About this document</title>
-$front
-<para>
-If you have comments on the formatting of this manpage, then please contact
-Michael Still (mikal\@stillhq.com).
-</para>
-
 <para>
 This documentation was generated with kernel version $ARGV[2].
 </para>
@@ -98,7 +98,7 @@ EOF
   }
 
   # Ending modes
-  if(/<\/legalnotice>/){
+  if(/<\/bookinfo>/ || /<\/docinfo>/){
     $mode = 0;
   }
   elsif(/<\/refentry>/){

@@ -143,7 +143,10 @@ static void nr_heartbeat_expiry(unsigned long param)
 		   is accepted() it isn't 'dead' so doesn't get removed. */
 		if (sock_flag(sk, SOCK_DESTROY) ||
 		    (sk->sk_state == TCP_LISTEN && sock_flag(sk, SOCK_DEAD))) {
+			sock_hold(sk);
 			nr_destroy_socket(sk);
+			bh_unlock_sock(sk);
+			sock_put(sk);
 			return;
 		}
 		break;
@@ -227,6 +230,7 @@ static void nr_t1timer_expiry(unsigned long param)
 	case NR_STATE_1:
 		if (nr->n2count == nr->n2) {
 			nr_disconnect(sk, ETIMEDOUT);
+			bh_unlock_sock(sk);
 			return;
 		} else {
 			nr->n2count++;
@@ -237,6 +241,7 @@ static void nr_t1timer_expiry(unsigned long param)
 	case NR_STATE_2:
 		if (nr->n2count == nr->n2) {
 			nr_disconnect(sk, ETIMEDOUT);
+			bh_unlock_sock(sk);
 			return;
 		} else {
 			nr->n2count++;
@@ -247,6 +252,7 @@ static void nr_t1timer_expiry(unsigned long param)
 	case NR_STATE_3:
 		if (nr->n2count == nr->n2) {
 			nr_disconnect(sk, ETIMEDOUT);
+			bh_unlock_sock(sk);
 			return;
 		} else {
 			nr->n2count++;

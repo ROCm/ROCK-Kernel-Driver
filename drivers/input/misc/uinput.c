@@ -226,7 +226,7 @@ exit:
 	return retval;
 }
 
-static int uinput_write(struct file *file, const char *buffer, size_t count, loff_t *ppos)
+static ssize_t uinput_write(struct file *file, const char *buffer, size_t count, loff_t *ppos)
 {
 	struct uinput_device	*udev = file->private_data;
 	
@@ -323,36 +323,67 @@ static int uinput_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 			retval = uinput_destroy_device(udev);
 			break;
 
-
 		case UI_SET_EVBIT:
+			if (arg > EV_MAX) {
+				retval = -EINVAL;
+				break;
+			}
 			set_bit(arg, udev->dev->evbit);
 			break;
 			
 		case UI_SET_KEYBIT:
+			if (arg > KEY_MAX) {
+				retval = -EINVAL;
+				break;
+			}
 			set_bit(arg, udev->dev->keybit);
 			break;
 			
 		case UI_SET_RELBIT:
+			if (arg > REL_MAX) {
+				retval = -EINVAL;
+				break;
+			}
 			set_bit(arg, udev->dev->relbit);
 			break;
 			
 		case UI_SET_ABSBIT:
+			if (arg > ABS_MAX) {
+				retval = -EINVAL;
+				break;
+			}
 			set_bit(arg, udev->dev->absbit);
 			break;
 			
 		case UI_SET_MSCBIT:
+			if (arg > MSC_MAX) {
+				retval = -EINVAL;
+				break;
+			}
 			set_bit(arg, udev->dev->mscbit);
 			break;
 			
 		case UI_SET_LEDBIT:
+			if (arg > LED_MAX) {
+				retval = -EINVAL;
+				break;
+			}
 			set_bit(arg, udev->dev->ledbit);
 			break;
 			
 		case UI_SET_SNDBIT:
+			if (arg > SND_MAX) {
+				retval = -EINVAL;
+				break;
+			}
 			set_bit(arg, udev->dev->sndbit);
 			break;
 			
 		case UI_SET_FFBIT:
+			if (arg > FF_MAX) {
+				retval = -EINVAL;
+				break;
+			}
 			set_bit(arg, udev->dev->ffbit);
 			break;
 			

@@ -114,6 +114,8 @@ static int linear_run (mddev_t *mddev)
 		}
 
 		disk->rdev = rdev;
+		blk_queue_stack_limits(mddev->queue,
+				       rdev->bdev->bd_disk->queue);
 		disk->size = rdev->size;
 		mddev->array_size += rdev->size;
 
