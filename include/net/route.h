@@ -170,6 +170,7 @@ static inline int ip_route_newports(struct rtable **rp, u16 sport, u16 dport)
 		memcpy(&fl, &(*rp)->fl, sizeof(fl));
 		fl.uli_u.ports.sport = sport;
 		fl.uli_u.ports.dport = dport;
+		ip_rt_put(*rp);
 		*rp = NULL;
 		return ip_route_output_key(rp, &fl);
 	}
