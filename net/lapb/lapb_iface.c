@@ -443,8 +443,14 @@ static int __init lapb_init(void)
 	return 0;
 }
 
+static void __exit lapb_exit(void)
+{
+	WARN_ON(!list_empty(&lapb_list));
+}
+
 MODULE_AUTHOR("Jonathan Naylor <g4klx@g4klx.demon.co.uk>");
 MODULE_DESCRIPTION("The X.25 Link Access Procedure B link layer protocol");
 MODULE_LICENSE("GPL");
 
 module_init(lapb_init);
+module_exit(lapb_exit);
