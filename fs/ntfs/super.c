@@ -511,8 +511,10 @@ static BOOL is_boot_sector_ntfs(const struct super_block *sb,
 	 * field. If checksum is zero, no checking is done.
 	 */
 	if ((void*)b < (void*)&b->checksum && b->checksum) {
-		u32 i, *u;
-		for (i = 0, u = (u32*)b; u < (u32*)(&b->checksum); ++u)
+		le32 *u;
+		u32 i;
+
+		for (i = 0, u = (le32*)b; u < (le32*)(&b->checksum); ++u)
 			i += le32_to_cpup(u);
 		if (le32_to_cpu(b->checksum) != i)
 			goto not_ntfs;
@@ -521,7 +523,7 @@ static BOOL is_boot_sector_ntfs(const struct super_block *sb,
 	if (b->oem_id != magicNTFS)
 		goto not_ntfs;
 	/* Check bytes per sector value is between 256 and 4096. */
-	if (le16_to_cpu(b->bpb.bytes_per_sector) <  0x100 ||
+	if (le16_to_cpu(b->bpb.bytes_per_sector) < 0x100 ||
 			le16_to_cpu(b->bpb.bytes_per_sector) > 0x1000)
 		goto not_ntfs;
 	/* Check sectors per cluster value is valid. */
@@ -1003,7 +1005,7 @@ static BOOL check_mft_mirror(ntfs_volume *vol)
 			++index;
 		}
 		/* Make sure the record is ok. */
-		if (ntfs_is_baad_recordp(kmft)) {
+		if (ntfs_is_baad_recordp((le32*)kmft)) {
 			ntfs_error(sb, "Incomplete multi sector transfer "
 					"detected in mft record %i.", i);
 mm_unmap_out:
@@ -1012,7 +1014,7 @@ mft_unmap_out:
 			ntfs_unmap_page(mft_page);
 			return FALSE;
 		}
-		if (ntfs_is_baad_recordp(kmirr)) {
+		if (ntfs_is_baad_recordp((le32*)kmirr)) {
 			ntfs_error(sb, "Incomplete multi sector transfer "
 					"detected in mft mirror record %i.", i);
 			goto mm_unmap_out;

@@ -980,7 +980,7 @@ static int ntfs_mft_writepage(struct page *page, struct writeback_control *wbc)
 		ntfs_debug("Inode 0x%lx is not in icache.", mft_no);
 		/* The inode is not in icache. */
 		/* Skip the record if it is not a mft record (type "FILE"). */
-		if (!ntfs_is_mft_recordp(maddr)) {
+		if (!ntfs_is_mft_recordp((le32*)maddr)) {
 			ntfs_debug("Mft record 0x%lx is not a FILE record, "
 					"continuing search.", mft_no);
 			continue;

@@ -43,6 +43,11 @@ ToDo/Notes:
 	  new types as appropriate.
 	- Do proper type casting when using sle64_to_cpup() in fs/ntfs/dir.c
 	  and index.c.
+	- Add leMFT_REF data type to fs/ntfs/layout.h.
+	- Update all NTFS header files with the new little endian data types.
+	  Affected files are fs/ntfs/layout.h, logfile.h, and time.h.
+	- Do proper type casting when using ntfs_is_*_recordp() in
+	  fs/ntfs/logfile.c, mft.c, and super.c. 
 
 2.1.18 - Fix scheduling latencies at mount time as well as an endianness bug.
 

@@ -497,7 +497,7 @@ BOOL ntfs_check_logfile(struct inode *log_vi)
 		 * empty block after a non-empty block has been encountered
 		 * means we are done.
 		 */
-		if (!ntfs_is_empty_recordp(kaddr))
+		if (!ntfs_is_empty_recordp((le32*)kaddr))
 			logfile_is_empty = FALSE;
 		else if (!logfile_is_empty)
 			break;
@@ -505,20 +505,20 @@ BOOL ntfs_check_logfile(struct inode *log_vi)
 		 * A log record page means there cannot be a restart page after
 		 * this so no need to continue searching.
 		 */
-		if (ntfs_is_rcrd_recordp(kaddr))
+		if (ntfs_is_rcrd_recordp((le32*)kaddr))
 			break;
 		/*
 		 * A modified by chkdsk restart page means we cannot handle
 		 * this log file.
 		 */
-		if (ntfs_is_chkd_recordp(kaddr)) {
+		if (ntfs_is_chkd_recordp((le32*)kaddr)) {
 			ntfs_error(vol->sb, "$LogFile has been modified by "
 					"chkdsk.  Mount this volume in "
 					"Windows.");
 			goto err_out;
 		}
 		/* If not a restart page, continue. */
-		if (!ntfs_is_rstr_recordp(kaddr)) {
+		if (!ntfs_is_rstr_recordp((le32*)kaddr)) {
 			/* Skip to the minimum page size for the next one. */
 			if (!pos)
 				pos = NTFS_BLOCK_SIZE >> 1;
