@@ -784,13 +784,17 @@ static const char *ahc_linux_info(struct Scsi_Host *);
 static int	   ahc_linux_slave_alloc(Scsi_Device *);
 static int	   ahc_linux_slave_configure(Scsi_Device *);
 static void	   ahc_linux_slave_destroy(Scsi_Device *);
+#if defined(__i386__)
 static int	   ahc_linux_biosparam(struct scsi_device*,
 				       struct block_device*,
 				       sector_t, int[]);
+#endif
 #else
 static void	   ahc_linux_select_queue_depth(struct Scsi_Host *host,
 						Scsi_Device *scsi_devs);
+#if defined(__i386__)
 static int	   ahc_linux_biosparam(Disk *, kdev_t, int[]);
+#endif
 #endif
 static int	   ahc_linux_bus_reset(Scsi_Cmnd *);
 static int	   ahc_linux_dev_reset(Scsi_Cmnd *);
@@ -1194,6 +1198,7 @@ ahc_linux_select_queue_depth(struct Scsi_Host *host, Scsi_Device *scsi_devs)
 /*
  * Return the disk geometry for the given SCSI device.
  */
+#if defined(__i386__)
 static int
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
 ahc_linux_biosparam(struct scsi_device *sdev, struct block_device *bdev,
@@ -1257,6 +1262,7 @@ ahc_linux_biosparam(Disk *disk, kdev_t dev, int geom[])
 	geom[2] = cylinders;
 	return (0);
 }
+#endif
 
 /*
  * Abort the current SCSI command(s).
