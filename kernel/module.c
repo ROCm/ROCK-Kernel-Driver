@@ -1455,9 +1455,9 @@ static const char *get_ksymbol(struct module *mod,
 
 	/* At worse, next value is at end of module */
 	if (within(addr, mod->module_init, mod->init_size))
-		nextval = (unsigned long)mod->module_core+mod->core_size;
+		nextval = (unsigned long)mod->module_init + mod->init_size;
 	else 
-		nextval = (unsigned long)mod->module_init+mod->init_size;
+		nextval = (unsigned long)mod->module_core + mod->core_size;
 
 	/* Scan for closest preceeding symbol, and next symbol. (ELF
            starts real symbols at 1). */
