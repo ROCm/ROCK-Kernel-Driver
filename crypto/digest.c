@@ -6,7 +6,7 @@
  * Copyright (c) 2002 James Morris <jmorris@intercode.com.au>
  *
  * The HMAC implementation is derived from USAGI.
- * Copyright (c) 2002 USAGI/WIDE Project
+ * Copyright (c) 2002 Kazunori Miyazawa <miyazawa@linux-ipv6.org> / USAGI
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the Free

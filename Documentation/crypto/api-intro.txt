@@ -164,7 +164,7 @@ Original developers of the initial set of crypto algorithms:
   Andrew Tridgell and Steve French (MD4)
   Colin Plumb (MD5)
   Steve Raid (SHA1)
-  USAGI project members (HMAC)
+  Kazunori Miyazawa / USAGI (HMAC)
 
 The DES code was subsequently redeveloped by:
 
