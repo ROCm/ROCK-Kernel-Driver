@@ -519,7 +519,17 @@ static int cdc_bind (struct usbnet *dev, struct usb_interface *intf)
 	if (sizeof dev->data < sizeof *info)
 		return -EDOM;
 
-	/* expect strict spec conformance for the descriptors */
+	/* expect strict spec conformance for the descriptors, but
+	 * cope with firmware which stores them in the wrong place
+	 */
+	if (len == 0 && dev->udev->config->extralen) {
+		/* Motorola SB4100 (and maybe others) put
+		 * CDC descriptors here
+		 */
+		buf = dev->udev->config->extra;
+		len = dev->udev->config->extralen;
+	}
+
 	memset (info, 0, sizeof *info);
 	info->control = intf;
 	while (len > 3) {
@@ -606,7 +616,7 @@ next_desc:
 	return 0;
 
 bad_desc:
-	// devdbg (dev, "bad CDC descriptors");
+	dev_info (&dev->udev->dev, "bad CDC descriptors\n");
 	return -ENODEV;
 }
 
@@ -1645,6 +1655,9 @@ static const struct driver_info	blob_info = {
  * crc32, added to help detect when some sa1100 usb-to-memory DMA errata
  * haven't been fully worked around.
  *
+ * PXA based models use the same framing, and also can't implement
+ * set_interface properly.
+ *
  *-------------------------------------------------------------------------*/
 
 static struct sk_buff *
@@ -1684,34 +1697,14 @@ static const struct driver_info	zaurus_sl5x00_info = {
 	.unbind =	cdc_unbind,
 	.tx_fixup = 	zaurus_tx_fixup,
 };
-static const struct driver_info	zaurus_sla300_info = {
-	.description =	"Sharp Zaurus SL-A300",
+static const struct driver_info	zaurus_pxa_info = {
+	.description =	"Sharp Zaurus, PXA-2xx based",
 	.flags =	FLAG_FRAMING_Z,
 	.check_connect = always_connected,
 	.tx_fixup = 	zaurus_tx_fixup,
 
 	.in = 1, .out = 2,
 };
-static const struct driver_info	zaurus_slb500_info = {
-	/* Japanese B500 ~= US SL-5600 */
-	.description =	"Sharp Zaurus SL-B500",
-	.flags =	FLAG_FRAMING_Z,
-	.check_connect = always_connected,
-	.tx_fixup = 	zaurus_tx_fixup,
-
-	.in = 1, .out = 2,
-};
-static const struct driver_info zaurus_slc700_info = {
-    .description =  "Sharp Zaurus SL-C700",
-    .flags =    FLAG_FRAMING_Z,
-    .check_connect = always_connected,
-    .tx_fixup =     zaurus_tx_fixup,
-
-    .in = 1, .out = 2,
-};
-
-
-// SL-5600 and C-700 are PXA based; should resemble A300
 
 #endif
 
@@ -2731,6 +2724,8 @@ static const struct usb_device_id	products [] = {
 /*
  * SA-1100 based Sharp Zaurus ("collie"), or compatible.
  * Same idea as above, but different framing.
+ *
+ * PXA-2xx based models are also lying-about-cdc.
  */
 {
 	.match_flags	=   USB_DEVICE_ID_MATCH_INT_INFO
@@ -2746,29 +2741,38 @@ static const struct usb_device_id	products [] = {
 	.match_flags	=   USB_DEVICE_ID_MATCH_INT_INFO
 			  | USB_DEVICE_ID_MATCH_DEVICE, 
 	.idVendor		= 0x04DD,
-	.idProduct		= 0x8005,
+	.idProduct		= 0x8005,	/* A-300 */
 	.bInterfaceClass	= 0x02,
 	.bInterfaceSubClass	= 0x0a,
 	.bInterfaceProtocol	= 0x00,
-	.driver_info =  (unsigned long) &zaurus_sla300_info,
+	.driver_info =  (unsigned long) &zaurus_pxa_info,
 }, {
 	.match_flags	=   USB_DEVICE_ID_MATCH_INT_INFO
 			  | USB_DEVICE_ID_MATCH_DEVICE, 
 	.idVendor		= 0x04DD,
-	.idProduct		= 0x8006,
+	.idProduct		= 0x8006,	/* B-500/SL-5600 */
 	.bInterfaceClass	= 0x02,
 	.bInterfaceSubClass	= 0x0a,
 	.bInterfaceProtocol	= 0x00,
-	.driver_info =  (unsigned long) &zaurus_slb500_info,
+	.driver_info =  (unsigned long) &zaurus_pxa_info,
 }, {
 	.match_flags    =   USB_DEVICE_ID_MATCH_INT_INFO
 	          | USB_DEVICE_ID_MATCH_DEVICE,
-	.idVendor       = 0x04DD,
-	.idProduct      = 0x8007,
+	.idVendor		= 0x04DD,
+	.idProduct		= 0x8007,	/* C-700 */
 	.bInterfaceClass    = 0x02,
 	.bInterfaceSubClass = 0x0a,
 	.bInterfaceProtocol = 0x00,
-	.driver_info =  (unsigned long) &zaurus_slc700_info,
+	.driver_info =  (unsigned long) &zaurus_pxa_info,
+}, {
+	.match_flags    =   USB_DEVICE_ID_MATCH_INT_INFO
+		 | USB_DEVICE_ID_MATCH_DEVICE,
+	.idVendor               = 0x04DD,
+	.idProduct              = 0x9031,	/* C-750 */
+	.bInterfaceClass        = 0x02,
+	.bInterfaceSubClass     = 0x0a,
+	.bInterfaceProtocol     = 0x00,
+	.driver_info =  (unsigned long) &zaurus_pxa_info,
 },
 #endif
 
@@ -2787,6 +2791,7 @@ static const struct usb_device_id	products [] = {
 	.bInterfaceProtocol	= 0,
 	.driver_info 		= 0, /* BLACKLIST */
 },
+	// FIXME blacklist the other Zaurus models too, sigh
 #endif
 
 {
