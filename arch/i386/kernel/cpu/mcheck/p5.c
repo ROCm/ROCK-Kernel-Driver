@@ -25,7 +25,6 @@ static asmlinkage void pentium_machine_check(struct pt_regs * regs, long error_c
 	printk(KERN_EMERG "CPU#%d: Machine Check Exception:  0x%8X (type 0x%8X).\n", smp_processor_id(), loaddr, lotype);
 	if(lotype&(1<<5))
 		printk(KERN_EMERG "CPU#%d: Possible thermal failure (CPU on fire ?).\n", smp_processor_id());
-
 	tainted |= TAINT_MACHINE_CHECK;
 }
 

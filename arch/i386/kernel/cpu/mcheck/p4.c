@@ -40,6 +40,7 @@ static void unexpected_thermal_interrupt(struct pt_regs *regs)
 {	
 	printk(KERN_ERR "CPU%d: Unexpected LVT TMR interrupt!\n",
 			smp_processor_id());
+	tainted |= TAINT_MACHINE_CHECK;
 }
 
 /* P4/Xeon Thermal transition interrupt handler */
@@ -60,6 +61,7 @@ static void intel_thermal_interrupt(struct pt_regs *regs)
 		printk(KERN_EMERG "CPU%d: Temperature above threshold\n", cpu);
 		printk(KERN_EMERG "CPU%d: Running in modulated clock mode\n",
 				cpu);
+		tainted |= TAINT_MACHINE_CHECK;
 	} else {
 		printk(KERN_INFO "CPU%d: Temperature/speed normal\n", cpu);
 	}
@@ -222,12 +224,11 @@ static asmlinkage void intel_machine_check(struct pt_regs * regs, long error_cod
 			wrmsr(msr, 0UL, 0UL);
 			/* Serialize */
 			wmb();
+			tainted |= TAINT_MACHINE_CHECK;
 		}
 	}
 	mcgstl &= ~(1<<2);
 	wrmsr (MSR_IA32_MCG_STATUS,mcgstl, mcgsth);
-
-	tainted |= TAINT_MACHINE_CHECK;
 }
 
 

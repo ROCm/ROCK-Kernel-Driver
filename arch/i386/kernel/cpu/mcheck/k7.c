@@ -54,6 +54,7 @@ static asmlinkage void k7_machine_check(struct pt_regs * regs, long error_code)
 			wrmsr (MSR_IA32_MC0_STATUS+i*4, 0UL, 0UL);
 			/* Serialize */
 			wmb();
+			tainted |= TAINT_MACHINE_CHECK;
 		}
 	}
 
@@ -64,8 +65,6 @@ static asmlinkage void k7_machine_check(struct pt_regs * regs, long error_code)
 	printk (KERN_EMERG "Attempting to continue.\n");
 	mcgstl &= ~(1<<2);
 	wrmsr (MSR_IA32_MCG_STATUS,mcgstl, mcgsth);
-
-	tainted |= TAINT_MACHINE_CHECK;
 }
 
 
