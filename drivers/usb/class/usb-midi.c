@@ -896,7 +896,7 @@ static int usb_midi_open(struct inode *inode, struct file *file)
 			/* urb->dev must be reinitialized on 2.4.x kernels */
 			m->min.ep->urb->dev = m->min.ep->usbdev;
 
-			if ( usb_submit_urb(m->min.ep->urb, GFP_KERNEL) ) {
+			if ( usb_submit_urb(m->min.ep->urb, GFP_ATOMIC) ) {
 				printk(KERN_ERR "usbmidi: Cannot submit urb for MIDI-IN\n");
 			}
 			m->min.ep->urbSubmitted = 1;
