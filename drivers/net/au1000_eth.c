@@ -110,7 +110,7 @@ extern char * __init prom_getcmdline(void);
 
 
 /*
- * Base address and interupt of the Au1xxx ethernet macs
+ * Base address and interrupt of the Au1xxx ethernet macs
  */
 static struct {
 	unsigned int port;

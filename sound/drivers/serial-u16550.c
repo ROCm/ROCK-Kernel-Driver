@@ -204,7 +204,7 @@ inline static void snd_uart16550_buffer_output(snd_uart16550_t *uart)
 
 /* This loop should be called with interrupts disabled
  * We don't want to interrupt this, 
- * as we're already handling an interupt 
+ * as we're already handling an interrupt 
  */
 static void snd_uart16550_io_loop(snd_uart16550_t * uart)
 {
@@ -274,16 +274,16 @@ static void snd_uart16550_io_loop(snd_uart16550_t * uart)
  * ---------------------------
  * After receiving a interrupt, it is important to indicate to the UART that
  * this has been done. 
- * For a Rx interupt, this is done by reading the received byte.
- * For a Tx interupt this is done by either:
+ * For a Rx interrupt, this is done by reading the received byte.
+ * For a Tx interrupt this is done by either:
  * a) Writing a byte
  * b) Reading the IIR
- * It is particularly important to read the IIR if a Tx interupt is received
+ * It is particularly important to read the IIR if a Tx interrupt is received
  * when there is no data in tx_buff[], as in this case there no other
- * indication that the interupt has been serviced, and it remains outstanding
- * indefinitely. This has the curious side effect that and no further interupts
+ * indication that the interrupt has been serviced, and it remains outstanding
+ * indefinitely. This has the curious side effect that and no further interrupts
  * will be generated from this device AT ALL!!.
- * It is also desirable to clear outstanding interupts when the device is
+ * It is also desirable to clear outstanding interrupts when the device is
  * opened/closed.
  *
  *
@@ -300,7 +300,7 @@ static void snd_uart16550_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		spin_unlock(&uart->open_lock);
 		return;
 	}
-	inb(uart->base + UART_IIR);		/* indicate to the UART that the interupt has been serviced */
+	inb(uart->base + UART_IIR);		/* indicate to the UART that the interrupt has been serviced */
 	snd_uart16550_io_loop(uart);
 	spin_unlock(&uart->open_lock);
 }
@@ -378,7 +378,7 @@ static void snd_uart16550_do_open(snd_uart16550_t * uart)
 	     | UART_FCR_CLEAR_RCVR	/* Clear receiver FIFO */
 	     | UART_FCR_CLEAR_XMIT	/* Clear transmitter FIFO */
 	     | UART_FCR_TRIGGER_4	/* Set FIFO trigger at 4-bytes */
-	/* NOTE: interupt generated after T=(time)4-bytes
+	/* NOTE: interrupt generated after T=(time)4-bytes
 	 * if less than UART_FCR_TRIGGER bytes received
 	 */
 	     ,uart->base + UART_FCR);	/* FIFO Control Register */
@@ -430,8 +430,8 @@ static void snd_uart16550_do_open(snd_uart16550_t * uart)
 	}
 
 	if (uart->irq < 0) {
-		byte = (0 & UART_IER_RDI)	/* Disable Receiver data interupt */
-		    |(0 & UART_IER_THRI)	/* Disable Transmitter holding register empty interupt */
+		byte = (0 & UART_IER_RDI)	/* Disable Receiver data interrupt */
+		    |(0 & UART_IER_THRI)	/* Disable Transmitter holding register empty interrupt */
 		    ;
 	} else if (uart->adaptor == SNDRV_SERIAL_MS124W_SA) {
 		byte = UART_IER_RDI	/* Enable Receiver data interrupt */
@@ -440,11 +440,11 @@ static void snd_uart16550_do_open(snd_uart16550_t * uart)
 	} else if (uart->adaptor == SNDRV_SERIAL_GENERIC) {
 		byte = UART_IER_RDI	/* Enable Receiver data interrupt */
 		    | UART_IER_MSI	/* Enable Modem status interrupt */
-		    | UART_IER_THRI	/* Enable Transmitter holding register empty interupt */
+		    | UART_IER_THRI	/* Enable Transmitter holding register empty interrupt */
 		    ;
 	} else {
-		byte = UART_IER_RDI	/* Enable Receiver data interupt */
-		    | UART_IER_THRI	/* Enable Transmitter holding register empty interupt */
+		byte = UART_IER_RDI	/* Enable Receiver data interrupt */
+		    | UART_IER_THRI	/* Enable Transmitter holding register empty interrupt */
 		    ;
 	}
 	outb(byte, uart->base + UART_IER);	/* Interupt enable Register */
@@ -463,8 +463,8 @@ static void snd_uart16550_do_close(snd_uart16550_t * uart)
 	 * For now, the consequences are harmless.
 	 */
 
-	outb((0 & UART_IER_RDI)		/* Disable Receiver data interupt */
-	     |(0 & UART_IER_THRI)	/* Disable Transmitter holding register empty interupt */
+	outb((0 & UART_IER_RDI)		/* Disable Receiver data interrupt */
+	     |(0 & UART_IER_THRI)	/* Disable Transmitter holding register empty interrupt */
 	     ,uart->base + UART_IER);	/* Interupt enable Register */
 
 	switch (uart->adaptor) {
@@ -489,7 +489,7 @@ static void snd_uart16550_do_close(snd_uart16550_t * uart)
 		break;
 	}
 
-	inb(uart->base + UART_IIR);	/* Clear any outstanding interupts */
+	inb(uart->base + UART_IIR);	/* Clear any outstanding interrupts */
 
 	/* Restore old divisor */
 	if (uart->divisor != 0) {

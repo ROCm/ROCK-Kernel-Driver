@@ -740,7 +740,7 @@ ahd_pci_intr(struct ahd_softc *ahd)
 		if (i == 5)
 			continue;
 		pci_status[i] = ahd_inb(ahd, reg);
-		/* Clear latched errors.  So our interupt deasserts. */
+		/* Clear latched errors.  So our interrupt deasserts. */
 		ahd_outb(ahd, reg, pci_status[i]);
 	}
 
@@ -796,14 +796,14 @@ ahd_pci_split_intr(struct ahd_softc *ahd, u_int intstat)
 
 		split_status[i] = ahd_inb(ahd, DCHSPLTSTAT0);
 		split_status1[i] = ahd_inb(ahd, DCHSPLTSTAT1);
-		/* Clear latched errors.  So our interupt deasserts. */
+		/* Clear latched errors.  So our interrupt deasserts. */
 		ahd_outb(ahd, DCHSPLTSTAT0, split_status[i]);
 		ahd_outb(ahd, DCHSPLTSTAT1, split_status1[i]);
 		if (i != 0)
 			continue;
 		sg_split_status[i] = ahd_inb(ahd, SGSPLTSTAT0);
 		sg_split_status1[i] = ahd_inb(ahd, SGSPLTSTAT1);
-		/* Clear latched errors.  So our interupt deasserts. */
+		/* Clear latched errors.  So our interrupt deasserts. */
 		ahd_outb(ahd, SGSPLTSTAT0, sg_split_status[i]);
 		ahd_outb(ahd, SGSPLTSTAT1, sg_split_status1[i]);
 	}

@@ -781,8 +781,8 @@ io_int_handler:
         GET_THREAD_INFO                # load pointer to task_struct to R9
         la      %r2,SP_PTREGS(%r15)    # address of register-save area
 	llgh    %r3,__LC_SUBCHANNEL_NR # load subchannel number
-        llgf    %r4,__LC_IO_INT_PARM   # load interuption parm
-        llgf    %r5,__LC_IO_INT_WORD   # load interuption word
+        llgf    %r4,__LC_IO_INT_PARM   # load interruption parm
+        llgf    %r5,__LC_IO_INT_WORD   # load interruption word
 	brasl   %r14,do_IRQ            # call standard irq handler
 
 io_return:

@@ -164,7 +164,7 @@ the table are always safe :)
 
 If for some reason you feel the need to call the handle_sysrq function from
 within a function called by handle_sysrq, you must be aware that you are in
-a lock (you are also in an interupt handler, which means don't sleep!), so
+a lock (you are also in an interrupt handler, which means don't sleep!), so
 you must call __handle_sysrq_nolock instead.
 
 *  I have more questions, who can I ask?

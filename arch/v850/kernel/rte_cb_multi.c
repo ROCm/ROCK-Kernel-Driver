@@ -52,7 +52,7 @@ void __init multi_init (void)
 	register unsigned long jr_fixup = (char *)&_intv_start - (char *)dst;
 	register long *ii;
 
-	/* Copy interupt vectors as instructed by multi_intv_install_table. */
+	/* Copy interrupt vectors as instructed by multi_intv_install_table. */
 	for (ii = multi_intv_install_table; *ii >= 0; ii++) {
 		/* Copy 16-byte interrupt vector at offset *ii.  */
 		int boffs;

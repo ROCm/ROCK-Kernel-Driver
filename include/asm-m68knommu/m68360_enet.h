@@ -93,7 +93,7 @@
 #define ALEC     0x00000000
 #define DISFC    0x00000000
 #define PADS     0x00000000
-#define RET_LIM  0x000f     /* retry 15 times to send a frame before interupt */
+#define RET_LIM  0x000f     /* retry 15 times to send a frame before interrupt */
 #define ETH_MFLR 0x05ee     /* 1518 max frame size */
 #define MINFLR   0x0040     /* Minimum frame size 64 */
 #define MAXD1    0x05ee     /* Max dma count 1518 */

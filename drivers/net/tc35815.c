@@ -1227,7 +1227,7 @@ tc35815_rx(struct net_device *dev)
 		lp->rfd_cur = next_rfd;
 	}
 
-	/* re-enable BL/FDA Exhaust interupts. */
+	/* re-enable BL/FDA Exhaust interrupts. */
 	if (fd_free_count) {
 		tc_writel(tc_readl(&tr->Int_En) | Int_FDAExEn, &tr->Int_En);
 		if (buf_free_count)

@@ -1132,7 +1132,7 @@ static void snd_es1968_playback_setup(es1968_t *chip, esschan_t *es,
 	}
 
 	spin_lock_irqsave(&chip->reg_lock, flags);
-	/* clear WP interupts */
+	/* clear WP interrupts */
 	outw(1, chip->io_port + 0x04);
 	/* enable WP ints */
 	outw(inw(chip->io_port + ESM_PORT_HOST_IRQ) | ESM_HIRQ_DSIE, chip->io_port + ESM_PORT_HOST_IRQ);
@@ -1263,7 +1263,7 @@ static void snd_es1968_capture_setup(es1968_t *chip, esschan_t *es,
 	}
 
 	spin_lock_irqsave(&chip->reg_lock, flags);
-	/* clear WP interupts */
+	/* clear WP interrupts */
 	outw(1, chip->io_port + 0x04);
 	/* enable WP ints */
 	outw(inw(chip->io_port + ESM_PORT_HOST_IRQ) | ESM_HIRQ_DSIE, chip->io_port + ESM_PORT_HOST_IRQ);
@@ -1828,7 +1828,7 @@ static void __devinit es1968_measure_clock(es1968_t *chip)
 	apu_set_register(chip, apu, 10, 0x8F08);
 	apu_set_register(chip, apu, 11, 0x0000);
 	spin_lock_irqsave(&chip->reg_lock, flags);
-	outw(1, chip->io_port + 0x04); /* clear WP interupts */
+	outw(1, chip->io_port + 0x04); /* clear WP interrupts */
 	outw(inw(chip->io_port + ESM_PORT_HOST_IRQ) | ESM_HIRQ_DSIE, chip->io_port + ESM_PORT_HOST_IRQ); /* enable WP ints */
 	spin_unlock_irqrestore(&chip->reg_lock, flags);
 

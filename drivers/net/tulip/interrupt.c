@@ -501,7 +501,7 @@ void tulip_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 					   dev->name, csr5);
 #ifdef CONFIG_NET_HW_FLOWCONTROL
                         if (tp->fc_bit && (test_bit(tp->fc_bit, &netdev_fc_xoff)))
-                          if (net_ratelimit()) printk("BUG!! enabling interupt when FC off (timerintr.) \n");
+                          if (net_ratelimit()) printk("BUG!! enabling interrupt when FC off (timerintr.) \n");
 #endif
 			outl(tulip_tbl[tp->chip_id].valid_intrs, ioaddr + CSR7);
 			tp->ttimer = 0;

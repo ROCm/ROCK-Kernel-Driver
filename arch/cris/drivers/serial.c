@@ -1904,7 +1904,7 @@ static void _INLINE_ handle_ser_interrupt(struct e100_serial *info)
 		}
 
 #ifdef SERIAL_DEBUG_INTR
-		printk("** OK, disabling ser_interupts\n");
+		printk("** OK, disabling ser_interrupts\n");
 #endif
 		e100_disable_serial_data_irq(info);
 

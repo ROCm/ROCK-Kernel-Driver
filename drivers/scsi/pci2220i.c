@@ -2389,7 +2389,7 @@ static USHORT GetRegs (struct Scsi_Host *pshost, BOOL bigd, struct pci_dev *pcid
 	padapter->regRemap		= zr + RTR_LOCAL_REMAP;					// 32 bit local space remap
 	padapter->regDesc		= zr + RTR_REGIONS;	  					// 32 bit local region descriptor
 	padapter->regRange		= zr + RTR_LOCAL_RANGE;					// 32 bit local range
-	padapter->regIrqControl	= zr + RTR_INT_CONTROL_STATUS;			// 16 bit interupt control and status
+	padapter->regIrqControl	= zr + RTR_INT_CONTROL_STATUS;			// 16 bit interrupt control and status
 	padapter->regScratchPad	= zr + RTR_MAILBOX;	  					// 16 byte scratchpad I/O base address
 
 	padapter->regBase		= zl;

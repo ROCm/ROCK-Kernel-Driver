@@ -2608,7 +2608,7 @@ static int natsemi_suspend (struct pci_dev *pdev, u32 state)
 			if (wol) {
 				/* restart the NIC in WOL mode.
 				 * The nic must be stopped for this.
-				 * FIXME: use the WOL interupt
+				 * FIXME: use the WOL interrupt
 				 */
 				enable_wol_mode(dev, 0);
 			} else {

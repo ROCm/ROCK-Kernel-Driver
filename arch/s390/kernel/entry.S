@@ -757,8 +757,8 @@ io_int_handler:
         la      %r2,SP_PTREGS(%r15) # address of register-save area
         sr      %r3,%r3
         icm     %r3,3,__LC_SUBCHANNEL_NR   # load subchannel nr & extend to int
-        l       %r4,__LC_IO_INT_PARM       # load interuption parm
-	l       %r5,__LC_IO_INT_WORD       # load interuption word
+        l       %r4,__LC_IO_INT_PARM       # load interruption parm
+	l       %r5,__LC_IO_INT_WORD       # load interruption word
         basr    %r14,%r1          # branch to standard irq handler
 
 io_return:

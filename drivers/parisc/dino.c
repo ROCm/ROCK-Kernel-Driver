@@ -403,7 +403,7 @@ ilr_again:
 
 		/*
 		 * Perform a binary search on set bits.
-		 * `Less than Fatal' and PS2 interupts aren't supported.
+		 * `Less than Fatal' and PS2 interrupts aren't supported.
 		 */
 		if (mask & 0xf) {
 			if (mask & 0x3) {

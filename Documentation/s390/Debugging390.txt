@@ -97,7 +97,7 @@ s/390 z/Architecture
 6       6     Input/Output interrupt Mask
 
 7       7     External interrupt Mask used primarily for interprocessor signalling & 
-	      clock interupts.
+	      clock interrupts.
 
 8-11  8-11    PSW Key used for complex memory protection mechanism not used under linux
 
@@ -2423,7 +2423,7 @@ chandev
 There is a new device layer for channel devices, some
 drivers e.g. lcs are registered with this layer.
 If the device uses the channel device layer you'll be
-able to find what interupts it uses & the current state 
+able to find what interrupts it uses & the current state 
 of the device.
 See the manpage chandev.8 &type cat /proc/chandev for more info.
 

@@ -890,7 +890,7 @@ xwidget_register(xwidget_hwid_t hwid,		/* widget's hardware ID */
     widget_info->w_einfo = 0;
     /*
      * get the name of this xwidget vertex and keep the info.
-     * This is needed during errors and interupts, but as
+     * This is needed during errors and interrupts, but as
      * long as we have it, we can use it elsewhere.
      */
     s = dev_to_name(widget,devnm,MAXDEVNAME);
