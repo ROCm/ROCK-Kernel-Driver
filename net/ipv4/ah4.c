@@ -86,29 +86,23 @@ static int ah_output(struct sk_buff **pskb)
 		top_iph = (struct iphdr*)skb_push(*pskb, x->props.header_len);
 		top_iph->ihl = 5;
 		top_iph->version = 4;
-		top_iph->tos = 0;
-		top_iph->tot_len = htons((*pskb)->len);
-		top_iph->frag_off = 0;
+		top_iph->tos = iph->tos;
+		if (x->props.flags & XFRM_STATE_NOECN)
+			IP_ECN_clear(top_iph);
+		top_iph->frag_off = iph->frag_off & ~htons(IP_MF|IP_OFFSET);
 		if (!(iph->frag_off&htons(IP_DF)))
 			__ip_select_ident(top_iph, dst, 0);
-		top_iph->ttl = 0;
-		top_iph->protocol = IPPROTO_AH;
-		top_iph->check = 0;
+		top_iph->ttl = iph->ttl;
 		top_iph->saddr = x->props.saddr.a4;
 		top_iph->daddr = x->id.daddr.a4;
+		memcpy(&tmp_iph, top_iph, 20);
+		memset(&(IPCB(*pskb)->opt), 0, sizeof(struct ip_options));
 		ah = (struct ip_auth_hdr*)(top_iph+1);
 		ah->nexthdr = IPPROTO_IPIP;
 	} else {
 		memcpy(&tmp_iph, (*pskb)->data, iph->ihl*4);
 		top_iph = (struct iphdr*)skb_push(*pskb, x->props.header_len);
 		memcpy(top_iph, &tmp_iph, iph->ihl*4);
-		iph = &tmp_iph.iph;
-		top_iph->tos = 0;
-		top_iph->tot_len = htons((*pskb)->len);
-		top_iph->frag_off = 0;
-		top_iph->ttl = 0;
-		top_iph->protocol = IPPROTO_AH;
-		top_iph->check = 0;
 		if (top_iph->ihl != 5) {
 			err = ip_clear_mutable_options(top_iph, &top_iph->daddr);
 			if (err)
@@ -117,6 +111,15 @@ static int ah_output(struct sk_buff **pskb)
 		ah = (struct ip_auth_hdr*)((char*)top_iph+iph->ihl*4);
 		ah->nexthdr = iph->protocol;
 	}
+
+	iph = &tmp_iph.iph;
+	top_iph->tos = 0;
+	top_iph->tot_len = htons((*pskb)->len);
+	top_iph->frag_off = 0;
+	top_iph->ttl = 0;
+	top_iph->protocol = IPPROTO_AH;
+	top_iph->check = 0;
+
 	ahp = x->data;
 	ah->hdrlen  = (XFRM_ALIGN8(sizeof(struct ip_auth_hdr) + 
 				   ahp->icv_trunc_len) >> 2) - 2;
@@ -127,13 +130,8 @@ static int ah_output(struct sk_buff **pskb)
 	ahp->icv(ahp, *pskb, ah->auth_data);
 	top_iph->tos = iph->tos;
 	top_iph->ttl = iph->ttl;
-	if (x->props.mode) {
-		if (x->props.flags & XFRM_STATE_NOECN)
-			IP_ECN_clear(top_iph);
-		top_iph->frag_off = iph->frag_off&~htons(IP_MF|IP_OFFSET);
-		memset(&(IPCB(*pskb)->opt), 0, sizeof(struct ip_options));
-	} else {
-		top_iph->frag_off = iph->frag_off;
+	top_iph->frag_off = iph->frag_off;
+	if (!x->props.mode) {
 		top_iph->daddr = iph->daddr;
 		if (iph->ihl != 5)
 			memcpy(top_iph+1, iph+1, iph->ihl*4 - sizeof(struct iphdr));

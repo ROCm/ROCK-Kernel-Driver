@@ -19,9 +19,6 @@
 #ifdef CONFIG_IP_MULTICAST
 #include <net/arp.h>
 #endif
-#ifdef CONFIG_VIRT_TIMER
-#include <asm/timer.h>
-#endif
 
 /*
  * memory management
@@ -52,17 +49,6 @@ EXPORT_SYMBOL(dump_fpu);
 EXPORT_SYMBOL(overflowuid);
 EXPORT_SYMBOL(overflowgid);
 EXPORT_SYMBOL(empty_zero_page);
-
-/*
- * virtual CPU timer
- */
-#ifdef CONFIG_VIRT_TIMER
-EXPORT_SYMBOL(init_virt_timer);
-EXPORT_SYMBOL(add_virt_timer);
-EXPORT_SYMBOL(add_virt_timer_periodic);
-EXPORT_SYMBOL(mod_virt_timer);
-EXPORT_SYMBOL(del_virt_timer);
-#endif
 
 /*
  * misc.

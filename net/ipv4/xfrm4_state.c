@@ -11,7 +11,7 @@
 #include <linux/pfkeyv2.h>
 #include <linux/ipsec.h>
 
-extern struct xfrm_state_afinfo xfrm4_state_afinfo;
+static struct xfrm_state_afinfo xfrm4_state_afinfo;
 
 static void
 __xfrm4_init_tempsel(struct xfrm_state *x, struct flowi *fl,

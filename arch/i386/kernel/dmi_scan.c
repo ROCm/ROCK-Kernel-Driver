@@ -164,51 +164,6 @@ static void __init dmi_save_ident(struct dmi_header *dm, int slot, int string)
 #define NO_MATCH	{ DMI_NONE, NULL}
 #define MATCH		DMI_MATCH
 
-/* 
- * Reboot options and system auto-detection code provided by
- * Dell Inc. so their systems "just work". :-)
- */
-
-/* 
- * Some machines require the "reboot=b"  commandline option, this quirk makes that automatic.
- */
-static __init int set_bios_reboot(struct dmi_blacklist *d)
-{
-	extern int reboot_thru_bios;
-	if (reboot_thru_bios == 0)
-	{
-		reboot_thru_bios = 1;
-		printk(KERN_INFO "%s series board detected. Selecting BIOS-method for reboots.\n", d->ident);
-	}
-	return 0;
-}
-
-/*
- * Some machines require the "reboot=s"  commandline option, this quirk makes that automatic.
- */
-static __init int set_smp_reboot(struct dmi_blacklist *d)
-{
-#ifdef CONFIG_SMP
-	extern int reboot_smp;
-	if (reboot_smp == 0)
-	{
-		reboot_smp = 1;
-		printk(KERN_INFO "%s series board detected. Selecting SMP-method for reboots.\n", d->ident);
-	}
-#endif
-	return 0;
-}
-
-/*
- * Some machines require the "reboot=b,s"  commandline option, this quirk makes that automatic.
- */
-static __init int set_smp_bios_reboot(struct dmi_blacklist *d)
-{
-	set_smp_reboot(d);
-	set_bios_reboot(d);
-	return 0;
-}
-
 /*
  * Some machines, usually laptops, can't handle an enabled local APIC.
  * The symptoms include hangs or reboots when suspending or resuming,
@@ -340,22 +295,7 @@ static __init int disable_acpi_pci(struct dmi_blacklist *d)
  */
  
 static __initdata struct dmi_blacklist dmi_blacklist[]={
-	{ set_smp_bios_reboot, "Dell PowerEdge 1300", {	/* Handle problems with rebooting on Dell 1300's */
-			MATCH(DMI_SYS_VENDOR, "Dell Computer Corporation"),
-			MATCH(DMI_PRODUCT_NAME, "PowerEdge 1300/"),
-			NO_MATCH, NO_MATCH
-			} },
-	{ set_bios_reboot, "Dell PowerEdge 300", {	/* Handle problems with rebooting on Dell 300's */
-			MATCH(DMI_SYS_VENDOR, "Dell Computer Corporation"),
-			MATCH(DMI_PRODUCT_NAME, "PowerEdge 300/"),
-			NO_MATCH, NO_MATCH
-			} },
-	{ set_bios_reboot, "Dell PowerEdge 2400", {  /* Handle problems with rebooting on Dell 2400's */
-			MATCH(DMI_SYS_VENDOR, "Dell Computer Corporation"),
-			MATCH(DMI_PRODUCT_NAME, "PowerEdge 2400"),
-			NO_MATCH, NO_MATCH
-			} },
-			
+
 	/* Machines which have problems handling enabled local APICs */
 
 	{ local_apic_kills_bios, "Dell Inspiron", {

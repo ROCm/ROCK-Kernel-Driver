@@ -23,6 +23,8 @@ obj-$(CONFIG_BINFMT_ELF32)	+= binfmt_elf32.o
 obj-$(CONFIG_ARCH_S390_31)	+= entry.o reipl.o
 obj-$(CONFIG_ARCH_S390X)	+= entry64.o reipl64.o
 
+obj-$(CONFIG_VIRT_TIMER)	+= vtime.o
+
 #
 # This is just to get the dependencies...
 #

@@ -96,6 +96,7 @@ struct Qdisc
 	struct net_device	*dev;
 
 	struct tc_stats		stats;
+	spinlock_t		*stats_lock;
 	struct rcu_head 	q_rcu;
 	int			(*reshape_fail)(struct sk_buff *skb, struct Qdisc *q);
 
@@ -376,6 +377,7 @@ struct tcf_police
 	struct qdisc_rate_table *P_tab;
 
 	struct tc_stats	stats;
+	spinlock_t	*stats_lock;
 };
 
 #ifdef CONFIG_NET_CLS_ACT
@@ -391,6 +393,7 @@ struct tcf_##name *next; \
 	int action; \
 	struct tcf_t tm; \
 	struct tc_stats stats; \
+	spinlock_t *stats_lock; \
 	spinlock_t lock
 
 
@@ -436,7 +439,7 @@ extern int tcf_act_police(struct sk_buff **skb, struct tc_action *a);
 #endif
 
 extern int tcf_police(struct sk_buff *skb, struct tcf_police *p);
-extern int qdisc_copy_stats(struct sk_buff *skb, struct tc_stats *st);
+extern int qdisc_copy_stats(struct sk_buff *skb, struct tc_stats *st, spinlock_t *lock);
 extern void tcf_police_destroy(struct tcf_police *p);
 extern struct tcf_police * tcf_police_locate(struct rtattr *rta, struct rtattr *est);
 extern int tcf_police_dump(struct sk_buff *skb, struct tcf_police *p);
@@ -479,7 +482,7 @@ void dev_deactivate(struct net_device *dev);
 void qdisc_reset(struct Qdisc *qdisc);
 void qdisc_destroy(struct Qdisc *qdisc);
 struct Qdisc * qdisc_create_dflt(struct net_device *dev, struct Qdisc_ops *ops);
-int qdisc_new_estimator(struct tc_stats *stats, struct rtattr *opt);
+int qdisc_new_estimator(struct tc_stats *stats, spinlock_t *stats_lock, struct rtattr *opt);
 void qdisc_kill_estimator(struct tc_stats *stats);
 struct qdisc_rate_table *qdisc_get_rtab(struct tc_ratespec *r, struct rtattr *tab);
 void qdisc_put_rtab(struct qdisc_rate_table *tab);

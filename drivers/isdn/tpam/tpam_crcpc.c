@@ -54,7 +54,7 @@ static void ap_hdlc_like_ctrl_char_list (u32 ctrl_char) {
 		
 }
 
-void init_CRC() {
+void init_CRC(void) {
 	ap_hdlc_like_ctrl_char_list(0xffffffff);
 }
 

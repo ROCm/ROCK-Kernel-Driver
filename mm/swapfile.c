@@ -1085,7 +1085,7 @@ asmlinkage long sys_swapoff(const char __user * specialfile)
 	if (IS_ERR(pathname))
 		goto out;
 
-	victim = filp_open(pathname, O_RDWR, 0);
+	victim = filp_open(pathname, O_RDWR|O_LARGEFILE, 0);
 	putname(pathname);
 	err = PTR_ERR(victim);
 	if (IS_ERR(victim))
@@ -1354,7 +1354,7 @@ asmlinkage long sys_swapon(const char __user * specialfile, int swap_flags)
 		name = NULL;
 		goto bad_swap_2;
 	}
-	swap_file = filp_open(name, O_RDWR, 0);
+	swap_file = filp_open(name, O_RDWR|O_LARGEFILE, 0);
 	error = PTR_ERR(swap_file);
 	if (IS_ERR(swap_file)) {
 		swap_file = NULL;

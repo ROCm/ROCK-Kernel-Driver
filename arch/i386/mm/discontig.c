@@ -87,8 +87,6 @@ void set_pmd_pfn(unsigned long vaddr, unsigned long pfn, pgprot_t flags);
  */
 int __init get_memcfg_numa_flat(void)
 {
-	int pfn;
-
 	printk("NUMA - single node, flat memory mode\n");
 
 	/* Run the memory configuration and find the top of memory. */
@@ -96,16 +94,7 @@ int __init get_memcfg_numa_flat(void)
 	node_start_pfn[0]  = 0;
 	node_end_pfn[0]	  = max_pfn;
 
-	/* Fill in the physnode_map with our simplistic memory model,
-	* all memory is in node 0.
-	*/
-	for (pfn = node_start_pfn[0]; pfn <= node_end_pfn[0];
-	       pfn += PAGES_PER_ELEMENT)
-	{
-		physnode_map[pfn / PAGES_PER_ELEMENT] = 0;
-	}
-
-         /* Indicate there is one node available. */
+        /* Indicate there is one node available. */
 	node_set_online(0);
 	numnodes = 1;
 	return 1;
@@ -234,7 +223,7 @@ unsigned long __init setup_memory(void)
 {
 	int nid;
 	unsigned long bootmap_size, system_start_pfn, system_max_low_pfn;
-	unsigned long reserve_pages;
+	unsigned long reserve_pages, pfn;
 
 	/*
 	 * When mapping a NUMA machine we allocate the node_mem_map arrays
@@ -244,6 +233,21 @@ unsigned long __init setup_memory(void)
 	 * and ZONE_HIGHMEM.
 	 */
 	get_memcfg_numa();
+
+	/* Fill in the physnode_map */
+	for (nid = 0; nid < numnodes; nid++) {
+		printk("Node: %d, start_pfn: %ld, end_pfn: %ld\n",
+				nid, node_start_pfn[nid], node_end_pfn[nid]);
+		printk("  Setting physnode_map array to node %d for pfns:\n  ",
+				nid);
+		for (pfn = node_start_pfn[nid]; pfn < node_end_pfn[nid];
+	       				pfn += PAGES_PER_ELEMENT) {
+			physnode_map[pfn / PAGES_PER_ELEMENT] = nid;
+			printk("%ld ", pfn);
+		}
+		printk("\n");
+	}
+
 	reserve_pages = calculate_numa_remap_pages();
 
 	/* partially used pages are not usable - thus round upwards */

@@ -37,17 +37,7 @@ struct tc_stats
 	__u32	bps;			/* Current flow byte rate */
 	__u32	pps;			/* Current flow packet rate */
 	__u32	qlen;
-#ifdef CONFIG_NET_CLS_ACT
-/* eventually remove the define here; adding this(useful) 
-field at least fixes the 8 byte layout problems we 
-have with MIPS and PPC because we have a u64
-*/
-	__u32	reqs;			/* number of requeues happened */
-#endif
 	__u32	backlog;
-#ifdef __KERNEL__
-	spinlock_t *lock;
-#endif
 };
 
 struct tc_estimator
@@ -439,11 +429,14 @@ enum {
 
 #define TCA_ATM_MAX	TCA_ATM_STATE
 
-/* Delay section */
-struct tc_dly_qopt
+/* Network emulator */
+struct tc_netem_qopt
 {
-	__u32	latency;
-	__u32   limit;
-	__u32	loss;
+	__u32	latency;	/* added delay (us) */
+	__u32   limit;		/* fifo limit (packets) */
+	__u32	loss;		/* random packet loss (0=none ~0=100%) */
+	__u32	gap;		/* re-ordering gap (0 for delay all) */
+	__u32   duplicate;	/* random packet dup  (0=none ~0=100%) */
+	__u32	rate;		/* maximum transmit rate (bytes/sec) */
 };
 #endif

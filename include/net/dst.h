@@ -142,15 +142,14 @@ struct dst_entry * dst_clone(struct dst_entry * dst)
 	return dst;
 }
 
+extern const char dst_underflow_bug_msg[];
+
 static inline
 void dst_release(struct dst_entry * dst)
 {
 	if (dst) {
-		if (atomic_read(&dst->__refcnt) < 1) {
-			printk("BUG: dst underflow %d: %p\n",
-			       atomic_read(&dst->__refcnt),
-			       current_text_addr());
-		}
+		if (atomic_read(&dst->__refcnt) < 1)
+			printk(dst_underflow_bug_msg, dst, current_text_addr());
 		atomic_dec(&dst->__refcnt);
 	}
 }

@@ -157,7 +157,7 @@ static kmem_cache_t *sigqueue_cachep;
 
 static int sig_ignored(struct task_struct *t, int sig)
 {
-	void * handler;
+	void __user * handler;
 
 	/*
 	 * Tracers always want to know about signals..
@@ -2362,13 +2362,13 @@ do_sigaltstack (const stack_t __user *uss, stack_t __user *uoss, unsigned long s
 	int error;
 
 	if (uoss) {
-		oss.ss_sp = (void *) current->sas_ss_sp;
+		oss.ss_sp = (void __user *) current->sas_ss_sp;
 		oss.ss_size = current->sas_ss_size;
 		oss.ss_flags = sas_ss_flags(sp);
 	}
 
 	if (uss) {
-		void *ss_sp;
+		void __user *ss_sp;
 		size_t ss_size;
 		int ss_flags;
 

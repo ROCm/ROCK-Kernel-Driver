@@ -50,7 +50,6 @@ bootup_user_stack:
  */
         .global root_flags, ram_flags, root_dev
         .global sparc_ramdisk_image, sparc_ramdisk_size
-	.globl	silo_args
 
         .ascii  "HdrS"
         .word   LINUX_VERSION_CODE

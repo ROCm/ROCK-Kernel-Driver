@@ -1,5 +1,5 @@
 /* 
- * $Id: iucv.c,v 1.33 2004/05/24 10:19:18 braunu Exp $
+ * $Id: iucv.c,v 1.34 2004/06/24 10:53:48 braunu Exp $
  *
  * IUCV network driver
  *
@@ -29,7 +29,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * RELEASE-TAG: IUCV lowlevel driver $Revision: 1.33 $
+ * RELEASE-TAG: IUCV lowlevel driver $Revision: 1.34 $
  *
  */
 
@@ -177,9 +177,11 @@ static handler **iucv_pathid_table;
 static unsigned long max_connections;
 
 /**
- * declare_flag: is 0 when iucv_declare_buffer has not been called
+ * iucv_cpuid: contains the logical cpu number of the cpu which
+ * has declared the iucv buffer by issuing DECLARE_BUFFER.
+ * If no cpu has done the initialization iucv_cpuid contains -1.
  */
-static int declare_flag;
+static int iucv_cpuid = -1;
 /**
  * register_flag: is 0 when external interrupt has not been registered
  */
@@ -352,7 +354,7 @@ do { \
 static void
 iucv_banner(void)
 {
-	char vbuf[] = "$Revision: 1.33 $";
+	char vbuf[] = "$Revision: 1.34 $";
 	char *version = vbuf;
 
 	if ((version = strchr(version, ':'))) {
@@ -631,16 +633,16 @@ iucv_remove_pathid(__u16 pathid)
 }
 
 /**
- * iucv_declare_buffer_cpu0
- * Register at VM for subsequent IUCV operations. This is always
- * executed on CPU 0. Called from iucv_declare_buffer().
+ * iucv_declare_buffer_cpuid
+ * Register at VM for subsequent IUCV operations. This is executed
+ * on the reserved CPU iucv_cpuid. Called from iucv_declare_buffer().
  */
 static void
-iucv_declare_buffer_cpu0 (void *result)
+iucv_declare_buffer_cpuid (void *result)
 {
 	iparml_db *parm;
 
-	if (!(result && (smp_processor_id() == 0)))
+	if (smp_processor_id() != iucv_cpuid)
 		return;
 	parm = (iparml_db *)grab_param();
 	parm->ipbfadr1 = virt_to_phys(iucv_external_int_buffer);
@@ -650,16 +652,17 @@ iucv_declare_buffer_cpu0 (void *result)
 }
 
 /**
- * iucv_retrieve_buffer_cpu0:
- * Unregister IUCV usage at VM. This is always executed on CPU 0.
+ * iucv_retrieve_buffer_cpuid:
+ * Unregister IUCV usage at VM. This is always executed on the same
+ * cpu that registered the buffer to VM.
  * Called from iucv_retrieve_buffer().
  */
 static void
-iucv_retrieve_buffer_cpu0 (void *result)
+iucv_retrieve_buffer_cpuid (void *cpu)
 {
 	iparml_control *parm;
 
-	if (smp_processor_id() != 0)
+	if (smp_processor_id() != iucv_cpuid)
 		return;
 	parm = (iparml_control *)grab_param();
 	b2f0(RETRIEVE_BUFFER, parm);
@@ -676,18 +679,22 @@ iucv_retrieve_buffer_cpu0 (void *result)
 static int
 iucv_declare_buffer (void)
 {
-	ulong b2f0_result = 0x0deadbeef;
+	unsigned long flags;
+	ulong b2f0_result;
 
 	iucv_debug(1, "entering");
-	preempt_disable();
-	if (smp_processor_id() == 0)
-		iucv_declare_buffer_cpu0(&b2f0_result);
-	else
-		smp_call_function(iucv_declare_buffer_cpu0, &b2f0_result, 0, 1);
-	preempt_enable();
-	iucv_debug(1, "Address of EIB = %p", iucv_external_int_buffer);
-	if (b2f0_result == 0x0deadbeef)
-	    b2f0_result = 0xaa;
+	spin_lock_irqsave (&iucv_lock, flags);
+	if (iucv_cpuid == -1) {
+		/* Reserve any cpu for use by iucv. */
+		iucv_cpuid = smp_get_cpu(CPU_MASK_ALL);
+		spin_unlock_irqrestore (&iucv_lock, flags);
+		smp_call_function(iucv_declare_buffer_cpuid,
+				  &b2f0_result, 0, 1);
+		iucv_debug(1, "Address of EIB = %p", iucv_external_int_buffer);
+	} else {
+		spin_unlock_irqrestore (&iucv_lock, flags);
+		b2f0_result = 0;
+	}
 	iucv_debug(1, "exiting");
 	return b2f0_result;
 }
@@ -702,14 +709,11 @@ static int
 iucv_retrieve_buffer (void)
 {
 	iucv_debug(1, "entering");
-	if (declare_flag) {
-		preempt_disable();
-		if (smp_processor_id() == 0)
-			iucv_retrieve_buffer_cpu0(0);
-		else
-			smp_call_function(iucv_retrieve_buffer_cpu0, 0, 0, 1);
-		declare_flag = 0;
-		preempt_enable();
+	if (iucv_cpuid != -1) {
+		smp_call_function(iucv_retrieve_buffer_cpuid, 0, 0, 1);
+		/* Release the cpu reserved by iucv_declare_buffer. */
+		smp_put_cpu(iucv_cpuid);
+		iucv_cpuid = -1;
 	}
 	iucv_debug(1, "exiting");
 	return 0;
@@ -862,38 +866,31 @@ iucv_register_program (__u8 pgmname[16],
 		return NULL;
 	}
 
-	if (declare_flag == 0) {
-		rc = iucv_declare_buffer();
-		if (rc) {
-			char *err = "Unknown";
-			iucv_remove_handler(new_handler);
-			kfree(new_handler);
-			switch(rc) {
-				case 0x03:
-					err = "Directory error";
-					break;
-				case 0x0a:
-					err = "Invalid length";
-					break;
-				case 0x13:
-					err = "Buffer already exists";
-					break;
-				case 0x3e:
-					err = "Buffer overlap";
-					break;
-				case 0x5c:
-					err = "Paging or storage error";
-					break;
-				case 0xaa:
-					err = "Function not called";
-					break;
-			}
-			printk(KERN_WARNING "%s: iucv_declare_buffer "
-			       "returned error 0x%02lx (%s)\n", __FUNCTION__, rc,
-			       err);
-			return NULL;
+	rc = iucv_declare_buffer();
+	if (rc) {
+		char *err = "Unknown";
+		iucv_remove_handler(new_handler);
+		kfree(new_handler);
+		switch(rc) {
+		case 0x03:
+			err = "Directory error";
+			break;
+		case 0x0a:
+			err = "Invalid length";
+			break;
+		case 0x13:
+			err = "Buffer already exists";
+			break;
+		case 0x3e:
+			err = "Buffer overlap";
+			break;
+		case 0x5c:
+			err = "Paging or storage error";
+			break;
 		}
-		declare_flag = 1;
+		printk(KERN_WARNING "%s: iucv_declare_buffer "
+		       "returned error 0x%02lx (%s)\n", __FUNCTION__, rc, err);
+		return NULL;
 	}
 	if (register_flag == 0) {
 		/* request the 0x4000 external interrupt */
@@ -2190,11 +2187,11 @@ iucv_send2way_prmmsg_array (__u16 pathid,
 }
 
 void
-iucv_setmask_cpu0 (void *result)
+iucv_setmask_cpuid (void *result)
 {
         iparml_set_mask *parm;
 
-        if (smp_processor_id() != 0)
+        if (smp_processor_id() != iucv_cpuid)
                 return;
 
         iucv_debug(1, "entering");
@@ -2228,14 +2225,15 @@ iucv_setmask (int SetMaskFlag)
 		ulong result;
 		__u8  param;
 	} u;
+	int cpu;
 
 	u.param = SetMaskFlag;
-	preempt_disable();
-	if (smp_processor_id() == 0)
-		iucv_setmask_cpu0(&u);
+	cpu = get_cpu();
+	if (cpu == iucv_cpuid)
+		iucv_setmask_cpuid(&u);
 	else
-		smp_call_function(iucv_setmask_cpu0, &u, 0, 1);
-	preempt_enable();
+		smp_call_function(iucv_setmask_cpuid, &u, 0, 1);
+	put_cpu();
 
 	return u.result;
 }

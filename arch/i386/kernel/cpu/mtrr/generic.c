@@ -18,7 +18,7 @@ struct mtrr_state {
 	mtrr_type def_type;
 };
 
-static unsigned long smp_changes_mask __initdata = 0;
+static unsigned long smp_changes_mask;
 struct mtrr_state mtrr_state = {};
 
 

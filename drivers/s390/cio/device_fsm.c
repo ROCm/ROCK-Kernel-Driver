@@ -165,8 +165,6 @@ ccw_device_handle_oper(struct ccw_device *cdev)
 		return;
 	}
 	cdev->private->flags.donotify = 1;
-	/* Get device online again. */
-	ccw_device_online(cdev);
 }
 
 /*
@@ -233,15 +231,23 @@ ccw_device_recog_done(struct ccw_device *cdev, int state)
 			  cdev->private->devno, sch->irq);
 		break;
 	case DEV_STATE_OFFLINE:
-		if (cdev->private->state == DEV_STATE_DISCONNECTED_SENSE_ID)
+		if (cdev->private->state == DEV_STATE_DISCONNECTED_SENSE_ID) {
+			ccw_device_handle_oper(cdev);
 			notify = 1;
-		else  /* fill out sense information */
-			cdev->id = (struct ccw_device_id) {
-				.cu_type   = cdev->private->senseid.cu_type,
-				.cu_model  = cdev->private->senseid.cu_model,
-				.dev_type  = cdev->private->senseid.dev_type,
-				.dev_model = cdev->private->senseid.dev_model,
-			};
+		}
+		/* fill out sense information */
+		cdev->id = (struct ccw_device_id) {
+			.cu_type   = cdev->private->senseid.cu_type,
+			.cu_model  = cdev->private->senseid.cu_model,
+			.dev_type  = cdev->private->senseid.dev_type,
+			.dev_model = cdev->private->senseid.dev_model,
+		};
+		if (notify) {
+			/* Get device online again. */
+			ccw_device_online(cdev);
+			wake_up(&cdev->private->wait_q);
+			return;
+		}
 		/* Issue device info message. */
 		CIO_DEBUG(KERN_INFO, 2, "SenseID : device %04x reports: "
 			  "CU  Type/Mod = %04X/%02X, Dev Type/Mod = "
@@ -256,10 +262,7 @@ ccw_device_recog_done(struct ccw_device *cdev, int state)
 		break;
 	}
 	cdev->private->state = state;
-	if (notify && state == DEV_STATE_OFFLINE)
-		ccw_device_handle_oper(cdev);
-	else
-		io_subchannel_recog_done(cdev);
+	io_subchannel_recog_done(cdev);
 	if (state != DEV_STATE_NOT_OPER)
 		wake_up(&cdev->private->wait_q);
 }

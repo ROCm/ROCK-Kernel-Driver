@@ -206,7 +206,6 @@ static void rose_remove_node(struct rose_node *rose_node)
 {
 	struct rose_node *s;
 
-	spin_lock_bh(&rose_node_list_lock);
 	if ((s = rose_node_list) == rose_node) {
 		rose_node_list = rose_node->next;
 		kfree(rose_node);

@@ -122,6 +122,7 @@ static int ax25_rt_add(struct ax25_routes_struct *route)
 					ax25_rt->digipeat->calls[i]    = route->digi_addr[i];
 				}
 			}
+			write_unlock(&ax25_route_lock);
 			return 0;
 		}
 		ax25_rt = ax25_rt->next;

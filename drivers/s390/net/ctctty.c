@@ -1,5 +1,5 @@
 /*
- * $Id: ctctty.c,v 1.17 2004/03/31 17:06:34 ptiedem Exp $
+ * $Id: ctctty.c,v 1.21 2004/07/02 16:31:22 ptiedem Exp $
  *
  * CTC / ESCON network driver, tty interface.
  *
@@ -30,6 +30,7 @@
 #include <asm/uaccess.h>
 #include <linux/devfs_fs_kernel.h>
 #include "ctctty.h"
+#include "ctcdbug.h"
 
 #define CTC_TTY_MAJOR       43
 #define CTC_TTY_MAX_DEVICES 64
@@ -103,6 +104,7 @@ ctc_tty_try_read(ctc_tty_info * info, struct sk_buff *skb)
 	int len;
 	struct tty_struct *tty;
 
+	DBF_TEXT(trace, 2, __FUNCTION__);
 	if ((tty = info->tty)) {
 		if (info->mcr & UART_MCR_RTS) {
 			c = TTY_FLIPBUF_SIZE - tty->flip.count;
@@ -132,6 +134,7 @@ ctc_tty_readmodem(ctc_tty_info *info)
 	int ret = 1;
 	struct tty_struct *tty;
 
+	DBF_TEXT(trace, 2, __FUNCTION__);
 	if ((tty = info->tty)) {
 		if (info->mcr & UART_MCR_RTS) {
 			int c = TTY_FLIPBUF_SIZE - tty->flip.count;
@@ -165,6 +168,7 @@ ctc_tty_setcarrier(struct net_device *netdev, int on)
 {
 	int i;
 
+	DBF_TEXT(trace, 2, __FUNCTION__);
 	if ((!driver) || ctc_tty_shuttingdown)
 		return;
 	for (i = 0; i < CTC_TTY_MAX_DEVICES; i++)
@@ -185,6 +189,7 @@ ctc_tty_netif_rx(struct sk_buff *skb)
 	int i;
 	ctc_tty_info *info = NULL;
 
+	DBF_TEXT(trace, 2, __FUNCTION__);
 	if (!skb)
 		return;
 	if ((!skb->dev) || (!driver) || ctc_tty_shuttingdown) {
@@ -249,6 +254,7 @@ ctc_tty_tint(ctc_tty_info * info)
 	int wake = 1;
 	int rc;
 
+	DBF_TEXT(trace, 2, __FUNCTION__);
 	if (!info->netdev) {
 		if (skb)
 			kfree_skb(skb);
@@ -341,6 +347,7 @@ ctc_tty_inject(ctc_tty_info *info, char c)
 	int skb_res;
 	struct sk_buff *skb;
 	
+	DBF_TEXT(trace, 2, __FUNCTION__);
 	if (ctc_tty_shuttingdown)
 		return;
 	skb_res = info->netdev->hard_header_len + sizeof(info->mcr) +
@@ -361,6 +368,7 @@ ctc_tty_inject(ctc_tty_info *info, char c)
 static void
 ctc_tty_transmit_status(ctc_tty_info *info)
 {
+	DBF_TEXT(trace, 2, __FUNCTION__);
 	if (ctc_tty_shuttingdown)
 		return;
 	info->flags |= CTC_ASYNC_TX_LINESTAT;
@@ -374,6 +382,7 @@ ctc_tty_change_speed(ctc_tty_info * info)
 	unsigned int quot;
 	int i;
 
+	DBF_TEXT(trace, 2, __FUNCTION__);
 	if (!info->tty || !info->tty->termios)
 		return;
 	cflag = info->tty->termios->c_cflag;
@@ -412,6 +421,7 @@ ctc_tty_change_speed(ctc_tty_info * info)
 static int
 ctc_tty_startup(ctc_tty_info * info)
 {
+	DBF_TEXT(trace, 2, __FUNCTION__);
 	if (info->flags & CTC_ASYNC_INITIALIZED)
 		return 0;
 #ifdef CTC_DEBUG_MODEM_OPEN
@@ -454,6 +464,7 @@ ctc_tty_stopdev(unsigned long data)
 static void
 ctc_tty_shutdown(ctc_tty_info * info)
 {
+	DBF_TEXT(trace, 2, __FUNCTION__);
 	if (!(info->flags & CTC_ASYNC_INITIALIZED))
 		return;
 #ifdef CTC_DEBUG_MODEM_OPEN
@@ -486,14 +497,17 @@ ctc_tty_write(struct tty_struct *tty, int from_user, const u_char * buf, int cou
 	int total = 0;
 	ctc_tty_info *info = (ctc_tty_info *) tty->driver_data;
 
+	DBF_TEXT(trace, 2, __FUNCTION__);
 	if (ctc_tty_shuttingdown)
-		return 0;
+		goto ex;
 	if (ctc_tty_paranoia_check(info, tty->name, "ctc_tty_write"))
-		return 0;
+		goto ex;
 	if (!tty)
-		return 0;
-	if (!info->netdev)
-		return -ENODEV;
+		goto ex;
+	if (!info->netdev) {
+		total = -ENODEV;
+		goto ex;
+	}
 	if (from_user)
 		down(&info->write_sem);
 	while (1) {
@@ -530,6 +544,8 @@ ctc_tty_write(struct tty_struct *tty, int from_user, const u_char * buf, int cou
 	}
 	if (from_user)
 		up(&info->write_sem);
+ex:
+	DBF_TEXT(trace, 6, __FUNCTION__);
 	return total;
 }
 
@@ -559,13 +575,14 @@ ctc_tty_flush_buffer(struct tty_struct *tty)
 	ctc_tty_info *info;
 	unsigned long flags;
 
+	DBF_TEXT(trace, 2, __FUNCTION__);
 	if (!tty)
-		return;
+		goto ex;
 	spin_lock_irqsave(&ctc_tty_lock, flags);
 	info = (ctc_tty_info *) tty->driver_data;
 	if (ctc_tty_paranoia_check(info, tty->name, "ctc_tty_flush_buffer")) {
 		spin_unlock_irqrestore(&ctc_tty_lock, flags);
-		return;
+		goto ex;
 	}
 	skb_queue_purge(&info->tx_queue);
 	info->lsr |= UART_LSR_TEMT;
@@ -574,6 +591,9 @@ ctc_tty_flush_buffer(struct tty_struct *tty)
 	if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
 	    tty->ldisc.write_wakeup)
 		(tty->ldisc.write_wakeup) (tty);
+ex:
+	DBF_TEXT_(trace, 2, "ex: %s ", __FUNCTION__);
+	return;
 }
 
 static void
@@ -783,7 +803,6 @@ ctc_tty_set_termios(struct tty_struct *tty, struct termios *old_termios)
 {
 	ctc_tty_info *info = (ctc_tty_info *) tty->driver_data;
 	unsigned int cflag = tty->termios->c_cflag;
-
 	ctc_tty_change_speed(info);
 
 	/* Handle transition to B0 */
@@ -1032,8 +1051,10 @@ ctc_tty_close(struct tty_struct *tty, struct file *filp)
 		}
 	}
 	ctc_tty_shutdown(info);
-	if (tty->driver->flush_buffer)
-		tty->driver->flush_buffer(tty);
+	if (tty->driver->flush_buffer) {
+		skb_queue_purge(&info->tx_queue);
+		info->lsr |= UART_LSR_TEMT;
+	}
 	if (tty->ldisc.flush_buffer)
 		tty->ldisc.flush_buffer(tty);
 	info->tty = 0;
@@ -1059,7 +1080,6 @@ ctc_tty_hangup(struct tty_struct *tty)
 {
 	ctc_tty_info *info = (ctc_tty_info *)tty->driver_data;
 	unsigned long saveflags;
-
 	if (ctc_tty_paranoia_check(info, tty->name, "ctc_tty_hangup"))
 		return;
 	ctc_tty_shutdown(info);
@@ -1185,6 +1205,21 @@ ctc_tty_register_netdev(struct net_device *dev) {
 		       "with NULL dev or NULL dev-name\n");
 		return -1;
 	}
+
+	/*
+	 *	If the name is a format string the caller wants us to
+	 *	do a name allocation : format string must end with %d
+	 */
+	if (strchr(dev->name, '%'))
+	{
+		int err = dev_alloc_name(dev, dev->name);	// dev->name is changed by this
+		if (err < 0) {
+			printk(KERN_DEBUG "dev_alloc returned error %d\n", err);
+			return err;
+		}
+
+	}
+
 	for (p = dev->name; p && ((*p < '0') || (*p > '9')); p++);
 	ttynum = simple_strtoul(p, &err, 0);
 	if ((ttynum < 0) || (ttynum >= CTC_TTY_MAX_DEVICES) ||

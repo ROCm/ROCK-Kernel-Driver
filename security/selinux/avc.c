@@ -71,15 +71,33 @@ struct avc_callback_node {
 };
 
 static spinlock_t avc_lock = SPIN_LOCK_UNLOCKED;
-static struct avc_node *avc_node_freelist = NULL;
+static struct avc_node *avc_node_freelist;
 static struct avc_cache avc_cache;
 static unsigned avc_cache_stats[AVC_NSTATS];
-static struct avc_callback_node *avc_callbacks = NULL;
+static struct avc_callback_node *avc_callbacks;
 
 static inline int avc_hash(u32 ssid, u32 tsid, u16 tclass)
 {
 	return (ssid ^ (tsid<<2) ^ (tclass<<4)) & (AVC_CACHE_SLOTS - 1);
 }
+
+#ifdef AVC_CACHE_STATS
+static inline void avc_cache_stats_incr(int type)
+{
+	avc_cache_stats[type]++;
+}
+
+static inline void avc_cache_stats_add(int type, unsigned val)
+{
+	avc_cache_stats[type] += val;
+}
+#else
+static inline void avc_cache_stats_incr(int type)
+{ }
+
+static inline void avc_cache_stats_add(int type, unsigned val)
+{ }
+#endif
 
 /**
  * avc_dump_av - Display an access vector in human-readable form.
@@ -172,15 +190,6 @@ void __init avc_init(void)
 {
 	struct avc_node	*new;
 	int i;
-
-	for (i = 0; i < AVC_NSTATS; i++)
-		avc_cache_stats[i] = 0;
-
-	for (i = 0; i < AVC_CACHE_SLOTS; i++)
-		avc_cache.slots[i] = 0;
-	avc_cache.lru_hint = 0;
-	avc_cache.active_nodes = 0;
-	avc_cache.latest_notif = 0;
 
 	for (i = 0; i < AVC_CACHE_MAXNODES; i++) {
 		new = kmalloc(sizeof(*new), GFP_ATOMIC);

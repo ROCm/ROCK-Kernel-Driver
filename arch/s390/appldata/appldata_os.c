@@ -98,8 +98,7 @@ static inline void appldata_print_debug(struct appldata_os_data *os_data)
 		LOAD_INT(a2), LOAD_FRAC(a2));
 
 	P_DEBUG("nr_cpus = %u\n", os_data->nr_cpus);
-	for (i = 0; i < NR_CPUS; i++) {
-		if (!cpu_online(i)) continue;
+	for (i = 0; i < os_data->nr_cpus; i++) {
 		P_DEBUG("cpu%u : user = %u, nice = %u, system = %u, "
 			"idle = %u, irq = %u, softirq = %u, iowait = %u\n",
 				i,
@@ -124,7 +123,7 @@ static inline void appldata_print_debug(struct appldata_os_data *os_data)
  */
 static void appldata_get_os_data(void *data)
 {
-	int i;
+	int i, j;
 	struct appldata_os_data *os_data;
 
 	os_data = data;
@@ -139,21 +138,23 @@ static void appldata_get_os_data(void *data)
 	os_data->avenrun[1] = avenrun[1] + (FIXED_1/200);
 	os_data->avenrun[2] = avenrun[2] + (FIXED_1/200);
 
-	for (i = 0; i < num_online_cpus(); i++) {
-		os_data->os_cpu[i].per_cpu_user =
+	j = 0;
+	for_each_online_cpu(i) {
+		os_data->os_cpu[j].per_cpu_user =
 					kstat_cpu(i).cpustat.user;
-		os_data->os_cpu[i].per_cpu_nice =
+		os_data->os_cpu[j].per_cpu_nice =
 					kstat_cpu(i).cpustat.nice;
-		os_data->os_cpu[i].per_cpu_system =
+		os_data->os_cpu[j].per_cpu_system =
 					kstat_cpu(i).cpustat.system;
-		os_data->os_cpu[i].per_cpu_idle =
+		os_data->os_cpu[j].per_cpu_idle =
 					kstat_cpu(i).cpustat.idle;
-		os_data->os_cpu[i].per_cpu_irq =
+		os_data->os_cpu[j].per_cpu_irq =
 					kstat_cpu(i).cpustat.irq;
-		os_data->os_cpu[i].per_cpu_softirq =
+		os_data->os_cpu[j].per_cpu_softirq =
 					kstat_cpu(i).cpustat.softirq;
-		os_data->os_cpu[i].per_cpu_iowait =
+		os_data->os_cpu[j].per_cpu_iowait =
 					kstat_cpu(i).cpustat.iowait;
+		j++;
 	}
 
 	os_data->timestamp = get_clock();

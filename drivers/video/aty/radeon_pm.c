@@ -319,24 +319,30 @@ static void radeon_pm_disable_iopad(struct radeonfb_info *rinfo)
 
 static void radeon_pm_program_v2clk(struct radeonfb_info *rinfo)
 {
+	/* we use __INPLL and _OUTPLL and do the locking ourselves... */
+	unsigned long flags;
+	spin_lock_irqsave(&rinfo->reg_lock, flags);
 	/* Set v2clk to 65MHz */
-  	OUTPLL(pllPIXCLKS_CNTL,
-  		INPLL(pllPIXCLKS_CNTL) & ~PIXCLKS_CNTL__PIX2CLK_SRC_SEL_MASK);
+  	__OUTPLL(pllPIXCLKS_CNTL,
+  		__INPLL(rinfo, pllPIXCLKS_CNTL) & ~PIXCLKS_CNTL__PIX2CLK_SRC_SEL_MASK);
 	 
-  	OUTPLL(pllP2PLL_REF_DIV, 0x0000000c);
-	OUTPLL(pllP2PLL_CNTL, 0x0000bf00);
-	OUTPLL(pllP2PLL_DIV_0, 0x00020074 | P2PLL_DIV_0__P2PLL_ATOMIC_UPDATE_W);
+  	__OUTPLL(pllP2PLL_REF_DIV, 0x0000000c);
+	__OUTPLL(pllP2PLL_CNTL, 0x0000bf00);
+	__OUTPLL(pllP2PLL_DIV_0, 0x00020074 | P2PLL_DIV_0__P2PLL_ATOMIC_UPDATE_W);
 	
-	OUTPLL(pllP2PLL_CNTL, INPLL(pllP2PLL_CNTL) & ~P2PLL_CNTL__P2PLL_SLEEP);
+	__OUTPLL(pllP2PLL_CNTL,
+		__INPLL(rinfo, pllP2PLL_CNTL) & ~P2PLL_CNTL__P2PLL_SLEEP);
 	mdelay(1);
 
-	OUTPLL(pllP2PLL_CNTL, INPLL(pllP2PLL_CNTL) & ~P2PLL_CNTL__P2PLL_RESET); 	
+	__OUTPLL(pllP2PLL_CNTL,
+		__INPLL(rinfo, pllP2PLL_CNTL) & ~P2PLL_CNTL__P2PLL_RESET);
 	mdelay( 1);
 
-  	OUTPLL(pllPIXCLKS_CNTL,
-  		(INPLL(pllPIXCLKS_CNTL) & ~PIXCLKS_CNTL__PIX2CLK_SRC_SEL_MASK)
+  	__OUTPLL(pllPIXCLKS_CNTL,
+  		(__INPLL(rinfo, pllPIXCLKS_CNTL) & ~PIXCLKS_CNTL__PIX2CLK_SRC_SEL_MASK)
   		| (0x03 << PIXCLKS_CNTL__PIX2CLK_SRC_SEL__SHIFT));
 	mdelay( 1);	
+	spin_unlock_irqrestore(&rinfo->reg_lock, flags);
 }
 
 static void radeon_pm_low_current(struct radeonfb_info *rinfo)
@@ -391,7 +397,7 @@ static void radeon_pm_setup_for_suspend(struct radeonfb_info *rinfo)
 	u32 pixclks_cntl;
 	u32 disp_mis_cntl;
 	u32 disp_pwr_man;
-
+	u32 tmp;
 	
 	/* Force Core Clocks */
 	sclk_cntl = INPLL( pllSCLK_CNTL_M6);
@@ -496,7 +502,10 @@ static void radeon_pm_setup_for_suspend(struct radeonfb_info *rinfo)
 	clk_pin_cntl = INPLL( pllCLK_PIN_CNTL);
 	
 	clk_pin_cntl &= ~CLK_PIN_CNTL__ACCESS_REGS_IN_SUSPEND;
-	OUTPLL( pllMCLK_MISC, INPLL( pllMCLK_MISC) | MCLK_MISC__EN_MCLK_TRISTATE_IN_SUSPEND);	
+
+	/* because both INPLL and OUTPLL take the same lock, that's why. */
+	tmp = INPLL( pllMCLK_MISC) | MCLK_MISC__EN_MCLK_TRISTATE_IN_SUSPEND;
+	OUTPLL( pllMCLK_MISC, tmp);
 	
 	/* AGP PLL control */
 	OUTREG(BUS_CNTL1, INREG(BUS_CNTL1) |  BUS_CNTL1__AGPCLK_VALID);
@@ -516,7 +525,9 @@ static void radeon_pm_setup_for_suspend(struct radeonfb_info *rinfo)
 		| (0x20<<AGP_CNTL__MAX_IDLE_CLK__SHIFT));
 
 	/* ACPI mode */
-	OUTPLL( pllPLL_PWRMGT_CNTL, INPLL( pllPLL_PWRMGT_CNTL) & ~PLL_PWRMGT_CNTL__PM_MODE_SEL);					
+	/* because both INPLL and OUTPLL take the same lock, that's why. */
+	tmp = INPLL( pllPLL_PWRMGT_CNTL) & ~PLL_PWRMGT_CNTL__PM_MODE_SEL;
+	OUTPLL( pllPLL_PWRMGT_CNTL, tmp);
 
 
 	disp_mis_cntl = INREG(DISP_MISC_CNTL);
@@ -767,6 +778,7 @@ static void radeon_pm_full_reset_sdram(struct radeonfb_info *rinfo)
 static void radeon_set_suspend(struct radeonfb_info *rinfo, int suspend)
 {
 	u16 pwr_cmd;
+	u32 tmp;
 
 	if (!rinfo->pm_reg)
 		return;
@@ -802,7 +814,9 @@ static void radeon_set_suspend(struct radeonfb_info *rinfo, int suspend)
 			radeon_pm_setup_for_suspend(rinfo);
 
 			/* Reset the MDLL */
-			OUTPLL( pllMDLL_CKO, INPLL( pllMDLL_CKO) | MDLL_CKO__MCKOA_RESET | MDLL_CKO__MCKOB_RESET);
+			/* because both INPLL and OUTPLL take the same lock, that's why. */
+			tmp = INPLL( pllMDLL_CKO) | MDLL_CKO__MCKOA_RESET | MDLL_CKO__MCKOB_RESET;
+			OUTPLL( pllMDLL_CKO, tmp );
 		}
 
 		/* Switch PCI power managment to D2. */

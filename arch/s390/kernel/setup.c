@@ -58,8 +58,6 @@ struct {
 } memory_chunk[MEMORY_CHUNKS] = { { 0 } };
 #define CHUNK_READ_WRITE 0
 #define CHUNK_READ_ONLY 1
-int cpus_initialized = 0;
-static cpumask_t cpu_initialized;
 volatile int __cpu_logical_map[NR_CPUS]; /* logical cpu to cpu address */
 
 /*
@@ -85,14 +83,7 @@ static struct resource data_resource = { "Kernel data", 0, 0 };
  */
 void __devinit cpu_init (void)
 {
-        int nr = smp_processor_id();
         int addr = hard_smp_processor_id();
-
-        if (cpu_test_and_set(nr,cpu_initialized)) {
-                printk("CPU#%d ALREADY INITIALIZED!!!!!!!!!\n", nr);
-                for (;;) local_irq_enable();
-        }
-        cpus_initialized++;
 
         /*
          * Store processor id in lowcore (used e.g. in timer_interrupt)

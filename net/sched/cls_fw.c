@@ -506,7 +506,8 @@ static int fw_dump(struct tcf_proto *tp, unsigned long fh,
 #else
 #ifdef CONFIG_NET_CLS_POLICE
 	if (f->police) {
-		if (qdisc_copy_stats(skb, &f->police->stats))
+		if (qdisc_copy_stats(skb, &f->police->stats,
+				     f->police->stats_lock))
 			goto rtattr_failure;
 	}
 #endif
