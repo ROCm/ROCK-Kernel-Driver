@@ -1281,10 +1281,8 @@ int swsusp_read(void)
  *	swsusp_close - close swap device.
  */
 
-int swsusp_close(void)
+void swsusp_close(void)
 {
-	int error;
-
 	if (IS_ERR(resume_bdev)) {
 		pr_debug("swsusp: block device not initialised\n");
 		return;
