@@ -120,7 +120,7 @@ static const char *version =
 /*====================================================================*/
 
 socket_state_t dead_socket = {
-    0, SS_DETECT, 0, 0, 0
+	.csc_mask	= SS_DETECT,
 };
 
 
