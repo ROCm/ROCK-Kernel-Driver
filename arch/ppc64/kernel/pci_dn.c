@@ -196,11 +196,9 @@ void __init pci_devs_phb_init(void)
 
 static void __init pci_fixup_bus_sysdata_list(struct list_head *bus_list)
 {
-	struct list_head *ln;
 	struct pci_bus *bus;
 
-	for (ln = bus_list->next; ln != bus_list; ln = ln->next) {
-		bus = pci_bus_b(ln);
+	list_for_each_entry(bus, bus_list, node) {
 		if (bus->self)
 			bus->sysdata = bus->self->sysdata;
 		pci_fixup_bus_sysdata_list(&bus->children);
