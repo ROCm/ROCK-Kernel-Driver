@@ -71,6 +71,7 @@ typedef struct {
 
 /* The tape drive descriptor */
 typedef struct {
+	char name[8];
 	kdev_t devt;
 	Scsi_Device *device;
 	struct semaphore lock;	/* For serialization */
