@@ -380,6 +380,7 @@ typedef struct {
 	unsigned int ali_slot;			/* ALI DMA slot */
 	struct ac97_pcm *pcm;
 	int pcm_open_flag;
+	unsigned int page_attr_changed: 1;
 } ichdev_t;
 
 typedef struct _snd_intel8x0 intel8x0_t;
@@ -946,13 +947,19 @@ static int snd_intel8x0_hw_params(snd_pcm_substream_t * substream,
 	int dbl = params_rate(hw_params) > 48000;
 	int err;
 
-	if (chip->fix_nocache && runtime->dma_area && runtime->dma_bytes < size)
+	if (chip->fix_nocache && ichdev->page_attr_changed) {
 		fill_nocache(runtime->dma_area, runtime->dma_bytes, 0); /* clear */
+		ichdev->page_attr_changed = 0;
+	}
 	err = snd_pcm_lib_malloc_pages(substream, params_buffer_bytes(hw_params));
 	if (err < 0)
 		return err;
-	if (chip->fix_nocache && err > 0)
-		fill_nocache(runtime->dma_area, runtime->dma_bytes, 1);
+	if (chip->fix_nocache) {
+		if (runtime->dma_area && ! ichdev->page_attr_changed) {
+			fill_nocache(runtime->dma_area, runtime->dma_bytes, 1);
+			ichdev->page_attr_changed = 1;
+		}
+	}
 	if (ichdev->pcm_open_flag) {
 		snd_ac97_pcm_close(ichdev->pcm);
 		ichdev->pcm_open_flag = 0;
@@ -978,8 +985,10 @@ static int snd_intel8x0_hw_free(snd_pcm_substream_t * substream)
 		snd_ac97_pcm_close(ichdev->pcm);
 		ichdev->pcm_open_flag = 0;
 	}
-	if (chip->fix_nocache && substream->runtime->dma_area)
+	if (chip->fix_nocache && ichdev->page_attr_changed) {
 		fill_nocache(substream->runtime->dma_area, substream->runtime->dma_bytes, 0);
+		ichdev->page_attr_changed = 0;
+	}
 	return snd_pcm_lib_free_pages(substream);
 }
 
@@ -2291,6 +2300,17 @@ static int intel8x0_suspend(snd_card_t *card, unsigned int state)
 
 	for (i = 0; i < chip->pcm_devs; i++)
 		snd_pcm_suspend_all(chip->pcm[i]);
+	/* clear nocache */
+	if (chip->fix_nocache) {
+		for (i = 0; i < chip->bdbars_count; i++) {
+			ichdev_t *ichdev = &chip->ichd[i];
+			if (ichdev->substream && ichdev->page_attr_changed) {
+				snd_pcm_runtime_t *runtime = ichdev->substream->runtime;
+				if (runtime->dma_area)
+					fill_nocache(runtime->dma_area, runtime->dma_bytes, 0);
+			}
+		}
+	}
 	for (i = 0; i < 3; i++)
 		if (chip->ac97[i])
 			snd_ac97_suspend(chip->ac97[i]);
@@ -2320,7 +2340,7 @@ static int intel8x0_resume(snd_card_t *card, unsigned int state)
 	if (chip->fix_nocache) {
 		for (i = 0; i < chip->bdbars_count; i++) {
 			ichdev_t *ichdev = &chip->ichd[i];
-			if (ichdev->substream) {
+			if (ichdev->substream && ichdev->page_attr_changed) {
 				snd_pcm_runtime_t *runtime = ichdev->substream->runtime;
 				if (runtime->dma_area)
 					fill_nocache(runtime->dma_area, runtime->dma_bytes, 1);
