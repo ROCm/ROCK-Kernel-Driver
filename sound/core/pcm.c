@@ -852,11 +852,15 @@ static int snd_pcm_dev_disconnect(snd_device_t *device)
 {
 	snd_pcm_t *pcm = snd_magic_cast(snd_pcm_t, device->device_data, return -ENXIO);
 	struct list_head *list;
-	int idx;
+	snd_pcm_substream_t *substream;
+	int idx, cidx;
 
 	down(&register_mutex);
 	idx = (pcm->card->number * SNDRV_PCM_DEVICES) + pcm->device;
 	snd_pcm_devices[idx] = NULL;
+	for (cidx = 0; cidx < 2; cidx++)
+		for (substream = pcm->streams[cidx].substream; substream; substream = substream->next)
+			substream->runtime->status->state = SNDRV_PCM_STATE_DISCONNECTED;
 	list_for_each(list, &snd_pcm_notify_list) {
 		snd_pcm_notify_t *notify;
 		notify = list_entry(list, snd_pcm_notify_t, list);

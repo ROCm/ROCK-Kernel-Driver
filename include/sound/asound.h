@@ -283,7 +283,8 @@ enum sndrv_pcm_state {
 	SNDRV_PCM_STATE_DRAINING,	/* stream is draining */
 	SNDRV_PCM_STATE_PAUSED,		/* stream is paused */
 	SNDRV_PCM_STATE_SUSPENDED,	/* hardware is suspended */
-	SNDRV_PCM_STATE_LAST = SNDRV_PCM_STATE_SUSPENDED,
+	SNDRV_PCM_STATE_DISCONNECTED,	/* hardware is disconnected */
+	SNDRV_PCM_STATE_LAST = SNDRV_PCM_STATE_DISCONNECTED,
 };
 
 enum {
