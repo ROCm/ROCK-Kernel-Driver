@@ -726,6 +726,7 @@ GLOBAL_ENTRY(ia64_leave_syscall)
 	mov b6=r22				// restore b6
 	shr.u r18=r19,16	// get byte size of existing "dirty" partition
 (pKStk) br.cond.dpnt.many skip_rbs_switch
+(pNonSys) br.cond.dpnt.many dont_preserve_current_frame
 	br.cond.sptk.many rbs_switch
 END(ia64_leave_syscall)
 

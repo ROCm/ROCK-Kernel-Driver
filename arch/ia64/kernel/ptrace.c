@@ -29,6 +29,11 @@
 #include <asm/perfmon.h>
 #endif
 
+#include "entry.h"
+
+#define p4	(1UL << 4)	/* for pSys (see entry.h) */
+#define p5	(1UL << 5)	/* for pNonSys (see entry.h) */
+
 /*
  * Bits in the PSR that we allow ptrace() to change:
  *	be, up, ac, mfl, mfh (the user mask; five bits total)
@@ -50,6 +55,14 @@
 #else
 # define dprintk(format...)
 #endif
+
+/* Return TRUE if PT was created due to kernel-entry via a system-call.  */
+
+static inline int
+in_syscall (struct pt_regs *pt)
+{
+	return (long) pt->cr_ifs >= 0;
+}
 
 /*
  * Collect the NaT bits for r1-r31 from scratch_unat and return a NaT
@@ -272,7 +285,7 @@ put_rnat (struct task_struct *task, struct switch_stack *sw,
 	ubspstore = (unsigned long *) pt->ar_bspstore;
 
 	urbs_kargs = urbs_end;
-	if ((long)pt->cr_ifs >= 0) {
+	if (in_syscall(pt)) {
 		/*
 		 * If entered via syscall, don't allow user to set rnat bits
 		 * for syscall args.
@@ -331,6 +344,13 @@ put_rnat (struct task_struct *task, struct switch_stack *sw,
 		*rnat1_kaddr = ((*rnat1_kaddr & ~m) | (rnat1 & m));
 }
 
+static inline int
+on_kernel_rbs (unsigned long addr, unsigned long bspstore, unsigned long urbs_end)
+{
+	return (addr >= bspstore
+		&& addr <= (unsigned long) ia64_rse_rnat_addr((unsigned long *) urbs_end));
+}
+
 /*
  * Read a word from the user-level backing store of task CHILD.  ADDR is the user-level
  * address to read the word from, VAL a pointer to the return value, and USER_BSP gives
@@ -355,7 +375,7 @@ ia64_peek (struct task_struct *child, struct switch_stack *child_stack, unsigned
 	child_regs = ia64_task_regs(child);
 	bspstore = (unsigned long *) child_regs->ar_bspstore;
 	krbs = (unsigned long *) child + IA64_RBS_OFFSET/8;
-	if (laddr >= bspstore && laddr <= ia64_rse_rnat_addr(urbs_end)) {
+	if (on_kernel_rbs(addr, (unsigned long) bspstore, (unsigned long) urbs_end)) {
 		/*
 		 * Attempt to read the RBS in an area that's actually on the kernel RBS =>
 		 * read the corresponding bits in the kernel RBS.
@@ -406,7 +426,7 @@ ia64_poke (struct task_struct *child, struct switch_stack *child_stack, unsigned
 	child_regs = ia64_task_regs(child);
 	bspstore = (unsigned long *) child_regs->ar_bspstore;
 	krbs = (unsigned long *) child + IA64_RBS_OFFSET/8;
-	if (laddr >= bspstore && laddr <= ia64_rse_rnat_addr(urbs_end)) {
+	if (on_kernel_rbs(addr, (unsigned long) bspstore, (unsigned long) urbs_end)) {
 		/*
 		 * Attempt to write the RBS in an area that's actually on the kernel RBS
 		 * => write the corresponding bits in the kernel RBS.
@@ -443,7 +463,7 @@ ia64_get_user_rbs_end (struct task_struct *child, struct pt_regs *pt, unsigned l
 	ndirty = ia64_rse_num_regs(krbs, krbs + (pt->loadrs >> 19));
 	cfm = pt->cr_ifs & ~(1UL << 63);
 
-	if ((long) pt->cr_ifs >= 0) {
+	if (in_syscall(pt)) {
 		/*
 		 * If bit 63 of cr.ifs is cleared, the kernel was entered via a system
 		 * call and we need to recover the CFM that existed on entry to the
@@ -483,134 +503,80 @@ ia64_sync_user_rbs (struct task_struct *child, struct switch_stack *sw,
 	return 0;
 }
 
-/*
- * Simulate user-level "flushrs".  Note: we can't just add pt->loadrs>>16 to
- * pt->ar_bspstore because the kernel backing store and the user-level backing store may
- * have different alignments (and therefore a different number of intervening rnat slots).
- */
-static void
-user_flushrs (struct task_struct *task, struct pt_regs *pt)
+static inline int
+thread_matches (struct task_struct *thread, unsigned long addr)
 {
-	unsigned long *krbs;
-	long ndirty;
+	unsigned long thread_rbs_end;
+	struct pt_regs *thread_regs;
 
-	krbs = (unsigned long *) task + IA64_RBS_OFFSET/8;
-	ndirty = ia64_rse_num_regs(krbs, krbs + (pt->loadrs >> 19));
+	if (ptrace_check_attach(thread, 0) < 0)
+		/*
+		 * If the thread is not in an attachable state, we'll ignore it.
+		 * The net effect is that if ADDR happens to overlap with the
+		 * portion of the thread's register backing store that is
+		 * currently residing on the thread's kernel stack, then ptrace()
+		 * may end up accessing a stale value.  But if the thread isn't
+		 * stopped, that's a problem anyhow, so we're doing as well as we
+		 * can...
+		 */
+		return 0;
 
-	pt->ar_bspstore = (unsigned long) ia64_rse_skip_regs((unsigned long *) pt->ar_bspstore,
-							     ndirty);
-	pt->loadrs = 0;
+	thread_regs = ia64_task_regs(thread);
+	thread_rbs_end = ia64_get_user_rbs_end(thread, thread_regs, NULL);
+	if (!on_kernel_rbs(addr, thread_regs->ar_bspstore, thread_rbs_end))
+		return 0;
+
+	return 1;	/* looks like we've got a winner */
 }
-
-static inline void
-sync_user_rbs_one_thread (struct task_struct *p, int make_writable)
-{
-	struct switch_stack *sw;
-	unsigned long urbs_end;
-	struct pt_regs *pt;
-
-	sw = (struct switch_stack *) (p->thread.ksp + 16);
-	pt = ia64_task_regs(p);
-	urbs_end = ia64_get_user_rbs_end(p, pt, NULL);
-	ia64_sync_user_rbs(p, sw, pt->ar_bspstore, urbs_end);
-	if (make_writable)
-		user_flushrs(p, pt);
-}
-
-struct task_list {
-	struct task_list *next;
-	struct task_struct *task;
-};
-
-#ifdef CONFIG_SMP
-
-static inline void
-collect_task (struct task_list **listp, struct task_struct *p, int make_writable)
-{
-	struct task_list *e;
-
-	e = kmalloc(sizeof(*e), GFP_KERNEL);
-	if (!e)
-		/* oops, can't collect more: finish at least what we collected so far... */
-		return;
-
-	get_task_struct(p);
-	e->task = p;
-	e->next = *listp;
-	*listp = e;
-}
-
-static inline struct task_list *
-finish_task (struct task_list *list, int make_writable)
-{
-	struct task_list *next = list->next;
-
-	sync_user_rbs_one_thread(list->task, make_writable);
-	put_task_struct(list->task);
-	kfree(list);
-	return next;
-}
-
-#else
-# define collect_task(list, p, make_writable)	sync_user_rbs_one_thread(p, make_writable)
-# define finish_task(list, make_writable)	(NULL)
-#endif
 
 /*
- * Synchronize the RSE backing store of CHILD and all tasks that share the address space
- * with it.  CHILD_URBS_END is the address of the end of the register backing store of
- * CHILD.  If MAKE_WRITABLE is set, a user-level "flushrs" is simulated such that the VM
- * can be written via ptrace() and the tasks will pick up the newly written values.  It
- * would be OK to unconditionally simulate a "flushrs", but this would be more intrusive
- * than strictly necessary (e.g., it would make it impossible to obtain the original value
- * of ar.bspstore).
+ * GDB apparently wants to be able to read the register-backing store of any thread when
+ * attached to a given process.  If we are peeking or poking an address that happens to
+ * reside in the kernel-backing store of another thread, we need to attach to that thread,
+ * because otherwise we end up accessing stale data.
+ *
+ * task_list_lock must be read-locked before calling this routine!
  */
-static void
-threads_sync_user_rbs (struct task_struct *child, unsigned long child_urbs_end, int make_writable)
+static struct task_struct *
+find_thread_for_addr (struct task_struct *child, unsigned long addr)
 {
-	struct switch_stack *sw;
 	struct task_struct *g, *p;
 	struct mm_struct *mm;
-	struct pt_regs *pt;
-	long multi_threaded;
+	int mm_users;
 
-	task_lock(child);
-	{
-		mm = child->mm;
-		multi_threaded = mm && (atomic_read(&mm->mm_users) > 1);
-	}
-	task_unlock(child);
+	if (!(mm = get_task_mm(child)))
+		return child;
 
-	if (!multi_threaded) {
-		sw = (struct switch_stack *) (child->thread.ksp + 16);
-		pt = ia64_task_regs(child);
-		ia64_sync_user_rbs(child, sw, pt->ar_bspstore, child_urbs_end);
-		if (make_writable)
-			user_flushrs(child, pt);
-	} else {
-		/*
-		 * Note: we can't call ia64_sync_user_rbs() while holding the
-		 * tasklist_lock because that may cause a dead-lock: ia64_sync_user_rbs()
-		 * may indirectly call tlb_flush_all(), which triggers an IPI.
-		 * Furthermore, tasklist_lock is acquired by fork() with interrupts
-		 * disabled, so with the right timing, the IPI never completes, hence
-		 * tasklist_lock never gets released, hence fork() never completes...
-		 */
-		struct task_list *list = NULL;
+	mm_users = atomic_read(&mm->mm_users) - 1;	/* -1 because of our get_task_mm()... */
+	if (mm_users <= 1)
+		goto out;		/* not multi-threaded */
 
-		read_lock(&tasklist_lock);
-		{
-			do_each_thread(g, p) {
-				if (p->mm == mm && p->state != TASK_RUNNING)
-					collect_task(&list, p, make_writable);
-			} while_each_thread(g, p);
+	/*
+	 * First, traverse the child's thread-list.  Good for scalability with
+	 * NPTL-threads.
+	 */
+	p = child;
+	do {
+		if (thread_matches(p, addr)) {
+			child = p;
+			goto out;
 		}
-		read_unlock(&tasklist_lock);
+		if (mm_users-- <= 1)
+			goto out;
+	} while ((p = next_thread(p)) != child);
 
-		while (list)
-			list = finish_task(list, make_writable);
-	}
-	child->thread.flags |= IA64_THREAD_KRBS_SYNCED;	/* set the flag in the child thread only */
+	do_each_thread(g, p) {
+		if (child->mm != mm)
+			continue;
+
+		if (thread_matches(p, addr)) {
+			child = p;
+			goto out;
+		}
+	} while_each_thread(g, p);
+  out:
+	mmput(mm);
+	return child;
 }
 
 /*
@@ -668,12 +634,40 @@ access_fr (struct unw_frame_info *info, int regnum, int hi, unsigned long *data,
 	return ret;
 }
 
+/*
+ * Change the machine-state of CHILD such that it will return via the normal
+ * kernel exit-path, rather than the syscall-exit path.
+ */
+static void
+convert_to_non_syscall (struct task_struct *child, struct pt_regs  *pt, unsigned long cfm)
+{
+	struct unw_frame_info info, prev_info;
+	unsigned long ip, pr;
+
+	unw_init_from_blocked_task(&info, child);
+	while (1) {
+		prev_info = info;
+		if (unw_unwind(&info) < 0)
+			return;
+		if (unw_get_rp(&info, &ip) < 0)
+			return;
+		if (ip < FIXADDR_USER_END)
+			break;
+	}
+
+	unw_get_pr(&prev_info, &pr);
+	pr &= ~pSys;
+	pr |= pNonSys;
+	unw_set_pr(&prev_info, pr);
+
+	pt->cr_ifs = (1UL << 63) | cfm;
+}
+
 static int
 access_uarea (struct task_struct *child, unsigned long addr, unsigned long *data, int write_access)
 {
-	unsigned long *ptr, regnum, urbs_end, rnat_addr;
+	unsigned long *ptr, regnum, urbs_end, rnat_addr, cfm;
 	struct switch_stack *sw;
-	struct unw_frame_info info;
 	struct pt_regs *pt;
 
 	pt = ia64_task_regs(child);
@@ -778,13 +772,30 @@ access_uarea (struct task_struct *child, unsigned long addr, unsigned long *data
 			 * By convention, we use PT_AR_BSP to refer to the end of the user-level
 			 * backing store.  Use ia64_rse_skip_regs(PT_AR_BSP, -CFM.sof) to get
 			 * the real value of ar.bsp at the time the kernel was entered.
+			 *
+			 * Furthermore, when changing the contents of PT_AR_BSP (or
+			 * PT_CFM) we MUST copy any users-level stacked registers that are
+			 * stored on the kernel stack back to user-space because
+			 * otherwise, we might end up clobbering kernel stacked registers.
+			 * Also, if this happens while the task is blocked in a system
+			 * call, which convert the state such that the non-system-call
+			 * exit path is used.  This ensures that the proper state will be
+			 * picked up when resuming execution.  However, it *also* means
+			 * that once we write PT_AR_BSP/PT_CFM, it won't be possible to
+			 * modify the syscall arguments of the pending system call any
+			 * longer.  This shouldn't be an issue because modifying
+			 * PT_AR_BSP/PT_CFM generally implies that we're either abandoning
+			 * the pending system call or that we defer it's re-execution
+			 * (e.g., due to GDB doing an inferior function call).
 			 */
-			urbs_end = ia64_get_user_rbs_end(child, pt, NULL);
+			urbs_end = ia64_get_user_rbs_end(child, pt, &cfm);
 			if (write_access) {
 				if (*data != urbs_end) {
 					if (ia64_sync_user_rbs(child, sw,
 							       pt->ar_bspstore, urbs_end) < 0)
 						return -1;
+					if (in_syscall(pt))
+						convert_to_non_syscall(child, pt, cfm);
 					/* simulate user-level write of ar.bsp: */
 					pt->loadrs = 0;
 					pt->ar_bspstore = *data;
@@ -794,27 +805,19 @@ access_uarea (struct task_struct *child, unsigned long addr, unsigned long *data
 			return 0;
 
 		      case PT_CFM:
-			if ((long) pt->cr_ifs < 0) {
-				if (write_access)
+			urbs_end = ia64_get_user_rbs_end(child, pt, &cfm);
+			if (write_access) {
+				if (((cfm ^ *data) & 0x3fffffffffU) != 0) {
+					if (ia64_sync_user_rbs(child, sw,
+							       pt->ar_bspstore, urbs_end) < 0)
+						return -1;
+					if (in_syscall(pt))
+						convert_to_non_syscall(child, pt, cfm);
 					pt->cr_ifs = ((pt->cr_ifs & ~0x3fffffffffUL)
 						      | (*data & 0x3fffffffffUL));
-				else
-					*data = pt->cr_ifs & 0x3fffffffffUL;
-			} else {
-				/* kernel was entered through a system call */
-				unsigned long cfm;
-
-				unw_init_from_blocked_task(&info, child);
-				if (unw_unwind_to_user(&info) < 0)
-					return -1;
-
-				unw_get_cfm(&info, &cfm);
-				if (write_access)
-					unw_set_cfm(&info, ((cfm & ~0x3fffffffffU)
-							    | (*data & 0x3fffffffffUL)));
-				else
-					*data = cfm;
-			}
+				}
+			} else
+				*data = cfm;
 			return 0;
 
 		      case PT_CR_IPSR:
@@ -1240,9 +1243,6 @@ ptrace_disable (struct task_struct *child)
 	/* make sure the single step/take-branch tra bits are not set: */
 	child_psr->ss = 0;
 	child_psr->tb = 0;
-
-	/* Turn off flag indicating that the KRBS is sync'd with child's VM: */
-	child->thread.flags &= ~IA64_THREAD_KRBS_SYNCED;
 }
 
 asmlinkage long
@@ -1250,7 +1250,7 @@ sys_ptrace (long request, pid_t pid, unsigned long addr, unsigned long data,
 	    long arg4, long arg5, long arg6, long arg7, long stack)
 {
 	struct pt_regs *pt, *regs = (struct pt_regs *) &stack;
-	unsigned long urbs_end;
+	unsigned long urbs_end, peek_or_poke;
 	struct task_struct *child;
 	struct switch_stack *sw;
 	long ret;
@@ -1269,12 +1269,17 @@ sys_ptrace (long request, pid_t pid, unsigned long addr, unsigned long data,
 		goto out;
 	}
 
+	peek_or_poke = (request == PTRACE_PEEKTEXT || request == PTRACE_PEEKDATA
+			|| request == PTRACE_POKETEXT || request == PTRACE_POKEDATA);
 	ret = -ESRCH;
 	read_lock(&tasklist_lock);
 	{
 		child = find_task_by_pid(pid);
-		if (child)
+		if (child) {
+			if (peek_or_poke)
+				child = find_thread_for_addr(child, addr);
 			get_task_struct(child);
+		}
 	}
 	read_unlock(&tasklist_lock);
 	if (!child)
@@ -1299,10 +1304,6 @@ sys_ptrace (long request, pid_t pid, unsigned long addr, unsigned long data,
 	      case PTRACE_PEEKTEXT:
 	      case PTRACE_PEEKDATA:		/* read word at location addr */
 		urbs_end = ia64_get_user_rbs_end(child, pt, NULL);
-
-		if (!(child->thread.flags & IA64_THREAD_KRBS_SYNCED))
-			threads_sync_user_rbs(child, urbs_end, 0);
-
 		ret = ia64_peek(child, sw, urbs_end, addr, &data);
 		if (ret == 0) {
 			ret = data;
@@ -1313,9 +1314,6 @@ sys_ptrace (long request, pid_t pid, unsigned long addr, unsigned long data,
 	      case PTRACE_POKETEXT:
 	      case PTRACE_POKEDATA:		/* write the word at location addr */
 		urbs_end = ia64_get_user_rbs_end(child, pt, NULL);
-		if (!(child->thread.flags & IA64_THREAD_KRBS_SYNCED))
-			threads_sync_user_rbs(child, urbs_end, 1);
-
 		ret = ia64_poke(child, sw, urbs_end, addr, data);
 		goto out_tsk;
 
@@ -1359,9 +1357,6 @@ sys_ptrace (long request, pid_t pid, unsigned long addr, unsigned long data,
 		ia64_psr(pt)->ss = 0;
 		ia64_psr(pt)->tb = 0;
 
-		/* Turn off flag indicating that the KRBS is sync'd with child's VM: */
-		child->thread.flags &= ~IA64_THREAD_KRBS_SYNCED;
-
 		wake_up_process(child);
 		ret = 0;
 		goto out_tsk;
@@ -1380,9 +1375,6 @@ sys_ptrace (long request, pid_t pid, unsigned long addr, unsigned long data,
 		ia64_psr(pt)->ss = 0;
 		ia64_psr(pt)->tb = 0;
 
-		/* Turn off flag indicating that the KRBS is sync'd with child's VM: */
-		child->thread.flags &= ~IA64_THREAD_KRBS_SYNCED;
-
 		wake_up_process(child);
 		ret = 0;
 		goto out_tsk;
@@ -1400,9 +1392,6 @@ sys_ptrace (long request, pid_t pid, unsigned long addr, unsigned long data,
 			ia64_psr(pt)->tb = 1;
 		}
 		child->exit_code = data;
-
-		/* Turn off flag indicating that the KRBS is sync'd with child's VM: */
-		child->thread.flags &= ~IA64_THREAD_KRBS_SYNCED;
 
 		/* give it a chance to run. */
 		wake_up_process(child);
