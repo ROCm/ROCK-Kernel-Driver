@@ -30,7 +30,6 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
-
 #include "xfs.h"
 
 #include "xfs_macros.h"
@@ -858,7 +857,7 @@ xfs_inobt_lookup(
 	xfs_agblock_t		agbno;	/* a.g. relative btree block number */
 	xfs_agnumber_t		agno;	/* allocation group number */
 	xfs_inobt_block_t	*block=NULL;	/* current btree block */
-	int			diff;	/* difference for the current key */
+	__int64_t		diff;	/* difference for the current key */
 	int			error;	/* error return value */
 	int			keyno=0;	/* current key number */
 	int			level;	/* level in the btree */
@@ -883,7 +882,7 @@ xfs_inobt_lookup(
 	 */
 	for (level = cur->bc_nlevels - 1, diff = 1; level >= 0; level--) {
 		xfs_buf_t	*bp;	/* buffer pointer for btree block */
-		xfs_daddr_t		d;	/* disk address of btree block */
+		xfs_daddr_t	d;	/* disk address of btree block */
 
 		/*
 		 * Get the disk address we're looking for.
@@ -977,7 +976,8 @@ xfs_inobt_lookup(
 				/*
 				 * Compute difference to get next direction.
 				 */
-				diff = (int)startino - cur->bc_rec.i.ir_startino;
+				diff = (__int64_t)
+					startino - cur->bc_rec.i.ir_startino;
 				/*
 				 * Less than, move right.
 				 */
