@@ -668,13 +668,14 @@ mptscsih_io_done(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *mr)
 		scsi_state = pScsiReply->SCSIState;
 		scsi_status = pScsiReply->SCSIStatus;
 		xfer_cnt = le32_to_cpu(pScsiReply->TransferCount);
+		sc->resid = sc->request_bufflen - xfer_cnt;
 
-		dreplyprintk((KERN_NOTICE " Reply (%d:%d:%d) mf=%p, mr=%p, sc=%p\n",
-				ioc->id, pScsiReq->TargetID, pScsiReq->LUN[1],
-				mf, mr, sc));
-		dreplyprintk((KERN_NOTICE "IOCStatus=%04xh SCSIState=%02xh"
-				" SCSIStatus=%02xh xfer_cnt=%08xh\n",
-				status, scsi_state, scsi_status, xfer_cnt));
+		dreplyprintk((KERN_NOTICE "Reply ha=%d id=%d lun=%d:\n"
+			"IOCStatus=%04xh SCSIState=%02xh SCSIStatus=%02xh\n"
+			"resid=%d bufflen=%d xfer_cnt=%d\n",
+			ioc->id, pScsiReq->TargetID, pScsiReq->LUN[1],
+			status, scsi_state, scsi_status, sc->resid, 
+			sc->request_bufflen, xfer_cnt));
 
 		if (scsi_state & MPI_SCSI_STATE_AUTOSENSE_VALID)
 			copy_sense_data(sc, hd, mf, pScsiReply);
@@ -724,7 +725,6 @@ mptscsih_io_done(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *mr)
 			break;
 
 		case MPI_IOCSTATUS_SCSI_RESIDUAL_MISMATCH:	/* 0x0049 */
-			sc->resid = sc->request_bufflen - xfer_cnt;
 			if ( xfer_cnt >= sc->underflow ) {
 				/* Sufficient data transfer occurred */
 				sc->result = (DID_OK << 16) | scsi_status;
@@ -753,7 +753,7 @@ mptscsih_io_done(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *mr)
 				 */
 				;
 			} else {
-				if ( (xfer_cnt == 0) || (sc->underflow > xfer_cnt)) {
+				if (xfer_cnt < sc->underflow) {
 					sc->result = DID_SOFT_ERROR << 16;
 				}
 				if (scsi_state & (MPI_SCSI_STATE_AUTOSENSE_FAILED | MPI_SCSI_STATE_NO_SCSI_STATUS)) {
@@ -767,15 +767,9 @@ mptscsih_io_done(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *mr)
 				}
 			}
 
-			/* Give report and update residual count.
-			 */
 			dreplyprintk((KERN_NOTICE "  sc->underflow={report ERR if < %02xh bytes xfer'd}\n",
 					sc->underflow));
 			dreplyprintk((KERN_NOTICE "  ActBytesXferd=%02xh\n", xfer_cnt));
-
-			sc->resid = sc->request_bufflen - xfer_cnt;
-			dreplyprintk((KERN_NOTICE "  SET sc->resid=%02xh\n", sc->resid));
-			
 			/* Report Queue Full
 			 */
 			if (scsi_status == MPI_SCSI_STATUS_TASK_SET_FULL)
@@ -830,7 +824,7 @@ mptscsih_io_done(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *mr)
 			break;
 
 		case MPI_IOCSTATUS_SCSI_PROTOCOL_ERROR:		/* 0x0047 */
-				sc->result = DID_SOFT_ERROR << 16;
+			sc->result = DID_SOFT_ERROR << 16;
 			break;
 
 		case MPI_IOCSTATUS_INVALID_FUNCTION:		/* 0x0001 */
