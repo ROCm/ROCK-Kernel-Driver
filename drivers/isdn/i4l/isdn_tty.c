@@ -2095,11 +2095,10 @@ isdn_tty_init(void)
 #endif
 		kfree(info->xmit_buf - 4);
 	}
- err_unregister_tty:
-	tty_unregister_driver(&isdn_mdm->tty_modem);
+	tty_unregister_driver(m->tty_modem);
  err:
-	put_tty_driver(&isdn_mdm->tty_modem);
-	isdn_mdm->tty_modem = NULL;
+	put_tty_driver(m->tty_modem);
+	m->tty_modem = NULL;
 	return retval;
 }
 
@@ -2118,9 +2117,9 @@ isdn_tty_exit(void)
 #endif
 		kfree(info->xmit_buf - 4);
 	}
-	tty_unregister_driver(&isdn_mdm->tty_modem);
-	put_tty_driver(&isdn_mdm->tty_modem);
-	isdn_mdm->tty_modem = NULL;
+	tty_unregister_driver(isdn_mdm.tty_modem);
+	put_tty_driver(isdn_mdm.tty_modem);
+	isdn_mdm.tty_modem = NULL;
 }
 
 /*
