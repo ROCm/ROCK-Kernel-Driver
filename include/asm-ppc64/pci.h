@@ -149,9 +149,6 @@ int pci_mmap_page_range(struct pci_dev *pdev, struct vm_area_struct *vma,
 /* Tell drivers/pci/proc.c that we have pci_mmap_page_range() */
 #define HAVE_PCI_MMAP	1
 
-#define sg_dma_address(sg)	((sg)->dma_address)
-#define sg_dma_len(sg)		((sg)->dma_length)
-
 #define pci_map_page(dev, page, off, size, dir) \
 		pci_map_single(dev, (page_address(page) + (off)), size, dir)
 #define pci_unmap_page(dev,addr,sz,dir) pci_unmap_single(dev,addr,sz,dir)

@@ -92,7 +92,7 @@
 	NFSERR_NOT_SAME = 10027,	/*       v4 */
 	NFSERR_LOCK_RANGE = 10028,	/*       v4 */
 	NFSERR_SYMLINK = 10029,		/*       v4 */
-	NFSERR_READDIR_NOSPC = 10030,	/*       v4 */
+	NFSERR_RESTOREFH = 10030,	/*       v4 */
 	NFSERR_LEASE_MOVED = 10031,	/*       v4 */
 	NFSERR_ATTRNOTSUPP = 10032,	/*       v4 */
 	NFSERR_NO_GRACE = 10033,	/*       v4 */

@@ -51,7 +51,7 @@
 #include <asm/uaccess.h>
 
 
-#define MODULE_VERSION "1.0"
+#define MODULE_VERS "1.0"
 #define MODULE_NAME "procfs_example"
 
 #define FOOBAR_LEN 8
@@ -185,7 +185,7 @@ static int __init init_procfs_example(void)
 
 	/* everything OK */
 	printk(KERN_INFO "%s %s initialised\n",
-	       MODULE_NAME, MODULE_VERSION);
+	       MODULE_NAME, MODULE_VERS);
 	return 0;
 
 no_symlink:
@@ -213,7 +213,7 @@ static void __exit cleanup_procfs_example(void)
 	remove_proc_entry(MODULE_NAME, NULL);
 
 	printk(KERN_INFO "%s %s removed\n",
-	       MODULE_NAME, MODULE_VERSION);
+	       MODULE_NAME, MODULE_VERS);
 }
 
 

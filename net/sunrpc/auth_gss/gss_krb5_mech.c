@@ -39,6 +39,8 @@
 #include <linux/types.h>
 #include <linux/slab.h>
 #include <linux/sunrpc/auth.h>
+#include <linux/in.h>
+#include <linux/sunrpc/svcauth_gss.h>
 #include <linux/sunrpc/gss_krb5.h>
 #include <linux/sunrpc/xdr.h>
 #include <linux/crypto.h>
@@ -232,6 +234,8 @@ static int __init init_kerberos_module(void)
 	gm = gss_mech_get_by_OID(&gss_mech_krb5_oid);
 	gss_register_triple(RPC_AUTH_GSS_KRB5 , gm, 0, RPC_GSS_SVC_NONE);
 	gss_register_triple(RPC_AUTH_GSS_KRB5I, gm, 0, RPC_GSS_SVC_INTEGRITY);
+	if (svcauth_gss_register_pseudoflavor(RPC_AUTH_GSS_KRB5, "krb5"))
+		printk("Failed to register %s with server!\n", "krb5");
 	gss_mech_put(gm);
 	return 0;
 }

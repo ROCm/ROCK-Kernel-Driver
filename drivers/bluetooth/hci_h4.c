@@ -229,7 +229,7 @@ static int h4_recv(struct hci_uart *hu, void *data, int count)
 
 		default:
 			BT_ERR("Unknown HCI packet type %2.2x", (__u8)*ptr);
-			hu->hdev.stat.err_rx++;
+			hu->hdev->stat.err_rx++;
 			ptr++; count--;
 			continue;
 		};
@@ -243,7 +243,7 @@ static int h4_recv(struct hci_uart *hu, void *data, int count)
 			h4->rx_count = 0;
 			return 0;
 		}
-		h4->rx_skb->dev = (void *) &hu->hdev;
+		h4->rx_skb->dev = (void *) hu->hdev;
 		h4->rx_skb->pkt_type = type;
 	}
 	return count;

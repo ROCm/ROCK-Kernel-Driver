@@ -29,7 +29,7 @@
 #include <asm/hvcall.h>
 #include <asm/cputable.h>
 
-#define MODULE_VERSION "1.0"
+#define MODULE_VERS "1.0"
 #define MODULE_NAME "lparcfg"
 
 static struct proc_dir_entry *proc_ppc64_lparcfg;

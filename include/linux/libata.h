@@ -70,6 +70,7 @@
 
 enum {
 	/* various global constants */
+	LIBATA_MAX_PRD		= ATA_MAX_PRD / 2,
 	ATA_MAX_PORTS		= 8,
 	ATA_DEF_QUEUE		= 1,
 	ATA_MAX_QUEUE		= 1,

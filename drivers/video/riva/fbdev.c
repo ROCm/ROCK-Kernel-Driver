@@ -1530,9 +1530,9 @@ static int rivafb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 			break;
 		}
 		
-		move_buf_aligned(info, data, src, d_pitch, s_pitch, info->cursor.image.height);
+		fb_move_buf_aligned(info, &info->sprite, data, d_pitch, src, s_pitch, info->cursor.image.height);
 
-		move_buf_aligned(info, mask, msk, d_pitch, s_pitch, info->cursor.image.height);
+		fb_move_buf_aligned(info, &info->sprite, mask, d_pitch, msk, s_pitch, info->cursor.image.height);
 
 		bg = ((info->cmap.red[bg_idx] & 0xf8) << 7) |
 		     ((info->cmap.green[bg_idx] & 0xf8) << 2) |

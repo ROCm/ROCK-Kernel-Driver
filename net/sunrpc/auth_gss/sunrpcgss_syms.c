@@ -8,6 +8,7 @@
 #include <linux/unistd.h>
 
 #include <linux/sunrpc/auth_gss.h>
+#include <linux/sunrpc/svcauth_gss.h>
 #include <linux/sunrpc/gss_asn1.h>
 
 /* sec_triples: */
@@ -17,6 +18,7 @@ EXPORT_SYMBOL(gss_cmp_triples);
 EXPORT_SYMBOL(gss_pseudoflavor_to_mechOID);
 EXPORT_SYMBOL(gss_pseudoflavor_supported);
 EXPORT_SYMBOL(gss_pseudoflavor_to_service);
+EXPORT_SYMBOL(svcauth_gss_register_pseudoflavor);
 
 /* registering gss mechanisms to the mech switching code: */
 EXPORT_SYMBOL(gss_mech_register);

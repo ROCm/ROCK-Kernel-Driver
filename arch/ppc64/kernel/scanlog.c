@@ -30,7 +30,7 @@
 #include <asm/prom.h>
 #include <asm/proc_fs.h>
 
-#define MODULE_VERSION "1.0"
+#define MODULE_VERS "1.0"
 #define MODULE_NAME "scanlog"
 
 /* Status returns from ibm,scan-log-dump */
