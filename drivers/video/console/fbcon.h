@@ -18,28 +18,6 @@
 
 #include <asm/io.h>
 
-struct display;
-
-    /*                                  
-     *  `switch' for the Low Level Operations
-     */
- 
-struct display_switch {                                                
-    void (*bmove)(struct display *p, int sy, int sx, int dy, int dx,
-		  int height, int width);
-    /* for clear, conp may be NULL, which means use a blanking (black) color */
-    void (*clear)(struct vc_data *conp, struct display *p, int sy, int sx,
-		  int height, int width);
-    void (*putcs)(struct vc_data *conp, struct display *p, const unsigned short *s,
-		  int count, int yy, int xx);     
-    void (*cursor)(struct display *p, int flags, int xx, int yy);
-    void (*clear_margins)(struct vc_data *conp, struct display *p,
-			  int bottom_only);
-    unsigned int fontwidthmask;      /* 1 at (1 << (width - 1)) if width is supported */
-}; 
-
-extern struct display_switch fbcon_dummy;
-
    /*
     *    This is the interface between the low-level console driver and the
     *    low-level frame buffer device
@@ -65,6 +43,7 @@ struct display {
     short yscroll;                  /* Hardware scrolling */
     unsigned char fgshift, bgshift;
     unsigned short charmask;        /* 0xff or 0x1ff */
+    unsigned int fontwidthmask;      /* 1 at (1 << (width - 1)) if width is supported */
 };
 
 /* drivers/video/console/fbcon.c */

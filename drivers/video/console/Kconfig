@@ -85,7 +85,7 @@ config DUMMY_CONSOLE
 	default y
 
 config FRAMEBUFFER_CONSOLE
-	bool "Framebuffer Console support"
+	tristate "Framebuffer Console support"
 	depends on FB
 
 config PCI_CONSOLE
@@ -117,48 +117,6 @@ config FBCON_ADVANCED
 	  (some of) them as modules, read <file:Documentation/modules.txt>.
 
 	  If unsure, say N.
-
-config FBCON_AFB
-	tristate "Amiga bitplanes support" if FBCON_ADVANCED
-	depends on FRAMEBUFFER_CONSOLE 
-	default m if !FBCON_ADVANCED && FB_AMIGA=m
-	default y if !FBCON_ADVANCED && FB_AMIGA=y
-	help
-	  This is the low level frame buffer console driver for 1 to 8
-	  bitplanes (2 to 256 colors) on Amiga.
-
-config FBCON_ILBM
-	tristate "Amiga interleaved bitplanes support" if FBCON_ADVANCED
-	depends on FRAMEBUFFER_CONSOLE 
-	default m if !FBCON_ADVANCED && FB_AMIGA=m
-	default y if !FBCON_ADVANCED && FB_AMIGA=y
-	help
-	  This is the low level frame buffer console driver for 1 to 8
-	  interleaved bitplanes (2 to 256 colors) on Amiga.
-
-config FBCON_IPLAN2P2
-	tristate "Atari interleaved bitplanes (2 planes) support" if FBCON_ADVANCED
-	depends on FRAMEBUFFER_CONSOLE 
-	default y if !FBCON_ADVANCED && FB_ATARI
-	help
-	  This is the low level frame buffer console driver for 2 interleaved
-	  bitplanes (4 colors) on Atari.
-
-config FBCON_IPLAN2P4
-	tristate "Atari interleaved bitplanes (4 planes) support" if FBCON_ADVANCED
-	depends on FRAMEBUFFER_CONSOLE 
-	default y if !FBCON_ADVANCED && FB_ATARI
-	help
-	  This is the low level frame buffer console driver for 4 interleaved
-	  bitplanes (16 colors) on Atari.
-
-config FBCON_IPLAN2P8
-	tristate "Atari interleaved bitplanes (8 planes) support" if FBCON_ADVANCED
-	depends on FRAMEBUFFER_CONSOLE 
-	default y if !FBCON_ADVANCED && FB_ATARI
-	help
-	  This is the low level frame buffer console driver for 8 interleaved
-	  bitplanes (256 colors) on Atari.
 
 # Guess what we need
 config FBCON_STI

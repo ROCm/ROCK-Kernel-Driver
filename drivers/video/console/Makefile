@@ -5,9 +5,7 @@
 # All of the (potential) objects that export symbols.
 # This list comes from 'grep -l EXPORT_SYMBOL *.[hc]'.
 
-export-objs    	:= fbcon.o fbcon-accel.o fbcon-afb.o fbcon-ilbm.o \
-		   fbcon-iplan2p2.o fbcon-iplan2p4.o fbcon-iplan2p8.o \
-		   fbcon-hga.o
+export-objs    	:= fbcon.o
 
 # Each configuration option enables a list of files.
 
@@ -17,6 +15,8 @@ obj-$(CONFIG_PROM_CONSOLE)        += promcon.o promcon_tbl.o
 obj-$(CONFIG_STI_CONSOLE)         += sticon.o sticore.o
 obj-$(CONFIG_VGA_CONSOLE)         += vgacon.o
 obj-$(CONFIG_MDA_CONSOLE)         += mdacon.o
+obj-$(CONFIG_FRAMEBUFFER_CONSOLE) += fbcon.o fonts.o
+
 
 obj-$(CONFIG_FONT_SUN8x16)        += font_sun8x16.o
 obj-$(CONFIG_FONT_SUN12x22)       += font_sun12x22.o
@@ -27,15 +27,8 @@ obj-$(CONFIG_FONT_PEARL_8x8)      += font_pearl_8x8.o
 obj-$(CONFIG_FONT_ACORN_8x8)      += font_acorn_8x8.o
 obj-$(CONFIG_FONT_MINI_4x6)       += font_mini_4x6.o
 
-obj-$(CONFIG_FRAMEBUFFER_CONSOLE) += fbcon.o fonts.o fbcon-accel.o
-
 # Generic Low Level Drivers
 
-obj-$(CONFIG_FBCON_AFB)           += fbcon-afb.o
-obj-$(CONFIG_FBCON_ILBM)          += fbcon-ilbm.o
-obj-$(CONFIG_FBCON_IPLAN2P2)      += fbcon-iplan2p2.o
-obj-$(CONFIG_FBCON_IPLAN2P4)      += fbcon-iplan2p4.o
-obj-$(CONFIG_FBCON_IPLAN2P8)      += fbcon-iplan2p8.o
 obj-$(CONFIG_FBCON_STI)           += fbcon-sti.o
 
 # Files generated that shall be removed upon make clean
