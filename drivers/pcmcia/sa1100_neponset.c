@@ -3,6 +3,7 @@
  *
  * Neponset PCMCIA specific routines
  */
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/device.h>
@@ -127,6 +128,7 @@ neponset_pcmcia_configure_socket(int sock, const struct pcmcia_configure *conf)
 }
 
 static struct pcmcia_low_level neponset_pcmcia_ops = {
+	.owner			= THIS_MODULE,
 	.init			= neponset_pcmcia_init,
 	.shutdown		= sa1111_pcmcia_shutdown,
 	.socket_state		= sa1111_pcmcia_socket_state,
@@ -137,17 +139,17 @@ static struct pcmcia_low_level neponset_pcmcia_ops = {
 	.socket_suspend		= sa1111_pcmcia_socket_suspend,
 };
 
-int __init pcmcia_neponset_init(void)
+int __init pcmcia_neponset_init(struct device *dev)
 {
 	int ret = -ENODEV;
 
 	if (machine_is_assabet())
-		ret = sa1100_register_pcmcia(&neponset_pcmcia_ops);
+		ret = sa1100_register_pcmcia(&neponset_pcmcia_ops, dev);
 
 	return ret;
 }
 
-void __devexit pcmcia_neponset_exit(void)
+void __devexit pcmcia_neponset_exit(struct device *dev)
 {
-	sa1100_unregister_pcmcia(&neponset_pcmcia_ops);
+	sa1100_unregister_pcmcia(&neponset_pcmcia_ops, dev);
 }

@@ -4,8 +4,10 @@
  * PCMCIA implementation routines for simpad
  *
  */
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
+#include <linux/device.h>
 #include <linux/init.h>
 
 #include <asm/hardware.h>
@@ -146,6 +148,7 @@ static int simpad_pcmcia_socket_suspend(int sock)
 }
 
 static struct pcmcia_low_level simpad_pcmcia_ops = { 
+  .owner		= THIS_MODULE,
   .init			= simpad_pcmcia_init,
   .shutdown		= simpad_pcmcia_shutdown,
   .socket_state		= simpad_pcmcia_socket_state,
@@ -156,17 +159,17 @@ static struct pcmcia_low_level simpad_pcmcia_ops = {
   .socket_suspend	= simpad_pcmcia_socket_suspend,
 };
 
-int __init pcmcia_simpad_init(void)
+int __init pcmcia_simpad_init(struct device *dev)
 {
 	int ret = -ENODEV;
 
 	if (machine_is_simpad())
-		ret = sa1100_register_pcmcia(&simpad_pcmcia_ops);
+		ret = sa1100_register_pcmcia(&simpad_pcmcia_ops, dev);
 
 	return ret;
 }
 
-void __exit pcmcia_simpad_exit(void)
+void __exit pcmcia_simpad_exit(struct device *dev)
 {
-	sa1100_unregister_pcmcia(&simpad_pcmcia_ops);
+	sa1100_unregister_pcmcia(&simpad_pcmcia_ops, dev);
 }

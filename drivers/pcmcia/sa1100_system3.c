@@ -25,9 +25,11 @@
  *
  *
  */
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/init.h>
+#include <linux/device.h>
 #include <linux/ioport.h>
 
 #include <asm/hardware.h>
@@ -99,8 +101,9 @@ static void system3_pcmcia_socket_state(int sock, struct pcmcia_state *state)
 }
 
 struct pcmcia_low_level system3_pcmcia_ops = {
-	.init				= system3_pcmcia_init,
-	.shutdown			= system3_pcmcia_shutdown,
+	.owner			= THIS_MODULE,
+	.init			= system3_pcmcia_init,
+	.shutdown		= system3_pcmcia_shutdown,
 	.socket_state		= system3_pcmcia_socket_state,
 	.get_irq_info		= sa1111_pcmcia_get_irq_info,
 	.configure_socket	= system3_pcmcia_configure_socket,
@@ -109,17 +112,17 @@ struct pcmcia_low_level system3_pcmcia_ops = {
 	.socket_suspend		= sa1111_pcmcia_socket_suspend,
 };
 
-int __init pcmcia_system3_init(void)
+int __init pcmcia_system3_init(struct device *dev)
 {
 	int ret = -ENODEV;
 
 	if (machine_is_pt_system3())
-		ret = sa1100_register_pcmcia(&system3_pcmcia_ops);
+		ret = sa1100_register_pcmcia(&system3_pcmcia_ops, dev);
 
 	return ret;
 }
 
-void __exit pcmcia_system3_exit(void)
+void __exit pcmcia_system3_exit(struct device *dev)
 {
-	sa1100_unregister_pcmcia(&system3_pcmcia_ops);
+	sa1100_unregister_pcmcia(&system3_pcmcia_ops, dev);
 }

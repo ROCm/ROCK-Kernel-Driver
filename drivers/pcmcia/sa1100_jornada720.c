@@ -4,6 +4,7 @@
  * Jornada720 PCMCIA specific routines
  *
  */
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/device.h>
@@ -90,7 +91,7 @@ printk("%s(): config socket %d vcc %d vpp %d\n", __FUNCTION__,
     return -1;
   }
 
-  ret = sa1111_pcmcia_configure_socket(conf);
+  ret = sa1111_pcmcia_configure_socket(sock, conf);
   if (ret == 0) {
     unsigned long flags;
 
@@ -103,6 +104,7 @@ printk("%s(): config socket %d vcc %d vpp %d\n", __FUNCTION__,
 }
 
 static struct pcmcia_low_level jornada720_pcmcia_ops = {
+  .owner		= THIS_MODULE,
   .init			= jornada720_pcmcia_init,
   .shutdown		= sa1111_pcmcia_shutdown,
   .socket_state		= sa1111_pcmcia_socket_state,
@@ -113,17 +115,17 @@ static struct pcmcia_low_level jornada720_pcmcia_ops = {
   .socket_suspend	= sa1111_pcmcia_socket_suspend,
 };
 
-int __init pcmcia_jornada720_init(void)
+int __init pcmcia_jornada720_init(struct device *dev)
 {
 	int ret = -ENODEV;
 
 	if (machine_is_jornada720())
-		ret = sa1100_register_pcmcia(&jornada720_pcmcia_ops);
+		ret = sa1100_register_pcmcia(&jornada720_pcmcia_ops, dev);
 
 	return ret;
 }
 
-void __devexit pcmcia_jornada720_exit(void)
+void __devexit pcmcia_jornada720_exit(struct device *dev)
 {
-	sa1100_unregister_pcmcia(&jornada720_pcmcia_ops);
+	sa1100_unregister_pcmcia(&jornada720_pcmcia_ops, dev);
 }

@@ -5,9 +5,10 @@
  * by Jordi Colomer, 09/05/2001
  *
  */
-
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
+#include <linux/device.h>
 #include <linux/init.h>
 
 #include <asm/hardware.h>
@@ -217,6 +218,7 @@ static int flexanet_pcmcia_socket_suspend(int sock)
  *
  */
 static struct pcmcia_low_level flexanet_pcmcia_ops = {
+  .owner		= THIS_MODULE,
   .init			= flexanet_pcmcia_init,
   .shutdown		= flexanet_pcmcia_shutdown,
   .socket_state		= flexanet_pcmcia_socket_state,
@@ -227,18 +229,18 @@ static struct pcmcia_low_level flexanet_pcmcia_ops = {
   .socket_suspend	= flexanet_pcmcia_socket_suspend,
 };
 
-int __init pcmcia_flexanet_init(void)
+int __init pcmcia_flexanet_init(struct device *dev)
 {
 	int ret = -ENODEV;
 
 	if (machine_is_flexanet())
-		ret = sa1100_register_pcmcia(&flexanet_pcmcia_ops);
+		ret = sa1100_register_pcmcia(&flexanet_pcmcia_ops, dev);
 
 	return ret;
 }
 
-void __exit pcmcia_flexanet_exit(void)
+void __exit pcmcia_flexanet_exit(struct device *dev)
 {
-	sa1100_unregister_pcmcia(&flexanet_pcmcia_ops);
+	sa1100_unregister_pcmcia(&flexanet_pcmcia_ops, dev);
 }
 

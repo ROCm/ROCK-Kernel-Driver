@@ -6,8 +6,10 @@
  *
  */
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
+#include <linux/device.h>
 #include <linux/init.h>
 
 #include <asm/hardware.h>
@@ -156,6 +158,7 @@ static int cerf_pcmcia_socket_suspend(int sock)
 }
 
 static struct pcmcia_low_level cerf_pcmcia_ops = { 
+  .owner		= THIS_MODULE,
   .init			= cerf_pcmcia_init,
   .shutdown		= cerf_pcmcia_shutdown,
   .socket_state		= cerf_pcmcia_socket_state,
@@ -166,17 +169,17 @@ static struct pcmcia_low_level cerf_pcmcia_ops = {
   .socket_suspend	= cerf_pcmcia_socket_suspend,
 };
 
-int __init pcmcia_cerf_init(void)
+int __init pcmcia_cerf_init(struct device *dev)
 {
 	int ret = -ENODEV;
 
 	if (machine_is_cerf())
-		ret = sa1100_register_pcmcia(&cerf_pcmcia_ops);
+		ret = sa1100_register_pcmcia(&cerf_pcmcia_ops, dev);
 
 	return ret;
 }
 
-void __exit pcmcia_cerf_exit(void)
+void __exit pcmcia_cerf_exit(struct device *dev)
 {
-	sa1100_unregister_pcmcia(&cerf_pcmcia_ops);
+	sa1100_unregister_pcmcia(&cerf_pcmcia_ops, dev);
 }

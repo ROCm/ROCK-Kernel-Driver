@@ -4,8 +4,10 @@
  * PCMCIA implementation routines for H3600
  *
  */
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
+#include <linux/device.h>
 #include <linux/init.h>
 
 #include <asm/hardware.h>
@@ -186,6 +188,7 @@ static int h3600_pcmcia_socket_suspend(int sock)
 }
 
 struct pcmcia_low_level h3600_pcmcia_ops = { 
+	.owner			= THIS_MODULE,
 	.init			= h3600_pcmcia_init,
 	.shutdown		= h3600_pcmcia_shutdown,
 	.socket_state		= h3600_pcmcia_socket_state,
@@ -196,17 +199,17 @@ struct pcmcia_low_level h3600_pcmcia_ops = {
 	.socket_suspend		= h3600_pcmcia_socket_suspend,
 };
 
-int __init pcmcia_h3600_init(void)
+int __init pcmcia_h3600_init(struct device *dev)
 {
 	int ret = -ENODEV;
 
 	if (machine_is_h3600())
-		ret = sa1100_register_pcmcia(&h3600_pcmcia_ops);
+		ret = sa1100_register_pcmcia(&h3600_pcmcia_ops, dev);
 
 	return ret;
 }
 
-void __exit pcmcia_h3600_exit(void)
+void __exit pcmcia_h3600_exit(struct device *dev)
 {
-	sa1100_unregister_pcmcia(&h3600_pcmcia_ops);
+	sa1100_unregister_pcmcia(&h3600_pcmcia_ops, dev);
 }

@@ -377,12 +377,16 @@ sa1100_pcmcia_register_callback(unsigned int sock,
 {
   struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(sock);
 
+  if (handler && !try_module_get(skt->ops->owner))
+  	return -ENODEV;
   if (handler == NULL) {
     skt->handler = NULL;
   } else {
     skt->handler_info = info;
     skt->handler = handler;
   }
+  if (!handler)
+  	module_put(skt->ops->owner);
 
   return 0;
 }
@@ -918,11 +922,10 @@ static struct notifier_block sa1100_pcmcia_notifier_block = {
  *
  * Register an SA1100 PCMCIA low level driver with the SA1100 core.
  */
-int sa1100_register_pcmcia(struct pcmcia_low_level *ops)
+int sa1100_register_pcmcia(struct pcmcia_low_level *ops, struct device *dev)
 {
 	struct pcmcia_init pcmcia_init;
-	struct pcmcia_state state[SA1100_PCMCIA_MAX_SOCK];
-	struct pcmcia_state_array state_array;
+	struct pcmcia_socket_class_data *cls;
 	unsigned int i, cpu_clock;
 	int ret;
 
@@ -990,14 +993,17 @@ int sa1100_register_pcmcia(struct pcmcia_low_level *ops)
 		sa1100_pcmcia_set_mecr(skt, cpu_clock);
 	}
 
-
-	/* Only advertise as many sockets as we can detect */
-	ret = register_ss_entry(sa1100_pcmcia_socket_count,
-				&sa1100_pcmcia_operations);
-	if (ret < 0) {
-		printk(KERN_ERR "Unable to register sockets\n");
+	cls = kmalloc(sizeof(struct pcmcia_socket_class_data), GFP_KERNEL);
+	if (!cls) {
+		ret = -ENOMEM;
 		goto out_err;
 	}
+
+	memset(cls, 0, sizeof(struct pcmcia_socket_class_data));
+
+	cls->ops	= &sa1100_pcmcia_operations;
+	cls->nsock	= sa1100_pcmcia_socket_count;
+	dev->class_data = cls;
 
 	/*
 	 * Start the event poll timer.  It will reschedule by itself afterwards.
@@ -1027,7 +1033,7 @@ EXPORT_SYMBOL(sa1100_register_pcmcia);
  *
  * Unregister a previously registered pcmcia driver
  */
-void sa1100_unregister_pcmcia(struct pcmcia_low_level *ops)
+void sa1100_unregister_pcmcia(struct pcmcia_low_level *ops, struct device *dev)
 {
 	int i;
 
@@ -1043,8 +1049,6 @@ void sa1100_unregister_pcmcia(struct pcmcia_low_level *ops)
 
 	del_timer_sync(&poll_timer);
 
-	unregister_ss_entry(&sa1100_pcmcia_operations);
-
 	for (i = 0; i < sa1100_pcmcia_socket_count; i++) {
 		struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(i);
 
@@ -1058,9 +1062,70 @@ void sa1100_unregister_pcmcia(struct pcmcia_low_level *ops)
 
 	flush_scheduled_work();
 
+	kfree(dev->class_data);
+	dev->class_data = NULL;
+
 	pcmcia_low_level = NULL;
 }
 EXPORT_SYMBOL(sa1100_unregister_pcmcia);
+
+static struct device_driver sa1100_pcmcia_driver = {
+	.name		= "sa11x0-pcmcia",
+	.bus		= &platform_bus_type,
+	.devclass	= &pcmcia_socket_class,
+};
+
+static struct platform_device sa1100_pcmcia_device = {
+	.name		= "sa11x0-pcmcia",
+	.id		= 0,
+	.dev		= {
+		.name	= "Intel Corporation SA11x0 [PCMCIA]",
+	},
+};
+
+struct ll_fns {
+	int (*init)(struct device *dev);
+	void (*exit)(struct device *dev);
+};
+
+static struct ll_fns sa1100_ll_fns[] = {
+#ifdef CONFIG_SA1100_ASSABET
+	{ .init = pcmcia_assabet_init,	.exit = pcmcia_assabet_exit,	},
+#endif
+#ifdef CONFIG_SA1100_CERF
+	{ .init = pcmcia_cerf_init,	.exit = pcmcia_cerf_exit,	},
+#endif
+#ifdef CONFIG_SA1100_FLEXANET
+	{ .init = pcmcia_flexanet_init,	.exit = pcmcia_flexanet_exit,	},
+#endif
+#ifdef CONFIG_SA1100_FREEBIRD
+	{ .init = pcmcia_freebird_init,	.exit = pcmcia_freebird_exit,	},
+#endif
+#ifdef CONFIG_SA1100_GRAPHICSCLIENT
+	{ .init = pcmcia_gcplus_init,	.exit = pcmcia_gcplus_exit,	},
+#endif
+#ifdef CONFIG_SA1100_H3600
+	{ .init = pcmcia_h3600_init,	.exit = pcmcia_h3600_exit,	},
+#endif
+#ifdef CONFIG_SA1100_PANGOLIN
+	{ .init = pcmcia_pangolin_init,	.exit = pcmcia_pangolin_exit,	},
+#endif
+#ifdef CONFIG_SA1100_SHANNON
+	{ .init = pcmcia_shannon_init,	.exit = pcmcia_shannon_exit,	},
+#endif
+#ifdef CONFIG_SA1100_SIMPAD
+	{ .init = pcmcia_simpad_init,	.exit = pcmcia_simpad_exit,	},
+#endif
+#ifdef CONFIG_SA1100_STORK
+	{ .init = pcmcia_stork_init,	.exit = pcmcia_stork_exit,	},
+#endif
+#ifdef CONFIG_SA1100_TRIZEPS
+	{ .init = pcmcia_trizeps_init,	.exit = pcmcia_trizeps_exit,	},
+#endif
+#ifdef CONFIG_SA1100_YOPY
+	{ .init = pcmcia_yopy_init,	.exit = pcmcia_yopy_exit,	},
+#endif
+};
 
 /* sa1100_pcmcia_init()
  * ^^^^^^^^^^^^^^^^^^^^
@@ -1086,61 +1151,34 @@ static int __init sa1100_pcmcia_init(void)
 		return -EINVAL;
 	}
 
-	for (i = 0; i < SA1100_PCMCIA_MAX_SOCK; i++) {
-		struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(i);
-
-		skt->speed_io   = SA1100_PCMCIA_IO_ACCESS;
-		skt->speed_attr = SA1100_PCMCIA_5V_MEM_ACCESS;
-		skt->speed_mem  = SA1100_PCMCIA_5V_MEM_ACCESS;
-	}
-
 #ifdef CONFIG_CPU_FREQ
 	ret = cpufreq_register_notifier(&sa1100_pcmcia_notifier_block,
 					CPUFREQ_TRANSITION_NOTIFIER);
 	if (ret < 0) {
 		printk(KERN_ERR "Unable to register CPU frequency change "
 			"notifier (%d)\n", ret);
+		driver_unregister(&sa1100_pcmcia_driver);
 		return ret;
 	}
 #endif
 
-#ifdef CONFIG_SA1100_ASSABET
-	pcmcia_assabet_init();
-#endif
-#ifdef CONFIG_SA1100_CERF
-	pcmcia_cerf_init();
-#endif
-#ifdef CONFIG_SA1100_FLEXANET
-	pcmcia_flexanet_init();
-#endif
-#ifdef CONFIG_SA1100_FREEBIRD
-	pcmcia_freebird_init();
-#endif
-#ifdef CONFIG_SA1100_GRAPHICSCLIENT
-	pcmcia_gcplus_init();
-#endif
-#ifdef CONFIG_SA1100_H3600
-	pcmcia_h3600_init();
-#endif
-#ifdef CONFIG_SA1100_PANGOLIN
-	pcmcia_pangolin_init();
-#endif
-#ifdef CONFIG_SA1100_SHANNON
-	pcmcia_shannon_init();
-#endif
-#ifdef CONFIG_SA1100_SIMPAD
-	pcmcia_simpad_init();
-#endif
-#ifdef CONFIG_SA1100_STORK
-	pcmcia_stork_init();
-#endif
-#ifdef CONFIG_SA1100_TRIZEPS
-	pcmcia_trizeps_init();
-#endif
-#ifdef CONFIG_SA1100_YOPY
-	pcmcia_yopy_init();
-#endif
+	driver_register(&sa1100_pcmcia_driver);
 
+	/*
+	 * Initialise any "on-board" PCMCIA sockets.
+	 */
+	for (i = 0; i < ARRAY_SIZE(sa1100_ll_fns); i++) {
+		ret = sa1100_ll_fns[i].init(&sa1100_pcmcia_device.dev);
+		if (ret == 0)
+			break;
+	}
+
+	if (ret == 0)
+		platform_device_register(&sa1100_pcmcia_device);
+
+	/*
+	 * Don't fail if we don't find any on-board sockets.
+	 */
 	return 0;
 }
 
@@ -1151,48 +1189,14 @@ static int __init sa1100_pcmcia_init(void)
  */
 static void __exit sa1100_pcmcia_exit(void)
 {
-#ifdef CONFIG_SA1100_ASSABET
-	pcmcia_assabet_exit();
-#endif
-#ifdef CONFIG_SA1100_CERF
-	pcmcia_cerf_exit();
-#endif
-#ifdef CONFIG_SA1100_FLEXANET
-	pcmcia_flexanet_exit();
-#endif
-#ifdef CONFIG_SA1100_FREEBIRD
-	pcmcia_freebird_exit();
-#endif
-#ifdef CONFIG_SA1100_GRAPHICSCLIENT
-	pcmcia_gcplus_exit();
-#endif
-#ifdef CONFIG_SA1100_H3600
-	pcmcia_h3600_exit();
-#endif
-#ifdef CONFIG_SA1100_PANGOLIN
-	pcmcia_pangolin_exit();
-#endif
-#ifdef CONFIG_SA1100_SHANNON
-	pcmcia_shannon_exit();
-#endif
-#ifdef CONFIG_SA1100_SIMPAD
-	pcmcia_simpad_exit();
-#endif
-#ifdef CONFIG_SA1100_STORK
-	pcmcia_stork_exit();
-#endif
-#ifdef CONFIG_SA1100_YOPY
-	pcmcia_yopy_exit();
-#endif
+	platform_device_unregister(&sa1100_pcmcia_device);
 
-	if (pcmcia_low_level) {
-		printk(KERN_ERR "PCMCIA: low level driver still registered\n");
-		sa1100_unregister_pcmcia(pcmcia_low_level);
-	}
 
 #ifdef CONFIG_CPU_FREQ
 	cpufreq_unregister_notifier(&sa1100_pcmcia_notifier_block, CPUFREQ_TRANSITION_NOTIFIER);
 #endif
+
+	driver_unregister(&sa1100_pcmcia_driver);
 }
 
 MODULE_AUTHOR("John Dorsey <john+@cs.cmu.edu>");

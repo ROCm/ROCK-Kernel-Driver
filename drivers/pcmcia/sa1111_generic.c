@@ -12,6 +12,9 @@
 #include <linux/interrupt.h>
 #include <linux/init.h>
 
+#include <linux/proc_fs.h>
+#include <pcmcia/ss.h>
+
 #include <asm/hardware.h>
 #include <asm/hardware/sa1111.h>
 #include <asm/irq.h>
@@ -206,28 +209,28 @@ static int pcmcia_probe(struct device *dev)
 	sa1111_writel(PCCR_S0_FLT | PCCR_S1_FLT, base + SA1111_PCCR);
 
 #ifdef CONFIG_SA1100_ADSBITSY
-	pcmcia_adsbitsy_init();
+	pcmcia_adsbitsy_init(dev);
 #endif
 #ifdef CONFIG_SA1100_BADGE4
-	pcmcia_badge4_init();
+	pcmcia_badge4_init(dev);
 #endif
 #ifdef CONFIG_SA1100_GRAPHICSMASTER
-	pcmcia_graphicsmaster_init();
+	pcmcia_graphicsmaster_init(dev);
 #endif
 #ifdef CONFIG_SA1100_JORNADA720
-	pcmcia_jornada720_init();
+	pcmcia_jornada720_init(dev);
 #endif
 #ifdef CONFIG_ASSABET_NEPONSET
-	pcmcia_neponset_init();
+	pcmcia_neponset_init(dev);
 #endif
 #ifdef CONFIG_SA1100_PFS168
-	pcmcia_pfs_init();
+	pcmcia_pfs_init(dev);
 #endif
 #ifdef CONFIG_SA1100_PT_SYSTEM3
-	pcmcia_system3_init();
+	pcmcia_system3_init(dev);
 #endif
 #ifdef CONFIG_SA1100_XP860
-	pcmcia_xp860_init();
+	pcmcia_xp860_init(dev);
 #endif
 	return 0;
 }
@@ -237,28 +240,28 @@ static int __devexit pcmcia_remove(struct device *dev)
 	struct sa1111_dev *sadev = SA1111_DEV(dev);
 
 #ifdef CONFIG_SA1100_ADSBITSY
-	pcmcia_adsbitsy_exit();
+	pcmcia_adsbitsy_exit(dev);
 #endif
 #ifdef CONFIG_SA1100_BADGE4
-	pcmcia_badge4_exit();
+	pcmcia_badge4_exit(dev);
 #endif
 #ifdef CONFIG_SA1100_GRAPHICSMASTER
-	pcmcia_graphicsmaster_exit();
+	pcmcia_graphicsmaster_exit(dev);
 #endif
 #ifdef CONFIG_SA1100_JORNADA720
-	pcmcia_jornada720_exit();
+	pcmcia_jornada720_exit(dev);
 #endif
 #ifdef CONFIG_ASSABET_NEPONSET
-	pcmcia_neponset_exit();
+	pcmcia_neponset_exit(dev);
 #endif
 #ifdef CONFIG_SA1100_PFS168
-	pcmcia_pfs_exit();
+	pcmcia_pfs_exit(dev);
 #endif
 #ifdef CONFIG_SA1100_PT_SYSTEM3
-	pcmcia_system3_exit();
+	pcmcia_system3_exit(dev);
 #endif
 #ifdef CONFIG_SA1100_XP860
-	pcmcia_xp860_exit();
+	pcmcia_xp860_exit(dev);
 #endif
 
 	release_mem_region(sadev->res.start, 512);
@@ -281,6 +284,7 @@ static struct sa1111_driver pcmcia_driver = {
 	.drv = {
 		.name		= "sa1111-pcmcia",
 		.bus		= &sa1111_bus_type,
+		.devclass	= &pcmcia_socket_class,
 		.probe		= pcmcia_probe,
 		.remove		= __devexit_p(pcmcia_remove),
 		.suspend	= pcmcia_suspend,

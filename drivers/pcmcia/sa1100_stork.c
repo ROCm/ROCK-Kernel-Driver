@@ -22,6 +22,7 @@
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
+#include <linux/device.h>
 #include <linux/i2c.h>
 
 #include <asm/hardware.h>
@@ -226,6 +227,7 @@ static int stork_pcmcia_socket_suspend(int sock)
 }
 
 static struct pcmcia_low_level stork_pcmcia_ops = { 
+	.owner			= THIS_MODULE,
 	.init			= stork_pcmcia_init,
 	.shutdown		= stork_pcmcia_shutdown,
 	.socket_state		= stork_pcmcia_socket_state,
@@ -236,18 +238,18 @@ static struct pcmcia_low_level stork_pcmcia_ops = {
 	.socket_suspend		= stork_pcmcia_socket_suspend,
 };
 
-int __init pcmcia_stork_init(void)
+int __init pcmcia_stork_init(struct device *dev)
 {
 	int ret = -ENODEV;
 
 	if (machine_is_stork())
-		ret = sa1100_register_pcmcia(&stork_pcmcia_ops);
+		ret = sa1100_register_pcmcia(&stork_pcmcia_ops, dev);
 
 	return ret;
 }
 
-void __exit pcmcia_stork_exit(void)
+void __exit pcmcia_stork_exit(struct device *dev)
 {
-	sa1100_unregister_pcmcia(&stork_pcmcia_ops);
+	sa1100_unregister_pcmcia(&stork_pcmcia_ops, dev);
 }
 

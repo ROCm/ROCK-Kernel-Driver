@@ -9,8 +9,10 @@
  * Guennadi Liakhovetski <gl@dsa-ac.de>
  *
  */
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
+#include <linux/device.h>
 #include <linux/init.h>
 
 #include <asm/hardware.h>
@@ -186,6 +188,7 @@ static int trizeps_pcmcia_socket_suspend(int sock)
  *
  ******************************************************/
 struct pcmcia_low_level trizeps_pcmcia_ops = {
+	.owner			= THIS_MODULE,
 	.init			= trizeps_pcmcia_init,
 	.shutdown		= trizeps_pcmcia_shutdown,
 	.socket_state		= trizeps_pcmcia_socket_state,
@@ -195,15 +198,15 @@ struct pcmcia_low_level trizeps_pcmcia_ops = {
 	.socket_suspend		= trizeps_pcmcia_socket_suspend,
 };
 
-int __init pcmcia_trizeps_init(void)
+int __init pcmcia_trizeps_init(struct device *dev)
 {
 	if (machine_is_trizeps()) {
-		return sa1100_register_pcmcia(&trizeps_pcmcia_ops);
+		return sa1100_register_pcmcia(&trizeps_pcmcia_ops, dev);
 	}
 	return -ENODEV;
 }
 
-void __exit pcmcia_trizeps_exit(void)
+void __exit pcmcia_trizeps_exit(struct device *dev)
 {
-	sa1100_unregister_pcmcia(&trizeps_pcmcia_ops);
+	sa1100_unregister_pcmcia(&trizeps_pcmcia_ops, dev);
 }

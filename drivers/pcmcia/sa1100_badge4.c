@@ -12,6 +12,7 @@
  * published by the Free Software Foundation.
  *
  */
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/device.h>
@@ -148,6 +149,7 @@ badge4_pcmcia_configure_socket(int sock, const struct pcmcia_configure *conf)
 }
 
 static struct pcmcia_low_level badge4_pcmcia_ops = {
+	.owner			= THIS_MODULE,
 	.init			= badge4_pcmcia_init,
 	.shutdown		= badge4_pcmcia_shutdown,
 	.socket_state		= sa1111_pcmcia_socket_state,
@@ -158,19 +160,19 @@ static struct pcmcia_low_level badge4_pcmcia_ops = {
 	.socket_suspend		= sa1111_pcmcia_socket_suspend,
 };
 
-int pcmcia_badge4_init(void)
+int pcmcia_badge4_init(struct device *dev)
 {
 	int ret = -ENODEV;
 
 	if (machine_is_badge4())
-		ret = sa1100_register_pcmcia(&badge4_pcmcia_ops);
+		ret = sa1100_register_pcmcia(&badge4_pcmcia_ops, dev);
 
 	return ret;
 }
 
-void __devexit pcmcia_badge4_exit(void)
+void __devexit pcmcia_badge4_exit(struct device *dev)
 {
-	sa1100_unregister_pcmcia(&badge4_pcmcia_ops);
+	sa1100_unregister_pcmcia(&badge4_pcmcia_ops, dev);
 }
 
 static int __init pcmv_setup(char *s)

@@ -192,61 +192,55 @@ struct sa1100_pcmcia_socket {
 /*
  * Declaration for all machine specific init/exit functions.
  */
-extern int pcmcia_adsbitsy_init(void);
-extern void pcmcia_adsbitsy_exit(void);
+extern int pcmcia_adsbitsy_init(struct device *);
+extern void pcmcia_adsbitsy_exit(struct device *);
 
-extern int pcmcia_assabet_init(void);
-extern void pcmcia_assabet_exit(void);
+extern int pcmcia_assabet_init(struct device *);
+extern void pcmcia_assabet_exit(struct device *);
 
-extern int pcmcia_badge4_init(void);
-extern void pcmcia_badge4_exit(void);
+extern int pcmcia_badge4_init(struct device *);
+extern void pcmcia_badge4_exit(struct device *);
 
-extern int pcmcia_cerf_init(void);
-extern void pcmcia_cerf_exit(void);
+extern int pcmcia_cerf_init(struct device *);
+extern void pcmcia_cerf_exit(struct device *);
 
-extern int pcmcia_flexanet_init(void);
-extern void pcmcia_flexanet_exit(void);
+extern int pcmcia_flexanet_init(struct device *);
+extern void pcmcia_flexanet_exit(struct device *);
 
-extern int pcmcia_freebird_init(void);
-extern void pcmcia_freebird_exit(void);
+extern int pcmcia_freebird_init(struct device *);
+extern void pcmcia_freebird_exit(struct device *);
 
-extern int pcmcia_gcplus_init(void);
-extern void pcmcia_gcplus_exit(void);
+extern int pcmcia_gcplus_init(struct device *);
+extern void pcmcia_gcplus_exit(struct device *);
 
-extern int pcmcia_graphicsmaster_init(void);
-extern void pcmcia_graphicsmaster_exit(void);
+extern int pcmcia_graphicsmaster_init(struct device *);
+extern void pcmcia_graphicsmaster_exit(struct device *);
 
-extern int pcmcia_jornada720_init(void);
-extern void pcmcia_jornada720_exit(void);
+extern int pcmcia_pangolin_init(struct device *);
+extern void pcmcia_pangolin_exit(struct device *);
 
-extern int pcmcia_neponset_init(void);
-extern void pcmcia_neponset_exit(void);
+extern int pcmcia_pfs168_init(struct device *);
+extern void pcmcia_pfs168_exit(struct device *);
 
-extern int pcmcia_pangolin_init(void);
-extern void pcmcia_pangolin_exit(void);
+extern int pcmcia_shannon_init(struct device *);
+extern void pcmcia_shannon_exit(struct device *);
 
-extern int pcmcia_pfs168_init(void);
-extern void pcmcia_pfs168_exit(void);
+extern int pcmcia_simpad_init(struct device *);
+extern void pcmcia_simpad_exit(struct device *);
 
-extern int pcmcia_shannon_init(void);
-extern void pcmcia_shannon_exit(void);
+extern int pcmcia_stork_init(struct device *);
+extern void pcmcia_stork_exit(struct device *);
 
-extern int pcmcia_simpad_init(void);
-extern void pcmcia_simpad_exit(void);
+extern int pcmcia_system3_init(struct device *);
+extern void pcmcia_system3_exit(struct device *);
 
-extern int pcmcia_stork_init(void);
-extern void pcmcia_stork_exit(void);
+extern int pcmcia_trizeps_init(struct device *);
+extern void pcmcia_trizeps_exit(struct device *);
 
-extern int pcmcia_system3_init(void);
-extern void pcmcia_system3_exit(void);
+extern int pcmcia_xp860_init(struct device *);
+extern void pcmcia_xp860_exit(struct device *);
 
-extern int pcmcia_trizeps_init(void);
-extern void pcmcia_trizeps_exit(void);
-
-extern int pcmcia_xp860_init(void);
-extern void pcmcia_xp860_exit(void);
-
-extern int pcmcia_yopy_init(void);
-extern void pcmcia_yopy_exit(void);
+extern int pcmcia_yopy_init(struct device *);
+extern void pcmcia_yopy_exit(struct device *);
 
 #endif  /* !defined(_PCMCIA_SA1100_H) */

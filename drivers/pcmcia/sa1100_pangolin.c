@@ -5,8 +5,10 @@
  *
  */
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
+#include <linux/device.h>
 #include <linux/init.h>
 
 #include <asm/hardware.h>
@@ -151,6 +153,7 @@ static int pangolin_pcmcia_socket_suspend(int sock)
 }
 
 static struct pcmcia_low_level pangolin_pcmcia_ops = { 
+  .owner		= THIS_MODULE,
   .init			= pangolin_pcmcia_init,
   .shutdown		= pangolin_pcmcia_shutdown,
   .socket_state		= pangolin_pcmcia_socket_state,
@@ -161,18 +164,18 @@ static struct pcmcia_low_level pangolin_pcmcia_ops = {
   socket_suspend,	pangolin_pcmcia_socket_suspend,
 };
 
-int __init pcmcia_pangolin_init(void)
+int __init pcmcia_pangolin_init(struct device *dev)
 {
 	int ret = -ENODEV;
 
 	if (machine_is_pangolin())
-		ret = sa1100_register_pcmcia(&pangolin_pcmcia_ops);
+		ret = sa1100_register_pcmcia(&pangolin_pcmcia_ops, dev);
 
 	return ret;
 }
 
-void __exit pcmcia_pangolin_exit(void)
+void __exit pcmcia_pangolin_exit(struct device *dev)
 {
-	sa1100_unregister_pcmcia(&pangolin_pcmcia_ops);
+	sa1100_unregister_pcmcia(&pangolin_pcmcia_ops, dev);
 }
 

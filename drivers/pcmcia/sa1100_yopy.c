@@ -4,8 +4,10 @@
  * PCMCIA implementation routines for Yopy
  *
  */
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
+#include <linux/device.h>
 #include <linux/init.h>
 
 #include <asm/hardware.h>
@@ -153,6 +155,7 @@ static int yopy_pcmcia_socket_suspend(int sock)
 }
 
 static struct pcmcia_low_level yopy_pcmcia_ops = {
+	.owner			= THIS_MODULE,
 	.init			= yopy_pcmcia_init,
 	.shutdown		= yopy_pcmcia_shutdown,
 	.socket_state		= yopy_pcmcia_socket_state,
@@ -163,18 +166,18 @@ static struct pcmcia_low_level yopy_pcmcia_ops = {
 	.socket_suspend		= yopy_pcmcia_socket_suspend,
 };
 
-int __init pcmcia_yopy_init(void)
+int __init pcmcia_yopy_init(struct device *dev)
 {
 	int ret = -ENODEV;
 
 	if (machine_is_yopy())
-		ret = sa1100_register_pcmcia(&yopy_pcmcia_ops);
+		ret = sa1100_register_pcmcia(&yopy_pcmcia_ops, dev);
 
 	return ret;
 }
 
-void __exit pcmcia_yopy_exit(void)
+void __exit pcmcia_yopy_exit(struct device *dev)
 {
-	sa1100_unregister_pcmcia(&yopy_pcmcia_ops);
+	sa1100_unregister_pcmcia(&yopy_pcmcia_ops, dev);
 }
 

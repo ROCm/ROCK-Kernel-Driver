@@ -46,6 +46,8 @@ struct pcmcia_irq_info {
 };
 
 struct pcmcia_low_level {
+  struct module *owner;
+
   int (*init)(struct pcmcia_init *);
   int (*shutdown)(void);
   void (*socket_state)(int sock, struct pcmcia_state *);
@@ -71,7 +73,7 @@ struct pcmcia_low_level {
 		unsigned int cpu_speed, unsigned int cmd_time);
 };
 
-extern int sa1100_register_pcmcia(struct pcmcia_low_level *);
-extern void sa1100_unregister_pcmcia(struct pcmcia_low_level *);
+extern int sa1100_register_pcmcia(struct pcmcia_low_level *, struct device *);
+extern void sa1100_unregister_pcmcia(struct pcmcia_low_level *, struct device *);
 
 #endif

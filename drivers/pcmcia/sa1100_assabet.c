@@ -5,9 +5,11 @@
  *
  */
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/errno.h>
 #include <linux/interrupt.h>
+#include <linux/device.h>
 #include <linux/init.h>
 
 #include <asm/hardware.h>
@@ -189,6 +191,7 @@ static int assabet_pcmcia_socket_suspend(int sock)
 }
 
 static struct pcmcia_low_level assabet_pcmcia_ops = { 
+	.owner			= THIS_MODULE,
 	.init			= assabet_pcmcia_init,
 	.shutdown		= assabet_pcmcia_shutdown,
 	.socket_state		= assabet_pcmcia_socket_state,
@@ -199,13 +202,13 @@ static struct pcmcia_low_level assabet_pcmcia_ops = {
 	.socket_suspend		= assabet_pcmcia_socket_suspend,
 };
 
-int __init pcmcia_assabet_init(void)
+int __init pcmcia_assabet_init(struct device *dev)
 {
 	int ret = -ENODEV;
 
 	if (machine_is_assabet()) {
 		if (!machine_has_neponset())
-			ret = sa1100_register_pcmcia(&assabet_pcmcia_ops);
+			ret = sa1100_register_pcmcia(&assabet_pcmcia_ops, dev);
 #ifndef CONFIG_ASSABET_NEPONSET
 		else
 			printk(KERN_ERR "Card Services disabled: missing "
@@ -215,8 +218,8 @@ int __init pcmcia_assabet_init(void)
 	return ret;
 }
 
-void __exit pcmcia_assabet_exit(void)
+void __exit pcmcia_assabet_exit(struct device *dev)
 {
-	sa1100_unregister_pcmcia(&assabet_pcmcia_ops);
+	sa1100_unregister_pcmcia(&assabet_pcmcia_ops, dev);
 }
 

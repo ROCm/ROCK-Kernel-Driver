@@ -4,9 +4,11 @@
  * XP860 PCMCIA specific routines
  *
  */
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/delay.h>
 #include <linux/sched.h>
+#include <linux/device.h>
 #include <linux/init.h>
 
 #include <asm/hardware.h>
@@ -132,6 +134,7 @@ xp860_pcmcia_configure_socket(int sock, const struct pcmcia_configure *conf)
 }
 
 static struct pcmcia_low_level xp860_pcmcia_ops = { 
+  .owner		= THIS_MODULE,
   .init			= xp860_pcmcia_init,
   .shutdown		= sa1111_pcmcia_shutdown,
   .socket_state		= sa1111_pcmcia_socket_state,
@@ -142,18 +145,18 @@ static struct pcmcia_low_level xp860_pcmcia_ops = {
   .socket_suspend	= sa1111_pcmcia_socket_suspend,
 };
 
-int __init pcmcia_xp860_init(void)
+int __init pcmcia_xp860_init(struct device *dev)
 {
 	int ret = -ENODEV;
 
 	if (machine_is_xp860())
-		ret = sa1100_register_pcmcia(&xp860_pcmcia_ops);
+		ret = sa1100_register_pcmcia(&xp860_pcmcia_ops, dev);
 
 	return ret;
 }
 
-void __exit pcmcia_xp860_exit(void)
+void __exit pcmcia_xp860_exit(struct device *dev)
 {
-	sa1100_unregister_pcmcia(&xp860_pcmcia_ops);
+	sa1100_unregister_pcmcia(&xp860_pcmcia_ops, dev);
 }
 
