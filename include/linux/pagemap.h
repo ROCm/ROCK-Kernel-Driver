@@ -154,17 +154,27 @@ static inline pgoff_t linear_page_index(struct vm_area_struct *vma,
 extern void FASTCALL(__lock_page(struct page *page));
 extern void FASTCALL(unlock_page(struct page *page));
 
-static inline void lock_page(struct page *page)
+
+extern int FASTCALL(__lock_page_wq(struct page *page, wait_queue_t *wait));
+static inline int lock_page_wq(struct page *page, wait_queue_t *wait)
 {
 	if (TestSetPageLocked(page))
-		__lock_page(page);
+		return __lock_page_wq(page, wait);
+	else
+		return 0;
+}
+
+static inline void lock_page(struct page *page)
+{
+	lock_page_wq(page, NULL);
 }
 	
 /*
  * This is exported only for wait_on_page_locked/wait_on_page_writeback.
  * Never use this directly!
  */
-extern void FASTCALL(wait_on_page_bit(struct page *page, int bit_nr));
+extern int FASTCALL(wait_on_page_bit_wq(struct page *page, int bit_nr,
+	wait_queue_t *wait));
 
 /* 
  * Wait for a page to be unlocked.
@@ -173,19 +183,33 @@ extern void FASTCALL(wait_on_page_bit(struct page *page, int bit_nr));
  * ie with increased "page->count" so that the page won't
  * go away during the wait..
  */
-static inline void wait_on_page_locked(struct page *page)
+static inline int wait_on_page_locked_wq(struct page *page, wait_queue_t *wait)
 {
 	if (PageLocked(page))
-		wait_on_page_bit(page, PG_locked);
+		return wait_on_page_bit_wq(page, PG_locked, wait);
+	return 0;
+}
+
+static inline int wait_on_page_writeback_wq(struct page *page,
+						wait_queue_t *wait)
+{
+	if (PageWriteback(page))
+		return wait_on_page_bit_wq(page, PG_writeback, wait);
+	return 0;
+}
+
+static inline void wait_on_page_locked(struct page *page)
+{
+	wait_on_page_locked_wq(page, NULL);
 }
 
 /* 
  * Wait for a page to complete writeback
  */
+
 static inline void wait_on_page_writeback(struct page *page)
 {
-	if (PageWriteback(page))
-		wait_on_page_bit(page, PG_writeback);
+	wait_on_page_writeback_wq(page, NULL);
 }
 
 extern void end_page_writeback(struct page *page);

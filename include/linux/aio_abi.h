@@ -38,8 +38,8 @@ enum {
 	IOCB_CMD_FDSYNC = 3,
 	/* These two are experimental.
 	 * IOCB_CMD_PREADX = 4,
-	 * IOCB_CMD_POLL = 5,
 	 */
+	IOCB_CMD_POLL = 5,
 	IOCB_CMD_NOOP = 6,
 };
 

@@ -206,12 +206,6 @@ int nobh_prepare_write(struct page*, unsigned, unsigned, get_block_t*);
 int nobh_commit_write(struct file *, struct page *, unsigned, unsigned);
 int nobh_truncate_page(struct address_space *, loff_t);
 
-#define OSYNC_METADATA	(1<<0)
-#define OSYNC_DATA	(1<<1)
-#define OSYNC_INODE	(1<<2)
-int generic_osync_inode(struct inode *, struct address_space *, int);
-
-
 /*
  * inline definitions
  */
