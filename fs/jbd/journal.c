@@ -872,6 +872,22 @@ void journal_update_superblock(journal_t *journal, int wait)
 	journal_superblock_t *sb = journal->j_superblock;
 	struct buffer_head *bh = journal->j_sb_buffer;
 
+	/*
+	 * As a special case, if the on-disk copy is already marked as needing
+	 * no recovery (s_start == 0) and there are no outstanding transactions
+	 * in the filesystem, then we can safely defer the superblock update
+	 * until the next commit by setting JFS_FLUSHED.  This avoids
+	 * attempting a write to a potential-readonly device.
+	 */
+	if (sb->s_start == 0 && journal->j_tail_sequence ==
+				journal->j_transaction_sequence) {
+		jbd_debug(1,"JBD: Skipping superblock update on recovered sb "
+			"(start %ld, seq %d, errno %d)\n",
+			journal->j_tail, journal->j_tail_sequence, 
+			journal->j_errno);
+		goto out;
+	}
+
 	spin_lock(&journal->j_state_lock);
 	jbd_debug(1,"JBD: updating superblock (start %ld, seq %d, errno %d)\n",
 		  journal->j_tail, journal->j_tail_sequence, journal->j_errno);
@@ -888,6 +904,7 @@ void journal_update_superblock(journal_t *journal, int wait)
 	else
 		ll_rw_block(WRITE, 1, &bh);
 
+out:
 	/* If we have just flushed the log (by marking s_start==0), then
 	 * any future commit will have to be careful to update the
 	 * superblock again to re-record the true start of the log. */
