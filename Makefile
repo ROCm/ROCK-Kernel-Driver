@@ -110,7 +110,7 @@ $(if $(wildcard $(KBUILD_OUTPUT)),, \
 $(filter-out _all,$(MAKECMDGOALS)) _all:
 	$(if $(KBUILD_VERBOSE:1=),@)$(MAKE) -C $(KBUILD_OUTPUT)		\
 	KBUILD_SRC=$(CURDIR)	     KBUILD_VERBOSE=$(KBUILD_VERBOSE)	\
-	KBUILD_CHECK=$(KBUILD_CHECK) KBUILD_EXTMOD=$(KBUILD_EXTMOD)     \
+	KBUILD_CHECK=$(KBUILD_CHECK) KBUILD_EXTMOD="$(KBUILD_EXTMOD)"	\
         -f $(CURDIR)/Makefile $@
 
 # Leave processing to above invocation of make
@@ -951,33 +951,34 @@ else # KBUILD_EXTMOD
 # We are always building modules
 KBUILD_MODULES := 1
 .PHONY: crmodverdir
-crmodverdir: FORCE
+crmodverdir:
 	$(Q)mkdir -p $(MODVERDIR)
 
-check-Module.symvers: FORCE
+.PHONY: $(objtree)/Module.symvers
+$(objtree)/Module.symvers:
 	@[ -e $(objtree)/Module.symvers ] || \
 	echo; \
 	echo "WARNING: Symbol version dump $(objtree)/Module.symvers is " \
 	     "missing, modules will have CONFIG_MODVERSIONS disabled."; \
 	echo
 
-.PHONY: $(KBUILD_EXTMOD)
-$(KBUILD_EXTMOD): crmodverdir check-Module.symvers FORCE
-	$(Q)$(MAKE) $(build)=$@
-
-.PHONY: modules
-modules: $(KBUILD_EXTMOD)
+module-dirs := $(addprefix _module_,$(KBUILD_EXTMOD))
+.PHONY: $(module-dirs) modules
+$(module-dirs): crmodverdir $(objtree)/Module.symvers
+	$(Q)$(MAKE) $(build)=$(patsubst _module_%,%,$@)
+ 
+modules: $(module-dirs)
 	@echo '  Building modules, stage 2.';
 	$(Q)$(MAKE) -rR -f $(srctree)/scripts/Makefile.modpost
+
+.PHONY: modules_add
+modules_add: modules_install
 
 .PHONY: modules_install
 modules_install:
 	$(Q)$(MAKE) -rR -f $(srctree)/scripts/Makefile.modinst
 
-.PHONY: modules_add
-modules_add: modules_install
-
-clean-dirs := _clean_$(KBUILD_EXTMOD)
+clean-dirs := $(addprefix _clean_,$(KBUILD_EXTMOD))
 
 .PHONY: $(clean-dirs) clean
 $(clean-dirs):
