@@ -504,7 +504,7 @@ static void dn_nsp_linkservice(struct sock *sk, struct sk_buff *skb)
 	struct dn_scp *scp = DN_SK(sk);
 	unsigned short segnum;
 	unsigned char lsflags;
-	char fcval;
+	signed char fcval;
 	int wake_up = 0;
 	char *ptr = skb->data;
 	unsigned char fctype = scp->services_rem & NSP_FC_MASK;
