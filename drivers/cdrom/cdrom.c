@@ -318,11 +318,11 @@ static const char *mrw_address_space[] = { "DMA", "GAA" };
 
 /* These are used to simplify getting data in from and back to user land */
 #define IOCTL_IN(arg, type, in)					\
-	if (copy_from_user(&(in), (type *) (arg), sizeof (in)))	\
+	if (copy_from_user(&(in), (type __user *) (arg), sizeof (in)))	\
 		return -EFAULT;
 
 #define IOCTL_OUT(arg, type, out) \
-	if (copy_to_user((type *) (arg), &(out), sizeof (out)))	\
+	if (copy_to_user((type __user *) (arg), &(out), sizeof (out)))	\
 		return -EFAULT;
 
 /* The (cdo->capability & ~cdi->mask & CDC_XXX) construct was used in
@@ -2526,7 +2526,7 @@ static int mmc_ioctl(struct cdrom_device_info *cdi, unsigned int cmd,
 			ret = cdrom_read_cd(cdi, &cgc, lba, blocksize, 1);
 			ret |= cdrom_switch_blocksize(cdi, blocksize);
 		}
-		if (!ret && copy_to_user((char *)arg, cgc.buffer, blocksize))
+		if (!ret && copy_to_user((char __user *)arg, cgc.buffer, blocksize))
 			ret = -EFAULT;
 		kfree(cgc.buffer);
 		return ret;
@@ -2678,7 +2678,7 @@ static int mmc_ioctl(struct cdrom_device_info *cdi, unsigned int cmd,
 		if ((s = (dvd_struct *) kmalloc(size, GFP_KERNEL)) == NULL)
 			return -ENOMEM;
 		cdinfo(CD_DO_IOCTL, "entering DVD_READ_STRUCT\n"); 
-		if (copy_from_user(s, (dvd_struct *)arg, size)) {
+		if (copy_from_user(s, (dvd_struct __user *)arg, size)) {
 			kfree(s);
 			return -EFAULT;
 		}
@@ -2686,7 +2686,7 @@ static int mmc_ioctl(struct cdrom_device_info *cdi, unsigned int cmd,
 			kfree(s);
 			return ret;
 		}
-		if (copy_to_user((dvd_struct *)arg, s, size))
+		if (copy_to_user((dvd_struct __user *)arg, s, size))
 			ret = -EFAULT;
 		kfree(s);
 		return ret;
@@ -2906,7 +2906,7 @@ struct cdrom_sysctl_settings {
 } cdrom_sysctl_settings;
 
 int cdrom_sysctl_info(ctl_table *ctl, int write, struct file * filp,
-                           void *buffer, size_t *lenp)
+                           void __user *buffer, size_t *lenp)
 {
         int pos;
 	struct cdrom_device_info *cdi;
@@ -3033,7 +3033,7 @@ void cdrom_update_settings(void)
 }
 
 static int cdrom_sysctl_handler(ctl_table *ctl, int write, struct file * filp,
-				void *buffer, size_t *lenp)
+				void __user *buffer, size_t *lenp)
 {
 	int *valp = ctl->data;
 	int val = *valp;
