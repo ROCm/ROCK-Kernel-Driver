@@ -385,7 +385,7 @@ static int __init NCR_D700_init(void)
 static void __exit NCR_D700_exit(void)
 {
 	mca_unregister_driver(&NCR_D700_driver);
-	scsi_sysfs_release_attributes();
+	scsi_sysfs_release_attributes(&NCR_D700_driver_template);
 }
 
 module_init(NCR_D700_init);

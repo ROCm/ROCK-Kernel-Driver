@@ -73,8 +73,7 @@
 #define SD_MAX_RETRIES		5
 
 struct scsi_disk {
-	struct list_head list;		/* list of all scsi_disks */
-	struct Scsi_Device_Template *driver;	/* always &sd_template */
+	struct scsi_driver *driver;	/* always &sd_template */
 	struct scsi_device *device;
 	struct gendisk	*disk;
 	sector_t	capacity;	/* size in 512-byte sectors */
@@ -85,37 +84,31 @@ struct scsi_disk {
 	unsigned	RCD : 1;	/* state of disk RCD bit, unused */
 };
 
-static LIST_HEAD(sd_devlist);
-static spinlock_t sd_devlist_lock = SPIN_LOCK_UNLOCKED;
-
 static unsigned long sd_index_bits[SD_DISKS / BITS_PER_LONG];
 static spinlock_t sd_index_lock = SPIN_LOCK_UNLOCKED;
 
 static void sd_init_onedisk(struct scsi_disk * sdkp, struct gendisk *disk);
 static void sd_rw_intr(struct scsi_cmnd * SCpnt);
 
-static int sd_attach(struct scsi_device *);
-static void sd_detach(struct scsi_device *);
-static void sd_rescan(struct scsi_device *);
+static int sd_probe(struct device *);
+static int sd_remove(struct device *);
+static void sd_shutdown(struct device *dev);
+static void sd_rescan(struct device *);
 static int sd_init_command(struct scsi_cmnd *);
 static int sd_synchronize_cache(struct scsi_disk *, int);
-static int sd_notifier(struct notifier_block *, unsigned long, void *);
 static void sd_read_capacity(struct scsi_disk *sdkp, char *diskname,
 		 struct scsi_request *SRpnt, unsigned char *buffer);
-static struct notifier_block sd_notifier_block = {sd_notifier, NULL, 0}; 
 
-static struct Scsi_Device_Template sd_template = {
-	.module		= THIS_MODULE,
-	.list		= LIST_HEAD_INIT(sd_template.list),
-	.name		= "disk",
-	.scsi_type	= TYPE_DISK,
-	.attach		= sd_attach,
-	.detach		= sd_detach,
-	.rescan		= sd_rescan,
-	.init_command	= sd_init_command,
-	.scsi_driverfs_driver = {
-		.name   = "sd",
+static struct scsi_driver sd_template = {
+	.owner			= THIS_MODULE,
+	.gendrv = {
+		.name		= "sd",
+		.probe		= sd_probe,
+		.remove		= sd_remove,
+		.shutdown	= sd_shutdown,
 	},
+	.rescan			= sd_rescan,
+	.init_command		= sd_init_command,
 };
 
 static int sd_major(int major_idx)
@@ -133,36 +126,6 @@ static int sd_major(int major_idx)
 	}
 }
 
-static struct scsi_disk *sd_find_by_sdev(Scsi_Device *sd)
-{
-	struct scsi_disk *sdkp;
-
-	spin_lock(&sd_devlist_lock);
-	list_for_each_entry(sdkp, &sd_devlist, list) {
-		if (sdkp->device == sd) {
-			spin_unlock(&sd_devlist_lock);
-			return sdkp;
-		}
-	}
-
-	spin_unlock(&sd_devlist_lock);
-	return NULL;
-}
-
-static inline void sd_devlist_insert(struct scsi_disk *sdkp)
-{
-	spin_lock(&sd_devlist_lock);
-	list_add(&sdkp->list, &sd_devlist);
-	spin_unlock(&sd_devlist_lock);
-}
-
-static inline void sd_devlist_remove(struct scsi_disk *sdkp)
-{
-	spin_lock(&sd_devlist_lock);
-	list_del(&sdkp->list);
-	spin_unlock(&sd_devlist_lock);
-}
- 
 static inline struct scsi_disk *scsi_disk(struct gendisk *disk)
 {
 	return container_of(disk->private_data, struct scsi_disk, driver);
@@ -636,12 +599,13 @@ not_present:
 	return 1;
 }
 
-static void sd_rescan(struct scsi_device * sdp)
+static void sd_rescan(struct device *dev)
 {
-	unsigned char *buffer;
-	struct scsi_disk *sdkp = sd_find_by_sdev(sdp);
+	struct scsi_device *sdp = to_scsi_device(dev);
+	struct scsi_disk *sdkp = dev_get_drvdata(dev);
 	struct gendisk *gd;
 	struct scsi_request *SRpnt;
+	unsigned char *buffer;
 
 	if (!sdkp || sdp->online == FALSE || !sdkp->media_present)
 		return;
@@ -1312,10 +1276,10 @@ sd_init_onedisk(struct scsi_disk * sdkp, struct gendisk *disk)
 }
 
 /**
- *	sd_attach - called during driver initialization and whenever a
+ *	sd_probe - called during driver initialization and whenever a
  *	new scsi device is attached to the system. It is called once
  *	for each scsi device (not just disks) present.
- *	@sdp: pointer to mid level scsi device object
+ *	@dev: pointer to device object
  *
  *	Returns 0 if successful (or not interested in this scsi device 
  *	(e.g. scanner)); 1 when there is an error.
@@ -1327,17 +1291,19 @@ sd_init_onedisk(struct scsi_disk * sdkp, struct gendisk *disk)
  *	and minor number that is chosen here.
  *
  *	Assume sd_attach is not re-entrant (for time being)
- *	Also think about sd_attach() and sd_detach() running coincidentally.
+ *	Also think about sd_attach() and sd_remove() running coincidentally.
  **/
-static int sd_attach(struct scsi_device * sdp)
+static int sd_probe(struct device *dev)
 {
+	struct scsi_device *sdp = to_scsi_device(dev);
 	struct scsi_disk *sdkp;
 	struct gendisk *gd;
 	u32 index;
 	int error;
 
+	error = -ENODEV;
 	if ((sdp->type != TYPE_DISK) && (sdp->type != TYPE_MOD))
-		return 1;
+		goto out;
 
 	SCSI_LOG_HLQUEUE(3, printk("sd_attach: scsi device: <%d,%d,%d,%d>\n", 
 			 sdp->host->host_no, sdp->channel, sdp->id, sdp->lun));
@@ -1389,8 +1355,8 @@ static int sd_attach(struct scsi_device * sdp)
 	gd->private_data = &sdkp->driver;
 	gd->queue = sdkp->device->request_queue;
 
-	sd_devlist_insert(sdkp);
 	set_capacity(gd, sdkp->capacity);
+	dev_set_drvdata(dev, sdkp);
 	add_disk(gd);
 
 	printk(KERN_NOTICE "Attached scsi %sdisk %s at scsi%d, channel %d, "
@@ -1409,44 +1375,42 @@ out:
 }
 
 /**
- *	sd_detach - called whenever a scsi disk (previously recognized by
- *	sd_attach) is detached from the system. It is called (potentially
+ *	sd_remove - called whenever a scsi disk (previously recognized by
+ *	sd_probe) is detached from the system. It is called (potentially
  *	multiple times) during sd module unload.
  *	@sdp: pointer to mid level scsi device object
  *
  *	Note: this function is invoked from the scsi mid-level.
  *	This function potentially frees up a device name (e.g. /dev/sdc)
- *	that could be re-used by a subsequent sd_attach().
+ *	that could be re-used by a subsequent sd_probe().
  *	This function is not called when the built-in sd driver is "exit-ed".
  **/
-static void sd_detach(struct scsi_device * sdp)
+static int sd_remove(struct device *dev)
 {
-	struct scsi_disk *sdkp;
+	struct scsi_disk *sdkp = dev_get_drvdata(dev);
 
-	SCSI_LOG_HLQUEUE(3, printk("sd_detach: <%d,%d,%d,%d>\n", 
-			    sdp->host->host_no, sdp->channel, sdp->id, 
-			    sdp->lun));
-
-	sdkp = sd_find_by_sdev(sdp);
-	if (!sdkp)
-		return;
-
-	/* check that we actually have a write back cache to synchronize */
-	if (sdkp->WCE) {
-		printk(KERN_NOTICE "Synchronizing SCSI cache: ");
-		sd_synchronize_cache(sdkp, 1);
-		printk("\n");
-	}
-
-	sd_devlist_remove(sdkp);
 	del_gendisk(sdkp->disk);
 
 	spin_lock(&sd_index_lock);
 	clear_bit(sdkp->index, sd_index_bits);
 	spin_unlock(&sd_index_lock);
 
+	sd_shutdown(dev);
 	put_disk(sdkp->disk);
 	kfree(sdkp);
+
+	return 0;
+}
+
+static void sd_shutdown(struct device *dev)
+{
+	struct scsi_disk *sdkp = dev_get_drvdata(dev);
+
+	if (sdkp->WCE) {
+		printk(KERN_NOTICE "Synchronizing SCSI cache: ");
+		sd_synchronize_cache(sdkp, 1);
+		printk("\n");
+	}
 }
 
 /**
@@ -1457,7 +1421,7 @@ static void sd_detach(struct scsi_device * sdp)
  **/
 static int __init init_sd(void)
 {
-	int majors = 0, rc = -ENODEV, i;
+	int majors = 0, i;
 
 	SCSI_LOG_HLQUEUE(3, printk("init_sd: sd driver entry point\n"));
 
@@ -1468,11 +1432,7 @@ static int __init init_sd(void)
 	if (!majors)
 		return -ENODEV;
 
-	rc = scsi_register_device(&sd_template);
-	if (rc)
-		return rc;
-	register_reboot_notifier(&sd_notifier_block);
-	return rc;
+	return scsi_register_driver(&sd_template.gendrv);
 }
 
 /**
@@ -1486,35 +1446,9 @@ static void __exit exit_sd(void)
 
 	SCSI_LOG_HLQUEUE(3, printk("exit_sd: exiting sd driver\n"));
 
-	unregister_reboot_notifier(&sd_notifier_block);
-	scsi_unregister_device(&sd_template);
+	scsi_unregister_driver(&sd_template.gendrv);
 	for (i = 0; i < SD_MAJORS; i++)
 		unregister_blkdev(sd_major(i), "sd");
-}
-
-/*
- * XXX: this function does not take sd_devlist_lock to synchronize
- *	access to sd_devlist.  This should be safe as no other reboot
- *	notifier can access it.
- */
-static int sd_notifier(struct notifier_block *n, unsigned long event, void *p)
-{
-	if (event != SYS_RESTART &&
-	    event != SYS_HALT &&
-	    event != SYS_POWER_OFF)
-		return NOTIFY_DONE;
-
-	if (!list_empty(&sd_devlist)) {
-		struct scsi_disk *sdkp;
-
-		printk(KERN_NOTICE "Synchronizing SCSI caches: ");
-		list_for_each_entry(sdkp, &sd_devlist, list)
-			if (sdkp->WCE)
-				sd_synchronize_cache(sdkp, 1);
-		printk("\n");
-	}
-
-	return NOTIFY_OK;
 }
 
 /* send a SYNCHRONIZE CACHE instruction down to the device through the
