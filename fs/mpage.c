@@ -599,9 +599,8 @@ mpage_writepages(struct address_space *mapping,
 		write_lock(&mapping->page_lock);
 	}
 	/*
-	 * Put the rest back, in the correct order.
+	 * Leave any remaining dirty pages on ->io_pages
 	 */
-	list_splice_init(&mapping->io_pages, mapping->dirty_pages.prev);
 	write_unlock(&mapping->page_lock);
 	pagevec_deactivate_inactive(&pvec);
 	if (bio)

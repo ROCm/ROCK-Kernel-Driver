@@ -134,8 +134,6 @@ static void __sync_single_inode(struct inode *inode, int wait, int *nr_to_write)
 	struct address_space *mapping = inode->i_mapping;
 	struct super_block *sb = inode->i_sb;
 
-	list_move(&inode->i_list, &sb->s_locked_inodes);
-
 	BUG_ON(inode->i_state & I_LOCK);
 
 	/* Set I_LOCK, reset I_DIRTY */
@@ -163,12 +161,12 @@ static void __sync_single_inode(struct inode *inode, int wait, int *nr_to_write)
 		if (inode->i_state & I_DIRTY) {		/* Redirtied */
 			list_add(&inode->i_list, &sb->s_dirty);
 		} else {
-			if (!list_empty(&mapping->dirty_pages)) {
+			if (!list_empty(&mapping->dirty_pages) ||
+					!list_empty(&mapping->io_pages)) {
 			 	/* Not a whole-file writeback */
 				mapping->dirtied_when = orig_dirtied_when;
 				inode->i_state |= I_DIRTY_PAGES;
-				list_add_tail(&inode->i_list,
-						&sb->s_dirty);
+				list_add_tail(&inode->i_list, &sb->s_dirty);
 			} else if (atomic_read(&inode->i_count)) {
 				list_add(&inode->i_list, &inode_in_use);
 			} else {
@@ -205,7 +203,7 @@ __writeback_single_inode(struct inode *inode, int sync, int *nr_to_write)
  * If older_than_this is non-NULL, then only write out mappings which
  * had their first dirtying at a time earlier than *older_than_this.
  *
- * If we're a pdlfush thread, then implement pdlfush collision avoidance
+ * If we're a pdlfush thread, then implement pdflush collision avoidance
  * against the entire list.
  *
  * WB_SYNC_HOLD is a hack for sys_sync(): reattach the inode to sb->s_dirty so
@@ -221,6 +219,11 @@ __writeback_single_inode(struct inode *inode, int sync, int *nr_to_write)
  * FIXME: this linear search could get expensive with many fileystems.  But
  * how to fix?  We need to go from an address_space to all inodes which share
  * a queue with that address_space.
+ *
+ * The inodes to be written are parked on sb->s_io.  They are moved back onto
+ * sb->s_dirty as they are selected for writing.  This way, none can be missed
+ * on the writer throttling path, and we get decent balancing between many
+ * thrlttled threads: we don't want them all piling up on __wait_on_inode.
  */
 static void
 sync_sb_inodes(struct backing_dev_info *single_bdi, struct super_block *sb,
@@ -241,7 +244,7 @@ sync_sb_inodes(struct backing_dev_info *single_bdi, struct super_block *sb,
 		if (single_bdi && mapping->backing_dev_info != single_bdi) {
 			if (sb != blockdev_superblock)
 				break;		/* inappropriate superblock */
-			list_move(&inode->i_list, &inode->i_sb->s_dirty);
+			list_move(&inode->i_list, &sb->s_dirty);
 			continue;		/* not this blockdev */
 		}
 
@@ -263,10 +266,11 @@ sync_sb_inodes(struct backing_dev_info *single_bdi, struct super_block *sb,
 
 		BUG_ON(inode->i_state & I_FREEING);
 		__iget(inode);
+		list_move(&inode->i_list, &sb->s_dirty);
 		__writeback_single_inode(inode, really_sync, nr_to_write);
 		if (sync_mode == WB_SYNC_HOLD) {
 			mapping->dirtied_when = jiffies;
-			list_move(&inode->i_list, &inode->i_sb->s_dirty);
+			list_move(&inode->i_list, &sb->s_dirty);
 		}
 		if (current_is_pdflush())
 			writeback_release(bdi);
@@ -278,9 +282,8 @@ sync_sb_inodes(struct backing_dev_info *single_bdi, struct super_block *sb,
 	}
 out:
 	/*
-	 * Put the rest back, in the correct order.
+	 * Leave any unwritten inodes on s_io.
 	 */
-	list_splice_init(&sb->s_io, sb->s_dirty.prev);
 	return;
 }
 
@@ -302,7 +305,7 @@ __writeback_unlocked_inodes(struct backing_dev_info *bdi, int *nr_to_write,
 	spin_lock(&sb_lock);
 	sb = sb_entry(super_blocks.prev);
 	for (; sb != sb_entry(&super_blocks); sb = sb_entry(sb->s_list.prev)) {
-		if (!list_empty(&sb->s_dirty)) {
+		if (!list_empty(&sb->s_dirty) || !list_empty(&sb->s_io)) {
 			spin_unlock(&sb_lock);
 			sync_sb_inodes(bdi, sb, sync_mode, nr_to_write,
 					older_than_this);
@@ -321,7 +324,7 @@ __writeback_unlocked_inodes(struct backing_dev_info *bdi, int *nr_to_write,
  * Note:
  * We don't need to grab a reference to superblock here. If it has non-empty
  * ->s_dirty it's hadn't been killed yet and kill_super() won't proceed
- * past sync_inodes_sb() until both ->s_dirty and ->s_locked_inodes are
+ * past sync_inodes_sb() until both the ->s_dirty and ->s_io lists are
  * empty. Since __sync_single_inode() regains inode_lock before it finally moves
  * inode from superblock lists we are OK.
  *
@@ -352,19 +355,6 @@ void writeback_backing_dev(struct backing_dev_info *bdi, int *nr_to_write,
 				sync_mode, older_than_this);
 }
 
-static void __wait_on_locked(struct list_head *head)
-{
-	struct list_head * tmp;
-	while ((tmp = head->prev) != head) {
-		struct inode *inode = list_entry(tmp, struct inode, i_list);
-		__iget(inode);
-		spin_unlock(&inode_lock);
-		__wait_on_inode(inode);
-		iput(inode);
-		spin_lock(&inode_lock);
-	}
-}
-
 /*
  * writeback and wait upon the filesystem's dirty inodes.  The caller will
  * do this in two passes - one to write, and one to wait.  WB_SYNC_HOLD is
@@ -384,8 +374,6 @@ void sync_inodes_sb(struct super_block *sb, int wait)
 	spin_lock(&inode_lock);
 	sync_sb_inodes(NULL, sb, wait ? WB_SYNC_ALL : WB_SYNC_HOLD,
 				&nr_to_write, NULL);
-	if (wait)
-		__wait_on_locked(&sb->s_locked_inodes);
 	spin_unlock(&inode_lock);
 }
 
