@@ -79,24 +79,6 @@ EXPORT_SYMBOL(irda_param_extract_all);
 EXPORT_SYMBOL(irda_param_pack);
 EXPORT_SYMBOL(irda_param_unpack);
 
-/* IrIAP/IrIAS */
-EXPORT_SYMBOL(iriap_open);
-EXPORT_SYMBOL(iriap_close);
-EXPORT_SYMBOL(iriap_getvaluebyclass_request);
-EXPORT_SYMBOL(irias_object_change_attribute);
-EXPORT_SYMBOL(irias_add_integer_attrib);
-EXPORT_SYMBOL(irias_add_octseq_attrib);
-EXPORT_SYMBOL(irias_add_string_attrib);
-EXPORT_SYMBOL(irias_insert_object);
-EXPORT_SYMBOL(irias_new_object);
-EXPORT_SYMBOL(irias_delete_object);
-EXPORT_SYMBOL(irias_delete_value);
-EXPORT_SYMBOL(irias_find_object);
-EXPORT_SYMBOL(irias_find_attrib);
-EXPORT_SYMBOL(irias_new_integer_value);
-EXPORT_SYMBOL(irias_new_string_value);
-EXPORT_SYMBOL(irias_new_octseq_value);
-
 /* IrLMP */
 EXPORT_SYMBOL(irlmp_discovery_request);
 EXPORT_SYMBOL(irlmp_get_discoveries);

@@ -25,6 +25,7 @@
  ********************************************************************/
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/skbuff.h>
 #include <linux/string.h>
@@ -200,6 +201,7 @@ struct iriap_cb *iriap_open(__u8 slsap_sel, int mode, void *priv,
 
 	return self;
 }
+EXPORT_SYMBOL(iriap_open);
 
 /*
  * Function __iriap_close (self)
@@ -248,6 +250,7 @@ void iriap_close(struct iriap_cb *self)
 
 	__iriap_close(self);
 }
+EXPORT_SYMBOL(iriap_close);
 
 static int iriap_register_lsap(struct iriap_cb *self, __u8 slsap_sel, int mode)
 {
@@ -435,6 +438,7 @@ int iriap_getvaluebyclass_request(struct iriap_cb *self,
 
 	return 0;
 }
+EXPORT_SYMBOL(iriap_getvaluebyclass_request);
 
 /*
  * Function iriap_getvaluebyclass_confirm (self, skb)
@@ -674,7 +678,7 @@ void iriap_getvaluebyclass_indication(struct iriap_cb *self,
 	if (obj == NULL) {
 		IRDA_DEBUG(2, "LM-IAS: Object %s not found\n", name);
 		iriap_getvaluebyclass_response(self, 0x1235, IAS_CLASS_UNKNOWN,
-					       &missing);
+					       &irias_missing);
 		return;
 	}
 	IRDA_DEBUG(4, "LM-IAS: found %s, id=%d\n", obj->name, obj->id);
@@ -683,7 +687,8 @@ void iriap_getvaluebyclass_indication(struct iriap_cb *self,
 	if (attrib == NULL) {
 		IRDA_DEBUG(2, "LM-IAS: Attribute %s not found\n", attr);
 		iriap_getvaluebyclass_response(self, obj->id,
-					       IAS_ATTRIB_UNKNOWN, &missing);
+					       IAS_ATTRIB_UNKNOWN, 
+					       &irias_missing);
 		return;
 	}
 
