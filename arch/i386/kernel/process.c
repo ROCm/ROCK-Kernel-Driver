@@ -55,6 +55,14 @@ asmlinkage void ret_from_fork(void) __asm__("ret_from_fork");
 int hlt_counter;
 
 /*
+ * Return saved PC of a blocked thread.
+ */
+unsigned long thread_saved_pc(struct task_struct *tsk)
+{
+	return ((unsigned long *)tsk->thread.esp)[3];
+}
+
+/*
  * Powermanagement idle function, if any..
  */
 void (*pm_idle)(void);

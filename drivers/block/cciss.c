@@ -44,12 +44,12 @@
 #include <linux/genhd.h>
 
 #define CCISS_DRIVER_VERSION(maj,min,submin) ((maj<<16)|(min<<8)|(submin))
-#define DRIVER_NAME "Compaq CISS Driver (v 2.4.5)"
-#define DRIVER_VERSION CCISS_DRIVER_VERSION(2,4,5)
+#define DRIVER_NAME "Compaq CISS Driver (v 2.5.0)"
+#define DRIVER_VERSION CCISS_DRIVER_VERSION(2,5,0)
 
 /* Embedded module documentation macros - see modules.h */
 MODULE_AUTHOR("Charles M. White III - Compaq Computer Corporation");
-MODULE_DESCRIPTION("Driver for Compaq Smart Array Controller 5300");
+MODULE_DESCRIPTION("Driver for Compaq Smart Array Controller 5xxx v. 2.5.0");
 MODULE_LICENSE("GPL");
 
 #include "cciss_cmd.h"
@@ -372,21 +372,18 @@ static int cciss_open(struct inode *inode, struct file *filep)
 
 	if (ctlr > MAX_CTLR || hba[ctlr] == NULL)
 		return -ENXIO;
-
-	if (!suser() && hba[ctlr]->sizes[minor(inode->i_rdev)] == 0)
-		return -ENXIO;
-
 	/*
 	 * Root is allowed to open raw volume zero even if its not configured
 	 * so array config can still work.  I don't think I really like this,
 	 * but I'm already using way to many device nodes to claim another one
 	 * for "raw controller".
 	 */
-	if (suser()
-		&& (hba[ctlr]->sizes[minor(inode->i_rdev)] == 0) 
-		&& (minor(inode->i_rdev)!= 0))
-		return -ENXIO;
-
+	if (hba[ctlr]->sizes[minor(inode->i_rdev)] == 0) {
+		if (minor(inode->i_rdev) != 0)
+			return -ENXIO;
+		if (!capable(CAP_SYS_ADMIN))
+			return -EPERM;
+	}
 	hba[ctlr]->drv[dsk].usage_count++;
 	hba[ctlr]->usage_count++;
 	return 0;
@@ -647,6 +644,7 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 		char 	*buff = NULL;
 		u64bit	temp64;
 		unsigned long flags;
+		DECLARE_COMPLETION(wait);
 
 		if (!arg) return -EINVAL;
 	
@@ -712,6 +710,8 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 			c->SG[0].Len = iocommand.buf_size;
 			c->SG[0].Ext = 0;  // we are not chaining
 		}
+		c->waiting = &wait;
+
 		/* Put the request on the tail of the request queue */
 		spin_lock_irqsave(CCISS_LOCK(ctlr), flags);
 		addQ(&h->reqQ, c);
@@ -719,9 +719,7 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 		start_io(h);
 		spin_unlock_irqrestore(CCISS_LOCK(ctlr), flags);
 
-		/* Wait for completion */
-		while(c->cmd_type != CMD_IOCTL_DONE)
-			schedule_timeout(1);
+		wait_for_completion(&wait);
 
 		/* unlock the buffers from DMA */
 		temp64.val32.lower = c->SG[0].Addr.lower;
@@ -933,6 +931,7 @@ static int sendcmd_withirq(__u8	cmd,
 	u64bit	buff_dma_handle;
 	unsigned long flags;
 	int return_status = IO_OK;
+	DECLARE_COMPLETION(wait);
 	
 	if ((c = cmd_alloc(h , 0)) == NULL)
 	{
@@ -1026,6 +1025,7 @@ static int sendcmd_withirq(__u8	cmd,
 		c->SG[0].Len = size;
 		c->SG[0].Ext = 0;  // we are not chaining
 	}
+	c->waiting = &wait;
 	
 	/* Put the request on the tail of the queue and send it */
 	spin_lock_irqsave(CCISS_LOCK(ctlr), flags);
@@ -1034,9 +1034,8 @@ static int sendcmd_withirq(__u8	cmd,
 	start_io(h);
 	spin_unlock_irqrestore(CCISS_LOCK(ctlr), flags);
 	
-	/* wait for completion */ 
-	while(c->cmd_type != CMD_IOCTL_DONE)
-		schedule_timeout(1);
+	wait_for_completion(&wait);
+
 	/* unlock the buffers from DMA */
         pci_unmap_single( h->pdev, (dma_addr_t) buff_dma_handle.val,
                 	size, PCI_DMA_BIDIRECTIONAL);
@@ -1128,6 +1127,7 @@ static int register_new_disk(kdev_t dev, int ctlr)
 	__u32 lunid = 0;
 	unsigned int block_size;
 	unsigned int total_size;
+	kdev_t kdev;
 
         if (!capable(CAP_SYS_RAWIO))
                 return -EPERM;
@@ -1340,7 +1340,7 @@ static int register_new_disk(kdev_t dev, int ctlr)
 
         for(i=max_p-1; i>=0; i--) {
                 int minor = start+i;
-		kdev_t kdev = mk_kdev(MAJOR_NR + ctlr, minor);
+		kdev = mk_kdev(MAJOR_NR + ctlr, minor);
                 invalidate_device(kdev, 1);
                 gdev->part[minor].start_sect = 0;
                 gdev->part[minor].nr_sects = 0;
@@ -1352,7 +1352,8 @@ static int register_new_disk(kdev_t dev, int ctlr)
 	++hba[ctlr]->num_luns;
 	gdev->nr_real = hba[ctlr]->highest_lun + 1;
 	/* setup partitions per disk */
-	grok_partitions(dev, hba[ctlr]->drv[logvol].nr_blocks);
+	kdev = mk_kdev(MAJOR_NR + ctlr, logvol<< gdev->minor_shift);
+	grok_partitions(kdev, hba[ctlr]->drv[logvol].nr_blocks);
 	
 	kfree(ld_buff);
 	kfree(size_buff);
@@ -1672,12 +1673,11 @@ static void start_io( ctlr_info_t *h)
 static inline void complete_buffers(struct bio *bio, int status)
 {
 	while (bio) {
-		int nsecs = bio_sectors(bio);
-
 		struct bio *xbh = bio->bi_next; 
+
 		bio->bi_next = NULL; 
-		blk_finished_io(nsecs);
-		bio_endio(bio, status, nsecs);
+		blk_finished_io(bio_sectors(bio));
+		bio_endio(bio, status);
 		bio = xbh;
 	}
 
@@ -1957,7 +1957,7 @@ static void do_cciss_intr(int irq, void *dev_id, struct pt_regs *regs)
 					complete_command(c, 0);
 					cmd_free(h, c, 1);
 				} else if (c->cmd_type == CMD_IOCTL_PEND) {
-					c->cmd_type = CMD_IOCTL_DONE;
+					complete(c->waiting);
 				}
 #				ifdef CONFIG_CISS_SCSI_TAPE
 				else if (c->cmd_type == CMD_SCSI)
@@ -2466,7 +2466,8 @@ static int __init cciss_init_one(struct pci_dev *pdev,
 	/* make sure the board interrupts are off */
 	hba[i]->access.set_intr_mask(hba[i], CCISS_INTR_OFF);
 	if( request_irq(hba[i]->intr, do_cciss_intr, 
-		SA_INTERRUPT|SA_SHIRQ, hba[i]->devname, hba[i]))
+		SA_INTERRUPT | SA_SHIRQ | SA_SAMPLE_RANDOM, 
+			hba[i]->devname, hba[i]))
 	{
 		printk(KERN_ERR "ciss: Unable to get irq %d for %s\n",
 			hba[i]->intr, hba[i]->devname);

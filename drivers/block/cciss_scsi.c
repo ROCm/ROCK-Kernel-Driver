@@ -897,6 +897,7 @@ cciss_scsi_do_simple_cmd(ctlr_info_t *c,
 			int direction)
 {
 	unsigned long flags;
+	DECLARE_COMPLETION(wait);
 
 	cp->cmd_type = CMD_IOCTL_PEND;		// treat this like an ioctl 
 	cp->scsi_cmd = NULL;
@@ -922,6 +923,8 @@ cciss_scsi_do_simple_cmd(ctlr_info_t *c,
 			(unsigned char *) buf, bufsize,
 			scsi_to_pci_dma_dir(SCSI_DATA_READ)); 
 
+	cp->waiting = &wait;
+
 	/* Put the request on the tail of the request queue */
 	spin_lock_irqsave(CCISS_LOCK(c->ctlr), flags);
 	addQ(&c->reqQ, cp);
@@ -929,9 +932,7 @@ cciss_scsi_do_simple_cmd(ctlr_info_t *c,
 	start_io(c);
 	spin_unlock_irqrestore(CCISS_LOCK(c->ctlr), flags);
 
-	/* Wait for the request to complete */
-	while(cp->cmd_type != CMD_IOCTL_DONE)
-		schedule_timeout(1);
+	wait_for_completion(&wait);
 
 	/* undo the dma mapping */
 	cciss_unmap_one(c->pdev, cp, bufsize,
@@ -1086,10 +1087,10 @@ cciss_scsi_do_report_phys_luns(ctlr_info_t *c,
 	cdb[3] = 0;
 	cdb[4] = 0;
 	cdb[5] = 0;
-	cdb[6] = (sizeof(*buf) >> 24) & 0xFF;  //MSB
-	cdb[7] = (sizeof(*buf) >> 16) & 0xFF;
-	cdb[8] = (sizeof(*buf) >> 8) & 0xFF;
-	cdb[9] = sizeof(*buf) & 0xFF;
+	cdb[6] = (bufsize >> 24) & 0xFF;  //MSB
+	cdb[7] = (bufsize >> 16) & 0xFF;
+	cdb[8] = (bufsize >> 8) & 0xFF;
+	cdb[9] = bufsize & 0xFF;
 	cdb[10] = 0;
 	cdb[11] = 0;
 

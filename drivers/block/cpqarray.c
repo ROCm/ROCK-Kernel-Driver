@@ -970,13 +970,11 @@ static inline void complete_buffers(struct bio *bio, int ok)
 {
 	struct bio *xbh;
 	while(bio) {
-		int nsecs = bio_sectors(bio);
-
 		xbh = bio->bi_next;
 		bio->bi_next = NULL;
 		
-		blk_finished_io(nsecs);
-		bio_endio(bio, ok, nsecs);
+		blk_finished_io(bio_sectors(bio));
+		bio_endio(bio, ok);
 
 		bio = xbh;
 	}

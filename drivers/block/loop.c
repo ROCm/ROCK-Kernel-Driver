@@ -319,7 +319,7 @@ static int do_bio_filebacked(struct loop_device *lo, struct bio *bio)
 	return ret;
 }
 
-static int loop_end_io_transfer(struct bio *, int);
+static void loop_end_io_transfer(struct bio *);
 static void loop_put_buffer(struct bio *bio)
 {
 	/*
@@ -377,21 +377,19 @@ static struct bio *loop_get_bio(struct loop_device *lo)
  * bi_end_io context (we don't want to do decrypt of a page with irqs
  * disabled)
  */
-static int loop_end_io_transfer(struct bio *bio, int nr_sectors)
+static void loop_end_io_transfer(struct bio *bio)
 {
 	struct bio *rbh = bio->bi_private;
 	struct loop_device *lo = &loop_dev[minor(rbh->bi_dev)];
 	int uptodate = test_bit(BIO_UPTODATE, &bio->bi_flags);
 
 	if (!uptodate || bio_rw(bio) == WRITE) {
-		bio_endio(rbh, uptodate, nr_sectors);
+		bio_endio(rbh, uptodate);
 		if (atomic_dec_and_test(&lo->lo_pending))
 			up(&lo->lo_bh_mutex);
 		loop_put_buffer(bio);
 	} else
 		loop_add_bio(lo, bio);
-
-	return 0;
 }
 
 static struct bio *loop_get_buffer(struct loop_device *lo, struct bio *rbh)
@@ -511,13 +509,13 @@ static inline void loop_handle_bio(struct loop_device *lo, struct bio *bio)
 	 */
 	if (lo->lo_flags & LO_FLAGS_DO_BMAP) {
 		ret = do_bio_filebacked(lo, bio);
-		bio_endio(bio, !ret, bio_sectors(bio));
+		bio_endio(bio, !ret);
 	} else {
 		struct bio *rbh = bio->bi_private;
 
 		ret = do_bio_blockbacked(lo, bio, rbh);
 
-		bio_endio(rbh, !ret, bio_sectors(rbh));
+		bio_endio(rbh, !ret);
 		loop_put_buffer(bio);
 	}
 }

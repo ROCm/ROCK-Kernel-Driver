@@ -123,29 +123,24 @@ static ide_startstop_t lba_48_rw_disk (ide_drive_t *drive, struct request *rq, u
  */
 static ide_startstop_t do_rw_disk (ide_drive_t *drive, struct request *rq, unsigned long block)
 {
-	if (rq->flags & REQ_CMD)
-		goto good_command;
+	if (!(rq->flags & REQ_CMD)) {
+		blk_dump_rq_flags(rq, "do_rw_disk, bad command");
+		ide_end_request(0, HWGROUP(drive));
+		return ide_stopped;
+	}
 
-	blk_dump_rq_flags(rq, "do_rw_disk, bad command");
-	ide_end_request(0, HWGROUP(drive));
-	return ide_stopped;
-
-good_command:
-
-#ifdef CONFIG_BLK_DEV_PDC4030
 	if (IS_PDC4030_DRIVE) {
 		extern ide_startstop_t promise_rw_disk(ide_drive_t *, struct request *, unsigned long);
 		return promise_rw_disk(drive, rq, block);
 	}
-#endif /* CONFIG_BLK_DEV_PDC4030 */
 
 	if ((drive->id->cfs_enable_2 & 0x0400) && (drive->addressing))	/* 48-bit LBA */
-		return lba_48_rw_disk(drive, rq, (unsigned long long) block);
+		return lba_48_rw_disk(drive, rq, block);
 	if (drive->select.b.lba)		/* 28-bit LBA */
-		return lba_28_rw_disk(drive, rq, (unsigned long) block);
+		return lba_28_rw_disk(drive, rq, block);
 
 	/* 28-bit CHS : DIE DIE DIE piece of legacy crap!!! */
-	return chs_rw_disk(drive, rq, (unsigned long) block);
+	return chs_rw_disk(drive, rq, block);
 }
 
 static task_ioreg_t get_command (ide_drive_t *drive, int cmd)

@@ -222,7 +222,6 @@ typedef struct _ErrorInfo_struct {
 /* Command types */
 #define CMD_RWREQ       0x00
 #define CMD_IOCTL_PEND  0x01
-#define CMD_IOCTL_DONE  0x02
 #define CMD_SCSI	0x03
 #define CMD_MSG_DONE	0x04
 #define CMD_MSG_TIMEOUT 0x05
@@ -240,6 +239,7 @@ typedef struct _CommandList_struct {
   struct _CommandList_struct *prev;
   struct _CommandList_struct *next;
   struct request *	   rq;
+  struct completion *waiting;
 #ifdef CONFIG_CISS_SCSI_TAPE
   void * scsi_cmd;
 #endif

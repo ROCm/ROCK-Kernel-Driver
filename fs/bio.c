@@ -316,13 +316,12 @@ oom:
 	return NULL;
 }
 
-static int bio_end_io_kio(struct bio *bio, int nr_sectors)
+static void bio_end_io_kio(struct bio *bio)
 {
 	struct kiobuf *kio = (struct kiobuf *) bio->bi_private;
 
 	end_kio_request(kio, test_bit(BIO_UPTODATE, &bio->bi_flags));
 	bio_put(bio);
-	return 0;
 }
 
 /**
@@ -441,7 +440,7 @@ out:
 	end_kio_request(kio, !err);
 }
 
-int bio_endio(struct bio *bio, int uptodate, int nr_sectors)
+void bio_endio(struct bio *bio, int uptodate)
 {
 	if (uptodate)
 		set_bit(BIO_UPTODATE, &bio->bi_flags);
@@ -449,9 +448,7 @@ int bio_endio(struct bio *bio, int uptodate, int nr_sectors)
 		clear_bit(BIO_UPTODATE, &bio->bi_flags);
 
 	if (bio->bi_end_io)
-		return bio->bi_end_io(bio, nr_sectors);
-
-	return 0;
+		bio->bi_end_io(bio);
 }
 
 static void __init biovec_init_pool(void)
