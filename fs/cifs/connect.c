@@ -742,6 +742,8 @@ cifs_parse_mount_options(char *options, const char *devname, struct smb_vol *vol
 			/* ignore */
 		} else if (strnicmp(data, "version", 3) == 0) {
 			/* ignore */
+		} else if (strnicmp(data, "guest",5) == 0) {
+			/* ignore */
 		} else if (strnicmp(data, "rw", 2) == 0) {
 			vol->rw = TRUE;
 		} else if ((strnicmp(data, "suid", 4) == 0) ||
