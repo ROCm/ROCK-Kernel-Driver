@@ -86,10 +86,15 @@ ppc64_elf_core_copy_regs(elf_gregset_t dstRegs, struct pt_regs* srcRegs)
 
 #ifdef __KERNEL__
 #define SET_PERSONALITY(ex, ibcs2)				\
-do {	if ((ex).e_ident[EI_CLASS] == ELFCLASS32)		\
-		set_thread_flag(TIF_32BIT);			\
+do {								\
+	unsigned long new_flags = 0				\
+	if ((ex).e_ident[EI_CLASS] == ELFCLASS32)		\
+		new_flags = _TIF_32BIT;				\
+	if ((current_thread_info()->flags & _TIF_32BIT)		\
+	    != new_flags)					\
+		set_thread_flag(TIF_ABI_PENDING);		\
 	else							\
-		clear_thread_flag(TIF_32BIT);			\
+		clear_thread_flag(TIF_ABI_PENDING);		\
 	if (ibcs2)						\
 		set_personality(PER_SVR4);			\
 	else if (current->personality != PER_LINUX32)		\

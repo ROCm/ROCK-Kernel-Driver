@@ -85,6 +85,7 @@ static inline struct thread_info *current_thread_info(void)
 					   TIF_NEED_RESCHED */
 #define TIF_32BIT		5	/* 32 bit binary */
 #define TIF_RUN_LIGHT		6	/* iSeries run light */
+#define TIF_ABI_PENDING		7	/* 32/64 bit switch needed */
 
 /* as above, but as bit values */
 #define _TIF_SYSCALL_TRACE	(1<<TIF_SYSCALL_TRACE)
@@ -94,6 +95,7 @@ static inline struct thread_info *current_thread_info(void)
 #define _TIF_POLLING_NRFLAG	(1<<TIF_POLLING_NRFLAG)
 #define _TIF_32BIT		(1<<TIF_32BIT)
 #define _TIF_RUN_LIGHT		(1<<TIF_RUN_LIGHT)
+#define _TIF_ABI_PENDING	(1<<TIF_ABI_PENDING)
 
 #define _TIF_USER_WORK_MASK	(_TIF_NOTIFY_RESUME | _TIF_SIGPENDING | \
 				 _TIF_NEED_RESCHED)
