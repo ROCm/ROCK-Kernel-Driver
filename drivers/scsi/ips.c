@@ -195,8 +195,8 @@ MODULE_PARM(ips, "s");
 /*
  * DRIVER_VER
  */
-#define IPS_VERSION_HIGH        "5.99"
-#define IPS_VERSION_LOW         ".01-BETA"
+#define IPS_VERSION_HIGH        "6.10"
+#define IPS_VERSION_LOW         ".90-BETA"
 
 #if !defined(__i386__) && !defined(__ia64__) && !defined(__x86_64__)
 #error "This driver has only been tested on the x86/ia64/x86_64 platforms"

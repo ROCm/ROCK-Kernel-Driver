@@ -1201,25 +1201,29 @@ typedef struct {
 *
 *************************************************************************/
 
-#define IPS_VER_MAJOR 5
-#define IPS_VER_MAJOR_STRING "5"
-#define IPS_VER_MINOR 99
-#define IPS_VER_MINOR_STRING "99"
-#define IPS_VER_BUILD 00
-#define IPS_VER_BUILD_STRING "00"
-#define IPS_VER_STRING "5.99.00"
-#define IPS_BUILD_IDENT 1132
+#define IPS_VER_MAJOR 6
+#define IPS_VER_MAJOR_STRING "6"
+#define IPS_VER_MINOR 10
+#define IPS_VER_MINOR_STRING "10"
+#define IPS_VER_BUILD 90
+#define IPS_VER_BUILD_STRING "90"
+#define IPS_VER_STRING "6.10.90"
+#define IPS_RELEASE_ID 0x00010000
+#define IPS_BUILD_IDENT 364
+#define IPS_LEGALCOPYRIGHT_STRING "(C) Copyright IBM Corp. 1994, 2003. All Rights Reserved."
+#define IPS_ADAPTECCOPYRIGHT_STRING "(c) Copyright Adaptec, Inc. 2002 to present. All Rights Reserved."
+#define IPS_NT_LEGALCOPYRIGHT_STRING "(C) Copyright IBM Corp. 1994, 2003."
 
 /* Version numbers for various adapters */
 #define IPS_VER_SERVERAID1 "2.25.01"
 #define IPS_VER_SERVERAID2 "2.88.13"
 #define IPS_VER_NAVAJO "2.88.13"
-#define IPS_VER_SERVERAID3 "5.11.05"
-#define IPS_VER_SERVERAID4H "5.11.05"
-#define IPS_VER_SERVERAID4MLx "5.11.05"
-#define IPS_VER_SARASOTA "5.11.05"
-#define IPS_VER_MARCO "0.00.00"
-#define IPS_VER_SEBRING "0.00.00"
+#define IPS_VER_SERVERAID3 "6.10.24"
+#define IPS_VER_SERVERAID4H "6.10.24"
+#define IPS_VER_SERVERAID4MLx "6.10.24"
+#define IPS_VER_SARASOTA "6.10.24"
+#define IPS_VER_MARCO "6.10.24"
+#define IPS_VER_SEBRING "6.10.24"
 
 /* Compatability IDs for various adapters */
 #define IPS_COMPAT_UNKNOWN ""
@@ -1228,17 +1232,17 @@ typedef struct {
 #define IPS_COMPAT_SERVERAID2 "2.88.13"
 #define IPS_COMPAT_NAVAJO  "2.88.13"
 #define IPS_COMPAT_KIOWA "2.88.13"
-#define IPS_COMPAT_SERVERAID3H  "SA510"
-#define IPS_COMPAT_SERVERAID3L  "SA510"
-#define IPS_COMPAT_SERVERAID4H  "SA510"
-#define IPS_COMPAT_SERVERAID4M  "SA510"
-#define IPS_COMPAT_SERVERAID4L  "SA510"
-#define IPS_COMPAT_SERVERAID4Mx "SA510"
-#define IPS_COMPAT_SERVERAID4Lx "SA510"
-#define IPS_COMPAT_SARASOTA     "SA510"
-#define IPS_COMPAT_MARCO        "SA000"
-#define IPS_COMPAT_SEBRING      "SA000"
-#define IPS_COMPAT_BIOS "SA510"
+#define IPS_COMPAT_SERVERAID3H  "SB610"
+#define IPS_COMPAT_SERVERAID3L  "SB610"
+#define IPS_COMPAT_SERVERAID4H  "SB610"
+#define IPS_COMPAT_SERVERAID4M  "SB610"
+#define IPS_COMPAT_SERVERAID4L  "SB610"
+#define IPS_COMPAT_SERVERAID4Mx "SB610"
+#define IPS_COMPAT_SERVERAID4Lx "SB610"
+#define IPS_COMPAT_SARASOTA     "SB610"
+#define IPS_COMPAT_MARCO        "SB610"
+#define IPS_COMPAT_SEBRING      "SB610"
+#define IPS_COMPAT_BIOS "SB610"
 
 #define IPS_COMPAT_MAX_ADAPTER_TYPE 16
 #define IPS_COMPAT_ID_LENGTH 8
