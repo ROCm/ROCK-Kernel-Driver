@@ -172,6 +172,8 @@
  *	2.1b1 04/01/31	GL	(applied 05.04) Remove internal		*
  *				command-queuing.			*
  *	2.1b2 04/02/01	CH	(applied 05.04) Fix error-handling	*
+ *	2.1c  04/05/23  GL	Update to use the new pci_driver API,	*
+ *				some scsi EH updates, more cleanup.	*
  ***********************************************************************/
 
 /* Uncomment SA_INTERRUPT, if the driver refuses to share its IRQ with other devices */

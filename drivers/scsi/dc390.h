@@ -19,7 +19,7 @@
 #endif
 
 #define DC390_BANNER "Tekram DC390/AM53C974"
-#define DC390_VERSION "2.1b 2004-04-13"
+#define DC390_VERSION "2.1c 2004-05-23"
 
 /* We don't have eh_abort_handler, eh_device_reset_handler, 
  * eh_bus_reset_handler, eh_host_reset_handler yet! 
