@@ -94,7 +94,7 @@
  * 2001-June	Works with usb-storage and NEC EHCI on 2.4
  */
 
-#define DRIVER_VERSION "2002-Nov-29"
+#define DRIVER_VERSION "2003-Jan-22"
 #define DRIVER_AUTHOR "David Brownell"
 #define DRIVER_DESC "USB 2.0 'Enhanced' Host Controller (EHCI) Driver"
 
@@ -110,10 +110,11 @@ static const char	hcd_name [] = "ehci-hcd";
 
 /* magic numbers that can affect system performance */
 #define	EHCI_TUNE_CERR		3	/* 0-3 qtd retries; 0 == don't stop */
-#define	EHCI_TUNE_RL_HS		0	/* nak throttle; see 4.9 */
+#define	EHCI_TUNE_RL_HS		4	/* nak throttle; see 4.9 */
 #define	EHCI_TUNE_RL_TT		0
 #define	EHCI_TUNE_MULT_HS	1	/* 1-3 transactions/uframe; 4.10.3 */
 #define	EHCI_TUNE_MULT_TT	1
+#define	EHCI_TUNE_FLS		2	/* (small) 256 frame schedule */
 
 #define EHCI_WATCHDOG_JIFFIES	(HZ/100)	/* arbitrary; ~10 msec */
 #define EHCI_ASYNC_JIFFIES	(HZ/20)		/* async idle timeout */
@@ -416,13 +417,26 @@ static int ehci_start (struct usb_hcd *hcd)
 			ehci_info (ehci, "enabled 64bit PCI DMA\n");
 	}
 
+	/* help hc dma work well with cachelines */
+	pci_set_mwi (ehci->hcd.pdev);
+
 	/* clear interrupt enables, set irq latency */
 	temp = readl (&ehci->regs->command) & 0xff;
 	if (log2_irq_thresh < 0 || log2_irq_thresh > 6)
 		log2_irq_thresh = 0;
 	temp |= 1 << (16 + log2_irq_thresh);
 	// if hc can park (ehci >= 0.96), default is 3 packets per async QH 
-	// keeping default periodic framelist size
+	if (HCC_PGM_FRAMELISTLEN (hcc_params)) {
+		/* periodic schedule size can be smaller than default */
+		temp &= ~(3 << 2);
+		temp |= (EHCI_TUNE_FLS << 2);
+		switch (EHCI_TUNE_FLS) {
+		case 0: ehci->periodic_size = 1024; break;
+		case 1: ehci->periodic_size = 512; break;
+		case 2: ehci->periodic_size = 256; break;
+		default:	BUG ();
+		}
+	}
 	temp &= ~(CMD_IAAD | CMD_ASE | CMD_PSE),
 	// Philips, Intel, and maybe others need CMD_RUN before the
 	// root hub will detect new devices (why?); NEC doesn't
@@ -759,7 +773,6 @@ static int ehci_urb_dequeue (struct usb_hcd *hcd, struct urb *urb)
 	struct ehci_hcd		*ehci = hcd_to_ehci (hcd);
 	struct ehci_qh		*qh;
 	unsigned long		flags;
-	int			maybe_irq = 1;
 
 	spin_lock_irqsave (&ehci->lock, flags);
 	switch (usb_pipetype (urb->pipe)) {
@@ -769,23 +782,23 @@ static int ehci_urb_dequeue (struct usb_hcd *hcd, struct urb *urb)
 		qh = (struct ehci_qh *) urb->hcpriv;
 		if (!qh)
 			break;
-		while (qh->qh_state == QH_STATE_LINKED
+
+		/* if we need to use IAA and it's busy, defer */
+		if (qh->qh_state == QH_STATE_LINKED
 				&& ehci->reclaim
 				&& HCD_IS_RUNNING (ehci->hcd.state)
 				) {
-			spin_unlock_irqrestore (&ehci->lock, flags);
+			struct ehci_qh		*last;
 
-			if (maybe_irq) {
-				if (in_interrupt ())
-					return -EAGAIN;
-				maybe_irq = 0;
-			}
-			/* let pending unlinks complete, so this can start */
-			wait_ms (1);
+			for (last = ehci->reclaim;
+					last->reclaim;
+					last = last->reclaim)
+				continue;
+			qh->qh_state = QH_STATE_UNLINK_WAIT;
+			last->reclaim = qh;
 
-			spin_lock_irqsave (&ehci->lock, flags);
-		}
-		if (!HCD_IS_RUNNING (ehci->hcd.state) && ehci->reclaim)
+		/* bypass IAA if the hc can't care */
+		} else if (!HCD_IS_RUNNING (ehci->hcd.state) && ehci->reclaim)
 			end_unlink_async (ehci, NULL);
 
 		/* something else might have unlinked the qh by now */

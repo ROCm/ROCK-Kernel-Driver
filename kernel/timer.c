@@ -26,8 +26,10 @@
 #include <linux/mm.h>
 #include <linux/notifier.h>
 #include <linux/thread_info.h>
+#include <linux/jiffies.h>
 
 #include <asm/uaccess.h>
+#include <asm/div64.h>
 
 /*
  * per-CPU timer vector definitions:
@@ -1085,13 +1087,16 @@ asmlinkage long sys_nanosleep(struct timespec *rqtp, struct timespec *rmtp)
 asmlinkage long sys_sysinfo(struct sysinfo *info)
 {
 	struct sysinfo val;
+	u64 uptime;
 	unsigned long mem_total, sav_total;
 	unsigned int mem_unit, bitcount;
 
 	memset((char *)&val, 0, sizeof(struct sysinfo));
 
 	read_lock_irq(&xtime_lock);
-	val.uptime = jiffies / HZ;
+	uptime = jiffies_64;
+	do_div(uptime, HZ);
+	val.uptime = (unsigned long) uptime;
 
 	val.loads[0] = avenrun[0] << (SI_LOAD_SHIFT - FSHIFT);
 	val.loads[1] = avenrun[1] << (SI_LOAD_SHIFT - FSHIFT);

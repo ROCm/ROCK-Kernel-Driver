@@ -1594,6 +1594,7 @@ void scsi_error_handler(void *data)
 	 */
 
 	sprintf(current->comm, "scsi_eh_%d", shost->host_no);
+	current->flags |= PF_IOTHREAD;
 
 	shost->eh_wait = &sem;
 	shost->ehandler = current;

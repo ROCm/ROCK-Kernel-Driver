@@ -28,8 +28,6 @@ JFS TODO list:
 Plans for our near term development items
 
    - enhance support for logfile on dedicated partition
-   - get access control list functionality operational
-   - get extended attributes functionality operational
 
 Longer term work items
 
@@ -37,7 +35,7 @@ Longer term work items
    - add quota support
    - add support for block sizes (512,1024,2048)
 
-Please send bugs, comments, cards and letters to linuxjfs@us.ibm.com.
+Please send bugs, comments, cards and letters to shaggy@austin.ibm.com.
 
 The JFS mailing list can be subscribed to by using the link labeled
 "Mail list Subscribe" at our web page http://oss.software.ibm.com/jfs/.

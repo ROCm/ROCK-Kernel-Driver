@@ -4,8 +4,6 @@
 # Based on:
 # $Id: Makefile,v 1.66 2002/04/23 13:52:14 mag Exp $
 
-export-objs	:= mtdcore.o mtdpart.o redboot.o cmdline.o afs.o mtdconcat.o
-
 obj-y           += chips/ maps/ devices/ nand/
 
 #                       *** BIG UGLY NOTE ***

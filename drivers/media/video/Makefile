@@ -2,12 +2,6 @@
 # Makefile for the video capture/playback device drivers.
 #
 
-# All of the (potential) objects that export symbols.
-# This list comes from 'grep -l EXPORT_SYMBOL *.[hc]'.
-
-export-objs     :=	videodev.o v4l2-common.o v4l1-compat.o \
-			bttv-if.o cpia.o video-buf.o
-
 bttv-objs	:=	bttv-driver.o bttv-cards.o bttv-if.o \
 			bttv-risc.o bttv-vbi.o
 zoran-objs      :=	zr36120.o zr36120_i2c.o zr36120_mem.o

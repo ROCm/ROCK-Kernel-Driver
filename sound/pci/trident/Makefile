@@ -3,8 +3,6 @@
 # Copyright (c) 2001 by Jaroslav Kysela <perex@suse.cz>
 #
 
-export-objs  := trident_main.o
-
 snd-trident-objs := trident.o trident_main.o trident_memory.o
 snd-trident-synth-objs := trident_synth.o
 

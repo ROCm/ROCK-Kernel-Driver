@@ -60,7 +60,7 @@ static void	tcp_v6_send_check(struct sock *sk, struct tcphdr *th, int len,
 				  struct sk_buff *skb);
 
 static int	tcp_v6_do_rcv(struct sock *sk, struct sk_buff *skb);
-static int	tcp_v6_xmit(struct sk_buff *skb);
+static int	tcp_v6_xmit(struct sk_buff *skb, int ipfragok);
 
 static struct tcp_func ipv6_mapped;
 static struct tcp_func ipv6_specific;

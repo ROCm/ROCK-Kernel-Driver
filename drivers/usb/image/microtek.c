@@ -398,7 +398,7 @@ static int mts_scsi_release(struct Scsi_Host *psh)
 
 static int mts_scsi_abort (Scsi_Cmnd *srb)
 {
-	struct mts_desc* desc = (struct mts_desc*)(srb->host->hostdata[0]);
+	struct mts_desc* desc = (struct mts_desc*)(srb->device->host->hostdata[0]);
 
 	MTS_DEBUG_GOT_HERE();
 
@@ -409,7 +409,7 @@ static int mts_scsi_abort (Scsi_Cmnd *srb)
 
 static int mts_scsi_host_reset (Scsi_Cmnd *srb)
 {
-	struct mts_desc* desc = (struct mts_desc*)(srb->host->hostdata[0]);
+	struct mts_desc* desc = (struct mts_desc*)(srb->device->host->hostdata[0]);
 
 	MTS_DEBUG_GOT_HERE();
 	mts_debug_dump(desc);
@@ -692,7 +692,7 @@ mts_build_transfer_context( Scsi_Cmnd *srb, struct mts_desc* desc )
 static
 int mts_scsi_queuecommand( Scsi_Cmnd *srb, mts_scsi_cmnd_callback callback )
 {
-	struct mts_desc* desc = (struct mts_desc*)(srb->host->hostdata[0]);
+	struct mts_desc* desc = (struct mts_desc*)(srb->device->host->hostdata[0]);
 	int err = 0;
 	int res;
 

@@ -16,17 +16,29 @@
 #include <linux/init.h>
 #include <asm/hardirq.h>
 #include <asm/softirq.h>
+#include <asm/kmap_types.h>
 
-static inline void *crypto_kmap(struct page *page)
+static enum km_type km_types[] = {
+	KM_USER0,
+	KM_USER1,
+	KM_SOFTIRQ0,
+	KM_SOFTIRQ1,
+};
+
+static inline enum km_type crypto_kmap_type(int out)
 {
-	return kmap_atomic(page, in_softirq() ?
-	                   KM_CRYPTO_SOFTIRQ : KM_CRYPTO_USER);
+	return km_types[(in_softirq() ? 2 : 0) + out];
+}
+	
+
+static inline void *crypto_kmap(struct page *page, int out)
+{
+	return kmap_atomic(page, crypto_kmap_type(out));
 }
 
-static inline void crypto_kunmap(void *vaddr)
+static inline void crypto_kunmap(void *vaddr, int out)
 {
-	kunmap_atomic(vaddr, in_softirq() ?
-		      KM_CRYPTO_SOFTIRQ : KM_CRYPTO_USER);
+	kunmap_atomic(vaddr, crypto_kmap_type(out));
 }
 
 static inline void crypto_yield(struct crypto_tfm *tfm)

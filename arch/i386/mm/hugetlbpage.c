@@ -283,8 +283,8 @@ int try_to_free_low(int count)
 				break;
 		}
 		page = list_entry(p, struct page, list);
-		if ((page_zone(page))->name[0] != 'H') // Look for non-Highmem
-				map = page;
+		if (!PageHighMem(page))
+			map = page;
 	}
 	if (map) {
 		list_del(&map->list);

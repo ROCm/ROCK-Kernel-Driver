@@ -123,7 +123,11 @@ void dump_stack(void)
 }
 
 
-static int kstack_depth_to_print = 48;
+#ifndef __LP64__
+static int kstack_depth_to_print = 64 * 4;
+#else
+static int kstack_depth_to_print = 128 * 4;
+#endif
 
 void show_stack(unsigned long *sp)
 {

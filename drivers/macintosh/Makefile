@@ -2,17 +2,6 @@
 # Makefile for the Macintosh-specific device drivers.
 #
 
-# Objects that export symbols.
-
-export-objs	:= adb.o mac_hid.o via-pmu.o
-
-# Object file lists.
-
-obj-y	:=
-obj-m	:=
-obj-n	:=
-obj-	:=
-
 # Each configuration option enables a list of files.
 
 obj-$(CONFIG_PMAC_PBOOK)	+= mediabay.o

@@ -42,6 +42,8 @@ static inline unsigned long get_min_readahead(struct file_ra_state *ra)
 	return (VM_MIN_READAHEAD * 1024) / PAGE_CACHE_SIZE;
 }
 
+#define list_to_page(head) (list_entry((head)->prev, struct page, list))
+
 /**
  * read_cache_pages - populate an address space with some pages, and
  * 			start reads against them.
@@ -63,7 +65,7 @@ int read_cache_pages(struct address_space *mapping, struct list_head *pages,
 	pagevec_init(&lru_pvec, 0);
 
 	while (!list_empty(pages)) {
-		page = list_entry(pages->prev, struct page, list);
+		page = list_to_page(pages);
 		list_del(&page->list);
 		if (add_to_page_cache(page, mapping, page->index, GFP_KERNEL)) {
 			page_cache_release(page);
@@ -72,8 +74,16 @@ int read_cache_pages(struct address_space *mapping, struct list_head *pages,
 		ret = filler(data, page);
 		if (!pagevec_add(&lru_pvec, page))
 			__pagevec_lru_add(&lru_pvec);
-		if (ret)
+		if (ret) {
+			while (!list_empty(pages)) {
+				struct page *victim;
+
+				victim = list_to_page(pages);
+				list_del(&victim->list);
+				page_cache_release(victim);
+			}
 			break;
+		}
 	}
 	pagevec_lru_add(&lru_pvec);
 	return ret;
@@ -85,13 +95,12 @@ static int read_pages(struct address_space *mapping, struct file *filp,
 	unsigned page_idx;
 	struct pagevec lru_pvec;
 
-	pagevec_init(&lru_pvec, 0);
-
 	if (mapping->a_ops->readpages)
 		return mapping->a_ops->readpages(filp, mapping, pages, nr_pages);
 
+	pagevec_init(&lru_pvec, 0);
 	for (page_idx = 0; page_idx < nr_pages; page_idx++) {
-		struct page *page = list_entry(pages->prev, struct page, list);
+		struct page *page = list_to_page(pages);
 		list_del(&page->list);
 		if (!add_to_page_cache(page, mapping,
 					page->index, GFP_KERNEL)) {

@@ -241,12 +241,6 @@ static void attach_inform(struct saa7146 *saa, int id)
 	}
 }
 
-static void detach_inform(struct saa7146 *saa, int id)
-{
-	int i;
-	i = saa->nr;
-}
-
 static void I2CBusScan(struct saa7146 *saa)
 {
 	int i;
@@ -1323,9 +1317,12 @@ static void make_clip_tab(struct saa7146 *saa, struct video_clip *cr, int ncr)
 		clip_draw_rectangle(clipmap, 0, 0, 1024, -(saa->win.y));
 }
 
-static int saa_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
+static int saa_ioctl(struct inode *inode, struct file *file,
+		     unsigned int cmd, unsigned long argl)
 {
-	struct saa7146 *saa = (struct saa7146 *) dev;
+	struct saa7146 *saa = file->private_data;
+	void *arg = (void *)argl;
+
 	switch (cmd) {
 	case VIDIOCGCAP:
 		{
@@ -1809,24 +1806,23 @@ static int saa_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
 	return 0;
 }
 
-static int saa_mmap(struct video_device *dev, const char *adr,
-		    unsigned long size)
+static int saa_mmap(struct file *file, struct vm_area_struct *vma)
 {
-	struct saa7146 *saa = (struct saa7146 *) dev;
+	struct saa7146 *saa = file->private_data;
 	printk(KERN_DEBUG "stradis%d: saa_mmap called\n", saa->nr);
 	return -EINVAL;
 }
 
-static long saa_read(struct video_device *dev, char *buf,
-		     unsigned long count, int nonblock)
+static ssize_t saa_read(struct file *file, char *buf,
+			size_t count, loff_t *ppos)
 {
 	return -EINVAL;
 }
 
-static long saa_write(struct video_device *dev, const char *buf,
-		      unsigned long count, int nonblock)
+static ssize_t saa_write(struct file *file, const char *buf,
+			 size_t count, loff_t *ppos)
 {
-	struct saa7146 *saa = (struct saa7146 *) dev;
+	struct saa7146 *saa = file->private_data;
 	unsigned long todo = count;
 	int blocksize, split;
 	unsigned long flags;
@@ -1945,11 +1941,23 @@ static long saa_write(struct video_device *dev, const char *buf,
 	return count;
 }
 
-static int saa_open(struct video_device *dev, int flags)
+static int saa_open(struct inode *inode, struct file *file)
 {
-	struct saa7146 *saa = (struct saa7146 *) dev;
+	struct saa7146 *saa = NULL;
+	unsigned int minor = minor(inode->i_rdev);
+	int i;
 
-	saa->video_dev.busy = 0;
+	for (i = 0; i < SAA7146_MAX; i++) {
+		if (saa7146s[i].video_dev.minor == minor) {
+			saa = &saa7146s[i];
+		}
+	}
+	if (saa == NULL) {
+		return -ENODEV;
+	}
+	file->private_data = saa;
+
+	//saa->video_dev.busy = 0; /* old hack to support multiple open */
 	saa->user++;
 	if (saa->user > 1)
 		return 0;	/* device open already, don't reset */
@@ -1957,29 +1965,37 @@ static int saa_open(struct video_device *dev, int flags)
 	return 0;
 }
 
-static void saa_close(struct video_device *dev)
+static int saa_release(struct inode *inode, struct file *file)
 {
-	struct saa7146 *saa = (struct saa7146 *) dev;
+	struct saa7146 *saa = file->private_data;
 	saa->user--;
-	saa->video_dev.busy = 0;
+	//saa->video_dev.busy = 0; /* old hack to support multiple open */
 	if (saa->user > 0)	/* still someone using device */
-		return;
+		return 0;
 	saawrite(0x007f0000, SAA7146_MC1);	/* stop all overlay dma */
+	return 0;
 }
+
+static struct file_operations saa_fops =
+{
+	.owner		= THIS_MODULE,
+	.open		= saa_open,
+	.release	= saa_release,
+	.ioctl		= saa_ioctl,
+	.read		= saa_read,
+	.llseek		= no_llseek,
+	.write		= saa_write,
+	.mmap		= saa_mmap,
+};
 
 /* template for video_device-structure */
 static struct video_device saa_template =
 {
-	.owner		= THIS_MODULE,
 	.name		= "SAA7146A",
 	.type		= VID_TYPE_CAPTURE | VID_TYPE_OVERLAY,
 	.hardware	= VID_HARDWARE_SAA7146,
-	.open		= saa_open,
-	.close		= saa_close,
-	.read		= saa_read,
-	.write		= saa_write,
-	.ioctl		= saa_ioctl,
-	.mmap		= saa_mmap,
+	.fops		= &saa_fops,
+	.minor		= -1,
 };
 
 static int configure_saa7146(struct pci_dev *dev, int num)

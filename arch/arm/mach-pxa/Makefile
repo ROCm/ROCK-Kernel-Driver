@@ -2,8 +2,6 @@
 # Makefile for the linux kernel.
 #
 
-export-objs := generic.o irq.o dma.o sa1111.o
-
 # Common support (must be linked before board specific support)
 obj-y += generic.o irq.o dma.o
 obj-$(CONFIG_SA1111) += sa1111.o

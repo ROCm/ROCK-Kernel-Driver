@@ -2,8 +2,6 @@
 # Makefile for the ATM Protocol Families.
 #
 
-export-objs 	:= common.o atm_misc.o raw.o resources.o ipcommon.o proc.o
-
 mpoa-objs	:= mpc.o mpoa_caches.o mpoa_proc.o
 
 obj-$(CONFIG_ATM) := addr.o pvc.o signaling.o svc.o common.o atm_misc.o raw.o resources.o

@@ -5,8 +5,6 @@
 # Rewritten to use lists instead of if-statements.
 #
 
-export-objs	= irport.o sir_core.o
-
 # Old SIR drivers (irtty is broken)
 obj-$(CONFIG_IRTTY_OLD)		+= irtty.o
 obj-$(CONFIG_IRPORT_SIR)	+= 		irport.o

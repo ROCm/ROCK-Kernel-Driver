@@ -36,7 +36,7 @@ struct device_driver memblk_driver = {
  */
 int __init register_memblk(struct memblk *memblk, int num, struct node *root)
 {
-	memblk->node_id = __memblk_to_node(num);
+	memblk->node_id = memblk_to_node(num);
 	memblk->sysdev.name = "memblk";
 	memblk->sysdev.id = num;
 	if (root)

@@ -12,8 +12,6 @@ endif
 CFLAGS_prom_init.o      += -mrelocatable-lib
 CFLAGS_btext.o          += -mrelocatable-lib
 
-export-objs			:=  ppc4xx_dma.o ppc4xx_pm.o
-
 obj-$(CONFIG_PPCBUG_NVRAM)	+= prep_nvram.o
 ifeq ($(CONFIG_4xx),y)
 obj-$(CONFIG_4xx)		+= ppc4xx_pic.o

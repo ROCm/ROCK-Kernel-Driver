@@ -2,10 +2,6 @@
 # Makefile for the input core drivers.
 #
 
-# Objects that export symbols.
-
-export-objs	:= serio.o
-
 # Each configuration option enables a list of files.
 
 obj-$(CONFIG_SERIO)		+= serio.o

@@ -56,7 +56,7 @@ static int som_core_dump(long signr, struct pt_regs * regs);
 static struct linux_binfmt som_format = {
 	.module		= THIS_MODULE,
 	.load_binary	= load_som_binary,
-	.load_library	= load_som_library,
+	.load_shlib	= load_som_library,
 	.core_dump	= som_core_dump,
 	.min_coredump	= SOM_PAGESIZE
 };

@@ -264,7 +264,7 @@ UNUSUAL_DEV(  0x054c, 0x0032, 0x0000, 0x9999,
 		
 /* Submitted by Nathan Babb <nathan@lexi.com> */
 UNUSUAL_DEV(  0x054c, 0x006d, 0x0000, 0x9999,
-                "Sony",
+		"Sony",
 		"PEG Mass Storage",
 		US_SC_8070, US_PR_CBI, NULL,
 		US_FL_FIX_INQUIRY ),
@@ -546,10 +546,10 @@ UNUSUAL_DEV( 0x07cf, 0x1001, 0x1000, 0x9009,
 
 /* aeb */
 UNUSUAL_DEV( 0x090c, 0x1132, 0x0000, 0xffff,
-	        "Feiya",
-	        "5-in-1 Card Reader",
-	        US_SC_SCSI, US_PR_BULK, NULL,
-	        US_FL_FIX_CAPACITY ),
+		"Feiya",
+		"5-in-1 Card Reader",
+		US_SC_SCSI, US_PR_BULK, NULL,
+		US_FL_FIX_CAPACITY ),
 
 UNUSUAL_DEV(  0x097a, 0x0001, 0x0000, 0x0001,
 		"Minds@Work",

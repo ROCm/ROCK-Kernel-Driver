@@ -68,13 +68,6 @@ extern struct timezone sys_tz;
 
 extern int panic_timeout;
 
-#ifdef CONFIG_MODVERSIONS
-const struct module_symbol __export_Using_Versions
-__attribute__((section("__ksymtab"))) = {
-	1 /* Version version */, "Using_Versions"
-};
-#endif
-
 /* process memory management */
 EXPORT_SYMBOL(do_mmap_pgoff);
 EXPORT_SYMBOL(do_munmap);

@@ -41,21 +41,12 @@ extern unsigned long empty_zero_page[1024];
 #ifndef __ASSEMBLY__
 #if CONFIG_X86_PAE
 # include <asm/pgtable-3level.h>
-
-/*
- * Need to initialise the X86 PAE caches
- */
-extern void pgtable_cache_init(void);
-
 #else
 # include <asm/pgtable-2level.h>
-
-/*
- * No page table caches to initialise
- */
-#define pgtable_cache_init()	do { } while (0)
-
 #endif
+
+void pgtable_cache_init(void);
+
 #endif
 
 #define __beep() asm("movb $0x3,%al; outb %al,$0x61")

@@ -9,6 +9,5 @@
 #
 # NB: cribbed from the drivers/sbus/Makefile -- PMM
 
-export-objs := ocp.o ocp-driver.o ocp-probe.o
 obj-y   	+= ocp.o ocp-driver.o ocp-probe.o
 

@@ -1,8 +1,6 @@
 # Makefile for linux/drivers/net/arcnet
 #
 
-export-objs := arcnet.o com20020.o
-
 obj-$(CONFIG_ARCNET) += arcnet.o
 obj-$(CONFIG_ARCNET_1201) += rfc1201.o
 obj-$(CONFIG_ARCNET_1051) += rfc1051.o

@@ -40,6 +40,7 @@
 
 #include <linux/parport.h>
 #include <asm/pdc.h>
+#include <asm/parisc-device.h>
 #include <asm/hardware.h>
 #include <asm/parport_gsc.h>
 

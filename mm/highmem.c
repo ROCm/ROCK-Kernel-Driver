@@ -366,7 +366,7 @@ static int bounce_end_io_read_isa(struct bio *bio, unsigned int bytes_done, int 
 	return 0;
 }
 
-void __blk_queue_bounce(request_queue_t *q, struct bio **bio_orig, int bio_gfp,
+static void __blk_queue_bounce(request_queue_t *q, struct bio **bio_orig,
 			mempool_t *pool)
 {
 	struct page *page;
@@ -387,7 +387,7 @@ void __blk_queue_bounce(request_queue_t *q, struct bio **bio_orig, int bio_gfp,
 		 * irk, bounce it
 		 */
 		if (!bio)
-			bio = bio_alloc(bio_gfp, (*bio_orig)->bi_vcnt);
+			bio = bio_alloc(GFP_NOIO, (*bio_orig)->bi_vcnt);
 
 		to = bio->bi_io_vec + i;
 
@@ -447,10 +447,9 @@ void __blk_queue_bounce(request_queue_t *q, struct bio **bio_orig, int bio_gfp,
 	*bio_orig = bio;
 }
 
-inline void blk_queue_bounce(request_queue_t *q, struct bio **bio_orig)
+void blk_queue_bounce(request_queue_t *q, struct bio **bio_orig)
 {
 	mempool_t *pool;
-	int bio_gfp;
 
 	/*
 	 * for non-isa bounce case, just check if the bounce pfn is equal
@@ -460,20 +459,16 @@ inline void blk_queue_bounce(request_queue_t *q, struct bio **bio_orig)
 	if (!(q->bounce_gfp & GFP_DMA)) {
 		if (q->bounce_pfn >= blk_max_pfn)
 			return;
-
-		bio_gfp = GFP_NOHIGHIO;
 		pool = page_pool;
 	} else {
 		BUG_ON(!isa_page_pool);
-
-		bio_gfp = GFP_NOIO;
 		pool = isa_page_pool;
 	}
 
 	/*
 	 * slow path
 	 */
-	__blk_queue_bounce(q, bio_orig, bio_gfp, pool);
+	__blk_queue_bounce(q, bio_orig, pool);
 }
 
 #if defined(CONFIG_DEBUG_HIGHMEM) && defined(CONFIG_HIGHMEM)

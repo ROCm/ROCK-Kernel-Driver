@@ -9,8 +9,6 @@ EXTRA_TARGETS	:= init_task.o pdc_cons.o process.o unaligned.o $(head-y)
 AFLAGS_entry.o	:= -traditional
 AFLAGS_pacache.o := -traditional
 
-export-objs	:= parisc_ksyms.o
-
 obj-y	     	:= cache.o pacache.o setup.o traps.o time.o irq.o \
 		   pa7300lc.o syscall.o entry.o sys_parisc.o firmware.o \
 		   ptrace.o hardware.o inventory.o drivers.o semaphore.o \

@@ -17,13 +17,12 @@ typedef struct kmem_cache_s kmem_cache_t;
 /* flags for kmem_cache_alloc() */
 #define	SLAB_NOFS		GFP_NOFS
 #define	SLAB_NOIO		GFP_NOIO
-#define SLAB_NOHIGHIO		GFP_NOHIGHIO
 #define	SLAB_ATOMIC		GFP_ATOMIC
 #define	SLAB_USER		GFP_USER
 #define	SLAB_KERNEL		GFP_KERNEL
 #define	SLAB_DMA		GFP_DMA
 
-#define SLAB_LEVEL_MASK		(__GFP_WAIT|__GFP_HIGH|__GFP_IO|__GFP_HIGHIO|__GFP_FS|__GFP_COLD|__GFP_NOWARN)
+#define SLAB_LEVEL_MASK		(__GFP_WAIT|__GFP_HIGH|__GFP_IO|__GFP_FS|__GFP_COLD|__GFP_NOWARN)
 #define	SLAB_NO_GROW		0x00001000UL	/* don't grow a cache */
 
 /* flags to pass to kmem_cache_create().

@@ -1,9 +1,5 @@
 # Makefile for the eicon ISDN device driver
 
-# Objects that export symbols.
-
-export-objs	:= Divas_mod.o eicon_mod.o
-
 # Each configuration option enables a list of files.
 
 obj-$(CONFIG_ISDN_DRV_EICON_OLD)    	+= eicon.o

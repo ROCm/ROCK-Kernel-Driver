@@ -46,8 +46,6 @@ EXTRA_CFLAGS += ${MPT_CFLAGS}
 
 #=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-} LSI_LOGIC
 
-export-objs	:= mptbase.o mptscsih.o mptlan.o mptctl.o isense.o
-
 obj-$(CONFIG_FUSION)		+= mptbase.o mptscsih.o
 obj-$(CONFIG_FUSION_ISENSE)	+= isense.o
 obj-$(CONFIG_FUSION_CTL)	+= mptctl.o

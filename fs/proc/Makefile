@@ -2,8 +2,6 @@
 # Makefile for the Linux proc filesystem routines.
 #
 
-export-objs := root.o
-
 obj-$(CONFIG_PROC_FS) += proc.o
 
 proc-objs    := inode.o root.o base.o generic.o array.o \

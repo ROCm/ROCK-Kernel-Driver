@@ -256,7 +256,7 @@ endif
 
 AFLAGS_vmlinux.lds.o := -DLOADADDR=$(LOADADDR)
 
-HEAD := arch/mips/kernel/head.o arch/mips/kernel/init_task.o
+head-y := arch/mips/kernel/head.o arch/mips/kernel/init_task.o
 
 SUBDIRS := arch/mips/tools
 

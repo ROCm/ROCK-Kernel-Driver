@@ -167,7 +167,7 @@ static inline int ip_route_connect(struct rtable **rp, u32 dst,
 		ip_rt_put(*rp);
 		*rp = NULL;
 	}
-	return ip_route_output_flow(rp, &fl, sk, 1);
+	return ip_route_output_flow(rp, &fl, sk, 0);
 }
 
 static inline int ip_route_newports(struct rtable **rp, u16 sport, u16 dport,

@@ -36,10 +36,6 @@ UNMAP_CFLAGS := $(patsubst -fprofile-arcs -ftest-coverage,,$(UNMAP_CFLAGS))
 DMODULES-$(CONFIG_MODULES) = -D__CONFIG_MODULES__
 DMODVERSIONS-$(CONFIG_MODVERSIONS) = -D__CONFIG_MODVERSIONS__
 
-export-objs-$(CONFIG_GPROF) += gprof_syms.o
-export-objs-$(CONFIG_GCOV) += gmon_syms.o
-
-export-objs := ksyms.o process_kern.o signal_kern.o $(export-objs-y)
 
 CFLAGS_user_syms.o = -D__AUTOCONF_INCLUDED__ $(DMODULES-y) $(DMODVERSIONS-y) \
 	-I/usr/include -I../include

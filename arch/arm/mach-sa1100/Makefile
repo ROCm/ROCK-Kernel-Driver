@@ -9,8 +9,6 @@ obj-n :=
 obj-  :=
 led-y := leds.o
 
-export-objs := dma.o generic.o pm.o
-
 # This needs to be cleaned up.  We probably need to have SA1100
 # and SA1110 config symbols.
 ifeq ($(CONFIG_CPU_FREQ),y)
@@ -26,12 +24,10 @@ obj-$(CONFIG_SA1100_ADSBITSY)		+= adsbitsy.o
 led-$(CONFIG_SA1100_ADSBITSY)		+= leds-adsbitsy.o
 
 obj-$(CONFIG_SA1100_ASSABET)		+= assabet.o
-export-objs				+= assabet.o
 led-$(CONFIG_SA1100_ASSABET)		+= leds-assabet.o
 obj-$(CONFIG_ASSABET_NEPONSET)		+= neponset.o
 
 obj-$(CONFIG_SA1100_BADGE4)		+= badge4.o
-export-objs				+= badge4.o
 led-$(CONFIG_SA1100_BADGE4)		+= leds-badge4.o
 
 obj-$(CONFIG_SA1100_BRUTUS)		+= brutus.o
@@ -43,12 +39,9 @@ led-$(CONFIG_SA1100_CERF)		+= leds-cerf.o
 obj-$(CONFIG_SA1100_EMPEG)		+= empeg.o
 
 obj-$(CONFIG_SA1100_FLEXANET)		+= flexanet.o
-export-objs				+= flexanet.o
 led-$(CONFIG_SA1100_FLEXANET)		+= leds-flexanet.o
 
 obj-$(CONFIG_SA1100_FREEBIRD)		+= freebird.o
-export-objs				+= freebird.o
-
 obj-$(CONFIG_SA1100_GRAPHICSCLIENT)	+= graphicsclient.o
 led-$(CONFIG_SA1100_GRAPHICSCLIENT)	+= leds-graphicsclient.o
 
@@ -56,13 +49,11 @@ obj-$(CONFIG_SA1100_GRAPHICSMASTER)	+= graphicsmaster.o
 led-$(CONFIG_SA1100_GRAPHICSMASTER)	+= leds-graphicsmaster.o
 
 obj-$(CONFIG_SA1100_H3600)		+= h3600.o
-export-objs				+= h3600.o
 
 obj-$(CONFIG_SA1100_HACKKIT)		+= hackkit.o
 led-$(CONFIG_SA1100_HACKKIT)		+= leds-hackkit.o
 
 obj-$(CONFIG_SA1100_HUW_WEBPANEL)	+= huw_webpanel.o
-export-objs				+= huw_webpanel.o
 
 obj-$(CONFIG_SA1100_ITSY)		+= itsy.o
 
@@ -93,15 +84,12 @@ obj-$(CONFIG_SA1100_SIMPAD)		+= simpad.o
 led-$(CONFIG_SA1100_SIMPAD)		+= leds-simpad.o  
 
 obj-$(CONFIG_SA1100_STORK)		+= stork.o
-export-objs				+= stork.o
 
 obj-$(CONFIG_SA1100_TRIZEPS)		+= trizeps.o
-export-objs				+= trizeps.o
 
 obj-$(CONFIG_SA1100_XP860)		+= xp860.o
 
 obj-$(CONFIG_SA1100_YOPY)		+= yopy.o
-export-objs				+= yopy.o
 
 # LEDs support
 obj-$(CONFIG_LEDS) += $(led-y)

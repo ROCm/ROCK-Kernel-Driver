@@ -2,8 +2,6 @@
 # Makefile for the Linux 802.x protocol layers.
 #
 
-export-objs		:= p8022.o psnap.o
-
 obj-y			:= p8023.o
 
 # Check the p8022 selections against net/core/Makefile.

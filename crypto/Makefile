@@ -2,8 +2,6 @@
 # Cryptographic API
 #
 
-export-objs := api.o hmac.o
-
 autoload-crypto-$(CONFIG_KMOD) = autoload.o
 proc-crypto-$(CONFIG_PROC_FS) = proc.o
 

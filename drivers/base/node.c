@@ -72,7 +72,7 @@ int __init register_node(struct node *node, int num, struct node *parent)
 {
 	int error;
 
-	node->cpumap = __node_to_cpu_mask(num);
+	node->cpumap = node_to_cpumask(num);
 	node->sysroot.id = num;
 	if (parent)
 		node->sysroot.dev.parent = &parent->sysroot.sysdev;

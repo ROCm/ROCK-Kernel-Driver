@@ -20,10 +20,24 @@
 	}								\
 									\
 	/* Kernel symbol table: GPL-only symbols */			\
-	__gpl_ksymtab     : AT(ADDR(__gpl_ksymtab) - LOAD_OFFSET) {	\
-		__start___gpl_ksymtab = .;				\
-		*(__gpl_ksymtab)					\
-		__stop___gpl_ksymtab = .;				\
+	__ksymtab_gpl     : AT(ADDR(__ksymtab_gpl) - LOAD_OFFSET) {	\
+		__start___ksymtab_gpl = .;				\
+		*(__ksymtab_gpl)					\
+		__stop___ksymtab_gpl = .;				\
+	}								\
+									\
+	/* Kernel symbol table: Normal symbols */			\
+	__kcrctab         : AT(ADDR(__kcrctab) - LOAD_OFFSET) {		\
+		__start___kcrctab = .;					\
+		*(__kcrctab)						\
+		__stop___kcrctab = .;					\
+	}								\
+									\
+	/* Kernel symbol table: GPL-only symbols */			\
+	__kcrctab_gpl     : AT(ADDR(__kcrctab_gpl) - LOAD_OFFSET) {	\
+		__start___kcrctab_gpl = .;				\
+		*(__kcrctab_gpl)					\
+		__stop___kcrctab_gpl = .;				\
 	}								\
 									\
 	/* Kernel symbol table: strings */				\

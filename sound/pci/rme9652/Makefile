@@ -3,8 +3,6 @@
 # Copyright (c) 2001 by Jaroslav Kysela <perex@suse.cz>
 #
 
-export-objs  := hammerfall_mem.o
-
 snd-hammerfall-mem-objs := hammerfall_mem.o
 snd-rme9652-objs := rme9652.o
 snd-hdsp-objs := hdsp.o

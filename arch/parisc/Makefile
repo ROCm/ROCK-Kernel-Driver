@@ -33,10 +33,10 @@ FINAL_LD=$(CROSS_COMPILE)ld --warn-common --warn-section-align
 
 OBJCOPY_FLAGS =-O binary -R .note -R .comment -S
 
-cflags-y	:= -D__linux__ -pipe -fno-strength-reduce
+cflags-y	:= -pipe
 
-# These should be on for older toolchains or SOM toolchains that don't
-# enable them by default.
+# These flags should be implied by an hppa-linux configuration, but they
+# are not in gcc 3.2.
 cflags-y	+= -mno-space-regs -mfast-indirect-calls
 
 # No fixed-point multiply
@@ -56,7 +56,6 @@ head-y			:= arch/parisc/kernel/head.o
 head-$(CONFIG_PARISC64)	:= arch/parisc/kernel/head64.o
 
 CFLAGS	+= $(cflags-y)
-HEAD	:= $(head-y)
 
 core-y	+= $(addprefix arch/parisc/, kernel/pdc_cons.o kernel/process.o   \
 		mm/ kernel/ hpux/ math-emu/ kernel/init_task.o )
@@ -95,9 +94,6 @@ include/asm-parisc/offsets.h: arch/parisc/kernel/asm-offsets.s
 	@echo -n '  Generating $@'
 	@$(generate-asm-offsets.h) < $< > $@.tmp
 	@$(update-if-changed)
-
-archclean:
-archmrproper:
 
 CLEAN_FILES	+= palo.conf lifimage include/asm-parisc/offsets.h \
 		include/asm-parisc/offsets.h.tmp

@@ -2,8 +2,6 @@
 # Makefile for the linux MPC8xx ppc-specific parts of comm processor
 #
 
-export-objs		:= fec.o
-
 obj-y			:= commproc.o uart.o
 
 obj-$(CONFIG_FEC_ENET)	+= fec.o
