@@ -51,7 +51,7 @@ static int zone_balance_max[MAX_NR_ZONES] __initdata = { 255 , 255, 255, };
 /*
  * Temporary debugging check for pages not lying within a given zone.
  */
-static inline int bad_range(struct zone *zone, struct page *page)
+static int bad_range(struct zone *zone, struct page *page)
 {
 	if (page_to_pfn(page) >= zone->zone_start_pfn + zone->spanned_pages)
 		return 1;

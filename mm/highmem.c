@@ -229,7 +229,7 @@ __initcall(init_emergency_pool);
 /*
  * highmem version, map in to vec
  */
-static inline void bounce_copy_vec(struct bio_vec *to, unsigned char *vfrom)
+static void bounce_copy_vec(struct bio_vec *to, unsigned char *vfrom)
 {
 	unsigned long flags;
 	unsigned char *vto;
@@ -272,7 +272,7 @@ int init_emergency_isa_pool(void)
  * queue gfp mask set, *to may or may not be a highmem page. kmap it
  * always, it will do the Right Thing
  */
-static inline void copy_to_high_bio_irq(struct bio *to, struct bio *from)
+static void copy_to_high_bio_irq(struct bio *to, struct bio *from)
 {
 	unsigned char *vfrom;
 	struct bio_vec *tovec, *fromvec;
@@ -338,7 +338,7 @@ static int bounce_end_io_write_isa(struct bio *bio, unsigned int bytes_done, int
 	return 0;
 }
 
-static inline void __bounce_end_io_read(struct bio *bio, mempool_t *pool)
+static void __bounce_end_io_read(struct bio *bio, mempool_t *pool)
 {
 	struct bio *bio_orig = bio->bi_private;
 

@@ -21,7 +21,7 @@
 #include <asm/cacheflush.h>
 #include <asm/tlbflush.h>
 
-static inline pte_t *get_one_pte_map_nested(struct mm_struct *mm, unsigned long addr)
+static pte_t *get_one_pte_map_nested(struct mm_struct *mm, unsigned long addr)
 {
 	pgd_t * pgd;
 	pmd_t * pmd;
@@ -81,7 +81,7 @@ static inline pte_t *alloc_one_pte_map(struct mm_struct *mm, unsigned long addr)
 	return pte;
 }
 
-static inline int copy_one_pte(struct mm_struct *mm, pte_t * src, pte_t * dst)
+static int copy_one_pte(struct mm_struct *mm, pte_t * src, pte_t * dst)
 {
 	int error = 0;
 	pte_t pte;
@@ -170,7 +170,7 @@ oops_we_failed:
 	return -1;
 }
 
-static inline unsigned long move_vma(struct vm_area_struct * vma,
+static unsigned long move_vma(struct vm_area_struct * vma,
 	unsigned long addr, unsigned long old_len, unsigned long new_len,
 	unsigned long new_addr)
 {

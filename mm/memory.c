@@ -599,7 +599,7 @@ out:
 	return i;
 }
 
-static inline void zeromap_pte_range(pte_t * pte, unsigned long address,
+static void zeromap_pte_range(pte_t * pte, unsigned long address,
                                      unsigned long size, pgprot_t prot)
 {
 	unsigned long end;

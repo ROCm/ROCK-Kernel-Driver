@@ -133,7 +133,7 @@ int vm_enough_memory(long pages)
 }
 
 /* Remove one vm structure from the inode's i_mapping address space. */
-static inline void remove_shared_vm_struct(struct vm_area_struct *vma)
+static void remove_shared_vm_struct(struct vm_area_struct *vma)
 {
 	struct file *file = vma->vm_file;
 
@@ -302,7 +302,7 @@ static inline void __vma_link_list(struct mm_struct * mm, struct vm_area_struct 
 	}
 }
 
-static inline void __vma_link_rb(struct mm_struct * mm, struct vm_area_struct * vma,
+static void __vma_link_rb(struct mm_struct * mm, struct vm_area_struct * vma,
 				 struct rb_node ** rb_link, struct rb_node * rb_parent)
 {
 	rb_link_node(&vma->vm_rb, rb_parent, rb_link);
@@ -336,8 +336,9 @@ static void __vma_link(struct mm_struct * mm, struct vm_area_struct * vma,  stru
 	__vma_link_file(vma);
 }
 
-static inline void vma_link(struct mm_struct * mm, struct vm_area_struct * vma, struct vm_area_struct * prev,
-			    struct rb_node ** rb_link, struct rb_node * rb_parent)
+static void vma_link(struct mm_struct *mm, struct vm_area_struct *vma,
+			struct vm_area_struct *prev, struct rb_node **rb_link,
+			struct rb_node *rb_parent)
 {
 	struct address_space *mapping = NULL;
 

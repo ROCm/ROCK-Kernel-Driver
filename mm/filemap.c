@@ -288,7 +288,7 @@ static int page_cache_read(struct file * file, unsigned long offset)
  * at a cost of "thundering herd" phenomena during rare hash
  * collisions.
  */
-static inline wait_queue_head_t *page_waitqueue(struct page *page)
+static wait_queue_head_t *page_waitqueue(struct page *page)
 {
 	const struct zone *zone = page_zone(page);
 
@@ -758,7 +758,7 @@ static inline int fault_in_pages_writeable(char *uaddr, int size)
 	return ret;
 }
 
-static inline void fault_in_pages_readable(const char *uaddr, int size)
+static void fault_in_pages_readable(const char *uaddr, int size)
 {
 	volatile char c;
 	int ret;
@@ -1296,7 +1296,7 @@ repeat:
 	return page;
 }
 
-inline void remove_suid(struct dentry *dentry)
+void remove_suid(struct dentry *dentry)
 {
 	struct iattr newattrs;
 	struct inode *inode = dentry->d_inode;
@@ -1332,7 +1332,7 @@ filemap_copy_from_user(struct page *page, unsigned long offset,
 	return left;
 }
 
-static inline int
+static int
 __filemap_copy_from_user_iovec(char *vaddr, 
 			const struct iovec *iov, size_t base, size_t bytes)
 {
