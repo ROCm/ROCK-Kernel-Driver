@@ -349,15 +349,15 @@ int sctp_outq_tail(struct sctp_outq *q, struct sctp_chunk *chunk)
 
 			sctp_outq_tail_data(q, chunk);
 			if (chunk->chunk_hdr->flags & SCTP_DATA_UNORDERED)
-				SCTP_INC_STATS(SctpOutUnorderChunks);
+				SCTP_INC_STATS(SCTP_MIB_OUTUNORDERCHUNKS);
 			else
-				SCTP_INC_STATS(SctpOutOrderChunks);
+				SCTP_INC_STATS(SCTP_MIB_OUTORDERCHUNKS);
 			q->empty = 0;
 			break;
 		};
 	} else {
 		__skb_queue_tail(&q->control, (struct sk_buff *) chunk);
-		SCTP_INC_STATS(SctpOutCtrlChunks);
+		SCTP_INC_STATS(SCTP_MIB_OUTCTRLCHUNKS);
 	}
 
 	if (error < 0)
@@ -1725,6 +1725,6 @@ static void sctp_generate_fwdtsn(struct sctp_outq *q, __u32 ctsn)
 
 	if (ftsn_chunk) {
 		__skb_queue_tail(&q->control, (struct sk_buff *)ftsn_chunk);
-		SCTP_INC_STATS(SctpOutCtrlChunks);
+		SCTP_INC_STATS(SCTP_MIB_OUTCTRLCHUNKS);
 	}
 }

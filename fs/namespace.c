@@ -1037,6 +1037,7 @@ int copy_namespace(int flags, struct task_struct *tsk)
 	struct namespace *new_ns;
 	struct vfsmount *rootmnt = NULL, *pwdmnt = NULL, *altrootmnt = NULL;
 	struct fs_struct *fs = tsk->fs;
+	struct vfsmount *p, *q;
 
 	if (!namespace)
 		return 0;
@@ -1071,14 +1072,16 @@ int copy_namespace(int flags, struct task_struct *tsk)
 	list_add_tail(&new_ns->list, &new_ns->root->mnt_list);
 	spin_unlock(&vfsmount_lock);
 
-	/* Second pass: switch the tsk->fs->* elements */
-	if (fs) {
-		struct vfsmount *p, *q;
-		write_lock(&fs->lock);
-
-		p = namespace->root;
-		q = new_ns->root;
-		while (p) {
+	/*
+	 * Second pass: switch the tsk->fs->* elements and mark new vfsmounts
+	 * as belonging to new namespace.  We have already acquired a private
+	 * fs_struct, so tsk->fs->lock is not needed.
+	 */
+	p = namespace->root;
+	q = new_ns->root;
+	while (p) {
+		q->mnt_namespace = new_ns;
+		if (fs) {
 			if (p == fs->rootmnt) {
 				rootmnt = p;
 				fs->rootmnt = mntget(q);
@@ -1091,10 +1094,9 @@ int copy_namespace(int flags, struct task_struct *tsk)
 				altrootmnt = p;
 				fs->altrootmnt = mntget(q);
 			}
-			p = next_mnt(p, namespace->root);
-			q = next_mnt(q, new_ns->root);
 		}
-		write_unlock(&fs->lock);
+		p = next_mnt(p, namespace->root);
+		q = next_mnt(q, new_ns->root);
 	}
 	up_write(&tsk->namespace->sem);
 

@@ -350,9 +350,10 @@ EXPORT_SYMBOL(csum_partial);
 EXPORT_SYMBOL(csum_partial_copy_sparc64);
 EXPORT_SYMBOL(ip_fast_csum);
 
-/* Moving data to/from userspace. */
+/* Moving data to/from/in userspace. */
 EXPORT_SYMBOL(__copy_to_user);
 EXPORT_SYMBOL(__copy_from_user);
+EXPORT_SYMBOL(__copy_in_user);
 EXPORT_SYMBOL(__strncpy_from_user);
 EXPORT_SYMBOL(__bzero_noasi);
 

@@ -432,7 +432,7 @@ struct inquiry_info_with_rssi {
 	__u8     pscan_period_mode;
 	__u8     dev_class[3];
 	__u16    clock_offset;
-	__u8     rssi;
+	__s8     rssi;
 } __attribute__ ((packed));
 
 #define HCI_EV_CONN_COMPLETE 	0x03

@@ -345,6 +345,15 @@ static inline struct zone *next_zone(struct zone *zone)
 #define for_each_zone(zone) \
 	for (zone = pgdat_list->node_zones; zone; zone = next_zone(zone))
 
+static inline int is_highmem_idx(int idx)
+{
+	return (idx == ZONE_HIGHMEM);
+}
+
+static inline int is_normal_idx(int idx)
+{
+	return (idx == ZONE_NORMAL);
+}
 /**
  * is_highmem - helper function to quickly check if a struct zone is a 
  *              highmem zone or not.  This is an attempt to keep references
@@ -353,12 +362,12 @@ static inline struct zone *next_zone(struct zone *zone)
  */
 static inline int is_highmem(struct zone *zone)
 {
-	return (zone - zone->zone_pgdat->node_zones == ZONE_HIGHMEM);
+	return (is_highmem_idx(zone - zone->zone_pgdat->node_zones));
 }
 
 static inline int is_normal(struct zone *zone)
 {
-	return (zone - zone->zone_pgdat->node_zones == ZONE_NORMAL);
+	return (is_normal_idx(zone - zone->zone_pgdat->node_zones));
 }
 
 /* These two functions are used to setup the per zone pages min values */
