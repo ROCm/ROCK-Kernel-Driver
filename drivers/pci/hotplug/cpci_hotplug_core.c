@@ -353,7 +353,6 @@ cpci_hp_register_bus(struct pci_bus *bus, u8 first, u8 last)
 		}
 		hotplug_slot->name = name;
 
-		slot->magic = SLOT_MAGIC;
 		slot->bus = bus;
 		slot->number = i;
 		slot->devfn = PCI_DEVFN(i, 0);

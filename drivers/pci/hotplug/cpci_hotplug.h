@@ -40,9 +40,7 @@
 #define HS_CSR_EIM	0x0002
 #define HS_CSR_DHA	0x0001
 
-#define SLOT_MAGIC	0x67267322
 struct slot {
-	u32 magic;
 	u8 number;
 	unsigned int devfn;
 	struct pci_bus *bus;
