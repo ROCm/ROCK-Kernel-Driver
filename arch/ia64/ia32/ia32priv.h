@@ -556,8 +556,8 @@ struct user_regs_struct32 {
 };
 
 /* Prototypes for use in elfcore32.h */
-extern int save_ia32_fpstate (struct task_struct *tsk, struct ia32_user_i387_struct *save);
-extern int save_ia32_fpxstate (struct task_struct *tsk, struct ia32_user_fxsr_struct *save);
+extern int save_ia32_fpstate (struct task_struct *, struct ia32_user_i387_struct __user *);
+extern int save_ia32_fpxstate (struct task_struct *, struct ia32_user_fxsr_struct __user *);
 
 #endif /* !CONFIG_IA32_SUPPORT */
 

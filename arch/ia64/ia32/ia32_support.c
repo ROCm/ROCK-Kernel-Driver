@@ -76,7 +76,7 @@ ia32_clone_tls (struct task_struct *child, struct pt_regs *childregs)
 	struct ia32_user_desc info;
 	int idx;
 
-	if (copy_from_user(&info, (void *)(childregs->r14 & 0xffffffff), sizeof(info)))
+	if (copy_from_user(&info, (void __user *)(childregs->r14 & 0xffffffff), sizeof(info)))
 		return -EFAULT;
 	if (LDT_empty(&info))
 		return -EINVAL;
