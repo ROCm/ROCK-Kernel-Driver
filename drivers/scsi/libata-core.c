@@ -2794,20 +2794,6 @@ static unsigned long ata_thread_iter(struct ata_port *ap)
 	return timeout;
 }
 
-void atapi_start(struct ata_queued_cmd *qc)
-{
-	struct ata_port *ap = qc->ap;
-
-	qc->flags |= ATA_QCFLAG_ACTIVE;
-	ap->active_tag = qc->tag;
-
-	ata_dev_select(ap, qc->dev->devno, 1, 0);
-	ata_tf_to_host_nolock(ap, &qc->tf);
-	queue_work(ata_wq, &ap->packet_task);
-
-	VPRINTK("EXIT\n");
-}
-
 /**
  *	atapi_packet_task - Write CDB bytes to hardware
  *	@_data: Port to which ATAPI device is attached.
