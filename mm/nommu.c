@@ -4,7 +4,7 @@
  *  Replacement code for mm functions to support CPU's that don't
  *  have any form of memory management unit (thus no virtual memory).
  *
- *  Copyright (c) 2000-2002 David McCullough <davidm@snapgear.com>
+ *  Copyright (c) 2000-2003 David McCullough <davidm@snapgear.com>
  *  Copyright (c) 2000-2001 D Jeff Dionne <jeff@uClinux.org>
  *  Copyright (c) 2002      Greg Ungerer <gerg@snapgear.com>
  */
@@ -30,6 +30,8 @@ unsigned long max_mapnr;
 unsigned long num_physpages;
 unsigned long askedalloc, realalloc;
 atomic_t vm_committed_space = ATOMIC_INIT(0);
+int sysctl_overcommit_memory = 0; /* default is heuristic overcommit */
+int sysctl_overcommit_ratio = 50; /* default is 50% */
 
 /*
  * Handle all mappings that got truncated by a "truncate()"
@@ -102,6 +104,7 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 	struct page **pages, struct vm_area_struct **vmas)
 {
 	int i;
+	static struct vm_area_struct dummy_vma;
 
 	for (i = 0; i < len; i++) {
 		if (pages) {
@@ -109,6 +112,8 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 			if (pages[i])
 				page_cache_get(pages[i]);
 		}
+		if (vmas)
+			vmas[i] = &dummy_vma;
 		start += PAGE_SIZE;
 	}
 	return(i);
@@ -180,7 +185,7 @@ void *vmalloc_32(unsigned long size)
 	return __vmalloc(size, GFP_KERNEL, PAGE_KERNEL);
 }
 
-void *vmap(struct page **pages, unsigned int count)
+void *vmap(struct page **pages, unsigned int count, unsigned long flags, pgprot_t prot)
 {
 	BUG();
 	return NULL;
