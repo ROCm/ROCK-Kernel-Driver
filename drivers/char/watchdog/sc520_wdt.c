@@ -229,8 +229,6 @@ static int fop_open(struct inode * inode, struct file * file)
 				return -EBUSY;
 			/* Good, fire up the show */
 			wdt_startup();
-			if (nowayout)
-				MOD_INC_USE_COUNT;
 
 			return 0;
 		default:
@@ -251,11 +249,6 @@ static int fop_close(struct inode * inode, struct file * file)
 	}
 	clear_bit(0, &wdt_is_open);
 	return 0;
-}
-
-static long long fop_llseek(struct file *file, long long offset, int origin)
-{
-	return -ESPIPE;
 }
 
 static int fop_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
@@ -282,7 +275,7 @@ static int fop_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 static struct file_operations wdt_fops = {
 	.owner		= THIS_MODULE,
-	.llseek		= fop_llseek,
+	.llseek		= no_llseek,
 	.write		= fop_write,
 	.open		= fop_open,
 	.release	= fop_close,

@@ -104,11 +104,13 @@ struct map_info dc21285_map = {
 	.copy_to	= dc21285_copy_to
 };
 
-
 /* Partition stuff */
 static struct mtd_partition *dc21285_parts;
 		      
 extern int parse_redboot_partitions(struct mtd_info *, struct mtd_partition **);
+extern int parse_cmdline_partitions(struct mtd_info *master,
+				    struct mtd_partition **pparts,
+				    const char *mtd_id);
 
 int __init init_dc21285(void)
 {
@@ -140,18 +142,34 @@ int __init init_dc21285(void)
 	mymtd = do_map_probe("cfi_probe", &dc21285_map);
 	if (mymtd) {
 		int nrparts = 0;
+		const char *part_type = NULL;
 
 		mymtd->module = THIS_MODULE;
 			
 		/* partition fixup */
-
-#ifdef CONFIG_MTD_REDBOOT_PARTS
-		nrparts = parse_redboot_partitions(mymtd, &dc21285_parts);
+		do {
+#ifdef CONFIG_MTD_CMDLINE_PARTS
+			nrparts = parse_cmdline_partitions(mymtd, &dc21285_parts, "dc21285");
+			if (nrparts > 0) {
+				part_type = "command line";
+				break;
+			}
 #endif
+#ifdef CONFIG_MTD_REDBOOT_PARTS
+			nrparts = parse_redboot_partitions(mymtd, &dc21285_parts);
+			if (nrparts > 0) {
+				part_type = "RedBoot";
+				break;
+			}
+#endif
+		} while (0);
+
 		if (nrparts > 0) {
 			add_mtd_partitions(mymtd, dc21285_parts, nrparts);
+			printk(KERN_NOTICE "DC21285 using %s partition "
+			       "definition\n", part_type);
 		} else if (nrparts == 0) {
-			printk(KERN_NOTICE "RedBoot partition table failed\n");
+			printk(KERN_NOTICE "DC21285 partition table failed\n");
 			add_mtd_device(mymtd);
 		}
 
