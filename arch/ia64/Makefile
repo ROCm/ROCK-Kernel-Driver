@@ -52,13 +52,6 @@ ifdef CONFIG_IA64_SGI_SN
         SUBDIRS         	+= arch/$(ARCH)/sn/fakeprom
 endif
 
-core-$(CONFIG_IA32_SUPPORT)	+= arch/$(ARCH)/ia32/
-
-libs-y				+= arch/$(ARCH)/lib/
-core-y				+= arch/$(ARCH)/kernel/ arch/$(ARCH)/mm/
-drivers-$(CONFIG_PCI)		+= arch/$(ARCH)/pci/
-drivers-$(CONFIG_IA64_HP_ZX1)	+= arch/$(ARCH)/hp/common/ arch/$(ARCH)/hp/zx1/
-
 MAKEBOOT = $(MAKE) -C arch/$(ARCH)/boot
 
 compressed: vmlinux
