@@ -76,8 +76,10 @@
 #include <linux/serio.h>
 #include <linux/workqueue.h>
 
+#define DRIVER_DESC	"LK keyboard driver"
+
 MODULE_AUTHOR ("Jan-Benedict Glaw <jbglaw@lug-owl.de>");
-MODULE_DESCRIPTION ("LK keyboard driver");
+MODULE_DESCRIPTION (DRIVER_DESC);
 MODULE_LICENSE ("GPL");
 
 /*
@@ -622,7 +624,7 @@ lkkbd_reinit (void *data)
  * lkkbd_connect() probes for a LK keyboard and fills the necessary structures.
  */
 static void
-lkkbd_connect (struct serio *serio, struct serio_dev *dev)
+lkkbd_connect (struct serio *serio, struct serio_driver *drv)
 {
 	struct lkkbd *lk;
 	int i;
@@ -665,7 +667,7 @@ lkkbd_connect (struct serio *serio, struct serio_dev *dev)
 
 	serio->private = lk;
 
-	if (serio_open (serio, dev)) {
+	if (serio_open (serio, drv)) {
 		kfree (lk);
 		return;
 	}
@@ -703,10 +705,14 @@ lkkbd_disconnect (struct serio *serio)
 	kfree (lk);
 }
 
-static struct serio_dev lkkbd_dev = {
-	.connect = lkkbd_connect,
-	.disconnect = lkkbd_disconnect,
-	.interrupt = lkkbd_interrupt,
+static struct serio_driver lkkbd_drv = {
+	.driver		= {
+		.name	= "lkkbd",
+	},
+	.description	= DRIVER_DESC,
+	.connect	= lkkbd_connect,
+	.disconnect	= lkkbd_disconnect,
+	.interrupt	= lkkbd_interrupt,
 };
 
 /*
@@ -715,14 +721,14 @@ static struct serio_dev lkkbd_dev = {
 int __init
 lkkbd_init (void)
 {
-	serio_register_device (&lkkbd_dev);
+	serio_register_driver(&lkkbd_drv);
 	return 0;
 }
 
 void __exit
 lkkbd_exit (void)
 {
-	serio_unregister_device (&lkkbd_dev);
+	serio_unregister_driver(&lkkbd_drv);
 }
 
 module_init (lkkbd_init);
