@@ -514,23 +514,9 @@ static struct {
 	unsigned int apic_thmr;
 } apic_pm_state;
 
-static int lapic_shutdown(struct sys_device *dev)
-{
-	unsigned long flags;
-
-	if (!apic_pm_state.active)
-		return 0;
-
-	
-	local_irq_save(flags);
-	disable_local_APIC();
-	local_irq_restore(flags);
-	
-	return 0;
-}
-
 static int lapic_suspend(struct sys_device *dev, u32 state)
 {
+	unsigned long flags;
 
 	if (!apic_pm_state.active)
 		return 0;
@@ -549,7 +535,10 @@ static int lapic_suspend(struct sys_device *dev, u32 state)
 	apic_pm_state.apic_tdcr = apic_read(APIC_TDCR);
 	apic_pm_state.apic_thmr = apic_read(APIC_LVTTHMR);
 	
-	return lapic_shutdown(dev);
+	local_irq_save(flags);
+	disable_local_APIC();
+	local_irq_restore(flags);
+	return 0;
 }
 
 static int lapic_resume(struct sys_device *dev)
@@ -598,7 +587,6 @@ static int lapic_resume(struct sys_device *dev)
 
 static struct sysdev_class lapic_sysclass = {
 	set_kset_name("lapic"),
-	.shutdown	= lapic_shutdown,
 	.resume		= lapic_resume,
 	.suspend	= lapic_suspend,
 };
