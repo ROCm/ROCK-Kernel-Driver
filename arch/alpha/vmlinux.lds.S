@@ -63,8 +63,8 @@ SECTIONS
   .init.ramfs : { *(.init.ramfs) }
   __initramfs_end = .;
 
-  . = ALIGN(8)
-  .con_initcall.init: {
+  . = ALIGN(8);
+  .con_initcall.init : {
 	__con_initcall_start = .;
 	*(.con_initcall.init)
 	__con_initcall_end = .;
