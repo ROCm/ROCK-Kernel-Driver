@@ -57,6 +57,11 @@ void rtnl_lock(void)
 {
 	rtnl_shlock();
 }
+
+int rtnl_lock_interruptible(void)
+{
+	return down_interruptible(&rtnl_sem);
+}
  
 void rtnl_unlock(void)
 {
@@ -695,5 +700,6 @@ EXPORT_SYMBOL(rtnetlink_links);
 EXPORT_SYMBOL(rtnetlink_put_metrics);
 EXPORT_SYMBOL(rtnl);
 EXPORT_SYMBOL(rtnl_lock);
+EXPORT_SYMBOL(rtnl_lock_interruptible);
 EXPORT_SYMBOL(rtnl_sem);
 EXPORT_SYMBOL(rtnl_unlock);

@@ -805,6 +805,7 @@ extern struct semaphore rtnl_sem;
 		        } while(0)
 
 extern void rtnl_lock(void);
+extern int rtnl_lock_interruptible(void);
 extern void rtnl_unlock(void);
 extern void rtnetlink_init(void);
 
