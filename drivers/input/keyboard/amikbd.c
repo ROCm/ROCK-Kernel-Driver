@@ -71,7 +71,7 @@ static struct input_dev amikbd_dev;
 static char *amikbd_name = "Amiga keyboard";
 static char *amikbd_phys = "amikbd/input0";
 
-static void amikbd_interrupt(int irq, void *dummy, struct pt_regs *fp)
+static irqreturn_t amikbd_interrupt(int irq, void *dummy, struct pt_regs *fp)
 {
 	unsigned char scancode, down;
 
@@ -93,16 +93,14 @@ static void amikbd_interrupt(int irq, void *dummy, struct pt_regs *fp)
 			input_report_key(&amikbd_dev, scancode, 1);
 			input_report_key(&amikbd_dev, scancode, 0);
 			input_sync(&amikbd_dev);
-			return;
+		} else {
+			input_report_key(&amikbd_dev, scancode, down);
+			input_sync(&amikbd_dev);
 		}
+	} else				/* scancodes >= 0x78 are error codes */
+		printk(amikbd_messages[scancode - 0x78]);
 
-		input_report_key(&amikbd_dev, scancode, down);
-		input_sync(&amikbd_dev);
-
-		return;
-	}
-
-	printk(amikbd_messages[scancode - 0x78]);	/* scancodes >= 0x78 are error codes */
+	return IRQ_HANDLED;
 }
 
 static int __init amikbd_init(void)

@@ -40,7 +40,7 @@ static struct input_dev amimouse_dev;
 static char *amimouse_name = "Amiga mouse";
 static char *amimouse_phys = "amimouse/input0";
 
-static void amimouse_interrupt(int irq, void *dummy, struct pt_regs *fp)
+static irqreturn_t amimouse_interrupt(int irq, void *dummy, struct pt_regs *fp)
 {
 	unsigned short joy0dat, potgor;
 	int nx, ny, dx, dy;
@@ -73,6 +73,8 @@ static void amimouse_interrupt(int irq, void *dummy, struct pt_regs *fp)
 	input_report_key(&amimouse_dev, BTN_RIGHT,  potgor & 0x0400);
 
 	input_sync(&amimouse_dev);
+
+	return IRQ_HANDLED;
 }
 
 static int amimouse_open(struct input_dev *dev)
