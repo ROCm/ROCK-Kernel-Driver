@@ -1028,17 +1028,11 @@ static void exp_flags(struct seq_file *m, int flag, int fsid, uid_t anonu, uid_t
 		seq_printf(m, "%sanongid=%d", first++?",":"", anong);
 }
 
-static inline void mangle(struct seq_file *m, const char *s)
-{
-	seq_escape(m, s, " \t\n\\");
-}
-
 static int e_show(struct seq_file *m, void *p)
 {
 	struct cache_head *cp = p;
 	struct svc_export *exp = container_of(cp, struct svc_export, h);
 	svc_client *clp;
-	char *pbuf;
 
 	if (p == (void *)1) {
 		seq_puts(m, "# Version 1.1\n");
@@ -1051,17 +1045,7 @@ static int e_show(struct seq_file *m, void *p)
 	if (cache_check(&svc_export_cache, &exp->h, NULL))
 		return 0;
 	if (cache_put(&exp->h, &svc_export_cache)) BUG();
-	pbuf = m->private;
-	mangle(m, d_path(exp->ex_dentry, exp->ex_mnt,
-			 pbuf, PAGE_SIZE));
-
-	seq_putc(m, '\t');
-	mangle(m, clp->name);
-	seq_putc(m, '(');
-	exp_flags(m, exp->ex_flags, exp->ex_fsid, 
-		  exp->ex_anon_uid, exp->ex_anon_gid);
-	seq_puts(m, ")\n");
-	return 0;
+	return svc_export_show(m, &svc_export_cache, cp, NULL);
 }
 
 struct seq_operations nfs_exports_op = {
