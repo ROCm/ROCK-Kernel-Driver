@@ -130,8 +130,13 @@ const unsigned char scsi_command_size[8] =
 	16, 12, 10, 10
 };
 static unsigned long serial_number;
-static Scsi_Cmnd *scsi_bh_queue_head;
-static Scsi_Cmnd *scsi_bh_queue_tail;
+
+struct softscsi_data {
+	Scsi_Cmnd *head;
+	Scsi_Cmnd *tail;
+};
+
+static struct softscsi_data softscsi_data[NR_CPUS] __cacheline_aligned;
 
 /*
  * Note - the initial logging level can be set here to log events at boot time.
@@ -253,10 +258,19 @@ __setup("scsi_logging=", scsi_logging_setup);
  
 static void scsi_wait_done(Scsi_Cmnd * SCpnt)
 {
-	struct request *req;
+	struct request *req = SCpnt->request;
+        struct request_queue *q = &SCpnt->device->request_queue;
+        unsigned long flags;
 
-	req = &SCpnt->request;
+        ASSERT_LOCK(q->queue_lock, 0);
 	req->rq_status = RQ_SCSI_DONE;	/* Busy, but indicate request done */
+
+        spin_lock_irqsave(q->queue_lock, flags);
+
+        if(blk_rq_tagged(req))
+                blk_queue_end_tag(q, req);
+
+        spin_unlock_irqrestore(q->queue_lock, flags);
 
 	if (req->waiting)
 		complete(req->waiting);
@@ -269,12 +283,6 @@ static void scsi_wait_done(Scsi_Cmnd * SCpnt)
  * on this lock.
  */
 static spinlock_t device_request_lock = SPIN_LOCK_UNLOCKED;
-
-/*
- * Used to protect insertion into and removal from the queue of
- * commands to be processed by the bottom half handler.
- */
-static spinlock_t scsi_bhqueue_lock = SPIN_LOCK_UNLOCKED;
 
 /*
  * Function:    scsi_allocate_request
@@ -296,17 +304,19 @@ static spinlock_t scsi_bhqueue_lock = SPIN_LOCK_UNLOCKED;
 Scsi_Request *scsi_allocate_request(Scsi_Device * device)
 {
   	Scsi_Request *SRpnt = NULL;
+        const int offset = ALIGN(sizeof(Scsi_Request), 4);
+        const int size = offset + sizeof(struct request);
   
   	if (!device)
   		panic("No device passed to scsi_allocate_request().\n");
   
-	SRpnt = (Scsi_Request *) kmalloc(sizeof(Scsi_Request), GFP_ATOMIC);
+        SRpnt = (Scsi_Request *) kmalloc(size, GFP_ATOMIC);
 	if( SRpnt == NULL )
 	{
 		return NULL;
 	}
-
-	memset(SRpnt, 0, sizeof(Scsi_Request));
+	memset(SRpnt, 0, size);
+        SRpnt->sr_request = (struct request *)(((char *)SRpnt) + offset);
 	SRpnt->sr_device = device;
 	SRpnt->sr_host = device->host;
 	SRpnt->sr_magic = SCSI_REQ_MAGIC;
@@ -434,7 +444,7 @@ Scsi_Cmnd *scsi_allocate_device(Scsi_Device * device, int wait,
 			 * Now we can check for a free command block for this device.
 			 */
 			for (SCpnt = device->device_queue; SCpnt; SCpnt = SCpnt->next) {
-				if (SCpnt->request.rq_status == RQ_INACTIVE)
+				if (SCpnt->request == NULL)
 					break;
 			}
 		}
@@ -503,9 +513,7 @@ Scsi_Cmnd *scsi_allocate_device(Scsi_Device * device, int wait,
 		}
 	}
 
-	SCpnt->request.rq_status = RQ_SCSI_BUSY;
-	SCpnt->request.waiting = NULL;	/* And no one is waiting for this
-					 * to complete */
+	SCpnt->request = NULL;
 	atomic_inc(&SCpnt->host->host_active);
 	atomic_inc(&SCpnt->device->device_active);
 
@@ -548,7 +556,7 @@ inline void __scsi_release_command(Scsi_Cmnd * SCpnt)
 
         SDpnt = SCpnt->device;
 
-	SCpnt->request.rq_status = RQ_INACTIVE;
+	SCpnt->request = NULL;
 	SCpnt->state = SCSI_STATE_UNUSED;
 	SCpnt->owner = SCSI_OWNER_NOBODY;
 	atomic_dec(&SCpnt->host->host_active);
@@ -771,13 +779,13 @@ void scsi_wait_req (Scsi_Request * SRpnt, const void *cmnd ,
 	DECLARE_COMPLETION(wait);
 	request_queue_t *q = &SRpnt->sr_device->request_queue;
 	
-	SRpnt->sr_request.waiting = &wait;
-	SRpnt->sr_request.rq_status = RQ_SCSI_BUSY;
+	SRpnt->sr_request->waiting = &wait;
+	SRpnt->sr_request->rq_status = RQ_SCSI_BUSY;
 	scsi_do_req (SRpnt, (void *) cmnd,
 		buffer, bufflen, scsi_wait_done, timeout, retries);
 	generic_unplug_device(q);
 	wait_for_completion(&wait);
-	SRpnt->sr_request.waiting = NULL;
+	SRpnt->sr_request->waiting = NULL;
 	if( SRpnt->sr_command != NULL )
 	{
 		scsi_release_command(SRpnt->sr_command);
@@ -928,8 +936,7 @@ void scsi_init_cmd_from_req(Scsi_Cmnd * SCpnt, Scsi_Request * SRpnt)
 	SCpnt->cmd_len = SRpnt->sr_cmd_len;
 	SCpnt->use_sg = SRpnt->sr_use_sg;
 
-	memcpy((void *) &SCpnt->request, (const void *) &SRpnt->sr_request,
-	       sizeof(SRpnt->sr_request));
+        SCpnt->request = SRpnt->sr_request;
 	memcpy((void *) SCpnt->data_cmnd, (const void *) SRpnt->sr_cmnd, 
 	       sizeof(SCpnt->data_cmnd));
 	SCpnt->reset_chain = NULL;
@@ -1089,37 +1096,29 @@ void scsi_do_cmd(Scsi_Cmnd * SCpnt, const void *cmnd,
 	SCSI_LOG_MLQUEUE(3, printk("Leaving scsi_do_cmd()\n"));
 }
 
-void scsi_tasklet_func(unsigned long);
-static DECLARE_TASKLET(scsi_tasklet, scsi_tasklet_func, 0);
-
-/*
+/**
+ * scsi_done - Mark this command as done
+ * @SCpnt: The SCSI Command which we think we've completed.
+ *
  * This function is the mid-level interrupt routine, which decides how
- *  to handle error conditions.  Each invocation of this function must
- *  do one and *only* one of the following:
+ * to handle error conditions.  Each invocation of this function must
+ * do one and *only* one of the following:
  *
  *      1) Insert command in BH queue.
  *      2) Activate error handler for host.
  *
- * FIXME(eric) - I am concerned about stack overflow (still).  An
- * interrupt could come while we are processing the bottom queue,
- * which would cause another command to be stuffed onto the bottom
- * queue, and it would in turn be processed as that interrupt handler
- * is returning.  Given a sufficiently steady rate of returning
- * commands, this could cause the stack to overflow.  I am not sure
- * what is the most appropriate solution here - we should probably
- * keep a depth count, and not process any commands while we still
- * have a bottom handler active higher in the stack.
+ * There is no longer a problem with stack overflow.  Interrupts queue
+ * Scsi_Cmnd on a per-CPU queue and the softirq handler removes them
+ * from the queue one at a time.
  *
- * There is currently code in the bottom half handler to monitor
- * recursion in the bottom handler and report if it ever happens.  If
- * this becomes a problem, it won't be hard to engineer something to
- * deal with it so that only the outer layer ever does any real
- * processing.  
+ * This function is sometimes called from interrupt context, but sometimes
+ * from task context.
  */
 void scsi_done(Scsi_Cmnd * SCpnt)
 {
 	unsigned long flags;
-	int tstatus;
+	int cpu, tstatus;
+	struct softscsi_data *queue;
 
 	/*
 	 * We don't have to worry about this one timing out any more.
@@ -1155,7 +1154,6 @@ void scsi_done(Scsi_Cmnd * SCpnt)
 		SCSI_LOG_MLCOMPLETE(1, printk("Ignoring completion of %p due to timeout status", SCpnt));
 		return;
 	}
-	spin_lock_irqsave(&scsi_bhqueue_lock, flags);
 
 	SCpnt->serial_number_at_timeout = 0;
 	SCpnt->state = SCSI_STATE_BHQUEUE;
@@ -1163,75 +1161,49 @@ void scsi_done(Scsi_Cmnd * SCpnt)
 	SCpnt->bh_next = NULL;
 
 	/*
-	 * Next, put this command in the BH queue.
-	 * 
-	 * We need a spinlock here, or compare and exchange if we can reorder incoming
-	 * Scsi_Cmnds, as it happens pretty often scsi_done is called multiple times
-	 * before bh is serviced. -jj
+	 * Next, put this command in the softirq queue.
 	 *
-	 * We already have the io_request_lock here, since we are called from the
-	 * interrupt handler or the error handler. (DB)
-	 *
-	 * This may be true at the moment, but I would like to wean all of the low
-	 * level drivers away from using io_request_lock.   Technically they should
-	 * all use their own locking.  I am adding a small spinlock to protect
-	 * this datastructure to make it safe for that day.  (ERY)
+	 * This is a per-CPU queue, so we just disable local interrupts
+	 * and need no spinlock.
 	 */
-	if (!scsi_bh_queue_head) {
-		scsi_bh_queue_head = SCpnt;
-		scsi_bh_queue_tail = SCpnt;
+
+	local_irq_save(flags);
+
+	cpu = smp_processor_id();
+	queue = &softscsi_data[cpu];
+
+	if (!queue->head) {
+		queue->head = SCpnt;
+		queue->tail = SCpnt;
 	} else {
-		scsi_bh_queue_tail->bh_next = SCpnt;
-		scsi_bh_queue_tail = SCpnt;
+		queue->tail->bh_next = SCpnt;
+		queue->tail = SCpnt;
 	}
 
-	spin_unlock_irqrestore(&scsi_bhqueue_lock, flags);
-	/*
-	 * Mark the bottom half handler to be run.
-	 */
-	tasklet_hi_schedule(&scsi_tasklet);
+	cpu_raise_softirq(cpu, SCSI_SOFTIRQ);
+
+	local_irq_restore(flags);
 }
 
-/*
- * Procedure:   scsi_bottom_half_handler
+/**
+ * scsi_softirq - Perform post-interrupt handling for completed commands
  *
- * Purpose:     Called after we have finished processing interrupts, it
- *              performs post-interrupt handling for commands that may
- *              have completed.
- *
- * Notes:       This is called with all interrupts enabled.  This should reduce
- *              interrupt latency, stack depth, and reentrancy of the low-level
- *              drivers.
- *
- * The io_request_lock is required in all the routine. There was a subtle
- * race condition when scsi_done is called after a command has already
- * timed out but before the time out is processed by the error handler.
- * (DB)
- *
- * I believe I have corrected this.  We simply monitor the return status of
- * del_timer() - if this comes back as 0, it means that the timer has fired
- * and that a timeout is in progress.   I have modified scsi_done() such
- * that in this instance the command is never inserted in the bottom
- * half queue.  Thus the only time we hold the lock here is when
- * we wish to atomically remove the contents of the queue.
+ * This is called with all interrupts enabled.  This should reduce
+ * interrupt latency, stack depth, and reentrancy of the low-level
+ * drivers.
  */
-void scsi_tasklet_func(unsigned long ignore)
+static void scsi_softirq(struct softirq_action *h)
 {
-	Scsi_Cmnd *SCpnt;
-	Scsi_Cmnd *SCnext;
-	unsigned long flags;
+	int cpu = smp_processor_id();
+	struct softscsi_data *queue = &softscsi_data[cpu];
 
+	while (queue->head) {
+		Scsi_Cmnd *SCpnt, *SCnext;
 
-	while (1 == 1) {
-		spin_lock_irqsave(&scsi_bhqueue_lock, flags);
-		SCpnt = scsi_bh_queue_head;
-		scsi_bh_queue_head = NULL;
-		spin_unlock_irqrestore(&scsi_bhqueue_lock, flags);
-
-		if (SCpnt == NULL) {
-			return;
-		}
-		SCnext = SCpnt->bh_next;
+		local_irq_disable();
+		SCpnt = queue->head;
+		queue->head = NULL;
+		local_irq_enable();
 
 		for (; SCpnt; SCpnt = SCnext) {
 			SCnext = SCpnt->bh_next;
@@ -1249,10 +1221,11 @@ void scsi_tasklet_func(unsigned long ignore)
 				break;
 			case NEEDS_RETRY:
 				/*
-				 * We only come in here if we want to retry a command.  The
-				 * test to see whether the command should be retried should be
-				 * keeping track of the number of tries, so we don't end up looping,
-				 * of course.
+				 * We only come in here if we want to retry a
+				 * command.  The test to see whether the
+				 * command should be retried should be keeping
+				 * track of the number of tries, so we don't
+				 * end up looping, of course.
 				 */
 				SCSI_LOG_MLCOMPLETE(3, printk("Command needs retry %d %d 0x%x\n", SCpnt->host->host_busy,
 				SCpnt->host->host_failed, SCpnt->result));
@@ -1261,12 +1234,14 @@ void scsi_tasklet_func(unsigned long ignore)
 				break;
 			case ADD_TO_MLQUEUE:
 				/* 
-				 * This typically happens for a QUEUE_FULL message -
-				 * typically only when the queue depth is only
-				 * approximate for a given device.  Adding a command
-				 * to the queue for the device will prevent further commands
-				 * from being sent to the device, so we shouldn't end up
-				 * with tons of things being sent down that shouldn't be.
+				 * This typically happens for a QUEUE_FULL
+				 * message - typically only when the queue
+				 * depth is only approximate for a given
+				 * device.  Adding a command to the queue for
+				 * the device will prevent further commands
+				 * from being sent to the device, so we
+				 * shouldn't end up with tons of things being
+				 * sent down that shouldn't be.
 				 */
 				SCSI_LOG_MLCOMPLETE(3, printk("Command rejected as device queue full, put on ml queue %p\n",
                                                               SCpnt));
@@ -1274,8 +1249,8 @@ void scsi_tasklet_func(unsigned long ignore)
 				break;
 			default:
 				/*
-				 * Here we have a fatal error of some sort.  Turn it over to
-				 * the error handler.
+				 * Here we have a fatal error of some sort.
+				 * Turn it over to the error handler.
 				 */
 				SCSI_LOG_MLCOMPLETE(3, printk("Command failed %p %x active=%d busy=%d failed=%d\n",
 						    SCpnt, SCpnt->result,
@@ -1295,8 +1270,10 @@ void scsi_tasklet_func(unsigned long ignore)
 					SCpnt->state = SCSI_STATE_FAILED;
 					SCpnt->host->in_recovery = 1;
 					/*
-					 * If the host is having troubles, then look to see if this was the last
-					 * command that might have failed.  If so, wake up the error handler.
+					 * If the host is having troubles, then
+					 * look to see if this was the last
+					 * command that might have failed.  If
+					 * so, wake up the error handler.
 					 */
 					if (SCpnt->host->host_busy == SCpnt->host->host_failed) {
 						SCSI_LOG_ERROR_RECOVERY(5, printk("Waking error handler thread (%d)\n",
@@ -1305,15 +1282,14 @@ void scsi_tasklet_func(unsigned long ignore)
 					}
 				} else {
 					/*
-					 * We only get here if the error recovery thread has died.
+					 * We only get here if the error
+					 * recovery thread has died.
 					 */
 					scsi_finish_command(SCpnt);
 				}
-			}
+			}	/* switch */
 		}		/* for(; SCpnt...) */
-
-	}			/* while(1==1) */
-
+	}			/* while(queue->head) */
 }
 
 /*
@@ -1490,7 +1466,7 @@ void scsi_build_commandblocks(Scsi_Device * SDpnt)
 		SCpnt->target = SDpnt->id;
 		SCpnt->lun = SDpnt->lun;
 		SCpnt->channel = SDpnt->channel;
-		SCpnt->request.rq_status = RQ_INACTIVE;
+		SCpnt->request = NULL;
 		SCpnt->use_sg = 0;
 		SCpnt->old_use_sg = 0;
 		SCpnt->old_cmd_len = 0;
@@ -1942,6 +1918,11 @@ int scsi_register_host(Scsi_Host_Template * tpnt)
 				}
 				printk(KERN_INFO "scsi%d : %s\n",		/* And print a little message */
 				       shpnt->host_no, name);
+				strncpy(shpnt->host_driverfs_dev.name,name,
+					DEVICE_NAME_SIZE-1);
+				sprintf(shpnt->host_driverfs_dev.bus_id,
+					"scsi%d",
+					shpnt->host_no);
 			}
 		}
 
@@ -1950,6 +1931,8 @@ int scsi_register_host(Scsi_Host_Template * tpnt)
 		 */
 		for (shpnt = scsi_hostlist; shpnt; shpnt = shpnt->next) {
 			if (shpnt->hostt == tpnt) {
+				/* first register parent with driverfs */
+				device_register(&shpnt->host_driverfs_dev);
 				scan_scsis(shpnt, 0, 0, 0, 0);
 				if (shpnt->select_queue_depths != NULL) {
 					(shpnt->select_queue_depths) (shpnt, shpnt->host_queue);
@@ -2062,16 +2045,16 @@ int scsi_unregister_host(Scsi_Host_Template * tpnt)
 			     SCpnt = SCpnt->next) {
 				online_status = SDpnt->online;
 				SDpnt->online = FALSE;
-				if (SCpnt->request.rq_status != RQ_INACTIVE) {
+				if (SCpnt->request && SCpnt->request->rq_status != RQ_INACTIVE) {
 					printk(KERN_ERR "SCSI device not inactive - rq_status=%d, target=%d, pid=%ld, state=%d, owner=%d.\n",
-					       SCpnt->request.rq_status, SCpnt->target, SCpnt->pid,
+					       SCpnt->request->rq_status, SCpnt->target, SCpnt->pid,
 					     SCpnt->state, SCpnt->owner);
 					for (SDpnt1 = shpnt->host_queue; SDpnt1;
 					     SDpnt1 = SDpnt1->next) {
 						for (SCpnt = SDpnt1->device_queue; SCpnt;
 						     SCpnt = SCpnt->next)
-							if (SCpnt->request.rq_status == RQ_SCSI_DISCONNECTING)
-								SCpnt->request.rq_status = RQ_INACTIVE;
+							if (SCpnt->request->rq_status == RQ_SCSI_DISCONNECTING)
+								SCpnt->request->rq_status = RQ_INACTIVE;
 					}
 					SDpnt->online = online_status;
 					printk(KERN_ERR "Device busy???\n");
@@ -2082,7 +2065,8 @@ int scsi_unregister_host(Scsi_Host_Template * tpnt)
 				 * continue on.
 				 */
 				SCpnt->state = SCSI_STATE_DISCONNECTING;
-				SCpnt->request.rq_status = RQ_SCSI_DISCONNECTING;	/* Mark as busy */
+                                if(SCpnt->request)
+                                        SCpnt->request->rq_status = RQ_SCSI_DISCONNECTING;	/* Mark as busy */
 			}
 		}
 	}
@@ -2104,6 +2088,7 @@ int scsi_unregister_host(Scsi_Host_Template * tpnt)
 				goto err_out;
 			}
 			devfs_unregister (SDpnt->de);
+			put_device(&SDpnt->sdev_driverfs_dev);
 		}
 	}
 
@@ -2154,6 +2139,7 @@ int scsi_unregister_host(Scsi_Host_Template * tpnt)
 		/* Remove the /proc/scsi directory entry */
 		sprintf(name,"%d",shpnt->host_no);
 		remove_proc_entry(name, tpnt->proc_dir);
+		put_device(&shpnt->host_driverfs_dev);
 		if (tpnt->release)
 			(*tpnt->release) (shpnt);
 		else {
@@ -2392,11 +2378,11 @@ static void scsi_dump_status(int level)
 				       SCpnt->target,
 				       SCpnt->lun,
 
-				       kdevname(SCpnt->request.rq_dev),
-				       SCpnt->request.sector,
-				       SCpnt->request.nr_sectors,
-				       (long)SCpnt->request.current_nr_sectors,
-				       SCpnt->request.rq_status,
+				       kdevname(SCpnt->request->rq_dev),
+				       SCpnt->request->sector,
+				       SCpnt->request->nr_sectors,
+				       (long)SCpnt->request->current_nr_sectors,
+				       SCpnt->request->rq_status,
 				       SCpnt->use_sg,
 
 				       SCpnt->retries,
@@ -2481,7 +2467,9 @@ struct scatterlist *scsi_alloc_sgtable(Scsi_Cmnd *SCpnt, int gfp_mask)
 
 	sgp = scsi_sg_pools + SCpnt->sglist_len;
 
+	current->flags |= PF_NOWARN;
 	sgl = mempool_alloc(sgp->pool, gfp_mask);
+	current->flags &= ~PF_NOWARN;
 	if (sgl) {
 		memset(sgl, 0, sgp->size);
 		return sgl;
@@ -2501,6 +2489,34 @@ void scsi_free_sgtable(struct scatterlist *sgl, int index)
 
 	mempool_free(sgl, sgp->pool);
 }
+
+static int scsi_bus_match(struct device *scsi_driverfs_dev, 
+                          struct device_driver *scsi_driverfs_drv)
+{
+        char *p=0;
+
+        if (!strcmp("sd", scsi_driverfs_drv->name)) {
+                if ((p = strstr(scsi_driverfs_dev->bus_id, ":disc")) || 
+		    (p = strstr(scsi_driverfs_dev->bus_id, ":p"))) { 
+                        return 1;
+                }
+        } else if (!strcmp("sg", scsi_driverfs_drv->name)) {
+                if (strstr(scsi_driverfs_dev->bus_id, ":gen"))
+                        return 1;
+        } else if (!strcmp("sr",scsi_driverfs_drv->name)) {
+                if (strstr(scsi_driverfs_dev->bus_id,":cd"))
+                        return 1;
+        } else if (!strcmp("st",scsi_driverfs_drv->name)) {
+                if (strstr(scsi_driverfs_dev->bus_id,":mt"))
+                        return 1;
+        }
+        return 0;
+}
+
+struct bus_type scsi_driverfs_bus_type = {
+        name: "scsi",
+        match: scsi_bus_match,
+};
 
 static int __init init_scsi(void)
 {
@@ -2548,6 +2564,11 @@ static int __init init_scsi(void)
 		printk(KERN_INFO "scsi: host order: %s\n", scsihosts);	
 	scsi_host_no_init (scsihosts);
 
+	bus_register(&scsi_driverfs_bus_type);
+
+	/* Where we handle work queued by scsi_done */
+	open_softirq(SCSI_SOFTIRQ, scsi_softirq, NULL);
+
 	return 0;
 }
 
@@ -2555,8 +2576,6 @@ static void __exit exit_scsi(void)
 {
 	Scsi_Host_Name *shn, *shn2 = NULL;
 	int i;
-
-	tasklet_kill(&scsi_tasklet);
 
         devfs_unregister (scsi_devfs_handle);
         for (shn = scsi_host_no_list;shn;shn = shn->next) {
@@ -2708,16 +2727,18 @@ int
 scsi_reset_provider(Scsi_Device *dev, int flag)
 {
 	Scsi_Cmnd SC, *SCpnt = &SC;
+        struct request req;
 	int rtn;
 
+        SCpnt->request = &req;
 	memset(&SCpnt->eh_timeout, 0, sizeof(SCpnt->eh_timeout));
 	SCpnt->host                    	= dev->host;
 	SCpnt->device                  	= dev;
 	SCpnt->target                  	= dev->id;
 	SCpnt->lun                     	= dev->lun;
 	SCpnt->channel                 	= dev->channel;
-	SCpnt->request.rq_status       	= RQ_SCSI_BUSY;
-	SCpnt->request.waiting        	= NULL;
+	SCpnt->request->rq_status      	= RQ_SCSI_BUSY;
+	SCpnt->request->waiting        	= NULL;
 	SCpnt->use_sg                  	= 0;
 	SCpnt->old_use_sg              	= 0;
 	SCpnt->old_cmd_len             	= 0;

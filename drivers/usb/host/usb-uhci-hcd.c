@@ -271,21 +271,15 @@ static int uhci_urb_enqueue (struct usb_hcd *hcd, struct urb *urb, int mem_flags
 static int uhci_urb_dequeue (struct usb_hcd *hcd, struct urb *urb)
 {
 	unsigned long flags=0;
-	struct uhci_hcd *uhci;
+	struct uhci_hcd	*uhci = hcd_to_uhci (hcd);
+	int ret;
 
 	dbg("uhci_urb_dequeue called for %p",urb);
 	
-	uhci = hcd_to_uhci (hcd);
-
-	if (urb->transfer_flags & USB_ASYNC_UNLINK) {
-		int ret;
-       		spin_lock_irqsave (&uhci->urb_list_lock, flags);
-		ret = uhci_unlink_urb_async(uhci, urb, UNLINK_ASYNC_STORE_URB);
-		spin_unlock_irqrestore (&uhci->urb_list_lock, flags);	
-		return ret;
-	}
-	else
-		return uhci_unlink_urb_sync(uhci, urb);
+	spin_lock_irqsave (&uhci->urb_list_lock, flags);
+	ret = uhci_unlink_urb_async(uhci, urb, UNLINK_ASYNC_STORE_URB);
+	spin_unlock_irqrestore (&uhci->urb_list_lock, flags);	
+	return ret;
 }
 /*--------------------------------------------------------------------------*/
 static int uhci_get_frame (struct usb_hcd *hcd)

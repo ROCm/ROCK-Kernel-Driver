@@ -964,8 +964,7 @@ void blk_run_queues(void)
 		return;
 	}
 
-	list_splice(&blk_plug_list, &local_plug_list);
-	INIT_LIST_HEAD(&blk_plug_list);
+	list_splice_init(&blk_plug_list, &local_plug_list);
 	spin_unlock_irq(&blk_plug_lock);
 	
 	while (!list_empty(&local_plug_list)) {
@@ -1212,19 +1211,17 @@ void blk_put_request(struct request *rq)
 
 static long ro_bits[MAX_BLKDEV][8];
 
-int is_read_only(kdev_t dev)
+int bdev_read_only(struct block_device *bdev)
 {
 	int minor,major;
 
-	major = major(dev);
-	minor = minor(dev);
-	if (major < 0 || major >= MAX_BLKDEV) return 0;
+	if (!bdev)
+		return 0;
+	major = MAJOR(bdev->bd_dev);
+	minor = MINOR(bdev->bd_dev);
+	if (major < 0 || major >= MAX_BLKDEV)
+		return 0;
 	return ro_bits[major][minor >> 5] & (1 << (minor & 31));
-}
-
-int bdev_read_only(struct block_device *bdev)
-{
-	return bdev && is_read_only(to_kdev_t(bdev->bd_dev));
 }
 
 void set_device_ro(kdev_t dev,int flag)

@@ -129,6 +129,7 @@ static void sd_rw_intr(Scsi_Cmnd * SCpnt);
 
 static Scsi_Disk * sd_get_sdisk(int index);
 
+extern void driverfs_remove_partitions(struct gendisk *hd, int minor);
 
 #if defined(CONFIG_PPC32)
 /**
@@ -327,13 +328,13 @@ static int sd_init_command(Scsi_Cmnd * SCpnt)
 	/*
 	 * don't support specials for nwo
 	 */
-	if (!(SCpnt->request.flags & REQ_CMD))
+	if (!(SCpnt->request->flags & REQ_CMD))
 		return 0;
 
-	part_nr = SD_PARTITION(SCpnt->request.rq_dev);
-	dsk_nr = DEVICE_NR(SCpnt->request.rq_dev);
+	part_nr = SD_PARTITION(SCpnt->request->rq_dev);
+	dsk_nr = DEVICE_NR(SCpnt->request->rq_dev);
 
-	block = SCpnt->request.sector;
+	block = SCpnt->request->sector;
 	this_count = SCpnt->request_bufflen >> 9;
 
 	SCSI_LOG_HLQUEUE(1, printk("sd_command_init: dsk_nr=%d, block=%d, "
@@ -344,9 +345,9 @@ static int sd_init_command(Scsi_Cmnd * SCpnt)
 	/* >>>>> this change is not in the lk 2.5 series */
 	if (part_nr >= (sd_template.dev_max << 4) || (part_nr & 0xf) ||
 	    !sdp || !sdp->online ||
- 	    block + SCpnt->request.nr_sectors > sd[part_nr].nr_sects) {
+ 	    block + SCpnt->request->nr_sectors > sd[part_nr].nr_sects) {
 		SCSI_LOG_HLQUEUE(2, printk("Finishing %ld sectors\n", 
-				 SCpnt->request.nr_sectors));
+				 SCpnt->request->nr_sectors));
 		SCSI_LOG_HLQUEUE(2, printk("Retry with 0x%p\n", SCpnt));
 		return 0;
 	}
@@ -375,7 +376,7 @@ static int sd_init_command(Scsi_Cmnd * SCpnt)
 	 * for this.
 	 */
 	if (sdp->sector_size == 1024) {
-		if ((block & 1) || (SCpnt->request.nr_sectors & 1)) {
+		if ((block & 1) || (SCpnt->request->nr_sectors & 1)) {
 			printk(KERN_ERR "sd: Bad block number requested");
 			return 0;
 		} else {
@@ -384,7 +385,7 @@ static int sd_init_command(Scsi_Cmnd * SCpnt)
 		}
 	}
 	if (sdp->sector_size == 2048) {
-		if ((block & 3) || (SCpnt->request.nr_sectors & 3)) {
+		if ((block & 3) || (SCpnt->request->nr_sectors & 3)) {
 			printk(KERN_ERR "sd: Bad block number requested");
 			return 0;
 		} else {
@@ -393,7 +394,7 @@ static int sd_init_command(Scsi_Cmnd * SCpnt)
 		}
 	}
 	if (sdp->sector_size == 4096) {
-		if ((block & 7) || (SCpnt->request.nr_sectors & 7)) {
+		if ((block & 7) || (SCpnt->request->nr_sectors & 7)) {
 			printk(KERN_ERR "sd: Bad block number requested");
 			return 0;
 		} else {
@@ -401,25 +402,25 @@ static int sd_init_command(Scsi_Cmnd * SCpnt)
 			this_count = this_count >> 3;
 		}
 	}
-	if (rq_data_dir(&SCpnt->request) == WRITE) {
+	if (rq_data_dir(SCpnt->request) == WRITE) {
 		if (!sdp->writeable) {
 			return 0;
 		}
 		SCpnt->cmnd[0] = WRITE_6;
 		SCpnt->sc_data_direction = SCSI_DATA_WRITE;
-	} else if (rq_data_dir(&SCpnt->request) == READ) {
+	} else if (rq_data_dir(SCpnt->request) == READ) {
 		SCpnt->cmnd[0] = READ_6;
 		SCpnt->sc_data_direction = SCSI_DATA_READ;
 	} else {
 		printk(KERN_ERR "sd: Unknown command %lx\n", 
-		       SCpnt->request.flags);
-/* overkill 	panic("Unknown sd command %lx\n", SCpnt->request.flags); */
+		       SCpnt->request->flags);
+/* overkill 	panic("Unknown sd command %lx\n", SCpnt->request->flags); */
 		return 0;
 	}
 
 	SCSI_LOG_HLQUEUE(2, printk("%s : %s %d/%ld 512 byte blocks.\n", 
-		nbuff, (rq_data_dir(&SCpnt->request) == WRITE) ? 
-		"writing" : "reading", this_count, SCpnt->request.nr_sectors));
+		nbuff, (rq_data_dir(SCpnt->request) == WRITE) ? 
+		"writing" : "reading", this_count, SCpnt->request->nr_sectors));
 
 	SCpnt->cmnd[1] = (SCpnt->device->scsi_level <= SCSI_2) ?
 			 ((SCpnt->lun << 5) & 0xe0) : 0;
@@ -664,7 +665,7 @@ static void sd_rw_intr(Scsi_Cmnd * SCpnt)
 #if CONFIG_SCSI_LOGGING
 	char nbuff[6];
 
-	SCSI_LOG_HLCOMPLETE(1, sd_dskname(DEVICE_NR(SCpnt->request.rq_dev), 
+	SCSI_LOG_HLCOMPLETE(1, sd_dskname(DEVICE_NR(SCpnt->request->rq_dev), 
 			    nbuff));
 	SCSI_LOG_HLCOMPLETE(1, printk("sd_rw_intr: %s: res=0x%x\n", 
 				      nbuff, result));
@@ -690,8 +691,8 @@ static void sd_rw_intr(Scsi_Cmnd * SCpnt)
 			(SCpnt->sense_buffer[4] << 16) |
 			(SCpnt->sense_buffer[5] << 8) |
 			SCpnt->sense_buffer[6];
-			if (SCpnt->request.bio != NULL)
-				block_sectors = bio_sectors(SCpnt->request.bio);
+			if (SCpnt->request->bio != NULL)
+				block_sectors = bio_sectors(SCpnt->request->bio);
 			switch (SCpnt->device->sector_size) {
 			case 1024:
 				error_sector <<= 1;
@@ -716,7 +717,7 @@ static void sd_rw_intr(Scsi_Cmnd * SCpnt)
 			}
 
 			error_sector &= ~(block_sectors - 1);
-			good_sectors = error_sector - SCpnt->request.sector;
+			good_sectors = error_sector - SCpnt->request->sector;
 			if (good_sectors < 0 || good_sectors >= this_count)
 				good_sectors = 0;
 			break;
@@ -1277,12 +1278,15 @@ static int sd_init()
 
 		init_mem_lth(sd_gendisks[k].de_arr, N);
 		init_mem_lth(sd_gendisks[k].flags, N);
+		init_mem_lth(sd_gendisks[k].driverfs_dev_arr, N);
 
-		if (!sd_gendisks[k].de_arr || !sd_gendisks[k].flags)
+		if (!sd_gendisks[k].de_arr || !sd_gendisks[k].flags ||
+				!sd_gendisks[k].driverfs_dev_arr)
 			goto cleanup_gendisks;
 
 		zero_mem_lth(sd_gendisks[k].de_arr, N);
 		zero_mem_lth(sd_gendisks[k].flags, N);
+		zero_mem_lth(sd_gendisks[k].driverfs_dev_arr, N);
 
 		sd_gendisks[k].major = SD_MAJOR(k);
 		sd_gendisks[k].major_name = "sd";
@@ -1291,7 +1295,6 @@ static int sd_init()
 		sd_gendisks[k].sizes = sd_sizes + k * (N << 4);
 		sd_gendisks[k].nr_real = 0;
 	}
-
 	return 0;
 
 #undef init_mem_lth
@@ -1302,6 +1305,7 @@ cleanup_gendisks:
 	for (k = 0; k < N_USED_SD_MAJORS; k++) {
 		vfree(sd_gendisks[k].de_arr);
 		vfree(sd_gendisks[k].flags);
+		vfree(sd_gendisks[k].driverfs_dev_arr);
 	}
 cleanup_mem:
 	vfree(sd_gendisks);
@@ -1436,6 +1440,8 @@ static int sd_attach(Scsi_Device * sdp)
 	SD_GENDISK(dsk_nr).nr_real++;
         devnum = dsk_nr % SCSI_DISKS_PER_MAJOR;
         SD_GENDISK(dsk_nr).de_arr[devnum] = sdp->de;
+        SD_GENDISK(dsk_nr).driverfs_dev_arr[devnum] = 
+		&sdp->sdev_driverfs_dev;
         if (sdp->removable)
 		SD_GENDISK(dsk_nr).flags[devnum] |= GENHD_FL_REMOVABLE;
 	sd_dskname(dsk_nr, diskname);
@@ -1535,6 +1541,8 @@ static void sd_detach(Scsi_Device * sdp)
 	max_p = 1 << sd_gendisk.minor_shift;
 	start = dsk_nr << sd_gendisk.minor_shift;
 	dev = MKDEV_SD_PARTITION(start);
+	driverfs_remove_partitions(&SD_GENDISK (dsk_nr), 
+					SD_MINOR_NUMBER (start));
 	wipe_partitions(dev);
 	for (j = max_p - 1; j >= 0; j--)
 		sd_sizes[start + j] = 0;
@@ -1556,9 +1564,16 @@ static void sd_detach(Scsi_Device * sdp)
  **/
 static int __init init_sd(void)
 {
+	int rc;
 	SCSI_LOG_HLQUEUE(3, printk("init_sd: sd driver entry point\n"));
 	sd_template.module = THIS_MODULE;
-	return scsi_register_device(&sd_template);
+	rc = scsi_register_device(&sd_template);
+	if (!rc) {
+		sd_template.scsi_driverfs_driver.name = (char *)sd_template.tag;
+		sd_template.scsi_driverfs_driver.bus = &scsi_driverfs_bus_type;
+		driver_register(&sd_template.scsi_driverfs_driver);
+	}
+	return rc;
 }
 
 /**
@@ -1591,6 +1606,7 @@ static void __exit exit_sd(void)
 	sd_template.dev_max = 0;
 	if (sd_gendisks != &sd_gendisk)
 		vfree(sd_gendisks);
+	remove_driver(&sd_template.scsi_driverfs_driver);
 }
 
 static Scsi_Disk * sd_get_sdisk(int index)

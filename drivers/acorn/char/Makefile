@@ -20,5 +20,16 @@ obj-y		+= $(obj-$(MACHINE))
 
 include $(TOPDIR)/Rules.make
 
-$(obj)/%.c: $(src)/%.map
+$(obj)/defkeymap-acorn.o: $(obj)/defkeymap-acorn.c
+
+# Uncomment if you're changing the keymap and have an appropriate
+# loadkeys version for the map. By default, we'll use the shipped
+# versions.
+# GENERATE_KEYMAP := 1
+
+ifdef GENERATE_KEYMAP
+
+$(obj)/defkeymap-acorn.c: $(obj)/%.c: $(src)/%.map
 	loadkeys --mktable $< > $@
+
+endif

@@ -15,6 +15,7 @@
  
 #include <asm/ppcboot.h>
 
+#ifndef __ASSEMBLY__
 #define SPD_IMMR_BASE	0xFFF00000	/* phys. addr of IMMR */
 #define SPD_IMAP_SIZE	(64 * 1024)	/* size of mapped area */
 
@@ -61,9 +62,34 @@
 #define IDE1_CONTROL_REG_OFFSET		0x0106
 #define IDE1_IRQ_REG_OFFSET		0x000A	/* not used */
 
+/* CPM Ethernet through SCCx.
+ *
+ * Bits in parallel I/O port registers that have to be set/cleared
+ * to configure the pins for SCC2 use.
+ */
+#define PA_ENET_MDC	((ushort)0x0001)	/* PA 15 !!! */
+#define PA_ENET_MDIO	((ushort)0x0002)	/* PA 14 !!! */
+#define PA_ENET_RXD	((ushort)0x0004)	/* PA 13 */
+#define PA_ENET_TXD	((ushort)0x0008)	/* PA 12 */
+#define PA_ENET_RCLK	((ushort)0x0200)	/* PA  6 */
+#define PA_ENET_TCLK	((ushort)0x0400)	/* PA  5 */
+
+#define PB_ENET_TENA	((uint)0x00002000)	/* PB 18 */
+
+#define PC_ENET_CLSN	((ushort)0x0040)	/* PC  9 */
+#define PC_ENET_RENA	((ushort)0x0080)	/* PC  8 */
+#define PC_ENET_RESET	((ushort)0x0100)	/* PC  7 !!! */
+
+/* Control bits in the SICR to route TCLK (CLK3) and RCLK (CLK2) to
+ * SCC2.  Also, make sure GR2 (bit 16) and SC2 (bit 17) are zero.
+ */
+#define SICR_ENET_MASK	((uint)0x0000ff00)
+#define SICR_ENET_CLKRT	((uint)0x00002E00)
+
 /* We don't use the 8259.
 */
 #define NR_8259_INTS	0
 
+#endif /* !__ASSEMBLY__ */
 #endif /* __ASM_SPD8XX_H__ */
 #endif /* __KERNEL__ */

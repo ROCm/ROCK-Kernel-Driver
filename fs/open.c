@@ -30,9 +30,7 @@ int vfs_statfs(struct super_block *sb, struct statfs *buf)
 		retval = -ENOSYS;
 		if (sb->s_op && sb->s_op->statfs) {
 			memset(buf, 0, sizeof(struct statfs));
-			lock_kernel();
 			retval = sb->s_op->statfs(sb, buf);
-			unlock_kernel();
 		}
 	}
 	return retval;
@@ -664,6 +662,14 @@ struct file *dentry_open(struct dentry *dentry, struct vfsmount *mnt, int flags)
 			goto cleanup_all;
 	}
 	f->f_flags &= ~(O_CREAT | O_EXCL | O_NOCTTY | O_TRUNC);
+
+	/* NB: we're sure to have correct a_ops only after f_op->open */
+	if (f->f_flags & O_DIRECT) {
+		error = -EINVAL;
+		if (inode->i_mapping && inode->i_mapping->a_ops)
+			if (!inode->i_mapping->a_ops->direct_IO)
+				goto cleanup_all;
+	}
 
 	return f;
 

@@ -288,9 +288,6 @@ if [ "$CONFIG_ADVANCED_OPTIONS" = "y" ]; then
    if [ "$CONFIG_8xx" = "y" ]; then
       bool "Pinned Kernel TLBs (860 ONLY)" CONFIG_PIN_TLB
    fi
-   if [ "$CONFIG_40x" = "y" ]; then
-      bool "Pinned Kernel TLBs" CONFIG_PIN_TLB
-   fi
    if [ "$CONFIG_ALL_PPC" != "y" ]; then
       bool "Set the boot link/load address" CONFIG_BOOT_LOAD_BOOL
       if [ "$CONFIG_BOOT_LOAD_BOOL" = "y" ]; then
@@ -605,6 +602,7 @@ mainmenu_option next_comment
 comment 'Kernel hacking'
 
 bool 'Magic SysRq key' CONFIG_MAGIC_SYSRQ
+bool 'Spinlock debugging' CONFIG_DEBUG_SPINLOCK
 bool 'Include kgdb kernel debugger' CONFIG_KGDB
 if [ "$CONFIG_KGDB" = "y" ]; then
    choice 'Serial Port'			\

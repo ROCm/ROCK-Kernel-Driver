@@ -319,8 +319,8 @@ static void do_acct_process(long exitcode, struct file *file)
 	ac.ac_btime = CT_TO_SECS(current->start_time) +
 		(xtime.tv_sec - (jiffies / HZ));
 	ac.ac_etime = encode_comp_t(jiffies - current->start_time);
-	ac.ac_utime = encode_comp_t(current->times.tms_utime);
-	ac.ac_stime = encode_comp_t(current->times.tms_stime);
+	ac.ac_utime = encode_comp_t(current->utime);
+	ac.ac_stime = encode_comp_t(current->stime);
 	ac.ac_uid = current->uid;
 	ac.ac_gid = current->gid;
 	ac.ac_tty = (current->tty) ? kdev_t_to_nr(current->tty->device) : 0;

@@ -471,7 +471,7 @@ start_journal_io:
            transaction's t_log_list queue, and metadata buffers are on
            the t_iobuf_list queue.
 
-	   Wait for the transactions in reverse order.  That way we are
+	   Wait for the buffers in reverse order.  That way we are
 	   less likely to be woken up until all IOs have completed, and
 	   so we incur less scheduling load.
 	*/
@@ -563,8 +563,10 @@ start_journal_io:
 
 	jbd_debug(3, "JBD: commit phase 6\n");
 
-	if (is_journal_aborted(journal))
+	if (is_journal_aborted(journal)) {
+		unlock_journal(journal);
 		goto skip_commit;
+	}
 
 	/* Done it all: now write the commit record.  We should have
 	 * cleaned up our previous buffers by now, so if we are in abort
@@ -574,9 +576,10 @@ start_journal_io:
 	descriptor = journal_get_descriptor_buffer(journal);
 	if (!descriptor) {
 		__journal_abort_hard(journal);
+		unlock_journal(journal);
 		goto skip_commit;
 	}
-	
+
 	/* AKPM: buglet - add `i' to tmp! */
 	for (i = 0; i < jh2bh(descriptor)->b_size; i += 512) {
 		journal_header_t *tmp =
@@ -596,14 +599,32 @@ start_journal_io:
 		__brelse(bh);		/* One for getblk() */
 		journal_unlock_journal_head(descriptor);
 	}
-	lock_journal(journal);
 
 	/* End of a transaction!  Finally, we can do checkpoint
            processing: any buffers committed as a result of this
            transaction can be removed from any checkpoint list it was on
            before. */
 
-skip_commit:
+skip_commit: /* The journal should be unlocked by now. */
+
+	/* Call any callbacks that had been registered for handles in this
+	 * transaction.  It is up to the callback to free any allocated
+	 * memory.
+	 */
+	if (!list_empty(&commit_transaction->t_jcb)) {
+		struct list_head *p, *n;
+		int error = is_journal_aborted(journal);
+
+		list_for_each_safe(p, n, &commit_transaction->t_jcb) {
+			struct journal_callback *jcb;
+
+			jcb = list_entry(p, struct journal_callback, jcb_list);
+			list_del(p);
+			jcb->jcb_func(jcb, error);
+		}
+	}
+
+	lock_journal(journal);
 
 	jbd_debug(3, "JBD: commit phase 7\n");
 

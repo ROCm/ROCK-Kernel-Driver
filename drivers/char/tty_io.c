@@ -1336,7 +1336,7 @@ retry_open:
 	ptmx_found:
 		set_bit(TTY_PTY_LOCK, &tty->flags); /* LOCK THE SLAVE */
 		minor -= driver->minor_start;
-		devpts_pty_new(driver->other->name_base + minor, mk_kdev(driver->other->major, minor + driver->other->minor_start));
+		devpts_pty_new(driver->other->name_base + minor, MKDEV(driver->other->major, minor + driver->other->minor_start));
 		tty_register_devfs(&pts_driver[major], DEVFS_FL_DEFAULT,
 				   pts_driver[major].minor_start + minor);
 		noctty = 1;

@@ -406,7 +406,7 @@ static int chkSuper(struct super_block *sb)
 	if (sbi->mntflag & JFS_INLINELOG)
 		sbi->logpxd = j_sb->s_logpxd;
 	else {
-		sbi->logdev = to_kdev_t(le32_to_cpu(j_sb->s_logdev));
+		sbi->logdev = le32_to_cpu(j_sb->s_logdev);
 		memcpy(sbi->uuid, j_sb->s_uuid, sizeof(sbi->uuid));
 		memcpy(sbi->loguuid, j_sb->s_loguuid, sizeof(sbi->uuid));
 	}

@@ -686,8 +686,8 @@ struct task_struct *do_fork(unsigned long clone_flags,
 
 	p->leader = 0;		/* session leadership doesn't inherit */
 	p->tty_old_pgrp = 0;
-	p->times.tms_utime = p->times.tms_stime = 0;
-	p->times.tms_cutime = p->times.tms_cstime = 0;
+	p->utime = p->stime = 0;
+	p->cutime = p->cstime = 0;
 #ifdef CONFIG_SMP
 	{
 		int i;

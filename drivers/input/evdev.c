@@ -1,5 +1,5 @@
 /*
- * $Id: evdev.c,v 1.42 2002/01/02 11:59:56 vojtech Exp $
+ * $Id: evdev.c,v 1.48 2002/05/26 14:28:26 jdeneux Exp $
  *
  *  Copyright (c) 1999-2001 Vojtech Pavlik
  *
@@ -40,7 +40,6 @@
 struct evdev {
 	int exist;
 	int open;
-	int open_for_write;
 	int minor;
 	char name[16];
 	struct input_handle handle;
@@ -91,7 +90,9 @@ static int evdev_fasync(int fd, struct file *file, int on)
 
 static int evdev_flush(struct file * file)
 {
-	return input_flush_device(&((struct evdev_list*)file->private_data)->evdev->handle, file);
+	struct evdev_list *list = (struct evdev_list*)file->private_data;
+	if (!list->evdev->exist) return -ENODEV;
+	return input_flush_device(&list->evdev->handle, file);
 }
 
 static int evdev_release(struct inode * inode, struct file * file)
@@ -157,6 +158,8 @@ static ssize_t evdev_write(struct file * file, const char * buffer, size_t count
 	struct evdev_list *list = file->private_data;
 	struct input_event event;
 	int retval = 0;
+
+	if (!list->evdev->exist) return -ENODEV;
 
 	while (retval < count) {
 
@@ -232,6 +235,8 @@ static int evdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	struct input_dev *dev = evdev->handle.dev;
 	int retval, t, u;
 
+	if (!evdev->exist) return -ENODEV;
+
 	switch (cmd) {
 
 		case EVIOCGVERSION:
@@ -284,11 +289,11 @@ static int evdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 				int err;
 
 				if (copy_from_user((void*)(&effect), (void*)arg, sizeof(effect))) {
-					return -EINVAL;
+					return -EFAULT;
 				}
 				err = dev->upload_effect(dev, &effect);
 				if (put_user(effect.id, &(((struct ff_effect*)arg)->id))) {
-					return -EINVAL;
+					return -EFAULT;
 				}
 				return err;
 			}
@@ -301,7 +306,8 @@ static int evdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 			else return -ENOSYS;
 
 		case EVIOCGEFFECTS:
-			put_user(dev->ff_effects_max, (int*) arg);
+			if ((retval = put_user(dev->ff_effects_max, (int*) arg)))
+				return retval;
 			return 0;
 
 		default:

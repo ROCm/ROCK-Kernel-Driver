@@ -156,7 +156,7 @@ static void magellan_connect(struct serio *serio, struct serio_dev *dev)
 	magellan->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_ABS);	
 
 	for (i = 0; i < 9; i++)
-		set_bit(magellan_buttons[i], &magellan->dev.keybit);
+		set_bit(magellan_buttons[i], magellan->dev.keybit);
 
 	for (i = 0; i < 6; i++) {
 		t = magellan_axes[i];

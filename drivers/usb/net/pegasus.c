@@ -1,45 +1,33 @@
 /*
-**	Pegasus: USB 10/100Mbps/HomePNA (1Mbps) Controller
-**
-**	Copyright (c) 1999-2002 Petko Manolov (petkan@users.sourceforge.net)
-**	
-**
-**	ChangeLog:
-**		....	Most of the time spend reading sources & docs.
-**		v0.2.x	First official release for the Linux kernel.
-**		v0.3.0	Beutified and structured, some bugs fixed.
-**		v0.3.x	URBifying bulk requests and bugfixing. First relatively
-**			stable release. Still can touch device's registers only
-**			from top-halves.
-**		v0.4.0	Control messages remained unurbified are now URBs.
-**			Now we can touch the HW at any time.
-**		v0.4.9	Control urbs again use process context to wait. Argh...
-**			Some long standing bugs (enable_net_traffic) fixed.
-**			Also nasty trick about resubmiting control urb from
-**			interrupt context used. Please let me know how it
-**			behaves. Pegasus II support added since this version.
-**			TODO: suppressing HCD warnings spewage on disconnect.
-**		v0.4.13	Ethernet address is now set at probe(), not at open()
-**			time as this seems to break dhcpd. 
-**		v0.5.0	branch to 2.5.x kernels
-**		v0.5.1	ethtool support added
-*/
-
-/*
+ *  Copyright (c) 1999-2002 Petko Manolov (petkan@users.sourceforge.net)
+ *
  * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ *	ChangeLog:
+ *		....	Most of the time spent on reading sources & docs.
+ *		v0.2.x	First official release for the Linux kernel.
+ *		v0.3.0	Beutified and structured, some bugs fixed.
+ *		v0.3.x	URBifying bulk requests and bugfixing. First relatively
+ *			stable release. Still can touch device's registers only
+ *			from top-halves.
+ *		v0.4.0	Control messages remained unurbified are now URBs.
+ *			Now we can touch the HW at any time.
+ *		v0.4.9	Control urbs again use process context to wait. Argh...
+ *			Some long standing bugs (enable_net_traffic) fixed.
+ *			Also nasty trick about resubmiting control urb from
+ *			interrupt context used. Please let me know how it
+ *			behaves. Pegasus II support added since this version.
+ *			TODO: suppressing HCD warnings spewage on disconnect.
+ *		v0.4.13	Ethernet address is now set at probe(), not at open()
+ *			time as this seems to break dhcpd. 
+ *		v0.5.0	branch to 2.5.x kernels
+ *		v0.5.1	ethtool support added
+ *		v0.5.5	rx socket buffers are in a pool and the their allocation
+ * 			is out of the interrupt routine.
  */
+
 
 #include <linux/sched.h>
 #include <linux/slab.h>
@@ -58,14 +46,13 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v0.5.4 (2002/04/11)"
+#define DRIVER_VERSION "v0.5.6 (2002/06/23)"
 #define DRIVER_AUTHOR "Petko Manolov <petkan@users.sourceforge.net>"
 #define DRIVER_DESC "Pegasus/Pegasus II USB Ethernet driver"
 
 static const char driver_name[] = "pegasus";
 
-#define	PEGASUS_USE_INTR
-#define	PEGASUS_WRITE_EEPROM
+#undef	PEGASUS_WRITE_EEPROM
 #define	BMSR_MEDIA	(BMSR_10HALF | BMSR_10FULL | BMSR_100HALF | \
 			BMSR_100FULL | BMSR_ANEGCAPABLE)
 
@@ -499,13 +486,57 @@ static int enable_net_traffic(struct net_device *dev, struct usb_device *usb)
 	return 0;
 }
 
+static void fill_skb_pool(pegasus_t *pegasus)
+{
+	int i;
+
+	for (i=0; i < RX_SKBS; i++) {
+		if (pegasus->rx_pool[i])
+			continue;
+		pegasus->rx_pool[i] = dev_alloc_skb(PEGASUS_MTU + 2);
+		/*
+		** we give up if the allocation fail. the tasklet will be
+		** rescheduled again anyway...
+		*/
+		if (pegasus->rx_pool[i] == NULL)
+			return;
+		pegasus->rx_pool[i]->dev = pegasus->net;
+		skb_reserve(pegasus->rx_pool[i], 2);
+	}
+}
+
+static void free_skb_pool(pegasus_t *pegasus)
+{
+	int i;
+
+	for (i=0; i < RX_SKBS; i++) {
+		if (pegasus->rx_pool[i]) {
+			dev_kfree_skb(pegasus->rx_pool[i]);
+			pegasus->rx_pool[i] = NULL;
+		}
+	}
+}
+
+static inline struct sk_buff *pull_skb(pegasus_t *pegasus)
+{
+	int i;
+	struct sk_buff *skb;
+
+	for (i=0; i < RX_SKBS; i++) {
+		if (likely(pegasus->rx_pool[i] != NULL)) {
+			skb = pegasus->rx_pool[i];
+			pegasus->rx_pool[i] = NULL;
+			return skb;
+		}
+	}
+	return NULL;
+}
+
 static void read_bulk_callback(struct urb *urb)
 {
 	pegasus_t *pegasus = urb->context;
 	struct net_device *net;
-	int count = urb->actual_length;
-	int rx_status;
-	struct sk_buff *skb;
+	int rx_status, count = urb->actual_length;
 	__u16 pkt_len;
 
 	if (!pegasus || !(pegasus->flags & PEGASUS_RUNNING))
@@ -519,7 +550,7 @@ static void read_bulk_callback(struct urb *urb)
 	case 0:
 		break;
 	case -ETIMEDOUT:
-		dbg("reset MAC");
+		dbg("%s: reset MAC", net->name);
 		pegasus->flags &= ~PEGASUS_RX_BUSY;
 		break;
 	case -ENOENT:
@@ -546,23 +577,24 @@ static void read_bulk_callback(struct urb *urb)
 	}
 	pkt_len = (rx_status & 0xfff) - 8;
 
-	if (!pegasus->rx_skb)
-		goto tl_sched;
-
+	if (pegasus->rx_skb == NULL)
+		printk("%s: rx_skb == NULL\n", __FUNCTION__);
+	/*
+	** we are sure at this point pegasus->rx_skb != NULL
+	** so we go ahead and pass up the packet.
+	*/
 	skb_put(pegasus->rx_skb, pkt_len);
 	pegasus->rx_skb->protocol = eth_type_trans(pegasus->rx_skb, net);
 	netif_rx(pegasus->rx_skb);
-
-	if (!(skb = dev_alloc_skb(PEGASUS_MTU + 2))) {
-		pegasus->rx_skb = NULL;
-		goto tl_sched;
-	}
-	
-	skb->dev = net;
-	skb_reserve(skb, 2);
-	pegasus->rx_skb = skb;
 	pegasus->stats.rx_packets++;
 	pegasus->stats.rx_bytes += pkt_len;
+	
+	spin_lock(&pegasus->rx_pool_lock);
+	pegasus->rx_skb = pull_skb(pegasus);
+	spin_unlock(&pegasus->rx_pool_lock);
+
+	if (pegasus->rx_skb == NULL)
+		goto tl_sched;
 goon:
 	FILL_BULK_URB(pegasus->rx_urb, pegasus->usb,
 		      usb_rcvbulkpipe(pegasus->usb, 1),
@@ -587,11 +619,19 @@ static void rx_fixup(unsigned long data)
 
 	pegasus = (pegasus_t *)data;
 
+	spin_lock_irq(&pegasus->rx_pool_lock);
+	fill_skb_pool(pegasus);
+	spin_unlock_irq(&pegasus->rx_pool_lock);
 	if (pegasus->flags & PEGASUS_RX_URB_FAIL)
 		if (pegasus->rx_skb)
 			goto try_again;
-
-	if (!(pegasus->rx_skb = dev_alloc_skb(PEGASUS_MTU + 2))) {
+	if (pegasus->rx_skb == NULL) {
+		spin_lock_irq(&pegasus->rx_pool_lock);
+		pegasus->rx_skb = pull_skb(pegasus);
+		spin_unlock_irq(&pegasus->rx_pool_lock);
+	}
+	if (pegasus->rx_skb == NULL) {
+		warn("wow, low on memory");
 		tasklet_schedule(&pegasus->rx_tl);
 		return;
 	}
@@ -625,7 +665,6 @@ static void write_bulk_callback(struct urb *urb)
 	netif_wake_queue(pegasus->net);
 }
 
-#ifdef	PEGASUS_USE_INTR
 static void intr_callback(struct urb *urb)
 {
 	pegasus_t *pegasus = urb->context;
@@ -662,7 +701,6 @@ static void intr_callback(struct urb *urb)
 		}
 	}
 }
-#endif
 
 static void pegasus_tx_timeout(struct net_device *net)
 {
@@ -748,15 +786,62 @@ static void set_carrier(struct net_device *net)
 
 }
 
+static void free_all_urbs(pegasus_t *pegasus)
+{
+	usb_free_urb(pegasus->intr_urb);
+	usb_free_urb(pegasus->tx_urb);
+	usb_free_urb(pegasus->rx_urb);
+	usb_free_urb(pegasus->ctrl_urb);
+}
+
+static void unlink_all_urbs(pegasus_t *pegasus)
+{
+	usb_unlink_urb(pegasus->intr_urb);
+	usb_unlink_urb(pegasus->tx_urb);
+	usb_unlink_urb(pegasus->rx_urb);
+	usb_unlink_urb(pegasus->ctrl_urb);
+}
+
+static int alloc_urbs(pegasus_t *pegasus)
+{
+	pegasus->ctrl_urb = usb_alloc_urb(0, GFP_KERNEL);
+	if (!pegasus->ctrl_urb) {
+		return 0;
+	}
+	pegasus->rx_urb = usb_alloc_urb(0, GFP_KERNEL);
+	if (!pegasus->rx_urb) {
+		usb_free_urb(pegasus->ctrl_urb);
+		return 0;
+	}
+	pegasus->tx_urb = usb_alloc_urb(0, GFP_KERNEL);
+	if (!pegasus->tx_urb) {
+		usb_free_urb(pegasus->rx_urb);
+		usb_free_urb(pegasus->ctrl_urb);
+		return 0;
+	}
+	pegasus->intr_urb = usb_alloc_urb(0, GFP_KERNEL);
+	if (!pegasus->intr_urb) {
+		usb_free_urb(pegasus->tx_urb);
+		usb_free_urb(pegasus->rx_urb);
+		usb_free_urb(pegasus->ctrl_urb);
+		return 0;
+	}
+
+	return 1;
+}
+
 static int pegasus_open(struct net_device *net)
 {
 	pegasus_t *pegasus = (pegasus_t *) net->priv;
 	int res;
 
-	if (!(pegasus->rx_skb = dev_alloc_skb(PEGASUS_MTU + 2)))
+	if (pegasus->rx_skb == NULL)
+		pegasus->rx_skb = pull_skb(pegasus);
+	/*
+	** Note: no point to free the pool.  it is empty :-)
+	*/
+	if (!pegasus->rx_skb)
 		return -ENOMEM;
-	pegasus->rx_skb->dev = net;
-	skb_reserve(pegasus->rx_skb, 2);
 
 	down(&pegasus->sem);
 	FILL_BULK_URB(pegasus->rx_urb, pegasus->usb,
@@ -765,19 +850,20 @@ static int pegasus_open(struct net_device *net)
 		      read_bulk_callback, pegasus);
 	if ((res = usb_submit_urb(pegasus->rx_urb, GFP_KERNEL)))
 		warn("%s: failed rx_urb %d", __FUNCTION__, res);
-#ifdef	PEGASUS_USE_INTR
 	FILL_INT_URB(pegasus->intr_urb, pegasus->usb,
 		     usb_rcvintpipe(pegasus->usb, 3),
 		     pegasus->intr_buff, sizeof(pegasus->intr_buff),
 		     intr_callback, pegasus, pegasus->intr_interval);
 	if ((res = usb_submit_urb(pegasus->intr_urb, GFP_KERNEL)))
 		warn("%s: failed intr_urb %d", __FUNCTION__, res);
-#endif
 	netif_start_queue(net);
 	pegasus->flags |= PEGASUS_RUNNING;
 	if ((res = enable_net_traffic(net, pegasus->usb))) {
 		err("can't enable_net_traffic() - %d", res);
 		res = -EIO;
+		usb_unlink_urb(pegasus->rx_urb);
+		usb_unlink_urb(pegasus->intr_urb);
+		free_skb_pool(pegasus);
 		goto exit;
 	}
 	set_carrier(net);
@@ -797,13 +883,7 @@ static int pegasus_close(struct net_device *net)
 	netif_stop_queue(net);
 	if (!(pegasus->flags & PEGASUS_UNPLUG))
 		disable_net_traffic(pegasus);
-
-	usb_unlink_urb(pegasus->rx_urb);
-	usb_unlink_urb(pegasus->tx_urb);
-	usb_unlink_urb(pegasus->ctrl_urb);
-#ifdef	PEGASUS_USE_INTR
-	usb_unlink_urb(pegasus->intr_urb);
-#endif
+	unlink_all_urbs(pegasus);
 	up(&pegasus->sem);
 
 	return 0;
@@ -986,38 +1066,14 @@ static void *pegasus_probe(struct usb_device *dev, unsigned int ifnum,
 	pegasus->dev_index = dev_index;
 	init_waitqueue_head(&pegasus->ctrl_wait);
 
-	pegasus->ctrl_urb = usb_alloc_urb(0, GFP_KERNEL);
-	if (!pegasus->ctrl_urb) {
-		kfree(pegasus);
-		return NULL;
-	}
-	pegasus->rx_urb = usb_alloc_urb(0, GFP_KERNEL);
-	if (!pegasus->rx_urb) {
-		usb_free_urb(pegasus->ctrl_urb);
-		kfree(pegasus);
-		return NULL;
-	}
-	pegasus->tx_urb = usb_alloc_urb(0, GFP_KERNEL);
-	if (!pegasus->tx_urb) {
-		usb_free_urb(pegasus->rx_urb);
-		usb_free_urb(pegasus->ctrl_urb);
-		kfree(pegasus);
-		return NULL;
-	}
-	pegasus->intr_urb = usb_alloc_urb(0, GFP_KERNEL);
-	if (!pegasus->intr_urb) {
-		usb_free_urb(pegasus->tx_urb);
-		usb_free_urb(pegasus->rx_urb);
-		usb_free_urb(pegasus->ctrl_urb);
+	if (!alloc_urbs(pegasus)) {
 		kfree(pegasus);
 		return NULL;
 	}
 
 	net = init_etherdev(NULL, 0);
 	if (!net) {
-		usb_free_urb(pegasus->tx_urb);
-		usb_free_urb(pegasus->rx_urb);
-		usb_free_urb(pegasus->ctrl_urb);
+		free_all_urbs(pegasus);
 		kfree(pegasus);
 		return NULL;
 	}
@@ -1039,32 +1095,26 @@ static void *pegasus_probe(struct usb_device *dev, unsigned int ifnum,
 	net->set_multicast_list = pegasus_set_multicast;
 	net->get_stats = pegasus_netdev_stats;
 	net->mtu = PEGASUS_MTU;
+	spin_lock_init(&pegasus->rx_pool_lock);
 
 	pegasus->features = usb_dev_id[dev_index].private;
-#ifdef	PEGASUS_USE_INTR
 	get_interrupt_interval(pegasus);
-#endif
 	if (reset_mac(pegasus)) {
 		err("can't reset MAC");
 		unregister_netdev(pegasus->net);
-		usb_free_urb(pegasus->tx_urb);
-		usb_free_urb(pegasus->rx_urb);
-		usb_free_urb(pegasus->ctrl_urb);
+		free_all_urbs(pegasus);
 		kfree(pegasus->net);
 		kfree(pegasus);
 		pegasus = NULL;
 		goto exit;
 	}
-
-	info("%s: %s", net->name, usb_dev_id[dev_index].name);
-
 	set_ethernet_addr(pegasus);
-
+	fill_skb_pool(pegasus);
+	printk("%s: %s\n", net->name, usb_dev_id[dev_index].name);
 	if (pegasus->features & PEGASUS_II) {
 		info("setup Pegasus II specific registers");
 		setup_pegasus_II(pegasus);
 	}
-
 	pegasus->phy = mii_phy_probe(pegasus);
 	if (pegasus->phy == 0xff) {
 		warn("can't locate MII phy, using default");
@@ -1087,14 +1137,9 @@ static void pegasus_disconnect(struct usb_device *dev, void *ptr)
 	pegasus->flags |= PEGASUS_UNPLUG;
 	unregister_netdev(pegasus->net);
 	usb_put_dev(dev);
-	usb_unlink_urb(pegasus->intr_urb);
-	usb_unlink_urb(pegasus->tx_urb);
-	usb_unlink_urb(pegasus->rx_urb);
-	usb_unlink_urb(pegasus->ctrl_urb);
-	usb_free_urb(pegasus->intr_urb);
-	usb_free_urb(pegasus->tx_urb);
-	usb_free_urb(pegasus->rx_urb);
-	usb_free_urb(pegasus->ctrl_urb);
+	unlink_all_urbs(pegasus);
+	free_all_urbs(pegasus);
+	free_skb_pool(pegasus);
 	if (pegasus->rx_skb)
 		dev_kfree_skb(pegasus->rx_skb);
 	kfree(pegasus->net);

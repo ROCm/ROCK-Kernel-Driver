@@ -19,8 +19,9 @@
 #include <linux/pagemap.h>
 #include <linux/writeback.h>
 #include <linux/init.h>
-#include <linux/sysrq.h>
+//#include <linux/sysrq.h>
 #include <linux/backing-dev.h>
+#include <linux/mpage.h>
 
 /*
  * The maximum number of pages to writeout in a single bdflush/kupdate
@@ -47,6 +48,8 @@
 #define SYNC_WRITEBACK_PAGES	1500
 
 
+/* The following parameters are exported via /proc/sys/vm */
+
 /*
  * Dirty memory thresholds, in percentages
  */
@@ -67,14 +70,17 @@ int dirty_async_ratio = 50;
 int dirty_sync_ratio = 60;
 
 /*
- * The interval between `kupdate'-style writebacks.
+ * The interval between `kupdate'-style writebacks, in centiseconds
+ * (hundredths of a second)
  */
 int dirty_writeback_centisecs = 5 * 100;
 
 /*
- * The largest amount of time for which data is allowed to remain dirty
+ * The longest amount of time for which data is allowed to remain dirty
  */
 int dirty_expire_centisecs = 30 * 100;
+
+/* End of sysctl-exported parameters */
 
 
 static void background_writeout(unsigned long _min_pages);
@@ -233,7 +239,8 @@ static void wb_kupdate(unsigned long arg)
 static void wb_timer_fn(unsigned long unused)
 {
 	if (pdflush_operation(wb_kupdate, 0) < 0)
-		mod_timer(&wb_timer, jiffies + HZ);
+		mod_timer(&wb_timer, jiffies + HZ); /* delay 1 second */
+
 }
 
 static int __init wb_timer_init(void)
@@ -307,108 +314,9 @@ int generic_vm_writeback(struct page *page, int *nr_to_write)
 }
 EXPORT_SYMBOL(generic_vm_writeback);
 
-/**
- * generic_writepages - walk the list of dirty pages of the given
- * address space and writepage() all of them.
- * 
- * @mapping: address space structure to write
- * @nr_to_write: subtract the number of written pages from *@nr_to_write
- *
- * This is a library function, which implements the writepages()
- * address_space_operation.
- *
- * (The next two paragraphs refer to code which isn't here yet, but they
- *  explain the presence of address_space.io_pages)
- *
- * Pages can be moved from clean_pages or locked_pages onto dirty_pages
- * at any time - it's not possible to lock against that.  So pages which
- * have already been added to a BIO may magically reappear on the dirty_pages
- * list.  And generic_writepages() will again try to lock those pages.
- * But I/O has not yet been started against the page.  Thus deadlock.
- *
- * To avoid this, the entire contents of the dirty_pages list are moved
- * onto io_pages up-front.  We then walk io_pages, locking the
- * pages and submitting them for I/O, moving them to locked_pages.
- *
- * This has the added benefit of preventing a livelock which would otherwise
- * occur if pages are being dirtied faster than we can write them out.
- *
- * If a page is already under I/O, generic_writepages() skips it, even
- * if it's dirty.  This is desirable behaviour for memory-cleaning writeback,
- * but it is INCORRECT for data-integrity system calls such as fsync().  fsync()
- * and msync() need to guarentee that all the data which was dirty at the time
- * the call was made get new I/O started against them.  The way to do this is
- * to run filemap_fdatawait() before calling filemap_fdatawrite().
- *
- * It's fairly rare for PageWriteback pages to be on ->dirty_pages.  It
- * means that someone redirtied the page while it was under I/O.
- */
 int generic_writepages(struct address_space *mapping, int *nr_to_write)
 {
-	int (*writepage)(struct page *) = mapping->a_ops->writepage;
-	int ret = 0;
-	int done = 0;
-	int err;
-
-	write_lock(&mapping->page_lock);
-
-	list_splice(&mapping->dirty_pages, &mapping->io_pages);
-	INIT_LIST_HEAD(&mapping->dirty_pages);
-
-        while (!list_empty(&mapping->io_pages) && !done) {
-		struct page *page = list_entry(mapping->io_pages.prev,
-					struct page, list);
-		list_del(&page->list);
-		if (PageWriteback(page)) {
-			if (PageDirty(page)) {
-				list_add(&page->list, &mapping->dirty_pages);
-				continue;
-			}
-			list_add(&page->list, &mapping->locked_pages);
-			continue;
-		}
-		if (!PageDirty(page)) {
-			list_add(&page->list, &mapping->clean_pages);
-			continue;
-		}
-		list_add(&page->list, &mapping->locked_pages);
-		page_cache_get(page);
-		write_unlock(&mapping->page_lock);
-		lock_page(page);
-
-		/* It may have been removed from swapcache: check ->mapping */
-		if (page->mapping && TestClearPageDirty(page) &&
-					!PageWriteback(page)) {
-			/* FIXME: batch this up */
-			if (!PageActive(page) && PageLRU(page)) {
-				spin_lock(&pagemap_lru_lock);
-				if (!PageActive(page) && PageLRU(page)) {
-					list_del(&page->lru);
-					list_add(&page->lru, &inactive_list);
-				}
-				spin_unlock(&pagemap_lru_lock);
-			}
-			err = writepage(page);
-			if (!ret)
-				ret = err;
-			if (nr_to_write && --(*nr_to_write) <= 0)
-				done = 1;
-		} else {
-			unlock_page(page);
-		}
-
-		page_cache_release(page);
-		write_lock(&mapping->page_lock);
-	}
-	if (!list_empty(&mapping->io_pages)) {
-		/*
-		 * Put the rest back, in the correct order.
-		 */
-		list_splice(&mapping->io_pages, mapping->dirty_pages.prev);
-		INIT_LIST_HEAD(&mapping->io_pages);
-	}
-	write_unlock(&mapping->page_lock);
-	return ret;
+	return mpage_writepages(mapping, nr_to_write, NULL);
 }
 EXPORT_SYMBOL(generic_writepages);
 

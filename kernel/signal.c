@@ -779,8 +779,8 @@ void do_notify_parent(struct task_struct *tsk, int sig)
 	info.si_uid = tsk->uid;
 
 	/* FIXME: find out whether or not this is supposed to be c*time. */
-	info.si_utime = tsk->times.tms_utime;
-	info.si_stime = tsk->times.tms_stime;
+	info.si_utime = tsk->utime;
+	info.si_stime = tsk->stime;
 
 	status = tsk->exit_code & 0x7f;
 	why = SI_KERNEL;	/* shouldn't happen */

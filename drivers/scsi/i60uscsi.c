@@ -66,12 +66,24 @@
  * 12/19/98 bv - v1.02a Use spinlocks for 2.1.95 and up
  * 01/31/99 bv - v1.02b Use mdelay instead of waitForPause
  * 08/08/99 bv - v1.02c Use waitForPause again.
+ * 06/25/02 Doug Ledford <dledford@redhat.com> - v1.02d
+ *          - Remove limit on number of controllers
+ *          - Port to DMA mapping API
+ *          - Clean up interrupt handler registration
+ *          - Fix memory leaks
+ *          - Fix allocation of scsi host structs and private data
  **************************************************************************/
 
 #include <linux/version.h>
-#include <linux/jiffies.h>
+#include <linux/module.h>
+#include <asm/irq.h>
+#include <linux/pci.h>
+#include <linux/delay.h>
 #include <asm/io.h>
-#include "i60uscsi.h"
+#include <linux/blkdev.h>
+#include "scsi.h"
+#include "hosts.h"
+#include "inia100.h"
 
 #define JIFFIES_TO_MS(t) ((t) * 1000 / HZ)
 #define MS_TO_JIFFIES(j) ((j * HZ) / 1000)
@@ -98,10 +110,7 @@ ORC_SCB *orc_alloc_scb(ORC_HCS * hcsp);
 extern void inia100SCBPost(BYTE * pHcb, BYTE * pScb);
 
 /* ---- INTERNAL VARIABLES ---- */
-ORC_HCS orc_hcs[MAX_SUPPORTED_ADAPTERS];
-static INIA100_ADPT_STRUCT inia100_adpt[MAX_SUPPORTED_ADAPTERS];
-/* set by inia100_setup according to the command line */
-int orc_num_scb;
+struct inia100_Adpt_Struc *inia100_adpt;
 
 NVRAM nvram, *nvramp = &nvram;
 static UCHAR dftNvRam[64] =
@@ -300,7 +309,7 @@ UCHAR get_NVRAM(ORC_HCS * hcsp, unsigned char address, unsigned char *pDataIn)
 /***************************************************************************/
 void orc_exec_scb(ORC_HCS * hcsp, ORC_SCB * scbp)
 {
-	scbp->SCB_Status = SCB_POST;
+	scbp->SCB_Status = ORCSCB_POST;
 	ORC_WR(hcsp->HCS_Base + ORC_PQUEUE, scbp->SCB_ScbIdx);
 	return;
 }
@@ -439,17 +448,11 @@ void setup_SCBs(ORC_HCS * hcsp)
 {
 	ORC_SCB *pVirScb;
 	int i;
-	UCHAR j;
 	ESCB *pVirEscb;
-	PVOID pPhysEscb;
-	PVOID tPhysEscb;
+	dma_addr_t pPhysEscb;
 
-	j = 0;
-	pVirScb = NULL;
-	tPhysEscb = (PVOID) NULL;
-	pPhysEscb = (PVOID) NULL;
 	/* Setup SCB HCS_Base and SCB Size registers */
-	ORC_WR(hcsp->HCS_Base + ORC_SCBSIZE, orc_num_scb);	/* Total number of SCBs */
+	ORC_WR(hcsp->HCS_Base + ORC_SCBSIZE, ORC_MAXQUEUE);	/* Total number of SCBs */
 	/* SCB HCS_Base address 0      */
 	ORC_WRLONG(hcsp->HCS_Base + ORC_SCBBASE0, hcsp->HCS_physScbArray);
 	/* SCB HCS_Base address 1      */
@@ -459,8 +462,8 @@ void setup_SCBs(ORC_HCS * hcsp)
 	pVirScb = (ORC_SCB *) hcsp->HCS_virScbArray;
 	pVirEscb = (ESCB *) hcsp->HCS_virEscbArray;
 
-	for (i = 0; i < orc_num_scb; i++) {
-		pPhysEscb = (PVOID) (hcsp->HCS_physEscbArray + (sizeof(ESCB) * i));
+	for (i = 0; i < ORC_MAXQUEUE; i++) {
+		pPhysEscb = (hcsp->HCS_physEscbArray + (sizeof(ESCB) * i));
 		pVirScb->SCB_SGPAddr = (U32) pPhysEscb;
 		pVirScb->SCB_SensePAddr = (U32) pPhysEscb;
 		pVirScb->SCB_EScb = pVirEscb;
@@ -534,7 +537,7 @@ int init_orchid(ORC_HCS * hcsp)
 	readBytep = (UCHAR *) & (nvramp->Target00Config);
 	for (i = 0; i < 16; readBytep++, i++) {
 		hcsp->TargetFlag[i] = *readBytep;
-		hcsp->MaximumTags[i] = orc_num_scb;
+		hcsp->MaximumTags[i] = ORC_MAXTAGS;
 	}			/* for                          */
 
 	if (nvramp->SCSI0Config & NCC_BUSRESET) {	/* Reset SCSI bus               */
@@ -578,7 +581,7 @@ int orc_reset_scsi_bus(ORC_HCS * pHCB)
  Output         : None.
  Return         : pSRB  -       Pointer to SCSI request block.
 *****************************************************************************/
-int orc_device_reset(ORC_HCS * pHCB, ULONG SCpnt, unsigned int target, unsigned int ResetFlags)
+int orc_device_reset(ORC_HCS * pHCB, Scsi_Cmnd *SCpnt, unsigned int target, unsigned int ResetFlags)
 {				/* I need Host Control Block Information */
 	ORC_SCB *pScb;
 	ESCB *pVirEscb;
@@ -595,14 +598,14 @@ int orc_device_reset(ORC_HCS * pHCB, ULONG SCpnt, unsigned int target, unsigned 
 
 	initAFlag(pHCB);
 	/* device reset */
-	for (i = 0; i < orc_num_scb; i++) {
+	for (i = 0; i < ORC_MAXQUEUE; i++) {
 		pVirEscb = pVirScb->SCB_EScb;
-		if ((pVirScb->SCB_Status) && (pVirEscb->SCB_Srb == (unsigned char *) SCpnt))
+		if ((pVirScb->SCB_Status) && (pVirEscb->SCB_Srb == SCpnt))
 			break;
 		pVirScb++;
 	}
 
-	if (i == orc_num_scb) {
+	if (i == ORC_MAXQUEUE) {
 		printk("Unable to Reset - No SCB Found\n");
 		spin_unlock_irqrestore(&(pHCB->BitAllocFlagLock), flags);
 		return (SCSI_RESET_NOT_RUNNING);
@@ -624,7 +627,7 @@ int orc_device_reset(ORC_HCS * pHCB, ULONG SCpnt, unsigned int target, unsigned 
 
 	pVirEscb->SCB_Srb = 0;
 	if (ResetFlags & SCSI_RESET_SYNCHRONOUS) {
-		pVirEscb->SCB_Srb = (unsigned char *) SCpnt;
+		pVirEscb->SCB_Srb = SCpnt;
 	}
 	orc_exec_scb(pHCB, pScb);	/* Start execute SCB            */
 	spin_unlock_irqrestore(&(pHCB->BitAllocFlagLock), flags);
@@ -640,7 +643,6 @@ ORC_SCB *__orc_alloc_scb(ORC_HCS * hcsp)
 	ULONG idx;
 	UCHAR index;
 	UCHAR i;
-	ULONG flags;
 
 	Ch = hcsp->HCS_Index;
 	for (i = 0; i < 8; i++) {
@@ -687,6 +689,22 @@ void orc_release_scb(ORC_HCS * hcsp, ORC_SCB * scbp)
 }
 
 
+/***************************************************************************/
+void orc_release_dma(ORC_HCS * hcsp, Scsi_Cmnd * SCpnt)
+{
+	struct scatterlist *pSrbSG;
+
+	if (SCpnt->use_sg) {
+		pSrbSG = (struct scatterlist *)SCpnt->request_buffer;
+		pci_unmap_sg(hcsp->pdev, pSrbSG, SCpnt->use_sg,
+			scsi_to_pci_dma_dir(SCpnt->sc_data_direction));
+	} else if (SCpnt->request_bufflen != 0) {
+		pci_unmap_single(hcsp->pdev, (U32)SCpnt->host_scribble,
+			SCpnt->request_bufflen,
+			scsi_to_pci_dma_dir(SCpnt->sc_data_direction));
+	}
+}
+
 /*****************************************************************************
  Function name	: Addinia100_into_Adapter_table
  Description	: This function will scan PCI bus to get all Orchid card
@@ -695,33 +713,29 @@ void orc_release_scb(ORC_HCS * hcsp, ORC_SCB * scbp)
  Return		: SUCCESSFUL	- Successful scan
  ohterwise	- No drives founded
 *****************************************************************************/
-int Addinia100_into_Adapter_table(WORD wBIOS, WORD wBASE, BYTE bInterrupt,
-				  BYTE bBus, BYTE bDevice)
+int Addinia100_into_Adapter_table(WORD wBIOS, WORD wBASE, struct pci_dev *pdev,
+		int iAdapters)
 {
 	unsigned int i, j;
 
-	for (i = 0; i < MAX_SUPPORTED_ADAPTERS; i++) {
+	for (i = 0; i < iAdapters; i++) {
 		if (inia100_adpt[i].ADPT_BIOS < wBIOS)
 			continue;
 		if (inia100_adpt[i].ADPT_BIOS == wBIOS) {
 			if (inia100_adpt[i].ADPT_BASE == wBASE) {
-				if (inia100_adpt[i].ADPT_Bus != 0xFF)
+				if (inia100_adpt[i].ADPT_pdev->bus->number != 0xFF)
 					return (FAILURE);
 			} else if (inia100_adpt[i].ADPT_BASE < wBASE)
 				continue;
 		}
-		for (j = MAX_SUPPORTED_ADAPTERS - 1; j > i; j--) {
+		for (j = iAdapters - 1; j > i; j--) {
 			inia100_adpt[j].ADPT_BASE = inia100_adpt[j - 1].ADPT_BASE;
-			inia100_adpt[j].ADPT_INTR = inia100_adpt[j - 1].ADPT_INTR;
 			inia100_adpt[j].ADPT_BIOS = inia100_adpt[j - 1].ADPT_BIOS;
-			inia100_adpt[j].ADPT_Bus = inia100_adpt[j - 1].ADPT_Bus;
-			inia100_adpt[j].ADPT_Device = inia100_adpt[j - 1].ADPT_Device;
+			inia100_adpt[j].ADPT_pdev = inia100_adpt[j - 1].ADPT_pdev;
 		}
 		inia100_adpt[i].ADPT_BASE = wBASE;
-		inia100_adpt[i].ADPT_INTR = bInterrupt;
 		inia100_adpt[i].ADPT_BIOS = wBIOS;
-		inia100_adpt[i].ADPT_Bus = bBus;
-		inia100_adpt[i].ADPT_Device = bDevice;
+		inia100_adpt[i].ADPT_pdev = pdev;
 		return (SUCCESSFUL);
 	}
 	return (FAILURE);
@@ -733,20 +747,23 @@ int Addinia100_into_Adapter_table(WORD wBIOS, WORD wBASE, BYTE bInterrupt,
  Description	: This function will scan PCI bus to get all Orchid card
  Input		: None.
  Output		: None.
- Return		: SUCCESSFUL	- Successful scan
- ohterwise	- No drives founded
+ Return		: 0 on success, 1 on failure
 *****************************************************************************/
-void init_inia100Adapter_table(void)
+int init_inia100Adapter_table(int iAdapters)
 {
 	int i;
 
-	for (i = 0; i < MAX_SUPPORTED_ADAPTERS; i++) {	/* Initialize adapter structure */
+	inia100_adpt = kmalloc(sizeof(INIA100_ADPT_STRUCT) * iAdapters,
+			GFP_KERNEL);
+	if(inia100_adpt == NULL)
+		return 1;
+
+	for (i = 0; i < iAdapters; i++) {/* Initialize adapter structure */
 		inia100_adpt[i].ADPT_BIOS = 0xffff;
 		inia100_adpt[i].ADPT_BASE = 0xffff;
-		inia100_adpt[i].ADPT_INTR = 0xff;
-		inia100_adpt[i].ADPT_Bus = 0xff;
-		inia100_adpt[i].ADPT_Device = 0xff;
+		inia100_adpt[i].ADPT_pdev = NULL;
 	}
+	return 0;
 }
 
 /*****************************************************************************
@@ -760,7 +777,7 @@ void get_orcPCIConfig(ORC_HCS * pCurHcb, int ch_idx)
 {
 	pCurHcb->HCS_Base = inia100_adpt[ch_idx].ADPT_BASE;	/* Supply base address  */
 	pCurHcb->HCS_BIOS = inia100_adpt[ch_idx].ADPT_BIOS;	/* Supply BIOS address  */
-	pCurHcb->HCS_Intr = inia100_adpt[ch_idx].ADPT_INTR;	/* Supply interrupt line */
+	pCurHcb->HCS_Intr = inia100_adpt[ch_idx].ADPT_pdev->irq;	/* Supply interrupt line */
 	return;
 }
 
@@ -805,7 +822,7 @@ int abort_SCB(ORC_HCS * hcsp, ORC_SCB * pScb)
  Output         : None.
  Return         : pSRB  -       Pointer to SCSI request block.
 *****************************************************************************/
-int orc_abort_srb(ORC_HCS * hcsp, ULONG SCpnt)
+int orc_abort_srb(ORC_HCS * hcsp, Scsi_Cmnd *SCpnt)
 {
 	ESCB *pVirEscb;
 	ORC_SCB *pVirScb;
@@ -816,9 +833,9 @@ int orc_abort_srb(ORC_HCS * hcsp, ULONG SCpnt)
 
 	pVirScb = (ORC_SCB *) hcsp->HCS_virScbArray;
 
-	for (i = 0; i < orc_num_scb; i++, pVirScb++) {
+	for (i = 0; i < ORC_MAXQUEUE; i++, pVirScb++) {
 		pVirEscb = pVirScb->SCB_EScb;
-		if ((pVirScb->SCB_Status) && (pVirEscb->SCB_Srb == (unsigned char *) SCpnt)) {
+		if ((pVirScb->SCB_Status) && (pVirEscb->SCB_Srb == SCpnt)) {
 			if (pVirScb->SCB_TagMsg == 0) {
 				spin_unlock_irqrestore(&(hcsp->BitAllocFlagLock), flags);
 				return (SCSI_ABORT_BUSY);

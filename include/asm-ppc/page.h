@@ -85,10 +85,12 @@ typedef unsigned long pgprot_t;
 /* to align the pointer to the (next) page boundary */
 #define PAGE_ALIGN(addr)	(((addr)+PAGE_SIZE-1)&PAGE_MASK)
 
+struct page;
 extern void clear_page(void *page);
 extern void copy_page(void *to, void *from);
-extern void clear_user_page(void *page, unsigned long vaddr);
-extern void copy_user_page(void *to, void *from, unsigned long vaddr);
+extern void clear_user_page(void *page, unsigned long vaddr, struct page *pg);
+extern void copy_user_page(void *to, void *from, unsigned long vaddr,
+			   struct page *pg);
 
 #ifndef CONFIG_APUS
 #define PPC_MEMSTART	0

@@ -25,25 +25,44 @@ SVGA_MODE := -DSVGA_MODE=NORMAL_VGA
 
 #RAMDISK := -DRAMDISK=512
 
+EXTRA_TARGETS	:= vmlinux.bin bvmlinux.bin bootsect bootsect.o \
+		   setup setup.o zImage bzImage
+
+host-progs	:= tools/build
+
+# 	Default
+
+boot: bzImage
+
+include $(TOPDIR)/Rules.make
+
 # ---------------------------------------------------------------------------
 
-BOOT_INCL =	$(TOPDIR)/include/linux/config.h \
-		$(TOPDIR)/include/linux/autoconf.h \
-		$(TOPDIR)/include/asm/boot.h
+zImage:  IMAGE_OFFSET := 0x1000
+zImage:  EXTRA_AFLAGS := -traditional $(SVGA_MODE) $(RAMDISK)
+bzImage: IMAGE_OFFSET := 0x100000
+bzImage: EXTRA_AFLAGS := -traditional $(SVGA_MODE) $(RAMDISK) -D__BIG_KERNEL__
+bzImage: BUILDFLAGS   := -b
 
-zImage: bootsect setup compressed/vmlinux tools/build
-	$(OBJCOPY) compressed/vmlinux compressed/vmlinux.out
-	tools/build bootsect setup compressed/vmlinux.out $(ROOT_DEV) > zImage
+quiet_cmd_image = BUILD  $(RELDIR)/$@
+cmd_image = tools/build $(BUILDFLAGS) bootsect setup vmlinux.bin \
+			$(ROOT_DEV) > $@
 
-bzImage: bbootsect bsetup compressed/bvmlinux tools/build
-	$(OBJCOPY) compressed/bvmlinux compressed/bvmlinux.out
-	tools/build -b bbootsect bsetup compressed/bvmlinux.out $(ROOT_DEV) > bzImage
+zImage bzImage: bootsect setup vmlinux.bin tools/build FORCE
+	$(call if_changed,image)
 
-compressed/vmlinux: $(TOPDIR)/vmlinux
-	@$(MAKE) -C compressed vmlinux
+vmlinux.bin: compressed/vmlinux FORCE
+	$(call if_changed,objcopy)
 
-compressed/bvmlinux: $(TOPDIR)/vmlinux
-	@$(MAKE) -C compressed bvmlinux
+LDFLAGS_bootsect := -Ttext 0x0 -s --oformat binary
+LDFLAGS_setup	 := -Ttext 0x0 -s --oformat binary -e begtext
+
+setup bootsect: %: %.o FORCE
+	$(call if_changed,ld)
+
+compressed/vmlinux: FORCE
+	@$(MAKE) IMAGE_OFFSET=$(IMAGE_OFFSET) -C compressed vmlinux
+
 
 zdisk: $(BOOTIMAGE)
 	dd bs=8192 if=$(BOOTIMAGE) of=/dev/fd0
@@ -58,48 +77,17 @@ zlilo: $(BOOTIMAGE)
 install: $(BOOTIMAGE)
 	sh -x ./install.sh $(KERNELRELEASE) $(BOOTIMAGE) $(TOPDIR)/System.map "$(INSTALL_PATH)"
 
-tools/build: tools/build.c
-	$(HOSTCC) $(HOSTCFLAGS) -o $@ $< -I$(TOPDIR)/include
-
-bootsect: bootsect.o
-	$(LD) -Ttext 0x0 -s --oformat binary -o $@ $<
-
-bootsect.o: bootsect.s
-	$(AS) -o $@ $<
-
-bootsect.s: bootsect.S Makefile $(BOOT_INCL)
-	$(CPP) $(CPPFLAGS) -traditional $(SVGA_MODE) $(RAMDISK) $< -o $@
-
-bbootsect: bbootsect.o
-	$(LD) -Ttext 0x0 -s --oformat binary $< -o $@
-
-bbootsect.o: bbootsect.s
-	$(AS) -o $@ $<
-
-bbootsect.s: bootsect.S Makefile $(BOOT_INCL)
-	$(CPP) $(CPPFLAGS) -D__BIG_KERNEL__ -traditional $(SVGA_MODE) $(RAMDISK) $< -o $@
-
-setup: setup.o
-	$(LD) -Ttext 0x0 -s --oformat binary -e begtext -o $@ $<
-
-setup.o: setup.s
-	$(AS) -o $@ $<
-
-setup.s: setup.S video.S Makefile $(BOOT_INCL) $(TOPDIR)/include/linux/version.h $(TOPDIR)/include/linux/compile.h
-	$(CPP) $(CPPFLAGS) -D__ASSEMBLY__ -traditional $(SVGA_MODE) $(RAMDISK) $< -o $@
-
-bsetup: bsetup.o
-	$(LD) -Ttext 0x0 -s --oformat binary -e begtext -o $@ $<
-
-bsetup.o: bsetup.s
-	$(AS) -o $@ $<
-
-bsetup.s: setup.S video.S Makefile $(BOOT_INCL) $(TOPDIR)/include/linux/version.h $(TOPDIR)/include/linux/compile.h
-	$(CPP) $(CPPFLAGS) -D__BIG_KERNEL__ -D__ASSEMBLY__ -traditional $(SVGA_MODE) $(RAMDISK) $< -o $@
-
 clean:
 	@echo 'Cleaning up (boot)'
-	@rm -f tools/build
+	@rm -f tools/build vmlinux.bin bvmlinux.bin
 	@rm -f setup bootsect zImage compressed/vmlinux.out
 	@rm -f bsetup bbootsect bzImage compressed/bvmlinux.out
 	@$(MAKE) -C compressed clean
+
+archhelp:
+	@echo  '* bzImage	- Compressed kernel image (arch/$(ARCH)/boot/bzImage)'
+	@echo  '  install	- Install kernel using'
+	@echo  '                  (your) ~/bin/installkernel or'
+	@echo  '                  (distribution) /sbin/installkernel or'
+	@echo  '        	  install to $$(INSTALL_PATH) and run lilo'
+

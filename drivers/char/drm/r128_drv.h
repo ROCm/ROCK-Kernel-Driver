@@ -34,8 +34,8 @@
 #ifndef __R128_DRV_H__
 #define __R128_DRV_H__
 
-#define GET_RING_HEAD( ring )		le32_to_cpu( *(ring)->head )
-#define SET_RING_HEAD( ring, val )	*(ring)->head = cpu_to_le32( val )
+#define GET_RING_HEAD(ring)		readl( (volatile u32 *) (ring)->head )
+#define SET_RING_HEAD(ring,val)		writel( (val), (volatile u32 *) (ring)->head )
 
 typedef struct drm_r128_freelist {
    	unsigned int age;
@@ -384,44 +384,11 @@ extern int r128_cce_indirect( struct inode *inode, struct file *filp,
 #define R128_BASE(reg)		((unsigned long)(dev_priv->mmio->handle))
 #define R128_ADDR(reg)		(R128_BASE( reg ) + reg)
 
-#define R128_DEREF(reg)		*(volatile u32 *)R128_ADDR( reg )
-#ifdef __alpha__
-#define R128_READ(reg)		(_R128_READ((u32 *)R128_ADDR(reg)))
-static inline u32 _R128_READ(u32 *addr)
-{
-	mb();
-	return *(volatile u32 *)addr;
-}
-#define R128_WRITE(reg,val)						\
-do {									\
-	wmb();								\
-	R128_DEREF(reg) = val;						\
-} while (0)
-#else
-#define R128_READ(reg)		le32_to_cpu( R128_DEREF( reg ) )
-#define R128_WRITE(reg,val)						\
-do {									\
-	R128_DEREF( reg ) = cpu_to_le32( val );				\
-} while (0)
-#endif
+#define R128_READ(reg)		readl( (volatile u32 *) R128_ADDR(reg) )
+#define R128_WRITE(reg,val)	writel( (val), (volatile u32 *) R128_ADDR(reg) )
 
-#define R128_DEREF8(reg)	*(volatile u8 *)R128_ADDR( reg )
-#ifdef __alpha__
-#define R128_READ8(reg)		_R128_READ8((u8 *)R128_ADDR(reg))
-static inline u8 _R128_READ8(u8 *addr)
-{
-	mb();
-	return *(volatile u8 *)addr;
-}
-#define R128_WRITE8(reg,val)						\
-do {									\
-	wmb();								\
-	R128_DEREF8(reg) = val;						\
-} while (0)
-#else
-#define R128_READ8(reg)		R128_DEREF8( reg )
-#define R128_WRITE8(reg,val)	do { R128_DEREF8( reg ) = val; } while (0)
-#endif
+#define R128_READ8(reg)		readb( (volatile u8 *) R128_ADDR(reg) )
+#define R128_WRITE8(reg,val)	writeb( (val), (volatile u8 *) R128_ADDR(reg) )
 
 #define R128_WRITE_PLL(addr,val)					\
 do {									\
@@ -493,7 +460,11 @@ do {									\
  * Ring control
  */
 
+#if defined(__powerpc__)
+#define r128_flush_write_combine()	(void) GET_RING_HEAD( &dev_priv->ring )
+#else
 #define r128_flush_write_combine()	mb()
+#endif
 
 
 #define R128_VERBOSE	0

@@ -237,8 +237,7 @@ int freeze_processes(void)
 			todo++;
 		}
 		read_unlock(&tasklist_lock);
-		sys_sched_yield();
-		schedule();
+		yield();
 		if (time_after(jiffies, start_time + TIMEOUT)) {
 			PRINTK( "\n" );
 			printk(KERN_ERR " stopping tasks failed (%d tasks remaining)\n", todo );

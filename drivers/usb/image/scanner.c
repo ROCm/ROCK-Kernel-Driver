@@ -971,17 +971,11 @@ probe_scanner(struct usb_device *dev, unsigned int ifnum,
 	
 	down(&scn_mutex);
 
-	retval = usb_register_dev(&scanner_driver, 1, &scn_minor);
+	retval = usb_register_dev(&usb_scanner_fops, SCN_BASE_MNR, 1, &scn_minor);
 	if (retval) {
-		if (retval != -ENODEV) {
-			err ("Not able to get a minor for this device.");
-			up(&scn_mutex);
-			return NULL;
-		}
-		for (scn_minor = 0; scn_minor < SCN_MAX_MNR; scn_minor++) {
-			if (!p_scn_table[scn_minor])
-				break;
-		}
+		err ("Not able to get a minor for this device.");
+		up(&scn_mutex);
+		return NULL;
 	}
 
 /* Check to make sure that the last slot isn't already taken */
@@ -1112,7 +1106,7 @@ disconnect_scanner(struct usb_device *dev, void *ptr)
 
 	dbg("disconnect_scanner: De-allocating minor:%d", scn->scn_minor);
 	devfs_unregister(scn->devfs);
-	usb_deregister_dev(&scanner_driver, 1, scn->scn_minor);
+	usb_deregister_dev(1, scn->scn_minor);
 	p_scn_table[scn->scn_minor] = NULL;
 	usb_free_urb(scn->scn_irq);
 	up (&(scn->sem));
@@ -1125,9 +1119,6 @@ usb_driver scanner_driver = {
 	name:		"usbscanner",
 	probe:		probe_scanner,
 	disconnect:	disconnect_scanner,
-	fops:		&usb_scanner_fops,
-	minor:		SCN_BASE_MNR,
-	num_minors:	SCN_MAX_MNR,
 	id_table:	NULL, /* This would be scanner_device_ids, but we
 				 need to check every USB device, in case
 				 we match a user defined vendor/product ID. */

@@ -1102,7 +1102,7 @@ int lmLogOpen(struct super_block *sb, log_t ** logptr)
 	 */
       externalLog:
 
-	if (!(bdev = bdget(kdev_t_to_nr(JFS_SBI(sb)->logdev)))) {
+	if (!(bdev = bdget(JFS_SBI(sb)->logdev))) {
 		rc = ENODEV;
 		goto free;
 	}

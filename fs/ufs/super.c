@@ -959,6 +959,8 @@ int ufs_statfs (struct super_block * sb, struct statfs * buf)
 	struct ufs_sb_private_info * uspi;
 	struct ufs_super_block_first * usb1;
 
+	lock_kernel();
+
 	uspi = sb->u.ufs_sb.s_uspi;
 	usb1 = ubh_get_usb_first (USPI_UBH);
 	
@@ -972,6 +974,9 @@ int ufs_statfs (struct super_block * sb, struct statfs * buf)
 	buf->f_files = uspi->s_ncg * uspi->s_ipg;
 	buf->f_ffree = fs32_to_cpu(sb, usb1->fs_cstotal.cs_nifree);
 	buf->f_namelen = UFS_MAXNAMLEN;
+
+	unlock_kernel();
+
 	return 0;
 }
 

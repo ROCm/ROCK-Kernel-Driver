@@ -54,16 +54,36 @@ EXPORT_SYMBOL(gameport_cooked_read);
 static struct gameport *gameport_list;
 static struct gameport_dev *gameport_dev;
 
+
+#ifdef __i386__
+
+#define DELTA(x,y)      ((y)-(x)+((y)<(x)?1193180/HZ:0))
+#define GET_TIME(x)     do { x = get_time_pit(); } while (0)
+
+static unsigned int get_time_pit(void)
+{
+	extern spinlock_t i8253_lock;
+	unsigned long flags;
+	unsigned int count;
+
+	spin_lock_irqsave(&i8253_lock, flags);
+	outb_p(0x00, 0x43);
+	count = inb_p(0x40);
+	count |= inb_p(0x40) << 8;
+	spin_unlock_irqrestore(&i8253_lock, flags);
+
+	return count;
+}
+
+#endif
+
 /*
  * gameport_measure_speed() measures the gameport i/o speed.
  */
 
 static int gameport_measure_speed(struct gameport *gameport)
 {
-#if defined(__i386__) || defined(__x86_64__)
-
-#define GET_TIME(x)     do { outb(0, 0x43); x = inb(0x40); x |= inb(0x40) << 8; } while (0)
-#define DELTA(x,y)      ((y)-(x)+((y)<(x)?1193180L/HZ:0))
+#ifdef __i386__
 
 	unsigned int i, t, t1, t2, t3, tx;
 	unsigned long flags;

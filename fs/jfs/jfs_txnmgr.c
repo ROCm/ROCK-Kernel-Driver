@@ -2975,10 +2975,7 @@ int jfs_sync(void)
 			}
 		}
 		/* Add anon_list2 back to anon_list */
-		if (!list_empty(&TxAnchor.anon_list2)) {
-			list_splice(&TxAnchor.anon_list2, &TxAnchor.anon_list);
-			INIT_LIST_HEAD(&TxAnchor.anon_list2);
-		}
+		list_splice_init(&TxAnchor.anon_list2, &TxAnchor.anon_list);
 		add_wait_queue(&jfs_sync_thread_wait, &wq);
 		set_current_state(TASK_INTERRUPTIBLE);
 		TXN_UNLOCK();

@@ -6,7 +6,7 @@ ToDo:
 	  user open()s a file with i_size > s_maxbytes? Should read_inode()
 	  truncate the visible i_size? Will the user just get -E2BIG (or
 	  whatever) on open()? Or will (s)he be able to open() but lseek() and
-	  read() will fail when s_maxbytes is reached? -> Investigate this!
+	  read() will fail when s_maxbytes is reached? -> Investigate this.
 	- Implement/allow non-resident index bitmaps in dir.c::ntfs_readdir()
 	  and then also consider initialized_size w.r.t. the bitmaps, etc.
 	- vcn_to_lcn() should somehow return the correct pointer within the
@@ -17,11 +17,78 @@ ToDo:
 	- Consider if ntfs_file_read_compressed_block() shouldn't be coping
 	  with initialized_size < data_size. I don't think it can happen but
 	  it requires more careful consideration.
-	- CLEANUP: Modularise and reuse code in aops.c. At the moment we have
-	  several copies of almost identicall functions and the functions are
-	  quite big. Modularising them a bit, e.g. a-la get_block(), will make
-	  them cleaner and make code reuse easier.
-	- Want to use dummy inodes for address space i/o.
+	- CLEANUP: At the moment we have two copies of almost identical
+	  functions in aops.c, can merge them once fake inode address space
+	  based attribute i/o is further developed.
+	- CLEANUP: Modularising code in aops.c a bit, e.g. a-la get_block(),
+	  will be cleaner and make code reuse easier.
+	- Modify ntfs_read_locked_inode() to return an error code and update
+	  callers, i.e. ntfs_iget(), to pass that error code up instead of just
+	  using -EIO.
+	- Enable NFS exporting of NTFS.
+	- Use fake inodes for address space i/o.
+
+2.0.14 - Run list merging code cleanup, minor locking changes, typo fixes.
+
+	- Change fs/ntfs/super.c::ntfs_statfs() to not rely on BKL by moving
+	  the locking out of super.c::get_nr_free_mft_records() and taking and
+	  dropping the mftbmp_lock rw_semaphore in ntfs_statfs() itself.
+	- Bring attribute run list merging code (fs/ntfs/attrib.c) in sync with
+	  current userspace ntfs library code. This means that if a merge
+	  fails the original run lists are always left unmodified instead of
+	  being silently corrupted.
+	- Misc typo fixes.
+
+2.0.13 - Use iget5_locked() in preparation for fake inodes and small cleanups.
+
+	- Remove nr_mft_bits and the now superfluous union with nr_mft_records
+	  from ntfs_volume structure.
+	- Remove nr_lcn_bits and the now superfluous union with nr_clusters
+	  from ntfs_volume structure.
+	- Use iget5_locked() and friends instead of conventional iget(). Wrap
+	  the call in fs/ntfs/inode.c::ntfs_iget() and update callers of iget()
+	  to use ntfs_iget(). Leave only one iget() call at mount time so we
+	  don't need an ntfs_iget_mount().
+	- Change fs/ntfs/inode.c::ntfs_new_extent_inode() to take mft_no as an
+	  additional argument.
+
+2.0.12 - Initial cleanup of address space operations following 2.0.11 changes.
+
+	- Merge fs/ntfs/aops.c::end_buffer_read_mst_async() and
+	  fs/ntfs/aops.c::end_buffer_read_file_async() into one function
+	  fs/ntfs/aops.c::end_buffer_read_attr_async() using NInoMstProtected()
+	  to determine whether to apply mst fixups or not.
+	- Above change allows merging fs/ntfs/aops.c::ntfs_file_read_block()
+	  and fs/ntfs/aops.c::ntfs_mst_readpage() into one function
+	  fs/ntfs/aops.c::ntfs_attr_read_block(). Also, create a tiny wrapper
+	  fs/ntfs/aops.c::ntfs_mst_readpage() to transform the parameters from
+	  the VFS readpage function prototype to the ntfs_attr_read_block()
+	  function prototype.
+
+2.0.11 - Initial preparations for fake inode based attribute i/o.
+
+	- Move definition of ntfs_inode_state_bits to fs/ntfs/inode.h and
+	  do some macro magic (adapted from include/linux/buffer_head.h) to
+	  expand all the helper functions NInoFoo(), NInoSetFoo(), and
+	  NInoClearFoo().
+	- Add new flag to ntfs_inode_state_bits: NI_Sparse.
+	- Add new fields to ntfs_inode structure to allow use of fake inodes
+	  for attribute i/o: type, name, name_len. Also add new state bits:
+	  NI_Attr, which, if set, indicates the inode is a fake inode, and
+	  NI_MstProtected, which, if set, indicates the attribute uses multi
+	  sector transfer protection, i.e. fixups need to be applied after
+	  reads and before/after writes.
+	- Rename fs/ntfs/inode.c::ntfs_{new,clear,destroy}_inode() to
+	  ntfs_{new,clear,destroy}_extent_inode() and update callers.
+	- Use ntfs_clear_extent_inode() in fs/ntfs/inode.c::__ntfs_clear_inode()
+	  instead of ntfs_destroy_extent_inode().
+	- Cleanup memory deallocations in {__,}ntfs_clear_{,big_}inode().
+	- Make all operations on ntfs inode state bits use the NIno* functions.
+	- Set up the new ntfs inode fields and state bits in
+	  fs/ntfs/inode.c::ntfs_read_inode() and add appropriate cleanup of
+	  allocated memory to __ntfs_clear_inode().
+	- Cleanup ntfs_inode structure a bit for better ordering of elements
+	  w.r.t. their size to allow better packing of the structure in memory.
 
 2.0.10 - There can only be 2^32 - 1 inodes on an NTFS volume.
 
@@ -38,7 +105,10 @@ ToDo:
 
 	- Change decompression engine to use a single buffer protected by a
 	  spin lock instead of per-CPU buffers. (Rusty Russell)
-	- Switch to using the new KM_BIO_SRC_IRQ for atomic kmaps. (Andrew
+	- Do not update cb_pos when handling a partial final page during
+	  decompression of a sparse compression block, as the value is later
+	  reset without being read/used. (Rusty Russell)
+	- Switch to using the new KM_BIO_SRC_IRQ for atomic kmap()s. (Andrew
 	  Morton)
 	- Change buffer size in ntfs_readdir()/ntfs_filldir() to use
 	  NLS_MAX_CHARSET_SIZE which makes the buffers almost 1kiB each but

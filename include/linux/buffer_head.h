@@ -121,7 +121,6 @@ BUFFER_FNS(Boundary, boundary)
 #define page_has_buffers(page)	PagePrivate(page)
 
 #define invalidate_buffers(dev)	__invalidate_buffers((dev), 0)
-#define destroy_buffers(dev)	__invalidate_buffers((dev), 1)
 
 
 /*
@@ -156,7 +155,6 @@ int sync_blockdev(struct block_device *bdev);
 void __wait_on_buffer(struct buffer_head *);
 void sleep_on_buffer(struct buffer_head *bh);
 void wake_up_buffer(struct buffer_head *bh);
-int fsync_dev(kdev_t);
 int fsync_bdev(struct block_device *);
 int fsync_super(struct super_block *);
 int fsync_no_super(struct block_device *);
@@ -164,7 +162,7 @@ struct buffer_head *__find_get_block(struct block_device *, sector_t, int);
 struct buffer_head * __getblk(struct block_device *, sector_t, int);
 void __brelse(struct buffer_head *);
 void __bforget(struct buffer_head *);
-struct buffer_head * __bread(struct block_device *, int, int);
+struct buffer_head *__bread(struct block_device *, sector_t block, int size);
 void wakeup_bdflush(void);
 struct buffer_head *alloc_buffer_head(void);
 void free_buffer_head(struct buffer_head * bh);
@@ -201,9 +199,9 @@ int generic_osync_inode(struct inode *, int);
  * inline definitions
  */
 
-static inline void get_bh(struct buffer_head * bh)
+static inline void get_bh(struct buffer_head *bh)
 {
-        atomic_inc(&(bh)->b_count);
+        atomic_inc(&bh->b_count);
 }
 
 static inline void put_bh(struct buffer_head *bh)
@@ -212,68 +210,49 @@ static inline void put_bh(struct buffer_head *bh)
         atomic_dec(&bh->b_count);
 }
 
-/*
- * If an error happens during the make_request, this function
- * has to be recalled. It marks the buffer as clean and not
- * uptodate, and it notifys the upper layer about the end
- * of the I/O.
- */
-static inline void buffer_IO_error(struct buffer_head * bh)
+static inline void brelse(struct buffer_head *bh)
 {
-	clear_buffer_dirty(bh);
-
-	/*
-	 * b_end_io has to clear the BH_Uptodate bitflag in the read error
-	 * case, however buffer contents are not necessarily bad if a
-	 * write fails
-	 */
-	bh->b_end_io(bh, buffer_uptodate(bh));
+	if (bh)
+		__brelse(bh);
 }
 
-
-static inline void brelse(struct buffer_head *buf)
+static inline void bforget(struct buffer_head *bh)
 {
-	if (buf)
-		__brelse(buf);
+	if (bh)
+		__bforget(bh);
 }
 
-static inline void bforget(struct buffer_head *buf)
-{
-	if (buf)
-		__bforget(buf);
-}
-
-static inline struct buffer_head * sb_bread(struct super_block *sb, int block)
+static inline struct buffer_head *sb_bread(struct super_block *sb, sector_t block)
 {
 	return __bread(sb->s_bdev, block, sb->s_blocksize);
 }
 
-static inline struct buffer_head * sb_getblk(struct super_block *sb, int block)
+static inline struct buffer_head *sb_getblk(struct super_block *sb, sector_t block)
 {
 	return __getblk(sb->s_bdev, block, sb->s_blocksize);
 }
 
 static inline struct buffer_head *
-sb_find_get_block(struct super_block *sb, int block)
+sb_find_get_block(struct super_block *sb, sector_t block)
 {
 	return __find_get_block(sb->s_bdev, block, sb->s_blocksize);
 }
 
 static inline void
-map_bh(struct buffer_head *bh, struct super_block *sb, int block)
+map_bh(struct buffer_head *bh, struct super_block *sb, sector_t block)
 {
 	set_buffer_mapped(bh);
 	bh->b_bdev = sb->s_bdev;
 	bh->b_blocknr = block;
 }
 
-static inline void wait_on_buffer(struct buffer_head * bh)
+static inline void wait_on_buffer(struct buffer_head *bh)
 {
 	if (buffer_locked(bh))
 		__wait_on_buffer(bh);
 }
 
-static inline void lock_buffer(struct buffer_head * bh)
+static inline void lock_buffer(struct buffer_head *bh)
 {
 	while (test_set_buffer_locked(bh))
 		__wait_on_buffer(bh);

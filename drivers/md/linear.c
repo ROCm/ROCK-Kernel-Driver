@@ -60,7 +60,6 @@ static int linear_run (mddev_t *mddev)
 			goto out;
 		}
 
-		disk->dev = rdev->dev;
 		disk->bdev = rdev->bdev;
 		atomic_inc(&rdev->bdev->bd_count);
 		disk->size = rdev->size;
@@ -163,7 +162,7 @@ static int linear_make_request (request_queue_t *q, struct bio *bio)
     
 	if (block >= (tmp_dev->size + tmp_dev->offset)
 				|| block < tmp_dev->offset) {
-		printk ("linear_make_request: Block %ld out of bounds on dev %s size %ld offset %ld\n", block, kdevname(tmp_dev->dev), tmp_dev->size, tmp_dev->offset);
+		printk ("linear_make_request: Block %ld out of bounds on dev %s size %ld offset %ld\n", block, bdevname(tmp_dev->bdev), tmp_dev->size, tmp_dev->offset);
 		bio_io_error(bio);
 		return 0;
 	}
@@ -186,11 +185,11 @@ static int linear_status (char *page, mddev_t *mddev)
 	for (j = 0; j < conf->nr_zones; j++)
 	{
 		sz += sprintf(page+sz, "[%s",
-			partition_name(conf->hash_table[j].dev0->dev));
+			bdev_partition_name(conf->hash_table[j].dev0->bdev));
 
 		if (conf->hash_table[j].dev1)
 			sz += sprintf(page+sz, "/%s] ",
-			  partition_name(conf->hash_table[j].dev1->dev));
+			  bdev_partition_name(conf->hash_table[j].dev1->bdev));
 		else
 			sz += sprintf(page+sz, "] ");
 	}
