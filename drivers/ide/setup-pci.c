@@ -587,7 +587,6 @@ void ide_pci_setup_ports(struct pci_dev *dev, ide_pci_device_t *d, int autodma, 
 	int at_least_one_hwif_enabled = 0;
 	ide_hwif_t *hwif, *mate = NULL;
 	static int secondpdc = 0;
-	int drive0_tune, drive1_tune;
 	u8 tmp;
 
 	index->all = 0xf0f0;
@@ -648,26 +647,11 @@ controller_ok:
 		else
 			ide_hwif_setup_dma(dev, d, hwif);
 bypass_legacy_dma:
-
-		drive0_tune = hwif->drives[0].autotune;
-		drive1_tune = hwif->drives[1].autotune;
-
 		if (d->init_hwif)
 			/* Call chipset-specific routine
 			 * for each enabled hwif
 			 */
 			d->init_hwif(hwif);
-
-		/*
-		 *	This is in the wrong place. The driver may
-		 *	do set up based on the autotune value and this
-		 *	will then trash it. Torben please move it and
-		 *	propagate the fixes into the drivers
-		 */		
-		if (drive0_tune == IDE_TUNE_BIOS) /* biostimings */
-			hwif->drives[0].autotune = IDE_TUNE_BIOS;
-		if (drive1_tune == IDE_TUNE_BIOS)
-			hwif->drives[1].autotune = IDE_TUNE_BIOS;
 
 		mate = hwif;
 		at_least_one_hwif_enabled = 1;
