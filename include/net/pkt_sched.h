@@ -308,13 +308,13 @@ extern PSCHED_WATCHER psched_time_mark;
 
 extern int psched_tod_diff(int delta_sec, int bound);
 
-#define PSCHED_TDIFF_SAFE(tv1, tv2, bound, guard) \
+#define PSCHED_TDIFF_SAFE(tv1, tv2, bound) \
 ({ \
 	   int __delta_sec = (tv1).tv_sec - (tv2).tv_sec; \
 	   int __delta = (tv1).tv_usec - (tv2).tv_usec; \
 	   switch (__delta_sec) { \
 	   default: \
-		   __delta = psched_tod_diff(__delta_sec, bound); guard; break; \
+		   __delta = psched_tod_diff(__delta_sec, bound);  break; \
 	   case 2: \
 		   __delta += 1000000; \
 	   case 1: \
@@ -355,12 +355,8 @@ extern int psched_tod_diff(int delta_sec, int bound);
 #else
 
 #define PSCHED_TDIFF(tv1, tv2) (long)((tv1) - (tv2))
-#define PSCHED_TDIFF_SAFE(tv1, tv2, bound, guard) \
-({ \
-	   long long __delta = (tv1) - (tv2); \
-	   if ( __delta > (long long)(bound)) {  __delta = (bound); guard; } \
-	   __delta; \
-})
+#define PSCHED_TDIFF_SAFE(tv1, tv2, bound) \
+	min_t(long long, (tv1) - (tv2), bound)
 
 
 #define PSCHED_TLESS(tv1, tv2) ((tv1) < (tv2))
