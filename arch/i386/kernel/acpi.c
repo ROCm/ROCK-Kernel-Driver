@@ -78,15 +78,15 @@ char *__acpi_map_table(unsigned long phys, unsigned long size)
 
 	offset = phys & (PAGE_SIZE - 1);
 	mapped_size = PAGE_SIZE - offset;
-	set_fixmap(FIX_IO_APIC_BASE_END, phys);
-	base = fix_to_virt(FIX_IO_APIC_BASE_END);
+	set_fixmap(FIX_ACPI_END, phys);
+	base = fix_to_virt(FIX_ACPI_END);
 
 	/*
 	 * Most cases can be covered by the below.
 	 */
-	idx = FIX_IO_APIC_BASE_END;
+	idx = FIX_ACPI_END;
 	while (mapped_size < size) {
-		if (--idx < FIX_IO_APIC_BASE_0)
+		if (--idx < FIX_ACPI_BEGIN)
 			return 0;	/* cannot handle this */
 		phys += PAGE_SIZE;
 		set_fixmap(idx, phys);
