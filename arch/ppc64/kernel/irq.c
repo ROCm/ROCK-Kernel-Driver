@@ -589,7 +589,9 @@ int do_IRQ(struct pt_regs *regs)
 
 	return 1; /* lets ret_from_int know we can do checks */
 }
+
 #else	/* CONFIG_PPC_ISERIES */
+
 int do_IRQ(struct pt_regs *regs)
 {
 	int irq, first = 1;

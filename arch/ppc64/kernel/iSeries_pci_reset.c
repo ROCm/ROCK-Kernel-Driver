@@ -36,7 +36,6 @@
 #include <asm/iSeries/HvCallPci.h>
 #include <asm/iSeries/HvTypes.h>
 #include <asm/iSeries/mf.h>
-#include <asm/flight_recorder.h>
 #include <asm/pci.h>
 
 #include <asm/iSeries/iSeries_pci.h>

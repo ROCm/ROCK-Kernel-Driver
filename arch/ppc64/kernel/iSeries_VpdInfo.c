@@ -153,7 +153,7 @@ int device_Location(struct pci_dev *PciDev, char *BufPtr)
 	struct iSeries_Device_Node *DevNode =
 		(struct iSeries_Device_Node *)PciDev->sysdata;
 	return sprintf(BufPtr, "PCI: Bus%3d, AgentId%3d, Vendor %04X, Location %s",
-		       DevNode->DsaAddr.busNumber, DevNode->AgentId,
+		       DevNode->DsaAddr.Dsa.busNumber, DevNode->AgentId,
 		       DevNode->Vendor, DevNode->Location);
 }
 
