@@ -67,23 +67,23 @@ static int filemap_sync_pte_range(pmd_t * pmd,
 	return error;
 }
 
-static inline int filemap_sync_pmd_range(pgd_t * pgd,
+static inline int filemap_sync_pmd_range(pud_t * pud,
 	unsigned long address, unsigned long end, 
 	struct vm_area_struct *vma, unsigned int flags)
 {
 	pmd_t * pmd;
 	int error;
 
-	if (pgd_none(*pgd))
+	if (pud_none(*pud))
 		return 0;
-	if (pgd_bad(*pgd)) {
-		pgd_ERROR(*pgd);
-		pgd_clear(pgd);
+	if (pud_bad(*pud)) {
+		pud_ERROR(*pud);
+		pud_clear(pud);
 		return 0;
 	}
-	pmd = pmd_offset(pgd, address);
-	if ((address & PGDIR_MASK) != (end & PGDIR_MASK))
-		end = (address & PGDIR_MASK) + PGDIR_SIZE;
+	pmd = pmd_offset(pud, address);
+	if ((address & PUD_MASK) != (end & PUD_MASK))
+		end = (address & PUD_MASK) + PUD_SIZE;
 	error = 0;
 	do {
 		error |= filemap_sync_pte_range(pmd, address, end, vma, flags);
@@ -93,11 +93,39 @@ static inline int filemap_sync_pmd_range(pgd_t * pgd,
 	return error;
 }
 
+static inline int filemap_sync_pud_range(pgd_t *pgd,
+	unsigned long address, unsigned long end,
+	struct vm_area_struct *vma, unsigned int flags)
+{
+	pud_t *pud;
+	int error;
+
+	if (pgd_none(*pgd))
+		return 0;
+	if (pgd_bad(*pgd)) {
+		pgd_ERROR(*pgd);
+		pgd_clear(pgd);
+		return 0;
+	}
+	pud = pud_offset(pgd, address);
+	if ((address & PGDIR_MASK) != (end & PGDIR_MASK))
+		end = (address & PGDIR_MASK) + PGDIR_SIZE;
+	error = 0;
+	do {
+		error |= filemap_sync_pmd_range(pud, address, end, vma, flags);
+		address = (address + PUD_SIZE) & PUD_MASK;
+		pud++;
+	} while (address && (address < end));
+	return error;
+}
+
 static int filemap_sync(struct vm_area_struct * vma, unsigned long address,
 	size_t size, unsigned int flags)
 {
-	pgd_t * dir;
+	pgd_t *pgd;
 	unsigned long end = address + size;
+	unsigned long next;
+	int i;
 	int error = 0;
 
 	/* Aquire the lock early; it may be possible to avoid dropping
@@ -105,7 +133,7 @@ static int filemap_sync(struct vm_area_struct * vma, unsigned long address,
 	 */
 	spin_lock(&vma->vm_mm->page_table_lock);
 
-	dir = pgd_offset(vma->vm_mm, address);
+	pgd = pgd_offset(vma->vm_mm, address);
 	flush_cache_range(vma, address, end);
 
 	/* For hugepages we can't go walking the page table normally,
@@ -116,11 +144,14 @@ static int filemap_sync(struct vm_area_struct * vma, unsigned long address,
 
 	if (address >= end)
 		BUG();
-	do {
-		error |= filemap_sync_pmd_range(dir, address, end, vma, flags);
-		address = (address + PGDIR_SIZE) & PGDIR_MASK;
-		dir++;
-	} while (address && (address < end));
+	for (i = pgd_index(address); i <= pgd_index(end-1); i++) {
+		next = (address + PGDIR_SIZE) & PGDIR_MASK;
+		if (next <= address || next > end)
+			next = end;
+		error |= filemap_sync_pud_range(pgd, address, next, vma, flags);
+		address = next;
+		pgd++;
+	}
 	/*
 	 * Why flush ? filemap_sync_pte already flushed the tlbs with the
 	 * dirty bits.

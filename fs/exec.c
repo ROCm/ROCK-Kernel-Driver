@@ -300,6 +300,7 @@ void install_arg_page(struct vm_area_struct *vma,
 {
 	struct mm_struct *mm = vma->vm_mm;
 	pgd_t * pgd;
+	pud_t * pud;
 	pmd_t * pmd;
 	pte_t * pte;
 
@@ -310,7 +311,10 @@ void install_arg_page(struct vm_area_struct *vma,
 	pgd = pgd_offset(mm, address);
 
 	spin_lock(&mm->page_table_lock);
-	pmd = pmd_alloc(mm, pgd, address);
+	pud = pud_alloc(mm, pgd, address);
+	if (!pud)
+		goto out;
+	pmd = pmd_alloc(mm, pud, address);
 	if (!pmd)
 		goto out;
 	pte = pte_alloc_map(mm, pmd, address);
