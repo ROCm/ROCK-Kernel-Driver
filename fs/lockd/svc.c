@@ -196,7 +196,7 @@ lockd(struct svc_rqst *rqstp)
 int
 lockd_up(void)
 {
-	static int		warned = 0; 
+	static int		warned;
 	struct svc_serv *	serv;
 	int			error = 0;
 
@@ -267,7 +267,7 @@ out:
 void
 lockd_down(void)
 {
-	static int warned = 0; 
+	static int warned;
 
 	down(&nlmsvc_sema);
 	if (nlmsvc_users) {

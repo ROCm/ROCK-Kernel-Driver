@@ -106,7 +106,7 @@ void ext2_discard_prealloc (struct inode * inode)
 static int ext2_alloc_block (struct inode * inode, unsigned long goal, int *err)
 {
 #ifdef EXT2FS_DEBUG
-	static unsigned long alloc_hits = 0, alloc_attempts = 0;
+	static unsigned long alloc_hits, alloc_attempts;
 #endif
 	unsigned long result;
 

@@ -267,7 +267,7 @@ static int ext3_alloc_block (handle_t *handle,
 
 #ifdef EXT3_PREALLOCATE
 #ifdef EXT3FS_DEBUG
-	static unsigned long alloc_hits = 0, alloc_attempts = 0;
+	static unsigned long alloc_hits, alloc_attempts;
 #endif
 	struct ext3_inode_info *ei = EXT3_I(inode);
 	/* Writer: ->i_prealloc* */

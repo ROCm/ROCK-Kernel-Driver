@@ -33,7 +33,7 @@
 #include "sysctl.h"
 
 /* Number of mounted file systems which have compression enabled. */
-static unsigned long ntfs_nr_compression_users = 0;
+static unsigned long ntfs_nr_compression_users;
 
 /* Error constants/strings used in inode.c::ntfs_show_options(). */
 typedef enum {

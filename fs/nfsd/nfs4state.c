@@ -53,9 +53,9 @@
 /* Globals */
 time_t boot_time;
 static u32 current_clientid = 1;
-static u32 current_ownerid = 0;
-static u32 current_fileid = 0;
-static u32 nfs4_init = 0;
+static u32 current_ownerid;
+static u32 current_fileid;
+static u32 nfs4_init;
 stateid_t zerostateid;             /* bits all 0 */
 stateid_t onestateid;              /* bits all 1 */
 

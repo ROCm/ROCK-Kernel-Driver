@@ -686,7 +686,7 @@ static inline unsigned long hash(struct super_block *sb, unsigned long hashval)
  
 ino_t iunique(struct super_block *sb, ino_t max_reserved)
 {
-	static ino_t counter = 0;
+	static ino_t counter;
 	struct inode *inode;
 	struct hlist_head * head;
 	ino_t res;
