@@ -298,12 +298,12 @@ config SND_INTEL8X0
 	  SiS 7012, AMD768/8111, NVidia NForce and ALi 5455 chips.
 
 config SND_INTEL8X0M
-	tristate "Intel i8x0/MX440; AMD768/8111 modems (EXPERIMENTAL)"
+	tristate "Intel i8x0/MX440; NForce; AMD768/8111 modems (EXPERIMENTAL)"
 	depends on SND && EXPERIMENTAL
 	select SND_AC97_CODEC
 	help
-	  Say 'Y' or 'M' to include support for Intel8x0 and AMD768/8111 based
-	  modems.
+	  Say 'Y' or 'M' to include support for Intel8x0, NVidia NForce and
+	  AMD768/8111 base modems.
 
 config SND_SONICVIBES
 	tristate "S3 SonicVibes"
