@@ -86,9 +86,6 @@ union diskpage {
  */
 #define PAGES_FOR_IO	512
 
-static const char name_suspend[] = "Suspend Machine: ";
-static const char name_resume[] = "Resume Machine: ";
-
 /*
  * Saving part...
  */
@@ -972,7 +969,7 @@ static int __init check_sig(swp_entry_t * next)
 	if ((error = write_page(0,hdr)))
 		goto Done;
 
-	pr_debug( "%sSignature found, resuming\n", name_resume );
+	pr_debug("pmdisk: Signature found, resuming\n");
  Done:
 	free_page((unsigned long)hdr);
 	return error;
@@ -1176,7 +1173,7 @@ int __init pmdisk_read(void)
 	if (!error)
 		pr_debug("Reading resume file was successful\n");
 	else
-		pr_debug( "%sError %d resuming\n", name_resume, error );
+		pr_debug("pmdisk: Error %d resuming\n", error);
 	return error;
 }
 
