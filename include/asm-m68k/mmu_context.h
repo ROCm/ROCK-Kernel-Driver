@@ -13,8 +13,8 @@ static inline void enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk)
 #include <asm/page.h>
 #include <asm/pgalloc.h>
 
-extern inline int
-init_new_context(struct task_struct *tsk, struct mm_struct *mm)
+static inline int init_new_context(struct task_struct *tsk,
+				   struct mm_struct *mm)
 {
 	mm->context = virt_to_phys(mm->pgd);
 	return 0;
@@ -22,7 +22,7 @@ init_new_context(struct task_struct *tsk, struct mm_struct *mm)
 
 #define destroy_context(mm)		do { } while(0)
 
-extern inline void switch_mm_0230(struct mm_struct *mm)
+static inline void switch_mm_0230(struct mm_struct *mm)
 {
 	unsigned long crp[2] = {
 		0x80000000 | _PAGE_TABLE, mm->context
@@ -55,7 +55,7 @@ extern inline void switch_mm_0230(struct mm_struct *mm)
 	asm volatile (".chip 68k");
 }
 
-extern inline void switch_mm_0460(struct mm_struct *mm)
+static inline void switch_mm_0460(struct mm_struct *mm)
 {
 	asm volatile (".chip 68040");
 
@@ -91,7 +91,7 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next, str
 
 #define deactivate_mm(tsk,mm)	do { } while (0)
 
-extern inline void activate_mm(struct mm_struct *prev_mm,
+static inline void activate_mm(struct mm_struct *prev_mm,
 			       struct mm_struct *next_mm)
 {
 	next_mm->context = virt_to_phys(next_mm->pgd);
@@ -144,7 +144,7 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next, str
 
 #define deactivate_mm(tsk,mm)	do { } while (0)
 
-extern inline void activate_mm(struct mm_struct *prev_mm,
+static inline void activate_mm(struct mm_struct *prev_mm,
 			       struct mm_struct *next_mm)
 {
 	activate_context(next_mm);

@@ -83,7 +83,7 @@ extern void cache_push_v(unsigned long vaddr, int len);
 #define flush_cache_vmap(start, end)		flush_cache_all()
 #define flush_cache_vunmap(start, end)		flush_cache_all()
 
-extern inline void flush_cache_mm(struct mm_struct *mm)
+static inline void flush_cache_mm(struct mm_struct *mm)
 {
 	if (mm == current->mm)
 		__flush_cache_030();
@@ -91,7 +91,7 @@ extern inline void flush_cache_mm(struct mm_struct *mm)
 
 /* flush_cache_range/flush_cache_page must be macros to avoid
    a dependency on linux/mm.h, which includes this file... */
-extern inline void flush_cache_range(struct vm_area_struct *vma,
+static inline void flush_cache_range(struct vm_area_struct *vma,
 				     unsigned long start,
 				     unsigned long end)
 {
@@ -99,7 +99,7 @@ extern inline void flush_cache_range(struct vm_area_struct *vma,
 	        __flush_cache_030();
 }
 
-extern inline void flush_cache_page(struct vm_area_struct *vma,
+static inline void flush_cache_page(struct vm_area_struct *vma,
 				    unsigned long vmaddr)
 {
  	if (vma->vm_mm == current->mm)
@@ -109,7 +109,7 @@ extern inline void flush_cache_page(struct vm_area_struct *vma,
 
 /* Push the page at kernel virtual address and clear the icache */
 /* RZ: use cpush %bc instead of cpush %dc, cinv %ic */
-extern inline void __flush_page_to_ram(void *vaddr)
+static inline void __flush_page_to_ram(void *vaddr)
 {
 	if (CPU_IS_040_OR_060) {
 		__asm__ __volatile__("nop\n\t"

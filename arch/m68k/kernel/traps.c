@@ -447,7 +447,7 @@ extern int mmu_emu_handle_fault (unsigned long, int, int);
 
 /* sun3 version of bus_error030 */
 
-extern inline void bus_error030 (struct frame *fp)
+static inline void bus_error030 (struct frame *fp)
 {
 	unsigned char buserr_type = sun3_get_buserr ();
 	unsigned long addr, errorcode;
