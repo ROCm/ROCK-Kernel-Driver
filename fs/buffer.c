@@ -113,7 +113,12 @@ static int bh_wake_function(wait_queue_t *wait, unsigned mode,
 
 static void sync_buffer(struct buffer_head *bh)
 {
-	blk_run_page(bh->b_page);
+	struct block_device *bd;
+
+	smp_mb();
+	bd = bh->b_bdev;
+	if (bd)
+		blk_run_address_space(bd->bd_inode->i_mapping);
 }
 
 void fastcall __lock_buffer(struct buffer_head *bh)
