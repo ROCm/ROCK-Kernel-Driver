@@ -82,6 +82,9 @@ ToDo/Notes:
 	  extend the initialized size.
 	- Map the page instead of using page_address() before writing to it in
 	  fs/ntfs/aops.c::ntfs_mft_writepage().
+	- Provide exclusion between opening an inode / mapping an mft record
+	  and accessing the mft record in fs/ntfs/mft.c::ntfs_mft_writepage()
+	  by setting the page not uptodate throughout ntfs_mft_writepage().
 
 2.1.20 - Fix two stupid bugs introduced in 2.1.18 release.
 

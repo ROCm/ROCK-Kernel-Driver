@@ -724,18 +724,9 @@ int write_mft_record_nolock(ntfs_inode *ni, MFT_RECORD *m, int sync)
 	 */
 	if (!NInoTestClearDirty(ni))
 		goto done;
-	/* Make sure we have mapped buffers. */
-	if (!page_has_buffers(page)) {
-no_buffers_err_out:
-		ntfs_error(vol->sb, "Writing mft records without existing "
-				"buffers is not implemented yet.  %s",
-				ntfs_please_email);
-		err = -EOPNOTSUPP;
-		goto err_out;
-	}
+	BUG_ON(!page_has_buffers(page));
 	bh = head = page_buffers(page);
-	if (!bh)
-		goto no_buffers_err_out;
+	BUG_ON(!bh);
 	nr_bhs = 0;
 	block_start = 0;
 	m_start = ni->page_ofs;
@@ -892,6 +883,12 @@ static int ntfs_mft_writepage(struct page *page, struct writeback_control *wbc)
 	ntfs_debug("Entering for %i inodes starting at 0x%lx.", nr, mft_no);
 	/* Iterate over the mft records in the page looking for a dirty one. */
 	maddr = (u8*)kmap(page);
+	/*
+	 * Clear the page uptodate flag.  This will cause anyone trying to get
+	 * hold of the page to block on the page lock in read_cache_page().
+	 */
+	BUG_ON(!PageUptodate(page));
+	ClearPageUptodate(page);
 	for (i = 0; i < nr; ++i, ++mft_no, maddr += vol->mft_record_size) {
 		struct inode *vi;
 		ntfs_inode *ni, *eni;
@@ -1034,6 +1031,7 @@ static int ntfs_mft_writepage(struct page *page, struct writeback_control *wbc)
 		up(&ni->extent_lock);
 		iput(vi);
 	}
+	SetPageUptodate(page);
 	kunmap(page);
 	/* If a dirty mft record was found, redirty the page. */
 	if (is_dirty) {
