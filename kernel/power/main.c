@@ -71,17 +71,14 @@ static int suspend_prepare(u32 state)
 
 	if ((error = device_suspend(state)))
 		goto Finish;
-
 	return 0;
- Done:
-	pm_restore_console();
-	return error;
  Finish:
 	if (pm_ops->finish)
 		pm_ops->finish(state);
  Thaw:
 	thaw_processes();
-	goto Done;
+	pm_restore_console();
+	return error;
 }
 
 
