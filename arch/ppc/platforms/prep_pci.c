@@ -1029,11 +1029,18 @@ prep_route_pci_interrupts(void)
 		}
 	} else if ( _prep_type == _PREP_IBM ) {
 		unsigned char irq_edge_mask_lo, irq_edge_mask_hi;
+		unsigned short irq_edge_mask;
+		int i;
 
 		setup_ibm_pci(&irq_edge_mask_lo, &irq_edge_mask_hi);
 
 		outb(inb(0x04d0)|irq_edge_mask_lo, 0x4d0); /* primary 8259 */
 		outb(inb(0x04d1)|irq_edge_mask_hi, 0x4d1); /* cascaded 8259 */
+
+		irq_edge_mask = (irq_edge_mask_hi << 8) | irq_edge_mask_lo;
+		for (i = 0; i < 16; ++i, irq_edge_mask >>= 1)
+			if (irq_edge_mask & 1)
+				irq_desc[i].status |= IRQ_LEVEL;
 	} else {
 		printk("No known machine pci routing!\n");
 		return;
