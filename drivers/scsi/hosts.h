@@ -541,9 +541,6 @@ static inline void scsi_set_pci_device(struct Scsi_Host *shost,
 {
 	shost->pci_dev = pdev;
 	shost->host_driverfs_dev.parent=&pdev->dev;
-
-	/* register parent with driverfs */
-	device_register(&shost->host_driverfs_dev);
 }
 
 

@@ -838,14 +838,7 @@ static void sr_detach(struct scsi_device * SDp)
 
 static int __init init_sr(void)
 {
-	int rc;
-	rc = scsi_register_device(&sr_template);
-	if (!rc) {
-		sr_template.scsi_driverfs_driver.name = (char *)sr_template.tag;
-		sr_template.scsi_driverfs_driver.bus = &scsi_driverfs_bus_type;
-		driver_register(&sr_template.scsi_driverfs_driver);
-	}
-	return rc;
+	return scsi_register_device(&sr_template);
 }
 
 static void __exit exit_sr(void)
@@ -857,7 +850,6 @@ static void __exit exit_sr(void)
 		kfree(scsi_CDs);
 
 	sr_template.dev_max = 0;
-	driver_unregister(&sr_template.scsi_driverfs_driver);
 }
 
 module_init(init_sr);

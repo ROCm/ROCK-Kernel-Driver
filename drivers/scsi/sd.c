@@ -1334,7 +1334,6 @@ static int __init init_sd(void)
 			       SD_MAJOR(i));
 		else
 			majors++;
-	}
 
 	if (!majors)
 		return -ENODEV;
@@ -1342,9 +1341,6 @@ static int __init init_sd(void)
 	rc = scsi_register_device(&sd_template);
 	if (rc)
 		return rc;
-	sd_template.scsi_driverfs_driver.name = (char *)sd_template.tag;
-	sd_template.scsi_driverfs_driver.bus = &scsi_driverfs_bus_type;
-	driver_register(&sd_template.scsi_driverfs_driver);
 	register_reboot_notifier(&sd_notifier_block);
 	return rc;
 }
