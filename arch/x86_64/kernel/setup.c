@@ -1070,7 +1070,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	        "fxsr", "sse", "sse2", "ss", "ht", "tm", "ia64", NULL,
 
 		/* AMD-defined */
-		NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+		"pni", NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 		NULL, NULL, NULL, "syscall", NULL, NULL, NULL, NULL,
 		NULL, NULL, NULL, NULL, "nx", NULL, "mmxext", NULL,
 		NULL, NULL, NULL, NULL, NULL, "lm", "3dnowext", "3dnow",

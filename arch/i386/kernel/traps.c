@@ -489,7 +489,7 @@ DO_ERROR( 9, SIGFPE,  "coprocessor segment overrun", coprocessor_segment_overrun
 DO_ERROR(10, SIGSEGV, "invalid TSS", invalid_TSS)
 DO_ERROR(11, SIGBUS,  "segment not present", segment_not_present)
 DO_ERROR(12, SIGBUS,  "stack segment", stack_segment)
-DO_ERROR_INFO(17, SIGBUS, "alignment check", alignment_check, BUS_ADRALN, get_cr2())
+DO_ERROR_INFO(17, SIGBUS, "alignment check", alignment_check, BUS_ADRALN, 0)
 
 asmlinkage void do_general_protection(struct pt_regs * regs, long error_code)
 {
