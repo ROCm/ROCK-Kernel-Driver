@@ -53,6 +53,10 @@
 	mov	reg	= ar.k3;;						\
 	addl	reg	= IA64_CPUINFO_PERCPU_PADDR,reg
 
+#define GET_CPUINFO_PAL_PADDR(reg)						\
+	mov	reg	= ar.k3;;						\
+	addl	reg	= IA64_CPUINFO_PAL_PADDR,reg
+
 /*
  * This macro gets the physical address of this cpu's MCA save structure.
  */

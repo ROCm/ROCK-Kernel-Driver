@@ -292,12 +292,32 @@ setup_gate (void)
 	ia64_patch_gate();
 }
 
+void
+set_mca_pointer(struct cpuinfo_ia64 *cpuinfo, void *cpu_data)
+{
+	void *my_cpu_data = ia64_imva(cpu_data);
+
+        /*
+         * The MCA info structure was allocated earlier and a physical address pointer
+         * saved in __per_cpu_mca[cpu].  Move that pointer into the cpuinfo structure.
+         */
+
+        cpuinfo->ia64_pa_mca_data = (__u64 *)__per_cpu_mca[smp_processor_id()];
+
+        cpuinfo->percpu_paddr = pte_val(mk_pte_phys(__pa(my_cpu_data), PAGE_KERNEL));
+        ia64_set_kr(IA64_KR_PA_CPU_INFO, __pa(cpuinfo));
+
+        /*
+         * Set pal_base and pal_paddr in cpuinfo structure.
+         */
+        efi_get_pal_addr();
+}
+
 void __devinit
 ia64_mmu_init (void *my_cpu_data)
 {
 	unsigned long psr, pta, impl_va_bits;
 	extern void __devinit tlb_init (void);
-	struct cpuinfo_ia64 *cpuinfo;
 
 #ifdef CONFIG_DISABLE_VHPT
 #	define VHPT_ENABLE_BIT	0
@@ -362,22 +382,6 @@ ia64_mmu_init (void *my_cpu_data)
 	ia64_set_rr(HPAGE_REGION_BASE, HPAGE_SHIFT << 2);
 	ia64_srlz_d();
 #endif
-
-	/*
-	 * The MCA info structure was allocated earlier and a physical address pointer
-	 * saved in k3.  Move that pointer into the cpuinfo structure and save
-	 * the physical address of the cpuinfo structure in k3.
-	 */
-	cpuinfo = (struct cpuinfo_ia64 *)my_cpu_data;
-	cpuinfo->ia64_pa_mca_data = (__u64 *)ia64_get_kr(IA64_KR_PA_CPU_INFO);
-
-	cpuinfo->percpu_paddr = pte_val(mk_pte_phys(__pa(my_cpu_data), PAGE_KERNEL));
-	ia64_set_kr(IA64_KR_PA_CPU_INFO, __pa(my_cpu_data));
-
-	/*
-	 * Set pal_base and pal_paddr in cpuinfo structure.
-	 */
-	efi_get_pal_addr();
 }
 
 #ifdef CONFIG_VIRTUAL_MEM_MAP

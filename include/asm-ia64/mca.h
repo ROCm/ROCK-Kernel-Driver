@@ -61,6 +61,8 @@ typedef struct ia64_mc_info_s {
 
 } ia64_mc_info_t;
 
+#define PERCPU_MCA_SIZE sizeof(struct ia64_mc_info_s)
+
 typedef struct ia64_mca_sal_to_os_state_s {
 	u64		imsto_os_gp;		/* GP of the os registered with the SAL */
 	u64		imsto_pal_proc;		/* PAL_PROC entry point - physical addr */

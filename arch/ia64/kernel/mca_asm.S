@@ -147,7 +147,6 @@ begin_tlb_purge_and_reload:
 	GET_PERCPU_PADDR(r2)	// paddr of percpu_paddr in cpuinfo struct
 	;;
 	mov	r17=r2
-	mov 	r23=r2		// save current ia64_mca_percpu_info addr pointer.
 	;;
 	adds r17=8,r17
 	;;
@@ -247,7 +246,9 @@ begin_tlb_purge_and_reload:
 	srlz.d
 	;;
 	// 2. Reload DTR register for PERCPU data.
-	mov r17=r23
+	GET_PERCPU_PADDR(r2)		// paddr of percpu_paddr in cpuinfo struct
+	;;
+	mov r17=r2
 	movl r16=PERCPU_ADDR		// vaddr
 	movl r18=PERCPU_PAGE_SHIFT<<2
 	;;
@@ -262,7 +263,9 @@ begin_tlb_purge_and_reload:
 	srlz.d
 	;;
 	// 3. Reload ITR for PAL code.
-	adds r17=40,r23
+	GET_CPUINFO_PAL_PADDR(r2)	// paddr of pal_paddr in cpuinfo struct
+	;;
+	mov r17=r2
 	;;
 	ld8 r18=[r17],8			// pte
 	;;

@@ -60,6 +60,7 @@
 unsigned long __per_cpu_offset[NR_CPUS];
 EXPORT_SYMBOL(__per_cpu_offset);
 #endif
+unsigned long __per_cpu_mca[NR_CPUS];
 
 DEFINE_PER_CPU(struct cpuinfo_ia64, cpu_info);
 DEFINE_PER_CPU(unsigned long, local_per_cpu_offset);
@@ -580,6 +581,7 @@ void
 cpu_init (void)
 {
 	extern void __devinit ia64_mmu_init (void *);
+	extern void set_mca_pointer (struct cpuinfo_ia64 *, void *);
 	unsigned long num_phys_stacked;
 	pal_vm_info_2_u_t vmi;
 	unsigned int max_ctx;
@@ -634,6 +636,7 @@ cpu_init (void)
 		BUG();
 
 	ia64_mmu_init(ia64_imva(cpu_data));
+	set_mca_pointer(cpu_info, cpu_data);
 
 #ifdef CONFIG_IA32_SUPPORT
 	ia32_cpu_init();

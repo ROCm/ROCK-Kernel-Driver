@@ -205,6 +205,7 @@ void foo(void)
 	BLANK();
 	/* used by arch/ia64/kernel/mca_asm.S */
 	DEFINE(IA64_CPUINFO_PERCPU_PADDR, offsetof (struct cpuinfo_ia64, percpu_paddr));
+	DEFINE(IA64_CPUINFO_PAL_PADDR, offsetof (struct cpuinfo_ia64, pal_paddr));
 	DEFINE(IA64_CPUINFO_PA_MCA_INFO, offsetof (struct cpuinfo_ia64, ia64_pa_mca_data));
 	DEFINE(IA64_MCA_PROC_STATE_DUMP, offsetof (struct ia64_mca_cpu_s, ia64_mca_proc_state_dump));
 	DEFINE(IA64_MCA_STACK, offsetof (struct ia64_mca_cpu_s, ia64_mca_stack));

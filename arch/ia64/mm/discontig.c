@@ -350,11 +350,11 @@ static int __init find_pernode_space(unsigned long start, unsigned long len,
 		mem_data[node].node_data = __va(pernode);
 		pernode += L1_CACHE_ALIGN(sizeof(struct ia64_node_data));
 
-		mca_data_phys = (void *)pernode;
-		pernode += L1_CACHE_ALIGN(sizeof(ia64_mca_cpu_t)) * phys_cpus;
-
 		mem_data[node].pgdat->bdata = bdp;
 		pernode += L1_CACHE_ALIGN(sizeof(pg_data_t));
+
+		mca_data_phys = (void *)pernode;
+		pernode += L1_CACHE_ALIGN(sizeof(ia64_mca_cpu_t)) * phys_cpus;
 
 		/*
 		 * Copy the static per-cpu data into the region we
@@ -370,13 +370,11 @@ static int __init find_pernode_space(unsigned long start, unsigned long len,
 					 * The memory for the cpuinfo structure is allocated
 					 * here, but the data in the structure is initialized
 					 * later.  Save the physical address of the MCA save
-					 * area in IA64_KR_PA_CPU_INFO.  When the cpuinfo struct 
-					 * is initialized, the value in IA64_KR_PA_CPU_INFO
-					 * will be put in the cpuinfo structure and 
-					 * IA64_KR_PA_CPU_INFO will be set to the physical
-					 * addresss of the cpuinfo structure.
+					 * area in __per_cpu_mca[cpu].  When the cpuinfo struct 
+					 * is initialized, the value in __per_cpu_mca[cpu]
+					 * will be put in the cpuinfo structure.
 					 */
-					ia64_set_kr(IA64_KR_PA_CPU_INFO, __pa(mca_data_phys));
+					__per_cpu_mca[cpu] = __pa(mca_data_phys);
 					mca_data_phys += L1_CACHE_ALIGN(sizeof(ia64_mca_cpu_t));
 				}
 				__per_cpu_offset[cpu] = (char*)__va(cpu_data) -
