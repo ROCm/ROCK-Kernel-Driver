@@ -1,3 +1,5 @@
+#include <linux/init.h>
+#include <linux/slab.h>
 #include <linux/mm.h>
 #include <asm/io.h>
 #include <asm/mtrr.h>
@@ -5,6 +7,90 @@
 #include <asm/system.h>
 #include <asm/cpufeature.h>
 #include "mtrr.h"
+
+struct mtrr_state {
+	struct mtrr_var_range *var_ranges;
+	mtrr_type fixed_ranges[NUM_FIXED_RANGES];
+	unsigned char enabled;
+	mtrr_type def_type;
+};
+
+static unsigned long smp_changes_mask __initdata = 0;
+struct mtrr_state mtrr_state = {};
+
+
+/*  Get the MSR pair relating to a var range  */
+static void __init
+get_mtrr_var_range(unsigned int index, struct mtrr_var_range *vr)
+{
+	rdmsr(MTRRphysBase_MSR(index), vr->base_lo, vr->base_hi);
+	rdmsr(MTRRphysMask_MSR(index), vr->mask_lo, vr->mask_hi);
+}
+
+static void __init
+get_fixed_ranges(mtrr_type * frs)
+{
+	unsigned long *p = (unsigned long *) frs;
+	int i;
+
+	rdmsr(MTRRfix64K_00000_MSR, p[0], p[1]);
+
+	for (i = 0; i < 2; i++)
+		rdmsr(MTRRfix16K_80000_MSR + i, p[2 + i * 2], p[3 + i * 2]);
+	for (i = 0; i < 8; i++)
+		rdmsr(MTRRfix4K_C0000_MSR + i, p[6 + i * 2], p[7 + i * 2]);
+}
+
+/*  Grab all of the MTRR state for this CPU into *state  */
+void get_mtrr_state(void)
+{
+	unsigned int i;
+	struct mtrr_var_range *vrs;
+	unsigned long lo, dummy;
+
+	if (!mtrr_state.var_ranges) {
+		mtrr_state.var_ranges = kmalloc(num_var_ranges * sizeof (struct mtrr_var_range), 
+						GFP_KERNEL);
+		if (!mtrr_state.var_ranges)
+			return;
+	} 
+	vrs = mtrr_state.var_ranges;
+
+	for (i = 0; i < num_var_ranges; i++)
+		get_mtrr_var_range(i, &vrs[i]);
+	get_fixed_ranges(mtrr_state.fixed_ranges);
+
+	rdmsr(MTRRdefType_MSR, lo, dummy);
+	mtrr_state.def_type = (lo & 0xff);
+	mtrr_state.enabled = (lo & 0xc00) >> 10;
+}
+
+/*  Free resources associated with a struct mtrr_state  */
+void __init finalize_mtrr_state(void)
+{
+	if (mtrr_state.var_ranges)
+		kfree(mtrr_state.var_ranges);
+	mtrr_state.var_ranges = NULL;
+}
+
+/*  Some BIOS's are fucked and don't set all MTRRs the same!  */
+void __init mtrr_state_warn(void)
+{
+	unsigned long mask = smp_changes_mask;
+
+	if (!mask)
+		return;
+	if (mask & MTRR_CHANGE_MASK_FIXED)
+		printk
+		    ("mtrr: your CPUs had inconsistent fixed MTRR settings\n");
+	if (mask & MTRR_CHANGE_MASK_VARIABLE)
+		printk
+		    ("mtrr: your CPUs had inconsistent variable MTRR settings\n");
+	if (mask & MTRR_CHANGE_MASK_DEFTYPE)
+		printk
+		    ("mtrr: your CPUs had inconsistent MTRRdefType settings\n");
+	printk("mtrr: probably your BIOS does not setup all CPUs\n");
+}
 
 
 int generic_get_free_region(unsigned long base, unsigned long size)
@@ -55,23 +141,104 @@ void generic_get_mtrr(unsigned int reg, unsigned long *base,
 	*type = base_lo & 0xff;
 }
 
-void generic_set_mtrr(unsigned int reg, unsigned long base,
-		      unsigned long size, mtrr_type type)
-/*  [SUMMARY] Set variable MTRR register on the local CPU.
-    <reg> The register to set.
-    <base> The base address of the region.
-    <size> The size of the region. If this is 0 the region is disabled.
-    <type> The type of the region.
-    <do_safe> If TRUE, do the change safely. If FALSE, safety measures should
-    be done externally.
-    [RETURNS] Nothing.
+static int __init set_fixed_ranges(mtrr_type * frs)
+{
+	unsigned long *p = (unsigned long *) frs;
+	int changed = FALSE;
+	int i;
+	unsigned long lo, hi;
+
+	rdmsr(MTRRfix64K_00000_MSR, lo, hi);
+	if (p[0] != lo || p[1] != hi) {
+		wrmsr(MTRRfix64K_00000_MSR, p[0], p[1]);
+		changed = TRUE;
+	}
+
+	for (i = 0; i < 2; i++) {
+		rdmsr(MTRRfix16K_80000_MSR + i, lo, hi);
+		if (p[2 + i * 2] != lo || p[3 + i * 2] != hi) {
+			wrmsr(MTRRfix16K_80000_MSR + i, p[2 + i * 2],
+			      p[3 + i * 2]);
+			changed = TRUE;
+		}
+	}
+
+	for (i = 0; i < 8; i++) {
+		rdmsr(MTRRfix4K_C0000_MSR + i, lo, hi);
+		if (p[6 + i * 2] != lo || p[7 + i * 2] != hi) {
+			wrmsr(MTRRfix4K_C0000_MSR + i, p[6 + i * 2],
+			      p[7 + i * 2]);
+			changed = TRUE;
+		}
+	}
+	return changed;
+}
+
+/*  Set the MSR pair relating to a var range. Returns TRUE if
+    changes are made  */
+static int __init set_mtrr_var_ranges(unsigned int index, struct mtrr_var_range *vr)
+{
+	unsigned int lo, hi;
+	int changed = FALSE;
+
+	rdmsr(MTRRphysBase_MSR(index), lo, hi);
+	if ((vr->base_lo & 0xfffff0ffUL) != (lo & 0xfffff0ffUL)
+	    || (vr->base_hi & 0xfUL) != (hi & 0xfUL)) {
+		wrmsr(MTRRphysBase_MSR(index), vr->base_lo, vr->base_hi);
+		changed = TRUE;
+	}
+
+	rdmsr(MTRRphysMask_MSR(index), lo, hi);
+
+	if ((vr->mask_lo & 0xfffff800UL) != (lo & 0xfffff800UL)
+	    || (vr->mask_hi & 0xfUL) != (hi & 0xfUL)) {
+		wrmsr(MTRRphysMask_MSR(index), vr->mask_lo, vr->mask_hi);
+		changed = TRUE;
+	}
+	return changed;
+}
+
+static unsigned long set_mtrr_state(u32 deftype_lo, u32 deftype_hi)
+/*  [SUMMARY] Set the MTRR state for this CPU.
+    <state> The MTRR state information to read.
+    <ctxt> Some relevant CPU context.
+    [NOTE] The CPU must already be in a safe state for MTRR changes.
+    [RETURNS] 0 if no changes made, else a mask indication what was changed.
 */
 {
-	u32 cr0, cr4 = 0;
-	u32 deftype_lo, deftype_hi;
-	static spinlock_t set_atomicity_lock = SPIN_LOCK_UNLOCKED;
+	unsigned int i;
+	unsigned long change_mask = 0;
 
-	spin_lock(&set_atomicity_lock);
+	for (i = 0; i < num_var_ranges; i++)
+		if (set_mtrr_var_ranges(i, &mtrr_state.var_ranges[i]))
+			change_mask |= MTRR_CHANGE_MASK_VARIABLE;
+
+	if (set_fixed_ranges(mtrr_state.fixed_ranges))
+		change_mask |= MTRR_CHANGE_MASK_FIXED;
+
+	/*  Set_mtrr_restore restores the old value of MTRRdefType,
+	   so to set it we fiddle with the saved value  */
+	if ((deftype_lo & 0xff) != mtrr_state.def_type
+	    || ((deftype_lo & 0xc00) >> 10) != mtrr_state.enabled) {
+		deftype_lo |= (mtrr_state.def_type | mtrr_state.enabled << 10);
+		change_mask |= MTRR_CHANGE_MASK_DEFTYPE;
+	}
+
+	return change_mask;
+}
+
+
+static u32 cr4 = 0;
+static u32 deftype_lo, deftype_hi;
+
+static void prepare_set(void)
+{
+	u32 cr0;
+
+	/*  Note that this is not ideal, since the cache is only flushed/disabled
+	   for this CPU while the MTRRs are changed, but changing this requires
+	   more invasive changes to the way the kernel boots  */
+
 	/*  Save value of CR4 and clear Page Global Enable (bit 7)  */
 	if ( cpu_has_pge ) {
 		cr4 = read_cr4();
@@ -90,18 +257,10 @@ void generic_set_mtrr(unsigned int reg, unsigned long base,
 
 	/*  Disable MTRRs, and set the default type to uncached  */
 	wrmsr(MTRRdefType_MSR, deftype_lo & 0xf300UL, deftype_hi);
+}
 
-	if (size == 0) {
-		/* The invalid bit is kept in the mask, so we simply clear the
-		   relevant mask register to disable a range. */
-		wrmsr(MTRRphysMask_MSR(reg), 0, 0);
-	} else {
-		wrmsr(MTRRphysBase_MSR(reg), base << PAGE_SHIFT | type,
-		      (base & size_and_mask) >> (32 - PAGE_SHIFT));
-		wrmsr(MTRRphysMask_MSR(reg), -size << PAGE_SHIFT | 0x800,
-		      (-size & size_and_mask) >> (32 - PAGE_SHIFT));
-	}
-
+static void post_set(void)
+{
 	/*  Flush caches and TLBs  */
 	wbinvd();
 
@@ -114,7 +273,57 @@ void generic_set_mtrr(unsigned int reg, unsigned long base,
 	/*  Restore value of CR4  */
 	if ( cpu_has_pge )
 		write_cr4(cr4);
-	spin_unlock(&set_atomicity_lock);
+
+}
+
+static void generic_set_all(void)
+{
+	unsigned long mask, count;
+
+	prepare_set();
+
+	/* Actually set the state */
+	mask = set_mtrr_state(deftype_lo,deftype_hi);
+
+	post_set();
+
+	/*  Use the atomic bitops to update the global mask  */
+	for (count = 0; count < sizeof mask * 8; ++count) {
+		if (mask & 0x01)
+			set_bit(count, &smp_changes_mask);
+		mask >>= 1;
+	}
+	
+}
+
+static void generic_set_mtrr(unsigned int reg, unsigned long base,
+			     unsigned long size, mtrr_type type)
+/*  [SUMMARY] Set variable MTRR register on the local CPU.
+    <reg> The register to set.
+    <base> The base address of the region.
+    <size> The size of the region. If this is 0 the region is disabled.
+    <type> The type of the region.
+    <do_safe> If TRUE, do the change safely. If FALSE, safety measures should
+    be done externally.
+    [RETURNS] Nothing.
+*/
+{
+	prepare_set();
+
+	printk("MTRR: setting reg %x\n",reg);
+
+	if (size == 0) {
+		/* The invalid bit is kept in the mask, so we simply clear the
+		   relevant mask register to disable a range. */
+		wrmsr(MTRRphysMask_MSR(reg), 0, 0);
+	} else {
+		wrmsr(MTRRphysBase_MSR(reg), base << PAGE_SHIFT | type,
+		      (base & size_and_mask) >> (32 - PAGE_SHIFT));
+		wrmsr(MTRRphysMask_MSR(reg), -size << PAGE_SHIFT | 0x800,
+		      (-size & size_and_mask) >> (32 - PAGE_SHIFT));
+	}
+
+	post_set();
 }
 
 int generic_validate_add_page(unsigned long base, unsigned long size, unsigned int type)
@@ -178,7 +387,7 @@ int positive_have_wrcomb(void)
  */
 struct mtrr_ops generic_mtrr_ops = {
 	.use_intel_if      = 1,
-	.init_secondary    = generic_init_secondary,
+	.set_all	   = generic_set_all,
 	.get               = generic_get_mtrr,
 	.get_free_region   = generic_get_free_region,
 	.set               = generic_set_mtrr,
