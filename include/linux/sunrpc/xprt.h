@@ -190,7 +190,7 @@ void			xprt_transmit(struct rpc_task *);
 void			xprt_receive(struct rpc_task *);
 int			xprt_adjust_timeout(struct rpc_timeout *);
 void			xprt_release(struct rpc_task *);
-void			xprt_reconnect(struct rpc_task *);
+void			xprt_connect(struct rpc_task *);
 int			xprt_clear_backlog(struct rpc_xprt *);
 void			xprt_sock_setbufsize(struct rpc_xprt *);
 

@@ -7,7 +7,7 @@
  *
  *  -	RPC header generation and argument serialization.
  *  -	Credential refresh.
- *  -	TCP reconnect handling (when finished).
+ *  -	TCP connect handling.
  *  -	Retry of operation when it is suspected the operation failed because
  *	of uid squashing on the server, or when the credentials were stale
  *	and need to be refreshed, or when a packet was damaged in transit.
@@ -55,9 +55,9 @@ static void	call_status(struct rpc_task *task);
 static void	call_refresh(struct rpc_task *task);
 static void	call_refreshresult(struct rpc_task *task);
 static void	call_timeout(struct rpc_task *task);
-static void	call_reconnect(struct rpc_task *task);
-static void	child_reconnect(struct rpc_task *);
-static void	child_reconnect_status(struct rpc_task *);
+static void	call_connect(struct rpc_task *task);
+static void	child_connect(struct rpc_task *task);
+static void	child_connect_status(struct rpc_task *task);
 static u32 *	call_header(struct rpc_task *task);
 static u32 *	call_verify(struct rpc_task *task);
 
@@ -561,51 +561,54 @@ call_bind(struct rpc_task *task)
 	dprintk("RPC: %4d call_bind xprt %p %s connected\n", task->tk_pid,
 			xprt, (xprt_connected(xprt) ? "is" : "is not"));
 
-	task->tk_action = (xprt_connected(xprt)) ? call_transmit : call_reconnect;
+	task->tk_action = (xprt_connected(xprt)) ? call_transmit : call_connect;
 
 	if (!clnt->cl_port) {
-		task->tk_action = call_reconnect;
+		task->tk_action = call_connect;
 		task->tk_timeout = RPC_CONNECT_TIMEOUT;
 		rpc_getport(task, clnt);
 	}
 }
 
 /*
- * 4a.	Reconnect to the RPC server (TCP case)
+ * 4a.	Connect to the RPC server (TCP case)
  */
 static void
-call_reconnect(struct rpc_task *task)
+call_connect(struct rpc_task *task)
 {
 	struct rpc_clnt *clnt = task->tk_client;
 	struct rpc_task *child;
 
-	dprintk("RPC: %4d call_reconnect status %d\n",
+	dprintk("RPC: %4d call_connect status %d\n",
 				task->tk_pid, task->tk_status);
 
 	task->tk_action = call_transmit;
 	if (task->tk_status < 0 || !clnt->cl_xprt->stream)
 		return;
 
-	/* Run as a child to ensure it runs as an rpciod task */
+	/* Run as a child to ensure it runs as an rpciod task.  Rpciod
+	 * guarantees we have the correct capabilities for socket bind
+	 * to succeed. */
 	child = rpc_new_child(clnt, task);
 	if (child) {
-		child->tk_action = child_reconnect;
+		child->tk_action = child_connect;
 		rpc_run_child(task, child, NULL);
 	}
 }
 
-static void child_reconnect(struct rpc_task *task)
+static void
+child_connect(struct rpc_task *task)
 {
-	task->tk_client->cl_stats->netreconn++;
 	task->tk_status = 0;
-	task->tk_action = child_reconnect_status;
-	xprt_reconnect(task);
+	task->tk_action = child_connect_status;
+	xprt_connect(task);
 }
 
-static void child_reconnect_status(struct rpc_task *task)
+static void
+child_connect_status(struct rpc_task *task)
 {
 	if (task->tk_status == -EAGAIN)
-		task->tk_action = child_reconnect;
+		task->tk_action = child_connect;
 	else
 		task->tk_action = NULL;
 }

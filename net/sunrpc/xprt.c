@@ -86,7 +86,7 @@ static void	xprt_request_init(struct rpc_task *, struct rpc_xprt *);
 static void	do_xprt_transmit(struct rpc_task *);
 static inline void	do_xprt_reserve(struct rpc_task *);
 static void	xprt_disconnect(struct rpc_xprt *);
-static void	xprt_reconn_status(struct rpc_task *task);
+static void	xprt_conn_status(struct rpc_task *task);
 static struct rpc_xprt * xprt_setup(int proto, struct sockaddr_in *ap,
 						struct rpc_timeout *to);
 static struct socket *xprt_create_socket(int, struct rpc_timeout *);
@@ -136,7 +136,7 @@ xprt_from_sock(struct sock *sk)
 /*
  * Serialize write access to sockets, in order to prevent different
  * requests from interfering with each other.
- * Also prevents TCP socket reconnections from colliding with writes.
+ * Also prevents TCP socket connects from colliding with writes.
  */
 static int
 __xprt_lock_write(struct rpc_xprt *xprt, struct rpc_task *task)
@@ -409,19 +409,19 @@ xprt_disconnect(struct rpc_xprt *xprt)
 }
 
 /*
- * Reconnect a broken TCP connection.
+ * Attempt to connect a TCP socket.
  *
- * Note: This cannot collide with the TCP reads, as both run from rpciod
+ * NB: This never collides with TCP reads, as both run from rpciod
  */
 void
-xprt_reconnect(struct rpc_task *task)
+xprt_connect(struct rpc_task *task)
 {
 	struct rpc_xprt	*xprt = task->tk_xprt;
 	struct socket	*sock = xprt->sock;
 	struct sock	*inet;
 	int		status;
 
-	dprintk("RPC: %4d xprt_reconnect xprt %p %s connected\n", task->tk_pid,
+	dprintk("RPC: %4d xprt_connect xprt %p %s connected\n", task->tk_pid,
 			xprt, (xprt_connected(xprt) ? "is" : "is not"));
 
 	if (xprt->shutdown) {
@@ -471,7 +471,7 @@ xprt_reconnect(struct rpc_task *task)
 			/* if the socket is already closing, delay briefly */
 			if ((1 << inet->state) & ~(TCPF_SYN_SENT|TCPF_SYN_RECV))
 				task->tk_timeout = RPC_REESTABLISH_TIMEOUT;
-			rpc_sleep_on(&xprt->pending, task, xprt_reconn_status,
+			rpc_sleep_on(&xprt->pending, task, xprt_conn_status,
 									NULL);
 			release_sock(inet);
 			/* task status set when task wakes up again */
@@ -523,21 +523,20 @@ xprt_reconnect(struct rpc_task *task)
 }
 
 /*
- * Reconnect timeout. We just mark the transport as not being in the
- * process of reconnecting, and leave the rest to the upper layers.
+ * We arrive here when awoken from waiting on connection establishment.
  */
 static void
-xprt_reconn_status(struct rpc_task *task)
+xprt_conn_status(struct rpc_task *task)
 {
 	struct rpc_xprt	*xprt = task->tk_xprt;
 
 	switch (task->tk_status) {
 	case 0:
-		dprintk("RPC: %4d xprt_reconn_status: connection established\n",
+		dprintk("RPC: %4d xprt_conn_status: connection established\n",
 				task->tk_pid);
 		goto out;
 	case -ETIMEDOUT:
-		dprintk("RPC: %4d xprt_reconn_status: timed out\n",
+		dprintk("RPC: %4d xprt_conn_status: timed out\n",
 				task->tk_pid);
 		/* prevent TCP from continuing to retry SYNs */
 		xprt_close(xprt);
@@ -1487,7 +1486,8 @@ xprt_sock_setbufsize(struct rpc_xprt *xprt)
 }
 
 /*
- * Create a client socket given the protocol and peer address.
+ * Datastream sockets are created here, but xprt_connect will create
+ * and connect stream sockets.
  */
 static struct socket *
 xprt_create_socket(int proto, struct rpc_timeout *to)
