@@ -27,6 +27,7 @@
 #include <net/ip6_fib.h>
 #include <net/ip6_route.h>
 #include <net/flow.h>
+#include <net/ip6_checksum.h>
 #include <linux/netfilter_ipv6/ip6_tables.h>
 #include <linux/netfilter_ipv6/ip6t_REJECT.h>
 

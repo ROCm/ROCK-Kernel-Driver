@@ -44,6 +44,7 @@
 #include <linux/random.h>
 #include <linux/jhash.h>
 #include <net/ipv6.h>
+#include <net/ip6_checksum.h>
 #include <linux/err.h>
 #include <linux/kernel.h>
 

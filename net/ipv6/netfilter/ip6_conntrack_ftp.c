@@ -24,6 +24,7 @@
 #include <net/checksum.h>
 #include <net/tcp.h>
 #include <net/ipv6.h>
+#include <net/ip6_checksum.h>
 #include <linux/kernel.h>
 
 #include <linux/netfilter_ipv6/ip6_conntrack.h>
