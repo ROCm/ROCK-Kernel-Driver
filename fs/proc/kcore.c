@@ -381,8 +381,13 @@ static ssize_t read_kcore(struct file *file, char *buffer, size_t buflen, loff_t
 			return tsz;
 	}
 #endif
-	/* fill the remainder of the buffer from kernel VM space */
-	start = (unsigned long)__va(*fpos - elf_buflen);
+	
+	/*
+	 * Fill the remainder of the buffer from kernel VM space.
+	 * We said in the ELF header that the data which starts
+	 * at 'elf_buflen' is virtual address PAGE_OFFSET. --rmk
+	 */
+	start = PAGE_OFFSET + (*fpos - elf_buflen);
 	if ((tsz = (PAGE_SIZE - (start & ~PAGE_MASK))) > buflen)
 		tsz = buflen;
 		
