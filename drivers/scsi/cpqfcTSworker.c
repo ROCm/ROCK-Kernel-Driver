@@ -2887,15 +2887,22 @@ static void ScsiReportLunsDone(Scsi_Cmnd *Cmnd)
 Done:  
 }
 
+extern int is_private_data_of_cpqfc(CPQFCHBA *hba, void * pointer);
+extern void cpqfc_free_private_data(CPQFCHBA *hba, cpqfc_passthru_private_t *data);
+
 static void 
 call_scsi_done(Scsi_Cmnd *Cmnd)
 {
-	// We have to reinitialize sent_command here, so the scsi-mid
-	// layer won't re-use the scsi command leaving it set incorrectly.
-	// (incorrectly for our purposes...it's normally unused.)
-
-        if (Cmnd->SCp.sent_command != 0) {	// was it a passthru?
-		Cmnd->SCp.sent_command = 0;
+	CPQFCHBA *hba;
+	hba = (CPQFCHBA *) Cmnd->host->hostdata;
+	// Was this command a cpqfc passthru ioctl ?
+        if (Cmnd->sc_request != NULL && Cmnd->host != NULL && 
+		Cmnd->host->hostdata != NULL &&
+		is_private_data_of_cpqfc((CPQFCHBA *) Cmnd->host->hostdata,
+			Cmnd->sc_request->upper_private_data)) {
+		cpqfc_free_private_data(hba, 
+			Cmnd->sc_request->upper_private_data);	
+		Cmnd->sc_request->upper_private_data = NULL;
 		Cmnd->result &= 0xff00ffff;
 		Cmnd->result |= (DID_PASSTHROUGH << 16);  // prevents retry
 	}
@@ -3293,6 +3300,7 @@ static int GetLoopID( ULONG al_pa )
 }
 #endif
 
+extern cpqfc_passthru_private_t *cpqfc_private(Scsi_Request *sr);
 
 // Search the singly (forward) linked list "fcPorts" looking for 
 // either the SCSI target (if != -1), port_id (if not NULL), 
@@ -3366,8 +3374,18 @@ PFC_LOGGEDIN_PORT  fcFindLoggedInPort(
       {
         // For "passthru" modes, the IOCTL caller is responsible
 	// for setting the FCP-LUN addressing
-	if( !Cmnd->SCp.sent_command ) // NOT passthru?
-	{
+	if (Cmnd->sc_request != NULL && Cmnd->host != NULL && 
+		Cmnd->host->hostdata != NULL &&
+		is_private_data_of_cpqfc((CPQFCHBA *) Cmnd->host->hostdata,
+			Cmnd->sc_request->upper_private_data)) { 
+		/* This is a passthru... */
+		cpqfc_passthru_private_t *pd;
+		pd = Cmnd->sc_request->upper_private_data;
+        	Cmnd->SCp.phase = pd->bus;
+		// Cmnd->SCp.have_data_in = pd->pdrive;
+		Cmnd->SCp.have_data_in = Cmnd->lun;
+	} else {
+	  /* This is not a passthru... */
 	
           // set the FCP-LUN addressing type
           Cmnd->SCp.phase = pLoggedInPort->ScsiNexus.VolumeSetAddressing;	
@@ -3380,6 +3398,8 @@ PFC_LOGGEDIN_PORT  fcFindLoggedInPort(
 	  // Report Luns command
           if( pLoggedInPort->ScsiNexus.LunMasking == 1) 
 	  {
+	    if (Cmnd->lun > sizeof(pLoggedInPort->ScsiNexus.lun))
+		return NULL;
             // we KNOW all the valid LUNs... 0xFF is invalid!
             Cmnd->SCp.have_data_in = pLoggedInPort->ScsiNexus.lun[Cmnd->lun];
 	    if (pLoggedInPort->ScsiNexus.lun[Cmnd->lun] == 0xFF)
@@ -3504,7 +3524,6 @@ static void UnblockScsiDevice( struct Scsi_Host *HostAdapter,
 	{
           printk("LinkDnCmnd scsi_done ptr null, port_id %Xh\n",
 		  pLoggedInPort->port_id);
-	  Cmnd->SCp.sent_command = 0;
 	}
 	else
 	  call_scsi_done(Cmnd);
@@ -5232,7 +5251,6 @@ static ULONG build_SEST_sgList(
 	sgl = (struct scatterlist*)Cmnd->request_buffer;  
 	sg_count = pci_map_sg(pcidev, sgl, Cmnd->use_sg, 
 		scsi_to_pci_dma_dir(Cmnd->sc_data_direction));
-        // printk("sgl = %p, sg_count = %d\n", (void *) sgl, sg_count);
   	if( sg_count <= 3 ) {
 
 	// we need to be careful here that no individual mapping
@@ -5261,7 +5279,6 @@ static ULONG build_SEST_sgList(
 	//	printk("totalsgs = %d, sgcount=%d\n",totalsgs,sg_count);
   }
 
-  // printk("totalsgs = %d, sgcount=%d\n", totalsgs, sg_count);
   if( totalsgs <= 3 ) // can (must) use "local" SEST list
   {
     while( bytes_to_go)
@@ -6164,13 +6181,11 @@ void cpqfcTSCompleteExchange(
       }
       else
       {
-	Exchanges->fcExchange[ x_ID ].Cmnd->SCp.sent_command = 0;
 //	printk(" not calling scsi_done on x_ID %Xh, Cmnd %p\n",
 //			x_ID, Exchanges->fcExchange[ x_ID ].Cmnd);
       }
     }
     else{
-	Exchanges->fcExchange[ x_ID ].Cmnd->SCp.sent_command = 0;
       printk(" x_ID %Xh, type %Xh, Cdb0 %Xh\n", x_ID,
 	Exchanges->fcExchange[ x_ID ].type, 
 	Exchanges->fcExchange[ x_ID ].Cmnd->cmnd[0]);	      
@@ -6463,10 +6478,10 @@ static int build_FCP_payload( Scsi_Cmnd *Cmnd,
       for( i=0; (i < Cmnd->cmd_len) && i < MAX_COMMAND_SIZE; i++)
 	*payload++ = Cmnd->cmnd[i];
 
-      if( Cmnd->cmd_len == 16 )
-      {
-        memcpy( payload, &Cmnd->SCp.buffers_residual, 4);
-      }
+      // if( Cmnd->cmd_len == 16 )
+      // {
+      //  memcpy( payload, &Cmnd->SCp.buffers_residual, 4);
+      // }
       payload+= (16 - i);  
 
 		      // FCP_DL is largest number of expected data bytes

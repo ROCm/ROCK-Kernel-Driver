@@ -12,13 +12,9 @@
 #include <linux/slab.h>
 #include <linux/err.h>
 #include <linux/init.h>
-#include <linux/err.h>
 #include "base.h"
 
-struct device device_root = {
-	bus_id:		"root",
-	name:		"System root",
-};
+LIST_HEAD(global_device_list);
 
 int (*platform_notify)(struct device * dev) = NULL;
 int (*platform_notify_remove)(struct device * dev) = NULL;
@@ -178,17 +174,15 @@ int device_register(struct device *dev)
 	INIT_LIST_HEAD(&dev->bus_list);
 	spin_lock_init(&dev->lock);
 	atomic_set(&dev->refcount,2);
-
-	if (dev != &device_root) {
-		if (!dev->parent)
-			dev->parent = &device_root;
-		get_device(dev->parent);
-
-		spin_lock(&device_lock);
+	
+	spin_lock(&device_lock);
+	if (dev->parent) {
+		get_device_locked(dev->parent);
 		list_add_tail(&dev->g_list,&dev->parent->g_list);
 		list_add_tail(&dev->node,&dev->parent->children);
-		spin_unlock(&device_lock);
-	}
+	} else
+		list_add_tail(&dev->g_list,&global_device_list);
+	spin_unlock(&device_lock);
 
 	pr_debug("DEV: registering device: ID = '%s', name = %s\n",
 		 dev->bus_id, dev->name);
@@ -269,12 +263,8 @@ void put_device(struct device * dev)
 	if (dev->release)
 		dev->release(dev);
 
-	put_device(dev->parent);
-}
-
-static int __init device_init_root(void)
-{
-	return device_register(&device_root);
+	if (dev->parent)
+		put_device(dev->parent);
 }
 
 static int __init device_init(void)
@@ -282,14 +272,9 @@ static int __init device_init(void)
 	int error;
 
 	error = init_driverfs_fs();
-	if (error) {
-		panic("DEV: could not initialize driverfs");
-		return error;
-	}
-	error = device_init_root();
 	if (error)
-		printk(KERN_ERR "%s: device root init failed!\n", __FUNCTION__);
-	return error;
+		panic("DEV: could not initialize driverfs");
+	return 0;
 }
 
 core_initcall(device_init);

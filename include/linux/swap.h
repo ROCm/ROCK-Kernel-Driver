@@ -156,8 +156,6 @@ extern int FASTCALL(page_over_rsslimit(struct page *));
 
 /* linux/mm/swap.c */
 extern void FASTCALL(lru_cache_add(struct page *));
-extern void FASTCALL(__lru_cache_del(struct page *));
-extern void FASTCALL(lru_cache_del(struct page *));
 
 extern void FASTCALL(activate_page(struct page *));
 
@@ -211,7 +209,7 @@ extern struct swap_list_t swap_list;
 asmlinkage long sys_swapoff(const char *);
 asmlinkage long sys_swapon(const char *, int);
 
-extern spinlock_t pagemap_lru_lock;
+extern spinlock_t _pagemap_lru_lock;
 
 extern void FASTCALL(mark_page_accessed(struct page *));
 
@@ -227,12 +225,17 @@ do {						\
 		BUG();				\
 } while (0)
 
+#define __add_page_to_active_list(page)		\
+do {						\
+	list_add(&(page)->lru, &active_list);	\
+	inc_page_state(nr_active);		\
+} while (0)
+
 #define add_page_to_active_list(page)		\
 do {						\
 	DEBUG_LRU_PAGE(page);			\
 	SetPageActive(page);			\
-	list_add(&(page)->lru, &active_list);	\
-	inc_page_state(nr_active);		\
+	__add_page_to_active_list(page);	\
 } while (0)
 
 #define add_page_to_inactive_list(page)		\

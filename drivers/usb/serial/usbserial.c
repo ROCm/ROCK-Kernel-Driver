@@ -1193,7 +1193,7 @@ static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
 	interface = &dev->actconfig->interface[ifnum];
 	list_for_each (tmp, &usb_serial_driver_list) {
 		type = list_entry(tmp, struct usb_serial_device_type, driver_list);
-		id_pattern = usb_match_id(dev, interface, type->id_table);
+		id_pattern = usb_match_id(interface, type->id_table);
 		if (id_pattern != NULL) {
 			dbg("descriptor matches");
 			found = 1;

@@ -57,7 +57,6 @@ static int i2c_debug = 0;
 
 static wait_queue_head_t pcf_wait;
 static int pcf_pending;
-spinlock_t irq_driver_lock = SPIN_LOCK_UNLOCKED;
 
 /* ----- global defines -----------------------------------------------	*/
 #define DEB(x)	if (i2c_debug>=1) x
@@ -118,12 +117,12 @@ static void pcf_isa_waitforpin(void) {
 	int timeout = 2;
 
 	if (irq > 0) {
-		spin_lock_irq(&irq_driver_lock);
+		cli();
 		if (pcf_pending == 0) {
 			interruptible_sleep_on_timeout(&pcf_wait, timeout*HZ );
 		} else
 			pcf_pending = 0;
-		spin_unlock_irq(&irq_driver_lock);
+		sti();
 	} else {
 		udelay(100);
 	}

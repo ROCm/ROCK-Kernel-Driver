@@ -252,7 +252,7 @@ show_async (struct device *dev, char *buf, size_t count, loff_t off)
 
 	return count - size;
 }
-static DEVICE_ATTR (async, "sched-async", S_IRUSR, show_async, NULL);
+static DEVICE_ATTR (async, S_IRUSR, show_async, NULL);
 
 #define DBG_SCHED_LIMIT 64
 
@@ -360,7 +360,7 @@ show_periodic (struct device *dev, char *buf, size_t count, loff_t off)
 
 	return count - size;
 }
-static DEVICE_ATTR (periodic, "sched-periodic", S_IRUSR, show_periodic, NULL);
+static DEVICE_ATTR (periodic, S_IRUSR, show_periodic, NULL);
 
 #undef DBG_SCHED_LIMIT
 

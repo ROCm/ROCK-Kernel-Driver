@@ -11,9 +11,13 @@ Original driver (sg.h):
 Version 2 and 3 extensions to driver:
 *       Copyright (C) 1998 - 2002 Douglas Gilbert
 
-    Version: 3.5.26 (20020708)
+    Version: 3.5.27 (20020812)
     This version is for 2.5 series kernels.
 
+    Changes since 3.5.26 (20020708)
+	- re-add direct IO using Kai Makisara's work
+	- re-tab to 8, start using C99-isms
+	- simplify memory management
     Changes since 3.5.25 (20020504)
 	- driverfs additions
 	- copy_to/from_user() fixes [William Stinson]
