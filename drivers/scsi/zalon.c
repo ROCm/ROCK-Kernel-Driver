@@ -133,9 +133,9 @@ static struct parisc_device_id zalon_tbl[] = {
 MODULE_DEVICE_TABLE(parisc, zalon_tbl);
 
 static struct parisc_driver zalon_driver = {
-	name:		"GSC SCSI (Zalon)",
-	id_table:	zalon_tbl,
-	probe:		zalon_scsi_callback,
+	.name =		"GSC SCSI (Zalon)",
+	.id_table =	zalon_tbl,
+	.probe =	zalon_scsi_callback,
 };
 
 int zalon7xx_detect(Scsi_Host_Template *tpnt)

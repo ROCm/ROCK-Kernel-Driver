@@ -131,6 +131,8 @@
 #include <linux/sched.h>
 #include <linux/errno.h>
 #include <linux/pci.h>
+#include <linux/dma-mapping.h>
+#include <linux/interrupt.h>
 #include <linux/string.h>
 #include <linux/mm.h>
 #include <linux/ioport.h>
@@ -193,6 +195,7 @@ typedef	u_long		vm_offset_t;
 
 #if defined(CONFIG_SCSI_ZALON) || defined(CONFIG_SCSI_ZALON_MODULE)
 #define ENABLE_SCSI_ZALON
+#include <asm/parisc-device.h>
 #include "zalon.h"
 #endif
 
@@ -1116,7 +1119,7 @@ struct ncb {
 	**	General controller parameters and configuration.
 	**----------------------------------------------------------------
 	*/
-	pcidev_t	pdev;
+	device_t	dev;
 	u_short		device_id;	/* PCI device id		*/
 	u_char		revision_id;	/* PCI device revision id	*/
 	u_char		bus;		/* PCI BUS number		*/
@@ -3681,11 +3684,11 @@ ncr_attach (Scsi_Host_Template *tpnt, int unit, ncr_device *device)
 	/*
 	**	Allocate the host control block.
 	*/
-	np = __m_calloc_dma(device->pdev, sizeof(struct ncb), "NCB");
+	np = __m_calloc_dma(device->dev, sizeof(struct ncb), "NCB");
 	if (!np)
 		goto attach_error;
 	NCR_INIT_LOCK_NCB(np);
-	np->pdev  = device->pdev;
+	np->dev  = device->dev;
 	np->p_ncb = vtobus(np);
 	host_data->ncb = np;
 
@@ -3826,9 +3829,7 @@ ncr_attach (Scsi_Host_Template *tpnt, int unit, ncr_device *device)
 	instance->dma_channel	= 0;
 	instance->cmd_per_lun	= MAX_TAGS;
 	instance->can_queue	= (MAX_START-4);
-#ifndef ENABLE_SCSI_ZALON
-	scsi_set_pci_device(instance, device->pdev);
-#endif
+	scsi_set_device(instance, device->dev);
 
 #ifdef SCSI_NCR_INTEGRITY_CHECKING
 	np->check_integrity	  = 0;
@@ -9443,7 +9444,7 @@ int zalon_attach(Scsi_Host_Template *tpnt, unsigned long io_port,
 
 	/* Initialise ncr_device structure with items required by ncr_attach. */
 	device.host_id		= driver_setup.host_id;
-	device.pdev		= ccio_get_fake(dev);
+	device.dev		= &dev->dev;
 	device.slot.bus		= 0;
 	device.slot.device_fn	= 0;
 	device.slot.base	= (u_long)io_port;
@@ -9510,7 +9511,20 @@ static
 #endif
 #if LINUX_VERSION_CODE >= LinuxVersionCode(2,4,0) || defined(MODULE)
 #ifdef ENABLE_SCSI_ZALON
-Scsi_Host_Template driver_template = SCSI_ZALON;
+Scsi_Host_Template driver_template =  {
+	.proc_name =		"zalon720",
+	.detect =		zalon7xx_detect,
+	.release =		zalon7xx_release,
+	.info =			ncr53c8xx_info,
+	.queuecommand =		ncr53c8xx_queue_command,
+	.can_queue =		SCSI_NCR_CAN_QUEUE,
+	.this_id =		7,
+	.sg_tablesize =		SCSI_NCR_SG_TABLESIZE,
+	.cmd_per_lun =		SCSI_NCR_CMD_PER_LUN,
+	.use_clustering =	DISABLE_CLUSTERING,
+};
+
+
 #else
 Scsi_Host_Template driver_template = NCR53C8XX;
 #endif

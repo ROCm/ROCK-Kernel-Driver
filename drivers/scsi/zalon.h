@@ -22,19 +22,6 @@ int zalon7xx_release(struct Scsi_Host *);
 #define zalon7xx_release NULL
 #endif
 
-#define SCSI_ZALON { proc_name:		"zalon720",	\
-			detect:         zalon7xx_detect,	\
-			release:        zalon7xx_release,	\
-			info:           ncr53c8xx_info, 	\
-			queuecommand:   ncr53c8xx_queue_command,\
-			bios_param:     scsicam_bios_param,	\
-			can_queue:      SCSI_NCR_CAN_QUEUE,	\
-			this_id:        7,			\
-			sg_tablesize:   SCSI_NCR_SG_TABLESIZE,	\
-			cmd_per_lun:    SCSI_NCR_CMD_PER_LUN,	\
-			use_clustering: DISABLE_CLUSTERING} 
-
-
 #define GSC_SCSI_ZALON_OFFSET 0x800
 
 #define IO_MODULE_EIM		(1*4)
