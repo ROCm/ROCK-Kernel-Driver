@@ -1904,18 +1904,19 @@ inline void blk_recalc_rq_sectors(struct request *rq, int nsect)
 
 int end_that_request_first(struct request *req, int uptodate, int nr_sectors)
 {
-	int nsect, total_nsect;
+	int total_nsect = 0, error = 0;
 	struct bio *bio;
 
 	req->errors = 0;
-	if (!uptodate)
+	if (!uptodate) {
 		printk("end_request: I/O error, dev %s, sector %lu\n",
 			kdevname(req->rq_dev), req->sector);
+		error = -EIO;
+	}
 
-	total_nsect = 0;
 	while ((bio = req->bio)) {
-		nsect = bio_iovec(bio)->bv_len >> 9;
-		total_nsect += nsect;
+		const int nsect = bio_iovec(bio)->bv_len >> 9;
+		int new_bio = 0;
 
 		BIO_BUG_ON(bio_iovec(bio)->bv_len > bio->bi_size);
 
@@ -1927,36 +1928,52 @@ int end_that_request_first(struct request *req, int uptodate, int nr_sectors)
 
 			bio_iovec(bio)->bv_offset += partial;
 			bio_iovec(bio)->bv_len -= partial;
-			blk_recalc_rq_sectors(req, total_nsect);
-			blk_recalc_rq_segments(req);
-			bio_endio(bio, partial, !uptodate ? -EIO : 0);
-			return 1;
+			bio_endio(bio, partial, error);
+			total_nsect += nr_sectors;
+			break;
 		}
 
 		/*
-		 * if bio->bi_end_io returns 0, this bio is done. move on
+		 * we are ending the last part of the bio, advance req pointer
 		 */
-		req->bio = bio->bi_next;
-		if (bio_endio(bio, nsect << 9, !uptodate ? -EIO : 0)) {
-			bio->bi_idx++;
-			req->bio = bio;
+		if ((nsect << 9) >= bio->bi_size) {
+			req->bio = bio->bi_next;
+			new_bio = 1;
 		}
 
+		bio_endio(bio, nsect << 9, error);
+
+		total_nsect += nsect;
 		nr_sectors -= nsect;
+
+		/*
+		 * if we didn't advance the req->bio pointer, advance bi_idx
+		 * to indicate we are now on the next bio_vec
+		 */
+		if (!new_bio)
+			bio->bi_idx++;
 
 		if ((bio = req->bio)) {
 			/*
 			 * end more in this run, or just return 'not-done'
 			 */
-			if (unlikely(nr_sectors <= 0)) {
-				blk_recalc_rq_sectors(req, total_nsect);
-				blk_recalc_rq_segments(req);
-				return 1;
-			}
+			if (unlikely(nr_sectors <= 0))
+				break;
 		}
 	}
 
-	return 0;
+	/*
+	 * completely done
+	 */
+	if (!req->bio)
+		return 0;
+
+	/*
+	 * if the request wasn't completed, update state
+	 */
+	blk_recalc_rq_sectors(req, total_nsect);
+	blk_recalc_rq_segments(req);
+	return 1;
 }
 
 void end_that_request_last(struct request *req)
