@@ -70,40 +70,43 @@ void cfb_imageblit(struct fb_info *p, struct fb_image *image)
 
 	src = image->data;	
 
-	if (p->fix.visual == FB_VISUAL_TRUECOLOR) {
-		fgx = fgcolor = ((u32 *)(p->pseudo_palette))[image->fg_color];
-		bgx = bgcolor = ((u32 *)(p->pseudo_palette))[image->bg_color];
-	} else {
-		fgx = fgcolor = image->fg_color;
-		bgx = bgcolor = image->bg_color;
-	}	
- 
-	for (i = 0; i < ppw-1; i++) {
-		fgx <<= p->var.bits_per_pixel;
-		bgx <<= p->var.bits_per_pixel;
-		fgx |= fgcolor;
-		bgx |= bgcolor;
-	}
-	eorx = fgx ^ bgx;
-	n = ((image->width + 7) >> 3);
-	pad = (n << 3) - image->width;
+	if (image->depth == 1) {
 
-	for (i = 0; i < image->height; i++) {
-		dst = (unsigned long *) dst1;
-		
-		for (j = image->width/ppw; j > 0; j--) {
-			mask = 0;
-		
-			for (k = ppw; k > 0; k--) {	
-				if (test_bit(l, src))
-					mask |= (tmp >> (p->var.bits_per_pixel*(k-1)));
-				l--;
-				if (l < 0) { l = 7; src++; }
-			}
-			fb_writel((mask & eorx)^bgx, dst);
-			dst++;
+		if (p->fix.visual == FB_VISUAL_TRUECOLOR) {
+			fgx = fgcolor = ((u32 *)(p->pseudo_palette))[image->fg_color];
+			bgx = bgcolor = ((u32 *)(p->pseudo_palette))[image->bg_color];
+		} else {
+			fgx = fgcolor = image->fg_color;
+			bgx = bgcolor = image->bg_color;
+		}	
+ 
+		for (i = 0; i < ppw-1; i++) {
+			fgx <<= p->var.bits_per_pixel;
+			bgx <<= p->var.bits_per_pixel;
+			fgx |= fgcolor;
+			bgx |= bgcolor;
 		}
-		l =- pad;		
-		dst1 += p->fix.line_length;	
-	}	
+		eorx = fgx ^ bgx;
+		n = ((image->width + 7) >> 3);
+		pad = (n << 3) - image->width;
+
+		for (i = 0; i < image->height; i++) {
+			dst = (unsigned long *) dst1;
+		
+			for (j = image->width/ppw; j > 0; j--) {
+				mask = 0;
+		
+				for (k = ppw; k > 0; k--) {	
+					if (test_bit(l, src))
+						mask |= (tmp >> (p->var.bits_per_pixel*(k-1)));
+					l--;
+					if (l < 0) { l = 7; src++; }
+				}
+				fb_writel((mask & eorx)^bgx, dst);
+				dst++;
+			}
+			l =- pad;		
+			dst1 += p->fix.line_length;	
+		}	
+	}
 }

@@ -387,44 +387,6 @@ static int __init hga_card_detect(void)
  * ------------------------------------------------------------------------- */
 
 /**
- *	hga_get_fix - get the fixed part of the display
- *	@fix:struct fb_fix_screeninfo to fill in
- *	@con:unused
- *	@info:pointer to fb_info object containing info for current hga board
- *
- *	This wrapper function copies @info->fix to @fix.
- *	A zero is returned on success and %-EINVAL for failure.
- */
-
-int hga_get_fix(struct fb_fix_screeninfo *fix, int con, struct fb_info *info)
-{
-	CHKINFO(-EINVAL);
-	DPRINTK("hga_get_fix: con:%d, info:%x, fb_info:%x\n", con, (unsigned)info, (unsigned)&fb_info);
-
-	*fix = info->fix;
-	return 0;
-}
-
-/**
- *	hga_get_var - get the user defined part of the display
- *	@var:struct fb_var_screeninfo to fill in
- *	@con:unused
- *	@info:pointer to fb_info object containing info for current hga board
- *
- *	This wrapper function copies @info->var to @var.
- *	A zero is returned on success and %-EINVAL for failure.
- */
-
-int hga_get_var(struct fb_var_screeninfo *var, int con, struct fb_info *info)
-{
-	CHKINFO(-EINVAL);
-	DPRINTK("hga_get_var: con:%d, info:%x, fb_info:%x\n", con, (unsigned)info, (unsigned)&fb_info);
-
-	*var = info->var;
-	return 0;
-}
-
-/**
  *	hga_set_var - set the user defined part of the display
  *	@var:new video mode
  *	@con:unused
@@ -596,8 +558,8 @@ static int hgafb_blank(int blank_mode, struct fb_info *info)
 
 static struct fb_ops hgafb_ops = {
 	owner:		THIS_MODULE,
-	fb_get_fix:	hga_get_fix,
-	fb_get_var:	hga_get_var,
+	fb_get_fix:	gen_get_fix,
+	fb_get_var:	gen_get_var,
 	fb_set_var:	hga_set_var,
 	fb_get_cmap:	hga_get_cmap,
 	fb_set_cmap:	gen_set_cmap,
