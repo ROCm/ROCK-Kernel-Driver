@@ -1109,16 +1109,17 @@ static int hdsp_set_rate(hdsp_t *hdsp, int rate, int called_internally)
 		rate_bits = HDSP_Frequency176_4KHz;
 		break;
 	case 192000:
-		if (current_rate != 192000) {
+		if (current_rate < 128000) {
 			reject_if_open = 1;
 		}
 		rate_bits = HDSP_Frequency192KHz;
+		break;
 	default:
 		return -EINVAL;
 	}
 
 	if (reject_if_open && (hdsp->capture_pid >= 0 || hdsp->playback_pid >= 0)) {
-		snd_printk ("cannot change between single- and double-speed mode (capture PID = %d, playback PID = %d)\n",
+		snd_printk ("cannot change speed mode (capture PID = %d, playback PID = %d)\n",
 			    hdsp->capture_pid,
 			    hdsp->playback_pid);
 		return -EBUSY;
@@ -2102,9 +2103,11 @@ static int hdsp_set_clock_source(hdsp_t *hdsp, int mode)
 	switch (mode) {
 	case HDSP_CLOCK_SOURCE_AUTOSYNC:
 		if (hdsp_external_sample_rate(hdsp) != 0) {
-		    hdsp->control_register &= ~HDSP_ClockModeMaster;		
-		    hdsp_write(hdsp, HDSP_controlRegister, hdsp->control_register);
-		    return 0;
+		    if (!hdsp_set_rate(hdsp, hdsp_external_sample_rate(hdsp), 1)) {
+			hdsp->control_register &= ~HDSP_ClockModeMaster;		
+			hdsp_write(hdsp, HDSP_controlRegister, hdsp->control_register);
+			return 0;
+		    }
 		}
 		return -1;
 	case HDSP_CLOCK_SOURCE_INTERNAL_32KHZ:
@@ -4189,30 +4192,37 @@ static snd_pcm_hw_constraint_list_t hdsp_hw_constraints_9632_sample_rates = {
 static int snd_hdsp_hw_rule_in_channels(snd_pcm_hw_params_t *params,
 					snd_pcm_hw_rule_t *rule)
 {
-	unsigned int list[2];
 	hdsp_t *hdsp = rule->private;
 	snd_interval_t *c = hw_param_interval(params, SNDRV_PCM_HW_PARAM_CHANNELS);
 	if (hdsp->io_type == H9632) {
+		unsigned int list[3];
 		list[0] = hdsp->qs_in_channels;
+		list[1] = hdsp->ds_in_channels;
+		list[2] = hdsp->ss_in_channels;
+		return snd_interval_list(c, 3, list, 0);
 	} else {
+		unsigned int list[2];
 		list[0] = hdsp->ds_in_channels;
+		list[1] = hdsp->ss_in_channels;
+		return snd_interval_list(c, 2, list, 0);
 	}
-	list[1] = hdsp->ss_in_channels;
-	return snd_interval_list(c, 2, list, 0);
 }
 
 static int snd_hdsp_hw_rule_out_channels(snd_pcm_hw_params_t *params,
 					snd_pcm_hw_rule_t *rule)
 {
-	unsigned int list[2];
+	unsigned int list[3];
 	hdsp_t *hdsp = rule->private;
 	snd_interval_t *c = hw_param_interval(params, SNDRV_PCM_HW_PARAM_CHANNELS);
 	if (hdsp->io_type == H9632) {
 		list[0] = hdsp->qs_out_channels;
+		list[1] = hdsp->ds_out_channels;
+		list[2] = hdsp->ss_out_channels;
+		return snd_interval_list(c, 3, list, 0);
 	} else {
 		list[0] = hdsp->ds_out_channels;
+		list[1] = hdsp->ss_out_channels;
 	}
-	list[1] = hdsp->ss_out_channels;
 	return snd_interval_list(c, 2, list, 0);
 }
 
@@ -4229,7 +4239,7 @@ static int snd_hdsp_hw_rule_in_channels_rate(snd_pcm_hw_params_t *params,
 			.integer = 1,
 		};
 		return snd_interval_refine(c, &t);	
-	} else if (r->min > 48000) {
+	} else if (r->min > 48000 && r->max <= 96000) {
 		snd_interval_t t = {
 			.min = hdsp->ds_in_channels,
 			.max = hdsp->ds_in_channels,
@@ -4260,7 +4270,7 @@ static int snd_hdsp_hw_rule_out_channels_rate(snd_pcm_hw_params_t *params,
 			.integer = 1,
 		};
 		return snd_interval_refine(c, &t);	
-	} else if (r->min > 48000) {
+	} else if (r->min > 48000 && r->max <= 96000) {
 		snd_interval_t t = {
 			.min = hdsp->ds_out_channels,
 			.max = hdsp->ds_out_channels,
