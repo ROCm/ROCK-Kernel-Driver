@@ -988,9 +988,12 @@ munmap_back:
 	 *         f_op->mmap method. -DaveM
 	 */
 	addr = vma->vm_start;
+	pgoff = vma->vm_pgoff;
+	vm_flags = vma->vm_flags;
 
 	if (!file || !vma_merge(mm, prev, addr, vma->vm_end,
 			vma->vm_flags, NULL, file, pgoff, vma_policy(vma))) {
+		file = vma->vm_file;
 		vma_link(mm, vma, prev, rb_link, rb_parent);
 		if (correct_wcount)
 			atomic_inc(&inode->i_writecount);
@@ -1005,6 +1008,7 @@ munmap_back:
 	}
 out:	
 	mm->total_vm += len >> PAGE_SHIFT;
+	__vm_stat_account(mm, vm_flags, file, len >> PAGE_SHIFT);
 	if (vm_flags & VM_LOCKED) {
 		mm->locked_vm += len >> PAGE_SHIFT;
 		make_pages_present(addr, addr + len);
@@ -1015,7 +1019,6 @@ out:
 					pgoff, flags & MAP_NONBLOCK);
 		down_write(&mm->mmap_sem);
 	}
-	__vm_stat_account(mm, vm_flags, file, len >> PAGE_SHIFT);
 	return addr;
 
 unmap_and_free_vma:
