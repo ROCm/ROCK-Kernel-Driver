@@ -443,7 +443,8 @@ static int aac_biosparm(struct scsi_device *sdev, struct block_device *bdev,
 		param->sectors = 32;
 	}
 
-	param->cylinders = capacity/(param->heads * param->sectors);
+	param->cylinders = cap_to_cyls(capacity,
+			(param->heads * param->sectors));
 
 	/*
 	 *	Read the partition table block
@@ -497,7 +498,8 @@ static int aac_biosparm(struct scsi_device *sdev, struct block_device *bdev,
 			end_sec = first->end_sector & 0x3f;
 		}
 
-		param->cylinders = capacity / (param->heads * param->sectors);
+		param->cylinders = cap_to_cyls(capacity,
+				(param->heads * param->sectors));
 
 		if(num < 4 && end_sec == param->sectors)
 		{

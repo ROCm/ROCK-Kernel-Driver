@@ -1369,6 +1369,21 @@ static inline struct hw_fib *addr2fib(u32 addr)
 	return (struct hw_fib *)addr;
 }
 
+/**
+ * 	Convert capacity to cylinders
+ *  	accounting for the fact capacity could be a 64 bit value
+ *
+ */
+static inline u32 cap_to_cyls(sector_t capacity, u32 divisor)
+{
+#ifdef CONFIG_LBD
+	do_div(capacity, divisor);
+#else
+	capacity /= divisor;
+#endif
+	return (u32) capacity;
+}
+
 const char *aac_driverinfo(struct Scsi_Host *);
 struct fib *fib_alloc(struct aac_dev *dev);
 int fib_setup(struct aac_dev *dev);
