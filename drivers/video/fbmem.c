@@ -172,6 +172,7 @@ extern int kyrofb_init(void);
 extern int kyrofb_setup(char*);
 extern int mc68x328fb_init(void);
 extern int mc68x328fb_setup(char *);
+extern int asiliantfb_init(void);
 
 static struct {
 	const char *name;
@@ -384,6 +385,9 @@ static struct {
 #endif
 #ifdef CONFIG_FB_68328
 	{ "68328fb", mc68x328fb_init, mc68x328fb_setup },
+#endif
+#ifdef CONFIG_FB_ASILIANT
+	{ "asiliantfb", asiliantfb_init, NULL },
 #endif
 
 	/*
