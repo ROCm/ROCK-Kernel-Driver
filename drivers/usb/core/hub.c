@@ -1197,13 +1197,13 @@ static int hub_port_disable(struct usb_device *hdev, int port)
  * low-speed devices for which this debounce period may last over a second.
  * Not covered by the spec - but easy to deal with.
  *
- * This implementation uses a 400ms total debounce timeout; if the
+ * This implementation uses a 1500ms total debounce timeout; if the
  * connection isn't stable by then it returns -ETIMEDOUT.  It checks
  * every 25ms for transient disconnects.  When the port status has been
  * unchanged for 100ms it returns the port status.
  */
 
-#define HUB_DEBOUNCE_TIMEOUT	 400  /* 1500 */
+#define HUB_DEBOUNCE_TIMEOUT	1500
 #define HUB_DEBOUNCE_STEP	  25
 #define HUB_DEBOUNCE_STABLE	 100
 
@@ -1219,10 +1219,10 @@ static int hub_port_debounce(struct usb_device *hdev, int port)
 		if (ret < 0)
 			return ret;
 
-		if ( /* !(portchange & USB_PORT_STAT_C_CONNECTION) && */
+		if (!(portchange & USB_PORT_STAT_C_CONNECTION) &&
 		     (portstatus & USB_PORT_STAT_CONNECTION) == connection) {
 			stable_time += HUB_DEBOUNCE_STEP;
-			if (stable_time >= HUB_DEBOUNCE_STABLE && connection /* */)
+			if (stable_time >= HUB_DEBOUNCE_STABLE)
 				break;
 		} else {
 			stable_time = 0;
