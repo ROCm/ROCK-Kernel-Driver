@@ -310,19 +310,23 @@ static int rd_ioctl(struct inode *inode, struct file *file,
 }
 
 /*
- * The backing_dev_info is shared between files which are backed by the ramdisk
- * inode and by the ramdisk inode itself.  This is a bit unfortunate because
- * they really want separate semantics.  The files *do* want full writeback
- * and dirty-memory accounting treatment, whereas the ramdisk blockdev mapping
- * wants neither.
- *
- * So we make things look like a regular blockdev and the cheat in various ways
- * in the ramdisk inode's a_ops.
+ * This is the backing_dev_info for the blockdev inode itself.  It doesn't need
+ * writeback and it does not contribute to dirty memory accounting.
  */
-
 static struct backing_dev_info rd_backing_dev_info = {
 	.ra_pages	= 0,	/* No readahead */
 	.memory_backed	= 1,	/* Does not contribute to dirty memory */
+	.unplug_io_fn	= default_unplug_io_fn,
+};
+
+/*
+ * This is the backing_dev_info for the files which live atop the ramdisk
+ * "device".  These files do need writeback and they do contribute to dirty
+ * memory accounting.
+ */
+static struct backing_dev_info rd_file_backing_dev_info = {
+	.ra_pages	= 0,	/* No readahead */
+	.memory_backed	= 0,	/* Does contribute to dirty memory */
 	.unplug_io_fn	= default_unplug_io_fn,
 };
 
@@ -343,6 +347,7 @@ static int rd_open(struct inode *inode, struct file *filp)
 		mapping = inode->i_mapping;
 		mapping->a_ops = &ramdisk_aops;
 		mapping->backing_dev_info = &rd_backing_dev_info;
+		bdev->bd_inode_backing_dev_info = &rd_file_backing_dev_info;
 
 		/*
 		 * Deep badness.  rd_blkdev_pagecache_IO() needs to allocate
