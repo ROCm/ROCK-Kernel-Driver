@@ -550,7 +550,7 @@ xfs_qm_scall_getqstat(
 
 	uip = gip = NULL;
 	tempuqip = tempgqip = B_FALSE;
-	bzero(out, sizeof(fs_quota_stat_t));
+	memset(out, 0, sizeof(fs_quota_stat_t));
 
 	out->qs_version = FS_QSTAT_VERSION;
 	if (! XFS_SB_VERSION_HASQUOTA(&mp->m_sb)) {
@@ -885,7 +885,7 @@ xfs_qm_export_dquot(
 	xfs_disk_dquot_t	*src,
 	struct fs_disk_quota	*dst)
 {
-	bzero(dst, sizeof(*dst));
+	memset(dst, 0, sizeof(*dst));
 	dst->d_version = FS_DQUOT_VERSION;  /* different from src->d_version */
 	dst->d_flags =
 		xfs_qm_export_qtype_flags(INT_GET(src->d_flags, ARCH_CONVERT));

@@ -331,7 +331,7 @@ xfs_dir2_block_addname(
 		blp--;
 		mid++;
 		if (mid)
-			ovbcopy(&blp[1], blp, mid * sizeof(*blp));
+			memmove(blp, &blp[1], mid * sizeof(*blp));
 		lfloglow = 0;
 		lfloghigh = mid;
 	}
@@ -357,7 +357,7 @@ xfs_dir2_block_addname(
 		    (highstale == INT_GET(btp->count, ARCH_CONVERT) ||
 		     mid - lowstale <= highstale - mid)) {
 			if (mid - lowstale)
-				ovbcopy(&blp[lowstale + 1], &blp[lowstale],
+				memmove(&blp[lowstale], &blp[lowstale + 1],
 					(mid - lowstale) * sizeof(*blp));
 			lfloglow = MIN(lowstale, lfloglow);
 			lfloghigh = MAX(mid, lfloghigh);
@@ -369,7 +369,7 @@ xfs_dir2_block_addname(
 			ASSERT(highstale < INT_GET(btp->count, ARCH_CONVERT));
 			mid++;
 			if (highstale - mid)
-				ovbcopy(&blp[mid], &blp[mid + 1],
+				memmove(&blp[mid + 1], &blp[mid],
 					(highstale - mid) * sizeof(*blp));
 			lfloglow = MIN(mid, lfloglow);
 			lfloghigh = MAX(highstale, lfloghigh);
@@ -397,7 +397,7 @@ xfs_dir2_block_addname(
 	 */
 	INT_SET(dep->inumber, ARCH_CONVERT, args->inumber);
 	dep->namelen = args->namelen;
-	bcopy(args->name, dep->name, args->namelen);
+	memcpy(dep->name, args->name, args->namelen);
 	tagp = XFS_DIR2_DATA_ENTRY_TAG_P(dep);
 	INT_SET(*tagp, ARCH_CONVERT, (xfs_dir2_data_off_t)((char *)dep - (char *)block));
 	/*
@@ -717,7 +717,7 @@ xfs_dir2_block_lookup_int(
 		 */
 		if (dep->namelen == args->namelen &&
 		    dep->name[0] == args->name[0] &&
-		    bcmp(dep->name, args->name, args->namelen) == 0) {
+		    memcmp(dep->name, args->name, args->namelen) == 0) {
 			*bpp = bp;
 			*entno = mid;
 			return 0;
@@ -1075,7 +1075,7 @@ xfs_dir2_sf_to_block(
 	buf_len = dp->i_df.if_bytes;
 	buf = kmem_alloc(dp->i_df.if_bytes, KM_SLEEP);
 
-	bcopy(sfp, buf, dp->i_df.if_bytes);
+	memcpy(buf, sfp, dp->i_df.if_bytes);
 	xfs_idata_realloc(dp, -dp->i_df.if_bytes, XFS_DATA_FORK);
 	dp->i_d.di_size = 0;
 	xfs_trans_log_inode(tp, dp, XFS_ILOG_CORE);
@@ -1199,7 +1199,7 @@ xfs_dir2_sf_to_block(
 		INT_SET(dep->inumber, ARCH_CONVERT, XFS_DIR2_SF_GET_INUMBER_ARCH(sfp,
 				XFS_DIR2_SF_INUMBERP(sfep), ARCH_CONVERT));
 		dep->namelen = sfep->namelen;
-		bcopy(sfep->name, dep->name, dep->namelen);
+		memcpy(dep->name, sfep->name, dep->namelen);
 		tagp = XFS_DIR2_DATA_ENTRY_TAG_P(dep);
 		INT_SET(*tagp, ARCH_CONVERT, (xfs_dir2_data_off_t)((char *)dep - (char *)block));
 		xfs_dir2_data_log_entry(tp, bp, dep);

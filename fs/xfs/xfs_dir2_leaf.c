@@ -110,7 +110,7 @@ xfs_dir2_block_to_leaf(
 	 * Could compact these but I think we always do the conversion
 	 * after squeezing out stale entries.
 	 */
-	bcopy(blp, leaf->ents, INT_GET(btp->count, ARCH_CONVERT) * sizeof(xfs_dir2_leaf_entry_t));
+	memcpy(leaf->ents, blp, INT_GET(btp->count, ARCH_CONVERT) * sizeof(xfs_dir2_leaf_entry_t));
 	xfs_dir2_leaf_log_ents(tp, lbp, 0, INT_GET(leaf->hdr.count, ARCH_CONVERT) - 1);
 	needscan = 0;
 	needlog = 1;
@@ -353,7 +353,7 @@ xfs_dir2_leaf_addname(
 		 */
 		if (use_block >= INT_GET(ltp->bestcount, ARCH_CONVERT)) {
 			bestsp--;
-			ovbcopy(&bestsp[1], &bestsp[0],
+			memmove(&bestsp[0], &bestsp[1],
 				INT_GET(ltp->bestcount, ARCH_CONVERT) * sizeof(bestsp[0]));
 			INT_MOD(ltp->bestcount, ARCH_CONVERT, +1);
 			xfs_dir2_leaf_log_tail(tp, lbp);
@@ -402,7 +402,7 @@ xfs_dir2_leaf_addname(
 	dep = (xfs_dir2_data_entry_t *)dup;
 	INT_SET(dep->inumber, ARCH_CONVERT, args->inumber);
 	dep->namelen = args->namelen;
-	bcopy(args->name, dep->name, dep->namelen);
+	memcpy(dep->name, args->name, dep->namelen);
 	tagp = XFS_DIR2_DATA_ENTRY_TAG_P(dep);
 	INT_SET(*tagp, ARCH_CONVERT, (xfs_dir2_data_off_t)((char *)dep - (char *)data));
 	/*
@@ -434,7 +434,7 @@ xfs_dir2_leaf_addname(
 		 * lep is still good as the index leaf entry.
 		 */
 		if (index < INT_GET(leaf->hdr.count, ARCH_CONVERT))
-			ovbcopy(lep, lep + 1,
+			memmove(lep + 1, lep,
 				(INT_GET(leaf->hdr.count, ARCH_CONVERT) - index) * sizeof(*lep));
 		/*
 		 * Record low and high logging indices for the leaf.
@@ -493,8 +493,8 @@ xfs_dir2_leaf_addname(
 			 * and make room for the new entry.
 			 */
 			if (index - lowstale - 1 > 0)
-				ovbcopy(&leaf->ents[lowstale + 1],
-					&leaf->ents[lowstale],
+				memmove(&leaf->ents[lowstale],
+					&leaf->ents[lowstale + 1],
 					(index - lowstale - 1) * sizeof(*lep));
 			lep = &leaf->ents[index - 1];
 			lfloglow = MIN(lowstale, lfloglow);
@@ -512,8 +512,8 @@ xfs_dir2_leaf_addname(
 			 * and make room for the new entry.
 			 */
 			if (highstale - index > 0)
-				ovbcopy(&leaf->ents[index],
-					&leaf->ents[index + 1],
+				memmove(&leaf->ents[index + 1],
+					&leaf->ents[index],
 					(highstale - index) * sizeof(*lep));
 			lep = &leaf->ents[index];
 			lfloglow = MIN(index, lfloglow);
@@ -847,7 +847,7 @@ xfs_dir2_leaf_getdents(
 					 * the table.
 					 */
 					if (!map->br_blockcount && --map_valid)
-						ovbcopy(&map[1], &map[0],
+						memmove(&map[0], &map[1],
 							sizeof(map[0]) *
 							map_valid);
 					i -= j;
@@ -909,8 +909,8 @@ xfs_dir2_leaf_getdents(
 						nmap--;
 						length = map_valid + nmap - i;
 						if (length)
-							ovbcopy(&map[i + 1],
-								&map[i],
+							memmove(&map[i],
+								&map[i + 1],
 								sizeof(map[i]) *
 								length);
 					} else {
@@ -1409,7 +1409,7 @@ xfs_dir2_leaf_lookup_int(
 		 */
 		if (dep->namelen == args->namelen &&
 		    dep->name[0] == args->name[0] &&
-		    bcmp(dep->name, args->name, args->namelen) == 0) {
+		    memcmp(dep->name, args->name, args->namelen) == 0) {
 			*dbpp = dbp;
 			*indexp = index;
 			return 0;
@@ -1544,7 +1544,7 @@ xfs_dir2_leaf_removename(
 			 * Copy the table down so inactive entries at the
 			 * end are removed.
 			 */
-			ovbcopy(bestsp, &bestsp[db - i],
+			memmove(&bestsp[db - i], bestsp,
 				(INT_GET(ltp->bestcount, ARCH_CONVERT) - (db - i)) * sizeof(*bestsp));
 			INT_MOD(ltp->bestcount, ARCH_CONVERT, -(db - i));
 			xfs_dir2_leaf_log_tail(tp, lbp);
@@ -1728,7 +1728,7 @@ xfs_dir2_leaf_trim_data(
 	 */
 	bestsp = XFS_DIR2_LEAF_BESTS_P_ARCH(ltp, ARCH_CONVERT);
 	INT_MOD(ltp->bestcount, ARCH_CONVERT, -1);
-	ovbcopy(&bestsp[0], &bestsp[1], INT_GET(ltp->bestcount, ARCH_CONVERT) * sizeof(*bestsp));
+	memmove(&bestsp[1], &bestsp[0], INT_GET(ltp->bestcount, ARCH_CONVERT) * sizeof(*bestsp));
 	xfs_dir2_leaf_log_tail(tp, lbp);
 	xfs_dir2_leaf_log_bests(tp, lbp, 0, INT_GET(ltp->bestcount, ARCH_CONVERT) - 1);
 	return 0;
@@ -1842,7 +1842,7 @@ xfs_dir2_node_to_leaf(
 	/*
 	 * Set up the leaf bests table.
 	 */
-	bcopy(free->bests, XFS_DIR2_LEAF_BESTS_P_ARCH(ltp, ARCH_CONVERT),
+	memcpy(XFS_DIR2_LEAF_BESTS_P_ARCH(ltp, ARCH_CONVERT), free->bests,
 		INT_GET(ltp->bestcount, ARCH_CONVERT) * sizeof(leaf->bests[0]));
 	xfs_dir2_leaf_log_bests(tp, lbp, 0, INT_GET(ltp->bestcount, ARCH_CONVERT) - 1);
 	xfs_dir2_leaf_log_tail(tp, lbp);

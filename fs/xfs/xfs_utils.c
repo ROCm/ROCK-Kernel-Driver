@@ -345,7 +345,7 @@ xfs_bump_ino_vers2(
 
 	ip->i_d.di_version = XFS_DINODE_VERSION_2;
 	ip->i_d.di_onlink = 0;
-	bzero(&(ip->i_d.di_pad[0]), sizeof(ip->i_d.di_pad));
+	memset(&(ip->i_d.di_pad[0]), 0, sizeof(ip->i_d.di_pad));
 	mp = tp->t_mountp;
 	if (!XFS_SB_VERSION_HASNLINK(&mp->m_sb)) {
 		s = XFS_SB_LOCK(mp);

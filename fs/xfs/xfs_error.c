@@ -69,9 +69,9 @@ char *	xfs_etest_fsname[XFS_NUM_INJECT_ERROR];
 void
 xfs_error_test_init(void)
 {
-	bzero(xfs_etest, sizeof(xfs_etest));
-	bzero(xfs_etest_fsid, sizeof(xfs_etest_fsid));
-	bzero(xfs_etest_fsname, sizeof(xfs_etest_fsname));
+	memset(xfs_etest, 0, sizeof(xfs_etest));
+	memset(xfs_etest_fsid, 0, sizeof(xfs_etest_fsid));
+	memset(xfs_etest_fsname, 0, sizeof(xfs_etest_fsname));
 }
 
 int
@@ -84,7 +84,7 @@ xfs_error_test(int error_tag, int *fsidp, char *expression,
 	if (random() % randfactor)
 		return 0;
 
-	bcopy(fsidp, &fsid, sizeof(fsid_t));
+	memcpy(&fsid, fsidp, sizeof(fsid_t));
 
 	for (i = 0; i < XFS_NUM_INJECT_ERROR; i++)  {
 		if (xfs_etest[i] == error_tag && xfs_etest_fsid[i] == fsid) {
@@ -105,7 +105,7 @@ xfs_errortag_add(int error_tag, xfs_mount_t *mp)
 	int len;
 	int64_t fsid;
 
-	bcopy(mp->m_fixedfsid, &fsid, sizeof(fsid_t));
+	memcpy(&fsid, mp->m_fixedfsid, sizeof(fsid_t));
 
 	for (i = 0; i < XFS_NUM_INJECT_ERROR; i++)  {
 		if (xfs_etest_fsid[i] == fsid && xfs_etest[i] == error_tag) {
@@ -138,7 +138,7 @@ xfs_errortag_clear(int error_tag, xfs_mount_t *mp)
 	int i;
 	int64_t fsid;
 
-	bcopy(mp->m_fixedfsid, &fsid, sizeof(fsid_t));
+	memcpy(&fsid, mp->m_fixedfsid, sizeof(fsid_t));
 
 	for (i = 0; i < XFS_NUM_INJECT_ERROR; i++) {
 		if (xfs_etest_fsid[i] == fsid && xfs_etest[i] == error_tag) {
@@ -191,7 +191,7 @@ xfs_errortag_clearall(xfs_mount_t *mp)
 {
 	int64_t fsid;
 
-	bcopy(mp->m_fixedfsid, &fsid, sizeof(fsid_t));
+	memcpy(&fsid, mp->m_fixedfsid, sizeof(fsid_t));
 
 	return xfs_errortag_clearall_umount(fsid, mp->m_fsname, 1);
 }

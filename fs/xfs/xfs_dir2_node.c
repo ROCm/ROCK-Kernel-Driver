@@ -239,7 +239,7 @@ xfs_dir2_leafn_add(
 	if (INT_ISZERO(leaf->hdr.stale, ARCH_CONVERT)) {
 		lep = &leaf->ents[index];
 		if (index < INT_GET(leaf->hdr.count, ARCH_CONVERT))
-			ovbcopy(lep, lep + 1,
+			memmove(lep + 1, lep,
 				(INT_GET(leaf->hdr.count, ARCH_CONVERT) - index) * sizeof(*lep));
 		lfloglow = index;
 		lfloghigh = INT_GET(leaf->hdr.count, ARCH_CONVERT);
@@ -288,8 +288,8 @@ xfs_dir2_leafn_add(
 			       XFS_DIR2_NULL_DATAPTR);
 			ASSERT(index - lowstale - 1 >= 0);
 			if (index - lowstale - 1 > 0)
-				ovbcopy(&leaf->ents[lowstale + 1],
-					&leaf->ents[lowstale],
+				memmove(&leaf->ents[lowstale],
+					&leaf->ents[lowstale + 1],
 					(index - lowstale - 1) * sizeof(*lep));
 			lep = &leaf->ents[index - 1];
 			lfloglow = MIN(lowstale, lfloglow);
@@ -304,8 +304,8 @@ xfs_dir2_leafn_add(
 			       XFS_DIR2_NULL_DATAPTR);
 			ASSERT(highstale - index >= 0);
 			if (highstale - index > 0)
-				ovbcopy(&leaf->ents[index],
-					&leaf->ents[index + 1],
+				memmove(&leaf->ents[index + 1],
+					&leaf->ents[index],
 					(highstale - index) * sizeof(*lep));
 			lep = &leaf->ents[index];
 			lfloglow = MIN(index, lfloglow);
@@ -564,7 +564,7 @@ xfs_dir2_leafn_lookup_int(
 			 */
 			if (dep->namelen == args->namelen &&
 			    dep->name[0] == args->name[0] &&
-			    bcmp(dep->name, args->name, args->namelen) == 0) {
+			    memcmp(dep->name, args->name, args->namelen) == 0) {
 				args->inumber = INT_GET(dep->inumber, ARCH_CONVERT);
 				*indexp = index;
 				state->extravalid = 1;
@@ -644,7 +644,7 @@ xfs_dir2_leafn_moveents(
 	 * to hold the new entries.
 	 */
 	if (start_d < INT_GET(leaf_d->hdr.count, ARCH_CONVERT)) {
-		ovbcopy(&leaf_d->ents[start_d], &leaf_d->ents[start_d + count],
+		memmove(&leaf_d->ents[start_d + count], &leaf_d->ents[start_d],
 			(INT_GET(leaf_d->hdr.count, ARCH_CONVERT) - start_d) *
 			sizeof(xfs_dir2_leaf_entry_t));
 		xfs_dir2_leaf_log_ents(tp, bp_d, start_d + count,
@@ -666,7 +666,7 @@ xfs_dir2_leafn_moveents(
 	/*
 	 * Copy the leaf entries from source to destination.
 	 */
-	bcopy(&leaf_s->ents[start_s], &leaf_d->ents[start_d],
+	memcpy(&leaf_d->ents[start_d], &leaf_s->ents[start_s],
 		count * sizeof(xfs_dir2_leaf_entry_t));
 	xfs_dir2_leaf_log_ents(tp, bp_d, start_d, start_d + count - 1);
 	/*
@@ -674,7 +674,7 @@ xfs_dir2_leafn_moveents(
 	 * delete the ones we copied by sliding the next ones down.
 	 */
 	if (start_s + count < INT_GET(leaf_s->hdr.count, ARCH_CONVERT)) {
-		ovbcopy(&leaf_s->ents[start_s + count], &leaf_s->ents[start_s],
+		memmove(&leaf_s->ents[start_s], &leaf_s->ents[start_s + count],
 			count * sizeof(xfs_dir2_leaf_entry_t));
 		xfs_dir2_leaf_log_ents(tp, bp_s, start_s, start_s + count - 1);
 	}
@@ -1135,7 +1135,7 @@ xfs_dir2_leafn_toosmall(
 		 * path point to the block we want to drop (this one).
 		 */
 		forward = !INT_ISZERO(info->forw, ARCH_CONVERT);
-		bcopy(&state->path, &state->altpath, sizeof(state->path));
+		memcpy(&state->altpath, &state->path, sizeof(state->path));
 		error = xfs_da_path_shift(state, &state->altpath, forward, 0,
 			&rval);
 		if (error)
@@ -1197,7 +1197,7 @@ xfs_dir2_leafn_toosmall(
 	 * Make altpath point to the block we want to keep (the lower
 	 * numbered block) and path point to the block we want to drop.
 	 */
-	bcopy(&state->path, &state->altpath, sizeof(state->path));
+	memcpy(&state->altpath, &state->path, sizeof(state->path));
 	if (blkno < blk->blkno)
 		error = xfs_da_path_shift(state, &state->altpath, forward, 0,
 			&rval);
@@ -1685,7 +1685,7 @@ xfs_dir2_node_addname_int(
 	dep = (xfs_dir2_data_entry_t *)dup;
 	INT_SET(dep->inumber, ARCH_CONVERT, args->inumber);
 	dep->namelen = args->namelen;
-	bcopy(args->name, dep->name, dep->namelen);
+	memcpy(dep->name, args->name, dep->namelen);
 	tagp = XFS_DIR2_DATA_ENTRY_TAG_P(dep);
 	INT_SET(*tagp, ARCH_CONVERT, (xfs_dir2_data_off_t)((char *)dep - (char *)data));
 	xfs_dir2_data_log_entry(tp, dbp, dep);

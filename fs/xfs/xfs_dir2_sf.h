@@ -93,7 +93,7 @@ typedef struct { __uint8_t i[2]; } xfs_dir2_sf_off_t;
  * be calculated on the fly.
  *
  * Entries are packed toward the top as tightly as possible.  The header
- * and the elements must be bcopy()'d out into a work area to get correct
+ * and the elements must be memcpy'd out into a work area to get correct
  * alignment for the inode number fields.
  */
 typedef struct xfs_dir2_sf_hdr {

@@ -170,7 +170,7 @@ xfs_growfs_rt_alloc(
 				error = XFS_ERROR(EIO);
 				goto error_exit;
 			}
-			bzero(XFS_BUF_PTR(bp), mp->m_sb.sb_blocksize);
+			memset(XFS_BUF_PTR(bp), 0, mp->m_sb.sb_blocksize);
 			xfs_trans_log_buf(tp, bp, 0, mp->m_sb.sb_blocksize - 1);
 			/*
 			 * Commit the transaction.

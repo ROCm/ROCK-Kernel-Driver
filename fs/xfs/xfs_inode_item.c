@@ -96,7 +96,7 @@ xfs_inode_item_size(
 			if (iip->ili_root_size > 0) {
 				ASSERT(iip->ili_root_size ==
 				       ip->i_df.if_broot_bytes);
-				ASSERT(bcmp(iip->ili_orig_root,
+				ASSERT(memcmp(iip->ili_orig_root,
 					    ip->i_df.if_broot,
 					    iip->ili_root_size) == 0);
 			} else {
@@ -297,7 +297,7 @@ xfs_inode_item_format(
 			 */
 			ip->i_d.di_version = XFS_DINODE_VERSION_2;
 			ip->i_d.di_onlink = 0;
-			bzero(&(ip->i_d.di_pad[0]), sizeof(ip->i_d.di_pad));
+			memset(&(ip->i_d.di_pad[0]), 0, sizeof(ip->i_d.di_pad));
 		}
 	}
 
@@ -889,7 +889,7 @@ xfs_inode_item_init(
 	iip->ili_inode = ip;
 
 	/*
-	   We have bzeroed memory. No need ...
+	   We have zeroed memory. No need ...
 	   iip->ili_extents_buf = NULL;
 	   iip->ili_pushbuf_flag = 0;
 	 */

@@ -880,7 +880,7 @@ xfs_trans_binval(
 	bip->bli_flags &= ~(XFS_BLI_LOGGED | XFS_BLI_DIRTY);
 	bip->bli_format.blf_flags &= ~XFS_BLI_INODE_BUF;
 	bip->bli_format.blf_flags |= XFS_BLI_CANCEL;
-	bzero((char *)(bip->bli_format.blf_data_map),
+	memset((char *)(bip->bli_format.blf_data_map), 0,
 	      (bip->bli_format.blf_map_size * sizeof(uint)));
 	lidp->lid_flags |= XFS_LID_DIRTY;
 	tp->t_flags |= XFS_TRANS_DIRTY;

@@ -382,9 +382,9 @@ xfs_xlatesb(
 		    size == 1 ||
 		    xfs_sb_info[f].type == 1) {
 			if (dir > 0) {
-				bcopy(buf_ptr + first, mem_ptr + first, size);
+				memcpy(mem_ptr + first, buf_ptr + first, size);
 			} else {
-				bcopy(mem_ptr + first, buf_ptr + first, size);
+				memcpy(buf_ptr + first, mem_ptr + first, size);
 			}
 		} else {
 			switch (size) {
@@ -680,7 +680,7 @@ xfs_mountfs(
 		}
 		uuid_mounted=1;
 		ret64 = uuid_hash64(&sbp->sb_uuid);
-		bcopy(&ret64, &vfsp->vfs_fsid, sizeof(ret64));
+		memcpy(&vfsp->vfs_fsid, &ret64, sizeof(ret64));
 	}
 
 	/*
@@ -1139,7 +1139,7 @@ xfs_unmountfs(xfs_mount_t *mp, struct cred *cr)
 	/*
 	 * clear all error tags on this filesystem
 	 */
-	bcopy(&(XFS_MTOVFS(mp)->vfs_fsid), &fsid, sizeof(int64_t));
+	memcpy(&fsid, &(XFS_MTOVFS(mp)->vfs_fsid), sizeof(int64_t));
 	(void) xfs_errortag_clearall_umount(fsid, mp->m_fsname, 0);
 #endif
 

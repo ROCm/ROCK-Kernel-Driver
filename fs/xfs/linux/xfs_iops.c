@@ -91,7 +91,7 @@ linvfs_mknod(
 		mode &= ~current->fs->umask;
 #endif
 
-	bzero(&va, sizeof(va));
+	memset(&va, 0, sizeof(va));
 	va.va_mask = AT_TYPE|AT_MODE;
 	va.va_type = IFTOVT(mode);
 	va.va_mode = mode;
@@ -259,7 +259,7 @@ linvfs_symlink(
 
 	dvp = LINVFS_GET_VP(dir);
 
-	bzero(&va, sizeof(va));
+	memset(&va, 0, sizeof(va));
 	va.va_type = VLNK;
 	va.va_mode = irix_symlink_mode ? 0777 & ~current->fs->umask : S_IRWXUGO;
 	va.va_mask = AT_TYPE|AT_MODE;

@@ -1427,7 +1427,7 @@ xfs_qm_qino_alloc(
 		xfs_trans_cancel(tp, 0);
 		return (error);
 	}
-	bzero(&zerocr, sizeof(zerocr));
+	memset(&zerocr, 0, sizeof(zerocr));
 
 	if ((error = xfs_dir_ialloc(&tp, mp->m_rootip, IFREG, 1, 0,
 				   &zerocr, 0, 1, ip, &committed))) {
@@ -2417,11 +2417,11 @@ xfs_qm_dqalloc_incore(
 		if ((dqp = xfs_qm_dqreclaim_one())) {
 			XFS_STATS_INC(xfsstats.xs_qm_dqreclaims);
 			/*
-			 * Just bzero the core here. The rest will get
+			 * Just zero the core here. The rest will get
 			 * reinitialized by caller. XXX we shouldn't even
-			 * do this bzero ...
+			 * do this zero ...
 			 */
-			bzero(&dqp->q_core, sizeof(dqp->q_core));
+			memset(&dqp->q_core, 0, sizeof(dqp->q_core));
 			*O_dqpp = dqp;
 			return (B_FALSE);
 		}

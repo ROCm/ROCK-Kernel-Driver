@@ -427,9 +427,9 @@ typedef struct xfs_handle {
 				 - (char *) &(handle))			  \
 				 + (handle).ha_fid.xfs_fid_len)
 
-#define XFS_HANDLE_CMP(h1, h2)	bcmp(h1, h2, sizeof (xfs_handle_t))
+#define XFS_HANDLE_CMP(h1, h2)	memcmp(h1, h2, sizeof(xfs_handle_t))
 
-#define FSHSIZE		sizeof (fsid_t)
+#define FSHSIZE		sizeof(fsid_t)
 
 
 /*

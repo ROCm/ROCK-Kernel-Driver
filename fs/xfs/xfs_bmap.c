@@ -489,7 +489,7 @@ xfs_bmap_add_attrfork_local(
 		return 0;
 	if ((ip->i_d.di_mode & IFMT) == IFDIR) {
 		mp = ip->i_mount;
-		bzero(&dargs, sizeof(dargs));
+		memset(&dargs, 0, sizeof(dargs));
 		dargs.dp = ip;
 		dargs.firstblock = firstblock;
 		dargs.flist = flist;
@@ -3146,7 +3146,7 @@ xfs_bmap_delete_exlist(
 	ASSERT(ifp->if_flags & XFS_IFEXTENTS);
 	base = ifp->if_u1.if_extents;
 	nextents = ifp->if_bytes / (uint)sizeof(xfs_bmbt_rec_t) - count;
-	ovbcopy(&base[idx + count], &base[idx],
+	memmove(&base[idx], &base[idx + count],
 		(nextents - idx) * sizeof(*base));
 	xfs_iext_realloc(ip, -count, whichfork);
 }
@@ -3310,7 +3310,7 @@ xfs_bmap_insert_exlist(
 	xfs_iext_realloc(ip, count, whichfork);
 	base = ifp->if_u1.if_extents;
 	nextents = ifp->if_bytes / (uint)sizeof(xfs_bmbt_rec_t);
-	ovbcopy(&base[idx], &base[idx + count],
+	memmove(&base[idx + count], &base[idx],
 		(nextents - (idx + count)) * sizeof(*base));
 	for (to = idx; to < idx + count; to++, new++)
 		xfs_bmbt_set_all(&base[to], new);
@@ -3380,7 +3380,7 @@ xfs_bmap_local_to_extents(
 		ASSERT(args.len == 1);
 		*firstblock = args.fsbno;
 		bp = xfs_btree_get_bufl(args.mp, tp, args.fsbno, 0);
-		bcopy(ifp->if_u1.if_data, (char *)XFS_BUF_PTR(bp),
+		memcpy((char *)XFS_BUF_PTR(bp), ifp->if_u1.if_data,
 			ifp->if_bytes);
 		xfs_trans_log_buf(tp, bp, 0, ifp->if_bytes - 1);
 		xfs_idata_realloc(ip, -ifp->if_bytes, whichfork);
@@ -3556,7 +3556,7 @@ xfs_bmap_trace_addentry(
 	if (cnt == 1) {
 		ASSERT(r2 == NULL);
 		r2 = &tr2;
-		bzero(&tr2, sizeof(tr2));
+		memset(&tr2, 0, sizeof(tr2));
 	} else
 		ASSERT(r2 != NULL);
 	ktrace_enter(xfs_bmap_trace_buf,
@@ -4462,7 +4462,7 @@ xfs_bmap_read_extents(
 		 */
 		frp = XFS_BTREE_REC_ADDR(mp->m_sb.sb_blocksize, xfs_bmbt,
 			block, 1, mp->m_bmap_dmxr[0]);
-		bcopy(frp, trp, num_recs * sizeof(*frp));
+		memcpy(trp, frp, num_recs * sizeof(*frp));
 		if (exntf == XFS_EXTFMT_NOSTATE) {
 			/*
 			 * Check all attribute bmap btree records and

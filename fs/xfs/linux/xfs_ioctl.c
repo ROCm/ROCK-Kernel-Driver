@@ -67,7 +67,7 @@ xfs_find_handle(
 	if (copy_from_user(&hreq, (xfs_fsop_handlereq_t *)arg, sizeof(hreq)))
 		return -XFS_ERROR(EFAULT);
 
-	bzero((char *)&handle, sizeof(handle));
+	memset((char *)&handle, 0, sizeof(handle));
 
 	switch (cmd) {
 	case XFS_IOC_PATH_TO_FSHANDLE:
@@ -228,7 +228,7 @@ xfs_vget_fsop_handlereq(
 	if (copy_from_user(handlep, hanp, hlen))
 		return XFS_ERROR(EFAULT);
 	if (hlen < sizeof(*handlep))
-		bzero(((char *)handlep) + hlen, sizeof(*handlep) - hlen);
+		memset(((char *)handlep) + hlen, 0, sizeof(*handlep) - hlen);
 	if (hlen > sizeof(handlep->ha_fsid)) {
 		if (handlep->ha_fid.xfs_fid_len !=
 				(hlen - sizeof(handlep->ha_fsid)

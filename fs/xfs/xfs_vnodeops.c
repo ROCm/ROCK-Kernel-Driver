@@ -3702,7 +3702,7 @@ xfs_symlink(
 	 */
 	if (pathlen <= XFS_IFORK_DSIZE(ip)) {
 		xfs_idata_realloc(ip, pathlen, XFS_DATA_FORK);
-		bcopy(target_path, ip->i_df.if_u1.if_data, pathlen);
+		memcpy(ip->i_df.if_u1.if_data, target_path, pathlen);
 		ip->i_d.di_size = pathlen;
 
 		/*
@@ -3743,7 +3743,7 @@ xfs_symlink(
 			}
 			pathlen -= byte_cnt;
 
-			bcopy(cur_chunk, XFS_BUF_PTR(bp), byte_cnt);
+			memcpy(XFS_BUF_PTR(bp), cur_chunk, byte_cnt);
 			cur_chunk += byte_cnt;
 
 			xfs_trans_log_buf(tp, bp, 0, byte_cnt - 1);
@@ -3859,10 +3859,10 @@ xfs_fid2(
 	xfid->fid_len = sizeof(xfs_fid2_t) - sizeof(xfid->fid_len);
 	xfid->fid_pad = 0;
 	/*
-	 * use bcopy because the inode is a long long and there's no
+	 * use memcpy because the inode is a long long and there's no
 	 * assurance that xfid->fid_ino is properly aligned.
 	 */
-	bcopy(&ip->i_ino, &xfid->fid_ino, sizeof xfid->fid_ino);
+	memcpy(&xfid->fid_ino, &ip->i_ino, sizeof(xfid->fid_ino));
 	xfid->fid_gen = ip->i_d.di_gen;
 
 	return 0;
@@ -4504,9 +4504,9 @@ xfs_zero_remaining_bytes(
 					  mp, bp, XFS_BUF_ADDR(bp));
 			break;
 		}
-		bzero(XFS_BUF_PTR(bp) +
+		memset(XFS_BUF_PTR(bp) +
 			(offset - XFS_FSB_TO_B(mp, imap.br_startoff)),
-		      lastoffset - offset + 1);
+		      0, lastoffset - offset + 1);
 		XFS_BUF_UNDONE(bp);
 		XFS_BUF_UNREAD(bp);
 		XFS_BUF_WRITE(bp);

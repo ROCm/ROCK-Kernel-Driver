@@ -210,7 +210,7 @@ xfs_dir_init(xfs_trans_t *trans, xfs_inode_t *dir, xfs_inode_t *parent_dir)
 	xfs_da_args_t args;
 	int error;
 
-	bzero((char *)&args, sizeof(args));
+	memset((char *)&args, 0, sizeof(args));
 	args.dp = dir;
 	args.trans = trans;
 
