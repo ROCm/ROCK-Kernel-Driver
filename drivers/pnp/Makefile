@@ -11,7 +11,7 @@
 O_TARGET := pnp.o
 
 export-objs := isapnp.o pnpbios_core.o
-multi-objs := isa-pnp.o pnpbios.o
+list-multi := isa-pnp.o pnpbios.o
 
 isa-pnp-proc-$(CONFIG_PROC_FS) = isapnp_proc.o
 pnpbios-proc-$(CONFIG_PROC_FS) = pnpbios_proc.o
