@@ -287,27 +287,32 @@ __outsl (unsigned long port, void *src, unsigned long count)
 
 /*
  * The address passed to these functions are ioremap()ped already.
+ *
+ * We need these to be machine vectors since some platforms don't provide
+ * DMA coherence via PIO reads (PCI drivers and the spec imply that this is
+ * a good idea).  Writes are ok though for all existing ia64 platforms (and
+ * hopefully it'll stay that way).
  */
 static inline unsigned char
-__readb (void *addr)
+__ia64_readb (void *addr)
 {
 	return *(volatile unsigned char *)addr;
 }
 
 static inline unsigned short
-__readw (void *addr)
+__ia64_readw (void *addr)
 {
 	return *(volatile unsigned short *)addr;
 }
 
 static inline unsigned int
-__readl (void *addr)
+__ia64_readl (void *addr)
 {
 	return *(volatile unsigned int *) addr;
 }
 
 static inline unsigned long
-__readq (void *addr)
+__ia64_readq (void *addr)
 {
 	return *(volatile unsigned long *) addr;
 }
@@ -335,6 +340,11 @@ __writeq (unsigned long val, void *addr)
 {
 	*(volatile unsigned long *) addr = val;
 }
+
+#define __readb		platform_readb
+#define __readw		platform_readw
+#define __readl		platform_readl
+#define __readq		platform_readq
 
 #define readb(a)	__readb((void *)(a))
 #define readw(a)	__readw((void *)(a))

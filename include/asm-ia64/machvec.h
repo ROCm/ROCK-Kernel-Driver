@@ -61,6 +61,10 @@ typedef unsigned int ia64_mv_inl_t (unsigned long);
 typedef void ia64_mv_outb_t (unsigned char, unsigned long);
 typedef void ia64_mv_outw_t (unsigned short, unsigned long);
 typedef void ia64_mv_outl_t (unsigned int, unsigned long);
+typedef unsigned char ia64_mv_readb_t (void *);
+typedef unsigned short ia64_mv_readw_t (void *);
+typedef unsigned int ia64_mv_readl_t (void *);
+typedef unsigned long ia64_mv_readq_t (void *);
 
 extern void machvec_noop (void);
 
@@ -109,6 +113,10 @@ extern void machvec_noop (void);
 #  define platform_outb		ia64_mv.outb
 #  define platform_outw		ia64_mv.outw
 #  define platform_outl		ia64_mv.outl
+#  define platform_readb        ia64_mv.readb
+#  define platform_readw        ia64_mv.readw
+#  define platform_readl        ia64_mv.readl
+#  define platform_readq        ia64_mv.readq
 # endif
 
 /* __attribute__((__aligned__(16))) is required to make size of the
@@ -147,7 +155,11 @@ struct ia64_machine_vector {
 	ia64_mv_outb_t *outb;
 	ia64_mv_outw_t *outw;
 	ia64_mv_outl_t *outl;
-} __attribute__((__aligned__(16)));
+	ia64_mv_readb_t *readb;
+	ia64_mv_readw_t *readw;
+	ia64_mv_readl_t *readl;
+	ia64_mv_readq_t *readq;
+};
 
 #define MACHVEC_INIT(name)			\
 {						\
@@ -181,6 +193,10 @@ struct ia64_machine_vector {
 	platform_outb,				\
 	platform_outw,				\
 	platform_outl,				\
+	platform_readb,				\
+	platform_readw,				\
+	platform_readl,				\
+	platform_readq,				\
 }
 
 extern struct ia64_machine_vector ia64_mv;
@@ -295,6 +311,18 @@ extern ia64_mv_pci_dma_supported swiotlb_pci_dma_supported;
 #endif
 #ifndef platform_outl
 # define platform_outl		__ia64_outl
+#endif
+#ifndef platform_readb
+# define platform_readb		__ia64_readb
+#endif
+#ifndef platform_readw
+# define platform_readw		__ia64_readw
+#endif
+#ifndef platform_readl
+# define platform_readl		__ia64_readl
+#endif
+#ifndef platform_readq
+# define platform_readq		__ia64_readq
 #endif
 
 #endif /* _ASM_IA64_MACHVEC_H */
