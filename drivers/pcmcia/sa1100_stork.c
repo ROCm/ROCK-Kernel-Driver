@@ -25,6 +25,7 @@
 #include <linux/i2c.h>
 
 #include <asm/hardware.h>
+#include <asm/mach-types.h>
 #include <asm/irq.h>
 #include "sa1100_generic.h"
 

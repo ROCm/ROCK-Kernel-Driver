@@ -10,6 +10,9 @@
 
 #include <asm/hardware.h>
 #include <asm/irq.h>
+#include <asm/mach-types.h>
+#include <asm/arch/h3600.h>
+
 #include "sa1100_generic.h"
 
 static struct irqs {
@@ -195,3 +198,17 @@ struct pcmcia_low_level h3600_pcmcia_ops = {
 	.socket_suspend		= h3600_pcmcia_socket_suspend,
 };
 
+int __init pcmcia_h3600_init(void)
+{
+	int ret = -ENODEV;
+
+	if (machine_is_h3600())
+		ret = sa1100_register_pcmcia(&h3600_pcmcia_ops);
+
+	return ret;
+}
+
+void __exit pcmcia_h3600_exit(void)
+{
+	sa1100_unregister_pcmcia(&h3600_pcmcia_ops);
+}

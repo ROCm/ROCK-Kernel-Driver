@@ -14,6 +14,7 @@
 #include <linux/init.h>
 
 #include <asm/hardware.h>   // included trizeps.h
+#include <asm/mach-types.h>
 #include <asm/system.h>
 #include <asm/irq.h>
 #include "sa1100_generic.h"

@@ -719,7 +719,7 @@ sa1100_pcmcia_set_mem_map(unsigned int sock, struct pccard_mem_map *map)
 	(map->flags&MAP_ATTRIB)?"ATTRIB ":"",
 	(map->flags&MAP_USE_WAIT)?"USE_WAIT ":"");
 
-  if (map->map >= MAX_WIN){
+  if (map->map >= MAX_WIN) {
     printk(KERN_ERR "%s(): map (%d) out of range\n", __FUNCTION__,
 	   map->map);
     return -1;
@@ -1148,6 +1148,9 @@ static int __init sa1100_pcmcia_init(void)
 #ifdef CONFIG_SA1100_GRAPHICSCLIENT
 	pcmcia_gcplus_init();
 #endif
+#ifdef CONFIG_SA1100_H3600
+	pcmcia_h3600_init();
+#endif
 #ifdef CONFIG_SA1100_PANGOLIN
 	pcmcia_pangolin_init();
 #endif
@@ -1191,6 +1194,9 @@ static void __exit sa1100_pcmcia_exit(void)
 #endif
 #ifdef CONFIG_SA1100_GRAPHICSCLIENT
 	pcmcia_gcplus_exit();
+#endif
+#ifdef CONFIG_SA1100_H3600
+	pcmcia_h3600_exit();
 #endif
 #ifdef CONFIG_SA1100_PANGOLIN
 	pcmcia_pangolin_exit();
