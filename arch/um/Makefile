@@ -117,7 +117,6 @@ archclean: sysclean
 
 archdep: 
 	for d in $(ARCH_SUBDIRS); do $(MAKE) -C $$d fastdep; done
-	@$(MAKEBOOT) dep
 
 $(SYMLINK_HEADERS):
 	cd $(TOPDIR)/$(dir $@) ; \

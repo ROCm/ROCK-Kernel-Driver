@@ -42,7 +42,7 @@ void *port_init(char *str, int device, struct chan_opts *opts)
 	}
 	str++;
 	port = strtoul(str, &end, 0);
-	if(*end != '\0'){
+	if((*end != '\0') || (end == str)){
 		printk("port_init : couldn't parse port '%s'\n", str);
 		return(NULL);
 	}
@@ -132,42 +132,6 @@ int port_listen_fd(int port)
  out:
 	os_close_file(fd);
 	return(err);
-}
-
-int port_rcv_fd(int fd)
-{
-	int new, n;
-	char buf[CMSG_SPACE(sizeof(new))];
-	struct msghdr msg;
-	struct cmsghdr *cmsg;
-
-	msg.msg_name = NULL;
-	msg.msg_namelen = 0;
-	msg.msg_iov = NULL;
-	msg.msg_iovlen = 0;
-	msg.msg_control = buf;
-	msg.msg_controllen = sizeof(buf);
-	msg.msg_flags = 0;
-
-	n = recvmsg(fd, &msg, 0);
-	if(n < 0){
-		printk("rcv_fd : recvmsg failed - errno = %d\n", errno);
-		return(-1);
-	}
-  
-	cmsg = CMSG_FIRSTHDR(&msg);
-	if(cmsg == NULL){
-		printk("rcv_fd didn't receive anything, error = %d\n", errno);
-		return(-1);
-	}
-	if((cmsg->cmsg_level != SOL_SOCKET) || 
-	   (cmsg->cmsg_type != SCM_RIGHTS)){
-		printk("rcv_fd didn't receive a descriptor\n");
-		return(-1);
-	}
-
-	new = ((int *) CMSG_DATA(cmsg))[0];
-	return(new);
 }
 
 struct port_pre_exec_data {
