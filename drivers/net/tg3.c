@@ -7057,8 +7057,12 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 	/* Back to back register writes can cause problems on this chip,
 	 * the workaround is to read back all reg writes except those to
 	 * mailbox regs.  See tg3_write_indirect_reg32().
+	 *
+	 * PCI Express 5750_A0 rev chips need this workaround too.
 	 */
-	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5701)
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5701 ||
+	    ((tp->tg3_flags2 & TG3_FLG2_PCI_EXPRESS) &&
+	     GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5750))
 		tp->tg3_flags |= TG3_FLAG_5701_REG_WRITE_BUG;
 
 	if ((pci_state_reg & PCISTATE_BUS_SPEED_HIGH) != 0)
