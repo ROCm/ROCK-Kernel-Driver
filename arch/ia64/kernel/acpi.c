@@ -152,6 +152,10 @@ acpi_get_crs_next (struct acpi_buffer *buf, int *offset)
 		return NULL;
 
 	res = buf->pointer + *offset;
+
+	if (res->length <= 0)
+		return NULL;
+
 	*offset += res->length;
 	return res;
 }
