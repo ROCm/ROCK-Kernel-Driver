@@ -504,6 +504,7 @@ int ip_fragment(struct sk_buff *skb, int (*output)(struct sk_buff*))
 			/* Prepare header of the next frame,
 			 * before previous one went down. */
 			if (frag) {
+				frag->ip_summed = CHECKSUM_NONE;
 				frag->h.raw = frag->data;
 				frag->nh.raw = __skb_push(frag, hlen);
 				memcpy(frag->nh.raw, iph, hlen);

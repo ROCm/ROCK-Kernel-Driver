@@ -83,7 +83,10 @@ static unsigned int help(struct sk_buff **pskb,
 	 *              0x01, \n:  terminators
 	 */
 
-	sprintf(buffer, "%u %u", ntohl(exp->tuple.src.ip), port);
+	/* AAA = "us", ie. where server normally talks to. */
+	sprintf(buffer, "%u %u",
+		ntohl(exp->master->tuplehash[IP_CT_DIR_REPLY].tuple.dst.ip),
+		port);
 	DEBUGP("ip_nat_irc: Inserting '%s' == %u.%u.%u.%u, port %u\n",
 	       buffer, NIPQUAD(exp->tuple.src.ip), port);
 
