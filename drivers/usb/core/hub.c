@@ -647,7 +647,7 @@ static int usb_hub_port_status(struct usb_device *hub, int port,
 	struct usb_port_status *portsts;
 	int ret = -ENOMEM;
 
-	portsts = kmalloc(sizeof(*portsts), GFP_KERNEL);
+	portsts = kmalloc(sizeof(*portsts), GFP_NOIO);
 	if (portsts) {
 		ret = usb_get_port_status(hub, port + 1, portsts);
 		if (ret < 0)
