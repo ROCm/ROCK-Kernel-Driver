@@ -72,6 +72,7 @@ extern void init_ras_IRQ(void);
 
 extern void find_and_init_phbs(void);
 extern void pSeries_pcibios_fixup(void);
+extern void pSeries_pcibios_fixup_bus(struct pci_bus *bus);
 extern void iSeries_pcibios_fixup(void);
 
 extern void pSeries_get_rtc_time(struct rtc_time *rtc_time);
@@ -245,6 +246,7 @@ chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 
  	#ifndef CONFIG_PPC_ISERIES
  		ppc_md.pcibios_fixup = pSeries_pcibios_fixup;
+ 		ppc_md.pcibios_fixup_bus = pSeries_pcibios_fixup_bus;
  	#else 
  		ppc_md.pcibios_fixup = NULL;
  		// ppc_md.pcibios_fixup = iSeries_pcibios_fixup;

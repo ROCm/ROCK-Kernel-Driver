@@ -398,81 +398,6 @@ handle_irq_event(int irq, struct pt_regs *regs, struct irqaction *action)
 	local_irq_disable();
 }
 
-#ifdef CONFIG_SMP
-extern unsigned long irq_affinity [NR_IRQS];
-
-typedef struct {
-	unsigned long cpu;
-	unsigned long timestamp;
-} ____cacheline_aligned irq_balance_t;
-
-static irq_balance_t irq_balance[NR_IRQS] __cacheline_aligned
-			= { [ 0 ... NR_IRQS-1 ] = { 0, 0 } };
-
-#define IDLE_ENOUGH(cpu,now) \
-		(idle_cpu(cpu) && ((now) - irq_stat[(cpu)].idle_timestamp > 1))
-
-#define IRQ_ALLOWED(cpu,allowed_mask) \
-		((1UL << cpu) & (allowed_mask))
-
-#define IRQ_BALANCE_INTERVAL (HZ/50)
-
-static unsigned long move(unsigned long curr_cpu, unsigned long allowed_mask,
-			  unsigned long now, int direction)
-{
-	int search_idle = 1;
-	int cpu = curr_cpu;
-
-	goto inside;
-
-	do {
-		if (unlikely(cpu == curr_cpu))
-			search_idle = 0;
-inside:
-		if (direction == 1) {
-			cpu++;
-			if (cpu >= NR_CPUS)
-				cpu = 0;
-		} else {
-			cpu--;
-			if (cpu == -1)
-				cpu = NR_CPUS-1;
-		}
-	} while (!cpu_online(cpu) || !IRQ_ALLOWED(cpu,allowed_mask) ||
-			(search_idle && !IDLE_ENOUGH(cpu,now)));
-
-	return cpu;
-}
-
-static inline void balance_irq(int irq)
-{
-	irq_balance_t *entry = irq_balance + irq;
-	unsigned long now = jiffies;
-
-	if (unlikely(time_after(now, entry->timestamp + IRQ_BALANCE_INTERVAL))) {
-		unsigned long allowed_mask;
-		unsigned int new_cpu;
-		unsigned long random_number;
-
-		if (!irq_desc[irq].handler->set_affinity)
-			return;
-
-		random_number = mftb();
-		random_number &= 1;
-
-		allowed_mask = cpu_online_map & irq_affinity[irq];
-		entry->timestamp = now;
-		new_cpu = move(entry->cpu, allowed_mask, now, random_number);
-		if (entry->cpu != new_cpu) {
-			entry->cpu = new_cpu;
-			irq_desc[irq].handler->set_affinity(irq, 1UL << new_cpu);
-		}
-	}
-}
-#else
-#define balance_irq(irq) do { } while (0)
-#endif
-
 /*
  * Eventually, this should take an array of interrupts and an array size
  * so it can dispatch multiple interrupts.
@@ -483,10 +408,6 @@ void ppc_irq_dispatch_handler(struct pt_regs *regs, int irq)
 	struct irqaction *action;
 	int cpu = smp_processor_id();
 	irq_desc_t *desc = irq_desc + irq;
-
-	/* XXX This causes bad performance and lockups on XICS - Anton */
-	if (naca->interrupt_controller == IC_OPEN_PIC)
-		balance_irq(irq);
 
 	kstat_cpu(cpu).irqs[irq]++;
 	spin_lock(&desc->lock);
