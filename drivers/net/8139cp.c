@@ -1405,17 +1405,6 @@ static int cp_set_rx_csum(struct net_device *dev, u32 data)
 	return 0;
 }
 
-/* move this to net/core/ethtool.c */
-static int ethtool_op_set_tx_csum(struct net_device *dev, u32 data)
-{
-	if (data)
-		dev->features |= NETIF_F_IP_CSUM;
-	else
-		dev->features &= ~NETIF_F_IP_CSUM;
-
-	return 0;
-}
-
 static void cp_get_regs(struct net_device *dev, struct ethtool_regs *regs,
 		        void *p)
 {
