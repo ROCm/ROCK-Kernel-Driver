@@ -393,7 +393,6 @@ struct pci_dev {
 					   0xffffffff.  You only need to change
 					   this if your device has broken DMA
 					   or supports 64-bit transfers.  */
-	struct list_head pools;		/* pci_pools tied to this device */
 
 	u64		consistent_dma_mask;/* Like dma_mask, but for
 					       pci_alloc_consistent mappings as
@@ -692,12 +691,15 @@ const struct pci_device_id *pci_match_device(const struct pci_device_id *ids, co
 int pci_scan_bridge(struct pci_bus *bus, struct pci_dev * dev, int max, int pass);
 
 /* kmem_cache style wrapper around pci_alloc_consistent() */
-struct pci_pool *pci_pool_create (const char *name, struct pci_dev *dev,
-		size_t size, size_t align, size_t allocation);
-void pci_pool_destroy (struct pci_pool *pool);
 
-void *pci_pool_alloc (struct pci_pool *pool, int flags, dma_addr_t *handle);
-void pci_pool_free (struct pci_pool *pool, void *vaddr, dma_addr_t addr);
+#include <linux/dmapool.h>
+
+#define	pci_pool dma_pool
+#define pci_pool_create(name, pdev, size, align, allocation) \
+		dma_pool_create(name, &pdev->dev, size, align, allocation)
+#define	pci_pool_destroy(pool) dma_pool_destroy(pool)
+#define	pci_pool_alloc(pool, flags, handle) dma_pool_alloc(pool, flags, handle)
+#define	pci_pool_free(pool, vaddr, addr) dma_pool_free(pool, vaddr, addr)
 
 #if defined(CONFIG_ISA) || defined(CONFIG_EISA)
 extern struct pci_dev *isa_bridge;
