@@ -46,8 +46,10 @@ int debugger_kernel_faults = 1;
 void bad_page_fault(struct pt_regs *, unsigned long, int);
 
 /*
- * For 600- and 800-family processors, the error_code parameter is DSISR
- * for a data fault, SRR1 for an instruction fault.
+ * The error_code parameter is
+ *  - DSISR for a non-SLB data access fault,
+ *  - SRR1 & 0x08000000 for a non-SLB instruction access fault
+ *  - 0 any SLB fault.
  */
 void do_page_fault(struct pt_regs *regs, unsigned long address,
 		   unsigned long error_code)
@@ -57,17 +59,6 @@ void do_page_fault(struct pt_regs *regs, unsigned long address,
 	siginfo_t info;
 	unsigned long code = SEGV_MAPERR;
 	unsigned long is_write = error_code & 0x02000000;
-
-	/*
-	 * Fortunately the bit assignments in SRR1 for an instruction
-	 * fault and DSISR for a data fault are mostly the same for the
-	 * bits we are interested in.  But there are some bits which
-	 * indicate errors in DSISR but can validly be set in SRR1.
-	 */
-	if (regs->trap == 0x400)
-		error_code &= 0x48200000;
-	else if (regs->trap != 0x300) /* ensure error_code is 0 on SLB miss */
-		error_code = 0;
 
 #ifdef CONFIG_DEBUG_KERNEL
 	if (debugger_fault_handler && (regs->trap == 0x300 ||
