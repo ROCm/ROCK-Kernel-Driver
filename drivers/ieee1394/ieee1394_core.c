@@ -515,9 +515,9 @@ int hpsb_send_packet(struct hpsb_packet *packet)
         if (packet->node_id == host->node_id)
         { /* it is a local request, so handle it locally */
                 quadlet_t *data;
-                size_t size=packet->data_size+packet->header_size;
+                size_t size = packet->data_size + packet->header_size;
 
-                data = kmalloc(packet->header_size + packet->data_size, GFP_ATOMIC);
+                data = kmalloc(size, GFP_ATOMIC);
                 if (!data) {
                         HPSB_ERR("unable to allocate memory for concatenating header and data");
                         return -ENOMEM;
@@ -526,12 +526,12 @@ int hpsb_send_packet(struct hpsb_packet *packet)
                 memcpy(data, packet->header, packet->header_size);
 
                 if (packet->data_size)
-			memcpy(((u8*)data)+packet->header_size, packet->data, packet->data_size);
+			memcpy(((u8*)data) + packet->header_size, packet->data, packet->data_size);
 
                 dump_packet("send packet local:", packet->header,
                             packet->header_size);
 
-                hpsb_packet_sent(host, packet,  packet->expect_response?ACK_PENDING:ACK_COMPLETE);
+                hpsb_packet_sent(host, packet, packet->expect_response ? ACK_PENDING : ACK_COMPLETE);
                 hpsb_packet_received(host, data, size, 0);
 
                 kfree(data);
