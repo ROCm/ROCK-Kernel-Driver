@@ -59,7 +59,7 @@ typedef elf_greg_t elf_gregset_t[ELF_NGREG];
 #define VSYSCALL_BASE	(__fix_to_virt(FIX_VSYSCALL))
 #define VSYSCALL_EHDR	((const struct elfhdr *) VSYSCALL_BASE)
 #define VSYSCALL_ENTRY	((unsigned long) &__kernel_vsyscall)
-extern void __kernel_vsyscall;
+extern void *__kernel_vsyscall[0];
 
 /*
  * Architecture-neutral AT_ values in 0-17, leave some room

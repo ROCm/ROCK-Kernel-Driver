@@ -48,7 +48,7 @@ struct cpuinfo_um boot_cpu_data = {
 /* Placeholder to make UML link until the vsyscall stuff is actually 
  * implemented
  */
-void __kernel_vsyscall;
+void *__kernel_vsyscall[0];
 
 unsigned long thread_saved_pc(struct task_struct *task)
 {

@@ -53,6 +53,10 @@ int module_frob_arch_sections(Elf_Ehdr *hdr,
 	return 0;
 }
 
+/* from asm-i386/elf.h */
+#define R_386_32        1
+#define R_386_PC32      2
+
 int apply_relocate(Elf32_Shdr *sechdrs,
 		   const char *strtab,
 		   unsigned int symindex,
