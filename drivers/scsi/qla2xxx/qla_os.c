@@ -882,38 +882,38 @@ qla2x00_queuecommand(struct scsi_cmnd *cmd, void (*fn)(struct scsi_cmnd *))
 static int
 qla2x00_eh_wait_on_command(scsi_qla_host_t *ha, struct scsi_cmnd *cmd)
 {
-#define ABORT_WAIT_TIME	10 /* seconds */
+#define ABORT_POLLING_PERIOD	HZ
+#define ABORT_WAIT_TIME		((10 * HZ) / (ABORT_POLLING_PERIOD))
 
 	int		found = 0;
 	int		done = 0;
-	srb_t		*rp;
+	srb_t		*rp = NULL;
 	struct list_head *list, *temp;
 	u_long		max_wait_time = ABORT_WAIT_TIME;
 
 	do {
 		/* Check on done queue */
-		if (!found) {
-			spin_lock(&ha->list_lock);
-			list_for_each_safe(list, temp, &ha->done_queue) {
-				rp = list_entry(list, srb_t, list);
+		spin_lock(&ha->list_lock);
+		list_for_each_safe(list, temp, &ha->done_queue) {
+			rp = list_entry(list, srb_t, list);
 
-				/*
-				* Found command.  Just exit and wait for the
-				* cmd sent to OS.
-			 	*/
-				if (cmd == rp->cmd) {
-					found++;
-					DEBUG3(printk("%s: found in done "
-							"queue.\n", __func__);)
-					break;
-				}
+			/*
+			 * Found command. Just exit and wait for the cmd sent
+			 * to OS.
+			*/
+			if (cmd == rp->cmd) {
+				found++;
+				DEBUG3(printk("%s: found in done queue.\n",
+				    __func__);)
+				break;
 			}
-			spin_unlock(&ha->list_lock);
 		}
+		spin_unlock(&ha->list_lock);
 
-		/* Checking to see if its returned to OS */
-		rp = (srb_t *) CMD_SP(cmd);
-		if (rp == NULL ) {
+		/* Complete the cmd right away. */
+		if (found) { 
+			qla2x00_delete_from_done_queue(ha, rp);
+			sp_put(ha, rp);
 			done++;
 			break;
 		}
@@ -921,20 +921,14 @@ qla2x00_eh_wait_on_command(scsi_qla_host_t *ha, struct scsi_cmnd *cmd)
 		spin_unlock_irq(ha->host->host_lock);
 
 		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(2*HZ);
+		schedule_timeout(ABORT_POLLING_PERIOD);
 
 		spin_lock_irq(ha->host->host_lock);
 
 	} while ((max_wait_time--));
 
-	if (done) {
+	if (done)
 		DEBUG2(printk(KERN_INFO "%s: found cmd=%p.\n", __func__, cmd));
-	} else if (found) {
-		/* Immediately return command to the mid-layer */
-		qla2x00_delete_from_done_queue(ha, rp);
-		sp_put(ha, rp);
-		done++;
-	}
 
 	return (done);
 }

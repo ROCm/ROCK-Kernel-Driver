@@ -2267,7 +2267,8 @@ typedef struct scsi_qla_host {
 	mbx_cmd_t	*mcp;
 	unsigned long	mbx_cmd_flags;
 #define MBX_INTERRUPT	1
-#define MBX_INTR_WAIT   2
+#define MBX_INTR_WAIT	2
+#define MBX_UPDATE_FLASH_ACTIVE	3
 
 	spinlock_t	mbx_reg_lock;   /* Mbx Cmd Register Lock */
 
