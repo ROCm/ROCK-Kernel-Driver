@@ -33,9 +33,10 @@
  *      1.03 make it more portable            zippel@linux-m68k.org
  *      1.04 removed useless timer code       rz@linux-m68k.org
  *      1.05 portable RTC_UIE emulation       rz@linux-m68k.org
+ *      1.06 set_rtc_time can return an error trini@kernel.crashing.org
  */
 
-#define RTC_VERSION	"1.05"
+#define RTC_VERSION	"1.06"
 
 #include <linux/module.h>
 #include <linux/config.h>
@@ -128,8 +129,8 @@ void gen_rtc_timer(unsigned long data)
 	lostint = get_rtc_ss() - oldsecs ;
 	if (lostint<0) 
 		lostint = 60 - lostint;
-	if (jiffies-tt_exp>1)
-		printk("genrtc: timer task delayed by %ld jiffies\n",
+	if (time_after(jiffies, tt_exp))
+		printk(KERN_INFO "genrtc: timer task delayed by %ld jiffies\n",
 		       jiffies-tt_exp);
 	ttask_active=0;
 	stask_active=1;
@@ -174,7 +175,7 @@ static ssize_t gen_rtc_read(struct file *file, char *buf,
 	unsigned long data;
 	ssize_t retval;
 
-	if (count < sizeof(unsigned long))
+        if (count != sizeof (unsigned int) && count != sizeof (unsigned long))
 		return -EINVAL;
 
 	if (file->f_flags & O_NONBLOCK && !gen_rtc_irq_data)
@@ -193,7 +194,14 @@ static ssize_t gen_rtc_read(struct file *file, char *buf,
 		schedule();
 	}
 
-	retval = put_user(data, (unsigned long *)buf);
+	/* first test allows optimizer to nuke this case for 32-bit machines */
+	if (sizeof (int) != sizeof (long) && count == sizeof (unsigned int)) {
+		unsigned int uidata = data;
+		retval = put_user(uidata, (unsigned long *)buf);
+	}
+	else {
+		retval = put_user(data, (unsigned long *)buf);
+	}
 	if (!retval)
 		retval = sizeof(unsigned long);
  out:
@@ -326,8 +334,7 @@ static int gen_rtc_ioctl(struct inode *inode, struct file *file,
 		    wtime.tm_sec < 0 || wtime.tm_sec >= 60)
 			return -EINVAL;
 
-		set_rtc_time(&wtime);
-		return 0;
+		return set_rtc_time(&wtime);
 	    }
 	}
 

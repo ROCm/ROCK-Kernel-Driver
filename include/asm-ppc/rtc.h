@@ -68,7 +68,10 @@ static inline void set_rtc_time(struct rtc_time *time)
 				time->tm_sec);
 
 		(ppc_md.set_rtc_time)(nowtime);
-	}
+
+		return 0;
+	} else
+		return -EINVAL;
 }
 
 static inline unsigned int get_rtc_ss(void)
