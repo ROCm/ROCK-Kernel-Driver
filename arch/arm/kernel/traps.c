@@ -116,7 +116,7 @@ static void dump_instr(struct pt_regs *regs)
 
 static void dump_stack(struct task_struct *tsk, unsigned long sp)
 {
-	dump_mem("Stack: ", sp - 16, 8192+(unsigned long)tsk->thread_info);
+	dump_mem("Stack: ", sp, 8192+(unsigned long)tsk->thread_info);
 }
 
 static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
@@ -132,7 +132,7 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
 	} else if (verify_stack(fp)) {
 		printk("invalid frame pointer 0x%08x", fp);
 		ok = 0;
-	} else if (fp < 4096+(unsigned long)tsk->thread_info)
+	} else if (fp < (unsigned long)(tsk->thread_info + 1))
 		printk("frame pointer underflow");
 	printk("\n");
 
@@ -167,8 +167,8 @@ NORET_TYPE void die(const char *str, struct pt_regs *regs, int err)
 	printk("Internal error: %s: %x\n", str, err);
 	printk("CPU: %d\n", smp_processor_id());
 	show_regs(regs);
-	printk("Process %s (pid: %d, stackpage=%08lx)\n",
-		current->comm, current->pid, 4096+(unsigned long)tsk);
+	printk("Process %s (pid: %d, stack limit = 0x%p)\n",
+		current->comm, current->pid, tsk->thread_info + 1);
 
 	if (!user_mode(regs) || in_interrupt()) {
 		mm_segment_t fs;
@@ -201,7 +201,7 @@ void die_if_kernel(const char *str, struct pt_regs *regs, int err)
     	die(str, regs, err);
 }
 
-asmlinkage void do_undefinstr(int address, struct pt_regs *regs, int mode)
+asmlinkage void do_undefinstr(struct pt_regs *regs)
 {
 	unsigned long *pc;
 	siginfo_t info;
@@ -229,7 +229,7 @@ asmlinkage void do_undefinstr(int address, struct pt_regs *regs, int mode)
 
 	force_sig_info(SIGILL, &info, current);
 
-	die_if_kernel("Oops - undefined instruction", regs, mode);
+	die_if_kernel("Oops - undefined instruction", regs, 0);
 }
 
 #ifdef CONFIG_CPU_26

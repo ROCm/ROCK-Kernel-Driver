@@ -61,11 +61,6 @@
 #define	IRQ_GPIO27		48
 
 /*
- * To get the GPIO number from an IRQ number
- */
-#define GPIO_11_27_IRQ(i)	((i) - 21)
-
-/*
  * The next 16 interrupts are for board specific purposes.  Since
  * the kernel can only run on one machine at a time, we can re-use
  * these.  If you need more, increase IRQ_BOARD_END, but keep it

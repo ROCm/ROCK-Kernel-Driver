@@ -55,7 +55,7 @@ __initcall(init_huw_cs3);
 
 
 static void __init
-fixup_huw_webpanel(struct machine_desc *desc, struct param_struct *params,
+fixup_huw_webpanel(struct machine_desc *desc, struct tag *tags,
 		   char **cmdline, struct meminfo *mi)
 {
 	/**

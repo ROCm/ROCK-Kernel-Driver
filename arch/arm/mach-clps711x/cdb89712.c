@@ -45,7 +45,7 @@ static struct map_desc cdb89712_io_desc[] __initdata = {
 };
 
 static void __init
-fixup_cdb89712(struct machine_desc *desc, struct param_struct *params,
+fixup_cdb89712(struct machine_desc *desc, struct tag *tags,
 	    char **cmdline, struct meminfo *mi)
 {
 }

@@ -35,7 +35,7 @@ extern void epxa10db_init_irq(void);
 
 
 static void __init
-epxa10db_fixup(struct machine_desc *desc, struct param_struct *params,
+epxa10db_fixup(struct machine_desc *desc, struct tag *tags,
 		 char **cmdline, struct meminfo *mi)
 {
 

@@ -52,7 +52,8 @@ void *consistent_alloc(int gfp, size_t size, dma_addr_t *dma_handle)
 		goto no_page;
 
 	*dma_handle = page_to_bus(page);
-	ret = __ioremap(page_to_phys(page), size, 0);
+	ret = __ioremap(page_to_pfn(page) << PAGE_SHIFT, size, 0,
+			PAGE_SIZE << order);
 	if (!ret)
 		goto no_remap;
 

@@ -120,9 +120,10 @@
 		(((unsigned long)(addr) - PAGE_OFFSET) >> NODE_MAX_MEM_SHIFT)
 
 /*
- * Given a physical address, convert it to a node id.
+ * Given a page frame number, convert it to a node id.
  */
-#define PHYS_TO_NID(addr) KVADDR_TO_NID(__phys_to_virt(addr))
+#define PFN_TO_NID(pfn) \
+	(((pfn) - PHYS_PFN_OFFSET) >> (NODE_MAX_MEM_SHIFT - PAGE_SHIFT))
 
 /*
  * Given a kaddr, ADDR_TO_MAPBASE finds the owning node of the memory
@@ -131,30 +132,15 @@
 #define ADDR_TO_MAPBASE(kaddr) \
 			NODE_MEM_MAP(KVADDR_TO_NID((unsigned long)(kaddr)))
 
+#define PFN_TO_MAPBASE(pfn)	NODE_MEM_MAP(PFN_TO_NID(pfn))
+
 /*
  * Given a kaddr, LOCAL_MAR_NR finds the owning node of the memory
  * and returns the index corresponding to the appropriate page in the
  * node's mem_map.
  */
-#define LOCAL_MAP_NR(kaddr) \
-	(((unsigned long)(kaddr)-LOCAL_BASE_ADDR((kaddr))) >> PAGE_SHIFT)
-
-/*
- * Given a kaddr, virt_to_page returns a pointer to the corresponding 
- * mem_map entry.
- */
-#define virt_to_page(kaddr) \
-	(ADDR_TO_MAPBASE(kaddr) + LOCAL_MAP_NR(kaddr))
-
-/*
- * VALID_PAGE returns a non-zero value if given page pointer is valid.
- * This assumes all node's mem_maps are stored within the node they refer to.
- */
-#define VALID_PAGE(page) \
-({ unsigned int node = KVADDR_TO_NID(page); \
-   ( (node < NR_NODES) && \
-     ((unsigned)((page) - NODE_MEM_MAP(node)) < NODE_DATA(node)->node_size) ); \
-})
+#define LOCAL_MAP_NR(addr) \
+	(((unsigned long)(addr) & (NODE_MAX_MEM_SIZE - 1)) >> PAGE_SHIFT)
 
 /*
  * The PS7211 allows up to 256MB max per DRAM bank, but the EDB7211
@@ -167,40 +153,13 @@
 #define NODE_MAX_MEM_SHIFT	24
 #define NODE_MAX_MEM_SIZE	(1<<NODE_MAX_MEM_SHIFT)
 
-/*
- * Given a mem_map_t, LOCAL_MAP_BASE finds the owning node for the
- * physical page and returns the kaddr for the mem_map of that node.
- */
-#define LOCAL_MAP_BASE(page) \
-			NODE_MEM_MAP(KVADDR_TO_NID((unsigned long)(page)))
-
-/*
- * Given a kaddr, LOCAL_BASE_ADDR finds the owning node of the memory
- * and returns the kaddr corresponding to first physical page in the
- * node's mem_map.
- */
-#define LOCAL_BASE_ADDR(kaddr)	((unsigned long)(kaddr) & ~(NODE_MAX_MEM_SIZE-1))
-
-/* 
- * With discontigmem, the conceptual mem_map array starts from PAGE_OFFSET.
- * Given a kaddr, MAP_NR returns the appropriate global mem_map index so 
- * it matches the corresponding node's local mem_map.
- */
-#define MAP_NR(kaddr)	(LOCAL_MAP_NR((kaddr)) + \
-		(((unsigned long)ADDR_TO_MAPBASE((kaddr)) - PAGE_OFFSET) / \
-		sizeof(mem_map_t)))
-
 #else
 
-#define PHYS_TO_NID(addr)	(0)
+#define PFN_TO_NID(pfn)		(0)
 
 #endif /* CONFIG_DISCONTIGMEM */
 
 #endif	/* CONFIG_ARCH_EDB7211 */
-
-#ifndef PHYS_TO_NID
-#define PHYS_TO_NID(addr)	(0)
-#endif
 
 #endif
 
