@@ -30,7 +30,6 @@ extern unsigned int cinst;
  */
 extern int indicate_status(int,ulong,char*);
 extern int scm_command(isdn_ctrl *);
-extern void *memcpy_fromshmem(int, void *, const void *, size_t);
 
 
 /*
