@@ -123,6 +123,10 @@ struct usb_hub_status {
  * Hub descriptor 
  * See USB 2.0 spec Table 11-13
  */
+
+#define USB_DT_HUB			(USB_TYPE_CLASS | 0x09)
+#define USB_DT_HUB_NONVAR_SIZE		7
+
 struct usb_hub_descriptor {
 	__u8  bDescLength;
 	__u8  bDescriptorType;

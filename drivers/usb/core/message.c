@@ -8,6 +8,8 @@
 #include <linux/init.h>
 #include <asm/byteorder.h>
 
+#include "hcd.h"	/* for usbcore internals */
+
 struct usb_api_data {
 	wait_queue_head_t wqh;
 	int done;

@@ -348,6 +348,16 @@ extern struct semaphore usb_bus_list_lock;
 extern void usb_bus_get (struct usb_bus *bus);
 extern void usb_bus_put (struct usb_bus *bus);
 
+extern struct usb_interface *usb_ifnum_to_if (struct usb_device *dev,
+	unsigned ifnum);
+
+extern int usb_find_interface_driver (struct usb_device *dev,
+	struct usb_interface *interface);
+
+/* for probe/disconnect with correct module usage counting */
+void *usb_bind_driver(struct usb_driver *driver, struct usb_interface *intf);
+void usb_unbind_driver(struct usb_device *device, struct usb_interface *intf);
+
 /*-------------------------------------------------------------------------*/
 
 /* hub.h ... DeviceRemovable in 2.4.2-ac11, gone in 2.4.10 */
