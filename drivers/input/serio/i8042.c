@@ -61,6 +61,8 @@ struct timer_list i8042_timer;
 static unsigned long i8042_start;
 #endif
 
+extern struct pt_regs *kbd_pt_regs;
+
 static unsigned long i8042_unxlate_seen[128 / BITS_PER_LONG];
 static unsigned char i8042_unxlate_table[128] = {
 	  0,118, 22, 30, 38, 37, 46, 54, 61, 62, 70, 69, 78, 85,102, 13,
@@ -345,6 +347,10 @@ static void i8042_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	unsigned long flags;
 	unsigned char str, data;
 	unsigned int dfl;
+
+#ifdef CONFIG_VT
+	kbd_pt_regs = regs;
+#endif
 
 	spin_lock_irqsave(&i8042_lock, flags);
 
