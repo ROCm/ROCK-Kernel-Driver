@@ -165,7 +165,7 @@ printk(level "%s: " fmt "\n" , OHCI1394_DRIVER_NAME , ## args)
 printk(level "%s_%d: " fmt "\n" , OHCI1394_DRIVER_NAME, card , ## args)
 
 static char version[] __devinitdata =
-	"$Rev: 897 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 902 $ Ben Collins <bcollins@debian.org>";
 
 /* Module Parameters */
 static int phys_dma = 1;
