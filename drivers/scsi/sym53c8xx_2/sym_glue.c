@@ -192,12 +192,6 @@ static void __devinit pci_unmap_mem(u_long vaddr, u_long size)
 }
 #endif
 
-/*
- *  Used to retrieve the host structure when the 
- *  driver is called from the proc FS.
- */
-static struct Scsi_Host	*first_host = NULL;
-
 #define scsi_data_direction(cmd)	(cmd->sc_data_direction)
 
 /*
@@ -1985,12 +1979,6 @@ sym_attach (struct scsi_host_template *tpnt, int unit, sym_device *dev)
 	np->s.timer.function = sym53c8xx_timer;
 	np->s.lasttime=0;
 	sym_timer (np);
-
-	/*
-	 *  Done.
-	 */
-        if (!first_host)
-        	first_host = instance;
 
 	/*
 	 *  Fill Linux host instance structure
