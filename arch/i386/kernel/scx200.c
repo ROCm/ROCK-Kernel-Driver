@@ -12,7 +12,6 @@
 #include <linux/pci.h>
 
 #include <linux/scx200.h>
-#include <linux/scx200.h>
 
 #define NAME "scx200"
 
