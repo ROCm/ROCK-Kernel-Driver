@@ -283,16 +283,6 @@ extern mdp_disk_t *get_spare(mddev_t *mddev);
 			tmp = tmp->next, tmp->prev != &all_mddevs	\
 		; )
 
-static inline int lock_mddev (mddev_t * mddev)
-{
-	return down_interruptible(&mddev->reconfig_sem);
-}
-
-static inline void unlock_mddev (mddev_t * mddev)
-{
-	up(&mddev->reconfig_sem);
-}
-
 #define xchg_values(x,y) do { __typeof__(x) __tmp = x; \
 				x = y; y = __tmp; } while (0)
 
