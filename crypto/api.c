@@ -122,6 +122,7 @@ out_free_ctx:
 		kfree(tfm->crt_ctx);
 out_free_tfm:
 	kfree(tfm);
+	tfm = NULL;
 out_put:
 	crypto_alg_put(alg);
 out:
