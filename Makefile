@@ -580,7 +580,7 @@ spec:
 	. scripts/mkspec >kernel.spec
 
 #	Build a tar ball, generate an rpm from it and pack the result
-#	There arw two bits of magic here
+#	There are two bits of magic here
 #	1) The use of /. to avoid tar packing just the symlink
 #	2) Removing the .dep files as they have source paths in them that
 #	   will become invalid
