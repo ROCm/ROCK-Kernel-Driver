@@ -550,7 +550,7 @@ Thu Jan 17 01:17:20 1995  Theodore Y. Ts'o  (tytso@rt-11)
 		the StarTech 16650 chip.  Treat it as a 16450 for now,
 		because of its FIFO bugs.
 
-Thu Jan  5 21:21:57 1995  <dhinds@allegro.stanford.edu>
+Thu Jan  5 21:21:57 1995  <dahinds@users.sourceforge.net>
 
 	* serial.c: (receive_char): Added counter to prevent infinite loop
 		when a PCMCIA serial device is ejected.

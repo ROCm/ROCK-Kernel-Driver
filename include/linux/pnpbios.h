@@ -3,7 +3,7 @@
  *
  * Original BIOS code (C) 1998 Christian Schmidt (chr.schmidt@tu-bs.de)
  * PnP handler parts (c) 1998 Tom Lees <tom@lpsg.demon.co.uk>
- * Minor reorganizations by David Hinds <dhinds@zen.stanford.edu>
+ * Minor reorganizations by David Hinds <dahinds@users.sourceforge.net>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
