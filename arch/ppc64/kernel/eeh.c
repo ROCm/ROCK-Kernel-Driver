@@ -414,13 +414,13 @@ static void eeh_event_handler(void *dummy)
 	while (1) {
 		spin_lock_irqsave(&eeh_eventlist_lock, flags);
 		event = NULL;
-		if (!list_empty(&eeh_eventlist))
-		{
-			event = list_entry(&eeh_eventlist, struct eeh_event, list);
+		if (!list_empty(&eeh_eventlist)) {
+			event = list_entry(eeh_eventlist.next, struct eeh_event, list);
 			list_del(&event->list);
 		}
 		spin_unlock_irqrestore(&eeh_eventlist_lock, flags);
-		if (NULL == event) break;
+		if (event == NULL)
+			break;
 
 		memset(slot_errbuf, 0, eeh_error_buf_size);
 
