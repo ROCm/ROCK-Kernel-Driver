@@ -72,9 +72,6 @@
 #undef REV_PCI_ORDER
 #undef ROCKET_DEBUG_IO
 
-#undef CONFIG_DEVFS_FS
-
-
 /*   CAUTION!!!!!  The TIME_STAT Function relies on the Pentium 64 bit
  *    register.  For various reasons related to 1.2.13, the test for this
  *    register is omitted from this driver.  If you are going to enable
