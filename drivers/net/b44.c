@@ -1905,7 +1905,7 @@ static void __devexit b44_remove_one(struct pci_dev *pdev)
 static int b44_suspend(struct pci_dev *pdev, u32 state)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
-	struct b44 *bp = dev->priv;
+	struct b44 *bp = netdev_priv(dev);
 
         if (!netif_running(dev))
                  return 0;
@@ -1926,7 +1926,7 @@ static int b44_suspend(struct pci_dev *pdev, u32 state)
 static int b44_resume(struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
-	struct b44 *bp = dev->priv;
+	struct b44 *bp = netdev_priv(dev);
 
 	pci_restore_state(pdev, bp->pci_cfg_state);
 
