@@ -29,6 +29,9 @@
 #include <linux/slab.h>
 #include <linux/notifier.h>
 
+#include <asm/topology.h>
+
+DECLARE_BITMAP(memblk_online_map, MAX_NR_MEMBLKS);
 struct pglist_data *pgdat_list;
 unsigned long totalram_pages;
 unsigned long totalhigh_pages;
@@ -1164,6 +1167,7 @@ void __init free_area_init_node(int nid, struct pglist_data *pgdat,
 	pgdat->node_mem_map = node_mem_map;
 
 	free_area_init_core(pgdat, zones_size, zholes_size);
+	memblk_set_online(__node_to_memblk(nid));
 
 	calculate_zone_bitmap(pgdat, zones_size);
 }

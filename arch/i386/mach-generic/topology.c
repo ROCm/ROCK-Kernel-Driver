@@ -48,7 +48,7 @@ static int __init topology_init(void)
 		arch_register_node(i);
 	for (i = 0; i < NR_CPUS; i++)
 		if (cpu_possible(i)) arch_register_cpu(i);
-	for (i = 0; i < numnodes; i++)
+	for (i = 0; i < num_online_memblks(); i++)
 		arch_register_memblk(i);
 	return 0;
 }

@@ -279,6 +279,38 @@ extern struct pglist_data contig_page_data;
 
 #endif /* !CONFIG_DISCONTIGMEM */
 
+
+extern DECLARE_BITMAP(memblk_online_map, MAX_NR_MEMBLKS);
+
+#if defined(CONFIG_DISCONTIGMEM) || defined(CONFIG_NUMA)
+
+#define memblk_online(memblk)		test_bit(memblk, memblk_online_map)
+#define memblk_set_online(memblk)	set_bit(memblk, memblk_online_map)
+#define memblk_set_offline(memblk)	clear_bit(memblk, memblk_online_map)
+static inline unsigned int num_online_memblks(void)
+{
+	int i, num = 0;
+
+	for(i = 0; i < MAX_NR_MEMBLKS; i++){
+		if (memblk_online(i))
+			num++;
+	}
+	return num;
+}
+
+#else /* !CONFIG_DISCONTIGMEM && !CONFIG_NUMA */
+
+#define memblk_online(memblk) \
+	({ BUG_ON((memblk) != 0); test_bit(memblk, memblk_online_map); })
+#define memblk_set_online(memblk) \
+	({ BUG_ON((memblk) != 0); set_bit(memblk, memblk_online_map); })
+#define memblk_set_offline(memblk) \
+	({ BUG_ON((memblk) != 0); clear_bit(memblk, memblk_online_map); })
+#define num_online_memblks()		1
+
+#endif /* CONFIG_DISCONTIGMEM || CONFIG_NUMA */
+
+
 #define MAP_ALIGN(x)	((((x) % sizeof(struct page)) == 0) ? (x) : ((x) + \
 		sizeof(struct page) - ((x) % sizeof(struct page))))
 
