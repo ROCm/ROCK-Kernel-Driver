@@ -130,7 +130,6 @@
 #define ISD200_TRANSPORT_GOOD       0   /* Transport good, command good     */
 #define ISD200_TRANSPORT_FAILED     1   /* Transport good, command failed   */
 #define ISD200_TRANSPORT_ERROR      2   /* Transport bad (i.e. device dead) */
-#define ISD200_TRANSPORT_SHORT      4   /* Transport short                  */
 
 /* driver action codes */
 #define	ACTION_READ_STATUS	0
@@ -394,119 +393,6 @@ void isd200_build_sense(struct us_data *us, Scsi_Cmnd *srb)
 
 
 /**************************************************************************
- *  ISD200 Bulk Transport
- *
- * Note:  This routine was copied from the usb_stor_Bulk_transport routine
- * located in the transport.c source file.  The scsi command is limited to
- * only 12 bytes while the CDB for the ISD200 must be 16 bytes.
- */
-int isd200_Bulk_transport( struct us_data *us, Scsi_Cmnd *srb, 
-                           union ata_cdb *AtaCdb, unsigned char AtaCdbLength )
-{
-        struct bulk_cb_wrap bcb;
-        struct bulk_cs_wrap bcs;
-        int result;
-        unsigned int transfer_length;
-
-	int dir = srb->sc_data_direction;
-	srb->sc_data_direction = SCSI_DATA_WRITE;
-        transfer_length = usb_stor_transfer_length(srb);
-	srb->sc_data_direction = dir;
-    
-        /* set up the command wrapper */
-        bcb.Signature = cpu_to_le32(US_BULK_CB_SIGN);
-        bcb.DataTransferLength = cpu_to_le32(transfer_length);
-        bcb.Flags = srb->sc_data_direction == SCSI_DATA_READ ? 1 << 7 : 0;
-        bcb.Tag = srb->serial_number;
-        bcb.Lun = srb->cmnd[1] >> 5;
-        if (us->flags & US_FL_SCM_MULT_TARG)
-                bcb.Lun |= srb->target << 4;
-        bcb.Length = AtaCdbLength;
-    
-        /* copy the command payload */
-        memset(bcb.CDB, 0, sizeof(bcb.CDB));
-        memcpy(bcb.CDB, AtaCdb, bcb.Length);
-    
-        /* send it to out endpoint */
-        US_DEBUGP("Bulk command S 0x%x T 0x%x Trg %d LUN %d L %d F %d CL %d\n",
-                  le32_to_cpu(bcb.Signature), bcb.Tag,
-                  (bcb.Lun >> 4), (bcb.Lun & 0x0F), 
-                  le32_to_cpu(bcb.DataTransferLength), bcb.Flags, bcb.Length);
-	result = usb_stor_bulk_transfer_buf(us, us->send_bulk_pipe,
-				(char *) &bcb, US_BULK_CB_WRAP_LEN, NULL);
-        US_DEBUGP("Bulk command transfer result=%d\n", result);
-	if (result != USB_STOR_XFER_GOOD)  
-                return ISD200_TRANSPORT_ERROR;
-    
-        /* if the command transfered well, then we go to the data stage */
-	if (transfer_length) {
-		unsigned int pipe = srb->sc_data_direction == SCSI_DATA_READ ? 
-				us->recv_bulk_pipe : us->send_bulk_pipe;
-		result = usb_stor_bulk_transfer_srb(us, pipe, srb,
-					transfer_length);
-		US_DEBUGP("Bulk data transfer result 0x%x\n", result);
-		if (result == USB_STOR_XFER_ERROR)
-			return ISD200_TRANSPORT_ERROR;
-        }
-    
-        /* See flow chart on pg 15 of the Bulk Only Transport spec for
-         * an explanation of how this code works.
-         */
-    
-        /* get CSW for device status */
-        US_DEBUGP("Attempting to get CSW...\n");
-	result = usb_stor_bulk_transfer_buf(us, us->recv_bulk_pipe,
-				(char *) &bcs, US_BULK_CS_WRAP_LEN, NULL);
-
-        /* did the attempt to read the CSW fail? */
-	if (result == USB_STOR_XFER_STALLED) {
-           
-                /* get the status again */
-                US_DEBUGP("Attempting to get CSW (2nd try)...\n");
-		result = usb_stor_bulk_transfer_buf(us, us->recv_bulk_pipe,
-				(char *) &bcs, US_BULK_CS_WRAP_LEN, NULL);
-        }
-    
-        /* if we still have a failure at this point, we're in trouble */
-        US_DEBUGP("Bulk status result = %d\n", result);
-        if (result != USB_STOR_XFER_GOOD)
-                return ISD200_TRANSPORT_ERROR;
-    
-        /* check bulk status */
-        US_DEBUGP("Bulk status Sig 0x%x T 0x%x R %d Stat 0x%x\n",
-                  le32_to_cpu(bcs.Signature), bcs.Tag, 
-                  bcs.Residue, bcs.Status);
-        if (bcs.Signature != cpu_to_le32(US_BULK_CS_SIGN) || 
-            bcs.Tag != bcb.Tag || 
-            bcs.Status > US_BULK_STAT_PHASE) {
-                US_DEBUGP("Bulk logical error\n");
-                return ISD200_TRANSPORT_ERROR;
-        }
-    
-        /* based on the status code, we report good or bad */
-        switch (bcs.Status) {
-        case US_BULK_STAT_OK:
-                /* command good -- note that we could be short on data */
-		if (srb->resid > 0)
-			return ISD200_TRANSPORT_SHORT;
-                return ISD200_TRANSPORT_GOOD;
-
-        case US_BULK_STAT_FAIL:
-                /* command failed */
-                return ISD200_TRANSPORT_FAILED;
-        
-        case US_BULK_STAT_PHASE:
-                /* phase error */
-                usb_stor_Bulk_reset(us);
-                return ISD200_TRANSPORT_ERROR;
-        }
-    
-        /* we should never get here, but if we do, we're in trouble */
-        return ISD200_TRANSPORT_ERROR;
-}
-
-
-/**************************************************************************
  *  isd200_action
  *
  * Routine for sending commands to the isd200
@@ -592,9 +478,11 @@ static int isd200_action( struct us_data *us, int action,
 		break;
 	}
 
-	status = isd200_Bulk_transport(us, &srb, &ata, sizeof(ata.generic));
-	if (status != ISD200_TRANSPORT_GOOD &&
-			status != ISD200_TRANSPORT_SHORT) {
+	memcpy(srb.cmnd, &ata, sizeof(ata.generic));
+	status = usb_stor_Bulk_transport(&srb, us);
+	if (status == USB_STOR_TRANSPORT_GOOD)
+		status = ISD200_GOOD;
+	else {
 		US_DEBUGP("   isd200_action(0x%02x) error: %d\n",action,status);
 		status = ISD200_ERROR;
 		/* need to reset device here */
@@ -649,8 +537,8 @@ void isd200_invoke_transport( struct us_data *us,
 
 	/* send the command to the transport layer */
 	srb->resid = 0;
-	transferStatus = isd200_Bulk_transport(us, srb, ataCdb,
-					       sizeof(ataCdb->generic));
+	memcpy(srb->cmnd, ataCdb, sizeof(ataCdb->generic));
+	transferStatus = usb_stor_Bulk_transport(srb, us);
 
 	/* if the command gets aborted by the higher layers, we need to
 	 * short-circuit all other processing
@@ -663,37 +551,37 @@ void isd200_invoke_transport( struct us_data *us,
 
 	switch (transferStatus) {
 
-	case ISD200_TRANSPORT_GOOD:
+	case USB_STOR_TRANSPORT_GOOD:
 		/* Indicate a good result */
 		srb->result = GOOD << 1;
 		break;
 
-	case ISD200_TRANSPORT_FAILED:
+	case USB_STOR_TRANSPORT_FAILED:
 		US_DEBUGP("-- transport indicates command failure\n");
 		need_auto_sense = 1;
 		break;
 
-	case ISD200_TRANSPORT_ERROR:
-		US_DEBUGP("-- transport indicates transport failure\n");
+	case USB_STOR_TRANSPORT_ERROR:
+		US_DEBUGP("-- transport indicates transport error\n");
 		srb->result = DID_ERROR << 16;
-		break;
-
-	case ISD200_TRANSPORT_SHORT:
-		srb->result = GOOD << 1;
-		if (!((srb->cmnd[0] == REQUEST_SENSE) ||
-		      (srb->cmnd[0] == INQUIRY) ||
-		      (srb->cmnd[0] == MODE_SENSE) ||
-		      (srb->cmnd[0] == LOG_SENSE) ||
-		      (srb->cmnd[0] == MODE_SENSE_10))) {
-			US_DEBUGP("-- unexpectedly short transfer\n");
-			need_auto_sense = 1;
-		}
-		break;
+		/* Need reset here */
+		return;
     
 	default:
-		US_DEBUGP("-- transport indicates unknown failure\n");   
+		US_DEBUGP("-- transport indicates unknown error\n");   
 		srb->result = DID_ERROR << 16;
-       
+		/* Need reset here */
+		return;
+	}
+
+	if ((srb->resid > 0) &&
+	    !((srb->cmnd[0] == REQUEST_SENSE) ||
+	      (srb->cmnd[0] == INQUIRY) ||
+	      (srb->cmnd[0] == MODE_SENSE) ||
+	      (srb->cmnd[0] == LOG_SENSE) ||
+	      (srb->cmnd[0] == MODE_SENSE_10))) {
+		US_DEBUGP("-- unexpectedly short transfer\n");
+		need_auto_sense = 1;
 	}
 
 	if (need_auto_sense) {
@@ -701,14 +589,21 @@ void isd200_invoke_transport( struct us_data *us,
 		if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
 			US_DEBUGP("-- auto-sense aborted\n");
 			srb->result = DID_ABORT << 16;
-		} else if (result == ISD200_GOOD)
+		} else if (result == ISD200_GOOD) {
 			isd200_build_sense(us, srb);
+			srb->result = CHECK_CONDITION << 1;
+
+			/* If things are really okay, then let's show that */
+			if ((srb->sense_buffer[2] & 0xf) == 0x0)
+				srb->result = GOOD << 1;
+		} else
+			srb->result = DID_ERROR << 16;
 	}
 
 	/* Regardless of auto-sense, if we _know_ we have an error
 	 * condition, show that in the result code
 	 */
-	if (transferStatus == ISD200_TRANSPORT_FAILED)
+	if (transferStatus == USB_STOR_TRANSPORT_FAILED)
 		srb->result = CHECK_CONDITION << 1;
 }
 
