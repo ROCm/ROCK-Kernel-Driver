@@ -53,6 +53,7 @@ subdir-$(CONFIG_USB_SCANNER)	+= image
 subdir-$(CONFIG_USB_SERIAL)	+= serial
 
 subdir-$(CONFIG_USB_AUERSWALD)	+= misc
+subdir-$(CONFIG_USB_BRLVGER)	+= misc
 subdir-$(CONFIG_USB_EMI26)	+= misc
 subdir-$(CONFIG_USB_RIO500)	+= misc
 subdir-$(CONFIG_USB_TIGL)	+= misc
