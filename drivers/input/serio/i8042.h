@@ -2,30 +2,22 @@
 #define _I8042_H
 
 /*
- * $Id: i8042.h,v 1.6 2001/10/05 22:48:09 vojtech Exp $
+ *  Copyright (c) 1999-2002 Vojtech Pavlik
  *
- *  Copyright (c) 1999-2001 Vojtech Pavlik
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 as published by
+ * the Free Software Foundation.
  */
 
 /*
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or 
- * (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- * 
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
- * 
- * Should you need to contact me, the author, you can do so either by
- * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
- * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
+ * Arch-dependent inline functions and defines.
  */
+
+#if defined(CONFIG_PPC)
+#include "i8042-ppcio.h"
+#else
+#include "i8042-io.h"
+#endif
 
 /*
  * If you want to trace all the i/o the i8042 module does for
@@ -33,20 +25,6 @@
  */
 
 #undef I8042_DEBUG_IO
-
-/*
- * On most PC based systems the keyboard IRQ is 1.
- */
-
-#define I8042_KBD_IRQ CONFIG_I8042_KBD_IRQ 
-
-/*
- * On most PC based systems the aux port IRQ is 12. There are exceptions,
- * though. Unfortunately IRQ probing is not possible without touching
- * the device attached to the port.
- */
-
-#define I8042_AUX_IRQ CONFIG_I8042_AUX_IRQ
 
 /*
  * This is in 50us units, the time we wait for the i8042 to react. This
@@ -64,14 +42,6 @@
  */
 
 #define I8042_POLL_PERIOD	HZ/20
-
-/*
- * Register numbers.
- */
-
-#define I8042_COMMAND_REG	CONFIG_I8042_REG_BASE + 4	
-#define I8042_STATUS_REG	CONFIG_I8042_REG_BASE + 4	
-#define I8042_DATA_REG		CONFIG_I8042_REG_BASE	
 
 /*
  * Status register bits.
