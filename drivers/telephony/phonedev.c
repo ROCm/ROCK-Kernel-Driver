@@ -106,7 +106,6 @@ int phone_register_device(struct phone_device *p, int unit)
 		if (phone_device[i] == NULL) {
 			phone_device[i] = p;
 			p->minor = i;
-			MOD_INC_USE_COUNT;
 			up(&phone_lock);
 			return 0;
 		}
@@ -126,7 +125,6 @@ void phone_unregister_device(struct phone_device *pfd)
 		panic("phone: bad unregister");
 	phone_device[pfd->minor] = NULL;
 	up(&phone_lock);
-	MOD_DEC_USE_COUNT;
 }
 
 
