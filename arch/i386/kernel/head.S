@@ -16,6 +16,8 @@
 #include <asm/pgtable.h>
 #include <asm/desc.h>
 #include <asm/cache.h>
+#include <asm/thread_info.h>
+
 
 #define OLD_CL_MAGIC_ADDR	0x90020
 #define OLD_CL_MAGIC		0xA33F
@@ -325,7 +327,7 @@ rp_sidt:
 	ret
 
 ENTRY(stack_start)
-	.long init_thread_union+8192
+	.long init_thread_union+THREAD_SIZE
 	.long __BOOT_DS
 
 /* This is the default interrupt "handler" :-) */
