@@ -825,8 +825,7 @@ static int dummy_urb_enqueue (
 	dum = container_of (hcd, struct dummy, hcd);
 	spin_lock_irqsave (&dum->lock, flags);
 
-	if (!dum->hdev)
-		dum->hdev = urb->dev->hcpriv;
+	dum->hdev = urb->dev->hcpriv;
 	urb->hcpriv = dum;
 	if (usb_pipetype (urb->pipe) == PIPE_CONTROL)
 		urb->error_count = 1;		/* mark as a new urb */
@@ -994,10 +993,17 @@ static int periodic_bytes (struct dummy *dum, struct dummy_ep *ep)
 	return limit;
 }
 
+#define is_active(dum)	((dum->port_status & \
+		(USB_PORT_STAT_CONNECTION | USB_PORT_STAT_ENABLE | \
+			USB_PORT_STAT_SUSPEND)) \
+		== (USB_PORT_STAT_CONNECTION | USB_PORT_STAT_ENABLE))
+
 static struct dummy_ep *find_endpoint (struct dummy *dum, u8 address)
 {
 	int		i;
 
+	if (!is_active (dum))
+		return NULL;
 	if ((address & ~USB_DIR_IN) == 0)
 		return &dum->ep [0];
 	for (i = 1; i < DUMMY_ENDPOINTS; i++) {
@@ -1010,6 +1016,8 @@ static struct dummy_ep *find_endpoint (struct dummy *dum, u8 address)
 	}
 	return NULL;
 }
+
+#undef is_active
 
 #define Dev_Request	(USB_TYPE_STANDARD | USB_RECIP_DEVICE)
 #define Dev_InRequest	(Dev_Request | USB_DIR_IN)
@@ -1404,9 +1412,8 @@ static int dummy_hub_control (
 			break;
 		case USB_PORT_FEAT_POWER:
 			dum->port_status = 0;
-			dum->address = 0;
-			dum->hdev = 0;
 			dum->resuming = 0;
+			stop_activity(dum, dum->driver);
 			break;
 		default:
 			dum->port_status &= ~(1 << wValue);
