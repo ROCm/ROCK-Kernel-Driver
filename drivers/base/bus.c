@@ -316,7 +316,7 @@ static int device_attach(struct device * dev)
  *	Note that we ignore the error from bus_match(), since it's perfectly
  *	valid for a driver not to bind to any devices.
  */
-static void driver_attach(struct device_driver * drv)
+void driver_attach(struct device_driver * drv)
 {
 	struct bus_type * bus = drv->bus;
 	struct list_head * entry;
