@@ -35,9 +35,12 @@
 #include <linux/security.h>
 #include <linux/mount.h>
 #include <linux/kernel.h>
+#include <linux/init.h>
 #include <asm/uaccess.h>
 
 extern int max_threads;
+
+static struct workqueue_struct *khelper_wq;
 
 #ifdef CONFIG_KMOD
 
@@ -109,6 +112,7 @@ int request_module(const char *fmt, ...)
 	atomic_dec(&kmod_concurrent);
 	return ret;
 }
+EXPORT_SYMBOL(request_module);
 #endif /* CONFIG_KMOD */
 
 #ifdef CONFIG_HOTPLUG
@@ -197,9 +201,7 @@ static int wait_for_helper(void *data)
 	return 0;
 }
 
-/*
- * This is run by keventd.
- */
+/* This is run by khelper thread  */
 static void __call_usermodehelper(void *data)
 {
 	struct subprocess_info *sub_info = data;
@@ -249,26 +251,22 @@ int call_usermodehelper(char *path, char **argv, char **envp, int wait)
 	};
 	DECLARE_WORK(work, __call_usermodehelper, &sub_info);
 
-	if (system_state != SYSTEM_RUNNING)
+	if (!khelper_wq)
 		return -EBUSY;
 
 	if (path[0] == '\0')
-		goto out;
+		return 0;
 
-	if (current_is_keventd()) {
-		/* We can't wait on keventd! */
-		__call_usermodehelper(&sub_info);
-	} else {
-		schedule_work(&work);
-		wait_for_completion(&done);
-	}
-out:
+	queue_work(khelper_wq, &work);
+	wait_for_completion(&done);
 	return sub_info.retval;
 }
-
 EXPORT_SYMBOL(call_usermodehelper);
 
-#ifdef CONFIG_KMOD
-EXPORT_SYMBOL(request_module);
-#endif
-
+static __init int usermodehelper_init(void)
+{
+	khelper_wq = create_singlethread_workqueue("khelper");
+	BUG_ON(!khelper_wq);
+	return 0;
+}
+__initcall(usermodehelper_init);
