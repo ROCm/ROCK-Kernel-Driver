@@ -1,7 +1,7 @@
 /*
  * Directory notifications for Linux.
  *
- * Copyright (C) 2000 Stephen Rothwell
+ * Copyright (C) 2000,2001,2002 Stephen Rothwell
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -59,7 +59,7 @@ int fcntl_dirnotify(int fd, struct file *filp, unsigned long arg)
 	write_lock(&dn_lock);
 	prev = &inode->i_dnotify;
 	for (odn = *prev; odn != NULL; prev = &odn->dn_next, odn = *prev)
-		if (odn->dn_filp == filp)
+		if ((odn->dn_owner == current->files) && (odn->dn_filp == filp))
 			break;
 	if (odn != NULL) {
 		if (turning_off) {
@@ -82,6 +82,7 @@ int fcntl_dirnotify(int fd, struct file *filp, unsigned long arg)
 	dn->dn_mask = arg;
 	dn->dn_fd = fd;
 	dn->dn_filp = filp;
+	dn->dn_owner = current->files;
 	inode->i_dnotify_mask |= arg & ~DN_MULTISHOT;
 	dn->dn_next = inode->i_dnotify;
 	inode->i_dnotify = dn;
