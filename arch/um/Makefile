@@ -133,8 +133,7 @@ archmrproper:
 	do \
 		$(MAKE) -C $$d archmrproper; \
 	done
-	rm -f $(SYMLINK_HEADERS) $(ARCH_SYMLINKS) include/asm \
-		$(ARCH_DIR)/uml.lds.S $(ARCH_DIR)/dyn_link.ld \
+	rm -f $(CLEAN_FILES) $(SYMLINK_HEADERS) $(ARCH_SYMLINKS) include/asm \
 		$(addprefix $(ARCH_DIR)/kernel/,$(KERN_SYMLINKS))
 
 archclean: sysclean
