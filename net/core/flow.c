@@ -34,13 +34,15 @@ static kmem_cache_t *flow_cachep;
 static int flow_lwm, flow_hwm;
 
 struct flow_percpu_info {
+	int hash_rnd_recalc;
 	u32 hash_rnd;
-	int number;
+	int count;
 } ____cacheline_aligned;
 static struct flow_percpu_info flow_hash_info[NR_CPUS];
 
-#define flow_count(cpu)			(flow_hash_info[cpu].number)
+#define flow_hash_rnd_recalc(cpu)	(flow_hash_info[cpu].hash_rnd_recalc)
 #define flow_hash_rnd(cpu)		(flow_hash_info[cpu].hash_rnd)
+#define flow_count(cpu)			(flow_hash_info[cpu].count)
 
 static struct timer_list flow_hash_rnd_timer;
 
@@ -51,16 +53,15 @@ static void flow_cache_new_hashrnd(unsigned long arg)
 	int i;
 
 	for (i = 0; i < NR_CPUS; i++)
-		get_random_bytes(&flow_hash_rnd(i), sizeof(u32));
+		flow_hash_rnd_recalc(i) = 1;
 
 	flow_hash_rnd_timer.expires = jiffies + FLOW_HASH_RND_PERIOD;
 	add_timer(&flow_hash_rnd_timer);
 }
 
-static void flow_cache_shrink(int cpu)
+static void __flow_cache_shrink(int cpu, int shrink_to)
 {
 	struct flow_cache_entry *fle, **flp;
-	int shrink_to = flow_lwm / flow_hash_size;
 	int i;
 
 	for (i = 0; i < flow_hash_size; i++) {
@@ -79,6 +80,21 @@ static void flow_cache_shrink(int cpu)
 			flow_count(cpu)--;
 		}
 	}
+}
+
+static void flow_cache_shrink(int cpu)
+{
+	int shrink_to = flow_lwm / flow_hash_size;
+
+	__flow_cache_shrink(cpu, shrink_to);
+}
+
+static void flow_new_hash_rnd(int cpu)
+{
+	get_random_bytes(&flow_hash_rnd(cpu), sizeof(u32));
+	flow_hash_rnd_recalc(cpu) = 0;
+
+	__flow_cache_shrink(cpu, 0);
 }
 
 static u32 flow_hash_code(struct flowi *key, int cpu)
@@ -131,6 +147,8 @@ void *flow_cache_lookup(struct flowi *key, u16 family, u8 dir,
 
 	local_bh_disable();
 	cpu = smp_processor_id();
+	if (flow_hash_rnd_recalc(cpu))
+		flow_new_hash_rnd(cpu);
 	hash = flow_hash_code(key, cpu);
 
 	head = &flow_table[(cpu << flow_hash_shift) + hash];
@@ -208,12 +226,8 @@ static int __init flow_cache_init(void)
 	flow_lwm = 2 * flow_hash_size;
 	flow_hwm = 4 * flow_hash_size;
 
-	for (i = 0; i < NR_CPUS; i++) {
-		flow_hash_rnd(i) =
-			(u32) ((num_physpages ^ (num_physpages>>8)) ^
-			       (jiffies ^ (jiffies >> 7)));
-		flow_hash_rnd(i) ^= i;
-	}
+	for (i = 0; i < NR_CPUS; i++)
+		flow_hash_rnd_recalc(i) = 1;
 
 	init_timer(&flow_hash_rnd_timer);
 	flow_hash_rnd_timer.function = flow_cache_new_hashrnd;
