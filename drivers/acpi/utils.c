@@ -39,7 +39,7 @@ ACPI_MODULE_NAME		("acpi_utils")
                             Object Evaluation Helpers
    -------------------------------------------------------------------------- */
 
-#ifdef ACPI_DEBUG
+#ifdef ACPI_DEBUG_OUTPUT
 #define acpi_util_eval_error(h,p,s) {\
 	char prefix[80] = {'\0'};\
 	acpi_buffer buffer = {sizeof(prefix), prefix};\

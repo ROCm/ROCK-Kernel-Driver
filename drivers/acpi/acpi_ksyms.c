@@ -43,7 +43,7 @@ EXPORT_SYMBOL(acpi_db_user_commands);
 
 /* ACPI Core Subsystem */
 
-#ifdef ACPI_DEBUG
+#ifdef ACPI_DEBUG_OUTPUT
 EXPORT_SYMBOL(acpi_dbg_layer);
 EXPORT_SYMBOL(acpi_dbg_level);
 EXPORT_SYMBOL(acpi_ut_debug_print_raw);
@@ -52,7 +52,7 @@ EXPORT_SYMBOL(acpi_ut_status_exit);
 EXPORT_SYMBOL(acpi_ut_value_exit);
 EXPORT_SYMBOL(acpi_ut_exit);
 EXPORT_SYMBOL(acpi_ut_trace);
-#endif /*ACPI_DEBUG*/
+#endif /*ACPI_DEBUG_OUTPUT*/
 
 EXPORT_SYMBOL(acpi_get_handle);
 EXPORT_SYMBOL(acpi_get_parent);
