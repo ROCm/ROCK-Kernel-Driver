@@ -598,7 +598,6 @@ kernel_thread (int (*fn)(void *), void *arg, unsigned long flags)
 	}
 	return tid;
 }
-EXPORT_SYMBOL(kernel_thread);
 
 /*
  * Flush thread state.  This is called when a thread does an execve().

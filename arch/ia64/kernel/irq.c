@@ -226,7 +226,6 @@ inline void synchronize_irq(unsigned int irq)
 	while (irq_descp(irq)->status & IRQ_INPROGRESS)
 		cpu_relax();
 }
-EXPORT_SYMBOL(synchronize_irq);
 #endif
 
 /*
@@ -368,7 +367,6 @@ inline void disable_irq_nosync(unsigned int irq)
 	}
 	spin_unlock_irqrestore(&desc->lock, flags);
 }
-EXPORT_SYMBOL(disable_irq_nosync);
 
 /**
  *	disable_irq - disable an irq and wait for completion
@@ -391,7 +389,6 @@ void disable_irq(unsigned int irq)
 	if (desc->action)
 		synchronize_irq(irq);
 }
-EXPORT_SYMBOL(disable_irq);
 
 /**
  *	enable_irq - enable handling of an irq
@@ -430,7 +427,6 @@ void enable_irq(unsigned int irq)
 	}
 	spin_unlock_irqrestore(&desc->lock, flags);
 }
-EXPORT_SYMBOL(enable_irq);
 
 /*
  * do_IRQ handles all normal device IRQ's (the special
@@ -799,7 +795,6 @@ unsigned int probe_irq_mask(unsigned long val)
 
 	return mask & val;
 }
-EXPORT_SYMBOL(probe_irq_mask);
 
 /**
  *	probe_irq_off	- end an interrupt autodetect

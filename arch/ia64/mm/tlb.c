@@ -10,7 +10,6 @@
  *              IPI based ptc implementation and A-step IPI implementation.
  */
 #include <linux/config.h>
-#include <linux/module.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -127,7 +126,6 @@ local_flush_tlb_all (void)
 	local_irq_restore(flags);
 	ia64_srlz_i();			/* srlz.i implies srlz.d */
 }
-EXPORT_SYMBOL(local_flush_tlb_all);
 
 void
 flush_tlb_range (struct vm_area_struct *vma, unsigned long start, unsigned long end)
@@ -164,7 +162,6 @@ flush_tlb_range (struct vm_area_struct *vma, unsigned long start, unsigned long 
 
 	ia64_srlz_i();			/* srlz.i implies srlz.d */
 }
-EXPORT_SYMBOL(flush_tlb_range);
 
 void __init
 ia64_tlb_init (void)
