@@ -164,8 +164,6 @@ struct cpufreq_driver {
 	struct module           *owner;
 	char			name[CPUFREQ_NAME_LEN];
 
-	struct cpufreq_policy	*policy;
-
 	/* needed by all drivers */
 	int	(*init)		(struct cpufreq_policy *policy);
 	int	(*verify)	(struct cpufreq_policy *policy);

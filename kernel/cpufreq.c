@@ -34,6 +34,9 @@ static struct cpufreq_driver   	*cpufreq_driver;
 static struct cpufreq_policy	*cpufreq_cpu_data[NR_CPUS];
 static spinlock_t		cpufreq_driver_lock = SPIN_LOCK_UNLOCKED;
 
+/* internal prototype */
+static int __cpufreq_governor(struct cpufreq_policy *policy, unsigned int event);
+
 
 /**
  * Two notifier lists: the "policy" list is involved in the 
@@ -356,7 +359,11 @@ static int cpufreq_add_dev (struct sys_device * sys_dev)
 	if (!try_module_get(cpufreq_driver->owner))
 		return -EINVAL;
 
-	policy = &cpufreq_driver->policy[cpu];
+	policy = kmalloc(sizeof(struct cpufreq_policy), GFP_KERNEL);
+	if (!policy)
+		return -ENOMEM;
+	memset(policy, 0, sizeof(struct cpufreq_policy));
+
 	policy->cpu = cpu;
 	init_MUTEX_LOCKED(&policy->lock);
 	init_completion(&policy->kobj_unregister);
@@ -366,7 +373,7 @@ static int cpufreq_add_dev (struct sys_device * sys_dev)
 	 */
 	ret = cpufreq_driver->init(policy);
 	if (ret)
-		goto out;
+		goto err_out;
 
 	memcpy(&new_policy, policy, sizeof(struct cpufreq_policy));
 
@@ -377,7 +384,7 @@ static int cpufreq_add_dev (struct sys_device * sys_dev)
 
 	ret = kobject_register(&policy->kobj);
 	if (ret)
-		goto out;
+		goto err_out;
 
 	/* set up files for this cpu device */
 	drv_attr = cpufreq_driver->attr;
@@ -394,16 +401,23 @@ static int cpufreq_add_dev (struct sys_device * sys_dev)
 	
 	/* set default policy */
 	ret = cpufreq_set_policy(&new_policy);
-	if (ret) {
-		spin_lock_irqsave(&cpufreq_driver_lock, flags);
-		cpufreq_cpu_data[cpu] = NULL;
-		spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
+	if (ret)
+		goto err_out_unregister;
 
-		kobject_unregister(&policy->kobj);
-		wait_for_completion(&policy->kobj_unregister);
-	}
+	module_put(cpufreq_driver->owner);
+	return 0;
 
- out:
+
+ err_out_unregister:
+	spin_lock_irqsave(&cpufreq_driver_lock, flags);
+	cpufreq_cpu_data[cpu] = NULL;
+	spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
+
+	kobject_unregister(&policy->kobj);
+	wait_for_completion(&policy->kobj_unregister);
+
+ err_out:
+	kfree(policy);
 	module_put(cpufreq_driver->owner);
 	return ret;
 }
@@ -443,14 +457,13 @@ static int cpufreq_remove_dev (struct sys_device * sys_dev)
 	 */
 	wait_for_completion(&data->kobj_unregister);
 
-	if ((cpufreq_driver->target) && 
-	    (data->policy == CPUFREQ_POLICY_GOVERNOR)) {
-		data->governor->governor(data, CPUFREQ_GOV_STOP);
-		module_put(data->governor->owner);
-	}
+	if (cpufreq_driver->target)
+		__cpufreq_governor(data, CPUFREQ_GOV_STOP);
 
 	if (cpufreq_driver->exit)
 		cpufreq_driver->exit(data);
+
+	kfree(data);
 
 	return 0;
 }
@@ -868,7 +881,7 @@ void cpufreq_notify_transition(struct cpufreq_freqs *freqs, unsigned int state)
 	case CPUFREQ_POSTCHANGE:
 		adjust_jiffies(CPUFREQ_POSTCHANGE, freqs);
 		notifier_call_chain(&cpufreq_transition_notifier_list, CPUFREQ_POSTCHANGE, freqs);
-		cpufreq_driver->policy[freqs->cpu].cur = freqs->new;
+		cpufreq_cpu_data[freqs->cpu]->cur = freqs->new;
 		break;
 	}
 	up_read(&cpufreq_notifier_rwsem);
@@ -907,14 +920,6 @@ int cpufreq_register_driver(struct cpufreq_driver *driver_data)
 	cpufreq_driver = driver_data;
 	spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
 
-	cpufreq_driver->policy = kmalloc(NR_CPUS * sizeof(struct cpufreq_policy), GFP_KERNEL);
-	if (!cpufreq_driver->policy) {
-		cpufreq_driver = NULL;
-		return -ENOMEM;
-	}
-
-	memset(cpufreq_driver->policy, 0, NR_CPUS * sizeof(struct cpufreq_policy));
-
 	return sysdev_driver_register(&cpu_sysdev_class,&cpufreq_sysdev_driver);
 }
 EXPORT_SYMBOL_GPL(cpufreq_register_driver);
@@ -938,7 +943,6 @@ int cpufreq_unregister_driver(struct cpufreq_driver *driver)
 	sysdev_driver_unregister(&cpu_sysdev_class, &cpufreq_sysdev_driver);
 
 	spin_lock_irqsave(&cpufreq_driver_lock, flags);
-	kfree(cpufreq_driver->policy);
 	cpufreq_driver = NULL;
 	spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
 
