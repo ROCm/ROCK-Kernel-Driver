@@ -71,10 +71,10 @@ static struct usb_driver hci_usb_driver;
 
 static struct usb_device_id bluetooth_ids[] = {
 	/* Broadcom BCM2033 without firmware */
-	{ USB_DEVICE(0x0a5c, 0x2033), driver_info: HCI_IGNORE },
+	{ USB_DEVICE(0x0a5c, 0x2033), .driver_info = HCI_IGNORE },
 
 	/* Digianswer device */
-	{ USB_DEVICE(0x08fd, 0x0001), driver_info: HCI_DIGIANSWER },
+	{ USB_DEVICE(0x08fd, 0x0001), .driver_info = HCI_DIGIANSWER },
 
 	/* Generic Bluetooth USB device */
 	{ USB_DEVICE_INFO(HCI_DEV_CLASS, HCI_DEV_SUBCLASS, HCI_DEV_PROTOCOL) },
