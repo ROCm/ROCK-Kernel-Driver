@@ -54,7 +54,7 @@ struct class_device_attribute *scsi_sysfs_shost_attrs[] = {
 	NULL
 };
 
-static struct class shost_class = {
+struct class shost_class = {
 	.name		= "scsi_host",
 };
 

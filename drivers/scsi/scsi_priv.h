@@ -56,7 +56,7 @@ struct scsi_target {
 extern void scsi_host_busy_inc(struct Scsi_Host *, Scsi_Device *);
 extern void scsi_host_busy_dec_and_test(struct Scsi_Host *, Scsi_Device *);
 extern struct Scsi_Host *scsi_host_get_next(struct Scsi_Host *);
-extern struct Scsi_Host *scsi_host_hn_get(unsigned short);
+extern struct Scsi_Host *scsi_host_lookup(unsigned short);
 extern void scsi_host_put(struct Scsi_Host *);
 extern void scsi_host_init(void);
 
@@ -128,5 +128,7 @@ extern void scsi_sysfs_unregister(void);
  * class and device attributes */
 extern struct class_device_attribute *scsi_sysfs_shost_attrs[];
 extern struct device_attribute *scsi_sysfs_sdev_attrs[];
+
+extern struct class shost_class;
 
 #endif /* _SCSI_PRIV_H */
