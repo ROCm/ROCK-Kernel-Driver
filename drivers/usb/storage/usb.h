@@ -69,6 +69,7 @@ struct us_unusual_dev {
 /* Flag definitions: these entries are static */
 #define US_FL_SINGLE_LUN      0x00000001 /* allow access to only LUN 0	    */
 #define US_FL_MODE_XLATE      0          /* [no longer used]                */
+#define US_FL_NEED_OVERRIDE   0x00000004 /* unusual_devs entry is necessary */
 #define US_FL_IGNORE_SER      0		 /* [no longer used]		    */
 #define US_FL_SCM_MULT_TARG   0x00000020 /* supports multiple targets	    */
 #define US_FL_FIX_INQUIRY     0x00000040 /* INQUIRY response needs faking   */

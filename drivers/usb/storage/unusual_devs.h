@@ -613,7 +613,7 @@ UNUSUAL_DEV( 0x07cf, 0x1001, 0x1000, 0x9009,
 		"Casio",
 		"QV DigitalCamera",
 		US_SC_DEVICE, US_PR_CB, NULL,
-		US_FL_FIX_INQUIRY ),
+		US_FL_NEED_OVERRIDE | US_FL_FIX_INQUIRY ),
 
 /* Later Casio cameras apparently tell the truth */
 UNUSUAL_DEV( 0x07cf, 0x1001, 0x9010, 0x9999,
