@@ -297,7 +297,7 @@ void b1_reset_ctr(struct capi_ctr *ctrl)
 }
 
 void b1_register_appl(struct capi_ctr *ctrl,
-				__u16 appl,
+				u16 appl,
 				capi_register_params *rp)
 {
 	avmctrl_info *cinfo = (avmctrl_info *)(ctrl->driverdata);
@@ -323,7 +323,7 @@ void b1_register_appl(struct capi_ctr *ctrl,
 	ctrl->appl_registered(ctrl, appl);
 }
 
-void b1_release_appl(struct capi_ctr *ctrl, __u16 appl)
+void b1_release_appl(struct capi_ctr *ctrl, u16 appl)
 {
 	avmctrl_info *cinfo = (avmctrl_info *)(ctrl->driverdata);
 	avmcard *card = cinfo->card;
@@ -343,14 +343,14 @@ void b1_send_message(struct capi_ctr *ctrl, struct sk_buff *skb)
 	avmcard *card = cinfo->card;
 	unsigned int port = card->port;
 	unsigned long flags;
-	__u16 len = CAPIMSG_LEN(skb->data);
-	__u8 cmd = CAPIMSG_COMMAND(skb->data);
-	__u8 subcmd = CAPIMSG_SUBCOMMAND(skb->data);
+	u16 len = CAPIMSG_LEN(skb->data);
+	u8 cmd = CAPIMSG_COMMAND(skb->data);
+	u8 subcmd = CAPIMSG_SUBCOMMAND(skb->data);
 
 	save_flags(flags);
 	cli();
 	if (CAPICMD(cmd, subcmd) == CAPI_DATA_B3_REQ) {
-		__u16 dlen = CAPIMSG_DATALEN(skb->data);
+		u16 dlen = CAPIMSG_DATALEN(skb->data);
 		b1_put_byte(port, SEND_DATA_B3_REQ);
 		b1_put_slice(port, skb->data, len);
 		b1_put_slice(port, skb->data + len, dlen);
@@ -369,8 +369,8 @@ void b1_parse_version(avmctrl_info *cinfo)
 	struct capi_ctr *ctrl = cinfo->capi_ctrl;
 	avmcard *card = cinfo->card;
 	capi_profile *profp;
-	__u8 *dversion;
-	__u8 flag;
+	u8 *dversion;
+	u8 flag;
 	int i, j;
 
 	for (j = 0; j < AVM_MAXVERSION; j++)
@@ -394,7 +394,7 @@ void b1_parse_version(avmctrl_info *cinfo)
 
 	profp = &ctrl->profile;
 
-	flag = ((__u8 *)(profp->manu))[1];
+	flag = ((u8 *)(profp->manu))[1];
 	switch (flag) {
 	case 0: if (cinfo->version[VER_CARDTYPE])
 	           strcpy(cinfo->cardname, cinfo->version[VER_CARDTYPE]);
@@ -410,7 +410,7 @@ void b1_parse_version(avmctrl_info *cinfo)
         printk(KERN_NOTICE "%s: card %d \"%s\" ready.\n",
 				card->name, ctrl->cnr, cinfo->cardname);
 
-        flag = ((__u8 *)(profp->manu))[3];
+        flag = ((u8 *)(profp->manu))[3];
         if (flag)
 		printk(KERN_NOTICE "%s: card %d Protocol:%s%s%s%s%s%s%s\n",
 			card->name,
@@ -424,7 +424,7 @@ void b1_parse_version(avmctrl_info *cinfo)
 			(flag & 0x40) ? " 1TR6" : ""
 			);
 
-        flag = ((__u8 *)(profp->manu))[5];
+        flag = ((u8 *)(profp->manu))[5];
 	if (flag)
 		printk(KERN_NOTICE "%s: card %d Linetype:%s%s%s%s\n",
 			card->name,
@@ -574,7 +574,7 @@ int b1ctl_read_proc(char *page, char **start, off_t off,
 {
 	avmctrl_info *cinfo = (avmctrl_info *)(ctrl->driverdata);
 	avmcard *card = cinfo->card;
-	__u8 flag;
+	u8 flag;
 	int len = 0;
 	char *s;
 
@@ -604,7 +604,7 @@ int b1ctl_read_proc(char *page, char **start, off_t off,
 	   len += sprintf(page+len, "%-16s %s\n", "ver_serial", s);
 
 	if (card->cardtype != avm_m1) {
-        	flag = ((__u8 *)(ctrl->profile.manu))[3];
+        	flag = ((u8 *)(ctrl->profile.manu))[3];
         	if (flag)
 			len += sprintf(page+len, "%-16s%s%s%s%s%s%s%s\n",
 			"protocol",
@@ -618,7 +618,7 @@ int b1ctl_read_proc(char *page, char **start, off_t off,
 			);
 	}
 	if (card->cardtype != avm_m1) {
-        	flag = ((__u8 *)(ctrl->profile.manu))[5];
+        	flag = ((u8 *)(ctrl->profile.manu))[5];
 		if (flag)
 			len += sprintf(page+len, "%-16s%s%s%s%s\n",
 			"linetype",

@@ -484,14 +484,14 @@ static void t1isa_send_message(struct capi_ctr *ctrl, struct sk_buff *skb)
 	avmcard *card = cinfo->card;
 	unsigned int port = card->port;
 	unsigned long flags;
-	__u16 len = CAPIMSG_LEN(skb->data);
-	__u8 cmd = CAPIMSG_COMMAND(skb->data);
-	__u8 subcmd = CAPIMSG_SUBCOMMAND(skb->data);
+	u16 len = CAPIMSG_LEN(skb->data);
+	u8 cmd = CAPIMSG_COMMAND(skb->data);
+	u8 subcmd = CAPIMSG_SUBCOMMAND(skb->data);
 
 	save_flags(flags);
 	cli();
 	if (CAPICMD(cmd, subcmd) == CAPI_DATA_B3_REQ) {
-		__u16 dlen = CAPIMSG_DATALEN(skb->data);
+		u16 dlen = CAPIMSG_DATALEN(skb->data);
 		b1_put_byte(port, SEND_DATA_B3_REQ);
 		t1_put_slice(port, skb->data, len);
 		t1_put_slice(port, skb->data + len, dlen);

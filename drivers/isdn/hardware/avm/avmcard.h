@@ -41,12 +41,12 @@ enum avmcardtype {
 
 typedef struct avmcard_dmabuf {
     long        size;
-    __u8       *dmabuf;
+    u8       *dmabuf;
     dma_addr_t  dmaaddr;
 } avmcard_dmabuf;
 
 typedef struct avmcard_dmainfo {
-	__u32                recvlen;
+	u32                recvlen;
         avmcard_dmabuf       recvbuf;
 
         avmcard_dmabuf       sendbuf;
@@ -71,7 +71,7 @@ typedef struct avmcard {
 	int interrupt;
 
 	void *mbase;
-	volatile __u32 csr;
+	volatile u32 csr;
 	avmcard_dmainfo *dma;
 
 	struct avmctrl_info {
@@ -542,9 +542,9 @@ int b1_loaded(avmcard *card);
 
 int b1_load_firmware(struct capi_ctr *ctrl, capiloaddata *data);
 void b1_reset_ctr(struct capi_ctr *ctrl);
-void b1_register_appl(struct capi_ctr *ctrl, __u16 appl,
+void b1_register_appl(struct capi_ctr *ctrl, u16 appl,
 				capi_register_params *rp);
-void b1_release_appl(struct capi_ctr *ctrl, __u16 appl);
+void b1_release_appl(struct capi_ctr *ctrl, u16 appl);
 void b1_send_message(struct capi_ctr *ctrl, struct sk_buff *skb);
 void b1_parse_version(avmctrl_info *card);
 void b1_handle_interrupt(avmcard * card);
@@ -567,9 +567,9 @@ int b1dma_load_firmware(struct capi_ctr *ctrl, capiloaddata *data);
 void b1dma_reset_ctr(struct capi_ctr *ctrl);
 void b1dma_remove_ctr(struct capi_ctr *ctrl);
 void b1dma_register_appl(struct capi_ctr *ctrl,
-				__u16 appl,
+				u16 appl,
 				capi_register_params *rp);
-void b1dma_release_appl(struct capi_ctr *ctrl, __u16 appl);
+void b1dma_release_appl(struct capi_ctr *ctrl, u16 appl);
 void b1dma_send_message(struct capi_ctr *ctrl, struct sk_buff *skb);
 int b1dmactl_read_proc(char *page, char **start, off_t off,
         		int count, int *eof, struct capi_ctr *ctrl);
