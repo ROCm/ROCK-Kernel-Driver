@@ -548,10 +548,10 @@ UNUSUAL_DEV(  0x07c4, 0xa400, 0x0000, 0xffff,
  * - They don't like the INQUIRY command. So we must handle this command
  *   of the SCSI layer ourselves.
  */
-UNUSUAL_DEV( 0x07cf, 0x1001, 0x1000, 0x5009,
+UNUSUAL_DEV( 0x07cf, 0x1001, 0x1000, 0x9999,
 		"Casio",
 		"QV DigitalCamera",
-		US_SC_8070, US_PR_CB, NULL,
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_INQUIRY ),
 
 /* Submitted by Hartmut Wahl <hwahl@hwahl.de>*/
