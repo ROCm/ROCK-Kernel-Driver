@@ -57,25 +57,10 @@ endif
 
 HEAD := arch/sparc64/kernel/head.o arch/sparc64/kernel/init_task.o
 
-SUBDIRS += arch/sparc64/kernel arch/sparc64/lib arch/sparc64/mm \
-	arch/sparc64/prom
-
-ifneq ($(CONFIG_SOLARIS_EMUL),n)
-  SUBDIRS += arch/sparc64/solaris
-endif
-
-SUBDIRS += arch/sparc64/math-emu
-
-CORE_FILES := arch/sparc64/kernel/kernel.o arch/sparc64/mm/mm.o $(CORE_FILES)
-
-ifeq ($(CONFIG_SOLARIS_EMUL),y)
-  CORE_FILES += arch/sparc64/solaris/solaris.o
-endif
-
-CORE_FILES += arch/sparc64/math-emu/math-emu.o
-
-LIBS := $(TOPDIR)/lib/lib.a $(LIBS) $(TOPDIR)/arch/sparc64/prom/lib.a \
-	$(TOPDIR)/arch/sparc64/lib/lib.a
+core-y				+= arch/sparc64/kernel/ arch/sparc64/mm/
+core-$(CONFIG_SOLARIS_EMUL)	+= arch/sparc64/solaris/
+core-y				+= arch/sparc64/math-emu/
+libs-y				+= arch/sparc64/prom/ arch/sparc64/lib/
 
 vmlinux.aout: vmlinux
 	$(ELFTOAOUT) -o $(TOPDIR)/vmlinux.aout $(TOPDIR)/vmlinux
