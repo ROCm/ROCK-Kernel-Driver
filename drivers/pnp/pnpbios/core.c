@@ -431,14 +431,15 @@ int __init pnpbios_init(void)
 	}
 
 	/* register with the pnp layer */
-	pnp_register_protocol(&pnpbios_protocol);
+	if (pnp_register_protocol(&pnpbios_protocol)) {
+		printk(KERN_ERR "PnPBIOS: Unable to register driver.  Aborting.\n");
+		return -EIO;
+	}
 
-#ifdef CONFIG_PROC_FS
 	/* start the proc interface */
 	ret = pnpbios_proc_init();
 	if (ret)
-		return ret;
-#endif
+		printk(KERN_ERR "PnPBIOS: Failed to create proc interface.\n");
 
 	/* scan for pnpbios devices */
 	build_devlist();
