@@ -707,15 +707,17 @@ When kbuild executes the following steps are followed (roughly):
 	probe supported options:
 
 		#arch/i386/Makefile
-		check_gcc = $(shell if $(CC) $(1) -S -o /dev/null -xc \
-		            /dev/null\ > /dev/null 2>&1; then echo "$(1)"; \
-		            else echo "$(2)"; fi)
-		cflags-$(CONFIG_MCYRIXIII) += $(call check_gcc,\
-		                                     -march=c3,-march=i486)
 
-		CFLAGS += $(cflags-y)
+		...
+		cflags-$(CONFIG_MPENTIUMII)     += $(call cc-option,\
+						-march=pentium2,-march=i686)
+		...
+		# Disable unit-at-a-time mode ...
+		CFLAGS += $(call cc-option,-fno-unit-at-a-time)
+		...
 
-	The above examples both utilise the trick that a config option expands
+
+	The first examples utilises the trick that a config option expands
 	to 'y' when selected.
 
     CFLAGS_KERNEL	$(CC) options specific for built-in
