@@ -44,6 +44,10 @@
 
 #include <asm/uaccess.h>
 #include <asm/processor.h>
+#ifdef	CONFIG_KDB
+#include <linux/kdb.h>
+static int proc_do_kdb(ctl_table *table, int write, struct file *filp, void *buffer, size_t *lenp, loff_t *ppos);
+#endif	/* CONFIG_KDB */
 
 #ifdef CONFIG_ROOT_NFS
 #include <linux/nfs_fs.h>
@@ -490,6 +494,16 @@ static ctl_table kern_table[] = {
 		.proc_handler	= &proc_dointvec,
 	},
 #endif
+#ifdef	CONFIG_KDB
+	{
+		.ctl_name	= KERN_KDB,
+		.procname	= "kdb",
+		.data		= &kdb_on,
+		.maxlen		= sizeof(kdb_on),
+		.mode		= 0644,
+		.proc_handler	= &proc_do_kdb,
+	},
+#endif	/* CONFIG_KDB */
 	{
 		.ctl_name	= KERN_CADPID,
 		.procname	= "cad_pid",
@@ -2203,6 +2217,22 @@ void unregister_sysctl_table(struct ctl_table_header * table)
 }
 
 #endif /* CONFIG_SYSCTL */
+
+#ifdef	CONFIG_KDB
+static int proc_do_kdb(ctl_table *table, int write, struct file *filp,
+		       void *buffer, size_t *lenp, loff_t *ppos)
+{
+#ifdef	CONFIG_SYSCTL
+	if (KDB_FLAG(NO_CONSOLE) && write) {
+		printk(KERN_ERR "kdb has no working console and has switched itself off\n");
+		return -EINVAL;
+	}
+	return proc_dointvec(table, write, filp, buffer, lenp, ppos);
+#else	/* !CONFIG_SYSCTL */
+	return -ENOSYS;
+#endif	/* CONFIG_SYSCTL */
+}
+#endif	/* CONFIG_KDB */
 
 /*
  * No sense putting this after each symbol definition, twice,

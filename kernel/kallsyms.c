@@ -19,6 +19,12 @@
 #include <linux/err.h>
 #include <linux/proc_fs.h>
 
+#ifdef CONFIG_KDB
+#define all_var 1
+#else
+#define all_var 0
+#endif
+
 /* These will be re-linked against their real values during the second link stage */
 extern unsigned long kallsyms_addresses[] __attribute__((weak));
 extern unsigned long kallsyms_num_syms __attribute__((weak));
@@ -31,6 +37,7 @@ extern unsigned long kallsyms_markers[] __attribute__((weak));
 
 /* Defined by the linker script. */
 extern char _stext[], _etext[], _sinittext[], _einittext[];
+extern char _end[];	/* for CONFIG_KDB */
 
 static inline int is_kernel_inittext(unsigned long addr)
 {
@@ -117,6 +124,12 @@ static unsigned int get_symbol_offset(unsigned long pos)
 	return name - kallsyms_names;
 }
 
+/* kdb treats all kernel addresses as valid, including data */
+static inline int is_kernel(unsigned long addr)
+{
+	return 1;
+}
+
 /* Lookup the address for this symbol. Returns 0 if not found. */
 unsigned long kallsyms_lookup_name(const char *name)
 {
@@ -147,7 +160,8 @@ const char *kallsyms_lookup(unsigned long addr,
 	namebuf[KSYM_NAME_LEN] = 0;
 	namebuf[0] = 0;
 
-	if (is_kernel_text(addr) || is_kernel_inittext(addr)) {
+	if ((all_var && is_kernel(addr)) ||
+	    (!all_var && (is_kernel_text(addr) || is_kernel_inittext(addr)))) {
 		unsigned long symbol_end=0;
 
 		/* do a binary search on the sorted kallsyms_addresses array */
@@ -181,7 +195,7 @@ const char *kallsyms_lookup(unsigned long addr,
 			if (is_kernel_inittext(addr))
 				symbol_end = (unsigned long)_einittext;
 			else
-				symbol_end = (unsigned long)_etext;
+				symbol_end = all_var ? (unsigned long)_end : (unsigned long)_etext;
 		}
 
 		*symbolsize = symbol_end - kallsyms_addresses[low];
@@ -382,3 +396,25 @@ int __init kallsyms_init(void)
 __initcall(kallsyms_init);
 
 EXPORT_SYMBOL(__print_symbol);
+
+#ifdef	CONFIG_KDB
+#include <linux/kdb.h>
+#include <linux/kdbprivate.h>
+
+const char *kdb_walk_kallsyms(loff_t *pos)
+{
+	static struct kallsym_iter kdb_walk_kallsyms_iter;
+	if (*pos == 0) {
+		memset(&kdb_walk_kallsyms_iter, 0, sizeof(kdb_walk_kallsyms_iter));
+		reset_iter(&kdb_walk_kallsyms_iter, 0);
+	}
+	while (1) {
+		if (!update_iter(&kdb_walk_kallsyms_iter, *pos))
+			return NULL;
+		++*pos;
+		/* Some debugging symbols have no name.  Ignore them. */ 
+		if (kdb_walk_kallsyms_iter.name[0])
+			return kdb_walk_kallsyms_iter.name;
+	}
+}
+#endif	/* CONFIG_KDB */

@@ -5,6 +5,9 @@
  */
 
 #include <linux/config.h>
+#ifdef	CONFIG_KDB
+#include <linux/kdb.h>
+#endif
 #include <linux/mm.h>
 #include <linux/slab.h>
 #include <linux/interrupt.h>
@@ -857,11 +860,18 @@ asmlinkage long sys_exit(int error_code)
 task_t fastcall *next_thread(const task_t *p)
 {
 #ifdef CONFIG_SMP
+#ifdef	CONFIG_KDB
+	/* kdb does not take locks */
+	if (!KDB_IS_RUNNING()) {
+#endif
 	if (!p->sighand)
 		BUG();
 	if (!spin_is_locked(&p->sighand->siglock) &&
 				!rwlock_is_locked(&tasklist_lock))
 		BUG();
+#ifdef	CONFIG_KDB
+	}
+#endif
 #endif
 	return pid_task(p->pids[PIDTYPE_TGID].pid_list.next, PIDTYPE_TGID);
 }

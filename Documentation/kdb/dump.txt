@@ -1,0 +1,364 @@
+Interaction between KDB and LKCD.
+
+Executive summary: Do not select CONFIG_KDB_CONTINUE_CATASTROPHIC=2 or
+use KDB command 'sr c' without first patching LKCD to use KDB data.
+
+Both KDB and LKCD try to stop all the other cpus, so the system is not
+changing while it is being debugged or dumped.  KDB will cope with cpus
+that cannot be stopped, some versions of LKCD will just hang.  In
+particular, when LKCD is invoked from KDB, LKCD will attempt to stop
+the other cpus again and may hang.
+
+Some versions of LKCD detect that other cpus are not responding and
+ignore them.  This is almost as bad, the data is changing while it is
+being dumped.  Also the method used to avoid hung cpus has been known
+to cause oops when LKCD has finished dumping.
+
+LKCD does not know about several special cases on IA64, including INIT
+and MCA backtraces, interrupt handlers, out of line code etc.  LKCD
+cannot capture cpu state on any cpu that is not responding to OS
+interrupts, which means that any cpu that is spinning in a disabled
+loop cannot be debugged.  Any cpu that calls into SAL for MCA
+rendezvous cannot be debugged.  Even when LKCD captures IA64 state, the
+user space lcrash code cannot unwind through any assembler code, which
+rules out all the interesting cases.
+
+KDB knows far more than LKCD about architecture peculiarities, stack
+formats, interrupt handling etc.  The methods used by KDB to stop the
+other processors and capture their state are far more reliable than
+those used by LKCD.  KDB can capture INIT and MCA data on IA64, as well
+as save the state of cpus before they enter SAL.
+
+Rather than duplicating the complex KDB code in LKCD, LKCD can be
+patched to use the information that has already been captured by KDB.
+Obviously this only works when LKCD is invoked from KDB.  If you invoke
+LKCD directly from the console with SysRq-c or the dump() function is
+called from code outside KDB then you get the old and broken LKCD
+processing.  Because lcrash uses the old unwind algorithm which cannot
+unwind through IA64 assembler code, KDB kludges the saved state into
+something that the old unwind algorithm can cope with.  Calling LKCD
+from KDB gives you a clean dump, but you have to patch LKCD first.
+
+There are two ways to invoke LKCD from KDB.  One way is manual, using
+the KDB 'sr c' command.  This is identical to doing SysRq-C from the
+console except that it goes through KDB first, so LKCD can use the data
+that KDB has captured.  Obviously 'sr c' requires human intervention
+and KDB must be on, it is up to the person doing the debugging if they
+want to take a dump.
+
+The second way is to set CONFIG_KDB_CONTINUE_CATASTROPHIC=2.  With this
+setting, you automatically get a dump for catastrophic errors.  A
+catastrophic error is a panic, oops, NMI or other watchdog tripping,
+INIT and MCA events on IA64.  CONFIG_KDB_CONTINUE_CATASTROPHIC=2 has no
+effect on debugging events such as break points, single step etc. so it
+does not interfere with manual debugging.
+
+When CONFIG_KDB_CONTINUE_CATASTROPHIC=2 and KDB is on, a catastrophic
+error will drop into KDB to allow manual debugging, typing 'go' will
+take a dump and force a reboot.  With this setting and KDB is off, KDB
+detects a catastrophic error, does enough processing to capture the
+state, takes a dump and forces a reboot - all automatic with no human
+intervention.
+
+For unattended and clean LKCD dumps, patch LKCD to use KDB data.  Use
+  CONFIG_DUMP=y
+  CONFIG_KDB=y
+  CONFIG_KDB_OFF=y
+  CONFIG_KDB_CONTINUE_CATASTROPHIC=2
+
+If you want human intervention before taking a dump, use
+  CONFIG_DUMP=y
+  CONFIG_KDB=y
+  CONFIG_KDB_OFF=n
+  CONFIG_KDB_CONTINUE_CATASTROPHIC=2
+
+
+The following are indicative patches against lkcd 4.1, kernel 2.4.20.
+You may have to to modify the patches for other kernels or other
+versions of lkcd.
+
+diff -urp lkcd/drivers/dump/dump_base.c lkcd/drivers/dump/dump_base.c
+--- lkcd/drivers/dump/dump_base.c	Thu May  1 13:10:12 2003
++++ lkcd/drivers/dump/dump_base.c	Fri Jun 20 12:28:16 2003
+@@ -207,6 +207,9 @@
+ #include <asm/hardirq.h>
+ #include <linux/version.h>
+ #include <asm/system.h>
++#ifdef	CONFIG_KDB
++#include <linux/kdb.h>
++#endif
+ 
+ /*
+  * -----------------------------------------------------------------------
+@@ -852,6 +855,13 @@ dump_silence_system(void)
+ 	unsigned int stage = 0;
+ 	int cpu = smp_processor_id();
+ 
++#ifdef	CONFIG_KDB
++	if (KDB_IS_RUNNING()) {
++		/* kdb is in control, the system is already silenced */
++		printk(KERN_ALERT "LKCD entered from KDB\n");
++	}
++#endif	/* CONFIG_KDB */
++
+ 	if (in_interrupt()) {
+ 		printk(KERN_ALERT "Dumping from interrupt handler !\n");
+ 		printk(KERN_ALERT "Uncertain scenario - but will try my best\n");
+@@ -861,6 +871,9 @@ dump_silence_system(void)
+ 		 * another approach 
+ 		 */
+ 	}
+ 	/* see if there's something to do before we re-enable interrupts */
++#ifdef	CONFIG_KDB
++	if (!KDB_IS_RUNNING())
++#endif	/* CONFIG_KDB */
+ 	(void)__dump_silence_system(stage);
+ 
+@@ -905,6 +918,9 @@ dump_silence_system(void)
+ 
+ 	/* now increment the stage and do stuff after interrupts are enabled */
+ 	stage++;
++#ifdef	CONFIG_KDB
++	if (!KDB_IS_RUNNING())
++#endif	/* CONFIG_KDB */
+ 	(void)__dump_silence_system(stage);
+ 
+ 	/* time to leave */
+diff -urp lkcd/drivers/dump/dump_i386.c lkcd/drivers/dump/dump_i386.c
+--- lkcd/drivers/dump/dump_i386.c	Tue Jul  9 07:14:11 2002
++++ lkcd/drivers/dump/dump_i386.c	Fri Jun 20 12:29:12 2003
+@@ -27,6 +27,10 @@
+ #include <asm/processor.h>
+ #include <asm/hardirq.h>
+ #include <linux/irq.h>
++#ifdef	CONFIG_KDB
++#include <linux/kdb.h>
++#include <linux/kdbprivate.h>
++#endif	/* CONFIG_KDB */
+ 
+ static int alloc_dha_stack(void)
+ {
+@@ -119,6 +123,31 @@ save_other_cpu_states(void)
+ {
+ 	int i;
+ 
++#ifdef	CONFIG_KDB
++	if (KDB_IS_RUNNING()) {
++		/* invoked from kdb, which has already saved all the state */
++		int cpu;
++		struct kdb_running_process *krp;
++		for (cpu = 0, krp = kdb_running_process; cpu < smp_num_cpus; ++cpu, ++krp) {
++			if (krp->seqno < kdb_seqno - 1 ||
++			    !krp->regs ||
++			    !krp->p ||
++			    kdb_process_cpu(krp->p) != cpu) {
++				printk(KERN_WARNING "No KDB data for cpu %d, it will not be in the LKCD dump\n", cpu);
++				continue;
++			}
++			if (cpu == smp_processor_id())
++				continue;	/* dumped by save_this_cpu_state */
++			// kdb_printf("%s: cpu %d task %p regs %p\n", __FUNCTION__, cpu, krp->p, krp->regs);
++			save_this_cpu_state(cpu, krp->regs, krp->p);
++		}
++		return;
++	}
++	printk(KERN_WARNING "This kernel supports KDB but LKCD was invoked directly, not via KDB.\n");
++	printk(KERN_WARNING "Falling back to the old and broken LKCD method of getting data from all cpus,\n");
++	printk(KERN_WARNING "do not be surprised if LKCD hangs.\n");
++#endif	/* CONFIG_KDB */
++
+ 	if (smp_num_cpus > 1) {
+ 		atomic_set(&waiting_for_dump_ipi, smp_num_cpus-1);
+ 		for (i = 0; i < NR_CPUS; i++)
+diff -urp lkcd/drivers/dump/dump_ia64.c lkcd/drivers/dump/dump_ia64.c
+--- lkcd/drivers/dump/dump_ia64.c	Tue Jul  9 07:14:11 2002
++++ lkcd/drivers/dump/dump_ia64.c	Fri Jun 20 12:31:41 2003
+@@ -30,6 +30,10 @@
+ #include <asm/processor.h>
+ #include <asm/hardirq.h>
+ #include <linux/irq.h>
++#ifdef	CONFIG_KDB
++#include <linux/kdb.h>
++#include <linux/kdbprivate.h>
++#endif	/* CONFIG_KDB */
+ 
+ extern unsigned long irq_affinity[];
+ 
+@@ -75,6 +79,12 @@ save_this_cpu_state(int cpu, struct pt_r
+ 
+ 	if (tsk && dump_header_asm.dha_stack[cpu]) {
+ 		memcpy((void*)dump_header_asm.dha_stack[cpu], tsk, THREAD_SIZE);
++#ifdef	CONFIG_KDB
++		if (KDB_IS_RUNNING()) {
++			static void kludge_for_broken_lcrash(int);
++			kludge_for_broken_lcrash(cpu);
++		}
++#endif	/* CONFIG_KDB */
+ 	}
+ 	return;
+ }
+@@ -107,6 +117,32 @@ save_other_cpu_states(void)
+ {
+ 	int i;
+ 
++#ifdef	CONFIG_KDB
++	if (KDB_IS_RUNNING()) {
++		/* invoked from kdb, which has already saved all the state */
++		int cpu;
++		struct kdb_running_process *krp;
++		for (cpu = 0, krp = kdb_running_process; cpu < smp_num_cpus; ++cpu, ++krp) {
++			if (krp->seqno < kdb_seqno - 1 ||
++			    !krp->regs ||
++			    !krp->arch.sw ||
++			    !krp->p ||
++			    kdb_process_cpu(krp->p) != cpu) {
++				printk(KERN_WARNING "No KDB data for cpu %d, it will not be in the LKCD dump\n", cpu);
++				continue;
++			}
++			if (cpu == smp_processor_id())
++				continue;	/* dumped by save_this_cpu_state */
++			// kdb_printf("%s: cpu %d task %p regs %p\n", __FUNCTION__, cpu, krp->p, krp->regs);
++			save_this_cpu_state(cpu, krp->regs, krp->p);
++		}
++		return;
++	}
++	printk(KERN_WARNING "This kernel supports KDB but LKCD was invoked directly, not via KDB.\n");
++	printk(KERN_WARNING "Falling back to the old and broken LKCD method of getting data from all cpus,\n");
++	printk(KERN_WARNING "do not be surprised if LKCD hangs.\n");
++#endif	/* CONFIG_KDB */
++
+ 	if (smp_num_cpus > 1) {
+ 		atomic_set(&waiting_for_dump_ipi, smp_num_cpus-1);
+ 		for (i = 0; i < NR_CPUS; i++)
+@@ -380,3 +416,131 @@ void * __dump_memcpy(void * dest, const 
+ 	}
+ 	return(vp);
+ }
++
++#ifdef	CONFIG_KDB
++/*
++ * lcrash is broken.  It incorrectly assumes that all tasks are blocked, it
++ * assumes that all code is built by gcc (and therefore it cannot unwind through
++ * assembler code), it assumes that there is only one pt_regs at the base of the
++ * stack (where user space entered the kernel).  Dumping from kdb (or any
++ * interrupt context) breaks all those assumptions, resulting in a good dump
++ * that lcrash cannot get any useful backtraces from.
++ *
++ * The real fix is to correct lcrash, using libunwind.  That is not going to
++ * happen any time soon, so this kludge takes the kdb data and reformats it to
++ * suit the broken lcrash code.  The task state is unwound past the interrupt
++ * frame (pt_regs) before kdb, then a switch_stack is synthesized in place of
++ * the pt_regs, using the unwound data.  ksp is changed to point to this
++ * switch_stack, making it look like the task is blocked with no interrupt.
++ *
++ * This will not work when the interrupt occurred in a leaf function, with no
++ * save of b0.  But the old unwind code in lcrash cannot cope with that either,
++ * so no change.
++ */
++
++static inline void *
++kludge_copy_addr(int cpu, void *addr, struct task_struct *p)
++{
++	return (char *)addr - (char *)p + (char *)(dump_header_asm.dha_stack[cpu]);
++}
++
++static void
++kludge_for_broken_lcrash(int cpu)
++{
++	struct kdb_running_process *krp = kdb_running_process + cpu;
++	struct task_struct *p, *p_copy;
++	struct switch_stack *sw, *sw_copy, *sw_new;
++	struct pt_regs *regs;
++	struct unw_frame_info info;
++	kdb_symtab_t symtab;
++	kdb_machreg_t sp;
++	int count, i;
++	char nat;
++
++	if (krp->seqno < kdb_seqno - 1 ||
++	    !krp->regs ||
++	    user_mode(krp->regs) ||
++	    !krp->arch.sw ||
++	    !krp->p ||
++	    kdb_process_cpu(krp->p) != cpu)
++		return;
++	p = krp->p;
++	regs = krp->regs;
++	sw = krp->arch.sw;
++#if 0
++	{
++		char buf[80];
++		sprintf(buf, "btc %d\n", cpu);
++		kdb_parse(buf, regs);
++	}
++#endif
++
++	unw_init_frame_info(&info, p, sw);
++	count = 0;
++	do {
++		unw_get_sp(&info, &sp);
++		// kdb_printf("sp 0x%lx regs 0x%lx\n", sp, regs);
++	} while (sp < (kdb_machreg_t)regs && unw_unwind(&info) >= 0 && count++ < 200);
++	if (count >= 200) {
++		printk(KERN_WARNING "Unwind for process %d on cpu %d looped\n", p->pid, cpu);
++		return;
++	}
++
++	/* Must not touch the real stack data, kludge the data using the copies
++	 * in dump_header_asm.
++	 */
++	p_copy = kludge_copy_addr(cpu, p, p);
++	sw_new = (struct switch_stack *)((u64)(regs + 1) + 16) - 1;
++	sw_copy = kludge_copy_addr(cpu, sw_new, p);
++	// kdb_printf("p_copy 0x%p sw_new 0x%p sw_copy 0x%p\n", p_copy, sw_new, sw_copy);
++	memset(sw_copy, 0, sizeof(*sw_copy));
++
++	sw_copy->caller_unat = sw->caller_unat;
++	unw_access_ar(&info, UNW_AR_FPSR, &sw_copy->ar_fpsr, 0);
++	for (i = 2; i <= 5; ++i)
++		unw_access_fr(&info, i, &sw_copy->f2 + i - 2, 0);
++	for (i = 10; i <= 31; ++i)
++		unw_access_fr(&info, i, &sw_copy->f10 + i - 10, 0);
++	for (i = 4; i <= 7; ++i)
++		unw_access_gr(&info, i, &sw_copy->r4 + i - 4, &nat, 0);
++	for (i = 0; i <= 5; ++i)
++		unw_access_br(&info, i, &sw_copy->b0 + i, 0);
++	sw_copy->ar_pfs = *info.cfm_loc;
++	unw_access_ar(&info, UNW_AR_LC, &sw_copy->ar_lc, 0);
++	unw_access_ar(&info, UNW_AR_UNAT, &sw_copy->ar_unat, 0);
++	unw_access_ar(&info, UNW_AR_RNAT, &sw_copy->ar_rnat, 0);
++	/* FIXME: unwind.c returns the original bspstore, not the value that
++	 * matches the current unwind state.  Calculate our own value for the
++	 * modified bspstore.  This should work but does not
++	 *   unw_access_ar(&info, UNW_AR_BSPSTORE, &sw_copy->ar_bspstore, 0);
++	*/
++	sw_copy->ar_bspstore = (unsigned long)ia64_rse_skip_regs((unsigned long *)info.bsp, (*info.cfm_loc >> 7) & 0x7f);
++	unw_access_pr(&info, &sw_copy->pr, 0);
++
++	/* lcrash cannot unwind through the new spinlock contention code and it
++	 * is too important a case to ignore.  So the kludge extracts the
++	 * calling IP before saving the data.
++	 */
++	if (kdbnearsym(regs->cr_iip, &symtab) &&
++		strncmp(symtab.sym_name, "ia64_spinlock_contention", 24) == 0)
++		unw_get_rp(&info, &sw_copy->b0);
++
++	p_copy->thread.ksp = (__u64)sw_new - 16;
++	dump_header_asm.dha_smp_regs[cpu] = *((struct pt_regs *)((unsigned long)p + THREAD_SIZE) - 1);
++#if 0
++	{
++		/* debug.  Destructive overwrite of task, then bt the result in kdb to
++		 * validate the modified task.
++		 */
++		char buf[80];
++		memcpy(p, p_copy, THREAD_SIZE);
++		krp->regs = NULL;
++		krp->arch.sw = sw_new;
++		sprintf(buf, "btc %d\n", cpu);
++		kdb_parse(buf, NULL);
++		while(1){};
++	}
++#endif
++}
++
++#endif	/* CONFIG_KDB */
