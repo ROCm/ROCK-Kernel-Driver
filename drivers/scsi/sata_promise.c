@@ -728,9 +728,9 @@ static inline unsigned int pdc20621_host_intr( struct ata_port *ap,
 
 		/* step one - exec ATA command */
 		else {
+			u8 seq = (u8) (port_no + 1 + 4);
 			VPRINTK("ata%u: read ata, 0x%x 0x%x\n", ap->id,
 				readl(mmio + 0x104), readl(mmio + 0x12c));
-			u8 seq = (u8) (port_no + 1 + 4);
 
 			/* submit hdma pkt */
 			writel(0x00000001, mmio + PDC_20621_SEQCTL + (seq * 4));
@@ -747,9 +747,9 @@ static inline unsigned int pdc20621_host_intr( struct ata_port *ap,
 	case ATA_PROT_DMA_WRITE:
 		/* step one - DMA from host to DIMM */
 		if (doing_hdma) {
+			u8 seq = (u8) (port_no + 1);
 			VPRINTK("ata%u: write hdma, 0x%x 0x%x\n", ap->id,
 				readl(mmio + 0x104), readl(mmio + 0x12c));
-			u8 seq = (u8) (port_no + 1);
 
 			/* submit ata pkt */
 			writel(0x00000001, mmio + PDC_20621_SEQCTL + (seq * 4));
