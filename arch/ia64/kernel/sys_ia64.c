@@ -12,6 +12,7 @@
 #include <linux/hugetlb.h>
 #include <linux/mman.h>
 #include <linux/sched.h>
+#include <linux/shm.h>
 #include <linux/file.h>		/* doh, must come after sched.h... */
 #include <linux/smp.h>
 #include <linux/smp_lock.h>

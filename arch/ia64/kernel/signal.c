@@ -385,15 +385,14 @@ setup_frame (int sig, struct k_sigaction *ka, siginfo_t *info, sigset_t *set,
 
 	frame = (void *) scr->pt.r12;
 	tramp_addr = GATE_ADDR + (ia64_sigtramp - __start_gate_section);
-	if (ka->sa.sa_flags & SA_ONSTACK) {
+	if ((ka->sa.sa_flags & SA_ONSTACK) && sas_ss_flags((unsigned long) frame) == 0) {
+		frame = (void *) ((current->sas_ss_sp + current->sas_ss_size)
+				  & ~(STACK_ALIGN - 1));
 		/*
-		 * We need to check the memory and register stacks separately, because
-		 * they're switched separately (memory stack is switched in the kernel,
-		 * register stack is switched in the signal trampoline).
+		 * We need to check for the register stack being on the signal stack
+		 * separately, because it's switched separately (memory stack is switched
+		 * in the kernel, register stack is switched in the signal trampoline).
 		 */
-		if (!on_sig_stack((unsigned long) frame))
-			frame = (void *) ((current->sas_ss_sp + current->sas_ss_size)
-					  & ~(STACK_ALIGN - 1));
 		if (!rbs_on_sig_stack(scr->pt.ar_bspstore))
 			new_rbs  = (current->sas_ss_sp + sizeof(long) - 1) & ~(sizeof(long) - 1);
 	}
@@ -453,16 +452,14 @@ static long
 handle_signal (unsigned long sig, struct k_sigaction *ka, siginfo_t *info, sigset_t *oldset,
 	       struct sigscratch *scr)
 {
-#ifdef CONFIG_IA32_SUPPORT
 	if (IS_IA32_PROCESS(&scr->pt)) {
 		/* send signal to IA-32 process */
 		if (!ia32_setup_frame1(sig, ka, info, oldset, &scr->pt))
 			return 0;
 	} else
-#endif
-	/* send signal to IA-64 process */
-	if (!setup_frame(sig, ka, info, oldset, scr))
-		return 0;
+		/* send signal to IA-64 process */
+		if (!setup_frame(sig, ka, info, oldset, scr))
+			return 0;
 
 	if (ka->sa.sa_flags & SA_ONESHOT)
 		ka->sa.sa_handler = SIG_DFL;
@@ -490,6 +487,7 @@ ia64_do_signal (sigset_t *oldset, struct sigscratch *scr, long in_syscall)
 	siginfo_t info;
 	long restart = in_syscall;
 	long errno = scr->pt.r8;
+#	define ERR_CODE(c)	(IS_IA32_PROCESS(&scr->pt) ? -(c) : (c))
 
 	/*
 	 * In the ia64_leave_kernel code path, we want the common case to go fast, which
@@ -502,7 +500,6 @@ ia64_do_signal (sigset_t *oldset, struct sigscratch *scr, long in_syscall)
 	if (!oldset)
 		oldset = &current->blocked;
 
-#ifdef CONFIG_IA32_SUPPORT
 	if (IS_IA32_PROCESS(&scr->pt)) {
 		if (in_syscall) {
 			if (errno >= 0)
@@ -510,9 +507,7 @@ ia64_do_signal (sigset_t *oldset, struct sigscratch *scr, long in_syscall)
 			else
 				errno = -errno;
 		}
-	} else
-#endif
-	if (scr->pt.r10 != -1)
+	} else if (scr->pt.r10 != -1)
 		/*
 		 * A system calls has to be restarted only if one of the error codes
 		 * ERESTARTNOHAND, ERESTARTSYS, or ERESTARTNOINTR is returned.  If r10
@@ -531,25 +526,25 @@ ia64_do_signal (sigset_t *oldset, struct sigscratch *scr, long in_syscall)
 
 		if (restart) {
 			switch (errno) {
+			      case ERESTART_RESTARTBLOCK:
+printk("ERESTART_RESTARTBLOCK: ignoring\n");
+				current_thread_info()->restart_block.fn = do_no_restart_syscall;
+			      case ERESTARTNOHAND:
+				scr->pt.r8 = ERR_CODE(EINTR);
+				/* note: scr->pt.r10 is already -1 */
+				break;
+
 			      case ERESTARTSYS:
 				if ((ka->sa.sa_flags & SA_RESTART) == 0) {
-			      case ERESTARTNOHAND:
-#ifdef CONFIG_IA32_SUPPORT
-					if (IS_IA32_PROCESS(&scr->pt))
-						scr->pt.r8 = -EINTR;
-					else
-#endif
-						scr->pt.r8 = EINTR;
+					scr->pt.r8 = ERR_CODE(EINTR);
 					/* note: scr->pt.r10 is already -1 */
 					break;
 				}
 			      case ERESTARTNOINTR:
-#ifdef CONFIG_IA32_SUPPORT
 				if (IS_IA32_PROCESS(&scr->pt)) {
 					scr->pt.r8 = scr->pt.r1;
 					scr->pt.cr_iip -= 2;
 				} else
-#endif
 					ia64_decrement_ip(&scr->pt);
 			}
 		}
@@ -565,19 +560,28 @@ ia64_do_signal (sigset_t *oldset, struct sigscratch *scr, long in_syscall)
 	/* Did we come from a system call? */
 	if (restart) {
 		/* Restart the system call - no handlers present */
-		if (errno == ERESTARTNOHAND || errno == ERESTARTSYS || errno == ERESTARTNOINTR) {
-#ifdef CONFIG_IA32_SUPPORT
+		if (errno == ERESTARTNOHAND || errno == ERESTARTSYS || errno == ERESTARTNOINTR
+		    || errno == ERESTART_RESTARTBLOCK)
+		{
 			if (IS_IA32_PROCESS(&scr->pt)) {
 				scr->pt.r8 = scr->pt.r1;
 				scr->pt.cr_iip -= 2;
-			} else
-#endif
-			/*
-			 * Note: the syscall number is in r15 which is saved in pt_regs so
-			 * all we need to do here is adjust ip so that the "break"
-			 * instruction gets re-executed.
-			 */
-			ia64_decrement_ip(&scr->pt);
+				if (errno == ERESTART_RESTARTBLOCK) {
+					scr->pt.r8 = 0;	/* x86 version of __NR_restart_syscall */
+					scr->pt.cr_iip -= 2;
+				}
+			} else {
+				/*
+				 * Note: the syscall number is in r15 which is saved in
+				 * pt_regs so all we need to do here is adjust ip so that
+				 * the "break" instruction gets re-executed.
+				 */
+				ia64_decrement_ip(&scr->pt);
+				if (errno == ERESTART_RESTARTBLOCK) {
+printk("ERESTART_RESTARTBLOCK: restarting at %lx\n", scr->pt.cr_iip);
+					scr->pt.r15 = __NR_restart_syscall;
+				}
+			}
 		}
 	}
 	return 0;

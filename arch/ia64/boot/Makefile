@@ -15,7 +15,7 @@ targets-$(CONFIG_IA64_GENERIC) += bootloader
 EXTRA_TARGETS += $(sort $(targets-y))
 
 quiet_cmd_cptotop = LN      $@
-      cmd_cptotop = ln $< $@
+      cmd_cptotop = ln -f $< $@
 
 vmlinux.gz: $(obj)/vmlinux.gz $(targets-y)
 	$(call cmd,cptotop)

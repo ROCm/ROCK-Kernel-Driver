@@ -493,7 +493,7 @@ collect_task (struct task_list **listp, struct task_struct *p, int make_writable
 		/* oops, can't collect more: finish at least what we collected so far... */
 		return;
 
-	task_lock(p);
+	get_task_struct(p);
 	e->task = p;
 	e->next = *listp;
 	*listp = e;
@@ -505,7 +505,7 @@ finish_task (struct task_list *list, int make_writable)
 	struct task_list *next = list->next;
 
 	sync_user_rbs_one_thread(list->task, make_writable);
-	task_unlock(list->task);
+	put_task_struct(list->task);
 	kfree(list);
 	return next;
 }
