@@ -27,6 +27,7 @@
 #include "init.h"
 #include "os.h"
 #include "mode_kern.h"
+#include "uml_uaccess.h"
 
 /* Changed during early boot */
 pgd_t swapper_pg_dir[1024];
@@ -414,8 +415,28 @@ __uml_setup("mem=", uml_mem_setup,
 
 struct page *arch_validate(struct page *page, int mask, int order)
 {
-	return(CHOOSE_MODE_PROC(arch_validate_tt, arch_validate_skas, page, 
-				mask, order));
+	unsigned long addr, zero = 0;
+	int i;
+
+ again:
+	if(page == NULL) return(page);
+	if(PageHighMem(page)) return(page);
+
+	addr = (unsigned long) page_address(page);
+	for(i = 0; i < (1 << order); i++){
+		current->thread.fault_addr = (void *) addr;
+		if(__do_copy_to_user((void *) addr, &zero, 
+				     sizeof(zero),
+				     &current->thread.fault_addr,
+				     &current->thread.fault_catcher)){
+			if(!(mask & __GFP_WAIT)) return(NULL);
+			else break;
+		}
+		addr += PAGE_SIZE;
+	}
+	if(i == (1 << order)) return(page);
+	page = alloc_pages(mask, order);
+	goto again;
 }
 
 DECLARE_MUTEX(vm_reserved_sem);

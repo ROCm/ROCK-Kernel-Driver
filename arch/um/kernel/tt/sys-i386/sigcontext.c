@@ -29,14 +29,15 @@ int copy_sc_from_user_tt(void *to_ptr, void *from_ptr, void *data)
 	return(err);
 }
 
-int copy_sc_to_user_tt(void *to_ptr, void *from_ptr, void *data)
+int copy_sc_to_user_tt(void *to_ptr, void *fp, void *from_ptr, void *data)
 {
 	struct arch_frame_data *arch = data;
 	struct sigcontext *to = to_ptr, *from = from_ptr;
 	struct _fpstate *to_fp, *from_fp;
 	int err;
 
-	to_fp = (struct _fpstate *)((unsigned long) to + sizeof(*to));
+	to_fp = (struct _fpstate *) 
+		(fp ? (unsigned long) fp : ((unsigned long) to + sizeof(*to)));
 	from_fp = from->fpstate;
 	err = copy_to_user_proc(to, from, sizeof(*to));
 	if(from_fp != NULL){

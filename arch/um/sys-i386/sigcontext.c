@@ -21,7 +21,7 @@ int sc_size(void *data)
 void sc_to_sc(void *to_ptr, void *from_ptr)
 {
 	struct sigcontext *to = to_ptr, *from = from_ptr;
-	int size = sizeof(*to) + signal_frame_sc.arch.fpstate_size;
+	int size = sizeof(*to) + signal_frame_sc.common.arch.fpstate_size;
 
 	memcpy(to, from, size);
 	if(from->fpstate != NULL) to->fpstate = (struct _fpstate *) (to + 1);

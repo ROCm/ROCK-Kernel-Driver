@@ -10,10 +10,7 @@
 #include <sys/ioctl.h>
 #include "user_util.h"
 #include "mem_user.h"
-
-/* XXX All the __CONFIG_* stuff is broken because this file can't include
- * config.h
- */
+#include "uml-config.h"
 
 /* Had to steal this from linux/module.h because that file can't be included
  * since this includes various user-level headers.

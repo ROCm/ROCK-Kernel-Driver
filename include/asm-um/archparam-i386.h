@@ -48,7 +48,7 @@ typedef elf_greg_t elf_gregset_t[ELF_NGREG];
 	/* fake once used fs and gs selectors? */	\
 	pr_reg[9] = PT_REGS_DS(regs);		\
 	pr_reg[10] = PT_REGS_DS(regs);		\
-	pr_reg[11] = regs->regs.syscall;	\
+	pr_reg[11] = PT_REGS_SYSCALL_NR(regs);	\
 	pr_reg[12] = PT_REGS_IP(regs);		\
 	pr_reg[13] = PT_REGS_CS(regs);		\
 	pr_reg[14] = PT_REGS_EFLAGS(regs);	\

@@ -14,26 +14,27 @@
 #include "task.h"
 #include "tt.h"
 
-void sig_handler_common_tt(int sig, struct sigcontext *sc)
+void sig_handler_common_tt(int sig, void *sc_ptr)
 {
-	struct uml_pt_regs save_regs, *r;
+	struct sigcontext *sc = sc_ptr;
+	struct tt_regs save_regs, *r;
 	struct signal_info *info;
 	int save_errno = errno, is_user;
 
 	unprotect_kernel_mem();
 
-	r = (struct uml_pt_regs *) TASK_REGS(get_current());
+	r = &TASK_REGS(get_current())->tt;
 	save_regs = *r;
 	is_user = user_context(SC_SP(sc));
-	r->is_user = is_user;
-	r->mode.tt = sc;
-	if(sig != SIGUSR2) r->syscall = -1;
+	r->sc = sc;
+	if(sig != SIGUSR2) 
+		r->syscall = -1;
 
 	change_sig(SIGUSR1, 1);
 	info = &sig_info[sig];
 	if(!info->is_irq) unblock_signals();
 
-	(*info->handler)(sig, r);
+	(*info->handler)(sig, (union uml_pt_regs *) r);
 
 	if(is_user){
 		interrupt_end();
