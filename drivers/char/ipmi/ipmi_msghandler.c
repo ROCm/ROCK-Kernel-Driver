@@ -3038,9 +3038,9 @@ static int panic_event(struct notifier_block *this,
 }
 
 static struct notifier_block panic_block = {
-	panic_event,
-	NULL,
-	200   /* priority: INT_MAX >= x >= 0 */
+	.notifier_call	= panic_event,
+	.next		= NULL,
+	.priority	= 200	/* priority: INT_MAX >= x >= 0 */
 };
 
 static int ipmi_init_msghandler(void)
