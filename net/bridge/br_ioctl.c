@@ -68,8 +68,8 @@ static int br_ioctl_device(struct net_bridge *br,
 	{
 		struct __bridge_info b;
 
-	        read_lock(&br->lock);
 		memset(&b, 0, sizeof(struct __bridge_info));
+		rcu_read_lock();
 		memcpy(&b.designated_root, &br->designated_root, 8);
 		memcpy(&b.bridge_id, &br->bridge_id, 8);
 		b.root_path_cost = br->root_path_cost;
@@ -89,7 +89,7 @@ static int br_ioctl_device(struct net_bridge *br,
 		b.tcn_timer_value = timer_residue(&br->tcn_timer);
 		b.topology_change_timer_value = timer_residue(&br->topology_change_timer);
 		b.gc_timer_value = timer_residue(&br->gc_timer);
-	        read_unlock(&br->lock);
+	        rcu_read_unlock();
 
 		if (copy_to_user((void *)arg0, &b, sizeof(b)))
 			return -EFAULT;
@@ -116,27 +116,27 @@ static int br_ioctl_device(struct net_bridge *br,
 	}
 
 	case BRCTL_SET_BRIDGE_FORWARD_DELAY:
-		write_lock(&br->lock);
+		spin_lock_bh(&br->lock);
 		br->bridge_forward_delay = user_to_ticks(arg0);
 		if (br_is_root_bridge(br))
 			br->forward_delay = br->bridge_forward_delay;
-		write_unlock(&br->lock);
+		spin_unlock_bh(&br->lock);
 		return 0;
 
 	case BRCTL_SET_BRIDGE_HELLO_TIME:
-		write_lock(&br->lock);
+		spin_lock_bh(&br->lock);
 		br->bridge_hello_time = user_to_ticks(arg0);
 		if (br_is_root_bridge(br))
 			br->hello_time = br->bridge_hello_time;
-		write_unlock(&br->lock);
+		spin_unlock_bh(&br->lock);
 		return 0;
 
 	case BRCTL_SET_BRIDGE_MAX_AGE:
-		write_lock(&br->lock);
+		spin_lock_bh(&br->lock);
 		br->bridge_max_age = user_to_ticks(arg0);
 		if (br_is_root_bridge(br))
 			br->max_age = br->bridge_max_age;
-		write_unlock(&br->lock);
+		spin_unlock_bh(&br->lock);
 		return 0;
 
 	case BRCTL_SET_AGEING_TIME:
@@ -152,9 +152,9 @@ static int br_ioctl_device(struct net_bridge *br,
 		struct __port_info p;
 		struct net_bridge_port *pt;
 
-		read_lock(&br->lock);
+		rcu_read_lock();
 		if ((pt = br_get_port(br, arg1)) == NULL) {
-			read_unlock(&br->lock);
+			rcu_read_unlock();
 			return -EINVAL;
 		}
 
@@ -172,7 +172,7 @@ static int br_ioctl_device(struct net_bridge *br,
 		p.forward_delay_timer_value = timer_residue(&pt->forward_delay_timer);
 		p.hold_timer_value = timer_residue(&pt->hold_timer);
 
-		read_unlock(&br->lock);
+		rcu_read_unlock();
 
 		if (copy_to_user((void *)arg0, &p, sizeof(p)))
 			return -EFAULT;
@@ -185,9 +185,9 @@ static int br_ioctl_device(struct net_bridge *br,
 		return 0;
 
 	case BRCTL_SET_BRIDGE_PRIORITY:
-		write_lock(&br->lock);
+		spin_lock_bh(&br->lock);
 		br_stp_set_bridge_priority(br, arg0);
-		write_unlock(&br->lock);
+		spin_unlock_bh(&br->lock);
 		return 0;
 
 	case BRCTL_SET_PORT_PRIORITY:
@@ -195,12 +195,12 @@ static int br_ioctl_device(struct net_bridge *br,
 		struct net_bridge_port *p;
 		int ret = 0;
 
-		write_lock(&br->lock);
+		spin_lock_bh(&br->lock);
 		if ((p = br_get_port(br, arg0)) == NULL) 
 			ret = -EINVAL;
 		else
 			br_stp_set_port_priority(p, arg1);
-		write_unlock(&br->lock);
+		spin_unlock_bh(&br->lock);
 		return ret;
 	}
 
@@ -209,12 +209,12 @@ static int br_ioctl_device(struct net_bridge *br,
 		struct net_bridge_port *p;
 		int ret = 0;
 
-		write_lock(&br->lock);
+		spin_lock_bh(&br->lock);
 		if ((p = br_get_port(br, arg0)) == NULL)
 			ret = -EINVAL;
 		else
 			br_stp_set_path_cost(p, arg1);
-		write_unlock(&br->lock);
+		spin_unlock_bh(&br->lock);
 		return ret;
 	}
 
