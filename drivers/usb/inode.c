@@ -184,6 +184,7 @@ static struct inode *usbfs_get_inode (struct super_block *sb, int mode, int dev)
 	return inode; 
 }
 
+/* SMP-safe */
 static int usbfs_mknod (struct inode *dir, struct dentry *dentry, int mode,
 			int dev)
 {
@@ -238,7 +239,9 @@ static int usbfs_unlink (struct inode *dir, struct dentry *dentry)
 	if (usbfs_empty(dentry)) {
 		struct inode *inode = dentry->d_inode;
 
+		lock_kernel();
 		inode->i_nlink--;
+		unlock_kernel();
 		dput(dentry);
 		error = 0;
 	}
