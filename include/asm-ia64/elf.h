@@ -199,11 +199,11 @@ extern int dump_task_fpu (struct task_struct *, elf_fpregset_t *);
 
 #define GATE_EHDR	((const struct elfhdr *) GATE_ADDR)
 
-#define ARCH_DLINFO							\
-do {									\
-	extern char __kernel_syscall_via_epc[];				\
-	NEW_AUX_ENT(AT_SYSINFO, __kernel_syscall_via_epc);		\
-	NEW_AUX_ENT(AT_SYSINFO_EHDR, (unsigned long) GATE_EHDR);	\
+#define ARCH_DLINFO								\
+do {										\
+	extern char __kernel_syscall_via_epc[];					\
+	NEW_AUX_ENT(AT_SYSINFO, (unsigned long) __kernel_syscall_via_epc);	\
+	NEW_AUX_ENT(AT_SYSINFO_EHDR, (unsigned long) GATE_EHDR);		\
 } while (0)
 
 /*
