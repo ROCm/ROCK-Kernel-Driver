@@ -1347,7 +1347,7 @@ int expand_stack(struct vm_area_struct * vma, unsigned long address)
 	address &= PAGE_MASK;
 
 	/* already expanded while waiting for anon_vma lock? */
-	if (vma->vm_start >= address) {
+	if (vma->vm_end >= address) {
 		anon_vma_unlock(vma);
 		return 0;
 	}
