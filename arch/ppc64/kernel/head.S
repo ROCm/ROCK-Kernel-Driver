@@ -1281,6 +1281,10 @@ _GLOBAL(save_remaining_regs)
 	SAVE_4GPRS(16, r1)
 	SAVE_8GPRS(24, r1)
 
+	/* Set the marker value "regshere" just before the reg values */
+	SET_REG_TO_CONST(r22, 0x7265677368657265)
+	std	r22,STACK_FRAME_OVERHEAD-16(r1)
+
 	/*
 	 * Clear the RESULT field
 	 */

@@ -1867,6 +1867,7 @@ xlog_recover_do_inode_buffer(
 
 			nbits = xfs_contig_bits(data_map, map_size,
 							 bit);
+			ASSERT(nbits > 0);
 			reg_buf_offset = bit << XFS_BLI_SHIFT;
 			reg_buf_bytes = nbits << XFS_BLI_SHIFT;
 			item_index++;
@@ -1951,6 +1952,7 @@ xlog_recover_do_reg_buffer(
 		if (bit == -1)
 			break;
 		nbits = xfs_contig_bits(data_map, map_size, bit);
+		ASSERT(nbits > 0);
 		ASSERT(item->ri_buf[i].i_addr != 0);
 		ASSERT(item->ri_buf[i].i_len % XFS_BLI_CHUNK == 0);
 		ASSERT(XFS_BUF_COUNT(bp) >=

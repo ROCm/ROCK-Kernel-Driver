@@ -215,7 +215,7 @@ static inline u8 eeh_inb(unsigned long port) {
 
 static inline void eeh_outb(u8 val, unsigned long port) {
 	if (_IO_IS_VALID(port))
-		return out_8((u8 *)(port+pci_io_base), val);
+		out_8((u8 *)(port+pci_io_base), val);
 }
 
 static inline u16 eeh_inw(unsigned long port) {
@@ -230,7 +230,7 @@ static inline u16 eeh_inw(unsigned long port) {
 
 static inline void eeh_outw(u16 val, unsigned long port) {
 	if (_IO_IS_VALID(port))
-		return out_le16((u16 *)(port+pci_io_base), val);
+		out_le16((u16 *)(port+pci_io_base), val);
 }
 
 static inline u32 eeh_inl(unsigned long port) {
@@ -245,7 +245,7 @@ static inline u32 eeh_inl(unsigned long port) {
 
 static inline void eeh_outl(u32 val, unsigned long port) {
 	if (_IO_IS_VALID(port))
-		return out_le32((u32 *)(port+pci_io_base), val);
+		out_le32((u32 *)(port+pci_io_base), val);
 }
 
 /* in-string eeh macros */

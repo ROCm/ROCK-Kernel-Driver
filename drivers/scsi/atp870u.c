@@ -4,6 +4,7 @@
  *  Copyright (C) 1997	Wu Ching Chen
  *  2.1.x update (C) 1998  Krzysztof G. Baranowski
  *  2.5.x update (C) 2002  Red Hat <alan@redhat.com>
+ *  2.6.x update (C) 2004  Red Hat <alan@redhat.com>
  *
  * Marcelo Tosatti <marcelo@conectiva.com.br> : SMP fixes
  *
@@ -126,9 +127,11 @@ stop_dma:
 			/*
 			 *      Issue more commands
 			 */
+			spin_lock_irqsave(dev->host->host_lock, flags);
 			if (((dev->quhdu != dev->quendu) || (dev->last_cmd != 0xff)) && (dev->in_snd == 0)) {
 				send_s870(host);
 			}
+			spin_unlock_irqrestore(dev->host->host_lock, flags);
 			/*
 			 *      Done
 			 */
@@ -371,9 +374,11 @@ go_42:
 			/*
 			 *      If there is stuff to send and nothing going then send it
 			 */
+			spin_lock_irqsave(dev->host->host_lock, flags);
 			if (((dev->last_cmd != 0xff) || (dev->quhdu != dev->quendu)) && (dev->in_snd == 0)) {
 				send_s870(host);
 			}
+			spin_unlock_irqrestore(dev->host->host_lock, flags);
 			dev->in_int = 0;
 			goto out;
 		}
@@ -443,9 +448,16 @@ out:
 	return IRQ_HANDLED;
 }
 
+/**
+ *	atp870u_queuecommand	-	Queue SCSI command
+ *	@req_p: request block
+ *	@done: completion function
+ *
+ *	Queue a command to the ATP queue. Called with the host lock held.
+ */
+ 
 static int atp870u_queuecommand(Scsi_Cmnd * req_p, void (*done) (Scsi_Cmnd *))
 {
-	unsigned long flags;
 	unsigned short int m;
 	unsigned int tmport;
 	struct Scsi_Host *host;
@@ -484,7 +496,6 @@ static int atp870u_queuecommand(Scsi_Cmnd * req_p, void (*done) (Scsi_Cmnd *))
 	 *      Count new command
 	 */
 
-	spin_lock_irqsave(host->host_lock, flags);
 	dev->quendu++;
 	if (dev->quendu >= qcnt) {
 		dev->quendu = 0;
@@ -498,24 +509,31 @@ static int atp870u_queuecommand(Scsi_Cmnd * req_p, void (*done) (Scsi_Cmnd *))
 		}
 		dev->quendu--;
 		req_p->result = 0x00020000;
-		spin_unlock_irqrestore(host->host_lock, flags);
 		done(req_p);
 		return 0;
 	}
 	dev->querequ[dev->quendu] = req_p;
 	tmport = dev->ioport + 0x1c;
-	spin_unlock_irqrestore(host->host_lock, flags);
 	if ((inb(tmport) == 0) && (dev->in_int == 0) && (dev->in_snd == 0)) {
 		send_s870(host);
 	}
 	return 0;
 }
 
+/**
+ *	send_s870	-	send a command to the controller
+ *	@host: host
+ *
+ *	On entry there is work queued to be done. We move some of that work to the
+ *	controller itself. 
+ *
+ *	Caller holds the host lock.
+ */
+ 
 static void send_s870(struct Scsi_Host *host)
 {
 	unsigned int tmport;
 	Scsi_Cmnd *workrequ;
-	unsigned long flags;
 	unsigned int i;
 	unsigned char j, target_id;
 	unsigned char *prd;
@@ -527,10 +545,7 @@ static void send_s870(struct Scsi_Host *host)
 	struct atp_unit *dev = (struct atp_unit *)&host->hostdata;
 	int sg_count;
 
-	spin_lock_irqsave(host->host_lock, flags);
-	
 	if (dev->in_snd != 0) {
-		spin_unlock_irqrestore(host->host_lock, flags);
 		return;
 	}
 	dev->in_snd = 1;
@@ -543,13 +558,11 @@ static void send_s870(struct Scsi_Host *host)
 		dev->last_cmd = 0xff;
 		if (dev->quhdu == dev->quendu) {
 			dev->in_snd = 0;
-			spin_unlock_irqrestore(dev->host->host_lock, flags);
 			return;
 		}
 	}
 	if ((dev->last_cmd != 0xff) && (dev->working != 0)) {
 		dev->in_snd = 0;
-		spin_unlock_irqrestore(dev->host->host_lock, flags);
 		return;
 	}
 	dev->working++;
@@ -567,7 +580,6 @@ static void send_s870(struct Scsi_Host *host)
 	dev->quhdu = j;
 	dev->working--;
 	dev->in_snd = 0;
-	spin_unlock_irqrestore(host->host_lock, flags);
 	return;
 cmd_subp:
 	workportu = dev->ioport;
@@ -582,7 +594,6 @@ cmd_subp:
 abortsnd:
 	dev->last_cmd |= 0x40;
 	dev->in_snd = 0;
-	spin_unlock_irqrestore(dev->host->host_lock, flags);
 	return;
 oktosend:
 	memcpy(&dev->ata_cdbu[0], &workrequ->cmnd[0], workrequ->cmd_len);
@@ -684,7 +695,6 @@ oktosend:
 			dev->last_cmd |= 0x40;
 		}
 		dev->in_snd = 0;
-		spin_unlock_irqrestore(host->host_lock, flags);
 		return;
 	}
 	tmpcip = dev->pciport;
@@ -770,7 +780,6 @@ oktosend:
 			dev->last_cmd |= 0x40;
 		}
 		dev->in_snd = 0;
-		spin_unlock_irqrestore(host->host_lock, flags);
 		return;
 	}
 	if (inb(tmport) == 0) {
@@ -781,9 +790,6 @@ oktosend:
 		dev->last_cmd |= 0x40;
 	}
 	dev->in_snd = 0;
-	spin_unlock_irqrestore(host->host_lock, flags);
-	return;
-
 }
 
 static unsigned char fun_scam(struct atp_unit *dev, unsigned short int *val)

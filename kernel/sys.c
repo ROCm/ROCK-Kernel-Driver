@@ -1281,8 +1281,12 @@ int set_current_groups(struct group_info *group_info)
 
 	groups_sort(group_info);
 	get_group_info(group_info);
+
+	task_lock(current);
 	old_info = current->group_info;
 	current->group_info = group_info;
+	task_unlock(current);
+
 	put_group_info(old_info);
 
 	return 0;
@@ -1302,6 +1306,7 @@ asmlinkage long sys_getgroups(int gidsetsize, gid_t __user *grouplist)
 	if (gidsetsize < 0)
 		return -EINVAL;
 
+	/* no need to grab task_lock here; it cannot change */
 	get_group_info(current->group_info);
 	i = current->group_info->ngroups;
 	if (gidsetsize) {

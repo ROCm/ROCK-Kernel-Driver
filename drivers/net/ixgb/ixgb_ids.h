@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   
-  Copyright(c) 1999 - 2003 Intel Corporation. All rights reserved.
+  Copyright(c) 1999 - 2004 Intel Corporation. All rights reserved.
   
   This program is free software; you can redistribute it and/or modify it 
   under the terms of the GNU General Public License as published by the Free 
@@ -23,6 +23,7 @@
   Contact Information:
   Linux NICS <linux.nics@intel.com>
   Intel Corporation, 5200 N.E. Elam Young Parkway, Hillsboro, OR 97124-6497
+
 *******************************************************************************/
 
 #ifndef _IXGB_IDS_H_
@@ -35,9 +36,17 @@
 #define INTEL_VENDOR_ID         0x8086
 #define INTEL_SUBVENDOR_ID      0x8086
 
-#define IXGB_DEVICE_ID_82597EX 	0x1048
-#define IXGB_SUBDEVICE_ID_A11F  0xA11F	/* Adapter-OEM-1310nm-Fiber */
-#define IXGB_SUBDEVICE_ID_A01F	0xA01F	/* Adapter-Retail-1310nm-Fiber */
+#define IXGB_DEVICE_ID_82597EX      0x1048
+#define IXGB_DEVICE_ID_82597EX_SR   0x1A48
+
+#define IXGB_SUBDEVICE_ID_A11F  0xA11F
+#define IXGB_SUBDEVICE_ID_A01F  0xA01F
+
+#define IXGB_SUBDEVICE_ID_A15F  0xA15F
+#define IXGB_SUBDEVICE_ID_A05F  0xA05F
+
+#define IXGB_SUBDEVICE_ID_A12F  0xA12F
+#define IXGB_SUBDEVICE_ID_A02F  0xA02F
 
 #endif				/* #ifndef _IXGB_IDS_H_ */
 

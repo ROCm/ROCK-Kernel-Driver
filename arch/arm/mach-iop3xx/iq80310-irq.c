@@ -22,8 +22,6 @@
 #include <asm/hardware.h>
 #include <asm/system.h>
 
-#include <asm/mach-types.h>
-
 extern void iop310_init_irq(void);
 extern void iop310_irq_demux(unsigned int, struct irqdesc *, struct pt_regs *);
 

@@ -20,7 +20,6 @@
 #include <linux/config.h>
 #include <linux/types.h>
 #include <linux/serial_reg.h>
-#include <asm/mach-types.h>
 #include <asm/hardware.h>
 #include <asm/arch/serial.h>
 

@@ -535,11 +535,11 @@ __SYSCALL(__NR_vserver, sys_ni_syscall)
 #define __NR_vserver		236
 __SYSCALL(__NR_vserver, sys_ni_syscall)
 #define __NR_mbind 		237
-__SYSCALL(__NR_mbind, sys_ni_syscall)
+__SYSCALL(__NR_mbind, sys_mbind)
 #define __NR_set_mempolicy 	238
-__SYSCALL(__NR_set_mempolicy, sys_ni_syscall)
+__SYSCALL(__NR_set_mempolicy, sys_set_mempolicy)
 #define __NR_get_mempolicy 	239
-__SYSCALL(__NR_get_mempolicy, sys_ni_syscall)
+__SYSCALL(__NR_get_mempolicy, sys_get_mempolicy)
 #define __NR_mq_open 		240
 __SYSCALL(__NR_mq_open, sys_mq_open)
 #define __NR_mq_unlink 		241

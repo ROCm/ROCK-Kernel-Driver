@@ -407,7 +407,7 @@ int iounmap_explicit(void *addr, unsigned long size)
 	area = im_get_area((unsigned long) addr, size, 
 			    IM_REGION_EXISTS | IM_REGION_SUBSET);
 	if (area == NULL) {
-		printk(KERN_ERR "%s() cannot unmap nonexistant range 0x%lx\n",
+		printk(KERN_ERR "%s() cannot unmap nonexistent range 0x%lx\n",
 				__FUNCTION__, (unsigned long) addr);
 		return 1;
 	}

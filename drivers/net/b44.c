@@ -1882,10 +1882,10 @@ static int b44_resume(struct pci_dev *pdev)
 	struct net_device *dev = pci_get_drvdata(pdev);
 	struct b44 *bp = dev->priv;
 
+	pci_restore_state(pdev, bp->pci_cfg_state);
+
 	if (!netif_running(dev))
 		return 0;
-
-	pci_restore_state(pdev, bp->pci_cfg_state);
 
 	spin_lock_irq(&bp->lock);
 

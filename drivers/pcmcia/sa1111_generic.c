@@ -149,7 +149,7 @@ static int pcmcia_probe(struct sa1111_dev *dev)
 	pcmcia_jornada720_init(&dev->dev);
 #endif
 #ifdef CONFIG_ARCH_LUBBOCK
-	pcmcia_lubbock_init(&dev->dev);
+	pcmcia_lubbock_init(dev);
 #endif
 #ifdef CONFIG_ASSABET_NEPONSET
 	pcmcia_neponset_init(dev);

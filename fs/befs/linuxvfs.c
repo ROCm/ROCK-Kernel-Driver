@@ -571,7 +571,7 @@ befs_utf2nls(struct super_block *sb, const char *in,
 		}
 
 		/* convert from Unicode to nls */
-		unilen = nls->uni2char(uni, &result[o], 1);
+		unilen = nls->uni2char(uni, &result[o], in_len - o);
 		if (unilen < 0) {
 			goto conv_err;
 		}
@@ -584,7 +584,7 @@ befs_utf2nls(struct super_block *sb, const char *in,
 	return o;
 
       conv_err:
-	befs_error(sb, "Name using charecter set %s contains a charecter that "
+	befs_error(sb, "Name using character set %s contains a character that "
 		   "cannot be converted to unicode.", nls->charset);
 	befs_debug(sb, "<--- utf2nls()");
 	kfree(result);

@@ -481,7 +481,6 @@ asmlinkage void __init start_kernel(void)
 	proc_root_init();
 #endif
 	check_bugs();
-	printk("POSIX conformance testing by UNIFIX\n");
 
 	/* 
 	 *	We count on the initial thread going ok 

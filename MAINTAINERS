@@ -538,11 +538,6 @@ CRAMFS FILESYSTEM
 W:     http://sourceforge.net/projects/cramfs/
 S:     Orphan
 
-CREDITS FILE
-P:	John A. Martin
-M:	jam@acm.org
-S:	Maintained
-
 CRIS PORT
 P:	Bjorn Wesen
 M:	bjornw@axis.com
@@ -2369,7 +2364,7 @@ S:	Maintained
 
 XFS FILESYSTEM
 P:	Silicon Graphics Inc
-M:	owner-xfs@oss.sgi.com
+M:	xfs-masters@oss.sgi.com
 M:	nathans@sgi.com
 L:	linux-xfs@oss.sgi.com
 W:	http://oss.sgi.com/projects/xfs

@@ -682,14 +682,21 @@ xfs_mountfs(
 					error = XFS_ERROR(EINVAL);
 					goto error1;
 				}
+				xfs_fs_cmn_err(CE_WARN, mp,
+"stripe alignment turned off: sunit(%d)/swidth(%d) incompatible with agsize(%d)",
+					mp->m_dalign, mp->m_swidth,
+					sbp->sb_agblocks);
+
 				mp->m_dalign = 0;
 				mp->m_swidth = 0;
 			} else if (mp->m_dalign) {
 				mp->m_swidth = XFS_BB_TO_FSBT(mp, mp->m_swidth);
 			} else {
 				if (mp->m_flags & XFS_MOUNT_RETERR) {
-					cmn_err(CE_WARN,
-					"XFS: alignment check 3 failed");
+					xfs_fs_cmn_err(CE_WARN, mp,
+"stripe alignment turned off: sunit(%d) less than bsize(%d)",
+                                        	mp->m_dalign,
+						mp->m_blockmask +1);
 					error = XFS_ERROR(EINVAL);
 					goto error1;
 				}

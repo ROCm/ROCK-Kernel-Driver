@@ -861,7 +861,9 @@ typedef struct {
 #define AIROGMICRID		11
 #define AIROGMICSTATS		12
 #define AIROGFLAGS		13
+#define AIROGID			14
 #define AIRORRID		15
+#define AIRORSWVERSION		17
 
 /* Leave gap of 40 commands after AIROGSTATSD32 for future */
 
@@ -892,10 +894,13 @@ typedef struct {
 #define AUXMEMSIZE	(256 * 1024)
 
 typedef struct aironet_ioctl {
-	unsigned short command;	// What to do
+	unsigned short command;		// What to do
 	unsigned short len;		// Len of data
+	unsigned short ridnum;		// rid number
 	unsigned char *data;		// d-data
 } aironet_ioctl;
+
+static char *swversion = "2.1";
 #endif /* CISCO_EXT */
 
 #define NUM_MODULES       2
@@ -1097,6 +1102,7 @@ static int transmit_802_11_packet(struct airo_info*, int len, char *pPacket);
 static int mpi_send_packet (struct net_device *dev);
 static void mpi_unmap_card(struct pci_dev *pci);
 static void mpi_receive_802_3(struct airo_info *ai);
+static void mpi_receive_802_11(struct airo_info *ai);
 static int waitbusy (struct airo_info *ai);
 
 static irqreturn_t airo_interrupt( int irq, void* dev_id, struct pt_regs
@@ -2451,16 +2457,18 @@ static int mpi_init_descriptors (struct airo_info *ai)
 	cmd.parm0 = FID_TX;
 	cmd.parm1 = (ai->txfids[0].card_ram_off - ai->pciaux);
 	cmd.parm2 = MPI_MAX_FIDS;
-	rc=issuecommand(ai, &cmd, &rsp);
-	if (rc != SUCCESS) {
-		printk(KERN_ERR "airo:  Couldn't allocate TX FID\n");
-		return rc;
-	}
 
 	for (i=0; i<MPI_MAX_FIDS; i++) {
 		ai->txfids[i].tx_desc.valid = 1;
 		memcpy((char *)ai->txfids[i].card_ram_off,
 			&ai->txfids[i].tx_desc, sizeof(TxFid));
+	}
+	ai->txfids[i-1].tx_desc.eoc = 1; /* Last descriptor has EOC set */
+
+	rc=issuecommand(ai, &cmd, &rsp);
+	if (rc != SUCCESS) {
+		printk(KERN_ERR "airo:  Couldn't allocate TX FID\n");
+		return rc;
 	}
 
 	/* Alloc card Rid descriptor */
@@ -2653,7 +2661,7 @@ static struct net_device *init_wifidev(struct airo_info *ai,
 	return dev;
 }
 
-int reset_mpi_card( struct net_device *dev , int lock) {
+int reset_card( struct net_device *dev , int lock) {
 	struct airo_info *ai = dev->priv;
 
 	if (lock && down_interruptible(&ai->sem))
@@ -2737,9 +2745,6 @@ struct net_device *_init_airo_card( unsigned short irq, int port,
 		SET_NETDEV_DEV(dev, &pci->dev);
 	}
 
-	if (test_bit(FLAG_MPI,&ai->flags))
-		reset_mpi_card (dev, 1);
-
 	rc = request_irq( dev->irq, airo_interrupt, SA_SHIRQ, dev->name, dev );
 	if (rc) {
 		printk(KERN_ERR "airo: register interrupt %d failed, rc %d\n", irq, rc );
@@ -2776,8 +2781,7 @@ struct net_device *_init_airo_card( unsigned short irq, int port,
 		printk(KERN_ERR "airo: Couldn't register_netdev\n");
 		goto err_out_map;
 	}
-	if (!test_bit(FLAG_MPI,&ai->flags))
-		ai->wifidev = init_wifidev(ai, dev);
+	ai->wifidev = init_wifidev(ai, dev);
 
 	set_bit(FLAG_REGISTERED,&ai->flags);
 	printk( KERN_INFO "airo: MAC enabled %s %x:%x:%x:%x:%x:%x\n",
@@ -2840,7 +2844,7 @@ int reset_airo_card( struct net_device *dev )
 	int i;
 	struct airo_info *ai = dev->priv;
 
-	if (reset_mpi_card (dev, 1))
+	if (reset_card (dev, 1))
 		return -1;
 
 	if ( setup_card(ai, dev->dev_addr, 1 ) != SUCCESS ) {
@@ -3101,7 +3105,10 @@ static irqreturn_t airo_interrupt ( int irq, void* dev_id, struct pt_regs *regs)
 			u16 *buffer;
 
 			if (test_bit(FLAG_MPI,&apriv->flags)) {
-				mpi_receive_802_3(apriv);
+				if test_bit(FLAG_802_11, &apriv->flags)
+					mpi_receive_802_11(apriv);
+				else
+					mpi_receive_802_3(apriv);
 				OUT4500(apriv, EVACK, EV_RX);
 				goto exitrx;
 			}
@@ -3483,6 +3490,112 @@ badrx:
 	}
 }
 
+void mpi_receive_802_11 (struct airo_info *ai)
+{
+	RxFid rxd;
+	struct sk_buff *skb = NULL;
+	u16 fc, len, hdrlen = 0;
+#pragma pack(1)
+	struct {
+		u16 status, len;
+		u8 rssi[2];
+		u8 rate;
+		u8 freq;
+		u16 tmp[4];
+	} hdr;
+#pragma pack()
+	u16 gap;
+	u16 *buffer;
+	char *ptr = ai->rxfids[0].virtual_host_addr+4;
+
+	memcpy ((char *)&rxd, ai->rxfids[0].card_ram_off, sizeof(rxd));
+	memcpy ((char *)&hdr, ptr, sizeof(hdr));
+	ptr += sizeof(hdr);
+	/* Bad CRC. Ignore packet */
+	if (le16_to_cpu(hdr.status) & 2)
+		hdr.len = 0;
+	if (ai->wifidev == NULL)
+		hdr.len = 0;
+	len = le16_to_cpu(hdr.len);
+	if (len > 2312) {
+		printk( KERN_ERR "airo: Bad size %d\n", len );
+		goto badrx;
+	}
+	if (len == 0)
+		goto badrx;
+
+	memcpy ((char *)&fc, ptr, sizeof(fc));
+	fc = le16_to_cpu(fc);
+	switch (fc & 0xc) {
+		case 4:
+			if ((fc & 0xe0) == 0xc0)
+				hdrlen = 10;
+			else
+				hdrlen = 16;
+			break;
+		case 8:
+			if ((fc&0x300)==0x300){
+				hdrlen = 30;
+				break;
+			}
+		default:
+			hdrlen = 24;
+	}
+
+	skb = dev_alloc_skb( len + hdrlen + 2 );
+	if ( !skb ) {
+		ai->stats.rx_dropped++;
+		goto badrx;
+	}
+	buffer = (u16*)skb_put (skb, len + hdrlen);
+	memcpy ((char *)buffer, ptr, hdrlen);
+	ptr += hdrlen;
+	if (hdrlen == 24)
+		ptr += 6;
+	memcpy ((char *)&gap, ptr, sizeof(gap));
+	ptr += sizeof(gap);
+	gap = le16_to_cpu(gap);
+	if (gap) {
+		if (gap <= 8)
+			ptr += gap;
+		else
+			printk(KERN_ERR
+			    "airo: gaplen too big. Problems will follow...\n");
+	}
+	memcpy ((char *)buffer + hdrlen, ptr, len);
+	ptr += len;
+#ifdef IW_WIRELESS_SPY	  /* defined in iw_handler.h */
+	if (ai->spy_data.spy_number > 0) {
+		char *sa;
+		struct iw_quality wstats;
+		/* Prepare spy data : addr + qual */
+		sa = (char*)buffer + 10;
+		wstats.qual = hdr.rssi[0];
+		if (ai->rssi)
+			wstats.level = 0x100 - ai->rssi[hdr.rssi[1]].rssidBm;
+		else
+			wstats.level = (hdr.rssi[1] + 321) / 2;
+		wstats.updated = 3;
+		/* Update spy records */
+		wireless_spy_update(ai->dev, sa, &wstats);
+	}
+#endif /* IW_WIRELESS_SPY */
+	skb->mac.raw = skb->data;
+	skb->pkt_type = PACKET_OTHERHOST;
+	skb->dev = ai->wifidev;
+	skb->protocol = htons(ETH_P_802_2);
+	skb->dev->last_rx = jiffies;
+	skb->ip_summed = CHECKSUM_NONE;
+	netif_rx( skb );
+badrx:
+	if (rxd.valid == 0) {
+		rxd.valid = 1;
+		rxd.rdy = 0;
+		rxd.len = PKTSIZE;
+		memcpy (ai->rxfids[0].card_ram_off, (char *)&rxd, sizeof(rxd));
+	}
+}
+
 static u16 setup_card(struct airo_info *ai, u8 *mac, int lock)
 {
 	Cmd cmd;
@@ -3550,10 +3663,16 @@ static u16 setup_card(struct airo_info *ai, u8 *mac, int lock)
 		status = readCapabilityRid(ai, &cap_rid, lock);
 		if ( status != SUCCESS ) return ERROR;
 
+		/*
+		 * This driver supports MPI350 firmwares up to, and
+		 * including 5.30.17
+		 */
 		if (test_bit(FLAG_MPI, &ai->flags) &&
-		    strcmp (cap_rid.prodVer, "5.00.01") &&
-		    strcmp (cap_rid.prodVer, "5.00.03") &&
-		    strcmp (cap_rid.prodVer, "5b00.08"))
+		    strncmp (cap_rid.prodVer, "5.00.", 5) &&
+		    strncmp (cap_rid.prodVer, "5b00.", 5) &&
+		    strncmp (cap_rid.prodVer, "5.02.", 5) &&
+		    strncmp (cap_rid.prodVer, "5.20.", 5) &&
+		    strncmp (cap_rid.prodVer, "5.30.", 5))
 			printk(KERN_ERR "airo: Firmware version %s is not supported. Use it at your own risk!\n", cap_rid.prodVer);
 
 		status = PC4500_readrid(ai,RID_RSSI,&rssi_rid,sizeof(rssi_rid),lock);
@@ -3934,7 +4053,7 @@ static int PC4500_writerid(struct airo_info *ai, u16 rid,
 		memset(&rsp, 0, sizeof(rsp));
 
 		ai->config_desc.rid_desc.valid = 1;
-		ai->config_desc.rid_desc.len = RIDSIZE;
+		ai->config_desc.rid_desc.len = *((u16 *)pBuf);
 		ai->config_desc.rid_desc.rid = 0;
 
 		cmd.cmd = CMD_WRITERID;
@@ -5378,7 +5497,6 @@ static int airo_pci_resume(struct pci_dev *pdev)
 	struct net_device *dev = pci_get_drvdata(pdev);
 	struct airo_info *ai = dev->priv;
 	Resp rsp;
-	int err;
 
 	printk(KERN_DEBUG "%s: airo_mpi waking up\n", dev->name);
 
@@ -5386,13 +5504,6 @@ static int airo_pci_resume(struct pci_dev *pdev)
 		return 0;
 
 	if (ai->power > 1) {
-		err = reset_mpi_card(dev, 0);
-		if (err) {
-			printk(KERN_ERR "%s: Error %d resetting on %s()\n",
-			       dev->name, err, __FUNCTION__);
-			return err;
-		}
-		schedule_timeout (HZ/2);
 		mpi_init_descriptors(ai);
 		setup_card(ai, dev->dev_addr, 0);
 		clear_bit(FLAG_RADIO_OFF, &ai->flags);
@@ -6786,7 +6897,10 @@ static int airo_config_commit(struct net_device *dev,
 
 		readAPListRid(local, &APList_rid);
 		readSsidRid(local, &SSID_rid);
-		reset_airo_card(dev);
+		if (test_bit(FLAG_MPI,&local->flags))
+			setup_card(local, dev->dev_addr, 1 );
+		else
+			reset_airo_card(dev);
 		disable_MAC(local, 1);
 		writeSsidRid(local, &SSID_rid, 1);
 		writeAPListRid(local, &APList_rid, 1);
@@ -6946,9 +7060,15 @@ static int airo_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 
 		/* Separate R/W functions bracket legality here
 		 */
-		if ( com.command <= AIRORRID )
+		if ( com.command == AIRORSWVERSION ) {
+			if (copy_to_user(com.data, swversion, sizeof(swversion)))
+				rc = -EFAULT;
+			else
+				rc = 0;
+		}
+		else if ( com.command <= AIRORRID)
 			rc = readrids(dev,&com);
-		else if ( com.command >= AIROPCAP && com.command <= AIROPLEAPUSR )
+		else if ( com.command >= AIROPCAP && com.command <= (AIROPLEAPUSR+2) )
 			rc = writerids(dev,&com);
 		else if ( com.command >= AIROFLSHRST && com.command <= AIRORESTART )
 			rc = flashcard(dev,&com);
@@ -7078,7 +7198,7 @@ static int readrids(struct net_device *dev, aironet_ioctl *comp) {
 			return -EFAULT;
 		return 0;
 #endif
-	case AIRORRID:      ridcode = comp->len;        break;
+	case AIRORRID:      ridcode = comp->ridnum;     break;
 	default:
 		return -EINVAL;
 		break;
@@ -7092,10 +7212,7 @@ static int readrids(struct net_device *dev, aironet_ioctl *comp) {
 	 * then return it to the user
 	 * 9/22/2000 Honor user given length
 	 */
-	if (comp->command == AIRORRID)
-		len = le16_to_cpu(*(unsigned short *)iobuf); /* Yuck! */
-	else
-		len = comp->len;
+	len = comp->len;
 
 	if (copy_to_user(comp->data, iobuf, min(len, (int)RIDSIZE))) {
 		kfree (iobuf);
@@ -7141,6 +7258,8 @@ static int writerids(struct net_device *dev, aironet_ioctl *comp) {
 	case AIROPLEAPPWD:  ridcode = RID_LEAPPASSWORD; break;
 	case AIROPWEPKEY:   ridcode = RID_WEP_TEMP; writer = PC4500_writerid;
 		break;
+	case AIROPLEAPUSR+1: ridcode = 0xFF2A;          break;
+	case AIROPLEAPUSR+2: ridcode = 0xFF2B;          break;
 
 		/* this is not really a rid but a command given to the card
 		 * same with MAC off

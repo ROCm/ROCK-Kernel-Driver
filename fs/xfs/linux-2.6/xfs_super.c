@@ -71,6 +71,7 @@
 #include <linux/init.h>
 #include <linux/mount.h>
 #include <linux/suspend.h>
+#include <linux/writeback.h>
 
 STATIC struct quotactl_ops linvfs_qops;
 STATIC struct super_operations linvfs_sops;
@@ -391,7 +392,7 @@ xfssyncd(
 
 	for (;;) {
 		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(xfs_syncd_interval);
+		schedule_timeout((xfs_syncd_centisecs * HZ) / 100);
 		/* swsusp */
 		if (current->flags & PF_FREEZE)
 			refrigerator(PF_FREEZE);
@@ -400,6 +401,10 @@ xfssyncd(
 		if (vfsp->vfs_flag & VFS_RDONLY)
 			continue;
 		VFS_SYNC(vfsp, SYNCD_FLAGS, NULL, error);
+
+		vfsp->vfs_sync_seq++;
+		wmb();
+		wake_up(&vfsp->vfs_wait_single_sync_task);
 	}
 
 	vfsp->vfs_sync_task = NULL;
@@ -484,6 +489,24 @@ linvfs_sync_super(
 
 	VFS_SYNC(vfsp, flags, NULL, error);
 	sb->s_dirt = 0;
+
+	if (unlikely(laptop_mode)) {
+		int	prev_sync_seq = vfsp->vfs_sync_seq;
+		/*
+		 * The disk must be active because we're syncing.
+		 * We schedule syncd now (now that the disk is
+		 * active) instead of later (when it might not be).
+		 */
+		wake_up_process(vfsp->vfs_sync_task);
+		/*
+		 * We have to wait for the sync iteration to complete.
+		 * If we don't, the disk activity caused by the sync
+		 * will come after the sync is completed, and that
+		 * triggers another sync from laptop mode.
+		 */
+		wait_event(vfsp->vfs_wait_single_sync_task,
+				vfsp->vfs_sync_seq != prev_sync_seq);
+	}
 
 	return -error;
 }

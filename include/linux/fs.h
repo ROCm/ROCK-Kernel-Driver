@@ -13,15 +13,12 @@
 #include <linux/types.h>
 #include <linux/kdev_t.h>
 #include <linux/ioctl.h>
-#include <linux/list.h>
 #include <linux/dcache.h>
 #include <linux/stat.h>
 #include <linux/cache.h>
-#include <linux/radix-tree.h>
 #include <linux/prio_tree.h>
 #include <linux/kobject.h>
 #include <asm/atomic.h>
-#include <linux/audit.h>
 
 struct iovec;
 struct nameidata;
@@ -214,6 +211,9 @@ extern int leases_enable, dir_notify_enable, lease_break_time;
 
 #ifdef __KERNEL__
 
+#include <linux/list.h>
+#include <linux/radix-tree.h>
+#include <linux/audit.h>
 #include <asm/semaphore.h>
 #include <asm/byteorder.h>
 
@@ -532,8 +532,8 @@ struct fown_struct {
 	rwlock_t lock;          /* protects pid, uid, euid fields */
 	int pid;		/* pid or -pgrp where SIGIO should be sent */
 	uid_t uid, euid;	/* uid/euid of process setting the owner */
-	int signum;		/* posix.1b rt signal to be delivered on IO */
 	void *security;
+	int signum;		/* posix.1b rt signal to be delivered on IO */
 };
 
 /*
@@ -561,10 +561,10 @@ struct file {
 	atomic_t		f_count;
 	unsigned int 		f_flags;
 	mode_t			f_mode;
+	int			f_error;
 	loff_t			f_pos;
 	struct fown_struct	f_owner;
 	unsigned int		f_uid, f_gid;
-	int			f_error;
 	struct file_ra_state	f_ra;
 
 	unsigned long		f_version;

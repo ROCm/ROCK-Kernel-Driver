@@ -25,6 +25,7 @@
 #include <asm/pgtable.h>
 #include <asm/core_cia.h>
 #include <asm/tlbflush.h>
+#include <asm/8253pit.h>
 
 #include "proto.h"
 #include "irq_impl.h"
@@ -64,6 +65,8 @@ ruffian_init_irq(void)
 	common_init_isa_dma();
 }
 
+#define RUFFIAN_LATCH	((PIT_TICK_RATE + HZ / 2) / HZ)
+
 static void __init
 ruffian_init_rtc(void)
 {
@@ -72,8 +75,8 @@ ruffian_init_rtc(void)
 
 	/* Setup interval timer.  */
 	outb(0x34, 0x43);		/* binary, mode 2, LSB/MSB, ch 0 */
-	outb(LATCH & 0xff, 0x40);	/* LSB */
-	outb(LATCH >> 8, 0x40);		/* MSB */
+	outb(RUFFIAN_LATCH & 0xff, 0x40);	/* LSB */
+	outb(RUFFIAN_LATCH >> 8, 0x40);		/* MSB */
 
 	outb(0xb6, 0x43);		/* pit counter 2: speaker */
 	outb(0x31, 0x42);

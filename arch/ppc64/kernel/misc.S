@@ -102,6 +102,30 @@ _GLOBAL(local_irq_restore)
 	blr
 #endif /* CONFIG_PPC_ISERIES */
 
+#ifdef CONFIG_IRQSTACKS
+_GLOBAL(call_do_softirq)
+	mflr	r0
+	std	r0,16(r1)
+	stdu	r1,THREAD_SIZE-112(r3)
+	mr	r1,r3
+	bl	.__do_softirq
+	ld	r1,0(r1)
+	ld	r0,16(r1)
+	mtlr	r0
+	blr
+
+_GLOBAL(call_handle_irq_event)
+	mflr	r0
+	std	r0,16(r1)
+	stdu	r1,THREAD_SIZE-112(r6)
+	mr	r1,r6
+	bl	.handle_irq_event
+	ld	r1,0(r1)
+	ld	r0,16(r1)
+	mtlr	r0
+	blr
+#endif /* CONFIG_IRQSTACKS */
+
 /*
  * Flush instruction cache.
  */

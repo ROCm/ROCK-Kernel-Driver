@@ -97,7 +97,7 @@ xfs_read_xfsstats(
 	len += sprintf(buffer + len, "xpc %Lu %Lu %Lu\n",
 			xs_xstrat_bytes, xs_write_bytes, xs_read_bytes);
 	len += sprintf(buffer + len, "debug %u\n",
-#if defined(XFSDEBUG)
+#if defined(DEBUG)
 		1);
 #else
 		0);

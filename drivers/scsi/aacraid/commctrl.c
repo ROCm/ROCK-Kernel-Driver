@@ -148,7 +148,7 @@ static int open_getadapter_fib(struct aac_dev * dev, void *arg)
 		 *	the list to 0.
 		 */
 		fibctx->count = 0;
-		AAC_INIT_LIST_HEAD(&fibctx->hw_fib_list);
+		INIT_LIST_HEAD(&fibctx->fib_list);
 		fibctx->jiffies = jiffies/HZ;
 		/*
 		 *	Now add this context onto the adapter's 
@@ -179,7 +179,7 @@ static int next_getadapter_fib(struct aac_dev * dev, void *arg)
 {
 	struct fib_ioctl f;
 	struct aac_fib_context *fibctx, *aifcp;
-	struct hw_fib * hw_fib;
+	struct fib *fib;
 	int status;
 	struct list_head * entry;
 	int found;
@@ -222,25 +222,27 @@ static int next_getadapter_fib(struct aac_dev * dev, void *arg)
 	 *	-EAGAIN
 	 */
 return_fib:
-	if (!aac_list_empty(&fibctx->hw_fib_list)) {
-		struct aac_list_head * entry;
+	if (!list_empty(&fibctx->fib_list)) {
+		struct list_head * entry;
 		/*
 		 *	Pull the next fib from the fibs
 		 */
-		entry = (struct aac_list_head*)(ulong)fibctx->hw_fib_list.next;
-		aac_list_del(entry);
+		entry = fibctx->fib_list.next;
+		list_del(entry);
 		
-		hw_fib = aac_list_entry(entry, struct hw_fib, header.FibLinks);
+		fib = list_entry(entry, struct fib, fiblink);
 		fibctx->count--;
 		spin_unlock_irqrestore(&dev->fib_lock, flags);
-		if (copy_to_user(f.fib, hw_fib, sizeof(struct hw_fib))) {
-			kfree(hw_fib);
+		if (copy_to_user(f.fib, fib->hw_fib, sizeof(struct hw_fib))) {
+			kfree(fib->hw_fib);
+			kfree(fib);
 			return -EFAULT;
 		}	
 		/*
 		 *	Free the space occupied by this copy of the fib.
 		 */
-		kfree(hw_fib);
+		kfree(fib->hw_fib);
+		kfree(fib);
 		status = 0;
 		fibctx->jiffies = jiffies/HZ;
 	} else {
@@ -262,24 +264,25 @@ return_fib:
 
 int aac_close_fib_context(struct aac_dev * dev, struct aac_fib_context * fibctx)
 {
-	struct hw_fib *hw_fib;
+	struct fib *fib;
 
 	/*
 	 *	First free any FIBs that have not been consumed.
 	 */
-	while (!aac_list_empty(&fibctx->hw_fib_list)) {
-		struct aac_list_head * entry;
+	while (!list_empty(&fibctx->fib_list)) {
+		struct list_head * entry;
 		/*
 		 *	Pull the next fib from the fibs
 		 */
-		entry = (struct aac_list_head*)(ulong)(fibctx->hw_fib_list.next);
-		aac_list_del(entry);
-		hw_fib = aac_list_entry(entry, struct hw_fib, header.FibLinks);
+		entry = fibctx->fib_list.next;
+		list_del(entry);
+		fib = list_entry(entry, struct fib, fiblink);
 		fibctx->count--;
 		/*
 		 *	Free the space occupied by this copy of the fib.
 		 */
-		kfree(hw_fib);
+		kfree(fib->hw_fib);
+		kfree(fib);
 	}
 	/*
 	 *	Remove the Context from the AdapterFibContext List
