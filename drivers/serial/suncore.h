@@ -19,8 +19,6 @@
 #define SUNKBD_UP		0x80
 #define SUNKBD_A		0x4d
 
-extern void sun_do_break(void);
-
 extern unsigned int suncore_mouse_baud_cflag_next(unsigned int, int *);
 extern int suncore_mouse_baud_detection(unsigned char, int);
 

@@ -141,26 +141,6 @@ no_options:
 
 EXPORT_SYMBOL(sunserial_console_termios);
 
-void
-sun_do_break(void)
-{
-	if (!stop_a_enabled)
-		return;
-
-	printk("\n");
-	flush_user_windows();
-
-#ifndef CONFIG_SPARC64
-	if ((unsigned long)linux_dbvec >= DEBUG_FIRSTVADDR &&
-	    (unsigned long)linux_dbvec <= DEBUG_LASTVADDR)
-		sp_enter_debugger();
-	else
-#endif
-		prom_cmdline();
-}
-
-EXPORT_SYMBOL(sun_do_break);
-
 /* Sun serial MOUSE auto baud rate detection.  */
 static struct mouse_baud_cflag {
 	int baud;

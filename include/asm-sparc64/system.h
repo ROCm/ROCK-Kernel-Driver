@@ -120,6 +120,8 @@ enum sparc_cpu {
 
 #ifndef __ASSEMBLY__
 
+extern void sun_do_break(void);
+
 extern void synchronize_user_stack(void);
 
 extern void __flushw_user(void);
