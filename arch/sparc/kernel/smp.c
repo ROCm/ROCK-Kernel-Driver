@@ -133,6 +133,16 @@ void __init smp_boot_cpus(void)
 		smp4d_boot_cpus();
 }
 
+void smp_send_reschedule(int cpu)
+{
+	smp_message_pass (cpu, MSG_RESCHEDULE, 0, 0);
+}
+
+void smp_send_stop(void)
+{
+	smp_message_pass (MSG_ALL_BUT_SELF, MSG_STOP_CPU, 0, 0);
+}
+
 void smp_flush_cache_all(void)
 {
 	xc0((smpfunc_t) BTFIXUP_CALL(local_flush_cache_all));
