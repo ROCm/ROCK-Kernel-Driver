@@ -1457,11 +1457,8 @@ L:	linux-mips@linux-mips.org
 S:	Maintained
 
 MISCELLANEOUS MCA-SUPPORT
-P:	David Weinehall
-M:	Project MCA Team <mcalinux@acc.umu.se>
-M:	David Weinehall <tao@acc.umu.se>
-W:	http://www.acc.umu.se/~tao/
-W:	http://www.acc.umu.se/~mcalinux/
+P:	James Bottomley
+M:	jejb@steeleye.com
 L:	linux-kernel@vger.kernel.org
 S:	Maintained
 
