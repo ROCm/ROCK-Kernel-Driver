@@ -56,8 +56,7 @@
  *
  */
 
-#include <linux/ethtool.h>
-#include <asm/uaccess.h>
+/* Do *NOT* add other headers here, you are guaranteed to be wrong - Jean II */
 #include "wavelan_cs.p.h"		/* Private header */
 
 /************************* MISC SUBROUTINES **************************/
@@ -2890,8 +2889,8 @@ static const struct iw_handler_def	wavelan_handler_def =
 	.private	= (iw_handler *) wavelan_private_handler,
 	.private_args	= (struct iw_priv_args *) wavelan_private_args,
 };
+#endif /* WIRELESS_EXT > 12 */
 
-#else /* WIRELESS_EXT > 12 */
 /*------------------------------------------------------------------*/
 /*
  * Perform ioctl : config & info stuff
@@ -2916,8 +2915,9 @@ wavelan_ioctl(struct net_device *	dev,	/* Device on wich the ioctl apply */
       ret = netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
       break;
 
+#if WIRELESS_EXT <= 12
       /* --------------- WIRELESS EXTENSIONS --------------- */
-
+      /* Now done as iw_handler - Jean II */
     case SIOCGIWNAME:
       wavelan_get_name(dev, NULL, &(wrq->u), NULL);
       break;
@@ -3191,6 +3191,7 @@ wavelan_ioctl(struct net_device *	dev,	/* Device on wich the ioctl apply */
       }
       break;
 #endif	/* HISTOGRAM */
+#endif /* WIRELESS_EXT <= 12 */
 
       /* ------------------- OTHER IOCTL ------------------- */
 
@@ -3203,7 +3204,6 @@ wavelan_ioctl(struct net_device *	dev,	/* Device on wich the ioctl apply */
 #endif
   return ret;
 }
-#endif /* WIRELESS_EXT > 12 */
 
 /*------------------------------------------------------------------*/
 /*
@@ -5199,9 +5199,8 @@ wavelan_attach(void)
 #ifdef WIRELESS_EXT	/* If wireless extension exist in the kernel */
 #if WIRELESS_EXT > 12
   dev->wireless_handlers = (struct iw_handler_def *)&wavelan_handler_def;
-#else /* WIRELESS_EXT > 12 */
-  dev->do_ioctl = wavelan_ioctl;	/* wireless extensions */
 #endif /* WIRELESS_EXT > 12 */
+  dev->do_ioctl = wavelan_ioctl;	/* old wireless extensions */
   dev->get_wireless_stats = wavelan_get_wireless_stats;
 #endif
 
