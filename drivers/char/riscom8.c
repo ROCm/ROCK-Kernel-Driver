@@ -45,6 +45,7 @@
 #include <linux/fcntl.h>
 #include <linux/major.h>
 #include <linux/init.h>
+#include <linux/delay.h>
 
 #include <asm/uaccess.h>
 
@@ -1114,8 +1115,7 @@ static void rc_close(struct tty_struct * tty, struct file * filp)
 		 */
 		timeout = jiffies+HZ;
 		while(port->IER & IER_TXEMPTY)  {
-			current->state = TASK_INTERRUPTIBLE;
- 			schedule_timeout(port->timeout);
+			msleep_interruptible(jiffies_to_msecs(port->timeout));
 			if (time_after(jiffies, timeout))
 				break;
 		}
@@ -1130,8 +1130,7 @@ static void rc_close(struct tty_struct * tty, struct file * filp)
 	port->tty = NULL;
 	if (port->blocked_open) {
 		if (port->close_delay) {
-			current->state = TASK_INTERRUPTIBLE;
-			schedule_timeout(port->close_delay);
+			msleep_interruptible(jiffies_to_msecs(port->close_delay));
 		}
 		wake_up_interruptible(&port->open_wait);
 	}

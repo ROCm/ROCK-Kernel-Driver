@@ -43,6 +43,7 @@
 #include <linux/acpi.h>
 #include <linux/efi.h>
 #include <linux/mmzone.h>
+#include <linux/nodemask.h>
 #include <asm/io.h>
 #include <asm/iosapic.h>
 #include <asm/machvec.h>

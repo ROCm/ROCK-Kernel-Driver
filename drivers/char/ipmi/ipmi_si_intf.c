@@ -2283,6 +2283,7 @@ void __exit cleanup_one_si(struct smi_info *to_clean)
 	   interface is in a clean state. */
 	while ((to_clean->curr_msg) || (to_clean->si_state != SI_NORMAL)) {
 		poll(to_clean);
+		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule_timeout(1);
 	}
 

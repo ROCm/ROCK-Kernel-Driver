@@ -765,10 +765,10 @@ static int catc_stop(struct net_device *netdev)
 	if (!catc->is_f5u011)
 		del_timer_sync(&catc->timer);
 
-	usb_unlink_urb(catc->rx_urb);
-	usb_unlink_urb(catc->tx_urb);
-	usb_unlink_urb(catc->irq_urb);
-	usb_unlink_urb(catc->ctrl_urb);
+	usb_kill_urb(catc->rx_urb);
+	usb_kill_urb(catc->tx_urb);
+	usb_kill_urb(catc->irq_urb);
+	usb_kill_urb(catc->ctrl_urb);
 
 	return 0;
 }

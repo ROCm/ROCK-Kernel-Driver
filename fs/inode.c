@@ -1264,37 +1264,10 @@ void remove_dquot_ref(struct super_block *sb, int type, struct list_head *tofree
 
 #endif
 
-/*
- * Hashed waitqueues for wait_on_inode().  The table is pretty small - the
- * kernel doesn't lock many inodes at the same time.
- */
-#define I_WAIT_TABLE_ORDER	3
-static struct i_wait_queue_head {
-	wait_queue_head_t wqh;
-} ____cacheline_aligned_in_smp i_wait_queue_heads[1<<I_WAIT_TABLE_ORDER];
-
-/*
- * Return the address of the waitqueue_head to be used for this inode
- */
-static wait_queue_head_t *i_waitq_head(struct inode *inode)
+int inode_wait(void *word)
 {
-	return &i_wait_queue_heads[hash_ptr(inode, I_WAIT_TABLE_ORDER)].wqh;
-}
-
-void __wait_on_inode(struct inode *inode)
-{
-	DECLARE_WAITQUEUE(wait, current);
-	wait_queue_head_t *wq = i_waitq_head(inode);
-
-	add_wait_queue(wq, &wait);
-repeat:
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	if (inode->i_state & I_LOCK) {
-		schedule();
-		goto repeat;
-	}
-	remove_wait_queue(wq, &wait);
-	__set_current_state(TASK_RUNNING);
+	schedule();
+	return 0;
 }
 
 /*
@@ -1303,36 +1276,39 @@ repeat:
  * that it isn't found.  This is because iget will immediately call
  * ->read_inode, and we want to be sure that evidence of the deletion is found
  * by ->read_inode.
- *
- * This call might return early if an inode which shares the waitq is woken up.
- * This is most easily handled by the caller which will loop around again
- * looking for the inode.
- *
  * This is called with inode_lock held.
  */
 static void __wait_on_freeing_inode(struct inode *inode)
 {
-	DECLARE_WAITQUEUE(wait, current);
-	wait_queue_head_t *wq = i_waitq_head(inode);
+	wait_queue_head_t *wq;
+	DEFINE_WAIT_BIT(wait, &inode->i_state, __I_LOCK);
 
-	add_wait_queue(wq, &wait);
-	set_current_state(TASK_UNINTERRUPTIBLE);
+	/*
+	 * I_FREEING and I_CLEAR are cleared in process context under
+	 * inode_lock, so we have to give the tasks who would clear them
+	 * a chance to run and acquire inode_lock.
+	 */
+	if (!(inode->i_state & I_LOCK)) {
+		spin_unlock(&inode_lock);
+		yield();
+		spin_lock(&inode_lock);
+		return;
+	}
+	wq = bit_waitqueue(&inode->i_state, __I_LOCK);
+	prepare_to_wait(wq, &wait.wait, TASK_UNINTERRUPTIBLE);
 	spin_unlock(&inode_lock);
 	schedule();
-	remove_wait_queue(wq, &wait);
+	finish_wait(wq, &wait.wait);
 	spin_lock(&inode_lock);
 }
 
 void wake_up_inode(struct inode *inode)
 {
-	wait_queue_head_t *wq = i_waitq_head(inode);
-
 	/*
 	 * Prevent speculative execution through spin_unlock(&inode_lock);
 	 */
 	smp_mb();
-	if (waitqueue_active(wq))
-		wake_up_all(wq);
+	wake_up_bit(&inode->i_state, __I_LOCK);
 }
 
 static __initdata unsigned long ihash_entries;
@@ -1367,11 +1343,6 @@ void __init inode_init_early(void)
 
 void __init inode_init(unsigned long mempages)
 {
-	int i;
-
-	for (i = 0; i < ARRAY_SIZE(i_wait_queue_heads); i++)
-		init_waitqueue_head(&i_wait_queue_heads[i].wqh);
-
 	/* inode slab cache */
 	inode_cachep = kmem_cache_create("inode_cache", sizeof(struct inode),
 				0, SLAB_PANIC, init_once, NULL);

@@ -465,7 +465,9 @@ static void radeon_pm_setup_for_suspend(struct radeonfb_info *rinfo)
 						
  	OUTPLL( pllPIXCLKS_CNTL, pixclks_cntl);
 
-
+	/* Switch off LVDS interface */
+	OUTREG(LVDS_GEN_CNTL, INREG(LVDS_GEN_CNTL) &
+	       ~(LVDS_BLON | LVDS_EN | LVDS_ON | LVDS_DIGON));
 
 	/* Enable System power management */
 	pll_pwrmgt_cntl = INPLL( pllPLL_PWRMGT_CNTL);

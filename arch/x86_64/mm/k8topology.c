@@ -12,6 +12,7 @@
 #include <linux/init.h>
 #include <linux/string.h>
 #include <linux/module.h>
+#include <linux/nodemask.h>
 #include <asm/io.h>
 #include <linux/pci_ids.h>
 #include <asm/types.h>

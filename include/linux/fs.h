@@ -758,6 +758,7 @@ struct super_block {
 	int			s_need_sync_fs;
 	atomic_t		s_active;
 	void                    *s_security;
+	struct xattr_handler	**s_xattr;
 
 	struct list_head	s_dirty;	/* dirty inodes */
 	struct list_head	s_io;		/* parked for writeback */
@@ -981,7 +982,8 @@ struct super_operations {
 #define I_DIRTY_SYNC		1 /* Not dirty enough for O_DATASYNC */
 #define I_DIRTY_DATASYNC	2 /* Data-related inode changes pending */
 #define I_DIRTY_PAGES		4 /* Data-related inode changes pending */
-#define I_LOCK			8
+#define __I_LOCK		3
+#define I_LOCK			(1 << __I_LOCK)
 #define I_FREEING		16
 #define I_CLEAR			32
 #define I_NEW			64
@@ -1254,7 +1256,6 @@ extern struct block_device *bdget(dev_t);
 extern void bd_set_size(struct block_device *, loff_t size);
 extern void bd_forget(struct inode *inode);
 extern void bdput(struct block_device *);
-extern int blkdev_open(struct inode *, struct file *);
 extern struct block_device *open_by_devnum(dev_t, unsigned);
 extern struct file_operations def_blk_fops;
 extern struct address_space_operations def_blk_aops;
@@ -1339,7 +1340,9 @@ extern sector_t bmap(struct inode *, sector_t);
 extern int setattr_mask(unsigned int);
 extern int notify_change(struct dentry *, struct iattr *);
 extern int permission(struct inode *, int, struct nameidata *);
-extern int vfs_permission(struct inode *, int);
+extern int generic_permission(struct inode *, int,
+		int (*check_acl)(struct inode *, int));
+
 extern int get_write_access(struct inode *);
 extern int deny_write_access(struct file *);
 static inline void put_write_access(struct inode * inode)

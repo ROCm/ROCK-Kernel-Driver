@@ -28,6 +28,7 @@
 #include <linux/bootmem.h>
 #include <linux/mmzone.h>
 #include <linux/module.h>
+#include <linux/nodemask.h>
 #include <asm/numaq.h>
 
 /* These are needed before the pgdat's are created */

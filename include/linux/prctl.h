@@ -49,7 +49,6 @@
 # define PR_TIMING_TIMESTAMP    1       /* Accurate timestamp based
                                                    process timing */
 
-
 #define PR_SET_NAME    15		/* Set process name */
 
 #endif /* _LINUX_PRCTL_H */

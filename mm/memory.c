@@ -114,6 +114,7 @@ static inline void free_one_pmd(struct mmu_gather *tlb, pmd_t * dir)
 	page = pmd_page(*dir);
 	pmd_clear(dir);
 	dec_page_state(nr_page_table_pages);
+	tlb->mm->nr_ptes--;
 	pte_free_tlb(tlb, page);
 }
 
@@ -163,7 +164,6 @@ pte_t fastcall * pte_alloc_map(struct mm_struct *mm, pmd_t *pmd, unsigned long a
 		spin_lock(&mm->page_table_lock);
 		if (!new)
 			return NULL;
-
 		/*
 		 * Because we dropped the lock, we should re-check the
 		 * entry, as somebody else could have populated it..
@@ -172,6 +172,7 @@ pte_t fastcall * pte_alloc_map(struct mm_struct *mm, pmd_t *pmd, unsigned long a
 			pte_free(new);
 			goto out;
 		}
+		mm->nr_ptes++;
 		inc_page_state(nr_page_table_pages);
 		pmd_populate(mm, pmd, new);
 	}

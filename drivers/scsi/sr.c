@@ -377,6 +377,7 @@ static int sr_init_command(struct scsi_cmnd * SCpnt)
 			return 0;
 		SCpnt->cmnd[0] = WRITE_10;
 		SCpnt->sc_data_direction = DMA_TO_DEVICE;
+ 	 	cd->cdi.media_written = 1;
 	} else if (rq_data_dir(SCpnt->request) == READ) {
 		SCpnt->cmnd[0] = READ_10;
 		SCpnt->sc_data_direction = DMA_FROM_DEVICE;
@@ -875,10 +876,10 @@ static void get_capabilities(struct scsi_cd *cd)
 		cd->cdi.mask |= CDC_CLOSE_TRAY; */
 
 	/*
-	 * if DVD-RAM of MRW-W, we are randomly writeable
+	 * if DVD-RAM, MRW-W or CD-RW, we are randomly writable
 	 */
-	if ((cd->cdi.mask & (CDC_DVD_RAM | CDC_MRW_W | CDC_RAM)) !=
-			(CDC_DVD_RAM | CDC_MRW_W | CDC_RAM)) {
+	if ((cd->cdi.mask & (CDC_DVD_RAM | CDC_MRW_W | CDC_RAM | CDC_CD_RW)) !=
+			(CDC_DVD_RAM | CDC_MRW_W | CDC_RAM | CDC_CD_RW)) {
 		cd->device->writeable = 1;
 	}
 

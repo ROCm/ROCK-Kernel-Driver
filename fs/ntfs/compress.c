@@ -25,6 +25,9 @@
 #include <linux/buffer_head.h>
 #include <linux/blkdev.h>
 
+#include "attrib.h"
+#include "inode.h"
+#include "debug.h"
 #include "ntfs.h"
 
 /**
@@ -600,9 +603,9 @@ lock_retry_remap:
 			/* Seek to element containing target vcn. */
 			while (rl->length && rl[1].vcn <= vcn)
 				rl++;
-			lcn = ntfs_vcn_to_lcn(rl, vcn);
+			lcn = ntfs_rl_vcn_to_lcn(rl, vcn);
 		} else
-			lcn = (LCN)LCN_RL_NOT_MAPPED;
+			lcn = LCN_RL_NOT_MAPPED;
 		ntfs_debug("Reading vcn = 0x%llx, lcn = 0x%llx.",
 				(unsigned long long)vcn,
 				(unsigned long long)lcn);
@@ -926,7 +929,7 @@ map_rl_err:
 
 rl_err:
 	up_read(&ni->runlist.lock);
-	ntfs_error(vol->sb, "ntfs_vcn_to_lcn() failed. Cannot read "
+	ntfs_error(vol->sb, "ntfs_rl_vcn_to_lcn() failed. Cannot read "
 			"compression block.");
 	goto err_out;
 

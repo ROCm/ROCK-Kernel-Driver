@@ -603,6 +603,8 @@ static int matroxfb_dh_regit(CPMINFO struct matroxfb_dh_fb_info* m2info) {
 
 	m2info->fbcon.fbops = &matroxfb_dh_ops;
 	m2info->fbcon.flags = FBINFO_FLAG_DEFAULT;
+	m2info->fbcon.flags |= FBINFO_HWACCEL_XPAN |
+			       FBINFO_HWACCEL_YPAN;
 	m2info->fbcon.currcon = -1;
 	m2info->fbcon.pseudo_palette = m2info->cmap;
 	fb_alloc_cmap(&m2info->fbcon.cmap, 256, 1);

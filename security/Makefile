@@ -2,6 +2,7 @@
 # Makefile for the kernel security code
 #
 
+obj-$(CONFIG_KEYS)			+= keys/
 subdir-$(CONFIG_SECURITY_SELINUX)	+= selinux
 
 # if we don't select a security model, use the default capabilities

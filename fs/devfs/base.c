@@ -1802,7 +1802,6 @@ static int __init devfs_setup(char *str)
 
 __setup("devfs=", devfs_setup);
 
-EXPORT_SYMBOL(devfs_mk_symlink);
 EXPORT_SYMBOL(devfs_mk_dir);
 EXPORT_SYMBOL(devfs_remove);
 

@@ -37,6 +37,7 @@
 #include <linux/tty_flip.h>
 #include <linux/sched.h>
 #include <linux/spinlock.h>
+#include <linux/delay.h>
 #include <asm/uaccess.h>
 #include <asm/hvconsole.h>
 #include <asm/vio.h>
@@ -44,7 +45,7 @@
 #define HVC_MAJOR	229
 #define HVC_MINOR	0
 
-#define TIMEOUT		((HZ + 99) / 100)
+#define TIMEOUT		(10)
 
 /*
  * Wait this long per iteration while trying to push buffered data to the
@@ -607,7 +608,7 @@ int khvcd(void *unused)
 			if (poll_mask == 0)
 				schedule();
 			else
-				schedule_timeout(TIMEOUT);
+				msleep_interruptible(TIMEOUT);
 		}
 		__set_current_state(TASK_RUNNING);
 	} while (!kthread_should_stop());

@@ -98,6 +98,23 @@ static int slave_configure(struct scsi_device *sdev)
 	 * the end, scatter-gather buffers follow page boundaries. */
 	blk_queue_dma_alignment(sdev->request_queue, (512 - 1));
 
+	/* Set the SCSI level to at least 2.  We'll leave it at 3 if that's
+	 * what is originally reported.  We need this to avoid confusing
+	 * the SCSI layer with devices that report 0 or 1, but need 10-byte
+	 * commands (ala ATAPI devices behind certain bridges, or devices
+	 * which simply have broken INQUIRY data).
+	 *
+	 * NOTE: This means /dev/sg programs (ala cdrecord) will get the
+	 * actual information.  This seems to be the preference for
+	 * programs like that.
+	 *
+	 * NOTE: This also means that /proc/scsi/scsi and sysfs may report
+	 * the actual value or the modified one, depending on where the
+	 * data comes from.
+	 */
+	if (sdev->scsi_level < SCSI_2)
+		sdev->scsi_level = SCSI_2;
+
 	/* According to the technical support people at Genesys Logic,
 	 * devices using their chips have problems transferring more than
 	 * 32 KB at a time.  In practice people have found that 64 KB
@@ -266,7 +283,7 @@ static int device_reset(struct scsi_cmnd *srb)
 static int bus_reset(struct scsi_cmnd *srb)
 {
 	struct us_data *us = (struct us_data *)srb->device->host->hostdata[0];
-	int result;
+	int result, rc;
 
 	US_DEBUGP("%s called\n", __FUNCTION__);
 	if (us->sm_state != US_STATE_IDLE) {
@@ -291,8 +308,16 @@ static int bus_reset(struct scsi_cmnd *srb)
 		result = -EBUSY;
 		US_DEBUGP("Refusing to reset a multi-interface device\n");
 	} else {
-		result = usb_reset_device(us->pusb_dev);
-		US_DEBUGP("usb_reset_device returns %d\n", result);
+		rc = usb_lock_device_for_reset(us->pusb_dev, us->pusb_intf);
+		if (rc < 0) {
+			US_DEBUGP("unable to lock device for reset: %d\n", rc);
+			result = rc;
+		} else {
+			result = usb_reset_device(us->pusb_dev);
+			if (rc)
+				usb_unlock_device(us->pusb_dev);
+			US_DEBUGP("usb_reset_device returns %d\n", result);
+		}
 	}
 	up(&(us->dev_semaphore));
 

@@ -13,6 +13,7 @@
 
 #include <linux/config.h>
 #include <linux/isdn.h>
+#include <linux/delay.h>
 #include "isdn_common.h"
 #include "isdn_tty.h"
 #ifdef CONFIG_ISDN_AUDIO
@@ -1748,8 +1749,7 @@ isdn_tty_close(struct tty_struct *tty, struct file *filp)
 	tty->closing = 0;
 	module_put(info->owner);
 	if (info->blocked_open) {
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(HZ/2);
+		msleep_interruptible(500);
 		wake_up_interruptible(&info->open_wait);
 	}
 	info->flags &= ~(ISDN_ASYNC_NORMAL_ACTIVE | ISDN_ASYNC_CLOSING);

@@ -299,6 +299,7 @@ enum jbd_state_bits {
 	BH_JBDDirty,		/* Is dirty but journaled */
 	BH_State,		/* Pins most journal_head state */
 	BH_JournalHead,		/* Pins bh->b_private and jh->b_bh */
+	BH_Unshadow,		/* Dummy bit, for BJ_Shadow wakeup filtering */
 };
 
 BUFFER_FNS(JBD, jbd)

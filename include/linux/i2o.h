@@ -147,10 +147,10 @@ struct i2o_controller {
 
 	struct pci_dev *pdev;	/* PCI device */
 
-	int short_req:1;	/* use small block sizes */
-	int no_quiesce:1;	/* dont quiesce before reset */
-	int raptor:1;		/* split bar */
-	int promise:1;		/* Promise controller */
+	unsigned int short_req:1;	/* use small block sizes */
+	unsigned int no_quiesce:1;	/* dont quiesce before reset */
+	unsigned int raptor:1;		/* split bar */
+	unsigned int promise:1;		/* Promise controller */
 
 #ifdef CONFIG_MTRR
 	int mtrr_reg0;
@@ -180,9 +180,9 @@ struct i2o_controller {
 	struct i2o_dma in_queue;	/* inbound message queue Host->IOP */
 	struct i2o_dma out_queue;	/* outbound message queue IOP->Host */
 
-	int battery:1;		/* Has a battery backup */
-	int io_alloc:1;		/* An I/O resource was allocated */
-	int mem_alloc:1;	/* A memory resource was allocated */
+	unsigned int battery:1;		/* Has a battery backup */
+	unsigned int io_alloc:1;	/* An I/O resource was allocated */
+	unsigned int mem_alloc:1;	/* A memory resource was allocated */
 
 	struct resource io_resource;	/* I/O resource allocated to the IOP */
 	struct resource mem_resource;	/* Mem resource allocated to the IOP */

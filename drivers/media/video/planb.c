@@ -178,8 +178,7 @@ static unsigned char saa_status(int byte, struct planb *pb)
 	saa_write_reg (SAA7196_STDC, saa_regs[pb->win.norm][SAA7196_STDC]);
 
 	/* Let's wait 30msec for this one */
-	current->state = TASK_INTERRUPTIBLE;
-	schedule_timeout(30 * HZ / 1000);
+	msleep_interruptible(30);
 
 	return (unsigned char)in_8 (&planb_regs->saa_status);
 }

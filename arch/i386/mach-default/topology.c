@@ -27,6 +27,7 @@
  */
 #include <linux/init.h>
 #include <linux/smp.h>
+#include <linux/nodemask.h>
 #include <asm/cpu.h>
 
 struct i386_cpu cpu_devices[NR_CPUS];

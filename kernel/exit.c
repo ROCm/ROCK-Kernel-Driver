@@ -14,6 +14,7 @@
 #include <linux/personality.h>
 #include <linux/tty.h>
 #include <linux/namespace.h>
+#include <linux/key.h>
 #include <linux/security.h>
 #include <linux/cpu.h>
 #include <linux/acct.h>
@@ -511,8 +512,6 @@ void exit_mm(struct task_struct *tsk)
 	__exit_mm(tsk);
 }
 
-EXPORT_SYMBOL(exit_mm);
-
 static inline void choose_new_parent(task_t *p, task_t *reaper, task_t *child_reaper)
 {
 	/*
@@ -816,6 +815,7 @@ asmlinkage NORET_TYPE void do_exit(long code)
 	__exit_fs(tsk);
 	exit_namespace(tsk);
 	exit_thread();
+	exit_keys(tsk);
 
 	if (tsk->signal->leader)
 		disassociate_ctty(1);

@@ -277,6 +277,9 @@ int timer_interrupt(struct pt_regs * regs)
 			write_seqlock(&xtime_lock);
 			tb_last_stamp = lpaca->next_jiffy_update_tb;
 			do_timer(regs);
+#ifndef CONFIG_SMP
+			update_process_times(user_mode(regs));
+#endif
 			timer_sync_xtime( cur_tb );
 			timer_check_rtc();
 			write_sequnlock(&xtime_lock);

@@ -22,9 +22,10 @@
 
 #ifdef NTFS_RW
 
-#include "ntfs.h"
 #include "index.h"
 #include "quota.h"
+#include "debug.h"
+#include "ntfs.h"
 
 /**
  * ntfs_mark_quotas_out_of_date - mark the quotas out of date on an ntfs volume

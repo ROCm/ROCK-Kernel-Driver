@@ -579,7 +579,7 @@ wait_for_iobuf:
 		journal_file_buffer(jh, commit_transaction, BJ_Forget);
 		/* Wake up any transactions which were waiting for this
 		   IO to complete */
-		wake_up_buffer(bh);
+		wake_up_bit(&bh->b_state, BH_Unshadow);
 		JBUFFER_TRACE(jh, "brelse shadowed buffer");
 		__brelse(bh);
 	}

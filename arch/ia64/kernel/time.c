@@ -67,14 +67,8 @@ timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 	profile_tick(CPU_PROFILING, regs);
 
 	while (1) {
-#ifdef CONFIG_SMP
-		/*
-		 * For UP, this is done in do_timer().  Weird, but
-		 * fixing that would require updates to all
-		 * platforms.
-		 */
 		update_process_times(user_mode(regs));
-#endif
+
 		new_itm += local_cpu_data->itm_delta;
 
 		if (smp_processor_id() == TIME_KEEPER_ID) {

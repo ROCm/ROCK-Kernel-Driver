@@ -82,6 +82,7 @@
 #include <linux/ioport.h>
 #include <linux/mm.h>
 #include <linux/slab.h>
+#include <linux/delay.h>
 
 #include <linux/netdevice.h>
 
@@ -3259,8 +3260,7 @@ static void mgsl_close(struct tty_struct *tty, struct file * filp)
 	
 	if (info->blocked_open) {
 		if (info->close_delay) {
-			set_current_state(TASK_INTERRUPTIBLE);
-			schedule_timeout(info->close_delay);
+			msleep_interruptible(jiffies_to_msecs(info->close_delay));
 		}
 		wake_up_interruptible(&info->open_wait);
 	}
@@ -3326,8 +3326,7 @@ static void mgsl_wait_until_sent(struct tty_struct *tty, int timeout)
 	if ( info->params.mode == MGSL_MODE_HDLC ||
 		info->params.mode == MGSL_MODE_RAW ) {
 		while (info->tx_active) {
-			set_current_state(TASK_INTERRUPTIBLE);
-			schedule_timeout(char_time);
+			msleep_interruptible(jiffies_to_msecs(char_time));
 			if (signal_pending(current))
 				break;
 			if (timeout && time_after(jiffies, orig_jiffies + timeout))
@@ -3336,8 +3335,7 @@ static void mgsl_wait_until_sent(struct tty_struct *tty, int timeout)
 	} else {
 		while (!(usc_InReg(info,TCSR) & TXSTATUS_ALL_SENT) &&
 			info->tx_enabled) {
-			set_current_state(TASK_INTERRUPTIBLE);
-			schedule_timeout(char_time);
+			msleep_interruptible(jiffies_to_msecs(char_time));
 			if (signal_pending(current))
 				break;
 			if (timeout && time_after(jiffies, orig_jiffies + timeout))
@@ -7200,8 +7198,7 @@ BOOLEAN mgsl_irq_test( struct mgsl_struct *info )
 
 	EndTime=100;
 	while( EndTime-- && !info->irq_occurred ) {
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(msecs_to_jiffies(10));
+		msleep_interruptible(10);
 	}
 	
 	spin_lock_irqsave(&info->irq_spinlock,flags);

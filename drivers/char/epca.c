@@ -561,8 +561,7 @@ static void pc_close(struct tty_struct * tty, struct file * filp)
 
 			if (ch->close_delay) 
 			{
-				current->state = TASK_INTERRUPTIBLE;
-				schedule_timeout(ch->close_delay);
+				msleep_interruptible(jiffies_to_msecs(ch->close_delay));
 			}
 
 			wake_up_interruptible(&ch->open_wait);

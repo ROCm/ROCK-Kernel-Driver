@@ -118,7 +118,7 @@ static void usb_mouse_close(struct input_dev *dev)
 	struct usb_mouse *mouse = dev->private;
 
 	if (!--mouse->open)
-		usb_unlink_urb(mouse->irq);
+		usb_kill_urb(mouse->irq);
 }
 
 static int usb_mouse_probe(struct usb_interface * intf, const struct usb_device_id * id)
@@ -223,7 +223,7 @@ static void usb_mouse_disconnect(struct usb_interface *intf)
 	
 	usb_set_intfdata(intf, NULL);
 	if (mouse) {
-		usb_unlink_urb(mouse->irq);
+		usb_kill_urb(mouse->irq);
 		input_unregister_device(&mouse->dev);
 		usb_free_urb(mouse->irq);
 		usb_buffer_free(interface_to_usbdev(intf), 8, mouse->data, mouse->data_dma);

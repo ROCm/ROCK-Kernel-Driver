@@ -46,6 +46,9 @@ static irqreturn_t
 timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	do_timer(regs);
+#ifndef CONFIG_SMP
+	update_process_times(user_mode(regs));
+#endif
 	do_profile(regs);
 	RTC_RTCC = 0;				/* Clear interrupt */
 

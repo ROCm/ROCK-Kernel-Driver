@@ -517,7 +517,7 @@ static int hfs_permission(struct inode *inode, int mask,
 {
 	if (S_ISREG(inode->i_mode) && mask & MAY_EXEC)
 		return 0;
-	return vfs_permission(inode, mask);
+	return generic_permission(inode, mask, NULL);
 }
 
 static int hfs_file_open(struct inode *inode, struct file *file)

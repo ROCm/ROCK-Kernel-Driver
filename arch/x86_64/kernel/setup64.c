@@ -43,79 +43,26 @@ char boot_cpu_stack[IRQSTACKSIZE] __attribute__((section(".bss.page_aligned")));
 
 unsigned long __supported_pte_mask = ~0UL;
 static int do_not_nx __initdata = 0;
-unsigned long vm_stack_flags = __VM_STACK_FLAGS; 
-unsigned long vm_stack_flags32 = __VM_STACK_FLAGS; 
-unsigned long vm_data_default_flags = __VM_DATA_DEFAULT_FLAGS; 
-unsigned long vm_data_default_flags32 = __VM_DATA_DEFAULT_FLAGS; 
-unsigned long vm_force_exec32 = PROT_EXEC; 
 
 /* noexec=on|off
 Control non executable mappings for 64bit processes.
 
-on	Enable
+on	Enable(default)
 off	Disable
-noforce (default) Don't enable by default for heap/stack/data, 
-	but allow PROT_EXEC to be effective
-
 */ 
 static int __init nonx_setup(char *str)
 {
 	if (!strcmp(str, "on")) {
                 __supported_pte_mask |= _PAGE_NX; 
  		do_not_nx = 0; 
- 		vm_data_default_flags &= ~VM_EXEC; 
- 		vm_stack_flags &= ~VM_EXEC;  
-	} else if (!strcmp(str, "noforce") || !strcmp(str, "off")) {
-		do_not_nx = (str[0] == 'o');
-		if (do_not_nx)
-			__supported_pte_mask &= ~_PAGE_NX; 
-		vm_data_default_flags |= VM_EXEC; 
-		vm_stack_flags |= VM_EXEC;
+	} else if (!strcmp(str, "off")) {
+		do_not_nx = 1;
+		__supported_pte_mask &= ~_PAGE_NX;
         } 
         return 1;
 } 
 
 __setup("noexec=", nonx_setup); 
-
-/* noexec32=opt{,opt} 
-
-Control the no exec default for 32bit processes. Can be also overwritten
-per executable using ELF header flags (e.g. needed for the X server)
-Requires noexec=on or noexec=noforce to be effective.
-
-Valid options: 
-   all,on    Heap,stack,data is non executable. 	
-   off       (default) Heap,stack,data is executable
-   stack     Stack is non executable, heap/data is.
-   force     Don't imply PROT_EXEC for PROT_READ 
-   compat    (default) Imply PROT_EXEC for PROT_READ
-
-*/
- static int __init nonx32_setup(char *s)
- {
-	 while (*s) {
-		if (!strncmp(s, "all", 3) || !strncmp(s,"on",2)) {
-			vm_data_default_flags32 &= ~VM_EXEC; 
-			vm_stack_flags32 &= ~VM_EXEC;  
-		} else if (!strncmp(s, "off",3)) {
-			vm_data_default_flags32 |= VM_EXEC; 
-			vm_stack_flags32 |= VM_EXEC;  
-		} else if (!strncmp(s, "stack", 5)) {
-			vm_data_default_flags32 |= VM_EXEC; 
-			vm_stack_flags32 &= ~VM_EXEC;  		
-		} else if (!strncmp(s, "force",5)) {
-			vm_force_exec32 = 0; 
-		} else if (!strncmp(s, "compat",5)) {
-			vm_force_exec32 = PROT_EXEC;
-		} 
-		s += strcspn(s, ",");
-		if (*s == ',')
-			++s;
-	 }
-	 return 1;
-} 
-
-__setup("noexec32=", nonx32_setup); 
 
 /*
  * Great future plan:

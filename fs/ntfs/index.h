@@ -30,6 +30,7 @@
 #include "inode.h"
 #include "attrib.h"
 #include "mft.h"
+#include "aops.h"
 
 /**
  * @idx_ni:	index inode containing the @entry described by this context
@@ -115,8 +116,6 @@ static inline void ntfs_index_entry_flush_dcache_page(ntfs_index_context *ictx)
 		flush_dcache_page(ictx->page);
 }
 
-extern void __ntfs_index_entry_mark_dirty(ntfs_index_context *ictx);
-
 /**
  * ntfs_index_entry_mark_dirty - mark an index entry dirty
  * @ictx:	ntfs index context describing the index entry
@@ -140,7 +139,8 @@ static inline void ntfs_index_entry_mark_dirty(ntfs_index_context *ictx)
 	if (ictx->is_in_root)
 		mark_mft_record_dirty(ictx->actx->ntfs_ino);
 	else
-		__ntfs_index_entry_mark_dirty(ictx);
+		mark_ntfs_record_dirty(ictx->page,
+				(u8*)ictx->ia - (u8*)page_address(ictx->page));
 }
 
 #endif /* NTFS_RW */

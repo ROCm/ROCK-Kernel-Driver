@@ -228,7 +228,7 @@ static int  belkin_sa_open (struct usb_serial_port *port, struct file *filp)
 	port->interrupt_in_urb->dev = port->serial->dev;
 	retval = usb_submit_urb(port->interrupt_in_urb, GFP_KERNEL);
 	if (retval) {
-		usb_unlink_urb(port->read_urb);
+		usb_kill_urb(port->read_urb);
 		err(" usb_submit_urb(read int) failed");
 	}
 
@@ -242,9 +242,9 @@ static void belkin_sa_close (struct usb_serial_port *port, struct file *filp)
 	dbg("%s port %d", __FUNCTION__, port->number);
 
 	/* shutdown our bulk reads and writes */
-	usb_unlink_urb (port->write_urb);
-	usb_unlink_urb (port->read_urb);
-	usb_unlink_urb (port->interrupt_in_urb);
+	usb_kill_urb(port->write_urb);
+	usb_kill_urb(port->read_urb);
+	usb_kill_urb(port->interrupt_in_urb);
 } /* belkin_sa_close */
 
 

@@ -625,8 +625,7 @@ static void moxa_close(struct tty_struct *tty, struct file *filp)
 	ch->tty = NULL;
 	if (ch->blocked_open) {
 		if (ch->close_delay) {
-			set_current_state(TASK_INTERRUPTIBLE);
-			schedule_timeout(ch->close_delay);
+			msleep_interruptible(jiffies_to_msecs(ch->close_delay));
 		}
 		wake_up_interruptible(&ch->open_wait);
 	}

@@ -4,7 +4,12 @@
  * Rewritten and vastly simplified by Rusty Russell for in-kernel
  * module loader:
  *   Copyright 2002 Rusty Russell <rusty@rustcorp.com.au> IBM Corporation
- * Stem compression by Andi Kleen.
+ *
+ * ChangeLog:
+ *
+ * (25/Aug/2004) Paulo Marques <pmarques@grupopie.com>
+ *      Changed the compression method from stem compression to "table lookup"
+ *      compression (see scripts/kallsyms.c for a more complete description)
  */
 #include <linux/kallsyms.h>
 #include <linux/module.h>
@@ -17,7 +22,12 @@
 /* These will be re-linked against their real values during the second link stage */
 extern unsigned long kallsyms_addresses[] __attribute__((weak));
 extern unsigned long kallsyms_num_syms __attribute__((weak));
-extern char kallsyms_names[] __attribute__((weak));
+extern u8 kallsyms_names[] __attribute__((weak));
+
+extern u8 kallsyms_token_table[] __attribute__((weak));
+extern u16 kallsyms_token_index[] __attribute__((weak));
+
+extern unsigned long kallsyms_markers[] __attribute__((weak));
 
 /* Defined by the linker script. */
 extern char _stext[], _etext[], _sinittext[], _einittext[];
@@ -37,21 +47,88 @@ static inline int is_kernel_text(unsigned long addr)
 	return 0;
 }
 
+/* expand a compressed symbol data into the resulting uncompressed string,
+   given the offset to where the symbol is in the compressed stream */
+static unsigned int kallsyms_expand_symbol(unsigned int off, char *result)
+{
+	int len, skipped_first = 0;
+	u8 *tptr, *data;
+
+	/* get the compressed symbol length from the first symbol byte */
+	data = &kallsyms_names[off];
+	len = *data;
+	data++;
+
+	/* update the offset to return the offset for the next symbol on
+	 * the compressed stream */
+	off += len + 1;
+
+	/* for every byte on the compressed symbol data, copy the table
+	   entry for that byte */
+	while(len) {
+		tptr = &kallsyms_token_table[ kallsyms_token_index[*data] ];
+		data++;
+		len--;
+
+		while (*tptr) {
+			if(skipped_first) {
+				*result = *tptr;
+				result++;
+			} else
+				skipped_first = 1;
+			tptr++;
+		}
+	}
+
+	*result = '\0';
+
+	/* return to offset to the next symbol */
+	return off;
+}
+
+/* get symbol type information. This is encoded as a single char at the
+ * begining of the symbol name */
+static char kallsyms_get_symbol_type(unsigned int off)
+{
+	/* get just the first code, look it up in the token table, and return the
+	 * first char from this token */
+	return kallsyms_token_table[ kallsyms_token_index[ kallsyms_names[off+1] ] ];
+}
+
+
+/* find the offset on the compressed stream given and index in the
+ * kallsyms array */
+static unsigned int get_symbol_offset(unsigned long pos)
+{
+	u8 *name;
+	int i;
+
+	/* use the closest marker we have. We have markers every 256 positions,
+	 * so that should be close enough */
+	name = &kallsyms_names[ kallsyms_markers[pos>>8] ];
+
+	/* sequentially scan all the symbols up to the point we're searching for.
+	 * Every symbol is stored in a [<len>][<len> bytes of data] format, so we
+	 * just need to add the len to the current pointer for every symbol we
+	 * wish to skip */
+	for(i = 0; i < (pos&0xFF); i++)
+		name = name + (*name) + 1;
+
+	return name - kallsyms_names;
+}
+
 /* Lookup the address for this symbol. Returns 0 if not found. */
 unsigned long kallsyms_lookup_name(const char *name)
 {
 	char namebuf[KSYM_NAME_LEN+1];
 	unsigned long i;
-	char *knames;
+	unsigned int off;
 
-	for (i = 0, knames = kallsyms_names; i < kallsyms_num_syms; i++) {
-		unsigned prefix = *knames++;
+	for (i = 0, off = 0; i < kallsyms_num_syms; i++) {
+		off = kallsyms_expand_symbol(off, namebuf);
 
-		strlcpy(namebuf + prefix, knames, KSYM_NAME_LEN - prefix);
 		if (strcmp(namebuf, name) == 0)
 			return kallsyms_addresses[i];
-
-		knames += strlen(knames) + 1;
 	}
 	return module_kallsyms_lookup_name(name);
 }
@@ -62,7 +139,7 @@ const char *kallsyms_lookup(unsigned long addr,
 			    unsigned long *offset,
 			    char **modname, char *namebuf)
 {
-	unsigned long i, best = 0;
+	unsigned long i, low, high, mid;
 
 	/* This kernel should never had been booted. */
 	BUG_ON(!kallsyms_addresses);
@@ -71,40 +148,45 @@ const char *kallsyms_lookup(unsigned long addr,
 	namebuf[0] = 0;
 
 	if (is_kernel_text(addr) || is_kernel_inittext(addr)) {
-		unsigned long symbol_end;
-		char *name = kallsyms_names;
+		unsigned long symbol_end=0;
 
-		/* They're sorted, we could be clever here, but who cares? */
-		for (i = 0; i < kallsyms_num_syms; i++) {
-			if (kallsyms_addresses[i] > kallsyms_addresses[best] &&
-			    kallsyms_addresses[i] <= addr)
-				best = i;
+		/* do a binary search on the sorted kallsyms_addresses array */
+		low = 0;
+		high = kallsyms_num_syms;
+
+		while (high-low > 1) {
+			mid = (low + high) / 2;
+			if (kallsyms_addresses[mid] <= addr) low = mid;
+			else high = mid;
 		}
+
+		/* search for the first aliased symbol. Aliased symbols are
+		   symbols with the same address */
+		while (low && kallsyms_addresses[low - 1] == kallsyms_addresses[low])
+			--low;
 
 		/* Grab name */
-		for (i = 0; i <= best; i++) { 
-			unsigned prefix = *name++;
-			strncpy(namebuf + prefix, name, KSYM_NAME_LEN - prefix);
-			name += strlen(name) + 1;
-		}
-
-		/* At worst, symbol ends at end of section. */
-		if (is_kernel_inittext(addr))
-			symbol_end = (unsigned long)_einittext;
-		else
-			symbol_end = (unsigned long)_etext;
+		kallsyms_expand_symbol(get_symbol_offset(low), namebuf);
 
 		/* Search for next non-aliased symbol */
-		for (i = best+1; i < kallsyms_num_syms; i++) {
-			if (kallsyms_addresses[i] > kallsyms_addresses[best]) {
+		for (i = low + 1; i < kallsyms_num_syms; i++) {
+			if (kallsyms_addresses[i] > kallsyms_addresses[low]) {
 				symbol_end = kallsyms_addresses[i];
 				break;
 			}
 		}
 
-		*symbolsize = symbol_end - kallsyms_addresses[best];
+		/* if we found no next symbol, we use the end of the section */
+		if (!symbol_end) {
+			if (is_kernel_inittext(addr))
+				symbol_end = (unsigned long)_einittext;
+			else
+				symbol_end = (unsigned long)_etext;
+		}
+
+		*symbolsize = symbol_end - kallsyms_addresses[low];
 		*modname = NULL;
-		*offset = addr - kallsyms_addresses[best];
+		*offset = addr - kallsyms_addresses[low];
 		return namebuf;
 	}
 
@@ -135,7 +217,7 @@ void __print_symbol(const char *fmt, unsigned long address)
 	printk(fmt, buffer);
 }
 
-/* To avoid O(n^2) iteration, we carry prefix along. */
+/* To avoid using get_symbol_offset for every symbol, we carry prefix along. */
 struct kallsym_iter
 {
 	loff_t pos;
@@ -168,31 +250,23 @@ static int get_ksymbol_mod(struct kallsym_iter *iter)
 /* Returns space to next name. */
 static unsigned long get_ksymbol_core(struct kallsym_iter *iter)
 {
-	unsigned stemlen, off = iter->nameoff;
+	unsigned off = iter->nameoff;
 
-	/* First char of each symbol name indicates prefix length
-	   shared with previous name (stem compression). */
-	stemlen = kallsyms_names[off++];
-
-	strlcpy(iter->name+stemlen, kallsyms_names + off,
-		KSYM_NAME_LEN+1-stemlen);
-	off += strlen(kallsyms_names + off) + 1;
 	iter->owner = NULL;
 	iter->value = kallsyms_addresses[iter->pos];
-	if (is_kernel_text(iter->value) || is_kernel_inittext(iter->value))
-		iter->type = 't';
-	else
-		iter->type = 'd';
 
-	upcase_if_global(iter);
+	iter->type = kallsyms_get_symbol_type(off);
+
+	off = kallsyms_expand_symbol(off, iter->name);
+
 	return off - iter->nameoff;
 }
 
-static void reset_iter(struct kallsym_iter *iter)
+static void reset_iter(struct kallsym_iter *iter, loff_t new_pos)
 {
 	iter->name[0] = '\0';
-	iter->nameoff = 0;
-	iter->pos = 0;
+	iter->nameoff = get_symbol_offset(new_pos);
+	iter->pos = new_pos;
 }
 
 /* Returns false if pos at or past end of file. */
@@ -204,16 +278,13 @@ static int update_iter(struct kallsym_iter *iter, loff_t pos)
 		return get_ksymbol_mod(iter);
 	}
 	
-	/* If we're past the desired position, reset to start. */
-	if (pos < iter->pos)
-		reset_iter(iter);
+	/* If we're not on the desired position, reset to new position. */
+	if (pos != iter->pos)
+		reset_iter(iter, pos);
 
-	/* We need to iterate through the previous symbols: can be slow */
-	for (; iter->pos != pos; iter->pos++) {
-		iter->nameoff += get_ksymbol_core(iter);
-		cond_resched();
-	}
-	get_ksymbol_core(iter);
+	iter->nameoff += get_ksymbol_core(iter);
+	iter->pos++;
+
 	return 1;
 }
 
@@ -267,14 +338,15 @@ struct seq_operations kallsyms_op = {
 static int kallsyms_open(struct inode *inode, struct file *file)
 {
 	/* We keep iterator in m->private, since normal case is to
-	 * s_start from where we left off, so we avoid O(N^2). */
+	 * s_start from where we left off, so we avoid doing
+	 * using get_symbol_offset for every symbol */
 	struct kallsym_iter *iter;
 	int ret;
 
 	iter = kmalloc(sizeof(*iter), GFP_KERNEL);
 	if (!iter)
 		return -ENOMEM;
-	reset_iter(iter);
+	reset_iter(iter, 0);
 
 	ret = seq_open(file, &kallsyms_op);
 	if (ret == 0)

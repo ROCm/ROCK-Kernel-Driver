@@ -735,6 +735,7 @@ static int __devinit kyrofb_probe(struct pci_dev *pdev,
 
 	fb_memset(info->screen_base, 0, size);
 
+	info->device = &pdev->dev;
 	if (register_framebuffer(info) < 0)
 		goto out_unmap;
 

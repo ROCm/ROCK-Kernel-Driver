@@ -19,6 +19,7 @@ obj-$(CONFIG_USB_SERIAL_EDGEPORT_TI)		+= io_ti.o
 obj-$(CONFIG_USB_SERIAL_EMPEG)			+= empeg.o
 obj-$(CONFIG_USB_SERIAL_FTDI_SIO)		+= ftdi_sio.o
 obj-$(CONFIG_USB_SERIAL_IPAQ)			+= ipaq.o
+obj-$(CONFIG_USB_SERIAL_IPW)			+= ipw.o
 obj-$(CONFIG_USB_SERIAL_IR)			+= ir-usb.o
 obj-$(CONFIG_USB_SERIAL_KEYSPAN)		+= keyspan.o
 obj-$(CONFIG_USB_SERIAL_KEYSPAN_PDA)		+= keyspan_pda.o

@@ -12,7 +12,7 @@
 #include <linux/buffer_head.h>
 #include <asm/uaccess.h>
 
-extern struct key  MIN_KEY;
+extern struct reiserfs_key  MIN_KEY;
 
 static int reiserfs_readdir (struct file *, void *, filldir_t);
 int reiserfs_dir_fsync(struct file *filp, struct dentry *dentry, int datasync) ;
@@ -46,7 +46,7 @@ static int reiserfs_readdir (struct file * filp, void * dirent, filldir_t filldi
     INITIALIZE_PATH (path_to_entry);
     struct buffer_head * bh;
     int item_num, entry_num;
-    const struct key * rkey;
+    const struct reiserfs_key * rkey;
     struct item_head * ih, tmp_ih;
     int search_res;
     char * local_buf;

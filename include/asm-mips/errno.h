@@ -110,6 +110,10 @@
  */
 #define ENOMEDIUM	159	/* No medium found */
 #define EMEDIUMTYPE	160	/* Wrong medium type */
+#define	ENOKEY		161	/* Required key not available */
+#define	EKEYEXPIRED	162	/* Key has expired */
+#define	EKEYREVOKED	163	/* Key has been revoked */
+#define	EKEYREJECTED	164	/* Key was rejected by service */
 
 #define EDQUOT		1133	/* Quota exceeded */
 

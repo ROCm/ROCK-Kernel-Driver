@@ -32,6 +32,7 @@
 #include <asm/system.h>
 #include <linux/ioctl.h>
 #include <linux/mtio.h>
+#include <linux/delay.h>
 
 #include <linux/ftape.h>
 #include <linux/qic117.h>
@@ -96,19 +97,12 @@ void ftape_sleep(unsigned int time)
 		timeout = ticks;
 		save_flags(flags);
 		sti();
-		set_current_state(TASK_INTERRUPTIBLE);
-		do {
-			/*  Mmm. Isn't current->blocked == 0xffffffff ?
-			 */
-			if (signal_pending(current)) {
-				TRACE(ft_t_err,
-				      "awoken by non-blocked signal :-(");
-				break;	/* exit on signal */
-			}
-			while (current->state != TASK_RUNNING) {
-				timeout = schedule_timeout(timeout);
-			}
-		} while (timeout);
+		msleep_interruptible(jiffies_to_msecs(timeout));
+		/*  Mmm. Isn't current->blocked == 0xffffffff ?
+		 */
+		if (signal_pending(current)) {
+			TRACE(ft_t_err, "awoken by non-blocked signal :-(");
+		}
 		restore_flags(flags);
 	}
 	TRACE_EXIT;

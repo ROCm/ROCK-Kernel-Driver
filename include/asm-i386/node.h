@@ -5,6 +5,7 @@
 #include <linux/mmzone.h>
 #include <linux/node.h>
 #include <linux/topology.h>
+#include <linux/nodemask.h>
 
 struct i386_node {
 	struct node node;
