@@ -104,7 +104,7 @@ extern void isdn_tty_carrier_timeout(void);
 extern void isdn_tty_modem_xmit(void);
 extern int isdn_tty_init(void);
 extern void isdn_tty_readmodem(void);
-extern int isdn_tty_find_icall(int, int, int, setup_parm *);
+extern int isdn_tty_find_icall(struct isdn_slot *slot, setup_parm *setup);
 extern void isdn_tty_cleanup_xmit(modem_info *);
 extern int isdn_tty_capi_facility(capi_msg *cm); 
 extern void isdn_tty_at_cout(char *, modem_info *);

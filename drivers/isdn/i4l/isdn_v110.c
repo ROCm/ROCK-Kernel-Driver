@@ -512,11 +512,11 @@ buffer_full:
 
 
 void
-isdn_v110_open(int sl, struct isdn_v110 *iv110)
+isdn_v110_open(struct isdn_slot *slot, struct isdn_v110 *iv110)
 {	
 	isdn_v110_stream *v;
-	int hdrlen = isdn_slot_hdrlen(sl);
-	int maxsize = isdn_slot_maxbufsize(sl);
+	int hdrlen = isdn_slot_hdrlen(slot);
+	int maxsize = isdn_slot_maxbufsize(slot);
 
 	atomic_inc(&iv110->v110use);
 	switch (iv110->v110emu) {
@@ -533,7 +533,7 @@ isdn_v110_open(int sl, struct isdn_v110 *iv110)
 	if ((v = iv110->v110)) {
 		while (v->SyncInit) {
 			struct sk_buff *skb = isdn_v110_sync(v);
-			if (isdn_slot_write(sl, skb) <= 0) {
+			if (isdn_slot_write(slot, skb) <= 0) {
 				dev_kfree_skb(skb);
 				/* Unable to send, try later */
 				break;
@@ -547,7 +547,7 @@ isdn_v110_open(int sl, struct isdn_v110 *iv110)
 }
 
 void
-isdn_v110_close(int sl, struct isdn_v110 *iv110)
+isdn_v110_close(struct isdn_slot *slot, struct isdn_v110 *iv110)
 {
 	while (1) {
 		atomic_inc(&iv110->v110use);
@@ -560,7 +560,7 @@ isdn_v110_close(int sl, struct isdn_v110 *iv110)
 }
 
 int
-isdn_v110_bsent(int sl, struct isdn_v110 *iv110)
+isdn_v110_bsent(struct isdn_slot *slot, struct isdn_v110 *iv110)
 {
 	isdn_v110_stream *v = iv110->v110;
 	int i, ret;
@@ -587,7 +587,7 @@ isdn_v110_bsent(int sl, struct isdn_v110 *iv110)
 		else
 			skb = isdn_v110_idle(v);
 		if (skb) {
-			if (isdn_slot_write(sl, skb) <= 0) {
+			if (isdn_slot_write(slot, skb) <= 0) {
 				dev_kfree_skb(skb);
 				break;
 			} else {

@@ -26,7 +26,6 @@
 #include "isdn_audio.h"
 #endif
 #include <linux/isdn_divertif.h>
-#include "isdn_v110.h"
 #include <linux/devfs_fs_kernel.h>
 
 MODULE_DESCRIPTION("ISDN4Linux: link layer");
@@ -56,22 +55,6 @@ static char *slot_st_str[] = {
 	"ST_SLOT_WAIT_BHUP",
 	"ST_SLOT_WAIT_DHUP",
 };
-
-struct isdn_slot {
-	int               di;                  /* driver index               */
-	struct isdn_driver *drv;               /* driver                     */
-	int               ch;                  /* channel index (per driver) */
-	int               usage;               /* how is it used             */
-	char              num[ISDN_MSNLEN];    /* the current phone number   */
-	unsigned long     ibytes;              /* Statistics incoming bytes  */
-	unsigned long     obytes;              /* Statistics outgoing bytes  */
-	struct isdn_v110  iv110;               /* For V.110                  */
-	int               m_idx;               /* Index for mdm....          */
-	void             *priv;                /* pointer to isdn_net_dev    */
-	int             (*event_cb)(int sl, int pr, void *arg);
-	struct fsm_inst   fi;
-};
-
 
 static char *ev_str[] = {
 	"EV_DRV_REGISTER",
@@ -117,10 +100,8 @@ static int  isdn_v110_data_req(struct isdn_slot *slot, struct sk_buff *skb);
 static inline int
 do_event_cb(struct isdn_slot *slot, int pr, void *arg)
 {
-	int sl = slot - slots;
-
 	if (slot->event_cb)
-		return slot->event_cb(sl, pr, arg);
+		return slot->event_cb(slot, pr, arg);
 
 	return -ENXIO;
 }
@@ -304,7 +285,6 @@ slot_icall(struct fsm_inst *fi, int pr, void *arg)
 {
 	struct isdn_slot *slot = fi->userdata;
 	isdn_ctrl *ctrl = arg;
-	int sl = slot - slots;
 	int retval;
 
 	fsm_change_state(fi, ST_SLOT_IN);
@@ -314,15 +294,13 @@ slot_icall(struct fsm_inst *fi, int pr, void *arg)
 	
 	strcpy(slot->num, ctrl->parm.setup.phone);
 	/* Try to find a network-interface which will accept incoming call */
-	retval = isdn_net_find_icall(ctrl->driver, ctrl->arg, sl, 
-				     &ctrl->parm.setup);
+	retval = isdn_net_find_icall(slot, &ctrl->parm.setup);
 
 	/* already taken by net now? */
 	if (fi->state != ST_SLOT_IN)
 		goto out;
 
-	retval = isdn_tty_find_icall(ctrl->driver, ctrl->arg, sl, 
-				     &ctrl->parm.setup);
+	retval = isdn_tty_find_icall(slot, &ctrl->parm.setup);
  out:
 	return 0;
 }
@@ -342,12 +320,11 @@ static int
 slot_unbind(struct fsm_inst *fi, int pr, void *arg)
 {
 	struct isdn_slot *slot = fi->userdata;
-	int sl = slot - slots;
 	isdn_ctrl cmd;
 
 	strcpy(slot->num, "???");
 	cmd.parm.num[0] = '\0';
-	isdn_slot_command(sl, ISDN_CMD_SETEAZ, &cmd);
+	isdn_slot_command(slot, ISDN_CMD_SETEAZ, &cmd);
 	slot->ibytes = 0;
 	slot->obytes = 0;
 	slot->usage = ISDN_USAGE_NONE;
@@ -1990,7 +1967,7 @@ isdn_map_eaz2msn(char *msn, int di)
  * Find an unused ISDN-channel, whose feature-flags match the
  * given L2- and L3-protocols.
  */
-int
+struct isdn_slot *
 isdn_get_free_slot(int usage, int l2_proto, int l3_proto,
 		   int pre_dev, int pre_chan, char *msn)
 {
@@ -2029,32 +2006,28 @@ isdn_get_free_slot(int usage, int l2_proto, int l3_proto,
 			slot->usage = usage;
 			isdn_info_update();
 			fsm_event(&slot->fi, EV_SLOT_BIND, NULL);
-			return i;
+			return slot;
 		}
 	}
 	restore_flags(flags);
-	return -1;
+	return NULL;
 }
 
 /*
  * Set state of ISDN-channel to 'unused'
  */
 void
-isdn_slot_free(int sl)
+isdn_slot_free(struct isdn_slot *slot)
 {
-	fsm_event(&slots[sl].fi, EV_SLOT_UNBIND, NULL);
+	fsm_event(&slot->fi, EV_SLOT_UNBIND, NULL);
 }
 
 /*
  * Return: length of data on success, -ERRcode on failure.
  */
 int
-isdn_slot_write(int sl, struct sk_buff *skb)
+isdn_slot_write(struct isdn_slot *slot, struct sk_buff *skb)
 {
-	struct isdn_slot *slot = &slots[sl];
-
-	BUG_ON(sl < 0);
-
 	return fsm_event(&slot->fi, EV_DATA_REQ, skb);
 }
 
@@ -2157,38 +2130,26 @@ EXPORT_SYMBOL(isdn_ppp_unregister_compressor);
 #endif
 
 int
-isdn_slot_maxbufsize(int sl)
+isdn_slot_maxbufsize(struct isdn_slot *slot)
 {
-	BUG_ON(sl < 0);
-
-	return slots[sl].drv->maxbufsize;
+	return slot->drv->maxbufsize;
 }
 
 int
-isdn_slot_hdrlen(int sl)
+isdn_slot_hdrlen(struct isdn_slot *slot)
 {
-	struct isdn_slot *slot = &slots[sl];
-	
-	BUG_ON(sl < 0);
-	
 	return slot->drv->interface->hl_hdrlen;
 }
 
 char *
-isdn_slot_map_eaz2msn(int sl, char *msn)
+isdn_slot_map_eaz2msn(struct isdn_slot *slot, char *msn)
 {
-	struct isdn_slot *slot = &slots[sl];
-	
-	BUG_ON(sl < 0);
-	
 	return isdn_map_eaz2msn(msn, slot->di);
 }
 
 int
-isdn_slot_command(int sl, int cmd, isdn_ctrl *ctrl)
+isdn_slot_command(struct isdn_slot *slot, int cmd, isdn_ctrl *ctrl)
 {
-	struct isdn_slot *slot = &slots[sl];
-
 	ctrl->command = cmd;
 	ctrl->driver = slot->di;
 
@@ -2230,14 +2191,11 @@ isdn_slot_command(int sl, int cmd, isdn_ctrl *ctrl)
 }
 
 int
-isdn_slot_dial(int sl, struct dial_info *dial)
+isdn_slot_dial(struct isdn_slot *slot, struct dial_info *dial)
 {
-	struct isdn_slot *slot = &slots[sl];
 	isdn_ctrl cmd;
 	int retval;
-	char *msn = isdn_slot_map_eaz2msn(sl, dial->msn);
-
-	BUG_ON(sl < 0);
+	char *msn = isdn_slot_map_eaz2msn(slot, dial->msn);
 
 	/* check for DOV */
 	if (dial->si1 == 7 && tolower(dial->phone[0]) == 'v') { /* DOV call */
@@ -2249,21 +2207,21 @@ isdn_slot_dial(int sl, struct dial_info *dial)
 	slot->usage |= ISDN_USAGE_OUTGOING;
 	isdn_info_update();
 
-	retval = isdn_slot_command(sl, ISDN_CMD_CLREAZ, &cmd);
+	retval = isdn_slot_command(slot, ISDN_CMD_CLREAZ, &cmd);
 	if (retval)
 		return retval;
 
 	strcpy(cmd.parm.num, msn);
-	retval = isdn_slot_command(sl, ISDN_CMD_SETEAZ, &cmd);
+	retval = isdn_slot_command(slot, ISDN_CMD_SETEAZ, &cmd);
 
 	cmd.arg = dial->l2_proto << 8;
 	cmd.parm.fax = dial->fax;
-	retval = isdn_slot_command(sl, ISDN_CMD_SETL2, &cmd);
+	retval = isdn_slot_command(slot, ISDN_CMD_SETL2, &cmd);
 	if (retval)
 		return retval;
 
 	cmd.arg = dial->l3_proto << 8;
-	retval = isdn_slot_command(sl, ISDN_CMD_SETL3, &cmd);
+	retval = isdn_slot_command(slot, ISDN_CMD_SETL3, &cmd);
 	if (retval)
 		return retval;
 
@@ -2272,12 +2230,12 @@ isdn_slot_dial(int sl, struct dial_info *dial)
 	strcpy(cmd.parm.setup.eazmsn, msn);
 	strcpy(cmd.parm.setup.phone, dial->phone);
 
-	printk(KERN_INFO "ISDN: slot %d: Dialing %s -> %s (SI %d/%d) (B %d/%d)\n",
-	       sl, cmd.parm.setup.eazmsn, cmd.parm.setup.phone,
+	printk(KERN_INFO "ISDN: Dialing %s -> %s (SI %d/%d) (B %d/%d)\n",
+	       cmd.parm.setup.eazmsn, cmd.parm.setup.phone,
 	       cmd.parm.setup.si1, cmd.parm.setup.si2,
 	       dial->l2_proto, dial->l3_proto);
 
-	return isdn_slot_command(sl, ISDN_CMD_DIAL, &cmd);
+	return isdn_slot_command(slot, ISDN_CMD_DIAL, &cmd);
 }
 
 int
@@ -2297,39 +2255,15 @@ isdn_slot_m_idx(int sl)
 }
 
 void
-isdn_slot_set_m_idx(int sl, int midx)
+isdn_slot_set_m_idx(struct isdn_slot *slot, int midx)
 {
-	BUG_ON(sl < 0);
-
-	slots[sl].m_idx = midx;
+	slot->m_idx = midx;
 }
 
 char *
-isdn_slot_num(int sl)
+isdn_slot_num(struct isdn_slot *slot)
 {
-	BUG_ON(sl < 0);
-
-	return slots[sl].num;
-}
-
-void
-isdn_slot_set_priv(int sl, int usage, void *priv, 
-		   int (*event_cb)(int sl, int pr, void *arg))
-{
-	BUG_ON(sl < 0);
-
-	slots[sl].usage &= ISDN_USAGE_EXCLUSIVE;
-	slots[sl].usage |= usage;
-	slots[sl].priv = priv;
-	slots[sl].event_cb = event_cb;
-}
-
-void *
-isdn_slot_priv(int sl)
-{
-	BUG_ON(sl < 0);
-
-	return slots[sl].priv;
+	return slot->num;
 }
 
 int
@@ -2548,35 +2482,29 @@ isdn_v110_add_features(struct isdn_driver *drv)
 static void
 __isdn_v110_open(struct isdn_slot *slot)
 {
-	int sl = slot - slots;
-
 	if (!slot->iv110.v110emu)
 		return;
 
-	isdn_v110_open(sl, &slot->iv110);
+	isdn_v110_open(slot, &slot->iv110);
 }
 
 static void
 __isdn_v110_close(struct isdn_slot *slot)
 {
-	int sl = slot - slots;
-
 	if (!slot->iv110.v110emu)
 		return;
 
-	isdn_v110_close(sl, &slot->iv110);
+	isdn_v110_close(slot, &slot->iv110);
 }
 
 static void
 __isdn_v110_bsent(struct isdn_slot *slot, int pr, isdn_ctrl *c)
 {
-	int sl = slot - slots;
-
 	if (!slot->iv110.v110emu) {
 		do_event_cb(slot, pr, c);
 		return;
 	}
-	isdn_v110_bsent(sl, &slot->iv110);
+	isdn_v110_bsent(slot, &slot->iv110);
 }
 
 /*
@@ -2615,8 +2543,6 @@ isdn_v110_setl2(struct isdn_slot *slot, isdn_ctrl *cmd)
 static int
 isdn_v110_data_ind(struct isdn_slot *slot, struct sk_buff *skb)
 {
-	int sl = slot - slots;
-
 	if (!slot->iv110.v110emu)
 		goto recv;
 		
@@ -2626,7 +2552,7 @@ isdn_v110_data_ind(struct isdn_slot *slot, struct sk_buff *skb)
 
 recv:
 	if (slot->event_cb)
-		slot->event_cb(sl, EV_DATA_IND, skb);
+		slot->event_cb(slot, EV_DATA_IND, skb);
 	return 0;
 }
 

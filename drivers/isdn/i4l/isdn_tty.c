@@ -31,20 +31,20 @@ static void isdn_tty_modem_reset_regs(modem_info *, int);
 static void isdn_tty_cmd_ATA(modem_info *);
 static void isdn_tty_flush_buffer(struct tty_struct *);
 static void isdn_tty_modem_result(int, modem_info *);
-static int isdn_tty_stat_callback(int i, isdn_ctrl *c);
-static int isdn_tty_rcv_skb(int i, struct sk_buff *skb);
+static int isdn_tty_stat_callback(struct isdn_slot *slot, isdn_ctrl *c);
+static int isdn_tty_rcv_skb(struct isdn_slot *slot, struct sk_buff *skb);
 #ifdef CONFIG_ISDN_AUDIO
 static int isdn_tty_countDLE(unsigned char *, int);
 #endif
 
 static int
-isdn_tty_event_callback(int sl, int pr, void *arg)
+isdn_tty_event_callback(struct isdn_slot *slot, int pr, void *arg)
 {
 	switch (pr) {
 	case EV_DATA_IND:
-		return isdn_tty_rcv_skb(sl, arg);
+		return isdn_tty_rcv_skb(slot, arg);
 	default:
-		return isdn_tty_stat_callback(sl, arg);
+		return isdn_tty_stat_callback(slot, arg);
 	}
 }
 
@@ -281,7 +281,7 @@ isdn_tty_readmodem(void)
 }
 
 static int
-isdn_tty_rcv_skb(int i, struct sk_buff *skb)
+isdn_tty_rcv_skb(struct isdn_slot *slot, struct sk_buff *skb)
 {
 	ulong flags;
 #ifdef CONFIG_ISDN_AUDIO
@@ -289,7 +289,7 @@ isdn_tty_rcv_skb(int i, struct sk_buff *skb)
 #endif
 	modem_info *info;
 
-	info = isdn_slot_priv(i);
+	info = slot->priv;
 #ifdef CONFIG_ISDN_AUDIO
 	ifmt = 1;
 	
@@ -728,7 +728,7 @@ isdn_tty_dial(char *n, modem_info * info, atemu * m)
 	int si = 7;
 	int l2 = m->mdmreg[REG_L2PROT];
 	ulong flags;
-	int i;
+	struct isdn_slot *slot;
 	int j;
 
 	for (j = 7; j >= 0; j--)
@@ -751,8 +751,8 @@ isdn_tty_dial(char *n, modem_info * info, atemu * m)
 	m->mdmreg[REG_SI1I] = si2bit[si];
 	save_flags(flags);
 	cli();
-	i = isdn_get_free_slot(usg, l2, m->mdmreg[REG_L3PROT], -1, -1, m->msn);
-	if (i < 0) {
+	slot = isdn_get_free_slot(usg, l2, m->mdmreg[REG_L3PROT], -1, -1, m->msn);
+	if (!slot) {
 		restore_flags(flags);
 		isdn_tty_modem_result(RESULT_NO_DIALTONE, info);
 	} else {
@@ -765,9 +765,11 @@ isdn_tty_dial(char *n, modem_info * info, atemu * m)
 			.phone    = n,
 		};
 
-		info->isdn_slot = i;
-		isdn_slot_set_m_idx(i, info->line);
-		isdn_slot_set_priv(i, ISDN_USAGE_MODEM, info, isdn_tty_event_callback);
+		info->isdn_slot = slot;
+		isdn_slot_set_m_idx(slot, info->line);
+		slot->usage |= ISDN_USAGE_MODEM;
+		slot->priv = info;
+		slot->event_cb = isdn_tty_event_callback;
 		info->last_dir = 1;
 		info->last_l2 = l2;
 		strcpy(info->last_num, n);
@@ -793,13 +795,13 @@ void
 isdn_tty_modem_hup(modem_info * info, int local)
 {
 	isdn_ctrl cmd;
-	int slot;
+	struct isdn_slot *slot;
 
 	if (!info)
 		return;
 
 	slot = info->isdn_slot;
-	if (slot < 0)
+	if (!slot)
 		return;
 
 #ifdef ISDN_DEBUG_MODEM_HUP
@@ -848,9 +850,10 @@ isdn_tty_modem_hup(modem_info * info, int local)
 
 	info->emu.mdmreg[REG_RINGCNT] = 0;
 	skb_queue_purge(&info->rpqueue);
+	slot->priv = NULL;
+	slot->event_cb = NULL;
 	isdn_slot_free(slot);
-	isdn_slot_set_priv(slot, 0, NULL, NULL);
-	info->isdn_slot = -1;
+	info->isdn_slot = NULL;
 }
 
 /*
@@ -910,7 +913,7 @@ isdn_tty_resume(char *id, modem_info * info, atemu * m)
 	int l2 = m->mdmreg[REG_L2PROT];
 	isdn_ctrl cmd;
 	ulong flags;
-	int i;
+	struct isdn_slot *slot;
 	int j;
 	int l;
 
@@ -935,14 +938,16 @@ isdn_tty_resume(char *id, modem_info * info, atemu * m)
 	m->mdmreg[REG_SI1I] = si2bit[si];
 	save_flags(flags);
 	cli();
-	i = isdn_get_free_slot(usg, l2, m->mdmreg[REG_L3PROT], -1, -1, m->msn);
-	if (i < 0) {
+	slot = isdn_get_free_slot(usg, l2, m->mdmreg[REG_L3PROT], -1, -1, m->msn);
+	if (!slot) {
 		restore_flags(flags);
 		isdn_tty_modem_result(RESULT_NO_DIALTONE, info);
 	} else {
-		info->isdn_slot = i;
-		isdn_slot_set_m_idx(i, info->line);
-		isdn_slot_set_priv(i, ISDN_USAGE_MODEM, info, isdn_tty_event_callback);
+		info->isdn_slot = slot;
+		isdn_slot_set_m_idx(slot, info->line);
+		slot->usage |= ISDN_USAGE_MODEM;
+		slot->priv = info;
+		slot->event_cb = isdn_tty_event_callback;
 		info->last_dir = 1;
 //		strcpy(info->last_num, n);
 		restore_flags(flags);
@@ -981,7 +986,7 @@ isdn_tty_send_msg(modem_info * info, atemu * m, char *msg)
 	int l2 = m->mdmreg[REG_L2PROT];
 	isdn_ctrl cmd;
 	ulong flags;
-	int i;
+	struct isdn_slot *slot;
 	int j;
 	int l;
 
@@ -1010,14 +1015,16 @@ isdn_tty_send_msg(modem_info * info, atemu * m, char *msg)
 	m->mdmreg[REG_SI1I] = si2bit[si];
 	save_flags(flags);
 	cli();
-	i = isdn_get_free_slot(usg, l2, m->mdmreg[REG_L3PROT], -1, -1, m->msn);
-	if (i < 0) {
+	slot = isdn_get_free_slot(usg, l2, m->mdmreg[REG_L3PROT], -1, -1, m->msn);
+	if (!slot) {
 		restore_flags(flags);
 		isdn_tty_modem_result(RESULT_NO_DIALTONE, info);
 	} else {
-		info->isdn_slot = i;
-		isdn_slot_set_m_idx(i, info->line);
-		isdn_slot_set_priv(i, ISDN_USAGE_MODEM, info, isdn_tty_event_callback);
+		info->isdn_slot = slot;
+		isdn_slot_set_m_idx(slot, info->line);
+		slot->usage |= ISDN_USAGE_MODEM;
+		slot->priv = info;
+		slot->event_cb = isdn_tty_event_callback;
 		info->last_dir = 1;
 		restore_flags(flags);
 		info->last_l2 = l2;
@@ -1212,7 +1219,7 @@ isdn_tty_write(struct tty_struct *tty, int from_user, const u_char * buf, int co
 		c = count;
 		if (c > info->xmit_size - info->xmit_count)
 			c = info->xmit_size - info->xmit_count;
-		if (info->isdn_slot >= 0 && c > isdn_slot_maxbufsize(info->isdn_slot))
+		if (info->isdn_slot && c > isdn_slot_maxbufsize(info->isdn_slot))
 			c = isdn_slot_maxbufsize(info->isdn_slot);
 		if (c <= 0)
 			break;
@@ -2123,7 +2130,7 @@ isdn_tty_init(void)
 		info->normal_termios = m->tty_modem.init_termios;
 		init_waitqueue_head(&info->open_wait);
 		init_waitqueue_head(&info->close_wait);
-		info->isdn_slot = -1;
+		info->isdn_slot = NULL;
 		skb_queue_head_init(&info->rpqueue);
 		info->xmit_size = ISDN_SERIAL_XMIT_SIZE;
 		skb_queue_head_init(&info->xmit_queue);
@@ -2240,7 +2247,7 @@ isdn_tty_match_icall(char *cid, atemu *emu, int di)
  *      CID is longer.
  */
 int
-isdn_tty_find_icall(int di, int ch, int sl, setup_parm *setup)
+isdn_tty_find_icall(struct isdn_slot *slot, setup_parm *setup)
 {
 	char *eaz;
 	int i;
@@ -2285,17 +2292,18 @@ isdn_tty_find_icall(int di, int ch, int sl, setup_parm *setup)
 #ifndef FIX_FILE_TRANSFER
 				(info->flags & ISDN_ASYNC_NORMAL_ACTIVE) &&
 #endif
-				(info->isdn_slot == -1) &&
-				(USG_NONE(isdn_slot_usage(sl)))) {
+				(!info->isdn_slot)) {
 				int matchret;
 
-				if ((matchret = isdn_tty_match_icall(eaz, &info->emu, di)) > wret)
+				if ((matchret = isdn_tty_match_icall(eaz, &info->emu, slot->di)) > wret)
 					wret = matchret;
 				if (!matchret) {                  /* EAZ is matching */
-					info->isdn_slot = sl;
-					isdn_slot_set_m_idx(sl, info->line);
-					isdn_slot_set_priv(sl, isdn_calc_usage(si1, info->emu.mdmreg[REG_L2PROT]), info, isdn_tty_event_callback);
-					strcpy(isdn_slot_num(sl), nr);
+					info->isdn_slot = slot;
+					isdn_slot_set_m_idx(slot, info->line);
+					slot->usage |= isdn_calc_usage(si1, info->emu.mdmreg[REG_L2PROT]);
+					slot->priv = info;
+					slot->event_cb = isdn_tty_event_callback;
+					strcpy(slot->num, nr);
 					strcpy(info->emu.cpn, eaz);
 					info->emu.mdmreg[REG_SI1I] = si2bit[si1];
 					info->emu.mdmreg[REG_PLAN] = setup->plan;
@@ -2321,13 +2329,13 @@ isdn_tty_find_icall(int di, int ch, int sl, setup_parm *setup)
 	(info->flags & (ISDN_ASYNC_NORMAL_ACTIVE | ISDN_ASYNC_CALLOUT_ACTIVE))
 
 static int
-isdn_tty_stat_callback(int i, isdn_ctrl *c)
+isdn_tty_stat_callback(struct isdn_slot *slot, isdn_ctrl *c)
 {
 	isdn_ctrl cmd;
 	modem_info *info;
 	char *e;
 
-	info = isdn_slot_priv(i);
+	info = slot->priv;
 	if (1) {
 		switch (c->command) {
                         case ISDN_STAT_CINF:
@@ -2423,14 +2431,14 @@ isdn_tty_stat_callback(int i, isdn_ctrl *c)
 						info->last_dir = 0;
 					info->dialing = 0;
 					info->rcvsched = 1;
-					if (USG_MODEM(isdn_slot_usage(i))) {
+					if (USG_MODEM(slot->usage)) {
 						if (info->emu.mdmreg[REG_L2PROT] == ISDN_PROTO_L2_MODEM) {
 							strcpy(info->emu.connmsg, c->parm.num);
 							isdn_tty_modem_result(RESULT_CONNECT, info);
 						} else
 							isdn_tty_modem_result(RESULT_CONNECT64000, info);
 					}
-					if (USG_VOICE(isdn_slot_usage(i)))
+					if (USG_VOICE(slot->usage))
 						isdn_tty_modem_result(RESULT_VCON, info);
 					return 1;
 				}
@@ -2570,7 +2578,7 @@ isdn_tty_at_cout(char *msg, modem_info * info)
 static void
 isdn_tty_on_hook(modem_info * info)
 {
-	if (info->isdn_slot >= 0) {
+	if (info->isdn_slot) {
 #ifdef ISDN_DEBUG_MODEM_HUP
 		printk(KERN_DEBUG "Mhup in isdn_tty_on_hook\n");
 #endif

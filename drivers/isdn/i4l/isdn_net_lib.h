@@ -50,7 +50,7 @@ void isdn_net_lib_init(void);
 void isdn_net_lib_exit(void);
 void isdn_net_hangup_all(void);
 int  isdn_net_ioctl(struct inode *, struct file *, uint, ulong);
-int  isdn_net_find_icall(int, int, int, setup_parm *);
+int  isdn_net_find_icall(struct isdn_slot *slot, setup_parm *setup);
 
 /* provided for interface types to use */
 void isdn_net_writebuf_skb(isdn_net_dev *, struct sk_buff *skb);
@@ -133,10 +133,10 @@ struct isdn_net_local_s {
 /* per ISDN channel (ISDN interface) data */
 
 struct isdn_net_dev_s {
-  int                    isdn_slot;    /* Index to isdn device/channel     */
+  struct isdn_slot      *isdn_slot;    /* Index to isdn device/channel     */
+  struct isdn_slot      *exclusive;    /* NULL if non excl                 */
   int                    pre_device;   /* Preselected isdn-device          */
   int                    pre_channel;  /* Preselected isdn-channel         */
-  int                    exclusive;    /* -1 if non excl./idx to excl chan */
 
   struct timer_list      dial_timer;   /* dial events timer                */
   struct fsm_inst        fi;           /* call control state machine       */

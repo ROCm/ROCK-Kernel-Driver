@@ -327,7 +327,7 @@ typedef struct modem_info {
 					 /* 2 = B-Channel is up, deliver d.*/
   int                   dialing;         /* Dial in progress or ATA        */
   int                   rcvsched;        /* Receive needs schedule         */
-  int                   isdn_slot;	 /* Index to isdn-driver/channel   */
+  struct isdn_slot     *isdn_slot;	 /* Ptr to isdn-driver/channel     */
   struct sk_buff_head   rpqueue;         /* Queue of recv'd packets        */
   int                   rcvcount;        /* Byte-counters for B rx         */
   int                   ncarrier;        /* Flag: schedule NO CARRIER      */

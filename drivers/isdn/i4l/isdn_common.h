@@ -10,6 +10,7 @@
  */
 
 #include <linux/isdn.h>
+#include "isdn_v110.h"
 
 #undef  ISDN_DEBUG_MODEM_OPEN
 #undef  ISDN_DEBUG_MODEM_IOCTL
@@ -68,6 +69,21 @@ extern void isdn_dumppkt(char *, u_char *, int, int);
 static inline void isdn_dumppkt(char *s, u_char *d, int l, int m) { }
 #endif
 
+struct isdn_slot {
+	int               di;                  /* driver index               */
+	struct isdn_driver *drv;               /* driver                     */
+	int               ch;                  /* channel index (per driver) */
+	int               usage;               /* how is it used             */
+	char              num[ISDN_MSNLEN];    /* the current phone number   */
+	unsigned long     ibytes;              /* Statistics incoming bytes  */
+	unsigned long     obytes;              /* Statistics outgoing bytes  */
+	struct isdn_v110  iv110;               /* For V.110                  */
+	int               m_idx;               /* Index for mdm....          */
+	void             *priv;                /* pointer to isdn_net_dev    */
+	int             (*event_cb)(struct isdn_slot *, int pr, void *arg);
+	struct fsm_inst   fi;
+};
+
 struct dial_info {
 	int            l2_proto;
 	int            l3_proto;
@@ -78,22 +94,19 @@ struct dial_info {
 	unsigned char *phone;
 };
 
-extern int   isdn_get_free_slot(int, int, int, int, int, char *);
-extern void  isdn_slot_free(int slot);
-extern int   isdn_slot_command(int slot, int cmd, isdn_ctrl *);
-extern int   isdn_slot_dial(int slot, struct dial_info *dial);
-extern char *isdn_slot_map_eaz2msn(int slot, char *msn);
-extern int   isdn_slot_write(int slot, struct sk_buff *);
-extern int   isdn_slot_hdrlen(int slot);
-extern int   isdn_slot_maxbufsize(int slot);
-extern int   isdn_slot_usage(int slot);
-extern char *isdn_slot_num(int slot);
-extern int   isdn_slot_m_idx(int slot);
-extern void  isdn_slot_set_m_idx(int slot, int midx);
-extern void  isdn_slot_set_priv(int sl, int usage, void *priv, 
-				int (*event_cb)(int sl, int pr, void *arg));
-extern void *isdn_slot_priv(int sl);
-extern int   isdn_hard_header_len(void);
+struct isdn_slot *isdn_get_free_slot(int, int, int, int, int, char *);
+void  isdn_slot_free(struct isdn_slot *);
+int   isdn_slot_command(struct isdn_slot *, int cmd, isdn_ctrl *);
+int   isdn_slot_dial(struct isdn_slot *, struct dial_info *dial);
+char *isdn_slot_map_eaz2msn(struct isdn_slot *, char *msn);
+int   isdn_slot_write(struct isdn_slot *, struct sk_buff *);
+int   isdn_slot_hdrlen(struct isdn_slot *);
+int   isdn_slot_maxbufsize(struct isdn_slot *);
+char *isdn_slot_num(struct isdn_slot *);
+void  isdn_slot_set_m_idx(struct isdn_slot *, int midx);
+int   isdn_hard_header_len(void);
+int   isdn_slot_m_idx(int sl);
+int   isdn_slot_usage(int sl);
 
 int   isdn_drv_lookup(char *drvid);
 char *isdn_drv_drvid(int di);
