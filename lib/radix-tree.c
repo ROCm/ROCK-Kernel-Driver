@@ -363,7 +363,7 @@ void __init radix_tree_init(void)
 {
 	radix_tree_node_cachep = kmem_cache_create("radix_tree_node",
 			sizeof(struct radix_tree_node), 0,
-			SLAB_HWCACHE_ALIGN, radix_tree_node_ctor, NULL);
+			0, radix_tree_node_ctor, NULL);
 	if (!radix_tree_node_cachep)
 		panic ("Failed to create radix_tree_node cache\n");
 	radix_tree_node_pool = mempool_create(512, radix_tree_node_pool_alloc,
