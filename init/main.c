@@ -93,7 +93,6 @@ extern void pidhash_init(void);
 extern void pidmap_init(void);
 extern void anon_vma_init(void);
 extern void radix_tree_init(void);
-extern void prio_tree_init(void);
 extern void free_initmem(void);
 extern void populate_rootfs(void);
 extern void driver_init(void);
@@ -497,7 +496,6 @@ asmlinkage void __init start_kernel(void)
 	calibrate_delay();
 	pidmap_init();
 	pgtable_cache_init();
-	prio_tree_init();
 	anon_vma_init();
 
 #ifdef	CONFIG_KDB

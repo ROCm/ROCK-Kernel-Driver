@@ -94,6 +94,8 @@ kdbm_print_vm(struct vm_area_struct *vp, unsigned long addr, int verbose_flg)
 
 	kdb_printf("vm_mm = 0x%p\n", (void *) vp->vm_mm);
 	kdb_printf("vm_next = 0x%p\n", (void *) vp->vm_next);
+	kdb_printf("shared.next = 0x%p\n", (void *) vp->shared.next);
+	kdb_printf("shared.prev = 0x%p\n", (void *) vp->shared.prev);
 	kdb_printf("vm_ops = 0x%p\n", (void *) vp->vm_ops);
 	if (vp->vm_ops != NULL) {
 		kdb_printf("vm_ops->open = 0x%p\n", vp->vm_ops->open);

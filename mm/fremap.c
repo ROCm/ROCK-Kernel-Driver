@@ -151,8 +151,6 @@ asmlinkage long sys_remap_file_pages(unsigned long start, unsigned long size,
 	unsigned long __prot, unsigned long pgoff, unsigned long flags)
 {
 	struct mm_struct *mm = current->mm;
-	struct address_space *mapping;
-	unsigned long linear_pgoff;
 	unsigned long end = start + size;
 	struct vm_area_struct *vma;
 	int err = -EINVAL;
@@ -189,19 +187,9 @@ asmlinkage long sys_remap_file_pages(unsigned long start, unsigned long size,
 			end > start && start >= vma->vm_start &&
 				end <= vma->vm_end) {
 
-		linear_pgoff = vma->vm_pgoff;
-		linear_pgoff +=  ((start - vma->vm_start) >> PAGE_SHIFT);
 		/* Must set VM_NONLINEAR before any pages are populated. */
-		if (pgoff != linear_pgoff && !(vma->vm_flags & VM_NONLINEAR)) {
-			mapping = vma->vm_file->f_mapping;
-			down(&mapping->i_shared_sem);
+		if (pgoff != ((start - vma->vm_start) >> PAGE_SHIFT) + vma->vm_pgoff)
 			vma->vm_flags |= VM_NONLINEAR;
-			__vma_prio_tree_remove(&mapping->i_mmap_shared, vma);
-			INIT_VMA_SHARED_LIST(vma);
-			list_add_tail(&vma->shared.vm_set.list,
-					&mapping->i_mmap_nonlinear);
-			up(&mapping->i_shared_sem);
-		}
 
 		/* ->populate can take a long time, so downgrade the lock. */
 		downgrade_write(&mm->mmap_sem);

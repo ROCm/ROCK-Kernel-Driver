@@ -791,7 +791,9 @@ edd_init(void)
 
 	printk(KERN_INFO "BIOS EDD facility v%s, %d devices found\n",
 	       EDD_VERSION, eddnr);
+#if 0
 	printk(KERN_INFO "Please report your BIOS at %s\n", REPORT_URL);
+#endif
 
 	if (!eddnr) {
 		printk(KERN_INFO "EDD information not available.\n");

@@ -29,9 +29,8 @@ struct address_space swapper_space = {
 	.tree_lock	= SPIN_LOCK_UNLOCKED,
 	.a_ops		= &swap_aops,
 	.backing_dev_info = &swap_backing_dev_info,
-	.i_mmap		= PRIO_TREE_ROOT_INIT,
-	.i_mmap_shared	= PRIO_TREE_ROOT_INIT,
-	.i_mmap_nonlinear = LIST_HEAD_INIT(swapper_space.i_mmap_nonlinear),
+	.i_mmap		= LIST_HEAD_INIT(swapper_space.i_mmap),
+	.i_mmap_shared	= LIST_HEAD_INIT(swapper_space.i_mmap_shared),
 	.i_shared_sem	= __MUTEX_INITIALIZER(swapper_space.i_shared_sem),
 	.truncate_count  = ATOMIC_INIT(0),
 	.private_lock	= SPIN_LOCK_UNLOCKED,
@@ -329,8 +328,7 @@ struct page * lookup_swap_cache(swp_entry_t entry)
  * A failure return means that either the page allocation failed or that
  * the swap entry is no longer in use.
  */
-struct page * 
-read_swap_cache_async(swp_entry_t entry, struct vm_area_struct *vma, unsigned long addr)
+struct page * read_swap_cache_async(swp_entry_t entry)
 {
 	struct page *found_page, *new_page = NULL;
 	int err;
@@ -350,7 +348,7 @@ read_swap_cache_async(swp_entry_t entry, struct vm_area_struct *vma, unsigned lo
 		 * Get a new page to read into from swap.
 		 */
 		if (!new_page) {
-			new_page = alloc_page_vma(GFP_HIGHUSER, vma, addr);
+			new_page = alloc_page(GFP_HIGHUSER);
 			if (!new_page)
 				break;		/* Out of memory */
 		}

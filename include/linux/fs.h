@@ -18,7 +18,6 @@
 #include <linux/stat.h>
 #include <linux/cache.h>
 #include <linux/radix-tree.h>
-#include <linux/prio_tree.h>
 #include <linux/kobject.h>
 #include <asm/atomic.h>
 
@@ -328,9 +327,8 @@ struct address_space {
 	spinlock_t		tree_lock;	/* and spinlock protecting it */
 	unsigned long		nrpages;	/* number of total pages */
 	struct address_space_operations *a_ops;	/* methods */
-	struct prio_tree_root	i_mmap;		/* tree of private mappings */
-	struct prio_tree_root	i_mmap_shared;	/* tree of shared mappings */
-	struct list_head	i_mmap_nonlinear;/*list of nonlinear mappings */
+	struct list_head	i_mmap;		/* list of private mappings */
+	struct list_head	i_mmap_shared;	/* list of shared mappings */
 	struct semaphore	i_shared_sem;	/* protect both above lists */
 	atomic_t		truncate_count;	/* Cover race condition with truncate */
 	unsigned long		dirtied_when;	/* jiffies of first page dirtying */

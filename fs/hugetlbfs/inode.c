@@ -265,13 +265,11 @@ static void hugetlbfs_drop_inode(struct inode *inode)
  * vma->vm_pgoff is in PAGE_SIZE units.
  */
 static void
-hugetlb_vmtruncate_list(struct prio_tree_root *root, unsigned long h_pgoff)
+hugetlb_vmtruncate_list(struct list_head *list, unsigned long h_pgoff)
 {
 	struct vm_area_struct *vma;
-	struct prio_tree_iter iter;
 
-	vma = __vma_prio_tree_first(root, &iter, h_pgoff, ULONG_MAX);
-	while (vma) {
+	list_for_each_entry(vma, list, shared) {
 		unsigned long h_vm_pgoff;
 		unsigned long v_length;
 		unsigned long h_length;
@@ -303,8 +301,6 @@ hugetlb_vmtruncate_list(struct prio_tree_root *root, unsigned long h_pgoff)
 		zap_hugepage_range(vma,
 				vma->vm_start + v_offset,
 				v_length - v_offset);
-
-		vma = __vma_prio_tree_next(vma, root, &iter, h_pgoff, ULONG_MAX);
 	}
 }
 
@@ -324,11 +320,9 @@ static int hugetlb_vmtruncate(struct inode *inode, loff_t offset)
 
 	inode->i_size = offset;
 	down(&mapping->i_shared_sem);
-	/* Protect against page fault */
-	atomic_inc(&mapping->truncate_count);
-	if (unlikely(!prio_tree_empty(&mapping->i_mmap)))
+	if (!list_empty(&mapping->i_mmap))
 		hugetlb_vmtruncate_list(&mapping->i_mmap, pgoff);
-	if (unlikely(!prio_tree_empty(&mapping->i_mmap_shared)))
+	if (!list_empty(&mapping->i_mmap_shared))
 		hugetlb_vmtruncate_list(&mapping->i_mmap_shared, pgoff);
 	up(&mapping->i_shared_sem);
 	truncate_hugepages(mapping, offset);
@@ -381,7 +375,6 @@ static struct inode *hugetlbfs_get_inode(struct super_block *sb, uid_t uid,
 
 	inode = new_inode(sb);
 	if (inode) {
-		struct hugetlbfs_inode_info *info;
 		inode->i_mode = mode;
 		inode->i_uid = uid;
 		inode->i_gid = gid;
@@ -390,8 +383,6 @@ static struct inode *hugetlbfs_get_inode(struct super_block *sb, uid_t uid,
 		inode->i_mapping->a_ops = &hugetlbfs_aops;
 		inode->i_mapping->backing_dev_info =&hugetlbfs_backing_dev_info;
 		inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
-		info = HUGETLBFS_I(inode);
-		mpol_shared_policy_init(&info->policy);
 		switch (mode & S_IFMT) {
 		default:
 			init_special_inode(inode, mode, dev);
@@ -519,32 +510,6 @@ static void hugetlbfs_put_super(struct super_block *sb)
 	}
 }
 
-static kmem_cache_t *hugetlbfs_inode_cachep;
-
-static struct inode *hugetlbfs_alloc_inode(struct super_block *sb)
-{
-	struct hugetlbfs_inode_info *p = kmem_cache_alloc(hugetlbfs_inode_cachep,
-							  SLAB_KERNEL);
-	if (!p)
-		return NULL;
-	return &p->vfs_inode;
-}
-
-static void init_once(void *foo, kmem_cache_t *cachep, unsigned long flags)
-{
-	struct hugetlbfs_inode_info *ei = (struct hugetlbfs_inode_info *) foo;
-
-	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
-	    SLAB_CTOR_CONSTRUCTOR)
-		inode_init_once(&ei->vfs_inode);
-}
-
-static void hugetlbfs_destroy_inode(struct inode *inode)
-{
-	mpol_free_shared_policy(&HUGETLBFS_I(inode)->policy);  
-	kmem_cache_free(hugetlbfs_inode_cachep, HUGETLBFS_I(inode));
-}
-
 static struct address_space_operations hugetlbfs_aops = {
 	.readpage	= hugetlbfs_readpage,
 	.prepare_write	= hugetlbfs_prepare_write,
@@ -576,8 +541,6 @@ static struct inode_operations hugetlbfs_inode_operations = {
 };
 
 static struct super_operations hugetlbfs_ops = {
-	.alloc_inode    = hugetlbfs_alloc_inode,
-	.destroy_inode  = hugetlbfs_destroy_inode,
 	.statfs		= hugetlbfs_statfs,
 	.drop_inode	= hugetlbfs_drop_inode,
 	.put_super	= hugetlbfs_put_super,
@@ -792,16 +755,9 @@ static int __init init_hugetlbfs_fs(void)
 	int error;
 	struct vfsmount *vfsmount;
 
-	hugetlbfs_inode_cachep = kmem_cache_create("hugetlbfs_inode_cache",
-				     sizeof(struct hugetlbfs_inode_info),
-				     0, SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT,
-				     init_once, NULL);
-	if (hugetlbfs_inode_cachep == NULL)
-		return -ENOMEM;
-
 	error = register_filesystem(&hugetlbfs_fs_type);
 	if (error)
-		goto out;
+		return error;
 
 	vfsmount = kern_mount(&hugetlbfs_fs_type);
 
@@ -811,16 +767,11 @@ static int __init init_hugetlbfs_fs(void)
 	}
 
 	error = PTR_ERR(vfsmount);
-
- out:
-	if (error)
-		kmem_cache_destroy(hugetlbfs_inode_cachep);		
 	return error;
 }
 
 static void __exit exit_hugetlbfs_fs(void)
 {
-	kmem_cache_destroy(hugetlbfs_inode_cachep);
 	unregister_filesystem(&hugetlbfs_fs_type);
 }
 

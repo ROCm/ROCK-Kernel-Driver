@@ -29,8 +29,7 @@ static inline void bitmap_fill(unsigned long *bitmap, int bits)
 static inline void bitmap_copy(unsigned long *dst,
 			const unsigned long *src, int bits)
 {
-	int len = BITS_TO_LONGS(bits)*sizeof(unsigned long);
-	memcpy(dst, src, len);
+	memcpy(dst, src, BITS_TO_LONGS(bits)*sizeof(unsigned long));
 }
 
 void bitmap_shift_right(unsigned long *dst,

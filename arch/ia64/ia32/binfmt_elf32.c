@@ -106,7 +106,6 @@ ia64_elf32_init (struct pt_regs *regs)
 		vma->vm_file = NULL;
 		vma->anon_vma = NULL;
 		vma->vm_private_data = NULL;
-		mpol_set_vma_default(vma);
 		down_write(&current->mm->mmap_sem);
 		{
 			insert_vm_struct(current->mm, vma);
@@ -195,7 +194,6 @@ ia32_setup_arg_pages (struct linux_binprm *bprm, int executable_stack)
 		mpnt->vm_file = NULL;
 		mpnt->anon_vma = NULL;
 		mpnt->vm_private_data = 0;
-		mpol_set_vma_default(mpnt);
 		insert_vm_struct(current->mm, mpnt);
 		current->mm->total_vm = (mpnt->vm_end - mpnt->vm_start) >> PAGE_SHIFT;
 	}

@@ -11,9 +11,7 @@
 #include <linux/list.h>
 #include <linux/mmzone.h>
 #include <linux/rbtree.h>
-#include <linux/prio_tree.h>
 #include <linux/fs.h>
-#include <linux/mempolicy.h>
 
 #ifndef CONFIG_DISCONTIGMEM          /* Don't use mapnrs, do it properly */
 extern unsigned long max_mapnr;
@@ -65,9 +63,6 @@ typedef struct anon_vma_s {
  *
  * This structure is exactly 64 bytes on ia32.  Please think very, very hard
  * before adding anything to it.
- * [Now 4 bytes more on 32bit NUMA machines. Sorry. -AK.
- * But if you want to recover the 4 bytes justr remove vm_next. It is redundant 
- * with vm_rb. Will be a lot of editing work though. vm_rb.color is redundant too.] 
  */
 struct vm_area_struct {
 	struct mm_struct * vm_mm;	/* The address space we belong to. */
@@ -88,28 +83,7 @@ struct vm_area_struct {
 	 * one of the address_space->i_mmap{,shared} lists,
 	 * for shm areas, the list of attaches, otherwise unused.
 	 */
-	union {
-		struct {
-			struct list_head list;
-			void *parent;
-		} vm_set;
-
-		struct prio_tree_node  prio_tree_node;
-
-		struct {
-			void *first;
-			void *second;
-			void *parent;
-		} both;
-	} shared;
-
-	/*
-	 * shared.vm_set : list of vmas that map exactly the same set of pages
-	 * vm_set_head   : head of the vm_set list
-	 *
-	 * TODO: try to shove the following field into vm_private_data ??
-	 */
-	struct vm_area_struct *vm_set_head;
+	struct list_head shared;
 
 	/*
 	 * The same vma can be both queued into the i_mmap and in a
@@ -132,8 +106,6 @@ struct vm_area_struct {
 					   units, *not* PAGE_CACHE_SIZE */
 	struct file * vm_file;		/* File we map to (can be NULL). */
 	void * vm_private_data;		/* was vm_pte (shared mem) */
-
-	struct mempolicy *vm_policy;	/* NUMA policy for the VMA */
 };
 
 /*
@@ -187,150 +159,6 @@ struct vm_area_struct {
 #define VM_RandomReadHint(v)		((v)->vm_flags & VM_RAND_READ)
 
 /*
- * The following macros are used for implementing prio_tree for i_mmap{_shared}
- */
-
-#define	RADIX_INDEX(vma)  ((vma)->vm_pgoff)
-#define	VMA_SIZE(vma)	  (((vma)->vm_end - (vma)->vm_start) >> PAGE_SHIFT)
-/* avoid overflow */
-#define	HEAP_INDEX(vma)	  ((vma)->vm_pgoff + (VMA_SIZE(vma) - 1))
-
-#define GET_INDEX_VMA(vma, radix, heap)		\
-do {						\
-	radix = RADIX_INDEX(vma);		\
-	heap = HEAP_INDEX(vma);			\
-} while (0)
-
-#define GET_INDEX(node, radix, heap)		\
-do { 						\
-	struct vm_area_struct *__tmp = 		\
-	  prio_tree_entry(node, struct vm_area_struct, shared.prio_tree_node);\
-	GET_INDEX_VMA(__tmp, radix, heap); 	\
-} while (0)
-
-#define	INIT_VMA_SHARED_LIST(vma)			\
-do {							\
-	INIT_LIST_HEAD(&(vma)->shared.vm_set.list);	\
-	(vma)->shared.vm_set.parent = NULL;		\
-	(vma)->vm_set_head = NULL;			\
-} while (0)
-
-#define INIT_VMA_SHARED(vma)			\
-do {						\
-	(vma)->shared.both.first = NULL;	\
-	(vma)->shared.both.second = NULL;	\
-	(vma)->shared.both.parent = NULL;	\
-	(vma)->vm_set_head = NULL;		\
-} while (0)
-
-extern void __vma_prio_tree_insert(struct prio_tree_root *,
-	struct vm_area_struct *);
-
-extern void __vma_prio_tree_remove(struct prio_tree_root *,
-	struct vm_area_struct *);
-
-static inline int vma_shared_empty(struct vm_area_struct *vma)
-{
-	return vma->shared.both.first == NULL;
-}
-
-/*
- * Helps to add a new vma that maps the same (identical) set of pages as the
- * old vma to an i_mmap tree.
- */
-static inline void __vma_prio_tree_add(struct vm_area_struct *vma,
-	struct vm_area_struct *old)
-{
-	INIT_VMA_SHARED_LIST(vma);
-
-	/* Leave these BUG_ONs till prio_tree patch stabilizes */
-	BUG_ON(RADIX_INDEX(vma) != RADIX_INDEX(old));
-	BUG_ON(HEAP_INDEX(vma) != HEAP_INDEX(old));
-
-	if (old->shared.both.parent) {
-		if (old->vm_set_head) {
-			list_add_tail(&vma->shared.vm_set.list,
-					&old->vm_set_head->shared.vm_set.list);
-			return;
-		}
-		else {
-			old->vm_set_head = vma;
-			vma->vm_set_head = old;
-		}
-	}
-	else
-		list_add(&vma->shared.vm_set.list, &old->shared.vm_set.list);
-}
-
-/*
- * We cannot modify vm_start, vm_end, vm_pgoff fields of a vma that has been
- * already present in an i_mmap{_shared} tree without modifying the tree. The
- * following helper function should be used when such modifications are
- * necessary. We should hold the mapping's i_shared_sem.
- *
- * This function can be (micro)optimized for some special cases (maybe later).
- */
-static inline void __vma_modify(struct prio_tree_root *root,
-	struct vm_area_struct *vma, unsigned long start, unsigned long end,
-	unsigned long pgoff)
-{
-	if (root)
-		__vma_prio_tree_remove(root, vma);
-	vma->vm_start = start;
-	vma->vm_end = end;
-	vma->vm_pgoff = pgoff;
-	if (root)
-		__vma_prio_tree_insert(root, vma);
-}
-
-/*
- * Helper functions to enumerate vmas that map a given file page or a set of
- * contiguous file pages. The functions return vmas that at least map a single
- * page in the given range of contiguous file pages.
- */
-static inline struct vm_area_struct *__vma_prio_tree_first(
-	struct prio_tree_root *root, struct prio_tree_iter *iter,
-	unsigned long begin, unsigned long end)
-{
-	struct prio_tree_node *ptr;
-
-	ptr = prio_tree_first(root, iter, begin, end);
-
-	if (ptr)
-		return prio_tree_entry(ptr, struct vm_area_struct,
-				shared.prio_tree_node);
-	else
-		return NULL;
-}
-
-static inline struct vm_area_struct *__vma_prio_tree_next(
-	struct vm_area_struct *vma, struct prio_tree_root *root,
-	struct prio_tree_iter *iter, unsigned long begin, unsigned long end)
-{
-	struct prio_tree_node *ptr;
-	struct vm_area_struct *next;
-
-	if (vma->shared.both.parent) {
-		if (vma->vm_set_head)
-			return vma->vm_set_head;
-	}
-	else {
-		next = list_entry(vma->shared.vm_set.list.next,
-				struct vm_area_struct, shared.vm_set.list);
-		if (!(next->vm_set_head))
-			return next;
-	}
-
-	ptr = prio_tree_next(root, iter, begin, end);
-
-	if (ptr)
-		return prio_tree_entry(ptr, struct vm_area_struct,
-				shared.prio_tree_node);
-	else
-		return NULL;
-}
-
-/*
  * mapping from the currently active vm_flags protection bits (the
  * low four bits) to a page protection mask..
  */
@@ -347,8 +175,6 @@ struct vm_operations_struct {
 	void (*close)(struct vm_area_struct * area);
 	struct page * (*nopage)(struct vm_area_struct * area, unsigned long address, int *type);
 	int (*populate)(struct vm_area_struct * area, unsigned long address, unsigned long len, pgprot_t prot, unsigned long pgoff, int nonblock);
-	int (*set_policy)(struct vm_area_struct *vma, struct mempolicy *new);
-	struct mempolicy *(*get_policy)(struct vm_area_struct *vma, unsigned long addr);
 };
 
 /* forward declaration; pte_chain is meant to be internal to rmap.c */
@@ -650,8 +476,6 @@ extern void show_free_areas(void);
 
 struct page *shmem_nopage(struct vm_area_struct * vma,
 			unsigned long address, int *type);
-int shmem_set_policy(struct vm_area_struct *vma, struct mempolicy *new);
-struct mempolicy *shmem_get_policy(struct vm_area_struct *vma, unsigned long addr);
 struct file *shmem_file_setup(char * name, loff_t size, unsigned long flags);
 void shmem_lock(struct file * file, int lock);
 int shmem_zero_setup(struct vm_area_struct *);
@@ -863,11 +687,6 @@ static inline struct vm_area_struct * find_vma_intersection(struct mm_struct * m
 	return vma;
 }
 
-static inline unsigned long vma_pages(struct vm_area_struct *vma)
-{
-	return (vma->vm_end - vma->vm_start) >> PAGE_SHIFT;
-}
-
 extern struct vm_area_struct *find_extend_vma(struct mm_struct *mm, unsigned long addr);
 
 extern unsigned int nr_used_zone_pages(void);
@@ -877,9 +696,6 @@ extern struct page * follow_page(struct mm_struct *mm, unsigned long address,
 		int write);
 extern int remap_page_range(struct vm_area_struct *vma, unsigned long from,
 		unsigned long to, unsigned long size, pgprot_t prot);
-
-extern int arch_hugetlb_fault(struct mm_struct *mm, struct vm_area_struct *vma, 
-			      unsigned long address, int write_access);
 
 #ifndef CONFIG_DEBUG_PAGEALLOC
 static inline void
