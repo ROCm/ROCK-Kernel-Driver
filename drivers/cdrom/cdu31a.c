@@ -331,12 +331,11 @@ static struct timer_list cdu31a_abort_timer;
    from the abort read. */
 static int abort_read_started = 0;
 
-
 /*
- * This routine returns 1 if the disk has been changed since the last
- * check or 0 if it hasn't.
+ * Uniform cdrom interface function
+ * report back, if disc has changed from time of last request.
  */
-static int scd_disk_change(kdev_t full_dev)
+static int scd_media_changed(struct cdrom_device_info *cdi, int disc_nr)
 {
 	int retval;
 
@@ -344,15 +343,6 @@ static int scd_disk_change(kdev_t full_dev)
 	disk_changed = 0;
 
 	return retval;
-}
-
-/*
- * Uniform cdrom interface function
- * report back, if disc has changed from time of last request.
- */
-static int scd_media_changed(struct cdrom_device_info *cdi, int disc_nr)
-{
-	return scd_disk_change(cdi->dev);
 }
 
 /*
