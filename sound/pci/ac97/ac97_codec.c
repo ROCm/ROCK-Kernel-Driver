@@ -2067,6 +2067,8 @@ static int set_spdif_rate(ac97_t *ac97, unsigned short rate)
  *
  * The valid registers are AC97_PMC_MIC_ADC_RATE,
  * AC97_PCM_FRONT_DAC_RATE, AC97_PCM_LR_ADC_RATE and AC97_SPDIF.
+ * AC97_PCM_SURR_DAC_RATE and AC97_PCM_LFE_DAC_RATE are accepted
+ * if the codec supports them.
  * The SPDIF register is a pseudo-register to change the rate of SPDIF
  * (only if supported).
  *
@@ -2074,27 +2076,27 @@ static int set_spdif_rate(ac97_t *ac97, unsigned short rate)
  */
 int snd_ac97_set_rate(ac97_t *ac97, int reg, unsigned short rate)
 {
-	unsigned short mask;
 	unsigned int tmp;
 	
 	switch (reg) {
 	case AC97_PCM_MIC_ADC_RATE:
-		mask = 0x0000;
 		if ((ac97->regs[AC97_EXTENDED_STATUS] & AC97_EA_VRM) == 0)	/* MIC VRA */
 			if (rate != 48000)
 				return -EINVAL;
 		break;
 	case AC97_PCM_FRONT_DAC_RATE:
-		mask = 0x0200;
+	case AC97_PCM_LR_ADC_RATE:
 		if ((ac97->regs[AC97_EXTENDED_STATUS] & AC97_EA_VRA) == 0)	/* VRA */
 			if (rate != 48000)
 				return -EINVAL;
 		break;
-	case AC97_PCM_LR_ADC_RATE:
-		mask = 0x0100;
-		if ((ac97->regs[AC97_EXTENDED_STATUS] & AC97_EA_VRA) == 0)	/* VRA */
-			if (rate != 48000)
-				return -EINVAL;
+	case AC97_PCM_SURR_DAC_RATE:
+		if (! (ac97->ext_id & AC97_SCAP_SURROUND_DAC))
+			return -EINVAL;
+		break;
+	case AC97_PCM_LFE_DAC_RATE:
+		if (! (ac97->ext_id & AC97_SCAP_CENTER_LFE_DAC))
+			return -EINVAL;
 		break;
 	case AC97_SPDIF:
 		return set_spdif_rate(ac97, rate);
