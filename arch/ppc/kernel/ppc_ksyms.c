@@ -260,6 +260,15 @@ EXPORT_SYMBOL(release_OF_resource);
 EXPORT_SYMBOL(pci_busdev_to_OF_node);
 EXPORT_SYMBOL(pci_device_to_OF_node);
 EXPORT_SYMBOL(pci_device_from_OF_node);
+EXPORT_SYMBOL(of_find_node_by_name);
+EXPORT_SYMBOL(of_find_node_by_type);
+EXPORT_SYMBOL(of_find_compatible_node);
+EXPORT_SYMBOL(of_find_node_by_path);
+EXPORT_SYMBOL(of_find_all_nodes);
+EXPORT_SYMBOL(of_get_parent);
+EXPORT_SYMBOL(of_get_next_child);
+EXPORT_SYMBOL(of_node_get);
+EXPORT_SYMBOL(of_node_put);
 #endif /* CONFIG_PPC_OF */
 #if defined(CONFIG_BOOTX_TEXT)
 EXPORT_SYMBOL(btext_update_display);

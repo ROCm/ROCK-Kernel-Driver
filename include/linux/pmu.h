@@ -127,6 +127,8 @@ extern int pmu_request(struct adb_request *req,
 		void (*done)(struct adb_request *), int nbytes, ...);
 
 extern void pmu_poll(void);
+extern void pmu_poll_adb(void); /* For use by xmon */
+extern void pmu_wait_complete(struct adb_request *req);
 
 /* For use before switching interrupts off for a long time;
  * warning: not stackable
@@ -138,6 +140,7 @@ extern void pmu_enable_irled(int on);
 
 extern void pmu_restart(void);
 extern void pmu_shutdown(void);
+extern void pmu_unlock(void);
 
 extern int pmu_present(void);
 extern int pmu_get_model(void);
