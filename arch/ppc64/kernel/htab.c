@@ -46,6 +46,7 @@
 #include <asm/io.h>
 #include <asm/eeh.h>
 #include <asm/tlb.h>
+#include <asm/cacheflush.h>
 
 /*
  * Note:  pte   --> Linux PTE
