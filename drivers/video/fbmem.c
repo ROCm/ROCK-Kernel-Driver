@@ -738,26 +738,35 @@ static struct logo_data {
 
 int fb_prepare_logo(struct fb_info *info)
 {
+	int depth = fb_get_color_depth(info);
+
 	memset(&fb_logo, 0, sizeof(struct logo_data));
 
-	switch (info->fix.visual) {
-	case FB_VISUAL_TRUECOLOR:
-		if (info->var.bits_per_pixel >= 8)
+	if (info->fix.visual == FB_VISUAL_DIRECTCOLOR) {
+		depth = info->var.blue.length;
+		if (info->var.red.length < depth)
+			depth = info->var.red.length;
+		if (info->var.green.length < depth)
+			depth = info->var.green.length;
+	}
+
+	if (depth >= 8) {
+		switch (info->fix.visual) {
+		case FB_VISUAL_TRUECOLOR:
 			fb_logo.needs_truepalette = 1;
-		break;
-	case FB_VISUAL_DIRECTCOLOR:
-		if (info->var.bits_per_pixel >= 24) {
+			break;
+		case FB_VISUAL_DIRECTCOLOR:
 			fb_logo.needs_directpalette = 1;
 			fb_logo.needs_cmapreset = 1;
+			break;
+		case FB_VISUAL_PSEUDOCOLOR:
+			fb_logo.needs_cmapreset = 1;
+			break;
 		}
-		break;
-	case FB_VISUAL_PSEUDOCOLOR:
-		fb_logo.needs_cmapreset = 1;
-		break;
 	}
 
 	/* Return if no suitable logo was found */
-	fb_logo.logo = fb_find_logo(fb_get_color_depth(info));
+	fb_logo.logo = fb_find_logo(depth);
 	
 	if (!fb_logo.logo || fb_logo.logo->height > info->var.yres) {
 		fb_logo.logo = NULL;
