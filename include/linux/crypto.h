@@ -20,6 +20,7 @@
 #include <linux/types.h>
 #include <linux/list.h>
 #include <linux/string.h>
+#include <asm/page.h>
 
 /*
  * Algorithm masks and types.
@@ -141,9 +142,6 @@ struct digest_tfm {
 	void (*dit_final)(struct crypto_tfm *tfm, u8 *out);
 	void (*dit_digest)(struct crypto_tfm *tfm, struct scatterlist *sg,
 	                   unsigned int nsg, u8 *out);
-	void (*dit_hmac)(struct crypto_tfm *tfm, u8 *key,
-	                 unsigned int keylen, struct scatterlist *sg,
-	                 unsigned int nsg, u8 *out);
 };
 
 struct compress_tfm {
@@ -259,16 +257,6 @@ static inline void crypto_digest_digest(struct crypto_tfm *tfm,
 	tfm->crt_digest.dit_digest(tfm, sg, nsg, out);
 }
 
-static inline void crypto_digest_hmac(struct crypto_tfm *tfm,
-                                      u8 *key, unsigned int keylen,
-                                      struct scatterlist *sg,
-                                      unsigned int nsg, u8 *out)
-                                      
-{
-	BUG_ON(crypto_tfm_alg_type(tfm) != CRYPTO_ALG_TYPE_DIGEST);
-	tfm->crt_digest.dit_hmac(tfm, key, keylen, sg, nsg, out);
-}
-
 static inline int crypto_cipher_setkey(struct crypto_tfm *tfm,
                                        const u8 *key, unsigned int keylen)
 {
@@ -318,4 +306,18 @@ static inline void crypto_comp_decompress(struct crypto_tfm *tfm)
 	tfm->crt_compress.cot_decompress(tfm);
 }
 
+/*
+ * HMAC support.
+ */
+#ifdef CONFIG_CRYPTO_HMAC
+void crypto_hmac_init(struct crypto_tfm *tfm, u8 *key, unsigned int *keylen);
+void crypto_hmac_update(struct crypto_tfm *tfm,
+                        struct scatterlist *sg, unsigned int nsg);
+void crypto_hmac_final(struct crypto_tfm *tfm, u8 *key,
+                       unsigned int *keylen, u8 *out);
+void crypto_hmac(struct crypto_tfm *tfm, u8 *key, unsigned int *keylen,
+                 struct scatterlist *sg, unsigned int nsg, u8 *out);
+#endif	/* CONFIG_CRYPTO_HMAC */
+
 #endif	/* _LINUX_CRYPTO_H */
+

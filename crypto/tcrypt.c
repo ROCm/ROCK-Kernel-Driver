@@ -66,7 +66,6 @@ test_md5(void)
 	char result[128];
 	struct crypto_tfm *tfm;
 	struct md5_testvec *md5_tv;
-	struct hmac_md5_testvec *hmac_md5_tv;
 	unsigned int tsize;
 
 	printk("\ntesting md5\n");
@@ -131,14 +130,34 @@ test_md5(void)
 	printk("%s\n",
 	       memcmp(result, md5_tv[4].digest,
 		      crypto_tfm_alg_digestsize(tfm)) ? "fail" : "pass");
+	crypto_free_tfm(tfm);
+}
+
+#ifdef CONFIG_CRYPTO_HMAC
+static void
+test_hmac_md5(void)
+{
+	char *p;
+	unsigned int i, klen;
+	struct scatterlist sg[2];
+	char result[128];
+	struct crypto_tfm *tfm;
+	struct hmac_md5_testvec *hmac_md5_tv;
+	unsigned int tsize;
+
+	tfm = crypto_alloc_tfm("md5", 0);
+	if (tfm == NULL) {
+		printk("failed to load transform for md5\n");
+		return;
+	}
 
 	printk("\ntesting hmac_md5\n");
-
+	
 	tsize = sizeof (hmac_md5_tv_template);
 	if (tsize > TVMEMSIZE) {
 		printk("template (%u) too big for tvmem (%u)\n", tsize,
 		       TVMEMSIZE);
-		return;
+		goto out;
 	}
 
 	memcpy(tvmem, hmac_md5_tv_template, tsize);
@@ -153,8 +172,8 @@ test_md5(void)
 		sg[0].offset = ((long) p & ~PAGE_MASK);
 		sg[0].length = strlen(hmac_md5_tv[i].plaintext);
 
-		crypto_digest_hmac(tfm, hmac_md5_tv[i].key,
-				   strlen(hmac_md5_tv[i].key), sg, 1, result);
+		klen = strlen(hmac_md5_tv[i].key);
+		crypto_hmac(tfm, hmac_md5_tv[i].key, &klen, sg, 1, result);
 
 		hexdump(result, crypto_tfm_alg_digestsize(tfm));
 		printk("%s\n",
@@ -181,16 +200,96 @@ test_md5(void)
 	sg[1].length = 12;
 
 	memset(result, 0, sizeof (result));
-	crypto_digest_hmac(tfm, hmac_md5_tv[1].key, strlen(hmac_md5_tv[1].key),
-			   sg, 2, result);
+	klen = strlen(hmac_md5_tv[7].key);
+	crypto_hmac(tfm, hmac_md5_tv[7].key, &klen, sg, 2, result);
 	hexdump(result, crypto_tfm_alg_digestsize(tfm));
 
 	printk("%s\n",
-	       memcmp(result, hmac_md5_tv[1].digest,
+	       memcmp(result, hmac_md5_tv[7].digest,
 		      crypto_tfm_alg_digestsize(tfm)) ? "fail" : "pass");
-
+out:
 	crypto_free_tfm(tfm);
 }
+
+static void
+test_hmac_sha1(void)
+{
+	char *p;
+	unsigned int i, klen;
+	struct crypto_tfm *tfm;
+	struct hmac_sha1_testvec *hmac_sha1_tv;
+	struct scatterlist sg[2];
+	unsigned int tsize;
+	char result[SHA1_DIGEST_SIZE];
+
+	tfm = crypto_alloc_tfm("sha1", 0);
+	if (tfm == NULL) {
+		printk("failed to load transform for sha1\n");
+		return;
+	}
+
+	printk("\ntesting hmac_sha1\n");
+
+	tsize = sizeof (hmac_sha1_tv_template);
+	if (tsize > TVMEMSIZE) {
+		printk("template (%u) too big for tvmem (%u)\n", tsize,
+		       TVMEMSIZE);
+		goto out;
+	}
+
+	memcpy(tvmem, hmac_sha1_tv_template, tsize);
+	hmac_sha1_tv = (void *) tvmem;
+
+	for (i = 0; i < HMAC_SHA1_TEST_VECTORS; i++) {
+		printk("test %u:\n", i + 1);
+		memset(result, 0, sizeof (result));
+
+		p = hmac_sha1_tv[i].plaintext;
+		sg[0].page = virt_to_page(p);
+		sg[0].offset = ((long) p & ~PAGE_MASK);
+		sg[0].length = strlen(hmac_sha1_tv[i].plaintext);
+
+		klen = strlen(hmac_sha1_tv[i].key);
+		
+		crypto_hmac(tfm, hmac_sha1_tv[i].key, &klen, sg, 1, result);
+
+		hexdump(result, sizeof (result));
+		printk("%s\n",
+		       memcmp(result, hmac_sha1_tv[i].digest,
+			      crypto_tfm_alg_digestsize(tfm)) ? "fail" :
+		       "pass");
+	}
+
+	printk("\ntesting hmac_sha1 across pages\n");
+
+	/* setup the dummy buffer first */
+	memset(xbuf, 0, sizeof (xbuf));
+
+	memcpy(&xbuf[IDX1], "what do ya want ", 16);
+	memcpy(&xbuf[IDX2], "for nothing?", 12);
+
+	p = &xbuf[IDX1];
+	sg[0].page = virt_to_page(p);
+	sg[0].offset = ((long) p & ~PAGE_MASK);
+	sg[0].length = 16;
+
+	p = &xbuf[IDX2];
+	sg[1].page = virt_to_page(p);
+	sg[1].offset = ((long) p & ~PAGE_MASK);
+	sg[1].length = 12;
+
+	memset(result, 0, sizeof (result));
+	klen = strlen(hmac_sha1_tv[7].key);
+	crypto_hmac(tfm, hmac_sha1_tv[7].key, &klen, sg, 2, result);
+	hexdump(result, crypto_tfm_alg_digestsize(tfm));
+
+	printk("%s\n",
+	       memcmp(result, hmac_sha1_tv[7].digest,
+		      crypto_tfm_alg_digestsize(tfm)) ? "fail" : "pass");
+out:
+	crypto_free_tfm(tfm);
+}
+#endif	/* CONFIG_CRYPTO_HMAC */
 
 static void
 test_md4(void)
@@ -249,7 +348,6 @@ test_sha1(void)
 	unsigned int i;
 	struct crypto_tfm *tfm;
 	struct sha1_testvec *sha1_tv;
-	struct hmac_sha1_testvec *hmac_sha1_tv;
 	struct scatterlist sg[2];
 	unsigned int tsize;
 	char result[SHA1_DIGEST_SIZE];
@@ -314,64 +412,6 @@ test_sha1(void)
 	hexdump(result, crypto_tfm_alg_digestsize(tfm));
 	printk("%s\n",
 	       memcmp(result, sha1_tv[1].digest,
-		      crypto_tfm_alg_digestsize(tfm)) ? "fail" : "pass");
-
-	printk("\ntesting hmac_sha1\n");
-
-	tsize = sizeof (hmac_sha1_tv_template);
-	if (tsize > TVMEMSIZE) {
-		printk("template (%u) too big for tvmem (%u)\n", tsize,
-		       TVMEMSIZE);
-		return;
-	}
-
-	memcpy(tvmem, hmac_sha1_tv_template, tsize);
-	hmac_sha1_tv = (void *) tvmem;
-
-	for (i = 0; i < HMAC_SHA1_TEST_VECTORS; i++) {
-		printk("test %u:\n", i + 1);
-		memset(result, 0, sizeof (result));
-
-		p = hmac_sha1_tv[i].plaintext;
-		sg[0].page = virt_to_page(p);
-		sg[0].offset = ((long) p & ~PAGE_MASK);
-		sg[0].length = strlen(hmac_sha1_tv[i].plaintext);
-
-		crypto_digest_hmac(tfm, hmac_sha1_tv[i].key,
-				   strlen(hmac_sha1_tv[i].key), sg, 1, result);
-
-		hexdump(result, sizeof (result));
-		printk("%s\n",
-		       memcmp(result, hmac_sha1_tv[i].digest,
-			      crypto_tfm_alg_digestsize(tfm)) ? "fail" :
-		       "pass");
-	}
-
-	printk("\ntesting hmac_sha1 across pages\n");
-
-	/* setup the dummy buffer first */
-	memset(xbuf, 0, sizeof (xbuf));
-
-	memcpy(&xbuf[IDX1], "what do ya want ", 16);
-	memcpy(&xbuf[IDX2], "for nothing?", 12);
-
-	p = &xbuf[IDX1];
-	sg[0].page = virt_to_page(p);
-	sg[0].offset = ((long) p & ~PAGE_MASK);
-	sg[0].length = 16;
-
-	p = &xbuf[IDX2];
-	sg[1].page = virt_to_page(p);
-	sg[1].offset = ((long) p & ~PAGE_MASK);
-	sg[1].length = 12;
-
-	memset(result, 0, sizeof (result));
-	crypto_digest_hmac(tfm, hmac_sha1_tv[1].key,
-			   strlen(hmac_sha1_tv[1].key), sg, 2, result);
-	hexdump(result, crypto_tfm_alg_digestsize(tfm));
-
-	printk("%s\n",
-	       memcmp(result, hmac_sha1_tv[1].digest,
 		      crypto_tfm_alg_digestsize(tfm)) ? "fail" : "pass");
 	crypto_free_tfm(tfm);
 }
@@ -1325,6 +1365,10 @@ do_test(void)
 		test_des();
 		test_des3_ede();
 		test_md4();
+#ifdef CONFIG_CRYPTO_HMAC
+		test_hmac_md5();
+		test_hmac_sha1();
+#endif		
 		break;
 
 	case 1:
@@ -1347,7 +1391,18 @@ do_test(void)
 		test_md4();
 		break;
 
+#ifdef CONFIG_CRYPTO_HMAC
 	case 100:
+		test_hmac_md5();
+		break;
+		
+		
+	case 101:
+		test_hmac_sha1();
+		break;
+#endif
+
+	case 1000:
 		test_available();
 		break;
 		
