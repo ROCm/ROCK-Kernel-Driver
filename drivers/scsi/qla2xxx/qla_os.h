@@ -58,11 +58,13 @@
 #include <linux/ioctl.h>
 #include <asm/uaccess.h>
 
-#include "scsi.h"
+#include <scsi/scsi.h>
 #include <scsi/scsi_host.h>
-
-#include <scsi/scsicam.h>
+#include <scsi/scsi_device.h>
+#include <scsi/scsi_cmnd.h>
+#include <scsi/scsi_tcq.h>
 #include <scsi/scsi_ioctl.h>
+#include <scsi/scsicam.h>
 #include <scsi/scsi_transport.h>
 #include <scsi/scsi_transport_fc.h>
 
