@@ -444,10 +444,11 @@ int eesoxscsi_proc_info(struct Scsi_Host *host, char *buffer, char **start, off_
 	p += sprintf(p, "Term    : o%s\n",
 			info->control & EESOX_TERM_ENABLE ? "n" : "ff");
 
-	pos += fas216_print_stats(&info->info, buffer + pos);
 	p += fas216_print_stats(&info->info, p);
 	p += fas216_print_devices(&info->info, p);
 
+	*start = buffer + offset;
+	pos = p - buffer - offset;
 	if (pos > length)
 		pos = length;
 

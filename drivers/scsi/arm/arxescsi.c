@@ -237,7 +237,7 @@ static const char *arxescsi_info(struct Scsi_Host *host)
  */
 static int
 arxescsi_proc_info(struct Scsi_Host *host, char *buffer, char **start, off_t offset, int length,
-		   int host_no, int inout)
+		   int inout)
 {
 	struct arxescsi_info *info;
 	char *p = buffer;
@@ -264,7 +264,7 @@ static Scsi_Host_Template arxescsi_template = {
 	.proc_info			= arxescsi_proc_info,
 	.name				= "ARXE SCSI card",
 	.info				= arxescsi_info,
-	.queuecommand			= fas216_queue_command,
+	.queuecommand			= fas216_noqueue_command,
 	.eh_host_reset_handler		= fas216_eh_host_reset,
 	.eh_bus_reset_handler		= fas216_eh_bus_reset,
 	.eh_device_reset_handler	= fas216_eh_device_reset,

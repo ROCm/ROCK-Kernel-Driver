@@ -310,6 +310,7 @@ typedef struct {
 	} dma;
 
 	/* miscellaneous */
+	int			internal_done;		/* flag to indicate request done */
 	unsigned long		magic_end;
 } FAS216_Info;
 
@@ -334,6 +335,14 @@ extern int fas216_add (struct Scsi_Host *instance, struct device *dev);
  * Returns : 0 - success, else error
  */
 extern int fas216_queue_command (Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
+
+/* Function: int fas216_noqueue_command (Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
+ * Purpose : queue a command for adapter to process, and process it to completion.
+ * Params  : SCpnt - Command to queue
+ *	     done  - done function to call once command is complete
+ * Returns : 0 - success, else error
+ */
+extern int fas216_noqueue_command (Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
 
 /* Function: irqreturn_t fas216_intr (FAS216_Info *info)
  * Purpose : handle interrupts from the interface to progress a command
