@@ -81,14 +81,18 @@ int device_suspend(u32 state)
 	while(!list_empty(&dpm_active)) {
 		struct list_head * entry = dpm_active.prev;
 		struct device * dev = to_device(entry);
-		if ((error = suspend_device(dev,state)))
-			goto Error;
+		if ((error = suspend_device(dev,state))) {
+			if (error != -EAGAIN)
+				goto Error;
+			else
+				error = 0;
+		}
 	}
  Done:
 	up(&dpm_sem);
 	return error;
  Error:
-	device_resume();
+	dpm_resume();
 	goto Done;
 }
 
