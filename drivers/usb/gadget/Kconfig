@@ -208,6 +208,16 @@ config USB_ZERO
 	  Say "y" to link the driver statically, or "m" to build a
 	  dynamically linked module called "g_zero".
 
+config USB_ZERO_HNPTEST
+	boolean "HNP Test Device"
+	depends on USB_ZERO && USB_OTG
+	help
+	  You can configure this device to enumerate using the device
+	  identifiers of the USB-OTG test device.  That means that when
+	  this gadget connects to another OTG device, with this one using
+	  the "B-Peripheral" role, that device will use HNP to let this
+	  one serve as the USB host instead (in the "B-Host" role).
+
 config USB_ETH
 	tristate "Ethernet Gadget"
 	depends on NET
