@@ -1796,10 +1796,8 @@ nfsd4_encode_dirent_fattr(struct nfsd4_readdir *cd,
 		}
 
 	}
-
-	nfserr = nfsd4_encode_fattr(NULL, exp,
-			dentry, p, buflen, cd->rd_bmval,
-			cd->rd_rqstp);
+	nfserr = nfsd4_encode_fattr(NULL, exp, dentry, p, buflen, cd->rd_bmval,
+					cd->rd_rqstp);
 out_put:
 	dput(dentry);
 	exp_put(exp);
@@ -1850,9 +1848,6 @@ nfsd4_encode_dirent(struct readdir_cd *ccd, const char *name, int namlen,
 	p = xdr_encode_hyper(p, NFS_OFFSET_MAX);    /* offset of next entry */
 	p = xdr_encode_array(p, name, namlen);      /* name length & name */
 
-	/*
-	 * Now we come to the ugly part: writing the fattr for this entry.
-	 */
 	nfserr = nfsd4_encode_dirent_fattr(cd, name, namlen, p, &buflen);
 	switch (nfserr) {
 	case nfs_ok:
@@ -1865,9 +1860,7 @@ nfsd4_encode_dirent(struct readdir_cd *ccd, const char *name, int namlen,
 		goto fail;
 	default:
 		/*
-		 * If we get here, we experienced a miscellaneous
-		 * failure while writing the attributes.  If the
-		 * client requested the RDATTR_ERROR attribute,
+		 * If the client requested the RDATTR_ERROR attribute,
 		 * we stuff the error code into this attribute
 		 * and continue.  If this attribute was not requested,
 		 * then in accordance with the spec, we fail the
@@ -1880,12 +1873,10 @@ nfsd4_encode_dirent(struct readdir_cd *ccd, const char *name, int namlen,
 		if (p == NULL)
 			goto fail;
 	}
-
 	cd->buflen -= (p - cd->buffer);
 	cd->buffer = p;
 	cd->common.err = nfs_ok;
 	return 0;
-
 fail:
 	cd->common.err = nfserr;
 	return -EINVAL;
