@@ -1014,29 +1014,35 @@ config FB_HIT
 	  This is the frame buffer device driver for the Hitachi HD64461 LCD
 	  frame buffer card.
 
+config FB_PMAG_AA
+	bool "PMAG-AA TURBOchannel framebuffer support"
+	depends on FB && MACH_DECSTATION && TC
+	help
+	  Support for the PMAG-AA TURBOchannel framebuffer card (1280x1024x1)
+	  used mainly in the MIPS-based DECstation series.
+
 config FB_PMAG_BA
 	bool "PMAG-BA TURBOchannel framebuffer support"
-	depends on FB && DECSTATION && TC
+	depends on FB && MACH_DECSTATION && TC
 	help
-	  Say Y here to directly support the on-board PMAG-BA framebuffer in
-	  the 5000/1xx versions of the DECstation.  There is a page dedicated
-	  to Linux on DECstations at <http://decstation.unix-ag.org/>.
+	  Support for the PMAG-BA TURBOchannel framebuffer card (1024x864x8)
+	  used mainly in the MIPS-based DECstation series.
 
 config FB_PMAGB_B
-	bool "PMAGB-B TURBOchannel framebuffer spport"
-	depends on FB && DECSTATION && TC
+	bool "PMAGB-B TURBOchannel framebuffer support"
+	depends on FB && MACH_DECSTATION && TC
 	help
-	  Say Y here to directly support the on-board PMAGB-B framebuffer in
-	  the 5000/1xx versions of the DECstation.  There is a page dedicated
-	  to Linux on DECstations at <http://decstation.unix-ag.org/>.
+	  Support for the PMAGB-B TURBOchannel framebuffer card used mainly
+	  in the MIPS-based DECstation series. The card is currently only
+	  supported in 1280x1024x8 mode.
 
 config FB_MAXINE
-	bool "Maxine (Personal DECstation) onboard framebuffer spport"
-	depends on FB && DECSTATION && TC
+	bool "Maxine (Personal DECstation) onboard framebuffer support"
+	depends on FB && MACH_DECSTATION && TC
 	help
-	  Say Y here to directly support the on-board framebuffer in the
-	  Maxine (5000/20, /25, /33) version of the DECstation.  There is a
-	  page dedicated to Linux on DECstations at <http://decstation.unix-ag.org/>.
+	  Support for the onboard framebuffer (1024x768x8) in the Personal
+	  DECstation series (Personal DECstation 5000/20, /25, /33, /50,
+	  Codename "Maxine").
 
 config FB_TX3912
 	bool "TMPTX3912/PR31700 frame buffer support"

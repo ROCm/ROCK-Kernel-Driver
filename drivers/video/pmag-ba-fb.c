@@ -52,27 +52,27 @@ struct pmag_ba_ramdac_regs {
 static struct fb_info pmagba_fb_info[3];
 
 static struct fb_var_screeninfo pmagbafb_defined = {
-	.xres 		= 1024,
+	.xres		= 1024,
 	.yres		= 864,
-	.xres_virtual 	= 1024,
-	.yres_virtual 	= 864,
-	.bits_per_pixel = 8,
+	.xres_virtual	= 1024,
+	.yres_virtual	= 864,
+	.bits_per_pixel	= 8,
 	.red.length	= 8,
 	.green.length	= 8,
 	.blue.length	= 8,
-	.activate 	= FB_ACTIVATE_NOW, 
-	.height 	= 274,	
-	.width 		= 195,
-	.accel 		= FB_ACCEL_NONE,
-	.vmode 		= FB_VMODE_NONINTERLACED,
+	.activate	= FB_ACTIVATE_NOW,
+	.height		= 274,
+	.width		= 195,
+	.accel		= FB_ACCEL_NONE,
+	.vmode		= FB_VMODE_NONINTERLACED,
 };
 
 static struct fb_fix_screeninfo pmagbafb_fix = {
-	.id 		= "PMAG-BA",
-	.smem_len 	= (1024 * 864),
-	.type 		= FB_TYPE_PACKED_PIXELS,
-	.visual 	= FB_VISUAL_PSEUDOCOLOR,
-	.line_length 	= 1024,
+	.id		= "PMAG-BA",
+	.smem_len	= (1024 * 864),
+	.type		= FB_TYPE_PACKED_PIXELS,
+	.visual		= FB_VISUAL_PSEUDOCOLOR,
+	.line_length	= 1024,
 };
 
 /*
@@ -89,10 +89,10 @@ void pmagbafb_erase_cursor(struct pmag_ba_ramdac_regs *bt459_regs)
  * Set the palette. 
  */
 static int pmagbafb_setcolreg(unsigned regno, unsigned red, unsigned green,
-                              unsigned blue, unsigned transp,
-                              struct fb_info *info)
+			      unsigned blue, unsigned transp,
+			      struct fb_info *info)
 {
-	struct pmag_ba_ramdac_regs *bt459_regs = (struct pmag_ba_ramdac_regs *) info->par; 
+	struct pmag_ba_ramdac_regs *bt459_regs = (struct pmag_ba_ramdac_regs *) info->par;
 
 	if (regno >= info->cmap.len)
 		return 1;
@@ -111,6 +111,8 @@ static int pmagbafb_setcolreg(unsigned regno, unsigned red, unsigned green,
 
 static struct fb_ops pmagbafb_ops = {
 	.owner		= THIS_MODULE,
+	.fb_get_fix	= gen_get_fix,
+	.fb_get_var	= gen_get_var,
 	.fb_setcolreg	= pmagbafb_setcolreg,
 	.fb_fillrect	= cfb_fillrect,
 	.fb_copyarea	= cfb_copyarea,
@@ -122,6 +124,7 @@ int __init pmagbafb_init_one(int slot)
 {
 	unsigned long base_addr = get_tc_base_addr(slot);
 	struct fb_info *info = &pmagba_fb_info[slot]; 
+	struct display *disp = &pmagba_disp[slot];
 
 	printk("PMAG-BA framebuffer in slot %d\n", slot);
 	/*
@@ -145,7 +148,7 @@ int __init pmagbafb_init_one(int slot)
 	info->flags = FBINFO_DEFAULT;
 
 	fb_alloc_cmap(&fb_info.cmap, 256, 0);
-	
+
 	if (register_framebuffer(info) < 0)
 		return 1;
 	return 0;

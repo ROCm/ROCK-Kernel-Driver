@@ -195,7 +195,7 @@ config SGI_PARTITION
 
 config ULTRIX_PARTITION
 	bool "Ultrix partition table support" if PARTITION_ADVANCED
-	default y if DECSTATION
+	default y if MACH_DECSTATION
 	help
 	  Say Y here if you would like to be able to read the hard disk
 	  partition table format used by DEC (now Compaq) Ultrix machines.

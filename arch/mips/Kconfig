@@ -149,6 +149,7 @@ config MIPS_COBALT
 
 config MACH_DECSTATION
 	bool "Support for DECstations"
+	select BOOT_ELF32
 	select DMA_NONCOHERENT
 	select IRQ_CPU
 	depends on MIPS32 || EXPERIMENTAL
