@@ -148,6 +148,9 @@
 #define PCI_DEVICE_ID_AMD_8111_AC97	0x746d
 #endif
 
+#define MODULOP2(a, b) ((a) & ((b) - 1))
+#define MASKP2(a, b) ((a) & ~((b) - 1))
+
 static int ftsodell;
 static int strict_clocking;
 static unsigned int clocking;
@@ -209,6 +212,7 @@ struct i810_channel
 
 #define ENUM_ENGINE(PRE,DIG) 									\
 enum {												\
+	PRE##_BASE =	0x##DIG##0,		/* Base Address */				\
 	PRE##_BDBAR =	0x##DIG##0,		/* Buffer Descriptor list Base Address */	\
 	PRE##_CIV =	0x##DIG##4,		/* Current Index Value */			\
 	PRE##_LVI =	0x##DIG##5,		/* Last Valid Index */				\
@@ -491,8 +495,12 @@ struct i810_card {
 /* extract register offset from codec struct */
 #define IO_REG_OFF(codec) (((struct i810_card *) codec->private_data)->ac97_id_map[codec->id])
 
+#define GET_CIV(port) MODULOP2(inb((port) + OFF_CIV), SG_LEN)
+#define GET_LVI(port) MODULOP2(inb((port) + OFF_LVI), SG_LEN)
+
 /* set LVI from CIV */
-#define CIV_TO_LVI(port, off) outb((inb(port+OFF_CIV)+off) & 31, port+OFF_LVI)
+#define CIV_TO_LVI(port, off) \
+	outb(MODULOP2(GET_CIV((port)) + (off), SG_LEN), (port) + OFF_LVI)
 
 static struct i810_card *devs = NULL;
 
@@ -762,7 +770,7 @@ static inline unsigned i810_get_dma_addr(struct i810_state *state, int rec)
 		port_picb = port + OFF_PICB;
 
 	do {
-		civ = inb(port+OFF_CIV) & 31;
+		civ = GET_CIV(port);
 		offset = inw(port_picb);
 		/* Must have a delay here! */ 
 		if(offset == 0)
@@ -782,7 +790,7 @@ static inline unsigned i810_get_dma_addr(struct i810_state *state, int rec)
 		 * that we won't have to worry about the chip still being
 		 * out of sync with reality ;-)
 		 */
-	} while (civ != (inb(port+OFF_CIV) & 31) || offset != inw(port_picb));
+	} while (civ != GET_CIV(port) || offset != inw(port_picb));
 		 
 	return (((civ + 1) * dmabuf->fragsize - (bytes * offset))
 		% dmabuf->dmasize);
@@ -1134,8 +1142,8 @@ static void i810_update_ptr(struct i810_state *state)
 			/* this is normal for the end of a read */
 			/* only give an error if we went past the */
 			/* last valid sg entry */
-			if((inb(state->card->iobase + PI_CIV) & 31) !=
-			   (inb(state->card->iobase + PI_LVI) & 31)) {
+			if (GET_CIV(state->card->iobase + PI_BASE) !=
+			    GET_LVI(state->card->iobase + PI_BASE)) {
 				printk(KERN_WARNING "i810_audio: DMA overrun on read\n");
 				dmabuf->error++;
 			}
@@ -1159,13 +1167,13 @@ static void i810_update_ptr(struct i810_state *state)
 			/* this is normal for the end of a write */
 			/* only give an error if we went past the */
 			/* last valid sg entry */
-			if((inb(state->card->iobase + PO_CIV) & 31) !=
-			   (inb(state->card->iobase + PO_LVI) & 31)) {
+			if (GET_CIV(state->card->iobase + PO_BASE) !=
+			    GET_LVI(state->card->iobase + PO_BASE)) {
 				printk(KERN_WARNING "i810_audio: DMA overrun on write\n");
 				printk("i810_audio: CIV %d, LVI %d, hwptr %x, "
 					"count %d\n",
-					inb(state->card->iobase + PO_CIV) & 31,
-					inb(state->card->iobase + PO_LVI) & 31,
+					GET_CIV(state->card->iobase + PO_BASE),
+					GET_LVI(state->card->iobase + PO_BASE),
 					dmabuf->hwptr, dmabuf->count);
 				dmabuf->error++;
 			}
@@ -3056,7 +3064,7 @@ static void __devinit i810_configure_clocking (void)
 			goto config_out;
 		}
 		dmabuf->count = dmabuf->dmasize;
-		CIV_TO_LVI(card->iobase+dmabuf->write_channel->port, 31);
+		CIV_TO_LVI(card->iobase+dmabuf->write_channel->port, -1);
 		local_irq_save(flags);
 		start_dac(state);
 		offset = i810_get_dma_addr(state, 0);
