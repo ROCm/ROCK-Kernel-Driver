@@ -585,6 +585,9 @@ static int bfusb_load_firmware(struct bfusb *bfusb, unsigned char *firmware, int
 		return -EBUSY;
 	}
 
+	bfusb->udev->toggle[0] = bfusb->udev->toggle[1] = 0;
+	bfusb->udev->halted[0] = bfusb->udev->halted[1] = 0;
+
 	buf = kmalloc(BFUSB_MAX_BLOCK_SIZE + 3, GFP_ATOMIC);
 	if (!buf) {
 		BT_ERR("Can't allocate memory chunk for firmware");
@@ -623,6 +626,9 @@ static int bfusb_load_firmware(struct bfusb *bfusb, unsigned char *firmware, int
 		BT_ERR("Can't change to running configuration");
 		goto error;
 	}
+
+	bfusb->udev->toggle[0] = bfusb->udev->toggle[1] = 0;
+	bfusb->udev->halted[0] = bfusb->udev->halted[1] = 0;
 
 	BT_INFO("BlueFRITZ! USB device ready");
 
