@@ -1127,7 +1127,7 @@ static int proc_ioctl (struct dev_state *ps, void __user *arg)
 	if (copy_from_user(&ctrl, arg, sizeof (ctrl)))
 		return -EFAULT;
 	if ((size = _IOC_SIZE (ctrl.ioctl_code)) > 0) {
-		if ((buf = kmalloc (size, GFP_KERNEL)) == 0)
+		if ((buf = kmalloc (size, GFP_KERNEL)) == NULL)
 			return -ENOMEM;
 		if ((_IOC_DIR(ctrl.ioctl_code) & _IOC_WRITE)) {
 			if (copy_from_user (buf, ctrl.data, size)) {
@@ -1187,7 +1187,7 @@ static int proc_ioctl (struct dev_state *ps, void __user *arg)
 		down_read(&usb_bus_type.subsys.rwsem);
 		if (intf->dev.driver)
 			driver = to_usb_driver(intf->dev.driver);
-		if (driver == 0 || driver->ioctl == 0) {
+		if (driver == NULL || driver->ioctl == NULL) {
 			retval = -ENOTTY;
 		} else {
 			retval = driver->ioctl (intf, ctrl.ioctl_code, buf);
@@ -1203,7 +1203,7 @@ static int proc_ioctl (struct dev_state *ps, void __user *arg)
 			&& size > 0
 			&& copy_to_user (ctrl.data, buf, size) != 0)
 		retval = -EFAULT;
-	if (buf != 0)
+	if (buf != NULL)
 		kfree (buf);
 	return retval;
 }

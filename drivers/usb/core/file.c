@@ -30,7 +30,7 @@
 
 #define MAX_USB_MINORS	256
 static struct file_operations *usb_minors[MAX_USB_MINORS];
-static spinlock_t minor_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(minor_lock);
 
 static int usb_open(struct inode * inode, struct file * file)
 {

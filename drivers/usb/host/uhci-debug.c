@@ -95,24 +95,25 @@ static int uhci_show_qh(struct uhci_qh *qh, char *buf, int len, int space)
 	struct list_head *head, *tmp;
 	struct uhci_td *td;
 	int i = 0, checked = 0, prevactive = 0;
+	__le32 element = qh_element(qh);
 
 	/* Try to make sure there's enough memory */
 	if (len < 80 * 6)
 		return 0;
 
 	out += sprintf(out, "%*s[%p] link (%08x) element (%08x)\n", space, "",
-			qh, le32_to_cpu(qh->link), le32_to_cpu(qh->element));
+			qh, le32_to_cpu(qh->link), le32_to_cpu(element));
 
-	if (qh->element & UHCI_PTR_QH)
+	if (element & UHCI_PTR_QH)
 		out += sprintf(out, "%*s  Element points to QH (bug?)\n", space, "");
 
-	if (qh->element & UHCI_PTR_DEPTH)
+	if (element & UHCI_PTR_DEPTH)
 		out += sprintf(out, "%*s  Depth traverse\n", space, "");
 
-	if (qh->element & cpu_to_le32(8))
+	if (element & cpu_to_le32(8))
 		out += sprintf(out, "%*s  Bit 3 set (bug?)\n", space, "");
 
-	if (!(qh->element & ~(UHCI_PTR_QH | UHCI_PTR_DEPTH)))
+	if (!(element & ~(UHCI_PTR_QH | UHCI_PTR_DEPTH)))
 		out += sprintf(out, "%*s  Element is NULL (bug?)\n", space, "");
 
 	if (!qh->urbp) {
@@ -127,7 +128,7 @@ static int uhci_show_qh(struct uhci_qh *qh, char *buf, int len, int space)
 
 	td = list_entry(tmp, struct uhci_td, list);
 
-	if (cpu_to_le32(td->dma_handle) != (qh->element & ~UHCI_PTR_BITS))
+	if (cpu_to_le32(td->dma_handle) != (element & ~UHCI_PTR_BITS))
 		out += sprintf(out, "%*s Element != First TD\n", space, "");
 
 	while (tmp != head) {
@@ -447,7 +448,7 @@ static int uhci_sprint_schedule(struct uhci_hcd *uhci, char *buf, int len)
 			if (qh->link != UHCI_PTR_TERM)
 				out += sprintf(out, "    bandwidth reclamation on!\n");
 
-			if (qh->element != cpu_to_le32(uhci->term_td->dma_handle))
+			if (qh_element(qh) != cpu_to_le32(uhci->term_td->dma_handle))
 				out += sprintf(out, "    skel_term_qh element is not set to term_td!\n");
 
 			continue;

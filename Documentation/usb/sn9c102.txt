@@ -26,7 +26,7 @@ Index
 
 1. Copyright
 ============
-Copyright (C) 2004 by Luca Risolia <luca.risolia@studio.unibo.it>
+Copyright (C) 2004-2005 by Luca Risolia <luca.risolia@studio.unibo.it>
 
 
 2. Disclaimer
@@ -164,6 +164,17 @@ Description:    Specify V4L2 minor mode number:
                 recognized camera and use auto for the first one and for every
                 other camera.
 Default:        -1
+-------------------------------------------------------------------------------
+Name:           force_munmap;
+Type:           bool array (min = 0, max = 64)
+Syntax:         <0|1[,...]> 
+Description:    Force the application to unmap previously mapped buffer memory
+                before calling any VIDIOC_S_CROP or VIDIOC_S_FMT ioctl's. Not
+                all the applications support this feature. This parameter is
+                specific for each detected camera.
+                0 = do not force memory unmapping"
+                1 = force memory unmapping (save memory)"
+Default:        0
 -------------------------------------------------------------------------------
 Name:           debug
 Type:           int
@@ -362,11 +373,11 @@ rules:
 file descriptor. Once it is selected, the application must close and reopen the
 device to switch to the other I/O method;
 
-- previously mapped buffer memory must always be unmapped before calling any
-of the "VIDIOC_S_CROP", "VIDIOC_TRY_FMT" and "VIDIOC_S_FMT" ioctl's. The same
-number of buffers as before will be allocated again to match the size of the
-new video frames, so you have to map the buffers again before any I/O attempts
-on them.
+- although it is not mandatory, previously mapped buffer memory should always
+be unmapped before calling any "VIDIOC_S_CROP" or "VIDIOC_S_FMT" ioctl's.
+The same number of buffers as before will be allocated again to match the size
+of the new video frames, so you have to map the buffers again before any I/O
+attempts on them.
 
 Consistently with the hardware limits, this driver also supports image
 downscaling with arbitrary scaling factors from 1, 2 and 4 in both directions.

@@ -1096,7 +1096,7 @@ static int usblp_set_protocol(struct usblp *usblp, int protocol)
 		usblp->writebuf, 0,
 		usblp_bulk_write, usblp);
 
-	usblp->bidir = (usblp->protocol[protocol].epread != 0);
+	usblp->bidir = (usblp->protocol[protocol].epread != NULL);
 	if (usblp->bidir)
 		usb_fill_bulk_urb(usblp->readurb, usblp->dev,
 			usb_rcvbulkpipe(usblp->dev,
