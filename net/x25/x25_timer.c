@@ -61,7 +61,7 @@ void x25_stop_heartbeat(struct sock *sk)
 
 void x25_start_t2timer(struct sock *sk)
 {
-	x25_cb *x25 = x25_sk(sk);
+	struct x25_opt *x25 = x25_sk(sk);
 
 	del_timer(&x25->timer);
 
@@ -74,7 +74,7 @@ void x25_start_t2timer(struct sock *sk)
 
 void x25_start_t21timer(struct sock *sk)
 {
-	x25_cb *x25 = x25_sk(sk);
+	struct x25_opt *x25 = x25_sk(sk);
 
 	del_timer(&x25->timer);
 
@@ -87,7 +87,7 @@ void x25_start_t21timer(struct sock *sk)
 
 void x25_start_t22timer(struct sock *sk)
 {
-	x25_cb *x25 = x25_sk(sk);
+	struct x25_opt *x25 = x25_sk(sk);
 
 	del_timer(&x25->timer);
 
@@ -100,7 +100,7 @@ void x25_start_t22timer(struct sock *sk)
 
 void x25_start_t23timer(struct sock *sk)
 {
-	x25_cb *x25 = x25_sk(sk);
+	struct x25_opt *x25 = x25_sk(sk);
 
 	del_timer(&x25->timer);
 
@@ -118,7 +118,7 @@ void x25_stop_timer(struct sock *sk)
 
 unsigned long x25_display_timer(struct sock *sk)
 {
-	x25_cb *x25 = x25_sk(sk);
+	struct x25_opt *x25 = x25_sk(sk);
 
 	if (!timer_pending(&x25->timer))
 		return 0;
@@ -164,7 +164,7 @@ unlock:
  */
 static inline void x25_do_timer_expiry(struct sock * sk)
 {
-	x25_cb *x25 = x25_sk(sk);
+	struct x25_opt *x25 = x25_sk(sk);
 
 	switch (x25->state) {
 

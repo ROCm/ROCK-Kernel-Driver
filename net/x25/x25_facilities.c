@@ -172,7 +172,7 @@ int x25_create_facilities(unsigned char *buffer,
 int x25_negotiate_facilities(struct sk_buff *skb, struct sock *sk,
 			     struct x25_facilities *new)
 {
-	x25_cb *x25 = x25_sk(sk);
+	struct x25_opt *x25 = x25_sk(sk);
 	struct x25_facilities *ours = &x25->facilities;
 	struct x25_facilities theirs;
 	int len;
