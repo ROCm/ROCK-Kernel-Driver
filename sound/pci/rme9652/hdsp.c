@@ -471,7 +471,6 @@ struct _hdsp {
 	int                   dev;
 	int                   irq;
 	unsigned long         port;
-	struct resource      *res_port;
         unsigned long         iobase;
 	snd_card_t           *card;
 	snd_pcm_t            *pcm;
@@ -4940,7 +4939,6 @@ static int __devinit snd_hdsp_create(snd_card_t *card,
 	spin_lock_init(&hdsp->midi[0].lock);
 	spin_lock_init(&hdsp->midi[1].lock);
 	hdsp->iobase = 0;
-	hdsp->res_port = 0;
 	hdsp->control_register = 0;
 	hdsp->control2_register = 0;
 	hdsp->io_type = Undefined;
@@ -4995,13 +4993,9 @@ static int __devinit snd_hdsp_create(snd_card_t *card,
 
 	pci_set_master(hdsp->pci);
 
+	if ((err = pci_request_regions(pci, "hdsp")) < 0)
+		return err;
 	hdsp->port = pci_resource_start(pci, 0);
-
-	if ((hdsp->res_port = request_mem_region(hdsp->port, HDSP_IO_EXTENT, "hdsp")) == NULL) {
-		snd_printk("unable to grab memory region 0x%lx-0x%lx\n", hdsp->port, hdsp->port + HDSP_IO_EXTENT - 1);
-		return -EBUSY;
-	}
-
 	if ((hdsp->iobase = (unsigned long) ioremap_nocache(hdsp->port, HDSP_IO_EXTENT)) == 0) {
 		snd_printk("unable to remap region 0x%lx-0x%lx\n", hdsp->port, hdsp->port + HDSP_IO_EXTENT - 1);
 		return -EBUSY;
@@ -5074,7 +5068,7 @@ static int __devinit snd_hdsp_create(snd_card_t *card,
 
 static int snd_hdsp_free(hdsp_t *hdsp)
 {
-	if (hdsp->res_port) {
+	if (hdsp->port) {
 		/* stop the audio, and cancel all interrupts */
 		hdsp->control_register &= ~(HDSP_Start|HDSP_AudioInterruptEnable|HDSP_Midi0InterruptEnable|HDSP_Midi1InterruptEnable);
 		hdsp_write (hdsp, HDSP_controlRegister, hdsp->control_register);
@@ -5088,10 +5082,8 @@ static int snd_hdsp_free(hdsp_t *hdsp)
 	if (hdsp->iobase)
 		iounmap((void *) hdsp->iobase);
 
-	if (hdsp->res_port) {
-		release_resource(hdsp->res_port);
-		kfree_nocheck(hdsp->res_port);
-	}
+	if (hdsp->port)
+		pci_release_regions(hdsp->pci);
 		
 	return 0;
 }

@@ -184,15 +184,10 @@ struct _snd_azf3328 {
 	int irq;
 
 	unsigned long codec_port;
-	struct resource *res_codec_port;
 	unsigned long io2_port;
-	struct resource *res_io2_port;
 	unsigned long mpu_port;
-	struct resource *res_mpu_port;
 	unsigned long synth_port;
-	struct resource *res_synth_port;
 	unsigned long mixer_port;
-	struct resource *res_mixer_port;
 
 #ifdef SUPPORT_JOYSTICK
 	struct gameport gameport;
@@ -1273,28 +1268,9 @@ static int snd_azf3328_free(azf3328_t *chip)
 		kfree_nocheck(chip->res_joystick);
 	}
 #endif
-        if (chip->res_codec_port) {
-		release_resource(chip->res_codec_port);
-		kfree_nocheck(chip->res_codec_port);
-	}
-        if (chip->res_io2_port) {
-		release_resource(chip->res_io2_port);
-		kfree_nocheck(chip->res_io2_port);
-	}
-        if (chip->res_mpu_port) {
-		release_resource(chip->res_mpu_port);
-		kfree_nocheck(chip->res_mpu_port);
-	}
-        if (chip->res_synth_port) {
-		release_resource(chip->res_synth_port);
-		kfree_nocheck(chip->res_synth_port);
-	}
-        if (chip->res_mixer_port) {
-		release_resource(chip->res_mixer_port);
-		kfree_nocheck(chip->res_mixer_port);
-	}
         if (chip->irq >= 0)
 		free_irq(chip->irq, (void *)chip);
+	pci_release_regions(chip->pci);
 
         kfree(chip);
         return 0;
@@ -1358,36 +1334,16 @@ static int __devinit snd_azf3328_create(snd_card_t * card,
 		return -ENXIO;
 	}
 
+	if ((err = pci_request_regions(pci, "Aztech AZF3328")) < 0) {
+		kfree(chip);
+		return err;
+	}
+
 	chip->codec_port = pci_resource_start(pci, 0);
-	if ((chip->res_codec_port = request_region(chip->codec_port, 0x80, "Aztech AZF3328 I/O")) == NULL) {
-		snd_printk("unable to grab I/O port at 0x%lx-0x%lx\n", chip->codec_port, chip->codec_port + 0x80 - 1);
-		snd_azf3328_free(chip);
-		return -EBUSY;
-	}
 	chip->io2_port = pci_resource_start(pci, 1);
-	if ((chip->res_io2_port = request_region(chip->io2_port, 0x08, "Aztech AZF3328 I/O 2")) == NULL) {
-		snd_printk("unable to grab I/O 2 port at 0x%lx-0x%lx\n", chip->io2_port, chip->io2_port + 0x08 - 1);
-		snd_azf3328_free(chip);
-		return -EBUSY;
-	}
 	chip->mpu_port = pci_resource_start(pci, 2);
-	if ((chip->res_mpu_port = request_region(chip->mpu_port, 0x04, "Aztech AZF3328 MPU401")) == NULL) {
-		snd_printk("unable to grab MPU401 port at 0x%lx-0x%lx\n", chip->mpu_port, chip->mpu_port + 0x04 - 1);
-		snd_azf3328_free(chip);
-		return -EBUSY;
-	}
 	chip->synth_port = pci_resource_start(pci, 3);
-	if ((chip->res_synth_port = request_region(chip->synth_port, 0x08, "Aztech AZF3328 OPL3")) == NULL) {
-		snd_printk("unable to grab OPL3 port at 0x%lx-0x%lx\n", chip->synth_port, chip->synth_port + 0x08 - 1);
-		snd_azf3328_free(chip);
-		return -EBUSY;
-	}
 	chip->mixer_port = pci_resource_start(pci, 4);
-	if ((chip->res_mixer_port = request_region(chip->mixer_port, 0x40, "Aztech AZF3328 Mixer")) == NULL) {
-                snd_printk("unable to grab mixer port at 0x%lx-0x%lx\n", chip->mixer_port, chip->mixer_port + 0x40 - 1);
-		snd_azf3328_free(chip);
-		return -EBUSY;
-	}
 
 	if (request_irq(pci->irq, snd_azf3328_interrupt, SA_INTERRUPT|SA_SHIRQ, card->shortname, (void *)chip)) {
 		snd_printk("unable to grab IRQ %d\n", pci->irq);

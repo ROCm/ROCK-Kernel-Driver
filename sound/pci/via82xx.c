@@ -352,7 +352,6 @@ struct _snd_via82xx {
 	int irq;
 
 	unsigned long port;
-	struct resource *res_port;
 	struct resource *mpu_res;
 	int chip_type;
 	unsigned char revision;
@@ -1949,16 +1948,13 @@ static int snd_via82xx_free(via82xx_t *chip)
 		snd_via82xx_channel_reset(chip, &chip->devs[i]);
 	synchronize_irq(chip->irq);
       __end_hw:
+	if (chip->irq >= 0)
+		free_irq(chip->irq, (void *)chip);
 	if (chip->mpu_res) {
 		release_resource(chip->mpu_res);
 		kfree_nocheck(chip->mpu_res);
 	}
-	if (chip->res_port) {
-		release_resource(chip->res_port);
-		kfree_nocheck(chip->res_port);
-	}
-	if (chip->irq >= 0)
-		free_irq(chip->irq, (void *)chip);
+	pci_release_regions(chip->pci);
 	if (chip->chip_type == TYPE_VIA686) {
 #ifdef SUPPORT_JOYSTICK
 		if (chip->res_joystick) {
@@ -2017,12 +2013,11 @@ static int __devinit snd_via82xx_create(snd_card_t * card,
 	pci_read_config_byte(pci, VIA_FUNC_ENABLE, &chip->old_legacy);
 	pci_read_config_byte(pci, VIA_PNP_CONTROL, &chip->old_legacy_cfg);
 
-	chip->port = pci_resource_start(pci, 0);
-	if ((chip->res_port = request_region(chip->port, 256, card->driver)) == NULL) {
-		snd_printk("unable to grab ports 0x%lx-0x%lx\n", chip->port, chip->port + 256 - 1);
-		snd_via82xx_free(chip);
-		return -EBUSY;
+	if ((err = pci_request_regions(pci, card->driver)) < 0) {
+		kfree(chip);
+		return err;
 	}
+	chip->port = pci_resource_start(pci, 0);
 	if (request_irq(pci->irq, snd_via82xx_interrupt, SA_INTERRUPT|SA_SHIRQ,
 			card->driver, (void *)chip)) {
 		snd_printk("unable to grab IRQ %d\n", pci->irq);

@@ -191,7 +191,6 @@ MODULE_PARM_DESC(spdif_aclink, "S/PDIF over AC-link.");
 #define  ATI_REG_DMA_STATE		(7U<<26)
 
 
-#define ATI_MEM_REGION		256	/* i/o memory size */
 #define ATI_MAX_DESCRIPTORS	256	/* max number of descriptor packets */
 
 
@@ -259,7 +258,6 @@ struct snd_atiixp {
 	snd_card_t *card;
 	struct pci_dev *pci;
 
-	struct resource *res;		/* memory i/o */
 	unsigned long addr;
 	unsigned long remap_addr;
 	int irq;
@@ -1478,14 +1476,11 @@ static int snd_atiixp_free(atiixp_t *chip)
 	snd_atiixp_chip_stop(chip);
 	synchronize_irq(chip->irq);
       __hw_end:
-	if (chip->remap_addr)
-		iounmap((void *) chip->remap_addr);
-	if (chip->res) {
-		release_resource(chip->res);
-		kfree_nocheck(chip->res);
-	}
 	if (chip->irq >= 0)
 		free_irq(chip->irq, (void *)chip);
+	if (chip->remap_addr)
+		iounmap((void *) chip->remap_addr);
+	pci_release_regions(chip->pci);
 	kfree(chip);
 	return 0;
 }
@@ -1522,13 +1517,12 @@ static int __devinit snd_atiixp_create(snd_card_t *card,
 	chip->card = card;
 	chip->pci = pci;
 	chip->irq = -1;
-	chip->addr = pci_resource_start(pci, 0);
-	if ((chip->res = request_mem_region(chip->addr, ATI_MEM_REGION, "ATI IXP AC97")) == NULL) {
-		snd_printk(KERN_ERR "unable to grab I/O memory 0x%lx\n", chip->addr);
-		snd_atiixp_free(chip);
-		return -EBUSY;
+	if ((err = pci_request_regions(pci, "ATI IXP AC97")) < 0) {
+		kfree(chip);
+		return err;
 	}
-	chip->remap_addr = (unsigned long) ioremap_nocache(chip->addr, ATI_MEM_REGION);
+	chip->addr = pci_resource_start(pci, 0);
+	chip->remap_addr = (unsigned long) ioremap_nocache(chip->addr, pci_resource_len(pci, 0));
 	if (chip->remap_addr == 0) {
 		snd_printk(KERN_ERR "AC'97 space ioremap problem\n");
 		snd_atiixp_free(chip);

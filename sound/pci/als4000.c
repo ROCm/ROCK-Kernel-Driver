@@ -102,8 +102,8 @@ MODULE_PARM_DESC(joystick_port, "Joystick port address for ALS4000 soundcard. (0
 #endif
 
 typedef struct {
+	struct pci_dev *pci;
 	unsigned long gcr;
-	struct resource *res_gcr;
 #ifdef SUPPORT_JOYSTICK
 	struct gameport gameport;
 	struct resource *res_joystick;
@@ -582,8 +582,7 @@ static void snd_card_als4000_free( snd_card_t *card )
 		kfree_nocheck(acard->res_joystick);
 	}
 #endif
-	release_resource(acard->res_gcr);
-	kfree_nocheck(acard->res_gcr);
+	pci_release_regions(acard->pci);
 }
 
 static int __devinit snd_card_als4000_probe(struct pci_dev *pci,
@@ -593,7 +592,6 @@ static int __devinit snd_card_als4000_probe(struct pci_dev *pci,
 	snd_card_t *card;
 	snd_card_als4000_t *acard;
 	unsigned long gcr;
-	struct resource *res_gcr_port;
 	sb_t *chip;
 	opl3_t *opl3;
 	unsigned short word;
@@ -618,11 +616,9 @@ static int __devinit snd_card_als4000_probe(struct pci_dev *pci,
 		return -ENXIO;
 	}
 
+	if ((err = pci_request_regions(pci, "ALS4000")) < 0)
+		return err;
 	gcr = pci_resource_start(pci, 0);
-	if ((res_gcr_port = request_region(gcr, 0x40, "ALS4000")) == NULL) {
-		snd_printk("unable to grab region 0x%lx-0x%lx\n", gcr, gcr + 0x40 - 1);
-		return -EBUSY;
-	}
 
 	pci_read_config_word(pci, PCI_COMMAND, &word);
 	pci_write_config_word(pci, PCI_COMMAND, word | PCI_COMMAND_IO);
@@ -631,14 +627,13 @@ static int __devinit snd_card_als4000_probe(struct pci_dev *pci,
 	card = snd_card_new(index[dev], id[dev], THIS_MODULE, 
 			    sizeof( snd_card_als4000_t ) );
 	if (card == NULL) {
-		release_resource(res_gcr_port);
-		kfree_nocheck(res_gcr_port);
+		pci_release_regions(pci);
 		return -ENOMEM;
 	}
 
 	acard = (snd_card_als4000_t *)card->private_data;
+	acard->pci = pci;
 	acard->gcr = gcr;
-	acard->res_gcr = res_gcr_port;
 	card->private_free = snd_card_als4000_free;
 
 	/* disable all legacy ISA stuff except for joystick */

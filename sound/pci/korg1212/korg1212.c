@@ -343,10 +343,6 @@ struct _snd_korg1212 {
         unsigned long inIRQ;
         unsigned long iobase;
 
-	struct resource *res_iomem;
-	struct resource *res_ioport;
-	struct resource *res_iomem2;
-
 	struct snd_dma_device dma_dev;
 
 	struct snd_dma_buffer dma_dsp;
@@ -2108,23 +2104,7 @@ snd_korg1212_free(korg1212_t *korg1212)
                 korg1212->iobase = 0;
         }
         
-        if (korg1212->res_iomem != NULL) {
-                release_resource(korg1212->res_iomem);
-                kfree_nocheck(korg1212->res_iomem);
-                korg1212->res_iomem = NULL;
-        }
-        
-        if (korg1212->res_ioport != NULL) {
-                release_resource(korg1212->res_ioport);
-                kfree_nocheck(korg1212->res_ioport);
-                korg1212->res_ioport = NULL;
-        }
-        
-        if (korg1212->res_iomem2 != NULL) {
-                release_resource(korg1212->res_iomem2);
-                kfree_nocheck(korg1212->res_iomem2);
-                korg1212->res_iomem2 = NULL;
-        }
+	pci_release_regions(korg1212->pci);
 
         // ----------------------------------------------------
         // free up memory resources used for the DSP download.
@@ -2220,6 +2200,11 @@ static int __devinit snd_korg1212_create(snd_card_t * card, struct pci_dev *pci,
         for (i=0; i<kAudioChannels; i++)
                 korg1212->volumePhase[i] = 0;
 
+	if ((err = pci_request_regions(pci, "korg1212")) < 0) {
+		kfree(korg1212);
+		return err;
+	}
+
         korg1212->iomem = pci_resource_start(korg1212->pci, 0);
         korg1212->ioport = pci_resource_start(korg1212->pci, 1);
         korg1212->iomem2 = pci_resource_start(korg1212->pci, 2);
@@ -2239,27 +2224,6 @@ static int __devinit snd_korg1212_create(snd_card_t * card, struct pci_dev *pci,
 		   korg1212->iomem2, iomem2_size,
 		   stateName[korg1212->cardState]);
 #endif
-
-        korg1212->res_iomem = request_mem_region(korg1212->iomem, iomem_size, "korg1212");
-        if (korg1212->res_iomem == NULL) {
-		snd_printk(KERN_ERR "unable to grab region 0x%lx-0x%lx\n",
-                           korg1212->iomem, korg1212->iomem + iomem_size - 1);
-                return -EBUSY;
-        }
-
-        korg1212->res_ioport = request_region(korg1212->ioport, ioport_size, "korg1212");
-        if (korg1212->res_ioport == NULL) {
-		snd_printk(KERN_ERR "unable to grab region 0x%lx-0x%lx\n",
-                           korg1212->ioport, korg1212->ioport + ioport_size - 1);
-                return -EBUSY;
-        }
-
-        korg1212->res_iomem2 = request_mem_region(korg1212->iomem2, iomem2_size, "korg1212");
-        if (korg1212->res_iomem2 == NULL) {
-		snd_printk(KERN_ERR "unable to grab region 0x%lx-0x%lx\n",
-                           korg1212->iomem2, korg1212->iomem2 + iomem2_size - 1);
-                return -EBUSY;
-        }
 
         if ((korg1212->iobase = (unsigned long) ioremap(korg1212->iomem, iomem_size)) == 0) {
 		snd_printk(KERN_ERR "unable to remap memory region 0x%lx-0x%lx\n", korg1212->iobase,

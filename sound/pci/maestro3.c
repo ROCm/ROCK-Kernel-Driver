@@ -819,7 +819,6 @@ struct snd_m3 {
 	snd_card_t *card;
 
 	unsigned long iobase;
-	struct resource *iobase_res;
 
 	int irq;
 	int allegro_flag : 1;
@@ -2371,7 +2370,7 @@ static int snd_m3_free(m3_t *chip)
 		spin_unlock_irq(&chip->reg_lock);
 		kfree(chip->substreams);
 	}
-	if (chip->iobase_res) {
+	if (chip->iobase) {
 		snd_m3_outw(chip, HOST_INT_CTRL, 0); /* disable ints */
 	}
 
@@ -2380,15 +2379,13 @@ static int snd_m3_free(m3_t *chip)
 		vfree(chip->suspend_mem);
 #endif
 
-	if (chip->irq >= 0)
+	if (chip->irq >= 0) {
 		synchronize_irq(chip->irq);
-
-	if (chip->iobase_res) {
-		release_resource(chip->iobase_res);
-		kfree_nocheck(chip->iobase_res);
-	}
-	if (chip->irq >= 0)
 		free_irq(chip->irq, (void *)chip);
+	}
+
+	if (chip->iobase)
+		pci_release_regions(chip->pci);
 
 	kfree(chip);
 	return 0;
@@ -2555,13 +2552,11 @@ snd_m3_create(snd_card_t *card, struct pci_dev *pci,
 	}
 	memset(chip->substreams, 0, sizeof(m3_dma_t) * chip->num_substreams);
 
-	chip->iobase = pci_resource_start(pci, 0);
-	if ((chip->iobase_res = request_region(chip->iobase, 256,
-					       card->driver)) == NULL) {
-		snd_printk("unable to grab i/o ports %ld\n", chip->iobase);
+	if ((err = pci_request_regions(pci, card->driver)) < 0) {
 		snd_m3_free(chip);
-		return -EBUSY;
+		return err;
 	}
+	chip->iobase = pci_resource_start(pci, 0);
 	
 	/* just to be sure */
 	pci_set_master(pci);

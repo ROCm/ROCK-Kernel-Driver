@@ -468,8 +468,6 @@ struct snd_cs4281 {
 	unsigned long ba1;		/* virtual (accessible) address */
 	unsigned long ba0_addr;
 	unsigned long ba1_addr;
-	struct resource *ba0_res;
-	struct resource *ba1_res;
 
 	int dual_codec;
 
@@ -1358,20 +1356,13 @@ static int snd_cs4281_free(cs4281_t *chip)
 	/* PCI interface - D3 state */
 	pci_set_power_state(chip->pci, 3);
 
+	if (chip->irq >= 0)
+		free_irq(chip->irq, (void *)chip);
 	if (chip->ba0)
 		iounmap((void *) chip->ba0);
 	if (chip->ba1)
 		iounmap((void *) chip->ba1);
-	if (chip->ba0_res) {
-		release_resource(chip->ba0_res);
-		kfree_nocheck(chip->ba0_res);
-	}
-	if (chip->ba1_res) {
-		release_resource(chip->ba1_res);
-		kfree_nocheck(chip->ba1_res);
-	}
-	if (chip->irq >= 0)
-		free_irq(chip->irq, (void *)chip);
+	pci_release_regions(chip->pci);
 
 	kfree(chip);
 	return 0;
@@ -1411,8 +1402,6 @@ static int __devinit snd_cs4281_create(snd_card_t * card,
 	chip->card = card;
 	chip->pci = pci;
 	chip->irq = -1;
-	chip->ba0_addr = pci_resource_start(pci, 0);
-	chip->ba1_addr = pci_resource_start(pci, 1);
 	pci_set_master(pci);
 	if (dual_codec < 0 || dual_codec > 3) {
 		snd_printk(KERN_ERR "invalid dual_codec option %d\n", dual_codec);
@@ -1420,16 +1409,13 @@ static int __devinit snd_cs4281_create(snd_card_t * card,
 	}
 	chip->dual_codec = dual_codec;
 
-	if ((chip->ba0_res = request_mem_region(chip->ba0_addr, CS4281_BA0_SIZE, "CS4281 BA0")) == NULL) {
-		snd_printk(KERN_ERR "unable to grab memory region 0x%lx-0x%lx\n", chip->ba0_addr, chip->ba0_addr + CS4281_BA0_SIZE - 1);
-		snd_cs4281_free(chip);
-		return -ENOMEM;
+	if ((err = pci_request_regions(pci, "CS4281")) < 0) {
+		kfree(chip);
+		return err;
 	}
-	if ((chip->ba1_res = request_mem_region(chip->ba1_addr, CS4281_BA1_SIZE, "CS4281 BA1")) == NULL) {
-		snd_printk(KERN_ERR "unable to grab memory region 0x%lx-0x%lx\n", chip->ba1_addr, chip->ba1_addr + CS4281_BA1_SIZE - 1);
-		snd_cs4281_free(chip);
-		return -ENOMEM;
-	}
+	chip->ba0_addr = pci_resource_start(pci, 0);
+	chip->ba1_addr = pci_resource_start(pci, 1);
+
 	if (request_irq(pci->irq, snd_cs4281_interrupt, SA_INTERRUPT|SA_SHIRQ, "CS4281", (void *)chip)) {
 		snd_printk(KERN_ERR "unable to grab IRQ %d\n", pci->irq);
 		snd_cs4281_free(chip);
@@ -1437,8 +1423,8 @@ static int __devinit snd_cs4281_create(snd_card_t * card,
 	}
 	chip->irq = pci->irq;
 
-	chip->ba0 = (unsigned long) ioremap_nocache(chip->ba0_addr, CS4281_BA0_SIZE);
-	chip->ba1 = (unsigned long) ioremap_nocache(chip->ba1_addr, CS4281_BA1_SIZE);
+	chip->ba0 = (unsigned long) ioremap_nocache(chip->ba0_addr, pci_resource_len(pci, 0));
+	chip->ba1 = (unsigned long) ioremap_nocache(chip->ba1_addr, pci_resource_len(pci, 1));
 	if (!chip->ba0 || !chip->ba1) {
 		snd_cs4281_free(chip);
 		return -ENOMEM;

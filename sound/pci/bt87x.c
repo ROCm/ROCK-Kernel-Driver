@@ -153,7 +153,6 @@ struct snd_bt87x {
 	struct pci_dev *pci;
 
 	void *mmio;
-	struct resource *res_mmio;
 	int irq;
 
 	int dig_rate;
@@ -641,12 +640,9 @@ static int snd_bt87x_free(bt87x_t *chip)
 
 		iounmap(chip->mmio);
 	}
-	if (chip->res_mmio) {
-		release_resource(chip->res_mmio);
-		kfree_nocheck(chip->res_mmio);
-	}
 	if (chip->irq >= 0)
 		free_irq(chip->irq, chip);
+	pci_release_regions(chip->pci);
 	kfree(chip);
 	return 0;
 }
@@ -699,13 +695,9 @@ static int __devinit snd_bt87x_create(snd_card_t *card,
 	chip->irq = -1;
 	spin_lock_init(&chip->reg_lock);
 
-	chip->res_mmio = request_mem_region(pci_resource_start(pci, 0),
-					    pci_resource_len(pci, 0),
-					    "Bt87x audio");
-	if (!chip->res_mmio) {
-		snd_bt87x_free(chip);
-		snd_printk(KERN_ERR "cannot allocate io memory\n");
-		return -EBUSY;
+	if ((err = pci_request_regions(pci, "Bt87x audio")) < 0) {
+		kfree(chip);
+		return err;
 	}
 	chip->mmio = ioremap_nocache(pci_resource_start(pci, 0),
 				     pci_resource_len(pci, 0));

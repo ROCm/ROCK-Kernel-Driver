@@ -2464,7 +2464,7 @@ static int __devinit snd_ice1712_build_controls(ice1712_t *ice)
 
 static int snd_ice1712_free(ice1712_t *ice)
 {
-	if (ice->res_port == NULL)
+	if (! ice->port)
 		goto __hw_end;
 	/* mask all interrupts */
 	outb(0xc0, ICEMT(ice, IRQ));
@@ -2475,22 +2475,8 @@ static int snd_ice1712_free(ice1712_t *ice)
 		synchronize_irq(ice->irq);
 		free_irq(ice->irq, (void *) ice);
 	}
-	if (ice->res_port) {
-		release_resource(ice->res_port);
-		kfree_nocheck(ice->res_port);
-	}
-	if (ice->res_ddma_port) {
-		release_resource(ice->res_ddma_port);
-		kfree_nocheck(ice->res_ddma_port);
-	}
-	if (ice->res_dmapath_port) {
-		release_resource(ice->res_dmapath_port);
-		kfree_nocheck(ice->res_dmapath_port);
-	}
-	if (ice->res_profi_port) {
-		release_resource(ice->res_profi_port);
-		kfree_nocheck(ice->res_profi_port);
-	}
+	if (ice->port)
+		pci_release_regions(ice->pci);
 	snd_ice1712_akm4xxx_free(ice);
 	kfree(ice);
 	return 0;
@@ -2551,36 +2537,21 @@ static int __devinit snd_ice1712_create(snd_card_t * card,
 	ice->card = card;
 	ice->pci = pci;
 	ice->irq = -1;
-	ice->port = pci_resource_start(pci, 0);
-	ice->ddma_port = pci_resource_start(pci, 1);
-	ice->dmapath_port = pci_resource_start(pci, 2);
-	ice->profi_port = pci_resource_start(pci, 3);
 	pci_set_master(pci);
 	pci_write_config_word(ice->pci, 0x40, 0x807f);
 	pci_write_config_word(ice->pci, 0x42, 0x0006);
 	snd_ice1712_proc_init(ice);
 	synchronize_irq(pci->irq);
 
-	if ((ice->res_port = request_region(ice->port, 32, "ICE1712 - Controller")) == NULL) {
-		snd_printk("unable to grab ports 0x%lx-0x%lx\n", ice->port, ice->port + 32 - 1);
-		snd_ice1712_free(ice);
-		return -EIO;
+	if ((err = pci_request_regions(pci, "ICE1712")) < 0) {
+		kfree(ice);
+		return err;
 	}
-	if ((ice->res_ddma_port = request_region(ice->ddma_port, 16, "ICE1712 - DDMA")) == NULL) {
-		snd_printk("unable to grab ports 0x%lx-0x%lx\n", ice->ddma_port, ice->ddma_port + 16 - 1);
-		snd_ice1712_free(ice);
-		return -EIO;
-	}
-	if ((ice->res_dmapath_port = request_region(ice->dmapath_port, 16, "ICE1712 - DMA path")) == NULL) {
-		snd_printk("unable to grab ports 0x%lx-0x%lx\n", ice->dmapath_port, ice->dmapath_port + 16 - 1);
-		snd_ice1712_free(ice);
-		return -EIO;
-	}
-	if ((ice->res_profi_port = request_region(ice->profi_port, 64, "ICE1712 - Professional")) == NULL) {
-		snd_printk("unable to grab ports 0x%lx-0x%lx\n", ice->profi_port, ice->profi_port + 16 - 1);
-		snd_ice1712_free(ice);
-		return -EIO;
-	}
+	ice->port = pci_resource_start(pci, 0);
+	ice->ddma_port = pci_resource_start(pci, 1);
+	ice->dmapath_port = pci_resource_start(pci, 2);
+	ice->profi_port = pci_resource_start(pci, 3);
+
 	if (request_irq(pci->irq, snd_ice1712_interrupt, SA_INTERRUPT|SA_SHIRQ, "ICE1712", (void *) ice)) {
 		snd_printk("unable to grab IRQ %d\n", pci->irq);
 		snd_ice1712_free(ice);

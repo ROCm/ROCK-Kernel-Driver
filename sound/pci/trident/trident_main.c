@@ -3555,18 +3555,17 @@ int __devinit snd_trident_create(snd_card_t * card,
 	if (max_wavetable_size < 0 )
 		max_wavetable_size = 0;
 	trident->synth.max_size = max_wavetable_size * 1024;
-	trident->port = pci_resource_start(pci, 0);
 	trident->irq = -1;
 
 	trident->midi_port = TRID_REG(trident, T4D_MPU401_BASE);
 	pci_set_master(pci);
+
+	if ((err = pci_request_regions(pci, "Trident Audio")) < 0) {
+		kfree(trident);
+		return err;
+	}
 	trident->port = pci_resource_start(pci, 0);
 
-	if ((trident->res_port = request_region(trident->port, 0x100, "Trident Audio")) == NULL) {
-		snd_printk("unable to grab I/O region 0x%lx-0x%lx\n", trident->port, trident->port + 0x100 - 1);
-		snd_trident_free(trident);
-		return -EBUSY;
-	}
 	if (request_irq(pci->irq, snd_trident_interrupt, SA_INTERRUPT|SA_SHIRQ, "Trident Audio", (void *) trident)) {
 		snd_printk("unable to grab IRQ %d\n", pci->irq);
 		snd_trident_free(trident);
@@ -3684,10 +3683,7 @@ int snd_trident_free(trident_t *trident)
 	}
 	if (trident->irq >= 0)
 		free_irq(trident->irq, (void *)trident);
-	if (trident->res_port) {
-		release_resource(trident->res_port);
-		kfree_nocheck(trident->res_port);
-	}
+	pci_release_regions(trident->pci);
 	kfree(trident);
 	return 0;
 }

@@ -154,7 +154,6 @@ struct _snd_fm801 {
 	int irq;
 
 	unsigned long port;	/* I/O port number */
-	struct resource *res_port;
 	unsigned int multichannel: 1,	/* multichannel support */
 		     secondary: 1;	/* secondary codec */
 	unsigned char secondary_addr;	/* address of the secondary codec */
@@ -1235,12 +1234,9 @@ static int snd_fm801_free(fm801_t *chip)
 #ifdef TEA575X_RADIO
 	snd_tea575x_exit(&chip->tea);
 #endif
-	if (chip->res_port) {
-		release_resource(chip->res_port);
-		kfree_nocheck(chip->res_port);
-	}
 	if (chip->irq >= 0)
 		free_irq(chip->irq, (void *)chip);
+	pci_release_regions(chip->pci);
 
 	kfree(chip);
 	return 0;
@@ -1276,12 +1272,11 @@ static int __devinit snd_fm801_create(snd_card_t * card,
 	chip->card = card;
 	chip->pci = pci;
 	chip->irq = -1;
-	chip->port = pci_resource_start(pci, 0);
-	if ((chip->res_port = request_region(chip->port, 0x80, "FM801")) == NULL) {
-		snd_printk("unable to grab region 0x%lx-0x%lx\n", chip->port, chip->port + 0x80 - 1);
-		snd_fm801_free(chip);
-		return -EBUSY;
+	if ((err = pci_request_regions(pci, "FM801")) < 0) {
+		kfree(chip);
+		return err;
 	}
+	chip->port = pci_resource_start(pci, 0);
 	if (request_irq(pci->irq, snd_fm801_interrupt, SA_INTERRUPT|SA_SHIRQ, "FM801", (void *)chip)) {
 		snd_printk("unable to grab IRQ %d\n", chip->irq);
 		snd_fm801_free(chip);

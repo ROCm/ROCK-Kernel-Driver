@@ -212,7 +212,6 @@ typedef struct snd_rme9652 {
 	spinlock_t lock;
 	int irq;
 	unsigned long port;
-	struct resource *res_port;
 	unsigned long iobase;
 	
 	int precise_ptr;
@@ -1845,14 +1844,13 @@ static int snd_rme9652_free(rme9652_t *rme9652)
 		rme9652_stop(rme9652);
 	snd_rme9652_free_buffers(rme9652);
 
-	if (rme9652->iobase)
-		iounmap((void *) rme9652->iobase);
-	if (rme9652->res_port) {
-		release_resource(rme9652->res_port);
-		kfree_nocheck(rme9652->res_port);
-	}
 	if (rme9652->irq >= 0)
 		free_irq(rme9652->irq, (void *)rme9652);
+	if (rme9652->iobase)
+		iounmap((void *) rme9652->iobase);
+	if (rme9652->port)
+		pci_release_regions(rme9652->pci);
+
 	return 0;
 }
 
@@ -2552,12 +2550,9 @@ static int __devinit snd_rme9652_create(snd_card_t *card,
 
 	spin_lock_init(&rme9652->lock);
 
+	if ((err = pci_request_regions(pci, "rme9652")) < 0)
+		return err;
 	rme9652->port = pci_resource_start(pci, 0);
-	if ((rme9652->res_port = request_mem_region(rme9652->port, RME9652_IO_EXTENT, "rme9652")) == NULL) {
-		snd_printk("unable to grab memory region 0x%lx-0x%lx\n", rme9652->port, rme9652->port + RME9652_IO_EXTENT - 1);
-		return -EBUSY;
-	}
-
 	rme9652->iobase = (unsigned long) ioremap_nocache(rme9652->port, RME9652_IO_EXTENT);
 	if (rme9652->iobase == 0) {
 		snd_printk("unable to remap region 0x%lx-0x%lx\n", rme9652->port, rme9652->port + RME9652_IO_EXTENT - 1);

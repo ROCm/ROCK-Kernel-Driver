@@ -210,7 +210,6 @@ typedef struct snd_rme32 {
 	spinlock_t lock;
 	int irq;
 	unsigned long port;
-	struct resource *res_port;
 	unsigned long iobase;
 
 	u32 wcreg;		/* cached write control register value */
@@ -1327,9 +1326,9 @@ static void snd_rme32_free(void *private_data)
 		iounmap((void *) rme32->iobase);
 		rme32->iobase = 0;
 	}
-	if (rme32->res_port != NULL) {
-		release_resource(rme32->res_port);
-		rme32->res_port = NULL;
+	if (rme32->port) {
+		pci_release_regions(rme32->pci);
+		rme32->port = 0;
 	}
 }
 
@@ -1352,17 +1351,14 @@ static int __devinit snd_rme32_create(rme32_t * rme32)
 	int err;
 
 	rme32->irq = -1;
+	spin_lock_init(&rme32->lock);
 
 	if ((err = pci_enable_device(pci)) < 0)
 		return err;
 
+	if ((err = pci_request_regions(pci, "RME32")) < 0)
+		return err;
 	rme32->port = pci_resource_start(rme32->pci, 0);
-
-	if ((rme32->res_port = request_mem_region(rme32->port, RME32_IO_SIZE, "RME32")) == NULL) {
-		snd_printk("unable to grab memory region 0x%lx-0x%lx\n",
-			   rme32->port, rme32->port + RME32_IO_SIZE - 1);
-		return -EBUSY;
-	}
 
 	if (request_irq(pci->irq, snd_rme32_interrupt, SA_INTERRUPT | SA_SHIRQ, "RME32", (void *) rme32)) {
 		snd_printk("unable to grab IRQ %d\n", pci->irq);
@@ -1370,7 +1366,6 @@ static int __devinit snd_rme32_create(rme32_t * rme32)
 	}
 	rme32->irq = pci->irq;
 
-	spin_lock_init(&rme32->lock);
 	if ((rme32->iobase = (unsigned long) ioremap_nocache(rme32->port, RME32_IO_SIZE)) == 0) {
 		snd_printk("unable to remap memory region 0x%lx-0x%lx\n",
 			   rme32->port, rme32->port + RME32_IO_SIZE - 1);

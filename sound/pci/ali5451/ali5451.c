@@ -240,7 +240,6 @@ struct snd_stru_ali {
 
 	unsigned int hw_initialized: 1;
 	unsigned int spdif_support: 1;
-	struct resource *res_port;
 
 	struct pci_dev	*pci;
 	struct pci_dev	*pci_m1533;
@@ -1985,10 +1984,8 @@ static int snd_ali_free(ali_t * codec)
 		synchronize_irq(codec->irq);
 		free_irq(codec->irq, (void *)codec);
 	}
-	if (codec->res_port) {
-		release_resource(codec->res_port);
-		kfree_nocheck(codec->res_port);
-	}
+	if (codec->port)
+		pci_release_regions(codec->pci);
 #ifdef CONFIG_PM
 	if (codec->image)
 		kfree(codec->image);
@@ -2047,11 +2044,12 @@ static int snd_ali_chip_init(ali_t *codec)
 
 static int __devinit snd_ali_resources(ali_t *codec)
 {
+	int err;
+
 	snd_ali_printk("resouces allocation ...\n");
-	if ((codec->res_port = request_region(codec->port, 0x100, "ALI 5451")) == NULL) {
-		snd_printk("Unalbe to request io ports.\n");
-		return -EBUSY;
-	}
+	if ((err = pci_request_regions(codec->pci, "ALI 5451")) < 0)
+		return err;
+	codec->port = pci_resource_start(codec->pci, 0);
 
 	if (request_irq(codec->pci->irq, snd_ali_card_interrupt, SA_INTERRUPT|SA_SHIRQ, "ALI 5451", (void *)codec)) {
 		snd_printk("Unable to request irq.\n");
@@ -2107,7 +2105,6 @@ static int __devinit snd_ali_create(snd_card_t * card,
 	codec->card = card;
 	codec->pci = pci;
 	codec->irq = -1;
-	codec->port = pci_resource_start(pci, 0);
 	pci_read_config_byte(pci, PCI_REVISION_ID, &codec->revision);
 	codec->spdif_support = spdif_support;
 

@@ -543,7 +543,7 @@ static int __devinit snd_emu10k1_ecard_init(emu10k1_t * emu)
 
 static int snd_emu10k1_free(emu10k1_t *emu)
 {
-	if (emu->res_port != NULL) {	/* avoid access to already used hardware */
+	if (emu->port) {	/* avoid access to already used hardware */
 	       	snd_emu10k1_fx8010_tram_setup(emu, 0);
 		snd_emu10k1_done(emu);
        	}
@@ -557,12 +557,10 @@ static int snd_emu10k1_free(emu10k1_t *emu)
 		vfree(emu->page_ptr_table);
 	if (emu->page_addr_table)
 		vfree(emu->page_addr_table);
-	if (emu->res_port) {
-		release_resource(emu->res_port);
-		kfree_nocheck(emu->res_port);
-	}
 	if (emu->irq >= 0)
 		free_irq(emu->irq, (void *)emu);
+	if (emu->port)
+		pci_release_regions(emu->pci);
 	kfree(emu);
 	return 0;
 }
@@ -622,7 +620,6 @@ int __devinit snd_emu10k1_create(snd_card_t * card,
 	emu->irq = -1;
 	emu->synth = NULL;
 	emu->get_synth_voice = NULL;
-	emu->port = pci_resource_start(pci, 0);
 
 	emu->audigy = is_audigy;
 	if (is_audigy)
@@ -630,10 +627,11 @@ int __devinit snd_emu10k1_create(snd_card_t * card,
 	else
 		emu->gpr_base = FXGPREGBASE;
 
-	if ((emu->res_port = request_region(emu->port, 0x20, "EMU10K1")) == NULL) {
-		snd_emu10k1_free(emu);
-		return -EBUSY;
+	if ((err = pci_request_regions(pci, "EMU10K1")) < 0) {
+		kfree(emu);
+		return err;
 	}
+	emu->port = pci_resource_start(pci, 0);
 
 	if (request_irq(pci->irq, snd_emu10k1_interrupt, SA_INTERRUPT|SA_SHIRQ, "EMU10K1", (void *)emu)) {
 		snd_emu10k1_free(emu);

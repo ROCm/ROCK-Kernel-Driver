@@ -564,7 +564,6 @@ struct snd_es1968 {
 	/* Resources... */
 	int irq;
 	unsigned long io_port;
-	struct resource *res_io_port;
 	int type;
 	struct pci_dev *pci;
 	snd_card_t *card;
@@ -2448,7 +2447,7 @@ static int es1968_resume(snd_card_t *card, unsigned int state)
 
 static int snd_es1968_free(es1968_t *chip)
 {
-	if (chip->res_io_port) {
+	if (chip->io_port) {
 		synchronize_irq(chip->irq);
 		outw(1, chip->io_port + 0x04); /* clear WP interrupts */
 		outw(0, chip->io_port + ESM_PORT_HOST_IRQ); /* disable IRQ */
@@ -2466,10 +2465,7 @@ static int snd_es1968_free(es1968_t *chip)
 	snd_es1968_set_acpi(chip, ACPI_D3);
 	chip->master_switch = NULL;
 	chip->master_volume = NULL;
-	if (chip->res_io_port) {
-		release_resource(chip->res_io_port);
-		kfree_nocheck(chip->res_io_port);
-	}
+	pci_release_regions(chip->pci);
 	kfree(chip);
 	return 0;
 }
@@ -2543,12 +2539,11 @@ static int __devinit snd_es1968_create(snd_card_t * card,
 	chip->playback_streams = play_streams;
 	chip->capture_streams = capt_streams;
 
-	chip->io_port = pci_resource_start(pci, 0);
-	if ((chip->res_io_port = request_region(chip->io_port, 0x100, "ESS Maestro")) == NULL) {
-		snd_printk("unable to grab region 0x%lx-0x%lx\n", chip->io_port, chip->io_port + 0x100 - 1);
-		snd_es1968_free(chip);
-		return -EBUSY;
+	if ((err = pci_request_regions(pci, "ESS Maestro")) < 0) {
+		kfree(chip);
+		return err;
 	}
+	chip->io_port = pci_resource_start(pci, 0);
 	if (request_irq(pci->irq, snd_es1968_interrupt, SA_INTERRUPT|SA_SHIRQ,
 			"ESS Maestro", (void*)chip)) {
 		snd_printk("unable to grab IRQ %d\n", pci->irq);

@@ -395,19 +395,15 @@ typedef struct _snd_intel8x0 intel8x0_t;
 
 struct _snd_intel8x0 {
 	unsigned int device_type;
-	char ac97_name[32];
-	char ctrl_name[32];
 
 	int irq;
 
 	unsigned int mmio;
 	unsigned long addr;
 	unsigned long remap_addr;
-	struct resource *res;
 	unsigned int bm_mmio;
 	unsigned long bmaddr;
 	unsigned long remap_bmaddr;
-	struct resource *res_bm;
 
 	struct snd_dma_device dma_dev;
 
@@ -2202,20 +2198,13 @@ static int snd_intel8x0_free(intel8x0_t *chip)
 			fill_nocache(chip->bdbars.area, chip->bdbars.bytes, 0);
 		snd_dma_free_pages(&chip->dma_dev, &chip->bdbars);
 	}
+	if (chip->irq >= 0)
+		free_irq(chip->irq, (void *)chip);
 	if (chip->remap_addr)
 		iounmap((void *) chip->remap_addr);
 	if (chip->remap_bmaddr)
 		iounmap((void *) chip->remap_bmaddr);
-	if (chip->res) {
-		release_resource(chip->res);
-		kfree_nocheck(chip->res);
-	}
-	if (chip->res_bm) {
-		release_resource(chip->res_bm);
-		kfree_nocheck(chip->res_bm);
-	}
-	if (chip->irq >= 0)
-		free_irq(chip->irq, (void *)chip);
+	pci_release_regions(chip->pci);
 	kfree(chip);
 	return 0;
 }
@@ -2464,32 +2453,27 @@ static int __devinit snd_intel8x0_create(snd_card_t * card,
 	chip->card = card;
 	chip->pci = pci;
 	chip->irq = -1;
-	snd_intel8x0_proc_init(chip);
-	sprintf(chip->ac97_name, "%s - AC'97", card->shortname);
-	sprintf(chip->ctrl_name, "%s - Controller", card->shortname);
+
 	if (pci->vendor == PCI_VENDOR_ID_INTEL &&
 	    pci->device == PCI_DEVICE_ID_INTEL_440MX)
 		chip->fix_nocache = 1; /* enable workaround */
+
+	if ((err = pci_request_regions(pci, card->shortname)) < 0) {
+		kfree(chip);
+		return err;
+	}
+
 	if (device_type == DEVICE_ALI) {
 		/* ALI5455 has no ac97 region */
 		chip->bmaddr = pci_resource_start(pci, 0);
-		if ((chip->res_bm = request_region(chip->bmaddr, 256, chip->ctrl_name)) == NULL) {
-			snd_printk("unable to grab ports 0x%lx-0x%lx\n", chip->bmaddr, chip->bmaddr + 64 - 1);
-			snd_intel8x0_free(chip);
-			return -EBUSY;
-		}
 		goto port_inited;
 	}
 
 	if (pci_resource_flags(pci, 2) & IORESOURCE_MEM) {	/* ICH4 and Nforce */
 		chip->mmio = 1;
 		chip->addr = pci_resource_start(pci, 2);
-		if ((chip->res = request_mem_region(chip->addr, 512, chip->ac97_name)) == NULL) {
-			snd_printk("unable to grab I/O memory 0x%lx-0x%lx\n", chip->addr, chip->addr + 512 - 1);
-			snd_intel8x0_free(chip);
-			return -EBUSY;
-		}
-		chip->remap_addr = (unsigned long) ioremap_nocache(chip->addr, 512);
+		chip->remap_addr = (unsigned long) ioremap_nocache(chip->addr,
+								   pci_resource_len(pci, 2));
 		if (chip->remap_addr == 0) {
 			snd_printk("AC'97 space ioremap problem\n");
 			snd_intel8x0_free(chip);
@@ -2497,21 +2481,12 @@ static int __devinit snd_intel8x0_create(snd_card_t * card,
 		}
 	} else {
 		chip->addr = pci_resource_start(pci, 0);
-		if ((chip->res = request_region(chip->addr, 256, chip->ac97_name)) == NULL) {
-			snd_printk("unable to grab ports 0x%lx-0x%lx\n", chip->addr, chip->addr + 256 - 1);
-			snd_intel8x0_free(chip);
-			return -EBUSY;
-		}
 	}
 	if (pci_resource_flags(pci, 3) & IORESOURCE_MEM) {	/* ICH4 */
 		chip->bm_mmio = 1;
 		chip->bmaddr = pci_resource_start(pci, 3);
-		if ((chip->res_bm = request_mem_region(chip->bmaddr, 256, chip->ctrl_name)) == NULL) {
-			snd_printk("unable to grab I/O memory 0x%lx-0x%lx\n", chip->bmaddr, chip->bmaddr + 512 - 1);
-			snd_intel8x0_free(chip);
-			return -EBUSY;
-		}
-		chip->remap_bmaddr = (unsigned long) ioremap_nocache(chip->bmaddr, 256);
+		chip->remap_bmaddr = (unsigned long) ioremap_nocache(chip->bmaddr,
+								     pci_resource_len(pci, 3));
 		if (chip->remap_bmaddr == 0) {
 			snd_printk("Controller space ioremap problem\n");
 			snd_intel8x0_free(chip);
@@ -2519,11 +2494,6 @@ static int __devinit snd_intel8x0_create(snd_card_t * card,
 		}
 	} else {
 		chip->bmaddr = pci_resource_start(pci, 1);
-		if ((chip->res_bm = request_region(chip->bmaddr, 64, chip->ctrl_name)) == NULL) {
-			snd_printk("unable to grab ports 0x%lx-0x%lx\n", chip->bmaddr, chip->bmaddr + 64 - 1);
-			snd_intel8x0_free(chip);
-			return -EBUSY;
-		}
 	}
 
  port_inited:
@@ -2698,6 +2668,8 @@ static int __devinit snd_intel8x0_probe(struct pci_dev *pci,
 		}
 	} else
 		mpu_port[dev] = 0;
+
+	snd_intel8x0_proc_init(chip);
 
 	sprintf(card->longname, "%s at 0x%lx, irq %i",
 		card->shortname, chip->addr, chip->irq);

@@ -225,7 +225,6 @@ typedef struct snd_rme96 {
 	spinlock_t    lock;
 	int irq;
 	unsigned long port;
-	struct resource *res_port;
 	unsigned long iobase;
 	
 	u32 wcreg;    /* cached write control register value */
@@ -1553,10 +1552,9 @@ snd_rme96_free(void *private_data)
 		iounmap((void *)rme96->iobase);
 		rme96->iobase = 0;
 	}
-	if (rme96->res_port != NULL) {
-		release_resource(rme96->res_port);
-		kfree_nocheck(rme96->res_port);
-		rme96->res_port = NULL;
+	if (rme96->port) {
+		pci_release_regions(rme96->pci);
+		rme96->port = 0;
 	}
 }
 
@@ -1581,16 +1579,14 @@ snd_rme96_create(rme96_t *rme96)
 	int err;
 
 	rme96->irq = -1;
+	spin_lock_init(&rme96->lock);
 
 	if ((err = pci_enable_device(pci)) < 0)
 		return err;
 
+	if ((err = pci_request_regions(pci, "RME96")) < 0)
+		return err;
 	rme96->port = pci_resource_start(rme96->pci, 0);
-
-	if ((rme96->res_port = request_mem_region(rme96->port, RME96_IO_SIZE, "RME96")) == NULL) {
-		snd_printk("unable to grab memory region 0x%lx-0x%lx\n", rme96->port, rme96->port + RME96_IO_SIZE - 1);
-		return -EBUSY;
-	}
 
 	if (request_irq(pci->irq, snd_rme96_interrupt, SA_INTERRUPT|SA_SHIRQ, "RME96", (void *)rme96)) {
 		snd_printk("unable to grab IRQ %d\n", pci->irq);
@@ -1598,7 +1594,6 @@ snd_rme96_create(rme96_t *rme96)
 	}
 	rme96->irq = pci->irq;
 
-	spin_lock_init(&rme96->lock);
 	if ((rme96->iobase = (unsigned long) ioremap_nocache(rme96->port, RME96_IO_SIZE)) == 0) {
 		snd_printk("unable to remap memory region 0x%lx-0x%lx\n", rme96->port, rme96->port + RME96_IO_SIZE - 1);
 		return -ENOMEM;

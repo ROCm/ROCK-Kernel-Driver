@@ -433,7 +433,6 @@ struct snd_stru_cmipci {
 	int irq;
 
 	unsigned long iobase;
-	struct resource *res_iobase;
 	unsigned int ctrl;	/* FUNCTRL0 current value */
 
 	snd_pcm_t *pcm;		/* DAC/ADC PCM */
@@ -2553,10 +2552,7 @@ static int snd_cmipci_free(cmipci_t *cm)
 		kfree_nocheck(cm->res_joystick);
 	}
 #endif
-	if (cm->res_iobase) {
-		release_resource(cm->res_iobase);
-		kfree_nocheck(cm->res_iobase);
-	}
+	pci_release_regions(cm->pci);
 	kfree(cm);
 	return 0;
 }
@@ -2595,16 +2591,16 @@ static int __devinit snd_cmipci_create(snd_card_t *card, struct pci_dev *pci,
 	cm->card = card;
 	cm->pci = pci;
 	cm->irq = -1;
-	cm->iobase = pci_resource_start(pci, 0);
 	cm->channel[0].ch = 0;
 	cm->channel[1].ch = 1;
 	cm->channel[0].is_dac = cm->channel[1].is_dac = 1; /* dual DAC mode */
 
-	if ((cm->res_iobase = request_region(cm->iobase, CM_EXTENT_CODEC, card->driver)) == NULL) {
-		snd_printk("unable to grab ports 0x%lx-0x%lx\n", cm->iobase, cm->iobase + CM_EXTENT_CODEC - 1);
-		err = -EBUSY;
-		goto __error;
+	if ((err = pci_request_regions(pci, card->driver)) < 0) {
+		kfree(cm);
+		return err;
 	}
+	cm->iobase = pci_resource_start(pci, 0);
+
 	if (request_irq(pci->irq, snd_cmipci_interrupt, SA_INTERRUPT|SA_SHIRQ, card->driver, (void *)cm)) {
 		snd_printk("unable to grab IRQ %d\n", pci->irq);
 		err = -EBUSY;

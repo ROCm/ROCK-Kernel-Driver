@@ -207,13 +207,9 @@ struct _snd_sonicvibes {
 	int irq;
 
 	unsigned long sb_port;
-	struct resource *res_sb_port;
 	unsigned long enh_port;
-	struct resource *res_enh_port;
 	unsigned long synth_port;
-	struct resource *res_synth_port;
 	unsigned long midi_port;
-	struct resource *res_midi_port;
 	unsigned long game_port;
 	unsigned int dmaa_port;
 	struct resource *res_dmaa;
@@ -1181,22 +1177,8 @@ static int snd_sonicvibes_free(sonicvibes_t *sonic)
 #endif
 	pci_write_config_dword(sonic->pci, 0x40, sonic->dmaa_port);
 	pci_write_config_dword(sonic->pci, 0x48, sonic->dmac_port);
-	if (sonic->res_sb_port) {
-		release_resource(sonic->res_sb_port);
-		kfree_nocheck(sonic->res_sb_port);
-	}
-	if (sonic->res_enh_port) {
-		release_resource(sonic->res_enh_port);
-		kfree_nocheck(sonic->res_enh_port);
-	}
-	if (sonic->res_synth_port) {
-		release_resource(sonic->res_synth_port);
-		kfree_nocheck(sonic->res_synth_port);
-	}
-	if (sonic->res_midi_port) {
-		release_resource(sonic->res_midi_port);
-		kfree_nocheck(sonic->res_midi_port);
-	}
+	if (sonic->irq >= 0)
+		free_irq(sonic->irq, (void *)sonic);
 	if (sonic->res_dmaa) {
 		release_resource(sonic->res_dmaa);
 		kfree_nocheck(sonic->res_dmaa);
@@ -1205,8 +1187,7 @@ static int snd_sonicvibes_free(sonicvibes_t *sonic)
 		release_resource(sonic->res_dmac);
 		kfree_nocheck(sonic->res_dmac);
 	}
-	if (sonic->irq >= 0)
-		free_irq(sonic->irq, (void *)sonic);
+	pci_release_regions(sonic->pci);
 	kfree(sonic);
 	return 0;
 }
@@ -1248,31 +1229,18 @@ static int __devinit snd_sonicvibes_create(snd_card_t * card,
 	sonic->card = card;
 	sonic->pci = pci;
 	sonic->irq = -1;
+
+	if ((err = pci_request_regions(pci, "S3 SonicVibes")) < 0) {
+		kfree(sonic);
+		return err;
+	}
+
 	sonic->sb_port = pci_resource_start(pci, 0);
-	if ((sonic->res_sb_port = request_region(sonic->sb_port, 0x10, "S3 SonicVibes SB")) == NULL) {
-		snd_printk("unable to grab SB port at 0x%lx-0x%lx\n", sonic->sb_port, sonic->sb_port + 0x10 - 1);
-		snd_sonicvibes_free(sonic);
-		return -EBUSY;
-	}
 	sonic->enh_port = pci_resource_start(pci, 1);
-	if ((sonic->res_enh_port = request_region(sonic->enh_port, 0x10, "S3 SonicVibes Enhanced")) == NULL) {
-		snd_printk("unable to grab PCM port at 0x%lx-0x%lx\n", sonic->enh_port, sonic->enh_port + 0x10 - 1);
-		snd_sonicvibes_free(sonic);
-		return -EBUSY;
-	}
 	sonic->synth_port = pci_resource_start(pci, 2);
-	if ((sonic->res_synth_port = request_region(sonic->synth_port, 4, "S3 SonicVibes Synth")) == NULL) {
-		snd_printk("unable to grab synth port at 0x%lx-0x%lx\n", sonic->synth_port, sonic->synth_port + 4 - 1);
-		snd_sonicvibes_free(sonic);
-		return -EBUSY;
-	}
 	sonic->midi_port = pci_resource_start(pci, 3);
-	if ((sonic->res_midi_port = request_region(sonic->midi_port, 4, "S3 SonicVibes Midi")) == NULL) {
-		snd_printk("unable to grab MIDI port at 0x%lx-0x%lx\n", sonic->midi_port, sonic->midi_port + 4 - 1);
-		snd_sonicvibes_free(sonic);
-		return -EBUSY;
-	}
 	sonic->game_port = pci_resource_start(pci, 4);
+
 	if (request_irq(pci->irq, snd_sonicvibes_interrupt, SA_INTERRUPT|SA_SHIRQ, "S3 SonicVibes", (void *)sonic)) {
 		snd_printk("unable to grab IRQ %d\n", pci->irq);
 		snd_sonicvibes_free(sonic);

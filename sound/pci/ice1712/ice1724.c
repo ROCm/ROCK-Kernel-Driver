@@ -2058,7 +2058,7 @@ static int __devinit snd_vt1724_build_controls(ice1712_t *ice)
 
 static int snd_vt1724_free(ice1712_t *ice)
 {
-	if (ice->res_port == NULL)
+	if (! ice->port)
 		goto __hw_end;
 	/* mask all interrupts */
 	outb(0xff, ICEMT1724(ice, DMA_INT_MASK));
@@ -2069,14 +2069,7 @@ static int snd_vt1724_free(ice1712_t *ice)
 		synchronize_irq(ice->irq);
 		free_irq(ice->irq, (void *) ice);
 	}
-	if (ice->res_port) {
-		release_resource(ice->res_port);
-		kfree_nocheck(ice->res_port);
-	}
-	if (ice->res_profi_port) {
-		release_resource(ice->res_profi_port);
-		kfree_nocheck(ice->res_profi_port);
-	}
+	pci_release_regions(ice->pci);
 	snd_ice1712_akm4xxx_free(ice);
 	kfree(ice);
 	return 0;
@@ -2120,24 +2113,17 @@ static int __devinit snd_vt1724_create(snd_card_t * card,
 	ice->card = card;
 	ice->pci = pci;
 	ice->irq = -1;
-	ice->port = pci_resource_start(pci, 0);
-	ice->profi_port = pci_resource_start(pci, 1);
 	pci_set_master(pci);
 	snd_vt1724_proc_init(ice);
 	synchronize_irq(pci->irq);
 
-	if ((ice->res_port = request_region(ice->port, 32, "ICE1724 - Controller")) == NULL) {
-		snd_printk("unable to grab ports 0x%lx-0x%lx\n", ice->port, ice->port + 32 - 1);
-		snd_vt1724_free(ice);
-		return -EIO;
+	if ((err = pci_request_regions(pci, "ICE1724")) < 0) {
+		kfree(ice);
+		return err;
 	}
+	ice->port = pci_resource_start(pci, 0);
+	ice->profi_port = pci_resource_start(pci, 1);
 
-	if ((ice->res_profi_port = request_region(ice->profi_port, 128, "ICE1724 - Professional")) == NULL) {
-		snd_printk("unable to grab ports 0x%lx-0x%lx\n", ice->profi_port, ice->profi_port + 16 - 1);
-		snd_vt1724_free(ice);
-		return -EIO;
-	}
-		
 	if (request_irq(pci->irq, snd_vt1724_interrupt, SA_INTERRUPT|SA_SHIRQ, "ICE1724", (void *) ice)) {
 		snd_printk("unable to grab IRQ %d\n", pci->irq);
 		snd_vt1724_free(ice);

@@ -380,7 +380,6 @@ struct _snd_ensoniq {
 	unsigned long capture3size;
 
 	unsigned long port;
-	struct resource *res_port;
 	unsigned int mode;
 	unsigned int uartm;	/* UART mode */
 
@@ -1821,12 +1820,9 @@ static int snd_ensoniq_free(ensoniq_t *ensoniq)
 	if (ensoniq->dma_bug.area)
 		snd_dma_free_pages(&ensoniq->dma_dev, &ensoniq->dma_bug);
 #endif
-	if (ensoniq->res_port) {
-		release_resource(ensoniq->res_port);
-		kfree_nocheck(ensoniq->res_port);
-	}
 	if (ensoniq->irq >= 0)
 		free_irq(ensoniq->irq, (void *)ensoniq);
+	pci_release_regions(ensoniq->pci);
 	kfree(ensoniq);
 	return 0;
 }
@@ -1887,12 +1883,11 @@ static int __devinit snd_ensoniq_create(snd_card_t * card,
 	ensoniq->card = card;
 	ensoniq->pci = pci;
 	ensoniq->irq = -1;
-	ensoniq->port = pci_resource_start(pci, 0);
-	if ((ensoniq->res_port = request_region(ensoniq->port, 0x40, "Ensoniq AudioPCI")) == NULL) {
-		snd_printk("unable to grab ports 0x%lx-0x%lx\n", ensoniq->port, ensoniq->port + 0x40 - 1);
-		snd_ensoniq_free(ensoniq);
-		return -EBUSY;
+	if ((err = pci_request_regions(pci, "Ensoniq AudioPCI")) < 0) {
+		kfree(ensoniq);
+		return err;
 	}
+	ensoniq->port = pci_resource_start(pci, 0);
 	if (request_irq(pci->irq, snd_audiopci_interrupt, SA_INTERRUPT|SA_SHIRQ, "Ensoniq AudioPCI", (void *)ensoniq)) {
 		snd_printk("unable to grab IRQ %d\n", pci->irq);
 		snd_ensoniq_free(ensoniq);
