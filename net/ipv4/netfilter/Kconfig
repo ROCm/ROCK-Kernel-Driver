@@ -613,5 +613,19 @@ config IP_NF_MATCH_ADDRTYPE
 	  If you want to compile it as a module, say M here and read
 	  Documentation/modules.txt.  If unsure, say `N'.
 
+config IP_NF_MATCH_REALM
+	tristate  'realm match support'
+	depends on IP_NF_IPTABLES
+	select NET_CLS_ROUTE
+	help
+	  This option adds a `realm' match, which allows you to use the realm
+	  key from the routing subsytem inside iptables.
+	
+	  This match pretty much resembles the CONFIG_NET_CLS_ROUTE4 option 
+	  in tc world.
+	
+	  If you want to compile it as a module, say M here and read
+	  Documentation/modules.txt.  If unsure, say `N'.
+
 endmenu
 
