@@ -977,35 +977,38 @@ e1000_free_tx_resources(struct e1000_adapter *adapter)
 static void
 e1000_clean_tx_ring(struct e1000_adapter *adapter)
 {
+	struct e1000_desc_ring *tx_ring = &adapter->tx_ring;
+	struct e1000_buffer *buffer_info;
 	struct pci_dev *pdev = adapter->pdev;
 	unsigned long size;
-	int i;
+	unsigned int i;
 
 	/* Free all the Tx ring sk_buffs */
 
-	for(i = 0; i < adapter->tx_ring.count; i++) {
-		if(adapter->tx_ring.buffer_info[i].skb) {
+	for(i = 0; i < tx_ring->count; i++) {
+		buffer_info = &tx_ring->buffer_info[i];
+		if(buffer_info->skb) {
 
 			pci_unmap_page(pdev,
-			               adapter->tx_ring.buffer_info[i].dma,
-			               adapter->tx_ring.buffer_info[i].length,
+			               buffer_info->dma,
+			               buffer_info->length,
 			               PCI_DMA_TODEVICE);
 
-			dev_kfree_skb(adapter->tx_ring.buffer_info[i].skb);
+			dev_kfree_skb(buffer_info->skb);
 
-			adapter->tx_ring.buffer_info[i].skb = NULL;
+			buffer_info->skb = NULL;
 		}
 	}
 
-	size = sizeof(struct e1000_buffer) * adapter->tx_ring.count;
-	memset(adapter->tx_ring.buffer_info, 0, size);
+	size = sizeof(struct e1000_buffer) * tx_ring->count;
+	memset(tx_ring->buffer_info, 0, size);
 
 	/* Zero out the descriptor ring */
 
-	memset(adapter->tx_ring.desc, 0, adapter->tx_ring.size);
+	memset(tx_ring->desc, 0, tx_ring->size);
 
-	adapter->tx_ring.next_to_use = 0;
-	adapter->tx_ring.next_to_clean = 0;
+	tx_ring->next_to_use = 0;
+	tx_ring->next_to_clean = 0;
 
 	E1000_WRITE_REG(&adapter->hw, TDH, 0);
 	E1000_WRITE_REG(&adapter->hw, TDT, 0);
@@ -1021,17 +1024,17 @@ e1000_clean_tx_ring(struct e1000_adapter *adapter)
 static void
 e1000_free_rx_resources(struct e1000_adapter *adapter)
 {
+	struct e1000_desc_ring *rx_ring = &adapter->rx_ring;
 	struct pci_dev *pdev = adapter->pdev;
 
 	e1000_clean_rx_ring(adapter);
 
-	kfree(adapter->rx_ring.buffer_info);
-	adapter->rx_ring.buffer_info = NULL;
+	kfree(rx_ring->buffer_info);
+	rx_ring->buffer_info = NULL;
 
-	pci_free_consistent(pdev, adapter->rx_ring.size,
-	                    adapter->rx_ring.desc, adapter->rx_ring.dma);
+	pci_free_consistent(pdev, rx_ring->size, rx_ring->desc, rx_ring->dma);
 
-	adapter->rx_ring.desc = NULL;
+	rx_ring->desc = NULL;
 }
 
 /**
@@ -1042,35 +1045,38 @@ e1000_free_rx_resources(struct e1000_adapter *adapter)
 static void
 e1000_clean_rx_ring(struct e1000_adapter *adapter)
 {
+	struct e1000_desc_ring *rx_ring = &adapter->rx_ring;
+	struct e1000_buffer *buffer_info;
 	struct pci_dev *pdev = adapter->pdev;
 	unsigned long size;
-	int i;
+	unsigned int i;
 
 	/* Free all the Rx ring sk_buffs */
 
-	for(i = 0; i < adapter->rx_ring.count; i++) {
-		if(adapter->rx_ring.buffer_info[i].skb) {
+	for(i = 0; i < rx_ring->count; i++) {
+		buffer_info = &rx_ring->buffer_info[i];
+		if(buffer_info->skb) {
 
 			pci_unmap_single(pdev,
-			                 adapter->rx_ring.buffer_info[i].dma,
-			                 adapter->rx_ring.buffer_info[i].length,
+			                 buffer_info->dma,
+			                 buffer_info->length,
 			                 PCI_DMA_FROMDEVICE);
 
-			dev_kfree_skb(adapter->rx_ring.buffer_info[i].skb);
+			dev_kfree_skb(buffer_info->skb);
 
-			adapter->rx_ring.buffer_info[i].skb = NULL;
+			buffer_info->skb = NULL;
 		}
 	}
 
-	size = sizeof(struct e1000_buffer) * adapter->rx_ring.count;
-	memset(adapter->rx_ring.buffer_info, 0, size);
+	size = sizeof(struct e1000_buffer) * rx_ring->count;
+	memset(rx_ring->buffer_info, 0, size);
 
 	/* Zero out the descriptor ring */
 
-	memset(adapter->rx_ring.desc, 0, adapter->rx_ring.size);
+	memset(rx_ring->desc, 0, rx_ring->size);
 
-	adapter->rx_ring.next_to_clean = 0;
-	adapter->rx_ring.next_to_use = 0;
+	rx_ring->next_to_clean = 0;
+	rx_ring->next_to_use = 0;
 
 	E1000_WRITE_REG(&adapter->hw, RDH, 0);
 	E1000_WRITE_REG(&adapter->hw, RDT, 0);
@@ -1320,7 +1326,7 @@ e1000_watchdog(unsigned long data)
 	struct e1000_adapter *adapter = (struct e1000_adapter *) data;
 	struct net_device *netdev = adapter->netdev;
 	struct e1000_desc_ring *txdr = &adapter->tx_ring;
-	int i;
+	unsigned int i;
 
 	e1000_check_for_link(&adapter->hw);
 
@@ -1406,7 +1412,7 @@ e1000_tso(struct e1000_adapter *adapter, struct sk_buff *skb)
 {
 #ifdef NETIF_F_TSO
 	struct e1000_context_desc *context_desc;
-	int i;
+	unsigned int i;
 	uint8_t ipcss, ipcso, tucss, tucso, hdr_len;
 	uint16_t ipcse, tucse, mss;
 
@@ -1457,7 +1463,7 @@ static inline boolean_t
 e1000_tx_csum(struct e1000_adapter *adapter, struct sk_buff *skb)
 {
 	struct e1000_context_desc *context_desc;
-	int i;
+	unsigned int i;
 	uint8_t css, cso;
 
 	if(skb->ip_summed == CHECKSUM_HW) {
@@ -1490,18 +1496,21 @@ e1000_tx_map(struct e1000_adapter *adapter, struct sk_buff *skb,
 	unsigned int first)
 {
 	struct e1000_desc_ring *tx_ring = &adapter->tx_ring;
-	int len = skb->len, offset = 0, size, count = 0, i;
+	struct e1000_buffer *buffer_info;
+	int len = skb->len;
+	unsigned int offset = 0, size, count = 0, i;
 
 #ifdef NETIF_F_TSO
-	int tso = skb_shinfo(skb)->tso_size;
+	unsigned int tso = skb_shinfo(skb)->tso_size;
 #endif
-	int nr_frags = skb_shinfo(skb)->nr_frags;
-	int f;
+	unsigned int nr_frags = skb_shinfo(skb)->nr_frags;
+	unsigned int f;
 	len -= skb->data_len;
 
 	i = tx_ring->next_to_use;
 
 	while(len) {
+		buffer_info = &tx_ring->buffer_info[i];
 		size = min(len, E1000_MAX_DATA_PER_TXD);
 #ifdef NETIF_F_TSO
 		/* Workaround for premature desc write-backs
@@ -1509,13 +1518,13 @@ e1000_tx_map(struct e1000_adapter *adapter, struct sk_buff *skb,
 		if(tso && !nr_frags && size == len && size > 4)
 			size -= 4;
 #endif
-		tx_ring->buffer_info[i].length = size;
-		tx_ring->buffer_info[i].dma =
+		buffer_info->length = size;
+		buffer_info->dma =
 			pci_map_single(adapter->pdev,
 				skb->data + offset,
 				size,
 				PCI_DMA_TODEVICE);
-		tx_ring->buffer_info[i].time_stamp = jiffies;
+		buffer_info->time_stamp = jiffies;
 
 		len -= size;
 		offset += size;
@@ -1531,6 +1540,7 @@ e1000_tx_map(struct e1000_adapter *adapter, struct sk_buff *skb,
 		offset = 0;
 
 		while(len) {
+			buffer_info = &tx_ring->buffer_info[i];
 			size = min(len, E1000_MAX_DATA_PER_TXD);
 #ifdef NETIF_F_TSO
 			/* Workaround for premature desc write-backs
@@ -1538,14 +1548,14 @@ e1000_tx_map(struct e1000_adapter *adapter, struct sk_buff *skb,
 			if(tso && f == (nr_frags-1) && size == len && size > 4)
 				size -= 4;
 #endif
-			tx_ring->buffer_info[i].length = size;
-			tx_ring->buffer_info[i].dma =
+			buffer_info->length = size;
+			buffer_info->dma =
 				pci_map_page(adapter->pdev,
 					frag->page,
 					frag->page_offset + offset,
 					size,
 					PCI_DMA_TODEVICE);
-			tx_ring->buffer_info[i].time_stamp = jiffies;
+			buffer_info->time_stamp = jiffies;
 
 			len -= size;
 			offset += size;
@@ -1553,7 +1563,7 @@ e1000_tx_map(struct e1000_adapter *adapter, struct sk_buff *skb,
 			if(++i == tx_ring->count) i = 0;
 		}
 	}
-	if(--i < 0) i = tx_ring->count - 1;
+	i = (i == 0) ? tx_ring->count - 1 : i - 1;
 	tx_ring->buffer_info[i].skb = skb;
 	tx_ring->buffer_info[first].next_to_watch = i;
 
@@ -1565,8 +1575,9 @@ e1000_tx_queue(struct e1000_adapter *adapter, int count, int tx_flags)
 {
 	struct e1000_desc_ring *tx_ring = &adapter->tx_ring;
 	struct e1000_tx_desc *tx_desc = NULL;
+	struct e1000_buffer *buffer_info;
 	uint32_t txd_upper = 0, txd_lower = E1000_TXD_CMD_IFCS;
-	int i;
+	unsigned int i;
 
 	if(tx_flags & E1000_TX_FLAGS_TSO) {
 		txd_lower |= E1000_TXD_CMD_DEXT | E1000_TXD_DTYP_D |
@@ -1587,10 +1598,11 @@ e1000_tx_queue(struct e1000_adapter *adapter, int count, int tx_flags)
 	i = tx_ring->next_to_use;
 
 	while(count--) {
+		buffer_info = &tx_ring->buffer_info[i];
 		tx_desc = E1000_TX_DESC(*tx_ring, i);
-		tx_desc->buffer_addr = cpu_to_le64(tx_ring->buffer_info[i].dma);
+		tx_desc->buffer_addr = cpu_to_le64(buffer_info->dma);
 		tx_desc->lower.data =
-			cpu_to_le32(txd_lower | tx_ring->buffer_info[i].length);
+			cpu_to_le32(txd_lower | buffer_info->length);
 		tx_desc->upper.data = cpu_to_le32(txd_upper);
 		if(++i == tx_ring->count) i = 0;
 	}
@@ -1656,7 +1668,7 @@ e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 {
 	struct e1000_adapter *adapter = netdev->priv;
 	unsigned int first;
-	int tx_flags = 0;
+	unsigned int tx_flags = 0;
 
 	if(skb->len <= 0) {
 		dev_kfree_skb_any(skb);
@@ -1968,7 +1980,7 @@ e1000_intr(int irq, void *data, struct pt_regs *regs)
 	struct e1000_adapter *adapter = netdev->priv;
 	uint32_t icr = E1000_READ_REG(&adapter->hw, ICR);
 #ifndef CONFIG_E1000_NAPI
-	int i;
+	unsigned int i;
 #endif
 
 	if(!icr)
@@ -2040,7 +2052,8 @@ e1000_clean_tx_irq(struct e1000_adapter *adapter)
 	struct pci_dev *pdev = adapter->pdev;
 	struct e1000_tx_desc *tx_desc, *eop_desc;
 	struct e1000_buffer *buffer_info;
-	int i, eop, cleaned = FALSE;
+	unsigned int i, eop;
+	boolean_t cleaned = FALSE;
 
 	i = tx_ring->next_to_clean;
 	eop = tx_ring->buffer_info[i].next_to_watch;
@@ -2106,16 +2119,19 @@ e1000_clean_rx_irq(struct e1000_adapter *adapter)
 	struct net_device *netdev = adapter->netdev;
 	struct pci_dev *pdev = adapter->pdev;
 	struct e1000_rx_desc *rx_desc;
+	struct e1000_buffer *buffer_info;
 	struct sk_buff *skb;
 	unsigned long flags;
 	uint32_t length;
 	uint8_t last_byte;
-	int i, cleaned = FALSE;
+	unsigned int i;
+	boolean_t cleaned = FALSE;
 
 	i = rx_ring->next_to_clean;
 	rx_desc = E1000_RX_DESC(*rx_ring, i);
 
 	while(rx_desc->status & E1000_RXD_STAT_DD) {
+		buffer_info = &rx_ring->buffer_info[i];
 
 #ifdef CONFIG_E1000_NAPI
 		if(*work_done >= work_to_do)
@@ -2127,11 +2143,11 @@ e1000_clean_rx_irq(struct e1000_adapter *adapter)
 		cleaned = TRUE;
 
 		pci_unmap_single(pdev,
-		                 rx_ring->buffer_info[i].dma,
-		                 rx_ring->buffer_info[i].length,
+		                 buffer_info->dma,
+		                 buffer_info->length,
 		                 PCI_DMA_FROMDEVICE);
 
-		skb = rx_ring->buffer_info[i].skb;
+		skb = buffer_info->skb;
 		length = le16_to_cpu(rx_desc->length);
 
 		if(!(rx_desc->status & E1000_RXD_STAT_EOP)) {
@@ -2142,7 +2158,7 @@ e1000_clean_rx_irq(struct e1000_adapter *adapter)
 
 			dev_kfree_skb_irq(skb);
 			rx_desc->status = 0;
-			rx_ring->buffer_info[i].skb = NULL;
+			buffer_info->skb = NULL;
 
 			if(++i == rx_ring->count) i = 0;
 
@@ -2170,7 +2186,7 @@ e1000_clean_rx_irq(struct e1000_adapter *adapter)
 
 				dev_kfree_skb_irq(skb);
 				rx_desc->status = 0;
-				rx_ring->buffer_info[i].skb = NULL;
+				buffer_info->skb = NULL;
 
 				if(++i == rx_ring->count) i = 0;
 
@@ -2206,7 +2222,7 @@ e1000_clean_rx_irq(struct e1000_adapter *adapter)
 		netdev->last_rx = jiffies;
 
 		rx_desc->status = 0;
-		rx_ring->buffer_info[i].skb = NULL;
+		buffer_info->skb = NULL;
 
 		if(++i == rx_ring->count) i = 0;
 
@@ -2232,13 +2248,15 @@ e1000_alloc_rx_buffers(struct e1000_adapter *adapter)
 	struct net_device *netdev = adapter->netdev;
 	struct pci_dev *pdev = adapter->pdev;
 	struct e1000_rx_desc *rx_desc;
+	struct e1000_buffer *buffer_info;
 	struct sk_buff *skb;
 	int reserve_len = 2;
-	int i;
+	unsigned int i;
 
 	i = rx_ring->next_to_use;
+	buffer_info = &rx_ring->buffer_info[i];
 
-	while(!rx_ring->buffer_info[i].skb) {
+	while(!buffer_info->skb) {
 		rx_desc = E1000_RX_DESC(*rx_ring, i);
 
 		skb = dev_alloc_skb(adapter->rx_buffer_len + reserve_len);
@@ -2256,15 +2274,15 @@ e1000_alloc_rx_buffers(struct e1000_adapter *adapter)
 
 		skb->dev = netdev;
 
-		rx_ring->buffer_info[i].skb = skb;
-		rx_ring->buffer_info[i].length = adapter->rx_buffer_len;
-		rx_ring->buffer_info[i].dma =
+		buffer_info->skb = skb;
+		buffer_info->length = adapter->rx_buffer_len;
+		buffer_info->dma =
 			pci_map_single(pdev,
 			               skb->data,
 			               adapter->rx_buffer_len,
 			               PCI_DMA_FROMDEVICE);
 
-		rx_desc->buffer_addr = cpu_to_le64(rx_ring->buffer_info[i].dma);
+		rx_desc->buffer_addr = cpu_to_le64(buffer_info->dma);
 
 		if((i & ~(E1000_RX_BUFFER_WRITE - 1)) == i) {
 			/* Force memory writes to complete before letting h/w
@@ -2277,6 +2295,7 @@ e1000_alloc_rx_buffers(struct e1000_adapter *adapter)
 		}
 
 		if(++i == rx_ring->count) i = 0;
+		buffer_info = &rx_ring->buffer_info[i];
 	}
 
 	rx_ring->next_to_use = i;
