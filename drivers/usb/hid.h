@@ -2,12 +2,10 @@
 #define __HID_H
 
 /*
- * $Id: hid.h,v 1.10 2001/05/10 15:56:07 vojtech Exp $
+ * $Id: hid.h,v 1.24 2001/12/27 10:37:41 vojtech Exp $
  *
  *  Copyright (c) 1999 Andreas Gal
  *  Copyright (c) 2000-2001 Vojtech Pavlik
- *
- *  Sponsored by SuSE
  */
 
 /*
@@ -26,91 +24,9 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  *
  * Should you need to contact me, the author, you can do so either by
- * e-mail - mail your message to <vojtech@suse.cz>, or by paper mail:
- * Vojtech Pavlik, Ucitelska 1576, Prague 8, 182 00 Czech Republic
+ * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
+ * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
  */
-
-/*
- * HID class requests
- */
-#define HID_REQ_GET_REPORT		0x01
-#define HID_REQ_GET_IDLE		0x02
-#define HID_REQ_GET_PROTOCOL		0x03
-#define HID_REQ_SET_REPORT		0x09
-#define HID_REQ_SET_IDLE		0x0A
-#define HID_REQ_SET_PROTOCOL		0x0B
-
-/*
- * HID class descriptor types
- */
-#define HID_DT_HID			(USB_TYPE_CLASS | 0x01)
-#define HID_DT_REPORT			(USB_TYPE_CLASS | 0x02)
-#define HID_DT_PHYSICAL			(USB_TYPE_CLASS | 0x03)
-
-/*
- * Utilities for class control messaging
- */
-static inline int
-hid_set_idle(struct usb_device *dev, int ifnum, int duration, int report_id)
-{
-	return usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
-		HID_REQ_SET_IDLE, USB_TYPE_CLASS | USB_RECIP_INTERFACE,
-		(duration << 8) | report_id, ifnum, NULL, 0,
-		HZ * USB_CTRL_SET_TIMEOUT);
-}
-
-static inline int
-hid_get_protocol(struct usb_device *dev, int ifnum)
-{
-	unsigned char type;
-	int ret;
-
-	if ((ret = usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
-			HID_REQ_GET_PROTOCOL,
-			USB_DIR_IN | USB_TYPE_CLASS | USB_RECIP_INTERFACE,
-			0, ifnum, &type, 1, 
-			HZ * USB_CTRL_GET_TIMEOUT)) < 0)
-		return ret;
-
-	return type;
-}
-
-static inline int
-hid_set_protocol(struct usb_device *dev, int ifnum, int protocol)
-{
-	return usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
-		HID_REQ_SET_PROTOCOL, USB_TYPE_CLASS | USB_RECIP_INTERFACE,
-		protocol, ifnum, NULL, 0, 
-		HZ * USB_CTRL_SET_TIMEOUT);
-}
-
-static inline int
-hid_get_report(struct usb_device *dev, int ifnum, unsigned char type,
-	unsigned char id, void *buf, int size)
-{
-	return usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
-		HID_REQ_GET_REPORT,
-		USB_DIR_IN | USB_TYPE_CLASS | USB_RECIP_INTERFACE,
-		(type << 8) + id, ifnum, buf, size, 
-		HZ * USB_CTRL_GET_TIMEOUT);
-}
-
-static inline int
-hid_set_report(struct usb_device *dev, int ifnum, unsigned char type,
-	unsigned char id, void *buf, int size)
-{
-	return usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
-		HID_REQ_SET_REPORT, USB_TYPE_CLASS | USB_RECIP_INTERFACE,
-		(type << 8) + id, ifnum, buf, size, HZ);
-		// FIXME USB_CTRL_SET_TIMEOUT
-}
-
-
-/*
- * "Boot Protocol" keyboard/mouse drivers use don't use all of HID;
- * they're a lot smaller but can't support all the device features.
- */
-#ifndef	_HID_BOOT_PROTOCOL
 
 #include <linux/types.h>
 #include <linux/slab.h>
@@ -121,6 +37,25 @@ hid_set_report(struct usb_device *dev, int ifnum, unsigned char type,
  */
 
 #define USB_INTERFACE_CLASS_HID		3
+
+/*
+ * HID class requests
+ */
+
+#define HID_REQ_GET_REPORT		0x01
+#define HID_REQ_GET_IDLE		0x02
+#define HID_REQ_GET_PROTOCOL		0x03
+#define HID_REQ_SET_REPORT		0x09
+#define HID_REQ_SET_IDLE		0x0A
+#define HID_REQ_SET_PROTOCOL		0x0B
+
+/*
+ * HID class descriptor types
+ */
+
+#define HID_DT_HID			(USB_TYPE_CLASS | 0x01)
+#define HID_DT_REPORT			(USB_TYPE_CLASS | 0x02)
+#define HID_DT_PHYSICAL			(USB_TYPE_CLASS | 0x03)
 
 /*
  * We parse each description item into this structure. Short items data
@@ -240,9 +175,11 @@ struct hid_item {
 #define HID_UP_KEYBOARD 	0x00070000
 #define HID_UP_LED 		0x00080000
 #define HID_UP_BUTTON 		0x00090000
+#define HID_UP_ORDINAL 		0x000a0000
 #define HID_UP_CONSUMER		0x000c0000
 #define HID_UP_DIGITIZER 	0x000d0000
 #define HID_UP_PID 		0x000f0000
+#define HID_UP_HPVENDOR         0xff7f0000
 
 #define HID_USAGE		0x0000ffff
 
@@ -279,7 +216,7 @@ struct hid_global {
 	__s32    logical_maximum;
 	__s32    physical_minimum;
 	__s32    physical_maximum;
-	unsigned unit_exponent;
+	__s32    unit_exponent;
 	unsigned unit;
 	unsigned report_id;
 	unsigned report_size;
@@ -336,7 +273,7 @@ struct hid_field {
 	__s32     logical_maximum;
 	__s32     physical_minimum;
 	__s32     physical_maximum;
-	unsigned  unit_exponent;
+	__s32     unit_exponent;
 	unsigned  unit;
 	struct hid_report *report;	/* associated report */
 };
@@ -350,8 +287,6 @@ struct hid_report {
 	struct hid_field *field[HID_MAX_FIELDS];	/* fields of the report */
 	unsigned maxfield;				/* maximum valid field index */
 	unsigned size;					/* size of the report (bits) */
-	unsigned idx;					/* where we're in data */
-	unsigned char *data;				/* data for multi-packet reports */
 	struct hid_device *device;			/* associated device */
 };
 
@@ -364,15 +299,19 @@ struct hid_report_enum {
 #define HID_REPORT_TYPES 3
 
 #define HID_BUFFER_SIZE		32
-#define HID_CONTROL_FIFO_SIZE	8
+#define HID_CONTROL_FIFO_SIZE	64
+#define HID_OUTPUT_FIFO_SIZE	64
 
 struct hid_control_fifo {
-	struct usb_ctrlrequest dr;
-	char buffer[HID_BUFFER_SIZE];
+	unsigned char dir;
+	struct hid_report *report;
 };
 
 #define HID_CLAIMED_INPUT	1
 #define HID_CLAIMED_HIDDEV	2
+
+#define HID_CTRL_RUNNING	1
+#define HID_OUT_RUNNING		2
 
 struct hid_device {							/* device report descriptor */
 	 __u8 *rdesc;
@@ -386,12 +325,23 @@ struct hid_device {							/* device report descriptor */
 	struct usb_device *dev;						/* USB device */
 	int ifnum;							/* USB interface number */
 
-	struct urb urb;							/* USB URB structure */
-	char buffer[HID_BUFFER_SIZE];					/* Rx buffer */
+	unsigned long iofl;						/* I/O flags (CTRL_RUNNING, OUT_RUNNING) */
 
-	struct urb urbout;						/* Output URB */
-	struct hid_control_fifo out[HID_CONTROL_FIFO_SIZE];		/* Transmit buffer */
-	unsigned char outhead, outtail;					/* Tx buffer head & tail */
+	struct urb *urbin;						/* Input URB */
+	char inbuf[HID_BUFFER_SIZE];					/* Input buffer */
+
+	struct urb *urbctrl;						/* Control URB */
+	struct usb_ctrlrequest cr;					/* Control request struct */
+	struct hid_control_fifo ctrl[HID_CONTROL_FIFO_SIZE];		/* Control fifo */
+	unsigned char ctrlhead, ctrltail;				/* Control fifo head & tail */
+	char ctrlbuf[HID_BUFFER_SIZE];					/* Control buffer */
+	spinlock_t ctrllock;						/* Control fifo spinlock */
+
+	struct urb *urbout;						/* Output URB */
+	struct hid_report *out[HID_CONTROL_FIFO_SIZE];			/* Output pipe fifo */
+	unsigned char outhead, outtail;					/* Output pipe fifo head & tail */
+	char outbuf[HID_BUFFER_SIZE];					/* Output buffer */
+	spinlock_t outlock;						/* Output fifo spinlock */
 
 	unsigned claimed;						/* Claimed by hidinput, hiddev? */	
 	unsigned quirks;						/* Various quirks the device can pull on us */
@@ -400,8 +350,12 @@ struct hid_device {							/* device report descriptor */
 	void *hiddev;							/* The hiddev structure */
 	int minor;							/* Hiddev minor number */
 
+	wait_queue_head_t wait;						/* For sleeping */
+
 	int open;							/* is the device open by anyone? */
 	char name[128];							/* Device name */
+	char phys[64];							/* Device physical location */
+	char uniq[64];							/* Device unique identifier (serial #) */
 };
 
 #define HID_GLOBAL_STACK_SIZE 4
@@ -441,19 +395,18 @@ void hidinput_disconnect(struct hid_device *);
 #else
 #define hid_dump_input(a,b)	do { } while (0)
 #define hid_dump_device(c)	do { } while (0)
-#endif /* DEBUG */
+#define hid_dump_field(a,b)	do { } while (0)
+#endif
 
-#define IS_INPUT_APPLICATION(a) (((a >= 0x00010000) && (a <= 0x00010008)) || (a == 0x00010080) || ( a == 0x000c0001))
+#endif
+
+/* Applications from HID Usage Tables 4/8/99 Version 1.1 */
+/* We ignore a few input applications that are not widely used */
+#define IS_INPUT_APPLICATION(a) (((a >= 0x00010000) && (a <= 0x00010008)) || ( a == 0x00010080) || ( a == 0x000c0001))
 
 int hid_open(struct hid_device *);
 void hid_close(struct hid_device *);
 int hid_find_field(struct hid_device *, unsigned int, unsigned int, struct hid_field **);
 int hid_set_field(struct hid_field *, unsigned, __s32);
-void hid_write_report(struct hid_device *, struct hid_report *);
-void hid_read_report(struct hid_device *, struct hid_report *);
+void hid_submit_report(struct hid_device *, struct hid_report *, unsigned char dir);
 void hid_init_reports(struct hid_device *hid);
-
-#endif	/* !_HID_BOOT_PROTOCOL */
-
-#endif	/* !__HID_H */
-

@@ -1,11 +1,9 @@
 /*
- * $Id: hid-input.c,v 1.5 2001/05/23 09:25:02 vojtech Exp $
+ * $Id: hid-input.c,v 1.18 2001/11/07 09:01:18 vojtech Exp $
  *
  *  Copyright (c) 2000-2001 Vojtech Pavlik
  *
- *  USB HID to Linux Input mapping module
- *
- *  Sponsored by SuSE
+ *  USB HID to Linux Input mapping
  */
 
 /*
@@ -24,13 +22,12 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  *
  * Should you need to contact me, the author, you can do so either by
- * e-mail - mail your message to <vojtech@suse.cz>, or by paper mail:
- * Vojtech Pavlik, Ucitelska 1576, Prague 8, 182 00 Czech Republic
+ * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
+ * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
  */
 
 #include <linux/module.h>
 #include <linux/slab.h>
-#include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/input.h>
 #include <linux/usb.h>
@@ -61,12 +58,13 @@ static unsigned char hid_keyboard[256] = {
 static struct {
 	__s32 x;
 	__s32 y;
-}  hid_hat_to_axis[] = {{0, 0}, { 0,-1}, { 1,-1}, { 1, 0}, { 1, 1}, { 0, 1}, {-1, 1}, {-1, 0}, {-1,-1}};
+}  hid_hat_to_axis[] = {{ 0, 0}, { 0,-1}, { 1,-1}, { 1, 0}, { 1, 1}, { 0, 1}, {-1, 1}, {-1, 0}, {-1,-1}};
 
 static void hidinput_configure_usage(struct hid_device *device, struct hid_field *field, struct hid_usage *usage)
 {
 	struct input_dev *input = &device->input;
 	int max;
+	int is_abs = 0;
 	unsigned long *bit;
 
 	switch (usage->hid & HID_USAGE_PAGE) {
@@ -198,6 +196,7 @@ static void hidinput_configure_usage(struct hid_device *device, struct hid_field
 
 		case HID_UP_CONSUMER:	/* USB HUT v1.1, pages 56-62 */
 
+			set_bit(EV_REP, input->evbit);
 			switch (usage->hid & HID_USAGE) {
 				case 0x000: usage->code = 0; break;
 				case 0x034: usage->code = KEY_SLEEP;		break;
@@ -205,14 +204,21 @@ static void hidinput_configure_usage(struct hid_device *device, struct hid_field
 				case 0x08a: usage->code = KEY_WWW;		break;
 				case 0x095: usage->code = KEY_HELP;		break;
 
+				case 0x0b0: usage->code = KEY_PLAY;		break;
+				case 0x0b1: usage->code = KEY_PAUSE;		break;
+				case 0x0b2: usage->code = KEY_RECORD;		break;
+				case 0x0b3: usage->code = KEY_FASTFORWARD;	break;
 				case 0x0b4: usage->code = KEY_REWIND;		break;
 				case 0x0b5: usage->code = KEY_NEXTSONG;		break;
 				case 0x0b6: usage->code = KEY_PREVIOUSSONG;	break;
 				case 0x0b7: usage->code = KEY_STOPCD;		break;
 				case 0x0b8: usage->code = KEY_EJECTCD;		break;
 				case 0x0cd: usage->code = KEY_PLAYPAUSE;	break;
-
+			        case 0x0e0: is_abs = 1;
+					    usage->code = ABS_VOLUME;
+					    break;
 				case 0x0e2: usage->code = KEY_MUTE;		break;
+				case 0x0e5: usage->code = KEY_BASSBOOST;	break;
 				case 0x0e9: usage->code = KEY_VOLUMEUP;		break;
 				case 0x0ea: usage->code = KEY_VOLUMEDOWN;	break;
 
@@ -220,7 +226,6 @@ static void hidinput_configure_usage(struct hid_device *device, struct hid_field
 				case 0x18a: usage->code = KEY_MAIL;		break;
 				case 0x192: usage->code = KEY_CALC;		break;
 				case 0x194: usage->code = KEY_FILE;		break;
-
 				case 0x21a: usage->code = KEY_UNDO;		break;
 				case 0x21b: usage->code = KEY_COPY;		break;
 				case 0x21c: usage->code = KEY_CUT;		break;
@@ -233,6 +238,34 @@ static void hidinput_configure_usage(struct hid_device *device, struct hid_field
 				case 0x226: usage->code = KEY_STOP;		break;
 				case 0x227: usage->code = KEY_REFRESH;		break;
 				case 0x22a: usage->code = KEY_BOOKMARKS;	break;
+
+				default:    usage->code = KEY_UNKNOWN;		break;
+			}
+
+			if (is_abs) {
+			        usage->type = EV_ABS; bit = input->absbit; max = ABS_MAX;
+			} else  {
+				usage->type = EV_KEY; bit = input->keybit; max = KEY_MAX;
+			}
+			break;
+
+		case HID_UP_HPVENDOR:	/* Reported on a Dutch layout HP5308 */
+
+			set_bit(EV_REP, input->evbit);
+			switch (usage->hid & HID_USAGE) {
+			        case 0x021: usage->code = KEY_PRINT;            break;
+				case 0x070: usage->code = KEY_HP;		break;
+				case 0x071: usage->code = KEY_CAMERA;		break;
+				case 0x072: usage->code = KEY_SOUND;		break;
+				case 0x073: usage->code = KEY_QUESTION;		break;
+
+				case 0x080: usage->code = KEY_EMAIL;		break;
+				case 0x081: usage->code = KEY_CHAT;		break;
+				case 0x082: usage->code = KEY_SEARCH;		break;
+				case 0x083: usage->code = KEY_CONNECT;	        break;
+				case 0x084: usage->code = KEY_FINANCE;		break;
+				case 0x085: usage->code = KEY_SPORT;		break;
+				case 0x086: usage->code = KEY_SHOP;	        break;
 
 				default:    usage->code = KEY_UNKNOWN;		break;
 
@@ -353,7 +386,7 @@ static int hidinput_input_event(struct input_dev *dev, unsigned int type, unsign
 	}
 
 	hid_set_field(field, offset, value);
-	hid_write_report(hid, field->report);
+	hid_submit_report(hid, field->report, USB_DIR_OUT);
 
 	return 0;
 }
@@ -397,6 +430,8 @@ int hidinput_connect(struct hid_device *hid)
 	hid->input.close = hidinput_close;
 
 	hid->input.name = hid->name;
+	hid->input.phys = hid->phys;
+	hid->input.uniq = hid->uniq;
 	hid->input.idbus = BUS_USB;
 	hid->input.idvendor = dev->descriptor.idVendor;
 	hid->input.idproduct = dev->descriptor.idProduct;

@@ -1,12 +1,10 @@
 /*
- * $Id: hid-debug.h,v 1.3 2001/05/10 15:56:07 vojtech Exp $
+ * $Id: hid-debug.h,v 1.8 2001/09/25 09:37:57 vojtech Exp $
  *
  *  (c) 1999 Andreas Gal		<gal@cs.uni-magdeburg.de>
- *  (c) 2000-2001 Vojtech Pavlik	<vojtech@suse.cz>
+ *  (c) 2000-2001 Vojtech Pavlik	<vojtech@ucw.cz>
  *
  *  Some debug stuff for the HID parser.
- *
- *  Sponsored by SuSE
  */
 
 /*
@@ -25,8 +23,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  *
  * Should you need to contact me, the author, you can do so either by
- * e-mail - mail your message to <vojtech@suse.cz>, or by paper mail:
- * Vojtech Pavlik, Ucitelska 1576, Prague 8, 182 00 Czech Republic
+ * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
+ * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
  */
 
 struct hid_usage_entry {
@@ -36,6 +34,7 @@ struct hid_usage_entry {
 };
 
 static struct hid_usage_entry hid_usage_table[] = {
+  {  0,      0, "Undefined" },
   {  1,      0, "GenericDesktop" },
     {0, 0x01, "Pointer"},
     {0, 0x02, "Mouse"},
@@ -87,6 +86,7 @@ static struct hid_usage_entry hid_usage_table[] = {
   {  7, 0, "Keyboard" },
   {  8, 0, "LED" },
   {  9, 0, "Button" },
+  { 10, 0, "Ordinal" },
   { 12, 0, "Hotkey" },
   { 13, 0, "Digitizers" },
     {0, 0x01, "Digitizer"},
@@ -112,6 +112,112 @@ static struct hid_usage_entry hid_usage_table[] = {
     {0, 0x45, "Eraser"},
     {0, 0x46, "TabletPick"},
   { 15, 0, "PhysicalInterfaceDevice" },
+    {0, 0x00, "Undefined"},
+    {0, 0x01, "Physical_Interface_Device"},
+      {0, 0x20, "Normal"},
+    {0, 0x21, "Set_Effect_Report"},
+      {0, 0x22, "Effect_Block_Index"},
+      {0, 0x23, "Parameter_Block_Offset"},
+      {0, 0x24, "ROM_Flag"},
+      {0, 0x25, "Effect_Type"},
+        {0, 0x26, "ET_Constant_Force"},
+        {0, 0x27, "ET_Ramp"},
+        {0, 0x28, "ET_Custom_Force_Data"},
+        {0, 0x30, "ET_Square"},
+        {0, 0x31, "ET_Sine"},
+        {0, 0x32, "ET_Triangle"},
+        {0, 0x33, "ET_Sawtooth_Up"},
+        {0, 0x34, "ET_Sawtooth_Down"},
+        {0, 0x40, "ET_Spring"},
+        {0, 0x41, "ET_Damper"},
+        {0, 0x42, "ET_Inertia"},
+        {0, 0x43, "ET_Friction"},
+      {0, 0x50, "Duration"},
+      {0, 0x51, "Sample_Period"},
+      {0, 0x52, "Gain"},
+      {0, 0x53, "Trigger_Button"},
+      {0, 0x54, "Trigger_Repeat_Interval"},
+      {0, 0x55, "Axes_Enable"},
+        {0, 0x56, "Direction_Enable"},
+      {0, 0x57, "Direction"},
+      {0, 0x58, "Type_Specific_Block_Offset"},
+        {0, 0x59, "Block_Type"},
+        {0, 0x5A, "Set_Envelope_Report"},
+          {0, 0x5B, "Attack_Level"},
+          {0, 0x5C, "Attack_Time"},
+          {0, 0x5D, "Fade_Level"},
+          {0, 0x5E, "Fade_Time"},
+        {0, 0x5F, "Set_Condition_Report"},
+        {0, 0x60, "CP_Offset"},
+        {0, 0x61, "Positive_Coefficient"},
+        {0, 0x62, "Negative_Coefficient"},
+        {0, 0x63, "Positive_Saturation"},
+        {0, 0x64, "Negative_Saturation"},
+        {0, 0x65, "Dead_Band"},
+      {0, 0x66, "Download_Force_Sample"},
+      {0, 0x67, "Isoch_Custom_Force_Enable"},
+      {0, 0x68, "Custom_Force_Data_Report"},
+        {0, 0x69, "Custom_Force_Data"},
+        {0, 0x6A, "Custom_Force_Vendor_Defined_Data"},
+      {0, 0x6B, "Set_Custom_Force_Report"},
+        {0, 0x6C, "Custom_Force_Data_Offset"},
+        {0, 0x6D, "Sample_Count"},
+      {0, 0x6E, "Set_Periodic_Report"},
+        {0, 0x6F, "Offset"},
+        {0, 0x70, "Magnitude"},
+        {0, 0x71, "Phase"},
+        {0, 0x72, "Period"},
+      {0, 0x73, "Set_Constant_Force_Report"},
+        {0, 0x74, "Set_Ramp_Force_Report"},
+        {0, 0x75, "Ramp_Start"},
+        {0, 0x76, "Ramp_End"},
+      {0, 0x77, "Effect_Operation_Report"},
+        {0, 0x78, "Effect_Operation"},
+          {0, 0x79, "Op_Effect_Start"},
+          {0, 0x7A, "Op_Effect_Start_Solo"},
+          {0, 0x7B, "Op_Effect_Stop"},
+          {0, 0x7C, "Loop_Count"},
+      {0, 0x7D, "Device_Gain_Report"},
+        {0, 0x7E, "Device_Gain"},
+    {0, 0x7F, "PID_Pool_Report"},
+      {0, 0x80, "RAM_Pool_Size"},
+      {0, 0x81, "ROM_Pool_Size"},
+      {0, 0x82, "ROM_Effect_Block_Count"},
+      {0, 0x83, "Simultaneous_Effects_Max"},
+      {0, 0x84, "Pool_Alignment"},
+    {0, 0x85, "PID_Pool_Move_Report"},
+      {0, 0x86, "Move_Source"},
+      {0, 0x87, "Move_Destination"},
+      {0, 0x88, "Move_Length"},
+    {0, 0x89, "PID_Block_Load_Report"},
+      {0, 0x8B, "Block_Load_Status"},
+      {0, 0x8C, "Block_Load_Success"},
+      {0, 0x8D, "Block_Load_Full"},
+      {0, 0x8E, "Block_Load_Error"},
+      {0, 0x8F, "Block_Handle"},
+      {0, 0x90, "PID_Block_Free_Report"},
+      {0, 0x91, "Type_Specific_Block_Handle"},
+    {0, 0x92, "PID_State_Report"},
+      {0, 0x94, "Effect_Playing"},
+      {0, 0x95, "PID_Device_Control_Report"},
+        {0, 0x96, "PID_Device_Control"},
+        {0, 0x97, "DC_Enable_Actuators"},
+        {0, 0x98, "DC_Disable_Actuators"},
+        {0, 0x99, "DC_Stop_All_Effects"},
+        {0, 0x9A, "DC_Device_Reset"},
+        {0, 0x9B, "DC_Device_Pause"},
+        {0, 0x9C, "DC_Device_Continue"},
+      {0, 0x9F, "Device_Paused"},
+      {0, 0xA0, "Actuators_Enabled"},
+      {0, 0xA4, "Safety_Switch"},
+      {0, 0xA5, "Actuator_Override_Switch"},
+      {0, 0xA6, "Actuator_Power"},
+    {0, 0xA7, "Start_Delay"},
+    {0, 0xA8, "Parameter_Block_Size"},
+    {0, 0xA9, "Device_Managed_Pool"},
+    {0, 0xAA, "Shared_Parameter_Blocks"},
+    {0, 0xAB, "Create_New_Effect_Report"},
+    {0, 0xAC, "RAM_Pool_Available"},
   { 0, 0, NULL }
 };
 
@@ -176,7 +282,50 @@ static void hid_dump_field(struct hid_field *field, int n) {
 		tab(n); printk("Unit Exponent(%d)\n", field->unit_exponent);
 	}
 	if (field->unit) {
-		tab(n); printk("Unit(%u)\n", field->unit);
+		char *systems[5] = { "None", "SI Linear", "SI Rotation", "English Linear", "English Rotation" };
+		char *units[5][8] = {
+			{ "None", "None", "None", "None", "None", "None", "None", "None" },
+			{ "None", "Centimeter", "Gram", "Seconds", "Kelvin",     "Ampere", "Candela", "None" },
+			{ "None", "Radians",    "Gram", "Seconds", "Kelvin",     "Ampere", "Candela", "None" },
+			{ "None", "Inch",       "Slug", "Seconds", "Fahrenheit", "Ampere", "Candela", "None" },
+			{ "None", "Degrees",    "Slug", "Seconds", "Fahrenheit", "Ampere", "Candela", "None" }
+		};
+
+		int i;
+		int sys;
+                __u32 data = field->unit;
+
+		/* First nibble tells us which system we're in. */
+		sys = data & 0xf;
+		data >>= 4;
+
+		if(sys > 4) {
+			tab(n); printk("Unit(Invalid)\n");
+		}
+		else {
+			int earlier_unit = 0;
+
+			tab(n); printk("Unit(%s : ", systems[sys]);
+
+			for (i=1 ; i<sizeof(__u32)*2 ; i++) {
+				char nibble = data & 0xf;
+				data >>= 4;
+				if (nibble != 0) {
+					if(earlier_unit++ > 0)
+						printk("*");
+					printk("%s", units[sys][i]);
+					if(nibble != 1) {
+						/* This is a _signed_ nibble(!) */
+	
+						int val = nibble & 0x7;
+						if(nibble & 0x08)
+							val = -((0x7 & ~val) +1);
+						printk("^%d", val);
+					}
+				}
+			}
+			printk(")\n");
+		}
 	}
 	tab(n); printk("Report Size(%u)\n", field->report_size);
 	tab(n); printk("Report Count(%u)\n", field->report_count);
