@@ -935,11 +935,6 @@ static void storage_disconnect(struct usb_interface *intf)
 	us = usb_get_intfdata(intf);
 	usb_set_intfdata(intf, NULL);
 
-	/* serious error -- we're attempting to disconnect an interface but
-	 * cannot locate the local data structure
-	 */
-	BUG_ON(us == NULL);
-
 	/* set devices offline -- need host lock for this */
 	scsi_lock(us->host);
 	list_for_each_entry(sdev, &us->host->my_devices, siblings)

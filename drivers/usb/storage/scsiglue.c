@@ -141,13 +141,19 @@ static int usb_storage_release(struct Scsi_Host *psh)
 static int usb_storage_queuecommand( Scsi_Cmnd *srb , void (*done)(Scsi_Cmnd *))
 {
 	struct us_data *us = (struct us_data *)srb->device->host->hostdata[0];
+	int state = atomic_read(&us->sm_state);
 
 	US_DEBUGP("queuecommand() called\n");
 	srb->host_scribble = (unsigned char *)us;
 
 	/* enqueue the command */
-	BUG_ON(atomic_read(&us->sm_state) != US_STATE_IDLE);
-	BUG_ON(us->srb != NULL);
+	if (state != US_STATE_IDLE || us->srb != NULL) {
+		printk(KERN_ERR USB_STORAGE "Error in %s: " 
+			"state = %d, us->srb = %p\n",
+			__FUNCTION__, state, us->srb);
+		return SCSI_MLQUEUE_HOST_BUSY;
+	}
+
 	srb->scsi_done = done;
 	us->srb = srb;
 
@@ -175,8 +181,7 @@ static int usb_storage_command_abort( Scsi_Cmnd *srb )
 		return FAILED;
 	}
 
-	usb_stor_abort_transport(us);
-	return SUCCESS;
+	return usb_stor_abort_transport(us);
 }
 
 /* This invokes the transport reset mechanism to reset the state of the
@@ -185,10 +190,15 @@ static int usb_storage_command_abort( Scsi_Cmnd *srb )
 static int usb_storage_device_reset( Scsi_Cmnd *srb )
 {
 	struct us_data *us = (struct us_data *)srb->device->host->hostdata[0];
+	int state = atomic_read(&us->sm_state);
 	int result;
 
 	US_DEBUGP("device_reset() called\n" );
-	BUG_ON(atomic_read(&us->sm_state) != US_STATE_IDLE);
+	if (state != US_STATE_IDLE) {
+		printk(KERN_ERR USB_STORAGE "Error in %s: "
+			"invalid state %d\n", __FUNCTION__, state);
+		return FAILED;
+	}
 
 	/* set the state and release the lock */
 	atomic_set(&us->sm_state, US_STATE_RESETTING);
