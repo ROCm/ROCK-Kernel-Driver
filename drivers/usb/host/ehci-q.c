@@ -163,7 +163,6 @@ static inline void qtd_copy_status (struct urb *urb, size_t length, u32 token)
 
 static void ehci_urb_done (
 	struct ehci_hcd		*ehci,
-	dma_addr_t		addr,
 	struct urb		*urb
 ) {
 #ifdef	INTR_AUTOMAGIC
@@ -171,13 +170,6 @@ static void ehci_urb_done (
 	struct usb_device	*dev = 0;
 #endif
 
-	if (urb->transfer_buffer_length)
-		pci_unmap_single (ehci->hcd.pdev,
-			addr,
-			urb->transfer_buffer_length,
-			usb_pipein (urb->pipe)
-			    ? PCI_DMA_FROMDEVICE
-			    : PCI_DMA_TODEVICE);
 	if (likely (urb->hcpriv != 0)) {
 		struct ehci_qh	*qh = (struct ehci_qh *) urb->hcpriv;
 
@@ -263,7 +255,7 @@ qh_completions (struct ehci_hcd *ehci, struct ehci_qh *qh)
 			if (likely (last->urb != urb)) {
 				/* complete() can reenter this HCD */
 				spin_unlock_irqrestore (&ehci->lock, flags);
-				ehci_urb_done (ehci, last->buf_dma, last->urb);
+				ehci_urb_done (ehci, last->urb);
 				spin_lock_irqsave (&ehci->lock, flags);
 			}
 
@@ -347,12 +339,6 @@ qh_completions (struct ehci_hcd *ehci, struct ehci_qh *qh)
 				urb, urb->status, qtd, token,
 				urb->actual_length);
 #endif
-
-		/* SETUP for control urb? */
-		if (unlikely (QTD_PID (token) == 2))
-			pci_unmap_single (ehci->hcd.pdev,
-				qtd->buf_dma, sizeof (struct usb_ctrlrequest),
-				PCI_DMA_TODEVICE);
 	}
 
 	/* patch up list head? */
@@ -364,7 +350,7 @@ qh_completions (struct ehci_hcd *ehci, struct ehci_qh *qh)
 
 	/* last urb's completion might still need calling */
 	if (likely (last != 0)) {
-		ehci_urb_done (ehci, last->buf_dma, last->urb);
+		ehci_urb_done (ehci, last->urb);
 		ehci_qtd_free (ehci, last);
 	}
 }
@@ -405,10 +391,6 @@ static void qtd_list_free (
 				size = qtd->urb->transfer_buffer_length;
 				unmapped++;
 			}
-			if (qtd->buf_dma)
-				pci_unmap_single (ehci->hcd.pdev,
-					qtd->buf_dma,
-					size, direction);
 		}
 		ehci_qtd_free (ehci, qtd);
 	}
@@ -425,7 +407,7 @@ qh_urb_transaction (
 	int			flags
 ) {
 	struct ehci_qtd		*qtd, *qtd_prev;
-	dma_addr_t		buf, map_buf;
+	dma_addr_t		buf;
 	int			len, maxpacket;
 	int			is_input;
 	u32			token;
@@ -445,17 +427,8 @@ qh_urb_transaction (
 	/* for split transactions, SplitXState initialized to zero */
 
 	if (usb_pipecontrol (urb->pipe)) {
-		/* control request data is passed in the "setup" pid */
-		qtd->buf_dma = pci_map_single (
-					ehci->hcd.pdev,
-					urb->setup_packet,
-					sizeof (struct usb_ctrlrequest),
-					PCI_DMA_TODEVICE);
-		if (unlikely (!qtd->buf_dma))
-			goto cleanup;
-
 		/* SETUP pid */
-		qtd_fill (qtd, qtd->buf_dma, sizeof (struct usb_ctrlrequest),
+		qtd_fill (qtd, urb->setup_dma, sizeof (struct usb_ctrlrequest),
 			token | (2 /* "setup" */ << 8));
 
 		/* ... and always at least one more pid */
@@ -474,16 +447,10 @@ qh_urb_transaction (
 	 */
 	len = urb->transfer_buffer_length;
 	is_input = usb_pipein (urb->pipe);
-	if (likely (len > 0)) {
-		buf = map_buf = pci_map_single (ehci->hcd.pdev,
-			urb->transfer_buffer, len,
-			is_input
-			    ? PCI_DMA_FROMDEVICE
-			    : PCI_DMA_TODEVICE);
-		if (unlikely (!buf))
-			goto cleanup;
-	} else
-		buf = map_buf = 0;
+	if (likely (len > 0))
+		buf = urb->transfer_dma;
+	else
+		buf = 0;
 
 	if (!buf || is_input)
 		token |= (1 /* "in" */ << 8);
@@ -500,7 +467,6 @@ qh_urb_transaction (
 		int this_qtd_len;
 
 		qtd->urb = urb;
-		qtd->buf_dma = map_buf;
 		this_qtd_len = qtd_fill (qtd, buf, len, token);
 		len -= this_qtd_len;
 		buf += this_qtd_len;

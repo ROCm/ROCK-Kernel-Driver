@@ -530,11 +530,6 @@ itd_free_list (struct ehci_hcd *ehci, struct urb *urb)
 {
 	struct ehci_itd *first_itd = urb->hcpriv;
 
-	pci_unmap_single (ehci->hcd.pdev,
-		first_itd->buf_dma, urb->transfer_buffer_length,
-		usb_pipein (urb->pipe)
-		    ? PCI_DMA_FROMDEVICE
-		    : PCI_DMA_TODEVICE);
 	while (!list_empty (&first_itd->itd_list)) {
 		struct ehci_itd	*itd;
 
@@ -630,16 +625,7 @@ itd_urb_transaction (
 	int			frame_index;
 	struct ehci_itd		*first_itd, *itd;
 	int			status;
-	dma_addr_t		buf_dma, itd_dma;
-
-	/* set up one dma mapping for this urb */
-	buf_dma = pci_map_single (ehci->hcd.pdev,
-		urb->transfer_buffer, urb->transfer_buffer_length,
-		usb_pipein (urb->pipe)
-		    ? PCI_DMA_FROMDEVICE
-		    : PCI_DMA_TODEVICE);
-	if (buf_dma == 0)
-		return -ENOMEM;
+	dma_addr_t		itd_dma;
 
 	/* allocate/init ITDs */
 	for (frame_index = 0, first_itd = 0;
@@ -653,7 +639,8 @@ itd_urb_transaction (
 		memset (itd, 0, sizeof *itd);
 		itd->itd_dma = itd_dma;
 
-		status = itd_fill (ehci, itd, urb, frame_index, buf_dma);
+		status = itd_fill (ehci, itd, urb, frame_index,
+				urb->transfer_dma);
 		if (status != 0)
 			goto fail;
 
