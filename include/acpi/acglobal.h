@@ -87,6 +87,7 @@ extern      u32                                 acpi_gbl_nesting_level;
 
 ACPI_EXTERN u8                                  acpi_gbl_create_osi_method;
 ACPI_EXTERN u8                                  acpi_gbl_all_methods_serialized;
+ACPI_EXTERN u8                                  acpi_gbl_leave_wake_gpes_disabled;
 
 /*****************************************************************************
  *
@@ -196,6 +197,7 @@ extern const char                              *acpi_gbl_valid_osi_strings[ACPI_
 
 ACPI_EXTERN struct acpi_namespace_node          acpi_gbl_root_node_struct;
 ACPI_EXTERN struct acpi_namespace_node         *acpi_gbl_root_node;
+ACPI_EXTERN struct acpi_namespace_node         *acpi_gbl_fadt_gpe_device;
 
 extern const u8                                 acpi_gbl_ns_properties[NUM_NS_TYPES];
 extern const struct acpi_predefined_names       acpi_gbl_pre_defined_names [NUM_PREDEFINED_NAMES];

@@ -311,6 +311,15 @@ acpi_ns_evaluate_by_handle (
 	}
 
 	/*
+	 * For a method alias, we must grab the actual method node
+	 * so that proper scoping context will be established
+	 * before execution.
+	 */
+	if (acpi_ns_get_type (node) == ACPI_TYPE_LOCAL_METHOD_ALIAS) {
+		node = ACPI_CAST_PTR (struct acpi_namespace_node, node->object);
+	}
+
+	/*
 	 * Two major cases here:
 	 * 1) The object is an actual control method -- execute it.
 	 * 2) The object is not a method -- just return it's current
