@@ -2685,8 +2685,6 @@ static ssize_t ipr_store_tcq_enable(struct device *dev,
 	struct ipr_resource_entry *res;
 	unsigned long lock_flags = 0;
 	int tcq_active = simple_strtoul(buf, NULL, 10);
-	int qdepth = IPR_MAX_CMD_PER_LUN;
-	int tagged = 0;
 	ssize_t len = -ENXIO;
 
 	spin_lock_irqsave(ioa_cfg->host->host_lock, lock_flags);
@@ -2694,13 +2692,13 @@ static ssize_t ipr_store_tcq_enable(struct device *dev,
 	res = (struct ipr_resource_entry *)sdev->hostdata;
 
 	if (res) {
-		res->tcq_active = 0;
-		qdepth = res->qdepth;
-
 		if (ipr_is_gscsi(res) && sdev->tagged_supported) {
 			if (tcq_active) {
-				tagged = MSG_ORDERED_TAG;
 				res->tcq_active = 1;
+				scsi_activate_tcq(sdev, res->qdepth);
+			} else {
+				res->tcq_active = 0;
+				scsi_deactivate_tcq(sdev, res->qdepth);
 			}
 
 			len = strlen(buf);
@@ -2710,7 +2708,6 @@ static ssize_t ipr_store_tcq_enable(struct device *dev,
 	}
 
 	spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
-	scsi_adjust_queue_depth(sdev, tagged, qdepth);
 	return len;
 }
 
