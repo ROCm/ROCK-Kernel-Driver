@@ -1166,7 +1166,7 @@ static int rivafb_set_par(struct fb_info *info)
 	riva_load_video_mode(info);
 	riva_setup_accel(info);
 	
-	memset_io(par->riva.CURSOR, 0, MAX_CURS * MAX_CURS * 2);
+	par->cursor_reset = 1;
 	info->fix.line_length = (info->var.xres_virtual * (info->var.bits_per_pixel >> 3));
 	info->fix.visual = (info->var.bits_per_pixel == 8) ?
 				FB_VISUAL_PSEUDOCOLOR : FB_VISUAL_DIRECTCOLOR;
@@ -1552,15 +1552,21 @@ static int rivafb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 	struct riva_par *par = (struct riva_par *) info->par;
 	u8 data[MAX_CURS * MAX_CURS/8];
 	u16 fg, bg;
-	int i;
+	int i, set = cursor->set;
 
 	par->riva.ShowHideCursor(&par->riva, 0);
 
-	if (cursor->set & FB_CUR_SETPOS) {
+	if (par->cursor_reset) {
+		set = FB_CUR_SETALL;
+		par->cursor_reset = 0;
+	}
+
+	if (set & FB_CUR_SETSIZE)
+		memset_io(par->riva.CURSOR, 0, MAX_CURS * MAX_CURS * 2);
+
+	if (set & FB_CUR_SETPOS) {
 		u32 xx, yy, temp;
 
-		info->cursor.image.dx = cursor->image.dx;
-		info->cursor.image.dy = cursor->image.dy;
 		yy = cursor->image.dy - info->var.yoffset;
 		xx = cursor->image.dx - info->var.xoffset;
 		temp = xx & 0xFFFF;
@@ -1569,43 +1575,32 @@ static int rivafb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 		par->riva.PRAMDAC[0x0000300/4] = temp;
 	}
 
-	if (cursor->set & FB_CUR_SETSIZE) {
-		info->cursor.image.height = cursor->image.height;
-		info->cursor.image.width = cursor->image.width;
-		memset_io(par->riva.CURSOR, 0, MAX_CURS * MAX_CURS * 2);
-	}
 
-	if (cursor->set & FB_CUR_SETCMAP) {
-		info->cursor.image.bg_color = cursor->image.bg_color;
-		info->cursor.image.fg_color = cursor->image.fg_color;
-	}
-
-	if (cursor->set & (FB_CUR_SETSHAPE | FB_CUR_SETCMAP | FB_CUR_SETCUR)) {
-		u32 bg_idx = info->cursor.image.bg_color;
-		u32 fg_idx = info->cursor.image.fg_color;
-		u32 s_pitch = (info->cursor.image.width+7) >> 3;
+	if (set & (FB_CUR_SETSHAPE | FB_CUR_SETCMAP | FB_CUR_SETIMAGE)) {
+		u32 bg_idx = cursor->image.bg_color;
+		u32 fg_idx = cursor->image.fg_color;
+		u32 s_pitch = (cursor->image.width+7) >> 3;
 		u32 d_pitch = MAX_CURS/8;
 		u8 *dat = (u8 *) cursor->image.data;
-		u8 *msk = (u8 *) info->cursor.mask;
+		u8 *msk = (u8 *) cursor->mask;
 		u8 src[64];	
 		
-		info->cursor.image.data = cursor->image.data;
-		switch (info->cursor.rop) {
+		switch (cursor->rop) {
 		case ROP_XOR:
-			for (i = 0; i < s_pitch * info->cursor.image.height;
+			for (i = 0; i < s_pitch * cursor->image.height;
 			     i++)
 				src[i] = dat[i] ^ msk[i];
 			break;
 		case ROP_COPY:
 		default:
-			for (i = 0; i < s_pitch * info->cursor.image.height;
+			for (i = 0; i < s_pitch * cursor->image.height;
 			     i++)
 				src[i] = dat[i] & msk[i];
 			break;
 		}
 		
-		fb_sysmove_buf_aligned(info, &info->sprite, data, d_pitch, src,
-				       s_pitch, info->cursor.image.height);
+		fb_sysmove_buf_aligned(info, &info->pixmap, data, d_pitch, src,
+				       s_pitch, cursor->image.height);
 
 		bg = ((info->cmap.red[bg_idx] & 0xf8) << 7) |
 		     ((info->cmap.green[bg_idx] & 0xf8) << 2) |
@@ -1618,11 +1613,13 @@ static int rivafb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 		par->riva.LockUnlock(&par->riva, 0);
 
 		rivafb_load_cursor_image(par, data, bg, fg,
-					 info->cursor.image.width, 
-					 info->cursor.image.height);
+					 cursor->image.width,
+					 cursor->image.height);
 	}
-	if (info->cursor.enable)
+
+	if (cursor->enable)
 		par->riva.ShowHideCursor(&par->riva, 1);
+
 	return 0;
 }
 
