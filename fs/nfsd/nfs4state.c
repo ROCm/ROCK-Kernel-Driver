@@ -1120,6 +1120,9 @@ nfsd4_process_open2(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nf
 				stp = stq;
 				continue;
 			}
+			/* ignore lock owners */
+			if (stq->st_stateowner->so_is_open_owner == 0)
+				continue;
 			if (!test_share(stq,open))	
 				goto out;
 		}
