@@ -416,8 +416,6 @@ struct pci_dev {
 	 */
 	unsigned int	irq;
 	struct resource resource[DEVICE_COUNT_RESOURCE]; /* I/O and memory regions + expansion ROMs */
-	struct resource dma_resource[DEVICE_COUNT_DMA];
-	struct resource irq_resource[DEVICE_COUNT_IRQ];
 
 	char *		slot_name;	/* pointer to dev.bus_id */
 
