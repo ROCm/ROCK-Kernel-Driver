@@ -1386,13 +1386,17 @@ static int __init agp_intel_probe(struct pci_dev *pdev,
 		bridge = &intel_850_bridge;
 		name = "i850";
 		break;
-	case PCI_DEVICE_ID_INTEL_82855_HB:
-		if (find_i830(PCI_DEVICE_ID_INTEL_82855_IG)) {
+	case PCI_DEVICE_ID_INTEL_82855PM_HB:
+		bridge = &intel_845_bridge;
+		name = "855PM";
+		break;
+	case PCI_DEVICE_ID_INTEL_82855GM_HB:
+		if (find_i830(PCI_DEVICE_ID_INTEL_82855GM_IG)) {
 			bridge = &intel_830_bridge;
 			name = "855";
 		} else {
 			bridge = &intel_845_bridge;
-			name = "855PM";
+			name = "855GM";
 		}
 		break;
 	case PCI_DEVICE_ID_INTEL_82860_HB:
