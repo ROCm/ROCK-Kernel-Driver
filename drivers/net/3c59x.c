@@ -1772,10 +1772,12 @@ vortex_timer(unsigned long data)
 			if (vortex_debug > 1)
 				printk(KERN_DEBUG "%s: Media %s has link beat, %x.\n",
 					   dev->name, media_tbl[dev->if_port].name, media_status);
-		} else if (vortex_debug > 1) {
+		} else {
 			netif_carrier_off(dev);
-			printk(KERN_DEBUG "%s: Media %s has no link beat, %x.\n",
-				   dev->name, media_tbl[dev->if_port].name, media_status);
+			if (vortex_debug > 1) {
+				printk(KERN_DEBUG "%s: Media %s has no link beat, %x.\n",
+					   dev->name, media_tbl[dev->if_port].name, media_status);
+			}
 		}
 		break;
 	case XCVR_MII: case XCVR_NWAY:
