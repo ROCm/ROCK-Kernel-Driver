@@ -643,13 +643,24 @@ bad_block:		ext2_error(sb, "ext2_xattr_set",
 		here->e_name_len = name_len;
 		memcpy(here->e_name, name, name_len);
 	} else {
-		/* Remove the old value. */
 		if (!here->e_value_block && here->e_value_size) {
 			char *first_val = (char *)header + min_offs;
 			size_t offs = le16_to_cpu(here->e_value_offs);
 			char *val = (char *)header + offs;
 			size_t size = EXT2_XATTR_SIZE(
 				le32_to_cpu(here->e_value_size));
+
+			if (size == EXT2_XATTR_SIZE(value_len)) {
+				/* The old and the new value have the same
+				   size. Just replace. */
+				here->e_value_size = cpu_to_le32(value_len);
+				memset(val + size - EXT2_XATTR_PAD, 0,
+				       EXT2_XATTR_PAD); /* Clear pad bytes. */
+				memcpy(val, value, value_len);
+				goto skip_replace;
+			}
+
+			/* Remove the old value. */
 			memmove(first_val + size, first_val, val - first_val);
 			memset(first_val, 0, size);
 			here->e_value_offs = 0;
@@ -666,19 +677,12 @@ bad_block:		ext2_error(sb, "ext2_xattr_set",
 			}
 		}
 		if (value == NULL) {
-			/* Remove this attribute. */
-			if (EXT2_XATTR_NEXT(ENTRY(header+1)) == last) {
-				/* This block is now empty. */
-				error = ext2_xattr_set2(inode, bh, NULL);
-				goto cleanup;
-			} else {
-				/* Remove the old name. */
-				size_t size = EXT2_XATTR_LEN(name_len);
-				last = ENTRY((char *)last - size);
-				memmove(here, (char*)here + size,
-					(char*)last - (char*)here);
-				memset(last, 0, size);
-			}
+			/* Remove the old name. */
+			size_t size = EXT2_XATTR_LEN(name_len);
+			last = ENTRY((char *)last - size);
+			memmove(here, (char*)here + size,
+				(char*)last - (char*)here);
+			memset(last, 0, size);
 		}
 	}
 
@@ -695,9 +699,15 @@ bad_block:		ext2_error(sb, "ext2_xattr_set",
 			memcpy(val, value, value_len);
 		}
 	}
-	ext2_xattr_rehash(header, here);
 
-	error = ext2_xattr_set2(inode, bh, header);
+skip_replace:
+	if (IS_LAST_ENTRY(ENTRY(header+1))) {
+		/* This block is now empty. */
+		error = ext2_xattr_set2(inode, bh, NULL);
+	} else {
+		ext2_xattr_rehash(header, here);
+		error = ext2_xattr_set2(inode, bh, header);
+	}
 
 cleanup:
 	brelse(bh);
