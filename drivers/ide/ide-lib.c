@@ -421,8 +421,6 @@ void ide_toggle_bounce(ide_drive_t *drive, int on)
 		blk_queue_bounce_limit(drive->queue, addr);
 }
 
-EXPORT_SYMBOL(ide_toggle_bounce);
-
 /**
  *	ide_set_xfer_rate	-	set transfer rate
  *	@drive: drive to set

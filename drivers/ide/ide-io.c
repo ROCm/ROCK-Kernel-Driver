@@ -543,8 +543,6 @@ media_out:
 	return ide_stopped;
 }
 
-EXPORT_SYMBOL(ide_error);
-
 /**
  *	ide_abort	-	abort pending IDE operatins
  *	@drive: drive the error occurred on
@@ -585,8 +583,6 @@ ide_startstop_t ide_abort(ide_drive_t *drive, const char *msg)
 	return ide_stopped;
 }
 
-EXPORT_SYMBOL(ide_abort);
-
 /**
  *	ide_cmd		-	issue a simple drive command
  *	@drive: drive the command is for
@@ -598,7 +594,8 @@ EXPORT_SYMBOL(ide_abort);
  *	The drive must be selected beforehand.
  */
 
-void ide_cmd (ide_drive_t *drive, u8 cmd, u8 nsect, ide_handler_t *handler)
+static void ide_cmd (ide_drive_t *drive, u8 cmd, u8 nsect,
+		ide_handler_t *handler)
 {
 	ide_hwif_t *hwif = HWIF(drive);
 	if (IDE_CONTROL_REG)
@@ -607,8 +604,6 @@ void ide_cmd (ide_drive_t *drive, u8 cmd, u8 nsect, ide_handler_t *handler)
 	hwif->OUTB(nsect,IDE_NSECTOR_REG);
 	ide_execute_command(drive, cmd, handler, WAIT_CMD, NULL);
 }
-
-EXPORT_SYMBOL(ide_cmd);
 
 /**
  *	drive_cmd_intr		- 	drive command completion interrupt
@@ -620,7 +615,7 @@ EXPORT_SYMBOL(ide_cmd);
  *	the request
  */
  
-ide_startstop_t drive_cmd_intr (ide_drive_t *drive)
+static ide_startstop_t drive_cmd_intr (ide_drive_t *drive)
 {
 	struct request *rq = HWGROUP(drive)->rq;
 	ide_hwif_t *hwif = HWIF(drive);
@@ -645,8 +640,6 @@ ide_startstop_t drive_cmd_intr (ide_drive_t *drive)
 	return ide_stopped;
 }
 
-EXPORT_SYMBOL(drive_cmd_intr);
-
 /**
  *	do_special		-	issue some special commands
  *	@drive: drive the command is for
@@ -656,7 +649,7 @@ EXPORT_SYMBOL(drive_cmd_intr);
  *	back.
  */
 
-ide_startstop_t do_special (ide_drive_t *drive)
+static ide_startstop_t do_special (ide_drive_t *drive)
 {
 	special_t *s = &drive->special;
 
@@ -672,8 +665,6 @@ ide_startstop_t do_special (ide_drive_t *drive)
 	else
 		return DRIVER(drive)->special(drive);
 }
-
-EXPORT_SYMBOL(do_special);
 
 void ide_map_sg(ide_drive_t *drive, struct request *rq)
 {
@@ -715,7 +706,8 @@ EXPORT_SYMBOL_GPL(ide_init_sg_cmd);
  *	all commands to finish. Don't do this as that is due to change
  */
 
-ide_startstop_t execute_drive_cmd (ide_drive_t *drive, struct request *rq)
+static ide_startstop_t execute_drive_cmd (ide_drive_t *drive,
+		struct request *rq)
 {
 	ide_hwif_t *hwif = HWIF(drive);
 	if (rq->flags & REQ_DRIVE_TASKFILE) {
@@ -805,8 +797,6 @@ done:
  	return ide_stopped;
 }
 
-EXPORT_SYMBOL(execute_drive_cmd);
-
 /**
  *	start_request	-	start of I/O and command issuing for IDE
  *
@@ -818,7 +808,7 @@ EXPORT_SYMBOL(execute_drive_cmd);
  *	FIXME: this function needs a rename
  */
  
-ide_startstop_t start_request (ide_drive_t *drive, struct request *rq)
+static ide_startstop_t start_request (ide_drive_t *drive, struct request *rq)
 {
 	ide_startstop_t startstop;
 	sector_t block;
@@ -908,8 +898,6 @@ kill_rq:
 	DRIVER(drive)->end_request(drive, 0, 0);
 	return ide_stopped;
 }
-
-EXPORT_SYMBOL(start_request);
 
 /**
  *	ide_stall_queue		-	pause an IDE device
@@ -1033,10 +1021,7 @@ repeat:
  * the driver.  This makes the driver much more friendlier to shared IRQs
  * than previous designs, while remaining 100% (?) SMP safe and capable.
  */
-/* --BenH: made non-static as ide-pmac.c uses it to kick the hwgroup back
- *         into life on wakeup from machine sleep.
- */ 
-void ide_do_request (ide_hwgroup_t *hwgroup, int masked_irq)
+static void ide_do_request (ide_hwgroup_t *hwgroup, int masked_irq)
 {
 	ide_drive_t	*drive;
 	ide_hwif_t	*hwif;
@@ -1167,8 +1152,6 @@ void ide_do_request (ide_hwgroup_t *hwgroup, int masked_irq)
 			hwgroup->busy = 0;
 	}
 }
-
-EXPORT_SYMBOL(ide_do_request);
 
 /*
  * Passes the stuff to ide_do_request
@@ -1333,8 +1316,6 @@ void ide_timer_expiry (unsigned long data)
 	ide_do_request(hwgroup, IDE_NO_IRQ);
 	spin_unlock_irqrestore(&ide_lock, flags);
 }
-
-EXPORT_SYMBOL(ide_timer_expiry);
 
 /**
  *	unexpected_intr		-	handle an unexpected IDE interrupt
@@ -1532,8 +1513,6 @@ irqreturn_t ide_intr (int irq, void *dev_id, struct pt_regs *regs)
 	spin_unlock_irqrestore(&ide_lock, flags);
 	return IRQ_HANDLED;
 }
-
-EXPORT_SYMBOL(ide_intr);
 
 /**
  *	ide_init_drive_cmd	-	initialize a drive command request

@@ -132,6 +132,9 @@ static int proc_ide_read_settings
 	char		*out = page;
 	int		len, rc, mul_factor, div_factor;
 
+	printk(KERN_WARNING "Warning: /proc/ide/hd?/settings interface is "
+			    "obsolete, and will be removed soon!\n");
+
 	down(&ide_setting_sem);
 	out += sprintf(out, "name\t\t\tvalue\t\tmin\t\tmax\t\tmode\n");
 	out += sprintf(out, "----\t\t\t-----\t\t---\t\t---\t\t----\n");
@@ -167,6 +170,9 @@ static int proc_ide_write_settings(struct file *file, const char __user *buffer,
 	unsigned long	n;
 	ide_settings_t	*setting;
 	char *buf, *s;
+
+	printk(KERN_WARNING "Warning: /proc/ide/hd?/settings interface is "
+			    "obsolete, and will be removed soon!\n");
 
 	if (!capable(CAP_SYS_ADMIN))
 		return -EACCES;
