@@ -483,7 +483,7 @@ linvfs_statfs(
 	int			error;
 
 	VFS_STATVFS(vfsp, statp, NULL, error);
-	return error;
+	return -error;
 }
 
 STATIC int
@@ -500,7 +500,7 @@ linvfs_remount(
 	if (!error)
 		VFS_MNTUPDATE(vfsp, flags, args, error);
 	kmem_free(args, sizeof(*args));
-	return error;
+	return -error;
 }
 
 STATIC void
