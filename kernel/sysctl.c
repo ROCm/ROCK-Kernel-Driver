@@ -306,6 +306,14 @@ static ctl_table kern_table[] = {
 		.proc_handler	= &proc_dointvec,
 	},
 	{
+		.ctl_name	= KERN_UNSUPPORTED,
+		.procname	= "unsupported",
+		.data		= &unsupported,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{
 		.ctl_name	= KERN_CAP_BSET,
 		.procname	= "cap-bound",
 		.data		= &cap_bset,

@@ -57,6 +57,9 @@
 #define symbol_is(literal, string)				\
 	(strcmp(MODULE_SYMBOL_PREFIX literal, (string)) == 0)
 
+/* Allow unsupported modules switch. */ 
+int unsupported = 1;  /* default to be permissive. */
+
 /* Protects module list */
 static spinlock_t modlist_lock = SPIN_LOCK_UNLOCKED;
 
@@ -1414,7 +1417,15 @@ static struct module *load_module(void __user *umod,
 
 	supported = get_modinfo(sechdrs, infoindex, "supported");
 	if (!supported || strcmp(supported, "yes")) {
-		tainted |= TAINT_FORCED_MODULE;
+		if (!unsupported) {
+			printk(KERN_WARNING "%s: unsupported module, refusing "
+			       "to load. To override, echo "
+			       "1 > /proc/sys/kernel/unsupported.\n",
+			       mod->name);
+			err = -ENOEXEC;
+			goto free_hdr;
+		}
+		tainted |= TAINT_UNSUPPORTED;
 		printk(KERN_WARNING "%s: unsupported module, tainting "
 		       "kernel.\n", mod->name);
 	}
