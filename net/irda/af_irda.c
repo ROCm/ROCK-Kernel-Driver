@@ -1257,7 +1257,7 @@ static int irda_release(struct socket *sock)
  *    fragment the message if necessary
  */
 static int irda_sendmsg(struct kiocb *iocb, struct socket *sock,
-			struct msghdr *msg, int len)
+			struct msghdr *msg, size_t len)
 {
 	struct sock *sk = sock->sk;
 	struct irda_sock *self;
@@ -1329,12 +1329,13 @@ static int irda_sendmsg(struct kiocb *iocb, struct socket *sock,
  *    after being read, regardless of how much the user actually read
  */
 static int irda_recvmsg_dgram(struct kiocb *iocb, struct socket *sock,
-			      struct msghdr *msg, int size, int flags)
+			      struct msghdr *msg, size_t size, int flags)
 {
 	struct sock *sk = sock->sk;
 	struct irda_sock *self = irda_sk(sk);
 	struct sk_buff *skb;
-	int copied, err;
+	size_t copied;
+	int err;
 
 	IRDA_DEBUG(4, "%s()\n", __FUNCTION__);
 
@@ -1379,12 +1380,12 @@ static int irda_recvmsg_dgram(struct kiocb *iocb, struct socket *sock,
  * Function irda_recvmsg_stream (iocb, sock, msg, size, flags)
  */
 static int irda_recvmsg_stream(struct kiocb *iocb, struct socket *sock,
-			       struct msghdr *msg, int size, int flags)
+			       struct msghdr *msg, size_t size, int flags)
 {
 	struct sock *sk = sock->sk;
 	struct irda_sock *self = irda_sk(sk);
 	int noblock = flags & MSG_DONTWAIT;
-	int copied = 0;
+	size_t copied = 0;
 	int target = 1;
 	DECLARE_WAITQUEUE(waitq, current);
 
@@ -1505,7 +1506,7 @@ static int irda_recvmsg_stream(struct kiocb *iocb, struct socket *sock,
  *
  */
 static int irda_sendmsg_dgram(struct kiocb *iocb, struct socket *sock,
-			      struct msghdr *msg, int len)
+			      struct msghdr *msg, size_t len)
 {
 	struct sock *sk = sock->sk;
 	struct irda_sock *self;
@@ -1571,7 +1572,7 @@ static int irda_sendmsg_dgram(struct kiocb *iocb, struct socket *sock,
  */
 #ifdef CONFIG_IRDA_ULTRA
 static int irda_sendmsg_ultra(struct kiocb *iocb, struct socket *sock,
-			      struct msghdr *msg, int len)
+			      struct msghdr *msg, size_t len)
 {
 	struct sock *sk = sock->sk;
 	struct irda_sock *self;
