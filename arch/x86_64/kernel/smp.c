@@ -372,7 +372,10 @@ void smp_send_stop(void)
 	__smp_call_function(smp_really_stop_cpu, NULL, 0, 0);
 	if (!nolock)
 		spin_unlock(&call_lock);
-	smp_stop_cpu();
+
+	local_irq_disable();
+	disable_local_APIC();
+	local_irq_enable(); 
 }
 
 /*
