@@ -221,7 +221,7 @@ gss_cred_get_ctx(struct rpc_cred *cred)
 
 static int
 gss_parse_init_downcall(struct gss_api_mech *gm, struct xdr_netobj *buf,
-		struct gss_cl_ctx **gc, uid_t *uid)
+		struct gss_cl_ctx **gc, uid_t *uid, int *gss_err)
 {
 	char *end = buf->data + buf->len;
 	char *p = buf->data;
@@ -244,8 +244,17 @@ gss_parse_init_downcall(struct gss_api_mech *gm, struct xdr_netobj *buf,
 	/* FIXME: discarded timeout for now */
 	if (simple_get_bytes(&p, end, &timeout, sizeof(timeout)))
 		goto err_free_ctx;
+	*gss_err = 0;
 	if (simple_get_bytes(&p, end, &ctx->gc_win, sizeof(ctx->gc_win)))
 		goto err_free_ctx;
+	/* gssd signals an error by passing ctx->gc_win = 0: */
+	if (!ctx->gc_win) {
+		/* in which case the next int is an error code: */
+		if (simple_get_bytes(&p, end, gss_err, sizeof(*gss_err)))
+			goto err_free_ctx;
+		err = 0;
+		goto err_free_ctx;
+	}
 	if (simple_get_netobj(&p, end, &tmp_buf))
 		goto err_free_ctx;
 	if (dup_netobj(&tmp_buf, &ctx->gc_wire_ctx)) {
@@ -395,9 +404,10 @@ gss_pipe_downcall(struct file *filp, const char *src, size_t mlen)
 	struct auth_cred acred = { 0 };
 	struct rpc_cred *cred;
 	struct gss_upcall_msg *gss_msg;
-	struct gss_cl_ctx *ctx;
+	struct gss_cl_ctx *ctx = NULL;
 	ssize_t left;
 	int err;
+	int gss_err;
 
 	if (mlen > sizeof(buf))
 		return -ENOSPC;
@@ -409,13 +419,16 @@ gss_pipe_downcall(struct file *filp, const char *src, size_t mlen)
 	auth = clnt->cl_auth;
 	gss_auth = container_of(auth, struct gss_auth, rpc_auth);
 	mech = gss_auth->mech;
-	err = gss_parse_init_downcall(mech, &obj, &ctx, &acred.uid);
+	err = gss_parse_init_downcall(mech, &obj, &ctx, &acred.uid, &gss_err);
 	if (err)
 		goto err;
 	cred = rpcauth_lookup_credcache(auth, &acred, 0);
 	if (!cred)
-		goto err_release_ctx;
-	gss_cred_set_ctx(cred, ctx);
+		goto err;
+	if (gss_err)
+		cred->cr_flags |= RPCAUTH_CRED_DEAD;
+	else
+		gss_cred_set_ctx(cred, ctx);
 	spin_lock(&gss_auth->lock);
 	gss_msg = gss_find_upcall(gss_auth, acred.uid);
 	if (gss_msg)
@@ -423,9 +436,9 @@ gss_pipe_downcall(struct file *filp, const char *src, size_t mlen)
 	spin_unlock(&gss_auth->lock);
 	rpc_release_client(clnt);
 	return mlen;
-err_release_ctx:
-	gss_destroy_ctx(ctx);
 err:
+	if (ctx)
+		gss_destroy_ctx(ctx);
 	rpc_release_client(clnt);
 	dprintk("RPC: gss_pipe_downcall returning %d\n", err);
 	return err;
