@@ -1,5 +1,5 @@
 /*
- * linux/drivers/ide/hpt34x.c		Version 0.31	June. 9, 2000
+ * linux/drivers/ide/hpt34x.c		Version 0.40	Sept 10, 2002
  *
  * Copyright (C) 1998-2000	Andre Hedrick <andre@linux-ide.org>
  * May be copied or modified under the terms of the GNU General Public License
@@ -25,6 +25,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/delay.h>
@@ -321,34 +322,61 @@ static void __init init_dma_hpt34x (ide_hwif_t *hwif, unsigned long dmabase)
 
 extern void ide_setup_pci_device(struct pci_dev *, ide_pci_device_t *);
 
-static void __init init_setup_hpt34x (struct pci_dev *dev, ide_pci_device_t *d)
+static int __devinit hpt34x_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
-	char *chipset_names[] = {"HPT343", "HPT345"};
+	ide_pci_device_t *d = &hpt34x_chipsets[id->driver_data];
+	static char *chipset_names[] = {"HPT343", "HPT345"};
 	u16 pcicmd = 0;
 
 	pci_read_config_word(dev, PCI_COMMAND, &pcicmd);
 
-	strcpy(d->name, chipset_names[(pcicmd & PCI_COMMAND_MEMORY) ? 1 : 0]);
+	d->name = chipset_names[(pcicmd & PCI_COMMAND_MEMORY) ? 1 : 0];
 	d->bootable = (pcicmd & PCI_COMMAND_MEMORY) ? OFF_BOARD : NEVER_BOARD;
 
 	ide_setup_pci_device(dev, d);
-}
-
-int  __init hpt34x_scan_pcidev (struct pci_dev *dev)
-{
-	ide_pci_device_t *d;
-
-	if (dev->vendor != PCI_VENDOR_ID_TTI)
-		return 0;
-
-	for (d = hpt34x_chipsets; d && d->vendor && d->device; ++d) {
-		if (((d->vendor == dev->vendor) &&
-		     (d->device == dev->device)) &&
-		    (d->init_setup)) {
-			d->init_setup(dev, d);
-			return 1;
-		}
-	}
 	return 0;
 }
 
+/**
+ *	hpt34x_remove_one	-	called with an hpt34x is unplugged
+ *	@dev: the device that was removed
+ *
+ *	Disconnect an hpt34x device that has been unplugged either by hotplug
+ *	or by a more civilized notification scheme. Not yet supported.
+ */
+ 
+static void hpt34x_remove_one(struct pci_dev *dev)
+{
+	panic("hpt34x removal not yet supported");
+}
+
+static struct pci_device_id hpt34x_pci_tbl[] __devinitdata = {
+	{ PCI_VENDOR_ID_TTI, PCI_DEVICE_ID_TTI_HPT343, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{ 0, },
+};
+
+static struct pci_driver driver = {
+	name:		"HPT34x IDE",
+	id_table:	hpt34x_pci_tbl,
+	probe:		hpt34x_init_one,
+	remove:		__devexit_p(hpt34x_remove_one),
+};
+
+static int hpt34x_ide_init(void)
+{
+	return ide_pci_register_driver(&driver);
+}
+
+static void hpt34x_ide_exit(void)
+{
+	ide_pci_unregister_driver(&driver);
+}
+
+module_init(hpt34x_ide_init);
+module_exit(hpt34x_ide_exit);
+
+MODULE_AUTHOR("Andre Hedrick");
+MODULE_DESCRIPTION("PCI driver module for Highpoint 34x IDE");
+MODULE_LICENSE("GPL");
+
+EXPORT_NO_SYMBOLS;

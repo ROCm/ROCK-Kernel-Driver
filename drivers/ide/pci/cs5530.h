@@ -25,17 +25,15 @@ static ide_pci_host_proc_t cs5530_procs[] __initdata = {
 };
 #endif /* DISPLAY_CS5530_TIMINGS && CONFIG_PROC_FS */
 
-static void init_setup_cs5530(struct pci_dev *, ide_pci_device_t *);
 static unsigned int init_chipset_cs5530(struct pci_dev *, const char *);
 static void init_hwif_cs5530(ide_hwif_t *);
 static void init_dma_cs5530(ide_hwif_t *, unsigned long);
 
 static ide_pci_device_t cs5530_chipsets[] __initdata = {
-	{
+	{	/* 0 */
 		vendor:		PCI_VENDOR_ID_CYRIX,
 		device:		PCI_DEVICE_ID_CYRIX_5530_IDE,
 		name:		"CS5530",
-		init_setup:	init_setup_cs5530,
 		init_chipset:	init_chipset_cs5530,
 		init_iops:	NULL,
 		init_hwif:	init_hwif_cs5530,

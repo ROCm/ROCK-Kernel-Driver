@@ -904,9 +904,7 @@ extern inline void ide_unmap_buffer(struct request *rq, char *buffer, unsigned l
     ((1<<ide_pci)|(1<<ide_cmd646)|(1<<ide_ali14xx))
 #define IDE_CHIPSET_IS_PCI(c)	((IDE_CHIPSET_PCI_MASK >> (c)) & 1)
 
-#ifdef CONFIG_BLK_DEV_IDEPCI
 struct ide_pci_device_s;
-#endif /* CONFIG_BLK_DEV_IDEPCI */
 
 typedef struct hwif_s {
 	struct hwif_s *next;		/* for linked-list in ide_hwgroup_t */
@@ -937,10 +935,8 @@ typedef struct hwif_s {
 
 	hwif_chipset_t chipset;	/* sub-module for tuning.. */
 
-#ifdef CONFIG_BLK_DEV_IDEPCI
 	struct pci_dev  *pci_dev;	/* for pci chipsets */
 	struct ide_pci_device_s	*cds;	/* chipset device struct */
-#endif /* CONFIG_BLK_DEV_IDEPCI */
 
 #if 0
 	ide_hwif_ops_t	*hwifops;
@@ -1108,12 +1104,10 @@ typedef struct hwgroup_s {
 		/* ptr to current hwif in linked-list */
 	ide_hwif_t *hwif;
 
-#ifdef CONFIG_BLK_DEV_IDEPCI
 		/* for pci chipsets */
 	struct pci_dev *pci_dev;
 		/* chipset device struct */
 	struct ide_pci_device_s *cds;
-#endif /* CONFIG_BLK_DEV_IDEPCI */
 
 		/* current request */
 	struct request *rq;
@@ -1637,23 +1631,16 @@ extern void ide_intr(int irq, void *dev_id, struct pt_regs *regs);
 extern void do_ide_request(request_queue_t *);
 extern void ide_init_subdrivers(void);
 
-#ifndef _IDE_C
 extern struct block_device_operations ide_fops[];
 extern ide_proc_entry_t generic_subdriver_entries[];
-#endif
 
 extern int ata_attach(ide_drive_t *);
 
-#ifdef _IDE_C
-#ifdef CONFIG_BLK_DEV_IDE
 extern int ideprobe_init(void);
 
-#ifdef CONFIG_BLK_DEV_IDEPCI
 extern void ide_scan_pcibus(int scan_direction) __init;
-#endif /* CONFIG_BLK_DEV_IDEPCI */
-
-#endif /* CONFIG_BLK_DEV_IDE */
-#endif /* _IDE_C */
+extern int ide_pci_register_driver(struct pci_driver *driver);
+extern void ide_pci_unregister_driver(struct pci_driver *driver);
 
 extern void default_hwif_iops(ide_hwif_t *);
 extern void default_hwif_mmiops(ide_hwif_t *);
@@ -1664,8 +1651,6 @@ void ide_unregister_driver(ide_driver_t *driver);
 int ide_register_subdriver (ide_drive_t *drive, ide_driver_t *driver, int version);
 int ide_unregister_subdriver (ide_drive_t *drive);
 int ide_replace_subdriver(ide_drive_t *drive, const char *driver);
-
-#ifdef CONFIG_BLK_DEV_IDEPCI
 
 #ifdef CONFIG_PROC_FS
 typedef struct ide_pci_host_proc_s {
@@ -1716,14 +1701,9 @@ typedef struct ide_pci_device_s {
 	struct ide_pci_device_s	*next;
 } ide_pci_device_t;
 
-#ifdef LINUX_PCI_H
 extern void ide_setup_pci_device(struct pci_dev *, ide_pci_device_t *);
 extern void ide_setup_pci_devices(struct pci_dev *, struct pci_dev *, ide_pci_device_t *);
-#endif /* LINUX_PCI_H */
 
-#endif /* CONFIG_BLK_DEV_IDEPCI */
-
-#ifdef CONFIG_BLK_DEV_IDEDMA
 #define BAD_DMA_DRIVE		0
 #define GOOD_DMA_DRIVE		1
 extern int ide_build_dmatable(ide_drive_t *, struct request *);
@@ -1750,7 +1730,6 @@ extern int __ide_dma_verbose(ide_drive_t *);
 extern int __ide_dma_retune(ide_drive_t *);
 extern int __ide_dma_lostirq(ide_drive_t *);
 extern int __ide_dma_timeout(ide_drive_t *);
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 
 extern void hwif_unregister(ide_hwif_t *);
 
