@@ -159,11 +159,10 @@ long sys_rt_sigsuspend(sigset_t *unewset, size_t sigsetsize, int p3, int p4, int
 	}
 }
 
-
-
-long sys_sigaltstack(const stack_t *uss, stack_t *uoss)
+long sys_sigaltstack(const stack_t *uss, stack_t *uoss, unsigned long r5,
+		     unsigned long r6, unsigned long r7, unsigned long r8,
+		     struct pt_regs *regs)
 {
-	struct pt_regs *regs = (struct pt_regs *)&uss;
 	return do_sigaltstack(uss, uoss, regs->gpr[1]);
 }
 
@@ -250,7 +249,7 @@ int sys_rt_sigreturn(unsigned long r3, unsigned long r4, unsigned long r5,
 		goto badframe;
 	/* This function sets back the stack flags into
 	   the current task structure.  */
-	sys_sigaltstack(&st, NULL);
+	sys_sigaltstack(&st, NULL, 0, 0, 0, 0, regs);
 
 	return regs->result;
 

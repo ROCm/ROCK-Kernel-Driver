@@ -1,6 +1,4 @@
 /*
- * 
- *
  * Port for PPC64 David Engebretsen, IBM Corp.
  *   Contains common pci routines for ppc64 platform, pSeries and iSeries brands. 
  * 
@@ -128,7 +126,6 @@ void pcibios_fixup_pbus_ranges(struct pci_bus *pbus,
 {
 }
 
-
 void
 pcibios_update_resource(struct pci_dev *dev, struct resource *root,
 			     struct resource *res, int resource)
@@ -199,7 +196,6 @@ pcibios_align_resource(void *data, struct resource *res,
 		}
 	}
 }
-
 
 /*
  *  Handle resources of PCI devices.  If the world were perfect, we could
@@ -333,64 +329,27 @@ pcibios_assign_resources(void)
 		if (!class || class == PCI_CLASS_BRIDGE_HOST)
 			continue;
 
-		for(idx=0; idx<6; idx++) {
+		for (idx = 0; idx < 6; idx++) {
 			r = &dev->resource[idx];
 
 			/*
-			 *  Don't touch IDE controllers and I/O ports of video cards!
+			 * We shall assign a new address to this resource,
+			 * either because the BIOS (sic) forgot to do so
+			 * or because we have decided the old address was
+			 * unusable for some reason.
 			 */
-			if ((class == PCI_CLASS_STORAGE_IDE && idx < 4) ||
-			    (class == PCI_CLASS_DISPLAY_VGA && (r->flags & IORESOURCE_IO)))
-				continue;
-
-			/*
-			 *  We shall assign a new address to this resource, either because
-			 *  the BIOS forgot to do so or because we have decided the old
-			 *  address was unusable for some reason.
-			 */
-			if (!r->start && r->end && ppc_md.pcibios_enable_device_hook &&
-			    !ppc_md.pcibios_enable_device_hook(dev, 1))
+			if (!r->start && r->end)
 				pci_assign_resource(dev, idx);
 		}
 
-		if (0) { /* don't assign ROMs */
-			r = &dev->resource[PCI_ROM_RESOURCE];
-			r->end -= r->start;
-			r->start = 0;
-			if (r->end)
-				pci_assign_resource(dev, PCI_ROM_RESOURCE);
-		}
+#if 0 /* don't assign ROMs */
+		r = &dev->resource[PCI_ROM_RESOURCE];
+		r->end -= r->start;
+		r->start = 0;
+		if (r->end)
+			pci_assign_resource(dev, PCI_ROM_RESOURCE);
+#endif
 	}
-}
-
-
-int
-pcibios_enable_resources(struct pci_dev *dev)
-{
-	u16 cmd, old_cmd;
-	int idx;
-	struct resource *r;
-
-	pci_read_config_word(dev, PCI_COMMAND, &cmd);
-	old_cmd = cmd;
-	for(idx=0; idx<6; idx++) {
-		r = &dev->resource[idx];
-		if (!r->start && r->end) {
-			printk(KERN_ERR "PCI: Device %s not available because of resource collisions\n", dev->slot_name);
-			return -EINVAL;
-		}
-		if (r->flags & IORESOURCE_IO)
-			cmd |= PCI_COMMAND_IO;
-		if (r->flags & IORESOURCE_MEM)
-			cmd |= PCI_COMMAND_MEMORY;
-	}
-	if (dev->resource[PCI_ROM_RESOURCE].start)
-		cmd |= PCI_COMMAND_MEMORY;
-	if (cmd != old_cmd) {
-		printk("PCI: Enabling device %s (%04x -> %04x)\n", dev->slot_name, old_cmd, cmd);
-		pci_write_config_word(dev, PCI_COMMAND, cmd);
-	}
-	return 0;
 }
 
 /* 
@@ -407,8 +366,10 @@ pci_alloc_pci_controller(char *model, enum phb_types controller_type)
                 return NULL;
         }
         memset(hose, 0, sizeof(struct pci_controller));
-        if(strlen(model) < 8) strcpy(hose->what,model);
-        else                  memcpy(hose->what,model,7);
+        if(strlen(model) < 8)
+		strcpy(hose->what,model);
+        else
+		memcpy(hose->what,model,7);
         hose->type = controller_type;
         hose->global_number = global_phb_number;
 	phbtab[global_phb_number++] = hose;
@@ -418,34 +379,12 @@ pci_alloc_pci_controller(char *model, enum phb_types controller_type)
         return hose;
 }
 
-/*
- * This fixup is arch independent and probably should go somewhere else.
- */
-void __init
-pcibios_generic_fixup(void)
-{
-	struct pci_dev *dev;
-
-	/* Fix miss-identified vendor AMD pcnet32 adapters. */
-	dev = NULL;
-	while ((dev = pci_find_device(PCI_VENDOR_ID_TRIDENT, PCI_DEVICE_ID_AMD_LANCE, dev)) != NULL &&
-	       dev->class == (PCI_CLASS_NETWORK_ETHERNET << 8))
-		dev->vendor = PCI_VENDOR_ID_AMD;
-}
-
-
-
-/*********************************************************************** 
- *
- *
- * 
- ***********************************************************************/
-void __init
+static int __init
 pcibios_init(void)
 {
 	struct pci_controller *hose;
 	struct pci_bus *bus;
-	int    next_busno;
+	int next_busno;
 
 #ifndef CONFIG_PPC_ISERIES
 	pSeries_pcibios_init();
@@ -455,7 +394,6 @@ pcibios_init(void)
 
 	printk("PCI: Probing PCI hardware\n");
 	PPCDBG(PPCDBG_BUSWALK,"PCI: Probing PCI hardware\n");
-				
 
 	/* Scan all of the recorded PCI controllers.  */
 	for (next_busno = 0, hose = hose_head; hose; hose = hose->next) {
@@ -467,14 +405,11 @@ pcibios_init(void)
 			next_busno = hose->last_busno+1;
 	}
 	pci_bus_count = next_busno;
-		
+
 	/* Call machine dependant fixup */
 	if (ppc_md.pcibios_fixup) {
 		ppc_md.pcibios_fixup();
 	}
-
-	/* Generic fixups */
-	pcibios_generic_fixup();
 
 	/* Allocate and assign resources */
 	pcibios_allocate_bus_resources(&pci_root_buses);
@@ -577,20 +512,22 @@ char __init *pcibios_setup(char *str)
 	return str;
 }
 
-int pcibios_enable_device(struct pci_dev *dev)
+int pcibios_enable_device(struct pci_dev *dev, int mask)
 {
 	u16 cmd, old_cmd;
 	int idx;
 	struct resource *r;
 
-	PPCDBG(PPCDBG_BUSWALK,"PCI: %s for device %s \n",__FUNCTION__,dev->slot_name);
-	if (ppc_md.pcibios_enable_device_hook)
-		if (ppc_md.pcibios_enable_device_hook(dev, 0))
-			return -EINVAL;
-			
+	PPCDBG(PPCDBG_BUSWALK,"PCI: %s for device %s \n", __FUNCTION__,
+	       dev->slot_name);
+
 	pci_read_config_word(dev, PCI_COMMAND, &cmd);
 	old_cmd = cmd;
-	for (idx=0; idx<6; idx++) {
+	for (idx = 0; idx < 6; idx++) {
+		/* Only set up the requested stuff */
+		if (!(mask & (1<<idx)))
+			continue;
+
 		r = &dev->resource[idx];
 		if (!r->start && r->end) {
 			printk(KERN_ERR "PCI: Device %s not available because of resource collisions\n", dev->slot_name);
@@ -604,7 +541,8 @@ int pcibios_enable_device(struct pci_dev *dev)
 	if (cmd != old_cmd) {
 		printk("PCI: Enabling device %s (%04x -> %04x)\n",
 		       dev->slot_name, old_cmd, cmd);
-		PPCDBG(PPCDBG_BUSWALK,"PCI: Enabling device %s \n",dev->slot_name);
+		PPCDBG(PPCDBG_BUSWALK,"PCI: Enabling device %s \n",
+		       dev->slot_name);
 		pci_write_config_word(dev, PCI_COMMAND, cmd);
 	}
 	return 0;
@@ -985,12 +923,6 @@ void dumpPci_Controller(struct pci_controller* phb)
 		udbg_printf("\tio_base_phys  = 0x%016LX\n", phb->io_base_phys);
 		udbg_printf("\tpci_mem_offset= 0x%016LX\n", phb->pci_mem_offset);
 		udbg_printf("\tpci_io_offset = 0x%016LX\n", phb->pci_io_offset);
-
-		udbg_printf("\tcfg_addr      = 0x%016LX\n", phb->cfg_addr);
-		udbg_printf("\tcfg_data      = 0x%016LX\n", phb->cfg_data);
-		udbg_printf("\tphb_regs      = 0x%016LX\n", phb->phb_regs);
-		udbg_printf("\tchip_regs     = 0x%016LX\n", phb->chip_regs);
-
 
 		udbg_printf("\tResources\n");
 		dumpResources(&phb->io_resource);

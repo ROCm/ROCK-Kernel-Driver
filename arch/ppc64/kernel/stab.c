@@ -303,11 +303,13 @@ unsigned long ppc64_stab_preload = 1;
  */
 static void preload_stab(struct task_struct *tsk, struct mm_struct *mm)
 {
-	if (ppc64_preload_all_segments && test_tsk_thread_flag(tsk, TIF_32BIT)) {
+	if (ppc64_preload_all_segments &&
+	    test_tsk_thread_flag(tsk, TIF_32BIT)) {
 		unsigned long esid, vsid;
 
 		for (esid = 0; esid < 16; esid++) {
-			vsid = get_vsid(mm->context, esid << SID_SHIFT);
+			unsigned long ea = esid << SID_SHIFT;
+			vsid = get_vsid(mm->context, ea);
 			__ste_allocate(esid, vsid, 0);
 		}
 	} else {
@@ -318,15 +320,17 @@ static void preload_stab(struct task_struct *tsk, struct mm_struct *mm)
 		unsigned long vsid;
 
 		if (pc) {
-			if (REGION_ID(pc) >= KERNEL_REGION_ID)
-				BUG();
+			if (!IS_VALID_EA(pc) || 
+			    (REGION_ID(pc) >= KERNEL_REGION_ID))
+				return;
 			vsid = get_vsid(mm->context, pc);
 			__ste_allocate(GET_ESID(pc), vsid, 0);
 		}
 
 		if (stack && (pc_segment != stack_segment)) {
-			if (REGION_ID(stack) >= KERNEL_REGION_ID)
-				BUG();
+			if (!IS_VALID_EA(stack) || 
+			    (REGION_ID(stack) >= KERNEL_REGION_ID))
+				return;
 			vsid = get_vsid(mm->context, stack);
 			__ste_allocate(GET_ESID(stack), vsid, 0);
 		}
