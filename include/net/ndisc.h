@@ -124,6 +124,7 @@ static inline struct neighbour * ndisc_get_neigh(struct net_device *dev, struct 
 	return NULL;
 }
 
+extern void fib6_update_expiry(struct rt6_info *rt, unsigned int lifetime);
 
 #endif /* __KERNEL__ */
 
