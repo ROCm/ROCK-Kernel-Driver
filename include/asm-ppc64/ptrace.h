@@ -16,7 +16,7 @@
  * that the overall structure is a multiple of 16 bytes in length.
  *
  * Note that the offsets of the fields in this struct correspond with
- * the PT_* values below.  This simplifies arch/ppc/kernel/ptrace.c.
+ * the PT_* values below.  This simplifies arch/ppc64/kernel/ptrace.c.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -120,11 +120,14 @@ struct pt_regs32 {
 #define PT_RESULT 43
 
 #define PT_FPR0	48
+
+/* Kernel and userspace will both use this PT_FPSCR value.  32-bit apps will have
+ * visibility to the asm-ppc/ptrace.h header instead of this one.
+ */
+#define PT_FPSCR (PT_FPR0 + 32 + 1)	  /* each FP reg occupies 1 slot in 64-bit space */
+
 #ifdef __KERNEL__
-#define PT_FPSCR (PT_FPR0 + 32 + 1)	  /* each FP reg occupies 1 slot in this space */
-#define PT_FPSCR32 (PT_FPR0 + 2*32 + 1)	  /* To the 32-bit user - each FP reg occupies 2 slots in this space */
-#else
-#define PT_FPSCR (PT_FPR0 + 2*32 + 1)	/* each FP reg occupies 2 slots in this space -- Fix when 64-bit apps. */
+#define PT_FPSCR32 (PT_FPR0 + 2*32 + 1)	  /* each FP reg occupies 2 32-bit userspace slots */
 #endif
 
 /* Additional PTRACE requests implemented on PowerPC. */
