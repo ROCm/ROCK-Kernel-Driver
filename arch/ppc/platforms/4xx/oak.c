@@ -2,7 +2,7 @@
  *
  *    Copyright (c) 1999-2000 Grant Erickson <grant@lcse.umn.edu>
  *
- *    Module name: oak_setup.c
+ *    Module name: oak.c
  *
  *    Description:
  *      Architecture- / platform-specific boot-time initialization code for
@@ -29,7 +29,7 @@
 #include <asm/ppc4xx_pic.h>
 #include <asm/time.h>
 
-#include "oak_setup.h"
+#include "oak.h"
 
 /* Function Prototypes */
 
