@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/cio.c
  *   S/390 common I/O routines -- low level i/o calls
- *   $Revision: 1.98 $
+ *   $Revision: 1.100 $
  *
  *    Copyright (C) 1999-2002 IBM Deutschland Entwicklung GmbH,
  *			      IBM Corporation
@@ -442,6 +442,11 @@ cio_enable_subchannel (struct subchannel *sch, unsigned int isc)
 		if (ret == 0) {
 			stsch (sch->irq, &sch->schib);
 			if (sch->schib.pmcw.ena)
+				break;
+		}
+		if (ret == -EBUSY) {
+			struct irb irb;
+			if (tsch(sch->irq, &irb) != 0)
 				break;
 		}
 	}

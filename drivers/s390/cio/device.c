@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/device.c
  *  bus driver for ccw devices
- *   $Revision: 1.58 $
+ *   $Revision: 1.60 $
  *
  *    Copyright (C) 2002 IBM Deutschland Entwicklung GmbH,
  *			 IBM Corporation
@@ -434,6 +434,13 @@ ccw_device_register(struct ccw_device *cdev)
 	return ret;
 }
 
+void
+ccw_device_unregister(void *data)
+{
+	device_unregister((struct device *)data);
+}
+	
+
 static void
 ccw_device_release(struct device *dev)
 {
@@ -513,16 +520,10 @@ io_subchannel_recog_done(struct ccw_device *cdev)
 		wake_up(&ccw_device_init_wq);
 }
 
-static void
+static int
 io_subchannel_recog(struct ccw_device *cdev, struct subchannel *sch)
 {
 	int rc;
-
-	if (!get_device(&sch->dev)) {
-		if (cdev->dev.release)
-			cdev->dev.release(&cdev->dev);
-		return;
-	}
 
 	sch->dev.driver_data = cdev;
 	sch->driver = &io_subchannel_driver;
@@ -540,9 +541,6 @@ io_subchannel_recog(struct ccw_device *cdev, struct subchannel *sch)
 	snprintf (cdev->dev.bus_id, DEVICE_ID_SIZE, "0:%04x",
 		  sch->schib.pmcw.dev);
 
-	/* Do first half of device_register. */
-	device_initialize(&cdev->dev);
-
 	/* Increase counter of devices currently in recognition. */
 	atomic_inc(&ccw_device_init_count);
 
@@ -551,13 +549,10 @@ io_subchannel_recog(struct ccw_device *cdev, struct subchannel *sch)
 	rc = ccw_device_recognition(cdev);
 	spin_unlock_irq(cdev->ccwlock);
 	if (rc) {
-		sch->dev.driver_data = 0;
-		put_device(&sch->dev);
-		if (cdev->dev.release)
-			cdev->dev.release(&cdev->dev);
 		if (atomic_dec_and_test(&ccw_device_init_count))
 			wake_up(&ccw_device_init_wq);
 	}
+	return rc;
 }
 
 static int
@@ -565,6 +560,7 @@ io_subchannel_probe (struct device *pdev)
 {
 	struct subchannel *sch;
 	struct ccw_device *cdev;
+	int rc;
 
 	sch = to_subchannel(pdev);
 	if (sch->dev.driver_data) {
@@ -573,8 +569,20 @@ io_subchannel_probe (struct device *pdev)
 		 * Register it and exit. This happens for all early
 		 * device, e.g. the console.
 		 */
-		ccw_device_register(sch->dev.driver_data);
+		cdev = sch->dev.driver_data;
+		device_initialize(&cdev->dev);
+		ccw_device_register(cdev);
 		subchannel_add_files(&sch->dev);
+		/*
+		 * Check if the device is already online. If it is
+		 * the reference count needs to be corrected
+		 * (see ccw_device_online and css_init_done for the
+		 * ugly details).
+		 */
+		if (cdev->private->state != DEV_STATE_NOT_OPER &&
+		    cdev->private->state != DEV_STATE_OFFLINE &&
+		    cdev->private->state != DEV_STATE_BOXED)
+			get_device(&cdev->dev);
 		return 0;
 	}
 	cdev  = kmalloc (sizeof(*cdev), GFP_KERNEL);
@@ -592,7 +600,23 @@ io_subchannel_probe (struct device *pdev)
 		.parent = pdev,
 		.release = ccw_device_release,
 	};
-	io_subchannel_recog(cdev, to_subchannel(pdev));
+	/* Do first half of device_register. */
+	device_initialize(&cdev->dev);
+
+	if (!get_device(&sch->dev)) {
+		if (cdev->dev.release)
+			cdev->dev.release(&cdev->dev);
+		return 0;
+	}
+
+	rc = io_subchannel_recog(cdev, to_subchannel(pdev));
+	if (rc) {
+		sch->dev.driver_data = 0;
+		put_device(&sch->dev);
+		if (cdev->dev.release)
+			cdev->dev.release(&cdev->dev);
+	}
+
 	return 0;
 }
 
@@ -604,6 +628,8 @@ static int console_cdev_in_use;
 static int
 ccw_device_console_enable (struct ccw_device *cdev, struct subchannel *sch)
 {
+	int rc;
+
 	/* Initialize the ccw_device structure. */
 	cdev->dev = (struct device) {
 		.parent = &sch->dev,
@@ -613,7 +639,11 @@ ccw_device_console_enable (struct ccw_device *cdev, struct subchannel *sch)
 		.parent = &css_bus_device,
 		.bus	= &css_bus_type,
 	};
-	io_subchannel_recog(cdev, sch);
+
+	rc = io_subchannel_recog(cdev, sch);
+	if (rc)
+		return rc;
+
 	/* Now wait for the async. recognition to come to an end. */
 	while (!dev_fsm_final_state(cdev))
 		wait_cons_dev();

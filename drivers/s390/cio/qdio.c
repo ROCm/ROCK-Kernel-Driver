@@ -55,7 +55,7 @@
 #include "ioasm.h"
 #include "chsc.h"
 
-#define VERSION_QDIO_C "$Revision: 1.51 $"
+#define VERSION_QDIO_C "$Revision: 1.55 $"
 
 /****************** MODULE PARAMETER VARIABLES ********************/
 MODULE_AUTHOR("Utz Bacher <utz.bacher@de.ibm.com>");
@@ -1643,6 +1643,7 @@ qdio_timeout_handler(struct ccw_device *cdev)
 	default:
 		BUG();
 	}
+	ccw_device_set_timeout(cdev, 0);
 	wake_up(&cdev->private->wait_q);
 
 }
@@ -1891,26 +1892,25 @@ tiqdio_check_chsc_availability(void)
 		result=-EIO;
 		goto exit;
 	}
-	/* 4: request block
-	 * 2: general char
-	 * 512: chsc char */
-	if ((scsc_area->general_char[1] & 0x00800000) != 0x00800000) {
+	/* Check for bit 41. */
+	if ((scsc_area->general_char[1] & 0x00400000) != 0x00400000) {
 		QDIO_PRINT_WARN("Adapter interruption facility not " \
 				"installed.\n");
 		result=-ENOENT;
 		goto exit;
 	}
-	if ((scsc_area->chsc_char[2] & 0x00180000) != 0x00180000) {
+	/* Check for bits 107 and 108. */
+	if ((scsc_area->chsc_char[3] & 0x00180000) != 0x00180000) {
 		QDIO_PRINT_WARN("Set Chan Subsys. Char. & Fast-CHSCs " \
 				"not available.\n");
 		result=-ENOENT;
 		goto exit;
 	}
 
-	/* Check for hydra thin interrupts. */
+	/* Check for hydra thin interrupts (bit 67). */
 	hydra_thinints = ((scsc_area->general_char[2] & 0x10000000)
 		== 0x10000000);
-	sprintf(dbf_text,"hydra_ti%1x", hydra_thinints);
+	sprintf(dbf_text,"hydrati%1x", hydra_thinints);
 	QDIO_DBF_TEXT0(0,setup,dbf_text);
 exit:
 	free_page ((unsigned long) scsc_area);
@@ -2413,8 +2413,10 @@ qdio_establish_handle_irq(struct ccw_device *cdev, int cstat, int dstat)
 	QDIO_DBF_TEXT0(0,setup,dbf_text);
 	QDIO_DBF_TEXT0(0,trace,dbf_text);
 
-	if (qdio_establish_irq_check_for_errors(cdev, cstat, dstat))
+	if (qdio_establish_irq_check_for_errors(cdev, cstat, dstat)) {
+		ccw_device_set_timeout(cdev, 0);
 		return;
+	}
 
 	irq_ptr = cdev->private->qdio_data;
 
@@ -2439,7 +2441,7 @@ qdio_establish_handle_irq(struct ccw_device *cdev, int cstat, int dstat)
 	qdio_initialize_set_siga_flags_output(irq_ptr);
 
 	qdio_set_state(irq_ptr,QDIO_IRQ_STATE_ESTABLISHED);
-
+	ccw_device_set_timeout(cdev, 0);
 }
 
 int
@@ -2698,6 +2700,8 @@ qdio_establish(struct ccw_device *cdev)
                            "returned %i, next try returned %i\n",
                            irq_ptr->irq,result,result2);
 		result=result2;
+		if (result)
+			ccw_device_set_timeout(cdev, 0);
 	}
 
 	spin_unlock_irqrestore(get_ccwdev_lock(cdev),saveflags);
@@ -3000,7 +3004,6 @@ qdio_perf_procfile_read(char *buffer, char **buffer_location, off_t offset,
 			int buffer_length, int *eof, void *data)
 {
         int c=0;
-	int irq;
 
         /* we are always called with buffer_length=4k, so we all
            deliver on the first read */
@@ -3020,7 +3023,7 @@ qdio_perf_procfile_read(char *buffer, char **buffer_location, off_t offset,
 		 perf_stats.siga_ins);
 	_OUTP_IT("Number of SIGA out's issued                     : %u\n",
 		 perf_stats.siga_outs);
-	_OUTP_IT("Number of PCIs caught                          : %u\n",
+	_OUTP_IT("Number of PCIs caught                           : %u\n",
 		 perf_stats.pcis);
 	_OUTP_IT("Number of adapter interrupts caught             : %u\n",
 		 perf_stats.thinints);
@@ -3037,27 +3040,6 @@ qdio_perf_procfile_read(char *buffer, char **buffer_location, off_t offset,
 		 perf_stats.outbound_cnt);
 	_OUTP_IT("\n");
 
-	/* 
-	 * FIXME: Rather use driver_for_each_dev, if we had it. 
-	 * I know this loop destroys our layering, but at least gets the 
-	 * performance stats out...
-	 */
-	for (irq=0;irq <= highest_subchannel; irq++) {
-		struct qdio_irq *irq_ptr;
-		struct ccw_device *cdev;
-
-		if (!ioinfo[irq])
-			continue;
-		cdev = ioinfo[irq]->dev.driver_data;
-		if (!cdev)
-			continue;
-		irq_ptr = cdev->private->qdio_data;
-		if (!irq_ptr)
-			continue;
-		_OUTP_IT("Polling time on irq %4x                        " \
-			 ": %u\n",
-			 irq_ptr->irq,irq_ptr->input_qs[0]->timing.threshold);
-	}
         return c;
 }
 
