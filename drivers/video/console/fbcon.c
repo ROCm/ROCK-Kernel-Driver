@@ -992,7 +992,6 @@ static void fbcon_cursor(struct vc_data *vc, int mode)
 	int w = (vc->vc_font.width + 7) >> 3, c;
 	int y = real_y(p, vc->vc_y);
 	struct fb_cursor cursor;
-	char *mask = NULL;
 	
 	if (mode & CM_SOFTBACK) {
 		mode &= ~CM_SOFTBACK;
@@ -1045,11 +1044,15 @@ static void fbcon_cursor(struct vc_data *vc, int mode)
 		}
 
 		if ((cursor.set & FB_CUR_SETSIZE) || ((vc->vc_cursor_type & 0x0f) != p->cursor_shape)) {
+			char *mask = kmalloc(w*vc->vc_font.height, GFP_ATOMIC);
 			int cur_height, size, i = 0;
 
-			mask = kmalloc(w*vc->vc_font.height, GFP_ATOMIC);
 			if (!mask)	return;	
-			
+		
+			if (info->cursor.mask)
+				kfree(info->cursor.mask);
+			info->cursor.mask = mask;
+	
 			p->cursor_shape = vc->vc_cursor_type & 0x0f;
 			cursor.set |= FB_CUR_SETSHAPE;
 
@@ -1080,13 +1083,9 @@ static void fbcon_cursor(struct vc_data *vc, int mode)
 			size = cur_height * w;
 			while (size--)
 				mask[i++] = 0xff;
-        		cursor.mask = mask;
 		}
         	info->cursor.rop = ROP_XOR;
-
 		info->fbops->fb_cursor(info, &cursor);
-		if (mask)	
-			kfree(mask);
 		vbl_cursor_cnt = CURSOR_DRAW_DELAY;
 		break;
 	}

@@ -257,7 +257,6 @@ struct i810fb_par {
 	u32 pci_state[16];
 	unsigned long mmio_start_phys;
 	u8 *mmio_start_virtual;
-	u32 cursor_reset;
 	u32 pitch;
 	u32 pixconf;
 	u32 watermark;

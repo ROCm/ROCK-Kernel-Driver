@@ -55,17 +55,6 @@ int soft_cursor(struct fb_info *info, struct fb_cursor *cursor)
 	size &= ~buf_align;
 	dst = info->pixmap.addr + fb_get_buffer_offset(info, size);
 
-	if (cursor->set & FB_CUR_SETSHAPE) {
-		if (cursor->set & FB_CUR_SETSIZE) {
-			if (info->cursor.mask)
-				kfree(info->cursor.mask);
-			info->cursor.mask = kmalloc(dsize, GFP_ATOMIC);
-			if (!info->cursor.mask)
-				return -ENOMEM;
-		}
-		memcpy(info->cursor.mask, cursor->mask, dsize);			
-	}
-	
 	if (info->cursor.enable) {
 		switch (info->cursor.rop) {
 		case ROP_XOR:
@@ -81,7 +70,7 @@ int soft_cursor(struct fb_info *info, struct fb_cursor *cursor)
 	} else 
 		memcpy(src, cursor->image.data, size);
 	
-	move_buf_aligned(info, dst, src, d_pitch, s_pitch,info->cursor.image.height);
+	move_buf_aligned(info, dst, src, d_pitch, s_pitch, info->cursor.image.height);
 	
 	info->cursor.image.data = dst;
 	

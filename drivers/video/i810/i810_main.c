@@ -1301,7 +1301,6 @@ static int i810fb_set_par(struct fb_info *info)
 	decode_var(&info->var, par);
 	i810_load_regs(par);
 	i810_init_cursor(par);
-	par->cursor_reset = 1;
 
 	encode_fix(&info->fix, info);
 
@@ -1340,24 +1339,17 @@ static int i810fb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 {
 	struct i810fb_par *par = (struct i810fb_par *)info->par;
 	u8 *mmio = par->mmio_start_virtual;	
-	static u8 data[64 * 8];
+	u8 data[64 * 8];
 	
 	if (!info->var.accel_flags || par->dev_flags & LOCKUP) 
 		return soft_cursor(info, cursor);
 
 	if (cursor->image.width > 64 || cursor->image.height > 64)
-		return 1;
+		return -ENXIO;
 
-	if ((i810_readl(CURBASE, mmio) & 0xf) != par->cursor_heap.physical) {
+	if ((i810_readl(CURBASE, mmio) & 0xf) != par->cursor_heap.physical)
 		i810_init_cursor(par);
-		par->cursor_reset = 1;
-	}
 
-	if (par->cursor_reset) {
-		cursor->set = FB_CUR_SETALL;
-		par->cursor_reset = 0;
-	}
-	
 	i810_enable_cursor(mmio, OFF);
 
 	if (cursor->set & FB_CUR_SETHOT)
@@ -1397,12 +1389,12 @@ static int i810fb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 		switch (info->cursor.rop) {
 		case ROP_XOR:
 			for (i = 0; i < size; i++)
-				data[i] = cursor->image.data[i] ^ cursor->mask[i]; 
+				data[i] = cursor->image.data[i] ^ info->cursor.mask[i]; 
 			break;
 		case ROP_COPY:
 		default:
 			for (i = 0; i < size; i++)
-				data[i] = cursor->image.data[i] & cursor->mask[i]; 
+				data[i] = cursor->image.data[i] & info->cursor.mask[i]; 
 			break;
 		}
 		i810_load_cursor_image(info->cursor.image.width, 
