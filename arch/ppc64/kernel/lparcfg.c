@@ -331,7 +331,7 @@ static int lparcfg_data(unsigned char *buf, unsigned long size)
 	if (cur_cpu_spec->firmware_features & FW_FEATURE_SPLPAR) {
 		system_potential_processors =  get_splpar_potential_characteristics();
 		n += snprintf(buf+n, LPARCFG_BUFF_SIZE - n, 
-			      "system_active_processors=%d\n", 
+			      "system_active_processors=%ld\n", 
 			      (h_resource >> 2*8) & 0xffff);
 		n += snprintf(buf+n, LPARCFG_BUFF_SIZE - n, 
 			      "system_potential_processors=%d\n", 
@@ -373,16 +373,16 @@ static int lparcfg_data(unsigned char *buf, unsigned long size)
 
 	if (cur_cpu_spec->firmware_features & FW_FEATURE_SPLPAR) {
 		n += snprintf(buf+n, LPARCFG_BUFF_SIZE - n, 
-			      "pool=%d\n", (h_aggregation >> 0*8)&0xffff);
+			      "pool=%ld\n", (h_aggregation >> 0*8)&0xffff);
 
 		n += snprintf(buf+n, LPARCFG_BUFF_SIZE - n, 
-			      "pool_capacity=%d\n", (h_resource >> 3*8) &0xffff);
+			      "pool_capacity=%ld\n", (h_resource >> 3*8) &0xffff);
 
 		n += snprintf(buf+n, LPARCFG_BUFF_SIZE - n, 
-			      "group=%d\n", (h_aggregation >> 2*8)&0xffff);
+			      "group=%ld\n", (h_aggregation >> 2*8)&0xffff);
 
 		n += snprintf(buf+n, LPARCFG_BUFF_SIZE - n, 
-			      "capped=%d\n", (h_resource >> 6*8)&0x40);
+			      "capped=%ld\n", (h_resource >> 6*8)&0x40);
 
 		n += snprintf(buf+n, LPARCFG_BUFF_SIZE - n, 
 			      "capacity_weight=%d\n", (int)(h_resource>>5*8)&0xFF);

@@ -285,13 +285,13 @@ static ssize_t ppc_rtas_poweron_read(struct file * file, char * buf,
 		size_t count, loff_t *ppos)
 {
 	char stkbuf[40];  /* its small, its on stack */
-	int n;
+	int n, sn;
 	if (power_on_time == 0)
 		n = snprintf(stkbuf, 40, "Power on time not set\n");
 	else
 		n = snprintf(stkbuf, 40, "%lu\n", power_on_time);
 
-	int sn = strlen (stkbuf) +1;
+	sn = strlen (stkbuf) +1;
 	if (*ppos >= sn)
 		return 0;
 	if (n > sn - *ppos)
@@ -331,18 +331,19 @@ static ssize_t ppc_rtas_progress_write(struct file * file, const char * buf,
 static ssize_t ppc_rtas_progress_read(struct file * file, char * buf,
 		size_t count, loff_t *ppos)
 {
-	int n = 0;
+	int sn, n = 0;
+	char *tmpbuf;
 
 	if (progress_led == NULL) return 0;
 
-	char * tmpbuf = kmalloc (MAX_LINELENGTH, GFP_KERNEL);
+	tmpbuf = kmalloc (MAX_LINELENGTH, GFP_KERNEL);
 	if (!tmpbuf) {
 		printk(KERN_ERR "error: kmalloc failed\n");
 		return -ENOMEM;
 	}
 	n = sprintf (tmpbuf, "%s\n", progress_led);
 
-	int sn = strlen (tmpbuf) +1;
+	sn = strlen (tmpbuf) +1;
 	if (*ppos >= sn) {
 		kfree (tmpbuf);
 		return 0;
@@ -398,14 +399,13 @@ static ssize_t ppc_rtas_clock_read(struct file * file, char * buf,
 {
 	unsigned int year, mon, day, hour, min, sec;
 	unsigned long *ret = kmalloc(4*8, GFP_KERNEL);
-	int n, error;
+	int n, sn, error;
+	char stkbuf[40];  /* its small, its on stack */
 
 	error = rtas_call(rtas_token("get-time-of-day"), 0, 8, ret);
 	
 	year = ret[0]; mon  = ret[1]; day  = ret[2];
 	hour = ret[3]; min  = ret[4]; sec  = ret[5];
-
-	char stkbuf[40];  /* its small, its on stack */
 
 	if (error != 0){
 		printk(KERN_WARNING "error: reading the clock returned: %s\n", 
@@ -416,7 +416,7 @@ static ssize_t ppc_rtas_clock_read(struct file * file, char * buf,
 	}
 	kfree(ret);
 
-	int sn = strlen (stkbuf) +1;
+	sn = strlen (stkbuf) +1;
 	if (*ppos >= sn)
 		return 0;
 	if (n > sn - *ppos)
@@ -860,11 +860,12 @@ static ssize_t ppc_rtas_tone_freq_write(struct file * file, const char * buf,
 static ssize_t ppc_rtas_tone_freq_read(struct file * file, char * buf,
 		size_t count, loff_t *ppos)
 {
-	int n;
+	int n, sn;
 	char stkbuf[40];  /* its small, its on stack */
+
 	n = snprintf(stkbuf, 40, "%lu\n", rtas_tone_frequency);
 
-	int sn = strlen (stkbuf) +1;
+	sn = strlen (stkbuf) +1;
 	if (*ppos >= sn)
 		return 0;
 	if (n > sn - *ppos)
@@ -913,11 +914,12 @@ static ssize_t ppc_rtas_tone_volume_write(struct file * file, const char * buf,
 static ssize_t ppc_rtas_tone_volume_read(struct file * file, char * buf,
 		size_t count, loff_t *ppos)
 {
-	int n;
+	int n, sn;
 	char stkbuf[40];  /* its small, its on stack */
+
 	n = snprintf(stkbuf, 40, "%lu\n", rtas_tone_volume);
 
-	int sn = strlen (stkbuf) +1;
+	sn = strlen (stkbuf) +1;
 	if (*ppos >= sn)
 		return 0;
 	if (n > sn - *ppos)
