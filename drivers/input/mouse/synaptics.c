@@ -212,15 +212,6 @@ static int synaptics_set_mode(struct psmouse *psmouse, int mode)
 /*****************************************************************************
  *	Synaptics pass-through PS/2 port support
  ****************************************************************************/
-static int synaptics_pt_open(struct serio *port)
-{
-	return 0;
-}
-
-static void synaptics_pt_close(struct serio *port)
-{
-}
-
 static int synaptics_pt_write(struct serio *port, unsigned char c)
 {
 	struct psmouse *parent = port->driver;
@@ -282,8 +273,6 @@ static void synaptics_pt_create(struct psmouse *psmouse)
 	port->serio.name = "Synaptics pass-through";
 	port->serio.phys = "synaptics-pt/serio0";
 	port->serio.write = synaptics_pt_write;
-	port->serio.open = synaptics_pt_open;
-	port->serio.close = synaptics_pt_close;
 	port->serio.driver = psmouse;
 
 	port->activate = synaptics_pt_activate;

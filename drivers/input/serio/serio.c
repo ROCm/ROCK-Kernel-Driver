@@ -293,7 +293,7 @@ void serio_unregister_device(struct serio_dev *dev)
 int serio_open(struct serio *serio, struct serio_dev *dev)
 {
 	serio->dev = dev;
-	if (serio->open(serio)) {
+	if (serio->open && serio->open(serio)) {
 		serio->dev = NULL;
 		return -1;
 	}
@@ -303,7 +303,8 @@ int serio_open(struct serio *serio, struct serio_dev *dev)
 /* called from serio_dev->connect/disconnect methods under serio_sem */
 void serio_close(struct serio *serio)
 {
-	serio->close(serio);
+	if (serio->close)
+		serio->close(serio);
 	serio->dev = NULL;
 }
 
