@@ -88,8 +88,8 @@ SENSORS_INSMOD_8(adm1021, adm1023, max1617, max1617a, thmc10, lm84, gl523sm, mc1
    these macros are called: arguments may be evaluated more than once.
    Fixing this is just not worth it. */
 /* Conversions  note: 1021 uses normal integer signed-byte format*/
-#define TEMP_FROM_REG(val)	(val > 127 ? val-256 : val)
-#define TEMP_TO_REG(val)	(SENSORS_LIMIT((val < 0 ? val+256 : val),0,255))
+#define TEMP_FROM_REG(val)	(val > 127 ? (val-256)*1000 : val*1000)
+#define TEMP_TO_REG(val)	(SENSORS_LIMIT((val < 0 ? (val/1000)+256 : val/1000),0,255))
 
 /* Initial values */
 
@@ -172,8 +172,18 @@ show(temp_input);
 show(remote_temp_max);
 show(remote_temp_hyst);
 show(remote_temp_input);
-show(alarms);
-show(die_code);
+
+#define show2(value)	\
+static ssize_t show_##value(struct device *dev, char *buf)	\
+{								\
+	struct i2c_client *client = to_i2c_client(dev);		\
+	struct adm1021_data *data = i2c_get_clientdata(client);	\
+								\
+	adm1021_update_client(client);				\
+	return sprintf(buf, "%d\n", data->value);		\
+}
+show2(alarms);
+show2(die_code);
 
 #define set(value, reg)	\
 static ssize_t set_##value(struct device *dev, const char *buf, size_t count)	\
