@@ -41,7 +41,6 @@ typedef struct scsi_fctargaddress {
 } Scsi_FCTargAddress;
 
 extern int scsi_ioctl(struct scsi_device *, int, void __user *);
-extern int kernel_scsi_ioctl(struct scsi_device *, int , void *);
 extern int scsi_ioctl_send_command(struct scsi_device *,
 				   struct scsi_ioctl_command __user *);
 

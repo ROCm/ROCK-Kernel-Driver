@@ -447,19 +447,3 @@ int scsi_ioctl(struct scsi_device *sdev, int cmd, void __user *arg)
 	}
 	return -EINVAL;
 }
-
-/*
- * Just like scsi_ioctl, only callable from kernel space with no 
- * fs segment fiddling.
- */
-
-int kernel_scsi_ioctl(struct scsi_device *sdev, int cmd, void *arg)
-{
-	mm_segment_t oldfs;
-	int tmp;
-	oldfs = get_fs();
-	set_fs(get_ds());
-	tmp = scsi_ioctl(sdev, cmd, arg);
-	set_fs(oldfs);
-	return tmp;
-}

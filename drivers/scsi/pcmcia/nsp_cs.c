@@ -1936,10 +1936,10 @@ static void nsp_cs_config(dev_link_t *link)
 	nsp_dbg(NSP_DEBUG_INIT, "host=0x%p", host);
 
 	for (dev = host->host_queue; dev != NULL; dev = dev->next) {
-		unsigned long arg[2], id;
-		kernel_scsi_ioctl(dev, SCSI_IOCTL_GET_IDLUN, arg);
-		id = (arg[0] & 0x0f) + ((arg[0] >> 4) & 0xf0) +
-			((arg[0] >> 8) & 0xf00) + ((arg[0] >> 12) & 0xf000);
+		unsigned long id;
+		id = (dev->id & 0x0f) + ((dev->lun & 0x0f) << 4) +
+			((dev->channel & 0x0f) << 8) +
+			((dev->host->host_no & 0x0f) << 12);
 		node = &info->node[info->ndev];
 		node->minor = 0;
 		switch (dev->type) {
