@@ -15,6 +15,9 @@
 #include <linux/interrupt.h>
 #include <linux/smp.h>
 #include <linux/completion.h>
+#include <linux/percpu.h>
+#include <linux/bitops.h>
+#include <linux/notifier.h>
 #include <net/flow.h>
 #include <asm/atomic.h>
 #include <asm/semaphore.h>
@@ -33,7 +36,10 @@ atomic_t flow_cache_genid = ATOMIC_INIT(0);
 
 static u32 flow_hash_shift;
 #define flow_hash_size	(1 << flow_hash_shift)
-static struct flow_cache_entry **flow_table;
+static DEFINE_PER_CPU(struct flow_cache_entry **, flow_tables) = { NULL };
+
+#define flow_table(cpu) (per_cpu(flow_tables, cpu))
+
 static kmem_cache_t *flow_cachep;
 
 static int flow_lwm, flow_hwm;
@@ -43,11 +49,14 @@ struct flow_percpu_info {
 	u32 hash_rnd;
 	int count;
 } ____cacheline_aligned;
-static struct flow_percpu_info flow_hash_info[NR_CPUS];
+static DEFINE_PER_CPU(struct flow_percpu_info, flow_hash_info) = { 0 };
 
-#define flow_hash_rnd_recalc(cpu)	(flow_hash_info[cpu].hash_rnd_recalc)
-#define flow_hash_rnd(cpu)		(flow_hash_info[cpu].hash_rnd)
-#define flow_count(cpu)			(flow_hash_info[cpu].count)
+#define flow_hash_rnd_recalc(cpu) \
+	(per_cpu(flow_hash_info, cpu).hash_rnd_recalc)
+#define flow_hash_rnd(cpu) \
+	(per_cpu(flow_hash_info, cpu).hash_rnd)
+#define flow_count(cpu) \
+	(per_cpu(flow_hash_info, cpu).count)
 
 static struct timer_list flow_hash_rnd_timer;
 
@@ -55,17 +64,24 @@ static struct timer_list flow_hash_rnd_timer;
 
 struct flow_flush_info {
 	atomic_t cpuleft;
+	unsigned long cpumap;
 	struct completion completion;
 };
-static struct tasklet_struct flow_flush_tasklets[NR_CPUS];
-static DECLARE_MUTEX(flow_flush_sem);
+static DEFINE_PER_CPU(struct tasklet_struct, flow_flush_tasklets) = { NULL };
+
+#define flow_flush_tasklet(cpu) (&per_cpu(flow_flush_tasklets, cpu))
+
+static DECLARE_MUTEX(flow_cache_cpu_sem);
+static unsigned long flow_cache_cpu_map;
+static unsigned int flow_cache_cpu_count;
 
 static void flow_cache_new_hashrnd(unsigned long arg)
 {
 	int i;
 
 	for (i = 0; i < NR_CPUS; i++)
-		flow_hash_rnd_recalc(i) = 1;
+		if (test_bit(i, &flow_cache_cpu_map))
+			flow_hash_rnd_recalc(i) = 1;
 
 	flow_hash_rnd_timer.expires = jiffies + FLOW_HASH_RND_PERIOD;
 	add_timer(&flow_hash_rnd_timer);
@@ -79,7 +95,7 @@ static void __flow_cache_shrink(int cpu, int shrink_to)
 	for (i = 0; i < flow_hash_size; i++) {
 		int k = 0;
 
-		flp = &flow_table[cpu*flow_hash_size+i];
+		flp = &flow_table(cpu)[i];
 		while ((fle = *flp) != NULL && k < shrink_to) {
 			k++;
 			flp = &fle->next;
@@ -159,11 +175,16 @@ void *flow_cache_lookup(struct flowi *key, u16 family, u8 dir,
 
 	local_bh_disable();
 	cpu = smp_processor_id();
+
+	fle = NULL;
+	if (!test_bit(cpu, &flow_cache_cpu_map))
+		goto nocache;
+
 	if (flow_hash_rnd_recalc(cpu))
 		flow_new_hash_rnd(cpu);
 	hash = flow_hash_code(key, cpu);
 
-	head = &flow_table[(cpu << flow_hash_shift) + hash];
+	head = &flow_table(cpu)[hash];
 	for (fle = *head; fle; fle = fle->next) {
 		if (fle->family == family &&
 		    fle->dir == dir &&
@@ -197,6 +218,7 @@ void *flow_cache_lookup(struct flowi *key, u16 family, u8 dir,
 		}
 	}
 
+nocache:
 	{
 		void *obj;
 		atomic_t *obj_ref;
@@ -230,7 +252,7 @@ static void flow_cache_flush_tasklet(unsigned long data)
 	for (i = 0; i < flow_hash_size; i++) {
 		struct flow_cache_entry *fle;
 
-		fle = flow_table[(cpu << flow_hash_shift) + i];
+		fle = flow_table(cpu)[i];
 		for (; fle; fle = fle->next) {
 			unsigned genid = atomic_read(&flow_cache_genid);
 
@@ -246,6 +268,7 @@ static void flow_cache_flush_tasklet(unsigned long data)
 		complete(&info->completion);
 }
 
+static void flow_cache_flush_per_cpu(void *) __attribute__((__unused__));
 static void flow_cache_flush_per_cpu(void *data)
 {
 	struct flow_flush_info *info = data;
@@ -253,23 +276,31 @@ static void flow_cache_flush_per_cpu(void *data)
 	struct tasklet_struct *tasklet;
 
 	cpu = smp_processor_id();
-	tasklet = &flow_flush_tasklets[cpu];
-	tasklet_init(tasklet, flow_cache_flush_tasklet, (unsigned long)info);
+	if (!test_bit(cpu, &info->cpumap))
+		return;
+
+	tasklet = flow_flush_tasklet(cpu);
+	tasklet->data = (unsigned long)info;
 	tasklet_schedule(tasklet);
 }
 
 void flow_cache_flush(void)
 {
 	struct flow_flush_info info;
+	static DECLARE_MUTEX(flow_flush_sem);
 
-	atomic_set(&info.cpuleft, num_online_cpus());
+	down(&flow_cache_cpu_sem);
+	info.cpumap = flow_cache_cpu_map;
+	atomic_set(&info.cpuleft, flow_cache_cpu_count);
+	up(&flow_cache_cpu_sem);
+
 	init_completion(&info.completion);
 
 	down(&flow_flush_sem);
 
 	local_bh_disable();
 	smp_call_function(flow_cache_flush_per_cpu, &info, 1, 0);
-	flow_cache_flush_per_cpu(&info);
+	flow_cache_flush_tasklet((unsigned long)&info);
 	local_bh_enable();
 
 	wait_for_completion(&info.completion);
@@ -277,11 +308,51 @@ void flow_cache_flush(void)
 	up(&flow_flush_sem);
 }
 
+static void __devinit flow_cache_cpu_online(int cpu)
+{
+	struct tasklet_struct *tasklet;
+	unsigned long order;
+
+	flow_hash_rnd_recalc(cpu) = 1;
+
+	for (order = 0;
+	     (PAGE_SIZE << order) <
+		     (sizeof(struct flow_cache_entry *)*flow_hash_size);
+	     order++)
+		/* NOTHING */;
+
+	flow_table(cpu) = (struct flow_cache_entry **)
+		__get_free_pages(GFP_KERNEL, order);
+
+	memset(flow_table(cpu), 0, PAGE_SIZE << order);
+
+	tasklet = flow_flush_tasklet(cpu);
+	tasklet_init(tasklet, flow_cache_flush_tasklet, 0);
+
+	down(&flow_cache_cpu_sem);
+	set_bit(cpu, &flow_cache_cpu_map);
+	flow_cache_cpu_count++;
+	up(&flow_cache_cpu_sem);
+}
+
+static int __devinit flow_cache_cpu_notify(struct notifier_block *self,
+					   unsigned long action, void *hcpu)
+{
+	unsigned long cpu = (unsigned long)cpu;
+	switch (action) {
+	case CPU_UP_PREPARE:
+		flow_cache_cpu_online(cpu);
+		break;
+	}
+	return NOTIFY_OK;
+}
+
+static struct notifier_block __devinitdata flow_cache_cpu_nb = {
+	.notifier_call = flow_cache_cpu_notify,
+};
+
 static int __init flow_cache_init(void)
 {
-	unsigned long order;
-	int i;
-
 	flow_cachep = kmem_cache_create("flow_cache",
 					sizeof(struct flow_cache_entry),
 					0, SLAB_HWCACHE_ALIGN,
@@ -294,27 +365,13 @@ static int __init flow_cache_init(void)
 	flow_lwm = 2 * flow_hash_size;
 	flow_hwm = 4 * flow_hash_size;
 
-	for (i = 0; i < NR_CPUS; i++)
-		flow_hash_rnd_recalc(i) = 1;
-
 	init_timer(&flow_hash_rnd_timer);
 	flow_hash_rnd_timer.function = flow_cache_new_hashrnd;
 	flow_hash_rnd_timer.expires = jiffies + FLOW_HASH_RND_PERIOD;
 	add_timer(&flow_hash_rnd_timer);
 
-	for (order = 0;
-	     (PAGE_SIZE << order) <
-		     (NR_CPUS*sizeof(struct flow_entry *)*flow_hash_size);
-	     order++)
-		/* NOTHING */;
-
-	flow_table = (struct flow_cache_entry **)
-		__get_free_pages(GFP_ATOMIC, order);
-
-	if (!flow_table)
-		panic("Failed to allocate flow cache hash table\n");
-
-	memset(flow_table, 0, PAGE_SIZE << order);
+	flow_cache_cpu_online(smp_processor_id());
+	register_cpu_notifier(&flow_cache_cpu_nb);
 
 	return 0;
 }
