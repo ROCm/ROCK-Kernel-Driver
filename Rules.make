@@ -131,9 +131,13 @@ else
 	genksyms_smp_prefix := 
 endif
 
-$(MODVERDIR)/$(real-objs-y:.o=.ver): modkern_cflags := $(CFLAGS_KERNEL)
-$(MODVERDIR)/$(real-objs-m:.o=.ver): modkern_cflags := $(CFLAGS_MODULE)
-$(MODVERDIR)/$(export-objs:.o=.ver): export_flags   := -D__GENKSYMS__
+#	Don't include modversions.h, we're just about to generate it here.
+
+CFLAGS_MODULE := $(filter-out -include $(HPATH)/linux/modversions.h,$(CFLAGS_MODULE))
+
+$(addprefix $(MODVERDIR)/,$(real-objs-y:.o=.ver)): modkern_cflags := $(CFLAGS_KERNEL)
+$(addprefix $(MODVERDIR)/,$(real-objs-m:.o=.ver)): modkern_cflags := $(CFLAGS_MODULE)
+$(addprefix $(MODVERDIR)/,$(export-objs:.o=.ver)): export_flags   := -D__GENKSYMS__
 
 c_flags = -Wp,-MD,$(depfile) $(CFLAGS) $(NOSTDINC_FLAGS) \
 	  $(modkern_cflags) $(EXTRA_CFLAGS) $(CFLAGS_$(*F).o) \
@@ -145,18 +149,34 @@ c_flags = -Wp,-MD,$(depfile) $(CFLAGS) $(NOSTDINC_FLAGS) \
 # files changes
 
 quiet_cmd_cc_ver_c = MKVER  include/linux/modules/$(RELDIR)/$*.ver
-define cmd_cc_ver_c
-	mkdir -p $(dir $@); \
-	$(CPP) $(c_flags) $< | $(GENKSYMS) $(genksyms_smp_prefix) \
-	  -k $(VERSION).$(PATCHLEVEL).$(SUBLEVEL) > $@.tmp; \
+cmd_cc_ver_c = $(CPP) $(c_flags) $< | $(GENKSYMS) $(genksyms_smp_prefix) \
+		 -k $(VERSION).$(PATCHLEVEL).$(SUBLEVEL) > $@.tmp
+
+# Okay, let's explain what's happening in rule_make_cc_ver_c:
+# o echo the command
+# o execute the command
+# o If the $(CPP) fails, we won't notice because it's output is piped
+#   to $(GENKSYMS) which does not fail. We recognize this case by
+#   looking if the generated $(depfile) exists, though.
+# o If the .ver file changed, touch modversions.h, which is our maker
+#   of any changed .ver files.
+# o Move command line and deps into their normal .*.cmd place.  
+
+define rule_cc_ver_c
+	$(if $($(quiet)cmd_cc_ver_c),echo '  $($(quiet)cmd_cc_ver_c)';) \
+	$(cmd_cc_ver_c); \
+	if [ ! -r $(depfile) ]; then exit 1; fi; \
+	$(TOPDIR)/scripts/fixdep $(depfile) $@ $(TOPDIR) '$(cmd_cc_ver_c)' > $(@D)/.$(@F).tmp; \
+	rm -f $(depfile); \
 	if [ ! -r $@ ] || cmp -s $@ $@.tmp; then \
 	  touch $(TOPDIR)/include/linux/modversions.h; \
 	fi; \
 	mv -f $@.tmp $@
+	mv -f $(@D)/.$(@F).tmp $(@D)/.$(@F).cmd
 endef
 
 $(MODVERDIR)/%.ver: %.c FORCE
-	@$(call if_changed_dep,cc_ver_c)
+	@$(call if_changed_rule,cc_ver_c)
 
 targets := $(addprefix $(MODVERDIR)/,$(export-objs:.o=.ver))
 
@@ -446,7 +466,7 @@ if_changed = $(if $(strip $? \
 # execute the command and also postprocess generated .d dependencies
 # file
 
-if_changed_dep = $(if $(strip $? \
+if_changed_dep = $(if $(strip $? $(filter-out FORCE $(wildcard $^),$^)\
 		          $(filter-out $(cmd_$(1)),$(cmd_$@))\
 			  $(filter-out $(cmd_$@),$(cmd_$(1)))),\
 	@set -e; \
@@ -455,6 +475,17 @@ if_changed_dep = $(if $(strip $? \
 	$(TOPDIR)/scripts/fixdep $(depfile) $@ $(TOPDIR) '$(cmd_$(1))' > $(@D)/.$(@F).tmp; \
 	rm -f $(depfile); \
 	mv -f $(@D)/.$(@F).tmp $(@D)/.$(@F).cmd)
+
+# Usage: $(call if_changed_rule,foo)
+# will check if $(cmd_foo) changed, or any of the prequisites changed,
+# and if so will execute $(rule_foo)
+
+if_changed_rule = $(if $(strip $? \
+		               $(filter-out $(cmd_$(1)),$(cmd_$@))\
+			       $(filter-out $(cmd_$@),$(cmd_$(1)))),\
+			@set -e; \
+			mkdir -p $(dir $@); \
+			$(rule_$(1)))
 
 # If quiet is set, only print short version of command
 
