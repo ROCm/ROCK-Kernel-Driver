@@ -1,5 +1,8 @@
 /*
  * USB NB Camera driver
+ *
+ * HISTORY:
+ * 25-Dec-2002 Dmitri      Removed lighting, sharpness parameters, methods.
  */
 
 #include <linux/kernel.h>
@@ -33,12 +36,6 @@ static int flags = 0; /* FLAGS_DISPLAY_HINTS | FLAGS_OVERLAY_STATS; */
 
 static const int min_canvasWidth  = 8;
 static const int min_canvasHeight = 4;
-
-//static int lighting = 1; /* Medium */
-
-#define SHARPNESS_MIN	0
-#define SHARPNESS_MAX	6
-//static int sharpness = 4; /* Low noise, good details */
 
 #define FRAMERATE_MIN	0
 #define FRAMERATE_MAX	6
@@ -77,10 +74,6 @@ MODULE_PARM_DESC(flags,
 		"6=clean frames");
 MODULE_PARM(framerate, "i");
 MODULE_PARM_DESC(framerate, "Framerate setting: 0=slowest, 6=fastest (default=2)");
-MODULE_PARM(lighting, "i");
-MODULE_PARM_DESC(lighting, "Photosensitivity: 0=bright, 1=medium (default), 2=low light");
-MODULE_PARM(sharpness, "i");
-MODULE_PARM_DESC(sharpness, "Model1 noise reduction: 0=smooth, 6=sharp (default=4)");
 
 MODULE_PARM(init_brightness, "i");
 MODULE_PARM_DESC(init_brightness, "Brightness preconfiguration: 0-255 (default=128)");
@@ -206,24 +199,6 @@ static void ultracam_adjust_contrast(struct uvd *uvd)
 }
 
 /*
- * ultracam_change_lighting_conditions()
- */
-static void ultracam_change_lighting_conditions(struct uvd *uvd)
-{
-}
-
-/*
- * ultracam_set_sharpness()
- *
- * Cameras model 1 have internal smoothing feature. It is controlled by value in
- * range [0..6], where 0 is most smooth and 6 is most sharp (raw image, I guess).
- * Recommended value is 4. Cameras model 2 do not have this feature at all.
- */
-static void ultracam_set_sharpness(struct uvd *uvd)
-{
-}
-
-/*
  * ultracam_set_brightness()
  *
  * This procedure changes brightness of the picture.
@@ -272,8 +247,6 @@ static void ultracam_reinit_iso(struct uvd *uvd, int do_stop)
 
 static void ultracam_video_start(struct uvd *uvd)
 {
-	ultracam_change_lighting_conditions(uvd);
-	ultracam_set_sharpness(uvd);
 	ultracam_reinit_iso(uvd, 0);
 }
 
