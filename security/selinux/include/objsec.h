@@ -93,6 +93,13 @@ struct bprm_security_struct {
 	unsigned char set;
 };
 
+struct netif_security_struct {
+	struct net_device *dev;		/* back pointer */
+	u32 if_sid;			/* SID for this interface */
+	u32 msg_sid;			/* default SID for messages received on this interface */
+	struct avc_entry_ref avcr;	/* reference to permissions */
+};
+
 extern int inode_security_set_sid(struct inode *inode, u32 sid);
 
 #endif /* _SELINUX_OBJSEC_H_ */

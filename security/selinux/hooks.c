@@ -44,6 +44,7 @@
 #include <linux/ext2_fs.h>
 #include <linux/proc_fs.h>
 #include <linux/kd.h>
+#include <linux/netfilter_ipv4.h>
 #include <net/icmp.h>
 #include <net/ip.h>		/* for sysctl_local_port_range[] */
 #include <net/tcp.h>		/* struct or_callable used in sock_rcv_skb */
@@ -61,6 +62,7 @@
 
 #include "avc.h"
 #include "objsec.h"
+#include "netif.h"
 
 #ifdef CONFIG_SECURITY_SELINUX_DEVELOP
 int selinux_enforcing = 0;
@@ -2663,7 +2665,137 @@ static int selinux_socket_unix_may_send(struct socket *sock,
 	return 0;
 }
 
-#endif
+static int selinux_socket_sock_rcv_skb(struct sock *sk, struct sk_buff *skb)
+{
+	int err = 0;
+	u32 netif_perm;
+	struct socket *sock;
+	struct inode *inode;
+	struct net_device *dev;
+	struct sel_netif *netif;
+	struct netif_security_struct *nsec;
+	struct inode_security_struct *isec;
+	struct avc_audit_data ad;
+
+	/* Only IPv4 is supported here at this stage */
+	if (sk->sk_family != PF_INET)
+		goto out;
+
+	sock = sk->sk_socket;
+	
+	/* TCP control messages don't always have a socket. */
+	if (!sock)
+		goto out;
+
+	inode = SOCK_INODE(sock);
+	if (!inode)
+		goto out;
+
+	dev = skb->dev;
+	if (!dev)
+		goto out;
+
+	netif = sel_netif_lookup(dev);
+	if (IS_ERR(netif)) {
+		err = PTR_ERR(netif);
+		goto out;
+	}
+	
+	nsec = &netif->nsec;
+	isec = inode->i_security;
+
+	switch (isec->sclass) {
+	case SECCLASS_UDP_SOCKET:
+		netif_perm = NETIF__UDP_RECV;
+		break;
+	
+	case SECCLASS_TCP_SOCKET:
+		netif_perm = NETIF__TCP_RECV;
+		break;
+	
+	default:
+		netif_perm = NETIF__RAWIP_RECV;
+		break;
+	}
+
+	AVC_AUDIT_DATA_INIT(&ad, NET);
+	ad.u.net.netif = dev->name;
+	ad.u.net.skb = skb;
+
+	err = avc_has_perm(isec->sid, nsec->if_sid, SECCLASS_NETIF,
+	                   netif_perm, &nsec->avcr, &ad);
+
+	sel_netif_put(netif);
+out:	
+	return err;
+}
+
+#ifdef CONFIG_NETFILTER
+static unsigned int selinux_ip_postroute_last(unsigned int hooknum,
+                                              struct sk_buff **pskb,
+                                              const struct net_device *in,
+                                              const struct net_device *out,
+                                              int (*okfn)(struct sk_buff *))
+{
+	int err = NF_ACCEPT;
+	u32 netif_perm;
+	struct socket *sock;
+	struct inode *inode;
+	struct sel_netif *netif;
+	struct sk_buff *skb = *pskb;
+	struct netif_security_struct *nsec;
+	struct inode_security_struct *isec;
+	struct avc_audit_data ad;
+	struct net_device *dev = (struct net_device *)out;
+	
+	if (!skb->sk)
+		goto out;
+		
+	sock = skb->sk->sk_socket;
+	if (!sock)
+		goto out;
+		
+	inode = SOCK_INODE(sock);
+	if (!inode)
+		goto out;
+
+	netif = sel_netif_lookup(dev);
+	if (IS_ERR(netif)) {
+		err = NF_DROP;
+		goto out;
+	}
+	
+	nsec = &netif->nsec;
+	isec = inode->i_security;
+	
+	switch (isec->sclass) {
+	case SECCLASS_UDP_SOCKET:
+		netif_perm = NETIF__UDP_SEND;
+		break;
+	
+	case SECCLASS_TCP_SOCKET:
+		netif_perm = NETIF__TCP_SEND;
+		break;
+	
+	default:
+		netif_perm = NETIF__RAWIP_SEND;
+		break;
+	}
+
+	AVC_AUDIT_DATA_INIT(&ad, NET);
+	ad.u.net.netif = dev->name;
+	ad.u.net.skb = skb;
+
+	err = avc_has_perm(isec->sid, nsec->if_sid, SECCLASS_NETIF,
+	                   netif_perm, &nsec->avcr, &ad) ? NF_DROP : NF_ACCEPT;
+
+	sel_netif_put(netif);
+out:
+	return err;
+}
+#endif	/* CONFIG_NETFILTER */
+
+#endif	/* CONFIG_SECURITY_NETWORK */
 
 static int ipc_alloc_security(struct task_struct *task,
 			      struct kern_ipc_perm *perm,
@@ -3398,6 +3530,7 @@ struct security_operations selinux_ops = {
 	.socket_getsockopt =		selinux_socket_getsockopt,
 	.socket_setsockopt =		selinux_socket_setsockopt,
 	.socket_shutdown =		selinux_socket_shutdown,
+	.socket_sock_rcv_skb =		selinux_socket_sock_rcv_skb,
 #endif
 };
 
@@ -3467,3 +3600,33 @@ next_sb:
    all processes and objects when they are created. */
 security_initcall(selinux_init);
 
+#if defined(CONFIG_SECURITY_NETWORK) && defined(CONFIG_NETFILTER)
+
+static struct nf_hook_ops selinux_ip_ops[] = {
+	{ .hook =	selinux_ip_postroute_last,
+	  .owner =	THIS_MODULE,
+	  .pf =		PF_INET, 
+	  .hooknum =	NF_IP_POST_ROUTING, 
+	  .priority =	NF_IP_PRI_SELINUX_LAST, },
+};
+
+static int __init selinux_nf_ip_init(void)
+{
+	int err = 0;
+
+	if (!selinux_enabled)
+		goto out;
+		
+	printk(KERN_INFO "SELinux:  Registering netfilter hooks\n");
+	
+	err = nf_register_hook(&selinux_ip_ops[0]);
+	if (err)
+		panic("SELinux: nf_register_hook 0 error %d\n", err);
+
+out:
+	return err;
+}
+
+__initcall(selinux_nf_ip_init);
+
+#endif /* CONFIG_SECURITY_NETWORK && CONFIG_NETFILTER */
