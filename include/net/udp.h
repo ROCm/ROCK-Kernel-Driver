@@ -76,6 +76,4 @@ extern struct udp_mib udp_statistics[NR_CPUS*2];
 #define UDP_INC_STATS_BH(field)		SNMP_INC_STATS_BH(udp_statistics, field)
 #define UDP_INC_STATS_USER(field) 	SNMP_INC_STATS_USER(udp_statistics, field)
 
-extern int udp_proc_init(void);
-
 #endif	/* _UDP_H */
