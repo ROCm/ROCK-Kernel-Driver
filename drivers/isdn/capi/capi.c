@@ -957,14 +957,14 @@ capi_release(struct inode *inode, struct file *file)
 
 static struct file_operations capi_fops =
 {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	read:		capi_read,
-	write:		capi_write,
-	poll:		capi_poll,
-	ioctl:		capi_ioctl,
-	open:		capi_open,
-	release:	capi_release,
+	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
+	.read		= capi_read,
+	.write		= capi_write,
+	.poll		= capi_poll,
+	.ioctl		= capi_ioctl,
+	.open		= capi_open,
+	.release	= capi_release,
 };
 
 #ifdef CONFIG_ISDN_CAPI_MIDDLEWARE

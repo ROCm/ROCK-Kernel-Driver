@@ -32,7 +32,7 @@
 
 #include <asm/uaccess.h>
 
-extern int max_threads;
+extern int max_threads, system_running;
 
 static inline void
 use_init_fs_context(void)
@@ -158,6 +158,9 @@ static int exec_modprobe(void * module_name)
 	char *argv[] = { modprobe_path, "-s", "-k", "--", (char*)module_name, NULL };
 	int ret;
 
+	if (!system_running)
+		return -EBUSY;
+
 	ret = exec_usermodehelper(modprobe_path, argv, envp);
 	if (ret) {
 		static unsigned long last;
@@ -197,10 +200,9 @@ int request_module(const char * module_name)
 	unsigned long saved_policy = current->policy;
 
 	current->policy = SCHED_NORMAL;
-	/* Don't allow request_module() before the root fs is mounted!  */
-	if ( ! current->fs->root ) {
-		printk(KERN_ERR "request_module[%s]: Root fs not mounted\n",
-			module_name);
+	/* Don't allow request_module() when the system isn't set up */
+	if ( ! system_running ) {
+		printk(KERN_ERR "request_module[%s]: not ready\n", module_name);
 		ret = -EPERM;
 		goto out;
 	}
@@ -356,6 +358,9 @@ int call_usermodehelper(char *path, char **argv, char **envp)
 		.routine	= __call_usermodehelper,
 		.data		= &sub_info,
 	};
+
+	if (!system_running)
+		return -EBUSY;
 
 	if (path[0] == '\0')
 		goto out;
