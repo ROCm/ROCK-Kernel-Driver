@@ -1117,17 +1117,19 @@ static int ida_ioctl(struct inode *inode, struct file *filep, unsigned int cmd, 
 		put_user(get_start_sect(inode->i_rdev), &geo->start);
 		return 0;
 	case IDAGETDRVINFO:
-		return copy_to_user(&io->c.drv,&hba[ctlr]->drv[dsk],sizeof(drv_info_t));
+		if (copy_to_user(&io->c.drv, &hba[ctlr]->drv[dsk],
+				 sizeof(drv_info_t)))
+			return -EFAULT;
+		return 0;
 	case BLKRRPART:
 		return revalidate_logvol(inode->i_rdev, 1);
 	case IDAPASSTHRU:
 		if (!capable(CAP_SYS_RAWIO)) return -EPERM;
-		error = copy_from_user(&my_io, io, sizeof(my_io));
-		if (error) return error;
+		if (copy_from_user(&my_io, io, sizeof(my_io)))
+			return -EFAULT;
 		error = ida_ctlr_ioctl(ctlr, dsk, &my_io);
 		if (error) return error;
-		error = copy_to_user(io, &my_io, sizeof(my_io));
-		return error;
+		return copy_to_user(io, &my_io, sizeof(my_io)) ? -EFAULT : 0;
 	case IDAGETCTLRSIG:
 		if (!arg) return -EINVAL;
 		put_user(hba[ctlr]->ctlr_sig, (int*)arg);
@@ -1208,7 +1210,11 @@ static int ida_ctlr_ioctl(int ctlr, int dsk, ida_ioctl_t *io)
 			cmd_free(h, c, 0); 
 			return(error);
 		}
-		copy_from_user(p, (void*)io->sg[0].addr, io->sg[0].size);
+		if (copy_from_user(p, (void*)io->sg[0].addr, io->sg[0].size)) {
+			kfree(p);
+			cmd_free(h, c, 0); 
+			return -EFAULT;
+		}
 		c->req.hdr.blk = pci_map_single(h->pci_dev, &(io->c), 
 				sizeof(ida_ioctl_t), 
 				PCI_DMA_BIDIRECTIONAL);
@@ -1245,7 +1251,11 @@ static int ida_ctlr_ioctl(int ctlr, int dsk, ida_ioctl_t *io)
                         cmd_free(h, c, 0);
                         return(error);
                 }
-		copy_from_user(p, (void*)io->sg[0].addr, io->sg[0].size);
+		if (copy_from_user(p, (void*)io->sg[0].addr, io->sg[0].size)) {
+			kfree(p);
+                        cmd_free(h, c, 0);
+			return -EFAULT;
+		}
 		c->req.sg[0].size = io->sg[0].size;
 		c->req.sg[0].addr = pci_map_single(h->pci_dev, p, 
 			c->req.sg[0].size, PCI_DMA_BIDIRECTIONAL); 
@@ -1282,7 +1292,10 @@ static int ida_ctlr_ioctl(int ctlr, int dsk, ida_ioctl_t *io)
 	case DIAG_PASS_THRU:
 	case SENSE_CONTROLLER_PERFORMANCE:
 	case READ_FLASH_ROM:
-		copy_to_user((void*)io->sg[0].addr, p, io->sg[0].size);
+		if (copy_to_user((void*)io->sg[0].addr, p, io->sg[0].size)) {
+			kfree(p);
+			return -EFAULT;
+		}
 		/* fall through and free p */
 	case IDA_WRITE:
 	case IDA_WRITE_MEDIA:

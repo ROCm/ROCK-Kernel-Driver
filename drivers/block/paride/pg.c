@@ -623,7 +623,8 @@ static ssize_t pg_write(struct file * filp, const char * buf,
 	if (PG.busy) return -EBUSY;
 	if (count < hs) return -EINVAL;
 	
-	copy_from_user((char *)&hdr,buf,hs);
+	if (copy_from_user((char *)&hdr, buf, hs))
+		return -EFAULT;
 
 	if (hdr.magic != PG_MAGIC) return -EINVAL;
 	if (hdr.dlen > PG_MAX_DATA) return -EINVAL;
@@ -647,8 +648,8 @@ static ssize_t pg_write(struct file * filp, const char * buf,
 
 	PG.busy = 1;
 
-	copy_from_user(PG.bufptr,buf+hs,count-hs);
-
+	if (copy_from_user(PG.bufptr, buf + hs, count - hs))
+		return -EFAULT;
 	return count;
 }
 
@@ -682,9 +683,11 @@ static ssize_t pg_read(struct file * filp, char * buf,
 	hdr.duration = (jiffies - PG.start + HZ/2) / HZ;
 	hdr.scsi = PG.status & 0x0f;
 
-	copy_to_user(buf,(char *)&hdr,hs);
-	if (copy > 0) copy_to_user(buf+hs,PG.bufptr,copy);
-	
+	if (copy_to_user(buf, (char *)&hdr, hs))
+		return -EFAULT;
+	if (copy > 0)
+		if (copy_to_user(buf+hs,PG.bufptr,copy))
+			return -EFAULT;
 	return copy+hs;
 }
 
