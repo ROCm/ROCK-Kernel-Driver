@@ -69,6 +69,7 @@ typedef	struct avmctrl_info {
 	struct avmcard  *card;
 	struct capi_ctr *capi_ctrl;
 	
+	struct list_head ncci_head;
 } avmctrl_info;
 
 typedef struct avmcard {
@@ -549,7 +550,7 @@ void b1_reset_ctr(struct capi_ctr *ctrl);
 void b1_register_appl(struct capi_ctr *ctrl, u16 appl,
 				capi_register_params *rp);
 void b1_release_appl(struct capi_ctr *ctrl, u16 appl);
-void b1_send_message(struct capi_ctr *ctrl, struct sk_buff *skb);
+u16  b1_send_message(struct capi_ctr *ctrl, struct sk_buff *skb);
 void b1_parse_version(avmctrl_info *card);
 void b1_interrupt(int interrupt, void *devptr, struct pt_regs *regs);
 
@@ -574,7 +575,7 @@ void b1dma_register_appl(struct capi_ctr *ctrl,
 				u16 appl,
 				capi_register_params *rp);
 void b1dma_release_appl(struct capi_ctr *ctrl, u16 appl);
-void b1dma_send_message(struct capi_ctr *ctrl, struct sk_buff *skb);
+u16  b1dma_send_message(struct capi_ctr *ctrl, struct sk_buff *skb);
 int b1dmactl_read_proc(char *page, char **start, off_t off,
         		int count, int *eof, struct capi_ctr *ctrl);
 
