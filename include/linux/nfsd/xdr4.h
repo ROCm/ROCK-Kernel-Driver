@@ -68,6 +68,7 @@ struct nfsd4_access {
 struct nfsd4_close {
 	u32		cl_seqid;           /* request */
 	stateid_t	cl_stateid;         /* request+response */
+	struct nfs4_stateowner * cl_stateowner;	/* response */
 };
 
 struct nfsd4_commit {
@@ -340,6 +341,9 @@ extern int nfsd4_process_open2(struct svc_rqst *rqstp,
 		struct svc_fh *current_fh, struct nfsd4_open *open);
 extern int nfsd4_open_confirm(struct svc_rqst *rqstp, 
 		struct svc_fh *current_fh, struct nfsd4_open_confirm *oc);
+extern  int nfsd4_close(struct svc_rqst *rqstp, struct svc_fh *current_fh, 
+		struct nfsd4_close *close);
+
 #endif
 
 /*

@@ -64,6 +64,12 @@ u32 list_add_perfile = 0;
 u32 list_del_perfile = 0;
 u32 add_perclient = 0;
 u32 del_perclient = 0;
+u32 alloc_file = 0;
+u32 free_file = 0;
+u32 alloc_sowner = 0;
+u32 free_sowner = 0;
+u32 vfsopen = 0;
+u32 vfsclose = 0;
 
 /* Locking:
  *
@@ -89,6 +95,8 @@ opaque_hashval(const void *ptr, int nbytes)
 /* forward declarations */
 static void release_stateowner(struct nfs4_stateowner *sop);
 static void release_stateid(struct nfs4_stateid *stp);
+static void release_file(struct nfs4_file *fp);
+
 
 /* 
  * SETCLIENTID state 
@@ -297,6 +305,7 @@ move_to_confirmed(struct nfs4_client *clp, unsigned int idhashval)
 {
 	unsigned int strhashval;
 
+	dprintk("NFSD: move_to_confirm nfs4_client %p\n", clp);
 	list_del_init(&clp->cl_strhash);
 	list_del_init(&clp->cl_idhash);
 	list_add(&clp->cl_idhash, &conf_id_hashtbl[idhashval]);
@@ -687,6 +696,7 @@ alloc_init_file(unsigned int hashval, nfs4_ino_desc_t *ino) {
 		list_add(&fp->fi_hash, &file_hashtbl[hashval]);
 		memcpy(&fp->fi_ino, ino, sizeof(nfs4_ino_desc_t));
 		fp->fi_id = current_fileid++;
+		alloc_file++;
 		return fp;
 	}
 	return (struct nfs4_file *)NULL;
@@ -705,8 +715,7 @@ release_all_files(void)
 			if(!list_empty(&fp->fi_perfile)) {
 				printk("ERROR: release_all_files: file %p is open, creating dangling state !!!\n",fp);
 			}
-			list_del_init(&fp->fi_hash);
-			kfree(fp);
+			release_file(fp);
 		}
 	}
 }
@@ -734,6 +743,7 @@ free_stateowner(struct nfs4_stateowner *sop) {
 		kfree(sop->so_owner.data);
 		kfree(sop);
 		sop = NULL;
+		free_sowner++;
 	}
 }
 
@@ -757,6 +767,7 @@ alloc_init_stateowner(unsigned int strhashval, struct nfs4_client *clp, struct n
 	sop->so_client = clp;
 	sop->so_seqid = open->op_seqid;
 	sop->so_confirmed = 0;
+	alloc_sowner++;
 	return sop;
 }
 
@@ -807,12 +818,44 @@ release_stateid(struct nfs4_stateid *stp) {
 	list_del_init(&stp->st_peropenstate);
 	if(stp->st_vfs_set) {
 		nfsd_close(&stp->st_vfs_file);
+		vfsclose++;
 		dput(stp->st_vfs_file.f_dentry);
 		mntput(stp->st_vfs_file.f_vfsmnt);
 	}
 	/* should use a slab cache */
 	kfree(stp);
 	stp = NULL;
+}
+
+static void
+release_file(struct nfs4_file *fp)
+{
+	free_file++;
+	list_del_init(&fp->fi_hash);
+	kfree(fp);
+}	
+
+void
+release_open_state(struct nfs4_stateid *stp)
+{
+	struct nfs4_stateowner *sop = stp->st_stateowner;
+	struct nfs4_file *fp = stp->st_file;
+
+	dprintk("NFSD: release_open_state\n");
+	release_stateid(stp);
+	/*
+	 * release unused nfs4_stateowners.
+	 * XXX will need to be placed  on an  open_stateid_lru list to be
+	 * released by the laundromat service after the lease period
+	 * to enable us to handle CLOSE replay
+	 */
+	if (sop->so_confirmed && list_empty(&sop->so_peropenstate)) {
+		release_stateowner(sop);
+	}
+	/* unused nfs4_file's are releseed. XXX slab cache? */
+	if (list_empty(&fp->fi_perfile)) {
+		release_file(fp);
+	}
 }
 
 static int
@@ -1005,7 +1048,6 @@ nfsd4_process_open2(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nf
 	struct nfs4_stateid *stq, *stp = NULL;
 	int status;
 
-
 	status = nfserr_resource;
 	if (!sop)
 		goto out;
@@ -1050,6 +1092,7 @@ nfsd4_process_open2(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nf
 			                      &stp->st_vfs_file)) != 0)
 			goto out_free;
 
+		vfsopen++;
 		dget(stp->st_vfs_file.f_dentry);
 		mntget(stp->st_vfs_file.f_vfsmnt);
 
@@ -1382,6 +1425,36 @@ out:
 	up(&client_sema);
 	return status;
 }
+int
+nfsd4_close(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_close *close)
+{
+	int status;
+	struct nfs4_stateid *stp;
+
+	dprintk("NFSD: nfsd4_close on file %.*s\n", 
+			current_fh->fh_dentry->d_name.len, 
+			current_fh->fh_dentry->d_name.name);
+
+	down(&client_sema); /* XXX need finer grained locking */
+	if ((status = nfs4_preprocess_seqid_op(current_fh, close->cl_seqid, 
+					&close->cl_stateid, 
+					CHECK_FH, 
+					&close->cl_stateowner, &stp)))
+		goto out; 
+	/*
+	*  Return success, but first update the stateid.
+	*/
+	status = nfs_ok;
+	update_stateid(&stp->st_stateid);
+	memcpy(&close->cl_stateid, &stp->st_stateid, sizeof(stateid_t));
+
+	/* release_open_state() calls nfsd_close() if needed */
+	release_open_state(stp);
+out:
+	up(&client_sema);
+	return status;
+}
+
 void 
 nfs4_state_init(void)
 {
@@ -1441,6 +1514,12 @@ __nfs4_state_shutdown(void)
 			list_add_perfile, list_del_perfile);
 	dprintk("NFSD: add_perclient %d del_perclient %d\n",
 			add_perclient, del_perclient);
+	dprintk("NFSD: alloc_file %d free_file %d\n",
+			alloc_file, free_file);
+	dprintk("NFSD: alloc_sowner %d free_sowner %d\n",
+			alloc_sowner, free_sowner);
+	dprintk("NFSD: vfsopen %d vfsclose %d\n",
+			vfsopen, vfsclose);
 }
 
 void

@@ -55,12 +55,6 @@
 
 #define NFSDDBG_FACILITY		NFSDDBG_PROC
 
-static inline int
-nfsd4_close(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_close *close)
-{
-	return nfs_ok;
-}
-
 /* Note: The organization of the OPEN code seems a little strange; it
  * has been superfluously split into three routines, one of which is named
  * nfsd4_process_open2() even though there is no nfsd4_process_open1()!
