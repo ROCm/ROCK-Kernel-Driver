@@ -509,14 +509,11 @@ static int cpufreq_resume(struct sys_device * sysdev)
 	 */
 		ret = cpufreq_driver->target(cpu_policy, cpu_policy->cur, CPUFREQ_RELATION_H);
 
-	if (ret) {
+	if (ret)
 		printk(KERN_ERR "cpufreq: resume failed in ->setpolicy/target step on CPU %u\n", cpu_policy->cpu);
-		goto out;
-	}
 
- out:
+out:
 	cpufreq_cpu_put(cpu_policy);
-
 	return ret;
 }
 
