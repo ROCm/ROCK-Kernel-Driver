@@ -1071,7 +1071,7 @@ static int ipv6_generate_eui64(u8 *eui, struct net_device *dev)
 		eui[0] ^= 2;
 		return 0;
 	case ARPHRD_ARCNET:
-		/* XXX: inherit EUI-64 fro mother interface -- yoshfuji */
+		/* XXX: inherit EUI-64 from other interface -- yoshfuji */
 		if (dev->addr_len != ARCNET_ALEN)
 			return -1;
 		memset(eui, 0, 7);

@@ -223,7 +223,7 @@ static struct rt6_info *rt6_best_dflt(struct rt6_info *rt, int oif)
 			match = sprt;
 			mpri = m;
 			if (m >= 12) {
-				/* we choose the lastest default router if it
+				/* we choose the last default router if it
 				 * is in (probably) reachable state.
 				 * If route changed, we should do pmtu
 				 * discovery. --yoshfuji

@@ -711,7 +711,7 @@ static void ndisc_recv_ns(struct sk_buff *skb)
 			return;
 		}
 
-		/* XXX: RFC2461 7.1.1:
+		/* RFC2461 7.1.1:
 	 	 *	If the IP source address is the unspecified address, 
 		 *	there MUST NOT be source link-layer address option 
 		 *	in the message.
@@ -1164,7 +1164,7 @@ static void ndisc_redirect_rcv(struct sk_buff *skb)
 		return;
 	}
 
-	/* XXX: RFC2461 8.1: 
+	/* RFC2461 8.1: 
 	 *	The IP source address of the Redirect MUST be the same as the current
 	 *	first-hop router for the specified ICMP Destination Address.
 	 */
