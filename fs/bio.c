@@ -594,7 +594,7 @@ static void bio_dirty_fn(void *data);
 
 static DECLARE_WORK(bio_dirty_work, bio_dirty_fn, NULL);
 static spinlock_t bio_dirty_lock = SPIN_LOCK_UNLOCKED;
-static struct bio *bio_dirty_list = NULL;
+static struct bio *bio_dirty_list;
 
 /*
  * This runs in process context
