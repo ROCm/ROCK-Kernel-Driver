@@ -1,4 +1,4 @@
-/* orinoco_plx.c 0.11a
+/* orinoco_plx.c 0.11b
  * 
  * Driver for Prism II devices which would usually be driven by orinoco_cs,
  * but are connected to the PCI bus by a PLX9052. 
@@ -134,7 +134,7 @@ not have time for a while..
 #include "hermes.h"
 #include "orinoco.h"
 
-static char version[] __initdata = "orinoco_plx.c 0.11a (Daniel Barlow <dan@telent.net>)";
+static char version[] __initdata = "orinoco_plx.c 0.11b (Daniel Barlow <dan@telent.net>)";
 MODULE_AUTHOR("Daniel Barlow <dan@telent.net>");
 MODULE_DESCRIPTION("Driver for wireless LAN cards using the PLX9052 PCI bridge");
 #ifdef MODULE_LICENSE
@@ -284,7 +284,7 @@ static int orinoco_plx_init_one(struct pci_dev *pdev,
 
 	hermes_struct_init(&(priv->hw), dev->base_addr,
 			HERMES_IO, HERMES_16BIT_REGSPACING);
-	pci_set_drvdata(pdev, priv);
+	pci_set_drvdata(pdev, dev);
 
 	err = request_irq(pdev->irq, orinoco_plx_interrupt, SA_SHIRQ, dev->name, priv);
 	if (err) {
@@ -337,12 +337,12 @@ static int orinoco_plx_init_one(struct pci_dev *pdev,
 
 static void __devexit orinoco_plx_remove_one(struct pci_dev *pdev)
 {
-	struct orinoco_private *priv = pci_get_drvdata(pdev);
-	struct net_device *dev = priv->ndev;
+	struct net_device *dev = pci_get_drvdata(pdev);
+	struct orinoco_private *priv = dev->priv;
 
 	TRACE_ENTER("orinoco_plx");
 
-	if (!priv)
+	if (! dev)
 		BUG();
 
 	orinoco_proc_dev_cleanup(priv);
@@ -352,7 +352,7 @@ static void __devexit orinoco_plx_remove_one(struct pci_dev *pdev)
 	if (dev->irq)
 		free_irq(dev->irq, priv);
 		
-	kfree(priv);
+	kfree(dev);
 
 	release_region(pci_resource_start(pdev, 3), pci_resource_len(pdev, 3));
 

@@ -1,4 +1,4 @@
-/* airport.c 0.11a
+/* airport.c 0.11b
  *
  * A driver for "Hermes" chipset based Apple Airport wireless
  * card.
@@ -42,7 +42,7 @@
 #include "hermes.h"
 #include "orinoco.h"
 
-static char version[] __initdata = "airport.c 0.11a (Benjamin Herrenschmidt <benh@kernel.crashing.org>)";
+static char version[] __initdata = "airport.c 0.11b (Benjamin Herrenschmidt <benh@kernel.crashing.org>)";
 MODULE_AUTHOR("Benjamin Herrenschmidt <benh@kernel.crashing.org>");
 MODULE_DESCRIPTION("Driver for the Apple Airport wireless card.");
 MODULE_LICENSE("Dual MPL/GPL");
@@ -270,8 +270,8 @@ failed:
 static void
 airport_detach(struct net_device *dev)
 {
-	struct orinoco_private *priv = (struct orinoco_private *)dev->priv;
-	struct airport *card = (struct airport *)priv->card;
+	struct orinoco_private *priv = dev->priv;
+	struct airport *card = priv->card;
 
 	/* Unregister proc entry */
 	orinoco_proc_dev_cleanup(priv);
@@ -299,7 +299,7 @@ airport_detach(struct net_device *dev)
 	current->state = TASK_UNINTERRUPTIBLE;
 	schedule_timeout(HZ);
 	
-	kfree(card);
+	kfree(dev);
 }				/* airport_detach */
 
 static int __init
