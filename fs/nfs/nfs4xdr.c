@@ -261,7 +261,13 @@ static int nfs_stat_to_errno(int);
 #define NFS4_dec_access_sz	(compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				op_decode_hdr_maxsz + 2)
-  
+#define NFS4_enc_getattr_sz	(compound_encode_hdr_maxsz + \
+				encode_putfh_maxsz + \
+				encode_getattr_maxsz)
+#define NFS4_dec_getattr_sz	(compound_decode_hdr_maxsz + \
+				decode_putfh_maxsz + \
+				decode_getattr_maxsz)
+
 
 
 static struct {
@@ -552,6 +558,15 @@ encode_getattr_two(struct xdr_stream *xdr, uint32_t bm0, uint32_t bm1)
         return 0;
 }
 
+static int encode_getfattr(struct xdr_stream *xdr, const u32* bitmask)
+{
+	extern u32 nfs4_fattr_bitmap[];
+
+	return encode_getattr_two(xdr,
+			bitmask[0] & nfs4_fattr_bitmap[0],
+			bitmask[1] & nfs4_fattr_bitmap[1]);
+}
+
 static inline int
 encode_getattr(struct xdr_stream *xdr, struct nfs4_getattr *getattr)
 {
@@ -837,7 +852,8 @@ encode_open_downgrade(struct xdr_stream *xdr, struct nfs_closeargs *arg)
 	return 0;
 }
 
-static int encode_putfh(struct xdr_stream *xdr, const struct nfs_fh *fh)
+static int
+encode_putfh(struct xdr_stream *xdr, const struct nfs_fh *fh)
 {
 	int len = fh->size;
 	uint32_t *p;
@@ -1183,6 +1199,23 @@ static int nfs4_xdr_enc_access(struct rpc_rqst *req, uint32_t *p, const struct n
 	return status;
 }
 
+/*
+ * Encode GETATTR request
+ */
+static int nfs4_xdr_enc_getattr(struct rpc_rqst *req, uint32_t *p, const struct nfs4_getattr_arg *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 2,
+	};
+	int status;
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr);
+	if ((status = encode_putfh(&xdr, args->fh)) == 0)
+		status = encode_getfattr(&xdr, args->bitmask);
+	return status;
+}
 
 /*
  * Encode a CLOSE request
@@ -1653,6 +1686,320 @@ decode_op_hdr(struct xdr_stream *xdr, enum nfs_opnum4 expected)
 	return 0;
 }
 
+static int decode_attr_bitmap(struct xdr_stream *xdr, uint32_t *bitmap)
+{
+	uint32_t bmlen, *p;
+
+	READ_BUF(4);
+	READ32(bmlen);
+
+	bitmap[0] = bitmap[1] = 0;
+	READ_BUF((bmlen << 2));
+	if (bmlen > 0) {
+		READ32(bitmap[0]);
+		if (bmlen > 1)
+			READ32(bitmap[1]);
+	}
+	return 0;
+}
+
+static inline int decode_attr_length(struct xdr_stream *xdr, uint32_t *attrlen, uint32_t **savep)
+{
+	uint32_t *p;
+
+	READ_BUF(4);
+	READ32(*attrlen);
+	*savep = xdr->p;
+	return 0;
+}
+
+static int decode_attr_type(struct xdr_stream *xdr, uint32_t *bitmap, uint32_t *type)
+{
+	uint32_t *p;
+
+	*type = 0;
+	if (unlikely(bitmap[0] & (FATTR4_WORD0_TYPE - 1U)))
+		return -EIO;
+	if (likely(bitmap[0] & FATTR4_WORD0_TYPE)) {
+		READ_BUF(4);
+		READ32(*type);
+		if (*type < NF4REG || *type > NF4NAMEDATTR) {
+			dprintk("%s: bad type %d\n", __FUNCTION__, *type);
+			return -EIO;
+		}
+		bitmap[0] &= ~FATTR4_WORD0_TYPE;
+	}
+	dprintk("%s: type=0%o\n", __FUNCTION__, nfs_type2fmt[*type].nfs2type);
+	return 0;
+}
+
+static int decode_attr_change(struct xdr_stream *xdr, uint32_t *bitmap, uint64_t *change)
+{
+	uint32_t *p;
+
+	*change = 0;
+	if (unlikely(bitmap[0] & (FATTR4_WORD0_CHANGE - 1U)))
+		return -EIO;
+	if (likely(bitmap[0] & FATTR4_WORD0_CHANGE)) {
+		READ_BUF(8);
+		READ64(*change);
+		bitmap[0] &= ~FATTR4_WORD0_CHANGE;
+	}
+	dprintk("%s: change attribute=%Lu\n", __FUNCTION__,
+			(unsigned long long)*change);
+	return 0;
+}
+
+static int decode_attr_size(struct xdr_stream *xdr, uint32_t *bitmap, uint64_t *size)
+{
+	uint32_t *p;
+
+	*size = 0;
+	if (unlikely(bitmap[0] & (FATTR4_WORD0_SIZE - 1U)))
+		return -EIO;
+	if (likely(bitmap[0] & FATTR4_WORD0_SIZE)) {
+		READ_BUF(8);
+		READ64(*size);
+		bitmap[0] &= ~FATTR4_WORD0_SIZE;
+	}
+	dprintk("%s: file size=%Lu\n", __FUNCTION__, (unsigned long long)*size);
+	return 0;
+}
+
+static int decode_attr_fsid(struct xdr_stream *xdr, uint32_t *bitmap, struct nfs4_fsid *fsid)
+{
+	uint32_t *p;
+
+	fsid->major = 0;
+	fsid->minor = 0;
+	if (unlikely(bitmap[0] & (FATTR4_WORD0_FSID - 1U)))
+		return -EIO;
+	if (likely(bitmap[0] & FATTR4_WORD0_FSID)) {
+		READ_BUF(16);
+		READ64(fsid->major);
+		READ64(fsid->minor);
+		bitmap[0] &= ~FATTR4_WORD0_FSID;
+	}
+	dprintk("%s: fsid=(0x%Lx/0x%Lx)\n", __FUNCTION__,
+			(unsigned long long)fsid->major,
+			(unsigned long long)fsid->minor);
+	return 0;
+}
+
+static int decode_attr_fileid(struct xdr_stream *xdr, uint32_t *bitmap, uint64_t *fileid)
+{
+	uint32_t *p;
+
+	*fileid = 0;
+	if (unlikely(bitmap[0] & (FATTR4_WORD0_FILEID - 1U)))
+		return -EIO;
+	if (likely(bitmap[0] & FATTR4_WORD0_FILEID)) {
+		READ_BUF(8);
+		READ64(*fileid);
+		bitmap[0] &= ~FATTR4_WORD0_FILEID;
+	}
+	dprintk("%s: fileid=%Lu\n", __FUNCTION__, (unsigned long long)*fileid);
+	return 0;
+}
+
+static int decode_attr_mode(struct xdr_stream *xdr, uint32_t *bitmap, uint32_t *mode)
+{
+	uint32_t *p;
+
+	*mode = 0;
+	if (unlikely(bitmap[1] & (FATTR4_WORD1_MODE - 1U)))
+		return -EIO;
+	if (likely(bitmap[1] & FATTR4_WORD1_MODE)) {
+		READ_BUF(4);
+		READ32(*mode);
+		*mode &= ~S_IFMT;
+		bitmap[1] &= ~FATTR4_WORD1_MODE;
+	}
+	dprintk("%s: file mode=0%o\n", __FUNCTION__, (unsigned int)*mode);
+	return 0;
+}
+
+static int decode_attr_nlink(struct xdr_stream *xdr, uint32_t *bitmap, uint32_t *nlink)
+{
+	uint32_t *p;
+
+	*nlink = 1;
+	if (unlikely(bitmap[1] & (FATTR4_WORD1_NUMLINKS - 1U)))
+		return -EIO;
+	if (likely(bitmap[1] & FATTR4_WORD1_NUMLINKS)) {
+		READ_BUF(4);
+		READ32(*nlink);
+		bitmap[1] &= ~FATTR4_WORD1_NUMLINKS;
+	}
+	dprintk("%s: nlink=%u\n", __FUNCTION__, (unsigned int)*nlink);
+	return 0;
+}
+
+static int decode_attr_owner(struct xdr_stream *xdr, uint32_t *bitmap, struct nfs4_client *clp, int32_t *uid)
+{
+	uint32_t len, *p;
+
+	*uid = -2;
+	if (unlikely(bitmap[1] & (FATTR4_WORD1_OWNER - 1U)))
+		return -EIO;
+	if (likely(bitmap[1] & FATTR4_WORD1_OWNER)) {
+		READ_BUF(4);
+		READ32(len);
+		READ_BUF(len);
+		if (len < XDR_MAX_NETOBJ) {
+			if (nfs_map_name_to_uid(clp, (char *)p, len, uid) != 0)
+				dprintk("%s: nfs_map_name_to_uid failed!\n",
+						__FUNCTION__);
+		} else
+			printk(KERN_WARNING "%s: name too long (%u)!\n",
+					__FUNCTION__, len);
+		bitmap[1] &= ~FATTR4_WORD1_OWNER;
+	}
+	dprintk("%s: uid=%d\n", __FUNCTION__, (int)*uid);
+	return 0;
+}
+
+static int decode_attr_group(struct xdr_stream *xdr, uint32_t *bitmap, struct nfs4_client *clp, int32_t *gid)
+{
+	uint32_t len, *p;
+
+	*gid = -2;
+	if (unlikely(bitmap[1] & (FATTR4_WORD1_OWNER_GROUP - 1U)))
+		return -EIO;
+	if (likely(bitmap[1] & FATTR4_WORD1_OWNER_GROUP)) {
+		READ_BUF(4);
+		READ32(len);
+		READ_BUF(len);
+		if (len < XDR_MAX_NETOBJ) {
+			if (nfs_map_group_to_gid(clp, (char *)p, len, gid) != 0)
+				dprintk("%s: nfs_map_group_to_gid failed!\n",
+						__FUNCTION__);
+		} else
+			printk(KERN_WARNING "%s: name too long (%u)!\n",
+					__FUNCTION__, len);
+		bitmap[1] &= ~FATTR4_WORD1_OWNER_GROUP;
+	}
+	dprintk("%s: gid=%d\n", __FUNCTION__, (int)*gid);
+	return 0;
+}
+
+static int decode_attr_rdev(struct xdr_stream *xdr, uint32_t *bitmap, dev_t *rdev)
+{
+	uint32_t major = 0, minor = 0, *p;
+
+	*rdev = MKDEV(0,0);
+	if (unlikely(bitmap[1] & (FATTR4_WORD1_RAWDEV - 1U)))
+		return -EIO;
+	if (likely(bitmap[1] & FATTR4_WORD1_RAWDEV)) {
+		dev_t tmp;
+
+		READ_BUF(8);
+		READ32(major);
+		READ32(minor);
+		tmp = MKDEV(major, minor);
+		if (MAJOR(tmp) == major && MINOR(tmp) == minor)
+			*rdev = tmp;
+		bitmap[1] &= ~ FATTR4_WORD1_RAWDEV;
+	}
+	dprintk("%s: rdev=(0x%x:0x%x)\n", __FUNCTION__, major, minor);
+	return 0;
+}
+
+static int decode_attr_space_used(struct xdr_stream *xdr, uint32_t *bitmap, uint64_t *used)
+{
+	uint32_t *p;
+
+	*used = 0;
+	if (unlikely(bitmap[1] & (FATTR4_WORD1_SPACE_USED - 1U)))
+		return -EIO;
+	if (likely(bitmap[1] & FATTR4_WORD1_SPACE_USED)) {
+		READ_BUF(8);
+		READ64(*used);
+		bitmap[1] &= ~FATTR4_WORD1_SPACE_USED;
+	}
+	dprintk("%s: space used=%Lu\n", __FUNCTION__,
+			(unsigned long long)*used);
+	return 0;
+}
+
+static int decode_attr_time(struct xdr_stream *xdr, struct timespec *time)
+{
+	uint32_t *p;
+	uint64_t sec;
+	uint32_t nsec;
+
+	READ_BUF(12);
+	READ64(sec);
+	READ32(nsec);
+	time->tv_sec = (time_t)sec;
+	time->tv_nsec = (long)nsec;
+	return 0;
+}
+
+static int decode_attr_time_access(struct xdr_stream *xdr, uint32_t *bitmap, struct timespec *time)
+{
+	int status = 0;
+
+	time->tv_sec = 0;
+	time->tv_nsec = 0;
+	if (unlikely(bitmap[1] & (FATTR4_WORD1_TIME_ACCESS - 1U)))
+		return -EIO;
+	if (likely(bitmap[1] & FATTR4_WORD1_TIME_ACCESS)) {
+		status = decode_attr_time(xdr, time);
+		bitmap[1] &= ~FATTR4_WORD1_TIME_ACCESS;
+	}
+	dprintk("%s: atime=%ld\n", __FUNCTION__, (long)time->tv_sec);
+	return status;
+}
+
+static int decode_attr_time_metadata(struct xdr_stream *xdr, uint32_t *bitmap, struct timespec *time)
+{
+	int status = 0;
+
+	time->tv_sec = 0;
+	time->tv_nsec = 0;
+	if (unlikely(bitmap[1] & (FATTR4_WORD1_TIME_METADATA - 1U)))
+		return -EIO;
+	if (likely(bitmap[1] & FATTR4_WORD1_TIME_METADATA)) {
+		status = decode_attr_time(xdr, time);
+		bitmap[1] &= ~FATTR4_WORD1_TIME_METADATA;
+	}
+	dprintk("%s: ctime=%ld\n", __FUNCTION__, (long)time->tv_sec);
+	return status;
+}
+
+static int decode_attr_time_modify(struct xdr_stream *xdr, uint32_t *bitmap, struct timespec *time)
+{
+	int status = 0;
+
+	time->tv_sec = 0;
+	time->tv_nsec = 0;
+	if (unlikely(bitmap[1] & (FATTR4_WORD1_TIME_MODIFY - 1U)))
+		return -EIO;
+	if (likely(bitmap[1] & FATTR4_WORD1_TIME_MODIFY)) {
+		status = decode_attr_time(xdr, time);
+		bitmap[1] &= ~FATTR4_WORD1_TIME_MODIFY;
+	}
+	dprintk("%s: mtime=%ld\n", __FUNCTION__, (long)time->tv_sec);
+	return status;
+}
+
+static int verify_attr_len(struct xdr_stream *xdr, uint32_t *savep, uint32_t attrlen)
+{
+	unsigned int attrwords = XDR_QUADLEN(attrlen);
+	unsigned int nwords = xdr->p - savep;
+
+	if (unlikely(attrwords != nwords)) {
+		printk(KERN_WARNING "%s: server returned incorrect attribute length: %u %c %u\n",
+				__FUNCTION__,
+				attrwords << 2,
+				(attrwords < nwords) ? '<' : '>',
+				nwords << 2);
+		return -EIO;
+	}
+	return 0;
+}
+
 static int
 decode_change_info(struct xdr_stream *xdr, struct nfs4_change_info *cinfo)
 {
@@ -2091,6 +2438,69 @@ out_bad_bitmap:
 			(unsigned int)bmval0, (unsigned int)bmval1);
 	return -EIO;
 }
+
+static int decode_getfattr(struct xdr_stream *xdr, struct nfs_fattr *fattr, const struct nfs_server *server)
+{
+	uint32_t *savep;
+	uint32_t attrlen,
+		 bitmap[2] = {0},
+		 type;
+	int status, fmode = 0;
+
+	if ((status = decode_op_hdr(xdr, OP_GETATTR)) != 0)
+		goto xdr_error;
+	if ((status = decode_attr_bitmap(xdr, bitmap)) != 0)
+		goto xdr_error;
+
+	fattr->bitmap[0] = bitmap[0];
+	fattr->bitmap[1] = bitmap[1];
+
+	if ((status = decode_attr_length(xdr, &attrlen, &savep)) != 0)
+		goto xdr_error;
+
+
+	if ((status = decode_attr_type(xdr, bitmap, &type)) != 0)
+		goto xdr_error;
+	fattr->type = nfs_type2fmt[type].nfs2type;
+	fmode = nfs_type2fmt[type].mode;
+
+	if ((status = decode_attr_change(xdr, bitmap, &fattr->change_attr)) != 0)
+		goto xdr_error;
+	if ((status = decode_attr_size(xdr, bitmap, &fattr->size)) != 0)
+		goto xdr_error;
+	if ((status = decode_attr_fsid(xdr, bitmap, &fattr->fsid_u.nfs4)) != 0)
+		goto xdr_error;
+	if ((status = decode_attr_fileid(xdr, bitmap, &fattr->fileid)) != 0)
+		goto xdr_error;
+	if ((status = decode_attr_mode(xdr, bitmap, &fattr->mode)) != 0)
+		goto xdr_error;
+	fattr->mode |= fmode;
+	if ((status = decode_attr_nlink(xdr, bitmap, &fattr->nlink)) != 0)
+		goto xdr_error;
+	if ((status = decode_attr_owner(xdr, bitmap, server->nfs4_state, &fattr->uid)) != 0)
+		goto xdr_error;
+	if ((status = decode_attr_group(xdr, bitmap, server->nfs4_state, &fattr->gid)) != 0)
+		goto xdr_error;
+	if ((status = decode_attr_rdev(xdr, bitmap, &fattr->rdev)) != 0)
+		goto xdr_error;
+	if ((status = decode_attr_space_used(xdr, bitmap, &fattr->du.nfs3.used)) != 0)
+		goto xdr_error;
+	if ((status = decode_attr_time_access(xdr, bitmap, &fattr->atime)) != 0)
+		goto xdr_error;
+	if ((status = decode_attr_time_metadata(xdr, bitmap, &fattr->ctime)) != 0)
+		goto xdr_error;
+	if ((status = decode_attr_time_modify(xdr, bitmap, &fattr->mtime)) != 0)
+		goto xdr_error;
+	if ((status = verify_attr_len(xdr, savep, attrlen)) == 0) {
+		fattr->valid = NFS_ATTR_FATTR | NFS_ATTR_FATTR_V3 | NFS_ATTR_FATTR_V4;
+		fattr->timestamp = jiffies;
+	}
+xdr_error:
+	if (status != 0)
+		printk(KERN_NOTICE "%s: xdr error %d!\n", __FUNCTION__, -status);
+	return status;
+}
+
 
 static int
 decode_fsinfo(struct xdr_stream *xdr, struct nfs_fsinfo *fsinfo)
@@ -2758,6 +3168,29 @@ out:
 }
 
 /*
+ * Decode GETATTR response
+ */
+static int nfs4_xdr_dec_getattr(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_getattr_res *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+	
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (status)
+		goto out;
+	status = decode_putfh(&xdr);
+	if (status)
+		goto out;
+	status = decode_getfattr(&xdr, res->fattr, res->server);
+out:
+	return status;
+
+}
+
+
+/*
  * Decode CLOSE response
  */
 static int
@@ -3266,6 +3699,7 @@ struct rpc_procinfo	nfs4_procedures[] = {
   PROC(LOCKT,           enc_lockt,      dec_lockt),
   PROC(LOCKU,           enc_locku,      dec_locku),
   PROC(ACCESS,		enc_access,	dec_access),
+  PROC(GETATTR,		enc_getattr,	dec_getattr),
 };
 
 struct rpc_version		nfs_version4 = {

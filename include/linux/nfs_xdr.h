@@ -3,6 +3,11 @@
 
 #include <linux/sunrpc/xprt.h>
 
+struct nfs4_fsid {
+	__u64 major;
+	__u64 minor;
+};
+
 struct nfs_fattr {
 	unsigned short		valid;		/* which fields are valid */
 	__u64			pre_size;	/* pre_op_attr.size	  */
@@ -26,10 +31,7 @@ struct nfs_fattr {
 	dev_t			rdev;
 	union {
 		__u64		nfs3;		/* also nfs2 */
-		struct {
-			__u64	major;
-			__u64	minor;
-		} nfs4;
+		struct nfs4_fsid nfs4;
 	} fsid_u;
 	__u64			fileid;
 	struct timespec		atime;
@@ -526,6 +528,16 @@ struct nfs4_getattr {
         struct nfs_fattr *		gt_attrs;          /* response */
 	struct nfs_fsstat *		gt_fsstat;         /* response */
 	struct nfs_pathconf *		gt_pathconf;       /* response */
+};
+
+struct nfs4_getattr_arg {
+	const struct nfs_fh *		fh;
+	const u32 *			bitmask;
+};
+
+struct nfs4_getattr_res {
+	const struct nfs_server *	server;
+	struct nfs_fattr *		fattr;
 };
 
 struct nfs4_getfh {

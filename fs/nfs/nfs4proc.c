@@ -876,18 +876,25 @@ out:
 	return nfs4_proc_fsinfo(server, fhandle, info);
 }
 
-static int
-nfs4_proc_getattr(struct inode *inode, struct nfs_fattr *fattr)
+static int nfs4_proc_getattr(struct inode *inode, struct nfs_fattr *fattr)
 {
-	struct nfs4_compound compound;
-	struct nfs4_op ops[2];
-
+	struct nfs4_getattr_arg args = {
+		.fh = NFS_FH(inode),
+		.bitmask = nfs4_fattr_bitmap,
+	};
+	struct nfs4_getattr_res res = {
+		.fattr = fattr,
+		.server = NFS_SERVER(inode),
+	};
+	struct rpc_message msg = {
+		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_GETATTR],
+		.rpc_argp = &args,
+		.rpc_resp = &res,
+	};
+	
 	fattr->valid = 0;
 
-	nfs4_setup_compound(&compound, ops, NFS_SERVER(inode), "getattr");
-	nfs4_setup_putfh(&compound, NFS_FH(inode));
-	nfs4_setup_getattr(&compound, fattr);
-	return nfs4_map_errors(nfs4_call_compound(&compound, NULL, 0));
+	return nfs4_map_errors(rpc_call_sync(NFS_CLIENT(inode), &msg, 0));
 }
 
 /* 
