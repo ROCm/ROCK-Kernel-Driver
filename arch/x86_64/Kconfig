@@ -411,10 +411,6 @@ source "drivers/ieee1394/Kconfig"
 #source drivers/message/i2o/Config.in
 source "net/Kconfig"
 
-source "net/ax25/Kconfig"
-
-source "net/irda/Kconfig"
-
 source "drivers/isdn/Kconfig"
 
 # no support for non IDE/SCSI cdroms as they were all ISA only
@@ -436,8 +432,6 @@ source "drivers/video/Kconfig"
 source "sound/Kconfig"
 
 source "drivers/usb/Kconfig"
-
-source "net/bluetooth/Kconfig"
 
 source "arch/x86_64/oprofile/Kconfig"
 

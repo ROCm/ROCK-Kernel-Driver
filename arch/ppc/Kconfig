@@ -1133,10 +1133,6 @@ source "drivers/message/i2o/Kconfig"
 
 source "net/Kconfig"
 
-source "net/ax25/Kconfig"
-
-source "net/irda/Kconfig"
-
 source "drivers/isdn/Kconfig"
 
 source "drivers/video/Kconfig"
@@ -1313,8 +1309,6 @@ config SERIAL_SICC_CONSOLE
 endmenu
 
 source "drivers/usb/Kconfig"
-
-source "net/bluetooth/Kconfig"
 
 source "lib/Kconfig"
 

@@ -664,4 +664,10 @@ endmenu
 
 source "drivers/net/Kconfig"
 
+source "net/ax25/Kconfig"
+
+source "net/irda/Kconfig"
+
+source "net/bluetooth/Kconfig"
+
 endmenu

@@ -448,8 +448,6 @@ source "drivers/fc4/Kconfig"
 
 source "net/Kconfig"
 
-source "net/ax25/Kconfig"
-
 # This one must be before the filesystem configs. -DaveM
 
 menu "Unix98 PTY support"
@@ -505,9 +503,6 @@ source "fs/Kconfig"
 source "sound/Kconfig"
 
 source "drivers/usb/Kconfig"
-
-source "net/bluetooth/Kconfig"
-
 
 menu "Watchdog"
 

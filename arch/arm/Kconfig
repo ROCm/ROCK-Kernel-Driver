@@ -612,11 +612,6 @@ source "drivers/acorn/block/Kconfig"
 
 source "net/Kconfig"
 
-#   source net/ax25/Config.in
-source "net/irda/Kconfig"
-
-source "net/ax25/Kconfig"
-
 source "drivers/ide/Kconfig"
 
 source "drivers/scsi/Kconfig"

@@ -524,8 +524,6 @@ source "net/Kconfig"
 
 if !IA64_HP_SIM
 
-source "net/ax25/Kconfig"
-
 source "drivers/isdn/Kconfig"
 
 source "drivers/cdrom/Kconfig"
@@ -572,9 +570,6 @@ source "drivers/video/Kconfig"
 source "sound/Kconfig"
 
 source "drivers/usb/Kconfig"
-
-
-source "net/bluetooth/Kconfig"
 
 endif
 
