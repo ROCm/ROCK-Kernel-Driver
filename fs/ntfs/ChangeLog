@@ -28,6 +28,8 @@ ToDo/Notes:
 	  ACLs yet.
 	- Remove BKL use from ntfs_setattr() syncing up with the rest of the
 	  kernel.
+	- Get rid of the ugly transparent union in fs/ntfs/dir.c::ntfs_readdir()
+	  and ntfs_filldir() as per suggestion from Al Viro.
 
 2.1.18 - Fix scheduling latencies at mount time as well as an endianness bug.
 
