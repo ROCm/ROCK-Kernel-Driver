@@ -299,12 +299,12 @@ Examples
  * hex_ascii- + raw-view Example
  */
 
-#include <linux/module.h>
+#include <linux/init.h>
 #include <asm/debug.h>
 
 static debug_info_t* debug_info;
 
-int init_module(void)
+static int init(void)
 {
     /* register 4 debug areas with one page each and 4 byte data field */
 
@@ -319,10 +319,13 @@ int init_module(void)
     return 0;
 }
 
-void cleanup_module(void)
+static void cleanup(void)
 {
     debug_unregister (debug_info);
 }
+
+module_init(init);
+module_exit(cleanup);
 
 ---------------------------------------------------------------------------
 
@@ -330,12 +333,12 @@ void cleanup_module(void)
  * sprintf-view Example
  */
 
-#include <linux/module.h>
+#include <linux/init.h>
 #include <asm/debug.h>
 
 static debug_info_t* debug_info;
 
-int init_module(void)
+static int init(void)
 {
     /* register 4 debug areas with one page each and data field for */
     /* format string pointer + 2 varargs (= 3 * sizeof(long))       */
@@ -349,10 +352,13 @@ int init_module(void)
     return 0;
 }
 
-void cleanup_module(void)
+static void cleanup(void)
 {
     debug_unregister (debug_info);
 }
+
+module_init(init);
+module_exit(cleanup);
 
 
 
