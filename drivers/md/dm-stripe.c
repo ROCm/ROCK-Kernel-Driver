@@ -173,9 +173,8 @@ static int stripe_map(struct dm_target *ti, struct bio *bio,
 	struct stripe_c *sc = (struct stripe_c *) ti->private;
 
 	sector_t offset = bio->bi_sector - ti->begin;
-	uint32_t chunk = (uint32_t) (offset >> sc->chunk_shift);
-	uint32_t stripe = chunk % sc->stripes;	/* 32bit modulus */
-	chunk = chunk / sc->stripes;
+	sector_t chunk = offset >> sc->chunk_shift;
+	uint32_t stripe = do_div(chunk, sc->stripes);
 
 	bio->bi_bdev = sc->stripe[stripe].dev->bdev;
 	bio->bi_sector = sc->stripe[stripe].physical_start +
@@ -210,7 +209,7 @@ static int stripe_status(struct dm_target *ti,
 
 static struct target_type stripe_target = {
 	.name   = "striped",
-	.version= {1, 0, 1},
+	.version= {1, 0, 2},
 	.module = THIS_MODULE,
 	.ctr    = stripe_ctr,
 	.dtr    = stripe_dtr,
