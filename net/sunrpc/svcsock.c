@@ -574,8 +574,14 @@ svc_udp_recvfrom(struct svc_rqst *rqstp)
 
 
 	rqstp->rq_arg.len = len;
-	rqstp->rq_arg.page_len = len - rqstp->rq_arg.head[0].iov_len;
-	rqstp->rq_argused += (rqstp->rq_arg.page_len + PAGE_SIZE - 1)/ PAGE_SIZE;
+	rqstp->rq_arg.page_base = 0;
+	if (len <= rqstp->rq_arg.head[0].iov_len) {
+		rqstp->rq_arg.head[0].iov_len = len;
+		rqstp->rq_arg.page_len = 0;
+	} else {
+		rqstp->rq_arg.page_len = len - rqstp->rq_arg.head[0].iov_len;
+		rqstp->rq_argused += (rqstp->rq_arg.page_len + PAGE_SIZE - 1)/ PAGE_SIZE;
+	}
 	rqstp->rq_prot        = IPPROTO_UDP;
 
 	/* Get sender address */
