@@ -45,7 +45,6 @@
 
 extern int do_pipe(int *);
 extern asmlinkage unsigned long sys_brk(unsigned long);
-extern asmlinkage unsigned long sys_create_module(char *, unsigned long);
 
 /*
  * Brk needs to return an error.  Still support Linux's brk(0) query idiom,
@@ -639,33 +638,6 @@ osf_sigstack(struct sigstack *uss, struct sigstack *uoss)
 	error = 0;
  out:
 	return error;
-}
-
-/*
- * The Linux kernel isn't good at returning values that look
- * like negative longs (they are mistaken as error values).
- * Until that is fixed, we need this little workaround for
- * create_module() because it's one of the few system calls
- * that return kernel addresses (which are negative).
- */
-
-asmlinkage unsigned long
-do_alpha_create_module(char *module_name, unsigned long size,
-		       struct pt_regs *regs)
-{
-	long retval;
-
-	lock_kernel();
-	retval = sys_create_module(module_name, size);
-
-	/* We get either a module address or an error number, and we know
-	   the error number is a small negative number, while the address
-	   is always negative but much larger.  */
-	if (retval + 1000 < 0)
-		regs->r0 = 0;
-
-        unlock_kernel();
-	return retval;
 }
 
 asmlinkage long

@@ -324,10 +324,10 @@ sys_call_table:
 	.quad sys_old_adjtimex
 	.quad sys_swapoff
 	.quad sys_getdents			/* 305 */
-	.quad alpha_create_module
+	.quad sys_ni_syscall			/* 306: old create_module */
 	.quad sys_init_module
 	.quad sys_delete_module
-	.quad sys_get_kernel_syms
+	.quad sys_ni_syscall			/* 309: old get_kernel_syms */
 	.quad sys_syslog			/* 310 */
 	.quad sys_reboot
 	.quad sys_clone
@@ -365,7 +365,7 @@ sys_call_table:
 	.quad sys_getresuid
 	.quad sys_pciconfig_read		/* 345 */
 	.quad sys_pciconfig_write
-	.quad sys_query_module
+	.quad sys_ni_syscall			/* 347: old query_module */
 	.quad sys_prctl
 	.quad sys_pread64
 	.quad sys_pwrite64			/* 350 */
