@@ -84,6 +84,7 @@ static int check_quotactl_valid(struct super_block *sb, int type, int cmd, qid_t
 		case Q_SETINFO:
 		case Q_SETQUOTA:
 		case Q_GETQUOTA:
+			/* This is just informative test so we are satisfied without a lock */
 			if (!sb_has_quota_enabled(sb, type))
 				return -ESRCH;
 	}
@@ -151,7 +152,13 @@ static int do_quotactl(struct super_block *sb, int type, int cmd, qid_t id, cadd
 		case Q_GETFMT: {
 			__u32 fmt;
 
+			down_read(&sb_dqopt(sb)->dqoff_sem);
+			if (!sb_has_quota_enabled(sb, type)) {
+				up_read(&sb_dqopt(sb)->dqoff_sem);
+				return -ESRCH;
+			}
 			fmt = sb_dqopt(sb)->info[type].dqi_format->qf_fmt_id;
+			up_read(&sb_dqopt(sb)->dqoff_sem);
 			if (copy_to_user(addr, &fmt, sizeof(fmt)))
 				return -EFAULT;
 			return 0;
@@ -244,7 +251,6 @@ asmlinkage long sys_quotactl(unsigned int cmd, const char *special, qid_t id, ca
 	struct super_block *sb = NULL;
 	int ret = -EINVAL;
 
-	lock_kernel();
 	cmds = cmd >> SUBCMDSHIFT;
 	type = cmd & SUBCMDMASK;
 
@@ -259,6 +265,5 @@ asmlinkage long sys_quotactl(unsigned int cmd, const char *special, qid_t id, ca
 out:
 	if (sb)
 		drop_super(sb);
-	unlock_kernel();
 	return ret;
 }

@@ -29,6 +29,7 @@
 #include <linux/blkdev.h>
 #include <linux/smp_lock.h>
 #include <linux/buffer_head.h>
+#include <linux/vfs.h>
 #include <asm/uaccess.h>
 #include "xattr.h"
 #include "acl.h"

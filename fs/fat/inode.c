@@ -19,6 +19,7 @@
 #include <linux/pagemap.h>
 #include <linux/buffer_head.h>
 #include <linux/mount.h>
+#include <linux/vfs.h>
 #include <asm/unaligned.h>
 
 /*

@@ -81,6 +81,7 @@
 #include <linux/init.h>
 #include <linux/smp_lock.h>
 #include <linux/buffer_head.h>
+#include <linux/vfs.h>
 
 #include "swab.h"
 #include "util.h"

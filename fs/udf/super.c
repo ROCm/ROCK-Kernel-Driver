@@ -56,6 +56,7 @@
 #include <linux/nls.h>
 #include <linux/smp_lock.h>
 #include <linux/buffer_head.h>
+#include <linux/vfs.h>
 #include <asm/byteorder.h>
 
 #include <linux/udf_fs.h>

@@ -13,6 +13,7 @@
 #include <linux/efs_fs_sb.h>
 #include <linux/slab.h>
 #include <linux/buffer_head.h>
+#include <linux/vfs.h>
 
 static struct super_block *efs_get_sb(struct file_system_type *fs_type,
 	int flags, char *dev_name, void *data)

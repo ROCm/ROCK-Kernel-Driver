@@ -14,7 +14,7 @@
 #include <linux/dcache.h>
 #include <linux/namei.h>
 #include <linux/mm.h>
-
+#include <linux/vfs.h>
 #include <linux/sunrpc/xdr.h>
 #include <linux/sunrpc/svc.h>
 #include <linux/nfsd/nfsd.h>

@@ -119,9 +119,6 @@ static int __init miropcm20_rds_init(void)
 		return -EINVAL;
 
 	printk("miropcm20-rds: userinterface driver loaded.\n");
-#if DEBUG
-	printk("v4l-name: %s\n", devfs_get_name(pcm20_radio.devfs_handle, 0));
-#endif
 	return 0;
 }
 

@@ -32,6 +32,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/smp_lock.h>
+#include <linux/vfs.h>
 
 MODULE_LICENSE("GPL");
 

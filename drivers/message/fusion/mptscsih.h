@@ -20,7 +20,7 @@
  *  (mailto:netscape.net)
  *  (mailto:Pam.Delaney@lsil.com)
  *
- *  $Id: mptscsih.h,v 1.20 2002/10/17 20:16:00 pdelaney Exp $
+ *  $Id: mptscsih.h,v 1.21 2002/12/03 21:26:35 pdelaney Exp $
  */
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
@@ -73,9 +73,16 @@
  *	Try to keep these at 2^N-1
  */
 #define MPT_FC_CAN_QUEUE	63
-//#define MPT_SCSI_CAN_QUEUE	31
-#define MPT_SCSI_CAN_QUEUE	MPT_FC_CAN_QUEUE
-#define MPT_SCSI_CMD_PER_LUN	 7
+#if defined MPT_SCSI_USE_NEW_EH
+	#define MPT_SCSI_CAN_QUEUE	127
+#else
+	#define MPT_SCSI_CAN_QUEUE	63
+#endif
+
+#define MPT_SCSI_CMD_PER_DEV_HIGH	31
+#define MPT_SCSI_CMD_PER_DEV_LOW	7
+
+#define MPT_SCSI_CMD_PER_LUN		7
 
 #define MPT_SCSI_MAX_SECTORS    8192
 
@@ -206,11 +213,16 @@ struct mptscsih_driver_setup
 #define x_scsi_dev_reset	mptscsih_dev_reset
 #define x_scsi_host_reset	mptscsih_host_reset
 #define x_scsi_bios_param	mptscsih_bios_param
-#define x_scsi_slave_configure	mptscsih_slave_configure
 
 #define x_scsi_taskmgmt_bh	mptscsih_taskmgmt_bh
 #define x_scsi_old_abort	mptscsih_old_abort
 #define x_scsi_old_reset	mptscsih_old_reset
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,52)
+#define x_scsi_slave_configure	mptscsih_slave_configure
+#else
+#define x_scsi_select_queue_depths	mptscsih_select_queue_depths
+#endif
+#define x_scsi_proc_info	mptscsih_proc_info
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
@@ -237,8 +249,14 @@ extern	int		 x_scsi_bios_param(Disk *, struct block_device *, int *);
 #else
 extern	int		 x_scsi_bios_param(Disk *, kdev_t, int *);
 #endif
-extern	int		 x_scsi_slave_configure(Scsi_Device *);
 extern	void		 x_scsi_taskmgmt_bh(void *);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,52)
+extern	int		 x_scsi_slave_configure(Scsi_Device *);
+#else
+extern	void		 x_scsi_select_queue_depths(struct Scsi_Host *, Scsi_Device *);
+#endif
+
+extern	int		 x_scsi_proc_info(char *, char **, off_t, int, int, int);
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0)
 #define PROC_SCSI_DECL
@@ -248,14 +266,19 @@ extern	void		 x_scsi_taskmgmt_bh(void *);
 
 #ifdef MPT_SCSI_USE_NEW_EH
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,44)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,52)
 
 #define MPT_SCSIHOST {						\
 	PROC_SCSI_DECL						\
+	.proc_info			= x_scsi_proc_info,	\
 	.name				= "MPT SCSI Host",	\
 	.detect				= x_scsi_detect,	\
 	.release			= x_scsi_release,	\
 	.info				= x_scsi_info,		\
+	.command			= NULL,			\
+	.queuecommand			= x_scsi_queuecommand,	\
+	.slave_configure		= x_scsi_slave_configure,	\
+	.eh_strategy_handler		= NULL,			\
 	.eh_abort_handler		= x_scsi_abort,		\
 	.eh_device_reset_handler	= x_scsi_dev_reset,	\
 	.eh_bus_reset_handler		= x_scsi_bus_reset,	\
@@ -275,6 +298,7 @@ extern	void		 x_scsi_taskmgmt_bh(void *);
 #define MPT_SCSIHOST {						\
 	.next				= NULL,			\
 	PROC_SCSI_DECL						\
+	.proc_info			= x_scsi_proc_info,	\
 	.name				= "MPT SCSI Host",	\
 	.detect				= x_scsi_detect,	\
 	.release			= x_scsi_release,	\

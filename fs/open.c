@@ -18,7 +18,7 @@
 #include <linux/backing-dev.h>
 #include <linux/security.h>
 #include <linux/mount.h>
-
+#include <linux/vfs.h>
 #include <asm/uaccess.h>
 
 #define special_file(m) (S_ISCHR(m)||S_ISBLK(m)||S_ISFIFO(m)||S_ISSOCK(m))

@@ -41,6 +41,7 @@
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/stat.h>
+#include <linux/vfs.h>
 
 #include "vxfs.h"
 #include "vxfs_extern.h"

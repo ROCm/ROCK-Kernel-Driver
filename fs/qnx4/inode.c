@@ -25,7 +25,7 @@
 #include <linux/smp_lock.h>
 #include <linux/pagemap.h>
 #include <linux/buffer_head.h>
-
+#include <linux/vfs.h>
 #include <asm/uaccess.h>
 
 #define QNX4_VERSION  4

@@ -26,6 +26,7 @@
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/buffer_head.h>
+#include <linux/vfs.h>
 #include <asm/byteorder.h>
 #include "sysv.h"
 

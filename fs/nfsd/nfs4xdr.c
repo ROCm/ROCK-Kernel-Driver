@@ -48,7 +48,7 @@
 #include <linux/compatmac.h>
 #include <linux/fs.h>
 #include <linux/namei.h>
-
+#include <linux/vfs.h>
 #include <linux/sunrpc/xdr.h>
 #include <linux/sunrpc/svc.h>
 #include <linux/sunrpc/clnt.h>

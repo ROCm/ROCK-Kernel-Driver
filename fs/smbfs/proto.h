@@ -4,6 +4,7 @@
 
 struct smb_request;
 struct sock;
+struct statfs;
 
 /* proc.c */
 extern int smb_setcodepage(struct smb_sb_info *server, struct smb_nls_codepage *cp);

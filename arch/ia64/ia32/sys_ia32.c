@@ -48,6 +48,7 @@
 #include <linux/stat.h>
 #include <linux/ipc.h>
 #include <linux/compat.h>
+#include <linux/vfs.h>
 
 #include <asm/types.h>
 #include <asm/uaccess.h>

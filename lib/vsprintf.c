@@ -521,7 +521,7 @@ int vsscanf(const char * buf, const char * fmt, va_list args)
 	int num = 0;
 	int qualifier;
 	int base;
-	int field_width = -1;
+	int field_width;
 	int is_sign = 0;
 
 	while(*fmt && *str) {
@@ -559,6 +559,7 @@ int vsscanf(const char * buf, const char * fmt, va_list args)
 		}
 
 		/* get field width */
+		field_width = -1;
 		if (isdigit(*fmt))
 			field_width = skip_atoi(&fmt);
 

@@ -27,6 +27,7 @@
 #include <linux/timex.h>
 #include <linux/dnotify.h>
 #include <linux/compat.h>
+#include <linux/vfs.h>
 #include <net/sock.h>
 
 #include <asm/uaccess.h>

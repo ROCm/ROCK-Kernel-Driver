@@ -9,7 +9,7 @@
 #include <linux/types.h>
 #include <linux/time.h>
 #include <linux/nfs.h>
-
+#include <linux/vfs.h>
 #include <linux/sunrpc/xdr.h>
 #include <linux/sunrpc/svc.h>
 #include <linux/nfsd/nfsd.h>
