@@ -27,13 +27,6 @@
 #ifndef IRDA_VLSI_FIR_H
 #define IRDA_VLSI_FIR_H
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,4)
-#ifdef CONFIG_PROC_FS
-/* PDE() introduced in 2.5.4 */
-#define PDE(inode) ((inode)->u.generic_ip)
-#endif
-#endif
-
 /*
  * #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,xx)
  *
