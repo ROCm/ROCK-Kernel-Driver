@@ -437,7 +437,7 @@ EXPORT_SYMBOL(ide_end_drive_cmd);
  *	by read a sector's worth of data from the drive.  Of course,
  *	this may not help if the drive is *waiting* for data from *us*.
  */
-void try_to_flush_leftover_data (ide_drive_t *drive)
+static void try_to_flush_leftover_data (ide_drive_t *drive)
 {
 	int i = (drive->mult_count ? drive->mult_count : 1) * SECTOR_WORDS;
 
@@ -451,8 +451,6 @@ void try_to_flush_leftover_data (ide_drive_t *drive)
 		HWIF(drive)->ata_input_data(drive, buffer, wcount);
 	}
 }
-
-EXPORT_SYMBOL(try_to_flush_leftover_data);
 
 static ide_startstop_t ide_ata_error(ide_drive_t *drive, struct request *rq, u8 stat, u8 err)
 {
@@ -853,13 +851,6 @@ static ide_startstop_t start_request (ide_drive_t *drive, struct request *rq)
 	if (drive->max_failures && (drive->failures > drive->max_failures)) {
 		goto kill_rq;
 	}
-
-	/*
-	 * bail early if we've sent a device to sleep, however how to wake
-	 * this needs to be a masked flag.  FIXME for proper operations.
-	 */
-	if (drive->suspend_reset)
-		goto kill_rq;
 
 	block    = rq->sector;
 	if (blk_fs_request(rq) &&
