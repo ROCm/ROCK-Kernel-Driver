@@ -16,7 +16,7 @@ config IA64
 	  The Itanium Processor Family is Intel's 64-bit successor to
 	  the 32-bit X86 line.  The IA-64 Linux project has a home
 	  page at <http://www.linuxia64.org/> and a mailing list at
-	  linux-ia64@vger.kernel.org.
+	  <linux-ia64@vger.kernel.org>.
 
 config 64BIT
 	bool
@@ -57,7 +57,7 @@ config IA64_GENERIC
 	  DIG-compliant	 For DIG ("Developer's Interface Guide") compliant systems
 	  HP-zx1/sx1000	 For HP systems
 	  SGI-SN2	 For SGI Altix systems
-	  Ski-simulator  For the HP simulator (<http://www.hpl.hp.com/research/linux/ski/>)
+	  Ski-simulator  For the HP simulator <http://www.hpl.hp.com/research/linux/ski/>
 
 	  If you don't know what to do, choose "generic".
 
