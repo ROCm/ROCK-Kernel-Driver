@@ -167,6 +167,9 @@ setup_irq(unsigned int irq, struct irqaction * new)
 	unsigned long flags;
 	irq_desc_t *desc = irq_desc + irq;
 
+        if (desc->handler == &no_irq_type)
+		return -ENOSYS;
+
 	/*
 	 * Some drivers like serial.c use request_irq() heavily,
 	 * so we have to be careful not to interfere with a
@@ -208,7 +211,8 @@ setup_irq(unsigned int irq, struct irqaction * new)
 
 	if (!shared) {
 		desc->depth = 0;
-		desc->status &= ~IRQ_DISABLED;
+		desc->status &=
+		    ~(IRQ_DISABLED|IRQ_AUTODETECT|IRQ_WAITING|IRQ_INPROGRESS);
 		desc->handler->startup(irq);
 	}
 	spin_unlock_irqrestore(&desc->lock,flags);
@@ -353,12 +357,10 @@ prof_cpu_mask_write_proc(struct file *file, const char *buffer,
 static void
 register_irq_proc (unsigned int irq)
 {
-#ifdef CONFIG_SMP
-	struct proc_dir_entry *entry;
-#endif
 	char name [MAX_NAMELEN];
 
-	if (!root_irq_dir || (irq_desc[irq].handler == &no_irq_type))
+	if (!root_irq_dir || (irq_desc[irq].handler == &no_irq_type) ||
+	    irq_dir[irq])
 		return;
 
 	memset(name, 0, MAX_NAMELEN);
@@ -369,13 +371,16 @@ register_irq_proc (unsigned int irq)
 
 #ifdef CONFIG_SMP 
 	if (irq_desc[irq].handler->set_affinity) {
+		struct proc_dir_entry *entry;
 		/* create /proc/irq/1234/smp_affinity */
 		entry = create_proc_entry("smp_affinity", 0600, irq_dir[irq]);
 
-		entry->nlink = 1;
-		entry->data = (void *)(long)irq;
-		entry->read_proc = irq_affinity_read_proc;
-		entry->write_proc = irq_affinity_write_proc;
+		if (entry) {
+			entry->nlink = 1;
+			entry->data = (void *)(long)irq;
+			entry->read_proc = irq_affinity_read_proc;
+			entry->write_proc = irq_affinity_write_proc;
+		}
 
 		smp_affinity_entry[irq] = entry;
 	}
