@@ -593,8 +593,21 @@ crypt_clone(struct crypt_config *cc, struct crypt_io *io, struct bio *bio,
 				return NULL;
 			}
 		}
-	} else
-		clone = bio_clone(bio, GFP_NOIO);
+	} else {
+		/*
+		 * The block layer might modify the bvec array, so always
+		 * copy the required bvecs because we need the original
+		 * one in order to decrypt the whole bio data *afterwards*.
+		 */
+		clone = bio_alloc(GFP_NOIO, bio_segments(bio));
+		if (clone) {
+			clone->bi_idx = 0;
+			clone->bi_vcnt = bio_segments(bio);
+			clone->bi_size = bio->bi_size;
+			memcpy(clone->bi_io_vec, bio_iovec(bio),
+			       sizeof(struct bio_vec) * clone->bi_vcnt);
+		}
+	}
 
 	if (!clone)
 		return NULL;
