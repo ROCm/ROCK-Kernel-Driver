@@ -130,41 +130,41 @@ static int b1dma_fromlink(avmcard *card, void *buf, unsigned int len)
 	return 0;
 }
 
-static int WriteReg(avmcard *card, __u32 reg, __u8 val)
+static int WriteReg(avmcard *card, u32 reg, u8 val)
 {
-	__u8 cmd = 0x00;
+	u8 cmd = 0x00;
 	if (   b1dma_tolink(card, &cmd, 1) == 0
 	    && b1dma_tolink(card, &reg, 4) == 0) {
-		__u32 tmp = val;
+		u32 tmp = val;
 		return b1dma_tolink(card, &tmp, 4);
 	}
 	return -1;
 }
 
-static __u8 ReadReg(avmcard *card, __u32 reg)
+static u8 ReadReg(avmcard *card, u32 reg)
 {
-	__u8 cmd = 0x01;
+	u8 cmd = 0x01;
 	if (   b1dma_tolink(card, &cmd, 1) == 0
 	    && b1dma_tolink(card, &reg, 4) == 0) {
-		__u32 tmp;
+		u32 tmp;
 		if (b1dma_fromlink(card, &tmp, 4) == 0)
-			return (__u8)tmp;
+			return (u8)tmp;
 	}
 	return 0xff;
 }
 
 /* ------------------------------------------------------------- */
 
-static inline void _put_byte(void **pp, __u8 val)
+static inline void _put_byte(void **pp, u8 val)
 {
-	__u8 *s = *pp;
+	u8 *s = *pp;
 	*s++ = val;
 	*pp = s;
 }
 
-static inline void _put_word(void **pp, __u32 val)
+static inline void _put_word(void **pp, u32 val)
 {
-	__u8 *s = *pp;
+	u8 *s = *pp;
 	*s++ = val & 0xff;
 	*s++ = (val >> 8) & 0xff;
 	*s++ = (val >> 16) & 0xff;
@@ -180,19 +180,19 @@ static inline void _put_slice(void **pp, unsigned char *dp, unsigned int len)
 		_put_byte(pp, *dp++);
 }
 
-static inline __u8 _get_byte(void **pp)
+static inline u8 _get_byte(void **pp)
 {
-	__u8 *s = *pp;
-	__u8 val;
+	u8 *s = *pp;
+	u8 val;
 	val = *s++;
 	*pp = s;
 	return val;
 }
 
-static inline __u32 _get_word(void **pp)
+static inline u32 _get_word(void **pp)
 {
-	__u8 *s = *pp;
-	__u32 val;
+	u8 *s = *pp;
+	u32 val;
 	val = *s++;
 	val |= (*s++ << 8);
 	val |= (*s++ << 16);
@@ -201,7 +201,7 @@ static inline __u32 _get_word(void **pp)
 	return val;
 }
 
-static inline __u32 _get_slice(void **pp, unsigned char *dp)
+static inline u32 _get_slice(void **pp, unsigned char *dp)
 {
 	unsigned int len, i;
 
@@ -357,9 +357,9 @@ static void b1dma_dispatch_tx(avmcard *card)
 	avmcard_dmainfo *dma = card->dma;
 	unsigned long flags;
 	struct sk_buff *skb;
-	__u8 cmd, subcmd;
-	__u16 len;
-	__u32 txlen;
+	u8 cmd, subcmd;
+	u16 len;
+	u32 txlen;
 	int inint;
 	void *p;
 	
@@ -391,7 +391,7 @@ static void b1dma_dispatch_tx(avmcard *card)
 		p = dma->sendbuf.dmabuf;
 
 		if (CAPICMD(cmd, subcmd) == CAPI_DATA_B3_REQ) {
-			__u16 dlen = CAPIMSG_DATALEN(skb->data);
+			u16 dlen = CAPIMSG_DATALEN(skb->data);
 			_put_byte(&p, SEND_DATA_B3_REQ);
 			_put_slice(&p, skb->data, len);
 			_put_slice(&p, skb->data + len, dlen);
@@ -399,7 +399,7 @@ static void b1dma_dispatch_tx(avmcard *card)
 			_put_byte(&p, SEND_MESSAGE);
 			_put_slice(&p, skb->data, len);
 		}
-		txlen = (__u8 *)p - (__u8 *)dma->sendbuf.dmabuf;
+		txlen = (u8 *)p - (u8 *)dma->sendbuf.dmabuf;
 #ifdef CONFIG_B1DMA_DEBUG
 		printk(KERN_DEBUG "tx(%d): put msg len=%d\n",
 				inint, txlen);
@@ -447,7 +447,7 @@ static void queue_pollack(avmcard *card)
 	_put_byte(&p, 0);
 	_put_byte(&p, 0);
 	_put_byte(&p, SEND_POLLACK);
-	skb_put(skb, (__u8 *)p - (__u8 *)skb->data);
+	skb_put(skb, (u8 *)p - (u8 *)skb->data);
 
 	skb_queue_tail(&card->dma->send_queue, skb);
 	b1dma_dispatch_tx(card);
@@ -462,8 +462,8 @@ static void b1dma_handle_rx(avmcard *card)
 	struct capi_ctr *ctrl = cinfo->capi_ctrl;
 	struct sk_buff *skb;
 	void *p = dma->recvbuf.dmabuf+4;
-	__u32 ApplId, MsgLen, DataB3Len, NCCI, WindowSize;
-	__u8 b1cmd =  _get_byte(&p);
+	u32 ApplId, MsgLen, DataB3Len, NCCI, WindowSize;
+	u8 b1cmd =  _get_byte(&p);
 
 #ifdef CONFIG_B1DMA_DEBUG
 	printk(KERN_DEBUG "rx: 0x%x %lu\n", b1cmd, (unsigned long)dma->recvlen);
@@ -585,8 +585,8 @@ static void b1dma_handle_rx(avmcard *card)
 
 static void b1dma_handle_interrupt(avmcard *card)
 {
-	__u32 status = b1dmainmeml(card->mbase+AMCC_INTCSR);
-	__u32 newcsr;
+	u32 status = b1dmainmeml(card->mbase+AMCC_INTCSR);
+	u32 newcsr;
 
 	if ((status & ANY_S5933_INT) == 0) 
 		return;
@@ -598,9 +598,9 @@ static void b1dma_handle_interrupt(avmcard *card)
 
 	if ((status & RX_TC_INT) != 0) {
 		struct avmcard_dmainfo *dma = card->dma;
-		__u32 rxlen;
+		u32 rxlen;
 	   	if (card->dma->recvlen == 0) {
-			dma->recvlen = *((__u32 *)dma->recvbuf.dmabuf);
+			dma->recvlen = *((u32 *)dma->recvbuf.dmabuf);
 			rxlen = (dma->recvlen + 3) & ~3;
 			b1dmaoutmeml(card->mbase+AMCC_RXPTR,
 					dma->recvbuf.dmaaddr+4);
@@ -695,7 +695,7 @@ static void b1dma_send_init(avmcard *card)
 	_put_word(&p, CAPI_MAXAPPL);
 	_put_word(&p, AVM_NCCI_PER_CHANNEL*30);
 	_put_word(&p, card->cardnr - 1);
-	skb_put(skb, (__u8 *)p - (__u8 *)skb->data);
+	skb_put(skb, (u8 *)p - (u8 *)skb->data);
 
 	skb_queue_tail(&card->dma->send_queue, skb);
 	b1dma_dispatch_tx(card);
@@ -772,7 +772,7 @@ void b1dma_reset_ctr(struct capi_ctr *ctrl)
 
 
 void b1dma_register_appl(struct capi_ctr *ctrl,
-				__u16 appl,
+				u16 appl,
 				capi_register_params *rp)
 {
 	avmctrl_info *cinfo = (avmctrl_info *)(ctrl->driverdata);
@@ -801,7 +801,7 @@ void b1dma_register_appl(struct capi_ctr *ctrl,
 	_put_word(&p, nconn);
 	_put_word(&p, rp->datablkcnt);
 	_put_word(&p, rp->datablklen);
-	skb_put(skb, (__u8 *)p - (__u8 *)skb->data);
+	skb_put(skb, (u8 *)p - (u8 *)skb->data);
 
 	skb_queue_tail(&card->dma->send_queue, skb);
 	b1dma_dispatch_tx(card);
@@ -811,7 +811,7 @@ void b1dma_register_appl(struct capi_ctr *ctrl,
 
 /* ------------------------------------------------------------- */
 
-void b1dma_release_appl(struct capi_ctr *ctrl, __u16 appl)
+void b1dma_release_appl(struct capi_ctr *ctrl, u16 appl)
 {
 	avmctrl_info *cinfo = (avmctrl_info *)(ctrl->driverdata);
 	avmcard *card = cinfo->card;
@@ -830,7 +830,7 @@ void b1dma_release_appl(struct capi_ctr *ctrl, __u16 appl)
 	_put_byte(&p, SEND_RELEASE);
 	_put_word(&p, appl);
 
-	skb_put(skb, (__u8 *)p - (__u8 *)skb->data);
+	skb_put(skb, (u8 *)p - (u8 *)skb->data);
 	skb_queue_tail(&card->dma->send_queue, skb);
 	b1dma_dispatch_tx(card);
 }
@@ -853,10 +853,10 @@ int b1dmactl_read_proc(char *page, char **start, off_t off,
 	avmctrl_info *cinfo = (avmctrl_info *)(ctrl->driverdata);
 	avmcard *card = cinfo->card;
 	unsigned long flags;
-	__u8 flag;
+	u8 flag;
 	int len = 0;
 	char *s;
-	__u32 txoff, txlen, rxoff, rxlen, csr;
+	u32 txoff, txlen, rxoff, rxlen, csr;
 
 	len += sprintf(page+len, "%-16s %s\n", "name", card->name);
 	len += sprintf(page+len, "%-16s 0x%x\n", "io", card->port);
@@ -883,7 +883,7 @@ int b1dmactl_read_proc(char *page, char **start, off_t off,
 	   len += sprintf(page+len, "%-16s %s\n", "ver_serial", s);
 
 	if (card->cardtype != avm_m1) {
-        	flag = ((__u8 *)(ctrl->profile.manu))[3];
+        	flag = ((u8 *)(ctrl->profile.manu))[3];
         	if (flag)
 			len += sprintf(page+len, "%-16s%s%s%s%s%s%s%s\n",
 			"protocol",
@@ -897,7 +897,7 @@ int b1dmactl_read_proc(char *page, char **start, off_t off,
 			);
 	}
 	if (card->cardtype != avm_m1) {
-        	flag = ((__u8 *)(ctrl->profile.manu))[5];
+        	flag = ((u8 *)(ctrl->profile.manu))[5];
 		if (flag)
 			len += sprintf(page+len, "%-16s%s%s%s%s\n",
 			"linetype",
