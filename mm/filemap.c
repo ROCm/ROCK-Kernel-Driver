@@ -228,7 +228,6 @@ int add_to_page_cache(struct page *page,
 	if (!error) {
 		SetPageLocked(page);
 		___add_to_page_cache(page, mapping, offset);
-		ClearPageDirty(page);
 	} else {
 		page_cache_release(page);
 	}

@@ -462,7 +462,6 @@ found:
 		info->swapped--;
 	}
 	spin_unlock(&info->lock);
-	SetPageUptodate(page);
 	/*
 	 * Decrement swap count even when the entry is left behind:
 	 * try_to_unuse will skip over mms, then reincrement count.
@@ -540,8 +539,6 @@ static int shmem_writepage(struct page * page)
 		*entry = swap;
 		info->swapped++;
 		spin_unlock(&info->lock);
-		SetPageUptodate(page);
-		set_page_dirty(page);
 		unlock_page(page);
 		return 0;
 	}
