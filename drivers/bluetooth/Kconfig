@@ -99,6 +99,22 @@ config BT_HCIBLUECARD
 	  Say Y here to compile support for HCI BlueCard devices into the
 	  kernel or say M to compile it as module (bluecard_cs.o).
 
+config BT_HCIBTUART
+	tristate "HCI UART (PC Card) device driver"
+	depends on PCMCIA && BT
+	help
+	  Bluetooth HCI UART (PC Card) driver.
+	  This driver provides support for Bluetooth PCMCIA devices with
+	  an UART interface:
+	  Xircom CreditCard Bluetooth Adapter
+	  Xircom RealPort2 Bluetooth Adapter
+	  Sphinx PICO Card
+	  H-Soft blue+Card
+	  Cyber-blue Compact Flash Card
+
+	  Say Y here to compile support for HCI UART devices into the
+	  kernel or say M to compile it as module (btuart_cs.o).
+
 config BT_HCIVHCI
 	tristate "HCI VHCI (Virtual HCI device) driver"
 	depends on BT

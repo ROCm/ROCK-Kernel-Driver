@@ -2074,7 +2074,7 @@ static int __init l2cap_proc_init(void)
 
 static void __init l2cap_proc_cleanup(void)
 {
-        return 0;
+        return;
 }
 #endif /* CONFIG_PROC_FS */
 
