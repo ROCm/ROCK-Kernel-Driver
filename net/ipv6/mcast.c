@@ -1040,7 +1040,7 @@ int igmp6_event_query(struct sk_buff *skb)
 		/* MLDv1 router present */
 
 		/* Translate milliseconds to jiffies */
-		max_delay = ntohs(hdr->icmp6_maxdelay)*(HZ/10);
+		max_delay = (ntohs(hdr->icmp6_maxdelay)*HZ)/1000;
 
 		switchback = (idev->mc_qrv + 1) * max_delay;
 		idev->mc_v1_seen = jiffies + switchback;
@@ -1052,7 +1052,7 @@ int igmp6_event_query(struct sk_buff *skb)
 		/* clear deleted report items */
 		mld_clear_delrec(idev);
 	} else if (len >= 28) {
-		max_delay = MLDV2_MRC(ntohs(mlh2->mrc))*(HZ/10);
+		max_delay = (MLDV2_MRC(ntohs(mlh2->mrc))*HZ)/1000;
 		if (!max_delay)
 			max_delay = 1;
 		idev->mc_maxdelay = max_delay;
