@@ -83,48 +83,6 @@ pcibr_intr_bits(pciio_info_t info,
 
 
 /*
- *	Get the next wrapper pointer queued in the interrupt circular buffer.
- */
-pcibr_intr_wrap_t
-pcibr_wrap_get(pcibr_intr_cbuf_t cbuf)
-{
-    pcibr_intr_wrap_t	wrap;
-
-	if (cbuf->ib_in == cbuf->ib_out)
-	    panic( "pcibr intr circular buffer empty, cbuf=0x%p, ib_in=ib_out=%d\n",
-		(void *)cbuf, cbuf->ib_out);
-
-	wrap = cbuf->ib_cbuf[cbuf->ib_out++];
-	cbuf->ib_out = cbuf->ib_out % IBUFSIZE;
-	return(wrap);
-}
-
-/* 
- *	Queue a wrapper pointer in the interrupt circular buffer.
- */
-void
-pcibr_wrap_put(pcibr_intr_wrap_t wrap, pcibr_intr_cbuf_t cbuf)
-{
-	int	in;
-
-	/*
-	 * Multiple CPUs could be executing this code simultaneously
-	 * if a handler has registered multiple interrupt lines and
-	 * the interrupts are directed to different CPUs.
-	 */
-	spin_lock(&cbuf->ib_lock);
-	in = (cbuf->ib_in + 1) % IBUFSIZE;
-	if (in == cbuf->ib_out) 
-	    panic( "pcibr intr circular buffer full, cbuf=0x%p, ib_in=%d\n",
-		(void *)cbuf, cbuf->ib_in);
-
-	cbuf->ib_cbuf[cbuf->ib_in] = wrap;
-	cbuf->ib_in = in;
-	spin_unlock(&cbuf->ib_lock);
-	return;
-}
-
-/*
  *	On SN systems there is a race condition between a PIO read response
  *	and DMA's.  In rare cases, the read response may beat the DMA, causing
  *	the driver to think that data in memory is complete and meaningful.
