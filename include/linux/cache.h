@@ -44,4 +44,13 @@
 #endif /* CONFIG_SMP */
 #endif
 
+#if !defined(____cacheline_maxaligned_in_smp)
+#if defined(CONFIG_SMP)
+#define ____cacheline_maxaligned_in_smp \
+	__attribute__((__aligned__(1 << (L1_CACHE_SHIFT_MAX))))
+#else
+#define ____cacheline_maxaligned_in_smp
+#endif
+#endif
+
 #endif /* __LINUX_CACHE_H */
