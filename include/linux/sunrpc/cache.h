@@ -193,8 +193,11 @@ RTN *FNAME ARGS										\
 					t2 = tmp; tmp = new; new = t2;			\
 				}							\
 				if (test_bit(CACHE_NEGATIVE,  &item->MEMBER.flags))	\
-					 set_bit(CACHE_NEGATIVE, &tmp->MEMBER.flags);	\
-				else {UPDATE;}						\
+					set_bit(CACHE_NEGATIVE, &tmp->MEMBER.flags);	\
+				else {							\
+					UPDATE;						\
+					clear_bit(CACHE_NEGATIVE, &tmp->MEMBER.flags);	\
+				}							\
 			}								\
 			if (set||new) write_unlock(&(DETAIL)->hash_lock);		\
 			else read_unlock(&(DETAIL)->hash_lock);				\
