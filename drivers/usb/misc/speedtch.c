@@ -579,8 +579,7 @@ static void udsl_process_receive (unsigned long data)
 						atmsar_vcc->vcc->push (atmsar_vcc->vcc, new);
 					} else {
 						dbg
-						    ("dropping incoming packet : rx_inuse = %d, vcc->sk->rcvbuf = %d, skb->true_size = %d",
-						     atomic_read (&atmsar_vcc->vcc->rx_inuse),
+						    ("dropping incoming packet : vcc->sk->rcvbuf = %d, skb->true_size = %d",
 						     atmsar_vcc->vcc->sk->rcvbuf, new->truesize);
 						dev_kfree_skb (new);
 					}
