@@ -292,7 +292,7 @@ void parse_dep_file(void *map, size_t len)
 		exit(1);
 	}
 	memcpy(s, m, p-m); s[p-m] = 0;
-	printf("%s: \\\n", target);
+	printf("deps_%s := \\\n", target);
 	m = p+1;
 
 	clear_config();
@@ -314,7 +314,8 @@ void parse_dep_file(void *map, size_t len)
 		}
 		m = p + 1;
 	}
-	printf("\n");
+	printf("\n%s: $(deps_%s)\n\n", target, target);
+	printf("$(deps_%s):\n", target);
 }
 
 void print_deps(void)

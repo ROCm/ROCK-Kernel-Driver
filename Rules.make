@@ -446,7 +446,7 @@ if_changed = $(if $(strip $? \
 # execute the command and also postprocess generated .d dependencies
 # file
 
-if_changed_dep = $(if $(strip $? \
+if_changed_dep = $(if $(strip $? $(filter-out FORCE $(wildcard $^),$^)\
 		          $(filter-out $(cmd_$(1)),$(cmd_$@))\
 			  $(filter-out $(cmd_$@),$(cmd_$(1)))),\
 	@set -e; \
