@@ -1389,6 +1389,34 @@ struct address_space_operations ext3_aops = {
 	releasepage:	ext3_releasepage,	/* BKL not held.  Don't need */
 };
 
+/* For writeback mode, we can use mpage_writepages() */
+
+static int
+ext3_writepages(struct address_space *mapping, int *nr_to_write)
+{
+	int ret;
+	int err;
+
+	ret = write_mapping_buffers(mapping);
+	err = mpage_writepages(mapping, nr_to_write, ext3_get_block);
+	if (!ret)
+		ret = err;
+	return ret;
+}
+
+struct address_space_operations ext3_writeback_aops = {
+	readpage:	ext3_readpage,		/* BKL not held.  Don't need */
+	readpages:	ext3_readpages,		/* BKL not held.  Don't need */
+	writepage:	ext3_writepage,		/* BKL not held.  We take it */
+	writepages:	ext3_writepages,	/* BKL not held.  Don't need */
+	sync_page:	block_sync_page,
+	prepare_write:	ext3_prepare_write,	/* BKL not held.  We take it */
+	commit_write:	ext3_commit_write,	/* BKL not held.  We take it */
+	bmap:		ext3_bmap,		/* BKL held */
+	flushpage:	ext3_flushpage,		/* BKL not held.  Don't need */
+	releasepage:	ext3_releasepage,	/* BKL not held.  Don't need */
+};
+
 /*
  * ext3_block_truncate_page() zeroes out a mapping from file offset `from'
  * up to the end of the block which corresponds to `from'.
@@ -2159,7 +2187,10 @@ void ext3_read_inode(struct inode * inode)
 	else if (S_ISREG(inode->i_mode)) {
 		inode->i_op = &ext3_file_inode_operations;
 		inode->i_fop = &ext3_file_operations;
-		inode->i_mapping->a_ops = &ext3_aops;
+		if (ext3_should_writeback_data(inode))
+			inode->i_mapping->a_ops = &ext3_writeback_aops;
+		else
+			inode->i_mapping->a_ops = &ext3_aops;
 	} else if (S_ISDIR(inode->i_mode)) {
 		inode->i_op = &ext3_dir_inode_operations;
 		inode->i_fop = &ext3_dir_operations;
@@ -2168,7 +2199,10 @@ void ext3_read_inode(struct inode * inode)
 			inode->i_op = &ext3_fast_symlink_inode_operations;
 		else {
 			inode->i_op = &page_symlink_inode_operations;
-			inode->i_mapping->a_ops = &ext3_aops;
+			if (ext3_should_writeback_data(inode))
+				inode->i_mapping->a_ops = &ext3_writeback_aops;
+			else
+				inode->i_mapping->a_ops = &ext3_aops;
 		}
 	} else 
 		init_special_inode(inode, inode->i_mode,

@@ -299,5 +299,10 @@ static inline int ext3_should_order_data(struct inode *inode)
 	return (test_opt(inode->i_sb, DATA_FLAGS) == EXT3_MOUNT_ORDERED_DATA);
 }
 
+static inline int ext3_should_writeback_data(struct inode *inode)
+{
+	return !ext3_should_journal_data(inode) &&
+			!ext3_should_order_data(inode);
+}
 
 #endif	/* _LINUX_EXT3_JBD_H */
