@@ -193,7 +193,7 @@ grab_file(const char *filename, unsigned long *size)
 
 	*size = st.st_size;
 	map = mmap(NULL, *size, PROT_READ|PROT_WRITE, MAP_PRIVATE, fd, 0);
-	if (mmap == MAP_FAILED) {
+	if (map == MAP_FAILED) {
 		perror(filename);
 		abort();
 	}

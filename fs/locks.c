@@ -221,7 +221,7 @@ void locks_copy_lock(struct file_lock *new, struct file_lock *fl)
 static inline int flock_translate_cmd(int cmd) {
 	if (cmd & LOCK_MAND)
 		return cmd & (LOCK_MAND | LOCK_RW);
-	switch (cmd &~ LOCK_NB) {
+	switch (cmd) {
 	case LOCK_SH:
 		return F_RDLCK;
 	case LOCK_EX:
@@ -233,8 +233,8 @@ static inline int flock_translate_cmd(int cmd) {
 }
 
 /* Fill in a file_lock structure with an appropriate FLOCK lock. */
-static int flock_make_lock(struct file *filp,
-		struct file_lock **lock, unsigned int cmd)
+static int flock_make_lock(struct file *filp, struct file_lock **lock,
+		unsigned int cmd)
 {
 	struct file_lock *fl;
 	int type = flock_translate_cmd(cmd);
@@ -247,7 +247,7 @@ static int flock_make_lock(struct file *filp,
 
 	fl->fl_file = filp;
 	fl->fl_pid = current->tgid;
-	fl->fl_flags = (cmd & LOCK_NB) ? FL_FLOCK : FL_FLOCK | FL_SLEEP;
+	fl->fl_flags = FL_FLOCK;
 	fl->fl_type = type;
 	fl->fl_end = OFFSET_MAX;
 	
@@ -1265,9 +1265,8 @@ int fcntl_setlease(unsigned int fd, struct file *filp, long arg)
 		locks_free_lock(fl);
 		goto out_unlock;
 	}
-	fl->fl_next = *before;
-	*before = fl;
-	list_add(&fl->fl_link, &file_lock_list);
+
+	locks_insert_lock(before, fl);
 
 	error = f_setown(filp, current->tgid, 1);
 out_unlock:
@@ -1298,6 +1297,7 @@ asmlinkage long sys_flock(unsigned int fd, unsigned int cmd)
 {
 	struct file *filp;
 	struct file_lock *lock;
+	int can_sleep, unlock;
 	int error;
 
 	error = -EBADF;
@@ -1305,12 +1305,18 @@ asmlinkage long sys_flock(unsigned int fd, unsigned int cmd)
 	if (!filp)
 		goto out;
 
-	if ((cmd != LOCK_UN) && !(cmd & LOCK_MAND) && !(filp->f_mode & 3))
+	can_sleep = !(cmd & LOCK_NB);
+	cmd &= ~LOCK_NB;
+	unlock = (cmd == LOCK_UN);
+
+	if (!unlock && !(cmd & LOCK_MAND) && !(filp->f_mode & 3))
 		goto out_putf;
 
 	error = flock_make_lock(filp, &lock, cmd);
 	if (error)
 		goto out_putf;
+	if (can_sleep)
+		lock->fl_flags |= FL_SLEEP;
 
 	error = security_file_lock(filp, cmd);
 	if (error)
@@ -1318,7 +1324,7 @@ asmlinkage long sys_flock(unsigned int fd, unsigned int cmd)
 
 	for (;;) {
 		error = flock_lock_file(filp, lock);
-		if ((error != -EAGAIN) || (cmd & LOCK_NB))
+		if ((error != -EAGAIN) || !can_sleep)
 			break;
 		error = wait_event_interruptible(lock->fl_wait, !lock->fl_next);
 		if (!error)
@@ -1329,7 +1335,7 @@ asmlinkage long sys_flock(unsigned int fd, unsigned int cmd)
 	}
 
  out_free:
-	if (error) {
+	if (list_empty(&lock->fl_link)) {
 		locks_free_lock(lock);
 	}
 

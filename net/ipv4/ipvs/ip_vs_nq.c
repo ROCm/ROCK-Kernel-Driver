@@ -81,7 +81,6 @@ ip_vs_nq_dest_overhead(struct ip_vs_dest *dest)
 static struct ip_vs_dest *
 ip_vs_nq_schedule(struct ip_vs_service *svc, struct iphdr *iph)
 {
-	register struct list_head *l, *e;
 	struct ip_vs_dest *dest, *least;
 	unsigned int loh, doh;
 
@@ -100,9 +99,7 @@ ip_vs_nq_schedule(struct ip_vs_service *svc, struct iphdr *iph)
 	 * new connections.
 	 */
 
-	l = &svc->destinations;
-	for (e=l->next; e!=l; e=e->next) {
-		least = list_entry(e, struct ip_vs_dest, n_list);
+	list_for_each_entry(least, &svc->destinations, n_list) {
 		if (!(least->flags & IP_VS_DEST_F_OVERLOAD) &&
 		    atomic_read(&least->weight) > 0) {
 			loh = ip_vs_nq_dest_overhead(least);
@@ -120,8 +117,7 @@ ip_vs_nq_schedule(struct ip_vs_service *svc, struct iphdr *iph)
 	 *    Find the destination with the least load.
 	 */
   nextstage:
-	for (e=e->next; e!=l; e=e->next) {
-		dest = list_entry(e, struct ip_vs_dest, n_list);
+	list_for_each_entry(dest, &svc->destinations, n_list) {
 
 		if (dest->flags & IP_VS_DEST_F_OVERLOAD)
 			continue;

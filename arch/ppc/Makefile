@@ -59,10 +59,6 @@ bzImage: zImage
 $(BOOT_TARGETS): vmlinux
 	$(Q)$(MAKE) $(build)=arch/ppc/boot $@
 
-%_config: arch/ppc/configs/%_defconfig
-	rm -f .config arch/ppc/defconfig
-	cp -f arch/ppc/configs/$(@:config=defconfig) .config
-
 archclean:
 	$(Q)$(MAKE) $(clean)=arch/ppc/boot
 

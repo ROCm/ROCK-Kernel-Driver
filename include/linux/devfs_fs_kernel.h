@@ -4,7 +4,6 @@
 #include <linux/fs.h>
 #include <linux/config.h>
 #include <linux/spinlock.h>
-#include <linux/kdev_t.h>
 #include <linux/types.h>
 
 #include <asm/semaphore.h>

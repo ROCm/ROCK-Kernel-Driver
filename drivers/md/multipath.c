@@ -508,3 +508,4 @@ static void __exit multipath_exit (void)
 module_init(multipath_init);
 module_exit(multipath_exit);
 MODULE_LICENSE("GPL");
+MODULE_ALIAS("md-personality-7"); /* MULTIPATH */

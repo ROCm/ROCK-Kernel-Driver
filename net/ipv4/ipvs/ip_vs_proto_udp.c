@@ -245,22 +245,20 @@ static inline __u16 udp_app_hashkey(__u16 port)
 static int udp_register_app(struct ip_vs_app *inc)
 {
 	struct ip_vs_app *i;
-	struct list_head *t, *p;
 	__u16 hash, port = inc->port;
 	int ret = 0;
 
 	hash = udp_app_hashkey(port);
-	t = &udp_apps[hash];
+
 
 	spin_lock_bh(&udp_app_lock);
-	for (p = t->next; p != t; p = p->next) {
-		i = list_entry(p, struct ip_vs_app, p_list);
+	list_for_each_entry(i, &udp_apps[hash], p_list) {
 		if (i->port == port) {
 			ret = -EEXIST;
 			goto out;
 		}
 	}
-	list_add(&inc->p_list, t);
+	list_add(&inc->p_list, &udp_apps[hash]);
 	atomic_inc(&ip_vs_protocol_udp.appcnt);
 
   out:
@@ -281,7 +279,6 @@ udp_unregister_app(struct ip_vs_app *inc)
 
 static int udp_app_conn_bind(struct ip_vs_conn *cp)
 {
-	struct list_head *t, *p;
 	int hash;
 	struct ip_vs_app *inc;
 	int result = 0;
@@ -292,11 +289,9 @@ static int udp_app_conn_bind(struct ip_vs_conn *cp)
 
 	/* Lookup application incarnations and bind the right one */
 	hash = udp_app_hashkey(cp->vport);
-	t = &udp_apps[hash];
 
 	spin_lock(&udp_app_lock);
-	for (p = t->next; p != t; p = p->next) {
-		inc = list_entry(p, struct ip_vs_app, p_list);
+	list_for_each_entry(inc, &udp_apps[hash], p_list) {
 		if (inc->port == cp->vport) {
 			if (unlikely(!ip_vs_app_inc_get(inc)))
 				break;

@@ -188,7 +188,6 @@ static int ioctl_exec	(sdla_t* card, sdla_exec_t* u_exec, int);
 /* Miscellaneous functions */
 STATIC irqreturn_t sdla_isr	(int irq, void* dev_id, struct pt_regs *regs);
 static void release_hw  (sdla_t *card);
-static void run_wanpipe_tq (unsigned long);
 
 static int check_s508_conflicts (sdla_t* card,wandev_conf_t* conf, int*);
 static int check_s514_conflicts (sdla_t* card,wandev_conf_t* conf, int*);
@@ -202,29 +201,21 @@ static int check_s514_conflicts (sdla_t* card,wandev_conf_t* conf, int*);
 static char drvname[]	= "wanpipe";
 static char fullname[]	= "WANPIPE(tm) Multiprotocol Driver";
 static char copyright[]	= "(c) 1995-2000 Sangoma Technologies Inc.";
-static int ncards = 0; 
-static sdla_t* card_array = NULL;	/* adapter data space */
+static int ncards; 
+static sdla_t* card_array;		/* adapter data space */
 
-/* Wanpipe's own task queue, used for all API's.
- * All protocol specific tasks will be instered
- * into "wanpipe_tq_custom" task_queue. 
+/* Wanpipe's own workqueue, used for all API's.
+ * All protocol specific tasks will be inserted
+ * into the "wanpipe_wq" workqueue. 
 
- * On each rx_interrupt, the whole task queue
- * (wanpipe_tq_custom) will be queued into 
- * IMMEDIATE_BH via wanpipe_mark_bh() call. 
- 
- * The IMMEDIATE_BH will execute run_wanpipe_tq() 
- * function, which will execute all pending,
- * tasks in wanpipe_tq_custom queue */
+ * The kernel workqueue mechanism will execute
+ * all pending tasks in the "wanpipe_wq" workqueue.
+ */
 
-DECLARE_TASK_QUEUE(wanpipe_tq_custom);
-static struct tq_struct wanpipe_tq_task = 
-{
-	.routine = (void (*)(void *)) run_wanpipe_tq,
-	.data = &wanpipe_tq_custom
-};
+struct workqueue_struct *wanpipe_wq;
+DECLARE_WORK(wanpipe_work, NULL, NULL);
 
-static int wanpipe_bh_critical=0;
+static int wanpipe_bh_critical;
 
 /******* Kernel Loadable Module Entry Points ********************************/
 
@@ -248,6 +239,10 @@ int wanpipe_init(void)
 	printk(KERN_INFO "%s v%u.%u %s\n",
 		fullname, DRV_VERSION, DRV_RELEASE, copyright);
 
+	wanpipe_wq = create_workqueue("wanpipe_wq");
+	if (!wanpipe_wq)
+		return -ENOMEM;
+
 	/* Probe for wanpipe cards and return the number found */
 	printk(KERN_INFO "wanpipe: Probing for WANPIPE hardware.\n");
 	ncards = wanpipe_hw_probe();
@@ -255,13 +250,16 @@ int wanpipe_init(void)
 		printk(KERN_INFO "wanpipe: Allocating maximum %i devices: wanpipe%i - wanpipe%i.\n",ncards,1,ncards);
 	}else{
 		printk(KERN_INFO "wanpipe: No S514/S508 cards found, unloading modules!\n");
+		destroy_workqueue(wanpipe_wq);
 		return -ENODEV;
 	}
 	
 	/* Verify number of cards and allocate adapter data space */
 	card_array = kmalloc(sizeof(sdla_t) * ncards, GFP_KERNEL);
-	if (card_array == NULL)
+	if (card_array == NULL) {
+		destroy_workqueue(wanpipe_wq);
 		return -ENOMEM;
+	}
 
 	memset(card_array, 0, sizeof(sdla_t) * ncards);
 
@@ -291,6 +289,7 @@ int wanpipe_init(void)
 		ncards = cnt;	/* adjust actual number of cards */
 	}else {
 		kfree(card_array);
+		destroy_workqueue(wanpipe_wq);
 		printk(KERN_INFO "IN Init Module: NO Cards registered\n");
 		err = -ENODEV;
 	}
@@ -315,6 +314,7 @@ static void wanpipe_cleanup(void)
 		sdla_t* card = &card_array[i];
 		unregister_wan_device(card->devname);
 	}
+	destroy_workqueue(wanpipe_wq);
 	kfree(card_array);
 
 	printk(KERN_INFO "\nwanpipe: WANPIPE Modules Unloaded.\n");
@@ -672,15 +672,20 @@ static int check_s508_conflicts (sdla_t* card,wandev_conf_t* conf, int *irq)
 	
 
 	/* Make sure I/O port region is available only if we are the
-	 * master device.  If we are running in piggibacking mode, 
-	 * we will use the resources of the master card */
-	if (check_region(conf->ioport, SDLA_MAXIORANGE) && 
-	    !card->wandev.piggyback) {
-		printk(KERN_INFO
-			"%s: I/O region 0x%X - 0x%X is in use!\n",
-			card->wandev.name, conf->ioport,
-			conf->ioport + SDLA_MAXIORANGE);
-		return -EINVAL;
+	 * master device.  If we are running in piggybacking mode, 
+	 * we will use the resources of the master card. */
+	if (!card->wandev.piggyback) {
+		struct resource *rr =
+			request_region(conf->ioport, SDLA_MAXIORANGE, "sdlamain");
+		release_region(conf->ioport, SDLA_MAXIORANGE);
+
+		if (!rr) {
+			printk(KERN_INFO
+				"%s: I/O region 0x%X - 0x%X is in use!\n",
+				card->wandev.name, conf->ioport,
+				conf->ioport + SDLA_MAXIORANGE - 1);
+			return -EINVAL;
+		}
 	}
 
 	return 0;
@@ -1028,7 +1033,6 @@ static int ioctl_exec (sdla_t* card, sdla_exec_t* u_exec, int cmd)
 STATIC irqreturn_t sdla_isr (int irq, void* dev_id, struct pt_regs *regs)
 {
 #define	card	((sdla_t*)dev_id)
-	int handled = 0;
 
 	if(card->hw.type == SDLA_S514) {	/* handle interrrupt on S514 */
                 u32 int_status;
@@ -1209,6 +1213,7 @@ sdla_t * wanpipe_find_card (char *name)
 	}
 	return NULL;
 }
+
 sdla_t * wanpipe_find_card_num (int num)
 {
 	if (num < 1 || num > ncards)
@@ -1217,34 +1222,19 @@ sdla_t * wanpipe_find_card_num (int num)
 	return &card_array[num];
 }
 
-
-static void run_wanpipe_tq (unsigned long data)
+/*
+ * @work_pointer:	work_struct to be done;
+ * 			should already have PREPARE_WORK() or
+ * 			  INIT_WORK() done on it by caller;
+ */
+void wanpipe_queue_work (struct work_struct *work_pointer)
 {
-	task_queue *tq_queue = (task_queue *)data;
-	if (test_and_set_bit(2,(void*)&wanpipe_bh_critical))
-		printk(KERN_INFO "CRITICAL IN RUNNING TASK QUEUE\n");
-	run_task_queue (tq_queue);
-	clear_bit(2,(void*)&wanpipe_bh_critical);
+	if (test_and_set_bit(1, (void*)&wanpipe_bh_critical))
+		printk(KERN_INFO "CRITICAL IN QUEUING WORK\n");
 
-}
-
-void wanpipe_queue_tq (struct tq_struct *bh_pointer)
-{
-	if (test_and_set_bit(1,(void*)&wanpipe_bh_critical))
-		printk(KERN_INFO "CRITICAL IN QUEUING TASK\n");
-
-	queue_task(bh_pointer,&wanpipe_tq_custom);
+	queue_work(wanpipe_wq, work_pointer);
 	clear_bit(1,(void*)&wanpipe_bh_critical);
 }
-
-void wanpipe_mark_bh (void)
-{
-	if (!test_and_set_bit(0,(void*)&wanpipe_bh_critical)){
-		queue_task(&wanpipe_tq_task,&tq_immediate);
-		mark_bh(IMMEDIATE_BH);
-		clear_bit(0,(void*)&wanpipe_bh_critical);
-	}
-} 
 
 void wakeup_sk_bh(struct net_device *dev)
 {

@@ -36,7 +36,13 @@
 					cpu_set(cpu, __cpu_mask);	\
 					__cpu_mask;			\
 				})
-#define any_online_cpu(map)	find_first_bit((map).mask, NR_CPUS)
+#define any_online_cpu(map)			\
+({						\
+	cpumask_t __tmp__;			\
+	cpus_and(__tmp__, map, cpu_online_map);	\
+	find_first_bit(__tmp__.mask, NR_CPUS);	\
+})
+
 
 /*
  * um, these need to be usable as static initializers

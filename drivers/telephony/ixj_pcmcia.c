@@ -60,8 +60,10 @@ static dev_link_t *ixj_attach(void)
 	link->conf.Vcc = 50;
 	link->conf.IntType = INT_MEMORY_AND_IO;
 	link->priv = kmalloc(sizeof(struct ixj_info_t), GFP_KERNEL);
-	if (!link->priv)
+	if (!link->priv) {
+		kfree(link);
 		return NULL;
+	}
 	memset(link->priv, 0, sizeof(struct ixj_info_t));
 	/* Register with Card Services */
 	link->next = dev_list;

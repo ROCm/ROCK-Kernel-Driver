@@ -280,8 +280,10 @@ static struct sk_buff *igmpv3_newpack(struct net_device *dev, int size)
 				    .nl_u = { .ip4_u = {
 				    .daddr = IGMPV3_ALL_MCR } },
 				    .proto = IPPROTO_IGMP };
-		if (ip_route_output_key(&rt, &fl))
+		if (ip_route_output_key(&rt, &fl)) {
+			kfree_skb(skb);
 			return 0;
+		}
 	}
 	if (rt->rt_src == 0) {
 		ip_rt_put(rt);

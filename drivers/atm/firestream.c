@@ -1282,9 +1282,7 @@ static const struct atmdev_ops ops = {
 	.open =         fs_open,
 	.close =        fs_close,
 	.send =         fs_send,
-#if 0
 	.owner =        THIS_MODULE,
-#endif
 	/* ioctl:          fs_ioctl, */
 	/* getsockopt:     fs_getsockopt, */
 	/* setsockopt:     fs_setsockopt, */

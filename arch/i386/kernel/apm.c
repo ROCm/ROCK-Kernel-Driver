@@ -2008,7 +2008,7 @@ static int __init apm_init(void)
 	if (apm_proc)
 		apm_proc->owner = THIS_MODULE;
 
-	kernel_thread(apm, NULL, CLONE_FS | CLONE_FILES | CLONE_SIGHAND | SIGCHLD);
+	kernel_thread(apm, NULL, CLONE_KERNEL | SIGCHLD);
 
 	if (num_online_cpus() > 1 && !smp ) {
 		printk(KERN_NOTICE

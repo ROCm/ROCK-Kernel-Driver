@@ -80,7 +80,7 @@ extern struct movsl_mask {
  * checks that the pointer is in the user space range - after calling
  * this function, memory access functions may still return -EFAULT.
  */
-#define access_ok(type,addr,size) (__range_ok(addr,size) == 0)
+#define access_ok(type,addr,size) (likely(__range_ok(addr,size) == 0))
 
 /**
  * verify_area: - Obsolete, use access_ok()

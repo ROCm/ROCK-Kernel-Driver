@@ -189,6 +189,7 @@ static int bnep_sock_create(struct socket *sock, int protocol)
 
 static struct net_proto_family bnep_sock_family_ops = {
 	.family = PF_BLUETOOTH,
+	.owner	= THIS_MODULE,
 	.create = bnep_sock_create
 };
 

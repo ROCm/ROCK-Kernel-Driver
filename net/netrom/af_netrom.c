@@ -62,6 +62,7 @@ static HLIST_HEAD(nr_list);
 static spinlock_t nr_list_lock = SPIN_LOCK_UNLOCKED;
 
 static struct proto_ops nr_proto_ops;
+void nr_init_timers(struct sock *sk);
 
 static struct sock *nr_alloc_sock(void)
 {
@@ -279,17 +280,12 @@ void nr_destroy_socket(struct sock *sk)
 
 		kfree_skb(skb);
 	}
-	while ((skb = skb_dequeue(&sk->sk_write_queue)) != NULL) {
-		kfree_skb(skb);
-	}
 
 	if (atomic_read(&sk->sk_wmem_alloc) ||
 	    atomic_read(&sk->sk_rmem_alloc)) {
 		/* Defer: outstanding buffers */
-		init_timer(&sk->sk_timer);
-		sk->sk_timer.expires  = jiffies + 2 * HZ;
 		sk->sk_timer.function = nr_destroy_timer;
-		sk->sk_timer.data     = (unsigned long)sk;
+		sk->sk_timer.expires  = jiffies + 2 * HZ;
 		add_timer(&sk->sk_timer);
 	} else
 		sock_put(sk);
@@ -442,10 +438,7 @@ static int nr_create(struct socket *sock, int protocol)
 	skb_queue_head_init(&nr->reseq_queue);
 	skb_queue_head_init(&nr->frag_queue);
 
-	init_timer(&nr->t1timer);
-	init_timer(&nr->t2timer);
-	init_timer(&nr->t4timer);
-	init_timer(&nr->idletimer);
+	nr_init_timers(sk);
 
 	nr->t1     = sysctl_netrom_transport_timeout;
 	nr->t2     = sysctl_netrom_transport_acknowledge_delay;
@@ -491,10 +484,7 @@ static struct sock *nr_make_new(struct sock *osk)
 	skb_queue_head_init(&nr->reseq_queue);
 	skb_queue_head_init(&nr->frag_queue);
 
-	init_timer(&nr->t1timer);
-	init_timer(&nr->t2timer);
-	init_timer(&nr->t4timer);
-	init_timer(&nr->idletimer);
+	nr_init_timers(sk);
 
 	onr = nr_sk(osk);
 

@@ -1139,7 +1139,7 @@ kill_proc_info(int sig, struct siginfo *info, pid_t pid)
 static int kill_something_info(int sig, struct siginfo *info, int pid)
 {
 	if (!pid) {
-		return kill_pg_info(sig, info, current->pgrp);
+		return kill_pg_info(sig, info, process_group(current));
 	} else if (pid == -1) {
 		int retval = 0, count = 0;
 		struct task_struct * p;
@@ -1798,7 +1798,7 @@ relock:
 
 			/* signals can be posted during this window */
 
-			if (is_orphaned_pgrp(current->pgrp))
+			if (is_orphaned_pgrp(process_group(current)))
 				goto relock;
 
 			spin_lock_irq(&current->sighand->siglock);

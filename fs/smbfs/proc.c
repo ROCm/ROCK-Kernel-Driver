@@ -212,12 +212,9 @@ static int char2uni(const unsigned char *rawstring, int boundlen, wchar_t *uni)
 }
 
 static struct nls_table unicode_table = {
-	"unicode",
-	uni2char,
-	char2uni,
-	NULL,		/* not used by smbfs */
-	NULL,
-	NULL,		/* not a module */
+	.charset	= "unicode",
+	.uni2char	= uni2char,
+	.char2uni	= char2uni,
 };
 
 /* ----------------------------------------------------------- */

@@ -7,6 +7,8 @@
  * This is included by serial.c -- serial_sa1100.c makes no use of it.
  */
 
+#include <linux/config.h>
+
 /* Standard COM flags */
 #define STD_COM_FLAGS (ASYNC_BOOT_AUTOCONF | ASYNC_SKIP_TEST)
 
