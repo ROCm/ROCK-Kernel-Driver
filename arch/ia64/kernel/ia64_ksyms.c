@@ -28,6 +28,9 @@ EXPORT_SYMBOL(strrchr);
 EXPORT_SYMBOL(strstr);
 EXPORT_SYMBOL(strpbrk);
 
+#include <linux/syscalls.h>
+EXPORT_SYMBOL(sys_ioctl);
+
 #include <asm/checksum.h>
 EXPORT_SYMBOL(ip_fast_csum);		/* hand-coded assembly */
 
