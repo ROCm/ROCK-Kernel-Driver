@@ -11,7 +11,7 @@ CONFIG_CRYPTO_SHA1
   SHA-1 secure hash standard (FIPS 180-1), including HMAC (RFC2104, RFC2404).
 
 CONFIG_CRYPTO_DES
-  DES cipher algorithm (FIPS 46-2), and 3DES_EDE.
+  DES cipher algorithm (FIPS 46-2), and Triple DES EDE (FIPS 46-3).
 
 CONFIG_CRYPTO_TEST
   Quick & dirty crypto test module.

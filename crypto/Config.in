@@ -8,7 +8,7 @@ bool 'Cryptographic API' CONFIG_CRYPTO
 if [ "$CONFIG_CRYPTO" = "y" ]; then
   tristate       '  MD5 digest algorithm' CONFIG_CRYPTO_MD5
   tristate       '  SHA-1 digest algorithm' CONFIG_CRYPTO_SHA1
-  tristate       '  DES/3DES cipher algorithms' CONFIG_CRYPTO_DES
+  tristate       '  DES and Triple DES EDE cipher algorithms' CONFIG_CRYPTO_DES
   tristate       '  Testing module' CONFIG_CRYPTO_TEST
 fi
 

@@ -1,7 +1,7 @@
 /* 
  * Cryptographic API.
  *
- * DES & 3DES_EDE Cipher Algorithms.
+ * DES & Triple DES EDE Cipher Algorithms.
  *
  * Originally released as descore by Dana L. How <how@isl.stanford.edu>.
  * Modified by Raimar Falke <rf13@inf.tu-dresden.de> for the Linux-Kernel.
@@ -27,10 +27,24 @@
 #include <linux/crypto.h>
 
 #define DES_KEY_SIZE		8
-#define DES_KEY_SIZE_WORDS	2
+#define DES_EXPKEY_WORDS	32
 #define DES_BLOCK_SIZE		8
 
+#define DES3_EDE_KEY_SIZE	(3 * DES_KEY_SIZE)
+#define DES3_EDE_EXPKEY_WORDS	(3 * DES_EXPKEY_WORDS)
+#define DES3_EDE_BLOCK_SIZE	DES_BLOCK_SIZE
+
 #define ROR(d,c,o)	((d) = (d) >> (c) | (d) << (o))
+
+struct des_ctx {
+	__u8 iv[DES_BLOCK_SIZE];
+	__u32 expkey[DES_EXPKEY_WORDS];
+};
+
+struct des3_ede_ctx {
+	__u8 iv[DES_BLOCK_SIZE];
+	__u32 expkey[DES3_EDE_EXPKEY_WORDS];
+};
 
 const static __u32 des_keymap[] = {
 	0x02080008, 0x02082000, 0x00002008, 0x00000000,
@@ -263,30 +277,25 @@ const static char parity[] = {
 	4,8,8,0,8,0,0,8,8,0,0,8,0,8,8,0,8,5,0,8,0,8,8,0,0,8,8,0,8,0,6,8,
 };
 
-struct des_ctx {
-	__u8 iv[DES_BLOCK_SIZE];
-	__u32 keyinfo[32];
-};
 
-static void des_small_fips_encrypt(void *ctx, __u8 *dst, __u8 *src)
+static void des_small_fips_encrypt(__u32 *expkey, __u8 *dst, __u8 *src)
 {
-	__u32 *keyinfo = ((struct des_ctx *)ctx)->keyinfo;
 	__u32 x, y, z;
 	
-	x  = src [7];
+	x  = src[7];
 	x <<= 8;
-	x |= src [6];
+	x |= src[6];
 	x <<= 8;
-	x |= src [5];
+	x |= src[5];
 	x <<= 8;
-	x |= src [4];
-	y  = src [3];
+	x |= src[4];
+	y  = src[3];
 	y <<= 8;
-	y |= src [2];
+	y |= src[2];
 	y <<= 8;
-	y |= src [1];
+	y |= src[1];
 	y <<= 8;
-	y |= src [0];
+	y |= src[0];
 	z  = ((x >> 004) ^ y) & 0x0F0F0F0FL;
 	x ^= z << 004;
 	y ^= z;
@@ -304,7 +313,7 @@ static void des_small_fips_encrypt(void *ctx, __u8 *dst, __u8 *src)
 	y ^= z;
 	x ^= z;
 	y  = y >> 1 | y << 31;
-	z  = keyinfo [0];
+	z  = expkey[0];
 	z ^= y;
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 192) + (0xFC & z));
 	z >>= 8;
@@ -313,7 +322,7 @@ static void des_small_fips_encrypt(void *ctx, __u8 *dst, __u8 *src)
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 64) + (0xFC & z));
 	z >>= 8;
 	x ^= * (__u32 *) ((u8 *) des_keymap + (0xFC & z));
-	z  = keyinfo [1];
+	z  = expkey[1];
 	z ^= y;
 	z  = z << 4 | z >> 28;
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 448) + (0xFC & z));
@@ -323,7 +332,7 @@ static void des_small_fips_encrypt(void *ctx, __u8 *dst, __u8 *src)
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 320) + (0xFC & z));
 	z >>= 8;
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 256) + (0xFC & z));
-	z  = keyinfo [2];
+	z  = expkey[2];
 	z ^= x;
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 192) + (0xFC & z));
 	z >>= 8;
@@ -332,7 +341,7 @@ static void des_small_fips_encrypt(void *ctx, __u8 *dst, __u8 *src)
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 64) + (0xFC & z));
 	z >>= 8;
 	y ^= * (__u32 *) ((u8 *) des_keymap + (0xFC & z));
-	z  = keyinfo [3];
+	z  = expkey[3];
 	z ^= x;
 	z  = z << 4 | z >> 28;
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 448) + (0xFC & z));
@@ -342,7 +351,7 @@ static void des_small_fips_encrypt(void *ctx, __u8 *dst, __u8 *src)
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 320) + (0xFC & z));
 	z >>= 8;
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 256) + (0xFC & z));
-	z  = keyinfo [4];
+	z  = expkey[4];
 	z ^= y;
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 192) + (0xFC & z));
 	z >>= 8;
@@ -351,7 +360,7 @@ static void des_small_fips_encrypt(void *ctx, __u8 *dst, __u8 *src)
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 64) + (0xFC & z));
 	z >>= 8;
 	x ^= * (__u32 *) ((u8 *) des_keymap + (0xFC & z));
-	z  = keyinfo [5];
+	z  = expkey[5];
 	z ^= y;
 	z  = z << 4 | z >> 28;
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 448) + (0xFC & z));
@@ -361,7 +370,7 @@ static void des_small_fips_encrypt(void *ctx, __u8 *dst, __u8 *src)
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 320) + (0xFC & z));
 	z >>= 8;
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 256) + (0xFC & z));
-	z  = keyinfo [6];
+	z  = expkey[6];
 	z ^= x;
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 192) + (0xFC & z));
 	z >>= 8;
@@ -370,7 +379,7 @@ static void des_small_fips_encrypt(void *ctx, __u8 *dst, __u8 *src)
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 64) + (0xFC & z));
 	z >>= 8;
 	y ^= * (__u32 *) ((u8 *) des_keymap + (0xFC & z));
-	z  = keyinfo [7];
+	z  = expkey[7];
 	z ^= x;
 	z  = z << 4 | z >> 28;
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 448) + (0xFC & z));
@@ -380,7 +389,7 @@ static void des_small_fips_encrypt(void *ctx, __u8 *dst, __u8 *src)
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 320) + (0xFC & z));
 	z >>= 8;
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 256) + (0xFC & z));
-	z  = keyinfo [8];
+	z  = expkey[8];
 	z ^= y;
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 192) + (0xFC & z));
 	z >>= 8;
@@ -389,7 +398,7 @@ static void des_small_fips_encrypt(void *ctx, __u8 *dst, __u8 *src)
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 64) + (0xFC & z));
 	z >>= 8;
 	x ^= * (__u32 *) ((u8 *) des_keymap + (0xFC & z));
-	z  = keyinfo [9];
+	z  = expkey[9];
 	z ^= y;
 	z  = z << 4 | z >> 28;
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 448) + (0xFC & z));
@@ -399,7 +408,7 @@ static void des_small_fips_encrypt(void *ctx, __u8 *dst, __u8 *src)
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 320) + (0xFC & z));
 	z >>= 8;
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 256) + (0xFC & z));
-	z  = keyinfo [10];
+	z  = expkey[10];
 	z ^= x;
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 192) + (0xFC & z));
 	z >>= 8;
@@ -408,7 +417,7 @@ static void des_small_fips_encrypt(void *ctx, __u8 *dst, __u8 *src)
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 64) + (0xFC & z));
 	z >>= 8;
 	y ^= * (__u32 *) ((u8 *) des_keymap + (0xFC & z));
-	z  = keyinfo [11];
+	z  = expkey[11];
 	z ^= x;
 	z  = z << 4 | z >> 28;
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 448) + (0xFC & z));
@@ -418,7 +427,7 @@ static void des_small_fips_encrypt(void *ctx, __u8 *dst, __u8 *src)
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 320) + (0xFC & z));
 	z >>= 8;
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 256) + (0xFC & z));
-	z  = keyinfo [12];
+	z  = expkey[12];
 	z ^= y;
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 192) + (0xFC & z));
 	z >>= 8;
@@ -427,7 +436,7 @@ static void des_small_fips_encrypt(void *ctx, __u8 *dst, __u8 *src)
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 64) + (0xFC & z));
 	z >>= 8;
 	x ^= * (__u32 *) ((u8 *) des_keymap + (0xFC & z));
-	z  = keyinfo [13];
+	z  = expkey[13];
 	z ^= y;
 	z  = z << 4 | z >> 28;
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 448) + (0xFC & z));
@@ -437,7 +446,7 @@ static void des_small_fips_encrypt(void *ctx, __u8 *dst, __u8 *src)
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 320) + (0xFC & z));
 	z >>= 8;
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 256) + (0xFC & z));
-	z  = keyinfo [14];
+	z  = expkey[14];
 	z ^= x;
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 192) + (0xFC & z));
 	z >>= 8;
@@ -446,7 +455,7 @@ static void des_small_fips_encrypt(void *ctx, __u8 *dst, __u8 *src)
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 64) + (0xFC & z));
 	z >>= 8;
 	y ^= * (__u32 *) ((u8 *) des_keymap + (0xFC & z));
-	z  = keyinfo [15];
+	z  = expkey[15];
 	z ^= x;
 	z  = z << 4 | z >> 28;
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 448) + (0xFC & z));
@@ -456,7 +465,7 @@ static void des_small_fips_encrypt(void *ctx, __u8 *dst, __u8 *src)
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 320) + (0xFC & z));
 	z >>= 8;
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 256) + (0xFC & z));
-	z  = keyinfo [16];
+	z  = expkey[16];
 	z ^= y;
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 192) + (0xFC & z));
 	z >>= 8;
@@ -465,7 +474,7 @@ static void des_small_fips_encrypt(void *ctx, __u8 *dst, __u8 *src)
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 64) + (0xFC & z));
 	z >>= 8;
 	x ^= * (__u32 *) ((u8 *) des_keymap + (0xFC & z));
-	z  = keyinfo [17];
+	z  = expkey[17];
 	z ^= y;
 	z  = z << 4 | z >> 28;
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 448) + (0xFC & z));
@@ -475,7 +484,7 @@ static void des_small_fips_encrypt(void *ctx, __u8 *dst, __u8 *src)
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 320) + (0xFC & z));
 	z >>= 8;
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 256) + (0xFC & z));
-	z  = keyinfo [18];
+	z  = expkey[18];
 	z ^= x;
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 192) + (0xFC & z));
 	z >>= 8;
@@ -484,7 +493,7 @@ static void des_small_fips_encrypt(void *ctx, __u8 *dst, __u8 *src)
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 64) + (0xFC & z));
 	z >>= 8;
 	y ^= * (__u32 *) ((u8 *) des_keymap + (0xFC & z));
-	z  = keyinfo [19];
+	z  = expkey[19];
 	z ^= x;
 	z  = z << 4 | z >> 28;
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 448) + (0xFC & z));
@@ -494,7 +503,7 @@ static void des_small_fips_encrypt(void *ctx, __u8 *dst, __u8 *src)
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 320) + (0xFC & z));
 	z >>= 8;
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 256) + (0xFC & z));
-	z  = keyinfo [20];
+	z  = expkey[20];
 	z ^= y;
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 192) + (0xFC & z));
 	z >>= 8;
@@ -503,7 +512,7 @@ static void des_small_fips_encrypt(void *ctx, __u8 *dst, __u8 *src)
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 64) + (0xFC & z));
 	z >>= 8;
 	x ^= * (__u32 *) ((u8 *) des_keymap + (0xFC & z));
-	z  = keyinfo [21];
+	z  = expkey[21];
 	z ^= y;
 	z  = z << 4 | z >> 28;
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 448) + (0xFC & z));
@@ -513,7 +522,7 @@ static void des_small_fips_encrypt(void *ctx, __u8 *dst, __u8 *src)
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 320) + (0xFC & z));
 	z >>= 8;
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 256) + (0xFC & z));
-	z  = keyinfo [22];
+	z  = expkey[22];
 	z ^= x;
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 192) + (0xFC & z));
 	z >>= 8;
@@ -522,7 +531,7 @@ static void des_small_fips_encrypt(void *ctx, __u8 *dst, __u8 *src)
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 64) + (0xFC & z));
 	z >>= 8;
 	y ^= * (__u32 *) ((u8 *) des_keymap + (0xFC & z));
-	z  = keyinfo [23];
+	z  = expkey[23];
 	z ^= x;
 	z  = z << 4 | z >> 28;
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 448) + (0xFC & z));
@@ -532,7 +541,7 @@ static void des_small_fips_encrypt(void *ctx, __u8 *dst, __u8 *src)
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 320) + (0xFC & z));
 	z >>= 8;
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 256) + (0xFC & z));
-	z  = keyinfo [24];
+	z  = expkey[24];
 	z ^= y;
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 192) + (0xFC & z));
 	z >>= 8;
@@ -541,7 +550,7 @@ static void des_small_fips_encrypt(void *ctx, __u8 *dst, __u8 *src)
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 64) + (0xFC & z));
 	z >>= 8;
 	x ^= * (__u32 *) ((u8 *) des_keymap + (0xFC & z));
-	z  = keyinfo [25];
+	z  = expkey[25];
 	z ^= y;
 	z  = z << 4 | z >> 28;
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 448) + (0xFC & z));
@@ -551,7 +560,7 @@ static void des_small_fips_encrypt(void *ctx, __u8 *dst, __u8 *src)
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 320) + (0xFC & z));
 	z >>= 8;
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 256) + (0xFC & z));
-	z  = keyinfo [26];
+	z  = expkey[26];
 	z ^= x;
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 192) + (0xFC & z));
 	z >>= 8;
@@ -560,7 +569,7 @@ static void des_small_fips_encrypt(void *ctx, __u8 *dst, __u8 *src)
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 64) + (0xFC & z));
 	z >>= 8;
 	y ^= * (__u32 *) ((u8 *) des_keymap + (0xFC & z));
-	z  = keyinfo [27];
+	z  = expkey[27];
 	z ^= x;
 	z  = z << 4 | z >> 28;
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 448) + (0xFC & z));
@@ -570,7 +579,7 @@ static void des_small_fips_encrypt(void *ctx, __u8 *dst, __u8 *src)
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 320) + (0xFC & z));
 	z >>= 8;
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 256) + (0xFC & z));
-	z  = keyinfo [28];
+	z  = expkey[28];
 	z ^= y;
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 192) + (0xFC & z));
 	z >>= 8;
@@ -579,7 +588,7 @@ static void des_small_fips_encrypt(void *ctx, __u8 *dst, __u8 *src)
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 64) + (0xFC & z));
 	z >>= 8;
 	x ^= * (__u32 *) ((u8 *) des_keymap + (0xFC & z));
-	z  = keyinfo [29];
+	z  = expkey[29];
 	z ^= y;
 	z  = z << 4 | z >> 28;
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 448) + (0xFC & z));
@@ -589,7 +598,7 @@ static void des_small_fips_encrypt(void *ctx, __u8 *dst, __u8 *src)
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 320) + (0xFC & z));
 	z >>= 8;
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 256) + (0xFC & z));
-	z  = keyinfo [30];
+	z  = expkey[30];
 	z ^= x;
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 192) + (0xFC & z));
 	z >>= 8;
@@ -598,7 +607,7 @@ static void des_small_fips_encrypt(void *ctx, __u8 *dst, __u8 *src)
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 64) + (0xFC & z));
 	z >>= 8;
 	y ^= * (__u32 *) ((u8 *) des_keymap + (0xFC & z));
-	z  = keyinfo [31];
+	z  = expkey[31];
 	z ^= x;
 	z  = z << 4 | z >> 28;
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 448) + (0xFC & z));
@@ -625,42 +634,41 @@ static void des_small_fips_encrypt(void *ctx, __u8 *dst, __u8 *src)
 	z  = ((y >> 004) ^ x) & 0x0F0F0F0FL;
 	y ^= z << 004;
 	x ^= z;
-	dst [0] = x;
+	dst[0] = x;
 	x >>= 8;
-	dst [1] = x;
+	dst[1] = x;
 	x >>= 8;
-	dst [2] = x;
+	dst[2] = x;
 	x >>= 8;
-	dst [3] = x;
-	dst [4] = y;
+	dst[3] = x;
+	dst[4] = y;
 	y >>= 8;
-	dst [5] = y;
+	dst[5] = y;
 	y >>= 8;
-	dst [6] = y;
+	dst[6] = y;
 	y >>= 8;
-	dst [7] = y;
+	dst[7] = y;
 	return;
 }
 
-static void des_small_fips_decrypt(void *ctx, __u8 *dst, __u8 *src)
+static void des_small_fips_decrypt(__u32 *expkey, __u8 *dst, __u8 *src)
 {
-	__u32 *keyinfo = ((struct des_ctx *)ctx)->keyinfo;
 	__u32 x, y, z;
 	
-	x  = src [7];
+	x  = src[7];
 	x <<= 8;
-	x |= src [6];
+	x |= src[6];
 	x <<= 8;
-	x |= src [5];
+	x |= src[5];
 	x <<= 8;
-	x |= src [4];
-	y  = src [3];
+	x |= src[4];
+	y  = src[3];
 	y <<= 8;
-	y |= src [2];
+	y |= src[2];
 	y <<= 8;
-	y |= src [1];
+	y |= src[1];
 	y <<= 8;
-	y |= src [0];
+	y |= src[0];
 	z  = ((x >> 004) ^ y) & 0x0F0F0F0FL;
 	x ^= z << 004;
 	y ^= z;
@@ -678,7 +686,7 @@ static void des_small_fips_decrypt(void *ctx, __u8 *dst, __u8 *src)
 	y ^= z;
 	x ^= z;
 	y  = y >> 1 | y << 31;
-	z  = keyinfo [31];
+	z  = expkey[31];
 	z ^= y;
 	z  = z << 4 | z >> 28;
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 448) + (0xFC & z));
@@ -688,7 +696,7 @@ static void des_small_fips_decrypt(void *ctx, __u8 *dst, __u8 *src)
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 320) + (0xFC & z));
 	z >>= 8;
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 256) + (0xFC & z));
-	z  = keyinfo [30];
+	z  = expkey[30];
 	z ^= y;
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 192) + (0xFC & z));
 	z >>= 8;
@@ -697,7 +705,7 @@ static void des_small_fips_decrypt(void *ctx, __u8 *dst, __u8 *src)
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 64) + (0xFC & z));
 	z >>= 8;
 	x ^= * (__u32 *) ((u8 *) des_keymap + (0xFC & z));
-	z  = keyinfo [29];
+	z  = expkey[29];
 	z ^= x;
 	z  = z << 4 | z >> 28;
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 448) + (0xFC & z));
@@ -707,7 +715,7 @@ static void des_small_fips_decrypt(void *ctx, __u8 *dst, __u8 *src)
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 320) + (0xFC & z));
 	z >>= 8;
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 256) + (0xFC & z));
-	z  = keyinfo [28];
+	z  = expkey[28];
 	z ^= x;
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 192) + (0xFC & z));
 	z >>= 8;
@@ -716,7 +724,7 @@ static void des_small_fips_decrypt(void *ctx, __u8 *dst, __u8 *src)
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 64) + (0xFC & z));
 	z >>= 8;
 	y ^= * (__u32 *) ((u8 *) des_keymap + (0xFC & z));
-	z  = keyinfo [27];
+	z  = expkey[27];
 	z ^= y;
 	z  = z << 4 | z >> 28;
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 448) + (0xFC & z));
@@ -726,7 +734,7 @@ static void des_small_fips_decrypt(void *ctx, __u8 *dst, __u8 *src)
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 320) + (0xFC & z));
 	z >>= 8;
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 256) + (0xFC & z));
-	z  = keyinfo [26];
+	z  = expkey[26];
 	z ^= y;
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 192) + (0xFC & z));
 	z >>= 8;
@@ -735,7 +743,7 @@ static void des_small_fips_decrypt(void *ctx, __u8 *dst, __u8 *src)
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 64) + (0xFC & z));
 	z >>= 8;
 	x ^= * (__u32 *) ((u8 *) des_keymap + (0xFC & z));
-	z  = keyinfo [25];
+	z  = expkey[25];
 	z ^= x;
 	z  = z << 4 | z >> 28;
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 448) + (0xFC & z));
@@ -745,7 +753,7 @@ static void des_small_fips_decrypt(void *ctx, __u8 *dst, __u8 *src)
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 320) + (0xFC & z));
 	z >>= 8;
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 256) + (0xFC & z));
-	z  = keyinfo [24];
+	z  = expkey[24];
 	z ^= x;
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 192) + (0xFC & z));
 	z >>= 8;
@@ -754,7 +762,7 @@ static void des_small_fips_decrypt(void *ctx, __u8 *dst, __u8 *src)
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 64) + (0xFC & z));
 	z >>= 8;
 	y ^= * (__u32 *) ((u8 *) des_keymap + (0xFC & z));
-	z  = keyinfo [23];
+	z  = expkey[23];
 	z ^= y;
 	z  = z << 4 | z >> 28;
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 448) + (0xFC & z));
@@ -764,7 +772,7 @@ static void des_small_fips_decrypt(void *ctx, __u8 *dst, __u8 *src)
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 320) + (0xFC & z));
 	z >>= 8;
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 256) + (0xFC & z));
-	z  = keyinfo [22];
+	z  = expkey[22];
 	z ^= y;
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 192) + (0xFC & z));
 	z >>= 8;
@@ -773,7 +781,7 @@ static void des_small_fips_decrypt(void *ctx, __u8 *dst, __u8 *src)
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 64) + (0xFC & z));
 	z >>= 8;
 	x ^= * (__u32 *) ((u8 *) des_keymap + (0xFC & z));
-	z  = keyinfo [21];
+	z  = expkey[21];
 	z ^= x;
 	z  = z << 4 | z >> 28;
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 448) + (0xFC & z));
@@ -783,7 +791,7 @@ static void des_small_fips_decrypt(void *ctx, __u8 *dst, __u8 *src)
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 320) + (0xFC & z));
 	z >>= 8;
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 256) + (0xFC & z));
-	z  = keyinfo [20];
+	z  = expkey[20];
 	z ^= x;
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 192) + (0xFC & z));
 	z >>= 8;
@@ -792,7 +800,7 @@ static void des_small_fips_decrypt(void *ctx, __u8 *dst, __u8 *src)
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 64) + (0xFC & z));
 	z >>= 8;
 	y ^= * (__u32 *) ((u8 *) des_keymap + (0xFC & z));
-	z  = keyinfo [19];
+	z  = expkey[19];
 	z ^= y;
 	z  = z << 4 | z >> 28;
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 448) + (0xFC & z));
@@ -802,7 +810,7 @@ static void des_small_fips_decrypt(void *ctx, __u8 *dst, __u8 *src)
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 320) + (0xFC & z));
 	z >>= 8;
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 256) + (0xFC & z));
-	z  = keyinfo [18];
+	z  = expkey[18];
 	z ^= y;
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 192) + (0xFC & z));
 	z >>= 8;
@@ -811,7 +819,7 @@ static void des_small_fips_decrypt(void *ctx, __u8 *dst, __u8 *src)
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 64) + (0xFC & z));
 	z >>= 8;
 	x ^= * (__u32 *) ((u8 *) des_keymap + (0xFC & z));
-	z  = keyinfo [17];
+	z  = expkey[17];
 	z ^= x;
 	z  = z << 4 | z >> 28;
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 448) + (0xFC & z));
@@ -821,7 +829,7 @@ static void des_small_fips_decrypt(void *ctx, __u8 *dst, __u8 *src)
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 320) + (0xFC & z));
 	z >>= 8;
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 256) + (0xFC & z));
-	z  = keyinfo [16];
+	z  = expkey[16];
 	z ^= x;
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 192) + (0xFC & z));
 	z >>= 8;
@@ -830,7 +838,7 @@ static void des_small_fips_decrypt(void *ctx, __u8 *dst, __u8 *src)
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 64) + (0xFC & z));
 	z >>= 8;
 	y ^= * (__u32 *) ((u8 *) des_keymap + (0xFC & z));
-	z  = keyinfo [15];
+	z  = expkey[15];
 	z ^= y;
 	z  = z << 4 | z >> 28;
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 448) + (0xFC & z));
@@ -840,7 +848,7 @@ static void des_small_fips_decrypt(void *ctx, __u8 *dst, __u8 *src)
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 320) + (0xFC & z));
 	z >>= 8;
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 256) + (0xFC & z));
-	z  = keyinfo [14];
+	z  = expkey[14];
 	z ^= y;
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 192) + (0xFC & z));
 	z >>= 8;
@@ -849,7 +857,7 @@ static void des_small_fips_decrypt(void *ctx, __u8 *dst, __u8 *src)
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 64) + (0xFC & z));
 	z >>= 8;
 	x ^= * (__u32 *) ((u8 *) des_keymap + (0xFC & z));
-	z  = keyinfo [13];
+	z  = expkey[13];
 	z ^= x;
 	z  = z << 4 | z >> 28;
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 448) + (0xFC & z));
@@ -859,7 +867,7 @@ static void des_small_fips_decrypt(void *ctx, __u8 *dst, __u8 *src)
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 320) + (0xFC & z));
 	z >>= 8;
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 256) + (0xFC & z));
-	z  = keyinfo [12];
+	z  = expkey[12];
 	z ^= x;
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 192) + (0xFC & z));
 	z >>= 8;
@@ -868,7 +876,7 @@ static void des_small_fips_decrypt(void *ctx, __u8 *dst, __u8 *src)
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 64) + (0xFC & z));
 	z >>= 8;
 	y ^= * (__u32 *) ((u8 *) des_keymap + (0xFC & z));
-	z  = keyinfo [11];
+	z  = expkey[11];
 	z ^= y;
 	z  = z << 4 | z >> 28;
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 448) + (0xFC & z));
@@ -878,7 +886,7 @@ static void des_small_fips_decrypt(void *ctx, __u8 *dst, __u8 *src)
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 320) + (0xFC & z));
 	z >>= 8;
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 256) + (0xFC & z));
-	z  = keyinfo [10];
+	z  = expkey[10];
 	z ^= y;
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 192) + (0xFC & z));
 	z >>= 8;
@@ -887,7 +895,7 @@ static void des_small_fips_decrypt(void *ctx, __u8 *dst, __u8 *src)
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 64) + (0xFC & z));
 	z >>= 8;
 	x ^= * (__u32 *) ((u8 *) des_keymap + (0xFC & z));
-	z  = keyinfo [9];
+	z  = expkey[9];
 	z ^= x;
 	z  = z << 4 | z >> 28;
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 448) + (0xFC & z));
@@ -897,7 +905,7 @@ static void des_small_fips_decrypt(void *ctx, __u8 *dst, __u8 *src)
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 320) + (0xFC & z));
 	z >>= 8;
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 256) + (0xFC & z));
-	z  = keyinfo [8];
+	z  = expkey[8];
 	z ^= x;
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 192) + (0xFC & z));
 	z >>= 8;
@@ -906,7 +914,7 @@ static void des_small_fips_decrypt(void *ctx, __u8 *dst, __u8 *src)
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 64) + (0xFC & z));
 	z >>= 8;
 	y ^= * (__u32 *) ((u8 *) des_keymap + (0xFC & z));
-	z  = keyinfo [7];
+	z  = expkey[7];
 	z ^= y;
 	z  = z << 4 | z >> 28;
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 448) + (0xFC & z));
@@ -916,7 +924,7 @@ static void des_small_fips_decrypt(void *ctx, __u8 *dst, __u8 *src)
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 320) + (0xFC & z));
 	z >>= 8;
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 256) + (0xFC & z));
-	z  = keyinfo [6];
+	z  = expkey[6];
 	z ^= y;
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 192) + (0xFC & z));
 	z >>= 8;
@@ -925,7 +933,7 @@ static void des_small_fips_decrypt(void *ctx, __u8 *dst, __u8 *src)
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 64) + (0xFC & z));
 	z >>= 8;
 	x ^= * (__u32 *) ((u8 *) des_keymap + (0xFC & z));
-	z  = keyinfo [5];
+	z  = expkey[5];
 	z ^= x;
 	z  = z << 4 | z >> 28;
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 448) + (0xFC & z));
@@ -935,7 +943,7 @@ static void des_small_fips_decrypt(void *ctx, __u8 *dst, __u8 *src)
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 320) + (0xFC & z));
 	z >>= 8;
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 256) + (0xFC & z));
-	z  = keyinfo [4];
+	z  = expkey[4];
 	z ^= x;
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 192) + (0xFC & z));
 	z >>= 8;
@@ -944,7 +952,7 @@ static void des_small_fips_decrypt(void *ctx, __u8 *dst, __u8 *src)
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 64) + (0xFC & z));
 	z >>= 8;
 	y ^= * (__u32 *) ((u8 *) des_keymap + (0xFC & z));
-	z  = keyinfo [3];
+	z  = expkey[3];
 	z ^= y;
 	z  = z << 4 | z >> 28;
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 448) + (0xFC & z));
@@ -954,7 +962,7 @@ static void des_small_fips_decrypt(void *ctx, __u8 *dst, __u8 *src)
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 320) + (0xFC & z));
 	z >>= 8;
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 256) + (0xFC & z));
-	z  = keyinfo [2];
+	z  = expkey[2];
 	z ^= y;
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 192) + (0xFC & z));
 	z >>= 8;
@@ -963,7 +971,7 @@ static void des_small_fips_decrypt(void *ctx, __u8 *dst, __u8 *src)
 	x ^= * (__u32 *) ((u8 *) (des_keymap + 64) + (0xFC & z));
 	z >>= 8;
 	x ^= * (__u32 *) ((u8 *) des_keymap + (0xFC & z));
-	z  = keyinfo [1];
+	z  = expkey[1];
 	z ^= x;
 	z  = z << 4 | z >> 28;
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 448) + (0xFC & z));
@@ -973,7 +981,7 @@ static void des_small_fips_decrypt(void *ctx, __u8 *dst, __u8 *src)
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 320) + (0xFC & z));
 	z >>= 8;
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 256) + (0xFC & z));
-	z  = keyinfo [0];
+	z  = expkey[0];
 	z ^= x;
 	y ^= * (__u32 *) ((u8 *) (des_keymap + 192) + (0xFC & z));
 	z >>= 8;
@@ -999,33 +1007,32 @@ static void des_small_fips_decrypt(void *ctx, __u8 *dst, __u8 *src)
 	z  = ((y >> 004) ^ x) & 0x0F0F0F0FL;
 	y ^= z << 004;
 	x ^= z;
-	dst [0] = x;
+	dst[0] = x;
 	x >>= 8;
-	dst [1] = x;
+	dst[1] = x;
 	x >>= 8;
-	dst [2] = x;
+	dst[2] = x;
 	x >>= 8;
-	dst [3] = x;
-	dst [4] = y;
+	dst[3] = x;
+	dst[4] = y;
 	y >>= 8;
-	dst [5] = y;
+	dst[5] = y;
 	y >>= 8;
-	dst [6] = y;
+	dst[6] = y;
 	y >>= 8;
-	dst [7] = y;
+	dst[7] = y;
 	return;
 }
 
 /*
  * RFC2451: Weak key checks SHOULD be performed.
  */
-static int des_setkey(void *ctx, const __u8 *key, size_t keylen, int *flags)
+
+static int setkey(__u32 *expkey, const __u8 *key, size_t keylen, int *flags)
 {
-	struct des_ctx *dctx = ctx;
 	const __u8 *k;
 	__u8 *b0, *b1;
 	__u32 n, w;
-	__u32 *method;
 	__u8 bits0[56], bits1[56];
 
 	if (keylen != DES_KEY_SIZE) {
@@ -1125,7 +1132,6 @@ not_weak:
 	/* put the bits in the correct places */
 	n = 16;
 	k = rotors;
-	method = dctx->keyinfo;
 	
 	do {
 		w   = (b1[k[ 0   ]] | b0[k[ 1   ]]) << 4;
@@ -1143,7 +1149,7 @@ not_weak:
 		w  |= (b1[k[18   ]] | b0[k[19   ]]) << 4;
 		w  |= (b1[k[20   ]] | b0[k[21   ]]) << 2;
 		w  |=  b1[k[22   ]] | b0[k[23   ]];
-		method[0] = w;
+		expkey[0] = w;
 		
 		w   = (b1[k[ 0+24]] | b0[k[ 1+24]]) << 4;
 		w  |= (b1[k[ 2+24]] | b0[k[ 3+24]]) << 2;
@@ -1162,16 +1168,94 @@ not_weak:
 		w  |=  b1[k[22+24]] | b0[k[23+24]];
 		
 		ROR(w, 4, 28);      /* could be eliminated */
-		method[1] = w;
+		expkey[1] = w;
 
 		k += 48;
-		method += 2;
+		expkey += 2;
 	} while (--n);
 
 	return 0;
 }
 
-static struct crypto_alg alg = {
+static int des_setkey(void *ctx, const __u8 *key, size_t keylen, int *flags)
+{
+	return setkey(((struct des_ctx *)ctx)->expkey, key, keylen, flags);
+}
+
+static void des_encrypt(void *ctx, __u8 *dst, __u8 *src)
+{
+	des_small_fips_encrypt(((struct des_ctx *)ctx)->expkey, dst, src);
+}
+
+static void des_decrypt(void *ctx, __u8 *dst, __u8 *src)
+{
+	des_small_fips_decrypt(((struct des_ctx *)ctx)->expkey, dst, src);
+}
+
+/* 
+ * RFC2451:
+ *
+ *   For DES-EDE3, there is no known need to reject weak or
+ *   complementation keys.  Any weakness is obviated by the use of
+ *   multiple keys.
+ *
+ *   However, if the first two or last two independent 64-bit keys are
+ *   equal (k1 == k2 or k2 == k3), then the DES3 operation is simply the
+ *   same as DES.  Implementers MUST reject keys that exhibit this
+ *   property.
+ *
+ */
+static int des3_ede_setkey(void *ctx, const __u8 *key,
+                           size_t keylen, int *flags)
+{
+	int i, off;
+	struct des3_ede_ctx *dctx = ctx;
+
+	if (keylen != DES3_EDE_KEY_SIZE) {
+		*flags |= CRYPTO_BAD_KEY_LEN;
+		return -EINVAL;
+	}
+
+	if (!(memcmp(key, &key[DES_KEY_SIZE], DES_KEY_SIZE) && 
+	    memcmp(&key[DES_KEY_SIZE], &key[DES_KEY_SIZE * 2],
+	    					DES_KEY_SIZE))) {
+
+		*flags |= CRYPTO_BAD_KEY_SCHED;
+		return -EINVAL;
+	}
+	
+	for (i = 0, off = 0; i < 3; i++, off += DES_EXPKEY_WORDS,
+							key += DES_KEY_SIZE) {
+		int ret = setkey(&dctx->expkey[off], key, DES_KEY_SIZE, flags);
+		if (ret < 0)
+			return ret;
+	}	
+	return 0;
+}
+
+static void des3_ede_encrypt(void *ctx, __u8 *dst, __u8 *src)
+{
+	struct des3_ede_ctx *dctx = ctx;
+	
+	des_small_fips_encrypt(dctx->expkey, dst, src);
+	des_small_fips_decrypt(&dctx->expkey[DES_EXPKEY_WORDS], dst, dst);
+	des_small_fips_encrypt(&dctx->expkey[DES_EXPKEY_WORDS * 2], dst, dst);
+
+	return;
+}
+
+static void des3_ede_decrypt(void *ctx, __u8 *dst, __u8 *src)
+{
+	struct des3_ede_ctx *dctx = ctx;
+
+	des_small_fips_decrypt(&dctx->expkey[DES_EXPKEY_WORDS * 2], dst, src);
+	des_small_fips_encrypt(&dctx->expkey[DES_EXPKEY_WORDS], dst, dst);
+	des_small_fips_decrypt(dctx->expkey, dst, dst);
+	
+	return;
+}
+
+static struct crypto_alg des_alg = {
 	.cra_id		=	CRYPTO_ALG_DES,
 	.cra_name	=	"des",
 	.cra_blocksize	=	DES_BLOCK_SIZE,
@@ -1180,19 +1264,47 @@ static struct crypto_alg alg = {
 	.cia_keysize	=	DES_KEY_SIZE,
 	.cia_ivsize	=	DES_BLOCK_SIZE,
 	.cia_setkey   	= 	des_setkey,
-	.cia_encrypt 	=	des_small_fips_encrypt,
-	.cia_decrypt  	=	des_small_fips_decrypt } }
+	.cia_encrypt 	=	des_encrypt,
+	.cia_decrypt  	=	des_decrypt } }
+};
+
+static struct crypto_alg des3_ede_alg = {
+	.cra_id		=	CRYPTO_ALG_DES3_EDE,
+	.cra_name	=	"des3_ede",
+	.cra_blocksize	=	DES3_EDE_BLOCK_SIZE,
+	.cra_ctxsize	=	sizeof(struct des3_ede_ctx),
+	.cra_u		=	{ .cipher = {
+	.cia_keysize	=	DES3_EDE_KEY_SIZE,
+	.cia_ivsize	=	DES3_EDE_BLOCK_SIZE,
+	.cia_setkey   	= 	des3_ede_setkey,
+	.cia_encrypt 	=	des3_ede_encrypt,
+	.cia_decrypt  	=	des3_ede_decrypt } }
 };
 
 static int __init init(void)
 {
-	INIT_LIST_HEAD(&alg.cra_list);
-	return crypto_register_alg(&alg);
+	int ret = 0;
+	
+	INIT_LIST_HEAD(&des_alg.cra_list);
+	INIT_LIST_HEAD(&des3_ede_alg.cra_list);
+	
+	ret = crypto_register_alg(&des_alg);
+	if (ret < 0)
+		goto out;
+
+	ret = crypto_register_alg(&des3_ede_alg);
+	if (ret < 0) {
+		crypto_unregister_alg(&des_alg);
+		goto out;
+	}
+out:	
+	return ret;
 }
 
 static void __exit fini(void)
 {
-	crypto_unregister_alg(&alg);
+	crypto_unregister_alg(&des3_ede_alg);
+	crypto_unregister_alg(&des_alg);
 }
 
 module_init(init);
@@ -1200,16 +1312,3 @@ module_exit(fini);
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("DES & Triple DES EDE Cipher Algorithms");
-
-#if 0
-/*
- * RFC2451:
- *
- * However, if the first two or last two independent 64-bit keys are
- * equal (k1 == k2 or k2 == k3), then the 3DES operation is simply the
- * same as DES.  Implementers MUST reject keys that exhibit this
- * property.
- */
-
-#endif
-
