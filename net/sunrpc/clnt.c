@@ -972,10 +972,10 @@ call_verify(struct rpc_task *task)
 				task->tk_client->cl_server);
 		goto out_eio;
 	case RPC_PROC_UNAVAIL:
-		printk(KERN_WARNING "RPC: %4d call_verify: proc %u unsupported by program %u, version %u on server %s\n",
-				task->tk_pid, (unsigned int)task->tk_msg.rpc_proc,
-				(unsigned int)task->tk_client->cl_prog,
-				(unsigned int)task->tk_client->cl_vers,
+		printk(KERN_WARNING "RPC: %4d call_verify: proc %p unsupported by program %u, version %u on server %s\n",
+				task->tk_pid, task->tk_msg.rpc_proc,
+				task->tk_client->cl_prog,
+				task->tk_client->cl_vers,
 				task->tk_client->cl_server);
 		goto out_eio;
 	case RPC_GARBAGE_ARGS:
