@@ -115,15 +115,13 @@ static void pfkey_insert(struct sock *sk)
 {
 	pfkey_table_grab();
 	sk_add_node(sk, &pfkey_table);
-	sock_hold(sk);
 	pfkey_table_ungrab();
 }
 
 static void pfkey_remove(struct sock *sk)
 {
 	pfkey_table_grab();
-	if (sk_del_node_init(sk))
-		__sock_put(sk);
+	sk_del_node_init(sk);
 	pfkey_table_ungrab();
 }
 

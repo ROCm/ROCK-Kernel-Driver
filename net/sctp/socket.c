@@ -3346,7 +3346,7 @@ static __inline__ void __sctp_put_port(struct sock *sk)
 
 	sctp_spin_lock(&head->lock);
 	pp = sctp_sk(sk)->bind_hash;
-	hlist_del(&sk->sk_bind_node);
+	__sk_del_bind_node(sk);
 	sctp_sk(sk)->bind_hash = NULL;
 	inet_sk(sk)->num = 0;
 	sctp_bucket_destroy(pp);

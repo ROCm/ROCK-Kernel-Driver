@@ -64,17 +64,14 @@ static void raw_v6_hash(struct sock *sk)
 	write_lock_bh(&raw_v6_lock);
 	sk_add_node(sk, list);
 	sock_prot_inc_use(sk->sk_prot);
- 	sock_hold(sk);
  	write_unlock_bh(&raw_v6_lock);
 }
 
 static void raw_v6_unhash(struct sock *sk)
 {
  	write_lock_bh(&raw_v6_lock);
-	if (sk_del_node_init(sk)) {
+	if (sk_del_node_init(sk))
 		sock_prot_dec_use(sk->sk_prot);
-		__sock_put(sk);
-	}
 	write_unlock_bh(&raw_v6_lock);
 }
 

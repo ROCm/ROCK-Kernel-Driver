@@ -35,7 +35,6 @@ void llc_sap_assign_sock(struct llc_sap *sap, struct sock *sk)
 	write_lock_bh(&sap->sk_list.lock);
 	llc_sk(sk)->sap = sap;
 	sk_add_node(sk, &sap->sk_list.list);
-	sock_hold(sk);
 	write_unlock_bh(&sap->sk_list.lock);
 }
 
@@ -50,8 +49,7 @@ void llc_sap_assign_sock(struct llc_sap *sap, struct sock *sk)
 void llc_sap_unassign_sock(struct llc_sap *sap, struct sock *sk)
 {
 	write_lock_bh(&sap->sk_list.lock);
-	if (sk_del_node_init(sk))
-		sock_put(sk);
+	sk_del_node_init(sk);
 	write_unlock_bh(&sap->sk_list.lock);
 }
 
