@@ -272,7 +272,7 @@ void __init paging_init(void)
 /* [numa=off] */
 __init int numa_setup(char *opt) 
 { 
-	if (!strcmp(opt,"off"))
+	if (!strncmp(opt,"off",3))
 		numa_off = 1;
 #ifdef CONFIG_NUMA_EMU
 	if(!strncmp(opt, "fake=", 5)) {
