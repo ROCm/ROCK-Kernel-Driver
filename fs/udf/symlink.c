@@ -15,7 +15,7 @@
  *		ftp://prep.ai.mit.edu/pub/gnu/GPL
  *	Each contributing author retains all rights to their own work.
  *
- *  (C) 1998-2000 Ben Fennema
+ *  (C) 1998-2001 Ben Fennema
  *  (C) 1999 Stelias Computing Inc 
  *
  * HISTORY
@@ -39,13 +39,13 @@
 
 static void udf_pc_to_char(char *from, int fromlen, char *to)
 {
-	struct PathComponent *pc;
+	struct pathComponent *pc;
 	int elen = 0;
 	char *p = to;
 
 	while (elen < fromlen)
 	{
-		pc = (struct PathComponent *)(from + elen);
+		pc = (struct pathComponent *)(from + elen);
 		switch (pc->componentType)
 		{
 			case 1:
@@ -69,7 +69,7 @@ static void udf_pc_to_char(char *from, int fromlen, char *to)
 				p += pc->lengthComponentIdent;
 				*p++ = '/';
 		}
-		elen += sizeof(struct PathComponent) + pc->lengthComponentIdent;
+		elen += sizeof(struct pathComponent) + pc->lengthComponentIdent;
 	}
 	if (p > to+1)
 		p[-1] = '\0';
@@ -86,7 +86,7 @@ static int udf_symlink_filler(struct file *file, struct page *page)
 	char *p = kmap(page);
 	
 	lock_kernel();
-	if (UDF_I_ALLOCTYPE(inode) == ICB_FLAG_AD_IN_ICB)
+	if (UDF_I_ALLOCTYPE(inode) == ICBTAG_FLAG_AD_IN_ICB)
 	{
 		bh = udf_tread(inode->i_sb, inode->i_ino);
 

@@ -16,7 +16,7 @@
  *  Each contributing author retains all rights to their own work.
  *
  *  (C) 1998-1999 Dave Boynton
- *  (C) 1998-2000 Ben Fennema
+ *  (C) 1998-2001 Ben Fennema
  *  (C) 1999-2000 Stelias Computing Inc
  *
  * HISTORY
@@ -25,7 +25,7 @@
  *  10/07/98      Switched to using generic_readpage, etc., like isofs
  *                And it works!
  *  12/06/98 blf  Added udf_file_read. uses generic_file_read for all cases but
- *                ICB_FLAG_AD_IN_ICB.
+ *                ICBTAG_FLAG_AD_IN_ICB.
  *  04/06/99      64 bit file handling on 32 bit systems taken from ext2 file.c
  *  05/12/99      Preliminary file write support
  */
@@ -157,7 +157,7 @@ static ssize_t udf_file_write(struct file * file, const char * buf,
 	struct inode *inode = file->f_dentry->d_inode;
 	int err, pos;
 
-	if (UDF_I_ALLOCTYPE(inode) == ICB_FLAG_AD_IN_ICB)
+	if (UDF_I_ALLOCTYPE(inode) == ICBTAG_FLAG_AD_IN_ICB)
 	{
 		if (file->f_flags & O_APPEND)
 			pos = inode->i_size;
@@ -168,7 +168,7 @@ static ssize_t udf_file_write(struct file * file, const char * buf,
 			pos + count))
 		{
 			udf_expand_file_adinicb(inode, pos + count, &err);
-			if (UDF_I_ALLOCTYPE(inode) == ICB_FLAG_AD_IN_ICB)
+			if (UDF_I_ALLOCTYPE(inode) == ICBTAG_FLAG_AD_IN_ICB)
 			{
 				udf_debug("udf_expand_adinicb: err=%d\n", err);
 				return err;
@@ -233,7 +233,7 @@ int udf_ioctl(struct inode *inode, struct file *filp, unsigned int cmd,
 	int result = -EINVAL;
 	struct buffer_head *bh = NULL;
 	long_ad eaicb;
-	Uint8 *ea = NULL;
+	uint8_t *ea = NULL;
 
 	if ( permission(inode, MAY_READ) != 0 )
 	{
@@ -280,18 +280,18 @@ int udf_ioctl(struct inode *inode, struct file *filp, unsigned int cmd,
 
 	if (UDF_I_EXTENDED_FE(inode) == 0)
 	{
-		struct FileEntry *fe;
+		struct fileEntry *fe;
 
-		fe = (struct FileEntry *)bh->b_data;
+		fe = (struct fileEntry *)bh->b_data;
 		eaicb = lela_to_cpu(fe->extendedAttrICB);
 		if (UDF_I_LENEATTR(inode))
 			ea = fe->extendedAttr;
 	}
 	else
 	{
-		struct ExtendedFileEntry *efe;
+		struct extendedFileEntry *efe;
 
-		efe = (struct ExtendedFileEntry *)bh->b_data;
+		efe = (struct extendedFileEntry *)bh->b_data;
 		eaicb = lela_to_cpu(efe->extendedAttrICB);
 		if (UDF_I_LENEATTR(inode))
 			ea = efe->extendedAttr;
