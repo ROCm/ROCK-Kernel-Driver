@@ -1678,6 +1678,7 @@ struct ioc_iommu {
 
 static struct ioc_iommu ioc_iommu_info[] __initdata = {
 	{ ZX1_IOC_ID, "zx1", ioc_zx1_init },
+	{ SX1000_IOC_ID, "sx1000", NULL },
 };
 
 static struct ioc * __init
