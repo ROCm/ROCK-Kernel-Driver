@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: super.c,v 1.71 2002/07/23 12:57:38 dwmw2 Exp $
+ * $Id: super.c,v 1.72 2002/07/23 14:39:54 dwmw2 Exp $
  *
  */
 
@@ -77,11 +77,11 @@ static int jffs2_sb_compare(struct super_block *sb, void *data)
 	/* The superblocks are considered to be equivalent if the underlying MTD
 	   device is the same one */
 	if (c->mtd == p->mtd) {
-		D1(printk(KERN_DEBUG "jffs2_sb_compare: match on device %d (\"%s\")\n", mtd->index, mtd->name));
+		D1(printk(KERN_DEBUG "jffs2_sb_compare: match on device %d (\"%s\")\n", p->mtd->index, p->mtd->name));
 		return 1;
 	} else {
 		D1(printk(KERN_DEBUG "jffs2_sb_compare: No match, device %d (\"%s\"), device %d (\"%s\")\n",
-			  c->mtd->index, c->mtd->name, mtd->index, mtd->name));
+			  c->mtd->index, c->mtd->name, p->mtd->index, p->mtd->name));
 		return 0;
 	}
 }

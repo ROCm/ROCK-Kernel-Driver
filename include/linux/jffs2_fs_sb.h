@@ -1,10 +1,11 @@
-/* $Id: jffs2_fs_sb.h,v 1.31 2002/07/02 22:48:24 dwmw2 Exp $ */
+/* $Id: jffs2_fs_sb.h,v 1.32 2002/07/23 14:35:34 dwmw2 Exp $ */
 
 #ifndef _JFFS2_FS_SB
 #define _JFFS2_FS_SB
 
 #include <linux/types.h>
 #include <linux/spinlock.h>
+#include <linux/tqueue.h>
 #include <linux/completion.h>
 #include <asm/semaphore.h>
 #include <linux/list.h>
