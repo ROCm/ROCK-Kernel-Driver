@@ -148,8 +148,10 @@ static int driver_attach(struct device_driver * drv)
 	list_for_each(entry,&bus->devices) {
 		struct device * dev = container_of(entry,struct device,bus_list);
 		if (get_device(dev)) {
-			if (!bus_match(dev,drv) && dev->driver)
-				devclass_add_device(dev);
+			if (!dev->driver) {
+				if (!bus_match(dev,drv) && dev->driver)
+					devclass_add_device(dev);
+			}
 			put_device(dev);
 		}
 	}
