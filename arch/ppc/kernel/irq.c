@@ -210,7 +210,8 @@ void free_irq(unsigned int irq, void* dev_id)
 	return;
 }
 
-int request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *),
+int request_irq(unsigned int irq,
+	irqreturn_t (*handler)(int, void *, struct pt_regs *),
 	unsigned long irqflags, const char * devname, void *dev_id)
 {
 	struct irqaction *action;
@@ -218,16 +219,9 @@ int request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *)
 
 	if (irq >= NR_IRQS)
 		return -EINVAL;
-	if (!handler)
-	{
-		/*
-		 * free_irq() used to be implemented as a call to
-		 * request_irq() with handler being NULL.  Now we have
-		 * a real free_irq() but need to allow the old behavior
-		 * for old code that hasn't caught up yet.
-		 *  -- Cort <cort@fsmlabs.com>
-		 */
-		free_irq(irq, dev_id);
+	if (!handler) {
+		printk(KERN_ERR "request_irq called with NULL handler!\n");
+		dump_stack();
 		return 0;
 	}
 	
@@ -246,8 +240,7 @@ int request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *)
 	action->next = NULL;
 	
 	retval = setup_irq(irq, action);
-	if (retval)
-	{
+	if (retval) {
 		kfree(action);
 		return retval;
 	}
@@ -732,6 +725,7 @@ void init_irq_proc (void)
 	}
 }
 
-void no_action(int irq, void *dev, struct pt_regs *regs)
+irqreturn_t no_action(int irq, void *dev, struct pt_regs *regs)
 {
+	return IRQ_NONE;
 }
