@@ -584,10 +584,9 @@ io_init_node(cnodeid_t cnodeid)
 
 	} else {
 		void	*bridge;
-		extern uint64_t pcireg_control_get(void *);
 
 		bridge = (void *)NODE_SWIN_BASE(COMPACT_TO_NASID_NODEID(cnodeid), 0);
-		npdap->basew_id = pcireg_control_get(bridge) & WIDGET_WIDGET_ID;
+		npdap->basew_id = pcireg_bridge_control_get(bridge) & WIDGET_WIDGET_ID;
 
 		printk(" ****io_init_node: Unknown Widget Part Number 0x%x Widget ID 0x%x attached to Hubv 0x%p ****\n", widget_partnum, npdap->basew_id, (void *)hubv);
 		return;

@@ -918,6 +918,10 @@ typedef volatile struct bridge_s {
 #define PCIBR_TYPE0_CFG_DEV(ps, s) PCIBRIDGE_TYPE0_CFG_DEV((ps)->bs_busnum, s+1)
 #define PCIBR_BUS_TYPE0_CFG_DEVF(ps,s,f) PCIBRIDGE_TYPE0_CFG_DEVF((ps)->bs_busnum,(s+1),f)
 
+/* NOTE: 's' is the internal device number, not the external slot number */
+#define PCIBR_BUS_TYPE0_CFG_DEV(ps, s) \
+		PCIBRIDGE_TYPE0_CFG_DEV((ps)->bs_busnum, s+1)
+
 #endif				/* LANGUAGE_C */
 
 #define BRIDGE_EXTERNAL_FLASH	0x00C00000	/* External Flash PROMS */
@@ -943,10 +947,6 @@ typedef volatile struct bridge_s {
 #define XBRIDGE_REV_B			0x2
 
 /* macros to determine bridge type. 'wid' == widget identification */
-#define IS_BRIDGE(wid) (XWIDGET_PART_NUM(wid) == BRIDGE_WIDGET_PART_NUM && \
-			XWIDGET_MFG_NUM(wid) == BRIDGE_WIDGET_MFGR_NUM)
-#define IS_XBRIDGE(wid) (XWIDGET_PART_NUM(wid) == XBRIDGE_WIDGET_PART_NUM && \
-			XWIDGET_MFG_NUM(wid) == XBRIDGE_WIDGET_MFGR_NUM)
 #define IS_PIC_BUS0(wid) (XWIDGET_PART_NUM(wid) == PIC_WIDGET_PART_NUM_BUS0 && \
 			XWIDGET_MFG_NUM(wid) == PIC_WIDGET_MFGR_NUM)
 #define IS_PIC_BUS1(wid) (XWIDGET_PART_NUM(wid) == PIC_WIDGET_PART_NUM_BUS1 && \

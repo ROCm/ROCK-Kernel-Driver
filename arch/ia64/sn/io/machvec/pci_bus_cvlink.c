@@ -22,13 +22,18 @@ unsigned char num_bridges;
 static int done_probing;
 extern irqpda_t *irqpdaindr;
 
-static int pci_bus_map_create(vertex_hdl_t xtalk, char * io_moduleid);
+static int pci_bus_map_create(struct pcibr_list_s *softlistp, moduleid_t io_moduleid);
 vertex_hdl_t devfn_to_vertex(unsigned char busnum, unsigned int devfn);
 
 extern void register_pcibr_intr(int irq, pcibr_intr_t intr);
 
 void sn_dma_flush_init(unsigned long start, unsigned long end, int idx, int pin, int slot);
 extern int cbrick_type_get_nasid(nasid_t);
+extern void ioconfig_bus_new_entries(void);
+extern void ioconfig_get_busnum(char *, int *);
+extern int iomoduleid_get(nasid_t);
+extern int pcibr_widget_to_bus(vertex_hdl_t);
+extern int isIO9(int);
 
 #define IS_OPUS(nasid) (cbrick_type_get_nasid(nasid) == MODULE_OPUSBRICK)
 #define IS_ALTIX(nasid) (cbrick_type_get_nasid(nasid) == MODULE_CBRICK)
@@ -158,15 +163,14 @@ struct sn_flush_nasid_entry flush_nasid_list[MAX_NASIDS];
  * DMA writes.
  */
 void
-sn_dma_flush_init(unsigned long start, unsigned long end, int idx, int pin, int slot) {
+sn_dma_flush_init(unsigned long start, unsigned long end, int idx, int pin, int slot)
+{
 	nasid_t nasid; 
 	unsigned long dnasid;
 	int wid_num;
 	int bus;
 	struct sn_flush_device_list *p;
-	bridge_t *b;
-	bridgereg_t dev_sel;
-	extern int isIO9(int);
+	void *b;
 	int bwin;
 	int i;
 
@@ -243,7 +247,7 @@ sn_dma_flush_init(unsigned long start, unsigned long end, int idx, int pin, int 
 			break;
 		}
 	}
-	b = (bridge_t *)(NODE_SWIN_BASE(nasid, wid_num) | (bus << 23) );
+	b = (void *)(NODE_SWIN_BASE(nasid, wid_num) | (bus << 23) );
 
 	/* If it's IO9, then slot 2 maps to slot 7 and slot 6 maps to slot 8.
 	 * To see this is non-trivial.  By drawing pictures and reading manuals and talking
@@ -268,38 +272,30 @@ sn_dma_flush_init(unsigned long start, unsigned long end, int idx, int pin, int 
 				|| (IS_OPUS(nasid) && wid_num == 0xf) )
 				&& bus == 0) {
 		if (slot == 2) {
-			p->force_int_addr = (unsigned long)&b->b_force_always[6].intr;
-			dev_sel = b->b_int_device;
-			dev_sel |= (1<<18);
-			b->b_int_device = dev_sel;
+			p->force_int_addr = (unsigned long)pcireg_bridge_force_always_addr_get(b, 6);
+			pcireg_bridge_intr_device_bit_set(b, (1<<18));
 			dnasid = NASID_GET(virt_to_phys(&p->flush_addr));
-			b->p_int_addr_64[6] = (virt_to_phys(&p->flush_addr) & 0xfffffffff) | 
-				(dnasid << 36) | (0xfUL << 48);
+			pcireg_bridge_intr_addr_set(b, 6, ((virt_to_phys(&p->flush_addr) & 0xfffffffff) |
+						    (dnasid << 36) | (0xfUL << 48)));
 		} else  if (slot == 3) { /* 12160 SCSI device in IO9 */
-			p->force_int_addr = (unsigned long)&b->b_force_always[4].intr;
-			dev_sel = b->b_int_device;
-			dev_sel |= (2<<12);
-			b->b_int_device = dev_sel;
+			p->force_int_addr = (unsigned long)pcireg_bridge_force_always_addr_get(b, 4);
+			pcireg_bridge_intr_device_bit_set(b, (2<<12));
 			dnasid = NASID_GET(virt_to_phys(&p->flush_addr));
-			b->p_int_addr_64[4] = (virt_to_phys(&p->flush_addr) & 0xfffffffff) | 
-				(dnasid << 36) | (0xfUL << 48);
+			pcireg_bridge_intr_addr_set(b, 4, ((virt_to_phys(&p->flush_addr) & 0xfffffffff) |
+						    (dnasid << 36) | (0xfUL << 48)));
 		} else { /* slot == 6 */
-			p->force_int_addr = (unsigned long)&b->b_force_always[7].intr;
-			dev_sel = b->b_int_device;
-			dev_sel |= (5<<21);
-			b->b_int_device = dev_sel;
+			p->force_int_addr = (unsigned long)pcireg_bridge_force_always_addr_get(b, 7);
+			pcireg_bridge_intr_device_bit_set(b, (5<<21));
 			dnasid = NASID_GET(virt_to_phys(&p->flush_addr));
-			b->p_int_addr_64[7] = (virt_to_phys(&p->flush_addr) & 0xfffffffff) | 
-				(dnasid << 36) | (0xfUL << 48);
+			pcireg_bridge_intr_addr_set(b, 7, ((virt_to_phys(&p->flush_addr) & 0xfffffffff) |
+						    (dnasid << 36) | (0xfUL << 48)));
 		}
 	} else {
-		p->force_int_addr = (unsigned long)&b->b_force_always[pin + 2].intr;
-		dev_sel = b->b_int_device;
-		dev_sel |= ((slot - 1) << ( pin * 3) );
-		b->b_int_device = dev_sel;
+		p->force_int_addr = (unsigned long)pcireg_bridge_force_always_addr_get(b, (pin +2));
+		pcireg_bridge_intr_device_bit_set(b, ((slot - 1) << ( pin * 3)));
 		dnasid = NASID_GET(virt_to_phys(&p->flush_addr));
-		b->p_int_addr_64[pin + 2] = (virt_to_phys(&p->flush_addr) & 0xfffffffff) | 
-			(dnasid << 36) | (0xfUL << 48);
+		pcireg_bridge_intr_addr_set(b, (pin + 2), ((virt_to_phys(&p->flush_addr) & 0xfffffffff) |
+						    (dnasid << 36) | (0xfUL << 48)));
 	}
 }
 
@@ -400,7 +396,6 @@ sn_pci_fixup(int arg)
 		}
 
 		device_sysdata->vhdl = devfn_to_vertex(device_dev->bus->number, device_dev->devfn);
-		device_sysdata->isa64 = 0;
 		device_dev->sysdata = (void *) device_sysdata;
 		set_pci_provider(device_sysdata);
 
@@ -548,238 +543,132 @@ linux_bus_cvlink(void)
  * pci_bus_map_create() - Called by pci_bus_to_hcl_cvlink() to finish the job.
  *
  *	Linux PCI Bus numbers are assigned from lowest module_id numbers
- *	(rack/slot etc.) starting from HUB_WIDGET_ID_MAX down to 
- *	HUB_WIDGET_ID_MIN:
- *		widgetnum 15 gets lower Bus Number than widgetnum 14 etc.
- *
- *	Given 2 modules 001c01 and 001c02 we get the following mappings:
- *		001c01, widgetnum 15 = Bus number 0
- *		001c01, widgetnum 14 = Bus number 1
- *		001c02, widgetnum 15 = Bus number 3
- *		001c02, widgetnum 14 = Bus number 4
- *		etc.
- *
- * The rational for starting Bus Number 0 with Widget number 15 is because 
- * the system boot disks are always connected via Widget 15 Slot 0 of the 
- * I-brick.  Linux creates /dev/sd* devices(naming) strating from Bus Number 0 
- * Therefore, /dev/sda1 will be the first disk, on Widget 15 of the lowest 
- * module id(Master Cnode) of the system.
- *	
+ *	(rack/slot etc.)
  */
 static int 
-pci_bus_map_create(vertex_hdl_t xtalk, char * io_moduleid)
+pci_bus_map_create(struct pcibr_list_s *softlistp, moduleid_t moduleid)
 {
+	
+	int basebus_num, bus_number;
+	vertex_hdl_t pci_bus = softlistp->bl_vhdl;
+	char moduleid_str[16];
 
-	vertex_hdl_t master_node_vertex = NULL;
-	vertex_hdl_t xwidget = NULL;
-	vertex_hdl_t pci_bus = NULL;
-	hubinfo_t hubinfo = NULL;
-	xwidgetnum_t widgetnum;
-	char pathname[128];
-	graph_error_t rv;
-	int bus;
-	int basebus_num;
-	extern void ioconfig_get_busnum(char *, int *);
-
-	int bus_number;
+	memset(moduleid_str, 0, 16);
+	format_module_id(moduleid_str, moduleid, MODULE_FORMAT_BRIEF);
+        (void) ioconfig_get_busnum((char *)moduleid_str, &basebus_num);
 
 	/*
-	 * Loop throught this vertex and get the Xwidgets ..
+	 * Assign the correct bus number and also the nasid of this 
+	 * pci Xwidget.
 	 */
-
-
-	/* PCI devices */
-
-	for (widgetnum = HUB_WIDGET_ID_MAX; widgetnum >= HUB_WIDGET_ID_MIN; widgetnum--) {
-		sprintf(pathname, "%d", widgetnum);
-		xwidget = NULL;
-		
-		/*
-		 * Example - /hw/module/001c16/Pbrick/xtalk/8 is the xwidget
-		 *	     /hw/module/001c16/Pbrick/xtalk/8/pci/1 is device
-		 */
-		rv = hwgraph_traverse(xtalk, pathname, &xwidget);
-		if ( (rv != GRAPH_SUCCESS) ) {
-			if (!xwidget) {
-				continue;
-			}
-		}
-
-		sprintf(pathname, "%d/"EDGE_LBL_PCI, widgetnum);
-		pci_bus = NULL;
-		if (hwgraph_traverse(xtalk, pathname, &pci_bus) != GRAPH_SUCCESS)
-			if (!pci_bus) {
-				continue;
-}
-
-		/*
-		 * Assign the correct bus number and also the nasid of this 
-		 * pci Xwidget.
-		 * 
-		 * Should not be any race here ...
-		 */
-		num_bridges++;
-		busnum_to_pcibr_vhdl[num_bridges - 1] = pci_bus;
-
-		/*
-		 * Get the master node and from there get the NASID.
-		 */
-		master_node_vertex = device_master_get(xwidget);
-		if (!master_node_vertex) {
-			printk("WARNING: pci_bus_map_create: Unable to get .master for vertex 0x%p\n", (void *)xwidget);
-		}
-	
-		hubinfo_get(master_node_vertex, &hubinfo);
-		if (!hubinfo) {
-			printk("WARNING: pci_bus_map_create: Unable to get hubinfo for master node vertex 0x%p\n", (void *)master_node_vertex);
-			return(1);
-		} else {
-			busnum_to_nid[num_bridges - 1] = hubinfo->h_nasid;
-		}
-
-		/*
-		 * Pre assign DMA maps needed for 32 Bits Page Map DMA.
-		 */
-		busnum_to_atedmamaps[num_bridges - 1] = (void *) kmalloc(
-			sizeof(struct pcibr_dmamap_s) * MAX_ATE_MAPS, GFP_KERNEL);
-		if (!busnum_to_atedmamaps[num_bridges - 1])
-			printk("WARNING: pci_bus_map_create: Unable to precreate ATE DMA Maps for busnum %d vertex 0x%p\n", num_bridges - 1, (void *)xwidget);
-
-		memset(busnum_to_atedmamaps[num_bridges - 1], 0x0, 
-			sizeof(struct pcibr_dmamap_s) * MAX_ATE_MAPS);
-
-	}
-
-	/*
-	 * PCIX devices
-	 * We number busses differently for PCI-X devices.
-	 * We start from Lowest Widget on up ..
-	 */
-
-        (void) ioconfig_get_busnum((char *)io_moduleid, &basebus_num);
-
-	for (widgetnum = HUB_WIDGET_ID_MIN; widgetnum <= HUB_WIDGET_ID_MAX; widgetnum++) {
-
-		/* Do both buses */
-		for ( bus = 0; bus < 2; bus++ ) {
-			sprintf(pathname, "%d", widgetnum);
-			xwidget = NULL;
-			
-			/*
-			 * Example - /hw/module/001c16/Pbrick/xtalk/8 is the xwidget
-			 *	     /hw/module/001c16/Pbrick/xtalk/8/pci-x/0 is the bus
-			 *	     /hw/module/001c16/Pbrick/xtalk/8/pci-x/0/1 is device
-			 */
-			rv = hwgraph_traverse(xtalk, pathname, &xwidget);
-			if ( (rv != GRAPH_SUCCESS) ) {
-				if (!xwidget) {
-					continue;
-				}
-			}
-	
-			if ( bus == 0 )
-				sprintf(pathname, "%d/"EDGE_LBL_PCIX_0, widgetnum);
-			else
-				sprintf(pathname, "%d/"EDGE_LBL_PCIX_1, widgetnum);
-			pci_bus = NULL;
-			if (hwgraph_traverse(xtalk, pathname, &pci_bus) != GRAPH_SUCCESS)
-				if (!pci_bus) {
-					continue;
-				}
-	
-			/*
-			 * Assign the correct bus number and also the nasid of this 
-			 * pci Xwidget.
-			 * 
-			 * Should not be any race here ...
-			 */
-			bus_number = basebus_num + bus + io_brick_map_widget(MODULE_PXBRICK, widgetnum);
+	bus_number = basebus_num + pcibr_widget_to_bus(pci_bus);
 #ifdef DEBUG
-			printk("bus_number %d basebus_num %d bus %d io %d\n", 
-				bus_number, basebus_num, bus, 
-				io_brick_map_widget(MODULE_PXBRICK, widgetnum));
-#endif
-			busnum_to_pcibr_vhdl[bus_number] = pci_bus;
-	
-			/*
-			 * Pre assign DMA maps needed for 32 Bits Page Map DMA.
-			 */
-			busnum_to_atedmamaps[bus_number] = (void *) kmalloc(
-				sizeof(struct pcibr_dmamap_s) * MAX_ATE_MAPS, GFP_KERNEL);
-			if (!busnum_to_atedmamaps[bus_number])
-				printk("WARNING: pci_bus_map_create: Unable to precreate ATE DMA Maps for busnum %d vertex 0x%p\n", num_bridges - 1, (void *)xwidget);
-	
-			memset(busnum_to_atedmamaps[bus_number], 0x0, 
-				sizeof(struct pcibr_dmamap_s) * MAX_ATE_MAPS);
-		}
-	}
+	{
+	char hwpath[MAXDEVNAME] = "\0";
+	extern int hwgraph_vertex_name_get(vertex_hdl_t, char *, uint);
 
-        return(0);
+	pcibr_soft_t pcibr_soft = softlistp->bl_soft;
+	hwgraph_vertex_name_get(pci_bus, hwpath, MAXDEVNAME);
+	printk("%s:\n\tbus_num %d, basebus_num %d, brick_bus %d, "
+		"bus_vhdl 0x%lx, brick_type %d\n", hwpath, bus_number,
+		basebus_num, pcibr_widget_to_bus(pci_bus),
+		(uint64_t)pci_bus, pcibr_soft->bs_bricktype);
+	}
+#endif
+	busnum_to_pcibr_vhdl[bus_number] = pci_bus;
+
+	/*
+	 * Pre assign DMA maps needed for 32 Bits Page Map DMA.
+	 */
+	busnum_to_atedmamaps[bus_number] = (void *) vmalloc(
+			sizeof(struct pcibr_dmamap_s)*MAX_ATE_MAPS);
+	if (busnum_to_atedmamaps[bus_number] <= 0) {
+		printk("pci_bus_map_create: Cannot allocate memory for ate maps\n");
+		return -1;
+	}
+	memset(busnum_to_atedmamaps[bus_number], 0x0, 
+			sizeof(struct pcibr_dmamap_s) * MAX_ATE_MAPS);
+	return(0);
 }
 
 /*
- * pci_bus_to_hcl_cvlink() - This routine is called after SGI IO Infrastructure   
- *      initialization has completed to set up the mappings between Xbridge
- *      and logical pci bus numbers.  We also set up the NASID for each of these
- *      xbridges.
+ * pci_bus_to_hcl_cvlink() - This routine is called after SGI IO Infrastructure 
+ *      initialization has completed to set up the mappings between PCI BRIDGE
+ *      ASIC and logical pci bus numbers. 
  *
  *      Must be called before pci_init() is invoked.
  */
 int
 pci_bus_to_hcl_cvlink(void) 
 {
+	int i;
+	extern pcibr_list_p pcibr_list;
 
-	vertex_hdl_t devfs_hdl = NULL;
-	vertex_hdl_t xtalk = NULL;
-	int rv = 0;
-	char name[256];
-	char tmp_name[256];
-	int i, ii, j;
-	char *brick_name;
-	extern void ioconfig_bus_new_entries(void);
-
-	/*
-	 * Figure out which IO Brick is connected to the Compute Bricks.
-	 */
 	for (i = 0; i < nummodules; i++) {
-		extern int iomoduleid_get(nasid_t);
-		moduleid_t iobrick_id;
-		nasid_t nasid = -1;
-		int nodecnt;
-		int n = 0;
+		struct pcibr_list_s *softlistp = pcibr_list;
+		struct pcibr_list_s *first_in_list = NULL;
+		struct pcibr_list_s *last_in_list = NULL;
 
-		nodecnt = modules[i]->nodecnt;
-		for ( n = 0; n < nodecnt; n++ ) {
-			nasid = cnodeid_to_nasid(modules[i]->nodes[n]);
-			iobrick_id = iomoduleid_get(nasid);
-			if ((int)iobrick_id > 0) { /* Valid module id */
-				char name[12];
-				memset(name, 0, 12);
-				format_module_id((char *)&(modules[i]->io[n].moduleid), iobrick_id, MODULE_FORMAT_BRIEF);
+		/* Walk the list of pcibr_soft structs looking for matches */
+		while (softlistp) {
+			struct pcibr_soft_s *pcibr_soft = softlistp->bl_soft;
+			moduleid_t moduleid;
+			
+			/* Is this PCI bus associated with this moduleid? */
+			moduleid = NODE_MODULEID(
+			    NASID_TO_COMPACT_NODEID(pcibr_soft->bs_nasid));
+			if (modules[i]->id == moduleid) {
+				struct pcibr_list_s *new_element;
+
+				new_element = kmalloc(sizeof (struct pcibr_soft_s), GFP_KERNEL);
+				if (new_element == NULL) {
+					printk("%s: Couldn't allocate memory\n",__FUNCTION__);
+					return -ENOMEM;
+				}
+				new_element->bl_soft = softlistp->bl_soft;
+				new_element->bl_vhdl = softlistp->bl_vhdl;
+				new_element->bl_next = NULL;
+
+				/* list empty so just put it on the list */
+				if (first_in_list == NULL) {
+					first_in_list = new_element;
+					last_in_list = new_element;
+					softlistp = softlistp->bl_next;
+					continue;
+				}
+
+				/* 
+ 				 * BASEIO IObricks attached to a module have 
+				 * a higher priority than non BASEIO IOBricks 
+				 * when it comes to persistant pci bus
+				 * numbering, so put them on the front of the
+				 * list.
+				 */
+				if (isIO9(pcibr_soft->bs_nasid)) {
+					new_element->bl_next = first_in_list;
+					first_in_list = new_element;
+				} else {
+					last_in_list->bl_next = new_element;
+					last_in_list = new_element;
+				}
 			}
+			softlistp = softlistp->bl_next;
 		}
-	}
 				
-	devfs_hdl = hwgraph_path_to_vertex("hw/module");
-	for (i = 0; i < nummodules ; i++) {
-	    for ( j = 0; j < 2; j++ ) {
-		if ( j == 0 )
-			brick_name = EDGE_LBL_PXBRICK;
-		else
-			brick_name = EDGE_LBL_IXBRICK;
-
-		for ( ii = 0; ii < 2 ; ii++ ) {
-			memset(name, 0, 256);
-			memset(tmp_name, 0, 256);
-			format_module_id(name, modules[i]->id, MODULE_FORMAT_BRIEF);
-			sprintf(tmp_name, "/slab/%d/%s/xtalk", geo_slab(modules[i]->geoid[ii]), brick_name);
-			strcat(name, tmp_name);
-			xtalk = NULL;
-			rv = hwgraph_edge_get(devfs_hdl, name, &xtalk);
-			if ( rv == 0 ) 
-				pci_bus_map_create(xtalk, (char *)&(modules[i]->io[ii].moduleid));
+		/* 
+		 * We now have a list of all the pci bridges associated with
+		 * the module_id, modules[i].  Call pci_bus_map_create() for
+		 * each pci bridge
+		 */
+		softlistp = first_in_list;
+		while (softlistp) {
+			moduleid_t iobrick;
+			struct pcibr_list_s *next = softlistp->bl_next;
+			iobrick = iomoduleid_get(softlistp->bl_soft->bs_nasid);
+			pci_bus_map_create(softlistp, iobrick);
+			kfree(softlistp);
+			softlistp = next;
 		}
-	    }
 	}
 
 	/*

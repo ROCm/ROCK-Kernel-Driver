@@ -14,23 +14,19 @@
 #include <asm/sn/pci/pcibr_private.h>
 #include <asm/sn/pci/pci_defs.h>
 
-void              do_pcibr_rrb_clear(bridge_t *, int);
-void              do_pcibr_rrb_flush(bridge_t *, int);
-int               do_pcibr_rrb_count_valid(bridge_t *, pciio_slot_t, int);
-int               do_pcibr_rrb_count_avail(bridge_t *, pciio_slot_t);
-int               do_pcibr_rrb_alloc(bridge_t *, pciio_slot_t, int, int);
-int               do_pcibr_rrb_free(bridge_t *, pciio_slot_t, int, int);
-void		  do_pcibr_rrb_free_all(pcibr_soft_t, bridge_t *, pciio_slot_t);
+void		pcibr_rrb_alloc_init(pcibr_soft_t, int, int, int);
+void		pcibr_rrb_alloc_more(pcibr_soft_t, int, int, int);
 
-void              do_pcibr_rrb_autoalloc(pcibr_soft_t, int, int, int);
+int		pcibr_wrb_flush(vertex_hdl_t);
+int		pcibr_rrb_alloc(vertex_hdl_t, int *, int *);
+int		pcibr_rrb_check(vertex_hdl_t, int *, int *, int *, int *);
+int		pcibr_alloc_all_rrbs(vertex_hdl_t, int, int, int, int, 
+			     	     int, int, int, int, int);
+void		pcibr_rrb_flush(vertex_hdl_t);
+int		pcibr_slot_initial_rrb_alloc(vertex_hdl_t,pciio_slot_t);
 
-int		  pcibr_wrb_flush(vertex_hdl_t);
-int               pcibr_rrb_alloc(vertex_hdl_t, int *, int *);
-int               pcibr_rrb_check(vertex_hdl_t, int *, int *, int *, int *);
-void              pcibr_rrb_flush(vertex_hdl_t);
-int		  pcibr_slot_initial_rrb_alloc(vertex_hdl_t,pciio_slot_t);
+void            pcibr_rrb_debug(char *, pcibr_soft_t);
 
-void		  pcibr_rrb_debug(char *, pcibr_soft_t);
 
 /*
  * RRB Management
@@ -52,23 +48,27 @@ void		  pcibr_rrb_debug(char *, pcibr_soft_t);
 #define RRB_MASK (0xf)			/* mask a single rrb within reg */
 #define RRB_SIZE (4)			/* sizeof rrb within reg (bits) */
  
-#define RRB_ENABLE_BIT(bridge)		(0x8)  /* [BRIDGE | PIC]_RRB_EN */
-#define NUM_PDEV_BITS(bridge)		(1)
-#define NUM_VDEV_BITS(bridge)		(2)
-#define NUMBER_VCHANNELS(bridge)	(4)
-#define SLOT_2_PDEV(bridge, slot)	((slot) >> 1)
-#define SLOT_2_RRB_REG(bridge, slot)	((slot) & 0x1)
+#define RRB_ENABLE_BIT		      (0x8)  /* [BRIDGE | PIC]_RRB_EN */
+#define NUM_PDEV_BITS		      (1)
+#define NUMBER_VCHANNELS	      (4)
+#define SLOT_2_PDEV(slot)		((slot) >> 1)
+#define SLOT_2_RRB_REG(slot)  		((slot) & 0x1)
+
+#define RRB_VALID(rrb)		      (0x00010000 << (rrb))
+#define RRB_INUSE(rrb)		      (0x00000001 << (rrb))
+#define RRB_CLEAR(rrb)		      (0x00000001 << (rrb))
  
-/* validate that the slot and virtual channel are valid for a given bridge */
-#define VALIDATE_SLOT_n_VCHAN(bridge, s, v) \
-    (((((s) != PCIIO_SLOT_NONE) && ((s) <= (pciio_slot_t)3)) && (((v) >= 0) && ((v) <= 3))) ? 1 : 0)
+/* validate that the slot and virtual channel are valid */
+#define VALIDATE_SLOT_n_VCHAN(s, v) \
+    (((((s) != PCIIO_SLOT_NONE) && ((s) <= (pciio_slot_t)3)) && \
+      (((v) >= 0) && ((v) <= 3))) ? 1 : 0)
  
 /*  
  * Count how many RRBs are marked valid for the specified PCI slot
  * and virtual channel.	 Return the count.
  */ 
-int
-do_pcibr_rrb_count_valid(bridge_t *bridge,
+static int
+do_pcibr_rrb_count_valid(pcibr_soft_t pcibr_soft,
 			 pciio_slot_t slot,
 			 int vchan)
 {
@@ -76,18 +76,18 @@ do_pcibr_rrb_count_valid(bridge_t *bridge,
     uint16_t enable_bit, vchan_bits, pdev_bits, rrb_bits;
     int rrb_index, cnt=0;
 
-    if (!VALIDATE_SLOT_n_VCHAN(bridge, slot, vchan)) {
+    if (!VALIDATE_SLOT_n_VCHAN(slot, vchan)) {
 	printk(KERN_WARNING "do_pcibr_rrb_count_valid() invalid slot/vchan [%d/%d]\n", slot, vchan);
 	return 0;
     }
     
-    enable_bit = RRB_ENABLE_BIT(bridge);
-    vchan_bits = vchan << NUM_PDEV_BITS(bridge);
-    pdev_bits = SLOT_2_PDEV(bridge, slot);
+    enable_bit = RRB_ENABLE_BIT;
+    vchan_bits = vchan << NUM_PDEV_BITS;
+    pdev_bits = SLOT_2_PDEV(slot);
     rrb_bits = enable_bit | vchan_bits | pdev_bits;
     
-    tmp = bridge->b_rrb_map[SLOT_2_RRB_REG(bridge, slot)].reg;
-
+    tmp = pcireg_rrb_get(pcibr_soft, SLOT_2_RRB_REG(slot));
+    
     for (rrb_index = 0; rrb_index < 8; rrb_index++) {
 	if ((tmp & RRB_MASK) == rrb_bits)
 	    cnt++;
@@ -101,23 +101,23 @@ do_pcibr_rrb_count_valid(bridge_t *bridge,
  * Count how many RRBs are available to be allocated to the specified
  * slot.  Return the count.
  */ 
-int
-do_pcibr_rrb_count_avail(bridge_t *bridge,
+static int
+do_pcibr_rrb_count_avail(pcibr_soft_t pcibr_soft,
 			 pciio_slot_t slot)
 {
     uint64_t tmp;
     uint16_t enable_bit;
     int rrb_index, cnt=0;
     
-    if (!VALIDATE_SLOT_n_VCHAN(bridge, slot, 0)) {
+    if (!VALIDATE_SLOT_n_VCHAN(slot, 0)) {
 	printk(KERN_WARNING "do_pcibr_rrb_count_avail() invalid slot/vchan");
 	return 0;
     }
     
-    enable_bit = RRB_ENABLE_BIT(bridge);
-
-    tmp = bridge->b_rrb_map[SLOT_2_RRB_REG(bridge, slot)].reg;
-
+    enable_bit = RRB_ENABLE_BIT;
+    
+    tmp = pcireg_rrb_get(pcibr_soft, SLOT_2_RRB_REG(slot));
+    
     for (rrb_index = 0; rrb_index < 8; rrb_index++) {
 	if ((tmp & enable_bit) != enable_bit)
 	    cnt++;
@@ -135,8 +135,8 @@ do_pcibr_rrb_count_avail(bridge_t *bridge,
  * Note that if a request can be partially filled, it will be, even if
  * we return failure.
  */ 
-int
-do_pcibr_rrb_alloc(bridge_t *bridge,
+static int
+do_pcibr_rrb_alloc(pcibr_soft_t pcibr_soft,
 		   pciio_slot_t slot,
 		   int vchan,
 		   int more)
@@ -145,18 +145,18 @@ do_pcibr_rrb_alloc(bridge_t *bridge,
     uint16_t enable_bit, vchan_bits, pdev_bits, rrb_bits;
     int rrb_index;
     
-    if (!VALIDATE_SLOT_n_VCHAN(bridge, slot, vchan)) {
+    if (!VALIDATE_SLOT_n_VCHAN(slot, vchan)) {
 	printk(KERN_WARNING "do_pcibr_rrb_alloc() invalid slot/vchan");
 	return -1;
     }
     
-    enable_bit = RRB_ENABLE_BIT(bridge);
-    vchan_bits = vchan << NUM_PDEV_BITS(bridge);
-    pdev_bits = SLOT_2_PDEV(bridge, slot);
+    enable_bit = RRB_ENABLE_BIT;
+    vchan_bits = vchan << NUM_PDEV_BITS;
+    pdev_bits = SLOT_2_PDEV(slot);
     rrb_bits = enable_bit | vchan_bits | pdev_bits;
-
-    reg = tmp = bridge->b_rrb_map[SLOT_2_RRB_REG(bridge, slot)].reg;
-
+    
+    reg = tmp = pcireg_rrb_get(pcibr_soft, SLOT_2_RRB_REG(slot));
+    
     for (rrb_index = 0; ((rrb_index < 8) && (more > 0)); rrb_index++) {
 	if ((tmp & enable_bit) != enable_bit) {
 	    /* clear the rrb and OR in the new rrb into 'reg' */
@@ -166,11 +166,41 @@ do_pcibr_rrb_alloc(bridge_t *bridge,
 	}
 	tmp = (tmp >> RRB_SIZE);
     }
-
-    bridge->b_rrb_map[SLOT_2_RRB_REG(bridge, slot)].reg = reg;
+    
+    pcireg_rrb_set(pcibr_soft, SLOT_2_RRB_REG(slot), reg);
     return (more ? -1 : 0);
 }
  
+/*
+ * Wait for the the specified rrb to have no outstanding XIO pkts
+ * and for all data to be drained.  Mark the rrb as no longer being 
+ * valid.
+ */
+static void
+do_pcibr_rrb_clear(pcibr_soft_t pcibr_soft, int rrb)
+{
+    uint64_t             status;
+
+    /* bridge_lock must be held;  this RRB must be disabled. */
+
+    /* wait until RRB has no outstanduing XIO packets. */
+    status = pcireg_rrb_status_get(pcibr_soft);
+    while (status & RRB_INUSE(rrb)) {
+	status = pcireg_rrb_status_get(pcibr_soft);
+    }
+
+    /* if the RRB has data, drain it. */
+    if (status & RRB_VALID(rrb)) {
+	pcireg_rrb_clear_set(pcibr_soft, RRB_CLEAR(rrb));
+
+	/* wait until RRB is no longer valid. */
+	status = pcireg_rrb_status_get(pcibr_soft);
+	while (status & RRB_VALID(rrb)) {
+	    status = pcireg_rrb_status_get(pcibr_soft);
+	}
+    }
+}
+
  
 /*  
  * Release some of the RRBs that have been allocated for the specified
@@ -180,8 +210,8 @@ do_pcibr_rrb_alloc(bridge_t *bridge,
  * Note that if a request can be partially fulfilled, it will be, even
  * if we return failure.
  */ 
-int
-do_pcibr_rrb_free(bridge_t *bridge,
+static int
+do_pcibr_rrb_free(pcibr_soft_t pcibr_soft,
 		  pciio_slot_t slot,
 		  int vchan,
 		  int less)
@@ -190,18 +220,18 @@ do_pcibr_rrb_free(bridge_t *bridge,
     uint16_t enable_bit, vchan_bits, pdev_bits, rrb_bits;
     int rrb_index;
     
-    if (!VALIDATE_SLOT_n_VCHAN(bridge, slot, vchan)) {
+    if (!VALIDATE_SLOT_n_VCHAN(slot, vchan)) {
 	printk(KERN_WARNING "do_pcibr_rrb_free() invalid slot/vchan");
 	return -1;
     }
     
-    enable_bit = RRB_ENABLE_BIT(bridge);
-    vchan_bits = vchan << NUM_PDEV_BITS(bridge);
-    pdev_bits = SLOT_2_PDEV(bridge, slot);
+    enable_bit = RRB_ENABLE_BIT;
+    vchan_bits = vchan << NUM_PDEV_BITS;
+    pdev_bits = SLOT_2_PDEV(slot);
     rrb_bits = enable_bit | vchan_bits | pdev_bits;
-
-    reg = tmp = bridge->b_rrb_map[SLOT_2_RRB_REG(bridge, slot)].reg;
-
+    
+    reg = tmp = pcireg_rrb_get(pcibr_soft, SLOT_2_RRB_REG(slot));
+    
     for (rrb_index = 0; ((rrb_index < 8) && (less > 0)); rrb_index++) {
 	if ((tmp & RRB_MASK) == rrb_bits) {
 	   /*
@@ -210,132 +240,144 @@ do_pcibr_rrb_free(bridge_t *bridge,
 	    *	  reg = reg & ~(RRB_MASK << (RRB_SIZE * rrb_index));
 	    * But to be compatible with old code we'll only clear enable.
 	    */
-	    reg = reg & ~(RRB_ENABLE_BIT(bridge) << (RRB_SIZE * rrb_index));
+	    reg = reg & ~(RRB_ENABLE_BIT << (RRB_SIZE * rrb_index));
 	    clr = clr | (enable_bit << (RRB_SIZE * rrb_index));
 	    less--;
 	}
 	tmp = (tmp >> RRB_SIZE);
     }
-
-    bridge->b_rrb_map[SLOT_2_RRB_REG(bridge, slot)].reg = reg;
-
+    
+    pcireg_rrb_set(pcibr_soft, SLOT_2_RRB_REG(slot), reg);
+    
     /* call do_pcibr_rrb_clear() for all the rrbs we've freed */
     for (rrb_index = 0; rrb_index < 8; rrb_index++) {
-	int evn_odd = SLOT_2_RRB_REG(bridge, slot);
+	int evn_odd = SLOT_2_RRB_REG(slot);
 	if (clr & (enable_bit << (RRB_SIZE * rrb_index)))
-	    do_pcibr_rrb_clear(bridge, (2 * rrb_index) + evn_odd);
+	    do_pcibr_rrb_clear(pcibr_soft, (2 * rrb_index) + evn_odd);
     }
     
     return (less ? -1 : 0);
 }
  
-  
+/* 
+ * Flush the specified rrb by calling do_pcibr_rrb_clear().  This
+ * routine is just a wrapper to make sure the rrb is disabled 
+ * before calling do_pcibr_rrb_clear().
+ */
+static void
+do_pcibr_rrb_flush(pcibr_soft_t pcibr_soft, int rrbn)
+{
+    uint64_t	rrbv;
+    int		shft = (RRB_SIZE * (rrbn >> 1));
+    uint64_t	ebit = RRB_ENABLE_BIT << shft;
+
+    rrbv = pcireg_rrb_get(pcibr_soft, (rrbn & 1));
+    if (rrbv & ebit) {
+	pcireg_rrb_set(pcibr_soft, (rrbn & 1), (rrbv & ~ebit));
+    }
+
+    do_pcibr_rrb_clear(pcibr_soft, rrbn);
+
+    if (rrbv & ebit) {
+	pcireg_rrb_set(pcibr_soft, (rrbn & 1), rrbv);
+    }
+}
+
 /*  
  * free all the rrbs (both the normal and virtual channels) for the
  * specified slot.
  */ 
 void
 do_pcibr_rrb_free_all(pcibr_soft_t pcibr_soft,
-		      bridge_t *bridge,
 		      pciio_slot_t slot)
 {
     int vchan;
-    int vchan_total = NUMBER_VCHANNELS(bridge);
+    int vchan_total = NUMBER_VCHANNELS;
     
     /* pretend we own all 8 rrbs and just ignore the return value */
     for (vchan = 0; vchan < vchan_total; vchan++) {
-	    (void)do_pcibr_rrb_free(bridge, slot, vchan, 8);
+	    do_pcibr_rrb_free(pcibr_soft, slot, vchan, 8);
 	    pcibr_soft->bs_rrb_valid[slot][vchan] = 0;
     }
 }
- 
- 
+
+
 /*
- * Wait for the the specified rrb to have no outstanding XIO pkts
- * and for all data to be drained.  Mark the rrb as no longer being 
- * valid.
+ * Initialize a slot with a given number of RRBs.  (this routine
+ * will also give back RRBs if the slot has more than we want).
  */
 void
-do_pcibr_rrb_clear(bridge_t *bridge, int rrb)
+pcibr_rrb_alloc_init(pcibr_soft_t pcibr_soft,
+		     int slot,
+		     int vchan,
+		     int init_rrbs)
 {
-    uint64_t             status;
+    int			 had = pcibr_soft->bs_rrb_valid[slot][vchan];
+    int			 have = had;
+    int			 added = 0;
 
-    /* bridge_lock must be held;
-     * this RRB must be disabled.
-     */
-
-    /* wait until RRB has no outstanduing XIO packets. */
-    while ((status = bridge->b_resp_status) & BRIDGE_RRB_INUSE(rrb)) {
-	;				/* XXX- beats on bridge. bad idea? */
-    }
-
-    /* if the RRB has data, drain it. */
-    if (status & BRIDGE_RRB_VALID(rrb)) {
-	bridge->b_resp_clear = BRIDGE_RRB_CLEAR(rrb);
-
-	/* wait until RRB is no longer valid. */
-	while ((status = bridge->b_resp_status) & BRIDGE_RRB_VALID(rrb)) {
-		;				/* XXX- beats on bridge. bad idea? */
-	}
-    }
-}
-
-
-/* 
- * Flush the specified rrb by calling do_pcibr_rrb_clear().  This
- * routine is just a wrapper to make sure the rrb is disabled 
- * before calling do_pcibr_rrb_clear().
- */
-void
-do_pcibr_rrb_flush(bridge_t *bridge, int rrbn)
-{
-    reg_p	 rrbp = &bridge->b_rrb_map[rrbn & 1].reg;
-    bridgereg_t	 rrbv;
-    int		 shft = (RRB_SIZE * (rrbn >> 1));
-    unsigned long	 ebit = RRB_ENABLE_BIT(bridge) << shft;
-
-    rrbv = *rrbp;
-
-    if (rrbv & ebit) {
-	*rrbp = rrbv & ~ebit;
-    }
-
-    do_pcibr_rrb_clear(bridge, rrbn);
-
-    if (rrbv & ebit) {
-	*rrbp = rrbv;
-    }
-}
-
-
-void
-do_pcibr_rrb_autoalloc(pcibr_soft_t pcibr_soft,
-		       int slot,
-		       int vchan, 
-		       int more_rrbs)
-{
-    bridge_t               *bridge = pcibr_soft->bs_base;
-    int                     got;
-
-    for (got = 0; got < more_rrbs; ++got) {
+    for (added = 0; have < init_rrbs; ++added, ++have) {
 	if (pcibr_soft->bs_rrb_res[slot] > 0)
 	    pcibr_soft->bs_rrb_res[slot]--;
 	else if (pcibr_soft->bs_rrb_avail[slot & 1] > 0)
 	    pcibr_soft->bs_rrb_avail[slot & 1]--;
 	else
 	    break;
-	if (do_pcibr_rrb_alloc(bridge, slot, vchan, 1) < 0)
+	if (do_pcibr_rrb_alloc(pcibr_soft, slot, vchan, 1) < 0)
+	    break;
+
+	pcibr_soft->bs_rrb_valid[slot][vchan]++;
+    }
+
+    /* Free any extra RRBs that the slot may have allocated to it */
+    while (have > init_rrbs) {
+	pcibr_soft->bs_rrb_avail[slot & 1]++;
+	pcibr_soft->bs_rrb_valid[slot][vchan]--;
+	do_pcibr_rrb_free(pcibr_soft, slot, vchan, 1);
+	added--;
+	have--;
+    }
+
+    PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_RRB, pcibr_soft->bs_vhdl,
+		"pcibr_rrb_alloc_init: had %d, added/removed %d, "
+		"(of requested %d) RRBs "
+		"to slot %d, vchan %d\n", had, added, init_rrbs,
+		PCIBR_DEVICE_TO_SLOT(pcibr_soft, slot), vchan));
+
+    pcibr_rrb_debug("pcibr_rrb_alloc_init", pcibr_soft);
+}
+
+
+/*
+ * Allocate more RRBs to a given slot (if the RRBs are available).
+ */
+void
+pcibr_rrb_alloc_more(pcibr_soft_t pcibr_soft,
+		     int slot,
+		     int vchan, 
+		     int more_rrbs)
+{
+    int			 added;
+
+    for (added = 0; added < more_rrbs; ++added) {
+	if (pcibr_soft->bs_rrb_res[slot] > 0)
+	    pcibr_soft->bs_rrb_res[slot]--;
+	else if (pcibr_soft->bs_rrb_avail[slot & 1] > 0)
+	    pcibr_soft->bs_rrb_avail[slot & 1]--;
+	else
+	    break;
+	if (do_pcibr_rrb_alloc(pcibr_soft, slot, vchan, 1) < 0)
 	    break;
 
 	pcibr_soft->bs_rrb_valid[slot][vchan]++;
     }
 
     PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_RRB, pcibr_soft->bs_vhdl,
-		"do_pcibr_rrb_autoalloc: added %d (of %d requested) RRBs "
-		"to slot %d, vchan %d\n", got, more_rrbs, 
+		"pcibr_rrb_alloc_more: added %d (of %d requested) RRBs "
+		"to slot %d, vchan %d\n", added, more_rrbs, 
 		PCIBR_DEVICE_TO_SLOT(pcibr_soft, slot), vchan));
 
-    pcibr_rrb_debug("do_pcibr_rrb_autoalloc", pcibr_soft);
+    pcibr_rrb_debug("pcibr_rrb_alloc_more", pcibr_soft);
 }
 
 
@@ -348,25 +390,24 @@ pcibr_rrb_flush(vertex_hdl_t pconn_vhdl)
     pciio_info_t  pciio_info = pciio_info_get(pconn_vhdl);
     pcibr_soft_t  pcibr_soft = (pcibr_soft_t)pciio_info_mfast_get(pciio_info);
     pciio_slot_t  slot = PCIBR_INFO_SLOT_GET_INT(pciio_info);
-    bridge_t	 *bridge = pcibr_soft->bs_base;
 
     uint64_t tmp;
     uint16_t enable_bit, pdev_bits, rrb_bits, rrb_mask;
     int rrb_index;
     unsigned long s;
 
-    enable_bit = RRB_ENABLE_BIT(bridge);
-    pdev_bits = SLOT_2_PDEV(bridge, slot);
+    enable_bit = RRB_ENABLE_BIT;
+    pdev_bits = SLOT_2_PDEV(slot);
     rrb_bits = enable_bit | pdev_bits;
-    rrb_mask = enable_bit | ((NUM_PDEV_BITS(bridge) << 1) - 1);
+    rrb_mask = enable_bit | ((NUM_PDEV_BITS << 1) - 1);
 
-    tmp = bridge->b_rrb_map[SLOT_2_RRB_REG(bridge, slot)].reg;
+    tmp = pcireg_rrb_get(pcibr_soft, SLOT_2_RRB_REG(slot));
 
     s = pcibr_lock(pcibr_soft);
     for (rrb_index = 0; rrb_index < 8; rrb_index++) {
-	int evn_odd = SLOT_2_RRB_REG(bridge, slot);
+	int evn_odd = SLOT_2_RRB_REG(slot);
 	if ((tmp & rrb_mask) == rrb_bits)
-	    do_pcibr_rrb_flush(bridge, (2 * rrb_index) + evn_odd);
+	    do_pcibr_rrb_flush(pcibr_soft, (2 * rrb_index) + evn_odd);
 	tmp = (tmp >> RRB_SIZE);
     }
     pcibr_unlock(pcibr_soft, s);
@@ -383,12 +424,9 @@ pcibr_wrb_flush(vertex_hdl_t pconn_vhdl)
     pciio_info_t            pciio_info = pciio_info_get(pconn_vhdl);
     pciio_slot_t            pciio_slot = PCIBR_INFO_SLOT_GET_INT(pciio_info);
     pcibr_soft_t            pcibr_soft = (pcibr_soft_t) pciio_info_mfast_get(pciio_info);
-    bridge_t               *bridge = pcibr_soft->bs_base;
-    volatile bridgereg_t   *wrb_flush;
 
-    wrb_flush = &(bridge->b_wr_req_buf[pciio_slot].reg);
-    while (*wrb_flush)
-	;
+    pcireg_wrb_flush_get(pcibr_soft, pciio_slot);
+
     return(0);
 }
 
@@ -411,7 +449,6 @@ pcibr_rrb_alloc(vertex_hdl_t pconn_vhdl,
     pciio_info_t            pciio_info = pciio_info_get(pconn_vhdl);
     pciio_slot_t            pciio_slot = PCIBR_INFO_SLOT_GET_INT(pciio_info);
     pcibr_soft_t            pcibr_soft = (pcibr_soft_t) pciio_info_mfast_get(pciio_info);
-    bridge_t               *bridge = pcibr_soft->bs_base;
     int                     desired_vchan0;
     int                     desired_vchan1;
     int                     orig_vchan0;
@@ -441,7 +478,7 @@ pcibr_rrb_alloc(vertex_hdl_t pconn_vhdl,
 
     s = pcibr_lock(pcibr_soft);
 
-    vchan_total = NUMBER_VCHANNELS(bridge);
+    vchan_total = NUMBER_VCHANNELS;
 
     /* Save the boot-time RRB configuration for this slot */
     if (pcibr_soft->bs_rrb_valid_dflt[pciio_slot][VCHAN0] < 0) {
@@ -507,14 +544,14 @@ pcibr_rrb_alloc(vertex_hdl_t pconn_vhdl,
 	/* Commit the allocations: free, then alloc.
 	 */
 	if (delta_vchan0 < 0)
-	    (void) do_pcibr_rrb_free(bridge, pciio_slot, VCHAN0, -delta_vchan0);
+	    do_pcibr_rrb_free(pcibr_soft, pciio_slot, VCHAN0, -delta_vchan0);
 	if (delta_vchan1 < 0)
-	    (void) do_pcibr_rrb_free(bridge, pciio_slot, VCHAN1, -delta_vchan1);
+	    do_pcibr_rrb_free(pcibr_soft, pciio_slot, VCHAN1, -delta_vchan1);
 
 	if (delta_vchan0 > 0)
-	    (void) do_pcibr_rrb_alloc(bridge, pciio_slot, VCHAN0, delta_vchan0);
+	    do_pcibr_rrb_alloc(pcibr_soft, pciio_slot, VCHAN0, delta_vchan0);
 	if (delta_vchan1 > 0)
-	    (void) do_pcibr_rrb_alloc(bridge, pciio_slot, VCHAN1, delta_vchan1);
+	    do_pcibr_rrb_alloc(pcibr_soft, pciio_slot, VCHAN1, delta_vchan1);
 
 	/* Return final values to caller.
 	 */
@@ -666,7 +703,6 @@ pcibr_slot_initial_rrb_alloc(vertex_hdl_t pcibr_vhdl,
     pcibr_soft_t	 pcibr_soft;
     pcibr_info_h	 pcibr_infoh;
     pcibr_info_t	 pcibr_info;
-    bridge_t		*bridge;
     int 		 vchan_total;
     int			 vchan;
     int                  chan[4];
@@ -679,12 +715,10 @@ pcibr_slot_initial_rrb_alloc(vertex_hdl_t pcibr_vhdl,
     if (!PCIBR_VALID_SLOT(pcibr_soft, slot))
 	return(-EINVAL);
 
-    bridge = pcibr_soft->bs_base;
-
     /* How many RRBs are on this slot? */
-    vchan_total = NUMBER_VCHANNELS(bridge);
+    vchan_total = NUMBER_VCHANNELS;
     for (vchan = 0; vchan < vchan_total; vchan++) 
-        chan[vchan] = do_pcibr_rrb_count_valid(bridge, slot, vchan);
+        chan[vchan] = do_pcibr_rrb_count_valid(pcibr_soft, slot, vchan);
 
     PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_RRB, pcibr_vhdl,
 	    "pcibr_slot_initial_rrb_alloc: slot %d started with %d+%d+%d+%d\n",
@@ -695,25 +729,35 @@ pcibr_slot_initial_rrb_alloc(vertex_hdl_t pcibr_vhdl,
      */
     pcibr_infoh = pcibr_soft->bs_slot[slot].bss_infos;
     pcibr_info = pcibr_infoh[0];
+    /*
+     * PIC BRINGUP WAR (PV# 856866, 859504, 861476, 861478):
+     * Don't free RRBs we allocated to device[2|3]--vchan3 as
+     * a WAR to those PVs mentioned above.  In pcibr_attach2
+     * we allocate RRB0,8,1,9 to device[2|3]--vchan3.
+     */
+    if (PCIBR_WAR_ENABLED(PV856866, pcibr_soft) && 
+			(slot == 2 || slot == 3) &&
+        		(pcibr_info->f_vendor == PCIIO_VENDOR_ID_NONE) &&
+        		!pcibr_soft->bs_slot[slot].has_host) {
 
-    if (PCIBR_WAR_ENABLED(PV856866, pcibr_soft) &&
-                        (slot == 2 || slot == 3) &&
-                        (pcibr_info->f_vendor == PCIIO_VENDOR_ID_NONE) &&
-                        !pcibr_soft->bs_slot[slot].has_host) {
-
-        for (vchan = 0; vchan < 2; vchan++) {
-            do_pcibr_rrb_free(bridge, slot, vchan, 8);
-            pcibr_soft->bs_rrb_valid[slot][vchan] = 0;
-        }
+	for (vchan = 0; vchan < 2; vchan++) {
+	    do_pcibr_rrb_free(pcibr_soft, slot, vchan, 8);
+	    pcibr_soft->bs_rrb_valid[slot][vchan] = 0;
+	}
 
         pcibr_soft->bs_rrb_valid[slot][3] = chan[3];
 
         return(-ENODEV);
     }
 
-    /* Give back any assigned to empty slots */
-    if ((pcibr_info->f_vendor == PCIIO_VENDOR_ID_NONE) && !pcibr_soft->bs_slot[slot].has_host) {
-	do_pcibr_rrb_free_all(pcibr_soft, bridge, slot);
+    if ((pcibr_info->f_vendor == PCIIO_VENDOR_ID_NONE) &&
+	!pcibr_soft->bs_slot[slot].has_host) {
+	do_pcibr_rrb_free_all(pcibr_soft, slot);
+        
+	/* Reserve RRBs for this empty slot for hot-plug */
+	for (vchan = 0; vchan < vchan_total; vchan++) 
+	    pcibr_soft->bs_rrb_valid[slot][vchan] = 0;
+
 	return(-ENODEV);
     }
 
@@ -723,16 +767,6 @@ pcibr_slot_initial_rrb_alloc(vertex_hdl_t pcibr_vhdl,
     return(0);
 }
 
-void
-rrb_reserved_free(pcibr_soft_t pcibr_soft, int slot)
-{
-        int res = pcibr_soft->bs_rrb_res[slot];
-
-        if (res) {
-                 pcibr_soft->bs_rrb_avail[slot & 1] += res;
-                 pcibr_soft->bs_rrb_res[slot] = 0;
-        }
-}
 
 /*
  * pcibr_initial_rrb
@@ -750,7 +784,6 @@ pcibr_initial_rrb(vertex_hdl_t pcibr_vhdl,
 			     pciio_slot_t first, pciio_slot_t last)
 {
     pcibr_soft_t            pcibr_soft = pcibr_soft_get(pcibr_vhdl);
-    bridge_t               *bridge = pcibr_soft->bs_base;
     pciio_slot_t            slot;
     int			    rrb_total;
     int			    vchan_total;
@@ -763,12 +796,12 @@ pcibr_initial_rrb(vertex_hdl_t pcibr_vhdl,
     have[1][0] = have[1][1] = have[1][2] = 0;
     res[0] = res[1] = 0;
 
-    vchan_total = NUMBER_VCHANNELS(bridge);
+    vchan_total = NUMBER_VCHANNELS;
 
     for (slot = pcibr_soft->bs_min_slot; 
 			slot < PCIBR_NUM_SLOTS(pcibr_soft); ++slot) {
         /* Initial RRB management; give back RRBs in all non-existent slots */
-        (void) pcibr_slot_initial_rrb_alloc(pcibr_vhdl, slot);
+        pcibr_slot_initial_rrb_alloc(pcibr_vhdl, slot);
 
         /* Base calculations only on existing slots */
         if ((slot >= first) && (slot <= last)) {
@@ -782,8 +815,8 @@ pcibr_initial_rrb(vertex_hdl_t pcibr_vhdl,
     }
 
     /* Initialize even/odd slot available RRB counts */
-    pcibr_soft->bs_rrb_avail[0] = do_pcibr_rrb_count_avail(bridge, 0);
-    pcibr_soft->bs_rrb_avail[1] = do_pcibr_rrb_count_avail(bridge, 1);
+    pcibr_soft->bs_rrb_avail[0] = do_pcibr_rrb_count_avail(pcibr_soft, 0);
+    pcibr_soft->bs_rrb_avail[1] = do_pcibr_rrb_count_avail(pcibr_soft, 1);
 
     /*
      * Calculate reserved RRBs for slots based on current RRB usage
@@ -803,6 +836,9 @@ pcibr_initial_rrb(vertex_hdl_t pcibr_vhdl,
     /* Assign reserved RRBs to existing slots */
     for (slot = first; slot <= last; ++slot) {
         int                     r;
+
+	if (pcibr_soft->bs_unused_slot & (1 << slot))
+	    continue;
 
 	rrb_total = 0;
 	for (vchan = 0; vchan < vchan_total; vchan++)
@@ -829,7 +865,6 @@ void
 pcibr_rrb_debug(char *calling_func, pcibr_soft_t pcibr_soft)
 {
     pciio_slot_t slot;
-    char tmp_str[256];
     
     if (pcibr_debug_mask & PCIBR_DEBUG_RRB) {
         PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_RRB, pcibr_soft->bs_vhdl,
@@ -837,23 +872,17 @@ pcibr_rrb_debug(char *calling_func, pcibr_soft_t pcibr_soft)
                     pcibr_soft->bs_rrb_avail[0], pcibr_soft->bs_rrb_avail[1]));
 
         PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_RRB, pcibr_soft->bs_vhdl,
-                        "\tslot\tvchan0\tvchan1\tvchan2\tvchan3\treserved\n"));
+                    "\tslot\tvchan0\tvchan1\tvchan2\tvchan3\treserved\n"));
 
         for (slot=0; slot < PCIBR_NUM_SLOTS(pcibr_soft); slot++) {
-	    /*
-             * The kernel only allows functions to have so many variable args,
-             * attempting to call PCIBR_DEBUG_ALWAYS() with more than 5 printf
-             * arguments fails so sprintf() it into a temporary string.
-             */
-            sprintf(tmp_str, "\t %d\t  %d\t  %d\t  %d\t  %d\t  %d\n", 
-		        PCIBR_DEVICE_TO_SLOT(pcibr_soft, slot),
-                        0xFFF & pcibr_soft->bs_rrb_valid[slot][VCHAN0],
-                        0xFFF & pcibr_soft->bs_rrb_valid[slot][VCHAN1],
-                        0xFFF & pcibr_soft->bs_rrb_valid[slot][VCHAN2],
-                        0xFFF & pcibr_soft->bs_rrb_valid[slot][VCHAN3],
-                        pcibr_soft->bs_rrb_res[slot]);
             PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_RRB, pcibr_soft->bs_vhdl,
-                        "%s", tmp_str));
+		    "\t %d\t  %d\t  %d\t  %d\t  %d\t  %d\n",
+		    PCIBR_DEVICE_TO_SLOT(pcibr_soft, slot),
+		    0xFFF & pcibr_soft->bs_rrb_valid[slot][VCHAN0],
+		    0xFFF & pcibr_soft->bs_rrb_valid[slot][VCHAN1],
+		    0xFFF & pcibr_soft->bs_rrb_valid[slot][VCHAN2],
+		    0xFFF & pcibr_soft->bs_rrb_valid[slot][VCHAN3],
+		    pcibr_soft->bs_rrb_res[slot]));
         }
     }
 }

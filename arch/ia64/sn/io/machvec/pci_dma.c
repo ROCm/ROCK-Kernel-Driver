@@ -248,18 +248,6 @@ sn_pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg, int nents, int dire
 		phys_addr = __pa((unsigned long)page_address(sg->page) + sg->offset);
 
 		/*
-		 * Handle the most common case: 64 bit cards.  This
-		 * call should always succeed.
-		 */
-		if (IS_PCIA64(hwdev)) {
-			sg->dma_address = pcibr_dmatrans_addr(vhdl, NULL, phys_addr,
-						       sg->length,
-						       PCIIO_DMA_DATA | PCIIO_DMA_A64);
-			sg->dma_length = sg->length;
-			continue;
-		}
-
-		/*
 		 * Handle 32-63 bit cards via direct mapping
 		 */
 		if (IS_PCI32G(hwdev)) {
@@ -384,13 +372,6 @@ sn_pci_map_single(struct pci_dev *hwdev, void *ptr, size_t size, int direction)
 	 */
 	dma_addr = 0;
 	phys_addr = __pa(ptr);
-
-	if (IS_PCIA64(hwdev)) {
-		/* This device supports 64 bit DMA addresses. */
-		dma_addr = pcibr_dmatrans_addr(vhdl, NULL, phys_addr, size,
-					       PCIIO_DMA_DATA | PCIIO_DMA_A64);
-		return dma_addr;
-	}
 
 	/*
 	 * Devices that support 32 bit to 63 bit DMA addresses get

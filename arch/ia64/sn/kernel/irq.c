@@ -133,11 +133,7 @@ sn_set_affinity_irq(unsigned int irq, cpumask_t mask)
 		return; 
 
 	cpu = first_cpu(mask);
-	if (IS_PIC_SOFT(intr->bi_soft) ) {
-		sn_shub_redirect_intr(intr, cpu);
-	} else { 
-		return; 
-	}
+	sn_shub_redirect_intr(intr, cpu);
 	(void) set_irq_affinity_info(irq, cpu_physical_id(intr->bi_cpu), redir);
 #endif /* CONFIG_SMP */
 }
@@ -262,7 +258,7 @@ sn_check_intr(int irq, pcibr_intr_t intr) {
 	unsigned long irr_reg;
 
 
-	regval = pcireg_intr_status_get(intr->bi_soft->bs_base);
+	regval = pcireg_intr_status_get(intr->bi_soft);
 	irr_reg_num = irq_to_vector(irq) / 64;
 	irr_bit = irq_to_vector(irq) % 64;
 	switch (irr_reg_num) {
