@@ -66,10 +66,10 @@ static void qBri_cpu_trapped (PISDN_ADAPTER IoAdapter) {
 		IoAdapter->trapped = 1 ;
 	}
 
-	regs[0] = READ_DWORD((&base + offset) + 0x70);
-	regs[1] = READ_DWORD((&base + offset) + 0x74);
-	regs[2] = READ_DWORD((&base + offset) + 0x78);
-	regs[3] = READ_DWORD((&base + offset) + 0x7c);
+	regs[0] = READ_DWORD((base + offset) + 0x70);
+	regs[1] = READ_DWORD((base + offset) + 0x74);
+	regs[2] = READ_DWORD((base + offset) + 0x78);
+	regs[3] = READ_DWORD((base + offset) + 0x7c);
 	regs[0] &= IoAdapter->MemorySize - 1 ;
 
 	if ( (regs[0] >= offset)
