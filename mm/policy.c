@@ -244,7 +244,7 @@ verify_pages(unsigned long addr, unsigned long end, unsigned long *nodes)
 		p = NULL;
 		pte = pte_offset_map(pmd, addr);
 		if (pte_present(*pte))
-			p = pte_page(*pte)
+			p = pte_page(*pte);
 		pte_unmap(pte);
 		if (p) {
 			unsigned nid = page_zone(p)->zone_pgdat->node_id;
