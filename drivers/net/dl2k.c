@@ -1140,10 +1140,6 @@ set_multicast (struct net_device *dev)
 	long ioaddr = dev->base_addr;
 	u32 hash_table[2];
 	u16 rx_mode = 0;
-	int i;
-	int bit;
-	long index, crc;
-	struct dev_mc_list *mclist;
 	struct netdev_private *np = dev->priv;
 	
 	hash_table[0] = hash_table[1] = 0;
@@ -1157,6 +1153,8 @@ set_multicast (struct net_device *dev)
 		/* Receive broadcast and multicast frames */
 		rx_mode = ReceiveBroadcast | ReceiveMulticast | ReceiveUnicast;
 	} else if (dev->mc_count > 0) {
+		int i;
+		struct dev_mc_list *mclist;
 		/* Receive broadcast frames and multicast frames filtering 
 		   by Hashtable */
 		rx_mode =
@@ -1164,14 +1162,13 @@ set_multicast (struct net_device *dev)
 		for (i=0, mclist = dev->mc_list; mclist && i < dev->mc_count; 
 				i++, mclist=mclist->next) 
 		{
-			crc = ether_crc_le (ETH_ALEN, mclist->dmi_addr);
+			int bit, index = 0;
+			int crc = ether_crc_le (ETH_ALEN, mclist->dmi_addr);
 			/* The inverted high significant 6 bits of CRC are
 			   used as an index to hashtable */
-			for (index=0, bit=0; bit < 6; bit++) {
-				if (test_bit(31-bit, &crc)) {
-					 set_bit(bit, &index);
-				}
-			}
+			for (bit = 0; bit < 6; bit++)
+				if (crc & (1 << (31 - bit)))
+					index |= (1 << bit);
 			hash_table[index / 32] |= (1 << (index % 32));
 		}
 	} else {
