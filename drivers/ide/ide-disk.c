@@ -1083,7 +1083,12 @@ static inline void idedisk_check_hpa(ide_drive_t *drive)
 	else
 		set_max = idedisk_read_native_max_address(drive);
 
-	if (set_max <= capacity)
+	/*
+	 * some drives seem to have an off-by-one problem (or just refuse to
+	 * read that one sector they claim is in the HPA), so adjust max by
+	 * 1 sector
+	 */
+	if (set_max <= (capacity + 1))
 		return;
 
 	printk(KERN_INFO "%s: Host Protected Area detected.\n"
