@@ -399,6 +399,8 @@ struct _snd_intel8x0 {
 	unsigned long remap_bmaddr;
 	struct resource *res_bm;
 
+	struct snd_dma_device dma_dev;
+
 	struct pci_dev *pci;
 	snd_card_t *card;
 
@@ -423,8 +425,7 @@ struct _snd_intel8x0 {
 	spinlock_t ac97_lock;
 	
 	u32 bdbars_count;
-	u32 *bdbars;
-	dma_addr_t bdbars_addr;
+	struct snd_dma_buffer bdbars;
 	u32 int_sta_reg;		/* interrupt status register */
 	u32 int_sta_mask;		/* interrupt status mask */
 	unsigned int pcm_pos_shift;
@@ -2129,10 +2130,10 @@ static int snd_intel8x0_free(intel8x0_t *chip)
 	/* --- */
 	synchronize_irq(chip->irq);
       __hw_end:
-	if (chip->bdbars) {
+	if (chip->bdbars.area) {
 		if (chip->fix_nocache)
-			fill_nocache(chip->bdbars, chip->bdbars_count * sizeof(u32) * ICH_MAX_FRAGS * 2, 0);
-		pci_free_consistent(chip->pci, chip->bdbars_count * sizeof(u32) * ICH_MAX_FRAGS * 2, chip->bdbars, chip->bdbars_addr);
+			fill_nocache(chip->bdbars.area, chip->bdbars.bytes, 0);
+		snd_dma_free_pages(&chip->dma_dev, &chip->bdbars);
 	}
 	if (chip->remap_addr)
 		iounmap((void *) chip->remap_addr);
@@ -2522,10 +2523,13 @@ static int __devinit snd_intel8x0_create(snd_card_t * card,
 	/* SIS7012 handles the pcm data in bytes, others are in words */
 	chip->pcm_pos_shift = (device_type == DEVICE_SIS) ? 0 : 1;
 
+	memset(&chip->dma_dev, 0, sizeof(chip->dma_dev));
+	chip->dma_dev.type = SNDRV_DMA_TYPE_PCI;
+	chip->dma_dev.dev.pci = pci;
+
 	/* allocate buffer descriptor lists */
 	/* the start of each lists must be aligned to 8 bytes */
-	chip->bdbars = (u32 *)pci_alloc_consistent(pci, chip->bdbars_count * sizeof(u32) * ICH_MAX_FRAGS * 2, &chip->bdbars_addr);
-	if (chip->bdbars == NULL) {
+	if (snd_dma_alloc_pages(&chip->dma_dev, chip->bdbars_count * sizeof(u32) * ICH_MAX_FRAGS * 2, &chip->bdbars) < 0) {
 		snd_intel8x0_free(chip);
 		snd_printk(KERN_ERR "intel8x0: cannot allocate buffer descriptors\n");
 		return -ENOMEM;
@@ -2534,12 +2538,12 @@ static int __devinit snd_intel8x0_create(snd_card_t * card,
 	   are much bigger, so we don't care (on i386) */
 	/* workaround for 440MX */
 	if (chip->fix_nocache)
-		fill_nocache(chip->bdbars, chip->bdbars_count * sizeof(u32) * ICH_MAX_FRAGS * 2, 1);
+		fill_nocache(chip->bdbars.area, chip->bdbars.bytes, 1);
 	int_sta_masks = 0;
 	for (i = 0; i < chip->bdbars_count; i++) {
 		ichdev = &chip->ichd[i];
-		ichdev->bdbar = chip->bdbars + (i * ICH_MAX_FRAGS * 2);
-		ichdev->bdbar_addr = chip->bdbars_addr + (i * sizeof(u32) * ICH_MAX_FRAGS * 2);
+		ichdev->bdbar = ((u32 *)chip->bdbars.area) + (i * ICH_MAX_FRAGS * 2);
+		ichdev->bdbar_addr = chip->bdbars.addr + (i * sizeof(u32) * ICH_MAX_FRAGS * 2);
 		int_sta_masks |= ichdev->int_sta_mask;
 	}
 	chip->int_sta_reg = device_type == DEVICE_ALI ? ICH_REG_ALI_INTERRUPTSR : ICH_REG_GLOB_STA;
