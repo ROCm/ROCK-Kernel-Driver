@@ -239,7 +239,7 @@ struct usb_serial_device_type {
 	/* serial function calls */
 	int  (*open)		(struct usb_serial_port *port, struct file * filp);
 	void (*close)		(struct usb_serial_port *port, struct file * filp);
-	int  (*write)		(struct usb_serial_port *port, int from_user, const unsigned char *buf, int count);
+	int  (*write)		(struct usb_serial_port *port, const unsigned char *buf, int count);
 	int  (*write_room)	(struct usb_serial_port *port);
 	int  (*ioctl)		(struct usb_serial_port *port, struct file * file, unsigned int cmd, unsigned long arg);
 	void (*set_termios)	(struct usb_serial_port *port, struct termios * old);
@@ -278,7 +278,7 @@ static inline void usb_serial_console_exit (void) { }
 /* Functions needed by other parts of the usbserial core */
 extern struct usb_serial *usb_serial_get_by_index (unsigned int minor);
 extern int usb_serial_generic_open (struct usb_serial_port *port, struct file *filp);
-extern int usb_serial_generic_write (struct usb_serial_port *port, int from_user, const unsigned char *buf, int count);
+extern int usb_serial_generic_write (struct usb_serial_port *port, const unsigned char *buf, int count);
 extern void usb_serial_generic_close (struct usb_serial_port *port, struct file *filp);
 extern int usb_serial_generic_write_room (struct usb_serial_port *port);
 extern int usb_serial_generic_chars_in_buffer (struct usb_serial_port *port);

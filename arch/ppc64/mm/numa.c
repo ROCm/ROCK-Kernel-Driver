@@ -76,9 +76,11 @@ static struct device_node * __init find_cpu_node(unsigned int cpu)
 		interrupt_server = (unsigned int *)get_property(cpu_node,
 					"ibm,ppc-interrupt-server#s", &len);
 
+		len = len / sizeof(u32);
+
 		if (interrupt_server && (len > 0)) {
 			while (len--) {
-				if (interrupt_server[len-1] == hw_cpuid)
+				if (interrupt_server[len] == hw_cpuid)
 					return cpu_node;
 			}
 		} else {

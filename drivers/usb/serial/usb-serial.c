@@ -554,7 +554,7 @@ static void serial_close(struct tty_struct *tty, struct file * filp)
 	kref_put(&port->serial->kref, destroy_serial);
 }
 
-static int serial_write (struct tty_struct * tty, int from_user, const unsigned char *buf, int count)
+static int serial_write (struct tty_struct * tty, const unsigned char *buf, int count)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *) tty->driver_data;
 	int retval = -EINVAL;
@@ -567,7 +567,7 @@ static int serial_write (struct tty_struct * tty, int from_user, const unsigned 
 	}
 
 	/* pass on to the driver specific version of this function */
-	retval = port->serial->type->write(port, from_user, buf, count);
+	retval = port->serial->type->write(port, buf, count);
 
 exit:
 	return retval;

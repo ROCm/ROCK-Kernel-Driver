@@ -417,7 +417,7 @@ sl_encaps(struct slip *sl, unsigned char *icp, int len)
 	 *       14 Oct 1994  Dmitry Gorodchanin.
 	 */
 	sl->tty->flags |= (1 << TTY_DO_WRITE_WAKEUP);
-	actual = sl->tty->driver->write(sl->tty, 0, sl->xbuff, count);
+	actual = sl->tty->driver->write(sl->tty, sl->xbuff, count);
 #ifdef SL_CHECK_TRANSMIT
 	sl->dev->trans_start = jiffies;
 #endif
@@ -451,7 +451,7 @@ static void slip_write_wakeup(struct tty_struct *tty)
 		return;
 	}
 
-	actual = tty->driver->write(tty, 0, sl->xhead, sl->xleft);
+	actual = tty->driver->write(tty, sl->xhead, sl->xleft);
 	sl->xleft -= actual;
 	sl->xhead += actual;
 }
@@ -1475,7 +1475,7 @@ static void sl_outfill(unsigned long sls)
 			if (!netif_queue_stopped(sl->dev))
 			{
 				/* if device busy no outfill */
-				sl->tty->driver->write(sl->tty, 0, &s, 1);
+				sl->tty->driver->write(sl->tty, &s, 1);
 			}
 		}
 		else

@@ -1,5 +1,5 @@
 /*
- * $Id: ixp2000.c,v 1.1 2004/09/02 00:13:41 dsaxena Exp $
+ * $Id: ixp2000.c,v 1.3 2004/09/16 23:27:13 gleixner Exp $
  *
  * drivers/mtd/maps/ixp2000.c
  *
@@ -14,7 +14,7 @@
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
- *
+ * 
  */
 
 #include <linux/module.h>
@@ -44,8 +44,8 @@ struct ixp2000_flash_info {
 };
 
 static inline unsigned long flash_bank_setup(struct map_info *map, unsigned long ofs)
-{
-	unsigned long (*set_bank)(unsigned long) =
+{	
+	unsigned long (*set_bank)(unsigned long) = 
 		(unsigned long(*)(unsigned long))map->map_priv_2;
 
 	return (set_bank ? set_bank(ofs) : ofs);
@@ -53,15 +53,15 @@ static inline unsigned long flash_bank_setup(struct map_info *map, unsigned long
 
 #ifdef __ARMEB__
 /*
- * Rev A0 and A1 of IXP2400 silicon have a broken addressing unit which
- * causes the lower address bits to be XORed with 0x11 on 8 bit accesses
- * and XORed with 0x10 on 16 bit accesses. See the spec update, erratta 44.
+ * Rev A0 and A1 of IXP2400 silicon have a broken addressing unit which 
+ * causes the lower address bits to be XORed with 0x11 on 8 bit accesses 
+ * and XORed with 0x10 on 16 bit accesses. See the spec update, erratum 44.
  */
-static int errata44_workaround = 0;
+static int erratum44_workaround = 0;
 
 static inline unsigned long address_fix8_write(unsigned long addr)
 {
-	if (errata44_workaround) {
+	if (erratum44_workaround) {
 		return (addr ^ 3);
 	}
 	return addr;
@@ -88,7 +88,7 @@ static void ixp2000_flash_copy_from(struct map_info *map, void *to,
 			      unsigned long from, ssize_t len)
 {
 	from = flash_bank_setup(map, from);
-	while(len--)
+	while(len--) 
 		*(__u8 *) to++ = *(__u8 *)(map->map_priv_1 + from++);
 }
 
@@ -127,8 +127,8 @@ static int ixp2000_flash_remove(struct device *_dev)
 	if (info->map.map_priv_1)
 		iounmap((void *) info->map.map_priv_1);
 
-	if (info->partitions)
-		kfree(info->partitions);
+	if (info->partitions) {
+		kfree(info->partitions); }
 
 	if (info->res) {
 		release_resource(info->res);
@@ -147,11 +147,11 @@ static int ixp2000_flash_probe(struct device *_dev)
 	static const char *probes[] = { "RedBoot", "cmdlinepart", NULL };
 	struct platform_device *dev = to_platform_device(_dev);
 	struct ixp2000_flash_data *ixp_data = dev->dev.platform_data;
-	struct flash_platform_data *plat;
+	struct flash_platform_data *plat; 
 	struct ixp2000_flash_info *info;
 	unsigned long window_size;
 	int err = -1;
-
+	
 	if (!ixp_data)
 		return -ENODEV;
 
@@ -160,7 +160,7 @@ static int ixp2000_flash_probe(struct device *_dev)
 		return -ENODEV;
 
 	window_size = dev->resource->end - dev->resource->start + 1;
-	dev_info(_dev, "Probe of IXP2000 flash(%d banks x %dM)\n",
+	dev_info(_dev, "Probe of IXP2000 flash(%d banks x %dMiB)\n", 
 			ixp_data->nr_banks, ((u32)window_size >> 20));
 
 	if (plat->width != 1) {
@@ -173,7 +173,7 @@ static int ixp2000_flash_probe(struct device *_dev)
 	if(!info) {
 		err = -ENOMEM;
 		goto Error;
-	}
+	}	
 	memzero(info, sizeof(struct ixp2000_flash_info));
 
 	dev_set_drvdata(&dev->dev, info);
@@ -183,7 +183,7 @@ static int ixp2000_flash_probe(struct device *_dev)
 	 * not attempt to do a direct access on us.
 	 */
 	info->map.phys = NO_XIP;
-
+	
 	info->nr_banks = ixp_data->nr_banks;
 	info->map.size = ixp_data->nr_banks * window_size;
 	info->map.bankwidth = 1;
@@ -191,7 +191,7 @@ static int ixp2000_flash_probe(struct device *_dev)
 	/*
  	 * map_priv_2 is used to store a ptr to to the bank_setup routine
  	 */
-	info->map.map_priv_2 = (u32) ixp_data->bank_setup;
+	info->map.map_priv_2 = (void __iomem *) ixp_data->bank_setup;
 
 	info->map.name = dev->dev.bus_id;
 	info->map.read = ixp2000_flash_read8;
@@ -199,8 +199,8 @@ static int ixp2000_flash_probe(struct device *_dev)
 	info->map.copy_from = ixp2000_flash_copy_from;
 	info->map.copy_to = ixp2000_flash_copy_to;
 
-	info->res = request_mem_region(dev->resource->start,
-			dev->resource->end - dev->resource->start + 1,
+	info->res = request_mem_region(dev->resource->start, 
+			dev->resource->end - dev->resource->start + 1, 
 			dev->dev.bus_id);
 	if (!info->res) {
 		dev_err(_dev, "Could not reserve memory region\n");
@@ -209,7 +209,7 @@ static int ixp2000_flash_probe(struct device *_dev)
 	}
 
 	info->map.map_priv_1 =
-	    (unsigned long) ioremap(dev->resource->start,
+	    (void __iomem *) ioremap(dev->resource->start, 
 				    dev->resource->end - dev->resource->start + 1);
 	if (!info->map.map_priv_1) {
 		dev_err(_dev, "Failed to ioremap flash region\n");
@@ -224,12 +224,12 @@ static int ixp2000_flash_probe(struct device *_dev)
 
 #if defined(__ARMEB__)
 	/*
-	 * Enable errata 44 workaround for NPUs with broken slowport
+	 * Enable erratum 44 workaround for NPUs with broken slowport
 	 */
 
 	errata44_workaround = ixp2000_has_broken_slowport();
-	dev_info(_dev, "Errata 44 workaround %s\n",
-	       errata44_workaround ? "enabled" : "disabled");
+	dev_info(_dev, "Erratum 44 workaround %s\n",
+	       erratum44_workaround ? "enabled" : "disabled");
 #endif
 
 	info->mtd = do_map_probe(plat->map_name, &info->map);

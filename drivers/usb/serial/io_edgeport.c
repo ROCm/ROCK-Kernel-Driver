@@ -434,7 +434,7 @@ static void edge_bulk_out_cmd_callback	(struct urb *urb, struct pt_regs *regs);
 /* function prototypes for the usbserial callbacks */
 static int  edge_open			(struct usb_serial_port *port, struct file *filp);
 static void edge_close			(struct usb_serial_port *port, struct file *filp);
-static int  edge_write			(struct usb_serial_port *port, int from_user, const unsigned char *buf, int count);
+static int  edge_write			(struct usb_serial_port *port, const unsigned char *buf, int count);
 static int  edge_write_room		(struct usb_serial_port *port);
 static int  edge_chars_in_buffer	(struct usb_serial_port *port);
 static void edge_throttle		(struct usb_serial_port *port);
@@ -1262,7 +1262,7 @@ static void edge_close (struct usb_serial_port *port, struct file * filp)
  *	If successful, we return the number of bytes written, otherwise we return
  *	a negative error number.
  *****************************************************************************/
-static int edge_write (struct usb_serial_port *port, int from_user, const unsigned char *data, int count)
+static int edge_write (struct usb_serial_port *port, const unsigned char *data, int count)
 {
         struct edgeport_port *edge_port = usb_get_serial_port_data(port);
 	struct TxFifo *fifo;
@@ -1302,12 +1302,7 @@ static int edge_write (struct usb_serial_port *port, int from_user, const unsign
 	dbg("%s - copy %d bytes of %d into fifo ", __FUNCTION__, firsthalf, bytesleft);
 
 	/* now copy our data */
-	if (from_user) {
-		if (copy_from_user(&fifo->fifo[fifo->head], data, firsthalf))
-			return -EFAULT;
-	} else {
-		memcpy(&fifo->fifo[fifo->head], data, firsthalf);
-	}  
+	memcpy(&fifo->fifo[fifo->head], data, firsthalf);
 	usb_serial_debug_data(debug, &port->dev, __FUNCTION__, firsthalf, &fifo->fifo[fifo->head]);
 
 	// update the index and size
@@ -1323,12 +1318,7 @@ static int edge_write (struct usb_serial_port *port, int from_user, const unsign
 
 	if (secondhalf) {
 		dbg("%s - copy rest of data %d", __FUNCTION__, secondhalf);
-		if (from_user) {
-			if (copy_from_user(&fifo->fifo[fifo->head], &data[firsthalf], secondhalf))
-				return -EFAULT;
-		} else {
-			memcpy(&fifo->fifo[fifo->head], &data[firsthalf], secondhalf);
-		}
+		memcpy(&fifo->fifo[fifo->head], &data[firsthalf], secondhalf);
 		usb_serial_debug_data(debug, &port->dev, __FUNCTION__, secondhalf, &fifo->fifo[fifo->head]);
 		// update the index and size
 		fifo->count += secondhalf;
@@ -1556,7 +1546,7 @@ static void edge_throttle (struct usb_serial_port *port)
 	/* if we are implementing XON/XOFF, send the stop character */
 	if (I_IXOFF(tty)) {
 		unsigned char stop_char = STOP_CHAR(tty);
-		status = edge_write (port, 0, &stop_char, 1);
+		status = edge_write (port, &stop_char, 1);
 		if (status <= 0) {
 			return;
 		}
@@ -1605,7 +1595,7 @@ static void edge_unthrottle (struct usb_serial_port *port)
 	/* if we are implementing XON/XOFF, send the start character */
 	if (I_IXOFF(tty)) {
 		unsigned char start_char = START_CHAR(tty);
-		status = edge_write (port, 0, &start_char, 1);
+		status = edge_write (port, &start_char, 1);
 		if (status <= 0) {
 			return;
 		}

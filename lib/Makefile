@@ -22,6 +22,7 @@ obj-$(CONFIG_GENERIC_IOMAP) += iomap.o
 
 obj-$(CONFIG_ZLIB_INFLATE) += zlib_inflate/
 obj-$(CONFIG_ZLIB_DEFLATE) += zlib_deflate/
+obj-$(CONFIG_REED_SOLOMON) += reed_solomon/
 
 hostprogs-y	:= gen_crc32table
 clean-files	:= crc32table.h

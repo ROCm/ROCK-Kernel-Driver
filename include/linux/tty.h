@@ -291,6 +291,8 @@ struct tty_struct {
 	unsigned int canon_column;
 	struct semaphore atomic_read;
 	struct semaphore atomic_write;
+	unsigned char *write_buf;
+	int write_cnt;
 	spinlock_t read_lock;
 	/* If the tty has a pending do_SAK, queue it here - akpm */
 	struct work_struct SAK_work;

@@ -858,7 +858,7 @@ EXPORT_SYMBOL(unregister_console);
 void tty_write_message(struct tty_struct *tty, char *msg)
 {
 	if (tty && tty->driver->write)
-		tty->driver->write(tty, 0, msg, strlen(msg));
+		tty->driver->write(tty, msg, strlen(msg));
 	return;
 }
 

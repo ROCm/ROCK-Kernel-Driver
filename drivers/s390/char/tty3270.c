@@ -1599,7 +1599,7 @@ tty3270_do_write(struct tty3270 *tp, const unsigned char *buf, int count)
  * String write routine for 3270 ttys
  */
 static int
-tty3270_write(struct tty_struct * tty, int from_user,
+tty3270_write(struct tty_struct * tty,
 	      const unsigned char *buf, int count)
 {
 	struct tty3270 *tp;
@@ -1612,26 +1612,8 @@ tty3270_write(struct tty_struct * tty, int from_user,
 		tty3270_do_write(tp, tp->char_buf, tp->char_count);
 		tp->char_count = 0;
 	}
-	if (!from_user) {
-		tty3270_do_write(tp, buf, count);
-		return count;
-	}
-	ret = 0;
-	while (count > 0) {
-		length = count < TTY3270_CHAR_BUF_SIZE ?
-			count : TTY3270_CHAR_BUF_SIZE;
-		length -= copy_from_user(tp->char_buf, buf, length);
-		if (length == 0) {
-			if (!ret)
-				ret = -EFAULT;
-			break;
-		}
-		tty3270_do_write(tp, tp->char_buf, count);
-		buf += length;
-		count -= length;
-		ret += length;
-	}
-	return ret;
+	tty3270_do_write(tp, buf, count);
+	return count;
 }
 
 /*

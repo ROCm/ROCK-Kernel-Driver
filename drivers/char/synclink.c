@@ -2140,16 +2140,15 @@ static void mgsl_flush_chars(struct tty_struct *tty)
  * Arguments:
  * 
  * 	tty		pointer to tty information structure
- * 	from_user	flag: 1 = from user process
  * 	buf		pointer to buffer containing send data
  * 	count		size of send data in bytes
  * 	
  * Return Value:	number of characters written
  */
-static int mgsl_write(struct tty_struct * tty, int from_user,
+static int mgsl_write(struct tty_struct * tty,
 		    const unsigned char *buf, int count)
 {
-	int	c, ret = 0, err;
+	int	c, ret = 0;
 	struct mgsl_struct *info = (struct mgsl_struct *)tty->driver_data;
 	unsigned long flags;
 	
@@ -2186,20 +2185,7 @@ static int mgsl_write(struct tty_struct * tty, int from_user,
 
 			/* queue transmit frame request */
 			ret = count;
-			if (from_user) {
-				down(&tmp_buf_sem);
-				COPY_FROM_USER(err,tmp_buf, buf, count);
-				if (err) {
-					if ( debug_level >= DEBUG_LEVEL_INFO )
-						printk( "%s(%d):mgsl_write(%s) sync user buf copy failed\n",
-							__FILE__,__LINE__,info->device_name);
-					ret = -EFAULT;
-				} else
-					save_tx_buffer_request(info,tmp_buf,count);
-				up(&tmp_buf_sem);
-			}
-			else
-				save_tx_buffer_request(info,buf,count);
+			save_tx_buffer_request(info,buf,count);
 
 			/* if we have sufficient tx dma buffers,
 			 * load the next buffered tx request
@@ -2239,70 +2225,26 @@ static int mgsl_write(struct tty_struct * tty, int from_user,
 					__FILE__,__LINE__,info->device_name);
 			ret = count;
 			info->xmit_cnt = count;
-			if (from_user) {
-				down(&tmp_buf_sem);
-				COPY_FROM_USER(err,tmp_buf, buf, count);
-				if (err) {
-					if ( debug_level >= DEBUG_LEVEL_INFO )
-						printk( "%s(%d):mgsl_write(%s) sync user buf copy failed\n",
-							__FILE__,__LINE__,info->device_name);
-					ret = -EFAULT;
-				} else
-					mgsl_load_tx_dma_buffer(info,tmp_buf,count);
-				up(&tmp_buf_sem);
-			}
-			else
-				mgsl_load_tx_dma_buffer(info,buf,count);
+			mgsl_load_tx_dma_buffer(info,buf,count);
 		}
 	} else {
-		if (from_user) {
-			down(&tmp_buf_sem);
-			while (1) {
-				c = min_t(int, count,
-					min(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
-					    SERIAL_XMIT_SIZE - info->xmit_head));
-				if (c <= 0)
-					break;
-
-				COPY_FROM_USER(err,tmp_buf, buf, c);
-				c -= err;
-				if (!c) {
-					if (!ret)
-						ret = -EFAULT;
-					break;
-				}
-				spin_lock_irqsave(&info->irq_spinlock,flags);
-				c = min_t(int, c, min(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
-					       SERIAL_XMIT_SIZE - info->xmit_head));
-				memcpy(info->xmit_buf + info->xmit_head, tmp_buf, c);
-				info->xmit_head = ((info->xmit_head + c) &
-						   (SERIAL_XMIT_SIZE-1));
-				info->xmit_cnt += c;
+		while (1) {
+			spin_lock_irqsave(&info->irq_spinlock,flags);
+			c = min_t(int, count,
+				min(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
+				    SERIAL_XMIT_SIZE - info->xmit_head));
+			if (c <= 0) {
 				spin_unlock_irqrestore(&info->irq_spinlock,flags);
-				buf += c;
-				count -= c;
-				ret += c;
+				break;
 			}
-			up(&tmp_buf_sem);
-		} else {
-			while (1) {
-				spin_lock_irqsave(&info->irq_spinlock,flags);
-				c = min_t(int, count,
-					min(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
-					    SERIAL_XMIT_SIZE - info->xmit_head));
-				if (c <= 0) {
-					spin_unlock_irqrestore(&info->irq_spinlock,flags);
-					break;
-				}
-				memcpy(info->xmit_buf + info->xmit_head, buf, c);
-				info->xmit_head = ((info->xmit_head + c) &
-						   (SERIAL_XMIT_SIZE-1));
-				info->xmit_cnt += c;
-				spin_unlock_irqrestore(&info->irq_spinlock,flags);
-				buf += c;
-				count -= c;
-				ret += c;
-			}
+			memcpy(info->xmit_buf + info->xmit_head, buf, c);
+			info->xmit_head = ((info->xmit_head + c) &
+					   (SERIAL_XMIT_SIZE-1));
+			info->xmit_cnt += c;
+			spin_unlock_irqrestore(&info->irq_spinlock,flags);
+			buf += c;
+			count -= c;
+			ret += c;
 		}
 	}	
 	

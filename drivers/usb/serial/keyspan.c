@@ -342,7 +342,7 @@ static int keyspan_ioctl(struct usb_serial_port *port, struct file *file,
 
 	/* Write function is similar for the four protocols used
 	   with only a minor change for usa90 (usa19hs) required */
-static int keyspan_write(struct usb_serial_port *port, int from_user, 
+static int keyspan_write(struct usb_serial_port *port, 
 			 const unsigned char *buf, int count)
 {
 	struct keyspan_port_private 	*p_priv;
@@ -396,12 +396,7 @@ static int keyspan_write(struct usb_serial_port *port, int from_user,
 		   for now so set to zero */
 		((char *)this_urb->transfer_buffer)[0] = 0;
 
-		if (from_user) {
-			if (copy_from_user(this_urb->transfer_buffer + dataOffset, buf, todo))
-				return -EFAULT;
-		} else {
-			memcpy (this_urb->transfer_buffer + dataOffset, buf, todo);
-		}
+		memcpy (this_urb->transfer_buffer + dataOffset, buf, todo);
 		buf += todo;
 
 		/* send the data out the bulk port */

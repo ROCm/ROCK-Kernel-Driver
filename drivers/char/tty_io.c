@@ -168,6 +168,8 @@ static struct tty_struct *alloc_tty_struct(void)
 
 static inline void free_tty_struct(struct tty_struct *tty)
 {
+	if (tty->write_buf)
+		kfree(tty->write_buf);
 	kfree(tty);
 }
 
@@ -1019,41 +1021,71 @@ static ssize_t tty_read(struct file * file, char __user * buf, size_t count,
  * denial-of-service type attacks
  */
 static inline ssize_t do_tty_write(
-	ssize_t (*write)(struct tty_struct *, struct file *, const unsigned char __user *, size_t),
+	ssize_t (*write)(struct tty_struct *, struct file *, const unsigned char *, size_t),
 	struct tty_struct *tty,
 	struct file *file,
-	const unsigned char __user *buf,
+	const char __user *buf,
 	size_t count)
 {
 	ssize_t ret = 0, written = 0;
+	unsigned int chunk;
 	
 	if (down_interruptible(&tty->atomic_write)) {
 		return -ERESTARTSYS;
 	}
-	if ( test_bit(TTY_NO_WRITE_SPLIT, &tty->flags) ) {
-		lock_kernel();
-		written = write(tty, file, buf, count);
-		unlock_kernel();
-	} else {
-		for (;;) {
-			unsigned long size = max((unsigned long)PAGE_SIZE*2, 16384UL);
-			if (size > count)
-				size = count;
-			lock_kernel();
-			ret = write(tty, file, buf, size);
-			unlock_kernel();
-			if (ret <= 0)
-				break;
-			written += ret;
-			buf += ret;
-			count -= ret;
-			if (!count)
-				break;
-			ret = -ERESTARTSYS;
-			if (signal_pending(current))
-				break;
-			cond_resched();
+
+	/*
+	 * We chunk up writes into a temporary buffer. This
+	 * simplifies low-level drivers immensely, since they
+	 * don't have locking issues and user mode accesses.
+	 *
+	 * But if TTY_NO_WRITE_SPLIT is set, we should use a
+	 * big chunk-size..
+	 */
+	chunk = 4096;
+	if (test_bit(TTY_NO_WRITE_SPLIT, &tty->flags))
+		chunk = 65536;
+	if (count < chunk)
+		chunk = count;
+
+	/* write_buf/write_cnt is protected by the atomic_write semaphore */
+	if (tty->write_cnt < chunk) {
+		unsigned char *buf;
+
+		if (chunk < 1024)
+			chunk = 1024;
+
+		buf = kmalloc(chunk, GFP_KERNEL);
+		if (!buf) {
+			up(&tty->atomic_write);
+			return -ENOMEM;
 		}
+		tty->write_cnt = chunk;
+		tty->write_buf = buf;
+	}
+
+	/* Do the write .. */
+	for (;;) {
+		size_t size = count;
+		if (size > chunk)
+			size = chunk;
+		ret = -EFAULT;
+		if (copy_from_user(tty->write_buf, buf, size))
+			break;
+		lock_kernel();
+		ret = write(tty, file, tty->write_buf, size);
+		unlock_kernel();
+		if (ret <= 0)
+			break;
+		written += ret;
+		buf += ret;
+		count -= ret;
+		if (!count)
+			break;
+		ret = -ERESTARTSYS;
+		if (signal_pending(current))
+			break;
+		cond_resched();
 	}
 	if (written) {
 		file->f_dentry->d_inode->i_mtime = CURRENT_TIME;
@@ -1082,8 +1114,7 @@ static ssize_t tty_write(struct file * file, const char __user * buf, size_t cou
 	if (!ld->write)
 		ret = -EIO;
 	else
-		ret = do_tty_write(ld->write, tty, file,
-			    (const unsigned char __user *)buf, count);
+		ret = do_tty_write(ld->write, tty, file, buf, count);
 	tty_ldisc_deref(ld);
 	return ret;
 }
@@ -2618,7 +2649,7 @@ static void initialize_tty_struct(struct tty_struct *tty)
  */
 static void tty_default_put_char(struct tty_struct *tty, unsigned char ch)
 {
-	tty->driver->write(tty, 0, &ch, 1);
+	tty->driver->write(tty, &ch, 1);
 }
 
 static struct class_simple *tty_class;

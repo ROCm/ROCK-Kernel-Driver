@@ -105,7 +105,7 @@ static int xbof = -1;
 static int  ir_startup (struct usb_serial *serial);
 static int  ir_open (struct usb_serial_port *port, struct file *filep);
 static void ir_close (struct usb_serial_port *port, struct file *filep);
-static int  ir_write (struct usb_serial_port *port, int from_user, const unsigned char *buf, int count);
+static int  ir_write (struct usb_serial_port *port, const unsigned char *buf, int count);
 static void ir_write_bulk_callback (struct urb *urb, struct pt_regs *regs);
 static void ir_read_bulk_callback (struct urb *urb, struct pt_regs *regs);
 static void ir_set_termios (struct usb_serial_port *port, struct termios *old_termios);
@@ -325,7 +325,7 @@ static void ir_close (struct usb_serial_port *port, struct file * filp)
 	usb_kill_urb(port->read_urb);
 }
 
-static int ir_write (struct usb_serial_port *port, int from_user, const unsigned char *buf, int count)
+static int ir_write (struct usb_serial_port *port, const unsigned char *buf, int count)
 {
 	unsigned char *transfer_buffer;
 	int result;
@@ -359,12 +359,7 @@ static int ir_write (struct usb_serial_port *port, int from_user, const unsigned
 	*transfer_buffer = ir_xbof | ir_baud;
 	++transfer_buffer;
 
-	if (from_user) {
-		if (copy_from_user (transfer_buffer, buf, transfer_size))
-			return -EFAULT;
-	} else {
-		memcpy (transfer_buffer, buf, transfer_size);
-	}
+	memcpy (transfer_buffer, buf, transfer_size);
 
 	usb_fill_bulk_urb (
 		port->write_urb,

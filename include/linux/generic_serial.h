@@ -73,7 +73,7 @@ struct gs_port {
 
 
 void gs_put_char(struct tty_struct *tty, unsigned char ch);
-int  gs_write(struct tty_struct *tty, int from_user, 
+int  gs_write(struct tty_struct *tty, 
              const unsigned char *buf, int count);
 int  gs_write_room(struct tty_struct *tty);
 int  gs_chars_in_buffer(struct tty_struct *tty);

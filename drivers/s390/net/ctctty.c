@@ -489,7 +489,7 @@ ctc_tty_shutdown(ctc_tty_info * info)
  *  - If dialing, abort dial.
  */
 static int
-ctc_tty_write(struct tty_struct *tty, int from_user, const u_char * buf, int count)
+ctc_tty_write(struct tty_struct *tty, const u_char * buf, int count)
 {
 	int c;
 	int total = 0;
@@ -506,8 +506,6 @@ ctc_tty_write(struct tty_struct *tty, int from_user, const u_char * buf, int cou
 		total = -ENODEV;
 		goto ex;
 	}
-	if (from_user)
-		down(&info->write_sem);
 	while (1) {
 		struct sk_buff *skb;
 		int skb_res;
@@ -526,11 +524,7 @@ ctc_tty_write(struct tty_struct *tty, int from_user, const u_char * buf, int cou
 			break;
 		}
 		skb_reserve(skb, skb_res);
-		if (from_user)
-			copy_from_user(skb_put(skb, c),
-					(const u_char __user *)buf, c);
-		else
-			memcpy(skb_put(skb, c), buf, c);
+		memcpy(skb_put(skb, c), buf, c);
 		skb_queue_tail(&info->tx_queue, skb);
 		buf += c;
 		total += c;
@@ -540,8 +534,6 @@ ctc_tty_write(struct tty_struct *tty, int from_user, const u_char * buf, int cou
 		info->lsr &= ~UART_LSR_TEMT;
 		tasklet_schedule(&info->tasklet);
 	}
-	if (from_user)
-		up(&info->write_sem);
 ex:
 	DBF_TEXT(trace, 6, __FUNCTION__);
 	return total;

@@ -74,8 +74,7 @@ extern int line_open(struct line *lines, struct tty_struct *tty,
 		     struct chan_opts *opts);
 extern int line_setup(struct line *lines, int num, char *init, 
 		      int all_allowed);
-extern int line_write(struct line *line, struct tty_struct *tty, int from_user,
-		      const char *buf, int len);
+extern int line_write(struct line *line, struct tty_struct *tty, const char *buf, int len);
 extern int line_write_room(struct tty_struct *tty);
 extern char *add_xterm_umid(char *base);
 extern int line_setup_irq(int fd, int input, int output, void *data);

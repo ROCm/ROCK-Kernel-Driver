@@ -25,6 +25,7 @@
 #include <asm/machdep.h>
 #include <asm/time.h>
 #include <asm/ppc4xx_pic.h>
+#include <asm/param.h>
 
 #include <syslib/gen550.h>
 

@@ -908,8 +908,7 @@ static void rs_flush_chars(struct tty_struct *tty)
 	local_irq_restore(flags);
 }
 
-static int rs_write(struct tty_struct * tty, int from_user,
-		    const unsigned char *buf, int count)
+static int rs_write(struct tty_struct * tty, const unsigned char *buf, int count)
 {
 	int	c, ret = 0;
 	struct async_struct *info = (struct async_struct *)tty->driver_data;
@@ -922,57 +921,25 @@ static int rs_write(struct tty_struct * tty, int from_user,
 		return 0;
 
 	local_save_flags(flags);
-	if (from_user) {
-		down(&tmp_buf_sem);
-		while (1) {
-			int c1;
-			c = CIRC_SPACE_TO_END(info->xmit.head,
-					      info->xmit.tail,
-					      SERIAL_XMIT_SIZE);
-			if (count < c)
-				c = count;
-
-			c -= copy_from_user(tmp_buf, buf, c);
-			if (!c) {
-				if (!ret)
-					ret = -EFAULT;
-				break;
-			}
-			local_irq_disable();
-			c1 = CIRC_SPACE_TO_END(info->xmit.head,
-					       info->xmit.tail,
-					       SERIAL_XMIT_SIZE);
-			if (c1 < c)
-				c = c1;
-			memcpy(info->xmit.buf + info->xmit.head, tmp_buf, c);
-			info->xmit.head = ((info->xmit.head + c) &
-					   (SERIAL_XMIT_SIZE-1));
-			local_irq_restore(flags);
-			buf += c;
-			count -= c;
-			ret += c;
+	local_irq_disable();
+	while (1) {
+		c = CIRC_SPACE_TO_END(info->xmit.head,
+				      info->xmit.tail,
+				      SERIAL_XMIT_SIZE);
+		if (count < c)
+			c = count;
+		if (c <= 0) {
+			break;
 		}
-		up(&tmp_buf_sem);
-	} else {
-		local_irq_disable();
-		while (1) {
-			c = CIRC_SPACE_TO_END(info->xmit.head,
-					      info->xmit.tail,
-					      SERIAL_XMIT_SIZE);
-			if (count < c)
-				c = count;
-			if (c <= 0) {
-				break;
-			}
-			memcpy(info->xmit.buf + info->xmit.head, buf, c);
-			info->xmit.head = ((info->xmit.head + c) &
-					   (SERIAL_XMIT_SIZE-1));
-			buf += c;
-			count -= c;
-			ret += c;
-		}
-		local_irq_restore(flags);
+		memcpy(info->xmit.buf + info->xmit.head, buf, c);
+		info->xmit.head = ((info->xmit.head + c) &
+				   (SERIAL_XMIT_SIZE-1));
+		buf += c;
+		count -= c;
+		ret += c;
 	}
+	local_irq_restore(flags);
+
 	if (info->xmit.head != info->xmit.tail
 	    && !tty->stopped
 	    && !tty->hw_stopped

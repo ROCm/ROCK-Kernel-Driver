@@ -1479,7 +1479,7 @@ static void sx_close(struct tty_struct * tty, struct file * filp)
 }
 
 
-static int sx_write(struct tty_struct * tty, int from_user, 
+static int sx_write(struct tty_struct * tty, 
                     const unsigned char *buf, int count)
 {
 	struct specialix_port *port = (struct specialix_port *)tty->driver_data;
@@ -1496,52 +1496,22 @@ static int sx_write(struct tty_struct * tty, int from_user,
 		return 0;
 
 	save_flags(flags);
-	if (from_user) {
-		down(&tmp_buf_sem);
-		while (1) {
-			c = min_t(int, count, min(SERIAL_XMIT_SIZE - port->xmit_cnt - 1,
-					   SERIAL_XMIT_SIZE - port->xmit_head));
-			if (c <= 0)
-				break;
-
-			c -= copy_from_user(tmp_buf, buf, c);
-			if (!c) {
-				if (!total)
-					total = -EFAULT;
-				break;
-			}
-
-			cli();
-			c = min_t(int, c, min(SERIAL_XMIT_SIZE - port->xmit_cnt - 1,
-				       SERIAL_XMIT_SIZE - port->xmit_head));
-			memcpy(port->xmit_buf + port->xmit_head, tmp_buf, c);
-			port->xmit_head = (port->xmit_head + c) & (SERIAL_XMIT_SIZE-1);
-			port->xmit_cnt += c;
+	while (1) {
+		cli();
+		c = min_t(int, count, min(SERIAL_XMIT_SIZE - port->xmit_cnt - 1,
+				   SERIAL_XMIT_SIZE - port->xmit_head));
+		if (c <= 0) {
 			restore_flags(flags);
-
-			buf += c;
-			count -= c;
-			total += c;
+			break;
 		}
-		up(&tmp_buf_sem);
-	} else {
-		while (1) {
-			cli();
-			c = min_t(int, count, min(SERIAL_XMIT_SIZE - port->xmit_cnt - 1,
-					   SERIAL_XMIT_SIZE - port->xmit_head));
-			if (c <= 0) {
-				restore_flags(flags);
-				break;
-			}
-			memcpy(port->xmit_buf + port->xmit_head, buf, c);
-			port->xmit_head = (port->xmit_head + c) & (SERIAL_XMIT_SIZE-1);
-			port->xmit_cnt += c;
-			restore_flags(flags);
+		memcpy(port->xmit_buf + port->xmit_head, buf, c);
+		port->xmit_head = (port->xmit_head + c) & (SERIAL_XMIT_SIZE-1);
+		port->xmit_cnt += c;
+		restore_flags(flags);
 
-			buf += c;
-			count -= c;
-			total += c;
-		}
+		buf += c;
+		count -= c;
+		total += c;
 	}
 
 	cli();

@@ -735,7 +735,7 @@ static void mcfrs_flush_chars(struct tty_struct *tty)
 	local_irq_restore(flags);
 }
 
-static int mcfrs_write(struct tty_struct * tty, int from_user,
+static int mcfrs_write(struct tty_struct * tty,
 		    const unsigned char *buf, int count)
 {
 	volatile unsigned char	*uartp;
@@ -744,8 +744,8 @@ static int mcfrs_write(struct tty_struct * tty, int from_user,
 	int			c, total = 0;
 
 #if 0
-	printk("%s(%d): mcfrs_write(tty=%x,from_user=%d,buf=%x,count=%d)\n",
-		__FILE__, __LINE__, (int)tty, from_user, (int)buf, count);
+	printk("%s(%d): mcfrs_write(tty=%x,buf=%x,count=%d)\n",
+		__FILE__, __LINE__, (int)tty, (int)buf, count);
 #endif
 
 	if (serial_paranoia_check(info, tty->name, "mcfrs_write"))
@@ -764,19 +764,7 @@ static int mcfrs_write(struct tty_struct * tty, int from_user,
 		if (c <= 0)
 			break;
 
-		if (from_user) {
-			down(&mcfrs_tmp_buf_sem);
-			if (copy_from_user(mcfrs_tmp_buf, buf, c))
-				return -EFAULT;
-
-			local_irq_disable();
-			c = min(c, (int) min(((int)SERIAL_XMIT_SIZE) - info->xmit_cnt - 1,
-				       ((int)SERIAL_XMIT_SIZE) - info->xmit_head));
-			local_irq_restore(flags);
-			memcpy(info->xmit_buf + info->xmit_head, mcfrs_tmp_buf, c);
-			up(&mcfrs_tmp_buf_sem);
-		} else
-			memcpy(info->xmit_buf + info->xmit_head, buf, c);
+		memcpy(info->xmit_buf + info->xmit_head, buf, c);
 
 		local_irq_disable();
 		info->xmit_head = (info->xmit_head + c) & (SERIAL_XMIT_SIZE-1);

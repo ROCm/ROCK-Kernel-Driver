@@ -1,5 +1,5 @@
 /*
- * $Id: redwood.c,v 1.8 2004/07/12 21:59:44 dwmw2 Exp $
+ * $Id: redwood.c,v 1.9 2004/09/16 23:27:13 gleixner Exp $
  *
  * drivers/mtd/maps/redwood.c
  *
@@ -132,7 +132,7 @@ int __init init_redwood_flash(void)
 			WINDOW_SIZE, WINDOW_ADDR);
 
 	redwood_flash_map.virt =
-		(unsigned long)ioremap(WINDOW_ADDR, WINDOW_SIZE);
+		(void __iomem *)ioremap(WINDOW_ADDR, WINDOW_SIZE);
 
 	if (!redwood_flash_map.virt) {
 		printk("init_redwood_flash: failed to ioremap\n");

@@ -81,7 +81,6 @@ static int debug;
 static int  empeg_open			(struct usb_serial_port *port, struct file *filp);
 static void empeg_close			(struct usb_serial_port *port, struct file *filp);
 static int  empeg_write			(struct usb_serial_port *port,
-					int from_user,
 					const unsigned char *buf,
 					int count);
 static int  empeg_write_room		(struct usb_serial_port *port);
@@ -191,7 +190,7 @@ static void empeg_close (struct usb_serial_port *port, struct file * filp)
 }
 
 
-static int empeg_write (struct usb_serial_port *port, int from_user, const unsigned char *buf, int count)
+static int empeg_write (struct usb_serial_port *port, const unsigned char *buf, int count)
 {
 	struct usb_serial *serial = port->serial;
 	struct urb *urb;
@@ -235,14 +234,7 @@ static int empeg_write (struct usb_serial_port *port, int from_user, const unsig
 
 		transfer_size = min (count, URB_TRANSFER_BUFFER_SIZE);
 
-		if (from_user) {
-			if (copy_from_user (urb->transfer_buffer, current_position, transfer_size)) {
-				bytes_sent = -EFAULT;
-				break;
-			}
-		} else {
-			memcpy (urb->transfer_buffer, current_position, transfer_size);
-		}
+		memcpy (urb->transfer_buffer, current_position, transfer_size);
 
 		usb_serial_debug_data(debug, &port->dev, __FUNCTION__, transfer_size, urb->transfer_buffer);
 

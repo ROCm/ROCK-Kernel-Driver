@@ -216,12 +216,15 @@ xics_ops pSeriesLP_ops = {
 
 static unsigned int xics_startup(unsigned int virq)
 {
-	virq = irq_offset_down(virq);
-	if (radix_tree_insert(&irq_map, virt_irq_to_real(virq),
-			      &virt_irq_to_real_map[virq]) == -ENOMEM)
+	unsigned int irq;
+
+	irq = irq_offset_down(virq);
+	if (radix_tree_insert(&irq_map, virt_irq_to_real(irq),
+			      &virt_irq_to_real_map[irq]) == -ENOMEM)
 		printk(KERN_CRIT "Out of memory creating real -> virtual"
 		       " IRQ mapping for irq %u (real 0x%x)\n",
-		       virq, virt_irq_to_real(virq));
+		       virq, virt_irq_to_real(irq));
+	xics_enable_irq(virq);
 	return 0;	/* return value is ignored */
 }
 

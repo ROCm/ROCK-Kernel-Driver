@@ -143,7 +143,7 @@ restart:
 		int len;
 	
 		set_bit(TTY_DO_WRITE_WAKEUP, &tty->flags);
-		len = tty->driver->write(tty, 0, skb->data, skb->len);
+		len = tty->driver->write(tty, skb->data, skb->len);
 		hdev->stat.byte_tx += len;
 
 		skb_pull(skb, len);
@@ -502,7 +502,7 @@ static ssize_t hci_uart_tty_read(struct tty_struct *tty, struct file *file, unsi
 {
 	return 0;
 }
-static ssize_t hci_uart_tty_write(struct tty_struct *tty, struct file *file, const unsigned char __user *data, size_t count)
+static ssize_t hci_uart_tty_write(struct tty_struct *tty, struct file *file, const unsigned char *data, size_t count)
 {
 	return 0;
 }

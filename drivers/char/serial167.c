@@ -1208,7 +1208,7 @@ cy_flush_chars(struct tty_struct *tty)
     port is already active, there is no need to kick it.
  */
 static int
-cy_write(struct tty_struct * tty, int from_user,
+cy_write(struct tty_struct * tty,
            const unsigned char *buf, int count)
 {
   struct cyclades_port *info = (struct cyclades_port *)tty->driver_data;
@@ -1227,53 +1227,23 @@ cy_write(struct tty_struct * tty, int from_user,
         return 0;
     }
 
-    if (from_user) {
-	    down(&tmp_buf_sem);
-	    while (1) {
-		    c = min_t(int, count, min(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
-					      SERIAL_XMIT_SIZE - info->xmit_head));
-		    if (c <= 0)
-			    break;
-
-		    c -= copy_from_user(tmp_buf, buf, c);
-		    if (!c) {
-			    if (!total)
-				    total = -EFAULT;
-			    break;
-		    }
-
-		    local_irq_save(flags);
-		    c = min_t(int, c, min(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
-					  SERIAL_XMIT_SIZE - info->xmit_head));
-		    memcpy(info->xmit_buf + info->xmit_head, tmp_buf, c);
-		    info->xmit_head = (info->xmit_head + c) & (SERIAL_XMIT_SIZE-1);
-		    info->xmit_cnt += c;
+    while (1) {
+	    local_irq_save(flags);
+	    c = min_t(int, count, min(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
+				      SERIAL_XMIT_SIZE - info->xmit_head));
+	    if (c <= 0) {
 		    local_irq_restore(flags);
-
-		    buf += c;
-		    count -= c;
-		    total += c;
+		    break;
 	    }
-	    up(&tmp_buf_sem);
-    } else {
-	    while (1) {
-		    local_irq_save(flags);
-		    c = min_t(int, count, min(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
-					      SERIAL_XMIT_SIZE - info->xmit_head));
-		    if (c <= 0) {
-			    local_irq_restore(flags);
-			    break;
-		    }
 
-		    memcpy(info->xmit_buf + info->xmit_head, buf, c);
-		    info->xmit_head = (info->xmit_head + c) & (SERIAL_XMIT_SIZE-1);
-		    info->xmit_cnt += c;
-		    local_irq_restore(flags);
+	    memcpy(info->xmit_buf + info->xmit_head, buf, c);
+	    info->xmit_head = (info->xmit_head + c) & (SERIAL_XMIT_SIZE-1);
+	    info->xmit_cnt += c;
+	    local_irq_restore(flags);
 
-		    buf += c;
-		    count -= c;
-		    total += c;
-	    }
+	    buf += c;
+	    count -= c;
+	    total += c;
     }
 
     if (info->xmit_cnt

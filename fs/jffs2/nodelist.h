@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: nodelist.h,v 1.119 2004/05/26 12:28:12 gleixner Exp $
+ * $Id: nodelist.h,v 1.120 2004/10/07 15:11:54 havasi Exp $
  *
  */
 
@@ -281,9 +281,14 @@ static inline void paranoia_failed_dump(struct jffs2_eraseblock *jeb)
 			else if (!ref_obsolete(ref2)) \
 				my_used_size += ref_totlen(c, jeb, ref2); \
 			if (unlikely((!ref2->next_phys) != (ref2 == jeb->last_node))) { \
-				printk("ref for node at %p (phys %08x) has next_phys->%p (%08x), last_node->%p (phys %08x)\n", \
-				       ref2, ref_offset(ref2), ref2->next_phys, ref_offset(ref2->next_phys), \
-				       jeb->last_node, ref_offset(jeb->last_node)); \
+                                if (!ref2->next_phys) \
+				       printk("ref for node at %p (phys %08x) has next_phys->%p (----), last_node->%p (phys %08x)\n", \
+				             ref2, ref_offset(ref2), ref2->next_phys, \
+				             jeb->last_node, ref_offset(jeb->last_node)); \
+                                else \
+                                       printk("ref for node at %p (phys %08x) has next_phys->%p (%08x), last_node->%p (phys %08x)\n", \
+				             ref2, ref_offset(ref2), ref2->next_phys, ref_offset(ref2->next_phys), \
+				             jeb->last_node, ref_offset(jeb->last_node)); \
 				paranoia_failed_dump(jeb); \
 				BUG(); \
 			} \
