@@ -925,7 +925,7 @@ int dm_suspend(struct mapped_device *md)
 	while (1) {
 		set_current_state(TASK_INTERRUPTIBLE);
 
-		if (!atomic_read(&md->pending))
+		if (!atomic_read(&md->pending) || signal_pending(current))
 			break;
 
 		io_schedule();
@@ -934,6 +934,14 @@ int dm_suspend(struct mapped_device *md)
 
 	down_write(&md->lock);
 	remove_wait_queue(&md->wait, &wait);
+
+	/* were we interrupted ? */
+	if (atomic_read(&md->pending)) {
+		clear_bit(DMF_BLOCK_IO, &md->flags);
+		up_write(&md->lock);
+		return -EINTR;
+	}
+
 	set_bit(DMF_SUSPENDED, &md->flags);
 
 	map = dm_get_table(md);
