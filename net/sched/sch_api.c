@@ -441,7 +441,7 @@ qdisc_create(struct net_device *dev, u32 handle, struct rtattr **tca, int *errp)
 		handle = qdisc_alloc_handle(dev);
 		err = -ENOMEM;
 		if (handle == 0)
-			goto err_out2;
+			goto err_out3;
 	}
 
 	if (handle == TC_H_INGRESS)
@@ -464,6 +464,8 @@ qdisc_create(struct net_device *dev, u32 handle, struct rtattr **tca, int *errp)
 #endif
 		return sch;
 	}
+err_out3:
+	dev_put(dev);
 err_out2:
 	module_put(ops->owner);
 err_out:
