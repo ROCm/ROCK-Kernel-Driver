@@ -672,6 +672,8 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 	saved_command_line[COMMAND_LINE_SIZE-1] = '\0';
 
 	for (;;) {
+		if (c != ' ')
+			goto next_char;
 		/*
 		 * "mem=nopentium" disables the 4MB page tables.
 		 * "mem=XXX[kKmM]" defines a memory region from HIGH_MEM
@@ -682,7 +684,7 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 		 * HPA tells me bootloaders need to parse mem=, so no new
 		 * option should be mem=  [also see Documentation/i386/boot.txt]
 		 */
-		if (c == ' ' && !memcmp(from, "mem=", 4)) {
+		if (!memcmp(from, "mem=", 4)) {
 			if (to != command_line)
 				to--;
 			if (!memcmp(from+4, "nopentium", 9)) {
@@ -704,7 +706,7 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 			}
 		}
 
-		if (c == ' ' && !memcmp(from, "memmap=", 7)) {
+		else if (!memcmp(from, "memmap=", 7)) {
 			if (to != command_line)
 				to--;
 			if (!memcmp(from+7, "exactmap", 8)) {
@@ -812,7 +814,7 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 		 * This works even on boxes that have no highmem otherwise.
 		 * This also works to reduce highmem size on bigger boxes.
 		 */
-		if (c == ' ' && !memcmp(from, "highmem=", 8))
+		else if (!memcmp(from, "highmem=", 8))
 			highmem_pages = memparse(from+8, &from) >> PAGE_SHIFT;
 	
 		/*
@@ -820,9 +822,10 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 		 * bytes. This can be used to increase (or decrease) the
 		 * vmalloc area - the default is 128m.
 		 */
-		if (c == ' ' && !memcmp(from, "vmalloc=", 8))
+		else if (!memcmp(from, "vmalloc=", 8))
 			__VMALLOC_RESERVE = memparse(from+8, &from);
 
+	next_char:
 		c = *(from++);
 		if (!c)
 			break;
