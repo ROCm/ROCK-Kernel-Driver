@@ -1039,7 +1039,7 @@ static int prof_cpu_mask_read_proc (char *page, char **start, off_t off,
 	if (count < HEX_DIGITS+1)
 		return -EINVAL;
 
-	for (k = 0; k < sizeof(cpumask_t)/sizeof(unsigned long); ++k) {
+	for (k = 0; k < sizeof(cpumask_t)/sizeof(u16); ++k) {
 		int j = sprintf(page, "%04hx", (u16)cpus_coerce(*mask));
 		len += j;
 		page += j;

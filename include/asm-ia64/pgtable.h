@@ -63,7 +63,8 @@
 #define _PAGE_FILE		(1 << 1)		/* see swap & file pte remarks below */
 
 #define _PFN_MASK		_PAGE_PPN_MASK
-#define _PAGE_CHG_MASK		(_PFN_MASK | _PAGE_A | _PAGE_D)
+/* Mask of bits which may be changed by pte_modify(); the odd bits are there for _PAGE_PROTNONE */
+#define _PAGE_CHG_MASK	(_PAGE_P | _PAGE_PROTNONE | _PAGE_PL_MASK | _PAGE_AR_MASK | _PAGE_ED)
 
 #define _PAGE_SIZE_4K	12
 #define _PAGE_SIZE_8K	13
@@ -230,7 +231,7 @@ ia64_phys_addr_valid (unsigned long addr)
 #define mk_pte(page, pgprot)	pfn_pte(page_to_pfn(page), (pgprot))
 
 #define pte_modify(_pte, newprot) \
-	(__pte((pte_val(_pte) & _PAGE_CHG_MASK) | pgprot_val(newprot)))
+	(__pte((pte_val(_pte) & ~_PAGE_CHG_MASK) | (pgprot_val(newprot) & _PAGE_CHG_MASK)))
 
 #define page_pte_prot(page,prot)	mk_pte(page, prot)
 #define page_pte(page)			page_pte_prot(page, __pgprot(0))
