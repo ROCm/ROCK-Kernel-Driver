@@ -1,0 +1,79 @@
+
+menu "Character Devices"
+
+config STDIO_CONSOLE
+	bool
+	default y
+
+config SSL
+	bool "Virtual serial line"
+
+config FD_CHAN
+	bool "file descriptor channel support"
+
+config NULL_CHAN
+	bool "null channel support"
+
+config PORT_CHAN
+	bool "port channel support"
+
+config PTY_CHAN
+	bool "pty channel support"
+
+config TTY_CHAN
+	bool "tty channel support"
+
+config XTERM_CHAN
+	bool "xterm channel support"
+
+config CON_ZERO_CHAN
+	string "Default main console channel initialization"
+	default "fd:0,fd:1"
+
+config CON_CHAN
+	string "Default console channel initialization"
+	default "xterm"
+
+config SSL_CHAN
+	string "Default serial line channel initialization"
+	default "pty"
+
+config UNIX98_PTYS
+	bool "Unix98 PTY support"
+
+config UNIX98_PTY_COUNT
+	int "Maximum number of Unix98 PTYs in use (0-2048)"
+	depends on UNIX98_PTYS
+	default "256"
+
+config WATCHDOG
+	bool "Watchdog Timer Support"
+
+config WATCHDOG_NOWAYOUT
+	bool "Disable watchdog shutdown on close"
+	depends on WATCHDOG
+
+config SOFT_WATCHDOG
+	tristate "Software Watchdog"
+	depends on WATCHDOG
+
+config UML_WATCHDOG
+	tristate "UML watchdog"
+	depends on WATCHDOG
+
+config UML_SOUND
+	tristate "Sound support"
+
+config SOUND
+	tristate
+	default UML_SOUND
+
+config HOSTAUDIO
+	tristate
+	default UML_SOUND
+
+config TTY_LOG
+	bool "Enable tty logging"
+
+endmenu
+
