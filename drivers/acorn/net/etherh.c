@@ -66,6 +66,7 @@ static const card_ids __init etherh_cids[] = {
 };
 
 struct etherh_priv {
+	struct ei_device eidev;
 	unsigned int	id;
 	unsigned int	ctrl_port;
 	unsigned int	ctrl;
@@ -150,8 +151,8 @@ static expansioncard_ops_t etherh_ops = {
 static void
 etherh_setif(struct net_device *dev)
 {
-	struct ei_device *ei_local = (struct ei_device *) dev->priv;
-	struct etherh_priv *eh = (struct etherh_priv *)dev->rmem_start;
+	struct etherh_priv *eh = (struct etherh_priv *)dev->priv;
+	struct ei_device *ei_local = &eh->eidev;
 	unsigned long addr, flags;
 
 	local_irq_save(flags);
@@ -194,8 +195,8 @@ etherh_setif(struct net_device *dev)
 static int
 etherh_getifstat(struct net_device *dev)
 {
-	struct ei_device *ei_local = (struct ei_device *) dev->priv;
-	struct etherh_priv *eh = (struct etherh_priv *)dev->rmem_start;
+	struct etherh_priv *eh = (struct etherh_priv *)dev->priv;
+	struct ei_device *ei_local = &eh->eidev;
 	int stat = 0;
 
 	switch (eh->id) {
@@ -560,6 +561,9 @@ static struct net_device * __init etherh_init_one(struct expansion_card *ec)
 	if (!eh)
 		goto out_nopriv;
 
+	memset(eh, 0, sizeof(struct etherh_priv));
+	spin_lock_init(&eh->eidev.page_lock);
+
 	SET_MODULE_OWNER(dev);
 
 	dev->open	= etherh_open;
@@ -567,7 +571,7 @@ static struct net_device * __init etherh_init_one(struct expansion_card *ec)
 	dev->set_config	= etherh_set_config;
 	dev->irq	= ec->irq;
 	dev->base_addr	= ecard_address(ec, ECARD_MEMC, 0);
-	dev->rmem_start	= (unsigned long)eh;
+	dev->priv	= eh;
 
 	/*
 	 * IRQ and control port handling
