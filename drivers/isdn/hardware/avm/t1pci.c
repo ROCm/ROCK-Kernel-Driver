@@ -239,20 +239,11 @@ static struct pci_driver t1pci_pci_driver = {
 
 static int __init t1pci_init(void)
 {
-	struct capi_driver *driver = &t1pci_driver;
-	char *p;
 	int retval;
 
 	MOD_INC_USE_COUNT;
 
-	if ((p = strchr(revision, ':')) != 0 && p[1]) {
-		strncpy(driver->revision, p + 2, sizeof(driver->revision) - 1);
-		if ((p = strchr(driver->revision, '$')) != 0 && p > driver->revision)
-			*(p-1) = 0;
-	}
-
-	printk(KERN_INFO "%s: revision %s\n", driver->name, driver->revision);
-
+	b1_set_revision(&t1pci_driver, revision);
         attach_capi_driver(&t1pci_driver);
 
 	retval = pci_register_driver(&t1pci_pci_driver);
@@ -260,7 +251,7 @@ static int __init t1pci_init(void)
 		goto err;
 
 	printk(KERN_INFO "%s: %d T1-PCI card(s) detected\n",
-	       driver->name, retval);
+	       t1pci_driver.name, retval);
 	retval = 0;
 	goto out;
 

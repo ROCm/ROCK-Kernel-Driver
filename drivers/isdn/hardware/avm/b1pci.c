@@ -390,38 +390,16 @@ static struct pci_driver b1pci_pci_driver = {
 
 static int __init b1pci_init(void)
 {
-	struct capi_driver *driver = &b1pci_driver;
-#ifdef CONFIG_ISDN_DRV_AVMB1_B1PCIV4
-	struct capi_driver *driverv4 = &b1pciv4_driver;
-#endif
-	char *p;
 	int retval;
 
 	MOD_INC_USE_COUNT;
 
-	if ((p = strchr(revision, ':')) != 0 && p[1]) {
-		strncpy(driver->revision, p + 2, sizeof(driver->revision));
-		driver->revision[sizeof(driver->revision)-1] = 0;
-		if ((p = strchr(driver->revision, '$')) != 0 && p > driver->revision)
-			*(p-1) = 0;
-	}
-#ifdef CONFIG_ISDN_DRV_AVMB1_B1PCIV4
-	if ((p = strchr(revision, ':')) != 0 && p[1]) {
-		strncpy(driverv4->revision, p + 2, sizeof(driverv4->revision));
-		driverv4->revision[sizeof(driverv4->revision)-1] = 0;
-		if ((p = strchr(driverv4->revision, '$')) != 0 && p > driverv4->revision)
-			*(p-1) = 0;
-	}
-#endif
-
-	printk(KERN_INFO "%s: revision %s\n", driver->name, driver->revision);
-
-        attach_capi_driver(driver);
+	b1_set_revision(&b1pci_driver, revision);
+        attach_capi_driver(&b1pci_driver);
 
 #ifdef CONFIG_ISDN_DRV_AVMB1_B1PCIV4
-	printk(KERN_INFO "%s: revision %s\n", driverv4->name, driverv4->revision);
-
-        attach_capi_driver(driverv4);
+	b1_set_revision(&b1pciv4_driver, revision);
+        attach_capi_driver(&b1pciv4_driver);
 #endif
 
 	retval = pci_module_init(&b1pci_pci_driver);
@@ -429,23 +407,24 @@ static int __init b1pci_init(void)
 		goto err;
 
 	printk(KERN_INFO "%s: %d B1-PCI card(s) detected\n",
-	       driver->name, retval);
+	       b1pci_driver.name, retval);
 	retval = 0;
 	goto out;
 
  err:
-	detach_capi_driver(driver);
+	detach_capi_driver(&b1pci_driver);
 #ifdef CONFIG_ISDN_DRV_AVMB1_B1PCIV4
-	detach_capi_driver(driverv4);
+	detach_capi_driver(&b1pciv4_driver);
 #endif
  out:
 	MOD_DEC_USE_COUNT;
-	return -ENODEV;
+	return retval;
 }
 
 static void __exit b1pci_exit(void)
 {
 	pci_unregister_driver(&b1pci_pci_driver);
+
 	detach_capi_driver(&b1pci_driver);
 #ifdef CONFIG_ISDN_DRV_AVMB1_B1PCIV4
 	detach_capi_driver(&b1pciv4_driver);

@@ -537,6 +537,7 @@ static inline void b1_setinterrupt(unsigned int base, unsigned irq,
 }
 
 /* b1.c */
+void b1_set_revision(struct capi_driver *driver, char *rev);
 avmcard *b1_alloc_card(int nr_controllers);
 void b1_free_card(avmcard *card);
 int b1_detect(unsigned int base, enum avmcardtype cardtype);
@@ -560,7 +561,6 @@ int b1ctl_read_proc(char *page, char **start, off_t off,
 avmcard_dmainfo *avmcard_dma_alloc(char *name, struct pci_dev *,
 				   long rsize, long ssize);
 void avmcard_dma_free(avmcard_dmainfo *);
-
 
 /* b1dma.c */
 int b1pciv4_detect(avmcard *card);

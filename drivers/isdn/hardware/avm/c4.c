@@ -1245,21 +1245,6 @@ static struct capi_driver c4_driver = {
 	add_card: 0, /* no add_card function */
 };
 
-static void c4_attach_driver (struct capi_driver * driver)
-{
-	char *p;
-	if ((p = strchr(revision, ':')) != 0 && p[1]) {
-		strncpy(driver->revision, p + 2, sizeof(driver->revision));
-		driver->revision[sizeof(driver->revision)-1] = 0;
-		if ((p = strchr(driver->revision, '$')) != 0 && p > driver->revision)
-			*(p-1) = 0;
-	}
-
-	printk(KERN_INFO "%s: revision %s\n", driver->name, driver->revision);
-
-        attach_capi_driver(driver);
-}
-
 static int __devinit c4_probe(struct pci_dev *dev,
 			      const struct pci_device_id *ent)
 {
@@ -1305,8 +1290,11 @@ static int __init c4_init(void)
 
 	MOD_INC_USE_COUNT;
 
-	c4_attach_driver (&c4_driver);
-	c4_attach_driver (&c2_driver);
+	b1_set_revision(&c2_driver, revision);
+        attach_capi_driver(&c2_driver);
+
+	b1_set_revision(&c4_driver, revision);
+        attach_capi_driver(&c4_driver);
 
 	retval = pci_module_init(&c4_pci_driver);
 	if (retval < 0)

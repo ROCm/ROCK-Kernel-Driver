@@ -203,25 +203,13 @@ EXPORT_SYMBOL(b1pcmcia_delcard);
 
 static int __init b1pcmcia_init(void)
 {
-	struct capi_driver *driver = &b1pcmcia_driver;
-	char *p;
-	int retval = 0;
-
 	MOD_INC_USE_COUNT;
 
-	if ((p = strchr(revision, ':')) != 0 && p[1]) {
-		strncpy(driver->revision, p + 2, sizeof(driver->revision));
-		driver->revision[sizeof(driver->revision)-1] = 0;
-		if ((p = strchr(driver->revision, '$')) != 0 && p > driver->revision)
-			*(p-1) = 0;
-	}
-
-	printk(KERN_INFO "%s: revision %s\n", driver->name, driver->revision);
-
-        attach_capi_driver(driver);
+	b1_set_revision(&b1pcmcia_driver, revision);
+        attach_capi_driver(&b1pcmcia_driver);
 
 	MOD_DEC_USE_COUNT;
-	return retval;
+	return 0;
 }
 
 static void __exit b1pcmcia_exit(void)

@@ -516,30 +516,18 @@ static struct capi_driver t1isa_driver = {
 
 static int __init t1isa_init(void)
 {
-	struct capi_driver *driver = &t1isa_driver;
-	char *p;
-	int retval = 0;
-
 	MOD_INC_USE_COUNT;
 
-	if ((p = strchr(revision, ':')) != 0 && p[1]) {
-		strncpy(driver->revision, p + 2, sizeof(driver->revision));
-		driver->revision[sizeof(driver->revision)-1] = 0;
-		if ((p = strchr(driver->revision, '$')) != 0 && p > driver->revision)
-			*(p-1) = 0;
-	}
-
-	printk(KERN_INFO "%s: revision %s\n", driver->name, driver->revision);
-
-        attach_capi_driver(driver);
+	b1_set_revision(&t1isa_driver, revision);
+        attach_capi_driver(&t1isa_driver);
 
 	MOD_DEC_USE_COUNT;
-	return retval;
+	return 0;
 }
 
 static void __exit t1isa_exit(void)
 {
-    detach_capi_driver(&t1isa_driver);
+	detach_capi_driver(&t1isa_driver);
 }
 
 module_init(t1isa_init);
