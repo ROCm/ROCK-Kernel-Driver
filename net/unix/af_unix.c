@@ -1317,8 +1317,8 @@ static int unix_stream_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 		if (size > sk->sndbuf/2 - 64)
 			size = sk->sndbuf/2 - 64;
 
-		if (size > (128 * 1024) / 2)
-			size = (128 * 1024) / 2;
+		if (size > SKB_MAX_ALLOC)
+			size = SKB_MAX_ALLOC;
 			
 		/*
 		 *	Grab a buffer

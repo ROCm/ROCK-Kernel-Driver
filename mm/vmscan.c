@@ -541,6 +541,7 @@ static void refill_inactive(int nr_pages)
 
 		del_page_from_active_list(page);
 		add_page_to_inactive_list(page);
+		SetPageReferenced(page);
 	}
 	spin_unlock(&pagemap_lru_lock);
 }

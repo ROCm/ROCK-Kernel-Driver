@@ -1544,6 +1544,7 @@ static int sg_build_dir(Sg_request * srp, Sg_fd * sfp, int dxfer_len)
 	num = (rem_sz > (PAGE_SIZE - offset)) ? (PAGE_SIZE - offset) :
 						rem_sz;
 	sclp->address = page_address(kp->maplist[k]) + offset;
+	sclp->page = NULL;
 	sclp->length = num;
 	mem_src_arr[k] = SG_USER_MEM;
 	rem_sz -= num;
@@ -1630,6 +1631,7 @@ static int sg_build_indi(Sg_scatter_hold * schp, Sg_fd * sfp, int buff_size)
                     break;
             }
             sclp->address = p;
+	    sclp->page = NULL;
             sclp->length = ret_sz;
 	    mem_src_arr[k] = mem_src;
 
@@ -1787,6 +1789,7 @@ static void sg_remove_scat(Sg_scatter_hold * schp)
                        k, sclp->address, sclp->length, mem_src));
             sg_free(sclp->address, sclp->length, mem_src);
             sclp->address = NULL;
+	    sclp->page = NULL;
             sclp->length = 0;
         }
 	sg_free(schp->buffer, schp->sglist_len, schp->buffer_mem_src);

@@ -3,7 +3,7 @@
  *
  *	Procfs interface for the PCI bus.
  *
- *	Copyright (c) 1997--1999 Martin Mares <mj@suse.cz>
+ *	Copyright (c) 1997--1999 Martin Mares <mj@ucw.cz>
  */
 
 #include <linux/types.h>

@@ -98,6 +98,7 @@ static inline void wait_on_page(struct page * page)
 }
 
 extern struct page * grab_cache_page (struct address_space *, unsigned long);
+extern struct page * grab_cache_page_nowait (struct address_space *, unsigned long);
 
 typedef int filler_t(void *, struct page*);
 

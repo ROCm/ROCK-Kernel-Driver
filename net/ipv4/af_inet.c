@@ -620,6 +620,13 @@ int inet_stream_connect(struct socket *sock, struct sockaddr * uaddr,
 		if (sk->state != TCP_CLOSE) 
 			goto out;
 
+		err = -EAGAIN;
+		if (sk->num == 0) {
+			if (sk->prot->get_port(sk, 0) != 0)
+				goto out;
+			sk->sport = htons(sk->num);
+		}
+
 		err = sk->prot->connect(sk, uaddr, addr_len);
 		if (err < 0)
 			goto out;

@@ -33,32 +33,6 @@ pager_daemon_t pager_daemon = {
 	8,	/* do swap I/O in clusters of this size */
 };
 
-/**
- * (de)activate_page - move pages from/to active and inactive lists
- * @page: the page we want to move
- * @nolock - are we already holding the pagemap_lru_lock?
- *
- * Deactivate_page will move an active page to the right
- * inactive list, while activate_page will move a page back
- * from one of the inactive lists to the active list. If
- * called on a page which is not on any of the lists, the
- * page is left alone.
- */
-static inline void deactivate_page_nolock(struct page * page)
-{
-	if (PageActive(page)) {
-		del_page_from_active_list(page);
-		add_page_to_inactive_list(page);
-	}
-}	
-
-void deactivate_page(struct page * page)
-{
-	spin_lock(&pagemap_lru_lock);
-	deactivate_page_nolock(page);
-	spin_unlock(&pagemap_lru_lock);
-}
-
 /*
  * Move an inactive page to the active list.
  */

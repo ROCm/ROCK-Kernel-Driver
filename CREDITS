@@ -1868,9 +1868,8 @@ S: 1324 Sofia
 S: Bulgaria
 
 N: Martin Mares
-E: mj@suse.cz
 E: mj@ucw.cz
-W: http://atrey.karlin.mff.cuni.cz/~mj/
+W: http://www.ucw.cz/~mj/
 D: BIOS video mode handling code
 D: MOXA C-218 serial board driver
 D: Network autoconfiguration

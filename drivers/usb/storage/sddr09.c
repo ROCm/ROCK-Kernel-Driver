@@ -637,9 +637,11 @@ int sddr09_read_map(struct us_data *us) {
 	for (i=0; i<alloc_blocks; i++) {
 		if (i<alloc_blocks-1) {
 			sg[i].address = kmalloc( (1<<17), GFP_KERNEL );
+			sg[i].page = NULL;
 			sg[i].length = (1<<17);
 		} else {
 			sg[i].address = kmalloc(alloc_len, GFP_KERNEL);
+			sg[i].page = NULL;
 			sg[i].length = alloc_len;
 		}
 		alloc_len -= sg[i].length;

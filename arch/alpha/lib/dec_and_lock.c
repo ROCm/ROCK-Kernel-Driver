@@ -1,0 +1,40 @@
+/*
+ * arch/alpha/lib/dec_and_lock.c
+ *
+ * ll/sc version of atomic_dec_and_lock()
+ * 
+ */
+
+#include <linux/spinlock.h>
+#include <asm/atomic.h>
+
+  asm (".text					\n\
+	.global atomic_dec_and_lock		\n\
+	.ent atomic_dec_and_lock		\n\
+	.align	4				\n\
+atomic_dec_and_lock:				\n\
+	.prologue 0				\n\
+1:	ldl_l	$1, 0($16)			\n\
+	subl	$1, 1, $1			\n\
+	beq	$1, 2f				\n\
+	stl_c	$1, 0($16)			\n\
+	beq	$1, 3f				\n\
+	mb					\n\
+	clr	$0				\n\
+	ret					\n\
+3:	br	1b				\n\
+2:	lda	$27, atomic_dec_and_lock_1	\n\
+	.end atomic_dec_and_lock");
+
+	/* FALLTHRU */
+
+static int __attribute__((unused))
+atomic_dec_and_lock_1(atomic_t *atomic, spinlock_t *lock)
+{
+	/* Slow path */
+	spin_lock(lock);
+	if (atomic_dec_and_test(atomic))
+		return 1;
+	spin_unlock(lock);
+	return 0;
+}

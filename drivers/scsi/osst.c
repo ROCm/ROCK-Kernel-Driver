@@ -4935,6 +4935,7 @@ static OSST_buffer * new_tape_buffer( int from_initialization, int need_dma )
 			tb->sg[0].address =
 			    (unsigned char *)__get_free_pages(priority, order);
 			if (tb->sg[0].address != NULL) {
+			    tb->sg[0].page = NULL;
 			    tb->sg[0].length = b_size;
 			    break;
 			}
@@ -4970,6 +4971,7 @@ static OSST_buffer * new_tape_buffer( int from_initialization, int need_dma )
 				tb = NULL;
 				break;
 			    }
+			    tb->sg[segs].page = NULL;
 			    tb->sg[segs].length = b_size;
 			    got += b_size;
 			    segs++;
@@ -5043,6 +5045,7 @@ static int enlarge_buffer(OSST_buffer *STbuffer, int new_size, int need_dma)
 			normalize_buffer(STbuffer);
 			return FALSE;
 		}
+		STbuffer->sg[segs].page = NULL;
 		STbuffer->sg[segs].length = b_size;
 		STbuffer->sg_segs += 1;
 		got += b_size;

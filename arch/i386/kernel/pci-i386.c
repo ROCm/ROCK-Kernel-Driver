@@ -12,7 +12,7 @@
  *	Hannover, Germany
  *	hm@ix.de
  *
- * Copyright 1997--2000 Martin Mares <mj@suse.cz>
+ * Copyright 1997--2000 Martin Mares <mj@ucw.cz>
  *
  * For more information, please consult the following manuals (look at
  * http://www.pcisig.com/ for how to get them):

@@ -295,9 +295,13 @@ do_entIF(unsigned long type, unsigned long a1,
 			   we get the correct PC.  If not, we set a flag
 			   to correct it every time through.
 			*/
-			if (opDEC_testing && regs.pc == opDEC_test_pc) {
-				opDEC_fix = 4;
-				printk("opDEC fixup enabled.\n");
+			if (opDEC_testing) {
+				if (regs.pc == opDEC_test_pc) {
+					opDEC_fix = 4;
+					regs.pc += 4;
+					printk("opDEC fixup enabled.\n");
+				}
+				return;
 			}
 			regs.pc += opDEC_fix; 
 			

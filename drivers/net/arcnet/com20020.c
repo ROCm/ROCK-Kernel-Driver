@@ -3,7 +3,7 @@
  * 
  * Written 1997 by David Woodhouse.
  * Written 1994-1999 by Avery Pennarun.
- * Written 1999 by Martin Mares <mj@suse.cz>.
+ * Written 1999 by Martin Mares <mj@ucw.cz>.
  * Derived from skeleton.c by Donald Becker.
  *
  * Special thanks to Contemporary Controls, Inc. (www.ccontrols.com)

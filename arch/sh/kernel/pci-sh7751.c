@@ -3,7 +3,7 @@
  *
  *  Dustin McIntire (dustin@sensoria.com)
  *	Derived from arch/i386/kernel/pci-*.c which bore the message:
- *	(c) 1999--2000 Martin Mares <mj@suse.cz>
+ *	(c) 1999--2000 Martin Mares <mj@ucw.cz>
  *	
  *  May be copied or modified under the terms of the GNU General Public
  *  License.  See linux/COPYING for more information.

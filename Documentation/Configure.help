@@ -12258,6 +12258,15 @@ CONFIG_JOLIET
   http://www.unicode.org for more information). Say Y here if you want
   to be able to read Joliet CDROMs under Linux.
 
+Transparent decompression extension
+CONFIG_ZISOFS
+  This is a Linux-specific extension to RockRidge which lets you store
+  data in compressed form on a CD-ROM and have it transparently
+  decompressed when the CD-ROM is accessed.  See
+  <http://www.kernel.org/pub/linux/utils/fs/zisofs/> for the tools
+  necessary to create such a filesystem.  Say Y here if you want to be
+  able to read such compressed CD-ROMs.
+
 UDF File System support (read only)
 CONFIG_UDF_FS
   This is the new file system used on some CDROMs and DVDs. Say Y if

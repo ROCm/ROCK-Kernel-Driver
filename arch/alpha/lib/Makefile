@@ -49,6 +49,10 @@ OBJS =	__divqu.o __remqu.o __divlu.o __remlu.o \
 	fpreg.o \
 	callback_srm.o srm_puts.o srm_printk.o
 
+ifeq ($(CONFIG_SMP),y)
+  OBJS += dec_and_lock.o
+endif
+
 lib.a: $(OBJS)
 	$(AR) rcs lib.a $(OBJS)
 

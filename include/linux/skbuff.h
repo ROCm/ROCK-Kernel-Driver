@@ -35,7 +35,9 @@
 #define CHECKSUM_UNNECESSARY 2
 
 #define SKB_DATA_ALIGN(X)	(((X) + (SMP_CACHE_BYTES-1)) & ~(SMP_CACHE_BYTES-1))
-#define SKB_MAX_HEAD(X)		((PAGE_SIZE - (X) - sizeof(struct skb_shared_info))&~(SMP_CACHE_BYTES-1))
+#define SKB_MAX_ORDER(X,ORDER)	(((PAGE_SIZE<<(ORDER)) - (X) - sizeof(struct skb_shared_info))&~(SMP_CACHE_BYTES-1))
+#define SKB_MAX_HEAD(X)		(SKB_MAX_ORDER((X),0))
+#define SKB_MAX_ALLOC		(SKB_MAX_ORDER(0,2))
 
 /* A. Checksumming of received packets by device.
  *

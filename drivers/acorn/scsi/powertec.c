@@ -187,7 +187,8 @@ powertecscsi_dma_setup(struct Scsi_Host *host, Scsi_Pointer *SCp,
 			memcpy(info->sg + 1, SCp->buffer + 1,
 				sizeof(struct scatterlist) * bufs);
 		info->sg[0].address = SCp->ptr;
-		info->sg[0].length = SCp->this_residual;
+		info->sg[0].page    = NULL;
+		info->sg[0].length  = SCp->this_residual;
 
 		if (direction == DMA_OUT)
 			pci_dir = PCI_DMA_TODEVICE,

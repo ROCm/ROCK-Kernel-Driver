@@ -168,7 +168,11 @@ static void dump_packet(const struct ip6t_log_info *info,
 		printk("WINDOW=%u ", ntohs(tcph->window));
 		/* Max length: 9 "RES=0x3F " */
 		printk("RES=0x%02x ", (u_int8_t)(ntohl(tcp_flag_word(tcph) & TCP_RESERVED_BITS) >> 22));
-		/* Max length: 36 "URG ACK PSH RST SYN FIN " */
+		/* Max length: 32 "CWR ECE URG ACK PSH RST SYN FIN " */
+		if (tcph->cwr)
+			printk("CWR ");
+		if (tcph->ece)
+			printk("ECE ");
 		if (tcph->urg)
 			printk("URG ");
 		if (tcph->ack)

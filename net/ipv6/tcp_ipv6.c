@@ -5,7 +5,7 @@
  *	Authors:
  *	Pedro Roque		<roque@di.fc.ul.pt>	
  *
- *	$Id: tcp_ipv6.c,v 1.141 2001/10/26 14:51:13 davem Exp $
+ *	$Id: tcp_ipv6.c,v 1.140 2001/10/15 12:34:50 davem Exp $
  *
  *	Based on: 
  *	linux/net/ipv4/tcp.c
@@ -486,21 +486,11 @@ not_unique:
 	return -EADDRNOTAVAIL;
 }
 
-static int tcp_v6_hash_connect(struct sock *sk, struct sockaddr_in6 *dst)
+static int tcp_v6_hash_connecting(struct sock *sk)
 {
-	struct tcp_bind_hashbucket *head;
-	struct tcp_bind_bucket *tb;
-
-	/* XXX */ 
-	if (sk->num == 0) { 
-		int err = tcp_v6_get_port(sk, sk->num);
-		if (err)
-			return err;
-		sk->sport = htons(sk->num); 	
-	} 
-		
-	head = &tcp_bhash[tcp_bhashfn(sk->num)];
-	tb = head->chain;
+	unsigned short snum = sk->num;
+	struct tcp_bind_hashbucket *head = &tcp_bhash[tcp_bhashfn(snum)];
+	struct tcp_bind_bucket *tb = head->chain;
 
 	spin_lock_bh(&head->lock);
 
@@ -530,6 +520,7 @@ static int tcp_v6_connect(struct sock *sk, struct sockaddr *uaddr,
 	struct in6_addr saddr_buf;
 	struct flowi fl;
 	struct dst_entry *dst;
+	struct sk_buff *buff;
 	int addr_type;
 	int err;
 
@@ -669,6 +660,12 @@ static int tcp_v6_connect(struct sock *sk, struct sockaddr *uaddr,
 		tp->ext_header_len = np->opt->opt_flen+np->opt->opt_nflen;
 	tp->mss_clamp = IPV6_MIN_MTU - sizeof(struct tcphdr) - sizeof(struct ipv6hdr);
 
+	err = -ENOBUFS;
+	buff = alloc_skb(MAX_TCP_HEADER + 15, sk->allocation);
+
+	if (buff == NULL)
+		goto failure;
+
 	sk->dport = usin->sin6_port;
 
 	/*
@@ -679,23 +676,12 @@ static int tcp_v6_connect(struct sock *sk, struct sockaddr *uaddr,
 		tp->write_seq = secure_tcpv6_sequence_number(np->saddr.s6_addr32,
 							     np->daddr.s6_addr32,
 							     sk->sport, sk->dport);
-	tcp_connect_init(sk);
 
-	tcp_set_state(sk, TCP_SYN_SENT); 
-	err = tcp_v6_hash_connect(sk, usin); 
-	if (!err) {
-		struct sk_buff *buff;
-		err = -ENOBUFS;
-		buff = alloc_skb(MAX_TCP_HEADER + 15, sk->allocation);
-		if (buff != NULL) { 
-			tcp_connect_send(sk, buff); 
-			return 0;
-		} 
-	}
+	err = tcp_connect(sk, buff);
+	if (err == 0)
+		return 0;
 
-
-	tcp_set_state(sk, TCP_CLOSE); 
- failure:
+failure:
 	__sk_dst_reset(sk);
 	sk->dport = 0;
 	sk->route_caps = 0;
@@ -1775,6 +1761,7 @@ static struct tcp_func ipv6_specific = {
 	tcp_v6_rebuild_header,
 	tcp_v6_conn_request,
 	tcp_v6_syn_recv_sock,
+	tcp_v6_hash_connecting,
 	tcp_v6_remember_stamp,
 	sizeof(struct ipv6hdr),
 
@@ -1794,6 +1781,7 @@ static struct tcp_func ipv6_mapped = {
 	tcp_v4_rebuild_header,
 	tcp_v6_conn_request,
 	tcp_v6_syn_recv_sock,
+	tcp_v4_hash_connecting,
 	tcp_v4_remember_stamp,
 	sizeof(struct iphdr),
 

@@ -1,7 +1,7 @@
 /*
  *	Low-Level PCI Support for SGI Visual Workstation
  *
- *	(c) 1999--2000 Martin Mares <mj@suse.cz>
+ *	(c) 1999--2000 Martin Mares <mj@ucw.cz>
  */
 
 #include <linux/config.h>

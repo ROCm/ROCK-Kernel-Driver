@@ -250,7 +250,7 @@ pci_map_single(struct pci_dev *pdev, void *cpu_addr, size_t size, int dir)
 	if (dir == PCI_DMA_NONE)
 		BUG();
 	return pci_map_single_1(pdev, cpu_addr, size,
-			        (pdev->dma_mask >> 32) != 0);
+				pdev ? (pdev->dma_mask >> 32) != 0 : 0);
 }
 
 dma_addr_t
@@ -260,7 +260,7 @@ pci_map_page(struct pci_dev *pdev, struct page *page, unsigned long offset,
 	if (dir == PCI_DMA_NONE)
 		BUG();
 	return pci_map_single_1(pdev, (char *)page_address(page) + offset,
-			        size, (pdev->dma_mask >> 32) != 0);
+			        size, pdev ? (pdev->dma_mask >> 32) != 0 : 0);
 }
 
 /* Unmap a single streaming mode DMA translation.  The DMA_ADDR and
@@ -304,7 +304,7 @@ pci_unmap_single(struct pci_dev *pdev, dma_addr_t dma_addr, size_t size,
 	dma_ofs = (dma_addr - arena->dma_base) >> PAGE_SHIFT;
 	if (dma_ofs * PAGE_SIZE >= arena->size) {
 		printk(KERN_ERR "Bogus pci_unmap_single: dma_addr %lx "
-		       " base %x size %x\n", dma_addr, arena->dma_base,
+		       " base %lx size %x\n", dma_addr, arena->dma_base,
 		       arena->size);
 		return;
 		BUG();

@@ -105,7 +105,6 @@ extern void FASTCALL(lru_cache_add(struct page *));
 extern void FASTCALL(__lru_cache_del(struct page *));
 extern void FASTCALL(lru_cache_del(struct page *));
 
-extern void FASTCALL(deactivate_page(struct page *));
 extern void FASTCALL(activate_page(struct page *));
 
 extern void swap_setup(void);

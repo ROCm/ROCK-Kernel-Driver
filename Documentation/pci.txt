@@ -1,6 +1,6 @@
 			 How To Write Linux PCI Drivers
 
-		  by Martin Mares <mj@suse.cz> on 07-Feb-2000
+		   by Martin Mares <mj@ucw.cz> on 07-Feb-2000
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The world of PCI is vast and it's full of (mostly unpleasant) surprises.

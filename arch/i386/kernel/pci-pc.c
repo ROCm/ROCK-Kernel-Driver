@@ -1,7 +1,7 @@
 /*
  *	Low-Level PCI Support for PC
  *
- *	(c) 1999--2000 Martin Mares <mj@suse.cz>
+ *	(c) 1999--2000 Martin Mares <mj@ucw.cz>
  */
 
 #include <linux/config.h>
@@ -521,7 +521,7 @@ static int __init check_pcibios(void)
 		DBG("PCI: BIOS probe returned s=%02x hw=%02x ver=%02x.%02x l=%02x\n",
 			status, hw_mech, major_ver, minor_ver, pcibios_last_bus);
 		if (status || signature != PCI_SIGNATURE) {
-			printk (KERN_ERR "PCI: BIOS BUG #%x[%08x] found, report to <mj@suse.cz>\n",
+			printk (KERN_ERR "PCI: BIOS BUG #%x[%08x] found\n",
 				status, signature);
 			return 0;
 		}
@@ -773,7 +773,7 @@ static struct pci_ops * __init pci_find_bios(void)
 		if (sum != 0)
 			continue;
 		if (check->fields.revision != 0) {
-			printk("PCI: unsupported BIOS32 revision %d at 0x%p, report to <mj@suse.cz>\n",
+			printk("PCI: unsupported BIOS32 revision %d at 0x%p\n",
 				check->fields.revision, check);
 			continue;
 		}

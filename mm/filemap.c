@@ -549,6 +549,7 @@ int generic_buffer_fdatasync(struct inode *inode, unsigned long start_idx, unsig
 int fail_writepage(struct page *page)
 {
 	activate_page(page);
+	SetPageReferenced(page);
 	SetPageDirty(page);
 	UnlockPage(page);
 	return 0;
@@ -949,6 +950,51 @@ struct page *grab_cache_page(struct address_space *mapping, unsigned long index)
 	return find_or_create_page(mapping, index, mapping->gfp_mask);
 }
 
+
+/*
+ * Same as grab_cache_page, but do not wait if the page is unavailable.
+ * This is intended for speculative data generators, where the data can
+ * be regenerated if the page couldn't be grabbed.  This routine should
+ * be safe to call while holding the lock for another page.
+ */
+struct page *grab_cache_page_nowait(struct address_space *mapping, unsigned long index)
+{
+	struct page *page, **hash;
+
+	hash = page_hash(mapping, index);
+	page = __find_get_page(mapping, index, hash);
+
+	if ( page ) {
+		if ( !TryLockPage(page) ) {
+			/* Page found and locked */
+			/* This test is overly paranoid, but what the heck... */
+			if ( unlikely(page->mapping != mapping || page->index != index) ) {
+				/* Someone reallocated this page under us. */
+				UnlockPage(page);
+				page_cache_release(page);
+				return NULL;
+			} else {
+				return page;
+			}
+		} else {
+			/* Page locked by someone else */
+			page_cache_release(page);
+			return NULL;
+		}
+	}
+
+	page = page_cache_alloc(mapping);
+	if ( unlikely(!page) )
+		return NULL;	/* Failed to allocate a page */
+
+	if ( unlikely(add_to_page_cache_unique(page, mapping, index, hash)) ) {
+		/* Someone else grabbed the page already. */
+		page_cache_release(page);
+		return NULL;
+	}
+
+	return page;
+}
 
 #if 0
 #define PROFILE_READAHEAD

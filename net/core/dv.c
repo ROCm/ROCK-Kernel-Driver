@@ -53,7 +53,7 @@ int alloc_divert_blk(struct net_device *dev)
 {
 	int alloc_size = (sizeof(struct divert_blk) + 3) & ~3;
 
-	if (!strncmp(dev->name, "eth", 3)) {
+	if (dev->type == ARPHRD_ETHER) {
 		printk(KERN_DEBUG "divert: allocating divert_blk for %s\n",
 		       dev->name);
 

@@ -5,7 +5,7 @@
  *  bugs.  Devices present only on certain architectures (host
  *  bridges et cetera) should be handled in arch-specific code.
  *
- *  Copyright (c) 1999 Martin Mares <mj@suse.cz>
+ *  Copyright (c) 1999 Martin Mares <mj@ucw.cz>
  *
  *  The bridge optimization stuff has been removed. If you really
  *  have a silly BIOS which is unable to set your host bridge right,

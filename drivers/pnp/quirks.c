@@ -8,7 +8,7 @@
  *
  *  Heavily based on PCI quirks handling which is
  *
- *  Copyright (c) 1999 Martin Mares <mj@suse.cz>
+ *  Copyright (c) 1999 Martin Mares <mj@ucw.cz>
  */
 
 #include <linux/types.h>

@@ -5,7 +5,7 @@
  *
  *	Based on the PCI version:
  *
- *	(c) 1999--2000 Martin Mares <mj@suse.cz>
+ *	(c) 1999--2000 Martin Mares <mj@ucw.cz>
  */
 
 #include <stdio.h>

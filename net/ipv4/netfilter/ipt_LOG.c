@@ -95,7 +95,11 @@ static void dump_packet(const struct ipt_log_info *info,
 		printk("WINDOW=%u ", ntohs(tcph->window));
 		/* Max length: 9 "RES=0x3F " */
 		printk("RES=0x%02x ", (u_int8_t)(ntohl(tcp_flag_word(tcph) & TCP_RESERVED_BITS) >> 22));
-		/* Max length: 36 "URG ACK PSH RST SYN FIN " */
+		/* Max length: 32 "CWR ECE URG ACK PSH RST SYN FIN " */
+		if (tcph->cwr)
+			printk("CWR ");
+		if (tcph->ece)
+			printk("ECE ");
 		if (tcph->urg)
 			printk("URG ");
 		if (tcph->ack)
@@ -254,7 +258,7 @@ static void dump_packet(const struct ipt_log_info *info,
 
 	/* Proto    Max log string length */
 	/* IP:      40+46+6+11+127 = 230 */
-	/* TCP:     10+max(25,20+30+13+9+36+11+127) = 256 */
+	/* TCP:     10+max(25,20+30+13+9+32+11+127) = 252 */
 	/* UDP:     10+max(25,20) = 35 */
 	/* ICMP:    11+max(25, 18+25+max(19,14,24+3+n+10,3+n+10)) = 91+n */
 	/* ESP:     10+max(25)+15 = 50 */
@@ -263,7 +267,7 @@ static void dump_packet(const struct ipt_log_info *info,
 
 	/* (ICMP allows recursion one level deep) */
 	/* maxlen =  IP + ICMP +  IP + max(TCP,UDP,ICMP,unknown) */
-	/* maxlen = 230+   91  + 230 + 256 = 807 */
+	/* maxlen = 230+   91  + 230 + 252 = 803 */
 }
 
 static unsigned int

@@ -810,7 +810,6 @@ shmem_file_write(struct file *file,const char *buf,size_t count,loff_t *ppos)
 	while (count) {
 		unsigned long bytes, index, offset;
 		char *kaddr;
-		int deactivate = 1;
 
 		/*
 		 * Try to find the page in the cache. If it isn't there,
@@ -821,7 +820,6 @@ shmem_file_write(struct file *file,const char *buf,size_t count,loff_t *ppos)
 		bytes = PAGE_CACHE_SIZE - offset;
 		if (bytes > count) {
 			bytes = count;
-			deactivate = 0;
 		}
 
 		/*
@@ -868,8 +866,6 @@ shmem_file_write(struct file *file,const char *buf,size_t count,loff_t *ppos)
 unlock:
 		/* Mark it unlocked again and drop the page.. */
 		UnlockPage(page);
-		if (deactivate)
-			deactivate_page(page);
 		page_cache_release(page);
 
 		if (status < 0)

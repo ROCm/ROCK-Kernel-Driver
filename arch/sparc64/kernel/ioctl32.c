@@ -1,4 +1,4 @@
-/* $Id: ioctl32.c,v 1.126 2001/10/18 11:41:02 davem Exp $
+/* $Id: ioctl32.c,v 1.127 2001/11/01 23:54:19 davem Exp $
  * ioctl32.c: Conversion between 32bit and 64bit native ioctls.
  *
  * Copyright (C) 1997-2000  Jakub Jelinek  (jakub@redhat.com)
@@ -589,44 +589,6 @@ static int ethtool_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 
 out:
 	free_page((unsigned long)ifr.ifr_data);
-	return err;
-}
-
-static int mii_ioctl(unsigned long fd, unsigned int cmd, unsigned long arg)
-{
-	struct ifreq ifr;
-	mm_segment_t old_fs;
-	int err;
-	u32 data;
-
-	if (copy_from_user(&ifr, (struct ifreq32 *)arg, sizeof(struct ifreq32)))
-		return -EFAULT;
-	ifr.ifr_data = (__kernel_caddr_t) kmalloc(sizeof(struct mii_ioctl_data),
-						  GFP_KERNEL);
-	if (!ifr.ifr_data)
-		return -EAGAIN;
-
-	__get_user(data, &(((struct ifreq32 *)arg)->ifr_ifru.ifru_data));
-	if (copy_from_user(ifr.ifr_data, (char *)A(data),
-			   sizeof(struct mii_ioctl_data))) {
-		err = -EFAULT;
-		goto out;
-	}
-
-	old_fs = get_fs();
-	set_fs(KERNEL_DS);
-	err = sys_ioctl(fd, cmd, (unsigned long)&ifr);
-	set_fs(old_fs);
-
-	if (!err) {
-		if (copy_to_user((char *)A(data),
-				 ifr.ifr_data,
-				 sizeof(struct mii_ioctl_data)))
-			err = -EFAULT;
-	}
-
-out:
-	kfree(ifr.ifr_data);
 	return err;
 }
 
@@ -4102,6 +4064,9 @@ COMPATIBLE_IOCTL(SIOCGRARP)
 COMPATIBLE_IOCTL(SIOCDRARP)
 COMPATIBLE_IOCTL(SIOCADDDLCI)
 COMPATIBLE_IOCTL(SIOCDELDLCI)
+COMPATIBLE_IOCTL(SIOCGMIIPHY)
+COMPATIBLE_IOCTL(SIOCGMIIREG)
+COMPATIBLE_IOCTL(SIOCSMIIREG)
 /* SG stuff */
 COMPATIBLE_IOCTL(SG_SET_TIMEOUT)
 COMPATIBLE_IOCTL(SG_GET_TIMEOUT)
@@ -4523,9 +4488,6 @@ HANDLE_IOCTL(SIOCGPPPVER, dev_ifsioc)
 HANDLE_IOCTL(SIOCGIFTXQLEN, dev_ifsioc)
 HANDLE_IOCTL(SIOCSIFTXQLEN, dev_ifsioc)
 HANDLE_IOCTL(SIOCETHTOOL, ethtool_ioctl)
-HANDLE_IOCTL(SIOCGMIIPHY, mii_ioctl)
-HANDLE_IOCTL(SIOCGMIIREG, mii_ioctl)
-HANDLE_IOCTL(SIOCSMIIREG, mii_ioctl)
 HANDLE_IOCTL(SIOCADDRT, routing_ioctl)
 HANDLE_IOCTL(SIOCDELRT, routing_ioctl)
 /* Note SIOCRTMSG is no longer, so this is safe and * the user would have seen just an -EINVAL anyways. */

@@ -614,6 +614,7 @@ CONFIG_TMPFS=y
 # CONFIG_RAMFS is not set
 CONFIG_ISO9660_FS=y
 # CONFIG_JOLIET is not set
+# CONFIG_ZISOFS is not set
 # CONFIG_MINIX_FS is not set
 # CONFIG_VXFS_FS is not set
 # CONFIG_NTFS_FS is not set
@@ -655,6 +656,8 @@ CONFIG_LOCKD=y
 # CONFIG_NCPFS_SMALLDOS is not set
 # CONFIG_NCPFS_NLS is not set
 # CONFIG_NCPFS_EXTRAS is not set
+# CONFIG_ZISOFS_FS is not set
+# CONFIG_ZLIB_FS_INFLATE is not set
 
 #
 # Partition Types

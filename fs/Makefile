@@ -27,6 +27,7 @@ subdir-y			+= partitions
 
 # Do not add any filesystems before this line
 subdir-$(CONFIG_EXT2_FS)	+= ext2
+subdir-$(CONFIG_ZLIB_FS_INFLATE) += inflate_fs
 subdir-$(CONFIG_CRAMFS)		+= cramfs
 subdir-$(CONFIG_RAMFS)		+= ramfs
 subdir-$(CONFIG_CODA_FS)	+= coda

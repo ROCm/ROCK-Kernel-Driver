@@ -52,8 +52,8 @@ __asm__ ("
 	.globl xor_vis_2
 	.type xor_vis_2,@function
 xor_vis_2:
-	rd	%fprs, %g1
-	andcc	%g1, FPRS_FEF|FPRS_DU, %g0
+	rd	%fprs, %o5
+	andcc	%o5, FPRS_FEF|FPRS_DU, %g0
 	be,pt	%icc, 0f
 	 sethi	%hi(VISenter), %g1
 	jmpl	%g1 + %lo(VISenter), %g7
@@ -124,8 +124,8 @@ xor_vis_2:
 	.globl xor_vis_3
 	.type xor_vis_3,@function
 xor_vis_3:
-	rd	%fprs, %g1
-	andcc	%g1, FPRS_FEF|FPRS_DU, %g0
+	rd	%fprs, %o5
+	andcc	%o5, FPRS_FEF|FPRS_DU, %g0
 	be,pt	%icc, 0f
 	 sethi	%hi(VISenter), %g1
 	jmpl	%g1 + %lo(VISenter), %g7
@@ -193,8 +193,8 @@ xor_vis_3:
 	.globl xor_vis_4
 	.type xor_vis_4,@function
 xor_vis_4:
-	rd	%fprs, %g1
-	andcc	%g1, FPRS_FEF|FPRS_DU, %g0
+	rd	%fprs, %o5
+	andcc	%o5, FPRS_FEF|FPRS_DU, %g0
 	be,pt	%icc, 0f
 	 sethi	%hi(VISenter), %g1
 	jmpl	%g1 + %lo(VISenter), %g7
@@ -281,13 +281,15 @@ xor_vis_4:
 	.globl xor_vis_5
 	.type xor_vis_5,@function
 xor_vis_5:
-	rd	%fprs, %g1
-	andcc	%g1, FPRS_FEF|FPRS_DU, %g0
+	mov	%o5, %g5
+	rd	%fprs, %o5
+	andcc	%o5, FPRS_FEF|FPRS_DU, %g0
 	be,pt	%icc, 0f
 	 sethi	%hi(VISenter), %g1
 	jmpl	%g1 + %lo(VISenter), %g7
 	 add	%g7, 8, %g7
 0:	wr	%g0, FPRS_FEF, %fprs
+	mov	%g5, %o5
 	rd	%asi, %g1
 	wr	%g0, ASI_BLK_P, %asi
 	membar	#LoadStore|#StoreLoad|#StoreStore

@@ -1151,9 +1151,9 @@ S:	Maintained
 
 PCI SUBSYSTEM
 P:	Martin Mares
-M:	mj@suse.cz
+M:	mj@ucw.cz
 L:	linux-kernel@vger.kernel.org
-S:	Supported
+S:	Odd Fixes
 
 PCMCIA SUBSYSTEM
 P:	David Hinds
@@ -1401,7 +1401,7 @@ S:	Maintained
 
 SVGA HANDLING
 P:	Martin Mares
-M:	mj@suse.cz
+M:	mj@ucw.cz
 L:	linux-video@atrey.karlin.mff.cuni.cz
 S:	Maintained
 

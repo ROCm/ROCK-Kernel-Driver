@@ -3,7 +3,7 @@
  *
  *	PCI Bus Services -- Function For Backward Compatibility
  *
- *	Copyright 1998--2000 Martin Mares <mj@suse.cz>
+ *	Copyright 1998--2000 Martin Mares <mj@ucw.cz>
  */
 
 #include <linux/types.h>

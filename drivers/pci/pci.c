@@ -6,7 +6,7 @@
  *	Copyright 1993 -- 1997 Drew Eckhardt, Frederic Potter,
  *	David Mosberger-Tang
  *
- *	Copyright 1997 -- 2000 Martin Mares <mj@suse.cz>
+ *	Copyright 1997 -- 2000 Martin Mares <mj@ucw.cz>
  */
 
 #include <linux/config.h>

@@ -911,7 +911,7 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 	if (!VALID_PAGE(old_page))
 		goto bad_wp_page;
 
-	if (PageSwapCache(old_page) && !TryLockPage(old_page)) {
+	if (!TryLockPage(old_page)) {
 		int reuse = can_share_swap_page(old_page);
 		unlock_page(old_page);
 		if (reuse) {

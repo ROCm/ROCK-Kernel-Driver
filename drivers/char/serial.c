@@ -4457,7 +4457,7 @@ static int __devinit serial_init_one(struct pci_dev *dev,
 	else if (serial_pci_guess_board(dev, &tmp) == 0) {
 		printk(KERN_INFO "Redundant entry in serial pci_table.  "
 		       "Please send the output of\n"
-		       "lspci -vv, this message (%d,%d,%d,%d)\n"
+		       "lspci -vv, this message (%04x,%04x,%04x,%04x)\n"
 		       "and the manufacturer and name of "
 		       "serial board or modem board\n"
 		       "to serial-pci-info@lists.sourceforge.net.\n",
