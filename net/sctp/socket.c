@@ -730,6 +730,7 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 	sctp_scope_t scope;
 	long timeo;
 	__u16 sinfo_flags = 0;
+	struct sk_buff_head chunks;
 
 	SCTP_DEBUG_PRINTK("sctp_sendmsg(sk: %p, msg: %p, msg_len: %d)\n",
 			  sk, msg, msg_len);
@@ -946,19 +947,6 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 		goto out_free;
 	}
 
-	/* FIXME: In the current implementation, a single chunk is created
-	 * for the entire message initially, even if it has to be fragmented
-	 * later.  As the length field in the chunkhdr is used to set
-	 * the chunk length, the maximum size of the chunk and hence the
-	 * message is limited by its type(__u16).
-	 * The real fix is to fragment the message before creating the chunks.
-	 */
-	if (msg_len > ((__u16)(~(__u16)0) -
-		       WORD_ROUND(sizeof(sctp_data_chunk_t)+1))) {
-		err = -EMSGSIZE;
-		goto out_free;
-	}
-
 	/* If fragmentation is disabled and the message length exceeds the
 	 * association fragmentation point, return EMSGSIZE.  The I-D
 	 * does not specify what this error is, but this looks like
@@ -991,13 +979,6 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 			goto out_free;
 	}
 
-	/* Get enough memory for the whole message.  */
-	chunk = sctp_make_data_empty(asoc, sinfo, msg_len);
-	if (!chunk) {
-		err = -ENOMEM;
-		goto out_free;
-	}
-
 #if 0
 	/* FIXME: This looks wrong so I'll comment out.
 	 * We should be able to use this same technique for
@@ -1013,20 +994,13 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 	}
 #endif /* 0 */
 
-	/* Copy the message from the user.  */
-	err = sctp_user_addto_chunk(chunk, msg_len, msg->msg_iov);
-	if (err < 0)
+	/* Break the message into multiple chunks of maximum size. */
+	skb_queue_head_init(&chunks);
+	err = sctp_datachunks_from_user(asoc, sinfo, msg, msg_len, &chunks);
+	if (err)
 		goto out_free;
 
-	SCTP_DEBUG_PRINTK("Copied message to chunk: %p.\n", chunk);
-
-	/* Put the chunk->skb back into the form expected by send.  */
-	__skb_pull(chunk->skb, (__u8 *)chunk->chunk_hdr
-		   - (__u8 *)chunk->skb->data);
-
-	/* Do accounting for the write space.  */
-	sctp_set_owner_w(chunk);
-
+	/* Auto-connect, if we aren't connected already. */
 	if (SCTP_STATE_CLOSED == asoc->state) {
 		err = sctp_primitive_ASSOCIATE(asoc, NULL);
 		if (err < 0)
@@ -1034,18 +1008,22 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 		SCTP_DEBUG_PRINTK("We associated primitively.\n");
 	}
 
-	/* Send it to the lower layers.  */
-	err = sctp_primitive_SEND(asoc, chunk);
+	/* Now send the (possibly) fragmented message. */
+	while ((chunk = (sctp_chunk_t *)__skb_dequeue(&chunks))) {
 
-	SCTP_DEBUG_PRINTK("We sent primitively.\n");
+		/* Do accounting for the write space.  */
+		sctp_set_owner_w(chunk);
+		/* Send it to the lower layers.  */
+		sctp_primitive_SEND(asoc, chunk);
+		SCTP_DEBUG_PRINTK("We sent primitively.\n");
+	}
 
-	/* BUG: SCTP_CHECK_TIMER(sk); */
 	if (!err) {
 		err = msg_len;
 		goto out_unlock;
 	}
 	/* If we are already past ASSOCIATE, the lower
-	 * layers are responsible for its cleanup.
+	 * layers are responsible for association cleanup.
 	 */
 	goto out_free_chunk;
 

@@ -270,6 +270,10 @@ sctp_chunk_t *sctp_make_op_error(const sctp_association_t *,
 				 size_t paylen);
 void sctp_chunk_assign_tsn(sctp_chunk_t *);
 void sctp_chunk_assign_ssn(sctp_chunk_t *);
+int sctp_datachunks_from_user(sctp_association_t *,
+			      const struct sctp_sndrcvinfo *,
+			      struct msghdr *, int len,
+			      struct sk_buff_head *);
 
 
 /* Prototypes for statetable processing. */

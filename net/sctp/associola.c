@@ -629,11 +629,6 @@ __u32 __sctp_association_get_tsn_block(sctp_association_t *asoc, int num)
 	return retval;
 }
 
-/* Fetch the next Stream Sequence Number for stream number 'sid'.  */
-__u16 __sctp_association_get_next_ssn(sctp_association_t *asoc, __u16 sid)
-{
-	return sctp_ssn_next(&asoc->ssnmap->out, sid);
-}
 
 /* Compare two addresses to see if they match.  Wildcard addresses
  * only match themselves.

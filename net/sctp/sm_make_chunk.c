@@ -244,7 +244,7 @@ sctp_chunk_t *sctp_make_init_ack(const sctp_association_t *asoc,
 	size_t chunksize;
 
 	retval = NULL;
-	
+
 	addrs = sctp_bind_addrs_to_raw(&asoc->base.bind_addr, &addrs_len, priority);
 	if (!addrs.v)
 		goto nomem_rawaddr;
@@ -1078,53 +1078,6 @@ void sctp_free_chunk(sctp_chunk_t *chunk)
 	SCTP_DBG_OBJCNT_DEC(chunk);
 }
 
-/* Do a deep copy of a chunk.  */
-sctp_chunk_t *sctp_copy_chunk(sctp_chunk_t *chunk, const int priority)
-{
-	sctp_chunk_t *retval;
-	long offset;
-
-	retval = t_new(sctp_chunk_t, priority);
-	if (!retval)
-		goto nodata;
-
-	/* Do the shallow copy.  */
-	*retval = *chunk;
-
-	/* Make sure that the copy does NOT think it is on any lists.  */
-	retval->next = NULL;
-	retval->prev = NULL;
-	retval->list = NULL;
-	INIT_LIST_HEAD(&retval->transmitted_list);
-	INIT_LIST_HEAD(&retval->frag_list);
-
-	/* Now we copy the deep structure.  */
-	retval->skb = skb_copy(chunk->skb, priority);
-	if (!retval->skb) {
-		kfree(retval);
-		goto nodata;
-	}
-
-	/* Move the copy headers to point into the new skb.  */
-	offset = ((__u8 *)retval->skb->head)
-		- ((__u8 *)chunk->skb->head);
-
-	if (retval->param_hdr.v)
-		retval->param_hdr.v += offset;
-	if (retval->subh.v)
-		retval->subh.v += offset;
-	if (retval->chunk_end)
-		((__u8 *) retval->chunk_end) += offset;
-	if (retval->chunk_hdr)
-		((__u8 *) retval->chunk_hdr) += offset;
-	if (retval->sctp_hdr)
-		((__u8 *) retval->sctp_hdr) += offset;
-	SCTP_DBG_OBJCNT_INC(chunk);
-	return retval;
-
-nodata:
-	return NULL;
-}
 
 /* Append bytes to the end of a chunk.  Will panic if chunk is not big
  * enough.
@@ -1153,7 +1106,8 @@ void *sctp_addto_chunk(sctp_chunk_t *chunk, int len, const void *data)
  * chunk is not big enough.
  * Returns a kernel err value.
  */
-int sctp_user_addto_chunk(sctp_chunk_t *chunk, int len, struct iovec *data)
+static int sctp_user_addto_chunk(sctp_chunk_t *chunk, int off, int len,
+				 struct iovec *data)
 {
 	__u8 *target;
 	int err = 0;
@@ -1162,7 +1116,7 @@ int sctp_user_addto_chunk(sctp_chunk_t *chunk, int len, struct iovec *data)
 	target = skb_put(chunk->skb, len);
 
 	/* Copy data (whole iovec) into chunk */
-	if ((err = memcpy_fromiovec(target, data, len)))
+	if ((err = memcpy_fromiovecend(target, data, off, len)))
 		goto out;
 
 	/* Adjust the chunk length field.  */
@@ -1170,6 +1124,125 @@ int sctp_user_addto_chunk(sctp_chunk_t *chunk, int len, struct iovec *data)
 		htons(ntohs(chunk->chunk_hdr->length) + len);
 	chunk->chunk_end = chunk->skb->tail;
 
+out:
+	return err;
+}
+
+/* A data chunk can have a maximum payload of (2^16 - 20).  Break
+ * down any such message into smaller chunks.  Opportunistically, fragment
+ * the chunks down to the current MTU constraints.  We may get refragmented
+ * later if the PMTU changes, but it is _much better_ to fragment immediately
+ * with a reasonable guess than always doing our fragmentation on the
+ * soft-interrupt.
+ */
+
+
+int sctp_datachunks_from_user(sctp_association_t *asoc,
+			      const struct sctp_sndrcvinfo *sinfo,
+			      struct msghdr *msg, int msg_len,
+			      struct sk_buff_head *chunks)
+{
+	int max, whole, i, offset, over, err;
+	int len, first_len;
+	sctp_chunk_t *chunk;
+	__u8 frag;
+
+	/* What is a reasonable fragmentation point right now? */
+	max = asoc->pmtu;
+	if (max < SCTP_MIN_PMTU)
+		max = SCTP_MIN_PMTU;
+	max -= SCTP_IP_OVERHEAD;
+
+	/* Make sure not beyond maximum chunk size. */
+	if (max > SCTP_MAX_CHUNK_LEN)
+		max = SCTP_MAX_CHUNK_LEN;
+
+	/* Subtract out the overhead of a data chunk header. */
+	max -= sizeof(struct sctp_data_chunk);
+
+	whole = 0;
+	first_len = max;
+
+	/* Encourage Cookie-ECHO bundling. */
+	if (asoc->state < SCTP_STATE_ESTABLISHED) {
+		whole = msg_len / (max - SCTP_ARBITRARY_COOKIE_ECHO_LEN);
+
+		/* Account for the DATA to be bundled with the COOKIE-ECHO. */
+		if (whole) {
+			first_len = max - SCTP_ARBITRARY_COOKIE_ECHO_LEN;
+			msg_len -= first_len;
+			whole = 1;
+		}
+	} 
+
+	/* How many full sized?  How many bytes leftover? */
+	whole += msg_len / max;
+	over = msg_len % max;
+	offset = 0;
+
+	/* Create chunks for all the full sized DATA chunks. */
+	for (i=0, len=first_len; i < whole; i++) {
+		frag = SCTP_DATA_MIDDLE_FRAG;
+
+		if (0 == i)
+			frag |= SCTP_DATA_FIRST_FRAG;
+
+		if ((i == (whole - 1)) && !over)
+			frag |= SCTP_DATA_LAST_FRAG;
+
+		chunk = sctp_make_datafrag_empty(asoc, sinfo, len, frag, 0);
+
+		if (!chunk)
+			goto nomem;
+		err = sctp_user_addto_chunk(chunk, offset, len, msg->msg_iov);
+		if (err < 0)
+			goto errout;
+
+		offset += len;
+
+		/* Put the chunk->skb back into the form expected by send.  */
+		__skb_pull(chunk->skb, (__u8 *)chunk->chunk_hdr
+			   - (__u8 *)chunk->skb->data);
+
+		__skb_queue_tail(chunks, (struct sk_buff *)chunk);
+
+		/* The first chunk, the first chunk was likely short 
+		 * to allow bundling, so reset to full size.
+		 */
+		if (0 == i)
+			len = max;
+	}
+
+	/* .. now the leftover bytes. */
+	if (over) {
+		if (!whole)
+			frag = SCTP_DATA_NOT_FRAG;
+		else
+			frag = SCTP_DATA_LAST_FRAG;
+
+		chunk = sctp_make_datafrag_empty(asoc, sinfo, over, frag, 0);
+
+		if (!chunk)
+			goto nomem;
+
+		err = sctp_user_addto_chunk(chunk, offset, over, msg->msg_iov);
+
+		/* Put the chunk->skb back into the form expected by send.  */
+		__skb_pull(chunk->skb, (__u8 *)chunk->chunk_hdr
+			   - (__u8 *)chunk->skb->data);
+		if (err < 0)
+			goto errout;
+
+		__skb_queue_tail(chunks, (struct sk_buff *)chunk);
+	}
+	err = 0;
+	goto out;
+
+nomem:
+	err = -ENOMEM;
+errout:
+	while ((chunk = (sctp_chunk_t *)__skb_dequeue(chunks)))
+		sctp_free_chunk(chunk);
 out:
 	return err;
 }
@@ -1190,7 +1263,11 @@ void sctp_chunk_assign_ssn(sctp_chunk_t *chunk)
 		ssn = 0;
 	} else {
 		sid = htons(chunk->subh.data_hdr->stream);
-		ssn = htons(__sctp_association_get_next_ssn(chunk->asoc, sid));
+		if (chunk->chunk_hdr->flags & SCTP_DATA_LAST_FRAG)
+			ssn = sctp_ssn_next(&chunk->asoc->ssnmap->out, sid);
+		else
+			ssn = sctp_ssn_peek(&chunk->asoc->ssnmap->out, sid);
+		ssn = htons(ssn);
 	}
 
 	chunk->subh.data_hdr->ssn = ssn;

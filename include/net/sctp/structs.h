@@ -567,9 +567,7 @@ struct SCTP_chunk {
 sctp_chunk_t *sctp_make_chunk(const sctp_association_t *, __u8 type,
 			      __u8 flags, int size);
 void sctp_free_chunk(sctp_chunk_t *);
-sctp_chunk_t *sctp_copy_chunk(sctp_chunk_t *, int flags);
 void  *sctp_addto_chunk(sctp_chunk_t *chunk, int len, const void *data);
-int sctp_user_addto_chunk(sctp_chunk_t *chunk, int len, struct iovec *data);
 sctp_chunk_t *sctp_chunkify(struct sk_buff *, const sctp_association_t *,
 			    struct sock *);
 void sctp_init_addrs(sctp_chunk_t *, union sctp_addr *, union sctp_addr *);
@@ -941,7 +939,7 @@ int sctp_outq_set_output_handlers(struct sctp_outq *,
 				  sctp_outq_ohandler_t build,
 				  sctp_outq_ohandler_force_t force);
 void sctp_outq_restart(struct sctp_outq *);
-void sctp_retransmit(struct sctp_outq *, struct sctp_transport *, 
+void sctp_retransmit(struct sctp_outq *, struct sctp_transport *,
 		     sctp_retransmit_reason_t);
 void sctp_retransmit_mark(struct sctp_outq *, struct sctp_transport *, __u8);
 
@@ -1115,10 +1113,7 @@ static inline sctp_endpoint_t *sctp_ep(sctp_endpoint_common_t *base)
 {
 	sctp_endpoint_t *ep;
 
-	/* We are not really a list, but the list_entry() macro is
-	 * really quite generic to find the address of an outter struct.
-	 */
-	ep = list_entry(base, sctp_endpoint_t, base);
+	ep = container_of(base, sctp_endpoint_t, base);
 	return ep;
 }
 
@@ -1592,10 +1587,7 @@ static inline sctp_association_t *sctp_assoc(sctp_endpoint_common_t *base)
 {
 	sctp_association_t *asoc;
 
-	/* We are not really a list, but the list_entry() macro is
-	 * really quite generic find the address of an outter struct.
-	 */
-	asoc = list_entry(base, sctp_association_t, base);
+	asoc = container_of(base, sctp_association_t, base);
 	return asoc;
 }
 
