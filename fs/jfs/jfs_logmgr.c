@@ -73,10 +73,11 @@
 
 
 /*
- * lbuf's ready to be redriven.  Protected by log_redrive_lock (jfsIOtask)
+ * lbuf's ready to be redriven.  Protected by log_redrive_lock (jfsIO thread)
  */
 static lbuf_t *log_redrive_list;
 static spinlock_t log_redrive_lock = SPIN_LOCK_UNLOCKED;
+DECLARE_WAIT_QUEUE_HEAD(jfs_IO_thread_wait);
 
 
 /*
@@ -159,8 +160,7 @@ do {						\
  * external references
  */
 extern void txLazyUnlock(tblock_t * tblk);
-extern int jfs_thread_stopped(void);
-extern struct task_struct *jfsIOtask;
+extern int jfs_stop_threads;
 extern struct completion jfsIOwait;
 
 /*
@@ -1779,7 +1779,7 @@ static inline void lbmRedrive(lbuf_t *bp)
 	log_redrive_list = bp;
 	spin_unlock_irqrestore(&log_redrive_lock, flags);
 
-	wake_up_process(jfsIOtask);
+	wake_up(&jfs_IO_thread_wait);
 }
 
 
@@ -2154,17 +2154,16 @@ int jfsIOWait(void *arg)
 
 	unlock_kernel();
 
-	jfsIOtask = current;
-
 	spin_lock_irq(&current->sigmask_lock);
-	siginitsetinv(&current->blocked,
-		      sigmask(SIGHUP) | sigmask(SIGKILL) | sigmask(SIGSTOP)
-		      | sigmask(SIGCONT));
+	sigfillset(&current->blocked);
+	recalc_sigpending(current);
 	spin_unlock_irq(&current->sigmask_lock);
 
 	complete(&jfsIOwait);
 
 	do {
+		DECLARE_WAITQUEUE(wq, current);
+
 		spin_lock_irq(&log_redrive_lock);
 		while ((bp = log_redrive_list)) {
 			log_redrive_list = bp->l_redrive_next;
@@ -2173,11 +2172,13 @@ int jfsIOWait(void *arg)
 			lbmStartIO(bp);
 			spin_lock_irq(&log_redrive_lock);
 		}
-		spin_unlock_irq(&log_redrive_lock);
-
+		add_wait_queue(&jfs_IO_thread_wait, &wq);
 		set_current_state(TASK_INTERRUPTIBLE);
+		spin_unlock_irq(&log_redrive_lock);
 		schedule();
-	} while (!jfs_thread_stopped());
+		current->state = TASK_RUNNING;
+		remove_wait_queue(&jfs_IO_thread_wait, &wq);
+	} while (!jfs_stop_threads);
 
 	jFYI(1,("jfsIOWait being killed!\n"));
 	complete(&jfsIOwait);

@@ -100,6 +100,9 @@ static spinlock_t jfsTxnLock = SPIN_LOCK_UNLOCKED;
 #define LAZY_LOCK(flags)	spin_lock_irqsave(&TxAnchor.LazyLock, flags)
 #define LAZY_UNLOCK(flags) spin_unlock_irqrestore(&TxAnchor.LazyLock, flags)
 
+DECLARE_WAIT_QUEUE_HEAD(jfs_sync_thread_wait);
+DECLARE_WAIT_QUEUE_HEAD(jfs_commit_thread_wait);
+
 /*
  * Retry logic exist outside these macros to protect from spurrious wakeups.
  */
@@ -143,11 +146,10 @@ extern int lmGroupCommit(log_t * log, tblock_t * tblk);
 extern void lmSync(log_t *);
 extern int readSuper(struct super_block *sb, metapage_t ** bpp);
 extern int jfs_commit_inode(struct inode *, int);
-extern int jfs_thread_stopped(void);
+extern int jfs_stop_threads;
 
-extern struct task_struct *jfsCommitTask;
+struct task_struct *jfsCommitTask;
 extern struct completion jfsIOwait;
-extern struct task_struct *jfsSyncTask;
 
 /*
  * forward references
@@ -190,7 +192,7 @@ static lid_t txLockAlloc(void)
 	if ((++TxAnchor.tlocksInUse > TxLockHWM) && (TlocksLow == 0)) {
 		jEVENT(0,("txLockAlloc TlocksLow\n"));
 		TlocksLow = 1;
-	wake_up_process(jfsSyncTask);
+		wake_up(&jfs_sync_thread_wait);
 	}
 
 	return lid;
@@ -1223,11 +1225,10 @@ int txCommit(tid_t tid,		/* transaction identifier */
 	 */
 	if (tblk->xflag & (COMMIT_CREATE | COMMIT_DELETE))
 		atomic_inc(&tblk->ip->i_count);
-	if (tblk->xflag & COMMIT_DELETE) {
-		ip = tblk->ip;
-		assert((ip->i_nlink == 0) && !test_cflag(COMMIT_Nolink, ip));
-		set_cflag(COMMIT_Nolink, ip);
-	}
+
+	ASSERT((!(tblk->xflag & COMMIT_DELETE)) ||
+	       ((tblk->ip->i_nlink == 0) &&
+		!test_cflag(COMMIT_Nolink, tblk->ip)));
 
 	/*
 	 *      write COMMIT log record
@@ -2784,9 +2785,8 @@ int jfs_lazycommit(void)
 	jfsCommitTask = current;
 
 	spin_lock_irq(&current->sigmask_lock);
-	siginitsetinv(&current->blocked,
-		      sigmask(SIGHUP) | sigmask(SIGKILL) | sigmask(SIGSTOP)
-		      | sigmask(SIGCONT));
+	sigfillset(&current->blocked);
+	recalc_sigpending(current);
 	spin_unlock_irq(&current->sigmask_lock);
 
 	LAZY_LOCK_INIT();
@@ -2795,6 +2795,8 @@ int jfs_lazycommit(void)
 	complete(&jfsIOwait);
 
 	do {
+		DECLARE_WAITQUEUE(wq, current);
+
 		LAZY_LOCK(flags);
 restart:
 		WorkDone = 0;
@@ -2832,10 +2834,13 @@ restart:
 		if (WorkDone)
 			goto restart;
 
-		LAZY_UNLOCK(flags);
+		add_wait_queue(&jfs_commit_thread_wait, &wq);
 		set_current_state(TASK_INTERRUPTIBLE);
+		LAZY_UNLOCK(flags);
 		schedule();
-	} while (!jfs_thread_stopped());
+		current->state = TASK_RUNNING;
+		remove_wait_queue(&jfs_commit_thread_wait, &wq);
+	} while (!jfs_stop_threads);
 
 	if (TxAnchor.unlock_queue)
 		jERROR(1, ("jfs_lazycommit being killed with pending transactions!\n"));
@@ -2858,7 +2863,7 @@ void txLazyUnlock(tblock_t * tblk)
 	TxAnchor.unlock_tail = tblk;
 	tblk->cqnext = 0;
 	LAZY_UNLOCK(flags);
-	wake_up_process(jfsCommitTask);
+	wake_up(&jfs_commit_thread_wait);
 }
 
 static void LogSyncRelease(metapage_t * mp)
@@ -2905,17 +2910,15 @@ int jfs_sync(void)
 
 	unlock_kernel();
 
-	jfsSyncTask = current;
-
 	spin_lock_irq(&current->sigmask_lock);
-	siginitsetinv(&current->blocked,
-		      sigmask(SIGHUP) | sigmask(SIGKILL) | sigmask(SIGSTOP)
-		      | sigmask(SIGCONT));
+	sigfillset(&current->blocked);
+	recalc_sigpending(current);
 	spin_unlock_irq(&current->sigmask_lock);
 
 	complete(&jfsIOwait);
 
 	do {
+		DECLARE_WAITQUEUE(wq, current);
 		/*
 		 * write each inode on the anonymous inode list
 		 */
@@ -2976,11 +2979,13 @@ int jfs_sync(void)
 			list_splice(&TxAnchor.anon_list2, &TxAnchor.anon_list);
 			INIT_LIST_HEAD(&TxAnchor.anon_list2);
 		}
-		TXN_UNLOCK();
-
+		add_wait_queue(&jfs_sync_thread_wait, &wq);
 		set_current_state(TASK_INTERRUPTIBLE);
+		TXN_UNLOCK();
 		schedule();
-	} while (!jfs_thread_stopped());
+		current->state = TASK_RUNNING;
+		remove_wait_queue(&jfs_sync_thread_wait, &wq);
+	} while (!jfs_stop_threads);
 
 	jFYI(1, ("jfs_sync being killed\n"));
 	complete(&jfsIOwait);
