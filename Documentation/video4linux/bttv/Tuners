@@ -10,6 +10,7 @@ SAMSUNG Tuner identification: (e.g. TCPM9091PD27)
    M= BG+I+DK
    N= NTSC 
    Q= BG+I+DK+LL
+ [89]: ?
  [125]:
    2: No FM
    5: With FM
@@ -24,22 +25,23 @@ SAMSUNG Tuner identification: (e.g. TCPM9091PD27)
    3-wire/I2C tuning, 2-band/3-band
 
 Philips Tuner identification: (e.g. FM1216MF)
-  F[IRMQ]12[1345]{MF|ME|MP}
-  [IRMQ]:
-   I: Tuner Series
-   R: Tuner + Radio IF
-   M: Tuner + FM
-   Q,MR: specials
+  F[IRMQ]12[1345]6{MF|ME|MP}
+  F[IRMQ]:
+   FI12x6: Tuner Series
+   FR12x6: Tuner + Radio IF
+   FM12x6: Tuner + FM
+   FQ12x6: special
+   FMR12x6: special
    TD15xx: Digital Tuner ATSC
-  [1345]
-   1: PAL BG
-   3: NTSC
-   4: PAL I
-   5: Pal DK
+  12[1345]6:
+   1216: PAL BG
+   1236: NTSC
+   1246: PAL I
+   1256: Pal DK
   {MF|ME|MP}
    MF: w/ Secam
-   ME: BD DK I LL
-   MP: BG DK I
+   ME: BG DK I LL   (Multi Europe)
+   MP: BG DK I      (Multi PAL)
    MR: BG DK M (?)
    MG: BG DKI M (?)
 
@@ -50,10 +52,10 @@ Temic Tuner identification: (.e.g 4006FH5)
     41xx: Tuner compact
     40x9: Tuner+FM compact
    [0136]
-    0: PAL BG
-    1: Pal DK, Secam LL
-    3: NTSC
-    6: PAL I
+    xx0x: PAL BG
+    xx1x: Pal DK, Secam LL
+    xx3x: NTSC
+    xx6x: PAL I
    F[HYNR]5
     FH5: Pal BG
     FY5: others
@@ -86,3 +88,8 @@ LG Innotek Tuner:
     P= Standard phono female socket
     D= IEC female socket
     F= F-connector
+
+Other Tuners:
+TCL2002MB-1 : PAL BG + DK       =TUNER_LG_PAL_NEW_TAPC
+TCL2002MB-1F: PAL BG + DK w/FM  =PHILIPS_PAL
+TCL2002MI-2 : PAL I		= ??
