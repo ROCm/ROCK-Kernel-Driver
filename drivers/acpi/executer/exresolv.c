@@ -327,10 +327,43 @@ acpi_ex_resolve_multiple (
 	union acpi_operand_object       *obj_desc = (void *) operand;
 	struct acpi_namespace_node      *node;
 	acpi_object_type                type;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_ex_resolve_multiple");
 
+
+	/*
+	 * Operand can be either a namespace node or an operand descriptor
+	 */
+	switch (ACPI_GET_DESCRIPTOR_TYPE (obj_desc)) {
+	case ACPI_DESC_TYPE_OPERAND:
+		type = obj_desc->common.type;
+		break;
+
+	case ACPI_DESC_TYPE_NAMED:
+		type = ((struct acpi_namespace_node *) obj_desc)->type;
+		obj_desc = acpi_ns_get_attached_object ((struct acpi_namespace_node *) obj_desc);
+
+		/* If we had an Alias node, use the attached object for type info */
+
+		if (type == ACPI_TYPE_LOCAL_ALIAS) {
+			type = ((struct acpi_namespace_node *) obj_desc)->type;
+			obj_desc = acpi_ns_get_attached_object ((struct acpi_namespace_node *) obj_desc);
+		}
+		break;
+
+	default:
+		return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
+	}
+
+
+	/*
+	 * If type is anything other than a reference, we are done
+	 */
+	if (type != ACPI_TYPE_LOCAL_REFERENCE) {
+		goto exit;
+	}
 
 	/*
 	 * For reference objects created via the ref_of or Index operators,
@@ -420,6 +453,33 @@ acpi_ex_resolve_multiple (
 
 			if (obj_desc == operand) {
 				return_ACPI_STATUS (AE_AML_CIRCULAR_REFERENCE);
+			}
+			break;
+
+
+		case AML_LOCAL_OP:
+		case AML_ARG_OP:
+
+			if (return_desc) {
+				status = acpi_ds_method_data_get_value (obj_desc->reference.opcode,
+						  obj_desc->reference.offset, walk_state, &obj_desc);
+				if (ACPI_FAILURE (status)) {
+					return_ACPI_STATUS (status);
+				}
+				acpi_ut_remove_reference (obj_desc);
+			}
+			else {
+				status = acpi_ds_method_data_get_node (obj_desc->reference.opcode,
+						 obj_desc->reference.offset, walk_state, &node);
+				if (ACPI_FAILURE (status)) {
+					return_ACPI_STATUS (status);
+				}
+
+				obj_desc = acpi_ns_get_attached_object (node);
+				if (!obj_desc) {
+					type = ACPI_TYPE_ANY;
+					goto exit;
+				}
 			}
 			break;
 

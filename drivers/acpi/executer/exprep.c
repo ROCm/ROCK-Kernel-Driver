@@ -508,6 +508,7 @@ acpi_ex_prep_field_value (
 
 		if (!obj_desc->index_field.data_obj || !obj_desc->index_field.index_obj) {
 			ACPI_REPORT_ERROR (("Null Index Object during field prep\n"));
+			acpi_ut_delete_object_desc (obj_desc);
 			return_ACPI_STATUS (AE_AML_INTERNAL);
 		}
 

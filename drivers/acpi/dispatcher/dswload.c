@@ -182,18 +182,20 @@ acpi_ds_load1_begin_op (
 		 */
 		status = acpi_ns_lookup (walk_state->scope_info, path, object_type,
 				  ACPI_IMODE_EXECUTE, ACPI_NS_SEARCH_PARENT, walk_state, &(node));
-		if (ACPI_FAILURE (status)) {
 #ifdef _ACPI_ASL_COMPILER
-			if (status == AE_NOT_FOUND) {
-				acpi_dm_add_to_external_list (path);
-				status = AE_OK;
-			}
-			else {
-				ACPI_REPORT_NSERROR (path, status);
-			}
-#else
-			ACPI_REPORT_NSERROR (path, status);
+		if (status == AE_NOT_FOUND) {
+			/*
+			 * Table disassembly:
+			 * Target of Scope() not found.  Generate an External for it, and
+			 * insert the name into the namespace.
+			 */
+			acpi_dm_add_to_external_list (path);
+			status = acpi_ns_lookup (walk_state->scope_info, path, object_type,
+					   ACPI_IMODE_LOAD_PASS1, ACPI_NS_SEARCH_PARENT, walk_state, &(node));
+		}
 #endif
+		if (ACPI_FAILURE (status)) {
+			ACPI_REPORT_NSERROR (path, status);
 			return (status);
 		}
 

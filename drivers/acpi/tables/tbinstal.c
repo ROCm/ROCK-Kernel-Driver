@@ -266,9 +266,10 @@ acpi_tb_init_table_descriptor (
 	if (ACPI_IS_SINGLE_TABLE (acpi_gbl_table_data[table_type].flags)) {
 		/*
 		 * Only one table allowed, and a table has alread been installed
-		 *  at this location, so return an error.
+		 * at this location, so return an error.
 		 */
 		if (list_head->next) {
+			ACPI_MEM_FREE (table_desc);
 			return_ACPI_STATUS (AE_ALREADY_EXISTS);
 		}
 

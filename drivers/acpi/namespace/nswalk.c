@@ -264,8 +264,8 @@ acpi_ns_walk_namespace (
 					 * node, visit the onde
 					 */
 					level++;
-					parent_node   = child_node;
-					child_node    = NULL;
+					parent_node = child_node;
+					child_node = NULL;
 				}
 			}
 		}

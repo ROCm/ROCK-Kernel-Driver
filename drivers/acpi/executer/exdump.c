@@ -63,7 +63,7 @@
  *
  * PARAMETERS:  *obj_desc         - Pointer to entry to be dumped
  *
- * RETURN:      Status
+ * RETURN:      None
  *
  * DESCRIPTION: Dump an operand object
  *
@@ -71,12 +71,11 @@
 
 void
 acpi_ex_dump_operand (
-	union acpi_operand_object       *obj_desc)
+	union acpi_operand_object       *obj_desc,
+	u32                             depth)
 {
-	u8                              *buf = NULL;
 	u32                             length;
-	union acpi_operand_object       **element;
-	u16                             element_index;
+	u32                             index;
 
 
 	ACPI_FUNCTION_NAME ("ex_dump_operand")
@@ -88,9 +87,9 @@ acpi_ex_dump_operand (
 
 	if (!obj_desc) {
 		/*
-		 * This usually indicates that something serious is wrong
+		 * This could be a null element of a package
 		 */
-		acpi_os_printf ("Null Object Descriptor\n");
+		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Null Object Descriptor\n"));
 		return;
 	}
 
@@ -110,7 +109,11 @@ acpi_ex_dump_operand (
 
 	/* obj_desc is a valid object */
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "%p ", obj_desc));
+	if (depth > 0) {
+		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_EXEC, "%*s[%u] ", depth, " ", depth));
+	}
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_EXEC, "%p ", obj_desc));
+
 
 	switch (ACPI_GET_OBJECT_TYPE (obj_desc)) {
 	case ACPI_TYPE_LOCAL_REFERENCE:
@@ -193,7 +196,6 @@ acpi_ex_dump_operand (
 			break;
 
 		}
-
 		break;
 
 
@@ -203,7 +205,6 @@ acpi_ex_dump_operand (
 			obj_desc->buffer.length, obj_desc->buffer.pointer);
 
 		length = obj_desc->buffer.length;
-
 		if (length > 64) {
 			length = 64;
 		}
@@ -213,12 +214,11 @@ acpi_ex_dump_operand (
 		if (obj_desc->buffer.pointer) {
 			acpi_os_printf ("Buffer Contents: ");
 
-			for (buf = obj_desc->buffer.pointer; length--; ++buf) {
-				acpi_os_printf (" %02x", *buf);
+			for (index = 0; index < length; index++) {
+				acpi_os_printf (" %02x", obj_desc->buffer.pointer[index]);
 			}
 			acpi_os_printf ("\n");
 		}
-
 		break;
 
 
@@ -231,23 +231,20 @@ acpi_ex_dump_operand (
 
 	case ACPI_TYPE_PACKAGE:
 
-		acpi_os_printf ("Package count %X @ %p\n",
+		acpi_os_printf ("Package [Len %X] element_array %p\n",
 			obj_desc->package.count, obj_desc->package.elements);
 
 		/*
-		 * If elements exist, package vector pointer is valid,
+		 * If elements exist, package element pointer is valid,
 		 * and debug_level exceeds 1, dump package's elements.
 		 */
 		if (obj_desc->package.count &&
 			obj_desc->package.elements &&
 			acpi_dbg_level > 1) {
-			for (element_index = 0, element = obj_desc->package.elements;
-				  element_index < obj_desc->package.count;
-				  ++element_index, ++element) {
-				acpi_ex_dump_operand (*element);
+			for (index = 0; index < obj_desc->package.count; index++) {
+				acpi_ex_dump_operand (obj_desc->package.elements[index], depth+1);
 			}
 		}
-		acpi_os_printf ("\n");
 		break;
 
 
@@ -295,7 +292,7 @@ acpi_ex_dump_operand (
 			obj_desc->field.field_flags & AML_FIELD_LOCK_RULE_MASK,
 			obj_desc->field.field_flags & AML_FIELD_UPDATE_RULE_MASK,
 			obj_desc->field.base_byte_offset, obj_desc->field.start_field_bit_offset);
-		ACPI_DUMP_STACK_ENTRY (obj_desc->field.region_obj);
+		acpi_ex_dump_operand (obj_desc->field.region_obj, depth+1);
 		break;
 
 
@@ -319,9 +316,8 @@ acpi_ex_dump_operand (
 			acpi_os_printf ("*not a Buffer* \n");
 		}
 		else {
-			ACPI_DUMP_STACK_ENTRY (obj_desc->buffer_field.buffer_obj);
+			acpi_ex_dump_operand (obj_desc->buffer_field.buffer_obj, depth+1);
 		}
-
 		break;
 
 
@@ -408,7 +404,6 @@ acpi_ex_dump_operands (
 	u32                             line_number)
 {
 	acpi_native_uint                i;
-	union acpi_operand_object       **obj_desc;
 
 
 	ACPI_FUNCTION_NAME ("ex_dump_operands");
@@ -433,8 +428,7 @@ acpi_ex_dump_operands (
 	/* Dump the operand stack starting at the top */
 
 	for (i = 0; num_levels > 0; i--, num_levels--) {
-		obj_desc = &operands[i];
-		acpi_ex_dump_operand (*obj_desc);
+		acpi_ex_dump_operand (operands[i], 0);
 	}
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
@@ -499,7 +493,7 @@ acpi_ex_out_address (
  *
  * FUNCTION:    acpi_ex_dump_node
  *
- * PARAMETERS:  *Node           - Descriptor to dump
+ * PARAMETERS:  *Node               - Descriptor to dump
  *              Flags               - Force display
  *
  * DESCRIPTION: Dumps the members of the given.Node
