@@ -1,7 +1,7 @@
 Linux 2.6.x on MPC52xx family
 -----------------------------
 
-For the latest info, go to http://www.246tNt.com/mpc52xx/state.txt
+For the latest info, go to http://www.246tNt.com/mpc52xx/
  
 To compile/use :
 
@@ -37,12 +37,3 @@ Some remarks :
  - Of course, I inspired myself from the 2.4 port. If you think I forgot to
    mention you/your company in the copyright of some code, I'll correct it
    ASAP.
- - The codes wants the MBAR to be set at 0xf0000000 by the bootloader. It's
-   mapped 1:1 with the MMU. If for whatever reason, you want to change this,
-   beware that some code depends on the 0xf0000000 address and other depends
-   on the 1:1 mapping.
- - Most of the code assumes that port multiplexing, frequency selection, ...
-   has already been done. IMHO this should be done as early as possible, in
-   the bootloader. If for whatever reason you can't do it there, do it in the
-   platform setup code (if U-Boot) or in the arch/ppc/boot/simple/... (if
-   DBug)

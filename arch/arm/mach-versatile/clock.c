@@ -87,8 +87,8 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
 	if (clk->setvco) {
 		struct icst525_vco vco;
 
-		vco = icst525_khz_to_vco(clk->params, rate);
-		clk->rate = icst525_khz(clk->params, vco);
+		vco = icst525_khz_to_vco(clk->params, rate / 1000);
+		clk->rate = icst525_khz(clk->params, vco) * 1000;
 
 		printk("Clock %s: setting VCO reg params: S=%d R=%d V=%d\n",
 			clk->name, vco.s, vco.r, vco.v);

@@ -623,25 +623,25 @@
 #define S3C2410_GPG10         S3C2410_GPIONO(S3C2410_GPIO_BANKG, 10)
 #define S3C2410_GPG12_INP     (0x00 << 24)
 #define S3C2410_GPG12_OUTP    (0x01 << 24)
-#define S3C2410_GPG12_EINT18  (0x02 << 24)
+#define S3C2410_GPG12_EINT20  (0x02 << 24)
 #define S3C2410_GPG12_XMON    (0x03 << 24)
 
 #define S3C2410_GPG10         S3C2410_GPIONO(S3C2410_GPIO_BANKG, 10)
 #define S3C2410_GPG13_INP     (0x00 << 26)
 #define S3C2410_GPG13_OUTP    (0x01 << 26)
-#define S3C2410_GPG13_EINT18  (0x02 << 26)
+#define S3C2410_GPG13_EINT21  (0x02 << 26)
 #define S3C2410_GPG13_nXPON   (0x03 << 26)
 
 #define S3C2410_GPG10         S3C2410_GPIONO(S3C2410_GPIO_BANKG, 10)
 #define S3C2410_GPG14_INP     (0x00 << 28)
 #define S3C2410_GPG14_OUTP    (0x01 << 28)
-#define S3C2410_GPG14_EINT18  (0x02 << 28)
+#define S3C2410_GPG14_EINT22  (0x02 << 28)
 #define S3C2410_GPG14_YMON    (0x03 << 28)
 
 #define S3C2410_GPG10         S3C2410_GPIONO(S3C2410_GPIO_BANKG, 10)
 #define S3C2410_GPG15_INP     (0x00 << 30)
 #define S3C2410_GPG15_OUTP    (0x01 << 30)
-#define S3C2410_GPG15_EINT18  (0x02 << 30)
+#define S3C2410_GPG15_EINT23  (0x02 << 30)
 #define S3C2410_GPG15_nYPON   (0x03 << 30)
 
 
@@ -750,6 +750,11 @@
 #define S3C2410_MISCCR_USBSUSPND1   (1<<13)
 
 #define S3C2410_MISCCR_nRSTCON	    (1<<16)
+
+#define S3C2410_MISCCR_nEN_SCLK0    (1<<17)
+#define S3C2410_MISCCR_nEN_SCLK1    (1<<18)
+#define S3C2410_MISCCR_nEN_SCLKE    (1<<19)
+#define S3C2410_MISCCR_SDSLEEP	    (7<<17)
 
 /* external interrupt control... */
 /* S3C2410_EXTINT0 -> irq sense control for EINT0..EINT7
