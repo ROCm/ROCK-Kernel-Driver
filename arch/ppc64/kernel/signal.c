@@ -430,6 +430,7 @@ static void setup_rt_frame(int signr, struct k_sigaction *ka, siginfo_t *info,
 	regs->gpr[1] = newsp;
 	err |= get_user(regs->gpr[2], &funct_desc_ptr->toc);
 	regs->gpr[3] = signr;
+	regs->result = 0;
 	if (ka->sa.sa_flags & SA_SIGINFO) {
 		err |= get_user(regs->gpr[4], (unsigned long *)&frame->pinfo);
 		err |= get_user(regs->gpr[5], (unsigned long *)&frame->puc);

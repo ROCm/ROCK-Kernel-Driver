@@ -525,7 +525,7 @@ pci_default_setup(struct pci_dev *dev, struct pci_board *board,
 	else
 		offset += idx * board->uart_offset;
 
-	maxnr = (pci_resource_len(dev, bar) - board->uart_offset) /
+	maxnr = (pci_resource_len(dev, bar) - board->first_offset) /
 		(8 << board->reg_shift);
 
 	if (board->flags & FL_REGION_SZ_CAP && idx >= maxnr)
