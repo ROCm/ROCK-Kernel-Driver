@@ -106,13 +106,7 @@ extern long keyctl_negate_key(key_serial_t, unsigned, key_serial_t);
  * debugging key validation
  */
 #ifdef KEY_DEBUGGING
-static void __key_check(const struct key *key)
-{
-	printk("__key_check: key %p {%08x} should be {%08x}\n",
-	       key, key->magic, KEY_DEBUG_MAGIC);
-	BUG();
-}
-
+extern void __key_check(const struct key *);
 
 static inline void key_check(const struct key *key)
 {
