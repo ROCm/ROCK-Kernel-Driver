@@ -354,8 +354,7 @@ static const unsigned int rtl8169_rx_config =
 #define PHY_Cap_100_Half_Or_Less PHY_Cap_100_Half | PHY_Cap_10_Full_Or_Less
 #define PHY_Cap_100_Full_Or_Less PHY_Cap_100_Full | PHY_Cap_100_Half_Or_Less
 
-void
-mdio_write(void *ioaddr, int RegAddr, int value)
+static void mdio_write(void *ioaddr, int RegAddr, int value)
 {
 	int i;
 
@@ -372,8 +371,7 @@ mdio_write(void *ioaddr, int RegAddr, int value)
 	}
 }
 
-int
-mdio_read(void *ioaddr, int RegAddr)
+static int mdio_read(void *ioaddr, int RegAddr)
 {
 	int i, value = -1;
 
@@ -1674,8 +1672,7 @@ rtl8169_set_rx_mode(struct net_device *dev)
  *
  *  Get TX/RX statistics for rtl8169
  */
-struct net_device_stats *
-rtl8169_get_stats(struct net_device *dev)
+static struct net_device_stats *rtl8169_get_stats(struct net_device *dev)
 {
 	struct rtl8169_private *tp = dev->priv;
 	void *ioaddr = tp->mmio_addr;
