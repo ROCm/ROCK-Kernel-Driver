@@ -126,12 +126,6 @@ static int is_prefetch(struct pt_regs *regs, unsigned long addr)
 			break;
 		} 
 	}
-
-#if 1
-	if (prefetch)
-		printk("%s: prefetch caused page fault at %lx/%lx\n", current->comm,
-		       regs->rip, addr);
-#endif
 	return prefetch;
 }
 
@@ -241,12 +235,14 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	if (unlikely(in_atomic() || !mm))
 		goto bad_area_nosemaphore;
 
-	/* In some cases the CPU can report the carry bit for wrapping
-	   jumps in compatibility mode.
-	   Force the fault address to 4GB for anything in compatibility mode.
+	/* Work around K8 erratum #100
+	   K8 in compat mode occasionally jumps to illegal addresses >4GB.
+	   We catch this here in the page fault handler because these
+	   addresses are not reachable. Just detect this case and return.
 	   Any code segment in LDT is compatibility mode. */
-	if (regs->cs == __USER32_CS || (regs->cs & (1<<2)))
-		address &= 0xffffffff;
+	if ((regs->cs == __USER32_CS || (regs->cs & (1<<2))) &&
+		(address >> 32))
+		return;
 
  again:
 	down_read(&mm->mmap_sem);

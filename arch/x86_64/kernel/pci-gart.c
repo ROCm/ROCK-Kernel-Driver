@@ -31,6 +31,9 @@
 #include <asm/kdebug.h>
 #include <asm/proto.h>
 
+/* Work around a bug in the mpt-fusion driver. */
+#define FUSION_WORKAROUND 1 
+
 dma_addr_t bad_dma_address;
 
 unsigned long iommu_bus_base;	/* GART remapping area (physical) */
@@ -44,12 +47,13 @@ static int no_agp;
 #ifdef CONFIG_IOMMU_DEBUG
 int panic_on_overflow = 1; 
 int force_iommu = 1;
-int sac_force_size = 0; 
 #else
-int panic_on_overflow = 1; /* for testing */
+int panic_on_overflow = 0;
 int force_iommu = 0;
-int sac_force_size = 256*1024*1024;
 #endif
+int iommu_merge = 1; 
+int iommu_sac_force = 0; 
+int iommu_fullflush = 0;
 
 /* Allocation bitmap for the remapping area */ 
 static spinlock_t iommu_bitmap_lock = SPIN_LOCK_UNLOCKED;
@@ -152,6 +156,8 @@ static void __flush_gart(struct pci_dev *dev)
 
 static inline void flush_gart(struct pci_dev *dev)
 { 
+	if (iommu_fullflush)
+		need_flush = 1;
 	if (need_flush)
 		__flush_gart(dev);
 } 
@@ -290,6 +296,10 @@ static inline int need_iommu(struct pci_dev *dev, unsigned long addr, size_t siz
 	int mmu = high;
 	if (force_iommu) 
 		mmu = 1; 
+#ifdef FUSION_WORKAROUND
+	if (dev->vendor == PCI_VENDOR_ID_LSI_LOGIC)
+		mmu = 1; 
+#endif		
 	if (no_iommu) { 
 		if (high) 
 			panic("PCI-DMA: high address but no IOMMU.\n"); 
@@ -395,7 +405,7 @@ static int __pci_map_cont(struct scatterlist *sg, int start, int stopat,
 	for (i = start; i < stopat; i++) {
 		struct scatterlist *s = &sg[i];
 		unsigned long start_addr = s->dma_address;
-		BUG_ON(i > 0 && s->offset);
+		BUG_ON(i > start && s->offset);
 		if (i == start) {
 			*sout = *s; 
 			sout->dma_address = iommu_bus_base;
@@ -410,7 +420,6 @@ static int __pci_map_cont(struct scatterlist *sg, int start, int stopat,
 			addr += PAGE_SIZE;
 			iommu_page++;
 	} 
-		BUG_ON(i > 0 && addr % PAGE_SIZE); 
 	} 
 	BUG_ON(iommu_page - iommu_start != pages);	
 	return 0;
@@ -460,7 +469,7 @@ int pci_map_sg(struct pci_dev *dev, struct scatterlist *sg, int nents, int dir)
 			struct scatterlist *ps = &sg[i-1];
 			/* Can only merge when the last chunk ends on a page 
 			   boundary. */
-			if (!force_iommu || !need || (i-1 > start && ps->offset) ||
+			if (!iommu_merge || !need || (i-1 > start && s->offset) ||
 			    (ps->offset + ps->length) % PAGE_SIZE) { 
 				if (pci_map_cont(sg, start, i, sg+out, pages, 
 						 need) < 0)
@@ -545,14 +554,12 @@ int pci_dma_supported(struct pci_dev *dev, u64 mask)
 
 	   Problem with this is that if we overflow the IOMMU area
 	   and return DAC as fallback address the device may not handle it correctly.
-	   As a compromise we only do this if the IOMMU area is >= 256MB 
-	   which should make overflow unlikely enough.
 	   
 	   As a special case some controllers have a 39bit address mode 
 	   that is as efficient as 32bit (aic79xx). Don't force SAC for these.
 	   Assume all masks <= 40 bits are of this type. Normally this doesn't
 	   make any difference, but gives more gentle handling of IOMMU overflow. */
-	if (force_iommu && (mask > 0xffffffffffULL) && (iommu_size >= sac_force_size)){ 
+	if (iommu_sac_force && (mask >= 0xffffffffffULL)) { 
 		printk(KERN_INFO "%s: Force SAC with mask %Lx\n", dev->slot_name,mask);
 		return 0; 
 	}
@@ -681,7 +688,7 @@ static int __init pci_iommu_init(void)
 	unsigned long iommu_start;
 	struct pci_dev *dev;
 		
-#ifndef CONFIG_AGP_AMD_8151
+#ifndef CONFIG_AGP_AMD64
 	no_agp = 1; 
 #else
 	/* Makefile puts PCI initialization via subsys_initcall first. */
@@ -777,7 +784,8 @@ static int __init pci_iommu_init(void)
 /* Must execute after PCI subsystem */
 fs_initcall(pci_iommu_init);
 
-/* iommu=[size][,noagp][,off][,force][,noforce][,leak][,memaper[=order]]
+/* iommu=[size][,noagp][,off][,force][,noforce][,leak][,memaper[=order]][,merge]
+         [,forcesac][,fullflush][,nomerge]
    size  set size of iommu (in bytes) 
    noagp don't initialize the AGP driver and use full aperture.
    off   don't use the IOMMU
@@ -785,6 +793,10 @@ fs_initcall(pci_iommu_init);
    memaper[=order] allocate an own aperture over RAM with size 32MB^order.  
    noforce don't force IOMMU usage. Default.
    force  Force IOMMU.
+   merge  Do SG merging. Implies force (experimental)  
+   nomerge Don't do SG merging.
+   forcesac For SAC mode for masks <40bits  (experimental)
+   fullflush Flush IOMMU on each allocation (for testing)
 */
 __init int iommu_setup(char *opt) 
 { 
@@ -810,6 +822,16 @@ __init int iommu_setup(char *opt)
 		    panic_on_overflow = 1;
 	    if (!memcmp(p, "nopanic", 7))
 		    panic_on_overflow = 0;	    
+	    if (!memcmp(p, "merge", 5)) { 
+		    iommu_merge = 1;
+		    force_iommu = 1; 
+	    }
+	    if (!memcmp(p, "nomerge", 7))
+		    iommu_merge = 0;
+	    if (!memcmp(p, "forcesac", 8))
+		    iommu_sac_force = 1;
+	    if (!memcmp(p, "fullflush", 9))
+		    iommu_fullflush = 1;
 #ifdef CONFIG_IOMMU_LEAK
 	    if (!memcmp(p,"leak", 4)) { 
 		    leak_trace = 1;

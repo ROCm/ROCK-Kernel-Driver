@@ -28,6 +28,6 @@ obj-$(CONFIG_MODULES)		+= module.o
 obj-y				+= topology.o
 
 bootflag-y			+= ../../i386/kernel/bootflag.o
-cpuid-$(CONFIG_X86_CPUID)	+= ../../i386/kernel/cpuid.o
+cpuid-$(subst m,y,$(CONFIG_X86_CPUID))  += ../../i386/kernel/cpuid.o
 topology-y                     += ../../i386/mach-default/topology.o
 
