@@ -42,7 +42,7 @@
 	wr		%o5, 0, %fprs;
 
 #ifndef __ASSEMBLY__	
-extern __inline__ void save_and_clear_fpu(void) {
+static __inline__ void save_and_clear_fpu(void) {
 	__asm__ __volatile__ (
 "		rd %%fprs, %%o5\n"
 "		andcc %%o5, %0, %%g0\n"

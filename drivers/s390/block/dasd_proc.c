@@ -154,7 +154,6 @@ dasd_devices_print(dasd_devmap_t *devmap, char *str)
 {
 	dasd_device_t *device;
 	char *substr;
-	int major, minor;
 	int len;
 
 	device = dasd_get_device(devmap);
@@ -168,11 +167,10 @@ dasd_devices_print(dasd_devmap_t *devmap, char *str)
 	else
 		len += sprintf(str + len, "(none)");
 	/* Print kdev. */
-	major = MAJOR(device->bdev->bd_dev);
-	minor = MINOR(device->bdev->bd_dev);
-	len += sprintf(str + len, " at (%3d:%3d)", major, minor);
+	len += sprintf(str + len, " at (%3d:%3d)",
+		       device->gdp->major, device->gdp->first_minor);
 	/* Print device name. */
-	len += sprintf(str + len, " is %-7s", device->name);
+	len += sprintf(str + len, " is %-7s", device->gdp->disk_name);
 	/* Print devices features. */
 	substr = (devmap->features & DASD_FEATURE_READONLY) ? "(ro)" : " ";
 	len += sprintf(str + len, "%4s: ", substr);

@@ -327,7 +327,8 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 
 		case SCTP_CMD_GEN_INIT_ACK:
 			/* Generate an INIT ACK chunk.  */
-			new_obj = sctp_make_init_ack(asoc, chunk, GFP_ATOMIC);
+			new_obj = sctp_make_init_ack(asoc, chunk, GFP_ATOMIC,
+						     0);
 			if (!new_obj)
 				goto nomem;
 
@@ -344,10 +345,20 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 		case SCTP_CMD_GEN_COOKIE_ECHO:
 			/* Generate a COOKIE ECHO chunk.  */
 			new_obj = sctp_make_cookie_echo(asoc, chunk);
-			if (!new_obj)
+			if (!new_obj) {
+				if (command->obj.ptr)
+					sctp_free_chunk(command->obj.ptr);
 				goto nomem;
+			}
 			sctp_add_cmd_sf(commands, SCTP_CMD_REPLY,
 					SCTP_CHUNK(new_obj));
+
+			/* If there is an ERROR chunk to be sent along with
+			 * the COOKIE_ECHO, send it, too.
+			 */
+			if (command->obj.ptr)
+				sctp_add_cmd_sf(commands, SCTP_CMD_REPLY,
+						SCTP_CHUNK(command->obj.ptr));
 			break;
 
 		case SCTP_CMD_GEN_SHUTDOWN:
@@ -397,8 +408,7 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 			/* Send a full packet to our peer.  */
 			packet = command->obj.ptr;
 			sctp_packet_transmit(packet);
-			sctp_transport_free(packet->transport);
-			sctp_packet_free(packet);
+			sctp_ootb_pkt_free(packet);
 			break;
 
 		case SCTP_CMD_RETRAN:

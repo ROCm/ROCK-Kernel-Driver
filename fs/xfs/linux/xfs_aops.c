@@ -681,11 +681,13 @@ linvfs_get_blocks_direct(
 STATIC int
 linvfs_direct_IO(
 	int			rw,
-	struct inode		*inode,
+	struct file		*file,
 	const struct iovec	*iov,
 	loff_t			offset,
 	unsigned long		nr_segs)
 {
+	struct inode *inode = file->f_dentry->d_inode->i_mapping->host;
+
         return generic_direct_IO(rw, inode, iov, offset, nr_segs,
 					linvfs_get_blocks_direct);
 }

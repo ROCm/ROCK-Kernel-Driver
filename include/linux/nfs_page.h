@@ -33,7 +33,8 @@ struct nfs_page {
 	struct page		*wb_page;	/* page to read in/write out */
 	wait_queue_head_t	wb_wait;	/* wait queue */
 	unsigned long		wb_timeout;	/* when to read/write/commit */
-	unsigned int		wb_offset,	/* Offset of read/write */
+	unsigned long		wb_index;	/* Offset within mapping */
+	unsigned int		wb_offset,	/* Offset within page */
 				wb_bytes,	/* Length of request */
 				wb_count;	/* reference count */
 	unsigned long		wb_flags;
@@ -47,6 +48,7 @@ extern	struct nfs_page *nfs_create_request(struct rpc_cred *, struct inode *,
 					    unsigned int, unsigned int);
 extern	void nfs_clear_request(struct nfs_page *req);
 extern	void nfs_release_request(struct nfs_page *req);
+extern	void nfs_release_list(struct list_head *list);
 
 
 extern	void nfs_list_add_request(struct nfs_page *, struct list_head *);
@@ -58,6 +60,7 @@ extern	int nfs_scan_list(struct list_head *, struct list_head *,
 extern	int nfs_coalesce_requests(struct list_head *, struct list_head *,
 				  unsigned int);
 extern  int nfs_wait_on_request(struct nfs_page *);
+extern	int nfs_wait_for_reads(struct list_head *);
 
 extern	spinlock_t nfs_wreq_lock;
 

@@ -135,15 +135,13 @@ static int ohci_mem_init (struct ohci_hcd *ohci)
 	ohci->td_cache = pci_pool_create ("ohci_td", ohci->hcd.pdev,
 		sizeof (struct td),
 		32 /* byte alignment */,
-		0 /* no page-crossing issues */,
-		GFP_KERNEL);
+		0 /* no page-crossing issues */);
 	if (!ohci->td_cache)
 		return -ENOMEM;
 	ohci->ed_cache = pci_pool_create ("ohci_ed", ohci->hcd.pdev,
 		sizeof (struct ed),
 		16 /* byte alignment */,
-		0 /* no page-crossing issues */,
-		GFP_KERNEL);
+		0 /* no page-crossing issues */);
 	if (!ohci->ed_cache) {
 		pci_pool_destroy (ohci->td_cache);
 		return -ENOMEM;
@@ -177,6 +175,13 @@ td_alloc (struct ohci_hcd *hc, int mem_flags)
 		if (!hash_add_td (hc, td, mem_flags)) {
 			pci_pool_free (hc->td_cache, td, dma);
 			return NULL;
+		}
+		// DEBUG ONLY want to see if these tds are really getting
+		// allocated.  the last one in a page shouldn't be getting
+		// allocated during these tests!
+		if ((dma & 0x0fff) == 0x0fc0) {
+			dbg ("td = %p", td);
+			dump_stack ();
 		}
 	}
 	return td;

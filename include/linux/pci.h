@@ -637,7 +637,7 @@ struct pci_bus * pci_add_new_bus(struct pci_bus *parent, struct pci_dev *dev, in
 
 /* kmem_cache style wrapper around pci_alloc_consistent() */
 struct pci_pool *pci_pool_create (const char *name, struct pci_dev *dev,
-		size_t size, size_t align, size_t allocation, int flags);
+		size_t size, size_t align, size_t allocation);
 void pci_pool_destroy (struct pci_pool *pool);
 
 void *pci_pool_alloc (struct pci_pool *pool, int flags, dma_addr_t *handle);

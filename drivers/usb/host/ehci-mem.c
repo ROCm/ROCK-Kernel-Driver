@@ -166,8 +166,7 @@ static int ehci_mem_init (struct ehci_hcd *ehci, int flags)
 	ehci->qtd_pool = pci_pool_create ("ehci_qtd", ehci->hcd.pdev,
 			sizeof (struct ehci_qtd),
 			32 /* byte alignment (for hw parts) */,
-			4096 /* can't cross 4K */,
-			flags);
+			4096 /* can't cross 4K */);
 	if (!ehci->qtd_pool) {
 		dbg ("no qtd pool");
 		ehci_mem_cleanup (ehci);
@@ -178,8 +177,7 @@ static int ehci_mem_init (struct ehci_hcd *ehci, int flags)
 	ehci->qh_pool = pci_pool_create ("ehci_qh", ehci->hcd.pdev,
 			sizeof (struct ehci_qh),
 			32 /* byte alignment (for hw parts) */,
-			4096 /* can't cross 4K */,
-			flags);
+			4096 /* can't cross 4K */);
 	if (!ehci->qh_pool) {
 		dbg ("no qh pool");
 		ehci_mem_cleanup (ehci);
@@ -190,8 +188,7 @@ static int ehci_mem_init (struct ehci_hcd *ehci, int flags)
 	ehci->itd_pool = pci_pool_create ("ehci_itd", ehci->hcd.pdev,
 			sizeof (struct ehci_itd),
 			32 /* byte alignment (for hw parts) */,
-			4096 /* can't cross 4K */,
-			flags);
+			4096 /* can't cross 4K */);
 	if (!ehci->itd_pool) {
 		dbg ("no itd pool");
 		ehci_mem_cleanup (ehci);
@@ -202,8 +199,7 @@ static int ehci_mem_init (struct ehci_hcd *ehci, int flags)
 	ehci->sitd_pool = pci_pool_create ("ehci_sitd", ehci->hcd.pdev,
 			sizeof (struct ehci_sitd),
 			32 /* byte alignment (for hw parts) */,
-			4096 /* can't cross 4K */,
-			flags);
+			4096 /* can't cross 4K */);
 	if (!ehci->sitd_pool) {
 		dbg ("no sitd pool");
 		ehci_mem_cleanup (ehci);

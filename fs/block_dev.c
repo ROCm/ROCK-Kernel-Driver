@@ -116,9 +116,11 @@ blkdev_get_blocks(struct inode *inode, sector_t iblock,
 }
 
 static int
-blkdev_direct_IO(int rw, struct inode *inode, const struct iovec *iov,
+blkdev_direct_IO(int rw, struct file *file, const struct iovec *iov,
 			loff_t offset, unsigned long nr_segs)
 {
+	struct inode *inode = file->f_dentry->d_inode->i_mapping->host;
+
 	return generic_direct_IO(rw, inode, iov, offset,
 				nr_segs, blkdev_get_blocks);
 }

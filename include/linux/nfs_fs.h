@@ -14,6 +14,7 @@
 #include <linux/mm.h>
 #include <linux/pagemap.h>
 #include <linux/wait.h>
+#include <linux/uio.h>
 
 #include <linux/nfs_fs_sb.h>
 
@@ -24,6 +25,7 @@
 #include <linux/nfs.h>
 #include <linux/nfs2.h>
 #include <linux/nfs3.h>
+#include <linux/nfs_page.h>
 #include <linux/nfs_xdr.h>
 
 /*
@@ -242,9 +244,9 @@ loff_t page_offset(struct page *page)
 }
 
 static inline
-unsigned long page_index(struct page *page)
+loff_t req_offset(struct nfs_page *req)
 {
-	return page->index;
+	return ((loff_t)req->wb_index) << PAGE_CACHE_SHIFT;
 }
 
 /*
@@ -282,6 +284,12 @@ nfs_file_cred(struct file *file)
 #endif
 	return cred;
 }
+
+/*
+ * linux/fs/nfs/direct.c
+ */
+extern int nfs_direct_IO(int, struct file *, const struct iovec *, loff_t,
+			unsigned long);
 
 /*
  * linux/fs/nfs/dir.c
@@ -353,7 +361,8 @@ nfs_wb_all(struct inode *inode)
 static inline int
 nfs_wb_page(struct inode *inode, struct page* page)
 {
-	int error = nfs_sync_file(inode, 0, page_index(page), 1, FLUSH_WAIT | FLUSH_STABLE);
+	int error = nfs_sync_file(inode, 0, page->index, 1,
+						FLUSH_WAIT | FLUSH_STABLE);
 	return (error < 0) ? error : 0;
 }
 

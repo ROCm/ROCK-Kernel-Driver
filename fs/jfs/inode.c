@@ -310,9 +310,11 @@ static int jfs_bmap(struct address_space *mapping, long block)
 	return generic_block_bmap(mapping, block, jfs_get_block);
 }
 
-static int jfs_direct_IO(int rw, struct inode *inode, const struct iovec *iov, 
+static int jfs_direct_IO(int rw, struct file *file, const struct iovec *iov,
 			loff_t offset, unsigned long nr_segs)
 {
+	struct inode *inode = file->f_dentry->d_inode->i_mapping->host;
+
 	return generic_direct_IO(rw, inode, iov,
 				offset, nr_segs, jfs_get_blocks);
 }

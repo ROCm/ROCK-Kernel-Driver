@@ -2746,13 +2746,16 @@ void txLazyCommit(struct tblock * tblk)
 	if (tblk->flag & tblkGC_READY)
 		wake_up(&tblk->gcwait);	// LOGGC_WAKEUP
 
-	spin_unlock_irq(&log->gclock);	// LOGGC_UNLOCK
-
+	/*
+	 * Can't release log->gclock until we've tested tblk->flag
+	 */
 	if (tblk->flag & tblkGC_LAZY) {
+		spin_unlock_irq(&log->gclock);	// LOGGC_UNLOCK
 		txUnlock(tblk);
 		tblk->flag &= ~tblkGC_LAZY;
 		txEnd(tblk - TxBlock);	/* Convert back to tid */
-	}
+	} else
+		spin_unlock_irq(&log->gclock);	// LOGGC_UNLOCK
 
 	jFYI(1, ("txLazyCommit: done: tblk = 0x%p\n", tblk));
 }

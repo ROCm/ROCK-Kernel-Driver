@@ -42,6 +42,7 @@ static const size_t	pool_max [HCD_BUFFER_POOLS] = {
 /**
  * hcd_buffer_create - initialize buffer pools
  * @hcd: the bus whose buffer pools are to be initialized
+ * Context: !in_interrupt()
  *
  * Call this as part of initializing a host controller that uses the pci dma
  * memory allocators.  It initializes some pools of dma-consistent memory that
@@ -60,7 +61,7 @@ int hcd_buffer_create (struct usb_hcd *hcd)
 			continue;
 		snprintf (name, sizeof name, "buffer-%d", size);
 		hcd->pool [i] = pci_pool_create (name, hcd->pdev,
-				size, size, 0, SLAB_KERNEL);
+				size, size, 0);
 		if (!hcd->pool [i]) {
 			hcd_buffer_destroy (hcd);
 			return -ENOMEM;
@@ -74,6 +75,7 @@ EXPORT_SYMBOL (hcd_buffer_create);
 /**
  * hcd_buffer_destroy - deallocate buffer pools
  * @hcd: the bus whose buffer pools are to be destroyed
+ * Context: !in_interrupt()
  *
  * This frees the buffer pools created by hcd_buffer_create().
  */

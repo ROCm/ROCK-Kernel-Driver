@@ -222,7 +222,7 @@ rw_raw_dev(int rw, struct file *filp, const struct iovec *iov, unsigned long nr_
 		count = inode->i_size - *offp;
 		nr_segs = iov_shorten((struct iovec *)iov, nr_segs, count);
 	}
-	ret = generic_file_direct_IO(rw, inode, iov, *offp, nr_segs);
+	ret = generic_file_direct_IO(rw, filp, iov, *offp, nr_segs);
 
 	if (ret > 0)
 		*offp += ret;

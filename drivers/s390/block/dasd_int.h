@@ -140,7 +140,7 @@ do { \
 #define DEV_MESSAGE(d_loglevel,d_device,d_string,d_args...)\
 do { \
 	printk(d_loglevel PRINTK_HEADER " %s,%04x@%02x: " \
-	       d_string "\n", bdevname(d_device->bdev), \
+	       d_string "\n", d_device->gdp->disk_name, \
 	       d_device->devinfo.devno, d_device->devinfo.irq, \
 	       d_args); \
 	DBF_DEV_EVENT(DBF_ALERT, d_device, d_string, d_args); \
@@ -258,8 +258,6 @@ typedef struct dasd_discipline_t {
 
 typedef struct dasd_device_t {
 	/* Block device stuff. */
-	char name[16];			/* The device name in /dev. */
-	struct block_device *bdev;
 	struct gendisk *gdp;
 	devfs_handle_t devfs_entry;
 	request_queue_t *request_queue;
@@ -267,6 +265,7 @@ typedef struct dasd_device_t {
 	unsigned long blocks;		/* size of volume in blocks */
 	unsigned int bp_block;		/* bytes per block */
 	unsigned int s2b_shift;		/* log2 (bp_block/512) */
+	int ro_flag;			/* read-only flag */
 
 	/* Device discipline stuff. */
 	dasd_discipline_t *discipline;
@@ -479,7 +478,7 @@ int  dasd_gendisk_init(void);
 void dasd_gendisk_exit(void);
 int  dasd_gendisk_major_index(int);
 int  dasd_gendisk_index_major(int);
-struct gendisk *dasd_gendisk_alloc(char *, int);
+struct gendisk *dasd_gendisk_alloc(int);
 void dasd_setup_partitions(dasd_device_t *);
 void dasd_destroy_partitions(dasd_device_t *);
 

@@ -573,6 +573,7 @@ int vlan_dev_set_egress_priority(char *dev_name, __u32 skb_prio, short vlan_prio
 					dev_put(dev);
 					return 0;
 				}
+				mp = mp->next;
 			}
 
 			/* Create a new mapping then. */

@@ -13,6 +13,8 @@
 #include <asm/pgalloc.h>
 #include <asm/pgtable.h>
 #include <asm/page.h>
+#include <asm/cacheflush.h>
+#include <asm/tlbflush.h>
 
 static inline void forget_pte(pte_t page)
 {

@@ -2149,14 +2149,14 @@ static int __devinit uhci_start(struct usb_hcd *hcd)
 	uhci->fl->dma_handle = dma_handle;
 
 	uhci->td_pool = pci_pool_create("uhci_td", hcd->pdev,
-		sizeof(struct uhci_td), 16, 0, GFP_ATOMIC);
+		sizeof(struct uhci_td), 16, 0);
 	if (!uhci->td_pool) {
 		err("unable to create td pci_pool");
 		goto err_create_td_pool;
 	}
 
 	uhci->qh_pool = pci_pool_create("uhci_qh", hcd->pdev,
-		sizeof(struct uhci_qh), 16, 0, GFP_ATOMIC);
+		sizeof(struct uhci_qh), 16, 0);
 	if (!uhci->qh_pool) {
 		err("unable to create qh pci_pool");
 		goto err_create_qh_pool;

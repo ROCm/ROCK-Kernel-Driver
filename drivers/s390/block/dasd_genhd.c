@@ -162,7 +162,7 @@ dasd_device_name(char *str, int index, int partition)
  * Allocate gendisk structure for devindex.
  */
 struct gendisk *
-dasd_gendisk_alloc(char *device_name, int devindex)
+dasd_gendisk_alloc(int devindex)
 {
 	struct list_head *l;
 	struct major_info *mi;
@@ -195,7 +195,7 @@ dasd_gendisk_alloc(char *device_name, int devindex)
 		return ERR_PTR(-ENOMEM);
 
 	/* Initialize gendisk structure. */
-	memcpy(gdp->disk_name, device_name, 16);	/* huh? -- AV */
+	memset(gdp, 0, sizeof(struct gendisk));
 	gdp->major = mi->major;
 	gdp->first_minor = index << DASD_PARTN_BITS;
 	gdp->minor_shift = DASD_PARTN_BITS;
@@ -207,15 +207,16 @@ dasd_gendisk_alloc(char *device_name, int devindex)
 	 *   dasdaa - dasdzz : 676 devices, added up = 702
 	 *   dasdaaa - dasdzzz : 17576 devices, added up = 18278
 	 */
-	len = sprintf(device_name, "dasd");
+	len = sprintf(gdp->disk_name, "dasd");
 	if (devindex > 25) {
 		if (devindex > 701)
-			len += sprintf(device_name + len, "%c",
+			len += sprintf(gdp->disk_name + len, "%c",
 				       'a' + (((devindex - 702) / 676) % 26));
-		len += sprintf(device_name + len, "%c",
+		len += sprintf(gdp->disk_name + len, "%c",
 			       'a' + (((devindex - 26) / 26) % 26));
 	}
-	len += sprintf(device_name + len, "%c", 'a' + (devindex % 26));
+	len += sprintf(gdp->disk_name + len, "%c", 'a' + (devindex % 26));
+
 	return gdp;
 }
 

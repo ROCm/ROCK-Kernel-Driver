@@ -1,4 +1,4 @@
-/* $Id: eicon_mod.c,v 1.37.6.6 2001/09/23 22:24:37 kai Exp $
+/* $Id: eicon_mod.c,v 1.1.4.1.2.4 2002/10/01 11:29:13 armin Exp $
  *
  * ISDN lowlevel-module for Eicon active cards.
  * 
@@ -44,7 +44,7 @@
 static eicon_card *cards = (eicon_card *) NULL;   /* glob. var , contains
                                                      start of card-list   */
 
-static char *eicon_revision = "$Revision: 1.37.6.6 $";
+static char *eicon_revision = "$Revision: 1.1.4.1.2.4 $";
 
 extern char *eicon_pci_revision;
 extern char *eicon_isa_revision;
@@ -142,8 +142,10 @@ eicon_findnpcicard(int driverid)
 #endif /* CONFIG_PCI */
 
 static void
-eicon_rcv_dispatch(struct eicon_card *card)
+eicon_rcv_dispatch(unsigned long context)
 {
+	struct eicon_card *card = (struct eicon_card *)context;
+
 	switch (card->bus) {
 		case EICON_BUS_ISA:
 		case EICON_BUS_MCA:
@@ -152,13 +154,15 @@ eicon_rcv_dispatch(struct eicon_card *card)
 			break;
 		default:
 			eicon_log(card, 1,
-			       "eicon_ack_dispatch: Illegal bustype %d\n", card->bus);
+			       "eicon_rcv_dispatch: Illegal bustype %d\n", card->bus);
 	}
 }
 
 static void
-eicon_ack_dispatch(struct eicon_card *card)
+eicon_ack_dispatch(unsigned long context)
 {
+	struct eicon_card *card = (struct eicon_card *)context;
+
 	switch (card->bus) {
 		case EICON_BUS_ISA:
 		case EICON_BUS_MCA:
@@ -172,8 +176,10 @@ eicon_ack_dispatch(struct eicon_card *card)
 }
 
 static void
-eicon_transmit(struct eicon_card *card)
+eicon_transmit(unsigned long context)
 {
+	struct eicon_card *card = (struct eicon_card *)context;
+
 	switch (card->bus) {
 		case EICON_BUS_ISA:
 		case EICON_BUS_MCA:
@@ -868,12 +874,9 @@ eicon_alloccard(int Type, int membase, int irq, char *id, int card_id)
 		skb_queue_head_init(&card->sackq);
 		skb_queue_head_init(&card->statq);
 		card->statq_entries = 0;
-		card->snd_tq.routine = (void *) (void *) eicon_transmit;
-		card->snd_tq.data = card;
-		card->rcv_tq.routine = (void *) (void *) eicon_rcv_dispatch;
-		card->rcv_tq.data = card;
-		card->ack_tq.routine = (void *) (void *) eicon_ack_dispatch;
-		card->ack_tq.data = card;
+		tasklet_init(&card->snd_tq, eicon_transmit, (unsigned long)card);
+		tasklet_init(&card->rcv_tq, eicon_rcv_dispatch, (unsigned long)card);
+		tasklet_init(&card->ack_tq, eicon_ack_dispatch, (unsigned long)card);
 		card->interface.maxbufsize = 4000;
 		card->interface.command = if_command;
 		card->interface.writebuf_skb = if_sendbuf;

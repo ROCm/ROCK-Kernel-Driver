@@ -852,7 +852,7 @@ __generic_file_aio_read(struct kiocb *iocb, const struct iovec *iov,
 				nr_segs = iov_shorten((struct iovec *)iov,
 							nr_segs, count);
 			}
-			retval = generic_file_direct_IO(READ, inode, 
+			retval = generic_file_direct_IO(READ, filp,
 					iov, pos, nr_segs);
 			if (retval > 0)
 				*ppos = pos + retval;
@@ -1534,7 +1534,7 @@ generic_file_write_nolock(struct file *file, const struct iovec *iov,
 		if (count != ocount)
 			nr_segs = iov_shorten((struct iovec *)iov,
 						nr_segs, count);
-		written = generic_file_direct_IO(WRITE, inode, 
+		written = generic_file_direct_IO(WRITE, file,
 					iov, pos, nr_segs);
 		if (written > 0) {
 			loff_t end = pos + written;

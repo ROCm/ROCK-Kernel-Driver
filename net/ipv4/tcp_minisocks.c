@@ -428,7 +428,7 @@ static void tcp_twkill(unsigned long);
 
 static struct tcp_tw_bucket *tcp_tw_death_row[TCP_TWKILL_SLOTS];
 static spinlock_t tw_death_lock = SPIN_LOCK_UNLOCKED;
-static struct timer_list tcp_tw_timer = { function: tcp_twkill };
+static struct timer_list tcp_tw_timer = { .function = tcp_twkill };
 
 static void SMP_TIMER_NAME(tcp_twkill)(unsigned long dummy)
 {
@@ -495,7 +495,7 @@ void tcp_tw_deschedule(struct tcp_tw_bucket *tw)
 static int tcp_twcal_hand = -1;
 static int tcp_twcal_jiffie;
 static void tcp_twcal_tick(unsigned long);
-static struct timer_list tcp_twcal_timer = {function: tcp_twcal_tick};
+static struct timer_list tcp_twcal_timer = {.function = tcp_twcal_tick};
 static struct tcp_tw_bucket *tcp_twcal_row[TCP_TW_RECYCLE_SLOTS];
 
 void tcp_tw_schedule(struct tcp_tw_bucket *tw, int timeo)

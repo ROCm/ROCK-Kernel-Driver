@@ -647,10 +647,10 @@ out:
 }
 
 ssize_t
-generic_file_direct_IO(int rw, struct inode *inode, const struct iovec *iov, 
+generic_file_direct_IO(int rw, struct file *file, const struct iovec *iov,
 	loff_t offset, unsigned long nr_segs)
 {
-	struct address_space *mapping = inode->i_mapping;
+	struct address_space *mapping = file->f_dentry->d_inode->i_mapping;
 	ssize_t retval;
 
 	if (mapping->nrpages) {
@@ -661,9 +661,9 @@ generic_file_direct_IO(int rw, struct inode *inode, const struct iovec *iov,
 			goto out;
 	}
 
-	retval = mapping->a_ops->direct_IO(rw, inode, iov, offset, nr_segs);
-	if (inode->i_mapping->nrpages)
-		invalidate_inode_pages2(inode->i_mapping);
+	retval = mapping->a_ops->direct_IO(rw, file, iov, offset, nr_segs);
+	if (mapping->nrpages)
+		invalidate_inode_pages2(mapping);
 out:
 	return retval;
 }

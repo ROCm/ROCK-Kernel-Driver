@@ -207,7 +207,7 @@ static int unregister_vlan_dev(struct net_device *real_dev,
 #endif
 
 	/* sanity check */
-	if ((vlan_id >= VLAN_VID_MASK) || (vlan_id <= 0))
+	if (vlan_id >= VLAN_VID_MASK)
 		return -EINVAL;
 
 	spin_lock_bh(&vlan_group_lock);

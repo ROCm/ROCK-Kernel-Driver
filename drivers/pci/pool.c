@@ -31,13 +31,12 @@ struct pci_page {	/* cacheable header for 'allocation' bytes */
 #define	POOL_TIMEOUT_JIFFIES	((100 /* msec */ * HZ) / 1000)
 #define	POOL_POISON_BYTE	0xa7
 
-static spinlock_t pools_lock = SPIN_LOCK_UNLOCKED;
+DECLARE_MUTEX (pools_lock);
 
 static ssize_t
 show_pools (struct device *dev, char *buf, size_t count, loff_t off)
 {
 	struct pci_dev		*pdev;
-	unsigned long		flags;
 	unsigned		temp, size;
 	char			*next;
 	struct list_head	*i, *j;
@@ -53,7 +52,7 @@ show_pools (struct device *dev, char *buf, size_t count, loff_t off)
 	size -= temp;
 	next += temp;
 
-	spin_lock_irqsave (&pools_lock, flags);
+	down (&pools_lock);
 	list_for_each (i, &pdev->pools) {
 		struct pci_pool	*pool;
 		unsigned	pages = 0, blocks = 0;
@@ -76,7 +75,7 @@ show_pools (struct device *dev, char *buf, size_t count, loff_t off)
 		size -= temp;
 		next += temp;
 	}
-	spin_unlock_irqrestore (&pools_lock, flags);
+	up (&pools_lock);
 
 	return count - size;
 }
@@ -89,7 +88,7 @@ static DEVICE_ATTR (pools, S_IRUGO, show_pools, NULL);
  * @size: size of the blocks in this pool.
  * @align: alignment requirement for blocks; must be a power of two
  * @allocation: returned blocks won't cross this boundary (or zero)
- * @mem_flags: SLAB_* flags.
+ * Context: !in_interrupt()
  *
  * Returns a pci allocation pool with the requested characteristics, or
  * null if one can't be created.  Given one of these pools, pci_pool_alloc()
@@ -105,10 +104,9 @@ static DEVICE_ATTR (pools, S_IRUGO, show_pools, NULL);
  */
 struct pci_pool *
 pci_pool_create (const char *name, struct pci_dev *pdev,
-	size_t size, size_t align, size_t allocation, int mem_flags)
+	size_t size, size_t align, size_t allocation)
 {
 	struct pci_pool		*retval;
-	unsigned long		flags;
 
 	if (align == 0)
 		align = 1;
@@ -130,7 +128,7 @@ pci_pool_create (const char *name, struct pci_dev *pdev,
 	} else if (allocation < size)
 		return 0;
 
-	if (!(retval = kmalloc (sizeof *retval, mem_flags)))
+	if (!(retval = kmalloc (sizeof *retval, SLAB_KERNEL)))
 		return retval;
 
 	strncpy (retval->name, name, sizeof retval->name);
@@ -138,24 +136,22 @@ pci_pool_create (const char *name, struct pci_dev *pdev,
 
 	retval->dev = pdev;
 
-	if (pdev) {
-		int	do_add;
-		spin_lock_irqsave (&pools_lock, flags);
-		do_add = list_empty (&pdev->pools);
-		/* note:  not currently insisting "name" be unique */
-		list_add (&retval->pools, &pdev->pools);
-		spin_unlock_irqrestore (&pools_lock, flags);
-		if (do_add)
-			device_create_file (&pdev->dev, &dev_attr_pools);
-	} else
-		INIT_LIST_HEAD (&retval->pools);
-
 	INIT_LIST_HEAD (&retval->page_list);
 	spin_lock_init (&retval->lock);
 	retval->size = size;
 	retval->allocation = allocation;
 	retval->blocks_per_page = allocation / size;
 	init_waitqueue_head (&retval->waitq);
+
+	if (pdev) {
+		down (&pools_lock);
+		if (list_empty (&pdev->pools))
+			device_create_file (&pdev->dev, &dev_attr_pools);
+		/* note:  not currently insisting "name" be unique */
+		list_add (&retval->pools, &pdev->pools);
+		up (&pools_lock);
+	} else
+		INIT_LIST_HEAD (&retval->pools);
 
 	return retval;
 }
@@ -220,6 +216,7 @@ pool_free_page (struct pci_pool *pool, struct pci_page *page)
 /**
  * pci_pool_destroy - destroys a pool of pci memory blocks.
  * @pool: pci pool that will be destroyed
+ * Context: !in_interrupt()
  *
  * Caller guarantees that no more memory from the pool is in use,
  * and that nothing will try to use the pool after this call.
@@ -227,9 +224,12 @@ pool_free_page (struct pci_pool *pool, struct pci_page *page)
 void
 pci_pool_destroy (struct pci_pool *pool)
 {
-	unsigned long		flags;
+	down (&pools_lock);
+	list_del (&pool->pools);
+	if (pool->dev && list_empty (&pool->dev->pools))
+		device_remove_file (&pool->dev->dev, &dev_attr_pools);
+	up (&pools_lock);
 
-	spin_lock_irqsave (&pool->lock, flags);
 	while (!list_empty (&pool->page_list)) {
 		struct pci_page		*page;
 		page = list_entry (pool->page_list.next,
@@ -245,13 +245,6 @@ pci_pool_destroy (struct pci_pool *pool)
 			pool_free_page (pool, page);
 	}
 
-	spin_lock (&pools_lock);
-	list_del (&pool->pools);
-	if (pool->dev && list_empty (&pool->dev->pools))
-		device_remove_file (&pool->dev->dev, &dev_attr_pools);
-	spin_unlock (&pools_lock);
-
-	spin_unlock_irqrestore (&pool->lock, flags);
 	kfree (pool);
 }
 
@@ -296,7 +289,7 @@ restart:
 			}
 		}
 	}
-	if (!(page = pool_alloc_page (pool, mem_flags))) {
+	if (!(page = pool_alloc_page (pool, SLAB_ATOMIC))) {
 		if (mem_flags == SLAB_KERNEL) {
 			DECLARE_WAITQUEUE (wait, current);
 
