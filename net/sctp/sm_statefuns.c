@@ -995,7 +995,7 @@ static int sctp_sf_check_restart_addrs(const struct sctp_association *new_asoc,
 	/* Search through all current addresses and make sure
 	 * we aren't adding any new ones.
 	 */
-	new_addr = 0;
+	new_addr = NULL;
 	found = 0;
 
 	list_for_each(pos, &new_asoc->peer.transport_addr_list) {
