@@ -475,7 +475,6 @@ struct wl3501_80211_tx_plcp_hdr {
 
 /*
  * Data Frame MAC Header (IEEE 802.11)
- * FIXME: try to use ieee_802_11_header (see linux/802_11.h)
  */
 struct wl3501_80211_data_mac_hdr {
 	u16			frame_ctrl;
@@ -554,37 +553,5 @@ struct wl3501_card {
 	struct iw_statistics		wstats;
 	struct iw_spy_data		spy_data;
 	struct dev_node_t		node;
-};
-
-/**
- * struct wl3501_ioctl_blk - ioctl block
- * @cmd - Command to run
- * @len - Length of the data buffer
- * @data - Pointer to the data buffer
- *
- * wl3501_ioctl_blk is put into ifreq.ifr_data which is a union (16 bytes)
- * sizeof(wl3501_ioctl_blk) must be less than 16 bytes.
- */
-struct wl3501_ioctl_blk {
-	u16		cmd;
-	u16		len;
-	unsigned char	*data;
-};
-
-struct wl3501_ioctl_parm {
-	u8			def_chan;
-	u8			chan;
-	enum wl3501_net_type	net_type;
-	u8			essid[WL3501_ESSID_MAX_LEN];
-	u8			keep_essid[WL3501_ESSID_MAX_LEN];
-	u8			version[2];
-	u8			freq_domain;
-};
-
-enum wl3501_ioctl_cmd {
-	WL3501_IOCTL_CMD_GET_PARAMETER = SIOCIWFIRSTPRIV,
-	WL3501_IOCTL_CMD_SET_PARAMETER,
-	WL3501_IOCTL_CMD_WRITE_FLASH,
-	WL3501_IOCTL_CMD_SET_RESET,
 };
 #endif
