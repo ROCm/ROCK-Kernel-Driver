@@ -208,6 +208,7 @@ static void change_VID(int vid)
 
 	rdmsrl (MSR_K7_FID_VID_CTL, fidvidctl.val);
 	if (fidvidctl.bits.VID != vid) {
+		fidvidctl.bits.SGTC = latency;
 		fidvidctl.bits.VID = vid;
 		fidvidctl.bits.VIDC = 1;
 		wrmsrl (MSR_K7_FID_VID_CTL, fidvidctl.val);
