@@ -133,12 +133,8 @@ find_iosapic (unsigned int gsi)
 	return -1;
 }
 
-/*
- * Translate GSI number to the corresponding IA-64 interrupt vector.  If no
- * entry exists, return -1.
- */
-int
-gsi_to_vector (unsigned int gsi)
+static inline int
+_gsi_to_vector (unsigned int gsi)
 {
 	struct iosapic_intr_info *info;
 
@@ -146,6 +142,26 @@ gsi_to_vector (unsigned int gsi)
 		if (info->gsi_base + info->rte_index == gsi)
 			return info - iosapic_intr_info;
 	return -1;
+}
+
+/*
+ * Translate GSI number to the corresponding IA-64 interrupt vector.  If no
+ * entry exists, return -1.
+ */
+inline int
+gsi_to_vector (unsigned int gsi)
+{
+	return _gsi_to_vector(gsi);
+}
+
+int
+gsi_to_irq (unsigned int gsi)
+{
+	/*
+	 * XXX fix me: this assumes an identity mapping vetween IA-64 vector and Linux irq
+	 * numbers...
+	 */
+	return _gsi_to_vector(gsi);
 }
 
 static void
@@ -157,7 +173,7 @@ set_rte (unsigned int vector, unsigned int dest)
 	int rte_index;
 	char redir;
 
-	DBG(KERN_DEBUG"IOSAPIC: routing vector %d to %x\n", vector, dest);
+	DBG(KERN_DEBUG"IOSAPIC: routing vector %d to 0x%x\n", vector, dest);
 
 	rte_index = iosapic_intr_info[vector].rte_index;
 	if (rte_index < 0)

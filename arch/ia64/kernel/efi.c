@@ -60,66 +60,156 @@ struct proc_dir_entry *efi_dir = NULL;
 
 static unsigned long mem_limit = ~0UL;
 
-static efi_status_t
-phys_get_time (efi_time_t *tm, efi_time_cap_t *tc)
-{
-	return efi_call_phys(__va(runtime->get_time), __pa(tm), __pa(tc));
+#define efi_call_virt(f, args...)	(*(f))(args)
+
+#define STUB_GET_TIME(prefix, adjust_arg)							\
+static efi_status_t										\
+prefix##_get_time (efi_time_t *tm, efi_time_cap_t *tc)						\
+{												\
+	struct ia64_fpreg fr[6];								\
+	efi_status_t ret;									\
+												\
+	ia64_save_scratch_fpregs(fr);								\
+	ret = efi_call_##prefix((efi_get_time_t *) __va(runtime->get_time), adjust_arg(tm),	\
+				adjust_arg(tc));						\
+	ia64_load_scratch_fpregs(fr);								\
+	return ret;										\
 }
 
-static efi_status_t
-phys_set_time (efi_time_t *tm)
-{
-	return efi_call_phys(__va(runtime->set_time), __pa(tm));
+#define STUB_SET_TIME(prefix, adjust_arg)							\
+static efi_status_t										\
+prefix##_set_time (efi_time_t *tm)								\
+{												\
+	struct ia64_fpreg fr[6];								\
+	efi_status_t ret;									\
+												\
+	ia64_save_scratch_fpregs(fr);								\
+	ret = efi_call_##prefix((efi_set_time_t *) __va(runtime->set_time), adjust_arg(tm));	\
+	ia64_load_scratch_fpregs(fr);								\
+	return ret;										\
 }
 
-static efi_status_t
-phys_get_wakeup_time (efi_bool_t *enabled, efi_bool_t *pending, efi_time_t *tm)
-{
-	return efi_call_phys(__va(runtime->get_wakeup_time), __pa(enabled), __pa(pending),
-			     __pa(tm));
+#define STUB_GET_WAKEUP_TIME(prefix, adjust_arg)						\
+static efi_status_t										\
+prefix##_get_wakeup_time (efi_bool_t *enabled, efi_bool_t *pending, efi_time_t *tm)		\
+{												\
+	struct ia64_fpreg fr[6];								\
+	efi_status_t ret;									\
+												\
+	ia64_save_scratch_fpregs(fr);								\
+	ret = efi_call_##prefix((efi_get_wakeup_time_t *) __va(runtime->get_wakeup_time),	\
+				adjust_arg(enabled), adjust_arg(pending), adjust_arg(tm));	\
+	ia64_load_scratch_fpregs(fr);								\
+	return ret;										\
 }
 
-static efi_status_t
-phys_set_wakeup_time (efi_bool_t enabled, efi_time_t *tm)
-{
-	return efi_call_phys(__va(runtime->set_wakeup_time), enabled, __pa(tm));
+#define STUB_SET_WAKEUP_TIME(prefix, adjust_arg)						\
+static efi_status_t										\
+prefix##_set_wakeup_time (efi_bool_t enabled, efi_time_t *tm)					\
+{												\
+	struct ia64_fpreg fr[6];								\
+	efi_status_t ret;									\
+												\
+	ia64_save_scratch_fpregs(fr);								\
+	ret = efi_call_##prefix((efi_set_wakeup_time_t *) __va(runtime->set_wakeup_time),	\
+				enabled, adjust_arg(tm));					\
+	ia64_load_scratch_fpregs(fr);								\
+	return ret;										\
 }
 
-static efi_status_t
-phys_get_variable (efi_char16_t *name, efi_guid_t *vendor, u32 *attr,
-		   unsigned long *data_size, void *data)
-{
-	return efi_call_phys(__va(runtime->get_variable), __pa(name), __pa(vendor), __pa(attr),
-			     __pa(data_size), __pa(data));
+#define STUB_GET_VARIABLE(prefix, adjust_arg)						\
+static efi_status_t									\
+prefix##_get_variable (efi_char16_t *name, efi_guid_t *vendor, u32 *attr,		\
+		       unsigned long *data_size, void *data)				\
+{											\
+	struct ia64_fpreg fr[6];							\
+	efi_status_t ret;								\
+											\
+	ia64_save_scratch_fpregs(fr);							\
+	ret = efi_call_##prefix((efi_get_variable_t *) __va(runtime->get_variable),	\
+				adjust_arg(name), adjust_arg(vendor), adjust_arg(attr),	\
+				adjust_arg(data_size), adjust_arg(data));		\
+	ia64_load_scratch_fpregs(fr);							\
+	return ret;									\
 }
 
-static efi_status_t
-phys_get_next_variable (unsigned long *name_size, efi_char16_t *name, efi_guid_t *vendor)
-{
-	return efi_call_phys(__va(runtime->get_next_variable), __pa(name_size), __pa(name),
-			     __pa(vendor));
+#define STUB_GET_NEXT_VARIABLE(prefix, adjust_arg)						\
+static efi_status_t										\
+prefix##_get_next_variable (unsigned long *name_size, efi_char16_t *name, efi_guid_t *vendor)	\
+{												\
+	struct ia64_fpreg fr[6];								\
+	efi_status_t ret;									\
+												\
+	ia64_save_scratch_fpregs(fr);								\
+	ret = efi_call_##prefix((efi_get_next_variable_t *) __va(runtime->get_next_variable),	\
+				adjust_arg(name_size), adjust_arg(name), adjust_arg(vendor));	\
+	ia64_load_scratch_fpregs(fr);								\
+	return ret;										\
 }
 
-static efi_status_t
-phys_set_variable (efi_char16_t *name, efi_guid_t *vendor, u32 attr,
-		   unsigned long data_size, void *data)
-{
-	return efi_call_phys(__va(runtime->set_variable), __pa(name), __pa(vendor), attr,
-			     data_size, __pa(data));
+#define STUB_SET_VARIABLE(prefix, adjust_arg)						\
+static efi_status_t									\
+prefix##_set_variable (efi_char16_t *name, efi_guid_t *vendor, u32 attr,		\
+		       unsigned long data_size, void *data)				\
+{											\
+	struct ia64_fpreg fr[6];							\
+	efi_status_t ret;								\
+											\
+	ia64_save_scratch_fpregs(fr);							\
+	ret = efi_call_##prefix((efi_set_variable_t *) __va(runtime->set_variable),	\
+				adjust_arg(name), adjust_arg(vendor), attr, data_size,	\
+				adjust_arg(data));					\
+	ia64_load_scratch_fpregs(fr);							\
+	return ret;									\
 }
 
-static efi_status_t
-phys_get_next_high_mono_count (u64 *count)
-{
-	return efi_call_phys(__va(runtime->get_next_high_mono_count), __pa(count));
+#define STUB_GET_NEXT_HIGH_MONO_COUNT(prefix, adjust_arg)					\
+static efi_status_t										\
+prefix##_get_next_high_mono_count (u64 *count)							\
+{												\
+	struct ia64_fpreg fr[6];								\
+	efi_status_t ret;									\
+												\
+	ia64_save_scratch_fpregs(fr);								\
+	ret = efi_call_##prefix((efi_get_next_high_mono_count_t *)				\
+				__va(runtime->get_next_high_mono_count), adjust_arg(count));	\
+	ia64_load_scratch_fpregs(fr);								\
+	return ret;										\
 }
 
-static void
-phys_reset_system (int reset_type, efi_status_t status,
-		   unsigned long data_size, efi_char16_t *data)
-{
-	efi_call_phys(__va(runtime->reset_system), status, data_size, __pa(data));
+#define STUB_RESET_SYSTEM(prefix, adjust_arg)					\
+static void									\
+prefix##_reset_system (int reset_type, efi_status_t status,			\
+		       unsigned long data_size, efi_char16_t *data)		\
+{										\
+	struct ia64_fpreg fr[6];						\
+										\
+	ia64_save_scratch_fpregs(fr);						\
+	efi_call_##prefix((efi_reset_system_t *) __va(runtime->reset_system),	\
+			  reset_type, status, data_size, adjust_arg(data));	\
+	/* should not return, but just in case... */				\
+	ia64_load_scratch_fpregs(fr);						\
 }
+
+STUB_GET_TIME(phys, __pa)
+STUB_SET_TIME(phys, __pa)
+STUB_GET_WAKEUP_TIME(phys, __pa)
+STUB_SET_WAKEUP_TIME(phys, __pa)
+STUB_GET_VARIABLE(phys, __pa)
+STUB_GET_NEXT_VARIABLE(phys, __pa)
+STUB_SET_VARIABLE(phys, __pa)
+STUB_GET_NEXT_HIGH_MONO_COUNT(phys, __pa)
+STUB_RESET_SYSTEM(phys, __pa)
+
+STUB_GET_TIME(virt, )
+STUB_SET_TIME(virt, )
+STUB_GET_WAKEUP_TIME(virt, )
+STUB_SET_WAKEUP_TIME(virt, )
+STUB_GET_VARIABLE(virt, )
+STUB_GET_NEXT_VARIABLE(virt, )
+STUB_SET_VARIABLE(virt, )
+STUB_GET_NEXT_HIGH_MONO_COUNT(virt, )
+STUB_RESET_SYSTEM(virt, )
 
 void
 efi_gettimeofday (struct timeval *tv)
@@ -574,18 +664,17 @@ efi_enter_virtual_mode (void)
 	}
 
 	/*
-	 * Now that EFI is in virtual mode, we arrange for EFI functions to be
-	 * called directly:
+	 * Now that EFI is in virtual mode, we call the EFI functions more efficiently:
 	 */
-	efi.get_time = __va(runtime->get_time);
-	efi.set_time = __va(runtime->set_time);
-	efi.get_wakeup_time = __va(runtime->get_wakeup_time);
-	efi.set_wakeup_time = __va(runtime->set_wakeup_time);
-	efi.get_variable = __va(runtime->get_variable);
-	efi.get_next_variable = __va(runtime->get_next_variable);
-	efi.set_variable = __va(runtime->set_variable);
-	efi.get_next_high_mono_count = __va(runtime->get_next_high_mono_count);
-	efi.reset_system = __va(runtime->reset_system);
+	efi.get_time = virt_get_time;
+	efi.set_time = virt_set_time;
+	efi.get_wakeup_time = virt_get_wakeup_time;
+	efi.set_wakeup_time = virt_set_wakeup_time;
+	efi.get_variable = virt_get_variable;
+	efi.get_next_variable = virt_get_next_variable;
+	efi.set_variable = virt_set_variable;
+	efi.get_next_high_mono_count = virt_get_next_high_mono_count;
+	efi.reset_system = virt_reset_system;
 }
 
 /*
