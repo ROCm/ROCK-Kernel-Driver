@@ -479,6 +479,8 @@ rpm:	clean spec
 
 else # ifeq ($(filter $(noconfig_targets),$(MAKECMDGOALS)),)
 
+ifeq ($(filter-out $(noconfig_targets),$(MAKECMDGOALS)),)
+
 # Targets which don't need .config
 # ===========================================================================
 #
@@ -536,23 +538,6 @@ allmodconfig:
 
 defconfig:
 	yes '' | $(CONFIG_SHELL) scripts/Configure -d arch/$(ARCH)/config.in
-
-#	How we generate .config depends on which *config the
-#	user chose when calling make
-
-.config: $(filter oldconfig xconfig menuconfig config,$(MAKECMDGOALS)) ;
-
-#	If the user gave commands from both the need / need not
-#	.config sections, we need to call make again after
-#	.config is generated, now to take care of the remaining
-#	targets we know nothing about in this section
-
-remaining_targets := $(filter-out $(noconfig_targets),$(MAKECMDGOALS))
-
-$(remaining_targets) : make_with_config
-
-make_with_config: .config
-	@$(MAKE) $(remaining_targets)
 
 # Cleaning up
 # ---------------------------------------------------------------------------
@@ -657,8 +642,6 @@ sgmldocs psdocs pdfdocs htmldocs:
 	@$(MAKE) -C Documentation/DocBook $@
 
 
-endif # ifeq ($(filter $(noconfig_targets),$(MAKECMDGOALS)),)
-
 # Scripts to check various things for consistency
 # ---------------------------------------------------------------------------
 
@@ -670,6 +653,18 @@ checkhelp:
 
 checkincludes:
 	find * -name '*.[hcS]' -type f -print | sort | xargs $(PERL) -w scripts/checkincludes.pl
+
+else # ifneq ($(filter-out $(noconfig_targets),$(MAKECMDGOALS)),)
+
+# We're called with both targets which do and do not need
+# .config included. Handle them one after the other.
+# ===========================================================================
+
+%:: FORCE
+	$(MAKE) $@
+
+endif # ifeq ($(filter-out $(noconfig_targets),$(MAKECMDGOALS)),)
+endif # ifeq ($(filter $(noconfig_targets),$(MAKECMDGOALS)),)
 
 # FIXME Should go into a make.lib or something 
 # ===========================================================================
