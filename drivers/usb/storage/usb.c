@@ -547,6 +547,13 @@ static int usb_stor_allocate_urbs(struct us_data *ss)
 		return 2;
 	}
 
+	US_DEBUGP("Allocating scatter-gather request block\n");
+	ss->current_sg = kmalloc(sizeof(*ss->current_sg), GFP_KERNEL);
+	if (!ss->current_sg) {
+		US_DEBUGP("allocation failed\n");
+		return 5;
+	}
+
 	/* allocate the IRQ URB, if it is needed */
 	if (ss->protocol == US_PR_CBI) {
 		US_DEBUGP("Allocating IRQ for CBI transport\n");
@@ -606,6 +613,12 @@ static void usb_stor_deallocate_urbs(struct us_data *ss)
 		ss->irq_urb = NULL;
 	}
 	up(&(ss->irq_urb_sem));
+
+	/* free the scatter-gather request block */
+	if (ss->current_sg) {
+		kfree(ss->current_sg);
+		ss->current_sg = NULL;
+	}
 
 	/* free up the main URB for this device */
 	if (ss->current_urb) {

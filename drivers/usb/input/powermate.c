@@ -78,14 +78,33 @@ static void powermate_config_complete(struct urb *urb); /* forward declararation
 static void powermate_irq(struct urb *urb)
 {
 	struct powermate_device *pm = urb->context;
+	int retval;
 
-	if (urb->status)
+	switch (urb->status) {
+	case 0:
+		/* success */
+		break;
+	case -ECONNRESET:
+	case -ENOENT:
+	case -ESHUTDOWN:
+		/* this urb is terminated, clean up */
+		dbg("%s - urb shutting down with status: %d", __FUNCTION__, urb->status);
 		return;
+	default:
+		dbg("%s - nonzero urb status received: %d", __FUNCTION__, urb->status);
+		goto exit;
+	}
 
 	/* handle updates to device state */
 	input_report_key(&pm->input, BTN_0, pm->data[0] & 0x01);
 	input_report_rel(&pm->input, REL_DIAL, pm->data[1]);
 	input_sync(&pm->input);
+
+exit:
+	retval = usb_submit_urb (urb, GFP_ATOMIC);
+	if (retval)
+		err ("%s - usb_submit_urb failed with result %d",
+		     __FUNCTION__, retval);
 }
 
 /* Decide if we need to issue a control message and do so. Must be called with pm->lock down */

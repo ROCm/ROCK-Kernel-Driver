@@ -1,9 +1,9 @@
 /*
  * linux/arch/ia64/kernel/time.c
  *
- * Copyright (C) 1998-2001 Hewlett-Packard Co
- * Copyright (C) 1998-2000 Stephane Eranian <eranian@hpl.hp.com>
- * Copyright (C) 1999-2001 David Mosberger <davidm@hpl.hp.com>
+ * Copyright (C) 1998-2002 Hewlett-Packard Co
+ *	Stephane Eranian <eranian@hpl.hp.com>
+ *	David Mosberger <davidm@hpl.hp.com>
  * Copyright (C) 1999 Don Dugger <don.dugger@intel.com>
  * Copyright (C) 1999-2000 VA Linux Systems
  * Copyright (C) 1999-2000 Walt Drummond <drummond@valinux.com>
@@ -12,6 +12,7 @@
 
 #include <linux/init.h>
 #include <linux/kernel.h>
+#include <linux/profile.h>
 #include <linux/sched.h>
 #include <linux/time.h>
 #include <linux/interrupt.h>

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tbconvrt - ACPI Table conversion utilities
- *              $Revision: 43 $
+ *              $Revision: 44 $
  *
  *****************************************************************************/
 
@@ -137,7 +137,6 @@ acpi_tb_convert_to_xsdt (
 	/* Point the table descriptor to the new table */
 
 	table_info->pointer     = (acpi_table_header *) new_table;
-	table_info->base_pointer = (acpi_table_header *) new_table;
 	table_info->length      = table_size;
 	table_info->allocation  = ACPI_MEM_ALLOCATED;
 
@@ -385,7 +384,6 @@ acpi_tb_convert_table_fadt (void)
 	/* Install the new table */
 
 	table_desc->pointer     = (acpi_table_header *) acpi_gbl_FADT;
-	table_desc->base_pointer = acpi_gbl_FADT;
 	table_desc->allocation  = ACPI_MEM_ALLOCATED;
 	table_desc->length      = sizeof (fadt_descriptor_rev2);
 

@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exnames - interpreter/scanner name load/execute
- *              $Revision: 91 $
+ *              $Revision: 92 $
  *
  *****************************************************************************/
 
@@ -247,9 +247,9 @@ acpi_ex_get_name_string (
 	ACPI_FUNCTION_TRACE_PTR ("Ex_get_name_string", aml_address);
 
 
-	if (INTERNAL_TYPE_REGION_FIELD == data_type  ||
-		INTERNAL_TYPE_BANK_FIELD == data_type    ||
-		INTERNAL_TYPE_INDEX_FIELD == data_type) {
+	if (ACPI_TYPE_LOCAL_REGION_FIELD == data_type  ||
+		ACPI_TYPE_LOCAL_BANK_FIELD == data_type    ||
+		ACPI_TYPE_LOCAL_INDEX_FIELD == data_type) {
 		/* Disallow prefixes for types associated with Field_unit names */
 
 		name_string = acpi_ex_allocate_name_string (0, 1);

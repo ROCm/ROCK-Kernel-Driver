@@ -417,6 +417,7 @@ static int in2000_device_reset(Scsi_Cmnd *);
                   proc_info:       		in2000_proc_info,    /* pointer to proc info function */ \
                   name:            		"Always IN2000",     /* device name */ \
                   detect:          		in2000_detect,       /* returns number of in2000's found */ \
+                  release:			in2000_release,	     /* release the in2000 controller */ \
                   queuecommand:    		in2000_queuecommand, /* queue scsi command, don't wait */ \
                   eh_abort_handler:		in2000_abort,        /* abort current command */ \
                   eh_bus_reset_handler:		in2000_bus_reset,    /* reset scsi bus */ \

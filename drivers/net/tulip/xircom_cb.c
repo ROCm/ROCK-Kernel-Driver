@@ -299,7 +299,7 @@ static int __devinit xircom_probe(struct pci_dev *pdev, const struct pci_device_
 	dev->get_stats = &xircom_get_stats;
 	dev->priv = private;
 	dev->do_ioctl = &private_ioctl;
-	pdev->driver_data = dev;
+	pci_set_drvdata(pdev, dev);
 
 	
 	/* start the transmitter to get a heartbeat */
@@ -326,7 +326,7 @@ static int __devinit xircom_probe(struct pci_dev *pdev, const struct pci_device_
  */
 static void __devexit xircom_remove(struct pci_dev *pdev)
 {
-	struct net_device *dev = pdev->driver_data;
+	struct net_device *dev = pci_get_drvdata(pdev);
 	struct xircom_private *card;
 	enter("xircom_remove");
 	if (dev!=NULL) {

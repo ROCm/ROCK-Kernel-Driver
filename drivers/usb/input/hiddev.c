@@ -701,7 +701,7 @@ int hiddev_connect(struct hid_device *hid)
 	init_waitqueue_head(&hiddev->wait);
 
 	hiddev->minor = minor;
-	hiddev_table[minor] = hiddev;
+	hiddev_table[minor - HIDDEV_MINOR_BASE] = hiddev;
 
 	hiddev->hid = hid;
 	hiddev->exist = 1;

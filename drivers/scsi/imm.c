@@ -199,6 +199,8 @@ int imm_detect(Scsi_Host_Template * host)
 	    continue;
 	}
 
+	INIT_WORK(&imm_hosts[i].imm_tq, imm_interrupt, &imm_hosts[i]);
+	
 	host->can_queue = IMM_CAN_QUEUE;
 	host->sg_tablesize = imm_sg;
 	hreg = scsi_register(host, 0);

@@ -248,6 +248,8 @@
 #ifndef ASM
 struct NCR5380_hostdata {
 	NCR5380_implementation_fields;		/* implementation specific */
+	struct Scsi_Host *host;			/* Host backpointer */
+	struct NCR5380_hostdata *next;		/* Next in our hot chain */
 	unsigned char id_mask, id_higher_mask;	/* 1 << id, all bits greater */
 	unsigned char targets_present;		/* targets we have connected
 						   to, so we can call a select
@@ -269,6 +271,7 @@ struct NCR5380_hostdata {
 	struct Scsi_Host *next_timer;
 	int select_time;			/* timer in select for target response */
 	volatile Scsi_Cmnd *selecting;
+	struct work_struct coroutine;		/* our co-routine */
 #ifdef NCR5380_STATS
 	unsigned timebase;			/* Base for time calcs */
 	long time_read[8];			/* time to do reads */
@@ -281,7 +284,6 @@ struct NCR5380_hostdata {
 };
 
 #ifdef __KERNEL__
-static struct Scsi_Host *first_instance;	/* linked list of 5380's */
 
 #define dprintk(a,b)			do {} while(0)
 #define NCR5380_dprint(a,b)		do {} while(0)
@@ -290,36 +292,22 @@ static struct Scsi_Host *first_instance;	/* linked list of 5380's */
 #if defined(AUTOPROBE_IRQ)
 static int NCR5380_probe_irq(struct Scsi_Host *instance, int possible);
 #endif
-static void NCR5380_init(struct Scsi_Host *instance, int flags);
+static int NCR5380_init(struct Scsi_Host *instance, int flags);
 static void NCR5380_information_transfer(struct Scsi_Host *instance);
 #ifndef DONT_USE_INTR
 static void NCR5380_intr(int irq, void *dev_id, struct pt_regs *regs);
-static void do_NCR5380_intr(int irq, void *dev_id, struct pt_regs *regs);
 #endif
-static void NCR5380_main(void);
+static void NCR5380_main(void *ptr);
 static void NCR5380_print_options(struct Scsi_Host *instance);
+#ifdef NDEBUG
 static void NCR5380_print_phase(struct Scsi_Host *instance);
 static void NCR5380_print(struct Scsi_Host *instance);
-#ifndef NCR5380_abort
-static
 #endif
-int NCR5380_abort(Scsi_Cmnd * cmd);
-#ifndef NCR5380_bus_reset
-static
-#endif
-int NCR5380_bus_reset(Scsi_Cmnd * cmd);
-#ifndef NCR5380_host_reset
-static
-#endif
-int NCR5380_host_reset(Scsi_Cmnd * cmd);
-#ifndef NCR5380_device_reset
-static
-#endif
-int NCR5380_device_reset(Scsi_Cmnd * cmd);
-#ifndef NCR5380_queue_command
-static
-#endif
-int NCR5380_queue_command(Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *));
+static int NCR5380_abort(Scsi_Cmnd * cmd);
+static int NCR5380_bus_reset(Scsi_Cmnd * cmd);
+static int NCR5380_host_reset(Scsi_Cmnd * cmd);
+static int NCR5380_device_reset(Scsi_Cmnd * cmd);
+static int NCR5380_queue_command(Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *));
 
 
 static void NCR5380_reselect(struct Scsi_Host *instance);

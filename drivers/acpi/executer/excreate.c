@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: excreate - Named object creation
- *              $Revision: 94 $
+ *              $Revision: 97 $
  *
  *****************************************************************************/
 
@@ -55,7 +55,7 @@ acpi_ex_create_alias (
 {
 	acpi_namespace_node     *target_node;
 	acpi_namespace_node     *alias_node;
-	acpi_status             status;
+	acpi_status             status = AE_OK;
 
 
 	ACPI_FUNCTION_TRACE ("Ex_create_alias");
@@ -66,7 +66,7 @@ acpi_ex_create_alias (
 	alias_node = (acpi_namespace_node *) walk_state->operands[0];
 	target_node = (acpi_namespace_node *) walk_state->operands[1];
 
-	if (target_node->type == INTERNAL_TYPE_ALIAS) {
+	if (target_node->type == ACPI_TYPE_LOCAL_ALIAS) {
 		/*
 		 * Dereference an existing alias so that we don't create a chain
 		 * of aliases.  With this code, we guarantee that an alias is
@@ -95,8 +95,8 @@ acpi_ex_create_alias (
 		 * NS node, not the object itself.  This is because for these
 		 * types, the object can change dynamically via a Store.
 		 */
-		alias_node->type = INTERNAL_TYPE_ALIAS;
-		alias_node->object = (acpi_operand_object *) target_node;
+		alias_node->type = ACPI_TYPE_LOCAL_ALIAS;
+		alias_node->object = ACPI_CAST_PTR (acpi_operand_object, target_node);
 		break;
 
 	default:
@@ -117,7 +117,7 @@ acpi_ex_create_alias (
 
 	/* Since both operands are Nodes, we don't need to delete them */
 
-	return_ACPI_STATUS (AE_OK);
+	return_ACPI_STATUS (status);
 }
 
 
@@ -221,9 +221,10 @@ acpi_ex_create_mutex (
 	/* Init object and attach to NS node */
 
 	obj_desc->mutex.sync_level = (u8) walk_state->operands[1]->integer.value;
+	obj_desc->mutex.node = (acpi_namespace_node *) walk_state->operands[0];
 
-	status = acpi_ns_attach_object ((acpi_namespace_node *) walk_state->operands[0],
-			  obj_desc, ACPI_TYPE_MUTEX);
+	status = acpi_ns_attach_object (obj_desc->mutex.node,
+			 obj_desc, ACPI_TYPE_MUTEX);
 
 
 cleanup:

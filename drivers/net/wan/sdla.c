@@ -1665,7 +1665,10 @@ int __init sdla_c_setup(void)
 }
 
 #ifdef MODULE
-static struct net_device sdla0 = {"sdla0", 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, sdla_init};
+static struct net_device sdla0 = {
+	.name = "sdla0",
+	.init = sdla_init
+};
 
 MODULE_LICENSE("GPL");
 

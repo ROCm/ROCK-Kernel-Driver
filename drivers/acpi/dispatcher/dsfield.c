@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dsfield - Dispatcher field routines
- *              $Revision: 68 $
+ *              $Revision: 69 $
  *
  *****************************************************************************/
 
@@ -103,7 +103,7 @@ acpi_ds_create_buffer_field (
 	 * Enter the Name_string into the namespace
 	 */
 	status = acpi_ns_lookup (walk_state->scope_info, arg->common.value.string,
-			 INTERNAL_TYPE_DEF_ANY, ACPI_IMODE_LOAD_PASS1,
+			 ACPI_TYPE_ANY, ACPI_IMODE_LOAD_PASS1,
 			 flags, walk_state, &(node));
 	if (ACPI_FAILURE (status)) {
 		ACPI_REPORT_NSERROR (arg->common.value.string, status);
@@ -343,7 +343,7 @@ acpi_ds_create_field (
 
 	/* Each remaining arg is a Named Field */
 
-	info.field_type = INTERNAL_TYPE_REGION_FIELD;
+	info.field_type = ACPI_TYPE_LOCAL_REGION_FIELD;
 	info.region_node = region_node;
 
 	status = acpi_ds_get_field_names (&info, walk_state, arg->common.next);
@@ -384,17 +384,17 @@ acpi_ds_init_field_objects (
 	switch (walk_state->opcode) {
 	case AML_FIELD_OP:
 		arg = acpi_ps_get_arg (op, 2);
-		type = INTERNAL_TYPE_REGION_FIELD;
+		type = ACPI_TYPE_LOCAL_REGION_FIELD;
 		break;
 
 	case AML_BANK_FIELD_OP:
 		arg = acpi_ps_get_arg (op, 4);
-		type = INTERNAL_TYPE_BANK_FIELD;
+		type = ACPI_TYPE_LOCAL_BANK_FIELD;
 		break;
 
 	case AML_INDEX_FIELD_OP:
 		arg = acpi_ps_get_arg (op, 3);
-		type = INTERNAL_TYPE_INDEX_FIELD;
+		type = ACPI_TYPE_LOCAL_INDEX_FIELD;
 		break;
 
 	default:
@@ -477,11 +477,11 @@ acpi_ds_create_bank_field (
 		}
 	}
 
-	/* Second arg is the Bank Register (must already exist) */
+	/* Second arg is the Bank Register (Field) (must already exist) */
 
 	arg = arg->common.next;
 	status = acpi_ns_lookup (walk_state->scope_info, arg->common.value.string,
-			  INTERNAL_TYPE_BANK_FIELD_DEFN, ACPI_IMODE_EXECUTE,
+			  ACPI_TYPE_ANY, ACPI_IMODE_EXECUTE,
 			  ACPI_NS_SEARCH_PARENT, walk_state, &info.register_node);
 	if (ACPI_FAILURE (status)) {
 		ACPI_REPORT_NSERROR (arg->common.value.string, status);
@@ -500,7 +500,7 @@ acpi_ds_create_bank_field (
 
 	/* Each remaining arg is a Named Field */
 
-	info.field_type = INTERNAL_TYPE_BANK_FIELD;
+	info.field_type = ACPI_TYPE_LOCAL_BANK_FIELD;
 	info.region_node = region_node;
 
 	status = acpi_ds_get_field_names (&info, walk_state, arg->common.next);
@@ -552,7 +552,7 @@ acpi_ds_create_index_field (
 
 	arg = arg->common.next;
 	status = acpi_ns_lookup (walk_state->scope_info, arg->common.value.string,
-			  INTERNAL_TYPE_INDEX_FIELD_DEFN, ACPI_IMODE_EXECUTE,
+			  ACPI_TYPE_ANY, ACPI_IMODE_EXECUTE,
 			  ACPI_NS_SEARCH_PARENT, walk_state, &info.data_register_node);
 	if (ACPI_FAILURE (status)) {
 		ACPI_REPORT_NSERROR (arg->common.value.string, status);
@@ -566,7 +566,7 @@ acpi_ds_create_index_field (
 
 	/* Each remaining arg is a Named Field */
 
-	info.field_type = INTERNAL_TYPE_INDEX_FIELD;
+	info.field_type = ACPI_TYPE_LOCAL_INDEX_FIELD;
 	info.region_node = region_node;
 
 	status = acpi_ds_get_field_names (&info, walk_state, arg->common.next);

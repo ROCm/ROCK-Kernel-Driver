@@ -106,8 +106,6 @@ static const char	hcd_name [] = "ehci-hcd";
 #define EHCI_STATS
 #endif
 
-#define INTR_AUTOMAGIC		/* to be removed later in 2.5 */
-
 /* magic numbers that can affect system performance */
 #define	EHCI_TUNE_CERR		3	/* 0-3 qtd retries; 0 == don't stop */
 #define	EHCI_TUNE_RL_HS		0	/* nak throttle; see 4.9 */

@@ -2,7 +2,7 @@
  *
  * Module Name: evxfregn - External Interfaces, ACPI Operation Regions and
  *                         Address Spaces.
- *              $Revision: 50 $
+ *              $Revision: 51 $
  *
  *****************************************************************************/
 
@@ -220,7 +220,7 @@ acpi_install_address_space_handler (
 	 * So, we just allocate the object for the handler and link it
 	 * into the list.
 	 */
-	handler_obj = acpi_ut_create_internal_object (INTERNAL_TYPE_ADDRESS_HANDLER);
+	handler_obj = acpi_ut_create_internal_object (ACPI_TYPE_LOCAL_ADDRESS_HANDLER);
 	if (!handler_obj) {
 		status = AE_NO_MEMORY;
 		goto unlock_and_exit;

@@ -1780,7 +1780,7 @@ static int xl_change_mtu(struct net_device *dev, int mtu)
 
 static void __devexit xl_remove_one (struct pci_dev *pdev)
 {
-	struct net_device *dev = pdev->driver_data;
+	struct net_device *dev = pci_get_drvdata(pdev);
 	struct xl_private *xl_priv=(struct xl_private *)dev->priv;
 	
 	unregister_trdev(dev);

@@ -23,6 +23,4 @@ sctp-$(CONFIG_SYSCTL) += sysctl.o
 
 sctp-$(subst m,y,$(CONFIG_IPV6))	+= ipv6.o
 
-sctp-objs := $(sctp-y)
-
 include $(TOPDIR)/Rules.make

@@ -272,13 +272,27 @@ void elv_merge_requests(request_queue_t *q, struct request *rq,
 		e->elevator_merge_req_fn(q, rq, next);
 }
 
-/*
- * add_request and next_request are required to be supported, naturally
- */
-void __elv_add_request(request_queue_t *q, struct request *rq,
-			  struct list_head *insert_here)
+void __elv_add_request(request_queue_t *q, struct request *rq, int at_end,
+		       int plug)
 {
-	q->elevator.elevator_add_req_fn(q, rq, insert_here);
+	struct list_head *insert = &q->queue_head;
+
+	if (at_end)
+		insert = insert->prev;
+	if (plug)
+		blk_plug_device(q);
+
+	q->elevator.elevator_add_req_fn(q, rq, insert);
+}
+
+void elv_add_request(request_queue_t *q, struct request *rq, int at_end,
+		     int plug)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(q->queue_lock, flags);
+	__elv_add_request(q, rq, at_end, plug);
+	spin_unlock_irqrestore(q->queue_lock, flags);
 }
 
 static inline struct request *__elv_next_request(request_queue_t *q)
@@ -289,8 +303,14 @@ static inline struct request *__elv_next_request(request_queue_t *q)
 struct request *elv_next_request(request_queue_t *q)
 {
 	struct request *rq;
+	int ret;
 
 	while ((rq = __elv_next_request(q))) {
+		/*
+		 * just mark as started even if we don't start it, a request
+		 * that has been delayed should not be passed by new incoming
+		 * requests
+		 */
 		rq->flags |= REQ_STARTED;
 
 		if (&rq->queuelist == q->last_merge)
@@ -299,20 +319,22 @@ struct request *elv_next_request(request_queue_t *q)
 		if ((rq->flags & REQ_DONTPREP) || !q->prep_rq_fn)
 			break;
 
-		/*
-		 * all ok, break and return it
-		 */
-		if (!q->prep_rq_fn(q, rq))
+		ret = q->prep_rq_fn(q, rq);
+		if (ret == BLKPREP_OK) {
 			break;
-
-		/*
-		 * prep said no-go, kill it
-		 */
-		blkdev_dequeue_request(rq);
-		if (end_that_request_first(rq, 0, rq->nr_sectors))
-			BUG();
-
-		end_that_request_last(rq);
+		} else if (ret == BLKPREP_DEFER) {
+			rq = NULL;
+			break;
+		} else if (ret == BLKPREP_KILL) {
+			blkdev_dequeue_request(rq);
+			rq->flags |= REQ_QUIET;
+			while (end_that_request_first(rq, 0, rq->nr_sectors))
+				;
+			end_that_request_last(rq);
+		} else {
+			printk("%s: bad return=%d\n", __FUNCTION__, ret);
+			break;
+		}
 	}
 
 	return rq;
@@ -321,6 +343,16 @@ struct request *elv_next_request(request_queue_t *q)
 void elv_remove_request(request_queue_t *q, struct request *rq)
 {
 	elevator_t *e = &q->elevator;
+
+	/*
+	 * the main clearing point for q->last_merge is on retrieval of
+	 * request by driver (it calls elv_next_request()), but it _can_
+	 * also happen here if a request is added to the queue but later
+	 * deleted without ever being given to driver (merged with another
+	 * request).
+	 */
+	if (&rq->queuelist == q->last_merge)
+		q->last_merge = NULL;
 
 	if (e->elevator_remove_req_fn)
 		e->elevator_remove_req_fn(q, rq);
@@ -357,6 +389,7 @@ module_init(elevator_global_init);
 
 EXPORT_SYMBOL(elevator_noop);
 
+EXPORT_SYMBOL(elv_add_request);
 EXPORT_SYMBOL(__elv_add_request);
 EXPORT_SYMBOL(elv_next_request);
 EXPORT_SYMBOL(elv_remove_request);

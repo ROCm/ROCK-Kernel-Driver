@@ -73,6 +73,17 @@ struct _fpreg_ia32 {
        unsigned short exponent;
 };
 
+struct _fpxreg_ia32 {
+        unsigned short significand[4];
+        unsigned short exponent;
+        unsigned short padding[3];
+};
+
+struct _xmmreg_ia32 {
+        unsigned int element[4];
+};
+
+
 struct _fpstate_ia32 {
        unsigned int    cw,
 		       sw,
@@ -82,7 +93,16 @@ struct _fpstate_ia32 {
 		       dataoff,
 		       datasel;
        struct _fpreg_ia32      _st[8];
-       unsigned int    status;
+       unsigned short  status;
+       unsigned short  magic;          /* 0xffff = regular FPU data only */
+
+       /* FXSR FPU environment */
+       unsigned int         _fxsr_env[6];   /* FXSR FPU env is ignored */
+       unsigned int         mxcsr;
+       unsigned int         reserved;
+       struct _fpxreg_ia32  _fxsr_st[8];    /* FXSR FPU reg data is ignored */
+       struct _xmmreg_ia32  _xmm[8];
+       unsigned int         padding[56];
 };
 
 struct sigcontext_ia32 {
@@ -485,6 +505,18 @@ extern int ia32_exception (struct pt_regs *regs, unsigned long isr);
 extern int ia32_intercept (struct pt_regs *regs, unsigned long isr);
 extern unsigned long ia32_do_mmap (struct file *, unsigned long, unsigned long, int, int, loff_t);
 extern void ia32_load_segment_descriptors (struct task_struct *task);
+
+#define ia32f2ia64f(dst,src) \
+	do { \
+	register double f6 asm ("f6"); \
+	asm volatile ("ldfe f6=[%2];; stf.spill [%1]=f6" : "=f"(f6): "r"(dst), "r"(src) : "memory"); \
+	} while(0)
+
+#define ia64f2ia32f(dst,src) \
+	do { \
+	register double f6 asm ("f6"); \
+	asm volatile ("ldf.fill f6=[%2];; stfe [%1]=f6" : "=f"(f6): "r"(dst),  "r"(src) : "memory"); \
+	} while(0)
 
 #endif /* !CONFIG_IA32_SUPPORT */
 

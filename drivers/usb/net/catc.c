@@ -308,9 +308,17 @@ static void catc_irq_done(struct urb *urb)
 			linksts = LinkBad;
 	}
 
-	if (urb->status) {
-		dbg("irq_done, status %d, data %02x %02x.", urb->status, data[0], data[1]);
+	switch (urb->status) {
+	case 0:			/* success */
+		break;
+	case -ECONNRESET:	/* unlink */
+	case -ENOENT:
+	case -ESHUTDOWN:
 		return;
+	/* -EPIPE:  should clear the halt */
+	default:		/* error */
+		dbg("irq_done, status %d, data %02x %02x.", urb->status, data[0], data[1]);
+		goto resubmit;
 	}
 
 	if (linksts == LinkGood) {
@@ -334,6 +342,12 @@ static void catc_irq_done(struct urb *urb)
 			}
 		} 
 	}
+resubmit:
+	status = usb_submit_urb (urb, SLAB_ATOMIC);
+	if (status)
+		err ("can't resubmit intr, %s-%s, status %d",
+				catc->usbdev->bus->bus_name,
+				catc->usbdev->devpath, status);
 }
 
 /*

@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: nsaccess - Top-level functions for accessing ACPI namespace
- *              $Revision: 161 $
+ *              $Revision: 165 $
  *
  ******************************************************************************/
 
@@ -142,7 +142,7 @@ acpi_ns_root_initialize (void)
 				/*
 				 * Build an object around the static string
 				 */
-				obj_desc->string.length = ACPI_STRLEN (init_val->val);
+				obj_desc->string.length = (u32) ACPI_STRLEN (init_val->val);
 				obj_desc->string.pointer = init_val->val;
 				obj_desc->common.flags |= AOPOBJ_STATIC_POINTER;
 				break;
@@ -150,6 +150,7 @@ acpi_ns_root_initialize (void)
 
 			case ACPI_TYPE_MUTEX:
 
+				obj_desc->mutex.node = new_node;
 				obj_desc->mutex.sync_level =
 						 (u16) ACPI_STRTOUL (init_val->val, NULL, 10);
 
@@ -246,6 +247,7 @@ acpi_ns_lookup (
 	acpi_namespace_node     *current_node = NULL;
 	acpi_namespace_node     *this_node = NULL;
 	u32                     num_segments;
+	u32                     num_carats;
 	acpi_name               simple_name;
 	acpi_object_type        type_to_check_for;
 	acpi_object_type        this_search_type;
@@ -299,26 +301,9 @@ acpi_ns_lookup (
 		}
 	}
 
-	/*
-	 * This check is explicitly split to relax the Type_to_check_for
-	 * conditions for Bank_field_defn. Originally, both Bank_field_defn and
-	 * Def_field_defn caused Type_to_check_for to be set to ACPI_TYPE_REGION,
-	 * but the Bank_field_defn may also check for a Field definition as well
-	 * as an Operation_region.
-	 */
-	if (INTERNAL_TYPE_FIELD_DEFN == type) {
-		/* Def_field_defn defines fields in a Region */
+	/* Save type   TBD: may be no longer necessary */
 
-		type_to_check_for = ACPI_TYPE_REGION;
-	}
-	else if (INTERNAL_TYPE_BANK_FIELD_DEFN == type) {
-		/* Bank_field_defn defines data fields in a Field Object */
-
-		type_to_check_for = ACPI_TYPE_ANY;
-	}
-	else {
-		type_to_check_for = type;
-	}
+	type_to_check_for = type;
 
 	/*
 	 * Begin examination of the actual pathname
@@ -364,14 +349,15 @@ acpi_ns_lookup (
 			/* Pathname is relative to current scope, start there */
 
 			ACPI_DEBUG_PRINT ((ACPI_DB_NAMES,
-				"Searching relative to prefix scope [%p]\n",
-				prefix_node));
+				"Searching relative to prefix scope [%4.4s] (%p)\n",
+				prefix_node->name.ascii, prefix_node));
 
 			/*
 			 * Handle multiple Parent Prefixes (carat) by just getting
 			 * the parent node for each prefix instance.
 			 */
 			this_node = prefix_node;
+			num_carats = 0;
 			while (*path == (u8) AML_PARENT_PREFIX) {
 				/* Name is fully qualified, no search rules apply */
 
@@ -384,6 +370,7 @@ acpi_ns_lookup (
 
 				/* Backup to the parent node */
 
+				num_carats++;
 				this_node = acpi_ns_get_parent_node (this_node);
 				if (!this_node) {
 					/* Current scope has no parent scope */
@@ -396,7 +383,8 @@ acpi_ns_lookup (
 
 			if (search_parent_flag == ACPI_NS_NO_UPSEARCH) {
 				ACPI_DEBUG_PRINT ((ACPI_DB_NAMES,
-					"Path is absolute with one or more carats\n"));
+					"Search scope is [%4.4s], path has %d carat(s)\n",
+					this_node->name.ascii, num_carats));
 			}
 		}
 
@@ -420,6 +408,7 @@ acpi_ns_lookup (
 			 * have the correct target node and there are no name segments.
 			 */
 			num_segments = 0;
+			type = this_node->type;
 
 			ACPI_DEBUG_PRINT ((ACPI_DB_NAMES,
 				"Prefix-only Pathname (Zero name segments), Flags=%X\n", flags));
@@ -525,6 +514,7 @@ acpi_ns_lookup (
 					current_node));
 			}
 
+			*return_node = this_node;
 			return_ACPI_STATUS (status);
 		}
 
@@ -535,27 +525,24 @@ acpi_ns_lookup (
 		 *    2) And we are looking for a specific type
 		 *       (Not checking for TYPE_ANY)
 		 *    3) Which is not an alias
-		 *    4) Which is not a local type (TYPE_DEF_ANY)
-		 *    5) Which is not a local type (TYPE_SCOPE)
-		 *    6) Which is not a local type (TYPE_INDEX_FIELD_DEFN)
-		 *    7) And the type of target object is known (not TYPE_ANY)
-		 *    8) And target object does not match what we are looking for
+		 *    4) Which is not a local type (TYPE_SCOPE)
+		 *    5) And the type of target object is known (not TYPE_ANY)
+		 *    6) And target object does not match what we are looking for
 		 *
 		 * Then we have a type mismatch.  Just warn and ignore it.
 		 */
 		if ((num_segments       == 0)                               &&
 			(type_to_check_for  != ACPI_TYPE_ANY)                   &&
-			(type_to_check_for  != INTERNAL_TYPE_ALIAS)             &&
-			(type_to_check_for  != INTERNAL_TYPE_DEF_ANY)           &&
-			(type_to_check_for  != INTERNAL_TYPE_SCOPE)             &&
-			(type_to_check_for  != INTERNAL_TYPE_INDEX_FIELD_DEFN)  &&
+			(type_to_check_for  != ACPI_TYPE_LOCAL_ALIAS)           &&
+			(type_to_check_for  != ACPI_TYPE_LOCAL_SCOPE)           &&
 			(this_node->type    != ACPI_TYPE_ANY)                   &&
 			(this_node->type    != type_to_check_for)) {
 			/* Complain about a type mismatch */
 
 			ACPI_REPORT_WARNING (
-				("Ns_lookup: %4.4s, type %X, checking for type %X\n",
-				(char *) &simple_name, this_node->type, type_to_check_for));
+				("Ns_lookup: Type mismatch on %4.4s (%s), searching for (%s)\n",
+				(char *) &simple_name, acpi_ut_get_type_name (this_node->type),
+				acpi_ut_get_type_name (type_to_check_for)));
 		}
 
 		/*
@@ -581,15 +568,11 @@ acpi_ns_lookup (
 		 * If entry is a type which opens a scope, push the new scope on the
 		 * scope stack.
 		 */
-		if (acpi_ns_opens_scope (type_to_check_for)) {
+		if (acpi_ns_opens_scope (type)) {
 			status = acpi_ds_scope_stack_push (this_node, type, walk_state);
 			if (ACPI_FAILURE (status)) {
 				return_ACPI_STATUS (status);
 			}
-
-			ACPI_DEBUG_PRINT ((ACPI_DB_NAMES,
-				"Setting current scope to [%4.4s] (%p)\n",
-				this_node->name.ascii, this_node));
 		}
 	}
 

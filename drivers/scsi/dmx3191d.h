@@ -20,16 +20,15 @@
 #define PCI_DEVICE_ID_DOMEX_DMX3191D	0x0001
 #endif
 
-#ifndef ASM
-int dmx3191d_abort(Scsi_Cmnd *);
-int dmx3191d_detect(Scsi_Host_Template *);
-const char* dmx3191d_info(struct Scsi_Host *);
-int dmx3191d_proc_info(char *, char **, off_t, int, int, int);
-int dmx3191d_queue_command(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
-int dmx3191d_release_resources(struct Scsi_Host *);
-int dmx3191d_bus_reset(Scsi_Cmnd *);
-int dmx3191d_host_reset(Scsi_Cmnd *);
-int dmx3191d_device_reset(Scsi_Cmnd *);
+static int dmx3191d_abort(Scsi_Cmnd *);
+static int dmx3191d_detect(Scsi_Host_Template *);
+static const char* dmx3191d_info(struct Scsi_Host *);
+static int dmx3191d_proc_info(char *, char **, off_t, int, int, int);
+static int dmx3191d_queue_command(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
+static int dmx3191d_release_resources(struct Scsi_Host *);
+static int dmx3191d_bus_reset(Scsi_Cmnd *);
+static int dmx3191d_host_reset(Scsi_Cmnd *);
+static int dmx3191d_device_reset(Scsi_Cmnd *);
 
 
 #define DMX3191D {				\
@@ -64,9 +63,9 @@ int dmx3191d_device_reset(Scsi_Cmnd *);
 #define NCR5380_intr				dmx3191d_intr
 #define NCR5380_proc_info			dmx3191d_proc_info
 #define NCR5380_queue_command			dmx3191d_queue_command
-#define NCR5380_reset				dmx3191d_reset
-
-#endif	/* ASM */
+#define NCR5380_host_reset			dmx3191d_host_reset
+#define NCR5380_bus_reset			dmx3191d_bus_reset
+#define NCR5380_device_reset			dmx3191d_device_reset
 
 #endif	/* __DMX3191D_H */
 

@@ -38,7 +38,7 @@
 #include <linux/hdlc.h>
 
 
-static const char* version = "HDLC support module revision 1.10";
+static const char* version = "HDLC support module revision 1.11";
 
 
 static int hdlc_change_mtu(struct net_device *dev, int new_mtu)
@@ -95,13 +95,13 @@ int hdlc_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	if (cmd != SIOCWANDEV)
 		return -EINVAL;
 
-	switch(ifr->ifr_settings->type) {
+	switch(ifr->ifr_settings.type) {
 	case IF_PROTO_HDLC:
 	case IF_PROTO_PPP:
 	case IF_PROTO_CISCO:
 	case IF_PROTO_FR:
 	case IF_PROTO_X25:
-		proto = ifr->ifr_settings->type;
+		proto = ifr->ifr_settings.type;
 		break;
 
 	default:

@@ -759,7 +759,7 @@ int init_8200e(struct us_data *us) {
 
 	US_DEBUGP("INIT 15\n");
 
-	return USB_STOR_TRANSPORT_ERROR;
+	return USB_STOR_TRANSPORT_GOOD;
 }
 
 /*
