@@ -136,7 +136,7 @@ static void sn_fixup_ionodes(void)
 
 	for (i = 0; i < numionodes; i++) {
 		hubdev = (struct hubdev_info *)(NODEPDA(i)->pdinfo);
-		nasid = COMPACT_TO_NASID_NODEID(i);
+		nasid = cnodeid_to_nasid(i);
 		status = sal_get_hubdev_info(nasid, (uint64_t) __pa(hubdev));
 		if (status)
 			continue;
@@ -313,7 +313,7 @@ static void sn_pci_controller_fixup(int segment, int busnum)
 	SN_PCIBUS_BUSSOFT(bus) = provider_soft;
 
 	nasid = NASID_GET(SN_PCIBUS_BUSSOFT(bus)->bs_base);
-	cnode = NASID_TO_COMPACT_NODEID(nasid);
+	cnode = nasid_to_cnodeid(nasid);
 	hubdev_info = (struct hubdev_info *)(NODEPDA(cnode)->pdinfo);
 	SN_PCIBUS_BUSSOFT(bus)->bs_xwidget_info =
 	    &(hubdev_info->hdi_xwidget_info[SN_PCIBUS_BUSSOFT(bus)->bs_xid]);

@@ -24,9 +24,6 @@
 
 typedef u64	nic_t;
 
-#define NASID_TO_COMPACT_NODEID(nasid)  (nasid_to_cnodeid(nasid))
-#define COMPACT_TO_NASID_NODEID(cnode)  (cnodeid_to_nasid(cnode))
-
 extern void sn_flush_all_caches(long addr, long bytes);
 
 #endif /* _ASM_IA64_SN_ARCH_H */
