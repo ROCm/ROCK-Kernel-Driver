@@ -96,19 +96,6 @@ static int (*check_part[])(struct parsed_partitions *, struct block_device *) = 
 
 char *disk_name(struct gendisk *hd, int part, char *buf)
 {
-#ifdef CONFIG_DEVFS_FS
-	if (hd->devfs_name[0] != '\0') {
-		if (part)
-			snprintf(buf, BDEVNAME_SIZE, "%s/part%d",
-					hd->devfs_name, part);
-		else if (hd->minors != 1)
-			snprintf(buf, BDEVNAME_SIZE, "%s/disc", hd->devfs_name);
-		else
-			snprintf(buf, BDEVNAME_SIZE, "%s", hd->devfs_name);
-		return buf;
-	}
-#endif
-
 	if (!part)
 		snprintf(buf, BDEVNAME_SIZE, "%s", hd->disk_name);
 	else if (isdigit(hd->disk_name[strlen(hd->disk_name)-1]))
