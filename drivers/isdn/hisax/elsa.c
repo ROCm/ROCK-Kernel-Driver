@@ -1017,7 +1017,7 @@ setup_elsa(struct IsdnCard *card)
 			return(0);
 		}
 		if (cs->hw.elsa.cfg & 0x80 && pci_rev == 1) {
-			printk(KERN_INFO "Elsa: PLX9050 rev1 workaround activated");
+			printk(KERN_INFO "Elsa: PLX9050 rev1 workaround activated\n");
 			set_bit(FLG_BUGGY_PLX9050, &cs->HW_Flags);
 		}
 		cs->hw.elsa.ale  = cs->hw.elsa.base;
