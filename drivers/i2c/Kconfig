@@ -203,13 +203,9 @@ config I2C_RPXLITE
 	tristate "Embedded Planet RPX Lite/Classic suppoort"
 	depends on (RPXLITE || RPXCLASSIC) && I2C_ALGO8XX
 
-config I2C_IBM_OCP_ALGO
-	tristate "IBM on-chip I2C Algorithm"
+config I2C_IBM_IIC
+	tristate "IBM IIC I2C"
 	depends on IBM_OCP && I2C
-
-config I2C_IBM_OCP_ADAP
-	tristate "IBM on-chip I2C Adapter"
-	depends on I2C_IBM_OCP_ALGO
 
 config I2C_IOP3XX
 	tristate "Intel XScale IOP3xx on-chip I2C interface"
