@@ -16,6 +16,7 @@
 #include <linux/kernel.h>
 #include <linux/spinlock.h>
 #include <linux/if_bridge.h>
+#include <linux/times.h>
 #include <asm/atomic.h>
 #include <asm/uaccess.h>
 #include "br_private.h"
@@ -43,7 +44,7 @@ static __inline__ void copy_fdb(struct __fdb_entry *ent,
 	ent->port_no = f->dst?f->dst->port_no:0;
 	ent->is_local = f->is_local;
 	ent->ageing_timer_value = f->is_static ? 0 
-		: ((jiffies - f->ageing_timer) * USER_HZ) / HZ;
+		: jiffies_to_clock_t(jiffies - f->ageing_timer);
 }
 
 static __inline__ int br_mac_hash(const unsigned char *mac)

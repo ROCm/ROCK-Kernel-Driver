@@ -16,26 +16,15 @@
 #include <linux/kernel.h>
 #include <linux/if_bridge.h>
 #include <linux/netdevice.h>
+#include <linux/times.h>
 #include <asm/uaccess.h>
 #include "br_private.h"
-
-/* import values in USER_HZ  */
-static inline unsigned long user_to_ticks(unsigned long utick)
-{
-	return (utick * HZ) / USER_HZ;
-}
-
-/* export values in USER_HZ */
-static inline unsigned long ticks_to_user(unsigned long tick)
-{
-	return (tick * USER_HZ) / HZ;
-}
 
 /* Report time remaining in user HZ  */
 static unsigned long timer_residue(const struct timer_list *timer)
 {
-	return ticks_to_user(timer_pending(timer) 
-			     ? (timer->expires - jiffies) : 0);
+	return timer_pending(timer) 
+		? jiffies_to_clock_t(timer->expires - jiffies) : 0;
 }
 
 int br_ioctl_device(struct net_bridge *br, unsigned int cmd,
@@ -79,17 +68,17 @@ int br_ioctl_device(struct net_bridge *br, unsigned int cmd,
 		memcpy(&b.designated_root, &br->designated_root, 8);
 		memcpy(&b.bridge_id, &br->bridge_id, 8);
 		b.root_path_cost = br->root_path_cost;
-		b.max_age = ticks_to_user(br->max_age);
-		b.hello_time = ticks_to_user(br->hello_time);
+		b.max_age = jiffies_to_clock_t(br->max_age);
+		b.hello_time = jiffies_to_clock_t(br->hello_time);
 		b.forward_delay = br->forward_delay;
 		b.bridge_max_age = br->bridge_max_age;
 		b.bridge_hello_time = br->bridge_hello_time;
-		b.bridge_forward_delay = ticks_to_user(br->bridge_forward_delay);
+		b.bridge_forward_delay = jiffies_to_clock_t(br->bridge_forward_delay);
 		b.topology_change = br->topology_change;
 		b.topology_change_detected = br->topology_change_detected;
 		b.root_port = br->root_port;
 		b.stp_enabled = br->stp_enabled;
-		b.ageing_time = ticks_to_user(br->ageing_time);
+		b.ageing_time = jiffies_to_clock_t(br->ageing_time);
 		b.hello_timer_value = timer_residue(&br->hello_timer);
 		b.tcn_timer_value = timer_residue(&br->tcn_timer);
 		b.topology_change_timer_value = timer_residue(&br->topology_change_timer);
@@ -126,7 +115,7 @@ int br_ioctl_device(struct net_bridge *br, unsigned int cmd,
 			return -EPERM;
 
 		spin_lock_bh(&br->lock);
-		br->bridge_forward_delay = user_to_ticks(arg0);
+		br->bridge_forward_delay = clock_t_to_jiffies(arg0);
 		if (br_is_root_bridge(br))
 			br->forward_delay = br->bridge_forward_delay;
 		spin_unlock_bh(&br->lock);
@@ -137,7 +126,7 @@ int br_ioctl_device(struct net_bridge *br, unsigned int cmd,
 			return -EPERM;
 
 		spin_lock_bh(&br->lock);
-		br->bridge_hello_time = user_to_ticks(arg0);
+		br->bridge_hello_time = clock_t_to_jiffies(arg0);
 		if (br_is_root_bridge(br))
 			br->hello_time = br->bridge_hello_time;
 		spin_unlock_bh(&br->lock);
@@ -148,7 +137,7 @@ int br_ioctl_device(struct net_bridge *br, unsigned int cmd,
 			return -EPERM;
 
 		spin_lock_bh(&br->lock);
-		br->bridge_max_age = user_to_ticks(arg0);
+		br->bridge_max_age = clock_t_to_jiffies(arg0);
 		if (br_is_root_bridge(br))
 			br->max_age = br->bridge_max_age;
 		spin_unlock_bh(&br->lock);
@@ -158,7 +147,7 @@ int br_ioctl_device(struct net_bridge *br, unsigned int cmd,
 		if (!capable(CAP_NET_ADMIN))
 			return -EPERM;
 
-		br->ageing_time = user_to_ticks(arg0);
+		br->ageing_time = clock_t_to_jiffies(arg0);
 		return 0;
 
 	case BRCTL_GET_PORT_INFO:
