@@ -2694,7 +2694,7 @@ static void NCR5380_reselect (struct Scsi_Host *instance)
     phase = PHASE_MSGIN;
     NCR5380_transfer_pio(instance, &phase, &len, &data);
 
-    if (!msg[0] & 0x80) {
+    if (!(msg[0] & 0x80)) {
 	printk(KERN_DEBUG "scsi%d: expecting IDENTIFY message, got ", HOSTNO);
 	print_msg(msg);
 	do_abort(instance);
