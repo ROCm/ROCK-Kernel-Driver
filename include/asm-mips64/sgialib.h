@@ -6,7 +6,7 @@
  * SGI ARCS firmware interface library for the Linux kernel.
  *
  * Copyright (C) 1996 David S. Miller (dm@engr.sgi.com)
- * Copyright (C) 2001 Ralf Baechle (ralf@gnu.org)
+ * Copyright (C) 2001, 2002 Ralf Baechle (ralf@gnu.org)
  */
 #ifndef _ASM_SGIALIB_H
 #define _ASM_SGIALIB_H
@@ -24,12 +24,11 @@ extern LONG *_prom_argv, *_prom_envp;
 #define prom_argc(index) ((char *) (long) _prom_argc[(index)])
 
 extern int prom_flags;
-#define PROM_FLAG_ARCS  1
+#define PROM_FLAG_ARCS			1
+#define PROM_FLAG_USE_AS_CONSOLE	2
 
-/* Init the PROM library and it's internal data structures.  Called
- * at boot time from head.S before start_kernel is invoked.
- */
-extern int prom_init(int argc, char **argv, char **envp);
+/* Init the PROM library and it's internal data structures. */
+extern void prom_init(int argc, char **argv, char **envp, int *prom_vec);
 
 /* Simple char-by-char console I/O. */
 extern void prom_putchar(char c);
@@ -41,9 +40,9 @@ extern void prom_printf(char *fmt, ...);
 /* Memory descriptor management. */
 #define PROM_MAX_PMEMBLOCKS    32
 struct prom_pmemblock {
-	LONG	base;		/* Within KSEG0 or XKPHYS. */
+	LONG base;		/* Within KSEG0 or XKPHYS. */
 	ULONG size;		/* In bytes. */
-        ULONG type;		/* free or prom memory */
+	ULONG type;		/* free or prom memory */
 };
 
 /* Get next memory descriptor after CURR, returns first descriptor
@@ -57,9 +56,6 @@ extern struct linux_mdesc *prom_getmdesc(struct linux_mdesc *curr);
  */
 extern void prom_meminit(void);
 extern void prom_fixup_mem_map(unsigned long start_mem, unsigned long end_mem);
-
-/* Returns pointer to PROM physical memory block array. */
-extern struct prom_pmemblock *prom_getpblock_array(void);
 
 /* PROM device tree library routines. */
 #define PROM_NULL_COMPONENT ((pcomponent *) 0)
