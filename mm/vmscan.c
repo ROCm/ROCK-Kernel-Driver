@@ -870,7 +870,7 @@ int try_to_free_pages(struct zone **zones,
 		wakeup_bdflush(total_scanned);
 
 		/* Take a nap, wait for some writeback to complete */
-		if (total_scanned)
+		if (total_scanned && priority < DEF_PRIORITY - 2)
 			blk_congestion_wait(WRITE, HZ/10);
 	}
 	if ((gfp_mask & __GFP_FS) && !(gfp_mask & __GFP_NORETRY))
@@ -993,7 +993,7 @@ scan:
 		 * OK, kswapd is getting into trouble.  Take a nap, then take
 		 * another pass across the zones.
 		 */
-		if (pages_scanned)
+		if (pages_scanned && priority < DEF_PRIORITY - 2)
 			blk_congestion_wait(WRITE, HZ/10);
 	}
 out:
