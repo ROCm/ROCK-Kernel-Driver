@@ -95,6 +95,7 @@ static struct inode *alloc_inode(struct super_block *sb)
 		atomic_set(&inode->i_writecount, 0);
 		inode->i_size = 0;
 		inode->i_blocks = 0;
+		inode->i_bytes = 0;
 		inode->i_generation = 0;
 		memset(&inode->i_dquot, 0, sizeof(inode->i_dquot));
 		inode->i_pipe = NULL;

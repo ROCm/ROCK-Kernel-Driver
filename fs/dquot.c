@@ -972,7 +972,7 @@ int dquot_alloc_space(struct inode *inode, qsize_t number, int warn)
 			continue;
 		dquot_incr_space(dquot[cnt], number);
 	}
-	inode->i_blocks += number >> 9;
+	inode_add_bytes(inode, number);
 	/* NOBLOCK End */
 	ret = QUOTA_OK;
 warn_put_all:
@@ -1040,7 +1040,7 @@ void dquot_free_space(struct inode *inode, qsize_t number)
 		dquot_decr_space(dquot, number);
 		dqputduplicate(dquot);
 	}
-	inode->i_blocks -= number >> 9;
+	inode_sub_bytes(inode, number);
 	unlock_kernel();
 	/* NOBLOCK End */
 }
@@ -1103,7 +1103,7 @@ int dquot_transfer(struct inode *inode, struct iattr *iattr)
 		}
 	}
 	/* NOBLOCK START: From now on we shouldn't block */
-	space = ((qsize_t)inode->i_blocks) << 9;
+	space = inode_get_bytes(inode);
 	/* Build the transfer_from list and check the limits */
 	for (cnt = 0; cnt < MAXQUOTAS; cnt++) {
 		/* The second test can fail when quotaoff is in progress... */
@@ -1162,9 +1162,9 @@ warn_put_all:
 struct dquot_operations dquot_operations = {
 	initialize:	dquot_initialize,		/* mandatory */
 	drop:		dquot_drop,			/* mandatory */
-	alloc_block:	dquot_alloc_space,
+	alloc_space:	dquot_alloc_space,
 	alloc_inode:	dquot_alloc_inode,
-	free_block:	dquot_free_space,
+	free_space:	dquot_free_space,
 	free_inode:	dquot_free_inode,
 	transfer:	dquot_transfer
 };
