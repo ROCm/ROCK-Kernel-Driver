@@ -3433,13 +3433,25 @@ asmlinkage long sys_sched_yield(void)
 	return 0;
 }
 
-void __sched __cond_resched(void)
+static inline void __cond_resched(void)
 {
-	set_current_state(TASK_RUNNING);
-	schedule();
+	do {
+		preempt_count() += PREEMPT_ACTIVE;
+		schedule();
+		preempt_count() -= PREEMPT_ACTIVE;
+	} while (need_resched());
 }
 
-EXPORT_SYMBOL(__cond_resched);
+int __sched cond_resched(void)
+{
+	if (need_resched()) {
+		__cond_resched();
+		return 1;
+	}
+	return 0;
+}
+
+EXPORT_SYMBOL(cond_resched);
 
 /*
  * cond_resched_lock() - if a reschedule is pending, drop the given lock,
@@ -3462,8 +3474,7 @@ int cond_resched_lock(spinlock_t * lock)
 	if (need_resched()) {
 		_raw_spin_unlock(lock);
 		preempt_enable_no_resched();
-		set_current_state(TASK_RUNNING);
-		schedule();
+		__cond_resched();
 		spin_lock(lock);
 		return 1;
 	}

@@ -1065,14 +1065,23 @@ static inline int need_resched(void)
 	return unlikely(test_thread_flag(TIF_NEED_RESCHED));
 }
 
-extern void __cond_resched(void);
-static inline void cond_resched(void)
-{
-	if (need_resched())
-		__cond_resched();
-}
-
+/*
+ * cond_resched() and cond_resched_lock(): latency reduction via
+ * explicit rescheduling in places that are safe. The return
+ * value indicates whether a reschedule was done in fact.
+ */
+extern int cond_resched(void);
 extern int cond_resched_lock(spinlock_t * lock);
+
+/*
+ * Does a critical section need to be broken due to another
+ * task waiting?:
+ */
+#if defined(CONFIG_PREEMPT) && defined(CONFIG_SMP)
+# define need_lockbreak(lock) ((lock)->break_lock)
+#else
+# define need_lockbreak(lock) 0
+#endif
 
 /* Reevaluate whether the task has signals pending delivery.
    This is required every time the blocked sigset_t changes.

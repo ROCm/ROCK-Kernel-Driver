@@ -66,7 +66,7 @@
 # define preemptible()	(preempt_count() == 0 && !irqs_disabled())
 # define IRQ_EXIT_OFFSET (HARDIRQ_OFFSET-1)
 #else
-# define in_atomic()	(preempt_count() != 0)
+# define in_atomic()	((preempt_count() & ~PREEMPT_ACTIVE) != 0)
 # define preemptible()	0
 # define IRQ_EXIT_OFFSET HARDIRQ_OFFSET
 #endif
