@@ -59,3 +59,49 @@ void snd_wrapper_vfree(void *obj)
 	vfree(obj);
 }
 #endif
+
+
+/* check the condition in <sound/core.h> !! */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 4, 0)
+#if defined(__i386__) || defined(__ppc__) || defined(__x86_64__)
+
+#include <linux/pci.h>
+
+/*
+ * A dirty hack... when the kernel code is fixed this should be removed.
+ *
+ * since pci_alloc_consistent always tries GFP_DMA when the requested
+ * pci memory region is below 32bit, it happens quite often that even
+ * 2 order of pages cannot be allocated.
+ *
+ * so in the following, we allocate at first without dma_mask, so that
+ * allocation will be done without GFP_DMA.  if the area doesn't match
+ * with the requested region, then realloate with the original dma_mask
+ * again.
+ */
+
+void *snd_pci_hack_alloc_consistent(struct pci_dev *hwdev, size_t size,
+				    dma_addr_t *dma_handle)
+{
+	void *ret;
+	u64 dma_mask;
+	unsigned long rmask;
+
+	if (hwdev == NULL)
+		return pci_alloc_consistent(hwdev, size, dma_handle);
+	dma_mask = hwdev->dma_mask;
+	rmask = ~((unsigned long)dma_mask);
+	hwdev->dma_mask = 0xffffffff; /* do without masking */
+	ret = pci_alloc_consistent(hwdev, size, dma_handle);
+	if (ret && ((*dma_handle + size - 1) & rmask)) {
+		pci_free_consistent(hwdev, size, ret, *dma_handle);
+		ret = 0;
+	}
+	hwdev->dma_mask = dma_mask; /* restore */
+	if (! ret)
+		ret = pci_alloc_consistent(hwdev, size, dma_handle);
+	return ret;
+}
+
+#endif
+#endif

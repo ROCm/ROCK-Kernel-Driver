@@ -541,12 +541,10 @@ static int snd_pcm_substream_proc_done(snd_pcm_substream_t *substream)
 	return 0;
 }
 
-static int snd_pcm_new_stream(snd_pcm_t *pcm,
-			      snd_pcm_str_t *pstr,
-			      int substream_count,
-			      int stream)
+int snd_pcm_new_stream(snd_pcm_t *pcm, int stream, int substream_count)
 {
 	int idx, err;
+	snd_pcm_str_t *pstr = &pcm->streams[stream];
 	snd_pcm_substream_t *substream, *prev;
 
 #if defined(CONFIG_SND_PCM_OSS) || defined(CONFIG_SND_PCM_OSS_MODULE)
@@ -614,11 +612,11 @@ int snd_pcm_new(snd_card_t * card, char *id, int device,
 	if (id) {
 		strncpy(pcm->id, id, sizeof(pcm->id) - 1);
 	}
-	if ((err = snd_pcm_new_stream(pcm, &pcm->streams[SNDRV_PCM_STREAM_PLAYBACK], playback_count, SNDRV_PCM_STREAM_PLAYBACK)) < 0) {
+	if ((err = snd_pcm_new_stream(pcm, SNDRV_PCM_STREAM_PLAYBACK, playback_count)) < 0) {
 		snd_pcm_free(pcm);
 		return err;
 	}
-	if ((err = snd_pcm_new_stream(pcm, &pcm->streams[SNDRV_PCM_STREAM_CAPTURE], capture_count, SNDRV_PCM_STREAM_CAPTURE)) < 0) {
+	if ((err = snd_pcm_new_stream(pcm, SNDRV_PCM_STREAM_CAPTURE, capture_count)) < 0) {
 		snd_pcm_free(pcm);
 		return err;
 	}
@@ -974,6 +972,7 @@ module_exit(alsa_pcm_exit)
 EXPORT_SYMBOL(snd_pcm_lock);
 EXPORT_SYMBOL(snd_pcm_devices);
 EXPORT_SYMBOL(snd_pcm_new);
+EXPORT_SYMBOL(snd_pcm_new_stream);
 EXPORT_SYMBOL(snd_pcm_notify);
 EXPORT_SYMBOL(snd_pcm_open_substream);
 EXPORT_SYMBOL(snd_pcm_release_substream);

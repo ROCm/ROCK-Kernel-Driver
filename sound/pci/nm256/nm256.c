@@ -751,46 +751,46 @@ snd_nm256_capture_update(nm256_t *chip)
  */
 static snd_pcm_hardware_t snd_nm256_playback =
 {
-	info:
+	.info =
 #ifdef __i386__
 				SNDRV_PCM_INFO_MMAP|SNDRV_PCM_INFO_MMAP_VALID|
 #endif
 				SNDRV_PCM_INFO_INTERLEAVED |
 				/*SNDRV_PCM_INFO_PAUSE |*/
 				SNDRV_PCM_INFO_RESUME,
-	formats:		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE,
-	rates:			SNDRV_PCM_RATE_KNOT/*24k*/ | SNDRV_PCM_RATE_8000_48000,
-	rate_min:		8000,
-	rate_max:		48000,
-	channels_min:		1,
-	channels_max:		2,
-	periods_min:		2,
-	periods_max:		1024,
-	buffer_bytes_max:	128 * 1024,
-	period_bytes_min:	256,
-	period_bytes_max:	128 * 1024,
+	.formats =		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE,
+	.rates =		SNDRV_PCM_RATE_KNOT/*24k*/ | SNDRV_PCM_RATE_8000_48000,
+	.rate_min =		8000,
+	.rate_max =		48000,
+	.channels_min =		1,
+	.channels_max =		2,
+	.periods_min =		2,
+	.periods_max =		1024,
+	.buffer_bytes_max =	128 * 1024,
+	.period_bytes_min =	256,
+	.period_bytes_max =	128 * 1024,
 };
 
 static snd_pcm_hardware_t snd_nm256_capture =
 {
-	info:
+	.info =
 #ifdef __i386__
 				SNDRV_PCM_INFO_MMAP|SNDRV_PCM_INFO_MMAP_VALID|
 #endif
 				SNDRV_PCM_INFO_INTERLEAVED |
 				/*SNDRV_PCM_INFO_PAUSE |*/
 				SNDRV_PCM_INFO_RESUME,
-	formats:		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE,
-	rates:			SNDRV_PCM_RATE_KNOT/*24k*/ | SNDRV_PCM_RATE_8000_48000,
-	rate_min:		8000,
-	rate_max:		48000,
-	channels_min:		1,
-	channels_max:		2,
-	periods_min:		2,
-	periods_max:		1024,
-	buffer_bytes_max:	128 * 1024,
-	period_bytes_min:	256,
-	period_bytes_max:	128 * 1024,
+	.formats =		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE,
+	.rates =		SNDRV_PCM_RATE_KNOT/*24k*/ | SNDRV_PCM_RATE_8000_48000,
+	.rate_min =		8000,
+	.rate_max =		48000,
+	.channels_min =		1,
+	.channels_max =		2,
+	.periods_min =		2,
+	.periods_max =		1024,
+	.buffer_bytes_max =	128 * 1024,
+	.period_bytes_min =	256,
+	.period_bytes_max =	128 * 1024,
 };
 
 

@@ -253,8 +253,8 @@ static int snd_mixer_oss_get_volume(snd_mixer_oss_file_t *fmixer, int slot)
 	if (mixer == NULL || slot > 30)
 		return -EIO;
 	pslot = &mixer->slots[slot];
-	left = fmixer->volume[slot][0];
-	right = fmixer->volume[slot][1];
+	left = pslot->volume[0];
+	right = pslot->volume[1];
 	if (pslot->get_volume)
 		result = pslot->get_volume(fmixer, pslot, &left, &right);
 	if (!pslot->stereo)
@@ -262,8 +262,8 @@ static int snd_mixer_oss_get_volume(snd_mixer_oss_file_t *fmixer, int slot)
 	snd_assert(left >= 0 && left <= 100, return -EIO);
 	snd_assert(right >= 0 && right <= 100, return -EIO);
 	if (result >= 0) {
-		fmixer->volume[slot][0] = left;
-		fmixer->volume[slot][1] = right;
+		pslot->volume[0] = left;
+		pslot->volume[1] = right;
 	 	result = (left & 0xff) | ((right & 0xff) << 8);
 	}
 	return result;
@@ -284,13 +284,13 @@ static int snd_mixer_oss_set_volume(snd_mixer_oss_file_t *fmixer,
 	if (right > 100)
 		right = 100;
 	if (!pslot->stereo)
-		left = right = left;
+		right = left;
 	if (pslot->put_volume)
 		result = pslot->put_volume(fmixer, pslot, left, right);
 	if (result < 0)
 		return result;
-	fmixer->volume[slot][0] = left;
-	fmixer->volume[slot][1] = right;
+	pslot->volume[0] = left;
+	pslot->volume[1] = right;
  	return (left & 0xff) | ((right & 0xff) << 8);
 }
 
@@ -409,6 +409,7 @@ static long snd_mixer_oss_conv(long val, long omin, long omax, long nmin, long n
 	return ((nrange * (val - omin)) + (orange / 2)) / orange + nmin;
 }
 
+/* convert from alsa native to oss values (0-100) */
 static long snd_mixer_oss_conv1(long val, long min, long max, int *old)
 {
 	if (val == snd_mixer_oss_conv(*old, 0, 100, min, max))
@@ -416,6 +417,7 @@ static long snd_mixer_oss_conv1(long val, long min, long max, int *old)
 	return snd_mixer_oss_conv(val, min, max, 0, 100);
 }
 
+/* convert from oss to alsa native values */
 static long snd_mixer_oss_conv2(long val, long min, long max)
 {
 	return snd_mixer_oss_conv(val, 0, 100, min, max);
@@ -502,9 +504,9 @@ static void snd_mixer_oss_get_volume1_vol(snd_mixer_oss_file_t *fmixer,
 	snd_runtime_check(!kctl->info(kctl, &uinfo), return);
 	snd_runtime_check(!kctl->get(kctl, &uctl), return);
 	snd_runtime_check(uinfo.type != SNDRV_CTL_ELEM_TYPE_BOOLEAN || uinfo.value.integer.min != 0 || uinfo.value.integer.max != 1, return);
-	*left = snd_mixer_oss_conv1(uctl.value.integer.value[0], uinfo.value.integer.min, uinfo.value.integer.max, &fmixer->volume[pslot->number][0]);
+	*left = snd_mixer_oss_conv1(uctl.value.integer.value[0], uinfo.value.integer.min, uinfo.value.integer.max, &pslot->volume[0]);
 	if (uinfo.count > 1)
-		*right = snd_mixer_oss_conv1(uctl.value.integer.value[1], uinfo.value.integer.min, uinfo.value.integer.max, &fmixer->volume[pslot->number][1]);
+		*right = snd_mixer_oss_conv1(uctl.value.integer.value[1], uinfo.value.integer.min, uinfo.value.integer.max, &pslot->volume[1]);
 }
 
 static void snd_mixer_oss_get_volume1_sw(snd_mixer_oss_file_t *fmixer,

@@ -779,6 +779,7 @@ typedef struct snd_m3 m3_t;
 
 /* quirk lists */
 struct m3_quirk {
+	const char *name;	/* device name */
 	u16 vendor, device;	/* subsystem ids */
 	int amp_gpio;		/* gpio pin #  for external amp, -1 = default */
 	int irda_workaround;	/* non-zero if avoid to touch 0x10 on GPIO_DIRECTION
@@ -918,23 +919,33 @@ MODULE_DEVICE_TABLE(pci, snd_m3_ids);
 static struct m3_quirk m3_quirk_list[] = {
 	/* panasonic CF-28 "toughbook" */
 	{
-		vendor: 0x10f7,
-		device: 0x833e,
-		amp_gpio: 0x0d,
+		.name = "Panasonic CF-28",
+		.vendor = 0x10f7,
+		.device = 0x833e,
+		.amp_gpio = 0x0d,
+	},
+	/* panasonic CF-72 "toughbook" */
+	{
+		.name = "Panasonic CF-72",
+		.vendor = 0x10f7,
+		.device = 0x833d,
+		.amp_gpio = 0x0d,
 	},
 	/* Dell Inspiron 4000 */
 	{
-		vendor: 0x1028,
-		device: 0x00b0,
-		amp_gpio: -1,
-		irda_workaround: 1,
+		.name = "Dell Inspiron 4000",
+		.vendor = 0x1028,
+		.device = 0x00b0,
+		.amp_gpio = -1,
+		.irda_workaround = 1,
 	},
 	/* Dell Inspiron 8000 */
 	{
-		vendor: 0x1028,
-		device: 0x00a4,
-		amp_gpio: -1,
-		irda_workaround: 1,
+		.name = "Dell Insprion 8000",
+		.vendor = 0x1028,
+		.device = 0x00a4,
+		.amp_gpio = -1,
+		.irda_workaround = 1,
 	},
 	/* FIXME: Inspiron 8100 and 8200 ids should be here, too */
 	/* END */
@@ -1581,44 +1592,44 @@ snd_m3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 static snd_pcm_hardware_t snd_m3_playback =
 {
-	info:			(SNDRV_PCM_INFO_MMAP |
+	.info =			(SNDRV_PCM_INFO_MMAP |
 				 SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_MMAP_VALID |
 				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
 				 /*SNDRV_PCM_INFO_PAUSE |*/
 				 SNDRV_PCM_INFO_RESUME),
-	formats:		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE,
-	rates:			SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
-	rate_min:		8000,
-	rate_max:		48000,
-	channels_min:		1,
-	channels_max:		2,
-	buffer_bytes_max:	(512*1024),
-	period_bytes_min:	64,
-	period_bytes_max:	(512*1024),
-	periods_min:		1,
-	periods_max:		1024,
+	.formats =		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE,
+	.rates =		SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
+	.rate_min =		8000,
+	.rate_max =		48000,
+	.channels_min =		1,
+	.channels_max =		2,
+	.buffer_bytes_max =	(512*1024),
+	.period_bytes_min =	64,
+	.period_bytes_max =	(512*1024),
+	.periods_min =		1,
+	.periods_max =		1024,
 };
 
 static snd_pcm_hardware_t snd_m3_capture =
 {
-	info:			(SNDRV_PCM_INFO_MMAP |
+	.info =			(SNDRV_PCM_INFO_MMAP |
 				 SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_MMAP_VALID |
 				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
 				 /*SNDRV_PCM_INFO_PAUSE |*/
 				 SNDRV_PCM_INFO_RESUME),
-	formats:		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE,
-	rates:			SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
-	rate_min:		8000,
-	rate_max:		48000,
-	channels_min:		1,
-	channels_max:		2,
-	buffer_bytes_max:	(512*1024),
-	period_bytes_min:	64,
-	period_bytes_max:	(512*1024),
-	periods_min:		1,
-	periods_max:		1024,
+	.formats =		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE,
+	.rates =		SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
+	.rate_min =		8000,
+	.rate_max =		48000,
+	.channels_min =		1,
+	.channels_max =		2,
+	.buffer_bytes_max =	(512*1024),
+	.period_bytes_min =	64,
+	.period_bytes_max =	(512*1024),
+	.periods_min =		1,
+	.periods_max =		1024,
 };
 
 
@@ -2547,6 +2558,7 @@ snd_m3_create(snd_card_t *card, struct pci_dev *pci,
 	for (quirk = m3_quirk_list; quirk->vendor; quirk++) {
 		if (subsystem_vendor == quirk->vendor &&
 		    subsystem_device == quirk->device) {
+			printk(KERN_INFO "maestro3: enabled hack for '%s'\n", quirk->name);
 			chip->quirk = quirk;
 			break;
 		}

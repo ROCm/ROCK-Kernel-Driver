@@ -110,7 +110,8 @@ int snd_pcm_sgbuf_alloc(snd_pcm_substream_t *substream, size_t size)
 	if (pages < sgbuf->pages) {
 		/* release unsed pages */
 		sgbuf_shrink(sgbuf, pages);
-		substream->runtime->dma_bytes = size;
+		if (substream->runtime)
+			substream->runtime->dma_bytes = size;
 		return 1; /* changed */
 	} else if (pages > sgbuf->tblsize) {
 		/* bigger than existing one.  reallocate the table. */
@@ -136,7 +137,8 @@ int snd_pcm_sgbuf_alloc(snd_pcm_substream_t *substream, size_t size)
 		changed = 1;
 	}
 	sgbuf->size = size;
-	substream->runtime->dma_bytes = size;
+	if (substream->runtime)
+		substream->runtime->dma_bytes = size;
 	return changed;
 }
 

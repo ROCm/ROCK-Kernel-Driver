@@ -977,20 +977,22 @@ static int __devinit snd_via82xx_chip_init(via82xx_t *chip)
 		/* disable all legacy ports */
 		pci_write_config_byte(chip->pci, 0x42, 0);
 #endif
-
-	/* deassert ACLink reset, force SYNC */
-	pci_write_config_byte(chip->pci, 0x41, 0xe0);
-	udelay(100);
-	/* deassert ACLink reset, force SYNC (warm AC'97 reset) */
-	pci_write_config_byte(chip->pci, 0x41, 0x60);
-	udelay(2);
-	/* pci_write_config_byte(chip->pci, 0x41, 0x00);
-	   udelay(100);
-	*/
-	/* ACLink on, deassert ACLink reset, VSR, SGD data out */
-	/* note - FM data out has trouble with non VRA codecs !! */
-	pci_write_config_byte(chip->pci, 0x41, 0xcc);
-	udelay(100);
+	pci_read_config_byte(chip->pci, 0x40, &pval);
+	if (! (pval & 0x01)) { /* codec not ready? */
+		/* deassert ACLink reset, force SYNC */
+		pci_write_config_byte(chip->pci, 0x41, 0xe0);
+		udelay(100);
+		/* deassert ACLink reset, force SYNC (warm AC'97 reset) */
+		pci_write_config_byte(chip->pci, 0x41, 0x60);
+		udelay(2);
+		/* pci_write_config_byte(chip->pci, 0x41, 0x00);
+		   udelay(100);
+		*/
+		/* ACLink on, deassert ACLink reset, VSR, SGD data out */
+		/* note - FM data out has trouble with non VRA codecs !! */
+		pci_write_config_byte(chip->pci, 0x41, 0xcc);
+		udelay(100);
+	}
 	
 	/* Make sure VRA is enabled, in case we didn't do a
 	 * complete codec reset, above */

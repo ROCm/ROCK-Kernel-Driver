@@ -257,6 +257,7 @@ MODULE_PARM_SYNTAX(snd_fm_port, SNDRV_ENABLED ",allows:{{-1},{0x388},{0x3c8},{0x
 #define CM_REG_MISC		0x27
 #define CM_XGPO1		0x20
 // #define CM_XGPBIO		0x04
+#define CM_MIC_CENTER_LFE	0x04	/* mic as center/lfe out? (model 039 or later?) */
 #define CM_SPDIF_INVERSE	0x04	/* spdif input phase inverse (model 037) */
 #define CM_SPDVALID		0x02	/* spdif input valid check */
 #define CM_DMAUTO		0x01
@@ -2257,6 +2258,7 @@ static snd_kcontrol_new_t snd_cmipci_extra_mixer_switches[] __devinitdata = {
 	DEFINE_MIXER_SWITCH("Line-In As Bass", line_bass),
 	DEFINE_MIXER_SWITCH("IEC958 In Select", spdif_in_sel2),
 	DEFINE_MIXER_SWITCH("IEC958 In Phase Inverse", spdi_phase2),
+	DEFINE_MIXER_SWITCH("Mic As Center/LFE", spdi_phase), /* same bit as spdi_phase */
 };
 
 /* card control switches */

@@ -46,6 +46,7 @@ struct _snd_oss_mixer_slot {
 	unsigned long private_value;
 	void *private_data;
 	void (*private_free)(snd_mixer_oss_slot_t *slot);
+	int volume[2];
 };
 
 struct _snd_oss_mixer {
@@ -65,7 +66,6 @@ struct _snd_oss_mixer {
 };
 
 struct _snd_oss_file {
-	int volume[32][2];
 	snd_card_t *card;
 	snd_mixer_oss_t *mixer;
 };

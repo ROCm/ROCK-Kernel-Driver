@@ -2147,7 +2147,8 @@ static int __devinit snd_intel8x0_create(snd_card_t * card,
 	chip->pci = pci;
 	chip->irq = -1;
 	snd_intel8x0_proc_init(chip);
-	if (pci_resource_flags(pci, 2) & IORESOURCE_MEM) {	/* ICH4 and higher */
+	if (chip->device_type == DEVICE_INTEL_ICH4 &&
+	    (pci_resource_flags(pci, 2) & IORESOURCE_MEM)) {	/* ICH4 and higher */
 		chip->mmio = chip->bm_mmio = 1;
 		chip->addr = pci_resource_start(pci, 2);
 		sprintf(chip->ac97_name, "%s - AC'97", card->shortname);

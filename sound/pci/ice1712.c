@@ -1186,7 +1186,7 @@ static void snd_ice1712_set_pro_rate(ice1712_t *ice, snd_pcm_substream_t *substr
 {
 	unsigned long flags;
 	unsigned int rate;
-	unsigned char val, tmp;
+	unsigned char val, tmp, tmp2;
 
 	spin_lock_irqsave(&ice->reg_lock, flags);
 	if (inb(ICEMT(ice, PLAYBACK_CONTROL)) & (ICE1712_CAPTURE_START_SHADOW|
@@ -1224,17 +1224,25 @@ static void snd_ice1712_set_pro_rate(ice1712_t *ice, snd_pcm_substream_t *substr
 	case ICE1712_SUBDEVICE_DELTA44:
 	case ICE1712_SUBDEVICE_AUDIOPHILE:
 		spin_unlock_irqrestore(&ice->reg_lock, flags);
-		snd_ice1712_ak4524_reset(ice, 1);
 		down(&ice->gpio_mutex);
 		tmp = snd_ice1712_read(ice, ICE1712_IREG_GPIO_DATA);
-		if (val == 15 || val == 11 || val == 7) {
-			tmp |= ICE1712_DELTA_DFS;
-		} else {
-			tmp &= ~ICE1712_DELTA_DFS;
-		}
-		snd_ice1712_write(ice, ICE1712_IREG_GPIO_DATA, tmp);
 		up(&ice->gpio_mutex);
-		snd_ice1712_ak4524_reset(ice, 0);
+		tmp2 = tmp;
+		tmp2 &= ~ICE1712_DELTA_DFS; 
+		if (val == 15 || val == 11 || val == 7)
+			tmp2 |= ICE1712_DELTA_DFS;
+		if (tmp != tmp2) {
+			snd_ice1712_ak4524_reset(ice, 1);
+			down(&ice->gpio_mutex);
+			tmp = snd_ice1712_read(ice, ICE1712_IREG_GPIO_DATA);
+			if (val == 15 || val == 11 || val == 7)
+				tmp |= ICE1712_DELTA_DFS;
+			else
+				tmp &= ~ICE1712_DELTA_DFS;
+			snd_ice1712_write(ice, ICE1712_IREG_GPIO_DATA, tmp);
+			up(&ice->gpio_mutex);
+			snd_ice1712_ak4524_reset(ice, 0);
+		}
 		return;
 	}
       __end:
