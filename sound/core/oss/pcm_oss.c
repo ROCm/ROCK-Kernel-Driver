@@ -25,6 +25,9 @@
 
 #include <sound/driver.h>
 #include <linux/init.h>
+#include <linux/slab.h>
+#include <linux/time.h>
+#include <linux/vmalloc.h>
 #include <sound/core.h>
 #include <sound/minors.h>
 #include <sound/pcm.h>
@@ -1203,7 +1206,9 @@ static int snd_pcm_oss_get_odelay(snd_pcm_oss_file_t *pcm_oss_file)
 	if (runtime->oss.params || runtime->oss.prepare)
 		return 0;
 	err = snd_pcm_kernel_playback_ioctl(substream, SNDRV_PCM_IOCTL_DELAY, &delay);
-	if (err < 0)
+	if (err == -EPIPE)
+		delay = 0;	/* hack for broken OSS applications */
+	else if (err < 0)
 		return err;
 	return snd_pcm_oss_bytes(substream, delay);
 }
@@ -1764,8 +1769,11 @@ static int snd_pcm_oss_ioctl(struct inode *inode, struct file *file,
 		return -EIO;
 	case SNDCTL_DSP_GETODELAY:
 		res = snd_pcm_oss_get_odelay(pcm_oss_file);
-		if (res < 0)
+		if (res < 0) {
+			/* it's for sure, some broken apps don't check for error codes */
+			put_user(0, (int *)arg);
 			return res;
+		}
 		return put_user(res, (int *)arg) ? -EFAULT : 0;
 	case SNDCTL_DSP_PROFILE:
 		return 0;	/* silently ignore */

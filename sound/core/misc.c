@@ -22,6 +22,8 @@
 #define __NO_VERSION__
 #include <sound/driver.h>
 #include <linux/init.h>
+#include <linux/sched.h>
+#include <linux/time.h>
 #include <sound/core.h>
 
 int snd_task_name(struct task_struct *task, char *name, size_t size)

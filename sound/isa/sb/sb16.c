@@ -22,6 +22,12 @@
 #include <sound/driver.h>
 #include <asm/dma.h>
 #include <linux/init.h>
+#include <linux/slab.h>
+#ifndef LINUX_ISAPNP_H
+#include <linux/isapnp.h>
+#define isapnp_card pci_bus
+#define isapnp_dev pci_dev
+#endif
 #include <sound/core.h>
 #include <sound/sb.h>
 #include <sound/sb16_csp.h>
@@ -350,7 +356,7 @@ static void snd_sb16_free(snd_card_t *card)
 		return;
 	if (acard->fm_res) {
 		release_resource(acard->fm_res);
-		kfree(acard->fm_res);
+		kfree_nocheck(acard->fm_res);
 	}
 #ifdef __ISAPNP__
 	snd_sb16_deactivate(acard);

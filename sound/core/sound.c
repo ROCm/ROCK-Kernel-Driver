@@ -21,6 +21,8 @@
 
 #include <sound/driver.h>
 #include <linux/init.h>
+#include <linux/slab.h>
+#include <linux/time.h>
 #include <sound/core.h>
 #include <sound/minors.h>
 #include <sound/info.h>
@@ -347,7 +349,7 @@ static int __init alsa_sound_init(void)
 	}
 #endif
 #ifndef MODULE
-	printk("Advanced Linux Sound Architecture Driver Version " CONFIG_SND_VERSION ".\n");
+	printk("Advanced Linux Sound Architecture Driver Version " CONFIG_SND_VERSION CONFIG_SND_DATE ".\n");
 #endif
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0) && defined(CONFIG_APM)
 	pm_init();
@@ -424,6 +426,10 @@ EXPORT_SYMBOL(snd_kmalloc_strdup);
 EXPORT_SYMBOL(snd_malloc_pages);
 EXPORT_SYMBOL(snd_malloc_pages_fallback);
 EXPORT_SYMBOL(snd_free_pages);
+#ifdef CONFIG_ISA
+EXPORT_SYMBOL(snd_malloc_isa_pages);
+EXPORT_SYMBOL(snd_malloc_isa_pages_fallback);
+#endif
 #ifdef CONFIG_PCI
 EXPORT_SYMBOL(snd_malloc_pci_pages);
 EXPORT_SYMBOL(snd_malloc_pci_pages_fallback);

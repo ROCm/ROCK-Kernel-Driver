@@ -23,6 +23,10 @@
 #include <sound/core.h>
 #include <linux/major.h>
 #include <linux/init.h>
+#include <linux/sched.h>
+#include <linux/slab.h>
+#include <linux/time.h>
+#include <linux/wait.h>
 #include <sound/rawmidi.h>
 #include <sound/info.h>
 #include <sound/control.h>

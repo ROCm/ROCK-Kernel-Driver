@@ -21,6 +21,7 @@
 
 #include <sound/driver.h>
 #include <linux/init.h>
+#include <linux/time.h>
 #include <sound/core.h>
 #include <sound/emu10k1.h>
 #define SNDRV_GET_ID

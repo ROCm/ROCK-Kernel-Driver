@@ -30,6 +30,7 @@
 #include <linux/delay.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
+#include <linux/slab.h>
 #include <sound/core.h>
 #include <sound/control.h>
 #include <sound/pcm.h>
@@ -62,6 +63,7 @@ MODULE_DEVICES("{{Hoontech SoundTrack DSP 24},"
 		"{TerraTec,EWX 24/96},"
 		"{TerraTec,EWS 88MT},"
 		"{TerraTec,EWS 88D},"
+		"{TerraTec,DMX 6Fire},"
 		"{ICEnsemble,Generic ICE1712},"
 		"{ICEnsemble,Generic Envy24}}");
 
@@ -81,7 +83,7 @@ MODULE_PARM_DESC(snd_enable, "Enable ICE1712 soundcard.");
 MODULE_PARM_SYNTAX(snd_enable, SNDRV_ENABLE_DESC);
 MODULE_PARM(snd_omni, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(snd_omni, "Enable Midiman M-Audio Delta Omni I/O support.");
-MODULE_PARM_SYNTAX(snd_omni, SNDRV_ENABLE_DESC);
+MODULE_PARM_SYNTAX(snd_omni, SNDRV_ENABLED "," SNDRV_ENABLE_DESC);
 
 #ifndef PCI_VENDOR_ID_ICE
 #define PCI_VENDOR_ID_ICE		0x1412
@@ -4048,8 +4050,8 @@ static int __init snd_ice1712_build_controls(ice1712_t *ice)
 		err = snd_ctl_add(ice->card, snd_ctl_new1(&snd_ice1712_6fire_led, ice));
 		if (err < 0)
 			return err;
-		break;
 #endif
+		break;
 	}
 
 	return 0;
@@ -4070,19 +4072,19 @@ static int snd_ice1712_free(ice1712_t *ice)
 		free_irq(ice->irq, (void *) ice);
 	if (ice->res_port) {
 		release_resource(ice->res_port);
-		kfree(ice->res_port);
+		kfree_nocheck(ice->res_port);
 	}
 	if (ice->res_ddma_port) {
 		release_resource(ice->res_ddma_port);
-		kfree(ice->res_ddma_port);
+		kfree_nocheck(ice->res_ddma_port);
 	}
 	if (ice->res_dmapath_port) {
 		release_resource(ice->res_dmapath_port);
-		kfree(ice->res_dmapath_port);
+		kfree_nocheck(ice->res_dmapath_port);
 	}
 	if (ice->res_profi_port) {
 		release_resource(ice->res_profi_port);
-		kfree(ice->res_profi_port);
+		kfree_nocheck(ice->res_profi_port);
 	}
 	snd_magic_kfree(ice);
 	return 0;

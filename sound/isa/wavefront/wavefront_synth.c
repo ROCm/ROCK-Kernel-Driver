@@ -25,6 +25,9 @@
 #include <asm/io.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
+#include <linux/delay.h>
+#include <linux/time.h>
+#include <linux/wait.h>
 #include <sound/core.h>
 #include <sound/snd_wavefront.h>
 #include <sound/initval.h>
@@ -905,7 +908,7 @@ wavefront_freemem (snd_wavefront_t *dev)
 static int
 wavefront_send_sample (snd_wavefront_t *dev, 
 		       wavefront_patch_info *header,
-		       UINT16 *dataptr,
+		       u16 *dataptr,
 		       int data_is_unsigned)
 
 {
@@ -918,9 +921,9 @@ wavefront_send_sample (snd_wavefront_t *dev,
 	   divided by 2.
         */
 
-	UINT16 sample_short;
-	UINT32 length;
-	UINT16 *data_end = 0;
+	u16 sample_short;
+	u32 length;
+	u16 *data_end = 0;
 	unsigned int i;
 	const int max_blksize = 4096/2;
 	unsigned int written;
@@ -1070,13 +1073,13 @@ wavefront_send_sample (snd_wavefront_t *dev,
 	   but the offset only uses 24 bits.
 	*/
 
-	shptr = munge_int32 (*((UINT32 *) &header->hdr.s.sampleStartOffset),
+	shptr = munge_int32 (*((u32 *) &header->hdr.s.sampleStartOffset),
 			     shptr, 4);
-	shptr = munge_int32 (*((UINT32 *) &header->hdr.s.loopStartOffset),
+	shptr = munge_int32 (*((u32 *) &header->hdr.s.loopStartOffset),
 			     shptr, 4);
-	shptr = munge_int32 (*((UINT32 *) &header->hdr.s.loopEndOffset),
+	shptr = munge_int32 (*((u32 *) &header->hdr.s.loopEndOffset),
 			     shptr, 4);
-	shptr = munge_int32 (*((UINT32 *) &header->hdr.s.sampleEndOffset),
+	shptr = munge_int32 (*((u32 *) &header->hdr.s.sampleEndOffset),
 			     shptr, 4);
 	
 	/* This one is truly wierd. What kind of wierdo decided that in
@@ -1482,11 +1485,11 @@ WaveFront: hardware-dependent interface
 ***********************************************************************/
 
 static void
-process_sample_hdr (UCHAR8 *buf)
+process_sample_hdr (u8 *buf)
 
 {
 	wavefront_sample s;
-	UCHAR8 *ptr;
+	u8 *ptr;
 
 	ptr = buf;
 
@@ -1497,11 +1500,11 @@ process_sample_hdr (UCHAR8 *buf)
 	   something very similar in the reverse direction.
 	*/
 
-	*((UINT32 *) &s.sampleStartOffset) = demunge_int32 (ptr, 4); ptr += 4;
-	*((UINT32 *) &s.loopStartOffset) = demunge_int32 (ptr, 4); ptr += 4;
-	*((UINT32 *) &s.loopEndOffset) = demunge_int32 (ptr, 4); ptr += 4;
-	*((UINT32 *) &s.sampleEndOffset) = demunge_int32 (ptr, 4); ptr += 4;
-	*((UINT32 *) &s.FrequencyBias) = demunge_int32 (ptr, 3); ptr += 3;
+	*((u32 *) &s.sampleStartOffset) = demunge_int32 (ptr, 4); ptr += 4;
+	*((u32 *) &s.loopStartOffset) = demunge_int32 (ptr, 4); ptr += 4;
+	*((u32 *) &s.loopEndOffset) = demunge_int32 (ptr, 4); ptr += 4;
+	*((u32 *) &s.sampleEndOffset) = demunge_int32 (ptr, 4); ptr += 4;
+	*((u32 *) &s.FrequencyBias) = demunge_int32 (ptr, 3); ptr += 3;
 
 	s.SampleResolution = *ptr & 0x3;
 	s.Loop = *ptr & 0x8;
@@ -1568,7 +1571,7 @@ wavefront_synth_control (snd_wavefront_card_t *acard,
 		return 0;
 
 	case WFC_UPLOAD_PATCH:
-		munge_int32 (*((UINT32 *) wc->wbuf), patchnumbuf, 2);
+		munge_int32 (*((u32 *) wc->wbuf), patchnumbuf, 2);
 		memcpy (wc->wbuf, patchnumbuf, 2);
 		break;
 
@@ -1798,65 +1801,6 @@ wavefront_should_cause_interrupt (snd_wavefront_t *dev,
 	outb (val,port);
 	interruptible_sleep_on_timeout (&dev->interrupt_sleeper, timeout);
 	restore_flags (flags);
-}
-
-int
-snd_wavefront_detect_irq (snd_wavefront_t *dev) 
-
-{
-	int i;
-	int possible_irqs[] = { 5, 9, 12, 15, -1 };
-
-	/* Note: according to the PnP dump, 7 and 11 are possible too, but the
-	   WaveFront SDK doesn't tell us how to set the card to use them.  
-	*/
-
-	snd_printk ("autodetecting WaveFront IRQ\n");
-
-	for (i = 0; possible_irqs[i] > 0; i++) {
-		if (snd_wavefront_check_irq (dev, possible_irqs[i]) == 0) {
-			snd_printk ("autodetected IRQ %d\n", 
-				    possible_irqs[i]);
-			return possible_irqs[i];
-		}
-	}
-
-	return -1;
-}
-
-int
-snd_wavefront_check_irq (snd_wavefront_t *dev, int irq)
-
-{
-	int bits;
-	unsigned long irq_mask;
-	short reported_irq;
-
-	bits = snd_wavefront_interrupt_bits (irq);
-
-	irq_mask = probe_irq_on ();
-
-	outb (0x0, dev->control_port); 
-	outb (0x80 | 0x40 | bits, dev->data_port);	
-	wavefront_should_cause_interrupt(dev, 0x80|0x40|0x10|0x1,
-					 dev->control_port,
-					 (reset_time*HZ)/100);
-
-	reported_irq = probe_irq_off (irq_mask);
-
-	if (reported_irq == 0) {
-		snd_printk ("No unassigned interrupts detected "
-			    "after h/w reset\n");
-		return -1;
-	} else if (reported_irq < 0) {
-		snd_printk ("Multiple unassigned interrupts detected "
-			    "after h/w reset\n");
-		return -1;
-	} else if (reported_irq != irq) {
-		return -1;
-	}
-
-	return 0; /* OK */
 }
 
 static int
@@ -2306,8 +2250,6 @@ EXPORT_SYMBOL(snd_wavefront_synth_open);
 EXPORT_SYMBOL(snd_wavefront_synth_release);
 EXPORT_SYMBOL(snd_wavefront_internal_interrupt);
 EXPORT_SYMBOL(snd_wavefront_interrupt_bits);
-EXPORT_SYMBOL(snd_wavefront_detect_irq);
-EXPORT_SYMBOL(snd_wavefront_check_irq);
 EXPORT_SYMBOL(snd_wavefront_start);
 EXPORT_SYMBOL(snd_wavefront_detect);
 EXPORT_SYMBOL(snd_wavefront_cmd);

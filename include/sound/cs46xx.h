@@ -1713,8 +1713,8 @@ int snd_cs46xx_mixer(cs46xx_t *chip);
 int snd_cs46xx_midi(cs46xx_t *chip, int device, snd_rawmidi_t **rmidi);
 
 #ifdef CONFIG_PM
-void snd_cs46xx_suspend(cs46xx_t *chip, int can_schedule);
-void snd_cs46xx_resume(cs46xx_t *chip, int can_schedule);
+void snd_cs46xx_suspend(cs46xx_t *chip);
+void snd_cs46xx_resume(cs46xx_t *chip);
 #endif
 
 #endif /* __SOUND_CS46XX_H */

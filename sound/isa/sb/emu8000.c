@@ -21,6 +21,11 @@
  */
 
 #define __NO_VERSION__
+#include <sound/driver.h>
+#include <linux/wait.h>
+#include <linux/sched.h>
+#include <linux/slab.h>
+#include <sound/core.h>
 #include <sound/emu8000.h>
 #include <sound/emu8000_reg.h>
 #include <asm/io.h>
@@ -1058,15 +1063,15 @@ static int snd_emu8000_free(emu8000_t *hw)
 {
 	if (hw->res_port1) {
 		release_resource(hw->res_port1);
-		kfree(hw->res_port1);
+		kfree_nocheck(hw->res_port1);
 	}
 	if (hw->res_port2) {
 		release_resource(hw->res_port2);
-		kfree(hw->res_port2);
+		kfree_nocheck(hw->res_port2);
 	}
 	if (hw->res_port3) {
 		release_resource(hw->res_port3);
-		kfree(hw->res_port3);
+		kfree_nocheck(hw->res_port3);
 	}
 	snd_magic_kfree(hw);
 	return 0;

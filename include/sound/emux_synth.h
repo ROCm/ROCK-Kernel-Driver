@@ -21,8 +21,6 @@
  *   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
  */
 
-#include "driver.h"
-#include "core.h"
 #include "seq_kernel.h"
 #include "seq_device.h"
 #include "soundfont.h"

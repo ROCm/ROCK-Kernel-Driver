@@ -68,6 +68,13 @@
 #include <asm/io.h>
 #include <asm/dma.h>
 #include <linux/init.h>
+#include <linux/pm.h>
+#include <linux/slab.h>
+#ifndef LINUX_ISAPNP_H
+#include <linux/isapnp.h>
+#define isapnp_card pci_bus
+#define isapnp_dev pci_dev
+#endif
 #include <sound/core.h>
 #include <sound/control.h>
 #include <sound/pcm.h>
@@ -116,6 +123,10 @@ struct _snd_es18xx {
 	spinlock_t reg_lock;
 	spinlock_t mixer_lock;
 	spinlock_t ctrl_lock;
+#ifdef CONFIG_PM
+	struct pm_dev *pm_dev;
+	unsigned char pm_reg;
+#endif
 };
 
 #define AUDIO1_IRQ	0x01
@@ -135,6 +146,15 @@ struct _snd_es18xx {
 #define ES18XX_I2S	0x0200	/* I2S mixer control */
 #define ES18XX_MUTEREC	0x0400	/* Record source can be muted */
 #define ES18XX_CONTROL	0x0800	/* Has control ports */
+
+/* Power Management */
+#define ES18XX_PM	0x07
+#define ES18XX_PM_GPO0	0x01
+#define ES18XX_PM_GPO1	0x02
+#define ES18XX_PM_PDR	0x03
+#define ES18XX_PM_ANA	0x04
+#define ES18XX_PM_FM	0x06
+#define ES18XX_PM_SUS	0x08
 
 typedef struct _snd_es18xx es18xx_t;
 
@@ -463,7 +483,7 @@ static int snd_es18xx_playback1_prepare(es18xx_t *chip,
 			      (snd_pcm_format_unsigned(runtime->format) ? 0x00 : 0x04));
 
         /* Set DMA controller */
-        snd_dma_program(chip->dma2, runtime->dma_area, size, DMA_MODE_WRITE | DMA_AUTOINIT);
+        snd_dma_program(chip->dma2, runtime->dma_addr, size, DMA_MODE_WRITE | DMA_AUTOINIT);
 
 	return 0;
 }
@@ -575,7 +595,7 @@ static int snd_es18xx_capture_prepare(snd_pcm_substream_t *substream)
                          (snd_pcm_format_unsigned(runtime->format) ? 0x00 : 0x20));
 
         /* Set DMA controler */
-        snd_dma_program(chip->dma1, runtime->dma_area, size, DMA_MODE_READ | DMA_AUTOINIT);
+        snd_dma_program(chip->dma1, runtime->dma_addr, size, DMA_MODE_READ | DMA_AUTOINIT);
 
 	return 0;
 }
@@ -638,7 +658,7 @@ static int snd_es18xx_playback2_prepare(es18xx_t *chip,
                          (snd_pcm_format_unsigned(runtime->format) ? 0x00 : 0x20));
 
         /* Set DMA controler */
-        snd_dma_program(chip->dma1, runtime->dma_area, size, DMA_MODE_WRITE | DMA_AUTOINIT);
+        snd_dma_program(chip->dma1, runtime->dma_addr, size, DMA_MODE_WRITE | DMA_AUTOINIT);
 
 	return 0;
 }
@@ -1580,26 +1600,105 @@ int __init snd_es18xx_pcm(es18xx_t *chip, int device, snd_pcm_t ** rpcm)
 	sprintf(pcm->name, "ESS AudioDrive ES%x", chip->version);
         chip->pcm = pcm;
 
-	snd_pcm_lib_preallocate_isa_pages_for_all(pcm, 64*1024, chip->dma1 > 3 || chip->dma2 > 3 ? 128*1024 : 64*1024, GFP_KERNEL|GFP_DMA);
+	snd_pcm_lib_preallocate_isa_pages_for_all(pcm, 64*1024, chip->dma1 > 3 || chip->dma2 > 3 ? 128*1024 : 64*1024);
 
         if (rpcm)
         	*rpcm = pcm;
 	return 0;
 }
 
+/* Power Management support functions */
+#ifdef CONFIG_PM
+static void snd_es18xx_suspend(es18xx_t *chip)
+{
+	snd_card_t *card = chip->card;
+
+	snd_power_lock(card);
+	if (card->power_state == SNDRV_CTL_POWER_D3hot)
+		goto __skip;
+
+	snd_pcm_suspend_all(chip->pcm);
+
+	/* power down */
+	chip->pm_reg = (unsigned char)snd_es18xx_read(chip, ES18XX_PM);
+	chip->pm_reg |= (ES18XX_PM_FM | ES18XX_PM_SUS);
+	snd_es18xx_write(chip, ES18XX_PM, chip->pm_reg);
+	snd_es18xx_write(chip, ES18XX_PM, chip->pm_reg ^= ES18XX_PM_SUS);
+
+	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
+      __skip:
+      	snd_power_unlock(card);
+}
+
+static void snd_es18xx_resume(es18xx_t *chip)
+{
+	snd_card_t *card = chip->card;
+
+	snd_power_lock(card);
+	if (card->power_state == SNDRV_CTL_POWER_D0)
+		goto __skip;
+
+	/* restore PM register, we won't wake till (not 0x07) i/o activity though */
+	snd_es18xx_write(chip, ES18XX_PM, chip->pm_reg ^= ES18XX_PM_FM);
+
+	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
+      __skip:
+      	snd_power_unlock(card);
+}
+
+/* callback for control API */
+static int snd_es18xx_set_power_state(snd_card_t *card, unsigned int power_state)
+{
+	es18xx_t *chip = (es18xx_t *) card->power_state_private_data;
+	switch (power_state) {
+	case SNDRV_CTL_POWER_D0:
+	case SNDRV_CTL_POWER_D1:
+	case SNDRV_CTL_POWER_D2:
+		snd_es18xx_resume(chip);
+		break;
+	case SNDRV_CTL_POWER_D3hot:
+	case SNDRV_CTL_POWER_D3cold:
+		snd_es18xx_suspend(chip);
+		break;
+	default:
+		return -EINVAL;
+	}
+	return 0;
+}
+
+static int snd_es18xx_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data)
+{
+	es18xx_t *chip = snd_magic_cast(es18xx_t, dev->data, return 0);
+
+	switch (rqst) {
+	case PM_SUSPEND:
+		snd_es18xx_suspend(chip);
+		break;
+	case PM_RESUME:
+		snd_es18xx_resume(chip);
+		break;
+	}
+	return 0;
+}
+#endif /* CONFIG_PM */
+
 static int snd_es18xx_free(es18xx_t *chip)
 {
+#ifdef CONFIG_PM
+	if (chip->pm_dev)
+		pm_unregister(chip->pm_dev);
+#endif
 	if (chip->res_port) {
 		release_resource(chip->res_port);
-		kfree(chip->res_port);
+		kfree_nocheck(chip->res_port);
 	}
 	if (chip->res_ctrl_port) {
 		release_resource(chip->res_ctrl_port);
-		kfree(chip->res_ctrl_port);
+		kfree_nocheck(chip->res_ctrl_port);
 	}
 	if (chip->res_mpu_port) {
 		release_resource(chip->res_mpu_port);
-		kfree(chip->res_mpu_port);
+		kfree_nocheck(chip->res_mpu_port);
 	}
 	if (chip->irq >= 0)
 		free_irq(chip->irq, (void *) chip);
@@ -2066,6 +2165,17 @@ static int __init snd_audiodrive_probe(int dev)
 		}
 		chip->rmidi = rmidi;
 	}
+
+#ifdef CONFIG_PM
+	/* Power Management */
+	chip->pm_dev = pm_register(PM_ISA_DEV, 0, snd_es18xx_pm_callback);
+	if (chip->pm_dev) {
+		chip->pm_dev->data = chip;
+		/* set control api callback */
+		card->set_power_state = snd_es18xx_set_power_state;
+		card->power_state_private_data = chip;
+	}
+#endif
 	sprintf(card->driver, "ES%x", chip->version);
 	sprintf(card->shortname, "ESS AudioDrive ES%x", chip->version);
 	sprintf(card->longname, "%s at 0x%lx, irq %d, dma1 %d, dma2 %d",

@@ -26,6 +26,7 @@
 #include <asm/io.h>
 #include <linux/delay.h>
 #include <linux/init.h>
+#include <linux/slab.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/info.h>
@@ -1214,27 +1215,27 @@ static int snd_sonicvibes_free(sonicvibes_t *sonic)
 	pci_write_config_dword(sonic->pci, 0x48, sonic->dmac_port);
 	if (sonic->res_sb_port) {
 		release_resource(sonic->res_sb_port);
-		kfree(sonic->res_sb_port);
+		kfree_nocheck(sonic->res_sb_port);
 	}
 	if (sonic->res_enh_port) {
 		release_resource(sonic->res_enh_port);
-		kfree(sonic->res_enh_port);
+		kfree_nocheck(sonic->res_enh_port);
 	}
 	if (sonic->res_synth_port) {
 		release_resource(sonic->res_synth_port);
-		kfree(sonic->res_synth_port);
+		kfree_nocheck(sonic->res_synth_port);
 	}
 	if (sonic->res_midi_port) {
 		release_resource(sonic->res_midi_port);
-		kfree(sonic->res_midi_port);
+		kfree_nocheck(sonic->res_midi_port);
 	}
 	if (sonic->res_dmaa) {
 		release_resource(sonic->res_dmaa);
-		kfree(sonic->res_dmaa);
+		kfree_nocheck(sonic->res_dmaa);
 	}
 	if (sonic->res_dmac) {
 		release_resource(sonic->res_dmac);
-		kfree(sonic->res_dmac);
+		kfree_nocheck(sonic->res_dmac);
 	}
 	if (sonic->irq >= 0)
 		free_irq(sonic->irq, (void *)sonic);

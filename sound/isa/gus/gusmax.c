@@ -22,6 +22,8 @@
 #include <sound/driver.h>
 #include <asm/dma.h>
 #include <linux/init.h>
+#include <linux/delay.h>
+#include <linux/time.h>
 #include <sound/core.h>
 #include <sound/gus.h>
 #include <sound/cs4231.h>

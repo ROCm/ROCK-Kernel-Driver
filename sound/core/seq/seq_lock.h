@@ -1,6 +1,8 @@
 #ifndef __SND_SEQ_LOCK_H
 #define __SND_SEQ_LOCK_H
 
+#include <linux/sched.h>
+
 #if defined(__SMP__) || defined(CONFIG_SND_DEBUG)
 
 typedef atomic_t snd_use_lock_t;

@@ -23,6 +23,7 @@
 #include <sound/driver.h>
 #include <linux/delay.h>
 #include <linux/interrupt.h>
+#include <linux/time.h>
 #include <sound/core.h>
 #include <sound/gus.h>
 

@@ -24,6 +24,8 @@
 #include <asm/io.h>
 #include <asm/uaccess.h>
 #include <linux/init.h>
+#include <linux/slab.h>
+#include <linux/time.h>
 #include <sound/core.h>
 #include <sound/info.h>
 
@@ -314,19 +316,79 @@ void snd_free_pages(void *ptr, unsigned long size)
 #endif
 }
 
+#ifdef CONFIG_ISA
+
+#ifndef CONFIG_ISA_USE_PCI_ALLOC_CONSISTENT
+#ifdef CONFIG_PCI
+#define CONFIG_ISA_USE_PCI_ALLOC_CONSISTENT
+#endif
+#endif
+
+void *snd_malloc_isa_pages(unsigned long size, dma_addr_t *dma_addr)
+{
+	void *dma_area;
+
+#ifndef CONFIG_ISA_USE_PCI_ALLOC_CONSISTENT
+	dma_area = snd_malloc_pages(size, GFP_ATOMIC|GFP_DMA);
+	*dma_addr = dma_area ? isa_virt_to_bus(dma_area) : 0UL;
+#else
+	{
+		int pg;
+		for (pg = 0; PAGE_SIZE * (1 << pg) < size; pg++);
+		dma_area = pci_alloc_consistent(NULL, size, dma_addr);
+		if (dma_area != NULL) {
+			mem_map_t *page = virt_to_page(dma_area);
+			mem_map_t *last_page = page + (1 << pg);
+			while (page < last_page)
+				SetPageReserved(page++);
+#ifdef CONFIG_SND_DEBUG_MEMORY
+			snd_alloc_pages += 1 << pg;
+#endif
+		}
+	}
+#endif
+	return dma_area;
+}
+
+void *snd_malloc_isa_pages_fallback(unsigned long size,
+				    dma_addr_t *dma_addr,
+				    unsigned long *res_size)
+{
+	void *dma_area;
+
+#ifndef CONFIG_ISA_USE_PCI_ALLOC_CONSISTENT
+	dma_area = snd_malloc_pages_fallback(size, GFP_ATOMIC|GFP_DMA, res_size);
+	*dma_addr = dma_area ? isa_virt_to_bus(dma_area) : 0UL;
+	return dma_area;
+#else
+	snd_assert(size > 0, return NULL);
+	snd_assert(res_size != NULL, return NULL);
+	do {
+		if ((dma_area = snd_malloc_isa_pages(size, dma_addr)) != NULL) {
+			*res_size = size;
+			return dma_area;
+		}
+		size >>= 1;
+	} while (size >= PAGE_SIZE);
+	return NULL;
+#endif
+}
+
+#endif
+
 #ifdef CONFIG_PCI
 
 void *snd_malloc_pci_pages(struct pci_dev *pci,
 			   unsigned long size,
-			   dma_addr_t *dmaaddr)
+			   dma_addr_t *dma_addr)
 {
 	int pg;
 	void *res;
 
 	snd_assert(size > 0, return NULL);
-	snd_assert(dmaaddr != NULL, return NULL);
+	snd_assert(dma_addr != NULL, return NULL);
 	for (pg = 0; PAGE_SIZE * (1 << pg) < size; pg++);
-	res = pci_alloc_consistent(pci, PAGE_SIZE * (1 << pg), dmaaddr);
+	res = pci_alloc_consistent(pci, PAGE_SIZE * (1 << pg), dma_addr);
 	if (res != NULL) {
 		mem_map_t *page = virt_to_page(res);
 		mem_map_t *last_page = page + (1 << pg);
@@ -339,15 +401,16 @@ void *snd_malloc_pci_pages(struct pci_dev *pci,
 	return res;
 }
 
-void *snd_malloc_pci_pages_fallback(struct pci_dev *pci, unsigned long size,
-				    dma_addr_t *dmaaddr,
+void *snd_malloc_pci_pages_fallback(struct pci_dev *pci,
+				    unsigned long size,
+				    dma_addr_t *dma_addr,
 				    unsigned long *res_size)
 {
 	void *res;
 
 	snd_assert(res_size != NULL, return NULL);
 	do {
-		if ((res = snd_malloc_pci_pages(pci, size, dmaaddr)) != NULL) {
+		if ((res = snd_malloc_pci_pages(pci, size, dma_addr)) != NULL) {
 			*res_size = size;
 			return res;
 		}
@@ -356,7 +419,10 @@ void *snd_malloc_pci_pages_fallback(struct pci_dev *pci, unsigned long size,
 	return NULL;
 }
 
-void snd_free_pci_pages(struct pci_dev *pci, unsigned long size, void *ptr, dma_addr_t dmaaddr)
+void snd_free_pci_pages(struct pci_dev *pci,
+			unsigned long size,
+			void *ptr,
+			dma_addr_t dma_addr)
 {
 	int pg;
 	mem_map_t *page, *last_page;
@@ -368,7 +434,7 @@ void snd_free_pci_pages(struct pci_dev *pci, unsigned long size, void *ptr, dma_
 	last_page = page + (1 << pg);
 	while (page < last_page)
 		ClearPageReserved(page++);
-	pci_free_consistent(pci, PAGE_SIZE * (1 << pg), ptr, dmaaddr);
+	pci_free_consistent(pci, PAGE_SIZE * (1 << pg), ptr, dma_addr);
 #ifdef CONFIG_SND_DEBUG_MEMORY
 	snd_alloc_pages -= 1 << pg;
 #endif

@@ -31,6 +31,7 @@
 #include <linux/delay.h>
 #include <linux/pm.h>
 #include <linux/init.h>
+#include <linux/slab.h>
 #include <sound/core.h>
 #include <sound/cs4231.h>
 
@@ -837,7 +838,7 @@ static int snd_cs4231_playback_prepare(snd_pcm_substream_t * substream)
 	spin_lock_irqsave(&chip->reg_lock, flags);
 	chip->p_dma_size = size;
 	chip->image[CS4231_IFACE_CTRL] &= ~(CS4231_PLAYBACK_ENABLE | CS4231_PLAYBACK_PIO);
-	snd_dma_program(chip->dma1, runtime->dma_area, size, DMA_MODE_WRITE | DMA_AUTOINIT);
+	snd_dma_program(chip->dma1, runtime->dma_addr, size, DMA_MODE_WRITE | DMA_AUTOINIT);
 	count = snd_cs4231_get_count(chip->image[CS4231_PLAYBK_FORMAT], count) - 1;
 	snd_cs4231_out(chip, CS4231_PLY_LWR_CNT, (unsigned char) count);
 	snd_cs4231_out(chip, CS4231_PLY_UPR_CNT, (unsigned char) (count >> 8));
@@ -879,7 +880,7 @@ static int snd_cs4231_capture_prepare(snd_pcm_substream_t * substream)
 	spin_lock_irqsave(&chip->reg_lock, flags);
 	chip->c_dma_size = size;
 	chip->image[CS4231_IFACE_CTRL] &= ~(CS4231_RECORD_ENABLE | CS4231_RECORD_PIO);
-	snd_dma_program(chip->dma2, runtime->dma_area, size, DMA_MODE_READ | DMA_AUTOINIT);
+	snd_dma_program(chip->dma2, runtime->dma_addr, size, DMA_MODE_READ | DMA_AUTOINIT);
 	count = snd_cs4231_get_count(chip->image[CS4231_REC_FORMAT], count) - 1;
 	if (chip->single_dma && chip->hardware != CS4231_HW_INTERWAVE) {
 		snd_cs4231_out(chip, CS4231_PLY_LWR_CNT, (unsigned char) count);
@@ -1330,11 +1331,11 @@ static int snd_cs4231_free(cs4231_t *chip)
 {
 	if (chip->res_port) {
 		release_resource(chip->res_port);
-		kfree(chip->res_port);
+		kfree_nocheck(chip->res_port);
 	}
 	if (chip->res_cport) {
 		release_resource(chip->res_cport);
-		kfree(chip->res_port);
+		kfree_nocheck(chip->res_port);
 	}
 	if (chip->irq >= 0) {
 		disable_irq(chip->irq);
@@ -1531,7 +1532,7 @@ int snd_cs4231_pcm(cs4231_t *chip, int device, snd_pcm_t **rpcm)
 		pcm->info_flags |= SNDRV_PCM_INFO_JOINT_DUPLEX;
 	strcpy(pcm->name, snd_cs4231_chip_id(chip));
 
-	snd_pcm_lib_preallocate_isa_pages_for_all(pcm, 64*1024, chip->dma1 > 3 || chip->dma2 > 3 ? 128*1024 : 64*1024, GFP_KERNEL|GFP_DMA);
+	snd_pcm_lib_preallocate_isa_pages_for_all(pcm, 64*1024, chip->dma1 > 3 || chip->dma2 > 3 ? 128*1024 : 64*1024);
 
 	chip->pcm = pcm;
 	if (rpcm)

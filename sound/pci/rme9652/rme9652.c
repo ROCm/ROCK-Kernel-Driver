@@ -24,6 +24,7 @@
 #include <asm/io.h>
 #include <linux/delay.h>
 #include <linux/init.h>
+#include <linux/slab.h>
 #include <sound/core.h>
 #include <sound/control.h>
 #include <sound/pcm.h>
@@ -49,7 +50,7 @@ MODULE_PARM_DESC(snd_enable, "Enable/disable specific RME96{52,36} soundcards.")
 MODULE_PARM_SYNTAX(snd_enable, SNDRV_ENABLE_DESC);
 MODULE_PARM(snd_precise_ptr, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(snd_precise_ptr, "Enable precise pointer (doesn't work reliably).");
-MODULE_PARM_SYNTAX(snd_precise_ptr, SNDRV_BOOLEAN_FALSE_DESC);
+MODULE_PARM_SYNTAX(snd_precise_ptr, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
 MODULE_AUTHOR("Paul Davis <pbd@op.net>, Winfried Ritsch");
 MODULE_DESCRIPTION("RME Digi9652/Digi9636");
 MODULE_LICENSE("GPL");
@@ -1849,7 +1850,7 @@ static int snd_rme9652_free(rme9652_t *rme9652)
 		iounmap((void *) rme9652->iobase);
 	if (rme9652->res_port) {
 		release_resource(rme9652->res_port);
-		kfree(rme9652->res_port);
+		kfree_nocheck(rme9652->res_port);
 	}
 	if (rme9652->irq >= 0)
 		free_irq(rme9652->irq, (void *)rme9652);
@@ -1911,8 +1912,13 @@ static int __init snd_rme9652_initialize_memory(rme9652_t *rme9652)
 	rme9652_write(rme9652, RME9652_rec_buffer, cb_bus);
 	rme9652_write(rme9652, RME9652_play_buffer, pb_bus);
 
+#if 0 // not all architectures have this macro
 	rme9652->capture_buffer = bus_to_virt(cb_bus);
 	rme9652->playback_buffer = bus_to_virt(pb_bus);
+#else
+	rme9652->capture_buffer += cb_bus - cb_addr;
+	rme9652->playback_buffer += pb_bus - pb_addr;
+#endif
 
 	return 0;
 }

@@ -45,6 +45,7 @@
 
 #include <sound/driver.h>
 #include <linux/init.h>
+#include <linux/slab.h>
 #include <sound/core.h>
 #include <sound/ad1848.h>
 #include <sound/sb.h>

@@ -22,14 +22,11 @@
 #define __NO_VERSION__
 #include <sound/driver.h>
 #include <asm/io.h>
+#include <linux/time.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/info.h>
 #include <sound/initval.h>
-
-#ifdef CONFIG_ISA
-#define HAVE_ISA_VIRT_TO_BUS
-#endif
 
 static int snd_preallocate_dma = 1;
 MODULE_PARM(snd_preallocate_dma, "i");
@@ -43,17 +40,20 @@ MODULE_PARM_SYNTAX(snd_maximum_substreams, SNDRV_BOOLEAN_TRUE_DESC);
 
 static int snd_minimum_buffer = 16384;
 
+
 static void snd_pcm_lib_preallocate_dma_free(snd_pcm_substream_t *substream)
 {
 	if (substream->dma_area == NULL)
 		return;
 	switch (substream->dma_type) {
 	case SNDRV_PCM_DMA_TYPE_CONTINUOUS:
-#ifdef HAVE_ISA_VIRT_TO_BUS
-	case SNDRV_PCM_DMA_TYPE_ISA:
-#endif
 		snd_free_pages(substream->dma_area, substream->dma_bytes);
 		break;
+#ifdef CONFIG_ISA
+	case SNDRV_PCM_DMA_TYPE_ISA:
+		snd_free_isa_pages(substream->dma_bytes, substream->dma_area, substream->dma_addr);
+		break;
+#endif
 #ifdef CONFIG_PCI
 	case SNDRV_PCM_DMA_TYPE_PCI:
 		snd_free_pci_pages((struct pci_dev *)substream->dma_private, substream->dma_bytes, substream->dma_area, substream->dma_addr);
@@ -119,10 +119,9 @@ static void snd_pcm_lib_preallocate_proc_write(snd_info_entry_t *entry,
 				dma_area = snd_malloc_pages(size, (unsigned int)((unsigned long)substream->dma_private & 0xffffffff));
 				dma_addr = 0UL;		/* not valid */
 				break;
-#ifdef HAVE_ISA_VIRT_TO_BUS
+#ifdef CONFIG_ISA
 			case SNDRV_PCM_DMA_TYPE_ISA:
-				dma_area = snd_malloc_pages(size, (unsigned int)((unsigned long)substream->dma_private & 0xffffffff));
-				dma_addr = isa_virt_to_bus(dma_area);
+				dma_area = snd_malloc_isa_pages(size, &dma_addr);
 				break;
 #endif
 #ifdef CONFIG_PCI
@@ -168,10 +167,9 @@ static int snd_pcm_lib_preallocate_pages1(snd_pcm_substream_t *substream,
 			dma_area = snd_malloc_pages_fallback(size, (unsigned int)((unsigned long)substream->dma_private & 0xffffffff), &rsize);
 			dma_addr = 0UL;		/* not valid */
 			break;
-#ifdef HAVE_ISA_VIRT_TO_BUS
+#ifdef CONFIG_ISA
 		case SNDRV_PCM_DMA_TYPE_ISA:
-			dma_area = snd_malloc_pages_fallback(size, (unsigned int)((unsigned long)substream->dma_private & 0xffffffff), &rsize);
-			dma_addr = isa_virt_to_bus(dma_area);
+			dma_area = snd_malloc_isa_pages_fallback(size, &dma_addr, &rsize);
 			break;
 #endif
 #ifdef CONFIG_PCI
@@ -212,14 +210,9 @@ int snd_pcm_lib_preallocate_pages(snd_pcm_substream_t *substream,
 				      size_t size, size_t max,
 				      unsigned int flags)
 {
-#ifdef HAVE_ISA_VIRT_TO_BUS
 	substream->dma_type = SNDRV_PCM_DMA_TYPE_CONTINUOUS;
 	substream->dma_private = (void *)(unsigned long)flags;
 	return snd_pcm_lib_preallocate_pages1(substream, size, max);
-#else
-	snd_printk("this host has no isa_virt_to_bus!\n");
-	return -ENXIO;
-#endif
 }
 
 int snd_pcm_lib_preallocate_pages_for_all(snd_pcm_t *pcm,
@@ -231,36 +224,29 @@ int snd_pcm_lib_preallocate_pages_for_all(snd_pcm_t *pcm,
 
 	for (stream = 0; stream < 2; stream++)
 		for (substream = pcm->streams[stream].substream; substream; substream = substream->next)
-			if ((err = snd_pcm_lib_preallocate_isa_pages(substream, size, max, flags)) < 0)
+			if ((err = snd_pcm_lib_preallocate_pages(substream, size, max, flags)) < 0)
 				return err;
 	return 0;
 }
 
 #ifdef CONFIG_ISA
 int snd_pcm_lib_preallocate_isa_pages(snd_pcm_substream_t *substream,
-				      size_t size, size_t max,
-				      unsigned int flags)
+				      size_t size, size_t max)
 {
-#ifdef HAVE_ISA_VIRT_TO_BUS
 	substream->dma_type = SNDRV_PCM_DMA_TYPE_ISA;
-	substream->dma_private = (void *)(unsigned long)flags;
+	substream->dma_private = NULL;
 	return snd_pcm_lib_preallocate_pages1(substream, size, max);
-#else
-	snd_printk("this host has no isa_virt_to_bus!\n");
-	return -ENXIO;
-#endif
 }
 
 int snd_pcm_lib_preallocate_isa_pages_for_all(snd_pcm_t *pcm,
-					      size_t size, size_t max,
-					      unsigned int flags)
+					      size_t size, size_t max)
 {
 	snd_pcm_substream_t *substream;
 	int stream, err;
 
 	for (stream = 0; stream < 2; stream++)
 		for (substream = pcm->streams[stream].substream; substream; substream = substream->next)
-			if ((err = snd_pcm_lib_preallocate_isa_pages(substream, size, max, flags)) < 0)
+			if ((err = snd_pcm_lib_preallocate_isa_pages(substream, size, max)) < 0)
 				return err;
 	return 0;
 }
@@ -288,10 +274,13 @@ int snd_pcm_lib_malloc_pages(snd_pcm_substream_t *substream, size_t size)
 		dma_addr = substream->dma_addr;
 	} else {
 		switch (substream->dma_type) {
-#ifdef HAVE_ISA_VIRT_TO_BUS
-		case SNDRV_PCM_DMA_TYPE_ISA:
+		case SNDRV_PCM_DMA_TYPE_CONTINUOUS:
 			dma_area = snd_malloc_pages(size, (unsigned int)((unsigned long)substream->dma_private & 0xffffffff));
-			dma_addr = isa_virt_to_bus(dma_area);
+			dma_addr = 0UL;		/* not valid */
+			break;
+#ifdef CONFIG_ISA
+		case SNDRV_PCM_DMA_TYPE_ISA:
+			dma_area = snd_malloc_isa_pages(size, &dma_addr); 
 			break;
 #endif
 #ifdef CONFIG_PCI
@@ -322,9 +311,9 @@ int snd_pcm_lib_free_pages(snd_pcm_substream_t *substream)
 		return 0;
 	if (runtime->dma_area != substream->dma_area) {
 		switch (substream->dma_type) {
-#ifdef HAVE_ISA_VIRT_TO_BUS
+#ifdef CONFIG_ISA
 		case SNDRV_PCM_DMA_TYPE_ISA:
-			snd_free_pages(runtime->dma_area, runtime->dma_bytes);
+			snd_free_isa_pages(runtime->dma_bytes, runtime->dma_area, runtime->dma_addr);
 			break;
 #endif
 #ifdef CONFIG_PCI

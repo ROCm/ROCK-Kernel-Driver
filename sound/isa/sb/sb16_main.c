@@ -31,6 +31,7 @@
 #include <asm/io.h>
 #include <asm/dma.h>
 #include <linux/init.h>
+#include <linux/time.h>
 #include <sound/core.h>
 #include <sound/sb.h>
 #include <sound/sb16_csp.h>
@@ -269,7 +270,7 @@ static int snd_sb16_playback_prepare(snd_pcm_substream_t * substream)
 	snd_sb16_setup_rate(chip, runtime->rate, SNDRV_PCM_STREAM_PLAYBACK);
 	size = chip->p_dma_size = snd_pcm_lib_buffer_bytes(substream);
 	dma = (chip->mode & SB_MODE_PLAYBACK_8) ? chip->dma8 : chip->dma16;
-	snd_dma_program(dma, runtime->dma_area, size, DMA_MODE_WRITE | DMA_AUTOINIT);
+	snd_dma_program(dma, runtime->dma_addr, size, DMA_MODE_WRITE | DMA_AUTOINIT);
 
 	count = snd_pcm_lib_period_bytes(substream);
 	spin_lock_irqsave(&chip->reg_lock, flags);
@@ -336,7 +337,7 @@ static int snd_sb16_capture_prepare(snd_pcm_substream_t * substream)
 	snd_sb16_setup_rate(chip, runtime->rate, SNDRV_PCM_STREAM_CAPTURE);
 	size = chip->c_dma_size = snd_pcm_lib_buffer_bytes(substream);
 	dma = (chip->mode & SB_MODE_CAPTURE_8) ? chip->dma8 : chip->dma16;
-	snd_dma_program(dma, runtime->dma_area, size, DMA_MODE_READ | DMA_AUTOINIT);
+	snd_dma_program(dma, runtime->dma_addr, size, DMA_MODE_READ | DMA_AUTOINIT);
 
 	count = snd_pcm_lib_period_bytes(substream);
 	spin_lock_irqsave(&chip->reg_lock, flags);
@@ -870,7 +871,7 @@ int snd_sb16dsp_pcm(sb_t * chip, int device, snd_pcm_t ** rpcm)
 
 	snd_ctl_add(card, snd_ctl_new1(&snd_sb16_dma_control, chip));
 
-	snd_pcm_lib_preallocate_isa_pages_for_all(pcm, 64*1024, 128*1024, GFP_KERNEL|GFP_DMA);
+	snd_pcm_lib_preallocate_isa_pages_for_all(pcm, 64*1024, 128*1024);
 
 	if (rpcm)
 		*rpcm = pcm;

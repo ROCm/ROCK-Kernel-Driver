@@ -24,6 +24,7 @@
 #include <linux/delay.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
+#include <linux/slab.h>
 #include <sound/core.h>
 #include <sound/control.h>
 #include <sound/pcm.h>
@@ -1411,8 +1412,8 @@ static int snd_es1371_joystick_addr_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_
         uinfo->type = SNDRV_CTL_ELEM_TYPE_ENUMERATED;
         uinfo->count = 1;
         uinfo->value.enumerated.items = 3;
-	if (uinfo->value.enumerated.item > 3)
-		uinfo->value.enumerated.item = 3;
+	if (uinfo->value.enumerated.item >= 3)
+		uinfo->value.enumerated.item = 2;
 	sprintf(uinfo->value.enumerated.name, "port 0x%x", (uinfo->value.enumerated.item * 8) + 0x200);
         return 0;
 }
@@ -1524,7 +1525,7 @@ static int snd_ensoniq_free(ensoniq_t *ensoniq)
 #endif
 	if (ensoniq->res_port) {
 		release_resource(ensoniq->res_port);
-		kfree(ensoniq->res_port);
+		kfree_nocheck(ensoniq->res_port);
 	}
 	if (ensoniq->irq >= 0)
 		free_irq(ensoniq->irq, (void *)ensoniq);

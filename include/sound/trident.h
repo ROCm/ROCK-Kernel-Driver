@@ -469,8 +469,8 @@ int snd_trident_synth_copy_from_user(trident_t *trident, snd_util_memblk_t *blk,
 
 /* Power Management */
 #ifdef CONFIG_PM
-void snd_trident_suspend(trident_t *trident, int can_schedule);
-void snd_trident_resume(trident_t *trident, int can_schedule);
+void snd_trident_suspend(trident_t *trident);
+void snd_trident_resume(trident_t *trident);
 #endif
 
 #endif /* __SOUND_TRIDENT_H */

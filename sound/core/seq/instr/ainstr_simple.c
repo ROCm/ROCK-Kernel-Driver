@@ -20,6 +20,8 @@
  
 #include <sound/driver.h>
 #include <linux/init.h>
+#include <linux/sched.h>
+#include <linux/slab.h>
 #include <sound/core.h>
 #include <sound/ainstr_simple.h>
 #include <sound/initval.h>

@@ -21,6 +21,7 @@
 #include <asm/io.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
+#include <linux/slab.h>
 #include <sound/core.h>
 #include <sound/info.h>
 #include <sound/control.h>
@@ -61,10 +62,10 @@ MODULE_PARM_DESC(snd_enable, "Enable C-Media PCI soundcard.");
 MODULE_PARM_SYNTAX(snd_enable, SNDRV_ENABLE_DESC);
 MODULE_PARM(snd_mpu_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
 MODULE_PARM_DESC(snd_mpu_port, "MPU-401 port.");
-MODULE_PARM_SYNTAX(snd_mpu_port, "allows:{{-1},{0x330},{0x320},{0x310},{0x300}},dialog:list");
+MODULE_PARM_SYNTAX(snd_mpu_port, SNDRV_ENABLED ",allows:{{-1},{0x330},{0x320},{0x310},{0x300}},dialog:list");
 MODULE_PARM(snd_fm_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
 MODULE_PARM_DESC(snd_fm_port, "FM port.");
-MODULE_PARM_SYNTAX(snd_fm_port, "allows:{{-1},{0x388},{0x3c8},{0x3e0},{0x3e8}},dialog:list");
+MODULE_PARM_SYNTAX(snd_fm_port, SNDRV_ENABLED ",allows:{{-1},{0x388},{0x3c8},{0x3e0},{0x3e8}},dialog:list");
 
 #ifndef PCI_DEVICE_ID_CMEDIA_CM8738
 #define PCI_DEVICE_ID_CMEDIA_CM8738	0x0111
@@ -2448,7 +2449,7 @@ static int snd_cmipci_free(cmipci_t *cm)
 	}
 	if (cm->res_iobase) {
 		release_resource(cm->res_iobase);
-		kfree(cm->res_iobase);
+		kfree_nocheck(cm->res_iobase);
 	}
 	snd_magic_kfree(cm);
 	return 0;
@@ -2678,7 +2679,7 @@ static int __devinit snd_cmipci_probe(struct pci_dev *pci,
 		cm->iobase,
 		cm->irq);
 
-	snd_printd("%s is detected\n", card->longname);
+	//snd_printd("%s is detected\n", card->longname);
 
 	if ((err = snd_card_register(card)) < 0) {
 		snd_card_free(card);

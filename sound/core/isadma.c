@@ -38,7 +38,7 @@
  */
  
 void snd_dma_program(unsigned long dma,
-		     const void *buf, unsigned int size,
+		     unsigned long addr, unsigned int size,
                      unsigned short mode)
 {
 	unsigned long flags;
@@ -47,7 +47,7 @@ void snd_dma_program(unsigned long dma,
 	disable_dma(dma);
 	clear_dma_ff(dma);
 	set_dma_mode(dma, mode);
-	set_dma_addr(dma, isa_virt_to_bus((void *) buf));
+	set_dma_addr(dma, addr);
 	set_dma_count(dma, size);
 	if (!(mode & DMA_MODE_NO_ENABLE))
 		enable_dma(dma);

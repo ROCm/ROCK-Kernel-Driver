@@ -27,6 +27,7 @@
 #include <asm/io.h>
 #include <linux/delay.h>
 #include <linux/init.h>
+#include <linux/slab.h>
 #include <sound/minors.h>
 
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>, Hannu Savolainen 1993-1996, Rob Hooft");
@@ -351,11 +352,11 @@ static int snd_opl3_free(opl3_t *opl3)
 {
 	if (opl3->res_l_port) {
 		release_resource(opl3->res_l_port);
-		kfree(opl3->res_l_port);
+		kfree_nocheck(opl3->res_l_port);
 	}
 	if (opl3->res_r_port) {
 		release_resource(opl3->res_r_port);
-		kfree(opl3->res_r_port);
+		kfree_nocheck(opl3->res_r_port);
 	}
 	snd_magic_kfree(opl3);
 	return 0;
