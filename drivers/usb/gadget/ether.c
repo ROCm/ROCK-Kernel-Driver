@@ -854,8 +854,8 @@ set_ether_config (struct eth_dev *dev, int gfp_flags)
 
 #ifndef	DEV_CONFIG_CDC
 	if (result == 0) {
-		netif_carrier_on (&dev->net);
-		if (netif_running (&dev->net))
+		netif_carrier_on (dev->net);
+		if (netif_running (dev->net))
 			eth_start (dev, GFP_ATOMIC);
 	}
 #endif /* !CONFIG_CDC_ETHER */
@@ -1138,6 +1138,17 @@ eth_setup (struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 		value = eth_set_config (dev, ctrl->wValue, GFP_ATOMIC);
 		spin_unlock (&dev->lock);
 		break;
+#ifdef	CONFIG_USB_ETH_PXA2XX
+	/* PXA UDC prevents us from using SET_INTERFACE in normal ways.
+	 * And it hides GET_CONFIGURATION and GET_INTERFACE too.
+	 */
+	case USB_REQ_SET_INTERFACE:
+		spin_lock (&dev->lock);
+		value = eth_set_config (dev, DEV_CONFIG_VALUE, GFP_ATOMIC);
+		spin_unlock (&dev->lock);
+		break;
+
+#else	/* hardware that that stays out of our way */
 	case USB_REQ_GET_CONFIGURATION:
 		if (ctrl->bRequestType != USB_DIR_IN)
 			break;
@@ -1204,6 +1215,7 @@ eth_setup (struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 				: 0,
 		value = min (ctrl->wLength, (u16) 1);
 		break;
+#endif
 
 #ifdef DEV_CONFIG_CDC
 	case CDC_SET_ETHERNET_PACKET_FILTER:
@@ -1424,7 +1436,7 @@ static void rx_complete (struct usb_ep *ep, struct usb_request *req)
 
 	if (skb)
 		dev_kfree_skb_any (skb);
-	if (!netif_running (&dev->net)) {
+	if (!netif_running (dev->net)) {
 clean:
 		usb_ep_free_request (dev->out_ep, req);
 		req = 0;
