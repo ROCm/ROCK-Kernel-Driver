@@ -155,7 +155,8 @@ static char * nxt_dir_entry(char * old_entry, char * end_of_smb)
 	cFYI(1,("new entry %p old entry %p",new_entry,old_entry));
 	/* validate that new_entry is not past end of SMB */
 	if(new_entry >= end_of_smb) {
-		cFYI(1,("search entry %p began after end of SMB %p old entry is %p",new_entry,end_of_smb,old_entry)); /* BB removeme BB */
+		cFYI(1,("search entry %p began after end of SMB %p old entry %p",
+			new_entry,end_of_smb,old_entry)); 
 		return NULL;
 	} else
 		return new_entry;
@@ -265,7 +266,7 @@ static int find_cifs_entry(const int xid, struct cifsTconInfo * pTcon,
 			cifsFile->search_resume_name = NULL;
 		}
 		if(cifsFile->srch_inf.ntwrk_buf_start) {
-			cFYI(1,("freeing SMB ff cache buf on search rewind")); /* BB removeme BB */
+			cFYI(1,("freeing SMB ff cache buf on search rewind")); 
 			cifs_buf_release(cifsFile->srch_inf.ntwrk_buf_start);
 		}
 		rc = initiate_cifs_search(xid,file);
@@ -275,12 +276,9 @@ static int find_cifs_entry(const int xid, struct cifsTconInfo * pTcon,
 		}
 	}
 
-if(cifsFile->srch_inf.endOfSearch) {
-	cFYI(1,("end of search")); /* BB removeme BB */
-}
 	while((index_to_find >= cifsFile->srch_inf.index_of_last_entry) && 
 	      (rc == 0) && (cifsFile->srch_inf.endOfSearch == FALSE)){
-        cFYI(1,("calling findnext2"));
+	 	cFYI(1,("calling findnext2"));
 		rc = CIFSFindNext2(xid,pTcon,cifsFile->netfid, &cifsFile->srch_inf);
 		if(rc)
 			return -ENOENT;
@@ -296,7 +294,7 @@ if(cifsFile->srch_inf.endOfSearch) {
 		first_entry_in_buffer = cifsFile->srch_inf.index_of_last_entry -
 			cifsFile->srch_inf.entries_in_buffer;
 		pos_in_buf = index_to_find - first_entry_in_buffer;
-		cFYI(1,("found entry - pos_in_buf %d",pos_in_buf)); /* BB removeme BB */
+		cFYI(1,("found entry - pos_in_buf %d",pos_in_buf)); 
 		current_entry = cifsFile->srch_inf.srch_entries_start;
 		for(i=0;(i<(pos_in_buf)) && (current_entry != NULL);i++) {
 			/* go entry to next entry figuring out which we need to start with */
@@ -390,7 +388,7 @@ static int cifs_get_name_from_search_buf(struct qstr * pqst,char * current_entry
 		pqst->len = len;
 	}
 	pqst->hash = full_name_hash(pqst->name,pqst->len);
-	cFYI(1,("filldir on %s",pqst->name));  /* BB removeme BB */
+/*	cFYI(1,("filldir on %s",pqst->name));  */
 	return rc;
 }
 
@@ -542,7 +540,7 @@ int cifs_readdir2(struct file *file, void *direntry, filldir_t filldir)
 	if(pTcon == NULL)
 		return -EINVAL;
 
-cFYI(1,("readdir2 pos: %lld",file->f_pos)); /* BB removeme BB */
+/*	cFYI(1,("readdir2 pos: %lld",file->f_pos)); */
 
 	switch ((int) file->f_pos) {
 	case 0:
@@ -602,27 +600,19 @@ cFYI(1,("readdir2 pos: %lld",file->f_pos)); /* BB removeme BB */
 		rc = find_cifs_entry(xid,pTcon, file,
 				&current_entry,&num_to_fill);
 		if(rc) {
-			cFYI(1,("fce error %d",rc)); /* BB removeme BB */
+			cFYI(1,("fce error %d",rc)); 
 			goto rddir2_exit;
-		} else {
+		} else if (current_entry != NULL) {
 			cFYI(1,("entry %lld found",file->f_pos));
-		}
-
-
-		if(current_entry == NULL) {
-			cERROR(1,("current search entry null,exiting"));
+		} else {
+			cFYI(1,("could not find entry"));
 			goto rddir2_exit;
 		}
-		/* 2) initiate search, */
-		/* 3) seek into search buffer */
-		/* 4) if not found && later - FindNext */
-		/* else if earlier in search, close search and 
-				restart, continuing search till found or EndOfSearch */
-		cFYI(1,("loop through %d times filling dir for net buf start %p",num_to_fill,cifsFile->srch_inf.ntwrk_buf_start)); /* BB removeme BB */
+		cFYI(1,("loop through %d times filling dir for net buf %p",
+			num_to_fill,cifsFile->srch_inf.ntwrk_buf_start)); 
 		end_of_smb = cifsFile->srch_inf.ntwrk_buf_start + 
 			smbCalcSize((struct smb_hdr *)cifsFile->srch_inf.ntwrk_buf_start);
 		tmp_buf = kmalloc(NAME_MAX+1,GFP_KERNEL);
-		cFYI(1,("end of smb %p and tmp_buf %p current_entry %p",end_of_smb,tmp_buf,current_entry)); /* BB removeme BB */
 		for(i=0;(i<num_to_fill) && (rc == 0);i++) {
 			if(current_entry == NULL) {
 				cERROR(1,("beyond end of smb with num to fill %d i %d",num_to_fill,i)); /* BB removeme BB */
@@ -640,7 +630,6 @@ cFYI(1,("readdir2 pos: %lld",file->f_pos)); /* BB removeme BB */
 			file->f_pos++;
 			if(file->f_pos == cifsFile->srch_inf.index_of_last_entry) {
 				cFYI(1,("last entry in buf at pos %lld %s",file->f_pos,tmp_buf)); /* BB removeme BB */
-				/* BB fixme save resume key BB */
 				cifs_save_resume_key(current_entry,cifsFile);
 				break;
 			} else 

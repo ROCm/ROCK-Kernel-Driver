@@ -685,7 +685,7 @@ typedef struct smb_com_write_req {
 	__le32 OffsetHigh;
 	__le16 ByteCount;
 	__u8 Pad;		/* BB check for whether padded to DWORD boundary and optimum performance here */
-	char Data[1];
+	char Data[0];
 } WRITE_REQ;
 
 typedef struct smb_com_write_rsp {
