@@ -257,12 +257,18 @@ static int
 __ncp_lookup_validate(struct dentry * dentry, int flags)
 {
 	struct ncp_server *server;
-	struct inode *dir = dentry->d_parent->d_inode;
+	struct dentry *parent;
+	struct inode *dir;
 	struct ncp_entry_info finfo;
 	int res, val = 0, len = dentry->d_name.len + 1;
 	__u8 __name[len];
 
-	if (!dentry->d_inode || !dir)
+	read_lock(&dparent_lock);
+	parent = dget(dentry->d_parent);
+	read_unlock(&dparent_lock);
+	dir = parent->d_inode;
+
+	if (!dentry->d_inode)
 		goto finished;
 
 	server = NCP_SERVER(dir);
@@ -313,6 +319,7 @@ __ncp_lookup_validate(struct dentry * dentry, int flags)
 
 finished:
 	DDPRINTK("ncp_lookup_validate: result=%d\n", val);
+	dput(parent);
 	return val;
 }
 

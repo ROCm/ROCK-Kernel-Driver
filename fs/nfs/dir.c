@@ -467,12 +467,16 @@ static int nfs_lookup_revalidate(struct dentry * dentry, int flags)
 {
 	struct inode *dir;
 	struct inode *inode;
+	struct dentry *parent;
 	int error;
 	struct nfs_fh fhandle;
 	struct nfs_fattr fattr;
 
+	read_lock(&dparent_lock);
+	parent = dget(dentry->d_parent);
+	read_unlock(&dparent_lock);
 	lock_kernel();
-	dir = dentry->d_parent->d_inode;
+	dir = parent->d_inode;
 	inode = dentry->d_inode;
 
 	if (!inode) {
@@ -508,6 +512,7 @@ static int nfs_lookup_revalidate(struct dentry * dentry, int flags)
 	nfs_renew_times(dentry);
  out_valid:
 	unlock_kernel();
+	dput(parent);
 	return 1;
  out_bad:
 	NFS_CACHEINV(dir);
@@ -521,6 +526,7 @@ static int nfs_lookup_revalidate(struct dentry * dentry, int flags)
 	}
 	d_drop(dentry);
 	unlock_kernel();
+	dput(parent);
 	return 0;
 }
 

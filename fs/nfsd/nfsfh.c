@@ -477,6 +477,11 @@ find_fh_dentry(struct super_block *sb, __u32 *datap, int len, int fhtype, int ne
 			/* Something wrong.  We need to drop the whole dentry->result path
 			 * whatever it was
 			 */
+			/*
+			 *  FIXME: the loop below will do Bad Things(tm) if
+			 *  dentry (or one of its ancestors) become attached
+			 *  to the tree (e.g. due to VFAT-style alias handling)
+			 */
 			struct dentry *d;
 			for (d=result ; d ; d=(d->d_parent == d)?NULL:d->d_parent)
 				d_drop(d);
@@ -610,7 +615,7 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 				dentry = dget(exp->ex_dentry);
 				break;
 			default:
-				dentry = find_fh_dentry(exp->ex_dentry->d_inode->i_sb,
+				dentry = find_fh_dentry(exp->ex_dentry->d_sb,
 							datap, data_left, fh->fh_fileid_type,
 							!(exp->ex_flags & NFSEXP_NOSUBTREECHECK));
 			}
@@ -619,7 +624,7 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 			tfh[0] = fh->ofh_ino;
 			tfh[1] = fh->ofh_generation;
 			tfh[2] = fh->ofh_dirino;
-			dentry = find_fh_dentry(exp->ex_dentry->d_inode->i_sb,
+			dentry = find_fh_dentry(exp->ex_dentry->d_sb,
 						tfh, 3, fh->ofh_dirino?2:1,
 						!(exp->ex_flags & NFSEXP_NOSUBTREECHECK));
 		}
@@ -676,11 +681,15 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 		if (exp->ex_dentry != dentry) {
 			struct dentry *tdentry = dentry;
 
+			spin_lock(&dcache_lock);
 			do {
 				tdentry = tdentry->d_parent;
 				if (exp->ex_dentry == tdentry)
 					break;
 				/* executable only by root and we can't be root */
+				/*
+				 * FIXME: permissions check is not that simple
+				 */
 				if (current->fsuid
 				    && (exp->ex_flags & NFSEXP_ROOTSQUASH)
 				    && !(tdentry->d_inode->i_uid
@@ -700,8 +709,10 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 				printk("nfsd Security: %s/%s bad export.\n",
 				       dentry->d_parent->d_name.name,
 				       dentry->d_name.name);
+				spin_unlock(&dcache_lock);
 				goto out;
 			}
+			spin_unlock(&dcache_lock);
 		}
 	}
 
@@ -729,7 +740,7 @@ out:
 inline int _fh_update(struct dentry *dentry, struct svc_export *exp,
 		      __u32 *datap, int *maxsize)
 {
-	struct super_block *sb = dentry->d_inode->i_sb;
+	struct super_block *sb = dentry->d_sb;
 	
 	if (dentry == exp->ex_dentry) {
 		*maxsize = 0;
@@ -806,7 +817,7 @@ fh_compose(struct svc_fh *fhp, struct svc_export *exp, struct dentry *dentry, st
 
 	if (ref_fh &&
 	    ref_fh->fh_handle.fh_version == 0xca &&
-	    parent->d_inode->i_sb->s_op->dentry_to_fh == NULL) {
+	    dentry->d_sb->s_op->dentry_to_fh == NULL) {
 		/* old style filehandle please */
 		memset(&fhp->fh_handle.fh_base, 0, NFS_FHSIZE);
 		fhp->fh_handle.fh_size = NFS_FHSIZE;

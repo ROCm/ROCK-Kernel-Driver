@@ -112,11 +112,15 @@ exp_parent(svc_client *clp, struct super_block *sb, struct dentry *dentry)
 	struct list_head *head = &clp->cl_export[EXPORT_HASH(sb->s_dev)];
 	struct list_head *p;
 
+	spin_lock(&dcache_lock);
 	list_for_each(p, head) {
 		svc_export *exp = list_entry(p, svc_export, ex_hash);
-		if (is_subdir(dentry, exp->ex_dentry))
+		if (is_subdir(dentry, exp->ex_dentry)) {
+			spin_unlock(&dcache_lock);
 			return exp;
+		}
 	}
+	spin_unlock(&dcache_lock);
 	return NULL;
 }
 
@@ -132,12 +136,16 @@ exp_child(svc_client *clp, struct super_block *sb, struct dentry *dentry)
 	struct list_head *p;
 	struct dentry *ndentry;
 
+	spin_lock(&dcache_lock);
 	list_for_each(p, head) {
 		svc_export *exp = list_entry(p, svc_export, ex_hash);
 		ndentry = exp->ex_dentry;
-		if (ndentry && is_subdir(ndentry->d_parent, dentry))
+		if (ndentry && is_subdir(ndentry->d_parent, dentry)) {
+			spin_unlock(&dcache_lock);
 			return exp;
+		}
 	}
+	spin_unlock(&dcache_lock);
 	return NULL;
 }
 
