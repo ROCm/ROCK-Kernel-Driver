@@ -6,7 +6,7 @@
  *
  * Portions Copyright (c) 2001 Matrox Graphics Inc.
  *
- * Version: 1.64 2002/06/10
+ * Version: 1.65 2002/08/14
  *
  */
 
@@ -42,7 +42,6 @@ static int matroxfb_dh_getcolreg(unsigned regno, unsigned *red, unsigned *green,
 static int matroxfb_dh_setcolreg(unsigned regno, unsigned red, unsigned green,
 		unsigned blue, unsigned transp, struct fb_info* info) {
 #define m2info (container_of(info, struct matroxfb_dh_fb_info, fbcon))
-	struct display* p;
 
 	if (regno >= 16)
 		return 1;
@@ -50,33 +49,32 @@ static int matroxfb_dh_setcolreg(unsigned regno, unsigned red, unsigned green,
 	m2info->palette[regno].blue = blue;
 	m2info->palette[regno].green = green;
 	m2info->palette[regno].transp = transp;
-	p = m2info->currcon_display;
-	if (p->var.grayscale) {
+	if (m2info->fbcon.var.grayscale) {
 		/* gray = 0.30*R + 0.59*G + 0.11*B */
 		red = green = blue = (red * 77 + green * 151 + blue * 28) >> 8;
 	}
-	red = CNVT_TOHW(red, p->var.red.length);
-	green = CNVT_TOHW(green, p->var.green.length);
-	blue = CNVT_TOHW(blue, p->var.blue.length);
-	transp = CNVT_TOHW(transp, p->var.transp.length);
+	red = CNVT_TOHW(red, m2info->fbcon.var.red.length);
+	green = CNVT_TOHW(green, m2info->fbcon.var.green.length);
+	blue = CNVT_TOHW(blue, m2info->fbcon.var.blue.length);
+	transp = CNVT_TOHW(transp, m2info->fbcon.var.transp.length);
 
-	switch (p->var.bits_per_pixel) {
+	switch (m2info->fbcon.var.bits_per_pixel) {
 #ifdef FBCON_HAS_CFB16
 		case 16:
 			m2info->cmap.cfb16[regno] =
-				(red << p->var.red.offset)     |
-				(green << p->var.green.offset) |
-				(blue << p->var.blue.offset)   |
-				(transp << p->var.transp.offset);
+				(red << m2info->fbcon.var.red.offset)     |
+				(green << m2info->fbcon.var.green.offset) |
+				(blue << m2info->fbcon.var.blue.offset)   |
+				(transp << m2info->fbcon.var.transp.offset);
 			break;
 #endif
 #ifdef FBCON_HAS_CFB32
 		case 32:
 			m2info->cmap.cfb32[regno] =
-				(red << p->var.red.offset)     |
-				(green << p->var.green.offset) |
-				(blue << p->var.blue.offset)   |
-				(transp << p->var.transp.offset);
+				(red << m2info->fbcon.var.red.offset)     |
+				(green << m2info->fbcon.var.green.offset) |
+				(blue << m2info->fbcon.var.blue.offset)   |
+				(transp << m2info->fbcon.var.transp.offset);
 			break;
 #endif
 	}
@@ -99,7 +97,6 @@ static inline void my_install_cmap(struct matroxfb_dh_fb_info* m2info)
 
 static void matroxfb_dh_restore(struct matroxfb_dh_fb_info* m2info,
 		struct my_timming* mt,
-		struct display* p,
 		int mode,
 		unsigned int pos) {
 	u_int32_t tmp;
@@ -157,7 +154,7 @@ static void matroxfb_dh_restore(struct matroxfb_dh_fb_info* m2info,
 	mga_outl(0x3C20, ((mt->VSyncEnd - 1) << 16) | (mt->VSyncStart - 1));
 	mga_outl(0x3C24, ((mt->VSyncStart) << 16) | (mt->HSyncStart));	/* preload */
 	{
-		u_int32_t linelen = p->var.xres_virtual * (p->var.bits_per_pixel >> 3);
+		u_int32_t linelen = m2info->fbcon.var.xres_virtual * (m2info->fbcon.var.bits_per_pixel >> 3);
 		if (tmp & 0x02000000) {
 			/* field #0 is smaller, so... */
 			mga_outl(0x3C2C, pos);			/* field #1 vmemory start */
@@ -202,8 +199,7 @@ static void matroxfb_dh_disable(struct matroxfb_dh_fb_info* m2info) {
 	ACCESS_FBINFO(hw).crtc2.ctl = 0x00000004;
 }
 
-static void matroxfb_dh_cfbX_init(struct matroxfb_dh_fb_info* m2info,
-		struct display* p) {
+static void matroxfb_dh_cfbX_init(struct matroxfb_dh_fb_info* m2info) {
 	/* no acceleration for secondary head... */
 }
 
@@ -214,9 +210,11 @@ static void matroxfb_dh_pan_var(struct matroxfb_dh_fb_info* m2info,
 	unsigned int pixelsize;
 	MINFO_FROM(m2info->primary_dev);
 
-	pixelsize = var->bits_per_pixel >> 3;
-	linelen = var->xres_virtual * pixelsize;
-	pos = var->yoffset * linelen + var->xoffset * pixelsize;
+	m2info->fbcon.var.xoffset = var->xoffset;
+	m2info->fbcon.var.yoffset = var->yoffset;
+	pixelsize = m2info->fbcon.var.bits_per_pixel >> 3;
+	linelen = m2info->fbcon.var.xres_virtual * pixelsize;
+	pos = m2info->fbcon.var.yoffset * linelen + m2info->fbcon.var.xoffset * pixelsize;
 	pos += m2info->video.offbase;
 	if (m2info->interlaced) {
 		mga_outl(0x3C2C, pos);
@@ -227,7 +225,6 @@ static void matroxfb_dh_pan_var(struct matroxfb_dh_fb_info* m2info,
 }
 
 static int matroxfb_dh_decode_var(struct matroxfb_dh_fb_info* m2info,
-		struct display* p,
 		struct fb_var_screeninfo* var,
 		int *visual,
 		int *video_cmap_len,
@@ -306,7 +303,7 @@ static int matroxfb_dh_decode_var(struct matroxfb_dh_fb_info* m2info,
 }
 
 static void initMatroxDH(struct matroxfb_dh_fb_info* m2info, struct display* p) {
-	switch (p->var.bits_per_pixel) {
+	switch (m2info->fbcon.var.bits_per_pixel) {
 #ifdef FBCON_HAS_CFB16
 		case 16:
 			p->dispsw_data = m2info->cmap.cfb16;
@@ -349,44 +346,19 @@ static int matroxfb_dh_release(struct fb_info* info, int user) {
 #undef m2info
 }
 
-static int matroxfb_dh_get_fix(struct fb_fix_screeninfo* fix, int con,
-		struct fb_info* info) {
-#define m2info (container_of(info, struct matroxfb_dh_fb_info, fbcon))
-	struct display* p;
+static void matroxfb_dh_update_fix(struct matroxfb_dh_fb_info *m2info) {
+	struct fb_fix_screeninfo *fix = &m2info->fbcon.fix;
 
-	if (con >= 0)
-		p = fb_display + con;
-	else
-		p = m2info->fbcon.disp;
-
-	memset(fix, 0, sizeof(*fix));
 	strcpy(fix->id, "MATROX DH");
 
 	fix->smem_start = m2info->video.base;
 	fix->smem_len = m2info->video.len_usable;
-	fix->type = p->type;
-	fix->type_aux = p->type_aux;
-	fix->visual = p->visual;
-	fix->xpanstep = 8;	/* TBD */
 	fix->ypanstep = 1;
 	fix->ywrapstep = 0;
-	fix->line_length = p->line_length;
+	fix->xpanstep = 8;	/* TBD */
 	fix->mmio_start = m2info->mmio.base;
 	fix->mmio_len = m2info->mmio.len;
 	fix->accel = 0;		/* no accel... */
-	return 0;
-#undef m2info
-}
-
-static int matroxfb_dh_get_var(struct fb_var_screeninfo* var, int con,
-		struct fb_info* info) {
-#define m2info (container_of(info, struct matroxfb_dh_fb_info, fbcon))
-	if (con < 0)
-		*var = m2info->fbcon.disp->var;
-	else
-		*var = fb_display[con].var;
-	return 0;
-#undef m2info
 }
 
 static int matroxfb_dh_set_var(struct fb_var_screeninfo* var, int con,
@@ -404,7 +376,7 @@ static int matroxfb_dh_set_var(struct fb_var_screeninfo* var, int con,
 		p = m2info->fbcon.disp;
 	else
 		p = fb_display + con;
-	if ((err = matroxfb_dh_decode_var(m2info, p, var, &visual, &cmap_len, &mode)) != 0)
+	if ((err = matroxfb_dh_decode_var(m2info, var, &visual, &cmap_len, &mode)) != 0)
 		return err;
 	switch (var->activate & FB_ACTIVATE_MASK) {
 		case FB_ACTIVATE_TEST:	return 0;
@@ -425,13 +397,15 @@ static int matroxfb_dh_set_var(struct fb_var_screeninfo* var, int con,
 		chgvar = 0;
 	p->var = *var;
 	/* cmap */
-	m2info->fbcon.screen_base = vaddr_va(m2info->video.vbase);
-	p->visual = visual;
-	p->ypanstep = 1;
-	p->ywrapstep = 0;
-	p->type = FB_TYPE_PACKED_PIXELS;
-	p->type_aux = 0;
-	p->next_line = p->line_length = (var->xres_virtual * var->bits_per_pixel) >> 3;
+	if (con == m2info->fbcon.currcon) {
+		m2info->fbcon.screen_base = vaddr_va(m2info->video.vbase);
+		m2info->fbcon.var = *var;
+		m2info->fbcon.fix.visual = visual;
+		m2info->fbcon.fix.type = FB_TYPE_PACKED_PIXELS;
+		m2info->fbcon.fix.type_aux = 0;
+		p->next_line = m2info->fbcon.fix.line_length = (var->xres_virtual * var->bits_per_pixel) >> 3;
+		matroxfb_dh_update_fix(m2info);
+	}
 	p->can_soft_blank = 0;
 	p->inverse = 0;	/* TBD */
 	initMatroxDH(m2info, p);
@@ -443,12 +417,12 @@ static int matroxfb_dh_set_var(struct fb_var_screeninfo* var, int con,
 		int out;
 		int cnt;
 
-		matroxfb_var2my(var, &mt);
+		matroxfb_var2my(&m2info->fbcon.var, &mt);
 		mt.crtc = MATROXFB_SRC_CRTC2;
 		/* CRTC2 delay */
 		mt.delay = 34;
 
-		pos = (var->yoffset * var->xres_virtual + var->xoffset) * var->bits_per_pixel >> 3;
+		pos = (m2info->fbcon.var.yoffset * m2info->fbcon.var.xres_virtual + m2info->fbcon.var.xoffset) * m2info->fbcon.var.bits_per_pixel >> 3;
 		pos += m2info->video.offbase;
 		cnt = 0;
 		down_read(&ACCESS_FBINFO(altout).lock);
@@ -464,7 +438,7 @@ static int matroxfb_dh_set_var(struct fb_var_screeninfo* var, int con,
 		ACCESS_FBINFO(crtc2).mnp = mt.mnp;
 		up_read(&ACCESS_FBINFO(altout).lock);
 		if (cnt) {
-			matroxfb_dh_restore(m2info, &mt, p, mode, pos);
+			matroxfb_dh_restore(m2info, &mt, mode, pos);
 		} else {
 			matroxfb_dh_disable(m2info);
 		}
@@ -484,7 +458,7 @@ static int matroxfb_dh_set_var(struct fb_var_screeninfo* var, int con,
 			}
 		}
 		up_read(&ACCESS_FBINFO(altout).lock);
-		matroxfb_dh_cfbX_init(m2info, p);
+		matroxfb_dh_cfbX_init(m2info);
 		my_install_cmap(m2info);
 	}
 	return 0;
@@ -558,7 +532,7 @@ static int matroxfb_dh_get_vblank(const struct matroxfb_dh_fb_info* m2info, stru
 	/* mask out reserved bits + field number (odd/even) */
 	vblank->vcount = mga_inl(0x3C48) & 0x000007FF;
 	/* compatibility stuff */
-	if (vblank->vcount >= m2info->currcon_display->var.yres)
+	if (vblank->vcount >= m2info->fbcon.var.yres)
 		vblank->flags |= FB_VBLANK_VBLANKING;
 	return 0;
 }
@@ -701,8 +675,6 @@ static struct fb_ops matroxfb_dh_ops = {
 	.owner =	THIS_MODULE,
 	.fb_open =	matroxfb_dh_open,
 	.fb_release =	matroxfb_dh_release,
-	.fb_get_fix =	matroxfb_dh_get_fix,
-	.fb_get_var =	matroxfb_dh_get_var,
 	.fb_set_var =	matroxfb_dh_set_var,
 	.fb_get_cmap =	matroxfb_dh_get_cmap,
 	.fb_set_cmap =	matroxfb_dh_set_cmap,

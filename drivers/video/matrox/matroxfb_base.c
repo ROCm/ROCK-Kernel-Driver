@@ -6,7 +6,7 @@
  *
  * Portions Copyright (c) 2001 Matrox Graphics Inc.
  *
- * Version: 1.64 2002/06/10
+ * Version: 1.65 2002/08/14
  *
  * MTRR stuff: 1998 Tom Rini <trini@kernel.crashing.org>
  *
@@ -81,7 +81,10 @@
  *                     Fixes
  *
  *               "Mike Pieper" <mike@pieper-family.de>
- *                     TVOut enhandcements.
+ *                     TVOut enhandcements, V4L2 control interface.
+ *
+ *               "Diego Biurrun" <diego@biurrun.de>
+ *                     DFP testing
  *
  * (following author is not in any relation with this code, but his code
  *  is included in this driver)
@@ -176,11 +179,13 @@ static void matrox_pan_var(WPMINFO struct fb_var_screeninfo *var) {
 	if (ACCESS_FBINFO(dead))
 		return;
 
+	ACCESS_FBINFO(fbcon).var.xoffset = var->xoffset;
+	ACCESS_FBINFO(fbcon).var.yoffset = var->yoffset;
 	disp = ACCESS_FBINFO(currcon_display);
-	if (disp->type == FB_TYPE_TEXT) {
-		pos = var->yoffset / fontheight(disp) * disp->next_line / ACCESS_FBINFO(devflags.textstep) + var->xoffset / (fontwidth(disp)?fontwidth(disp):8);
+	if (ACCESS_FBINFO(fbcon).fix.type == FB_TYPE_TEXT) {
+		pos = ACCESS_FBINFO(fbcon).var.yoffset / fontheight(disp) * disp->next_line / ACCESS_FBINFO(devflags.textstep) + ACCESS_FBINFO(fbcon).var.xoffset / (fontwidth(disp)?fontwidth(disp):8);
 	} else {
-		pos = (var->yoffset * var->xres_virtual + var->xoffset) * ACCESS_FBINFO(curr.final_bppShift) / 32;
+		pos = (ACCESS_FBINFO(fbcon).var.yoffset * ACCESS_FBINFO(fbcon).var.xres_virtual + ACCESS_FBINFO(fbcon).var.xoffset) * ACCESS_FBINFO(curr.final_bppShift) / 32;
 		pos += ACCESS_FBINFO(curr.ydstorg.chunks);
 	}
 	p0 = ACCESS_FBINFO(hw).CRTC[0x0D] = pos & 0xFF;
@@ -567,7 +572,6 @@ static int matroxfb_setcolreg(unsigned regno, unsigned red, unsigned green,
 			      unsigned blue, unsigned transp,
 			      struct fb_info *fb_info)
 {
-	struct display* p;
 #ifdef CONFIG_FB_MATROX_MULTIHEAD
 	struct matrox_fb_info* minfo = container_of(fb_info, struct matrox_fb_info, fbcon);
 #endif
@@ -589,18 +593,17 @@ static int matroxfb_setcolreg(unsigned regno, unsigned red, unsigned green,
 	ACCESS_FBINFO(palette[regno].blue)  = blue;
 	ACCESS_FBINFO(palette[regno].transp) = transp;
 
-	p = ACCESS_FBINFO(currcon_display);
-	if (p->var.grayscale) {
+	if (ACCESS_FBINFO(fbcon).var.grayscale) {
 		/* gray = 0.30*R + 0.59*G + 0.11*B */
 		red = green = blue = (red * 77 + green * 151 + blue * 28) >> 8;
 	}
 
-	red = CNVT_TOHW(red, p->var.red.length);
-	green = CNVT_TOHW(green, p->var.green.length);
-	blue = CNVT_TOHW(blue, p->var.blue.length);
-	transp = CNVT_TOHW(transp, p->var.transp.length);
+	red = CNVT_TOHW(red, ACCESS_FBINFO(fbcon).var.red.length);
+	green = CNVT_TOHW(green, ACCESS_FBINFO(fbcon).var.green.length);
+	blue = CNVT_TOHW(blue, ACCESS_FBINFO(fbcon).var.blue.length);
+	transp = CNVT_TOHW(transp, ACCESS_FBINFO(fbcon).var.transp.length);
 
-	switch (p->var.bits_per_pixel) {
+	switch (ACCESS_FBINFO(fbcon).var.bits_per_pixel) {
 #if defined(FBCON_HAS_CFB8) || defined(FBCON_HAS_CFB4) || defined(FBCON_HAS_VGATEXT)
 #ifdef FBCON_HAS_VGATEXT
 	case 0:
@@ -620,81 +623,48 @@ static int matroxfb_setcolreg(unsigned regno, unsigned red, unsigned green,
 #ifdef FBCON_HAS_CFB16
 	case 16:
 		ACCESS_FBINFO(cmap.cfb16[regno]) =
-			(red << p->var.red.offset)     |
-			(green << p->var.green.offset) |
-			(blue << p->var.blue.offset)   |
-			(transp << p->var.transp.offset); /* for 1:5:5:5 */
+			(red << ACCESS_FBINFO(fbcon).var.red.offset)     |
+			(green << ACCESS_FBINFO(fbcon).var.green.offset) |
+			(blue << ACCESS_FBINFO(fbcon).var.blue.offset)   |
+			(transp << ACCESS_FBINFO(fbcon).var.transp.offset); /* for 1:5:5:5 */
 		break;
 #endif
 #ifdef FBCON_HAS_CFB24
 	case 24:
 		ACCESS_FBINFO(cmap.cfb24[regno]) =
-			(red   << p->var.red.offset)   |
-			(green << p->var.green.offset) |
-			(blue  << p->var.blue.offset);
+			(red   << ACCESS_FBINFO(fbcon).var.red.offset)   |
+			(green << ACCESS_FBINFO(fbcon).var.green.offset) |
+			(blue  << ACCESS_FBINFO(fbcon).var.blue.offset);
 		break;
 #endif
 #ifdef FBCON_HAS_CFB32
 	case 32:
 		ACCESS_FBINFO(cmap.cfb32[regno]) =
-			(red   << p->var.red.offset)   |
-			(green << p->var.green.offset) |
-			(blue  << p->var.blue.offset)  |
-			(transp << p->var.transp.offset);	/* 8:8:8:8 */
+			(red   << ACCESS_FBINFO(fbcon).var.red.offset)   |
+			(green << ACCESS_FBINFO(fbcon).var.green.offset) |
+			(blue  << ACCESS_FBINFO(fbcon).var.blue.offset)  |
+			(transp << ACCESS_FBINFO(fbcon).var.transp.offset);	/* 8:8:8:8 */
 		break;
 #endif
 	}
 	return 0;
 }
 
-static int matroxfb_get_fix(struct fb_fix_screeninfo *fix, int con,
-			 struct fb_info *info)
+static void matroxfb_update_fix(WPMINFO2)
 {
-	struct display* p;
+	struct fb_fix_screeninfo *fix = &ACCESS_FBINFO(fbcon).fix;
 	DBG("matroxfb_get_fix")
 
-#define minfo (container_of(info, struct matrox_fb_info, fbcon))
-
-	if (ACCESS_FBINFO(dead)) {
-		return -ENXIO;
-	}
-
-	if (con >= 0)
-		p = fb_display + con;
-	else
-		p = ACCESS_FBINFO(fbcon.disp);
-
-	memset(fix, 0, sizeof(*fix));
 	strcpy(fix->id,"MATROX");
 
 	fix->smem_start = ACCESS_FBINFO(video.base) + ACCESS_FBINFO(curr.ydstorg.bytes);
 	fix->smem_len = ACCESS_FBINFO(video.len_usable) - ACCESS_FBINFO(curr.ydstorg.bytes);
-	fix->type = p->type;
-	fix->type_aux = p->type_aux;
-	fix->visual = p->visual;
-	fix->xpanstep = 8; /* 8 for 8bpp, 4 for 16bpp, 2 for 32bpp */
+	fix->xpanstep = 8;	/* 8 for 8bpp, 4 for 16bpp, 2 for 32bpp */
 	fix->ypanstep = 1;
 	fix->ywrapstep = 0;
-	fix->line_length = p->line_length;
 	fix->mmio_start = ACCESS_FBINFO(mmio.base);
 	fix->mmio_len = ACCESS_FBINFO(mmio.len);
 	fix->accel = ACCESS_FBINFO(devflags.accelerator);
-	return 0;
-#undef minfo
-}
-
-static int matroxfb_get_var(struct fb_var_screeninfo *var, int con,
-			 struct fb_info *info)
-{
-#define minfo (container_of(info, struct matrox_fb_info, fbcon))
-	DBG("matroxfb_get_var")
-
-	if(con < 0)
-		*var=ACCESS_FBINFO(fbcon.disp)->var;
-	else
-		*var=fb_display[con].var;
-	return 0;
-#undef minfo
 }
 
 static int matroxfb_set_var(struct fb_var_screeninfo *var, int con,
@@ -741,17 +711,19 @@ static int matroxfb_set_var(struct fb_var_screeninfo *var, int con,
 	display->var = *var;
 	/* cmap */
 	ACCESS_FBINFO(fbcon.screen_base) = vaddr_va(ACCESS_FBINFO(video.vbase)) + ydstorg;
-	display->visual = visual;
-	display->ypanstep = 1;
-	display->ywrapstep = 0;
-	if (var->bits_per_pixel) {
-		display->type = FB_TYPE_PACKED_PIXELS;
-		display->type_aux = 0;
-		display->next_line = display->line_length = (var->xres_virtual * var->bits_per_pixel) >> 3;
-	} else {
-		display->type = FB_TYPE_TEXT;
-		display->type_aux = ACCESS_FBINFO(devflags.text_type_aux);
-		display->next_line = display->line_length = (var->xres_virtual / (fontwidth(display)?fontwidth(display):8)) * ACCESS_FBINFO(devflags.textstep);
+	if (display == ACCESS_FBINFO(currcon_display)) {
+		ACCESS_FBINFO(fbcon).var = *var;
+		matroxfb_update_fix(PMINFO2);
+		ACCESS_FBINFO(fbcon).fix.visual = visual;
+		if (var->bits_per_pixel) {
+			ACCESS_FBINFO(fbcon).fix.type = FB_TYPE_PACKED_PIXELS;
+			ACCESS_FBINFO(fbcon).fix.type_aux = 0;
+			display->next_line = ACCESS_FBINFO(fbcon).fix.line_length = (var->xres_virtual * var->bits_per_pixel) >> 3;
+		} else {
+			ACCESS_FBINFO(fbcon).fix.type = FB_TYPE_TEXT;
+			ACCESS_FBINFO(fbcon).fix.type_aux = ACCESS_FBINFO(devflags.text_type_aux);
+			display->next_line = ACCESS_FBINFO(fbcon).fix.line_length = (var->xres_virtual / (fontwidth(display)?fontwidth(display):8)) * ACCESS_FBINFO(devflags.textstep);
+		}
 	}
 	display->can_soft_blank = 1;
 	display->inverse = ACCESS_FBINFO(devflags.inverse);
@@ -766,7 +738,7 @@ static int matroxfb_set_var(struct fb_var_screeninfo *var, int con,
 		unsigned int pos;
 
 		ACCESS_FBINFO(curr.cmap_len) = cmap_len;
-		if (display->type == FB_TYPE_TEXT) {
+		if (ACCESS_FBINFO(fbcon).fix.type == FB_TYPE_TEXT) {
 			/* textmode must be in first megabyte, so no ydstorg allowed */
 			ACCESS_FBINFO(curr.ydstorg.bytes) = 0;
 			ACCESS_FBINFO(curr.ydstorg.chunks) = 0;
@@ -825,7 +797,7 @@ static int matroxfb_set_var(struct fb_var_screeninfo *var, int con,
 			ACCESS_FBINFO(crtc1).pixclock = mt.pixclock;
 			ACCESS_FBINFO(crtc1).mnp = mt.mnp;
 			ACCESS_FBINFO(hw_switch->init(PMINFO &mt, display));
-			if (display->type == FB_TYPE_TEXT) {
+			if (ACCESS_FBINFO(fbcon).fix.type == FB_TYPE_TEXT) {
 				if (fontheight(display))
 					pos = var->yoffset / fontheight(display) * display->next_line / ACCESS_FBINFO(devflags.textstep) + var->xoffset / (fontwidth(display)?fontwidth(display):8);
 				else
@@ -855,7 +827,7 @@ static int matroxfb_set_var(struct fb_var_screeninfo *var, int con,
 				}
 			}
 			up_read(&ACCESS_FBINFO(altout).lock);
-			matrox_cfbX_init(PMINFO display);
+			matrox_cfbX_init(PMINFO2);
 			my_install_cmap(PMINFO2);
 		}
 	}
@@ -956,7 +928,7 @@ static int matroxfb_get_vblank(CPMINFO struct fb_vblank *vblank)
 		vblank->flags |= FB_VBLANK_HBLANKING;
 	if (sts1 & 8)
 		vblank->flags |= FB_VBLANK_VSYNCING;
-	if (vblank->vcount >= ACCESS_FBINFO(currcon_display)->var.yres)
+	if (vblank->vcount >= ACCESS_FBINFO(fbcon).var.yres)
 		vblank->flags |= FB_VBLANK_VBLANKING;
 	vblank->hcount = 0;
 	vblank->count = 0;
@@ -1213,8 +1185,6 @@ static struct fb_ops matroxfb_ops = {
 	.owner =	THIS_MODULE,
 	.fb_open =	matroxfb_open,
 	.fb_release =	matroxfb_release,
-	.fb_get_fix =	matroxfb_get_fix,
-	.fb_get_var =	matroxfb_get_var,
 	.fb_set_var =	matroxfb_set_var,
 	.fb_get_cmap =	matroxfb_get_cmap,
 	.fb_set_cmap =	matroxfb_set_cmap,

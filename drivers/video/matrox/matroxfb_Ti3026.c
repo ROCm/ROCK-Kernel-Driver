@@ -6,7 +6,7 @@
  *
  * Portions Copyright (c) 2001 Matrox Graphics Inc.
  *
- * Version: 1.64 2002/06/10
+ * Version: 1.65 2002/08/14
  *
  * MTRR stuff: 1998 Tom Rini <trini@kernel.crashing.org>
  *
@@ -402,7 +402,7 @@ static int matroxfb_ti3026_setfont(struct display* p, int width, int height) {
 	return 0;
 }
 
-static int matroxfb_ti3026_selhwcursor(WPMINFO struct display* p) {
+static int matroxfb_ti3026_selhwcursor(WPMINFO2) {
 	ACCESS_FBINFO(dispsw.cursor) = matroxfb_ti3026_cursor;
 	ACCESS_FBINFO(dispsw.set_font) = matroxfb_ti3026_setfont;
 	return 0;
@@ -434,7 +434,7 @@ static int Ti3026_setpclk(WPMINFO int clk, struct display* p) {
 	hw->DACclk[1] = pixfeed;
 	hw->DACclk[2] = pixpost | 0xB0;
 
-	if (p->type == FB_TYPE_TEXT) {
+	if (ACCESS_FBINFO(fbcon).fix.type == FB_TYPE_TEXT) {
 		hw->DACreg[POS3026_XMEMPLLCTRL] = TVP3026_XMEMPLLCTRL_MCLK_MCLKPLL | TVP3026_XMEMPLLCTRL_RCLK_PIXPLL;
 		hw->DACclk[3] = 0xFD;
 		hw->DACclk[4] = 0x3D;
@@ -502,7 +502,7 @@ static int Ti3026_init(WPMINFO struct my_timming* m, struct display* p) {
 	DBG("Ti3026_init")
 
 	memcpy(hw->DACreg, MGADACbpp32, sizeof(hw->DACreg));
-	if (p->type == FB_TYPE_TEXT) {
+	if (ACCESS_FBINFO(fbcon).fix.type == FB_TYPE_TEXT) {
 		hw->DACreg[POS3026_XLATCHCTRL] = TVP3026_XLATCHCTRL_8_1;
 		hw->DACreg[POS3026_XTRUECOLORCTRL] = TVP3026_XTRUECOLORCTRL_PSEUDOCOLOR;
 		hw->DACreg[POS3026_XMUXCTRL] = TVP3026_XMUXCTRL_VGA;
@@ -569,7 +569,7 @@ static int Ti3026_init(WPMINFO struct my_timming* m, struct display* p) {
 
 	/* set interleaving */
 	hw->MXoptionReg &= ~0x00001000;
-	if ((p->type != FB_TYPE_TEXT) && isInterleave(MINFO)) hw->MXoptionReg |= 0x00001000;
+	if ((ACCESS_FBINFO(fbcon).fix.type != FB_TYPE_TEXT) && isInterleave(MINFO)) hw->MXoptionReg |= 0x00001000;
 
 	/* set DAC */
 	Ti3026_setpclk(PMINFO m->pixclock, p);

@@ -2,11 +2,11 @@
  *
  * Hardware accelerated Matrox Millennium I, II, Mystique, G100, G200 and G400
  *
- * (c) 1998,1999,2000,2001 Petr Vandrovec <vandrove@vc.cvut.cz>
+ * (c) 1998-2002 Petr Vandrovec <vandrove@vc.cvut.cz>
  *
  * Portions Copyright (c) 2001 Matrox Graphics Inc.
  *
- * Version: 1.62 2001/11/29
+ * Version: 1.65 2002/08/14
  *
  * MTRR stuff: 1998 Tom Rini <trini@kernel.crashing.org>
  *
@@ -227,7 +227,7 @@ int matroxfb_vgaHWinit(WPMINFO struct my_timming* m, struct display* p) {
 	unsigned int wd;
 	unsigned int divider;
 	int i;
-	int text = p->type == FB_TYPE_TEXT;
+	int text = ACCESS_FBINFO(fbcon).fix.type == FB_TYPE_TEXT;
 	int fwidth;
 	struct matrox_hw_state * const hw = &ACCESS_FBINFO(hw);
 
@@ -1013,6 +1013,6 @@ EXPORT_SYMBOL(matroxfb_vgaHWinit);		/* DAC1064, Ti3026 */
 EXPORT_SYMBOL(matroxfb_vgaHWrestore);		/* DAC1064, Ti3026 */
 EXPORT_SYMBOL(matroxfb_read_pins);
 
-MODULE_AUTHOR("(c) 1999-2001 Petr Vandrovec <vandrove@vc.cvut.cz>");
+MODULE_AUTHOR("(c) 1999-2002 Petr Vandrovec <vandrove@vc.cvut.cz>");
 MODULE_DESCRIPTION("Miscellaneous support for Matrox video cards");
 MODULE_LICENSE("GPL");

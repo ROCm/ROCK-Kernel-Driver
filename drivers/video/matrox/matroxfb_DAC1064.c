@@ -2,11 +2,11 @@
  *
  * Hardware accelerated Matrox Millennium I, II, Mystique, G100, G200, G400 and G450.
  *
- * (c) 1998-2001 Petr Vandrovec <vandrove@vc.cvut.cz>
+ * (c) 1998-2002 Petr Vandrovec <vandrove@vc.cvut.cz>
  *
  * Portions Copyright (c) 2001 Matrox Graphics Inc.
  *
- * Version: 1.62 2001/11/29
+ * Version: 1.65 2002/08/14
  *
  * See matroxfb_base.c for contributors.
  *
@@ -150,7 +150,7 @@ static int matroxfb_DAC1064_setfont(struct display* p, int width, int height) {
 	return 0;
 }
 
-static int DAC1064_selhwcursor(WPMINFO struct display* p) {
+static int DAC1064_selhwcursor(WPMINFO2) {
 	ACCESS_FBINFO(dispsw.cursor) = matroxfb_DAC1064_cursor;
 	ACCESS_FBINFO(dispsw.set_font) = matroxfb_DAC1064_setfont;
 	return 0;
@@ -453,24 +453,24 @@ void DAC1064_global_restore(WPMINFO2) {
 	}
 }
 
-static int DAC1064_init_1(WPMINFO struct my_timming* m, struct display *p) {
+static int DAC1064_init_1(WPMINFO struct my_timming* m) {
 	struct matrox_hw_state* hw = &ACCESS_FBINFO(hw);
 
 	DBG("DAC1064_init_1")
 
 	memcpy(hw->DACreg, MGA1064_DAC, sizeof(MGA1064_DAC_regs));
-	if (p->type == FB_TYPE_TEXT) {
+	if (ACCESS_FBINFO(fbcon).fix.type == FB_TYPE_TEXT) {
 		hw->DACreg[POS1064_XMISCCTRL] = M1064_XMISCCTRL_DAC_6BIT;
 		hw->DACreg[POS1064_XMULCTRL] = M1064_XMULCTRL_DEPTH_8BPP
 					     | M1064_XMULCTRL_GRAPHICS_PALETIZED;
 	} else {
-		switch (p->var.bits_per_pixel) {
+		switch (ACCESS_FBINFO(fbcon).var.bits_per_pixel) {
 		/* case 4: not supported by MGA1064 DAC */
 		case 8:
 			hw->DACreg[POS1064_XMULCTRL] = M1064_XMULCTRL_DEPTH_8BPP | M1064_XMULCTRL_GRAPHICS_PALETIZED;
 			break;
 		case 16:
-			if (p->var.green.length == 5)
+			if (ACCESS_FBINFO(fbcon).var.green.length == 5)
 				hw->DACreg[POS1064_XMULCTRL] = M1064_XMULCTRL_DEPTH_15BPP_1BPP | M1064_XMULCTRL_GRAPHICS_PALETIZED;
 			else
 				hw->DACreg[POS1064_XMULCTRL] = M1064_XMULCTRL_DEPTH_16BPP | M1064_XMULCTRL_GRAPHICS_PALETIZED;
@@ -495,12 +495,12 @@ static int DAC1064_init_1(WPMINFO struct my_timming* m, struct display *p) {
 	return 0;
 }
 
-static int DAC1064_init_2(WPMINFO struct my_timming* m, struct display* p) {
+static int DAC1064_init_2(WPMINFO struct my_timming* m) {
 	struct matrox_hw_state* hw = &ACCESS_FBINFO(hw);
 
 	DBG("DAC1064_init_2")
 
-	if (p->var.bits_per_pixel > 16) {	/* 256 entries */
+	if (ACCESS_FBINFO(fbcon).var.bits_per_pixel > 16) {	/* 256 entries */
 		int i;
 
 		for (i = 0; i < 256; i++) {
@@ -508,8 +508,8 @@ static int DAC1064_init_2(WPMINFO struct my_timming* m, struct display* p) {
 			hw->DACpal[i * 3 + 1] = i;
 			hw->DACpal[i * 3 + 2] = i;
 		}
-	} else if (p->var.bits_per_pixel > 8) {
-		if (p->var.green.length == 5) {	/* 0..31, 128..159 */
+	} else if (ACCESS_FBINFO(fbcon).var.bits_per_pixel > 8) {
+		if (ACCESS_FBINFO(fbcon).var.green.length == 5) {	/* 0..31, 128..159 */
 			int i;
 
 			for (i = 0; i < 32; i++) {
@@ -646,7 +646,7 @@ static int MGA1064_init(WPMINFO struct my_timming* m, struct display* p) {
 
 	DBG("MGA1064_init")
 
-	if (DAC1064_init_1(PMINFO m, p)) return 1;
+	if (DAC1064_init_1(PMINFO m)) return 1;
 	if (matroxfb_vgaHWinit(PMINFO m, p)) return 1;
 
 	hw->MiscOutReg = 0xCB;
@@ -657,7 +657,7 @@ static int MGA1064_init(WPMINFO struct my_timming* m, struct display* p) {
 	if (m->sync & FB_SYNC_COMP_HIGH_ACT) /* should be only FB_SYNC_COMP */
 		hw->CRTCEXT[3] |= 0x40;
 
-	if (DAC1064_init_2(PMINFO m, p)) return 1;
+	if (DAC1064_init_2(PMINFO m)) return 1;
 	return 0;
 }
 #endif
@@ -668,7 +668,7 @@ static int MGAG100_init(WPMINFO struct my_timming* m, struct display* p) {
 
 	DBG("MGAG100_init")
 
-	if (DAC1064_init_1(PMINFO m, p)) return 1;
+	if (DAC1064_init_1(PMINFO m)) return 1;
 	hw->MXoptionReg &= ~0x2000;
 	if (matroxfb_vgaHWinit(PMINFO m, p)) return 1;
 
@@ -680,7 +680,7 @@ static int MGAG100_init(WPMINFO struct my_timming* m, struct display* p) {
 	if (m->sync & FB_SYNC_COMP_HIGH_ACT) /* should be only FB_SYNC_COMP */
 		hw->CRTCEXT[3] |= 0x40;
 
-	if (DAC1064_init_2(PMINFO m, p)) return 1;
+	if (DAC1064_init_2(PMINFO m)) return 1;
 	return 0;
 }
 #endif	/* G100 */

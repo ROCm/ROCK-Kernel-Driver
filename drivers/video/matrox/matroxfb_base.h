@@ -2,7 +2,7 @@
  *
  * Hardware accelerated Matrox Millennium I, II, Mystique, G100, G200, G400 and G450
  *
- * (c) 1998,1999,2000,2001 Petr Vandrovec <vandrove@vc.cvut.cz>
+ * (c) 1998-2002 Petr Vandrovec <vandrove@vc.cvut.cz>
  *
  */
 #ifndef __MATROXFB_H__
@@ -670,7 +670,7 @@ struct matrox_switch {
 	void	(*reset)(WPMINFO2);
 	int	(*init)(WPMINFO struct my_timming*, struct display*);
 	void	(*restore)(WPMINFO struct display*);
-	int	(*selhwcursor)(WPMINFO struct display*);
+	int	(*selhwcursor)(WPMINFO2);
 };
 
 struct matroxfb_driver {
