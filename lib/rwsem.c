@@ -33,12 +33,13 @@ void rwsemtrace(struct rw_semaphore *sem, const char *str)
  *   - the 'waiting part' of the count (&0xffff0000) is negative (and will still be so)
  *   - there must be someone on the queue
  * - the spinlock must be held by the caller
- * - woken process blocks are discarded from the list after having flags zeroised
+ * - woken process blocks are discarded from the list after having task zeroed
  * - writers are only woken if wakewrite is non-zero
  */
 static inline struct rw_semaphore *__rwsem_do_wake(struct rw_semaphore *sem, int wakewrite)
 {
 	struct rwsem_waiter *waiter;
+	struct task_struct *tsk;
 	struct list_head *next;
 	signed long oldcount, woken, loop;
 
@@ -63,8 +64,11 @@ static inline struct rw_semaphore *__rwsem_do_wake(struct rw_semaphore *sem, int
 		goto readers_only;
 
 	list_del(&waiter->list);
-	waiter->flags = 0;
-	wake_up_process(waiter->task);
+	tsk = waiter->task;
+	mb();
+	waiter->task = NULL;
+	wake_up_process(tsk);
+	put_task_struct(tsk);
 	goto out;
 
 	/* don't want to wake any writers */
@@ -98,8 +102,11 @@ static inline struct rw_semaphore *__rwsem_do_wake(struct rw_semaphore *sem, int
 	for (; loop>0; loop--) {
 		waiter = list_entry(next,struct rwsem_waiter,list);
 		next = waiter->list.next;
-		waiter->flags = 0;
-		wake_up_process(waiter->task);
+		tsk = waiter->task;
+		mb();
+		waiter->task = NULL;
+		wake_up_process(tsk);
+		put_task_struct(tsk);
 	}
 
 	sem->wait_list.next = next;
@@ -131,6 +138,7 @@ static inline struct rw_semaphore *rwsem_down_failed_common(struct rw_semaphore 
 	/* set up my own style of waitqueue */
 	spin_lock(&sem->wait_lock);
 	waiter->task = tsk;
+	get_task_struct(tsk);
 
 	list_add_tail(&waiter->list,&sem->wait_list);
 
@@ -147,7 +155,7 @@ static inline struct rw_semaphore *rwsem_down_failed_common(struct rw_semaphore 
 
 	/* wait to be given the lock */
 	for (;;) {
-		if (!waiter->flags)
+		if (!waiter->task)
 			break;
 		schedule();
 		set_task_state(tsk, TASK_UNINTERRUPTIBLE);
