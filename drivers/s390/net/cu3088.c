@@ -1,5 +1,5 @@
 /*
- * $Id: cu3088.c,v 1.30 2003/08/28 11:14:11 cohuck Exp $
+ * $Id: cu3088.c,v 1.31 2003/09/29 15:24:27 cohuck Exp $
  *
  * CTC / LCS ccw_device driver
  *
@@ -55,8 +55,14 @@ static struct ccw_device_id cu3088_ids[] = {
 
 static struct ccw_driver cu3088_driver;
 
+static void
+cu3088_root_dev_release (struct device *dev)
+{
+}
+
 struct device cu3088_root_dev = {
 	.bus_id = "cu3088",
+	.release = cu3088_root_dev_release,
 };
 
 static ssize_t

@@ -43,6 +43,7 @@
 #include <asm/io.h>
 #include <asm/atomic.h>
 #include <asm/semaphore.h>
+#include <asm/timex.h>
 
 #include <asm/debug.h>
 #include <asm/qdio.h>
@@ -55,7 +56,7 @@
 #include "ioasm.h"
 #include "chsc.h"
 
-#define VERSION_QDIO_C "$Revision: 1.61 $"
+#define VERSION_QDIO_C "$Revision: 1.62 $"
 
 /****************** MODULE PARAMETER VARIABLES ********************/
 MODULE_AUTHOR("Utz Bacher <utz.bacher@de.ibm.com>");
@@ -112,10 +113,7 @@ qdio_min(int a,int b)
 static inline volatile __u64 
 qdio_get_micros(void)
 {
-        __u64 time;
-
-        asm volatile ("STCK %0" : "=m" (time));
-        return time>>12; /* time>>12 is microseconds*/
+        return (get_clock() >> 12); /* time>>12 is microseconds */
 }
 
 /* 

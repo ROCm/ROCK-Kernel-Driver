@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/chsc.c
  *   S/390 common I/O routines -- channel subsystem call
- *   $Revision: 1.77 $
+ *   $Revision: 1.78 $
  *
  *    Copyright (C) 1999-2002 IBM Deutschland Entwicklung GmbH,
  *			      IBM Corporation
@@ -843,6 +843,12 @@ chp_status_write(struct device *dev, const char *buf, size_t count)
 
 static DEVICE_ATTR(status, 0644, chp_status_show, chp_status_write);
 
+
+static void
+chp_release(struct device *dev)
+{
+}
+
 /*
  * Entries for chpids on the system bus.
  * This replaces /proc/chpids.
@@ -863,8 +869,10 @@ new_channel_path(int chpid, int status)
 	/* fill in status, etc. */
 	chp->id = chpid;
 	chp->state = status;
-	chp->dev.parent = &css_bus_device;
-
+	chp->dev = (struct device) {
+		.parent  = &css_bus_device,
+		.release = chp_release,
+	};
 	snprintf(chp->dev.bus_id, BUS_ID_SIZE, "chp0.%x", chpid);
 
 	/* make it known to the system */
