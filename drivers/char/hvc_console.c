@@ -102,7 +102,7 @@ static void hvc_close(struct tty_struct *tty, struct file * filp)
 	spin_unlock_irqrestore(&hp->lock, flags);
 }
 
-static void hvc_hangup(struct tty_struct *tty, struct file * filp)
+static void hvc_hangup(struct tty_struct *tty)
 {
 	struct hvc_struct *hp = tty->driver_data;
 
