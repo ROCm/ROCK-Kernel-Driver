@@ -26,7 +26,7 @@
 
 static int mce_disabled __initdata;
 /* 0: always panic, 1: panic if deadlock possible, 2: try to avoid panic */ 
-static int tolerant = 2;
+static int tolerant = 1;
 static int banks;
 static unsigned long bank[NR_BANKS] = { [0 ... NR_BANKS-1] = ~0UL };
 
