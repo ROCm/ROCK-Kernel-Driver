@@ -996,7 +996,7 @@ void __init mp_parse_prt (void)
 			continue;
 		}
 		if ((1<<bit) & mp_ioapic_routing[ioapic].pin_programmed[idx]) {
-			printk(KERN_DEBUG "Pin %d-%d already programmed\n",
+			Dprintk(KERN_DEBUG "Pin %d-%d already programmed\n",
 				mp_ioapic_routing[ioapic].apic_id, ioapic_pin);
  			if (use_pci_vector() && !platform_legacy_irq(irq))
  				irq = IO_APIC_VECTOR(irq);

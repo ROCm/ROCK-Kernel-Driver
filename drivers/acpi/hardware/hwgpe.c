@@ -528,6 +528,14 @@ acpi_hw_enable_non_wakeup_gpe_block (
 	/* Examine each GPE register within the block */
 
 	for (i = 0; i < gpe_block->register_count; i++) {
+		/* Clear the entire status register */
+
+		status = acpi_hw_low_level_write (8, 0xFF,
+				 &gpe_block->register_info[i].status_address);
+		if (ACPI_FAILURE (status)) {
+			return (status);
+		}
+
 		/*
 		 * We previously stored the enabled status of all GPEs.
 		 * Blast them back in.
