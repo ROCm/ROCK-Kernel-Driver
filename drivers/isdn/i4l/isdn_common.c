@@ -1267,10 +1267,9 @@ isdn_ctrl_ioctl(struct inode *inode, struct file *file, uint cmd, ulong arg)
 	int ret;
 	int i;
 	char *p;
-	char *s;
 	union iocpar {
 		char name[10];
-		char bname[22];
+		char bname[20];
 		isdn_ioctl_struct iocts;
 		isdn_net_ioctl_phone phone;
 		isdn_net_ioctl_cfg cfg;
@@ -1298,42 +1297,24 @@ isdn_ctrl_ioctl(struct inode *inode, struct file *file, uint cmd, ulong arg)
 #ifdef CONFIG_NETDEVICES
 	case IIOCNETAIF:
 		/* Add a network-interface */
-		if (arg) {
-			if (copy_from_user(name, (char *) arg, sizeof(name)))
-				return -EFAULT;
-			s = name;
-		} else {
-			s = NULL;
-		}
+		if (copy_from_user(name, (char *) arg, sizeof(name) - 1))
+			return -EFAULT;
+		name[sizeof(name)-1] = 0;
 		ret = down_interruptible(&dev->sem);
-		if( ret ) return ret;
-		if ((s = isdn_net_new(s, NULL))) {
-			if (copy_to_user((char *) arg, s, strlen(s) + 1)){
-				ret = -EFAULT;
-			} else {
-				ret = 0;
-			}
-		} else
-			ret = -ENODEV;
+		if (ret)
+			return ret;
+		ret = isdn_net_new(name, NULL);
 		up(&dev->sem);
 		return ret;
 	case IIOCNETASL:
 		/* Add a slave to a network-interface */
-		if (arg) {
-			if (copy_from_user(bname, (char *) arg, sizeof(bname) - 1))
-				return -EFAULT;
-		} else
-			return -EINVAL;
+		if (copy_from_user(bname, (char *) arg, sizeof(bname) - 1))
+			return -EFAULT;
+		bname[sizeof(bname)-1] = 0;
 		ret = down_interruptible(&dev->sem);
-		if( ret ) return ret;
-		if ((s = isdn_net_newslave(bname))) {
-			if (copy_to_user((char *) arg, s, strlen(s) + 1)){
-				ret = -EFAULT;
-			} else {
-				ret = 0;
-			}
-		} else
-			ret = -ENODEV;
+		if (ret)
+			return ret;
+		ret = isdn_net_newslave(bname);
 		up(&dev->sem);
 		return ret;
 	case IIOCNETDIF:

@@ -2579,26 +2579,24 @@ isdn_net_force_dial(char *name)
 /*
  * Allocate a new network-interface and initialize its data structures.
  */
-char *
+int
 isdn_net_new(char *name, struct net_device *master)
 {
+	int retval;
 	isdn_net_dev *netdev;
 
 	/* Avoid creating an existing interface */
 	if (isdn_net_findif(name)) {
 		printk(KERN_WARNING "isdn_net: interface %s already exists\n", name);
-		return NULL;
+		return -EEXIST;
 	}
-	if (!(netdev = (isdn_net_dev *) kmalloc(sizeof(isdn_net_dev), GFP_KERNEL))) {
+	if (!(netdev = kmalloc(sizeof(isdn_net_dev), GFP_KERNEL))) {
 		printk(KERN_WARNING "isdn_net: Could not allocate net-device\n");
-		return NULL;
+		return -ENOMEM;
 	}
 	memset(netdev, 0, sizeof(isdn_net_dev));
-	if (name == NULL)
-		strcpy(netdev->local.name, "         ");
-	else
-		strcpy(netdev->local.name, name);
-	strcpy(netdev->dev.name, netdev->local.name);
+	strcpy(netdev->local.name, name);
+	strcpy(netdev->dev.name, name);
 	netdev->dev.priv = &netdev->local;
 	netdev->dev.init = isdn_net_init;
 	netdev->local.p_encap = ISDN_NET_ENCAP_RAWIP;
@@ -2621,10 +2619,11 @@ isdn_net_new(char *name, struct net_device *master)
 		 */
 		netdev->dev.tx_timeout = isdn_net_tx_timeout;
 		netdev->dev.watchdog_timeo = ISDN_NET_TX_TIMEOUT;
-		if (register_netdev(&netdev->dev) != 0) {
+		retval = register_netdev(&netdev->dev);
+		if (retval) {
 			printk(KERN_WARNING "isdn_net: Could not register net-device\n");
 			kfree(netdev);
-			return NULL;
+			return retval;
 		}
 	}
 	netdev->local.magic = ISDN_NET_MAGIC;
@@ -2665,34 +2664,31 @@ isdn_net_new(char *name, struct net_device *master)
 
 	/* Put into to netdev-chain */
 	list_add(&netdev->global_list, &isdn_net_devs);
-	return netdev->dev.name;
+	return 0;
 }
 
-char *
+int
 isdn_net_newslave(char *parm)
 {
 	char *p = strchr(parm, ',');
-	isdn_net_dev *n;
-	char newname[10];
+	isdn_net_dev *m;
 
-	if (p) {
-		/* Slave-Name MUST not be empty */
-		if (!strlen(p + 1))
-			return NULL;
-		strcpy(newname, p + 1);
-		*p = 0;
-		/* Master must already exist */
-		if (!(n = isdn_net_findif(parm)))
-			return NULL;
-		/* Master must be a real interface, not a slave */
-		if (n->local.master)
-			return NULL;
-		/* Master must not be started yet */
-		if (isdn_net_device_started(n)) 
-			return NULL;
-		return (isdn_net_new(newname, &(n->dev)));
-	}
-	return NULL;
+	/* Slave-Name MUST not be empty */
+	if (!p || !p[1])
+		return -EINVAL;
+
+	*p = 0;
+	/* Master must already exist */
+	if (!(m = isdn_net_findif(parm)))
+		return -ESRCH;
+	/* Master must be a real interface, not a slave */
+	if (m->local.master)
+		return -ENXIO;
+	/* Master must not be started yet */
+	if (isdn_net_device_started(m)) 
+		return -EBUSY;
+
+	return isdn_net_new(p+1, &m->dev);
 }
 
 /*
