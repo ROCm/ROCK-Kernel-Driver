@@ -117,25 +117,27 @@ void do_page_cache_readahead(struct file *file,
 	/*
 	 * Preallocate as many pages as we will need.
 	 */
+	read_lock(&mapping->page_lock);
 	for (page_idx = 0; page_idx < nr_to_read; page_idx++) {
 		unsigned long page_offset = offset + page_idx;
 		
 		if (page_offset > end_index)
 			break;
 
-		read_lock(&mapping->page_lock);
 		page = radix_tree_lookup(&mapping->page_tree, page_offset);
-		read_unlock(&mapping->page_lock);
 		if (page)
 			continue;
 
+		read_unlock(&mapping->page_lock);
 		page = page_cache_alloc(mapping);
+		read_lock(&mapping->page_lock);
 		if (!page)
 			break;
 		page->index = page_offset;
 		list_add(&page->list, &page_pool);
 		nr_to_really_read++;
 	}
+	read_unlock(&mapping->page_lock);
 
 	/*
 	 * Now start the IO.  We ignore I/O errors - if the page is not
