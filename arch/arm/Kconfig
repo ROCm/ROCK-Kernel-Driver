@@ -796,8 +796,8 @@ config DEBUG_S3C2410_PORT
 	  before it is used.
 
 config DEBUG_S3C2410_UART
-	int
 	depends on DEBUG_LL && ARCH_S3C2410
+	int "S3C2410 UART to use for low-level debug"
 	default "0"
 	help
 	  Choice for UART for kernel low-level using S3C2410 UARTS,
