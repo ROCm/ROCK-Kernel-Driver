@@ -42,10 +42,6 @@ struct i2c_force_data {
 /* A structure containing the detect information.
    normal_i2c: filled in by the module writer. Terminated by I2C_CLIENT_ISA_END.
      A list of I2C addresses which should normally be examined.
-   normal_i2c_range: filled in by the module writer. Terminated by 
-     I2C_CLIENT_ISA_END
-     A list of pairs of I2C addresses, each pair being an inclusive range of
-     addresses which should normally be examined.
    normal_isa: filled in by the module writer. Terminated by SENSORS_ISA_END.
      A list of ISA addresses which should normally be examined.
    probe: insmod parameter. Initialize this list with I2C_CLIENT_ISA_END values.
@@ -62,7 +58,6 @@ struct i2c_force_data {
 */
 struct i2c_address_data {
 	unsigned short *normal_i2c;
-	unsigned short *normal_i2c_range;
 	unsigned int *normal_isa;
 	unsigned short *probe;
 	unsigned short *ignore;
@@ -83,7 +78,6 @@ struct i2c_address_data {
                       "List of adapter,address pairs not to scan"); \
 	static struct i2c_address_data addr_data = {			\
 			.normal_i2c =		normal_i2c,		\
-			.normal_i2c_range =	normal_i2c_range,	\
 			.normal_isa =		normal_isa,		\
 			.probe =		probe,			\
 			.ignore =		ignore,			\

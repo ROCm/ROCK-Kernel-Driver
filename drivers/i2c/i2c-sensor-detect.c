@@ -45,7 +45,6 @@ int i2c_detect(struct i2c_adapter *adapter,
 	int adapter_id =
 	    is_isa ? ANY_I2C_ISA_BUS : i2c_adapter_id(adapter);
 	unsigned short *normal_i2c;
-	unsigned short *normal_i2c_range;
 	unsigned int *normal_isa;
 	unsigned short *probe;
 	unsigned short *ignore;
@@ -56,12 +55,10 @@ int i2c_detect(struct i2c_adapter *adapter,
 		return -1;
 	
 	/* Use default "empty" list if the adapter doesn't specify any */
-	normal_i2c = normal_i2c_range = probe = ignore = empty;
+	normal_i2c = probe = ignore = empty;
 	normal_isa = empty_isa;
 	if (address_data->normal_i2c)
 		normal_i2c = address_data->normal_i2c;
-	if (address_data->normal_i2c_range)
-		normal_i2c_range = address_data->normal_i2c_range;
 	if (address_data->normal_isa)
 		normal_isa = address_data->normal_isa;
 	if (address_data->probe)
@@ -119,13 +116,6 @@ int i2c_detect(struct i2c_adapter *adapter,
 				if (addr == normal_i2c[i]) {
 					found = 1;
 					dev_dbg(&adapter->dev, "found normal i2c entry for adapter %d, addr %02x", adapter_id, addr);
-				}
-			}
-			for (i = 0; !found && (normal_i2c_range[i] != I2C_CLIENT_END); i += 2) {
-				if ((addr >= normal_i2c_range[i]) &&
-				    (addr <= normal_i2c_range[i + 1])) {
-					dev_dbg(&adapter->dev, "found normal i2c_range entry for adapter %d, addr %04x\n", adapter_id, addr);
-					found = 1;
 				}
 			}
 		}
