@@ -35,6 +35,10 @@ SECTIONS
 			*(.initcall6.init)
 			*(.initcall7.init)
 		__initcall_end = .;
+		. = ALIGN(32);
+		__initramfs_start = .;
+			*(.init.initramfs)
+		__initramfs_end = .;
 		. = ALIGN(4096);
 		__init_end = .;
 	}
