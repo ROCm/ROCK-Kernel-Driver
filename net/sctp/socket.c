@@ -1171,8 +1171,8 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 					= sinit->sinit_max_attempts;
 			}
 			if (sinit->sinit_max_init_timeo) {
-				asoc->max_init_timeo
-					= sinit->sinit_max_init_timeo * HZ;
+				asoc->max_init_timeo = 
+				 MSECS_TO_JIFFIES(sinit->sinit_max_init_timeo);
 			}
 		}
 
@@ -1610,7 +1610,8 @@ static int sctp_setsockopt_peer_addr_params(struct sock *sk,
 	 */
 		if (params.spp_hbinterval) {
 			trans->hb_allowed = 1;
-			trans->hb_interval = params.spp_hbinterval * HZ / 1000;
+			trans->hb_interval = 
+				MSECS_TO_JIFFIES(params.spp_hbinterval);
 		} else
 			trans->hb_allowed = 0;
 	}
@@ -1769,11 +1770,12 @@ static int sctp_setsockopt_rtoinfo(struct sock *sk, char *optval, int optlen) {
 
 	if (asoc) {
 		if (rtoinfo.srto_initial != 0)
-			asoc->rto_initial = rtoinfo.srto_initial * HZ / 1000;
+			asoc->rto_initial = 
+				MSECS_TO_JIFFIES(rtoinfo.srto_initial);
 		if (rtoinfo.srto_max != 0)
-			asoc->rto_max = rtoinfo.srto_max * HZ / 1000;
+			asoc->rto_max = MSECS_TO_JIFFIES(rtoinfo.srto_max);
 		if (rtoinfo.srto_min != 0)
-			asoc->rto_min = rtoinfo.srto_min * HZ / 1000;
+			asoc->rto_min = MSECS_TO_JIFFIES(rtoinfo.srto_min);
 	} else {
 		/* If there is no association or the association-id = 0
 		 * set the values to the endpoint.
@@ -2297,14 +2299,14 @@ SCTP_STATIC int sctp_init_sock(struct sock *sk)
 	sp->initmsg.sinit_num_ostreams   = sctp_max_outstreams;
 	sp->initmsg.sinit_max_instreams  = sctp_max_instreams;
 	sp->initmsg.sinit_max_attempts   = sctp_max_retrans_init;
-	sp->initmsg.sinit_max_init_timeo = (sctp_rto_max / HZ) * 1000;
+	sp->initmsg.sinit_max_init_timeo = JIFFIES_TO_MSECS(sctp_rto_max);
 
 	/* Initialize default RTO related parameters.  These parameters can
 	 * be modified for with the SCTP_RTOINFO socket option.
 	 */
-	sp->rtoinfo.srto_initial = (sctp_rto_initial / HZ) * 1000;
-	sp->rtoinfo.srto_max     = (sctp_rto_max / HZ) * 1000;
-	sp->rtoinfo.srto_min     = (sctp_rto_min / HZ) * 1000;
+	sp->rtoinfo.srto_initial = JIFFIES_TO_MSECS(sctp_rto_initial);
+	sp->rtoinfo.srto_max     = JIFFIES_TO_MSECS(sctp_rto_max);
+	sp->rtoinfo.srto_min     = JIFFIES_TO_MSECS(sctp_rto_min);
 
 	/* Initialize default association related parameters. These parameters
 	 * can be modified with the SCTP_ASSOCINFO socket option.
@@ -2313,8 +2315,8 @@ SCTP_STATIC int sctp_init_sock(struct sock *sk)
 	sp->assocparams.sasoc_number_peer_destinations = 0;
 	sp->assocparams.sasoc_peer_rwnd = 0;
 	sp->assocparams.sasoc_local_rwnd = 0;
-	sp->assocparams.sasoc_cookie_life = (sctp_valid_cookie_life / HZ)
-					* 1000;
+	sp->assocparams.sasoc_cookie_life = 
+		JIFFIES_TO_MSECS(sctp_valid_cookie_life);
 
 	/* Initialize default event subscriptions. By default, all the
 	 * options are off. 
@@ -2324,7 +2326,7 @@ SCTP_STATIC int sctp_init_sock(struct sock *sk)
 	/* Default Peer Address Parameters.  These defaults can
 	 * be modified via SCTP_PEER_ADDR_PARAMS
 	 */
-	sp->paddrparam.spp_hbinterval = (sctp_hb_interval / HZ) * 1000;
+	sp->paddrparam.spp_hbinterval = JIFFIES_TO_MSECS(sctp_hb_interval);
 	sp->paddrparam.spp_pathmaxrxt = sctp_max_retrans_path;
 
 	/* If enabled no SCTP message fragmentation will be performed.
@@ -2474,7 +2476,7 @@ static int sctp_getsockopt_sctp_status(struct sock *sk, int len, char *optval,
 	status.sstat_primary.spinfo_state = transport->active;
 	status.sstat_primary.spinfo_cwnd = transport->cwnd;
 	status.sstat_primary.spinfo_srtt = transport->srtt;
-	status.sstat_primary.spinfo_rto = (transport->rto / HZ) * 1000;
+	status.sstat_primary.spinfo_rto = JIFFIES_TO_MSECS(transport->rto);
 	status.sstat_primary.spinfo_mtu = transport->pmtu;
 
 	if (put_user(len, optlen)) {
@@ -2529,7 +2531,7 @@ static int sctp_getsockopt_peer_addr_info(struct sock *sk, int len,
 	pinfo.spinfo_state = transport->active;
 	pinfo.spinfo_cwnd = transport->cwnd;
 	pinfo.spinfo_srtt = transport->srtt;
-	pinfo.spinfo_rto = (transport->rto / HZ) * 1000;
+	pinfo.spinfo_rto = JIFFIES_TO_MSECS(transport->rto);
 	pinfo.spinfo_mtu = transport->pmtu;
 
 	if (put_user(len, optlen)) {
@@ -2733,7 +2735,7 @@ static int sctp_getsockopt_peer_addr_params(struct sock *sk, int len,
 	if (!trans->hb_allowed)
 		params.spp_hbinterval = 0;
 	else
-		params.spp_hbinterval = trans->hb_interval * 1000 / HZ;
+		params.spp_hbinterval = JIFFIES_TO_MSECS(trans->hb_interval);
 
 	/* spp_pathmaxrxt contains the maximum number of retransmissions
 	 * before this address shall be considered unreachable.
@@ -3084,9 +3086,9 @@ static int sctp_getsockopt_rtoinfo(struct sock *sk, int len, char *optval,
 
 	/* Values corresponding to the specific association. */
 	if (asoc) {
-		rtoinfo.srto_initial = (asoc->rto_initial / HZ) * 1000;
-		rtoinfo.srto_max = (asoc->rto_max / HZ) * 1000;
-		rtoinfo.srto_min = (asoc->rto_min / HZ) * 1000;
+		rtoinfo.srto_initial = JIFFIES_TO_MSECS(asoc->rto_initial);
+		rtoinfo.srto_max = JIFFIES_TO_MSECS(asoc->rto_max);
+		rtoinfo.srto_min = JIFFIES_TO_MSECS(asoc->rto_min);
 	} else {
 		/* Values corresponding to the endpoint. */
 		struct sctp_opt *sp = sctp_sk(sk);
