@@ -28,7 +28,7 @@ subdir-$(CONFIG_ZLIB_DEFLATE) += zlib_deflate
 obj-y += $(join $(subdir-y),$(subdir-y:%=/%.o))
 
 include $(TOPDIR)/drivers/net/Makefile.lib
-include $(TOPDIR)/drivers/usb/Makefile.lib
+include $(TOPDIR)/drivers/usb/class/Makefile.lib
 include $(TOPDIR)/fs/Makefile.lib
 
 include $(TOPDIR)/Rules.make
