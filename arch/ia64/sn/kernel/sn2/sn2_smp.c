@@ -46,15 +46,14 @@ static unsigned long sn2_ptc_deadlock_count;
 
 static inline unsigned long wait_piowc(void)
 {
-	volatile unsigned long *piows;
+	volatile unsigned long *piows, piows_val;
 	unsigned long ws;
 
 	piows = pda->pio_write_status_addr;
+	piows_val = pda->pio_write_status_val;
 	do {
-		ia64_mfa();
-	} while (((ws =
-		   *piows) & SH_PIO_WRITE_STATUS_0_PENDING_WRITE_COUNT_MASK) !=
-		 SH_PIO_WRITE_STATUS_0_PENDING_WRITE_COUNT_MASK);
+		cpu_relax();
+	} while (((ws = *piows) & SH_PIO_WRITE_STATUS_PENDING_WRITE_COUNT_MASK) != piows_val);
 	return ws;
 }
 
@@ -129,20 +128,20 @@ sn2_global_tlb_purge(unsigned long start, unsigned long end,
 	     cnode = find_next_bit(&nodes_flushed, NR_NODES, ++cnode))
 		nasids[nix++] = cnodeid_to_nasid(cnode);
 
-	data0 = (1UL << SH_PTC_0_A_SHFT) |
-	    (nbits << SH_PTC_0_PS_SHFT) |
-	    ((ia64_get_rr(start) >> 8) << SH_PTC_0_RID_SHFT) |
-	    (1UL << SH_PTC_0_START_SHFT);
+	data0 = (1UL << SH1_PTC_0_A_SHFT) |
+	    (nbits << SH1_PTC_0_PS_SHFT) |
+	    ((ia64_get_rr(start) >> 8) << SH1_PTC_0_RID_SHFT) |
+	    (1UL << SH1_PTC_0_START_SHFT);
 
-	ptc0 = (long *)GLOBAL_MMR_PHYS_ADDR(0, SH_PTC_0);
-	ptc1 = (long *)GLOBAL_MMR_PHYS_ADDR(0, SH_PTC_1);
+	ptc0 = (long *)GLOBAL_MMR_PHYS_ADDR(0, SH1_PTC_0);
+	ptc1 = (long *)GLOBAL_MMR_PHYS_ADDR(0, SH1_PTC_1);
 
 	mynasid = get_nasid();
 
 	spin_lock_irqsave(&sn2_global_ptc_lock, flags);
 
 	do {
-		data1 = start | (1UL << SH_PTC_1_START_SHFT);
+		data1 = start | (1UL << SH1_PTC_1_START_SHFT);
 		for (i = 0; i < nix; i++) {
 			nasid = nasids[i];
 			if (likely(nasid == mynasid)) {
@@ -159,7 +158,7 @@ sn2_global_tlb_purge(unsigned long start, unsigned long end,
 
 		if (flushed
 		    && (wait_piowc() &
-			SH_PIO_WRITE_STATUS_0_WRITE_DEADLOCK_MASK)) {
+			SH_PIO_WRITE_STATUS_WRITE_DEADLOCK_MASK)) {
 			sn2_ptc_deadlock_recovery(data0, data1);
 		}
 
@@ -188,8 +187,8 @@ void sn2_ptc_deadlock_recovery(unsigned long data0, unsigned long data1)
 
 	sn2_ptc_deadlock_count++;
 
-	ptc0 = (long *)GLOBAL_MMR_PHYS_ADDR(0, SH_PTC_0);
-	ptc1 = (long *)GLOBAL_MMR_PHYS_ADDR(0, SH_PTC_1);
+	ptc0 = (long *)GLOBAL_MMR_PHYS_ADDR(0, SH1_PTC_0);
+	ptc1 = (long *)GLOBAL_MMR_PHYS_ADDR(0, SH1_PTC_1);
 	piows = (long *)pda->pio_write_status_addr;
 
 	mycnode = numa_node_id();

@@ -42,8 +42,7 @@ void *sn_io_addr(unsigned long port)
 		 */
 		if ((port >= 0x1f0 && port <= 0x1f7) ||
 		    port == 0x3f6 || port == 0x3f7) {
-			io_base = (0xc000000fcc000000UL |
-				   ((unsigned long)get_nasid() << 38));
+			io_base = GLOBAL_MMR_ADDR(get_nasid(), 0xfcc000000UL);
 			addr = io_base | ((port >> 2) << 12) | (port & 0xfff);
 		} else {
 			addr = __ia64_get_io_port_base() | ((port >> 2) << 2);
@@ -66,9 +65,10 @@ EXPORT_SYMBOL(sn_io_addr);
  */
 void __sn_mmiowb(void)
 {
-	while ((((volatile unsigned long)(*pda->pio_write_status_addr)) &
-		SH_PIO_WRITE_STATUS_0_PENDING_WRITE_COUNT_MASK) !=
-	       SH_PIO_WRITE_STATUS_0_PENDING_WRITE_COUNT_MASK)
+	volatile unsigned long *adr = pda->pio_write_status_addr;
+	unsigned long val = pda->pio_write_status_val;
+
+	while ((*adr & SH_PIO_WRITE_STATUS_PENDING_WRITE_COUNT_MASK) != val)
 		cpu_relax();
 }
 

@@ -15,7 +15,6 @@
 #include <asm/hw_irq.h>
 #include <asm/system.h>
 
-#include "shub.h"
 #include <asm/sn/leds.h>
 #include <asm/sn/shub_mmr.h>
 #include <asm/sn/clksupport.h>
