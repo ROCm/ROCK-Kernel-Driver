@@ -1524,11 +1524,10 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	vol->nls_map = NULL;
 
 	/*
-	 * Default is group and other don't have write/execute access to files
-	 * and write access to directories.
+	 * Default is group and other don't have any access to files or
+	 * directories while owner has full access.
 	 */
-	vol->fmask = 0033;
-	vol->dmask = 0022;
+	vol->fmask = vol->dmask = 0077;
 
 	/*
 	 * Default is to show long file names (including POSIX file names), and

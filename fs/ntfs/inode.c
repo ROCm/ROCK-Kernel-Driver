@@ -759,15 +759,13 @@ skip_large_dir_stuff:
 				le32_to_cpu(ctx->attr->_ARA(value_length));
 		}
 no_data_attr_special_case:
-		/* Everyone gets read permissions. */
-		vi->i_mode |= S_IRUGO;
-		/* If not read-only, set write permissions. */
-		if (!IS_RDONLY(vi))
-			vi->i_mode |= S_IWUGO;
+		/* Everyone gets all permissions. */
+		vi->i_mode |= S_IRWXUGO;
+		/* If read-only, noone gets write permissions. */
+		if (IS_RDONLY(vi))
+			vi->i_mode &= ~S_IWUGO;
 		/* Apply the file permissions mask set in the mount options. */
 		vi->i_mode &= ~vol->fmask;
-		// FIXME: Encrypted files should probably get their rw bits
-		// taken away here.
 		/* Setup the operations for this inode. */
 		vi->i_op = &ntfs_file_inode_ops;
 		vi->i_fop = &ntfs_file_ops;

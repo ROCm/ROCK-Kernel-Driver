@@ -35,8 +35,13 @@ uid=
 gid=
 umask=			Provide default owner, group, and access mode mask.
 			These options work as documented in mount(8). By
-			default, the files are owned by root and are not
-			readable by anyone else.
+			default, the files/directories are owned by root and
+			he/she has read, write, and execute permissions. No one
+			else has any access permissions. I.e. the mode on all
+			files and directories is by default rwx------, a
+			consequence of the default umask=0077. Using a
+			umask of zero will grant all permissions to everyone,
+			i.e. all files and directories will have mode rwxrwxrwx.
 
 fmask=
 dmask=			Instead of specifying umask which applies both to
