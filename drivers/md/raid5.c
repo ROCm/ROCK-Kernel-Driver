@@ -1386,16 +1386,13 @@ static void raid5syncd (void *data)
 
 	if (!conf->resync_parity)
 		return;
-	if (conf->resync_parity == 2)
+	if (mddev->recovery_running != 2)
 		return;
-	down(&mddev->recovery_sem);
 	if (md_do_sync(mddev,NULL)) {
-		up(&mddev->recovery_sem);
 		printk("raid5: resync aborted!\n");
 		return;
 	}
 	conf->resync_parity = 0;
-	up(&mddev->recovery_sem);
 	printk("raid5: resync finished.\n");
 }
 
@@ -1615,6 +1612,7 @@ static int run (mddev_t *mddev)
 
 		printk("raid5: raid set md%d not clean; reconstructing parity\n", mdidx(mddev));
 		conf->resync_parity = 1;
+		mddev->recovery_running = 2;
 		md_wakeup_thread(conf->resync_thread);
 	}
 
@@ -1646,7 +1644,6 @@ static int stop_resync (mddev_t *mddev)
 
 	if (thread) {
 		if (conf->resync_parity) {
-			conf->resync_parity = 2;
 			md_interrupt_thread(thread);
 			printk(KERN_INFO "raid5: parity resync was not fully finished, restarting next time.\n");
 			return 1;
@@ -1666,7 +1663,7 @@ static int restart_resync (mddev_t *mddev)
 			return 0;
 		}
 		printk("raid5: waking up raid5resync.\n");
-		conf->resync_parity = 1;
+		mddev->recovery_running = 2;
 		md_wakeup_thread(conf->resync_thread);
 		return 1;
 	} else

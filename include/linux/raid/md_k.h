@@ -184,10 +184,14 @@ struct mddev_s
 	unsigned long			curr_resync;	/* blocks scheduled */
 	unsigned long			resync_mark;	/* a recent timestamp */
 	unsigned long			resync_mark_cnt;/* blocks written at resync_mark */
+	/* recovery_running is 0 for no recovery/resync,
+	 * 1 for active recovery
+	 * 2 for active resync
+	 * -error for an error (e.g. -EINTR)
+	 * it can only be set > 0 under reconfig_sem
+	 */
 	int				recovery_running;
 	struct semaphore		reconfig_sem;
-	struct semaphore		recovery_sem;
-	struct semaphore		resync_sem;
 	atomic_t			active;
 
 	atomic_t			recovery_active; /* blocks scheduled, but not written */

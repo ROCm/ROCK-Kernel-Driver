@@ -1125,9 +1125,8 @@ static void raid1syncd(void *data)
 
 	if (!conf->resync_mirrors)
 		return;
-	if (conf->resync_mirrors == 2)
+	if (mddev->recovery_running != 2)
 		return;
-	down(&mddev->recovery_sem);
 	if (!md_do_sync(mddev, NULL)) {
 		/*
 		 * Only if everything went Ok.
@@ -1137,7 +1136,6 @@ static void raid1syncd(void *data)
 
 	close_sync(conf);
 
-	up(&mddev->recovery_sem);
 }
 
 static int init_resync(conf_t *conf)
@@ -1477,6 +1475,7 @@ static int run(mddev_t *mddev)
 
 		printk(START_RESYNC, mdidx(mddev));
 		conf->resync_mirrors = 1;
+		mddev->recovery_running = 2;
 		md_wakeup_thread(conf->resync_thread);
 	}
 
@@ -1524,7 +1523,6 @@ static int stop_resync(mddev_t *mddev)
 
 	if (conf->resync_thread) {
 		if (conf->resync_mirrors) {
-			conf->resync_mirrors = 2;
 			md_interrupt_thread(conf->resync_thread);
 
 			printk(KERN_INFO "raid1: mirror resync was not fully finished, restarting next time.\n");
@@ -1544,7 +1542,7 @@ static int restart_resync(mddev_t *mddev)
 			MD_BUG();
 			return 0;
 		}
-		conf->resync_mirrors = 1;
+		mddev->recovery_running = 2;
 		md_wakeup_thread(conf->resync_thread);
 		return 1;
 	}

@@ -171,8 +171,6 @@ static mddev_t * mddev_find(int unit)
 
 	mddev->__minor = unit;
 	init_MUTEX(&mddev->reconfig_sem);
-	init_MUTEX(&mddev->recovery_sem);
-	init_MUTEX(&mddev->resync_sem);
 	INIT_LIST_HEAD(&mddev->disks);
 	INIT_LIST_HEAD(&mddev->all_mddevs);
 	atomic_set(&mddev->active, 1);
@@ -647,15 +645,6 @@ static void free_mddev(mddev_t *mddev)
 	export_array(mddev);
 	md_size[mdidx(mddev)] = 0;
 	md_hd_struct[mdidx(mddev)].nr_sects = 0;
-
-	/*
-	 * Make sure nobody else is using this mddev
-	 * (careful, we rely on the global kernel lock here)
-	 */
-	while (atomic_read(&mddev->resync_sem.count) != 1)
-		schedule();
-	while (atomic_read(&mddev->recovery_sem.count) != 1)
-		schedule();
 }
 
 #undef BAD_CSUM
@@ -1682,6 +1671,8 @@ out:
 #define	STILL_IN_USE \
 "md: md%d still in use.\n"
 
+DECLARE_WAIT_QUEUE_HEAD(resync_wait);
+
 static int do_md_stop(mddev_t * mddev, int ro)
 {
 	int err = 0, resync_interrupted = 0;
@@ -1703,7 +1694,7 @@ static int do_md_stop(mddev_t * mddev, int ro)
 			if (mddev->pers->stop_resync(mddev))
 				resync_interrupted = 1;
 
-		if (mddev->recovery_running)
+		if (mddev->recovery_running==1)
 			md_interrupt_thread(md_recovery_thread);
 
 		/*
@@ -1712,8 +1703,8 @@ static int do_md_stop(mddev_t * mddev, int ro)
 		 * hangs the process if some reconstruction has not
 		 * finished.
 		 */
-		down(&mddev->recovery_sem);
-		up(&mddev->recovery_sem);
+
+		wait_event(resync_wait, mddev->recovery_running <= 0);
 
 		invalidate_device(dev, 1);
 
@@ -2900,7 +2891,7 @@ int md_error(mddev_t *mddev, struct block_device *bdev)
 	 */
 	if (mddev->pers->stop_resync)
 		mddev->pers->stop_resync(mddev);
-	if (mddev->recovery_running)
+	if (mddev->recovery_running==1)
 		md_interrupt_thread(md_recovery_thread);
 	md_recover_arrays();
 
@@ -2959,7 +2950,7 @@ static int status_resync(char * page, mddev_t * mddev)
 			sz += sprintf(page + sz, ".");
 		sz += sprintf(page + sz, "] ");
 	}
-	if (!mddev->recovery_running)
+	if (mddev->recovery_running==2)
 		/*
 		 * true resync
 		 */
@@ -3048,7 +3039,7 @@ static int md_status_read_proc(char *page, char **start, off_t off,
 		if (mddev->curr_resync) {
 			sz += status_resync (page+sz, mddev);
 		} else {
-			if (atomic_read(&mddev->resync_sem.count) != 1)
+			if (mddev->recovery_running < 0)
 				sz += sprintf(page + sz, "	resync=DELAYED");
 		}
 		sz += sprintf(page + sz, "\n");
@@ -3153,8 +3144,6 @@ static int is_mddev_idle(mddev_t *mddev)
 	return idle;
 }
 
-DECLARE_WAIT_QUEUE_HEAD(resync_wait);
-
 void md_done_sync(mddev_t *mddev, int blocks, int ok)
 {
 	/* another "blocks" (512byte) blocks have been synced */
@@ -3178,10 +3167,6 @@ int md_do_sync(mddev_t *mddev, mdp_disk_t *spare)
 	struct list_head *tmp;
 	unsigned long last_check;
 
-
-	err = down_interruptible(&mddev->resync_sem);
-	if (err)
-		goto out_nolock;
 
 recheck:
 	serialize = 0;
@@ -3305,9 +3290,8 @@ recheck:
 	 */
 out:
 	wait_event(mddev->recovery_wait, !atomic_read(&mddev->recovery_active));
-	up(&mddev->resync_sem);
-out_nolock:
 	mddev->curr_resync = 0;
+	mddev->recovery_running = err;
 	wake_up(&resync_wait);
 	return err;
 }
@@ -3356,7 +3340,6 @@ void md_do_recovery(void *data)
 			goto unlock;
 		if (mddev->pers->diskop(mddev, &spare, DISKOP_SPARE_WRITE))
 			goto unlock;
-		down(&mddev->recovery_sem);
 		mddev->recovery_running = 1;
 		mddev_unlock(mddev);
 		err = md_do_sync(mddev, spare);
@@ -3384,12 +3367,7 @@ void md_do_recovery(void *data)
 			 */
 			mddev->pers->diskop(mddev, &spare,
 							 DISKOP_SPARE_INACTIVE);
-			up(&mddev->recovery_sem);
-			mddev->recovery_running = 0;
 			goto unlock;
-		} else {
-			mddev->recovery_running = 0;
-			up(&mddev->recovery_sem);
 		}
 		if (!disk_faulty(spare)) {
 			/*
@@ -3404,6 +3382,7 @@ void md_do_recovery(void *data)
 		}
 		mddev->sb_dirty = 1;
 		md_update_sb(mddev);
+		mddev->recovery_running = 0;
 	unlock:
 		mddev_unlock(mddev);
 	}
