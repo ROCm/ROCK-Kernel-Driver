@@ -3356,9 +3356,9 @@ do { \
 /*
  * Default EEPROM Configuration structure defined in a_init.c.
  */
-extern ADVEEP_3550_CONFIG Default_3550_EEPROM_Config;
-extern ADVEEP_38C0800_CONFIG Default_38C0800_EEPROM_Config;
-extern ADVEEP_38C1600_CONFIG Default_38C1600_EEPROM_Config;
+static ADVEEP_3550_CONFIG Default_3550_EEPROM_Config;
+static ADVEEP_38C0800_CONFIG Default_38C0800_EEPROM_Config;
+static ADVEEP_38C1600_CONFIG Default_38C1600_EEPROM_Config;
 
 /*
  * DvcGetPhyAddr() flag arguments
