@@ -651,6 +651,8 @@ fst_intr_rx ( struct fst_card_info *card, struct fst_port_info *port )
         int rxp;
         unsigned short len;
         struct sk_buff *skb;
+	struct net_device *dev = port_to_dev(port);
+	struct net_device_stats *stats = &dev_to_hdlc(dev)->stats;
         int i;
 
 
@@ -678,24 +680,24 @@ fst_intr_rx ( struct fst_card_info *card, struct fst_port_info *port )
                                         len );
         if ( dmabits != ( RX_STP | RX_ENP ) || len > LEN_RX_BUFFER - 2 )
         {
-                port->hdlc.stats.rx_errors++;
+                stats->rx_errors++;
 
                 /* Update error stats and discard buffer */
                 if ( dmabits & RX_OFLO )
                 {
-                        port->hdlc.stats.rx_fifo_errors++;
+                        stats->rx_fifo_errors++;
                 }
                 if ( dmabits & RX_CRC )
                 {
-                        port->hdlc.stats.rx_crc_errors++;
+                        stats->rx_crc_errors++;
                 }
                 if ( dmabits & RX_FRAM )
                 {
-                        port->hdlc.stats.rx_frame_errors++;
+                        stats->rx_frame_errors++;
                 }
                 if ( dmabits == ( RX_STP | RX_ENP ))
                 {
-                        port->hdlc.stats.rx_length_errors++;
+                        stats->rx_length_errors++;
                 }
 
                 /* Discard buffer descriptors until we see the end of packet
@@ -732,7 +734,7 @@ fst_intr_rx ( struct fst_card_info *card, struct fst_port_info *port )
         {
                 dbg ( DBG_RX,"intr_rx: can't allocate buffer\n");
 
-                port->hdlc.stats.rx_dropped++;
+                stats->rx_dropped++;
 
                 /* Return descriptor to card */
                 FST_WRB ( card, rxDescrRing[pi][rxp].bits, DMA_OWN );
@@ -756,16 +758,16 @@ fst_intr_rx ( struct fst_card_info *card, struct fst_port_info *port )
                 port->rxpos = rxp;
 
         /* Update stats */
-        port->hdlc.stats.rx_packets++;
-        port->hdlc.stats.rx_bytes += len;
+        stats->rx_packets++;
+        stats->rx_bytes += len;
 
         /* Push upstream */
         skb->mac.raw = skb->data;
-        skb->dev = hdlc_to_dev ( &port->hdlc );
+        skb->dev = dev;
         skb->protocol = hdlc_type_trans(skb, skb->dev);
         netif_rx ( skb );
 
-        port_to_dev ( port )->last_rx = jiffies;
+        dev->last_rx = jiffies;
 }
 
 
@@ -835,8 +837,8 @@ fst_intr ( int irq, void *dev_id, struct pt_regs *regs )
                          * always load up the entire packet for DMA.
                          */
                         dbg ( DBG_TX,"Tx underflow port %d\n", event & 0x03 );
-                        port->hdlc.stats.tx_errors++;
-                        port->hdlc.stats.tx_fifo_errors++;
+                        dev_to_hdlc(port_to_dev(port))->stats.tx_errors++;
+                        dev_to_hdlc(port_to_dev(port))->stats.tx_fifo_errors++;
                         break;
 
                 case INIT_CPLT:
@@ -1344,13 +1346,14 @@ static void
 fst_tx_timeout ( struct net_device *dev )
 {
         struct fst_port_info *port;
+	struct net_device_stats *stats = &dev_to_hdlc(dev)->stats;
 
         dbg ( DBG_INTR | DBG_TX,"tx_timeout\n");
 
         port = dev_to_port ( dev );
 
-        port->hdlc.stats.tx_errors++;
-        port->hdlc.stats.tx_aborted_errors++;
+        stats->tx_errors++;
+        stats->tx_aborted_errors++;
 
         if ( port->txcnt > 0 )
                 fst_issue_cmd ( port, ABORTTX );
@@ -1363,6 +1366,7 @@ fst_tx_timeout ( struct net_device *dev )
 static int
 fst_start_xmit ( struct sk_buff *skb, struct net_device *dev )
 {
+	struct net_device_stats *stats = &dev_to_hdlc(dev)->stats;
         struct fst_card_info *card;
         struct fst_port_info *port;
         unsigned char dmabits;
@@ -1377,8 +1381,8 @@ fst_start_xmit ( struct sk_buff *skb, struct net_device *dev )
         if ( ! netif_carrier_ok ( dev ))
         {
                 dev_kfree_skb ( skb );
-                port->hdlc.stats.tx_errors++;
-                port->hdlc.stats.tx_carrier_errors++;
+                stats->tx_errors++;
+                stats->tx_carrier_errors++;
                 return 0;
         }
 
@@ -1388,7 +1392,7 @@ fst_start_xmit ( struct sk_buff *skb, struct net_device *dev )
                 dbg ( DBG_TX,"Packet too large %d vs %d\n", skb->len,
                                                 LEN_TX_BUFFER );
                 dev_kfree_skb ( skb );
-                port->hdlc.stats.tx_errors++;
+                stats->tx_errors++;
                 return 0;
         }
 
@@ -1402,7 +1406,7 @@ fst_start_xmit ( struct sk_buff *skb, struct net_device *dev )
                 spin_unlock_irqrestore ( &card->card_lock, flags );
                 dbg ( DBG_TX,"Out of Tx buffers\n");
                 dev_kfree_skb ( skb );
-                port->hdlc.stats.tx_errors++;
+                stats->tx_errors++;
                 return 0;
         }
         if ( ++port->txpos >= NUM_TX_BUFFER )
@@ -1422,8 +1426,8 @@ fst_start_xmit ( struct sk_buff *skb, struct net_device *dev )
         FST_WRW ( card, txDescrRing[pi][txp].bcnt, cnv_bcnt ( skb->len ));
         FST_WRB ( card, txDescrRing[pi][txp].bits, DMA_OWN | TX_STP | TX_ENP );
 
-        port->hdlc.stats.tx_packets++;
-        port->hdlc.stats.tx_bytes += skb->len;
+        stats->tx_packets++;
+        stats->tx_bytes += skb->len;
 
         dev_kfree_skb ( skb );
 
@@ -1458,11 +1462,13 @@ fst_init_card ( struct fst_card_info *card )
          */
         for ( i = 0 ; i < card->nports ; i++ )
         {
+		hdlc_device *hdlc;
                 card->ports[i].card   = card;
                 card->ports[i].index  = i;
                 card->ports[i].run    = 0;
 
-                dev = hdlc_to_dev ( &card->ports[i].hdlc );
+                dev = port_to_dev(&card->ports[i]);
+		hdlc = dev_to_hdlc(dev);
 
                 /* Fill in the net device info */
                                 /* Since this is a PCI setup this is purely
@@ -1482,10 +1488,10 @@ fst_init_card ( struct fst_card_info *card )
                 dev->do_ioctl              = fst_ioctl;
                 dev->watchdog_timeo        = FST_TX_TIMEOUT;
                 dev->tx_timeout            = fst_tx_timeout;
-                card->ports[i].hdlc.attach = fst_attach;
-                card->ports[i].hdlc.xmit   = fst_start_xmit;
+                hdlc->attach = fst_attach;
+                hdlc->xmit   = fst_start_xmit;
 
-                if (( err = register_hdlc_device ( &card->ports[i].hdlc )) < 0 )
+                if (( err = register_hdlc_device(dev_to_hdlc(dev))) < 0 )
                 {
                         printk_err ("Cannot register HDLC device for port %d"
                                     " (errno %d)\n", i, -err );
@@ -1497,8 +1503,8 @@ fst_init_card ( struct fst_card_info *card )
         spin_lock_init ( &card->card_lock );
 
         printk ( KERN_INFO "%s-%s: %s IRQ%d, %d ports\n",
-                        hdlc_to_dev(&card->ports[0].hdlc)->name,
-                        hdlc_to_dev(&card->ports[card->nports-1].hdlc)->name,
+                        port_to_dev(&card->ports[0])->name,
+                        port_to_dev(&card->ports[card->nports-1])->name,
                         type_strings[card->type], card->irq, card->nports );
 }
 
@@ -1650,7 +1656,8 @@ fst_remove_one ( struct pci_dev *pdev )
 
         for ( i = 0 ; i < card->nports ; i++ )
         {
-                unregister_hdlc_device ( &card->ports[i].hdlc );
+		struct net_device *dev = port_to_dev(&card->ports[i]);
+                unregister_hdlc_device(dev_to_hdlc(dev));
         }
 
         fst_disable_intr ( card );
