@@ -27,7 +27,7 @@
 #include <net/llc_s_ev.h>
 #include <linux/trdevice.h>
 
-#if 1
+#if 0
 #define dprintk(args...) printk(KERN_DEBUG args)
 #else
 #define dprintk(args...)
@@ -123,23 +123,30 @@ int llc_rcv(struct sk_buff *skb, struct net_device *dev,
 
 		sk = llc_lookup_established(sap, &saddr, &daddr);
 		if (!sk) {
+			struct llc_opt *llc;
+
+			dprintk("%s: llc_lookup_established failed\n", __FUNCTION__);
 			/*
 			 * FIXME: here we'll pass the sk->family of the
 			 * listening socket, if found, when
 			 * llc_lookup_listener is added in the next patches.
 			 */
-			sk = llc_sock_alloc(PF_LLC);
+			sk = llc_sk_alloc(PF_LLC, GFP_ATOMIC);
 			if (!sk)
 				goto drop;
-			memcpy(&llc_sk(sk)->daddr, &saddr, sizeof(saddr));
+			llc = llc_sk(sk);
+			memcpy(&llc->laddr, &daddr, sizeof(llc->laddr));
+			memcpy(&llc->daddr, &saddr, sizeof(llc->daddr));
 			llc_sap_assign_sock(sap, sk);
 			sock_hold(sk);
 		}
 		skb->sk = sk;
 		bh_lock_sock(sk);
-		if (!sk->lock.users)
-			rc = llc_conn_rcv(sk, skb);
-		else {
+		if (!sk->lock.users) {
+			/* rc = */ llc_conn_rcv(sk, skb);
+			rc = 0;
+		} else {
+			dprintk("%s: adding to backlog...\n", __FUNCTION__);
 			llc_set_backlog_type(skb, LLC_PACKET);
 			sk_add_backlog(sk, skb);
 			rc = 0;

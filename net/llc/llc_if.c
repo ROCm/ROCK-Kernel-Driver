@@ -15,6 +15,7 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/netdevice.h>
+#include <linux/tcp.h>
 #include <asm/errno.h>
 #include <net/llc_if.h>
 #include <net/llc_sap.h>
@@ -249,7 +250,6 @@ int llc_build_and_send_pkt(struct sock *sk, struct sk_buff *skb)
 	int rc = -ECONNABORTED;
 	struct llc_opt *llc = llc_sk(sk);
 
-	lock_sock(sk);
 	if (llc->state == LLC_CONN_STATE_ADM)
 		goto out;
 	rc = -EBUSY;
@@ -269,7 +269,6 @@ int llc_build_and_send_pkt(struct sock *sk, struct sk_buff *skb)
 	skb->dev	    = llc->dev;
 	rc = llc_conn_state_process(sk, skb);
 out:
-	release_sock(sk);
 	return rc;
 }
 
@@ -299,7 +298,6 @@ static void llc_confirm_impossible(struct llc_prim_if_block *prim)
 static int llc_conn_req_handler(struct llc_prim_if_block *prim)
 {
 	int rc = -EBUSY;
-	struct llc_opt *llc;
 	struct llc_sap *sap = prim->sap;
 	struct sk_buff *skb;
 	struct net_device *ddev = mac_dev_peer(prim->data->conn.dev,
@@ -319,37 +317,16 @@ static int llc_conn_req_handler(struct llc_prim_if_block *prim)
 	daddr.lsap = prim->data->conn.daddr.lsap;
 	sk = llc_lookup_established(sap, &daddr, &laddr);
 	if (sk) {
-		llc_confirm_impossible(prim);
-		goto out_put;
+		if (sk->state == TCP_ESTABLISHED) {
+			llc_confirm_impossible(prim);
+			goto out_put;
+		} else
+			sock_put(sk);
 	}
 	rc = -ENOMEM;
-	if (prim->data->conn.sk) {
-		sk = prim->data->conn.sk;
-		if (llc_sock_init(sk))
-			goto out;
-	} else {
-		/*
-		 * FIXME: this one will die as soon as core and
-		 * llc_sock starts sharing a struct sock.
-		 */
-		sk = llc_sock_alloc(PF_LLC);
-		if (!sk) {
-			llc_confirm_impossible(prim);
-			goto out;
-		}
-		prim->data->conn.sk = sk;
-	}
+	sk = prim->data->conn.sk;
 	sock_hold(sk);
-	lock_sock(sk);
-	/* assign new connection to it's SAP */
-	llc_sap_assign_sock(sap, sk);
-	llc = llc_sk(sk);
-	memcpy(&llc->daddr, &daddr, sizeof(llc->daddr));
-	memcpy(&llc->laddr, &laddr, sizeof(llc->laddr));
-	llc->dev     = ddev;
-	llc->link    = prim->data->conn.link;
-	llc->handler = prim->data->conn.handler;
-	skb = alloc_skb(1, GFP_ATOMIC);
+	skb = alloc_skb(0, GFP_ATOMIC);
 	if (skb) {
 		struct llc_conn_state_ev *ev = llc_conn_ev(skb);
 
@@ -359,15 +336,10 @@ static int llc_conn_req_handler(struct llc_prim_if_block *prim)
 		ev->data.prim.data = prim;
 		rc = llc_conn_state_process(sk, skb);
 	}
-	if (rc) {
-		llc_sap_unassign_sock(sap, sk);
-		llc_sock_free(sk);
+	if (rc)
 		llc_confirm_impossible(prim);
-	}
-	release_sock(sk);
 out_put:
 	sock_put(sk);
-out:
 	return rc;
 }
 
@@ -388,7 +360,6 @@ static int llc_disc_req_handler(struct llc_prim_if_block *prim)
 	struct sock* sk = prim->data->disc.sk;
 
 	sock_hold(sk);
-	lock_sock(sk);
 	if (llc_sk(sk)->state == LLC_CONN_STATE_ADM ||
 	    llc_sk(sk)->state == LLC_CONN_OUT_OF_SVC)
 		goto out;
@@ -396,7 +367,7 @@ static int llc_disc_req_handler(struct llc_prim_if_block *prim)
 	 * Postpone unassigning the connection from its SAP and returning the
 	 * connection until all ACTIONs have been completely executed
 	 */
-	skb = alloc_skb(1, GFP_ATOMIC);
+	skb = alloc_skb(0, GFP_ATOMIC);
 	if (!skb)
 		goto out;
 	ev = llc_conn_ev(skb);
@@ -406,7 +377,6 @@ static int llc_disc_req_handler(struct llc_prim_if_block *prim)
 	ev->data.prim.data = prim;
 	rc = llc_conn_state_process(sk, skb);
 out:
-	release_sock(sk);
 	sock_put(sk);
 	return rc;
 }
@@ -426,8 +396,7 @@ static int llc_rst_req_handler(struct llc_prim_if_block *prim)
 	int rc = 1;
 	struct sock *sk = prim->data->res.sk;
 
-	lock_sock(sk);
-	skb = alloc_skb(1, GFP_ATOMIC);
+	skb = alloc_skb(0, GFP_ATOMIC);
 	if (skb) {
 		struct llc_conn_state_ev *ev = llc_conn_ev(skb);
 
@@ -437,7 +406,6 @@ static int llc_rst_req_handler(struct llc_prim_if_block *prim)
 		ev->data.prim.data = prim;
 		rc = llc_conn_state_process(sk, skb);
 	}
-	release_sock(sk);
 	return rc;
 }
 
@@ -498,7 +466,7 @@ static int llc_rst_rsp_handler(struct llc_prim_if_block *prim)
 	 * package as event and send it to connection event handler
 	 */
 	struct sock *sk = prim->data->res.sk;
-	struct sk_buff *skb = alloc_skb(1, GFP_ATOMIC);
+	struct sk_buff *skb = alloc_skb(0, GFP_ATOMIC);
 
 	if (skb) {
 		struct llc_conn_state_ev *ev = llc_conn_ev(skb);

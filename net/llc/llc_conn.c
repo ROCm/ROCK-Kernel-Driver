@@ -43,7 +43,7 @@ static int llc_offset_table[NBR_CONN_STATES][NBR_CONN_EV];
  *	@sk: connection
  *	@skb: occurred event
  *
- *	Sends an event to connection state machine. after processing event
+ *	Sends an event to connection state machine. After processing event
  *	(executing it's actions and changing state), upper layer will be
  *	indicated or confirmed, if needed. Returns 0 for success, 1 for
  *	failure. The socket lock has to be held before calling this function.
@@ -65,15 +65,6 @@ int llc_conn_state_process(struct sock *sk, struct sk_buff *skb)
 		llc_conn_free_ev(skb);
 	else if (ind_prim && cfm_prim)
 		skb_get(skb);
-#ifdef THIS_BREAKS_DISCONNECT_NOTIFICATION_BADLY
-	/* check if the connection was freed by the state machine by
-	 * means of llc_conn_disc */
-	if (rc == 2) {
-		printk(KERN_INFO "%s: rc == 2\n", __FUNCTION__);
-		rc = -ECONNABORTED;
-		goto out;
-	}
-#endif	/* THIS_BREAKS_DISCONNECT_NOTIFICATION_BADLY */
 	if (!flag)   /* indicate or confirm not required */
 		goto out;
 	rc = 0;
@@ -83,10 +74,13 @@ int llc_conn_state_process(struct sock *sk, struct sk_buff *skb)
 		 *	  sock crap
 		 */
 		if (flag == LLC_DATA_PRIM + 1) {
-			struct sock *upper = llc_sk(skb->sk)->handler;
-
-			skb->sk = upper;
-			if (sock_queue_rcv_skb(upper, skb)) {
+			if (sock_queue_rcv_skb(skb->sk, skb)) {
+				/*
+				 * FIXME: have to sync the LLC state
+				 *        machine wrt mem usage with
+				 *        sk->{r,w}mem_alloc, will do
+				 *        this soon 8)
+				 */
 				printk(KERN_ERR
 				       "%s: sock_queue_rcv_skb failed!\n",
 				       __FUNCTION__);
@@ -105,10 +99,8 @@ int llc_conn_state_process(struct sock *sk, struct sk_buff *skb)
 	}
 	if (!llc_data_accept_state(llc->state)) {
 		/* In this state, we can send I pdu */
-		struct sock* upper = llc_sk(skb->sk)->handler;
-
-		if (upper)
-			wake_up(upper->sleep);
+		if (skb->sk)
+			skb->sk->write_space(skb->sk);
 	} else
 		rc = llc->failed_data_req = 1;
 	kfree_skb(skb);
@@ -118,7 +110,6 @@ out:
 
 void llc_conn_send_pdu(struct sock *sk, struct sk_buff *skb)
 {
-	llc_sock_assert(sk);
 	/* queue PDU to send to MAC layer */
 	skb_queue_tail(&sk->write_queue, skb);
 	llc_conn_send_pdus(sk);
@@ -380,11 +371,10 @@ static struct llc_conn_state_trans *llc_qualify_conn_ev(struct sock *sk,
  *	llc_exec_conn_trans_actions - executes related actions
  *	@sk: connection
  *	@trans: transition that it's actions must be performed
- *	@skb: happened event
+ *	@skb: event
  *
  *	Executes actions that is related to happened event. Returns 0 for
- *	success, 1 to indicate failure of at least one action or 2 if the
- *	connection was freed (llc_conn_disc was called)
+ *	success, 1 to indicate failure of at least one action.
  */
 static int llc_exec_conn_trans_actions(struct sock *sk,
 				       struct llc_conn_state_trans *trans,

@@ -134,7 +134,7 @@ int llc_station_ac_report_status(struct llc_station *station,
 static void llc_station_ack_tmr_callback(unsigned long timeout_data)
 {
 	struct llc_station *station = (struct llc_station *)timeout_data;
-	struct sk_buff *skb = alloc_skb(1, GFP_ATOMIC);
+	struct sk_buff *skb = alloc_skb(0, GFP_ATOMIC);
 
 	station->ack_tmr_running = 0;
 	if (skb) {

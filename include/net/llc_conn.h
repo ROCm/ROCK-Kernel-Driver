@@ -2,7 +2,7 @@
 #define LLC_CONN_H
 /*
  * Copyright (c) 1997 by Procom Technology, Inc.
- * 		 2001 by Arnaldo Carvalho de Melo <acme@conectiva.com.br>
+ * 		 2001, 2002 by Arnaldo Carvalho de Melo <acme@conectiva.com.br>
  *
  * This program can be redistributed or modified under the terms of the
  * GNU General Public License as published by the Free Software Foundation.
@@ -13,8 +13,7 @@
  */
 #include <linux/timer.h>
 #include <net/llc_if.h>
-
-#define DEBUG_LLC_CONN_ALLOC
+#include <linux/llc.h>
 
 struct llc_timer {
 	struct timer_list timer;
@@ -25,7 +24,7 @@ struct llc_timer {
 struct llc_opt {
 	struct list_head    node;		/* entry in sap->sk_list.list */
 	struct sock	    *sk;		/* sock that has this llc_opt */
-	void		    *handler;		/* for upper layers usage */
+	struct sockaddr_llc addr;		/* address sock is bound to */
 	u8		    state;		/* state of connection */
 	struct llc_sap	    *sap;		/* pointer to parent SAP */
 	struct llc_addr	    laddr;		/* lsap/mac pair */
@@ -80,60 +79,11 @@ struct llc_opt {
 
 struct llc_conn_state_ev;
 
-extern struct sock *__llc_sock_alloc(int family);
-extern void __llc_sock_free(struct sock *sk, u8 free);
+extern struct sock *llc_sk_alloc(int family, int priority);
+extern void llc_sk_free(struct sock *sk);
 
-#ifdef DEBUG_LLC_CONN_ALLOC
-#define dump_stack() printk(KERN_INFO "call trace: %p, %p, %p\n",	\
-				__builtin_return_address(0),		\
-				__builtin_return_address(1),		\
-				__builtin_return_address(2));
-#define llc_sock_alloc(family)	({					\
-	struct sock *__sk = __llc_sock_alloc(family);			\
-	if (__sk) {							\
-		llc_sk(__sk)->f_alloc = __FUNCTION__;			\
-		llc_sk(__sk)->l_alloc = __LINE__;			\
-	}								\
-	__sk;})
-#define __llc_sock_assert(__sk)						\
-	if (llc_sk(__sk)->f_free) {					\
-		printk(KERN_ERR						\
-		       "%p conn (alloc'd @ %s(%d)) "			\
-		       "already freed @ %s(%d) "			\
-		       "being used again @ %s(%d)\n",			\
-		       llc_sk(__sk),					\
-		       llc_sk(__sk)->f_alloc, llc_sk(__sk)->l_alloc,	\
-		       llc_sk(__sk)->f_free, llc_sk(__sk)->l_free,	\
-		       __FUNCTION__, __LINE__);				\
-		dump_stack();
-#define llc_sock_free(__sk)						\
-{									\
-	__llc_sock_assert(__sk)						\
-	} else {							\
-		__llc_sock_free(__sk, 0);				\
-		llc_sk(__sk)->f_free = __FUNCTION__;			\
-		llc_sk(__sk)->l_free = __LINE__;			\
-	}								\
-}
-#define llc_sock_assert(__sk)						\
-{									\
-	__llc_sock_assert(__sk);					\
-	return; }							\
-}
-#define llc_sock_assert_ret(__sk, __ret)				\
-{									\
-	__llc_sock_assert(__sk);					\
-	return __ret; }							\
-}
-#else /* DEBUG_LLC_CONN_ALLOC */
-#define llc_sock_alloc(family) __llc_sock_alloc(family)
-#define llc_sock_free(__sk) __llc_sock_free(__sk, 1)
-#define llc_sock_assert(__sk)
-#define llc_sock_assert_ret(__sk)
-#endif /* DEBUG_LLC_CONN_ALLOC */
-
-extern void llc_sock_reset(struct sock *sk);
-extern int llc_sock_init(struct sock *sk);
+extern void llc_sk_reset(struct sock *sk);
+extern int llc_sk_init(struct sock *sk);
 
 /* Access to a connection */
 extern int llc_conn_state_process(struct sock *sk, struct sk_buff *skb);

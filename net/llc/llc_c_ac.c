@@ -1454,8 +1454,9 @@ int llc_conn_ac_set_f_flag_p(struct sock *sk, struct sk_buff *skb)
 void llc_conn_pf_cycle_tmr_cb(unsigned long timeout_data)
 {
 	struct sock *sk = (struct sock *)timeout_data;
-	struct sk_buff *skb = alloc_skb(1, GFP_ATOMIC);
+	struct sk_buff *skb = alloc_skb(0, GFP_ATOMIC);
 
+	bh_lock_sock(sk);
 	llc_sk(sk)->pf_cycle_timer.running = 0;
 	if (skb) {
 		struct llc_conn_state_ev *ev = llc_conn_ev(skb);
@@ -1464,13 +1465,15 @@ void llc_conn_pf_cycle_tmr_cb(unsigned long timeout_data)
 		ev->data.tmr.timer_specific = NULL;
 		llc_process_tmr_ev(sk, skb);
 	}
+	bh_unlock_sock(sk);
 }
 
 static void llc_conn_busy_tmr_cb(unsigned long timeout_data)
 {
 	struct sock *sk = (struct sock *)timeout_data;
-	struct sk_buff *skb = alloc_skb(1, GFP_ATOMIC);
+	struct sk_buff *skb = alloc_skb(0, GFP_ATOMIC);
 
+	bh_lock_sock(sk);
 	llc_sk(sk)->busy_state_timer.running = 0;
 	if (skb) {
 		struct llc_conn_state_ev *ev = llc_conn_ev(skb);
@@ -1479,13 +1482,15 @@ static void llc_conn_busy_tmr_cb(unsigned long timeout_data)
 		ev->data.tmr.timer_specific = NULL;
 		llc_process_tmr_ev(sk, skb);
 	}
+	bh_unlock_sock(sk);
 }
 
 void llc_conn_ack_tmr_cb(unsigned long timeout_data)
 {
 	struct sock* sk = (struct sock *)timeout_data;
-	struct sk_buff *skb = alloc_skb(1, GFP_ATOMIC);
+	struct sk_buff *skb = alloc_skb(0, GFP_ATOMIC);
 
+	bh_lock_sock(sk);
 	llc_sk(sk)->ack_timer.running = 0;
 	if (skb) {
 		struct llc_conn_state_ev *ev = llc_conn_ev(skb);
@@ -1494,13 +1499,15 @@ void llc_conn_ack_tmr_cb(unsigned long timeout_data)
 		ev->data.tmr.timer_specific = NULL;
 		llc_process_tmr_ev(sk, skb);
 	}
+	bh_unlock_sock(sk);
 }
 
 static void llc_conn_rej_tmr_cb(unsigned long timeout_data)
 {
 	struct sock *sk = (struct sock *)timeout_data;
-	struct sk_buff *skb = alloc_skb(1, GFP_ATOMIC);
+	struct sk_buff *skb = alloc_skb(0, GFP_ATOMIC);
 
+	bh_lock_sock(sk);
 	llc_sk(sk)->rej_sent_timer.running = 0;
 	if (skb) {
 		struct llc_conn_state_ev *ev = llc_conn_ev(skb);
@@ -1509,6 +1516,7 @@ static void llc_conn_rej_tmr_cb(unsigned long timeout_data)
 		ev->data.tmr.timer_specific = NULL;
 		llc_process_tmr_ev(sk, skb);
 	}
+	bh_unlock_sock(sk);
 }
 
 int llc_conn_ac_rst_vs(struct sock *sk, struct sk_buff *skb)
@@ -1536,14 +1544,11 @@ int llc_conn_ac_upd_vs(struct sock *sk, struct sk_buff *skb)
  *	llc_conn_disc - removes connection from SAP list and frees it
  *	@sk: closed connection
  *	@skb: occurred event
- *
- *	Returns 2, to indicate the state machine that the connection was freed.
  */
 int llc_conn_disc(struct sock *sk, struct sk_buff *skb)
 {
-	llc_sap_unassign_sock(llc_sk(sk)->sap, sk);
-	llc_sock_free(sk);
-	return 2;
+	/* FIXME: this thing seems to want to die */
+	return 0;
 }
 
 /**
@@ -1555,7 +1560,7 @@ int llc_conn_disc(struct sock *sk, struct sk_buff *skb)
  */
 int llc_conn_reset(struct sock *sk, struct sk_buff *skb)
 {
-	llc_sock_reset(sk);
+	llc_sk_reset(sk);
 	return 0;
 }
 
@@ -1589,19 +1594,16 @@ u8 llc_circular_between(u8 a, u8 b, u8 c)
  */
 static void llc_process_tmr_ev(struct sock *sk, struct sk_buff *skb)
 {
-	bh_lock_sock(sk);
 	if (llc_sk(sk)->state == LLC_CONN_OUT_OF_SVC) {
 		printk(KERN_WARNING "%s: timer called on closed connection\n",
 		       __FUNCTION__);
 		llc_conn_free_ev(skb);
-		goto out;
+	} else {
+		if (!sk->lock.users)
+			llc_conn_state_process(sk, skb);
+		else {
+			llc_set_backlog_type(skb, LLC_EVENT);
+			sk_add_backlog(sk, skb);
+		}
 	}
-	if (!sk->lock.users)
-		llc_conn_state_process(sk, skb);
-	else {
-		llc_set_backlog_type(skb, LLC_EVENT);
-		sk_add_backlog(sk, skb);
-	}
-out:
-	bh_unlock_sock(sk);
 }

@@ -73,8 +73,6 @@ struct llc_prim_conn {
 	u8		   pri;		/* service_class */
 	struct net_device *dev;
 	struct sock	  *sk;		/* returned from REQUEST */
-	void		  *handler;	/* upper layer use,
-					   stored in llc_opt->handler */
 	u16		   link;
 	struct sk_buff	  *skb;		/* received SABME  */
 };
