@@ -3,3 +3,5 @@
 #
 
 obj-y					:= core.o clock.o
+obj-$(CONFIG_ARCH_VERSATILE_PB)		+= versatile_pb.o
+obj-$(CONFIG_ARCH_VERSATILE_AB)		+= versatile_ab.o

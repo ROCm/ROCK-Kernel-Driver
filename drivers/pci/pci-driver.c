@@ -308,8 +308,8 @@ static int pci_device_suspend(struct device * dev, u32 state)
 	dev_state = state_conversion[state];
 	if (drv && drv->suspend)
 		i = drv->suspend(pci_dev, dev_state);
-		
-	pci_save_state(pci_dev);
+	else
+		pci_save_state(pci_dev);
 	return i;
 }
 

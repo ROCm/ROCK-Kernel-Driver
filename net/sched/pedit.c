@@ -244,9 +244,9 @@ tcf_pedit_dump(struct sk_buff *skb, struct tc_action *a,int bind, int ref)
 #endif
 
 	RTA_PUT(skb, TCA_PEDIT_PARMS, s, opt);
-	t.install = jiffies - p->tm.install;
-	t.lastuse = jiffies - p->tm.lastuse;
-	t.expires = p->tm.expires;
+	t.install = jiffies_to_clock_t(jiffies - p->tm.install);
+	t.lastuse = jiffies_to_clock_t(jiffies - p->tm.lastuse);
+	t.expires = jiffies_to_clock_t(p->tm.expires);
 	RTA_PUT(skb, TCA_PEDIT_TM, sizeof (t), &t);
 	return skb->len;
 

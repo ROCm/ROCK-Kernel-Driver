@@ -408,7 +408,6 @@ static void cg3_init_one(struct sbus_dev *sdev)
 		all->info.screen_base = (char *)
 			sbus_ioremap(&sdev->resource[0], CG3_RAM_OFFSET,
 				     all->par.fbsize, "cg3 ram");
-	all->info.currcon = -1;
 	all->info.par = &all->par;
 
 	cg3_blank(0, &all->info);

@@ -12,7 +12,6 @@
 #include <linux/smb.h>
 #include <linux/smb_fs_i.h>
 #include <linux/smb_fs_sb.h>
-#include <linux/fs.h>
 
 /*
  * ioctl commands
@@ -26,6 +25,7 @@
 
 #ifdef __KERNEL__
 
+#include <linux/fs.h>
 #include <linux/pagemap.h>
 #include <linux/vmalloc.h>
 #include <linux/smb_mount.h>

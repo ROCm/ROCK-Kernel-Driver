@@ -123,11 +123,17 @@ struct chan_ops port_ops = {
 int port_listen_fd(int port)
 {
 	struct sockaddr_in addr;
-	int fd, err;
+	int fd, err, arg;
 
 	fd = socket(PF_INET, SOCK_STREAM, 0);
 	if(fd == -1) 
 		return(-errno);
+
+	arg = 1;
+	if(setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &arg, sizeof(arg)) < 0){
+		err = -errno;
+		goto out;
+	}
 
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(port);

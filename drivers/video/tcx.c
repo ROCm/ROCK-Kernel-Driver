@@ -422,7 +422,6 @@ static void tcx_init_one(struct sbus_dev *sdev)
 		all->info.screen_base = (char *)
 			sbus_ioremap(&sdev->resource[0], 0,
 				     all->par.fbsize, "tcx ram");
-	all->info.currcon = -1;
 	all->info.par = &all->par;
 
 	/* Initialize brooktree DAC. */

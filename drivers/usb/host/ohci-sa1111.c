@@ -194,6 +194,7 @@ int usb_hcd_sa1111_probe (const struct hc_driver *driver,
 
 	usb_bus_init (&hcd->self);
 	hcd->self.op = &usb_hcd_operations;
+	hcd->self.release = &usb_hcd_release;
 	hcd->self.hcpriv = (void *) hcd;
 	hcd->self.bus_name = "sa1111";
 	hcd->product_desc = "SA-1111 OHCI";
@@ -213,9 +214,8 @@ int usb_hcd_sa1111_probe (const struct hc_driver *driver,
 
  err2:
 	hcd_buffer_destroy (hcd);
-	if (hcd)
-		driver->hcd_free(hcd);
  err1:
+	kfree(hcd);
 	sa1111_stop_hc(dev);
 	release_mem_region(dev->res.start, dev->res.end - dev->res.start + 1);
 	return retval;
@@ -237,8 +237,6 @@ int usb_hcd_sa1111_probe (const struct hc_driver *driver,
  */
 void usb_hcd_sa1111_remove (struct usb_hcd *hcd, struct sa1111_dev *dev)
 {
-	void *base;
-
 	info ("remove: %s, state %x", hcd->self.bus_name, hcd->state);
 
 	if (in_interrupt ())
@@ -256,9 +254,6 @@ void usb_hcd_sa1111_remove (struct usb_hcd *hcd, struct sa1111_dev *dev)
 	hcd_buffer_destroy (hcd);
 
 	usb_deregister_bus (&hcd->self);
-
-	base = hcd->regs;
-	hcd->driver->hcd_free (hcd);
 
 	sa1111_stop_hc(dev);
 	release_mem_region(dev->res.start, dev->res.end - dev->res.start + 1);
@@ -308,7 +303,6 @@ static const struct hc_driver ohci_sa1111_hc_driver = {
 	 * memory lifecycle (except per-request)
 	 */
 	.hcd_alloc =		ohci_hcd_alloc,
-	.hcd_free =		ohci_hcd_free,
 
 	/*
 	 * managing i/o requests and associated device resources

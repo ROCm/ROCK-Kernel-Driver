@@ -831,7 +831,7 @@ S:	Maintained
 
 FILESYSTEMS (VFS and infrastructure)
 P:	Alexander Viro
-M:	viro@math.psu.edu
+M:	viro@parcelfarce.linux.theplanet.co.uk
 S:	Maintained
 
 FIRMWARE LOADER (request_firmware)
@@ -1245,6 +1245,12 @@ M:	neilb@cse.unsw.edu.au
 L:	nfs@lists.sourceforge.net
 W:	http://nfs.sourceforge.net/
 W:	http://www.cse.unsw.edu.au/~neilb/patches/linux-devel/
+S:	Maintained
+
+KERNEL EVENT LAYER (KOBJECT_UEVENT)
+P:	Robert Love
+M:	rml@novell.com
+L:	linux-kernel@vger.kernel.org
 S:	Maintained
 
 LANMEDIA WAN CARD DRIVER
@@ -2335,6 +2341,15 @@ M:	wgreathouse@smva.com
 L:	linux-usb-users@lists.sourceforge.net
 L:	linux-usb-devel@lists.sourceforge.net
 S:	Maintained
+
+USB SERIAL CYPRESS M8 DRIVER
+P:	Lonnie Mendez
+M:	dignome@gmail.com
+L:	linux-usb-users@lists.sourceforge.net
+L:	linux-usb-devel@lists.sourceforge.net
+S:	Maintained
+W:	http://geocities.com/i0xox0i
+W:	http://firstlight.net/cvs
 
 USB SERIAL CYBERJACK PINPAD/E-COM DRIVER
 L:	linux-usb-users@lists.sourceforge.net

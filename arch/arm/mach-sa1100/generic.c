@@ -161,7 +161,7 @@ static u64 sa11x0udc_dma_mask = 0xffffffffUL;
 
 static struct platform_device sa11x0udc_device = {
 	.name		= "sa11x0-udc",
-	.id		= 0,
+	.id		= -1,
 	.dev		= {
 		.dma_mask = &sa11x0udc_dma_mask,
 		.coherent_dma_mask = 0xffffffff,
@@ -212,7 +212,7 @@ static u64 sa11x0mcp_dma_mask = 0xffffffffUL;
 
 static struct platform_device sa11x0mcp_device = {
 	.name		= "sa11x0-mcp",
-	.id		= 0,
+	.id		= -1,
 	.dev = {
 		.dma_mask = &sa11x0mcp_dma_mask,
 		.coherent_dma_mask = 0xffffffff,
@@ -233,7 +233,7 @@ static u64 sa11x0ssp_dma_mask = 0xffffffffUL;
 
 static struct platform_device sa11x0ssp_device = {
 	.name		= "sa11x0-ssp",
-	.id		= 0,
+	.id		= -1,
 	.dev = {
 		.dma_mask = &sa11x0ssp_dma_mask,
 		.coherent_dma_mask = 0xffffffff,
@@ -257,7 +257,7 @@ static struct resource sa11x0fb_resources[] = {
 
 static struct platform_device sa11x0fb_device = {
 	.name		= "sa11x0-fb",
-	.id		= 0,
+	.id		= -1,
 	.dev = {
 		.coherent_dma_mask = 0xffffffff,
 	},
@@ -267,7 +267,7 @@ static struct platform_device sa11x0fb_device = {
 
 static struct platform_device sa11x0pcmcia_device = {
 	.name		= "sa11x0-pcmcia",
-	.id		= 0,
+	.id		= -1,
 };
 
 static struct platform_device *sa11x0_devices[] __initdata = {

@@ -140,7 +140,7 @@ void __init init_IRQ(void)
 	disable_mappi_irq(M32R_IRQ_SIO1_S);
 #endif /* CONFIG_SERIAL_M32R_SIO */
 
-#if defined(CONFIG_M32RPCC)
+#if defined(CONFIG_M32R_PCC)
 	/* INT1 : pccard0 interrupt */
 	irq_desc[M32R_IRQ_INT1].status = IRQ_DISABLED;
 	irq_desc[M32R_IRQ_INT1].handler = &mappi_irq_type;

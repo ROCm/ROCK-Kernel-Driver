@@ -70,16 +70,18 @@ qword_set_loop:
 	st	r1, @+r4
 	bnc	qword_set_loop	    ||  cmpz	r2
 	jc	r14
-word_set_wrap:
+set_remainder:
 	cmpui	r2, #4
-	bc	byte_set
+	bc	byte_set_wrap1
 	addi	r2, #-4
 	bra	word_set_loop
 
 byte_set_wrap:
 	addi	r2, #4
-	addi	r4, #4		    ||  cmpz	r2
+	cmpz	r2
 	jc	r14
+byte_set_wrap1:
+	addi	r4, #4
 #if defined(CONFIG_ISA_M32R2)
 byte_set:
 	addi	r2, #-1		    ||	stb	r1, @r4+
@@ -153,18 +155,19 @@ qword_set_loop:
 	st	r1, @+r4
 	st	r1, @+r4
 	bnc	qword_set_loop
-	bnez	r2, word_set_wrap
+	bnez	r2, set_remainder
 	jmp	r14
-word_set_wrap:
+set_remainder:
 	cmpui	r2, #4
-	bc	byte_set
+	bc	byte_set_wrap1
 	addi	r2, #-4
 	bra	word_set_loop
 
 byte_set_wrap:
 	addi	r2, #4
-	addi	r4, #4
 	beqz	r2, end_memset
+byte_set_wrap1:
+	addi	r4, #4
 byte_set:
 	addi	r2, #-1
 	stb	r1, @r4

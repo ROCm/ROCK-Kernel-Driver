@@ -8,7 +8,7 @@
 
 #include "sysdep/ptrace.h"
 
-#define CATCH_EINTR(expr) while (((expr) < 0) && (errno == EINTR))
+#define CATCH_EINTR(expr) while ((errno = 0, ((expr) < 0)) && (errno == EINTR))
 
 extern int mode_tt;
 

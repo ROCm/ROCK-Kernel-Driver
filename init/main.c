@@ -604,7 +604,7 @@ static void __init do_initcalls(void)
 
 		if (initcall_debug) {
 			printk(KERN_DEBUG "Calling initcall 0x%p", *call);
-			print_symbol(": %s()", (unsigned long) *call);
+			print_fn_descriptor_symbol(": %s()", (unsigned long) *call);
 			printk("\n");
 		}
 

@@ -505,72 +505,6 @@ static void usbvideo_ReportStatistics(const struct uvd *uvd)
 }
 
 /*
- * usbvideo_DrawLine()
- *
- * A standard implementation of Bresenham's line drawing algorithm.
- * This procedure is provided primarily for debugging or demo
- * purposes.
- */
-void usbvideo_DrawLine(
-	struct usbvideo_frame *frame,
-	int x1, int y1,
-	int x2, int y2,
-	unsigned char cr, unsigned char cg, unsigned char cb)
-{
-	int i, dx, dy, np, d;
-	int dinc1, dinc2, x, xinc1, xinc2, y, yinc1, yinc2;
-
-	if ((dx = x2 - x1) < 0)
-		dx = -dx;
-	if ((dy = y2 - y1) < 0)
-		dy = -dy;
-	if (dx >= dy) {
-		np = dx + 1;
-		d = (2 * dy) - dx;
-		dinc1 = dy << 1;
-		dinc2 = (dy - dx) << 1;
-		xinc1 = 1;
-		xinc2 = 1;
-		yinc1 = 0;
-		yinc2 = 1;
-	} else {
-		np = dy + 1;
-		d = (2 * dx) - dy;
-		dinc1 = dx << 1;
-		dinc2 = (dx - dy) << 1;
-		xinc1 = 0;
-		xinc2 = 1;
-		yinc1 = 1;
-		yinc2 = 1;
-	}
-	/* Make sure x and y move in the right directions */
-	if (x1 > x2) {
-		xinc1 = -xinc1;
-		xinc2 = -xinc2;
-	}
-	if (y1 > y2) {
-		yinc1 = -yinc1;
-		yinc2 = -yinc2;
-	}
-	for (i=0, x=x1, y=y1; i < np; i++) {
-		if (frame->palette == VIDEO_PALETTE_RGB24) {
-/* TODO */		RGB24_PUTPIXEL(frame, x, y, cr, cg, cb);
-		}
-		if (d < 0) {
-			d += dinc1;
-			x += xinc1;
-			y += yinc1;
-		} else {
-			d += dinc2;
-			x += xinc2;
-			y += yinc2;
-		}
-	}
-}
-
-EXPORT_SYMBOL(usbvideo_DrawLine);
-
-/*
  * usbvideo_TestPattern()
  *
  * Procedure forms a test pattern (yellow grid on blue background).
@@ -658,6 +592,8 @@ void usbvideo_TestPattern(struct uvd *uvd, int fullframe, int pmode)
 
 EXPORT_SYMBOL(usbvideo_TestPattern);
 
+
+#ifdef DEBUG
 /*
  * usbvideo_HexDump()
  *
@@ -687,16 +623,7 @@ void usbvideo_HexDump(const unsigned char *data, int len)
 
 EXPORT_SYMBOL(usbvideo_HexDump);
 
-/* Debugging aid */
-void usbvideo_SayAndWait(const char *what)
-{
-	wait_queue_head_t wq;
-	init_waitqueue_head(&wq);
-	info("Say: %s", what);
-	interruptible_sleep_on_timeout (&wq, HZ*3); /* Timeout */
-}
-
-EXPORT_SYMBOL(usbvideo_SayAndWait);
+#endif
 
 /* ******************************************************************** */
 

@@ -334,9 +334,9 @@ tcf_ipt_dump(struct sk_buff *skb, struct tc_action *a, int bind, int ref)
 	RTA_PUT(skb, TCA_IPT_HOOK, 4, &p->hook);
 	RTA_PUT(skb, TCA_IPT_CNT, sizeof(struct tc_cnt), &c);
 	RTA_PUT(skb, TCA_IPT_TABLE, IFNAMSIZ, p->tname);
-	tm.install = jiffies - p->tm.install;
-	tm.lastuse = jiffies - p->tm.lastuse;
-	tm.expires = p->tm.expires;
+	tm.install = jiffies_to_clock_t(jiffies - p->tm.install);
+	tm.lastuse = jiffies_to_clock_t(jiffies - p->tm.lastuse);
+	tm.expires = jiffies_to_clock_t(p->tm.expires);
 	RTA_PUT(skb, TCA_IPT_TM, sizeof (tm), &tm);
 	return skb->len;
 

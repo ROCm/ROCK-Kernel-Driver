@@ -14,10 +14,6 @@
 #ifndef __ASM_SERIAL_H
 #define __ASM_SERIAL_H
 
-#include <asm/arch/serial.h>
-
-#define SERIAL_PORT_DFNS		\
-	STD_SERIAL_PORT_DEFNS		\
-	EXTRA_SERIAL_PORT_DEFNS
+#define BASE_BAUD	(1843200 / 16)
 
 #endif

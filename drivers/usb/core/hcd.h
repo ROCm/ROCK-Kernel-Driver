@@ -191,8 +191,13 @@ struct hc_driver {
 	int	(*get_frame_number) (struct usb_hcd *hcd);
 
 	/* memory lifecycle */
+	/* Note: The absence of hcd_free reflects a temporary situation;
+	 * in the near future hcd_alloc will disappear as well and all
+	 * allocations/deallocations will be handled by usbcore.  For the
+	 * moment, drivers are required to return a pointer that the core
+	 * can pass to kfree, i.e., the struct usb_hcd must be the _first_
+	 * member of a larger driver-specific structure. */
 	struct usb_hcd	*(*hcd_alloc) (void);
-	void		(*hcd_free) (struct usb_hcd *hcd);
 
 	/* manage i/o requests, device state */
 	int	(*urb_enqueue) (struct usb_hcd *hcd, struct urb *urb,
@@ -215,7 +220,6 @@ struct hc_driver {
 
 extern void usb_hcd_giveback_urb (struct usb_hcd *hcd, struct urb *urb, struct pt_regs *regs);
 extern void usb_bus_init (struct usb_bus *bus);
-extern int usb_rh_status_dequeue (struct usb_hcd *hcd, struct urb *urb);
 
 #ifdef CONFIG_PCI
 struct pci_dev;
@@ -360,6 +364,8 @@ static inline int hcd_register_root (struct usb_device *usb_dev,
 
 	return usb_register_root_hub (usb_dev, hcd->self.controller);
 }
+
+extern void usb_hcd_release (struct usb_bus *);
 
 extern void usb_set_device_state(struct usb_device *udev,
 		enum usb_device_state new_state);

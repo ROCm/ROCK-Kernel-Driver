@@ -79,9 +79,9 @@ extern cpumask_t irq_affinity[NR_IRQS];
 extern int no_irq_affinity;
 extern int noirqdebug_setup(char *str);
 
-extern asmlinkage int handle_IRQ_event(unsigned int irq, struct pt_regs *regs,
+extern fastcall int handle_IRQ_event(unsigned int irq, struct pt_regs *regs,
 				       struct irqaction *action);
-extern asmlinkage unsigned int __do_IRQ(unsigned int irq, struct pt_regs *regs);
+extern fastcall unsigned int __do_IRQ(unsigned int irq, struct pt_regs *regs);
 extern void note_interrupt(unsigned int irq, irq_desc_t *desc, int action_ret);
 extern void report_bad_irq(unsigned int irq, irq_desc_t *desc, int action_ret);
 extern int can_request_irq(unsigned int irq, unsigned long irqflags);

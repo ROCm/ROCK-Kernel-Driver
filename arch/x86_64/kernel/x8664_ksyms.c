@@ -32,6 +32,7 @@
 #include <asm/unistd.h>
 #include <asm/delay.h>
 #include <asm/tlbflush.h>
+#include <asm/kdebug.h>
 
 extern spinlock_t rtc_lock;
 
@@ -197,6 +198,7 @@ EXPORT_SYMBOL(_atomic_dec_and_lock);
 #endif
 
 EXPORT_SYMBOL(die_chain);
+EXPORT_SYMBOL(register_die_notifier);
 
 #ifdef CONFIG_SMP
 EXPORT_SYMBOL(cpu_sibling_map);

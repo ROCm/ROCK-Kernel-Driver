@@ -707,9 +707,9 @@ void ide_setup_pci_device (struct pci_dev *dev, ide_pci_device_t *d)
 	ata_index_t index_list = do_ide_setup_pci_device(dev, d, 1);
 
 	if ((index_list.b.low & 0xf0) != 0xf0)
-		probe_hwif_init(&ide_hwifs[index_list.b.low]);
+		probe_hwif_init_with_fixup(&ide_hwifs[index_list.b.low], d->fixup);
 	if ((index_list.b.high & 0xf0) != 0xf0)
-		probe_hwif_init(&ide_hwifs[index_list.b.high]);
+		probe_hwif_init_with_fixup(&ide_hwifs[index_list.b.high], d->fixup);
 
 	create_proc_ide_interfaces();
 }

@@ -12,6 +12,7 @@
 #include <linux/kernel.h>
 #include <linux/mm.h>
 #include <linux/interrupt.h>
+#include <linux/serial_8250.h>
 #include <linux/init.h>
 
 #include <asm/hardware.h>
@@ -195,6 +196,41 @@ static struct sys_timer ebsa110_timer = {
 	.init		= ebsa110_timer_init,
 	.offset		= ebsa110_gettimeoffset,
 };
+
+static struct plat_serial8250_port serial_platform_data[] = {
+	{
+		.iobase		= 0x3f8,
+		.irq		= 1,
+		.uartclk	= 1843200,
+		.regshift	= 0,
+		.iotype		= UPIO_PORT,
+		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
+	},
+	{
+		.iobase		= 0x2f8,
+		.irq		= 2,
+		.uartclk	= 1843200,
+		.regshift	= 0,
+		.iotype		= UPIO_PORT,
+		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
+	},
+	{ },
+};
+
+static struct platform_device serial_device = {
+	.name			= "serial8250",
+	.id			= 0,
+	.dev			= {
+		.platform_data	= serial_platform_data,
+	},
+};
+
+static int __init ebsa110_init(void)
+{
+	return platform_device_register(&serial_device);
+}
+
+arch_initcall(ebsa110_init);
 
 MACHINE_START(EBSA110, "EBSA110")
 	MAINTAINER("Russell King")

@@ -33,7 +33,7 @@ void syscall_handler_tt(int sig, union uml_pt_regs *regs)
 	SC_START_SYSCALL(sc);
 
 	index = record_syscall_start(syscall);
-	syscall_trace(regs, 1);
+	syscall_trace(regs, 0);
 	result = execute_syscall(regs);
 
 	/* regs->sc may have changed while the system call ran (there may
@@ -46,11 +46,11 @@ void syscall_handler_tt(int sig, union uml_pt_regs *regs)
 	   (result == -ERESTARTNOINTR))
 		do_signal(result);
 
-	syscall_trace(regs, 0);
+	syscall_trace(regs, 1);
 	record_syscall_end(index, result);
 }
 
-int do_syscall(void *task, int pid)
+int do_syscall(void *task, int pid, int local_using_sysemu)
 {
 	unsigned long proc_regs[FRAME_SIZE];
 	union uml_pt_regs *regs;
@@ -69,6 +69,9 @@ int do_syscall(void *task, int pid)
 	   ((unsigned long *) PT_IP(proc_regs) >= &_stext) && 
 	   ((unsigned long *) PT_IP(proc_regs) <= &_etext))
 		tracer_panic("I'm tracing myself and I can't get out");
+
+	if(local_using_sysemu)
+		return(1);
 
 	if(ptrace(PTRACE_POKEUSER, pid, PT_SYSCALL_NR_OFFSET, 
 		  __NR_getpid) < 0)

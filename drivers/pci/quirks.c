@@ -937,8 +937,7 @@ static void __devinit quirk_usb_handoff_ohci(struct pci_dev *pdev)
 		while (wait_time > 0 && 
 				readl(base + OHCI_CONTROL) & OHCI_CTRL_IR) {
 			wait_time -= 10;
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			schedule_timeout((HZ*10 + 999) / 1000);
+			msleep(10);
 		}
 	}
 
@@ -987,8 +986,7 @@ static void __devinit quirk_usb_disable_ehci(struct pci_dev *pdev)
 
 			wait_time = 500;
 			do {
-				set_current_state(TASK_UNINTERRUPTIBLE);
-				schedule_timeout((HZ*10+999)/1000);
+				msleep(10);
 				wait_time -= 10;
 				pci_read_config_dword(pdev,
 						hcc_params + EHCI_USBLEGSUP,

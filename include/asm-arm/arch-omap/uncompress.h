@@ -20,7 +20,7 @@
 #include <linux/config.h>
 #include <linux/types.h>
 #include <linux/serial_reg.h>
-#include <asm/arch/serial.h>
+#include <asm/arch/hardware.h>
 
 unsigned int system_rev;
 

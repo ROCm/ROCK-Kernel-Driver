@@ -396,7 +396,7 @@ static const struct usb_descriptor_header *hs_loopback_function [] = {
 
 #endif	/* !CONFIG_USB_GADGET_DUALSPEED */
 
-static char				manufacturer [40];
+static char				manufacturer [50];
 static char				serial [40];
 
 /* static strings, in UTF-8 */

@@ -17,8 +17,6 @@ extern void sysfs_remove_subdir(struct dentry *);
 extern const unsigned char * sysfs_get_name(struct sysfs_dirent *sd);
 extern void sysfs_drop_dentry(struct sysfs_dirent *sd, struct dentry *parent);
 
-extern int sysfs_follow_link(struct dentry *, struct nameidata *);
-extern void sysfs_put_link(struct dentry *, struct nameidata *);
 extern struct rw_semaphore sysfs_rename_sem;
 extern struct super_block * sysfs_sb;
 extern struct file_operations sysfs_dir_operations;

@@ -856,7 +856,7 @@ static inline void __init hs_subset_descriptors(void)
 
 /* descriptors that are built on-demand */
 
-static char				manufacturer [40];
+static char				manufacturer [50];
 static char				product_desc [40] = DRIVER_DESC;
 
 #ifdef	DEV_CONFIG_CDC
@@ -2183,7 +2183,7 @@ static int eth_stop (struct net_device *net)
 		);
 
 	/* ensure there are no more active requests */
-	if (dev->gadget->speed != USB_SPEED_UNKNOWN) {
+	if (dev->config) {
 		usb_ep_disable (dev->in_ep);
 		usb_ep_disable (dev->out_ep);
 		if (netif_carrier_ok (dev->net)) {
