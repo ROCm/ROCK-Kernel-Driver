@@ -400,7 +400,7 @@ static int smsc47m1_detect(struct i2c_adapter *adapter, int address, int kind)
 		return 0;
 	}
 
-	if (!request_region(address, SMSC_EXTENT, "smsc47m1")) {
+	if (!request_region(address, SMSC_EXTENT, smsc47m1_driver.name)) {
 		dev_err(&adapter->dev, "Region 0x%x already in use!\n", address);
 		return -EBUSY;
 	}

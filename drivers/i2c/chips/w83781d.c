@@ -1065,7 +1065,8 @@ w83781d_detect(struct i2c_adapter *adapter, int address, int kind)
 	}
 	
 	if (is_isa)
-		if (!request_region(address, W83781D_EXTENT, "w83781d")) {
+		if (!request_region(address, W83781D_EXTENT,
+				    w83781d_driver.name)) {
 			dev_dbg(&adapter->dev, "Request of region "
 				"0x%x-0x%x for w83781d failed\n", address,
 				address + W83781D_EXTENT - 1);

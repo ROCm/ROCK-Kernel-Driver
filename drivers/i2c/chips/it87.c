@@ -624,7 +624,7 @@ int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 
 	/* Reserve the ISA region */
 	if (is_isa)
-		if (!request_region(address, IT87_EXTENT, name))
+		if (!request_region(address, IT87_EXTENT, it87_driver.name))
 			goto ERROR0;
 
 	/* Probe whether there is anything available on this address. Already
