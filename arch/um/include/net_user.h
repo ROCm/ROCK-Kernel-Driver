@@ -43,6 +43,10 @@ extern int net_sendto(int fd, void *buf, int len, void *to, int sock_len);
 extern void open_addr(unsigned char *addr, unsigned char *netmask, void *arg);
 extern void close_addr(unsigned char *addr, unsigned char *netmask, void *arg);
 
+extern char *split_if_spec(char *str, ...);
+
+extern int dev_netmask(void *d, void *m);
+
 #endif
 
 /*

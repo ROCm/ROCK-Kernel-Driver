@@ -14,8 +14,6 @@ struct tuntap_data {
 	char *gate_addr;
 	int fd;
 	void *dev;
-	unsigned char hw_addr[ETH_ADDR_LEN];
-	int hw_setup;
 };
 
 extern struct net_user_info tuntap_user_info;

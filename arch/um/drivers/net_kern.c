@@ -29,16 +29,6 @@
 
 LIST_HEAD(opened);
 
-struct uml_net devices[MAX_UML_NETDEV] = {
-	[ 0 ... MAX_UML_NETDEV - 1 ] = 
-	{
-		dev:		NULL,
-		user:		NULL,
-		kern:		NULL,
-		private_size:	0,
-	}
-};
-
 static int uml_net_rx(struct net_device *dev)
 {
 	struct uml_net_private *lp = dev->priv;
@@ -255,14 +245,30 @@ void uml_net_user_timer_expire(unsigned long _conn)
 #endif
 }
 
-static int eth_configure(struct uml_net *device, int n)
+static struct list_head devices = LIST_HEAD_INIT(devices);
+
+static int eth_configure(int n, void *init, char *mac,
+			 struct transport *transport)
 {
+	struct uml_net *device;
 	struct net_device *dev;
 	struct uml_net_private *lp;
-	int save, err;
+	int save, err, size;
 
-	device->private_size += sizeof(struct uml_net_private) + 
+	device = kmalloc(sizeof(*device), GFP_KERNEL);
+	if(device == NULL){
+		printk(KERN_ERR "eth_configure failed to allocate uml_net\n");
+		return(1);
+	}
+
+	list_add(&device->list, &devices);
+	device->index = n;
+
+	size = transport->private_size + sizeof(struct uml_net_private) + 
 		sizeof(((struct uml_net_private *) 0)->user);
+
+	if(setup_etheraddr(mac, device->mac))
+		device->have_mac = 1;
 
 	printk(KERN_INFO "Netdevice %d ", n);
 	if(device->have_mac) printk("(%02x:%02x:%02x:%02x:%02x:%02x) ",
@@ -270,7 +276,7 @@ static int eth_configure(struct uml_net *device, int n)
 				    device->mac[2], device->mac[3], 
 				    device->mac[4], device->mac[5]);
 	printk(": ");
-	dev = kmalloc(sizeof(*dev) + device->private_size, GFP_KERNEL);
+	dev = kmalloc(sizeof(*dev) + size, GFP_KERNEL);
 	if(dev == NULL){
 		printk(KERN_ERR "eth_configure: failed to allocate device\n");
 		return(1);
@@ -279,14 +285,9 @@ static int eth_configure(struct uml_net *device, int n)
 	dev->priv = (void *) &dev[1];
 	device->dev = dev;
 
-	(*device->kern->init)(dev, device->transport_index);
-	rtnl_lock();
-	err = register_netdevice(dev);
-	rtnl_unlock();
-	if(err)
-		return(1);
+	(*transport->kern->init)(dev, init);
 
-	dev->mtu = device->user->max_packet;
+	dev->mtu = transport->user->max_packet;
 	dev->open = uml_net_open;
 	dev->hard_start_xmit = uml_net_start_xmit;
 	dev->stop = uml_net_close;
@@ -298,7 +299,36 @@ static int eth_configure(struct uml_net *device, int n)
 	dev->do_ioctl = uml_net_ioctl;
 	dev->watchdog_timeo = (HZ >> 1);
 	dev->irq = UM_ETH_IRQ;
+	dev->init = NULL;
+	dev->master = NULL;
+	dev->neigh_setup = NULL;
+	dev->owner = NULL;
+	dev->state = 0;
+	dev->next_sched = 0;
+	dev->get_wireless_stats = 0;
+	dev->wireless_handlers = 0;
+	dev->gflags = 0;
+	dev->mc_list = NULL;
+	dev->mc_count = 0;
+	dev->promiscuity = 0;
+	dev->atalk_ptr = NULL;
+	dev->ip_ptr = NULL;
+	dev->dn_ptr = NULL;
+	dev->ip6_ptr = NULL;
+	dev->ec_ptr = NULL;
+	atomic_set(&dev->refcnt, 0);
+	dev->features = 0;
+	dev->uninit = NULL;
+	dev->destructor = NULL;
+	dev->set_config = NULL;
+	dev->accept_fastpath = 0;
+	dev->br_port = 0;
 
+	rtnl_lock();
+	err = register_netdevice(dev);
+	rtnl_unlock();
+	if(err)
+		return(1);
 	lp = dev->priv;
 
 	/* lp.user is the first four bytes of the transport data, which
@@ -314,26 +344,39 @@ static int eth_configure(struct uml_net *device, int n)
 		  fd :			-1,
 		  mac :			{ 0xfe, 0xfd, 0x0, 0x0, 0x0, 0x0},
 		  have_mac :		device->have_mac,
-		  protocol :		device->kern->protocol,
-		  open :		device->user->open,
-		  close :		device->user->close,
-		  remove :		device->user->remove,
-		  read :		device->kern->read,
-		  write :		device->kern->write,
-		  add_address :		device->user->add_address,
-		  delete_address : 	device->user->delete_address,
-		  set_mtu :		device->user->set_mtu,
+		  protocol :		transport->kern->protocol,
+		  open :		transport->user->open,
+		  close :		transport->user->close,
+		  remove :		transport->user->remove,
+		  read :		transport->kern->read,
+		  write :		transport->kern->write,
+		  add_address :		transport->user->add_address,
+		  delete_address : 	transport->user->delete_address,
+		  set_mtu :		transport->user->set_mtu,
 		  user : 		{ save } });
 	init_timer(&lp->tl);
 	lp->tl.function = uml_net_user_timer_expire;
 	memset(&lp->stats, 0, sizeof(lp->stats));
 	if(lp->have_mac) memcpy(lp->mac, device->mac, sizeof(lp->mac));
 
-	if(device->user->init) 
-		(*device->user->init)(&lp->user, dev);
+	if(transport->user->init) 
+		(*transport->user->init)(&lp->user, dev);
 	if(device->have_mac)
 		set_ether_mac(dev, device->mac);
 	return(0);
+}
+
+static struct uml_net *find_device(int n)
+{
+	struct uml_net *device;
+	struct list_head *ele;
+
+	list_for_each(ele, &devices){
+		device = list_entry(ele, struct uml_net, list);
+		if(device->index == n)
+			return(device);
+	}
+	return(NULL);
 }
 
 static int eth_parse(char *str, int *index_out, char **str_out)
@@ -346,8 +389,8 @@ static int eth_parse(char *str, int *index_out, char **str_out)
 		printk(KERN_ERR "eth_setup: Failed to parse '%s'\n", str);
 		return(1);
 	}
-	if((n < 0) || (n > sizeof(devices)/sizeof(devices[0]))){
-		printk(KERN_ERR "eth_setup: device %d out of range\n", n);
+	if(n < 0){
+		printk(KERN_ERR "eth_setup: device %d is negative\n", n);
 		return(1);
 	}
 	str = end;
@@ -357,7 +400,7 @@ static int eth_parse(char *str, int *index_out, char **str_out)
 		return(1);
 	}
 	str++;
-	if(devices[n].dev != NULL){
+	if(find_device(n)){
 		printk(KERN_ERR "eth_setup: Device %d already configured\n",
 		       n);
 		return(1);
@@ -377,24 +420,54 @@ struct list_head transports = LIST_HEAD_INIT(transports);
 
 struct list_head eth_cmd_line = LIST_HEAD_INIT(eth_cmd_line);
 
+static int check_transport(struct transport *transport, char *eth, int n,
+			   void **init_out, char **mac_out)
+{
+	int len;
+
+	len = strlen(transport->name);
+	if(strncmp(eth, transport->name, len))
+		return(0);
+
+	eth += len;
+	if(*eth == ',')
+		eth++;
+	else if(*eth != '\0')
+		return(0);
+
+	*init_out = kmalloc(transport->setup_size, GFP_KERNEL);
+	if(*init_out == NULL)
+		return(1);
+
+	if(!transport->setup(eth, mac_out, *init_out)){
+		kfree(*init_out);
+		*init_out = NULL;
+	}
+	return(1);
+}
+
 void register_transport(struct transport *new)
 {
 	struct list_head *ele, *next;
 	struct eth_init *eth;
-	char *str;
-	int err;
+	void *init;
+	char *mac = NULL;
+	int match;
 
 	list_add(&new->list, &transports);
 
 	list_for_each_safe(ele, next, &eth_cmd_line){
 		eth = list_entry(ele, struct eth_init, list);
-		if(!strncmp(eth->init, new->name, strlen(new->name))){
-			str = eth->init + strlen(new->name);
-			err = new->setup(str, &devices[eth->index]);
-			if(!err) eth_configure(&devices[eth->index], 
-					       eth->index);
-			list_del(&eth->list);
+		match = check_transport(new, eth->init, eth->index, &init,
+					&mac);
+		if(!match)
+			continue;
+		else if(init != NULL){
+			eth_configure(eth->index, init, mac, new);
+			kfree(init);
 		}
+		list_del(&eth->list);
+		return;
 	}
 }
 
@@ -402,16 +475,20 @@ static int eth_setup_common(char *str, int index)
 {
 	struct list_head *ele;
 	struct transport *transport;
+	void *init;
+	char *mac = NULL;
 
 	list_for_each(ele, &transports){
 		transport = list_entry(ele, struct transport, list);
-		if(!strncmp(str, transport->name, strlen(transport->name))){
-			str += strlen(transport->name);
-			return(transport->setup(str, &devices[index]));
+	        if(!check_transport(transport, str, index, &init, &mac))
+			continue;
+		if(init != NULL){
+			eth_configure(index, init, mac, transport);
+			kfree(init);
 		}
+		return(1);
 	}
-
-	return(-1);
+	return(0);
 }
 
 static int eth_setup(char *str)
@@ -446,13 +523,12 @@ static int eth_init(void)
 {
 	struct list_head *ele, *next;
 	struct eth_init *eth;
-	int err;
 
 	list_for_each_safe(ele, next, &eth_cmd_line){
 		eth = list_entry(ele, struct eth_init, list);
-		err = eth_setup_common(eth->init, eth->index);
-		if(!err) eth_configure(&devices[eth->index], eth->index);
-		if(err >= 0) list_del(&eth->list);
+
+		if(eth_setup_common(eth->init, eth->index))
+			list_del(&eth->list);
 	}
 	
 	return(1);
@@ -462,7 +538,7 @@ __initcall(eth_init);
 
 static int net_config(char *str)
 {
-	int err, n;
+	int n, err;
 
 	err = eth_parse(str, &n, &str);
 	if(err) return(err);
@@ -470,32 +546,38 @@ static int net_config(char *str)
 	str = uml_strdup(str);
 	if(str == NULL){
 		printk(KERN_ERR "net_config failed to strdup string\n");
-		return(1);
+		return(-1);
 	}
-	err = eth_setup_common(str, n);
-	if(err){
+	err = !eth_setup_common(str, n);
+	if(err) 
 		kfree(str);
-		return(err);
-	}
-	err = eth_configure(&devices[n], n);
 	return(err);
 }
 
 static int net_remove(char *str)
 {
+	struct uml_net *device;
 	struct net_device *dev;
 	struct uml_net_private *lp;
+	char *end;
 	int n;
 
-	if(!isdigit(*str)) return(-1);
-	n = *str - '0';
-	if(devices[n].dev == NULL) return(0);
-	dev = devices[n].dev;
+	n = simple_strtoul(str, &end, 0);
+	if(*end != '\0')
+		return(-1);
+
+	device = find_device(n);
+	if(device == NULL)
+		return(0);
+
+	dev = device->dev;
 	lp = dev->priv;
 	if(lp->fd > 0) return(-1);
 	if(lp->remove != NULL) (*lp->remove)(&lp->user);
 	unregister_netdev(dev);
-	devices[n].dev = NULL;
+
+	list_del(&device->list);
+	kfree(device);
 	return(0);
 }
 
@@ -596,6 +678,8 @@ int setup_etheraddr(char *str, unsigned char *addr)
 	char *end;
 	int i;
 
+	if(str == NULL)
+		return(0);
 	for(i=0;i<6;i++){
 		addr[i] = simple_strtoul(str, &end, 16);
 		if((end == str) ||
@@ -603,7 +687,7 @@ int setup_etheraddr(char *str, unsigned char *addr)
 			printk(KERN_ERR 
 			       "setup_etheraddr: failed to parse '%s' "
 			       "as an ethernet address\n", str);
-			return(-1);
+			return(0);
 		}
 		str = end + 1;
 	}
@@ -611,9 +695,9 @@ int setup_etheraddr(char *str, unsigned char *addr)
 		printk(KERN_ERR 
 		       "Attempt to assign a broadcast ethernet address to a "
 		       "device disallowed\n");
-		return(-1);
+		return(0);
 	}
-	return(0);
+	return(1);
 }
 
 void dev_ip_addr(void *d, char *buf, char *bin_buf)
@@ -684,6 +768,24 @@ void iter_addresses(void *d, void (*cb)(unsigned char *, unsigned char *,
 	}
 }
 
+int dev_netmask(void *d, void *m)
+{
+	struct net_device *dev = d;
+	struct in_device *ip = dev->ip_ptr;
+	struct in_ifaddr *in;
+	__u32 *mask_out = m;
+
+	if(ip == NULL) 
+		return(1);
+
+	in = ip->ifa_list;
+	if(in == NULL) 
+		return(1);
+
+	*mask_out = in->ifa_mask;
+	return(0);
+}
+
 void *get_output_buffer(int *len_out)
 {
 	void *ret;
@@ -699,30 +801,24 @@ void free_output_buffer(void *buffer)
 	free_pages((unsigned long) buffer, 0);
 }
 
-int tap_setup_common(char *str, char *type, char **dev_name, char *mac, 
-		     int *have_mac, char **gate_addr)
+int tap_setup_common(char *str, char *type, char **dev_name, char **mac_out, 
+		     char **gate_addr)
 {
-	int err;
+	char *remain;
 
-	if(*str != ','){
-		printk(KERN_ERR 
-		       "ethertap_setup: expected ',' after '%s'\n", type);
+	remain = split_if_spec(str, dev_name, mac_out, gate_addr, NULL);
+	if(remain != NULL){
+		printk("tap_setup_common - Extra garbage on specification : "
+		       "'%s'\n", remain);
 		return(1);
 	}
-	str++;
-	if(*str != ',') *dev_name = str;
-	str = strchr(str, ',');
-	if(str == NULL) return(0);
-	*str++ = '\0';
-	if(*str != ','){
-		err = setup_etheraddr(str, mac);
-		if(!err) *have_mac = 1;
-	}
-	str = strchr(str, ',');
-	if(str == NULL) return(0);
-	*str++ = '\0';
-	if(*str != '\0') *gate_addr = str;
+
 	return(0);
+}
+
+unsigned short eth_protocol(struct sk_buff *skb)
+{
+	return(eth_type_trans(skb, skb->dev));
 }
 
 /*
