@@ -30,6 +30,10 @@ config PPC32
 	bool
 	default y
 
+# All PPCs use generic nvram driver through ppc_md
+config GENERIC_NVRAM
+	bool
+	default y
 
 source "init/Kconfig"
 

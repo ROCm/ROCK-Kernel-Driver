@@ -34,23 +34,40 @@ enum {
 /* Return partition offset in nvram */
 extern int	pmac_get_partition(int partition);
 
-/* Direct access to XPRAM */
+/* Direct access to XPRAM on PowerMacs */
 extern u8	pmac_xpram_read(int xpaddr);
 extern void	pmac_xpram_write(int xpaddr, u8 data);
+
+/* Synchronize NVRAM */
+extern void	nvram_sync(void);
+
+/* Normal access to NVRAM */
+extern unsigned char nvram_read_byte(int i);
+extern void nvram_write_byte(unsigned char c, int i);
 
 /* Some offsets in XPRAM */
 #define PMAC_XPRAM_MACHINE_LOC	0xe4
 #define PMAC_XPRAM_SOUND_VOLUME	0x08
 
-/* Machine location structure in XPRAM */
+/* Machine location structure in PowerMac XPRAM */
 struct pmac_machine_location {
 	unsigned int	latitude;	/* 2+30 bit Fractional number */
 	unsigned int	longitude;	/* 2+30 bit Fractional number */
 	unsigned int	delta;		/* mix of GMT delta and DLS */
 };
 
-/* /dev/nvram ioctls */
-#define PMAC_NVRAM_GET_OFFSET	_IOWR('p', 0x40, int) /* Get NVRAM partition offset */
+/*
+ * /dev/nvram ioctls
+ *
+ * Note that PMAC_NVRAM_GET_OFFSET is still supported, but is
+ * definitely obsolete. Do not use it if you can avoid it
+ */
+
+#define OBSOLETE_PMAC_NVRAM_GET_OFFSET \
+				_IOWR('p', 0x40, int)
+
+#define IOC_NVRAM_GET_OFFSET	_IOWR('p', 0x42, int)	/* Get NVRAM partition offset */
+#define IOC_NVRAM_SYNC		_IO('p', 0x43)		/* Sync NVRAM image */
 
 #endif
 #endif /* __KERNEL__ */

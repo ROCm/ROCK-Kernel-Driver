@@ -8,9 +8,6 @@ obj-$(CONFIG_PPC_PMAC)		+= macio_asic.o
 
 obj-$(CONFIG_PMAC_PBOOK)	+= mediabay.o
 obj-$(CONFIG_MAC_SERIAL)	+= macserial.o
-ifneq ($(CONFIG_MAC),y)
-  obj-$(CONFIG_NVRAM)		+= nvram.o
-endif
 obj-$(CONFIG_MAC_EMUMOUSEBTN)	+= mac_hid.o
 obj-$(CONFIG_INPUT_ADBHID)	+= adbhid.o
 obj-$(CONFIG_ANSLCD)		+= ans-lcd.o
