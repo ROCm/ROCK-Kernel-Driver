@@ -60,6 +60,12 @@ extern elevator_t elevator_linus;
 #define ELV_LINUS_SEEK_COST	16
 
 /*
+ * deadline i/o scheduler. uses request time outs to prevent indefinite
+ * starvation
+ */
+extern elevator_t iosched_deadline;
+
+/*
  * use the /proc/iosched interface, all the below is history ->
  */
 typedef struct blkelv_ioctl_arg_s {

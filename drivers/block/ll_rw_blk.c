@@ -1175,7 +1175,7 @@ int blk_init_queue(request_queue_t *q, request_fn_proc *rfn, spinlock_t *lock)
 	if (blk_init_free_list(q))
 		return -ENOMEM;
 
-	if ((ret = elevator_init(q, &q->elevator, elevator_linus))) {
+	if ((ret = elevator_init(q, &q->elevator, iosched_deadline))) {
 		blk_cleanup_queue(q);
 		return ret;
 	}
