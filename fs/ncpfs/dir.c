@@ -6,6 +6,7 @@
  *  Modified 1997 Peter Waltenberg, Bill Hawes, David Woodhouse for 2.1 dcache
  *  Modified 1998, 1999 Wolfram Pienkoss for NLS
  *  Modified 1999 Wolfram Pienkoss for directory caching
+ *  Modified 2000 Ben Harris, University of Cambridge for NFS NS meta-info
  *
  */
 
@@ -40,8 +41,12 @@ static int ncp_mkdir(struct inode *, struct dentry *, int);
 static int ncp_rmdir(struct inode *, struct dentry *);
 static int ncp_rename(struct inode *, struct dentry *,
 	  	      struct inode *, struct dentry *);
-#ifdef CONFIG_NCPFS_EXTRAS
+static int ncp_mknod(struct inode * dir, struct dentry *dentry,
+		     int mode, int rdev);
+#if defined(CONFIG_NCPFS_EXTRAS) || defined(CONFIG_NCPFS_NFS_NS)
 extern int ncp_symlink(struct inode *, struct dentry *, const char *);
+#else
+#define ncp_symlink NULL
 #endif
 		      
 struct file_operations ncp_dir_operations =
@@ -56,11 +61,10 @@ struct inode_operations ncp_dir_inode_operations =
 	create:		ncp_create,
 	lookup:		ncp_lookup,
 	unlink:		ncp_unlink,
-#ifdef CONFIG_NCPFS_EXTRAS
 	symlink:	ncp_symlink,
-#endif
 	mkdir:		ncp_mkdir,
 	rmdir:		ncp_rmdir,
+	mknod:		ncp_mknod,
 	rename:		ncp_rename,
 	setattr:	ncp_notify_change,
 };
@@ -743,6 +747,7 @@ ncp_do_readdir(struct file *filp, void *dirent, filldir_t filldir,
 			onerpl = offsetof(struct nw_info_struct, entryName) + entry.i.nameLen;
 			if (rpls < onerpl)
 				break;	/* short packet */
+			(void)ncp_obtain_nfs_info(server, &entry.i);
 			rpl += onerpl;
 			rpls -= onerpl;
 			entry.volume = entry.i.volNumber;
@@ -878,7 +883,7 @@ out_close:
 }
 
 int ncp_create_new(struct inode *dir, struct dentry *dentry, int mode,
-		int attributes)
+		   int rdev, int attributes)
 {
 	struct ncp_server *server = NCP_SERVER(dir);
 	struct ncp_entry_info finfo;
@@ -924,6 +929,15 @@ int ncp_create_new(struct inode *dir, struct dentry *dentry, int mode,
 		opmode = O_WRONLY;
 	}
 	finfo.access = opmode;
+	if (ncp_is_nfs_extras(server, finfo.volume)) {
+		finfo.i.nfs.mode = mode;
+		finfo.i.nfs.rdev = rdev;
+		if (ncp_modify_nfs_info(server, finfo.volume,
+					finfo.i.dirEntNum,
+					mode, rdev) != 0)
+			goto out;
+	}
+
 	error = ncp_instantiate(dir, dentry, &finfo);
 out:
 	unlock_kernel();
@@ -932,7 +946,7 @@ out:
 
 static int ncp_create(struct inode *dir, struct dentry *dentry, int mode)
 {
-	return ncp_create_new(dir, dentry, mode, 0);
+	return ncp_create_new(dir, dentry, mode, 0, 0);
 }
 
 static int ncp_mkdir(struct inode *dir, struct dentry *dentry, int mode)
@@ -960,6 +974,15 @@ static int ncp_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 					   OC_MODE_CREATE, aDIR, 0xffff,
 					   &finfo) == 0)
 	{
+		if (ncp_is_nfs_extras(server, finfo.volume)) {
+			mode |= S_IFDIR;
+			finfo.i.nfs.mode = mode;
+			if (ncp_modify_nfs_info(server,
+						finfo.volume,
+						finfo.i.dirEntNum,
+						mode, 0) != 0)
+				goto out;
+		}
 		error = ncp_instantiate(dir, dentry, &finfo);
 	}
 out:
@@ -1143,6 +1166,16 @@ static int ncp_rename(struct inode *old_dir, struct dentry *old_dentry,
 out:
 	unlock_kernel();
 	return error;
+}
+
+static int ncp_mknod(struct inode * dir, struct dentry *dentry,
+		     int mode, int rdev)
+{
+	if (ncp_is_nfs_extras(NCP_SERVER(dir), NCP_FINFO(dir)->volNumber)) {
+		DPRINTK(KERN_DEBUG "ncp_mknod: mode = 0%o\n", mode);
+		return ncp_create_new(dir, dentry, mode, rdev, 0);
+	}
+	return -EPERM; /* Strange, but true */
 }
 
 /* The following routines are taken directly from msdos-fs */

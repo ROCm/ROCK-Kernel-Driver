@@ -85,6 +85,18 @@ struct ncp_volume_info {
 #define RIM_ALL 	      (ntohl(0xFF0F0000L))
 #define RIM_COMPRESSED_INFO   (ntohl(0x00000080L))
 
+/* Defines for NSInfoBitMask */
+#define NSIBM_NFS_NAME		0x0001
+#define NSIBM_NFS_MODE		0x0002
+#define NSIBM_NFS_GID		0x0004
+#define NSIBM_NFS_NLINKS	0x0008
+#define NSIBM_NFS_RDEV		0x0010
+#define NSIBM_NFS_LINK		0x0020
+#define NSIBM_NFS_CREATED	0x0040
+#define NSIBM_NFS_UID		0x0080
+#define NSIBM_NFS_ACSFLAG	0x0100
+#define NSIBM_NFS_MYFLAG	0x0200
+
 /* open/create modes */
 #define OC_MODE_OPEN	  0x01
 #define OC_MODE_TRUNCATE  0x02
@@ -108,6 +120,11 @@ struct ncp_volume_info {
 #define AR_WRITE_THROUGH   0x0040
 #define AR_OPEN_COMPRESSED 0x0100
 #endif
+
+struct nw_nfs_info {
+	__u32 mode;
+	__u32 rdev;
+};
 
 struct nw_info_struct {
 	__u32 spaceAlloc __attribute__((packed));
@@ -136,6 +153,10 @@ struct nw_info_struct {
 	__u32 NSCreator __attribute__((packed));
 	__u8 nameLen __attribute__((packed));
 	__u8 entryName[256] __attribute__((packed));
+	/* libncp may depend on there being nothing after entryName */
+#ifdef __KERNEL__
+	struct nw_nfs_info nfs;
+#endif
 };
 
 /* modify mask - use with MODIFY_DOS_INFO structure */

@@ -5,6 +5,7 @@
  *  Modified for big endian by J.F. Chadima and David S. Miller
  *  Modified 1997 Peter Waltenberg, Bill Hawes, David Woodhouse for 2.1 dcache
  *  Modified 1998 Wolfram Pienkoss for NLS
+ *  Modified 2000 Ben Harris, University of Cambridge for NFS NS meta-info
  *
  */
 
@@ -91,7 +92,7 @@ static struct super_operations ncp_sops =
 };
 
 extern struct dentry_operations ncp_root_dentry_operations;
-#ifdef CONFIG_NCPFS_EXTRAS
+#if defined(CONFIG_NCPFS_EXTRAS) || defined(CONFIG_NCPFS_NFS_NS)
 extern struct address_space_operations ncp_symlink_aops;
 extern int ncp_symlink(struct inode*, struct dentry*, const char*);
 #endif
@@ -120,6 +121,14 @@ void ncp_update_inode(struct inode *inode, struct ncp_entry_info *nwinfo)
 
 static void ncp_update_dates(struct inode *inode, struct nw_info_struct *nwi)
 {
+	/* NFS namespace mode overrides others if it's set. */
+	DPRINTK(KERN_DEBUG "ncp_update_dates_and_mode: (%s) nfs.mode=0%o\n",
+		nwi->entryName, nwi->nfs.mode);
+	if (nwi->nfs.mode) {
+		/* XXX Security? */
+		inode->i_mode = nwi->nfs.mode;
+	}
+
 	inode->i_blocks = (inode->i_size + NCP_BLOCK_SIZE - 1) >> NCP_BLOCK_SHIFT;
 
 	inode->i_mtime = ncp_date_dos2unix(le16_to_cpu(nwi->modifyTime),
@@ -152,6 +161,7 @@ static void ncp_update_attrs(struct inode *inode, struct ncp_entry_info *nwinfo)
 						if (/* (inode->i_size >= NCP_MIN_SYMLINK_SIZE)
 						 && */ (inode->i_size <= NCP_MAX_SYMLINK_SIZE)) {
 							inode->i_mode = (inode->i_mode & ~S_IFMT) | S_IFLNK;
+							NCP_FINFO(inode)->flags |= NCPI_KLUDGE_SYMLINK;
 							break;
 						}
 					}
@@ -177,6 +187,7 @@ static void ncp_update_attrs(struct inode *inode, struct ncp_entry_info *nwinfo)
 
 void ncp_update_inode2(struct inode* inode, struct ncp_entry_info *nwinfo)
 {
+	NCP_FINFO(inode)->flags = 0;
 	if (!atomic_read(&NCP_FINFO(inode)->opened)) {
 		NCP_FINFO(inode)->nwattr = nwinfo->i.attributes;
 		ncp_update_attrs(inode, nwinfo);
@@ -193,6 +204,8 @@ static void ncp_set_attr(struct inode *inode, struct ncp_entry_info *nwinfo)
 {
 	struct ncp_server *server = NCP_SERVER(inode);
 
+	NCP_FINFO(inode)->flags = 0;
+	
 	ncp_update_attrs(inode, nwinfo);
 
 	DDPRINTK("ncp_read_inode: inode->i_mode = %u\n", inode->i_mode);
@@ -238,11 +251,17 @@ ncp_iget(struct super_block *sb, struct ncp_entry_info *info)
 		} else if (S_ISDIR(inode->i_mode)) {
 			inode->i_op = &ncp_dir_inode_operations;
 			inode->i_fop = &ncp_dir_operations;
-#ifdef CONFIG_NCPFS_EXTRAS
+#ifdef CONFIG_NCPFS_NFS_NS
+		} else if (S_ISCHR(inode->i_mode) || S_ISBLK(inode->i_mode) || S_ISFIFO(inode->i_mode) || S_ISSOCK(inode->i_mode)) {
+			init_special_inode(inode, inode->i_mode, info->i.nfs.rdev);
+#endif
+#if defined(CONFIG_NCPFS_EXTRAS) || defined(CONFIG_NCPFS_NFS_NS)
 		} else if (S_ISLNK(inode->i_mode)) {
 			inode->i_op = &ncp_symlink_inode_operations;
 			inode->i_data.a_ops = &ncp_symlink_aops;
 #endif
+		} else {
+			make_bad_inode(inode);
 		}
 		insert_inode_hash(inode);
 	} else
@@ -660,6 +679,27 @@ int ncp_notify_change(struct dentry *dentry, struct iattr *attr)
                 	info.attributes &= ~(aRONLY|aRENAMEINHIBIT|aDELETEINHIBIT);
                 else
 			info.attributes |=  (aRONLY|aRENAMEINHIBIT|aDELETEINHIBIT);
+
+#ifdef CONFIG_NCPFS_NFS_NS
+		if (ncp_is_nfs_extras(server, NCP_FINFO(inode)->volNumber)) {
+			result = ncp_modify_nfs_info(server,
+						     NCP_FINFO(inode)->volNumber,
+						     NCP_FINFO(inode)->dirEntNum,
+						     attr->ia_mode, 0);
+			if (result != 0)
+				goto out;
+			info.attributes &= ~(aSHARED | aSYSTEM);
+			{
+				/* mark partial success */
+				struct iattr tmpattr;
+				
+				tmpattr.ia_valid = ATTR_MODE;
+				tmpattr.ia_mode = attr->ia_mode;
+
+				inode_setattr(inode, &tmpattr);
+			}
+		}
+#endif
         }
 #endif
 

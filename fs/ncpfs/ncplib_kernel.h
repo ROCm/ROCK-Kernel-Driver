@@ -69,11 +69,14 @@ static inline void ncp_inode_close(struct inode *inode) {
 void ncp_extract_file_info(void* src, struct nw_info_struct* target);
 int ncp_obtain_info(struct ncp_server *server, struct inode *, char *,
 		struct nw_info_struct *target);
+int ncp_obtain_nfs_info(struct ncp_server *server, struct nw_info_struct *target);
 int ncp_lookup_volume(struct ncp_server *, char *, struct nw_info_struct *);
 int ncp_modify_file_or_subdir_dos_info(struct ncp_server *, struct inode *,
 	 __u32, const struct nw_modify_dos_info *info);
 int ncp_modify_file_or_subdir_dos_info_path(struct ncp_server *, struct inode *,
 	 const char* path, __u32, const struct nw_modify_dos_info *info);
+int ncp_modify_nfs_info(struct ncp_server *, __u8 volnum, __u32 dirent,
+			__u32 mode, __u32 rdev);
 
 int ncp_del_file_or_subdir2(struct ncp_server *, struct dentry*);
 int ncp_del_file_or_subdir(struct ncp_server *, struct inode *, char *);
@@ -112,6 +115,18 @@ ncp_mount_subdir(struct ncp_server *, struct nw_info_struct *,
 			__u8, __u8, __u32);
 int ncp_dirhandle_alloc(struct ncp_server *, __u8 vol, __u32 dirent, __u8 *dirhandle);
 int ncp_dirhandle_free(struct ncp_server *, __u8 dirhandle);
+
+int ncp_create_new(struct inode *dir, struct dentry *dentry,
+                          int mode, int rdev, int attributes);
+
+static inline int ncp_is_nfs_extras(struct ncp_server* server, unsigned int volnum) {
+#ifdef CONFIG_NCPFS_NFS_NS
+	return (server->m.flags & NCP_MOUNT_NFS_EXTRAS) &&
+	       (server->name_space[volnum] == NW_NS_NFS);
+#else
+	return 0;
+#endif
+}
 
 #ifdef CONFIG_NCPFS_NLS
 
