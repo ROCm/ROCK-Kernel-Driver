@@ -306,14 +306,28 @@ acpi_pci_link_set (
 	memset(&resource, 0, sizeof(resource));
 
 	/* NOTE: PCI interrupts are always level / active_low / shared. */
-	resource.res.id = ACPI_RSTYPE_IRQ;
-	resource.res.length = sizeof(struct acpi_resource);
-	resource.res.data.irq.edge_level = ACPI_LEVEL_SENSITIVE;
-	resource.res.data.irq.active_high_low = ACPI_ACTIVE_LOW;
-	resource.res.data.irq.shared_exclusive = ACPI_SHARED;
-	resource.res.data.irq.number_of_interrupts = 1;
-	resource.res.data.irq.interrupts[0] = irq;
-	resource.end.id = ACPI_RSTYPE_END_TAG;
+	if (irq <= 15) {
+		resource.res.id = ACPI_RSTYPE_IRQ;
+		resource.res.length = sizeof(struct acpi_resource);
+		resource.res.data.irq.edge_level = ACPI_LEVEL_SENSITIVE;
+		resource.res.data.irq.active_high_low = ACPI_ACTIVE_LOW;
+		resource.res.data.irq.shared_exclusive = ACPI_SHARED;
+		resource.res.data.irq.number_of_interrupts = 1;
+		resource.res.data.irq.interrupts[0] = irq;
+		resource.end.id = ACPI_RSTYPE_END_TAG;
+	}
+	else {
+		resource.res.id = ACPI_RSTYPE_EXT_IRQ;
+		resource.res.length = sizeof(struct acpi_resource);
+		resource.res.data.extended_irq.producer_consumer = ACPI_CONSUMER;
+		resource.res.data.extended_irq.edge_level = ACPI_LEVEL_SENSITIVE;
+		resource.res.data.extended_irq.active_high_low = ACPI_ACTIVE_LOW;
+		resource.res.data.extended_irq.shared_exclusive = ACPI_SHARED;
+		resource.res.data.extended_irq.number_of_interrupts = 1;
+		resource.res.data.extended_irq.interrupts[0] = irq;
+		/* ignore resource_source, it's optional */
+		resource.end.id = ACPI_RSTYPE_END_TAG;
+	}
 
 	status = acpi_set_current_resources(link->handle, &buffer);
 	if (ACPI_FAILURE(status)) {
