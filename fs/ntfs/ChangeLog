@@ -66,6 +66,10 @@ ToDo/Notes:
 	  buffers belonging to the ntfs record dirty.  This causes the buffers
 	  to become busy and hence they are safe from removal until the page
 	  has been written out.
+	- Fix stupid bug in fs/ntfs/attrib.c::ntfs_external_attr_find() in the
+	  error handling code path that resulted in a BUG() due to trying to
+	  unmap an extent mft record when the mapping of it had failed and it
+	  thus was not mapped.  (Thanks to Ken MacFerrin for the bug report.)
 
 2.1.21 - Fix some races and bugs, rewrite mft write code, add mft allocator.
 

@@ -655,7 +655,6 @@ static int ntfs_external_attr_find(const ATTR_TYPE type,
 				ctx->mrec = map_extent_mft_record(base_ni,
 						le64_to_cpu(
 						al_entry->mft_reference), &ni);
-				ctx->ntfs_ino = ni;
 				if (IS_ERR(ctx->mrec)) {
 					ntfs_error(vol->sb, "Failed to map "
 							"extent mft record "
@@ -667,8 +666,11 @@ static int ntfs_external_attr_find(const ATTR_TYPE type,
 					err = PTR_ERR(ctx->mrec);
 					if (err == -ENOENT)
 						err = -EIO;
+					/* Cause @ctx to be sanitized below. */
+					ni = NULL;
 					break;
 				}
+				ctx->ntfs_ino = ni;
 			}
 			ctx->attr = (ATTR_RECORD*)((u8*)ctx->mrec +
 					le16_to_cpu(ctx->mrec->attrs_offset));
@@ -740,7 +742,8 @@ do_next_attr:
 		err = -EIO;
 	}
 	if (ni != base_ni) {
-		unmap_extent_mft_record(ni);
+		if (ni)
+			unmap_extent_mft_record(ni);
 		ctx->ntfs_ino = base_ni;
 		ctx->mrec = ctx->base_mrec;
 		ctx->attr = ctx->base_attr;
