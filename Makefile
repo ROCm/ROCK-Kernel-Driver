@@ -825,8 +825,15 @@ define all-sources
 	       -name '*.[chS]' -print )
 endef
 
-quiet_cmd_cscope = MAKE   $@
-cmd_cscope = $(all-sources) | cscope -k -b -i -
+quiet_cmd_cscope-file = FILELST cscope.files
+      cmd_cscope-file = $(all-sources) > cscope.files
+
+quiet_cmd_cscope = MAKE    cscope.out
+      cmd_cscope = cscope -k -b
+
+cscope: FORCE
+	$(call cmd,cscope-file)
+	$(call cmd,cscope)
 
 quiet_cmd_TAGS = MAKE   $@
 cmd_TAGS = $(all-sources) | etags -
@@ -839,9 +846,6 @@ define cmd_tags
 	CTAGSF=`ctags --version | grep -i exuberant >/dev/null && echo "-I __initdata,__exitdata,EXPORT_SYMBOL,EXPORT_SYMBOL_NOVERS"`; \
 	$(all-sources) | xargs ctags $$CTAGSF -a
 endef
-
-cscope: FORCE
-	$(call cmd,cscope)
 
 TAGS: FORCE
 	$(call cmd,TAGS)
