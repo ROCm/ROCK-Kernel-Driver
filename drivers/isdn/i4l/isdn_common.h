@@ -57,7 +57,6 @@ extern void isdn_MOD_INC_USE_COUNT(void);
 extern void isdn_MOD_DEC_USE_COUNT(void);
 extern void isdn_lock_drivers(void);
 extern void isdn_unlock_drivers(void);
-extern void isdn_free_channel(int di, int ch, int usage);
 extern void isdn_info_update(void);
 extern char *isdn_map_eaz2msn(char *msn, int di);
 extern int isdn_getnum(char **);
@@ -77,7 +76,6 @@ struct isdn_slot {
 	unsigned long     ibytes;              /* Statistics incoming bytes  */
 	unsigned long     obytes;              /* Statistics outgoing bytes  */
 	struct isdn_v110  iv110;               /* For V.110                  */
-	int               m_idx;               /* Index for mdm....          */
 	void             *priv;                /* pointer to isdn_net_dev    */
 	int             (*event_cb)(struct isdn_slot *, int pr, void *arg);
 	struct fsm_inst   fi;
@@ -101,11 +99,7 @@ char *isdn_slot_map_eaz2msn(struct isdn_slot *, char *msn);
 int   isdn_slot_write(struct isdn_slot *, struct sk_buff *);
 int   isdn_slot_hdrlen(struct isdn_slot *);
 int   isdn_slot_maxbufsize(struct isdn_slot *);
-char *isdn_slot_num(struct isdn_slot *);
-void  isdn_slot_set_m_idx(struct isdn_slot *, int midx);
 int   isdn_hard_header_len(void);
-int   isdn_slot_m_idx(int sl);
-int   isdn_slot_usage(int sl);
 
 int   isdn_drv_lookup(char *drvid);
 char *isdn_drv_drvid(int di);

@@ -2179,34 +2179,6 @@ isdn_slot_dial(struct isdn_slot *slot, struct dial_info *dial)
 }
 
 int
-isdn_slot_usage(int sl)
-{
-	BUG_ON(sl < 0);
-
-	return slots[sl].usage;
-}
-
-int
-isdn_slot_m_idx(int sl)
-{
-	BUG_ON(sl < 0);
-
-	return slots[sl].m_idx;
-}
-
-void
-isdn_slot_set_m_idx(struct isdn_slot *slot, int midx)
-{
-	slot->m_idx = midx;
-}
-
-char *
-isdn_slot_num(struct isdn_slot *slot)
-{
-	return slot->num;
-}
-
-int
 isdn_hard_header_len(void)
 {
 	int drvidx;
@@ -2334,10 +2306,7 @@ static int __init isdn_init(void)
 	for (i = 0; i < ISDN_MAX_CHANNELS; i++) {
 		slots[i].di = -1;
 		slots[i].ch = -1;
-		slots[i].m_idx = -1;
 		strcpy(slots[i].num, "???");
-		init_waitqueue_head(&isdn_mdm.info[i].open_wait);
-		init_waitqueue_head(&isdn_mdm.info[i].close_wait);
 		slots[i].fi.fsm = &slot_fsm;
 		slots[i].fi.state = ST_SLOT_NULL;
 		slots[i].fi.debug = 1;

@@ -857,20 +857,13 @@ isdn_net_getpeer(isdn_net_ioctl_phone *phone, isdn_net_ioctl_phone *peer)
 
 	if (!idev)
 		return -ENODEV;
-	/* FIXME
-	 * Theoretical race: while this executes, the remote number might
-	 * become invalid (hang up) or change (new connection), resulting
-         * in (partially) wrong number copied to user. This race
-	 * currently ignored.
-	 */
-	slot = idev->isdn_slot;
-	if (slot < 0)
-		return -ENOTCONN;
-	/* for pre-bound channels, we need this extra check */
-	if (strncmp(isdn_slot_num(slot), "???", 3) == 0 )
+
+	if (idev->fi.state != ST_ACTIVE)
 		return -ENOTCONN;
 
-	strncpy(phone->phone, isdn_slot_num(slot), ISDN_MSNLEN);
+	slot = idev->isdn_slot;
+
+	strncpy(phone->phone, slot->num, ISDN_MSNLEN);
 	phone->outgoing = USG_OUTGOING(slot->usage);
 
 	if (copy_to_user(peer, phone, sizeof(*peer)))

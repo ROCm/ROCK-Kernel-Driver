@@ -764,7 +764,6 @@ isdn_tty_dial(char *n, modem_info * info, atemu * m)
 		};
 
 		info->isdn_slot = slot;
-		isdn_slot_set_m_idx(slot, info->line);
 		slot->usage |= ISDN_USAGE_MODEM;
 		slot->priv = info;
 		slot->event_cb = isdn_tty_event_callback;
@@ -941,7 +940,6 @@ isdn_tty_resume(char *id, modem_info * info, atemu * m)
 		isdn_tty_modem_result(RESULT_NO_DIALTONE, info);
 	} else {
 		info->isdn_slot = slot;
-		isdn_slot_set_m_idx(slot, info->line);
 		slot->usage |= ISDN_USAGE_MODEM;
 		slot->priv = info;
 		slot->event_cb = isdn_tty_event_callback;
@@ -1018,7 +1016,6 @@ isdn_tty_send_msg(modem_info * info, atemu * m, char *msg)
 		isdn_tty_modem_result(RESULT_NO_DIALTONE, info);
 	} else {
 		info->isdn_slot = slot;
-		isdn_slot_set_m_idx(slot, info->line);
 		slot->usage |= ISDN_USAGE_MODEM;
 		slot->priv = info;
 		slot->event_cb = isdn_tty_event_callback;
@@ -2133,6 +2130,8 @@ isdn_tty_init(void)
 		init_timer(&info->read_timer);
 		info->read_timer.data = (unsigned long) info;
 		info->read_timer.function = isdn_tty_readmodem;
+		init_waitqueue_head(&info->open_wait);
+		init_waitqueue_head(&info->close_wait);
 		skb_queue_head_init(&info->rpqueue);
 		info->xmit_size = ISDN_SERIAL_XMIT_SIZE;
 		skb_queue_head_init(&info->xmit_queue);
@@ -2301,7 +2300,6 @@ isdn_tty_find_icall(struct isdn_slot *slot, setup_parm *setup)
 					wret = matchret;
 				if (!matchret) {                  /* EAZ is matching */
 					info->isdn_slot = slot;
-					isdn_slot_set_m_idx(slot, info->line);
 					slot->usage |= isdn_calc_usage(si1, info->emu.mdmreg[REG_L2PROT]);
 					slot->priv = info;
 					slot->event_cb = isdn_tty_event_callback;
@@ -2740,7 +2738,7 @@ isdn_tty_modem_result(int code, modem_info * info)
 			    /* print CID, _before_ _every_ ring */
 			    if (!(m->mdmreg[REG_CIDONCE] & BIT_CIDONCE)) {
 				    isdn_tty_at_cout("\r\nCALLER NUMBER: ", info);
-				    isdn_tty_at_cout(isdn_slot_num(info->isdn_slot), info);
+				    isdn_tty_at_cout(info->isdn_slot->num, info);
 				    if (m->mdmreg[REG_CDN] & BIT_CDN) {
 					    isdn_tty_at_cout("\r\nCALLED NUMBER: ", info);
 					    isdn_tty_at_cout(info->emu.cpn, info);
@@ -2769,7 +2767,7 @@ isdn_tty_modem_result(int code, modem_info * info)
 					    (m->mdmreg[REG_RINGCNT] == 1)) {
 						isdn_tty_at_cout("\r\n", info);
 						isdn_tty_at_cout("CALLER NUMBER: ", info);
-						isdn_tty_at_cout(isdn_slot_num(info->isdn_slot), info);
+						isdn_tty_at_cout(info->isdn_slot->num, info);
 						if (m->mdmreg[REG_CDN] & BIT_CDN) {
 							isdn_tty_at_cout("\r\nCALLED NUMBER: ", info);
 							isdn_tty_at_cout(info->emu.cpn, info);
@@ -3281,7 +3279,7 @@ isdn_tty_cmd_ATA(modem_info * info)
 	if (info->msr & UART_MSR_RI) {
 		/* Accept incoming call */
 		info->last_dir = 0;
-		strcpy(info->last_num, isdn_slot_num(info->isdn_slot));
+		strcpy(info->last_num, info->isdn_slot->num);
 		m->mdmreg[REG_RINGCNT] = 0;
 		info->msr &= ~UART_MSR_RI;
 		l2 = m->mdmreg[REG_L2PROT];

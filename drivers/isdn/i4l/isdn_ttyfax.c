@@ -360,10 +360,8 @@ isdn_tty_cmd_FCLASS1(char **p, modem_info * info)
 			PARSE_ERROR1;
 		}
 		info->isdn_slot = slot;
-		isdn_slot_set_m_idx(slot, info->line);
 		isdn_slot_command(slot, ISDN_CMD_FAXCMD, &c);
 		isdn_slot_free(slot);
-		isdn_slot_set_m_idx(slot, -1);
 		info->isdn_slot = NULL;
 		restore_flags(flags);
 	} else {
