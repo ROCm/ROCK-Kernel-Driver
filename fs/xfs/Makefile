@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
+# Copyright (c) 2000-2004 Silicon Graphics, Inc.  All Rights Reserved.
 #
 # This program is free software; you can redistribute it and/or modify it
 # under the terms of version 2 of the GNU General Public License as
@@ -120,7 +120,6 @@ xfs-$(CONFIG_XFS_TRACE)		+= xfs_dir2_trace.o
 
 # Objects in linux/
 xfs-y				+= $(addprefix $(XFS_LINUX)/, \
-				   mrlock.o \
 				   xfs_aops.o \
 				   xfs_file.o \
 				   xfs_fs_subr.o \

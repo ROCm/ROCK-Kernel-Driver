@@ -3658,7 +3658,7 @@ xlog_do_recovery_pass(
 				error = xlog_bread(log, 0, wrapped_hblks, hbp);
 				if (error)
 					goto bread_err2;
-				XFS_BUF_SET_PTR(hbp, bufaddr, hblks);
+				XFS_BUF_SET_PTR(hbp, bufaddr, BBTOB(hblks));
 				if (!offset)
 					offset = xlog_align(log, 0,
 							wrapped_hblks, hbp);
@@ -3716,8 +3716,7 @@ xlog_do_recovery_pass(
 				if ((error = xlog_bread(log, wrapped_hblks,
 						bblks - split_bblks, dbp)))
 					goto bread_err2;
-				XFS_BUF_SET_PTR(dbp, bufaddr,
-						XLOG_BIG_RECORD_BSIZE);
+				XFS_BUF_SET_PTR(dbp, bufaddr, h_size);
 				if (!offset)
 					offset = xlog_align(log, wrapped_hblks,
 						bblks - split_bblks, dbp);

@@ -61,10 +61,6 @@
 
 #include "xfs_linux.h"
 
-
-#define BBSHIFT		9
-#define BN_ALIGN_MASK	((1 << (PAGE_CACHE_SHIFT - BBSHIFT)) - 1)
-
 #ifndef GFP_READAHEAD
 #define GFP_READAHEAD	(__GFP_NOWARN|__GFP_NORETRY)
 #endif
@@ -320,11 +316,13 @@ _pagebuf_freepages(
  *	pagebuf_free releases the specified buffer.  The modification
  *	state of any associated pages is left unchanged.
  */
-STATIC void
-_pagebuf_free(
+void
+pagebuf_free(
 	page_buf_t		*pb)
 {
 	PB_TRACE(pb, "free", 0);
+	
+	ASSERT(list_empty(&pb->pb_hash_list));
 
 	/* release any virtual mapping */ ;
 	if (pb->pb_flags & _PBF_ADDR_ALLOCATED) {
@@ -351,17 +349,6 @@ _pagebuf_free(
 	}
 
 	pagebuf_deallocate(pb);
-}
-
-void
-pagebuf_free(
-	page_buf_t		*pb)
-{
-	if (unlikely(!atomic_dec_and_test(&pb->pb_hold)))
-		BUG();
-	if (unlikely(!list_empty(&pb->pb_hash_list)))
-		BUG();
-	_pagebuf_free(pb);
 }
 
 /*
@@ -574,8 +561,7 @@ _pagebuf_find(				/* find buffer for block	*/
 
 		if (pb->pb_target == target &&
 		    pb->pb_file_offset == range_base &&
-		    pb->pb_buffer_length == range_length &&
-		    atomic_read(&pb->pb_hold)) {
+		    pb->pb_buffer_length == range_length) {
 			/* If we look at something bring it to the
 			 * front of the list for next time
 			 */
@@ -942,7 +928,7 @@ pagebuf_rele(
 		if (pb->pb_relse) {
 			atomic_inc(&pb->pb_hold);
 			spin_unlock(&hash->pb_hash_lock);
-			(*(pb->pb_relse))(pb);
+			(*(pb->pb_relse)) (pb);
 			spin_lock(&hash->pb_hash_lock);
 			do_free = 0;
 		}
@@ -952,15 +938,17 @@ pagebuf_rele(
 			atomic_inc(&pb->pb_hold);
 			pagebuf_delwri_queue(pb, 0);
 			do_free = 0;
-		} else if (pb->pb_flags & PBF_FS_MANAGED)
+		} else if (pb->pb_flags & PBF_FS_MANAGED) {
 			do_free = 0;
+		}
 
 		if (do_free) {
 			list_del_init(&pb->pb_hash_list);
 			spin_unlock(&hash->pb_hash_lock);
-			_pagebuf_free(pb);
-		} else
+			pagebuf_free(pb);
+		} else {
 			spin_unlock(&hash->pb_hash_lock);
+		}
 	}
 }
 
