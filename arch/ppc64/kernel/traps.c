@@ -449,16 +449,16 @@ SingleStepException(struct pt_regs *regs)
 	_exception(SIGTRAP, &info, regs);	
 }
 
+static void dummy_perf(struct pt_regs *regs)
+{
+}
+
+void (*perf_irq)(struct pt_regs *) = dummy_perf;
+
 void
 PerformanceMonitorException(struct pt_regs *regs)
 {
-	siginfo_t info;
-
-	info.si_signo = SIGTRAP;
-	info.si_errno = 0;
-	info.si_code = TRAP_BRKPT;
-	info.si_addr = 0;
-	_exception(SIGTRAP, &info, regs);
+	perf_irq(regs);
 }
 
 void

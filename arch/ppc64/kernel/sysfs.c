@@ -12,6 +12,71 @@
 
 /* PMC stuff */
 
+/*
+ * Enabling PMCs will slow partition context switch times so we only do
+ * it the first time we write to the PMCs.
+ */
+
+static DEFINE_PER_CPU(char, pmcs_enabled);
+
+#ifdef CONFIG_PPC_ISERIES
+void ppc64_enable_pmcs(void)
+{
+	/* XXX Implement for iseries */
+}
+#else
+void ppc64_enable_pmcs(void)
+{
+	unsigned long hid0;
+	unsigned long set, reset;
+	int ret;
+
+	/* Only need to enable them once */
+	if (__get_cpu_var(pmcs_enabled))
+		return;
+
+	__get_cpu_var(pmcs_enabled) = 1;
+
+	switch (systemcfg->platform) {
+		case PLATFORM_PSERIES:
+			hid0 = mfspr(HID0);
+			hid0 |= 1UL << (63 - 20);
+
+			/* POWER4 requires the following sequence */
+			asm volatile(
+				"sync\n"
+				"mtspr	%1, %0\n"
+				"mfspr	%0, %1\n"
+				"mfspr	%0, %1\n"
+				"mfspr	%0, %1\n"
+				"mfspr	%0, %1\n"
+				"mfspr	%0, %1\n"
+				"mfspr	%0, %1\n"
+				"isync" : "=&r" (hid0) : "i" (HID0), "0" (hid0):
+				"memory");
+			break;
+
+		case PLATFORM_PSERIES_LPAR:
+			set = 1UL << 63;
+			reset = 0;
+			ret = plpar_hcall_norets(H_PERFMON, set, reset);
+			if (ret)
+				printk(KERN_ERR "H_PERFMON call returned %d",
+				       ret);
+			break;
+
+		default:
+			break;
+	}
+
+	/* instruct hypervisor to maintain PMCs */
+	if (cur_cpu_spec->firmware_features & FW_FEATURE_SPLPAR) {
+		char *ptr = (char *)&paca[smp_processor_id()].xLpPaca;
+		ptr[0xBB] = 1;
+	}
+}
+#endif
+
 /* XXX convert to rusty's on_one_cpu */
 static unsigned long run_on_cpu(unsigned long cpu,
 			        unsigned long (*func)(unsigned long),
@@ -38,6 +103,7 @@ static unsigned long read_##NAME(unsigned long junk) \
 } \
 static unsigned long write_##NAME(unsigned long val) \
 { \
+	ppc64_enable_pmcs(); \
 	mtspr(ADDRESS, val); \
 	return 0; \
 } \
