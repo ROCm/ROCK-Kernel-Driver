@@ -2966,12 +2966,11 @@ S: Cliffwood, New Jersey 07721
 S: USA
 
 N: Manfred Spraul
-E: manfreds@colorfullife.com
-W: http://colorfullife.com/~manfreds
-D: major SysV IPC changes
-D: various bug fixes (mostly SMP code)
-S: Warburgring 67
-S: 66424 Homburg 
+E: manfred@colorfullife.com
+W: http://www.colorfullife.com/~manfred
+D: Lots of tiny hacks. Larger improvments to SysV IPC msg,
+D: slab, pipe, select.
+S: 71701 Schwieberdingen
 S: Germany
 
 N: Andrew Stanley-Jones
