@@ -75,7 +75,6 @@
 #define ISDN_NET_ENCAP_UIHDLC     5
 #define ISDN_NET_ENCAP_CISCOHDLCK 6 /* With SLARP and keepalive    */
 #define ISDN_NET_ENCAP_X25IFACE   7 /* Documentation/networking/x25-iface.txt*/
-#define ISDN_NET_ENCAP_MAX_ENCAP  ISDN_NET_ENCAP_X25IFACE
 
 /* Facility which currently uses an ISDN-channel */
 #define ISDN_USAGE_NONE       0

@@ -208,6 +208,7 @@ static int isdn_net_handle_event(isdn_net_local *lp, int pr, void *arg);
 static int isdn_rawip_setup(isdn_net_dev *p);
 static int isdn_ether_setup(isdn_net_dev *p);
 static int isdn_uihdlc_setup(isdn_net_dev *p);
+static int isdn_iptyp_setup(isdn_net_dev *p);
 static int isdn_other_setup(isdn_net_dev *p);
 
 char *isdn_net_revision = "$Revision: 1.140.6.11 $";
@@ -1357,32 +1358,6 @@ isdn_net_rcv_skb(int idx, struct sk_buff *skb)
 	return 0;
 }
 
-/*
- *  build an header
- *  depends on encaps that is being used.
- */
-
-static int
-isdn_net_header(struct sk_buff *skb, struct net_device *dev, unsigned short type,
-		void *daddr, void *saddr, unsigned plen)
-{
-	isdn_net_local *lp = dev->priv;
-	ushort len = 0;
-
-	switch (lp->p_encap) {
-		case ISDN_NET_ENCAP_IPTYP:
-			/* ethernet type field */
-			*((ushort *) skb_push(skb, 2)) = htons(type);
-			len = 2;
-			break;
-		default:
-			printk(KERN_WARNING "isdn_net_header called with encap %d!\n", lp->p_encap);
-			len = 0;
-			break;
-	}
-	return len;
-}
-
 /* We don't need to send arp, because we have point-to-point connections. */
 static int
 isdn_net_rebuild_header(struct sk_buff *skb)
@@ -2041,11 +2016,6 @@ isdn_net_set_encap(isdn_net_dev *p, isdn_net_ioctl_cfg *cfg)
 	isdn_net_local *lp = &p->local;
 	int retval;
 
-	if (cfg->p_encap < 0 ||
-	    cfg->p_encap > ISDN_NET_ENCAP_MAX_ENCAP) {
-		retval = -EINVAL;
-		goto out;
-	}
 	if (lp->p_encap == cfg->p_encap){
 		/* nothing to do */
 		retval = 0;
@@ -2083,10 +2053,15 @@ isdn_net_set_encap(isdn_net_dev *p, isdn_net_ioctl_cfg *cfg)
 	case ISDN_NET_ENCAP_UIHDLC:
 		retval = isdn_uihdlc_setup(p);
 		break;
+	case ISDN_NET_ENCAP_IPTYP:
+		retval = isdn_iptyp_setup(p);
+		break;
 	default:
-		retval = isdn_other_setup(p);
+		retval = -EINVAL;
 		break;
 	}
+	if (retval != 0)
+		lp->p_encap = -1;
 
  out:
 	return retval;
@@ -2586,6 +2561,30 @@ isdn_net_rmall(void)
 	return 0;
 }
 
+// ISDN_NET_ENCAP_IPTYP
+// ethernet type field
+// ======================================================================
+
+static int
+isdn_iptyp_header(struct sk_buff *skb, struct net_device *dev,
+		   unsigned short type, void *daddr, void *saddr, 
+		   unsigned plen)
+{
+	put_u16(skb_push(skb, 2), type);
+	return 2;
+}
+
+int
+isdn_iptyp_setup(isdn_net_dev *p)
+{
+	p->dev.hard_header = isdn_iptyp_header;
+	p->dev.hard_header_cache = NULL;
+	p->dev.header_cache_update = NULL;
+	p->dev.flags = IFF_NOARP|IFF_POINTOPOINT;
+
+	return 0;
+}
+
 // ISDN_NET_ENCAP_UIHDLC
 // HDLC with UI-Frames (for ispa with -h1 option) */
 // ======================================================================
@@ -2634,17 +2633,6 @@ isdn_ether_setup(isdn_net_dev *p)
 	p->dev.hard_header_cache = eth_header_cache;
 	p->dev.header_cache_update = eth_header_cache_update;
 	p->dev.flags = IFF_BROADCAST | IFF_MULTICAST;
-
-	return 0;
-}
-
-int
-isdn_other_setup(isdn_net_dev *p)
-{
-	p->dev.hard_header = isdn_net_header;
-	p->dev.hard_header_cache = NULL;
-	p->dev.header_cache_update = NULL;
-	p->dev.flags = IFF_NOARP|IFF_POINTOPOINT;
 
 	return 0;
 }
