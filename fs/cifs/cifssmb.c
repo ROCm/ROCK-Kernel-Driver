@@ -1565,7 +1565,7 @@ UnixQPathInfoRetry:
 	} else {		/* decode response */
 		pSMBr->DataOffset = le16_to_cpu(pSMBr->DataOffset);
 		/* BB also check if enough total bytes returned */
-		if ((pSMBr->ByteCount < sizeof(FILE_UNIX_BASIC_INFO) + sizeof(FILE_UNIX_BASIC_INFO)) || 
+		if ((pSMBr->ByteCount < sizeof(FILE_UNIX_BASIC_INFO)) || 
 			(pSMBr->DataOffset > 512) || 
 			(pSMBr->DataOffset < sizeof(struct smb_hdr))) {
 			cFYI(1,("UnixQPathinfo invalid data offset %d bytes returned %d",
