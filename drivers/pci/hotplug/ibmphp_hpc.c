@@ -152,11 +152,11 @@ static u8 i2c_ctrl_read (struct controller *ctlr_ptr, void *WPGBbar, u8 index)
 	u8 status;
 	int i;
 	void *wpg_addr;		// base addr + offset
-	ulong wpg_data,		// data to/from WPG LOHI format
-	ultemp, data;		// actual data HILO format
+	unsigned long wpg_data;	// data to/from WPG LOHI format
+	unsigned long ultemp;
+	unsigned long data;	// actual data HILO format
 
-
-	debug_polling ("%s - Entry WPGBbar[%lx] index[%x] \n", __FUNCTION__, (ulong) WPGBbar, index);
+	debug_polling ("%s - Entry WPGBbar[%p] index[%x] \n", __FUNCTION__, WPGBbar, index);
 
 	//--------------------------------------------------------------------
 	// READ - step 1
@@ -165,17 +165,17 @@ static u8 i2c_ctrl_read (struct controller *ctlr_ptr, void *WPGBbar, u8 index)
 	if (ctlr_ptr->ctlr_type == 0x02) {
 		data = WPG_READATADDR_MASK;
 		// fill in I2C address
-		ultemp = (ulong) ctlr_ptr->u.wpeg_ctlr.i2c_addr;
+		ultemp = (unsigned long)ctlr_ptr->u.wpeg_ctlr.i2c_addr;
 		ultemp = ultemp >> 1;
 		data |= (ultemp << 8);
 
 		// fill in index
-		data |= (ulong) index;
+		data |= (unsigned long)index;
 	} else if (ctlr_ptr->ctlr_type == 0x04) {
 		data = WPG_READDIRECT_MASK;
 
 		// fill in index
-		ultemp = (ulong) index;
+		ultemp = (unsigned long)index;
 		ultemp = ultemp << 8;
 		data |= ultemp;
 	} else {
@@ -184,14 +184,14 @@ static u8 i2c_ctrl_read (struct controller *ctlr_ptr, void *WPGBbar, u8 index)
 	}
 
 	wpg_data = swab32 (data);	// swap data before writing
-	(ulong) wpg_addr = (ulong) WPGBbar + (ulong) WPG_I2CMOSUP_OFFSET;
+	wpg_addr = WPGBbar + WPG_I2CMOSUP_OFFSET;
 	writel (wpg_data, wpg_addr);
 
 	//--------------------------------------------------------------------
 	// READ - step 2 : clear the message buffer
 	data = 0x00000000;
 	wpg_data = swab32 (data);
-	(ulong) wpg_addr = (ulong) WPGBbar + (ulong) WPG_I2CMBUFL_OFFSET;
+	wpg_addr = WPGBbar + WPG_I2CMBUFL_OFFSET;
 	writel (wpg_data, wpg_addr);
 
 	//--------------------------------------------------------------------
@@ -199,7 +199,7 @@ static u8 i2c_ctrl_read (struct controller *ctlr_ptr, void *WPGBbar, u8 index)
 	//                 2020 : [20] OR operation at [20] offset 0x20
 	data = WPG_I2CMCNTL_STARTOP_MASK;
 	wpg_data = swab32 (data);
-	(ulong) wpg_addr = (ulong) WPGBbar + (ulong) WPG_I2CMCNTL_OFFSET + (ulong) WPG_I2C_OR;
+	wpg_addr = WPGBbar + WPG_I2CMCNTL_OFFSET + WPG_I2C_OR;
 	writel (wpg_data, wpg_addr);
 
 	//--------------------------------------------------------------------
@@ -207,7 +207,7 @@ static u8 i2c_ctrl_read (struct controller *ctlr_ptr, void *WPGBbar, u8 index)
 	i = CMD_COMPLETE_TOUT_SEC;
 	while (i) {
 		long_delay (1 * HZ / 100);
-		(ulong) wpg_addr = (ulong) WPGBbar + (ulong) WPG_I2CMCNTL_OFFSET;
+		wpg_addr = WPGBbar + WPG_I2CMCNTL_OFFSET;
 		wpg_data = readl (wpg_addr);
 		data = swab32 (wpg_data);
 		if (!(data & WPG_I2CMCNTL_STARTOP_MASK))
@@ -223,7 +223,7 @@ static u8 i2c_ctrl_read (struct controller *ctlr_ptr, void *WPGBbar, u8 index)
 	i = CMD_COMPLETE_TOUT_SEC;
 	while (i) {
 		long_delay (1 * HZ / 100);
-		(ulong) wpg_addr = (ulong) WPGBbar + (ulong) WPG_I2CSTAT_OFFSET;
+		wpg_addr = WPGBbar + WPG_I2CSTAT_OFFSET;
 		wpg_data = readl (wpg_addr);
 		data = swab32 (wpg_data);
 		if (HPC_I2CSTATUS_CHECK (data))
@@ -237,7 +237,7 @@ static u8 i2c_ctrl_read (struct controller *ctlr_ptr, void *WPGBbar, u8 index)
 
 	//--------------------------------------------------------------------
 	// READ - step 6 : get DATA
-	(ulong) wpg_addr = (ulong) WPGBbar + (ulong) WPG_I2CMBUFL_OFFSET;
+	wpg_addr = WPGBbar + WPG_I2CMBUFL_OFFSET;
 	wpg_data = readl (wpg_addr);
 	data = swab32 (wpg_data);
 
@@ -259,12 +259,12 @@ static u8 i2c_ctrl_write (struct controller *ctlr_ptr, void *WPGBbar, u8 index, 
 {
 	u8 rc;
 	void *wpg_addr;		// base addr + offset
-	ulong wpg_data,		// data to/from WPG LOHI format 
-	ultemp, data;		// actual data HILO format
+	unsigned long wpg_data;	// data to/from WPG LOHI format 
+	unsigned long ultemp;
+	unsigned long data;	// actual data HILO format
 	int i;
 
-
-	debug_polling ("%s - Entry WPGBbar[%lx] index[%x] cmd[%x]\n", __FUNCTION__, (ulong) WPGBbar, index, cmd);
+	debug_polling ("%s - Entry WPGBbar[%p] index[%x] cmd[%x]\n", __FUNCTION__, WPGBbar, index, cmd);
 
 	rc = 0;
 	//--------------------------------------------------------------------
@@ -276,17 +276,17 @@ static u8 i2c_ctrl_write (struct controller *ctlr_ptr, void *WPGBbar, u8 index, 
 	if (ctlr_ptr->ctlr_type == 0x02) {
 		data = WPG_WRITEATADDR_MASK;
 		// fill in I2C address
-		ultemp = (ulong) ctlr_ptr->u.wpeg_ctlr.i2c_addr;
+		ultemp = (unsigned long)ctlr_ptr->u.wpeg_ctlr.i2c_addr;
 		ultemp = ultemp >> 1;
 		data |= (ultemp << 8);
 
 		// fill in index
-		data |= (ulong) index;
+		data |= (unsigned long)index;
 	} else if (ctlr_ptr->ctlr_type == 0x04) {
 		data = WPG_WRITEDIRECT_MASK;
 
 		// fill in index
-		ultemp = (ulong) index;
+		ultemp = (unsigned long)index;
 		ultemp = ultemp << 8;
 		data |= ultemp;
 	} else {
@@ -295,14 +295,14 @@ static u8 i2c_ctrl_write (struct controller *ctlr_ptr, void *WPGBbar, u8 index, 
 	}
 
 	wpg_data = swab32 (data);	// swap data before writing
-	(ulong) wpg_addr = (ulong) WPGBbar + (ulong) WPG_I2CMOSUP_OFFSET;
+	wpg_addr = WPGBbar + WPG_I2CMOSUP_OFFSET;
 	writel (wpg_data, wpg_addr);
 
 	//--------------------------------------------------------------------
 	// WRITE - step 2 : clear the message buffer
-	data = 0x00000000 | (ulong) cmd;
+	data = 0x00000000 | (unsigned long)cmd;
 	wpg_data = swab32 (data);
-	(ulong) wpg_addr = (ulong) WPGBbar + (ulong) WPG_I2CMBUFL_OFFSET;
+	wpg_addr = WPGBbar + WPG_I2CMBUFL_OFFSET;
 	writel (wpg_data, wpg_addr);
 
 	//--------------------------------------------------------------------
@@ -310,7 +310,7 @@ static u8 i2c_ctrl_write (struct controller *ctlr_ptr, void *WPGBbar, u8 index, 
 	//                 2020 : [20] OR operation at [20] offset 0x20
 	data = WPG_I2CMCNTL_STARTOP_MASK;
 	wpg_data = swab32 (data);
-	(ulong) wpg_addr = (ulong) WPGBbar + (ulong) WPG_I2CMCNTL_OFFSET + (ulong) WPG_I2C_OR;
+	wpg_addr = WPGBbar + WPG_I2CMCNTL_OFFSET + WPG_I2C_OR;
 	writel (wpg_data, wpg_addr);
 
 	//--------------------------------------------------------------------
@@ -318,7 +318,7 @@ static u8 i2c_ctrl_write (struct controller *ctlr_ptr, void *WPGBbar, u8 index, 
 	i = CMD_COMPLETE_TOUT_SEC;
 	while (i) {
 		long_delay (1 * HZ / 100);
-		(ulong) wpg_addr = (ulong) WPGBbar + (ulong) WPG_I2CMCNTL_OFFSET;
+		wpg_addr = WPGBbar + WPG_I2CMCNTL_OFFSET;
 		wpg_data = readl (wpg_addr);
 		data = swab32 (wpg_data);
 		if (!(data & WPG_I2CMCNTL_STARTOP_MASK))
@@ -335,7 +335,7 @@ static u8 i2c_ctrl_write (struct controller *ctlr_ptr, void *WPGBbar, u8 index, 
 	i = CMD_COMPLETE_TOUT_SEC;
 	while (i) {
 		long_delay (1 * HZ / 100);
-		(ulong) wpg_addr = (ulong) WPGBbar + (ulong) WPG_I2CSTAT_OFFSET;
+		wpg_addr = WPGBbar + WPG_I2CSTAT_OFFSET;
 		wpg_data = readl (wpg_addr);
 		data = swab32 (wpg_data);
 		if (HPC_I2CSTATUS_CHECK (data))
@@ -543,7 +543,7 @@ int ibmphp_hpc_readslot (struct slot * pslot, u8 cmd, u8 * pstatus)
 	int rc = 0;
 	int busindex;
 
-	debug_polling ("%s - Entry pslot[%lx] cmd[%x] pstatus[%lx]\n", __FUNCTION__, (ulong) pslot, cmd, (ulong) pstatus);
+	debug_polling ("%s - Entry pslot[%p] cmd[%x] pstatus[%p]\n", __FUNCTION__, pslot, cmd, pstatus);
 
 	if ((pslot == NULL)
 	    || ((pstatus == NULL) && (cmd != READ_ALLSTAT) && (cmd != READ_BUSSTATUS))) {
@@ -683,7 +683,7 @@ int ibmphp_hpc_writeslot (struct slot * pslot, u8 cmd)
 	int rc = 0;
 	int timeout;
 
-	debug_polling ("%s - Entry pslot[%lx] cmd[%x]\n", __FUNCTION__, (ulong) pslot, cmd);
+	debug_polling ("%s - Entry pslot[%p] cmd[%x]\n", __FUNCTION__, pslot, cmd);
 	if (pslot == NULL) {
 		rc = -EINVAL;
 		err ("%s - Error Exit rc[%d]\n", __FUNCTION__, rc);
@@ -976,7 +976,7 @@ static int update_slot (struct slot *pslot, u8 update)
 {
 	int rc = 0;
 
-	debug ("%s - Entry pslot[%lx]\n", __FUNCTION__, (ulong) pslot);
+	debug ("%s - Entry pslot[%p]\n", __FUNCTION__, pslot);
 	rc = ibmphp_hpc_readslot (pslot, READ_ALLSTAT, NULL);
 	debug ("%s - Exit rc[%d]\n", __FUNCTION__, rc);
 	return rc;
@@ -1004,8 +1004,7 @@ static int process_changeinstatus (struct slot *pslot, struct slot *poldslot)
 	u8 disable = FALSE;
 	u8 update = FALSE;
 
-	debug ("process_changeinstatus - Entry pslot[%lx], poldslot[%lx]\n", (ulong) pslot,
-	       (ulong) poldslot);
+	debug ("process_changeinstatus - Entry pslot[%p], poldslot[%p]\n", pslot, poldslot);
 
 	// bit 0 - HPC_SLOT_POWER
 	if ((pslot->status & 0x01) != (poldslot->status & 0x01))
