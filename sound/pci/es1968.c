@@ -94,7 +94,6 @@
  *	places.
  */
 
-#define __SND_OSS_COMPAT__
 #include <sound/driver.h>
 #include <asm/io.h>
 #include <linux/delay.h>

@@ -105,15 +105,11 @@ typedef struct snd_dm_fm_params {
 /* for OPL3 only */
 #define SNDRV_DM_FM_IOCTL_SET_CONNECTION	_IOW('H', 0x26, int)
 
-#ifdef __SND_OSS_COMPAT__
-
 #define SNDRV_DM_FM_OSS_IOCTL_RESET		0x20
 #define SNDRV_DM_FM_OSS_IOCTL_PLAY_NOTE		0x21
 #define SNDRV_DM_FM_OSS_IOCTL_SET_VOICE		0x22
 #define SNDRV_DM_FM_OSS_IOCTL_SET_PARAMS	0x23
 #define SNDRV_DM_FM_OSS_IOCTL_SET_MODE		0x24
 #define SNDRV_DM_FM_OSS_IOCTL_SET_OPL		0x25
-
-#endif
 
 #endif /* __SOUND_ASOUND_FM_H */
