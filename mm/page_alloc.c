@@ -1989,41 +1989,40 @@ void *__init alloc_large_system_hash(const char *tablename,
 				     unsigned int *_hash_shift,
 				     unsigned int *_hash_mask)
 {
-	unsigned long mem, max, log2qty, size;
+	unsigned long long max;
+	unsigned long log2qty, size;
 	void *table;
 
-	/* round applicable memory size up to nearest megabyte */
-	mem = consider_highmem ? nr_all_pages : nr_kernel_pages;
-	mem += (1UL << (20 - PAGE_SHIFT)) - 1;
-	mem >>= 20 - PAGE_SHIFT;
-	mem <<= 20 - PAGE_SHIFT;
-
-	/* limit to 1 bucket per 2^scale bytes of low memory (rounded up to
-	 * nearest power of 2 in size) */
-	if (scale > PAGE_SHIFT)
-		mem >>= (scale - PAGE_SHIFT);
-	else
-		mem <<= (PAGE_SHIFT - scale);
-
-	mem = 1UL << (long_log2(mem) + 1);
-
-	/* limit allocation size */
-	max = (1UL << (PAGE_SHIFT + MAX_SYS_HASH_TABLE_ORDER)) / bucketsize;
-	if (max > mem)
-		max = mem;
-
 	/* allow the kernel cmdline to have a say */
-	if (!numentries || numentries > max)
+	if (!numentries) {
+		/* round applicable memory size up to nearest megabyte */
+		numentries = consider_highmem ? nr_all_pages : nr_kernel_pages;
+		numentries += (1UL << (20 - PAGE_SHIFT)) - 1;
+		numentries >>= 20 - PAGE_SHIFT;
+		numentries <<= 20 - PAGE_SHIFT;
+
+		/* limit to 1 bucket per 2^scale bytes of low memory */
+		if (scale > PAGE_SHIFT)
+			numentries >>= (scale - PAGE_SHIFT);
+		else
+			numentries <<= (PAGE_SHIFT - scale);
+	}
+	/* rounded up to nearest power of 2 in size */
+	numentries = 1UL << (long_log2(numentries) + 1);
+
+	/* limit allocation size to 1/16 total memory */
+	max = ((unsigned long long)nr_all_pages << PAGE_SHIFT) >> 4;
+	do_div(max, bucketsize);
+
+	if (numentries > max)
 		numentries = max;
 
 	log2qty = long_log2(numentries);
 
 	do {
 		size = bucketsize << log2qty;
-
-		table = (void *) alloc_bootmem(size);
-
-	} while (!table && size > PAGE_SIZE);
+		table = alloc_bootmem(size);
+	} while (!table && size > PAGE_SIZE && --log2qty);
 
 	if (!table)
 		panic("Failed to allocate %s hash table\n", tablename);
