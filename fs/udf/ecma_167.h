@@ -606,7 +606,7 @@ struct fileEntry
 #define FE_RECORD_FMT_CRLF		0x0A
 #define FE_RECORD_FMT_LFCR		0x0B
 
-#define Record Display Attributes (ECMA 167r3 4/14.9.8) */
+/* Record Display Attributes (ECMA 167r3 4/14.9.8) */
 #define FE_RECORD_DISPLAY_ATTR_UNDEF	0x00
 #define FE_RECORD_DISPLAY_ATTR_1	0x01
 #define FE_RECORD_DISPLAY_ATTR_2	0x02
