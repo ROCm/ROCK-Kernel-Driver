@@ -20,6 +20,7 @@
 #include <linux/sched.h>
 #include <asm/atomic.h>
 #include <asm/semaphore.h>
+#include <asm/errno.h>
 
 /*
  * Atomically update sem->count.
