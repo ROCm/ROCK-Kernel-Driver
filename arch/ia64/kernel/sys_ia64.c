@@ -82,7 +82,6 @@ asmlinkage unsigned long
 ia64_shmat (int shmid, void *shmaddr, int shmflg, long arg3, long arg4, long arg5, long arg6,
 	    long arg7, long stack)
 {
-	extern int sys_shmat (int shmid, char *shmaddr, int shmflg, ulong *raddr);
 	struct pt_regs *regs = (struct pt_regs *) &stack;
 	unsigned long raddr;
 	int retval;
@@ -120,7 +119,7 @@ ia64_brk (unsigned long brk, long arg1, long arg2, long arg3,
 
 	/* Always allow shrinking brk. */
 	if (brk <= mm->brk) {
-		if (!do_munmap(mm, newbrk, oldbrk-newbrk))
+		if (!do_munmap(mm, newbrk, oldbrk-newbrk, 1))
 			goto set_brk;
 		goto out;
 	}
@@ -136,10 +135,6 @@ ia64_brk (unsigned long brk, long arg1, long arg2, long arg3,
 
 	/* Check against existing mmap mappings. */
 	if (find_vma_intersection(mm, oldbrk, newbrk+PAGE_SIZE))
-		goto out;
-
-	/* Check if we have enough memory.. */
-	if (!vm_enough_memory((newbrk-oldbrk) >> PAGE_SHIFT))
 		goto out;
 
 	/* Ok, looks good - let it rip. */

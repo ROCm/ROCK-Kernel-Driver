@@ -88,12 +88,6 @@ EXPORT_SYMBOL(ia64_cpu_to_sapicid);
 #include <asm/smplock.h>
 EXPORT_SYMBOL(kernel_flag);
 
-/* #include <asm/system.h> */
-EXPORT_SYMBOL(__global_sti);
-EXPORT_SYMBOL(__global_cli);
-EXPORT_SYMBOL(__global_save_flags);
-EXPORT_SYMBOL(__global_restore_flags);
-
 #else /* !CONFIG_SMP */
 
 EXPORT_SYMBOL(__flush_tlb_all);

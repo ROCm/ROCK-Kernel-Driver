@@ -41,9 +41,6 @@ SECTIONS
 
   /* Read-only data */
 
-  . = ALIGN(16);
-  __gp = . + 0x200000;	/* gp must be 16-byte aligned for exc. table */
-
   /* Global data */
   _data = .;
 
@@ -145,6 +142,9 @@ SECTIONS
 
   .data : AT(ADDR(.data) - PAGE_OFFSET)
 	{ *(.data) *(.gnu.linkonce.d*) CONSTRUCTORS }
+
+  . = ALIGN(16);
+  __gp = . + 0x200000;	/* gp must be 16-byte aligned for exc. table */
 
   .got : AT(ADDR(.got) - PAGE_OFFSET)
 	{ *(.got.plt) *(.got) }

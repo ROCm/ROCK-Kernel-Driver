@@ -106,6 +106,12 @@
 
 #define PFM_REG_RETFLAG_SET(flags, val)	do { flags &= ~PFM_REG_RETFL_MASK; flags |= (val); } while(0)
 
+#ifdef CONFIG_SMP
+#define cpu_is_online(i) (cpu_online_map & (1UL << i))
+#else
+#define cpu_is_online(i)        (i==0)
+#endif
+
 /*
  * debugging
  */
@@ -277,8 +283,8 @@ typedef struct {
 typedef struct {
 	pfm_pmu_reg_type_t	type;
 	int			pm_pos;
-	int			(*read_check)(struct task_struct *task, unsigned int cnum, unsigned long *val);
-	int			(*write_check)(struct task_struct *task, unsigned int cnum, unsigned long *val);
+	int			(*read_check)(struct task_struct *task, unsigned int cnum, unsigned long *val, struct pt_regs *regs);
+	int			(*write_check)(struct task_struct *task, unsigned int cnum, unsigned long *val, struct pt_regs *regs);
 	unsigned long		dep_pmd[4];
 	unsigned long		dep_pmc[4];
 } pfm_reg_desc_t;
@@ -396,7 +402,7 @@ static unsigned long reset_pmcs[IA64_NUM_PMC_REGS];	/* contains PAL reset values
 static void pfm_vm_close(struct vm_area_struct * area);
 
 static struct vm_operations_struct pfm_vm_ops={
-	close: pfm_vm_close
+	.close = pfm_vm_close
 };
 
 /*
@@ -610,7 +616,7 @@ pfm_remove_smpl_mapping(struct task_struct *task)
 
 	down_write(&task->mm->mmap_sem);
 
-	r = do_munmap(task->mm, ctx->ctx_smpl_vaddr, psb->psb_size);
+	r = do_munmap(task->mm, ctx->ctx_smpl_vaddr, psb->psb_size, 0);
 
 	up_write(&task->mm->mmap_sem);
 	if (r !=0) {
@@ -902,8 +908,8 @@ pfx_is_sane(struct task_struct *task, pfarg_context_t *pfx)
 		/*
 		 * and it must be a valid CPU
 		 */
-		cpu = ffs(pfx->ctx_cpu_mask);
-		if (!cpu_online(cpu)) {
+		cpu = ffz(~pfx->ctx_cpu_mask);
+		if (cpu_is_online(cpu) == 0) {
 			DBprintk(("CPU%d is not online\n", cpu));
 			return -EINVAL;
 		}
@@ -925,11 +931,12 @@ pfx_is_sane(struct task_struct *task, pfarg_context_t *pfx)
 			DBprintk(("must have notify_pid when blocking for [%d]\n", task->pid));
 			return -EINVAL;
 		}
-
+#if 0
 		if ((ctx_flags & PFM_FL_NOTIFY_BLOCK) && pfx->ctx_notify_pid == task->pid) {
 			DBprintk(("cannot notify self when blocking for [%d]\n", task->pid));
 			return -EINVAL;
 		}
+#endif
 	}
 	/* probably more to add here */
 
@@ -968,7 +975,7 @@ pfm_context_create(struct task_struct *task, pfm_context_t *ctx, void *req, int 
 	if (ctx_flags & PFM_FL_SYSTEM_WIDE) {
 
 		/* at this point, we know there is at least one bit set */
-		cpu = ffs(tmp.ctx_cpu_mask) - 1;
+		cpu = ffz(~tmp.ctx_cpu_mask);
 
 		DBprintk(("requesting CPU%d currently on CPU%d\n",cpu, smp_processor_id()));
 
@@ -1280,7 +1287,7 @@ pfm_write_pmcs(struct task_struct *task, pfm_context_t *ctx, void *arg, int coun
 		/*
 		 * execute write checker, if any
 		 */
-		if (PMC_WR_FUNC(cnum)) ret = PMC_WR_FUNC(cnum)(task, cnum, &tmp.reg_value);
+		if (PMC_WR_FUNC(cnum)) ret = PMC_WR_FUNC(cnum)(task, cnum, &tmp.reg_value, regs);
 abort_mission:
 		if (ret == -EINVAL) reg_retval = PFM_REG_RETFL_EINVAL;
 
@@ -1371,7 +1378,7 @@ pfm_write_pmds(struct task_struct *task, pfm_context_t *ctx, void *arg, int coun
 		/*
 		 * execute write checker, if any
 		 */
-		if (PMD_WR_FUNC(cnum)) ret = PMD_WR_FUNC(cnum)(task, cnum, &tmp.reg_value);
+		if (PMD_WR_FUNC(cnum)) ret = PMD_WR_FUNC(cnum)(task, cnum, &tmp.reg_value, regs);
 abort_mission:
 		if (ret == -EINVAL) reg_retval = PFM_REG_RETFL_EINVAL;
 
@@ -1394,6 +1401,8 @@ abort_mission:
 
 		/* keep track of what we use */
 		CTX_USED_PMD(ctx, pmu_conf.pmd_desc[(cnum)].dep_pmd[0]);
+		/* mark this register as used as well */
+		CTX_USED_PMD(ctx, RDEP(cnum));
 
 		/* writes to unimplemented part is ignored, so this is safe */
 		ia64_set_pmd(cnum, tmp.reg_value & pmu_conf.perf_ovfl_val);
@@ -1438,7 +1447,7 @@ pfm_read_pmds(struct task_struct *task, pfm_context_t *ctx, void *arg, int count
 	DBprintk(("ctx_last_cpu=%d for [%d]\n", atomic_read(&ctx->ctx_last_cpu), task->pid));
 
 	for (i = 0; i < count; i++, req++) {
-		unsigned long reg_val = ~0UL, ctx_val = ~0UL;
+		unsigned long ctx_val = ~0UL;
 
 		if (copy_from_user(&tmp, req, sizeof(tmp))) return -EFAULT;
 
@@ -1462,7 +1471,7 @@ pfm_read_pmds(struct task_struct *task, pfm_context_t *ctx, void *arg, int count
 		 */
 		if (atomic_read(&ctx->ctx_last_cpu) == smp_processor_id()){
 			ia64_srlz_d();
-			val = reg_val = ia64_get_pmd(cnum);
+			val = ia64_get_pmd(cnum);
 			DBprintk(("reading pmd[%u]=0x%lx from hw\n", cnum, val));
 		} else {
 #ifdef CONFIG_SMP
@@ -1484,7 +1493,7 @@ pfm_read_pmds(struct task_struct *task, pfm_context_t *ctx, void *arg, int count
 			}
 #endif
 			/* context has been saved */
-			val = reg_val = th->pmd[cnum];
+			val = th->pmd[cnum];
 		}
 		if (PMD_IS_COUNTING(cnum)) {
 			/*
@@ -1493,9 +1502,7 @@ pfm_read_pmds(struct task_struct *task, pfm_context_t *ctx, void *arg, int count
 
 			val &= pmu_conf.perf_ovfl_val;
 			val += ctx_val = ctx->ctx_soft_pmds[cnum].val;
-		} else {
-			val = reg_val = ia64_get_pmd(cnum);
-		}
+		} 
 
 		tmp.reg_value = val;
 
@@ -1503,14 +1510,13 @@ pfm_read_pmds(struct task_struct *task, pfm_context_t *ctx, void *arg, int count
 		 * execute read checker, if any
 		 */
 		if (PMD_RD_FUNC(cnum)) {
-			ret = PMD_RD_FUNC(cnum)(task, cnum, &tmp.reg_value);
+			ret = PMD_RD_FUNC(cnum)(task, cnum, &tmp.reg_value, regs);
 		}
 
 		PFM_REG_RETFLAG_SET(tmp.reg_flags, ret);
 
-		DBprintk(("read pmd[%u] ret=%d soft_pmd=0x%lx reg=0x%lx pmc=0x%lx\n", 
-					cnum, ret, ctx_val, reg_val, 
-					ia64_get_pmc(cnum)));
+		DBprintk(("read pmd[%u] ret=%d value=0x%lx pmc=0x%lx\n", 
+					cnum, ret, val, ia64_get_pmc(cnum)));
 
 		if (copy_to_user(req, &tmp, sizeof(tmp))) return -EFAULT;
 	}
@@ -1553,15 +1559,11 @@ pfm_use_debug_registers(struct task_struct *task)
 	 */
 	if (ctx && ctx->ctx_fl_using_dbreg == 1) return -1;
 
-	/*
-	 * XXX: not pretty
-	 */
 	LOCK_PFS();
 
 	/*
-	 * We only allow the use of debug registers when there is no system
-	 * wide monitoring 
-	 * XXX: we could relax this by 
+	 * We cannot allow setting breakpoints when system wide monitoring
+	 * sessions are using the debug registers.
 	 */
 	if (pfm_sessions.pfs_sys_use_dbregs> 0)
 		ret = -1;
@@ -1921,7 +1923,6 @@ typedef union {
 	dbr_mask_reg_t dbr;
 } dbreg_t;
 
-
 static int
 pfm_write_ibr_dbr(int mode, struct task_struct *task, void *arg, int count, struct pt_regs *regs)
 {
@@ -1963,8 +1964,8 @@ pfm_write_ibr_dbr(int mode, struct task_struct *task, void *arg, int count, stru
 	if (ctx->ctx_fl_system) {
 		/* we mark ourselves as owner  of the debug registers */
 		ctx->ctx_fl_using_dbreg = 1;
-	} else {
-       		if (ctx->ctx_fl_using_dbreg == 0) {
+		DBprintk(("system-wide setting fl_using_dbreg for [%d]\n", task->pid));
+	} else if (first_time) {
 			ret= -EBUSY;
 			if ((thread->flags & IA64_THREAD_DBG_VALID) != 0) {
 				DBprintk(("debug registers already in use for [%d]\n", task->pid));
@@ -1973,6 +1974,7 @@ pfm_write_ibr_dbr(int mode, struct task_struct *task, void *arg, int count, stru
 			/* we mark ourselves as owner  of the debug registers */
 			ctx->ctx_fl_using_dbreg = 1;
 
+			DBprintk(("setting fl_using_dbreg for [%d]\n", task->pid));
 			/* 
 			 * Given debug registers cannot be used for both debugging 
 			 * and performance monitoring at the same time, we reuse
@@ -1980,20 +1982,27 @@ pfm_write_ibr_dbr(int mode, struct task_struct *task, void *arg, int count, stru
 			 */
 			memset(task->thread.dbr, 0, sizeof(task->thread.dbr));
 			memset(task->thread.ibr, 0, sizeof(task->thread.ibr));
+	}
 
-			/*
-			 * clear hardware registers to make sure we don't
-			 * pick up stale state
-			 */
-			for (i=0; i < pmu_conf.num_ibrs; i++) {
-				ia64_set_ibr(i, 0UL);
-			}
-			ia64_srlz_i();
-			for (i=0; i < pmu_conf.num_dbrs; i++) {
-				ia64_set_dbr(i, 0UL);
-			}
-			ia64_srlz_d();
+	if (first_time) {
+		DBprintk(("[%d] clearing ibrs,dbrs\n", task->pid));
+		/*
+	 	 * clear hardware registers to make sure we don't
+	 	 * pick up stale state. 
+		 *
+		 * for a system wide session, we do not use
+		 * thread.dbr, thread.ibr because this process
+		 * never leaves the current CPU and the state
+		 * is shared by all processes running on it
+	 	 */
+		for (i=0; i < pmu_conf.num_ibrs; i++) {
+			ia64_set_ibr(i, 0UL);
 		}
+		ia64_srlz_i();
+		for (i=0; i < pmu_conf.num_dbrs; i++) {
+			ia64_set_dbr(i, 0UL);
+		}
+		ia64_srlz_d();
 	}
 
 	ret = -EFAULT;
@@ -2361,9 +2370,9 @@ sys_perfmonctl (pid_t pid, int cmd, void *arg, int count, long arg5, long arg6, 
 {
 	struct pt_regs *regs = (struct pt_regs *)&stack;
 	struct task_struct *task = current;
-	pfm_context_t *ctx = task->thread.pfm_context;
+	pfm_context_t *ctx;
 	size_t sz;
-	int ret = -ESRCH, narg;
+	int ret, narg;
 
 	/* 
 	 * reject any call if perfmon was disabled at initialization time
@@ -2393,6 +2402,8 @@ sys_perfmonctl (pid_t pid, int cmd, void *arg, int count, long arg5, long arg6, 
 
 		if (pid != current->pid) {
 
+			ret = -ESRCH;
+
 			read_lock(&tasklist_lock);
 
 			task = find_task_by_pid(pid);
@@ -2407,9 +2418,10 @@ sys_perfmonctl (pid_t pid, int cmd, void *arg, int count, long arg5, long arg6, 
 				ret = check_task_state(task);
 				if (ret != 0) goto abort_call;
 			}
-			ctx = task->thread.pfm_context;
 		}
 	} 
+
+	ctx = task->thread.pfm_context;
 
 	if (PFM_CMD_USE_CTX(cmd)) {
 		ret = -EINVAL;
@@ -2953,11 +2965,6 @@ perfmon_interrupt (int irq, void *arg, struct pt_regs *regs)
 static int
 perfmon_proc_info(char *page)
 {
-#ifdef CONFIG_SMP
-#define cpu_is_online(i) (cpu_online_map & (1UL << i))
-#else
-#define cpu_is_online(i)        1
-#endif
 	char *p = page;
 	int i;
 
@@ -4118,9 +4125,9 @@ pfm_cleanup_notifiers(struct task_struct *task)
 }
 
 static struct irqaction perfmon_irqaction = {
-	handler:	perfmon_interrupt,
-	flags:		SA_INTERRUPT,
-	name:		"perfmon"
+	.handler =	perfmon_interrupt,
+	.flags =	SA_INTERRUPT,
+	.name =		"perfmon"
 };
 
 
@@ -4149,11 +4156,6 @@ perfmon_init (void)
 {
 	pal_perf_mon_info_u_t pm_info;
 	s64 status;
-
-	register_percpu_irq(IA64_PERFMON_VECTOR, &perfmon_irqaction);
-
-	ia64_set_pmv(IA64_PERFMON_VECTOR);
-	ia64_srlz_d();
 
 	pmu_conf.pfm_is_disabled = 1;
 
@@ -4232,6 +4234,9 @@ __initcall(perfmon_init);
 void
 perfmon_init_percpu (void)
 {
+	if (smp_processor_id() == 0)
+		register_percpu_irq(IA64_PERFMON_VECTOR, &perfmon_irqaction);
+
 	ia64_set_pmv(IA64_PERFMON_VECTOR);
 	ia64_srlz_d();
 }

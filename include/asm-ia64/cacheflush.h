@@ -6,6 +6,8 @@
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
+#include <linux/page-flags.h>
+
 #include <asm/bitops.h>
 #include <asm/page.h>
 
@@ -23,7 +25,7 @@
 
 #define flush_dcache_page(page)			\
 do {						\
-	clear_bit(PG_arch_1, &page->flags);	\
+	clear_bit(PG_arch_1, &(page)->flags);	\
 } while (0)
 
 extern void flush_icache_range (unsigned long start, unsigned long end);

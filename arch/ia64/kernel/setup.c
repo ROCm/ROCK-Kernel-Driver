@@ -436,7 +436,7 @@ static void *
 c_start (struct seq_file *m, loff_t *pos)
 {
 #ifdef CONFIG_SMP
-	while (*pos < NR_CPUS && !(cpu_online_map & (1 << *pos)))
+	while (*pos < NR_CPUS && !(cpu_online_map & (1UL << *pos)))
 		++*pos;
 #endif
 	return *pos < NR_CPUS ? cpu_data(*pos) : NULL;
@@ -455,10 +455,10 @@ c_stop (struct seq_file *m, void *v)
 }
 
 struct seq_operations cpuinfo_op = {
-	start:	c_start,
-	next:	c_next,
-	stop:	c_stop,
-	show:	show_cpuinfo
+	.start =	c_start,
+	.next =		c_next,
+	.stop =		c_stop,
+	.show =		show_cpuinfo
 };
 
 void
@@ -542,7 +542,18 @@ cpu_init (void)
 	extern char __per_cpu_end[];
 	int cpu = smp_processor_id();
 
-	my_cpu_data = alloc_bootmem_pages(__per_cpu_end - __per_cpu_start);
+	if (__per_cpu_end - __per_cpu_start > PAGE_SIZE)
+		panic("Per-cpu data area too big! (%Zu > %Zu)",
+		      __per_cpu_end - __per_cpu_start, PAGE_SIZE);
+
+	/*
+	 * On the BSP, the page allocator isn't initialized by the time we get here.  On
+	 * the APs, the bootmem allocator is no longer available...
+	 */
+	if (cpu == 0)
+		my_cpu_data = alloc_bootmem_pages(__per_cpu_end - __per_cpu_start);
+	else
+		my_cpu_data = (void *) get_free_page(GFP_KERNEL);
 	memcpy(my_cpu_data, __phys_per_cpu_start, __per_cpu_end - __per_cpu_start);
 	__per_cpu_offset[cpu] = (char *) my_cpu_data - __per_cpu_start;
 	my_cpu_info = my_cpu_data + ((char *) &cpu_info - __per_cpu_start);

@@ -175,6 +175,7 @@ GLOBAL_ENTRY(ia64_switch_to)
 (p6)	srlz.d
 	ld8 sp=[r21]			// load kernel stack pointer of new task
 	mov IA64_KR(CURRENT)=r20	// update "current" application register
+	mov r8=r13			// return pointer to previously running task
 	mov r13=in0			// set "current" pointer
 	;;
 	DO_LOAD_SWITCH_STACK

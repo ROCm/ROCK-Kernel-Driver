@@ -125,9 +125,79 @@ efi_gettimeofday (struct timeval *tv)
 	tv->tv_usec = tm.nanosecond / 1000;
 }
 
+static int
+is_available_memory (efi_memory_desc_t *md)
+{
+	if (!(md->attribute & EFI_MEMORY_WB))
+		return 0;
+
+	switch (md->type) {
+	      case EFI_LOADER_CODE:
+	      case EFI_LOADER_DATA:
+	      case EFI_BOOT_SERVICES_CODE:
+	      case EFI_BOOT_SERVICES_DATA:
+	      case EFI_CONVENTIONAL_MEMORY:
+		return 1;
+	}
+	return 0;
+}
+
 /*
- * Walks the EFI memory map and calls CALLBACK once for each EFI
- * memory descriptor that has memory that is available for OS use.
+ * Trim descriptor MD so its starts at address START_ADDR.  If the descriptor covers
+ * memory that is normally available to the kernel, issue a warning that some memory
+ * is being ignored.
+ */
+static void
+trim_bottom (efi_memory_desc_t *md, u64 start_addr)
+{
+	u64 num_skipped_pages;
+
+	if (md->phys_addr >= start_addr || !md->num_pages)
+		return;
+
+	num_skipped_pages = (start_addr - md->phys_addr) >> EFI_PAGE_SHIFT;
+	if (num_skipped_pages > md->num_pages)
+		num_skipped_pages = md->num_pages;
+
+	if (is_available_memory(md))
+		printk(KERN_NOTICE "efi.%s: ignoring %luKB of memory at 0x%lx due to granule hole "
+		       "at 0x%lx\n", __FUNCTION__,
+		       (num_skipped_pages << EFI_PAGE_SHIFT) >> 10,
+		       md->phys_addr, start_addr - IA64_GRANULE_SIZE);
+	/*
+	 * NOTE: Don't set md->phys_addr to START_ADDR because that could cause the memory
+	 * descriptor list to become unsorted.  In such a case, md->num_pages will be
+	 * zero, so the Right Thing will happen.
+	 */
+	md->phys_addr += num_skipped_pages << EFI_PAGE_SHIFT;
+	md->num_pages -= num_skipped_pages;
+}
+
+static void
+trim_top (efi_memory_desc_t *md, u64 end_addr)
+{
+	u64 num_dropped_pages, md_end_addr;
+
+	md_end_addr = md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT);
+
+	if (md_end_addr <= end_addr || !md->num_pages)
+		return;
+
+	num_dropped_pages = (md_end_addr - end_addr) >> EFI_PAGE_SHIFT;
+	if (num_dropped_pages > md->num_pages)
+		num_dropped_pages = md->num_pages;
+
+	if (is_available_memory(md))
+		printk(KERN_NOTICE "efi.%s: ignoring %luKB of memory at 0x%lx due to granule hole "
+		       "at 0x%lx\n", __FUNCTION__,
+		       (num_dropped_pages << EFI_PAGE_SHIFT) >> 10,
+		       md->phys_addr, end_addr);
+	md->num_pages -= num_dropped_pages;
+}
+
+/*
+ * Walks the EFI memory map and calls CALLBACK once for each EFI memory descriptor that
+ * has memory that is available for OS use.
  */
 void
 efi_memmap_walk (efi_freemem_callback_t callback, void *arg)
@@ -137,9 +207,9 @@ efi_memmap_walk (efi_freemem_callback_t callback, void *arg)
 		u64 start;
 		u64 end;
 	} prev, curr;
-	void *efi_map_start, *efi_map_end, *p;
-	efi_memory_desc_t *md;
-	u64 efi_desc_size, start, end;
+	void *efi_map_start, *efi_map_end, *p, *q;
+	efi_memory_desc_t *md, *check_md;
+	u64 efi_desc_size, start, end, granule_addr, first_non_wb_addr = 0;
 
 	efi_map_start = __va(ia64_boot_param->efi_memmap);
 	efi_map_end   = efi_map_start + ia64_boot_param->efi_memmap_size;
@@ -147,24 +217,56 @@ efi_memmap_walk (efi_freemem_callback_t callback, void *arg)
 
 	for (p = efi_map_start; p < efi_map_end; p += efi_desc_size) {
 		md = p;
-		switch (md->type) {
-		      case EFI_LOADER_CODE:
-		      case EFI_LOADER_DATA:
-		      case EFI_BOOT_SERVICES_CODE:
-		      case EFI_BOOT_SERVICES_DATA:
-		      case EFI_CONVENTIONAL_MEMORY:
-			if (!(md->attribute & EFI_MEMORY_WB))
-				continue;
+
+		/* skip over non-WB memory descriptors; that's all we're interested in... */
+		if (!(md->attribute & EFI_MEMORY_WB))
+			continue;
+
+		if (md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT) > first_non_wb_addr) {
+			/*
+			 * Search for the next run of contiguous WB memory.  Start search
+			 * at first granule boundary covered by md.
+			 */
+			granule_addr = ((md->phys_addr + IA64_GRANULE_SIZE - 1)
+					& -IA64_GRANULE_SIZE);
+			first_non_wb_addr = granule_addr;
+			for (q = p; q < efi_map_end; q += efi_desc_size) {
+				check_md = q;
+
+				if (check_md->attribute & EFI_MEMORY_WB)
+					trim_bottom(md, granule_addr);
+
+				if (check_md->phys_addr < granule_addr)
+					continue;
+
+				if (!(check_md->attribute & EFI_MEMORY_WB))
+					break;	/* hit a non-WB region; stop search */
+
+				if (check_md->phys_addr != first_non_wb_addr)
+					break;	/* hit a memory hole; stop search */
+
+				first_non_wb_addr += check_md->num_pages << EFI_PAGE_SHIFT;
+			}
+			/* round it down to the previous granule-boundary: */
+			first_non_wb_addr &= -IA64_GRANULE_SIZE;
+
+			if (!(first_non_wb_addr > granule_addr))
+				continue;	/* couldn't find enough contiguous memory */
+		}
+
+		/* BUG_ON((md->phys_addr >> IA64_GRANULE_SHIFT) < first_non_wb_addr); */
+
+		trim_top(md, first_non_wb_addr);
+
+		if (is_available_memory(md)) {
 			if (md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT) > mem_limit) {
 				if (md->phys_addr > mem_limit)
 					continue;
 				md->num_pages = (mem_limit - md->phys_addr) >> EFI_PAGE_SHIFT;
 			}
-			if (md->num_pages == 0) {
-				printk("efi_memmap_walk: ignoring empty region at 0x%lx",
-				       md->phys_addr);
+
+			if (md->num_pages == 0)
 				continue;
-			}
 
 			curr.start = PAGE_OFFSET + md->phys_addr;
 			curr.end   = curr.start + (md->num_pages << EFI_PAGE_SHIFT);
@@ -187,10 +289,6 @@ efi_memmap_walk (efi_freemem_callback_t callback, void *arg)
 					prev = curr;
 				}
 			}
-			break;
-
-		      default:
-			continue;
 		}
 	}
 	if (prev_valid) {
@@ -268,8 +366,9 @@ efi_map_pal_code (void)
 		 */
 		psr = ia64_clear_ic();
 		ia64_itr(0x1, IA64_TR_PALCODE, vaddr & mask,
-			 pte_val(pfn_pte(md->phys_addr >> PAGE_SHIFT, PAGE_KERNEL)), IA64_GRANULE_SHIFT);
-		ia64_set_psr(psr);
+			 pte_val(pfn_pte(md->phys_addr >> PAGE_SHIFT, PAGE_KERNEL)),
+			 IA64_GRANULE_SHIFT);
+		ia64_set_psr(psr);		/* restore psr */
 		ia64_srlz_i();
 	}
 }
@@ -376,7 +475,7 @@ efi_init (void)
 			md = p;
 			printk("mem%02u: type=%u, attr=0x%lx, range=[0x%016lx-0x%016lx) (%luMB)\n",
 			       i, md->type, md->attribute, md->phys_addr,
-			       md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT) - 1,
+			       md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT),
 			       md->num_pages >> (20 - EFI_PAGE_SHIFT));
 		}
 	}
