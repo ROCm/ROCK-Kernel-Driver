@@ -979,8 +979,6 @@ struct dentry * __d_lookup(struct dentry * parent, struct qstr * name)
 
 		dentry = hlist_entry(node, struct dentry, d_hash);
 
-		smp_rmb();
-
 		if (dentry->d_name.hash != hash)
 			continue;
 		if (dentry->d_parent != parent)
@@ -1003,7 +1001,11 @@ struct dentry * __d_lookup(struct dentry * parent, struct qstr * name)
 		if (dentry->d_parent != parent)
 			goto next;
 
-		qstr = rcu_dereference(&dentry->d_name);
+		/*
+		 * It is safe to compare names since d_move() cannot
+		 * change the qstr (protected by d_lock).
+		 */
+		qstr = &dentry->d_name;
 		if (parent->d_op && parent->d_op->d_compare) {
 			if (parent->d_op->d_compare(parent, qstr, name))
 				goto next;
