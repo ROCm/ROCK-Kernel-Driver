@@ -563,8 +563,10 @@ ia32_do_drop_pp_list(struct partial_page_list *ppl)
 }
 
 void
-ia32_drop_partial_page_list(struct partial_page_list* ppl)
+ia32_drop_partial_page_list(struct task_struct *task)
 {
+	struct partial_page_list* ppl = task->thread.ppl;
+
 	if (ppl && atomic_dec_and_test(&ppl->pp_count))
 		ia32_do_drop_pp_list(ppl);
 }
@@ -855,14 +857,14 @@ sys32_mmap2 (unsigned int addr, unsigned int len, unsigned int prot, unsigned in
 asmlinkage long
 sys32_munmap (unsigned int start, unsigned int len)
 {
-	unsigned int end, pstart, pend;
+	unsigned int end = start + len;
 	long ret;
-
-	end = start + len;
 
 #if PAGE_SHIFT <= IA32_PAGE_SHIFT
 	ret = sys_munmap(start, end - start);
 #else
+	unsigned int pstart, pend;
+
 	if (OFFSET4K(start))
 		return -EINVAL;
 
@@ -1034,11 +1036,12 @@ sys32_mremap (unsigned int addr, unsigned int old_len, unsigned int new_len,
 		unsigned int flags, unsigned int new_addr)
 {
 	long ret;
-	unsigned int old_end, new_end;
 
 #if PAGE_SHIFT <= IA32_PAGE_SHIFT
 	ret = sys_mremap(addr, old_len, new_len, flags, new_addr);
 #else
+	unsigned int old_end, new_end;
+
 	if (OFFSET4K(addr))
 		return -EINVAL;
 

@@ -676,10 +676,8 @@ flush_thread (void)
 	/* drop floating-point and debug-register state if it exists: */
 	current->thread.flags &= ~(IA64_THREAD_FPH_VALID | IA64_THREAD_DBG_VALID);
 	ia64_drop_fpu(current);
-#ifdef CONFIG_IA32_SUPPORT
 	if (IS_IA32_PROCESS(ia64_task_regs(current)))
-		ia32_drop_partial_page_list(current->thread.ppl);
-#endif
+		ia32_drop_partial_page_list(current);
 }
 
 /*
@@ -699,10 +697,8 @@ exit_thread (void)
 	if (current->thread.flags & IA64_THREAD_DBG_VALID)
 		pfm_release_debug_registers(current);
 #endif
-#ifdef CONFIG_IA32_SUPPORT
 	if (IS_IA32_PROCESS(ia64_task_regs(current)))
-		ia32_drop_partial_page_list(current->thread.ppl);
-#endif
+		ia32_drop_partial_page_list(current);
 }
 
 unsigned long

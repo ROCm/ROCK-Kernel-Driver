@@ -1,5 +1,5 @@
-#ifndef _ASM_IA64_IA32_H
-#define _ASM_IA64_IA32_H
+#ifndef _ASM_IA64_IA32_PRIV_H
+#define _ASM_IA64_IA32_PRIV_H
 
 #include <linux/config.h>
 
@@ -17,7 +17,6 @@
  * 32 bit structures for IA32 support.
  */
 
-#define IA32_PAGE_SHIFT		12	/* 4KB pages */
 #define IA32_PAGE_SIZE		(1UL << IA32_PAGE_SHIFT)
 #define IA32_PAGE_MASK		(~(IA32_PAGE_SIZE - 1))
 #define IA32_PAGE_ALIGN(addr)	(((addr) + IA32_PAGE_SIZE - 1) & IA32_PAGE_MASK)
@@ -45,7 +44,11 @@ struct partial_page_list {
 	atomic_t		pp_count; /* reference count */
 };
 
+#if PAGE_SHIFT > IA32_PAGE_SHIFT
 struct partial_page_list* ia32_init_pp_list (void);
+#else
+# define ia32_init_pp_list()	0
+#endif
 
 /* sigcontext.h */
 /*
@@ -553,4 +556,4 @@ extern int save_ia32_fpxstate (struct task_struct *tsk, struct ia32_user_fxsr_st
 
 #endif /* !CONFIG_IA32_SUPPORT */
 
-#endif /* _ASM_IA64_IA32_H */
+#endif /* _ASM_IA64_IA32_PRIV_H */
