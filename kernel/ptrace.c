@@ -156,7 +156,7 @@ int access_process_vm(struct task_struct *tsk, unsigned long addr, void *buf, in
 			flush_page_to_ram(page);
 		}
 		kunmap(page);
-		put_page(page);
+		page_cache_release(page);
 		len -= bytes;
 		buf += bytes;
 		addr += bytes;
