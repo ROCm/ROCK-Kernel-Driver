@@ -315,8 +315,9 @@ static int ncp_fill_super(struct super_block *sb, void *raw_data, int silent)
 #endif
 	struct ncp_entry_info finfo;
 
+	error = -EFAULT;
 	if (raw_data == NULL)
-		goto out_no_data;
+		goto out;
 	switch (*(int*)raw_data) {
 		case NCP_MOUNT_VERSION:
 			{
@@ -356,23 +357,27 @@ static int ncp_fill_super(struct super_block *sb, void *raw_data, int silent)
 			}
 			break;
 		default:
-			goto out_bad_mount;
+			error = -ECHRNG;
+			goto out;
 	}
+	error = -EBADF;
 	ncp_filp = fget(data.ncp_fd);
 	if (!ncp_filp)
-		goto out_bad_file;
+		goto out;
+	error = -ENOTSOCK;
 	sock_inode = ncp_filp->f_dentry->d_inode;
 	if (!S_ISSOCK(sock_inode->i_mode))
-		goto out_bad_file2;
+		goto out_fput;
 	sock = SOCKET_I(sock_inode);
 	if (!sock)
-		goto out_bad_file2;
+		goto out_fput;
 		
 	if (sock->type == SOCK_STREAM)
-		default_bufsize = 61440;
+		default_bufsize = 0xF000;
 	else
 		default_bufsize = 1024;
 
+	sb->s_maxbytes = 0xFFFFFFFFU;
 	sb->s_blocksize = 1024;	/* Eh...  Is this correct? */
 	sb->s_blocksize_bits = 10;
 	sb->s_magic = NCP_SUPER_MAGIC;
@@ -408,10 +413,8 @@ static int ncp_fill_super(struct super_block *sb, void *raw_data, int silent)
 		printk(KERN_INFO "You need to recompile your ncpfs utils..\n");
 	}
 	server->m.time_out = server->m.time_out * HZ / 100;
-	server->m.file_mode = (server->m.file_mode &
-			       (S_IRWXU | S_IRWXG | S_IRWXO)) | S_IFREG;
-	server->m.dir_mode = (server->m.dir_mode &
-			      (S_IRWXU | S_IRWXG | S_IRWXO)) | S_IFDIR;
+	server->m.file_mode = (server->m.file_mode & S_IRWXUGO) | S_IFREG;
+	server->m.dir_mode = (server->m.dir_mode & S_IRWXUGO) | S_IFDIR;
 
 #ifdef CONFIG_NCPFS_NLS
 	/* load the default NLS charsets */
@@ -422,19 +425,21 @@ static int ncp_fill_super(struct super_block *sb, void *raw_data, int silent)
 	server->dentry_ttl = 0;	/* no caching */
 
 #undef NCP_PACKET_SIZE
-#define NCP_PACKET_SIZE 65536
+#define NCP_PACKET_SIZE 131072
+	error = -ENOMEM;
 	server->packet_size = NCP_PACKET_SIZE;
 	server->packet = vmalloc(NCP_PACKET_SIZE);
 	if (server->packet == NULL)
-		goto out_no_packet;
+		goto out_nls;
 
 	ncp_lock_server(server);
 	error = ncp_connect(server);
 	ncp_unlock_server(server);
 	if (error < 0)
-		goto out_no_connect;
+		goto out_packet;
 	DPRINTK("ncp_fill_super: NCP_SBP(sb) = %x\n", (int) NCP_SBP(sb));
 
+	error = -EMSGSIZE;	/* -EREMOTESIDEINCOMPATIBLE */
 #ifdef CONFIG_NCPFS_PACKET_SIGNING
 	if (ncp_negotiate_size_and_options(server, default_bufsize,
 		NCP_DEFAULT_OPTIONS, &(server->buffer_size), &options) == 0)
@@ -447,7 +452,7 @@ static int ncp_fill_super(struct super_block *sb, void *raw_data, int silent)
 				&(server->buffer_size), &options) != 0)
 				
 			{
-				goto out_no_bufsize;
+				goto out_disconnect;
 			}
 		}
 		if (options & 2)
@@ -457,7 +462,7 @@ static int ncp_fill_super(struct super_block *sb, void *raw_data, int silent)
 #endif	/* CONFIG_NCPFS_PACKET_SIGNING */
 	if (ncp_negotiate_buffersize(server, default_bufsize,
   				     &(server->buffer_size)) != 0)
-		goto out_no_bufsize;
+		goto out_disconnect;
 	DPRINTK("ncpfs: bufsize = %d\n", server->buffer_size);
 
 	memset(&finfo, 0, sizeof(finfo));
@@ -482,9 +487,11 @@ static int ncp_fill_super(struct super_block *sb, void *raw_data, int silent)
 	finfo.ino		= 2;	/* tradition */
 
 	server->name_space[finfo.i.volNumber] = NW_NS_DOS;
+
+	error = -ENOMEM;
         root_inode = ncp_iget(sb, &finfo);
         if (!root_inode)
-		goto out_no_root;
+		goto out_disconnect;
 	DPRINTK("ncp_fill_super: root vol=%d\n", NCP_FINFO(root_inode)->volNumber);
 	sb->s_root = d_alloc_root(root_inode);
         if (!sb->s_root)
@@ -493,49 +500,27 @@ static int ncp_fill_super(struct super_block *sb, void *raw_data, int silent)
 	return 0;
 
 out_no_root:
-	printk(KERN_ERR "ncp_fill_super: get root inode failed\n");
 	iput(root_inode);
-	goto out_disconnect;
-out_no_bufsize:
-	printk(KERN_ERR "ncp_fill_super: could not get bufsize\n");
 out_disconnect:
 	ncp_lock_server(server);
 	ncp_disconnect(server);
 	ncp_unlock_server(server);
-	goto out_free_packet;
-out_no_connect:
-	printk(KERN_ERR "ncp_fill_super: Failed connection, error=%d\n", error);
-out_free_packet:
+out_packet:
 	vfree(server->packet);
-	goto out_free_server;
-out_no_packet:
-	printk(KERN_ERR "ncp_fill_super: could not alloc packet\n");
-out_free_server:
+out_nls:
 #ifdef CONFIG_NCPFS_NLS
 	unload_nls(server->nls_io);
 	unload_nls(server->nls_vol);
 #endif
+out_fput:
 	/* 23/12/1998 Marcin Dalecki <dalecki@cs.net.pl>:
 	 * 
 	 * The previously used put_filp(ncp_filp); was bogous, since
 	 * it doesn't proper unlocking.
 	 */
 	fput(ncp_filp);
-	goto out;
-
-out_bad_file2:
-	fput(ncp_filp);
-out_bad_file:
-	printk(KERN_ERR "ncp_fill_super: invalid ncp socket\n");
-	goto out;
-out_bad_mount:
-	printk(KERN_INFO "ncp_fill_super: kernel requires mount version %d\n",
-		NCP_MOUNT_VERSION);
-	goto out;
-out_no_data:
-	printk(KERN_ERR "ncp_fill_super: missing data argument\n");
 out:
-	return -EINVAL;
+	return error;
 }
 
 static void ncp_put_super(struct super_block *sb)

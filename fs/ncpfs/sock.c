@@ -132,7 +132,7 @@ static int do_ncp_rpc_call(struct ncp_server *server, int size,
 		result = _send(sock, (void *) start, size);
 		if (result < 0) {
 			printk(KERN_ERR "ncp_rpc_call: send error = %d\n", result);
-			break;
+			return result;
 		}
 	      re_select:
 		poll_initwait(&wait_table);
