@@ -644,6 +644,7 @@ linvfs_readpage(
 
 STATIC int
 linvfs_readpages(
+	struct file		*unused,
 	struct address_space	*mapping,
 	struct list_head	*pages,
 	unsigned		nr_pages)

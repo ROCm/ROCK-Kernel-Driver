@@ -52,7 +52,7 @@ read_pages(struct address_space *mapping, struct file *filp,
 	pagevec_init(&lru_pvec, 0);
 
 	if (mapping->a_ops->readpages)
-		return mapping->a_ops->readpages(mapping, pages, nr_pages);
+		return mapping->a_ops->readpages(filp, mapping, pages, nr_pages);
 
 	for (page_idx = 0; page_idx < nr_pages; page_idx++) {
 		struct page *page = list_entry(pages->prev, struct page, list);
