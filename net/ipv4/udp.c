@@ -951,8 +951,6 @@ static int udp_queue_rcv_skb(struct sock * sk, struct sk_buff *skb)
 	if (sk->filter && skb->ip_summed != CHECKSUM_UNNECESSARY) {
 		if (__udp_checksum_complete(skb)) {
 			UDP_INC_STATS_BH(UdpInErrors);
-			IP_INC_STATS_BH(IpInDiscards);
-			ip_statistics[smp_processor_id()*2].IpInDelivers--;
 			kfree_skb(skb);
 			return -1;
 		}
@@ -962,8 +960,6 @@ static int udp_queue_rcv_skb(struct sock * sk, struct sk_buff *skb)
 
 	if (sock_queue_rcv_skb(sk,skb)<0) {
 		UDP_INC_STATS_BH(UdpInErrors);
-		IP_INC_STATS_BH(IpInDiscards);
-		ip_statistics[smp_processor_id()*2].IpInDelivers--;
 		kfree_skb(skb);
 		return -1;
 	}
@@ -1046,8 +1042,6 @@ int udp_rcv(struct sk_buff *skb)
 	u32 saddr = skb->nh.iph->saddr;
 	u32 daddr = skb->nh.iph->daddr;
 	int len = skb->len;
-
-  	IP_INC_STATS_BH(IpInDelivers);
 
 	/*
 	 *	Validate the packet and the UDP length.

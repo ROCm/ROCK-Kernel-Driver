@@ -237,11 +237,13 @@ static inline int ip_local_deliver_finish(struct sk_buff *skb)
 				protocol = -ret;
 				goto resubmit;
 			}
+			IP_INC_STATS_BH(IpInDelivers);
 		} else {
 			if (!raw_sk) {
 				icmp_send(skb, ICMP_DEST_UNREACH,
 					  ICMP_PROT_UNREACH, 0);
-			}
+			} else
+				IP_INC_STATS_BH(IpInDelivers);
 			kfree_skb(skb);
 		}
 	}
@@ -304,8 +306,10 @@ static inline int ip_rcv_finish(struct sk_buff *skb)
 		                                      --ANK (980813)
 		*/
 
-		if (skb_cow(skb, skb_headroom(skb)))
+		if (skb_cow(skb, skb_headroom(skb))) {
+			IP_INC_STATS_BH(IpInDiscards);
 			goto drop;
+		}
 		iph = skb->nh.iph;
 
 		if (ip_options_compile(NULL, skb))
@@ -353,8 +357,10 @@ int ip_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt)
 
 	IP_INC_STATS_BH(IpInReceives);
 
-	if ((skb = skb_share_check(skb, GFP_ATOMIC)) == NULL)
+	if ((skb = skb_share_check(skb, GFP_ATOMIC)) == NULL) {
+		IP_INC_STATS_BH(IpInDiscards);
 		goto out;
+	}
 
 	if (!pskb_may_pull(skb, sizeof(struct iphdr)))
 		goto inhdr_error;

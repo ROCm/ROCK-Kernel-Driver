@@ -275,7 +275,7 @@ static inline int rawv6_rcv_skb(struct sock * sk, struct sk_buff * skb)
 #if defined(CONFIG_FILTER)
 	if (sk->filter && skb->ip_summed != CHECKSUM_UNNECESSARY) {
 		if ((unsigned short)csum_fold(skb_checksum(skb, 0, skb->len, skb->csum))) {
-			IP6_INC_STATS_BH(Ip6InDiscards);
+			/* FIXME: increment a raw6 drops counter here */
 			kfree_skb(skb);
 			return 0;
 		}
@@ -284,12 +284,11 @@ static inline int rawv6_rcv_skb(struct sock * sk, struct sk_buff * skb)
 #endif
 	/* Charge it to the socket. */
 	if (sock_queue_rcv_skb(sk,skb)<0) {
-		IP6_INC_STATS_BH(Ip6InDiscards);
+		/* FIXME: increment a raw6 drops counter here */
 		kfree_skb(skb);
 		return 0;
 	}
 
-	IP6_INC_STATS_BH(Ip6InDelivers);
 	return 0;
 }
 
@@ -327,7 +326,7 @@ int rawv6_rcv(struct sock *sk, struct sk_buff *skb)
 	if (inet->hdrincl) {
 		if (skb->ip_summed != CHECKSUM_UNNECESSARY &&
 		    (unsigned short)csum_fold(skb_checksum(skb, 0, skb->len, skb->csum))) {
-			IP6_INC_STATS_BH(Ip6InDiscards);
+			/* FIXME: increment a raw6 drops counter here */
 			kfree_skb(skb);
 			return 0;
 		}
@@ -427,7 +426,7 @@ csum_copy_err:
 	   as some normal condition.
 	 */
 	err = (flags&MSG_DONTWAIT) ? -EAGAIN : -EHOSTUNREACH;
-	IP6_INC_STATS_USER(Ip6InDiscards);
+	/* FIXME: increment a raw6 drops counter here */
 	goto out_free;
 }
 

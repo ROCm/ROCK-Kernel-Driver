@@ -227,12 +227,11 @@ static int raw_rcv_skb(struct sock * sk, struct sk_buff * skb)
 	/* Charge it to the socket. */
 	
 	if (sock_queue_rcv_skb(sk, skb) < 0) {
-		IP_INC_STATS(IpInDiscards);
+		/* FIXME: increment a raw drops counter here */
 		kfree_skb(skb);
 		return NET_RX_DROP;
 	}
 
-	IP_INC_STATS(IpInDelivers);
 	return NET_RX_SUCCESS;
 }
 

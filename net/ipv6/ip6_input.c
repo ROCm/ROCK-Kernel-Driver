@@ -60,8 +60,10 @@ int ipv6_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt
 
 	IP6_INC_STATS_BH(Ip6InReceives);
 
-	if ((skb = skb_share_check(skb, GFP_ATOMIC)) == NULL)
+	if ((skb = skb_share_check(skb, GFP_ATOMIC)) == NULL) {
+		IP6_INC_STATS_BH(Ip6InDiscards);
 		goto out;
+	}
 
 	/* Store incoming device index. When the packet will
 	   be queued, we cannot refer to skb->dev anymore.
@@ -175,11 +177,13 @@ resubmit:
 			nexthdr = -ret;
 			goto resubmit;
 		}
+		IP6_INC_STATS_BH(Ip6InDelivers);
 	} else {
 		if (!raw_sk) {
 			IP6_INC_STATS_BH(Ip6InUnknownProtos);
 			icmpv6_param_prob(skb, ICMPV6_UNK_NEXTHDR, nhoff);
-		}
+		} else
+			IP6_INC_STATS_BH(Ip6InDelivers);
 		kfree_skb(skb);
 	}
 

@@ -1497,8 +1497,6 @@ static int tcp_v6_do_rcv(struct sock *sk, struct sk_buff *skb)
 	 *	is currently called with bh processing disabled.
 	 */
 
-  	IP6_INC_STATS_BH(Ip6InDelivers);
-
 	/* Do Stevens' IPV6_PKTOPTIONS.
 
 	   Yes, guys, it is the only place in our code, where we
