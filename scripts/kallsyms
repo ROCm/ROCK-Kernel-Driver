@@ -1,0 +1,40 @@
+#! /bin/sh
+# Written by Rusty Russell <rusty@rustcorp.com.au> 2002.
+
+if [ $# -ne 2 ]; then
+    echo Usage: kallsyms vmlinux objfile >&2
+
+    echo Adds a .kallsyms section containing symbol info.
+    exit 1
+fi
+
+set -e
+
+# Clean up on exit.
+trap "rm -f kallsyms.map kallsyms.c $2" 0
+
+# Takes nm output from $1, produces a .c file on standard output.
+encode_symbols()
+{
+    # First take addresses.
+    echo "unsigned long kallsyms_addresses[] = {"
+    sed 's/^[	]*\([A-Fa-f0-9]*\).*/0x\1UL,/' < $1
+    echo "};"
+
+    # Now output size.
+    echo "unsigned long kallsyms_num_syms = `wc -l < $1`;"
+
+    # Now output names.
+    echo "char kallsyms_names[] = ";
+    sed 's/^[         ]*[A-Fa-f0-9]*[         ]*.[    ]\(.*\)/"\1\\0"/' < $1
+    echo ";"
+}
+
+# FIXME: Use System.map as input, and regenerate each time in Makefile.
+$NM $1 | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > kallsyms.map
+
+encode_symbols kallsyms.map > kallsyms.c
+$CC $CFLAGS -c -o $2 kallsyms.c
+
+trap "rm -f kallsyms.map kallsyms.c" 0
+exit 0

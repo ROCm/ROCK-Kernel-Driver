@@ -1604,14 +1604,13 @@ config DEBUG_HIGHMEM
 	  This options enables addition error checking for high memory systems.
 	  Disable for production systems.
 
-# Reimplemented RSN.
-#config KALLSYMS
-#	bool "Load all symbols for debugging/kksymoops"
-#	depends on DEBUG_KERNEL
-#	help
-#	  Say Y here to let the kernel print out symbolic crash information and
-#	  symbolic stack backtraces. This increases the size of the kernel
-#	  somewhat, as all symbols have to be loaded into the kernel image.
+config KALLSYMS
+	bool "Load all symbols for debugging/kksymoops"
+	depends on DEBUG_KERNEL
+	help
+	  Say Y here to let the kernel print out symbolic crash information and
+	  symbolic stack backtraces. This increases the size of the kernel
+	  somewhat, as all symbols have to be loaded into the kernel image.
 
 config X86_EXTRA_IRQS
 	bool

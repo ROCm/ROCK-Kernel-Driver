@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exresnte - AML Interpreter object resolution
- *              $Revision: 60 $
+ *              $Revision: 61 $
  *
  *****************************************************************************/
 
@@ -85,8 +85,8 @@ acpi_ex_resolve_node_to_value (
 	source_desc = acpi_ns_get_attached_object (node);
 	entry_type = acpi_ns_get_type ((acpi_handle) node);
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Entry=%p Source_desc=%p Type=%X\n",
-		 node, source_desc, entry_type));
+	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Entry=%p Source_desc=%p [%s]\n",
+		 node, source_desc, acpi_ut_get_type_name (entry_type)));
 
 	if (entry_type == ACPI_TYPE_LOCAL_ALIAS) {
 		/* There is always exactly one level of indirection */

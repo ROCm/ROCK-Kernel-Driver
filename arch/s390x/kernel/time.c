@@ -126,7 +126,6 @@ void do_settimeofday(struct timeval *tv)
  */
 static void do_comparator_interrupt(struct pt_regs *regs, __u16 error_code)
 {
-	int cpu = smp_processor_id();
 	__u64 tmp;
 	__u32 ticks;
 

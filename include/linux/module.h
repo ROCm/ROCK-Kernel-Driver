@@ -14,6 +14,8 @@
 #include <linux/compiler.h>
 #include <linux/cache.h>
 #include <linux/kmod.h>
+#include <linux/elf.h>
+
 #include <asm/module.h>
 #include <asm/uaccess.h> /* For struct exception_table_entry */
 
@@ -29,7 +31,6 @@
 #define MODULE_GENERIC_TABLE(gtype,name)
 #define MODULE_DEVICE_TABLE(type,name)
 #define MODULE_PARM_DESC(var,desc)
-#define print_symbol(format, addr)
 #define print_modules()
 
 #define MODULE_NAME_LEN (64 - sizeof(unsigned long))
@@ -137,6 +138,13 @@ struct module
 	void (*exit)(void);
 #endif
 
+#ifdef CONFIG_KALLSYMS
+	/* We keep the symbol and string tables for kallsyms. */
+	Elf_Sym *symtab;
+	unsigned long num_syms;
+	char *strtab;
+#endif
+
 	/* The command line arguments (may be mangled).  People like
 	   keeping pointers to this stuff */
 	char args[0];
@@ -211,6 +219,12 @@ do {									     \
 	}								     \
 } while(0)
 
+/* For kallsyms to ask for address resolution.  NULL means not found. */
+const char *module_address_lookup(unsigned long addr,
+				  unsigned long *symbolsize,
+				  unsigned long *offset,
+				  char **modname);
+
 #else /* !CONFIG_MODULES... */
 #define EXPORT_SYMBOL(sym)
 #define EXPORT_SYMBOL_GPL(sym)
@@ -227,6 +241,15 @@ do {									     \
 #define module_name(mod) "kernel"
 
 #define __unsafe(mod)
+
+/* For kallsyms to ask for address resolution.  NULL means not found. */
+static inline const char *module_address_lookup(unsigned long addr,
+						unsigned long *symbolsize,
+						unsigned long *offset,
+						char **modname)
+{
+	return NULL;
+}
 #endif /* CONFIG_MODULES */
 
 /* For archs to search exception tables */

@@ -11,9 +11,9 @@ dasd_mod-objs      := dasd.o dasd_ioctl.o dasd_proc.o dasd_devmap.o \
 			dasd_genhd.o dasd_erp.o
 
 obj-$(CONFIG_DASD) += dasd_mod.o
+obj-$(CONFIG_DASD_DIAG) += dasd_diag_mod.o
 obj-$(CONFIG_DASD_ECKD) += dasd_eckd_mod.o
 obj-$(CONFIG_DASD_FBA)  += dasd_fba_mod.o
-obj-$(CONFIG_DASD_DIAG) += dasd_diag_mod.o
 obj-$(CONFIG_BLK_DEV_XPRAM) += xpram.o
 
 include $(TOPDIR)/Rules.make

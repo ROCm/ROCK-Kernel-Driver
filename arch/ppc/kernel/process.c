@@ -34,6 +34,7 @@
 #include <linux/prctl.h>
 #include <linux/init_task.h>
 #include <linux/module.h>
+#include <linux/kallsyms.h>
 
 #include <asm/pgtable.h>
 #include <asm/uaccess.h>

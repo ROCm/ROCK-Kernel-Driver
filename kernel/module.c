@@ -898,6 +898,11 @@ static struct module *load_module(void *umod,
 			DEBUGP("Exception table found in section %u\n", i);
 			exindex = i;
 		}
+#ifdef CONFIG_KALLSYMS
+		/* symbol and string tables for decoding later. */
+		if (sechdrs[i].sh_type == SHT_SYMTAB || i == hdr->e_shstrndx)
+			sechdrs[i].sh_flags |= SHF_ALLOC;
+#endif
 #ifndef CONFIG_MODULE_UNLOAD
 		/* Don't load .exit sections */
 		if (strstr(secstrings+sechdrs[i].sh_name, ".exit"))
@@ -1026,6 +1031,11 @@ static struct module *load_module(void *umod,
 			goto cleanup;
 	}
 
+#ifdef CONFIG_KALLSYMS
+	mod->symtab = (void *)sechdrs[symindex].sh_offset;
+	mod->num_syms = sechdrs[symindex].sh_size / sizeof(Elf_Sym);
+	mod->strtab = (void *)sechdrs[strindex].sh_offset;
+#endif
 	err = module_finalize(hdr, sechdrs, mod);
 	if (err < 0)
 		goto cleanup;
@@ -1141,9 +1151,82 @@ sys_init_module(void *umod,
 	return 0;
 }
 
-/* Called by the /proc file system to return a current list of
-   modules.  Al Viro came up with this interface as an "improvement".
-   God save us from any more such interface improvements. */
+#ifdef CONFIG_KALLSYMS
+static inline int inside_init(struct module *mod, unsigned long addr)
+{
+	if (mod->module_init
+	    && (unsigned long)mod->module_init <= addr
+	    && (unsigned long)mod->module_init + mod->init_size > addr)
+		return 1;
+	return 0;
+}
+
+static inline int inside_core(struct module *mod, unsigned long addr)
+{
+	if ((unsigned long)mod->module_core <= addr
+	    && (unsigned long)mod->module_core + mod->core_size > addr)
+		return 1;
+	return 0;
+}
+
+static const char *get_ksymbol(struct module *mod,
+			       unsigned long addr,
+			       unsigned long *size,
+			       unsigned long *offset)
+{
+	unsigned int i, next = 0, best = 0;
+
+	/* Scan for closest preceeding symbol, and next symbol. (ELF
+           starts real symbols at 1). */
+	for (i = 1; i < mod->num_syms; i++) {
+		if (mod->symtab[i].st_shndx == SHN_UNDEF)
+			continue;
+
+		if (mod->symtab[i].st_value <= addr
+		    && mod->symtab[i].st_value > mod->symtab[best].st_value)
+			best = i;
+		if (mod->symtab[i].st_value > addr
+		    && mod->symtab[i].st_value < mod->symtab[next].st_value)
+			next = i;
+	}
+
+	if (!best)
+		return NULL;
+
+	if (!next) {
+		/* Last symbol?  It ends at the end of the module then. */
+		if (inside_core(mod, addr))
+			*size = mod->module_core+mod->core_size - (void*)addr;
+		else
+			*size = mod->module_init+mod->init_size - (void*)addr;
+	} else
+		*size = mod->symtab[next].st_value - addr;
+
+	*offset = addr - mod->symtab[best].st_value;
+	return mod->strtab + mod->symtab[best].st_name;
+}
+
+/* For kallsyms to ask for address resolution.  NULL means not found.
+   We don't lock, as this is used for oops resolution and races are a
+   lesser concern. */
+const char *module_address_lookup(unsigned long addr,
+				  unsigned long *size,
+				  unsigned long *offset,
+				  char **modname)
+{
+	struct module *mod;
+
+	list_for_each_entry(mod, &modules, list) {
+		if (inside_core(mod, addr) || inside_init(mod, addr)) {
+			*modname = mod->name;
+			return get_ksymbol(mod, addr, size, offset);
+		}
+	}
+	return NULL;
+}
+#endif /* CONFIG_KALLSYMS */
+
+/* Called by the /proc file system to return a list of modules. */
 static void *m_start(struct seq_file *m, loff_t *pos)
 {
 	struct list_head *i;

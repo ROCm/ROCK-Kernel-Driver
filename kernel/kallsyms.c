@@ -1,233 +1,102 @@
 /*
- * kksymoops.c: in-kernel printing of symbolic oopses and stack traces.
+ * kallsyms.c: in-kernel printing of symbolic oopses and stack traces.
  *
- *  Copyright 2000 Keith Owens <kaos@ocs.com.au> April 2000
- *  Copyright 2002 Arjan van de Ven <arjanv@redhat.com>
- *
-   This code uses the list of all kernel and module symbols to :-
-
-   * Find any non-stack symbol in a kernel or module.  Symbols do
-     not have to be exported for debugging.
-
-   * Convert an address to the module (or kernel) that owns it, the
-     section it is in and the nearest symbol.  This finds all non-stack
-     symbols, not just exported ones.
-
+ * Rewritten and vastly simplified by Rusty Russell for in-kernel
+ * module loader:
+ *   Copyright 2002 Rusty Russell <rusty@rustcorp.com.au> IBM Corporation
  */
-
-#include <linux/mm.h>
-#include <linux/module.h>
 #include <linux/kallsyms.h>
+#include <linux/module.h>
 
-/* A symbol can appear in more than one module.  A token is used to
- * restart the scan at the next module, set the token to 0 for the
- * first scan of each symbol.
- */
+static char kallsyms_dummy;
 
-int kallsyms_symbol_to_address(
-	const char	 *name,		/* Name to lookup */
-	unsigned long 	 *token,	/* Which module to start at */
-	const char	**mod_name,	/* Set to module name */
-	unsigned long 	 *mod_start,	/* Set to start address of module */
-	unsigned long 	 *mod_end,	/* Set to end address of module */
-	const char	**sec_name,	/* Set to section name */
-	unsigned long 	 *sec_start,	/* Set to start address of section */
-	unsigned long 	 *sec_end,	/* Set to end address of section */
-	const char	**sym_name,	/* Set to full symbol name */
-	unsigned long 	 *sym_start,	/* Set to start address of symbol */
-	unsigned long 	 *sym_end	/* Set to end address of symbol */
-	)
+/* These will be re-linked against their real values during the second link stage */
+extern unsigned long kallsyms_addresses[1] __attribute__((weak, alias("kallsyms_dummy")));
+extern unsigned long kallsyms_num_syms __attribute__((weak, alias("kallsyms_dummy")));
+extern char kallsyms_names[1] __attribute__((weak, alias("kallsyms_dummy")));
+
+/* Defined by the linker script. */
+extern char _stext[], _etext[];
+
+/* Lookup an address.  modname is set to NULL if it's in the kernel. */
+const char *kallsyms_lookup(unsigned long addr,
+			    unsigned long *symbolsize,
+			    unsigned long *offset,
+			    char **modname)
 {
-	const struct kallsyms_header	*ka_hdr = NULL;	/* stupid gcc */
-	const struct kallsyms_section	*ka_sec;
-	const struct kallsyms_symbol	*ka_sym = NULL;
-	const char			*ka_str = NULL;
-	const struct module *m;
-	int i = 0, l;
-	const char *p, *pt_R;
-	char *p2;
+	unsigned long i, best = 0;
 
-	/* Restart? */
-	m = module_list;
-	if (token && *token) {
-		for (; m; m = m->next)
-			if ((unsigned long)m == *token)
-				break;
-		if (m)
-			m = m->next;
-	}
+	/* This kernel should never had been booted. */
+	if ((void *)kallsyms_addresses == &kallsyms_dummy)
+		BUG();
 
-	for (; m; m = m->next) {
-		if (!mod_member_present(m, kallsyms_start) || 
-		    !mod_member_present(m, kallsyms_end) ||
-		    m->kallsyms_start >= m->kallsyms_end)
-			continue;
-		ka_hdr = (struct kallsyms_header *)m->kallsyms_start;
-		ka_sym = (struct kallsyms_symbol *)
-			((char *)(ka_hdr) + ka_hdr->symbol_off);
-		ka_str = 
-			((char *)(ka_hdr) + ka_hdr->string_off);
-		for (i = 0; i < ka_hdr->symbols; ++i, kallsyms_next_sym(ka_hdr, ka_sym)) {
-			p = ka_str + ka_sym->name_off;
-			if (strcmp(p, name) == 0)
-				break;
-			/* Unversioned requests match versioned names */
-			if (!(pt_R = strstr(p, "_R")))
-				continue;
-			l = strlen(pt_R);
-			if (l < 10)
-				continue;	/* Not _R.*xxxxxxxx */
-			(void)simple_strtoul(pt_R+l-8, &p2, 16);
-			if (*p2)
-				continue;	/* Not _R.*xxxxxxxx */
-			if (strncmp(p, name, pt_R-p) == 0)
-				break;	/* Match with version */
+	if (addr >= (unsigned long)_stext && addr <= (unsigned long)_etext) {
+		unsigned long symbol_end;
+		char *name = kallsyms_names;
+
+		/* They're sorted, we could be clever here, but who cares? */
+		for (i = 0; i < kallsyms_num_syms; i++) {
+			if (kallsyms_addresses[i] > kallsyms_addresses[best] &&
+			    kallsyms_addresses[i] <= addr)
+				best = i;
 		}
-		if (i < ka_hdr->symbols)
-			break;
+
+		/* Grab name */
+		for (i = 0; i < best; i++)
+			name += strlen(name)+1;
+
+		/* Base symbol size on next symbol, but beware aliases. */
+		symbol_end = (unsigned long)_etext;
+		for (i = best+1; i < kallsyms_num_syms; i++) {
+			if (kallsyms_addresses[i] != kallsyms_addresses[best]){
+				symbol_end = kallsyms_addresses[i];
+				break;
+			}
+		}
+
+		*symbolsize = symbol_end - kallsyms_addresses[best];
+		*modname = NULL;
+		*offset = addr - kallsyms_addresses[best];
+		return name;
 	}
 
-	if (token)
-		*token = (unsigned long)m;
-	if (!m)
-		return(0);	/* not found */
-
-	ka_sec = (const struct kallsyms_section *)
-		((char *)ka_hdr + ka_hdr->section_off + ka_sym->section_off);
-	*mod_name = m->name;
-	*mod_start = ka_hdr->start;
-	*mod_end = ka_hdr->end;
-	*sec_name = ka_sec->name_off + ka_str;
-	*sec_start = ka_sec->start;
-	*sec_end = ka_sec->start + ka_sec->size;
-	*sym_name = ka_sym->name_off + ka_str;
-	*sym_start = ka_sym->symbol_addr;
-	if (i < ka_hdr->symbols-1) {
-		const struct kallsyms_symbol *ka_symn = ka_sym;
-		kallsyms_next_sym(ka_hdr, ka_symn);
-		*sym_end = ka_symn->symbol_addr;
-	}
-	else
-		*sym_end = *sec_end;
-	return(1);
+	return module_address_lookup(addr, symbolsize, offset, modname);
 }
 
-int kallsyms_address_to_symbol(
-	unsigned long	  address,	/* Address to lookup */
-	const char	**mod_name,	/* Set to module name */
-	unsigned long 	 *mod_start,	/* Set to start address of module */
-	unsigned long 	 *mod_end,	/* Set to end address of module */
-	const char	**sec_name,	/* Set to section name */
-	unsigned long 	 *sec_start,	/* Set to start address of section */
-	unsigned long 	 *sec_end,	/* Set to end address of section */
-	const char	**sym_name,	/* Set to full symbol name */
-	unsigned long 	 *sym_start,	/* Set to start address of symbol */
-	unsigned long 	 *sym_end	/* Set to end address of symbol */
-	)
+/* Replace "%s" in format with address, or returns -errno. */
+void __print_symbol(const char *fmt, unsigned long address)
 {
-	const struct kallsyms_header	*ka_hdr = NULL;	/* stupid gcc */
-	const struct kallsyms_section	*ka_sec = NULL;
-	const struct kallsyms_symbol	*ka_sym;
-	const char			*ka_str;
-	const struct module *m;
-	int i;
-	unsigned long end;
+	char *modname;
+	const char *name;
+	unsigned long offset, size;
 
-	for (m = module_list; m; m = m->next) {
-	  
-		if (!mod_member_present(m, kallsyms_start) || 
-		    !mod_member_present(m, kallsyms_end) ||
-		    m->kallsyms_start >= m->kallsyms_end)
-			continue;
-		ka_hdr = (struct kallsyms_header *)m->kallsyms_start;
-		ka_sec = (const struct kallsyms_section *)
-			((char *)ka_hdr + ka_hdr->section_off);
-		/* Is the address in any section in this module? */
-		for (i = 0; i < ka_hdr->sections; ++i, kallsyms_next_sec(ka_hdr, ka_sec)) {
-			if (ka_sec->start <= address &&
-			    (ka_sec->start + ka_sec->size) > address)
-				break;
-		}
-		if (i < ka_hdr->sections)
-			break;	/* Found a matching section */
+	name = kallsyms_lookup(address, &size, &offset, &modname);
+
+	if (!name) {
+		char addrstr[sizeof("0x%lx") + (BITS_PER_LONG*3/10)];
+
+		sprintf(addrstr, "0x%lx", address);
+		printk(fmt, addrstr);
+		return;
 	}
 
-	if (!m)
-		return(0);	/* not found */
+	if (modname) {
+		/* This is pretty small. */
+		char buffer[sizeof("%s+%#lx/%#lx [%s]")
+			   + strlen(name) + 2*(BITS_PER_LONG*3/10)
+			   + strlen(modname)];
 
-	ka_sym = (struct kallsyms_symbol *)
-		((char *)(ka_hdr) + ka_hdr->symbol_off);
-	ka_str = 
-		((char *)(ka_hdr) + ka_hdr->string_off);
-	*mod_name = m->name;
-	*mod_start = ka_hdr->start;
-	*mod_end = ka_hdr->end;
-	*sec_name = ka_sec->name_off + ka_str;
-	*sec_start = ka_sec->start;
-	*sec_end = ka_sec->start + ka_sec->size;
-	*sym_name = *sec_name;		/* In case we find no matching symbol */
-	*sym_start = *sec_start;
-	*sym_end = *sec_end;
+		sprintf(buffer, "%s+%#lx/%#lx [%s]",
+			name, offset, size, modname);
+		printk(fmt, buffer);
+	} else {
+		char buffer[sizeof("%s+%#lx/%#lx")
+			   + strlen(name) + 2*(BITS_PER_LONG*3/10)];
 
-	for (i = 0; i < ka_hdr->symbols; ++i, kallsyms_next_sym(ka_hdr, ka_sym)) {
-		if (ka_sym->symbol_addr > address)
-			continue;
-		if (i < ka_hdr->symbols-1) {
-			const struct kallsyms_symbol *ka_symn = ka_sym;
-			kallsyms_next_sym(ka_hdr, ka_symn);
-			end = ka_symn->symbol_addr;
-		}
-		else
-			end = *sec_end;
-		if (end <= address)
-			continue;
-		if ((char *)ka_hdr + ka_hdr->section_off + ka_sym->section_off
-		    != (char *)ka_sec)
-			continue;	/* wrong section */
-		*sym_name = ka_str + ka_sym->name_off;
-		*sym_start = ka_sym->symbol_addr;
-		*sym_end = end;
-		break;
+		sprintf(buffer, "%s+%#lx/%#lx", name, offset, size);
+		printk(fmt, buffer);
 	}
-	return(1);
 }
 
-/* List all sections in all modules.  The callback routine is invoked with
- * token, module name, section name, section start, section end, section flags.
- */
-int kallsyms_sections(void *token,
-		      int (*callback)(void *, const char *, const char *, ElfW(Addr), ElfW(Addr), ElfW(Word)))
-{
-	const struct kallsyms_header	*ka_hdr = NULL;	/* stupid gcc */
-	const struct kallsyms_section	*ka_sec = NULL;
-	const char			*ka_str;
-	const struct module *m;
-	int i;
-
-	for (m = module_list; m; m = m->next) {
-		if (!mod_member_present(m, kallsyms_start) || 
-		    !mod_member_present(m, kallsyms_end) ||
-		    m->kallsyms_start >= m->kallsyms_end)
-			continue;
-		ka_hdr = (struct kallsyms_header *)m->kallsyms_start;
-		ka_sec = (const struct kallsyms_section *) ((char *)ka_hdr + ka_hdr->section_off);
-		ka_str = ((char *)(ka_hdr) + ka_hdr->string_off);
-		for (i = 0; i < ka_hdr->sections; ++i, kallsyms_next_sec(ka_hdr, ka_sec)) {
-			if (callback(
-				token,
-				*(m->name) ? m->name : "kernel",
-				ka_sec->name_off + ka_str,
-				ka_sec->start,
-				ka_sec->start + ka_sec->size,
-				ka_sec->flags))
-				return(0);
-		}
-	}
-	return(1);
-}
-
-/* Allocate the __kallsyms section, so it's already present in
- * the temporary vmlinux that kallsyms is run on, so the first
- * run will pick up the section info already. */
-
-__asm__(".section __kallsyms,\"a\"\n.previous");
+EXPORT_SYMBOL(kallsyms_lookup);
+EXPORT_SYMBOL(__print_symbol);

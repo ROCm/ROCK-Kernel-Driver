@@ -10,7 +10,7 @@ obj-y	:= entry.o bitmap.o traps.o time.o process.o \
             setup.o sys_s390.o ptrace.o signal.o cpcmd.o ebcdic.o \
             semaphore.o reipl.o s390_ext.o debug.o
 
-obj-$(CONFIG_MODULES)		+= s390_ksyms.o
+obj-$(CONFIG_MODULES)		+= s390_ksyms.o module.o
 obj-$(CONFIG_SMP)		+= smp.o
 
 #

@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exmisc - ACPI AML (p-code) execution - specific opcodes
- *              $Revision: 110 $
+ *              $Revision: 112 $
  *
  *****************************************************************************/
 
@@ -148,9 +148,8 @@ acpi_ex_concat_template (
 	acpi_operand_object     **actual_return_desc,
 	acpi_walk_state         *walk_state)
 {
-	acpi_status             status;
 	acpi_operand_object     *return_desc;
-	NATIVE_CHAR             *new_buf;
+	u8                      *new_buf;
 	u8                      *end_tag1;
 	u8                      *end_tag2;
 	ACPI_SIZE               length1;
@@ -168,54 +167,35 @@ acpi_ex_concat_template (
 		return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
 	}
 
-	/* Create a new buffer object for the result */
-
-	return_desc = acpi_ut_create_internal_object (ACPI_TYPE_BUFFER);
-	if (!return_desc) {
-		return_ACPI_STATUS (AE_NO_MEMORY);
-	}
-
-	/* Allocate a new buffer for the result */
+	/* Compute the length of each part */
 
 	length1 = ACPI_PTR_DIFF (end_tag1, obj_desc1->buffer.pointer);
 	length2 = ACPI_PTR_DIFF (end_tag2, obj_desc2->buffer.pointer) +
 			  2; /* Size of END_TAG */
 
-	new_buf = ACPI_MEM_ALLOCATE (length1 + length2);
-	if (!new_buf) {
-		ACPI_REPORT_ERROR
-			(("Ex_concat_template: Buffer allocation failure\n"));
-		status = AE_NO_MEMORY;
-		goto cleanup;
+	/* Create a new buffer object for the result */
+
+	return_desc = acpi_ut_create_buffer_object (length1 + length2);
+	if (!return_desc) {
+		return_ACPI_STATUS (AE_NO_MEMORY);
 	}
 
 	/* Copy the templates to the new descriptor */
 
+	new_buf = return_desc->buffer.pointer;
 	ACPI_MEMCPY (new_buf, obj_desc1->buffer.pointer, length1);
 	ACPI_MEMCPY (new_buf + length1, obj_desc2->buffer.pointer, length2);
 
-	/* Complete the buffer object initialization */
-
-	return_desc->common.flags  = AOPOBJ_DATA_VALID;
-	return_desc->buffer.pointer = (u8 *) new_buf;
-	return_desc->buffer.length = (u32) (length1 + length2);
-
 	/* Compute the new checksum */
 
-	new_buf[return_desc->buffer.length - 1] = (NATIVE_CHAR)
+	new_buf[return_desc->buffer.length - 1] =
 			acpi_ut_generate_checksum (return_desc->buffer.pointer,
-					 (return_desc->buffer.length - 1));
+					   (return_desc->buffer.length - 1));
 
 	/* Return the completed template descriptor */
 
 	*actual_return_desc = return_desc;
 	return_ACPI_STATUS (AE_OK);
-
-
-cleanup:
-
-	acpi_ut_remove_reference (return_desc);
-	return_ACPI_STATUS (status);
 }
 
 
@@ -262,22 +242,14 @@ acpi_ex_do_concatenate (
 	case ACPI_TYPE_INTEGER:
 
 		/* Result of two Integers is a Buffer */
+		/* Need enough buffer space for two integers */
 
-		return_desc = acpi_ut_create_internal_object (ACPI_TYPE_BUFFER);
+		return_desc = acpi_ut_create_buffer_object (acpi_gbl_integer_byte_width * 2);
 		if (!return_desc) {
 			return (AE_NO_MEMORY);
 		}
 
-		/* Need enough buffer space for two integers */
-
-		return_desc->buffer.length = acpi_gbl_integer_byte_width * 2;
-		new_buf = ACPI_MEM_CALLOCATE (return_desc->buffer.length);
-		if (!new_buf) {
-			ACPI_REPORT_ERROR
-				(("Ex_do_concatenate: Buffer allocation failure\n"));
-			status = AE_NO_MEMORY;
-			goto cleanup;
-		}
+		new_buf = (NATIVE_CHAR *) return_desc->buffer.pointer;
 
 		/* Convert the first integer */
 
@@ -295,10 +267,6 @@ acpi_ex_do_concatenate (
 			this_integer >>= 8;
 		}
 
-		/* Complete the buffer object initialization */
-
-		return_desc->common.flags  = AOPOBJ_DATA_VALID;
-		return_desc->buffer.pointer = (u8 *) new_buf;
 		break;
 
 
@@ -340,19 +308,14 @@ acpi_ex_do_concatenate (
 
 		/* Result of two Buffers is a Buffer */
 
-		return_desc = acpi_ut_create_internal_object (ACPI_TYPE_BUFFER);
+		return_desc = acpi_ut_create_buffer_object (
+				   (ACPI_SIZE) obj_desc1->buffer.length +
+				   (ACPI_SIZE) obj_desc2->buffer.length);
 		if (!return_desc) {
 			return (AE_NO_MEMORY);
 		}
 
-		new_buf = ACPI_MEM_ALLOCATE ((ACPI_SIZE) obj_desc1->buffer.length +
-				  (ACPI_SIZE) obj_desc2->buffer.length);
-		if (!new_buf) {
-			ACPI_REPORT_ERROR
-				(("Ex_do_concatenate: Buffer allocation failure\n"));
-			status = AE_NO_MEMORY;
-			goto cleanup;
-		}
+		new_buf = (NATIVE_CHAR *) return_desc->buffer.pointer;
 
 		/* Concatenate the buffers */
 
@@ -361,12 +324,6 @@ acpi_ex_do_concatenate (
 		ACPI_MEMCPY (new_buf + obj_desc1->buffer.length, obj_desc2->buffer.pointer,
 				   obj_desc2->buffer.length);
 
-		/* Complete the buffer object initialization */
-
-		return_desc->common.flags  = AOPOBJ_DATA_VALID;
-		return_desc->buffer.pointer = (u8 *) new_buf;
-		return_desc->buffer.length = obj_desc1->buffer.length +
-				   obj_desc2->buffer.length;
 		break;
 
 
