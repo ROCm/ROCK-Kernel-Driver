@@ -8,6 +8,14 @@
 #include <asm/system.h>
 
 /*
+ * These are non-NULL pointers that will result in page faults
+ * under normal circumstances, used to verify that nobody uses
+ * non-initialized list entries.
+ */
+#define LIST_POISON1  ((void *) 0x00100100)
+#define LIST_POISON2  ((void *) 0x00200200)
+
+/*
  * Simple doubly linked list implementation.
  *
  * Some of the internal functions ("__xxx") are useful when
@@ -137,7 +145,10 @@ static inline void __list_del(struct list_head * prev, struct list_head * next)
 static inline void list_del(struct list_head *entry)
 {
 	__list_del(entry->prev, entry->next);
+	entry->next = LIST_POISON1;
+	entry->prev = LIST_POISON2;
 }
+
 /**
  * list_del_rcu - deletes entry from list without re-initialization
  * @entry: the element to delete from the list.
@@ -148,6 +159,8 @@ static inline void list_del(struct list_head *entry)
 static inline void list_del_rcu(struct list_head *entry)
 {
 	__list_del(entry->prev, entry->next);
+	entry->next = LIST_POISON1;
+	entry->prev = LIST_POISON2;
 }
 
 /**
@@ -399,8 +412,9 @@ static __inline__ void __hlist_del(struct hlist_node *n)
 
 static __inline__ void hlist_del(struct hlist_node *n)
 {
-	if (n->pprev)
-		__hlist_del(n);
+	__hlist_del(n);
+	n->next = LIST_POISON1;
+	n->pprev = LIST_POISON2;
 }
 
 #define hlist_del_rcu hlist_del  /* list_del_rcu is identical too? */
@@ -412,6 +426,8 @@ static __inline__ void hlist_del_init(struct hlist_node *n)
 		INIT_HLIST_NODE(n);
 	}
 }  
+
+#define hlist_del_rcu_init hlist_del_init
 
 static __inline__ void hlist_add_head(struct hlist_node *n, struct hlist_head *h) 
 { 
