@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: build.c,v 1.65 2004/11/20 16:19:38 dwmw2 Exp $
+ * $Id: build.c,v 1.66 2004/11/20 19:18:07 dwmw2 Exp $
  *
  */
 
@@ -325,6 +325,7 @@ int jffs2_do_mount_fs(struct jffs2_sb_info *c)
 		c->blocks[i].used_size = 0;
 		c->blocks[i].first_node = NULL;
 		c->blocks[i].last_node = NULL;
+		c->blocks[i].bad_count = 0;
 	}
 
 	init_MUTEX(&c->alloc_sem);
