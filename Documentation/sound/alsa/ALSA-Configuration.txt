@@ -179,6 +179,16 @@ Module parameters
     
     Module supports up to 8 cards, autoprobe and PnP.
 
+  Module snd-atiixp
+  -----------------
+
+    Module for ATI IXP 150/200/250 AC97 controllers.
+
+    ac97_clock		- AC'97 clock (defalut = 48000)
+    spdif_aclink	- S/PDIF transfer over AC-link (default = 1)
+
+    This module supports up to 8 cards and autoprobe.
+
   Module snd-au8810, snd-au8820, snd-au8830
   -----------------------------------------
 
