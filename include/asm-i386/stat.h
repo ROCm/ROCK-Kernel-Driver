@@ -73,4 +73,6 @@ struct stat64 {
 	unsigned long long	st_ino;
 };
 
+#define STAT_HAVE_NSEC 1
+
 #endif

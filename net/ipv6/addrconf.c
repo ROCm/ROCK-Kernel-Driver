@@ -347,6 +347,11 @@ static struct inet6_dev * ipv6_add_dev(struct net_device *dev)
 			return NULL;
 		}
 
+		/* One reference from device.  We must do this before
+		 * we invoke __ipv6_regen_rndid().
+		 */
+		in6_dev_hold(ndev);
+
 #ifdef CONFIG_IPV6_PRIVACY
 		get_random_bytes(ndev->rndid, sizeof(ndev->rndid));
 		get_random_bytes(ndev->entropy, sizeof(ndev->entropy));
@@ -367,8 +372,6 @@ static struct inet6_dev * ipv6_add_dev(struct net_device *dev)
 
 		write_lock_bh(&addrconf_lock);
 		dev->ip6_ptr = ndev;
-		/* One reference from device */
-		in6_dev_hold(ndev);
 		write_unlock_bh(&addrconf_lock);
 
 		ipv6_mc_init_dev(ndev);

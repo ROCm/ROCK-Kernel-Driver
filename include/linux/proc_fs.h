@@ -74,6 +74,12 @@ struct proc_dir_entry {
 	kdev_t	rdev;
 };
 
+struct kcore_list {
+	struct kcore_list *next;
+	unsigned long addr;
+	size_t size;
+};
+
 #ifdef CONFIG_PROC_FS
 
 extern struct proc_dir_entry proc_root;
@@ -179,6 +185,12 @@ static inline void proc_net_remove(const char *name)
 	remove_proc_entry(name,proc_net);
 }
 
+/*
+ * fs/proc/kcore.c
+ */
+extern void kclist_add(struct kcore_list *, void *, size_t);
+extern struct kcore_list *kclist_del(void *);
+
 #else
 
 #define proc_root_driver NULL
@@ -223,6 +235,8 @@ static inline struct kcore_list * kclist_del(void *addr)
 	return NULL;
 }
 
+static inline void kclist_add(struct kcore_list *new, void *addr, size_t size) {};
+static inline struct kcore_list * kclist_del(void *addr) {return NULL};
 #endif /* CONFIG_PROC_FS */
 
 struct proc_inode {

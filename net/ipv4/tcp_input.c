@@ -556,8 +556,8 @@ void tcp_update_metrics(struct sock *sk)
 			if (m >= dst_metric(dst, RTAX_RTTVAR))
 				dst->metrics[RTAX_RTTVAR-1] = m;
 			else
-				dst->metrics[RTAX_RTT-1] -=
-					(dst->metrics[RTAX_RTT-1] - m)>>2;
+				dst->metrics[RTAX_RTTVAR-1] -=
+					(dst->metrics[RTAX_RTTVAR-1] - m)>>2;
 		}
 
 		if (tp->snd_ssthresh >= 0xFFFF) {

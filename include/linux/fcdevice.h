@@ -33,11 +33,7 @@ extern int		fc_header(struct sk_buff *skb, struct net_device *dev,
 extern int		fc_rebuild_header(struct sk_buff *skb);
 extern unsigned short	fc_type_trans(struct sk_buff *skb, struct net_device *dev); 
 
-extern struct net_device *init_fcdev(struct net_device *dev, int sizeof_priv);
 extern struct net_device *alloc_fcdev(int sizeof_priv);
-extern int register_fcdev(struct net_device *dev);
-extern void unregister_fcdev(struct net_device *dev);
-
 #endif
 
 #endif	/* _LINUX_FCDEVICE_H */

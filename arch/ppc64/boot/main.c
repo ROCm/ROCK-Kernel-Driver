@@ -8,7 +8,6 @@
  * as published by the Free Software Foundation; either version
  * 2 of the License, or (at your option) any later version.
  */
-#define __KERNEL__
 #include "ppc32-types.h"
 #include "zlib.h"
 #include <linux/elf.h>
@@ -27,6 +26,10 @@ void *claim(unsigned int, unsigned int, unsigned int);
 void flush_cache(void *, unsigned long);
 void pause(void);
 extern void exit(void);
+
+unsigned long strlen(const char *s);
+void *memmove(void *dest, const void *src, unsigned long n);
+void *memcpy(void *dest, const void *src, unsigned long n);
 
 static struct bi_record *make_bi_recs(unsigned long);
 

@@ -54,7 +54,7 @@ MODULE_PARM_DESC(debug, "Debug enabled or not");
 #define MY_NAME "root_plug"
 #endif
 
-#define dbg(fmt, arg...)					\
+#define root_dbg(fmt, arg...)					\
 	do {							\
 		if (debug)					\
 			printk(KERN_DEBUG "%s: %s: " fmt ,	\
@@ -62,70 +62,21 @@ MODULE_PARM_DESC(debug, "Debug enabled or not");
 				## arg);			\
 	} while (0)
 
-extern struct list_head usb_bus_list;
-extern struct semaphore usb_bus_list_lock;
-
-static int match_device (struct usb_device *dev)
-{
-	int retval = -ENODEV;
-	int child;
-
-	dbg ("looking at vendor %d, product %d\n",
-	     dev->descriptor.idVendor,
-	     dev->descriptor.idProduct);
-
-	/* see if this device matches */
-	if ((dev->descriptor.idVendor == vendor_id) &&
-	    (dev->descriptor.idProduct == product_id)) {
-		dbg ("found the device!\n");
-		retval = 0;
-		goto exit;
-	}
-
-	/* look through all of the children of this device */
-	for (child = 0; child < dev->maxchild; ++child) {
-		if (dev->children[child]) {
-			retval = match_device (dev->children[child]);
-			if (retval == 0)
-				goto exit;
-		}
-	}
-exit:
-	return retval;
-}
-
-static int find_usb_device (void)
-{
-	struct list_head *buslist;
-	struct usb_bus *bus;
-	int retval = -ENODEV;
-	
-	down (&usb_bus_list_lock);
-	for (buslist = usb_bus_list.next;
-	     buslist != &usb_bus_list; 
-	     buslist = buslist->next) {
-		bus = container_of (buslist, struct usb_bus, bus_list);
-		retval = match_device(bus->root_hub);
-		if (retval == 0)
-			goto exit;
-	}
-exit:
-	up (&usb_bus_list_lock);
-	return retval;
-}
-	
-
 static int rootplug_bprm_check_security (struct linux_binprm *bprm)
 {
-	dbg ("file %s, e_uid = %d, e_gid = %d\n",
-	     bprm->filename, bprm->e_uid, bprm->e_gid);
+	struct usb_device *dev;
+
+	root_dbg("file %s, e_uid = %d, e_gid = %d\n",
+		 bprm->filename, bprm->e_uid, bprm->e_gid);
 
 	if (bprm->e_gid == 0) {
-		if (find_usb_device() != 0) {
-			dbg ("e_gid = 0, and device not found, "
-				"task not allowed to run...\n");
+		dev = usb_find_device(vendor_id, product_id);
+		if (!dev) {
+			root_dbg("e_gid = 0, and device not found, "
+				 "task not allowed to run...\n");
 			return -EPERM;
 		}
+		usb_put_dev(dev);
 	}
 
 	return 0;

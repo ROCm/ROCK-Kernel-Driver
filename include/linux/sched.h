@@ -317,6 +317,7 @@ struct k_itimer {
 	unsigned long it_incr;		/* interval specified in jiffies */
 	struct task_struct *it_process;	/* process to send signal to */
 	struct timer_list it_timer;
+	struct sigqueue *sigq;		/* signal queue entry. */
 };
 
 
@@ -571,6 +572,10 @@ extern void zap_other_threads(struct task_struct *p);
 extern int kill_pg(pid_t, int, int);
 extern int kill_sl(pid_t, int, int);
 extern int kill_proc(pid_t, int, int);
+extern struct sigqueue *sigqueue_alloc(void);
+extern void sigqueue_free(struct sigqueue *);
+extern int send_sigqueue(int, struct sigqueue *,  struct task_struct *);
+extern int send_group_sigqueue(int, struct sigqueue *,  struct task_struct *);
 extern int do_sigaction(int, const struct k_sigaction *, struct k_sigaction *);
 extern int do_sigaltstack(const stack_t __user *, stack_t __user *, unsigned long);
 

@@ -2,7 +2,6 @@
 # Automatically generated make config: don't edit
 #
 CONFIG_MMU=y
-CONFIG_SWAP=y
 CONFIG_RWSEM_XCHGADD_ALGORITHM=y
 CONFIG_GENERIC_ISA_DMA=y
 CONFIG_HAVE_DEC_LOCK=y
@@ -18,10 +17,14 @@ CONFIG_EXPERIMENTAL=y
 #
 # General setup
 #
+CONFIG_SWAP=y
 CONFIG_SYSVIPC=y
 # CONFIG_BSD_PROCESS_ACCT is not set
 CONFIG_SYSCTL=y
 CONFIG_LOG_BUF_SHIFT=15
+# CONFIG_EMBEDDED is not set
+CONFIG_FUTEX=y
+CONFIG_EPOLL=y
 
 #
 # Loadable module support
@@ -155,6 +158,7 @@ CONFIG_SCSI_SYM53C8XX_MAX_TAGS=64
 # CONFIG_SCSI_QLOGIC_ISP is not set
 # CONFIG_SCSI_QLOGIC_FC is not set
 # CONFIG_SCSI_QLOGIC_1280 is not set
+# CONFIG_SCSI_DC395x is not set
 # CONFIG_SCSI_DC390T is not set
 # CONFIG_SCSI_U14_34F is not set
 # CONFIG_SCSI_NSP32 is not set
@@ -199,7 +203,6 @@ CONFIG_PACKET=y
 # CONFIG_PACKET_MMAP is not set
 # CONFIG_NETLINK_DEV is not set
 # CONFIG_NETFILTER is not set
-CONFIG_FILTER=y
 CONFIG_UNIX=y
 # CONFIG_NET_KEY is not set
 CONFIG_INET=y
@@ -214,8 +217,9 @@ CONFIG_NET_IPIP=y
 CONFIG_SYN_COOKIES=y
 # CONFIG_INET_AH is not set
 # CONFIG_INET_ESP is not set
+# CONFIG_INET_IPCOMP is not set
+# CONFIG_IPV6 is not set
 # CONFIG_XFRM_USER is not set
-CONFIG_IPV6=y
 
 #
 # SCTP Configuration (EXPERIMENTAL)
@@ -306,6 +310,11 @@ CONFIG_E1000=y
 # CONFIG_R8169 is not set
 # CONFIG_SK98LIN is not set
 # CONFIG_TIGON3 is not set
+
+#
+# Ethernet (10000 Mbit)
+#
+# CONFIG_IXGB is not set
 # CONFIG_FDDI is not set
 # CONFIG_HIPPI is not set
 # CONFIG_PPP is not set
@@ -428,6 +437,7 @@ CONFIG_HVC_CONSOLE=y
 #
 # I2C Hardware Sensors Chip support
 #
+# CONFIG_I2C_SENSOR is not set
 
 #
 # Mice
@@ -466,61 +476,81 @@ CONFIG_RAW_DRIVER=y
 # CONFIG_VIDEO_DEV is not set
 
 #
+# Digital Video Broadcasting Devices
+#
+# CONFIG_DVB is not set
+
+#
 # File systems
 #
-# CONFIG_QUOTA is not set
-CONFIG_AUTOFS_FS=y
-# CONFIG_AUTOFS4_FS is not set
+CONFIG_EXT2_FS=y
+# CONFIG_EXT2_FS_XATTR is not set
+CONFIG_EXT3_FS=y
+# CONFIG_EXT3_FS_XATTR is not set
+CONFIG_JBD=y
+# CONFIG_JBD_DEBUG is not set
 CONFIG_REISERFS_FS=y
 # CONFIG_REISERFS_CHECK is not set
 # CONFIG_REISERFS_PROC_INFO is not set
+CONFIG_JFS_FS=y
+# CONFIG_JFS_POSIX_ACL is not set
+# CONFIG_JFS_DEBUG is not set
+# CONFIG_JFS_STATISTICS is not set
+CONFIG_XFS_FS=y
+# CONFIG_XFS_RT is not set
+# CONFIG_XFS_QUOTA is not set
+# CONFIG_XFS_POSIX_ACL is not set
+# CONFIG_MINIX_FS is not set
+# CONFIG_ROMFS_FS is not set
+# CONFIG_QUOTA is not set
+CONFIG_AUTOFS_FS=y
+# CONFIG_AUTOFS4_FS is not set
+
+#
+# CD-ROM/DVD Filesystems
+#
+CONFIG_ISO9660_FS=y
+# CONFIG_JOLIET is not set
+# CONFIG_ZISOFS is not set
+# CONFIG_UDF_FS is not set
+
+#
+# DOS/FAT/NT Filesystems
+#
+CONFIG_FAT_FS=y
+CONFIG_MSDOS_FS=y
+CONFIG_VFAT_FS=y
+# CONFIG_NTFS_FS is not set
+
+#
+# Pseudo filesystems
+#
+CONFIG_PROC_FS=y
+# CONFIG_DEVFS_FS is not set
+CONFIG_DEVPTS_FS=y
+# CONFIG_DEVPTS_FS_XATTR is not set
+# CONFIG_TMPFS is not set
+CONFIG_RAMFS=y
+
+#
+# Miscellaneous filesystems
+#
 # CONFIG_ADFS_FS is not set
 # CONFIG_AFFS_FS is not set
 # CONFIG_HFS_FS is not set
 # CONFIG_BEFS_FS is not set
 # CONFIG_BFS_FS is not set
-CONFIG_EXT3_FS=y
-# CONFIG_EXT3_FS_XATTR is not set
-CONFIG_JBD=y
-# CONFIG_JBD_DEBUG is not set
-CONFIG_FAT_FS=y
-CONFIG_MSDOS_FS=y
-CONFIG_VFAT_FS=y
 # CONFIG_EFS_FS is not set
 # CONFIG_CRAMFS is not set
-# CONFIG_TMPFS is not set
-CONFIG_RAMFS=y
-CONFIG_ISO9660_FS=y
-# CONFIG_JOLIET is not set
-# CONFIG_ZISOFS is not set
-CONFIG_JFS_FS=y
-# CONFIG_JFS_POSIX_ACL is not set
-# CONFIG_JFS_DEBUG is not set
-# CONFIG_JFS_STATISTICS is not set
-# CONFIG_MINIX_FS is not set
 # CONFIG_VXFS_FS is not set
-# CONFIG_NTFS_FS is not set
 # CONFIG_HPFS_FS is not set
-CONFIG_PROC_FS=y
-# CONFIG_DEVFS_FS is not set
-CONFIG_DEVPTS_FS=y
 # CONFIG_QNX4FS_FS is not set
-# CONFIG_ROMFS_FS is not set
-CONFIG_EXT2_FS=y
-# CONFIG_EXT2_FS_XATTR is not set
 # CONFIG_SYSV_FS is not set
-# CONFIG_UDF_FS is not set
 # CONFIG_UFS_FS is not set
-CONFIG_XFS_FS=y
-# CONFIG_XFS_RT is not set
-# CONFIG_XFS_QUOTA is not set
-# CONFIG_XFS_POSIX_ACL is not set
 
 #
 # Network File Systems
 #
-# CONFIG_CODA_FS is not set
-# CONFIG_INTERMEZZO_FS is not set
 CONFIG_NFS_FS=y
 CONFIG_NFS_V3=y
 CONFIG_NFS_V4=y
@@ -528,14 +558,16 @@ CONFIG_NFSD=y
 CONFIG_NFSD_V3=y
 # CONFIG_NFSD_V4 is not set
 CONFIG_NFSD_TCP=y
-CONFIG_SUNRPC=y
-# CONFIG_SUNRPC_GSS is not set
 CONFIG_LOCKD=y
 CONFIG_LOCKD_V4=y
 CONFIG_EXPORTFS=y
-CONFIG_CIFS=y
+CONFIG_SUNRPC=y
+# CONFIG_SUNRPC_GSS is not set
 # CONFIG_SMB_FS is not set
+CONFIG_CIFS=y
 # CONFIG_NCP_FS is not set
+# CONFIG_CODA_FS is not set
+# CONFIG_INTERMEZZO_FS is not set
 # CONFIG_AFS_FS is not set
 
 #
@@ -591,7 +623,7 @@ CONFIG_NLS_DEFAULT="iso8859-1"
 # Graphics support
 #
 CONFIG_FB=y
-# CONFIG_FB_CLGEN is not set
+# CONFIG_FB_CIRRUS is not set
 # CONFIG_FB_PM2 is not set
 # CONFIG_FB_CYBER2000 is not set
 CONFIG_FB_OF=y
@@ -600,7 +632,12 @@ CONFIG_FB_OF=y
 # CONFIG_FB_S3TRIO is not set
 # CONFIG_FB_VGA16 is not set
 # CONFIG_FB_RIVA is not set
-# CONFIG_FB_MATROX is not set
+CONFIG_FB_MATROX=y
+CONFIG_FB_MATROX_MILLENIUM=y
+CONFIG_FB_MATROX_MYSTIQUE=y
+CONFIG_FB_MATROX_G450=y
+CONFIG_FB_MATROX_G100=y
+CONFIG_FB_MATROX_MULTIHEAD=y
 # CONFIG_FB_RADEON is not set
 # CONFIG_FB_ATY128 is not set
 # CONFIG_FB_ATY is not set
@@ -618,7 +655,19 @@ CONFIG_FB_OF=y
 # CONFIG_VGA_CONSOLE is not set
 # CONFIG_MDA_CONSOLE is not set
 CONFIG_DUMMY_CONSOLE=y
-# CONFIG_FRAMEBUFFER_CONSOLE is not set
+CONFIG_FRAMEBUFFER_CONSOLE=y
+CONFIG_PCI_CONSOLE=y
+# CONFIG_FONTS is not set
+CONFIG_FONT_8x8=y
+CONFIG_FONT_8x16=y
+
+#
+# Logo configuration
+#
+CONFIG_LOGO=y
+CONFIG_LOGO_LINUX_MONO=y
+CONFIG_LOGO_LINUX_VGA16=y
+CONFIG_LOGO_LINUX_CLUT224=y
 
 #
 # Sound
@@ -629,6 +678,7 @@ CONFIG_DUMMY_CONSOLE=y
 # USB support
 #
 # CONFIG_USB is not set
+# CONFIG_USB_GADGET is not set
 
 #
 # Bluetooth support

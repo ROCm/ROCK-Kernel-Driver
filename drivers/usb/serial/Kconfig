@@ -351,6 +351,7 @@ config USB_SERIAL_KOBIL_SCT
 
             - USB TWIN
             - KAAN Standard Plus
+            - KAAN SIM
             - SecOVID Reader Plus
             - B1 Professional
             - KAAN Professional
