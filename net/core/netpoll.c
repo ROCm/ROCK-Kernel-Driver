@@ -242,9 +242,9 @@ void netpoll_send_udp(struct netpoll *np, const char *msg, int len)
 	iph = (struct iphdr *)skb_push(skb, sizeof(*iph));
 
 	/* iph->version = 4; iph->ihl = 5; */
-	put_unaligned(0x54, (unsigned char *)iph);
+	put_unaligned(0x45, (unsigned char *)iph);
 	iph->tos      = 0;
-	put_unaligned(htonl(ip_len), &(iph->tot_len));
+	put_unaligned(htons(ip_len), &(iph->tot_len));
 	iph->id       = 0;
 	iph->frag_off = 0;
 	iph->ttl      = 64;
