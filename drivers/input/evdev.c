@@ -126,7 +126,7 @@ static int evdev_open(struct inode * inode, struct file * file)
 	int i = iminor(inode) - EVDEV_MINOR_BASE;
 	int accept_err;
 
-	if (i >= EVDEV_MINORS || !evdev_table[i])
+	if (i >= EVDEV_MINORS || !evdev_table[i] || !evdev_table[i]->exist)
 		return -ENODEV;
 
 	if ((accept_err = input_accept_process(&(evdev_table[i]->handle), file)))
@@ -175,7 +175,7 @@ static ssize_t evdev_read(struct file * file, char * buffer, size_t count, loff_
 		return -EAGAIN;
 
 	retval = wait_event_interruptible(list->evdev->wait,
-		list->head != list->tail && list->evdev->exist);
+		list->head != list->tail || (!list->evdev->exist));
 
 	if (retval)
 		return retval;
