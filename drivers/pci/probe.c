@@ -628,11 +628,13 @@ int __devinit pci_scan_slot(struct pci_bus *bus, int devfn)
 		 	 * If this is a single function device,
 		 	 * don't scan past the first function.
 		 	 */
-			if (!dev->multifunction)
-				if (func > 0)
+			if (!dev->multifunction) {
+				if (func > 0) {
 					dev->multifunction = 1;
-				else
+				} else {
  					break;
+				}
+			}
 		} else {
 			if (func == 0)
 				break;
