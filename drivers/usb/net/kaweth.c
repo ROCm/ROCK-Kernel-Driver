@@ -713,7 +713,7 @@ static void kaweth_usb_transmit_complete(struct urb *urb, struct pt_regs *regs)
 static int kaweth_start_xmit(struct sk_buff *skb, struct net_device *net)
 {
 	struct kaweth_device *kaweth = net->priv;
-	char *private_header;
+	u16 *private_header;
 
 	int res;
 
@@ -745,7 +745,7 @@ static int kaweth_start_xmit(struct sk_buff *skb, struct net_device *net)
 	}
 
 	private_header = __skb_push(skb, 2);
-	*private_header = cpu_to_le16(skb->len);
+	*private_header = cpu_to_le16(skb->len-2);
 	kaweth->tx_skb = skb;
 
 	usb_fill_bulk_urb(kaweth->tx_urb,
