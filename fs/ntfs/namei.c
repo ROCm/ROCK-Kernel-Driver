@@ -93,7 +93,8 @@
  *    name. We then convert the name to the current NLS code page, and proceed
  *    searching for a dentry with this name, etc, as in case 2), above.
  */
-static struct dentry *ntfs_lookup(struct inode *dir_ino, struct dentry *dent, struct nameidata *nd)
+static struct dentry *ntfs_lookup(struct inode *dir_ino, struct dentry *dent,
+		struct nameidata *nd)
 {
 	ntfs_volume *vol = NTFS_SB(dir_ino->i_sb);
 	struct inode *dent_inode;
@@ -125,9 +126,8 @@ static struct dentry *ntfs_lookup(struct inode *dir_ino, struct dentry *dent, st
 					dent_ino == FILE_MFT) {
 				/* Perfect WIN32/POSIX match. -- Case 1. */
 				if (!name) {
-					d_splice_alias(dent_inode, dent);
 					ntfs_debug("Done.");
-					return NULL;
+					return d_splice_alias(dent_inode, dent);
 				}
 				/*
 				 * We are too indented. Handle imperfect
@@ -259,8 +259,12 @@ handle_name:
 			err = -ENOMEM;
 			goto err_out;
 		}
-		d_splice_alias(dent_inode, real_dent);
-		return real_dent;
+		new_dent = d_splice_alias(dent_inode, real_dent);
+		if (new_dent)
+			dput(real_dent);
+		else
+			new_dent = real_dent;
+		return new_dent;
 	}
 	kfree(nls_name.name);
 	/* Matching dentry exists, check if it is negative. */
@@ -367,7 +371,7 @@ struct dentry *ntfs_get_parent(struct dentry *child_dent)
 	struct dentry *parent_dent;
 	unsigned long parent_ino;
 
-	ntfs_debug("Entering for inode %lu.", vi->i_ino);
+	ntfs_debug("Entering for inode 0x%lx.", vi->i_ino);
 	/* Get the mft record of the inode belonging to the child dentry. */
 	mrec = map_mft_record(ni);
 	if (unlikely(IS_ERR(mrec)))
@@ -383,6 +387,8 @@ try_next:
 			NULL, 0, ctx))) {
 		put_attr_search_ctx(ctx);
 		unmap_mft_record(ni);
+		ntfs_error(vi->i_sb, "Inode 0x%lx does not have a file name "
+				"attribute. Run chkdsk.", vi->i_ino);
 		return ERR_PTR(-ENOENT);
 	}
 	attr = ctx->attr;
@@ -403,6 +409,9 @@ try_next:
 	if (unlikely(IS_ERR(parent_vi) || is_bad_inode(parent_vi))) {
 		if (!IS_ERR(parent_vi))
 			iput(parent_vi);
+		ntfs_error(vi->i_sb, "Failed to get parent directory inode "
+				"0x%lx of child inode 0x%lx.", parent_ino,
+				vi->i_ino);
 		return ERR_PTR(-EACCES);
 	}
 	/* Finally get a dentry for the parent directory and return it. */
@@ -411,7 +420,7 @@ try_next:
 		iput(parent_vi);
 		return ERR_PTR(-ENOMEM);
 	}
-	ntfs_debug("Done for inode %lu.", vi->i_ino);
+	ntfs_debug("Done for inode 0x%lx.", vi->i_ino);
 	return parent_dent;
 }
 
@@ -438,14 +447,16 @@ struct dentry *ntfs_get_dentry(struct super_block *sb, void *fh)
 	unsigned long ino = ((u32 *)fh)[0];
 	u32 gen = ((u32 *)fh)[1];
 
-	ntfs_debug("Entering for inode %lu, generation %u.", ino, gen);
+	ntfs_debug("Entering for inode 0x%lx, generation 0x%x.", ino, gen);
 	vi = ntfs_iget(sb, ino);
-	if (unlikely(IS_ERR(vi)))
+	if (unlikely(IS_ERR(vi))) {
+		ntfs_error(sb, "Failed to get inode 0x%lx.", ino);
 		return (struct dentry *)vi;
+	}
 	if (unlikely(is_bad_inode(vi) || vi->i_generation != gen)) {
 		/* We didn't find the right inode. */
-		ntfs_debug("Inode %lu, bad count: %d %d or version %u %u.",
-				vi->i_ino, vi->i_nlink,
+		ntfs_error(sb, "Inode 0x%lx, bad count: %d %d or version 0x%x "
+				"0x%x.", vi->i_ino, vi->i_nlink,
 				atomic_read(&vi->i_count), vi->i_generation,
 				gen);
 		iput(vi);
@@ -457,7 +468,6 @@ struct dentry *ntfs_get_dentry(struct super_block *sb, void *fh)
 		iput(vi);
 		return ERR_PTR(-ENOMEM);
 	}
-	ntfs_debug("Done for inode %lu, generation %u.", ino, gen);
+	ntfs_debug("Done for inode 0x%lx, generation 0x%x.", ino, gen);
 	return dent;
 }
-

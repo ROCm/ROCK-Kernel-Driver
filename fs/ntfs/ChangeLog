@@ -36,6 +36,8 @@ ToDo:
 	  fs/ntfs/aops.c::ntfs_commit_nonresident_write().
 	- Enforce no atime and no dir atime updates at mount/remount time as
 	  they are not implemented yet anyway.
+	- Move a few assignments in fs/ntfs/attrib.c::load_attribute_list() to
+	  after a NULL check.  Thanks to Dave Jones for pointing this out.
 
 2.1.6 - Fix minor bug in handling of compressed directories.
 
