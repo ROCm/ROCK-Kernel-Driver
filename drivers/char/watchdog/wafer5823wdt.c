@@ -1,5 +1,5 @@
 /*
- *	ICP Wafer 5823 Single Board Computer WDT driver for Linux 2.4.x
+ *	ICP Wafer 5823 Single Board Computer WDT driver
  *      http://www.icpamerica.com/wafer_5823.php
  *      May also work on other similar models
  *
@@ -17,10 +17,10 @@
  *	modify it under the terms of the GNU General Public License
  *	as published by the Free Software Foundation; either version
  *	2 of the License, or (at your option) any later version.
- *	
- *	Neither Alan Cox nor CymruNet Ltd. admit liability nor provide 
- *	warranty for any of this software. This material is provided 
- *	"AS-IS" and at no charge.	
+ *
+ *	Neither Alan Cox nor CymruNet Ltd. admit liability nor provide
+ *	warranty for any of this software. This material is provided
+ *	"AS-IS" and at no charge.
  *
  *	(c) Copyright 1995    Alan Cox <alan@lxorguk.ukuu.org.uk>
  *
@@ -39,6 +39,10 @@
 #include <asm/io.h>
 #include <asm/uaccess.h>
 
+#define WATCHDOG_NAME "Wafer 5823 WDT"
+#define PFX WATCHDOG_NAME ": "
+#define WD_TIMO 60			/* 60 sec default timeout */
+
 static unsigned long wafwdt_is_open;
 static spinlock_t wafwdt_lock;
 static int expect_close = 0;
@@ -55,7 +59,6 @@ static int expect_close = 0;
 #define WDT_START 0x443
 #define WDT_STOP 0x843
 
-#define WD_TIMO 60		/* 1 minute */
 static int wd_margin = WD_TIMO;
 
 #ifdef CONFIG_WATCHDOG_NOWAYOUT
@@ -124,7 +127,7 @@ static int wafwdt_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 	static struct watchdog_info ident = {
 		.options = WDIOF_KEEPALIVEPING | WDIOF_SETTIMEOUT | WDIOF_MAGICCLOSE,
 		.firmware_version = 1,
-		.identity = "Wafer 5823 WDT"
+		.identity = "Wafer 5823 WDT",
 	};
 	int one=1;
 
@@ -174,10 +177,10 @@ static int
 wafwdt_close(struct inode *inode, struct file *file)
 {
 	clear_bit(0, &wafwdt_is_open);
-	if (expect_close) {   
+	if (expect_close) {
 		wafwdt_stop();
 	} else {
-		printk(KERN_CRIT "WDT device closed unexpectedly.  WDT will not stop!\n");
+		printk(KERN_CRIT PFX "WDT device closed unexpectedly.  WDT will not stop!\n");
 	}
 	return 0;
 }
@@ -201,6 +204,7 @@ static int wafwdt_notify_sys(struct notifier_block *this, unsigned long code, vo
 
 static struct file_operations wafwdt_fops = {
 	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
 	.write		= wafwdt_write,
 	.ioctl		= wafwdt_ioctl,
 	.open		= wafwdt_open,
@@ -210,23 +214,23 @@ static struct file_operations wafwdt_fops = {
 static struct miscdevice wafwdt_miscdev = {
 	.minor	= WATCHDOG_MINOR,
 	.name	= "watchdog",
-	.fops	= &wafwdt_fops
+	.fops	= &wafwdt_fops,
 };
 
 /*
  *	The WDT needs to learn about soft shutdowns in order to
- *	turn the timebomb registers off. 
+ *	turn the timebomb registers off.
  */
 
 static struct notifier_block wafwdt_notifier = {
 	.notifier_call = wafwdt_notify_sys,
 	.next = NULL,
-	.priority = 0
+	.priority = 0,
 };
 
 static int __init wafwdt_init(void)
 {
-	printk(KERN_INFO "WDT driver for Wafer 5823 single board computer initialising.\n");
+	printk(KERN_INFO PFX "WDT driver for Wafer 5823 single board computer initialising.\n");
 
 	spin_lock_init(&wafwdt_lock);
 	if(!request_region(WDT_STOP, 1, "Wafer 5823 WDT"))
