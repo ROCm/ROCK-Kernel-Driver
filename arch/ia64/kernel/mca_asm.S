@@ -101,6 +101,11 @@
 	ld8	tmp=[sal_to_os_handoff];;				\
 	st8     [os_to_sal_handoff]=tmp;;
 
+#define GET_IA64_MCA_DATA(reg)						\
+	GET_THIS_PADDR(reg, ia64_mca_data)				\
+	;;								\
+	ld8 reg=[reg]
+
 	.global ia64_os_mca_dispatch
 	.global ia64_os_mca_dispatch_end
 	.global ia64_sal_to_os_handoff_state
@@ -309,14 +314,14 @@ err:
 done_tlb_purge_and_reload:
 
 	// Setup new stack frame for OS_MCA handling
-	GET_THIS_PADDR(r2, ia64_mca_data)
+	GET_IA64_MCA_DATA(r2)
 	;;
 	add r3 = IA64_MCA_CPU_STACKFRAME_OFFSET, r2
 	add r2 = IA64_MCA_CPU_RBSTORE_OFFSET, r2
 	;;
 	rse_switch_context(r6,r3,r2);;	// RSC management in this new context
 
-	GET_THIS_PADDR(r2, ia64_mca_data)
+	GET_IA64_MCA_DATA(r2)
 	;;
 	add r2 = IA64_MCA_CPU_STACK_OFFSET+IA64_MCA_STACK_SIZE-16, r2
 	;;
@@ -336,7 +341,7 @@ ia64_os_mca_virtual_begin:
 ia64_os_mca_virtual_end:
 
 	// restore the original stack frame here
-	GET_THIS_PADDR(r2, ia64_mca_data)
+	GET_IA64_MCA_DATA(r2)
 	;;
 	add r2 = IA64_MCA_CPU_STACKFRAME_OFFSET, r2
 	;;
@@ -380,7 +385,7 @@ ia64_os_mca_dispatch_end:
 ia64_os_mca_proc_state_dump:
 // Save bank 1 GRs 16-31 which will be used by c-language code when we switch
 //  to virtual addressing mode.
-	GET_THIS_PADDR(r2, ia64_mca_data)
+	GET_IA64_MCA_DATA(r2)
 	;;
 	add r2 = IA64_MCA_CPU_PROC_STATE_DUMP_OFFSET, r2
 	;;
@@ -613,7 +618,7 @@ end_os_mca_dump:
 ia64_os_mca_proc_state_restore:
 
 // Restore bank1 GR16-31
-	GET_THIS_PADDR(r2, ia64_mca_data)
+	GET_IA64_MCA_DATA(r2)
 	;;
 	add r2 = IA64_MCA_CPU_PROC_STATE_DUMP_OFFSET, r2
 
