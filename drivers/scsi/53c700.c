@@ -404,6 +404,8 @@ NCR_700_detect(struct scsi_host_template *tpnt,
 	       (hostdata->fast ? "53c700-66" : "53c700"),
 	       hostdata->rev, hostdata->differential ?
 	       "(Differential)" : "");
+	spi_signalling(host) = hostdata->differential ? SPI_SIGNAL_HVD :
+		SPI_SIGNAL_SE;
 	/* reset the chip */
 	NCR_700_chip_reset(host);
 

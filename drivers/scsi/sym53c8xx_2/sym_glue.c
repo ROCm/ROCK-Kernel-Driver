@@ -2305,6 +2305,28 @@ static void __devexit sym2_remove(struct pci_dev *pdev)
 	attach_count--;
 }
 
+static void sym2_get_signalling(struct Scsi_Host *shost)
+{
+	struct sym_hcb *np = ((struct host_data *)shost->hostdata)->ncb;
+	enum spi_signal_type type;
+
+	switch (np->scsi_mode) {
+	case SMODE_SE:
+		type =  SPI_SIGNAL_SE;
+		break;
+	case SMODE_LVD:
+		type = SPI_SIGNAL_LVD;
+		break;
+	case SMODE_HVD:
+		type = SPI_SIGNAL_HVD;
+		break;
+	default:
+		type = SPI_SIGNAL_UNKNOWN;
+		break;
+	}
+	spi_signalling(shost) = type;
+}
+
 static void sym2_get_offset(struct scsi_target *starget)
 {
 	struct Scsi_Host *shost = dev_to_shost(starget->dev.parent);
@@ -2403,6 +2425,7 @@ static struct spi_function_template sym2_transport_functions = {
 	.get_dt		= sym2_get_dt,
 	.set_dt		= sym2_set_dt,
 	.show_dt	= 1,
+	.get_signalling	= sym2_get_signalling,
 };
 
 static struct pci_device_id sym2_id_table[] __devinitdata = {

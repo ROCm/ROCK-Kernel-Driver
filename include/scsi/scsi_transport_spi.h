@@ -42,6 +42,17 @@ struct spi_transport_attrs {
 	struct semaphore dv_sem; /* semaphore to serialise dv */
 };
 
+enum spi_signal_type {
+	SPI_SIGNAL_UNKNOWN = 1,
+	SPI_SIGNAL_SE,
+	SPI_SIGNAL_LVD,
+	SPI_SIGNAL_HVD,
+};
+
+struct spi_host_attrs {
+	enum spi_signal_type signalling;
+};
+
 /* accessor functions */
 #define spi_period(x)	(((struct spi_transport_attrs *)&(x)->starget_data)->period)
 #define spi_offset(x)	(((struct spi_transport_attrs *)&(x)->starget_data)->offset)
@@ -55,6 +66,7 @@ struct spi_transport_attrs {
 #define spi_pcomp_en(x)	(((struct spi_transport_attrs *)&(x)->starget_data)->pcomp_en)
 #define spi_initial_dv(x)	(((struct spi_transport_attrs *)&(x)->starget_data)->initial_dv)
 #define spi_flags(x)	(((struct spi_transport_attrs *)&(x)->starget_data)->flags)
+#define spi_signalling(h)	(((struct spi_host_attrs *)&(h)->shost_data)->signalling)
 
 /* The functions by which the transport class and the driver communicate */
 struct spi_function_template {
@@ -78,6 +90,8 @@ struct spi_function_template {
 	void	(*set_rti)(struct scsi_target *, int);
 	void	(*get_pcomp_en)(struct scsi_target *);
 	void	(*set_pcomp_en)(struct scsi_target *, int);
+	void	(*get_signalling)(struct Scsi_Host *);
+	void	(*set_signalling)(struct Scsi_Host *, enum spi_signal_type);
 	/* The driver sets these to tell the transport class it
 	 * wants the attributes displayed in sysfs.  If the show_ flag
 	 * is not set, the attribute will be private to the transport

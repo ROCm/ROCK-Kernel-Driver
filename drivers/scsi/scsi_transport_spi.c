@@ -37,10 +37,12 @@
 #define SPI_PRINTK(x, l, f, a...)	dev_printk(l, &(x)->dev, f , ##a)
 
 static void transport_class_release(struct class_device *class_dev);
+static void host_class_release(struct class_device *class_dev);
 
 #define SPI_NUM_ATTRS 10	/* increase this if you add attributes */
 #define SPI_OTHER_ATTRS 1	/* Increase this if you add "always
 				 * on" attributes */
+#define SPI_HOST_ATTRS	1
 
 #define SPI_MAX_ECHO_BUFFER_SIZE	4096
 
@@ -56,6 +58,8 @@ struct spi_internal {
 	/* The array of null terminated pointers to attributes 
 	 * needed by scsi_sysfs.c */
 	struct class_device_attribute *attrs[SPI_NUM_ATTRS + SPI_OTHER_ATTRS + 1];
+	struct class_device_attribute private_host_attrs[SPI_HOST_ATTRS];
+	struct class_device_attribute *host_attrs[SPI_HOST_ATTRS + 1];
 };
 
 #define to_spi_internal(tmpl)	container_of(tmpl, struct spi_internal, t)
@@ -81,19 +85,69 @@ static const char *const ppr_to_ns[] = {
  * by 4 */
 #define SPI_STATIC_PPR	0x0c
 
+static struct {
+	enum spi_signal_type	value;
+	char			*name;
+} signal_types[] = {
+	{ SPI_SIGNAL_UNKNOWN, "unknown" },
+	{ SPI_SIGNAL_SE, "SE" },
+	{ SPI_SIGNAL_LVD, "LVD" },
+	{ SPI_SIGNAL_HVD, "HVD" },
+};
+
+static inline const char *spi_signal_to_string(enum spi_signal_type type)
+{
+	int i;
+
+	for (i = 0; i < sizeof(signal_types)/sizeof(signal_types[0]); i++) {
+		if (type == signal_types[i].value)
+			return signal_types[i].name;
+	}
+	return NULL;
+}
+static inline enum spi_signal_type spi_signal_to_value(const char *name)
+{
+	int i, len;
+
+	for (i = 0; i < sizeof(signal_types)/sizeof(signal_types[0]); i++) {
+		len =  strlen(signal_types[i].name);
+		if (strncmp(name, signal_types[i].name, len) == 0 &&
+		    (name[len] == '\n' || name[len] == '\0'))
+			return signal_types[i].value;
+	}
+	return SPI_SIGNAL_UNKNOWN;
+}
+
+
 struct class spi_transport_class = {
 	.name = "spi_transport",
 	.release = transport_class_release,
 };
 
+struct class spi_host_class = {
+	.name = "spi_host",
+	.release = host_class_release,
+};
+
 static __init int spi_transport_init(void)
 {
+	int error = class_register(&spi_host_class);
+	if (error)
+		return error;
 	return class_register(&spi_transport_class);
 }
 
 static void __exit spi_transport_exit(void)
 {
 	class_unregister(&spi_transport_class);
+	class_unregister(&spi_host_class);
+}
+
+static int spi_setup_host_attrs(struct Scsi_Host *shost)
+{
+	spi_signalling(shost) = SPI_SIGNAL_UNKNOWN;
+
+	return 0;
 }
 
 static int spi_setup_transport_attrs(struct scsi_target *starget)
@@ -119,6 +173,12 @@ static void transport_class_release(struct class_device *class_dev)
 {
 	struct scsi_target *starget = transport_class_to_starget(class_dev);
 	put_device(&starget->dev);
+}
+
+static void host_class_release(struct class_device *class_dev)
+{
+	struct Scsi_Host *shost = transport_class_to_shost(class_dev);
+	put_device(&shost->shost_gendev);
 }
 
 #define spi_transport_show_function(field, format_string)		\
@@ -265,6 +325,33 @@ store_spi_transport_period(struct class_device *cdev, const char *buf,
 static CLASS_DEVICE_ATTR(period, S_IRUGO | S_IWUSR, 
 			 show_spi_transport_period,
 			 store_spi_transport_period);
+
+static ssize_t show_spi_host_signalling(struct class_device *cdev, char *buf)
+{
+	struct Scsi_Host *shost = transport_class_to_shost(cdev);
+	struct spi_internal *i = to_spi_internal(shost->transportt);
+
+	if (i->f->get_signalling)
+		i->f->get_signalling(shost);
+
+	return sprintf(buf, "%s\n", spi_signal_to_string(spi_signalling(shost)));
+}
+static ssize_t store_spi_host_signalling(struct class_device *cdev,
+					 const char *buf, size_t count)
+{
+	struct Scsi_Host *shost = transport_class_to_shost(cdev);
+	struct spi_internal *i = to_spi_internal(shost->transportt);
+	enum spi_signal_type type = spi_signal_to_value(buf);
+
+	if (type != SPI_SIGNAL_UNKNOWN)
+		return count;
+
+	i->f->set_signalling(shost, type);
+	return count;
+}
+static CLASS_DEVICE_ATTR(signalling, S_IRUGO | S_IWUSR,
+			 show_spi_host_signalling,
+			 store_spi_host_signalling);
 
 #define DV_SET(x, y)			\
 	if(i->f->set_##x)		\
@@ -672,6 +759,15 @@ EXPORT_SYMBOL(spi_schedule_dv_device);
 	if (i->f->show_##field)						\
 		count++
 
+#define SETUP_HOST_ATTRIBUTE(field)					\
+	i->private_host_attrs[count] = class_device_attr_##field;	\
+	if (!i->f->set_##field) {					\
+		i->private_host_attrs[count].attr.mode = S_IRUGO;	\
+		i->private_host_attrs[count].store = NULL;		\
+	}								\
+	i->host_attrs[count] = &i->private_host_attrs[count];		\
+	count++
+
 struct scsi_transport_template *
 spi_attach_transport(struct spi_function_template *ft)
 {
@@ -688,6 +784,10 @@ spi_attach_transport(struct spi_function_template *ft)
 	i->t.target_class = &spi_transport_class;
 	i->t.target_setup = &spi_setup_transport_attrs;
 	i->t.target_size = sizeof(struct spi_transport_attrs);
+	i->t.host_attrs = &i->host_attrs[0];
+	i->t.host_class = &spi_host_class;
+	i->t.host_setup = &spi_setup_host_attrs;
+	i->t.host_size = sizeof(struct spi_host_attrs);
 	i->f = ft;
 
 	SETUP_ATTRIBUTE(period);
@@ -706,6 +806,13 @@ spi_attach_transport(struct spi_function_template *ft)
 	BUG_ON(count > SPI_NUM_ATTRS);
 
 	i->attrs[count++] = &class_device_attr_revalidate;
+
+	i->attrs[count] = NULL;
+
+	count = 0;
+	SETUP_HOST_ATTRIBUTE(signalling);
+
+	BUG_ON(count > SPI_HOST_ATTRS);
 
 	i->attrs[count] = NULL;
 
