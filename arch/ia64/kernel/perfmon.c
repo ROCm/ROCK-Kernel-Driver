@@ -657,6 +657,19 @@ pfm_smpl_buffer_alloc(pfm_context_t *ctx, unsigned long *which_pmds, unsigned lo
 	/*
 	 * partially initialize the vma for the sampling buffer
 	 */
+	vma->vm_flags	     = VM_READ| VM_MAYREAD |VM_RESERVED;
+	vma->vm_page_prot    = PAGE_READONLY; /* XXX may need to change */
+	vma->vm_ops	     = &pfm_vm_ops; /* necesarry to get the close() callback */
+	vma->vm_pgoff	     = 0;
+	vma->vm_file	     = NULL;
+	vma->vm_raend	     = 0;
+	vma->vm_private_data = psb;	/* information needed by the pfm_vm_close() function */
+
+	/*
+	 * Now we have everything we need and we can initialize
+	 * and connect all the data structures
+	 */
+
 	psb->psb_hdr	 = smpl_buf;
 	psb->psb_addr    = ((char *)smpl_buf)+sizeof(perfmon_smpl_hdr_t); /* first entry */
 	psb->psb_size    = size; /* aligned size */
