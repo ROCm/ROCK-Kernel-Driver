@@ -2571,6 +2571,7 @@ static void show_task(task_t * p)
 {
 	task_t *relative;
 	unsigned state;
+	unsigned long free = 0;
 	static const char *stat_nam[] = { "R", "S", "D", "T", "Z", "W" };
 
 	printk("%-13.13s ", p->comm);
@@ -2590,7 +2591,15 @@ static void show_task(task_t * p)
 	else
 		printk(" %016lx ", thread_saved_pc(p));
 #endif
-	printk("%5d %6d ", p->pid, p->parent->pid);
+#ifdef CONFIG_DEBUG_STACK_USAGE
+	{
+		unsigned long * n = (unsigned long *) (p->thread_info+1);
+		while (!*n)
+			n++;
+		free = (unsigned long) n - (unsigned long)(p->thread_info+1);
+	}
+#endif
+	printk("%5lu %5d %6d ", free, p->pid, p->parent->pid);
 	if ((relative = eldest_child(p)))
 		printk("%5d ", relative->pid);
 	else
