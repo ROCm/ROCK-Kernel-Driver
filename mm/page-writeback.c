@@ -677,6 +677,7 @@ int test_set_page_writeback(struct page *page)
 	return ret;
 
 }
+EXPORT_SYMBOL(test_set_page_writeback);
 
 /*
  * Return true if any of the pages in the mapping are marged with the
