@@ -1502,6 +1502,10 @@ static int nodemgr_host_thread(void *__hi)
 			 * start the the waiting over again */
 			while (!down_trylock(&hi->reset_sem))
 				i = 0;
+
+			/* Check the kill_me again */
+			if (hi->kill_me)
+				goto caught_signal;
 		}
 
 		if (!nodemgr_check_irm_capability(host, reset_cycles)) {
