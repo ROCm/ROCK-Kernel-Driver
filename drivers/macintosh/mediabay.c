@@ -23,6 +23,7 @@
 #include <linux/stddef.h>
 #include <linux/unistd.h>
 #include <linux/init.h>
+#include <linux/ide.h>
 #include <asm/prom.h>
 #include <asm/pgtable.h>
 #include <asm/io.h>
@@ -493,7 +494,7 @@ media_bay_set_ide_infos(struct device_node* which_bay, unsigned long base,
 			} while(--timeout);
 			printk(KERN_DEBUG "Timeount waiting IDE in bay %d\n", i);
 			return -ENODEV;
-		} 
+		}
 #endif
 	
 	return -ENODEV;
@@ -567,9 +568,10 @@ media_bay_step(int i)
 				hw_regs_t hw;
 
 				pmu_suspend();
-				ide_init_hwif_ports(&hw, (ide_ioreg_t) bay->cd_base, (ide_ioreg_t) 0, NULL);
+				ide_init_hwif_ports(&hw, (unsigned long) bay->cd_base, (unsigned long) 0, NULL);
 				hw.irq = bay->cd_irq;
-				bay->cd_index = ide_register_hw(&hw);
+				hw.chipset = ide_pmac;
+				bay->cd_index = ide_register_hw(&hw, NULL);
 				pmu_resume();
 			}
 			if (bay->cd_index == -1) {
@@ -834,4 +836,4 @@ media_bay_init(void)
 	return 0;
 }
 
-device_initcall(media_bay_init);
+subsys_initcall(media_bay_init);

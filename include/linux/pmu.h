@@ -30,6 +30,7 @@
 #define PMU_SET_INTR_MASK	0x70	/* set PMU interrupt mask */
 #define PMU_INT_ACK		0x78	/* read interrupt bits */
 #define PMU_SHUTDOWN		0x7e	/* turn power off */
+#define PMU_CPU_SPEED		0x7d	/* control CPU speed on some models */
 #define PMU_SLEEP		0x7f	/* put CPU to sleep */
 #define PMU_POWER_EVENTS	0x8f	/* Send power-event commands to PMU */
 #define PMU_RESET		0xd0	/* reset CPU */
@@ -191,6 +192,10 @@ int pmu_unregister_sleep_notifier(struct pmu_sleep_notifier* notifier);
 /* values for pmu_battery_info.flags */
 #define PMU_BATT_PRESENT	0x00000001
 #define PMU_BATT_CHARGING	0x00000002
+#define PMU_BATT_TYPE_MASK	0x000000f0
+#define PMU_BATT_TYPE_SMART	0x00000010 /* Smart battery */
+#define PMU_BATT_TYPE_HOOPER	0x00000020 /* 3400/3500 */
+#define PMU_BATT_TYPE_COMET	0x00000030 /* 2400 */
 
 struct pmu_battery_info
 {

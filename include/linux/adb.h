@@ -30,6 +30,15 @@
 #define POWER_PACKET	4
 #define MACIIC_PACKET	5
 #define PMU_PACKET	6
+#define ADB_QUERY	7
+
+/* ADB queries */
+
+/* ADB_QUERY_GETDEVINFO
+ * Query ADB slot for device presence
+ * data[2] = id, rep[0] = orig addr, rep[1] = handler_id
+ */
+#define ADB_QUERY_GETDEVINFO	1
 
 #ifdef __KERNEL__
 

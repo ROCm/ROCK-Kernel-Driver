@@ -7,29 +7,6 @@
 #ifndef _MAC53C94_H
 #define _MAC53C94_H
 
-int mac53c94_detect(Scsi_Host_Template *);
-int mac53c94_release(struct Scsi_Host *);
-int mac53c94_command(Scsi_Cmnd *);
-int mac53c94_queue(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
-int mac53c94_abort(Scsi_Cmnd *);
-int mac53c94_reset(Scsi_Cmnd *, unsigned int);
-
-#define SCSI_MAC53C94 {					\
-	.proc_name	= "53c94",			\
-	.name		= "53C94",			\
-	.detect		= mac53c94_detect,		\
-	.release	= mac53c94_release,		\
-	.command	= mac53c94_command,		\
-	.queuecommand	= mac53c94_queue,			\
-	.abort		= mac53c94_abort,			\
-	.reset		= mac53c94_reset,			\
-	.can_queue	= 1,				\
-	.this_id	= 7,				\
-	.sg_tablesize	= SG_ALL,				\
-	.cmd_per_lun	= 1,				\
-	.use_clustering	= DISABLE_CLUSTERING,		\
-}
-
 /*
  * Registers in the 53C94 controller.
  */
