@@ -128,49 +128,21 @@ static int i801_transaction(void);
 static int i801_block_transaction(union i2c_smbus_data *data,
 				  char read_write, int command);
 
+static unsigned short i801_smba;
+static struct pci_dev *I801_dev;
+static int isich4;
 
-
-
-static unsigned short i801_smba = 0;
-static struct pci_dev *I801_dev = NULL;
-static int isich4 = 0;
-
-/* Detect whether a I801 can be found, and initialize it, where necessary.
-   Note the differences between kernels with the old PCI BIOS interface and
-   newer kernels with the real PCI interface. In compat.h some things are
-   defined to make the transition easier. */
-int i801_setup(void)
+static int i801_setup(struct pci_dev *dev)
 {
 	int error_return = 0;
 	int *num = supported;
 	unsigned char temp;
 
-	/* First check whether we can access PCI at all */
-	if (pci_present() == 0) {
-		printk(KERN_WARNING "i2c-i801.o: Error: No PCI-bus found!\n");
-		error_return = -ENODEV;
-		goto END;
-	}
-
-	/* Look for each chip */
 	/* Note: we keep on searching until we have found 'function 3' */
-	I801_dev = NULL;
-	do {
-		if((I801_dev = pci_find_device(PCI_VENDOR_ID_INTEL,
-					      *num, I801_dev))) {
-			if(PCI_FUNC(I801_dev->devfn) != 3)
-				continue;
-			break;
-		}
-		num++;
-	} while (*num != 0);
+	if(PCI_FUNC(dev->devfn) != 3)
+		return -ENODEV;
 
-	if (I801_dev == NULL) {
-		printk
-		    (KERN_WARNING "i2c-i801.o: Error: Can't detect I801, function 3!\n");
-		error_return = -ENODEV;
-		goto END;
-	}
+	I801_dev = dev;
 	isich4 = *num == PCI_DEVICE_ID_INTEL_82801DB_SMBUS;
 
 /* Determine the address of the SMBus areas */
@@ -658,13 +630,43 @@ static struct i2c_adapter i801_adapter = {
 
 
 static struct pci_device_id i801_ids[] __devinitdata = {
+	{
+		.vendor =	PCI_VENDOR_ID_INTEL,
+		.device =	PCI_DEVICE_ID_INTEL_82801AA_3,
+		.subvendor =	PCI_ANY_ID,
+		.subdevice =	PCI_ANY_ID,
+	},
+	{
+		.vendor =	PCI_VENDOR_ID_INTEL,
+		.device =	PCI_DEVICE_ID_INTEL_82801AB_3,
+		.subvendor =	PCI_ANY_ID,
+		.subdevice =	PCI_ANY_ID,
+	},
+	{
+		.vendor =	PCI_VENDOR_ID_INTEL,
+		.device =	PCI_DEVICE_ID_INTEL_82801BA_2,
+		.subvendor =	PCI_ANY_ID,
+		.subdevice =	PCI_ANY_ID,
+	},
+	{
+		.vendor =	PCI_VENDOR_ID_INTEL,
+		.device =	PCI_DEVICE_ID_INTEL_82801CA_SMBUS,
+		.subvendor =	PCI_ANY_ID,
+		.subdevice =	PCI_ANY_ID,
+	},
+	{
+		.vendor =	PCI_VENDOR_ID_INTEL,
+		.device =	PCI_DEVICE_ID_INTEL_82801DB_SMBUS,
+		.subvendor =	PCI_ANY_ID,
+		.subdevice =	PCI_ANY_ID,
+	},
 	{ 0, }
 };
 
 static int __devinit i801_probe(struct pci_dev *dev, const struct pci_device_id *id)
 {
 
-	if (i801_setup()) {
+	if (i801_setup(dev)) {
 		printk
 		    (KERN_WARNING "i2c-i801.o: I801 not detected, module not inserted.\n");
 		return -ENODEV;
