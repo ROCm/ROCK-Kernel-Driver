@@ -63,6 +63,7 @@
 #include <linux/ioport.h>
 #include <linux/init.h>
 #include <linux/i2c.h>
+#include <asm/io.h>
 
 static int blacklist[] = {
 	PCI_DEVICE_ID_SI_540,
