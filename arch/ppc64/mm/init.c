@@ -540,8 +540,6 @@ static int __init setup_kcore(void)
 }
 module_init(setup_kcore);
 
-void initialize_paca_hardware_interrupt_stack(void);
-
 void __init mem_init(void)
 {
 #ifndef CONFIG_DISCONTIGMEM
@@ -607,9 +605,6 @@ void __init mem_init(void)
 	       PAGE_OFFSET, (unsigned long)__va(lmb_end_of_DRAM()));
 #endif
 	mem_init_done = 1;
-
-	/* set the last page of each hardware interrupt stack to be protected */
-	initialize_paca_hardware_interrupt_stack();
 
 #ifdef CONFIG_PPC_ISERIES
 	create_virtual_bus_tce_table();
