@@ -373,7 +373,6 @@ static int __devinit slc90e66_init_one(struct pci_dev *dev, const struct pci_dev
 	if (dev->device != d->device)
 		BUG();
 	ide_setup_pci_device(dev, d);
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -393,13 +392,7 @@ static int slc90e66_ide_init(void)
 	return ide_pci_register_driver(&driver);
 }
 
-static void slc90e66_ide_exit(void)
-{
-	ide_pci_unregister_driver(&driver);
-}
-
 module_init(slc90e66_ide_init);
-module_exit(slc90e66_ide_exit);
 
 MODULE_AUTHOR("Andre Hedrick");
 MODULE_DESCRIPTION("PCI driver module for SLC90E66 IDE");

@@ -299,7 +299,9 @@ static void __init init_ide_data (void)
 		init_hwif_data(index);
 
 	/* Add default hw interfaces */
+	initializing = 1;
 	ide_init_default_hwifs();
+	initializing = 0;
 
 	idebus_parameter = 0;
 	system_bus_speed = 0;

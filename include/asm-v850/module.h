@@ -1,8 +1,8 @@
 /*
  * include/asm-v850/module.h -- Architecture-specific module hooks
  *
- *  Copyright (C) 2001,02,03  NEC Corporation
- *  Copyright (C) 2001,02,03  Miles Bader <miles@gnu.org>
+ *  Copyright (C) 2001,02,03,04  NEC Corporation
+ *  Copyright (C) 2001,02,03,04  Miles Bader <miles@gnu.org>
  *  Copyright (C) 2001,03  Rusty Russell
  *
  * This file is subject to the terms and conditions of the GNU General
@@ -50,5 +50,13 @@ search_extable(const struct exception_table_entry *first,
 {
 	return 0;
 }
+#define ARCH_HAS_SEARCH_EXTABLE
+static inline void
+sort_extable(struct exception_table_entry *start,
+	     struct exception_table_entry *finish)
+{
+	/* nada */
+}
+#define ARCH_HAS_SORT_EXTABLE
 
 #endif /* __V850_MODULE_H__ */

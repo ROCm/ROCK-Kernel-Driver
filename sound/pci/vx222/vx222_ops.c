@@ -406,7 +406,8 @@ static int vx2_load_dsp(vx_core_t *vx, const snd_hwdep_dsp_image_t *dsp)
 	int err;
 
 	if (*dsp->name)
-		snd_printdd("loading dsp [%d] %s, size = %d\n", dsp->index, dsp->name, dsp->length);
+		snd_printdd("loading dsp [%d] %s, size = %Zd\n",
+			dsp->index, dsp->name, dsp->length);
 	switch (dsp->index) {
 	case 0:
 		/* xilinx image */

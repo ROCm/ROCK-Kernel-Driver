@@ -226,7 +226,6 @@ static int __devinit triflex_init_one(struct pci_dev *dev,
 	
 	ide_setup_pci_device(dev, d);
 	triflex_dev = dev;
-	MOD_INC_USE_COUNT;
 	
 	return 0;
 }
@@ -242,13 +241,7 @@ static int triflex_ide_init(void)
 	return ide_pci_register_driver(&driver);
 }
 
-static void triflex_ide_exit(void)
-{
-	ide_pci_unregister_driver(&driver);
-}
-
 module_init(triflex_ide_init);
-module_exit(triflex_ide_exit);
 
 MODULE_AUTHOR("Torben Mathiasen");
 MODULE_DESCRIPTION("PCI driver module for Compaq Triflex IDE");

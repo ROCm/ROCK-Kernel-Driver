@@ -33,14 +33,6 @@ rapide_probe(struct expansion_card *ec, const struct ecard_id *id)
 
 	if (ret)
 		ecard_release(ec);
-	/*
-	 * this locks the driver in-core - remove this
-	 * comment and the two lines below when we can
-	 * safely remove interfaces.
-	 */
-	else
-		MOD_INC_USE_COUNT;
-
 	return ret;
 }
 
@@ -68,13 +60,7 @@ static int __init rapide_init(void)
 	return ecard_register_driver(&rapide_driver);
 }
 
-static void __exit rapide_exit(void)
-{
-	ecard_remove_driver(&rapide_driver);
-}
-
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Yellowstone RAPIDE driver");
 
 module_init(rapide_init);
-module_exit(rapide_exit);

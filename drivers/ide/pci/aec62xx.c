@@ -530,7 +530,6 @@ static int __devinit aec62xx_init_one(struct pci_dev *dev, const struct pci_devi
 	if (dev->device != d->device)
 		BUG();
 	d->init_setup(dev, d);
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -554,13 +553,7 @@ static int aec62xx_ide_init(void)
 	return ide_pci_register_driver(&driver);
 }
 
-static void aec62xx_ide_exit(void)
-{
-	ide_pci_unregister_driver(&driver);
-}
-
 module_init(aec62xx_ide_init);
-module_exit(aec62xx_ide_exit);
 
 MODULE_AUTHOR("Andre Hedrick");
 MODULE_DESCRIPTION("PCI driver module for ARTOP AEC62xx IDE");
