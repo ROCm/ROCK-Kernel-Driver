@@ -73,8 +73,8 @@ static unsigned int max_scsi_luns = MAX_SCSI_LUNS;
 static unsigned int max_scsi_luns = 1;
 #endif
 
-module_param(max_scsi_luns, int, S_IRUGO|S_IWUSR);
-MODULE_PARM_DESC(max_scsi_luns,
+module_param_named(max_luns, max_scsi_luns, int, S_IRUGO|S_IWUSR);
+MODULE_PARM_DESC(max_luns,
 		 "last scsi LUN (should be between 1 and 2^32-1)");
 
 #ifdef CONFIG_SCSI_REPORT_LUNS
@@ -87,8 +87,8 @@ MODULE_PARM_DESC(max_scsi_luns,
  */
 static unsigned int max_scsi_report_luns = 128;
 
-module_param(max_scsi_report_luns, int, S_IRUGO|S_IWUSR);
-MODULE_PARM_DESC(max_scsi_report_luns,
+module_param_named(max_report_luns, max_scsi_report_luns, int, S_IRUGO|S_IWUSR);
+MODULE_PARM_DESC(max_report_luns,
 		 "REPORT LUNS maximum number of LUNS received (should be"
 		 " between 1 and 16384)");
 #endif

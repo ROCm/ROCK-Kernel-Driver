@@ -451,14 +451,14 @@ out:
 	return err;
 }
 
-module_param_string(scsi_dev_flags, scsi_dev_flags, sizeof(scsi_dev_flags), 0);
-MODULE_PARM_DESC(scsi_dev_flags,
+module_param_string(dev_flags, scsi_dev_flags, sizeof(scsi_dev_flags), 0);
+MODULE_PARM_DESC(dev_flags,
 	 "Given scsi_dev_flags=vendor:model:flags[,v:m:f] add black/white"
 	 " list entries for vendor and model with an integer value of flags"
 	 " to the scsi device info list");
 
-module_param(scsi_default_dev_flags, int, S_IRUGO|S_IWUSR);
-MODULE_PARM_DESC(scsi_default_dev_flags,
+module_param_named(default_dev_flags, scsi_default_dev_flags, int, S_IRUGO|S_IWUSR);
+MODULE_PARM_DESC(default_dev_flags,
 		 "scsi default device flag integer value");
 
 /**
