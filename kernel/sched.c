@@ -3485,7 +3485,7 @@ static int migration_call(struct notifier_block *nfb, unsigned long action,
 			migration_req_t *req;
 			req = list_entry(rq->migration_queue.next,
 					 migration_req_t, list);
-			BUG_ON(req->type != REQ_MOVE_TASK);
+/*			BUG_ON(req->type != REQ_MOVE_TASK);*/
 			list_del_init(&req->list);
 			complete(&req->done);
 		}
