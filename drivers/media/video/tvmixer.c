@@ -195,8 +195,9 @@ static int tvmixer_open(struct inode *inode, struct file *file)
 
 	/* lock bttv in memory while the mixer is in use  */
 	file->private_data = mix;
-	if (client->adapter->inc_use)
-		client->adapter->inc_use(client->adapter);
+
+	if (!try_module_get(client->adapter->owner))
+		return -ENODEV;
         return 0;
 }
 
@@ -210,8 +211,7 @@ static int tvmixer_release(struct inode *inode, struct file *file)
 		return -ENODEV;
 	}
 
-	if (client->adapter->dec_use)
-		client->adapter->dec_use(client->adapter);
+	module_put(client->adapter->owner);
 	return 0;
 }
 

@@ -114,8 +114,6 @@ static void adm1021_init_client(struct i2c_client *client);
 static int adm1021_detach_client(struct i2c_client *client);
 static int adm1021_command(struct i2c_client *client, unsigned int cmd,
 			   void *arg);
-static void adm1021_inc_use(struct i2c_client *client);
-static void adm1021_dec_use(struct i2c_client *client);
 static int adm1021_read_value(struct i2c_client *client, u8 reg);
 static int adm1021_write_value(struct i2c_client *client, u8 reg,
 			       u16 value);
@@ -136,14 +134,13 @@ static int read_only = 0;
 
 /* This is the driver that will be inserted */
 static struct i2c_driver adm1021_driver = {
-	/* name */ "ADM1021, MAX1617 sensor driver",
-	/* id */ I2C_DRIVERID_ADM1021,
-	/* flags */ I2C_DF_NOTIFY,
-	/* attach_adapter */ &adm1021_attach_adapter,
-	/* detach_client */ &adm1021_detach_client,
-	/* command */ &adm1021_command,
-	/* inc_use */ &adm1021_inc_use,
-	/* dec_use */ &adm1021_dec_use
+	.owner		= THIS_MODULE,
+	.name		= "ADM1021, MAX1617 sensor driver",
+	.id		= I2C_DRIVERID_ADM1021,
+	.flags		= I2C_DF_NOTIFY,
+	.attach_adapter	= adm1021_attach_adapter,
+	.detach_client	= adm1021_detach_client,
+	.command	= adm1021_command,
 };
 
 /* These files are created for each detected adm1021. This is just a template;
@@ -375,16 +372,6 @@ int adm1021_command(struct i2c_client *client, unsigned int cmd, void *arg)
 	return 0;
 }
 
-void adm1021_inc_use(struct i2c_client *client)
-{
-	MOD_INC_USE_COUNT;
-}
-
-void adm1021_dec_use(struct i2c_client *client)
-{
-	MOD_DEC_USE_COUNT;
-}
-
 /* All registers are byte-sized */
 int adm1021_read_value(struct i2c_client *client, u8 reg)
 {
@@ -478,8 +465,9 @@ void adm1021_temp(struct i2c_client *client, int operation, int ctl_name,
 void adm1021_remote_temp(struct i2c_client *client, int operation,
 			 int ctl_name, int *nrels_mag, long *results)
 {
-int prec=0;
 	struct adm1021_data *data = client->data;
+	int prec = 0;
+
 	if (operation == SENSORS_PROC_REAL_INFO)
 		if (data->type == adm1023) { *nrels_mag = 3; }
                  else { *nrels_mag = 0; }

@@ -184,35 +184,6 @@ static void iic_ite_release(void)
 	release_region(gpi.iic_base , 2);
 }
 
-
-static int iic_ite_reg(struct i2c_client *client)
-{
-	return 0;
-}
-
-
-static int iic_ite_unreg(struct i2c_client *client)
-{
-	return 0;
-}
-
-
-static void iic_ite_inc_use(struct i2c_adapter *adap)
-{
-#ifdef MODULE
-	MOD_INC_USE_COUNT;
-#endif
-}
-
-
-static void iic_ite_dec_use(struct i2c_adapter *adap)
-{
-#ifdef MODULE
-	MOD_DEC_USE_COUNT;
-#endif
-}
-
-
 /* ------------------------------------------------------------------------
  * Encapsulate the above functions in the correct operations structure.
  * This is only done when more than one hardware adapter is supported.
@@ -228,14 +199,10 @@ static struct i2c_algo_iic_data iic_ite_data = {
 };
 
 static struct i2c_adapter iic_ite_ops = {
-	"ITE IIC adapter",
-	I2C_HW_I_IIC,
-	NULL,
-	&iic_ite_data,
-	iic_ite_inc_use,
-	iic_ite_dec_use,
-	iic_ite_reg,
-	iic_ite_unreg,
+	.owner		= THIS_MODULE,
+	.name		= "ITE IIC adapter",
+	.id		= I2C_HW_I_IIC,
+	.algo_data	= &iic_ite_data,
 };
 
 /* Called when the module is loaded.  This function starts the

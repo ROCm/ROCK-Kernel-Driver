@@ -61,44 +61,21 @@ static struct i2c_algo_bit_data bit_frodo_data = {
 	.timeout	= 100
 };
 
-static int frodo_client_register (struct i2c_client *client)
-{
-	return (0);
-}
-
-static int frodo_client_unregister (struct i2c_client *client)
-{
-	return (0);
-}
-
-static void frodo_inc_use (struct i2c_adapter *adapter)
-{
-	MOD_INC_USE_COUNT;
-}
-
-static void frodo_dec_use (struct i2c_adapter *adapter)
-{
-	MOD_DEC_USE_COUNT;
-}
-
 static struct i2c_adapter frodo_ops = {
+	.owner			= THIS_MODULE,
 	.name			= "Frodo adapter driver",
 	.id			= I2C_HW_B_FRODO,
 	.algo_data		= &bit_frodo_data,
-	.inc_use		= frodo_inc_use,
-	.dec_use		= frodo_dec_use,
-	.client_register	= frodo_client_register,
-	.client_unregister	= frodo_client_unregister
 };
 
 static int __init i2c_frodo_init (void)
 {
-	return (i2c_bit_add_bus (&frodo_ops));
+	return i2c_bit_add_bus(&frodo_ops);
 }
 
 static void __exit i2c_frodo_exit (void)
 {
-	i2c_bit_del_bus (&frodo_ops);
+	i2c_bit_del_bus(&frodo_ops);
 }
 
 MODULE_AUTHOR ("Abraham van der Merwe <abraham@2d3d.co.za>");

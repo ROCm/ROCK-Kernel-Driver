@@ -364,8 +364,10 @@ int i2cdev_open (struct inode *inode, struct file *file)
 	client->adapter = i2cdev_adaps[minor];
 	file->private_data = client;
 
-	if (i2cdev_adaps[minor]->inc_use)
-		i2cdev_adaps[minor]->inc_use(i2cdev_adaps[minor]);
+	if (!try_module_get(i2cdev_adaps[minor]->owner)) {
+		kfree(client);
+		return -ENODEV;
+	}
 
 #ifdef DEBUG
 	printk(KERN_DEBUG "i2c-dev.o: opened i2c-%d\n",minor);
@@ -381,10 +383,7 @@ static int i2cdev_release (struct inode *inode, struct file *file)
 #ifdef DEBUG
 	printk(KERN_DEBUG "i2c-dev.o: Closed: i2c-%d\n", minor);
 #endif
-	lock_kernel();
-	if (i2cdev_adaps[minor]->dec_use)
-		i2cdev_adaps[minor]->dec_use(i2cdev_adaps[minor]);
-	unlock_kernel();
+	module_put(i2cdev_adaps[minor]->owner);
 	return 0;
 }
 

@@ -142,7 +142,7 @@ static void pcf_isa_handler(int this_irq, void *dev_id, struct pt_regs *regs) {
 static int pcf_isa_init(void)
 {
 	if (!mmapped) {
-		if (!request_region(base, 2, "i2c (isa bus adapter)"))
+		if (!request_region(base, 2, "i2c (isa bus adapter)")) {
 			printk(KERN_ERR
 			       "i2c-elektor.o: requested I/O region (0x%X:2) "
 			       "is in use.\n", base);
@@ -158,32 +158,6 @@ static int pcf_isa_init(void)
 	}
 	return 0;
 }
-
-static int pcf_isa_reg(struct i2c_client *client)
-{
-	return 0;
-}
-
-
-static int pcf_isa_unreg(struct i2c_client *client)
-{
-	return 0;
-}
-
-static void pcf_isa_inc_use(struct i2c_adapter *adap)
-{
-#ifdef MODULE
-	MOD_INC_USE_COUNT;
-#endif
-}
-
-static void pcf_isa_dec_use(struct i2c_adapter *adap)
-{
-#ifdef MODULE
-	MOD_DEC_USE_COUNT;
-#endif
-}
-
 
 /* ------------------------------------------------------------------------
  * Encapsulate the above functions in the correct operations structure.
@@ -201,13 +175,10 @@ static struct i2c_algo_pcf_data pcf_isa_data = {
 };
 
 static struct i2c_adapter pcf_isa_ops = {
+	.owner		   = THIS_MODULE,
 	.name		   = "PCF8584 ISA adapter",
 	.id		   = I2C_HW_P_ELEK,
 	.algo_data	   = &pcf_isa_data,
-	.inc_use	   = pcf_isa_inc_use,
-	.dec_use	   = pcf_isa_dec_use,
-	.client_register   = pcf_isa_reg,
-	.client_unregister = pcf_isa_unreg,
 };
 
 static int __init i2c_pcfisa_init(void) 
