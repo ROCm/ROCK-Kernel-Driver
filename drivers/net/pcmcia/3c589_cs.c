@@ -287,12 +287,9 @@ static void tc589_detach(dev_link_t *link)
     
     /* Unlink device structure, free bits */
     *linkp = link->next;
-    if (link->dev) {
+    if (link->dev)
 	unregister_netdev(dev);
-	free_netdev(dev);
-    } else
-        kfree(dev);
-    
+    free_netdev(dev);
 } /* tc589_detach */
 
 /*======================================================================
