@@ -199,7 +199,7 @@ static int verify_command(struct file *file, unsigned char *cmd)
 			return 0;
 	}
 
-	if (!(type & CMD_WARNED)) {
+	if (!type) {
 		cmd_type[cmd[0]] = CMD_WARNED;
 		printk(KERN_WARNING "scsi: unknown opcode 0x%02x\n", cmd[0]);
 	}
