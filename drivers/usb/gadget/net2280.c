@@ -73,7 +73,7 @@
 #include <asm/unaligned.h>
 
 
-#define DRIVER_DESC		"NetChip 2280 USB Peripheral Controller"
+#define	DRIVER_DESC		"NetChip 2280 USB Peripheral Controller"
 #define	DRIVER_VERSION		"May Day 2003"
 
 #define	DMA_ADDR_INVALID	(~(dma_addr_t)0)
@@ -97,6 +97,15 @@ static int use_dma = 1;
 
 /* "modprobe net2280 use_dma=n" etc */
 module_param (use_dma, bool, S_IRUGO|S_IWUSR);
+
+/* mode 0 == ep-{a,b,c,d} 1K fifo each
+ * mode 1 == ep-{a,b} 2K fifo each, ep-{c,d} unavailable
+ * mode 2 == ep-a 2K fifo, ep-{b,c} 1K each, ep-d unavailable
+ */
+static ushort fifo_mode = 0;
+
+/* "modprobe net2280 fifo_mode=1" etc */
+module_param (fifo_mode, ushort, 0644);
 
 #define	DIR_STRING(bAddress) (((bAddress) & USB_DIR_IN) ? "in" : "out")
 
@@ -384,7 +393,7 @@ net2280_free_request (struct usb_ep *_ep, struct usb_request *_req)
 	struct net2280_request	*req;
 
 	ep = container_of (_ep, struct net2280_ep, ep);
-	if (!ep || !_req || (!ep->desc && ep->num != 0))
+	if (!ep || !_req)
 		return;
 
 	req = container_of (_req, struct net2280_request, req);
@@ -411,7 +420,7 @@ net2280_free_request (struct usb_ep *_ep, struct usb_request *_req)
 #if	defined(CONFIG_X86)
 #define USE_KMALLOC
 
-#elif	define(CONFIG_PPC) && !defined(CONFIG_NOT_COHERENT_CACHE)
+#elif	defined(CONFIG_PPC) && !defined(CONFIG_NOT_COHERENT_CACHE)
 #define USE_KMALLOC
 
 /* FIXME there are other cases, including an x86-64 one ...  */
@@ -493,6 +502,7 @@ write_fifo (struct net2280_ep *ep, struct usb_request *req)
 {
 	struct net2280_ep_regs	*regs = ep->regs;
 	u8			*buf;
+	u32			tmp;
 	unsigned		count, total;
 
 	/* INVARIANT:  fifo is currently empty. (testable) */
@@ -516,14 +526,17 @@ write_fifo (struct net2280_ep *ep, struct usb_request *req)
 		 * should normally be full (4 bytes) and successive partial
 		 * lines are ok only in certain cases.
 		 */
-		writel (get_unaligned ((u32 *)buf), &regs->ep_data);
+		tmp = get_unaligned ((u32 *)buf);
+		cpu_to_le32s (&tmp);
+		writel (tmp, &regs->ep_data);
 		buf += 4;
 		count -= 4;
 	}
 
 	/* last fifo entry is "short" unless we wrote a full packet */
 	if (total < ep->ep.maxpacket) {
-		u32	tmp = count ? get_unaligned ((u32 *)buf) : count;
+		tmp = count ? get_unaligned ((u32 *)buf) : count;
+		cpu_to_le32s (&tmp);
 		set_fifo_bytecount (ep, count & 0x03);
 		writel (tmp, &regs->ep_data);
 	}
@@ -623,12 +636,15 @@ read_fifo (struct net2280_ep *ep, struct net2280_request *req)
 			req, req->req.actual, req->req.length);
 
 	while (count >= 4) {
-		put_unaligned (readl (&regs->ep_data), (u32 *)buf);
+		tmp = readl (&regs->ep_data);
+		cpu_to_le32s (&tmp);
+		put_unaligned (tmp, (u32 *)buf);
 		buf += 4;
 		count -= 4;
 	}
 	if (count) {
 		tmp = readl (&regs->ep_data);
+		cpu_to_le32s (&tmp);
 		do {
 			*buf++ = (u8) tmp;
 			tmp >>= 8;
@@ -1193,11 +1209,13 @@ net2280_fifo_status (struct usb_ep *_ep)
 
 	ep = container_of (_ep, struct net2280_ep, ep);
 	if (!_ep || (!ep->desc && ep->num != 0))
-		return -EINVAL;
+		return -ENODEV;
 	if (!ep->dev->driver || ep->dev->gadget.speed == USB_SPEED_UNKNOWN)
 		return -ESHUTDOWN;
 
-	avail = readl (&ep->regs->ep_avail);
+	avail = readl (&ep->regs->ep_avail) & ((1 << 12) - 1);
+	if (avail > ep->fifo_size)
+		return -EOVERFLOW;
 	if (ep->is_in)
 		avail = ep->fifo_size - avail;
 	return avail;
@@ -1260,7 +1278,7 @@ static int net2280_wakeup (struct usb_gadget *_gadget)
 	if (!_gadget)
 		return 0;
 	dev = container_of (_gadget, struct net2280, gadget);
-	writel (1 << GENERATE_RESUME, dev->usb->usbstat);
+	writel (1 << GENERATE_RESUME, &dev->usb->usbstat);
 
 	/* pci writes may still be posted */
 	return 0;
@@ -1649,7 +1667,7 @@ static void usb_reset (struct net2280 *dev)
 	writel (tmp, &dev->regs->devinit);
 
 	/* standard fifo and endpoint allocations */
-	set_fifo_mode (dev, 0);
+	set_fifo_mode (dev, (fifo_mode <= 2) ? fifo_mode : 0);
 }
 
 static void usb_reinit (struct net2280 *dev)
@@ -2119,6 +2137,10 @@ static void handle_stat0_irqs (struct net2280 *dev, u32 stat)
 			, &ep->regs->ep_stat);
 		u.raw [0] = readl (&dev->usb->setup0123);
 		u.raw [1] = readl (&dev->usb->setup4567);
+		
+		cpu_to_le32s (&u.raw [0]);
+		cpu_to_le32s (&u.raw [1]);
+
 		le16_to_cpus (&u.r.wValue);
 		le16_to_cpus (&u.r.wIndex);
 		le16_to_cpus (&u.r.wLength);

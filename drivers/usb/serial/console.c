@@ -76,9 +76,12 @@ static int __init usb_console_setup(struct console *co, char *options)
 		s = options;
 		while (*s >= '0' && *s <= '9')
 			s++;
-		if (*s)	parity = *s++;
-		if (*s)	bits   = *s++ - '0';
-		if (*s)	doflow = (*s++ == 'r');
+		if (*s)
+			parity = *s++;
+		if (*s)
+			bits   = *s++ - '0';
+		if (*s)
+			doflow = (*s++ == 'r');
 	}
 
 	/* build a cflag setting */

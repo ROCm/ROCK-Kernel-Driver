@@ -1355,8 +1355,10 @@ static struct usb_midi_device *parse_descriptor( struct usb_device *d, unsigned 
 		next = p2 + p2[0];
 		length -= p2[0];
 
-		if (p2[0] < 2 ) break;
-		if (p2[1] != USB_DT_CS_INTERFACE) break;
+		if (p2[0] < 2 )
+			break;
+		if (p2[1] != USB_DT_CS_INTERFACE)
+			break;
 		if (p2[2] == MIDI_IN_JACK && p2[0] >= 6 ) {
 			jack = p2[4];
 #ifdef HAVE_JACK_STRINGS
@@ -1366,7 +1368,8 @@ static struct usb_midi_device *parse_descriptor( struct usb_device *d, unsigned 
 			       jack, (p2[3] == EMBEDDED_JACK)?"EMBEDDED":"EXTERNAL" );
 		} else if ( p2[2] == MIDI_OUT_JACK && p2[0] >= 6) {
 			pins = p2[5];
-			if ( p2[0] < (6 + 2 * pins) ) continue;
+			if ( p2[0] < (6 + 2 * pins) )
+				continue;
 			jack = p2[4];
 #ifdef HAVE_JACK_STRINGS
 			jack2string[jack] = p2[5 + 2 * pins];
@@ -1375,9 +1378,11 @@ static struct usb_midi_device *parse_descriptor( struct usb_device *d, unsigned 
 			       jack, (p2[3] == EMBEDDED_JACK)?"EMBEDDED":"EXTERNAL", pins );
 		} else if ( p2[2] == ELEMENT_DESCRIPTOR  && p2[0]  >= 10) {
 			pins = p2[4];
-			if ( p2[0] < (9 + 2 * pins ) ) continue;
+			if ( p2[0] < (9 + 2 * pins ) )
+				continue;
 			nbytes = p2[8 + 2 * pins ];
-			if ( p2[0] < (10 + 2 * pins + nbytes) ) continue;
+			if ( p2[0] < (10 + 2 * pins + nbytes) )
+				continue;
 			longBits = 0L;
 			for ( offset = 0, shift = 0; offset < nbytes && offset < 8; offset ++, shift += 8) {
 				longBits |= ((long)(p2[9 + 2 * pins + offset])) << shift;
@@ -1408,7 +1413,8 @@ static struct usb_midi_device *parse_descriptor( struct usb_device *d, unsigned 
 			if ( p2 && next && ( p2 > next ) )
 				p2 = 0;
 
-			if ( p1[0] < 9 || !p2 || p2[0] < 4 ) continue;
+			if ( p1[0] < 9 || !p2 || p2[0] < 4 )
+				continue;
 
 			if ( (p1[2] & 0x80) == 0x80 ) {
 				if ( iep < 15 ) {
@@ -1417,7 +1423,8 @@ static struct usb_midi_device *parse_descriptor( struct usb_device *d, unsigned 
 						pins = 16;
 					u->in[iep].endpoint = p1[2];
 					u->in[iep].cableId = ( 1 << pins ) - 1;
-					if ( u->in[iep].cableId ) iep ++;
+					if ( u->in[iep].cableId )
+						iep ++;
 					if ( iep < 15 ) {
 						u->in[iep].endpoint = -1;
 						u->in[iep].cableId = -1;
@@ -1430,7 +1437,8 @@ static struct usb_midi_device *parse_descriptor( struct usb_device *d, unsigned 
 						pins = 16;
 					u->out[oep].endpoint = p1[2];
 					u->out[oep].cableId = ( 1 << pins ) - 1;
-					if ( u->out[oep].cableId ) oep ++;
+					if ( u->out[oep].cableId )
+						oep ++;
 					if ( oep < 15 ) {
 						u->out[oep].endpoint = -1;
 						u->out[oep].cableId = -1;
@@ -1446,7 +1454,8 @@ static struct usb_midi_device *parse_descriptor( struct usb_device *d, unsigned 
 			next = find_descriptor(buffer, bufSize, p1, USB_DT_ENDPOINT,
 					       ifnum, altSetting ); 
 	
-			if ( p1[0] < 7 ) continue;
+			if ( p1[0] < 7 )
+				continue;
 
 			if ( (p1[2] & 0x80) == 0x80 ) {
 				if ( iep < 15 ) {
@@ -1455,7 +1464,8 @@ static struct usb_midi_device *parse_descriptor( struct usb_device *d, unsigned 
 						pins = 16;
 					u->in[iep].endpoint = p1[2];
 					u->in[iep].cableId = ( 1 << pins ) - 1;
-					if ( u->in[iep].cableId ) iep ++;
+					if ( u->in[iep].cableId )
+						iep ++;
 					if ( iep < 15 ) {
 						u->in[iep].endpoint = -1;
 						u->in[iep].cableId = -1;
@@ -1468,7 +1478,8 @@ static struct usb_midi_device *parse_descriptor( struct usb_device *d, unsigned 
 						pins = 16;
 					u->out[oep].endpoint = p1[2];
 					u->out[oep].cableId = ( 1 << pins ) - 1;
-					if ( u->out[oep].cableId ) oep ++;
+					if ( u->out[oep].cableId )
+						oep ++;
 					if ( oep < 15 ) {
 						u->out[oep].endpoint = -1;
 						u->out[oep].cableId = -1;
@@ -1486,7 +1497,7 @@ static struct usb_midi_device *parse_descriptor( struct usb_device *d, unsigned 
 	return u;
 
 error_end:
-	if ( u ) kfree(u);
+	kfree(u);
 	return NULL;
 }
 
@@ -1501,7 +1512,8 @@ static int on_bits( unsigned short v )
 	int ret=0;
 
 	for ( i=0 ; i<16 ; i++ ) {
-		if ( v & (1<<i) ) ret++;
+		if ( v & (1<<i) )
+			ret++;
 	}
 
 	return ret;
@@ -1578,7 +1590,8 @@ static int alloc_usb_midi_device( struct usb_device *d, struct usb_midi_state *s
 	if ( alt < 0 ) {
 		alt = get_alt_setting( d, u->interface );
 	}
-	if ( alt < 0 ) { return -ENXIO; }
+	if ( alt < 0 )
+		return -ENXIO;
 
 	/* Configure interface */
 	if ( usb_set_interface( d, u->interface, alt ) < 0 ) {
@@ -1596,7 +1609,8 @@ static int alloc_usb_midi_device( struct usb_device *d, struct usb_midi_state *s
 	       && u->in[inEndpoints].cableId >= 0 ) {
 		inDevs += on_bits((unsigned short)u->in[inEndpoints].cableId);
 		mins[inEndpoints] = alloc_midi_in_endpoint( d, u->in[inEndpoints].endpoint );
-		if ( mins[inEndpoints] == NULL ) { goto error_end; }
+		if ( mins[inEndpoints] == NULL )
+			goto error_end;
 		inEndpoints++;
 	}
 
@@ -1605,7 +1619,8 @@ static int alloc_usb_midi_device( struct usb_device *d, struct usb_midi_state *s
 	       && u->out[outEndpoints].cableId >= 0 ) {
 		outDevs += on_bits((unsigned short)u->out[outEndpoints].cableId);
 		mouts[outEndpoints] = alloc_midi_out_endpoint( d, u->out[outEndpoints].endpoint );
-		if ( mouts[outEndpoints] == NULL ) { goto error_end; }
+		if ( mouts[outEndpoints] == NULL )
+			goto error_end;
 		outEndpoints++;
 	}
 
@@ -1707,7 +1722,8 @@ static int alloc_usb_midi_device( struct usb_device *d, struct usb_midi_state *s
 		mout = mouts[outEndpoint];
 
 		mdevs[i] = allocMidiDev( s, min, mout, inCableId, outCableId );
-		if ( mdevs[i] == NULL ) { goto error_end; }
+		if ( mdevs[i] == NULL )
+			goto error_end;
 
 	}
 
@@ -1962,11 +1978,15 @@ static int detect_by_hand(struct usb_device *d, unsigned int ifnum, struct usb_m
 		return -EINVAL;
 	}
 
-	if ( ualt < 0 ) { ualt = -1; }
+	if ( ualt < 0 )
+		ualt = -1;
 
-	if ( umin   < 0 || umin   > 15 ) { umin   = 0x01 | USB_DIR_IN; }
-	if ( umout  < 0 || umout  > 15 ) { umout  = 0x01; }
-	if ( ucable < 0 || ucable > 15 ) { ucable = 0; }
+	if ( umin   < 0 || umin   > 15 )
+		umin   = 0x01 | USB_DIR_IN;
+	if ( umout  < 0 || umout  > 15 )
+		umout  = 0x01;
+	if ( ucable < 0 || ucable > 15 )
+		ucable = 0;
 
 	u.deviceName = 0; /* A flag for alloc_usb_midi_device to get device name
 			     from device. */

@@ -35,9 +35,8 @@ menuconfig USB_GADGET
 #
 # USB Peripheral Controller Support
 #
-# FIXME convert to tristate choice when "choice" behaves as specified
-#
-comment "USB Peripheral Controller Support"
+choice
+	prompt "USB Peripheral Controller Support"
 	depends on USB_GADGET
 
 config USB_NET2280
@@ -55,19 +54,17 @@ config USB_NET2280
 	   dynamically linked module called "net2280" and force all
 	   gadget drivers to also be dynamically linked.
 
+endchoice
+
 #
 # USB Gadget Drivers
 #
-# FIXME only one of these may be statically linked; choice/endchoice.
-#
-comment "USB Gadget Drivers"
+choice
+	prompt "USB Gadget Drivers"
 	depends on USB_GADGET
+	default USB_ETH
 
-# FIXME want better dependency/config approach for drivers.  with only
-# two knobs to tweak (driver y/m/n, and a hardware symbol) there's no
-# good excuse for Kconfig to cause such trouble here.  there are clear
-# bugs (coredumps, multiple choices enabled, and more) in its (boolean)
-# "choice" logic too ...
+# FIXME want a cleaner dependency/config approach for drivers.
 
 config USB_ZERO
 	tristate "Gadget Zero (DEVELOPMENT)"
@@ -149,5 +146,7 @@ config USB_ETH_SA1100
 	bool
 	depends on USB_ETH && USB_SA1100
 	default y
+
+endchoice
 
 # endmenuconfig

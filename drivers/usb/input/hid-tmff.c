@@ -112,7 +112,8 @@ int hid_tmff_init(struct hid_device *hid)
 	struct list_head *pos;
 
 	private = kmalloc(sizeof(struct tmff_device), GFP_KERNEL);
-	if (!private) return -ENOMEM;
+	if (!private)
+		return -ENOMEM;
 
 	memset(private, 0, sizeof(struct tmff_device));
 	hid->ff_private = private;

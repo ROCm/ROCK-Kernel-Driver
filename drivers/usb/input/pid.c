@@ -117,7 +117,8 @@ static int hid_pid_erase(struct input_dev *dev, int id)
 	unsigned wanted_report = HID_UP_PID | FF_PID_USAGE_BLOCK_FREE;  /*  PID Block Free Report */
 	int ret;
 
-	if (!CHECK_OWNERSHIP(id, pid)) return -EACCES;
+	if (!CHECK_OWNERSHIP(id, pid))
+		return -EACCES;
 
 	/* Find report */
 	ret =  hid_find_report_by_usage(hid, wanted_report, &report, HID_OUTPUT_REPORT);
@@ -214,7 +215,8 @@ static int hid_pid_upload_effect(struct input_dev *dev,
 	}
 	else {
 		/* We want to update an effect */
-		if (!CHECK_OWNERSHIP(effect->id, pid_private)) return -EACCES;
+		if (!CHECK_OWNERSHIP(effect->id, pid_private))
+			return -EACCES;
 
 		/* Parameter type cannot be updated */
 		if (effect->type != pid_private->effects[effect->id].effect.type)

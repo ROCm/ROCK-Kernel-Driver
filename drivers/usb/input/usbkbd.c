@@ -137,7 +137,8 @@ int usb_kbd_event(struct input_dev *dev, unsigned int type, unsigned int code, i
 {
 	struct usb_kbd *kbd = dev->private;
 
-	if (type != EV_LED) return -1;
+	if (type != EV_LED)
+		return -1;
 
 
 	kbd->newleds = (!!test_bit(LED_KANA,    dev->led) << 3) | (!!test_bit(LED_COMPOSE, dev->led) << 3) |

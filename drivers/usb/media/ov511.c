@@ -876,15 +876,18 @@ ov518_i2c_write_internal(struct usb_ov511 *ov,
 
 	/* Select camera register */
 	rc = reg_w(ov, R51x_I2C_SADDR_3, reg);
-	if (rc < 0) return rc;
+	if (rc < 0)
+		return rc;
 
 	/* Write "value" to I2C data port of OV511 */
 	rc = reg_w(ov, R51x_I2C_DATA, value);
-	if (rc < 0) return rc;
+	if (rc < 0)
+		return rc;
 
 	/* Initiate 3-byte write cycle */
 	rc = reg_w(ov, R518_I2C_CTL, 0x01);
-	if (rc < 0) return rc;
+	if (rc < 0)
+		return rc;
 
 	return 0;
 }
@@ -903,33 +906,43 @@ ov511_i2c_write_internal(struct usb_ov511 *ov,
 	for (retries = OV511_I2C_RETRIES; ; ) {
 		/* Select camera register */
 		rc = reg_w(ov, R51x_I2C_SADDR_3, reg);
-		if (rc < 0) return rc;
+		if (rc < 0)
+			break;
 
 		/* Write "value" to I2C data port of OV511 */
 		rc = reg_w(ov, R51x_I2C_DATA, value);
-		if (rc < 0) return rc;
+		if (rc < 0)
+			break;
 
 		/* Initiate 3-byte write cycle */
 		rc = reg_w(ov, R511_I2C_CTL, 0x01);
-		if (rc < 0) return rc;
-
-		do rc = reg_r(ov, R511_I2C_CTL);
-		while (rc > 0 && ((rc&1) == 0)); /* Retry until idle */
-		if (rc < 0) return rc;
-
-		if ((rc&2) == 0) /* Ack? */
+		if (rc < 0)
 			break;
+
+		/* Retry until idle */
+		do
+			rc = reg_r(ov, R511_I2C_CTL);
+		while (rc > 0 && ((rc&1) == 0)); 
+		if (rc < 0)
+			break;
+
+		/* Ack? */
+		if ((rc&2) == 0) {
+			rc = 0;
+			break;
+		}
 #if 0
 		/* I2C abort */
 		reg_w(ov, R511_I2C_CTL, 0x10);
 #endif
 		if (--retries < 0) {
 			err("i2c write retries exhausted");
-			return -1;
+			rc = -1;
+			break;
 		}
 	}
 
-	return 0;
+	return rc;
 }
 
 /* NOTE: Do not call this function directly!
@@ -944,15 +957,18 @@ ov518_i2c_read_internal(struct usb_ov511 *ov, unsigned char reg)
 
 	/* Select camera register */
 	rc = reg_w(ov, R51x_I2C_SADDR_2, reg);
-	if (rc < 0) return rc;
+	if (rc < 0)
+		return rc;
 
 	/* Initiate 2-byte write cycle */
 	rc = reg_w(ov, R518_I2C_CTL, 0x03);
-	if (rc < 0) return rc;
+	if (rc < 0)
+		return rc;
 
 	/* Initiate 2-byte read cycle */
 	rc = reg_w(ov, R518_I2C_CTL, 0x05);
-	if (rc < 0) return rc;
+	if (rc < 0)
+		return rc;
 
 	value = reg_r(ov, R51x_I2C_DATA);
 
@@ -972,15 +988,20 @@ ov511_i2c_read_internal(struct usb_ov511 *ov, unsigned char reg)
 	for (retries = OV511_I2C_RETRIES; ; ) {
 		/* Select camera register */
 		rc = reg_w(ov, R51x_I2C_SADDR_2, reg);
-		if (rc < 0) return rc;
+		if (rc < 0)
+			return rc;
 
 		/* Initiate 2-byte write cycle */
 		rc = reg_w(ov, R511_I2C_CTL, 0x03);
-		if (rc < 0) return rc;
+		if (rc < 0)
+			return rc;
 
-		do rc = reg_r(ov, R511_I2C_CTL);
-		while (rc > 0 && ((rc&1) == 0)); /* Retry until idle */
-		if (rc < 0) return rc;
+		/* Retry until idle */
+		do
+			 rc = reg_r(ov, R511_I2C_CTL);
+		while (rc > 0 && ((rc&1) == 0));
+		if (rc < 0)
+			return rc;
 
 		if ((rc&2) == 0) /* Ack? */
 			break;
@@ -998,18 +1019,23 @@ ov511_i2c_read_internal(struct usb_ov511 *ov, unsigned char reg)
 	for (retries = OV511_I2C_RETRIES; ; ) {
 		/* Initiate 2-byte read cycle */
 		rc = reg_w(ov, R511_I2C_CTL, 0x05);
-		if (rc < 0) return rc;
+		if (rc < 0)
+			return rc;
 
-		do rc = reg_r(ov, R511_I2C_CTL);
-		while (rc > 0 && ((rc&1) == 0)); /* Retry until idle */
-		if (rc < 0) return rc;
+		/* Retry until idle */
+		do
+			rc = reg_r(ov, R511_I2C_CTL);
+		while (rc > 0 && ((rc&1) == 0));
+		if (rc < 0)
+			return rc;
 
 		if ((rc&2) == 0) /* Ack? */
 			break;
 
 		/* I2C abort */
 		rc = reg_w(ov, R511_I2C_CTL, 0x10);
-		if (rc < 0) return rc;
+		if (rc < 0)
+			return rc;
 
 		if (--retries < 0) {
 			err("i2c read retries exhausted");
@@ -1127,10 +1153,12 @@ i2c_set_slave_internal(struct usb_ov511 *ov, unsigned char slave)
 	int rc;
 
 	rc = reg_w(ov, R51x_I2C_W_SID, slave);
-	if (rc < 0) return rc;
+	if (rc < 0)
+		return rc;
 
 	rc = reg_w(ov, R51x_I2C_R_SID, slave + 1);
-	if (rc < 0) return rc;
+	if (rc < 0)
+		return rc;
 
 	return 0;
 }
@@ -1149,7 +1177,8 @@ i2c_w_slave(struct usb_ov511 *ov,
 
 	/* Set new slave IDs */
 	rc = i2c_set_slave_internal(ov, slave);
-	if (rc < 0) goto out;
+	if (rc < 0)
+		goto out;
 
 	rc = ov51x_i2c_write_mask_internal(ov, reg, value, mask);
 
@@ -1174,7 +1203,8 @@ i2c_r_slave(struct usb_ov511 *ov,
 
 	/* Set new slave IDs */
 	rc = i2c_set_slave_internal(ov, slave);
-	if (rc < 0) goto out;
+	if (rc < 0)
+		goto out;
 
 	if (ov->bclass == BCL_OV518)
 		rc = ov518_i2c_read_internal(ov, reg);
@@ -1199,12 +1229,11 @@ ov51x_set_slave_ids(struct usb_ov511 *ov, unsigned char sid)
 	down(&ov->i2c_lock);
 
 	rc = i2c_set_slave_internal(ov, sid);
-	if (rc < 0) goto out;
+	if (rc < 0)
+		goto out;
 
 	// FIXME: Is this actually necessary?
 	rc = ov51x_reset(ov, OV511_RESET_NOREGS);
-	if (rc < 0) goto out;
-
 out:
 	up(&ov->i2c_lock);
 	return rc;
@@ -1403,7 +1432,8 @@ init_ov_sensor(struct usb_ov511 *ov)
 	int i, success;
 
 	/* Reset the sensor */
-	if (i2c_w(ov, 0x12, 0x80) < 0) return -EIO;
+	if (i2c_w(ov, 0x12, 0x80) < 0)
+		return -EIO;
 
 	/* Wait for it to initialize */
 	schedule_timeout(1 + 150 * HZ / 1000);
@@ -1416,11 +1446,13 @@ init_ov_sensor(struct usb_ov511 *ov)
 		}
 
 		/* Reset the sensor */
-		if (i2c_w(ov, 0x12, 0x80) < 0) return -EIO;
+		if (i2c_w(ov, 0x12, 0x80) < 0)
+			return -EIO;
 		/* Wait for it to initialize */
 		schedule_timeout(1 + 150 * HZ / 1000);
 		/* Dummy read to sync I2C */
-		if (i2c_r(ov, 0x00) < 0) return -EIO;
+		if (i2c_r(ov, 0x00) < 0)
+			return -EIO;
 	}
 
 	if (!success)
@@ -1442,24 +1474,37 @@ ov511_set_packet_size(struct usb_ov511 *ov, int size)
 	mult = size >> 5;
 
 	if (ov->bridge == BRG_OV511) {
-		if (size == 0) alt = OV511_ALT_SIZE_0;
-		else if (size == 257) alt = OV511_ALT_SIZE_257;
-		else if (size == 513) alt = OV511_ALT_SIZE_513;
-		else if (size == 769) alt = OV511_ALT_SIZE_769;
-		else if (size == 993) alt = OV511_ALT_SIZE_993;
+		if (size == 0)
+			alt = OV511_ALT_SIZE_0;
+		else if (size == 257)
+			alt = OV511_ALT_SIZE_257;
+		else if (size == 513)
+			alt = OV511_ALT_SIZE_513;
+		else if (size == 769)
+			alt = OV511_ALT_SIZE_769;
+		else if (size == 993)
+			alt = OV511_ALT_SIZE_993;
 		else {
 			err("Set packet size: invalid size (%d)", size);
 			return -EINVAL;
 		}
 	} else if (ov->bridge == BRG_OV511PLUS) {
-		if (size == 0) alt = OV511PLUS_ALT_SIZE_0;
-		else if (size == 33) alt = OV511PLUS_ALT_SIZE_33;
-		else if (size == 129) alt = OV511PLUS_ALT_SIZE_129;
-		else if (size == 257) alt = OV511PLUS_ALT_SIZE_257;
-		else if (size == 385) alt = OV511PLUS_ALT_SIZE_385;
-		else if (size == 513) alt = OV511PLUS_ALT_SIZE_513;
-		else if (size == 769) alt = OV511PLUS_ALT_SIZE_769;
-		else if (size == 961) alt = OV511PLUS_ALT_SIZE_961;
+		if (size == 0)
+			alt = OV511PLUS_ALT_SIZE_0;
+		else if (size == 33)
+			alt = OV511PLUS_ALT_SIZE_33;
+		else if (size == 129)
+			alt = OV511PLUS_ALT_SIZE_129;
+		else if (size == 257)
+			alt = OV511PLUS_ALT_SIZE_257;
+		else if (size == 385)
+			alt = OV511PLUS_ALT_SIZE_385;
+		else if (size == 513)
+			alt = OV511PLUS_ALT_SIZE_513;
+		else if (size == 769)
+			alt = OV511PLUS_ALT_SIZE_769;
+		else if (size == 961)
+			alt = OV511PLUS_ALT_SIZE_961;
 		else {
 			err("Set packet size: invalid size (%d)", size);
 			return -EINVAL;
@@ -1502,14 +1547,22 @@ ov518_set_packet_size(struct usb_ov511 *ov, int size)
 		return -EIO;
 
 	if (ov->bclass == BCL_OV518) {
-		if (size == 0) alt = OV518_ALT_SIZE_0;
-		else if (size == 128) alt = OV518_ALT_SIZE_128;
-		else if (size == 256) alt = OV518_ALT_SIZE_256;
-		else if (size == 384) alt = OV518_ALT_SIZE_384;
-		else if (size == 512) alt = OV518_ALT_SIZE_512;
-		else if (size == 640) alt = OV518_ALT_SIZE_640;
-		else if (size == 768) alt = OV518_ALT_SIZE_768;
-		else if (size == 896) alt = OV518_ALT_SIZE_896;
+		if (size == 0)
+			alt = OV518_ALT_SIZE_0;
+		else if (size == 128)
+			alt = OV518_ALT_SIZE_128;
+		else if (size == 256)
+			alt = OV518_ALT_SIZE_256;
+		else if (size == 384)
+			alt = OV518_ALT_SIZE_384;
+		else if (size == 512)
+			alt = OV518_ALT_SIZE_512;
+		else if (size == 640)
+			alt = OV518_ALT_SIZE_640;
+		else if (size == 768)
+			alt = OV518_ALT_SIZE_768;
+		else if (size == 896)
+			alt = OV518_ALT_SIZE_896;
 		else {
 			err("Set packet size: invalid size (%d)", size);
 			return -EINVAL;
@@ -3939,28 +3992,40 @@ ov51x_init_isoc(struct usb_ov511 *ov)
 	ov->curframe = -1;
 
 	if (ov->bridge == BRG_OV511) {
-		if (cams == 1)				size = 993;
-		else if (cams == 2)			size = 513;
-		else if (cams == 3 || cams == 4)	size = 257;
+		if (cams == 1)
+			size = 993;
+		else if (cams == 2)
+			size = 513;
+		else if (cams == 3 || cams == 4)
+			size = 257;
 		else {
 			err("\"cams\" parameter too high!");
 			return -1;
 		}
 	} else if (ov->bridge == BRG_OV511PLUS) {
-		if (cams == 1)				size = 961;
-		else if (cams == 2)			size = 513;
-		else if (cams == 3 || cams == 4)	size = 257;
-		else if (cams >= 5 && cams <= 8)	size = 129;
-		else if (cams >= 9 && cams <= 31)	size = 33;
+		if (cams == 1)
+			size = 961;
+		else if (cams == 2)
+			size = 513;
+		else if (cams == 3 || cams == 4)
+			size = 257;
+		else if (cams >= 5 && cams <= 8)
+			size = 129;
+		else if (cams >= 9 && cams <= 31)
+			size = 33;
 		else {
 			err("\"cams\" parameter too high!");
 			return -1;
 		}
 	} else if (ov->bclass == BCL_OV518) {
-		if (cams == 1)				size = 896;
-		else if (cams == 2)			size = 512;
-		else if (cams == 3 || cams == 4)	size = 256;
-		else if (cams >= 5 && cams <= 8)	size = 128;
+		if (cams == 1)
+			size = 896;
+		else if (cams == 2)
+			size = 512;
+		else if (cams == 3 || cams == 4)
+			size = 256;
+		else if (cams >= 5 && cams <= 8)
+			size = 128;
 		else {
 			err("\"cams\" parameter too high!");
 			return -1;
@@ -5016,7 +5081,7 @@ ov51x_control_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	struct proc_dir_entry *pde = PDE(inode);
 	struct usb_ov511 *ov;
 	void *arg = (void *) ularg;
-	int rc;
+	int rc = 0;
 
 	if (!pde)
 		return -ENOENT;
@@ -5037,81 +5102,79 @@ ov51x_control_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 		PDEBUG(4, "Get interface version: %d", ver);
 		if (copy_to_user(arg, &ver, sizeof(ver)))
-			return -EFAULT;
-
-		return 0;
+			rc = -EFAULT;
+		break;
 	}
 	case OV511IOC_GUSHORT:
 	{
 		struct ov511_ushort_opt opt;
 
-		if (copy_from_user(&opt, arg, sizeof(opt)))
-			return -EFAULT;
+		if (copy_from_user(&opt, arg, sizeof(opt))) {
+			rc = -EFAULT;
+			break;
+		}
 
 		switch (opt.optnum) {
 		case OV511_USOPT_BRIGHT:
 			rc = sensor_get_brightness(ov, &(opt.val));
-			if (rc)	return rc;
 			break;
 		case OV511_USOPT_SAT:
 			rc = sensor_get_saturation(ov, &(opt.val));
-			if (rc)	return rc;
 			break;
 		case OV511_USOPT_HUE:
 			rc = sensor_get_hue(ov, &(opt.val));
-			if (rc)	return rc;
 			break;
 		case OV511_USOPT_CONTRAST:
 			rc = sensor_get_contrast(ov, &(opt.val));
-			if (rc)	return rc;
 			break;
 		default:
 			err("Invalid get short option number");
-			return -EINVAL;
+			rc = -EINVAL;
 		}
 
+		if (rc < 0)
+			break;
 		if (copy_to_user(arg, &opt, sizeof(opt)))
-			return -EFAULT;
-
-		return 0;
+			rc = -EFAULT;
+		break;
 	}
 	case OV511IOC_SUSHORT:
 	{
 		struct ov511_ushort_opt opt;
 
-		if (copy_from_user(&opt, arg, sizeof(opt)))
-			return -EFAULT;
+		if (copy_from_user(&opt, arg, sizeof(opt))) {
+			rc = -EFAULT;
+			break;
+		}
 
 		switch (opt.optnum) {
 		case OV511_USOPT_BRIGHT:
 			rc = sensor_set_brightness(ov, opt.val);
-			if (rc)	return rc;
 			break;
 		case OV511_USOPT_SAT:
 			rc = sensor_set_saturation(ov, opt.val);
-			if (rc)	return rc;
 			break;
 		case OV511_USOPT_HUE:
 			rc = sensor_set_hue(ov, opt.val);
-			if (rc)	return rc;
 			break;
 		case OV511_USOPT_CONTRAST:
 			rc = sensor_set_contrast(ov, opt.val);
-			if (rc)	return rc;
 			break;
 		default:
 			err("Invalid set short option number");
-			return -EINVAL;
+			rc = -EINVAL;
 		}
 
-		return 0;
+		break;
 	}
 	case OV511IOC_GUINT:
 	{
 		struct ov511_uint_opt opt;
 
-		if (copy_from_user(&opt, arg, sizeof(opt)))
-			return -EFAULT;
+		if (copy_from_user(&opt, arg, sizeof(opt))) {
+			rc = -EFAULT;
+			break;
+		}
 
 		switch (opt.optnum) {
 		case OV511_UIOPT_POWER_FREQ:
@@ -5131,29 +5194,31 @@ ov51x_control_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 			break;
 		default:
 			err("Invalid get int option number");
-			return -EINVAL;
+			rc = -EINVAL;
 		}
 
+		if (rc < 0)
+			break;
 		if (copy_to_user(arg, &opt, sizeof(opt)))
-			return -EFAULT;
+			rc = -EFAULT;
 
-		return 0;
+		break;
 	}
 	case OV511IOC_SUINT:
 	{
 		struct ov511_uint_opt opt;
 
-		if (copy_from_user(&opt, arg, sizeof(opt)))
-			return -EFAULT;
+		if (copy_from_user(&opt, arg, sizeof(opt))) {
+			rc = -EFAULT;
+			break;
+		}
 
 		switch (opt.optnum) {
 		case OV511_UIOPT_POWER_FREQ:
 			rc = sensor_set_light_freq(ov, opt.val);
-			if (rc)	return rc;
 			break;
 		case OV511_UIOPT_BFILTER:
 			rc = sensor_set_banding_filter(ov, opt.val);
-			if (rc)	return rc;
 			break;
 		case OV511_UIOPT_LED:
 			if (opt.val <= 2) {
@@ -5162,15 +5227,14 @@ ov51x_control_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 					ov51x_led_control(ov, 0);
 				else if (ov->led_policy == LED_ON)
 					ov51x_led_control(ov, 1);
-			} else {
-				return -EINVAL;
-			}
+			} else
+				rc = -EINVAL;
 			break;
 		case OV511_UIOPT_DEBUG:
 			if (opt.val <= 5)
 				debug = opt.val;
 			else
-				return -EINVAL;
+				rc = -EINVAL;
 			break;
 		case OV511_UIOPT_COMPRESS:
 			ov->compress = opt.val;
@@ -5183,43 +5247,48 @@ ov51x_control_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 			break;
 		default:
 			err("Invalid get int option number");
-			return -EINVAL;
+			rc = -EINVAL;
 		}
 
-		return 0;
+		break;
 	}
 	case OV511IOC_WI2C:
 	{
 		struct ov511_i2c_struct w;
 
-		if (copy_from_user(&w, arg, sizeof(w)))
-			return -EFAULT;
+		if (copy_from_user(&w, arg, sizeof(w))) {
+			rc = -EFAULT;
+			break;
+		}
 
-		return i2c_w_slave(ov, w.slave, w.reg, w.value,	w.mask);
+		rc = i2c_w_slave(ov, w.slave, w.reg, w.value, w.mask);
+		break;
 	}
 	case OV511IOC_RI2C:
 	{
 		struct ov511_i2c_struct r;
 
-		if (copy_from_user(&r, arg, sizeof(r)))
-			return -EFAULT;
+		if (copy_from_user(&r, arg, sizeof(r))) {
+			rc = -EFAULT;
+			break;
+		}
 
 		rc = i2c_r_slave(ov, r.slave, r.reg);
 		if (rc < 0)
-			return rc;
+			break;
 
 		r.value = rc;
 
 		if (copy_to_user(arg, &r, sizeof(r)))
-			return -EFAULT;
+			rc = -EFAULT;
 
-		return 0;
+		break;
 	}
 	default:
-		return -EINVAL;
+		rc = -EINVAL;
 	} /* end switch */
 
-	return 0;
+	return rc;
 }
 #endif
 
@@ -5358,7 +5427,8 @@ ov7xx0_configure(struct usb_ov511 *ov)
 		PDEBUG(1, "OV7xx0 sensor initalized (method 1)");
 	} else {
 		/* Reset the 76xx */
-		if (i2c_w(ov, 0x12, 0x80) < 0) return -1;
+		if (i2c_w(ov, 0x12, 0x80) < 0)
+			return -1;
 
 		/* Wait for it to initialize */
 		schedule_timeout(1 + 150 * HZ / 1000);
@@ -5822,7 +5892,8 @@ ov511_configure(struct usb_ov511 *ov)
 	if (ov->customid == 70)		/* USB Life TV (PAL/SECAM) */
 		ov->pal = 1;
 
-	if (write_regvals(ov, aRegvalsInit511)) goto error;
+	if (write_regvals(ov, aRegvalsInit511))
+		goto error;
 
 	if (ov->led_policy == LED_OFF || ov->led_policy == LED_AUTO)
 		ov51x_led_control(ov, 0);
@@ -5830,14 +5901,17 @@ ov511_configure(struct usb_ov511 *ov)
 	/* The OV511+ has undocumented bits in the flow control register.
 	 * Setting it to 0xff fixes the corruption with moving objects. */
 	if (ov->bridge == BRG_OV511) {
-		if (write_regvals(ov, aRegvalsNorm511)) goto error;
+		if (write_regvals(ov, aRegvalsNorm511))
+			goto error;
 	} else if (ov->bridge == BRG_OV511PLUS) {
-		if (write_regvals(ov, aRegvalsNorm511Plus)) goto error;
+		if (write_regvals(ov, aRegvalsNorm511Plus))
+			goto error;
 	} else {
 		err("Invalid bridge");
 	}
 
-	if (ov511_init_compression(ov)) goto error;
+	if (ov511_init_compression(ov))
+		goto error;
 
 	ov->packet_numbering = 1;
 	ov511_set_packet_size(ov, 0);
@@ -5975,10 +6049,12 @@ ov518_configure(struct usb_ov511 *ov)
 	/* Give it the default description */
 	ov->desc = symbolic(camlist, 0);
 
-	if (write_regvals(ov, aRegvalsInit518)) goto error;
+	if (write_regvals(ov, aRegvalsInit518))
+		goto error;
 
 	/* Set LED GPIO pin to output mode */
-	if (reg_w_mask(ov, 0x57, 0x00, 0x02) < 0) goto error;
+	if (reg_w_mask(ov, 0x57, 0x00, 0x02) < 0)
+		goto error;
 
 	/* LED is off by default with OV518; have to explicitly turn it on */
 	if (ov->led_policy == LED_OFF || ov->led_policy == LED_AUTO)
@@ -5994,16 +6070,20 @@ ov518_configure(struct usb_ov511 *ov)
 	}
 
 	if (ov->bridge == BRG_OV518) {
-		if (write_regvals(ov, aRegvalsNorm518)) goto error;
+		if (write_regvals(ov, aRegvalsNorm518))
+			goto error;
 	} else if (ov->bridge == BRG_OV518PLUS) {
-		if (write_regvals(ov, aRegvalsNorm518Plus)) goto error;
+		if (write_regvals(ov, aRegvalsNorm518Plus))
+			goto error;
 	} else {
 		err("Invalid bridge");
 	}
 
-	if (reg_w(ov, 0x2f, 0x80) < 0) goto error;
+	if (reg_w(ov, 0x2f, 0x80) < 0)
+		goto error;
 
-	if (ov518_init_compression(ov)) goto error;
+	if (ov518_init_compression(ov))
+		goto error;
 
 	if (ov->bridge == BRG_OV518)
 	{

@@ -90,6 +90,6 @@ config USB_PRINTER
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called printer. If you want to compile it as a
+	  The module will be called usblp. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
