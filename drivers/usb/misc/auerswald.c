@@ -2181,6 +2181,7 @@ static void __exit auerswald_cleanup (void)
 
 MODULE_AUTHOR (DRIVER_AUTHOR);
 MODULE_DESCRIPTION (DRIVER_DESC);
+MODULE_LICENSE ("GPL");
 
 module_init (auerswald_init);
 module_exit (auerswald_cleanup);
