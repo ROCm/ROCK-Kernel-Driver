@@ -14,6 +14,7 @@
 #include <linux/sys.h>
 #include <linux/linkage.h>
 #include <linux/config.h>
+#include <asm/asm-offsets.h>
 #include <asm/thread_info.h>
 #include <asm/unistd.h>
 
