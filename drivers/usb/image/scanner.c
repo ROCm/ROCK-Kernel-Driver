@@ -1,7 +1,7 @@
 /* -*- linux-c -*- */
 
 /* 
- * Driver for USB Scanners (linux-2.4.18)
+ * Driver for USB Scanners (linux-2.5.52)
  *
  * Copyright (C) 1999, 2000, 2001, 2002 David E. Nelson
  *
@@ -313,6 +313,19 @@
  *    - Changed maintainership from David E. Nelson to Brian
  *      Beattie <beattie@beattie-home.net>.
  *
+ * 0.4.9  12/19/2002
+ *    - Added vendor/product ids for Nikon, Mustek, Plustek, Genius, Epson,
+ *      Canon, Umax, Hewlett-Packard, Benq, Agfa, Minolta scanners.
+ *      Thanks to Dieter Faulbaum <faulbaum@mail.bessy.de>, Stian Jordet
+ *      <liste@jordet.nu>, "Yann E. MORIN" <yann.morin.1998@anciens.enib.fr>,
+ *      "Jaeger, Gerhard" <gerhard@gjaeger.de>, Ira Childress 
+ *      <ichildress@mn.rr.com>, Till Kamppeter <till.kamppeter@gmx.net>,
+ *      Ed Hamrick <EdHamrick@aol.com>, Oliver Schwartz
+ *	<Oliver.Schwartz@gmx.de> and everyone else who sent ids.
+ *    - Some Benq, Genius and Plustek ids are identified now.
+ *    - Accept scanners with only one bulk (in) endpoint (thanks to Sergey
+ *      Vlasov <vsu@mivlgu.murom.ru>).
+ *
  * TODO
  *    - Remove the 2/3 endpoint limitation
  *    - Performance
@@ -501,6 +514,12 @@ write_scanner(struct file * file, const char * buffer,
 	scn = file->private_data;
 
 	down(&(scn->sem));
+
+	if (!scn->bulk_out_ep) {
+		/* This scanner does not have a bulk-out endpoint */
+		up(&(scn->sem));
+		return -EINVAL;
+	}
 
 	scn_minor = scn->scn_minor;
 
@@ -896,15 +915,15 @@ probe_scanner(struct usb_interface *intf,
 	interface = intf->altsetting;
 
 /*
- * Start checking for two bulk endpoints OR two bulk endpoints *and* one
+ * Start checking for one or two bulk endpoints and an optional
  * interrupt endpoint. If we have an interrupt endpoint go ahead and
  * setup the handler. FIXME: This is a future enhancement...
  */
 
 	dbg("probe_scanner: Number of Endpoints:%d", (int) interface->desc.bNumEndpoints);
 
-	if ((interface->desc.bNumEndpoints != 2) && (interface->desc.bNumEndpoints != 3)) {
-		info("probe_scanner: Only two or three endpoints supported.");
+	if ((interface->desc.bNumEndpoints < 1) || (interface->desc.bNumEndpoints > 3)) {
+		info("probe_scanner: Only 1, 2, or 3 endpoints supported.");
 		return -ENODEV;
 	}
 
@@ -944,6 +963,12 @@ probe_scanner(struct usb_interface *intf,
  */
 
 	switch(interface->desc.bNumEndpoints) {
+	case 1:
+		if (!have_bulk_in) {
+			info("probe_scanner: One bulk-in endpoint required.");
+			return -EIO;
+		}
+		break;
 	case 2:
 		if (!have_bulk_in || !have_bulk_out) {
 			info("probe_scanner: Two bulk endpoints required.");
