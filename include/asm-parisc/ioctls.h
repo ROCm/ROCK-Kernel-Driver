@@ -69,6 +69,10 @@
 #define TIOCSHAYESESP   0x545F  /* Set Hayes ESP configuration */
 #define FIOQSIZE	0x5460	/* Get exact space used by quota */
 
+#define TIOCSTART	0x5461
+#define TIOCSTOP	0x5462
+#define TIOCSLTC	0x5462
+
 /* Used for packet mode */
 #define TIOCPKT_DATA		 0
 #define TIOCPKT_FLUSHREAD	 1

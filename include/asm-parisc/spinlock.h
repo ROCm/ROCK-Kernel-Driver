@@ -3,23 +3,35 @@
 
 #include <asm/system.h>
 
-/* we seem to be the only architecture that uses 0 to mean locked - but we
- * have to.  prumpf */
+/* Note that PA-RISC has to use `1' to mean unlocked and `0' to mean locked
+ * since it only has load-and-zero.
+ */
 
 #undef SPIN_LOCK_UNLOCKED
 #define SPIN_LOCK_UNLOCKED (spinlock_t) { 1 }
 
 #define spin_lock_init(x)	do { (x)->lock = 1; } while(0)
 
-#define spin_unlock_wait(x)	do { barrier(); } while(((volatile spinlock_t *)(x))->lock == 1)
+#define spin_is_locked(x) ((x)->lock == 0)
 
-#define spin_lock(x) \
+#define spin_unlock_wait(x)	do { barrier(); } while(((volatile spinlock_t *)(x))->lock == 0)
+
+#if 1
+#define _raw_spin_lock(x) do { \
+	while (__ldcw (&(x)->lock) == 0) \
+		while (((x)->lock) == 0) ; } while (0)
+
+#else
+#define _raw_spin_lock(x) \
 	do { while(__ldcw(&(x)->lock) == 0); } while(0)
+#endif
 	
-#define spin_unlock(x) \
+#define _raw_spin_unlock(x) \
 	do { (x)->lock = 1; } while(0)
 
-#define spin_trylock(x) (__ldcw(&(x)->lock) == 1)
+#define _raw_spin_trylock(x) (__ldcw(&(x)->lock) != 0)
+
+
 
 /*
  * Read-write spinlocks, allowing multiple readers
@@ -30,29 +42,37 @@ typedef struct {
 	volatile int counter;
 } rwlock_t;
 
-#define RW_LOCK_UNLOCKED (rwlock_t) { SPIN_LOCK_UNLOCKED, 0 }
+#define RW_LOCK_UNLOCKED (rwlock_t) { {1}, 0 }
+
+#define rwlock_init(lp)	do { *(lp) = RW_LOCK_UNLOCKED; } while (0)
+
+#define rwlock_is_locked(lp) ((lp)->counter != 0)
 
 /* read_lock, read_unlock are pretty straightforward.  Of course it somehow
  * sucks we end up saving/restoring flags twice for read_lock_irqsave aso. */
 
-static inline void read_lock(rwlock_t *rw)
+static  __inline__ void _raw_read_lock(rwlock_t *rw)
 {
 	unsigned long flags;
-	spin_lock_irqsave(&rw->lock, flags);
+	local_irq_save(flags);
+	_raw_spin_lock(&rw->lock); 
 
 	rw->counter++;
 
-	spin_unlock_irqrestore(&rw->lock, flags);
+	_raw_spin_unlock(&rw->lock);
+	local_irq_restore(flags);
 }
 
-static inline void read_unlock(rwlock_t *rw)
+static  __inline__ void _raw_read_unlock(rwlock_t *rw)
 {
 	unsigned long flags;
-	spin_lock_irqsave(&rw->lock, flags);
+	local_irq_save(flags);
+	_raw_spin_lock(&rw->lock); 
 
 	rw->counter--;
 
-	spin_unlock_irqrestore(&rw->lock, flags);
+	_raw_spin_unlock(&rw->lock);
+	local_irq_restore(flags);
 }
 
 /* write_lock is less trivial.  We optimistically grab the lock and check
@@ -64,14 +84,14 @@ static inline void read_unlock(rwlock_t *rw)
  * writers) in interrupt handlers someone fucked up and we'd dead-lock
  * sooner or later anyway.   prumpf */
 
-static inline void write_lock(rwlock_t *rw)
+static  __inline__ void _raw_write_lock(rwlock_t *rw)
 {
 retry:
-	spin_lock(&rw->lock);
+	_raw_spin_lock(&rw->lock);
 
 	if(rw->counter != 0) {
 		/* this basically never happens */
-		spin_unlock(&rw->lock);
+		_raw_spin_unlock(&rw->lock);
 
 		while(rw->counter != 0);
 
@@ -79,13 +99,25 @@ retry:
 	}
 
 	/* got it.  now leave without unlocking */
+	rw->counter = -1; /* remember we are locked */
 }
 
 /* write_unlock is absolutely trivial - we don't have to wait for anything */
 
-static inline void write_unlock(rwlock_t *rw)
+static  __inline__ void _raw_write_unlock(rwlock_t *rw)
 {
-	spin_unlock(&rw->lock);
+	rw->counter = 0;
+	_raw_spin_unlock(&rw->lock);
+}
+
+static __inline__ int is_read_locked(rwlock_t *rw)
+{
+	return rw->counter > 0;
+}
+
+static __inline__ int is_write_locked(rwlock_t *rw)
+{
+	return rw->counter < 0;
 }
 
 #endif /* __ASM_SPINLOCK_H */

@@ -13,11 +13,17 @@
 
 struct msqid64_ds {
 	struct ipc64_perm msg_perm;
+#ifndef __LP64__
 	unsigned int   __pad1;
+#endif
 	__kernel_time_t msg_stime;	/* last msgsnd time */
+#ifndef __LP64__
 	unsigned int   __pad2;
+#endif
 	__kernel_time_t msg_rtime;	/* last msgrcv time */
+#ifndef __LP64__
 	unsigned int   __pad3;
+#endif
 	__kernel_time_t msg_ctime;	/* last change time */
 	unsigned int  msg_cbytes;	/* current number of bytes on queue */
 	unsigned int  msg_qnum;	/* number of messages in queue */

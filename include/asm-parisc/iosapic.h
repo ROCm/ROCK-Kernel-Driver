@@ -15,7 +15,7 @@
 ** fixup_irq is to initialize PCI IRQ line support and
 ** virtualize pcidev->irq value. To be called by pci_fixup_bus().
 */
-extern void *iosapic_register(void *hpa);
+extern void *iosapic_register(unsigned long hpa);
 extern int iosapic_fixup_irq(void *obj, struct pci_dev *pcidev);
 
 

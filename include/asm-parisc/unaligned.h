@@ -17,4 +17,11 @@
      memmove((ptr), &__tmp, sizeof(*(ptr)));		\
      (void)0; })
 
-#endif /* _ASM_PARISC_UNALIGNED_H */
+
+#ifdef __KERNEL__
+struct pt_regs;
+void handle_unaligned(struct pt_regs *regs);
+int check_unaligned(struct pt_regs *regs);
+#endif
+
+#endif /* _ASM_PARISC_UNALIGNED_H_ */
