@@ -1323,23 +1323,28 @@ static int i810fb_blank (int blank_mode, struct fb_info *info)
 	
 	pwr = i810_readl(PWR_CLKC, mmio);
 
-	switch(blank_mode) {
-	case VESA_NO_BLANKING:
+	switch (blank_mode) {
+	case FB_BLANK_UNBLANK:
 		mode = POWERON;
 		pwr |= 1;
 		scr_off = ON;
 		break;
-	case VESA_VSYNC_SUSPEND:
+	case FB_BLANK_NORMAL:
+		mode = POWERON;
+		pwr |= 1;
+		scr_off = OFF;
+		break;
+	case FB_BLANK_VSYNC_SUSPEND:
 		mode = STANDBY;
 		pwr |= 1;
 		scr_off = OFF;
 		break;
-	case VESA_HSYNC_SUSPEND:
+	case FB_BLANK_HSYNC_SUSPEND:
 		mode = SUSPEND;
 		pwr |= 1;
 		scr_off = OFF;
 		break;
-	case VESA_POWERDOWN:
+	case FB_BLANK_POWERDOWN:
 		mode = POWERDOWN;
 		pwr &= ~1;
 		scr_off = OFF;
@@ -1347,9 +1352,11 @@ static int i810fb_blank (int blank_mode, struct fb_info *info)
 	default:
 		return -EINVAL; 
 	}
+
 	i810_screen_off(mmio, scr_off);
 	i810_writel(HVSYNC, mmio, mode);
 	i810_writel(PWR_CLKC, mmio, pwr);
+
 	return 0;
 }
 

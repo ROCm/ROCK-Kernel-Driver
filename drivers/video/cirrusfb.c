@@ -1727,7 +1727,8 @@ int cirrusfb_blank (int blank_mode, struct fb_info *info)
 	}
 
 	/* Undo current */
-	if (current_mode != VESA_NO_BLANKING) {
+	if (current_mode == FB_BLANK_NORMAL ||
+	    current_mode == FB_BLANK_UNBLANK) {
 		/* unblank the screen */
 		val = vga_rseq (cinfo->regbase, VGA_SEQ_CLOCK_MODE);
 		vga_wseq (cinfo->regbase, VGA_SEQ_CLOCK_MODE, val & 0xdf);	/* clear "FullBandwidth" bit */
@@ -1736,22 +1737,23 @@ int cirrusfb_blank (int blank_mode, struct fb_info *info)
 	}
 
 	/* set new */
-	if(blank_mode != VESA_NO_BLANKING) {
+	if(blank_mode > FB_BLANK_NORMAL) {
 		/* blank the screen */
 		val = vga_rseq (cinfo->regbase, VGA_SEQ_CLOCK_MODE);
 		vga_wseq (cinfo->regbase, VGA_SEQ_CLOCK_MODE, val | 0x20);	/* set "FullBandwidth" bit */
 	}
 
 	switch (blank_mode) {
-	case VESA_NO_BLANKING:
+	case FB_BLANK_UNBLANK:
+	case FB_BLANK_NORMAL:
 		break;
-	case VESA_VSYNC_SUSPEND:
+	case FB_BLANK_VSYNC_SUSPEND:
 		vga_wgfx (cinfo->regbase, CL_GRE, 0x04);
 		break;
-	case VESA_HSYNC_SUSPEND:
+	case FB_BLANK_HSYNC_SUSPEND:
 		vga_wgfx (cinfo->regbase, CL_GRE, 0x02);
 		break;
-	case VESA_POWERDOWN:
+	case FB_BLANK_POWERDOWN:
 		vga_wgfx (cinfo->regbase, CL_GRE, 0x06);
 		break;
 	default:
@@ -1761,7 +1763,9 @@ int cirrusfb_blank (int blank_mode, struct fb_info *info)
 
 	cinfo->blank_mode = blank_mode;
 	DPRINTK ("EXIT, returning 0\n");
-	return 0;
+
+	/* Let fbcon do a soft blank for us */
+	return (blank_mode == FB_BLANK_NORMAL) ? 1 : 0;
 }
 /**** END   Hardware specific Routines **************************************/
 /****************************************************************************/
