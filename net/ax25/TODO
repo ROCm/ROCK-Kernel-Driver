@@ -1,25 +1,13 @@
-af_ax25.c:ax25_connect:
-
-	There is a race with changing the socket state here which should be
-	fixed by introduction of proper socket locking:
-
-        if (sk->state != TCP_ESTABLISHED) {
-                /* Not in ABM, not in WAIT_UA -> failed */
-                sock->state = SS_UNCONNECTED;
-                return sock_error(sk);  /* Always set at this point */
-        }
-
 Do the ax25_list_lock, ax25_dev_lock, linkfail_lockreally, ax25_frag_lock and
-listen_lock have to be interrupt safe?
+listen_lock have to be bh-safe?
+
+Do the netrom and rose locks have to be bh-safe?
 
 A device might be deleted after lookup in the SIOCADDRT ioctl but before it's
 being used.
 
-Routes to a device begin taken down might be deleted by ax25_rt_device_down
-but added by somebody else before the device has been deleted.
-
-Introduce a clear locking strategy.  What I've put there is simply an evil
-hack to get the code to survive.
+Routes to a device being taken down might be deleted by ax25_rt_device_down
+but added by somebody else before the device has been deleted fully.
 
 Massive amounts of lock_kernel / unlock_kernel are just a temporary solution to
 get around the removal of SOCKOPS_WRAP.  A serious locking strategy has to be
