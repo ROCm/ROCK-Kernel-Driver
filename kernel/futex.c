@@ -276,7 +276,7 @@ static int futex_fd(struct list_head *head,
 	filp->f_dentry = dget(futex_mnt->mnt_root);
 
 	if (signal) {
-		filp->f_owner.pid = current->pid;
+		filp->f_owner.pid = current->tgid;
 		filp->f_owner.uid = current->uid;
 		filp->f_owner.euid = current->euid;
 		filp->f_owner.signum = signal;
