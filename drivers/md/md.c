@@ -106,7 +106,6 @@ static ctl_table raid_root_table[] = {
  * subsystems want to have a pre-defined structure
  */
 struct hd_struct md_hd_struct[MAX_MD_DEVS];
-static int md_maxreadahead[MAX_MD_DEVS];
 static mdk_thread_t *md_recovery_thread;
 
 int md_size[MAX_MD_DEVS];
@@ -1579,7 +1578,6 @@ static int device_size_calculation(mddev_t * mddev)
 		if (sb->level == -3)
 			readahead = 0;
 	}
-	md_maxreadahead[mdidx(mddev)] = readahead;
 
 	printk(KERN_INFO "md%d: max total readahead window set to %ldk\n",
 		mdidx(mddev), readahead*(PAGE_SIZE/1024));
@@ -3614,7 +3612,6 @@ static void md_geninit(void)
 
 	for(i = 0; i < MAX_MD_DEVS; i++) {
 		md_size[i] = 0;
-		md_maxreadahead[i] = 32;
 	}
 	blk_size[MAJOR_NR] = md_size;
 
