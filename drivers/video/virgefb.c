@@ -1752,7 +1752,7 @@ int __init virgefb_init(void)
 
 	} else {
 
-		/* board running in Z3 space. Seperate video memory (3 apertures)
+		/* board running in Z3 space. Separate video memory (3 apertures)
 		   and S3 register set */
 
 		on_zorro2 = 0;

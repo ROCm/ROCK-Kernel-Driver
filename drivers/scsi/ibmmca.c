@@ -1157,7 +1157,7 @@ static void check_devices(int host_index, int adaptertype)
 	if (adaptertype == IBM_SCSI2_FW) {	/* F/W SCSI adapter: */
 		/* F/W adapter PUN-space extension evaluation: */
 		if (num_bus) {
-			printk(KERN_INFO "IBM MCA SCSI: Seperate bus mode (wide-addressing enabled)\n");
+			printk(KERN_INFO "IBM MCA SCSI: Separate bus mode (wide-addressing enabled)\n");
 			subsystem_maxid(host_index) = 16;
 		} else {
 			printk(KERN_INFO "IBM MCA SCSI: Combined bus mode (wide-addressing disabled)\n");

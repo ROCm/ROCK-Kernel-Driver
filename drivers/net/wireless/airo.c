@@ -5816,7 +5816,7 @@ static int airo_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 			break;
 		}
 
-		/* Seperate R/W functions bracket legality here
+		/* Separate R/W functions bracket legality here
 		 */
 		if ( com.command <= AIROGMICSTATS )
 			rc = readrids(dev,&com);
