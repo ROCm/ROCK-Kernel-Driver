@@ -40,93 +40,93 @@ void _outl(u32 b, unsigned long addr)
 	__outl(b, addr);
 }
 
-u8 ___raw_readb(unsigned long addr)
+u8 ___raw_readb(const volatile void __iomem *addr)
 {
 	return __readb(addr);
 }
 
-u16 ___raw_readw(unsigned long addr)
+u16 ___raw_readw(const volatile void __iomem *addr)
 {
 	return __readw(addr);
 }
 
-u32 ___raw_readl(unsigned long addr)
+u32 ___raw_readl(const volatile void __iomem *addr)
 {
 	return __readl(addr);
 }
 
-u64 ___raw_readq(unsigned long addr)
+u64 ___raw_readq(const volatile void __iomem *addr)
 {
 	return __readq(addr);
 }
 
-u8 _readb(unsigned long addr)
+u8 _readb(const volatile void __iomem *addr)
 {
 	unsigned long r = __readb(addr);
 	mb();
 	return r;
 }
 
-u16 _readw(unsigned long addr)
+u16 _readw(const volatile void __iomem *addr)
 {
 	unsigned long r = __readw(addr);
 	mb();
 	return r;
 }
 
-u32 _readl(unsigned long addr)
+u32 _readl(const volatile void __iomem *addr)
 {
 	unsigned long r = __readl(addr);
 	mb();
 	return r;
 }
 
-u64 _readq(unsigned long addr)
+u64 _readq(const volatile void __iomem *addr)
 {
 	unsigned long r = __readq(addr);
 	mb();
 	return r;
 }
 
-void ___raw_writeb(u8 b, unsigned long addr)
+void ___raw_writeb(u8 b, volatile void __iomem *addr)
 {
 	__writeb(b, addr);
 }
 
-void ___raw_writew(u16 b, unsigned long addr)
+void ___raw_writew(u16 b, volatile void __iomem *addr)
 {
 	__writew(b, addr);
 }
 
-void ___raw_writel(u32 b, unsigned long addr)
+void ___raw_writel(u32 b, volatile void __iomem *addr)
 {
 	__writel(b, addr);
 }
 
-void ___raw_writeq(u64 b, unsigned long addr)
+void ___raw_writeq(u64 b, volatile void __iomem *addr)
 {
 	__writeq(b, addr);
 }
 
-void _writeb(u8 b, unsigned long addr)
+void _writeb(u8 b, volatile void __iomem *addr)
 {
 	__writeb(b, addr);
 	mb();
 }
 
-void _writew(u16 b, unsigned long addr)
+void _writew(u16 b, volatile void __iomem *addr)
 {
 	__writew(b, addr);
 	mb();
 }
 
-void _writel(u32 b, unsigned long addr)
+void _writel(u32 b, volatile void __iomem *addr)
 {
 	__writel(b, addr);
 	mb();
 }
 
-void _writeq(u64 b, unsigned long addr)
+void _writeq(u64 b, volatile void __iomem *addr)
 {
 	__writeq(b, addr);
 	mb();
@@ -411,12 +411,12 @@ void outsl (unsigned long port, const void *src, unsigned long count)
  * Copy data from IO memory space to "real" memory space.
  * This needs to be optimized.
  */
-void _memcpy_fromio(void * to, unsigned long from, long count)
+void _memcpy_fromio(void * to, const volatile void __iomem *from, long count)
 {
 	/* Optimize co-aligned transfers.  Everything else gets handled
 	   a byte at a time. */
 
-	if (count >= 8 && ((unsigned long)to & 7) == (from & 7)) {
+	if (count >= 8 && ((u64)to & 7) == ((u64)from & 7)) {
 		count -= 8;
 		do {
 			*(u64 *)to = __raw_readq(from);
@@ -427,7 +427,7 @@ void _memcpy_fromio(void * to, unsigned long from, long count)
 		count += 8;
 	}
 
-	if (count >= 4 && ((unsigned long)to & 3) == (from & 3)) {
+	if (count >= 4 && ((u64)to & 3) == ((u64)from & 3)) {
 		count -= 4;
 		do {
 			*(u32 *)to = __raw_readl(from);
@@ -438,7 +438,7 @@ void _memcpy_fromio(void * to, unsigned long from, long count)
 		count += 4;
 	}
 
-	if (count >= 2 && ((unsigned long)to & 1) == (from & 1)) {
+	if (count >= 2 && ((u64)to & 1) == ((u64)from & 1)) {
 		count -= 2;
 		do {
 			*(u16 *)to = __raw_readw(from);
@@ -455,19 +455,20 @@ void _memcpy_fromio(void * to, unsigned long from, long count)
 		to++;
 		from++;
 	}
+	mb();
 }
 
 /*
  * Copy data from "real" memory space to IO memory space.
  * This needs to be optimized.
  */
-void _memcpy_toio(unsigned long to, const void * from, long count)
+void _memcpy_toio(volatile void __iomem *to, const void * from, long count)
 {
 	/* Optimize co-aligned transfers.  Everything else gets handled
 	   a byte at a time. */
 	/* FIXME -- align FROM.  */
 
-	if (count >= 8 && (to & 7) == ((unsigned long)from & 7)) {
+	if (count >= 8 && ((u64)to & 7) == ((u64)from & 7)) {
 		count -= 8;
 		do {
 			__raw_writeq(*(const u64 *)from, to);
@@ -478,7 +479,7 @@ void _memcpy_toio(unsigned long to, const void * from, long count)
 		count += 8;
 	}
 
-	if (count >= 4 && (to & 3) == ((unsigned long)from & 3)) {
+	if (count >= 4 && ((u64)to & 3) == ((u64)from & 3)) {
 		count -= 4;
 		do {
 			__raw_writel(*(const u32 *)from, to);
@@ -489,7 +490,7 @@ void _memcpy_toio(unsigned long to, const void * from, long count)
 		count += 4;
 	}
 
-	if (count >= 2 && (to & 1) == ((unsigned long)from & 1)) {
+	if (count >= 2 && ((u64)to & 1) == ((u64)from & 1)) {
 		count -= 2;
 		do {
 			__raw_writew(*(const u16 *)from, to);
@@ -512,24 +513,24 @@ void _memcpy_toio(unsigned long to, const void * from, long count)
 /*
  * "memset" on IO memory space.
  */
-void _memset_c_io(unsigned long to, unsigned long c, long count)
+void _memset_c_io(volatile void __iomem *to, unsigned long c, long count)
 {
 	/* Handle any initial odd byte */
-	if (count > 0 && (to & 1)) {
+	if (count > 0 && ((u64)to & 1)) {
 		__raw_writeb(c, to);
 		to++;
 		count--;
 	}
 
 	/* Handle any initial odd halfword */
-	if (count >= 2 && (to & 2)) {
+	if (count >= 2 && ((u64)to & 2)) {
 		__raw_writew(c, to);
 		to += 2;
 		count -= 2;
 	}
 
 	/* Handle any initial odd word */
-	if (count >= 4 && (to & 4)) {
+	if (count >= 4 && ((u64)to & 4)) {
 		__raw_writel(c, to);
 		to += 4;
 		count -= 4;
@@ -571,24 +572,28 @@ void _memset_c_io(unsigned long to, unsigned long c, long count)
 void
 scr_memcpyw(u16 *d, const u16 *s, unsigned int count)
 {
-	if (! __is_ioaddr((unsigned long) s)) {
-		/* Source is memory.  */
-		if (! __is_ioaddr((unsigned long) d))
-			memcpy(d, s, count);
-		else
-			memcpy_toio(d, s, count);
-	} else {
-		/* Source is screen.  */
-		if (! __is_ioaddr((unsigned long) d))
-			memcpy_fromio(d, s, count);
-		else {
+	const u16 __iomem *ios = (const u16 __iomem *) s;
+	u16 __iomem *iod = (u16 __iomem *) d;
+	int s_isio = __is_ioaddr(s);
+	int d_isio = __is_ioaddr(d);
+
+	if (s_isio) {
+		if (d_isio) {
 			/* FIXME: Should handle unaligned ops and
 			   operation widening.  */
+
 			count /= 2;
 			while (count--) {
-				u16 tmp = __raw_readw((unsigned long)(s++));
-				__raw_writew(tmp, (unsigned long)(d++));
+				u16 tmp = __raw_readw(ios++);
+				__raw_writew(tmp, iod++);
 			}
 		}
+		else
+			memcpy_fromio(d, ios, count);
+	} else {
+		if (d_isio)
+			memcpy_toio(iod, s, count);
+		else
+			memcpy(d, s, count);
 	}
 }

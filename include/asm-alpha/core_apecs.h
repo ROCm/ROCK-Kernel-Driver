@@ -370,9 +370,9 @@ struct el_apecs_procdata
  * data to/from the right byte-lanes.
  */
 
-#define vip	volatile int *
-#define vuip	volatile unsigned int *
-#define vulp	volatile unsigned long *
+#define vip	volatile int __force *
+#define vuip	volatile unsigned int __force *
+#define vulp	volatile unsigned long __force *
 
 __EXTERN_INLINE u8 apecs_inb(unsigned long addr)
 {
@@ -421,8 +421,9 @@ __EXTERN_INLINE void apecs_outl(u32 b, unsigned long addr)
  * dense memory space, everything else through sparse space.
  */
 
-__EXTERN_INLINE u8 apecs_readb(unsigned long addr)
+__EXTERN_INLINE u8 apecs_readb(const volatile void __iomem *xaddr)
 {
+	unsigned long addr = (unsigned long) xaddr;
 	unsigned long result, msb;
 
 	addr -= APECS_DENSE_MEM;
@@ -435,8 +436,9 @@ __EXTERN_INLINE u8 apecs_readb(unsigned long addr)
 	return __kernel_extbl(result, addr & 3);
 }
 
-__EXTERN_INLINE u16 apecs_readw(unsigned long addr)
+__EXTERN_INLINE u16 apecs_readw(const volatile void __iomem *xaddr)
 {
+	unsigned long addr = (unsigned long) xaddr;
 	unsigned long result, msb;
 
 	addr -= APECS_DENSE_MEM;
@@ -449,18 +451,19 @@ __EXTERN_INLINE u16 apecs_readw(unsigned long addr)
 	return __kernel_extwl(result, addr & 3);
 }
 
-__EXTERN_INLINE u32 apecs_readl(unsigned long addr)
+__EXTERN_INLINE u32 apecs_readl(const volatile void __iomem *addr)
 {
-	return (*(vuip)addr) & 0xffffffff;
+	return *(vuip)addr;
 }
 
-__EXTERN_INLINE u64 apecs_readq(unsigned long addr)
+__EXTERN_INLINE u64 apecs_readq(const volatile void __iomem *addr)
 {
 	return *(vulp)addr;
 }
 
-__EXTERN_INLINE void apecs_writeb(u8 b, unsigned long addr)
+__EXTERN_INLINE void apecs_writeb(u8 b, volatile void __iomem *xaddr)
 {
+	unsigned long addr = (unsigned long) xaddr;
 	unsigned long msb;
 
 	addr -= APECS_DENSE_MEM;
@@ -472,8 +475,9 @@ __EXTERN_INLINE void apecs_writeb(u8 b, unsigned long addr)
 	*(vuip) ((addr << 5) + APECS_SPARSE_MEM + 0x00) = b * 0x01010101;
 }
 
-__EXTERN_INLINE void apecs_writew(u16 b, unsigned long addr)
+__EXTERN_INLINE void apecs_writew(u16 b, volatile void __iomem *xaddr)
 {
+	unsigned long addr = (unsigned long) xaddr;
 	unsigned long msb;
 
 	addr -= APECS_DENSE_MEM;
@@ -485,24 +489,24 @@ __EXTERN_INLINE void apecs_writew(u16 b, unsigned long addr)
 	*(vuip) ((addr << 5) + APECS_SPARSE_MEM + 0x08) = b * 0x00010001;
 }
 
-__EXTERN_INLINE void apecs_writel(u32 b, unsigned long addr)
+__EXTERN_INLINE void apecs_writel(u32 b, volatile void __iomem *addr)
 {
 	*(vuip)addr = b;
 }
 
-__EXTERN_INLINE void apecs_writeq(u64 b, unsigned long addr)
+__EXTERN_INLINE void apecs_writeq(u64 b, volatile void __iomem *addr)
 {
 	*(vulp)addr = b;
 }
 
-__EXTERN_INLINE unsigned long apecs_ioremap(unsigned long addr,
+__EXTERN_INLINE void __iomem *apecs_ioremap(unsigned long addr,
 					    unsigned long size
 					    __attribute__((unused)))
 {
-	return addr + APECS_DENSE_MEM;
+	return (void __iomem *)(addr + APECS_DENSE_MEM);
 }
 
-__EXTERN_INLINE void apecs_iounmap(unsigned long addr)
+__EXTERN_INLINE void apecs_iounmap(volatile void __iomem *addr)
 {
 	return;
 }
@@ -521,25 +525,25 @@ __EXTERN_INLINE int apecs_is_ioaddr(unsigned long addr)
 #define __inb(p)		apecs_inb((unsigned long)(p))
 #define __inw(p)		apecs_inw((unsigned long)(p))
 #define __inl(p)		apecs_inl((unsigned long)(p))
-#define __outb(x,p)		apecs_outb((x),(unsigned long)(p))
-#define __outw(x,p)		apecs_outw((x),(unsigned long)(p))
-#define __outl(x,p)		apecs_outl((x),(unsigned long)(p))
-#define __readb(a)		apecs_readb((unsigned long)(a))
-#define __readw(a)		apecs_readw((unsigned long)(a))
-#define __readl(a)		apecs_readl((unsigned long)(a))
-#define __readq(a)		apecs_readq((unsigned long)(a))
-#define __writeb(x,a)		apecs_writeb((x),(unsigned long)(a))
-#define __writew(x,a)		apecs_writew((x),(unsigned long)(a))
-#define __writel(x,a)		apecs_writel((x),(unsigned long)(a))
-#define __writeq(x,a)		apecs_writeq((x),(unsigned long)(a))
-#define __ioremap(a,s)		apecs_ioremap((unsigned long)(a),(s))
-#define __iounmap(a)		apecs_iounmap((unsigned long)(a))
+#define __outb(x,p)		apecs_outb(x,(unsigned long)(p))
+#define __outw(x,p)		apecs_outw(x,(unsigned long)(p))
+#define __outl(x,p)		apecs_outl(x,(unsigned long)(p))
+#define __readb(a)		apecs_readb(a)
+#define __readw(a)		apecs_readw(a)
+#define __readl(a)		apecs_readl(a)
+#define __readq(a)		apecs_readq(a)
+#define __writeb(x,a)		apecs_writeb(x,a)
+#define __writew(x,a)		apecs_writew(x,a)
+#define __writel(x,a)		apecs_writel(x,a)
+#define __writeq(x,a)		apecs_writeq(x,a)
+#define __ioremap(a,s)		apecs_ioremap(a,s)
+#define __iounmap(a)		apecs_iounmap(a)
 #define __is_ioaddr(a)		apecs_is_ioaddr((unsigned long)(a))
 
 #define __raw_readl(a)		__readl(a)
 #define __raw_readq(a)		__readq(a)
-#define __raw_writel(v,a)	__writel((v),(a))
-#define __raw_writeq(v,a)	__writeq((v),(a))
+#define __raw_writel(v,a)	__writel(v,a)
+#define __raw_writeq(v,a)	__writeq(v,a)
 
 #endif /* __WANT_IO_DEF */
 

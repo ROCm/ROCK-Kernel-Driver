@@ -215,9 +215,9 @@ union el_lca {
  * data to/from the right byte-lanes.
  */
 
-#define vip	volatile int *
-#define vuip	volatile unsigned int *
-#define vulp	volatile unsigned long *
+#define vip	volatile int __force *
+#define vuip	volatile unsigned int __force *
+#define vulp	volatile unsigned long __force *
 
 __EXTERN_INLINE u8 lca_inb(unsigned long addr)
 {
@@ -266,8 +266,9 @@ __EXTERN_INLINE void lca_outl(u32 b, unsigned long addr)
  * dense memory space, everything else through sparse space.
  */
 
-__EXTERN_INLINE u8 lca_readb(unsigned long addr)
+__EXTERN_INLINE u8 lca_readb(const volatile void __iomem *xaddr)
 {
+	unsigned long addr = (unsigned long) xaddr;
 	unsigned long result, msb;
 
 	addr -= LCA_DENSE_MEM;
@@ -280,8 +281,9 @@ __EXTERN_INLINE u8 lca_readb(unsigned long addr)
 	return __kernel_extbl(result, addr & 3);
 }
 
-__EXTERN_INLINE u16 lca_readw(unsigned long addr)
+__EXTERN_INLINE u16 lca_readw(const volatile void __iomem *xaddr)
 {
+	unsigned long addr = (unsigned long) xaddr;
 	unsigned long result, msb;
 
 	addr -= LCA_DENSE_MEM;
@@ -294,18 +296,19 @@ __EXTERN_INLINE u16 lca_readw(unsigned long addr)
 	return __kernel_extwl(result, addr & 3);
 }
 
-__EXTERN_INLINE u32 lca_readl(unsigned long addr)
+__EXTERN_INLINE u32 lca_readl(const volatile void __iomem *addr)
 {
-	return (*(vuip)addr) & 0xffffffff;
+	return *(vuip)addr;
 }
 
-__EXTERN_INLINE u64 lca_readq(unsigned long addr)
+__EXTERN_INLINE u64 lca_readq(const volatile void __iomem *addr)
 {
 	return *(vulp)addr;
 }
 
-__EXTERN_INLINE void lca_writeb(u8 b, unsigned long addr)
+__EXTERN_INLINE void lca_writeb(u8 b, volatile void __iomem *xaddr)
 {
+	unsigned long addr = (unsigned long) xaddr;
 	unsigned long msb;
 	unsigned long w;
 
@@ -319,8 +322,9 @@ __EXTERN_INLINE void lca_writeb(u8 b, unsigned long addr)
 	*(vuip) ((addr << 5) + LCA_SPARSE_MEM + 0x00) = w;
 }
 
-__EXTERN_INLINE void lca_writew(u16 b, unsigned long addr)
+__EXTERN_INLINE void lca_writew(u16 b, volatile void __iomem *xaddr)
 {
+	unsigned long addr = (unsigned long) xaddr;
 	unsigned long msb;
 	unsigned long w;
 
@@ -334,24 +338,24 @@ __EXTERN_INLINE void lca_writew(u16 b, unsigned long addr)
 	*(vuip) ((addr << 5) + LCA_SPARSE_MEM + 0x08) = w;
 }
 
-__EXTERN_INLINE void lca_writel(u32 b, unsigned long addr)
+__EXTERN_INLINE void lca_writel(u32 b, volatile void __iomem *addr)
 {
 	*(vuip)addr = b;
 }
 
-__EXTERN_INLINE void lca_writeq(u64 b, unsigned long addr)
+__EXTERN_INLINE void lca_writeq(u64 b, volatile void __iomem *addr)
 {
 	*(vulp)addr = b;
 }
 
-__EXTERN_INLINE unsigned long lca_ioremap(unsigned long addr,
+__EXTERN_INLINE void __iomem *lca_ioremap(unsigned long addr,
 					  unsigned long size
 					  __attribute__((unused)))
 {
-	return addr + LCA_DENSE_MEM;
+	return (void __iomem *)(addr + LCA_DENSE_MEM);
 }
 
-__EXTERN_INLINE void lca_iounmap(unsigned long addr)
+__EXTERN_INLINE void lca_iounmap(volatile void __iomem *addr)
 {
 	return;
 }
@@ -370,25 +374,25 @@ __EXTERN_INLINE int lca_is_ioaddr(unsigned long addr)
 #define __inb(p)		lca_inb((unsigned long)(p))
 #define __inw(p)		lca_inw((unsigned long)(p))
 #define __inl(p)		lca_inl((unsigned long)(p))
-#define __outb(x,p)		lca_outb((x),(unsigned long)(p))
-#define __outw(x,p)		lca_outw((x),(unsigned long)(p))
-#define __outl(x,p)		lca_outl((x),(unsigned long)(p))
-#define __readb(a)		lca_readb((unsigned long)(a))
-#define __readw(a)		lca_readw((unsigned long)(a))
-#define __readl(a)		lca_readl((unsigned long)(a))
-#define __readq(a)		lca_readq((unsigned long)(a))
-#define __writeb(x,a)		lca_writeb((x),(unsigned long)(a))
-#define __writew(x,a)		lca_writew((x),(unsigned long)(a))
-#define __writel(x,a)		lca_writel((x),(unsigned long)(a))
-#define __writeq(x,a)		lca_writeq((x),(unsigned long)(a))
-#define __ioremap(a,s)		lca_ioremap((unsigned long)(a),(s))
-#define __iounmap(a)		lca_iounmap((unsigned long)(a))
+#define __outb(x,p)		lca_outb(x,(unsigned long)(p))
+#define __outw(x,p)		lca_outw(x,(unsigned long)(p))
+#define __outl(x,p)		lca_outl(x,(unsigned long)(p))
+#define __readb(a)		lca_readb(a)
+#define __readw(a)		lca_readw(a)
+#define __readl(a)		lca_readl(a)
+#define __readq(a)		lca_readq(a)
+#define __writeb(x,a)		lca_writeb(x,a)
+#define __writew(x,a)		lca_writew(x,a)
+#define __writel(x,a)		lca_writel(x,a)
+#define __writeq(x,a)		lca_writeq(x,a)
+#define __ioremap(a,s)		lca_ioremap(a,s)
+#define __iounmap(a)		lca_iounmap(a)
 #define __is_ioaddr(a)		lca_is_ioaddr((unsigned long)(a))
 
 #define __raw_readl(a)		__readl(a)
 #define __raw_readq(a)		__readq(a)
-#define __raw_writel(v,a)	__writel((v),(a))
-#define __raw_writeq(v,a)	__writeq((v),(a))
+#define __raw_writel(v,a)	__writel(v,a)
+#define __raw_writeq(v,a)	__writeq(v,a)
 
 #endif /* __WANT_IO_DEF */
 

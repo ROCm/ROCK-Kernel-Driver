@@ -211,11 +211,11 @@ struct el_MCPCIA_uncorrected_frame_mcheck {
  * Unfortunately, we can't use BWIO with EV5, so for now, we always use SPARSE.
  */
 
-#define vucp	volatile unsigned char *
-#define vusp	volatile unsigned short *
-#define vip	volatile int *
-#define vuip	volatile unsigned int *
-#define vulp	volatile unsigned long *
+#define vucp	volatile unsigned char __force *
+#define vusp	volatile unsigned short __force *
+#define vip	volatile int __force *
+#define vuip	volatile unsigned int __force *
+#define vulp	volatile unsigned long __force *
 
 __EXTERN_INLINE u8 mcpcia_inb(unsigned long in_addr)
 {
@@ -328,14 +328,14 @@ __EXTERN_INLINE void mcpcia_outl(u32 b, unsigned long in_addr)
  *
  */
 
-__EXTERN_INLINE unsigned long mcpcia_ioremap(unsigned long addr,
+__EXTERN_INLINE void __iomem *mcpcia_ioremap(unsigned long addr,
 					     unsigned long size
 					     __attribute__((unused)))
 {
-	return addr + MCPCIA_MEM_BIAS;
+	return (void __iomem *)(addr + MCPCIA_MEM_BIAS);
 }
 
-__EXTERN_INLINE void mcpcia_iounmap(unsigned long addr)
+__EXTERN_INLINE void mcpcia_iounmap(volatile void __iomem *addr)
 {
 	return;
 }
@@ -345,10 +345,10 @@ __EXTERN_INLINE int mcpcia_is_ioaddr(unsigned long addr)
 	return addr >= MCPCIA_SPARSE(0);
 }
 
-__EXTERN_INLINE u8 mcpcia_readb(unsigned long in_addr)
+__EXTERN_INLINE u8 mcpcia_readb(const volatile void __iomem *xaddr)
 {
-	unsigned long addr = in_addr & 0xffffffffUL;
-	unsigned long hose = in_addr & ~0xffffffffUL;
+	unsigned long addr = (unsigned long)xaddr & 0xffffffffUL;
+	unsigned long hose = (unsigned long)xaddr & ~0xffffffffUL;
 	unsigned long result, work;
 
 #ifndef MCPCIA_ONE_HAE_WINDOW
@@ -364,10 +364,10 @@ __EXTERN_INLINE u8 mcpcia_readb(unsigned long in_addr)
 	return __kernel_extbl(result, addr & 3);
 }
 
-__EXTERN_INLINE u16 mcpcia_readw(unsigned long in_addr)
+__EXTERN_INLINE u16 mcpcia_readw(const volatile void __iomem *xaddr)
 {
-	unsigned long addr = in_addr & 0xffffffffUL;
-	unsigned long hose = in_addr & ~0xffffffffUL;
+	unsigned long addr = (unsigned long)xaddr & 0xffffffffUL;
+	unsigned long hose = (unsigned long)xaddr & ~0xffffffffUL;
 	unsigned long result, work;
 
 #ifndef MCPCIA_ONE_HAE_WINDOW
@@ -383,10 +383,10 @@ __EXTERN_INLINE u16 mcpcia_readw(unsigned long in_addr)
 	return __kernel_extwl(result, addr & 3);
 }
 
-__EXTERN_INLINE void mcpcia_writeb(u8 b, unsigned long in_addr)
+__EXTERN_INLINE void mcpcia_writeb(u8 b, volatile void __iomem *xaddr)
 {
-	unsigned long addr = in_addr & 0xffffffffUL;
-	unsigned long hose = in_addr & ~0xffffffffUL;
+	unsigned long addr = (unsigned long)xaddr & 0xffffffffUL;
+	unsigned long hose = (unsigned long)xaddr & ~0xffffffffUL;
 	unsigned long w;
 
 #ifndef MCPCIA_ONE_HAE_WINDOW
@@ -396,15 +396,15 @@ __EXTERN_INLINE void mcpcia_writeb(u8 b, unsigned long in_addr)
 #endif
 	addr = addr & MCPCIA_MEM_MASK;
 
-	w = __kernel_insbl(b, in_addr & 3);
+	w = __kernel_insbl(b, addr & 3);
 	hose = hose - MCPCIA_DENSE(4) + MCPCIA_SPARSE(4);
 	*(vuip) ((addr << 5) + hose + 0x00) = w;
 }
 
-__EXTERN_INLINE void mcpcia_writew(u16 b, unsigned long in_addr)
+__EXTERN_INLINE void mcpcia_writew(u16 b, volatile void __iomem *xaddr)
 {
-	unsigned long addr = in_addr & 0xffffffffUL;
-	unsigned long hose = in_addr & ~0xffffffffUL;
+	unsigned long addr = (unsigned long)xaddr & 0xffffffffUL;
+	unsigned long hose = (unsigned long)xaddr & ~0xffffffffUL;
 	unsigned long w;
 
 #ifndef MCPCIA_ONE_HAE_WINDOW
@@ -414,27 +414,27 @@ __EXTERN_INLINE void mcpcia_writew(u16 b, unsigned long in_addr)
 #endif
 	addr = addr & MCPCIA_MEM_MASK;
 
-	w = __kernel_inswl(b, in_addr & 3);
+	w = __kernel_inswl(b, addr & 3);
 	hose = hose - MCPCIA_DENSE(4) + MCPCIA_SPARSE(4);
 	*(vuip) ((addr << 5) + hose + 0x08) = w;
 }
 
-__EXTERN_INLINE u32 mcpcia_readl(unsigned long addr)
+__EXTERN_INLINE u32 mcpcia_readl(const volatile void __iomem *addr)
 {
-	return (*(vuip)addr) & 0xffffffff;
+	return *(vuip)addr;
 }
 
-__EXTERN_INLINE u64 mcpcia_readq(unsigned long addr)
+__EXTERN_INLINE u64 mcpcia_readq(const volatile void __iomem *addr)
 {
 	return *(vulp)addr;
 }
 
-__EXTERN_INLINE void mcpcia_writel(u32 b, unsigned long addr)
+__EXTERN_INLINE void mcpcia_writel(u32 b, volatile void __iomem *addr)
 {
 	*(vuip)addr = b;
 }
 
-__EXTERN_INLINE void mcpcia_writeq(u64 b, unsigned long addr)
+__EXTERN_INLINE void mcpcia_writeq(u64 b, volatile void __iomem *addr)
 {
 	*(vulp)addr = b;
 }
@@ -450,25 +450,25 @@ __EXTERN_INLINE void mcpcia_writeq(u64 b, unsigned long addr)
 #define __inb(p)		mcpcia_inb((unsigned long)(p))
 #define __inw(p)		mcpcia_inw((unsigned long)(p))
 #define __inl(p)		mcpcia_inl((unsigned long)(p))
-#define __outb(x,p)		mcpcia_outb((x),(unsigned long)(p))
-#define __outw(x,p)		mcpcia_outw((x),(unsigned long)(p))
-#define __outl(x,p)		mcpcia_outl((x),(unsigned long)(p))
-#define __readb(a)		mcpcia_readb((unsigned long)(a))
-#define __readw(a)		mcpcia_readw((unsigned long)(a))
-#define __readl(a)		mcpcia_readl((unsigned long)(a))
-#define __readq(a)		mcpcia_readq((unsigned long)(a))
-#define __writeb(x,a)		mcpcia_writeb((x),(unsigned long)(a))
-#define __writew(x,a)		mcpcia_writew((x),(unsigned long)(a))
-#define __writel(x,a)		mcpcia_writel((x),(unsigned long)(a))
-#define __writeq(x,a)		mcpcia_writeq((x),(unsigned long)(a))
-#define __ioremap(a,s)		mcpcia_ioremap((unsigned long)(a),(s))
-#define __iounmap(a)		mcpcia_iounmap((unsigned long)(a))
+#define __outb(x,p)		mcpcia_outb(x,(unsigned long)(p))
+#define __outw(x,p)		mcpcia_outw(x,(unsigned long)(p))
+#define __outl(x,p)		mcpcia_outl(x,(unsigned long)(p))
+#define __readb(a)		mcpcia_readb(a)
+#define __readw(a)		mcpcia_readw(a)
+#define __readl(a)		mcpcia_readl(a)
+#define __readq(a)		mcpcia_readq(a)
+#define __writeb(x,a)		mcpcia_writeb(x,a)
+#define __writew(x,a)		mcpcia_writew(x,a)
+#define __writel(x,a)		mcpcia_writel(x,a)
+#define __writeq(x,a)		mcpcia_writeq(x,a)
+#define __ioremap(a,s)		mcpcia_ioremap(a,s)
+#define __iounmap(a)		mcpcia_iounmap(a)
 #define __is_ioaddr(a)		mcpcia_is_ioaddr((unsigned long)(a))
 
 #define __raw_readl(a)		__readl(a)
 #define __raw_readq(a)		__readq(a)
-#define __raw_writel(v,a)	__writel((v),(a))
-#define __raw_writeq(v,a)	__writeq((v),(a))
+#define __raw_writel(v,a)	__writel(v,a)
+#define __raw_writeq(v,a)	__writeq(v,a)
 
 #endif /* __WANT_IO_DEF */
 

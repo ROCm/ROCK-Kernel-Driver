@@ -451,78 +451,46 @@ __EXTERN_INLINE void marvel_outl(u32 l, unsigned long addr)
  * Memory functions.  All accesses through linear space.
  */
 
-extern unsigned long marvel_ioremap(unsigned long addr, unsigned long size);
-extern void marvel_iounmap(unsigned long addr);
+extern void __iomem *marvel_ioremap(unsigned long addr, unsigned long size);
+extern void marvel_iounmap(volatile void __iomem *addr);
 
-__EXTERN_INLINE u8 marvel_readb(unsigned long addr)
+__EXTERN_INLINE u8 marvel_readb(const volatile void __iomem *addr)
 {
-	if (!marvel_is_ioaddr(addr)) {
-		IOBUG(("Bad MEM addr %lx - reading -1\n", addr));
-		return (u8)-1;
-	}
 	return __kernel_ldbu(*(vucp)addr);
 }
 
-__EXTERN_INLINE u16 marvel_readw(unsigned long addr)
+__EXTERN_INLINE u16 marvel_readw(const volatile void __iomem *addr)
 {
-	if (!marvel_is_ioaddr(addr)) {
-		IOBUG(("Bad MEM addr %lx - reading -1\n", addr));
-		return (u16)-1;
-	}
 	return __kernel_ldwu(*(vusp)addr);
 }
 
-__EXTERN_INLINE u32 marvel_readl(unsigned long addr)
+__EXTERN_INLINE u32 marvel_readl(const volatile void __iomem *addr)
 {
-	if (!marvel_is_ioaddr(addr)) {
-		IOBUG(("Bad MEM addr %lx - reading -1\n", addr));
-		return (u32)-1;
-	}
 	return *(vuip)addr;
 }
 
-__EXTERN_INLINE u64 marvel_readq(unsigned long addr)
+__EXTERN_INLINE u64 marvel_readq(const volatile void __iomem *addr)
 {
-	if (!marvel_is_ioaddr(addr)) {
-		IOBUG(("Bad MEM addr %lx - reading -1\n", addr));
-		return (u64)-1;
-	}
 	return *(vulp)addr;
 }
 
-__EXTERN_INLINE void marvel_writeb(u8 b, unsigned long addr)
+__EXTERN_INLINE void marvel_writeb(u8 b, volatile void __iomem *addr)
 {
-	if (!marvel_is_ioaddr(addr)) {
-		IOBUG(("Bad MEM addr %lx - dropping store\n", addr));
-		return;
-	}
 	__kernel_stb(b, *(vucp)addr);
 }
 
-__EXTERN_INLINE void marvel_writew(u16 w, unsigned long addr)
+__EXTERN_INLINE void marvel_writew(u16 w, volatile void __iomem *addr)
 {
-	if (!marvel_is_ioaddr(addr)) {
-		IOBUG(("Bad MEM addr %lx - dropping store\n", addr));
-		return;
-	}
 	__kernel_stw(w, *(vusp)addr);
 }
 
-__EXTERN_INLINE void marvel_writel(u32 l, unsigned long addr)
+__EXTERN_INLINE void marvel_writel(u32 l, volatile void __iomem *addr)
 {
-	if (!marvel_is_ioaddr(addr)) {
-		IOBUG(("Bad MEM addr %lx - dropping store\n", addr));
-		return;
-	}
 	*(vuip)addr = l;
 }
 
-__EXTERN_INLINE void marvel_writeq(u64 q, unsigned long addr)
+__EXTERN_INLINE void marvel_writeq(u64 q, volatile void __iomem *addr)
 {
-	if (!marvel_is_ioaddr(addr)) {
-		IOBUG(("Bad MEM addr %lx - dropping store\n", addr));
-		return;
-	}
 	*(vulp)addr = q;
 }
 
@@ -540,19 +508,19 @@ __EXTERN_INLINE void marvel_writeq(u64 q, unsigned long addr)
 #define __inb(p)		marvel_inb((unsigned long)(p))
 #define __inw(p)		marvel_inw((unsigned long)(p))
 #define __inl(p)		marvel_inl((unsigned long)(p))
-#define __outb(x,p)		marvel_outb((x),(unsigned long)(p))
-#define __outw(x,p)		marvel_outw((x),(unsigned long)(p))
-#define __outl(x,p)		marvel_outl((x),(unsigned long)(p))
-#define __readb(a)		marvel_readb((unsigned long)(a))
-#define __readw(a)		marvel_readw((unsigned long)(a))
-#define __readl(a)		marvel_readl((unsigned long)(a))
-#define __readq(a)		marvel_readq((unsigned long)(a))
-#define __writeb(x,a)		marvel_writeb((x),(unsigned long)(a))
-#define __writew(x,a)		marvel_writew((x),(unsigned long)(a))
-#define __writel(x,a)		marvel_writel((x),(unsigned long)(a))
-#define __writeq(x,a)		marvel_writeq((x),(unsigned long)(a))
-#define __ioremap(a,s)		marvel_ioremap((unsigned long)(a),(s))
-#define __iounmap(a)		marvel_iounmap((unsigned long)(a))
+#define __outb(x,p)		marvel_outb(x,(unsigned long)(p))
+#define __outw(x,p)		marvel_outw(x,(unsigned long)(p))
+#define __outl(x,p)		marvel_outl(x,(unsigned long)(p))
+#define __readb(a)		marvel_readb(a)
+#define __readw(a)		marvel_readw(a)
+#define __readl(a)		marvel_readl(a)
+#define __readq(a)		marvel_readq(a)
+#define __writeb(x,a)		marvel_writeb(x,a)
+#define __writew(x,a)		marvel_writew(x,a)
+#define __writel(x,a)		marvel_writel(x,a)
+#define __writeq(x,a)		marvel_writeq(x,a)
+#define __ioremap(a,s)		marvel_ioremap(a,s)
+#define __iounmap(a)		marvel_iounmap(a)
 #define __is_ioaddr(a)		marvel_is_ioaddr((unsigned long)(a))
 
 /* Disable direct inlining of these calls with the debug checks present.  */

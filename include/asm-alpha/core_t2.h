@@ -199,8 +199,8 @@ struct el_t2_procdata_mcheck {
 
 struct el_t2_logout_header {
 	unsigned int	elfl_size;	/* size in bytes of logout area. */
-	int		elfl_sbz1:31;	/* Should be zero. */
-	char		elfl_retry:1;	/* Retry flag. */
+	unsigned int	elfl_sbz1:31;	/* Should be zero. */
+	unsigned int	elfl_retry:1;	/* Retry flag. */
 	unsigned int	elfl_procoffset; /* Processor-specific offset. */
 	unsigned int	elfl_sysoffset;	 /* Offset of system-specific. */
 	unsigned int	elfl_error_type;	/* PAL error type code. */
@@ -438,8 +438,9 @@ __EXTERN_INLINE void t2_outl(u32 b, unsigned long addr)
 
 static spinlock_t t2_hae_lock = SPIN_LOCK_UNLOCKED;
 
-__EXTERN_INLINE u8 t2_readb(unsigned long addr)
+__EXTERN_INLINE u8 t2_readb(const volatile void __iomem *xaddr)
 {
+	unsigned long addr = (unsigned long) xaddr;
 	unsigned long result, msb;
 	unsigned long flags;
 	spin_lock_irqsave(&t2_hae_lock, flags);
@@ -451,8 +452,9 @@ __EXTERN_INLINE u8 t2_readb(unsigned long addr)
 	return __kernel_extbl(result, addr & 3);
 }
 
-__EXTERN_INLINE u16 t2_readw(unsigned long addr)
+__EXTERN_INLINE u16 t2_readw(const volatile void __iomem *xaddr)
 {
+	unsigned long addr = (unsigned long) xaddr;
 	unsigned long result, msb;
 	unsigned long flags;
 	spin_lock_irqsave(&t2_hae_lock, flags);
@@ -468,8 +470,9 @@ __EXTERN_INLINE u16 t2_readw(unsigned long addr)
  * On SABLE with T2, we must use SPARSE memory even for 32-bit access,
  * because we cannot access all of DENSE without changing its HAE.
  */
-__EXTERN_INLINE u32 t2_readl(unsigned long addr)
+__EXTERN_INLINE u32 t2_readl(const volatile void __iomem *xaddr)
 {
+	unsigned long addr = (unsigned long) xaddr;
 	unsigned long result, msb;
 	unsigned long flags;
 	spin_lock_irqsave(&t2_hae_lock, flags);
@@ -481,8 +484,9 @@ __EXTERN_INLINE u32 t2_readl(unsigned long addr)
 	return result & 0xffffffffUL;
 }
 
-__EXTERN_INLINE u64 t2_readq(unsigned long addr)
+__EXTERN_INLINE u64 t2_readq(const volatile void __iomem *xaddr)
 {
+	unsigned long addr = (unsigned long) xaddr;
 	unsigned long r0, r1, work, msb;
 	unsigned long flags;
 	spin_lock_irqsave(&t2_hae_lock, flags);
@@ -496,8 +500,9 @@ __EXTERN_INLINE u64 t2_readq(unsigned long addr)
 	return r1 << 32 | r0;
 }
 
-__EXTERN_INLINE void t2_writeb(u8 b, unsigned long addr)
+__EXTERN_INLINE void t2_writeb(u8 b, volatile void __iomem *xaddr)
 {
+	unsigned long addr = (unsigned long) xaddr;
 	unsigned long msb, w;
 	unsigned long flags;
 	spin_lock_irqsave(&t2_hae_lock, flags);
@@ -509,8 +514,9 @@ __EXTERN_INLINE void t2_writeb(u8 b, unsigned long addr)
 	spin_unlock_irqrestore(&t2_hae_lock, flags);
 }
 
-__EXTERN_INLINE void t2_writew(u16 b, unsigned long addr)
+__EXTERN_INLINE void t2_writew(u16 b, volatile void __iomem *xaddr)
 {
+	unsigned long addr = (unsigned long) xaddr;
 	unsigned long msb, w;
 	unsigned long flags;
 	spin_lock_irqsave(&t2_hae_lock, flags);
@@ -526,8 +532,9 @@ __EXTERN_INLINE void t2_writew(u16 b, unsigned long addr)
  * On SABLE with T2, we must use SPARSE memory even for 32-bit access,
  * because we cannot access all of DENSE without changing its HAE.
  */
-__EXTERN_INLINE void t2_writel(u32 b, unsigned long addr)
+__EXTERN_INLINE void t2_writel(u32 b, volatile void __iomem *xaddr)
 {
+	unsigned long addr = (unsigned long) xaddr;
 	unsigned long msb;
 	unsigned long flags;
 	spin_lock_irqsave(&t2_hae_lock, flags);
@@ -538,8 +545,9 @@ __EXTERN_INLINE void t2_writel(u32 b, unsigned long addr)
 	spin_unlock_irqrestore(&t2_hae_lock, flags);
 }
 
-__EXTERN_INLINE void t2_writeq(u64 b, unsigned long addr)
+__EXTERN_INLINE void t2_writeq(u64 b, volatile void __iomem *xaddr)
 {
+	unsigned long addr = (unsigned long) xaddr;
 	unsigned long msb, work;
 	unsigned long flags;
 	spin_lock_irqsave(&t2_hae_lock, flags);
@@ -552,14 +560,14 @@ __EXTERN_INLINE void t2_writeq(u64 b, unsigned long addr)
 	spin_unlock_irqrestore(&t2_hae_lock, flags);
 }
 
-__EXTERN_INLINE unsigned long t2_ioremap(unsigned long addr, 
+__EXTERN_INLINE void __iomem *t2_ioremap(unsigned long addr, 
 					 unsigned long size
 					 __attribute__((unused)))
 {
-	return addr;
+	return (void __iomem *)addr;
 }
 
-__EXTERN_INLINE void t2_iounmap(unsigned long addr)
+__EXTERN_INLINE void t2_iounmap(volatile void __iomem *addr)
 {
 	return;
 }
@@ -577,19 +585,19 @@ __EXTERN_INLINE int t2_is_ioaddr(unsigned long addr)
 #define __inb(p)		t2_inb((unsigned long)(p))
 #define __inw(p)		t2_inw((unsigned long)(p))
 #define __inl(p)		t2_inl((unsigned long)(p))
-#define __outb(x,p)		t2_outb((x),(unsigned long)(p))
-#define __outw(x,p)		t2_outw((x),(unsigned long)(p))
-#define __outl(x,p)		t2_outl((x),(unsigned long)(p))
-#define __readb(a)		t2_readb((unsigned long)(a))
-#define __readw(a)		t2_readw((unsigned long)(a))
-#define __readl(a)		t2_readl((unsigned long)(a))
-#define __readq(a)		t2_readq((unsigned long)(a))
-#define __writeb(x,a)		t2_writeb((x),(unsigned long)(a))
-#define __writew(x,a)		t2_writew((x),(unsigned long)(a))
-#define __writel(x,a)		t2_writel((x),(unsigned long)(a))
-#define __writeq(x,a)		t2_writeq((x),(unsigned long)(a))
-#define __ioremap(a,s)		t2_ioremap((unsigned long)(a),(s))
-#define __iounmap(a)		t2_iounmap((unsigned long)(a))
+#define __outb(x,p)		t2_outb(x,(unsigned long)(p))
+#define __outw(x,p)		t2_outw(x,(unsigned long)(p))
+#define __outl(x,p)		t2_outl(x,(unsigned long)(p))
+#define __readb(a)		t2_readb(a)
+#define __readw(a)		t2_readw(a)
+#define __readl(a)		t2_readl(a)
+#define __readq(a)		t2_readq(a)
+#define __writeb(x,a)		t2_writeb(x,a)
+#define __writew(x,a)		t2_writew(x,a)
+#define __writel(x,a)		t2_writel(x,a)
+#define __writeq(x,a)		t2_writeq(x,a)
+#define __ioremap(a,s)		t2_ioremap(a,s)
+#define __iounmap(a)		t2_iounmap(a)
 #define __is_ioaddr(a)		t2_is_ioaddr((unsigned long)(a))
 
 #endif /* __WANT_IO_DEF */

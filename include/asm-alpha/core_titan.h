@@ -430,50 +430,50 @@ __EXTERN_INLINE void titan_outl(u32 b, unsigned long addr)
  * Memory functions.  all accesses are done through linear space.
  */
 
-extern unsigned long titan_ioremap(unsigned long addr, unsigned long size);
-extern void titan_iounmap(unsigned long addr);
+extern void __iomem *titan_ioremap(unsigned long addr, unsigned long size);
+extern void titan_iounmap(volatile void __iomem *addr);
 
 __EXTERN_INLINE int titan_is_ioaddr(unsigned long addr)
 {
 	return addr >= TITAN_BASE;
 }
 
-__EXTERN_INLINE u8 titan_readb(unsigned long addr)
+__EXTERN_INLINE u8 titan_readb(const volatile void __iomem *addr)
 {
 	return __kernel_ldbu(*(vucp)addr);
 }
 
-__EXTERN_INLINE u16 titan_readw(unsigned long addr)
+__EXTERN_INLINE u16 titan_readw(const volatile void __iomem *addr)
 {
 	return __kernel_ldwu(*(vusp)addr);
 }
 
-__EXTERN_INLINE u32 titan_readl(unsigned long addr)
+__EXTERN_INLINE u32 titan_readl(const volatile void __iomem *addr)
 {
 	return (*(vuip)addr) & 0xffffffff;
 }
 
-__EXTERN_INLINE u64 titan_readq(unsigned long addr)
+__EXTERN_INLINE u64 titan_readq(const volatile void __iomem *addr)
 {
 	return *(vulp)addr;
 }
 
-__EXTERN_INLINE void titan_writeb(u8 b, unsigned long addr)
+__EXTERN_INLINE void titan_writeb(u8 b, volatile void __iomem *addr)
 {
 	__kernel_stb(b, *(vucp)addr);
 }
 
-__EXTERN_INLINE void titan_writew(u16 b, unsigned long addr)
+__EXTERN_INLINE void titan_writew(u16 b, volatile void __iomem *addr)
 {
 	__kernel_stw(b, *(vusp)addr);
 }
 
-__EXTERN_INLINE void titan_writel(u32 b, unsigned long addr)
+__EXTERN_INLINE void titan_writel(u32 b, volatile void __iomem *addr)
 {
 	*(vuip)addr = b;
 }
 
-__EXTERN_INLINE void titan_writeq(u64 b, unsigned long addr)
+__EXTERN_INLINE void titan_writeq(u64 b, volatile void __iomem *addr)
 {
 	*(vulp)addr = b;
 }
@@ -488,36 +488,36 @@ __EXTERN_INLINE void titan_writeq(u64 b, unsigned long addr)
 #define __inb(p)		titan_inb((unsigned long)(p))
 #define __inw(p)		titan_inw((unsigned long)(p))
 #define __inl(p)		titan_inl((unsigned long)(p))
-#define __outb(x,p)		titan_outb((x),(unsigned long)(p))
-#define __outw(x,p)		titan_outw((x),(unsigned long)(p))
-#define __outl(x,p)		titan_outl((x),(unsigned long)(p))
-#define __readb(a)		titan_readb((unsigned long)(a))
-#define __readw(a)		titan_readw((unsigned long)(a))
-#define __readl(a)		titan_readl((unsigned long)(a))
-#define __readq(a)		titan_readq((unsigned long)(a))
-#define __writeb(x,a)		titan_writeb((x),(unsigned long)(a))
-#define __writew(x,a)		titan_writew((x),(unsigned long)(a))
-#define __writel(x,a)		titan_writel((x),(unsigned long)(a))
-#define __writeq(x,a)		titan_writeq((x),(unsigned long)(a))
-#define __ioremap(a,s)		titan_ioremap((unsigned long)(a),(s))
-#define __iounmap(a)		titan_iounmap((unsigned long)(a))
+#define __outb(x,p)		titan_outb(x,(unsigned long)(p))
+#define __outw(x,p)		titan_outw(x,(unsigned long)(p))
+#define __outl(x,p)		titan_outl(x,(unsigned long)(p))
+#define __readb(a)		titan_readb(a)
+#define __readw(a)		titan_readw(a)
+#define __readl(a)		titan_readl(a)
+#define __readq(a)		titan_readq(a)
+#define __writeb(x,a)		titan_writeb(x,a)
+#define __writew(x,a)		titan_writew(x,a)
+#define __writel(x,a)		titan_writel(x,a)
+#define __writeq(x,a)		titan_writeq(x,a)
+#define __ioremap(a,s)		titan_ioremap(a,s)
+#define __iounmap(a)		titan_iounmap(a)
 #define __is_ioaddr(a)		titan_is_ioaddr((unsigned long)(a))
 
-#define inb(port) 		__inb((port))
-#define inw(port) 		__inw((port))
-#define inl(port) 		__inl((port))
-#define outb(v, port) 		__outb((v),(port))
-#define outw(v, port) 		__outw((v),(port))
-#define outl(v, port) 		__outl((v),(port))
+#define inb(p)	 		__inb(p)
+#define inw(p) 			__inw(p)
+#define inl(p) 			__inl(p)
+#define outb(v,p) 		__outb(v,p)
+#define outw(v,p) 		__outw(v,p)
+#define outl(v,p) 		__outl(v,p)
 
-#define __raw_readb(a)		__readb((unsigned long)(a))
-#define __raw_readw(a)		__readw((unsigned long)(a))
-#define __raw_readl(a)		__readl((unsigned long)(a))
-#define __raw_readq(a)		__readq((unsigned long)(a))
-#define __raw_writeb(v,a)	__writeb((v),(unsigned long)(a))
-#define __raw_writew(v,a)	__writew((v),(unsigned long)(a))
-#define __raw_writel(v,a)	__writel((v),(unsigned long)(a))
-#define __raw_writeq(v,a)	__writeq((v),(unsigned long)(a))
+#define __raw_readb(a)		__readb(a)
+#define __raw_readw(a)		__readw(a)
+#define __raw_readl(a)		__readl(a)
+#define __raw_readq(a)		__readq(a)
+#define __raw_writeb(v,a)	__writeb(v,a)
+#define __raw_writew(v,a)	__writew(v,a)
+#define __raw_writel(v,a)	__writel(v,a)
+#define __raw_writeq(v,a)	__writeq(v,a)
 
 #endif /* __WANT_IO_DEF */
 

@@ -306,11 +306,11 @@ struct el_CIA_sysdata_mcheck {
  * get at PCI memory and I/O.
  */
 
-#define vucp	volatile unsigned char *
-#define vusp	volatile unsigned short *
-#define vip	volatile int *
-#define vuip	volatile unsigned int *
-#define vulp	volatile unsigned long *
+#define vucp	volatile unsigned char __force *
+#define vusp	volatile unsigned short __force *
+#define vip	volatile int __force *
+#define vuip	volatile unsigned int __force *
+#define vulp	volatile unsigned long __force *
 
 __EXTERN_INLINE u8 cia_inb(unsigned long addr)
 {
@@ -422,8 +422,9 @@ __EXTERN_INLINE void cia_bwx_outl(u32 b, unsigned long addr)
  *
  */
 
-__EXTERN_INLINE u8 cia_readb(unsigned long addr)
+__EXTERN_INLINE u8 cia_readb(const volatile void __iomem *xaddr)
 {
+	unsigned long addr = (unsigned long) xaddr;
 	unsigned long result;
 
 	addr &= CIA_MEM_R1_MASK;
@@ -431,8 +432,9 @@ __EXTERN_INLINE u8 cia_readb(unsigned long addr)
 	return __kernel_extbl(result, addr & 3);
 }
 
-__EXTERN_INLINE u16 cia_readw(unsigned long addr)
+__EXTERN_INLINE u16 cia_readw(const volatile void __iomem *xaddr)
 {
+	unsigned long addr = (unsigned long) xaddr;
 	unsigned long result;
 
 	addr &= CIA_MEM_R1_MASK;
@@ -440,8 +442,9 @@ __EXTERN_INLINE u16 cia_readw(unsigned long addr)
 	return __kernel_extwl(result, addr & 3);
 }
 
-__EXTERN_INLINE void cia_writeb(u8 b, unsigned long addr)
+__EXTERN_INLINE void cia_writeb(u8 b, volatile void __iomem *xaddr)
 {
+	unsigned long addr = (unsigned long) xaddr;
 	unsigned long w;
 
 	addr &= CIA_MEM_R1_MASK;
@@ -449,8 +452,9 @@ __EXTERN_INLINE void cia_writeb(u8 b, unsigned long addr)
 	*(vuip) ((addr << 5) + CIA_SPARSE_MEM + 0x00) = w;
 }
 
-__EXTERN_INLINE void cia_writew(u16 b, unsigned long addr)
+__EXTERN_INLINE void cia_writew(u16 b, volatile void __iomem *xaddr)
 {
+	unsigned long addr = (unsigned long) xaddr;
 	unsigned long w;
 
 	addr &= CIA_MEM_R1_MASK;
@@ -458,85 +462,85 @@ __EXTERN_INLINE void cia_writew(u16 b, unsigned long addr)
 	*(vuip) ((addr << 5) + CIA_SPARSE_MEM + 0x08) = w;
 }
 
-__EXTERN_INLINE u32 cia_readl(unsigned long addr)
+__EXTERN_INLINE u32 cia_readl(const volatile void __iomem *addr)
 {
 	return *(vuip)addr;
 }
 
-__EXTERN_INLINE u64 cia_readq(unsigned long addr)
+__EXTERN_INLINE u64 cia_readq(const volatile void __iomem *addr)
 {
 	return *(vulp)addr;
 }
 
-__EXTERN_INLINE void cia_writel(u32 b, unsigned long addr)
+__EXTERN_INLINE void cia_writel(u32 b, volatile void __iomem *addr)
 {
 	*(vuip)addr = b;
 }
 
-__EXTERN_INLINE void cia_writeq(u64 b, unsigned long addr)
+__EXTERN_INLINE void cia_writeq(u64 b, volatile void __iomem *addr)
 {
 	*(vulp)addr = b;
 }
 
-__EXTERN_INLINE unsigned long cia_ioremap(unsigned long addr,
+__EXTERN_INLINE void __iomem *cia_ioremap(unsigned long addr,
 					  unsigned long size
 					  __attribute__((unused)))
 {
-	return addr + CIA_DENSE_MEM;
+	return (void __iomem *)(addr + CIA_DENSE_MEM);
 }
 
-__EXTERN_INLINE void cia_iounmap(unsigned long addr)
+__EXTERN_INLINE void cia_iounmap(volatile void __iomem *addr)
 {
 	return;
 }
 
-__EXTERN_INLINE u8 cia_bwx_readb(unsigned long addr)
+__EXTERN_INLINE u8 cia_bwx_readb(const volatile void __iomem *addr)
 {
 	return __kernel_ldbu(*(vucp)addr);
 }
 
-__EXTERN_INLINE u16 cia_bwx_readw(unsigned long addr)
+__EXTERN_INLINE u16 cia_bwx_readw(const volatile void __iomem *addr)
 {
 	return __kernel_ldwu(*(vusp)addr);
 }
 
-__EXTERN_INLINE u32 cia_bwx_readl(unsigned long addr)
+__EXTERN_INLINE u32 cia_bwx_readl(const volatile void __iomem *addr)
 {
 	return *(vuip)addr;
 }
 
-__EXTERN_INLINE u64 cia_bwx_readq(unsigned long addr)
+__EXTERN_INLINE u64 cia_bwx_readq(const volatile void __iomem *addr)
 {
 	return *(vulp)addr;
 }
 
-__EXTERN_INLINE void cia_bwx_writeb(u8 b, unsigned long addr)
+__EXTERN_INLINE void cia_bwx_writeb(u8 b, volatile void __iomem *addr)
 {
 	__kernel_stb(b, *(vucp)addr);
 }
 
-__EXTERN_INLINE void cia_bwx_writew(u16 b, unsigned long addr)
+__EXTERN_INLINE void cia_bwx_writew(u16 b, volatile void __iomem *addr)
 {
 	__kernel_stw(b, *(vusp)addr);
 }
 
-__EXTERN_INLINE void cia_bwx_writel(u32 b, unsigned long addr)
+__EXTERN_INLINE void cia_bwx_writel(u32 b, volatile void __iomem *addr)
 {
 	*(vuip)addr = b;
 }
 
-__EXTERN_INLINE void cia_bwx_writeq(u64 b, unsigned long addr)
+__EXTERN_INLINE void cia_bwx_writeq(u64 b, volatile void __iomem *addr)
 {
 	*(vulp)addr = b;
 }
 
-__EXTERN_INLINE unsigned long cia_bwx_ioremap(unsigned long addr,
+__EXTERN_INLINE void __iomem *cia_bwx_ioremap(unsigned long addr,
 					      unsigned long size)
 {
-	return addr + CIA_BW_MEM;
+	return (void __iomem *)(addr + CIA_BW_MEM);
 }
 
-__EXTERN_INLINE void cia_bwx_iounmap(unsigned long addr)
+__EXTERN_INLINE void cia_bwx_iounmap(volatile void __iomem *addr)
 {
 	return;
 }
@@ -558,54 +562,54 @@ __EXTERN_INLINE int cia_is_ioaddr(unsigned long addr)
 # define __inb(p)		cia_bwx_inb((unsigned long)(p))
 # define __inw(p)		cia_bwx_inw((unsigned long)(p))
 # define __inl(p)		cia_bwx_inl((unsigned long)(p))
-# define __outb(x,p)		cia_bwx_outb((x),(unsigned long)(p))
-# define __outw(x,p)		cia_bwx_outw((x),(unsigned long)(p))
-# define __outl(x,p)		cia_bwx_outl((x),(unsigned long)(p))
-# define __readb(a)		cia_bwx_readb((unsigned long)(a))
-# define __readw(a)		cia_bwx_readw((unsigned long)(a))
-# define __readl(a)		cia_bwx_readl((unsigned long)(a))
-# define __readq(a)		cia_bwx_readq((unsigned long)(a))
-# define __writeb(x,a)		cia_bwx_writeb((x),(unsigned long)(a))
-# define __writew(x,a)		cia_bwx_writew((x),(unsigned long)(a))
-# define __writel(x,a)		cia_bwx_writel((x),(unsigned long)(a))
-# define __writeq(x,a)		cia_bwx_writeq((x),(unsigned long)(a))
-# define __ioremap(a,s)		cia_bwx_ioremap((unsigned long)(a),(s))
-# define __iounmap(a)           cia_bwx_iounmap((unsigned long)(a))
+# define __outb(x,p)		cia_bwx_outb(x,(unsigned long)(p))
+# define __outw(x,p)		cia_bwx_outw(x,(unsigned long)(p))
+# define __outl(x,p)		cia_bwx_outl(x,(unsigned long)(p))
+# define __readb(a)		cia_bwx_readb(a)
+# define __readw(a)		cia_bwx_readw(a)
+# define __readl(a)		cia_bwx_readl(a)
+# define __readq(a)		cia_bwx_readq(a)
+# define __writeb(x,a)		cia_bwx_writeb(x,a)
+# define __writew(x,a)		cia_bwx_writew(x,a)
+# define __writel(x,a)		cia_bwx_writel(x,a)
+# define __writeq(x,a)		cia_bwx_writeq(x,a)
+# define __ioremap(a,s)		cia_bwx_ioremap(a,s)
+# define __iounmap(a)           cia_bwx_iounmap(a)
 # define inb(p)			__inb(p)
 # define inw(p)			__inw(p)
 # define inl(p)			__inl(p)
-# define outb(x,p)		__outb((x),(p))
-# define outw(x,p)		__outw((x),(p))
-# define outl(x,p)		__outl((x),(p))
+# define outb(x,p)		__outb(x,p)
+# define outw(x,p)		__outw(x,p)
+# define outl(x,p)		__outl(x,p)
 # define __raw_readb(a)		__readb(a)
 # define __raw_readw(a)		__readw(a)
 # define __raw_readl(a)		__readl(a)
 # define __raw_readq(a)		__readq(a)
-# define __raw_writeb(x,a)	__writeb((x),(a))
-# define __raw_writew(x,a)	__writew((x),(a))
-# define __raw_writel(x,a)	__writel((x),(a))
-# define __raw_writeq(x,a)	__writeq((x),(a))
+# define __raw_writeb(x,a)	__writeb(x,a)
+# define __raw_writew(x,a)	__writew(x,a)
+# define __raw_writel(x,a)	__writel(x,a)
+# define __raw_writeq(x,a)	__writeq(x,a)
 #else
 # define __inb(p)		cia_inb((unsigned long)(p))
 # define __inw(p)		cia_inw((unsigned long)(p))
 # define __inl(p)		cia_inl((unsigned long)(p))
-# define __outb(x,p)		cia_outb((x),(unsigned long)(p))
-# define __outw(x,p)		cia_outw((x),(unsigned long)(p))
-# define __outl(x,p)		cia_outl((x),(unsigned long)(p))
-# define __readb(a)		cia_readb((unsigned long)(a))
-# define __readw(a)		cia_readw((unsigned long)(a))
-# define __readl(a)		cia_readl((unsigned long)(a))
-# define __readq(a)		cia_readq((unsigned long)(a))
-# define __writeb(x,a)		cia_writeb((x),(unsigned long)(a))
-# define __writew(x,a)		cia_writew((x),(unsigned long)(a))
-# define __writel(x,a)		cia_writel((x),(unsigned long)(a))
-# define __writeq(x,a)		cia_writeq((x),(unsigned long)(a))
-# define __ioremap(a,s)		cia_ioremap((unsigned long)(a),(s))
-# define __iounmap(a)           cia_iounmap((unsigned long)(a))
+# define __outb(x,p)		cia_outb(x,(unsigned long)(p))
+# define __outw(x,p)		cia_outw(x,(unsigned long)(p))
+# define __outl(x,p)		cia_outl(x,(unsigned long)(p))
+# define __readb(a)		cia_readb(a)
+# define __readw(a)		cia_readw(a)
+# define __readl(a)		cia_readl(a)
+# define __readq(a)		cia_readq(a)
+# define __writeb(x,a)		cia_writeb(x,a)
+# define __writew(x,a)		cia_writew(x,a)
+# define __writel(x,a)		cia_writel(x,a)
+# define __writeq(x,a)		cia_writeq(x,a)
+# define __ioremap(a,s)		cia_ioremap(a,s)
+# define __iounmap(a)           cia_iounmap(a)
 # define __raw_readl(a)		__readl(a)
 # define __raw_readq(a)		__readq(a)
-# define __raw_writel(v,a)	__writel((v),(a))
-# define __raw_writeq(v,a)	__writeq((v),(a))
+# define __raw_writel(v,a)	__writel(v,a)
+# define __raw_writeq(v,a)	__writeq(v,a)
 #endif /* PYXIS */
 
 #define __is_ioaddr(a)		cia_is_ioaddr((unsigned long)(a))
