@@ -61,9 +61,7 @@ void volatile qdio_eyecatcher(void)
 MODULE_AUTHOR("Utz Bacher <utz.bacher@de.ibm.com>");
 MODULE_DESCRIPTION("QDIO base support version 2, " \
 		   "Copyright 2000 IBM Corporation");
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,12))
 MODULE_LICENSE("GPL");
-#endif
 
 /******************** HERE WE GO ***********************************/
 
@@ -1584,7 +1582,7 @@ static void qdio_release_irq_memory(qdio_irq_t *irq_ptr)
 			kfree(irq_ptr->input_qs[i]);
 
 next:
-		if (!irq_ptr->output_qs[i]) goto next2;
+		if (!irq_ptr->output_qs[i]) continue;
 		available=0;
 		if (!irq_ptr->output_qs[i]->is_0copy_sbals_q)
 			for (j=0;j<QDIO_MAX_BUFFERS_PER_Q;j++) {
@@ -1599,7 +1597,7 @@ next:
 		if (irq_ptr->output_qs[i]->slib)
 			kfree(irq_ptr->output_qs[i]->slib);
 		kfree(irq_ptr->output_qs[i]);
-next2:
+
 	}
 	if (irq_ptr->qdr) kfree(irq_ptr->qdr);
 	kfree(irq_ptr);
@@ -2191,21 +2189,12 @@ static int qdio_chsc(qdio_chsc_area_t *chsc_area)
 {
 	int cc;
 
-#ifdef QDIO_32_BIT
 	asm volatile (
 		".insn	rre,0xb25f0000,%1,0	\n\t"
 		"ipm	%0	\n\t"
 		"srl	%0,28	\n\t"
 		: "=d" (cc) : "d" (chsc_area) : "cc"
 		);
-#else /* QDIO_32_BIT */
-	asm volatile (
-		".insn	rre,0xb25f0000,%1,0	\n\t"
-		"ipm	%0	\n\t"
-		"srl	%0,28	\n\t"
-		: "=d" (cc) : "d" (chsc_area) : "cc"
-		);
-#endif /* QDIO_32_BIT */
 
 	return cc;
 }

@@ -1650,7 +1650,7 @@ ext3_clear_blocks(handle_t *handle, struct inode *inode, struct buffer_head *bh,
 			struct buffer_head *bh;
 
 			*p = 0;
-			bh = sb_get_hash_table(inode->i_sb, nr);
+			bh = sb_find_get_block(inode->i_sb, nr);
 			ext3_forget(handle, 0, inode, bh, nr);
 		}
 	}

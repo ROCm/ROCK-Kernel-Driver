@@ -14,53 +14,26 @@
 #include <linux/init.h>
 #include <linux/pagemap.h>
 #include <linux/smp_lock.h>
-#include <linux/buffer_head.h>	/* block_sync_page()/try_to_free_buffers() */
+#include <linux/buffer_head.h>	/* block_sync_page() */
 
 #include <asm/pgtable.h>
 
 /*
- * We may have stale swap cache pages in memory: notice
- * them here and get rid of the unnecessary final write.
- */
-static int swap_writepage(struct page *page)
-{
-	if (remove_exclusive_swap_page(page)) {
-		unlock_page(page);
-		return 0;
-	}
-	rw_swap_page(WRITE, page);
-	return 0;
-}
-
-/*
- * swapper_space doesn't have a real inode, so it gets a special vm_writeback()
- * so we don't need swap special cases in generic_vm_writeback().
- *
- * Swap pages are PageLocked and PageWriteback while under writeout so that
- * memory allocators will throttle against them.
- */
-static int swap_vm_writeback(struct page *page, int *nr_to_write)
-{
-	struct address_space *mapping = page->mapping;
-
-	unlock_page(page);
-	return generic_writepages(mapping, nr_to_write);
-}
-
-static struct address_space_operations swap_aops = {
-	vm_writeback:	swap_vm_writeback,
-	writepage:	swap_writepage,
-	sync_page:	block_sync_page,
-	set_page_dirty:	__set_page_dirty_nobuffers,
-};
-
-/*
  * swapper_inode doesn't do anything much.  It is really only here to
  * avoid some special-casing in other parts of the kernel.
+ *
+ * We set i_size to "infinity" to keep the page I/O functions happy.  The swap
+ * block allocator makes sure that allocations are in-range.  A strange
+ * number is chosen to prevent various arith overflows elsewhere.  For example,
+ * `lblock' in block_read_full_page().
  */
 static struct inode swapper_inode = {
-	i_mapping:		&swapper_space,
+	i_mapping:	&swapper_space,
+	i_size:		PAGE_SIZE * 0xffffffffLL,
+	i_blkbits:	PAGE_SHIFT,
 };
+
+extern struct address_space_operations swap_aops;
 
 struct address_space swapper_space = {
 	page_tree:	RADIX_TREE_INIT(GFP_ATOMIC),
@@ -131,10 +104,9 @@ int add_to_swap_cache(struct page *page, swp_entry_t entry)
  */
 void __delete_from_swap_cache(struct page *page)
 {
-	if (!PageLocked(page))
-		BUG();
-	if (!PageSwapCache(page))
-		BUG();
+	BUG_ON(!PageLocked(page));
+	BUG_ON(!PageSwapCache(page));
+	BUG_ON(PageWriteback(page));
 	ClearPageDirty(page);
 	__remove_inode_page(page);
 	INC_CACHE_INFO(del_total);
@@ -150,14 +122,9 @@ void delete_from_swap_cache(struct page *page)
 {
 	swp_entry_t entry;
 
-	/*
-	 * I/O should have completed and nobody can have a ref against the
-	 * page's buffers
-	 */
 	BUG_ON(!PageLocked(page));
 	BUG_ON(PageWriteback(page));
-	if (page_has_buffers(page) && !try_to_free_buffers(page))
-		BUG();
+	BUG_ON(page_has_buffers(page));
   
 	entry.val = page->index;
 
@@ -223,16 +190,9 @@ int move_from_swap_cache(struct page *page, unsigned long index,
 	void **pslot;
 	int err;
 
-	/*
-	 * Drop the buffers now, before taking the page_lock.  Because
-	 * mapping->private_lock nests outside mapping->page_lock.
-	 * This "must" succeed.  The page is locked and all I/O has completed
-	 * and nobody else has a ref against its buffers.
-	 */
 	BUG_ON(!PageLocked(page));
 	BUG_ON(PageWriteback(page));
-	if (page_has_buffers(page) && !try_to_free_buffers(page))
-		BUG();
+	BUG_ON(page_has_buffers(page));
 
 	write_lock(&swapper_space.page_lock);
 	write_lock(&mapping->page_lock);
@@ -362,7 +322,7 @@ struct page * read_swap_cache_async(swp_entry_t entry)
 			/*
 			 * Initiate read into locked page and return.
 			 */
-			rw_swap_page(READ, new_page);
+			swap_readpage(NULL, new_page);
 			return new_page;
 		}
 	} while (err != -ENOENT && err != -ENOMEM);

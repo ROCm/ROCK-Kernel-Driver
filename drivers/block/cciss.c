@@ -30,6 +30,7 @@
 #include <linux/delay.h>
 #include <linux/major.h>
 #include <linux/fs.h>
+#include <linux/bio.h>
 #include <linux/blkpg.h>
 #include <linux/timer.h>
 #include <linux/proc_fs.h>

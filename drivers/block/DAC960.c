@@ -28,6 +28,7 @@
 #include <linux/types.h>
 #include <linux/blk.h>
 #include <linux/blkdev.h>
+#include <linux/bio.h>
 #include <linux/completion.h>
 #include <linux/delay.h>
 #include <linux/genhd.h>

@@ -39,6 +39,7 @@
 #include <linux/reboot.h>
 #include <linux/init.h>
 #include <linux/ctype.h>
+#include <linux/slab.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
@@ -320,9 +321,6 @@ void show_regs(struct pt_regs * regs)
 	printk("CR2: %016lx CR3: %016lx CR4: %016lx\n", cr2, cr3, cr4);
 }
 
-#define __STR(x) #x
-#define __STR2(x) __STR(x)
-
 extern void load_gs_index(unsigned);
 
 /*
@@ -330,7 +328,13 @@ extern void load_gs_index(unsigned);
  */
 void exit_thread(void)
 {
-	/* nothing to do ... */
+	struct task_struct *me = current;
+	if (me->thread.io_bitmap_ptr) { 
+		kfree(me->thread.io_bitmap_ptr); 
+		me->thread.io_bitmap_ptr = NULL;
+		(init_tss + smp_processor_id())->io_map_base = 
+			INVALID_IO_BITMAP_OFFSET;
+	}
 }
 
 void flush_thread(void)
@@ -391,6 +395,14 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long rsp,
 
 	unlazy_fpu(current);	
 	p->thread.i387 = current->thread.i387;
+
+	if (unlikely(me->thread.io_bitmap_ptr != NULL)) { 
+		p->thread.io_bitmap_ptr = kmalloc((IO_BITMAP_SIZE+1)*4, GFP_KERNEL);
+		if (!p->thread.io_bitmap_ptr) 
+			return -ENOMEM;
+		memcpy(p->thread.io_bitmap_ptr, me->thread.io_bitmap_ptr, 
+		       (IO_BITMAP_SIZE+1)*4);
+	} 
 
 	return 0;
 }
@@ -491,21 +503,14 @@ void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 	/* 
 	 * Handle the IO bitmap 
 	 */ 
-	if (unlikely(prev->ioperm || next->ioperm)) {
-		if (next->ioperm) {
+	if (unlikely(prev->io_bitmap_ptr || next->io_bitmap_ptr)) {
+		if (next->io_bitmap_ptr) {
 			/*
 			 * 4 cachelines copy ... not good, but not that
 			 * bad either. Anyone got something better?
 			 * This only affects processes which use ioperm().
-			 * [Putting the TSSs into 4k-tlb mapped regions
-			 * and playing VM tricks to switch the IO bitmap
-			 * is not really acceptable.]
-			 * On x86-64 we could put multiple bitmaps into 
-			 * the GDT and just switch offsets
-			 * This would require ugly special cases on overflow
-			 * though -AK 
 			 */
-			memcpy(tss->io_bitmap, next->io_bitmap,
+			memcpy(tss->io_bitmap, next->io_bitmap_ptr,
 				 IO_BITMAP_SIZE*sizeof(u32));
 			tss->io_map_base = IO_BITMAP_OFFSET;
 		} else {

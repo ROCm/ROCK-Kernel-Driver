@@ -14,6 +14,7 @@
  */
 
 #include <linux/vmalloc.h>
+#include <linux/mm.h>
 #include <asm/io.h>
 #include <asm/pgalloc.h>
 #include <asm/cacheflush.h>

@@ -209,6 +209,7 @@
 #include <linux/hdreg.h>
 #include <linux/stat.h>
 #include <linux/fs.h>
+#include <linux/bio.h>
 #include <linux/proc_fs.h>
 #include <linux/blkdev.h>
 #include <linux/genhd.h>

@@ -445,8 +445,10 @@ int fail_writepage(struct page *page)
 {
 	/* Only activate on memory-pressure, not fsync.. */
 	if (current->flags & PF_MEMALLOC) {
-		activate_page(page);
-		SetPageReferenced(page);
+		if (!PageActive(page))
+			activate_page(page);
+		if (!PageReferenced(page))
+			SetPageReferenced(page);
 	}
 
 	/* Set the page dirty again, unlock */
@@ -868,55 +870,35 @@ struct page *grab_cache_page(struct address_space *mapping, unsigned long index)
  * This is intended for speculative data generators, where the data can
  * be regenerated if the page couldn't be grabbed.  This routine should
  * be safe to call while holding the lock for another page.
+ *
+ * Clear __GFP_FS when allocating the page to avoid recursion into the fs
+ * and deadlock against the caller's locked page.
  */
-struct page *grab_cache_page_nowait(struct address_space *mapping, unsigned long index)
+struct page *
+grab_cache_page_nowait(struct address_space *mapping, unsigned long index)
 {
-	struct page *page;
+	struct page *page = find_get_page(mapping, index);
 
-	page = find_get_page(mapping, index);
-
-	if ( page ) {
-		if ( !TestSetPageLocked(page) ) {
-			/* Page found and locked */
-			/* This test is overly paranoid, but what the heck... */
-			if ( unlikely(page->mapping != mapping || page->index != index) ) {
-				/* Someone reallocated this page under us. */
-				unlock_page(page);
-				page_cache_release(page);
-				return NULL;
-			} else {
-				return page;
-			}
-		} else {
-			/* Page locked by someone else */
-			page_cache_release(page);
-			return NULL;
-		}
-	}
-
-	page = page_cache_alloc(mapping);
-	if (unlikely(!page))
-		return NULL;	/* Failed to allocate a page */
-
-	if (unlikely(add_to_page_cache_unique(page, mapping, index))) {
-		/*
-		 * Someone else grabbed the page already, or
-		 * failed to allocate a radix-tree node
-		 */
+	if (page) {
+		if (!TestSetPageLocked(page))
+			return page;
 		page_cache_release(page);
 		return NULL;
 	}
-
+	page = alloc_pages(mapping->gfp_mask & ~__GFP_FS, 0);
+	if (page && add_to_page_cache_unique(page, mapping, index)) {
+		page_cache_release(page);
+		page = NULL;
+	}
 	return page;
 }
 
 /*
  * Mark a page as having seen activity.
  *
- * If it was already so marked, move it
- * to the active queue and drop the referenced
- * bit. Otherwise, just mark it for future
- * action..
+ * inactive,unreferenced	->	inactive,referenced
+ * inactive,referenced		->	active,unreferenced
+ * active,unreferenced		->	active,referenced
  */
 void mark_page_accessed(struct page *page)
 {
@@ -924,10 +906,9 @@ void mark_page_accessed(struct page *page)
 		activate_page(page);
 		ClearPageReferenced(page);
 		return;
+	} else if (!PageReferenced(page)) {
+		SetPageReferenced(page);
 	}
-
-	/* Mark the page referenced, AFTER checking for previous usage.. */
-	SetPageReferenced(page);
 }
 
 /*
@@ -2286,7 +2267,8 @@ generic_file_write(struct file *file, const char *buf,
 			}
 		}
 		kunmap(page);
-		SetPageReferenced(page);
+		if (!PageReferenced(page))
+			SetPageReferenced(page);
 		unlock_page(page);
 		page_cache_release(page);
 		if (status < 0)

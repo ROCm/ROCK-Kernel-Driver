@@ -45,21 +45,12 @@ struct cpuinfo_x86 {
 	__u8	x86_vendor;	/* CPU vendor */
 	__u8	x86_model;
 	__u8	x86_mask;
-  /* We know that wp_works_ok = 1, hlt_works_ok = 1, hard_math = 1,
-     etc... */
-	char	wp_works_ok;	/* It doesn't on 386's */
-	char	hlt_works_ok;	/* Problems on some 486Dx4's and old 386's */
-	char	hard_math;
-	char	rfu;
 	int	cpuid_level;	/* Maximum supported CPUID level, -1=no CPUID */
 	__u32	x86_capability[NCAPINTS];
 	char	x86_vendor_id[16];
 	char	x86_model_id[64];
 	int 	x86_cache_size;  /* in KB - valid for CPUS which support this
 				    call  */
-	int	fdiv_bug;
-	int	f00f_bug;
-	int	coma_bug;
 	unsigned long loops_per_jiffy;
 } ____cacheline_aligned;
 
@@ -323,7 +314,7 @@ struct thread_struct {
 /* IO permissions. the bitmap could be moved into the GDT, that would make
    switch faster for a limited number of ioperm using tasks. -AK */
 	int		ioperm;
-	u32	io_bitmap[IO_BITMAP_SIZE+1];
+	u32	*io_bitmap_ptr;
 };
 
 #define INIT_THREAD  {				\

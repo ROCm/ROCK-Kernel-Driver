@@ -121,9 +121,6 @@ imagesize.c: vmlinux.gz
 clean:
 	rm -f piggyback note addnote $(OBJS) zImage zImage.initrd vmlinux.gz no_initrd.o imagesize.c addSystemMap vmlinux.sm addRamDisk vmlinux.initrd vmlinux.sminitrd 
 
-fastdep:
-	$(TOPDIR)/scripts/mkdep *.[Sch] > .depend
-
 dep:
 	$(CPP) $(CPPFLAGS) -M *.S *.c > .depend
 

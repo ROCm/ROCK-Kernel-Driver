@@ -293,7 +293,7 @@ int journal_revoke(handle_t *handle, unsigned long blocknr,
 	bh = bh_in;
 
 	if (!bh) {
-		bh = __get_hash_table(bdev, blocknr, journal->j_blocksize);
+		bh = __find_get_block(bdev, blocknr, journal->j_blocksize);
 		if (bh)
 			BUFFER_TRACE(bh, "found on hash");
 	}
@@ -303,7 +303,7 @@ int journal_revoke(handle_t *handle, unsigned long blocknr,
 
 		/* If there is a different buffer_head lying around in
 		 * memory anywhere... */
-		bh2 = __get_hash_table(bdev, blocknr, journal->j_blocksize);
+		bh2 = __find_get_block(bdev, blocknr, journal->j_blocksize);
 		if (bh2) {
 			/* ... and it has RevokeValid status... */
 			if ((bh2 != bh) &&
@@ -407,7 +407,7 @@ int journal_cancel_revoke(handle_t *handle, struct journal_head *jh)
 	 * state machine will get very upset later on. */
 	if (need_cancel) {
 		struct buffer_head *bh2;
-		bh2 = __get_hash_table(bh->b_bdev, bh->b_blocknr, bh->b_size);
+		bh2 = __find_get_block(bh->b_bdev, bh->b_blocknr, bh->b_size);
 		if (bh2) {
 			if (bh2 != bh)
 				clear_bit(BH_Revoked, &bh2->b_state);

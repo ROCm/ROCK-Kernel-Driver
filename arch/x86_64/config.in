@@ -47,8 +47,7 @@ define_bool CONFIG_EISA n
 define_bool CONFIG_X86_IO_APIC y
 define_bool CONFIG_X86_LOCAL_APIC y
 
-#currently broken:
-#bool 'MTRR (Memory Type Range Register) support' CONFIG_MTRR
+bool 'MTRR (Memory Type Range Register) support' CONFIG_MTRR
 bool 'Symmetric multi-processing support' CONFIG_SMP
 if [ "$CONFIG_SMP" = "n" ]; then
    bool 'Preemptible Kernel' CONFIG_PREEMPT
@@ -226,6 +225,7 @@ if [ "$CONFIG_DEBUG_KERNEL" != "n" ]; then
    bool '  Spinlock debugging' CONFIG_DEBUG_SPINLOCK
    bool '  Additional run-time checks' CONFIG_CHECKING
    bool '  Debug __init statements' CONFIG_INIT_DEBUG
+   bool '  Spinlock debugging' CONFIG_DEBUG_SPINLOCK
 fi
 endmenu
 

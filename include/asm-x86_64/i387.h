@@ -16,10 +16,21 @@
 #include <asm/processor.h>
 #include <asm/sigcontext.h>
 #include <asm/user.h>
+#include <asm/thread_info.h>
 
 extern void fpu_init(void);
 extern void init_fpu(void);
 int save_i387(struct _fpstate *buf);
+
+static inline int need_signal_i387(struct task_struct *me) 
+{ 
+	if (!me->used_math)
+		return 0;
+	me->used_math = 0; 
+	if (!test_thread_flag(TIF_USEDFPU))
+		return 0;
+	return 1;
+} 
 
 /*
  * FPU lazy state save handling...

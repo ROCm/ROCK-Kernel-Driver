@@ -15,7 +15,6 @@ obj-y	:= process.o semaphore.o signal.o entry.o traps.o irq.o vm86.o \
 
 obj-y				+= cpu/
 obj-$(CONFIG_MCA)		+= mca.o
-obj-$(CONFIG_EISA)		+= eisa.o
 obj-$(CONFIG_MTRR)		+= mtrr.o
 obj-$(CONFIG_X86_MSR)		+= msr.o
 obj-$(CONFIG_X86_CPUID)		+= cpuid.o

@@ -65,6 +65,4 @@ __divlu.o: $(ev6)divide.S
 __remlu.o: $(ev6)divide.S
 	$(CC) $(AFLAGS) -DREM -DINTSIZE -c -o __remlu.o $(ev6)divide.S
 
-dep:
-
 include $(TOPDIR)/Rules.make

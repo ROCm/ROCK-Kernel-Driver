@@ -22,6 +22,7 @@
 #include <linux/delay.h>
 #include <linux/smp_lock.h>
 #include <linux/interrupt.h>
+#include <linux/tqueue.h>
 #include <linux/kernel_stat.h>
 
 #include <asm/uaccess.h>
@@ -69,11 +70,11 @@ unsigned long event;
 extern int do_setitimer(int, struct itimerval *, struct itimerval *);
 
 /*
- * The 64-bit value is not volatile - you MUST NOT read it
+ * The 64-bit jiffies value is not atomic - you MUST NOT read it
  * without holding read_lock_irq(&xtime_lock).
  * jiffies is defined in the linker script...
  */
-u64 jiffies_64;
+
 
 unsigned int * prof_buffer;
 unsigned long prof_len;
@@ -231,11 +232,6 @@ int del_timer(struct timer_list * timer)
 }
 
 #ifdef CONFIG_SMP
-void sync_timers(void)
-{
-	spin_unlock_wait(&global_bh_lock);
-}
-
 /*
  * SMP specific function to delete periodic timer.
  * Caller must disable by some means restarting the timer

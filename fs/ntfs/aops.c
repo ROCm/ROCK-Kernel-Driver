@@ -61,10 +61,10 @@ static void end_buffer_read_file_async(struct buffer_head *bh, int uptodate)
 
 			if (file_ofs < ni->initialized_size)
 				ofs = ni->initialized_size - file_ofs;
-			addr = kmap_atomic(page, KM_BIO_IRQ);
+			addr = kmap_atomic(page, KM_BIO_SRC_IRQ);
 			memset(addr + bh_offset(bh) + ofs, 0, bh->b_size - ofs);
 			flush_dcache_page(page);
-			kunmap_atomic(addr, KM_BIO_IRQ);
+			kunmap_atomic(addr, KM_BIO_SRC_IRQ);
 		}
 	} else
 		SetPageError(page);
@@ -363,10 +363,10 @@ static void end_buffer_read_mftbmp_async(struct buffer_head *bh, int uptodate)
 
 			if (file_ofs < vol->mftbmp_initialized_size)
 				ofs = vol->mftbmp_initialized_size - file_ofs;
-			addr = kmap_atomic(page, KM_BIO_IRQ);
+			addr = kmap_atomic(page, KM_BIO_SRC_IRQ);
 			memset(addr + bh_offset(bh) + ofs, 0, bh->b_size - ofs);
 			flush_dcache_page(page);
-			kunmap_atomic(addr, KM_BIO_IRQ);
+			kunmap_atomic(addr, KM_BIO_SRC_IRQ);
 		}
 	} else
 		SetPageError(page);
@@ -559,10 +559,10 @@ static void end_buffer_read_mst_async(struct buffer_head *bh, int uptodate)
 
 			if (file_ofs < ni->initialized_size)
 				ofs = ni->initialized_size - file_ofs;
-			addr = kmap_atomic(page, KM_BIO_IRQ);
+			addr = kmap_atomic(page, KM_BIO_SRC_IRQ);
 			memset(addr + bh_offset(bh) + ofs, 0, bh->b_size - ofs);
 			flush_dcache_page(page);
-			kunmap_atomic(addr, KM_BIO_IRQ);
+			kunmap_atomic(addr, KM_BIO_SRC_IRQ);
 		}
 	} else
 		SetPageError(page);
@@ -593,7 +593,7 @@ static void end_buffer_read_mst_async(struct buffer_head *bh, int uptodate)
 
 		rec_size = ni->_IDM(index_block_size);
 		recs = PAGE_CACHE_SIZE / rec_size;
-		addr = kmap_atomic(page, KM_BIO_IRQ);
+		addr = kmap_atomic(page, KM_BIO_SRC_IRQ);
 		for (i = 0; i < recs; i++) {
 			if (!post_read_mst_fixup((NTFS_RECORD*)(addr +
 					i * rec_size), rec_size))
@@ -607,7 +607,7 @@ static void end_buffer_read_mst_async(struct buffer_head *bh, int uptodate)
 					ni->_IDM(index_block_size_bits)) + i));
 		}
 		flush_dcache_page(page);
-		kunmap_atomic(addr, KM_BIO_IRQ);
+		kunmap_atomic(addr, KM_BIO_SRC_IRQ);
 		if (likely(!nr_err && recs))
 			SetPageUptodate(page);
 		else {

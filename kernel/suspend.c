@@ -320,14 +320,15 @@ static void mark_swapfiles(swp_entry_t prev, int mode)
 {
 	swp_entry_t entry;
 	union diskpage *cur;
-	
-	cur = (union diskpage *)get_free_page(GFP_ATOMIC);
-	if (!cur)
+	struct page *page;
+
+	page = alloc_page(GFP_ATOMIC);
+	if (!page)
 		panic("Out of memory in mark_swapfiles");
+	cur = page_address(page);
 	/* XXX: this is dirty hack to get first page of swap file */
 	entry = swp_entry(root_swap, 0);
-	lock_page(virt_to_page((unsigned long)cur));
-	rw_swap_page_nolock(READ, entry, (char *) cur);
+	rw_swap_page_sync(READ, entry, page);
 
 	if (mode == MARK_SWAP_RESUME) {
 	  	if (!memcmp("SUSP1R",cur->swh.magic.magic,6))
@@ -345,10 +346,8 @@ static void mark_swapfiles(swp_entry_t prev, int mode)
 		cur->link.next = prev; /* prev is the first/last swap page of the resume area */
 		/* link.next lies *no more* in last 4 bytes of magic */
 	}
-	lock_page(virt_to_page((unsigned long)cur));
-	rw_swap_page_nolock(WRITE, entry, (char *)cur);
-	
-	free_page((unsigned long)cur);
+	rw_swap_page_sync(WRITE, entry, page);
+	__free_page(page);
 }
 
 static void read_swapfiles(void) /* This is called before saving image */
@@ -409,6 +408,7 @@ static int write_suspend_image(void)
 	int nr_pgdir_pages = SUSPEND_PD_PAGES(nr_copy_pages);
 	union diskpage *cur,  *buffer = (union diskpage *)get_free_page(GFP_ATOMIC);
 	unsigned long address;
+	struct page *page;
 
 	PRINTS( "Writing data to swap (%d pages): ", nr_copy_pages );
 	for (i=0; i<nr_copy_pages; i++) {
@@ -421,13 +421,8 @@ static int write_suspend_image(void)
 			panic("\nPage %d: not enough swapspace on suspend device", i );
 	    
 		address = (pagedir_nosave+i)->address;
-		lock_page(virt_to_page(address));
-		{
-			long dummy1;
-			struct inode *suspend_file;
-			get_swaphandle_info(entry, &dummy1, &suspend_file);
-		}
-		rw_swap_page_nolock(WRITE, entry, (char *) address);
+		page = virt_to_page(address);
+		rw_swap_page_sync(WRITE, entry, page);
 		(pagedir_nosave+i)->swap_address = entry;
 	}
 	PRINTK(" done\n");
@@ -452,8 +447,8 @@ static int write_suspend_image(void)
 		if (PAGE_SIZE % sizeof(struct pbe))
 			panic("I need PAGE_SIZE to be integer multiple of struct pbe, otherwise next assignment could damage pagedir");
 		cur->link.next = prev;				
-		lock_page(virt_to_page((unsigned long)cur));
-		rw_swap_page_nolock(WRITE, entry, (char *) cur);
+		page = virt_to_page((unsigned long)cur);
+		rw_swap_page_sync(WRITE, entry, page);
 		prev = entry;
 	}
 	PRINTK(", header");
@@ -473,8 +468,8 @@ static int write_suspend_image(void)
 		
 	cur->link.next = prev;
 
-	lock_page(virt_to_page((unsigned long)cur));
-	rw_swap_page_nolock(WRITE, entry, (char *) cur);
+	page = virt_to_page((unsigned long)cur);
+	rw_swap_page_sync(WRITE, entry, page);
 	prev = entry;
 
 	PRINTK( ", signature" );

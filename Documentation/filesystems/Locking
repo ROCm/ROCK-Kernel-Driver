@@ -50,27 +50,27 @@ prototypes:
 	int (*removexattr) (struct dentry *, const char *);
 
 locking rules:
-	all may block
-		BKL	i_sem(inode)
-lookup:		no	yes
-create:		no	yes
-link:		no	yes (both)
-mknod:		no	yes
-symlink:	no	yes
-mkdir:		no	yes
-unlink:		no	yes (both)
-rmdir:		no	yes (both)	(see below)
-rename:		no	yes (all)	(see below)
-readlink:	no	no
-follow_link:	no	no
-truncate:	no	yes		(see below)
-setattr:	no	yes
-permission:	yes	no
-getattr:	no	no
-setxattr:	no	yes
-getxattr:	no	yes
-listxattr:	no	yes
-removexattr:	no	yes
+	all may block, none have BKL
+		i_sem(inode)
+lookup:		yes
+create:		yes
+link:		yes (both)
+mknod:		yes
+symlink:	yes
+mkdir:		yes
+unlink:		yes (both)
+rmdir:		yes (both)	(see below)
+rename:		yes (all)	(see below)
+readlink:	no
+follow_link:	no
+truncate:	yes		(see below)
+setattr:	yes
+permission:	no
+getattr:	no
+setxattr:	yes
+getxattr:	yes
+listxattr:	yes
+removexattr:	yes
 	Additionally, ->rmdir(), ->unlink() and ->rename() have ->i_sem on
 victim.
 	cross-directory ->rename() has (per-superblock) ->s_vfs_rename_sem.

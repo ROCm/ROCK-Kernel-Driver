@@ -18,8 +18,12 @@
 #endif
 #include <linux/kernel.h>
 
-#define prepare_to_switch()	do { } while(0)
-#define switch_to(prev,next) do {					     \
+#define prepare_arch_schedule(prev)		do { } while (0)
+#define finish_arch_schedule(prev)		do { } while (0)
+#define prepare_arch_switch(rq)			do { } while (0)
+#define finish_arch_switch(rq)			spin_unlock_irq(&(rq)->lock)
+
+#define switch_to(prev,next,last) do {					     \
 	if (prev == next)						     \
 		break;							     \
 	save_fp_regs1(&prev->thread.fp_regs);				     \

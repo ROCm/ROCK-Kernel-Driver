@@ -2,7 +2,7 @@
 # Makefile for the linux kernel.
 #
 
-export-objs := check.o ibm.o msdos.o
+export-objs := check.o msdos.o
 
 obj-y := check.o
 

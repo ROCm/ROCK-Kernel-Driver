@@ -94,17 +94,3 @@ endif
 endif # GENERIC
 
 include $(TOPDIR)/Rules.make
-
-ASM_OFFSETS_H = $(TOPDIR)/include/asm-alpha/asm_offsets.h
-asm_offsets:
-	$(CC) $(CFLAGS) -S -o - check_asm.c | \
-	sed -e '/xyzzy/ { s/xyzzy //; p; }; d;' > asm_offsets.tmp
-	@if cmp -s asm_offsets.tmp $(ASM_OFFSETS_H); then \
-	  set -x; rm asm_offsets.tmp; \
-	else \
-	  set -x; mv asm_offsets.tmp $(ASM_OFFSETS_H); \
-	fi
-
-clean::
-	rm -f check_asm
-

@@ -17,18 +17,18 @@ if [ "$CONFIG_DASD" != "n"  ]; then
   dep_tristate '   Support for ECKD Disks' CONFIG_DASD_ECKD $CONFIG_DASD
   if [ "$CONFIG_DASD_ECKD" = "m" ]; then
     bool     '   Automatic activation of ECKD module' CONFIG_DASD_AUTO_ECKD
-  fi;
+  fi
   dep_tristate '   Support for FBA  Disks' CONFIG_DASD_FBA $CONFIG_DASD
   if [ "$CONFIG_DASD_FBA" = "m" ]; then
     bool     '   Automatic activation of FBA  module' CONFIG_DASD_AUTO_FBA
-  fi;
+  fi
 #  dep_tristate '   Support for CKD  Disks' CONFIG_DASD_CKD $CONFIG_DASD
   if [ "$CONFIG_ARCH_S390X" != "y" ]; then
     dep_tristate '   Support for DIAG access to CMS reserved Disks' CONFIG_DASD_DIAG $CONFIG_DASD
     if [ "$CONFIG_DASD_DIAG" = "m" ]; then
       bool     '   Automatic activation of DIAG module' CONFIG_DASD_AUTO_DIAG
-    fi;
-  fi; 
+    fi
+  fi
 fi
 
 endmenu

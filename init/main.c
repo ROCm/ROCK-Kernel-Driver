@@ -34,7 +34,6 @@
 
 #if defined(CONFIG_ARCH_S390)
 #include <asm/s390mach.h>
-#include <asm/ccwcache.h>
 #endif
 
 #ifdef CONFIG_MTRR
@@ -393,9 +392,6 @@ asmlinkage void __init start_kernel(void)
 	buffer_init();
 	vfs_caches_init(mempages);
 	radix_tree_init();
-#if defined(CONFIG_ARCH_S390)
-	ccwcache_init();
-#endif
 	signals_init();
 #ifdef CONFIG_PROC_FS
 	proc_root_init();

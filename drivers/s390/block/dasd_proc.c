@@ -93,7 +93,7 @@ dasd_devices_write(struct file *file, const char *user_buf,
 		   size_t user_len, loff_t * offset)
 {
 	char *buffer, *str;
-	int add_or_set, device_or_range;
+	int add_or_set;
 	int from, to, features;
 
 	buffer = dasd_get_user_string(user_buf, user_len);
@@ -109,15 +109,11 @@ dasd_devices_write(struct file *file, const char *user_buf,
 		goto out_error;
 	for (str = str + 4; isspace(*str); str++);
 
-	/* Scan for "device " or "range=". */
-	if (strncmp(str, "device", 6) == 0 && isspace(str[6])) {
-		device_or_range = 0;
+	/* Scan for "device " and "range=" and ignore it. This is sick. */
+	if (strncmp(str, "device", 6) == 0 && isspace(str[6]))
 		for (str = str + 6; isspace(*str); str++);
-	} else if (strncmp(str, "range=", 6) == 0) {
-		device_or_range = 1;
-		str = str + 6;
-	} else
-		goto out_error;
+	if (strncmp(str, "range=", 6) == 0) 
+		for (str = str + 6; isspace(*str); str++);
 
 	/* Scan device number range and feature string. */
 	to = from = dasd_devno(str, &str);

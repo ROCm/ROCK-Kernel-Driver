@@ -7,7 +7,6 @@ extern unsigned long event;
 
 #include <linux/config.h>
 #include <linux/capability.h>
-#include <linux/tqueue.h>
 #include <linux/threads.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
@@ -160,7 +159,6 @@ extern unsigned long cache_decay_ticks;
 extern signed long FASTCALL(schedule_timeout(signed long timeout));
 asmlinkage void schedule(void);
 
-extern int schedule_task(struct tq_struct *task);
 extern void flush_scheduled_tasks(void);
 extern int start_context_thread(void);
 extern int current_is_keventd(void);

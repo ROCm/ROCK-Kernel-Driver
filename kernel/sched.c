@@ -6,14 +6,14 @@
  *  Copyright (C) 1991-2002  Linus Torvalds
  *
  *  1996-12-23  Modified by Dave Grothe to fix bugs in semaphores and
- *              make semaphores SMP safe
+ *		make semaphores SMP safe
  *  1998-11-19	Implemented schedule_timeout() and related stuff
  *		by Andrea Arcangeli
  *  2002-01-04	New ultra-scalable O(1) scheduler by Ingo Molnar:
- *  		hybrid priority-list and round-robin design with
- *  		an array-switch method of distributing timeslices
- *  		and per-CPU runqueues.  Additional code by Davide
- *  		Libenzi, Robert Love, and Rusty Russell.
+ *		hybrid priority-list and round-robin design with
+ *		an array-switch method of distributing timeslices
+ *		and per-CPU runqueues.  Additional code by Davide
+ *		Libenzi, Robert Love, and Rusty Russell.
  */
 
 #include <linux/mm.h>
@@ -180,11 +180,14 @@ static inline void task_rq_unlock(runqueue_t *rq, unsigned long *flags)
 /*
  * rq_lock - lock a given runqueue and disable interrupts.
  */
-static inline runqueue_t *rq_lock(runqueue_t *rq)
+static inline runqueue_t *this_rq_lock(void)
 {
+	runqueue_t *rq;
+
 	local_irq_disable();
 	rq = this_rq();
 	spin_lock(&rq->lock);
+
 	return rq;
 }
 
@@ -358,12 +361,17 @@ repeat_lock_task:
 	rq = task_rq_lock(p, &flags);
 	old_state = p->state;
 	if (!p->array) {
-		if (unlikely(sync && (rq->curr != p))) {
-			if (p->thread_info->cpu != smp_processor_id()) {
-				p->thread_info->cpu = smp_processor_id();
-				task_rq_unlock(rq, &flags);
-				goto repeat_lock_task;
-			}
+		/*
+		 * Fast-migrate the task if it's not running or runnable
+		 * currently. Do not violate hard affinity.
+		 */
+		if (unlikely(sync && (rq->curr != p) &&
+			(p->thread_info->cpu != smp_processor_id()) &&
+			(p->cpus_allowed & (1UL << smp_processor_id())))) {
+
+			p->thread_info->cpu = smp_processor_id();
+			task_rq_unlock(rq, &flags);
+			goto repeat_lock_task;
 		}
 		if (old_state == TASK_UNINTERRUPTIBLE)
 			rq->nr_uninterruptible--;
@@ -388,9 +396,7 @@ int wake_up_process(task_t * p)
 
 void wake_up_forked_process(task_t * p)
 {
-	runqueue_t *rq;
-
-	rq = rq_lock(rq);
+	runqueue_t *rq = this_rq_lock();
 
 	p->state = TASK_RUNNING;
 	if (!rt_task(p)) {
@@ -798,7 +804,8 @@ asmlinkage void schedule(void)
 	list_t *queue;
 	int idx;
 
-	BUG_ON(in_interrupt());
+	if (unlikely(in_interrupt()))
+		BUG();
 
 #if CONFIG_DEBUG_HIGHMEM
 	check_highmem_ptes();
@@ -1164,13 +1171,12 @@ static inline task_t *find_process_by_pid(pid_t pid)
 static int setscheduler(pid_t pid, int policy, struct sched_param *param)
 {
 	struct sched_param lp;
+	int retval = -EINVAL;
 	prio_array_t *array;
 	unsigned long flags;
 	runqueue_t *rq;
-	int retval;
 	task_t *p;
 
-	retval = -EINVAL;
 	if (!param || pid < 0)
 		goto out_nounlock;
 
@@ -1257,10 +1263,9 @@ asmlinkage long sys_sched_setparam(pid_t pid, struct sched_param *param)
 
 asmlinkage long sys_sched_getscheduler(pid_t pid)
 {
+	int retval = -EINVAL;
 	task_t *p;
-	int retval;
 
-	retval = -EINVAL;
 	if (pid < 0)
 		goto out_nounlock;
 
@@ -1277,11 +1282,10 @@ out_nounlock:
 
 asmlinkage long sys_sched_getparam(pid_t pid, struct sched_param *param)
 {
-	task_t *p;
 	struct sched_param lp;
-	int retval;
+	int retval = -EINVAL;
+	task_t *p;
 
-	retval = -EINVAL;
 	if (!param || pid < 0)
 		goto out_nounlock;
 
@@ -1316,8 +1320,8 @@ asmlinkage int sys_sched_setaffinity(pid_t pid, unsigned int len,
 				      unsigned long *user_mask_ptr)
 {
 	unsigned long new_mask;
-	task_t *p;
 	int retval;
+	task_t *p;
 
 	if (len < sizeof(new_mask))
 		return -EINVAL;
@@ -1367,13 +1371,12 @@ out_unlock:
 asmlinkage int sys_sched_getaffinity(pid_t pid, unsigned int len,
 				      unsigned long *user_mask_ptr)
 {
-	unsigned long mask;
 	unsigned int real_len;
-	task_t *p;
+	unsigned long mask;
 	int retval;
+	task_t *p;
 
 	real_len = sizeof(mask);
-
 	if (len < real_len)
 		return -EINVAL;
 
@@ -1398,25 +1401,35 @@ out_unlock:
 
 asmlinkage long sys_sched_yield(void)
 {
-	runqueue_t *rq;
-	prio_array_t *array;
-
-	rq = rq_lock(rq);
+	runqueue_t *rq = this_rq_lock();
+	prio_array_t *array = current->array;
 
 	/*
-	 * Decrease the yielding task's priority by one, to avoid
-	 * livelocks. This priority loss is temporary, it's recovered
-	 * once the current timeslice expires.
+	 * There are three levels of how a yielding task will give up
+	 * the current CPU:
 	 *
-	 * If priority is already MAX_PRIO-1 then we still
-	 * roundrobin the task within the runlist.
+	 *  #1 - it decreases its priority by one. This priority loss is
+	 *       temporary, it's recovered once the current timeslice
+	 *       expires.
+	 *
+	 *  #2 - once it has reached the lowest priority level,
+	 *       it will give up timeslices one by one. (We do not
+	 *       want to give them up all at once, it's gradual,
+	 *       to protect the casual yield()er.)
+	 *
+	 *  #3 - once all timeslices are gone we put the process into
+	 *       the expired array.
+	 *
+	 *  (special rule: RT tasks do not lose any priority, they just
+	 *  roundrobin on their current priority level.)
 	 */
-	array = current->array;
-	/*
-	 * If the task has reached maximum priority (or is a RT task)
-	 * then just requeue the task to the end of the runqueue:
-	 */
-	if (likely(current->prio == MAX_PRIO-1 || rt_task(current))) {
+	if (likely(current->prio == MAX_PRIO-1)) {
+		if (current->time_slice <= 1) {
+			dequeue_task(current, rq->active);
+			enqueue_task(current, rq->expired);
+		} else
+			current->time_slice--;
+	} else if (unlikely(rt_task(current))) {
 		list_del(&current->run_list);
 		list_add_tail(&current->run_list, array->queue + current->prio);
 	} else {
@@ -1467,9 +1480,9 @@ asmlinkage long sys_sched_get_priority_min(int policy)
 
 asmlinkage long sys_sched_rr_get_interval(pid_t pid, struct timespec *interval)
 {
+	int retval = -EINVAL;
 	struct timespec t;
 	task_t *p;
-	int retval = -EINVAL;
 
 	if (pid < 0)
 		goto out_nounlock;
@@ -1861,4 +1874,4 @@ void __init migration_init(void)
 			schedule_timeout(2);
 	}
 }
-#endif /* CONFIG_SMP */
+#endif

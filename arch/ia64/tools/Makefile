@@ -9,7 +9,7 @@ mrproper:
 clean:
 	rm -f print_offsets.s print_offsets offsets.h
 
-fastdep: offsets.h
+$(TARGET): offsets.h
 	@if ! cmp -s offsets.h ${TARGET}; then	\
 		echo -e "*** Updating ${TARGET}...";	\
 		cp offsets.h ${TARGET};		\

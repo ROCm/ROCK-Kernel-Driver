@@ -29,7 +29,7 @@
 /*
  * Radix tree node definition.
  */
-#define RADIX_TREE_MAP_SHIFT  7
+#define RADIX_TREE_MAP_SHIFT  6
 #define RADIX_TREE_MAP_SIZE  (1UL << RADIX_TREE_MAP_SHIFT)
 #define RADIX_TREE_MAP_MASK  (RADIX_TREE_MAP_SIZE-1)
 

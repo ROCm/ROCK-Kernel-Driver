@@ -28,6 +28,7 @@
 #include <linux/fs.h>
 #include <linux/blkdev.h>
 #include <linux/elevator.h>
+#include <linux/bio.h>
 #include <linux/blk.h>
 #include <linux/config.h>
 #include <linux/module.h>
@@ -424,3 +425,5 @@ EXPORT_SYMBOL(elevator_noop);
 EXPORT_SYMBOL(__elv_add_request);
 EXPORT_SYMBOL(__elv_next_request);
 EXPORT_SYMBOL(elv_remove_request);
+EXPORT_SYMBOL(elevator_exit);
+EXPORT_SYMBOL(elevator_init);
