@@ -45,7 +45,7 @@ extern void pxa_cpu_resume(void);
  */
 enum {	SLEEP_SAVE_START = 0,
 
-	SLEEP_SAVE_OSCR, SLEEP_SAVE_OIER,
+	SLEEP_SAVE_OIER,
 	SLEEP_SAVE_OSMR0, SLEEP_SAVE_OSMR1, SLEEP_SAVE_OSMR2, SLEEP_SAVE_OSMR3,
 
 	SLEEP_SAVE_GPLR0, SLEEP_SAVE_GPLR1, SLEEP_SAVE_GPLR2,
@@ -78,7 +78,6 @@ static int pxa_pm_enter(u32 state)
 	delta = xtime.tv_sec - RCNR;
 
 	/* save vital registers */
-	SAVE(OSCR);
 	SAVE(OSMR0);
 	SAVE(OSMR1);
 	SAVE(OSMR2);
@@ -149,8 +148,10 @@ static int pxa_pm_enter(u32 state)
 	RESTORE(OSMR1);
 	RESTORE(OSMR2);
 	RESTORE(OSMR3);
-	RESTORE(OSCR);
 	RESTORE(OIER);
+
+	/* OSMR0 is the system timer: make sure OSCR is sufficiently behind */
+	OSCR = OSMR0 - LATCH;
 
 	RESTORE(CKEN);
 

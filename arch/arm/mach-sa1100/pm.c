@@ -44,7 +44,7 @@ extern void sa1100_cpu_resume(void);
  */
 enum {	SLEEP_SAVE_SP = 0,
 
-	SLEEP_SAVE_OSCR, SLEEP_SAVE_OIER,
+	SLEEP_SAVE_OIER,
 	SLEEP_SAVE_OSMR0, SLEEP_SAVE_OSMR1, SLEEP_SAVE_OSMR2, SLEEP_SAVE_OSMR3,
 
 	SLEEP_SAVE_GPDR, SLEEP_SAVE_GAFR,
@@ -69,7 +69,6 @@ static int sa11x0_pm_enter(u32 state)
 	gpio = GPLR;
 
 	/* save vital registers */
-	SAVE(OSCR);
 	SAVE(OSMR0);
 	SAVE(OSMR1);
 	SAVE(OSMR2);
@@ -131,8 +130,10 @@ static int sa11x0_pm_enter(u32 state)
 	RESTORE(OSMR1);
 	RESTORE(OSMR2);
 	RESTORE(OSMR3);
-	RESTORE(OSCR);
 	RESTORE(OIER);
+
+	/* OSMR0 is the system timer: make sure OSCR is sufficiently behind */
+	OSCR = OSMR0 - LATCH;
 
 	/* restore current time */
 	xtime.tv_sec = RCNR + delta;
