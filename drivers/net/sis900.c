@@ -116,6 +116,7 @@ static struct mii_chip_info {
 #define	HOME 	0x0001
 #define LAN	0x0002
 #define MIX	0x0003
+#define UNKNOWN	0x0
 } mii_chip_table[] = {
 	{ "SiS 900 Internal MII PHY", 		0x001d, 0x8000, LAN },
 	{ "SiS 7014 Physical Layer Solution", 	0x0016, 0xf830, LAN },
@@ -577,9 +578,11 @@ static int __init sis900_mii_probe (struct net_device * net_dev)
 				break;
 			}
 			
-		if( !mii_chip_table[i].phy_id1 )
+		if( !mii_chip_table[i].phy_id1 ) {
 			printk(KERN_INFO "%s: Unknown PHY transceiver found at address %d.\n",
-			       net_dev->name, phy_addr);			
+			       net_dev->name, phy_addr);
+			mii_phy->phy_types = UNKNOWN;
+		}
 	}
 	
 	if (sis_priv->mii == NULL) {
@@ -644,15 +647,15 @@ static int __init sis900_mii_probe (struct net_device * net_dev)
 static u16 sis900_default_phy(struct net_device * net_dev)
 {
 	struct sis900_private * sis_priv = net_dev->priv;
- 	struct mii_phy *phy = NULL, *phy_home = NULL, *default_phy = NULL;
+ 	struct mii_phy *phy = NULL, *phy_home = NULL, *default_phy = NULL, *phy_lan = NULL;
 	u16 status;
 
         for( phy=sis_priv->first_mii; phy; phy=phy->next ){
 		status = mdio_read(net_dev, phy->phy_addr, MII_STATUS);
 		status = mdio_read(net_dev, phy->phy_addr, MII_STATUS);
 
-		/* Link ON & Not select deafalut PHY */
-		 if ( (status & MII_STAT_LINK) && !(default_phy) )
+		/* Link ON & Not select default PHY & not ghost PHY */
+		 if ( (status & MII_STAT_LINK) && !default_phy && (phy->phy_types != UNKNOWN) )
 		 	default_phy = phy;
 		 else{
 			status = mdio_read(net_dev, phy->phy_addr, MII_CONTROL);
@@ -660,12 +663,16 @@ static u16 sis900_default_phy(struct net_device * net_dev)
 				status | MII_CNTL_AUTO | MII_CNTL_ISOLATE);
 			if( phy->phy_types == HOME )
 				phy_home = phy;
+			else if (phy->phy_types == LAN)
+				phy_lan = phy;
 		 }
 	}
 
-	if( (!default_phy) && phy_home )
+	if( !default_phy && phy_home )
 		default_phy = phy_home;
-	else if(!default_phy)
+	else if( !default_phy && phy_lan )
+		default_phy = phy_lan;
+	else if ( !default_phy )
 		default_phy = sis_priv->first_mii;
 
 	if( sis_priv->mii != default_phy ){
