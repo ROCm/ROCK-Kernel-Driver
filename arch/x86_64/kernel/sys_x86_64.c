@@ -105,13 +105,6 @@ asmlinkage long sys_uname(struct new_utsname * name)
 	return err ? -EFAULT : 0;
 }
 
-asmlinkage long sys_pause(void)
-{
-	current->state = TASK_INTERRUPTIBLE;
-	schedule();
-	return -ERESTARTNOHAND;
-}
-
 asmlinkage long wrap_sys_shmat(int shmid, char *shmaddr, int shmflg)
 {
 	unsigned long raddr;
