@@ -374,7 +374,7 @@ void __init clear_kernel_mapping(unsigned long address, unsigned long size)
 	__flush_tlb_all();
 } 
 
-static inline int page_is_ram (unsigned long pagenr)
+inline int page_is_ram (unsigned long pagenr)
 {
 	int i;
 

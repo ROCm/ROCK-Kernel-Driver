@@ -190,6 +190,8 @@ static void __init probe_roms(void)
 	}
 }
 
+unsigned long crashdump_addr = 0xdeadbeef;
+
 static __init void parse_cmdline_early (char ** cmdline_p)
 {
 	char c = ' ', *to = command_line, *from = COMMAND_LINE;
@@ -276,6 +278,9 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 
 		if (!memcmp(from,"oops=panic", 10))
 			panic_on_oops = 1;
+		
+		if (c == ' ' && !memcmp(from, "crashdump=", 10))
+			crashdump_addr = memparse(from+10, &from);
 
 	next_char:
 		c = *(from++);
@@ -368,6 +373,10 @@ static int __init noreplacement_setup(char *s)
 } 
 
 __setup("noreplacement", noreplacement_setup); 
+
+#ifdef CONFIG_CRASH_DUMP_SOFTBOOT
+extern void crashdump_reserve(void);
+#endif
 
 void __init setup_arch(char **cmdline_p)
 {
@@ -474,6 +483,9 @@ void __init setup_arch(char **cmdline_p)
 	}
 #endif
 	paging_init();
+#ifdef CONFIG_CRASH_DUMP_SOFTBOOT
+	crashdump_reserve(); /* Preserve crash dump state from prev boot */
+#endif
 
 	check_ioapic();
 #ifdef CONFIG_ACPI_BOOT

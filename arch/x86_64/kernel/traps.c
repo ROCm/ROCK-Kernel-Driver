@@ -27,6 +27,7 @@
 #include <linux/spinlock.h>
 #include <linux/interrupt.h>
 #include <linux/module.h>
+#include <linux/dump.h>
 #include <linux/moduleparam.h>
 
 #include <asm/system.h>
@@ -365,6 +366,7 @@ void __die(const char * str, struct pt_regs * regs, long err)
 		printk("\n");
 	notify_die(DIE_OOPS, (char *)str, regs, err, 255, SIGSEGV);
 	show_registers(regs);
+	dump((char *)str, regs); 
 	/* Executive summary in case the oops scrolled away */
 	printk("RIP "); 
 	printk_address(regs->rip); 
@@ -550,6 +552,21 @@ static void mem_parity_error(unsigned char reason, struct pt_regs * regs)
 	outb(reason, 0x61);
 }
 
+
+#ifdef CONFIG_SMP
+int (*dump_ipi_function_ptr)(struct pt_regs *) = NULL;
+static int dump_ipi(struct pt_regs *regs)
+{
+	if (!(dump_ipi_function_ptr && dump_ipi_function_ptr(regs))) {
+		return 0;
+	}
+	ack_APIC_irq();
+	return 1;
+}
+#else
+#define dump_ipi(regs) 0
+#endif
+
 static void io_check_error(unsigned char reason, struct pt_regs * regs)
 {
 	printk("NMI: IOCK error (debug interrupt?)\n");
@@ -572,6 +589,9 @@ static void unknown_nmi_error(unsigned char reason, struct pt_regs * regs)
 asmlinkage void default_do_nmi(struct pt_regs * regs)
 {
 	unsigned char reason = inb(0x61);
+
+	if (dump_ipi(regs))
+		return;
 
 	if (!(reason & 0xc0)) {
 		if (notify_die(DIE_NMI_IPI, "nmi_ipi", regs, reason, 0, SIGINT) == NOTIFY_BAD)

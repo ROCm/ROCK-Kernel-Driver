@@ -106,6 +106,8 @@
 #include <linux/reboot.h>
 #include <linux/fs.h>
 #include <linux/dump.h>
+#include <linux/ioctl32.h>
+#include <linux/syscalls.h>
 #include "dump_methods.h"
 #include <linux/proc_fs.h>
 #include <linux/module.h>
@@ -158,6 +160,10 @@ struct __dump_compress dump_none_compression = {
 /* our device operations and functions */
 static int dump_ioctl(struct inode *i, struct file *f,
 	unsigned int cmd, unsigned long arg);
+
+#ifdef CONFIG_COMPAT
+static int dw_long(unsigned int, unsigned int, unsigned long, struct file*);
+#endif
 
 static struct file_operations dump_fops = {
 	.owner	= THIS_MODULE,
@@ -660,6 +666,23 @@ proc_doulonghex(ctl_table *ctl, int write, struct file *f,
  * -----------------------------------------------------------------------
  */
 
+#ifdef CONFIG_COMPAT
+static int dw_long(unsigned int fd, unsigned int cmd, unsigned long arg,
+                struct file *f)
+{
+        mm_segment_t old_fs = get_fs();
+        int err;
+        unsigned long val;
+
+        set_fs (KERNEL_DS);
+        err = sys_ioctl(fd, cmd, (u64)&val);
+        set_fs (old_fs);
+        if (!err && put_user((unsigned int) val, (u32 *)arg))
+               return -EFAULT;
+        return err;
+}
+#endif
+
 /*
  * These register and unregister routines are exported for modules
  * to register their dump drivers (like block, net etc)
@@ -788,6 +811,30 @@ dump_init(void)
 
 	__dump_init((u64)PAGE_OFFSET);
 
+#ifdef CONFIG_COMPAT
+       err = register_ioctl32_conversion(DIOSDUMPDEV, NULL);
+       err |= register_ioctl32_conversion(DIOGDUMPDEV, NULL);
+       err |= register_ioctl32_conversion(DIOSDUMPLEVEL, NULL);
+       err |= register_ioctl32_conversion(DIOGDUMPLEVEL, dw_long);
+       err |= register_ioctl32_conversion(DIOSDUMPFLAGS, NULL);
+       err |= register_ioctl32_conversion(DIOGDUMPFLAGS, dw_long);
+       err |= register_ioctl32_conversion(DIOSDUMPCOMPRESS, NULL);
+       err |= register_ioctl32_conversion(DIOGDUMPCOMPRESS, dw_long);
+       err |= register_ioctl32_conversion(DIOSTARGETIP, NULL);
+       err |= register_ioctl32_conversion(DIOGTARGETIP, NULL);
+       err |= register_ioctl32_conversion(DIOSTARGETPORT, NULL);
+       err |= register_ioctl32_conversion(DIOGTARGETPORT, NULL);
+       err |= register_ioctl32_conversion(DIOSSOURCEPORT, NULL);
+       err |= register_ioctl32_conversion(DIOGSOURCEPORT, NULL);
+       err |= register_ioctl32_conversion(DIOSETHADDR, NULL);
+       err |= register_ioctl32_conversion(DIOGETHADDR, NULL);
+       err |= register_ioctl32_conversion(DIOGDUMPOKAY, dw_long);
+       err |= register_ioctl32_conversion(DIOSDUMPTAKE, NULL);
+       if (err) {
+                printk(KERN_ERR "LKCD: registering ioctl32 translations failed\
+");
+       }
+#endif
 	/* set the dump_compression_list structure up */
 	dump_register_compression(&dump_none_compression);
 
@@ -810,6 +857,7 @@ dump_init(void)
 static void __exit
 dump_cleanup(void)
 {
+	int err;
 	dump_okay = 0;
 
 	if (dump_config.dumper)
@@ -817,6 +865,30 @@ dump_cleanup(void)
 
 	/* arch-specific cleanup routine */
 	__dump_cleanup();
+
+#ifdef CONFIG_COMPAT
+	err = unregister_ioctl32_conversion(DIOSDUMPDEV);
+	err |= unregister_ioctl32_conversion(DIOGDUMPDEV);
+	err |= unregister_ioctl32_conversion(DIOSDUMPLEVEL);
+	err |= unregister_ioctl32_conversion(DIOGDUMPLEVEL);
+	err |= unregister_ioctl32_conversion(DIOSDUMPFLAGS);
+	err |= unregister_ioctl32_conversion(DIOGDUMPFLAGS);
+	err |= unregister_ioctl32_conversion(DIOSDUMPCOMPRESS);
+	err |= unregister_ioctl32_conversion(DIOGDUMPCOMPRESS);
+	err |= unregister_ioctl32_conversion(DIOSTARGETIP);
+	err |= unregister_ioctl32_conversion(DIOGTARGETIP);
+	err |= unregister_ioctl32_conversion(DIOSTARGETPORT);
+	err |= unregister_ioctl32_conversion(DIOGTARGETPORT);
+	err |= unregister_ioctl32_conversion(DIOSSOURCEPORT);
+	err |= unregister_ioctl32_conversion(DIOGSOURCEPORT);
+	err |= unregister_ioctl32_conversion(DIOSETHADDR);
+	err |= unregister_ioctl32_conversion(DIOGETHADDR);
+	err |= unregister_ioctl32_conversion(DIOGDUMPOKAY);
+	err |= unregister_ioctl32_conversion(DIOSDUMPTAKE);
+	if (err) {
+		printk(KERN_ERR "LKCD: Unregistering ioctl32 translations failed\n");
+	}
+#endif
 
 	/* ignore errors while unregistering -- since can't do anything */
 	unregister_sysctl_table(sysctl_header);

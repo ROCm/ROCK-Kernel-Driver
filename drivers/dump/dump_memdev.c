@@ -103,21 +103,37 @@ void dump_early_reserve_map(struct dump_memdev *dev)
 	map1= (unsigned long *)dev->indirect_map_root;
 
 	while (map1 && (off < last)) {
+#ifdef CONFIG_X86_64
+		reserve_bootmem_node(NODE_DATA(0), virt_to_phys((void *)map1),
+				 PAGE_SIZE);
+#else
 		reserve_bootmem(virt_to_phys((void *)map1), PAGE_SIZE);
+#endif
 		for (i=0;  (i < DUMP_MAP_SZ - 1) && map1[i] && (off < last); 
 			i++, off += DUMP_MAP_SZ) {
 			pr_debug("indirect map[%d] = 0x%lx\n", i, map1[i]);
 			if (map1[i] >= max_low_pfn)
 				continue;
+#ifdef CONFIG_X86_64
+			reserve_bootmem_node(NODE_DATA(0), 
+					map1[i] << PAGE_SHIFT, PAGE_SIZE);
+#else
 			reserve_bootmem(map1[i] << PAGE_SHIFT, PAGE_SIZE);
+#endif
 			map2 = pfn_to_kaddr(map1[i]);
 			for (j = 0 ; (j < DUMP_MAP_SZ) && map2[j] && 
 				(off + j < last); j++) {
 				pr_debug("\t map[%d][%d] = 0x%lx\n", i, j, 
 					map2[j]);
 				if (map2[j] < max_low_pfn) {
+#ifdef CONFIG_X86_64
+					reserve_bootmem_node(NODE_DATA(0),
+						map2[j] << PAGE_SHIFT,
+						PAGE_SIZE);
+#else
 					reserve_bootmem(map2[j] << PAGE_SHIFT,
 						PAGE_SIZE);
+#endif
 				}
 			}
 		}

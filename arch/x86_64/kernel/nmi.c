@@ -24,6 +24,7 @@
 #include <linux/module.h>
 #include <linux/sysdev.h>
 #include <linux/nmi.h>
+#include <linux/dump.h>
 
 #include <asm/smp.h>
 #include <asm/mtrr.h>
@@ -363,6 +364,7 @@ void nmi_watchdog_tick (struct pt_regs * regs, unsigned reason)
 				panic("nmi watchdog");
 			printk("console shuts up ...\n");
 			console_silent();
+			dump("NMI watchdog detected",regs);
 			spin_unlock(&nmi_print_lock);
 			bust_spinlocks(0);
 			do_exit(SIGSEGV);

@@ -41,7 +41,7 @@
 dma_addr_t bad_dma_address;
 
 unsigned long iommu_bus_base;	/* GART remapping area (physical) */
-static unsigned long iommu_size; 	/* size of remapping area bytes */
+unsigned long iommu_size; 	/* size of remapping area bytes */
 static unsigned long iommu_pages;	/* .. and in pages */
 
 u32 *iommu_gatt_base; 		/* Remapping table */

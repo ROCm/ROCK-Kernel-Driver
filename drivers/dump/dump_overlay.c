@@ -135,8 +135,14 @@ void crashdump_reserve(void)
 			
 	printk("Dump may be available from previous boot\n");
 
+#ifdef CONFIG_X86_64
+	reserve_bootmem_node(NODE_DATA(0), 
+		virt_to_phys((void *)crashdump_addr), 
+		PAGE_ALIGN(sizeof(struct dump_config_block)));
+#else
 	reserve_bootmem(virt_to_phys((void *)crashdump_addr), 
 		PAGE_ALIGN(sizeof(struct dump_config_block)));
+#endif
 	dump_early_reserve_map(&dump_saved_config->memdev);
 
 }

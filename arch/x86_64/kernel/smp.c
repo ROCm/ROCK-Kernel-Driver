@@ -20,6 +20,7 @@
 #include <linux/kernel_stat.h>
 #include <linux/mc146818rtc.h>
 #include <linux/interrupt.h>
+#include <linux/dump.h>
 
 #include <asm/mtrr.h>
 #include <asm/pgalloc.h>
@@ -64,6 +65,13 @@ static inline void __send_IPI_shortcut(unsigned int shortcut, int vector)
 	 * No need to touch the target chip field
 	 */
 	cfg = __prepare_ICR(shortcut, vector);
+
+	 if (vector == DUMP_VECTOR) {
+ 		 /*
+ 		  * Setup DUMP IPI to be delivered as an NMI
+ 		  */
+ 		 cfg = (cfg&~APIC_VECTOR_MASK)|APIC_DM_NMI;
+	 }
 
 	/*
 	 * Send the IPI. The write to APIC_ICR fires this off.
@@ -117,6 +125,13 @@ static inline void send_IPI_mask(cpumask_t cpumask, int vector)
 	 */
 	cfg = __prepare_ICR(0, vector);
 	
+	 if (vector == DUMP_VECTOR) {
+ 		 /*
+ 		  * Setup DUMP IPI to be delivered as an NMI
+ 		  */
+ 		 cfg = (cfg&~APIC_VECTOR_MASK)|APIC_DM_NMI;
+	 }
+
 	/*
 	 * Send the IPI. The write to APIC_ICR fires this off.
 	 */
@@ -351,6 +366,13 @@ void smp_kdb_stop(void)
 	send_IPI_allbutself(KDB_VECTOR);
 }
 
+/*static int (*dump_ipi_function_ptr)(struct pt_regs *) = NULL;
+void dump_send_ipi(int (*dump_ipi_handler)(struct pt_regs *))*/
+void dump_send_ipi(void)
+{
+	send_IPI_allbutself(DUMP_VECTOR);
+}
+
 /*
  * this function sends a 'reschedule' IPI to another CPU.
  * it goes straight through and wastes no time serializing
@@ -416,7 +438,7 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 	wmb();
 	/* Send a message to all other CPUs and wait for them to respond */
 	send_IPI_allbutself(CALL_FUNCTION_VECTOR);
-
+	
 	/* Wait for response */
 	while (atomic_read(&data.started) != cpus)
 		barrier();
@@ -427,6 +449,18 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 	spin_unlock(&call_lock);
 
 	return 0;
+}
+
+void stop_this_cpu(void* dummy)
+{
+	/*
+	 * Remove this CPU:
+	 */
+	cpu_clear(smp_processor_id(), cpu_online_map);
+	local_irq_disable();
+	disable_local_APIC();
+	for (;;) 
+		asm("hlt"); 
 }
 
 void smp_stop_cpu(void)
@@ -442,10 +476,10 @@ void smp_stop_cpu(void)
 
 static void smp_really_stop_cpu(void *dummy)
 {
-	smp_stop_cpu(); 
-	for (;;) 
-		asm("hlt"); 
-} 
+	smp_stop_cpu();
+	for (;;)
+		asm("hlt");
+}
 
 void smp_send_stop(void)
 {
