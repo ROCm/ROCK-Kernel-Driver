@@ -648,6 +648,9 @@ int irlmp_disconnect_request(struct lsap_cb *self, struct sk_buff *userdata)
 	ASSERT(self->lap->lsaps != NULL, return -1;);
 
 	lsap = hashbin_remove(self->lap->lsaps, (int) self, NULL);
+#ifdef CONFIG_IRDA_CACHE_LAST_LSAP
+	self->lap->cache.valid = FALSE;
+#endif
 
 	ASSERT(lsap != NULL, return -1;);
 	ASSERT(lsap->magic == LMP_LSAP_MAGIC, return -1;);

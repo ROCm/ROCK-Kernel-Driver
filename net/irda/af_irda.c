@@ -140,8 +140,10 @@ static void irda_disconnect_indication(void *instance, void *sap,
 		dev_kfree_skb(skb);
 
 	sk = self->sk;
-	if (sk == NULL)
+	if (sk == NULL) {
+		IRDA_DEBUG(0, __FUNCTION__ "(%p) : BUG : sk is NULL\n", self);
 		return;
+	}
 
 	/* Prevent race conditions with irda_release() and irda_shutdown() */
 	if ((!sk->dead) && (sk->state != TCP_CLOSE)) {
@@ -1317,12 +1319,12 @@ static int irda_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 		len = self->max_data_size;
 	}
 
-	skb = sock_alloc_send_skb(sk, len + self->max_header_size,
+	skb = sock_alloc_send_skb(sk, len + self->max_header_size + 16, 
 				  msg->msg_flags & MSG_DONTWAIT, &err);
 	if (!skb)
 		return -ENOBUFS;
 
-	skb_reserve(skb, self->max_header_size);
+	skb_reserve(skb, self->max_header_size + 16);
 
 	asmptr = skb->h.raw = skb_put(skb, len);
 	memcpy_fromiovec(asmptr, msg->msg_iov, len);
@@ -1395,30 +1397,6 @@ static int irda_recvmsg_dgram(struct socket *sock, struct msghdr *msg,
 }
 
 /*
- * Function irda_data_wait (sk)
- *
- *    Sleep until data has arrive. But check for races..
- *
- *    The caller is expected to deal with the situation when we return
- *    due to pending signals. And even if not, the peeked skb might have
- *    been already dequeued due to concurrent operation.
- *    Currently irda_recvmsg_stream() is the only caller and is ok.
- * Return 0 if condition packet has arrived, -ERESTARTSYS if signal_pending()
- * Only used once in irda_recvmsg_stream() -> inline
- */
-static inline int irda_data_wait(struct sock *sk)
-{
-	int ret = 0;
-	if (!skb_peek(&sk->receive_queue)) {
-		set_bit(SOCK_ASYNC_WAITDATA, &sk->socket->flags);
-		__wait_event_interruptible(*(sk->sleep),
-			(skb_peek(&sk->receive_queue)!=NULL), ret);
-		clear_bit(SOCK_ASYNC_WAITDATA, &sk->socket->flags);
-	}
-	return(ret);
-}
-
-/*
  * Function irda_recvmsg_stream (sock, msg, size, flags, scm)
  */
 static int irda_recvmsg_stream(struct socket *sock, struct msghdr *msg,
@@ -1429,6 +1407,7 @@ static int irda_recvmsg_stream(struct socket *sock, struct msghdr *msg,
 	int noblock = flags & MSG_DONTWAIT;
 	int copied = 0;
 	int target = 1;
+	DECLARE_WAITQUEUE(waitq, current);
 
 	IRDA_DEBUG(3, __FUNCTION__ "()\n");
 
@@ -1451,25 +1430,43 @@ static int irda_recvmsg_stream(struct socket *sock, struct msghdr *msg,
 
 		skb=skb_dequeue(&sk->receive_queue);
 		if (skb==NULL) {
+			int ret = 0;
+
 			if (copied >= target)
 				break;
+
+			/* The following code is a cut'n'paste of the
+			 * wait_event_interruptible() macro.
+			 * We don't us the macro because the test condition
+			 * is messy. - Jean II */
+			set_bit(SOCK_ASYNC_WAITDATA, &sk->socket->flags);
+			add_wait_queue(sk->sleep, &waitq);
+			set_current_state(TASK_INTERRUPTIBLE);
 
 			/*
 			 *	POSIX 1003.1g mandates this order.
 			 */
+			if (sk->err)
+				ret = sock_error(sk);
+			else if (sk->shutdown & RCV_SHUTDOWN)
+				;
+			else if (noblock)
+				ret = -EAGAIN;
+			else if (signal_pending(current))
+				ret = -ERESTARTSYS;
+			else if (skb_peek(&sk->receive_queue) == NULL)
+				/* Wait process until data arrives */
+				schedule();
 
-			if (sk->err) {
-				return sock_error(sk);
-			}
+			current->state = TASK_RUNNING;
+			remove_wait_queue(sk->sleep, &waitq);
+			clear_bit(SOCK_ASYNC_WAITDATA, &sk->socket->flags);
 
+			if(ret)
+				return(ret);
 			if (sk->shutdown & RCV_SHUTDOWN)
 				break;
 
-			if (noblock)
-				return -EAGAIN;
-			/* Wait process until data arrives */
-			if (irda_data_wait(sk))
-				return -ERESTARTSYS;
 			continue;
 		}
 
@@ -2383,11 +2380,11 @@ bed:
 				   "(), nothing discovered yet, going to sleep...\n");
 
 			/* Set watchdog timer to expire in <val> ms. */
+			self->errno = 0;
 			self->watchdog.function = irda_discovery_timeout;
 			self->watchdog.data = (unsigned long) self;
 			self->watchdog.expires = jiffies + (val * HZ/1000);
 			add_timer(&(self->watchdog));
-			self->errno = 0;
 
 			/* Wait for IR-LMP to call us back */
 			__wait_event_interruptible(self->query_wait,
