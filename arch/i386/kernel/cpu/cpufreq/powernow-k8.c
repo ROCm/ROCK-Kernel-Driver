@@ -79,8 +79,7 @@ static u32 find_freq_from_fid(u32 fid)
 
 
 /* Return the vco fid for an input fid */
-static u32
-convert_fid_to_vco_fid(u32 fid)
+static u32 convert_fid_to_vco_fid(u32 fid)
 {
 	if (fid < HI_FID_TABLE_BOTTOM) {
 		return 8 + (2 * fid);
@@ -90,11 +89,10 @@ convert_fid_to_vco_fid(u32 fid)
 }
 
 /*
- * Return 1 if the pending bit is set. Unless we are actually just told the
- * processor to transition a state, seeing this bit set is really bad news.
+ * Return 1 if the pending bit is set. Unless we just instructed the processor
+ * to transition to a new state, seeing this bit set is really bad news.
  */
-static inline int
-pending_bit_stuck(void)
+static inline int pending_bit_stuck(void)
 {
 	u32 lo, hi;
 
@@ -103,8 +101,8 @@ pending_bit_stuck(void)
 }
 
 /*
- * Update the global current fid / vid values from the status msr. Returns 1
- * on error.
+ * Update the global current fid / vid values from the status msr.
+ * Returns 1 on error.
  */
 static int
 query_current_values_with_pending_wait(void)
@@ -728,8 +726,7 @@ transition_frequency(unsigned int index)
 }
 
 /* Driver entry point to switch to the target frequency */
-static int
-powernowk8_target(struct cpufreq_policy *pol, unsigned targfreq, unsigned relation)
+static int powernowk8_target(struct cpufreq_policy *pol, unsigned targfreq, unsigned relation)
 {
 	u32 checkfid = currfid;
 	u32 checkvid = currvid;
@@ -846,10 +843,8 @@ static struct cpufreq_driver cpufreq_amd64_driver = {
 	.attr = powernow_k8_attr,
 };
 
-
 /* driver entry point for init */
-static int __init
-powernowk8_init(void)
+static int __init powernowk8_init(void)
 {
 	int rc;
 
@@ -869,10 +864,9 @@ powernowk8_init(void)
 }
 
 /* driver entry point for term */
-static void __exit
-powernowk8_exit(void)
+static void __exit powernowk8_exit(void)
 {
-	dprintk(KERN_INFO PFX "powernowk8_exit\n");
+	dprintk(KERN_INFO PFX "exit\n");
 
 	cpufreq_unregister_driver(&cpufreq_amd64_driver);
 }
