@@ -149,12 +149,12 @@ struct pte_chain;
  * TODO: make this structure smaller, it could be as small as 32 bytes.
  */
 struct page {
+	unsigned long flags;		/* atomic flags, some possibly
+					   updated asynchronously */
+	atomic_t count;			/* Usage count, see below. */
 	struct list_head list;		/* ->mapping has some page lists. */
 	struct address_space *mapping;	/* The inode (or ...) we belong to. */
 	unsigned long index;		/* Our offset within mapping. */
-	atomic_t count;			/* Usage count, see below. */
-	unsigned long flags;		/* atomic flags, some possibly
-					   updated asynchronously */
 	struct list_head lru;		/* Pageout list, eg. active_list;
 					   protected by pagemap_lru_lock !! */
 	union {
