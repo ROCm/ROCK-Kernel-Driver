@@ -370,7 +370,7 @@ static int __init agp_amd64_probe(struct pci_dev *pdev,
 	struct agp_bridge_data *bridge;
 	u8 rev_id;
 	u8 cap_ptr;
-	char *revstring="  ";
+	char *revstring=NULL;
 
 	cap_ptr = pci_find_capability(pdev, PCI_CAP_ID_AGP);
 	if (!cap_ptr)
