@@ -27,14 +27,14 @@ struct scsi_transport_template;
 struct spi_transport_attrs {
 	int period;		/* value in the PPR/SDTR command */
 	int offset;
-	int width:1;		/* 0 - narrow, 1 - wide */
-	int iu:1;		/* Information Units enabled */
-	int dt:1;		/* DT clocking enabled */
-	int qas:1;		/* Quick Arbitration and Selection enabled */
-	int wr_flow:1;		/* Write Flow control enabled */
-	int rd_strm:1;		/* Read streaming enabled */
-	int rti:1;		/* Retain Training Information */
-	int pcomp_en:1;		/* Precompensation enabled */
+	unsigned int width:1;	/* 0 - narrow, 1 - wide */
+	unsigned int iu:1;	/* Information Units enabled */
+	unsigned int dt:1;	/* DT clocking enabled */
+	unsigned int qas:1;	/* Quick Arbitration and Selection enabled */
+	unsigned int wr_flow:1;	/* Write Flow control enabled */
+	unsigned int rd_strm:1;	/* Read streaming enabled */
+	unsigned int rti:1;	/* Retain Training Information */
+	unsigned int pcomp_en:1;/* Precompensation enabled */
 };
 
 /* accessor functions */
@@ -71,6 +71,20 @@ struct spi_function_template {
 	void	(*set_rti)(struct scsi_device *, int);
 	void	(*get_pcomp_en)(struct scsi_device *);
 	void	(*set_pcomp_en)(struct scsi_device *, int);
+	/* The driver sets these to tell the transport class it
+	 * wants the attributes displayed in sysfs.  If the show_ flag
+	 * is not set, the attribute will be private to the transport
+	 * class */
+	unsigned long	show_period:1;
+	unsigned long	show_offset:1;
+	unsigned long	show_width:1;
+	unsigned long	show_iu:1;
+	unsigned long	show_dt:1;
+	unsigned long	show_qas:1;
+	unsigned long	show_wr_flow:1;
+	unsigned long	show_rd_strm:1;
+	unsigned long	show_rti:1;
+	unsigned long	show_pcomp_en:1;
 };
 
 struct scsi_transport_template *spi_attach_transport(struct spi_function_template *);

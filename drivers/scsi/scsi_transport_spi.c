@@ -204,38 +204,25 @@ store_spi_transport_period(struct class_device *cdev, const char *buf,
 	}
 
 	if(period == -1) {
-		 int val = simple_strtoul(buf, NULL, 0);
+		int val = simple_strtoul(buf, NULL, 0);
 
-		 
-		 if(val >= (SPI_STATIC_PPR + 1)*4)
-			  period = val/4;
 
+		/* Should probably check limits here, but this
+		 * gets reasonably close to OK for most things */
+		period = val/4;
 	}
 
-	if(period == -1 || period > 0xff)
-		 return -EINVAL;
+	if(period > 0xff)
+		period = 0xff;
 
 	i->f->set_period(sdev, period);
 
 	return count;
 }
 	
-
-	
-		 
-
-
 static CLASS_DEVICE_ATTR(period, S_IRUGO | S_IWUSR, 
 			 show_spi_transport_period,
 			 store_spi_transport_period);
-
-
-struct scsi_transport_template spi_transport_template = {
-	.class = &spi_transport_class,
-	.setup = &spi_setup_transport_attrs,
-	.cleanup = NULL,
-	.size = sizeof(struct spi_transport_attrs) - sizeof(unsigned long),
-};
 
 #define SETUP_ATTRIBUTE(field)						\
 	i->private_attrs[count] = class_device_attr_##field;		\
@@ -244,7 +231,8 @@ struct scsi_transport_template spi_transport_template = {
 		i->private_attrs[count].store = NULL;			\
 	}								\
 	i->attrs[count] = &i->private_attrs[count];			\
-	count++
+	if(i->f->show_##field)						\
+		count++
 
 struct scsi_transport_template *
 spi_attach_transport(struct spi_function_template *ft)
@@ -277,7 +265,7 @@ spi_attach_transport(struct spi_function_template *ft)
 
 	/* if you add an attribute but forget to increase SPI_NUM_ATTRS
 	 * this bug will trigger */
-	BUG_ON(count != SPI_NUM_ATTRS);
+	BUG_ON(count > SPI_NUM_ATTRS);
 
 	i->attrs[count] = NULL;
 
