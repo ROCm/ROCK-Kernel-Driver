@@ -10,7 +10,7 @@
  * gets translated into an assembly file which, in turn, is processed
  * by awk to generate offsets.h.  So if you make any changes to this
  * file, be sure to verify that the awk procedure still works (see
- * prin_offsets.awk).
+ * print_offsets.awk).
  */
 #include <linux/config.h>
 

@@ -701,7 +701,7 @@ GLOBAL_ENTRY(ia64_leave_kernel)
 	 * NOTE: alloc, loadrs, and cover can't be predicated.
 	 */
 (pNonSys) br.cond.dpnt dont_preserve_current_frame
-	cover				// add current frame into dirty partition
+	cover				// add current frame into dirty partition and set cr.ifs
 	;;
 	mov r19=ar.bsp			// get new backing store pointer
 	sub r16=r16,r18			// krbs = old bsp - size of dirty partition
@@ -727,7 +727,7 @@ dont_preserve_current_frame:
 #	define Nregs	14
 #endif
 	alloc loc0=ar.pfs,2,Nregs-2,2,0
-	shr.u loc1=r18,9		// RNaTslots <= dirtySize / (64*8) + 1
+	shr.u loc1=r18,9		// RNaTslots <= floor(dirtySize / (64*8))
 	sub r17=r17,r18			// r17 = (physStackedSize + 8) - dirtySize
 	;;
 	mov ar.rsc=r19			// load ar.rsc to be used for "loadrs"
@@ -774,13 +774,13 @@ rse_clear_invalid:
 	;;
 	mov loc3=0
 	mov loc4=0
-	mov loc9=0
 	mov loc5=0
 	mov loc6=0
+	mov loc7=0
 (pRecurse) br.call.sptk.many b6=rse_clear_invalid
 	;;
-	mov loc7=0
 	mov loc8=0
+	mov loc9=0
 	cmp.ne pReturn,p0=r0,in1	// if recursion count != 0, we need to do a br.ret
 	mov loc10=0
 	mov loc11=0
