@@ -1635,12 +1635,7 @@ static void hub_port_connect_change(struct usb_hub *hub, int port,
 		}
 
 		usb_set_device_state(udev, USB_STATE_POWERED);
-
-		/* hub can tell if it's lowspeed already:  D- pullup (not D+) */
-		if (portstatus & USB_PORT_STAT_LOW_SPEED)
-			udev->speed = USB_SPEED_LOW;
-		else
-			udev->speed = USB_SPEED_UNKNOWN;
+		udev->speed = USB_SPEED_UNKNOWN;
  
 		/* set the address */
 		choose_address(udev);
