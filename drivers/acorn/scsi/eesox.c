@@ -32,6 +32,7 @@
 #include <linux/delay.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
+#include <linux/dma-mapping.h>
 
 #include <asm/io.h>
 #include <asm/irq.h>
@@ -165,22 +166,23 @@ eesoxscsi_dma_setup(struct Scsi_Host *host, Scsi_Pointer *SCp,
 		       fasdmadir_t direction, fasdmatype_t min_type)
 {
 	struct eesoxscsi_info *info = (struct eesoxscsi_info *)host->hostdata;
+	struct device *dev = scsi_get_device(host);
 	int dmach = host->dma_channel;
 
 	if (dmach != NO_DMA &&
 	    (min_type == fasdma_real_all || SCp->this_residual >= 512)) {
-		int bufs, pci_dir, dma_dir;
+		int bufs, map_dir, dma_dir;
 
 		bufs = copy_SCp_to_sg(&info->sg[0], SCp, NR_SG);
 
 		if (direction == DMA_OUT)
-			pci_dir = PCI_DMA_TODEVICE,
+			map_dir = DMA_TO_DEVICE,
 			dma_dir = DMA_MODE_WRITE;
 		else
-			pci_dir = PCI_DMA_FROMDEVICE,
+			map_dir = DMA_FROM_DEVICE,
 			dma_dir = DMA_MODE_READ;
 
-		pci_map_sg(NULL, info->sg, bufs + 1, pci_dir);
+		dma_map_sg(dev, info->sg, bufs + 1, map_dir);
 
 		disable_dma(dmach);
 		set_dma_sg(dmach, info->sg, bufs + 1);
