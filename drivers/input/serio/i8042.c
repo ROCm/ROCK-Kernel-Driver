@@ -508,16 +508,7 @@ static int i8042_enable_mux_ports(struct i8042_values *values)
 
 static int __init i8042_check_mux(struct i8042_values *values)
 {
-	static int i8042_check_mux_cookie;
 	unsigned char mux_version;
-
-/*
- * Check if AUX irq is available.
- */
-	if (request_irq(values->irq, i8042_interrupt, SA_SHIRQ,
-				"i8042", &i8042_check_mux_cookie))
-                return -1;
-	free_irq(values->irq, &i8042_check_mux_cookie);
 
 	if (i8042_enable_mux_mode(values, &mux_version))
 		return -1;
@@ -622,6 +613,7 @@ static int __init i8042_port_register(struct i8042_values *values, struct serio 
 
 	if (i8042_command(&i8042_ctr, I8042_CMD_CTL_WCTR)) {
 		printk(KERN_WARNING "i8042.c: Can't write CTR while registering.\n");
+		values->exists = 0;
 		return -1; 
 	}
 
@@ -652,8 +644,6 @@ static void i8042_timer_func(unsigned long data)
 static int i8042_controller_init(void)
 {
 
-	if (i8042_noaux)
-		i8042_nomux = 1;
 /*
  * Test the i8042. We need to know if it thinks it's working correctly
  * before doing anything else.
@@ -908,15 +898,15 @@ int __init i8042_init(void)
 	if (i8042_dumbkbd)
 		i8042_kbd_port.write = NULL;
 
-	for (i = 0; i < 4; i++)
-		i8042_init_mux_values(i8042_mux_values + i, i8042_mux_port + i, i);
-
-	if (!i8042_nomux && !i8042_check_mux(&i8042_aux_values))
-		for (i = 0; i < 4; i++)
-			i8042_port_register(i8042_mux_values + i, i8042_mux_port + i);
-	else 
-		if (!i8042_noaux && !i8042_check_aux(&i8042_aux_values))
+	if (!i8042_noaux && !i8042_check_aux(&i8042_aux_values)) {
+		if (!i8042_nomux && !i8042_check_mux(&i8042_aux_values))
+			for (i = 0; i < 4; i++) {
+				i8042_init_mux_values(i8042_mux_values + i, i8042_mux_port + i, i);
+				i8042_port_register(i8042_mux_values + i, i8042_mux_port + i);
+			}
+		else
 			i8042_port_register(&i8042_aux_values, &i8042_aux_port);
+	}
 
 	i8042_port_register(&i8042_kbd_values, &i8042_kbd_port);
 
