@@ -333,6 +333,11 @@ config PCI_DIRECT
 	depends on PCI
 	default y
 
+# the drivers/pci/msi.c code needs to be fixed first before enabling
+config PCI_USE_VECTOR
+	bool
+	default n
+
 source "drivers/pci/Kconfig"
 
 config HOTPLUG
@@ -526,13 +531,6 @@ config IOMMU_LEAK
          Add a simple leak tracer to the IOMMU code. This is useful when you
 	 are debugging a buggy device driver that leaks IOMMU mappings.
        
-config MCE_DEBUG
-       bool "K8 Machine check debugging mode"
-       default y 
-       help
-         Turn on all Machine Check debugging for device driver problems.	  
-	 This can cause panics, but is useful to find device driver problems.
-
 #config X86_REMOTE_DEBUG
 #       bool "kgdb debugging stub"
 

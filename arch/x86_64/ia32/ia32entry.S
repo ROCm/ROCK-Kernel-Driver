@@ -330,10 +330,10 @@ ia32_sys_call_table:
 	.quad sys32_adjtimex
 	.quad sys32_mprotect		/* 125 */
 	.quad compat_sys_sigprocmask
-	.quad sys32_module_warning	/* create_module */
+	.quad quiet_ni_syscall		/* create_module */
 	.quad sys_init_module
 	.quad sys_delete_module
-	.quad sys32_module_warning	/* 130  get_kernel_syms */
+	.quad quiet_ni_syscall		/* 130  get_kernel_syms */
 	.quad ni_syscall	/* quotactl */ 
 	.quad sys_getpgid
 	.quad sys_fchdir
