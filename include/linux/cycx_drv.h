@@ -37,10 +37,6 @@
 #define	DATA_OFFSET	0x0100	/* For code and data files load */
 #define	START_OFFSET	0x3ff0	/* 80186 starts here */
 
-#ifndef MIN
-#define MIN(a,b)	((a) < (b) ? (a) : (b))
-#endif
-
 /**
  *	struct cycx_hw - Adapter hardware configuration
  *	@fwid - firmware ID
