@@ -2,8 +2,8 @@
  *
  * Name:	skgetwsi.h
  * Project:	Gigabit Ethernet Adapters, TWSI-Module
- * Version:	$Revision: 1.6 $
- * Date:	$Date: 2004/11/08 15:04:00 $
+ * Version:	$Revision: 1.7 $
+ * Date:	$Date: 2004/12/20 14:48:51 $
  * Purpose:	Special defines for TWSI
  *
  ******************************************************************************/
@@ -211,10 +211,10 @@
 
 #define SK_SEN_CORE_1V3_VAL		1300	/* Voltage ASIC Core 1.3 Volt */
 
-#define SK_SEN_CORE_1V3_HIGH_ERR	(SK_I32)(SK_SEN_CORE_1V2_VAL * C_PLUS_15)
-#define SK_SEN_CORE_1V3_HIGH_WARN	(SK_I32)(SK_SEN_CORE_1V2_VAL * C_PLUS_10)
-#define SK_SEN_CORE_1V3_LOW_WARN	(SK_I32)(SK_SEN_CORE_1V2_VAL * C_MINUS_5)
-#define SK_SEN_CORE_1V3_LOW_ERR 	(SK_I32)(SK_SEN_CORE_1V2_VAL * C_MINUS_10)
+#define SK_SEN_CORE_1V3_HIGH_ERR	(SK_I32)(SK_SEN_CORE_1V3_VAL * C_PLUS_15)
+#define SK_SEN_CORE_1V3_HIGH_WARN	(SK_I32)(SK_SEN_CORE_1V3_VAL * C_PLUS_10)
+#define SK_SEN_CORE_1V3_LOW_WARN	(SK_I32)(SK_SEN_CORE_1V3_VAL * C_MINUS_5)
+#define SK_SEN_CORE_1V3_LOW_ERR 	(SK_I32)(SK_SEN_CORE_1V3_VAL * C_MINUS_10)
 
 /*
  * FAN 1 speed

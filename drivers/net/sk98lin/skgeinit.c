@@ -2,8 +2,8 @@
  *
  * Name:	skgeinit.c
  * Project:	Gigabit Ethernet Adapters, Common Modules
- * Version:	$Revision: 2.68 $
- * Date:	$Date: 2005/01/10 17:01:45 $
+ * Version:	$Revision: 2.70 $
+ * Date:	$Date: 2005/01/28 09:23:54 $
  * Purpose:	Contains functions to initialize the adapter
  *
  ******************************************************************************/
@@ -30,7 +30,7 @@
 
 #if (defined(DEBUG) || ((!defined(LINT)) && (!defined(SK_SLIM))))
 static const char SysKonnectFileId[] =
-	"@(#) $Id: skgeinit.c,v 2.68 2005/01/10 17:01:45 rschmidt Exp $ (C) Marvell.";
+	"@(#) $Id: skgeinit.c,v 2.70 2005/01/28 09:23:54 rschmidt Exp $ (C) Marvell.";
 #endif
 
 struct s_QOffTab {
@@ -2254,6 +2254,22 @@ SK_IOC	IoC)		/* I/O Context */
 				}
 			}
 		}
+		else {
+			/* Check for CLS = 0 (Dev. 4.55) */
+			if (pAC->GIni.GIPciBus != SK_PEX_BUS) {
+				/* PCI and PCI-X */
+				SK_IN8(IoC, PCI_C(pAC, PCI_CACHE_LSZ), &Byte);
+				if (Byte == 0) {
+					/* set CLS to 2 if configured to 0 */
+					SK_OUT8(IoC, PCI_C(pAC, PCI_CACHE_LSZ), 2);
+				}
+				if (pAC->GIni.GIPciBus == SK_PCIX_BUS) {
+					SK_IN32(IoC, PCI_C(pAC, PCI_OUR_REG_1), &DWord);
+					DWord |= PCI_CLS_OPT;
+					SK_OUT32(IoC, PCI_C(pAC, PCI_OUR_REG_1), DWord);
+				}
+			}
+		}
 
 		/* switch power to VCC (WA for VAUX problem) */
 		SK_OUT8(IoC, B0_POWER_CTRL, (SK_U8)(PC_VAUX_ENA | PC_VCC_ENA |
@@ -2355,7 +2371,7 @@ SK_IOC	IoC)		/* I/O Context */
 	pAC->GIni.GIPmdTyp = Byte;
 
 	pAC->GIni.GICopperType = (SK_BOOL)(Byte == 'T' || Byte == '1' ||
-		(pAC->GIni.GIYukon2 && Byte != 'S'));
+		(pAC->GIni.GIYukon2 && !(Byte == 'L' || Byte == 'S')));
 
 	/* read the PHY type (Yukon and Genesis) */
 	SK_IN8(IoC, B2_E_1, &Byte);
@@ -2396,7 +2412,7 @@ SK_IOC	IoC)		/* I/O Context */
 		if (pAC->GIni.GIYukon) {
 
 			if ((Byte < (SK_U8)SK_PHY_MARV_COPPER) &&
-				pAC->GIni.GIPmdTyp != 'S') {
+				pAC->GIni.GIPmdTyp != 'L' && pAC->GIni.GIPmdTyp != 'S') {
 				/* if this field is not initialized */
 				Byte = (SK_U8)SK_PHY_MARV_COPPER;
 
@@ -2592,8 +2608,8 @@ SK_IOC	IoC)		/* I/O Context */
 		}
 
 		/*
-		 * Writing the HW Error Mask Reg. will not generate an
-		 * IRQ as long as the B0_IMSK is not set by the driver.
+		 * Writing the HW Error Mask Reg. will not generate an IRQ
+		 * as long as the B0_IMSK is not set by the driver.
 		 */
 		SK_OUT32(IoC, B0_HWE_IMSK, pAC->GIni.GIValHwIrqMask);
 	}

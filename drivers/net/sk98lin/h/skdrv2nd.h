@@ -2,8 +2,8 @@
  *
  * Name:        skdrv2nd.h
  * Project:     GEnesis, PCI Gigabit Ethernet Adapter
- * Version:     $Revision: 1.29.2.13 $
- * Date:        $Date: 2004/11/25 15:23:19 $
+ * Version:     $Revision: 1.29.2.15 $
+ * Date:        $Date: 2005/02/07 12:42:54 $
  * Purpose:     Second header file for driver and all other modules
  *
  ******************************************************************************/
@@ -60,6 +60,7 @@
  *
  ******************************************************************************/
 
+#define Y2_RX_CHECK		/* RX Check timestamp */
 #define USE_TIST_FOR_RESET	/* Use timestamp for reset */
 #define Y2_RECOVERY		/* use specific recovery yukon2 functions */
 #define Y2_LE_CHECK		/* activate check for LE order */
@@ -613,7 +614,14 @@ struct s_DevNet {
 #ifdef Y2_RECOVERY
 	struct 		timer_list KernelTimer;	/* Kernel timer struct  */
 	int		TransmitTimeoutTimer; 	/* Transmit timer       */
-	SK_BOOL		TimerExpired; 	/* Transmit timer       */
+	SK_BOOL		TimerExpired;		/* Transmit timer       */
+	SK_BOOL		InRecover;		/* Recover flag		*/
+#ifdef Y2_RX_CHECK
+	SK_U8		FifoReadPointer;	/* Backup of the FRP */
+	SK_U8		FifoReadLevel;		/* Backup of the FRL */
+	SK_U32		BmuStateMachine;	/* Backup of the MBU SM */
+	SK_U32		LastJiffies;		/* Backup of the jiffies */
+#endif
 #endif
 	SK_AC		*pAC;
 };  

@@ -2,8 +2,8 @@
  *
  * Name:	skgesirq.c
  * Project:	Gigabit Ethernet Adapters, Common Modules
- * Version:	$Revision: 2.17 $
- * Date:	$Date: 2004/07/02 15:24:06 $
+ * Version:	$Revision: 2.19 $
+ * Date:	$Date: 2005/01/28 09:16:55 $
  * Purpose:	Special IRQ module
  *
  ******************************************************************************/
@@ -56,7 +56,7 @@
 
 #if (defined(DEBUG) || ((!defined(LINT)) && (!defined(SK_SLIM))))
 static const char SysKonnectFileId[] =
-	"@(#) $Id: skgesirq.c,v 2.17 2004/07/02 15:24:06 rschmidt Exp $ (C) Marvell.";
+	"@(#) $Id: skgesirq.c,v 2.19 2005/01/28 09:16:55 rschmidt Exp $ (C) Marvell.";
 #endif
 
 /* local function prototypes */
@@ -87,7 +87,7 @@ static const SK_U16 SkGeRxRegs[]= {
 	XM_RXF_511B,
 	XM_RXF_1023B,
 	XM_RXF_MAX_SZ
-} ;
+};
 #endif /* GENESIS */
 
 #ifdef __C2MAN__
@@ -120,7 +120,7 @@ int		Port)	/* Port Index (MAC_1 + n) */
 
 	pPrt->PAutoNegTimeOut = 0;
 
-	if (pPrt->PLinkModeConf != SK_LMODE_AUTOSENSE) {
+	if (pPrt->PLinkModeConf != (SK_U8)SK_LMODE_AUTOSENSE) {
 		pPrt->PLinkMode = pPrt->PLinkModeConf;
 		return;
 	}
@@ -305,7 +305,7 @@ int		Port)	/* Port Index (MAC_1 + n) */
 		}
 
 		/* Set Link Mode Status */
-		if (pPrt->PLinkMode == SK_LMODE_FULL) {
+		if (pPrt->PLinkMode == (SK_U8)SK_LMODE_FULL) {
 			pPrt->PLinkModeStatus = (SK_U8)SK_LMODE_STAT_FULL;
 		}
 		else {
@@ -694,37 +694,47 @@ SK_U32	HwStatus)	/* Interrupt status word */
 		}
 
 		/* Reset all bits in the PCI STATUS register */
-		SK_IN16(IoC, PCI_C(pAC,PCI_STATUS), &Word);
+		SK_IN16(IoC, PCI_C(pAC, PCI_STATUS), &Word);
 
 		SK_OUT8(IoC, B2_TST_CTRL1, TST_CFG_WRITE_ON);
-		SK_OUT16(IoC, PCI_C(pAC,PCI_STATUS), (SK_U16)(Word | PCI_ERRBITS));
+		SK_OUT16(IoC, PCI_C(pAC, PCI_STATUS), (SK_U16)(Word | PCI_ERRBITS));
 		SK_OUT8(IoC, B2_TST_CTRL1, TST_CFG_WRITE_OFF);
 
 		Para.Para64 = 0;
 		SkEventQueue(pAC, SKGE_DRV, SK_DRV_ADAP_FAIL, Para);
 	}
 
+	/* check for PCI-Express Uncorrectable Error*/
 	if ((HwStatus & Y2_IS_PCI_EXP) != 0) {
-		/* PCI-Express uncorrectable Error occured */
 		/*
-		 * On PCI-Express bus bridges are called root complexes.
+		 * On PCI-Express bus bridges are called root complexes (RC).
 		 * PCI-Express errors are recognized by the root complex too,
 		 * which requests the system to handle the problem. After error
 		 * occurence it may be that no access to the adapter may be performed
 		 * any longer.
 		 */
-		SK_ERR_LOG(pAC, SK_ERRCL_HW, SKERR_SIRQ_E026, SKERR_SIRQ_E026MSG);
 
-		/* Save uncorrectable error status */
+		/* Get uncorrectable error status */
 		SK_IN32(IoC, PCI_C(pAC, PEX_UNC_ERR_STAT), &DWord);
+
+		SK_DBG_MSG(pAC, SK_DBGMOD_HWM, SK_DBGCAT_IRQ,
+			("PEX Uncorr.Error Status: 0x%08lX\n", DWord));
+
+		if (DWord != PEX_UNSUP_REQ) {
+			/* ignore Unsupported Request Errors */
+			SK_ERR_LOG(pAC, SK_ERRCL_HW, SKERR_SIRQ_E026, SKERR_SIRQ_E026MSG);
+		}
 
 		/* clear the interrupt */
 		SK_OUT32(IoC, B2_TST_CTRL1, TST_CFG_WRITE_ON);
 		SK_OUT32(IoC, PCI_C(pAC, PEX_UNC_ERR_STAT), 0xffffffffUL);
 		SK_OUT32(IoC, B2_TST_CTRL1, TST_CFG_WRITE_OFF);
 
-		if ((DWord & PEX_FATAL_ERRORS) != 0) {
-			/* Stop only, if the uncorrectable error is fatal */	
+		if ((DWord & (PEX_FATAL_ERRORS | PEX_POIS_TLP)) != 0) {
+			/*
+			 * Stop only, if the uncorrectable error is fatal or
+			 * Poisoned TLP occured
+			 */
 			Para.Para64 = 0;
 			SkEventQueue(pAC, SKGE_DRV, SK_DRV_ADAP_FAIL, Para);
 
@@ -774,7 +784,7 @@ SK_U32	Istatus)	/* Interrupt status word */
 	SK_EVPARA	Para;
 	SK_U32		RegVal32;	/* Read register value */
 	SK_GEPORT	*pPrt;		/* GIni Port struct pointer */
-	SK_U16 		PhyInt;
+	SK_U16		PhyInt;
 	int			i;
 
 	if (((Istatus & IS_HW_ERR) & pAC->GIni.GIValIrqMask) != 0) {
@@ -818,7 +828,7 @@ SK_U32	Istatus)	/* Interrupt status word */
 
 	if ((Istatus & IS_PA_TO_TX1) != 0) {
 
-		pPrt = &pAC->GIni.GP[0];
+		pPrt = &pAC->GIni.GP[MAC_1];
 
 		/* May be a normal situation in a server with a slow network */
 		SK_OUT16(IoC, B3_PA_CTRL, PA_CLR_TO_TX1);
@@ -868,7 +878,7 @@ SK_U32	Istatus)	/* Interrupt status word */
 
 	if ((Istatus & IS_PA_TO_TX2) != 0) {
 
-		pPrt = &pAC->GIni.GP[1];
+		pPrt = &pAC->GIni.GP[MAC_2];
 
 		/* May be a normal situation in a server with a slow network */
 		SK_OUT16(IoC, B3_PA_CTRL, PA_CLR_TO_TX2);
@@ -1209,7 +1219,7 @@ SK_U32	Istatus)	/* Interrupt status word */
 #ifdef YUK2
 	SK_EVPARA	Para;
 	SK_U32		RegVal32;	/* Read register value */
-	SK_U32		DwValue;
+	SK_U8		Value;
 
 	/* HW Error indicated ? */
 	if (((Istatus & Y2_IS_HW_ERR) & pAC->GIni.GIValIrqMask) != 0) {
@@ -1223,9 +1233,9 @@ SK_U32	Istatus)	/* Interrupt status word */
 	if ((Istatus & Y2_IS_ASF) != 0) {
 		/* clear IRQ */
 		/* later on clearing should be done in ASF ISR handler */
-		SK_IN32(IoC, B28_Y2_ASF_STAT_CMD, &DwValue);
-		DwValue |= Y2_ASF_CLR_HSTI;
-		SK_OUT32(IoC, B28_Y2_ASF_STAT_CMD, DwValue);
+		SK_IN8(IoC, B28_Y2_ASF_STAT_CMD, &Value);
+		Value |= Y2_ASF_CLR_HSTI;
+		SK_OUT8(IoC, B28_Y2_ASF_STAT_CMD, Value);
 		/* Call IRQ handler in ASF Module */
 		/* TBD */
 	}
@@ -1267,7 +1277,7 @@ SK_U32	Istatus)	/* Interrupt status word */
 	/* Timer interrupt (served last) */
 	if ((Istatus & Y2_IS_TIMINT) != 0) {
 		SK_DBG_MSG(pAC, SK_DBGMOD_HWM, SK_DBGCAT_IRQ,
-			("Timer Int: 0x%08X\n", Istatus));
+			("Timer Int: 0x%08lX\n", Istatus));
 		SkHwtIsr(pAC, IoC);
 	}
 #endif	/* YUK2 */
@@ -1335,10 +1345,10 @@ int		Port)		/* Port Index (MAC_1 + n) */
 
 		(void)SkXmMacStatistic(pAC, IoC, Port, XM_RXF_FCS_ERR, &FcsErrCts);
 
-		if (pPrt->PLinkModeConf == SK_LMODE_AUTOSENSE &&
-			pPrt->PLipaAutoNeg == SK_LIPA_UNKNOWN &&
-			(pPrt->PLinkMode == SK_LMODE_HALF ||
-			 pPrt->PLinkMode == SK_LMODE_FULL)) {
+		if (pPrt->PLinkModeConf == (SK_U8)SK_LMODE_AUTOSENSE &&
+			pPrt->PLipaAutoNeg == (SK_U8)SK_LIPA_UNKNOWN &&
+			(pPrt->PLinkMode == (SK_U8)SK_LMODE_HALF ||
+			 pPrt->PLinkMode == (SK_U8)SK_LMODE_FULL)) {
 			/*
 			 * This is autosensing and we are in the fallback
 			 * manual full/half duplex mode.
@@ -1351,7 +1361,7 @@ int		Port)		/* Port Index (MAC_1 + n) */
 				return(SK_HW_PS_RESTART);
 			}
 			else {
-				pPrt->PLipaAutoNeg = SK_LIPA_MANUAL;
+				pPrt->PLipaAutoNeg = (SK_U8)SK_LIPA_MANUAL;
 			}
 		}
 
@@ -1412,12 +1422,8 @@ int		Port)		/* Port Index (MAC_1 + n) */
 
 	pPrt = &pAC->GIni.GP[Port];
 
-	if (pPrt->PLinkMode == SK_LMODE_HALF || pPrt->PLinkMode == SK_LMODE_FULL) {
-		AutoNeg = SK_FALSE;
-	}
-	else {
-		AutoNeg = SK_TRUE;
-	}
+	AutoNeg = pPrt->PLinkMode != SK_LMODE_HALF &&
+			  pPrt->PLinkMode != SK_LMODE_FULL;
 
 #ifdef GENESIS
 	if (pAC->GIni.GIGenesis) {
@@ -1523,7 +1529,7 @@ SK_BOOL	AutoNeg)	/* Is Auto-negotiation used ? */
 				 * Link Restart Workaround:
 				 *  it may be possible that the other Link side
 				 *  restarts its link as well an we detect
-				 *  another LinkBroken. To prevent this
+				 *  another PLinkBroken. To prevent this
 				 *  happening we check for a maximum number
 				 *  of consecutive restart. If those happens,
 				 *  we do NOT restart the active link and
@@ -1571,7 +1577,7 @@ SK_BOOL	AutoNeg)	/* Is Auto-negotiation used ? */
 				if ((Isrc & XM_IS_INP_ASS) != 0) {
 					pPrt->PLinkBroken = SK_TRUE;
 					/* Re-Init Link partner Autoneg flag */
-					pPrt->PLipaAutoNeg = SK_LIPA_UNKNOWN;
+					pPrt->PLipaAutoNeg = (SK_U8)SK_LIPA_UNKNOWN;
 					SK_DBG_MSG(pAC, SK_DBGMOD_HWM, SK_DBGCAT_IRQ,
 						("Link broken Port %d\n", Port));
 
@@ -1616,16 +1622,20 @@ SK_BOOL	AutoNeg)	/* Is Auto-negotiation used ? */
 	}
 
 	if (AutoNeg) {
+		/* Auto-Negotiation Done ? */
 		if ((IsrcSum & XM_IS_AND) != 0) {
+
 			SkHWLinkUp(pAC, IoC, Port);
+
 			Done = SkMacAutoNegDone(pAC, IoC, Port);
+
 			if (Done != SK_AND_OK) {
 				/* Get PHY parameters, for debugging only */
 				SkXmPhyRead(pAC, IoC, Port, PHY_XMAC_AUNE_LP, &LpAb);
 				SkXmPhyRead(pAC, IoC, Port, PHY_XMAC_RES_ABI, &ResAb);
 				SK_DBG_MSG(pAC, SK_DBGMOD_HWM, SK_DBGCAT_ERR,
 					("AutoNeg FAIL Port %d (LpAb %x, ResAb %x)\n",
-					 Port, LpAb, ResAb));
+					Port, LpAb, ResAb));
 
 				/* Try next possible mode */
 				NextMode = SkHWSenseGetNext(pAC, IoC, Port);
@@ -1647,37 +1657,36 @@ SK_BOOL	AutoNeg)	/* Is Auto-negotiation used ? */
 		}
 
 		/* AutoNeg not done, but HW link is up. Check for timeouts */
-		pPrt->PAutoNegTimeOut++;
-		if (pPrt->PAutoNegTimeOut >= SK_AND_MAX_TO) {
+		if (pPrt->PAutoNegTimeOut++ >= SK_AND_MAX_TO) {
 			/* Increase the Timeout counter */
 			pPrt->PAutoNegTOCt++;
 
 			/* Timeout occured */
 			SK_DBG_MSG(pAC, SK_DBGMOD_HWM, SK_DBGCAT_IRQ,
 				("AutoNeg timeout Port %d\n", Port));
-			if (pPrt->PLinkModeConf == SK_LMODE_AUTOSENSE &&
-				pPrt->PLipaAutoNeg != SK_LIPA_AUTO) {
+			if (pPrt->PLinkModeConf == (SK_U8)SK_LMODE_AUTOSENSE &&
+				pPrt->PLipaAutoNeg != (SK_U8)SK_LIPA_AUTO) {
 				/* Set Link manually up */
 				SkHWSenseSetNext(pAC, IoC, Port, SK_LMODE_FULL);
 				SK_DBG_MSG(pAC, SK_DBGMOD_HWM, SK_DBGCAT_IRQ,
 					("Set manual full duplex Port %d\n", Port));
 			}
 
-			if (pPrt->PLinkModeConf == SK_LMODE_AUTOSENSE &&
-				pPrt->PLipaAutoNeg == SK_LIPA_AUTO &&
+			if (pPrt->PLinkModeConf == (SK_U8)SK_LMODE_AUTOSENSE &&
+				pPrt->PLipaAutoNeg == (SK_U8)SK_LIPA_AUTO &&
 				pPrt->PAutoNegTOCt >= SK_MAX_ANEG_TO) {
 				/*
 				 * This is rather complicated.
 				 * we need to check here whether the LIPA_AUTO
 				 * we saw before is false alert. We saw at one
-				 * switch ( SR8800) that on boot time it sends
+				 * switch (SR8800) that on boot time it sends
 				 * just one auto-neg packet and does no further
 				 * auto-negotiation.
 				 * Solution: we restart the autosensing after
 				 * a few timeouts.
 				 */
 				pPrt->PAutoNegTOCt = 0;
-				pPrt->PLipaAutoNeg = SK_LIPA_UNKNOWN;
+				pPrt->PLipaAutoNeg = (SK_U8)SK_LIPA_UNKNOWN;
 				SkHWInitDefSense(pAC, IoC, Port);
 			}
 
@@ -1688,7 +1697,7 @@ SK_BOOL	AutoNeg)	/* Is Auto-negotiation used ? */
 	else {
 		/* Link is up and we don't need more */
 #ifdef DEBUG
-		if (pPrt->PLipaAutoNeg == SK_LIPA_AUTO) {
+		if (pPrt->PLipaAutoNeg == (SK_U8)SK_LIPA_AUTO) {
 			SK_DBG_MSG(pAC, SK_DBGMOD_HWM, SK_DBGCAT_ERR,
 				("ERROR: Lipa auto detected on port %d\n", Port));
 		}
@@ -1698,8 +1707,8 @@ SK_BOOL	AutoNeg)	/* Is Auto-negotiation used ? */
 		SkHWLinkUp(pAC, IoC, Port);
 
 		/*
-		 * Link sync (GP) and so assume a good connection. But if not received
-		 * a bunch of frames received in a time slot (maybe broken tx cable)
+		 * Link sync (GP) and so assume a good connection. But if no
+		 * bunch of frames received in a time slot (maybe broken Tx cable)
 		 * the port is restart.
 		 */
 		return(SK_HW_PS_LINK);
@@ -1799,7 +1808,7 @@ SK_BOOL	AutoNeg)	/* Is Auto-negotiation used ? */
 	if (AutoNeg) {
 		/* Auto-Negotiation Over ? */
 		if ((PhyStat & PHY_ST_AN_OVER) != 0) {
-			
+
 			SkHWLinkUp(pAC, IoC, Port);
 
 			Done = SkMacAutoNegDone(pAC, IoC, Port);
@@ -1821,9 +1830,9 @@ SK_BOOL	AutoNeg)	/* Is Auto-negotiation used ? */
 		}
 	}
 	else {	/* !AutoNeg */
-		/* Link is up and we don't need more. */
+		/* Link is up and we don't need more */
 #ifdef DEBUG
-		if (pPrt->PLipaAutoNeg == SK_LIPA_AUTO) {
+		if (pPrt->PLipaAutoNeg == (SK_U8)SK_LIPA_AUTO) {
 			SK_DBG_MSG(pAC, SK_DBGMOD_HWM, SK_DBGCAT_ERR,
 				("ERROR: Lipa auto detected on port %d\n", Port));
 		}
@@ -1863,9 +1872,7 @@ SK_BOOL	AutoNeg)	/* Is Auto-negotiation used ? */
 	SK_U16		PhySpecStat;/* PHY Specific Status */
 	SK_U16		ResAb;		/* Master/Slave resolution */
 	SK_EVPARA	Para;
-#ifdef DEBUG
 	SK_U16		Word;		/* I/O helper */
-#endif /* DEBUG */
 
 	pPrt = &pAC->GIni.GP[Port];
 
@@ -1940,10 +1947,28 @@ SK_BOOL	AutoNeg)	/* Is Auto-negotiation used ? */
 	pPrt->PMSStatus = ((ResAb & PHY_B_1000S_MSR) != 0) ?
 		SK_MS_STAT_MASTER : SK_MS_STAT_SLAVE;
 
-	pPrt->PCableLen = (SK_U8)((PhySpecStat & PHY_M_PS_CABLE_MSK) >> 7);
+	/* on PHY 88E1112 cable length is in Reg. 26, Page 5 */
+	if (pAC->GIni.GIChipId == CHIP_ID_YUKON_XL) {
+		/* save page register */
+		SkGmPhyRead(pAC, IoC, Port, PHY_MARV_EXT_ADR, &Word);
+
+		/* select page 5 to access VCT DSP distance register */
+		SkGmPhyWrite(pAC, IoC, Port, PHY_MARV_EXT_ADR, 5);
+
+		/* get VCT DSP distance */
+		SkGmPhyRead(pAC, IoC, Port, PHY_MARV_EXT_CTRL_2, &PhySpecStat);
+
+		/* restore page register */
+		SkGmPhyWrite(pAC, IoC, Port, PHY_MARV_EXT_ADR, Word);
+
+		pPrt->PCableLen = (SK_U8)(PhySpecStat & PHY_M_EC2_FO_AM_MSK);
+	}
+	else {
+		pPrt->PCableLen = (SK_U8)((PhySpecStat & PHY_M_PS_CABLE_MSK) >> 7);
+	}
 
 	if (AutoNeg) {
-		/* Auto-Negotiation Over ? */
+		/* Auto-Negotiation Complete ? */
 		if ((PhyStat & PHY_ST_AN_OVER) != 0) {
 
 			SkHWLinkUp(pAC, IoC, Port);
@@ -1958,9 +1983,8 @@ SK_BOOL	AutoNeg)	/* Is Auto-negotiation used ? */
 		}
 	}
 	else {	/* !AutoNeg */
-		/* Link is up and we don't need more */
 #ifdef DEBUG
-		if (pPrt->PLipaAutoNeg == SK_LIPA_AUTO) {
+		if (pPrt->PLipaAutoNeg == (SK_U8)SK_LIPA_AUTO) {
 			SK_DBG_MSG(pAC, SK_DBGMOD_HWM, SK_DBGCAT_ERR,
 				("ERROR: Lipa auto detected on port %d\n", Port));
 		}
@@ -2071,13 +2095,12 @@ SK_BOOL	AutoNeg)	/* Is Auto-negotiation used ? */
 		}
 
 		/* AutoNeg not done, but HW link is up. Check for timeouts */
-		pPrt->PAutoNegTimeOut++;
-		if (pPrt->PAutoNegTimeOut >= SK_AND_MAX_TO) {
+		if (pPrt->PAutoNegTimeOut++ >= SK_AND_MAX_TO) {
 			/* Timeout occured */
 			SK_DBG_MSG(pAC, SK_DBGMOD_HWM, SK_DBGCAT_IRQ,
 				("AutoNeg timeout Port %d\n", Port));
-			if (pPrt->PLinkModeConf == SK_LMODE_AUTOSENSE &&
-				pPrt->PLipaAutoNeg != SK_LIPA_AUTO) {
+			if (pPrt->PLinkModeConf == (SK_U8)SK_LMODE_AUTOSENSE &&
+				pPrt->PLipaAutoNeg != (SK_U8)SK_LIPA_AUTO) {
 				/* Set Link manually up */
 				SkHWSenseSetNext(pAC, IoC, Port, SK_LMODE_FULL);
 				SK_DBG_MSG(pAC, SK_DBGMOD_HWM, SK_DBGCAT_IRQ,
@@ -2091,7 +2114,7 @@ SK_BOOL	AutoNeg)	/* Is Auto-negotiation used ? */
 	else {
 		/* Link is up and we don't need more */
 #ifdef DEBUG
-		if (pPrt->PLipaAutoNeg == SK_LIPA_AUTO) {
+		if (pPrt->PLipaAutoNeg == (SK_U8)SK_LIPA_AUTO) {
 			SK_DBG_MSG(pAC, SK_DBGMOD_HWM, SK_DBGCAT_ERR,
 				("ERROR: Lipa auto detected on port %d\n", Port));
 		}
@@ -2151,7 +2174,7 @@ SK_U32		Event,		/* Module specific Event */
 SK_EVPARA	Para)		/* Event specific Parameter */
 {
 	SK_GEPORT	*pPrt;		/* GIni Port struct pointer */
-	SK_U32		Port;
+	int			Port;
 	SK_U32		Val32;
 	int			PortStat;
 	SK_U8		Val8;
@@ -2159,7 +2182,7 @@ SK_EVPARA	Para)		/* Event specific Parameter */
 	SK_U64		Octets;
 #endif /* GENESIS */
 
-	Port = Para.Para32[0];
+	Port = (int)Para.Para32[0];
 	pPrt = &pAC->GIni.GP[Port];
 
 	switch (Event) {
@@ -2170,14 +2193,14 @@ SK_EVPARA	Para)		/* Event specific Parameter */
 		}
 		else {
 			/* Check whether port came up */
-			PortStat = SkGePortCheckUp(pAC, IoC, (int)Port);
+			PortStat = SkGePortCheckUp(pAC, IoC, Port);
 		}
 
 		switch (PortStat) {
 		case SK_HW_PS_RESTART:
 			if (pPrt->PHWLinkUp) {
 				/* Set Link to down */
-				SkHWLinkDown(pAC, IoC, (int)Port);
+				SkHWLinkDown(pAC, IoC, Port);
 
 				/*
 				 * Signal directly to RLMT to ensure correct
@@ -2198,7 +2221,7 @@ SK_EVPARA	Para)		/* Event specific Parameter */
 
 		/* Start again the check Timer */
 		if (pPrt->PHWLinkUp) {
-			
+
 			Val32 = SK_WA_ACT_TIME;
 		}
 		else {
@@ -2223,7 +2246,7 @@ SK_EVPARA	Para)		/* Event specific Parameter */
 			SkRlmtEvent(pAC, IoC, SK_RLMT_LINK_DOWN, Para);
 		}
 
-		SkHWLinkDown(pAC, IoC, (int)Port);
+		SkHWLinkDown(pAC, IoC, Port);
 
 		/* Schedule Port RESET */
 		SkEventQueue(pAC, SKGE_DRV, SK_DRV_PORT_RESET, Para);
@@ -2246,7 +2269,7 @@ SK_EVPARA	Para)		/* Event specific Parameter */
 		/* Stop Workaround Timer */
 		SkTimerStop(pAC, IoC, &pPrt->PWaTimer);
 
-		SkHWLinkDown(pAC, IoC, (int)Port);
+		SkHWLinkDown(pAC, IoC, Port);
 		break;
 
 	case SK_HWEV_UPDATE_STAT:
@@ -2255,7 +2278,7 @@ SK_EVPARA	Para)		/* Event specific Parameter */
 
 	case SK_HWEV_CLEAR_STAT:
 		/* We do NOT need to clear any statistics */
-		for (Port = 0; Port < (SK_U32)pAC->GIni.GIMacsFound; Port++) {
+		for (Port = 0; Port < pAC->GIni.GIMacsFound; Port++) {
 			pPrt->PPrevRx = 0;
 			pPrt->PPrevFcs = 0;
 			pPrt->PPrevShorts = 0;
@@ -2432,12 +2455,12 @@ SK_U16		IStatus)	/* Interrupt Status */
 	if ((IStatus & PHY_M_IS_LST_CHANGE) != 0) {
 
 		SK_DBG_MSG(pAC, SK_DBGMOD_HWM, SK_DBGCAT_CTRL,
-			("Link Status changed\n", IStatus));
+			("Link Status changed\n"));
 
 		Para.Para32[0] = (SK_U32)Port;
 
 		if (pPrt->PHWLinkUp) {
-			
+
 			SkHWLinkDown(pAC, IoC, Port);
 
 			SkGmPhyRead(pAC, IoC, Port, PHY_MARV_AUNE_ADV, &Word);
@@ -2457,7 +2480,6 @@ SK_U16		IStatus)	/* Interrupt Status */
 			SkEventQueue(pAC, SKGE_RLMT, SK_RLMT_LINK_DOWN, Para);
 		}
 		else {
-
 			if ((IStatus & PHY_M_IS_AN_COMPL) != 0) {
 				SK_DBG_MSG(pAC, SK_DBGMOD_HWM, SK_DBGCAT_CTRL,
 					("Auto-Negotiation completed\n"));

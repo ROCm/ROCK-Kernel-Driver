@@ -22,12 +22,12 @@
  *
  ******************************************************************************/
 
-#define BOOT_STRING  "sk98lin: Network Device Driver v8.13.1.3\n" \
+#define BOOT_STRING  "sk98lin: Network Device Driver v8.14.3.3\n" \
                      "(C)Copyright 1999-2005 Marvell(R)."
-#define VER_STRING   "8.13.1.3"
-#define PATCHLEVEL   "01"
+#define VER_STRING   "8.14.3.3"
+#define PATCHLEVEL   "03"
 #define DRIVER_FILE_NAME   "sk98lin"
-#define DRIVER_REL_DATE    "Jan-17-2005"
+#define DRIVER_REL_DATE    "Feb-11-2005"
 
 /*******************************************************************************
  *

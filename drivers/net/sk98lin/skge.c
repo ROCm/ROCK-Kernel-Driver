@@ -2,8 +2,8 @@
  *
  * Name:        skge.c
  * Project:     GEnesis, PCI Gigabit Ethernet Adapter
- * Version:     $Revision: 1.60.2.28 $
- * Date:        $Date: 2004/12/23 18:40:09 $
+ * Version:     $Revision: 1.60.2.31 $
+ * Date:        $Date: 2005/02/07 12:41:23 $
  * Purpose:     The main driver source module
  *
  ******************************************************************************/
@@ -468,6 +468,10 @@ static int __devinit sk98lin_init_device(struct pci_dev *pdev,
 	/* Save initial device name */
 	strcpy(pNet->InitialDevName, dev->name);
 
+	/* Set network to off */
+	netif_stop_queue(dev);
+	netif_carrier_off(dev);
+
 	/* Print adapter specific string from vpd and config settings */
 	printk("%s: %s\n", pNet->InitialDevName, pAC->DeviceStr);
 	printk("      PrefPort:%c  RlmtMode:%s\n",
@@ -572,6 +576,11 @@ static int __devinit sk98lin_init_device(struct pci_dev *pdev,
 
 		/* Save initial device name */
 		strcpy(pNet->InitialDevName, dev->name);
+
+		/* Set network to off */
+		netif_stop_queue(dev);
+		netif_carrier_off(dev);
+
 
 #ifdef CONFIG_PROC_FS
 		if (pSkRootDir 
@@ -692,38 +701,116 @@ DEV_NET *pNet)  /* holds the pointer to adapter control context */
 {
 	SK_AC           *pAC = pNet->pAC;
 	SK_BOOL		StartTimer = SK_TRUE;
+#ifdef Y2_RX_CHECK
+	SK_BOOL		ZeroRegister = SK_FALSE;
+	SK_U8		FifoReadPointer;
+	SK_U8		FifoReadLevel;
+	SK_U32		BmuStateMachine;
+#endif
 
-	if (CHIP_ID_YUKON_2(pAC)) {
+	if (pNet->InRecover)
+		return;
 
 #define TXPORT pAC->TxPort[pNet->PortNr][TX_PRIO_LOW]
 #define RXPORT pAC->RxPort[pNet->PortNr]
 
-		if (netif_running(pAC->dev[pNet->PortNr])) {
-			if (!(IS_Q_EMPTY(&TXPORT.TxAQ_working))) {
-				if (TXPORT.LastDone != TXPORT.TxALET.Done) {
-					TXPORT.LastDone = TXPORT.TxALET.Done;
-					pNet->TransmitTimeoutTimer = 0;
-				} else {
-					pNet->TransmitTimeoutTimer++;
-					if (pNet->TransmitTimeoutTimer >= 10) {
-						pNet->TransmitTimeoutTimer = 0;
-#ifdef CHECK_TRANSMIT_TIMEOUT
-						StartTimer =  SK_FALSE;
+	if (	(CHIP_ID_YUKON_2(pAC)) &&
+		(netif_running(pAC->dev[pNet->PortNr]))) {
+		
+#ifdef Y2_RX_CHECK
+		/* Check the receiver only if link is up*/
+		if (	(netif_carrier_ok(pAC->dev[pNet->PortNr])) &&
+			(pNet->LastJiffies == pAC->dev[pNet->PortNr]->last_rx)) {
+
+			/* Nothing received */
+			/* Get the register values */
+			SK_IN8(pAC->IoBase, 0x0448, &FifoReadPointer);
+			SK_IN8(pAC->IoBase, 0x044a, &FifoReadLevel);
+			SK_IN32(pAC->IoBase, 0x043c, &BmuStateMachine);
+
+			/* Check the register values */
+			if 	((pNet->FifoReadPointer != FifoReadPointer) ||
+				(pNet->FifoReadLevel != FifoReadLevel)      ||
+				(pNet->BmuStateMachine != BmuStateMachine)) {
+
+				/* Check the values */
+				if 	((pNet->FifoReadPointer) ||
+					(pNet->FifoReadLevel)	||
+					(pNet->BmuStateMachine)) {
+
+					/* Check the jiffies again */
+					if (pNet->LastJiffies == 
+						pAC->dev[pNet->PortNr]->last_rx) {
+						/* Still nothing received */
 						SkLocalEventQueue(pAC, SKGE_DRV, 
 							SK_DRV_RECOVER,pNet->PortNr,-1,SK_FALSE);
-#endif
+					} else {
+						ZeroRegister = SK_TRUE;
 					}
-				} 
+				} else {
+					pNet->FifoReadPointer = FifoReadPointer;
+					pNet->FifoReadLevel = FifoReadLevel;
+					pNet->BmuStateMachine = BmuStateMachine;
+					
+				}
+			} else {
+				if ((FifoReadLevel != 0) && 
+					(FifoReadPointer > 0)) {
+					/* Check the jiffies again */
+					if (pNet->LastJiffies == 
+						pAC->dev[pNet->PortNr]->last_rx) {
+						/* Still nothing received */
+						SkLocalEventQueue(pAC, SKGE_DRV, 
+							SK_DRV_RECOVER,pNet->PortNr,-1,SK_FALSE);
+					} else {
+						ZeroRegister = SK_TRUE;
+					}
+				} else {
+					ZeroRegister = SK_TRUE;
+				}
+			}
+		} else {
+			/* Clear the values */
+			if 	((pNet->FifoReadPointer) ||
+				(pNet->FifoReadLevel)	||
+				(pNet->BmuStateMachine)) {
+					ZeroRegister = SK_TRUE;
+			}
+			pNet->LastJiffies = 
+				pAC->dev[pNet->PortNr]->last_rx;
+		}
+
+		/* Clear the register values */
+		if (ZeroRegister) {
+			pNet->FifoReadPointer = 0; 
+			pNet->FifoReadLevel   = 0;
+			pNet->BmuStateMachine = 0;
+		}
+#endif
+
+		/* Checkthe transmitter */
+		if (!(IS_Q_EMPTY(&TXPORT.TxAQ_working))) {
+			if (TXPORT.LastDone != TXPORT.TxALET.Done) {
+				TXPORT.LastDone = TXPORT.TxALET.Done;
+				pNet->TransmitTimeoutTimer = 0;
+			} else {
+				pNet->TransmitTimeoutTimer++;
+				if (pNet->TransmitTimeoutTimer >= 10) {
+					pNet->TransmitTimeoutTimer = 0;
+#ifdef CHECK_TRANSMIT_TIMEOUT
+					StartTimer =  SK_FALSE;
+					SkLocalEventQueue(pAC, SKGE_DRV, 
+						SK_DRV_RECOVER,pNet->PortNr,-1,SK_FALSE);
+#endif
+				}
 			} 
 		} 
 
 #ifdef CHECK_TRANSMIT_TIMEOUT
-		if (StartTimer == SK_TRUE) {
-			pNet->KernelTimer.expires = jiffies + (1*HZ)/4; /* 250ms */
-			add_timer(&pNet->KernelTimer);
-		}
-#endif
+		pNet->KernelTimer.expires = jiffies + (1*HZ)/4; /* 250ms */
+		add_timer(&pNet->KernelTimer);
 		pNet->TimerExpired = SK_FALSE;
+#endif
 	}
 }
 #endif
@@ -2098,6 +2185,8 @@ struct SK_NET_DEVICE *dev)  /* the device that is to be opened */
 	spin_unlock_irqrestore(&pAC->SlowPathLock, Flags);
 
 #ifdef Y2_RECOVERY
+	pNet->InRecover = SK_FALSE;
+
 	/* Initialize the kernel timer */
 	init_timer(&pNet->KernelTimer);
 	pNet->KernelTimer.function	= SkGeHandleKernelTimer;
@@ -2364,6 +2453,7 @@ int	WorkDone = 0;
 		spin_unlock(&pAC->TxPort[1][TX_PRIO_LOW].TxDesRingLock);
 #endif
 		ReceiveIrq(pAC, &pAC->RxPort[1], SK_TRUE, &WorkDone, WorkToDo);
+		CLEAR_AND_START_RX(1);
 	}
 #ifdef USE_TX_COMPLETE
 	spin_lock(&pAC->TxPort[0][TX_PRIO_LOW].TxDesRingLock);
@@ -2371,6 +2461,7 @@ int	WorkDone = 0;
 	spin_unlock(&pAC->TxPort[0][TX_PRIO_LOW].TxDesRingLock);
 #endif
 	ReceiveIrq(pAC, &pAC->RxPort[0], SK_TRUE, &WorkDone, WorkToDo);
+	CLEAR_AND_START_RX(0);
 
 	*budget -= WorkDone;
 	dev->quota -= WorkDone;
@@ -5008,12 +5099,6 @@ SK_EVPARA  Param)  /* event-parameter            */
 #endif
 
 	switch (Event) {
-	case SK_DRV_ADAP_FAIL:
-		SK_DBG_MSG(NULL, SK_DBGMOD_DRV, SK_DBGCAT_DRV_EVENT,
-			("ADAPTER FAIL EVENT\n"));
-		printk("%s: Adapter failed.\n", pAC->dev[0]->name);
-		SK_OUT32(pAC->IoBase, B0_IMSK, 0); /* disable interrupts */
-		break;
 	case SK_DRV_PORT_FAIL:
 		FromPort = Param.Para32[0];
 		SK_DBG_MSG(NULL, SK_DBGMOD_DRV, SK_DBGCAT_DRV_EVENT,
@@ -5235,7 +5320,8 @@ SK_EVPARA  Param)  /* event-parameter            */
 		}
 
 		/* Inform the world that link protocol is up. */
-		netif_wake_queue(pAC->dev[0]);
+		netif_wake_queue(pAC->dev[FromPort]);
+		netif_carrier_on(pAC->dev[FromPort]);
 		pAC->dev[FromPort]->flags |= IFF_RUNNING;
 		break;
 	case SK_DRV_NET_DOWN:	
@@ -5243,6 +5329,12 @@ SK_EVPARA  Param)  /* event-parameter            */
 		FromPort = Param.Para32[1];
 		SK_DBG_MSG(NULL, SK_DBGMOD_DRV, SK_DBGCAT_DRV_EVENT,
 			("NET DOWN EVENT "));
+
+		/* Stop queue and carrier */
+		netif_stop_queue(pAC->dev[FromPort]);
+		netif_carrier_off(pAC->dev[FromPort]);
+
+		/* Print link change */
 		if (DoPrintInterfaceChange) {
 			if (pAC->dev[FromPort]->flags & IFF_RUNNING) {
 				printk("%s: network connection down\n", 
@@ -5406,11 +5498,35 @@ SK_EVPARA  Param)  /* event-parameter            */
 			printk("Expiration of unknown timer\n");
 		}
 		break;
+	case SK_DRV_ADAP_FAIL:
+#if (!defined (Y2_RECOVERY) && !defined (Y2_LE_CHECK))
+		SK_DBG_MSG(NULL, SK_DBGMOD_DRV, SK_DBGCAT_DRV_EVENT,
+			("ADAPTER FAIL EVENT\n"));
+		printk("%s: Adapter failed.\n", pAC->dev[0]->name);
+		SK_OUT32(pAC->IoBase, B0_IMSK, 0); /* disable interrupts */
+		break;
+#endif
+
 #if (defined (Y2_RECOVERY) || defined (Y2_LE_CHECK))
 	case SK_DRV_RECOVER:
+		pNet = (DEV_NET *) pAC->dev[0]->priv;
+
+		/* Recover already in progress */
+		if (pNet->InRecover) {
+			break;
+		}
+
+		netif_stop_queue(pAC->dev[0]); /* stop device if running */
+		pNet->InRecover = SK_TRUE;
+
 		FromPort = Param.Para32[0];
 		SK_DBG_MSG(NULL, SK_DBGMOD_DRV, SK_DBGCAT_DRV_EVENT,
 			("PORT RESET EVENT, Port: %d ", FromPort));
+
+		/* Disable interrupts */
+		SK_OUT32(pAC->IoBase, B0_IMSK, 0);
+		SK_OUT32(pAC->IoBase, B0_HWE_IMSK, 0);
+
 		SkLocalEventQueue64(pAC, SKGE_PNMI, SK_PNMI_EVT_XMAC_RESET,
 					FromPort, SK_FALSE);
 		spin_lock_irqsave(
@@ -5515,7 +5631,7 @@ SK_EVPARA  Param)  /* event-parameter            */
 			&pAC->TxPort[FromPort][TX_PRIO_LOW].TxDesRingLock,
 			Flags);
 
-#ifdef Y2_RECOVERY
+#if 0
 		/* restart the kernel timer */
 		pNet = (DEV_NET *) pAC->dev[FromPort]->priv;
 		if (!timer_pending(&pNet->KernelTimer)) {
@@ -5524,6 +5640,11 @@ SK_EVPARA  Param)  /* event-parameter            */
 			add_timer(&pNet->KernelTimer);
 		}
 #endif
+		pNet->InRecover = SK_FALSE;
+		/* enable Interrupts */
+		SK_OUT32(pAC->IoBase, B0_IMSK, pAC->GIni.GIValIrqMask);
+		SK_OUT32(pAC->IoBase, B0_HWE_IMSK, IRQ_HWE_MASK);
+		netif_wake_queue(pAC->dev[0]);
 		break;
 	default:
 		break;

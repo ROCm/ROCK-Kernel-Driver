@@ -2,8 +2,8 @@
  *
  * Name:	sky2le.h
  * Project:	Gigabit Ethernet Adapters, Common Modules
- * Version:	$Revision: 1.8 $
- * Date:	$Date: 2004/11/09 14:26:38 $
+ * Version:	$Revision: 1.9 $
+ * Date:	$Date: 2005/01/26 10:53:34 $
  * Purpose:	Common list element definitions and access macros.
  *
  ******************************************************************************/
@@ -56,15 +56,27 @@ extern "C" {
 
 #ifdef SK_LITTLE_ENDIAN
 
+#ifndef	SK_USE_REV_DESC
 #define LE2DWord(value)	(value)
-
-#else	/* !SK_LITTLE_ENDIAN */
-
+#else	/* SK_USE_REV_DESC */
 #define LE2DWord(value)					\
 	((((value)<<24L) & 0xff000000L) +	\
 	 (((value)<< 8L) & 0x00ff0000L) +	\
 	 (((value)>> 8L) & 0x0000ff00L) +	\
 	 (((value)>>24L) & 0x000000ffL))
+#endif	/* SK_USE_REV_DESC */
+
+#else	/* !SK_LITTLE_ENDIAN */
+
+#ifndef	SK_USE_REV_DESC
+#define LE2DWord(value)					\
+	((((value)<<24L) & 0xff000000L) +	\
+	 (((value)<< 8L) & 0x00ff0000L) +	\
+	 (((value)>> 8L) & 0x0000ff00L) +	\
+	 (((value)>>24L) & 0x000000ffL))
+#else	/* SK_USE_REV_DESC */
+#define LE2DWord(value)	(value)
+#endif	/* SK_USE_REV_DESC */
 
 #endif	/* !SK_LITTLE_ENDIAN */
 
@@ -84,16 +96,27 @@ extern "C" {
 
 #ifdef SK_LITTLE_ENDIAN
 
+#ifndef	SK_USE_REV_DESC
 #define DWord2LE(value) (value)
-
-#else	/* !SK_LITTLE_ENDIAN */
-
+#else	/* SK_USE_REV_DESC */
 #define DWord2LE(value)					\
 	((((value)<<24L) & 0xff000000L) +	\
 	 (((value)<< 8L) & 0x00ff0000L) +	\
 	 (((value)>> 8L) & 0x0000ff00L) +	\
 	 (((value)>>24L) & 0x000000ffL))
+#endif	/* SK_USE_REV_DESC */
 
+#else	/* !SK_LITTLE_ENDIAN */
+
+#ifndef	SK_USE_REV_DESC
+#define DWord2LE(value)					\
+	((((value)<<24L) & 0xff000000L) +	\
+	 (((value)<< 8L) & 0x00ff0000L) +	\
+	 (((value)>> 8L) & 0x0000ff00L) +	\
+	 (((value)>>24L) & 0x000000ffL))
+#else	/* SK_USE_REV_DESC */
+#define DWord2LE(value) (value)
+#endif	/* SK_USE_REV_DESC */
 #endif	/* !SK_LITTLE_ENDIAN */
 
 /******************************************************************************
@@ -110,15 +133,22 @@ extern "C" {
  */
 
 #ifdef SK_LITTLE_ENDIAN
-
+#ifndef	SK_USE_REV_DESC
 #define LE2Word(value) (value)
-
-#else	/* !SK_LITTLE_ENDIAN */
-
+#else	/* SK_USE_REV_DESC */
 #define LE2Word(value)				\
 	((((value)<< 8L) & 0xff00) +	\
 	 (((value)>> 8L) & 0x00ff))
+#endif	/* SK_USE_REV_DESC */
 
+#else	/* !SK_LITTLE_ENDIAN */
+#ifndef	SK_USE_REV_DESC
+#define LE2Word(value)				\
+	((((value)<< 8L) & 0xff00) +	\
+	 (((value)>> 8L) & 0x00ff))
+#else	/* SK_USE_REV_DESC */
+#define LE2Word(value) (value)
+#endif	/* SK_USE_REV_DESC */
 #endif	/* !SK_LITTLE_ENDIAN */
 
 /******************************************************************************
@@ -136,15 +166,22 @@ extern "C" {
  */
 
 #ifdef SK_LITTLE_ENDIAN
-
+#ifndef	SK_USE_REV_DESC
 #define Word2LE(value) (value)
-
-#else	/* !SK_LITTLE_ENDIAN */
-
+#else	/* SK_USE_REV_DESC */
 #define Word2LE(value)				\
 	((((value)<< 8L) & 0xff00) +	\
 	 (((value)>> 8L) & 0x00ff))
+#endif	/* SK_USE_REV_DESC */
 
+#else	/* !SK_LITTLE_ENDIAN */
+#ifndef	SK_USE_REV_DESC
+#define Word2LE(value)				\
+	((((value)<< 8L) & 0xff00) +	\
+	 (((value)>> 8L) & 0x00ff))
+#else	/* SK_USE_REV_DESC */
+#define Word2LE(value) (value)
+#endif	/* SK_USE_REV_DESC */
 #endif	/* !SK_LITTLE_ENDIAN */
 
 /******************************************************************************

@@ -2,8 +2,8 @@
  *
  * Name:        sky2.c
  * Project:     Yukon2 specific functions and implementations
- * Version:     $Revision: 1.35.2.26 $
- * Date:        $Date: 2004/12/22 12:48:48 $
+ * Version:     $Revision: 1.35.2.27 $
+ * Date:        $Date: 2005/01/31 16:22:14 $
  * Purpose:     The main driver source module
  *
  *****************************************************************************/
@@ -404,6 +404,15 @@ struct  pt_regs *ptregs)  /* not used by our driver                      */
 		return SkIsrRetNone;
 
 	}
+
+#ifdef Y2_RECOVERY
+	if (pNet->InRecover) {
+		SK_DBG_MSG(pAC, SK_DBGMOD_DRV, SK_DBGCAT_DRV_INT_SRC,
+			("Already in recover\n ==> SkY2Isr\n"));
+		SK_OUT32(pAC->IoBase, B0_Y2_SP_ICR, 2);
+		return SkIsrRetNone;
+	}
+#endif
 
 #ifdef CONFIG_SK98LIN_NAPI
 	if (netif_rx_schedule_prep(dev)) {
@@ -1547,6 +1556,13 @@ SK_U16  Vlan)         /* Vlan Id                                     */
 	** take first receive buffer out of working queue 
 	*/
 	POP_FIRST_PKT_FROM_QUEUE(&pAC->RxPort[Port].RxQ_working, pSkPacket);
+	if (pSkPacket == NULL) {
+ 		SK_DBG_MSG(pAC, SK_DBGMOD_DRV, 
+			SK_DBGCAT_DRV_ERROR,
+			("Packet not available. NULL pointer.\n"));
+		return(SK_TRUE);
+	}
+
 	if (HW_FEATURE(pAC, HWF_WA_DEV_420)) {
 		NbrRxBuffersInHW--;
 	}

@@ -2,8 +2,8 @@
  *
  * Name:	skgehw.h
  * Project:	Gigabit Ethernet Adapters, Common Modules
- * Version:	$Revision: 2.48 $
- * Date:	$Date: 2005/01/11 08:54:13 $
+ * Version:	$Revision: 2.49 $
+ * Date:	$Date: 2005/01/20 13:01:35 $
  * Purpose:	Defines and Macros for the Gigabit Ethernet Adapter Product Family
  *
  ******************************************************************************/
@@ -337,6 +337,7 @@ extern "C" {
 #define PCI_DIS_PCI_CLK	BIT_8		/* Disable PCI clock driving */
 #define PCI_SKEW_DAS	(0xfL<<4)	/* Bit	7.. 4:	Skew Ctrl, DAS Ext */
 #define PCI_SKEW_BASE	0xfL		/* Bit	3.. 0:	Skew Ctrl, Base	*/
+#define PCI_CLS_OPT		BIT_3		/* Cache Line Size opt. PCI-X (YUKON-2) */ 
 
 /*	PCI_OUR_REG_2		32 bit	Our Register 2 */
 #define PCI_VPD_WR_THR	(0xffL<<24)	/* Bit 31..24:	VPD Write Threshold */

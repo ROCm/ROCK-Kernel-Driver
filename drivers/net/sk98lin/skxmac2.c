@@ -2,8 +2,8 @@
  *
  * Name:	skxmac2.c
  * Project:	Gigabit Ethernet Adapters, Common Modules
- * Version:	$Revision: 2.31 $
- * Date:	$Date: 2005/01/04 14:22:28 $
+ * Version:	$Revision: 2.32 $
+ * Date:	$Date: 2005/01/26 10:16:41 $
  * Purpose:	Contains functions to initialize the MACs and PHYs
  *
  ******************************************************************************/
@@ -36,7 +36,7 @@ typedef struct s_PhyHack {
 
 #if (defined(DEBUG) || ((!defined(LINT)) && (!defined(SK_SLIM))))
 static const char SysKonnectFileId[] =
-	"@(#) $Id: skxmac2.c,v 2.31 2005/01/04 14:22:28 rschmidt Exp $ (C) Marvell.";
+	"@(#) $Id: skxmac2.c,v 2.32 2005/01/26 10:16:41 rschmidt Exp $ (C) Marvell.";
 #endif
 
 #ifdef GENESIS
@@ -1282,6 +1282,8 @@ int		Port)	/* Port Index (MAC_1 + n) */
 	}
 #endif /* YUKON */
 
+	pAC->GIni.GP[Port].PHWLinkUp = SK_FALSE;
+
 	pAC->GIni.GP[Port].PState = SK_PRT_RESET;
 
 }	/* SkMacHardRst */
@@ -2207,8 +2209,9 @@ SK_U8	Mode)		/* low power mode */
 			PowerDownBit = (Port == MAC_1) ? PCI_Y2_PHY1_POWD :
 				PCI_Y2_PHY2_POWD;
 
-			/* no COMA mode on Yukon-FE */
-			if (pAC->GIni.GIChipId == CHIP_ID_YUKON_FE) {
+			/* no COMA mode on Yukon-FE and Yukon-2 PHY */
+			if (pAC->GIni.GIChipId == CHIP_ID_YUKON_FE ||
+				pAC->GIni.GIChipId == CHIP_ID_YUKON_XL) {
 				/* set IEEE compatible Power Down Mode */
 				Ret = SkGmPhyWrite(pAC, IoC, Port, PHY_MARV_CTRL, PHY_CT_PDOWN);
 
@@ -2221,7 +2224,8 @@ SK_U8	Mode)		/* low power mode */
 			/* enable Core Clock Division */
 			SK_OUT32(IoC, B2_Y2_CLK_CTRL,
 				((pAC->GIni.GIChipId == CHIP_ID_YUKON_XL) ?
-				(Y2_CLK_DIV_VAL_2(Word) | Y2_CLK_SEL_VAL_2(Y2_CLK_SELECT2_MSK)) :
+				 /* on Yukon-2 divide clock by 2, clock select value is 31 */
+				(Y2_CLK_DIV_VAL_2(0) | Y2_CLK_SEL_VAL_2(Y2_CLK_SELECT2_MSK)) :
 				Y2_CLK_DIV_VAL(Word)) | Y2_CLK_DIV_ENA);
 
 			/* ASF system clock stopped */
@@ -2603,7 +2607,8 @@ SK_BOOL	DoLoop)		/* Should a Phy LoopBack be set-up? */
 				/* enable Automatic Crossover */
 				PhyCtrl |= (SK_U16)PHY_M_PC_MDI_XMODE(PHY_M_PC_ENA_AUTO);
 
-				if (pAC->GIni.GIChipId == CHIP_ID_YUKON_XL) {
+				if (AutoNeg && pPrt->PLinkSpeed == SK_LSPEED_AUTO &&
+					pAC->GIni.GIChipId == CHIP_ID_YUKON_XL) {
 					/* on PHY 88E1112 there is a change for downshift control */
 					PhyCtrl &= ~PHY_M_PC_DSC_MSK;
 					PhyCtrl |= PHY_M_PC_DSC(0) | PHY_M_PC_DOWN_S_ENA;

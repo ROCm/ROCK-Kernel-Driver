@@ -2,8 +2,8 @@
  *
  * Name:	sktwsi.c
  * Project:	Gigabit Ethernet Adapters, TWSI-Module
- * Version:	$Revision: 1.8 $
- * Date:	$Date: 2004/10/26 09:26:08 $
+ * Version:	$Revision: 1.9 $
+ * Date:	$Date: 2004/12/20 15:10:30 $
  * Purpose:	Functions to access Voltage and Temperature Sensor
  *
  ******************************************************************************/
@@ -26,7 +26,7 @@
  */
 #if (defined(DEBUG) || ((!defined(LINT)) && (!defined(SK_SLIM))))
 static const char SysKonnectFileId[] =
-	"@(#) $Id: sktwsi.c,v 1.8 2004/10/26 09:26:08 rschmidt Exp $ (C) Marvell.";
+	"@(#) $Id: sktwsi.c,v 1.9 2004/12/20 15:10:30 rschmidt Exp $ (C) Marvell.";
 #endif
 
 #include "h/skdrv1st.h"		/* Driver Specific Definitions */
@@ -558,7 +558,8 @@ SK_SENSOR	*pSen)	/* Sensor to be read */
 static int SkI2cInit0(
 SK_AC	*pAC)	/* Adapter Context */
 {
-	int	i;
+	int			i;
+	SK_SENSOR	*pSen;
 
 	/* Begin with first sensor */
 	pAC->I2c.CurrSens = 0;
@@ -575,21 +576,23 @@ SK_AC	*pAC)	/* Adapter Context */
 #endif /* !SK_DIAG */
 
 	for (i = 0; i < SK_MAX_SENSORS; i++) {
-		pAC->I2c.SenTable[i].SenDesc = "unknown";
-		pAC->I2c.SenTable[i].SenType = SK_SEN_UNKNOWN;
-		pAC->I2c.SenTable[i].SenThreErrHigh = 0;
-		pAC->I2c.SenTable[i].SenThreErrLow = 0;
-		pAC->I2c.SenTable[i].SenThreWarnHigh = 0;
-		pAC->I2c.SenTable[i].SenThreWarnLow = 0;
-		pAC->I2c.SenTable[i].SenReg = LM80_FAN2_IN;
-		pAC->I2c.SenTable[i].SenInit = SK_SEN_DYN_INIT_NONE;
-		pAC->I2c.SenTable[i].SenValue = 0;
-		pAC->I2c.SenTable[i].SenErrFlag = SK_SEN_ERR_NOT_PRESENT;
-		pAC->I2c.SenTable[i].SenErrCts = 0;
-		pAC->I2c.SenTable[i].SenBegErrTS = 0;
-		pAC->I2c.SenTable[i].SenState = SK_SEN_IDLE;
-		pAC->I2c.SenTable[i].SenRead = NULL;
-		pAC->I2c.SenTable[i].SenDev = 0;
+		pSen = &pAC->I2c.SenTable[i];
+
+		pSen->SenDesc = "unknown";
+		pSen->SenType = SK_SEN_UNKNOWN;
+		pSen->SenThreErrHigh = 0;
+		pSen->SenThreErrLow = 0;
+		pSen->SenThreWarnHigh = 0;
+		pSen->SenThreWarnLow = 0;
+		pSen->SenReg = LM80_FAN2_IN;
+		pSen->SenInit = SK_SEN_DYN_INIT_NONE;
+		pSen->SenValue = 0;
+		pSen->SenErrFlag = SK_SEN_ERR_NOT_PRESENT;
+		pSen->SenErrCts = 0;
+		pSen->SenBegErrTS = 0;
+		pSen->SenState = SK_SEN_IDLE;
+		pSen->SenRead = NULL;
+		pSen->SenDev = 0;
 	}
 
 	/* Now we are "INIT data"ed */
@@ -622,9 +625,10 @@ static int SkI2cInit1(
 SK_AC	*pAC,	/* Adapter Context */
 SK_IOC	IoC)	/* I/O Context */
 {
-	int i;
-	SK_U8 I2cSwCtrl;
-	SK_GEPORT *pPrt;	/* GIni Port struct pointer */
+	int			i;
+	SK_U8		I2cSwCtrl;
+	SK_GEPORT	*pPrt;	/* GIni Port struct pointer */
+	SK_SENSOR	*pSen;
 
 	if (pAC->I2c.InitLevel != SK_INIT_DATA) {
 		/* Re-init not needed in TWSI module */
@@ -687,172 +691,178 @@ SK_IOC	IoC)	/* I/O Context */
 	}
 
 	for (i = 0; i < pAC->I2c.MaxSens; i++) {
+		pSen = &pAC->I2c.SenTable[i];
 		switch (i) {
 		case 0:
-			pAC->I2c.SenTable[i].SenDesc = "Temperature";
-			pAC->I2c.SenTable[i].SenType = SK_SEN_TEMP;
-			pAC->I2c.SenTable[i].SenThreErrHigh = SK_SEN_TEMP_HIGH_ERR;
-			pAC->I2c.SenTable[i].SenThreWarnHigh = SK_SEN_TEMP_HIGH_WARN;
-			pAC->I2c.SenTable[i].SenThreWarnLow = SK_SEN_TEMP_LOW_WARN;
-			pAC->I2c.SenTable[i].SenThreErrLow = SK_SEN_TEMP_LOW_ERR;
-			pAC->I2c.SenTable[i].SenReg = LM80_TEMP_IN;
+			pSen->SenDesc = "Temperature";
+			pSen->SenType = SK_SEN_TEMP;
+			pSen->SenThreErrHigh = SK_SEN_TEMP_HIGH_ERR;
+			pSen->SenThreWarnHigh = SK_SEN_TEMP_HIGH_WARN;
+			pSen->SenThreWarnLow = SK_SEN_TEMP_LOW_WARN;
+			pSen->SenThreErrLow = SK_SEN_TEMP_LOW_ERR;
+			pSen->SenReg = LM80_TEMP_IN;
 			break;
 		case 1:
-			pAC->I2c.SenTable[i].SenDesc = "Voltage PCI";
-			pAC->I2c.SenTable[i].SenType = SK_SEN_VOLT;
-			pAC->I2c.SenTable[i].SenThreErrHigh = SK_SEN_PCI_5V_HIGH_ERR;
-			pAC->I2c.SenTable[i].SenThreWarnHigh = SK_SEN_PCI_5V_HIGH_WARN;
+			pSen->SenDesc = "Voltage PCI";
+			pSen->SenType = SK_SEN_VOLT;
+			pSen->SenThreErrHigh = SK_SEN_PCI_5V_HIGH_ERR;
+			pSen->SenThreWarnHigh = SK_SEN_PCI_5V_HIGH_WARN;
 			if (pAC->GIni.GIPciBus != SK_PEX_BUS) {
-				pAC->I2c.SenTable[i].SenThreWarnLow = SK_SEN_PCI_5V_LOW_WARN;
-				pAC->I2c.SenTable[i].SenThreErrLow = SK_SEN_PCI_5V_LOW_ERR;
+				pSen->SenThreWarnLow = SK_SEN_PCI_5V_LOW_WARN;
+				pSen->SenThreErrLow = SK_SEN_PCI_5V_LOW_ERR;
 			}
 			else {
-				pAC->I2c.SenTable[i].SenThreWarnLow = 0;
-				pAC->I2c.SenTable[i].SenThreErrLow = 0;
+				pSen->SenThreWarnLow = 0;
+				pSen->SenThreErrLow = 0;
 			}
-			pAC->I2c.SenTable[i].SenReg = LM80_VT0_IN;
+			pSen->SenReg = LM80_VT0_IN;
 			break;
 		case 2:
-			pAC->I2c.SenTable[i].SenDesc = "Voltage PCI-IO";
-			pAC->I2c.SenTable[i].SenType = SK_SEN_VOLT;
-			pAC->I2c.SenTable[i].SenThreErrHigh = SK_SEN_PCI_IO_5V_HIGH_ERR;
-			pAC->I2c.SenTable[i].SenThreWarnHigh = SK_SEN_PCI_IO_5V_HIGH_WARN;
+			pSen->SenDesc = "Voltage PCI-IO";
+			pSen->SenType = SK_SEN_VOLT;
+			pSen->SenThreErrHigh = SK_SEN_PCI_IO_5V_HIGH_ERR;
+			pSen->SenThreWarnHigh = SK_SEN_PCI_IO_5V_HIGH_WARN;
 			if (pAC->GIni.GIPciBus != SK_PEX_BUS) {
-				pAC->I2c.SenTable[i].SenThreWarnLow = SK_SEN_PCI_IO_3V3_LOW_WARN;
-				pAC->I2c.SenTable[i].SenThreErrLow = SK_SEN_PCI_IO_3V3_LOW_ERR;
+				pSen->SenThreWarnLow = SK_SEN_PCI_IO_3V3_LOW_WARN;
+				pSen->SenThreErrLow = SK_SEN_PCI_IO_3V3_LOW_ERR;
 			}
 			else {
-				pAC->I2c.SenTable[i].SenThreWarnLow = 0;
-				pAC->I2c.SenTable[i].SenThreErrLow = 0;
+				pSen->SenThreWarnLow = 0;
+				pSen->SenThreErrLow = 0;
 			}
-			pAC->I2c.SenTable[i].SenReg = LM80_VT1_IN;
-			pAC->I2c.SenTable[i].SenInit = SK_SEN_DYN_INIT_PCI_IO;
+			pSen->SenReg = LM80_VT1_IN;
+			pSen->SenInit = SK_SEN_DYN_INIT_PCI_IO;
 			break;
 		case 3:
-			pAC->I2c.SenTable[i].SenDesc = "Voltage ASIC";
-			pAC->I2c.SenTable[i].SenType = SK_SEN_VOLT;
-			pAC->I2c.SenTable[i].SenThreErrHigh = SK_SEN_VDD_HIGH_ERR;
-			pAC->I2c.SenTable[i].SenThreWarnHigh = SK_SEN_VDD_HIGH_WARN;
-			pAC->I2c.SenTable[i].SenThreWarnLow = SK_SEN_VDD_LOW_WARN;
-			pAC->I2c.SenTable[i].SenThreErrLow = SK_SEN_VDD_LOW_ERR;
-			pAC->I2c.SenTable[i].SenReg = LM80_VT2_IN;
+			if (pAC->GIni.GIGenesis) {
+				pSen->SenDesc = "Voltage ASIC";
+			}
+			else {
+				pSen->SenDesc = "Voltage VMAIN";
+			}
+			pSen->SenType = SK_SEN_VOLT;
+			pSen->SenThreErrHigh = SK_SEN_VDD_HIGH_ERR;
+			pSen->SenThreWarnHigh = SK_SEN_VDD_HIGH_WARN;
+			pSen->SenThreWarnLow = SK_SEN_VDD_LOW_WARN;
+			pSen->SenThreErrLow = SK_SEN_VDD_LOW_ERR;
+			pSen->SenReg = LM80_VT2_IN;
 			break;
 		case 4:
 			if (pAC->GIni.GIGenesis) {
 				if (pPrt->PhyType == SK_PHY_BCOM) {
-					pAC->I2c.SenTable[i].SenDesc = "Voltage PHY A PLL";
-					pAC->I2c.SenTable[i].SenThreErrHigh = SK_SEN_PLL_3V3_HIGH_ERR;
-					pAC->I2c.SenTable[i].SenThreWarnHigh = SK_SEN_PLL_3V3_HIGH_WARN;
-					pAC->I2c.SenTable[i].SenThreWarnLow = SK_SEN_PLL_3V3_LOW_WARN;
-					pAC->I2c.SenTable[i].SenThreErrLow = SK_SEN_PLL_3V3_LOW_ERR;
+					pSen->SenDesc = "Voltage PHY A PLL";
+					pSen->SenThreErrHigh = SK_SEN_PLL_3V3_HIGH_ERR;
+					pSen->SenThreWarnHigh = SK_SEN_PLL_3V3_HIGH_WARN;
+					pSen->SenThreWarnLow = SK_SEN_PLL_3V3_LOW_WARN;
+					pSen->SenThreErrLow = SK_SEN_PLL_3V3_LOW_ERR;
 				}
 				else {
-					pAC->I2c.SenTable[i].SenDesc = "Voltage PMA";
-					pAC->I2c.SenTable[i].SenThreErrHigh = SK_SEN_PLL_3V3_HIGH_ERR;
-					pAC->I2c.SenTable[i].SenThreWarnHigh = SK_SEN_PLL_3V3_HIGH_WARN;
-					pAC->I2c.SenTable[i].SenThreWarnLow = SK_SEN_PLL_3V3_LOW_WARN;
-					pAC->I2c.SenTable[i].SenThreErrLow = SK_SEN_PLL_3V3_LOW_ERR;
+					pSen->SenDesc = "Voltage PMA";
+					pSen->SenThreErrHigh = SK_SEN_PLL_3V3_HIGH_ERR;
+					pSen->SenThreWarnHigh = SK_SEN_PLL_3V3_HIGH_WARN;
+					pSen->SenThreWarnLow = SK_SEN_PLL_3V3_LOW_WARN;
+					pSen->SenThreErrLow = SK_SEN_PLL_3V3_LOW_ERR;
 				}
 			}
 			else {
-				pAC->I2c.SenTable[i].SenDesc = "Voltage VAUX";
-				pAC->I2c.SenTable[i].SenThreErrHigh = SK_SEN_VAUX_3V3_HIGH_ERR;
-				pAC->I2c.SenTable[i].SenThreWarnHigh = SK_SEN_VAUX_3V3_HIGH_WARN;
+				pSen->SenDesc = "Voltage VAUX";
+				pSen->SenThreErrHigh = SK_SEN_VAUX_3V3_HIGH_ERR;
+				pSen->SenThreWarnHigh = SK_SEN_VAUX_3V3_HIGH_WARN;
 				if (pAC->GIni.GIVauxAvail) {
-					pAC->I2c.SenTable[i].SenThreWarnLow = SK_SEN_VAUX_3V3_LOW_WARN;
-					pAC->I2c.SenTable[i].SenThreErrLow = SK_SEN_VAUX_3V3_LOW_ERR;
+					pSen->SenThreWarnLow = SK_SEN_VAUX_3V3_LOW_WARN;
+					pSen->SenThreErrLow = SK_SEN_VAUX_3V3_LOW_ERR;
 				}
 				else {
-					pAC->I2c.SenTable[i].SenThreErrLow = 0;
-					pAC->I2c.SenTable[i].SenThreWarnLow = 0;
+					pSen->SenThreErrLow = 0;
+					pSen->SenThreWarnLow = 0;
 				}
 			}
-			pAC->I2c.SenTable[i].SenType = SK_SEN_VOLT;
-			pAC->I2c.SenTable[i].SenReg = LM80_VT3_IN;
+			pSen->SenType = SK_SEN_VOLT;
+			pSen->SenReg = LM80_VT3_IN;
 			break;
 		case 5:
 			if (CHIP_ID_YUKON_2(pAC)) {
 				if (pAC->GIni.GIChipRev == 0) {
-					pAC->I2c.SenTable[i].SenDesc = "Voltage Core 1V3";
-					pAC->I2c.SenTable[i].SenThreErrHigh = SK_SEN_CORE_1V3_HIGH_ERR;
-					pAC->I2c.SenTable[i].SenThreWarnHigh = SK_SEN_CORE_1V3_HIGH_WARN;
-					pAC->I2c.SenTable[i].SenThreWarnLow = SK_SEN_CORE_1V3_LOW_WARN;
-					pAC->I2c.SenTable[i].SenThreErrLow = SK_SEN_CORE_1V3_LOW_ERR;
+					pSen->SenDesc = "Voltage Core 1V3";
+					pSen->SenThreErrHigh = SK_SEN_CORE_1V3_HIGH_ERR;
+					pSen->SenThreWarnHigh = SK_SEN_CORE_1V3_HIGH_WARN;
+					pSen->SenThreWarnLow = SK_SEN_CORE_1V3_LOW_WARN;
+					pSen->SenThreErrLow = SK_SEN_CORE_1V3_LOW_ERR;
 				}
 				else {
-					pAC->I2c.SenTable[i].SenDesc = "Voltage Core 1V2";
-					pAC->I2c.SenTable[i].SenThreErrHigh = SK_SEN_CORE_1V2_HIGH_ERR;
-					pAC->I2c.SenTable[i].SenThreWarnHigh = SK_SEN_CORE_1V2_HIGH_WARN;
-					pAC->I2c.SenTable[i].SenThreWarnLow = SK_SEN_CORE_1V2_LOW_WARN;
-					pAC->I2c.SenTable[i].SenThreErrLow = SK_SEN_CORE_1V2_LOW_ERR;
+					pSen->SenDesc = "Voltage Core 1V2";
+					pSen->SenThreErrHigh = SK_SEN_CORE_1V2_HIGH_ERR;
+					pSen->SenThreWarnHigh = SK_SEN_CORE_1V2_HIGH_WARN;
+					pSen->SenThreWarnLow = SK_SEN_CORE_1V2_LOW_WARN;
+					pSen->SenThreErrLow = SK_SEN_CORE_1V2_LOW_ERR;
 				}
 			}
 			else {
 				if (pAC->GIni.GIGenesis) {
-					pAC->I2c.SenTable[i].SenDesc = "Voltage PHY 2V5";
-					pAC->I2c.SenTable[i].SenThreErrHigh = SK_SEN_PHY_2V5_HIGH_ERR;
-					pAC->I2c.SenTable[i].SenThreWarnHigh = SK_SEN_PHY_2V5_HIGH_WARN;
-					pAC->I2c.SenTable[i].SenThreWarnLow = SK_SEN_PHY_2V5_LOW_WARN;
-					pAC->I2c.SenTable[i].SenThreErrLow = SK_SEN_PHY_2V5_LOW_ERR;
+					pSen->SenDesc = "Voltage PHY 2V5";
+					pSen->SenThreErrHigh = SK_SEN_PHY_2V5_HIGH_ERR;
+					pSen->SenThreWarnHigh = SK_SEN_PHY_2V5_HIGH_WARN;
+					pSen->SenThreWarnLow = SK_SEN_PHY_2V5_LOW_WARN;
+					pSen->SenThreErrLow = SK_SEN_PHY_2V5_LOW_ERR;
 				}
 				else {
-					pAC->I2c.SenTable[i].SenDesc = "Voltage Core 1V5";
-					pAC->I2c.SenTable[i].SenThreErrHigh = SK_SEN_CORE_1V5_HIGH_ERR;
-					pAC->I2c.SenTable[i].SenThreWarnHigh = SK_SEN_CORE_1V5_HIGH_WARN;
-					pAC->I2c.SenTable[i].SenThreWarnLow = SK_SEN_CORE_1V5_LOW_WARN;
-					pAC->I2c.SenTable[i].SenThreErrLow = SK_SEN_CORE_1V5_LOW_ERR;
+					pSen->SenDesc = "Voltage Core 1V5";
+					pSen->SenThreErrHigh = SK_SEN_CORE_1V5_HIGH_ERR;
+					pSen->SenThreWarnHigh = SK_SEN_CORE_1V5_HIGH_WARN;
+					pSen->SenThreWarnLow = SK_SEN_CORE_1V5_LOW_WARN;
+					pSen->SenThreErrLow = SK_SEN_CORE_1V5_LOW_ERR;
 				}
 			}
-			pAC->I2c.SenTable[i].SenType = SK_SEN_VOLT;
-			pAC->I2c.SenTable[i].SenReg = LM80_VT4_IN;
+			pSen->SenType = SK_SEN_VOLT;
+			pSen->SenReg = LM80_VT4_IN;
 			break;
 		case 6:
 			if (CHIP_ID_YUKON_2(pAC)) {
-				pAC->I2c.SenTable[i].SenDesc = "Voltage PHY 1V5";
-				pAC->I2c.SenTable[i].SenThreErrHigh = SK_SEN_CORE_1V5_HIGH_ERR;
-				pAC->I2c.SenTable[i].SenThreWarnHigh = SK_SEN_CORE_1V5_HIGH_WARN;
+				pSen->SenDesc = "Voltage PHY 1V5";
+				pSen->SenThreErrHigh = SK_SEN_CORE_1V5_HIGH_ERR;
+				pSen->SenThreWarnHigh = SK_SEN_CORE_1V5_HIGH_WARN;
 				if (pAC->GIni.GIPciBus == SK_PEX_BUS) {
-					pAC->I2c.SenTable[i].SenThreWarnLow = SK_SEN_CORE_1V5_LOW_WARN;
-					pAC->I2c.SenTable[i].SenThreErrLow = SK_SEN_CORE_1V5_LOW_ERR;
+					pSen->SenThreWarnLow = SK_SEN_CORE_1V5_LOW_WARN;
+					pSen->SenThreErrLow = SK_SEN_CORE_1V5_LOW_ERR;
 				}
 				else {
-					pAC->I2c.SenTable[i].SenThreWarnLow = 0;
-					pAC->I2c.SenTable[i].SenThreErrLow = 0;
+					pSen->SenThreWarnLow = 0;
+					pSen->SenThreErrLow = 0;
 				}
 			}
 			else {
 				if (pAC->GIni.GIGenesis) {
-					pAC->I2c.SenTable[i].SenDesc = "Voltage PHY B PLL";
+					pSen->SenDesc = "Voltage PHY B PLL";
 				}
 				else {
-					pAC->I2c.SenTable[i].SenDesc = "Voltage PHY 3V3";
+					pSen->SenDesc = "Voltage PHY 3V3";
 				}
-				pAC->I2c.SenTable[i].SenThreErrHigh = SK_SEN_PLL_3V3_HIGH_ERR;
-				pAC->I2c.SenTable[i].SenThreWarnHigh = SK_SEN_PLL_3V3_HIGH_WARN;
-				pAC->I2c.SenTable[i].SenThreWarnLow = SK_SEN_PLL_3V3_LOW_WARN;
-				pAC->I2c.SenTable[i].SenThreErrLow = SK_SEN_PLL_3V3_LOW_ERR;
+				pSen->SenThreErrHigh = SK_SEN_PLL_3V3_HIGH_ERR;
+				pSen->SenThreWarnHigh = SK_SEN_PLL_3V3_HIGH_WARN;
+				pSen->SenThreWarnLow = SK_SEN_PLL_3V3_LOW_WARN;
+				pSen->SenThreErrLow = SK_SEN_PLL_3V3_LOW_ERR;
 			}
-			pAC->I2c.SenTable[i].SenType = SK_SEN_VOLT;
-			pAC->I2c.SenTable[i].SenReg = LM80_VT5_IN;
+			pSen->SenType = SK_SEN_VOLT;
+			pSen->SenReg = LM80_VT5_IN;
 			break;
 		case 7:
 			if (pAC->GIni.GIGenesis) {
-				pAC->I2c.SenTable[i].SenDesc = "Speed Fan";
-				pAC->I2c.SenTable[i].SenType = SK_SEN_FAN;
-				pAC->I2c.SenTable[i].SenThreErrHigh = SK_SEN_FAN_HIGH_ERR;
-				pAC->I2c.SenTable[i].SenThreWarnHigh = SK_SEN_FAN_HIGH_WARN;
-				pAC->I2c.SenTable[i].SenThreWarnLow = SK_SEN_FAN_LOW_WARN;
-				pAC->I2c.SenTable[i].SenThreErrLow = SK_SEN_FAN_LOW_ERR;
-				pAC->I2c.SenTable[i].SenReg = LM80_FAN2_IN;
+				pSen->SenDesc = "Speed Fan";
+				pSen->SenType = SK_SEN_FAN;
+				pSen->SenThreErrHigh = SK_SEN_FAN_HIGH_ERR;
+				pSen->SenThreWarnHigh = SK_SEN_FAN_HIGH_WARN;
+				pSen->SenThreWarnLow = SK_SEN_FAN_LOW_WARN;
+				pSen->SenThreErrLow = SK_SEN_FAN_LOW_ERR;
+				pSen->SenReg = LM80_FAN2_IN;
 			}
 			else {
-				pAC->I2c.SenTable[i].SenDesc = "Voltage PHY 2V5";
-				pAC->I2c.SenTable[i].SenType = SK_SEN_VOLT;
-				pAC->I2c.SenTable[i].SenThreErrHigh = SK_SEN_PHY_2V5_HIGH_ERR;
-				pAC->I2c.SenTable[i].SenThreWarnHigh = SK_SEN_PHY_2V5_HIGH_WARN;
-				pAC->I2c.SenTable[i].SenThreWarnLow = SK_SEN_PHY_2V5_LOW_WARN;
-				pAC->I2c.SenTable[i].SenThreErrLow = SK_SEN_PHY_2V5_LOW_ERR;
-				pAC->I2c.SenTable[i].SenReg = LM80_VT6_IN;
+				pSen->SenDesc = "Voltage PHY 2V5";
+				pSen->SenType = SK_SEN_VOLT;
+				pSen->SenThreErrHigh = SK_SEN_PHY_2V5_HIGH_ERR;
+				pSen->SenThreWarnHigh = SK_SEN_PHY_2V5_HIGH_WARN;
+				pSen->SenThreWarnLow = SK_SEN_PHY_2V5_LOW_WARN;
+				pSen->SenThreErrLow = SK_SEN_PHY_2V5_LOW_ERR;
+				pSen->SenReg = LM80_VT6_IN;
 			}
 			break;
 		default:
@@ -861,13 +871,15 @@ SK_IOC	IoC)	/* I/O Context */
 			break;
 		}
 
-		pAC->I2c.SenTable[i].SenValue = 0;
-		pAC->I2c.SenTable[i].SenErrFlag = SK_SEN_ERR_OK;
-		pAC->I2c.SenTable[i].SenErrCts = 0;
-		pAC->I2c.SenTable[i].SenBegErrTS = 0;
-		pAC->I2c.SenTable[i].SenState = SK_SEN_IDLE;
-		pAC->I2c.SenTable[i].SenRead = SkLm80ReadSensor;
-		pAC->I2c.SenTable[i].SenDev = LM80_ADDR;
+		pSen->SenValue = 0;
+		pSen->SenErrFlag = SK_SEN_ERR_OK;
+		pSen->SenErrCts = 0;
+		pSen->SenBegErrTS = 0;
+		pSen->SenState = SK_SEN_IDLE;
+		if (pSen->SenThreWarnLow != 0) {
+			pSen->SenRead = SkLm80ReadSensor;
+		}
+		pSen->SenDev = LM80_ADDR;
 	}
 
 #ifndef SK_DIAG
@@ -890,7 +902,7 @@ static int SkI2cInit2(
 SK_AC	*pAC,	/* Adapter Context */
 SK_IOC	IoC)	/* I/O Context */
 {
-	int		ReadComplete;
+	int			ReadComplete;
 	SK_SENSOR	*pSen;
 
 	if (pAC->I2c.InitLevel != SK_INIT_IO) {
@@ -900,6 +912,7 @@ SK_IOC	IoC)	/* I/O Context */
 	}
 
 	pSen = &pAC->I2c.SenTable[pAC->I2c.CurrSens];
+
 	ReadComplete = SkI2cReadSensor(pAC, IoC, pSen);
 
 	if (ReadComplete) {
@@ -1004,10 +1017,11 @@ SK_SENSOR	*pSen)
 	ParaLocal.Para64 = (SK_U64)pAC->I2c.CurrSens;
 
 	/* Check the Value against the thresholds. First: Error Thresholds */
-	TooHigh = (pSen->SenValue > pSen->SenThreErrHigh);
-	TooLow = (pSen->SenValue < pSen->SenThreErrLow);
+	TooHigh = pSen->SenValue > pSen->SenThreErrHigh;
+	TooLow  = pSen->SenValue < pSen->SenThreErrLow;
 
 	IsError = SK_FALSE;
+
 	if (TooHigh || TooLow) {
 		/* Error condition is satisfied */
 		DoTrapSend = SK_TRUE;
@@ -1049,8 +1063,8 @@ SK_SENSOR	*pSen)
 			pSen->SenErrCts++;
 
 			/* Queue PNMI Event */
-			SkEventQueue(pAC, SKGE_PNMI, (TooHigh ?
-				SK_PNMI_EVT_SEN_ERR_UPP : SK_PNMI_EVT_SEN_ERR_LOW),
+			SkEventQueue(pAC, SKGE_PNMI, TooHigh ?
+				SK_PNMI_EVT_SEN_ERR_UPP : SK_PNMI_EVT_SEN_ERR_LOW,
 				ParaLocal);
 		}
 
@@ -1072,8 +1086,8 @@ SK_SENSOR	*pSen)
 
 	/* Check the Value against the thresholds */
 	/* 2nd: Warning thresholds */
-	TooHigh = (pSen->SenValue > pSen->SenThreWarnHigh);
-	TooLow = (pSen->SenValue < pSen->SenThreWarnLow);
+	TooHigh = pSen->SenValue > pSen->SenThreWarnHigh;
+	TooLow  = pSen->SenValue < pSen->SenThreWarnLow;
 
 	if (!IsError && (TooHigh || TooLow)) {
 		/* Error condition is satisfied */
@@ -1113,8 +1127,8 @@ SK_SENSOR	*pSen)
 			pSen->SenWarnCts++;
 
 			/* Queue PNMI Event */
-			SkEventQueue(pAC, SKGE_PNMI, (TooHigh ?
-				SK_PNMI_EVT_SEN_WAR_UPP : SK_PNMI_EVT_SEN_WAR_LOW), ParaLocal);
+			SkEventQueue(pAC, SKGE_PNMI, TooHigh ?
+				SK_PNMI_EVT_SEN_WAR_UPP : SK_PNMI_EVT_SEN_WAR_LOW, ParaLocal);
 		}
 
 		if (DoErrLog) {
@@ -1141,9 +1155,8 @@ SK_SENSOR	*pSen)
 
 	/* End of check against the thresholds */
 
-	/* Bug fix AF: 16.Aug.2001: Correct the init base of LM80 sensor */
 	if (pSen->SenInit == SK_SEN_DYN_INIT_PCI_IO) {
-
+		/* Bug fix AF: 16.Aug.2001: Correct the init base of LM80 sensor */
 		pSen->SenInit = SK_SEN_DYN_INIT_NONE;
 
 		if (pSen->SenValue > SK_SEN_PCI_IO_RANGE_LIMITER) {
@@ -1157,7 +1170,7 @@ SK_SENSOR	*pSen)
 			pSen->SenThreErrHigh = SK_SEN_PCI_IO_3V3_HIGH_ERR;
 		}
 	}
-	
+
 #ifdef TEST_ONLY
 	/* Dynamic thresholds also for VAUX of LM80 sensor */
 	if (pSen->SenInit == SK_SEN_DYN_INIT_VAUX) {
@@ -1318,15 +1331,17 @@ SK_EVPARA	Para)	/* Event specific Parameter */
 		break;
 	case SK_I2CEV_CLEAR:
 		for (i = 0; i < SK_MAX_SENSORS; i++) {
-			pAC->I2c.SenTable[i].SenErrFlag = SK_SEN_ERR_OK;
-			pAC->I2c.SenTable[i].SenErrCts = 0;
-			pAC->I2c.SenTable[i].SenWarnCts = 0;
-			pAC->I2c.SenTable[i].SenBegErrTS = 0;
-			pAC->I2c.SenTable[i].SenBegWarnTS = 0;
-			pAC->I2c.SenTable[i].SenLastErrTrapTS = (SK_U64)0;
-			pAC->I2c.SenTable[i].SenLastErrLogTS = (SK_U64)0;
-			pAC->I2c.SenTable[i].SenLastWarnTrapTS = (SK_U64)0;
-			pAC->I2c.SenTable[i].SenLastWarnLogTS = (SK_U64)0;
+			pSen = &pAC->I2c.SenTable[i];
+
+			pSen->SenErrFlag = SK_SEN_ERR_OK;
+			pSen->SenErrCts = 0;
+			pSen->SenWarnCts = 0;
+			pSen->SenBegErrTS = 0;
+			pSen->SenBegWarnTS = 0;
+			pSen->SenLastErrTrapTS = (SK_U64)0;
+			pSen->SenLastErrLogTS = (SK_U64)0;
+			pSen->SenLastWarnTrapTS = (SK_U64)0;
+			pSen->SenLastWarnLogTS = (SK_U64)0;
 		}
 		break;
 	default:
