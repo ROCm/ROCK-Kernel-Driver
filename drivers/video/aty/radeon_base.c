@@ -1320,6 +1320,16 @@ static void radeon_calc_pll_regs(struct radeonfb_info *rinfo, struct radeon_regs
 	 * not sure which model starts having FP2_GEN_CNTL, I assume anything more
 	 * recent than an r(v)100...
 	 */
+#if 0
+	/* XXX I had reports of flicker happening with the cinema display
+	 * on TMDS1 that seem to be fixed if I also forbit odd dividers in
+	 * this case. This could just be a bandwidth calculation issue, I
+	 * haven't implemented the bandwidth code yet, but in the meantime,
+	 * forcing uses_dvo to 1 fixes it and shouln't have bad side effects,
+	 * I haven't seen a case were were absolutely needed an odd PLL
+	 * divider. I'll find a better fix once I have more infos on the
+	 * real cause of the problem.
+	 */
 	while (rinfo->has_CRTC2) {
 		u32 fp2_gen_cntl = INREG(FP2_GEN_CNTL);
 		u32 disp_output_cntl;
@@ -1353,6 +1363,9 @@ static void radeon_calc_pll_regs(struct radeonfb_info *rinfo, struct radeon_regs
 		uses_dvo = 1;
 		break;
 	}
+#else
+	use_dvo = 1;
+#endif
 	if (freq > rinfo->pll.ppll_max)
 		freq = rinfo->pll.ppll_max;
 	if (freq*12 < rinfo->pll.ppll_min)
