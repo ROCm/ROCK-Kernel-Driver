@@ -147,8 +147,9 @@ void ppc64_enable_pmcs(void)
 			reset = 0;
 			ret = plpar_hcall_norets(H_PERFMON, set, reset);
 			if (ret)
-				printk(KERN_ERR "H_PERFMON call returned %d",
-				       ret);
+				printk(KERN_ERR "H_PERFMON call on cpu %u "
+						"returned %d\n",
+						smp_processor_id(), ret);
 			break;
 
 		default:
