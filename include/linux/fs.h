@@ -988,7 +988,6 @@ extern int unregister_filesystem(struct file_system_type *);
 extern struct vfsmount *kern_mount(struct file_system_type *);
 extern int may_umount(struct vfsmount *);
 extern long do_mount(char *, char *, char *, unsigned long, void *);
-extern void umount_tree(struct vfsmount *);
 
 #define kern_umount mntput
 
