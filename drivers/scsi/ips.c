@@ -2159,27 +2159,60 @@ ips_host_info(ips_ha_t * ha, char *ptr, off_t offset, int len)
 
 	copy_info(&info, "\tIRQ number                        : %d\n", ha->irq);
 
-	if (le32_to_cpu(ha->nvram->signature) == IPS_NVRAM_P5_SIG)
-		copy_info(&info,
-			  "\tBIOS Version                      : %c%c%c%c%c%c%c%c\n",
-			  ha->nvram->bios_high[0], ha->nvram->bios_high[1],
-			  ha->nvram->bios_high[2], ha->nvram->bios_high[3],
-			  ha->nvram->bios_low[0], ha->nvram->bios_low[1],
-			  ha->nvram->bios_low[2], ha->nvram->bios_low[3]);
+    /* For the Next 3 lines Check for Binary 0 at the end and don't include it if it's there. */
+    /* That keeps everything happy for "text" operations on the proc file.                    */
 
-	copy_info(&info,
-		  "\tFirmware Version                  : %c%c%c%c%c%c%c%c\n",
-		  ha->enq->CodeBlkVersion[0], ha->enq->CodeBlkVersion[1],
-		  ha->enq->CodeBlkVersion[2], ha->enq->CodeBlkVersion[3],
-		  ha->enq->CodeBlkVersion[4], ha->enq->CodeBlkVersion[5],
-		  ha->enq->CodeBlkVersion[6], ha->enq->CodeBlkVersion[7]);
+	if (le32_to_cpu(ha->nvram->signature) == IPS_NVRAM_P5_SIG) {
+        if (ha->nvram->bios_low[3] == 0) { 
+            copy_info(&info,
+			          "\tBIOS Version                      : %c%c%c%c%c%c%c\n",
+			          ha->nvram->bios_high[0], ha->nvram->bios_high[1],
+			          ha->nvram->bios_high[2], ha->nvram->bios_high[3],
+			          ha->nvram->bios_low[0], ha->nvram->bios_low[1],
+			          ha->nvram->bios_low[2]);
 
-	copy_info(&info,
-		  "\tBoot Block Version                : %c%c%c%c%c%c%c%c\n",
-		  ha->enq->BootBlkVersion[0], ha->enq->BootBlkVersion[1],
-		  ha->enq->BootBlkVersion[2], ha->enq->BootBlkVersion[3],
-		  ha->enq->BootBlkVersion[4], ha->enq->BootBlkVersion[5],
-		  ha->enq->BootBlkVersion[6], ha->enq->BootBlkVersion[7]);
+        } else {
+		    copy_info(&info,
+			          "\tBIOS Version                      : %c%c%c%c%c%c%c%c\n",
+			          ha->nvram->bios_high[0], ha->nvram->bios_high[1],
+			          ha->nvram->bios_high[2], ha->nvram->bios_high[3],
+			          ha->nvram->bios_low[0], ha->nvram->bios_low[1],
+			          ha->nvram->bios_low[2], ha->nvram->bios_low[3]);
+        }
+
+    }
+
+    if (ha->enq->CodeBlkVersion[7] == 0) {
+        copy_info(&info,
+		          "\tFirmware Version                  : %c%c%c%c%c%c%c\n",
+		          ha->enq->CodeBlkVersion[0], ha->enq->CodeBlkVersion[1],
+		          ha->enq->CodeBlkVersion[2], ha->enq->CodeBlkVersion[3],
+		          ha->enq->CodeBlkVersion[4], ha->enq->CodeBlkVersion[5],
+		          ha->enq->CodeBlkVersion[6]);
+    } else {
+        copy_info(&info,
+		          "\tFirmware Version                  : %c%c%c%c%c%c%c%c\n",
+		          ha->enq->CodeBlkVersion[0], ha->enq->CodeBlkVersion[1],
+		          ha->enq->CodeBlkVersion[2], ha->enq->CodeBlkVersion[3],
+		          ha->enq->CodeBlkVersion[4], ha->enq->CodeBlkVersion[5],
+		          ha->enq->CodeBlkVersion[6], ha->enq->CodeBlkVersion[7]);
+    }
+
+    if (ha->enq->BootBlkVersion[7] == 0) {
+        copy_info(&info,
+		          "\tBoot Block Version                : %c%c%c%c%c%c%c\n",
+		          ha->enq->BootBlkVersion[0], ha->enq->BootBlkVersion[1],
+		          ha->enq->BootBlkVersion[2], ha->enq->BootBlkVersion[3],
+		          ha->enq->BootBlkVersion[4], ha->enq->BootBlkVersion[5],
+		          ha->enq->BootBlkVersion[6]);
+    } else {
+        copy_info(&info,
+		          "\tBoot Block Version                : %c%c%c%c%c%c%c%c\n",
+		          ha->enq->BootBlkVersion[0], ha->enq->BootBlkVersion[1],
+		          ha->enq->BootBlkVersion[2], ha->enq->BootBlkVersion[3],
+		          ha->enq->BootBlkVersion[4], ha->enq->BootBlkVersion[5],
+		          ha->enq->BootBlkVersion[6], ha->enq->BootBlkVersion[7]);
+    }
 
 	copy_info(&info, "\tDriver Version                    : %s%s\n",
 		  IPS_VERSION_HIGH, IPS_VERSION_LOW);
@@ -2840,6 +2873,11 @@ ips_next(ips_ha_t * ha, int intr)
 
 		scb->dcdb.cmd_attribute =
 		    ips_command_direction[scb->scsi_cmd->cmnd[0]];
+
+        /* Allow a WRITE BUFFER Command to Have no Data */
+        /* This is Used by Tape Flash Utilites          */
+        if ((scb->scsi_cmd->cmnd[0] == WRITE_BUFFER) && (scb->data_len == 0)) 
+            scb->dcdb.cmd_attribute = 0;                  
 
 		if (!(scb->dcdb.cmd_attribute & 0x3))
 			scb->dcdb.transfer_length = 0;
