@@ -56,11 +56,7 @@
  * also controls for enabling/disabling internal speaker and line
  * input.
  *
- * Buffers used by this driver are all DMA consistent. Since harmony is
- * not "real" pci device, we use a fake struct pci_dev for
- * pci_alloc_consistent().
- * (note that some machines -712 for ex.- don't implement DMA consistent
- * memory, so we will need to use kmalloc instead)
+ * Buffers used by this driver are all DMA consistent.
  */
 
 #include <linux/delay.h>
@@ -202,8 +198,7 @@ typedef struct snd_card_harmony {
 	int cap_stopped;
 	int cap_total;
 
-	struct pci_dev *fake_pci_dev; /* The fake pci_dev needed for 
-					pci_* functions under ccio. */
+	struct parisc_device *pa_dev;
 
 	/* the graveyard buffer is used as recording buffer when playback, 
 	 * because harmony always want a buffer to put recorded data */
@@ -720,13 +715,6 @@ static int snd_card_harmony_playback_open(snd_pcm_substream_t * substream)
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	int err;
 	
-	/*
-	 * harmony is not "real" pci, but we need a pci_dev
-	 * to alloc PCI DMA pages
-	 */
-	substream->runtime->dma_private = harmony->fake_pci_dev;
-//	substream->dma_type = SNDRV_PCM_DMA_TYPE_PCI;
-	
 	harmony->playback_substream = substream;
 	runtime->hw = snd_card_harmony_playback;
 	snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_RATE, &hw_constraint_rates);
@@ -743,14 +731,6 @@ static int snd_card_harmony_capture_open(snd_pcm_substream_t * substream)
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	int err;
 	
-	
-	/*
-	 * harmony is not "real" pci, but we need a pci_dev
-	 * to alloc PCI DMA pages
-	 */
-	substream->runtime->dma_private = harmony->fake_pci_dev;
-//	substream->dma_type = SNDRV_PCM_DMA_TYPE_PCI;
-
 	harmony->capture_substream = substream;
 	runtime->hw = snd_card_harmony_capture;
 	snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_RATE, &hw_constraint_rates);
@@ -796,12 +776,11 @@ static int snd_card_harmony_capture_close(snd_pcm_substream_t * substream)
 static int snd_card_harmony_hw_params(snd_pcm_substream_t *substream, 
 	                   snd_pcm_hw_params_t * hw_params)
 {
-	snd_pcm_runtime_t *runtime = substream->runtime;
 	int err;
 	
 	err = snd_pcm_lib_malloc_pages(substream, params_buffer_bytes(hw_params));
 	DPRINTK(KERN_INFO PFX "HW Params returned %d, dma_addr %lx\n", err,
-			(unsigned long)runtime->dma_addr);
+			(unsigned long)substream->runtime->dma_addr);
 	return err;
 }
 
@@ -859,7 +838,7 @@ static int snd_card_harmony_pcm_init(snd_card_harmony_t *harmony, int device)
 	
 	/* initialize graveyard buffer */
 	harmony->dma_dev.type = SNDRV_DMA_TYPE_DEV;
-	harmony->dma_dev.dev = snd_dma_pci_data(harmony->fake_pci_dev); 
+	harmony->dma_dev.dev = &harmony->pa_dev->dev;
 	harmony->graveyard_addr = snd_dma_alloc_pages(&chip->dma_dev,
 			HARMONY_BUF_SIZE*GRAVEYARD_BUFS, &harmony->graveyard_dma);
 	harmony->graveyard_count = 0;
@@ -876,7 +855,7 @@ static int snd_card_harmony_pcm_init(snd_card_harmony_t *harmony, int device)
 	harmony->graveyard_count = 0;
 	
 	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV,
-					      snd_dma_pci_data(harmony->fake_pci_dev),
+					      &harmony->pa_dev->dev,
 					      64 * 1024, 128 * 1024);
 
 	return 0;
@@ -1020,10 +999,11 @@ static int snd_card_harmony_create(snd_card_t *card, struct parisc_device *pa_de
 	
 	harmony->card = card;
 	
+	harmony->pa_dev = pa_dev;
+
 	/* Set the HPA of harmony */
 	harmony->hpa = pa_dev->hpa;
 	
-
 	harmony->irq = pa_dev->irq;
 	if (!harmony->irq) {
 		printk(KERN_ERR PFX "no irq found\n");
@@ -1049,8 +1029,6 @@ static int snd_card_harmony_create(snd_card_t *card, struct parisc_device *pa_de
 		return -EBUSY;
 	}
 	
-	/* a fake pci_dev is needed for pci_* functions under ccio */
-	harmony->fake_pci_dev = ccio_get_fake(pa_dev);
 	return 0;
 }
 	
