@@ -749,7 +749,7 @@ static void sd_end_flush(request_queue_t *q, struct request *flush_rq)
 		spin_unlock(q->queue_lock);
 		scsi_io_completion(cmd, bytes, 0);
 		spin_lock(q->queue_lock);
-	} else if (blk_barrier_postflush(rq))
+	} else if (blk_barrier_postflush(rq)) {
 		spin_unlock(q->queue_lock);
 		scsi_io_completion(cmd, 0, bytes);
 		spin_lock(q->queue_lock);
