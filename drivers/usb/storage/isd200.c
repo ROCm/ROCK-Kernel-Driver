@@ -650,7 +650,7 @@ static void isd200_log_config( struct isd200_info* info )
 /**************************************************************************
  * isd200_write_config
  *									 
- * Write the ISD200 Configuraton data
+ * Write the ISD200 Configuration data
  *
  * RETURNS:
  *    ISD status code
@@ -693,7 +693,7 @@ int isd200_write_config( struct us_data *us )
 /**************************************************************************
  * isd200_read_config
  *									 
- * Reads the ISD200 Configuraton data
+ * Reads the ISD200 Configuration data
  *
  * RETURNS:
  *    ISD status code
@@ -977,7 +977,7 @@ int isd200_get_inquiry_data( struct us_data *us )
 		/* check for an ATA device */
 		if (info->DeviceFlags & DF_ATA_DEVICE) {
 			/* this must be an ATA device */
-			/* perform an ATA Commmand Identify */
+			/* perform an ATA Command Identify */
 			transferStatus = isd200_action( us, ACTION_IDENTIFY,
 							&info->drive, 
 							sizeof(struct hd_driveid) );

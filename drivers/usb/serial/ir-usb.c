@@ -471,7 +471,7 @@ static void ir_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 
 			/*
 			 * Bypass flip-buffers, and feed the ldisc directly
-			 * due to our potentally large buffer size.  Since we
+			 * due to our potentially large buffer size.  Since we
 			 * used to set low_latency, this is exactly what the
 			 * tty layer did anyway :)
 			 */
@@ -553,7 +553,7 @@ static void ir_set_termios (struct usb_serial_port *port, struct termios *old_te
 		/* 
 		 * FIXME, we should compare the baud request against the
 		 * capability stated in the IR header that we got in the
-		 * startup funtion.
+		 * startup function.
 		 */
 		switch (cflag & CBAUD) {
 			case B2400:    ir_baud = SPEED_2400;    break;

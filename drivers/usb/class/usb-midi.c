@@ -1270,7 +1270,7 @@ static void *find_descriptor( void *descStart, unsigned int descLength, void *af
 	return NULL;
 }
 
-/** Utility to find a class-specfic interface descriptor.
+/** Utility to find a class-specific interface descriptor.
  *  dsubtype is a descriptor subtype
  *  Called by parseDescriptor();
  **/

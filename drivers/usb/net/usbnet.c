@@ -1707,7 +1707,7 @@ static int usbnet_stop (struct net_device *net)
 
 /*-------------------------------------------------------------------------*/
 
-// posts reads, and enables write queing
+// posts reads, and enables write queuing
 
 // precondition: never called in_interrupt
 

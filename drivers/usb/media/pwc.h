@@ -147,7 +147,7 @@ struct pwc_device
       2. data is synchronized and packed into a frame buffer
       3a. in case data is compressed, decompress it directly into image buffer
       3b. in case data is uncompressed, copy into image buffer with viewport
-      4. data is transfered to the user process
+      4. data is transferred to the user process
 
       Note that MAX_ISO_BUFS != MAX_FRAMES != MAX_IMAGES.... 
       We have in effect a back-to-back-double-buffer system.

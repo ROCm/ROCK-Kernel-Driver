@@ -193,7 +193,7 @@ struct udsl_instance_data {
 static const char udsl_driver_name [] = "speedtch";
 
 /*
- * atm driver prototypes and stuctures
+ * atm driver prototypes and structures
  */
 
 static void udsl_atm_dev_close (struct atm_dev *dev);

@@ -33,8 +33,8 @@
  *  0.1  8/31/1999
  *
  *    Developed/tested using linux-2.3.15 with minor ohci.c changes to
- *    support short packes during bulk xfer mode.  Some testing was
- *    done with ohci-hcd but the performace was low.  Very limited
+ *    support short packets during bulk xfer mode.  Some testing was
+ *    done with ohci-hcd but the performance was low.  Very limited
  *    testing was performed with uhci but I was unable to get it to
  *    work.  Initial relase to the linux-usb development effort.
  *
@@ -338,7 +338,7 @@
  *      Till Kamppeter <till.kamppeter@gmx.net> and others for all the ids.
  *    - Cleaned up list of vendor/product ids.
  *    - Print information about user-supplied ids only once at startup instead
- *      of everytime any USB device is plugged in.
+ *      of every time any USB device is plugged in.
  *    - Removed PV8630 ioctls. Use the standard ioctls instead.
  *    - Made endpoint detection more generic. Basically, only one bulk-in 
  *      endpoint is required, everything else is optional.

@@ -516,7 +516,7 @@ descriptor_error:
 
 	endpoint = &desc->endpoint[0].desc;
 
-	/* Output endpoint? Curiousier and curiousier.. */
+	/* Output endpoint? Curiouser and curiouser.. */
 	if (!(endpoint->bEndpointAddress & USB_DIR_IN)) {
 		goto descriptor_error;
 	}
@@ -958,7 +958,7 @@ static void usb_hub_events(void)
 	int i, ret;
 
 	/*
-	 *  We restart the list everytime to avoid a deadlock with
+	 *  We restart the list every time to avoid a deadlock with
 	 * deleting hubs downstream from this one. This should be
 	 * safe since we delete the hub from the event list.
 	 * Not the most efficient, but avoids deadlocks.
