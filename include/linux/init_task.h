@@ -45,7 +45,8 @@
     thread_info:	&init_thread_info,				\
     flags:		0,						\
     lock_depth:		-1,						\
-    __nice:		DEF_USER_NICE,					\
+    prio:		120,						\
+    static_prio:	120,						\
     policy:		SCHED_OTHER,					\
     cpus_allowed:	-1,						\
     mm:			NULL,						\

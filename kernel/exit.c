@@ -31,8 +31,6 @@ int getrusage(struct task_struct *, int, struct rusage *);
 
 static void release_task(struct task_struct * p)
 {
-	unsigned long flags;
-
 	if (p == current)
 		BUG();
 #ifdef CONFIG_SMP
@@ -46,25 +44,7 @@ static void release_task(struct task_struct * p)
 	current->cmin_flt += p->min_flt + p->cmin_flt;
 	current->cmaj_flt += p->maj_flt + p->cmaj_flt;
 	current->cnswap += p->nswap + p->cnswap;
-	/*
-	 * Potentially available timeslices are retrieved
-	 * here - this way the parent does not get penalized
-	 * for creating too many processes.
-	 *
-	 * (this cannot be used to artificially 'generate'
-	 * timeslices, because any timeslice recovered here
-	 * was given away by the parent in the first place.)
-	 */
-	__save_flags(flags);
-	__cli();
-	current->time_slice += p->time_slice;
-	if (current->time_slice > MAX_TIMESLICE)
-		current->time_slice = MAX_TIMESLICE;
-	if (p->sleep_avg < current->sleep_avg)
-		current->sleep_avg = (current->sleep_avg * EXIT_WEIGHT +
-				p->sleep_avg) / (EXIT_WEIGHT + 1);
-	__restore_flags(flags);
-
+	sched_exit(p);
 	p->pid = 0;
 	put_task_struct(p);
 }
@@ -172,9 +152,8 @@ void reparent_to_init(void)
 	current->exit_signal = SIGCHLD;
 
 	current->ptrace = 0;
-	if ((current->policy == SCHED_OTHER) &&
-			(current->__nice < DEF_USER_NICE))
-		set_user_nice(current, DEF_USER_NICE);
+	if ((current->policy == SCHED_OTHER) && (task_nice(current) < 0))
+		set_user_nice(current, 0);
 	/* cpus_allowed? */
 	/* rt_priority? */
 	/* signals? */

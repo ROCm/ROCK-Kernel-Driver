@@ -221,7 +221,7 @@ asmlinkage long sys_setpriority(int which, int who, int niceval)
 		}
 		if (error == -ESRCH)
 			error = 0;
-		if (niceval < p->__nice && !capable(CAP_SYS_NICE))
+		if (niceval < task_nice(p) && !capable(CAP_SYS_NICE))
 			error = -EACCES;
 		else
 			set_user_nice(p, niceval);
@@ -250,7 +250,7 @@ asmlinkage long sys_getpriority(int which, int who)
 		long niceval;
 		if (!proc_sel(p, which, who))
 			continue;
-		niceval = 20 - p->__nice;
+		niceval = 20 - task_nice(p);
 		if (niceval > retval)
 			retval = niceval;
 	}

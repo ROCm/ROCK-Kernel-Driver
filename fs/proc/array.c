@@ -336,12 +336,8 @@ int proc_pid_stat(struct task_struct *task, char * buffer)
 
 	/* scale priority and nice values from timeslices to -20..20 */
 	/* to make it look like a "normal" Unix priority/nice value  */
-	priority = task->prio;
-	if (priority >= MAX_RT_PRIO)
-		priority -= MAX_RT_PRIO;
-	else
-		priority = priority-100;
-	nice = task->__nice;
+	priority = task_prio(task);
+	nice = task_nice(task);
 
 	read_lock(&tasklist_lock);
 	ppid = task->pid ? task->p_opptr->pid : 0;

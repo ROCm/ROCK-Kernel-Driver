@@ -358,7 +358,7 @@ static __inline__ int find_next_zero_bit (void * addr, int size, int offset)
  * @offset: The bitnumber to start searching at
  * @size: The maximum size to search
  */
-static __inline__ int find_next_bit (void * addr, int size, int offset)
+static __inline__ int find_next_bit(void * addr, int size, int offset)
 {
 	unsigned long * p = ((unsigned long *) addr) + (offset >> 5);
 	int set = 0, bit = offset & 31, res;
