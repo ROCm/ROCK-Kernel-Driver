@@ -122,9 +122,9 @@ static int remap_area_pages(unsigned long address, unsigned long phys_addr,
 
 #define IS_LOW512(addr) (!((unsigned long)(addr) & ~0x1fffffffUL))
 
-void * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flags)
+void __iomem * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flags)
 {
-	void * addr;
+	void __iomem * addr;
 	struct vm_struct * area;
 	unsigned long offset, last_addr;
 
@@ -169,13 +169,13 @@ void * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flag
 	if (!area)
 		return NULL;
 	area->phys_addr = phys_addr;
-	addr = area->addr;
+	addr = (void __iomem *) area->addr;
 	if (remap_area_pages((unsigned long)addr, phys_addr, size, flags)) {
-		vunmap(addr);
+		vunmap((void __force *) addr);
 		return NULL;
 	}
 
-	return (void *) (offset + (char *)addr);
+	return (void __iomem *) (offset + (char __iomem *)addr);
 }
 
 #define IS_KSEG1(addr) (((unsigned long)(addr) & ~0x1fffffffUL) == KSEG1)
