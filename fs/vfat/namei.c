@@ -573,13 +573,18 @@ xlate_to_uni(const unsigned char *name, int len, unsigned char *outname,
 	int charlen;
 
 	if (utf8) {
+		int name_len = strlen(name);
+
 		*outlen = utf8_mbstowcs((wchar_t *)outname, name, PAGE_SIZE);
-		if (name[len-1] == '.')
-			*outlen-=2;
+
+		/*
+		 * We stripped '.'s before and set len appropriately,
+		 * but utf8_mbstowcs doesn't care about len
+		 */
+		*outlen -= (name_len-len);
+
 		op = &outname[*outlen * sizeof(wchar_t)];
 	} else {
-		if (name[len-1] == '.') 
-			len--;
 		if (nls) {
 			for (i = 0, ip = name, op = outname, *outlen = 0;
 			     i < len && *outlen <= 260; *outlen += 1)
