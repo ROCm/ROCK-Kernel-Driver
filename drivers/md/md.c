@@ -1626,9 +1626,6 @@ static int do_md_run(mddev_t * mddev)
 	chunk_size = mddev->sb->chunk_size;
 	pnum = level_to_pers(mddev->sb->level);
 
-	mddev->param.chunk_size = chunk_size;
-	mddev->param.personality = pnum;
-
 	if ((pnum != MULTIPATH) && (pnum != RAID1)) {
 		if (!chunk_size) {
 			/*
@@ -2828,13 +2825,6 @@ static int md_ioctl(struct inode *inode, struct file *file,
 
 		case RUN_ARRAY:
 		{
-/* The data is never used....
-			mdu_param_t param;
-			err = copy_from_user(&param, (mdu_param_t *)arg,
-							 sizeof(param));
-			if (err)
-				goto abort_unlock;
-*/
 			err = do_md_run (mddev);
 			/*
 			 * we have to clean up the mess if

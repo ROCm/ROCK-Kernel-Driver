@@ -199,7 +199,6 @@ struct mddev_s
 	int				nb_dev;
 	struct list_head 		disks;
 	int				sb_dirty;
-	mdu_param_t			param;
 	int				ro;
 	unsigned long			curr_resync;	/* blocks scheduled */
 	unsigned long			resync_mark;	/* a recent timestamp */

@@ -186,7 +186,7 @@ static int linear_status (char *page, mddev_t *mddev)
 	}
 	sz += sprintf(page+sz, "\n");
 #endif
-	sz += sprintf(page+sz, " %dk rounding", mddev->param.chunk_size/1024);
+	sz += sprintf(page+sz, " %dk rounding", mddev->sb->chunk_size/1024);
 	return sz;
 }
 

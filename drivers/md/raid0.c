@@ -233,7 +233,7 @@ static int raid0_make_request (mddev_t *mddev, int rw, struct bio *bio)
 	mdk_rdev_t *tmp_dev;
 	unsigned long chunk, block, rsect;
 
-	chunk_size = mddev->param.chunk_size >> 10;
+	chunk_size = mddev->sb->chunk_size >> 10;
 	chunksize_bits = ffz(~chunk_size);
 	block = bio->bi_sector >> 1;
 	hash = conf->hash_table + block / conf->smallest->size;
@@ -322,7 +322,7 @@ static int raid0_status (char *page, mddev_t *mddev)
 				conf->strip_zone[j].size);
 	}
 #endif
-	sz += sprintf(page + sz, " %dk chunks", mddev->param.chunk_size/1024);
+	sz += sprintf(page + sz, " %dk chunks", mddev->sb->chunk_size/1024);
 	return sz;
 }
 
