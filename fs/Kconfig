@@ -1025,7 +1025,7 @@ config HFSPLUS_FS
 	  style features such as file ownership and permissions.
 
 config BEFS_FS
-	tristate "BeOS file systemv(BeFS) support (read only) (EXPERIMENTAL)"
+	tristate "BeOS file system (BeFS) support (read only) (EXPERIMENTAL)"
 	depends on EXPERIMENTAL
 	select NLS
 	help
