@@ -17,6 +17,7 @@
 #include <asm/mach/pci.h>
 
 static int debug_pci;
+static int use_firmware;
 
 /*
  * We can't use pci_find_device() here since we are
@@ -571,15 +572,17 @@ void __init pci_common_init(struct hw_pci *hw)
 	list_for_each_entry(sys, &hw->buses, node) {
 		struct pci_bus *bus = sys->bus;
 
-		/*
-		 * Size the bridge windows.
-		 */
-		pci_bus_size_bridges(bus);
+		if (!use_firmware) {
+			/*
+		 	 * Size the bridge windows.
+		 	 */
+			pci_bus_size_bridges(bus);
 
-		/*
-		 * Assign resources.
-		 */
-		pci_bus_assign_resources(bus);
+			/*
+		 	 * Assign resources.
+		 	 */
+			pci_bus_assign_resources(bus);
+		}
 
 		/*
 		 * Tell drivers about devices found.
@@ -592,6 +595,9 @@ char * __init pcibios_setup(char *str)
 {
 	if (!strcmp(str, "debug")) {
 		debug_pci = 1;
+		return NULL;
+	} else if (!strcmp(str, "firmware")) {
+		use_firmware = 1;
 		return NULL;
 	}
 	return str;
