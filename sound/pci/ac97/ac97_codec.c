@@ -1505,7 +1505,7 @@ static int snd_ac97_mixer_build(ac97_t * ac97)
 	snd_ac97_update_bits(ac97, AC97_GENERAL_PURPOSE, ~AC97_GP_DRSS_MASK, 0x0000);
 
 	/* build 3D controls */
-	if (ac97->build_ops && ac97->build_ops->build_3d) {
+	if (ac97->build_ops->build_3d) {
 		ac97->build_ops->build_3d(ac97);
 	} else {
 		if (snd_ac97_try_volume_mix(ac97, AC97_3D_CONTROL)) {
@@ -1528,14 +1528,14 @@ static int snd_ac97_mixer_build(ac97_t * ac97)
 
 	/* build S/PDIF controls */
 	if (ac97->ext_id & AC97_EI_SPDIF) {
-		if (ac97->build_ops && ac97->build_ops->build_spdif) {
+		if (ac97->build_ops->build_spdif) {
 			if ((err = ac97->build_ops->build_spdif(ac97)) < 0)
 				return err;
 		} else {
 			for (idx = 0; idx < 5; idx++)
 				if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_controls_spdif[idx], ac97))) < 0)
 					return err;
-			if (ac97->build_ops && ac97->build_ops->build_post_spdif) {
+			if (ac97->build_ops->build_post_spdif) {
 				if ((err = ac97->build_ops->build_post_spdif(ac97)) < 0)
 					return err;
 			}
@@ -1548,7 +1548,7 @@ static int snd_ac97_mixer_build(ac97_t * ac97)
 	}
 	
 	/* build chip specific controls */
-	if (ac97->build_ops && ac97->build_ops->build_specific)
+	if (ac97->build_ops->build_specific)
 		if ((err = ac97->build_ops->build_specific(ac97)) < 0)
 			return err;
 
@@ -1811,6 +1811,9 @@ int snd_ac97_bus(snd_card_t *card, int num, ac97_bus_ops_t *ops,
 	return 0;
 }
 
+/* build_ops to do nothing */
+static struct snd_ac97_build_ops null_build_ops;
+
 /**
  * snd_ac97_mixer - create an Codec97 component
  * @bus: the AC97 bus which codec is attached to
@@ -2050,6 +2053,9 @@ int snd_ac97_mixer(ac97_bus_t *bus, ac97_template_t *template, ac97_t **rac97)
 		bus->ops->init(ac97);
 	snd_ac97_get_name(ac97, ac97->id, name, !ac97_is_audio(ac97));
 	snd_ac97_get_name(NULL, ac97->id, name, !ac97_is_audio(ac97));  // ac97->id might be changed in the special setup code
+	if (! ac97->build_ops)
+		ac97->build_ops = &null_build_ops;
+
 	if (ac97_is_audio(ac97)) {
 		char comp[16];
 		if (card->mixername[0] == '\0') {
@@ -2157,6 +2163,8 @@ static void snd_ac97_powerdown(ac97_t *ac97)
  */
 void snd_ac97_suspend(ac97_t *ac97)
 {
+	if (ac97->build_ops->suspend)
+		ac97->build_ops->suspend(ac97);
 	snd_ac97_powerdown(ac97);
 }
 

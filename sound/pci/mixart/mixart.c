@@ -526,11 +526,11 @@ static int mixart_set_format(mixart_stream_t *stream, snd_pcm_format_t format)
 		stream_param.sample_type = ST_INTEGER_24BE;
 		stream_param.sample_size = 24;
 		break;
-	case SNDRV_PCM_FMTBIT_FLOAT_LE:
+	case SNDRV_PCM_FORMAT_FLOAT_LE:
 		stream_param.sample_type = ST_FLOATING_POINT_32LE;
 		stream_param.sample_size = 32;
 		break;
-	case  SNDRV_PCM_FMTBIT_FLOAT_BE:
+	case  SNDRV_PCM_FORMAT_FLOAT_BE:
 		stream_param.sample_type = ST_FLOATING_POINT_32BE;
 		stream_param.sample_size = 32;
 		break;

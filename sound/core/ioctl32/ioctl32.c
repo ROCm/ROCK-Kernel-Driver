@@ -219,25 +219,10 @@ struct sndrv_ctl_elem_value32 {
 	struct sndrv_ctl_elem_id id;
 	unsigned int indirect;	/* bit-field causes misalignment */
         union {
-		union {
-			s32 value[128];
-			u32 value_ptr;
-		} integer;
-		union {
-			s64 value[64];
-			u32 value_ptr;
-		} integer64;
-		union {
-			u32 item[128];
-			u32 item_ptr;
-		} enumerated;
-		union {
-			unsigned char data[512];
-			u32 data_ptr;
-		} bytes;
-		struct sndrv_aes_iec958 iec958;
+		s32 integer[128];	/* integer and boolean need conversion */
+		unsigned char data[512];	/* others should be compatible */
         } value;
-        unsigned char reserved[128];
+        unsigned char reserved[128];	/* not used */
 };
 
 
@@ -269,7 +254,7 @@ static inline int _snd_ioctl32_ctl_elem_value(unsigned int fd, unsigned int cmd,
 	struct sndrv_ctl_elem_value *data;
 	struct sndrv_ctl_elem_value32 __user *data32;
 	snd_ctl_file_t *ctl;
-	int err, i;
+	int err, i, indirect;
 	int type;
 
 	/* sanity check */
@@ -281,7 +266,7 @@ static inline int _snd_ioctl32_ctl_elem_value(unsigned int fd, unsigned int cmd,
 		return -ENOTTY;
 
 	data32 = compat_ptr(arg);
-	data = kmalloc(sizeof(*data), GFP_KERNEL);
+	data = kcalloc(1, sizeof(*data), GFP_KERNEL);
 	if (data == NULL)
 		return -ENOMEM;
 
@@ -289,12 +274,12 @@ static inline int _snd_ioctl32_ctl_elem_value(unsigned int fd, unsigned int cmd,
 		err = -EFAULT;
 		goto __end;
 	}
-	if (__get_user(data->indirect, &data32->indirect)) {
+	if (__get_user(indirect, &data32->indirect)) {
 		err = -EFAULT;
 		goto __end;
 	}
 	/* FIXME: indirect access is not supported */
-	if (data->indirect) {
+	if (indirect) {
 		err = -EINVAL;
 		goto __end;
 	}
@@ -309,7 +294,7 @@ static inline int _snd_ioctl32_ctl_elem_value(unsigned int fd, unsigned int cmd,
 	case SNDRV_CTL_ELEM_TYPE_INTEGER:
 		for (i = 0; i < 128; i++) {
 			int val;
-			if (__get_user(val, &data32->value.integer.value[i])) {
+			if (__get_user(val, &data32->value.integer[i])) {
 				err = -EFAULT;
 				goto __end;
 			}
@@ -317,33 +302,12 @@ static inline int _snd_ioctl32_ctl_elem_value(unsigned int fd, unsigned int cmd,
 		}
 		break;
 	case SNDRV_CTL_ELEM_TYPE_INTEGER64:
-		if (__copy_from_user(data->value.integer64.value,
-				     data32->value.integer64.value,
-				     sizeof(data->value.integer64.value))) {
-			err = -EFAULT;
-			goto __end;
-		}
-		break;
 	case SNDRV_CTL_ELEM_TYPE_ENUMERATED:
-		if (__copy_from_user(data->value.enumerated.item,
-				     data32->value.enumerated.item,
-				     sizeof(data32->value.enumerated.item))) {
-			err = -EFAULT;
-			goto __end;
-		}
-		break;
 	case SNDRV_CTL_ELEM_TYPE_BYTES:
-		if (__copy_from_user(data->value.bytes.data,
-				     data32->value.bytes.data,
-				     sizeof(data32->value.bytes.data))) {
-			err = -EFAULT;
-			goto __end;
-		}
-		break;
 	case SNDRV_CTL_ELEM_TYPE_IEC958:
-		if (__copy_from_user(&data->value.iec958,
-				     &data32->value.iec958,
-				     sizeof(data32->value.iec958))) {
+		if (__copy_from_user(data->value.bytes.data,
+				     data32->value.data,
+				     sizeof(data32->value.data))) {
 			err = -EFAULT;
 			goto __end;
 		}
@@ -367,43 +331,20 @@ static inline int _snd_ioctl32_ctl_elem_value(unsigned int fd, unsigned int cmd,
 		for (i = 0; i < 128; i++) {
 			int val;
 			val = data->value.integer.value[i];
-			if (__put_user(val, &data32->value.integer.value[i])) {
+			if (__put_user(val, &data32->value.integer[i])) {
 				err = -EFAULT;
 				goto __end;
 			}
 		}
 		break;
-	case SNDRV_CTL_ELEM_TYPE_INTEGER64:
-		if (__copy_to_user(data32->value.integer64.value,
-				   data->value.integer64.value,
-				   sizeof(data32->value.integer64.value))) {
-			err = -EFAULT;
-			goto __end;
-		}
-		break;
-	case SNDRV_CTL_ELEM_TYPE_ENUMERATED:
-		if (__copy_to_user(data32->value.enumerated.item,
-				   data->value.enumerated.item,
-				   sizeof(data32->value.enumerated.item))) {
-			err = -EFAULT;
-			goto __end;
-		}
-		break;
-	case SNDRV_CTL_ELEM_TYPE_BYTES:
-		if (__copy_to_user(data32->value.bytes.data,
+	default:
+		if (__copy_to_user(data32->value.data,
 				   data->value.bytes.data,
-				   sizeof(data32->value.bytes.data))) {
+				   sizeof(data32->value.data))) {
 			err = -EFAULT;
 			goto __end;
 		}
 		break;
-	case SNDRV_CTL_ELEM_TYPE_IEC958:
-		if (__copy_to_user(&data32->value.iec958,
-				   &data->value.iec958,
-				   sizeof(data32->value.iec958))) {
-			err = -EFAULT;
-			goto __end;
-		}
 		break;
 	}
 	err = 0;
