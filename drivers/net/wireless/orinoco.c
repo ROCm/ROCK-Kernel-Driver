@@ -4129,6 +4129,8 @@ struct net_device *alloc_orinocodev(int sizeof_card, int (*hard_reset)(struct or
 	struct orinoco_private *priv;
 
 	dev = alloc_etherdev(sizeof(struct orinoco_private) + sizeof_card);
+	if (!dev)
+		return NULL;
 	priv = (struct orinoco_private *)dev->priv;
 	priv->ndev = dev;
 	if (sizeof_card)
