@@ -42,6 +42,7 @@
 #include <linux/init.h>
 #include <linux/wait.h>
 #include <linux/net.h>
+#include <linux/proc_fs.h>
 #include <net/sock.h>
 #include <asm/uaccess.h>
 #include <asm/unaligned.h>
@@ -570,6 +571,15 @@ struct rfcomm_session *rfcomm_session_create(bdaddr_t *src, bdaddr_t *dst, int *
 failed:
 	sock_release(sock);
 	return NULL;
+}
+
+void rfcomm_session_getaddr(struct rfcomm_session *s, bdaddr_t *src, bdaddr_t *dst)
+{
+	struct sock *sk = s->sock->sk;
+	if (src)
+		bacpy(src, &bluez_sk(sk)->src);
+	if (dst)
+		bacpy(dst, &bluez_sk(sk)->dst);
 }
 
 /* ---- RFCOMM frame sending ---- */
@@ -1674,6 +1684,63 @@ static int rfcomm_run(void *unused)
 	return 0;
 }
 
+/* ---- Proc fs support ---- */
+static int rfcomm_dlc_dump(char *buf)
+{
+	struct rfcomm_session *s;
+	struct sock *sk;
+	struct list_head *p, *pp;
+	char *ptr = buf;
+
+	rfcomm_lock();
+
+	list_for_each(p, &session_list) {
+		s = list_entry(p, struct rfcomm_session, list);
+		sk = s->sock->sk;
+
+		list_for_each(pp, &s->dlcs) {
+		struct rfcomm_dlc *d;
+			d = list_entry(pp, struct rfcomm_dlc, list);
+
+			ptr += sprintf(ptr, "dlc %s %s %ld %d %d %d %d\n",
+				batostr(&bluez_sk(sk)->src), batostr(&bluez_sk(sk)->dst),
+				d->state, d->dlci, d->mtu, d->rx_credits, d->tx_credits);
+		}
+	}
+	
+	rfcomm_unlock();
+
+	return ptr - buf;
+}
+
+extern int rfcomm_sock_dump(char *buf);
+
+static int rfcomm_read_proc(char *buf, char **start, off_t offset, int count, int *eof, void *priv)
+{
+	char *ptr = buf;
+	int len;
+
+	BT_DBG("count %d, offset %ld", count, offset);
+
+	ptr += rfcomm_dlc_dump(ptr);
+	ptr += rfcomm_sock_dump(ptr);
+	len  = ptr - buf;
+
+	if (len <= count + offset)
+		*eof = 1;
+
+	*start = buf + offset;
+	len -= offset;
+
+	if (len > count)
+		len = count;
+	if (len < 0)
+		len = 0;
+
+	return len;
+}
+
+/* ---- Initialization ---- */
 int __init rfcomm_init(void)
 {
 	kernel_thread(rfcomm_run, NULL, CLONE_FS | CLONE_FILES | CLONE_SIGHAND);
@@ -1683,6 +1750,8 @@ int __init rfcomm_init(void)
 #ifdef CONFIG_BLUEZ_RFCOMM_TTY
 	rfcomm_init_ttys();
 #endif
+
+	create_proc_read_entry("bluetooth/rfcomm", 0, 0, rfcomm_read_proc, NULL);
 
 	BT_INFO("BlueZ RFCOMM ver %s", VERSION);
 	BT_INFO("Copyright (C) 2002 Maxim Krasnyansky <maxk@qualcomm.com>");
@@ -1700,6 +1769,8 @@ void rfcomm_cleanup(void)
 	/* Wait until thread is running */
 	while (atomic_read(&running))
 		schedule();
+
+	remove_proc_entry("bluetooth/rfcomm", NULL);
 
 #ifdef CONFIG_BLUEZ_RFCOMM_TTY
 	rfcomm_cleanup_ttys();

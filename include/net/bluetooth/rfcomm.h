@@ -268,6 +268,7 @@ struct rfcomm_session *rfcomm_session_get(bdaddr_t *src, bdaddr_t *dst);
 struct rfcomm_session *rfcomm_session_create(bdaddr_t *src, bdaddr_t *dst, int *err);
 void   rfcomm_session_del(struct rfcomm_session *s);
 void   rfcomm_session_close(struct rfcomm_session *s, int err);
+void   rfcomm_session_getaddr(struct rfcomm_session *s, bdaddr_t *src, bdaddr_t *dst);
 
 static inline void rfcomm_session_hold(struct rfcomm_session *s)
 {
@@ -290,7 +291,7 @@ struct sockaddr_rc {
 	u8          rc_channel;
 };
 
-#define rfcomm_pi(sk)   ((struct rfcomm_pinfo *) &sk->protinfo)
+#define rfcomm_pi(sk)   ((struct rfcomm_pinfo *) sk->protinfo)
 
 struct rfcomm_pinfo {
 	struct rfcomm_dlc   *dlc;

@@ -43,7 +43,6 @@
 #include <linux/interrupt.h>
 #include <linux/socket.h>
 #include <linux/skbuff.h>
-#include <linux/proc_fs.h>
 #include <linux/list.h>
 #include <net/sock.h>
 
@@ -83,7 +82,6 @@ static void rfcomm_sk_data_ready(struct rfcomm_dlc *d, struct sk_buff *skb)
 
 	if (atomic_read(&sk->rmem_alloc) >= sk->rcvbuf)
 		rfcomm_dlc_throttle(d);
-	return;
 }
 
 static void rfcomm_sk_state_change(struct rfcomm_dlc *d, int err)
@@ -94,22 +92,26 @@ static void rfcomm_sk_state_change(struct rfcomm_dlc *d, int err)
 
 	BT_DBG("dlc %p state %ld err %d", d, d->state, err);
 
+	bh_lock_sock(sk);
+
 	if (err)
 		sk->err = err;
 	sk->state = d->state;
 
 	parent = bluez_sk(sk)->parent;
-	if (!parent)
+	if (!parent) {
+		if (d->state == BT_CONNECTED)
+			rfcomm_session_getaddr(d->session, &bluez_sk(sk)->src, NULL);
 		sk->state_change(sk);
-	else
+	} else
 		parent->data_ready(parent, 0);
-	return;
+
+	bh_unlock_sock(sk);
 }
 
 static void rfcomm_sk_modem_status(struct rfcomm_dlc *d, int v24_sig)
 {
 	BT_DBG("dlc %p v24_sig 0x%02x", d, v24_sig);
-
 	return;
 }
 
@@ -374,6 +376,7 @@ static int rfcomm_sock_connect(struct socket *sock, struct sockaddr *addr, int a
 
 	sk->state = BT_CONNECT;
 	bacpy(&bluez_sk(sk)->dst, &sa->rc_bdaddr);
+	rfcomm_pi(sk)->channel = sa->rc_channel;
 
 	err = rfcomm_dlc_open(d, &bluez_sk(sk)->src, &sa->rc_bdaddr, sa->rc_channel);
 	if (!err)
@@ -655,7 +658,6 @@ static int rfcomm_sock_shutdown(struct socket *sock, int how)
 	return 0;
 }
 
-
 static int rfcomm_sock_setsockopt(struct socket *sock, int level, int optname, char *optval, int optlen)
 {
 	struct sock *sk = sock->sk;
@@ -735,14 +737,16 @@ static int rfcomm_sock_release(struct socket *sock)
  */
 int rfcomm_connect_ind(struct rfcomm_session *s, u8 channel, struct rfcomm_dlc **d)
 {
-	struct bluez_sock *bsk = bluez_sk(s->sock->sk);
 	struct sock *sk, *parent;
+	bdaddr_t src, dst;
 	int result = 0;
 
 	BT_DBG("session %p channel %d", s, channel);
 
+	rfcomm_session_getaddr(s, &src, &dst);
+
 	/* Check if we have socket listening on channel */
-	parent = rfcomm_get_sock_by_channel(BT_LISTEN, channel, &bsk->src);
+	parent = rfcomm_get_sock_by_channel(BT_LISTEN, channel, &src);
 	if (!parent)
 		return 0;
 
@@ -757,8 +761,8 @@ int rfcomm_connect_ind(struct rfcomm_session *s, u8 channel, struct rfcomm_dlc *
 		goto done;
 
 	rfcomm_sock_init(sk, parent);
-	bacpy(&bluez_sk(sk)->src, &bsk->src);
-	bacpy(&bluez_sk(sk)->dst, &bsk->dst);
+	bacpy(&bluez_sk(sk)->src, &src);
+	bacpy(&bluez_sk(sk)->dst, &dst);
 	rfcomm_pi(sk)->channel = channel;
 
 	sk->state = BT_CONFIG;
@@ -774,8 +778,9 @@ done:
 }
 
 /* ---- Proc fs support ---- */
-static int rfcomm_sock_dump(char *buf, struct bluez_sock_list *list)
+int rfcomm_sock_dump(char *buf)
 {
+	struct bluez_sock_list *list = &rfcomm_sk_list;
 	struct rfcomm_pinfo *pi;
 	struct sock *sk;
 	char *ptr = buf;
@@ -784,40 +789,14 @@ static int rfcomm_sock_dump(char *buf, struct bluez_sock_list *list)
 
 	for (sk = list->head; sk; sk = sk->next) {
 		pi = rfcomm_pi(sk);
-		ptr += sprintf(ptr, "%s %s %d %d\n",
+		ptr += sprintf(ptr, "sk  %s %s %d %d\n",
 				batostr(&bluez_sk(sk)->src), batostr(&bluez_sk(sk)->dst),
-				sk->state, rfcomm_pi(sk)->channel); 
+				sk->state, rfcomm_pi(sk)->channel);
 	}
 
 	write_unlock_bh(&list->lock);
 
-	ptr += sprintf(ptr, "\n");
-
 	return ptr - buf;
-}
-
-static int rfcomm_read_proc(char *buf, char **start, off_t offset, int count, int *eof, void *priv)
-{
-	char *ptr = buf;
-	int len;
-
-	BT_DBG("count %d, offset %ld", count, offset);
-
-	ptr += rfcomm_sock_dump(ptr, &rfcomm_sk_list);
-	len  = ptr - buf;
-
-	if (len <= count + offset)
-		*eof = 1;
-
-	*start = buf + offset;
-	len -= offset;
-
-	if (len > count)
-		len = count;
-	if (len < 0)
-		len = 0;
-
-	return len;
 }
 
 static struct proto_ops rfcomm_sock_ops = {
@@ -853,15 +832,12 @@ int rfcomm_init_sockets(void)
 		return err;
 	}
 
-	create_proc_read_entry("bluetooth/rfcomm", 0, 0, rfcomm_read_proc, NULL);
 	return 0;
 }
 
 void rfcomm_cleanup_sockets(void)
 {
 	int err;
-
-	remove_proc_entry("bluetooth/rfcomm", NULL);
 
 	/* Unregister socket, protocol and notifier */
 	if ((err = bluez_sock_unregister(BTPROTO_RFCOMM)))
