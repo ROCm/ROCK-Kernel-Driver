@@ -681,20 +681,6 @@ static char rcsid[] =
 static void cy_throttle (struct tty_struct *tty);
 static void cy_send_xchar (struct tty_struct *tty, char ch);
 
-static unsigned long 
-cy_get_user(unsigned long *addr)
-{
-	unsigned long result = 0;
-	int error = get_user (result, addr);
-	if (error)
-		printk ("cyclades: cy_get_user: error == %d\n", error);
-	return result;
-}
-
-#ifndef MIN
-#define MIN(a,b)        ((a) < (b) ? (a) : (b))
-#endif
-
 #define IS_CYC_Z(card) ((card).num_chips == -1)
 
 #define Z_FPGA_CHECK(card) \
@@ -708,7 +694,7 @@ cy_get_user(unsigned long *addr)
 			((card).base_addr+ID_ADDRESS))->signature)))
 
 #ifndef SERIAL_XMIT_SIZE
-#define	SERIAL_XMIT_SIZE	(MIN(PAGE_SIZE, 4096))
+#define	SERIAL_XMIT_SIZE	(min(PAGE_SIZE, 4096))
 #endif
 #define WAKEUP_CHARS		256
 
@@ -2680,7 +2666,7 @@ cy_wait_until_sent(struct tty_struct *tty, int timeout)
   unsigned char *base_addr;
   int card,chip,channel,index;
   unsigned long orig_jiffies;
-  signed long char_time;
+  int char_time;
 	
     if (serial_paranoia_check(info, tty->name, "cy_wait_until_sent"))
 	return;
@@ -2705,7 +2691,7 @@ cy_wait_until_sent(struct tty_struct *tty, int timeout)
     if (timeout < 0)
 	timeout = 0;
     if (timeout)
-	char_time = MIN(char_time, timeout);
+	char_time = min(char_time, timeout);
     /*
      * If the transmitter hasn't cleared in twice the approximate
      * amount of time to send the entire FIFO, it probably won't
@@ -2932,8 +2918,8 @@ cy_write(struct tty_struct * tty, int from_user,
 	while (1) {
 	    int c1;
 	    
-	    c = MIN(count, MIN(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
-				SERIAL_XMIT_SIZE - info->xmit_head));
+	    c = min(count, min((int)(SERIAL_XMIT_SIZE - info->xmit_cnt - 1),
+				(int)(SERIAL_XMIT_SIZE - info->xmit_head)));
 	    if (c <= 0)
 		break;
 
@@ -2945,8 +2931,8 @@ cy_write(struct tty_struct * tty, int from_user,
 		break;
 	    }
 	    CY_LOCK(info, flags);
-	    c1 = MIN(c, MIN(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
-			SERIAL_XMIT_SIZE - info->xmit_head));
+	    c1 = min(c, min((int)(SERIAL_XMIT_SIZE - info->xmit_cnt - 1),
+			(int)(SERIAL_XMIT_SIZE - info->xmit_head)));
 			
 	    if (c1 < c)
 	    	c = c1;
@@ -2962,8 +2948,8 @@ cy_write(struct tty_struct * tty, int from_user,
     } else {
 	CY_LOCK(info, flags);
 	while (1) {
-	    c = MIN(count, MIN(SERIAL_XMIT_SIZE - info->xmit_cnt - 1, 
-			SERIAL_XMIT_SIZE - info->xmit_head));
+	    c = min(count, min((int)(SERIAL_XMIT_SIZE - info->xmit_cnt - 1),
+			(int)(SERIAL_XMIT_SIZE - info->xmit_head)));
 	        
 	    if (c <= 0)
 		break;

@@ -112,14 +112,12 @@ config CYCLADES
 	tristate "Cyclades async mux support"
 	depends on SERIAL_NONSTANDARD
 	---help---
-	  This is a driver for a card that gives you many serial ports. You
-	  would need something like this to connect more than two modems to
+	  This driver supports Cyclades Z and Y multiserial boards.
+	  You would need something like this to connect more than two modems to
 	  your Linux box, for instance in order to become a dial-in server.
+
 	  For information about the Cyclades-Z card, read
 	  <file:drivers/char/README.cycladesZ>.
-
-	  As of 1.3.9x kernels, this driver's minor numbers start at 0 instead
-	  of 32.
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called cyclades.
