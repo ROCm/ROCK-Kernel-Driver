@@ -11,10 +11,10 @@
 SYSTEM  =$(TOPDIR)/vmlinux
 
 Image:	$(SYSTEM)
-	$(OBJCOPY) $(SYSTEM) Image
+	$(OBJCOPY) $(OBJCOPYFLAGS) $< $@
 
 zImage: compressed/vmlinux
-	$(OBJCOPY) compressed/vmlinux zImage
+	$(OBJCOPY) $(OBJCOPYFLAGS) $< $@
 
 compressed/vmlinux: $(TOPDIR)/vmlinux
 	$(MAKE) -C compressed vmlinux

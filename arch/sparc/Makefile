@@ -20,7 +20,7 @@ NEW_GAS := $(shell if $(LD) --version 2>&1 | grep 'elf64_sparc' > /dev/null; the
 
 ifeq ($(NEW_GAS),y)
 AS              := $(AS) -32
-LD              := $(LD) -m elf32_sparc
+LDFLAGS		:= -m elf32_sparc
 endif
 
 #CFLAGS := $(CFLAGS) -g -pipe -fcall-used-g5 -fcall-used-g7
@@ -30,8 +30,8 @@ else
 CFLAGS := $(CFLAGS) -m32 -pipe -mno-fpu -fcall-used-g5 -fcall-used-g7
 endif
 
-#LINKFLAGS = -N -Ttext 0xf0004000
-LINKFLAGS = -T arch/sparc/vmlinux.lds
+#LDFLAGS_vmlinux = -N -Ttext 0xf0004000
+LDFLAGS_vmlinux = -T arch/sparc/vmlinux.lds
 
 HEAD := arch/sparc/kernel/head.o arch/sparc/kernel/init_task.o
 

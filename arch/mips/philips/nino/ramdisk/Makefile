@@ -7,6 +7,6 @@
 #
 
 ramdisk.o: ramdisk.gz ld.script
-	$(LD) -T ld.script -b binary -o $@ ramdisk.gz
+	$(LD) $(LDFLAGS) -T ld.script -b binary -o $@ ramdisk.gz
 
 include $(TOPDIR)/Rules.make

@@ -13,16 +13,15 @@
 # Copyright (C) 1994 by Linus Torvalds
 #
 
-LD=$(CROSS_COMPILE)ld -m elf64_s390
+LDFLAGS		:= -m elf64_s390
 CPP=$(CC) -E
-OBJCOPY=$(CROSS_COMPILE)objcopy -O binary -R .note -R .comment -S
-LDFLAGS=-e start
+OBJCOPYFLAGS	:= -O binary
 ifeq ($(CONFIG_SHARED_KERNEL),y)
   LINKSCRIPT := arch/s390x/vmlinux-shared.lds
 else
   LINKSCRIPT := arch/s390x/vmlinux.lds
 endif
-LINKFLAGS =-T $(TOPDIR)/$(LINKSCRIPT) $(LDFLAGS)
+LDFLAGS_vmlinux := -T $(LINKSCRIPT) -e start
 MODFLAGS += -fpic
 
 CFLAGS_PIPE := -pipe
