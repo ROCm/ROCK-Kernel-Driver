@@ -41,6 +41,7 @@ EXPORT_SYMBOL(csum_partial_copy_nocheck);
 EXPORT_SYMBOL(csum_tcpudp_magic);
 EXPORT_SYMBOL(ip_compute_csum);
 EXPORT_SYMBOL(ip_fast_csum);
+EXPORT_SYMBOL(csum_partial);
 
 #include <asm/io.h>
 EXPORT_SYMBOL(__ia64_memcpy_fromio);
