@@ -878,7 +878,7 @@ static int nfs_unlink(struct inode *dir, struct dentry *dentry)
 		return error;
 	}
 	if (!d_unhashed(dentry)) {
-		d_drop(dentry);
+		list_del_init(&dentry->d_hash);
 		need_rehash = 1;
 	}
 	spin_unlock(&dcache_lock);
