@@ -467,7 +467,11 @@ xfs_readsb(xfs_mount_t *mp)
 
 	bp = xfs_buf_read_flags(mp->m_ddev_targp, XFS_SB_DADDR,
 				BTOBB(sector_size), extra_flags);
-	ASSERT(bp);
+	if (!bp || XFS_BUF_ISERROR(bp)) {
+		cmn_err(CE_WARN, "XFS: SB read failed");
+		error = bp ? XFS_BUF_GETERROR(bp) : ENOMEM;
+		goto fail;
+	}
 	ASSERT(XFS_BUF_ISBUSY(bp));
 	ASSERT(XFS_BUF_VALUSEMA(bp) <= 0);
 
@@ -482,9 +486,7 @@ xfs_readsb(xfs_mount_t *mp)
 	error = xfs_mount_validate_sb(mp, &(mp->m_sb));
 	if (error) {
 		cmn_err(CE_WARN, "XFS: SB validate failed");
-		XFS_BUF_UNMANAGE(bp);
-		xfs_buf_relse(bp);
-		return error;
+		goto fail;
 	}
 
 	/*
@@ -494,9 +496,8 @@ xfs_readsb(xfs_mount_t *mp)
 		cmn_err(CE_WARN,
 			"XFS: device supports only %u byte sectors (not %u)",
 			sector_size, mp->m_sb.sb_sectsize);
-		XFS_BUF_UNMANAGE(bp);
-		xfs_buf_relse(bp);
-		return XFS_ERROR(ENOSYS);
+		error = ENOSYS;
+		goto fail;
 	}
 
 	/*
@@ -509,7 +510,11 @@ xfs_readsb(xfs_mount_t *mp)
 		sector_size = mp->m_sb.sb_sectsize;
 		bp = xfs_buf_read_flags(mp->m_ddev_targp, XFS_SB_DADDR,
 					BTOBB(sector_size), extra_flags);
-		ASSERT(bp);
+		if (!bp || XFS_BUF_ISERROR(bp)) {
+			cmn_err(CE_WARN, "XFS: SB re-read failed");
+			error = bp ? XFS_BUF_GETERROR(bp) : ENOMEM;
+			goto fail;
+		}
 		ASSERT(XFS_BUF_ISBUSY(bp));
 		ASSERT(XFS_BUF_VALUSEMA(bp) <= 0);
 	}
@@ -518,6 +523,13 @@ xfs_readsb(xfs_mount_t *mp)
 	xfs_buf_relse(bp);
 	ASSERT(XFS_BUF_VALUSEMA(bp) > 0);
 	return 0;
+
+ fail:
+	if (bp) {
+		XFS_BUF_UNMANAGE(bp);
+		xfs_buf_relse(bp);
+	}
+	return error;
 }
 
 
