@@ -67,6 +67,10 @@ struct scsi_device {
 	unsigned char current_tag;	/* current tag */
 	struct scsi_target      *sdev_target;   /* used only for single_lun */
 
+	unsigned int	sdev_bflags; /* black/white flags as also found in
+				 * scsi_devinfo.[hc]. For now used only to
+				 * pass settings from slave_alloc to scsi
+				 * core. */
 	unsigned online:1;
 
 	unsigned writeable:1;
