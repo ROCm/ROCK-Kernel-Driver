@@ -2942,6 +2942,6 @@ static int net_run_sbin_hotplug(struct net_device *dev, char *action)
 	envp [i++] = action_str;
 	envp [i] = 0;
 
-	return call_usermodehelper(argv [0], argv, envp);
+	return call_usermodehelper(argv [0], argv, envp, 0);
 }
 #endif
