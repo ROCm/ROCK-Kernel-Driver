@@ -40,7 +40,7 @@
 /* Set the copy breakpoint for the copy-only-tiny-frames scheme.
  * Setting to > 1518 effectively disables this feature.
  */
-static int rx_copybreak = 0;
+static int rx_copybreak = 200;
 
 /* end user-configurable values */
 
@@ -85,8 +85,8 @@ static const int multicast_filter_limit = 32;
 #define PKT_BUF_SZ		1536
 
 #define DRV_MODULE_NAME		"typhoon"
-#define DRV_MODULE_VERSION 	"1.0"
-#define DRV_MODULE_RELDATE	"03/02/14"
+#define DRV_MODULE_VERSION 	"1.5.1"
+#define DRV_MODULE_RELDATE	"03/06/26"
 #define PFX			DRV_MODULE_NAME ": "
 #define ERR_PFX			KERN_ERR PFX
 
@@ -150,7 +150,7 @@ struct typhoon_card_info {
 #define TYPHOON_CRYPTO_DES		1
 #define TYPHOON_CRYPTO_3DES		2
 #define	TYPHOON_CRYPTO_VARIABLE		4
-#define TYPHOON_FIBER			5
+#define TYPHOON_FIBER			8
 
 enum typhoon_cards {
 	TYPHOON_TX = 0, TYPHOON_TX95, TYPHOON_TX97, TYPHOON_SVR,
@@ -1798,7 +1798,7 @@ typhoon_interrupt(int irq, void *dev_instance, struct pt_regs *rgs)
 	u32 intr_status;
 
 	intr_status = readl(ioaddr + TYPHOON_REG_INTR_STATUS);
-	if(!intr_status)
+	if(!(intr_status & TYPHOON_INTR_HOST_INT))
 		return IRQ_NONE;
 
 	writel(intr_status, ioaddr + TYPHOON_REG_INTR_STATUS);
