@@ -26,7 +26,7 @@
 /*
  * This does not append a newline
  */
-static void puts(const char *s)
+static void putstr(const char *s)
 {
 	while (*s) {
 		while ((*UART_TSR(EXC_UART00_BASE) &

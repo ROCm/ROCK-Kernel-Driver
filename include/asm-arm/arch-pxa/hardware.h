@@ -72,8 +72,6 @@ typedef struct { volatile u32 offset[4096]; } __regbase;
 
 #endif
 
-#include "pxa-regs.h"
-
 #ifndef __ASSEMBLY__
 
 /*

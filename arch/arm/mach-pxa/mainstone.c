@@ -31,6 +31,7 @@
 #include <asm/mach/map.h>
 #include <asm/mach/irq.h>
 
+#include <asm/arch/pxa-regs.h>
 #include <asm/arch/mainstone.h>
 #include <asm/arch/pxafb.h>
 

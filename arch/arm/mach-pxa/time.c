@@ -27,6 +27,7 @@
 #include <asm/irq.h>
 #include <asm/mach/irq.h>
 #include <asm/mach/time.h>
+#include <asm/arch/pxa-regs.h>
 
 
 static inline unsigned long pxa_get_rtc_time(void)
