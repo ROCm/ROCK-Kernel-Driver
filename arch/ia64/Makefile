@@ -14,6 +14,7 @@ export AWK
 
 OBJCOPYFLAGS	:= --strip-all
 LDFLAGS_vmlinux	:= -static
+LDFLAGS_MODULE	+= -T arch/ia64/module.lds
 AFLAGS_KERNEL	:= -mconstant-gp
 EXTRA		:=
 
