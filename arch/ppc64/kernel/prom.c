@@ -304,6 +304,24 @@ prom_print_nl(void)
 	prom_print(RELOC("\n"));
 }
 
+static int __init
+prom_next_node(phandle *nodep)
+{
+	phandle node;
+	unsigned long offset = reloc_offset();
+
+	if ((node = *nodep) != 0
+	    && (*nodep = call_prom(RELOC("child"), 1, 1, node)) != 0)
+		return 1;
+	if ((*nodep = call_prom(RELOC("peer"), 1, 1, node)) != 0)
+		return 1;
+	for (;;) {
+		if ((node = call_prom(RELOC("parent"), 1, 1, node)) == 0)
+			return 0;
+		if ((*nodep = call_prom(RELOC("peer"), 1, 1, node)) != 0)
+			return 1;
+	}
+}
 
 static unsigned long
 prom_initialize_naca(unsigned long mem)
@@ -780,7 +798,7 @@ prom_dump_lmb(void)
 
 
 #ifdef CONFIG_PMAC_DART
-void prom_initialize_dart_table(void)
+static void prom_initialize_dart_table(void)
 {
 	unsigned long offset = reloc_offset();
 	extern unsigned long dart_tablebase;
@@ -806,9 +824,7 @@ void prom_initialize_dart_table(void)
 }
 #endif /* CONFIG_PMAC_DART */
 
-
-void
-prom_initialize_tce_table(void)
+static void prom_initialize_tce_table(void)
 {
 	phandle node;
 	ihandle phb_node;
@@ -1441,170 +1457,6 @@ static int __init prom_find_machine_type(void)
 	return PLATFORM_PSERIES;
 }
 
-/*
- * We enter here early on, when the Open Firmware prom is still
- * handling exceptions and the MMU hash table for us.
- */
-
-unsigned long __init
-prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
-	  unsigned long r6, unsigned long r7)
-{
-	unsigned long mem;
-	ihandle prom_cpu;
-	phandle cpu_pkg;
-	unsigned long offset = reloc_offset();
-	long l;
-	char *p, *d;
-	unsigned long phys;
-	u32 getprop_rval;
-	struct systemcfg *_systemcfg;
-	struct paca_struct *_xPaca = PTRRELOC(&paca[0]);
-	struct prom_t *_prom = PTRRELOC(&prom);
-
-	/* First zero the BSS -- use memset, some arches don't have
-	 * caches on yet */
-	memset(PTRRELOC(&__bss_start), 0, __bss_stop - __bss_start);
-
-	/* Setup systemcfg and NACA pointers now */
-	RELOC(systemcfg) = _systemcfg = (struct systemcfg *)(SYSTEMCFG_VIRT_ADDR - offset);
-	RELOC(naca) = (struct naca_struct *)(NACA_VIRT_ADDR - offset);
-
-	/* Init interface to Open Firmware and pickup bi-recs */
-	prom_init_client_services(pp);
-
-	/* Init prom stdout device */
-	prom_init_stdout();
-
-	/* check out if we have bi_recs */
-	_prom->bi_recs = prom_bi_rec_verify((struct bi_record *)r6);
-	if ( _prom->bi_recs != NULL )
-		RELOC(klimit) = PTRUNRELOC((unsigned long)_prom->bi_recs +
-					   _prom->bi_recs->data[1]);
-
-	/* Default machine type. */
-	_systemcfg->platform = prom_find_machine_type();
-
-	/* On pSeries, copy the CPU hold code */
-	if (_systemcfg->platform == PLATFORM_PSERIES)
-		copy_and_flush(0, KERNELBASE - offset, 0x100, 0);
-
-	/* Start storing things at klimit */
-      	mem = RELOC(klimit) - offset; 
-
-	/* Get the full OF pathname of the stdout device */
-	p = (char *) mem;
-	memset(p, 0, 256);
-	call_prom(RELOC("instance-to-path"), 3, 1, _prom->stdout, p, 255);
-	RELOC(of_stdout_device) = PTRUNRELOC(p);
-	mem += strlen(p) + 1;
-
-	getprop_rval = 1;
-	call_prom(RELOC("getprop"), 4, 1,
-		  _prom->root, RELOC("#size-cells"),
-		  &getprop_rval, sizeof(getprop_rval));
-	_prom->encode_phys_size = (getprop_rval == 1) ? 32 : 64;
-
-	/* Determine which cpu is actually running right _now_ */
-        if ((long)call_prom(RELOC("getprop"), 4, 1, _prom->chosen,
-			    RELOC("cpu"), &getprop_rval,
-			    sizeof(getprop_rval)) <= 0)
-                prom_panic(RELOC("cannot find boot cpu"));
-
-	prom_cpu = (ihandle)(unsigned long)getprop_rval;
-	cpu_pkg = call_prom(RELOC("instance-to-package"), 1, 1, prom_cpu);
-	call_prom(RELOC("getprop"), 4, 1,
-		cpu_pkg, RELOC("reg"),
-		&getprop_rval, sizeof(getprop_rval));
-	_prom->cpu = (int)(unsigned long)getprop_rval;
-	_xPaca[0].xHwProcNum = _prom->cpu;
-
-	RELOC(boot_cpuid) = 0;
-
-#ifdef DEBUG_PROM
-  	prom_print(RELOC("Booting CPU hw index = 0x"));
-  	prom_print_hex(_prom->cpu);
-  	prom_print_nl();
-#endif
-
-	/* Get the boot device and translate it to a full OF pathname. */
-	p = (char *) mem;
-	l = (long) call_prom(RELOC("getprop"), 4, 1, _prom->chosen,
-			    RELOC("bootpath"), p, 1<<20);
-	if (l > 0) {
-		p[l] = 0;	/* should already be null-terminated */
-		RELOC(bootpath) = PTRUNRELOC(p);
-		mem += l + 1;
-		d = (char *) mem;
-		*d = 0;
-		call_prom(RELOC("canon"), 3, 1, p, d, 1<<20);
-		RELOC(bootdevice) = PTRUNRELOC(d);
-		mem = DOUBLEWORD_ALIGN(mem + strlen(d) + 1);
-	}
-
-	RELOC(cmd_line[0]) = 0;
-	if ((long)_prom->chosen > 0) {
-		call_prom(RELOC("getprop"), 4, 1, _prom->chosen, 
-			  RELOC("bootargs"), p, sizeof(cmd_line));
-		if (p != NULL && p[0] != 0)
-			strlcpy(RELOC(cmd_line), p, sizeof(cmd_line));
-	}
-
-	early_cmdline_parse();
-
-	mem = prom_initialize_lmb(mem);
-
-	mem = prom_bi_rec_reserve(mem);
-
-	mem = check_display(mem);
-
-	if (_systemcfg->platform != PLATFORM_POWERMAC)
-		prom_instantiate_rtas();
-        
-        /* Initialize some system info into the Naca early... */
-        mem = prom_initialize_naca(mem);
-
-	smt_setup();
-	
-        /* If we are on an SMP machine, then we *MUST* do the
-         * following, regardless of whether we have an SMP
-         * kernel or not.
-         */
-	prom_hold_cpus(mem);
-
-#ifdef DEBUG_PROM
-	prom_print(RELOC("copying OF device tree...\n"));
-#endif
-	mem = copy_device_tree(mem);
-
-	RELOC(klimit) = mem + offset;
-
-	lmb_reserve(0, __pa(RELOC(klimit)));
-
-	if (_systemcfg->platform == PLATFORM_PSERIES)
-		prom_initialize_tce_table();
-
-#ifdef CONFIG_PMAC_DART
-	if (_systemcfg->platform == PLATFORM_POWERMAC)
-		prom_initialize_dart_table();
-#endif
-
-#ifdef CONFIG_BOOTX_TEXT
-	if(_prom->disp_node) {
-		prom_print(RELOC("Setting up bi display...\n"));
-		setup_disp_fake_bi(_prom->disp_node);
-	}
-#endif /* CONFIG_BOOTX_TEXT */
-
-	prom_print(RELOC("Calling quiesce ...\n"));
-	call_prom(RELOC("quiesce"), 0, 0);
-	phys = KERNELBASE - offset;
-
-	prom_print(RELOC("returning from prom_init\n"));
-	return phys;
-}
-
-
 static int
 prom_set_color(ihandle ih, int i, int r, int g, int b)
 {
@@ -1742,26 +1594,6 @@ check_display(unsigned long mem)
 	return DOUBLEWORD_ALIGN(mem);
 }
 
-
-static int __init
-prom_next_node(phandle *nodep)
-{
-	phandle node;
-	unsigned long offset = reloc_offset();
-
-	if ((node = *nodep) != 0
-	    && (*nodep = call_prom(RELOC("child"), 1, 1, node)) != 0)
-		return 1;
-	if ((*nodep = call_prom(RELOC("peer"), 1, 1, node)) != 0)
-		return 1;
-	for (;;) {
-		if ((node = call_prom(RELOC("parent"), 1, 1, node)) == 0)
-			return 0;
-		if ((*nodep = call_prom(RELOC("peer"), 1, 1, node)) != 0)
-			return 1;
-	}
-}
-
 /*
  * Make a copy of the device tree from the PROM.
  */
@@ -1891,6 +1723,221 @@ inspect_node(phandle node, struct device_node *dad,
 
 	return mem_start;
 }
+
+
+/* Verify bi_recs are good */
+static struct bi_record *
+prom_bi_rec_verify(struct bi_record *bi_recs)
+{
+	struct bi_record *first, *last;
+
+	if ( bi_recs == NULL || bi_recs->tag != BI_FIRST )
+		return NULL;
+
+	last = (struct bi_record *)(long)bi_recs->data[0];
+	if ( last == NULL || last->tag != BI_LAST )
+		return NULL;
+
+	first = (struct bi_record *)(long)last->data[0];
+	if ( first == NULL || first != bi_recs )
+		return NULL;
+
+	return bi_recs;
+}
+
+static unsigned long
+prom_bi_rec_reserve(unsigned long mem)
+{
+	unsigned long offset = reloc_offset();
+	struct prom_t *_prom = PTRRELOC(&prom);
+	struct bi_record *rec;
+
+	if ( _prom->bi_recs != NULL) {
+
+		for ( rec=_prom->bi_recs;
+		      rec->tag != BI_LAST;
+		      rec=bi_rec_next(rec) ) {
+			switch (rec->tag) {
+#ifdef CONFIG_BLK_DEV_INITRD
+			case BI_INITRD:
+				lmb_reserve(rec->data[0], rec->data[1]);
+				break;
+#endif /* CONFIG_BLK_DEV_INITRD */
+			}
+		}
+		/* The next use of this field will be after relocation
+	 	 * is enabled, so convert this physical address into a
+	 	 * virtual address.
+	 	 */
+		_prom->bi_recs = PTRUNRELOC(_prom->bi_recs);
+	}
+
+	return mem;
+}
+
+/*
+ * We enter here early on, when the Open Firmware prom is still
+ * handling exceptions and the MMU hash table for us.
+ */
+
+unsigned long __init
+prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
+	  unsigned long r6, unsigned long r7)
+{
+	unsigned long mem;
+	ihandle prom_cpu;
+	phandle cpu_pkg;
+	unsigned long offset = reloc_offset();
+	long l;
+	char *p, *d;
+	unsigned long phys;
+	u32 getprop_rval;
+	struct systemcfg *_systemcfg;
+	struct paca_struct *_xPaca = PTRRELOC(&paca[0]);
+	struct prom_t *_prom = PTRRELOC(&prom);
+
+	/* First zero the BSS -- use memset, some arches don't have
+	 * caches on yet */
+	memset(PTRRELOC(&__bss_start), 0, __bss_stop - __bss_start);
+
+	/* Setup systemcfg and NACA pointers now */
+	RELOC(systemcfg) = _systemcfg = (struct systemcfg *)(SYSTEMCFG_VIRT_ADDR - offset);
+	RELOC(naca) = (struct naca_struct *)(NACA_VIRT_ADDR - offset);
+
+	/* Init interface to Open Firmware and pickup bi-recs */
+	prom_init_client_services(pp);
+
+	/* Init prom stdout device */
+	prom_init_stdout();
+
+	/* check out if we have bi_recs */
+	_prom->bi_recs = prom_bi_rec_verify((struct bi_record *)r6);
+	if ( _prom->bi_recs != NULL )
+		RELOC(klimit) = PTRUNRELOC((unsigned long)_prom->bi_recs +
+					   _prom->bi_recs->data[1]);
+
+	/* Default machine type. */
+	_systemcfg->platform = prom_find_machine_type();
+
+	/* On pSeries, copy the CPU hold code */
+	if (_systemcfg->platform == PLATFORM_PSERIES)
+		copy_and_flush(0, KERNELBASE - offset, 0x100, 0);
+
+	/* Start storing things at klimit */
+      	mem = RELOC(klimit) - offset;
+
+	/* Get the full OF pathname of the stdout device */
+	p = (char *) mem;
+	memset(p, 0, 256);
+	call_prom(RELOC("instance-to-path"), 3, 1, _prom->stdout, p, 255);
+	RELOC(of_stdout_device) = PTRUNRELOC(p);
+	mem += strlen(p) + 1;
+
+	getprop_rval = 1;
+	call_prom(RELOC("getprop"), 4, 1,
+		  _prom->root, RELOC("#size-cells"),
+		  &getprop_rval, sizeof(getprop_rval));
+	_prom->encode_phys_size = (getprop_rval == 1) ? 32 : 64;
+
+	/* Determine which cpu is actually running right _now_ */
+        if ((long)call_prom(RELOC("getprop"), 4, 1, _prom->chosen,
+			    RELOC("cpu"), &getprop_rval,
+			    sizeof(getprop_rval)) <= 0)
+                prom_panic(RELOC("cannot find boot cpu"));
+
+	prom_cpu = (ihandle)(unsigned long)getprop_rval;
+	cpu_pkg = call_prom(RELOC("instance-to-package"), 1, 1, prom_cpu);
+	call_prom(RELOC("getprop"), 4, 1,
+		cpu_pkg, RELOC("reg"),
+		&getprop_rval, sizeof(getprop_rval));
+	_prom->cpu = (int)(unsigned long)getprop_rval;
+	_xPaca[0].xHwProcNum = _prom->cpu;
+
+	RELOC(boot_cpuid) = 0;
+
+#ifdef DEBUG_PROM
+  	prom_print(RELOC("Booting CPU hw index = 0x"));
+  	prom_print_hex(_prom->cpu);
+  	prom_print_nl();
+#endif
+
+	/* Get the boot device and translate it to a full OF pathname. */
+	p = (char *) mem;
+	l = (long) call_prom(RELOC("getprop"), 4, 1, _prom->chosen,
+			    RELOC("bootpath"), p, 1<<20);
+	if (l > 0) {
+		p[l] = 0;	/* should already be null-terminated */
+		RELOC(bootpath) = PTRUNRELOC(p);
+		mem += l + 1;
+		d = (char *) mem;
+		*d = 0;
+		call_prom(RELOC("canon"), 3, 1, p, d, 1<<20);
+		RELOC(bootdevice) = PTRUNRELOC(d);
+		mem = DOUBLEWORD_ALIGN(mem + strlen(d) + 1);
+	}
+
+	RELOC(cmd_line[0]) = 0;
+	if ((long)_prom->chosen > 0) {
+		call_prom(RELOC("getprop"), 4, 1, _prom->chosen,
+			  RELOC("bootargs"), p, sizeof(cmd_line));
+		if (p != NULL && p[0] != 0)
+			strlcpy(RELOC(cmd_line), p, sizeof(cmd_line));
+	}
+
+	early_cmdline_parse();
+
+	mem = prom_initialize_lmb(mem);
+
+	mem = prom_bi_rec_reserve(mem);
+
+	mem = check_display(mem);
+
+	if (_systemcfg->platform != PLATFORM_POWERMAC)
+		prom_instantiate_rtas();
+
+        /* Initialize some system info into the Naca early... */
+        mem = prom_initialize_naca(mem);
+
+	smt_setup();
+
+        /* If we are on an SMP machine, then we *MUST* do the
+         * following, regardless of whether we have an SMP
+         * kernel or not.
+         */
+	prom_hold_cpus(mem);
+
+#ifdef DEBUG_PROM
+	prom_print(RELOC("copying OF device tree...\n"));
+#endif
+	mem = copy_device_tree(mem);
+
+	RELOC(klimit) = mem + offset;
+
+	lmb_reserve(0, __pa(RELOC(klimit)));
+
+	if (_systemcfg->platform == PLATFORM_PSERIES)
+		prom_initialize_tce_table();
+
+#ifdef CONFIG_PMAC_DART
+	if (_systemcfg->platform == PLATFORM_POWERMAC)
+		prom_initialize_dart_table();
+#endif
+
+#ifdef CONFIG_BOOTX_TEXT
+	if(_prom->disp_node) {
+		prom_print(RELOC("Setting up bi display...\n"));
+		setup_disp_fake_bi(_prom->disp_node);
+	}
+#endif /* CONFIG_BOOTX_TEXT */
+
+	prom_print(RELOC("Calling quiesce ...\n"));
+	call_prom(RELOC("quiesce"), 0, 0);
+	phys = KERNELBASE - offset;
+
+	prom_print(RELOC("returning from prom_init\n"));
+	return phys;
+}
+
 
 /*
  * finish_device_tree is called once things are running normally
@@ -3188,55 +3235,3 @@ print_properties(struct device_node *np)
 	}
 }
 #endif
-
-
-/* Verify bi_recs are good */
-static struct bi_record *
-prom_bi_rec_verify(struct bi_record *bi_recs)
-{
-	struct bi_record *first, *last;
-
-	if ( bi_recs == NULL || bi_recs->tag != BI_FIRST )
-		return NULL;
-
-	last = (struct bi_record *)(long)bi_recs->data[0];
-	if ( last == NULL || last->tag != BI_LAST )
-		return NULL;
-
-	first = (struct bi_record *)(long)last->data[0];
-	if ( first == NULL || first != bi_recs )
-		return NULL;
-
-	return bi_recs;
-}
-
-static unsigned long
-prom_bi_rec_reserve(unsigned long mem)
-{
-	unsigned long offset = reloc_offset();
-	struct prom_t *_prom = PTRRELOC(&prom);
-	struct bi_record *rec;
-
-	if ( _prom->bi_recs != NULL) {
-
-		for ( rec=_prom->bi_recs;
-		      rec->tag != BI_LAST;
-		      rec=bi_rec_next(rec) ) {
-			switch (rec->tag) {
-#ifdef CONFIG_BLK_DEV_INITRD
-			case BI_INITRD:
-				lmb_reserve(rec->data[0], rec->data[1]);
-				break;
-#endif /* CONFIG_BLK_DEV_INITRD */
-			}
-		}
-		/* The next use of this field will be after relocation
-	 	 * is enabled, so convert this physical address into a
-	 	 * virtual address.
-	 	 */
-		_prom->bi_recs = PTRUNRELOC(_prom->bi_recs);
-	}
-
-	return mem;
-}
-
