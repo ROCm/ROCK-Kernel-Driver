@@ -44,6 +44,11 @@ void stab_initialize(unsigned long stab)
 		/* Invalidate the entire SLB & all the ERATS */
 #ifdef CONFIG_PPC_ISERIES
 		asm volatile("isync; slbia; isync":::"memory");
+		/*
+		 * The hypervisor loads SLB entry 0, but we need to increment
+		 * next_round_robin to avoid overwriting it
+		 */
+		get_paca()->xStab_data.next_round_robin = 1;
 #else
 		asm volatile("isync":::"memory");
 		asm volatile("slbmte  %0,%0"::"r" (0) : "memory");
@@ -51,6 +56,14 @@ void stab_initialize(unsigned long stab)
 		make_slbe(esid, vsid, seg0_largepages, 1);
 		asm volatile("isync":::"memory");
 #endif
+
+		/*
+		 * Bolt in the first vmalloc segment. Since modules end
+		 * up there it gets hit very heavily.
+		 */
+		esid = GET_ESID(VMALLOCBASE);
+		vsid = get_kernel_vsid(VMALLOCBASE);
+		make_slbe(esid, vsid, 0, 1);
 	} else {
 		asm volatile("isync; slbia; isync":::"memory");
 		make_ste(stab, esid, vsid);
@@ -317,6 +330,7 @@ static void make_slbe(unsigned long esid, unsigned long vsid, int large,
 		unsigned long word0;
 		slb_dword1    data;
 	} vsid_data;
+	struct paca_struct *lpaca = get_paca();
 
 	/*
 	 * We take the next entry, round robin. Previously we tried
@@ -330,18 +344,25 @@ static void make_slbe(unsigned long esid, unsigned long vsid, int large,
 	 * for the kernel stack during the first part of exception exit 
 	 * which gets invalidated due to a tlbie from another cpu at a
 	 * non recoverable point (after setting srr0/1) - Anton
+	 *
+	 * paca Ksave is always valid (even when on the interrupt stack)
+	 * so we use that.
 	 */
-	castout_entry = get_paca()->xStab_data.next_round_robin;
+	castout_entry = lpaca->xStab_data.next_round_robin;
 	do {
 		entry = castout_entry;
 		castout_entry++; 
+		/*
+		 * We bolt in the first kernel segment and the first
+		 * vmalloc segment.
+		 */
 		if (castout_entry >= naca->slb_size)
-			castout_entry = 1; 
+			castout_entry = 2;
 		asm volatile("slbmfee  %0,%1" : "=r" (esid_data) : "r" (entry));
 	} while (esid_data.data.v &&
-		 esid_data.data.esid == GET_ESID(__get_SP()));
+		 esid_data.data.esid == GET_ESID(lpaca->xKsave));
 
-	get_paca()->xStab_data.next_round_robin = castout_entry;
+	lpaca->xStab_data.next_round_robin = castout_entry;
 
 	/* slbie not needed as the previous mapping is still valid. */
 
@@ -422,6 +443,8 @@ int slb_allocate(unsigned long ea)
 	}
 
 	esid = GET_ESID(ea);
+
+	BUG_ON((esid << SID_SHIFT) == VMALLOCBASE);
 	__slb_allocate(esid, vsid, context);
 
 	return 0;
@@ -478,7 +501,9 @@ void flush_slb(struct task_struct *tsk, struct mm_struct *mm)
 		unsigned long word0;
 		slb_dword0 data;
 	} esid_data;
+	unsigned long esid, vsid;
 
+	WARN_ON(!irqs_disabled());
 
 	if (offset <= NR_STAB_CACHE_ENTRIES) {
 		int i;
@@ -486,11 +511,23 @@ void flush_slb(struct task_struct *tsk, struct mm_struct *mm)
 		for (i = 0; i < offset; i++) {
 			esid_data.word0 = 0;
 			esid_data.data.esid = __get_cpu_var(stab_cache[i]);
+			BUG_ON(esid_data.data.esid == GET_ESID(VMALLOCBASE));
 			asm volatile("slbie %0" : : "r" (esid_data));
 		}
 		asm volatile("isync" : : : "memory");
 	} else {
 		asm volatile("isync; slbia; isync" : : : "memory");
+
+		/*
+		 * Bolt in the first vmalloc segment. Since modules end
+		 * up there it gets hit very heavily. We must not touch
+		 * the vmalloc region between the slbia and here, thats
+		 * why we require interrupts off.
+		 */
+		esid = GET_ESID(VMALLOCBASE);
+		vsid = get_kernel_vsid(VMALLOCBASE);
+		get_paca()->xStab_data.next_round_robin = 1;
+		make_slbe(esid, vsid, 0, 1);
 	}
 
 	/* Workaround POWER5 < DD2.1 issue */
