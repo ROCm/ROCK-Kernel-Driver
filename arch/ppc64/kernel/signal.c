@@ -26,7 +26,6 @@
 #include <linux/unistd.h>
 #include <linux/stddef.h>
 #include <linux/elf.h>
-#include <asm/ppc32.h>
 #include <asm/sigcontext.h>
 #include <asm/ucontext.h>
 #include <asm/uaccess.h>
