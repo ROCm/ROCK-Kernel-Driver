@@ -2905,7 +2905,7 @@ pfm_write_pmcs(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 		 * 	- system-wide session: PMCx.pm=1 (privileged monitor)
 		 * 	- per-task           : PMCx.pm=0 (user monitor)
 		 */
-		if ((is_monitor || is_counting) && value != PMC_DFL_VAL(i) && PFM_CHECK_PMC_PM(ctx, cnum, value)) {
+		if ((is_monitor || is_counting) && value != PMC_DFL_VAL(cnum) && PFM_CHECK_PMC_PM(ctx, cnum, value)) {
 			DPRINT(("pmc%u pmc_pm=%ld fl_system=%d\n",
 				cnum,
 				PMC_PM(cnum, value),
