@@ -32,7 +32,7 @@ struct scsi_request {
 	unsigned sr_bufflen;	/* Size of data buffer */
 	void *sr_buffer;		/* Data buffer */
 	int sr_allowed;
-	unsigned char sr_data_direction;
+	enum dma_data_direction sr_data_direction;
 	unsigned char sr_cmd_len;
 	unsigned char sr_cmnd[MAX_COMMAND_SIZE];
 	void (*sr_done) (struct scsi_cmnd *);	/* Mid-level done function */

@@ -562,7 +562,7 @@ static int scsi_request_sense(struct scsi_cmnd *scmd)
 	scmd->request_bufflen = 252;
 	scmd->use_sg = 0;
 	scmd->cmd_len = COMMAND_SIZE(scmd->cmnd[0]);
-	scmd->sc_data_direction = SCSI_DATA_READ;
+	scmd->sc_data_direction = DMA_FROM_DEVICE;
 	scmd->underflow = 0;
 
 	rtn = scsi_send_eh_cmnd(scmd, SENSE_TIMEOUT);
@@ -742,7 +742,7 @@ retry_tur:
 	scmd->use_sg = 0;
 	scmd->cmd_len = COMMAND_SIZE(scmd->cmnd[0]);
 	scmd->underflow = 0;
-	scmd->sc_data_direction = SCSI_DATA_NONE;
+	scmd->sc_data_direction = DMA_NONE;
 
 	rtn = scsi_send_eh_cmnd(scmd, SENSE_TIMEOUT);
 
@@ -1348,7 +1348,7 @@ static void scsi_eh_lock_door(struct scsi_device *sdev)
 	sreq->sr_cmnd[3] = 0;
 	sreq->sr_cmnd[4] = SCSI_REMOVAL_PREVENT;
 	sreq->sr_cmnd[5] = 0;
-	sreq->sr_data_direction = SCSI_DATA_NONE;
+	sreq->sr_data_direction = DMA_NONE;
 	sreq->sr_bufflen = 0;
 	sreq->sr_buffer = NULL;
 	sreq->sr_allowed = 5;
@@ -1723,7 +1723,7 @@ scsi_reset_provider(struct scsi_device *dev, int flag)
 
 	scmd->cmd_len			= 0;
 
-	scmd->sc_data_direction	= SCSI_DATA_UNKNOWN;
+	scmd->sc_data_direction		= DMA_BIDIRECTIONAL;
 	scmd->sc_request		= NULL;
 	scmd->sc_magic			= SCSI_CMND_MAGIC;
 

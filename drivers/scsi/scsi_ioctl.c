@@ -104,7 +104,7 @@ static int ioctl_internal_command(struct scsi_device *sdev, char *cmd,
 		return -ENOMEM;
 	}
 
-	sreq->sr_data_direction = SCSI_DATA_NONE;
+	sreq->sr_data_direction = DMA_NONE;
         scsi_wait_req(sreq, cmd, NULL, 0, timeout, retries);
 
 	SCSI_LOG_IOCTL(2, printk("Ioctl returned  0x%x\n", sreq->sr_result));
@@ -258,19 +258,19 @@ int scsi_ioctl_send_command(struct scsi_device *sdev,
 			return -ENOMEM;
 		memset(buf, 0, buf_needed);
 		if (inlen == 0) {
-			data_direction = SCSI_DATA_READ;
+			data_direction = DMA_FROM_DEVICE;
 		} else if (outlen == 0 ) {
-			data_direction = SCSI_DATA_WRITE;
+			data_direction = DMA_TO_DEVICE;
 		} else {
 			/*
 			 * Can this ever happen?
 			 */
-			data_direction = SCSI_DATA_UNKNOWN;
+			data_direction = DMA_BIDIRECTIONAL;
 		}
 
 	} else {
 		buf = NULL;
-		data_direction = SCSI_DATA_NONE;
+		data_direction = DMA_NONE;
 	}
 
 	/*

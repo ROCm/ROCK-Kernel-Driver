@@ -25,54 +25,6 @@
 #include <scsi/scsi.h>
 
 /*
- * These are the values that the SCpnt->sc_data_direction and 
- * SRpnt->sr_data_direction can take.  These need to be set
- * The SCSI_DATA_UNKNOWN value is essentially the default.
- * In the event that the command creator didn't bother to
- * set a value, you will see SCSI_DATA_UNKNOWN.
- */
-#define SCSI_DATA_UNKNOWN       0
-#define SCSI_DATA_WRITE         1
-#define SCSI_DATA_READ          2
-#define SCSI_DATA_NONE          3
-
-#ifdef CONFIG_PCI
-#include <linux/pci.h>
-#if ((SCSI_DATA_UNKNOWN == PCI_DMA_BIDIRECTIONAL) && (SCSI_DATA_WRITE == PCI_DMA_TODEVICE) && (SCSI_DATA_READ == PCI_DMA_FROMDEVICE) && (SCSI_DATA_NONE == PCI_DMA_NONE))
-#define scsi_to_pci_dma_dir(scsi_dir)	((int)(scsi_dir))
-#else
-extern __inline__ int scsi_to_pci_dma_dir(unsigned char scsi_dir)
-{
-        if (scsi_dir == SCSI_DATA_UNKNOWN)
-                return PCI_DMA_BIDIRECTIONAL;
-        if (scsi_dir == SCSI_DATA_WRITE)
-                return PCI_DMA_TODEVICE;
-        if (scsi_dir == SCSI_DATA_READ)
-                return PCI_DMA_FROMDEVICE;
-        return PCI_DMA_NONE;
-}
-#endif
-#endif
-
-#if defined(CONFIG_SBUS) && !defined(CONFIG_SUN3) && !defined(CONFIG_SUN3X)
-#include <asm/sbus.h>
-#if ((SCSI_DATA_UNKNOWN == SBUS_DMA_BIDIRECTIONAL) && (SCSI_DATA_WRITE == SBUS_DMA_TODEVICE) && (SCSI_DATA_READ == SBUS_DMA_FROMDEVICE) && (SCSI_DATA_NONE == SBUS_DMA_NONE))
-#define scsi_to_sbus_dma_dir(scsi_dir)	((int)(scsi_dir))
-#else
-extern __inline__ int scsi_to_sbus_dma_dir(unsigned char scsi_dir)
-{
-        if (scsi_dir == SCSI_DATA_UNKNOWN)
-                return SBUS_DMA_BIDIRECTIONAL;
-        if (scsi_dir == SCSI_DATA_WRITE)
-                return SBUS_DMA_TODEVICE;
-        if (scsi_dir == SCSI_DATA_READ)
-                return SBUS_DMA_FROMDEVICE;
-        return SBUS_DMA_NONE;
-}
-#endif
-#endif
-
-/*
  * Some defs, in case these are not defined elsewhere.
  */
 #ifndef TRUE
@@ -226,6 +178,21 @@ extern int scsi_sysfs_modify_sdev_attribute(struct device_attribute ***dev_attrs
 					    struct device_attribute *attr);
 extern int scsi_sysfs_modify_shost_attribute(struct class_device_attribute ***class_attrs,
 					     struct class_device_attribute *attr);
+
+/*
+ * Legacy dma direction interfaces.
+ *
+ * This assumes the pci/sbus dma mapping flags have the same numercial
+ * values as the generic dma-mapping ones.  Currently they have but there's
+ * no way to check.  Better don't use these interfaces!
+ */
+#define SCSI_DATA_UNKNOWN	(DMA_BIDIRECTIONAL)
+#define SCSI_DATA_WRITE		(DMA_TO_DEVICE)
+#define SCSI_DATA_READ		(DMA_FROM_DEVICE)
+#define SCSI_DATA_NONE		(DMA_NONE)
+
+#define scsi_to_pci_dma_dir(scsi_dir)	((int)(scsi_dir))
+#define scsi_to_sbus_dma_dir(scsi_dir)	((int)(scsi_dir))
 
 /*
  * This is the crap from the old error handling code.  We have it in a special

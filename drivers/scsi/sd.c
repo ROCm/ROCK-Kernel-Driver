@@ -163,11 +163,11 @@ static int sd_init_command(struct scsi_cmnd * SCpnt)
 
 		memcpy(SCpnt->cmnd, rq->cmd, sizeof(SCpnt->cmnd));
 		if (rq_data_dir(rq) == WRITE)
-			SCpnt->sc_data_direction = SCSI_DATA_WRITE;
+			SCpnt->sc_data_direction = DMA_TO_DEVICE;
 		else if (rq->data_len)
-			SCpnt->sc_data_direction = SCSI_DATA_READ;
+			SCpnt->sc_data_direction = DMA_FROM_DEVICE;
 		else
-			SCpnt->sc_data_direction = SCSI_DATA_NONE;
+			SCpnt->sc_data_direction = DMA_NONE;
 
 		this_count = rq->data_len;
 		if (rq->timeout)
@@ -253,10 +253,10 @@ static int sd_init_command(struct scsi_cmnd * SCpnt)
 			return 0;
 		}
 		SCpnt->cmnd[0] = WRITE_6;
-		SCpnt->sc_data_direction = SCSI_DATA_WRITE;
+		SCpnt->sc_data_direction = DMA_TO_DEVICE;
 	} else if (rq_data_dir(SCpnt->request) == READ) {
 		SCpnt->cmnd[0] = READ_6;
-		SCpnt->sc_data_direction = SCSI_DATA_READ;
+		SCpnt->sc_data_direction = DMA_FROM_DEVICE;
 	} else {
 		printk(KERN_ERR "sd: Unknown command %lx\n", 
 		       SCpnt->request->flags);
@@ -792,7 +792,7 @@ sd_spinup_disk(struct scsi_disk *sdkp, char *diskname,
 			SRpnt->sr_cmd_len = 0;
 			SRpnt->sr_sense_buffer[0] = 0;
 			SRpnt->sr_sense_buffer[2] = 0;
-			SRpnt->sr_data_direction = SCSI_DATA_NONE;
+			SRpnt->sr_data_direction = DMA_NONE;
 
 			scsi_wait_req (SRpnt, (void *) cmd, (void *) buffer,
 				       0/*512*/, SD_TIMEOUT, SD_MAX_RETRIES);
@@ -852,7 +852,7 @@ sd_spinup_disk(struct scsi_disk *sdkp, char *diskname,
 				SRpnt->sr_sense_buffer[0] = 0;
 				SRpnt->sr_sense_buffer[2] = 0;
 
-				SRpnt->sr_data_direction = SCSI_DATA_NONE;
+				SRpnt->sr_data_direction = DMA_NONE;
 				scsi_wait_req(SRpnt, (void *)cmd, 
 					      (void *) buffer, 0/*512*/, 
 					      SD_TIMEOUT, SD_MAX_RETRIES);
@@ -917,7 +917,7 @@ repeat:
 		SRpnt->sr_cmd_len = 0;
 		SRpnt->sr_sense_buffer[0] = 0;
 		SRpnt->sr_sense_buffer[2] = 0;
-		SRpnt->sr_data_direction = SCSI_DATA_READ;
+		SRpnt->sr_data_direction = DMA_FROM_DEVICE;
 
 		scsi_wait_req(SRpnt, (void *) cmd, (void *) buffer,
 			      longrc ? 12 : 8, SD_TIMEOUT, SD_MAX_RETRIES);
@@ -1394,7 +1394,7 @@ static void sd_shutdown(struct device *dev)
 		return;
 	}
 
-	sreq->sr_data_direction = SCSI_DATA_NONE;
+	sreq->sr_data_direction = DMA_NONE;
 	for (retries = 3; retries > 0; --retries) {
 		unsigned char cmd[10] = { 0 };
 
