@@ -24,10 +24,10 @@
 #define MAX_ORDER CONFIG_FORCE_MAX_ZONEORDER
 #endif
 
-typedef struct free_area_struct {
+struct free_area {
 	struct list_head	free_list;
 	unsigned long		*map;
-} free_area_t;
+};
 
 struct pglist_data;
 
@@ -78,7 +78,7 @@ struct zone {
 	/*
 	 * free areas of different sizes
 	 */
-	free_area_t		free_area[MAX_ORDER];
+	struct free_area	free_area[MAX_ORDER];
 
 	/*
 	 * wait_table		-- the array holding the hash table

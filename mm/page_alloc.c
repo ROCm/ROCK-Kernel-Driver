@@ -82,7 +82,7 @@ static inline int bad_range(struct zone *zone, struct page *page)
 void __free_pages_ok (struct page *page, unsigned int order)
 {
 	unsigned long index, page_idx, mask, flags;
-	free_area_t *area;
+	struct free_area *area;
 	struct page *base;
 	struct zone *zone;
 
@@ -155,7 +155,7 @@ out:
 
 static inline struct page *
 expand(struct zone *zone, struct page *page,
-	 unsigned long index, int low, int high, free_area_t * area)
+	 unsigned long index, int low, int high, struct free_area *area)
 {
 	unsigned long size = 1 << high;
 
@@ -194,7 +194,7 @@ static inline void prep_new_page(struct page *page)
 
 static struct page *rmqueue(struct zone *zone, unsigned int order)
 {
-	free_area_t * area = zone->free_area + order;
+	struct free_area *area = zone->free_area + order;
 	unsigned int curr_order = order;
 	struct list_head *head, *curr;
 	unsigned long flags;
