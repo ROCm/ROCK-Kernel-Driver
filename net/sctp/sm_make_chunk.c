@@ -667,7 +667,8 @@ nodata:
 }
 
 /* Make a SHUTDOWN chunk. */
-struct sctp_chunk *sctp_make_shutdown(const struct sctp_association *asoc)
+struct sctp_chunk *sctp_make_shutdown(const struct sctp_association *asoc,
+				      const struct sctp_chunk *chunk)
 {
 	struct sctp_chunk *retval;
 	sctp_shutdownhdr_t shut;
@@ -683,6 +684,9 @@ struct sctp_chunk *sctp_make_shutdown(const struct sctp_association *asoc)
 
 	retval->subh.shutdown_hdr =
 		sctp_addto_chunk(retval, sizeof(shut), &shut);
+
+	if (chunk)
+		retval->transport = chunk->transport;
 nodata:
 	return retval;
 }
