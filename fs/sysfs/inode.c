@@ -704,7 +704,19 @@ static void hash_and_remove(struct dentry * dir, const char * name)
 		    (victim->d_parent->d_inode == dir->d_inode)) {
 			simple_unlink(dir->d_inode,victim);
 			d_delete(victim);
+
+			pr_debug("sysfs: Removing %s (%d)\n", victim->d_name.name,
+				 atomic_read(&victim->d_count));
+			/**
+			 * Drop reference from initial get_dentry().
+			 */
+			dput(victim);
 		}
+		
+		/**
+		 * Drop the reference acquired from get_dentry() above.
+		 */
+		dput(victim);
 	}
 	up(&dir->d_inode->i_sem);
 }
@@ -748,29 +760,60 @@ void sysfs_remove_link(struct kobject * kobj, char * name)
 void sysfs_remove_dir(struct kobject * kobj)
 {
 	struct list_head * node, * next;
-	struct dentry * dentry = kobj->dentry;
+	struct dentry * dentry = dget(kobj->dentry);
 	struct dentry * parent;
 
 	if (!dentry)
 		return;
 
+	pr_debug("sysfs %s: removing dir\n",dentry->d_name.name);
 	parent = dget(dentry->d_parent);
 	down(&parent->d_inode->i_sem);
 	down(&dentry->d_inode->i_sem);
 
 	list_for_each_safe(node,next,&dentry->d_subdirs) {
-		struct dentry * d = list_entry(node,struct dentry,d_child);
-		/* make sure dentry is still there */
+		struct dentry * d = dget(list_entry(node,struct dentry,d_child));
+		/** 
+		 * Make sure dentry is still there 
+		 */
+		pr_debug(" o %s: ",d->d_name.name);
 		if (d->d_inode) {
+
+			pr_debug("removing");
+			/**
+			 * Unlink and unhash.
+			 */
 			simple_unlink(dentry->d_inode,d);
-			d_delete(dentry);
+			d_delete(d);
+
+			/**
+			 * Drop reference from initial get_dentry().
+			 */
+			dput(d);
 		}
+		pr_debug(" done (%d)\n",atomic_read(&d->d_count));
+		/**
+		 * drop reference from dget() above.
+		 */
+		dput(d);
 	}
 
 	up(&dentry->d_inode->i_sem);
 	d_invalidate(dentry);
 	simple_rmdir(parent->d_inode,dentry);
 	d_delete(dentry);
+
+	pr_debug(" o %s removing done (%d)\n",dentry->d_name.name,
+		 atomic_read(&dentry->d_count));
+	/**
+	 * Drop reference from initial get_dentry().
+	 */
+	dput(dentry);
+
+	/**
+	 * Drop reference from dget() on entrance.
+	 */
+	dput(dentry);
 	up(&parent->d_inode->i_sem);
 	dput(parent);
 }
