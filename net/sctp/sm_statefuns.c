@@ -873,6 +873,105 @@ sctp_disposition_t sctp_sf_backbeat_8_3(const sctp_endpoint_t *ep,
 	return SCTP_DISPOSITION_CONSUME;
 }
 
+/* Helper function to send out an abort for the restart
+ * condition.
+ */
+static int sctp_sf_send_restart_abort(sockaddr_storage_t *ssa, 
+				      sctp_chunk_t *init,
+				      sctp_cmd_seq_t *commands) 
+{
+	int len;
+	sctp_packet_t *pkt;
+	sctp_addr_param_t *addrparm;
+	sctp_errhdr_t *errhdr;
+	sctp_endpoint_t *ep;
+	char buffer[sizeof(sctp_errhdr_t) + sizeof(sctp_addr_param_t)];
+
+	/* Build the error on the stack.   We are way to malloc
+	 * malloc crazy throughout the code today.
+	 */
+	errhdr = (sctp_errhdr_t *)buffer;
+	addrparm = (sctp_addr_param_t *)errhdr->variable;
+	
+	/* Copy into a parm format. */
+	len = sockaddr2sctp_addr(ssa, addrparm);
+	len += sizeof(sctp_errhdr_t);
+
+	errhdr->cause = SCTP_ERROR_RESTART;
+	errhdr->length = htons(len);
+
+	/* Assign to the control socket. */
+	ep = sctp_sk((sctp_get_ctl_sock()))->ep;
+
+	/* Association is NULL since this may be a restart attack and we
+	 * want to send back the attacker's vtag.
+	 */
+	pkt = sctp_abort_pkt_new(ep, NULL, init, errhdr, len);
+
+	if (!pkt) 
+		goto out;
+	sctp_add_cmd_sf(commands, SCTP_CMD_SEND_PKT, SCTP_PACKET(pkt));
+
+	/* Discard the rest of the inbound packet. */
+	sctp_add_cmd_sf(commands, SCTP_CMD_DISCARD_PACKET, SCTP_NULL());
+
+out:
+	/* Even if there is no memory, treat as a failure so
+	 * the packet will get dropped. 
+	 */
+	return 0;
+}
+
+/* A restart is occuring, check to make sure no new addresses 
+ * are being added as we may be under a takeover attack.
+ */
+static int sctp_sf_check_restart_addrs(const sctp_association_t *new_asoc,
+				       const sctp_association_t *asoc,
+				       sctp_chunk_t *init,
+				       sctp_cmd_seq_t *commands) 
+{
+	sctp_transport_t *new_addr, *addr;
+	struct list_head *pos, *pos2;
+	int found;
+
+	/* Implementor's Guide - Sectin 5.2.2
+	 * ...
+	 * Before responding the endpoint MUST check to see if the
+	 * unexpected INIT adds new addresses to the association. If new
+	 * addresses are added to the association, the endpoint MUST respond
+	 * with an ABORT..
+	 */
+
+	/* Search through all current addresses and make sure
+	 * we aren't adding any new ones.
+	 */
+	new_addr = 0;
+	found = 0;
+
+	list_for_each(pos, &new_asoc->peer.transport_addr_list) {
+		new_addr = list_entry(pos, sctp_transport_t, transports);
+		found = 0;
+		list_for_each(pos2, &asoc->peer.transport_addr_list) {
+			addr = list_entry(pos2, sctp_transport_t, transports);
+			if (sctp_cmp_addr_exact(&new_addr->ipaddr,
+						&addr->ipaddr)) {
+				found = 1;
+				break;
+			}
+		}
+		if (!found)
+			break;
+	}
+
+	/* If a new address was added, ABORT the sender. */
+	if (!found && new_addr) {
+		sctp_sf_send_restart_abort(&new_addr->ipaddr, init, commands);
+	}
+	
+	/* Return success if all addresses were found. */   
+	return found;
+}
+
 /* Populate the verification/tie tags based on overlapping INIT
  * scenario.
  *
@@ -969,6 +1068,7 @@ static sctp_disposition_t sctp_sf_do_unexpected_init(
 	const sctp_subtype_t type,
 	void *arg, sctp_cmd_seq_t *commands)
 {
+	sctp_disposition_t retval;
 	sctp_chunk_t *chunk = arg;
 	sctp_chunk_t *repl;
 	sctp_association_t *new_asoc;
@@ -1006,15 +1106,14 @@ static sctp_disposition_t sctp_sf_do_unexpected_init(
 					ntohs(err_chunk->chunk_hdr->length) -
 					sizeof(sctp_chunkhdr_t));
 
-			sctp_free_chunk(err_chunk);
-
 			if (packet) {
 				sctp_add_cmd_sf(commands, SCTP_CMD_SEND_PKT,
 						SCTP_PACKET(packet));
-				return SCTP_DISPOSITION_CONSUME;
+				retval = SCTP_DISPOSITION_CONSUME;
 			} else {
-				return SCTP_DISPOSITION_NOMEM;
+				retval = SCTP_DISPOSITION_NOMEM;
 			}
+			goto cleanup;
 		} else {
 			return sctp_sf_tabort_8_4_8(ep, asoc, type, arg,
 						    commands);
@@ -1038,6 +1137,19 @@ static sctp_disposition_t sctp_sf_do_unexpected_init(
 	 */
 	sctp_process_init(new_asoc, chunk->chunk_hdr->type, sctp_source(chunk),
 			  (sctp_init_chunk_t *)chunk->chunk_hdr, GFP_ATOMIC);
+
+	/* Make sure no new addresses are being added during the
+	 * restart.   Do not do this check for COOKIE-WAIT state,
+	 * since there are no peer addresses to check against.
+	 * Upon return an ABORT will have been sent if needed.  
+	 */
+	if (asoc->state != SCTP_STATE_COOKIE_WAIT) {
+		if (!sctp_sf_check_restart_addrs(new_asoc, asoc, chunk, 
+						 commands)) {
+			retval = SCTP_DISPOSITION_CONSUME;
+			goto cleanup_asoc;
+		}
+	}
 
 	sctp_tietags_populate(new_asoc, asoc);
 
@@ -1086,13 +1198,18 @@ static sctp_disposition_t sctp_sf_do_unexpected_init(
 	 * Otherwise, "Z" will be vulnerable to resource attacks.
 	 */
 	sctp_add_cmd_sf(commands, SCTP_CMD_DELETE_TCB, SCTP_NULL());
-	return SCTP_DISPOSITION_CONSUME;
+	retval = SCTP_DISPOSITION_CONSUME;
 
-nomem:
+cleanup:
 	if (err_chunk)
 		sctp_free_chunk(err_chunk);
-
-	return SCTP_DISPOSITION_NOMEM;
+	return retval;
+nomem:
+	retval = SCTP_DISPOSITION_NOMEM;
+	goto cleanup;
+cleanup_asoc:
+	sctp_association_free(new_asoc);
+	goto cleanup;
 }
 
 /*
@@ -1198,6 +1315,8 @@ sctp_disposition_t sctp_sf_do_5_2_2_dupinit(const sctp_endpoint_t *ep,
 	return sctp_sf_do_unexpected_init(ep, asoc, type, arg, commands);
 }
 
+
+
 /* Unexpected COOKIE-ECHO handlerfor peer restart (Table 2, action 'A')
  *
  * Section 5.2.4
@@ -1212,9 +1331,6 @@ static sctp_disposition_t sctp_sf_do_dupcook_a(const sctp_endpoint_t *ep,
 	sctp_init_chunk_t *peer_init;
 	sctp_ulpevent_t *ev;
 	sctp_chunk_t *repl;
-	sctp_transport_t *new_addr, *addr;
-	struct list_head *pos, *pos2, *temp;
-	int found, error;
 
 	/* new_asoc is a brand-new association, so these are not yet
 	 * side effects--it is safe to run them here.
@@ -1223,60 +1339,14 @@ static sctp_disposition_t sctp_sf_do_dupcook_a(const sctp_endpoint_t *ep,
 	sctp_process_init(new_asoc, chunk->chunk_hdr->type,
 			  sctp_source(chunk), peer_init, GFP_ATOMIC);
 
-	/* Make sure peer is not adding new addresses.  */
-	found = 0;
-	new_addr = NULL;
-	list_for_each(pos, &new_asoc->peer.transport_addr_list) {
-		new_addr = list_entry(pos, sctp_transport_t, transports);
-		found = 0;
-		list_for_each_safe(pos2, temp, 
-				   &asoc->peer.transport_addr_list) {
-			addr = list_entry(pos2, sctp_transport_t, transports);
-			if (sctp_cmp_addr_exact(&new_addr->ipaddr,
-						&addr->ipaddr)) {
-				found = 1;
-				break;
-			}
-		}
-		if (!found)
-			break;
-	}
-
-	if (!found) {
-		sctp_bind_addr_t *bp;
-		sctpParam_t rawaddr;
-		int len;
-
-		bp = sctp_bind_addr_new(GFP_ATOMIC);
-		if (!bp)
-			goto nomem;
-
-		error = sctp_add_bind_addr(bp, &new_addr->ipaddr, GFP_ATOMIC);
-		if (error)
-			goto nomem_add;
-
-		rawaddr = sctp_bind_addrs_to_raw(bp, &len, GFP_ATOMIC);
-		if (!rawaddr.v)
-			goto nomem_raw;
-
-		repl = sctp_make_abort(asoc, chunk, len+sizeof(sctp_errhdr_t));
-		if (!repl)
-			goto nomem_abort;
-		sctp_init_cause(repl, SCTP_ERROR_RESTART, rawaddr.v, len);
-		sctp_add_cmd_sf(commands, SCTP_CMD_REPLY, SCTP_CHUNK(repl));
-		/* Discard the rest of the packet too. */
-		sctp_add_cmd_sf(commands, SCTP_CMD_DISCARD_PACKET, 
-				SCTP_NULL());
+	/* Make sure no new addresses are being added during the
+	 * restart.  Though this is a pretty complicated attack
+	 * since you'd have to get inside the cookie.
+	 */
+	if (!sctp_sf_check_restart_addrs(new_asoc, asoc, chunk, commands)) {
+		printk("cookie echo check\n"); 
 		return SCTP_DISPOSITION_CONSUME;
-
-	nomem_abort:
-		kfree(rawaddr.v);
-
-	nomem_raw:
-	nomem_add:
-		sctp_bind_addr_free(bp);
-		goto nomem;
-	}
+	}	
 
 	/* For now, fail any unsent/unacked data.  Consider the optional
 	 * choice of resending of this data.
@@ -1305,7 +1375,6 @@ static sctp_disposition_t sctp_sf_do_dupcook_a(const sctp_endpoint_t *ep,
 
 nomem_ev:
 	sctp_free_chunk(repl);
-
 nomem:
 	return SCTP_DISPOSITION_NOMEM;
 }
@@ -2529,7 +2598,7 @@ sctp_disposition_t sctp_sf_tabort_8_4_8(const sctp_endpoint_t *ep,
 	if (packet) {
 		/* Make an ABORT. The T bit will be set if the asoc
 		 * is NULL.
-         	 */
+		 */
         	abort = sctp_make_abort(asoc, chunk, 0);
 		if (!abort) {
 			sctp_ootb_pkt_free(packet);
@@ -4092,10 +4161,10 @@ sctp_sackhdr_t *sctp_sm_pull_sack(sctp_chunk_t *chunk)
  * error causes.
  */
 sctp_packet_t *sctp_abort_pkt_new(const sctp_endpoint_t *ep,
-				 const sctp_association_t *asoc,
-				 sctp_chunk_t *chunk,
-				 const void *payload,
-				 size_t paylen)
+				  const sctp_association_t *asoc,
+				  sctp_chunk_t *chunk,
+				  const void *payload,
+				  size_t paylen)
 {
 	sctp_packet_t *packet;
 	sctp_chunk_t *abort;
@@ -4128,7 +4197,7 @@ sctp_packet_t *sctp_abort_pkt_new(const sctp_endpoint_t *ep,
 
 /* Allocate a packet for responding in the OOTB conditions.  */
 sctp_packet_t *sctp_ootb_pkt_new(const sctp_association_t *asoc,
-					const sctp_chunk_t *chunk)
+				 const sctp_chunk_t *chunk)
 {
 	sctp_packet_t *packet;
 	sctp_transport_t *transport;
@@ -4146,7 +4215,14 @@ sctp_packet_t *sctp_ootb_pkt_new(const sctp_association_t *asoc,
 	if (asoc) {
 		vtag = asoc->peer.i.init_tag;
 	} else {
-		vtag = ntohl(chunk->sctp_hdr->vtag);
+		/* Special case the INIT as there is no vtag yet. */
+		if (SCTP_CID_INIT == chunk->chunk_hdr->type) {
+			sctp_init_chunk_t *init;
+			init = (sctp_init_chunk_t *)&chunk->chunk_hdr;
+			vtag = ntohl(init->init_hdr.init_tag);
+		} else {
+			vtag = ntohl(chunk->sctp_hdr->vtag);
+		}
 	}
 
 	/* Make a transport for the bucket, Eliza... */

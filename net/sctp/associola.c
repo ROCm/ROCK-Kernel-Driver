@@ -476,13 +476,6 @@ sctp_transport_t *sctp_assoc_add_peer(sctp_association_t *asoc,
 		asoc->peer.retran_path = peer;
 	}
 
-	/* If we do not yet have a primary path, set one.  */
-	if (NULL == asoc->peer.primary_path) {
-		asoc->peer.primary_path = peer;
-		asoc->peer.active_path = peer;
-		asoc->peer.retran_path = peer;
-	}
-
 	if (asoc->peer.active_path == asoc->peer.retran_path)
 		asoc->peer.retran_path = peer;
 

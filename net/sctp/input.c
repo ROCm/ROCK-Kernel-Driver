@@ -584,14 +584,20 @@ static sctp_association_t *__sctp_rcv_initack_lookup(struct sk_buff *skb,
 	struct sctphdr *sh = (struct sctphdr *) skb->h.raw;
 	sctp_chunkhdr_t *ch;
 	__u8 *ch_end, *data;
-	sctpParam_t parm;
+	sctp_paramhdr_t *parm;
 
 	ch = (sctp_chunkhdr_t *) skb->data;
 
 	ch_end = ((__u8 *) ch) + WORD_ROUND(ntohs(ch->length));
 
-	if (SCTP_CID_INIT_ACK != ch->type)
+	/* If this is INIT/INIT-ACK look inside the chunk too. */
+	switch (ch->type) {
+	case SCTP_CID_INIT:
+	case SCTP_CID_INIT_ACK:
+		break;
+	default:
 		return NULL;
+	}
 
 	/*
 	 * This code will NOT touch anything inside the chunk--it is
@@ -609,25 +615,24 @@ static sctp_association_t *__sctp_rcv_initack_lookup(struct sk_buff *skb,
 	/* Find the start of the TLVs and the end of the chunk.  This is
 	 * the region we search for address parameters.
 	 */
-
 	data = skb->data + sizeof(sctp_init_chunk_t);
 
 	/* See sctp_process_init() for how to go thru TLVs. */
 	while (data < ch_end) {
-		parm.v  = data;
+		parm = (sctp_paramhdr_t *)data;
 
-		if (!parm.p->length)
+		if (!parm->length)
 			break;
 
-		data += WORD_ROUND(ntohs(parm.p->length));
+		data += WORD_ROUND(ntohs(parm->length));
 
 		/* Note: Ignoring hostname addresses. */
-		if ((SCTP_PARAM_IPV4_ADDRESS  != parm.p->type) &&
-		    (SCTP_PARAM_IPV6_ADDRESS != parm.p->type))
+		if ((SCTP_PARAM_IPV4_ADDRESS != parm->type) &&
+		    (SCTP_PARAM_IPV6_ADDRESS != parm->type))
 			continue;
 
-		sctp_param2sockaddr(paddr, parm, ntohs(sh->source));
-
+		sctp_param2sockaddr(paddr, (sctp_addr_param_t *)parm, 
+				    ntohs(sh->source));
 		asoc = __sctp_rcv_lookup_association(laddr, paddr, transportp);
 		if (asoc)
 			return asoc;
