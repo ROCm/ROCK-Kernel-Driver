@@ -828,11 +828,6 @@ int cp_compat_stat(struct kstat *stat, struct compat_stat *statbuf)
 	return err;
 }
 
-asmlinkage int sys32_sysfs(int option, u32 arg1, u32 arg2)
-{
-	return sys_sysfs(option, arg1, arg2);
-}
-
 struct ncp_mount_data32 {
         int version;
         unsigned int ncp_fd;
@@ -1718,33 +1713,6 @@ asmlinkage int sys32_settimeofday(struct compat_timeval *tv, struct timezone *tz
 	return do_sys_settimeofday(tv ? &kts : NULL, tz ? &ktz : NULL);
 }
 
-asmlinkage int sys32_utimes(char __user *filename,
-			struct compat_timeval __user *tvs)
-{
-	char *kfilename;
-	struct timeval ktvs[2];
-	mm_segment_t old_fs;
-	int ret;
-
-	kfilename = getname(filename);
-	ret = PTR_ERR(kfilename);
-	if (!IS_ERR(kfilename)) {
-		if (tvs) {
-			if (get_tv32(&ktvs[0], tvs) ||
-			    get_tv32(&ktvs[1], 1+tvs))
-				return -EFAULT;
-		}
-
-		old_fs = get_fs();
-		set_fs(KERNEL_DS);
-		ret = sys_utimes(kfilename, &ktvs[0]);
-		set_fs(old_fs);
-
-		putname(kfilename);
-	}
-	return ret;
-}
-
 /* These are here just in case some old sparc32 binary calls it. */
 asmlinkage int sys32_pause(void)
 {
@@ -1752,17 +1720,6 @@ asmlinkage int sys32_pause(void)
 	schedule();
 	return -ERESTARTNOHAND;
 }
-
-
-asmlinkage int sys32_prctl(int option, u32 arg2, u32 arg3, u32 arg4, u32 arg5)
-{
-	return sys_prctl(option,
-			 (unsigned long) arg2,
-			 (unsigned long) arg3,
-			 (unsigned long) arg4,
-			 (unsigned long) arg5);
-}
-
 
 asmlinkage compat_ssize_t sys32_pread64(unsigned int fd, char *ubuf,
 				 compat_size_t count, u32 poshi, u32 poslo)
@@ -1895,13 +1852,6 @@ asmlinkage int sys32_adjtimex(struct timex32 *utp)
 		ret = -EFAULT;
 
 	return ret;
-}
-
-asmlinkage int sys_setpriority32(u32 which, u32 who, u32 niceval)
-{
-	return sys_setpriority((int) which,
-			       (int) who,
-			       (int) niceval);
 }
 
 struct __sysctl_args32 {

@@ -53,8 +53,6 @@ typedef struct
 
 asmlinkage int FASTCALL(do_signal(struct pt_regs *regs, sigset_t *oldset));
 
-int do_signal32(struct pt_regs *regs, sigset_t *oldset);
-
 int copy_siginfo_to_user32(siginfo_t32 *to, siginfo_t *from)
 {
 	int err;
@@ -123,7 +121,7 @@ sys32_sigsuspend(struct pt_regs * regs,int history0, int history1, old_sigset_t 
 	while (1) {
 		set_current_state(TASK_INTERRUPTIBLE);
 		schedule();
-		if (do_signal32(regs, &saveset))
+		if (do_signal(regs, &saveset))
 			return -EINTR;
 	}
 }
@@ -158,7 +156,7 @@ sys32_rt_sigsuspend(struct pt_regs * regs,compat_sigset_t *unewset, size_t sigse
         while (1) {
                 set_current_state(TASK_INTERRUPTIBLE);
                 schedule();
-                if (do_signal32(regs, &saveset))
+                if (do_signal(regs, &saveset))
                         return -EINTR;
         }
 }                                                         
@@ -294,8 +292,8 @@ static int save_sigregs32(struct pt_regs *regs,_sigregs32 *sregs)
 	_s390_regs_common32 regs32;
 	int err, i;
 
-	regs32.psw.mask = PSW32_USER_BITS |
-		((__u32)(regs->psw.mask >> 32) & PSW32_MASK_CC);
+	regs32.psw.mask = PSW32_MASK_MERGE(PSW32_USER_BITS,
+					   (__u32)(regs->psw.mask >> 32));
 	regs32.psw.addr = PSW32_ADDR_AMODE31 | (__u32) regs->psw.addr;
 	for (i = 0; i < NUM_GPRS; i++)
 		regs32.gprs[i] = (__u32) regs->gprs[i];
@@ -320,8 +318,8 @@ static int restore_sigregs32(struct pt_regs *regs,_sigregs32 *sregs)
 	err = __copy_from_user(&regs32, &sregs->regs, sizeof(regs32));
 	if (err)
 		return err;
-	regs->psw.mask = PSW_USER32_BITS |
-		(__u64)(regs32.psw.mask & PSW32_MASK_CC) << 32;
+	regs->psw.mask = PSW_MASK_MERGE(regs->psw.mask,
+				        (__u64)regs32.psw.mask << 32);
 	regs->psw.addr = (__u64)(regs32.psw.addr & PSW32_ADDR_INSN);
 	for (i = 0; i < NUM_GPRS; i++)
 		regs->gprs[i] = (__u64) regs32.gprs[i];
@@ -482,7 +480,6 @@ static void setup_frame32(int sig, struct k_sigaction *ka,
 	/* Set up registers for signal handler */
 	regs->gprs[15] = (__u64) frame;
 	regs->psw.addr = (__u64) ka->sa.sa_handler;
-	regs->psw.mask = PSW_USER32_BITS;
 
 	regs->gprs[2] = map_signal(sig);
 	regs->gprs[3] = (__u64) &frame->sc;
@@ -539,7 +536,6 @@ static void setup_rt_frame32(int sig, struct k_sigaction *ka, siginfo_t *info,
 	/* Set up registers for signal handler */
 	regs->gprs[15] = (__u64) frame;
 	regs->psw.addr = (__u64) ka->sa.sa_handler;
-	regs->psw.mask = PSW_USER32_BITS;
 
 	regs->gprs[2] = map_signal(sig);
 	regs->gprs[3] = (__u64) &frame->info;
@@ -556,35 +552,11 @@ give_sigsegv:
  * OK, we're invoking a handler
  */	
 
-static void
+void
 handle_signal32(unsigned long sig, siginfo_t *info, sigset_t *oldset,
 	struct pt_regs * regs)
 {
 	struct k_sigaction *ka = &current->sighand->action[sig-1];
-
-	/* Are we from a system call? */
-	if (regs->trap == __LC_SVC_OLD_PSW) {
-		/* If so, check system call restarting.. */
-		switch (regs->gprs[2]) {
-			case -ERESTART_RESTARTBLOCK:
-				current_thread_info()->restart_block.fn =
-					do_no_restart_syscall;
-				clear_thread_flag(TIF_RESTART_SVC);
-			case -ERESTARTNOHAND:
-				regs->gprs[2] = -EINTR;
-				break;
-
-			case -ERESTARTSYS:
-				if (!(ka->sa.sa_flags & SA_RESTART)) {
-					regs->gprs[2] = -EINTR;
-					break;
-				}
-			/* fallthrough */
-			case -ERESTARTNOINTR:
-				regs->gprs[2] = regs->orig_gpr2;
-				regs->psw.addr -= regs->ilc;
-		}
-	}
 
 	/* Set up the stack frame */
 	if (ka->sa.sa_flags & SA_SIGINFO)
@@ -604,53 +576,3 @@ handle_signal32(unsigned long sig, siginfo_t *info, sigset_t *oldset,
 	}
 }
 
-/*
- * Note that 'init' is a special process: it doesn't get signals it doesn't
- * want to handle. Thus you cannot kill init even with a SIGKILL even by
- * mistake.
- *
- * Note that we go through the signals twice: once to check the signals that
- * the kernel can handle, and then we build all the user-level signal handling
- * stack-frames in one go after that.
- */
-int do_signal32(struct pt_regs *regs, sigset_t *oldset)
-{
-	siginfo_t info;
-	int signr;
-
-	/*
-	 * We want the common case to go fast, which
-	 * is why we may in certain cases get here from
-	 * kernel mode. Just return without doing anything
-	 * if so.
-	 */
-	if (!user_mode(regs))
-		return 1;
-
-	if (!oldset)
-		oldset = &current->blocked;
-
-	signr = get_signal_to_deliver(&info, regs, NULL);
-	if (signr > 0) {
-		/* Whee!  Actually deliver the signal.  */
-		handle_signal32(signr, &info, oldset, regs);
-		return 1;
-	}
-
-	/* Did we come from a system call? */
-	if ( regs->trap == __LC_SVC_OLD_PSW /* System Call! */ ) {
-		/* Restart the system call - no handlers present */
-		if (regs->gprs[2] == -ERESTARTNOHAND ||
-		    regs->gprs[2] == -ERESTARTSYS ||
-		    regs->gprs[2] == -ERESTARTNOINTR) {
-			regs->gprs[2] = regs->orig_gpr2;
-			regs->psw.addr -= regs->ilc;
-		}
-		/* Restart the system call with a new system call number */
-		if (regs->gprs[2] == -ERESTART_RESTARTBLOCK) {
-			regs->gprs[2] = __NR_restart_syscall;
-			set_thread_flag(TIF_RESTART_SVC);
-		}
-	}
-	return 0;
-}

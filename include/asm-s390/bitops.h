@@ -532,7 +532,7 @@ __constant_test_bit(unsigned long nr, const volatile unsigned long *addr) {
  * Find-bit routines..
  */
 static inline int
-find_first_zero_bit(unsigned long * addr, unsigned int size)
+find_first_zero_bit(const unsigned long * addr, unsigned int size)
 {
 	unsigned long cmp, count;
         unsigned int res;
@@ -571,7 +571,7 @@ find_first_zero_bit(unsigned long * addr, unsigned int size)
 }
 
 static inline int
-find_first_bit(unsigned long * addr, unsigned int size)
+find_first_bit(const unsigned long * addr, unsigned int size)
 {
 	unsigned long cmp, count;
         unsigned int res;
@@ -610,7 +610,7 @@ find_first_bit(unsigned long * addr, unsigned int size)
 }
 
 static inline int
-find_next_zero_bit (unsigned long * addr, int size, int offset)
+find_next_zero_bit (const unsigned long * addr, int size, int offset)
 {
         unsigned long * p = ((unsigned long *) addr) + (offset >> 5);
         unsigned long bitvec, reg;
@@ -649,7 +649,7 @@ find_next_zero_bit (unsigned long * addr, int size, int offset)
 }
 
 static inline int
-find_next_bit (unsigned long * addr, int size, int offset)
+find_next_bit (const unsigned long * addr, int size, int offset)
 {
         unsigned long * p = ((unsigned long *) addr) + (offset >> 5);
         unsigned long bitvec, reg;
@@ -693,7 +693,7 @@ find_next_bit (unsigned long * addr, int size, int offset)
  * Find-bit routines..
  */
 static inline unsigned long
-find_first_zero_bit(unsigned long * addr, unsigned long size)
+find_first_zero_bit(const unsigned long * addr, unsigned long size)
 {
         unsigned long res, cmp, count;
 
@@ -735,7 +735,7 @@ find_first_zero_bit(unsigned long * addr, unsigned long size)
 }
 
 static inline unsigned long
-find_first_bit(unsigned long * addr, unsigned long size)
+find_first_bit(const unsigned long * addr, unsigned long size)
 {
         unsigned long res, cmp, count;
 
@@ -777,7 +777,7 @@ find_first_bit(unsigned long * addr, unsigned long size)
 }
 
 static inline unsigned long
-find_next_zero_bit (unsigned long * addr, unsigned long size, unsigned long offset)
+find_next_zero_bit (const unsigned long * addr, unsigned long size, unsigned long offset)
 {
         unsigned long * p = ((unsigned long *) addr) + (offset >> 6);
         unsigned long bitvec, reg;
@@ -821,7 +821,7 @@ find_next_zero_bit (unsigned long * addr, unsigned long size, unsigned long offs
 }
 
 static inline unsigned long
-find_next_bit (unsigned long * addr, unsigned long size, unsigned long offset)
+find_next_bit (const unsigned long * addr, unsigned long size, unsigned long offset)
 {
         unsigned long * p = ((unsigned long *) addr) + (offset >> 6);
         unsigned long bitvec, reg;
