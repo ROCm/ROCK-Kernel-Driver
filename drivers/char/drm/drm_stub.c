@@ -87,7 +87,7 @@ static int drm_fill_in_dev(drm_device_t *dev, struct pci_dev *pdev, const struct
 	dev->driver = driver;
 	
 	if (dev->driver->preinit)
-		if ((retcode = dev->driver->preinit(dev)))
+		if ((retcode = dev->driver->preinit(dev, ent->driver_data)))
 			goto error_out_unreg;
 
 	if (drm_core_has_AGP(dev)) {

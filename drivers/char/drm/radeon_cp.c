@@ -1266,14 +1266,8 @@ static void radeon_set_pcigart( drm_radeon_private_t *dev_priv, int on )
 
 static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 {
-	drm_radeon_private_t *dev_priv;
+	drm_radeon_private_t *dev_priv = dev->dev_private;;
 	DRM_DEBUG( "\n" );
-
-	dev_priv = drm_alloc( sizeof(drm_radeon_private_t), DRM_MEM_DRIVER );
-	if ( dev_priv == NULL )
-		return DRM_ERR(ENOMEM);
-
-	memset( dev_priv, 0, sizeof(drm_radeon_private_t) );
 
 	dev_priv->is_pci = init->is_pci;
 
@@ -1546,6 +1540,7 @@ static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 
 int radeon_do_cleanup_cp( drm_device_t *dev )
 {
+	drm_radeon_private_t *dev_priv = dev->dev_private;
 	DRM_DEBUG( "\n" );
 
 	/* Make sure interrupts are disabled here because the uninstall ioctl
@@ -1554,30 +1549,25 @@ int radeon_do_cleanup_cp( drm_device_t *dev )
 	 */
 	if ( dev->irq_enabled ) drm_irq_uninstall(dev);
 
-	if ( dev->dev_private ) {
-		drm_radeon_private_t *dev_priv = dev->dev_private;
-
 #if __OS_HAS_AGP
-		if ( !dev_priv->is_pci ) {
-			if ( dev_priv->cp_ring != NULL )
-				drm_core_ioremapfree( dev_priv->cp_ring, dev );
-			if ( dev_priv->ring_rptr != NULL )
-				drm_core_ioremapfree( dev_priv->ring_rptr, dev );
-			if ( dev->agp_buffer_map != NULL )
-				drm_core_ioremapfree( dev->agp_buffer_map, dev );
-		} else
+	if ( !dev_priv->is_pci ) {
+		if ( dev_priv->cp_ring != NULL )
+			drm_core_ioremapfree( dev_priv->cp_ring, dev );
+		if ( dev_priv->ring_rptr != NULL )
+			drm_core_ioremapfree( dev_priv->ring_rptr, dev );
+		if ( dev->agp_buffer_map != NULL )
+			drm_core_ioremapfree( dev->agp_buffer_map, dev );
+	} else
 #endif
-		{
-			if (!drm_ati_pcigart_cleanup( dev,
-						dev_priv->phys_pci_gart,
-						dev_priv->bus_pci_gart ))
-				DRM_ERROR( "failed to cleanup PCI GART!\n" );
-		}
-
-		drm_free( dev->dev_private, sizeof(drm_radeon_private_t),
-			   DRM_MEM_DRIVER );
-		dev->dev_private = NULL;
+	{
+		if (!drm_ati_pcigart_cleanup( dev,
+					      dev_priv->phys_pci_gart,
+					      dev_priv->bus_pci_gart ))
+			DRM_ERROR( "failed to cleanup PCI GART!\n" );
 	}
+	
+	/* only clear to the start of flags */
+	memset(dev_priv, 0, offsetof(drm_radeon_private_t, flags));
 
 	return 0;
 }
@@ -2016,4 +2006,43 @@ int radeon_cp_buffers( DRM_IOCTL_ARGS )
 	DRM_COPY_TO_USER_IOCTL( argp, d, sizeof(d) );
 
 	return ret;
+}
+
+int radeon_driver_preinit(struct drm_device *dev, unsigned long flags)
+{
+	drm_radeon_private_t *dev_priv;
+	int ret = 0;
+
+	dev_priv = drm_alloc(sizeof(drm_radeon_private_t), DRM_MEM_DRIVER);
+	if (dev_priv == NULL)
+		return DRM_ERR(ENOMEM);
+
+	memset(dev_priv, 0, sizeof(drm_radeon_private_t));
+	dev->dev_private = (void *)dev_priv;
+	dev_priv->flags = flags;
+
+	switch (flags & CHIP_FAMILY_MASK) {
+	case CHIP_R100:
+	case CHIP_RV200:
+	case CHIP_R200:
+	case CHIP_R300:
+		dev_priv->flags |= CHIP_HAS_HIERZ;
+		break;
+	default:
+	/* all other chips have no hierarchical z buffer */
+		break;
+	}
+	return ret;
+}
+
+int radeon_driver_postcleanup(struct drm_device *dev)
+{
+	drm_radeon_private_t *dev_priv = dev->dev_private;
+
+	DRM_DEBUG("\n");
+
+	drm_free(dev_priv, sizeof(*dev_priv), DRM_MEM_DRIVER);
+
+	dev->dev_private = NULL;
+	return 0;
 }

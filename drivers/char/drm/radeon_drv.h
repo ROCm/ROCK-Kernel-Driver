@@ -117,6 +117,8 @@ enum radeon_chip_flags {
 	CHIP_IS_MOBILITY = 0x00010000UL,
 	CHIP_IS_IGP = 0x00020000UL,
 	CHIP_SINGLE_CRTC = 0x00040000UL,
+	CHIP_IS_AGP = 0x00080000UL,
+	CHIP_HAS_HIERZ = 0x00100000UL, 
 };
 
 typedef struct drm_radeon_freelist {
@@ -235,6 +237,8 @@ typedef struct drm_radeon_private {
    	wait_queue_head_t swi_queue;
    	atomic_t swi_emitted;
 
+	/* starting from here on, data is preserved accross an open */
+	uint32_t flags;		/* see radeon_chip_flags */
 } drm_radeon_private_t;
 
 typedef struct drm_radeon_buf_priv {
@@ -260,6 +264,9 @@ extern int radeon_wait_ring( drm_radeon_private_t *dev_priv, int n );
 extern int radeon_do_cp_idle( drm_radeon_private_t *dev_priv );
 extern int radeon_do_cleanup_cp( drm_device_t *dev );
 extern int radeon_do_cleanup_pageflip( drm_device_t *dev );
+
+extern int radeon_driver_preinit(struct drm_device *dev, unsigned long flags);
+extern int radeon_driver_postcleanup(struct drm_device *dev);
 
 				/* radeon_state.c */
 extern int radeon_cp_clear( DRM_IOCTL_ARGS );

@@ -557,7 +557,7 @@ typedef struct drm_vbl_sig {
 struct drm_device;
 
 struct drm_driver {
-	int (*preinit)(struct drm_device *);
+	int (*preinit)(struct drm_device *, unsigned long flags);
 	void (*prerelease)(struct drm_device *, struct file *filp);
 	void (*pretakedown)(struct drm_device *);
 	int (*postcleanup)(struct drm_device *);
