@@ -334,6 +334,18 @@ config VIOTAPE
 	  If you are running Linux on an iSeries system and you want Linux
 	  to read and/or write a tape drive owned by OS/400, say Y here.
 
+config SCHEDSTATS
+	bool "Collect scheduler statistics"
+	depends on DEBUG_KERNEL && PROC_FS
+	help
+	  If you say Y here, additional code will be inserted into the
+	  scheduler and related routines to collect statistics about
+	  scheduler behavior and provide them in /proc/schedstat.  These
+	  stats may be useful for both tuning and debugging the scheduler
+	  If you aren't debugging the scheduler or trying to tune a specific
+	  application, you can say N to avoid the very slight overhead
+	  this adds.
+
 endmenu
 
 config VIOPATH

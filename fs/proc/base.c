@@ -60,6 +60,9 @@ enum pid_directory_inos {
 	PROC_TGID_MAPS,
 	PROC_TGID_MOUNTS,
 	PROC_TGID_WCHAN,
+#ifdef CONFIG_SCHEDSTATS
+	PROC_TGID_SCHEDSTAT,
+#endif
 #ifdef CONFIG_SECURITY
 	PROC_TGID_ATTR,
 	PROC_TGID_ATTR_CURRENT,
@@ -83,6 +86,9 @@ enum pid_directory_inos {
 	PROC_TID_MAPS,
 	PROC_TID_MOUNTS,
 	PROC_TID_WCHAN,
+#ifdef CONFIG_SCHEDSTATS
+	PROC_TID_SCHEDSTAT,
+#endif
 #ifdef CONFIG_SECURITY
 	PROC_TID_ATTR,
 	PROC_TID_ATTR_CURRENT,
@@ -123,6 +129,9 @@ static struct pid_entry tgid_base_stuff[] = {
 #ifdef CONFIG_KALLSYMS
 	E(PROC_TGID_WCHAN,     "wchan",   S_IFREG|S_IRUGO),
 #endif
+#ifdef CONFIG_SCHEDSTATS
+	E(PROC_TGID_SCHEDSTAT, "schedstat", S_IFREG|S_IRUGO),
+#endif
 	{0,0,NULL,0}
 };
 static struct pid_entry tid_base_stuff[] = {
@@ -144,6 +153,9 @@ static struct pid_entry tid_base_stuff[] = {
 #endif
 #ifdef CONFIG_KALLSYMS
 	E(PROC_TID_WCHAN,      "wchan",   S_IFREG|S_IRUGO),
+#endif
+#ifdef CONFIG_SCHEDSTATS
+	E(PROC_TID_SCHEDSTAT, "schedstat",S_IFREG|S_IRUGO),
 #endif
 	{0,0,NULL,0}
 };
@@ -397,6 +409,19 @@ static int proc_pid_wchan(struct task_struct *task, char *buffer)
 	return sprintf(buffer, "%lu", wchan);
 }
 #endif /* CONFIG_KALLSYMS */
+
+#ifdef CONFIG_SCHEDSTATS
+/*
+ * Provides /proc/PID/schedstat
+ */
+static int proc_pid_schedstat(struct task_struct *task, char *buffer)
+{
+	return sprintf(buffer, "%lu %lu %lu\n",
+			task->sched_info.cpu_time,
+			task->sched_info.run_delay,
+			task->sched_info.pcnt);
+}
+#endif
 
 /************************************************************************/
 /*                       Here the fs part begins                        */
@@ -1374,6 +1399,13 @@ static struct dentry *proc_pident_lookup(struct inode *dir,
 		case PROC_TGID_WCHAN:
 			inode->i_fop = &proc_info_file_operations;
 			ei->op.proc_read = proc_pid_wchan;
+			break;
+#endif
+#ifdef CONFIG_SCHEDSTATS
+		case PROC_TID_SCHEDSTAT:
+		case PROC_TGID_SCHEDSTAT:
+			inode->i_fop = &proc_info_file_operations;
+			ei->op.proc_read = proc_pid_schedstat;
 			break;
 #endif
 		default:

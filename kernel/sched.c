@@ -40,6 +40,8 @@
 #include <linux/cpu.h>
 #include <linux/percpu.h>
 #include <linux/kthread.h>
+#include <linux/seq_file.h>
+#include <linux/times.h>
 #include <asm/tlb.h>
 
 #include <asm/unistd.h>
@@ -182,6 +184,16 @@ static unsigned int task_timeslice(task_t *p)
 
 #define task_hot(p, now, sd) ((now) - (p)->timestamp < (sd)->cache_hot_time)
 
+enum idle_type
+{
+	IDLE,
+	NOT_IDLE,
+	NEWLY_IDLE,
+	MAX_IDLE_TYPES
+};
+
+struct sched_domain;
+
 /*
  * These are the runqueue data structures:
  */
@@ -233,9 +245,185 @@ struct runqueue {
 	task_t *migration_thread;
 	struct list_head migration_queue;
 #endif
+
+#ifdef CONFIG_SCHEDSTATS
+	/* latency stats */
+	struct sched_info rq_sched_info;
+
+	/* sys_sched_yield() stats */
+	unsigned long yld_exp_empty;
+	unsigned long yld_act_empty;
+	unsigned long yld_both_empty;
+	unsigned long yld_cnt;
+
+	/* schedule() stats */
+	unsigned long sched_noswitch;
+	unsigned long sched_switch;
+	unsigned long sched_cnt;
+	unsigned long sched_goidle;
+
+	/* pull_task() stats */
+	unsigned long pt_gained[MAX_IDLE_TYPES];
+	unsigned long pt_lost[MAX_IDLE_TYPES];
+
+	/* active_load_balance() stats */
+	unsigned long alb_cnt;
+	unsigned long alb_lost;
+	unsigned long alb_gained;
+	unsigned long alb_failed;
+
+	/* try_to_wake_up() stats */
+	unsigned long ttwu_cnt;
+	unsigned long ttwu_attempts;
+	unsigned long ttwu_moved;
+
+	/* wake_up_new_task() stats */
+	unsigned long wunt_cnt;
+	unsigned long wunt_moved;
+
+	/* sched_migrate_task() stats */
+	unsigned long smt_cnt;
+
+	/* sched_balance_exec() stats */
+	unsigned long sbe_cnt;
+#endif
 };
 
 static DEFINE_PER_CPU(struct runqueue, runqueues);
+
+/*
+ * sched-domains (multiprocessor balancing) declarations:
+ */
+#ifdef CONFIG_SMP
+#define SCHED_LOAD_SCALE	128UL	/* increase resolution of load */
+
+#define SD_BALANCE_NEWIDLE	1	/* Balance when about to become idle */
+#define SD_BALANCE_EXEC		2	/* Balance on exec */
+#define SD_WAKE_IDLE		4	/* Wake to idle CPU on task wakeup */
+#define SD_WAKE_AFFINE		8	/* Wake task to waking CPU */
+#define SD_WAKE_BALANCE		16	/* Perform balancing at task wakeup */
+#define SD_SHARE_CPUPOWER	32	/* Domain members share cpu power */
+
+struct sched_group {
+	struct sched_group *next;	/* Must be a circular list */
+	cpumask_t cpumask;
+
+	/*
+	 * CPU power of this group, SCHED_LOAD_SCALE being max power for a
+	 * single CPU. This should be read only (except for setup). Although
+	 * it will need to be written to at cpu hot(un)plug time, perhaps the
+	 * cpucontrol semaphore will provide enough exclusion?
+	 */
+	unsigned long cpu_power;
+};
+
+struct sched_domain {
+	/* These fields must be setup */
+	struct sched_domain *parent;	/* top domain must be null terminated */
+	struct sched_group *groups;	/* the balancing groups of the domain */
+	cpumask_t span;			/* span of all CPUs in this domain */
+	unsigned long min_interval;	/* Minimum balance interval ms */
+	unsigned long max_interval;	/* Maximum balance interval ms */
+	unsigned int busy_factor;	/* less balancing by factor if busy */
+	unsigned int imbalance_pct;	/* No balance until over watermark */
+	unsigned long long cache_hot_time; /* Task considered cache hot (ns) */
+	unsigned int cache_nice_tries;	/* Leave cache hot tasks for # tries */
+	unsigned int per_cpu_gain;	/* CPU % gained by adding domain cpus */
+	int flags;			/* See SD_* */
+
+	/* Runtime fields. */
+	unsigned long last_balance;	/* init to jiffies. units in jiffies */
+	unsigned int balance_interval;	/* initialise to 1. units in ms. */
+	unsigned int nr_balance_failed; /* initialise to 0 */
+
+#ifdef CONFIG_SCHEDSTATS
+	/* load_balance() stats */
+	unsigned long lb_cnt[MAX_IDLE_TYPES];
+	unsigned long lb_failed[MAX_IDLE_TYPES];
+	unsigned long lb_imbalance[MAX_IDLE_TYPES];
+	unsigned long lb_nobusyg[MAX_IDLE_TYPES];
+	unsigned long lb_nobusyq[MAX_IDLE_TYPES];
+
+	/* sched_balance_exec() stats */
+	unsigned long sbe_attempts;
+	unsigned long sbe_pushed;
+
+	/* try_to_wake_up() stats */
+	unsigned long ttwu_wake_affine;
+	unsigned long ttwu_wake_balance;
+#endif
+};
+
+#ifndef ARCH_HAS_SCHED_TUNE
+#ifdef CONFIG_SCHED_SMT
+#define ARCH_HAS_SCHED_WAKE_IDLE
+/* Common values for SMT siblings */
+#define SD_SIBLING_INIT (struct sched_domain) {		\
+	.span			= CPU_MASK_NONE,	\
+	.parent			= NULL,			\
+	.groups			= NULL,			\
+	.min_interval		= 1,			\
+	.max_interval		= 2,			\
+	.busy_factor		= 8,			\
+	.imbalance_pct		= 110,			\
+	.cache_hot_time		= 0,			\
+	.cache_nice_tries	= 0,			\
+	.per_cpu_gain		= 25,			\
+	.flags			= SD_BALANCE_NEWIDLE	\
+				| SD_BALANCE_EXEC	\
+				| SD_WAKE_AFFINE	\
+				| SD_WAKE_IDLE		\
+				| SD_SHARE_CPUPOWER,	\
+	.last_balance		= jiffies,		\
+	.balance_interval	= 1,			\
+	.nr_balance_failed	= 0,			\
+}
+#endif
+
+/* Common values for CPUs */
+#define SD_CPU_INIT (struct sched_domain) {		\
+	.span			= CPU_MASK_NONE,	\
+	.parent			= NULL,			\
+	.groups			= NULL,			\
+	.min_interval		= 1,			\
+	.max_interval		= 4,			\
+	.busy_factor		= 64,			\
+	.imbalance_pct		= 125,			\
+	.cache_hot_time		= (5*1000000/2),	\
+	.cache_nice_tries	= 1,			\
+	.per_cpu_gain		= 100,			\
+	.flags			= SD_BALANCE_NEWIDLE	\
+				| SD_BALANCE_EXEC	\
+				| SD_WAKE_AFFINE	\
+				| SD_WAKE_BALANCE,	\
+	.last_balance		= jiffies,		\
+	.balance_interval	= 1,			\
+	.nr_balance_failed	= 0,			\
+}
+
+/* Arch can override this macro in processor.h */
+#if defined(CONFIG_NUMA) && !defined(SD_NODE_INIT)
+#define SD_NODE_INIT (struct sched_domain) {		\
+	.span			= CPU_MASK_NONE,	\
+	.parent			= NULL,			\
+	.groups			= NULL,			\
+	.min_interval		= 8,			\
+	.max_interval		= 32,			\
+	.busy_factor		= 32,			\
+	.imbalance_pct		= 125,			\
+	.cache_hot_time		= (10*1000000),		\
+	.cache_nice_tries	= 1,			\
+	.per_cpu_gain		= 100,			\
+	.flags			= SD_BALANCE_EXEC	\
+				| SD_WAKE_BALANCE,	\
+	.last_balance		= jiffies,		\
+	.balance_interval	= 1,			\
+	.nr_balance_failed	= 0,			\
+}
+#endif
+#endif /*  ARCH_HAS_SCHED_TUNE */
+#endif
+
 
 #define for_each_domain(cpu, domain) \
 	for (domain = cpu_rq(cpu)->sd; domain; domain = domain->parent)
@@ -279,6 +467,100 @@ static inline void task_rq_unlock(runqueue_t *rq, unsigned long *flags)
 	spin_unlock_irqrestore(&rq->lock, *flags);
 }
 
+#ifdef CONFIG_SCHEDSTATS
+/*
+ * bump this up when changing the output format or the meaning of an existing
+ * format, so that tools can adapt (or abort)
+ */
+#define SCHEDSTAT_VERSION 10
+
+static int show_schedstat(struct seq_file *seq, void *v)
+{
+	int cpu;
+	enum idle_type itype;
+
+	seq_printf(seq, "version %d\n", SCHEDSTAT_VERSION);
+	seq_printf(seq, "timestamp %lu\n", jiffies);
+	for_each_online_cpu(cpu) {
+		runqueue_t *rq = cpu_rq(cpu);
+		struct sched_domain *sd;
+		int dcnt = 0;
+
+		/* runqueue-specific stats */
+		seq_printf(seq,
+		    "cpu%d %lu %lu %lu %lu %lu %lu %lu %lu %lu %lu %lu %lu "
+		    "%lu %lu %lu %lu %lu %lu %lu %lu %lu %lu",
+		    cpu, rq->yld_both_empty,
+		    rq->yld_act_empty, rq->yld_exp_empty,
+		    rq->yld_cnt, rq->sched_noswitch,
+		    rq->sched_switch, rq->sched_cnt, rq->sched_goidle,
+		    rq->alb_cnt, rq->alb_gained, rq->alb_lost,
+		    rq->alb_failed,
+		    rq->ttwu_cnt, rq->ttwu_moved, rq->ttwu_attempts,
+		    rq->wunt_cnt, rq->wunt_moved,
+		    rq->smt_cnt, rq->sbe_cnt, rq->rq_sched_info.cpu_time,
+		    rq->rq_sched_info.run_delay, rq->rq_sched_info.pcnt);
+
+		for (itype = IDLE; itype < MAX_IDLE_TYPES; itype++)
+			seq_printf(seq, " %lu %lu", rq->pt_gained[itype],
+						    rq->pt_lost[itype]);
+		seq_printf(seq, "\n");
+
+		/* domain-specific stats */
+		for_each_domain(cpu, sd) {
+			char mask_str[NR_CPUS];
+
+			cpumask_scnprintf(mask_str, NR_CPUS, sd->span);
+			seq_printf(seq, "domain%d %s", dcnt++, mask_str);
+			for (itype = IDLE; itype < MAX_IDLE_TYPES; itype++) {
+				seq_printf(seq, " %lu %lu %lu %lu %lu",
+				    sd->lb_cnt[itype],
+				    sd->lb_failed[itype],
+				    sd->lb_imbalance[itype],
+				    sd->lb_nobusyq[itype],
+				    sd->lb_nobusyg[itype]);
+			}
+			seq_printf(seq, " %lu %lu %lu %lu\n",
+			    sd->sbe_pushed, sd->sbe_attempts,
+			    sd->ttwu_wake_affine, sd->ttwu_wake_balance);
+		}
+	}
+	return 0;
+}
+
+static int schedstat_open(struct inode *inode, struct file *file)
+{
+	unsigned int size = PAGE_SIZE * (1 + num_online_cpus() / 32);
+	char *buf = kmalloc(size, GFP_KERNEL);
+	struct seq_file *m;
+	int res;
+
+	if (!buf)
+		return -ENOMEM;
+	res = single_open(file, show_schedstat, NULL);
+	if (!res) {
+		m = file->private_data;
+		m->buf = buf;
+		m->size = size;
+	} else
+		kfree(buf);
+	return res;
+}
+
+struct file_operations proc_schedstat_operations = {
+	.open    = schedstat_open,
+	.read    = seq_read,
+	.llseek  = seq_lseek,
+	.release = single_release,
+};
+
+# define schedstat_inc(rq, field)	rq->field++;
+# define schedstat_add(rq, field, amt)	rq->field += amt;
+#else /* !CONFIG_SCHEDSTATS */
+# define schedstat_inc(rq, field)	do { } while (0);
+# define schedstat_add(rq, field, amt)	do { } while (0);
+#endif
+
 /*
  * rq_lock - lock a given runqueue and disable interrupts.
  */
@@ -298,6 +580,112 @@ static inline void rq_unlock(runqueue_t *rq)
 	spin_unlock_irq(&rq->lock);
 }
 
+#ifdef CONFIG_SCHEDSTATS
+/*
+ * Called when a process is dequeued from the active array and given
+ * the cpu.  We should note that with the exception of interactive
+ * tasks, the expired queue will become the active queue after the active
+ * queue is empty, without explicitly dequeuing and requeuing tasks in the
+ * expired queue.  (Interactive tasks may be requeued directly to the
+ * active queue, thus delaying tasks in the expired queue from running;
+ * see scheduler_tick()).
+ *
+ * This function is only called from sched_info_arrive(), rather than
+ * dequeue_task(). Even though a task may be queued and dequeued multiple
+ * times as it is shuffled about, we're really interested in knowing how
+ * long it was from the *first* time it was queued to the time that it
+ * finally hit a cpu.
+ */
+static inline void sched_info_dequeued(task_t *t)
+{
+	t->sched_info.last_queued = 0;
+}
+
+/*
+ * Called when a task finally hits the cpu.  We can now calculate how
+ * long it was waiting to run.  We also note when it began so that we
+ * can keep stats on how long its timeslice is.
+ */
+static inline void sched_info_arrive(task_t *t)
+{
+	unsigned long now = jiffies, diff = 0;
+	struct runqueue *rq = task_rq(t);
+
+	if (t->sched_info.last_queued)
+		diff = now - t->sched_info.last_queued;
+	sched_info_dequeued(t);
+	t->sched_info.run_delay += diff;
+	t->sched_info.last_arrival = now;
+	t->sched_info.pcnt++;
+
+	if (!rq)
+		return;
+
+	rq->rq_sched_info.run_delay += diff;
+	rq->rq_sched_info.pcnt++;
+}
+
+/*
+ * Called when a process is queued into either the active or expired
+ * array.  The time is noted and later used to determine how long we
+ * had to wait for us to reach the cpu.  Since the expired queue will
+ * become the active queue after active queue is empty, without dequeuing
+ * and requeuing any tasks, we are interested in queuing to either. It
+ * is unusual but not impossible for tasks to be dequeued and immediately
+ * requeued in the same or another array: this can happen in sched_yield(),
+ * set_user_nice(), and even load_balance() as it moves tasks from runqueue
+ * to runqueue.
+ *
+ * This function is only called from enqueue_task(), but also only updates
+ * the timestamp if it is already not set.  It's assumed that
+ * sched_info_dequeued() will clear that stamp when appropriate.
+ */
+static inline void sched_info_queued(task_t *t)
+{
+	if (!t->sched_info.last_queued)
+		t->sched_info.last_queued = jiffies;
+}
+
+/*
+ * Called when a process ceases being the active-running process, either
+ * voluntarily or involuntarily.  Now we can calculate how long we ran.
+ */
+static inline void sched_info_depart(task_t *t)
+{
+	struct runqueue *rq = task_rq(t);
+	unsigned long diff = jiffies - t->sched_info.last_arrival;
+
+	t->sched_info.cpu_time += diff;
+
+	if (rq)
+		rq->rq_sched_info.cpu_time += diff;
+}
+
+/*
+ * Called when tasks are switched involuntarily due, typically, to expiring
+ * their time slice.  (This may also be called when switching to or from
+ * the idle task.)  We are only called when prev != next.
+ */
+static inline void sched_info_switch(task_t *prev, task_t *next)
+{
+	struct runqueue *rq = task_rq(prev);
+
+	/*
+	 * prev now departs the cpu.  It's not interesting to record
+	 * stats about how efficient we were at scheduling the idle
+	 * process, however.
+	 */
+	if (prev != rq->idle)
+		sched_info_depart(prev);
+
+	if (next != rq->idle)
+		sched_info_arrive(next);
+}
+#else
+#define sched_info_queued(t)		do { } while (0)
+#define sched_info_switch(t, next)	do { } while (0)
+#endif /* CONFIG_SCHEDSTATS */
+
 /*
  * Adding/removing a task to/from a priority array:
  */
@@ -311,6 +699,7 @@ static void dequeue_task(struct task_struct *p, prio_array_t *array)
 
 static void enqueue_task(struct task_struct *p, prio_array_t *array)
 {
+	sched_info_queued(p);
 	list_add_tail(&p->run_list, array->queue + p->prio);
 	__set_bit(p->prio, array->bitmap);
 	array->nr_active++;
@@ -740,6 +1129,7 @@ static int try_to_wake_up(task_t * p, unsigned int state, int sync)
 #endif
 
 	rq = task_rq_lock(p, &flags);
+	schedstat_inc(rq, ttwu_cnt);
 	old_state = p->state;
 	if (!(old_state & state))
 		goto out;
@@ -787,23 +1177,35 @@ static int try_to_wake_up(task_t * p, unsigned int state, int sync)
 		 */
 		imbalance = sd->imbalance_pct + (sd->imbalance_pct - 100) / 2;
 
-		if ( ((sd->flags & SD_WAKE_AFFINE) &&
-				!task_hot(p, rq->timestamp_last_tick, sd))
-			|| ((sd->flags & SD_WAKE_BALANCE) &&
-				imbalance*this_load <= 100*load) ) {
+		if ((sd->flags & SD_WAKE_AFFINE) &&
+				!task_hot(p, rq->timestamp_last_tick, sd)) {
 			/*
-			 * Now sd has SD_WAKE_AFFINE and p is cache cold in sd
-			 * or sd has SD_WAKE_BALANCE and there is an imbalance
+			 * This domain has SD_WAKE_AFFINE and p is cache cold
+			 * in this domain.
 			 */
-			if (cpu_isset(cpu, sd->span))
+			if (cpu_isset(cpu, sd->span)) {
+				schedstat_inc(sd, ttwu_wake_affine);
 				goto out_set_cpu;
+			}
+		} else if ((sd->flags & SD_WAKE_BALANCE) &&
+				imbalance*this_load <= 100*load) {
+			/*
+			 * This domain has SD_WAKE_BALANCE and there is
+			 * an imbalance.
+			 */
+			if (cpu_isset(cpu, sd->span)) {
+				schedstat_inc(sd, ttwu_wake_balance);
+				goto out_set_cpu;
+			}
 		}
 	}
 
 	new_cpu = cpu; /* Could not wake to this_cpu. Wake to cpu instead */
 out_set_cpu:
+	schedstat_inc(rq, ttwu_attempts);
 	new_cpu = wake_idle(new_cpu, p);
 	if (new_cpu != cpu && cpu_isset(new_cpu, p->cpus_allowed)) {
+		schedstat_inc(rq, ttwu_moved);
 		set_task_cpu(p, new_cpu);
 		task_rq_unlock(rq, &flags);
 		/* might preempt at this point */
@@ -886,6 +1288,9 @@ void fastcall sched_fork(task_t *p)
 	INIT_LIST_HEAD(&p->run_list);
 	p->array = NULL;
 	spin_lock_init(&p->switch_lock);
+#ifdef CONFIG_SCHEDSTATS
+	memset(&p->sched_info, 0, sizeof(p->sched_info));
+#endif
 #ifdef CONFIG_PREEMPT
 	/*
 	 * During context-switch we hold precisely one spinlock, which
@@ -943,6 +1348,7 @@ void fastcall wake_up_new_task(task_t * p, unsigned long clone_flags)
 
 	BUG_ON(p->state != TASK_RUNNING);
 
+	schedstat_inc(rq, wunt_cnt);
 	/*
 	 * We decrease the sleep average of forking parents
 	 * and children as well, to keep max-interactive tasks
@@ -991,6 +1397,7 @@ void fastcall wake_up_new_task(task_t * p, unsigned long clone_flags)
 
 		current->sleep_avg = JIFFIES_TO_NS(CURRENT_BONUS(current) *
 			PARENT_PENALTY / 100 * MAX_SLEEP_AVG / MAX_BONUS);
+		schedstat_inc(rq, wunt_moved);
 	}
 
 	if (unlikely(cpu != this_cpu)) {
@@ -1161,13 +1568,6 @@ unsigned long nr_iowait(void)
 	return sum;
 }
 
-enum idle_type
-{
-	IDLE,
-	NOT_IDLE,
-	NEWLY_IDLE,
-};
-
 #ifdef CONFIG_SMP
 
 /*
@@ -1282,6 +1682,7 @@ static void sched_migrate_task(task_t *p, int dest_cpu)
 	    || unlikely(cpu_is_offline(dest_cpu)))
 		goto out;
 
+	schedstat_inc(rq, smt_cnt);
 	/* force the process onto the specified CPU */
 	if (migrate_task(p, dest_cpu, &req)) {
 		/* Need to wait for migration thread (might exit: take ref). */
@@ -1309,6 +1710,7 @@ void sched_exec(void)
 	struct sched_domain *tmp, *sd = NULL;
 	int new_cpu, this_cpu = get_cpu();
 
+	schedstat_inc(this_rq(), sbe_cnt);
 	/* Prefer the current CPU if there's only this task running */
 	if (this_rq()->nr_running <= 1)
 		goto out;
@@ -1317,9 +1719,11 @@ void sched_exec(void)
 		if (tmp->flags & SD_BALANCE_EXEC)
 			sd = tmp;
 
+	schedstat_inc(sd, sbe_attempts);
 	if (sd) {
 		new_cpu = find_idlest_cpu(current, this_cpu, sd);
 		if (new_cpu != this_cpu) {
+			schedstat_inc(sd, sbe_pushed);
 			put_cpu();
 			sched_migrate_task(current, new_cpu);
 			return;
@@ -1443,6 +1847,15 @@ skip_queue:
 		idx++;
 		goto skip_bitmap;
 	}
+
+	/*
+	 * Right now, this is the only place pull_task() is called,
+	 * so we can safely collect pull_task() stats here rather than
+	 * inside pull_task().
+	 */
+	schedstat_inc(this_rq, pt_gained[idle]);
+	schedstat_inc(busiest, pt_lost[idle]);
+
 	pull_task(busiest, array, tmp, this_rq, dst_array, this_cpu);
 	pulled++;
 
@@ -1637,14 +2050,20 @@ static int load_balance(int this_cpu, runqueue_t *this_rq,
 	int nr_moved;
 
 	spin_lock(&this_rq->lock);
+	schedstat_inc(sd, lb_cnt[idle]);
 
 	group = find_busiest_group(sd, this_cpu, &imbalance, idle);
-	if (!group)
+	if (!group) {
+		schedstat_inc(sd, lb_nobusyg[idle]);
 		goto out_balanced;
+	}
 
 	busiest = find_busiest_queue(group);
-	if (!busiest)
+	if (!busiest) {
+		schedstat_inc(sd, lb_nobusyq[idle]);
 		goto out_balanced;
+	}
+
 	/*
 	 * This should be "impossible", but since load
 	 * balancing is inherently racy and statistical,
@@ -1654,6 +2073,8 @@ static int load_balance(int this_cpu, runqueue_t *this_rq,
 		WARN_ON(1);
 		goto out_balanced;
 	}
+
+ 	schedstat_add(sd, lb_imbalance[idle], imbalance);
 
 	nr_moved = 0;
 	if (busiest->nr_running > 1) {
@@ -1671,6 +2092,7 @@ static int load_balance(int this_cpu, runqueue_t *this_rq,
 	spin_unlock(&this_rq->lock);
 
 	if (!nr_moved) {
+		schedstat_inc(sd, lb_failed[idle]);
 		sd->nr_balance_failed++;
 
 		if (unlikely(sd->nr_balance_failed > sd->cache_nice_tries+2)) {
@@ -1725,19 +2147,27 @@ static int load_balance_newidle(int this_cpu, runqueue_t *this_rq,
 	unsigned long imbalance;
 	int nr_moved = 0;
 
+	schedstat_inc(sd, lb_cnt[NEWLY_IDLE]);
 	group = find_busiest_group(sd, this_cpu, &imbalance, NEWLY_IDLE);
-	if (!group)
+	if (!group) {
+		schedstat_inc(sd, lb_nobusyg[NEWLY_IDLE]);
 		goto out;
+	}
 
 	busiest = find_busiest_queue(group);
-	if (!busiest || busiest == this_rq)
+	if (!busiest || busiest == this_rq) {
+		schedstat_inc(sd, lb_nobusyq[NEWLY_IDLE]);
 		goto out;
+	}
 
 	/* Attempt to move tasks */
 	double_lock_balance(this_rq, busiest);
 
+	schedstat_add(sd, lb_imbalance[NEWLY_IDLE], imbalance);
 	nr_moved = move_tasks(this_rq, this_cpu, busiest,
 					imbalance, sd, NEWLY_IDLE);
+	if (!nr_moved)
+		schedstat_inc(sd, lb_failed[NEWLY_IDLE]);
 
 	spin_unlock(&busiest->lock);
 
@@ -1777,6 +2207,7 @@ static void active_load_balance(runqueue_t *busiest, int busiest_cpu)
 	struct sched_group *group, *busy_group;
 	int i;
 
+	schedstat_inc(busiest, alb_cnt);
 	if (busiest->nr_running <= 1)
 		return;
 
@@ -1821,7 +2252,12 @@ static void active_load_balance(runqueue_t *busiest, int busiest_cpu)
 		if (unlikely(busiest == rq))
 			goto next_group;
 		double_lock_balance(busiest, rq);
-		move_tasks(rq, push_cpu, busiest, 1, sd, IDLE);
+		if (move_tasks(rq, push_cpu, busiest, 1, sd, IDLE)) {
+			schedstat_inc(busiest, alb_lost);
+			schedstat_inc(rq, alb_gained);
+		} else {
+			schedstat_inc(busiest, alb_failed);
+		}
 		spin_unlock(&rq->lock);
 next_group:
 		group = group->next;
@@ -2174,6 +2610,7 @@ need_resched:
 	}
 
 	release_kernel_lock(prev);
+	schedstat_inc(rq, sched_cnt);
 	now = sched_clock();
 	if (likely(now - prev->timestamp < NS_MAX_SLEEP_AVG))
 		run_time = now - prev->timestamp;
@@ -2220,18 +2657,21 @@ need_resched:
 		/*
 		 * Switch the active and expired arrays.
 		 */
+		schedstat_inc(rq, sched_switch);
 		rq->active = rq->expired;
 		rq->expired = array;
 		array = rq->active;
 		rq->expired_timestamp = 0;
 		rq->best_expired_prio = MAX_PRIO;
-	}
+	} else
+		schedstat_inc(rq, sched_noswitch);
 
 	idx = sched_find_first_bit(array->bitmap);
 	queue = array->queue + idx;
 	next = list_entry(queue->next, task_t, run_list);
 
 	if (dependent_sleeper(cpu, rq, next)) {
+		schedstat_inc(rq, sched_goidle);
 		next = rq->idle;
 		goto switch_tasks;
 	}
@@ -2261,6 +2701,7 @@ switch_tasks:
 	}
 	prev->timestamp = now;
 
+	sched_info_switch(prev, next);
 	if (likely(prev != next)) {
 		next->timestamp = now;
 		rq->nr_switches++;
@@ -2972,6 +3413,7 @@ asmlinkage long sys_sched_yield(void)
 	prio_array_t *array = current->array;
 	prio_array_t *target = rq->expired;
 
+	schedstat_inc(rq, yld_cnt);
 	/*
 	 * We implement yielding by moving the task into the expired
 	 * queue.
@@ -2981,6 +3423,13 @@ asmlinkage long sys_sched_yield(void)
 	 */
 	if (rt_task(current))
 		target = rq->active;
+
+	if (current->array->nr_active == 1) {
+		schedstat_inc(rq, yld_act_empty);
+		if (!rq->expired->nr_active)
+			schedstat_inc(rq, yld_both_empty);
+	} else if (!rq->expired->nr_active)
+		schedstat_inc(rq, yld_exp_empty);
 
 	dequeue_task(current, array);
 	enqueue_task(current, target);
@@ -3623,7 +4072,7 @@ EXPORT_SYMBOL(kernel_flag);
 
 #ifdef CONFIG_SMP
 /* Attach the domain 'sd' to 'cpu' as its base domain */
-void cpu_attach_domain(struct sched_domain *sd, int cpu)
+static void cpu_attach_domain(struct sched_domain *sd, int cpu)
 {
 	migration_req_t req;
 	unsigned long flags;
