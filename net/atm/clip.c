@@ -93,6 +93,7 @@ static void unlink_clip_vcc(struct clip_vcc *clip_vcc)
 		printk(KERN_CRIT "!clip_vcc->entry (clip_vcc %p)\n",clip_vcc);
 		return;
 	}
+	spin_lock_bh(&entry->neigh->dev->xmit_lock);	/* block clip_start_xmit() */
 	entry->neigh->used = jiffies;
 	for (walk = &entry->vccs; *walk; walk = &(*walk)->next)
 		if (*walk == clip_vcc) {
@@ -102,17 +103,20 @@ static void unlink_clip_vcc(struct clip_vcc *clip_vcc)
 			clip_vcc->entry = NULL;
 			if (clip_vcc->xoff)
 				netif_wake_queue(entry->neigh->dev);
-			if (entry->vccs) return;
+			if (entry->vccs)
+				goto out;
 			entry->expires = jiffies-1;
 				/* force resolution or expiration */
 			error = neigh_update(entry->neigh,NULL,NUD_NONE,0,0);
 			if (error)
 				printk(KERN_CRIT "unlink_clip_vcc: "
 				    "neigh_update failed with %d\n",error);
-			return;
+			goto out;
 		}
 	printk(KERN_CRIT "ATMARP: unlink_clip_vcc failed (entry %p, vcc "
 	  "0x%p)\n",entry,clip_vcc);
+out:
+	spin_unlock_bh(&entry->neigh->dev->xmit_lock);
 }
 
 
