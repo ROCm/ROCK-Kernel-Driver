@@ -33,9 +33,19 @@ source "drivers/media/dvb/dvb-core/Kconfig"
 source "drivers/media/dvb/frontends/Kconfig"
 
 comment "Supported SAA7146 based PCI Adapters"
-	depends on DVB
+	depends on DVB && PCI
 
 source "drivers/media/dvb/ttpci/Kconfig"
+
+comment "Supported USB Adapters"
+	depends on DVB && USB
+
+source "drivers/media/dvb/ttusb-budget/Kconfig"
+source "drivers/media/dvb/ttusb-dec/Kconfig"
+
+comment "Supported FlexCopII (B2C2) Adapters"
+	depends on DVB && PCI
+source "drivers/media/dvb/b2c2/Kconfig"
 
 endmenu
 
