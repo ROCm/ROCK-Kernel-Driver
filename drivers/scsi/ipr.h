@@ -72,6 +72,8 @@
 #define IPR_SUBS_DEV_ID_5703	0x0278
 #define IPR_SUBS_DEV_ID_572E  0x02D3
 #define IPR_SUBS_DEV_ID_573D  0x02D4
+#define IPR_SUBS_DEV_ID_570F	0x02BD
+#define IPR_SUBS_DEV_ID_571B	0x02BE
 
 #define IPR_NAME				"ipr"
 
