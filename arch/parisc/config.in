@@ -47,15 +47,6 @@ fi
 endmenu
 
 mainmenu_option next_comment
-comment 'Loadable module support'
-bool 'Enable loadable module support' CONFIG_MODULES
-if [ "$CONFIG_MODULES" = "y" ]; then
-  bool 'Set version information on all module symbols' CONFIG_MODVERSIONS
-  bool 'Kernel module loader' CONFIG_KMOD
-fi
-endmenu
-
-mainmenu_option next_comment
 comment 'General setup'
 
 tristate 'Kernel support for SOM binaries' CONFIG_BINFMT_SOM
