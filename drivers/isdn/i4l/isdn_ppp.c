@@ -1117,30 +1117,36 @@ isdn_ppp_push_higher(isdn_net_dev * net_dev, isdn_net_local * lp, struct sk_buff
 	}
 
 #ifdef CONFIG_IPPP_FILTER
-	/* check if the packet passes the pass and active filters
-	 * the filter instructions are constructed assuming
-	 * a four-byte PPP header on each packet (which is still present) */
-	skb_push(skb, 4);
-	*(u_int16_t *)skb->data = 0;	/* indicate inbound in DLT_LINUX_SLL */
-
-	if (is->pass_filter.filter
-	    && sk_run_filter(skb, is->pass_filter.filter,
-	                    is->pass_filter.len) == 0) {
+	/* the DLT_LINUX_SLL filter instructions are constructed assuming
+	 * a 16 byte faked ethernet header on each packet first word
+	 * is the direction flag the last contain the ethernet protocol
+	 * so we need 16 byte headroom, which should be always available
+	 * to avoid underrun abort filtering if here is no room
+	 */
+	if (unlikely(skb_headroom(skb) < 16)) {
+		printk(KERN_WARNING "ppp filters (in) not running - need %d byte more headroom\n",
+			16 - skb_headroom(skb));
+		goto no_filter;
+	}
+	*(u_int16_t *)skb_push(skb, 2) = skb->protocol;
+	*(u_int16_t *)skb_push(skb, 14) = 0; /* indicate inbound in DLT_LINUX_SLL */
+	if (is->pass_filter.filter &&
+	    sk_run_filter(skb, is->pass_filter.filter, is->pass_filter.len) == 0) {
 		if (is->debug & 0x2)
 			printk(KERN_DEBUG "IPPP: inbound frame filtered.\n");
 		kfree_skb(skb);
 		return;
 	}
-	if (!(is->active_filter.filter
-	      && sk_run_filter(skb, is->active_filter.filter,
-	                       is->active_filter.len) == 0)) {
+	if (!(is->active_filter.filter &&
+	    sk_run_filter(skb, is->active_filter.filter, is->active_filter.len) == 0)) {
 		if (is->debug & 0x2)
 			printk(KERN_DEBUG "IPPP: link-active filter: reseting huptimer.\n");
 		lp->huptimer = 0;
 		if (mlp)
 			mlp->huptimer = 0;
 	}
-	skb_pull(skb, 4);
+	skb_pull(skb, 16);
+no_filter:
 #else /* CONFIG_IPPP_FILTER */
 	lp->huptimer = 0;
 	if (mlp)
@@ -1259,29 +1265,34 @@ isdn_ppp_xmit(struct sk_buff *skb, struct net_device *netdev)
 	skb_pull(skb,IPPP_MAX_HEADER);
 
 #ifdef CONFIG_IPPP_FILTER
-	/* check if we should pass this packet
-	 * the filter instructions are constructed assuming
-	 * a four-byte PPP header on each packet */
-	skb_push(skb, 4);
-	*(u_int16_t *)skb->data = htons(4); /* indicate outbound in DLT_LINUX_SLL */
-	*(u_int16_t *)(skb->data + 2) = htons(proto);
-
-	if (ipt->pass_filter.filter 
-	    && sk_run_filter(skb, ipt->pass_filter.filter,
-		             ipt->pass_filter.len) == 0) {
+	/* the DLT_LINUX_SLL filter instructions are constructed assuming
+	 * a 16 byte faked ethernet header on each packet first word
+	 * is the direction flag the last contain the ethernet protocol
+	 * so we need 16 byte headroom, which _should_ be always available
+	 * to avoid underrun abort filtering if here is unlikely no room
+	 */
+	if (unlikely(skb_headroom(skb) < 16)) {
+		printk(KERN_WARNING "ppp filters(out) not running - need %d byte more headroom\n",
+			16 - skb_headroom(skb));
+		goto no_filter;
+	}
+	*(u_int16_t *)skb_push(skb, 2) = skb->protocol;
+	*(u_int16_t *)skb_push(skb, 14) = htons(4); /* indicate outbound in DLT_LINUX_SLL */
+	if (ipt->pass_filter.filter &&
+	    sk_run_filter(skb, ipt->pass_filter.filter, ipt->pass_filter.len) == 0) {
 		if (ipt->debug & 0x4)
 			printk(KERN_DEBUG "IPPP: outbound frame filtered.\n");
 		kfree_skb(skb);
 		goto unlock;
 	}
-	if (!(ipt->active_filter.filter
-	      && sk_run_filter(skb, ipt->active_filter.filter,
-		               ipt->active_filter.len) == 0)) {
+	if (!(ipt->active_filter.filter &&
+	    sk_run_filter(skb, ipt->active_filter.filter, ipt->active_filter.len) == 0)) {
 		if (ipt->debug & 0x4)
 			printk(KERN_DEBUG "IPPP: link-active filter: reseting huptimer.\n");
 		lp->huptimer = 0;
 	}
-	skb_pull(skb, 4);
+	skb_pull(skb, 16);
+no_filter:
 #else /* CONFIG_IPPP_FILTER */
 	lp->huptimer = 0;
 #endif /* CONFIG_IPPP_FILTER */
@@ -1435,15 +1446,12 @@ isdn_ppp_xmit(struct sk_buff *skb, struct net_device *netdev)
 int isdn_ppp_autodial_filter(struct sk_buff *skb, isdn_net_local *lp)
 {
 	struct ippp_struct *is = ippp_table[lp->ppp_slot];
-	u_int16_t proto;
 	int drop = 0;
+	u_int16_t savprot;
 
 	switch (ntohs(skb->protocol)) {
 	case ETH_P_IP:
-		proto = PPP_IP;
-		break;
 	case ETH_P_IPX:
-		proto = PPP_IPX;
 		break;
 	default:
 		printk(KERN_ERR "isdn_ppp_autodial_filter: unsupported protocol 0x%x.\n",
@@ -1451,14 +1459,22 @@ int isdn_ppp_autodial_filter(struct sk_buff *skb, isdn_net_local *lp)
 		return 1;
 	}
 
-	/* the filter instructions are constructed assuming
-	 * a four-byte PPP header on each packet. we have to
-	 * temporarily remove part of the fake header stuck on
-	 * earlier.
+	/* the DLT_LINUX_SLL filter instructions are constructed assuming
+	 * a 16 byte faked ethernet header on each packet first word
+	 * is the direction flag the last contain the ethernet protocol
+	 * so we need 16 - IPPP_MAX_HEADER byte extra headroom, which 
+	 * _should_ be always available to avoid underrun abort filtering
+	 * if here is unlikely no room
 	 */
-	skb_pull(skb, IPPP_MAX_HEADER - 4);
-	*(u_int16_t *)skb->data = htons(4);	/* indicate outbound in DLT_LINUX_SLL */
-	*(u_int16_t *)(skb->data + 2) = htons(proto);
+	if (unlikely(skb_headroom(skb) < 16 - IPPP_MAX_HEADER)) {
+		printk(KERN_WARNING "ppp filters(autodial) not running - need %d byte more headroom\n",
+			16 - IPPP_MAX_HEADER - skb_headroom(skb));
+		return 0;
+	}
+	skb_pull(skb, IPPP_MAX_HEADER - 2);
+	savprot = *(u_int16_t *)skb->data;
+	*(u_int16_t *)skb->data = skb->protocol;
+	*(u_int16_t *)skb_push(skb, 14) = htons(4); /* indicate outbound in DLT_LINUX_SLL */
 	
 	drop |= is->pass_filter.filter
 	        && sk_run_filter(skb, is->pass_filter.filter,
@@ -1467,7 +1483,9 @@ int isdn_ppp_autodial_filter(struct sk_buff *skb, isdn_net_local *lp)
 	        && sk_run_filter(skb, is->active_filter.filter,
 	                         is->active_filter.len) == 0;
 	
-	skb_push(skb, IPPP_MAX_HEADER - 4);
+	skb_pull(skb, 14);
+	*(u_int16_t *)skb->data = savprot;
+	skb_push(skb, IPPP_MAX_HEADER - 2);
 	return drop;
 }
 #endif

@@ -991,29 +991,49 @@ ppp_send_frame(struct ppp *ppp, struct sk_buff *skb)
 
 	if (proto < 0x8000) {
 #ifdef CONFIG_PPP_FILTER
-		/* check if we should pass this packet */
-		/* the filter instructions are constructed assuming
-		   a four-byte PPP header on each packet */
-		*(u_int16_t *)skb_push(skb, 2) = htons(4); /* indicate outbound in DLT_LINUX_SLL */;
-		if (ppp->pass_filter.filter
-		    && sk_run_filter(skb, ppp->pass_filter.filter,
-				     ppp->pass_filter.len) == 0) {
-			if (ppp->debug & 1)
-				printk(KERN_DEBUG "PPP: outbound frame not passed\n");
-			kfree_skb(skb);
-			return;
+		/* the DLT_LINUX_SLL filter instructions are constructed assuming
+		 * a 16 byte faked ethernet header on each packet first word
+		 * is the direction flag the last contain the ethernet protocol
+		 */
+		if (ppp->pass_filter.filter || ppp->active_filter.filter) {
+			int npi = proto_to_npindex(proto);
+
+			if (npi < 0) /* we only filter defined protocols */
+				goto no_filter;
+			
+			/* we only have a 2 byte header yet so we need 14 bytes more headroom
+			 * to avoid underrun abort filtering if here is no room
+			 */
+			if (unlikely(skb_headroom(skb) < 14)) {
+				printk(KERN_WARNING "ppp filters (out) not running - need %d byte more headroom\n",
+					14 - skb_headroom(skb));
+				goto no_filter;
+			}
+			/* we set the ethernet protocol in the header */
+			*(u_int16_t *)skb->data = htons(npindex_to_ethertype[npi]);
+			*(u_int16_t *)skb_push(skb, 14) = htons(4); /* indicate outbound in DLT_LINUX_SLL */
+			/* check if we should pass this packet */
+			if (ppp->pass_filter.filter &&
+			    sk_run_filter(skb, ppp->pass_filter.filter, ppp->pass_filter.len) == 0) {
+				if (ppp->debug & 1)
+					printk(KERN_DEBUG "PPP: outbound frame not passed\n");
+				kfree_skb(skb);
+				return;
+			}
+			/* if this packet passes the active filter, record the time */
+			if (!(ppp->active_filter.filter &&
+			    sk_run_filter(skb, ppp->active_filter.filter, ppp->active_filter.len) == 0))
+				ppp->last_xmit = jiffies;
+			skb_pull(skb, 14);
+			*(u_int16_t *)skb->data = htons(proto); /* rewrite PPP protocol value */
 		}
-		/* if this packet passes the active filter, record the time */
-		if (!(ppp->active_filter.filter
-		      && sk_run_filter(skb, ppp->active_filter.filter,
-				       ppp->active_filter.len) == 0))
-			ppp->last_xmit = jiffies;
-		skb_pull(skb, 2);
+	}
+no_filter:
 #else
 		/* for data packets, record the time */
 		ppp->last_xmit = jiffies;
-#endif /* CONFIG_PPP_FILTER */
 	}
+#endif /* CONFIG_PPP_FILTER */
 
 	++ppp->stats.tx_packets;
 	ppp->stats.tx_bytes += skb->len - 2;
@@ -1553,23 +1573,37 @@ ppp_receive_nonmp_frame(struct ppp *ppp, struct sk_buff *skb)
 		/* network protocol frame - give it to the kernel */
 
 #ifdef CONFIG_PPP_FILTER
-		/* check if the packet passes the pass and active filters */
-		/* the filter instructions are constructed assuming
-		   a four-byte PPP header on each packet */
-		*(u_int16_t *)skb_push(skb, 2) = 0; /* indicate inbound in DLT_LINUX_SLL */
-		if (ppp->pass_filter.filter
-		    && sk_run_filter(skb, ppp->pass_filter.filter,
-				     ppp->pass_filter.len) == 0) {
-			if (ppp->debug & 1)
-				printk(KERN_DEBUG "PPP: inbound frame not passed\n");
-			kfree_skb(skb);
-			return;
+		/* the DLT_LINUX_SLL filter instructions are constructed assuming
+		 * a 16 byte faked ethernet header on each packet first word
+		 * is the direction flag the last contain the ethernet protocol
+		 */
+		if (ppp->pass_filter.filter || ppp->active_filter.filter) {
+			/* we only have a 2 byte header yet so we need 14 bytes more headroom
+			 * to avoid underrun abort filtering if here is no room
+			 */
+			if (unlikely(skb_headroom(skb) < 14)) {
+				printk(KERN_WARNING "ppp filters (in) not running - need %d byte more headroom\n",
+					14 - skb_headroom(skb));
+				goto no_filter;
+			}
+			/* we set the ethernet protocol in the header */
+			*(u_int16_t *)skb->data = htons(npindex_to_ethertype[npi]);
+			*(u_int16_t *)skb_push(skb, 14) = 0; /* indicate inbound in DLT_LINUX_SLL */
+			/* check if we should pass this packet */
+			if (ppp->pass_filter.filter &&
+			    sk_run_filter(skb, ppp->pass_filter.filter, ppp->pass_filter.len) == 0) {
+				if (ppp->debug & 1)
+					printk(KERN_DEBUG "PPP: inbound frame not passed\n");
+				kfree_skb(skb);
+				return;
+			}
+			if (!(ppp->active_filter.filter &&
+			    sk_run_filter(skb, ppp->active_filter.filter, ppp->active_filter.len) == 0))
+				ppp->last_recv = jiffies;
+			skb_pull(skb, 14);
+			/* we do not need to restore the old protocol value it is pulled next step */
 		}
-		if (!(ppp->active_filter.filter
-		      && sk_run_filter(skb, ppp->active_filter.filter,
-				       ppp->active_filter.len) == 0))
-			ppp->last_recv = jiffies;
-		skb_pull(skb, 2);
+no_filter:
 #else
 		ppp->last_recv = jiffies;
 #endif /* CONFIG_PPP_FILTER */
