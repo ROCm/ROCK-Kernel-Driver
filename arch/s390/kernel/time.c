@@ -27,6 +27,7 @@
 #include <asm/uaccess.h>
 #include <asm/delay.h>
 #include <asm/s390_ext.h>
+#include <asm/div64.h>
 
 #include <linux/timex.h>
 #include <linux/config.h>
@@ -47,45 +48,22 @@ static uint64_t init_timer_cc;
 extern rwlock_t xtime_lock;
 extern unsigned long wall_jiffies;
 
-void tod_to_timeval(__u64 todval, struct timeval *xtime)
+void tod_to_timeval(__u64 todval, struct timespec *xtime)
 {
-        const int high_bit = 0x80000000L;
-        const int c_f4240 = 0xf4240L;
-        const int c_7a120 = 0x7a120;
-	/* We have to divide the 64 bit value todval by 4096
-	 * (because the 2^12 bit is the one that changes every 
-         * microsecond) and then split it into seconds and
-         * microseconds. A value of max (2^52-1) divided by
-         * the value 0xF4240 can yield a max result of approx
-         * (2^32.068). Thats to big to fit into a signed int
-	 *   ... hacking time!
-         */
-	asm volatile ("L     2,%1\n\t"
-		      "LR    3,2\n\t"
-		      "SRL   2,12\n\t"
-		      "SLL   3,20\n\t"
-		      "L     4,%O1+4(%R1)\n\t"
-		      "SRL   4,12\n\t"
-		      "OR    3,4\n\t"  /* now R2/R3 contain (todval >> 12) */
-		      "SR    4,4\n\t"
-		      "CL    2,%2\n\t"
-		      "JL    .+12\n\t"
-		      "S     2,%2\n\t"
-		      "L     4,%3\n\t"
-                      "D     2,%4\n\t"
-		      "OR    3,4\n\t"
-		      "ST    2,%O0+4(%R0)\n\t"
-		      "ST    3,%0"
-		      : "=m" (*xtime) : "m" (todval),
-		        "m" (c_7a120), "m" (high_bit), "m" (c_f4240)
-		      : "cc", "memory", "2", "3", "4" );
+	unsigned long long sec;
+
+	sec = todval >> 12;
+	do_div(sec, 1000000);
+	xtime->tv_sec = sec;
+	todval -= (sec * 1000000) << 12;
+	xtime->tv_nsec = ((todval * 1000) >> 12);
 }
 
 static inline unsigned long do_gettimeoffset(void) 
 {
 	__u64 now;
 
-	asm ("STCK 0(%0)" : : "a" (&now) : "memory", "cc");
+	asm volatile ("STCK 0(%0)" : : "a" (&now) : "memory", "cc");
         now = (now - init_timer_cc) >> 12;
 	/* We require the offset from the latest update of xtime */
 	now -= (__u64) wall_jiffies*USECS_PER_JIFFY;
@@ -102,7 +80,7 @@ void do_gettimeofday(struct timeval *tv)
 
 	read_lock_irqsave(&xtime_lock, flags);
 	sec = xtime.tv_sec;
-	usec = xtime.tv_usec + do_gettimeoffset();
+	usec = xtime.tv_nsec / 1000 + do_gettimeoffset();
 	read_unlock_irqrestore(&xtime_lock, flags);
 
 	while (usec >= 1000000) {
@@ -118,7 +96,7 @@ void do_settimeofday(struct timeval *tv)
 {
 
 	write_lock_irq(&xtime_lock);
-	/* This is revolting. We need to set the xtime.tv_usec
+	/* This is revolting. We need to set the xtime.tv_nsec
 	 * correctly. However, the value in this location is
 	 * is value at the last tick.
 	 * Discover what correction gettimeofday
@@ -131,7 +109,8 @@ void do_settimeofday(struct timeval *tv)
 		tv->tv_sec--;
 	}
 
-	xtime = *tv;
+	xtime.tv_sec = tv->tv_sec;
+	xtime.tv_nsec = tv->tv_usec * 1000;
 	time_adjust = 0;		/* stop active adjtime() */
 	time_status |= STA_UNSYNC;
 	time_maxerror = NTP_PHASE_LIMIT;
@@ -152,7 +131,7 @@ static void do_comparator_interrupt(struct pt_regs *regs, __u16 error_code)
 {
 	int cpu = smp_processor_id();
 
-	irq_enter(cpu, 0);
+	irq_enter();
 
 	/*
 	 * set clock comparator for next tick
@@ -174,7 +153,7 @@ static void do_comparator_interrupt(struct pt_regs *regs, __u16 error_code)
 	do_timer(regs);
 #endif
 
-	irq_exit(cpu, 0);
+	irq_exit();
 }
 
 /*

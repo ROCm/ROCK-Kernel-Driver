@@ -15,7 +15,6 @@
 #include <asm/cache.h>
 #include <asm/lowcore.h>
 #include <asm/errno.h>
-#include <asm/smp.h>
 #include <asm/ptrace.h>
 #include <asm/thread_info.h>
 
@@ -551,8 +550,8 @@ sys_call_table:
         .long  SYSCALL(sys_rt_sigtimedwait,sys32_rt_sigtimedwait_wrapper)
         .long  SYSCALL(sys_rt_sigqueueinfo,sys32_rt_sigqueueinfo_wrapper)
         .long  SYSCALL(sys_rt_sigsuspend_glue,sys32_rt_sigsuspend_glue)
-        .long  SYSCALL(sys_pread,sys32_pread_wrapper)           /* 180 */
-        .long  SYSCALL(sys_pwrite,sys32_pwrite_wrapper)
+        .long  SYSCALL(sys_pread64,sys32_pread_wrapper)           /* 180 */
+        .long  SYSCALL(sys_pwrite64,sys32_pwrite_wrapper)
         .long  SYSCALL(sys_ni_syscall,sys32_chown16_wrapper)    /* old chown16 syscall */
         .long  SYSCALL(sys_getcwd,sys32_getcwd_wrapper)
         .long  SYSCALL(sys_capget,sys32_capget_wrapper)

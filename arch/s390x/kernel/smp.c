@@ -46,43 +46,14 @@ extern volatile int __cpu_logical_map[];
 /*
  * An array with a pointer the lowcore of every CPU.
  */
-static int       max_cpus = NR_CPUS;	  /* Setup configured maximum number of CPUs to activate	*/
-int              smp_num_cpus;
+
 struct _lowcore *lowcore_ptr[NR_CPUS];
 cycles_t         cacheflush_time=0;
 int              smp_threads_ready=0;      /* Set when the idlers are all forked. */
-static atomic_t  smp_commenced = ATOMIC_INIT(0);
 
-volatile unsigned long phys_cpu_present_map;
 volatile unsigned long cpu_online_map;
+volatile unsigned long cpu_possible_map;
 unsigned long    cache_decay_ticks = 0;
-
-/*
- *      Setup routine for controlling SMP activation
- *
- *      Command-line option of "nosmp" or "maxcpus=0" will disable SMP
- *      activation entirely (the MPS table probe still happens, though).
- *
- *      Command-line option of "maxcpus=<NUM>", where <NUM> is an integer
- *      greater than 0, limits the maximum number of CPUs activated in
- *      SMP mode to <NUM>.
- */
-
-static int __init nosmp(char *str)
-{
-	max_cpus = 0;
-	return 1;
-}
-
-__setup("nosmp", nosmp);
-
-static int __init maxcpus(char *str)
-{
-	get_option(&str, &max_cpus);
-	return 1;
-}
-
-__setup("maxcpus=", maxcpus);
 
 /*
  * Reboot, halt and power_off routines for SMP.
@@ -147,9 +118,10 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
  */
 {
 	struct call_data_struct data;
-	int cpus = smp_num_cpus-1;
+	int cpus = num_online_cpus()-1;
 
-	if (!cpus || !atomic_read(&smp_commenced))
+	/* FIXME: get cpu lock -hc */
+	if (cpus <= 0)
 		return 0;
 
 	data.func = func;
@@ -182,8 +154,8 @@ static inline void do_send_stop(void)
         int i, rc;
 
         /* stop all processors */
-        for (i =  0; i < smp_num_cpus; i++) {
-                if (smp_processor_id() == i)
+        for (i =  0; i < NR_CPUS; i++) {
+                if (!cpu_online(i) || smp_processor_id() == i)
 			continue;
 		do {
 			rc = signal_processor_ps(&dummy, 0, i, sigp_stop);
@@ -198,8 +170,8 @@ static inline void do_store_status(void)
         int i, rc;
 
         /* store status of all processors in their lowcores (real 0) */
-        for (i =  0; i < smp_num_cpus; i++) {
-                if (smp_processor_id() == i) 
+        for (i =  0; i < NR_CPUS; i++) {
+                if (!cpu_online(i) || smp_processor_id() == i) 
 			continue;
 		low_core_addr = (unsigned long)get_cpu_lowcore(i);
 		do {
@@ -340,8 +312,8 @@ static void smp_ext_bitcall_others(ec_bit_sig sig)
 {
         int i;
 
-        for (i = 0; i < smp_num_cpus; i++) {
-                if (smp_processor_id() == i)
+        for (i = 0; i < NR_CPUS; i++) {
+                if (!cpu_online(i) || smp_processor_id() == i)
                         continue;
                 /*
                  * Set signaling bit in lowcore of target cpu and kick it
@@ -405,13 +377,11 @@ void smp_ctl_bit_callback(void *info) {
 void smp_ctl_set_bit(int cr, int bit) {
         ec_creg_mask_parms parms;
 
-        if (atomic_read(&smp_commenced) != 0) {
-                parms.start_ctl = cr;
-                parms.end_ctl = cr;
-                parms.orvals[cr] = 1 << bit;
-                parms.andvals[cr] = -1L;
-                smp_call_function(smp_ctl_bit_callback, &parms, 0, 1);
-        }
+	parms.start_ctl = cr;
+	parms.end_ctl = cr;
+	parms.orvals[cr] = 1 << bit;
+	parms.andvals[cr] = -1L;
+	smp_call_function(smp_ctl_bit_callback, &parms, 0, 1);
         __ctl_set_bit(cr, bit);
 }
 
@@ -421,13 +391,11 @@ void smp_ctl_set_bit(int cr, int bit) {
 void smp_ctl_clear_bit(int cr, int bit) {
         ec_creg_mask_parms parms;
 
-        if (atomic_read(&smp_commenced) != 0) {
-                parms.start_ctl = cr;
-                parms.end_ctl = cr;
-                parms.orvals[cr] = 0;
-                parms.andvals[cr] = ~(1L << bit);
-                smp_call_function(smp_ctl_bit_callback, &parms, 0, 1);
-        }
+	parms.start_ctl = cr;
+	parms.end_ctl = cr;
+	parms.orvals[cr] = 0;
+	parms.andvals[cr] = ~(1L << bit);
+	smp_call_function(smp_ctl_bit_callback, &parms, 0, 1);
         __ctl_clear_bit(cr, bit);
 }
 
@@ -436,26 +404,27 @@ void smp_ctl_clear_bit(int cr, int bit) {
  * Lets check how many CPUs we have.
  */
 
-void smp_count_cpus(void)
+void __init smp_check_cpus(unsigned int max_cpus)
 {
-        int curr_cpu;
+        int curr_cpu, num_cpus;
 
+	boot_cpu_addr = S390_lowcore.cpu_data.cpu_addr;
         current_thread_info()->cpu = 0;
-        smp_num_cpus = 1;
-	phys_cpu_present_map = 1;
+        num_cpus = 1;
+	cpu_possible_map = 1;
         cpu_online_map = 1;
         for (curr_cpu = 0;
-             curr_cpu <= 65535 && smp_num_cpus < max_cpus; curr_cpu++) {
+             curr_cpu <= 65535 && num_cpus < max_cpus; curr_cpu++) {
                 if ((__u16) curr_cpu == boot_cpu_addr)
                         continue;
-                __cpu_logical_map[smp_num_cpus] = (__u16) curr_cpu;
-                if (signal_processor(smp_num_cpus, sigp_sense) ==
+                __cpu_logical_map[num_cpus] = (__u16) curr_cpu;
+                if (signal_processor(num_cpus, sigp_sense) ==
                     sigp_not_operational)
                         continue;
-		set_bit(smp_num_cpus, &phys_cpu_present_map);
-                smp_num_cpus++;
+		set_bit(num_cpus, &cpu_possible_map);
+                num_cpus++;
         }
-        printk("Detected %d CPU's\n",(int) smp_num_cpus);
+        printk("Detected %d CPU's\n",(int) num_cpus);
         printk("Boot cpu address %2X\n", boot_cpu_addr);
 }
 
@@ -470,19 +439,18 @@ int __init start_secondary(void *cpuvoid)
 {
         /* Setup the cpu */
         cpu_init();
-	/* Mark this cpu as online. */
-	set_bit(smp_processor_id(), &cpu_online_map);
-        /* Print info about this processor */
-        print_cpu_info(&safe_get_cpu_lowcore(smp_processor_id())->cpu_data);
-        /* Wait for completion of smp startup */
-        while (!atomic_read(&smp_commenced))
-                /* nothing */ ;
         /* init per CPU timer */
         init_cpu_timer();
 #ifdef CONFIG_PFAULT
 	/* Enable pfault pseudo page faults on this cpu. */
 	pfault_init();
 #endif
+	/* Mark this cpu as online. */
+	set_bit(smp_processor_id(), &cpu_online_map);
+	/* Switch on interrupts */
+	local_irq_enable();
+        /* Print info about this processor */
+        print_cpu_info(&S390_lowcore.cpu_data);
         /* cpu_idle will call schedule for us */
         return cpu_idle(NULL);
 }
@@ -493,19 +461,35 @@ static struct task_struct * __init fork_by_hand(void)
        /* don't care about the psw and regs settings since we'll never
           reschedule the forked task. */
        memset(&regs,0,sizeof(struct pt_regs));
-       return do_fork(CLONE_VM|CLONE_IDLETASK, 0, &regs, 0);
+       return do_fork(CLONE_VM|CLONE_IDLETASK, 0, &regs, 0, NULL);
 }
 
-static void __init do_boot_cpu(int cpu)
+int __cpu_up(unsigned int cpu)
 {
         struct task_struct *idle;
         struct _lowcore    *cpu_lowcore;
+	sigp_ccode          ccode;
+
+	/*
+	 * Set prefix page for new cpu
+	 */
+
+	ccode = signal_processor_p((u64) lowcore_ptr[cpu],
+				   cpu, sigp_set_prefix);
+	if(ccode){
+		printk("sigp_set_prefix failed for cpu %d "
+		       "with condition code %d\n",
+		       (int) cpu, (int) ccode);
+		return -EIO;
+	}
 
         /* We can't use kernel_thread since we must _avoid_ to reschedule
            the child. */
         idle = fork_by_hand();
-	if (IS_ERR(idle))
-                panic("failed fork for CPU %d", cpu);
+	if (IS_ERR(idle)){
+                printk("failed fork for CPU %d", cpu);
+		return -EIO;
+	}
 
         /*
          * We remove it from the pidhash and the runqueue
@@ -517,7 +501,7 @@ static void __init do_boot_cpu(int cpu)
 
         cpu_lowcore = get_cpu_lowcore(cpu);
 	cpu_lowcore->save_area[15] = idle->thread.ksp;
-	cpu_lowcore->kernel_stack = (__u64) idle->thread_info + 16384;
+	cpu_lowcore->kernel_stack = (__u64) idle->thread_info + (4*PAGE_SIZE);
         __asm__ __volatile__("la    1,%0\n\t"
 			     "stctg 0,15,0(1)\n\t"
 			     "la    1,%1\n\t"
@@ -528,75 +512,47 @@ static void __init do_boot_cpu(int cpu)
 
         eieio();
         signal_processor(cpu,sigp_restart);
+
+	while (!cpu_online(cpu));
+	return 0;
 }
 
 /*
- *      Architecture specific routine called by the kernel just before init is
- *      fired off. This allows the BP to have everything in order [we hope].
- *      At the end of this all the APs will hit the system scheduling and off
- *      we go. Each AP will load the system gdt's and jump through the kernel
- *      init into idle(). At this point the scheduler will one day take over
- *      and give them jobs to do. smp_callin is a standard routine
- *      we use to track CPUs as they power up.
+ *	Cycle through the processors and setup structures.
  */
 
-void __init smp_commence(void)
-{
-        /*
-         *      Lets the callins below out of their loop.
-         */
-        atomic_set(&smp_commenced,1);
-}
-
-/*
- *	Cycle through the processors sending restart sigps to boot each.
- */
-
-void __init smp_boot_cpus(void)
+void __init smp_prepare_cpus(unsigned int max_cpus)
 {
 	unsigned long async_stack;
-        sigp_ccode   ccode;
         int i;
 
         /* request the 0x1202 external interrupt */
         if (register_external_interrupt(0x1202, do_ext_call_interrupt) != 0)
                 panic("Couldn't request external interrupt 0x1202");
-        smp_count_cpus();
+        smp_check_cpus(max_cpus);
         memset(lowcore_ptr,0,sizeof(lowcore_ptr));  
         
         /*
-         *      Initialize the logical to physical CPU number mapping
+         *  Initialize prefix pages and stacks for all possible cpus
          */
         print_cpu_info(&safe_get_cpu_lowcore(0)->cpu_data);
 
-        for(i = 0; i < smp_num_cpus; i++) {
-                lowcore_ptr[i] = (struct _lowcore *)
-                                    __get_free_pages(GFP_KERNEL|GFP_DMA, 1);
+        for(i = 0; i < NR_CPUS; i++) {
+		if (!cpu_possible(i))
+			continue;
+		lowcore_ptr[i] = (struct _lowcore *)
+			__get_free_pages(GFP_KERNEL|GFP_DMA, 1);
 		async_stack = __get_free_pages(GFP_KERNEL,2);
 		if (lowcore_ptr[i] == NULL || async_stack == 0ULL)
 			panic("smp_boot_cpus failed to allocate memory\n");
                 memcpy(lowcore_ptr[i], &S390_lowcore, sizeof(struct _lowcore));
 		lowcore_ptr[i]->async_stack = async_stack + (4 * PAGE_SIZE);
-                /*
-                 * Most of the parameters are set up when the cpu is
-                 * started up.
-                 */
-                if (smp_processor_id() == i) {
-                        set_prefix((u32)(u64) lowcore_ptr[i]);
-			continue;
-		}
-		ccode = signal_processor_p((u64) lowcore_ptr[i],
-					   i, sigp_set_prefix);
-		if(ccode)
-			panic("sigp_set_prefix failed for cpu %d "
-			      "with condition code %d\n",
-			      (int) i, (int) ccode);
-		do_boot_cpu(i);
-        }
-	/*
-	 * Now wait until all of the cpus are online.
-	 */
-	while (phys_cpu_present_map != cpu_online_map);
+	}
+	set_prefix((u32)(u64) lowcore_ptr[smp_processor_id()]);
+}
+
+void smp_cpus_done(unsigned int max_cpis)
+{
 }
 
 /*
@@ -613,5 +569,4 @@ int setup_profiling_timer(unsigned int multiplier)
 EXPORT_SYMBOL(lowcore_ptr);
 EXPORT_SYMBOL(smp_ctl_set_bit);
 EXPORT_SYMBOL(smp_ctl_clear_bit);
-EXPORT_SYMBOL(smp_num_cpus);
 EXPORT_SYMBOL(smp_call_function);

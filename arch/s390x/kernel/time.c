@@ -47,18 +47,18 @@ static uint64_t init_timer_cc;
 extern rwlock_t xtime_lock;
 extern unsigned long wall_jiffies;
 
-void tod_to_timeval(__u64 todval, struct timeval *xtime)
+void tod_to_timeval(__u64 todval, struct timespec *xtime)
 {
-        todval >>= 12;
-        xtime->tv_sec = todval / 1000000;
-        xtime->tv_usec = todval % 1000000;
+        xtime->tv_sec = (todval >> 12) / 1000000;
+	todval -= (xtime->tv_sec * 1000000) << 12;
+	xtime->tv_nsec = ((todval * 1000) >> 12);
 }
 
 static inline unsigned long do_gettimeoffset(void) 
 {
 	__u64 now;
 
-	asm ("STCK 0(%0)" : : "a" (&now) : "memory", "cc");
+	asm volatile ("STCK 0(%0)" : : "a" (&now) : "memory", "cc");
         now = (now - init_timer_cc) >> 12;
 	/* We require the offset from the latest update of xtime */
 	now -= (__u64) wall_jiffies*USECS_PER_JIFFY;
@@ -75,7 +75,7 @@ void do_gettimeofday(struct timeval *tv)
 
 	read_lock_irqsave(&xtime_lock, flags);
 	sec = xtime.tv_sec;
-	usec = xtime.tv_usec + do_gettimeoffset();
+	usec = xtime.tv_nsec + do_gettimeoffset();
 	read_unlock_irqrestore(&xtime_lock, flags);
 
 	while (usec >= 1000000) {
@@ -104,7 +104,8 @@ void do_settimeofday(struct timeval *tv)
 		tv->tv_sec--;
 	}
 
-	xtime = *tv;
+	xtime.tv_sec = tv->tv_sec;
+	xtime.tv_nsec = tv->tv_usec * 1000;
 	time_adjust = 0;		/* stop active adjtime() */
 	time_status |= STA_UNSYNC;
 	time_maxerror = NTP_PHASE_LIMIT;
@@ -125,7 +126,7 @@ static void do_comparator_interrupt(struct pt_regs *regs, __u16 error_code)
 {
 	int cpu = smp_processor_id();
 
-	irq_enter(cpu, 0);
+	irq_enter();
 
 	/*
 	 * set clock comparator for next tick
@@ -147,7 +148,7 @@ static void do_comparator_interrupt(struct pt_regs *regs, __u16 error_code)
 	do_timer(regs);
 #endif
 
-	irq_exit(cpu, 0);
+	irq_exit();
 }
 
 /*

@@ -15,7 +15,6 @@
 #include <asm/cache.h>
 #include <asm/lowcore.h>
 #include <asm/errno.h>
-#include <asm/smp.h>
 #include <asm/ptrace.h>
 #include <asm/thread_info.h>
 

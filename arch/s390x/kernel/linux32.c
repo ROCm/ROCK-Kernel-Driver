@@ -1953,15 +1953,17 @@ sys32_rt_sigtimedwait(sigset_t32 *uthese, siginfo_t32 *uinfo,
 			return -EINVAL;
 	}
 
-	spin_lock_irq(&current->sigmask_lock);
-	sig = dequeue_signal(&these, &info);
+	spin_lock_irq(&current->sig->siglock);
+	sig = dequeue_signal(&current->sig->shared_pending, &these, &info);
+	if (!sig)
+		sig = dequeue_signal(&current->pending, &these, &info);
 	if (!sig) {
 		/* None ready -- temporarily unblock those we're interested
 		   in so that we'll be awakened when they arrive.  */
-		sigset_t oldblocked = current->blocked;
+		current->real_blocked = current->blocked;
 		sigandsets(&current->blocked, &current->blocked, &these);
 		recalc_sigpending();
-		spin_unlock_irq(&current->sigmask_lock);
+		spin_unlock_irq(&current->sig->siglock);
 
 		timeout = MAX_SCHEDULE_TIMEOUT;
 		if (uts)
@@ -1971,12 +1973,15 @@ sys32_rt_sigtimedwait(sigset_t32 *uthese, siginfo_t32 *uinfo,
 		current->state = TASK_INTERRUPTIBLE;
 		timeout = schedule_timeout(timeout);
 
-		spin_lock_irq(&current->sigmask_lock);
-		sig = dequeue_signal(&these, &info);
-		current->blocked = oldblocked;
+		spin_lock_irq(&current->sig->siglock);
+		sig = dequeue_signal(&current->sig->shared_pending, &these, &info);
+		if (!sig)
+			sig = dequeue_signal(&current->pending, &these, &info);
+		current->blocked = current->real_blocked;
+		siginitset(&current->real_blocked, 0);
 		recalc_sigpending();
 	}
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 
 	if (sig) {
 		ret = sig;

@@ -170,6 +170,14 @@ void show_stack(unsigned long *sp)
 	show_trace(sp);
 }
 
+/*
+ * The architecture-independent dump_stack generator
+ */
+void dump_stack(void)
+{
+	show_stack(0);
+}
+
 void show_registers(struct pt_regs *regs)
 {
 	mm_segment_t old_fs;

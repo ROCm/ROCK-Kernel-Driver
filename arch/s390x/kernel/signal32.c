@@ -112,11 +112,11 @@ sys32_sigsuspend(struct pt_regs * regs,int history0, int history1, old_sigset_t 
 	sigset_t saveset;
 
 	mask &= _BLOCKABLE;
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sig->siglock);
 	saveset = current->blocked;
 	siginitset(&current->blocked, mask);
 	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 	regs->gprs[2] = -EINTR;
 
 	while (1) {
@@ -147,11 +147,11 @@ sys32_rt_sigsuspend(struct pt_regs * regs,sigset_t32 *unewset, size_t sigsetsize
 	}
         sigdelsetmask(&newset, ~_BLOCKABLE);
 
-        spin_lock_irq(&current->sigmask_lock);
+        spin_lock_irq(&current->sig->siglock);
         saveset = current->blocked;
         current->blocked = newset;
         recalc_sigpending();
-        spin_unlock_irq(&current->sigmask_lock);
+        spin_unlock_irq(&current->sig->siglock);
         regs->gprs[2] = -EINTR;
 
         while (1) {
@@ -352,10 +352,10 @@ asmlinkage long sys32_sigreturn(struct pt_regs *regs)
 		goto badframe;
 
 	sigdelsetmask(&set, ~_BLOCKABLE);
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sig->siglock);
 	current->blocked = set;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 
 	if (restore_sigregs32(regs, &frame->sregs))
 		goto badframe;
@@ -382,10 +382,10 @@ asmlinkage long sys32_rt_sigreturn(struct pt_regs *regs)
 		goto badframe;
 
 	sigdelsetmask(&set, ~_BLOCKABLE);
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sig->siglock);
 	current->blocked = set;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 
 	if (restore_sigregs32(regs, &frame->uc.uc_mcontext))
 		goto badframe;
@@ -595,11 +595,11 @@ handle_signal32(unsigned long sig, siginfo_t *info, sigset_t *oldset,
 		ka->sa.sa_handler = SIG_DFL;
 
 	if (!(ka->sa.sa_flags & SA_NODEFER)) {
-		spin_lock_irq(&current->sigmask_lock);
+		spin_lock_irq(&current->sig->siglock);
 		sigorsets(&current->blocked,&current->blocked,&ka->sa.sa_mask);
 		sigaddset(&current->blocked,sig);
 		recalc_sigpending();
-		spin_unlock_irq(&current->sigmask_lock);
+		spin_unlock_irq(&current->sig->siglock);
 	}
 }
 
