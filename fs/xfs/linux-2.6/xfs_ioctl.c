@@ -94,7 +94,7 @@
 STATIC int
 xfs_find_handle(
 	unsigned int		cmd,
-	void __user		*arg)
+	void			__user *arg)
 {
 	int			hsize;
 	xfs_handle_t		handle;
@@ -211,14 +211,14 @@ xfs_vget_fsop_handlereq(
 	xfs_mount_t		*mp,
 	struct inode		*parinode,	/* parent inode pointer    */
 	int			cap,		/* capability level for op */
-	void __user		*arg,		/* userspace data pointer  */
+	void			__user *arg,	/* userspace data pointer  */
 	unsigned long		size,		/* size of expected struct */
 	/* output arguments */
 	xfs_fsop_handlereq_t	*hreq,
 	vnode_t			**vp,
 	struct inode		**inode)
 {
-	void __user		*hanp;
+	void			__user *hanp;
 	size_t			hlen;
 	xfs_fid_t		*xfid;
 	xfs_handle_t		*handlep;
@@ -300,7 +300,7 @@ xfs_vget_fsop_handlereq(
 STATIC int
 xfs_open_by_handle(
 	xfs_mount_t		*mp,
-	void __user		*arg,
+	void			__user *arg,
 	struct file		*parfilp,
 	struct inode		*parinode)
 {
@@ -383,7 +383,7 @@ xfs_open_by_handle(
 STATIC int
 xfs_readlink_by_handle(
 	xfs_mount_t		*mp,
-	void __user		*arg,
+	void			__user *arg,
 	struct file		*parfilp,
 	struct inode		*parinode)
 {
@@ -429,7 +429,7 @@ xfs_readlink_by_handle(
 STATIC int
 xfs_fssetdm_by_handle(
 	xfs_mount_t		*mp,
-	void __user		*arg,
+	void			__user *arg,
 	struct file		*parfilp,
 	struct inode		*parinode)
 {
@@ -469,7 +469,7 @@ xfs_fssetdm_by_handle(
 STATIC int
 xfs_attrlist_by_handle(
 	xfs_mount_t		*mp,
-	void __user		*arg,
+	void			__user *arg,
 	struct file		*parfilp,
 	struct inode		*parinode)
 {
@@ -498,7 +498,7 @@ xfs_attrlist_by_handle(
 STATIC int
 xfs_attrmulti_by_handle(
 	xfs_mount_t		*mp,
-	void __user		*arg,
+	void			__user *arg,
 	struct file		*parfilp,
 	struct inode		*parinode)
 {
@@ -577,23 +577,23 @@ xfs_ioc_space(
 	struct file		*filp,
 	int			flags,
 	unsigned int		cmd,
-	void __user		*arg);
+	void			__user *arg);
 
 STATIC int
 xfs_ioc_bulkstat(
 	xfs_mount_t		*mp,
 	unsigned int		cmd,
-	void __user		*arg);
+	void			__user *arg);
 
 STATIC int
 xfs_ioc_fsgeometry_v1(
 	xfs_mount_t		*mp,
-	void __user		*arg);
+	void			__user *arg);
 
 STATIC int
 xfs_ioc_fsgeometry(
 	xfs_mount_t		*mp,
-	void __user		*arg);
+	void			__user *arg);
 
 STATIC int
 xfs_ioc_xattr(
@@ -601,7 +601,7 @@ xfs_ioc_xattr(
 	xfs_inode_t		*ip,
 	struct file		*filp,
 	unsigned int		cmd,
-	void __user		*arg);
+	void			__user *arg);
 
 STATIC int
 xfs_ioc_getbmap(
@@ -609,12 +609,12 @@ xfs_ioc_getbmap(
 	struct file		*filp,
 	int			flags,
 	unsigned int		cmd,
-	void __user		*arg);
+	void			__user *arg);
 
 STATIC int
 xfs_ioc_getbmapx(
 	bhv_desc_t		*bdp,
-	void __user		*arg);
+	void			__user *arg);
 
 int
 xfs_ioctl(
@@ -623,7 +623,7 @@ xfs_ioctl(
 	struct file		*filp,
 	int			ioflags,
 	unsigned int		cmd,
-	void __user		*arg)
+	void			__user *arg)
 {
 	int			error;
 	vnode_t			*vp;
@@ -880,7 +880,7 @@ xfs_ioc_space(
 	struct file		*filp,
 	int			ioflags,
 	unsigned int		cmd,
-	void __user		*arg)
+	void			__user *arg)
 {
 	xfs_flock64_t		bf;
 	int			attr_flags = 0;
@@ -912,7 +912,7 @@ STATIC int
 xfs_ioc_bulkstat(
 	xfs_mount_t		*mp,
 	unsigned int		cmd,
-	void __user		*arg)
+	void			__user *arg)
 {
 	xfs_fsop_bulkreq_t	bulkreq;
 	int			count;	/* # of records returned */
@@ -975,7 +975,7 @@ xfs_ioc_bulkstat(
 STATIC int
 xfs_ioc_fsgeometry_v1(
 	xfs_mount_t		*mp,
-	void __user		*arg)
+	void			__user *arg)
 {
 	xfs_fsop_geom_v1_t	fsgeo;
 	int			error;
@@ -992,7 +992,7 @@ xfs_ioc_fsgeometry_v1(
 STATIC int
 xfs_ioc_fsgeometry(
 	xfs_mount_t		*mp,
-	void __user		*arg)
+	void			__user *arg)
 {
 	xfs_fsop_geom_t		fsgeo;
 	int			error;
@@ -1071,7 +1071,7 @@ xfs_ioc_xattr(
 	xfs_inode_t		*ip,
 	struct file		*filp,
 	unsigned int		cmd,
-	void __user		*arg)
+	void			__user *arg)
 {
 	struct fsxattr		fa;
 	vattr_t			va;
@@ -1176,7 +1176,7 @@ xfs_ioc_getbmap(
 	struct file		*filp,
 	int			ioflags,
 	unsigned int		cmd,
-	void __user		*arg)
+	void			__user *arg)
 {
 	struct getbmap		bm;
 	int			iflags;
@@ -1204,7 +1204,7 @@ xfs_ioc_getbmap(
 STATIC int
 xfs_ioc_getbmapx(
 	bhv_desc_t		*bdp,
-	void __user		*arg)
+	void			__user *arg)
 {
 	struct getbmapx		bmx;
 	struct getbmap		bm;

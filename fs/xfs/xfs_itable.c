@@ -68,7 +68,7 @@ int		       		/* error status */
 xfs_bulkstat_one(
 	xfs_mount_t	*mp,		/* mount point for filesystem */
 	xfs_ino_t	ino,		/* inode number to get data for */
-	void __user	*buffer,	/* buffer to place output in */
+	void		__user *buffer,	/* buffer to place output in */
 	int		ubsize,		/* size of buffer */
 	void		*private_data,	/* my private data */
 	xfs_daddr_t	bno,		/* starting bno of inode cluster */
@@ -231,7 +231,7 @@ xfs_bulkstat(
 	bulkstat_one_pf		formatter, /* func that'd fill a single buf */
 	void			*private_data,/* private data for formatter */
 	size_t			statstruct_size, /* sizeof struct filling */
-	char __user		*ubuffer, /* buffer with inode stats */
+	char			__user *ubuffer, /* buffer with inode stats */
 	int			flags,	/* defined in xfs_itable.h */
 	int			*done)	/* 1 if there're more stats to get */
 {
@@ -265,7 +265,7 @@ xfs_bulkstat(
 	int			tmp;	/* result value from btree calls */
 	int			ubcount; /* size of user's buffer */
 	int			ubleft;	/* bytes left in user's buffer */
-	char __user		*ubufp;	/* current pointer into user's buffer */
+	char			__user *ubufp;	/* pointer into user's buffer */
 	int			ubelem;	/* spaces used in user's buffer */
 	int			ubused;	/* bytes used by formatter */
 	xfs_buf_t		*bp;	/* ptr to on-disk inode cluster buf */
@@ -633,7 +633,7 @@ int					/* error status */
 xfs_bulkstat_single(
 	xfs_mount_t		*mp,	/* mount point for filesystem */
 	xfs_ino_t		*lastinop, /* inode to return */
-	char __user		*buffer,/* buffer with inode stats */
+	char			__user *buffer, /* buffer with inode stats */
 	int			*done)	/* 1 if there're more stats to get */
 {
 	int			count;	/* count value for bulkstat call */
@@ -682,7 +682,7 @@ xfs_inumbers(
 	xfs_mount_t	*mp,		/* mount point for filesystem */
 	xfs_ino_t	*lastino,	/* last inode returned */
 	int		*count,		/* size of buffer/count returned */
-	xfs_inogrp_t __user *ubuffer)	/* buffer with inode descriptions */
+	xfs_inogrp_t	__user *ubuffer)/* buffer with inode descriptions */
 {
 	xfs_buf_t	*agbp;
 	xfs_agino_t	agino;

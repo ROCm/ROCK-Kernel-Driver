@@ -313,10 +313,10 @@ typedef struct xfs_bstat {
  * The user-level BulkStat Request interface structure.
  */
 typedef struct xfs_fsop_bulkreq {
-	__u64 __user	*lastip;	/* last inode # pointer		*/
+	__u64		__user *lastip;	/* last inode # pointer		*/
 	__s32		icount;		/* count of entries in buffer	*/
-	void __user	*ubuffer;	/* user buffer for inode desc.	*/
-	__s32 __user	*ocount;	/* output count pointer		*/
+	void		__user *ubuffer;/* user buffer for inode desc.	*/
+	__s32		__user *ocount;	/* output count pointer		*/
 } xfs_fsop_bulkreq_t;
 
 
@@ -344,12 +344,12 @@ typedef struct xfs_error_injection {
  */
 typedef struct xfs_fsop_handlereq {
 	__u32		fd;		/* fd for FD_TO_HANDLE		*/
-	void __user	*path;		/* user pathname		*/
+	void		__user *path;	/* user pathname		*/
 	__u32		oflags;		/* open flags			*/
-	void __user	*ihandle;	/* user supplied handle		*/
+	void		__user *ihandle;/* user supplied handle		*/
 	__u32		ihandlen;	/* user supplied length		*/
-	void __user	*ohandle;	/* user buffer for handle	*/
-	__u32 __user	*ohandlen;	/* user buffer length		*/
+	void		__user *ohandle;/* user buffer for handle	*/
+	__u32		__user *ohandlen;/* user buffer length		*/
 } xfs_fsop_handlereq_t;
 
 /*
@@ -360,35 +360,35 @@ typedef struct xfs_fsop_handlereq {
  */
 
 typedef struct xfs_fsop_setdm_handlereq {
-	struct xfs_fsop_handlereq hreq; /* handle interface structure */
-	struct fsdmidata __user *data;	/* DMAPI data to set	      */
+	struct xfs_fsop_handlereq	hreq;	/* handle information	*/
+	struct fsdmidata		__user *data;	/* DMAPI data	*/
 } xfs_fsop_setdm_handlereq_t;
 
 typedef struct xfs_attrlist_cursor {
-	__u32	opaque[4];
+	__u32		opaque[4];
 } xfs_attrlist_cursor_t;
 
 typedef struct xfs_fsop_attrlist_handlereq {
-	struct xfs_fsop_handlereq hreq; /* handle interface structure */
-	struct xfs_attrlist_cursor pos; /* opaque cookie, list offset */
-	__u32 flags;			/* flags, use ROOT/USER names */
-	__u32 buflen;			/* length of buffer supplied  */
-	void *buffer;			/* attrlist data to return    */
+	struct xfs_fsop_handlereq	hreq; /* handle interface structure */
+	struct xfs_attrlist_cursor	pos; /* opaque cookie, list offset */
+	__u32				flags;	/* which namespace to use */
+	__u32				buflen;	/* length of buffer supplied */
+	void				__user *buffer;	/* returned names */
 } xfs_fsop_attrlist_handlereq_t;
 
 typedef struct xfs_attr_multiop {
-	__u32	am_opcode;
-	__s32	am_error;
-	void	*am_attrname;
-	void	*am_attrvalue;
-	__u32	am_length;
-	__u32	am_flags;
+	__u32		am_opcode;
+	__s32		am_error;
+	void		__user *am_attrname;
+	void		__user *am_attrvalue;
+	__u32		am_length;
+	__u32		am_flags;
 } xfs_attr_multiop_t;
 
 typedef struct xfs_fsop_attrmulti_handlereq {
-	struct xfs_fsop_handlereq hreq; /* handle interface structure */
-	__u32 opcount;			/* count of following multiop */
-	struct xfs_attr_multiop	__user *ops; /* attr_multi data to get/set */
+	struct xfs_fsop_handlereq	hreq; /* handle interface structure */
+	__u32				opcount;/* count of following multiop */
+	struct xfs_attr_multiop		__user *ops; /* attr_multi data */
 } xfs_fsop_attrmulti_handlereq_t;
 
 /*

@@ -61,7 +61,7 @@ static struct vm_operations_struct linvfs_file_vm_ops;
 STATIC inline ssize_t
 __linvfs_read(
 	struct kiocb		*iocb,
-	char __user		*buf,
+	char			__user *buf,
 	int			ioflags,
 	size_t			count,
 	loff_t			pos)
@@ -83,7 +83,7 @@ __linvfs_read(
 STATIC ssize_t
 linvfs_read(
 	struct kiocb		*iocb,
-	char __user		*buf,
+	char			__user *buf,
 	size_t			count,
 	loff_t			pos)
 {
@@ -93,7 +93,7 @@ linvfs_read(
 STATIC ssize_t
 linvfs_read_invis(
 	struct kiocb		*iocb,
-	char __user		*buf,
+	char			__user *buf,
 	size_t			count,
 	loff_t			pos)
 {
@@ -104,12 +104,12 @@ linvfs_read_invis(
 STATIC inline ssize_t
 __linvfs_write(
 	struct kiocb	*iocb,
-	const char __user *buf,
+	const char	__user *buf,
 	int		ioflags,
 	size_t		count,
 	loff_t		pos)
 {
-	struct iovec	iov = { (void __user *)buf, count};
+	struct iovec	iov = {(void __user *)buf, count};
 	struct file	*file = iocb->ki_filp;
 	struct inode	*inode = file->f_mapping->host;
 	vnode_t		*vp = LINVFS_GET_VP(inode);
@@ -134,7 +134,7 @@ __linvfs_write(
 STATIC ssize_t
 linvfs_write(
 	struct kiocb		*iocb,
-	const char __user	*buf,
+	const char		__user *buf,
 	size_t			count,
 	loff_t			pos)
 {
@@ -144,7 +144,7 @@ linvfs_write(
 STATIC ssize_t
 linvfs_write_invis(
 	struct kiocb		*iocb,
-	const char __user	*buf,
+	const char		__user *buf,
 	size_t			count,
 	loff_t			pos)
 {
@@ -259,7 +259,7 @@ linvfs_sendfile(
 	loff_t			*ppos,
 	size_t			count,
 	read_actor_t		actor,
-	void __user		*target)
+	void			__user *target)
 {
 	vnode_t			*vp = LINVFS_GET_VP(filp->f_dentry->d_inode);
 	ssize_t			rval;

@@ -65,7 +65,7 @@
  */
 int
 xfs_swapext(
-	xfs_swapext_t __user *sxp)
+	xfs_swapext_t	__user *sxp)
 {
 	xfs_swapext_t	sx;
 	xfs_inode_t     *ip=NULL, *tip=NULL, *ips[2];
