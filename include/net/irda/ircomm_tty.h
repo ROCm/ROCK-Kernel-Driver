@@ -44,6 +44,11 @@
 #define IRCOMM_TTY_MAJOR 161
 #define IRCOMM_TTY_MINOR 0
 
+/* This is used as an initial value to max_header_size before the proper
+ * value is filled in (5 for ttp, 4 for lmp). This allow us to detect
+ * the state of the underlying connection. - Jean II */
+#define IRCOMM_TTY_HDR_UNITIALISED	32
+
 /*
  * IrCOMM TTY driver state
  */

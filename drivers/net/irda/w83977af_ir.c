@@ -612,7 +612,7 @@ static void w83977af_dma_write(struct w83977af_ir *self, int iobase)
 	disable_dma(self->io.dma);
 	clear_dma_ff(self->io.dma);
 	set_dma_mode(self->io.dma, DMA_MODE_READ);
-	set_dma_addr(self->io.dma, virt_to_bus(self->tx_buff.data));
+	set_dma_addr(self->io.dma, isa_virt_to_bus(self->tx_buff.data));
 	set_dma_count(self->io.dma, self->tx_buff.len);
 #else
 	setup_dma(self->io.dma, self->tx_buff.data, self->tx_buff.len, 
@@ -770,7 +770,7 @@ int w83977af_dma_receive(struct w83977af_ir *self)
 	disable_dma(self->io.dma);
 	clear_dma_ff(self->io.dma);
 	set_dma_mode(self->io.dma, DMA_MODE_READ);
-	set_dma_addr(self->io.dma, virt_to_bus(self->rx_buff.data));
+	set_dma_addr(self->io.dma, isa_virt_to_bus(self->rx_buff.data));
 	set_dma_count(self->io.dma, self->rx_buff.truesize);
 #else
 	setup_dma(self->io.dma, self->rx_buff.data, self->rx_buff.truesize, 

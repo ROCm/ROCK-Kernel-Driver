@@ -1313,7 +1313,7 @@ e100_hardware_send_packet(char *buf, int length)
 static void
 e100_clear_network_leds(unsigned long dummy)
 {
-	if (led_active && jiffies > time_after(jiffies, led_next_time)) {
+	if (led_active && time_after(jiffies, led_next_time)) {
 		e100_set_network_leds(NO_NETWORK_ACTIVITY);
 
 		/* Set the earliest time we may set the LED */

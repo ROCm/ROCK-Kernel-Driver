@@ -83,6 +83,7 @@ void cleanup_module(void)
 	arcnet_unregister_proto(&rawmode_proto);
 }
 
+MODULE_LICENSE("GPL");
 #endif				/* MODULE */
 
 

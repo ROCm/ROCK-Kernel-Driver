@@ -378,7 +378,7 @@ void irlmp_link_discovery_indication(struct lap_cb *self,
 	
 	/* Just handle it the same way as a discovery confirm,
 	 * bypass the LM_LAP state machine (see below) */
-	irlmp_discovery_confirm(irlmp->cachelog);
+	irlmp_discovery_confirm(irlmp->cachelog, DISCOVERY_PASSIVE);
 }
 
 /*
@@ -404,7 +404,7 @@ void irlmp_link_discovery_confirm(struct lap_cb *self, hashbin_t *log)
 	 *	2) It doesn't affect the LM_LAP state
 	 *	3) Faster, slimer, simpler, ...
 	 * Jean II */
-	irlmp_discovery_confirm(irlmp->cachelog);
+	irlmp_discovery_confirm(irlmp->cachelog, DISCOVERY_ACTIVE);
 }
 
 #ifdef CONFIG_IRDA_CACHE_LAST_LSAP

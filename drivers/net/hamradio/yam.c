@@ -1179,6 +1179,7 @@ static void __exit yam_cleanup_driver(void)
 
 MODULE_AUTHOR("Frederic Rible F1OAT frible@teaser.fr");
 MODULE_DESCRIPTION("Yam amateur radio modem driver");
+MODULE_LICENSE("GPL");
 
 module_init(yam_init_driver);
 module_exit(yam_cleanup_driver);

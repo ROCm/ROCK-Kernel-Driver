@@ -144,7 +144,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define E100_MAX_NIC 16
 
-#define E100_MAX_BUSY_WAIT 50	/*Max udelays in wait_scb and wait_cus_idle */
+#define E100_MAX_SCB_WAIT	100	/* Max udelays in wait_scb */
+#define E100_MAX_CU_IDLE_WAIT	50	/* Max udelays in wait_cus_idle */
 
 /* CPUSAVER_BUNDLE_MAX: Sets the maximum number of frames that will be bundled.
  * In some situations, such as the TCP windowing algorithm, it may be

@@ -48,6 +48,7 @@
 #include <asm/pgalloc.h>
 #include <asm/uaccess.h>
 #include <asm/tlb.h>
+#include <asm/tlbflush.h>
 
 unsigned long max_mapnr;
 unsigned long num_physpages;

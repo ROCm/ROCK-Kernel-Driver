@@ -30,7 +30,7 @@
 #include <linux/zorro.h>
 
 #include <asm/system.h>
-#include <asm/io.h>
+
 #include <asm/irq.h>
 #include <asm/amigaints.h>
 #include <asm/amigahw.h>
@@ -142,15 +142,15 @@ static int __init ariadne2_init(struct net_device *dev, unsigned long board,
     {
 	unsigned long reset_start_time = jiffies;
 
-	writeb(readb(ioaddr + NE_RESET), ioaddr + NE_RESET);
+	z_writeb(z_readb(ioaddr + NE_RESET), ioaddr + NE_RESET);
 
-	while ((readb(ioaddr + NE_EN0_ISR) & ENISR_RESET) == 0)
+	while ((z_readb(ioaddr + NE_EN0_ISR) & ENISR_RESET) == 0)
 	    if (jiffies - reset_start_time > 2*HZ/100) {
 		printk(" not found (no reset ack).\n");
 		return -ENODEV;
 	    }
 
-	writeb(0xff, ioaddr + NE_EN0_ISR);		/* Ack all intr. */
+	z_writeb(0xff, ioaddr + NE_EN0_ISR);		/* Ack all intr. */
     }
 
     /* Read the 16 bytes of station address PROM.
@@ -177,16 +177,16 @@ static int __init ariadne2_init(struct net_device *dev, unsigned long board,
 	    {E8390_RREAD+E8390_START, NE_CMD},
 	};
 	for (i = 0; i < sizeof(program_seq)/sizeof(program_seq[0]); i++) {
-	    writeb(program_seq[i].value, ioaddr + program_seq[i].offset);
+	    z_writeb(program_seq[i].value, ioaddr + program_seq[i].offset);
 	}
     }
     for (i = 0; i < 16; i++) {
-	SA_prom[i] = readb(ioaddr + NE_DATAPORT);
-	(void)readb(ioaddr + NE_DATAPORT);
+	SA_prom[i] = z_readb(ioaddr + NE_DATAPORT);
+	(void)z_readb(ioaddr + NE_DATAPORT);
     }
 
     /* We must set the 8390 for word mode. */
-    writeb(0x49, ioaddr + NE_EN0_DCFG);
+    z_writeb(0x49, ioaddr + NE_EN0_DCFG);
     start_page = NESM_START_PG;
     stop_page = NESM_STOP_PG;
 
@@ -260,18 +260,18 @@ static void ariadne2_reset_8390(struct net_device *dev)
     if (ei_debug > 1)
 	printk("resetting the 8390 t=%ld...", jiffies);
 
-    writeb(readb(NE_BASE + NE_RESET), NE_BASE + NE_RESET);
+    z_writeb(z_readb(NE_BASE + NE_RESET), NE_BASE + NE_RESET);
 
     ei_status.txing = 0;
     ei_status.dmaing = 0;
 
     /* This check _should_not_ be necessary, omit eventually. */
-    while ((readb(NE_BASE+NE_EN0_ISR) & ENISR_RESET) == 0)
+    while ((z_readb(NE_BASE+NE_EN0_ISR) & ENISR_RESET) == 0)
 	if (jiffies - reset_start_time > 2*HZ/100) {
 	    printk("%s: ne_reset_8390() did not complete.\n", dev->name);
 	    break;
 	}
-    writeb(ENISR_RESET, NE_BASE + NE_EN0_ISR);	/* Ack intr. */
+    z_writeb(ENISR_RESET, NE_BASE + NE_EN0_ISR);	/* Ack intr. */
 }
 
 /* Grab the 8390 specific header. Similar to the block_input routine, but
@@ -294,19 +294,19 @@ static void ariadne2_get_8390_hdr(struct net_device *dev,
     }
 
     ei_status.dmaing |= 0x01;
-    writeb(E8390_NODMA+E8390_PAGE0+E8390_START, nic_base+ NE_CMD);
-    writeb(ENISR_RDC, nic_base + NE_EN0_ISR);
-    writeb(sizeof(struct e8390_pkt_hdr), nic_base + NE_EN0_RCNTLO);
-    writeb(0, nic_base + NE_EN0_RCNTHI);
-    writeb(0, nic_base + NE_EN0_RSARLO);		/* On page boundary */
-    writeb(ring_page, nic_base + NE_EN0_RSARHI);
-    writeb(E8390_RREAD+E8390_START, nic_base + NE_CMD);
+    z_writeb(E8390_NODMA+E8390_PAGE0+E8390_START, nic_base+ NE_CMD);
+    z_writeb(ENISR_RDC, nic_base + NE_EN0_ISR);
+    z_writeb(sizeof(struct e8390_pkt_hdr), nic_base + NE_EN0_RCNTLO);
+    z_writeb(0, nic_base + NE_EN0_RCNTHI);
+    z_writeb(0, nic_base + NE_EN0_RSARLO);		/* On page boundary */
+    z_writeb(ring_page, nic_base + NE_EN0_RSARHI);
+    z_writeb(E8390_RREAD+E8390_START, nic_base + NE_CMD);
 
     ptrs = (short*)hdr;
     for (cnt = 0; cnt < (sizeof(struct e8390_pkt_hdr)>>1); cnt++)
-	*ptrs++ = readw(NE_BASE + NE_DATAPORT);
+	*ptrs++ = z_readw(NE_BASE + NE_DATAPORT);
 
-    writeb(ENISR_RDC, nic_base + NE_EN0_ISR);	/* Ack intr. */
+    z_writeb(ENISR_RDC, nic_base + NE_EN0_ISR);	/* Ack intr. */
 
     hdr->count = WORDSWAP(hdr->count);
 
@@ -316,7 +316,7 @@ static void ariadne2_get_8390_hdr(struct net_device *dev,
 /* Block input and output, similar to the Crynwr packet driver.  If you
    are porting to a new ethercard, look at the packet driver source for hints.
    The NEx000 doesn't share the on-board packet memory -- you have to put
-   the packet out through the "remote DMA" dataport using writeb. */
+   the packet out through the "remote DMA" dataport using z_writeb. */
 
 static void ariadne2_block_input(struct net_device *dev, int count,
 				 struct sk_buff *skb, int ring_offset)
@@ -334,20 +334,20 @@ static void ariadne2_block_input(struct net_device *dev, int count,
 	return;
     }
     ei_status.dmaing |= 0x01;
-    writeb(E8390_NODMA+E8390_PAGE0+E8390_START, nic_base+ NE_CMD);
-    writeb(ENISR_RDC, nic_base + NE_EN0_ISR);
-    writeb(count & 0xff, nic_base + NE_EN0_RCNTLO);
-    writeb(count >> 8, nic_base + NE_EN0_RCNTHI);
-    writeb(ring_offset & 0xff, nic_base + NE_EN0_RSARLO);
-    writeb(ring_offset >> 8, nic_base + NE_EN0_RSARHI);
-    writeb(E8390_RREAD+E8390_START, nic_base + NE_CMD);
+    z_writeb(E8390_NODMA+E8390_PAGE0+E8390_START, nic_base+ NE_CMD);
+    z_writeb(ENISR_RDC, nic_base + NE_EN0_ISR);
+    z_writeb(count & 0xff, nic_base + NE_EN0_RCNTLO);
+    z_writeb(count >> 8, nic_base + NE_EN0_RCNTHI);
+    z_writeb(ring_offset & 0xff, nic_base + NE_EN0_RSARLO);
+    z_writeb(ring_offset >> 8, nic_base + NE_EN0_RSARHI);
+    z_writeb(E8390_RREAD+E8390_START, nic_base + NE_CMD);
     ptrs = (short*)buf;
     for (cnt = 0; cnt < (count>>1); cnt++)
-	*ptrs++ = readw(NE_BASE + NE_DATAPORT);
+	*ptrs++ = z_readw(NE_BASE + NE_DATAPORT);
     if (count & 0x01)
-	buf[count-1] = readb(NE_BASE + NE_DATAPORT);
+	buf[count-1] = z_readb(NE_BASE + NE_DATAPORT);
 
-    writeb(ENISR_RDC, nic_base + NE_EN0_ISR);	/* Ack intr. */
+    z_writeb(ENISR_RDC, nic_base + NE_EN0_ISR);	/* Ack intr. */
     ei_status.dmaing &= ~0x01;
 }
 
@@ -375,24 +375,24 @@ static void ariadne2_block_output(struct net_device *dev, int count,
     }
     ei_status.dmaing |= 0x01;
     /* We should already be in page 0, but to be safe... */
-    writeb(E8390_PAGE0+E8390_START+E8390_NODMA, nic_base + NE_CMD);
+    z_writeb(E8390_PAGE0+E8390_START+E8390_NODMA, nic_base + NE_CMD);
 
-    writeb(ENISR_RDC, nic_base + NE_EN0_ISR);
+    z_writeb(ENISR_RDC, nic_base + NE_EN0_ISR);
 
    /* Now the normal output. */
-    writeb(count & 0xff, nic_base + NE_EN0_RCNTLO);
-    writeb(count >> 8,   nic_base + NE_EN0_RCNTHI);
-    writeb(0x00, nic_base + NE_EN0_RSARLO);
-    writeb(start_page, nic_base + NE_EN0_RSARHI);
+    z_writeb(count & 0xff, nic_base + NE_EN0_RCNTLO);
+    z_writeb(count >> 8,   nic_base + NE_EN0_RCNTHI);
+    z_writeb(0x00, nic_base + NE_EN0_RSARLO);
+    z_writeb(start_page, nic_base + NE_EN0_RSARHI);
 
-    writeb(E8390_RWRITE+E8390_START, nic_base + NE_CMD);
+    z_writeb(E8390_RWRITE+E8390_START, nic_base + NE_CMD);
     ptrs = (short*)buf;
     for (cnt = 0; cnt < count>>1; cnt++)
-	writew(*ptrs++, NE_BASE+NE_DATAPORT);
+	z_writew(*ptrs++, NE_BASE+NE_DATAPORT);
 
     dma_start = jiffies;
 
-    while ((readb(NE_BASE + NE_EN0_ISR) & ENISR_RDC) == 0)
+    while ((z_readb(NE_BASE + NE_EN0_ISR) & ENISR_RDC) == 0)
 	if (jiffies - dma_start > 2*HZ/100) {		/* 20ms */
 		printk("%s: timeout waiting for Tx RDC.\n", dev->name);
 		ariadne2_reset_8390(dev);
@@ -400,7 +400,7 @@ static void ariadne2_block_output(struct net_device *dev, int count,
 		break;
 	}
 
-    writeb(ENISR_RDC, nic_base + NE_EN0_ISR);	/* Ack intr. */
+    z_writeb(ENISR_RDC, nic_base + NE_EN0_ISR);	/* Ack intr. */
     ei_status.dmaing &= ~0x01;
     return;
 }
@@ -423,3 +423,5 @@ static void __exit ariadne2_cleanup(void)
 
 module_init(ariadne2_probe);
 module_exit(ariadne2_cleanup);
+
+MODULE_LICENSE("GPL");
