@@ -464,6 +464,7 @@ int scsi_cmd_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long ar
 			memset(rq->cmd, 0, sizeof(rq->cmd));
 			rq->cmd[0] = GPCMD_START_STOP_UNIT;
 			rq->cmd[4] = 0x02 + (close != 0);
+			rq->cmd_len = 6;
 			err = blk_do_rq(q, bdev, rq);
 			blk_put_request(rq);
 			break;
