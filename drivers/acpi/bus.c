@@ -675,6 +675,9 @@ error0:
 	return_VALUE(-ENODEV);
 }
 
+struct subsystem acpi_subsys = {
+	.kobj	= { .name = "acpi" },
+};
 
 static int __init acpi_init (void)
 {
@@ -692,6 +695,8 @@ static int __init acpi_init (void)
 		printk(KERN_INFO PREFIX "Disabled via command line (acpi=off)\n");
 		return -ENODEV;
 	}
+
+	firmware_register(&acpi_subsys);
 
 	result = acpi_bus_init();
 

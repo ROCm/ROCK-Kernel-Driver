@@ -437,6 +437,11 @@ extern int device_suspend(u32 state, u32 level);
 extern void device_resume(u32 level);
 extern void device_shutdown(void);
 
+
+/* drivrs/base/firmware.c */
+extern int firmware_register(struct subsystem *);
+extern void firmware_uregister(struct subsystem *);
+
 /* debugging and troubleshooting/diagnostic helpers. */
 #ifdef DEBUG
 #define dev_dbg(dev, format, arg...)		\
