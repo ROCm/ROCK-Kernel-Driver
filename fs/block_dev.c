@@ -62,7 +62,7 @@ static void kill_bdev(struct block_device *bdev)
 	truncate_inode_pages(bdev->bd_inode->i_mapping, 0);
 }	
 
-int set_blocksize(struct block_device *bdev, int size)
+int __set_blocksize(struct block_device *bdev, int size, int sync)
 {
 	/* Size must be a power of two, and between 512 and PAGE_SIZE */
 	if (size > PAGE_SIZE || size < 512 || (size & (size-1)))
@@ -74,7 +74,8 @@ int set_blocksize(struct block_device *bdev, int size)
 
 	/* Don't change the size if it is same as current */
 	if (bdev->bd_block_size != size) {
-		sync_blockdev(bdev);
+		if (sync)
+			sync_blockdev(bdev);
 		bdev->bd_block_size = size;
 		bdev->bd_inode->i_blkbits = blksize_bits(size);
 		kill_bdev(bdev);
@@ -82,7 +83,7 @@ int set_blocksize(struct block_device *bdev, int size)
 	return 0;
 }
 
-EXPORT_SYMBOL(set_blocksize);
+EXPORT_SYMBOL(__set_blocksize);
 
 int sb_set_blocksize(struct super_block *sb, int size)
 {
@@ -480,17 +481,19 @@ int bd_claim(struct block_device *bdev, void *holder)
 
 EXPORT_SYMBOL(bd_claim);
 
-void bd_release(struct block_device *bdev)
+void __bd_release(struct block_device *bdev, int size)
 {
 	spin_lock(&bdev_lock);
 	if (!--bdev->bd_contains->bd_holders)
 		bdev->bd_contains->bd_holder = NULL;
-	if (!--bdev->bd_holders)
+	if (!--bdev->bd_holders) {
 		bdev->bd_holder = NULL;
+		set_blocksize_nosync (bdev, size);
+	}
 	spin_unlock(&bdev_lock);
 }
 
-EXPORT_SYMBOL(bd_release);
+EXPORT_SYMBOL(__bd_release);
 
 /*
  * Tries to open block device by device number.  Use it ONLY if you
@@ -914,10 +917,10 @@ EXPORT_SYMBOL(open_bdev_excl);
  *
  * This is the counterpart to open_bdev_excl().
  */
-void close_bdev_excl(struct block_device *bdev)
+void __close_bdev_excl(struct block_device *bdev, int size)
 {
-	bd_release(bdev);
+	__bd_release(bdev, size);
 	blkdev_put(bdev);
 }
 
-EXPORT_SYMBOL(close_bdev_excl);
+EXPORT_SYMBOL(__close_bdev_excl);

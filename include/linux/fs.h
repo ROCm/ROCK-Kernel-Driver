@@ -1319,7 +1319,10 @@ extern long compat_blkdev_ioctl(struct file *, unsigned, unsigned long);
 extern int blkdev_get(struct block_device *, mode_t, unsigned);
 extern int blkdev_put(struct block_device *);
 extern int bd_claim(struct block_device *, void *);
-extern void bd_release(struct block_device *);
+extern void __bd_release(struct block_device *, int);
+static inline void bd_release(struct block_device *bdev) {
+	__bd_release (bdev, bdev->bd_block_size);
+}
 
 /* fs/char_dev.c */
 extern int alloc_chrdev_region(dev_t *, unsigned, unsigned, const char *);
@@ -1336,7 +1339,10 @@ extern const char *__bdevname(dev_t, char *buffer);
 extern const char *bdevname(struct block_device *bdev, char *buffer);
 extern struct block_device *lookup_bdev(const char *);
 extern struct block_device *open_bdev_excl(const char *, int, void *);
-extern void close_bdev_excl(struct block_device *);
+extern void __close_bdev_excl(struct block_device *, int);
+static inline void close_bdev_excl(struct block_device *bdev) {
+	__close_bdev_excl(bdev, bdev->bd_block_size);
+}
 
 extern void init_special_inode(struct inode *, umode_t, dev_t);
 
@@ -1473,7 +1479,14 @@ extern void file_kill(struct file *f);
 struct bio;
 extern void submit_bio(int, struct bio *);
 extern int bdev_read_only(struct block_device *);
-extern int set_blocksize(struct block_device *, int);
+extern int __set_blocksize(struct block_device *, int, int);
+static inline int set_blocksize(struct block_device *bdev, int size) {
+	return __set_blocksize (bdev, size, 1);
+}
+static inline int set_blocksize_nosync(struct block_device *bdev, int size) {
+	return __set_blocksize (bdev, size, 0);
+}
+
 extern int sb_set_blocksize(struct super_block *, int);
 extern int sb_min_blocksize(struct super_block *, int);
 
