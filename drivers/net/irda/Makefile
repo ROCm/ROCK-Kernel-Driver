@@ -5,10 +5,12 @@
 # Rewritten to use lists instead of if-statements.
 #
 
-export-objs	= irport.o
+export-objs	= irport.o sir_core.o
 
-obj-$(CONFIG_IRTTY_SIR)		+= irtty.o
+# Old SIR drivers (irtty is broken)
+obj-$(CONFIG_IRTTY_OLD)		+= irtty.o
 obj-$(CONFIG_IRPORT_SIR)	+= 		irport.o
+# FIR drivers
 obj-$(CONFIG_USB_IRDA)		+= irda-usb.o
 obj-$(CONFIG_NSC_FIR)		+= nsc-ircc.o
 obj-$(CONFIG_WINBOND_FIR)	+= w83977af_ir.o
@@ -18,9 +20,10 @@ obj-$(CONFIG_TOSHIBA_FIR)	+= donauboe.o
 obj-$(CONFIG_SMC_IRCC_FIR)	+= smc-ircc.o	irport.o
 obj-$(CONFIG_ALI_FIR)		+= ali-ircc.o
 obj-$(CONFIG_VLSI_FIR)		+= vlsi_ir.o
-obj-$(CONFIG_ESI_DONGLE)	+= esi.o
-obj-$(CONFIG_TEKRAM_DONGLE)	+= tekram.o
-obj-$(CONFIG_ACTISYS_DONGLE)	+= actisys.o
+# Old dongle drivers for old SIR drivers
+obj-$(CONFIG_ESI_OLD)		+= esi.o
+obj-$(CONFIG_TEKRAM_OLD)	+= tekram.o
+obj-$(CONFIG_ACTISYS_OLD)	+= actisys.o
 obj-$(CONFIG_GIRBIL_DONGLE)	+= girbil.o
 obj-$(CONFIG_LITELINK_DONGLE)	+= litelink.o
 obj-$(CONFIG_OLD_BELKIN_DONGLE)	+= old_belkin.o
@@ -28,5 +31,14 @@ obj-$(CONFIG_EP7211_IR)		+= ep7211_ir.o
 obj-$(CONFIG_MCP2120_DONGLE)	+= mcp2120.o
 obj-$(CONFIG_ACT200L_DONGLE)	+= act200l.o
 obj-$(CONFIG_MA600_DONGLE)	+= ma600.o
+# New SIR drivers
+obj-$(CONFIG_IRTTY_SIR)		+= irtty-sir.o	sir-dev.o
+# New dongles drivers for new SIR drivers
+obj-$(CONFIG_ESI_DONGLE)	+= esi-sir.o
+obj-$(CONFIG_TEKRAM_DONGLE)	+= tekram-sir.o
+obj-$(CONFIG_ACTISYS_DONGLE)	+= actisys-sir.o
+
+# The SIR helper module
+sir-dev-objs := sir_core.o sir_dev.o sir_dongle.o sir_kthread.o
 
 include $(TOPDIR)/Rules.make
