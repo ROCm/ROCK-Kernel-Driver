@@ -238,7 +238,7 @@ static int __init snd_gusclassic_legacy_auto_probe(unsigned long xport)
 static int __init alsa_card_gusclassic_init(void)
 {
 	static unsigned long possible_ports[] = {0x220, 0x230, 0x240, 0x250, 0x260, -1};
-	int dev, cards;
+	int dev, cards, i;
 
 	for (dev = cards = 0; dev < SNDRV_CARDS && enable[dev]; dev++) {
 		if (port[dev] == SNDRV_AUTO_PORT)
@@ -246,7 +246,10 @@ static int __init alsa_card_gusclassic_init(void)
 		if (snd_gusclassic_probe(dev) >= 0)
 			cards++;
 	}
-	cards += snd_legacy_auto_probe(possible_ports, snd_gusclassic_legacy_auto_probe);
+	i = snd_legacy_auto_probe(possible_ports, snd_gusclassic_legacy_auto_probe);
+	if (i > 0)
+		cards += i;
+
 	if (!cards) {
 #ifdef MODULE
 		printk(KERN_ERR "GUS Classic soundcard not found or device busy\n");

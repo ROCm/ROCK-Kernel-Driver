@@ -929,7 +929,7 @@ static struct pnp_card_driver interwave_pnpc_driver = {
 
 static int __init alsa_card_interwave_init(void)
 {
-	int cards = 0;
+	int cards = 0, i;
 	static long possible_ports[] = {0x210, 0x220, 0x230, 0x240, 0x250, 0x260, -1};
 	int dev;
 
@@ -949,10 +949,14 @@ static int __init alsa_card_interwave_init(void)
 #endif
 	}
 	/* legacy auto configured cards */
-	cards += snd_legacy_auto_probe(possible_ports, snd_interwave_probe_legacy_port);
+	i = snd_legacy_auto_probe(possible_ports, snd_interwave_probe_legacy_port);
+	if (i > 0)
+		cards += i;
 #ifdef CONFIG_PNP
-        /* ISA PnP cards */
-        cards += pnp_register_card_driver(&interwave_pnpc_driver);
+	/* ISA PnP cards */
+	i = pnp_register_card_driver(&interwave_pnpc_driver);
+	if (i > 0)
+		cards += i;
 #endif
 
 	if (!cards) {

@@ -349,7 +349,7 @@ static int __init snd_gusextreme_legacy_auto_probe(unsigned long xport)
 static int __init alsa_card_gusextreme_init(void)
 {
 	static unsigned long possible_ports[] = {0x220, 0x240, 0x260, -1};
-	int dev, cards;
+	int dev, cards, i;
 
 	for (dev = cards = 0; dev < SNDRV_CARDS && enable[dev] > 0; dev++) {
 		if (port[dev] == SNDRV_AUTO_PORT)
@@ -357,7 +357,10 @@ static int __init alsa_card_gusextreme_init(void)
 		if (snd_gusextreme_probe(dev) >= 0)
 			cards++;
 	}
-	cards += snd_legacy_auto_probe(possible_ports, snd_gusextreme_legacy_auto_probe);
+	i = snd_legacy_auto_probe(possible_ports, snd_gusextreme_legacy_auto_probe);
+	if (i > 0)
+		cards += i;
+
 	if (!cards) {
 #ifdef MODULE
 		printk(KERN_ERR "GUS Extreme soundcard not found or device busy\n");
