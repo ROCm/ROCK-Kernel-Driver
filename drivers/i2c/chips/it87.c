@@ -226,7 +226,7 @@ static struct i2c_driver it87_driver = {
 	.detach_client	= it87_detach_client,
 };
 
-static int it87_id = 0;
+static int it87_id;
 
 static ssize_t show_in(struct device *dev, char *buf, int nr)
 {

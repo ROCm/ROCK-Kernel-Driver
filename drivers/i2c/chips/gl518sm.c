@@ -164,7 +164,7 @@ static struct i2c_driver gl518_driver = {
  * Internal variables
  */
 
-static int gl518_id = 0;
+static int gl518_id;
 
 /*
  * Sysfs stuff

@@ -120,7 +120,7 @@ struct max1619_data {
  * Internal variables
  */
 
-static int max1619_id = 0;
+static int max1619_id;
 
 /*
  * Sysfs stuff

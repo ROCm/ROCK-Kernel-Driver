@@ -405,7 +405,7 @@ static struct i2c_driver lm85_driver = {
 };
 
 /* Unique ID assigned to each LM85 detected */
-static int lm85_id = 0;
+static int lm85_id;
 
 
 /* 4 Fans */

@@ -153,7 +153,7 @@ struct adm1025_data {
  * Internal variables
  */
 
-static int adm1025_id = 0;
+static int adm1025_id;
 
 /*
  * Sysfs stuff

@@ -187,7 +187,7 @@ struct lm90_data {
  * Internal variables
  */
 
-static int lm90_id = 0;
+static int lm90_id;
 
 /*
  * Sysfs stuff

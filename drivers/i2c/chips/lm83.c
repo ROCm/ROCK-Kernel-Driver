@@ -152,7 +152,7 @@ struct lm83_data {
  * Internal variables
  */
 
-static int lm83_id = 0;
+static int lm83_id;
 
 /*
  * Sysfs stuff

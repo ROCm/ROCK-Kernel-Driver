@@ -145,7 +145,7 @@ static int lm80_write_value(struct i2c_client *client, u8 reg, u8 value);
  * Internal variables
  */
 
-static int lm80_id = 0;
+static int lm80_id;
 
 /*
  * Driver data (common to all clients)

@@ -156,7 +156,7 @@ struct fscher_data {
  * Internal variables
  */
 
-static int fscher_id = 0;
+static int fscher_id;
 
 /*
  * Sysfs stuff
