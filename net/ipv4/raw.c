@@ -326,8 +326,8 @@ error:
 static void raw_probe_proto_opt(struct flowi *fl, struct msghdr *msg)
 {
 	struct iovec *iov;
-	u8 *type = NULL;
-	u8 *code = NULL;
+	u8 __user *type = NULL;
+	u8 __user *code = NULL;
 	int probed = 0;
 	int i;
 
@@ -354,8 +354,8 @@ static void raw_probe_proto_opt(struct flowi *fl, struct msghdr *msg)
 				code = iov->iov_base;
 
 			if (type && code) {
-				fl->fl_icmp_type = *type;
-				fl->fl_icmp_code = *code;
+				get_user(fl->fl_icmp_type, type);
+				__get_user(fl->fl_icmp_code, code);
 				probed = 1;
 			}
 			break;
