@@ -925,11 +925,13 @@ int ide_release_iomio_dma (ide_hwif_t *hwif)
  */
 int ide_release_dma (ide_hwif_t *hwif)
 {
+	if (hwif->mmio == 2)
+		return 1;
 	if (hwif->chipset == ide_etrax100)
 		return 1;
 
 	ide_release_dma_engine(hwif);
-	if (hwif->mmio)
+	if (hwif->mmio == 1)
 		return ide_release_mmio_dma(hwif);
 	return ide_release_iomio_dma(hwif);
 }
@@ -986,6 +988,21 @@ fail:
 	return 1;
 }
 
+int ide_mapped_mmio_dma (ide_hwif_t *hwif, unsigned long base, unsigned int ports)
+{
+	printk(KERN_INFO "    %s: MMIO-DMA ", hwif->name);
+
+	hwif->dma_base = base;
+	if (hwif->cds->extra && hwif->channel == 0)
+		hwif->dma_extra = hwif->cds->extra;
+
+	if(hwif->mate)
+		hwif->dma_master = (hwif->channel) ? hwif->mate->dma_base : base;
+	else
+		hwif->dma_master = base;
+	return 0;
+}
+
 int ide_iomio_dma (ide_hwif_t *hwif, unsigned long base, unsigned int ports)
 {
 	printk(KERN_INFO "    %s: BM-DMA at 0x%04lx-0x%04lx",
@@ -1020,7 +1037,9 @@ int ide_iomio_dma (ide_hwif_t *hwif, unsigned long base, unsigned int ports)
  */
 int ide_dma_iobase (ide_hwif_t *hwif, unsigned long base, unsigned int ports)
 {
-	if (hwif->mmio)
+	if (hwif->mmio == 2)
+		return ide_mapped_mmio_dma(hwif, base,ports);
+	if (hwif->mmio == 1)
 		return ide_mmio_dma(hwif, base, ports);
 	return ide_iomio_dma(hwif, base, ports);
 }
