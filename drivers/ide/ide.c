@@ -878,7 +878,6 @@ ide_startstop_t start_request (ide_drive_t *drive, struct request *rq)
 {
 	ide_startstop_t startstop;
 	unsigned long block;
-	unsigned int minor = minor(rq->rq_dev), unit = minor >> PARTN_BITS;
 	ide_hwif_t *hwif = HWIF(drive);
 
 	BUG_ON(!(rq->flags & REQ_STARTED));
@@ -897,15 +896,8 @@ ide_startstop_t start_request (ide_drive_t *drive, struct request *rq)
 	 * bail early if we've sent a device to sleep, however how to wake
 	 * this needs to be a masked flag.  FIXME for proper operations.
 	 */
-	if (drive->suspend_reset) {
+	if (drive->suspend_reset)
 		goto kill_rq;
-	}
-
-	if (unit >= MAX_DRIVES) {
-		printk("%s: bad device number: %s\n",
-			hwif->name, kdevname(rq->rq_dev));
-		goto kill_rq;
-	}
 
 	block    = rq->sector;
 	if (blk_fs_request(rq) &&
@@ -1170,18 +1162,6 @@ queue_next:
 }
 
 EXPORT_SYMBOL(ide_do_request);
-
-/*
- * ide_get_queue() returns the queue which corresponds to a given device.
- */
-request_queue_t *ide_get_queue (kdev_t dev)
-{
-	ide_hwif_t *hwif = (ide_hwif_t *)blk_dev[major(dev)].data;
-
-	return &hwif->drives[DEVICE_NR(dev) & 1].queue;
-}
-
-EXPORT_SYMBOL(ide_get_queue);
 
 /*
  * Passes the stuff to ide_do_request
@@ -1496,32 +1476,6 @@ void ide_intr (int irq, void *dev_id, struct pt_regs *regs)
 EXPORT_SYMBOL(ide_intr);
 
 /*
- * get_info_ptr() returns the (ide_drive_t *) for a given device number.
- * It returns NULL if the given device number does not match any present drives.
- */
-ide_drive_t *get_info_ptr (kdev_t i_rdev)
-{
-	int		major = major(i_rdev);
-	unsigned int	h;
-
-	for (h = 0; h < MAX_HWIFS; ++h) {
-		ide_hwif_t  *hwif = &ide_hwifs[h];
-		if (hwif->present && major == hwif->major) {
-			unsigned unit = DEVICE_NR(i_rdev);
-			if (unit < MAX_DRIVES) {
-				ide_drive_t *drive = &hwif->drives[unit];
-				if (drive->present)
-					return drive;
-			}
-			break;
-		}
-	}
-	return NULL;
-}
-
-EXPORT_SYMBOL(get_info_ptr);
-
-/*
  * This function is intended to be used prior to invoking ide_do_drive_cmd().
  */
 void ide_init_drive_cmd (struct request *rq)
@@ -1572,7 +1526,8 @@ int ide_do_drive_cmd (ide_drive_t *drive, struct request *rq, ide_action_t actio
 #endif
 	rq->errors = 0;
 	rq->rq_status = RQ_ACTIVE;
-	rq->rq_dev = mk_kdev(major,(drive->select.b.unit)<<PARTN_BITS);
+	rq->rq_dev = mk_kdev(drive->disk->major, drive->disk->first_minor);
+	rq->rq_disk = drive->disk;
 	if (action == ide_wait)
 		rq->waiting = &wait;
 	spin_lock_irqsave(&ide_lock, flags);
@@ -1615,17 +1570,13 @@ EXPORT_SYMBOL(ide_revalidate_drive);
  * usage == 1 (we need an open channel to use an ioctl :-), so this
  * is our limit.
  */
-int ide_revalidate_disk (kdev_t i_rdev)
+static int ide_revalidate_disk(struct gendisk *disk)
 {
-	ide_drive_t *drive;
-	if ((drive = get_info_ptr(i_rdev)) == NULL)
-		return -ENODEV;
+	ide_drive_t *drive = disk->private_data;
 	if (DRIVER(drive)->revalidate)
 		DRIVER(drive)->revalidate(drive);
 	return  0;
 }
-
-EXPORT_SYMBOL(ide_revalidate_disk);
 
 void ide_probe_module (void)
 {
@@ -1642,28 +1593,9 @@ EXPORT_SYMBOL(ide_probe_module);
 
 static int ide_open (struct inode * inode, struct file * filp)
 {
-	ide_drive_t *drive;
-
-	if ((drive = get_info_ptr(inode->i_rdev)) == NULL)
-		return -ENXIO;
-	if (drive->driver == NULL) {
-		if (drive->media == ide_disk)
-			(void) request_module("ide-disk");
-		if (drive->scsi)
-			(void) request_module("ide-scsi");
-		if (drive->media == ide_cdrom)
-			(void) request_module("ide-cd");
-		if (drive->media == ide_tape)
-			(void) request_module("ide-tape");
-		if (drive->media == ide_floppy)
-			(void) request_module("ide-floppy");
-	}
+	ide_drive_t *drive = inode->i_bdev->bd_disk->private_data;
 	drive->usage++;
-	if (drive->driver != NULL)
-		return DRIVER(drive)->open(inode, filp, drive);
-	printk (KERN_WARNING "%s: driver not present\n", drive->name);
-	drive->usage--;
-	return -ENXIO;
+	return DRIVER(drive)->open(inode, filp, drive);
 }
 
 /*
@@ -1672,13 +1604,9 @@ static int ide_open (struct inode * inode, struct file * filp)
  */
 static int ide_release (struct inode * inode, struct file * file)
 {
-	ide_drive_t *drive;
-
-	if ((drive = get_info_ptr(inode->i_rdev)) != NULL) {
-		drive->usage--;
-		if (drive->driver != NULL)
-			DRIVER(drive)->release(inode, file, drive);
-	}
+	ide_drive_t *drive = inode->i_bdev->bd_disk->private_data;
+	DRIVER(drive)->release(inode, file, drive);
+	drive->usage--;
 	return 0;
 }
 
@@ -1772,7 +1700,6 @@ void ide_unregister (unsigned int index)
 	ide_hwgroup_t *hwgroup;
 	int irq_count = 0, unit, i;
 	unsigned long flags;
-	unsigned int p, minor;
 	ide_hwif_t old_hwif;
 
 	if (index >= MAX_HWIFS)
@@ -1792,25 +1719,10 @@ void ide_unregister (unsigned int index)
 	}
 	hwif->present = 0;
 	
-	/*
-	 * All clear?  Then blow away the buffer cache
-	 */
 	spin_unlock_irqrestore(&ide_lock, flags);
-	for (unit = 0; unit < MAX_DRIVES; ++unit) {
-		drive = &hwif->drives[unit];
-		if (!drive->present)
-			continue;
-		minor = drive->select.b.unit << PARTN_BITS;
-		for (p = 0; p < (1<<PARTN_BITS); ++p) {
-			if (get_capacity(drive->disk)) {
-				kdev_t devp = mk_kdev(hwif->major, minor+p);
-				invalidate_device(devp, 0);
-			}
-		}
 #ifdef CONFIG_PROC_FS
-		destroy_proc_ide_drives(hwif);
+	destroy_proc_ide_drives(hwif);
 #endif
-	}
 	spin_lock_irqsave(&ide_lock, flags);
 	hwgroup = hwif->hwgroup;
 
@@ -1885,9 +1797,8 @@ void ide_unregister (unsigned int index)
 	/*
 	 * Remove us from the kernel's knowledge
 	 */
+	blk_unregister_region(MKDEV(hwif->major, 0), MAX_DRIVES<<PARTN_BITS);
 	unregister_blkdev(hwif->major, hwif->name);
-	blk_dev[hwif->major].data = NULL;
-	blk_dev[hwif->major].queue = NULL;
 	for (i = 0; i < MAX_DRIVES; i++) {
 		struct gendisk *disk = hwif->drives[i].disk;
 		hwif->drives[i].disk = NULL;
@@ -2482,28 +2393,21 @@ EXPORT_SYMBOL(ata_attach);
 static int ide_ioctl (struct inode *inode, struct file *file,
 			unsigned int cmd, unsigned long arg)
 {
-	int err = 0, major, minor;
-	ide_drive_t *drive;
-	struct request rq;
-	kdev_t dev;
+	ide_drive_t *drive = inode->i_bdev->bd_disk->private_data;
 	ide_settings_t *setting;
-
-	major = major(dev); minor = minor(dev);
-	if ((drive = get_info_ptr(inode->i_rdev)) == NULL)
-		return -ENODEV;
+	int err = 0;
 
 	if ((setting = ide_find_setting_by_ioctl(drive, cmd)) != NULL) {
 		if (cmd == setting->read_ioctl) {
 			err = ide_read_setting(drive, setting);
 			return err >= 0 ? put_user(err, (long *) arg) : err;
 		} else {
-			if ((minor(inode->i_rdev) & PARTN_MASK))
+			if (inode->i_bdev != inode->i_bdev->bd_contains)
 				return -EINVAL;
 			return ide_write_setting(drive, setting, arg);
 		}
 	}
 
-	ide_init_drive_cmd (&rq);
 	switch (cmd) {
 		case HDIO_GETGEO:
 		{
@@ -2532,7 +2436,7 @@ static int ide_ioctl (struct inode *inode, struct file *file,
 
 		case HDIO_OBSOLETE_IDENTITY:
 		case HDIO_GET_IDENTITY:
-			if (minor(inode->i_rdev) & PARTN_MASK)
+			if (inode->i_bdev != inode->i_bdev->bd_contains)
 				return -EINVAL;
 			if (drive->id == NULL)
 				return -ENOMSG;
@@ -2662,12 +2566,9 @@ static int ide_ioctl (struct inode *inode, struct file *file,
 	}
 }
 
-static int ide_check_media_change (kdev_t i_rdev)
+static int ide_check_media_change(struct gendisk *disk)
 {
-	ide_drive_t *drive;
-
-	if ((drive = get_info_ptr(i_rdev)) == NULL)
-		return -ENODEV;
+	ide_drive_t *drive = disk->private_data;
 	if (drive->driver != NULL)
 		return DRIVER(drive)->media_change(drive);
 	return 0;
@@ -3491,12 +3392,12 @@ void ide_unregister_driver(ide_driver_t *driver)
 EXPORT_SYMBOL(ide_unregister_driver);
 
 struct block_device_operations ide_fops[] = {{
-	.owner			= THIS_MODULE,
-	.open			= ide_open,
-	.release		= ide_release,
-	.ioctl			= ide_ioctl,
-	.check_media_change	= ide_check_media_change,
-	.revalidate		= ide_revalidate_disk
+	.owner		= THIS_MODULE,
+	.open		= ide_open,
+	.release	= ide_release,
+	.ioctl		= ide_ioctl,
+	.media_changed	= ide_check_media_change,
+	.revalidate_disk= ide_revalidate_disk
 }};
 
 EXPORT_SYMBOL(ide_fops);
@@ -3537,8 +3438,6 @@ int __init ide_init (void)
 
 	return 0;
 }
-
-module_init(ide_init);
 
 #ifdef MODULE
 char *options = NULL;
@@ -3588,5 +3487,7 @@ void cleanup_module (void)
 #else /* !MODULE */
 
 __setup("", ide_setup);
+
+module_init(ide_init);
 
 #endif /* MODULE */

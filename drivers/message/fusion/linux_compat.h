@@ -75,11 +75,11 @@ typedef int (*__init_module_func_t)(void);
 typedef void (*__cleanup_module_func_t)(void);
 #define module_init(x) \
 	int init_module(void) __attribute__((alias(#x))); \
-	extern inline __init_module_func_t __init_module_inline(void) \
+	static inline __init_module_func_t __init_module_inline(void) \
 	{ return x; }
 #define module_exit(x) \
 	void cleanup_module(void) __attribute__((alias(#x))); \
-	extern inline __cleanup_module_func_t __cleanup_module_inline(void) \
+	static inline __cleanup_module_func_t __cleanup_module_inline(void) \
 	{ return x; }
 
 #else

@@ -51,7 +51,6 @@
 
 #define MAJOR_NR SCSI_DISK0_MAJOR
 #define LOCAL_END_REQUEST
-#define DEVICE_NR(device) (((major(device) & SD_MAJOR_MASK) << (8 - 4)) + (minor(device) >> 4))
 #include <linux/blk.h>
 #include <linux/blkpg.h>
 #include "scsi.h"
@@ -87,10 +86,10 @@
 static Scsi_Disk ** sd_dsk_arr;
 static rwlock_t sd_dsk_arr_lock = RW_LOCK_UNLOCKED;
 
-static int check_scsidisk_media_change(kdev_t);
-static int sd_revalidate(kdev_t);
+static int check_scsidisk_media_change(struct gendisk *);
+static int sd_revalidate(struct gendisk *);
 
-static void sd_init_onedisk(Scsi_Disk * sdkp, int dsk_nr);
+static void sd_init_onedisk(Scsi_Disk * sdkp, struct gendisk *disk);
 
 static int sd_init(void);
 static void sd_finish(void);
@@ -187,17 +186,16 @@ sd_find_target(void *hp, int scsi_id)
 static int sd_ioctl(struct inode * inode, struct file * filp, 
 		    unsigned int cmd, unsigned long arg)
 {
-	kdev_t dev = inode->i_rdev;
-        Scsi_Disk * sdkp;
-	struct Scsi_Host * host;
-	Scsi_Device * sdp;
+	struct gendisk *disk = inode->i_bdev->bd_disk;
+        Scsi_Disk *sdkp = disk->private_data;
+	Scsi_Device *sdp = sdkp->device;
+	struct Scsi_Host *host;
 	int diskinfo[4];
-	int dsk_nr = DEVICE_NR(dev);
+	int error;
     
-	SCSI_LOG_IOCTL(1, printk("sd_ioctl: dsk_nr=%d, cmd=0x%x\n",
-		       dsk_nr, cmd));
-	sdkp = sd_get_sdisk(dsk_nr);
-	if ((NULL == sdkp) || (NULL == (sdp = sdkp->device)))
+	SCSI_LOG_IOCTL(1, printk("sd_ioctl: disk=%s, cmd=0x%x\n",
+						disk->disk_name, cmd));
+	if (!sdp)
 		return -ENODEV;
 	/*
 	 * If we are in the middle of error recovery, don't let anyone
@@ -208,6 +206,10 @@ static int sd_ioctl(struct inode * inode, struct file * filp,
 
 	if( !scsi_block_when_processing_errors(sdp) )
 		return -ENODEV;
+
+	error = scsi_cmd_ioctl(inode->i_bdev, cmd, arg);
+	if (error != -ENOTTY)
+		return error;
 
 	switch (cmd) 
 	{
@@ -264,29 +266,6 @@ static void sd_dskname(unsigned int dsk_nr, char *buffer)
 	}
 }
 
-/**
- *	sd_find_queue - yields queue associated with device
- *	@dev: kernel device descriptor (kdev_t)
- *
- *	Returns NULL if no match, otherwise returns pointer to associated
- *	request queue.
- *
- *	Note: this function is invoked (often) from the block subsystem
- *	and should not wait on anything (sd_get_sdisk() does have a read
- *	spinlock).
- **/
-static request_queue_t *sd_find_queue(kdev_t dev)
-{
-	Scsi_Disk *sdkp;
- 	int dsk_nr = DEVICE_NR(dev);
-
-	sdkp = sd_get_sdisk(dsk_nr);
-	if (sdkp && sdkp->device)
-		return &sdkp->device->request_queue;
-	else
-		return NULL;	/* No such device */
-}
-
 static struct gendisk **sd_disks;
 
 /**
@@ -299,33 +278,54 @@ static struct gendisk **sd_disks;
  **/
 static int sd_init_command(Scsi_Cmnd * SCpnt)
 {
-	int dsk_nr, part_nr, this_count;
+	int this_count, timeout;
+	struct gendisk *disk;
 	sector_t block;
-	Scsi_Device *sdp;
-#if CONFIG_SCSI_LOGGING
-	char nbuff[6];
-#endif
+	Scsi_Device *sdp = SCpnt->device;
+
+	timeout = SD_TIMEOUT;
+	if (SCpnt->device->type != TYPE_DISK)
+		timeout = SD_MOD_TIMEOUT;
+
 	/*
-	 * don't support specials for nwo
+	 * these are already setup, just copy cdb basically
+	 */
+	if (SCpnt->request->flags & REQ_BLOCK_PC) {
+		struct request *rq = SCpnt->request;
+
+		if (sizeof(rq->cmd) > sizeof(SCpnt->cmnd))
+			return 0;
+
+		memcpy(SCpnt->cmnd, rq->cmd, sizeof(SCpnt->cmnd));
+		if (rq_data_dir(rq) == WRITE)
+			SCpnt->sc_data_direction = SCSI_DATA_WRITE;
+		else if (rq->data_len)
+			SCpnt->sc_data_direction = SCSI_DATA_READ;
+		else
+			SCpnt->sc_data_direction = SCSI_DATA_NONE;
+
+		this_count = rq->data_len;
+		if (rq->timeout)
+			timeout = rq->timeout;
+
+		goto queue;
+	}
+
+	/*
+	 * we only do REQ_CMD and REQ_BLOCK_PC
 	 */
 	if (!(SCpnt->request->flags & REQ_CMD))
 		return 0;
 
-	part_nr = SD_PARTITION(SCpnt->request->rq_dev);
-	dsk_nr = DEVICE_NR(SCpnt->request->rq_dev);
-
+	disk = SCpnt->request->rq_disk;
 	block = SCpnt->request->sector;
 	this_count = SCpnt->request_bufflen >> 9;
 
-	SCSI_LOG_HLQUEUE(1, printk("sd_command_init: dsk_nr=%d, block=%llu, "
-			    "count=%d\n", dsk_nr, (unsigned long long)block, this_count));
+	SCSI_LOG_HLQUEUE(1, printk("sd_command_init: disk=%s, block=%llu, "
+			    "count=%d\n", disk->disk_name, (unsigned long long)block, this_count));
 
-	sdp = SCpnt->device;
-	/* >>>>> the "(part_nr & 0xf)" excludes 15th partition, why?? */
-	/* >>>>> this change is not in the lk 2.5 series */
-	if (part_nr >= (sd_template.dev_max << 4) || (part_nr & 0xf) ||
-	    !sdp || !sdp->online ||
- 	    block + SCpnt->request->nr_sectors > get_capacity(sd_disks[dsk_nr])) {
+	if (!sdp || !sdp->online ||
+ 	    block + SCpnt->request->nr_sectors > get_capacity(disk)) {
 		SCSI_LOG_HLQUEUE(2, printk("Finishing %ld sectors\n", 
 				 SCpnt->request->nr_sectors));
 		SCSI_LOG_HLQUEUE(2, printk("Retry with 0x%p\n", SCpnt));
@@ -340,9 +340,8 @@ static int sd_init_command(Scsi_Cmnd * SCpnt)
 		/* printk("SCSI disk has been changed. Prohibiting further I/O.\n"); */
 		return 0;
 	}
-	SCSI_LOG_HLQUEUE(2, sd_dskname(dsk_nr, nbuff));
-	SCSI_LOG_HLQUEUE(2, printk("%s : [part_nr=%d], block=%llu\n",
-				   nbuff, part_nr, (unsigned long long)block));
+	SCSI_LOG_HLQUEUE(2, printk("%s : block=%llu\n",
+				   disk->disk_name, (unsigned long long)block));
 
 	/*
 	 * If we have a 1K hardware sectorsize, prevent access to single
@@ -399,7 +398,7 @@ static int sd_init_command(Scsi_Cmnd * SCpnt)
 	}
 
 	SCSI_LOG_HLQUEUE(2, printk("%s : %s %d/%ld 512 byte blocks.\n", 
-		nbuff, (rq_data_dir(SCpnt->request) == WRITE) ? 
+		disk->disk_name, (rq_data_dir(SCpnt->request) == WRITE) ? 
 		"writing" : "reading", this_count, SCpnt->request->nr_sectors));
 
 	SCpnt->cmnd[1] = 0;
@@ -432,12 +431,12 @@ static int sd_init_command(Scsi_Cmnd * SCpnt)
 	 * host adapter, it's safe to assume that we can at least transfer
 	 * this many bytes between each connect / disconnect.
 	 */
+queue:
 	SCpnt->transfersize = sdp->sector_size;
 	SCpnt->underflow = this_count << 9;
 
 	SCpnt->allowed = MAX_RETRIES;
-	SCpnt->timeout_per_command = (SCpnt->device->type == TYPE_DISK ?
-				      SD_TIMEOUT : SD_MOD_TIMEOUT);
+	SCpnt->timeout_per_command = timeout;
 
 	/*
 	 * This is the completion routine we use.  This is matched in terms
@@ -467,16 +466,14 @@ static int sd_init_command(Scsi_Cmnd * SCpnt)
  **/
 static int sd_open(struct inode *inode, struct file *filp)
 {
+	struct gendisk *disk = inode->i_bdev->bd_disk;
+	Scsi_Disk *sdkp = disk->private_data;
+	Scsi_Device * sdp = sdkp->device;
 	int retval = -ENXIO;
-	Scsi_Device * sdp;
-	Scsi_Disk * sdkp;
-	int dsk_nr = DEVICE_NR(inode->i_rdev);
 
-	SCSI_LOG_HLQUEUE(3, printk("sd_open: dsk_nr=%d, part_nr=%d\n", 
-			    dsk_nr, SD_PARTITION(inode->i_rdev)));
+	SCSI_LOG_HLQUEUE(3, printk("sd_open: disk=%s\n", disk->disk_name));
 
-	sdkp = sd_get_sdisk(dsk_nr);
-	if ((NULL == sdkp) || (NULL == (sdp = sdkp->device)))
+	if (!sdkp)
 		return -ENXIO;	/* No such device */
 
 	/*
@@ -554,14 +551,12 @@ error_out:
  **/
 static int sd_release(struct inode *inode, struct file *filp)
 {
-	Scsi_Disk * sdkp;
-	int dsk_nr = DEVICE_NR(inode->i_rdev);
-	Scsi_Device * sdp;
+	struct gendisk *disk = inode->i_bdev->bd_disk;
+	Scsi_Disk *sdkp = disk->private_data;
+	Scsi_Device *sdp = sdkp->device;
 
-	SCSI_LOG_HLQUEUE(3, printk("sd_release: dsk_nr=%d, part_nr=%d\n", 
-			    dsk_nr, SD_PARTITION(inode->i_rdev)));
-	sdkp = sd_get_sdisk(dsk_nr);
-	if ((NULL == sdkp) || (NULL == (sdp = sdkp->device)))
+	SCSI_LOG_HLQUEUE(3, printk("sd_release: disk=%s\n", disk->disk_name));
+	if (!sdp)
 		return -ENODEV; /* open uses ENXIO ?? */
 
 	/* ... and what if there are packets in flight and this close()
@@ -584,12 +579,12 @@ static int sd_release(struct inode *inode, struct file *filp)
 
 static struct block_device_operations sd_fops =
 {
-	owner:			THIS_MODULE,
-	open:			sd_open,
-	release:		sd_release,
-	ioctl:			sd_ioctl,
-	check_media_change:	check_scsidisk_media_change,
-	revalidate:		sd_revalidate
+	.owner		= THIS_MODULE,
+	.open		= sd_open,
+	.release	= sd_release,
+	.ioctl		= sd_ioctl,
+	.media_changed	= check_scsidisk_media_change,
+	.revalidate_disk= sd_revalidate
 };
 
 /**
@@ -607,12 +602,8 @@ static void sd_rw_intr(Scsi_Cmnd * SCpnt)
 	sector_t block_sectors = 1;
 	sector_t error_sector;
 #if CONFIG_SCSI_LOGGING
-	char nbuff[6];
-
-	SCSI_LOG_HLCOMPLETE(1, sd_dskname(DEVICE_NR(SCpnt->request->rq_dev), 
-			    nbuff));
 	SCSI_LOG_HLCOMPLETE(1, printk("sd_rw_intr: %s: res=0x%x\n", 
-				      nbuff, result));
+				SCpnt->request->rq_disk->disk_name, result));
 	if (0 != result) {
 		SCSI_LOG_HLCOMPLETE(1, printk("sd_rw_intr: sb[0,2,asc,ascq]"
 				"=%x,%x,%x,%x\n", SCpnt->sense_buffer[0],
@@ -713,21 +704,18 @@ sd_set_media_not_present(Scsi_Disk *sdkp) {
  *
  *	Note: this function is invoked from the block subsystem.
  **/
-static int check_scsidisk_media_change(kdev_t full_dev)
+static int check_scsidisk_media_change(struct gendisk *disk)
 {
+	Scsi_Disk *sdkp = disk->private_data;
+	Scsi_Device *sdp = sdkp->device;
 	int retval;
 	int flag = 0;	/* <<<< what is this for?? */
-	Scsi_Disk * sdkp;
-	Scsi_Device * sdp;
-	int dsk_nr = DEVICE_NR(full_dev);
-
-	sdkp = sd_get_sdisk(dsk_nr);
 
 	SCSI_LOG_HLQUEUE(3, printk("check_scsidisk_media_change: "
-			    "dsk_nr=%d\n", dsk_nr));
-	if ((NULL == sdkp) || (NULL == (sdp = sdkp->device))) {
-		printk(KERN_ERR "check_scsidisk_media_change: dsk_nr=%d, "
-		       "invalid device\n", dsk_nr);
+			    "disk=%s\n", disk->disk_name));
+	if (!sdp) {
+		printk(KERN_ERR "check_scsidisk_media_change: disk=%s, "
+		       "invalid device\n", disk->disk_name);
 		return 0;
 	}
 	if (!sdp->removable)
@@ -1155,18 +1143,13 @@ sd_read_write_protect_flag(Scsi_Disk *sdkp, char *diskname,
  *	Note: this function is local to this driver.
  **/
 static void
-sd_init_onedisk(Scsi_Disk * sdkp, int dsk_nr) {
-	char diskname[40];
+sd_init_onedisk(Scsi_Disk * sdkp, struct gendisk *disk)
+{
 	unsigned char *buffer;
 	Scsi_Device *sdp;
 	Scsi_Request *SRpnt;
 
-	SCSI_LOG_HLQUEUE(3, printk("sd_init_onedisk: dsk_nr=%d\n", dsk_nr));
-
-	/*
-	 * Get the name of the disk, in case we need to log it somewhere.
-	 */
-	sd_dskname(dsk_nr, diskname);
+	SCSI_LOG_HLQUEUE(3, printk("sd_init_onedisk: disk=%s\n", disk->disk_name));
 
 	/*
 	 * If the device is offline, don't try and read capacity or any
@@ -1196,14 +1179,14 @@ sd_init_onedisk(Scsi_Disk * sdkp, int dsk_nr) {
 	sdkp->media_present = 1;
 	sdkp->write_prot = 0;
 
-	sd_spinup_disk(sdkp, diskname, SRpnt, buffer);
-	sd_read_cache_type(sdkp, diskname, SRpnt, buffer);
+	sd_spinup_disk(sdkp, disk->disk_name, SRpnt, buffer);
+	sd_read_cache_type(sdkp, disk->disk_name, SRpnt, buffer);
 
 	if (sdkp->media_present)
-		sd_read_capacity(sdkp, diskname, SRpnt, buffer);
+		sd_read_capacity(sdkp, disk->disk_name, SRpnt, buffer);
 
 	if (sdp->removable && sdkp->media_present)
-		sd_read_write_protect_flag(sdkp, diskname, SRpnt, buffer);
+		sd_read_write_protect_flag(sdkp, disk->disk_name, SRpnt, buffer);
 
 	SRpnt->sr_device->ten = 1;
 	SRpnt->sr_device->remap = 1;
@@ -1322,18 +1305,18 @@ static void sd_finish()
 	Scsi_Disk * sdkp;
 
 	SCSI_LOG_HLQUEUE(3, printk("sd_finish: \n"));
-	for (k = 0; k < N_USED_SD_MAJORS; k++)
-		blk_dev[SD_MAJOR(k)].queue = sd_find_queue;
 
 	for (k = 0; k < sd_template.dev_max; ++k) {
 		sdkp = sd_get_sdisk(k);
 		if (sdkp && (0 == sdkp->capacity) && sdkp->device) {
-			sd_init_onedisk(sdkp, k);
-			if (!sdkp->has_been_registered) {
-				set_capacity(sd_disks[k], sdkp->capacity);
-				add_disk(sd_disks[k]);
-				sdkp->has_been_registered = 1;
-			}
+			sd_init_onedisk(sdkp, sd_disks[k]);
+			if (sdkp->has_been_registered)
+				continue;
+			set_capacity(sd_disks[k], sdkp->capacity);
+			sd_disks[k]->private_data = sdkp;
+			sd_disks[k]->queue = &sdkp->device->request_queue;
+			add_disk(sd_disks[k]);
+			sdkp->has_been_registered = 1;
 		}
 	}
 	return;
@@ -1436,16 +1419,15 @@ static int sd_attach(Scsi_Device * sdp)
 	return 0;
 }
 
-static int sd_revalidate(kdev_t dev)
+static int sd_revalidate(struct gendisk *disk)
 {
-	int dsk_nr = DEVICE_NR(dev);
-	Scsi_Disk * sdkp = sd_get_sdisk(dsk_nr);
+	Scsi_Disk *sdkp = disk->private_data;
 
-	if (!sdkp || !sdkp->device)
+	if (!sdkp->device)
 		return -ENODEV;
 
-	sd_init_onedisk(sdkp, dsk_nr);
-	set_capacity(sd_disks[dsk_nr], sdkp->capacity);
+	sd_init_onedisk(sdkp, disk);
+	set_capacity(disk, sdkp->capacity);
 	return 0;
 }
 
@@ -1463,7 +1445,6 @@ static int sd_revalidate(kdev_t dev)
 static void sd_detach(Scsi_Device * sdp)
 {
 	Scsi_Disk *sdkp = NULL;
-	kdev_t dev;
 	int dsk_nr;
 	unsigned long iflags;
 
@@ -1493,7 +1474,6 @@ static void sd_detach(Scsi_Device * sdp)
 
 	if (sdkp->has_been_registered) {
 		sdkp->has_been_registered = 0;
-		dev = MKDEV_SD(dsk_nr);
 		del_gendisk(sd_disks[dsk_nr]);
 	}
 	sdp->attached--;
@@ -1544,8 +1524,6 @@ static void __exit exit_sd(void)
 			vfree(sd_dsk_arr[k]);
 		vfree(sd_dsk_arr);
 	}
-	for (k = 0; k < N_USED_SD_MAJORS; k++)
-		blk_dev[SD_MAJOR(k)].queue = NULL;
 	sd_template.dev_max = 0;
 	remove_driver(&sd_template.scsi_driverfs_driver);
 

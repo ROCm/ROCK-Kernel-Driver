@@ -8,7 +8,12 @@
 # Tom Rini	January 2001
 #
 
-coffcrt0.o:
-	$(CC) $(AFLAGS) -DXCOFF -traditional -c -o coffcrt0.o crt0.S
+L_TARGET				:= lib.a
+
+obj-y					:= string.o util.o misc-common.o
+obj-$(CONFIG_ALL_PPC)			+= mpc10x_memory.o
+obj-$(CONFIG_LOPEC)			+= mpc10x_memory.o
+obj-$(CONFIG_PAL4)			+= cpc700_memory.o
+obj-$(CONFIG_SERIAL_8250_CONSOLE)	+= ns16550.o
 
 include $(TOPDIR)/Rules.make

@@ -289,7 +289,7 @@ static inline void esp_advance_phase(Scsi_Cmnd *s, int newphase)
 #endif
 
 #ifdef DEBUG_ESP_CMDS
-extern inline void esp_cmd(struct NCR_ESP *esp, struct ESP_regs *eregs,
+inline void esp_cmd(struct NCR_ESP *esp, struct ESP_regs *eregs,
 			   unchar cmd)
 {
 	esp->espcmdlog[esp->espcmdent] = cmd;

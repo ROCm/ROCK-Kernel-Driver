@@ -40,6 +40,5 @@ extern kdev_t sd_find_target(void *host, int tgt);
 #define N_SD_MAJORS	8
 
 #define SD_MAJOR_MASK	(N_SD_MAJORS - 1)
-#define SD_PARTITION(i)		(((major(i) & SD_MAJOR_MASK) << 8) | (minor(i) & 255))
 
 #endif

@@ -1256,7 +1256,6 @@ extern int noautodma;
  */
 #define IDE_DRIVER		/* Toggle some magic bits in blk.h */
 #define LOCAL_END_REQUEST	/* Don't generate end_request in blk.h */
-#define DEVICE_NR(device)	(minor(device) >> PARTN_BITS)
 #include <linux/blk.h>
 
 extern int ide_end_request (ide_drive_t *drive, int uptodate, int nrsecs);
@@ -1316,12 +1315,7 @@ extern int ide_wait_stat(ide_startstop_t *, ide_drive_t *, u8, u8, unsigned long
  * This routine is called from the partition-table code in genhd.c
  * to "convert" a drive to a logical geometry with fewer than 1024 cyls.
  */
-extern int ide_xlate_1024 (kdev_t, int, int, const char *);
-
-/*
- * Convert kdev_t structure into ide_drive_t * one.
- */
-extern ide_drive_t *get_info_ptr (kdev_t i_rdev);
+extern int ide_xlate_1024(struct block_device *, int, int, const char *);
 
 /*
  * Return the current idea about the total capacity of this drive.
@@ -1575,11 +1569,6 @@ extern int ide_system_bus_speed(void);
  * to the hwgroup by sleeping for timeout jiffies.
  */
 extern void ide_stall_queue(ide_drive_t *drive, unsigned long timeout);
-
-/*
- * ide_get_queue() returns the queue which corresponds to a given device.
- */
-extern request_queue_t *ide_get_queue (kdev_t dev);
 
 /*
  * CompactFlash cards and their brethern pretend to be removable hard disks,

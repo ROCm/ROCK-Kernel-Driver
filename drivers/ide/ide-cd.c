@@ -2647,7 +2647,6 @@ static int ide_cdrom_register (ide_drive_t *drive, int nslots)
 	struct cdrom_info *info = drive->driver_data;
 	struct cdrom_device_info *devinfo = &info->devinfo;
 
-	devinfo->dev = mk_kdev(drive->disk->major, drive->disk->first_minor);
 	devinfo->ops = &ide_cdrom_dops;
 	devinfo->mask = 0;
 	devinfo->speed = CDROM_STATE_FLAGS(drive)->current_speed;
@@ -3026,15 +3025,9 @@ int ide_cdrom_ioctl (ide_drive_t *drive,
 		     struct inode *inode, struct file *file,
 		     unsigned int cmd, unsigned long arg)
 {
-	int error;
+	struct cdrom_info *info = drive->driver_data;
 
-	/* Try the generic SCSI command ioctl's first.. */
-	error = scsi_cmd_ioctl(inode->i_bdev, cmd, arg);
-	if (error != -ENOTTY)
-		return error;
-
-	/* Then the generic cdrom ioctl's.. */
-	return cdrom_ioctl(inode, file, cmd, arg);
+	return cdrom_ioctl(&info->devinfo, inode, cmd, arg);
 }
 
 static
@@ -3044,9 +3037,9 @@ int ide_cdrom_open (struct inode *ip, struct file *fp, ide_drive_t *drive)
 	int rc = -ENOMEM;
 
 	MOD_INC_USE_COUNT;
-	if (info->buffer == NULL)
+	if (!info->buffer)
 		info->buffer = (char *) kmalloc(SECTOR_BUFFER_SIZE, GFP_KERNEL);
-        if ((info->buffer == NULL) || (rc = cdrom_open(ip, fp))) {
+        if (!info->buffer || (rc = cdrom_open(&info->devinfo, ip, fp))) {
 		drive->usage--;
 		MOD_DEC_USE_COUNT;
 	}
@@ -3057,15 +3050,16 @@ static
 void ide_cdrom_release (struct inode *inode, struct file *file,
 			ide_drive_t *drive)
 {
-	cdrom_release (inode, file);
+	struct cdrom_info *info = drive->driver_data;
+	cdrom_release (&info->devinfo, file);
 	MOD_DEC_USE_COUNT;
 }
 
 static
 int ide_cdrom_check_media_change (ide_drive_t *drive)
 {
-	return cdrom_media_changed(mk_kdev(drive->disk->major,
-			drive->disk->first_minor));
+	struct cdrom_info *info = drive->driver_data;
+	return cdrom_media_changed(&info->devinfo);
 }
 
 static

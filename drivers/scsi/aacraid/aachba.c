@@ -1060,7 +1060,8 @@ int aac_scsi_cmd(Scsi_Cmnd * scsicmd)
 			 */
 			 
 			spin_unlock_irq(scsicmd->host->host_lock);
-			fsa_dev_ptr->devno[cid] = DEVICE_NR(scsicmd->sc_request->sr_request->rq_dev);
+			fsa_dev_ptr->devno[cid] = 
+				DEVICE_NR(scsicmd->request->rq_dev);
 			ret = aac_read(scsicmd, cid);
 			spin_lock_irq(scsicmd->host->host_lock);
 			return ret;

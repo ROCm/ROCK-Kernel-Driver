@@ -304,7 +304,6 @@ static void epat_log_adapter( PIA *pi, char * scratch, int verbose )
 static void epat_init_proto( PIA *pi)
 
 {  	MOD_INC_USE_COUNT;
-	printk("epat_init_proto");
 }
 
 static void epat_release_proto( PIA *pi)

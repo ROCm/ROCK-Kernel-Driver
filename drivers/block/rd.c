@@ -90,7 +90,7 @@ static struct block_device *rd_bdev[NUM_RAMDISKS];/* Protected device data */
  */
 int rd_size = CONFIG_BLK_DEV_RAM_SIZE;		/* Size of the RAM disks */
 /*
- * It would be very desiderable to have a soft-blocksize (that in the case
+ * It would be very desirable to have a soft-blocksize (that in the case
  * of the ramdisk driver is also the hardblocksize ;) of PAGE_SIZE because
  * doing that we'll achieve a far better MM footprint. Using a rd_blocksize of
  * BLOCK_SIZE in the worst case we'll make PAGE_SIZE/BLOCK_SIZE buffer-pages
