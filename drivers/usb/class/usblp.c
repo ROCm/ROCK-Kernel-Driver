@@ -75,6 +75,7 @@
 #define IOCNR_HP_SET_CHANNEL		4
 #define IOCNR_GET_BUS_ADDRESS		5
 #define IOCNR_GET_VID_PID		6
+#define IOCNR_SOFT_RESET		7
 /* Get device_id string: */
 #define LPIOC_GET_DEVICE_ID(len) _IOC(_IOC_READ, 'P', IOCNR_GET_DEVICE_ID, len)
 /* The following ioctls were added for http://hpoj.sourceforge.net: */
@@ -90,6 +91,8 @@
 #define LPIOC_GET_BUS_ADDRESS(len) _IOC(_IOC_READ, 'P', IOCNR_GET_BUS_ADDRESS, len)
 /* Get two-int array: [0]=vendor ID, [1]=product ID: */
 #define LPIOC_GET_VID_PID(len) _IOC(_IOC_READ, 'P', IOCNR_GET_VID_PID, len)
+/* Perform class specific soft reset */
+#define LPIOC_SOFT_RESET _IOC(_IOC_NONE, 'P', IOCNR_SOFT_RESET, 0);
 
 /*
  * A DEVICE_ID string may include the printer's serial number.
@@ -587,6 +590,13 @@ static int usblp_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 					usblp->minor, twoints[0], twoints[1]);
 				break;
 
+			case IOCNR_SOFT_RESET:
+				if (_IOC_DIR(cmd) != _IOC_NONE) {
+					retval = -EINVAL;
+					goto done;
+				}
+				retval = usblp_reset(usblp);
+				break;
 			default:
 				retval = -ENOTTY;
 		}
