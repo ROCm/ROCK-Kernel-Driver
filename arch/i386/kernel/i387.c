@@ -10,7 +10,6 @@
 
 #include <linux/config.h>
 #include <linux/sched.h>
-#include <linux/spinlock.h>
 #include <asm/processor.h>
 #include <asm/i387.h>
 #include <asm/math_emu.h>
