@@ -116,7 +116,7 @@ MODULE_DEVICE_TABLE(pci, e1000_pci_tbl);
 
 static char *e1000_strings[] = {
 	"Intel(R) PRO/1000 Network Connection",
-	"Compaq Gigabit Ethernet Server Adapter",
+	"HP Gigabit Ethernet Server Adapter",
 	"IBM Mobile, Desktop & Server Adapters"
 };
 
