@@ -333,6 +333,7 @@ rsc_init(struct rsc *new, struct rsc *tmp)
 	new->handle.data = tmp->handle.data;
 	tmp->handle.data = NULL;
 	new->mechctx = NULL;
+	new->cred.cr_group_info = NULL;
 }
 
 static inline void
@@ -453,8 +454,11 @@ gss_svc_searchbyctx(struct xdr_netobj *handle)
 	struct rsc rsci;
 	struct rsc *found;
 
-	rsci.handle = *handle;
+	memset(&rsci, 0, sizeof(rsci));
+	if (dup_to_netobj(&rsci.handle, handle->data, handle->len))
+		return NULL;
 	found = rsc_lookup(&rsci, 0);
+	rsc_free(&rsci);
 	if (!found)
 		return NULL;
 	if (cache_check(&rsc_cache, &found->h, NULL))
