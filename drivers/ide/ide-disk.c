@@ -907,7 +907,7 @@ ide_startstop_t idedisk_error (ide_drive_t *drive, const char *msg, u8 stat)
 		/* force an abort */
 		hwif->OUTB(WIN_IDLEIMMEDIATE,IDE_COMMAND_REG);
 	}
-	if (rq->errors >= ERROR_MAX)
+	if (rq->errors >= ERROR_MAX || blk_noretry_request(rq))
 		DRIVER(drive)->end_request(drive, 0, 0);
 	else {
 		if ((rq->errors & ERROR_RESET) == ERROR_RESET) {

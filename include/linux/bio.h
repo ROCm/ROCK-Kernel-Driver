@@ -119,10 +119,12 @@ struct bio {
  * bit 0 -- read (not set) or write (set)
  * bit 1 -- rw-ahead when set
  * bit 2 -- barrier
+ * bit 3 -- fail fast, don't want low level driver retries
  */
 #define BIO_RW		0
 #define BIO_RW_AHEAD	1
 #define BIO_RW_BARRIER	2
+#define BIO_RW_FAILFAST	3
 
 /*
  * various member access, note that bio_data should of course not be used

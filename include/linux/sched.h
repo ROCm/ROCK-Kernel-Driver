@@ -487,6 +487,7 @@ do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
 #define PF_SWAPOFF	0x00080000	/* I am in swapoff */
 #define PF_LESS_THROTTLE 0x01000000	/* Throttle me less: I clena memory */
 #define PF_SYNCWRITE	0x00200000	/* I am doing a sync write */
+#define PF_READAHEAD	0x00400000	/* I am doing read-ahead */
 
 #ifdef CONFIG_SMP
 extern int set_cpus_allowed(task_t *p, unsigned long new_mask);
