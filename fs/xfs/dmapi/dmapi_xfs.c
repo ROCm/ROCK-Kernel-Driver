@@ -466,7 +466,6 @@ xfs_ip_to_stat(
 STATIC int
 xfs_dm_bulkstat_one(
 	xfs_mount_t	*mp,		/* mount point for filesystem */
-	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_ino_t	ino,		/* inode number to get data for */
 	void		*buffer,	/* buffer to place output in */
 	int		ubsize,		/* size of buffer */
@@ -504,7 +503,7 @@ xfs_dm_bulkstat_one(
 		*res = BULKSTAT_RV_NOTHING;
 		return EINVAL;
 	}
-	error = xfs_iget(mp, tp, ino, XFS_ILOCK_SHARED, &ip, bno);
+	error = xfs_iget(mp, NULL, ino, XFS_ILOCK_SHARED, &ip, bno);
 	if (error) {
 		*res = BULKSTAT_RV_NOTHING;
 		return(error);
@@ -701,7 +700,7 @@ xfs_dirents_to_stats(
 
 		statp = (dm_stat_t *) bufp;
 
-		(void)xfs_dm_bulkstat_one(mp, NULL, (xfs_ino_t)p->d_ino,
+		(void)xfs_dm_bulkstat_one(mp, (xfs_ino_t)p->d_ino,
 					  statp, sizeof(*statp), NULL,
 					  0, NULL, NULL, &res);
 		if (res != BULKSTAT_RV_DIDONE)
@@ -1319,7 +1318,7 @@ xfs_dm_get_bulkall_rvp(
 
 	dmb.laststruct = NULL;
 	dmb.bulkall = 1;
-	error = xfs_bulkstat(mp, NULL, (xfs_ino_t *)&loc,
+	error = xfs_bulkstat(mp, (xfs_ino_t *)&loc,
 			     &nelems, 
 			     xfs_dm_bulkstat_one,
 			     (void*)&dmb,
@@ -1409,7 +1408,7 @@ xfs_dm_get_bulkattr_rvp(
 	 * fill the buffer with dm_stat_t's
 	 */
 
-	error = xfs_bulkstat(mp, NULL,
+	error = xfs_bulkstat(mp,
 			     (xfs_ino_t *)&loc,
 			     &nelems,
 			     xfs_dm_bulkstat_one,

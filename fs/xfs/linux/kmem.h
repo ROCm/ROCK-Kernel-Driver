@@ -40,7 +40,7 @@
 /*
  * Cutoff point to use vmalloc instead of kmalloc.
  */
-#define MAX_SLAB_SIZE	0x10000
+#define MAX_SLAB_SIZE	0x20000
 
 /*
  * XFS uses slightly different names for these due to the
@@ -52,6 +52,7 @@
 #define KM_SLEEP	0x0001
 #define KM_NOSLEEP	0x0002
 #define KM_NOFS		0x0004
+#define KM_MAYFAIL	0x0005
 
 typedef unsigned long xfs_pflags_t;
 
@@ -78,28 +79,31 @@ typedef unsigned long xfs_pflags_t;
 	*(NSTATEP) = *(OSTATEP);	\
 } while (0)
 
-/*
- * XXX get rid of the unconditional  __GFP_NOFAIL by adding
- * a KM_FAIL flag and using it where we're allowed to fail.
- */
 static __inline unsigned int
 kmem_flags_convert(int flags)
 {
 	int lflags;
 
 #if DEBUG
-	if (unlikely(flags & ~(KM_SLEEP|KM_NOSLEEP|KM_NOFS))) {
+	if (unlikely(flags & ~(KM_SLEEP|KM_NOSLEEP|KM_NOFS|KM_MAYFAIL))) {
 		printk(KERN_WARNING
 		    "XFS: memory allocation with wrong flags (%x)\n", flags);
 		BUG();
 	}
 #endif
 
-	lflags = (flags & KM_NOSLEEP) ? GFP_ATOMIC : (GFP_KERNEL|__GFP_NOFAIL);
+	if (flags & KM_NOSLEEP) {
+		lflags = GFP_ATOMIC;
+	} else {
+		lflags = GFP_KERNEL;
 
-	/* avoid recusive callbacks to filesystem during transactions */
-	if (PFLAGS_TEST_FSTRANS() || (flags & KM_NOFS))
-		lflags &= ~__GFP_FS;
+		/* avoid recusive callbacks to filesystem during transactions */
+		if (PFLAGS_TEST_FSTRANS() || (flags & KM_NOFS))
+			lflags &= ~__GFP_FS;
+
+		if (!(flags & KM_MAYFAIL))
+			lflags |= __GFP_NOFAIL;
+	}
 
 	return lflags;
 }
