@@ -756,6 +756,9 @@ nfsd_commit(struct svc_rqst *rqstp, struct svc_fh *fhp,
 	struct file	file;
 	int		err;
 
+	if ((u64)count > ~(u64)offset)
+		return nfserr_inval;
+
 	if ((err = nfsd_open(rqstp, fhp, S_IFREG, MAY_WRITE, &file)) != 0)
 		return err;
 	if (EX_ISSYNC(fhp->fh_export)) {
