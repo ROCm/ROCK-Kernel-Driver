@@ -18,6 +18,8 @@
 #define compat_jiffies_to_clock_t(x)	\
 		(((unsigned long)(x) * COMPAT_USER_HZ) / HZ)
 
+struct rusage;
+
 struct compat_itimerspec { 
 	struct compat_timespec it_interval;
 	struct compat_timespec it_value;
