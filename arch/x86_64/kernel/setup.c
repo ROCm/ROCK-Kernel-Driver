@@ -201,7 +201,18 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 	for (;;) {
 		if (c != ' ') 
 			goto next_char; 
- 
+
+#ifdef  CONFIG_SMP
+		/*
+		 * If the BIOS enumerates physical processors before logical,
+		 * maxcpus=N at enumeration-time can be used to disable HT.
+		 */
+		else if (!memcmp(from, "maxcpus=", 8)) {
+			extern unsigned int maxcpus;
+
+			maxcpus = simple_strtoul(from + 8, NULL, 0);
+		}
+#endif
 #ifdef CONFIG_ACPI_BOOT
 		/* "acpi=off" disables both ACPI table parsing and interpreter init */
 		if (!memcmp(from, "acpi=off", 8))

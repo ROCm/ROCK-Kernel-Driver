@@ -33,6 +33,7 @@
 
 /* Have we found an MP table */
 int smp_found_config;
+unsigned int __initdata maxcpus = NR_CPUS;
 
 int acpi_found_madt;
 
@@ -117,6 +118,17 @@ static void __init MP_processor_info (struct mpc_config_processor *m)
 		Dprintk("    Bootup CPU\n");
 		boot_cpu_id = m->mpc_apicid;
 	}
+	if (num_processors >= NR_CPUS) {
+		printk(KERN_WARNING "WARNING: NR_CPUS limit of %i reached."
+			" Processor ignored.\n", NR_CPUS);
+		return;
+	}
+	if (num_processors >= maxcpus) {
+		printk(KERN_WARNING "WARNING: maxcpus limit of %i reached."
+			" Processor ignored.\n", maxcpus);
+		return;
+	}
+
 	num_processors++;
 
 	if (m->mpc_apicid > MAX_APICS) {
