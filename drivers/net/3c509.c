@@ -304,7 +304,7 @@ static int nopnp;
 
 static int __init el3_common_init(struct net_device *dev)
 {
-	struct el3_private *lp = dev->priv;
+	struct el3_private *lp = netdev_priv(dev);
 	short i;
 	int err;
 
@@ -355,7 +355,7 @@ static int __init el3_common_init(struct net_device *dev)
 
 static void el3_common_remove (struct net_device *dev)
 {
-		struct el3_private *lp = dev->priv;
+		struct el3_private *lp = netdev_priv(dev);
 
 		(void) lp;				/* Keep gcc quiet... */
 #ifdef CONFIG_PM
@@ -575,7 +575,7 @@ no_pnp:
 	dev->base_addr = ioaddr;
 	dev->irq = irq;
 	dev->if_port = if_port;
-	lp = dev->priv;
+	lp = netdev_priv(dev);
 #if defined(__ISAPNP__) && !defined(CONFIG_X86_PC9800)
 	lp->dev = &idev->dev;
 #endif
@@ -671,7 +671,7 @@ static int __init el3_mca_probe(struct device *device) {
 		dev->base_addr = ioaddr;
 		dev->irq = irq;
 		dev->if_port = if_port;
-		lp = dev->priv;
+		lp = netdev_priv(dev);
 		lp->dev = device;
 		lp->type = EL3_MCA;
 		device->driver_data = dev;
@@ -732,7 +732,7 @@ static int __init el3_eisa_probe (struct device *device)
 	dev->base_addr = ioaddr;
 	dev->irq = irq;
 	dev->if_port = if_port;
-	lp = dev->priv;
+	lp = netdev_priv(dev);
 	lp->dev = device;
 	lp->type = EL3_EISA;
 	eisa_set_drvdata (edev, dev);
@@ -829,7 +829,7 @@ el3_open(struct net_device *dev)
 static void
 el3_tx_timeout (struct net_device *dev)
 {
-	struct el3_private *lp = (struct el3_private *)dev->priv;
+	struct el3_private *lp = netdev_priv(dev);
 	int ioaddr = dev->base_addr;
 
 	/* Transmitter timeout, serious problems. */
@@ -849,7 +849,7 @@ el3_tx_timeout (struct net_device *dev)
 static int
 el3_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-	struct el3_private *lp = (struct el3_private *)dev->priv;
+	struct el3_private *lp = netdev_priv(dev);
 	int ioaddr = dev->base_addr;
 	unsigned long flags;
 
@@ -943,7 +943,7 @@ el3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		return IRQ_NONE;
 	}
 
-	lp = (struct el3_private *)dev->priv;
+	lp = netdev_priv(dev);
 	spin_lock(&lp->lock);
 
 	ioaddr = dev->base_addr;
@@ -975,7 +975,7 @@ el3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 				outw(AckIntr | RxEarly, ioaddr + EL3_CMD);
 			}
 			if (status & TxComplete) {			/* Really Tx error. */
-				struct el3_private *lp = (struct el3_private *)dev->priv;
+				struct el3_private *lp = netdev_priv(dev);
 				short tx_status;
 				int i = 4;
 
@@ -1022,7 +1022,7 @@ el3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 static struct net_device_stats *
 el3_get_stats(struct net_device *dev)
 {
-	struct el3_private *lp = (struct el3_private *)dev->priv;
+	struct el3_private *lp = netdev_priv(dev);
 	unsigned long flags;
 
 	/*
@@ -1043,7 +1043,7 @@ el3_get_stats(struct net_device *dev)
 	*/
 static void update_stats(struct net_device *dev)
 {
-	struct el3_private *lp = (struct el3_private *)dev->priv;
+	struct el3_private *lp = netdev_priv(dev);
 	int ioaddr = dev->base_addr;
 
 	if (el3_debug > 5)
@@ -1073,7 +1073,7 @@ static void update_stats(struct net_device *dev)
 static int
 el3_rx(struct net_device *dev)
 {
-	struct el3_private *lp = (struct el3_private *)dev->priv;
+	struct el3_private *lp = netdev_priv(dev);
 	int ioaddr = dev->base_addr;
 	short rx_status;
 
@@ -1145,7 +1145,7 @@ static void
 set_multicast_list(struct net_device *dev)
 {
 	unsigned long flags;
-	struct el3_private *lp = (struct el3_private *)dev->priv;
+	struct el3_private *lp = netdev_priv(dev);
 	int ioaddr = dev->base_addr;
 
 	if (el3_debug > 1) {
@@ -1172,7 +1172,7 @@ static int
 el3_close(struct net_device *dev)
 {
 	int ioaddr = dev->base_addr;
-	struct el3_private *lp = (struct el3_private *)dev->priv;
+	struct el3_private *lp = netdev_priv(dev);
 	
 	if (el3_debug > 2)
 		printk("%s: Shutting down ethercard.\n", dev->name);
@@ -1317,7 +1317,7 @@ static int
 netdev_ethtool_ioctl (struct net_device *dev, void *useraddr)
 {
 	u32 ethcmd;
-	struct el3_private *lp = dev->priv;
+	struct el3_private *lp = netdev_priv(dev);
 
 	/* dev_ioctl() in ../../net/core/dev.c has already checked
 	   capable(CAP_NET_ADMIN), so don't bother with that here.  */
@@ -1558,7 +1558,7 @@ el3_suspend(struct pm_dev *pdev)
 		return -EINVAL;
 
 	dev = (struct net_device *)pdev->data;
-	lp = (struct el3_private *)dev->priv;
+	lp = netdev_priv(dev);
 	ioaddr = dev->base_addr;
 
 	spin_lock_irqsave(&lp->lock, flags);
@@ -1585,7 +1585,7 @@ el3_resume(struct pm_dev *pdev)
 		return -EINVAL;
 
 	dev = (struct net_device *)pdev->data;
-	lp = (struct el3_private *)dev->priv;
+	lp = netdev_priv(dev);
 	ioaddr = dev->base_addr;
 
 	spin_lock_irqsave(&lp->lock, flags);
