@@ -416,7 +416,7 @@ int show_stat(struct seq_file *p, void *v)
 	seq_printf(p, "intr %u", sum);
 
 #if !defined(CONFIG_PPC64) && !defined(CONFIG_ALPHA)
-	for (i = 0; i <= NR_IRQS; i++)
+	for (i = 0; i < NR_IRQS; i++)
 		seq_printf(p, " %u", kstat_irqs(i));
 #endif
 
