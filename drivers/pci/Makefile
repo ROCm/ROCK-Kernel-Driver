@@ -3,14 +3,15 @@
 #
 
 obj-y		+= access.o bus.o probe.o pci.o pool.o quirks.o \
-			names.o pci-driver.o search.o hotplug.o \
-			pci-sysfs.o
+			names.o pci-driver.o search.o pci-sysfs.o
 obj-$(CONFIG_PM)  += power.o
 obj-$(CONFIG_PROC_FS) += proc.o
 
 ifndef CONFIG_SPARC64
 obj-$(CONFIG_PCI) += setup-res.o
 endif
+
+obj-$(CONFIG_HOTPLUG) += hotplug.o
 
 # Build the PCI Hotplug drivers if we were asked to
 obj-$(CONFIG_HOTPLUG_PCI) += hotplug/
