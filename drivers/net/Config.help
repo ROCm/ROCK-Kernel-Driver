@@ -3,6 +3,10 @@ CONFIG_BAGETLANCE
   MIPS-32-based Baget embedded system.  This chipset is better known
   via the NE2100 cards.
 
+CONFIG_LASI_82596
+  Say Y here to support the on-board Intel 82596 ethernet controller
+  built into Hewlett-Packard PA-RISC machines.
+
 CONFIG_MIPS_JAZZ_SONIC
   This is the driver for the onboard card of MIPS Magnum 4000,
   Acer PICA, Olivetti M700-10 and a few other identical OEM systems.
@@ -213,6 +217,12 @@ CONFIG_PPPOE
   This driver requires a specially patched pppd daemon.  The patch to
   pppd, along with binaries of a patched pppd package can be found at:
   <http://www.shoshin.uwaterloo.ca/~mostrows/>.
+
+CONFIG_PPPOATM
+  Support PPP (Point to Point Protocol) encapsulated in ATM frames.
+  This implementation does not yet comply with section 8 of RFC2364,
+  which can lead to bad results if the ATM peer loses state and
+  changes its encapsulation unilaterally.
 
 CONFIG_NET_RADIO
   Support for wireless LANs and everything having to do with radio,
@@ -853,6 +863,10 @@ CONFIG_LANCE
   say M here and read <file:Documentation/modules.txt>.  This is
   recommended.  The module will be called lance.o.
 
+CONFIG_MIPS_AU1000_ENET
+  If you have an Alchemy Semi AU1000 ethernet controller
+  on an SGI MIPS system, say Y.  Otherwise, say N.
+
 CONFIG_SGI_IOC3_ETH
   If you have a network (Ethernet) card of this type, say Y and read
   the Ethernet-HOWTO, available from
@@ -1326,6 +1340,24 @@ CONFIG_DE4X5
   module, say M here and read <file:Documentation/modules.txt> as well
   as <file:Documentation/networking/net-modules.txt>.
 
+CONFIG_DE2104X
+  This driver is developed for the SMC EtherPower series Ethernet
+  cards and also works with cards based on the DECchip
+  21040 (Tulip series) chips.  Some LinkSys PCI cards are
+  of this type.  (If your card is NOT SMC EtherPower 10/100 PCI
+  (smc9332dst), you can also try the driver for "Generic DECchip"
+  cards, above.  However, most people with a network card of this type
+  will say Y here.) Do read the Ethernet-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>.  More specific
+  information is contained in
+  <file:Documentation/DocBook/tulip-user.tmpl>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called tulip.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt> as well
+  as <file:Documentation/networking/net-modules.txt>.
+
 CONFIG_TULIP
   This driver is developed for the SMC EtherPower series Ethernet
   cards and also works with cards based on the DECchip 
@@ -1343,6 +1375,20 @@ CONFIG_TULIP
   The module will be called tulip.o.  If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt> as well
   as <file:Documentation/networking/net-modules.txt>.
+
+CONFIG_TULIP_MWI
+  This configures your Tulip card specifically for the card and
+  system cache line size type you are using.
+
+  This is experimental code, not yet tested on many boards.
+
+  If unsure, say N.
+
+CONFIG_TULIP_MMIO
+  Use PCI shared memory for the NIC registers, rather than going through
+  the Tulip's PIO (programmed I/O ports).  Faster, but could produce
+  obscure bugs if your mainboard has memory controller timing issues.
+  If in doubt, say N.
 
 CONFIG_DGRS
   This is support for the Digi International RightSwitch series of
@@ -1373,6 +1419,11 @@ CONFIG_FEALNX
   Say Y here to support the Mysom MTD-800 family of PCI-based Ethernet
   cards. Specifications and data at
   <http://www.myson.com.hk/mtd/datasheet/>.
+
+CONFIG_LP486E
+  Say Y here to support the 82596-based on-board Ethernet controller
+  for the Panther motherboard, which is one of the two shipped in the
+  Intel Professional Workstation.
 
 CONFIG_ETH16I
   If you have a network (Ethernet) card of this type, say Y and read
@@ -1412,6 +1463,16 @@ CONFIG_VIA_RHINE
   The module will be called via-rhine.o.  If you want to compile it as
   a module, say M here and read <file:Documentation/modules.txt> as
   well as <file:Documentation/networking/net-modules.txt>.
+
+CONFIG_VIA_RHINE_MMIO
+  This instructs the driver to use PCI shared memory (MMIO) instead of
+  programmed I/O ports (PIO). Enabling this gives an improvement in
+  processing time in parts of the driver.
+
+  It is not known if this works reliably on all "rhine" based cards,
+  but it has been tested successfully on some DFE-530TX adapters.
+
+  If unsure, say N.
 
 CONFIG_DM9102
   This driver is for DM9102(A)/DM9132/DM9801 compatible PCI cards from
