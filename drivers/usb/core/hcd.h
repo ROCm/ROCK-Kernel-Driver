@@ -191,6 +191,12 @@ struct hc_driver {
 	int	(*get_frame_number) (struct usb_hcd *hcd);
 
 	/* memory lifecycle */
+	/* Note: The absence of hcd_free reflects a temporary situation;
+	 * in the near future hcd_alloc will disappear as well and all
+	 * allocations/deallocations will be handled by usbcore.  For the
+	 * moment, drivers are required to return a pointer that the core
+	 * can pass to kfree, i.e., the struct usb_hcd must be the _first_
+	 * member of a larger driver-specific structure. */
 	struct usb_hcd	*(*hcd_alloc) (void);
 
 	/* manage i/o requests, device state */
