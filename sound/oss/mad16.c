@@ -881,7 +881,7 @@ static int __initdata cdirq = 0;
 static int __initdata cdport = 0x340;
 static int __initdata cddma = -1;
 static int __initdata opl4 = 0;
-static int __initdata joystick = 0;
+static int __initdata joystick = 1;
 
 MODULE_PARM(mpu_io, "i");
 MODULE_PARM(mpu_irq, "i");

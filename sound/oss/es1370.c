@@ -23,11 +23,6 @@
  *
  *
  * Module command line parameters:
- *   joystick if 1 enables the joystick interface on the card; but it still
- *            needs a driver for joysticks connected to a standard IBM-PC
- *	      joyport. It is tested with the joy-analog driver. This 
- *	      module must be loaded before the joystick driver. Kmod will
- *	      not ensure that.
  *   lineout  if 1 the LINE jack is used as an output instead of an input.
  *            LINE then contains the unmixed dsp output. This can be used
  *            to make the card a four channel one: use dsp to output two
@@ -2529,14 +2524,11 @@ static /*const*/ struct file_operations es1370_midi_fops = {
 /* maximum number of devices; only used for command line params */
 #define NR_DEVICE 5
 
-static int joystick[NR_DEVICE] = { 0, };
 static int lineout[NR_DEVICE] = { 0, };
 static int micbias[NR_DEVICE] = { 0, };
 
 static unsigned int devindex = 0;
 
-MODULE_PARM(joystick, "1-" __MODULE_STRING(NR_DEVICE) "i");
-MODULE_PARM_DESC(joystick, "if 1 enables joystick interface (still need separate driver)");
 MODULE_PARM(lineout, "1-" __MODULE_STRING(NR_DEVICE) "i");
 MODULE_PARM_DESC(lineout, "if 1 the LINE input is converted to LINE out");
 MODULE_PARM(micbias, "1-" __MODULE_STRING(NR_DEVICE) "i");
@@ -2617,13 +2609,11 @@ static int __devinit es1370_probe(struct pci_dev *pcidev, const struct pci_devic
 	 * mic bias setting (by Kim.Berts@fisub.mail.abb.com) */
 	s->ctrl = CTRL_CDC_EN | (DAC2_SRTODIV(8000) << CTRL_SH_PCLKDIV) | (1 << CTRL_SH_WTSRSEL);
 	s->gameport.io = 0;
-	if (joystick[devindex]) {
-		if (!request_region(0x200, JOY_EXTENT, "es1370"))
-			printk(KERN_ERR "es1370: joystick io port 0x200 in use\n");
-		else {
-			s->ctrl |= CTRL_JYSTK_EN;
-			s->gameport.io = 0x200;
-		}
+	if (!request_region(0x200, JOY_EXTENT, "es1370"))
+		printk(KERN_ERR "es1370: joystick io port 0x200 in use\n");
+	else {
+		s->ctrl |= CTRL_JYSTK_EN;
+		s->gameport.io = 0x200;
 	}
 	if (lineout[devindex])
 		s->ctrl |= CTRL_XCTL0;
@@ -2765,7 +2755,7 @@ module_exit(cleanup_es1370);
 
 #ifndef MODULE
 
-/* format is: es1370=[joystick[,lineout[,micbias]]] */
+/* format is: es1370=lineout[,micbias]] */
 
 static int __init es1370_setup(char *str)
 {
@@ -2775,9 +2765,8 @@ static int __init es1370_setup(char *str)
 		return 0;
 
 	(void)
-	(   (get_option(&str,&joystick[nr_dev]) == 2)
-	 && (get_option(&str,&lineout [nr_dev]) == 2)
-	 &&  get_option(&str,&micbias [nr_dev])
+	((get_option(&str,&lineout [nr_dev]) == 2)
+	 && get_option(&str,&micbias [nr_dev])
 	);
 
 	nr_dev++;
