@@ -1,6 +1,6 @@
 /*
  * AGPGART
- * Copyright (C) 2002-2003 Dave Jones
+ * Copyright (C) 2002-2004 Dave Jones
  * Copyright (C) 1999 Jeff Hartmann
  * Copyright (C) 1999 Precision Insight, Inc.
  * Copyright (C) 1999 Xi Graphics, Inc.
@@ -167,8 +167,6 @@ struct agp_bridge_data {
 
 #define PGE_EMPTY(b, p)	(!(p) || (p) == (unsigned long) (b)->scratch_page)
 
-/* Chipset independant registers (from AGP Spec) */
-#define AGP_APBASE	0x10
 
 /* Intel registers */
 #define INTEL_APSIZE	0xb4
@@ -277,7 +275,9 @@ unsigned long agp_generic_mask_memory(unsigned long addr, int type);
 extern int agp_off;
 extern int agp_try_unsupported_boot;
 
-/* Standard agp registers */
+/* Chipset independant registers (from AGP Spec) */
+#define AGP_APBASE	0x10
+
 #define AGPSTAT			0x4
 #define AGPCMD			0x8
 #define AGPNISTAT		0xc
