@@ -293,7 +293,7 @@ iosapic_set_affinity (unsigned int irq, cpumask_t mask)
 	irq &= (~IA64_IRQ_REDIRECTED);
 	vec = irq_to_vector(irq);
 
-	if (cpus_empty(mask) || vec >= IA64_NUM_VECTORS)
+	if (cpus_empty(mask))
 		return;
 
 	dest = cpu_physical_id(first_cpu(mask));
