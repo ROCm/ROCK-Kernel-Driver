@@ -432,6 +432,7 @@ void do_tty_hangup(void *data)
 	struct file * cons_filp = NULL;
 	struct task_struct *p;
 	struct list_head *l;
+	struct pid *pid;
 	int    closecount = 0, n;
 
 	if (!tty)
@@ -496,17 +497,17 @@ void do_tty_hangup(void *data)
 	}
 	
 	read_lock(&tasklist_lock);
- 	for_each_process(p) {
-		if ((tty->session > 0) && (p->session == tty->session) &&
-		    p->leader) {
-			send_sig(SIGHUP,p,1);
-			send_sig(SIGCONT,p,1);
+	if (tty->session > 0)
+		for_each_task_pid(tty->session, PIDTYPE_SID, p, l, pid) {
+			if (p->tty == tty)
+				p->tty = NULL;
+			if (!p->leader)
+				continue;
+			send_sig(SIGHUP, p, 1);
+			send_sig(SIGCONT, p, 1);
 			if (tty->pgrp > 0)
 				p->tty_old_pgrp = tty->pgrp;
 		}
-		if (p->tty == tty)
-			p->tty = NULL;
-	}
 	read_unlock(&tasklist_lock);
 
 	tty->flags = 0;
@@ -571,6 +572,8 @@ void disassociate_ctty(int on_exit)
 {
 	struct tty_struct *tty = current->tty;
 	struct task_struct *p;
+	struct list_head *l;
+	struct pid *pid;
 	int tty_pgrp = -1;
 
 	lock_kernel();
@@ -598,9 +601,8 @@ void disassociate_ctty(int on_exit)
 	tty->pgrp = -1;
 
 	read_lock(&tasklist_lock);
-	for_each_process(p)
-	  	if (p->session == current->session)
-			p->tty = NULL;
+	for_each_task_pid(current->session, PIDTYPE_SID, p, l, pid)
+		p->tty = NULL;
 	read_unlock(&tasklist_lock);
 	unlock_kernel();
 }
@@ -1221,12 +1223,15 @@ static void release_dev(struct file * filp)
 	 */
 	if (tty_closing || o_tty_closing) {
 		struct task_struct *p;
+		struct list_head *l;
+		struct pid *pid;
 
 		read_lock(&tasklist_lock);
-		for_each_process(p) {
-			if (p->tty == tty || (o_tty && p->tty == o_tty))
+		for_each_task_pid(tty->session, PIDTYPE_SID, p, l, pid)
+			p->tty = NULL;
+		if (o_tty)
+			for_each_task_pid(o_tty->session, PIDTYPE_SID, p,l, pid)
 				p->tty = NULL;
-		}
 		read_unlock(&tasklist_lock);
 
 		if (redirect == tty || (o_tty && redirect == o_tty))
@@ -1540,6 +1545,10 @@ static int fionbio(struct file *file, int *arg)
 
 static int tiocsctty(struct tty_struct *tty, int arg)
 {
+	struct list_head *l;
+	struct pid *pid;
+	task_t *p;
+
 	if (current->leader &&
 	    (current->session == tty->session))
 		return 0;
@@ -1558,12 +1567,10 @@ static int tiocsctty(struct tty_struct *tty, int arg)
 			/*
 			 * Steal it away
 			 */
-			struct task_struct *p;
 
 			read_lock(&tasklist_lock);
-			for_each_process(p)
-				if (p->tty == tty)
-					p->tty = NULL;
+			for_each_task_pid(tty->session, PIDTYPE_SID, p, l, pid)
+				p->tty = NULL;
 			read_unlock(&tasklist_lock);
 		} else
 			return -EPERM;
