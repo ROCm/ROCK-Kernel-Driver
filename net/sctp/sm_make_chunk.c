@@ -1813,11 +1813,14 @@ int sctp_process_init(struct sctp_association *asoc, sctp_cid_t cid,
 	 * stream sequence number shall be set to 0.
 	 */
 
-	/* Allocate storage for the negotiated streams. */
-	asoc->ssnmap = sctp_ssnmap_new(asoc->peer.i.num_outbound_streams,
-				       asoc->c.sinit_num_ostreams, gfp);
-	if (!asoc->ssnmap)
-		goto nomem_ssnmap;
+	/* Allocate storage for the negotiated streams if it is not a temporary 	 * association.
+	 */
+	if (!asoc->temp) {
+		asoc->ssnmap = sctp_ssnmap_new(asoc->c.sinit_max_instreams,
+					       asoc->c.sinit_num_ostreams, gfp);
+		if (!asoc->ssnmap)
+			goto nomem_ssnmap;
+	}
 
 	/* ADDIP Section 4.1 ASCONF Chunk Procedures
 	 *

@@ -1435,7 +1435,7 @@ static int sctp_setsockopt_initmsg(struct sock *sk, char *optval, int optlen)
 }
 
 /*
- * 7.1.14 Set default send parameters (SET_DEFAULT_SEND_PARAM)
+ * 7.1.14 Set default send parameters (SCTP_DEFAULT_SEND_PARAM)
  *
  *   Applications that wish to use the sendto() system call may wish to
  *   specify a default set of parameters that would normally be supplied
@@ -2072,9 +2072,8 @@ SCTP_STATIC int sctp_init_sock(struct sock *sk)
 		return -ESOCKTNOSUPPORT;
 	}
 
-	/* FIXME:  The next draft (04) of the SCTP Sockets Extensions
-	 * should include a socket option for manipulating these
-	 * message parameters (and a few others).
+	/* Initialize default send parameters. These parameters can be
+	 * modified with the SCTP_DEFAULT_SEND_PARAM socket option.
 	 */
 	sp->default_stream = 0;
 	sp->default_ppid = 0;
@@ -2093,7 +2092,6 @@ SCTP_STATIC int sctp_init_sock(struct sock *sk)
 
 	/* Initialize default RTO related parameters.  These parameters can
 	 * be modified for with the SCTP_RTOINFO socket option.
-	 * FIXME: These are not used yet.
 	 */
 	sp->rtoinfo.srto_initial = (sctp_rto_initial / HZ) * 1000;
 	sp->rtoinfo.srto_max     = (sctp_rto_max / HZ) * 1000;
@@ -2776,7 +2774,7 @@ static int sctp_getsockopt_primary_addr(struct sock *sk, int len,
 
 /*
  *
- * 7.1.14 Set default send parameters (SET_DEFAULT_SEND_PARAM)
+ * 7.1.14 Set default send parameters (SCTP_DEFAULT_SEND_PARAM)
  *
  *   Applications that wish to use the sendto() system call may wish to
  *   specify a default set of parameters that would normally be supplied
