@@ -149,6 +149,7 @@ config MIPS_COBALT
 	depends on EXPERIMENTAL
 	select DMA_NONCOHERENT
 	select HW_HAS_PCI
+	select I8259
 	select IRQ_CPU
 
 config MACH_DECSTATION
