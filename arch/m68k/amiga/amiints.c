@@ -197,7 +197,7 @@ int amiga_request_irq(unsigned int irq,
 	}
 
 	if (irq >= IRQ_AMIGA_AUTO)
-		return sys_request_irq(irq - IRQ_AMIGA_AUTO, handler,
+		return cpu_request_irq(irq - IRQ_AMIGA_AUTO, handler,
 		                       flags, devname, dev_id);
 
 	if (irq >= IRQ_AMIGA_CIAB)
@@ -244,7 +244,7 @@ void amiga_free_irq(unsigned int irq, void *dev_id)
 	}
 
 	if (irq >= IRQ_AMIGA_AUTO)
-		sys_free_irq(irq - IRQ_AMIGA_AUTO, dev_id);
+		cpu_free_irq(irq - IRQ_AMIGA_AUTO, dev_id);
 
 	if (irq >= IRQ_AMIGA_CIAB) {
 		cia_free_irq(&ciab_base, irq - IRQ_AMIGA_CIAB, dev_id);

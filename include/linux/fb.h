@@ -236,15 +236,71 @@ struct fb_con2fbmap {
 #define VESA_HSYNC_SUSPEND      2
 #define VESA_POWERDOWN          3
 
+/* Definitions below are used in the parsed monitor specs */
+#define FB_DPMS_ACTIVE_OFF	1
+#define FB_DPMS_SUSPEND		2
+#define FB_DPMS_STANDBY		4
+
+#define FB_DISP_DDI		1
+#define FB_DISP_ANA_700_300	2
+#define FB_DISP_ANA_714_286	4
+#define FB_DISP_ANA_1000_400	8
+#define FB_DISP_ANA_700_000	16
+
+#define FB_DISP_MONO		32
+#define FB_DISP_RGB		64
+#define FB_DISP_MULTI		128
+#define FB_DISP_UNKNOWN		256
+
+#define FB_SIGNAL_NONE		0
+#define FB_SIGNAL_BLANK_BLANK	1
+#define FB_SIGNAL_SEPARATE	2
+#define FB_SIGNAL_COMPOSITE	4
+#define FB_SIGNAL_SYNC_ON_GREEN	8
+#define FB_SIGNAL_SERRATION_ON	16
+
+#define FB_MISC_PRIM_COLOR	1
+#define FB_MISC_1ST_DETAIL	2	/* First Detailed Timing is preferred */
+
+struct fb_chroma {
+	__u32 redx;	/* in fraction of 1024 */
+	__u32 greenx;
+	__u32 bluex;
+	__u32 whitex;
+	__u32 redy;
+	__u32 greeny;
+	__u32 bluey;
+	__u32 whitey;
+};
+
 struct fb_monspecs {
+	struct fb_chroma chroma;
+	struct fb_videomode *modedb;	/* mode database */
+	__u8  manufacturer[4];		/* Manufacturer */
+	__u8  monitor[14];		/* Monitor String */
+	__u8  serial_no[14];		/* Serial Number */
+	__u8  ascii[14];		/* ? */
+	__u32 modedb_len;		/* mode database length */
+	__u32 model;			/* Monitor Model */
+	__u32 serial;			/* Serial Number - Integer */
+	__u32 year;			/* Year manufactured */
+	__u32 week;			/* Week Manufactured */
 	__u32 hfmin;			/* hfreq lower limit (Hz) */
-	__u32 hfmax; 			/* hfreq upper limit (Hz) */
+	__u32 hfmax;			/* hfreq upper limit (Hz) */
+	__u32 dclkmin;			/* pixelclock lower limit (Hz) */
+	__u32 dclkmax;			/* pixelclock upper limit (Hz) */
+	__u16 input;			/* display type - see FB_DISP_* */
+	__u16 dpms;			/* DPMS support - see FB_DPMS_ */
+	__u16 signal;			/* Signal Type - see FB_SIGNAL_* */
 	__u16 vfmin;			/* vfreq lower limit (Hz) */
 	__u16 vfmax;			/* vfreq upper limit (Hz) */
-	__u32 dclkmin;                  /* pixelclock lower limit (Hz) */
-	__u32 dclkmax;                  /* pixelclock upper limit (Hz) */
-	unsigned gtf  : 1;              /* supports GTF */
-	unsigned dpms : 1;		/* supports DPMS */
+	__u16 gamma;			/* Gamma - in fractions of 100 */
+	__u16 gtf	: 1;		/* supports GTF */
+	__u16 misc;			/* Misc flags - see FB_MISC_* */
+	__u8  version;			/* EDID version... */
+	__u8  revision;			/* ...and revision */
+	__u8  max_x;			/* Maximum horizontal size (cm) */
+	__u8  max_y;			/* Maximum vertical size (cm) */
 };
 
 #define FB_VBLANK_VBLANKING	0x001	/* currently in a vertical blank */
@@ -379,14 +435,19 @@ struct fb_pixmap {
 	u32 scan_align;		/* alignment per scanline		*/
 	u32 access_align;	/* alignment per read/write		*/
 	u32 flags;		/* see FB_PIXMAP_*			*/
-				/* access methods			*/
+	/* access methods */
 	void (*outbuf)(struct fb_info *info, u8 *addr, u8 *src, unsigned int size);
 	u8   (*inbuf) (struct fb_info *info, u8 *addr);
 };
 
-    /*
-     *  Frame buffer operations
-     */
+
+/*
+ * Frame buffer operations
+ *
+ * LOCKING NOTE: those functions must _ALL_ be called with the console
+ * semaphore held, this is the only suitable locking mecanism we have
+ * in 2.6. Some may be called at interrupt time at this point though.
+ */
 
 struct fb_ops {
 	/* open/release and usage marking */
@@ -394,13 +455,16 @@ struct fb_ops {
 	int (*fb_open)(struct fb_info *info, int user);
 	int (*fb_release)(struct fb_info *info, int user);
 
-	/* For framebuffers with strange non linear layouts */
+	/* For framebuffers with strange non linear layouts or that do not
+	 * work with normal memory mapped access
+	 */
 	ssize_t (*fb_read)(struct file *file, char *buf, size_t count, loff_t *ppos);
 	ssize_t (*fb_write)(struct file *file, const char *buf, size_t count, loff_t *ppos);
 
 	/* checks var and eventually tweaks it to something supported,
 	 * DO NOT MODIFY PAR */
 	int (*fb_check_var)(struct fb_var_screeninfo *var, struct fb_info *info);
+
 	/* set the video mode according to info->var */
 	int (*fb_set_par)(struct fb_info *info);
 
@@ -441,15 +505,14 @@ struct fb_ops {
 struct fb_info {
 	int node;
 	int flags;
-	int open;			/* Has this been open already ? */
 #define FBINFO_FLAG_MODULE	1	/* Low-level driver is a module */
 	struct fb_var_screeninfo var;	/* Current var */
 	struct fb_fix_screeninfo fix;	/* Current fix */
 	struct fb_monspecs monspecs;	/* Current Monitor specs */
 	struct fb_cursor cursor;	/* Current cursor */	
 	struct work_struct queue;	/* Framebuffer event queue */
-	struct fb_pixmap pixmap;	/* Image Hardware Mapper */
-	struct fb_pixmap sprite;	/* Cursor hardware Mapper */
+	struct fb_pixmap pixmap;	/* Image hardware mapper */
+	struct fb_pixmap sprite;	/* Cursor hardware mapper */
 	struct fb_cmap cmap;		/* Current cmap */
 	struct fb_ops *fbops;
 	char *screen_base;		/* Virtual address */
@@ -459,6 +522,7 @@ struct fb_info {
 #define FBINFO_STATE_RUNNING	0
 #define FBINFO_STATE_SUSPENDED	1
 	u32 state;			/* Hardware state i.e suspend */
+
 	/* From here on everything is device dependent */
 	void *par;	
 };
@@ -469,12 +533,14 @@ struct fb_info {
 #define FBINFO_FLAG_DEFAULT	0
 #endif
 
+// This will go away
 #if defined(__sparc__)
 
 /* We map all of our framebuffers such that big-endian accesses
  * are what we want, so the following is sufficient.
  */
 
+// This will go away
 #define fb_readb sbus_readb
 #define fb_readw sbus_readw
 #define fb_readl sbus_readl
@@ -485,7 +551,7 @@ struct fb_info {
 #define fb_writeq sbus_writeq
 #define fb_memset sbus_memset_io
 
-#elif defined(__i386__) || defined(__alpha__) || defined(__x86_64__) || defined(__hppa__) || defined(__sh__)
+#elif defined(__i386__) || defined(__alpha__) || defined(__x86_64__) || defined(__hppa__) || defined(__sh__) || defined(__powerpc__)
 
 #define fb_readb __raw_readb
 #define fb_readw __raw_readw
@@ -546,24 +612,32 @@ extern struct fb_info *framebuffer_alloc(size_t size, struct device *dev);
 extern void framebuffer_release(struct fb_info *info);
 
 /* drivers/video/fbmon.c */
-#define FB_MAXTIMINGS       0
-#define FB_VSYNCTIMINGS     1
-#define FB_HSYNCTIMINGS     2
-#define FB_DCLKTIMINGS      3
-#define FB_IGNOREMON    0x100
+#define FB_MAXTIMINGS		0
+#define FB_VSYNCTIMINGS		1
+#define FB_HSYNCTIMINGS		2
+#define FB_DCLKTIMINGS		3
+#define FB_IGNOREMON		0x100
+
+#define FB_MODE_IS_UNKNOWN	0
+#define FB_MODE_IS_DETAILED	1
+#define FB_MODE_IS_STANDARD	2
+#define FB_MODE_IS_VESA		4
+#define FB_MODE_IS_CALCULATED	8
+#define FB_MODE_IS_FIRST	16
 
 extern int fbmon_valid_timings(u_int pixclock, u_int htotal, u_int vtotal,
 			       const struct fb_info *fb_info);
 extern int fbmon_dpms(const struct fb_info *fb_info);
 extern int fb_get_mode(int flags, u32 val, struct fb_var_screeninfo *var,
 		       struct fb_info *info);
-extern int fb_validate_mode(struct fb_var_screeninfo *var,
+extern int fb_validate_mode(const struct fb_var_screeninfo *var,
 			    struct fb_info *info);
-extern int parse_edid(unsigned char *edid, struct fb_var_screeninfo *var);
+extern int fb_parse_edid(unsigned char *edid, struct fb_var_screeninfo *var);
+extern int fb_get_monitor_limits(unsigned char *edid, struct fb_monspecs *specs);
+extern void fb_edid_to_monspecs(unsigned char *edid, struct fb_monspecs *specs);
 extern int fb_get_monitor_limits(unsigned char *edid, struct fb_monspecs *specs);
 extern struct fb_videomode *fb_create_modedb(unsigned char *edid, int *dbsize);
 extern void fb_destroy_modedb(struct fb_videomode *modedb);
-extern void show_edid(unsigned char *edid);
 
 /* drivers/video/modedb.c */
 #define VESA_MODEDB_SIZE 34
@@ -578,58 +652,28 @@ extern struct fb_cmap *fb_default_cmap(int len);
 extern void fb_invert_cmaps(void);
 
 struct fb_videomode {
-    const char *name;	/* optional */
-    u32 refresh;	/* optional */
-    u32 xres;
-    u32 yres;
-    u32 pixclock;
-    u32 left_margin;
-    u32 right_margin;
-    u32 upper_margin;
-    u32 lower_margin;
-    u32 hsync_len;
-    u32 vsync_len;
-    u32 sync;
-    u32 vmode;
+	const char *name;	/* optional */
+	u32 refresh;		/* optional */
+	u32 xres;
+	u32 yres;
+	u32 pixclock;
+	u32 left_margin;
+	u32 right_margin;
+	u32 upper_margin;
+	u32 lower_margin;
+	u32 hsync_len;
+	u32 vsync_len;
+	u32 sync;
+	u32 vmode;
+	u32 flag;
 };
 
-#ifdef MODULE
-static inline int fb_find_mode(struct fb_var_screeninfo *var,
-			       struct fb_info *info,
-			       const char *mode_option,
-			       const struct fb_videomode *db,
-			       unsigned int dbsize,
-			       const struct fb_videomode *default_mode,
-			       unsigned int default_bpp)
-{
-    extern int __fb_try_mode(struct fb_var_screeninfo *var,
-	    		     struct fb_info *info,
-			     const struct fb_videomode *mode,
-			     unsigned int bpp);
-    /*
-     *  FIXME: How to make the compiler optimize vga640x400 away if
-     *         default_mode is non-NULL?
-     */
-    static const struct fb_videomode vga640x400 = {
-	/* 640x400 @ 70 Hz, 31.5 kHz hsync */
-	NULL, 70, 640, 400, 39721, 40, 24, 39, 9, 96, 2,
-	0, FB_VMODE_NONINTERLACED
-    };
-    if (!default_mode)
-	default_mode = &vga640x400;
-    if (!default_bpp)
-	default_bpp = 8;
-    return __fb_try_mode(var, info, default_mode, default_bpp);
-}
-#else
-extern int __init fb_find_mode(struct fb_var_screeninfo *var,
-			       struct fb_info *info,
-			       const char *mode_option,
-			       const struct fb_videomode *db,
-			       unsigned int dbsize,
-			       const struct fb_videomode *default_mode,
-			       unsigned int default_bpp);
-#endif
+extern int fb_find_mode(struct fb_var_screeninfo *var,
+			struct fb_info *info, const char *mode_option,
+			const struct fb_videomode *db,
+			unsigned int dbsize,
+			const struct fb_videomode *default_mode,
+			unsigned int default_bpp);
 
 #endif /* __KERNEL__ */
 

@@ -180,15 +180,6 @@ static int setup_debug = 0;
 
 static char *setup_str = (char *) NULL;
 
-static irqreturn_t i91u_intr0(int irq, void *dev_id, struct pt_regs *);
-static irqreturn_t i91u_intr1(int irq, void *dev_id, struct pt_regs *);
-static irqreturn_t i91u_intr2(int irq, void *dev_id, struct pt_regs *);
-static irqreturn_t i91u_intr3(int irq, void *dev_id, struct pt_regs *);
-static irqreturn_t i91u_intr4(int irq, void *dev_id, struct pt_regs *);
-static irqreturn_t i91u_intr5(int irq, void *dev_id, struct pt_regs *);
-static irqreturn_t i91u_intr6(int irq, void *dev_id, struct pt_regs *);
-static irqreturn_t i91u_intr7(int irq, void *dev_id, struct pt_regs *);
-
 static void i91u_panic(char *msg);
 
 static void i91uSCBPost(BYTE * pHcb, BYTE * pScb);
@@ -278,7 +269,7 @@ static irqreturn_t i91u_intr(int irqno, void *dev_id, struct pt_regs *regs)
 	unsigned long flags;
 	
 	spin_lock_irqsave(dev->host_lock, flags);
-	tul_isr((HCS *)hreg->base);
+	tul_isr((HCS *)dev->base);
 	spin_unlock_irqrestore(dev->host_lock, flags);
 	return IRQ_HANDLED;
 }

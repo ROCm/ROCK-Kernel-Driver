@@ -29,6 +29,7 @@
 #include <linux/pci.h>
 #include <linux/wait.h>
 #include <linux/init.h>
+#include <linux/fs.h>
 
 #include <asm/io.h>
 #include <asm/uaccess.h>

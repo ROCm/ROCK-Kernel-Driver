@@ -289,11 +289,6 @@ asmlinkage int sys_olduname(struct oldold_utsname * name)
 	return error;
 }
 
-asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int on)
-{
-	return -ENOSYS;
-}
-
 #else /* CONFIG_ARCH_S390X */
 
 asmlinkage int s390x_newuname(struct new_utsname * name)

@@ -2345,6 +2345,7 @@ int __init fb_console_init(void)
 {
 	if (!num_registered_fb)
 		return -ENODEV;
+
 	take_over_console(&fb_con, first_fb_vc, last_fb_vc, fbcon_is_default);
 	acquire_console_sem();
 	if (!fbcon_event_notifier_registered) {
@@ -2352,9 +2353,10 @@ int __init fb_console_init(void)
 		fbcon_event_notifier_registered = 1;
 	} 
 	release_console_sem();
-
 	return 0;
 }
+
+#ifdef MODULE
 
 void __exit fb_console_exit(void)
 {
@@ -2369,6 +2371,8 @@ void __exit fb_console_exit(void)
 
 module_init(fb_console_init);
 module_exit(fb_console_exit);
+
+#endif
 
 /*
  *  Visible symbols for modules

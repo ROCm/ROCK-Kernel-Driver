@@ -32,7 +32,7 @@
 #define AT_SYSINFO 32
 #define AT_SYSINFO_EHDR		33
 
-int sysctl_vsyscall32;
+int sysctl_vsyscall32 = 1;
 
 #define ARCH_DLINFO do {  \
 	if (sysctl_vsyscall32) { \
@@ -46,7 +46,7 @@ struct elf_phdr;
 
 #define IA32_EMULATOR 1
 
-#define ELF_ET_DYN_BASE		(IA32_PAGE_OFFSET/3 + 0x1000000)
+#define ELF_ET_DYN_BASE		(TASK_UNMAPPED_32 + 0x1000000)
 
 #undef ELF_ARCH
 #define ELF_ARCH EM_386
@@ -261,7 +261,6 @@ do {							\
 		set_thread_flag(TIF_ABI_PENDING);		\
 	else							\
 		clear_thread_flag(TIF_ABI_PENDING);		\
-	set_personality((ibcs2)?PER_SVR4:current->personality);	\
 } while (0)
 
 /* Override some function names */

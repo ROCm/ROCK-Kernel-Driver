@@ -173,8 +173,8 @@ extern unsigned long __PAGE_KERNEL;
  */
 #undef TEST_VERIFY_AREA
 
-/* page table for 0-4MB for everybody */
-extern unsigned long pg0[1024];
+/* The boot page tables (all created as a single array) */
+extern unsigned long pg0[];
 
 #define pte_present(x)	((x).pte_low & (_PAGE_PRESENT | _PAGE_PROTNONE))
 #define pte_clear(xp)	do { set_pte(xp, __pte(0)); } while (0)

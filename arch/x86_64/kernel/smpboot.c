@@ -55,10 +55,15 @@
 
 /* Number of siblings per CPU package */
 int smp_num_siblings = 1;
-int phys_proc_id[NR_CPUS]; /* Package ID of each logical CPU */
+char phys_proc_id[NR_CPUS]; /* Package ID of each logical CPU */
 
 /* Bitmask of currently online CPUs */
 cpumask_t cpu_online_map;
+
+/* which CPU (physical APIC ID) maps to which logical CPU number */
+volatile char x86_apicid_to_cpu[NR_CPUS];
+/* which logical CPU number maps to which CPU (physical APIC ID) */
+volatile char x86_cpu_to_apicid[NR_CPUS];
 
 static cpumask_t cpu_callin_map;
 cpumask_t cpu_callout_map;
@@ -70,7 +75,7 @@ struct cpuinfo_x86 cpu_data[NR_CPUS] __cacheline_aligned;
 /* Set when the idlers are all forked */
 int smp_threads_ready;
 
-int cpu_sibling_map[NR_CPUS] __cacheline_aligned;
+char cpu_sibling_map[NR_CPUS] __cacheline_aligned;
 
 /*
  * Trampoline 80x86 program as an array.
@@ -574,6 +579,9 @@ static void __init do_boot_cpu (int apicid)
 	if (IS_ERR(idle))
 		panic("failed fork for CPU %d", cpu);
 	wake_up_forked_process(idle);	
+	x86_cpu_to_apicid[cpu] = apicid;
+	x86_apicid_to_cpu[apicid] = cpu;
+
 
 	/*
 	 * We remove it from the pidhash and the runqueue
@@ -885,7 +893,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 					break;
 				}
 			}
-			if (cpu_sibling_map[cpu] == NO_PROC_ID) {
+			if (cpu_sibling_map[cpu] == (char)NO_PROC_ID) {
 				smp_num_siblings = 1;
 				printk(KERN_WARNING "WARNING: No sibling found for CPU %d.\n", cpu);
 			}

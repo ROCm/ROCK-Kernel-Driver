@@ -201,6 +201,8 @@ static int cramfs_fill_super(struct super_block *sb, void *data, int silent)
 	struct cramfs_sb_info *sbi;
 	struct inode *root;
 
+	sb->s_flags |= MS_RDONLY;
+
 	sbi = kmalloc(sizeof(struct cramfs_sb_info), GFP_KERNEL);
 	if (!sbi)
 		return -ENOMEM;

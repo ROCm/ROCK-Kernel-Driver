@@ -15,6 +15,7 @@
 #include <linux/interrupt.h>
 #include <linux/slab.h>
 #include <linux/bootmem.h>
+#include <linux/cpumask.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
 #include <asm/sn/sgi.h>
@@ -118,10 +119,11 @@ sn_end_irq(unsigned int irq)
 }
 
 static void
-sn_set_affinity_irq(unsigned int irq, unsigned long cpu)
+sn_set_affinity_irq(unsigned int irq, cpumask_t mask)
 {
 #ifdef CONFIG_SMP
 	int redir = 0;
+	int cpu;
 	struct sn_intr_list_t *p = sn_intr_list[irq];
 	pcibr_intr_t intr;
 	extern void sn_shub_redirect_intr(pcibr_intr_t intr, unsigned long cpu);
@@ -135,7 +137,9 @@ sn_set_affinity_irq(unsigned int irq, unsigned long cpu)
 	if (intr == NULL)
 		return; 
 
+	cpu = first_cpu(mask);
 	sn_shub_redirect_intr(intr, cpu);
+	irq = irq & 0xff;  /* strip off redirect bit, if someone stuck it on. */
 	(void) set_irq_affinity_info(irq, cpu_physical_id(intr->bi_cpu), redir);
 #endif /* CONFIG_SMP */
 }

@@ -17,7 +17,7 @@
    Last modified: 18-JAN-1998 Richard Gooch <rgooch@atnf.csiro.au> Devfs support
  */
 
-static char *verstr = "20040213";
+static char *verstr = "20040226";
 
 #include <linux/module.h>
 
@@ -121,7 +121,15 @@ static struct st_dev_parm {
 };
 #endif
 
-static char *st_formats[ST_NBR_MODES] ={"", "l", "m", "a"};
+/* Restrict the number of modes so that names for all are assigned */
+#if ST_NBR_MODES > 16
+#error "Maximum number of modes is 16"
+#endif
+/* Bit reversed order to get same names for same minors with all
+   mode counts */
+static char *st_formats[] = {
+	"",  "r", "k", "s", "l", "t", "o", "u",
+	"m", "v", "p", "x", "a", "y", "q", "z"}; 
 
 /* The default definitions have been moved to st_options.h */
 
@@ -3888,8 +3896,11 @@ static int st_probe(struct device *dev)
 				       dev_num);
 				goto out_free_tape;
 			}
-			snprintf(cdev->kobj.name, KOBJ_NAME_LEN, "%sm%d%s", disk->disk_name,
-				 mode, j ? "n" : "");
+			/* Make sure that the minor numbers corresponding to the four
+			   first modes always get the same names */
+			i = mode << (4 - ST_NBR_MODE_BITS);
+			snprintf(cdev->kobj.name, KOBJ_NAME_LEN, "%s%s%s", j ? "n" : "",
+				 disk->disk_name, st_formats[i]);
 			cdev->owner = THIS_MODULE;
 			cdev->ops = &st_fops;
 
@@ -3909,22 +3920,26 @@ static int st_probe(struct device *dev)
 	}
 
 	for (mode = 0; mode < ST_NBR_MODES; ++mode) {
+		/* Make sure that the minor numbers corresponding to the four
+		   first modes always get the same names */
+		i = mode << (4 - ST_NBR_MODE_BITS);
 		/*  Rewind entry  */
-		devfs_mk_cdev(MKDEV(SCSI_TAPE_MAJOR, dev_num + (mode << 5)),
+		devfs_mk_cdev(MKDEV(SCSI_TAPE_MAJOR, TAPE_MINOR(dev_num, mode, 0)),
 			      S_IFCHR | S_IRUGO | S_IWUGO,
-			      "%s/mt%s", SDp->devfs_name, st_formats[mode]);
+			      "%s/mt%s", SDp->devfs_name, st_formats[i]);
 		/*  No-rewind entry  */
-		devfs_mk_cdev(MKDEV(SCSI_TAPE_MAJOR, dev_num + (mode << 5) + 128),
+		devfs_mk_cdev(MKDEV(SCSI_TAPE_MAJOR, TAPE_MINOR(dev_num, mode, 1)),
 			      S_IFCHR | S_IRUGO | S_IWUGO,
-			      "%s/mt%sn", SDp->devfs_name, st_formats[mode]);
+			      "%s/mt%sn", SDp->devfs_name, st_formats[i]);
 	}
 	disk->number = devfs_register_tape(SDp->devfs_name);
 
 	printk(KERN_WARNING
 	"Attached scsi tape %s at scsi%d, channel %d, id %d, lun %d\n",
 	       tape_name(tpnt), SDp->host->host_no, SDp->channel, SDp->id, SDp->lun);
-	printk(KERN_WARNING "%s: try direct i/o: %s, max page reachable by HBA %lu\n",
-	       tape_name(tpnt), tpnt->try_dio ? "yes" : "no", tpnt->max_pfn);
+	printk(KERN_WARNING "%s: try direct i/o: %s (alignment %d B), max page reachable by HBA %lu\n",
+	       tape_name(tpnt), tpnt->try_dio ? "yes" : "no",
+	       queue_dma_alignment(SDp->request_queue) + 1, tpnt->max_pfn);
 
 	return 0;
 
@@ -3977,8 +3992,9 @@ static int st_remove(struct device *dev)
 			sysfs_remove_link(&tpnt->device->sdev_gendev.kobj,
 					  "tape");
 			for (mode = 0; mode < ST_NBR_MODES; ++mode) {
-				devfs_remove("%s/mt%s", SDp->devfs_name, st_formats[mode]);
-				devfs_remove("%s/mt%sn", SDp->devfs_name, st_formats[mode]);
+				j = mode << (4 - ST_NBR_MODE_BITS);
+				devfs_remove("%s/mt%s", SDp->devfs_name, st_formats[j]);
+				devfs_remove("%s/mt%sn", SDp->devfs_name, st_formats[j]);
 				for (j=0; j < 2; j++) {
 					class_simple_device_remove(MKDEV(SCSI_TAPE_MAJOR,
 									 TAPE_MINOR(i, mode, j)));

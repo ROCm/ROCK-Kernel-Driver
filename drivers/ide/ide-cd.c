@@ -2931,6 +2931,7 @@ static int ide_cdrom_register (ide_drive_t *drive, int nslots)
 	if (!CDROM_CONFIG_FLAGS(drive)->mrw_w)
 		devinfo->mask |= CDC_MRW_W;
 
+	devinfo->disk = drive->disk;
 	return register_cdrom(devinfo);
 }
 

@@ -34,10 +34,11 @@
 				   in empty_zero_block - treat this as 1 byte  */
 #define EDDBUF	0x600		/* addr of edd_info structs in empty_zero_block */
 #define EDDMAXNR 6		/* number of edd_info structs starting at EDDBUF  */
-#define EDDEXTSIZE 4		/* change these if you muck with the structures */
+#define EDDEXTSIZE 8		/* change these if you muck with the structures */
 #define EDDPARMSIZE 74
 #define CHECKEXTENSIONSPRESENT 0x41
 #define GETDEVICEPARAMETERS 0x48
+#define LEGACYGETDEVICEPARAMETERS 0x08
 #define EDDMAGIC1 0x55AA
 #define EDDMAGIC2 0xAA55
 
@@ -165,6 +166,9 @@ struct edd_info {
 	u8 device;
 	u8 version;
 	u16 interface_support;
+	u16 legacy_cylinders;
+	u8 legacy_heads;
+	u8 legacy_sectors;
 	struct edd_device_params params;
 } __attribute__ ((packed));
 

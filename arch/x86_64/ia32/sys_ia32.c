@@ -1876,18 +1876,9 @@ long sys32_quotactl(void)
 
 cond_syscall(sys32_ipc)
 
-struct exec_domain ia32_exec_domain = { 
-	.name = "linux/x86",
-	.pers_low = PER_LINUX32,
-	.pers_high = PER_LINUX32,
-};      
-
 static int __init ia32_init (void)
 {
 	printk("IA32 emulation $Id: sys_ia32.c,v 1.32 2002/03/24 13:02:28 ak Exp $\n");  
-	ia32_exec_domain.signal_map = default_exec_domain.signal_map;
-	ia32_exec_domain.signal_invmap = default_exec_domain.signal_invmap;
-	register_exec_domain(&ia32_exec_domain);
 	return 0;
 }
 

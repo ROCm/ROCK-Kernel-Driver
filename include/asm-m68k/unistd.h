@@ -374,7 +374,6 @@ asmlinkage long sys_mmap2(
 asmlinkage int sys_execve(char *name, char **argv, char **envp);
 asmlinkage int sys_pipe(unsigned long *fildes);
 asmlinkage int sys_ptrace(long request, long pid, long addr, long data);
-asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int on);
 struct pt_regs;
 struct sigaction;
 asmlinkage long sys_rt_sigaction(int sig,

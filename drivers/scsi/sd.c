@@ -19,6 +19,9 @@
  *	   not being read in sd_open. Fix problem where removable media 
  *	   could be ejected after sd_open.
  *	 - Douglas Gilbert <dgilbert@interlog.com> cleanup for lk 2.5.x
+ *	 - Badari Pulavarty <pbadari@us.ibm.com>, Matthew Wilcox 
+ *	   <willy@debian.org>, Kurt Garloff <garloff@suse.de>: 
+ *	   Support 32k/1M disks.
  *
  *	Logging policy (needs CONFIG_SCSI_LOGGING defined):
  *	 - setting up transfer: SCSI_LOG_HLQUEUE levels 1 and 2
@@ -61,7 +64,7 @@
  * Remaining dev_t-handling stuff
  */
 #define SD_MAJORS	16
-#define SD_DISKS	(SD_MAJORS << 4)
+#define SD_DISKS	32768	/* anything between 256 and 262144 */
 
 /*
  * Time out in seconds for disks and Magneto-opticals (which are slower).
@@ -121,6 +124,20 @@ static struct scsi_driver sd_template = {
 	.init_command		= sd_init_command,
 };
 
+/* Device no to disk mapping:
+ * 
+ *       major         disc2     disc  p1
+ *   |............|.............|....|....| <- dev_t
+ *    31        20 19          8 7  4 3  0
+ * 
+ * Inside a major, we have 16k disks, however mapped non-
+ * contiguously. The first 16 disks are for major0, the next
+ * ones with major1, ... Disk 256 is for major0 again, disk 272 
+ * for major1, ... 
+ * As we stay compatible with our numbering scheme, we can reuse 
+ * the well-know SCSI majors 8, 65--71, 136--143.
+ */
+
 static int sd_major(int major_idx)
 {
 	switch (major_idx) {
@@ -135,6 +152,14 @@ static int sd_major(int major_idx)
 		return 0;	/* shut up gcc */
 	}
 }
+
+static unsigned int make_sd_dev(unsigned int sd_nr, unsigned int part)
+{
+	return  (part & 0xf) | ((sd_nr & 0xf) << 4) |
+		(sd_major((sd_nr & 0xf0) >> 4) << 20) | (sd_nr & 0xfff00);
+}
+
+/* reverse mapping dev -> (sd_nr, part) not currently needed */
 
 #define to_scsi_disk(obj) container_of(obj,struct scsi_disk,kobj);
 
@@ -1301,7 +1326,7 @@ static int sd_probe(struct device *dev)
 	struct scsi_disk *sdkp;
 	struct gendisk *gd;
 	u32 index;
-	int error;
+	int error, devno;
 
 	error = -ENODEV;
 	if ((sdp->type != TYPE_DISK) && (sdp->type != TYPE_MOD))
@@ -1319,6 +1344,12 @@ static int sd_probe(struct device *dev)
 	kobject_init(&sdkp->kobj);
 	sdkp->kobj.ktype = &scsi_disk_kobj_type;
 
+	/* Note: We can accomodate 64 partitions, but the genhd code
+	 * assumes partitions allocate consecutive minors, which they don't.
+	 * So for now stay with max 16 partitions and leave two spare bits. 
+	 * Later, we may change the genhd code and the alloc_disk() call
+	 * and the ->minors assignment here. 	KG, 2004-02-10
+	 */ 
 	gd = alloc_disk(16);
 	if (!gd)
 		goto out_free;
@@ -1339,16 +1370,23 @@ static int sd_probe(struct device *dev)
 	sdkp->index = index;
 	sdkp->openers = 0;
 
-	gd->major = sd_major(index >> 4);
-	gd->first_minor = (index & 15) << 4;
+	devno = make_sd_dev(index, 0);
+	gd->major = MAJOR(devno);
+	gd->first_minor = MINOR(devno);
 	gd->minors = 16;
 	gd->fops = &sd_fops;
 
-	if (index >= 26) {
-		sprintf(gd->disk_name, "sd%c%c",
-			'a' + index/26-1,'a' + index % 26);
-	} else {
+	if (index < 26) {
 		sprintf(gd->disk_name, "sd%c", 'a' + index % 26);
+	} else if (index < (26*27)) {
+		sprintf(gd->disk_name, "sd%c%c",
+			'a' + index / 26 - 1,'a' + index % 26);
+	} else {
+		const unsigned int m1 = (index / 26 - 1) / 26 - 1;
+		const unsigned int m2 = (index / 26 - 1) % 26;
+		const unsigned int m3 =  index % 26;
+		sprintf(gd->disk_name, "sd%c%c%c",
+			'a' + m1, 'a' + m2, 'a' + m3);
 	}
 
 	strcpy(gd->devfs_name, sdp->devfs_name);

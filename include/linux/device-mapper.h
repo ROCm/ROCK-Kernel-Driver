@@ -13,6 +13,11 @@ struct dm_dev;
 
 typedef enum { STATUSTYPE_INFO, STATUSTYPE_TABLE } status_type_t;
 
+union map_info {
+	void *ptr;
+	unsigned long long ll;
+};
+
 /*
  * In the constructor the target parameter will already have the
  * table, type, begin and len fields filled in.
@@ -32,7 +37,19 @@ typedef void (*dm_dtr_fn) (struct dm_target *ti);
  * = 0: The target will handle the io by resubmitting it later
  * > 0: simple remap complete
  */
-typedef int (*dm_map_fn) (struct dm_target *ti, struct bio *bio);
+typedef int (*dm_map_fn) (struct dm_target *ti, struct bio *bio,
+			  union map_info *map_context);
+
+/*
+ * Returns:
+ * < 0 : error (currently ignored)
+ * 0   : ended successfully
+ * 1   : for some reason the io has still not completed (eg,
+ *       multipath target might want to requeue a failed io).
+ */
+typedef int (*dm_endio_fn) (struct dm_target *ti,
+			    struct bio *bio, int error,
+			    union map_info *map_context);
 
 typedef void (*dm_suspend_fn) (struct dm_target *ti);
 typedef void (*dm_resume_fn) (struct dm_target *ti);
@@ -57,9 +74,11 @@ void dm_put_device(struct dm_target *ti, struct dm_dev *d);
 struct target_type {
 	const char *name;
 	struct module *module;
+        unsigned version[3];
 	dm_ctr_fn ctr;
 	dm_dtr_fn dtr;
 	dm_map_fn map;
+	dm_endio_fn end_io;
 	dm_suspend_fn suspend;
 	dm_resume_fn resume;
 	dm_status_fn status;
@@ -86,7 +105,7 @@ struct dm_target {
 	sector_t split_io;
 
 	/*
-	 * These are automaticall filled in by
+	 * These are automatically filled in by
 	 * dm_table_get_device.
 	 */
 	struct io_restrictions limits;

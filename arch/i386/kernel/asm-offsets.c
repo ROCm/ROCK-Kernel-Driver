@@ -4,9 +4,11 @@
  * to extract and format the required data.
  */
 
+#include <linux/sched.h>
 #include <linux/signal.h>
 #include <asm/ucontext.h>
 #include "sigframe.h"
+#include <asm/fixmap.h>
 
 #define DEFINE(sym, val) \
         asm volatile("\n->" #sym " %0 " #val : : "i" (val))
@@ -28,4 +30,6 @@ void foo(void)
 
 	DEFINE(RT_SIGFRAME_sigcontext,
 	       offsetof (struct rt_sigframe, uc.uc_mcontext));
+
+	DEFINE(PAGE_SIZE_asm, PAGE_SIZE);
 }

@@ -16,7 +16,7 @@
  *  Each contributing author retains all rights to their own work.
  *
  *  (C) 1998-1999 Dave Boynton
- *  (C) 1998-2001 Ben Fennema
+ *  (C) 1998-2004 Ben Fennema
  *  (C) 1999-2000 Stelias Computing Inc
  *
  * HISTORY
@@ -247,9 +247,9 @@ static int udf_release_file(struct inode * inode, struct file * filp)
 {
 	if (filp->f_mode & FMODE_WRITE)
 	{
-		lock_kernel();
+		down(&inode->i_sem);
 		udf_discard_prealloc(inode);
-		unlock_kernel();
+		up(&inode->i_sem);
 	}
 	return 0;
 }

@@ -53,7 +53,7 @@ asmlinkage extern void ret_from_fork(void);
 
 unsigned long kernel_thread_flags = CLONE_VM | CLONE_UNTRACED;
 
-int hlt_counter;
+atomic_t hlt_counter = ATOMIC_INIT(0);
 
 /*
  * Powermanagement idle function, if any..
@@ -62,14 +62,14 @@ void (*pm_idle)(void);
 
 void disable_hlt(void)
 {
-	hlt_counter++;
+	atomic_inc(&hlt_counter);
 }
 
 EXPORT_SYMBOL(disable_hlt);
 
 void enable_hlt(void)
 {
-	hlt_counter--;
+	atomic_dec(&hlt_counter);
 }
 
 EXPORT_SYMBOL(enable_hlt);
@@ -80,7 +80,7 @@ EXPORT_SYMBOL(enable_hlt);
  */
 void default_idle(void)
 {
-	if (!hlt_counter) {
+	if (!atomic_read(&hlt_counter)) {
 		local_irq_disable();
 		if (!need_resched())
 			safe_halt();

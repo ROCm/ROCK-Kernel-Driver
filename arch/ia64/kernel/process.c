@@ -574,8 +574,8 @@ ia64_set_personality (struct elf64_hdr *elf_ex, int ibcs2_interpreter)
 pid_t
 kernel_thread (int (*fn)(void *), void *arg, unsigned long flags)
 {
-	extern void ia64_invoke_kernel_thread_helper (void);
-	unsigned long *helper_fptr = (unsigned long *) &ia64_invoke_kernel_thread_helper;
+	extern void start_kernel_thread (void);
+	unsigned long *helper_fptr = (unsigned long *) &start_kernel_thread;
 	struct {
 		struct switch_stack sw;
 		struct pt_regs pt;

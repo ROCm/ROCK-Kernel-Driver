@@ -20,6 +20,7 @@
 #include <asm/sn/vector.h>
 #include <asm/sn/slotnum.h>
 #include <asm/sn/arch.h>
+#include <asm/sn/sgi.h>
 
 typedef uint64_t	router_reg_t;
 

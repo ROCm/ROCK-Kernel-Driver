@@ -202,7 +202,7 @@ void __init syscall_init(void)
 	wrmsrl(MSR_LSTAR, system_call); 
 
 #ifdef CONFIG_IA32_EMULATION   		
-	wrmsrl(MSR_CSTAR, ia32_cstar_target); 
+	syscall32_cpu_init ();
 #endif
 
 	/* Flags to clear on syscall */
@@ -274,6 +274,9 @@ void __init cpu_init (void)
 
 	asm volatile("pushfq ; popq %%rax ; btr $14,%%rax ; pushq %%rax ; popfq" ::: "eax");
 
+	if (cpu == 0) 
+		early_identify_cpu(&boot_cpu_data);
+
 	syscall_init();
 
 	wrmsrl(MSR_FS_BASE, 0);
@@ -287,7 +290,8 @@ void __init cpu_init (void)
 	 */
 	for (v = 0; v < N_EXCEPTION_STACKS; v++) {
 		if (cpu) {
-			estacks = (char *)__get_free_pages(GFP_ATOMIC, 0);
+			estacks = (char *)__get_free_pages(GFP_ATOMIC, 
+						   EXCEPTION_STACK_ORDER);
 			if (!estacks)
 				panic("Cannot allocate exception stack %ld %d\n",
 				      v, cpu); 
