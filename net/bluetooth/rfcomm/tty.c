@@ -572,6 +572,11 @@ static int rfcomm_tty_open(struct tty_struct *tty, struct file *filp)
 		if (dlc->state == BT_CONNECTED)
 			break;
 
+		if (signal_pending(current)) {
+			err = -EINTR;
+			break;
+		}
+
 		schedule();
 	}
 	set_current_state(TASK_RUNNING);
