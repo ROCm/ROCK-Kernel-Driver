@@ -14,16 +14,17 @@
 
 struct mmc_cid {
 	unsigned int		manfid;
-	unsigned int		serial;
 	char			prod_name[8];
+	unsigned int		serial;
+	unsigned short		oemid;
+	unsigned short		year;
 	unsigned char		hwrev;
 	unsigned char		fwrev;
 	unsigned char		month;
-	unsigned char		year;
 };
 
 struct mmc_csd {
-	unsigned char		mmc_prot;
+	unsigned char		mmca_vsn;
 	unsigned short		cmdclass;
 	unsigned short		tacc_clks;
 	unsigned int		tacc_ns;

@@ -67,8 +67,9 @@ mmc_bus_hotplug(struct device *dev, char **envp, int num_envp, char *buf,
 
 	i = 0;
 	add_env("MMC_CCC=%s", ccc);
-	add_env("MMC_MANFID=%03x", card->cid.manfid);
-	add_env("MMC_SLOT_NAME=%s", card->dev.bus_id);
+	add_env("MMC_MANFID=%06x", card->cid.manfid);
+	add_env("MMC_NAME=%s", mmc_card_name(card));
+	add_env("MMC_OEMID=%04x", card->cid.oemid);
 
 	return 0;
 }
@@ -162,12 +163,13 @@ MMC_ATTR(cid, "%08x%08x%08x%08x\n", card->raw_cid[0], card->raw_cid[1],
 	card->raw_cid[2], card->raw_cid[3]);
 MMC_ATTR(csd, "%08x%08x%08x%08x\n", card->raw_csd[0], card->raw_csd[1],
 	card->raw_csd[2], card->raw_csd[3]);
-MMC_ATTR(date, "%02d/%04d\n", card->cid.month, 1997 + card->cid.year);
+MMC_ATTR(date, "%02d/%04d\n", card->cid.month, card->cid.year);
 MMC_ATTR(fwrev, "0x%x\n", card->cid.fwrev);
 MMC_ATTR(hwrev, "0x%x\n", card->cid.hwrev);
-MMC_ATTR(manfid, "0x%03x\n", card->cid.manfid);
+MMC_ATTR(manfid, "0x%06x\n", card->cid.manfid);
 MMC_ATTR(name, "%s\n", card->cid.prod_name);
-MMC_ATTR(serial, "0x%06x\n", card->cid.serial);
+MMC_ATTR(oemid, "0x%04x\n", card->cid.oemid);
+MMC_ATTR(serial, "0x%08x\n", card->cid.serial);
 
 static struct device_attribute *mmc_dev_attributes[] = {
 	&dev_attr_cid,
@@ -177,6 +179,7 @@ static struct device_attribute *mmc_dev_attributes[] = {
 	&dev_attr_hwrev,
 	&dev_attr_manfid,
 	&dev_attr_name,
+	&dev_attr_oemid,
 	&dev_attr_serial,
 };
 

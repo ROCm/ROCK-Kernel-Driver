@@ -300,51 +300,110 @@ static u32 mmc_select_voltage(struct mmc_host *host, u32 ocr)
 	return ocr;
 }
 
+#define UNSTUFF_BITS(resp,start,size)					\
+	({								\
+		const u32 __mask = (1 << (size)) - 1;			\
+		const int __off = 3 - ((start) / 32);			\
+		const int __shft = (start) & 31;			\
+		u32 __res;						\
+									\
+		__res = resp[__off] >> __shft;				\
+		if ((size) + __shft >= 32)				\
+			__res |= resp[__off-1] << (32 - __shft);	\
+		__res & __mask;						\
+	})
+
+/*
+ * Given the decoded CSD structure, decode the raw CID to our CID structure.
+ */
 static void mmc_decode_cid(struct mmc_card *card)
 {
-	struct mmc_cid *cid = &card->cid;
 	u32 *resp = card->raw_cid;
 
-	memset(cid, 0, sizeof(struct mmc_cid));
+	memset(&card->cid, 0, sizeof(struct mmc_cid));
 
-	cid->manfid	  = resp[0] >> 8;
-	cid->prod_name[0] = resp[0];
-	cid->prod_name[1] = resp[1] >> 24;
-	cid->prod_name[2] = resp[1] >> 16;
-	cid->prod_name[3] = resp[1] >> 8;
-	cid->prod_name[4] = resp[1];
-	cid->prod_name[5] = resp[2] >> 24;
-	cid->prod_name[6] = resp[2] >> 16;
-	cid->prod_name[7] = '\0';
-	cid->hwrev	  = (resp[2] >> 12) & 15;
-	cid->fwrev	  = (resp[2] >> 8) & 15;
-	cid->serial	  = (resp[2] & 255) << 16 | (resp[3] >> 16);
-	cid->month	  = (resp[3] >> 12) & 15;
-	cid->year	  = (resp[3] >> 8) & 15;
+	/*
+	 * The selection of the format here is guesswork based upon
+	 * information people have sent to date.
+	 */
+	switch (card->csd.mmca_vsn) {
+	case 0: /* MMC v1.? */
+	case 1: /* MMC v1.4 */
+		card->cid.manfid	= UNSTUFF_BITS(resp, 104, 24);
+		card->cid.prod_name[0]	= UNSTUFF_BITS(resp, 96, 8);
+		card->cid.prod_name[1]	= UNSTUFF_BITS(resp, 88, 8);
+		card->cid.prod_name[2]	= UNSTUFF_BITS(resp, 80, 8);
+		card->cid.prod_name[3]	= UNSTUFF_BITS(resp, 72, 8);
+		card->cid.prod_name[4]	= UNSTUFF_BITS(resp, 64, 8);
+		card->cid.prod_name[5]	= UNSTUFF_BITS(resp, 56, 8);
+		card->cid.prod_name[6]	= UNSTUFF_BITS(resp, 48, 8);
+		card->cid.hwrev		= UNSTUFF_BITS(resp, 44, 4);
+		card->cid.fwrev		= UNSTUFF_BITS(resp, 40, 4);
+		card->cid.serial	= UNSTUFF_BITS(resp, 16, 24);
+		card->cid.month		= UNSTUFF_BITS(resp, 12, 4);
+		card->cid.year		= UNSTUFF_BITS(resp, 8, 4) + 1997;
+		break;
+
+	case 2: /* MMC v2.x ? */
+	case 3: /* MMC v3.x ? */
+		card->cid.manfid	= UNSTUFF_BITS(resp, 120, 8);
+		card->cid.oemid		= UNSTUFF_BITS(resp, 104, 16);
+		card->cid.prod_name[0]	= UNSTUFF_BITS(resp, 96, 8);
+		card->cid.prod_name[1]	= UNSTUFF_BITS(resp, 88, 8);
+		card->cid.prod_name[2]	= UNSTUFF_BITS(resp, 80, 8);
+		card->cid.prod_name[3]	= UNSTUFF_BITS(resp, 72, 8);
+		card->cid.prod_name[4]	= UNSTUFF_BITS(resp, 64, 8);
+		card->cid.prod_name[5]	= UNSTUFF_BITS(resp, 56, 8);
+		card->cid.serial	= UNSTUFF_BITS(resp, 16, 32);
+		card->cid.month		= UNSTUFF_BITS(resp, 12, 4);
+		card->cid.year		= UNSTUFF_BITS(resp, 8, 4) + 1997;
+		break;
+
+	default:
+		printk("%s: card has unknown MMCA version %d\n",
+			card->host->host_name, card->csd.mmca_vsn);
+		mmc_card_set_bad(card);
+		break;
+	}
 }
 
+/*
+ * Given a 128-bit response, decode to our card CSD structure.
+ */
 static void mmc_decode_csd(struct mmc_card *card)
 {
 	struct mmc_csd *csd = &card->csd;
-	unsigned int e, m;
+	unsigned int e, m, csd_struct;
 	u32 *resp = card->raw_csd;
 
-	csd->mmc_prot	 = (resp[0] >> 26) & 15;
-	m = (resp[0] >> 19) & 15;
-	e = (resp[0] >> 16) & 7;
+	/*
+	 * We only understand CSD structure v1.1 and v2.
+	 * v2 has extra information in bits 15, 11 and 10.
+	 */
+	csd_struct = UNSTUFF_BITS(resp, 126, 2);
+	if (csd_struct != 1 && csd_struct != 2) {
+		printk("%s: unrecognised CSD structure version %d\n",
+			card->host->host_name, csd_struct);
+		mmc_card_set_bad(card);
+		return;
+	}
+
+	csd->mmca_vsn	 = UNSTUFF_BITS(resp, 122, 4);
+	m = UNSTUFF_BITS(resp, 115, 4);
+	e = UNSTUFF_BITS(resp, 112, 3);
 	csd->tacc_ns	 = (tacc_exp[e] * tacc_mant[m] + 9) / 10;
-	csd->tacc_clks	 = ((resp[0] >> 8) & 255) * 100;
+	csd->tacc_clks	 = UNSTUFF_BITS(resp, 104, 8) * 100;
 
-	m = (resp[0] >> 3) & 15;
-	e = resp[0] & 7;
+	m = UNSTUFF_BITS(resp, 99, 4);
+	e = UNSTUFF_BITS(resp, 96, 3);
 	csd->max_dtr	  = tran_exp[e] * tran_mant[m];
-	csd->cmdclass	  = (resp[1] >> 20) & 0xfff;
+	csd->cmdclass	  = UNSTUFF_BITS(resp, 84, 12);
 
-	e = (resp[2] >> 15) & 7;
-	m = (resp[1] << 2 | resp[2] >> 30) & 0x3fff;
+	e = UNSTUFF_BITS(resp, 47, 3);
+	m = UNSTUFF_BITS(resp, 62, 12);
 	csd->capacity	  = (1 + m) << (e + 2);
 
-	csd->read_blkbits = (resp[1] >> 16) & 15;
+	csd->read_blkbits = UNSTUFF_BITS(resp, 80, 4);
 }
 
 /*
