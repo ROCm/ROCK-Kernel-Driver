@@ -2,108 +2,79 @@
  *  linux/arch/arm/mm/fault-armv.c
  *
  *  Copyright (C) 1995  Linus Torvalds
- *  Modifications for ARM processor (c) 1995-2001 Russell King
+ *  Modifications for ARM processor (c) 1995-2002 Russell King
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
-#include <linux/config.h>
-#include <linux/compiler.h>
-#include <linux/signal.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>
-#include <linux/errno.h>
-#include <linux/string.h>
 #include <linux/types.h>
 #include <linux/ptrace.h>
-#include <linux/mman.h>
 #include <linux/mm.h>
-#include <linux/interrupt.h>
-#include <linux/proc_fs.h>
 #include <linux/bitops.h>
 #include <linux/init.h>
 
-#include <asm/system.h>
-#include <asm/uaccess.h>
 #include <asm/pgalloc.h>
 #include <asm/pgtable.h>
 
-extern void die_if_kernel(const char *str, struct pt_regs *regs, int err);
-extern void show_pte(struct mm_struct *mm, unsigned long addr);
-extern int do_page_fault(unsigned long addr, int error_code,
-			 struct pt_regs *regs);
-extern int do_translation_fault(unsigned long addr, int error_code,
-				struct pt_regs *regs);
-extern void do_bad_area(struct task_struct *tsk, struct mm_struct *mm,
-			unsigned long addr, int error_code,
-			struct pt_regs *regs);
-
-#ifdef CONFIG_ALIGNMENT_TRAP
-extern int do_alignment(unsigned long addr, int error_code, struct pt_regs *regs);
-#else
-#define do_alignment do_bad
-#endif
-
+#include "fault.h"
 
 /*
  * Some section permission faults need to be handled gracefully.
  * They can happen due to a __{get,put}_user during an oops.
  */
 static int
-do_sect_fault(unsigned long addr, int error_code, struct pt_regs *regs)
+do_sect_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 {
 	struct task_struct *tsk = current;
-	do_bad_area(tsk, tsk->active_mm, addr, error_code, regs);
+	do_bad_area(tsk, tsk->active_mm, addr, fsr, regs);
 	return 0;
-}
-
-/*
- * Hook for things that need to trap external faults.  Note that
- * we don't guarantee that this will be the final version of the
- * interface.
- */
-int (*external_fault)(unsigned long addr, struct pt_regs *regs);
-
-static int
-do_external_fault(unsigned long addr, int error_code, struct pt_regs *regs)
-{
-	if (external_fault)
-		return external_fault(addr, regs);
-	return 1;
 }
 
 /*
  * This abort handler always returns "fault".
  */
 static int
-do_bad(unsigned long addr, int error_code, struct pt_regs *regs)
+do_bad(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 {
 	return 1;
 }
 
-static const struct fsr_info {
-	int	(*fn)(unsigned long addr, int error_code, struct pt_regs *regs);
+static struct fsr_info {
+	int	(*fn)(unsigned long addr, unsigned int fsr, struct pt_regs *regs);
 	int	sig;
 	const char *name;
 } fsr_info[] = {
 	{ do_bad,		SIGSEGV, "vector exception"		   },
-	{ do_alignment,		SIGILL,	 "alignment exception"		   },
+	{ do_bad,		SIGILL,	 "alignment exception"		   },
 	{ do_bad,		SIGKILL, "terminal exception"		   },
-	{ do_alignment,		SIGILL,	 "alignment exception"		   },
-	{ do_external_fault,	SIGBUS,	 "external abort on linefetch"	   },
+	{ do_bad,		SIGILL,	 "alignment exception"		   },
+	{ do_bad,		SIGBUS,	 "external abort on linefetch"	   },
 	{ do_translation_fault,	SIGSEGV, "section translation fault"	   },
-	{ do_external_fault,	SIGBUS,	 "external abort on linefetch"	   },
+	{ do_bad,		SIGBUS,	 "external abort on linefetch"	   },
 	{ do_page_fault,	SIGSEGV, "page translation fault"	   },
-	{ do_external_fault,	SIGBUS,	 "external abort on non-linefetch" },
+	{ do_bad,		SIGBUS,	 "external abort on non-linefetch" },
 	{ do_bad,		SIGSEGV, "section domain fault"		   },
-	{ do_external_fault,	SIGBUS,	 "external abort on non-linefetch" },
+	{ do_bad,		SIGBUS,	 "external abort on non-linefetch" },
 	{ do_bad,		SIGSEGV, "page domain fault"		   },
 	{ do_bad,		SIGBUS,	 "external abort on translation"   },
 	{ do_sect_fault,	SIGSEGV, "section permission fault"	   },
 	{ do_bad,		SIGBUS,	 "external abort on translation"   },
 	{ do_page_fault,	SIGSEGV, "page permission fault"	   }
 };
+
+void __init
+hook_fault_code(int nr, int (*fn)(unsigned long, unsigned int, struct pt_regs *),
+		int sig, const char *name)
+{
+	if (nr >= 0 && nr < 16) {
+		fsr_info[nr].fn   = fn;
+		fsr_info[nr].sig  = sig;
+		fsr_info[nr].name = name;
+	}
+}
 
 /*
  * Dispatch a data abort to the relevant handler.

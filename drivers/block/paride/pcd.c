@@ -329,8 +329,8 @@ static void pcd_init_units( void )
 }
 
 int pcd_init (void)	/* preliminary initialisation */
-
-{       int 	i, unit;
+{
+	int unit;
 
 	if (disable) return -1;
 

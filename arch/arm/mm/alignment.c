@@ -30,9 +30,7 @@
 #include <asm/pgtable.h>
 #include <asm/unaligned.h>
 
-extern void
-do_bad_area(struct task_struct *tsk, struct mm_struct *mm, unsigned long addr,
-	    int error_code, struct pt_regs *regs);
+#include "fault.h"
 
 /*
  * 32-bit misaligned trap handler (c) 1998 San Mehat (CCC) -July 1998
@@ -130,31 +128,6 @@ static int proc_alignment_write(struct file *file, const char *buffer,
 	return count;
 }
 
-/*
- * This needs to be done after sysctl_init, otherwise sys/ will be
- * overwritten.  Actually, this shouldn't be in sys/ at all since
- * it isn't a sysctl, and it doesn't contain sysctl information.
- * We now locate it in /proc/cpu/alignment instead.
- */
-static int __init alignment_init(void)
-{
-	struct proc_dir_entry *res;
-
-	res = proc_mkdir("cpu", NULL);
-	if (!res)
-		return -ENOMEM;
-
-	res = create_proc_entry("alignment", S_IWUSR | S_IRUGO, res);
-	if (!res)
-		return -ENOMEM;
-
-	res->read_proc = proc_alignment_read;
-	res->write_proc = proc_alignment_write;
-
-	return 0;
-}
-
-__initcall(alignment_init);
 #endif /* CONFIG_PROC_FS */
 
 union offset_union {
@@ -486,7 +459,8 @@ bad:
 	return TYPE_ERROR;
 }
 
-int do_alignment(unsigned long addr, int error_code, struct pt_regs *regs)
+static int
+do_alignment(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 {
 	union offset_union offset;
 	unsigned long instr, instrptr;
@@ -577,7 +551,7 @@ int do_alignment(unsigned long addr, int error_code, struct pt_regs *regs)
 	/*
 	 * We got a fault - fix it up, or die.
 	 */
-	do_bad_area(current, current->mm, addr, error_code, regs);
+	do_bad_area(current, current->mm, addr, fsr, regs);
 	return 0;
 
  bad:
@@ -594,8 +568,8 @@ int do_alignment(unsigned long addr, int error_code, struct pt_regs *regs)
 
 	if (ai_usermode & 1)
 		printk("Alignment trap: %s (%d) PC=0x%08lx Instr=0x%08lx "
-		       "Address=0x%08lx Code 0x%02x\n", current->comm,
-			current->pid, instrptr, instr, addr, error_code);
+		       "Address=0x%08lx FSR 0x%03x\n", current->comm,
+			current->pid, instrptr, instr, addr, fsr);
 
 	if (ai_usermode & 2)
 		goto fixup;
@@ -607,3 +581,34 @@ int do_alignment(unsigned long addr, int error_code, struct pt_regs *regs)
 
 	return 0;
 }
+
+/*
+ * This needs to be done after sysctl_init, otherwise sys/ will be
+ * overwritten.  Actually, this shouldn't be in sys/ at all since
+ * it isn't a sysctl, and it doesn't contain sysctl information.
+ * We now locate it in /proc/cpu/alignment instead.
+ */
+static int __init alignment_init(void)
+{
+#ifdef CONFIG_PROC_FS
+	struct proc_dir_entry *res;
+
+	res = proc_mkdir("cpu", NULL);
+	if (!res)
+		return -ENOMEM;
+
+	res = create_proc_entry("alignment", S_IWUSR | S_IRUGO, res);
+	if (!res)
+		return -ENOMEM;
+
+	res->read_proc = proc_alignment_read;
+	res->write_proc = proc_alignment_write;
+#endif
+
+	hook_fault_code(1, do_alignment, SIGILL, "alignment exception");
+	hook_fault_code(3, do_alignment, SIGILL, "alignment exception");
+
+	return 0;
+}
+
+__initcall(alignment_init);

@@ -381,10 +381,10 @@ int i2c_del_driver(struct i2c_driver *driver)
 						printk("i2c-core.o: while "
 						       "unregistering driver "
 						       "`%s', the client at "
-						       "address %02x of
-						       adapter `%s' could not
-						       be detached; driver
-						       not unloaded!",
+						       "address %02x of "
+						       "adapter `%s' could not "
+						       "be detached; driver "
+						       "not unloaded!",
 						       driver->name,
 						       client->addr,
 						       adap->name);

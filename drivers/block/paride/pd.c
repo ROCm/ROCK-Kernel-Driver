@@ -381,9 +381,8 @@ void pd_init_units( void )
 }
 
 int pd_init (void)
-
-{       int i;
-	request_queue_t * q; 
+{
+	request_queue_t * q;
 
 	if (disable) return -1;
         if (devfs_register_blkdev(MAJOR_NR,name,&pd_fops)) {

@@ -43,12 +43,14 @@
 
 void cfb_imageblit(struct fb_info *p, struct fb_image *image)
 {
-	int pad, ppw, shift, shift_right, shift_left, x2, y2, n, i, j, k, l = 7;
+	int pad, ppw;
+	int x2, y2, n, i, j, k, l = 7;
 	unsigned long tmp = ~0 << (BITS_PER_LONG - p->var.bits_per_pixel);
 	unsigned long fgx, bgx, fgcolor, bgcolor, eorx;	
-	unsigned long end_index, end_mask;
+	unsigned long end_mask;
 	unsigned long *dst = NULL;
-	u8 *dst1, *src;
+	u8 *dst1;
+	u8 *src;
 
 	/* 
 	 * We could use hardware clipping but on many cards you get around hardware
@@ -97,8 +99,8 @@ void cfb_imageblit(struct fb_info *p, struct fb_image *image)
 			for (j = image->width/ppw; j > 0; j--) {
 				end_mask = 0;
 		
-				for (k = ppw; k > 0; k--) {	
-					if (test_bit(l, src))
+				for (k = ppw; k > 0; k--) {
+					if (test_bit(l, (unsigned long *) src))
 						end_mask |= (tmp >> (p->var.bits_per_pixel*(k-1)));
 					l--;
 					if (l < 0) { l = 7; src++; }
@@ -110,7 +112,7 @@ void cfb_imageblit(struct fb_info *p, struct fb_image *image)
 			if (n) {
 				end_mask = 0;	
 				for (j = n; j > 0; j--) {
-					if (test_bit(l, src))
+					if (test_bit(l, (unsigned long *) src))
 						end_mask |= (tmp >> (p->var.bits_per_pixel*(j-1)));
 					l--;
 					if (l < 0) { l = 7; src++; }

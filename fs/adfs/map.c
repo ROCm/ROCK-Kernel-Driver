@@ -257,7 +257,7 @@ int
 adfs_map_lookup(struct super_block *sb, unsigned int frag_id,
 		unsigned int offset)
 {
-	struct adfs_sb_info *asb = &sb->u.adfs_sb;
+	struct adfs_sb_info *asb = ADFS_SB(sb);
 	unsigned int zone, mapoff;
 	int result;
 
