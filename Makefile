@@ -151,7 +151,7 @@ export	VERSION PATCHLEVEL SUBLEVEL EXTRAVERSION KERNELRELEASE ARCH \
 	CONFIG_SHELL TOPDIR HOSTCC HOSTCFLAGS CROSS_COMPILE AS LD CC \
 	CPP AR NM STRIP OBJCOPY OBJDUMP MAKE MAKEFILES GENKSYMS PERL
 
-export CPPFLAGS EXPORT_FLAGS NOSTDINC_FLAGS OBJCOPYFLAGS
+export CPPFLAGS EXPORT_FLAGS NOSTDINC_FLAGS OBJCOPYFLAGS LDFLAGS
 export CFLAGS CFLAGS_KERNEL CFLAGS_MODULE 
 export AFLAGS AFLAGS_KERNEL AFLAGS_MODULE
 
@@ -249,29 +249,25 @@ endif
 
 init-y		:= init/
 drivers-y	:= drivers/ sound/
-networks-y	:= net/
+net-y		:= net/
 libs-y		:= lib/
+core-y		:=
+SUBDIRS		:=
 
 include arch/$(ARCH)/Makefile
 
 core-y		+= kernel/ mm/ fs/ ipc/ security/
 
-SUBDIRS		+= $(patsubst %/,%,$(filter %/, $(init-y) $(init-m)))
-INIT		+= $(patsubst %/, %/built-in.o, $(init-y))
+SUBDIRS		+= $(patsubst %/,%,$(filter %/, $(init-y) $(init-m) \
+		     $(core-y) $(core-m) $(drivers-y) $(drivers-m) \
+		     $(net-y) $(net-m) $(libs-y) $(libs-m)))
+init-y		:= $(patsubst %/, %/built-in.o, $(init-y))
+core-y		:= $(patsubst %/, %/built-in.o, $(core-y))
+drivers-y	:= $(patsubst %/, %/built-in.o, $(drivers-y))
+net-y		:= $(patsubst %/, %/built-in.o, $(net-y))
+libs-y		:= $(patsubst %/, %/lib.a, $(libs-y))
 
-SUBDIRS		+= $(patsubst %/,%,$(filter %/, $(core-y) $(core-m)))
-CORE_FILES	+= $(patsubst %/, %/built-in.o, $(core-y))
-
-SUBDIRS		+= $(patsubst %/,%,$(filter %/, $(drivers-y) $(drivers-m)))
-DRIVERS		+= $(patsubst %/, %/built-in.o, $(drivers-y))
-
-SUBDIRS		+= $(patsubst %/,%,$(filter %/, $(networks-y) $(networks-m)))
-NETWORKS	+= $(patsubst %/, %/built-in.o, $(networks-y))
-
-SUBDIRS		+= $(patsubst %/,%,$(filter %/, $(libs-y) $(libs-m)))
-LIBS		+= $(patsubst %/, %/lib.a, $(libs-y))
-
-export	NETWORKS DRIVERS LIBS HEAD LDFLAGS MAKEBOOT
+$(warning $(SUBDIRS))
 
 # Build vmlinux
 # ---------------------------------------------------------------------------
@@ -283,16 +279,16 @@ export	NETWORKS DRIVERS LIBS HEAD LDFLAGS MAKEBOOT
 #       we cannot yet know if we will need to relink vmlinux.
 #	So we descend into init/ inside the rule for vmlinux again.
 
-vmlinux-objs := $(HEAD) $(INIT) $(CORE_FILES) $(LIBS) $(DRIVERS) $(NETWORKS)
+vmlinux-objs := $(HEAD) $(init-y) $(core-y) $(libs-y) $(drivers-y) $(net-y)
 
 quiet_cmd_link_vmlinux = LD      $@
 define cmd_link_vmlinux
-	$(LD) $(LDFLAGS) $(LDFLAGS_vmlinux) $(HEAD) $(INIT) \
+	$(LD) $(LDFLAGS) $(LDFLAGS_vmlinux) $(HEAD) $(init-y) \
 	--start-group \
-	$(CORE_FILES) \
-	$(LIBS) \
-	$(DRIVERS) \
-	$(NETWORKS) \
+	$(core-y) \
+	$(libs-y) \
+	$(drivers-y) \
+	$(net-y) \
 	--end-group \
 	$(filter $(kallsyms.o),$^) \
 	-o $@
