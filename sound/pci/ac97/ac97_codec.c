@@ -1816,11 +1816,13 @@ int snd_ac97_mixer(ac97_bus_t * bus, ac97_t * _ac97, ac97_t ** rac97)
 		bus->wait(ac97);
 	else {
 		udelay(50);
-		err = -ENXIO;
-		if (! (ac97->scaps & AC97_SCAP_SKIP_AUDIO))
-			err = ac97_reset_wait(ac97, HZ/2, 0);
-		if (err < 0 && ! (ac97->scaps & AC97_SCAP_SKIP_MODEM))
+		if (ac97->scaps & AC97_SCAP_SKIP_AUDIO)
 			err = ac97_reset_wait(ac97, HZ/2, 1);
+		else {
+			err = ac97_reset_wait(ac97, HZ/2, 0);
+			if (err < 0)
+				err = ac97_reset_wait(ac97, 0, 1);
+		}
 		if (err < 0) {
 			snd_printk(KERN_WARNING "AC'97 %d does not respond - RESET\n", ac97->num);
 			/* proceed anyway - it's often non-critical */
