@@ -448,7 +448,7 @@ static int __devinit yellowfin_init_one(struct pci_dev *pdev,
 
 	np = dev->priv;
 
-	if (pci_request_regions(pdev, dev->name))
+	if (pci_request_regions(pdev, DRV_NAME))
 		goto err_out_free_netdev;
 
 	pci_set_master (pdev);

@@ -219,6 +219,8 @@
 static char version[] __devinitdata =
 	"defxx.c:v1.06 2003/08/04  Lawrence V. Stefani and others\n";
 
+#define DRV_NAME "defxx"
+
 #define DYNAMIC_BUFFERS 1
 
 #define SKBUFF_RX_COPYBREAK 200
@@ -435,9 +437,9 @@ static int __devinit dfx_init_one_pci_or_eisa(struct pci_dev *pdev, long ioaddr)
 
 	bp = dev->priv;
 
-	if (!request_region (ioaddr, pdev ? PFI_K_CSR_IO_LEN : PI_ESIC_K_CSR_IO_LEN, dev->name)) {
+	if (!request_region (ioaddr, pdev ? PFI_K_CSR_IO_LEN : PI_ESIC_K_CSR_IO_LEN, DRV_NAME)) {
 		printk (KERN_ERR "%s: Cannot reserve I/O resource 0x%x @ 0x%lx, aborting\n",
-			dev->name, PFI_K_CSR_IO_LEN, ioaddr);
+			DRV_NAME, PFI_K_CSR_IO_LEN, ioaddr);
 		err = -EBUSY;
 		goto err_out;
 	}

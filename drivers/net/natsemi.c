@@ -766,7 +766,7 @@ static int __devinit natsemi_probe1 (struct pci_dev *pdev,
 	SET_MODULE_OWNER(dev);
 	SET_NETDEV_DEV(dev, &pdev->dev);
 
-	i = pci_request_regions(pdev, dev->name);
+	i = pci_request_regions(pdev, DRV_NAME);
 	if (i)
 		goto err_pci_request_regions;
 

@@ -36,6 +36,8 @@
 #include "8390.h"
 
 
+#define DRV_NAME	"zorro8390"
+
 #define NE_BASE		(dev->base_addr)
 #define NE_CMD		(0x00*2)
 #define NE_DATAPORT	(0x10*2)	/* NatSemi-defined port window offset. */
@@ -115,7 +117,7 @@ static int __devinit zorro8390_init_one(struct zorro_dev *z,
     if (!dev)
 	return -ENOMEM;
     SET_MODULE_OWNER(dev);
-    if (!request_mem_region(ioaddr, NE_IO_EXTENT*2, dev->name)) {
+    if (!request_mem_region(ioaddr, NE_IO_EXTENT*2, DRV_NAME)) {
 	free_netdev(dev);
 	return -EBUSY;
     }
@@ -198,7 +200,7 @@ static int __devinit zorro8390_init(struct net_device *dev,
     dev->irq = IRQ_AMIGA_PORTS;
 
     /* Install the Interrupt handler */
-    i = request_irq(IRQ_AMIGA_PORTS, ei_interrupt, SA_SHIRQ, dev->name, dev);
+    i = request_irq(IRQ_AMIGA_PORTS, ei_interrupt, SA_SHIRQ, DRV_NAME, dev);
     if (i) return i;
 
     for(i = 0; i < ETHER_ADDR_LEN; i++) {

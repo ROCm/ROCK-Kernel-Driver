@@ -2717,7 +2717,7 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 
 	gp = dev->priv;
 
-	err = pci_request_regions(pdev, dev->name);
+	err = pci_request_regions(pdev, DRV_NAME);
 	if (err) {
 		printk(KERN_ERR PFX "Cannot obtain PCI resources, "
 		       "aborting.\n");

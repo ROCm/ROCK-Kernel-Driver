@@ -75,6 +75,8 @@ All other communication is through memory!
 #include <asm/io.h>
 #include <asm/dma.h>
 
+#define DRV_NAME "lp486e"
+
 /* debug print flags */
 #define LOG_SRCDST    0x80000000
 #define LOG_STATINT   0x40000000
@@ -970,7 +972,7 @@ int __init lp486e_probe(struct net_device *dev) {
 		return -ENODEV;
 	probed++;
 
-	if (!request_region(IOADDR, LP486E_TOTAL_SIZE, dev->name)) {
+	if (!request_region(IOADDR, LP486E_TOTAL_SIZE, DRV_NAME)) {
 		printk(KERN_ERR "lp486e: IO address 0x%x in use\n", IOADDR);
 		return -EBUSY;
 	}

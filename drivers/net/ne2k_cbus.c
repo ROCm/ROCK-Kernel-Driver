@@ -37,6 +37,8 @@ static const char version[] =
 
 #include "8390.h"
 
+#define DRV_NAME "ne2k_cbus"
+
 /* Some defines that people can play with if so inclined. */
 
 /* Do we support clones that don't adhere to 14,15 of the SAprom ? */
@@ -187,6 +189,7 @@ static void cleanup_card(struct net_device *dev)
 	ne2k_cbus_destroy(dev);
 }
 
+#ifndef MODULE
 struct net_device * __init ne_probe(int unit)
 {
 	struct net_device *dev = alloc_ei_netdev();
@@ -211,6 +214,7 @@ out:
 	free_netdev(dev);
 	return ERR_PTR(err);
 }
+#endif
 
 static int __init ne_probe_cbus(struct net_device *dev, const struct ne2k_cbus_hwinfo *hw, int ioaddr, int irq)
 {
@@ -263,7 +267,7 @@ static int __init ne_probe1(struct net_device *dev, int ioaddr)
 
 	for (rlist = hw->regionlist; rlist->range; rlist++)
 		if (!request_region(ioaddr + rlist->start,
-					rlist->range, dev->name)) {
+					rlist->range, DRV_NAME)) {
 			ret = -EBUSY;
 			goto err_out;
 		}

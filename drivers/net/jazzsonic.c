@@ -37,6 +37,8 @@
 #include <asm/jazz.h>
 #include <asm/jazzdma.h>
 
+#define DRV_NAME "jazzsonic"
+
 #define SREGS_PAD(n)    u16 n;
 
 #include "sonic.h"
@@ -151,7 +153,7 @@ static int __init sonic_probe1(struct net_device *dev, unsigned int base_addr,
 	int err = -ENODEV;
 	int i;
 
-	if (!request_region(base_addr, 0x100, dev->name))
+	if (!request_region(base_addr, 0x100, DRV_NAME))
 		return -EBUSY;
 	/*
 	 * get the Silicon Revision ID. If this is one of the known
