@@ -124,28 +124,33 @@ __change_page_attr(unsigned long address, struct page *page, pgprot_t prot,
 	kpte_flags = pte_val(*kpte); 
 	if (pgprot_val(prot) != pgprot_val(ref_prot)) { 
 		if ((kpte_flags & _PAGE_PSE) == 0) { 
-			pte_t old = *kpte;
-			pte_t standard = mk_pte(page, ref_prot); 
-
 			set_pte(kpte, mk_pte(page, prot)); 
-			if (pte_same(old,standard))
-				get_page(kpte_page);
 		} else {
+			/*
+			 * split_large_page will take the reference for this change_page_attr
+			 * on the split page.
+			 */
 			struct page *split = split_large_page(address, prot, ref_prot); 
 			if (!split)
 				return -ENOMEM;
-			get_page(kpte_page);
 			set_pte(kpte,mk_pte(split, ref_prot));
+			kpte_page = split;
 		}	
+		get_page(kpte_page);
 	} else if ((kpte_flags & _PAGE_PSE) == 0) { 
 		set_pte(kpte, mk_pte(page, ref_prot));
 		__put_page(kpte_page);
-	}
+	} else
+		BUG();
 
-	if (page_count(kpte_page) == 1) {
+	switch (page_count(kpte_page)) {
+	case 1:
 		save_page(address, kpte_page); 		     
 		revert_page(address, ref_prot);
-	} 
+		break;
+	case 0:
+		BUG(); /* memleak and failed 2M page regeneration */
+	}
 	return 0;
 } 
 

@@ -128,11 +128,11 @@ void * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flag
 	if (phys_addr >= 0xA0000 && last_addr < 0x100000)
 		return phys_to_virt(phys_addr);
 
+#ifndef CONFIG_DISCONTIGMEM
 	/*
 	 * Don't allow anybody to remap normal RAM that we're using..
 	 */
 	if (phys_addr < virt_to_phys(high_memory)) {
-#ifndef CONFIG_DISCONTIGMEM
 		char *t_addr, *t_end;
  		struct page *page;
 
@@ -142,8 +142,8 @@ void * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flag
 		for(page = virt_to_page(t_addr); page <= virt_to_page(t_end); page++)
 			if(!PageReserved(page))
 				return NULL;
-#endif
 	}
+#endif
 
 	/*
 	 * Mappings have to be page-aligned
@@ -155,7 +155,7 @@ void * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flag
 	/*
 	 * Ok, go for it..
 	 */
-	area = get_vm_area(size, VM_IOREMAP);
+	area = get_vm_area(size, VM_IOREMAP | (flags << 24));
 	if (!area)
 		return NULL;
 	area->phys_addr = phys_addr;
@@ -195,12 +195,12 @@ void *ioremap_nocache (unsigned long phys_addr, unsigned long size)
 	if (!p) 
 		return p; 
 
-	if (phys_addr + size < virt_to_phys(high_memory)) { 
+	if (phys_addr + size - 1 < virt_to_phys(high_memory)) { 
 		struct page *ppage = virt_to_page(__va(phys_addr));		
 		unsigned long npages = (size + PAGE_SIZE - 1) >> PAGE_SHIFT;
 
-		BUG_ON(phys_addr+size > (unsigned long)high_memory);
-		BUG_ON(phys_addr + size < phys_addr);
+		BUG_ON(phys_addr+size >= (unsigned long)high_memory);
+		BUG_ON(phys_addr + size <= phys_addr);
 
 		if (change_page_attr(ppage, npages, PAGE_KERNEL_NOCACHE) < 0) { 
 			iounmap(p); 
@@ -223,7 +223,7 @@ void iounmap(void *addr)
 		return;
 	} 
 
-	if (p->flags && p->phys_addr < virt_to_phys(high_memory)) { 
+	if ((p->flags >> 24) && p->phys_addr + p->size < virt_to_phys(high_memory)) { 
 		change_page_attr(virt_to_page(__va(p->phys_addr)),
 				 p->size >> PAGE_SHIFT,
 				 PAGE_KERNEL); 				 
