@@ -7,8 +7,11 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  *
- *  This hardware is really sick.  No way to clear interrupts.  Have
- *  to turn off the clock whenever we touch the device.  Yuck!
+ *  This hardware is really sick:
+ *   - No way to clear interrupts.
+ *   - Have to turn off the clock whenever we touch the device.
+ *   - Doesn't tell you how many data blocks were transferred.
+ *  Yuck!
  *
  *	1 and 3 byte data transfers not supported
  *	max block length up to 1023
@@ -74,23 +77,20 @@ static inline unsigned int ns_to_clocks(unsigned int ns)
 static void pxamci_stop_clock(struct pxamci_host *host)
 {
 	if (readl(host->base + MMC_STAT) & STAT_CLK_EN) {
-		unsigned long flags;
+		unsigned long timeout = 10000;
 		unsigned int v;
 
 		writel(STOP_CLOCK, host->base + MMC_STRPCL);
 
-		/*
-		 * Wait for the "clock has stopped" interrupt.
-		 * We need to unmask the interrupt to receive
-		 * the notification.  Sigh.
-		 */
-		spin_lock_irqsave(&host->lock, flags);
-		writel(host->imask & ~CLK_IS_OFF, host->base + MMC_I_MASK);
 		do {
-			v = readl(host->base + MMC_I_REG);
-		} while (!(v & CLK_IS_OFF));
-		writel(host->imask, host->base + MMC_I_MASK);
-		spin_unlock_irqrestore(&host->lock, flags);
+			v = readl(host->base + MMC_STAT);
+			if (!(v & STAT_CLK_EN))
+				break;
+			udelay(1);
+		} while (timeout--);
+
+		if (v & STAT_CLK_EN)
+			dev_err(mmc_dev(host->mmc), "unable to stop clock\n");
 	}
 }
 
@@ -279,8 +279,13 @@ static int pxamci_data_done(struct pxamci_host *host, unsigned int stat)
 	else if (stat & (STAT_CRC_READ_ERROR|STAT_CRC_WRITE_ERROR))
 		data->error = MMC_ERR_BADCRC;
 
-	data->bytes_xfered = (data->blocks - readl(host->base + MMC_NOB))
-			       << data->blksz_bits;
+	/*
+	 * There appears to be a hardware design bug here.  There seems to
+	 * be no way to find out how much data was transferred to the card.
+	 * This means that if there was an error on any block, we mark all
+	 * data blocks as being in error.
+	 */
+	data->bytes_xfered = data->blocks << data->blksz_bits;
 
 	pxamci_disable_irq(host, DATA_TRAN_DONE);
 
@@ -493,7 +498,7 @@ static int pxamci_probe(struct device *dev)
 	if (ret)
 		goto out;
 
-	dev_set_drvdata(dev, host);
+	dev_set_drvdata(dev, mmc);
 
 	mmc_add_host(mmc);
 
