@@ -133,7 +133,7 @@ sd_find_target(void *host, int tgt)
         if (dp->device != NULL && dp->device->host == host
             && dp->device->id == tgt)
             return MKDEV_SD(i);
-    return 0;
+    return NODEV;
 }
 #endif
 
