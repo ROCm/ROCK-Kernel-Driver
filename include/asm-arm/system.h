@@ -42,6 +42,19 @@
 #define CR_XP	(1 << 23)	/* Extended page tables			*/
 #define CR_VE	(1 << 24)	/* Vectored interrupts			*/
 
+#define CPUID_ID	0
+#define CPUID_CACHETYPE	1
+#define CPUID_TCM	2
+#define CPUID_TLBTYPE	3
+
+#define read_cpuid(reg)					\
+	({						\
+		unsigned int __val;			\
+		asm("mrc p15, 0, %0, c0, c0, " #reg	\
+		    : "=r" (__val));			\
+		__val;					\
+	})
+
 /*
  * This is used to ensure the compiler did actually allocate the register we
  * asked it for some inline assembly sequences.  Apparently we can't trust
