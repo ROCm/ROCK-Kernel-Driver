@@ -644,7 +644,7 @@ void acpi_device_get_debug_info(struct acpi_device * device, acpi_handle handle,
 		break;
 	}
 
-	pr_debug("Found %s %s [%p]\n", type_string, name, handle);
+	printk(KERN_DEBUG "Found %s %s [%p]\n", type_string, name, handle);
 #endif /*CONFIG_ACPI_DEBUG_OUTPUT*/
 }
 
