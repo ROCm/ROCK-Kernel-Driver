@@ -209,13 +209,6 @@ struct cpufreq_driver {
 #define CPUFREQ_CONST_LOOPS 	0x02	/* loops_per_jiffy or other kernel
 					 * "constants" aren't affected by
 					 * frequency transitions */
-#define CPUFREQ_PANIC_OUTOFSYNC	0x04	/* panic if cpufreq's opinion of
-					 * current frequency differs from
-					 * actual frequency */
-#define CPUFREQ_PANIC_RESUME_OUTOFSYNC 0x08 /* panic if cpufreq's opinion of
-					 * current frequency differs from
-					 * actual frequency on resume
-					 * from sleep. */
 
 
 int cpufreq_register_driver(struct cpufreq_driver *driver_data);
