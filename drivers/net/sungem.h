@@ -94,6 +94,8 @@
 #define GREG_SWRST_TXRST	0x00000001	/* TX Software Reset		*/
 #define GREG_SWRST_RXRST	0x00000002	/* RX Software Reset		*/
 #define GREG_SWRST_RSTOUT	0x00000004	/* Force RST# pin active	*/
+#define GREG_SWRST_CACHESIZE	0x00ff0000	/* RIO only: cache line size	*/
+#define GREG_SWRST_CACHE_SHIFT	16
 
 /* TX DMA Registers */
 #define TXDMA_KICK	0x2000UL	/* TX Kick Register		*/
@@ -985,6 +987,9 @@ struct gem {
 	int			rx_pause_on;
 	int			mii_phy_addr;
 	int			gigabit_capable;
+
+	u32			mac_rx_cfg;
+	u32			swrst_base;
 
 	/* Autoneg & PHY control */
 	int			link_cntl;

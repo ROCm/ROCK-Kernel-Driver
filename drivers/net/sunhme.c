@@ -34,6 +34,7 @@ static char version[] =
 #include <linux/ethtool.h>
 #include <linux/mii.h>
 #include <linux/crc32.h>
+#include <linux/random.h>
 #include <asm/system.h>
 #include <asm/bitops.h>
 #include <asm/io.h>
@@ -2929,8 +2930,10 @@ static void get_hme_mac_nonsparc(struct pci_dev *pdev, unsigned char *dev_addr)
 	if (is_quattro_p(pdev))
 		index = PCI_SLOT(pdev->devfn);
 
-	if (pdev->resource[PCI_ROM_RESOURCE].parent == NULL)
-		pci_assign_resource(pdev, PCI_ROM_RESOURCE);
+	if (pdev->resource[PCI_ROM_RESOURCE].parent == NULL) {
+		if (pci_assign_resource(pdev, PCI_ROM_RESOURCE) < 0)
+			goto use_random;
+	}
 
 	pci_read_config_dword(pdev, pdev->rom_base_reg, &rom_reg_orig);
 	pci_write_config_dword(pdev, pdev->rom_base_reg,
@@ -2944,6 +2947,15 @@ static void get_hme_mac_nonsparc(struct pci_dev *pdev, unsigned char *dev_addr)
 		iounmap(p);
 
 	pci_write_config_dword(pdev, pdev->rom_base_reg, rom_reg_orig);
+	return;
+
+use_random:
+	/* Sun MAC prefix then 3 random bytes. */
+	dev_addr[0] = 0x08;
+	dev_addr[1] = 0x00;
+	dev_addr[2] = 0x20;
+	get_random_bytes(dev_addr, 3);
+	return;
 }
 #endif /* !(__sparc__) */
 
