@@ -1,5 +1,5 @@
 /*
- * $Id: pmc551.c,v 1.24 2003/05/20 21:03:08 dwmw2 Exp $
+ * $Id: pmc551.c,v 1.26 2004/07/14 17:25:07 dwmw2 Exp $
  *
  * PMC551 PCI Mezzanine Ram Device
  *

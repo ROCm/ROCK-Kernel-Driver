@@ -1,7 +1,7 @@
 /* Linux driver for NAND Flash Translation Layer      */
 /* (c) 1999 Machine Vision Holdings, Inc.             */
 /* Author: David Woodhouse <dwmw2@infradead.org>      */
-/* $Id: nftlcore.c,v 1.94 2003/06/23 12:00:08 dwmw2 Exp $ */
+/* $Id: nftlcore.c,v 1.96 2004/06/28 13:52:55 dbrown Exp $ */
 
 /*
   The contents of this file are distributed under the GNU General
@@ -43,8 +43,18 @@ static void nftl_add_mtd(struct mtd_blktrans_ops *tr, struct mtd_info *mtd)
 	struct NFTLrecord *nftl;
 	unsigned long temp;
 
-	if (mtd->ecctype != MTD_ECC_RS_DiskOnChip)
+	if (mtd->type != MTD_NANDFLASH)
 		return;
+	/* OK, this is moderately ugly.  But probably safe.  Alternatives? */
+	if (memcmp(mtd->name, "DiskOnChip", 10))
+		return;
+
+	if (!mtd->block_isbad) {
+		printk(KERN_ERR
+"NFTL no longer supports the old DiskOnChip drivers loaded via docprobe.\n"
+"Please use the new diskonchip driver under the NAND subsystem.\n");
+		return;
+	}
 
 	DEBUG(MTD_DEBUG_LEVEL1, "NFTL: add_mtd for %s\n", mtd->name);
 
@@ -60,6 +70,8 @@ static void nftl_add_mtd(struct mtd_blktrans_ops *tr, struct mtd_info *mtd)
 	nftl->mbd.devnum = -1;
 	nftl->mbd.blksize = 512;
 	nftl->mbd.tr = tr;
+	memcpy(&nftl->oobinfo, &mtd->oobinfo, sizeof(struct nand_oobinfo));
+	nftl->oobinfo.useecc = MTD_NANDECC_PLACEONLY;
 
         if (NFTL_mount(nftl) < 0) {
 		printk(KERN_WARNING "NFTL: could not mount device\n");
@@ -350,17 +362,19 @@ static u16 NFTL_foldchain (struct NFTLrecord *nftl, unsigned thisVUC, unsigned p
                 if (BlockMap[block] == BLOCK_NIL)
                         continue;
                 
-                ret = MTD_READECC(nftl->mbd.mtd, (nftl->EraseSize * BlockMap[block]) + (block * 512),
-				  512, &retlen, movebuf, (char *)&oob, NAND_ECC_DISKONCHIP); 
+                ret = MTD_READ(nftl->mbd.mtd, (nftl->EraseSize * BlockMap[block]) + (block * 512),
+				  512, &retlen, movebuf); 
                 if (ret < 0) {
-                    ret = MTD_READECC(nftl->mbd.mtd, (nftl->EraseSize * BlockMap[block])
+                    ret = MTD_READ(nftl->mbd.mtd, (nftl->EraseSize * BlockMap[block])
                                       + (block * 512), 512, &retlen,
-                                      movebuf, (char *)&oob, NAND_ECC_DISKONCHIP); 
+                                      movebuf); 
                     if (ret != -EIO) 
                         printk("Error went away on retry.\n");
                 }
+		memset(&oob, 0xff, sizeof(struct nftl_oob));
+		oob.b.Status = oob.b.Status1 = SECTOR_USED;
                 MTD_WRITEECC(nftl->mbd.mtd, (nftl->EraseSize * targetEUN) + (block * 512),
-                             512, &retlen, movebuf, (char *)&oob, NAND_ECC_DISKONCHIP);
+                             512, &retlen, movebuf, (char *)&oob, &nftl->oobinfo);
 	}
         
         /* add the header so that it is now a valid chain */
@@ -390,7 +404,6 @@ static u16 NFTL_foldchain (struct NFTLrecord *nftl, unsigned thisVUC, unsigned p
 
                 if (NFTL_formatblock(nftl, thisEUN) < 0) {
 			/* could not erase : mark block as reserved
-			 * FixMe: Update Bad Unit Table on disk
 			 */
 			nftl->ReplUnitTable[thisEUN] = BLOCK_RESERVED;
                 } else {
@@ -617,7 +630,7 @@ static int nftl_writeblock(struct mtd_blktrans_dev *mbd, unsigned long block,
 	u16 writeEUN;
 	unsigned long blockofs = (block * 512) & (nftl->EraseSize - 1);
 	size_t retlen;
-	u8 eccbuf[6];
+	struct nftl_oob oob;
 
 	writeEUN = NFTL_findwriteunit(nftl, block);
 
@@ -628,9 +641,11 @@ static int nftl_writeblock(struct mtd_blktrans_dev *mbd, unsigned long block,
 		return 1;
 	}
 
+	memset(&oob, 0xff, sizeof(struct nftl_oob));
+	oob.b.Status = oob.b.Status1 = SECTOR_USED;
 	MTD_WRITEECC(nftl->mbd.mtd, (writeEUN * nftl->EraseSize) + blockofs,
-		     512, &retlen, (char *)buffer, (char *)eccbuf, NAND_ECC_DISKONCHIP);
-        /* no need to write SECTOR_USED flags since they are written in mtd_writeecc */
+		     512, &retlen, (char *)buffer, (char *)&oob, &nftl->oobinfo);
+        /* need to write SECTOR_USED flags since they are not written in mtd_writeecc */
 
 	return 0;
 }
@@ -692,8 +707,7 @@ static int nftl_readblock(struct mtd_blktrans_dev *mbd, unsigned long block,
 	} else {
 		loff_t ptr = (lastgoodEUN * nftl->EraseSize) + blockofs;
 		size_t retlen;
-		u_char eccbuf[6];
-		if (MTD_READECC(nftl->mbd.mtd, ptr, 512, &retlen, buffer, eccbuf, NAND_ECC_DISKONCHIP))
+		if (MTD_READ(nftl->mbd.mtd, ptr, 512, &retlen, buffer))
 			return -EIO;
 	}
 	return 0;
@@ -735,7 +749,7 @@ extern char nftlmountrev[];
 
 int __init init_nftl(void)
 {
-	printk(KERN_INFO "NFTL driver: nftlcore.c $Revision: 1.94 $, nftlmount.c %s\n", nftlmountrev);
+	printk(KERN_INFO "NFTL driver: nftlcore.c $Revision: 1.96 $, nftlmount.c %s\n", nftlmountrev);
 
 	return register_mtd_blktrans(&nftl_tr);
 }

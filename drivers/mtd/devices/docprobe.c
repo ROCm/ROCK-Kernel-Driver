@@ -4,7 +4,7 @@
 /* (C) 1999 Machine Vision Holdings, Inc.			*/
 /* (C) 1999-2003 David Woodhouse <dwmw2@infradead.org>		*/
 
-/* $Id: docprobe.c,v 1.36 2003/05/23 11:29:34 dwmw2 Exp $	*/
+/* $Id: docprobe.c,v 1.41 2003/12/03 10:19:57 dwmw2 Exp $	*/
 
 
 
@@ -135,6 +135,9 @@ static inline int __init doccheck(unsigned long potential, unsigned long physadr
 		 window, DOCControl);
 #endif /* !DOC_PASSIVE_PROBE */	
 
+	/* We need to read the ChipID register four times. For some
+	   newer DiskOnChip 2000 units, the first three reads will
+	   return the DiskOnChip Millennium ident. Don't ask. */
 	ChipID = ReadDOC(window, ChipID);
   
 	switch (ChipID) {
@@ -148,6 +151,12 @@ static inline int __init doccheck(unsigned long potential, unsigned long physadr
 		break;
 		
 	case DOC_ChipID_DocMil:
+		/* Check for the new 2000 with Millennium ASIC */
+		ReadDOC(window, ChipID);
+		ReadDOC(window, ChipID);
+		if (ReadDOC(window, ChipID) != DOC_ChipID_DocMil)
+			ChipID = DOC_ChipID_Doc2kTSOP;
+
 		/* Check the TOGGLE bit in the ECC register */
 		tmp  = ReadDOC(window, ECCConf) & DOC_TOGGLE_BIT;
 		tmpb = ReadDOC(window, ECCConf) & DOC_TOGGLE_BIT;
@@ -191,7 +200,6 @@ static inline int __init doccheck(unsigned long potential, unsigned long physadr
 			tmpc = ReadDOC(window, Mplus_Toggle) & DOC_TOGGLE_BIT;
 			if (tmp != tmpb && tmp == tmpc)
 					return ChipID;
-			break;
 		default:
 			break;
 		}
@@ -199,8 +207,8 @@ static inline int __init doccheck(unsigned long potential, unsigned long physadr
 
 	default:
 
-#ifndef CONFIG_MTD_DOCPROBE_55AA
-		printk(KERN_WARNING "Possible DiskOnChip with unknown ChipID %2.2X found at 0x%lx\n",
+#ifdef CONFIG_MTD_DOCPROBE_55AA
+		printk(KERN_DEBUG "Possible DiskOnChip with unknown ChipID %2.2X found at 0x%lx\n",
 		       ChipID, physadr);
 #endif
 #ifndef DOC_PASSIVE_PROBE
@@ -241,6 +249,12 @@ static void __init DoC_Probe(unsigned long physadr)
 		return;
 	
 	if ((ChipID = doccheck(docptr, physadr))) {
+		if (ChipID == DOC_ChipID_Doc2kTSOP) {
+			/* Remove this at your own peril. The hardware driver works but nothing prevents you from erasing bad blocks */
+			printk(KERN_NOTICE "Refusing to drive DiskOnChip 2000 TSOP until Bad Block Table is correctly supported by INFTL\n");
+			iounmap((void *)docptr);
+			return;
+		}
 		docfound = 1;
 		mtd = kmalloc(sizeof(struct DiskOnChip) + sizeof(struct mtd_info), GFP_KERNEL);
 
@@ -262,6 +276,12 @@ static void __init DoC_Probe(unsigned long physadr)
 		sprintf(namebuf, "with ChipID %2.2X", ChipID);
 
 		switch(ChipID) {
+		case DOC_ChipID_Doc2kTSOP:
+			name="2000 TSOP";
+			im_funcname = "DoC2k_init";
+			im_modname = "doc2000";
+			break;
+			
 		case DOC_ChipID_Doc2k:
 			name="2000";
 			im_funcname = "DoC2k_init";

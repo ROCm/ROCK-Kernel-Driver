@@ -1,5 +1,5 @@
 /*
- * $Id: mtd_blkdevs.c,v 1.16 2003/06/23 13:34:43 dwmw2 Exp $
+ * $Id: mtd_blkdevs.c,v 1.22 2004/07/12 12:35:28 dwmw2 Exp $
  *
  * (C) 2003 David Woodhouse <dwmw2@infradead.org>
  *
@@ -295,7 +295,10 @@ int add_mtd_blktrans_dev(struct mtd_blktrans_dev *new)
 	snprintf(gd->devfs_name, sizeof(gd->devfs_name),
 		 "%s/%c", tr->name, (tr->part_bits?'a':'0') + new->devnum);
 
-	set_capacity(gd, new->size);
+	/* 2.5 has capacity in units of 512 bytes while still
+	   having BLOCK_SIZE_BITS set to 10. Just to keep us amused. */
+	set_capacity(gd, (new->size * new->blksize) >> 9);
+
 	gd->private_data = new;
 	new->blkcore_priv = gd;
 	gd->queue = tr->blkcore_priv->rq;
