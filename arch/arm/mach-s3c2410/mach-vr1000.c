@@ -23,6 +23,7 @@
  *     10-Jan-2005 BJD  Removed include of s3c2410.h
  *     14-Jan-2005 BJD  Added clock init
  *     15-Jan-2005 BJD  Add serial port device definition
+ *     20-Jan-2005 BJD  Use UPF_IOREMAP for ports
 */
 
 #include <linux/kernel.h>
@@ -77,10 +78,6 @@ static struct map_desc vr1000_iodesc[] __initdata = {
 
   { S3C2410_VA_ISA_BYTE, PA_CS2(BAST_PA_ISAIO),	   SZ_16M, MT_DEVICE },
   { S3C2410_VA_ISA_WORD, PA_CS3(BAST_PA_ISAIO),	   SZ_16M, MT_DEVICE },
-
-  /* serial ports */
-
-  { VR1000_VA_SERIAL,	 VR1000_PA_SERIAL,	   SZ_1M, MT_DEVICE },
 
   /* we could possibly compress the next set down into a set of smaller tables
    * pagetables, but that would mean using an L2 section, and it still means
@@ -183,42 +180,37 @@ static struct s3c2410_uartcfg vr1000_uartcfgs[] = {
 
 #define VR1000_BAUDBASE (3692307)
 
-#define VR1000_SERIAL_MEMBASE(x) ((void __iomem *)VR1000_VA_SERIAL + 0x80 + ((x) << 5))
 #define VR1000_SERIAL_MAPBASE(x) (VR1000_PA_SERIAL + 0x80 + ((x) << 5))
 
 static struct plat_serial8250_port serial_platform_data[] = {
 	[0] = {
-		.membase	= VR1000_SERIAL_MEMBASE(0),
 		.mapbase	= VR1000_SERIAL_MAPBASE(0),
 		.irq		= IRQ_VR1000_SERIAL + 0,
-		.flags		= UPF_BOOT_AUTOCONF,
+		.flags		= UPF_BOOT_AUTOCONF | UPF_IOREMAP,
 		.iotype		= UPIO_MEM,
 		.regshift	= 0,
 		.uartclk	= VR1000_BAUDBASE,
 	},
 	[1] = {
-		.membase	= VR1000_SERIAL_MEMBASE(1),
 		.mapbase	= VR1000_SERIAL_MAPBASE(1),
 		.irq		= IRQ_VR1000_SERIAL + 1,
-		.flags		= UPF_BOOT_AUTOCONF,
+		.flags		= UPF_BOOT_AUTOCONF | UPF_IOREMAP,
 		.iotype		= UPIO_MEM,
 		.regshift	= 0,
 		.uartclk	= VR1000_BAUDBASE,
 	},
 	[2] = {
-		.membase	= VR1000_SERIAL_MEMBASE(2),
 		.mapbase	= VR1000_SERIAL_MAPBASE(2),
 		.irq		= IRQ_VR1000_SERIAL + 2,
-		.flags		= UPF_BOOT_AUTOCONF,
+		.flags		= UPF_BOOT_AUTOCONF | UPF_IOREMAP,
 		.iotype		= UPIO_MEM,
 		.regshift	= 0,
 		.uartclk	= VR1000_BAUDBASE,
 	},
 	[3] = {
-		.membase	= VR1000_SERIAL_MEMBASE(3),
 		.mapbase	= VR1000_SERIAL_MAPBASE(3),
 		.irq		= IRQ_VR1000_SERIAL + 3,
-		.flags		= UPF_BOOT_AUTOCONF,
+		.flags		= UPF_BOOT_AUTOCONF | UPF_IOREMAP,
 		.iotype		= UPIO_MEM,
 		.regshift	= 0,
 		.uartclk	= VR1000_BAUDBASE,
