@@ -94,8 +94,8 @@ fixup_broken_pcnet32(struct pci_dev* dev)
 }
 
 void
-pcibios_update_resource(struct pci_dev *dev, struct resource *root,
-			struct resource *res, int resource)
+pcibios_update_resource(struct pci_dev *dev, struct resource *res,
+			int resource)
 {
 	u32 new, check;
 	int reg;

@@ -470,8 +470,8 @@ int pci_assign_resource(struct pci_dev *pdev, int resource)
 	return err;
 }
 
-void pcibios_update_resource(struct pci_dev *pdev, struct resource *res1,
-			     struct resource *res2, int index)
+void pcibios_update_resource(struct pci_dev *pdev, struct resource *res,
+			     int index)
 {
 }
 

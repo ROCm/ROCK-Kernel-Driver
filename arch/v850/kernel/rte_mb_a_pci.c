@@ -288,8 +288,7 @@ void __devinit pcibios_update_irq (struct pci_dev *dev, int irq)
 }
 
 void __nomods_init
-pcibios_update_resource (struct pci_dev *dev, struct resource *root,
-			 struct resource *r, int resource)
+pcibios_update_resource (struct pci_dev *dev, struct resource *r, int resource)
 {
 	u32 new, check;
 	int reg;

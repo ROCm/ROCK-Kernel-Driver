@@ -856,8 +856,8 @@ char * __init pcibios_setup(char *str)
 
 /*
  */
-void pcibios_update_resource(struct pci_dev *pdev, struct resource *res1,
-			     struct resource *res2, int index)
+void pcibios_update_resource(struct pci_dev *pdev, struct resource *res,
+			     int index)
 {
 }
 

@@ -260,8 +260,8 @@ struct pci_fixup pcibios_fixups[] = {
 };
 
 void __devinit
-pcibios_update_resource(struct pci_dev *dev, struct resource *root,
-			struct resource *res, int resource)
+pcibios_update_resource(struct pci_dev *dev, struct resource *res,
+			int resource)
 {
 	struct pci_sys_data *sys = dev->sysdata;
 	u32 val, check;

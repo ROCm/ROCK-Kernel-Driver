@@ -333,8 +333,8 @@ void __init pcibios_align_resource (void *data, struct resource *res,
 {
 }
 
-void __init pcibios_update_resource (struct pci_dev *dev, struct resource *root,
-				     struct resource *res, int resource)
+void __init pcibios_update_resource (struct pci_dev *dev, struct resource *res,
+				     int resource)
 {
 }
 

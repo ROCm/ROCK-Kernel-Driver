@@ -168,8 +168,8 @@ pcibios_align_resource(void *data, struct resource *res,
 }
 
 void
-pcibios_update_resource(struct pci_dev *dev, struct resource *root,
-			struct resource *res, int resource)
+pcibios_update_resource(struct pci_dev *dev, struct resource *res,
+			int resource)
 {
 	/* this should not be called */
 }

@@ -341,8 +341,8 @@ int pcibios_enable_device(struct pci_dev *dev)
 	return pcibios_enable_resources(dev);
 }
 
-void pcibios_update_resource(struct pci_dev *dev, struct resource *root,
-			     struct resource *res, int resource)
+void pcibios_update_resource(struct pci_dev *dev, struct resource *res,
+			     int resource)
 {
 	u32 new, check;
 	int reg;

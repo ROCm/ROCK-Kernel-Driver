@@ -197,8 +197,8 @@ pcibios_setup(char *str)
 }
 
 void __init
-pcibios_update_resource(struct pci_dev *dev, struct resource *root,
-                        struct resource *res, int resource)
+pcibios_update_resource(struct pci_dev *dev, struct resource *res,
+			int resource)
 {
 	unsigned long where, size;
 	u32 reg;
@@ -206,7 +206,8 @@ pcibios_update_resource(struct pci_dev *dev, struct resource *root,
 	where = PCI_BASE_ADDRESS_0 + (resource * 4);
 	size = res->end - res->start;
 	pci_read_config_dword(dev, where, &reg);
-	reg = (reg & size) | (((u32)(res->start - root->start)) & ~size);
+	/* FIXME - this doesn't work for PCI-PCI bridges. */
+	reg = (reg & size) | (((u32)(res->start - res->parent->start)) & ~size);
 	pci_write_config_dword(dev, where, reg);
 }
 

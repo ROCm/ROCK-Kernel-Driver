@@ -90,9 +90,9 @@ int pci_assign_resource(struct pci_dev *dev, int resno)
 		       resno, res->start, res->end, dev->slot_name);
 	} else {
 		DBGC((KERN_ERR "  got res[%lx:%lx] for resource %d of %s\n",
-		      res->start, res->end, i, dev->dev.name));
+		      res->start, res->end, resno, dev->dev.name));
 		/* Update PCI config space.  */
-		pcibios_update_resource(dev, res->parent, res, resno);
+		pcibios_update_resource(dev, res, resno);
 	}
 
 	return ret;

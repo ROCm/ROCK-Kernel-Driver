@@ -265,8 +265,8 @@ pcibios_fixup_bus(struct pci_bus *bus)
 }
 
 void
-pcibios_update_resource(struct pci_dev *dev, struct resource *parent,
-			struct resource *res, int resource)
+pcibios_update_resource(struct pci_dev *dev, struct resource *res,
+			int resource)
 {
 	struct pci_controller *hose = dev->sysdata;
 	struct resource *root;

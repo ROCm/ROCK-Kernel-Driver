@@ -211,7 +211,6 @@ void __devinit pcibios_update_irq(struct pci_dev *dev, int irq)
 void __devinit
 pcibios_update_resource(
 	struct pci_dev *dev,
-	struct resource *root,
 	struct resource *res,
 	int barnum
 	)
