@@ -256,7 +256,7 @@ static int snmp_seq_show(struct seq_file *seq, void *v)
 {
 	int i;
 
-	seq_printf(seq, "Ip: Forwarding DefaultTTL");
+	seq_puts(seq, "Ip: Forwarding DefaultTTL");
 
 	for (i = 0; snmp4_ipstats_list[i].name != NULL; i++)
 		seq_printf(seq, " %s", snmp4_ipstats_list[i].name);

@@ -2017,12 +2017,12 @@ static int tcp6_seq_show(struct seq_file *seq, void *v)
 	struct tcp_iter_state *st;
 
 	if (v == SEQ_START_TOKEN) {
-		seq_printf(seq,
-			   "  sl  "
-			   "local_address                         "
-			   "remote_address                        "
-			   "st tx_queue rx_queue tr tm->when retrnsmt"
-			   "   uid  timeout inode\n");
+		seq_puts(seq,
+			 "  sl  "
+			 "local_address                         "
+			 "remote_address                        "
+			 "st tx_queue rx_queue tr tm->when retrnsmt"
+			 "   uid  timeout inode\n");
 		goto out;
 	}
 	st = seq->private;
