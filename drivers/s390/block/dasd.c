@@ -2055,13 +2055,9 @@ dasd_init(void)
 
 	DBF_EVENT(DBF_EMERG, "%s", "debug area created");
 
-#ifdef CONFIG_DEVFS_FS
-	if (!devfs_mk_dir("dasd")) {
-		DBF_EVENT(DBF_ALERT, "%s", "no devfs");
-		rc = -ENOSYS;
+	rc = devfs_mk_dir("dasd");
+	if (rc)
 		goto failed;
-	}
-#endif
 	rc = dasd_devmap_init();
 	if (rc)
 		goto failed;
