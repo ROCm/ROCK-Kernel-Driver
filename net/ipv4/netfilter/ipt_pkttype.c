@@ -42,8 +42,12 @@ static int checkentry(const char *tablename,
 	return 1;
 }
 
-static struct ipt_match pkttype_match
-= { { NULL, NULL }, "pkttype", &match, &checkentry, NULL, THIS_MODULE };
+static struct ipt_match pkttype_match = {
+	.name		= "pkttype",
+	.match		= &match,
+	.checkentry	= &checkentry,
+	.me		= THIS_MODULE,
+};
 
 static int __init init(void)
 {

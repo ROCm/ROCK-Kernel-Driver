@@ -41,8 +41,12 @@ static int check(const char *tablename,
 	return 1;
 }
 
-static struct ipt_match state_match
-= { { NULL, NULL }, "state", &match, &check, NULL, THIS_MODULE };
+static struct ipt_match state_match = {
+	.name		= "state",
+	.match		= &match,
+	.checkentry	= &check,
+	.me		= THIS_MODULE,
+};
 
 static int __init init(void)
 {

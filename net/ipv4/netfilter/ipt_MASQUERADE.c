@@ -167,20 +167,19 @@ static int masq_inet_event(struct notifier_block *this,
 }
 
 static struct notifier_block masq_dev_notifier = {
-	masq_device_event,
-	NULL,
-	0
+	.notifier_call	= masq_device_event,
 };
 
 static struct notifier_block masq_inet_notifier = {
-	masq_inet_event,
-	NULL,
-	0
+	.notifier_call	= masq_inet_event,
 };
 
-static struct ipt_target masquerade
-= { { NULL, NULL }, "MASQUERADE", masquerade_target, masquerade_check, NULL,
-    THIS_MODULE };
+static struct ipt_target masquerade = {
+	.name		= "MASQUERADE",
+	.target		= masquerade_target,
+	.checkentry	= masquerade_check,
+	.me		= THIS_MODULE,
+};
 
 static int __init init(void)
 {

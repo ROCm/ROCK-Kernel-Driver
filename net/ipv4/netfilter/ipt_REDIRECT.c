@@ -96,9 +96,12 @@ redirect_target(struct sk_buff **pskb,
 	return ip_nat_setup_info(ct, &newrange, hooknum);
 }
 
-static struct ipt_target redirect_reg
-= { { NULL, NULL }, "REDIRECT", redirect_target, redirect_check, NULL,
-    THIS_MODULE };
+static struct ipt_target redirect_reg = {
+	.name		= "REDIRECT",
+	.target		= redirect_target,
+	.checkentry	= redirect_check,
+	.me		= THIS_MODULE,
+};
 
 static int __init init(void)
 {

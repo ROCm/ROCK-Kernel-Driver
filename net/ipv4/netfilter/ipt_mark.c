@@ -33,8 +33,12 @@ checkentry(const char *tablename,
 	return 1;
 }
 
-static struct ipt_match mark_match
-= { { NULL, NULL }, "mark", &match, &checkentry, NULL, THIS_MODULE };
+static struct ipt_match mark_match = {
+	.name		= "mark",
+	.match		= &match,
+	.checkentry	= &checkentry,
+	.me		= THIS_MODULE,
+};
 
 static int __init init(void)
 {

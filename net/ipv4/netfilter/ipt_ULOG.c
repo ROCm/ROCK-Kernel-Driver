@@ -304,9 +304,11 @@ static int ipt_ulog_checkentry(const char *tablename,
 	return 1;
 }
 
-static struct ipt_target ipt_ulog_reg =
-    { {NULL, NULL}, "ULOG", ipt_ulog_target, ipt_ulog_checkentry, NULL,
-THIS_MODULE
+static struct ipt_target ipt_ulog_reg = {
+	.name		= "ULOG",
+	.target		= ipt_ulog_target,
+	.checkentry	= ipt_ulog_checkentry,
+	.me		= THIS_MODULE,
 };
 
 static int __init init(void)

@@ -1205,14 +1205,24 @@ void arpt_unregister_table(struct arpt_table *table)
 }
 
 /* The built-in targets: standard (NULL) and error. */
-static struct arpt_target arpt_standard_target
-= { { NULL, NULL }, ARPT_STANDARD_TARGET, NULL, NULL, NULL };
-static struct arpt_target arpt_error_target
-= { { NULL, NULL }, ARPT_ERROR_TARGET, arpt_error, NULL, NULL };
+static struct arpt_target arpt_standard_target = {
+	.name		= ARPT_STANDARD_TARGET,
+};
 
-static struct nf_sockopt_ops arpt_sockopts
-= { { NULL, NULL }, PF_INET, ARPT_BASE_CTL, ARPT_SO_SET_MAX+1, do_arpt_set_ctl,
-    ARPT_BASE_CTL, ARPT_SO_GET_MAX+1, do_arpt_get_ctl, 0, NULL  };
+static struct arpt_target arpt_error_target = {
+	.name		= ARPT_ERROR_TARGET,
+	.target		= arpt_error,
+};
+
+static struct nf_sockopt_ops arpt_sockopts = {
+	.pf		= PF_INET,
+	.set_optmin	= ARPT_BASE_CTL,
+	.set_optmax	= ARPT_SO_SET_MAX+1,
+	.set		= do_arpt_set_ctl,
+	.get_optmin	= ARPT_BASE_CTL,
+	.get_optmax	= ARPT_SO_GET_MAX+1,
+	.get		= do_arpt_get_ctl,
+};
 
 #ifdef CONFIG_PROC_FS
 static inline int print_name(const struct arpt_table *t,

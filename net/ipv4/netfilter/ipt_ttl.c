@@ -57,8 +57,12 @@ static int checkentry(const char *tablename, const struct ipt_ip *ip,
 	return 1;
 }
 
-static struct ipt_match ttl_match = { { NULL, NULL }, "ttl", &match,
-		&checkentry, NULL, THIS_MODULE };
+static struct ipt_match ttl_match = {
+	.name		= "ttl",
+	.match		= &match,
+	.checkentry	= &checkentry,
+	.me		= THIS_MODULE,
+};
 
 static int __init init(void)
 {

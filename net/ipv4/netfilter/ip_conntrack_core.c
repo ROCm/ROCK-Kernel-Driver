@@ -1339,11 +1339,12 @@ getorigdst(struct sock *sk, int optval, void *user, int *len)
 	return -ENOENT;
 }
 
-static struct nf_sockopt_ops so_getorigdst
-= { { NULL, NULL }, PF_INET,
-    0, 0, NULL, /* Setsockopts */
-    SO_ORIGINAL_DST, SO_ORIGINAL_DST+1, &getorigdst,
-    0, NULL };
+static struct nf_sockopt_ops so_getorigdst = {
+	.pf		= PF_INET,
+	.get_optmin	= SO_ORIGINAL_DST,
+	.get_optmax	= SO_ORIGINAL_DST+1,
+	.get		= &getorigdst,
+};
 
 #define NET_IP_CONNTRACK_MAX 2089
 #define NET_IP_CONNTRACK_MAX_NAME "ip_conntrack_max"
@@ -1367,7 +1368,6 @@ static ctl_table ip_conntrack_dir_table[] = {
 	{
 		.ctl_name	= NET_IPV4,
 		.procname	= "ipv4",
-		.maxlen		= 0,
 		.mode		= 0555,
 		.child		= ip_conntrack_table
 	},
@@ -1378,7 +1378,6 @@ static ctl_table ip_conntrack_root_table[] = {
 	{
 		.ctl_name	= CTL_NET,
 		.procname	= "net",
-		.maxlen		= 0,
 		.mode		= 0555,
 		.child		= ip_conntrack_dir_table
 	},

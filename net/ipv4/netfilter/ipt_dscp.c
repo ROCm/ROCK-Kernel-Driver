@@ -40,8 +40,12 @@ static int checkentry(const char *tablename, const struct ipt_ip *ip,
 	return 1;
 }
 
-static struct ipt_match dscp_match = { { NULL, NULL }, "dscp", &match,
-		&checkentry, NULL, THIS_MODULE };
+static struct ipt_match dscp_match = {
+	.name		= "dscp",
+	.match		= &match,
+	.checkentry	= &checkentry,
+	.me		= THIS_MODULE,
+};
 
 static int __init init(void)
 {

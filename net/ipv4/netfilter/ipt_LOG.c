@@ -350,9 +350,12 @@ static int ipt_log_checkentry(const char *tablename,
 	return 1;
 }
 
-static struct ipt_target ipt_log_reg
-= { { NULL, NULL }, "LOG", ipt_log_target, ipt_log_checkentry, NULL, 
-    THIS_MODULE };
+static struct ipt_target ipt_log_reg = {
+	.name		= "LOG",
+	.target		= ipt_log_target,
+	.checkentry	= ipt_log_checkentry,
+	.me		= THIS_MODULE,
+};
 
 static int __init init(void)
 {
