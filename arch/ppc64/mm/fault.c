@@ -38,6 +38,44 @@
 #include <asm/uaccess.h>
 
 /*
+ * Check whether the instruction at regs->nip is a store using
+ * an update addressing form which will update r1.
+ */
+static int store_updates_sp(struct pt_regs *regs)
+{
+	unsigned int inst;
+
+	if (get_user(inst, (unsigned int *)regs->nip))
+		return 0;
+	/* check for 1 in the rA field */
+	if (((inst >> 16) & 0x1f) != 1)
+		return 0;
+	/* check major opcode */
+	switch (inst >> 26) {
+	case 37:	/* stwu */
+	case 39:	/* stbu */
+	case 45:	/* sthu */
+	case 53:	/* stfsu */
+	case 55:	/* stfdu */
+		return 1;
+	case 62:	/* std or stdu */
+		return (inst & 3) == 1;
+	case 31:
+		/* check minor opcode */
+		switch ((inst >> 1) & 0x3ff) {
+		case 181:	/* stdux */
+		case 183:	/* stwux */
+		case 247:	/* stbux */
+		case 439:	/* sthux */
+		case 695:	/* stfsux */
+		case 759:	/* stfdux */
+			return 1;
+		}
+	}
+	return 0;
+}
+
+/*
  * The error_code parameter is
  *  - DSISR for a non-SLB data access fault,
  *  - SRR1 & 0x08000000 for a non-SLB instruction access fault
@@ -82,6 +120,39 @@ void do_page_fault(struct pt_regs *regs, unsigned long address,
 	}
 	if (!(vma->vm_flags & VM_GROWSDOWN))
 		goto bad_area;
+
+	/*
+	 * N.B. The POWER/Open ABI allows programs to access up to
+	 * 288 bytes below the stack pointer.
+	 * The kernel signal delivery code writes up to about 1.5kB
+	 * below the stack pointer (r1) before decrementing it.
+	 * The exec code can write slightly over 640kB to the stack
+	 * before setting the user r1.  Thus we allow the stack to
+	 * expand to 1MB without further checks.
+	 */
+	if (address + 0x100000 < vma->vm_end) {
+		/* get user regs even if this fault is in kernel mode */
+		struct pt_regs *uregs = current->thread.regs;
+		if (uregs == NULL)
+			goto bad_area;
+
+		/*
+		 * A user-mode access to an address a long way below
+		 * the stack pointer is only valid if the instruction
+		 * is one which would update the stack pointer to the
+		 * address accessed if the instruction completed,
+		 * i.e. either stwu rs,n(r1) or stwux rs,r1,rb
+		 * (or the byte, halfword, float or double forms).
+		 *
+		 * If we don't check this then any write to the area
+		 * between the last mapped region and the stack will
+		 * expand the stack rather than segfaulting.
+		 */
+		if (address + 2048 < uregs->gpr[1]
+		    && (!user_mode(regs) || !store_updates_sp(regs)))
+			goto bad_area;
+	}
+
 	if (expand_stack(vma, address))
 		goto bad_area;
 
