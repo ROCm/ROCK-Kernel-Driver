@@ -1015,14 +1015,16 @@ xdr_xcode_array2(struct xdr_buf *buf, unsigned int base,
 	/* process pages array */
 	base -= buf->head->iov_len;
 	if (todo && base < buf->page_len) {
+		unsigned int avail_page;
+
 		avail_here = min(todo, buf->page_len - base);
 		todo -= avail_here;
 
 		base += buf->page_base;
 		ppages = buf->pages + (base >> PAGE_CACHE_SHIFT);
 		base &= ~PAGE_CACHE_MASK;
-		unsigned int avail_page = min_t(unsigned int,
-			PAGE_CACHE_SIZE - base, avail_here);
+		avail_page = min_t(unsigned int, PAGE_CACHE_SIZE - base,
+				   avail_here);
 		c = kmap(*ppages) + base;
 
 		while (avail_here) {
