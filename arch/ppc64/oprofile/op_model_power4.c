@@ -24,6 +24,8 @@
 static unsigned long reset_value[OP_MAX_COUNTER];
 
 static int num_counters;
+static int oprofile_running;
+static int mmcra_has_sihv;
 
 static void power4_reg_setup(struct op_counter_config *ctr,
 			     struct op_system_config *sys,
@@ -32,6 +34,16 @@ static void power4_reg_setup(struct op_counter_config *ctr,
 	int i;
 
 	num_counters = num_ctrs;
+
+	/*
+	 * SIHV / SIPR bits are only implemented on POWER4+ (GQ) and above.
+	 * However we disable it on all POWER4 until we verify it works
+	 * (I was seeing some strange behaviour last time I tried).
+	 *
+	 * It has been verified to work on POWER5 so we enable it there.
+	 */
+	if (!(__is_processor(PV_POWER4) || __is_processor(PV_POWER4p)))
+		mmcra_has_sihv = 1;
 
 	for (i = 0; i < num_counters; ++i)
 		reset_value[i] = 0x80000000UL - ctr[i].count;
@@ -99,6 +111,8 @@ static void power4_start(struct op_counter_config *ctr)
 	mmcr0 &= ~MMCR0_FC;
 	mtspr(SPRN_MMCR0, mmcr0);
 
+	oprofile_running = 1;
+
 	dbg("start on cpu %d, mmcr0 %x\n", smp_processor_id(), mmcr0);
 }
 
@@ -110,6 +124,8 @@ static void power4_stop(void)
 	mmcr0 = mfspr(SPRN_MMCR0);
 	mmcr0 |= MMCR0_FC;
 	mtspr(SPRN_MMCR0, mmcr0);
+
+	oprofile_running = 0;
 
 	dbg("stop on cpu %d, mmcr0 %x\n", smp_processor_id(), mmcr0);
 
@@ -128,9 +144,6 @@ static void __attribute_used__ rtas_bucket(void)
 static void __attribute_used__ kernel_unknown_bucket(void)
 {
 }
-
-/* XXX Not currently working */
-static int mmcra_has_sihv = 0;
 
 /*
  * On GQ and newer the MMCRA stores the HV and PR bits at the time
@@ -210,7 +223,7 @@ static void power4_handle_interrupt(struct pt_regs *regs,
 	for (i = 0; i < num_counters; ++i) {
 		val = ctr_read(i);
 		if (val < 0) {
-			if (ctr[i].enabled) {
+			if (oprofile_running && ctr[i].enabled) {
 				oprofile_add_sample(pc, is_kernel, i, cpu);
 				ctr_write(i, reset_value[i]);
 			} else {
