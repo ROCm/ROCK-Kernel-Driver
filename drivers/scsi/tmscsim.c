@@ -1042,7 +1042,7 @@ static void dc390_BuildSRB (Scsi_Cmnd* pcmd, PDCB pDCB, PSRB pSRB)
 
 static int DC390_queue_command (Scsi_Cmnd *cmd, void (* done)(Scsi_Cmnd *))
 {
-    PDCB   pDCB;
+    PDCB   pDCB = (PDCB) cmd->device->hostdata;
     PSRB   pSRB;
     PACB   pACB = (PACB) cmd->device->host->hostdata;
 
@@ -1058,8 +1058,6 @@ static int DC390_queue_command (Scsi_Cmnd *cmd, void (* done)(Scsi_Cmnd *))
 		cmd->device->id, cmd->device->lun); 
 	goto fail;
     }
-
-    pDCB = dc390_findDCB (pACB, cmd->device->id, cmd->device->lun);
 
     /* Should it be: BUG_ON(!pDCB); ? */
 
@@ -1286,7 +1284,7 @@ static void dc390_dumpinfo (PACB pACB, PDCB pDCB, PSRB pSRB)
 
 static int DC390_abort (Scsi_Cmnd *cmd)
 {
-    PDCB  pDCB;
+    PDCB  pDCB = (PDCB) cmd->device->hostdata;
     PSRB  pSRB, psrb;
     UINT  count, i;
     int   status;
@@ -1296,7 +1294,6 @@ static int DC390_abort (Scsi_Cmnd *cmd)
     printk ("DC390: Abort command (pid %li, Device %02i-%02i)\n",
 	    cmd->pid, cmd->device->id, cmd->device->lun);
 
-    pDCB = dc390_findDCB (pACB, cmd->device->id, cmd->device->lun);
     if( !pDCB ) goto  NOT_RUN;
 
     /* Added 98/07/02 KG */
@@ -1909,6 +1906,7 @@ static int dc390_slave_alloc(struct scsi_device *scsi_device)
 	PACB pACB = (PACB) scsi_device->host->hostdata;
 	dc390_initDCB(pACB, &pDCB, scsi_device->id, scsi_device->lun);
 	if (pDCB != NULL) {
+		scsi_device->hostdata = pDCB;
 		pACB->scan_devices = 1;
 		return 0;
 	}
@@ -1924,7 +1922,7 @@ static int dc390_slave_alloc(struct scsi_device *scsi_device)
 static void dc390_slave_destroy(struct scsi_device *scsi_device)
 {
 	PACB pACB = (PACB) scsi_device->host->hostdata;
-	PDCB pDCB = dc390_findDCB (pACB, scsi_device->id, scsi_device->lun);;
+	PDCB pDCB = (PDCB) scsi_device->hostdata;
 	pACB->scan_devices = 0;
 	if (pDCB != NULL)
 		dc390_remove_dev(pACB, pDCB);
@@ -1978,7 +1976,7 @@ static int __devinit dc390_init_one(struct pci_dev *dev,
 	if (!scsi_host)
 		goto nomem;
 
-	pACB = (PACB)scsi_host->hostdata;
+	pACB = (PACB) scsi_host->hostdata;
 
 	if (dc390_init(scsi_host, io_port, irq, dev, dc390_adapterCnt)) {
 		ret = -EBUSY;
@@ -2180,7 +2178,7 @@ static int DC390_proc_info (struct Scsi_Host *shpnt, char *buffer, char **start,
 static int dc390_shutdown (struct Scsi_Host *host)
 {
     UCHAR    bval;
-    PACB pACB = (PACB)(host->hostdata);
+    PACB pACB = (PACB) host->hostdata;
    
 /*  pACB->soft_reset(host); */
 
@@ -2200,7 +2198,7 @@ static int dc390_shutdown (struct Scsi_Host *host)
 static void dc390_freeDCBs (struct Scsi_Host *host)
 {
     PDCB pDCB, nDCB;
-    PACB pACB = (PACB)(host->hostdata);
+    PACB pACB = (PACB) host->hostdata;
     
     pDCB = pACB->pLinkDCB;
     if (!pDCB) return;
@@ -2219,7 +2217,7 @@ static void dc390_freeDCBs (struct Scsi_Host *host)
 static int DC390_release (struct Scsi_Host *host)
 {
     DC390_IFLAGS;
-    PACB pACB = (PACB)(host->hostdata);
+    PACB pACB = (PACB) host->hostdata;
 
     DC390_LOCK_IO(host);
 
