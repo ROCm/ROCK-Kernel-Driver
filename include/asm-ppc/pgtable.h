@@ -145,8 +145,8 @@ extern unsigned long ioremap_bot, ioremap_base;
      is cleared in the TLB miss handler before the TLB entry is loaded.
    - All other bits of the PTE are loaded into TLBLO without
      modification, leaving us only the bits 20, 21, 24, 25, 26, 30 for
-     software PTE bits.  We actually use use bits 21, 24, 25, 26, and
-     30 respectively for the software bits: ACCESSED, DIRTY, RW, EXEC,
+     software PTE bits.  We actually use use bits 21, 24, 25, and
+     30 respectively for the software bits: ACCESSED, DIRTY, RW, and
      PRESENT.
 */
 
@@ -161,6 +161,13 @@ extern unsigned long ioremap_bot, ioremap_base;
 #define _PAGE_HWWRITE	0x100	/* hardware: Dirty & RW, set in exception */
 #define _PAGE_HWEXEC	0x200	/* hardware: EX permission */
 #define _PAGE_ACCESSED	0x400	/* software: R: page referenced */
+
+#define _PMD_PRESENT	0x400	/* PMD points to page of PTEs */
+#define _PMD_BAD	0x802
+#define _PMD_SIZE	0x0e0	/* size field, != 0 for large-page PMD entry */
+#define _PMD_SIZE_4M	0x0c0
+#define _PMD_SIZE_16M	0x0e0
+#define PMD_PAGE_SIZE(pmdval)	(1024 << (((pmdval) & _PMD_SIZE) >> 4))
 
 #elif defined(CONFIG_8xx)
 /* Definitions for 8xx embedded chips. */
@@ -184,8 +191,20 @@ extern unsigned long ioremap_bot, ioremap_base;
 #define _PAGE_HWWRITE	0x0100	/* h/w write enable: never set in Linux PTE */
 #define _PAGE_USER	0x0800	/* One of the PP bits, the other is USER&~RW */
 
+#define _PMD_PRESENT	0x0001
+#define _PMD_BAD	0x0ff0
 #define _PMD_PAGE_MASK	0x000c
 #define _PMD_PAGE_8M	0x000c
+
+/*
+ * The 8xx TLB miss handler allegedly sets _PAGE_ACCESSED in the PTE
+ * for an address even if _PAGE_PRESENT is not set, as a performance
+ * optimization.  This is a bug if you ever want to use swap unless
+ * _PAGE_ACCESSED is 2, which it isn't, or unless you have 8xx-specific
+ * definitions for __swp_entry etc. below, which would be gross.
+ *  -- paulus
+ */
+#define _PTE_NONE_MASK _PAGE_ACCESSED
 
 #else /* CONFIG_6xx */
 /* Definitions for 60x, 740/750, etc. */
@@ -200,21 +219,22 @@ extern unsigned long ioremap_bot, ioremap_base;
 #define _PAGE_ACCESSED	0x100	/* R: page referenced */
 #define _PAGE_EXEC	0x200	/* software: i-cache coherency required */
 #define _PAGE_RW	0x400	/* software: user write access allowed */
+
+#define _PTE_NONE_MASK	_PAGE_HASHPTE
+
+#define _PMD_PRESENT	0
+#define _PMD_PRESENT_MASK (PAGE_MASK)
+#define _PMD_BAD	(~PAGE_MASK)
 #endif
 
-/* The non-standard PowerPC MMUs, which includes the 4xx and 8xx (and
- * mabe 603e) have TLB miss handlers that unconditionally set the
- * _PAGE_ACCESSED flag as a performance optimization.  This causes
- * problems for the page_none() macro, just like the HASHPTE flag does
- * for the standard PowerPC MMUs.  Depending upon the MMU configuration,
- * either HASHPTE or ACCESSED will have to be masked to give us a
- * proper pte_none() condition.
+/*
+ * Some bits are only used on some cpu families...
  */
 #ifndef _PAGE_HASHPTE
 #define _PAGE_HASHPTE	0
-#define _PTE_NONE_MASK _PAGE_ACCESSED
-#else
-#define _PTE_NONE_MASK _PAGE_HASHPTE
+#endif
+#ifndef _PTE_NONE_MASK
+#define _PTE_NONE_MASK 0
 #endif
 #ifndef _PAGE_SHARED
 #define _PAGE_SHARED	0
@@ -228,6 +248,13 @@ extern unsigned long ioremap_bot, ioremap_base;
 #ifndef _PAGE_EXEC
 #define _PAGE_EXEC	0
 #endif
+#ifndef _PMD_PRESENT_MASK
+#define _PMD_PRESENT_MASK	_PMD_PRESENT
+#endif
+#ifndef _PMD_SIZE
+#define _PMD_SIZE	0
+#define PMD_PAGE_SIZE(pmd)	bad_call_to_PMD_PAGE_SIZE()
+#endif
 
 #define _PAGE_CHG_MASK	(PAGE_MASK | _PAGE_ACCESSED | _PAGE_DIRTY)
 
@@ -237,27 +264,28 @@ extern unsigned long ioremap_bot, ioremap_base;
  * to have it in the Linux PTE, and in fact the bit could be reused for
  * another purpose.  -- paulus.
  */
-#define _PAGE_BASE	_PAGE_PRESENT | _PAGE_ACCESSED
-#define _PAGE_WRENABLE	_PAGE_RW | _PAGE_DIRTY | _PAGE_HWWRITE
 
-#define _PAGE_KERNEL	_PAGE_BASE | _PAGE_WRENABLE | _PAGE_SHARED | _PAGE_HWEXEC
-#define _PAGE_IO	_PAGE_KERNEL | _PAGE_NO_CACHE | _PAGE_GUARDED
+#define _PAGE_BASE	(_PAGE_PRESENT | _PAGE_ACCESSED)
+#define _PAGE_WRENABLE	(_PAGE_RW | _PAGE_DIRTY | _PAGE_HWWRITE)
+#define _PAGE_KERNEL	(_PAGE_BASE | _PAGE_SHARED | _PAGE_WRENABLE)
 
-#define _PAGE_RAM	_PAGE_KERNEL
+#ifdef CONFIG_PPC_STD_MMU
+/* On standard PPC MMU, no user access implies kernel read/write access,
+ * so to write-protect kernel memory we must turn on user access */
+#define _PAGE_KERNEL_RO	(_PAGE_BASE | _PAGE_SHARED | _PAGE_USER)
+#else
+#define _PAGE_KERNEL_RO	(_PAGE_BASE | _PAGE_SHARED)
+#endif
+
+#define _PAGE_IO	(_PAGE_KERNEL | _PAGE_NO_CACHE | _PAGE_GUARDED)
+#define _PAGE_RAM	(_PAGE_KERNEL | _PAGE_HWEXEC)
 
 #if defined(CONFIG_KGDB) || defined(CONFIG_XMON)
 /* We want the debuggers to be able to set breakpoints anywhere, so
  * don't write protect the kernel text */
 #define _PAGE_RAM_TEXT	_PAGE_RAM
 #else
-#ifdef CONFIG_PPC_STD_MMU
-/* On standard PPC MMU, no user access implies kernel read/write
- * access, so to write-protect the kernel text we must turn on user
- * access */
-#define _PAGE_RAM_TEXT	(_PAGE_RAM & ~_PAGE_WRENABLE) | _PAGE_USER
-#else
-#define _PAGE_RAM_TEXT	(_PAGE_RAM & ~_PAGE_WRENABLE)
-#endif
+#define _PAGE_RAM_TEXT	(_PAGE_KERNEL_RO | _PAGE_HWEXEC)
 #endif
 
 #define PAGE_NONE	__pgprot(_PAGE_BASE)
@@ -268,9 +296,7 @@ extern unsigned long ioremap_bot, ioremap_base;
 #define PAGE_COPY	__pgprot(_PAGE_BASE | _PAGE_USER)
 #define PAGE_COPY_X	__pgprot(_PAGE_BASE | _PAGE_USER | _PAGE_EXEC)
 
-#define PAGE_KERNEL	__pgprot(_PAGE_KERNEL)
-#define PAGE_KERNEL_RO	__pgprot(_PAGE_BASE | _PAGE_SHARED)
-#define PAGE_KERNEL_CI	__pgprot(_PAGE_IO)
+#define PAGE_KERNEL	__pgprot(_PAGE_RAM)
 
 /*
  * The PowerPC can only do execute protection on a segment (256MB) basis,
@@ -297,6 +323,10 @@ extern unsigned long ioremap_bot, ioremap_base;
 #define __S111	PAGE_SHARED_X
 
 #ifndef __ASSEMBLY__
+/* Make sure we get a link error if PMD_PAGE_SIZE is ever called on a
+ * kernel without large page PMD support */
+extern unsigned long bad_call_to_PMD_PAGE_SIZE(void);
+
 /*
  * Conversions between PTE values and page frame numbers.
  */
@@ -321,8 +351,8 @@ extern unsigned long empty_zero_page[1024];
 #define pte_clear(ptep)		do { set_pte((ptep), __pte(0)); } while (0)
 
 #define pmd_none(pmd)		(!pmd_val(pmd))
-#define	pmd_bad(pmd)		(0)
-#define	pmd_present(pmd)	(pmd_val(pmd) != 0)
+#define	pmd_bad(pmd)		(pmd_val(pmd) & _PMD_BAD)
+#define	pmd_present(pmd)	(pmd_val(pmd) & _PMD_PRESENT_MASK)
 #define	pmd_clear(pmdp)		do { pmd_val(*(pmdp)) = 0; } while (0)
 
 #ifndef __ASSEMBLY__
