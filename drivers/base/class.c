@@ -2,7 +2,7 @@
  * class.c - basic device class management
  */
 
-#undef DEBUG
+#define DEBUG
 
 #include <linux/device.h>
 #include <linux/module.h>
@@ -98,7 +98,6 @@ void devclass_remove_file(struct device_class * cls, struct devclass_attribute *
 }
 
 
-
 int devclass_add_driver(struct device_driver * drv)
 {
 	struct device_class * cls = get_devclass(drv->devclass);
@@ -172,8 +171,10 @@ int devclass_add_device(struct device * dev)
 				error = cls->add_device(dev);
 			if (!error) {
 				enum_device(cls,dev);
-				interface_add(cls,dev);
+				interface_add_dev(dev);
 			}
+
+			list_add_tail(&dev->class_list,&cls->devices);
 
 			/* notify userspace (call /sbin/hotplug) */
 			class_hotplug (dev, "add");
@@ -196,8 +197,10 @@ void devclass_remove_device(struct device * dev)
 			down_write(&cls->subsys.rwsem);
 			pr_debug("device class %s: removing device %s\n",
 				 cls->name,dev->name);
-			interface_remove(cls,dev);
+			interface_remove_dev(dev);
 			unenum_device(cls,dev);
+
+			list_del(&dev->class_list);
 
 			/* notify userspace (call /sbin/hotplug) */
 			class_hotplug (dev, "remove");
@@ -224,6 +227,7 @@ void put_devclass(struct device_class * cls)
 int devclass_register(struct device_class * cls)
 {
 	INIT_LIST_HEAD(&cls->drivers);
+	INIT_LIST_HEAD(&cls->devices);
 
 	pr_debug("device class '%s': registering\n",cls->name);
 	strncpy(cls->subsys.kobj.name,cls->name,KOBJ_NAME_LEN);
