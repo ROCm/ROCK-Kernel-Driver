@@ -134,12 +134,6 @@ static int usb_parse_interface(struct usb_interface *interface, unsigned char *b
 	interface->act_altsetting = 0;
 	interface->num_altsetting = 0;
 	interface->max_altsetting = USB_ALTSETTINGALLOC;
-	device_initialize(&interface->dev);
-	interface->dev.release = usb_release_intf;
-
-	/* put happens in usb_destroy_configuration */
-	get_device(&interface->dev);
-
 	interface->altsetting = kmalloc(sizeof(*interface->altsetting) * interface->max_altsetting,
 					GFP_KERNEL);
 
@@ -284,6 +278,7 @@ static int usb_parse_interface(struct usb_interface *interface, unsigned char *b
 int usb_parse_configuration(struct usb_host_config *config, char *buffer)
 {
 	int i, size;
+	struct usb_interface *interface;
 	int retval = -EINVAL;
 	struct usb_descriptor_header *header;
 
@@ -296,18 +291,23 @@ int usb_parse_configuration(struct usb_host_config *config, char *buffer)
 
 	if (config->desc.bNumInterfaces > USB_MAXINTERFACES) {
 		warn("too many interfaces");
-		goto error;
+		return -EINVAL;
 	}
 
 	for (i = 0; i < config->desc.bNumInterfaces; ++i) {
-		config->interface[i] = kmalloc(sizeof(struct usb_interface), GFP_KERNEL);
-		dbg("kmalloc IF %p, numif %i", config->interface[i], i);
-		if (!config->interface[i]) {
+		interface = config->interface[i] =
+		    kmalloc(sizeof(struct usb_interface), GFP_KERNEL);
+		dbg("kmalloc IF %p, numif %i", interface, i);
+		if (!interface) {
 			err("out of memory");
-			retval = -ENOMEM;
-			goto error;
+			return -ENOMEM;
 		}
-		memset(config->interface[i], 0x00, sizeof(struct usb_interface));
+		memset(interface, 0, sizeof(struct usb_interface));
+		interface->dev.release = usb_release_intf;
+		device_initialize(&interface->dev);
+
+		/* put happens in usb_destroy_configuration */
+		get_device(&interface->dev);
 	}
 
 	buffer += config->desc.bLength;
@@ -376,10 +376,6 @@ int usb_parse_configuration(struct usb_host_config *config, char *buffer)
 	}
 
 	return size;
-error:
-	for (i = 0; i < USB_MAXINTERFACES; ++i)
-		kfree(config->interface[i]);
-	return retval;
 }
 
 // hub-only!! ... and only exported for reset/reinit path.
@@ -401,13 +397,13 @@ void usb_destroy_configuration(struct usb_device *dev)
 	for (c = 0; c < dev->descriptor.bNumConfigurations; c++) {
 		struct usb_host_config *cf = &dev->config[c];
 
-		if (!cf->interface)
-			break;
-
 		for (i = 0; i < cf->desc.bNumInterfaces; i++) {
 			struct usb_interface *ifp = cf->interface[i];
-			put_device(&ifp->dev);
+
+			if (ifp)
+				put_device(&ifp->dev);
 		}
+		kfree(cf->extra);
 	}
 	kfree(dev->config);
 }
@@ -449,6 +445,7 @@ int usb_get_configuration(struct usb_device *dev)
 		err("out of memory");
 		return -ENOMEM;
 	}
+	memset(dev->rawdescriptors, 0, sizeof(char *) * dev->descriptor.bNumConfigurations);
 
 	buffer = kmalloc(8, GFP_KERNEL);
 	if (!buffer) {
@@ -502,7 +499,7 @@ int usb_get_configuration(struct usb_device *dev)
 		if (result > 0)
 			dbg("descriptor data left");
 		else if (result < 0) {
-			result = -EINVAL;
+			++cfgno;
 			goto err;
 		}
 	}
