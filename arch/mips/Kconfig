@@ -496,6 +496,11 @@ config REPLICATE_EXHANDLERS
 config SGI_IP32
 	bool "Support for SGI IP32 (O2) (EXPERIMENTAL)"
 	depends on MIPS64 && EXPERIMENTAL
+	select ARC
+	select ARC32
+	select BOOT_ELF32
+	select OWN_DMA
+	select DMA_IP32
 	select DMA_NONCOHERENT
 	select HW_HAS_PCI
 	select R5000_CPU_SCACHE
