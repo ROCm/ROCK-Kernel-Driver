@@ -255,7 +255,7 @@ temp_boot_pmds:
 	
 .org 0x5000
 ENTRY(level2_kernel_pgt)
-	/* 10MB kernel mapping. The kernel code cannot be bigger than that.
+	/* 40MB kernel mapping. The kernel code cannot be bigger than that.
 	   When you change this change KERNEL_TEXT_SIZE in page.h too. */
 	/* (2^48-(2*1024*1024*1024)-((2^39)*511)-((2^30)*510)) = 0 */
 	.quad	0x0000000000000183
@@ -263,8 +263,21 @@ ENTRY(level2_kernel_pgt)
 	.quad	0x0000000000400183
 	.quad	0x0000000000600183
 	.quad	0x0000000000800183
-	/* 10MB mapping for now to decrease the aliasing window */
-	.fill   15,8,0
+	.quad	0x0000000000A00183
+	.quad	0x0000000000C00183
+	.quad	0x0000000000E00183
+	.quad	0x0000000001000183
+	.quad	0x0000000001200183
+	.quad	0x0000000001400183
+	.quad	0x0000000001600183
+	.quad	0x0000000001800183
+	.quad	0x0000000001A00183
+	.quad	0x0000000001C00183
+	.quad	0x0000000001E00183
+	.quad	0x0000000002000183
+	.quad	0x0000000002200183
+	.quad	0x0000000002400183
+	.quad	0x0000000002600183
 	/* Module mapping starts here */
 	.fill	492,8,0
 

@@ -108,6 +108,9 @@
 #define M29W160DT	0x22C4
 #define M29W160DB	0x2249
 #define M29W040B	0x00E3
+#define M50FW040	0x002C
+#define M50FW080	0x002D
+#define M50FW016	0x002E
 
 /* SST */
 #define SST29EE512	0x005d
@@ -1232,6 +1235,45 @@ static const struct amd_flash_info jedec_table[] = {
 		.NumEraseRegions= 1,
 		.regions	= {
 			ERASEINFO(0x10000,8),
+		}
+        }, {
+		.mfr_id		= MANUFACTURER_ST,
+		.dev_id		= M50FW040,
+		.name		= "ST M50FW040",
+		.uaddr		= {
+			[0] = MTD_UADDR_UNNECESSARY,    /* x8 */
+		},
+		.DevSize	= SIZE_512KiB,
+		.CmdSet		= P_ID_INTEL_EXT,
+		.NumEraseRegions= 1,
+		.regions	= {
+			ERASEINFO(0x10000,8),
+		}
+        }, {
+		.mfr_id		= MANUFACTURER_ST,
+		.dev_id		= M50FW080,
+		.name		= "ST M50FW080",
+		.uaddr		= {
+			[0] = MTD_UADDR_UNNECESSARY,    /* x8 */
+		},
+		.DevSize	= SIZE_1MiB,
+		.CmdSet		= P_ID_INTEL_EXT,
+		.NumEraseRegions= 1,
+		.regions	= {
+			ERASEINFO(0x10000,16),
+		}
+        }, {
+		.mfr_id		= MANUFACTURER_ST,
+		.dev_id		= M50FW016,
+		.name		= "ST M50FW016",
+		.uaddr		= {
+			[0] = MTD_UADDR_UNNECESSARY,    /* x8 */
+		},
+		.DevSize	= SIZE_2MiB,
+		.CmdSet		= P_ID_INTEL_EXT,
+		.NumEraseRegions= 1,
+		.regions	= {
+			ERASEINFO(0x10000,32),
 		}
 	}, {
 		.mfr_id		= MANUFACTURER_TOSHIBA,

@@ -423,8 +423,9 @@ no_context:
 		printk(KERN_ALERT "Unable to handle kernel NULL pointer dereference");
 	else
 		printk(KERN_ALERT "Unable to handle kernel paging request");
-	printk(" at %016lx RIP: \n",address);	
+	printk(" at %016lx RIP: \n" KERN_ALERT,address);
 	printk_address(regs->rip);
+	printk("\n");
 	dump_pagetable(address);
 	__die("Oops", regs, error_code);
 	/* Executive summary in case the body of the oops scrolled away */

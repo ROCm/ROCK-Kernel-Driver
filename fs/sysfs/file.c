@@ -89,6 +89,7 @@ static int fill_read_buffer(struct file * file, struct sysfs_buffer * buffer)
 		return -ENOMEM;
 
 	count = ops->show(kobj,attr,buffer->page);
+	BUG_ON(count > PAGE_SIZE);
 	if (count >= 0)
 		buffer->count = count;
 	else

@@ -124,8 +124,7 @@ exp_find(struct auth_domain *clp, int fsid_type, u32 *fsidv,
 		int err;
 		exp_get(exp);
 		expkey_put(&ek->h, &svc_expkey_cache);
-		if (exp &&
-		    (err = cache_check(&svc_export_cache, &exp->h, reqp)))
+		if ((err = cache_check(&svc_export_cache, &exp->h, reqp)))
 			exp = ERR_PTR(err);
 		return exp;
 	} else
