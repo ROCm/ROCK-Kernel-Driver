@@ -19,6 +19,7 @@
 #include <linux/delay.h>
 #include <linux/pci.h>
 #include <linux/fb.h>
+#include <linux/jiffies.h>
 
 #include <asm/io.h>
 
@@ -106,8 +107,7 @@ static int riva_setup_i2c_bus(struct riva_i2c_chan *chan, const char *name)
 	chan->algo.getsda		= riva_gpio_getsda;
 	chan->algo.getscl		= riva_gpio_getscl;
 	chan->algo.udelay		= 40;
-	chan->algo.mdelay               = 5;
-	chan->algo.timeout		= 20;
+	chan->algo.timeout		= msecs_to_jiffies(2);
 	chan->algo.data 		= chan;
 
 	i2c_set_adapdata(&chan->adapter, chan);
@@ -127,39 +127,18 @@ static int riva_setup_i2c_bus(struct riva_i2c_chan *chan, const char *name)
 
 void riva_create_i2c_busses(struct riva_par *par)
 {
+	par->bus = 3;
+
 	par->chan[0].par	= par;
 	par->chan[1].par	= par;
 	par->chan[2].par        = par;
 
-	par->bus = 0;
-
-	switch ((par->pdev->device >> 4) & 0xff) {
-	case 0x17:
-	case 0x18:
-	case 0x25:
-	case 0x28:
-	case 0x30:
-	case 0x31:
-	case 0x32:
-	case 0x33:
-	case 0x34:
-		par->chan[2].ddc_base   = 0x50;
-		par->bus++;
-		riva_setup_i2c_bus(&par->chan[2], "BUS3");
-	case 0x04:
-	case 0x05:
-	case 0x10:
-	case 0x11:
-	case 0x15:
-	case 0x20:
-		par->chan[1].ddc_base	= 0x36;
-		par->bus++;
-		riva_setup_i2c_bus(&par->chan[1], "BUS2");
-	case 0x03:
-		par->chan[0].ddc_base	= 0x3e;
-		par->bus++;
-		riva_setup_i2c_bus(&par->chan[0], "BUS1");
-	}
+	par->chan[0].ddc_base = 0x3e;
+	par->chan[1].ddc_base = 0x36;
+	par->chan[2].ddc_base = 0x50;
+	riva_setup_i2c_bus(&par->chan[0], "BUS1");
+	riva_setup_i2c_bus(&par->chan[1], "BUS2");
+	riva_setup_i2c_bus(&par->chan[2], "BUS3");
 }
 
 void riva_delete_i2c_busses(struct riva_par *par)
@@ -172,6 +151,9 @@ void riva_delete_i2c_busses(struct riva_par *par)
 		i2c_bit_del_bus(&par->chan[1].adapter);
 	par->chan[1].par = NULL;
 
+	if (par->chan[2].par)
+		i2c_bit_del_bus(&par->chan[2].adapter);
+	par->chan[2].par = NULL;
 }
 
 static u8 *riva_do_probe_i2c_edid(struct riva_i2c_chan *chan)

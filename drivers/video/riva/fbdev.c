@@ -1769,17 +1769,19 @@ static int __devinit riva_get_EDID_OF(struct fb_info *info, struct pci_dev *pd)
 static int __devinit riva_get_EDID_i2c(struct fb_info *info)
 {
 	struct riva_par *par = (struct riva_par *) info->par;
+	struct fb_var_screeninfo var;
 	int i;
 
 	NVTRACE_ENTER();
 	riva_create_i2c_busses(par);
-	for (i = par->bus; i >= 1; i--) {
-		riva_probe_i2c_connector(par, i, &par->EDID);
-		if (par->EDID) {
+	for (i = 0; i < par->bus; i++) {
+		riva_probe_i2c_connector(par, i+1, &par->EDID);
+		if (par->EDID && !fb_parse_edid(par->EDID, &var)) {
 			printk(PFX "Found EDID Block from BUS %i\n", i);
 			break;
 		}
 	}
+
 	NVTRACE_LEAVE();
 	return (par->EDID) ? 1 : 0;
 }
