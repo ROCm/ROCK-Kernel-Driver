@@ -2264,32 +2264,36 @@ static const smsc_chip_t * __init smsc_ircc_probe(unsigned short cfg_base,u8 reg
 
 static int __init smsc_superio_fdc(unsigned short cfg_base)
 {
-	if (check_region(cfg_base, 2) < 0) {
+	int ret = -1;
+
+	if (!request_region(cfg_base, 2, driver_name)) {
 		WARNING("%s: can't get cfg_base of 0x%03x\n",
 			__FUNCTION__, cfg_base);
-		return -1;
+	} else {
+		if (!smsc_superio_flat(fdc_chips_flat,cfg_base,"FDC")
+		    ||!smsc_superio_paged(fdc_chips_paged,cfg_base,"FDC"))
+			ret =  0;
+
+		release_region(cfg_base, 2);
 	}
 
-	if (!smsc_superio_flat(fdc_chips_flat,cfg_base,"FDC")||!smsc_superio_paged(fdc_chips_paged,cfg_base,"FDC"))
-		return 0;
-
-	return -1;
+	return ret;
 }
 
 static int __init smsc_superio_lpc(unsigned short cfg_base)
 {
-#if 0
-	if (check_region(cfg_base, 2) < 0) {
-		IRDA_DEBUG(0, __FUNCTION__ ": can't get cfg_base of 0x%03x\n",
-			   cfg_base);
-		return -1;
+	int ret = -1;
+
+	if (!request_region(cfg_base, 2, driver_name)) {
+		WARNING("%s: can't get cfg_base of 0x%03x\n",
+			__FUNCTION__, cfg_base);
+	} else {
+		if (!smsc_superio_flat(lpc_chips_flat,cfg_base,"LPC")
+		    ||!smsc_superio_paged(lpc_chips_paged,cfg_base,"LPC"))
+			ret = 0;
+		release_region(cfg_base, 2);
 	}
-#endif
-
-	if (!smsc_superio_flat(lpc_chips_flat,cfg_base,"LPC")||!smsc_superio_paged(lpc_chips_paged,cfg_base,"LPC"))
-		return 0;
-
-	return -1;
+	return ret;
 }
 
 /************************************************
