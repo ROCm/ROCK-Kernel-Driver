@@ -53,8 +53,6 @@ static int blinkenlights = 0;
 module_param (blinkenlights, bool, S_IRUGO);
 MODULE_PARM_DESC (blinkenlights, "true to cycle leds on hubs");
 
-static int hub_port_disable(struct usb_device *hdev, int port);
-
 
 #ifdef	DEBUG
 static inline char *portspeed (int portstatus)
@@ -623,30 +621,12 @@ fail:
 	return ret;
 }
 
-static void hub_remove_children_work(void *__hub)
-{
-	struct usb_hub		*hub = __hub;
-	struct usb_device	*hdev = hub->hdev;
-	int			i;
-
-	kfree(hub);
-
-	usb_lock_device(hdev);
-	for (i = 0; i < hdev->maxchild; ++i) {
-		if (hdev->children[i])
-			usb_disconnect(&hdev->children[i]);
-	}
-	usb_unlock_device(hdev);
-	usb_put_dev(hdev);
-}
-
 static unsigned highspeed_hubs;
 
 static void hub_disconnect(struct usb_interface *intf)
 {
 	struct usb_hub *hub = usb_get_intfdata (intf);
 	struct usb_device *hdev;
-	int i, n;
 
 	if (!hub)
 		return;
@@ -689,27 +669,8 @@ static void hub_disconnect(struct usb_interface *intf)
 		hub->buffer = NULL;
 	}
 
-	/* If there are any children then this is unbind only, not a
-	 * physical disconnection.  The active ports must be disabled
-	 * and later on we must call usb_disconnect().  We can't call
-	 * it here because we already own the usb bus writelock.
-	 */
-	n = 0;
-	for (i = 0; i < hdev->maxchild; ++i) {
-		if (hdev->children[i]) {
-			++n;
-			hub_port_disable(hdev, i);
-		}
-	}
-
-	if (n == 0)
-		kfree(hub);
-	else {
-		/* Reuse hub->leds to disconnect the children */
-		INIT_WORK(&hub->leds, hub_remove_children_work, hub);
-		schedule_work(&hub->leds);
-		usb_get_dev(hdev);
-	}
+	/* Free the memory */
+	kfree(hub);
 }
 
 static int hub_probe(struct usb_interface *intf, const struct usb_device_id *id)
