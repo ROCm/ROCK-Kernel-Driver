@@ -119,7 +119,7 @@ invstr:	mflr	r6				/* Make it accessible */
 	tlbsx	0,r6				/* Fall through, we had to match */
 match_TLB:
 	mfspr	r7,SPRN_MAS0
-	rlwinm	r3,r7,16,28,31			/* Extract MAS0(Entry) */
+	rlwinm	r3,r7,16,20,31			/* Extract MAS0(Entry) */
 
 	mfspr	r7,SPRN_MAS1			/* Insure IPROT set */
 	oris	r7,r7,MAS1_IPROT@h
@@ -131,7 +131,7 @@ match_TLB:
 	andi.	r9,r9,0xfff
 	li	r6,0				/* Set Entry counter to 0 */
 1:	lis	r7,0x1000			/* Set MAS0(TLBSEL) = 1 */
-	rlwimi	r7,r6,16,12,15			/* Setup MAS0 = TLBSEL | ESEL(r6) */
+	rlwimi	r7,r6,16,4,15			/* Setup MAS0 = TLBSEL | ESEL(r6) */
 	mtspr	SPRN_MAS0,r7
 	tlbre
 	mfspr	r7,SPRN_MAS1
@@ -163,13 +163,13 @@ skpinv:	addi	r6,r6,1				/* Increment */
 	andi.	r5, r3, 0x1	/* Find an entry not used and is non-zero */
 	addi	r5, r5, 0x1
 	lis	r7,0x1000	/* Set MAS0(TLBSEL) = 1 */
-	rlwimi	r7,r3,16,12,15	/* Setup MAS0 = TLBSEL | ESEL(r3) */
+	rlwimi	r7,r3,16,4,15	/* Setup MAS0 = TLBSEL | ESEL(r3) */
 	mtspr	SPRN_MAS0,r7
 	tlbre
 
 	/* Just modify the entry ID and EPN for the temp mapping */
 	lis	r7,0x1000	/* Set MAS0(TLBSEL) = 1 */
-	rlwimi	r7,r5,16,12,15	/* Setup MAS0 = TLBSEL | ESEL(r5) */
+	rlwimi	r7,r5,16,4,15	/* Setup MAS0 = TLBSEL | ESEL(r5) */
 	mtspr	SPRN_MAS0,r7
 	xori	r6,r4,1		/* Setup TMP mapping in the other Address space */
 	slwi	r6,r6,12
@@ -201,7 +201,7 @@ skpinv:	addi	r6,r6,1				/* Increment */
 
 /* 5. Invalidate mapping we started in */
 	lis	r7,0x1000	/* Set MAS0(TLBSEL) = 1 */
-	rlwimi	r7,r3,16,12,15	/* Setup MAS0 = TLBSEL | ESEL(r3) */
+	rlwimi	r7,r3,16,4,15	/* Setup MAS0 = TLBSEL | ESEL(r3) */
 	mtspr	SPRN_MAS0,r7
 	tlbre
 	li	r6,0
@@ -242,7 +242,7 @@ skpinv:	addi	r6,r6,1				/* Increment */
 
 /* 8. Clear out the temp mapping */
 	lis	r7,0x1000	/* Set MAS0(TLBSEL) = 1 */
-	rlwimi	r7,r5,16,12,15	/* Setup MAS0 = TLBSEL | ESEL(r5) */
+	rlwimi	r7,r5,16,4,15	/* Setup MAS0 = TLBSEL | ESEL(r5) */
 	mtspr	SPRN_MAS0,r7
 	tlbre
 	mtspr	SPRN_MAS1,r8
@@ -282,7 +282,7 @@ skpinv:	addi	r6,r6,1				/* Increment */
 	mtspr	SPRN_IVPR,r4
 
 	/* Setup the defaults for TLB entries */
-	li	r2,MAS4_TSIZED(BOOKE_PAGESZ_4K)
+	li	r2,(MAS4_TSIZED(BOOKE_PAGESZ_4K))@l
    	mtspr	SPRN_MAS4, r2
 
 #if 0
@@ -539,8 +539,7 @@ interrupt_base:
 	ori	r11, r11, swapper_pg_dir@l
 
 	mfspr	r12,SPRN_MAS1		/* Set TID to 0 */
-	li	r13,MAS1_TID@l
-	andc	r12,r12,r13
+	rlwinm	r12,r12,0,16,1
 	mtspr	SPRN_MAS1,r12
 
 	b	4f
@@ -604,8 +603,7 @@ interrupt_base:
 	ori	r11, r11, swapper_pg_dir@l
 
 	mfspr	r12,SPRN_MAS1		/* Set TID to 0 */
-	li	r13,MAS1_TID@l
-	andc	r12,r12,r13
+	rlwinm	r12,r12,0,16,1
 	mtspr	SPRN_MAS1,r12
 
 	b	4f
