@@ -311,7 +311,7 @@ unsigned int __init init_chipset_amd74xx(struct pci_dev *dev, const char *name)
 			amd_80w = ((u & 0x3) ? 1 : 0) | ((u & 0xc) ? 2 : 0);
 			for (i = 24; i >= 0; i -= 8)
 				if (((u >> i) & 4) && !(amd_80w & (1 << (1 - (i >> 4))))) {
-					printk(KERN_WARNING "AMD_IDE: Bios didn't set cable bits corectly. Enabling workaround.\n");
+					printk(KERN_WARNING "AMD_IDE: Bios didn't set cable bits correctly. Enabling workaround.\n");
 					amd_80w |= (1 << (1 - (i >> 4)));
 				}
 			break;
