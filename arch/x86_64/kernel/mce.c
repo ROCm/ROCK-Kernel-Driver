@@ -143,10 +143,6 @@ void do_machine_check(struct pt_regs * regs, long error_code)
 		return;
 	if (!(m.mcgstatus & MCG_STATUS_RIPV))
 		kill_it = 1;
-	if (regs) {
-		m.rip = regs->rip;
-		m.cs = regs->cs;
-	}
 	
 	rdtscll(mcestart);
 	mb();
@@ -154,7 +150,12 @@ void do_machine_check(struct pt_regs * regs, long error_code)
 	for (i = 0; i < banks; i++) {
 		if (!bank[i])
 			continue;
-		
+
+		if (regs) {
+			m.rip = regs->rip;
+			m.cs = regs->cs;
+		}
+				
 		m.misc = 0; 
 		m.addr = 0;
 
@@ -198,7 +199,7 @@ void do_machine_check(struct pt_regs * regs, long error_code)
 	if (!regs)
 		return;
 	if (nowayout)
-		mce_panic("Machine check", &m, mcestart);
+		mce_panic("Machine check", &panicm, mcestart);
 	if (kill_it) {
 		int user_space = 0;
 
