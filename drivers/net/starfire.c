@@ -799,6 +799,7 @@ static struct net_device_stats *get_stats(struct net_device *dev);
 static int	netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
 static int	netdev_close(struct net_device *dev);
 static void	netdev_media_change(struct net_device *dev);
+static struct ethtool_ops ethtool_ops;
 
 
 #ifdef VLAN_SUPPORT
@@ -1015,6 +1016,7 @@ static int __devinit starfire_init_one(struct pci_dev *pdev,
 	dev->get_stats = &get_stats;
 	dev->set_multicast_list = &set_rx_mode;
 	dev->do_ioctl = &netdev_ioctl;
+	SET_ETHTOOL_OPS(dev, &ethtool_ops);
 
 	if (mtu)
 		dev->mtu = mtu;
@@ -1996,106 +1998,89 @@ static void set_rx_mode(struct net_device *dev)
 	writel(rx_mode, ioaddr + RxFilterMode);
 }
 
-
-static int netdev_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
+static int check_if_running(struct net_device *dev)
 {
-	struct ethtool_cmd ecmd;
-	struct netdev_private *np = netdev_priv(dev);
-
-	if (copy_from_user(&ecmd, useraddr, sizeof(ecmd)))
-		return -EFAULT;
-
-	switch (ecmd.cmd) {
-	case ETHTOOL_GDRVINFO: {
-		struct ethtool_drvinfo info;
-		memset(&info, 0, sizeof(info));
-		info.cmd = ecmd.cmd;
-		strcpy(info.driver, DRV_NAME);
-		strcpy(info.version, DRV_VERSION);
-		*info.fw_version = 0;
-		strcpy(info.bus_info, PCI_SLOT_NAME(np->pci_dev));
-		if (copy_to_user(useraddr, &info, sizeof(info)))
-		       return -EFAULT;
-		return 0;
-	}
-
-	/* get settings */
-	case ETHTOOL_GSET: {
-		struct ethtool_cmd ecmd = { ETHTOOL_GSET };
-		spin_lock_irq(&np->lock);
-		mii_ethtool_gset(&np->mii_if, &ecmd);
-		spin_unlock_irq(&np->lock);
-		if (copy_to_user(useraddr, &ecmd, sizeof(ecmd)))
-			return -EFAULT;
-		return 0;
-	}
-	/* set settings */
-	case ETHTOOL_SSET: {
-		int r;
-		struct ethtool_cmd ecmd;
-		if (copy_from_user(&ecmd, useraddr, sizeof(ecmd)))
-			return -EFAULT;
-		spin_lock_irq(&np->lock);
-		r = mii_ethtool_sset(&np->mii_if, &ecmd);
-		spin_unlock_irq(&np->lock);
-		check_duplex(dev);
-		return r;
-	}
-	/* restart autonegotiation */
-	case ETHTOOL_NWAY_RST: {
-		return mii_nway_restart(&np->mii_if);
-	}
-	/* get link status */
-	case ETHTOOL_GLINK: {
-		struct ethtool_value edata = {ETHTOOL_GLINK};
-		edata.data = mii_link_ok(&np->mii_if);
-		if (copy_to_user(useraddr, &edata, sizeof(edata)))
-			return -EFAULT;
-		return 0;
-	}
-
-	/* get message-level */
-	case ETHTOOL_GMSGLVL: {
-		struct ethtool_value edata = {ETHTOOL_GMSGLVL};
-		edata.data = debug;
-		if (copy_to_user(useraddr, &edata, sizeof(edata)))
-			return -EFAULT;
-		return 0;
-	}
-	/* set message-level */
-	case ETHTOOL_SMSGLVL: {
-		struct ethtool_value edata;
-		if (copy_from_user(&edata, useraddr, sizeof(edata)))
-			return -EFAULT;
-		debug = edata.data;
-		return 0;
-	}
-	default:
-		return -EOPNOTSUPP;
-	}
+	if (!netif_running(dev))
+		return -EINVAL;
+	return 0;
 }
 
+static void get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
+{
+	struct netdev_private *np = netdev_priv(dev);
+	strcpy(info->driver, DRV_NAME);
+	strcpy(info->version, DRV_VERSION);
+	strcpy(info->bus_info, PCI_SLOT_NAME(np->pci_dev));
+}
+
+static int get_settings(struct net_device *dev, struct ethtool_cmd *ecmd)
+{
+	struct netdev_private *np = netdev_priv(dev);
+	spin_lock_irq(&np->lock);
+	mii_ethtool_gset(&np->mii_if, ecmd);
+	spin_unlock_irq(&np->lock);
+	return 0;
+}
+
+static int set_settings(struct net_device *dev, struct ethtool_cmd *ecmd)
+{
+	struct netdev_private *np = netdev_priv(dev);
+	int res;
+	spin_lock_irq(&np->lock);
+	res = mii_ethtool_sset(&np->mii_if, ecmd);
+	spin_unlock_irq(&np->lock);
+	check_duplex(dev);
+	return res;
+}
+
+static int nway_reset(struct net_device *dev)
+{
+	struct netdev_private *np = netdev_priv(dev);
+	return mii_nway_restart(&np->mii_if);
+}
+
+static u32 get_link(struct net_device *dev)
+{
+	struct netdev_private *np = netdev_priv(dev);
+	return mii_link_ok(&np->mii_if);
+}
+
+static u32 get_msglevel(struct net_device *dev)
+{
+	return debug;
+}
+
+static void set_msglevel(struct net_device *dev, u32 val)
+{
+	debug = val;
+}
+
+static struct ethtool_ops ethtool_ops = {
+	.begin = check_if_running,
+	.get_drvinfo = get_drvinfo,
+	.get_settings = get_settings,
+	.set_settings = set_settings,
+	.nway_reset = nway_reset,
+	.get_link = get_link,
+	.get_msglevel = get_msglevel,
+	.set_msglevel = set_msglevel,
+};
 
 static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct netdev_private *np = netdev_priv(dev);
+	struct mii_ioctl_data *data = if_mii(rq);
 	int rc;
 
 	if (!netif_running(dev))
 		return -EINVAL;
 
-	if (cmd == SIOCETHTOOL)
-		rc = netdev_ethtool_ioctl(dev, rq->ifr_data);
+	spin_lock_irq(&np->lock);
+	rc = generic_mii_ioctl(&np->mii_if, data, cmd, NULL);
+	spin_unlock_irq(&np->lock);
 
-	else {
-		struct mii_ioctl_data *data = if_mii(rq);
-		spin_lock_irq(&np->lock);
-		rc = generic_mii_ioctl(&np->mii_if, data, cmd, NULL);
-		spin_unlock_irq(&np->lock);
-
-		if ((cmd == SIOCSMIIREG) && (data->phy_id == np->phys[0]))
-			check_duplex(dev);
-	}
+	if ((cmd == SIOCSMIIREG) && (data->phy_id == np->phys[0]))
+		check_duplex(dev);
 
 	return rc;
 }
