@@ -48,6 +48,8 @@ extern void flush_cache_range(struct vm_area_struct *, unsigned long, unsigned l
 	flush_cache_mm((vma)->vm_mm)
 
 
+struct page;
+
 /* 
  * On spitfire, the icache doesn't snoop local stores and we don't
  * use block commit stores (which invalidate icache lines) during
