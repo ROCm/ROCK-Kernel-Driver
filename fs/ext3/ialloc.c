@@ -568,10 +568,7 @@ repeat:
 #endif
 	ei->i_block_group = group;
 	
-	if (ei->i_flags & EXT3_SYNC_FL)
-		inode->i_flags |= S_SYNC;
-	if (ei->i_flags & EXT3_DIRSYNC_FL)
-		inode->i_flags |= S_DIRSYNC;
+	ext3_set_inode_flags(inode);
 	if (IS_DIRSYNC(inode))
 		handle->h_sync = 1;
 	insert_inode_hash(inode);
