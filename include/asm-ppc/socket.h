@@ -65,6 +65,6 @@
 					/* other similar things on the	*/
 					/* user level.			*/
 #define	SOCK_MAX	(SOCK_PACKET+1)
-#endif
+#endif /* __KERNEL__ */
 
 #endif /* _ASM_SOCKET_H */

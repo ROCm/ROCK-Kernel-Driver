@@ -31,16 +31,12 @@ enum {
 	pmac_nvram_NR		/* MacOS Name Registry partition */
 };
 
-#ifdef __KERNEL__
-
 /* Return partition offset in nvram */
 extern int	pmac_get_partition(int partition);
 
 /* Direct access to XPRAM */
 extern u8	pmac_xpram_read(int xpaddr);
 extern void	pmac_xpram_write(int xpaddr, u8 data);
-
-#endif /* __KERNEL__ */
 
 /* Some offsets in XPRAM */
 #define PMAC_XPRAM_MACHINE_LOC	0xe4
