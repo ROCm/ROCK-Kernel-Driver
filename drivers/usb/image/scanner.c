@@ -364,6 +364,9 @@
  *      Mustek, Pacific Image Electronics, Plustek, and Visioneer scanners.
  *      Fixed names of some other scanners.
  *
+ * 0.4.14  2003-07-15
+ *    - Fixed race between open and probe (Oliver Neukum).
+ *
  * TODO
  *    - Performance
  *    - Select/poll methods
@@ -1117,10 +1120,9 @@ probe_scanner(struct usb_interface *intf,
 	info ("USB scanner device (0x%04x/0x%04x) now attached to %s",
 	      dev->descriptor.idVendor, dev->descriptor.idProduct, name);
 
-	up(&scn_mutex);
-
 	usb_set_intfdata(intf, scn);
-
+	up(&scn_mutex);
+	
 	return 0;
 }
 
