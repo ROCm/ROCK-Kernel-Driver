@@ -871,7 +871,6 @@ acpi_processor_get_performance_control (
 	struct acpi_buffer	buffer = {ACPI_ALLOCATE_BUFFER, NULL};
 	union acpi_object	*pct = NULL;
 	union acpi_object	obj = {0};
-	struct acpi_pct_register *reg = NULL;
 
 	ACPI_FUNCTION_TRACE("acpi_processor_get_performance_control");
 
@@ -903,19 +902,9 @@ acpi_processor_get_performance_control (
 		result = -EFAULT;
 		goto end;
 	}
+	memcpy(&pr->performance->control_register, obj.buffer.pointer, sizeof(struct acpi_pct_register));
 
-	reg = (struct acpi_pct_register *) (obj.buffer.pointer);
 
-	if (reg->space_id != ACPI_ADR_SPACE_SYSTEM_IO) {
-		ACPI_DEBUG_PRINT((ACPI_DB_ERROR,
-			"Unsupported address space [%d] (control_register)\n",
-			(u32) reg->space_id));
-		result = -EFAULT;
-		goto end;
-	}
-
-	pr->performance->control_register = (u16) reg->address;
-	pr->performance->control_register_bit_width = reg->bit_width;
 	/*
 	 * status_register
 	 */
@@ -931,23 +920,7 @@ acpi_processor_get_performance_control (
 		goto end;
 	}
 
-	reg = (struct acpi_pct_register *) (obj.buffer.pointer);
-
-	if (reg->space_id != ACPI_ADR_SPACE_SYSTEM_IO) {
-		ACPI_DEBUG_PRINT((ACPI_DB_ERROR,
-			"Unsupported address space [%d] (status_register)\n",
-			(u32) reg->space_id));
-		result = -EFAULT;
-		goto end;
-	}
-
-	pr->performance->status_register = (u16) reg->address;
-	pr->performance->status_register_bit_width = reg->bit_width;
-
-	ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
-		"control_register[0x%04x] status_register[0x%04x]\n",
-		pr->performance->control_register,
-		pr->performance->status_register));
+	memcpy(&pr->performance->status_register, obj.buffer.pointer, sizeof(struct acpi_pct_register));
 
 end:
 	acpi_os_free(buffer.pointer);
