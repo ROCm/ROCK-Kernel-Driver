@@ -118,7 +118,7 @@ ihandle prom_stdout __initdata = 0;
 char *prom_display_paths[FB_MAX] __initdata = { 0, };
 phandle prom_display_nodes[FB_MAX] __initdata;
 unsigned int prom_num_displays __initdata = 0;
-static char *of_stdout_device __initdata = 0;
+char *of_stdout_device __initdata = 0;
 static ihandle prom_disp_node __initdata = 0;
 
 unsigned int rtas_data;   /* physical pointer */
@@ -879,6 +879,11 @@ prom_init(int r3, int r4, prom_entry pp)
 	   kernel is running at the address it was linked at. */
 	for (i = 0; i < prom_num_displays; ++i)
 		prom_display_paths[i] = PTRUNRELOC(prom_display_paths[i]);
+
+#ifdef CONFIG_SERIAL_CORE_CONSOLE
+	/* Relocate the of stdout for console autodetection */
+	of_stdout_device = PTRUNRELOC(of_stdout_device);
+#endif
 
 	prom_print("returning 0x");
 	prom_print_hex(phys);
