@@ -52,15 +52,15 @@ struct sbp2_command_orb {
 	u8 cdb[12];
 };
 
-#define LOGIN_REQUEST			0x0
-#define QUERY_LOGINS_REQUEST		0x1
-#define RECONNECT_REQUEST		0x3
-#define SET_PASSWORD_REQUEST		0x4
-#define LOGOUT_REQUEST			0x7
-#define ABORT_TASK_REQUEST		0xb
-#define ABORT_TASK_SET			0xc
-#define LOGICAL_UNIT_RESET		0xe
-#define TARGET_RESET_REQUEST		0xf
+#define SBP2_LOGIN_REQUEST		0x0
+#define SBP2_QUERY_LOGINS_REQUEST	0x1
+#define SBP2_RECONNECT_REQUEST		0x3
+#define SBP2_SET_PASSWORD_REQUEST	0x4
+#define SBP2_LOGOUT_REQUEST		0x7
+#define SBP2_ABORT_TASK_REQUEST		0xb
+#define SBP2_ABORT_TASK_SET		0xc
+#define SBP2_LOGICAL_UNIT_RESET		0xe
+#define SBP2_TARGET_RESET_REQUEST	0xf
 
 #define ORB_SET_LUN(value)                      (value & 0xffff)
 #define ORB_SET_FUNCTION(value)                 ((value & 0xf) << 16)
