@@ -38,6 +38,7 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/timer.h>
@@ -82,7 +83,6 @@
  * Data declarations.
  */
 unsigned long scsi_pid;
-struct scsi_cmnd *last_cmnd;
 static unsigned long serial_number;
 
 /*
@@ -107,26 +107,6 @@ const char *const scsi_device_types[MAX_SCSI_DEVICE_CODE] = {
 	"Unknown          ",
 	"Enclosure        ",
 };
-
-MODULE_PARM(scsi_logging_level, "i");
-MODULE_PARM_DESC(scsi_logging_level, "SCSI logging level; should be zero or nonzero");
-
-#ifndef MODULE
-static int __init scsi_logging_setup(char *str)
-{
-	int tmp;
-
-	if (get_option(&str, &tmp) == 1) {
-		scsi_logging_level = (tmp ? ~0 : 0);
-		return 1;
-	} else {
-		printk(KERN_INFO "scsi_logging_setup : usage scsi_logging_level=n "
-		       "(n should be 0 or non-zero)\n");
-		return 0;
-	}
-}
-__setup("scsi_logging=", scsi_logging_setup);
-#endif
 
 /*
  * Function:    scsi_allocate_request
@@ -460,29 +440,18 @@ int scsi_dispatch_cmd(struct scsi_cmnd *cmd)
 		goto out;
 	}
 
-	if (host->can_queue) {
-		SCSI_LOG_MLQUEUE(3, printk("queuecommand : routine at %p\n",
-					   host->hostt->queuecommand));
+	SCSI_LOG_MLQUEUE(3, printk("queuecommand : routine at %p\n",
+				   host->hostt->queuecommand));
 
-		spin_lock_irqsave(host->host_lock, flags);
-		rtn = host->hostt->queuecommand(cmd, scsi_done);
-		spin_unlock_irqrestore(host->host_lock, flags);
-		if (rtn) {
-			scsi_queue_insert(cmd,
+	spin_lock_irqsave(host->host_lock, flags);
+	rtn = host->hostt->queuecommand(cmd, scsi_done);
+	spin_unlock_irqrestore(host->host_lock, flags);
+	if (rtn) {
+		scsi_queue_insert(cmd,
 				(rtn == SCSI_MLQUEUE_DEVICE_BUSY) ?
-					rtn : SCSI_MLQUEUE_HOST_BUSY);
-			SCSI_LOG_MLQUEUE(3,
-			    printk("queuecommand : request rejected\n"));
-		}
-	} else {
-		SCSI_LOG_MLQUEUE(3, printk("command() :  routine at %p\n",
-					host->hostt->command));
-
-		spin_lock_irqsave(host->host_lock, flags);
-		cmd->result = host->hostt->command(cmd);
-		scsi_done(cmd);
-		spin_unlock_irqrestore(host->host_lock, flags);
-		rtn = 0;
+				 rtn : SCSI_MLQUEUE_HOST_BUSY);
+		SCSI_LOG_MLQUEUE(3,
+		    printk("queuecommand : request rejected\n"));
 	}
 
  out:
@@ -752,16 +721,8 @@ void scsi_finish_command(struct scsi_cmnd *cmd)
 	struct scsi_device *sdev = cmd->device;
 	struct Scsi_Host *shost = sdev->host;
 	struct scsi_request *sreq;
-	unsigned long flags;
 
-	scsi_host_busy_dec_and_test(shost, sdev);
-
-	/*
-	 * XXX(hch): We really want a nice helper for this..
-	 */
-	spin_lock_irqsave(&sdev->sdev_lock, flags);
-	sdev->device_busy--;
-	spin_unlock_irqrestore(&sdev->sdev_lock, flags);
+	scsi_device_unbusy(sdev);
 
         /*
          * Clear the flags which say that the device/host is no longer
@@ -983,6 +944,9 @@ void scsi_set_device_offline(struct scsi_device *sdev)
 MODULE_DESCRIPTION("SCSI core");
 MODULE_LICENSE("GPL");
 
+module_param(scsi_logging_level, int, S_IRUGO|S_IWUSR);
+MODULE_PARM_DESC(scsi_logging_level, "a bit mask of logging levels");
+
 static int __init init_scsi(void)
 {
 	int error, i;
@@ -1003,7 +967,6 @@ static int __init init_scsi(void)
 	for (i = 0; i < NR_CPUS; i++)
 		INIT_LIST_HEAD(&done_q[i]);
 
-	scsi_host_init();
 	devfs_mk_dir("scsi");
 	open_softirq(SCSI_SOFTIRQ, scsi_softirq, NULL);
 	printk(KERN_NOTICE "SCSI subsystem initialized\n");

@@ -1793,15 +1793,6 @@ static struct Scsi_Host *ibmmca_register(Scsi_Host_Template * scsi_template, int
 	return shpnt;
 }
 
-static int ibmmca_command(Scsi_Cmnd * cmd)
-{
-	ibmmca_queuecommand(cmd, internal_done);
-	cmd->SCp.Status = 0;
-	while (!cmd->SCp.Status)
-		barrier();
-	return cmd->result;
-}
-
 static int ibmmca_release(struct Scsi_Host *shpnt)
 {
 	release_region(shpnt->io_port, shpnt->n_io_port);
@@ -2490,7 +2481,6 @@ static Scsi_Host_Template driver_template = {
           .name           = "IBM SCSI-Subsystem",
           .detect         = ibmmca_detect,
           .release        = ibmmca_release,
-          .command        = ibmmca_command,
           .queuecommand   = ibmmca_queuecommand,
 	  .eh_abort_handler = ibmmca_abort,
 	  .eh_host_reset_handler = ibmmca_host_reset,

@@ -264,7 +264,6 @@ static Scsi_Host_Template arxescsi_template = {
 	.proc_info			= arxescsi_proc_info,
 	.name				= "ARXE SCSI card",
 	.info				= arxescsi_info,
-	.command			= fas216_command,
 	.queuecommand			= fas216_queue_command,
 	.eh_host_reset_handler		= fas216_eh_host_reset,
 	.eh_bus_reset_handler		= fas216_eh_bus_reset,

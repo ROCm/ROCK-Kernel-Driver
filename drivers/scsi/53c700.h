@@ -12,6 +12,10 @@
 
 #include <asm/io.h>
 
+#if defined(CONFIG_53C700_MEM_MAPPED) && defined(CONFIG_53C700_IO_MAPPED)
+#define CONFIG_53C700_BOTH_MAPPED
+#endif
+
 /* Turn on for general debugging---too verbose for normal use */
 #undef	NCR_700_DEBUG
 /* Debug the tag queues, checking hash queue allocation and deallocation
@@ -178,6 +182,9 @@ struct NCR_700_Host_Parameters {
 	/* NOTHING BELOW HERE NEEDS ALTERING */
 	__u32	fast:1;		/* if we can alter the SCSI bus clock
                                    speed (so can negiotiate sync) */
+#ifdef CONFIG_53C700_BOTH_MAPPED
+	__u32	mem_mapped;	/* set if memory mapped */
+#endif
 	int	sync_clock;	/* The speed of the SYNC core */
 
 	__u32	*script;		/* pointer to script location */
@@ -428,11 +435,8 @@ struct NCR_700_Host_Parameters {
 	} \
 }
 
-#endif
-
-#ifdef CONFIG_53C700_MEM_MAPPED
 static inline __u8
-NCR_700_readb(struct Scsi_Host *host, __u32 reg)
+NCR_700_mem_readb(struct Scsi_Host *host, __u32 reg)
 {
 	const struct NCR_700_Host_Parameters *hostdata __attribute__((unused))
 		= (struct NCR_700_Host_Parameters *)host->hostdata[0];
@@ -441,7 +445,7 @@ NCR_700_readb(struct Scsi_Host *host, __u32 reg)
 }
 
 static inline __u32
-NCR_700_readl(struct Scsi_Host *host, __u32 reg)
+NCR_700_mem_readl(struct Scsi_Host *host, __u32 reg)
 {
 	__u32 value = __raw_readl(host->base + reg);
 	const struct NCR_700_Host_Parameters *hostdata __attribute__((unused))
@@ -456,7 +460,7 @@ NCR_700_readl(struct Scsi_Host *host, __u32 reg)
 }
 
 static inline void
-NCR_700_writeb(__u8 value, struct Scsi_Host *host, __u32 reg)
+NCR_700_mem_writeb(__u8 value, struct Scsi_Host *host, __u32 reg)
 {
 	const struct NCR_700_Host_Parameters *hostdata __attribute__((unused))
 		= (struct NCR_700_Host_Parameters *)host->hostdata[0];
@@ -465,7 +469,7 @@ NCR_700_writeb(__u8 value, struct Scsi_Host *host, __u32 reg)
 }
 
 static inline void
-NCR_700_writel(__u32 value, struct Scsi_Host *host, __u32 reg)
+NCR_700_mem_writel(__u32 value, struct Scsi_Host *host, __u32 reg)
 {
 	const struct NCR_700_Host_Parameters *hostdata __attribute__((unused))
 		= (struct NCR_700_Host_Parameters *)host->hostdata[0];
@@ -478,9 +482,9 @@ NCR_700_writel(__u32 value, struct Scsi_Host *host, __u32 reg)
 
 	__raw_writel(bS_to_host(value), host->base + reg);
 }
-#elif defined(CONFIG_53C700_IO_MAPPED)
+
 static inline __u8
-NCR_700_readb(struct Scsi_Host *host, __u32 reg)
+NCR_700_io_readb(struct Scsi_Host *host, __u32 reg)
 {
 	const struct NCR_700_Host_Parameters *hostdata __attribute__((unused))
 		= (struct NCR_700_Host_Parameters *)host->hostdata[0];
@@ -489,7 +493,7 @@ NCR_700_readb(struct Scsi_Host *host, __u32 reg)
 }
 
 static inline __u32
-NCR_700_readl(struct Scsi_Host *host, __u32 reg)
+NCR_700_io_readl(struct Scsi_Host *host, __u32 reg)
 {
 	__u32 value = inl(host->base + reg);
 	const struct NCR_700_Host_Parameters *hostdata __attribute__((unused))
@@ -505,7 +509,7 @@ NCR_700_readl(struct Scsi_Host *host, __u32 reg)
 }
 
 static inline void
-NCR_700_writeb(__u8 value, struct Scsi_Host *host, __u32 reg)
+NCR_700_io_writeb(__u8 value, struct Scsi_Host *host, __u32 reg)
 {
 	const struct NCR_700_Host_Parameters *hostdata __attribute__((unused))
 		= (struct NCR_700_Host_Parameters *)host->hostdata[0];
@@ -514,7 +518,7 @@ NCR_700_writeb(__u8 value, struct Scsi_Host *host, __u32 reg)
 }
 
 static inline void
-NCR_700_writel(__u32 value, struct Scsi_Host *host, __u32 reg)
+NCR_700_io_writel(__u32 value, struct Scsi_Host *host, __u32 reg)
 {
 	const struct NCR_700_Host_Parameters *hostdata __attribute__((unused))
 		= (struct NCR_700_Host_Parameters *)host->hostdata[0];
@@ -527,4 +531,100 @@ NCR_700_writel(__u32 value, struct Scsi_Host *host, __u32 reg)
 
 	outl(bS_to_host(value), host->base + reg);
 }
+
+#ifdef CONFIG_53C700_BOTH_MAPPED
+
+static inline __u8
+NCR_700_readb(struct Scsi_Host *host, __u32 reg)
+{
+	__u8 val;
+
+	const struct NCR_700_Host_Parameters *hostdata __attribute__((unused))
+		= (struct NCR_700_Host_Parameters *)host->hostdata[0];
+
+	if(hostdata->mem_mapped)
+		val = NCR_700_mem_readb(host, reg);
+	else
+		val = NCR_700_io_readb(host, reg);
+
+	return val;
+}
+
+static inline __u32
+NCR_700_readl(struct Scsi_Host *host, __u32 reg)
+{
+	__u32 val;
+
+	const struct NCR_700_Host_Parameters *hostdata __attribute__((unused))
+		= (struct NCR_700_Host_Parameters *)host->hostdata[0];
+
+	if(hostdata->mem_mapped)
+		val = NCR_700_mem_readl(host, reg);
+	else
+		val = NCR_700_io_readl(host, reg);
+
+	return val;
+}
+
+static inline void
+NCR_700_writeb(__u8 value, struct Scsi_Host *host, __u32 reg)
+{
+	const struct NCR_700_Host_Parameters *hostdata __attribute__((unused))
+		= (struct NCR_700_Host_Parameters *)host->hostdata[0];
+
+	if(hostdata->mem_mapped)
+		NCR_700_mem_writeb(value, host, reg);
+	else
+		NCR_700_io_writeb(value, host, reg);
+}
+
+static inline void
+NCR_700_writel(__u32 value, struct Scsi_Host *host, __u32 reg)
+{
+	const struct NCR_700_Host_Parameters *hostdata __attribute__((unused))
+		= (struct NCR_700_Host_Parameters *)host->hostdata[0];
+
+	if(hostdata->mem_mapped)
+		NCR_700_mem_writel(value, host, reg);
+	else
+		NCR_700_io_writel(value, host, reg);
+}
+
+static inline void
+NCR_700_set_mem_mapped(struct NCR_700_Host_Parameters *hostdata)
+{
+	hostdata->mem_mapped = 1;
+}
+
+static inline void
+NCR_700_set_io_mapped(struct NCR_700_Host_Parameters *hostdata)
+{
+	hostdata->mem_mapped = 0;
+}
+
+
+#elif defined(CONFIG_53C700_IO_MAPPED)
+
+#define NCR_700_readb NCR_700_io_readb
+#define NCR_700_readl NCR_700_io_readl
+#define NCR_700_writeb NCR_700_io_writeb
+#define NCR_700_writel NCR_700_io_writel
+
+#define NCR_700_set_io_mapped(x)
+#define NCR_700_set_mem_mapped(x)	error I/O mapped only
+
+#elif defined(CONFIG_53C700_MEM_MAPPED)
+
+#define NCR_700_readb NCR_700_mem_readb
+#define NCR_700_readl NCR_700_mem_readl
+#define NCR_700_writeb NCR_700_mem_writeb
+#define NCR_700_writel NCR_700_mem_writel
+
+#define NCR_700_set_io_mapped(x)	error MEM mapped only
+#define NCR_700_set_mem_mapped(x)
+
+#else
+#error neither CONFIG_53C700_MEM_MAPPED nor CONFIG_53C700_IO_MAPPED is set
+#endif
+
 #endif

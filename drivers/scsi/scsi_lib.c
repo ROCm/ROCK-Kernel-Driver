@@ -95,7 +95,6 @@ int scsi_queue_insert(struct scsi_cmnd *cmd, int reason)
 {
 	struct Scsi_Host *host = cmd->device->host;
 	struct scsi_device *device = cmd->device;
-	unsigned long flags;
 
 	SCSI_LOG_MLQUEUE(1,
 		 printk("Inserting command %p into mlqueue\n", cmd));
@@ -134,10 +133,7 @@ int scsi_queue_insert(struct scsi_cmnd *cmd, int reason)
 	 * Decrement the counters, since these commands are no longer
 	 * active on the host/device.
 	 */
-	spin_lock_irqsave(device->request_queue->queue_lock, flags);
-	device->device_busy--;
-	spin_unlock_irqrestore(device->request_queue->queue_lock, flags);
-	scsi_host_busy_dec_and_test(host, device);
+	scsi_device_unbusy(device);
 
 	/*
 	 * Insert this command at the head of the queue for it's device.
@@ -312,6 +308,21 @@ void scsi_setup_cmd_retry(struct scsi_cmnd *cmd)
 	cmd->cmd_len = cmd->old_cmd_len;
 	cmd->sc_data_direction = cmd->sc_old_data_direction;
 	cmd->underflow = cmd->old_underflow;
+}
+
+void scsi_device_unbusy(struct scsi_device *sdev)
+{
+	struct Scsi_Host *shost = sdev->host;
+	unsigned long flags;
+
+	spin_lock_irqsave(shost->host_lock, flags);
+	shost->host_busy--;
+	if (unlikely(shost->in_recovery && shost->host_failed))
+		scsi_eh_wakeup(shost);
+	spin_unlock(shost->host_lock);
+	spin_lock(&sdev->sdev_lock);
+	sdev->device_busy--;
+	spin_unlock_irqrestore(&sdev->sdev_lock, flags);
 }
 
 /*
@@ -730,17 +741,6 @@ void scsi_io_completion(struct scsi_cmnd *cmd, int good_sectors,
 	 * can choose a block to remap, etc.
 	 */
 	if (driver_byte(result) != 0) {
-		if (suggestion(result) == SUGGEST_REMAP) {
-#ifdef REMAP
-			/*
-			 * Not yet implemented.  A read will fail after being remapped,
-			 * a write will call the strategy routine again.
-			 */
-			if (cmd->device->remap) {
-				result = 0;
-			}
-#endif
-		}
 		if ((cmd->sense_buffer[0] & 0x7f) == 0x70) {
 			/*
 			 * If the device is in the process of becoming ready,
@@ -944,6 +944,18 @@ static int scsi_prep_fn(struct request_queue *q, struct request *req)
 		} else
 			cmd = req->special;
 	} else if (req->flags & (REQ_CMD | REQ_BLOCK_PC)) {
+		/*
+		 * Just check to see if the device is online.  If
+		 * it isn't, we refuse to process ordinary commands
+		 * (we will allow specials just in case someone needs
+		 * to send a command to an offline device without bringing
+		 * it back online)
+		 */
+		if(!sdev->online) {
+			printk(KERN_ERR "scsi%d (%d:%d): rejecting I/O to offline device\n",
+			       sdev->host->host_no, sdev->id, sdev->lun);
+			return BLKPREP_KILL;
+		}
 		/*
 		 * Now try and find a command block that we can use.
 		 */

@@ -225,8 +225,7 @@ static void fas216_dumpinfo(FAS216_Info *info)
 	printk("    dma={ transfer_type=%X setup=%p pseudo=%p stop=%p }\n",
 		info->dma.transfer_type, info->dma.setup,
 		info->dma.pseudo, info->dma.stop);
-	printk("    internal_done=%X magic_end=%lX }\n",
-		info->internal_done, info->magic_end);
+	printk("    magic_end=%lX }\n", info->magic_end);
 }
 
 #ifdef CHECK_STRUCTURE
@@ -2253,74 +2252,6 @@ int fas216_queue_command(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 	return result;
 }
 
-/**
- * fas216_internal_done - trigger restart of a waiting thread in fas216_command
- * @SCpnt: Command to wake
- *
- * Trigger restart of a waiting thread in fas216_command
- */
-static void fas216_internal_done(Scsi_Cmnd *SCpnt)
-{
-	FAS216_Info *info = (FAS216_Info *)SCpnt->device->host->hostdata;
-
-	fas216_checkmagic(info);
-
-	info->internal_done = 1;
-}
-
-/**
- * fas216_command - queue a command for adapter to process.
- * @SCpnt: Command to queue
- *
- * Queue a command for adapter to process.
- * Returns: scsi result code.
- * Notes: io_request_lock is held, interrupts are disabled.
- */
-int fas216_command(Scsi_Cmnd *SCpnt)
-{
-	FAS216_Info *info = (FAS216_Info *)SCpnt->device->host->hostdata;
-
-	fas216_checkmagic(info);
-
-	/*
-	 * We should only be using this if we don't have an interrupt.
-	 * Provide some "incentive" to use the queueing code.
-	 */
-	if (info->scsi.irq != NO_IRQ)
-		BUG();
-
-	info->internal_done = 0;
-	fas216_queue_command(SCpnt, fas216_internal_done);
-
-	/*
-	 * This wastes time, since we can't return until the command is
-	 * complete. We can't sleep either since we may get re-entered!
-	 * However, we must re-enable interrupts, or else we'll be
-	 * waiting forever.
-	 */
-	spin_unlock_irq(info->host->host_lock);
-
-	while (!info->internal_done) {
-		/*
-		 * If we don't have an IRQ, then we must poll the card for
-		 * it's interrupt, and use that to call this driver's
-		 * interrupt routine.  That way, we keep the command
-		 * progressing.  Maybe we can add some inteligence here
-		 * and go to sleep if we know that the device is going
-		 * to be some time (eg, disconnected).
-		 */
-		if (fas216_readb(info, REG_STAT) & STAT_INT) {
-			spin_lock_irq(info->host->host_lock);
-			fas216_intr(info);
-			spin_unlock_irq(info->host->host_lock);
-		}
-	}
-
-	spin_lock_irq(info->host->host_lock);
-
-	return SCpnt->result;
-}
-
 /*
  * Error handler timeout function.  Indicate that we timed out,
  * and wake up any error handler process so it can continue.
@@ -2942,6 +2873,7 @@ void fas216_remove(struct Scsi_Host *host)
 	scsi_remove_host(host);
 
 	fas216_writeb(info, REG_CMD, CMD_RESETCHIP);
+	scsi_host_put(host);
 }
 
 /**
