@@ -49,7 +49,6 @@ typedef struct vfs {
 	bhv_head_t		vfs_bh;		/* head of vfs behavior chain */
 	struct super_block	*vfs_super;	/* Linux superblock structure */
 	struct task_struct	*vfs_sync_task;
-	wait_queue_head_t	vfs_sync;
 	wait_queue_head_t	vfs_wait_sync_task;
 } vfs_t;
 

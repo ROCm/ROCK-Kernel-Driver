@@ -32,20 +32,12 @@
 
 #include <xfs.h>
 
-static void sync_timeout(unsigned long __data)
-{
-	struct task_struct * p = (struct task_struct *) __data;
-
-	wake_up_process(p);
-}
-
 #define SYNCD_FLAGS	(SYNC_FSDATA|SYNC_BDFLUSH|SYNC_ATTR)
 
 int syncd(void *arg)
 {
 	vfs_t			*vfsp = (vfs_t *) arg;
 	int			error;
-	struct timer_list	timer;
 
 	daemonize("xfs_syncd");
 
@@ -53,22 +45,20 @@ int syncd(void *arg)
 	wmb();
 	wake_up(&vfsp->vfs_wait_sync_task);
 
-	init_timer(&timer);
-	timer.data = (unsigned long)current;
-	timer.function = sync_timeout;
+	for (;;) {
+		set_current_state(TASK_INTERRUPTIBLE);
+		schedule_timeout(xfs_params.sync_interval);
+		if (vfsp->vfs_flag & VFS_UMOUNT)
+			break;
+		if (vfsp->vfs_flag & VFS_RDONLY);
+			continue;
+		VFS_SYNC(vfsp, SYNCD_FLAGS, NULL, error);
+	}
 
-	do {
-		mod_timer(&timer, jiffies + xfs_params.sync_interval);
-		interruptible_sleep_on(&vfsp->vfs_sync);
-
-		if (!(vfsp->vfs_flag & VFS_RDONLY))
-			VFS_SYNC(vfsp, SYNCD_FLAGS, NULL, error);
-	} while (!(vfsp->vfs_flag & VFS_UMOUNT));
-
-	del_timer_sync(&timer);
 	vfsp->vfs_sync_task = NULL;
 	wmb();
 	wake_up(&vfsp->vfs_wait_sync_task);
+
 	return 0;
 }
 
@@ -91,6 +81,6 @@ linvfs_stop_syncd(vfs_t *vfsp)
 	vfsp->vfs_flag |= VFS_UMOUNT;
 	wmb();
 
-	wake_up(&vfsp->vfs_sync);
+	wake_up_process(vfsp->vfs_sync_task);
 	wait_event(vfsp->vfs_wait_sync_task, !vfsp->vfs_sync_task);
 }
