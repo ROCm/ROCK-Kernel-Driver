@@ -158,7 +158,7 @@ static const char udsl_driver_name[] = "Alcatel SpeedTouch USB";
 static DECLARE_MUTEX(udsl_usb_ioctl_lock);
 
 #ifdef DEBUG_PACKET
-int udsl_print_packet (const unsigned char *data, int len);
+static int udsl_print_packet (const unsigned char *data, int len);
 #endif
 
 /*
@@ -169,8 +169,8 @@ static int udsl_atm_open (struct atm_vcc *vcc, short vpi, int vci);
 static void udsl_atm_close (struct atm_vcc *vcc);
 static int udsl_atm_ioctl (struct atm_dev *dev, unsigned int cmd, void *arg);
 static int udsl_atm_send (struct atm_vcc *vcc, struct sk_buff *skb);
-int udsl_atm_proc_read (struct atm_dev *atm_dev, loff_t * pos, char *page);
-void udsl_atm_processqueue (unsigned long data);
+static int udsl_atm_proc_read (struct atm_dev *atm_dev, loff_t * pos, char *page);
+static void udsl_atm_processqueue (unsigned long data);
 
 static struct atmdev_ops udsl_atm_devops = {
 	.open =		udsl_atm_open,
@@ -190,7 +190,7 @@ struct udsl_atm_dev_data {
 static int udsl_usb_probe (struct usb_interface *intf,
 			   const struct usb_device_id *id);
 static void udsl_usb_disconnect (struct usb_interface *intf);
-int udsl_usb_send_data (struct udsl_instance_data *instance, struct atm_vcc *vcc,
+static int udsl_usb_send_data (struct udsl_instance_data *instance, struct atm_vcc *vcc,
 			struct sk_buff *skb);
 static int udsl_usb_ioctl (struct usb_interface *intf, unsigned int code, void *user_data);
 static int udsl_usb_cancelsends (struct udsl_instance_data *instance, struct atm_vcc *vcc);
@@ -213,8 +213,7 @@ static struct usb_driver udsl_usb_driver = {
 *
 ****************************************************************************/
 
-struct atm_dev *udsl_atm_startdevice (struct udsl_instance_data *instance,
-				      struct atmdev_ops *devops)
+static struct atm_dev *udsl_atm_startdevice (struct udsl_instance_data *instance, struct atmdev_ops *devops)
 {
 	MOD_INC_USE_COUNT;
 	instance->atm_dev = atm_dev_register (udsl_driver_name, devops, -1, 0);
@@ -231,7 +230,7 @@ struct atm_dev *udsl_atm_startdevice (struct udsl_instance_data *instance,
 	return instance->atm_dev;
 }
 
-void udsl_atm_stopdevice (struct udsl_instance_data *instance)
+static void udsl_atm_stopdevice (struct udsl_instance_data *instance)
 {
 	struct atm_vcc *walk;
 	struct sk_buff *skb;
@@ -257,7 +256,7 @@ void udsl_atm_stopdevice (struct udsl_instance_data *instance)
 	MOD_DEC_USE_COUNT;
 }
 
-void udsl_atm_set_mac (struct udsl_instance_data *instance, const char mac[6])
+static void udsl_atm_set_mac (struct udsl_instance_data *instance, const char mac[6])
 {
 	if (!instance->atm_dev)
 		return;
@@ -270,7 +269,7 @@ void udsl_atm_set_mac (struct udsl_instance_data *instance, const char mac[6])
 * ATM helper functions
 *
 ****************************************************************************/
-struct sk_buff *udsl_atm_alloc_tx (struct atm_vcc *vcc, unsigned int size)
+static struct sk_buff *udsl_atm_alloc_tx (struct atm_vcc *vcc, unsigned int size)
 {
 	struct atmsar_vcc_data *atmsar_vcc =
 	    ((struct udsl_atm_dev_data *) vcc->dev_data)->atmsar_vcc;
@@ -282,7 +281,7 @@ struct sk_buff *udsl_atm_alloc_tx (struct atm_vcc *vcc, unsigned int size)
 	return NULL;
 }
 
-int udsl_atm_proc_read (struct atm_dev *atm_dev, loff_t * pos, char *page)
+static int udsl_atm_proc_read (struct atm_dev *atm_dev, loff_t * pos, char *page)
 {
 	struct udsl_instance_data *instance = atm_dev->dev_data;
 	int left = *pos;
@@ -317,7 +316,7 @@ int udsl_atm_proc_read (struct atm_dev *atm_dev, loff_t * pos, char *page)
 * ATM DATA functions
 *
 ****************************************************************************/
-int udsl_atm_send (struct atm_vcc *vcc, struct sk_buff *skb)
+static int udsl_atm_send (struct atm_vcc *vcc, struct sk_buff *skb)
 {
 	struct udsl_atm_dev_data *dev_data = vcc->dev_data;
 	struct udsl_instance_data *instance = vcc->dev->dev_data;
@@ -361,7 +360,7 @@ int udsl_atm_send (struct atm_vcc *vcc, struct sk_buff *skb)
 };
 
 
-void udsl_atm_processqueue (unsigned long data)
+static void udsl_atm_processqueue (unsigned long data)
 {
 	struct udsl_instance_data *instance = (struct udsl_instance_data *) data;
 	struct atmsar_vcc_data *atmsar_vcc = NULL;
@@ -420,7 +419,7 @@ void udsl_atm_processqueue (unsigned long data)
 * SAR driver entries
 *
 ****************************************************************************/
-int udsl_atm_open (struct atm_vcc *vcc, short vpi, int vci)
+static int udsl_atm_open (struct atm_vcc *vcc, short vpi, int vci)
 {
 	struct udsl_atm_dev_data *dev_data;
 	struct udsl_instance_data *instance = vcc->dev->dev_data;
@@ -458,7 +457,7 @@ int udsl_atm_open (struct atm_vcc *vcc, short vpi, int vci)
 	return 0;
 }
 
-void udsl_atm_close (struct atm_vcc *vcc)
+static void udsl_atm_close (struct atm_vcc *vcc)
 {
 	struct udsl_atm_dev_data *dev_data = vcc->dev_data;
 	struct udsl_instance_data *instance = vcc->dev->dev_data;
@@ -485,7 +484,7 @@ void udsl_atm_close (struct atm_vcc *vcc)
 	return;
 };
 
-int udsl_atm_ioctl (struct atm_dev *dev, unsigned int cmd, void *arg)
+static int udsl_atm_ioctl (struct atm_dev *dev, unsigned int cmd, void *arg)
 {
 	switch (cmd) {
 	case ATM_QUERYLOOP:
@@ -538,7 +537,7 @@ static void udsl_usb_send_data_complete (struct urb *urb, struct pt_regs *regs)
 		ctx->skb, ctx->skb->len, err);
 }
 
-int udsl_usb_cancelsends (struct udsl_instance_data *instance, struct atm_vcc *vcc)
+static int udsl_usb_cancelsends (struct udsl_instance_data *instance, struct atm_vcc *vcc)
 {
 	int i;
 
@@ -558,7 +557,7 @@ int udsl_usb_cancelsends (struct udsl_instance_data *instance, struct atm_vcc *v
 }
 
 /**** send ******/
-int udsl_usb_send_data (struct udsl_instance_data *instance, struct atm_vcc *vcc,
+static int udsl_usb_send_data (struct udsl_instance_data *instance, struct atm_vcc *vcc,
 			struct sk_buff *skb)
 {
 	int err, i;
@@ -622,7 +621,7 @@ int udsl_usb_send_data (struct udsl_instance_data *instance, struct atm_vcc *vcc
 }
 
 /********* receive *******/
-void udsl_usb_data_receive (struct urb *urb, struct pt_regs *regs)
+static void udsl_usb_data_receive (struct urb *urb, struct pt_regs *regs)
 {
 	struct udsl_data_ctx *ctx;
 	struct udsl_instance_data *instance;
@@ -676,7 +675,7 @@ void udsl_usb_data_receive (struct urb *urb, struct pt_regs *regs)
 	return;
 };
 
-int udsl_usb_data_init (struct udsl_instance_data *instance)
+static int udsl_usb_data_init (struct udsl_instance_data *instance)
 {
 	int i, succes;
 
@@ -928,7 +927,7 @@ module_exit(udsl_usb_cleanup);
 *
 *******************************************************************************/
 
-int udsl_print_packet (const unsigned char *data, int len)
+static int udsl_print_packet (const unsigned char *data, int len)
 {
 	unsigned char buffer[256];
 	int i = 0, j = 0;
