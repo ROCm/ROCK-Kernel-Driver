@@ -826,6 +826,10 @@ CONFIG_X86_MCE_NONFATAL
   or out-of-spec (ie, overclocked) hardware.
   This option only does something on hardware with Intel P6 style MCE.
   (Pentium Pro and above, AMD Athlon/Duron)
+
+CONFIG_X86_MCE_P4THERMAL
+  Enabling this feature will cause a message to be printed when the P4
+  enters thermal throttling.
 				 
 CONFIG_TOSHIBA
   This adds a driver to safely access the System Management Mode of
