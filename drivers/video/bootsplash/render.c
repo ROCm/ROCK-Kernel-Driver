@@ -7,6 +7,7 @@
 #include <linux/types.h>
 #include <linux/fb.h>
 #include <linux/vt_kern.h>
+#include <linux/selection.h>
 #include <asm/irq.h>
 #include <asm/system.h>
 
@@ -26,6 +27,8 @@ void splash_putcs(struct splash_data *sd, struct vc_data *vc, struct fb_info *in
 	u16 c = scr_readw(s);
 
 	int fg_color, bg_color, transparent;
+        if (console_blanked)
+	    return;
         fg_color = attr_fgcol(fgshift, c);
         bg_color = attr_bgcol(bgshift, c);
 	transparent = sd->splash_color == bg_color;
@@ -83,6 +86,8 @@ static void splash_renderc(struct splash_data *sd, struct fb_info *info, int fg_
 	u8 *dst, *splashsrc;
 	unsigned int d, x, y;
 
+        if (console_blanked)
+	    return;
 	splashsrc = (u8 *)(info->splash_pic + ypos * info->splash_bytes + xpos * 2);
 	dst = (u8 *)(info->screen_base + ypos * info->fix.line_length + xpos * 2);
 	fgx = ((u32 *)info->pseudo_palette)[fg_color];
@@ -182,6 +187,8 @@ void splash_clear(struct splash_data *sd, struct vc_data *vc, struct fb_info *in
 	u32 bgx;
 	u8 *dst;
 
+        if (console_blanked)
+	    return;
 	sy = sy * vc->vc_font.height + sd->splash_text_yo;
 	sx = sx * vc->vc_font.width + sd->splash_text_xo;
 	height *= vc->vc_font.height;
@@ -200,6 +207,8 @@ void splash_bmove(struct splash_data *sd, struct vc_data *vc, struct fb_info *in
 {
 	struct fb_copyarea area;
 
+        if (console_blanked)
+	    return;
 	area.sx = sx * vc->vc_font.width;
 	area.sy = sy * vc->vc_font.height;
 	area.dx = dx * vc->vc_font.width;
@@ -220,6 +229,8 @@ void splash_clear_margins(struct splash_data *sd, struct vc_data *vc, struct fb_
 	unsigned int tw = vc->vc_cols*vc->vc_font.width;
 	unsigned int th = vc->vc_rows*vc->vc_font.height;
 	
+        if (console_blanked)
+	    return;
 	if (!bottom_only) {
 		/* top margin */
 		splashfill(info, 0, 0, sd->splash_text_yo, info->var.xres);
@@ -272,6 +283,8 @@ void splash_bmove_redraw(struct splash_data *sd, struct vc_data *vc, struct fb_i
 	int x = dx;
 	unsigned short attr = 1;
 
+        if (console_blanked)
+	    return;
 	do {
 		c = scr_readw(d);
 		if (attr != (c & 0xff00)) {

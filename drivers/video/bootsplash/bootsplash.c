@@ -555,7 +555,7 @@ static int splash_getraw(unsigned char *start, unsigned char *end, int *update)
 	    printk(KERN_INFO " found, but has oversized text area!\n");
 	    return -1;
 	}
-	if (!vc_cons[unit].d || info->fbops != &vesafb_ops) {
+	if (!vc_cons[unit].d || info->fbops->fb_imageblit != cfb_imageblit) {
 	    splash_free(vc, info);
 	    printk(KERN_INFO " found, but framebuffer can't handle it!\n");
 	    return -1;
