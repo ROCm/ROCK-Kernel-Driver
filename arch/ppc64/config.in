@@ -23,6 +23,10 @@ if [ "$CONFIG_SMP" = "y" ]; then
   bool '  Distribute interrupts on all CPUs by default' CONFIG_IRQ_ALL_CPUS
   if [ "$CONFIG_PPC_PSERIES" = "y" ]; then
     bool '  Hardware multithreading' CONFIG_HMT
+    bool '  Discontiguous Memory Support' CONFIG_DISCONTIGMEM
+    if [ "$CONFIG_DISCONTIGMEM" = "y" ]; then
+      bool '    NUMA support' CONFIG_NUMA
+    fi
   fi
 fi
 define_bool CONFIG_PREEMPT n
