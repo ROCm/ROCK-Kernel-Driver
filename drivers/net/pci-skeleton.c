@@ -795,7 +795,7 @@ static int __devinit netdrv_init_one (struct pci_dev *pdev,
 	tp->pci_dev = pdev;
 	tp->board = ent->driver_data;
 	tp->mmio_addr = ioaddr;
-	tp->lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&tp->lock);
 
 	pci_set_drvdata(pdev, dev);
 

@@ -344,7 +344,7 @@ static inline int sched_find_first_bit(unsigned long *b)
 #define ext2_test_bit(nr, addr) test_bit((nr), (addr))
 #define ext2_find_first_zero_bit(addr, size) find_first_zero_bit((addr), (size))
 #define ext2_find_next_zero_bit(addr, size, offset) \
-                find_next_zero_bit((addr), (size), (offset))
+                find_next_zero_bit((unsigned long *)(addr), (size), (offset))
 #else
 static __inline__ int ext2_set_bit(int nr, volatile void * addr)
 {

@@ -3,12 +3,12 @@
  *
  * Copyright (c) 2000 Gerd Knorr
  * based on code by:
- *   Eric Sandeen (eric_sandeen@bigfoot.com) 
+ *   Eric Sandeen (eric_sandeen@bigfoot.com)
  *   Steve VanDeBogart (vandebo@uclink.berkeley.edu)
  *   Greg Alexander (galexand@acm.org)
  *
  * This code is placed under the terms of the GNU General Public License
- * 
+ *
  * OPTIONS:
  *   debug - set to 1 if you'd like to see debug messages
  *
@@ -207,7 +207,7 @@ static int chip_read(struct CHIPSTATE *chip)
 		       i2c_clientname(&chip->c));
 		return -1;
 	}
-	dprintk("%s: chip_read: 0x%x\n",i2c_clientname(&chip->c),buffer); 
+	dprintk("%s: chip_read: 0x%x\n",i2c_clientname(&chip->c),buffer);
 	return buffer;
 }
 
@@ -227,14 +227,14 @@ static int chip_read2(struct CHIPSTATE *chip, int subaddr)
 		return -1;
 	}
 	dprintk("%s: chip_read2: reg%d=0x%x\n",
-		i2c_clientname(&chip->c),subaddr,read[0]); 
+		i2c_clientname(&chip->c),subaddr,read[0]);
 	return read[0];
 }
 
 static int chip_cmd(struct CHIPSTATE *chip, char *name, audiocmd *cmd)
 {
 	int i;
-	
+
 	if (0 == cmd->count)
 		return 0;
 
@@ -273,7 +273,7 @@ static int chip_thread(void *data)
 	DECLARE_WAITQUEUE(wait, current);
         struct CHIPSTATE *chip = data;
 	struct CHIPDESC  *desc = chiplist + chip->type;
-	
+
 	daemonize("%s",i2c_clientname(&chip->c));
 	allow_signal(SIGTERM);
 	dprintk("%s: thread started\n", i2c_clientname(&chip->c));
@@ -292,10 +292,10 @@ static int chip_thread(void *data)
 		/* don't do anything for radio or if mode != auto */
 		if (chip->norm == VIDEO_MODE_RADIO || chip->mode != 0)
 			continue;
-		
+
 		/* have a look what's going on */
 		desc->checkmode(chip);
-		
+
 		/* schedule next check */
 		mod_timer(&chip->wt, jiffies+2*HZ);
 	}
@@ -352,14 +352,14 @@ static void generic_checkmode(struct CHIPSTATE *chip)
 static int tda9840_getmode(struct CHIPSTATE *chip)
 {
 	int val, mode;
-	
+
 	val = chip_read(chip);
 	mode = VIDEO_SOUND_MONO;
 	if (val & TDA9840_DS_DUAL)
 		mode |= VIDEO_SOUND_LANG1 | VIDEO_SOUND_LANG2;
 	if (val & TDA9840_ST_STEREO)
 		mode |= VIDEO_SOUND_STEREO;
-	
+
 	dprintk ("tda9840_getmode(): raw chip read: %d, return: %d\n",
 		 val, mode);
 	return mode;
@@ -369,7 +369,7 @@ static void tda9840_setmode(struct CHIPSTATE *chip, int mode)
 {
 	int update = 1;
 	int t = chip->shadow.bytes[TDA9840_SW + 1] & ~0x7e;
-	
+
 	switch (mode) {
 	case VIDEO_SOUND_MONO:
 		t |= TDA9840_MONO;
@@ -419,7 +419,7 @@ static void tda9840_setmode(struct CHIPSTATE *chip, int mode)
  * in 1dB steps - mute is 0x27 */
 
 
-/* 0x02 - BA in TDA9855 */ 
+/* 0x02 - BA in TDA9855 */
 /* lower 5 bits control bass gain from -12dB (0x06) to 16.5dB (0x19)
  * in .5dB steps - 0 is 0x0E */
 
@@ -433,7 +433,7 @@ static void tda9840_setmode(struct CHIPSTATE *chip, int mode)
 /* Unique to TDA9855: */
 /* 4 bits << 2 control subwoofer/surround gain from -14db (0x1) to 14db (0xf)
  * in 3dB steps - mute is 0x0 */
- 
+
 /* Unique to TDA9850: */
 /* lower 4 bits control stereo noise threshold, over which stereo turns off
  * set to values of 0x00 through 0x0f for Ster1 through Ster16 */
@@ -446,7 +446,7 @@ static void tda9840_setmode(struct CHIPSTATE *chip, int mode)
 #define TDA9855_LOUD	1<<5 /* Loudness, 1==off */
 #define TDA9855_SUR	1<<3 /* Surround / Subwoofer 1==.5(L-R) 0==.5(L+R) */
 			     /* Bits 0 to 3 select various combinations
-                              * of line in and line out, only the 
+                              * of line in and line out, only the
                               * interesting ones are defined */
 #define TDA9855_EXT	1<<2 /* Selects inputs LIR and LIL.  Pins 41 & 12 */
 #define TDA9855_INT	0    /* Selects inputs LOR and LOL.  (internal) */
@@ -499,7 +499,7 @@ static int  tda985x_getmode(struct CHIPSTATE *chip)
 {
 	int mode;
 
-	mode = ((TDA985x_STP | TDA985x_SAPP) & 
+	mode = ((TDA985x_STP | TDA985x_SAPP) &
 		chip_read(chip)) >> 4;
 	/* Add mono mode regardless of SAP and stereo */
 	/* Allows forced mono */
@@ -510,7 +510,7 @@ static void tda985x_setmode(struct CHIPSTATE *chip, int mode)
 {
 	int update = 1;
 	int c6 = chip->shadow.bytes[TDA985x_C6+1] & 0x3f;
-	
+
 	switch (mode) {
 	case VIDEO_SOUND_MONO:
 		c6 |= TDA985x_MONO;
@@ -538,7 +538,7 @@ static void tda985x_setmode(struct CHIPSTATE *chip, int mode)
 #define TDA9873_AD	0x01 /* Adjust                       */
 #define TDA9873_PT	0x02 /* Port                         */
 
-/* Subaddress 0x00: Switching Data 
+/* Subaddress 0x00: Switching Data
  * B7..B0:
  *
  * B1, B0: Input source selection
@@ -552,10 +552,10 @@ static void tda985x_setmode(struct CHIPSTATE *chip, int mode)
 #define TDA9873_EXT_MONO    1
 
 /*    B3, B2: output signal select
- * B4    : transmission mode 
+ * B4    : transmission mode
  *  0, 0, 1   Mono
  *  1, 0, 0   Stereo
- *  1, 1, 1   Stereo (reversed channel)    
+ *  1, 1, 1   Stereo (reversed channel)
  *  0, 0, 0   Dual AB
  *  0, 0, 1   Dual AA
  *  0, 1, 0   Dual BB
@@ -587,7 +587,7 @@ static void tda985x_setmode(struct CHIPSTATE *chip, int mode)
 
 #define	TDA9873_STEREO_ADJ	0x06 /* 0dB gain */
 
-/* Bits C6..C4 control FM stantard  
+/* Bits C6..C4 control FM stantard
  * C6, C5, C4
  *  0,  0,  0   B/G (PAL FM)
  *  0,  0,  1   M
@@ -609,7 +609,7 @@ static void tda985x_setmode(struct CHIPSTATE *chip, int mode)
 #define TDA9873_IDR_FAST 1 << 7
 
 
-/* Subaddress 0x02: Port data */ 
+/* Subaddress 0x02: Port data */
 
 /* E1, E0   free programmable ports P1/P2
     0,  0   both ports low
@@ -632,11 +632,11 @@ static void tda985x_setmode(struct CHIPSTATE *chip, int mode)
  */
 #define TDA9873_MOUT_MONO   0
 #define TDA9873_MOUT_FMONO  0
-#define TDA9873_MOUT_DUALA  0 
-#define TDA9873_MOUT_DUALB  1 << 3 
-#define TDA9873_MOUT_ST     1 << 4 
+#define TDA9873_MOUT_DUALA  0
+#define TDA9873_MOUT_DUALB  1 << 3
+#define TDA9873_MOUT_ST     1 << 4
 #define TDA9873_MOUT_EXTM   (1 << 4 ) & (1 << 3)
-#define TDA9873_MOUT_EXTL   1 << 5 
+#define TDA9873_MOUT_EXTL   1 << 5
 #define TDA9873_MOUT_EXTR   (1 << 5 ) & (1 << 3)
 #define TDA9873_MOUT_EXTLR  (1 << 5 ) & (1 << 4)
 #define TDA9873_MOUT_MUTE   (1 << 5 ) & (1 << 4) & (1 << 3)
@@ -670,13 +670,13 @@ static void tda9873_setmode(struct CHIPSTATE *chip, int mode)
 		dprintk("tda9873_setmode(): external input\n");
 		return;
 	}
-	
+
 	dprintk("tda9873_setmode(): chip->shadow.bytes[%d] = %d\n", TDA9873_SW+1, chip->shadow.bytes[TDA9873_SW+1]);
 	dprintk("tda9873_setmode(): sw_data  = %d\n", sw_data);
 
 	switch (mode) {
 	case VIDEO_SOUND_MONO:
-		sw_data |= TDA9873_TR_MONO;   
+		sw_data |= TDA9873_TR_MONO;
 		break;
 	case VIDEO_SOUND_STEREO:
 		sw_data |= TDA9873_TR_STEREO;
@@ -871,7 +871,7 @@ static int tda9874a_getmode(struct CHIPSTATE *chip)
 		if(nsr & 0x02) /* NSR.S/MB=1 */
 			mode |= VIDEO_SOUND_STEREO;
 #endif
-		if(nsr & 0x01) /* NSR.D/SB=1 */ 
+		if(nsr & 0x01) /* NSR.D/SB=1 */
 			mode |= VIDEO_SOUND_LANG1 | VIDEO_SOUND_LANG2;
 	} else {
 		if(dsr & 0x02) /* DSR.IDSTE=1 */
@@ -1082,7 +1082,7 @@ static int tda8425_initialize(struct CHIPSTATE *chip)
 static void tda8425_setmode(struct CHIPSTATE *chip, int mode)
 {
 	int s1 = chip->shadow.bytes[TDA8425_S1+1] & 0xe1;
-	
+
 	if (mode & VIDEO_SOUND_LANG1) {
 		s1 |= TDA8425_S1_ML_SOUND_A;
 		s1 |= TDA8425_S1_STEREO_PSEUDO;
@@ -1090,10 +1090,10 @@ static void tda8425_setmode(struct CHIPSTATE *chip, int mode)
 	} else if (mode & VIDEO_SOUND_LANG2) {
 		s1 |= TDA8425_S1_ML_SOUND_B;
 		s1 |= TDA8425_S1_STEREO_PSEUDO;
-		
+
 	} else {
 		s1 |= TDA8425_S1_ML_STEREO;
-		
+
 		if (mode & VIDEO_SOUND_MONO)
 			s1 |= TDA8425_S1_STEREO_MONO;
 		if (mode & VIDEO_SOUND_STEREO)
@@ -1152,7 +1152,7 @@ static void tda8425_setmode(struct CHIPSTATE *chip, int mode)
 static int ta8874z_getmode(struct CHIPSTATE *chip)
 {
 	int val, mode;
-	
+
 	val = chip_read(chip);
 	mode = VIDEO_SOUND_MONO;
 	if (val & TA8874Z_B1){
@@ -1264,7 +1264,7 @@ static struct CHIPDESC chiplist[] = {
 		.inputmute  = TDA9873_MUTE | TDA9873_AUTOMUTE,
 		.inputmap   = {0xa0, 0xa2, 0xa0, 0xa0, 0xc0},
 		.inputmask  = TDA9873_INP_MASK|TDA9873_MUTE|TDA9873_AUTOMUTE,
-		
+
 	},
 	{
 		.name       = "tda9874h/a",
@@ -1522,7 +1522,7 @@ static int chip_detach(struct i2c_client *client)
 		wake_up_interruptible(&chip->wq);
 		wait_for_completion(&chip->texit);
 	}
-	
+
 	i2c_detach_client(&chip->c);
 	kfree(chip);
 	return 0;
@@ -1587,7 +1587,7 @@ static int chip_command(struct i2c_client *client,
 	case VIDIOCSAUDIO:
 	{
 		struct video_audio *va = arg;
-		
+
 		if (desc->flags & CHIP_HAS_VOLUME) {
 			chip->left = (min(65536 - va->balance,32768) *
 				      va->volume) / 32768;
@@ -1613,7 +1613,7 @@ static int chip_command(struct i2c_client *client,
 	case VIDIOCSCHAN:
 	{
 		struct video_channel *vc = arg;
-		
+
 		dprintk(KERN_DEBUG "tvaudio: VIDIOCSCHAN\n");
 		chip->norm = vc->norm;
 		break;

@@ -535,6 +535,11 @@ static int tda9887_configure(struct tda9887 *t)
 	tda9887_set_config(t,buf);
 	tda9887_set_insmod(t,buf);
 
+	if (t->std & V4L2_STD_SECAM_L) {
+		/* secam fixup (FIXME: move this to tvnorms array?) */
+		buf[1] &= ~cOutputPort2Inactive;
+	}
+
 	dprintk(PREFIX "writing: b=0x%02x c=0x%02x e=0x%02x\n",
 		buf[1],buf[2],buf[3]);
 	if (debug > 1)
@@ -565,11 +570,11 @@ static int tda9887_attach(struct i2c_adapter *adap, int addr, int kind)
                 return -ENOMEM;
 	memset(t,0,sizeof(*t));
 	t->client      = client_template;
-	t->std         = 0;;
+	t->std         = 0;
 	t->pinnacle_id = UNSET;
         i2c_set_clientdata(&t->client, t);
         i2c_attach_client(&t->client);
-        
+
 	return 0;
 }
 
@@ -618,7 +623,7 @@ tda9887_command(struct i2c_client *client, unsigned int cmd, void *arg)
 		t->radio = 1;
 		tda9887_configure(t);
 		break;
-		
+
 	case AUDC_CONFIG_PINNACLE:
 	{
 		int *i = arg;
@@ -712,6 +717,22 @@ tda9887_command(struct i2c_client *client, unsigned int cmd, void *arg)
 	return 0;
 }
 
+static int tda9887_suspend(struct device * dev, u32 state, u32 level)
+{
+	dprintk("tda9887: suspend\n");
+	return 0;
+}
+
+static int tda9887_resume(struct device * dev, u32 level)
+{
+	struct i2c_client *c = container_of(dev, struct i2c_client, dev);
+	struct tda9887 *t = i2c_get_clientdata(c);
+
+	dprintk("tda9887: resume\n");
+	tda9887_configure(t);
+	return 0;
+}
+
 /* ----------------------------------------------------------------------- */
 
 static struct i2c_driver driver = {
@@ -722,6 +743,10 @@ static struct i2c_driver driver = {
         .attach_adapter = tda9887_probe,
         .detach_client  = tda9887_detach,
         .command        = tda9887_command,
+	.driver = {
+		.suspend = tda9887_suspend,
+		.resume  = tda9887_resume,
+	},
 };
 static struct i2c_client client_template =
 {

@@ -287,10 +287,9 @@ static int dn_insert_route(struct dn_route *rt, unsigned hash, struct dn_route *
 		if (compare_keys(&rth->fl, &rt->fl)) {
 			/* Put it first */
 			*rthp = rth->u.rt_next;
-			smp_wmb();
-			rth->u.rt_next = dn_rt_hash_table[hash].chain;
-			smp_wmb();
-			dn_rt_hash_table[hash].chain = rth;
+			rcu_assign_pointer(rth->u.rt_next,
+					   dn_rt_hash_table[hash].chain);
+			rcu_assign_pointer(dn_rt_hash_table[hash].chain, rth);
 
 			rth->u.dst.__use++;
 			dst_hold(&rth->u.dst);
@@ -304,10 +303,8 @@ static int dn_insert_route(struct dn_route *rt, unsigned hash, struct dn_route *
 		rthp = &rth->u.rt_next;
 	}
 
-	smp_wmb();
-	rt->u.rt_next = dn_rt_hash_table[hash].chain;
-	smp_wmb();
-	dn_rt_hash_table[hash].chain = rt;
+	rcu_assign_pointer(rt->u.rt_next, dn_rt_hash_table[hash].chain);
+	rcu_assign_pointer(dn_rt_hash_table[hash].chain, rt);
 	
 	dst_hold(&rt->u.dst);
 	rt->u.dst.__use++;

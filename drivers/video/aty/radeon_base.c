@@ -2186,7 +2186,9 @@ static int radeonfb_pci_register (struct pci_dev *pdev,
 	       		rinfo->video_ram = 8192 * 1024;
 	       		break;
 	       	default:
-	       		break;
+			printk (KERN_ERR "radeonfb: no video RAM reported\n");
+			ret = -ENXIO;
+			goto err_unmap_rom;
 		}
 	}
 

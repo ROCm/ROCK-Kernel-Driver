@@ -1,5 +1,5 @@
 /*
-    $Id: btcx-risc.c,v 1.2 2004/09/15 16:15:24 kraxel Exp $
+    $Id: btcx-risc.c,v 1.3 2004/10/13 10:39:00 kraxel Exp $
 
     btcx-risc.c
 
@@ -189,7 +189,7 @@ btcx_calc_skips(int line, int width, unsigned int *maxy,
 {
 	unsigned int clip,skip;
 	int end,maxline;
-	
+
 	skip=0;
 	maxline = 9999;
 	for (clip = 0; clip < nclips; clip++) {
@@ -199,7 +199,7 @@ btcx_calc_skips(int line, int width, unsigned int *maxy,
 			continue;
 		if (clips[clip].c.left > (signed)width)
 			break;
-		
+
 		/* vertical range */
 		if (line > clips[clip].c.top+clips[clip].c.height-1)
 			continue;

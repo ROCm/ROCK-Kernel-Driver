@@ -110,7 +110,6 @@ static int flush_buffer(struct line *line)
 int line_write(struct line *lines, struct tty_struct *tty, const char *buf, int len)
 {
 	struct line *line;
-	char *new;
 	unsigned long flags;
 	int n, err, i, ret = 0;
 
@@ -143,7 +142,6 @@ int line_write(struct line *lines, struct tty_struct *tty, const char *buf, int 
 	}
  out_up:
 	up(&line->sem);
- out_free:
 	return(ret);
 }
 
@@ -203,13 +201,17 @@ void line_disable(struct line *line, int current_irq)
 
 	if(line->driver->read_irq == current_irq)
 		free_irq_later(line->driver->read_irq, line);
-	else
+	else {
+		free_irq_by_irq_and_dev(line->driver->read_irq, line);
 		free_irq(line->driver->read_irq, line);
+	}
 
 	if(line->driver->write_irq == current_irq)
 		free_irq_later(line->driver->write_irq, line);
-	else
+	else {
+		free_irq_by_irq_and_dev(line->driver->write_irq, line);
 		free_irq(line->driver->write_irq, line);
+	}
 
 	line->have_irq = 0;
 }

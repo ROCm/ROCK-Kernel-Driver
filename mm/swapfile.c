@@ -1374,7 +1374,7 @@ asmlinkage long sys_swapon(const char __user * specialfile, int swap_flags)
 	p->highest_bit = 0;
 	p->cluster_nr = 0;
 	p->inuse_pages = 0;
-	p->sdev_lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&p->sdev_lock);
 	p->next = -1;
 	if (swap_flags & SWAP_FLAG_PREFER) {
 		p->prio =

@@ -1,5 +1,5 @@
 
-/* 
+/*
     tuner.h - definition for different tuners
 
     Copyright (C) 1997 Markus Schroeder (schroedm@uni-duesseldorf.de)

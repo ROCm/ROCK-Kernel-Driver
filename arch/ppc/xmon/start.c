@@ -102,7 +102,7 @@ static struct sysrq_key_op sysrq_xmon_op =
 {
 	.handler =	sysrq_handle_xmon,
 	.help_msg =	"Xmon",
-	.action_msg =	"Entering xmon\n",
+	.action_msg =	"Entering xmon",
 };
 #endif
 

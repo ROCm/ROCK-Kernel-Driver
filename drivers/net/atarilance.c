@@ -606,7 +606,7 @@ static unsigned long __init lance_probe1( struct net_device *dev,
 		printk( "      Use \"ifconfig hw ether ...\" to set the address.\n" );
 	}
 
-	lp->devlock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&lp->devlock);
 
 	MEM->init.mode = 0x0000;		/* Disable Rx and Tx. */
 	for( i = 0; i < 6; i++ )

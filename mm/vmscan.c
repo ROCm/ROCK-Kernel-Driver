@@ -574,7 +574,6 @@ static void shrink_cache(struct zone *zone, struct scan_control *sc)
 			nr_taken++;
 		}
 		zone->nr_inactive -= nr_taken;
-		zone->pages_scanned += nr_taken;
 		spin_unlock_irq(&zone->lru_lock);
 
 		if (nr_taken == 0)
@@ -675,6 +674,7 @@ refill_inactive_zone(struct zone *zone, struct scan_control *sc)
 		}
 		pgscanned++;
 	}
+	zone->pages_scanned += pgscanned;
 	zone->nr_active -= pgmoved;
 	spin_unlock_irq(&zone->lru_lock);
 

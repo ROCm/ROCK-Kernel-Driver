@@ -231,7 +231,7 @@ int cycx_x25_wan_init(struct cycx_device *card, wandev_conf_t *conf)
 	/* Initialize protocol-specific fields */
 	card->mbox  = card->hw.dpmbase + X25_MBOX_OFFS;
 	card->u.x.connection_keys = 0;
-	card->u.x.lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&card->u.x.lock);
 
 	/* Configure adapter. Here we set reasonable defaults, then parse
 	 * device configuration structure and set configuration options.

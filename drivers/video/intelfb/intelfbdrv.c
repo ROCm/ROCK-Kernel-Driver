@@ -410,9 +410,9 @@ cleanup(struct intelfb_info *dinfo)
 	}
 
 	if (dinfo->mmio_base)
-		iounmap((void *)dinfo->mmio_base);
+		iounmap((void __iomem *)dinfo->mmio_base);
 	if (dinfo->aperture.virtual)
-		iounmap((void *)dinfo->aperture.virtual);
+		iounmap((void __iomem *)dinfo->aperture.virtual);
 
 	if (dinfo->mmio_base_phys)
 		release_mem_region(dinfo->mmio_base_phys, INTEL_REG_SIZE);
@@ -510,15 +510,16 @@ intelfb_pci_register(struct pci_dev *pdev, const struct pci_device_id *ent)
 	}
 
 	/* Map the fb and MMIO regions */
-	dinfo->aperture.virtual = (u32)ioremap_nocache
+	dinfo->aperture.virtual = (u32 __iomem *)ioremap_nocache
 		(dinfo->aperture.physical, dinfo->aperture.size);
 	if (!dinfo->aperture.virtual) {
 		ERR_MSG("Cannot remap FB region.\n");
 		cleanup(dinfo);
 		return -ENODEV;
 	}
-	dinfo->mmio_base = (u32)ioremap_nocache(dinfo->mmio_base_phys,
-						INTEL_REG_SIZE);
+	dinfo->mmio_base =
+		(u32 __iomem *)ioremap_nocache(dinfo->mmio_base_phys,
+					       INTEL_REG_SIZE);
 	if (!dinfo->mmio_base) {
 		ERR_MSG("Cannot remap MMIO region.\n");
 		cleanup(dinfo);
@@ -656,14 +657,16 @@ intelfb_pci_register(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	DBG_MSG("fb: 0x%x(+ 0x%x)/0x%x (0x%x)\n",
 		dinfo->fb.physical, dinfo->fb.offset, dinfo->fb.size,
-		dinfo->fb.virtual);
+		(u32 __iomem ) dinfo->fb.virtual);
 	DBG_MSG("MMIO: 0x%x/0x%x (0x%x)\n",
-		dinfo->mmio_base_phys, INTEL_REG_SIZE, dinfo->mmio_base);
+		dinfo->mmio_base_phys, INTEL_REG_SIZE,
+		(u32 __iomem) dinfo->mmio_base);
 	DBG_MSG("ring buffer: 0x%x/0x%x (0x%x)\n",
-		dinfo->ring.physical, dinfo->ring.size, dinfo->ring.virtual);
+		dinfo->ring.physical, dinfo->ring.size,
+		(u32 __iomem ) dinfo->ring.virtual);
 	DBG_MSG("HW cursor: 0x%x/0x%x (0x%x) (offset 0x%x) (phys 0x%x)\n",
 		dinfo->cursor.physical, dinfo->cursor.size,
-		dinfo->cursor.virtual, dinfo->cursor.offset,
+		(u32 __iomem ) dinfo->cursor.virtual, dinfo->cursor.offset,
 		dinfo->cursor.physical);
 
 	DBG_MSG("options: accel = %d, hwcursor = %d, fixed = %d, "
@@ -1159,7 +1162,7 @@ update_dinfo(struct intelfb_info *dinfo, struct fb_var_screeninfo *var)
 	if (FIXED_MODE(dinfo))
 		dinfo->pitch = dinfo->initial_pitch;
 
-	dinfo->info->screen_base = (char *)dinfo->fb.virtual;
+	dinfo->info->screen_base = (char __iomem *)dinfo->fb.virtual;
 	dinfo->info->fix.line_length = dinfo->pitch;
 	dinfo->info->fix.visual = dinfo->visual;
 }

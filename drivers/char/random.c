@@ -818,12 +818,10 @@ static void add_timer_randomness(struct timer_rand_state *state, unsigned num)
 	 * jiffies.
 	 */
 	time = get_cycles();
-	if (time != 0) {
-		if (sizeof(time) > 4)
-			num ^= (u32)(time >> 32);
-	} else {
+	if (time)
+		num ^= (u32)((time >> 31) >> 1);
+	else
 		time = jiffies;
-	}
 
 	/*
 	 * Calculate number of bits of randomness we probably added.

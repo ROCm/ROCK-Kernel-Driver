@@ -22,10 +22,8 @@ EXPORT_SYMBOL(num_audiodevs);
 EXPORT_SYMBOL(midi_devs);
 EXPORT_SYMBOL(num_midis);
 EXPORT_SYMBOL(synth_devs);
-EXPORT_SYMBOL(num_synths);
 
 EXPORT_SYMBOL(sound_timer_devs);
-EXPORT_SYMBOL(num_sound_timers);
 
 EXPORT_SYMBOL(sound_install_audiodrv);
 EXPORT_SYMBOL(sound_install_mixer);
@@ -33,7 +31,6 @@ EXPORT_SYMBOL(sound_alloc_dma);
 EXPORT_SYMBOL(sound_free_dma);
 EXPORT_SYMBOL(sound_open_dma);
 EXPORT_SYMBOL(sound_close_dma);
-EXPORT_SYMBOL(sound_alloc_audiodev);
 EXPORT_SYMBOL(sound_alloc_mididev);
 EXPORT_SYMBOL(sound_alloc_mixerdev);
 EXPORT_SYMBOL(sound_alloc_timerdev);

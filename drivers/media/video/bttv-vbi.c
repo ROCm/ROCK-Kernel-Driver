@@ -1,21 +1,21 @@
 /*
-    $Id: bttv-vbi.c,v 1.5 2004/10/06 17:30:51 kraxel Exp $
+    $Id: bttv-vbi.c,v 1.6 2004/10/13 10:39:00 kraxel Exp $
 
     bttv - Bt848 frame grabber driver
     vbi interface
-    
+
     (c) 2002 Gerd Knorr <kraxel@bytesex.org>
-    
+
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation; either version 2 of the License, or
     (at your option) any later version.
-    
+
     This program is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
     GNU General Public License for more details.
-    
+
     You should have received a copy of the GNU General Public License
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
@@ -83,7 +83,7 @@ static int vbi_buffer_prepare(void *priv, struct videobuf_buffer *vb,
 	struct bttv *btv = fh->btv;
 	struct bttv_buffer *buf = (struct bttv_buffer*)vb;
 	int rc;
-	
+
 	buf->vb.size = fh->lines * 2 * 2048;
 	if (0 != buf->vb.baddr  &&  buf->vb.bsize < buf->vb.size)
 		return -EINVAL;
@@ -112,7 +112,7 @@ vbi_buffer_queue(void *priv, struct videobuf_buffer *vb)
 	struct bttv_fh *fh = priv;
 	struct bttv *btv = fh->btv;
 	struct bttv_buffer *buf = (struct bttv_buffer*)vb;
-	
+
 	dprintk("queue %p\n",vb);
 	buf->vb.state = STATE_QUEUED;
 	list_add_tail(&buf->vb.queue,&btv->vcapture);
@@ -127,7 +127,7 @@ static void vbi_buffer_release(void *priv, struct videobuf_buffer *vb)
 	struct bttv_fh *fh = priv;
 	struct bttv *btv = fh->btv;
 	struct bttv_buffer *buf = (struct bttv_buffer*)vb;
-	
+
 	dprintk("free %p\n",vb);
 	bttv_dma_free(fh->btv,buf);
 }

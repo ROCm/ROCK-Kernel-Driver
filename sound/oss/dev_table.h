@@ -397,7 +397,6 @@ void sound_unload_mixerdev(int dev);
 void sound_unload_mididev(int dev);
 void sound_unload_synthdev(int dev);
 void sound_unload_timerdev(int dev);
-int sound_alloc_audiodev(void);
 int sound_alloc_mixerdev(void);
 int sound_alloc_timerdev(void);
 int sound_alloc_synthdev(void);

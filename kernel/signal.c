@@ -1109,7 +1109,7 @@ int group_send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
 
 int __kill_pg_info(int sig, struct siginfo *info, pid_t pgrp)
 {
-	struct task_struct *p;
+	struct task_struct *p = NULL;
 	int retval, success;
 
 	if (pgrp <= 0)

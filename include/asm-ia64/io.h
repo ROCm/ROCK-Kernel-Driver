@@ -32,7 +32,8 @@
  */
 #define IO_SPACE_LIMIT		0xffffffffffffffffUL
 
-#define MAX_IO_SPACES			16
+#define MAX_IO_SPACES_BITS		4
+#define MAX_IO_SPACES			(1UL << MAX_IO_SPACES_BITS)
 #define IO_SPACE_BITS			24
 #define IO_SPACE_SIZE			(1UL << IO_SPACE_BITS)
 
@@ -52,10 +53,24 @@ extern unsigned int num_io_spaces;
 
 # ifdef __KERNEL__
 
+/*
+ * All MMIO iomem cookies are in region 6; anything less is a PIO cookie:
+ *	0xCxxxxxxxxxxxxxxx	MMIO cookie (return from ioremap)
+ *	0x000000001SPPPPPP	PIO cookie (S=space number, P..P=port)
+ *
+ * ioread/writeX() uses the leading 1 in PIO cookies (PIO_OFFSET) to catch
+ * code that uses bare port numbers without the prerequisite pci_iomap().
+ */
+#define PIO_OFFSET		(1UL << (MAX_IO_SPACES_BITS + IO_SPACE_BITS))
+#define PIO_MASK		(PIO_OFFSET - 1)
+#define PIO_RESERVED		__IA64_UNCACHED_OFFSET
+#define HAVE_ARCH_PIO_SIZE
+
 #include <asm/intrinsics.h>
 #include <asm/machvec.h>
 #include <asm/page.h>
 #include <asm/system.h>
+#include <asm-generic/iomap.h>
 
 /*
  * Change virtual addresses to physical addresses and vv.

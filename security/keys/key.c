@@ -1036,4 +1036,4 @@ static int __init key_init(void)
 
 } /* end key_init() */
 
-subsys_initcall(key_init);
+security_initcall(key_init);

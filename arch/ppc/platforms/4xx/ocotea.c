@@ -350,8 +350,12 @@ void __init platform_init(unsigned long r3, unsigned long r4,
 	ibm440gx_get_clocks(&clocks, 33333333, 6 * 1843200);
 	ocp_sys_info.opb_bus_freq = clocks.opb;
 
-	/* Disable L2-Cache on broken hardware, enable it otherwise */
-	ibm440gx_l2c_setup(&clocks);
+	/*
+	 * Always disable L2 cache. All revs/speeds of silicon
+	 * have parity error problems despite errata claims to
+	 * the contrary.
+	 */
+	ibm440gx_l2c_disable();
 
 	ibm44x_platform_init();
 
