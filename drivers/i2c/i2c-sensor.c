@@ -163,20 +163,8 @@ int i2c_detect(struct i2c_adapter *adapter,
 	return 0;
 }
 
-static int __init i2c_sensor_init(void)
-{
-	return 0;
-}
-
-static void __exit i2c_sensor_exit(void)
-{
-}
-
 EXPORT_SYMBOL(i2c_detect);
 
 MODULE_AUTHOR("Frodo Looijaard <frodol@dds.nl>");
 MODULE_DESCRIPTION("i2c-sensor driver");
 MODULE_LICENSE("GPL");
-
-module_init(i2c_sensor_init);
-module_exit(i2c_sensor_exit);
