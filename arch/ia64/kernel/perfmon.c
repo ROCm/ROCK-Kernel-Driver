@@ -2227,6 +2227,15 @@ out:
 static void
 pfm_free_fd(int fd, struct file *file)
 {
+	struct files_struct *files = current->files;
+
+	/* 
+	 * there ie no fd_uninstall(), so we do it here
+	 */
+	spin_lock(&files->file_lock);
+        files->fd[fd] = NULL;
+	spin_unlock(&files->file_lock);
+
 	if (file) put_filp(file);
 	put_unused_fd(fd);
 }
@@ -2659,8 +2668,10 @@ pfm_context_create(pfm_context_t *ctx, void *arg, int count, struct pt_regs *reg
 	ctx = pfm_context_alloc();
 	if (!ctx) goto error;
 
-	req->ctx_fd = ctx->ctx_fd = pfm_alloc_fd(&filp);
-	if (req->ctx_fd < 0) goto error_file;
+	ret = pfm_alloc_fd(&filp);
+	if (ret < 0) goto error_file;
+
+	req->ctx_fd = ctx->ctx_fd = ret;
 
 	/*
 	 * attach context to file
@@ -3985,7 +3996,10 @@ pfm_stop(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 	state     = ctx->ctx_state;
 	is_system = ctx->ctx_fl_system;
 
-	if (state != PFM_CTX_LOADED && state != PFM_CTX_MASKED) return -EINVAL;
+	/*
+	 * context must be attached to issue the stop command (includes LOADED,MASKED,ZOMBIE)
+	 */
+	if (state == PFM_CTX_UNLOADED) return -EINVAL;
 
 	/*
  	 * In system wide and when the context is loaded, access can only happen
@@ -6312,15 +6326,15 @@ pfm_flush_pmds(struct task_struct *task, pfm_context_t *ctx)
 	 */
 	is_self = ctx->ctx_task == task ? 1 : 0;
 
-#ifdef CONFIG_SMP
-	if (task == current) {
-#else
 	/*
-	 * in UP, the state can still be in the registers
+	 * can access PMU is task is the owner of the PMU state on the current CPU
+	 * or if we are running on the CPU bound to the context in system-wide mode
+	 * (that is not necessarily the task the context is attached to in this mode).
+	 * In system-wide we always have can_access_pmu true because a task running on an
+	 * invalid processor is flagged earlier in the call stack (see pfm_stop).
 	 */
-	if (task == current || GET_PMU_OWNER() == task) {
-#endif
-		can_access_pmu = 1;
+	can_access_pmu = (GET_PMU_OWNER() == task) || (ctx->ctx_fl_system && ctx->ctx_cpu == smp_processor_id());
+	if (can_access_pmu) {
 		/*
 		 * Mark the PMU as not owned
 		 * This will cause the interrupt handler to do nothing in case an overflow
@@ -6330,6 +6344,7 @@ pfm_flush_pmds(struct task_struct *task, pfm_context_t *ctx)
 		 * on.
 		 */
 		SET_PMU_OWNER(NULL, NULL);
+		DPRINT(("releasing ownership\n"));
 
 		/*
 		 * read current overflow status:
