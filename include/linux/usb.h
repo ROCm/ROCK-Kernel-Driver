@@ -670,6 +670,7 @@ extern void usb_deregister_dev(int num_minors, int start_minor);
 
 extern int usb_device_probe(struct device *dev);
 extern int usb_device_remove(struct device *dev);
+extern int usb_disabled(void);
 
 /* -------------------------------------------------------------------------- */
 
