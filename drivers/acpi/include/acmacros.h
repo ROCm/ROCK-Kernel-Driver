@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acmacros.h - C macros for the entire subsystem.
- *       $Revision: 124 $
+ *       $Revision: 125 $
  *
  *****************************************************************************/
 
@@ -287,10 +287,12 @@
 /*
  * Macros for the master AML opcode table
  */
-#if defined(ACPI_DEBUG) || defined(ENABLE_DEBUGGER)
+#ifdef ACPI_DISASSEMBLER
 #define ACPI_OP(name,Pargs,Iargs,obj_type,class,type,flags)    {name,Pargs,Iargs,flags,obj_type,class,type}
+#define ACPI_DISASM_ONLY_MEMBERS(a)      a;
 #else
 #define ACPI_OP(name,Pargs,Iargs,obj_type,class,type,flags)    {Pargs,Iargs,flags,obj_type,class,type}
+#define ACPI_DISASM_ONLY_MEMBERS(a)
 #endif
 
 #define ARG_TYPE_WIDTH                  5
@@ -435,7 +437,6 @@
 
 #define ACPI_DEBUG_DEFINE(a)            a;
 #define ACPI_DEBUG_ONLY_MEMBERS(a)      a;
-#define _OPCODE_NAMES
 #define _VERBOSE_STRUCTURES
 
 
@@ -514,10 +515,6 @@
 #define return_ACPI_STATUS(s)           return(s)
 #define return_VALUE(s)                 return(s)
 #define return_PTR(s)                   return(s)
-
-#ifdef ENABLE_DEBUGGER
-#define _OPCODE_NAMES
-#endif
 
 #endif
 

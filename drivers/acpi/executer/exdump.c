@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exdump - Interpreter debug output routines
- *              $Revision: 156 $
+ *              $Revision: 157 $
  *
  *****************************************************************************/
 
@@ -575,14 +575,14 @@ acpi_ex_dump_object_descriptor (
 	{
 		if (!((ACPI_LV_OBJECTS & acpi_dbg_level) && (_COMPONENT & acpi_dbg_layer)))
 		{
-			return;
+			return_VOID;
 		}
 	}
 
 	if (ACPI_GET_DESCRIPTOR_TYPE (obj_desc) != ACPI_DESC_TYPE_OPERAND)
 	{
 		acpi_os_printf ("Ex_dump_object_descriptor: %p is not a valid ACPI object\n", obj_desc);
-		return;
+		return_VOID;
 	}
 
 	/* Common Fields */

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: psargs - Parse AML opcode arguments
- *              $Revision: 61 $
+ *              $Revision: 62 $
  *
  *****************************************************************************/
 
@@ -332,7 +332,7 @@ acpi_ps_get_next_namepath (
 	NATIVE_CHAR             *path;
 	acpi_parse_object       *name_op;
 	acpi_status             status;
-	acpi_namespace_node     *method_node = NULL;
+	acpi_operand_object     *method_desc;
 	acpi_namespace_node     *node;
 	acpi_generic_state      scope_info;
 
@@ -369,30 +369,36 @@ acpi_ps_get_next_namepath (
 			 &node);
 	if (ACPI_SUCCESS (status)) {
 		if (node->type == ACPI_TYPE_METHOD) {
-			method_node = node;
-			ACPI_DEBUG_PRINT ((ACPI_DB_PARSE, "method - %p Path=%p\n",
-				method_node, path));
+			method_desc = acpi_ns_get_attached_object (node);
+			ACPI_DEBUG_PRINT ((ACPI_DB_PARSE, "Control Method - %p Desc %p Path=%p\n",
+				node, method_desc, path));
 
 			name_op = acpi_ps_alloc_op (AML_INT_NAMEPATH_OP);
-			if (name_op) {
-				/* Change arg into a METHOD CALL and attach name to it */
-
-				acpi_ps_init_op (arg, AML_INT_METHODCALL_OP);
-
-				name_op->common.value.name = path;
-
-				/* Point METHODCALL/NAME to the METHOD Node */
-
-				name_op->common.node = method_node;
-				acpi_ps_append_arg (arg, name_op);
-
-				if (!acpi_ns_get_attached_object (method_node)) {
-					return_VOID;
-				}
-
-				*arg_count = (acpi_ns_get_attached_object (method_node))->method.param_count;
+			if (!name_op) {
+				return_VOID;
 			}
 
+			/* Change arg into a METHOD CALL and attach name to it */
+
+			acpi_ps_init_op (arg, AML_INT_METHODCALL_OP);
+
+			name_op->common.value.name = path;
+
+			/* Point METHODCALL/NAME to the METHOD Node */
+
+			name_op->common.node = node;
+			acpi_ps_append_arg (arg, name_op);
+
+			if (!method_desc) {
+				ACPI_DEBUG_PRINT ((ACPI_DB_PARSE, "Control Method - %p has no attached object\n",
+					node));
+				return_VOID;
+			}
+
+			ACPI_DEBUG_PRINT ((ACPI_DB_PARSE, "Control Method - %p Args %X\n",
+				node, method_desc->method.param_count));
+
+			*arg_count = method_desc->method.param_count;
 			return_VOID;
 		}
 

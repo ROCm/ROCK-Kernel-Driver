@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utglobal - Global variables for the ACPI subsystem
- *              $Revision: 164 $
+ *              $Revision: 165 $
  *
  *****************************************************************************/
 
@@ -27,6 +27,7 @@
 
 #include "acpi.h"
 #include "acnamesp.h"
+#include "amlcode.h"
 
 #define _COMPONENT          ACPI_UTILITIES
 	 ACPI_MODULE_NAME    ("utglobal")
@@ -357,15 +358,15 @@ acpi_fixed_event_info       acpi_gbl_fixed_event_info[ACPI_NUM_FIXED_EVENTS] =
 
 /* Region type decoding */
 
-static const NATIVE_CHAR *acpi_gbl_region_types[ACPI_NUM_PREDEFINED_REGIONS] =
+const NATIVE_CHAR *acpi_gbl_region_types[ACPI_NUM_PREDEFINED_REGIONS] =
 {
 	"System_memory",
 	"System_iO",
-	"PCIConfig",
+	"PCI_Config",
 	"Embedded_control",
 	"SMBus",
 	"CMOS",
-	"PCIBar_target",
+	"PCIBARTarget",
 	"Data_table",
 };
 
@@ -554,55 +555,6 @@ acpi_ut_get_mutex_name (
 	return (acpi_gbl_mutex_names[mutex_id]);
 }
 
-
-/* Various strings for future use */
-
-#if 0
-#include "amlcode.h"
-
-/* Data used in keeping track of fields */
-
-static const NATIVE_CHAR *acpi_gbl_FEnames[NUM_FIELD_NAMES] =
-{
-	"skip",
-	"?access?"
-};              /* FE = Field Element */
-
-
-static const NATIVE_CHAR *acpi_gbl_match_ops[NUM_MATCH_OPS] =
-{
-	"Error",
-	"MTR",
-	"MEQ",
-	"MLE",
-	"MLT",
-	"MGE",
-	"MGT"
-};
-
-
-/* Access type decoding */
-
-static const NATIVE_CHAR *acpi_gbl_access_types[NUM_ACCESS_TYPES] =
-{
-	"Any_acc",
-	"Byte_acc",
-	"Word_acc",
-	"DWord_acc",
-	"QWord_acc",
-	"Buffer_acc",
-};
-
-
-/* Update rule decoding */
-
-static const NATIVE_CHAR *acpi_gbl_update_rules[NUM_UPDATE_RULES] =
-{
-	"Preserve",
-	"Write_as_ones",
-	"Write_as_zeros"
-};
-#endif /* Future use */
 
 #endif
 

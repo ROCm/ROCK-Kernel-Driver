@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: psutils - Parser miscellaneous utilities (Parser only)
- *              $Revision: 52 $
+ *              $Revision: 53 $
  *
  *****************************************************************************/
 
@@ -186,7 +186,7 @@ acpi_ps_free_op (
 		ACPI_DEBUG_PRINT ((ACPI_DB_ALLOCATIONS, "Free retval op: %p\n", op));
 	}
 
-	if (op->common.flags == ACPI_PARSEOP_GENERIC) {
+	if (op->common.flags & ACPI_PARSEOP_GENERIC) {
 		acpi_ut_release_to_cache (ACPI_MEM_LIST_PSNODE, op);
 	}
 	else {

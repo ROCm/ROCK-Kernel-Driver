@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dsobject - Dispatcher object management routines
- *              $Revision: 104 $
+ *              $Revision: 105 $
  *
  *****************************************************************************/
 
@@ -35,6 +35,7 @@
 	 ACPI_MODULE_NAME    ("dsobject")
 
 
+#ifndef ACPI_NO_METHOD_EXECUTION
 /*******************************************************************************
  *
  * FUNCTION:    Acpi_ds_init_one_object
@@ -213,199 +214,6 @@ acpi_ds_initialize_objects (
 		"%hd Methods, %hd Regions\n", info.method_count, info.op_region_count));
 
 	return_ACPI_STATUS (AE_OK);
-}
-
-
-/*****************************************************************************
- *
- * FUNCTION:    Acpi_ds_init_object_from_op
- *
- * PARAMETERS:  Walk_state      - Current walk state
- *              Op              - Parser op used to init the internal object
- *              Opcode          - AML opcode associated with the object
- *              Ret_obj_desc    - Namespace object to be initialized
- *
- * RETURN:      Status
- *
- * DESCRIPTION: Initialize a namespace object from a parser Op and its
- *              associated arguments.  The namespace object is a more compact
- *              representation of the Op and its arguments.
- *
- ****************************************************************************/
-
-acpi_status
-acpi_ds_init_object_from_op (
-	acpi_walk_state         *walk_state,
-	acpi_parse_object       *op,
-	u16                     opcode,
-	acpi_operand_object     **ret_obj_desc)
-{
-	const acpi_opcode_info  *op_info;
-	acpi_operand_object     *obj_desc;
-	acpi_status             status = AE_OK;
-
-
-	ACPI_FUNCTION_TRACE ("Ds_init_object_from_op");
-
-
-	obj_desc = *ret_obj_desc;
-	op_info = acpi_ps_get_opcode_info (opcode);
-	if (op_info->class == AML_CLASS_UNKNOWN) {
-		/* Unknown opcode */
-
-		return_ACPI_STATUS (AE_TYPE);
-	}
-
-	/* Perform per-object initialization */
-
-	switch (ACPI_GET_OBJECT_TYPE (obj_desc)) {
-	case ACPI_TYPE_BUFFER:
-
-		/*
-		 * Defer evaluation of Buffer Term_arg operand
-		 */
-		obj_desc->buffer.node     = (acpi_namespace_node *) walk_state->operands[0];
-		obj_desc->buffer.aml_start = op->named.data;
-		obj_desc->buffer.aml_length = op->named.length;
-		break;
-
-
-	case ACPI_TYPE_PACKAGE:
-
-		/*
-		 * Defer evaluation of Package Term_arg operand
-		 */
-		obj_desc->package.node     = (acpi_namespace_node *) walk_state->operands[0];
-		obj_desc->package.aml_start = op->named.data;
-		obj_desc->package.aml_length = op->named.length;
-		break;
-
-
-	case ACPI_TYPE_INTEGER:
-
-		switch (op_info->type) {
-		case AML_TYPE_CONSTANT:
-			/*
-			 * Resolve AML Constants here - AND ONLY HERE!
-			 * All constants are integers.
-			 * We mark the integer with a flag that indicates that it started life
-			 * as a constant -- so that stores to constants will perform as expected (noop).
-			 * (Zero_op is used as a placeholder for optional target operands.)
-			 */
-			obj_desc->common.flags = AOPOBJ_AML_CONSTANT;
-
-			switch (opcode) {
-			case AML_ZERO_OP:
-
-				obj_desc->integer.value = 0;
-				break;
-
-			case AML_ONE_OP:
-
-				obj_desc->integer.value = 1;
-				break;
-
-			case AML_ONES_OP:
-
-				obj_desc->integer.value = ACPI_INTEGER_MAX;
-
-				/* Truncate value if we are executing from a 32-bit ACPI table */
-
-				acpi_ex_truncate_for32bit_table (obj_desc);
-				break;
-
-			case AML_REVISION_OP:
-
-				obj_desc->integer.value = ACPI_CA_SUPPORT_LEVEL;
-				break;
-
-			default:
-
-				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unknown constant opcode %X\n", opcode));
-				status = AE_AML_OPERAND_TYPE;
-				break;
-			}
-			break;
-
-
-		case AML_TYPE_LITERAL:
-
-			obj_desc->integer.value = op->common.value.integer;
-			break;
-
-
-		default:
-			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unknown Integer type %X\n", op_info->type));
-			status = AE_AML_OPERAND_TYPE;
-			break;
-		}
-		break;
-
-
-	case ACPI_TYPE_STRING:
-
-		obj_desc->string.pointer = op->common.value.string;
-		obj_desc->string.length = ACPI_STRLEN (op->common.value.string);
-
-		/*
-		 * The string is contained in the ACPI table, don't ever try
-		 * to delete it
-		 */
-		obj_desc->common.flags |= AOPOBJ_STATIC_POINTER;
-		break;
-
-
-	case ACPI_TYPE_METHOD:
-		break;
-
-
-	case INTERNAL_TYPE_REFERENCE:
-
-		switch (op_info->type) {
-		case AML_TYPE_LOCAL_VARIABLE:
-
-			/* Split the opcode into a base opcode + offset */
-
-			obj_desc->reference.opcode = AML_LOCAL_OP;
-			obj_desc->reference.offset = opcode - AML_LOCAL_OP;
-			acpi_ds_method_data_get_node (AML_LOCAL_OP, obj_desc->reference.offset,
-				walk_state, (acpi_namespace_node **) &obj_desc->reference.object);
-			break;
-
-
-		case AML_TYPE_METHOD_ARGUMENT:
-
-			/* Split the opcode into a base opcode + offset */
-
-			obj_desc->reference.opcode = AML_ARG_OP;
-			obj_desc->reference.offset = opcode - AML_ARG_OP;
-			break;
-
-
-		default: /* Other literals, etc.. */
-
-			if (op->common.aml_opcode == AML_INT_NAMEPATH_OP) {
-				/* Node was saved in Op */
-
-				obj_desc->reference.node = op->common.node;
-			}
-
-			obj_desc->reference.opcode = opcode;
-			break;
-		}
-		break;
-
-
-	default:
-
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unimplemented data type: %X\n",
-			ACPI_GET_OBJECT_TYPE (obj_desc)));
-
-		status = AE_AML_OPERAND_TYPE;
-		break;
-	}
-
-	return_ACPI_STATUS (status);
 }
 
 
@@ -778,6 +586,204 @@ acpi_ds_create_node (
 	/* Remove local reference to the object */
 
 	acpi_ut_remove_reference (obj_desc);
+	return_ACPI_STATUS (status);
+}
+
+#endif /* ACPI_NO_METHOD_EXECUTION */
+
+
+/*****************************************************************************
+ *
+ * FUNCTION:    Acpi_ds_init_object_from_op
+ *
+ * PARAMETERS:  Walk_state      - Current walk state
+ *              Op              - Parser op used to init the internal object
+ *              Opcode          - AML opcode associated with the object
+ *              Ret_obj_desc    - Namespace object to be initialized
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Initialize a namespace object from a parser Op and its
+ *              associated arguments.  The namespace object is a more compact
+ *              representation of the Op and its arguments.
+ *
+ ****************************************************************************/
+
+acpi_status
+acpi_ds_init_object_from_op (
+	acpi_walk_state         *walk_state,
+	acpi_parse_object       *op,
+	u16                     opcode,
+	acpi_operand_object     **ret_obj_desc)
+{
+	const acpi_opcode_info  *op_info;
+	acpi_operand_object     *obj_desc;
+	acpi_status             status = AE_OK;
+
+
+	ACPI_FUNCTION_TRACE ("Ds_init_object_from_op");
+
+
+	obj_desc = *ret_obj_desc;
+	op_info = acpi_ps_get_opcode_info (opcode);
+	if (op_info->class == AML_CLASS_UNKNOWN) {
+		/* Unknown opcode */
+
+		return_ACPI_STATUS (AE_TYPE);
+	}
+
+	/* Perform per-object initialization */
+
+	switch (ACPI_GET_OBJECT_TYPE (obj_desc)) {
+	case ACPI_TYPE_BUFFER:
+
+		/*
+		 * Defer evaluation of Buffer Term_arg operand
+		 */
+		obj_desc->buffer.node     = (acpi_namespace_node *) walk_state->operands[0];
+		obj_desc->buffer.aml_start = op->named.data;
+		obj_desc->buffer.aml_length = op->named.length;
+		break;
+
+
+	case ACPI_TYPE_PACKAGE:
+
+		/*
+		 * Defer evaluation of Package Term_arg operand
+		 */
+		obj_desc->package.node     = (acpi_namespace_node *) walk_state->operands[0];
+		obj_desc->package.aml_start = op->named.data;
+		obj_desc->package.aml_length = op->named.length;
+		break;
+
+
+	case ACPI_TYPE_INTEGER:
+
+		switch (op_info->type) {
+		case AML_TYPE_CONSTANT:
+			/*
+			 * Resolve AML Constants here - AND ONLY HERE!
+			 * All constants are integers.
+			 * We mark the integer with a flag that indicates that it started life
+			 * as a constant -- so that stores to constants will perform as expected (noop).
+			 * (Zero_op is used as a placeholder for optional target operands.)
+			 */
+			obj_desc->common.flags = AOPOBJ_AML_CONSTANT;
+
+			switch (opcode) {
+			case AML_ZERO_OP:
+
+				obj_desc->integer.value = 0;
+				break;
+
+			case AML_ONE_OP:
+
+				obj_desc->integer.value = 1;
+				break;
+
+			case AML_ONES_OP:
+
+				obj_desc->integer.value = ACPI_INTEGER_MAX;
+
+				/* Truncate value if we are executing from a 32-bit ACPI table */
+
+#ifndef ACPI_NO_METHOD_EXECUTION
+				acpi_ex_truncate_for32bit_table (obj_desc);
+#endif
+				break;
+
+			case AML_REVISION_OP:
+
+				obj_desc->integer.value = ACPI_CA_SUPPORT_LEVEL;
+				break;
+
+			default:
+
+				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unknown constant opcode %X\n", opcode));
+				status = AE_AML_OPERAND_TYPE;
+				break;
+			}
+			break;
+
+
+		case AML_TYPE_LITERAL:
+
+			obj_desc->integer.value = op->common.value.integer;
+			break;
+
+
+		default:
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unknown Integer type %X\n", op_info->type));
+			status = AE_AML_OPERAND_TYPE;
+			break;
+		}
+		break;
+
+
+	case ACPI_TYPE_STRING:
+
+		obj_desc->string.pointer = op->common.value.string;
+		obj_desc->string.length = ACPI_STRLEN (op->common.value.string);
+
+		/*
+		 * The string is contained in the ACPI table, don't ever try
+		 * to delete it
+		 */
+		obj_desc->common.flags |= AOPOBJ_STATIC_POINTER;
+		break;
+
+
+	case ACPI_TYPE_METHOD:
+		break;
+
+
+	case INTERNAL_TYPE_REFERENCE:
+
+		switch (op_info->type) {
+		case AML_TYPE_LOCAL_VARIABLE:
+
+			/* Split the opcode into a base opcode + offset */
+
+			obj_desc->reference.opcode = AML_LOCAL_OP;
+			obj_desc->reference.offset = opcode - AML_LOCAL_OP;
+#ifndef ACPI_NO_METHOD_EXECUTION
+			acpi_ds_method_data_get_node (AML_LOCAL_OP, obj_desc->reference.offset,
+				walk_state, (acpi_namespace_node **) &obj_desc->reference.object);
+#endif
+			break;
+
+
+		case AML_TYPE_METHOD_ARGUMENT:
+
+			/* Split the opcode into a base opcode + offset */
+
+			obj_desc->reference.opcode = AML_ARG_OP;
+			obj_desc->reference.offset = opcode - AML_ARG_OP;
+			break;
+
+		default: /* Other literals, etc.. */
+
+			if (op->common.aml_opcode == AML_INT_NAMEPATH_OP) {
+				/* Node was saved in Op */
+
+				obj_desc->reference.node = op->common.node;
+			}
+
+			obj_desc->reference.opcode = opcode;
+			break;
+		}
+		break;
+
+
+	default:
+
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unimplemented data type: %X\n",
+			ACPI_GET_OBJECT_TYPE (obj_desc)));
+
+		status = AE_AML_OPERAND_TYPE;
+		break;
+	}
+
 	return_ACPI_STATUS (status);
 }
 

@@ -204,7 +204,6 @@ acpi_os_read_port (
 	void                    *value,
 	u32                     width);
 
-
 acpi_status
 acpi_os_write_port (
 	ACPI_IO_ADDRESS         address,
@@ -221,7 +220,6 @@ acpi_os_read_memory (
 	ACPI_PHYSICAL_ADDRESS   address,
 	void                    *value,
 	u32                     width);
-
 
 acpi_status
 acpi_os_write_memory (
@@ -241,7 +239,6 @@ acpi_os_read_pci_configuration (
 	void                    *value,
 	u32                     width);
 
-
 acpi_status
 acpi_os_write_pci_configuration (
 	acpi_pci_id             *pci_id,
@@ -258,7 +255,6 @@ u8
 acpi_os_readable (
 	void                    *pointer,
 	u32                     length);
-
 
 u8
 acpi_os_writable (
@@ -287,6 +283,10 @@ void
 acpi_os_vprintf (
 	const NATIVE_CHAR       *format,
 	va_list                 args);
+
+void
+acpi_os_redirect_output (
+	void                    *destination);
 
 
 /*
