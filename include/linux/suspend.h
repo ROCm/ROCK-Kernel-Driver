@@ -41,7 +41,6 @@ static inline int software_suspend(void)
 	printk("Warning: fake suspend called\n");
 	return -EPERM;
 }
-#define software_resume()		do { } while(0)
 #endif	/* CONFIG_SOFTWARE_SUSPEND */
 
 

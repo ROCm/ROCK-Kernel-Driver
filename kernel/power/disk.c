@@ -30,6 +30,9 @@ extern int swsusp_resume(void);
 extern int swsusp_free(void);
 
 
+static int noresume = 0;
+char resume_file[256] = CONFIG_PM_STD_PARTITION;
+
 /**
  *	power_down - Shut machine down for hibernate.
  *	@mode:		Suspend-to-disk mode
@@ -99,6 +102,7 @@ static void finish(void)
 {
 	device_resume();
 	platform_finish();
+	enable_nonboot_cpus();
 	thaw_processes();
 	pm_restore_console();
 }
@@ -126,6 +130,7 @@ static int prepare(void)
 	/* Free memory before shutting down devices. */
 	free_some_memory();
 
+	disable_nonboot_cpus();
 	if ((error = device_suspend(PM_SUSPEND_DISK)))
 		goto Finish;
 
@@ -133,6 +138,7 @@ static int prepare(void)
  Finish:
 	platform_finish();
  Thaw:
+	enable_nonboot_cpus();
 	thaw_processes();
 	pm_restore_console();
 	return error;
@@ -188,7 +194,7 @@ int pm_suspend_disk(void)
 
 
 /**
- *	pm_resume - Resume from a saved image.
+ *	software_resume - Resume from a saved image.
  *
  *	Called as a late_initcall (so all devices are discovered and
  *	initialized), we call pmdisk to see if we have a saved image or not.
@@ -199,9 +205,17 @@ int pm_suspend_disk(void)
  *
  */
 
-static int pm_resume(void)
+static int software_resume(void)
 {
 	int error;
+
+	if (noresume) {
+		/**
+		 * FIXME: If noresume is specified, we need to find the partition
+		 * and reset it back to normal swap space.
+		 */
+		return 0;
+	}
 
 	pr_debug("PM: Reading pmdisk image.\n");
 
@@ -216,16 +230,6 @@ static int pm_resume(void)
 	barrier();
 	mb();
 
-	/* FIXME: The following (comment and mdelay()) are from swsusp.
-	 * Are they really necessary?
-	 *
-	 * We do not want some readahead with DMA to corrupt our memory, right?
-	 * Do it with disabled interrupts for best effect. That way, if some
-	 * driver scheduled DMA, we have good chance for DMA to finish ;-).
-	 */
-	pr_debug("PM: Waiting for DMAs to settle down.\n");
-	mdelay(1000);
-
 	pr_debug("PM: Restoring saved image.\n");
 	swsusp_resume();
 	pr_debug("PM: Restore failed, recovering.n");
@@ -237,7 +241,7 @@ static int pm_resume(void)
 	return 0;
 }
 
-late_initcall(pm_resume);
+late_initcall(software_resume);
 
 
 static char * pm_disk_modes[] = {
@@ -336,3 +340,22 @@ static int __init pm_disk_init(void)
 }
 
 core_initcall(pm_disk_init);
+
+
+static int __init resume_setup(char *str)
+{
+	if (noresume)
+		return 1;
+
+	strncpy( resume_file, str, 255 );
+	return 1;
+}
+
+static int __init noresume_setup(char *str)
+{
+	noresume = 1;
+	return 1;
+}
+
+__setup("noresume", noresume_setup);
+__setup("resume=", resume_setup);
