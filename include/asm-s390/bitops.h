@@ -59,8 +59,8 @@ static inline void set_bit_cs(int nr, volatile void *ptr)
 
 	addr = (unsigned long) ptr;
 #if ALIGN_CS == 1
-	addr ^= addr & 3;		/* align address to 4 */
 	nr += (addr & 3) << 3;		/* add alignment to bit number */
+	addr ^= addr & 3;		/* align address to 4 */
 #endif
 	addr += (nr ^ (nr & 31)) >> 3;	/* calculate address for CS */
 	mask = 1UL << (nr & 31);	/* make OR mask */
@@ -84,8 +84,8 @@ static inline void clear_bit_cs(int nr, volatile void *ptr)
 
 	addr = (unsigned long) ptr;
 #if ALIGN_CS == 1
-	addr ^= addr & 3;		/* align address to 4 */
 	nr += (addr & 3) << 3;		/* add alignment to bit number */
+	addr ^= addr & 3;		/* align address to 4 */
 #endif
 	addr += (nr ^ (nr & 31)) >> 3;	/* calculate address for CS */
 	mask = ~(1UL << (nr & 31));	/* make AND mask */
@@ -109,8 +109,8 @@ static inline void change_bit_cs(int nr, volatile void *ptr)
 
 	addr = (unsigned long) ptr;
 #if ALIGN_CS == 1
-	addr ^= addr & 3;		/* align address to 4 */
 	nr += (addr & 3) << 3;		/* add alignment to bit number */
+	addr ^= addr & 3;		/* align address to 4 */
 #endif
 	addr += (nr ^ (nr & 31)) >> 3;	/* calculate address for CS */
 	mask = 1UL << (nr & 31);	/* make XOR mask */
@@ -160,8 +160,8 @@ static inline int test_and_clear_bit_cs(int nr, volatile void *ptr)
 
 	addr = (unsigned long) ptr;
 #if ALIGN_CS == 1
-	addr ^= addr & 3;		/* align address to 4 */
 	nr += (addr & 3) << 3;		/* add alignment to bit number */
+	addr ^= addr & 3;		/* align address to 4 */
 #endif
 	addr += (nr ^ (nr & 31)) >> 3;	/* calculate address for CS */
 	mask = ~(1UL << (nr & 31));	/* make AND mask */
@@ -186,8 +186,8 @@ static inline int test_and_change_bit_cs(int nr, volatile void *ptr)
 
 	addr = (unsigned long) ptr;
 #if ALIGN_CS == 1
-	addr ^= addr & 3;		/* align address to 4 */
 	nr += (addr & 3) << 3;		/* add alignment to bit number */
+	addr ^= addr & 3;		/* align address to 4 */
 #endif
 	addr += (nr ^ (nr & 31)) >> 3;	/* calculate address for CS */
 	mask = 1UL << (nr & 31);	/* make XOR mask */

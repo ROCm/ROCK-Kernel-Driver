@@ -203,19 +203,23 @@ dasd_device_t *
 dasd_alloc_device(dasd_devmap_t *devmap)
 {
 	dasd_device_t *device;
+	struct gendisk *gdp;
 	int rc;
-
-	/* Make sure the gendisk structure for this device exists. */
-	while (dasd_gendisk_from_devindex(devmap->devindex) == NULL) {
-		rc = dasd_gendisk_new_major();
-		if (rc)
-			return ERR_PTR(rc);
-	}
 
 	device = kmalloc(sizeof (dasd_device_t), GFP_ATOMIC);
 	if (device == NULL)
 		return ERR_PTR(-ENOMEM);
 	memset(device, 0, sizeof (dasd_device_t));
+
+	/* Get devinfo from the common io layer. */
+	rc = get_dev_info_by_devno(devmap->devno, &device->devinfo);
+	if (rc) {
+		kfree(device);
+		return ERR_PTR(rc);
+	}
+	DBF_EVENT(DBF_NOTICE, "got devinfo CU-type %04x and dev-type %04x",
+		  device->devinfo.sid_data.cu_type,
+		  device->devinfo.sid_data.dev_type);
 
 	/* Get two pages for normal block device operations. */
 	device->ccw_mem = (void *) __get_free_pages(GFP_ATOMIC | GFP_DMA, 1);
@@ -231,17 +235,15 @@ dasd_alloc_device(dasd_devmap_t *devmap)
 		return ERR_PTR(-ENOMEM);
 	}
 
-	/* Get devinfo from the common io layer. */
-	rc = get_dev_info_by_devno(devmap->devno, &device->devinfo);
-	if (rc) {
- 		free_page((unsigned long) device->erp_mem);
+	/* Allocate gendisk structure for device. */
+	gdp = dasd_gendisk_alloc(device->name, devmap->devindex);
+	if (IS_ERR(gdp)) {
+		free_page((unsigned long) device->erp_mem);
 		free_pages((unsigned long) device->ccw_mem, 1);
 		kfree(device);
-		return ERR_PTR(rc);
+		return (dasd_device_t *) gdp;
 	}
-	DBF_EVENT(DBF_NOTICE, "got devinfo CU-type %04x and dev-type %04x",
-		  device->devinfo.sid_data.cu_type,
-		  device->devinfo.sid_data.dev_type);
+	device->gdp = gdp;
 
 	dasd_init_chunklist(&device->ccw_chunks, device->ccw_mem, PAGE_SIZE*2);
 	dasd_init_chunklist(&device->erp_chunks, device->erp_mem, PAGE_SIZE);
@@ -268,6 +270,7 @@ dasd_free_device(dasd_device_t *device)
 		kfree(device->private);
 	free_page((unsigned long) device->erp_mem);
 	free_pages((unsigned long) device->ccw_mem, 1);
+	dasd_gendisk_free(device->gdp);
 	kfree(device);
 }
 
@@ -278,21 +281,22 @@ static inline int
 dasd_state_new_to_known(dasd_device_t *device)
 {
 	char buffer[5];
-	struct gendisk *gdp;
 	dasd_devmap_t *devmap;
 	umode_t devfs_perm;
 	devfs_handle_t dir;
-	int minor, rc;
+	int major, minor, rc;
 
 	devmap = dasd_devmap_from_devno(device->devinfo.devno);
 	if (devmap == NULL)
 		return -ENODEV;
-	gdp = dasd_gendisk_from_devindex(devmap->devindex);
-	if (gdp == NULL)
+	major = dasd_gendisk_index_major(devmap->devindex);
+	if (major < 0)
 		return -ENODEV;
-	/* Set kdev and the device name. */
-	device->kdev = mk_kdev(gdp->major, gdp->first_minor);
-	strcpy(device->name, gdp->disk_name);
+	minor = devmap->devindex % DASD_PER_MAJOR;
+
+	/* Set bdev and the device name. */
+	device->bdev = bdget(MKDEV(major, minor << DASD_PARTN_BITS));
+	strcpy(device->name, device->gdp->disk_name);
 
 	/* Find a discipline for the device. */
 	rc = dasd_find_disc(device);
@@ -302,14 +306,13 @@ dasd_state_new_to_known(dasd_device_t *device)
 	/* Add a proc directory and the dasd device entry to devfs. */
 	sprintf(buffer, "%04x", device->devinfo.devno);
 	dir = devfs_mk_dir(dasd_devfs_handle, buffer, device);
-	gdp->de = dir;
+	device->gdp->de = dir;
 	if (devmap->features & DASD_FEATURE_READONLY)
 		devfs_perm = S_IFBLK | S_IRUSR;
 	else
 		devfs_perm = S_IFBLK | S_IRUSR | S_IWUSR;
 	device->devfs_entry = devfs_register(dir, "device", DEVFS_FL_DEFAULT,
-					     major(device->kdev),
-					     minor(device->kdev),
+					     major, minor << DASD_PARTN_BITS,
 					     devfs_perm,
 					     &dasd_device_operations, NULL);
 	device->state = DASD_STATE_KNOWN;
@@ -322,17 +325,25 @@ dasd_state_new_to_known(dasd_device_t *device)
 static inline void
 dasd_state_known_to_new(dasd_device_t * device)
 {
-	dasd_devmap_t *devmap = dasd_devmap_from_devno(device->devinfo.devno);
-	struct gendisk *gdp = dasd_gendisk_from_devindex(devmap->devindex);
-	if (gdp == NULL)
-		return;
+	dasd_devmap_t *devmap;
+	struct block_device *bdev;
+	int minor;
+
+	devmap = dasd_devmap_from_devno(device->devinfo.devno);
+	minor = devmap->devindex % DASD_PER_MAJOR;
+
 	/* Remove device entry and devfs directory. */
 	devfs_unregister(device->devfs_entry);
-	devfs_unregister(gdp->de);
+	devfs_unregister(device->gdp->de);
 
 	/* Forget the discipline information. */
 	device->discipline = NULL;
 	device->state = DASD_STATE_NEW;
+
+	/* Forget the block device */
+	bdev = device->bdev;
+	device->bdev = NULL;
+	bdput(bdev);
 }
 
 /*
@@ -419,21 +430,29 @@ dasd_state_accept_to_basic(dasd_device_t * device)
 }
 
 /*
+ * get the kdev_t of a device 
+ * FIXME: remove this when no longer needed
+ */
+static inline kdev_t
+dasd_partition_to_kdev_t(dasd_device_t *device, unsigned int partition)
+{
+	return to_kdev_t(device->bdev->bd_dev+partition);
+}
+
+
+/*
  * Setup block device.
  */
 static inline int
 dasd_state_accept_to_ready(dasd_device_t * device)
 {
 	dasd_devmap_t *devmap;
-	int major, minor;
 	int rc, i;
 
 	devmap = dasd_devmap_from_devno(device->devinfo.devno);
 	if (devmap->features & DASD_FEATURE_READONLY) {
-		major = major(device->kdev);
-		minor = minor(device->kdev);
 		for (i = 0; i < (1 << DASD_PARTN_BITS); i++)
-			set_device_ro(mk_kdev(major, minor+i), 1);
+			set_device_ro(dasd_partition_to_kdev_t(device, i), 1);
 		DEV_MESSAGE (KERN_WARNING, device, "%s",
 			     "setting read-only mode ");
 	}
@@ -1539,11 +1558,9 @@ restart:
 			goto restart;
 		}
 
-		/* Dechain request from device request queue ... */
+		/* Rechain request on device device request queue */
 		cqr->endclk = get_clock();
-		list_del(&cqr->list);
-		/* ... and add it to list of final requests. */
-		list_add_tail(&cqr->list, final_queue);
+		list_move_tail(&cqr->list, final_queue);
 	}
 }
 
@@ -1572,6 +1589,10 @@ __dasd_process_blk_queue(dasd_device_t * device)
 	dasd_ccw_req_t *cqr;
 	int nr_queued;
 
+	/* No bdev, no queue. */
+	bdev = device->bdev;
+	if (!bdev)
+		return;
 	queue = device->request_queue;
 	/* No queue ? Then there is nothing to do. */
 	if (queue == NULL)
@@ -1594,9 +1615,6 @@ __dasd_process_blk_queue(dasd_device_t * device)
 		if (cqr->status == DASD_CQR_QUEUED)
 			nr_queued++;
 	}
-	bdev = bdget(kdev_t_to_nr(device->kdev));
-	if (!bdev)
-		return;
 	while (!blk_queue_plugged(queue) &&
 	       !blk_queue_empty(queue) &&
 		nr_queued < DASD_CHANQ_MAX_SIZE) {
@@ -1628,7 +1646,6 @@ __dasd_process_blk_queue(dasd_device_t * device)
 		dasd_profile_start(device, cqr, req);
 		nr_queued++;
 	}
-	bdput(bdev);
 }
 
 /*
@@ -1707,11 +1724,9 @@ dasd_flush_ccw_queue(dasd_device_t * device, int all)
 			__dasd_process_erp(device, cqr);
 			continue;
 		}
-		/* Dechain request from device request queue ... */
+		/* Rechain request on device request queue */
 		cqr->endclk = get_clock();
-		list_del(&cqr->list);
-		/* ... and add it to list of flushed requests. */
-		list_add_tail(&cqr->list, &flush_queue);
+		list_move_tail(&cqr->list, &flush_queue);
 	}
 	spin_unlock_irq(get_irq_lock(device->devinfo.irq));
 	/* Now call the callback function of flushed requests */

@@ -5,12 +5,12 @@
 EXTRA_TARGETS	:= head.o init_task.o
 EXTRA_AFLAGS	:= -traditional
 
-export-objs	:= debug.o ebcdic.o irq.o s390_ext.o smp.o s390_ksyms.o \
+export-objs	:= debug.o ebcdic.o s390_ext.o smp.o s390_ksyms.o \
 		   exec32.o
 
-obj-y		:= entry.o bitmap.o traps.o time.o process.o irq.o \
+obj-y		:= entry.o bitmap.o traps.o time.o process.o \
 		   setup.o sys_s390.o ptrace.o signal.o cpcmd.o ebcdic.o \
-		   semaphore.o s390fpu.o reipl.o s390_ext.o debug.o
+		   semaphore.o reipl.o s390_ext.o debug.o
 
 obj-$(CONFIG_MODULES)		+= s390_ksyms.o
 obj-$(CONFIG_SMP)		+= smp.o

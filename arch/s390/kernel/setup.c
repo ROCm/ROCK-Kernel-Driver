@@ -52,7 +52,6 @@ unsigned long machine_flags = 0;
 struct { unsigned long addr, size, type; } memory_chunk[16] = { { 0 } };
 #define CHUNK_READ_WRITE 0
 #define CHUNK_READ_ONLY 1
-__u16 boot_cpu_addr;
 int cpus_initialized = 0;
 unsigned long cpu_initialized = 0;
 volatile int __cpu_logical_map[NR_CPUS]; /* logical cpu to cpu address */
@@ -79,7 +78,7 @@ static struct resource data_resource = { "Kernel data", 0, 0 };
 /*
  * cpu_init() initializes state that is per-CPU.
  */
-void __init cpu_init (void)
+void __devinit cpu_init (void)
 {
         int nr = smp_processor_id();
         int addr = hard_smp_processor_id();
@@ -305,7 +304,7 @@ void __init setup_arch(char **cmdline_p)
 	unsigned long start_pfn, end_pfn;
         static unsigned int smptrap=0;
         unsigned long delay = 0;
-	struct _lowcore *lowcore;
+	struct _lowcore *lc;
 	int i;
 
         if (smptrap)
@@ -452,30 +451,28 @@ void __init setup_arch(char **cmdline_p)
         /*
          * Setup lowcore for boot cpu
          */
-	lowcore = (struct _lowcore *)
-		__alloc_bootmem(PAGE_SIZE, PAGE_SIZE, 0);
-	memset(lowcore, 0, PAGE_SIZE);
-	lowcore->restart_psw.mask = _RESTART_PSW_MASK;
-	lowcore->restart_psw.addr = _ADDR_31 + (addr_t) &restart_int_handler;
-	lowcore->external_new_psw.mask = _EXT_PSW_MASK;
-	lowcore->external_new_psw.addr = _ADDR_31 + (addr_t) &ext_int_handler;
-	lowcore->svc_new_psw.mask = _SVC_PSW_MASK;
-	lowcore->svc_new_psw.addr = _ADDR_31 + (addr_t) &system_call;
-	lowcore->program_new_psw.mask = _PGM_PSW_MASK;
-	lowcore->program_new_psw.addr = _ADDR_31 + (addr_t) &pgm_check_handler;
-        lowcore->mcck_new_psw.mask = _MCCK_PSW_MASK;
-	lowcore->mcck_new_psw.addr = _ADDR_31 + (addr_t) &mcck_int_handler;
-	lowcore->io_new_psw.mask = _IO_PSW_MASK;
-	lowcore->io_new_psw.addr = _ADDR_31 + (addr_t) &io_int_handler;
-	lowcore->ipl_device = S390_lowcore.ipl_device;
-	lowcore->kernel_stack = ((__u32) &init_thread_union) + 8192;
-	lowcore->async_stack = (__u32)
+	lc = (struct _lowcore *) __alloc_bootmem(PAGE_SIZE, PAGE_SIZE, 0);
+	memset(lc, 0, PAGE_SIZE);
+	lc->restart_psw.mask = PSW_BASE_BITS;
+	lc->restart_psw.addr = PSW_ADDR_AMODE31 + (__u32) restart_int_handler;
+	lc->external_new_psw.mask = PSW_KERNEL_BITS;
+	lc->external_new_psw.addr = PSW_ADDR_AMODE31 + (__u32) ext_int_handler;
+	lc->svc_new_psw.mask = PSW_KERNEL_BITS;
+	lc->svc_new_psw.addr = PSW_ADDR_AMODE31 + (__u32) system_call;
+	lc->program_new_psw.mask = PSW_KERNEL_BITS;
+	lc->program_new_psw.addr = PSW_ADDR_AMODE31 + (__u32)pgm_check_handler;
+        lc->mcck_new_psw.mask = PSW_KERNEL_BITS;
+	lc->mcck_new_psw.addr = PSW_ADDR_AMODE31 + (__u32) mcck_int_handler;
+	lc->io_new_psw.mask = PSW_KERNEL_BITS;
+	lc->io_new_psw.addr = PSW_ADDR_AMODE31 + (__u32) io_int_handler;
+	lc->ipl_device = S390_lowcore.ipl_device;
+	lc->kernel_stack = ((__u32) &init_thread_union) + 8192;
+	lc->async_stack = (__u32)
 		__alloc_bootmem(2*PAGE_SIZE, 2*PAGE_SIZE, 0) + 8192;
-	lowcore->jiffy_timer = -1LL;
-	set_prefix((__u32) lowcore);
+	lc->jiffy_timer = -1LL;
+	set_prefix((__u32) lc);
         cpu_init();
-        boot_cpu_addr = S390_lowcore.cpu_data.cpu_addr;
-        __cpu_logical_map[0] = boot_cpu_addr;
+        __cpu_logical_map[0] = S390_lowcore.cpu_data.cpu_addr;
 
 	/*
 	 * Create kernel page tables and switch to virtual addressing.
@@ -524,11 +521,14 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 		seq_printf(m, "vendor_id       : IBM/S390\n"
 			       "# processors    : %i\n"
 			       "bogomips per cpu: %lu.%02lu\n",
-			       smp_num_cpus, loops_per_jiffy/(500000/HZ),
+			       num_online_cpus(), loops_per_jiffy/(500000/HZ),
 			       (loops_per_jiffy/(5000/HZ))%100);
 	}
 	if (cpu_online_map & (1 << n)) {
-		cpuinfo = &safe_get_cpu_lowcore(n)->cpu_data;
+		if (smp_processor_id() == n)
+			cpuinfo = &S390_lowcore.cpu_data;
+		else
+			cpuinfo = &lowcore_ptr[n]->cpu_data;
 		seq_printf(m, "processor %li: "
 			       "version = %02X,  "
 			       "identification = %06X,  "

@@ -168,6 +168,8 @@ extern char empty_zero_page[PAGE_SIZE];
 #define _REGION_TABLE       (_REGION_THIRD|_REGION_THIRD_LEN|0x40|0x100)
 #define _KERN_REGION_TABLE  (_REGION_THIRD|_REGION_THIRD_LEN)
 
+#define USER_STD_MASK           0x0000000000000080UL
+
 /* Bits in the storage key */
 #define _PAGE_CHANGED    0x02          /* HW changed bit                   */
 #define _PAGE_REFERENCED 0x04          /* HW referenced bit                */

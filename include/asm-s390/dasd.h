@@ -13,6 +13,8 @@
  * 12/06/01 DASD_API_VERSION 2 - binary compatible to 0 (new BIODASDINFO2)
  * 01/23/02 DASD_API_VERSION 3 - added BIODASDPSRD (and BIODASDENAPAV) IOCTL
  * 02/15/02 DASD_API_VERSION 4 - added BIODASDSATTR IOCTL
+ * ##/##/## DASD_API_VERSION 5 - added boxed dasd support TOBEDONE
+ * 21/06/02 DASD_API_VERSION 6 - fixed HDIO_GETGEO: geo.start is in sectors!
  *         
  */
 
@@ -22,7 +24,7 @@
 
 #define DASD_IOCTL_LETTER 'D'
 
-#define DASD_API_VERSION 4
+#define DASD_API_VERSION 6
 
 /* 
  * struct dasd_information2_t

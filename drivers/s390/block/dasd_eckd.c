@@ -29,6 +29,7 @@
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/hdreg.h>	/* HDIO_GETGEO			    */
+#include <linux/bio.h>
 
 #include <asm/debug.h>
 #include <asm/idals.h>
@@ -69,7 +70,6 @@ typedef struct dasd_eckd_private_t {
 	attrib_data_t attrib;	/* e.g. cache operations */
 } dasd_eckd_private_t;
 
-#ifdef CONFIG_DASD_DYNAMIC
 static
 devreg_t dasd_eckd_known_devices[] = {
 	{
@@ -94,7 +94,6 @@ devreg_t dasd_eckd_known_devices[] = {
 		oper_func:dasd_oper_handler
 	}
 };
-#endif
 
 static const int sizes_trk0[] = { 28, 148, 84 };
 #define LABEL_SIZE 140
@@ -1092,7 +1091,8 @@ dasd_eckd_fill_info(dasd_device_t * device, dasd_information2_t * info)
  * Buils a channel programm to releases a prior reserved 
  * (see dasd_eckd_reserve) device.
  */
-static int dasd_eckd_release(void *inp, int no, long args)
+static int
+dasd_eckd_release(struct block_device *bdev, int no, long args)
 {
 	dasd_devmap_t *devmap;
 	dasd_device_t *device;
@@ -1101,7 +1101,7 @@ static int dasd_eckd_release(void *inp, int no, long args)
 
 	if (!capable(CAP_SYS_ADMIN))
 		return -EACCES;
-	devmap = dasd_devmap_from_kdev(((struct inode *) inp)->i_rdev);
+	devmap = dasd_devmap_from_bdev(bdev);
 	device = (devmap != NULL) ?
 		dasd_get_device(devmap) : ERR_PTR(-ENODEV);
 	if (IS_ERR(device))
@@ -1134,7 +1134,8 @@ static int dasd_eckd_release(void *inp, int no, long args)
  * 'timeout the request'. This leads to an terminate IO if 
  * the interrupt is outstanding for a certain time. 
  */
-static int dasd_eckd_reserve(void *inp, int no, long args)
+static int
+dasd_eckd_reserve(struct block_device *bdev, int no, long args)
 {
 	dasd_devmap_t *devmap;
 	dasd_device_t *device;
@@ -1143,7 +1144,7 @@ static int dasd_eckd_reserve(void *inp, int no, long args)
 
 	if (!capable(CAP_SYS_ADMIN))
 		return -EACCES;
-	devmap = dasd_devmap_from_kdev(((struct inode *) inp)->i_rdev);
+	devmap = dasd_devmap_from_bdev(bdev);
 	device = (devmap != NULL) ?
 		dasd_get_device(devmap) : ERR_PTR(-ENODEV);
 	if (IS_ERR(device))
@@ -1168,7 +1169,7 @@ static int dasd_eckd_reserve(void *inp, int no, long args)
 
 	if (rc == -EIO) {
 		/* Request got an eror or has been timed out. */
-		dasd_eckd_release(inp, no, args);
+		dasd_eckd_release(bdev, no, args);
 	}
 	dasd_kfree_request(cqr, cqr->device);
 	dasd_put_device(devmap);
@@ -1180,7 +1181,8 @@ static int dasd_eckd_reserve(void *inp, int no, long args)
  * Buils a channel programm to break a device's reservation. 
  * (unconditional reserve)
  */
-static int dasd_eckd_steal_lock(void *inp, int no, long args)
+static int
+dasd_eckd_steal_lock(struct block_device *bdev, int no, long args)
 {
 	dasd_devmap_t *devmap;
 	dasd_device_t *device;
@@ -1189,7 +1191,7 @@ static int dasd_eckd_steal_lock(void *inp, int no, long args)
 
 	if (!capable(CAP_SYS_ADMIN))
 		return -EACCES;
-	devmap = dasd_devmap_from_kdev(((struct inode *) inp)->i_rdev);
+	devmap = dasd_devmap_from_bdev(bdev);
 	device = (devmap != NULL) ?
 		dasd_get_device(devmap) : ERR_PTR(-ENODEV);
 	if (IS_ERR(device))
@@ -1213,7 +1215,7 @@ static int dasd_eckd_steal_lock(void *inp, int no, long args)
 
 	if (rc == -EIO) {
 		/* Request got an eror or has been timed out. */
-		dasd_eckd_release(inp, no, args);
+		dasd_eckd_release(bdev, no, args);
 	}
 	dasd_kfree_request(cqr, cqr->device);
 	dasd_put_device(devmap);
@@ -1223,7 +1225,8 @@ static int dasd_eckd_steal_lock(void *inp, int no, long args)
 /*
  * Read performance statistics
  */
-static int dasd_eckd_performance(void *inp, int no, long args)
+static int
+dasd_eckd_performance(struct block_device *bdev, int no, long args)
 {
 	dasd_devmap_t *devmap;
 	dasd_device_t *device;
@@ -1233,7 +1236,7 @@ static int dasd_eckd_performance(void *inp, int no, long args)
 	ccw1_t *ccw;
 	int rc;
 
-	devmap = dasd_devmap_from_kdev(((struct inode *) inp)->i_rdev);
+	devmap = dasd_devmap_from_bdev(bdev);
 	device = (devmap != NULL) ?
 		dasd_get_device(devmap) : ERR_PTR(-ENODEV);
 	if (IS_ERR(device))
@@ -1292,7 +1295,8 @@ static int dasd_eckd_performance(void *inp, int no, long args)
  * Set attributes (cache operations)
  * Stores the attributes for cache operation to be used in Define Extend (DE).
  */
-static int dasd_eckd_set_attrib(void *inp, int no, long args)
+static int
+dasd_eckd_set_attrib(struct block_device *bdev, int no, long args)
 {
 	dasd_devmap_t *devmap;
 	dasd_device_t *device;
@@ -1304,7 +1308,7 @@ static int dasd_eckd_set_attrib(void *inp, int no, long args)
 	if (!args)
 		return -EINVAL;
 
-	devmap = dasd_devmap_from_kdev(((struct inode *) inp)->i_rdev);
+	devmap = dasd_devmap_from_bdev(bdev);
 	device = (devmap != NULL) ?
 		dasd_get_device(devmap) : ERR_PTR(-ENODEV);
 	if (IS_ERR(device))
@@ -1452,10 +1456,8 @@ dasd_eckd_init(void)
 	ASCEBC(dasd_eckd_discipline.ebcname, 4);
 	dasd_discipline_add(&dasd_eckd_discipline);
 
-#ifdef CONFIG_DASD_DYNAMIC
 	for (i = 0; i < sizeof(dasd_eckd_known_devices)/sizeof(devreg_t); i++)
 			s390_device_register(&dasd_eckd_known_devices[i]);
-#endif
 	return 0;
 }
 
@@ -1464,10 +1466,8 @@ dasd_eckd_cleanup(void)
 {
 	int i;
 
-#ifdef CONFIG_DASD_DYNAMIC
 	for (i = 0; i < sizeof(dasd_eckd_known_devices)/sizeof(devreg_t); i++)
 		s390_device_unregister(&dasd_eckd_known_devices[i]);
-#endif				/* CONFIG_DASD_DYNAMIC */
 
 	dasd_discipline_del(&dasd_eckd_discipline);
 

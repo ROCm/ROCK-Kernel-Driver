@@ -160,7 +160,8 @@ debug_text_event(debug_info_t* id, int level, const char* txt)
 }
 
 extern debug_entry_t *
-debug_sprintf_event(debug_info_t* id,int level,char *string,...);
+debug_sprintf_event(debug_info_t* id,int level,char *string,...)
+	__attribute__ ((format(printf, 3, 4)));
 
 
 extern inline debug_entry_t* 
@@ -195,7 +196,8 @@ debug_text_exception(debug_info_t* id, int level, const char* txt)
 
 
 extern debug_entry_t *
-debug_sprintf_exception(debug_info_t* id,int level,char *string,...);
+debug_sprintf_exception(debug_info_t* id,int level,char *string,...)
+	__attribute__ ((format(printf, 3, 4)));
 
 int debug_register_view(debug_info_t* id, struct debug_view* view);
 int debug_unregister_view(debug_info_t* id, struct debug_view* view);

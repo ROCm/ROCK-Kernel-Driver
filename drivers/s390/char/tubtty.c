@@ -35,7 +35,7 @@ static int tty3270_write_proc(struct file *, const char *,
 	unsigned long, void *);
 
 /* tty3270 utility functions */
-static void tty3270_bh(void *);
+static void tty3270_tasklet(unsigned long);
        void tty3270_sched_bh(tub_t *);
 static int tty3270_wait(tub_t *, long *);
        void tty3270_int(tub_t *, devstat_t *);
@@ -598,17 +598,18 @@ tty3270_hangup(struct tty_struct *tty)
 
 
 /*
- * tty3270_bh(tubp) -- Perform back-half processing
+ * tty3270_tasklet(tubp) -- Perform back-half processing
  */
 static void
-tty3270_bh(void *data)
+tty3270_tasklet(unsigned long data)
 {
 	tub_t *tubp;
 	ioinfo_t *ioinfop;
 	long flags;
 	struct tty_struct *tty;
 
-	ioinfop = ioinfo[(tubp = data)->irq];
+	tubp = (tub_t *) data;
+	ioinfop = ioinfo[tubp->irq];
 	while (TUBTRYLOCK(tubp->irq, flags) == 0) {
 		if (ioinfop->ui.flags.unready == 1)
 			return;
@@ -663,10 +664,9 @@ tty3270_sched_bh(tub_t *tubp)
 	if (tubp->flags & TUB_BHPENDING)
 		return;
 	tubp->flags |= TUB_BHPENDING;
-	tubp->tqueue.routine = tty3270_bh;
-	tubp->tqueue.data = tubp;
-	queue_task(&tubp->tqueue, &tq_immediate);
-	mark_bh(IMMEDIATE_BH);
+	tasklet_init(&tubp->tasklet, tty3270_tasklet,
+		     (unsigned long) tubp);
+	tasklet_schedule(&tubp->tasklet);
 }
 
 /*

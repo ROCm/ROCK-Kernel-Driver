@@ -38,6 +38,8 @@
 #define __LC_IO_INT_WORD                0x0C0
 #define __LC_MCCK_CODE                  0x0E8
 
+#define __LC_DIAG44_OPCODE		0x214
+
 #define __LC_SAVE_AREA                  0xC00
 #define __LC_KERNEL_STACK               0xD40
 #define __LC_ASYNC_STACK                0xD48
@@ -53,32 +55,6 @@
 #define __LC_CREGS_SAVE_AREA            0x1380
 
 #define __LC_PFAULT_INTPARM             0x11B8
-
-/* interrupt handler start with all io, external and mcck interrupt disabled */
-
-#define _RESTART_PSW_MASK    0x0000000180000000
-#define _EXT_PSW_MASK        0x0400000180000000
-#define _PGM_PSW_MASK        0x0400000180000000
-#define _SVC_PSW_MASK        0x0400000180000000
-#define _MCCK_PSW_MASK       0x0400000180000000
-#define _IO_PSW_MASK         0x0400000180000000
-#define _USER_PSW_MASK       0x0705C00180000000
-#define _WAIT_PSW_MASK       0x0706000180000000
-#define _DW_PSW_MASK         0x0002000180000000
-
-#define _PRIMARY_MASK        0x0000    /* MASK for SACF                    */
-#define _SECONDARY_MASK      0x0100    /* MASK for SACF                    */
-#define _ACCESS_MASK         0x0200    /* MASK for SACF                    */
-#define _HOME_MASK           0x0300    /* MASK for SACF                    */
-
-#define _PSW_PRIM_SPACE_MODE 0x0000000000000000
-#define _PSW_SEC_SPACE_MODE  0x0000800000000000
-#define _PSW_ACC_REG_MODE    0x0000400000000000
-#define _PSW_HOME_SPACE_MODE 0x0000C00000000000
-
-#define _PSW_WAIT_MASK_BIT   0x0002000000000000
-#define _PSW_IO_MASK_BIT     0x0200000000000000
-#define _PSW_IO_WAIT         0x0202000000000000
 
 #ifndef __ASSEMBLY__
 
@@ -146,7 +122,8 @@ struct _lowcore
 	psw_t        io_new_psw;               /* 0x1f0 */
         psw_t        return_psw;               /* 0x200 */
 	__u32        sync_io_word;             /* 0x210 */
-        __u8         pad8[0xc00-0x214];        /* 0x214 */
+	__u32        diag44_opcode;            /* 0x214 */
+        __u8         pad8[0xc00-0x218];        /* 0x218 */
         /* System info area */
 	__u64        save_area[16];            /* 0xc00 */
         __u8         pad9[0xd40-0xc80];        /* 0xc80 */
@@ -191,25 +168,17 @@ struct _lowcore
 	__u8         pad17[0x2000-0x1400];      /* 0x1400 */
 } __attribute__((packed)); /* End structure*/
 
+#define S390_lowcore (*((struct _lowcore *) 0))
+extern struct _lowcore *lowcore_ptr[];
+
 extern __inline__ void set_prefix(__u32 address)
 {
         __asm__ __volatile__ ("spx %0" : : "m" (address) : "memory" );
 }
 
-#define S390_lowcore (*((struct _lowcore *) 0))
-extern struct _lowcore *lowcore_ptr[];
-
-#ifndef CONFIG_SMP
-#define get_cpu_lowcore(cpu)      (&S390_lowcore)
-#define safe_get_cpu_lowcore(cpu) (&S390_lowcore)
-#else
-#define get_cpu_lowcore(cpu)      (lowcore_ptr[(cpu)])
-#define safe_get_cpu_lowcore(cpu) \
-        ((cpu) == smp_processor_id() ? &S390_lowcore : lowcore_ptr[(cpu)])
-#endif
-#endif /* __ASSEMBLY__ */
-
 #define __PANIC_MAGIC           0xDEADC0DE
+
+#endif
 
 #endif
 

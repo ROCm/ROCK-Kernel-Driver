@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/blacklist.c
  *   S/390 common I/O routines -- blacklisting of specific devices
- *   $Revision: 1.5 $
+ *   $Revision: 1.7 $
  *
  *    Copyright (C) 1999-2002 IBM Deutschland Entwicklung GmbH,
  *                            IBM Corporation
@@ -134,7 +134,7 @@ __setup ("cio_ignore=", blacklist_setup);
 int
 is_blacklisted (int devno)
 {
-	return (test_bit (devno, &bl_dev));
+	return test_bit (devno, &bl_dev);
 }
 
 #ifdef CONFIG_PROC_FS
@@ -243,10 +243,10 @@ static int cio_ignore_write (struct file *file, const char *user_buf,
 		return -EFAULT;
 	}
 	buf[user_len] = '\0';
-
+#if 0
 	CIO_DEBUG(KERN_DEBUG, 2, 
 		  "/proc/cio_ignore: '%s'\n", buf);
-
+#endif
 	blacklist_parse_proc_parameters (buf);
 
 	vfree (buf);

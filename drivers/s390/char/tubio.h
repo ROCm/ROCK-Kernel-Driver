@@ -234,7 +234,7 @@ typedef struct tub_s {
 	enum tubstat    stat;
 	enum tubcmd     cmd;
 	int             flags;		/* See below for values */
-	struct tq_struct tqueue;
+	struct tasklet_struct tasklet;
 
 	/* Stuff for fs-driver support */
 	pid_t           fs_pid;         /* Pid if TBM_FS */
