@@ -1,4 +1,6 @@
-#ifdef SETUP_POST
+#ifndef SETUP_POST
+#define ARCH_SETUP
+#else
 static inline char * __init machine_specific_memory_setup(void)
 {
 	char *who;

@@ -676,6 +676,7 @@ void __init setup_arch(char **cmdline_p)
 	rd_prompt = ((RAMDISK_FLAGS & RAMDISK_PROMPT_FLAG) != 0);
 	rd_doload = ((RAMDISK_FLAGS & RAMDISK_LOAD_FLAG) != 0);
 #endif
+	ARCH_SETUP
 	setup_memory_region();
 
 	if (!MOUNT_ROOT_RDONLY)
