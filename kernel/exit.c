@@ -898,13 +898,19 @@ static int wait_task_zombie(task_t *p, unsigned int *stat_addr, struct rusage *r
 			__ptrace_unlink(p);
 			p->state = TASK_ZOMBIE;
 			/* If this is a detached thread, this is where it goes away.  */
-			if (p->exit_signal == -1)
+			if (p->exit_signal == -1) {
+				/* release_task takes the lock itself.  */
+				write_unlock_irq(&tasklist_lock);
 				release_task (p);
-			else
+			}
+			else {
 				do_notify_parent(p, p->exit_signal);
+				write_unlock_irq(&tasklist_lock);
+			}
 			p = NULL;
 		}
-		write_unlock_irq(&tasklist_lock);
+		else
+			write_unlock_irq(&tasklist_lock);
 	}
 	if (p != NULL)
 		release_task(p);
