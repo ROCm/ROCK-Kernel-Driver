@@ -1980,8 +1980,8 @@ config E1000
 	  as <file:Documentation/networking/net-modules.txt>.
 
 config E1000_NAPI
-	bool "Use Rx Polling (NAPI) (EXPERIMENTAL)"
-	depends on E1000 && EXPERIMENTAL
+	bool "Use Rx Polling (NAPI)"
+	depends on E1000
 
 config MYRI_SBUS
 	tristate "MyriCOM Gigabit Ethernet support"
