@@ -129,21 +129,4 @@ extern void sa1100_reset_dma(dma_regs_t *regs);
 
 #define sa1100_clear_dma(regs)	((regs)->ClrDCSR = DCSR_IE|DCSR_RUN|DCSR_STRTA|DCSR_STRTB)
 
-
-#ifdef CONFIG_SA1111
-static inline void
-__arch_adjust_zones(int node, unsigned long *size, unsigned long *holes)
-{
-	unsigned int sz = 256;
-
-	if (node != 0)
-		sz = 0;
-
-	size[1] = size[0] - sz;
-	size[0] = sz;
-}
-
-#define arch_adjust_zones(node,size,holes) __arch_adjust_zones(node,size,holes)
-#endif
-
 #endif /* _ASM_ARCH_DMA_H */

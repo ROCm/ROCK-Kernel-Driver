@@ -57,6 +57,8 @@
 #error Top of user space clashes with start of module space
 #endif
 
+#ifndef __ASSEMBLY__
+
 /*
  * The DMA mask corresponding to the maximum bus address allocatable
  * using GFP_DMA.  The default here places no restriction on DMA
@@ -67,7 +69,9 @@
 #define ISA_DMA_THRESHOLD	(0xffffffffULL)
 #endif
 
-#ifndef __ASSEMBLY__
+#ifndef arch_adjust_zones
+#define arch_adjust_zones(node,size,holes) do { } while (0)
+#endif
 
 /*
  * PFNs are used to describe any physical page; this means
