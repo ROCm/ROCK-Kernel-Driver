@@ -1551,7 +1551,7 @@ mptbase_remove(struct pci_dev *pdev)
 	Q_DEL_ITEM(ioc);
 	mpt_adapter_dispose(ioc);
 
-	mptscsih_sync_irq(ioc->irq);
+	mptscsih_sync_irq(pdev->irq);
 	pci_set_drvdata(pdev, NULL);
 }
 
