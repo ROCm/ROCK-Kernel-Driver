@@ -659,7 +659,7 @@ CONFIG_AMD_RNG
   To compile this driver as a module ( = code which can be inserted in
   and removed from the running kernel whenever you want), say M here
   and read <file:Documentation/modules.txt>. The module will be called
-  i810_rng.o.
+  amd768_rng.o.
 
   If unsure, say N.
 
