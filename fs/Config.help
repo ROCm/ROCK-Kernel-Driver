@@ -576,6 +576,37 @@ CONFIG_HPFS_FS
   say M here and read <file:Documentation/modules.txt>.  If unsure,
   say N.
 
+CONFIG_NTFS_FS
+  NTFS is the file system of Microsoft Windows NT/2000/XP. For more
+  information see <file:Documentation/filesystems/ntfs.txt>. Saying Y
+  here would allow you to read from NTFS partitions.
+
+  This file system is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called ntfs.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>. If you
+  are not using Windows NT/2000/XP in addition to Linux on your computer
+  it is safe to say N.
+
+CONFIG_NTFS_DEBUG
+  If you are experiencing any problems with the NTFS file system, say
+  Y here. This will result in additional consistency checks to be
+  performed by the driver as well as additional debugging messages to
+  be written to the system log. Note that debugging messages are
+  disabled by default. To enable them, supply the option debug_msgs=1
+  at the kernel command line when booting the kernel or as an option
+  to insmod when loading the ntfs module. Once the driver is active,
+  you can enable debugging messages by doing (as root):
+    echo 1 > /proc/sys/fs/ntfs-debug
+  Replacing the "1" with "0" would disable debug messages.
+
+  If you leave debugging messages disable, this results in little
+  overhead, but enabling debug messages results in very significant
+  slowdown of the system.
+
+  When reporting bugs, please try to have available a full dump of
+  debugging messages while the misbehaviour was occurring.
+
 CONFIG_SYSV_FS
   SCO, Xenix and Coherent are commercial Unix systems for Intel
   machines, and Version 7 was used on the DEC PDP-11. Saying Y
