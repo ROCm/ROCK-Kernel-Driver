@@ -214,6 +214,7 @@ DECLARE_SNMP_STAT(struct sctp_mib, sctp_statistics);
 #define SCTP_INC_STATS(field)		SNMP_INC_STATS(sctp_statistics, field)
 #define SCTP_INC_STATS_BH(field)	SNMP_INC_STATS_BH(sctp_statistics, field)
 #define SCTP_INC_STATS_USER(field)	SNMP_INC_STATS_USER(sctp_statistics, field)
+#define SCTP_DEC_STATS(field)		SNMP_DEC_STATS(sctp_statistics, field)
 
 /* Determine if this is a valid kernel address.  */
 static inline int sctp_is_valid_kaddr(unsigned long addr)

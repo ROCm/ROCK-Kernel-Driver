@@ -10,7 +10,7 @@ sctp-y := sm_statetable.o sm_statefuns.o sm_sideeffect.o \
 	  inqueue.o outqueue.o ulpqueue.o command.o \
 	  tsnmap.o bind_addr.o socket.o primitive.o \
 	  output.o input.o hashdriver.o sla1.o \
-	  debug.o ssnmap.o
+	  debug.o ssnmap.o proc.o
 
 ifeq ($(CONFIG_SCTP_ADLER32), y)
 sctp-y += adler32.o

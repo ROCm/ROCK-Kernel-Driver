@@ -86,6 +86,7 @@ typedef enum {
 	SCTP_CMD_PURGE_OUTQUEUE, /* Purge all data waiting to be sent. */
 	SCTP_CMD_SETUP_T2,       /* Hi-level, setup T2-shutdown parms.  */
 	SCTP_CMD_RTO_PENDING,	 /* Set transport's rto_pending. */
+	SCTP_CMD_CHUNK_PD,	 /* Partial data delivery considerations. */
 
 	SCTP_CMD_LAST
 } sctp_verb_t;
@@ -115,7 +116,7 @@ typedef union {
 	struct sctp_transport *transport;
 	sctp_bind_addr_t  *bp;
 	sctp_init_chunk_t *init;
-	sctp_ulpevent_t *ulpevent;
+	struct sctp_ulpevent *ulpevent;
 	sctp_packet_t *packet;
 	sctp_sackhdr_t *sackh;
 } sctp_arg_t;
@@ -163,7 +164,7 @@ SCTP_ARG_CONSTRUCTOR(ASOC,	sctp_association_t *, asoc)
 SCTP_ARG_CONSTRUCTOR(TRANSPORT,	struct sctp_transport *, transport)
 SCTP_ARG_CONSTRUCTOR(BA,	sctp_bind_addr_t *, bp)
 SCTP_ARG_CONSTRUCTOR(PEER_INIT,	sctp_init_chunk_t *, init)
-SCTP_ARG_CONSTRUCTOR(ULPEVENT,  sctp_ulpevent_t *, ulpevent)
+SCTP_ARG_CONSTRUCTOR(ULPEVENT,  struct sctp_ulpevent *, ulpevent)
 SCTP_ARG_CONSTRUCTOR(PACKET,	sctp_packet_t *, packet)
 SCTP_ARG_CONSTRUCTOR(SACKH,	sctp_sackhdr_t *, sackh)
 

@@ -527,10 +527,8 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 			break;
 
 		case SCTP_CMD_REPORT_DUP:
-			if (asoc->peer.next_dup_tsn < SCTP_MAX_DUP_TSNS) {
-				asoc->peer.dup_tsns[asoc->peer.next_dup_tsn++] =
-					ntohl(command->obj.u32);
-			}
+			sctp_tsnmap_mark_dup(&asoc->peer.tsn_map,
+					     ntohl(command->obj.u32));
 			break;
 
 		case SCTP_CMD_REPORT_BIGGAP:
@@ -596,6 +594,13 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 		case SCTP_CMD_RTO_PENDING:
 			t = command->obj.transport;
 			t->rto_pending = 1;
+			break;
+
+		case SCTP_CMD_CHUNK_PD:
+			/* Send a chunk to the sockets layer.  */
+			sctp_ulpq_partial_delivery(&asoc->ulpq,
+						   command->obj.ptr,
+						   GFP_ATOMIC);
 			break;
 
 		default:
@@ -737,7 +742,6 @@ int sctp_gen_sack(sctp_association_t *asoc, int force, sctp_cmd_seq_t *commands)
 		asoc->a_rwnd = asoc->rwnd;
 
 		asoc->peer.sack_needed = 0;
-		asoc->peer.next_dup_tsn = 0;
 
 		error = sctp_outq_tail(&asoc->outqueue, sack);
 
@@ -1014,7 +1018,7 @@ static void sctp_do_8_2_transport_strike(sctp_association_t *asoc,
 static void sctp_cmd_init_failed(sctp_cmd_seq_t *commands,
 				 sctp_association_t *asoc)
 {
-	sctp_ulpevent_t *event;
+	struct sctp_ulpevent *event;
 
 	event = sctp_ulpevent_make_assoc_change(asoc,
 						0,
@@ -1041,7 +1045,7 @@ static void sctp_cmd_assoc_failed(sctp_cmd_seq_t *commands,
 				  sctp_subtype_t subtype,
 				  sctp_chunk_t *chunk)
 {
-	sctp_ulpevent_t *event;
+	struct sctp_ulpevent *event;
 	__u16 error = 0;
 
 	switch(event_type) {
@@ -1061,12 +1065,11 @@ static void sctp_cmd_assoc_failed(sctp_cmd_seq_t *commands,
 		break;
 	}
 
-	event = sctp_ulpevent_make_assoc_change(asoc,
-						0,
-						SCTP_COMM_LOST,
-						error, 0, 0,
-						GFP_ATOMIC);
+	/* Cancel any partial delivery in progress. */
+	sctp_ulpq_abort_pd(&asoc->ulpq, GFP_ATOMIC);
 
+	event = sctp_ulpevent_make_assoc_change(asoc, 0, SCTP_COMM_LOST,
+						error, 0, 0, GFP_ATOMIC);
 	if (event)
 		sctp_add_cmd_sf(commands, SCTP_CMD_EVENT_ULP,
 				SCTP_ULPEVENT(event));
@@ -1141,7 +1144,7 @@ static void sctp_cmd_hb_timers_stop(sctp_cmd_seq_t *cmds,
 		if (del_timer(&t->hb_timer))
 			sctp_transport_put(t);
 	}
-} 
+}
 
 /* Helper function to update the heartbeat timer. */
 static void sctp_cmd_hb_timer_update(sctp_cmd_seq_t *cmds,
