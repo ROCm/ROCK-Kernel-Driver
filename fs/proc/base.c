@@ -778,34 +778,41 @@ static struct dentry_operations pid_base_dentry_operations =
 };
 
 /* Lookups */
-#define MAX_MULBY10	((~0U-9)/10)
+
+static unsigned name_to_int(struct dentry *dentry)
+{
+	const char *name = dentry->d_name.name;
+	int len = dentry->d_name.len;
+	unsigned n = 0;
+
+	if (len > 1 && *name == '0')
+		goto out;
+	while (len-- > 0) {
+		unsigned c = *name++ - '0';
+		if (c > 9)
+			goto out;
+		if (n >= (~0U-9)/10)
+			goto out;
+		n *= 10;
+		n += c;
+	}
+	return n;
+out:
+	return ~0U;
+}
 
 /* SMP-safe */
 static struct dentry *proc_lookupfd(struct inode * dir, struct dentry * dentry)
 {
-	unsigned int fd, c;
 	struct task_struct *task = proc_task(dir);
+	unsigned fd = name_to_int(dentry);
 	struct file * file;
 	struct files_struct * files;
 	struct inode *inode;
 	struct proc_inode *ei;
-	const char *name;
-	int len;
 
-	fd = 0;
-	len = dentry->d_name.len;
-	name = dentry->d_name.name;
-	if (len > 1 && *name == '0') goto out;
-	while (len-- > 0) {
-		c = *name - '0';
-		name++;
-		if (c > 9)
-			goto out;
-		if (fd >= MAX_MULBY10)
-			goto out;
-		fd *= 10;
-		fd += c;
-	}
+	if (fd == ~0U)
+		goto out;
 
 	inode = proc_pid_make_inode(dir->i_sb, task, PROC_PID_FD_DIR+fd);
 	if (!inode)
@@ -992,17 +999,12 @@ static struct inode_operations proc_self_inode_operations = {
 /* SMP-safe */
 struct dentry *proc_pid_lookup(struct inode *dir, struct dentry * dentry)
 {
-	unsigned int pid, c;
 	struct task_struct *task;
-	const char *name;
 	struct inode *inode;
 	struct proc_inode *ei;
-	int len;
+	unsigned pid;
 
-	pid = 0;
-	name = dentry->d_name.name;
-	len = dentry->d_name.len;
-	if (len == 4 && !memcmp(name, "self", 4)) {
+	if (dentry->d_name.len == 4 && !memcmp(dentry->d_name.name,"self",4)) {
 		inode = new_inode(dir->i_sb);
 		if (!inode)
 			return ERR_PTR(-ENOMEM);
@@ -1017,18 +1019,9 @@ struct dentry *proc_pid_lookup(struct inode *dir, struct dentry * dentry)
 		d_add(dentry, inode);
 		return NULL;
 	}
-	while (len-- > 0) {
-		c = *name - '0';
-		name++;
-		if (c > 9)
-			goto out;
-		if (pid >= MAX_MULBY10)
-			goto out;
-		pid *= 10;
-		pid += c;
-		if (!pid)
-			goto out;
-	}
+	pid = name_to_int(dentry);
+	if (pid == ~0U)
+		goto out;
 
 	read_lock(&tasklist_lock);
 	task = find_task_by_pid(pid);
