@@ -272,13 +272,18 @@ static int svwks_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 
 	ide_hwif_t *hwif	= HWIF(drive);
 	struct pci_dev *dev	= hwif->pci_dev;
-	u8 speed		= ide_rate_filter(svwks_ratemask(drive), xferspeed);
+	u8 speed;
 	u8 pio			= ide_get_best_pio_mode(drive, 255, 5, NULL);
 	u8 unit			= (drive->select.b.unit & 0x01);
 	u8 csb5			= svwks_csb_check(dev);
 	u8 ultra_enable		= 0, ultra_timing = 0;
 	u8 dma_timing		= 0, pio_timing = 0;
 	u16 csb5_pio		= 0;
+
+	if (xferspeed == 255)	/* PIO auto-tuning */
+		speed = XFER_PIO_0 + pio;
+	else
+		speed = ide_rate_filter(svwks_ratemask(drive), xferspeed);
 
 	/* If we are about to put a disk into UDMA mode we screwed up.
 	   Our code assumes we never _ever_ do this on an OSB4 */
