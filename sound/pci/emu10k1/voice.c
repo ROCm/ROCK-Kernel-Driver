@@ -81,12 +81,8 @@ static int voice_alloc(emu10k1_t *emu, emu10k1_voice_type_t type, int number, em
 		}
 	}
 	
-	if (first_voice == last_voice) {
-		printk("BUG (or not enough voices), number %d, next free %d!\n",
-				number,
-				emu->next_free_voice);
+	if (first_voice == last_voice)
 		return -ENOMEM;
-	}	
 	
 	for (i=0; i < number; i++) {
 		voice = &emu->voices[(first_voice + i) % NUM_G];
