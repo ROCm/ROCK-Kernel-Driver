@@ -440,12 +440,14 @@ ccw_device_nopath_notify(void *data)
 	if (!ret) {
 		if (get_device(&sch->dev)) {
 			/* Driver doesn't want to keep device. */
+			cio_disable_subchannel(sch);
 			device_unregister(&sch->dev);
 			sch->schib.pmcw.intparm = 0;
 			cio_modify(sch);
 			put_device(&sch->dev);
 		}
 	} else {
+		cio_disable_subchannel(sch);
 		ccw_device_set_timeout(cdev, 0);
 		cdev->private->state = DEV_STATE_DISCONNECTED;
 		wake_up(&cdev->private->wait_q);
@@ -787,6 +789,7 @@ ccw_device_killing_irq(struct ccw_device *cdev, enum dev_event dev_event)
 	struct subchannel *sch;
 
 	sch = to_subchannel(cdev->dev.parent);
+	ccw_device_set_timeout(cdev, 0);
 	/* OK, i/o is dead now. Call interrupt handler. */
 	cdev->private->state = DEV_STATE_ONLINE;
 	if (cdev->handler)
