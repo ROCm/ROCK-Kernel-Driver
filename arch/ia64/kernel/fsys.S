@@ -123,6 +123,189 @@ ENTRY(fsys_set_tid_address)
 	br.ret.sptk.many b6
 END(fsys_set_tid_address)
 
+ENTRY(fsys_gettimeofday)
+
+	add r9=TI_FLAGS+IA64_TASK_SIZE,r16
+	;;
+	ld4 r9=[r9]
+	;;	
+	and r9=TIF_ALLWORK_MASK,r9
+	;;
+	// r32, r33 should contain the 2 args of gettimeofday
+	
+	tnat.nz p6,p7=r32		// in case the args are NaT
+	cmp.ne p8, p0=0, r9
+	;;
+	
+(p7)	tnat.nz p6,p0=r33		
+(p8)	br.spnt.many fsys_fallback_syscall
+	;;
+(p6)	adds r8=EINVAL, r0		// r8 = EINVAL
+(p6)	adds r10=-1, r0			// r10 = -1	
+(p6)	br.ret.spnt.many b6		// return with r8 set to EINVAL
+
+	movl r17=xtime_lock
+	movl r19=xtime			// xtime is a timespec struct
+	movl r20=cpu_info__per_cpu
+	movl r26=jiffies
+	movl r27=wall_jiffies
+	movl r31=last_nsec_offset
+	movl r24=2361183241434822607	// for division hack (only for / 1000)
+	;;	
+	setf.sig f9=r24			// f9 is used for division hack
+	adds r21=IA64_CPUINFO_ITM_NEXT_OFFSET, r20
+	adds r22=IA64_CPUINFO_ITM_DELTA_OFFSET, r20
+	adds r30=IA64_CPUINFO_NSEC_PER_CYC_OFFSET, r20
+	adds r3=IA64_TIMESPEC_TV_NSEC_OFFSET, r19	
+					// r3 = &xtime->tv_nsec
+	
+	
+while_loop_1:
+
+	// *** seq = read_seqbegin(&xtime_lock); ***
+	
+	ld4 r23=[r17]			// since &xtime_lock == &xtime_lock->sequence
+#ifdef CONFIG_SMP
+	mf
+#endif
+	;;				// barrier()
+	// now r23 = seq
+	
+	ld8 r14=[r31]			// r14 = old = last_nsec_offset		
+	
+	ld8 r28=[r26]			// r28 = jiffies
+	ld8 r29=[r27]			// r29 = wall_jiffies
+	;;
+	
+	ld8 r24=[r21]			// r24 now contains itm_next
+	ld8 r25=[r22]			// r25 now contains itm_delta
+
+	sub r28=r28, r29		// r28 now contains "lost"
+	;;
+	adds r28=1, r28			// r28 now contains "lost + 1"
+	;;
+	setf.sig f6=r28
+	setf.sig f7=r25
+	
+	ld8 r2=[r19]			// r2 = sec = xtime.tv_sec
+	;;
+	
+	ld8 r28=[r3]			// r28 = nsec = xtime.tv_nsec
+	xma.l f8=f6, f7, f0		// put lower 64-bits result of f6 * f7 in f8
+	;;
+	getf.sig r18=f8			// r18 now contains the (lost + 1) * itm_delta
+	;;
+	sub r18=r24, r18		// r18 is last_tick 
+	mov r25=ar.itc			// put time stamp into r25 (ITC) == now
+	;;
+	cmp.leu p7, p8 = r18, r25	// if last_tick <= now, p7 = 1
+	;;
+(p7)	ld8 r24=[r30]			// r24 contains local_cpu_data->nsec_per_cyc value
+(p7)	sub r25=r25, r18		// elasped_cycles in r25
+	;;
+(p7)	setf.sig f6=r24
+(p7)	setf.sig f7=r25
+	;;
+(p7)	xma.l f8=f6, f7, f0
+
+	;;
+(p7)	getf.sig r18=f8			// r18 = clasped_cycles * local_cpu_data->nsec_per_cyc
+	;;	
+(p7)	shr.u r18=r18, IA64_NSEC_PER_CYC_SHIFT
+	
+(p8) 	ld8 r18=[r31]			// r18 = last_time_offset (is unsigned long)
+
+	// now end of gettimeoffset, r18 should contain the desire result (offset)
+
+	// *** if (unlikely(read_seqretry(&xtime_lock, seq))) continue; ***
+
+	;; 				// barrier()
+	
+#ifdef CONFIG_SMP
+	mf
+#endif
+	adds r24=1, r0			// r24 = 1
+	ld4 r25=[r17]			// r25 = xtime_lock->sequence (load again)
+	;;
+	and r24=r24, r23		// r24 = seq & 1
+	xor r25=r25, r23		// r25 = xtime_lock->sequence ^ seq
+	;;
+	or r24=r24, r25			// now r24 = read_seqretry(&xtime_lock, seq)
+	;;
+	cmp.ne p7, p0=r24, r0
+	;;
+(p7)	br.spnt.many while_loop_1	// continue
+	
+	cmp.leu p7, p8 = r18, r14	// if (offset <= old)
+	;;
+(p7)	mov r18=r14			// offset = old
+(p7)	br.spnt.few loop_exit_1		// break
+	
+	mov ar.ccv=r18			// ar.ccv = offset
+	;;
+	cmpxchg8.acq r25=[r31], r14, ar.ccv	
+					// compare-and-exchange (atomic!)
+	;;
+	cmp.eq p8,p0 = r25, r14	
+	;;
+(p8)	br.sptk.many loop_exit_1
+	br.sptk.many while_loop_1
+
+loop_exit_1:
+
+	// at this point, r28 is nsec and r18 is offset
+
+	add r3=r28, r18			// r3 = (nsec + offset)
+	;;
+	// now we try to divide r3 by 1000 to get the value in usec instead of nsec
+	
+	shr.u r24 = r3, 3
+	;;
+	setf.sig f7 = r24
+	;;
+	xmpy.hu f6 = f7, f9
+	;;
+	getf.sig r3 = f6
+	;;
+	shr.u r3 = r3, 4
+	// end of division, r3 is divided by 1000 (=usec)
+	
+	addl r24=1000000, r0		// r24 = 1000000
+	;;
+	
+while_loop_2:
+	
+	cmp.geu p7, p8=r3, r24		// while (usec >= 1000000)
+	;;
+(p8)	br.sptk.many loop_exit_2
+
+	sub r3=r3, r24			// usec -= 1000000
+	adds r2=1, r2			// ++sec
+	
+	br.many while_loop_2
+	
+loop_exit_2:	 
+	
+	// finally, 	r2 = sec
+	// 		r3 = usec
+	
+	mov r24=r32			// we need to preserve this...
+	;;
+	st8 [r32]=r2, 8
+	;;
+	st8 [r32]=r3			// store them in the timeval struct
+	;;
+	mov r32=r24
+	
+	mov r8=r0			// success
+	
+	MCKINLEY_E9_WORKAROUND
+	
+	br.ret.sptk.many b6
+	// return to caller
+
+END(fsys_gettimeofday)
+
 	.rodata
 	.align 8
 	.globl fsyscall_table
@@ -190,7 +373,7 @@ fsyscall_table:
 	data8 fsys_fallback_syscall	// setrlimit
 	data8 fsys_fallback_syscall	// getrlimit		// 1085
 	data8 fsys_fallback_syscall	// getrusage
-	data8 fsys_fallback_syscall	// gettimeofday
+	data8 fsys_gettimeofday		// gettimeofday
 	data8 fsys_fallback_syscall	// settimeofday
 	data8 fsys_fallback_syscall	// select
 	data8 fsys_fallback_syscall	// poll			// 1090
