@@ -125,7 +125,11 @@ int conf_read(const char *name)
 			*p++ = 0;
 			if (strncmp(p, "is not set", 10))
 				continue;
-			sym = sym_lookup(line + 9, 0);
+			sym = sym_find(line + 9);
+			if (!sym) {
+				fprintf(stderr, "%s:%d: trying to assign nonexistent symbol %s\n", name, lineno, line + 9);
+				break;
+			}
 			switch (sym->type) {
 			case S_BOOLEAN:
 			case S_TRISTATE:
@@ -408,6 +412,7 @@ int conf_write(const char *name)
 	if (out_h) {
 		fclose(out_h);
 		rename(".tmpconfig.h", "include/linux/autoconf.h");
+		file_write_dep(NULL);
 	}
 	if (!name || basename != conf_def_filename) {
 		if (!name)
