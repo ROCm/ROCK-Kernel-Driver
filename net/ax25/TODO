@@ -1,0 +1,11 @@
+af_ax25.c:ax25_connect:
+
+	There is a race with changing the socket state here which should be
+	fixed by introduction of proper socket locking:
+
+        if (sk->state != TCP_ESTABLISHED) {
+                /* Not in ABM, not in WAIT_UA -> failed */
+                sock->state = SS_UNCONNECTED;
+                return sock_error(sk);  /* Always set at this point */
+        }
+
