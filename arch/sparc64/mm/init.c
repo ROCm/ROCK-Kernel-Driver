@@ -1726,7 +1726,7 @@ void __init mem_init(void)
 	 * Set up the zero page, mark it reserved, so that page count
 	 * is not manipulated when freeing the page from user ptes.
 	 */
-	mem_map_zero = _alloc_pages(GFP_KERNEL, 0);
+	mem_map_zero = alloc_pages(GFP_KERNEL, 0);
 	if (mem_map_zero == NULL) {
 		prom_printf("paging_init: Cannot alloc zero page.\n");
 		prom_halt();

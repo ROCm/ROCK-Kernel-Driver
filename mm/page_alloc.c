@@ -256,14 +256,6 @@ int is_head_of_free_region(struct page *page)
 }
 #endif /* CONFIG_SOFTWARE_SUSPEND */
 
-#ifndef CONFIG_DISCONTIGMEM
-struct page *_alloc_pages(unsigned int gfp_mask, unsigned int order)
-{
-	return __alloc_pages(gfp_mask, order,
-		contig_page_data.node_zonelists+(gfp_mask & GFP_ZONEMASK));
-}
-#endif
-
 static /* inline */ struct page *
 balance_classzone(struct zone* classzone, unsigned int gfp_mask,
 			unsigned int order, int * freed)
@@ -679,13 +671,41 @@ void show_free_areas(void)
 /*
  * Builds allocation fallback zone lists.
  */
-static inline void build_zonelists(pg_data_t *pgdat)
+static int __init build_zonelists_node(pg_data_t *pgdat, struct zonelist *zonelist, int j, int k)
 {
-	int i, j, k;
+	switch (k) {
+		struct zone *zone;
+	default:
+		BUG();
+	case ZONE_HIGHMEM:
+		zone = pgdat->node_zones + ZONE_HIGHMEM;
+		if (zone->size) {
+#ifndef CONFIG_HIGHMEM
+			BUG();
+#endif
+			zonelist->zones[j++] = zone;
+		}
+	case ZONE_NORMAL:
+		zone = pgdat->node_zones + ZONE_NORMAL;
+		if (zone->size)
+			zonelist->zones[j++] = zone;
+	case ZONE_DMA:
+		zone = pgdat->node_zones + ZONE_DMA;
+		if (zone->size)
+			zonelist->zones[j++] = zone;
+	}
 
+	return j;
+}
+
+static void __init build_zonelists(pg_data_t *pgdat)
+{
+	int i, j, k, node, local_node;
+
+	local_node = pgdat->node_id;
+	printk("Building zonelist for node : %d\n", local_node);
 	for (i = 0; i <= GFP_ZONEMASK; i++) {
 		struct zonelist *zonelist;
-		struct zone *zone;
 
 		zonelist = pgdat->node_zonelists + i;
 		memset(zonelist, 0, sizeof(*zonelist));
@@ -697,31 +717,30 @@ static inline void build_zonelists(pg_data_t *pgdat)
 		if (i & __GFP_DMA)
 			k = ZONE_DMA;
 
-		switch (k) {
-			default:
-				BUG();
-			/*
-			 * fallthrough:
-			 */
-			case ZONE_HIGHMEM:
-				zone = pgdat->node_zones + ZONE_HIGHMEM;
-				if (zone->size) {
-#ifndef CONFIG_HIGHMEM
-					BUG();
-#endif
-					zonelist->zones[j++] = zone;
-				}
-			case ZONE_NORMAL:
-				zone = pgdat->node_zones + ZONE_NORMAL;
-				if (zone->size)
-					zonelist->zones[j++] = zone;
-			case ZONE_DMA:
-				zone = pgdat->node_zones + ZONE_DMA;
-				if (zone->size)
-					zonelist->zones[j++] = zone;
-		}
+ 		j = build_zonelists_node(pgdat, zonelist, j, k);
+ 		/*
+ 		 * Now we build the zonelist so that it contains the zones
+ 		 * of all the other nodes.
+ 		 * We don't want to pressure a particular node, so when
+ 		 * building the zones for node N, we make sure that the
+ 		 * zones coming right after the local ones are those from
+ 		 * node N+1 (modulo N)
+ 		 */
+ 		for (node = local_node + 1; node < numnodes; node++)
+ 			j = build_zonelists_node(NODE_DATA(node), zonelist, j, k);
+ 		for (node = 0; node < local_node; node++)
+ 			j = build_zonelists_node(NODE_DATA(node), zonelist, j, k);
+ 
 		zonelist->zones[j++] = NULL;
 	} 
+}
+
+void __init build_all_zonelists(void)
+{
+	int i;
+
+	for(i = 0 ; i < numnodes ; i++)
+		build_zonelists(NODE_DATA(i));
 }
 
 void __init calculate_totalpages (pg_data_t *pgdat, unsigned long *zones_size,
@@ -919,7 +938,6 @@ void __init free_area_init_core(pg_data_t *pgdat,
 			  (unsigned long *) alloc_bootmem_node(pgdat, bitmap_size);
 		}
 	}
-	build_zonelists(pgdat);
 }
 
 #ifndef CONFIG_DISCONTIGMEM

@@ -10,11 +10,14 @@
 #include <linux/wait.h>
 #include <linux/cache.h>
 #include <asm/atomic.h>
+#ifdef CONFIG_DISCONTIGMEM
+#include <asm/numnodes.h>
+#endif
+#ifndef MAX_NUMNODES
+#define MAX_NUMNODES 1
+#endif
 
-/*
- * Free memory management - zoned buddy allocator.
- */
-
+/* Free memory management - zoned buddy allocator.  */
 #ifndef CONFIG_FORCE_MAX_ZONEORDER
 #define MAX_ORDER 11
 #else
@@ -137,7 +140,7 @@ struct zone {
  * footprint of this construct is very small.
  */
 struct zonelist {
-	struct zone *zones[MAX_NR_ZONES+1]; // NULL delimited
+	struct zone *zones[MAX_NUMNODES * MAX_NR_ZONES + 1]; // NULL delimited
 };
 
 #define GFP_ZONEMASK	0x0f
@@ -190,6 +193,7 @@ extern void calculate_totalpages (pg_data_t *pgdat, unsigned long *zones_size,
 extern void free_area_init_core(pg_data_t *pgdat, unsigned long *zones_size,
 		unsigned long *zholes_size);
 void get_zone_counts(unsigned long *active, unsigned long *inactive);
+extern void build_all_zonelists(void);
 
 extern pg_data_t contig_page_data;
 

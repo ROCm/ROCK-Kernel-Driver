@@ -36,12 +36,10 @@ extern plat_pg_data_t *plat_node_data[];
 
 #ifdef CONFIG_ALPHA_WILDFIRE
 # define ALPHA_PA_TO_NID(pa)	((pa) >> 36)	/* 16 nodes max due 43bit kseg */
-#define NODE_MAX_MEM_SIZE	(64L * 1024L * 1024L * 1024L) /* 64 GB */
-#define MAX_NUMNODES		WILDFIRE_MAX_QBB
+# define NODE_MAX_MEM_SIZE	(64L * 1024L * 1024L * 1024L) /* 64 GB */
 #else
 # define ALPHA_PA_TO_NID(pa)	(0)
-#define NODE_MAX_MEM_SIZE	(~0UL)
-#define MAX_NUMNODES		1
+# define NODE_MAX_MEM_SIZE	(~0UL)
 #endif
 
 #define PHYSADDR_TO_NID(pa)		ALPHA_PA_TO_NID(pa)

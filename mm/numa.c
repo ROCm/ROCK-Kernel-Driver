@@ -85,48 +85,4 @@ void __init free_area_init_node(int nid, pg_data_t *pgdat, struct page *pmap,
 	memset(pgdat->valid_addr_bitmap, 0, size);
 }
 
-static struct page * alloc_pages_pgdat(pg_data_t *pgdat, unsigned int gfp_mask,
-	unsigned int order)
-{
-	return __alloc_pages(gfp_mask, order, pgdat->node_zonelists + (gfp_mask & GFP_ZONEMASK));
-}
-
-/*
- * This can be refined. Currently, tries to do round robin, instead
- * should do concentratic circle search, starting from current node.
- */
-struct page * _alloc_pages(unsigned int gfp_mask, unsigned int order)
-{
-	struct page *ret = 0;
-	pg_data_t *start, *temp;
-#ifndef CONFIG_NUMA
-	unsigned long flags;
-	static pg_data_t *next = 0;
-#endif
-
-	if (order >= MAX_ORDER)
-		return NULL;
-#ifdef CONFIG_NUMA
-	temp = NODE_DATA(numa_node_id());
-#else
-	if (!next)
-		next = pgdat_list;
-	temp = next;
-	next = next->pgdat_next;
-#endif
-	start = temp;
-	while (temp) {
-		if ((ret = alloc_pages_pgdat(temp, gfp_mask, order)))
-			return(ret);
-		temp = temp->pgdat_next;
-	}
-	temp = pgdat_list;
-	while (temp != start) {
-		if ((ret = alloc_pages_pgdat(temp, gfp_mask, order)))
-			return(ret);
-		temp = temp->pgdat_next;
-	}
-	return(0);
-}
-
 #endif /* CONFIG_DISCONTIGMEM */

@@ -392,6 +392,7 @@ asmlinkage void __init start_kernel(void)
 	printk(linux_banner);
 	setup_arch(&command_line);
 	setup_per_cpu_areas();
+	build_all_zonelists();
 	printk("Kernel command line: %s\n", saved_command_line);
 	parse_options(command_line);
 	trap_init();
