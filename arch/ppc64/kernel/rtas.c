@@ -104,15 +104,20 @@ phys_call_rtas_display_status(char c)
 void
 call_rtas_display_status(char c)
 {
-	struct rtas_args *rtas = &(get_paca()->xRtas);
+	struct rtas_args *args = &(get_paca()->xRtas);
+	unsigned long s;
 
-	rtas->token = 10;
-	rtas->nargs = 1;
-	rtas->nret  = 1;
-	rtas->rets  = (rtas_arg_t *)&(rtas->args[1]);
-	rtas->args[0] = (int)c;
+	spin_lock_irqsave(&rtas.lock, s);
 
-	enter_rtas((void *)__pa((unsigned long)rtas));	
+	args->token = 10;
+	args->nargs = 1;
+	args->nret  = 1;
+	args->rets  = (rtas_arg_t *)&(args->args[1]);
+	args->args[0] = (int)c;
+
+	enter_rtas((void *)__pa((unsigned long)args));	
+
+	spin_unlock_irqrestore(&rtas.lock, s);
 }
 
 int
@@ -127,8 +132,9 @@ rtas_token(const char *service)
 	return tokp ? *tokp : RTAS_UNKNOWN_SERVICE;
 }
 
-void
-log_rtas_error(struct rtas_args	*rtas_args)
+
+static int
+__log_rtas_error(struct rtas_args *rtas_args)
 {
 	struct rtas_args err_args, temp_args;
 
@@ -147,13 +153,24 @@ log_rtas_error(struct rtas_args	*rtas_args)
 	PPCDBG(PPCDBG_RTAS, "\tentering rtas with 0x%lx\n",
 	       (void *)__pa((unsigned long)&err_args));
 	enter_rtas((void *)__pa((unsigned long)&get_paca()->xRtas));
-	PPCDBG(PPCDBG_RTAS, "\treturned from rtas ...\n");
-
+	PPCDBG(PPCDBG_RTAS, "\treturned from rtas ...\n");	
 
 	err_args = get_paca()->xRtas;
 	get_paca()->xRtas = temp_args;
 
-	if (err_args.rets[0] == 0)
+	return err_args.rets[0];
+}
+
+void
+log_rtas_error(struct rtas_args	*rtas_args)
+{
+	unsigned long s;
+	int rc;
+
+	spin_lock_irqsave(&rtas.lock, s);
+	rc = __log_rtas_error(rtas_args);
+	spin_unlock_irqrestore(&rtas.lock, s);
+	if (rc == 0)
 		log_error(rtas_err_buf, ERR_TYPE_RTAS_LOG, 0);
 }
 
@@ -162,9 +179,10 @@ rtas_call(int token, int nargs, int nret,
 	  unsigned long *outputs, ...)
 {
 	va_list list;
-	int i;
+	int i, logit = 0;
 	unsigned long s;
 	struct rtas_args *rtas_args = &(get_paca()->xRtas);
+	long ret;
 
 	PPCDBG(PPCDBG_RTAS, "Entering rtas_call\n");
 	PPCDBG(PPCDBG_RTAS, "\ttoken    = 0x%x\n", token);
@@ -173,6 +191,9 @@ rtas_call(int token, int nargs, int nret,
 	PPCDBG(PPCDBG_RTAS, "\t&outputs = 0x%lx\n", outputs);
 	if (token == RTAS_UNKNOWN_SERVICE)
 		return -1;
+
+	/* Gotta do something different here, use global lock for now... */
+	spin_lock_irqsave(&rtas.lock, s);
 
 	rtas_args->token = token;
 	rtas_args->nargs = nargs;
@@ -186,26 +207,16 @@ rtas_call(int token, int nargs, int nret,
 	va_end(list);
 
 	for (i = 0; i < nret; ++i)
-	  rtas_args->rets[i] = 0;
+		rtas_args->rets[i] = 0;
 
-#if 0   /* Gotta do something different here, use global lock for now... */
-	spin_lock_irqsave(&rtas_args->lock, s);
-#else
-	spin_lock_irqsave(&rtas.lock, s);
-#endif
 	PPCDBG(PPCDBG_RTAS, "\tentering rtas with 0x%lx\n",
 		(void *)__pa((unsigned long)rtas_args));
 	enter_rtas((void *)__pa((unsigned long)rtas_args));
 	PPCDBG(PPCDBG_RTAS, "\treturned from rtas ...\n");
 
 	if (rtas_args->rets[0] == -1)
-		log_rtas_error(rtas_args);
+		logit = (__log_rtas_error(rtas_args) == 0);
 
-#if 0   /* Gotta do something different here, use global lock for now... */
-	spin_unlock_irqrestore(&rtas_args->lock, s);
-#else
-	spin_unlock_irqrestore(&rtas.lock, s);
-#endif
 	ifppcdebug(PPCDBG_RTAS) {
 		for(i=0; i < nret ;i++)
 			udbg_printf("\tnret[%d] = 0x%lx\n", i, (ulong)rtas_args->rets[i]);
@@ -214,7 +225,15 @@ rtas_call(int token, int nargs, int nret,
 	if (nret > 1 && outputs != NULL)
 		for (i = 0; i < nret-1; ++i)
 			outputs[i] = rtas_args->rets[i+1];
-	return (ulong)((nret > 0) ? rtas_args->rets[0] : 0);
+	ret = (ulong)((nret > 0) ? rtas_args->rets[0] : 0);
+
+	/* Gotta do something different here, use global lock for now... */
+	spin_unlock_irqrestore(&rtas.lock, s);
+
+	if (logit)
+		log_error(rtas_err_buf, ERR_TYPE_RTAS_LOG, 0);
+
+	return ret;
 }
 
 /* Given an RTAS status code of 990n compute the hinted delay of 10^n
@@ -496,11 +515,11 @@ asmlinkage int ppc_rtas(struct rtas_args __user *uargs)
 	enter_rtas((void *)__pa((unsigned long)&get_paca()->xRtas));
 	args = get_paca()->xRtas;
 
+	spin_unlock_irqrestore(&rtas.lock, flags);
+
 	args.rets  = (rtas_arg_t *)&(args.args[nargs]);
 	if (args.rets[0] == -1)
 		log_rtas_error(&args);
-
-	spin_unlock_irqrestore(&rtas.lock, flags);
 
 	/* Copy out args. */
 	if (copy_to_user(uargs->args + nargs,
@@ -517,7 +536,9 @@ asmlinkage int ppc_rtas(struct rtas_args __user *uargs)
 void rtas_stop_self(void)
 {
 	struct rtas_args *rtas_args = &(get_paca()->xRtas);
+	unsigned long s;
 
+	spin_lock_irqsave(&rtas.lock, s);
 	rtas_args->token = rtas_token("stop-self");
 	BUG_ON(rtas_args->token == RTAS_UNKNOWN_SERVICE);
 	rtas_args->nargs = 0;
@@ -527,6 +548,8 @@ void rtas_stop_self(void)
 	printk("%u %u Ready to die...\n",
 	       smp_processor_id(), hard_smp_processor_id());
 	enter_rtas((void *)__pa(rtas_args));
+	spin_unlock_irqrestore(&rtas.lock, s);
+
 	panic("Alas, I survived.\n");
 }
 #endif /* CONFIG_HOTPLUG_CPU */
