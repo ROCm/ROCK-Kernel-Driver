@@ -2865,16 +2865,14 @@ static int mega_findCard (Scsi_Host_Template * pHostTmpl,
 		pciDevFun = pdev->devfn;
 #endif
 		if ((flag & BOARD_QUARTZ) && (skip_id == -1)) {
-			pcibios_read_config_word (pciBus, pciDevFun,
-						  PCI_CONF_AMISIG, &magic);
+			pci_read_config_word (pdev, PCI_CONF_AMISIG, &magic);
 			if ((magic != AMI_SIGNATURE)
 			    && (magic != AMI_SIGNATURE_471)) {
 				pciIdx++;
 				continue;	/* not an AMI board */
 			}
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
-			pcibios_read_config_dword (pciBus, pciDevFun,
-						   PCI_CONF_AMISIG64, &magic64);
+			pci_read_config_dword (pdev, PCI_CONF_AMISIG64, &magic64);
 
 			if (magic64 == AMI_64BIT_SIGNATURE)
 				flag |= BOARD_64BIT;
@@ -3215,7 +3213,6 @@ int megaraid_detect (Scsi_Host_Template * pHostTmpl)
 	count += mega_findCard (pHostTmpl, PCI_VENDOR_ID_AMI,
 				PCI_DEVICE_ID_AMI_MEGARAID3, BOARD_QUARTZ);
 
-	mega_reorder_hosts ();
 
 #ifdef CONFIG_PROC_FS
 	if (count) {
@@ -3480,173 +3477,6 @@ mega_get_boot_ldrv(mega_host_config *megacfg)
 
 }
 
-
-static void mega_reorder_hosts (void)
-{
-	struct Scsi_Host *shpnt;
-	struct Scsi_Host *shone;
-	struct Scsi_Host *shtwo;
-	mega_host_config *boot_host;
-	int i;
-
-	/*
-	 * Find the (first) host which has it's BIOS enabled
-	 */
-	boot_host = NULL;
-	for (i = 0; i < MAX_CONTROLLERS; i++) {
-		if (mega_hbas[i].is_bios_enabled) {
-			boot_host = mega_hbas[i].hostdata_addr;
-			break;
-		}
-	}
-
-	if (boot_host == NULL) {
-		printk (KERN_WARNING "megaraid: no BIOS enabled.\n");
-		return;
-	}
-
-	/*
-	 * Traverse through the list of SCSI hosts for our HBA locations
-	 */
-	shone = shtwo = NULL;
-	for (shpnt = scsi_hostlist; shpnt; shpnt = shpnt->next) {
-		/* Is it one of ours? */
-		for (i = 0; i < MAX_CONTROLLERS; i++) {
-			if ((mega_host_config *) shpnt->hostdata ==
-			    mega_hbas[i].hostdata_addr) {
-				/* Does this one has BIOS enabled */
-				if (mega_hbas[i].hostdata_addr == boot_host) {
-
-					/* Are we first */
-					if (shtwo == NULL)	/* Yes! */
-						return;
-					else {	/* :-( */
-						shone = shpnt;
-					}
-				} else {
-					if (!shtwo) {
-						/* were we here before? xchng first */
-						shtwo = shpnt;
-					}
-				}
-				break;
-			}
-		}
-		/*
-		 * Have we got the boot host and one which does not have the bios
-		 * enabled.
-		 */
-		if (shone && shtwo)
-			break;
-	}
-	if (shone && shtwo) {
-		mega_swap_hosts (shone, shtwo);
-	}
-
-	return;
-}
-
-static void mega_swap_hosts (struct Scsi_Host *shone, struct Scsi_Host *shtwo)
-{
-	struct Scsi_Host *prevtoshtwo;
-	struct Scsi_Host *prevtoshone;
-	struct Scsi_Host *save = NULL;;
-
-	/* Are these two nodes adjacent */
-	if (shtwo->next == shone) {
-
-		if (shtwo == scsi_hostlist && shone->next == NULL) {
-
-			/* just two nodes */
-			scsi_hostlist = shone;
-			shone->next = shtwo;
-			shtwo->next = NULL;
-		} else if (shtwo == scsi_hostlist) {
-			/* first two nodes of the list */
-
-			scsi_hostlist = shone;
-			shtwo->next = shone->next;
-			scsi_hostlist->next = shtwo;
-		} else if (shone->next == NULL) {
-			/* last two nodes of the list */
-
-			prevtoshtwo = scsi_hostlist;
-
-			while (prevtoshtwo->next != shtwo)
-				prevtoshtwo = prevtoshtwo->next;
-
-			prevtoshtwo->next = shone;
-			shone->next = shtwo;
-			shtwo->next = NULL;
-		} else {
-			prevtoshtwo = scsi_hostlist;
-
-			while (prevtoshtwo->next != shtwo)
-				prevtoshtwo = prevtoshtwo->next;
-
-			prevtoshtwo->next = shone;
-			shtwo->next = shone->next;
-			shone->next = shtwo;
-		}
-
-	} else if (shtwo == scsi_hostlist && shone->next == NULL) {
-		/* shtwo at head, shone at tail, not adjacent */
-
-		prevtoshone = scsi_hostlist;
-
-		while (prevtoshone->next != shone)
-			prevtoshone = prevtoshone->next;
-
-		scsi_hostlist = shone;
-		shone->next = shtwo->next;
-		prevtoshone->next = shtwo;
-		shtwo->next = NULL;
-	} else if (shtwo == scsi_hostlist && shone->next != NULL) {
-		/* shtwo at head, shone is not at tail */
-
-		prevtoshone = scsi_hostlist;
-		while (prevtoshone->next != shone)
-			prevtoshone = prevtoshone->next;
-
-		scsi_hostlist = shone;
-		prevtoshone->next = shtwo;
-		save = shtwo->next;
-		shtwo->next = shone->next;
-		shone->next = save;
-	} else if (shone->next == NULL) {
-		/* shtwo not at head, shone at tail */
-
-		prevtoshtwo = scsi_hostlist;
-		prevtoshone = scsi_hostlist;
-
-		while (prevtoshtwo->next != shtwo)
-			prevtoshtwo = prevtoshtwo->next;
-		while (prevtoshone->next != shone)
-			prevtoshone = prevtoshone->next;
-
-		prevtoshtwo->next = shone;
-		shone->next = shtwo->next;
-		prevtoshone->next = shtwo;
-		shtwo->next = NULL;
-
-	} else {
-		prevtoshtwo = scsi_hostlist;
-		prevtoshone = scsi_hostlist;
-		save = NULL;;
-
-		while (prevtoshtwo->next != shtwo)
-			prevtoshtwo = prevtoshtwo->next;
-		while (prevtoshone->next != shone)
-			prevtoshone = prevtoshone->next;
-
-		prevtoshtwo->next = shone;
-		save = shone->next;
-		shone->next = shtwo->next;
-		prevtoshone->next = shtwo;
-		shtwo->next = save;
-	}
-	return;
-}
 
 static inline void mega_freeSgList (mega_host_config * megaCfg)
 {
@@ -4293,7 +4123,6 @@ mega_partsize(struct block_device *bdev, sector_t capacity, int *geom)
 	struct partition *p, *largest = NULL;
 	int i, largest_cyl;
 	int heads, cyls, sectors;
-	int capacity = capacity;
 	unsigned char *buf;
 
 	if (!(buf = scsi_bios_ptable(bdev)))
@@ -4683,12 +4512,7 @@ static int megadev_ioctl (struct inode *inode, struct file *filep,
 		/*
 		 * Find this host
 		 */
-		for( shpnt = scsi_hostlist; shpnt; shpnt = shpnt->next ) {
-			if( shpnt->hostdata == (unsigned long *)megaCtlrs[adapno] ) {
-				megacfg = (mega_host_config *)shpnt->hostdata;
-				break;
-			}
-		}
+		shpnt = megaCtlrs[adapno]->host;
 		if(shpnt == NULL)  return -ENODEV;
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
@@ -4803,12 +4627,7 @@ static int megadev_ioctl (struct inode *inode, struct file *filep,
 		/*
 		 * Find this host
 		 */
-		for( shpnt = scsi_hostlist; shpnt; shpnt = shpnt->next ) {
-			if( shpnt->hostdata == (unsigned long *)megaCtlrs[adapno] ) {
-				megacfg = (mega_host_config *)shpnt->hostdata;
-				break;
-			}
-		}
+		shpnt = megaCtlrs[adapno]->host;
 		if(shpnt == NULL)  return -ENODEV;
 
 		/*
