@@ -730,6 +730,7 @@ typedef struct ide_drive_s {
 	u8	bios_head;	/* BIOS/fdisk/LILO number of heads */
 	u8	bios_sect;	/* BIOS/fdisk/LILO sectors per track */
 	u8	queue_depth;	/* max queue depth */
+	u8	doing_barrier;	/* state, 1=currently doing flush */
 
 	unsigned int	bios_cyl;	/* BIOS/fdisk/LILO number of cyls */
 	unsigned int	cyl;		/* "real" number of cyls */
@@ -1259,6 +1260,11 @@ extern ide_startstop_t ide_do_reset (ide_drive_t *);
  * This function is intended to be used prior to invoking ide_do_drive_cmd().
  */
 extern void ide_init_drive_cmd (struct request *rq);
+
+/*
+ * this function returns error location sector offset in case of a write error
+ */
+extern sector_t ide_get_error_location(ide_drive_t *, char *);
 
 /*
  * "action" parameter type for ide_do_drive_cmd() below.

@@ -2777,6 +2777,9 @@ int submit_bh(int rw, struct buffer_head * bh)
 	if (rw == READ && buffer_dirty(bh))
 		buffer_error();
 
+	if (buffer_ordered(bh) && (rw == WRITE))
+		rw = WRITE_BARRIER;
+
 	/* Only clear out a write error when rewriting */
 	if (test_set_buffer_req(bh) && rw == WRITE)
 		clear_buffer_write_io_error(bh);

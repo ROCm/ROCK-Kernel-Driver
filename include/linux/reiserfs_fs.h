@@ -1765,7 +1765,8 @@ int reiserfs_end_persistent_transaction(struct reiserfs_transaction_handle *);
 int reiserfs_commit_page(struct inode *inode, struct page *page,
 		unsigned from, unsigned to);
 int reiserfs_flush_old_commits(struct super_block *);
-void reiserfs_commit_for_inode(struct inode *) ;
+int reiserfs_commit_for_inode(struct inode *) ;
+int  reiserfs_inode_needs_commit(struct inode *) ;
 void reiserfs_update_inode_transaction(struct inode *) ;
 void reiserfs_wait_on_write_block(struct super_block *s) ;
 void reiserfs_block_writes(struct reiserfs_transaction_handle *th) ;
@@ -2023,7 +2024,6 @@ int reiserfs_global_version_in_proc( char *buffer, char **start, off_t offset,
 /* dir.c */
 extern struct inode_operations reiserfs_dir_inode_operations;
 extern struct inode_operations reiserfs_symlink_inode_operations;
-extern struct inode_operations reiserfs_special_inode_operations;
 extern struct file_operations reiserfs_dir_operations;
 
 /* tail_conversion.c */

@@ -54,6 +54,97 @@
 #include <asm/io.h>
 #include <asm/bitops.h>
 
+static void ide_fill_flush_cmd(ide_drive_t *drive, struct request *rq)
+{
+	char *buf = rq->cmd;
+
+	/*
+	 * reuse cdb space for ata command
+	 */
+	memset(buf, 0, sizeof(rq->cmd));
+
+	rq->flags |= REQ_DRIVE_TASK | REQ_STARTED;
+	rq->buffer = buf;
+	rq->buffer[0] = WIN_FLUSH_CACHE;
+
+	if (drive->id->cfs_enable_2 & 0x2400)
+		rq->buffer[0] = WIN_FLUSH_CACHE_EXT;
+}
+
+/*
+ * preempt pending requests, and store this cache flush for immediate
+ * execution
+ */
+static struct request *ide_queue_flush_cmd(ide_drive_t *drive,
+					   struct request *rq, int post)
+{
+	struct request *flush_rq = &HWGROUP(drive)->wrq;
+
+	/*
+	 * write cache disabled, just return barrier write immediately
+	 */
+	if (!drive->wcache)
+		return rq;
+
+	ide_init_drive_cmd(flush_rq);
+	ide_fill_flush_cmd(drive, flush_rq);
+
+	flush_rq->special = rq;
+	flush_rq->nr_sectors = rq->nr_sectors;
+
+	if (!post) {
+		drive->doing_barrier = 1;
+		flush_rq->flags |= REQ_BAR_PREFLUSH;
+		blkdev_dequeue_request(rq);
+	} else
+		flush_rq->flags |= REQ_BAR_POSTFLUSH;
+
+	__elv_add_request(drive->queue, flush_rq, ELEVATOR_INSERT_FRONT, 0);
+	HWGROUP(drive)->rq = NULL;
+	return flush_rq;
+}
+
+static int __ide_end_request(ide_drive_t *drive, struct request *rq,
+			     int uptodate, int nr_sectors)
+{
+	int ret = 1;
+
+	BUG_ON(!(rq->flags & REQ_STARTED));
+
+	/*
+	 * if failfast is set on a request, override number of sectors and
+	 * complete the whole request right now
+	 */
+	if (blk_noretry_request(rq) && !uptodate)
+		nr_sectors = rq->hard_nr_sectors;
+
+	if (!blk_fs_request(rq) && !uptodate && !rq->errors)
+		rq->errors = -EIO;
+
+	/*
+	 * decide whether to reenable DMA -- 3 is a random magic for now,
+	 * if we DMA timeout more than 3 times, just stay in PIO
+	 */
+	if (drive->state == DMA_PIO_RETRY && drive->retry_pio <= 3) {
+		drive->state = 0;
+		HWGROUP(drive)->hwif->ide_dma_on(drive);
+	}
+
+	if (!end_that_request_first(rq, uptodate, nr_sectors)) {
+		add_disk_randomness(rq->rq_disk);
+
+		if (blk_rq_tagged(rq))
+			blk_queue_end_tag(drive->queue, rq);
+
+		blkdev_dequeue_request(rq);
+		end_that_request_last(rq);
+		HWGROUP(drive)->rq = NULL;
+		ret = 0;
+	}
+
+	return ret;
+}
+
 /**
  *	ide_end_request		-	complete an IDE I/O
  *	@drive: IDE device for the I/O
@@ -74,37 +165,21 @@ int ide_end_request (ide_drive_t *drive, int uptodate, int nr_sectors)
 	spin_lock_irqsave(&ide_lock, flags);
 	rq = HWGROUP(drive)->rq;
 
-	BUG_ON(!(rq->flags & REQ_STARTED));
-
 	if (!nr_sectors)
 		nr_sectors = rq->hard_cur_sectors;
 
-	/*
-	 * if failfast is set on a request, override number of sectors and
-	 * complete the whole request right now
-	 */
-	if (blk_noretry_request(rq) && !uptodate)
-		nr_sectors = rq->hard_nr_sectors;
+	if (!blk_barrier_rq(rq))
+		ret = __ide_end_request(drive, rq, uptodate, nr_sectors);
+	else {
+		struct request *flush_rq = &HWGROUP(drive)->wrq;
 
-	/*
-	 * decide whether to reenable DMA -- 3 is a random magic for now,
-	 * if we DMA timeout more than 3 times, just stay in PIO
-	 */
-	if (drive->state == DMA_PIO_RETRY && drive->retry_pio <= 3) {
-		drive->state = 0;
-		HWGROUP(drive)->hwif->ide_dma_on(drive);
+		flush_rq->nr_sectors -= nr_sectors;
+		if (!flush_rq->nr_sectors) {
+			ide_queue_flush_cmd(drive, rq, 1);
+			ret = 0;
+		}
 	}
 
-	if (!end_that_request_first(rq, uptodate, nr_sectors)) {
-		add_disk_randomness(rq->rq_disk);
-		if (!blk_rq_tagged(rq))
-			blkdev_dequeue_request(rq);
-		else
-			blk_queue_end_tag(drive->queue, rq);
-		HWGROUP(drive)->rq = NULL;
-		end_that_request_last(rq);
-		ret = 0;
-	}
 	spin_unlock_irqrestore(&ide_lock, flags);
 	return ret;
 }
@@ -138,6 +213,92 @@ static void ide_complete_pm_request (ide_drive_t *drive, struct request *rq)
 	HWGROUP(drive)->rq = NULL;
 	end_that_request_last(rq);
 	spin_unlock_irqrestore(&ide_lock, flags);
+}
+
+/*
+ * FIXME: probably move this somewhere else, name is bad too :)
+ */
+u64 ide_get_error_location(ide_drive_t *drive, char *args)
+{
+	u32 high, low;
+	u8 hcyl, lcyl, sect;
+	u64 sector;
+
+	high = 0;
+	hcyl = args[5];
+	lcyl = args[4];
+	sect = args[3];
+	
+	if (drive->id->cfs_enable_2 & 0x2400) {
+		low = (hcyl << 16) | (lcyl << 8) | sect;
+		HWIF(drive)->OUTB(drive->ctl|0x80, IDE_CONTROL_REG);
+		high = ide_read_24(drive);
+	} else {
+		u8 cur = HWIF(drive)->INB(IDE_SELECT_REG);
+		if (cur & 0x40)
+			low = (hcyl << 16) | (lcyl << 8) | sect;
+		else {
+			low = hcyl * drive->head * drive->sect;
+			low += lcyl * drive->sect;
+			low += sect - 1;
+		}
+	}
+
+	sector = ((u64) high << 24) | low;
+	return sector;
+}
+
+static void ide_complete_barrier(ide_drive_t *drive, struct request *rq,
+				 int error)
+{
+	struct request *real_rq = rq->special;
+	int good_sectors, bad_sectors;
+	sector_t sector;
+
+	if (!error) {
+		if (blk_barrier_postflush(rq)) {
+			/*
+			 * this completes the barrier write
+			 */
+			__ide_end_request(drive, real_rq, 1, real_rq->hard_nr_sectors);
+			drive->doing_barrier = 0;
+		} else {
+			/*
+			 * just indicate that we did the pre flush
+			 */
+			real_rq->flags |= REQ_BAR_PREFLUSH;
+			__elv_add_request(drive->queue, real_rq, ELEVATOR_INSERT_FRONT, 0);
+		}
+		/*
+		 * all is fine, return
+		 */
+		return;
+	}
+
+	/*
+	 * bummer, flush failed. if it was the pre-flush, fail the barrier.
+	 * if it was the post-flush, complete the succesful part of the request
+	 * and fail the rest
+	 */
+	good_sectors = 0;
+	if (blk_barrier_postflush(rq)) {
+		sector = ide_get_error_location(drive, rq->buffer);
+
+		if ((sector >= real_rq->hard_sector) &&
+		    (sector < real_rq->hard_sector + real_rq->hard_nr_sectors))
+			good_sectors = sector - real_rq->hard_sector;
+	} else
+		sector = real_rq->hard_sector;
+
+	bad_sectors = real_rq->hard_nr_sectors - good_sectors;
+	if (good_sectors)
+		__ide_end_request(drive, real_rq, 1, good_sectors);
+	if (bad_sectors)
+		__ide_end_request(drive, real_rq, 0, bad_sectors);
+
+	drive->doing_barrier = 0;
+
+	printk(KERN_ERR "%s: failed barrier write: sector=%Lx(good=%d/bad=%d)\n", drive->name, sector, good_sectors, bad_sectors);
 }
 
 /**
@@ -229,6 +390,10 @@ void ide_end_drive_cmd (ide_drive_t *drive, u8 stat, u8 err)
 
 	spin_lock_irqsave(&ide_lock, flags);
 	blkdev_dequeue_request(rq);
+
+	if (blk_barrier_preflush(rq) || blk_barrier_postflush(rq))
+		ide_complete_barrier(drive, rq, err);
+
 	HWGROUP(drive)->rq = NULL;
 	end_that_request_last(rq);
 	spin_unlock_irqrestore(&ide_lock, flags);
@@ -715,6 +880,15 @@ static inline ide_drive_t *choose_drive (ide_hwgroup_t *hwgroup)
 repeat:	
 	best = NULL;
 	drive = hwgroup->drive;
+
+	/*
+	 * drive is doing pre-flush, ordered write, post-flush sequence. even
+	 * though that is 3 requests, it must be seen as a single transaction.
+	 * we must not preempt this drive until that is complete
+	 */
+	if (drive->doing_barrier)
+		return drive;
+
 	do {
 		if ((!drive->sleep || time_after_eq(jiffies, drive->sleep))
 		    && !elv_queue_empty(drive->queue)) {
@@ -882,6 +1056,13 @@ queue_next:
 		}
 
 		/*
+		 * if rq is a barrier write, issue pre cache flush if not
+		 * already done
+		 */
+		if (blk_barrier_rq(rq) && !blk_barrier_preflush(rq))
+			rq = ide_queue_flush_cmd(drive, rq, 0);
+
+		/*
 		 * Sanity: don't accept a request that isn't a PM request
 		 * if we are currently power managed. This is very important as
 		 * blk_stop_queue() doesn't prevent the elv_next_request()
@@ -900,6 +1081,10 @@ queue_next:
 			break;
 		}
 
+		/*
+		 * we can only queue read-write requests, so let the drive
+		 * queue drain before continuing with this command.
+		 */
 		if (!rq->bio && ata_pending_commands(drive))
 			break;
 
@@ -936,7 +1121,9 @@ EXPORT_SYMBOL(ide_do_request);
  */
 void do_ide_request(request_queue_t *q)
 {
-	ide_do_request(q->queuedata, IDE_NO_IRQ);
+	ide_drive_t *drive = q->queuedata;
+
+	ide_do_request(HWGROUP(drive), IDE_NO_IRQ);
 }
 
 /*
@@ -1305,6 +1492,7 @@ void ide_init_drive_cmd (struct request *rq)
 {
 	memset(rq, 0, sizeof(*rq));
 	rq->flags = REQ_DRIVE_CMD;
+	rq->ref_count = 1;
 }
 
 EXPORT_SYMBOL(ide_init_drive_cmd);
