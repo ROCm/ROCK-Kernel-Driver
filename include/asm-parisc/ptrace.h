@@ -43,9 +43,6 @@ struct pt_regs {
  * since we have taken branch traps too)
  */
 #define PTRACE_SINGLEBLOCK	12	/* resume execution until next branch */
-#define PTRACE_GETSIGINFO	13	/* get child's siginfo structure */
-#define PTRACE_SETSIGINFO	14	/* set child's siginfo structure */
-
 #ifdef __KERNEL__
 
 /* XXX should we use iaoq[1] or iaoq[0] ? */

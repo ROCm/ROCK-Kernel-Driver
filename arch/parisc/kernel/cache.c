@@ -114,7 +114,7 @@ show_cache_info(struct seq_file *m)
 void __init 
 parisc_cache_init(void)
 {
-	if(pdc_cache_info(&cache_info)<0)
+	if (pdc_cache_info(&cache_info) < 0)
 		panic("parisc_cache_init: pdc_cache_info failed");
 
 #if 0
@@ -167,25 +167,25 @@ parisc_cache_init(void)
 
 	split_tlb = 0;
 	if (cache_info.dt_conf.tc_sh == 0 || cache_info.dt_conf.tc_sh == 2) {
-
-	    if (cache_info.dt_conf.tc_sh == 2)
-		printk(KERN_WARNING "Unexpected TLB configuration. "
+		if (cache_info.dt_conf.tc_sh == 2)
+			printk(KERN_WARNING "Unexpected TLB configuration. "
 			"Will flush I/D separately (could be optimized).\n");
 
-	    split_tlb = 1;
+		split_tlb = 1;
 	}
 
-	dcache_stride = ( (1<<(cache_info.dc_conf.cc_block+3)) *
-			 cache_info.dc_conf.cc_line );
-	icache_stride = ( (1<<(cache_info.ic_conf.cc_block+3)) *
-			 cache_info.ic_conf.cc_line );
+	dcache_stride = (1 << (cache_info.dc_conf.cc_block + 3)) *
+						cache_info.dc_conf.cc_line;
+	icache_stride = (1 << (cache_info.ic_conf.cc_block + 3)) *
+						cache_info.ic_conf.cc_line;
 #ifndef CONFIG_PA20
-	if(pdc_btlb_info(&btlb_info)<0) {
+	if (pdc_btlb_info(&btlb_info) < 0) {
 		memset(&btlb_info, 0, sizeof btlb_info);
 	}
 #endif
 
-	if ((boot_cpu_data.pdc.capabilities & PDC_MODEL_NVA_MASK) == PDC_MODEL_NVA_UNSUPPORTED) {
+	if ((boot_cpu_data.pdc.capabilities & PDC_MODEL_NVA_MASK) ==
+						PDC_MODEL_NVA_UNSUPPORTED) {
 		printk(KERN_WARNING "Only equivalent aliasing supported\n");
 #ifndef CONFIG_SMP
 		panic("SMP kernel required to avoid non-equivalent aliasing");
@@ -195,31 +195,69 @@ parisc_cache_init(void)
 
 void disable_sr_hashing(void)
 {
-    int srhash_type;
+	int srhash_type;
 
-    if (boot_cpu_data.cpu_type == pcxl2)
-	return; /* pcxl2 doesn't support space register hashing */
+	switch (boot_cpu_data.cpu_type) {
+	case pcx: /* We shouldn't get this far.  setup.c should prevent it. */
+		BUG();
+		return;
 
-    switch (boot_cpu_data.cpu_type) {
+	case pcxs:
+	case pcxt:
+	case pcxt_:
+		srhash_type = SRHASH_PCXST;
+		break;
 
-    case pcx:
-	BUG(); /* We shouldn't get here. code in setup.c should prevent it */
-	return;
+	case pcxl:
+		srhash_type = SRHASH_PCXL;
+		break;
 
-    case pcxs:
-    case pcxt:
-    case pcxt_:
-	srhash_type = SRHASH_PCXST;
-	break;
+	case pcxl2: /* pcxl2 doesn't support space register hashing */
+		return;
 
-    case pcxl:
-	srhash_type = SRHASH_PCXL;
-	break;
+	default: /* Currently all PA2.0 machines use the same ins. sequence */
+		srhash_type = SRHASH_PA20;
+		break;
+	}
 
-    default: /* Currently all PA2.0 machines use the same ins. sequence */
-	srhash_type = SRHASH_PA20;
-	break;
-    }
-
-    disable_sr_hashing_asm(srhash_type);
+	disable_sr_hashing_asm(srhash_type);
 }
+
+void __flush_dcache_page(struct page *page)
+{
+	struct mm_struct *mm = current->active_mm;
+	struct list_head *l;
+
+	flush_kernel_dcache_page(page_address(page));
+
+	if (!page->mapping)
+		return;
+
+	list_for_each(l, &page->mapping->i_mmap_shared) {
+		struct vm_area_struct *mpnt;
+		unsigned long off;
+
+		mpnt = list_entry(l, struct vm_area_struct, shared);
+
+		/*
+		 * If this VMA is not in our MM, we can ignore it.
+		 */
+		if (mpnt->vm_mm != mm)
+			continue;
+
+		if (page->index < mpnt->vm_pgoff)
+			continue;
+
+		off = page->index - mpnt->vm_pgoff;
+		if (off >= (mpnt->vm_end - mpnt->vm_start) >> PAGE_SHIFT)
+			continue;
+
+		flush_cache_page(mpnt, mpnt->vm_start + (off << PAGE_SHIFT));
+
+		/* All user shared mappings should be equivalently mapped,
+		 * so once we've flushed one we should be ok
+		 */
+		break;
+	}
+}
+

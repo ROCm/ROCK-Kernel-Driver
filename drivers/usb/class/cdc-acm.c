@@ -138,9 +138,9 @@ struct acm_line {
  */
 
 struct acm {
-	struct usb_device *dev;				/* the coresponding usb device */
+	struct usb_device *dev;				/* the corresponding usb device */
 	struct usb_interface *iface;			/* the interfaces - +0 control +1 data */
-	struct tty_struct *tty;				/* the coresponding tty */
+	struct tty_struct *tty;				/* the corresponding tty */
 	struct urb *ctrlurb, *readurb, *writeurb;	/* urbs */
 	struct acm_line line;				/* line coding (bits, stop, parity) */
 	struct work_struct work;					/* work queue entry for line discipline waking up */

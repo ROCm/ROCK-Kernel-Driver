@@ -1155,6 +1155,7 @@ int __devinit __cpu_up(unsigned int cpu)
 
 void __init smp_cpus_done(unsigned int max_cpus)
 {
+	setup_ioapic_dest(TARGET_CPUS);
 	zap_low_mappings();
 }
 

@@ -168,7 +168,7 @@ struct usb_bluetooth {
 	int			magic;
 	struct usb_device *	dev;
 	struct tty_driver *	tty_driver;	/* the tty_driver for this device */
-	struct tty_struct *	tty;		/* the coresponding tty for this port */
+	struct tty_struct *	tty;		/* the corresponding tty for this port */
 
 	unsigned char		minor;		/* the starting minor number for this device */
 	int			throttle;	/* throttled by tty layer */
@@ -1328,7 +1328,7 @@ int usb_bluetooth_init(void)
 	int i;
 	int result;
 
-	/* Initalize our global data */
+	/* Initialize our global data */
 	for (i = 0; i < BLUETOOTH_TTY_MINORS; ++i) {
 		bluetooth_table[i] = NULL;
 	}

@@ -86,13 +86,14 @@ spinlock_t die_lock = SPIN_LOCK_UNLOCKED;
 
 void die(const char * str, struct pt_regs * fp, long err)
 {
+	static int die_counter;
 	console_verbose();
 	spin_lock_irq(&die_lock);
 #ifdef CONFIG_PMAC_BACKLIGHT
 	set_backlight_enable(1);
 	set_backlight_level(BACKLIGHT_MAX);
 #endif
-	printk("Oops: %s, sig: %ld\n", str, err);
+	printk("Oops: %s, sig: %ld [#%d]\n", str, err, ++die_counter);
 	show_regs(fp);
 	spin_unlock_irq(&die_lock);
 	/* do_exit() should take care of panic'ing from an interrupt

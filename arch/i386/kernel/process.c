@@ -290,6 +290,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
 {
 	struct pt_regs * childregs;
 	struct task_struct *tsk;
+	int err;
 
 	childregs = ((struct pt_regs *) (THREAD_SIZE + (unsigned long) p->thread_info)) - 1;
 	struct_cpy(childregs, regs);
@@ -322,20 +323,27 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
 		struct user_desc info;
 		int idx;
 
+		err = -EFAULT;
 		if (copy_from_user(&info, (void *)childregs->esi, sizeof(info)))
-			return -EFAULT;
+			goto out;
+		err = -EINVAL;
 		if (LDT_empty(&info))
-			return -EINVAL;
+			goto out;
 
 		idx = info.entry_number;
 		if (idx < GDT_ENTRY_TLS_MIN || idx > GDT_ENTRY_TLS_MAX)
-			return -EINVAL;
+			goto out;
 
 		desc = p->thread.tls_array + idx - GDT_ENTRY_TLS_MIN;
 		desc->a = LDT_entry_a(&info);
 		desc->b = LDT_entry_b(&info);
 	}
-	return 0;
+
+	err = 0;
+ out:
+	if (err && p->thread.ts_io_bitmap)
+		kfree(p->thread.ts_io_bitmap);
+	return err;
 }
 
 /*

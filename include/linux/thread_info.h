@@ -12,7 +12,7 @@
  */
 struct restart_block {
 	long (*fn)(struct restart_block *);
-	unsigned long arg0, arg1, arg2;
+	unsigned long arg0, arg1, arg2, arg3;
 };
 
 extern long do_no_restart_syscall(struct restart_block *parm);

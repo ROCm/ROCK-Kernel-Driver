@@ -48,6 +48,7 @@ struct ufs_buffer_head * _ubh_bread_ (struct ufs_sb_private_info * uspi,
 failed:
 	for (j = 0; j < i; j++)
 		brelse (ubh->bh[j]);
+	kfree(ubh);
 	return NULL;
 }
 
