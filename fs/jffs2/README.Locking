@@ -1,4 +1,4 @@
-	$Id: README.Locking,v 1.8 2004/11/14 11:43:41 dedekind Exp $
+	$Id: README.Locking,v 1.9 2004/11/20 10:35:40 dwmw2 Exp $
 
 	JFFS2 LOCKING DOCUMENTATION
 	---------------------------
@@ -133,3 +133,16 @@ the jffs2_raw_node_ref structures in question while the garbage
 collection code is looking at them.
 
 Suggestions for alternative solutions to this problem would be welcomed.
+
+
+	wbuf_sem
+	--------
+
+This read/write semaphore protects against concurrent access to the
+write-behind buffer ('wbuf') used for flash chips where we must write
+in blocks. It protects both the contents of the wbuf and the metadata
+which indicates which flash region (if any) is currently covered by 
+the buffer.
+
+Ordering constraints:
+	Lock wbuf_sem last, after the alloc_sem or and f->sem.
