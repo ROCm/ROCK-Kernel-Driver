@@ -25,6 +25,7 @@ struct thread_struct {
 	unsigned long cr2;
 	int err;
 	unsigned long trap_no;
+	int singlestep_syscall;
 	void *fault_addr;
 	void *fault_catcher;
 	struct task_struct *prev_sched;
@@ -37,7 +38,6 @@ struct thread_struct {
 			int extern_pid;
 			int tracing;
 			int switch_pipe[2];
-			int singlestep_syscall;
 			int vm_seq;
 		} tt;
 #endif

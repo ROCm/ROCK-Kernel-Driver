@@ -154,7 +154,7 @@ static int kern_do_signal(struct pt_regs *regs, sigset_t *oldset)
 	 */
 	if((current->ptrace & PT_DTRACE) && 
 	   is_syscall(PT_REGS_IP(&current->thread.regs)))
- 		(void) CHOOSE_MODE(current->thread.mode.tt.singlestep_syscall = 1, 0);
+		current->thread.singlestep_syscall = 1;
 	return(0);
 }
 

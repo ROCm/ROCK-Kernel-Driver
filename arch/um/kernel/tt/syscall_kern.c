@@ -123,8 +123,8 @@ long execute_syscall_tt(void *r)
 
 	set_fs(USER_DS);
 
-	if(current->thread.mode.tt.singlestep_syscall){
-		current->thread.mode.tt.singlestep_syscall = 0;
+	if(current->thread.singlestep_syscall){
+		current->thread.singlestep_syscall = 0;
 		current->ptrace &= ~PT_DTRACE;
 		force_sig(SIGTRAP, current);
 	}

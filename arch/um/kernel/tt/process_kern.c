@@ -527,7 +527,7 @@ int singlestepping_tt(void *t)
 {
 	struct task_struct *task = t;
 
-	if(task->thread.mode.tt.singlestep_syscall)
+	if(task->thread.singlestep_syscall)
 		return(0);
 	return(task->ptrace & PT_DTRACE);
 }
