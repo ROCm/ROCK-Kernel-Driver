@@ -1687,8 +1687,6 @@ static void serial8250_release_port(struct uart_port *port)
 	struct uart_8250_port *up = (struct uart_8250_port *)port;
 	unsigned long start, offset = 0, size = 0;
 
-	if (!(up->port.flags & UPF_RESOURCES))
-		return;
 	if (up->port.type == PORT_RSA) {
 		offset = UART_RSA_BASE << up->port.regshift;
 		size = 8;
@@ -1733,15 +1731,13 @@ static int serial8250_request_port(struct uart_port *port)
 	struct resource *res = NULL, *res_rsa = NULL;
 	int ret = 0;
 
-	if (up->port.flags & UPF_RESOURCES) {
-		if (up->port.type == PORT_RSA) {
-			ret = serial8250_request_rsa_resource(up, &res_rsa);
-			if (ret < 0)
-				return ret;
-		}
-
-		ret = serial8250_request_std_resource(up, &res);
+	if (up->port.type == PORT_RSA) {
+		ret = serial8250_request_rsa_resource(up, &res_rsa);
+		if (ret < 0)
+			return ret;
 	}
+
+	ret = serial8250_request_std_resource(up, &res);
 
 	/*
 	 * If we have a mapbase, then request that as well.
@@ -1782,17 +1778,13 @@ static void serial8250_config_port(struct uart_port *port, int flags)
 	 * Find the region that we can probe for.  This in turn
 	 * tells us whether we can probe for the type of port.
 	 */
-	if (up->port.flags & UPF_RESOURCES) {
-		ret = serial8250_request_std_resource(up, &res_std);
-		if (ret < 0)
-			return;
+	ret = serial8250_request_std_resource(up, &res_std);
+	if (ret < 0)
+		return;
 
-		ret = serial8250_request_rsa_resource(up, &res_rsa);
-		if (ret < 0)
-			probeflags &= ~PROBE_RSA;
-	} else {
+	ret = serial8250_request_rsa_resource(up, &res_rsa);
+	if (ret < 0)
 		probeflags &= ~PROBE_RSA;
-	}
 
 	if (flags & UART_CONFIG_TYPE)
 		autoconfig(up, probeflags);
@@ -1867,8 +1859,7 @@ static void __init serial8250_isa_init_ports(void)
 		up->port.iobase   = old_serial_port[i].port;
 		up->port.irq      = irq_canonicalize(old_serial_port[i].irq);
 		up->port.uartclk  = old_serial_port[i].baud_base * 16;
-		up->port.flags    = old_serial_port[i].flags |
-				    UPF_RESOURCES;
+		up->port.flags    = old_serial_port[i].flags;
 		up->port.hub6     = old_serial_port[i].hub6;
 		up->port.membase  = old_serial_port[i].iomem_base;
 		up->port.iotype   = old_serial_port[i].io_type;

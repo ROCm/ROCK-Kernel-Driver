@@ -43,8 +43,7 @@ serial_register_onedev(unsigned long baddr, void *vaddr, int irq, unsigned int b
 
 	memset(&req, 0, sizeof(req));
 	req.irq			= irq;
-	req.flags		= UPF_AUTOPROBE | UPF_RESOURCES |
-				  UPF_SHARE_IRQ;
+	req.flags		= UPF_AUTOPROBE | UPF_SHARE_IRQ;
 	req.baud_base		= baud_base;
 	req.io_type		= UPIO_MEM;
 	req.iomem_base		= vaddr;
