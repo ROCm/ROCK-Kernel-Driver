@@ -949,12 +949,10 @@ svc_sock_update_bufs(struct svc_serv *serv)
 		if (sock->type == SOCK_DGRAM) {
 			/* udp sockets need large rcvbuf as all pending
 			 * requests are still in that buffer.
-			 * As outgoing requests do not wait for an
-			 * ACK, only a moderate sndbuf is needed
 			 */
 			svc_sock_setbufsize(sock,
-					    5 * serv->sv_bufsz,
-					    (serv->sv_nrthreads+2)* serv->sv_bufsz);
+					    (serv->sv_nrthreads+3) * serv->sv_bufsz,
+					    (serv->sv_nrthreads+3) * serv->sv_bufsz);
 		} else if (svsk->sk_sk->state != TCP_LISTEN) {
 			printk(KERN_ERR "RPC update_bufs: permanent sock neither UDP or TCP_LISTEN\n");
 		}
