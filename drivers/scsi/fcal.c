@@ -292,11 +292,12 @@ static int fcal_encode_addr(Scsi_Cmnd *SCpnt, u16 *addr, fc_channel *fc, fcp_cmn
 	if (SCpnt->cmnd[1] & 0xe0) return -EINVAL;
 	/* FC-PLDA tells us... */
 	memset(addr, 0, 8);
-	f = (struct fcal *)SCpnt->host->hostdata;
-	if (!f->map[SCpnt->target]) return -EINVAL;
+	f = (struct fcal *)SCpnt->device->host->hostdata;
+	if (!f->map[SCpnt->device->id])
+		return -EINVAL;
 	/* Now, determine DID: It will be Native Identifier, so we zero upper
 	   2 bytes of the 3 byte DID, lowest byte will be AL-PA */
-	fcmd->did = target2alpa[SCpnt->target];
+	fcmd->did = target2alpa[SCpnt->device->id];
 	FCALD(("trying DID %06x\n", fcmd->did))
 	return 0;
 }
