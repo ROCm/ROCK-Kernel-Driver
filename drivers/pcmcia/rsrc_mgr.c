@@ -301,8 +301,6 @@ static int readable(struct pcmcia_socket *s, struct resource *res, cisinfo_t *in
 {
 	int ret = -1;
 
-	s->cis_mem.sys_start = res->start;
-	s->cis_mem.sys_stop = res->end;
 	s->cis_mem.res = res;
 	s->cis_virt = ioremap(res->start, s->map_size);
 	if (s->cis_virt) {
@@ -312,8 +310,6 @@ static int readable(struct pcmcia_socket *s, struct resource *res, cisinfo_t *in
 		s->cis_virt = NULL;
 		destroy_cis_cache(s);
 	}
-	s->cis_mem.sys_start = 0;
-	s->cis_mem.sys_stop = 0;
 	s->cis_mem.res = NULL;
 	if ((ret != 0) || (info->Chains == 0))
 		return 0;
@@ -332,8 +328,6 @@ static int checksum(struct pcmcia_socket *s, struct resource *res)
 		map.map = 0;
 		map.flags = MAP_ACTIVE;
 		map.speed = 0;
-		map.sys_start = res->start;
-		map.sys_stop = res->end;
 		map.res = res;
 		map.card_start = 0;
 		s->ops->set_mem_map(s, &map);
