@@ -252,6 +252,7 @@ static int kallsyms_open(struct inode *inode, struct file *file)
 	iter = kmalloc(sizeof(*iter), GFP_KERNEL);
 	if (!iter)
 		return -ENOMEM;
+	reset_iter(iter);
 
 	ret = seq_open(file, &kallsyms_op);
 	if (ret == 0)
