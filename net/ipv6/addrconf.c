@@ -132,45 +132,43 @@ static int ipv6_chk_same_addr(const struct in6_addr *addr, struct net_device *de
 
 static struct notifier_block *inet6addr_chain;
 
-struct ipv6_devconf ipv6_devconf =
-{
-	0,				/* forwarding		*/
-	IPV6_DEFAULT_HOPLIMIT,		/* hop limit		*/
-	IPV6_MIN_MTU,			/* mtu			*/
-	1,				/* accept RAs		*/
-	1,				/* accept redirects	*/
-	1,				/* autoconfiguration	*/
-	1,				/* dad transmits	*/
-	MAX_RTR_SOLICITATIONS,		/* router solicits	*/
-	RTR_SOLICITATION_INTERVAL,	/* rtr solicit interval	*/
-	MAX_RTR_SOLICITATION_DELAY,	/* rtr solicit delay	*/
+struct ipv6_devconf ipv6_devconf = {
+	.forwarding		= 0,
+	.hop_limit		= IPV6_DEFAULT_HOPLIMIT,
+	.mtu6			= IPV6_MIN_MTU,
+	.accept_ra		= 1,
+	.accept_redirects	= 1,
+	.autoconf		= 1,
+	.dad_transmits		= 1,
+	.rtr_solicits		= MAX_RTR_SOLICITATIONS,
+	.rtr_solicit_interval	= RTR_SOLICITATION_INTERVAL,
+	.rtr_solicit_delay	= MAX_RTR_SOLICITATION_DELAY,
 #ifdef CONFIG_IPV6_PRIVACY
-	.use_tempaddr 			= 0,
-	.temp_valid_lft			= TEMP_VALID_LIFETIME,
-	.temp_prefered_lft		= TEMP_PREFERRED_LIFETIME,
-	.regen_max_retry		= REGEN_MAX_RETRY,
-	.max_desync_factor		= MAX_DESYNC_FACTOR,
+	.use_tempaddr 		= 0,
+	.temp_valid_lft		= TEMP_VALID_LIFETIME,
+	.temp_prefered_lft	= TEMP_PREFERRED_LIFETIME,
+	.regen_max_retry	= REGEN_MAX_RETRY,
+	.max_desync_factor	= MAX_DESYNC_FACTOR,
 #endif
 };
 
-static struct ipv6_devconf ipv6_devconf_dflt =
-{
-	0,				/* forwarding		*/
-	IPV6_DEFAULT_HOPLIMIT,		/* hop limit		*/
-	IPV6_MIN_MTU,			/* mtu			*/
-	1,				/* accept RAs		*/
-	1,				/* accept redirects	*/
-	1,				/* autoconfiguration	*/
-	1,				/* dad transmits	*/
-	MAX_RTR_SOLICITATIONS,		/* router solicits	*/
-	RTR_SOLICITATION_INTERVAL,	/* rtr solicit interval	*/
-	MAX_RTR_SOLICITATION_DELAY,	/* rtr solicit delay	*/
+static struct ipv6_devconf ipv6_devconf_dflt = {
+	.forwarding		= 0,
+	.hop_limit		= IPV6_DEFAULT_HOPLIMIT,
+	.mtu6			= IPV6_MIN_MTU,
+	.accept_ra		= 1,
+	.accept_redirects	= 1,
+	.autoconf		= 1,
+	.dad_transmits		= 1,
+	.rtr_solicits		= MAX_RTR_SOLICITATIONS,
+	.rtr_solicit_interval	= RTR_SOLICITATION_INTERVAL,
+	.rtr_solicit_delay	= MAX_RTR_SOLICITATION_DELAY,
 #ifdef CONFIG_IPV6_PRIVACY
-	.use_tempaddr			= 0,
-	.temp_valid_lft			= TEMP_VALID_LIFETIME,
-	.temp_prefered_lft		= TEMP_PREFERRED_LIFETIME,
-	.regen_max_retry		= REGEN_MAX_RETRY,
-	.max_desync_factor		= MAX_DESYNC_FACTOR,
+	.use_tempaddr		= 0,
+	.temp_valid_lft		= TEMP_VALID_LIFETIME,
+	.temp_prefered_lft	= TEMP_PREFERRED_LIFETIME,
+	.regen_max_retry	= REGEN_MAX_RETRY,
+	.max_desync_factor	= MAX_DESYNC_FACTOR,
 #endif
 };
 

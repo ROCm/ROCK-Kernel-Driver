@@ -78,16 +78,16 @@ int sysctl_tcp_reordering = TCP_FASTRETRANS_THRESH;
 #ifdef CONFIG_INET_ECN
 int sysctl_tcp_ecn = 1;
 #else
-int sysctl_tcp_ecn = 0;
+int sysctl_tcp_ecn;
 #endif
 int sysctl_tcp_dsack = 1;
 int sysctl_tcp_app_win = 31;
 int sysctl_tcp_adv_win_scale = 2;
 
-int sysctl_tcp_stdurg = 0;
-int sysctl_tcp_rfc1337 = 0;
+int sysctl_tcp_stdurg;
+int sysctl_tcp_rfc1337;
 int sysctl_tcp_max_orphans = NR_FILE;
-int sysctl_tcp_frto = 0;
+int sysctl_tcp_frto;
 
 #define FLAG_DATA		0x01 /* Incoming frame contained data.		*/
 #define FLAG_WIN_UPDATE		0x02 /* Incoming ACK was a window update.	*/
