@@ -143,9 +143,7 @@ int __init mca_register_device (int bus, struct mca_device *mca_dev)
 	mca_dev->dev.bus = &mca_bus_type;
 	sprintf (mca_dev->dev.bus_id, "%02d:%02X", bus, mca_dev->slot);
 	mca_dev->dma_mask = mca_bus->default_dma_mask;
-	/* FIXME: uncomment this when we get a global idea of where
-	 * dma_mask goes */
-	//mca_dev->dev.dma_mask = &mca_dev->dma_mask;
+	mca_dev->dev.dma_mask = &mca_dev->dma_mask;
 
 	if (device_register(&mca_dev->dev))
 		return 0;
