@@ -129,7 +129,7 @@ static int ec_read16(u8 addr, u16 *value) {
 }
 
 /* Initializes the device - this comes from the AML code in the ACPI bios */
-static void __devinit sonypi_type1_srs(void) {
+static void sonypi_type1_srs(void) {
 	u32 v;
 
 	pci_read_config_dword(sonypi_device.dev, SONYPI_G10A, &v);
@@ -151,7 +151,7 @@ static void __devinit sonypi_type1_srs(void) {
 	pci_write_config_dword(sonypi_device.dev, SONYPI_G10A, v);
 }
 
-static void __devinit sonypi_type2_srs(void) {
+static void sonypi_type2_srs(void) {
 	if (sonypi_ec_write(SONYPI_SHIB, (sonypi_device.ioport1 & 0xFF00) >> 8))
 		printk(KERN_WARNING "ec_write failed\n");
 	if (sonypi_ec_write(SONYPI_SLOB,  sonypi_device.ioport1 & 0x00FF))
