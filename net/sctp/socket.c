@@ -986,21 +986,6 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 			goto out_free;
 	}
 
-#if 0
-	/* FIXME: This looks wrong so I'll comment out.
-	 * We should be able to use this same technique for
-	 * primary address override!  --jgrimm
-	 */
-	/* If the user gave us an address, copy it in.  */
-	if (msg->msg_name) {
-		chunk->transport = sctp_assoc_lookup_paddr(asoc, &to);
-		if (!chunk->transport) {
-			err = -EINVAL;
-			goto out_free;
-		}
-	}
-#endif /* 0 */
-
 	/* Break the message into multiple chunks of maximum size. */
 	skb_queue_head_init(&chunks);
 	err = sctp_datachunks_from_user(asoc, sinfo, msg, msg_len, &chunks);
@@ -1020,6 +1005,23 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 
 		/* Do accounting for the write space.  */
 		sctp_set_owner_w(chunk);
+
+		/* This flag, in the UDP model, requests the SCTP stack to
+		 * override the primary destination address with the 
+		 * address found with the sendto/sendmsg call.
+		 */
+		if (sinfo_flags & MSG_ADDR_OVER) {
+			if (!msg->msg_name) {
+				err = -EINVAL;
+				goto out_free;
+			}
+			chunk->transport = sctp_assoc_lookup_paddr(asoc, &to);
+			if (!chunk->transport) {
+				err = -EINVAL;
+				goto out_free;
+			}
+		}
+
 		/* Send it to the lower layers.  */
 		sctp_primitive_SEND(asoc, chunk);
 		SCTP_DEBUG_PRINTK("We sent primitively.\n");
