@@ -104,7 +104,7 @@ static void clps711xuart_enable_ms(struct uart_port *port)
 {
 }
 
-static void clps711xuart_int_rx(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t clps711xuart_int_rx(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct uart_port *port = dev_id;
 	struct tty_struct *tty = port->info->tty;
@@ -139,7 +139,7 @@ static void clps711xuart_int_rx(int irq, void *dev_id, struct pt_regs *regs)
 	}
  out:
 	tty_flip_buffer_push(tty);
-	return;
+	return IRQ_HANDLED;
 
  handle_error:
 	if (ch & UARTDR_PARERR)
@@ -180,7 +180,7 @@ static void clps711xuart_int_rx(int irq, void *dev_id, struct pt_regs *regs)
 	goto error_return;
 }
 
-static void clps711xuart_int_tx(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t clps711xuart_int_tx(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct uart_port *port = dev_id;
 	struct circ_buf *xmit = &port->info->xmit;
@@ -190,11 +190,11 @@ static void clps711xuart_int_tx(int irq, void *dev_id, struct pt_regs *regs)
 		clps_writel(port->x_char, UARTDR(port));
 		port->icount.tx++;
 		port->x_char = 0;
-		return;
+		return IRQ_HANDLED;
 	}
 	if (uart_circ_empty(xmit) || uart_tx_stopped(port)) {
 		clps711xuart_stop_tx(port, 0);
-		return;
+		return IRQ_HANDLED;
 	}
 
 	count = port->fifosize >> 1;
@@ -211,6 +211,8 @@ static void clps711xuart_int_tx(int irq, void *dev_id, struct pt_regs *regs)
 
 	if (uart_circ_empty(xmit))
 		clps711xuart_stop_tx(port, 0);
+
+	return IRQ_HANDLED;
 }
 
 static unsigned int clps711xuart_tx_empty(struct uart_port *port)
