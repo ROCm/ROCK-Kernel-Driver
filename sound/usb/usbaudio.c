@@ -1833,11 +1833,6 @@ static int parse_audio_endpoints(snd_usb_audio_t *chip, unsigned char *buffer, i
 /*
  * parse audio control descriptor and create pcm/midi streams
  */
-
-static int snd_usb_create_midi_interface(snd_usb_audio_t *chip,
-					 struct usb_interface *iface,
-					 const snd_usb_audio_quirk_t *quirk);
-
 static int snd_usb_create_streams(snd_usb_audio_t *chip, int ctrlif,
 				  unsigned char *buffer, int buflen)
 {
@@ -1893,32 +1888,6 @@ static int snd_usb_create_streams(snd_usb_audio_t *chip, int ctrlif,
 		usb_driver_claim_interface(&usb_audio_driver, iface, (void *)-1);
 	}
 
-	return 0;
-}
-
-static int snd_usb_create_midi_interface(snd_usb_audio_t *chip,
-					 struct usb_interface *iface,
-					 const snd_usb_audio_quirk_t *quirk)
-{
-#if defined(CONFIG_SND_SEQUENCER) || defined(CONFIG_SND_SEQUENCER_MODULE)
-	snd_seq_device_t *seq_device;
-	snd_usb_midi_t *umidi;
-	int err;
-
-	err = snd_seq_device_new(chip->card, chip->next_seq_device,
-				 SNDRV_SEQ_DEV_ID_USBMIDI,
-				 sizeof(snd_usb_midi_t), &seq_device);
-	if (err < 0)
-		return err;
-	chip->next_seq_device++;
-	strcpy(seq_device->name, chip->card->shortname);
-	umidi = (snd_usb_midi_t *)SNDRV_SEQ_DEVICE_ARGPTR(seq_device);
-	umidi->chip = chip;
-	umidi->iface = iface;
-	umidi->ifnum = iface->altsetting->bInterfaceNumber;
-	umidi->quirk = quirk;
-	umidi->seq_client = -1;
-#endif
 	return 0;
 }
 

@@ -123,8 +123,6 @@
 /* maximum number of endpoints per interface */
 #define MIDI_MAX_ENDPOINTS 2
 
-#define SNDRV_SEQ_DEV_ID_USBMIDI "usb-midi"
-
 /*
  */
 
@@ -140,9 +138,7 @@ struct snd_usb_audio {
 	struct list_head pcm_list;	/* list of pcm streams */
 	int pcm_devs;
 
-#if defined(CONFIG_SND_SEQUENCER) || defined(CONFIG_SND_SEQUENCER_MODULE)
-	int next_seq_device;
-#endif
+	int next_midi_device;
 };  
 
 /*
@@ -177,31 +173,6 @@ struct snd_usb_midi_endpoint_info {
 /* for QUIRK_MIDI_MIDIMAN, data is the number of ports */
 
 /*
- * USB MIDI sequencer device data
- */
-typedef struct snd_usb_midi snd_usb_midi_t;
-typedef struct snd_usb_midi_endpoint snd_usb_midi_endpoint_t;
-typedef struct snd_usb_midi_out_endpoint snd_usb_midi_out_endpoint_t;
-typedef struct snd_usb_midi_in_endpoint snd_usb_midi_in_endpoint_t;
-
-struct snd_usb_midi {
-	/* filled by usbaudio.c */
-	snd_usb_audio_t *chip;
-	struct usb_interface *iface;
-	int ifnum;
-	const snd_usb_audio_quirk_t *quirk;
-
-	/* used internally in usbmidi.c */
-	int seq_client;
-	struct snd_usb_midi_endpoint {
-		snd_usb_midi_out_endpoint_t *out;
-		snd_usb_midi_in_endpoint_t *in;
-		snd_rawmidi_t *rmidi[0x10];
-	} endpoints[MIDI_MAX_ENDPOINTS];
-};
-
-
-/*
  */
 
 #define combine_word(s)    ((*s) | ((unsigned int)(s)[1] << 8))
@@ -214,5 +185,7 @@ void *snd_usb_find_desc(void *descstart, int desclen, void *after, u8 dtype, int
 void *snd_usb_find_csint_desc(void *descstart, int desclen, void *after, u8 dsubtype, int iface, int altsetting);
 
 int snd_usb_create_mixer(snd_usb_audio_t *chip, int ctrlif, unsigned char *buffer, int buflen);
+
+int snd_usb_create_midi_interface(snd_usb_audio_t *chip, struct usb_interface *iface, const snd_usb_audio_quirk_t *quirk);
 
 #endif /* __USBAUDIO_H */
