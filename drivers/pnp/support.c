@@ -257,11 +257,11 @@ static void possible_mem(unsigned char *p, int size, struct pnp_option *option)
 	mem = pnp_alloc(sizeof(struct pnp_mem));
 	if (!mem)
 		return;
-	mem->min = ((p[3] << 8) | p[2]) << 8;
-	mem->max = ((p[5] << 8) | p[4]) << 8;
-	mem->align = (p[7] << 8) | p[6];
-	mem->size = ((p[9] << 8) | p[8]) << 8;
-	mem->flags = p[1];
+	mem->min = ((p[5] << 8) | p[4]) << 8;
+	mem->max = ((p[7] << 8) | p[6]) << 8;
+	mem->align = (p[9] << 8) | p[8];
+	mem->size = ((p[11] << 8) | p[10]) << 8;
+	mem->flags = p[3];
 	pnp_register_mem_resource(option,mem);
 	return;
 }
@@ -272,11 +272,11 @@ static void possible_mem32(unsigned char *p, int size, struct pnp_option *option
 	mem = pnp_alloc(sizeof(struct pnp_mem));
 	if (!mem)
 		return;
-	mem->min = (p[5] << 24) | (p[4] << 16) | (p[3] << 8) | p[2];
-	mem->max = (p[9] << 24) | (p[8] << 16) | (p[7] << 8) | p[6];
-	mem->align = (p[13] << 24) | (p[12] << 16) | (p[11] << 8) | p[10];
-	mem->size = (p[17] << 24) | (p[16] << 16) | (p[15] << 8) | p[14];
-	mem->flags = p[1];
+	mem->min = (p[7] << 24) | (p[6] << 16) | (p[5] << 8) | p[4];
+	mem->max = (p[11] << 24) | (p[10] << 16) | (p[9] << 8) | p[8];
+	mem->align = (p[15] << 24) | (p[14] << 16) | (p[13] << 8) | p[12];
+	mem->size = (p[19] << 24) | (p[18] << 16) | (p[17] << 8) | p[16];
+	mem->flags = p[3];
 	pnp_register_mem_resource(option,mem);
 	return;
 }
@@ -287,10 +287,10 @@ static void possible_fixed_mem32(unsigned char *p, int size, struct pnp_option *
 	mem = pnp_alloc(sizeof(struct pnp_mem));
 	if (!mem)
 		return;
-	mem->min = mem->max = (p[5] << 24) | (p[4] << 16) | (p[3] << 8) | p[2];
-	mem->size = (p[9] << 24) | (p[8] << 16) | (p[7] << 8) | p[6];
+	mem->min = mem->max = (p[7] << 24) | (p[6] << 16) | (p[5] << 8) | p[4];
+	mem->size = (p[11] << 24) | (p[10] << 16) | (p[9] << 8) | p[8];
 	mem->align = 0;
-	mem->flags = p[1];
+	mem->flags = p[3];
 	pnp_register_mem_resource(option,mem);
 	return;
 }
@@ -486,12 +486,12 @@ static void write_mem(unsigned char *p, struct resource * res)
 {
 	unsigned long base = res->start;
 	unsigned long len = res->end - res->start + 1;
-	p[2] = (base >> 8) & 0xff;
-	p[3] = ((base >> 8) >> 8) & 0xff;
 	p[4] = (base >> 8) & 0xff;
 	p[5] = ((base >> 8) >> 8) & 0xff;
-	p[8] = (len >> 8) & 0xff;
-	p[9] = ((len >> 8) >> 8) & 0xff;
+	p[6] = (base >> 8) & 0xff;
+	p[7] = ((base >> 8) >> 8) & 0xff;
+	p[10] = (len >> 8) & 0xff;
+	p[11] = ((len >> 8) >> 8) & 0xff;
 	return;
 }
 
@@ -499,32 +499,32 @@ static void write_mem32(unsigned char *p, struct resource * res)
 {
 	unsigned long base = res->start;
 	unsigned long len = res->end - res->start + 1;
-	p[2] = base & 0xff;
-	p[3] = (base >> 8) & 0xff;
-	p[4] = (base >> 16) & 0xff;
-	p[5] = (base >> 24) & 0xff;
-	p[6] = base & 0xff;
-	p[7] = (base >> 8) & 0xff;
-	p[8] = (base >> 16) & 0xff;
-	p[9] = (base >> 24) & 0xff;
-	p[14] = len & 0xff;
-	p[15] = (len >> 8) & 0xff;
-	p[16] = (len >> 16) & 0xff;
-	p[17] = (len >> 24) & 0xff;
+	p[4] = base & 0xff;
+	p[5] = (base >> 8) & 0xff;
+	p[6] = (base >> 16) & 0xff;
+	p[7] = (base >> 24) & 0xff;
+	p[8] = base & 0xff;
+	p[9] = (base >> 8) & 0xff;
+	p[10] = (base >> 16) & 0xff;
+	p[11] = (base >> 24) & 0xff;
+	p[16] = len & 0xff;
+	p[17] = (len >> 8) & 0xff;
+	p[18] = (len >> 16) & 0xff;
+	p[19] = (len >> 24) & 0xff;
 	return;
 }
 
 static void write_fixed_mem32(unsigned char *p, struct resource * res)
 {	unsigned long base = res->start;
 	unsigned long len = res->end - res->start + 1;
-	p[2] = base & 0xff;
-	p[3] = (base >> 8) & 0xff;
-	p[4] = (base >> 16) & 0xff;
-	p[5] = (base >> 24) & 0xff;
-	p[6] = len & 0xff;
-	p[7] = (len >> 8) & 0xff;
-	p[8] = (len >> 16) & 0xff;
-	p[9] = (len >> 24) & 0xff;
+	p[4] = base & 0xff;
+	p[5] = (base >> 8) & 0xff;
+	p[6] = (base >> 16) & 0xff;
+	p[7] = (base >> 24) & 0xff;
+	p[8] = len & 0xff;
+	p[9] = (len >> 8) & 0xff;
+	p[10] = (len >> 16) & 0xff;
+	p[11] = (len >> 24) & 0xff;
 	return;
 }
 
