@@ -54,8 +54,9 @@ static rwlock_t llc_ui_sockets_lock = RW_LOCK_UNLOCKED;
 
 static int llc_ui_indicate(struct llc_prim_if_block *prim);
 static int llc_ui_confirm(struct llc_prim_if_block *prim);
-static int llc_ui_wait_for_conn(struct sock *sk, int seconds);
-static int llc_ui_wait_for_disc(struct sock *sk, int seconds);
+static int llc_ui_wait_for_conn(struct sock *sk, int timeout);
+static int llc_ui_wait_for_disc(struct sock *sk, int timeout);
+static int llc_ui_wait_for_data(struct sock *sk, int timeout);
 
 /**
  *	llc_ui_next_link_no - return the next unused link number for a sap
@@ -512,10 +513,14 @@ static int llc_ui_release(struct socket *sock)
 
 	if (!sk)
 		goto out;
+	sock_hold(sk);
+	lock_sock(sk);
 	llc_ui = llc_ui_sk(sk);
 	if (llc_ui->core_sk && !llc_ui_send_disc(sk))
-		llc_ui_wait_for_disc(sk, 255);
+		llc_ui_wait_for_disc(sk, sk->rcvtimeo);
 	llc_ui_remove_socket(sk);
+	release_sock(sk);
+
 	if (llc_ui->sap && !llc_ui_find_sap(llc_ui->sap->laddr.lsap))
 		llc_sap_close(llc_ui->sap);
 	sock_orphan(sk);
@@ -530,6 +535,7 @@ static int llc_ui_release(struct socket *sock)
 		sk->timer.data = (unsigned long)sk;
 		add_timer(&sk->timer);
 	}
+	sock_put(sk);
 out:
 	return 0;
 }
@@ -706,7 +712,7 @@ static int llc_ui_shutdown(struct socket *sock, int how)
 		goto out;
 	rc = llc_ui_send_disc(sk);
 	if (!rc)
-		llc_ui_wait_for_disc(sk, 255);
+		llc_ui_wait_for_disc(sk, sk->rcvtimeo);
 	/* Wake up anyone sleeping in poll */
 	sk->state_change(sk);
 out:
@@ -772,7 +778,7 @@ static int llc_ui_connect(struct socket *sock, struct sockaddr *uaddr,
 		sk->state   = TCP_CLOSE;
 		goto out;
 	}
-	rc = llc_ui_wait_for_conn(sk, 255);
+	rc = llc_ui_wait_for_conn(sk, sk->rcvtimeo);
 out:
 	release_sock(sk);
 	return rc;
@@ -814,18 +820,20 @@ out:
 	return rc;
 }
 
-static int llc_ui_wait_for_disc(struct sock *sk, int seconds)
+static int llc_ui_wait_for_disc(struct sock *sk, int timeout)
 {
 	DECLARE_WAITQUEUE(wait, current);
-	int rc, timeout = seconds * HZ;
+	int rc;
 
 	add_wait_queue_exclusive(sk->sleep, &wait);
 	for (;;) {
 		__set_current_state(TASK_INTERRUPTIBLE);
 		rc = 0;
-		if (sk->state != TCP_CLOSE)
+		if (sk->state != TCP_CLOSE) {
+			release_sock(sk);
 			timeout = schedule_timeout(timeout);
-		else
+			lock_sock(sk);
+		} else
 			break;
 		rc = -ERESTARTSYS;
 		if (signal_pending(current))
@@ -839,25 +847,54 @@ static int llc_ui_wait_for_disc(struct sock *sk, int seconds)
 	return rc;
 }
 
-static int llc_ui_wait_for_conn(struct sock *sk, int seconds)
+static int llc_ui_wait_for_conn(struct sock *sk, int timeout)
 {
 	struct llc_ui_opt *llc_ui = llc_ui_sk(sk);
 	DECLARE_WAITQUEUE(wait, current);
-	int rc, timeout = seconds * HZ;
+	int rc;
 
 	add_wait_queue_exclusive(sk->sleep, &wait);
 	for (;;) {
 		__set_current_state(TASK_INTERRUPTIBLE);
 		rc = 0;
-		if (sk->state != TCP_ESTABLISHED)
+		if (sk->state != TCP_ESTABLISHED) {
+			release_sock(sk);
 			timeout = schedule_timeout(timeout);
-		if (sk->state == TCP_ESTABLISHED) {
+			lock_sock(sk);
+		} else {
 			if (!llc_ui->core_sk)
 				rc = -EAGAIN;
 			break;
 		}
 		rc = -EAGAIN;
 		if (sk->state == TCP_CLOSE)
+			break;
+		rc = -ERESTARTSYS;
+		if (signal_pending(current))
+			break;
+		rc = -EAGAIN;
+		if (!timeout)
+			break;
+	}
+	__set_current_state(TASK_RUNNING);
+	remove_wait_queue(sk->sleep, &wait);
+	return rc;
+}
+
+static int llc_ui_wait_for_data(struct sock *sk, int timeout)
+{
+	DECLARE_WAITQUEUE(wait, current);
+	int rc;
+
+	add_wait_queue_exclusive(sk->sleep, &wait);
+	for (;;) {
+		__set_current_state(TASK_INTERRUPTIBLE);
+		rc = 0;
+		if (skb_queue_empty(&sk->receive_queue)) {
+			release_sock(sk);
+			timeout = schedule_timeout(timeout);
+			lock_sock(sk);
+		} else
 			break;
 		rc = -ERESTARTSYS;
 		if (signal_pending(current))
@@ -895,21 +932,13 @@ static int llc_ui_accept(struct socket *sock, struct socket *newsock, int flags)
 	if (sock->state != SS_UNCONNECTED || sk->state != TCP_LISTEN)
 		goto out;
 	/* wait for a connection to arrive. */
-	do {
-		skb = skb_dequeue(&sk->receive_queue);
-		if (!skb) {
-			rc = -EWOULDBLOCK;
-			if (flags & O_NONBLOCK)
-				goto out;
-			interruptible_sleep_on(sk->sleep);
-			rc = -ERESTARTSYS;
-			if (signal_pending(current))
-				goto out;
-		}
-	} while (!skb);
+	rc = llc_ui_wait_for_data(sk, sk->rcvtimeo);
+	if (rc)
+		goto out;
+	skb = skb_dequeue(&sk->receive_queue);
 
 	rc = -EINVAL;
-	if(!skb->sk)
+	if (!skb->sk)
 		goto frees;
 	/* attach connection to a new socket. */
 	rc = llc_ui_create(newsock, sk->protocol);
