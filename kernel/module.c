@@ -1243,7 +1243,15 @@ static void add_kallsyms(struct module *mod,
 		mod->symtab[i].st_info
 			= elf_type(&mod->symtab[i], sechdrs, secstrings, mod);
 }
-#endif
+#else
+static inline void add_kallsyms(struct module *mod,
+				Elf_Shdr *sechdrs,
+				unsigned int symindex,
+				unsigned int strindex,
+				const char *secstrings)
+{
+}
+#endif /* CONFIG_KALLSYMS */
 
 /* Allocate and load the module: note that size of section 0 is always
    zero, and we rely on this for optional sections. */
@@ -1516,13 +1524,11 @@ static struct module *load_module(void __user *umod,
 	percpu_modcopy(mod->percpu, (void *)sechdrs[pcpuindex].sh_addr,
 		       sechdrs[pcpuindex].sh_size);
 
+	add_kallsyms(mod, sechdrs, symindex, strindex, secstrings);
+
 	err = module_finalize(hdr, sechdrs, mod);
 	if (err < 0)
 		goto cleanup;
-
-#ifdef CONFIG_KALLSYMS
-	add_kallsyms(mod, sechdrs, symindex, strindex, secstrings);
-#endif
 
 	mod->args = args;
 	if (obsparmindex) {
