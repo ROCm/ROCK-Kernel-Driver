@@ -184,13 +184,13 @@ int ste_allocate(unsigned long ea)
 	/* Kernel or user address? */
 	if (REGION_ID(ea) >= KERNEL_REGION_ID) {
 		vsid = get_kernel_vsid(ea);
-		context = REGION_ID(ea);
+		context = KERNEL_CONTEXT(ea);
 	} else {
 		if (!current->mm)
 			return 1;
 
 		context = current->mm->context;
-		vsid = get_vsid(context, ea);
+		vsid = get_vsid(context.id, ea);
 	}
 
 	esid = GET_ESID(ea);
@@ -223,7 +223,7 @@ static void preload_stab(struct task_struct *tsk, struct mm_struct *mm)
 
 	if (!IS_VALID_EA(pc) || (REGION_ID(pc) >= KERNEL_REGION_ID))
 		return;
-	vsid = get_vsid(mm->context, pc);
+	vsid = get_vsid(mm->context.id, pc);
 	__ste_allocate(pc_esid, vsid);
 
 	if (pc_esid == stack_esid)
@@ -231,7 +231,7 @@ static void preload_stab(struct task_struct *tsk, struct mm_struct *mm)
 
 	if (!IS_VALID_EA(stack) || (REGION_ID(stack) >= KERNEL_REGION_ID))
 		return;
-	vsid = get_vsid(mm->context, stack);
+	vsid = get_vsid(mm->context.id, stack);
 	__ste_allocate(stack_esid, vsid);
 
 	if (pc_esid == unmapped_base_esid || stack_esid == unmapped_base_esid)
@@ -240,7 +240,7 @@ static void preload_stab(struct task_struct *tsk, struct mm_struct *mm)
 	if (!IS_VALID_EA(unmapped_base) ||
 	    (REGION_ID(unmapped_base) >= KERNEL_REGION_ID))
 		return;
-	vsid = get_vsid(mm->context, unmapped_base);
+	vsid = get_vsid(mm->context.id, unmapped_base);
 	__ste_allocate(unmapped_base_esid, vsid);
 
 	/* Order update */
@@ -406,14 +406,14 @@ int slb_allocate(unsigned long ea)
 
 	/* Kernel or user address? */
 	if (REGION_ID(ea) >= KERNEL_REGION_ID) {
-		context = REGION_ID(ea);
+		context = KERNEL_CONTEXT(ea);
 		vsid = get_kernel_vsid(ea);
 	} else {
 		if (unlikely(!current->mm))
 			return 1;
 
 		context = current->mm->context;
-		vsid = get_vsid(context, ea);
+		vsid = get_vsid(context.id, ea);
 	}
 
 	esid = GET_ESID(ea);
@@ -444,7 +444,7 @@ static void preload_slb(struct task_struct *tsk, struct mm_struct *mm)
 
 	if (!IS_VALID_EA(pc) || (REGION_ID(pc) >= KERNEL_REGION_ID))
 		return;
-	vsid = get_vsid(mm->context, pc);
+	vsid = get_vsid(mm->context.id, pc);
 	__slb_allocate(pc_esid, vsid, mm->context);
 
 	if (pc_esid == stack_esid)
@@ -452,7 +452,7 @@ static void preload_slb(struct task_struct *tsk, struct mm_struct *mm)
 
 	if (!IS_VALID_EA(stack) || (REGION_ID(stack) >= KERNEL_REGION_ID))
 		return;
-	vsid = get_vsid(mm->context, stack);
+	vsid = get_vsid(mm->context.id, stack);
 	__slb_allocate(stack_esid, vsid, mm->context);
 
 	if (pc_esid == unmapped_base_esid || stack_esid == unmapped_base_esid)
@@ -461,7 +461,7 @@ static void preload_slb(struct task_struct *tsk, struct mm_struct *mm)
 	if (!IS_VALID_EA(unmapped_base) ||
 	    (REGION_ID(unmapped_base) >= KERNEL_REGION_ID))
 		return;
-	vsid = get_vsid(mm->context, unmapped_base);
+	vsid = get_vsid(mm->context.id, unmapped_base);
 	__slb_allocate(unmapped_base_esid, vsid, mm->context);
 }
 
