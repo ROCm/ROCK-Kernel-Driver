@@ -141,13 +141,6 @@
 	mov	\rd, \rd, lsl #13
 	.endm
 
-/*
- * Like adr, but force SVC mode (if required)
- */
-	.macro	adrsvc, cond, reg, label
-	adr\cond	\reg, \label
-	.endm
-
 	.macro	alignment_trap, rbase, rtemp, sym
 #ifdef CONFIG_ALIGNMENT_TRAP
 #define OFF_CR_ALIGNMENT(x)	cr_alignment - x

@@ -141,7 +141,7 @@ __irq_svc:
 	@
 	@ routine called with r0 = irq number, r1 = struct pt_regs *
 	@
-	adrsvc	ne, lr, 1b
+	adrne	lr, 1b
 	bne	asm_do_IRQ
 #ifdef CONFIG_PREEMPT
 	ldr	r0, [r8, #TI_FLAGS]		@ get flags
@@ -191,7 +191,7 @@ __und_svc:
 	@  r0 - instruction
 	@
 	ldr	r0, [r2, #-4]
-	adrsvc	al, r9, 1f
+	adr	r9, 1f
 	bl	call_fpe
 
 	mov	r0, sp				@ struct pt_regs *regs
@@ -312,7 +312,7 @@ __dabt_usr:
 	@
 	enable_irq r2
 	mov	r2, sp
-	adrsvc	al, lr, ret_from_exception
+	adr	lr, ret_from_exception
 	b	do_DataAbort
 
 	.align	5
@@ -328,7 +328,7 @@ __irq_usr:
 #endif
 1:	get_irqnr_and_base r0, r6, r5, lr
 	movne	r1, sp
-	adrsvc	ne, lr, 1b
+	adrne	lr, 1b
 	@
 	@ routine called with r0 = irq number, r1 = struct pt_regs *
 	@
@@ -364,8 +364,8 @@ __und_usr:
 	@  r0 - instruction
 	@
 1:	ldrt	r0, [r4]
-	adrsvc	al, r9, ret_from_exception
-	adrsvc	al, lr, fpundefinstr
+	adr	r9, ret_from_exception
+	adr	lr, fpundefinstr
 	@
 	@ fallthrough to call_fpe
 	@
@@ -462,7 +462,7 @@ ENTRY(fp_enter)
 
 fpundefinstr:
 	mov	r0, sp
-	adrsvc	al, lr, ret_from_exception
+	adr	lr, ret_from_exception
 	b	do_undefinstr
 
 	.align	5
