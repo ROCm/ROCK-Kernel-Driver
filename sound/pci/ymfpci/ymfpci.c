@@ -267,6 +267,10 @@ static int __devinit snd_card_ymfpci_probe(struct pci_dev *pci,
 		snd_card_free(card);
 		return err;
 	}
+	if ((err = snd_ymfpci_timer(chip, 0)) < 0) {
+		snd_card_free(card);
+		return err;
+	}
 	if (chip->mpu_res) {
 		if ((err = snd_mpu401_uart_new(card, 0, MPU401_HW_YMFPCI,
 					       mpu_port[dev], 1,
