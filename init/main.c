@@ -269,6 +269,8 @@ static int __init unknown_bootoption(char *param, char *val)
 				panic_later = "Too many boot env vars at `%s'";
 				panic_param = param;
 			}
+			if (!strncmp(param, envp_init[i], val - param))
+				break;
 		}
 		envp_init[i] = param;
 	} else {
