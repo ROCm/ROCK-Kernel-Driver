@@ -45,6 +45,8 @@
 
 #undef REALLY_SLOW_IO		/* most systems can safely undef this */
 
+//#define DEBUG
+
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/types.h>
@@ -365,6 +367,8 @@ ide_startstop_t __ide_do_rw_disk (ide_drive_t *drive, struct request *rq, sector
 		if (drive->addressing == 1) {
 			task_ioreg_t tasklets[10];
 
+			pr_debug("%s: LBA=0x%012llx\n", drive->name, block);
+
 			if (blk_rq_tagged(rq)) {
 				tasklets[0] = nsectors.b.low;
 				tasklets[1] = nsectors.b.high;
@@ -389,14 +393,6 @@ ide_startstop_t __ide_do_rw_disk (ide_drive_t *drive, struct request *rq, sector
 				tasklets[9] = (task_ioreg_t)((u64)block >> 40);
 			}
 #ifdef DEBUG
-			printk("%s: %sing: LBAsect=%lu, sectors=%ld, "
-				"buffer=0x%08lx, LBAsect=0x%012lx\n",
-				drive->name,
-				rq_data_dir(rq)==READ?"read":"writ",
-				block,
-				rq->nr_sectors,
-				(unsigned long) rq->buffer,
-				block);
 			printk("%s: 0x%02x%02x 0x%02x%02x%02x%02x%02x%02x\n",
 				drive->name, tasklets[3], tasklets[2],
 				tasklets[9], tasklets[8], tasklets[7],
@@ -415,14 +411,6 @@ ide_startstop_t __ide_do_rw_disk (ide_drive_t *drive, struct request *rq, sector
 			hwif->OUTB(tasklets[6], IDE_HCYL_REG);
 			hwif->OUTB(0x00|drive->select.all,IDE_SELECT_REG);
 		} else {
-#ifdef DEBUG
-			printk("%s: %sing: LBAsect=%llu, sectors=%ld, "
-				"buffer=0x%08lx\n",
-				drive->name,
-				rq_data_dir(rq)==READ?"read":"writ",
-				(unsigned long long)block, rq->nr_sectors,
-				(unsigned long) rq->buffer);
-#endif
 			if (blk_rq_tagged(rq)) {
 				hwif->OUTB(nsectors.b.low, IDE_FEATURE_REG);
 				hwif->OUTB(rq->tag << 3, IDE_NSECTOR_REG);
@@ -444,6 +432,8 @@ ide_startstop_t __ide_do_rw_disk (ide_drive_t *drive, struct request *rq, sector
 		head  = track % drive->head;
 		cyl   = track / drive->head;
 
+		pr_debug("%s: CHS=%u/%u/%u\n", drive->name, cyl, head, sect);
+
 		if (blk_rq_tagged(rq)) {
 			hwif->OUTB(nsectors.b.low, IDE_FEATURE_REG);
 			hwif->OUTB(rq->tag << 3, IDE_NSECTOR_REG);
@@ -451,15 +441,9 @@ ide_startstop_t __ide_do_rw_disk (ide_drive_t *drive, struct request *rq, sector
 			hwif->OUTB(0x00, IDE_FEATURE_REG);
 			hwif->OUTB(nsectors.b.low, IDE_NSECTOR_REG);
 		}
-
 		hwif->OUTB(cyl, IDE_LCYL_REG);
 		hwif->OUTB(cyl>>8, IDE_HCYL_REG);
 		hwif->OUTB(head|drive->select.all,IDE_SELECT_REG);
-#ifdef DEBUG
-		printk("%s: %sing: CHS=%d/%d/%d, sectors=%ld, buffer=0x%08lx\n",
-			drive->name, rq_data_dir(rq)==READ?"read":"writ", cyl,
-			head, sect, rq->nr_sectors, (unsigned long) rq->buffer);
-#endif
 	}
 
 	if (rq_data_dir(rq) == READ) {
@@ -589,12 +573,7 @@ static ide_startstop_t chs_rw_disk (ide_drive_t *drive, struct request *rq, unsi
 
 	nsectors.all = (u16) rq->nr_sectors;
 
-#ifdef DEBUG
-	printk("%s: %sing: ", drive->name, (rq_data_dir(rq)==READ) ? "read" : "writ");
-	printk("CHS=%d/%d/%d, ", cyl, head, sect);
-	printk("sectors=%ld, ", rq->nr_sectors);
-	printk("buffer=0x%08lx\n", (unsigned long) rq->buffer);
-#endif
+	pr_debug("%s: CHS=%u/%u/%u\n", drive->name, cyl, head, sect);
 
 	memset(&args, 0, sizeof(ide_task_t));
 
@@ -624,13 +603,6 @@ static ide_startstop_t lba_28_rw_disk (ide_drive_t *drive, struct request *rq, u
 	ata_nsector_t		nsectors;
 
 	nsectors.all = (u16) rq->nr_sectors;
-
-#ifdef DEBUG
-	printk("%s: %sing: ", drive->name, (rq_data_dir(rq)==READ) ? "read" : "writ");
-	printk("LBAsect=%lld, ", block);
-	printk("sectors=%ld, ", rq->nr_sectors);
-	printk("buffer=0x%08lx\n", (unsigned long) rq->buffer);
-#endif
 
 	memset(&args, 0, sizeof(ide_task_t));
 
@@ -666,13 +638,6 @@ static ide_startstop_t lba_48_rw_disk (ide_drive_t *drive, struct request *rq, u
 	ata_nsector_t		nsectors;
 
 	nsectors.all = (u16) rq->nr_sectors;
-
-#ifdef DEBUG
-	printk("%s: %sing: ", drive->name, (rq_data_dir(rq)==READ) ? "read" : "writ");
-	printk("LBAsect=%lld, ", block);
-	printk("sectors=%ld, ", rq->nr_sectors);
-	printk("buffer=0x%08lx\n", (unsigned long) rq->buffer);
-#endif
 
 	memset(&args, 0, sizeof(ide_task_t));
 
@@ -723,6 +688,10 @@ static ide_startstop_t ide_do_rw_disk (ide_drive_t *drive, struct request *rq, s
 
 		return ide_started;
 	}
+
+	pr_debug("%s: %sing: block=%llu, sectors=%lu, buffer=0x%08lx\n",
+		 drive->name, rq_data_dir(rq) == READ ? "read" : "writ",
+		 block, rq->nr_sectors, (unsigned long)rq->buffer);
 
 	if (hwif->rw_disk)
 		return hwif->rw_disk(drive, rq, block);
