@@ -609,7 +609,13 @@ cpu_init (void)
 
 	cpu_data = per_cpu_init();
 
-	ia64_set_kr(IA64_KR_PER_CPU_DATA, __pa(cpu_data - (void *) __per_cpu_start));
+	/*
+	 * We set ar.k3 so that assembly code in MCA handler can compute
+	 * physical addresses of per cpu variables with a simple:
+	 *   phys = ar.k3 + &per_cpu_var
+	 */
+	ia64_set_kr(IA64_KR_PER_CPU_DATA,
+		    ia64_tpa(cpu_data) - (long) __per_cpu_start);
 
 	get_max_cacheline_size();
 

@@ -1209,6 +1209,18 @@ ia64_mca_cpu_init(void *cpu_data)
 {
 	void *pal_vaddr;
 
+	if (smp_processor_id() == 0) {
+		void *mca_data;
+		int cpu;
+
+		mca_data = alloc_bootmem(sizeof(struct ia64_mca_cpu)
+					 * NR_CPUS);
+		for (cpu = 0; cpu < NR_CPUS; cpu++) {
+			__per_cpu_mca[cpu] = __pa(mca_data);
+			mca_data += sizeof(struct ia64_mca_cpu);
+		}
+	}
+
         /*
          * The MCA info structure was allocated earlier and its
          * physical address saved in __per_cpu_mca[cpu].  Copy that
