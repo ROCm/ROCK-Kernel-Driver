@@ -23,7 +23,7 @@
 #include <asm/hardware.h>
 #include <asm/hardware/ssp.h>
 
-static void ssp_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t ssp_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	unsigned int status = Ser4SSSR;
 
@@ -32,6 +32,8 @@ static void ssp_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	}
 
 	Ser4SSSR = SSSR_ROR;
+
+	return status ? IRQ_HANDLED : IRQ_NONE;
 }
 
 /**

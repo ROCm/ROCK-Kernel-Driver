@@ -168,14 +168,14 @@ sa1111_irq_handler(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
 {
 	unsigned int stat0, stat1, i;
 
-	stat0 = INTSTATCLR0;
-	stat1 = INTSTATCLR1;
+	stat0 = sa1111_readl(desc->data + SA1111_INTSTATCLR0);
+	stat1 = sa1111_readl(desc->data + SA1111_INTSTATCLR1);
 
-	INTSTATCLR0 = stat0;
+	sa1111_writel(stat0, desc->data + SA1111_INTSTATCLR0);
 
 	desc->chip->ack(irq);
 
-	INTSTATCLR1 = stat1;
+	sa1111_writel(stat1, desc->data + SA1111_INTSTATCLR1);
 
 	if (stat0 == 0 && stat1 == 0) {
 		do_bad_IRQ(irq, desc, regs);
@@ -203,12 +203,22 @@ static void sa1111_ack_irq(unsigned int irq)
 
 static void sa1111_mask_lowirq(unsigned int irq)
 {
-	INTEN0 &= ~SA1111_IRQMASK_LO(irq);
+	void *mapbase = get_irq_chipdata(irq);
+	unsigned long ie0;
+
+	ie0 = sa1111_readl(mapbase + SA1111_INTEN0);
+	ie0 &= ~SA1111_IRQMASK_LO(irq);
+	writel(ie0, mapbase + SA1111_INTEN0);
 }
 
 static void sa1111_unmask_lowirq(unsigned int irq)
 {
-	INTEN0 |= SA1111_IRQMASK_LO(irq);
+	void *mapbase = get_irq_chipdata(irq);
+	unsigned long ie0;
+
+	ie0 = sa1111_readl(mapbase + SA1111_INTEN0);
+	ie0 |= SA1111_IRQMASK_LO(irq);
+	sa1111_writel(ie0, mapbase + SA1111_INTEN0);
 }
 
 /*
@@ -221,12 +231,15 @@ static void sa1111_unmask_lowirq(unsigned int irq)
 static int sa1111_retrigger_lowirq(unsigned int irq)
 {
 	unsigned int mask = SA1111_IRQMASK_LO(irq);
+	void *mapbase = get_irq_chipdata(irq);
+	unsigned long ip0;
 	int i;
 
+	ip0 = sa1111_readl(mapbase + SA1111_INTPOL0);
 	for (i = 0; i < 8; i++) {
-		INTPOL0 ^= mask;
-		INTPOL0 ^= mask;
-		if (INTSTATCLR1 & mask)
+		sa1111_writel(ip0 ^ mask, mapbase + SA1111_INTPOL0);
+		sa1111_writel(ip0, mapbase + SA1111_INTPOL0);
+		if (sa1111_readl(mapbase + SA1111_INTSTATCLR1) & mask)
 			break;
 	}
 
@@ -239,6 +252,8 @@ static int sa1111_retrigger_lowirq(unsigned int irq)
 static int sa1111_type_lowirq(unsigned int irq, unsigned int flags)
 {
 	unsigned int mask = SA1111_IRQMASK_LO(irq);
+	void *mapbase = get_irq_chipdata(irq);
+	unsigned long ip0;
 
 	if (flags == IRQT_PROBE)
 		return 0;
@@ -246,11 +261,13 @@ static int sa1111_type_lowirq(unsigned int irq, unsigned int flags)
 	if ((!(flags & __IRQT_RISEDGE) ^ !(flags & __IRQT_FALEDGE)) == 0)
 		return -EINVAL;
 
+	ip0 = sa1111_readl(mapbase + SA1111_INTPOL0);
 	if (flags & __IRQT_RISEDGE)
-		INTPOL0 &= ~mask;
+		ip0 &= ~mask;
 	else
-		INTPOL0 |= mask;
-	WAKE_POL0 = INTPOL0;
+		ip0 |= mask;
+	sa1111_writel(ip0, mapbase + SA1111_INTPOL0);
+	sa1111_writel(ip0, mapbase + SA1111_WAKEPOL0);
 
 	return 0;
 }
@@ -258,11 +275,15 @@ static int sa1111_type_lowirq(unsigned int irq, unsigned int flags)
 static int sa1111_wake_lowirq(unsigned int irq, unsigned int on)
 {
 	unsigned int mask = SA1111_IRQMASK_LO(irq);
+	void *mapbase = get_irq_chipdata(irq);
+	unsigned long we0;
 
+	we0 = sa1111_readl(mapbase + SA1111_WAKEEN0);
 	if (on)
-		WAKE_EN0 |= mask;
+		we0 |= mask;
 	else
-		WAKE_EN0 &= ~mask;
+		we0 &= ~mask;
+	sa1111_writel(we0, mapbase + SA1111_WAKEEN0);
 
 	return 0;
 }
@@ -278,12 +299,22 @@ static struct irqchip sa1111_low_chip = {
 
 static void sa1111_mask_highirq(unsigned int irq)
 {
-	INTEN1 &= ~SA1111_IRQMASK_HI(irq);
+	void *mapbase = get_irq_chipdata(irq);
+	unsigned long ie1;
+
+	ie1 = sa1111_readl(mapbase + SA1111_INTEN1);
+	ie1 &= ~SA1111_IRQMASK_HI(irq);
+	sa1111_writel(ie1, mapbase + SA1111_INTEN1);
 }
 
 static void sa1111_unmask_highirq(unsigned int irq)
 {
-	INTEN1 |= SA1111_IRQMASK_HI(irq);
+	void *mapbase = get_irq_chipdata(irq);
+	unsigned long ie1;
+
+	ie1 = sa1111_readl(mapbase + SA1111_INTEN1);
+	ie1 |= SA1111_IRQMASK_HI(irq);
+	sa1111_writel(ie1, mapbase + SA1111_INTEN1);
 }
 
 /*
@@ -296,12 +327,15 @@ static void sa1111_unmask_highirq(unsigned int irq)
 static int sa1111_retrigger_highirq(unsigned int irq)
 {
 	unsigned int mask = SA1111_IRQMASK_HI(irq);
+	void *mapbase = get_irq_chipdata(irq);
+	unsigned long ip1;
 	int i;
 
+	ip1 = sa1111_readl(mapbase + SA1111_INTPOL1);
 	for (i = 0; i < 8; i++) {
-		INTPOL1 ^= mask;
-		INTPOL1 ^= mask;
-		if (INTSTATCLR1 & mask)
+		sa1111_writel(ip1 ^ mask, mapbase + SA1111_INTPOL1);
+		sa1111_writel(ip1, mapbase + SA1111_INTPOL1);
+		if (sa1111_readl(mapbase + SA1111_INTSTATCLR1) & mask)
 			break;
 	}
 
@@ -314,6 +348,8 @@ static int sa1111_retrigger_highirq(unsigned int irq)
 static int sa1111_type_highirq(unsigned int irq, unsigned int flags)
 {
 	unsigned int mask = SA1111_IRQMASK_HI(irq);
+	void *mapbase = get_irq_chipdata(irq);
+	unsigned long ip1;
 
 	if (flags == IRQT_PROBE)
 		return 0;
@@ -321,11 +357,13 @@ static int sa1111_type_highirq(unsigned int irq, unsigned int flags)
 	if ((!(flags & __IRQT_RISEDGE) ^ !(flags & __IRQT_FALEDGE)) == 0)
 		return -EINVAL;
 
+	ip1 = sa1111_readl(mapbase + SA1111_INTPOL1);
 	if (flags & __IRQT_RISEDGE)
-		INTPOL1 &= ~mask;
+		ip1 &= ~mask;
 	else
-		INTPOL1 |= mask;
-	WAKE_POL1 = INTPOL1;
+		ip1 |= mask;
+	sa1111_writel(ip1, mapbase + SA1111_INTPOL1);
+	sa1111_writel(ip1, mapbase + SA1111_WAKEPOL1);
 
 	return 0;
 }
@@ -333,11 +371,15 @@ static int sa1111_type_highirq(unsigned int irq, unsigned int flags)
 static int sa1111_wake_highirq(unsigned int irq, unsigned int on)
 {
 	unsigned int mask = SA1111_IRQMASK_HI(irq);
+	void *mapbase = get_irq_chipdata(irq);
+	unsigned long we1;
 
+	we1 = sa1111_readl(mapbase + SA1111_WAKEEN1);
 	if (on)
-		WAKE_EN1 |= mask;
+		we1 |= mask;
 	else
-		WAKE_EN1 &= ~mask;
+		we1 &= ~mask;
+	sa1111_writel(we1, mapbase + SA1111_WAKEEN1);
 
 	return 0;
 }
@@ -381,12 +423,14 @@ static void __init sa1111_init_irq(struct sa1111_dev *sadev)
 
 	for (irq = IRQ_GPAIN0; irq <= SSPROR; irq++) {
 		set_irq_chip(irq, &sa1111_low_chip);
+		set_irq_chipdata(irq, sadev->mapbase);
 		set_irq_handler(irq, do_edge_IRQ);
 		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
 	}
 
 	for (irq = AUDXMTDMADONEA; irq <= IRQ_S1_BVD1_STSCHG; irq++) {
 		set_irq_chip(irq, &sa1111_high_chip);
+		set_irq_chipdata(irq, sadev->mapbase);
 		set_irq_handler(irq, do_edge_IRQ);
 		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
 	}
@@ -395,6 +439,7 @@ static void __init sa1111_init_irq(struct sa1111_dev *sadev)
 	 * Register SA1111 interrupt
 	 */
 	set_irq_type(sadev->irq[0], IRQT_RISING);
+	set_irq_data(sadev->irq[0], sadev->mapbase);
 	set_irq_chained_handler(sadev->irq[0], sa1111_irq_handler);
 }
 
