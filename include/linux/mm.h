@@ -58,6 +58,7 @@ extern int sysctl_legacy_va_layout;
  * space that has a special rule for the page-fault handlers (ie a shared
  * library, the executable area etc).
  */
+#ifdef CONFIG_MMU
 struct vm_area_struct {
 	struct mm_struct * vm_mm;	/* The address space we belong to. */
 	unsigned long vm_start;		/* Our start address within vm_mm. */
@@ -110,6 +111,31 @@ struct vm_area_struct {
 	struct mempolicy *vm_policy;	/* NUMA policy for the VMA */
 #endif
 };
+
+#else
+
+struct vm_area_struct {
+	struct list_head	vm_link;	/* system object list */
+	atomic_t		vm_usage;	/* count of refs */
+	unsigned long		vm_start;
+	unsigned long		vm_end;
+	pgprot_t		vm_page_prot;	/* access permissions of this VMA */
+	unsigned long		vm_flags;
+	unsigned long		vm_pgoff;
+	struct file		*vm_file;	/* file or device mapped */
+};
+
+struct mm_tblock_struct {
+	struct mm_tblock_struct	*next;
+	struct vm_area_struct	*vma;
+};
+
+extern struct list_head nommu_vma_list;
+extern struct rw_semaphore nommu_vma_sem;
+
+extern unsigned int kobjsize(const void *objp);
+
+#endif
 
 /*
  * vm_flags..
@@ -602,6 +628,10 @@ int redirty_page_for_writepage(struct writeback_control *wbc,
 int FASTCALL(set_page_dirty(struct page *page));
 int set_page_dirty_lock(struct page *page);
 int clear_page_dirty_for_io(struct page *page);
+
+extern unsigned long do_mremap(unsigned long addr,
+			       unsigned long old_len, unsigned long new_len,
+			       unsigned long flags, unsigned long new_addr);
 
 /*
  * Prototype to add a shrinker callback for ageable caches.
