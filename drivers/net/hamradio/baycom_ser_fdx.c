@@ -417,21 +417,27 @@ static int ser12_open(struct net_device *dev)
 		return -ENXIO;
 	if (bc->baud < 300 || bc->baud > 4800)
 		return -EINVAL;
-	if (check_region(dev->base_addr, SER12_EXTENT))
+	if (!request_region(dev->base_addr, SER12_EXTENT, "baycom_ser_fdx")) {
+		printk(KERN_WARNING "BAYCOM_SER_FSX: I/O port 0x%04lx busy \n", 
+		       dev->base_addr);
 		return -EACCES;
+	}
 	memset(&bc->modem, 0, sizeof(bc->modem));
 	bc->hdrv.par.bitrate = bc->baud;
 	bc->baud_us = 1000000/bc->baud;
 	bc->baud_uartdiv = (115200/8)/bc->baud;
-	if ((u = ser12_check_uart(dev->base_addr)) == c_uart_unknown)
+	if ((u = ser12_check_uart(dev->base_addr)) == c_uart_unknown){
+		release_region(dev->base_addr, SER12_EXTENT);
 		return -EIO;
+	}
 	outb(0, FCR(dev->base_addr));  /* disable FIFOs */
 	outb(0x0d, MCR(dev->base_addr));
 	outb(0, IER(dev->base_addr));
 	if (request_irq(dev->irq, ser12_interrupt, SA_INTERRUPT | SA_SHIRQ,
-			"baycom_ser_fdx", dev))
+			"baycom_ser_fdx", dev)) {
+		release_region(dev->base_addr, SER12_EXTENT);
 		return -EBUSY;
-	request_region(dev->base_addr, SER12_EXTENT, "baycom_ser_fdx");
+	}
 	/*
 	 * set the SIO to 6 Bits/character; during receive,
 	 * the baud rate is set to produce 100 ints/sec
