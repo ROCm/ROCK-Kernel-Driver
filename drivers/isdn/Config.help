@@ -26,11 +26,6 @@ CONFIG_ISDN
   Therefore the old ISDN4Linux layer is becoming obsolete. It is 
   still usable, though, if you select this option.
 
-  If you want to compile the ISDN code as a module ( = code which can
-  be inserted in and removed from the running kernel whenever you
-  want), say M here and read <file:Documentation/modules.txt>.  The
-  module will be called isdn.o. If unsure, say N.
-
 CONFIG_ISDN_PPP
   Over digital connections such as ISDN, there is no need to
   synchronize sender and recipient's clocks with start and stop bits
@@ -100,11 +95,6 @@ CONFIG_ISDN_DRV_ICN
   <file:Documentation/isdn/README.icn> for more
   information.
 
-  If you want to compile this as a module ( = code which can be
-  inserted in and removed from the running kernel whenever you want),
-  say M here and read <file:Documentation/modules.txt>.  The module
-  will be called icn.o.
-
 CONFIG_ISDN_DRV_LOOP
   This driver provides a virtual ISDN card. Its primary purpose is
   testing of linklevel features or configuration without getting
@@ -123,12 +113,6 @@ CONFIG_ISDN_DRV_HISAX
   If you have a card with such a chipset, you should say Y here and
   also to the configuration option of the driver for your particular
   card, below.
-
-  If you want to compile this as a module ( = code which can be
-  inserted in and removed from the running kernel whenever you want),
-  say M here and read <file:Documentation/modules.txt>.  The module
-  will be called hisax.o.  See <file:Documentation/isdn/README.HiSax>
-  for more information on using this driver.
 
 CONFIG_HISAX_EURO
   Say Y or N according to the D-channel protocol which your local
@@ -393,11 +377,6 @@ CONFIG_ISDN_DRV_PCBIT
   <file:Documentation/isdn/README> and
   <file:Documentation/isdn/README.pcbit> for more information.
 
-  If you want to compile this as a module ( = code which can be
-  inserted in and removed from the running kernel whenever you want),
-  say M here and read <file:Documentation/modules.txt>.  The module
-  will be called pcbit.o.
-
 CONFIG_ISDN_DRV_SC
   This enables support for the Spellcaster BRI ISDN boards.  This
   driver currently builds only in a modularized version ( = code which
@@ -448,12 +427,6 @@ CONFIG_ISDN_CAPI
   Interface, a standard making it easy for programs to access ISDN
   hardware, see <http://www.capi.org/>.  This is needed for AVM's set
   of active ISDN controllers like B1, T1, M1.
-
-  This code is also available as a module ( = code which can be
-  inserted in and removed from the running kernel whenever you want).
-  The modules will be called capi.o and kernelcapi.o. If you want to
-  compile it as a module, say M here and read
-  <file:Documentation/modules.txt>.
 
 CONFIG_ISDN_CAPI_CAPI20
   This option will provide the CAPI 2.0 interface to userspace
@@ -527,11 +500,6 @@ CONFIG_ISDN_DRV_TPAM
   separately from the Auvertech's web site: <http://www.auvertech.fr/>.
 
   Please redirect all support questions to support@auvertech.fr.
-
-  If you want to compile this as a module ( = code which can be
-  inserted in and removed from the running kernel whenever you want),
-  say M here and read <file:Documentation/modules.txt>.  The module
-  will be called tpam.o.
 
 CONFIG_HYSDN
   Say Y here if you have one of Hypercope's active PCI ISDN cards
