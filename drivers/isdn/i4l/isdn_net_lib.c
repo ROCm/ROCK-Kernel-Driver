@@ -1777,6 +1777,7 @@ bhup(struct fsm_inst *fi, int pr, void *arg)
 
 	printk(KERN_INFO "%s: disconnected\n", idev->name);
 	fsm_change_state(fi, ST_WAIT_DHUP);
+	return 0;
 }
 
 static int
@@ -1898,7 +1899,7 @@ isdn_net_event_callback(struct isdn_slot *slot, int pr, void *arg)
 static int
 isdn_net_handle_event(isdn_net_dev *idev, int pr, void *arg)
 {
-	fsm_event(&idev->fi, pr, arg);
+	return fsm_event(&idev->fi, pr, arg);
 }
 
 static int
