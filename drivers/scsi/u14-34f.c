@@ -847,9 +847,9 @@ static int port_detect \
 
    if (have_old_firmware) tpnt->use_clustering = DISABLE_CLUSTERING;
 
-   spin_unlock(&driver_lock);
+   spin_unlock_irq(&driver_lock);
    sh[j] = scsi_register(tpnt, sizeof(struct hostdata));
-   spin_lock(&driver_lock);
+   spin_lock_irq(&driver_lock);
 
    if (sh[j] == NULL) {
       printk("%s: unable to register host, detaching.\n", name);
