@@ -994,6 +994,7 @@ irqreturn_t snd_cs4231_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		if (status & CS4231_PLAYBACK_IRQ) {
 			if (chip->playback_substream)
 				snd_pcm_period_elapsed(chip->playback_substream);
+		}
 		if (status & CS4231_RECORD_IRQ) {
 			if (chip->capture_substream) {
 				snd_cs4231_overrange(chip);
