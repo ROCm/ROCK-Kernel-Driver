@@ -1497,8 +1497,6 @@ static struct super_block *nfs_get_sb(struct file_system_type *fs_type,
 		return ERR_PTR(error);
 	}
 	s->s_flags |= MS_ACTIVE;
-	/* The nfs client applies the umask itself when needed. */
-	s->s_flags |= MS_POSIXACL;
 	return s;
 }
 
