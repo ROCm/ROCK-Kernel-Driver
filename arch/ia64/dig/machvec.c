@@ -1,3 +1,2 @@
-#define MACHVEC_PLATFORM_NAME		dig
-#define MACHVEC_PLATFORM_HEADER		<asm/machvec_dig.h>
+#define MACHVEC_PLATFORM_NAME	dig
 #include <asm/machvec_init.h>

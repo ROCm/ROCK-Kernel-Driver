@@ -92,15 +92,13 @@ asmlinkage void machine_check(void);
 
 static int kstack_depth_to_print = 24;
 
-void show_trace(struct task_struct *task)
+void show_trace(unsigned long * stack)
 {
 	int i;
-	unsigned long addr, *stack;
+	unsigned long addr;
 
-	if (!task)
-		stack = (unsigned long*)&task;
-	else
-		stack = (unsigned long *) task->thread.esp;
+	if (!stack)
+		stack = (unsigned long*)&stack;
 
 	printk("Call Trace:");
 #if CONFIG_KALLSYMS
@@ -124,21 +122,19 @@ void show_trace_task(struct task_struct *tsk)
 	/* User space on another CPU? */
 	if ((esp ^ (unsigned long)tsk->thread_info) & (PAGE_MASK<<1))
 		return;
-	show_trace(tsk);
+	show_trace((unsigned long *)esp);
 }
 
-void show_stack(struct task_struct *task)
+void show_stack(unsigned long * esp)
 {
-	unsigned long *stack, *esp;
+	unsigned long *stack;
 	int i;
 
 	// debugging aid: "show_stack(NULL);" prints the
 	// back trace for this cpu.
 
-	if(task==NULL)
-		esp=(unsigned long*)&task;
-	else
-		esp = (unsigned long*)task->thread.esp;
+	if(esp==NULL)
+		esp=(unsigned long*)&esp;
 
 	stack = esp;
 	for(i=0; i < kstack_depth_to_print; i++) {
@@ -149,7 +145,7 @@ void show_stack(struct task_struct *task)
 		printk("%08lx ", *stack++);
 	}
 	printk("\n");
-	show_trace(task);
+	show_trace(esp);
 }
 
 /*
@@ -157,7 +153,9 @@ void show_stack(struct task_struct *task)
  */
 void dump_stack(void)
 {
-	show_trace(NULL);
+	unsigned long stack;
+
+	show_trace(&stack);
 }
 
 void show_registers(struct pt_regs *regs)
@@ -194,7 +192,7 @@ void show_registers(struct pt_regs *regs)
 	if (in_kernel) {
 
 		printk("\nStack: ");
-		show_stack(NULL);
+		show_stack((unsigned long*)esp);
 
 		printk("Code: ");
 		if(regs->eip < PAGE_OFFSET)

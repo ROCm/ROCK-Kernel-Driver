@@ -903,8 +903,8 @@ static void radeon_cp_init_ring_buffer( drm_device_t *dev,
 
 		RADEON_WRITE( RADEON_CP_RB_RPTR_ADDR,
 			     entry->busaddr[page_ofs]);
-		DRM_DEBUG( "ring rptr: offset=0x%08lx handle=0x%08lx\n",
-			   (unsigned long) entry->busaddr[page_ofs],
+		DRM_DEBUG( "ring rptr: offset=0x%08x handle=0x%08lx\n",
+			   entry->busaddr[page_ofs],
 			   entry->handle + tmp_ofs );
 	}
 
@@ -1152,9 +1152,9 @@ static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 				       init->sarea_priv_offset);
 
 	if ( !dev_priv->is_pci ) {
-		DRM_IOREMAP( dev_priv->cp_ring, dev );
-		DRM_IOREMAP( dev_priv->ring_rptr, dev );
-		DRM_IOREMAP( dev_priv->buffers, dev );
+		DRM_IOREMAP( dev_priv->cp_ring );
+		DRM_IOREMAP( dev_priv->ring_rptr );
+		DRM_IOREMAP( dev_priv->buffers );
 		if(!dev_priv->cp_ring->handle ||
 		   !dev_priv->ring_rptr->handle ||
 		   !dev_priv->buffers->handle) {
@@ -1279,11 +1279,11 @@ int radeon_do_cleanup_cp( drm_device_t *dev )
 
 		if ( !dev_priv->is_pci ) {
 			if ( dev_priv->cp_ring != NULL )
-				DRM_IOREMAPFREE( dev_priv->cp_ring, dev );
+				DRM_IOREMAPFREE( dev_priv->cp_ring );
 			if ( dev_priv->ring_rptr != NULL )
-				DRM_IOREMAPFREE( dev_priv->ring_rptr, dev );
+				DRM_IOREMAPFREE( dev_priv->ring_rptr );
 			if ( dev_priv->buffers != NULL )
-				DRM_IOREMAPFREE( dev_priv->buffers, dev );
+				DRM_IOREMAPFREE( dev_priv->buffers );
 		} else {
 #if __REALLY_HAVE_SG
 			if (!DRM(ati_pcigart_cleanup)( dev,

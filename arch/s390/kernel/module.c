@@ -386,7 +386,3 @@ int module_finalize(const Elf_Ehdr *hdr,
 		kfree(me->arch.syminfo);
 	return 0;
 }
-
-void module_arch_cleanup(struct module *mod)
-{
-}

@@ -1,0 +1,3 @@
+config SUSE_KERNEL
+	bool
+	default y

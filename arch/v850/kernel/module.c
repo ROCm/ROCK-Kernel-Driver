@@ -230,8 +230,3 @@ int apply_relocate_add (Elf32_Shdr *sechdrs, const char *strtab,
 
 	return 0;
 }
-
-void
-module_arch_cleanup(struct module *mod)
-{
-}

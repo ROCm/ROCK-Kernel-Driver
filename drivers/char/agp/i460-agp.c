@@ -571,7 +571,6 @@ static int __init agp_intel_i460_probe (struct pci_dev *dev, const struct pci_de
 	if (cap_ptr == 0)
 		return -ENODEV;
 
-	agp_bridge->type = INTEL_460GX;
 	agp_bridge->dev = dev;
 	agp_bridge->capndx = cap_ptr;
 	intel_i460_setup(dev);

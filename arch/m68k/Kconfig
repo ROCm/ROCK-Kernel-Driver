@@ -1835,3 +1835,5 @@ source "crypto/Kconfig"
 
 source "lib/Kconfig"
 
+source "suse/Kconfig"
+

@@ -1218,7 +1218,7 @@ asmlinkage long sys_getrlimit(unsigned int resource, struct rlimit __user *rlim)
 			? -EFAULT : 0;
 }
 
-#if (!defined(__ia64__) && !defined(CONFIG_V850)) || defined(CONFIG_COMPAT)
+#if !defined(__ia64__) && !defined(CONFIG_V850)
 
 /*
  *	Back compatibility for getrlimit. Needed for some apps.

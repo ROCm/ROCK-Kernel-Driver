@@ -265,10 +265,6 @@ static ctl_table kern_table[] = {
 	 0600, NULL, &proc_dointvec},
 	{KERN_PANIC_ON_OOPS,"panic_on_oops",
 	 &panic_on_oops,sizeof(int),0644,NULL,&proc_dointvec},
-#ifdef CONFIG_SMP
-	{KERN_CACHEDECAYTICKS, "cache_decay_ticks", &cache_decay_ticks, sizeof (cache_decay_ticks),
-	 0644, NULL, &proc_doulongvec_minmax},
-#endif
 	{0}
 };
 

@@ -5,10 +5,7 @@
  * I/O TLBs (aka DMA address translation hardware).
  * Copyright (C) 2000 Asit Mallick <Asit.K.Mallick@intel.com>
  * Copyright (C) 2000 Goutham Rao <goutham.rao@intel.com>
- * Copyright (C) 2000, 2003 Hewlett-Packard Co
- *	David Mosberger-Tang <davidm@hpl.hp.com>
  *
- * 03/05/07 davidm	Switch from PCI-DMA to generic device DMA API.
  * 00/12/13 davidm	Rename to swiotlb.c and add mark_clean() to avoid
  *			unnecessary i-cache flushing.
  */
@@ -95,7 +92,7 @@ __setup("swiotlb=", setup_io_tlb_npages);
 void
 swiotlb_init (void)
 {
-	unsigned long i;
+	int i;
 
 	/*
 	 * Get IO TLB memory from the low pages
@@ -124,7 +121,7 @@ swiotlb_init (void)
  * Allocates bounce buffer and returns its kernel virtual address.
  */
 static void *
-map_single (struct device *hwdev, char *buffer, size_t size, int dir)
+map_single (struct pci_dev *hwdev, char *buffer, size_t size, int direction)
 {
 	unsigned long flags;
 	char *dma_addr;
@@ -164,7 +161,7 @@ map_single (struct device *hwdev, char *buffer, size_t size, int dir)
 			if (io_tlb_list[index] >= nslots) {
 				int count = 0;
 
-				for (i = index; i < (int) (index + nslots); i++)
+				for (i = index; i < index + nslots; i++)
 					io_tlb_list[i] = 0;
 				for (i = index - 1; (OFFSET(i, IO_TLB_SEGSIZE) != IO_TLB_SEGSIZE -1)
 				       && io_tlb_list[i]; i--)
@@ -198,7 +195,7 @@ map_single (struct device *hwdev, char *buffer, size_t size, int dir)
 	 * needed when we sync the memory.  Then we sync the buffer if needed.
 	 */
 	io_tlb_orig_addr[index] = buffer;
-	if (dir == DMA_TO_DEVICE || dir == DMA_BIDIRECTIONAL)
+	if (direction == PCI_DMA_TODEVICE || direction == PCI_DMA_BIDIRECTIONAL)
 		memcpy(dma_addr, buffer, size);
 
 	return dma_addr;
@@ -208,7 +205,7 @@ map_single (struct device *hwdev, char *buffer, size_t size, int dir)
  * dma_addr is the kernel virtual address of the bounce buffer to unmap.
  */
 static void
-unmap_single (struct device *hwdev, char *dma_addr, size_t size, int dir)
+unmap_single (struct pci_dev *hwdev, char *dma_addr, size_t size, int direction)
 {
 	unsigned long flags;
 	int i, nslots = ALIGN(size, 1 << IO_TLB_SHIFT) >> IO_TLB_SHIFT;
@@ -218,7 +215,7 @@ unmap_single (struct device *hwdev, char *dma_addr, size_t size, int dir)
 	/*
 	 * First, sync the memory before unmapping the entry
 	 */
-	if ((dir == DMA_FROM_DEVICE) || (dir == DMA_BIDIRECTIONAL))
+	if ((direction == PCI_DMA_FROMDEVICE) || (direction == PCI_DMA_BIDIRECTIONAL))
 		/*
 		 * bounce... copy the data back into the original buffer * and delete the
 		 * bounce buffer.
@@ -242,7 +239,7 @@ unmap_single (struct device *hwdev, char *dma_addr, size_t size, int dir)
 		for (i = index + nslots - 1; i >= index; i--)
 			io_tlb_list[i] = ++count;
 		/*
-		 * Step 2: merge the returned slots with the preceding slots, if
+		 * Step 2: merge the returned slots with the preceeding slots, if
 		 * available (non zero)
 		 */
 		for (i = index - 1;  (OFFSET(i, IO_TLB_SEGSIZE) != IO_TLB_SEGSIZE -1) &&
@@ -253,46 +250,49 @@ unmap_single (struct device *hwdev, char *dma_addr, size_t size, int dir)
 }
 
 static void
-sync_single (struct device *hwdev, char *dma_addr, size_t size, int dir)
+sync_single (struct pci_dev *hwdev, char *dma_addr, size_t size, int direction)
 {
 	int index = (dma_addr - io_tlb_start) >> IO_TLB_SHIFT;
 	char *buffer = io_tlb_orig_addr[index];
 
 	/*
 	 * bounce... copy the data back into/from the original buffer
-	 * XXX How do you handle DMA_BIDIRECTIONAL here ?
+	 * XXX How do you handle PCI_DMA_BIDIRECTIONAL here ?
 	 */
-	if (dir == DMA_FROM_DEVICE)
+	if (direction == PCI_DMA_FROMDEVICE)
 		memcpy(buffer, dma_addr, size);
-	else if (dir == DMA_TO_DEVICE)
+	else if (direction == PCI_DMA_TODEVICE)
 		memcpy(dma_addr, buffer, size);
 	else
 		BUG();
 }
 
 void *
-swiotlb_alloc_coherent (struct device *hwdev, size_t size, dma_addr_t *dma_handle, int flags)
+swiotlb_alloc_consistent (struct pci_dev *hwdev, size_t size, dma_addr_t *dma_handle)
 {
-	unsigned long dev_addr;
+	unsigned long pci_addr;
+	int gfp = GFP_ATOMIC;
 	void *ret;
 
-	/* XXX fix me: the DMA API should pass us an explicit DMA mask instead: */
-	flags |= GFP_DMA;
-
-	ret = (void *)__get_free_pages(flags, get_order(size));
+	/*
+	 * Alloc_consistent() is defined to return memory < 4GB, no matter what the DMA
+	 * mask says.
+	 */
+	gfp |= GFP_DMA; /* XXX fix me: should change this to GFP_32BIT or ZONE_32BIT */
+	ret = (void *)__get_free_pages(gfp, get_order(size));
 	if (!ret)
 		return NULL;
 
 	memset(ret, 0, size);
-	dev_addr = virt_to_phys(ret);
-	if (hwdev && hwdev->dma_mask && (dev_addr & ~*hwdev->dma_mask) != 0)
-		panic("swiotlb_alloc_consistent: allocated memory is out of range for device");
-	*dma_handle = dev_addr;
+	pci_addr = virt_to_phys(ret);
+	if (hwdev && (pci_addr & ~hwdev->dma_mask) != 0)
+		panic("swiotlb_alloc_consistent: allocated memory is out of range for PCI device");
+	*dma_handle = pci_addr;
 	return ret;
 }
 
 void
-swiotlb_free_coherent (struct device *hwdev, size_t size, void *vaddr, dma_addr_t dma_handle)
+swiotlb_free_consistent (struct pci_dev *hwdev, size_t size, void *vaddr, dma_addr_t dma_handle)
 {
 	free_pages((unsigned long) vaddr, get_order(size));
 }
@@ -305,34 +305,34 @@ swiotlb_free_coherent (struct device *hwdev, size_t size, void *vaddr, dma_addr_
  * swiotlb_unmap_single or swiotlb_dma_sync_single is performed.
  */
 dma_addr_t
-swiotlb_map_single (struct device *hwdev, void *ptr, size_t size, int dir)
+swiotlb_map_single (struct pci_dev *hwdev, void *ptr, size_t size, int direction)
 {
-	unsigned long dev_addr = virt_to_phys(ptr);
+	unsigned long pci_addr = virt_to_phys(ptr);
 
-	if (dir == DMA_NONE)
+	if (direction == PCI_DMA_NONE)
 		BUG();
 	/*
 	 * Check if the PCI device can DMA to ptr... if so, just return ptr
 	 */
-	if (hwdev && hwdev->dma_mask && (dev_addr & ~*hwdev->dma_mask) == 0)
+	if ((pci_addr & ~hwdev->dma_mask) == 0)
 		/*
 		 * Device is bit capable of DMA'ing to the buffer... just return the PCI
 		 * address of ptr
 		 */
-		return dev_addr;
+		return pci_addr;
 
 	/*
 	 * get a bounce buffer:
 	 */
-	dev_addr = virt_to_phys(map_single(hwdev, ptr, size, dir));
+	pci_addr = virt_to_phys(map_single(hwdev, ptr, size, direction));
 
 	/*
 	 * Ensure that the address returned is DMA'ble:
 	 */
-	if (hwdev && hwdev->dma_mask && (dev_addr & ~*hwdev->dma_mask) != 0)
+	if ((pci_addr & ~hwdev->dma_mask) != 0)
 		panic("map_single: bounce buffer is not DMA'ble");
 
-	return dev_addr;
+	return pci_addr;
 }
 
 /*
@@ -363,15 +363,15 @@ mark_clean (void *addr, size_t size)
  * device wrote there.
  */
 void
-swiotlb_unmap_single (struct device *hwdev, dma_addr_t dev_addr, size_t size, int dir)
+swiotlb_unmap_single (struct pci_dev *hwdev, dma_addr_t pci_addr, size_t size, int direction)
 {
-	char *dma_addr = phys_to_virt(dev_addr);
+	char *dma_addr = phys_to_virt(pci_addr);
 
-	if (dir == DMA_NONE)
+	if (direction == PCI_DMA_NONE)
 		BUG();
 	if (dma_addr >= io_tlb_start && dma_addr < io_tlb_end)
-		unmap_single(hwdev, dma_addr, size, dir);
-	else if (dir == DMA_FROM_DEVICE)
+		unmap_single(hwdev, dma_addr, size, direction);
+	else if (direction == PCI_DMA_FROMDEVICE)
 		mark_clean(dma_addr, size);
 }
 
@@ -385,21 +385,21 @@ swiotlb_unmap_single (struct device *hwdev, dma_addr_t dev_addr, size_t size, in
  * again owns the buffer.
  */
 void
-swiotlb_sync_single (struct device *hwdev, dma_addr_t dev_addr, size_t size, int dir)
+swiotlb_sync_single (struct pci_dev *hwdev, dma_addr_t pci_addr, size_t size, int direction)
 {
-	char *dma_addr = phys_to_virt(dev_addr);
+	char *dma_addr = phys_to_virt(pci_addr);
 
-	if (dir == DMA_NONE)
+	if (direction == PCI_DMA_NONE)
 		BUG();
 	if (dma_addr >= io_tlb_start && dma_addr < io_tlb_end)
-		sync_single(hwdev, dma_addr, size, dir);
-	else if (dir == DMA_FROM_DEVICE)
+		sync_single(hwdev, dma_addr, size, direction);
+	else if (direction == PCI_DMA_FROMDEVICE)
 		mark_clean(dma_addr, size);
 }
 
 /*
  * Map a set of buffers described by scatterlist in streaming mode for DMA.  This is the
- * scatter-gather version of the above swiotlb_map_single interface.  Here the scatter
+ * scather-gather version of the above swiotlb_map_single interface.  Here the scatter
  * gather list elements are each tagged with the appropriate dma address and length.  They
  * are obtained via sg_dma_{address,length}(SG).
  *
@@ -412,22 +412,23 @@ swiotlb_sync_single (struct device *hwdev, dma_addr_t dev_addr, size_t size, int
  * Device ownership issues as mentioned above for swiotlb_map_single are the same here.
  */
 int
-swiotlb_map_sg (struct device *hwdev, struct scatterlist *sg, int nelems, int dir)
+swiotlb_map_sg (struct pci_dev *hwdev, struct scatterlist *sg, int nelems, int direction)
 {
 	void *addr;
-	unsigned long dev_addr;
+	unsigned long pci_addr;
 	int i;
 
-	if (dir == DMA_NONE)
+	if (direction == PCI_DMA_NONE)
 		BUG();
 
 	for (i = 0; i < nelems; i++, sg++) {
 		addr = SG_ENT_VIRT_ADDRESS(sg);
-		dev_addr = virt_to_phys(addr);
-		if (hwdev && hwdev->dma_mask && (dev_addr & ~*hwdev->dma_mask) != 0)
-			sg->dma_address = (dma_addr_t) map_single(hwdev, addr, sg->length, dir);
+		pci_addr = virt_to_phys(addr);
+		if ((pci_addr & ~hwdev->dma_mask) != 0)
+			sg->dma_address = (dma_addr_t)
+				map_single(hwdev, addr, sg->length, direction);
 		else
-			sg->dma_address = dev_addr;
+			sg->dma_address = pci_addr;
 		sg->dma_length = sg->length;
 	}
 	return nelems;
@@ -438,17 +439,17 @@ swiotlb_map_sg (struct device *hwdev, struct scatterlist *sg, int nelems, int di
  * here are the same as for swiotlb_unmap_single() above.
  */
 void
-swiotlb_unmap_sg (struct device *hwdev, struct scatterlist *sg, int nelems, int dir)
+swiotlb_unmap_sg (struct pci_dev *hwdev, struct scatterlist *sg, int nelems, int direction)
 {
 	int i;
 
-	if (dir == DMA_NONE)
+	if (direction == PCI_DMA_NONE)
 		BUG();
 
 	for (i = 0; i < nelems; i++, sg++)
 		if (sg->dma_address != SG_ENT_PHYS_ADDRESS(sg))
-			unmap_single(hwdev, (void *) sg->dma_address, sg->dma_length, dir);
-		else if (dir == DMA_FROM_DEVICE)
+			unmap_single(hwdev, (void *) sg->dma_address, sg->dma_length, direction);
+		else if (direction == PCI_DMA_FROMDEVICE)
 			mark_clean(SG_ENT_VIRT_ADDRESS(sg), sg->dma_length);
 }
 
@@ -460,16 +461,16 @@ swiotlb_unmap_sg (struct device *hwdev, struct scatterlist *sg, int nelems, int 
  * usage.
  */
 void
-swiotlb_sync_sg (struct device *hwdev, struct scatterlist *sg, int nelems, int dir)
+swiotlb_sync_sg (struct pci_dev *hwdev, struct scatterlist *sg, int nelems, int direction)
 {
 	int i;
 
-	if (dir == DMA_NONE)
+	if (direction == PCI_DMA_NONE)
 		BUG();
 
 	for (i = 0; i < nelems; i++, sg++)
 		if (sg->dma_address != SG_ENT_PHYS_ADDRESS(sg))
-			sync_single(hwdev, (void *) sg->dma_address, sg->dma_length, dir);
+			sync_single(hwdev, (void *) sg->dma_address, sg->dma_length, direction);
 }
 
 /*
@@ -478,7 +479,7 @@ swiotlb_sync_sg (struct device *hwdev, struct scatterlist *sg, int nelems, int d
  * you would pass 0x00ffffff as the mask to this function.
  */
 int
-swiotlb_dma_supported (struct device *hwdev, u64 mask)
+swiotlb_pci_dma_supported (struct pci_dev *hwdev, u64 mask)
 {
 	return 1;
 }
@@ -490,6 +491,6 @@ EXPORT_SYMBOL(swiotlb_map_sg);
 EXPORT_SYMBOL(swiotlb_unmap_sg);
 EXPORT_SYMBOL(swiotlb_sync_single);
 EXPORT_SYMBOL(swiotlb_sync_sg);
-EXPORT_SYMBOL(swiotlb_alloc_coherent);
-EXPORT_SYMBOL(swiotlb_free_coherent);
-EXPORT_SYMBOL(swiotlb_dma_supported);
+EXPORT_SYMBOL(swiotlb_alloc_consistent);
+EXPORT_SYMBOL(swiotlb_free_consistent);
+EXPORT_SYMBOL(swiotlb_pci_dma_supported);

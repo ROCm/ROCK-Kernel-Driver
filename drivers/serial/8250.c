@@ -2064,11 +2064,9 @@ int register_serial(struct serial_struct *req)
 	return __register_serial(req, -1);
 }
 
-int __init early_serial_setup(struct uart_port *port)
+int __init early_serial_setup(struct serial_struct *req)
 {
-	serial8250_isa_init_ports();
-	serial8250_ports[port->line].port	= *port;
-	serial8250_ports[port->line].port.ops	= &serial8250_pops;
+	__register_serial(req, req->line);
 	return 0;
 }
 

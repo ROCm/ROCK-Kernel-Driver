@@ -295,7 +295,11 @@ struct host_data {
 #ifndef SYM_LINUX_DYNAMIC_DMA_MAPPING
 typedef u_long		bus_addr_t;
 #else
+#if	SYM_CONF_DMA_ADDRESSING_MODE > 0
+typedef dma64_addr_t	bus_addr_t;
+#else
 typedef dma_addr_t	bus_addr_t;
+#endif
 #endif
 
 /*

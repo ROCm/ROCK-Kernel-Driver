@@ -38,7 +38,7 @@ static salinfo_entry_t salinfo_entries[]={
 	{ "itc_drift",		IA64_SAL_PLATFORM_FEATURE_ITC_DRIFT, },
 };
 
-#define NR_SALINFO_ENTRIES ARRAY_SIZE(salinfo_entries)
+#define NR_SALINFO_ENTRIES (sizeof(salinfo_entries)/sizeof(salinfo_entry_t))
 
 /*
  * One for each feature and one more for the directory entry...

@@ -1546,6 +1546,8 @@ source "crypto/Kconfig"
 
 source "lib/Kconfig"
 
+source "suse/Kconfig"
+
 config X86_SMP
 	bool
 	depends on SMP && !X86_VOYAGER

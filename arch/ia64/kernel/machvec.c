@@ -1,14 +1,12 @@
 #include <linux/config.h>
 
-#include <asm/system.h>
-
 #ifdef CONFIG_IA64_GENERIC
 
 #include <linux/kernel.h>
 #include <linux/string.h>
 
-#include <asm/machvec.h>
 #include <asm/page.h>
+#include <asm/machvec.h>
 
 struct ia64_machine_vector ia64_mv;
 
@@ -44,10 +42,4 @@ machvec_init (const char *name)
 void
 machvec_noop (void)
 {
-}
-
-void
-machvec_memory_fence (void)
-{
-	mb();
 }

@@ -1,8 +1,9 @@
 #ifndef __LINUX_PERCPU_H
 #define __LINUX_PERCPU_H
-#include <linux/preempt.h> /* For preempt_disable() */
+#include <linux/spinlock.h> /* For preempt_disable() */
 #include <linux/slab.h> /* For kmalloc_percpu() */
 #include <asm/percpu.h>
+
 /* Must be an lvalue. */
 #define get_cpu_var(var) (*({ preempt_disable(); &__get_cpu_var(var); }))
 #define put_cpu_var(var) preempt_enable()
