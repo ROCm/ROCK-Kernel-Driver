@@ -63,7 +63,6 @@
 
 /* local variables */
 static int debug;
-static int setup;
 static char* bridge;
 static u8 bridge_busnr;
 static u8 bridge_slot;
