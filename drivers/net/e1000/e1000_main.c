@@ -30,6 +30,14 @@
 
 /* Change Log
  *
+ * 5.1.13	5/28/03
+ *   o Bug fix: request_irq() failure resulted in freeing resources twice!
+ *     [Don Fry (brazilnut@us.ibm.com)]
+ *   o Bug fix: fix VLAN support on ppc64 [Mark Rakes (mrakes@vivato.net)]
+ *   o Bug fix: missing Tx cleanup opportunities during interrupt handling.
+ *   o Bug fix: alloc_etherdev failure didn't cleanup regions in probe.
+ *   o Cleanup: s/int/unsigned int/ for descriptor ring indexes.
+ *   
  * 5.1.11	5/6/03
  *   o Feature: Added support for 82546EB (Quad-port) hardware.
  *   o Feature: Added support for Diagnostics through Ethtool.
@@ -38,26 +46,11 @@
  *   o Bug fix: TSO bug fixes.
  *
  * 5.0.42	3/5/03
- *   o Feature: Added support for 82541 and 82547 hardware.
- *   o Feature: Added support for Intel Gigabit PHY (IGP) and a variety of
- *   eeproms.
- *   o Feature: Added support for TCP Segmentation Offload (TSO).
- *   o Feature: Added MII ioctl.
- *   o Feature: Added support for statistics reporting through ethtool.
- *   o Cleanup: Removed proprietary hooks for ANS.
- *   o Cleanup: Miscellaneous code changes to improve CPU utilization.
- *   	- Replaced "%" with conditionals and "+-" operators.
- *   	- Implemented dynamic Interrupt Throttle Rate (ITR).
- *   	- Reduced expensive PCI reads of ICR in interrupt.
- *   o Bug fix: Request IRQ after descriptor ring setup to avoid panic in
- *   shared interrupt instances.
- *
- * 4.4.18       11/27/02
  */
 
 char e1000_driver_name[] = "e1000";
 char e1000_driver_string[] = "Intel(R) PRO/1000 Network Driver";
-char e1000_driver_version[] = "5.1.11-k1";
+char e1000_driver_version[] = "5.1.13-k1";
 char e1000_copyright[] = "Copyright (c) 1999-2003 Intel Corporation.";
 
 /* e1000_pci_tbl - PCI Device ID Table
@@ -128,6 +121,7 @@ static void e1000_update_stats(struct e1000_adapter *adapter);
 static inline void e1000_irq_disable(struct e1000_adapter *adapter);
 static inline void e1000_irq_enable(struct e1000_adapter *adapter);
 static irqreturn_t e1000_intr(int irq, void *data, struct pt_regs *regs);
+static boolean_t e1000_clean_tx_irq(struct e1000_adapter *adapter);
 #ifdef CONFIG_E1000_NAPI
 static int e1000_clean(struct net_device *netdev, int *budget);
 static boolean_t e1000_clean_rx_irq(struct e1000_adapter *adapter,
@@ -135,7 +129,6 @@ static boolean_t e1000_clean_rx_irq(struct e1000_adapter *adapter,
 #else
 static boolean_t e1000_clean_rx_irq(struct e1000_adapter *adapter);
 #endif
-static boolean_t e1000_clean_tx_irq(struct e1000_adapter *adapter);
 static void e1000_alloc_rx_buffers(struct e1000_adapter *adapter);
 static int e1000_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd);
 static int e1000_mii_ioctl(struct net_device *netdev, struct ifreq *ifr,

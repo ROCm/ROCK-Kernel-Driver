@@ -294,10 +294,20 @@ e1000_reset_hw(struct e1000_hw *hw)
 	msec_delay(5);
     }
 
-    if(hw->mac_type > e1000_82543)
-        E1000_WRITE_REG_IO(hw, CTRL, (ctrl | E1000_CTRL_RST));
-    else
-        E1000_WRITE_REG(hw, CTRL, (ctrl | E1000_CTRL_RST));
+    switch(hw->mac_type) {
+        case e1000_82544:
+        case e1000_82540:
+        case e1000_82545:
+        case e1000_82546:
+        case e1000_82541:
+            /* These controllers can't ack the 64-bit write when issuing the
+             * reset, so use IO-mapping as a workaround to issue the reset */
+            E1000_WRITE_REG_IO(hw, CTRL, (ctrl | E1000_CTRL_RST));
+            break;
+        default:
+            E1000_WRITE_REG(hw, CTRL, (ctrl | E1000_CTRL_RST));
+            break;
+    }
 
     /* Force a reload from the EEPROM if necessary */
     if(hw->mac_type < e1000_82540) {
@@ -722,7 +732,8 @@ e1000_setup_fiber_link(struct e1000_hw *hw)
 static int32_t
 e1000_setup_copper_link(struct e1000_hw *hw)
 {
-    uint32_t ctrl, led_ctrl;
+    uint32_t ctrl;
+    uint32_t led_ctrl;
     int32_t ret_val;
     uint16_t i;
     uint16_t phy_data;
@@ -2284,7 +2295,8 @@ e1000_write_phy_reg(struct e1000_hw *hw,
 void
 e1000_phy_hw_reset(struct e1000_hw *hw)
 {
-    uint32_t ctrl, ctrl_ext, led_ctrl;
+    uint32_t ctrl, ctrl_ext;
+    uint32_t led_ctrl;
 
     DEBUGFUNC("e1000_phy_hw_reset");
 
