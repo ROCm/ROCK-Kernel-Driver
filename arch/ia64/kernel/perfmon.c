@@ -1975,8 +1975,6 @@ pfm_close(struct inode *inode, struct file *filp)
 
 		PROTECT_CTX(ctx, flags);
 
-		/* reload state, may have changed during  opening of critical section */
-		state = ctx->ctx_state;
 
 		remove_wait_queue(&ctx->ctx_zombieq, &wait);
   		set_current_state(TASK_RUNNING);
@@ -2005,6 +2003,10 @@ pfm_close(struct inode *inode, struct file *filp)
 	}
 
 doit:	/* cannot assume task is defined from now on */
+
+	/* reload state, may have changed during  opening of critical section */
+	state = ctx->ctx_state;
+
 	/*
 	 * the context is still attached to a task (possibly current)
 	 * we cannot destroy it right now
@@ -2037,7 +2039,7 @@ doit:	/* cannot assume task is defined from now on */
 
 	DPRINT(("[%d] ctx_state=%d free_possible=%d vaddr=%p addr=%p size=%lu\n",
 		current->pid,
-		ctx->ctx_state,
+		state,
 		free_possible,
 		smpl_buf_vaddr,
 		smpl_buf_addr,
@@ -2362,10 +2364,23 @@ error_kmem:
 static int
 pfm_bad_permissions(struct task_struct *task)
 {
-	/* stolen from bad_signal() */
-	return (current->session != task->session)
-	    && (current->euid ^ task->suid) && (current->euid ^ task->uid)
-	    && (current->uid ^ task->suid) && (current->uid ^ task->uid);
+	/* inspired by ptrace_attach() */
+	DPRINT(("[%d] cur: uid=%d gid=%d task: euid=%d suid=%d uid=%d egid=%d sgid=%d\n",
+		current->pid,
+		current->uid,
+		current->gid,
+		task->euid,
+		task->suid,
+		task->uid,
+		task->egid,
+		task->sgid));
+
+	return ((current->uid != task->euid)
+	    || (current->uid != task->suid)
+	    || (current->uid != task->uid)
+	    || (current->gid != task->egid)
+	    || (current->gid != task->sgid)
+	    || (current->gid != task->gid)) && !capable(CAP_SYS_PTRACE);
 }
 
 static int
