@@ -1172,7 +1172,7 @@ int __init scsi_init_queue(void)
 	return 0;
 }
 
-void __exit scsi_exit_lib(void)
+void __exit scsi_exit_queue(void)
 {
 	int i;
 
