@@ -39,12 +39,15 @@
 #include <asm/io.h>
 #include <asm/dbdma.h>
 #include <asm/ide.h>
-#include <asm/mediabay.h>
 #include <asm/pci-bridge.h>
 #include <asm/machdep.h>
 #include <asm/pmac_feature.h>
 #include <asm/sections.h>
 #include <asm/irq.h>
+
+#ifndef CONFIG_PPC64
+#include <asm/mediabay.h>
+#endif
 
 #include "ide-timing.h"
 
@@ -1183,6 +1186,7 @@ pmac_ide_setup_device(pmac_ide_hwif_t *pmif, ide_hwif_t *hwif)
 	/* Make sure we have sane timings */
 	sanitize_timings(pmif);
 
+#ifndef CONFIG_PPC64
 	/* XXX FIXME: Media bay stuff need re-organizing */
 	if (np->parent && np->parent->name
 	    && strcasecmp(np->parent->name, "media-bay") == 0) {
@@ -1198,7 +1202,9 @@ pmac_ide_setup_device(pmac_ide_hwif_t *pmif, ide_hwif_t *hwif)
 		 * units, I keep the old way
 		 */
 		ppc_md.feature_call(PMAC_FTR_IDE_ENABLE, np, 0, 1);
-	} else {
+	} else
+#endif
+	{
  		/* This is necessary to enable IDE when net-booting */
 		ppc_md.feature_call(PMAC_FTR_IDE_RESET, np, pmif->aapl_bus_id, 1);
 		ppc_md.feature_call(PMAC_FTR_IDE_ENABLE, np, pmif->aapl_bus_id, 1);
@@ -1238,9 +1244,9 @@ pmac_ide_setup_device(pmac_ide_hwif_t *pmif, ide_hwif_t *hwif)
 		hwif->led_act = pmu_hd_kick_blink;
 #endif
 
-	printk(KERN_INFO "ide%d: Found Apple %s controller, bus ID %d%s\n",
-			hwif->index, model_name[pmif->kind], pmif->aapl_bus_id,
-			pmif->mediabay ? " (mediabay)" : "");
+	printk(KERN_INFO "ide%d: Found Apple %s controller, bus ID %d%s, irq %d\n",
+	       hwif->index, model_name[pmif->kind], pmif->aapl_bus_id,
+	       pmif->mediabay ? " (mediabay)" : "", hwif->irq);
 			
 #ifdef CONFIG_PMAC_PBOOK
 	if (pmif->mediabay && check_media_bay_by_base(pmif->regbase, MB_CD) == 0)
@@ -1447,7 +1453,12 @@ pmac_ide_pci_attach(struct pci_dev *pdev, const struct pci_device_id *id)
 #ifdef CONFIG_BLK_DEV_IDEDMA_PMAC
 	pmif->dma_regs = (volatile struct dbdma_regs*)(base + 0x1000);
 #endif /* CONFIG_BLK_DEV_IDEDMA_PMAC */	
-	pmif->irq = pdev->irq;
+
+	/* We use the OF node irq mapping */
+	if (np->n_intrs == 0)
+		pmif->irq = pdev->irq;
+	else
+		pmif->irq = np->intrs[0].line;
 
 	pci_set_drvdata(pdev, hwif);
 
