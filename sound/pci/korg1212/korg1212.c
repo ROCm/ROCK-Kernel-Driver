@@ -1162,42 +1162,42 @@ static int snd_korg1212_downloadDSPCode(korg1212_t *korg1212)
 
 static snd_pcm_hardware_t snd_korg1212_playback_info =
 {
-        info:                (SNDRV_PCM_INFO_MMAP |
+	.info =               (SNDRV_PCM_INFO_MMAP |
                               SNDRV_PCM_INFO_MMAP_VALID |
                               SNDRV_PCM_INFO_INTERLEAVED),
-        formats:             SNDRV_PCM_FMTBIT_S16_LE,
-        rates:               (SNDRV_PCM_RATE_44100 |
+	.formats =	      SNDRV_PCM_FMTBIT_S16_LE,
+        .rates =              (SNDRV_PCM_RATE_44100 |
                               SNDRV_PCM_RATE_48000),
-        rate_min:            44100,
-        rate_max:            48000,
-        channels_min:        K1212_CHANNELS,
-        channels_max:        K1212_CHANNELS,
-        buffer_bytes_max:    K1212_BUF_SIZE,
-        period_bytes_min:    K1212_PERIOD_BYTES,
-        period_bytes_max:    K1212_PERIOD_BYTES,
-        periods_min:         K1212_PERIODS,
-        periods_max:         K1212_PERIODS,
-        fifo_size:           0,
+        .rate_min =           44100,
+        .rate_max =           48000,
+        .channels_min =       K1212_CHANNELS,
+        .channels_max =       K1212_CHANNELS,
+        .buffer_bytes_max =   K1212_BUF_SIZE,
+        .period_bytes_min =   K1212_PERIOD_BYTES,
+        .period_bytes_max =   K1212_PERIOD_BYTES,
+        .periods_min =        K1212_PERIODS,
+        .periods_max =        K1212_PERIODS,
+        .fifo_size =          0,
 };
 
 static snd_pcm_hardware_t snd_korg1212_capture_info =
 {
-        info:                (SNDRV_PCM_INFO_MMAP |
+        .info =               (SNDRV_PCM_INFO_MMAP |
                               SNDRV_PCM_INFO_MMAP_VALID |
                               SNDRV_PCM_INFO_INTERLEAVED),
-        formats:             SNDRV_PCM_FMTBIT_S16_LE,
-        rates:               (SNDRV_PCM_RATE_44100 |
+        .formats =	      SNDRV_PCM_FMTBIT_S16_LE,
+        .rates =	      (SNDRV_PCM_RATE_44100 |
                               SNDRV_PCM_RATE_48000),
-        rate_min:            44100,
-        rate_max:            48000,
-        channels_min:        K1212_CHANNELS,
-        channels_max:        K1212_CHANNELS,
-        buffer_bytes_max:    K1212_BUF_SIZE,
-        period_bytes_min:    K1212_PERIOD_BYTES,
-        period_bytes_max:    K1212_PERIOD_BYTES,
-        periods_min:         K1212_PERIODS,
-        periods_max:         K1212_PERIODS,
-        fifo_size:           0,
+        .rate_min =           44100,
+        .rate_max =           48000,
+        .channels_min =       K1212_CHANNELS,
+        .channels_max =       K1212_CHANNELS,
+        .buffer_bytes_max =   K1212_BUF_SIZE,
+        .period_bytes_min =   K1212_PERIOD_BYTES,
+        .period_bytes_max =   K1212_PERIOD_BYTES,
+        .periods_min =        K1212_PERIODS,
+        .periods_max =        K1212_PERIODS,
+        .fifo_size =          0,
 };
 
 static void snd_korg1212_free_pcm(snd_pcm_t *pcm)
@@ -1216,9 +1216,9 @@ static unsigned int period_bytes[] = { K1212_PERIOD_BYTES };
 #define PERIOD_BYTES sizeof(period_bytes) / sizeof(period_bytes[0])
 
 static snd_pcm_hw_constraint_list_t hw_constraints_period_bytes = {
-        count: PERIOD_BYTES,
-        list: period_bytes,
-        mask: 0
+        .count = PERIOD_BYTES,
+        .list = period_bytes,
+        .mask = 0
 };
 
 static int snd_korg1212_playback_open(snd_pcm_substream_t *substream)
@@ -1504,26 +1504,26 @@ static int snd_korg1212_playback_silence(snd_pcm_substream_t *substream,
 }
 
 static snd_pcm_ops_t snd_korg1212_playback_ops = {
-        open:           snd_korg1212_playback_open,
-        close:          snd_korg1212_playback_close,
-        ioctl:          snd_korg1212_ioctl,
-        hw_params:      snd_korg1212_hw_params,
-        prepare:        snd_korg1212_prepare,
-        trigger:        snd_korg1212_trigger,
-        pointer:        snd_korg1212_pointer,
-        copy:           snd_korg1212_playback_copy,
-        silence:        snd_korg1212_playback_silence,
+        .open =		snd_korg1212_playback_open,
+        .close =	snd_korg1212_playback_close,
+        .ioctl =	snd_korg1212_ioctl,
+        .hw_params =	snd_korg1212_hw_params,
+        .prepare =	snd_korg1212_prepare,
+        .trigger =	snd_korg1212_trigger,
+        .pointer =	snd_korg1212_pointer,
+        .copy =		snd_korg1212_playback_copy,
+        .silence =	snd_korg1212_playback_silence,
 };
 
 static snd_pcm_ops_t snd_korg1212_capture_ops = {
-	open:		snd_korg1212_capture_open,
-	close:		snd_korg1212_capture_close,
-	ioctl:		snd_korg1212_ioctl,
-	hw_params:	snd_korg1212_hw_params,
-	prepare:	snd_korg1212_prepare,
-	trigger:	snd_korg1212_trigger,
-	pointer:	snd_korg1212_pointer,
-	copy:		snd_korg1212_capture_copy,
+	.open =		snd_korg1212_capture_open,
+	.close =	snd_korg1212_capture_close,
+	.ioctl =	snd_korg1212_ioctl,
+	.hw_params =	snd_korg1212_hw_params,
+	.prepare =	snd_korg1212_prepare,
+	.trigger =	snd_korg1212_trigger,
+	.pointer =	snd_korg1212_pointer,
+	.copy =		snd_korg1212_capture_copy,
 };
 
 /*
@@ -1803,31 +1803,31 @@ static int snd_korg1212_control_sync_put(snd_kcontrol_t * kcontrol, snd_ctl_elem
 
 #define MON_MIXER(ord,c_name)									\
         {											\
-                access:		SNDRV_CTL_ELEM_ACCESS_READ | SNDRV_CTL_ELEM_ACCESS_WRITE,	\
-                iface:          SNDRV_CTL_ELEM_IFACE_MIXER,					\
-                name:		c_name " Monitor Volume",						\
-                info:		snd_korg1212_control_volume_info,				\
-                get:		snd_korg1212_control_volume_get,				\
-                put:		snd_korg1212_control_volume_put,				\
-		private_value:	ord,								\
+                .access =	SNDRV_CTL_ELEM_ACCESS_READ | SNDRV_CTL_ELEM_ACCESS_WRITE,	\
+                .iface =        SNDRV_CTL_ELEM_IFACE_MIXER,					\
+                .name =		c_name " Monitor Volume",					\
+                .info =		snd_korg1212_control_volume_info,				\
+                .get =		snd_korg1212_control_volume_get,				\
+                .put =		snd_korg1212_control_volume_put,				\
+		.private_value = ord,								\
         },                                                                                      \
         {											\
-                access:		SNDRV_CTL_ELEM_ACCESS_READ | SNDRV_CTL_ELEM_ACCESS_WRITE,	\
-                iface:          SNDRV_CTL_ELEM_IFACE_MIXER,					\
-                name:		c_name " Monitor Route",						\
-                info:		snd_korg1212_control_route_info,				\
-                get:		snd_korg1212_control_route_get,					\
-                put:		snd_korg1212_control_route_put,					\
-		private_value:	ord,								\
+                .access =	SNDRV_CTL_ELEM_ACCESS_READ | SNDRV_CTL_ELEM_ACCESS_WRITE,	\
+                .iface =        SNDRV_CTL_ELEM_IFACE_MIXER,					\
+                .name =		c_name " Monitor Route",					\
+                .info =		snd_korg1212_control_route_info,				\
+                .get =		snd_korg1212_control_route_get,					\
+                .put =		snd_korg1212_control_route_put,					\
+		.private_value = ord,								\
         },                                                                                      \
         {											\
-                access:		SNDRV_CTL_ELEM_ACCESS_READ | SNDRV_CTL_ELEM_ACCESS_WRITE,	\
-                iface:          SNDRV_CTL_ELEM_IFACE_PCM,					\
-                name:		c_name " Monitor Phase Invert",						\
-                info:		snd_korg1212_control_phase_info,				\
-                get:		snd_korg1212_control_phase_get,					\
-                put:		snd_korg1212_control_phase_put,					\
-		private_value:	ord,								\
+                .access =	SNDRV_CTL_ELEM_ACCESS_READ | SNDRV_CTL_ELEM_ACCESS_WRITE,	\
+                .iface =        SNDRV_CTL_ELEM_IFACE_PCM,					\
+                .name =		c_name " Monitor Phase Invert",					\
+                .info =		snd_korg1212_control_phase_info,				\
+                .get =		snd_korg1212_control_phase_get,					\
+                .put =		snd_korg1212_control_phase_put,					\
+		.private_value = ord,								\
         }
 
 static snd_kcontrol_new_t snd_korg1212_controls[] = {
@@ -1836,20 +1836,20 @@ static snd_kcontrol_new_t snd_korg1212_controls[] = {
         MON_MIXER(0, "ADAT-1"), MON_MIXER(1, "ADAT-2"), MON_MIXER(2, "ADAT-3"), MON_MIXER(3, "ADAT-4"),
         MON_MIXER(4, "ADAT-5"), MON_MIXER(5, "ADAT-6"), MON_MIXER(6, "ADAT-7"), MON_MIXER(7, "ADAT-8"),
 	{
-                access:		SNDRV_CTL_ELEM_ACCESS_READ | SNDRV_CTL_ELEM_ACCESS_WRITE,
-                iface:          SNDRV_CTL_ELEM_IFACE_PCM,
-                name:		"Sync Source",
-                info:		snd_korg1212_control_sync_info,
-                get:		snd_korg1212_control_sync_get,
-                put:		snd_korg1212_control_sync_put,
+                .access =	SNDRV_CTL_ELEM_ACCESS_READ | SNDRV_CTL_ELEM_ACCESS_WRITE,
+                .iface =        SNDRV_CTL_ELEM_IFACE_PCM,
+                .name =		"Sync Source",
+                .info =		snd_korg1212_control_sync_info,
+                .get =		snd_korg1212_control_sync_get,
+                .put =		snd_korg1212_control_sync_put,
         },
         {
-                access:		SNDRV_CTL_ELEM_ACCESS_READ | SNDRV_CTL_ELEM_ACCESS_WRITE,
-                iface:          SNDRV_CTL_ELEM_IFACE_MIXER,
-                name:		"ADC Attenuation",
-                info:		snd_korg1212_control_analog_info,
-                get:		snd_korg1212_control_analog_get,
-                put:		snd_korg1212_control_analog_put,
+                .access =	SNDRV_CTL_ELEM_ACCESS_READ | SNDRV_CTL_ELEM_ACCESS_WRITE,
+                .iface =        SNDRV_CTL_ELEM_IFACE_MIXER,
+                .name =		"ADC Attenuation",
+                .info =		snd_korg1212_control_analog_info,
+                .get =		snd_korg1212_control_analog_get,
+                .put =		snd_korg1212_control_analog_put,
         }
 };
 
@@ -2305,10 +2305,10 @@ static void __devexit snd_korg1212_remove(struct pci_dev *pci)
 }
 
 static struct pci_driver driver = {
-	name: "korg1212",
-	id_table: snd_korg1212_ids,
-	probe: snd_korg1212_probe,
-	remove: __devexit_p(snd_korg1212_remove),
+	.name = "korg1212",
+	.id_table = snd_korg1212_ids,
+	.probe = snd_korg1212_probe,
+	.remove = __devexit_p(snd_korg1212_remove),
 };
 
 static int __init alsa_card_korg1212_init(void)

@@ -1316,7 +1316,7 @@ static void airo_do_xmit(struct net_device *dev) {
 
 	if (down_trylock(&priv->sem) != 0) {
 		netif_stop_queue(dev);
-		priv->xmit.task.routine = (void (*)(void *))airo_do_xmit;
+		priv->xmit.task.func = (void (*)(void *))airo_do_xmit;
 		priv->xmit.task.data = (void *)dev;
 		schedule_work(&priv->xmit.task);
 		return;
@@ -1378,7 +1378,7 @@ static void airo_do_xmit11(struct net_device *dev) {
 
 	if (down_trylock(&priv->sem) != 0) {
 		netif_stop_queue(dev);
-		priv->xmit11.task.routine = (void (*)(void *))airo_do_xmit11;
+		priv->xmit11.task.func = (void (*)(void *))airo_do_xmit11;
 		priv->xmit11.task.data = (void *)dev;
 		schedule_work(&priv->xmit11.task);
 		return;
@@ -1464,7 +1464,7 @@ static void airo_end_promisc(struct airo_info *ai) {
 		completecommand(ai, &rsp);
 		up(&ai->sem);
 	} else {
-		ai->promisc_task.routine = (void (*)(void *))airo_end_promisc;
+		ai->promisc_task.func = (void (*)(void *))airo_end_promisc;
 		ai->promisc_task.data = (void *)ai;
 		schedule_work(&ai->promisc_task);
 	}
@@ -1480,7 +1480,7 @@ static void airo_set_promisc(struct airo_info *ai) {
 		sendcommand(ai, &cmd);
 		airo_end_promisc(ai);
 	} else {
-		ai->promisc_task.routine = (void (*)(void *))airo_set_promisc;
+		ai->promisc_task.func = (void (*)(void *))airo_set_promisc;
 		ai->promisc_task.data = (void *)ai;
 		schedule_work(&ai->promisc_task);
 	}
@@ -1812,7 +1812,7 @@ static void airo_send_event(struct net_device *dev) {
 		/* Send event to user space */
 		wireless_send_event(dev, SIOCGIWAP, &wrqu, NULL);
 	} else {
-		ai->event_task.routine = (void (*)(void *))airo_send_event;
+		ai->event_task.func = (void (*)(void *))airo_send_event;
 		ai->event_task.data = (void *)dev;
 		schedule_work(&ai->event_task);
 	}
@@ -1831,7 +1831,7 @@ static void airo_read_mic(struct airo_info *ai) {
 		micinit (ai, &mic_rid);
 #endif
 	} else {
-		ai->mic_task.routine = (void (*)(void *))airo_read_mic;
+		ai->mic_task.func = (void (*)(void *))airo_read_mic;
 		ai->mic_task.data = (void *)ai;
 		schedule_work(&ai->mic_task);
 	}

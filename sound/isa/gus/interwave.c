@@ -221,9 +221,9 @@ static int snd_interwave_i2c_getdataline(snd_i2c_bus_t *bus, int ack)
 }
 
 static snd_i2c_bit_ops_t snd_interwave_i2c_bit_ops = {
-	setlines: snd_interwave_i2c_setlines,
-	getclock: snd_interwave_i2c_getclockline,
-	getdata:  snd_interwave_i2c_getdataline,
+	.setlines = snd_interwave_i2c_setlines,
+	.getclock = snd_interwave_i2c_getclockline,
+	.getdata  = snd_interwave_i2c_getdataline,
 };
 
 static int __init snd_interwave_detect_stb(struct snd_interwave *iwcard,

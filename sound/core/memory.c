@@ -19,7 +19,6 @@
  *
  */
 
-#define __NO_VERSION__
 #include <sound/driver.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
@@ -539,42 +538,3 @@ int copy_from_user_toio(unsigned long dst, const void *src, size_t count)
 	return 0;
 #endif
 }
-
-#ifdef HACK_PCI_ALLOC_CONSISTENT
-/*
- * A dirty hack... when the kernel code is fixed this should be removed.
- *
- * since pci_alloc_consistent always tries GFP_DMA when the requested
- * pci memory region is below 32bit, it happens quite often that even
- * 2 order or pages cannot be allocated.
- *
- * so in the following, GFP_DMA is used only when the first allocation
- * doesn't match the requested region.
- */
-#ifdef __i386__
-#define get_phys_addr(x) virt_to_phys(x)
-#else /* ppc and x86-64 */
-#define get_phys_addr(x) virt_to_bus(x)
-#endif
-void *snd_pci_hack_alloc_consistent(struct pci_dev *hwdev, size_t size,
-				    dma_addr_t *dma_handle)
-{
-	void *ret;
-	int gfp = GFP_ATOMIC;
-
-	if (hwdev == NULL)
-		gfp |= GFP_DMA;
-	ret = (void *)__get_free_pages(gfp, get_order(size));
-	if (ret) {
-		if (hwdev && ((get_phys_addr(ret) + size - 1) & ~hwdev->dma_mask)) {
-			free_pages((unsigned long)ret, get_order(size));
-			ret = (void *)__get_free_pages(gfp | GFP_DMA, get_order(size));
-		}
-	}
-	if (ret) {
-		memset(ret, 0, size);
-		*dma_handle = get_phys_addr(ret);
-	}
-	return ret;
-}
-#endif /* hack */

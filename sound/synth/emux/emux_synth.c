@@ -22,7 +22,6 @@
  *
  */
 
-#define __NO_VERSION__
 #include "emux_voice.h"
 #include <sound/asoundef.h>
 

@@ -19,7 +19,6 @@
  *
  */
 
-#define __NO_VERSION__
 #include <sound/driver.h>
 #include <linux/time.h>
 #include <linux/init.h>
@@ -288,16 +287,16 @@ static void snd_emu10k1_midi_output_trigger(snd_rawmidi_substream_t * substream,
 
 static snd_rawmidi_ops_t snd_emu10k1_midi_output =
 {
-	open:		snd_emu10k1_midi_output_open,
-	close:		snd_emu10k1_midi_output_close,
-	trigger:	snd_emu10k1_midi_output_trigger,
+	.open =		snd_emu10k1_midi_output_open,
+	.close =	snd_emu10k1_midi_output_close,
+	.trigger =	snd_emu10k1_midi_output_trigger,
 };
 
 static snd_rawmidi_ops_t snd_emu10k1_midi_input =
 {
-	open:		snd_emu10k1_midi_input_open,
-	close:		snd_emu10k1_midi_input_close,
-	trigger:	snd_emu10k1_midi_input_trigger,
+	.open =		snd_emu10k1_midi_input_open,
+	.close =	snd_emu10k1_midi_input_close,
+	.trigger =	snd_emu10k1_midi_input_trigger,
 };
 
 static void snd_emu10k1_midi_free(snd_rawmidi_t *rmidi)

@@ -54,22 +54,28 @@
 #define CS4231_PLY_UPR_CNT	0x0e	/* playback upper base count */
 #define CS4231_PLY_LWR_CNT	0x0f	/* playback lower base count */
 #define CS4231_ALT_FEATURE_1	0x10	/* alternate #1 feature enable */
+#define AD1845_AF1_MIC_LEFT	0x10	/* alternate #1 feature + MIC left */
 #define CS4231_ALT_FEATURE_2	0x11	/* alternate #2 feature enable */
+#define AD1845_AF2_MIC_RIGHT	0x11	/* alternate #2 feature + MIC right */
 #define CS4231_LEFT_LINE_IN	0x12	/* left line input control */
 #define CS4231_RIGHT_LINE_IN	0x13	/* right line input control */
 #define CS4231_TIMER_LOW	0x14	/* timer low byte */
 #define CS4231_TIMER_HIGH	0x15	/* timer high byte */
 #define CS4231_LEFT_MIC_INPUT	0x16	/* left MIC input control register (InterWave only) */
+#define AD1845_UPR_FREQ_SEL	0x16	/* upper byte of frequency select */
 #define CS4231_RIGHT_MIC_INPUT	0x17	/* right MIC input control register (InterWave only) */
+#define AD1845_LWR_FREQ_SEL	0x17	/* lower byte of frequency select */
 #define CS4236_EXT_REG		0x17	/* extended register access */
 #define CS4231_IRQ_STATUS	0x18	/* irq status register */
 #define CS4231_LINE_LEFT_OUTPUT	0x19	/* left line output control register (InterWave only) */
 #define CS4231_VERSION		0x19	/* CS4231(A) - version values */
 #define CS4231_MONO_CTRL	0x1a	/* mono input/output control */
 #define CS4231_LINE_RIGHT_OUTPUT 0x1b	/* right line output control register (InterWave only) */
+#define AD1845_PWR_DOWN		0x1b	/* power down control */
 #define CS4235_LEFT_MASTER	0x1b	/* left master output control */
 #define CS4231_REC_FORMAT	0x1c	/* clock and data format - record - bits 7-0 MCE */
 #define CS4231_PLY_VAR_FREQ	0x1d	/* playback variable frequency */
+#define AD1845_CLOCK		0x1d	/* crystal clock select and total power down */
 #define CS4235_RIGHT_MASTER	0x1d	/* right master output control */
 #define CS4231_REC_UPR_CNT	0x1e	/* record upper count */
 #define CS4231_REC_LWR_CNT	0x1f	/* record lower count */
@@ -191,6 +197,7 @@
 #define CS4231_HW_CS4231_MASK   0x0100	/* CS4231 serie */
 #define CS4231_HW_CS4231        0x0100	/* CS4231 chip */
 #define CS4231_HW_CS4231A       0x0101	/* CS4231A chip */
+#define CS4231_HW_AD1845	0x0102	/* AD1845 chip */
 #define CS4231_HW_CS4232_MASK   0x0200	/* CS4232 serie (has control ports) */
 #define CS4231_HW_CS4232        0x0200	/* CS4232 */
 #define CS4231_HW_CS4232A       0x0201	/* CS4232A */
@@ -298,20 +305,20 @@ int snd_cs4236_mixer(cs4231_t * chip);
  */
 
 #define CS4231_SINGLE(xname, xindex, reg, shift, mask, invert) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: xindex, \
-  info: snd_cs4231_info_single, \
-  get: snd_cs4231_get_single, put: snd_cs4231_put_single, \
-  private_value: reg | (shift << 8) | (mask << 16) | (invert << 24) }
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .index = xindex, \
+  .info = snd_cs4231_info_single, \
+  .get = snd_cs4231_get_single, .put = snd_cs4231_put_single, \
+  .private_value = reg | (shift << 8) | (mask << 16) | (invert << 24) }
 
 int snd_cs4231_info_single(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo);
 int snd_cs4231_get_single(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol);
 int snd_cs4231_put_single(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol);
 
 #define CS4231_DOUBLE(xname, xindex, left_reg, right_reg, shift_left, shift_right, mask, invert) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: xindex, \
-  info: snd_cs4231_info_double, \
-  get: snd_cs4231_get_double, put: snd_cs4231_put_double, \
-  private_value: left_reg | (right_reg << 8) | (shift_left << 16) | (shift_right << 19) | (mask << 24) | (invert << 22) }
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .index = xindex, \
+  .info = snd_cs4231_info_double, \
+  .get = snd_cs4231_get_double, .put = snd_cs4231_put_double, \
+  .private_value = left_reg | (right_reg << 8) | (shift_left << 16) | (shift_right << 19) | (mask << 24) | (invert << 22) }
 
 int snd_cs4231_info_double(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo);
 int snd_cs4231_get_double(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol);

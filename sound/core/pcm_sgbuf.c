@@ -19,7 +19,6 @@
  *
  */
 
-#define __NO_VERSION__
 #include <sound/driver.h>
 #include <linux/slab.h>
 #include <sound/core.h>
@@ -81,6 +80,9 @@ int snd_pcm_sgbuf_delete(snd_pcm_substream_t *substream)
 {
 	struct snd_sg_buf *sgbuf;
 
+	/* return in case, when sgbuf is not initialized */
+	if (substream->dma_private == NULL)
+		return -EINVAL;
 	sgbuf = snd_magic_cast(snd_pcm_sgbuf_t, substream->dma_private, return -EINVAL);
 	sgbuf_shrink(sgbuf, 0);
 	if (sgbuf->table)
@@ -108,7 +110,8 @@ int snd_pcm_sgbuf_alloc(snd_pcm_substream_t *substream, size_t size)
 	if (pages < sgbuf->pages) {
 		/* release unsed pages */
 		sgbuf_shrink(sgbuf, pages);
-		substream->runtime->dma_bytes = size;
+		if (substream->runtime)
+			substream->runtime->dma_bytes = size;
 		return 1; /* changed */
 	} else if (pages > sgbuf->tblsize) {
 		/* bigger than existing one.  reallocate the table. */
@@ -134,7 +137,8 @@ int snd_pcm_sgbuf_alloc(snd_pcm_substream_t *substream, size_t size)
 		changed = 1;
 	}
 	sgbuf->size = size;
-	substream->runtime->dma_bytes = size;
+	if (substream->runtime)
+		substream->runtime->dma_bytes = size;
 	return changed;
 }
 

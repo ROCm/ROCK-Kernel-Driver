@@ -1010,19 +1010,19 @@ static int snd_sb_qsound_space_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value
 }
 
 static snd_kcontrol_new_t snd_sb_qsound_switch = {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "3D Control - Switch",
-	info: snd_sb_qsound_switch_info,
-	get: snd_sb_qsound_switch_get,
-	put: snd_sb_qsound_switch_put
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "3D Control - Switch",
+	.info = snd_sb_qsound_switch_info,
+	.get = snd_sb_qsound_switch_get,
+	.put = snd_sb_qsound_switch_put
 };
 
 static snd_kcontrol_new_t snd_sb_qsound_space = {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "3D Control - Space",
-	info: snd_sb_qsound_space_info,
-	get: snd_sb_qsound_space_get,
-	put: snd_sb_qsound_space_put
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "3D Control - Space",
+	.info = snd_sb_qsound_space_info,
+	.get = snd_sb_qsound_space_get,
+	.put = snd_sb_qsound_space_put
 };
 
 static int snd_sb_qsound_build(snd_sb_csp_t * p)

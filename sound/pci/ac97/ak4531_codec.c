@@ -56,10 +56,10 @@ static void snd_ak4531_dump(ak4531_t *ak4531)
  */
 
 #define AK4531_SINGLE(xname, xindex, reg, shift, mask, invert) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: xindex, \
-  info: snd_ak4531_info_single, \
-  get: snd_ak4531_get_single, put: snd_ak4531_put_single, \
-  private_value: reg | (shift << 16) | (mask << 24) | (invert << 22) }
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .index = xindex, \
+  .info = snd_ak4531_info_single, \
+  .get = snd_ak4531_get_single, .put = snd_ak4531_put_single, \
+  .private_value = reg | (shift << 16) | (mask << 24) | (invert << 22) }
 
 static int snd_ak4531_info_single(snd_kcontrol_t * kcontrol, snd_ctl_elem_info_t * uinfo)
 {
@@ -117,10 +117,10 @@ static int snd_ak4531_put_single(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t
 }                                                                                                                                                                                                                                                                                                            
 
 #define AK4531_DOUBLE(xname, xindex, left_reg, right_reg, left_shift, right_shift, mask, invert) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: xindex, \
-  info: snd_ak4531_info_double, \
-  get: snd_ak4531_get_double, put: snd_ak4531_put_double, \
-  private_value: left_reg | (right_reg << 8) | (left_shift << 16) | (right_shift << 19) | (mask << 24) | (invert << 22) }
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .index = xindex, \
+  .info = snd_ak4531_info_double, \
+  .get = snd_ak4531_get_double, .put = snd_ak4531_put_double, \
+  .private_value = left_reg | (right_reg << 8) | (left_shift << 16) | (right_shift << 19) | (mask << 24) | (invert << 22) }
 
 static int snd_ak4531_info_double(snd_kcontrol_t * kcontrol, snd_ctl_elem_info_t * uinfo)
 {
@@ -196,10 +196,10 @@ static int snd_ak4531_put_double(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t
 }                                                                                                                                                                                                                                                                                                            
 
 #define AK4531_INPUT_SW(xname, xindex, reg1, reg2, left_shift, right_shift) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: xindex, \
-  info: snd_ak4531_info_input_sw, \
-  get: snd_ak4531_get_input_sw, put: snd_ak4531_put_input_sw, \
-  private_value: reg1 | (reg2 << 8) | (left_shift << 16) | (right_shift << 24) }
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .index = xindex, \
+  .info = snd_ak4531_info_input_sw, \
+  .get = snd_ak4531_get_input_sw, .put = snd_ak4531_put_input_sw, \
+  .private_value = reg1 | (reg2 << 8) | (left_shift << 16) | (right_shift << 24) }
 
 static int snd_ak4531_info_input_sw(snd_kcontrol_t * kcontrol, snd_ctl_elem_info_t * uinfo)
 {
@@ -362,7 +362,7 @@ int snd_ak4531_mixer(snd_card_t * card, ak4531_t * _ak4531, ak4531_t ** rak4531)
 	int idx, err;
 	ak4531_t * ak4531;
 	static snd_device_ops_t ops = {
-		dev_free:	snd_ak4531_dev_free,
+		.dev_free =	snd_ak4531_dev_free,
 	};
 
 	snd_assert(rak4531 != NULL, return -EINVAL);

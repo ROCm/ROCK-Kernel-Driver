@@ -19,7 +19,6 @@
  *
  */
 
-#define __NO_VERSION__
 #include <sound/driver.h>
 #include <linux/mm.h>
 #include <linux/file.h>
@@ -174,11 +173,11 @@ int snd_pcm_hw_refine(snd_pcm_substream_t *substream,
 			continue;
 #ifdef RULES_DEBUG
 		printk("%s = ", snd_pcm_hw_param_names[k]);
-		printk("%x -> ", *m);
+		printk("%04x%04x%04x%04x -> ", m->bits[3], m->bits[2], m->bits[1], m->bits[0]);
 #endif
 		changed = snd_mask_refine(m, constrs_mask(constrs, k));
 #ifdef RULES_DEBUG
-		printk("%x\n", *m);
+		printk("%04x%04x%04x%04x\n", m->bits[3], m->bits[2], m->bits[1], m->bits[0]);
 #endif
 		if (changed)
 			params->cmask |= 1 << k;
@@ -439,8 +438,10 @@ static int snd_pcm_hw_free(snd_pcm_substream_t * substream)
 	}
 	if (atomic_read(&runtime->mmap_count))
 		return -EBADFD;
-	if (substream->ops->hw_free == NULL)
+	if (substream->ops->hw_free == NULL) {
+		runtime->status->state = SNDRV_PCM_STATE_OPEN;
 		return 0;
+	}
 	result = substream->ops->hw_free(substream);
 	runtime->status->state = SNDRV_PCM_STATE_OPEN;
 	return result;
@@ -464,6 +465,7 @@ static int snd_pcm_sw_params(snd_pcm_substream_t * substream, snd_pcm_sw_params_
 		return -EINVAL;
 	if (params->silence_threshold + params->silence_size > runtime->buffer_size)
 		return -EINVAL;
+	spin_lock_irq(&runtime->lock);
 	runtime->tstamp_mode = params->tstamp_mode;
 	runtime->sleep_min = params->sleep_min;
 	runtime->period_step = params->period_step;
@@ -474,7 +476,6 @@ static int snd_pcm_sw_params(snd_pcm_substream_t * substream, snd_pcm_sw_params_
 	runtime->silence_size = params->silence_size;
 	runtime->xfer_align = params->xfer_align;
         params->boundary = runtime->boundary;
-	spin_lock_irq(&runtime->lock);
 	if (snd_pcm_running(substream)) {
 		if (runtime->sleep_min)
 			snd_pcm_tick_prepare(substream);
@@ -1616,7 +1617,6 @@ int snd_pcm_hw_constraints_complete(snd_pcm_substream_t *substream)
 	snd_assert(err >= 0, return -EINVAL);
 
 	err = snd_pcm_hw_constraint_mask64(runtime, SNDRV_PCM_HW_PARAM_FORMAT, hw->formats);
-	//err = snd_pcm_hw_constraint_mask(runtime, SNDRV_PCM_HW_PARAM_FORMAT, hw->formats);
 	snd_assert(err >= 0, return -EINVAL);
 
 	err = snd_pcm_hw_constraint_mask(runtime, SNDRV_PCM_HW_PARAM_SUBFORMAT, 1 << SNDRV_PCM_SUBFORMAT_STD);
@@ -2525,9 +2525,9 @@ static unsigned long snd_pcm_mmap_status_nopage(struct vm_area_struct *area, uns
 
 static struct vm_operations_struct snd_pcm_vm_ops_status =
 {
-	nopage:		snd_pcm_mmap_status_nopage,
+	.nopage =	snd_pcm_mmap_status_nopage,
 #ifndef VM_RESERVED
-	swapout:	snd_pcm_mmap_swapout,
+	.swapout =	snd_pcm_mmap_swapout,
 #endif
 };
 
@@ -2579,9 +2579,9 @@ static unsigned long snd_pcm_mmap_control_nopage(struct vm_area_struct *area, un
 
 static struct vm_operations_struct snd_pcm_vm_ops_control =
 {
-	nopage:		snd_pcm_mmap_control_nopage,
+	.nopage =	snd_pcm_mmap_control_nopage,
 #ifndef VM_RESERVED
-	swapout:	snd_pcm_mmap_swapout,
+	.swapout =	snd_pcm_mmap_swapout,
 #endif
 };
 
@@ -2664,11 +2664,11 @@ static unsigned long snd_pcm_mmap_data_nopage(struct vm_area_struct *area, unsig
 
 static struct vm_operations_struct snd_pcm_vm_ops_data =
 {
-	open:		snd_pcm_mmap_data_open,
-	close:		snd_pcm_mmap_data_close,
-	nopage:		snd_pcm_mmap_data_nopage,
+	.open =		snd_pcm_mmap_data_open,
+	.close =	snd_pcm_mmap_data_close,
+	.nopage =	snd_pcm_mmap_data_nopage,
 #ifndef VM_RESERVED
-	swapout:	snd_pcm_mmap_swapout,
+	.swapout =	snd_pcm_mmap_swapout,
 #endif
 };
 
@@ -2844,44 +2844,44 @@ static int snd_pcm_hw_params_old_user(snd_pcm_substream_t * substream, struct sn
 
 static struct file_operations snd_pcm_f_ops_playback = {
 #ifndef LINUX_2_2
-	owner:		THIS_MODULE,
+	.owner =	THIS_MODULE,
 #endif
-	write:		snd_pcm_write,
+	.write =	snd_pcm_write,
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 3, 44)
-	writev:		snd_pcm_writev,
+	.writev =	snd_pcm_writev,
 #endif
-	open:		snd_pcm_open,
-	release:	snd_pcm_release,
-	poll:		snd_pcm_playback_poll,
-	ioctl:		snd_pcm_playback_ioctl,
-	mmap:		snd_pcm_mmap,
-	fasync:		snd_pcm_fasync,
+	.open =		snd_pcm_open,
+	.release =	snd_pcm_release,
+	.poll =		snd_pcm_playback_poll,
+	.ioctl =	snd_pcm_playback_ioctl,
+	.mmap =		snd_pcm_mmap,
+	.fasync =	snd_pcm_fasync,
 };
 
 static struct file_operations snd_pcm_f_ops_capture = {
 #ifndef LINUX_2_2
-	owner:		THIS_MODULE,
+	.owner =	THIS_MODULE,
 #endif
-	read:		snd_pcm_read,
+	.read =		snd_pcm_read,
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 3, 44)
-	readv:		snd_pcm_readv,
+	.readv =	snd_pcm_readv,
 #endif
-	open:		snd_pcm_open,
-	release:	snd_pcm_release,
-	poll:		snd_pcm_capture_poll,
-	ioctl:		snd_pcm_capture_ioctl,
-	mmap:		snd_pcm_mmap,
-	fasync:		snd_pcm_fasync,
+	.open =		snd_pcm_open,
+	.release =	snd_pcm_release,
+	.poll =		snd_pcm_capture_poll,
+	.ioctl =	snd_pcm_capture_ioctl,
+	.mmap =		snd_pcm_mmap,
+	.fasync =	snd_pcm_fasync,
 };
 
 snd_minor_t snd_pcm_reg[2] =
 {
 	{
-		comment:	"digital audio playback",
-		f_ops:		&snd_pcm_f_ops_playback,
+		.comment =	"digital audio playback",
+		.f_ops =	&snd_pcm_f_ops_playback,
 	},
 	{
-		comment:	"digital audio capture",
-		f_ops:		&snd_pcm_f_ops_capture,
+		.comment =	"digital audio capture",
+		.f_ops =	&snd_pcm_f_ops_capture,
 	}
 };

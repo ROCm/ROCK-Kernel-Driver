@@ -19,11 +19,11 @@
  */
 
 
-#define __NO_VERSION__
 #include <sound/driver.h>
 #include <linux/init.h>
 #include <linux/i2c.h>
 #include <linux/i2c-dev.h>
+#include <linux/slab.h>
 #include <sound/core.h>
 #include "pmac.h"
 
@@ -57,7 +57,7 @@ static int keywest_attach_adapter(struct i2c_adapter *adapter)
 		return -EINVAL;
 
 	if (strncmp(adapter->name, "mac-io", 6))
-		return 0;
+		return 0; /* ignored */
 
 	new_client = kmalloc(sizeof(struct i2c_client), GFP_KERNEL);
 	if (! new_client)
@@ -74,11 +74,14 @@ static int keywest_attach_adapter(struct i2c_adapter *adapter)
 	new_client->id = keywest_ctx->id++; /* Automatically unique */
 	keywest_ctx->client = new_client;
 
-	if ((err = keywest_ctx->init_client(keywest_ctx)) < 0)
+	if ((err = keywest_ctx->init_client(keywest_ctx)) < 0) {
+		snd_printk(KERN_ERR "tumbler: cannot initialize the MCS\n");
 		goto __err;
+	}
 
 	/* Tell the i2c layer a new client has arrived */
 	if (i2c_attach_client(new_client)) {
+		snd_printk(KERN_ERR "tumbler: cannot attach i2c client\n");
 		err = -ENODEV;
 		goto __err;
 	}
@@ -120,10 +123,11 @@ int __init snd_pmac_keywest_init(pmac_keywest_t *i2c)
 	if (keywest_ctx)
 		return -EBUSY;
 
+	keywest_ctx = i2c;
+
 	if ((err = i2c_add_driver(&keywest_driver))) {
 		snd_printk(KERN_ERR "cannot register keywest i2c driver\n");
 		return err;
 	}
-	keywest_ctx = i2c;
 	return 0;
 }

@@ -25,8 +25,8 @@
  *
  */
 
-#define __NO_VERSION__
 #include <sound/driver.h>
+#include <linux/delay.h>
 #include <linux/slab.h>
 #include <linux/time.h>
 #include <linux/init.h>
@@ -141,9 +141,9 @@ static unsigned int capture_period_sizes[31] = {
 };
 
 static snd_pcm_hw_constraint_list_t hw_constraints_capture_period_sizes = {
-	count: 31,
-	list: capture_period_sizes,
-	mask: 0
+	.count = 31,
+	.list = capture_period_sizes,
+	.mask = 0
 };
 
 static unsigned int capture_rates[8] = {
@@ -151,9 +151,9 @@ static unsigned int capture_rates[8] = {
 };
 
 static snd_pcm_hw_constraint_list_t hw_constraints_capture_rates = {
-	count: 8,
-	list: capture_rates,
-	mask: 0
+	.count = 8,
+	.list = capture_rates,
+	.mask = 0
 };
 
 static unsigned int snd_emu10k1_capture_rate_reg(unsigned int rate)
@@ -625,6 +625,7 @@ static int snd_emu10k1_capture_trigger(snd_pcm_substream_t * substream,
 		}
 		snd_emu10k1_ptr_write(emu, epcm->capture_bs_reg, 0, epcm->capture_bs_val);
 		epcm->running = 1;
+		epcm->first_ptr = 1;
 		break;
 	case SNDRV_PCM_TRIGGER_STOP:
 		epcm->running = 0;
@@ -682,6 +683,10 @@ static snd_pcm_uframes_t snd_emu10k1_capture_pointer(snd_pcm_substream_t * subst
 
 	if (!epcm->running)
 		return 0;
+	if (epcm->first_ptr) {
+		udelay(50);	// hack, it takes awhile until capture is started
+		epcm->first_ptr = 0;
+	}
 	ptr = snd_emu10k1_ptr_read(emu, epcm->capture_idx_reg, 0) & 0x0000ffff;
 	return bytes_to_frames(runtime, ptr);
 }
@@ -692,21 +697,21 @@ static snd_pcm_uframes_t snd_emu10k1_capture_pointer(snd_pcm_substream_t * subst
 
 static snd_pcm_hardware_t snd_emu10k1_playback =
 {
-	info:			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
 				 SNDRV_PCM_INFO_MMAP_VALID | SNDRV_PCM_INFO_PAUSE),
-	formats:		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE,
-	rates:			SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
-	rate_min:		4000,
-	rate_max:		48000,
-	channels_min:		1,
-	channels_max:		2,
-	buffer_bytes_max:	(128*1024),
-	period_bytes_min:	64,
-	period_bytes_max:	(128*1024),
-	periods_min:		1,
-	periods_max:		1024,
-	fifo_size:		0,
+	.formats =		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE,
+	.rates =		SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
+	.rate_min =		4000,
+	.rate_max =		48000,
+	.channels_min =		1,
+	.channels_max =		2,
+	.buffer_bytes_max =	(128*1024),
+	.period_bytes_min =	64,
+	.period_bytes_max =	(128*1024),
+	.periods_min =		1,
+	.periods_max =		1024,
+	.fifo_size =		0,
 };
 
 /*
@@ -715,21 +720,21 @@ static snd_pcm_hardware_t snd_emu10k1_playback =
 
 static snd_pcm_hardware_t snd_emu10k1_capture =
 {
-	info:			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
 				 SNDRV_PCM_INFO_MMAP_VALID),
-	formats:		SNDRV_PCM_FMTBIT_S16_LE,
-	rates:			SNDRV_PCM_RATE_8000_48000,
-	rate_min:		8000,
-	rate_max:		48000,
-	channels_min:		1,
-	channels_max:		2,
-	buffer_bytes_max:	(64*1024),
-	period_bytes_min:	384,
-	period_bytes_max:	(64*1024),
-	periods_min:		2,
-	periods_max:		2,
-	fifo_size:		0,
+	.formats =		SNDRV_PCM_FMTBIT_S16_LE,
+	.rates =		SNDRV_PCM_RATE_8000_48000,
+	.rate_min =		8000,
+	.rate_max =		48000,
+	.channels_min =		1,
+	.channels_max =		2,
+	.buffer_bytes_max =	(64*1024),
+	.period_bytes_min =	384,
+	.period_bytes_max =	(64*1024),
+	.periods_min =		2,
+	.periods_max =		2,
+	.fifo_size =		0,
 };
 
 /*
@@ -940,28 +945,28 @@ static int snd_emu10k1_capture_efx_close(snd_pcm_substream_t * substream)
 }
 
 static snd_pcm_ops_t snd_emu10k1_playback_ops = {
-	open:			snd_emu10k1_playback_open,
-	close:			snd_emu10k1_playback_close,
-	ioctl:			snd_pcm_lib_ioctl,
-	hw_params:		snd_emu10k1_playback_hw_params,
-	hw_free:		snd_emu10k1_playback_hw_free,
-	prepare:		snd_emu10k1_playback_prepare,
-	trigger:		snd_emu10k1_playback_trigger,
-	pointer:		snd_emu10k1_playback_pointer,
-	copy:			snd_pcm_sgbuf_ops_copy_playback,
-	silence:		snd_pcm_sgbuf_ops_silence,
-	page:			snd_pcm_sgbuf_ops_page,
+	.open =			snd_emu10k1_playback_open,
+	.close =		snd_emu10k1_playback_close,
+	.ioctl =		snd_pcm_lib_ioctl,
+	.hw_params =		snd_emu10k1_playback_hw_params,
+	.hw_free =		snd_emu10k1_playback_hw_free,
+	.prepare =		snd_emu10k1_playback_prepare,
+	.trigger =		snd_emu10k1_playback_trigger,
+	.pointer =		snd_emu10k1_playback_pointer,
+	.copy =			snd_pcm_sgbuf_ops_copy_playback,
+	.silence =		snd_pcm_sgbuf_ops_silence,
+	.page =			snd_pcm_sgbuf_ops_page,
 };
 
 static snd_pcm_ops_t snd_emu10k1_capture_ops = {
-	open:			snd_emu10k1_capture_open,
-	close:			snd_emu10k1_capture_close,
-	ioctl:			snd_pcm_lib_ioctl,
-	hw_params:		snd_emu10k1_capture_hw_params,
-	hw_free:		snd_emu10k1_capture_hw_free,
-	prepare:		snd_emu10k1_capture_prepare,
-	trigger:		snd_emu10k1_capture_trigger,
-	pointer:		snd_emu10k1_capture_pointer,
+	.open =			snd_emu10k1_capture_open,
+	.close =		snd_emu10k1_capture_close,
+	.ioctl =		snd_pcm_lib_ioctl,
+	.hw_params =		snd_emu10k1_capture_hw_params,
+	.hw_free =		snd_emu10k1_capture_hw_free,
+	.prepare =		snd_emu10k1_capture_prepare,
+	.trigger =		snd_emu10k1_capture_trigger,
+	.pointer =		snd_emu10k1_capture_pointer,
 };
 
 static void snd_emu10k1_pcm_free(snd_pcm_t *pcm)
@@ -1005,14 +1010,14 @@ int __devinit snd_emu10k1_pcm(emu10k1_t * emu, int device, snd_pcm_t ** rpcm)
 }
 
 static snd_pcm_ops_t snd_emu10k1_capture_mic_ops = {
-	open:			snd_emu10k1_capture_mic_open,
-	close:			snd_emu10k1_capture_mic_close,
-	ioctl:			snd_pcm_lib_ioctl,
-	hw_params:		snd_emu10k1_capture_hw_params,
-	hw_free:		snd_emu10k1_capture_hw_free,
-	prepare:		snd_emu10k1_capture_prepare,
-	trigger:		snd_emu10k1_capture_trigger,
-	pointer:		snd_emu10k1_capture_pointer,
+	.open =			snd_emu10k1_capture_mic_open,
+	.close =		snd_emu10k1_capture_mic_close,
+	.ioctl =		snd_pcm_lib_ioctl,
+	.hw_params =		snd_emu10k1_capture_hw_params,
+	.hw_free =		snd_emu10k1_capture_hw_free,
+	.prepare =		snd_emu10k1_capture_prepare,
+	.trigger =		snd_emu10k1_capture_trigger,
+	.pointer =		snd_emu10k1_capture_pointer,
 };
 
 static void snd_emu10k1_pcm_mic_free(snd_pcm_t *pcm)
@@ -1100,22 +1105,22 @@ static int snd_emu10k1_pcm_efx_voices_mask_put(snd_kcontrol_t * kcontrol, snd_ct
 }
 
 static snd_kcontrol_new_t snd_emu10k1_pcm_efx_voices_mask = {
-	iface: SNDRV_CTL_ELEM_IFACE_PCM,
-	name: "EFX voices mask",
-	info: snd_emu10k1_pcm_efx_voices_mask_info,
-	get: snd_emu10k1_pcm_efx_voices_mask_get,
-	put: snd_emu10k1_pcm_efx_voices_mask_put
+	.iface = SNDRV_CTL_ELEM_IFACE_PCM,
+	.name = "EFX voices mask",
+	.info = snd_emu10k1_pcm_efx_voices_mask_info,
+	.get = snd_emu10k1_pcm_efx_voices_mask_get,
+	.put = snd_emu10k1_pcm_efx_voices_mask_put
 };
 
 static snd_pcm_ops_t snd_emu10k1_capture_efx_ops = {
-	open:			snd_emu10k1_capture_efx_open,
-	close:			snd_emu10k1_capture_efx_close,
-	ioctl:			snd_pcm_lib_ioctl,
-	hw_params:		snd_emu10k1_capture_hw_params,
-	hw_free:		snd_emu10k1_capture_hw_free,
-	prepare:		snd_emu10k1_capture_prepare,
-	trigger:		snd_emu10k1_capture_trigger,
-	pointer:		snd_emu10k1_capture_pointer,
+	.open =			snd_emu10k1_capture_efx_open,
+	.close =		snd_emu10k1_capture_efx_close,
+	.ioctl =		snd_pcm_lib_ioctl,
+	.hw_params =		snd_emu10k1_capture_hw_params,
+	.hw_free =		snd_emu10k1_capture_hw_free,
+	.prepare =		snd_emu10k1_capture_prepare,
+	.trigger =		snd_emu10k1_capture_trigger,
+	.pointer =		snd_emu10k1_capture_pointer,
 };
 
 static void snd_emu10k1_pcm_efx_free(snd_pcm_t *pcm)

@@ -164,9 +164,9 @@ int snd_seq_device_new(snd_card_t *card, int device, char *id, int argsize,
 	ops_list_t *ops;
 	int err;
 	static snd_device_ops_t dops = {
-		dev_free:	snd_seq_device_dev_free,
-		dev_register:	snd_seq_device_dev_register,
-		dev_unregister:	snd_seq_device_dev_unregister
+		.dev_free = snd_seq_device_dev_free,
+		.dev_register = snd_seq_device_dev_register,
+		.dev_unregister = snd_seq_device_dev_unregister
 	};
 
 	if (result)

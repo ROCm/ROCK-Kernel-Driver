@@ -111,14 +111,14 @@ static const struct isapnp_card_id *snd_wavefront_isapnp_id[SNDRV_CARDS] = SNDRV
 static struct isapnp_card_id snd_wavefront_pnpids[] __devinitdata = {
 	{
 		ISAPNP_CARD_ID('C','S','C',0x7532),	/* Tropez */
-		devs: { ISAPNP_DEVICE_ID('C','S','C',0x0000),	/* WSS */
+		.devs = { ISAPNP_DEVICE_ID('C','S','C',0x0000),	/* WSS */
 			ISAPNP_DEVICE_ID('C','S','C',0x0010),	/* CTRL */
 			ISAPNP_DEVICE_ID('P','n','P',0xb006),	/* MPU */
 			ISAPNP_DEVICE_ID('C','S','C',000004), }, /* SYNTH */
 	},
 	{
 		ISAPNP_CARD_ID('C','S','C',0x7632),	/* Tropez+ */
-		devs: { ISAPNP_DEVICE_ID('C','S','C',0x0000),	/* WSS */
+		.devs = { ISAPNP_DEVICE_ID('C','S','C',0x0000),	/* WSS */
 			ISAPNP_DEVICE_ID('C','S','C',0x0010),	/* CTRL */
 			ISAPNP_DEVICE_ID('P','n','P',0xb006),	/* MPU */
 			ISAPNP_DEVICE_ID('C','S','C',000004), }, /* SYNTH */

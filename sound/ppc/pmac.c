@@ -20,12 +20,12 @@
  */
 
 
-#define __NO_VERSION__
 #include <sound/driver.h>
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <linux/init.h>
 #include <linux/delay.h>
+#include <linux/slab.h>
 #include <sound/core.h>
 #include "pmac.h"
 #include <sound/pcm_params.h>
@@ -244,7 +244,10 @@ static int snd_pmac_pcm_prepare(pmac_t *chip, pmac_stream_t *rec, snd_pcm_substr
 		snd_pmac_dma_set_command(rec, &chip->extra_dma);
 		snd_pmac_dma_run(rec, RUN);
 	}
-	offset = runtime->dma_addr;
+	/* continuous DMA memory type doesn't provide the physical address,
+	 * so we need to resolve the address here...
+	 */
+	offset = virt_to_bus(runtime->dma_area);
 	for (i = 0, cp = rec->cmd.cmds; i < rec->nperiods; i++, cp++) {
 		st_le32(&cp->phy_addr, offset);
 		st_le16(&cp->req_count, rec->period_size);
@@ -438,40 +441,40 @@ static void snd_pmac_pcm_update(pmac_t *chip, pmac_stream_t *rec)
 
 static snd_pcm_hardware_t snd_pmac_playback =
 {
-	info:		(SNDRV_PCM_INFO_INTERLEAVED |
-			 SNDRV_PCM_INFO_MMAP |
-			 SNDRV_PCM_INFO_MMAP_VALID |
-			 SNDRV_PCM_INFO_RESUME),
-	.formats	= SNDRV_PCM_FMTBIT_S16_BE | SNDRV_PCM_FMTBIT_S16_LE,
-	.rates		= SNDRV_PCM_RATE_8000_44100,
-	.rate_min	= 7350,
-	.rate_max	= 44100,
-	.channels_min	= 2,
-	.channels_max	= 2,
-	.buffer_bytes_max	= 32768,
-	.period_bytes_min	= 256,
-	.period_bytes_max	= 16384,
-	.periods_min		= 1,
-	.periods_max		= PMAC_MAX_FRAGS,
+	.info =			(SNDRV_PCM_INFO_INTERLEAVED |
+				 SNDRV_PCM_INFO_MMAP |
+				 SNDRV_PCM_INFO_MMAP_VALID |
+				 SNDRV_PCM_INFO_RESUME),
+	.formats =		SNDRV_PCM_FMTBIT_S16_BE | SNDRV_PCM_FMTBIT_S16_LE,
+	.rates =		SNDRV_PCM_RATE_8000_44100,
+	.rate_min =		7350,
+	.rate_max =		44100,
+	.channels_min =		2,
+	.channels_max =		2,
+	.buffer_bytes_max =	32768,
+	.period_bytes_min =	256,
+	.period_bytes_max =	16384,
+	.periods_min =		1,
+	.periods_max =		PMAC_MAX_FRAGS,
 };
 
 static snd_pcm_hardware_t snd_pmac_capture =
 {
-	info:		(SNDRV_PCM_INFO_INTERLEAVED |
-			 SNDRV_PCM_INFO_MMAP |
-			 SNDRV_PCM_INFO_MMAP_VALID |
-			 SNDRV_PCM_INFO_RESUME),
-	.formats	= SNDRV_PCM_FMTBIT_S16_BE | SNDRV_PCM_FMTBIT_S16_LE,
-	.rates		= SNDRV_PCM_RATE_8000_44100,
-	.rate_min	= 7350,
-	.rate_max	= 44100,
-	.channels_min	= 2,
-	.channels_max	= 2,
-	.buffer_bytes_max	= 32768,
-	.period_bytes_min	= 256,
-	.period_bytes_max	= 16384,
-	.periods_min		= 1,
-	.periods_max		= PMAC_MAX_FRAGS,
+	.info =			(SNDRV_PCM_INFO_INTERLEAVED |
+				 SNDRV_PCM_INFO_MMAP |
+				 SNDRV_PCM_INFO_MMAP_VALID |
+				 SNDRV_PCM_INFO_RESUME),
+	.formats =		SNDRV_PCM_FMTBIT_S16_BE | SNDRV_PCM_FMTBIT_S16_LE,
+	.rates =		SNDRV_PCM_RATE_8000_44100,
+	.rate_min =		7350,
+	.rate_max =		44100,
+	.channels_min =		2,
+	.channels_max =		2,
+	.buffer_bytes_max =	32768,
+	.period_bytes_min =	256,
+	.period_bytes_max =	16384,
+	.periods_min =		1,
+	.periods_max =		PMAC_MAX_FRAGS,
 };
 
 
@@ -628,32 +631,30 @@ static int snd_pmac_capture_close(snd_pcm_substream_t *subs)
  */
 
 static snd_pcm_ops_t snd_pmac_playback_ops = {
-	.open		= snd_pmac_playback_open,
-	.close		= snd_pmac_playback_close,
-	.ioctl		= snd_pcm_lib_ioctl,
-	.hw_params	= snd_pmac_pcm_hw_params,
-	.hw_free	= snd_pmac_pcm_hw_free,
-	.prepare	= snd_pmac_playback_prepare,
-	.trigger	= snd_pmac_playback_trigger,
-	.pointer	= snd_pmac_playback_pointer,
+	.open =		snd_pmac_playback_open,
+	.close =	snd_pmac_playback_close,
+	.ioctl =	snd_pcm_lib_ioctl,
+	.hw_params =	snd_pmac_pcm_hw_params,
+	.hw_free =	snd_pmac_pcm_hw_free,
+	.prepare =	snd_pmac_playback_prepare,
+	.trigger =	snd_pmac_playback_trigger,
+	.pointer =	snd_pmac_playback_pointer,
 };
 
 static snd_pcm_ops_t snd_pmac_capture_ops = {
-	.open		= snd_pmac_capture_open,
-	.close		= snd_pmac_capture_close,
-	.ioctl		= snd_pcm_lib_ioctl,
-	.hw_params	= snd_pmac_pcm_hw_params,
-	.hw_free	= snd_pmac_pcm_hw_free,
-	.prepare	= snd_pmac_capture_prepare,
-	.trigger	= snd_pmac_capture_trigger,
-	.pointer	= snd_pmac_capture_pointer,
+	.open =		snd_pmac_capture_open,
+	.close =	snd_pmac_capture_close,
+	.ioctl =	snd_pcm_lib_ioctl,
+	.hw_params =	snd_pmac_pcm_hw_params,
+	.hw_free =	snd_pmac_pcm_hw_free,
+	.prepare =	snd_pmac_capture_prepare,
+	.trigger =	snd_pmac_capture_trigger,
+	.pointer =	snd_pmac_capture_pointer,
 };
 
 static void pmac_pcm_free(snd_pcm_t *pcm)
 {
-#if 0
 	snd_pcm_lib_preallocate_free_for_all(pcm);
-#endif
 }
 
 int __init snd_pmac_pcm_new(pmac_t *chip)
@@ -687,10 +688,8 @@ int __init snd_pmac_pcm_new(pmac_t *chip)
 	chip->playback.cur_freqs = chip->freqs_ok;
 	chip->capture.cur_freqs = chip->freqs_ok;
 
-#if 0
 	/* preallocate 64k buffer */
 	snd_pcm_lib_preallocate_pages_for_all(pcm, 64 * 1024, 64 * 1024, GFP_KERNEL);
-#endif
 
 	return 0;
 }
@@ -1171,9 +1170,17 @@ static int __init snd_pmac_detect(pmac_t *chip)
 		// chip->can_byte_swap = 0; /* FIXME: check this */
 		chip->control_mask = MASK_IEPC | 0x11; /* disable IEE */
 	}
-	if (device_is_compatible(sound, "tumbler") ||
-	    device_is_compatible(sound, "snapper")) {
+	if (device_is_compatible(sound, "tumbler")) {
 		chip->model = PMAC_TUMBLER;
+		chip->can_capture = 0;  /* no capture */
+		chip->can_duplex = 0;
+		// chip->can_byte_swap = 0; /* FIXME: check this */
+		chip->num_freqs = 2;
+		chip->freq_table = tumbler_freqs;
+		chip->control_mask = MASK_IEPC | 0x11; /* disable IEE */
+	}
+	if (device_is_compatible(sound, "snapper")) {
+		chip->model = PMAC_SNAPPER;
 		chip->can_capture = 0;  /* no capture */
 		chip->can_duplex = 0;
 		// chip->can_byte_swap = 0; /* FIXME: check this */
@@ -1306,7 +1313,7 @@ int __init snd_pmac_new(snd_card_t *card, pmac_t **chip_return)
 	struct device_node *np;
 	int i, err;
 	static snd_device_ops_t ops = {
-		.dev_free	= snd_pmac_dev_free,
+		.dev_free =	snd_pmac_dev_free,
 	};
 
 	snd_runtime_check(chip_return, return -EINVAL);

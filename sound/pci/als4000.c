@@ -372,40 +372,40 @@ static void snd_als4000_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 static snd_pcm_hardware_t snd_als4000_playback =
 {
-	info:			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_MMAP_VALID),
-	formats:		SNDRV_PCM_FMTBIT_S8 | SNDRV_PCM_FMTBIT_U8 |
+	.formats =		SNDRV_PCM_FMTBIT_S8 | SNDRV_PCM_FMTBIT_U8 |
 				SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_U16_LE,	/* formats */
-	rates:			SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
-	rate_min:		4000,
-	rate_max:		48000,
-	channels_min:		1,
-	channels_max:		2,
-	buffer_bytes_max:	65536,
-	period_bytes_min:	64,
-	period_bytes_max:	65536,
-	periods_min:		1,
-	periods_max:		1024,
-	fifo_size:		0
+	.rates =		SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
+	.rate_min =		4000,
+	.rate_max =		48000,
+	.channels_min =		1,
+	.channels_max =		2,
+	.buffer_bytes_max =	65536,
+	.period_bytes_min =	64,
+	.period_bytes_max =	65536,
+	.periods_min =		1,
+	.periods_max =		1024,
+	.fifo_size =		0
 };
 
 static snd_pcm_hardware_t snd_als4000_capture =
 {
-	info:			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_MMAP_VALID),
-	formats:		SNDRV_PCM_FMTBIT_S8 | SNDRV_PCM_FMTBIT_U8 |
+	.formats =		SNDRV_PCM_FMTBIT_S8 | SNDRV_PCM_FMTBIT_U8 |
 				SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_U16_LE,	/* formats */
-	rates:			SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
-	rate_min:		4000,
-	rate_max:		48000,
-	channels_min:		1,
-	channels_max:		2,
-	buffer_bytes_max:	65536,
-	period_bytes_min:	64,
-	period_bytes_max:	65536,
-	periods_min:		1,
-	periods_max:		1024,
-	fifo_size:		0
+	.rates =		SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
+	.rate_min =		4000,
+	.rate_max =		48000,
+	.channels_min =		1,
+	.channels_max =		2,
+	.buffer_bytes_max =	65536,
+	.period_bytes_min =	64,
+	.period_bytes_max =	65536,
+	.periods_min =		1,
+	.periods_max =		1024,
+	.fifo_size =		0
 };
 
 /*****************************************************************/
@@ -451,25 +451,25 @@ static int snd_als4000_capture_close(snd_pcm_substream_t * substream)
 /******************************************************************/
 
 static snd_pcm_ops_t snd_als4000_playback_ops = {
-	open:		snd_als4000_playback_open,
-	close:		snd_als4000_playback_close,
-	ioctl:		snd_pcm_lib_ioctl,
-	hw_params:	snd_als4000_hw_params,
-	hw_free:	snd_als4000_hw_free,
-	prepare:	snd_als4000_playback_prepare,
-	trigger:	snd_als4000_playback_trigger,
-	pointer:	snd_als4000_playback_pointer
+	.open =		snd_als4000_playback_open,
+	.close =	snd_als4000_playback_close,
+	.ioctl =	snd_pcm_lib_ioctl,
+	.hw_params =	snd_als4000_hw_params,
+	.hw_free =	snd_als4000_hw_free,
+	.prepare =	snd_als4000_playback_prepare,
+	.trigger =	snd_als4000_playback_trigger,
+	.pointer =	snd_als4000_playback_pointer
 };
 
 static snd_pcm_ops_t snd_als4000_capture_ops = {
-	open:		snd_als4000_capture_open,
-	close:		snd_als4000_capture_close,
-	ioctl:		snd_pcm_lib_ioctl,
-	hw_params:	snd_als4000_hw_params,
-	hw_free:	snd_als4000_hw_free,
-	prepare:	snd_als4000_capture_prepare,
-	trigger:	snd_als4000_capture_trigger,
-	pointer:	snd_als4000_capture_pointer
+	.open =		snd_als4000_capture_open,
+	.close =	snd_als4000_capture_close,
+	.ioctl =	snd_pcm_lib_ioctl,
+	.hw_params =	snd_als4000_hw_params,
+	.hw_free =	snd_als4000_hw_free,
+	.prepare =	snd_als4000_capture_prepare,
+	.trigger =	snd_als4000_capture_trigger,
+	.pointer =	snd_als4000_capture_pointer
 };
 
 static void snd_als4000_pcm_free(snd_pcm_t *pcm)
@@ -679,10 +679,10 @@ static void __devexit snd_card_als4k_remove(struct pci_dev *pci)
 }
 
 static struct pci_driver driver = {
-	name: "ALS4000",
-	id_table: snd_als4000_ids,
-	probe: snd_card_als4k_probe,
-	remove: __devexit_p(snd_card_als4k_remove),
+	.name = "ALS4000",
+	.id_table = snd_als4000_ids,
+	.probe = snd_card_als4k_probe,
+	.remove = __devexit_p(snd_card_als4k_remove),
 };
 
 static int __init alsa_card_als4k_init(void)

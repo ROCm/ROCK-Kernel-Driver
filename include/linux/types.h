@@ -4,7 +4,7 @@
 #ifdef	__KERNEL__
 #include <linux/config.h>
 
-#define bitmap_member(name,bits) \
+#define DECLARE_BITMAP(name,bits) \
 	unsigned long name[((bits)+BITS_PER_LONG-1)/BITS_PER_LONG]
 #endif
 

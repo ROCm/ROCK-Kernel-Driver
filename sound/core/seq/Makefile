@@ -67,12 +67,13 @@ obj-$(CONFIG_SND_FM801) += snd-seq-midi.o snd-seq.o snd-seq-device.o snd-seq-mid
 obj-$(CONFIG_SND_ICE1712) += snd-seq-midi.o snd-seq.o snd-seq-device.o snd-seq-midi-event.o
 obj-$(CONFIG_SND_INTEL8X0) += snd-seq-midi.o snd-seq.o snd-seq-device.o snd-seq-midi-event.o
 obj-$(CONFIG_SND_SONICVIBES) += snd-seq-midi.o snd-seq.o snd-seq-device.o snd-seq-midi-event.o snd-seq-midi-emul.o snd-seq-instr.o
-obj-$(CONFIG_SND_VIA686) += snd-seq-midi.o snd-seq.o snd-seq-device.o snd-seq-midi-event.o
+obj-$(CONFIG_SND_VIA82XX) += snd-seq-midi.o snd-seq.o snd-seq-device.o snd-seq-midi-event.o
 obj-$(CONFIG_SND_ALI5451) += snd-seq-midi.o snd-seq.o snd-seq-device.o snd-seq-midi-event.o
 obj-$(CONFIG_SND_CS46XX) += snd-seq-midi.o snd-seq.o snd-seq-device.o snd-seq-midi-event.o
 obj-$(CONFIG_SND_EMU10K1) += snd-seq-midi.o snd-seq.o snd-seq-device.o snd-seq-midi-event.o snd-seq-midi-emul.o snd-seq-virmidi.o
 obj-$(CONFIG_SND_TRIDENT) += snd-seq-midi.o snd-seq.o snd-seq-device.o snd-seq-midi-event.o snd-seq-midi-emul.o snd-seq-instr.o
 obj-$(CONFIG_SND_YMFPCI) += snd-seq-midi.o snd-seq.o snd-seq-device.o snd-seq-midi-event.o snd-seq-midi-emul.o snd-seq-instr.o
+obj-$(CONFIG_SND_USB_AUDIO) += snd-seq.o snd-seq-device.o snd-seq-midi-event.o snd-seq-virmidi.o
 
 obj-m := $(sort $(obj-m))
 

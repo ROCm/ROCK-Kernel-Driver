@@ -94,8 +94,10 @@ static int __init snd_pmac_probe(void)
 			goto __error;
 		break;
 	case PMAC_TUMBLER:
-		strcpy(card->driver, "PMac Tumbler");
-		strcpy(card->shortname, "PowerMac Tumbler");
+	case PMAC_SNAPPER:
+		name_ext = chip->model == PMAC_TUMBLER ? "Tumbler" : "Snapper";
+		sprintf(card->driver, "PMac %s", name_ext);
+		sprintf(card->shortname, "PowerMac %s", name_ext);
 		sprintf(card->longname, "%s (Dev %d) Sub-frame %d",
 			card->shortname, chip->device_id, chip->subframe);
 		if ((err = snd_pmac_tumbler_init(chip)) < 0)

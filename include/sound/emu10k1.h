@@ -795,7 +795,8 @@ struct _snd_emu10k1_pcm {
 	snd_pcm_substream_t *substream;
 	emu10k1_voice_t *voices[2];
 	emu10k1_voice_t *extra;
-	int running;
+	unsigned short running;
+	unsigned short first_ptr;
 	snd_util_memblk_t *memblk;
 	unsigned int start_addr;
 	unsigned int ccca_start_addr;
@@ -1194,8 +1195,12 @@ int snd_emu10k1_proc_done(emu10k1_t * emu);
 #define A_EXTIN_AC97_R		0x01	/* AC'97 capture channel - right */
 #define A_EXTIN_SPDIF_CD_L	0x02	/* digital CD left */
 #define A_EXTIN_SPDIF_CD_R	0x03	/* digital CD left */
+#define A_EXTIN_OPT_SPDIF_L     0x04    /* audigy drive Optical SPDIF - left */
+#define A_EXTIN_OPT_SPDIF_R     0x05    /*                              right */ 
 #define A_EXTIN_LINE2_L		0x08	/* audigy drive line2/mic2 - left */
 #define A_EXTIN_LINE2_R		0x09	/*                           right */
+#define A_EXTIN_RCA_SPDIF_L     0x0a    /* audigy drive RCA SPDIF - left */
+#define A_EXTIN_RCA_SPDIF_R     0x0b    /*                          right */
 #define A_EXTIN_AUX2_L		0x0c	/* audigy drive aux2 - left */
 #define A_EXTIN_AUX2_R		0x0d	/*                   - right */
 
@@ -1296,15 +1301,24 @@ typedef struct {
 
 typedef struct {
 	char name[128];
+
 	unsigned long gpr_valid[0x100/(sizeof(unsigned long)*8)]; /* bitmask of valid initializers */
 	unsigned int gpr_map[0x100];	  /* initializers */
+
 	unsigned int gpr_add_control_count; /* count of GPR controls to add/replace */
 	emu10k1_fx8010_control_gpr_t *gpr_add_controls; /* GPR controls to add/replace */
+
 	unsigned int gpr_del_control_count; /* count of GPR controls to remove */
 	snd_ctl_elem_id_t *gpr_del_controls; /* IDs of GPR controls to remove */
+
+	unsigned int gpr_list_control_count; /* count of GPR controls to list */
+	unsigned int gpr_list_control_total; /* total count of GPR controls */
+	emu10k1_fx8010_control_gpr_t *gpr_list_controls; /* listed GPR controls */
+
 	unsigned long tram_valid[0xa0/(sizeof(unsigned long)*8)]; /* bitmask of valid initializers */
 	unsigned int tram_data_map[0xa0]; /* data initializers */
 	unsigned int tram_addr_map[0xa0]; /* map initializers */
+
 	unsigned long code_valid[512/(sizeof(unsigned long)*8)];  /* bitmask of valid instructions */
 	unsigned int code[512][2];	  /* one instruction - 64 bits */
 } emu10k1_fx8010_code_t;

@@ -713,16 +713,16 @@ static void snd_uart16550_output_trigger(snd_rawmidi_substream_t * substream, in
 
 static snd_rawmidi_ops_t snd_uart16550_output =
 {
-	open:		snd_uart16550_output_open,
-	close:		snd_uart16550_output_close,
-	trigger:	snd_uart16550_output_trigger,
+	.open =		snd_uart16550_output_open,
+	.close =	snd_uart16550_output_close,
+	.trigger =	snd_uart16550_output_trigger,
 };
 
 static snd_rawmidi_ops_t snd_uart16550_input =
 {
-	open:		snd_uart16550_input_open,
-	close:		snd_uart16550_input_close,
-	trigger:	snd_uart16550_input_trigger,
+	.open =		snd_uart16550_input_open,
+	.close =	snd_uart16550_input_close,
+	.trigger =	snd_uart16550_input_trigger,
 };
 
 static int snd_uart16550_free(snd_uart16550_t *uart)
@@ -752,7 +752,7 @@ static int __init snd_uart16550_create(snd_card_t * card,
 				       snd_uart16550_t **ruart)
 {
 	static snd_device_ops_t ops = {
-		dev_free:       snd_uart16550_dev_free,
+		.dev_free =	snd_uart16550_dev_free,
 	};
 	snd_uart16550_t *uart;
 	int err;

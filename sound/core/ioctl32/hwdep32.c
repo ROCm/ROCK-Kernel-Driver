@@ -18,7 +18,6 @@
  *
  */
 
-#define __NO_VERSION__
 #include <sound/driver.h>
 #include <linux/time.h>
 #include <sound/core.h>
@@ -29,7 +28,5 @@
 struct ioctl32_mapper hwdep_mappers[] = {
 	{ SNDRV_HWDEP_IOCTL_PVERSION, NULL },
 	{ SNDRV_HWDEP_IOCTL_INFO, NULL },
-	{ SNDRV_CTL_IOCTL_HWDEP_NEXT_DEVICE, NULL },
-	{ SNDRV_CTL_IOCTL_HWDEP_INFO, NULL },
 	{ 0 },
 };

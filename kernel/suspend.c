@@ -470,18 +470,21 @@ static int count_and_copy_data_pages(struct pbe *pagedir_p)
 	int nr_copy_pages = 0;
 	int pfn;
 	struct page *page;
-
-#ifndef CONFIG_DISCONTIGMEM	
-	if (max_mapnr != num_physpages)
-		panic("mapnr is not expected");
+	
+#ifdef CONFIG_DISCONTIGMEM
+	panic("Discontingmem not supported");
+#else
+	BUG_ON (max_mapnr != num_physpages);
 #endif
-	for (pfn = 0; pfn < num_physpages; pfn++) {
+	for (pfn = 0; pfn < max_mapnr; pfn++) {
 		page = pfn_to_page(pfn);
 		if (PageHighMem(page))
 			panic("Swsusp not supported on highmem boxes. Send 1GB of RAM to <pavel@ucw.cz> and try again ;-).");
+
 		if (!PageReserved(page)) {
 			if (PageNosave(page))
 				continue;
+
 
 			if ((chunk_size=is_head_of_free_region(page))!=0) {
 				pfn += chunk_size - 1;
@@ -776,9 +779,10 @@ void do_magic_resume_2(void)
 	BUG_ON (nr_copy_pages_check != nr_copy_pages);
 	BUG_ON (pagedir_order_check != pagedir_order);
 
+	__flush_tlb_global();		/* Even mappings of "global" things (vmalloc) need to be fixed */
+
 	PRINTK( "Freeing prev allocated pagedir\n" );
 	free_suspend_pagedir((unsigned long) pagedir_save);
-	__flush_tlb_global();		/* Even mappings of "global" things (vmalloc) need to be fixed */
 	drivers_resume(RESUME_ALL_PHASES);
 	spin_unlock_irq(&suspend_pagedir_lock);
 
@@ -809,12 +813,10 @@ void do_magic_suspend_2(void)
 
 	barrier();
 	mb();
-	drivers_resume(RESUME_PHASE2);
 	spin_lock_irq(&suspend_pagedir_lock);	/* Done to disable interrupts */ 
 	mdelay(1000);
 
 	free_pages((unsigned long) pagedir_nosave, pagedir_order);
-	drivers_resume(RESUME_PHASE1);
 	spin_unlock_irq(&suspend_pagedir_lock);
 	mark_swapfiles(((swp_entry_t) {0}), MARK_SWAP_RESUME);
 	PRINTK(KERN_WARNING "%sLeaving do_magic_suspend_2...\n", name_suspend);	
@@ -1037,6 +1039,7 @@ static int bdev_write_page(struct block_device *bdev, long pos, void *buf)
 	return 0;
 #endif
 	printk(KERN_CRIT "%sWarning %s: Fixing swap signatures unimplemented...\n", name_resume, resume_file);
+	return 0;
 }
 
 extern kdev_t __init name_to_kdev_t(const char *line);

@@ -579,7 +579,7 @@ nfs3_xdr_readdirres(struct rpc_rqst *req, u32 *p, struct nfs3_readdirres *res)
 			goto short_pkt;
 		entry = p;
 	}
-	if (!nr)
+	if (!nr && (entry[0] != 0 || entry[1] != 1))
 		goto short_pkt;
  out:
 	kunmap(*page);

@@ -238,22 +238,22 @@ static int snd_hwdep_control_ioctl(snd_card_t * card, snd_ctl_file_t * control,
 static struct file_operations snd_hwdep_f_ops =
 {
 #ifndef LINUX_2_2
-	owner:		THIS_MODULE,
+	.owner = 	THIS_MODULE,
 #endif
-	llseek:		snd_hwdep_llseek,
-	read:		snd_hwdep_read,
-	write:		snd_hwdep_write,
-	open:		snd_hwdep_open,
-	release:	snd_hwdep_release,
-	poll:		snd_hwdep_poll,
-	ioctl:		snd_hwdep_ioctl,
-	mmap:		snd_hwdep_mmap,
+	.llseek =	snd_hwdep_llseek,
+	.read = 	snd_hwdep_read,
+	.write =	snd_hwdep_write,
+	.open =		snd_hwdep_open,
+	.release =	snd_hwdep_release,
+	.poll =		snd_hwdep_poll,
+	.ioctl =	snd_hwdep_ioctl,
+	.mmap =		snd_hwdep_mmap,
 };
 
 static snd_minor_t snd_hwdep_reg =
 {
-	comment:	"hardware dependent",
-	f_ops:		&snd_hwdep_f_ops,
+	.comment =	"hardware dependent",
+	.f_ops =	&snd_hwdep_f_ops,
 };
 
 int snd_hwdep_new(snd_card_t * card, char *id, int device, snd_hwdep_t ** rhwdep)
@@ -261,9 +261,9 @@ int snd_hwdep_new(snd_card_t * card, char *id, int device, snd_hwdep_t ** rhwdep
 	snd_hwdep_t *hwdep;
 	int err;
 	static snd_device_ops_t ops = {
-		dev_free:	snd_hwdep_dev_free,
-		dev_register:	snd_hwdep_dev_register,
-		dev_unregister:	snd_hwdep_dev_unregister
+		.dev_free = snd_hwdep_dev_free,
+		.dev_register = snd_hwdep_dev_register,
+		.dev_unregister = snd_hwdep_dev_unregister
 	};
 
 	snd_assert(rhwdep != NULL, return -EINVAL);
@@ -338,10 +338,8 @@ static int snd_hwdep_dev_register(snd_device_t *device)
 						    &snd_hwdep_reg, hwdep->oss_dev) < 0) {
 				snd_printk(KERN_ERR "unable to register OSS compatibility device %i:%i\n",
 					   hwdep->card->number, hwdep->device);
-			} else {
-				snd_oss_info_register(SNDRV_OSS_INFO_DEV_SYNTH, hwdep->card->number, hwdep->name);
+			} else
 				hwdep->ossreg = 1;
-			}
 		}
 	}
 #endif
@@ -362,10 +360,8 @@ static int snd_hwdep_dev_unregister(snd_device_t *device)
 		return -EINVAL;
 	}
 #ifdef CONFIG_SND_OSSEMUL
-	if (hwdep->ossreg) {
+	if (hwdep->ossreg)
 		snd_unregister_oss_device(hwdep->oss_type, hwdep->card, hwdep->device);
-		snd_oss_info_unregister(SNDRV_OSS_INFO_DEV_SYNTH, hwdep->card->number);
-	}
 #endif
 	snd_unregister_device(SNDRV_DEVICE_TYPE_HWDEP, hwdep->card, hwdep->device);
 	snd_hwdep_devices[idx] = NULL;

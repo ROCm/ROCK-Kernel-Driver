@@ -45,6 +45,13 @@ static inline unsigned int snd_pcm_sgbuf_pages(size_t size)
 	return (size + PAGE_SIZE - 1) >> PAGE_SHIFT;
 }
 
+/*
+ * return the physical address at the corresponding offset
+ */
+static inline dma_addr_t snd_pcm_sgbuf_get_addr(struct snd_sg_buf *sgbuf, size_t offset)
+{
+	return sgbuf->table[offset >> PAGE_SHIFT].addr + offset % PAGE_SIZE;
+}
 
 int snd_pcm_sgbuf_init(snd_pcm_substream_t *substream, struct pci_dev *pci, int tblsize);
 int snd_pcm_sgbuf_delete(snd_pcm_substream_t *substream);

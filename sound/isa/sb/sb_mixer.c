@@ -19,7 +19,6 @@
  *
  */
 
-#define __NO_VERSION__
 #include <sound/driver.h>
 #include <asm/io.h>
 #include <linux/delay.h>
@@ -62,11 +61,11 @@ unsigned char snd_sbmixer_read(sb_t *chip, unsigned char reg)
  */
 
 #define SB_SINGLE(xname, reg, shift, mask) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, \
-  name: xname, \
-  info: snd_sbmixer_info_single, \
-  get: snd_sbmixer_get_single, put: snd_sbmixer_put_single, \
-  private_value: reg | (shift << 16) | (mask << 24) }
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, \
+  .name = xname, \
+  .info = snd_sbmixer_info_single, \
+  .get = snd_sbmixer_get_single, put: snd_sbmixer_put_single, \
+  .private_value = reg | (shift << 16) | (mask << 24) }
 
 static int snd_sbmixer_info_single(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
@@ -121,11 +120,11 @@ static int snd_sbmixer_put_single(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_
  */
 
 #define SB_DOUBLE(xname, left_reg, right_reg, left_shift, right_shift, mask) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, \
-  name: xname, \
-  info: snd_sbmixer_info_double, \
-  get: snd_sbmixer_get_double, put: snd_sbmixer_put_double, \
-  private_value: left_reg | (right_reg << 8) | (left_shift << 16) | (right_shift << 19) | (mask << 24) }
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, \
+  .name = xname, \
+  .info = snd_sbmixer_info_double, \
+  .get = snd_sbmixer_get_double, put: snd_sbmixer_put_double, \
+  .private_value = left_reg | (right_reg << 8) | (left_shift << 16) | (right_shift << 19) | (mask << 24) }
 
 static int snd_sbmixer_info_double(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
@@ -364,11 +363,11 @@ static int snd_sb8mixer_put_mux(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t 
  */
 
 #define SB16_INPUT_SW(xname, reg1, reg2, left_shift, right_shift) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, \
-  name: xname, \
-  info: snd_sb16mixer_info_input_sw, \
-  get: snd_sb16mixer_get_input_sw, put: snd_sb16mixer_put_input_sw, \
-  private_value: reg1 | (reg2 << 8) | (left_shift << 16) | (right_shift << 24) }
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, \
+  .name = xname, \
+  .info = snd_sb16mixer_info_input_sw, \
+  .get = snd_sb16mixer_get_input_sw, put: snd_sb16mixer_put_input_sw, \
+  .private_value = reg1 | (reg2 << 8) | (left_shift << 16) | (right_shift << 24) }
 
 static int snd_sb16mixer_info_input_sw(snd_kcontrol_t * kcontrol, snd_ctl_elem_info_t * uinfo)
 {
@@ -456,11 +455,11 @@ SB_DOUBLE("CD Playback Volume", SB_DSP_CD_DEV, SB_DSP_CD_DEV, 5, 1, 7),
 SB_DOUBLE("Line Playback Volume", SB_DSP_LINE_DEV, SB_DSP_LINE_DEV, 5, 1, 7),
 SB_SINGLE("Mic Playback Volume", SB_DSP_MIC_DEV, 1, 3),
 {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "Capture Source",
-	info: snd_sb8mixer_info_mux,
-	get: snd_sb8mixer_get_mux,
-	put: snd_sb8mixer_put_mux,
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "Capture Source",
+	.info = snd_sb8mixer_info_mux,
+	.get = snd_sb8mixer_get_mux,
+	.put = snd_sb8mixer_put_mux,
 },
 SB_SINGLE("Capture Filter", SB_DSP_CAPTURE_FILT, 5, 1),
 SB_SINGLE("Capture Low-Pass Filter", SB_DSP_CAPTURE_FILT, 3, 1)
@@ -530,11 +529,11 @@ SB_DOUBLE("Line Playback Switch", SB_DT019X_OUTPUT_SW1, SB_DT019X_OUTPUT_SW1, 4,
 SB_DOUBLE("PCM Playback Switch", SB_DT019X_OUTPUT_SW2, SB_DT019X_OUTPUT_SW2, 2,1, 1),
 SB_DOUBLE("Synth Playback Switch", SB_DT019X_OUTPUT_SW2, SB_DT019X_OUTPUT_SW2, 4,3, 1),
 {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "Capture Source",
-	info: snd_dt019x_input_sw_info,
-	get: snd_dt019x_input_sw_get,
-	put: snd_dt019x_input_sw_put,
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "Capture Source",
+	.info = snd_dt019x_input_sw_info,
+	.get = snd_dt019x_input_sw_get,
+	.put = snd_dt019x_input_sw_put,
 },
 };
 

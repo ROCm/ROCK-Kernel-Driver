@@ -17,6 +17,7 @@
 #include <linux/interrupt.h>
 #include <linux/bitops.h>
 #include <linux/bio.h>
+#include <linux/device.h>
 #include <linux/pci.h>
 #include <asm/byteorder.h>
 #include <asm/system.h>
@@ -789,6 +790,7 @@ typedef struct ide_drive_s {
 	unsigned autotune	: 2;	/* 1=autotune, 2=noautotune, 0=default */
 	unsigned remap_0_to_1	: 2;	/* 0=remap if ezdrive, 1=remap, 2=noremap */
 	unsigned ata_flash	: 1;	/* 1=present, 0=default */
+	unsigned blocked        : 1;	/* 1=powermanagment told us not to do anything, so sleep nicely */
 	unsigned addressing;		/*      : 3;
 					 *  0=28-bit
 					 *  1=48-bit

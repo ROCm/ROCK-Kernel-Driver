@@ -82,7 +82,7 @@ static int snd_cs8427_reg_write(snd_i2c_device_t *device, unsigned char reg, uns
 	buf[1] = val;
 	if ((err = snd_i2c_sendbytes(device, buf, 2)) != 2) {
 		snd_printk("unable to send bytes 0x%02x:0x%02x to CS8427 (%i)\n", buf[0], buf[1], err);
-		return err < 0 ? err : -EREMOTE;
+		return err < 0 ? err : -EIO;
 	}
 	return 0;
 }
@@ -94,11 +94,11 @@ static int snd_cs8427_reg_read(snd_i2c_device_t *device, unsigned char reg)
 
 	if ((err = snd_i2c_sendbytes(device, &reg, 1)) != 1) {
 		snd_printk("unable to send register 0x%x byte to CS8427\n", reg);
-		return err < 0 ? err : -EREMOTE;
+		return err < 0 ? err : -EIO;
 	}
 	if ((err = snd_i2c_readbytes(device, &buf, 1)) != 1) {
 		snd_printk("unable to read register 0x%x byte from CS8427\n", reg);
-		return err < 0 ? err : -EREMOTE;
+		return err < 0 ? err : -EIO;
 	}
 	return buf;
 }
@@ -148,7 +148,7 @@ static int snd_cs8427_send_corudata(snd_i2c_device_t *device,
 	for (idx = 0; idx < count; idx++)
 		data[idx + 1] = swapbits(ndata[idx]);
 	if (snd_i2c_sendbytes(device, data, count) != count)
-		return -EREMOTE;
+		return -EIO;
 	return 1;
 }
 
@@ -226,7 +226,7 @@ int snd_cs8427_create(snd_i2c_bus_t *bus,
 	/* send initial values */
 	memcpy(chip->regmap + (initvals1[0] & 0x7f), initvals1 + 1, 6);
 	if ((err = snd_i2c_sendbytes(device, initvals1, 7)) != 7) {
-		err = err < 0 ? err : -EREMOTE;
+		err = err < 0 ? err : -EIO;
 		goto __fail;
 	}
 	/* Turn off CS8427 interrupt stuff that is not used in hardware */
@@ -238,7 +238,7 @@ int snd_cs8427_create(snd_i2c_bus_t *bus,
 	/* send transfer initialization sequence */
 	memcpy(chip->regmap + (initvals2[0] & 0x7f), initvals2 + 1, 3);
 	if ((err = snd_i2c_sendbytes(device, initvals2, 4)) != 4) {
-		err = err < 0 ? err : -EREMOTE;
+		err = err < 0 ? err : -EIO;
 		goto __fail;
 	}
 	/* write default channel status bytes */
@@ -274,7 +274,7 @@ int snd_cs8427_create(snd_i2c_bus_t *bus,
       __fail:
       	snd_i2c_unlock(bus);
       	snd_i2c_device_free(device);
-      	return err < 0 ? err : -EREMOTE;
+      	return err < 0 ? err : -EIO;
 }
 
 static int snd_cs8427_in_status_info(snd_kcontrol_t *kcontrol,
@@ -359,35 +359,35 @@ static int snd_cs8427_spdif_mask_get(snd_kcontrol_t * kcontrol,
 
 static snd_kcontrol_new_t snd_cs8427_iec958_controls[] = {
 {
-	iface: SNDRV_CTL_ELEM_IFACE_PCM,
-	info: snd_cs8427_in_status_info,
-	name: "IEC958 CS8427 Input Status",
-	access: SNDRV_CTL_ELEM_ACCESS_READ | SNDRV_CTL_ELEM_ACCESS_VOLATILE,
-	get: snd_cs8427_in_status_get,
+	.iface =	SNDRV_CTL_ELEM_IFACE_PCM,
+	.info =		snd_cs8427_in_status_info,
+	.name =		"IEC958 CS8427 Input Status",
+	.access =	SNDRV_CTL_ELEM_ACCESS_READ | SNDRV_CTL_ELEM_ACCESS_VOLATILE,
+	.get =		snd_cs8427_in_status_get,
 },
 {
-	access:		SNDRV_CTL_ELEM_ACCESS_READ,
-	iface:		SNDRV_CTL_ELEM_IFACE_PCM,
-	name:           SNDRV_CTL_NAME_IEC958("",PLAYBACK,MASK),
-	info:		snd_cs8427_spdif_mask_info,
-	get:		snd_cs8427_spdif_mask_get,
+	.access =	SNDRV_CTL_ELEM_ACCESS_READ,
+	.iface =	SNDRV_CTL_ELEM_IFACE_PCM,
+	.name =		SNDRV_CTL_NAME_IEC958("",PLAYBACK,MASK),
+	.info =		snd_cs8427_spdif_mask_info,
+	.get =		snd_cs8427_spdif_mask_get,
 },
 {
-	iface:		SNDRV_CTL_ELEM_IFACE_PCM,
-	name:           SNDRV_CTL_NAME_IEC958("",PLAYBACK,DEFAULT),
-	info:		snd_cs8427_spdif_info,
-	get:		snd_cs8427_spdif_get,
-	put:		snd_cs8427_spdif_put,
-	private_value:	0
+	.iface =	SNDRV_CTL_ELEM_IFACE_PCM,
+	.name =		SNDRV_CTL_NAME_IEC958("",PLAYBACK,DEFAULT),
+	.info =		snd_cs8427_spdif_info,
+	.get =		snd_cs8427_spdif_get,
+	.put =		snd_cs8427_spdif_put,
+	.private_value = 0
 },
 {
-	access:		SNDRV_CTL_ELEM_ACCESS_READWRITE | SNDRV_CTL_ELEM_ACCESS_INACTIVE,
-	iface:		SNDRV_CTL_ELEM_IFACE_PCM,
-	name:           SNDRV_CTL_NAME_IEC958("",PLAYBACK,PCM_STREAM),
-	info:		snd_cs8427_spdif_info,
-	get:		snd_cs8427_spdif_get,
-	put:		snd_cs8427_spdif_put,
-	private_value:	1
+	.access =	SNDRV_CTL_ELEM_ACCESS_READWRITE | SNDRV_CTL_ELEM_ACCESS_INACTIVE,
+	.iface =	SNDRV_CTL_ELEM_IFACE_PCM,
+	.name =		SNDRV_CTL_NAME_IEC958("",PLAYBACK,PCM_STREAM),
+	.info =		snd_cs8427_spdif_info,
+	.get =		snd_cs8427_spdif_get,
+	.put =		snd_cs8427_spdif_put,
+	.private_value = 1
 }};
 
 int snd_cs8427_iec958_build(snd_i2c_device_t *cs8427,

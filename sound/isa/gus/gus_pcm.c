@@ -25,7 +25,6 @@
  *
  */
 
-#define __NO_VERSION__
 #include <sound/driver.h>
 #include <asm/dma.h>
 #include <linux/slab.h>
@@ -531,15 +530,15 @@ static snd_pcm_uframes_t snd_gf1_pcm_playback_pointer(snd_pcm_substream_t * subs
 }
 
 static ratnum_t clock = {
-	num: 9878400/16,
-	den_min: 2,
-	den_max: 257,
-	den_step: 1,
+	.num = 9878400/16,
+	.den_min = 2,
+	.den_max = 257,
+	.den_step = 1,
 };
 
 static snd_pcm_hw_constraint_ratnums_t hw_constraints_clocks  = {
-	nrats: 1,
-	rats: &clock,
+	.nrats = 1,
+	.rats = &clock,
 };
 
 static int snd_gf1_pcm_capture_hw_params(snd_pcm_substream_t * substream,
@@ -620,38 +619,38 @@ static void snd_gf1_pcm_interrupt_dma_read(snd_gus_card_t * gus)
 
 static snd_pcm_hardware_t snd_gf1_pcm_playback =
 {
-	info:			SNDRV_PCM_INFO_NONINTERLEAVED,
+	.info =			SNDRV_PCM_INFO_NONINTERLEAVED,
 	formats:		(SNDRV_PCM_FMTBIT_S8 | SNDRV_PCM_FMTBIT_U8 |
 				 SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_U16_LE),
-	rates:			SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
-	rate_min:		5510,
-	rate_max:		48000,
-	channels_min:		1,
-	channels_max:		2,
-	buffer_bytes_max:	(128*1024),
-	period_bytes_min:	64,
-	period_bytes_max:	(128*1024),
-	periods_min:		1,
-	periods_max:		1024,
-	fifo_size:		0,
+	.rates =		SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
+	.rate_min =		5510,
+	.rate_max =		48000,
+	.channels_min =		1,
+	.channels_max =		2,
+	.buffer_bytes_max =	(128*1024),
+	.period_bytes_min =	64,
+	.period_bytes_max =	(128*1024),
+	.periods_min =		1,
+	.periods_max =		1024,
+	.fifo_size =		0,
 };
 
 static snd_pcm_hardware_t snd_gf1_pcm_capture =
 {
-	info:			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_MMAP_VALID),
-	formats:		SNDRV_PCM_FMTBIT_S8 | SNDRV_PCM_FMTBIT_U8,
-	rates:			SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_44100,
-	rate_min:		5510,
-	rate_max:		44100,
-	channels_min:		1,
-	channels_max:		2,
-	buffer_bytes_max:	(128*1024),
-	period_bytes_min:	64,
-	period_bytes_max:	(128*1024),
-	periods_min:		1,
-	periods_max:		1024,
-	fifo_size:		0,
+	.formats =		SNDRV_PCM_FMTBIT_S8 | SNDRV_PCM_FMTBIT_U8,
+	.rates =		SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_44100,
+	.rate_min =		5510,
+	.rate_max =		44100,
+	.channels_min =		1,
+	.channels_max =		2,
+	.buffer_bytes_max =	(128*1024),
+	.period_bytes_min =	64,
+	.period_bytes_max =	(128*1024),
+	.periods_min =		1,
+	.periods_max =		1024,
+	.fifo_size =		0,
 };
 
 static void snd_gf1_pcm_playback_free(snd_pcm_runtime_t *runtime)
@@ -806,35 +805,35 @@ static int snd_gf1_pcm_volume_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_
 
 static snd_kcontrol_new_t snd_gf1_pcm_volume_control =
 {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "PCM Playback Volume",
-	info: snd_gf1_pcm_volume_info,
-	get: snd_gf1_pcm_volume_get,
-	put: snd_gf1_pcm_volume_put
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "PCM Playback Volume",
+	.info = snd_gf1_pcm_volume_info,
+	.get = snd_gf1_pcm_volume_get,
+	.put = snd_gf1_pcm_volume_put
 };
 
 static snd_pcm_ops_t snd_gf1_pcm_playback_ops = {
-	open:		snd_gf1_pcm_playback_open,
-	close:		snd_gf1_pcm_playback_close,
-	ioctl:		snd_pcm_lib_ioctl,
-	hw_params:	snd_gf1_pcm_playback_hw_params,
-	hw_free:	snd_gf1_pcm_playback_hw_free,
-	prepare:	snd_gf1_pcm_playback_prepare,
-	trigger:	snd_gf1_pcm_playback_trigger,
-	pointer:	snd_gf1_pcm_playback_pointer,
-	copy:		snd_gf1_pcm_playback_copy,
-	silence:	snd_gf1_pcm_playback_silence,
+	.open =		snd_gf1_pcm_playback_open,
+	.close =	snd_gf1_pcm_playback_close,
+	.ioctl =	snd_pcm_lib_ioctl,
+	.hw_params =	snd_gf1_pcm_playback_hw_params,
+	.hw_free =	snd_gf1_pcm_playback_hw_free,
+	.prepare =	snd_gf1_pcm_playback_prepare,
+	.trigger =	snd_gf1_pcm_playback_trigger,
+	.pointer =	snd_gf1_pcm_playback_pointer,
+	.copy =		snd_gf1_pcm_playback_copy,
+	.silence =	snd_gf1_pcm_playback_silence,
 };
 
 static snd_pcm_ops_t snd_gf1_pcm_capture_ops = {
-	open:		snd_gf1_pcm_capture_open,
-	close:		snd_gf1_pcm_capture_close,
-	ioctl:		snd_pcm_lib_ioctl,
-	hw_params:	snd_gf1_pcm_capture_hw_params,
-	hw_free:	snd_gf1_pcm_capture_hw_free,
-	prepare:	snd_gf1_pcm_capture_prepare,
-	trigger:	snd_gf1_pcm_capture_trigger,
-	pointer:	snd_gf1_pcm_capture_pointer,
+	.open =		snd_gf1_pcm_capture_open,
+	.close =	snd_gf1_pcm_capture_close,
+	.ioctl =	snd_pcm_lib_ioctl,
+	.hw_params =	snd_gf1_pcm_capture_hw_params,
+	.hw_free =	snd_gf1_pcm_capture_hw_free,
+	.prepare =	snd_gf1_pcm_capture_prepare,
+	.trigger =	snd_gf1_pcm_capture_trigger,
+	.pointer =	snd_gf1_pcm_capture_pointer,
 };
 
 int snd_gf1_pcm_new(snd_gus_card_t * gus, int pcm_dev, int control_index, snd_pcm_t ** rpcm)

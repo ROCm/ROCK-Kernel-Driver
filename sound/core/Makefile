@@ -3,17 +3,23 @@
 # Copyright (c) 1999,2001 by Jaroslav Kysela <perex@suse.cz>
 #
 
-export-objs  := sound.o pcm.o pcm_lib.o rawmidi.o timer.o hwdep.o \
-                pcm_sgbuf.o
+export-objs  := sound.o pcm.o pcm_lib.o rawmidi.o timer.o hwdep.o
 
-snd-objs     := sound.o init.o isadma.o memory.o info.o control.o misc.o \
+snd-objs     := sound.o init.o memory.o info.o control.o misc.o \
                 device.o wrappers.o
+ifeq ($(CONFIG_ISA),y)
+snd-objs     += isadma.o
+endif
 ifeq ($(CONFIG_SND_OSSEMUL),y)
 snd-objs     += sound_oss.o info_oss.o
 endif
 
 snd-pcm-objs := pcm.o pcm_native.o pcm_lib.o pcm_timer.o pcm_misc.o \
-		pcm_memory.o pcm_sgbuf.o
+		pcm_memory.o
+ifeq ($(CONFIG_PCI),y)
+snd-pcm-objs += pcm_sgbuf.o
+export-objs  += pcm_sgbuf.o
+endif
 
 snd-rawmidi-objs  := rawmidi.o
 snd-timer-objs    := timer.o
@@ -78,8 +84,7 @@ obj-$(CONFIG_SND_MAESTRO3) += snd-pcm.o snd-timer.o snd.o
 obj-$(CONFIG_SND_RME32) += snd-pcm.o snd-timer.o snd.o
 obj-$(CONFIG_SND_RME96) += snd-pcm.o snd-timer.o snd.o
 obj-$(CONFIG_SND_SONICVIBES) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o snd-hwdep.o
-obj-$(CONFIG_SND_VIA686) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o
-obj-$(CONFIG_SND_VIA8233) += snd-pcm.o snd-timer.o snd.o
+obj-$(CONFIG_SND_VIA82XX) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o
 obj-$(CONFIG_SND_ALI5451) += snd.o snd-rawmidi.o snd-timer.o snd-pcm.o
 obj-$(CONFIG_SND_CS46XX) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o
 obj-$(CONFIG_SND_EMU10K1) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o snd-hwdep.o
@@ -94,6 +99,10 @@ obj-$(CONFIG_SND_SA11XX_UDA1341) += snd-pcm.o snd-timer.o snd.o
 ifeq ($(CONFIG_SND_SB16_CSP),y)
   obj-$(CONFIG_SND_SB16) += snd-hwdep.o
   obj-$(CONFIG_SND_SBAWE) += snd-hwdep.o
+endif
+obj-$(CONFIG_SND_USB_AUDIO) += snd-pcm.o snd-timer.o snd.o
+ifeq ($(subst m,y,$(CONFIG_SND_SEQUENCER)),y)
+obj-$(CONFIG_SND_USB_AUDIO) += snd-rawmidi.o
 endif
 
 obj-m := $(sort $(obj-m))

@@ -199,7 +199,7 @@ extern struct zorro_dev *zorro_find_device(zorro_id id,
      *  the corresponding bits.
      */
 
-extern bitmap_member(zorro_unused_z2ram, 128);
+extern DECLARE_BITMAP(zorro_unused_z2ram, 128);
 
 #define Z2RAM_START		(0x00200000)
 #define Z2RAM_END		(0x00a00000)

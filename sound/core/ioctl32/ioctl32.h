@@ -60,27 +60,23 @@ static int _snd_ioctl32_##type(unsigned int fd, unsigned int cmd, unsigned long 
 {\
 	struct sndrv_##type##32 data32;\
 	struct sndrv_##type data;\
-	mm_segment_t oldseg = get_fs();\
+	mm_segment_t oldseg;\
 	int err;\
-	set_fs(KERNEL_DS);\
-	if (copy_from_user(&data32, (void*)arg, sizeof(data32))) {\
-		err = -EFAULT;\
-		goto __err;\
-	}\
+	if (copy_from_user(&data32, (void*)arg, sizeof(data32)))\
+		return -EFAULT;\
 	memset(&data, 0, sizeof(data));\
 	convert_from_32(type, &data, &data32);\
+	oldseg = get_fs();\
+	set_fs(KERNEL_DS);\
 	err = file->f_op->ioctl(file->f_dentry->d_inode, file, native_ctl, (unsigned long)&data);\
 	if (err < 0) \
-		goto __err;\
+		return err;\
 	if (native_ctl & (_IOC_READ << _IOC_DIRSHIFT)) {\
 		convert_to_32(type, &data32, &data);\
-		if (copy_to_user((void*)arg, &data32, sizeof(data32))) {\
-			err = -EFAULT;\
-			goto __err;\
-		}\
+		if (copy_to_user((void*)arg, &data32, sizeof(data32)))\
+			return -EFAULT;\
 	}\
- __err: set_fs(oldseg);\
-	return err;\
+	return 0;\
 }
 
 #define DEFINE_ALSA_IOCTL_ENTRY(name,type,native_ctl) \

@@ -288,7 +288,7 @@ struct snd_opl3 {
 	snd_midi_channel_set_t * chset;
 
 #ifdef CONFIG_SND_SEQUENCER_OSS
-	snd_seq_device_t *oss_seq_dev;	/* OSS sequencer device, WIP */
+	snd_seq_device_t *oss_seq_dev;	/* OSS sequencer device */
 	snd_midi_channel_set_t * oss_chset;
 #endif
  

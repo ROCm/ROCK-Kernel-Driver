@@ -67,9 +67,9 @@ static void snd_tea6330t_set(tea6330t_t *tea,
 #endif
 
 #define TEA6330T_MASTER_VOLUME(xname, xindex) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: xindex, \
-  info: snd_tea6330t_info_master_volume, \
-  get: snd_tea6330t_get_master_volume, put: snd_tea6330t_put_master_volume }
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .index = xindex, \
+  .info = snd_tea6330t_info_master_volume, \
+  .get = snd_tea6330t_get_master_volume, .put = snd_tea6330t_put_master_volume }
 
 static int snd_tea6330t_info_master_volume(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
@@ -123,9 +123,9 @@ static int snd_tea6330t_put_master_volume(snd_kcontrol_t * kcontrol, snd_ctl_ele
 }
 
 #define TEA6330T_MASTER_SWITCH(xname, xindex) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: xindex, \
-  info: snd_tea6330t_info_master_switch, \
-  get: snd_tea6330t_get_master_switch, put: snd_tea6330t_put_master_switch }
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .index = xindex, \
+  .info = snd_tea6330t_info_master_switch, \
+  .get = snd_tea6330t_get_master_switch, .put = snd_tea6330t_put_master_switch }
 
 static int snd_tea6330t_info_master_switch(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
@@ -172,9 +172,9 @@ static int snd_tea6330t_put_master_switch(snd_kcontrol_t * kcontrol, snd_ctl_ele
 }
 
 #define TEA6330T_BASS(xname, xindex) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: xindex, \
-  info: snd_tea6330t_info_bass, \
-  get: snd_tea6330t_get_bass, put: snd_tea6330t_put_bass }
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .index = xindex, \
+  .info = snd_tea6330t_info_bass, \
+  .get = snd_tea6330t_get_bass, .put = snd_tea6330t_put_bass }
 
 static int snd_tea6330t_info_bass(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
@@ -216,9 +216,9 @@ static int snd_tea6330t_put_bass(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t
 }
 
 #define TEA6330T_TREBLE(xname, xindex) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: xindex, \
-  info: snd_tea6330t_info_treble, \
-  get: snd_tea6330t_get_treble, put: snd_tea6330t_put_treble }
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .index = xindex, \
+  .info = snd_tea6330t_info_treble, \
+  .get = snd_tea6330t_get_treble, .put = snd_tea6330t_put_treble }
 
 static int snd_tea6330t_info_treble(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {

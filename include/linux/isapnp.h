@@ -132,11 +132,11 @@ struct isapnp_resources {
 #define ISAPNP_CARD_DEVS	8
 
 #define ISAPNP_CARD_ID(_va, _vb, _vc, _device) \
-		card_vendor: ISAPNP_VENDOR(_va, _vb, _vc), card_device: ISAPNP_DEVICE(_device)
+		.card_vendor = ISAPNP_VENDOR(_va, _vb, _vc), .card_device = ISAPNP_DEVICE(_device)
 #define ISAPNP_CARD_END \
-		card_vendor: 0, card_device: 0
+		.card_vendor = 0, .card_device = 0
 #define ISAPNP_DEVICE_ID(_va, _vb, _vc, _function) \
-		{ vendor: ISAPNP_VENDOR(_va, _vb, _vc), function: ISAPNP_FUNCTION(_function) }
+		{ .vendor = ISAPNP_VENDOR(_va, _vb, _vc), .function = ISAPNP_FUNCTION(_function) }
 
 /* export used IDs outside module */
 #define ISAPNP_CARD_TABLE(name) \
@@ -151,10 +151,10 @@ struct isapnp_card_id {
 };
 
 #define ISAPNP_DEVICE_SINGLE(_cva, _cvb, _cvc, _cdevice, _dva, _dvb, _dvc, _dfunction) \
-		card_vendor: ISAPNP_VENDOR(_cva, _cvb, _cvc), card_device: ISAPNP_DEVICE(_cdevice), \
-		vendor: ISAPNP_VENDOR(_dva, _dvb, _dvc), function: ISAPNP_FUNCTION(_dfunction)
+		.card_vendor = ISAPNP_VENDOR(_cva, _cvb, _cvc), .card_device =  ISAPNP_DEVICE(_cdevice), \
+		.vendor = ISAPNP_VENDOR(_dva, _dvb, _dvc), .function = ISAPNP_FUNCTION(_dfunction)
 #define ISAPNP_DEVICE_SINGLE_END \
-		card_vendor: 0, card_device: 0
+		.card_vendor = 0, .card_device = 0
 
 struct isapnp_device_id {
 	unsigned short card_vendor, card_device;
