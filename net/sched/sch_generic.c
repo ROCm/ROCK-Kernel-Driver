@@ -280,6 +280,7 @@ struct Qdisc noop_qdisc = {
 	.dequeue	=	noop_dequeue,
 	.flags		=	TCQ_F_BUILTIN,
 	.ops		=	&noop_qdisc_ops,	
+	.list		=	LIST_HEAD_INIT(noop_qdisc.list),
 };
 
 struct Qdisc_ops noqueue_qdisc_ops = {
@@ -298,6 +299,7 @@ struct Qdisc noqueue_qdisc = {
 	.dequeue	=	noop_dequeue,
 	.flags		=	TCQ_F_BUILTIN,
 	.ops		=	&noqueue_qdisc_ops,
+	.list		=	LIST_HEAD_INIT(noqueue_qdisc.list),
 };
 
 
