@@ -801,20 +801,13 @@ P:	Oliver Neukum
 M:	drivers@neukum.org
 S:	Maintained
 
-I2C DRIVERS
-P:	Simon Vogl
-M:	simon@tk.uni-linz.ac.at
-P:	Frodo Looijaard
-M:	frodol@dds.nl
-L:	linux-i2c@pelican.tk.uni-linz.ac.at
-W:	http://www.tk.uni-linz.ac.at/~simon/private/i2c
-S:	Maintained
-
-SENSORS DRIVERS
+I2C AND SENSORS DRIVERS
 P:      Frodo Looijaard
 M:      frodol@dds.nl
 P:      Philip Edelbrock
 M:      phil@netroedge.com
+P:	Greg Kroah-Hartman
+M:	greg@kroah.com
 L:      sensors@stimpy.netroedge.com
 W:      http://www.lm-sensors.nu/
 S:      Maintained

@@ -58,6 +58,7 @@ static int i2cdev_open (struct inode *inode, struct file *file);
 static int i2cdev_release (struct inode *inode, struct file *file);
 
 static int i2cdev_attach_adapter(struct i2c_adapter *adap);
+static int i2cdev_detach_adapter(struct i2c_adapter *adap);
 static int i2cdev_detach_client(struct i2c_client *client);
 static int i2cdev_command(struct i2c_client *client, unsigned int cmd,
                            void *arg);
@@ -72,15 +73,13 @@ static struct file_operations i2cdev_fops = {
 	.release	= i2cdev_release,
 };
 
-#define I2CDEV_ADAPS_MAX I2C_ADAP_MAX
-static struct i2c_adapter *i2cdev_adaps[I2CDEV_ADAPS_MAX];
-
 static struct i2c_driver i2cdev_driver = {
 	.owner		= THIS_MODULE,
 	.name		= "dev driver",
 	.id		= I2C_DRIVERID_I2CDEV,
-	.flags		= I2C_DF_DUMMY,
+	.flags		= I2C_DF_NOTIFY,
 	.attach_adapter	= i2cdev_attach_adapter,
+	.detach_adapter	= i2cdev_detach_adapter,
 	.detach_client	= i2cdev_detach_client,
 	.command	= i2cdev_command,
 };
@@ -340,35 +339,31 @@ static int i2cdev_open(struct inode *inode, struct file *file)
 {
 	unsigned int minor = minor(inode->i_rdev);
 	struct i2c_client *client;
+	struct i2c_adapter *adap;
 
-	if ((minor >= I2CDEV_ADAPS_MAX) || !(i2cdev_adaps[minor]))
+	adap = i2c_get_adapter(minor);
+	if (NULL == adap)
 		return -ENODEV;
 
 	client = kmalloc(sizeof(*client), GFP_KERNEL);
-	if (!client)
+	if (!client) {
+		i2c_put_adapter(adap);
 		return -ENOMEM;
+	}
 	memcpy(client, &i2cdev_client_template, sizeof(*client));
 
 	/* registered with adapter, passed as client to user */
-	client->adapter = i2cdev_adaps[minor];
+	client->adapter = adap;
 	file->private_data = client;
 
-	/* use adapter module, i2c-dev handled with fops */
-	if (!try_module_get(client->adapter->owner))
-		goto out_kfree;
-
 	return 0;
-
-out_kfree:
-	kfree(client);
-	return -ENODEV;
 }
 
 static int i2cdev_release(struct inode *inode, struct file *file)
 {
 	struct i2c_client *client = file->private_data;
 
-	module_put(client->adapter->owner);
+	i2c_put_adapter(client->adapter);
 	kfree(client);
 	file->private_data = NULL;
 
@@ -377,33 +372,28 @@ static int i2cdev_release(struct inode *inode, struct file *file)
 
 int i2cdev_attach_adapter(struct i2c_adapter *adap)
 {
-	int i;
 	char name[12];
+	int i;
 
-	if ((i = i2c_adapter_id(adap)) < 0) {
-		dev_dbg(&adap->dev, "Unknown adapter ?!?\n");
-		return -ENODEV;
-	}
-	if (i >= I2CDEV_ADAPS_MAX) {
-		dev_dbg(&adap->dev, "Adapter number too large?!? (%d)\n",i);
-		return -ENODEV;
-	}
-
+	i = i2c_adapter_id(adap);
 	sprintf (name, "i2c/%d", i);
-	if (! i2cdev_adaps[i]) {
-		i2cdev_adaps[i] = adap;
-		devfs_register (NULL, name,
+
+	devfs_register (NULL, name,
 			DEVFS_FL_DEFAULT, I2C_MAJOR, i,
 			S_IFCHR | S_IRUSR | S_IWUSR,
 			&i2cdev_fops, NULL);
-		dev_dbg(&adap->dev, "Registered as minor %d\n", i);
-	} else {
-		/* This is actually a detach_adapter call! */
-		devfs_remove("i2c/%d", i);
-		i2cdev_adaps[i] = NULL;
-		dev_dbg(&adap->dev, "Adapter unregistered\n");
-	}
+	dev_dbg(&adap->dev, "Registered as minor %d\n", i);
+	return 0;
+}
 
+int i2cdev_detach_adapter(struct i2c_adapter *adap)
+{
+	int i;
+
+	i = i2c_adapter_id(adap);
+
+	devfs_remove("i2c/%d", i);
+	dev_dbg(&adap->dev, "Adapter unregistered\n");
 	return 0;
 }
 

@@ -31,7 +31,7 @@
 #include "pci_hotplug.h"
 #include <linux/interrupt.h>
 #include <asm/io.h>		/* for read? and write? functions */
-
+#include <linux/delay.h>	/* for delays */
 
 #if !defined(CONFIG_HOTPLUG_PCI_COMPAQ_MODULE)
 	#define MY_NAME	"cpqphp.o"
@@ -146,6 +146,10 @@ struct ctrl_reg {			/* offset */
 	u8	reserved11;		/* 0x2b */
 	u8	slot_SERR;		/* 0x2c */
 	u8	slot_power;		/* 0x2d */
+	u8	reserved12;		/* 0x2e */
+	u8	reserved13;		/* 0x2f */
+	u8	next_curr_freq;		/* 0x30 */
+	u8	reset_freq_mode;	/* 0x31 */
 } __attribute__ ((packed));
 
 /* offsets to the controller registers based on the above structure layout */
@@ -173,6 +177,8 @@ enum ctrl_offsets {
 	CTRL_RESERVED11 =	offsetof(struct ctrl_reg, reserved11),
 	SLOT_SERR =		offsetof(struct ctrl_reg, slot_SERR),
 	SLOT_POWER =		offsetof(struct ctrl_reg, slot_power),
+	NEXT_CURR_FREQ =	offsetof(struct ctrl_reg, next_curr_freq),
+	RESET_FREQ_MODE =	offsetof(struct ctrl_reg, reset_freq_mode),
 };
 
 struct hrt {
@@ -294,12 +300,11 @@ struct controller {
 	struct pci_resource *bus_head;
 	struct pci_dev *pci_dev;
 	struct pci_bus *pci_bus;
-	struct proc_dir_entry* proc_entry;
-	struct proc_dir_entry* proc_entry2;
 	struct event_info event_queue[10];
 	struct slot *slot;
 	u8 next_event;
 	u8 interrupt;
+	u8 cfgspc_irq;
 	u8 bus;				/* bus number for the pci hotplug controller */
 	u8 rev;
 	u8 slot_device_offset;
@@ -316,8 +321,6 @@ struct controller {
 	u8 pcix_speed_capability;	/* PCI-X */
 	u8 pcix_support;		/* PCI-X */
 	u16 vendor_id;
-	char proc_name[20];
-	char proc_name2[20];
 	struct work_struct int_task_event;
 	wait_queue_head_t queue;	/* sleep & wake process */
 };
@@ -344,6 +347,7 @@ struct resource_lists {
 #define PCI_SUB_HPC_ID2			0xA2F8
 #define PCI_SUB_HPC_ID3			0xA2F9
 #define PCI_SUB_HPC_ID_INTC		0xA2FA
+#define PCI_SUB_HPC_ID4			0xA2FD
 
 #define INT_BUTTON_IGNORE		0
 #define INT_PRESENCE_ON			1
@@ -436,7 +440,7 @@ extern int	cpqhp_return_board_resources	(struct pci_func * func, struct resource
 extern void	cpqhp_destroy_resource_list	(struct resource_lists * resources);
 extern int	cpqhp_configure_device		(struct controller* ctrl, struct pci_func* func);
 extern int	cpqhp_unconfigure_device	(struct pci_func* func);
-
+extern struct slot *cpqhp_find_slot		(struct controller *ctrl, u8 device);
 
 /* Global variables */
 extern int cpqhp_debug;
@@ -564,6 +568,7 @@ static inline void green_LED_blink (struct controller *ctrl, u8 slot)
 	u32 led_control;
 	
 	led_control = readl(ctrl->hpc_reg + LED_CONTROL);
+	led_control &= ~(0x0101L << slot);
 	led_control |= (0x0001L << slot);
 	writel(led_control, ctrl->hpc_reg + LED_CONTROL);
 }
@@ -605,14 +610,63 @@ static inline u8 read_slot_enable (struct controller *ctrl)
 }
 
 
+/*
+ * get_controller_speed - find the current frequency/mode of controller.
+ *
+ * @ctrl: controller to get frequency/mode for.
+ *
+ * Returns controller speed.
+ *
+ */
 static inline u8 get_controller_speed (struct controller *ctrl)
 {
-	u16 misc;
-	
-	misc = readw(ctrl->hpc_reg + MISC);
-	return (misc & 0x0800) ? PCI_SPEED_66MHz : PCI_SPEED_33MHz;
-}
+	u8 curr_freq;
+ 	u16 misc;
+ 	
+	if (ctrl->pcix_support) {
+		curr_freq = readb(ctrl->hpc_reg + NEXT_CURR_FREQ);
+		if ((curr_freq & 0xB0) == 0xB0) 
+			return PCI_SPEED_133MHz_PCIX;
+		if ((curr_freq & 0xA0) == 0xA0)
+			return PCI_SPEED_100MHz_PCIX;
+		if ((curr_freq & 0x90) == 0x90)
+			return PCI_SPEED_66MHz_PCIX;
+		if (curr_freq & 0x10)
+			return PCI_SPEED_66MHz;
 
+		return PCI_SPEED_33MHz;
+	}
+
+ 	misc = readw(ctrl->hpc_reg + MISC);
+ 	return (misc & 0x0800) ? PCI_SPEED_66MHz : PCI_SPEED_33MHz;
+}
+ 
+
+/*
+ * get_adapter_speed - find the max supported frequency/mode of adapter.
+ *
+ * @ctrl: hotplug controller.
+ * @hp_slot: hotplug slot where adapter is installed.
+ *
+ * Returns adapter speed.
+ *
+ */
+static inline u8 get_adapter_speed (struct controller *ctrl, u8 hp_slot)
+{
+	u32 temp_dword = readl(ctrl->hpc_reg + NON_INT_INPUT);
+	dbg("slot: %d, PCIXCAP: %8x\n", hp_slot, temp_dword);
+	if (ctrl->pcix_support) {
+		if (temp_dword & (0x10000 << hp_slot))
+			return PCI_SPEED_133MHz_PCIX;
+		if (temp_dword & (0x100 << hp_slot))
+			return PCI_SPEED_66MHz_PCIX;
+	}
+
+	if (temp_dword & (0x01 << hp_slot))
+		return PCI_SPEED_66MHz;
+
+	return PCI_SPEED_33MHz;
+}
 
 static inline void enable_slot_power (struct controller *ctrl, u8 slot)
 {
@@ -719,6 +773,139 @@ static inline int wait_for_ctrl_irq (struct controller *ctrl)
 
 	dbg("%s - end\n", __FUNCTION__);
 	return retval;
+}
+
+
+/**
+ * set_controller_speed - set the frequency and/or mode of a specific
+ * controller segment.
+ *
+ * @ctrl: controller to change frequency/mode for.
+ * @adapter_speed: the speed of the adapter we want to match.
+ * @hp_slot: the slot number where the adapter is installed.
+ *
+ * Returns 0 if we successfully change frequency and/or mode to match the
+ * adapter speed.
+ * 
+ */
+static inline u8 set_controller_speed(struct controller *ctrl, u8 adapter_speed, u8 hp_slot)
+{
+	struct slot *slot;
+	u8 reg;
+	u8 slot_power = readb(ctrl->hpc_reg + SLOT_POWER);
+	u16 reg16;
+	u32 leds = readl(ctrl->hpc_reg + LED_CONTROL);
+	
+	if (ctrl->speed == adapter_speed)
+		return 0;
+	
+	/* We don't allow freq/mode changes if we find another adapter running
+	 * in another slot on this controller */
+	for(slot = ctrl->slot; slot; slot = slot->next) {
+		if (slot->device == (hp_slot + ctrl->slot_device_offset)) 
+			continue;
+		if (!slot->hotplug_slot && !slot->hotplug_slot->info) 
+			continue;
+		if (slot->hotplug_slot->info->adapter_status == 0) 
+			continue;
+		/* If another adapter is running on the same segment but at a
+		 * lower speed/mode, we allow the new adapter to function at
+		 * this rate if supported */
+		if (ctrl->speed < adapter_speed) 
+			return 0;
+
+		return 1;
+	}
+	
+	/* If the controller doesn't support freq/mode changes and the
+	 * controller is running at a higher mode, we bail */
+	if ((ctrl->speed > adapter_speed) && (!ctrl->pcix_speed_capability))
+		return 1;
+	
+	/* But we allow the adapter to run at a lower rate if possible */
+	if ((ctrl->speed < adapter_speed) && (!ctrl->pcix_speed_capability))
+		return 0;
+
+	/* We try to set the max speed supported by both the adapter and
+	 * controller */
+	if (ctrl->speed_capability < adapter_speed) {
+		if (ctrl->speed == ctrl->speed_capability)
+			return 0;
+		adapter_speed = ctrl->speed_capability;
+	}
+
+	writel(0x0L, ctrl->hpc_reg + LED_CONTROL);
+	writeb(0x00, ctrl->hpc_reg + SLOT_ENABLE);
+	
+	set_SOGO(ctrl); 
+	wait_for_ctrl_irq(ctrl);
+	
+	if (adapter_speed != PCI_SPEED_133MHz_PCIX)
+		reg = 0xF5;
+	else
+		reg = 0xF4;	
+	pci_write_config_byte(ctrl->pci_dev, 0x41, reg);
+	
+	reg16 = readw(ctrl->hpc_reg + NEXT_CURR_FREQ);
+	reg16 &= ~0x000F;
+	switch(adapter_speed) {
+		case(PCI_SPEED_133MHz_PCIX): 
+			reg = 0x75;
+			reg16 |= 0xB; 
+			break;
+		case(PCI_SPEED_100MHz_PCIX):
+			reg = 0x74;
+			reg16 |= 0xA;
+			break;
+		case(PCI_SPEED_66MHz_PCIX):
+			reg = 0x73;
+			reg16 |= 0x9;
+			break;
+		case(PCI_SPEED_66MHz):
+			reg = 0x73;
+			reg16 |= 0x1;
+			break;
+		default: /* 33MHz PCI 2.2 */
+			reg = 0x71;
+			break;
+			
+	}
+	reg16 |= 0xB << 12;
+	writew(reg16, ctrl->hpc_reg + NEXT_CURR_FREQ);
+	
+	mdelay(5); 
+	
+	/* Reenable interrupts */
+	writel(0, ctrl->hpc_reg + INT_MASK);
+
+	pci_write_config_byte(ctrl->pci_dev, 0x41, reg); 
+	
+	/* Restart state machine */
+	reg = ~0xF;
+	pci_read_config_byte(ctrl->pci_dev, 0x43, &reg);
+	pci_write_config_byte(ctrl->pci_dev, 0x43, reg);
+	
+	/* Only if mode change...*/
+	if (((ctrl->speed == PCI_SPEED_66MHz) && (adapter_speed == PCI_SPEED_66MHz_PCIX)) ||
+		((ctrl->speed == PCI_SPEED_66MHz_PCIX) && (adapter_speed == PCI_SPEED_66MHz))) 
+			set_SOGO(ctrl);
+	
+	wait_for_ctrl_irq(ctrl);
+	mdelay(1100);
+	
+	/* Restore LED/Slot state */
+	writel(leds, ctrl->hpc_reg + LED_CONTROL);
+	writeb(slot_power, ctrl->hpc_reg + SLOT_ENABLE);
+	
+	set_SOGO(ctrl);
+	wait_for_ctrl_irq(ctrl);
+
+	ctrl->speed = adapter_speed;
+	slot = cpqhp_find_slot(ctrl, hp_slot + ctrl->slot_device_offset);
+
+	info("Successfully changed frequency/mode for adapter in slot %d\n", 
+			slot->number);
+	return 0;
 }
 
 #endif

@@ -198,25 +198,9 @@ static int bt832_attach(struct i2c_adapter *adap, int addr,
 
 static int bt832_probe(struct i2c_adapter *adap)
 {
-	int rc;
-
-	printk("bt832_probe\n");
-
-	switch (adap->id) {
-	case I2C_ALGO_BIT | I2C_HW_B_BT848:
-	case I2C_ALGO_BIT | I2C_HW_B_RIVA:
-	case I2C_ALGO_SAA7134:
-		printk("bt832: probing %s i2c adapter [id=0x%x]\n",
-		       adap->name,adap->id);
-		rc = i2c_probe(adap, &addr_data, bt832_attach);
-		break;
-	default:
-		printk("bt832: ignoring %s i2c adapter [id=0x%x]\n",
-		       adap->name,adap->id);
-		rc = 0;
-		/* nothing */
-	}
-	return rc;
+	if (adap->class & I2C_ADAP_CLASS_TV_ANALOG)
+		return i2c_probe(adap, &addr_data, bt832_attach);
+	return 0;
 }
 
 static int bt832_detach(struct i2c_client *client)

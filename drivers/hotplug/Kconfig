@@ -61,7 +61,7 @@ config HOTPLUG_PCI_IBM
 
 config HOTPLUG_PCI_ACPI
 	tristate "ACPI PCI Hotplug driver"
-	depends on ACPI && HOTPLUG_PCI
+	depends on ACPI_BUS && HOTPLUG_PCI
 	help
 	  Say Y here if you have a system that supports PCI Hotplug using
 	  ACPI.

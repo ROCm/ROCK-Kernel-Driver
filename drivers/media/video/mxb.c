@@ -208,7 +208,8 @@ static int mxb_vbi_bypass(struct saa7146_dev* dev)
 static int mxb_probe(struct saa7146_dev* dev)
 {
 	struct mxb* mxb = 0;
-	int i = 0;	
+	struct i2c_client *client;
+	struct list_head *item;
 
 	request_module("tuner");
 	request_module("tea6420");
@@ -235,22 +236,20 @@ static int mxb_probe(struct saa7146_dev* dev)
 	}
 
 	/* loop through all i2c-devices on the bus and look who is there */
-	for(i = 0; i < I2C_CLIENT_MAX; i++) {
-		if( NULL == mxb->i2c_adapter.clients[i] ) {
-			continue;
-		}
-		if( I2C_TEA6420_1 == mxb->i2c_adapter.clients[i]->addr )
-			mxb->tea6420_1 = mxb->i2c_adapter.clients[i];
-		if( I2C_TEA6420_2 == mxb->i2c_adapter.clients[i]->addr ) 
-			mxb->tea6420_2 = mxb->i2c_adapter.clients[i];
-		if( I2C_TEA6415C_2 == mxb->i2c_adapter.clients[i]->addr ) 
-			mxb->tea6415c = mxb->i2c_adapter.clients[i];
-		if( I2C_TDA9840 == mxb->i2c_adapter.clients[i]->addr ) 
-			mxb->tda9840 = mxb->i2c_adapter.clients[i];
-		if( I2C_SAA7111A == mxb->i2c_adapter.clients[i]->addr ) 
-			mxb->saa7111a = mxb->i2c_adapter.clients[i];
-		if( 0x60 == mxb->i2c_adapter.clients[i]->addr ) 
-			mxb->tuner = mxb->i2c_adapter.clients[i];
+	list_for_each(item,&mxb->i2c_adapter.clients) {
+		client = list_entry(item, struct i2c_client, list);
+		if( I2C_TEA6420_1 == client->addr )
+			mxb->tea6420_1 = client;
+		if( I2C_TEA6420_2 == client->addr ) 
+			mxb->tea6420_2 = client;
+		if( I2C_TEA6415C_2 == client->addr ) 
+			mxb->tea6415c = client;
+		if( I2C_TDA9840 == client->addr ) 
+			mxb->tda9840 = client;
+		if( I2C_SAA7111A == client->addr ) 
+			mxb->saa7111a = client;
+		if( 0x60 == client->addr ) 
+			mxb->tuner = client;
 	}
 
 	/* check if all devices are present */
