@@ -479,3 +479,5 @@ int snd_pcm_limit_hw_rates(snd_pcm_runtime_t *runtime)
 	}
 	return 0;
 }
+
+EXPORT_SYMBOL(snd_pcm_format_size);
