@@ -41,22 +41,8 @@ typedef unsigned char spinlock_t;
 do {	membar("#LoadLoad");	\
 } while(*((volatile unsigned char *)lock))
 
-static __inline__ void _raw_spin_lock(spinlock_t *lock)
-{
-	__asm__ __volatile__(
-"1:	ldstub		[%0], %%g7\n"
-"	brnz,pn		%%g7, 2f\n"
-"	 membar		#StoreLoad | #StoreStore\n"
-"	.subsection	2\n"
-"2:	ldub		[%0], %%g7\n"
-"	brnz,pt		%%g7, 2b\n"
-"	 membar		#LoadLoad\n"
-"	b,a,pt		%%xcc, 1b\n"
-"	.previous\n"
-	: /* no outputs */
-	: "r" (lock)
-	: "g7", "memory");
-}
+/* arch/sparc64/lib/spinlock.S */
+extern void _raw_spin_lock(spinlock_t *lock);
 
 static __inline__ int _raw_spin_trylock(spinlock_t *lock)
 {

@@ -16,9 +16,7 @@
 #include <asm/asi.h>
 
 extern void __memmove(void *,const void *,__kernel_size_t);
-extern __kernel_size_t __memcpy(void *,const void *,__kernel_size_t);
 extern void *__memset(void *,int,__kernel_size_t);
-extern void *__builtin_memcpy(void *,const void *,__kernel_size_t);
 extern void *__builtin_memset(void *,int,__kernel_size_t);
 
 #ifndef EXPORT_SYMTAB_STROPS
@@ -37,29 +35,7 @@ extern void *__builtin_memset(void *,int,__kernel_size_t);
 
 #define __HAVE_ARCH_MEMCPY
 
-static inline void *__constant_memcpy(void *to, const void *from, __kernel_size_t n)
-{
-	if(n) {
-		if(n <= 32) {
-			__builtin_memcpy(to, from, n);
-		} else {
-			__memcpy(to, from, n);
-		}
-	}
-	return to;
-}
-
-static inline void *__nonconstant_memcpy(void *to, const void *from, __kernel_size_t n)
-{
-	__memcpy(to, from, n);
-	return to;
-}
-
-#undef memcpy
-#define memcpy(t, f, n) \
-(__builtin_constant_p(n) ? \
- __constant_memcpy((t),(f),(n)) : \
- __nonconstant_memcpy((t),(f),(n)))
+extern void * memcpy(void *,const void *,__kernel_size_t);
 
 #define __HAVE_ARCH_MEMSET
 
