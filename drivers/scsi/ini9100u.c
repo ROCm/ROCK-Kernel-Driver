@@ -115,9 +115,6 @@
 #endif
 
 #include <linux/module.h>
-
-#include <stdarg.h>
-#include <asm/irq.h>
 #include <linux/errno.h>
 #include <linux/delay.h>
 #include <linux/pci.h>
@@ -126,16 +123,18 @@
 #include <linux/spinlock.h>
 #include <linux/stat.h>
 #include <linux/config.h>
-
 #include <linux/kernel.h>
+#include <linux/proc_fs.h>
 #include <linux/string.h>
+#include <linux/interrupt.h>
 #include <linux/ioport.h>
 #include <linux/sched.h>
-#include <linux/proc_fs.h>
+#include <linux/slab.h>
+
 #include <asm/io.h>
+
 #include "scsi.h"
 #include "hosts.h"
-#include <linux/slab.h>
 #include "ini9100u.h"
 
 #ifdef DEBUG_i91u
