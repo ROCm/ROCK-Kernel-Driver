@@ -1188,7 +1188,7 @@ asmlinkage int irix_uname(struct iuname *buf)
 #undef DEBUG_XSTAT
 
 static inline u32
-linux_to_irix_dev_t (dev_t t)
+linux_to_irix_dev_t(dev_t t)
 {
 	return MAJOR (t) << 18 | MINOR (t);
 }
@@ -1360,17 +1360,17 @@ asmlinkage int irix_fxstat(int version, int fd, struct stat *statbuf)
 	return error;
 }
 
-extern asmlinkage int sys_mknod(const char * filename, int mode, dev_t dev);
+extern asmlinkage int sys_mknod(const char * filename, int mode, unsigned dev);
 
-asmlinkage int irix_xmknod(int ver, char *filename, int mode, dev_t dev)
+asmlinkage int irix_xmknod(int ver, char *filename, int mode, unsigned dev)
 {
 	int retval;
-
 	printk("[%s:%d] Wheee.. irix_xmknod(%d,%s,%x,%x)\n",
-	       current->comm, current->pid, ver, filename, mode, (int) dev);
+	       current->comm, current->pid, ver, filename, mode, dev);
 
 	switch(ver) {
 	case 2:
+		/* shouldn't we convert here as well as on stat()? */
 		retval = sys_mknod(filename, mode, dev);
 		break;
 

@@ -78,7 +78,7 @@ static void * __init read_dir(char *path, int *len)
 /*
  * recursively scan <path>, looking for a device node of type <dev>
  */
-static int __init find_in_devfs(char *path, dev_t dev)
+static int __init find_in_devfs(char *path, unsigned dev)
 {
 	struct stat buf;
 	char *end = path + strlen(path);
@@ -140,7 +140,7 @@ int __init create_dev(char *name, dev_t dev, char *devfs_name)
 	if (!dev)
 		return -1;
 	strcpy(path, "/dev");
-	if (find_in_devfs(path, dev) < 0)
+	if (find_in_devfs(path, old_encode_dev(dev)) < 0)
 		return -1;
 	return sys_symlink(path + 5, name);
 }

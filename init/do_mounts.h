@@ -10,7 +10,7 @@
 #include <linux/root_dev.h>
 
 asmlinkage long sys_unlink(const char *name);
-asmlinkage long sys_mknod(const char *name, int mode, dev_t dev);
+asmlinkage long sys_mknod(const char *name, int mode, unsigned dev);
 asmlinkage long sys_newstat(char * filename, struct stat * statbuf);
 asmlinkage long sys_ioctl(int fd, int cmd, unsigned long arg);
 asmlinkage long sys_mkdir(const char *name, int mode);
@@ -43,7 +43,7 @@ static inline void umount_devfs(const char *path) {}
 static inline int create_dev(char *name, dev_t dev, char *devfs_name)
 {
 	sys_unlink(name);
-	return sys_mknod(name, S_IFBLK|0600, dev);
+	return sys_mknod(name, S_IFBLK|0600, old_encode_dev(dev));
 }
 
 #endif

@@ -1445,7 +1445,7 @@ int vfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t dev)
 	return error;
 }
 
-asmlinkage long sys_mknod(const char __user * filename, int mode, dev_t dev)
+asmlinkage long sys_mknod(const char __user * filename, int mode, unsigned dev)
 {
 	int error = 0;
 	char * tmp;
@@ -1471,8 +1471,12 @@ asmlinkage long sys_mknod(const char __user * filename, int mode, dev_t dev)
 		case 0: case S_IFREG:
 			error = vfs_create(nd.dentry->d_inode,dentry,mode,&nd);
 			break;
-		case S_IFCHR: case S_IFBLK: case S_IFIFO: case S_IFSOCK:
-			error = vfs_mknod(nd.dentry->d_inode,dentry,mode,dev);
+		case S_IFCHR: case S_IFBLK:
+			error = vfs_mknod(nd.dentry->d_inode,dentry,mode,
+					old_decode_dev(dev));
+			break;
+		case S_IFIFO: case S_IFSOCK:
+			error = vfs_mknod(nd.dentry->d_inode,dentry,mode,0);
 			break;
 		case S_IFDIR:
 			error = -EPERM;

@@ -136,7 +136,7 @@ static void __init md_setup_drive(void)
 			snprintf(comp_name, 63, "/dev/%s", devname);
 			if (sys_newstat(comp_name, &buf) == 0 &&
 							S_ISBLK(buf.st_mode))
-				dev = buf.st_rdev;
+				dev = old_decode_dev(buf.st_rdev);
 			if (!dev) {
 				printk(KERN_WARNING "md: Unknown device name: %s\n", devname);
 				break;

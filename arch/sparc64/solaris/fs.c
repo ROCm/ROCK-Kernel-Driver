@@ -257,13 +257,13 @@ asmlinkage int solaris_fstat64(unsigned int fd, u32 statbuf)
 
 asmlinkage int solaris_mknod(u32 path, u32 mode, s32 dev)
 {
-	int (*sys_mknod)(const char *,int,dev_t) = 
-		(int (*)(const char *,int,dev_t))SYS(mknod);
+	int (*sys_mknod)(const char *,int,unsigned) = 
+		(int (*)(const char *,int,unsigned))SYS(mknod);
 	int major, minor;
 
 	if ((major = R4_MAJOR(dev)) > 255 || 
 	    (minor = R4_MINOR(dev)) > 255) return -EINVAL;
-	return sys_mknod((const char *)A(path), mode, MKDEV(major,minor));
+	return sys_mknod((const char *)A(path), mode, old_encode_dev(MKDEV(major,minor)));
 }
 
 asmlinkage int solaris_xmknod(int vers, u32 path, u32 mode, s32 dev)

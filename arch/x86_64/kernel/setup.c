@@ -317,7 +317,7 @@ void __init setup_arch(char **cmdline_p)
 {
 	unsigned long low_mem_size;
 
- 	ROOT_DEV = ORIG_ROOT_DEV;
+ 	ROOT_DEV = old_decode_dev(ORIG_ROOT_DEV);
  	drive_info = DRIVE_INFO;
  	screen_info = SCREEN_INFO;
 	edid_info = EDID_INFO;

@@ -24,7 +24,7 @@ static void __init free(void *where)
 }
 
 asmlinkage long sys_mkdir(char *name, int mode);
-asmlinkage long sys_mknod(char *name, int mode, dev_t dev);
+asmlinkage long sys_mknod(char *name, int mode, unsigned dev);
 asmlinkage long sys_symlink(char *old, char *new);
 asmlinkage long sys_link(char *old, char *new);
 asmlinkage long sys_write(int fd, const char *buf, size_t size);
@@ -92,7 +92,7 @@ static __initdata mode_t mode;
 static __initdata unsigned long body_len, name_len;
 static __initdata uid_t uid;
 static __initdata gid_t gid;
-static __initdata dev_t rdev;
+static __initdata unsigned rdev;
 
 static void __init parse_header(char *s)
 {
@@ -113,7 +113,7 @@ static void __init parse_header(char *s)
 	body_len = parsed[6];
 	major = parsed[7];
 	minor = parsed[8];
-	rdev = MKDEV(parsed[9], parsed[10]);
+	rdev = old_encode_dev(MKDEV(parsed[9], parsed[10]));
 	name_len = parsed[11];
 }
 

@@ -1476,7 +1476,7 @@ long sys32_uname(struct old_utsname * name)
 
 extern int sys_ustat(dev_t, struct ustat *);
 
-long sys32_ustat(dev_t dev, struct ustat32 *u32p)
+long sys32_ustat(unsigned dev, struct ustat32 *u32p)
 {
 	struct ustat u;
 	mm_segment_t seg;
