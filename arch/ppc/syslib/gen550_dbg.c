@@ -29,6 +29,11 @@
 
 #define SERIAL_BAUD	9600
 
+/* SERIAL_PORT_DFNS is defined in <asm/serial.h> */
+#ifndef SERIAL_PORT_DFNS
+#define SERIAL_PORT_DFNS
+#endif
+
 static struct serial_state rs_table[RS_TABLE_SIZE] = {
 	SERIAL_PORT_DFNS	/* defined in <asm/serial.h> */
 };
@@ -154,6 +159,7 @@ gen550_init(int i, struct uart_port *serial_req)
 	rs_table[i].port = serial_req->iobase;
 	rs_table[i].iomem_base = serial_req->membase;
 	rs_table[i].iomem_reg_shift = serial_req->regshift;
+	rs_table[i].baud_base = serial_req->uartclk ? serial_req->uartclk / 16 : BASE_BAUD;
 }
 
 #ifdef CONFIG_SERIAL_TEXT_DEBUG
