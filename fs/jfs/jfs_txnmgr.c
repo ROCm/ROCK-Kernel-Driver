@@ -2898,6 +2898,8 @@ int jfs_sync(void)
 {
 	struct inode *ip;
 	struct jfs_inode_info *jfs_ip;
+	int rc;
+	tid_t tid;
 
 	lock_kernel();
 
@@ -2927,17 +2929,19 @@ int jfs_sync(void)
 			ip = &jfs_ip->vfs_inode;
 
 			/*
-			 * We must release the TXN_LOCK since our
-			 * IWRITE_TRYLOCK implementation may still block
+			 * down_trylock returns 0 on success.  This is
+			 * inconsistent with spin_trylock.
 			 */
-			TXN_UNLOCK();
-			if (IWRITE_TRYLOCK(ip)) {
+			if (! down_trylock(&jfs_ip->commit_sem)) {
 				/*
 				 * inode will be removed from anonymous list
 				 * when it is committed
 				 */
-				jfs_commit_inode(ip, 0);
-				IWRITE_UNLOCK(ip);
+				TXN_UNLOCK();
+				tid = txBegin(ip->i_sb, COMMIT_INODE);
+				rc = txCommit(tid, 1, &ip, 0);
+				txEnd(tid);
+				up(&jfs_ip->commit_sem);
 				/*
 				 * Just to be safe.  I don't know how
 				 * long we can run without blocking
@@ -2945,17 +2949,11 @@ int jfs_sync(void)
 				cond_resched();
 				TXN_LOCK();
 			} else {
-				/* We can't get the write lock.  It may
+				/* We can't get the commit semaphore.  It may
 				 * be held by a thread waiting for tlock's
 				 * so let's not block here.  Save it to
 				 * put back on the anon_list.
 				 */
-
-				/*
-				 * We released TXN_LOCK, let's make sure
-				 * this inode is still there
-				 */
-				TXN_LOCK();
 				if (TxAnchor.anon_list.next !=
 				    &jfs_ip->anon_inode_list)
 					continue;

@@ -1524,8 +1524,6 @@ static int lmLogShutdown(log_t * log)
  *
  * RETURN:	0	- success
  *		errors returned by vms_iowait().
- *			
- * serialization: IWRITE_LOCK(log inode) held on entry/exit
  */
 static int lmLogFileSystem(log_t * log, char *uuid, int activate)
 {

@@ -107,8 +107,10 @@ int jfs_commit_inode(struct inode *inode, int wait)
 	}
 
 	tid = txBegin(inode->i_sb, COMMIT_INODE);
+	down(&JFS_IP(inode)->commit_sem);
 	rc = txCommit(tid, 1, &inode, wait ? COMMIT_SYNC : 0);
 	txEnd(tid);
+	up(&JFS_IP(inode)->commit_sem);
 	return -rc;
 }
 
@@ -123,25 +125,19 @@ void jfs_write_inode(struct inode *inode, int wait)
 	    !test_cflag(COMMIT_Dirty, inode))
 		return;
 
-	IWRITE_LOCK(inode);
-
 	if (jfs_commit_inode(inode, wait)) {
 		jERROR(1, ("jfs_write_inode: jfs_commit_inode failed!\n"));
 	}
-
-	IWRITE_UNLOCK(inode);
 }
 
 void jfs_delete_inode(struct inode *inode)
 {
 	jFYI(1, ("In jfs_delete_inode, inode = 0x%p\n", inode));
 
-	IWRITE_LOCK(inode);
 	if (test_cflag(COMMIT_Freewmap, inode))
 		freeZeroLink(inode);
 
 	diFree(inode);
-	IWRITE_UNLOCK(inode);
 
 	clear_inode(inode);
 }
@@ -203,8 +199,7 @@ static int jfs_get_block(struct inode *ip, sector_t lblock,
 
 	if ((no_size_check ||
 	     ((lblock64 << ip->i_sb->s_blocksize_bits) < ip->i_size)) &&
-	    (xtLookup
-	     (ip, lblock64, 1, &xflag, &xaddr, &xlen, no_size_check)
+	    (xtLookup(ip, lblock64, 1, &xflag, &xaddr, &xlen, no_size_check)
 	     == 0) && xlen) {
 		if (xflag & XAD_NOTRECORDED) {
 			if (!create)
@@ -241,8 +236,7 @@ static int jfs_get_block(struct inode *ip, sector_t lblock,
 	 * Allocate a new block
 	 */
 #ifdef _JFS_4K
-	if ((rc =
-	     extHint(ip, lblock64 << ip->i_sb->s_blocksize_bits, &xad)))
+	if ((rc = extHint(ip, lblock64 << ip->i_sb->s_blocksize_bits, &xad)))
 		goto unlock;
 	rc = extAlloc(ip, 1, lblock64, &xad, FALSE);
 	if (rc)
