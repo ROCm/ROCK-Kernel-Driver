@@ -570,7 +570,6 @@ isdn_audio_eval_dtmf(modem_info * info)
 			/* Schedule dequeuing */
 			if ((dev->modempoll) && (info->rcvsched))
 				isdn_timer_ctrl(ISDN_TIMER_MODEMREAD, 1);
-			wake_up_interruptible(&dev->drv[di]->rcv_waitq[ch]);
 		} else
 			kfree_skb(skb);
 		s->last = what;
@@ -691,7 +690,6 @@ isdn_audio_put_dle_code(modem_info * info, u_char code)
 	/* Schedule dequeuing */
 	if ((dev->modempoll) && (info->rcvsched))
 		isdn_timer_ctrl(ISDN_TIMER_MODEMREAD, 1);
-	wake_up_interruptible(&dev->drv[di]->rcv_waitq[ch]);
 }
 
 void

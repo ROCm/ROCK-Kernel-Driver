@@ -434,8 +434,6 @@ typedef struct {
 	unsigned long      DLEflag;           /* Flags: Insert DLE at next read   */
 #endif
 	struct sk_buff_head *rpqueue;         /* Pointers to start of Rcv-Queue   */
-	wait_queue_head_t  *rcv_waitq;       /* Wait-Queues for B-Channel-Reads  */
-	wait_queue_head_t  *snd_waitq;       /* Wait-Queue for B-Channel-Send's  */
 	char               msn2eaz[10][ISDN_MSNLEN];  /* Mapping-Table MSN->EAZ   */
 } driver;
 

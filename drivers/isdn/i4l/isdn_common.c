@@ -319,12 +319,9 @@ isdn_receive_skb_callback(int di, int channel, struct sk_buff *skb)
 	}
 
 	/* No network-device found, deliver to tty or raw-channel */
-	if (skb->len) {
-		if (isdn_tty_rcv_skb(i, di, channel, skb))
-			return;
-		wake_up_interruptible(&dev->drv[di]->rcv_waitq[channel]);
-	} else
-		dev_kfree_skb(skb);
+	if (isdn_tty_rcv_skb(i, di, channel, skb))
+		return;
+	dev_kfree_skb(skb);
 }
 
 /*
@@ -436,7 +433,6 @@ isdn_status_callback(isdn_ctrl * c)
 				return 0;
 			if (isdn_tty_stat_callback(i, c))
 				return 0;
-			wake_up_interruptible(&dev->drv[di]->snd_waitq[c->arg]);
 			break;
 		case ISDN_STAT_STAVAIL:
 			save_flags(flags);
@@ -658,7 +654,6 @@ isdn_status_callback(isdn_ctrl * c)
 			for (i = 0; i < dev->drv[di]->channels; i++)
 				skb_queue_purge(&dev->drv[di]->rpqueue[i]);
 			kfree(dev->drv[di]->rpqueue);
-			kfree(dev->drv[di]->rcv_waitq);
 			kfree(dev->drv[di]);
 			dev->drv[di] = NULL;
 			dev->drvid[di][0] = '\0';
@@ -1699,24 +1694,6 @@ isdn_add_channels(driver *d, int drvidx, int n, int adding)
 	}
 	for (j = 0; j < m; j++) {
 		skb_queue_head_init(&d->rpqueue[j]);
-	}
-
-	if ((adding) && (d->rcv_waitq))
-		kfree(d->rcv_waitq);
-	d->rcv_waitq = kmalloc(sizeof(wait_queue_head_t) * 2 * m, GFP_KERNEL);
-	if (!d->rcv_waitq) {
-		printk(KERN_WARNING "register_isdn: Could not alloc rcv_waitq\n");
-		if (!adding) {
-			kfree(d->rpqueue);
-			kfree(d->rcvcount);
-			kfree(d->rcverr);
-		}
-		return -1;
-	}
-	d->snd_waitq = d->rcv_waitq + m;
-	for (j = 0; j < m; j++) {
-		init_waitqueue_head(&d->rcv_waitq[j]);
-		init_waitqueue_head(&d->snd_waitq[j]);
 	}
 
 	dev->channels += n;
