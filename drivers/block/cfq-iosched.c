@@ -93,11 +93,6 @@ enum {
 
 static char *cfq_key_types[] = { "pgid", "tgid", "uid", "gid", NULL };
 
-/*
- * spare queue
- */
-#define CFQ_KEY_SPARE		(~0UL)
-
 static kmem_cache_t *crq_pool;
 static kmem_cache_t *cfq_pool;
 static kmem_cache_t *cfq_ioc_pool;
@@ -1234,19 +1229,6 @@ out:
 	return cfqq;
 }
 
-static struct cfq_queue *
-cfq_get_queue(struct cfq_data *cfqd, unsigned long key, int gfp_mask)
-{
-	request_queue_t *q = cfqd->queue;
-	struct cfq_queue *cfqq;
-
-	spin_lock_irq(q->queue_lock);
-	cfqq = __cfq_get_queue(cfqd, key, gfp_mask);
-	spin_unlock_irq(q->queue_lock);
-
-	return cfqq;
-}
-
 static void cfq_enqueue(struct cfq_data *cfqd, struct cfq_rq *crq)
 {
 	crq->is_sync = 0;
@@ -1433,14 +1415,8 @@ static int cfq_set_request(request_queue_t *q, struct request *rq, int gfp_mask)
 	spin_lock_irqsave(q->queue_lock, flags);
 
 	cfqq = __cfq_get_queue(cfqd, cfq_hash_key(cfqd, current), gfp_mask);
-	if (!cfqq) {
-#if 0
-		cfqq = cfq_get_queue(cfqd, CFQ_KEY_SPARE, gfp_mask);
-		printk("%s: got spare queue\n", current->comm);
-#else
+	if (!cfqq)
 		goto out_lock;
-#endif
-	}
 
 repeat:
 	if (cfqq->allocated[rw] >= cfqd->max_queued)
@@ -1495,20 +1471,9 @@ out_lock:
 static void cfq_put_cfqd(struct cfq_data *cfqd)
 {
 	request_queue_t *q = cfqd->queue;
-	struct cfq_queue *cfqq;
 
 	if (!atomic_dec_and_test(&cfqd->ref))
 		return;
-
-	/*
-	 * kill spare queue, getting it means we have two refences to it.
-	 * drop both
-	 */
-	spin_lock_irq(q->queue_lock);
-	cfqq = __cfq_get_queue(cfqd, CFQ_KEY_SPARE, GFP_ATOMIC);
-	cfq_put_queue(cfqq);
-	cfq_put_queue(cfqq);
-	spin_unlock_irq(q->queue_lock);
 
 	blk_put_queue(q);
 
@@ -1526,7 +1491,6 @@ static void cfq_exit_queue(elevator_t *e)
 static int cfq_init_queue(request_queue_t *q, elevator_t *e)
 {
 	struct cfq_data *cfqd;
-	struct cfq_queue *cfqq;
 	int i;
 
 	cfqd = kmalloc(sizeof(*cfqd), GFP_KERNEL);
@@ -1560,13 +1524,6 @@ static int cfq_init_queue(request_queue_t *q, elevator_t *e)
 	atomic_inc(&q->refcnt);
 
 	/*
-	 * setup spare failure queue
-	 */
-	cfqq = cfq_get_queue(cfqd, CFQ_KEY_SPARE, GFP_KERNEL);
-	if (!cfqq)
-		goto out_spare;
-
-	/*
 	 * just set it to some high value, we want anyone to be able to queue
 	 * some requests. fairness is handled differently
 	 */
@@ -1586,8 +1543,6 @@ static int cfq_init_queue(request_queue_t *q, elevator_t *e)
 	cfqd->cfq_back_penalty = cfq_back_penalty;
 
 	return 0;
-out_spare:
-	mempool_destroy(cfqd->crq_pool);
 out_crqpool:
 	kfree(cfqd->cfq_hash);
 out_cfqhash:
