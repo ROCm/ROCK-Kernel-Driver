@@ -43,6 +43,7 @@
 #include <asm/atomic.h>
 #include <linux/devfs_fs_kernel.h>
 
+#include "csr1212.h"
 #include "ieee1394.h"
 #include "ieee1394_types.h"
 #include "ieee1394_core.h"
@@ -214,15 +215,11 @@ static void add_host(struct hpsb_host *host)
 
 static struct host_info *find_host_info(struct hpsb_host *host)
 {
-        struct list_head *lh;
         struct host_info *hi;
 
-        list_for_each(lh, &host_info_list) {
-                hi = list_entry(lh, struct host_info, list);
-                if (hi->host == host) {
+        list_for_each_entry(hi, &host_info_list, list)
+                if (hi->host == host)
                         return hi;
-                }
-        }
 
         return NULL;
 }
@@ -261,7 +258,6 @@ static void remove_host(struct hpsb_host *host)
 static void host_reset(struct hpsb_host *host)
 {
         unsigned long flags;
-        struct list_head *lh;
         struct host_info *hi;
         struct file_info *fi;
         struct pending_request *req;
@@ -270,8 +266,7 @@ static void host_reset(struct hpsb_host *host)
         hi = find_host_info(host);
 
         if (hi != NULL) {
-                list_for_each(lh, &hi->file_info_list) {
-                        fi = list_entry(lh, struct file_info, list);
+                list_for_each_entry(fi, &hi->file_info_list, list) {
                         if (fi->notification == RAW1394_NOTIFY_ON) {
                                 req = __alloc_pending_request(SLAB_ATOMIC);
 
@@ -298,10 +293,9 @@ static void iso_receive(struct hpsb_host *host, int channel, quadlet_t *data,
                         size_t length)
 {
         unsigned long flags;
-        struct list_head *lh;
         struct host_info *hi;
         struct file_info *fi;
-        struct pending_request *req;
+        struct pending_request *req, *req_next;
         struct iso_block_store *ibs = NULL;
         LIST_HEAD(reqs);
 
@@ -314,12 +308,9 @@ static void iso_receive(struct hpsb_host *host, int channel, quadlet_t *data,
         hi = find_host_info(host);
 
         if (hi != NULL) {
-		list_for_each(lh, &hi->file_info_list) {
-                        fi = list_entry(lh, struct file_info, list);
-
-                        if (!(fi->listen_channels & (1ULL << channel))) {
+		list_for_each_entry(fi, &hi->file_info_list, list) {
+                        if (!(fi->listen_channels & (1ULL << channel)))
                                 continue;
-                        }
 
                         req = __alloc_pending_request(SLAB_ATOMIC);
                         if (!req) break;
@@ -354,23 +345,17 @@ static void iso_receive(struct hpsb_host *host, int channel, quadlet_t *data,
         }
         spin_unlock_irqrestore(&host_info_lock, flags);
 
-        lh = reqs.next;
-        while (lh != &reqs) {
-                req = list_entry(lh, struct pending_request, list);
-                lh = lh->next;
-
+	list_for_each_entry_safe(req, req_next, &reqs, list)
                 queue_complete_req(req);
-        }
 }
 
 static void fcp_request(struct hpsb_host *host, int nodeid, int direction,
 			int cts, u8 *data, size_t length)
 {
         unsigned long flags;
-        struct list_head *lh;
         struct host_info *hi;
         struct file_info *fi;
-        struct pending_request *req;
+        struct pending_request *req, *req_next;
         struct iso_block_store *ibs = NULL;
         LIST_HEAD(reqs);
 
@@ -383,12 +368,9 @@ static void fcp_request(struct hpsb_host *host, int nodeid, int direction,
         hi = find_host_info(host);
 
         if (hi != NULL) {
-		list_for_each(lh, &hi->file_info_list) {
-                        fi = list_entry(lh, struct file_info, list);
-
-                        if (!fi->fcp_buffer) {
+		list_for_each_entry(fi, &hi->file_info_list, list) {
+                        if (!fi->fcp_buffer)
                                 continue;
-                        }
 
                         req = __alloc_pending_request(SLAB_ATOMIC);
                         if (!req) break;
@@ -423,13 +405,8 @@ static void fcp_request(struct hpsb_host *host, int nodeid, int direction,
         }
         spin_unlock_irqrestore(&host_info_lock, flags);
 
-        lh = reqs.next;
-        while (lh != &reqs) {
-                req = list_entry(lh, struct pending_request, list);
-                lh = lh->next;
-
+	list_for_each_entry_safe(req, req_next, &reqs, list)
                 queue_complete_req(req);
-        }
 }
 
 
@@ -505,7 +482,6 @@ static int state_opened(struct file_info *fi, struct pending_request *req)
 
 static int state_initialized(struct file_info *fi, struct pending_request *req)
 {
-        struct list_head *lh;
         struct host_info *hi;
         struct raw1394_khost_list *khl;
 
@@ -527,12 +503,9 @@ static int state_initialized(struct file_info *fi, struct pending_request *req)
                         req->req.misc = host_count;
                         req->data = (quadlet_t *)khl;
                         
-                        list_for_each(lh, &host_info_list) {
-                                hi = list_entry(lh, struct host_info, list);
-
+                        list_for_each_entry(hi, &host_info_list, list) {
                                 khl->nodes = hi->host->node_count;
                                 strcpy(khl->name, hi->host->driver->name);
-
                                 khl++;
                         }
                 }
@@ -550,23 +523,17 @@ static int state_initialized(struct file_info *fi, struct pending_request *req)
                 break;
 
         case RAW1394_REQ_SET_CARD:
-                lh = NULL;
-
                 spin_lock_irq(&host_info_lock);
                 if (req->req.misc < host_count) {
-                        lh = host_info_list.next;
-                        while (req->req.misc--) {
-                                lh = lh->next;
-                        }
-                        hi = list_entry(lh, struct host_info, list);
+			list_for_each_entry(hi, &host_info_list, list) {
+				if (!req->req.misc--)
+					break;
+			}
 			get_device(&hi->host->device); // XXX Need to handle failure case
                         list_add_tail(&fi->list, &hi->file_info_list);
                         fi->host = hi->host;
                         fi->state = connected;
-                }
-                spin_unlock_irq(&host_info_lock);
 
-                if (lh != NULL) {
                         req->req.error = RAW1394_ERROR_NONE;
                         req->req.generation = get_hpsb_generation(fi->host);
                         req->req.misc = (fi->host->node_id << 16) 
@@ -577,6 +544,7 @@ static int state_initialized(struct file_info *fi, struct pending_request *req)
                 } else {
                         req->req.error = RAW1394_ERROR_INVALID_ARG;
                 }
+		spin_unlock_irq(&host_info_lock);
 
                 req->req.length = 0;
                 break;
@@ -898,7 +866,6 @@ static int arm_read (struct hpsb_host *host, int nodeid, quadlet_t *buffer,
 		     u64 addr, size_t length, u16 flags)
 {
         struct pending_request *req;
-        struct list_head *lh;
         struct host_info *hi;
         struct file_info *fi = NULL;
         struct list_head *entry;
@@ -915,8 +882,7 @@ static int arm_read (struct hpsb_host *host, int nodeid, quadlet_t *buffer,
         spin_lock(&host_info_lock);
         hi = find_host_info(host); /* search address-entry */
         if (hi != NULL) {
-                list_for_each(lh, &hi->file_info_list) {
-                        fi = list_entry(lh, struct file_info, list);
+                list_for_each_entry(fi, &hi->file_info_list, list) {
                         entry = fi->addr_list.next;
                         while (entry != &(fi->addr_list)) {
                                 arm_addr = list_entry(entry, struct arm_addr, addr_list);
@@ -1034,7 +1000,6 @@ static int arm_write (struct hpsb_host *host, int nodeid, int destid,
 		      quadlet_t *data, u64 addr, size_t length, u16 flags)
 {
         struct pending_request *req;
-        struct list_head *lh;
         struct host_info *hi;
         struct file_info *fi = NULL;
         struct list_head *entry;
@@ -1051,8 +1016,7 @@ static int arm_write (struct hpsb_host *host, int nodeid, int destid,
         spin_lock(&host_info_lock);
         hi = find_host_info(host); /* search address-entry */
         if (hi != NULL) {
-                list_for_each(lh, &hi->file_info_list) {
-                        fi = list_entry(lh, struct file_info, list);
+                list_for_each_entry(fi, &hi->file_info_list, list) {
                         entry = fi->addr_list.next;
                         while (entry != &(fi->addr_list)) {
                                 arm_addr = list_entry(entry, struct arm_addr, addr_list);
@@ -1161,7 +1125,6 @@ static int arm_lock (struct hpsb_host *host, int nodeid, quadlet_t *store,
              u64 addr, quadlet_t data, quadlet_t arg, int ext_tcode, u16 flags)
 {
         struct pending_request *req;
-        struct list_head *lh;
         struct host_info *hi;
         struct file_info *fi = NULL;
         struct list_head *entry;
@@ -1187,8 +1150,7 @@ static int arm_lock (struct hpsb_host *host, int nodeid, quadlet_t *store,
         spin_lock(&host_info_lock);
         hi = find_host_info(host); /* search address-entry */
         if (hi != NULL) {
-                list_for_each(lh, &hi->file_info_list) {
-                        fi = list_entry(lh, struct file_info, list);
+                list_for_each_entry(fi, &hi->file_info_list, list) {
                         entry = fi->addr_list.next;
                         while (entry != &(fi->addr_list)) {
                                 arm_addr = list_entry(entry, struct arm_addr, addr_list);
@@ -1359,7 +1321,6 @@ static int arm_lock64 (struct hpsb_host *host, int nodeid, octlet_t *store,
                u64 addr, octlet_t data, octlet_t arg, int ext_tcode, u16 flags)
 {
         struct pending_request *req;
-        struct list_head *lh;
         struct host_info *hi;
         struct file_info *fi = NULL;
         struct list_head *entry;
@@ -1394,8 +1355,7 @@ static int arm_lock64 (struct hpsb_host *host, int nodeid, octlet_t *store,
         spin_lock(&host_info_lock);
         hi = find_host_info(host); /* search addressentry in file_info's for host */
         if (hi != NULL) {
-                list_for_each(lh, &hi->file_info_list) {
-                        fi = list_entry(lh, struct file_info, list);
+                list_for_each_entry(fi, &hi->file_info_list, list) {
                         entry = fi->addr_list.next;
                         while (entry != &(fi->addr_list)) {
                                 arm_addr = list_entry(entry, struct arm_addr, addr_list);
@@ -1566,7 +1526,6 @@ static int arm_register(struct file_info *fi, struct pending_request *req)
 {
         int retval;
         struct arm_addr *addr;
-        struct list_head *lh, *lh_1, *lh_2;
         struct host_info *hi;
         struct file_info *fi_hlp = NULL;
         struct list_head *entry;
@@ -1630,8 +1589,7 @@ static int arm_register(struct file_info *fi, struct pending_request *req)
         same_host = 0;
         another_host = 0;
         /* same host with address-entry containing same addressrange ? */
-        list_for_each(lh, &hi->file_info_list) {
-                fi_hlp = list_entry(lh, struct file_info, list);
+        list_for_each_entry(fi_hlp, &hi->file_info_list, list) {
                 entry = fi_hlp->addr_list.next;
                 while (entry != &(fi_hlp->addr_list)) {
                         arm_addr = list_entry(entry, struct arm_addr, addr_list);
@@ -1656,11 +1614,9 @@ static int arm_register(struct file_info *fi, struct pending_request *req)
                 return (-EALREADY);
         }
         /* another host with valid address-entry containing same addressrange */
-        list_for_each(lh_1, &host_info_list) {
-                hi = list_entry(lh_1, struct host_info, list);
+        list_for_each_entry(hi, &host_info_list, list) {
                 if (hi->host != fi->host) {
-                        list_for_each(lh_2, &hi->file_info_list) {
-                                fi_hlp = list_entry(lh_2, struct file_info, list);
+                        list_for_each_entry(fi_hlp, &hi->file_info_list, list) {
                                 entry = fi_hlp->addr_list.next;
                                 while (entry != &(fi_hlp->addr_list)) {
                                         arm_addr = list_entry(entry, struct arm_addr, addr_list);
@@ -1719,7 +1675,6 @@ static int arm_unregister(struct file_info *fi, struct pending_request *req)
         int retval = 0;
         struct list_head *entry;
         struct arm_addr  *addr = NULL;
-        struct list_head *lh_1, *lh_2;
         struct host_info *hi;
         struct file_info *fi_hlp = NULL;
         struct arm_addr  *arm_addr = NULL;
@@ -1750,11 +1705,9 @@ static int arm_unregister(struct file_info *fi, struct pending_request *req)
         another_host = 0;
         /* another host with valid address-entry containing 
            same addressrange */
-        list_for_each(lh_1, &host_info_list) {
-                hi = list_entry(lh_1, struct host_info, list);
+        list_for_each_entry(hi, &host_info_list, list) {
                 if (hi->host != fi->host) {
-                        list_for_each(lh_2, &hi->file_info_list) {
-                                fi_hlp = list_entry(lh_2, struct file_info, list);
+                        list_for_each_entry(fi_hlp, &hi->file_info_list, list) {
                                 entry = fi_hlp->addr_list.next;
                                 while (entry != &(fi_hlp->addr_list)) {
                                         arm_addr = list_entry(entry, 
@@ -1822,9 +1775,9 @@ static int arm_get_buf(struct file_info *fi, struct pending_request *req)
 			if (req->req.address + req->req.length <= arm_addr->end) {
 				offset = req->req.address - arm_addr->start;
 
-				DBGMSG("arm_get_buf copy_to_user( %08X, %08X, %u )",
+				DBGMSG("arm_get_buf copy_to_user( %08X, %p, %u )",
 				       (u32) req->req.recvb,
-				       (u32) (arm_addr->addr_space_buffer+offset),
+				       arm_addr->addr_space_buffer+offset,
 				       (u32) req->req.length);
 
 				if (copy_to_user(int2ptr(req->req.recvb), arm_addr->addr_space_buffer+offset, req->req.length)) {
@@ -1833,7 +1786,10 @@ static int arm_get_buf(struct file_info *fi, struct pending_request *req)
 				}
 
 				spin_unlock_irqrestore(&host_info_lock, flags);
-				free_pending_request(req); /* we have to free the request, because we queue no response, and therefore nobody will free it */
+				/* We have to free the request, because we
+				 * queue no response, and therefore nobody
+				 * will free it. */
+				free_pending_request(req);
 				return sizeof(struct raw1394_request);
 			} else {
 				DBGMSG("arm_get_buf request exceeded mapping");
@@ -1873,8 +1829,8 @@ static int arm_set_buf(struct file_info *fi, struct pending_request *req)
 			if (req->req.address + req->req.length <= arm_addr->end) {
 				offset = req->req.address - arm_addr->start;
 
-				DBGMSG("arm_set_buf copy_from_user( %08X, %08X, %u )",
-				       (u32) (arm_addr->addr_space_buffer+offset),
+				DBGMSG("arm_set_buf copy_from_user( %p, %08X, %u )",
+				       arm_addr->addr_space_buffer+offset,
 				       (u32) req->req.sendb,
 				       (u32) req->req.length);
 
@@ -1941,22 +1897,22 @@ static int write_phypacket(struct file_info *fi, struct pending_request *req)
 
 static int get_config_rom(struct file_info *fi, struct pending_request *req)
 {
-        size_t return_size;
-        unsigned char rom_version;
         int ret=sizeof(struct raw1394_request);
         quadlet_t *data = kmalloc(req->req.length, SLAB_KERNEL);
         int status;
+
         if (!data) return -ENOMEM;
-        status = hpsb_get_config_rom(fi->host, data, 
-                req->req.length, &return_size, &rom_version);
+
+	status = csr1212_read(fi->host->csr.rom, CSR1212_CONFIG_ROM_SPACE_OFFSET,
+			      data, req->req.length);
         if (copy_to_user(int2ptr(req->req.recvb), data, 
                 req->req.length))
                 ret = -EFAULT;
-        if (copy_to_user(int2ptr(req->req.tag), &return_size, 
-                sizeof(return_size)))
+	if (copy_to_user(int2ptr(req->req.tag), &fi->host->csr.rom->cache_head->len,
+			 sizeof(fi->host->csr.rom->cache_head->len)))
                 ret = -EFAULT;
-        if (copy_to_user(int2ptr(req->req.address), &rom_version, 
-                sizeof(rom_version)))
+	if (copy_to_user(int2ptr(req->req.address), &fi->host->csr.generation,
+			 sizeof(fi->host->csr.generation)))
                 ret = -EFAULT;
         if (copy_to_user(int2ptr(req->req.sendb), &status, 
                 sizeof(status)))
@@ -1987,8 +1943,120 @@ static int update_config_rom(struct file_info *fi, struct pending_request *req)
         kfree(data);
         if (ret >= 0) {
                 free_pending_request(req); /* we have to free the request, because we queue no response, and therefore nobody will free it */
+		fi->cfgrom_upd = 1;
         }
         return ret;
+}
+
+static int modify_config_rom(struct file_info *fi, struct pending_request *req)
+{
+	struct csr1212_keyval *kv;
+	struct csr1212_csr_rom_cache *cache;
+	struct csr1212_dentry *dentry;
+	u32 dr;
+	int ret = 0;
+
+	if (req->req.misc == ~0) {
+		if (req->req.length == 0) return -EINVAL;
+
+		/* Find an unused slot */
+		for (dr = 0; dr < RAW1394_MAX_USER_CSR_DIRS && fi->csr1212_dirs[dr]; dr++);
+
+		if (dr == RAW1394_MAX_USER_CSR_DIRS) return -ENOMEM;
+
+		fi->csr1212_dirs[dr] = csr1212_new_directory(CSR1212_KV_ID_VENDOR);
+		if (!fi->csr1212_dirs[dr]) return -ENOMEM;
+	} else {
+		dr = req->req.misc;
+		if (!fi->csr1212_dirs[dr]) return -EINVAL;
+
+		/* Delete old stuff */
+		for (dentry = fi->csr1212_dirs[dr]->value.directory.dentries_head;
+		     dentry; dentry = dentry->next) {
+			csr1212_detach_keyval_from_directory(fi->host->csr.rom->root_kv,
+							     dentry->kv);
+		}
+
+		if (req->req.length == 0) {
+			csr1212_release_keyval(fi->csr1212_dirs[dr]);
+			fi->csr1212_dirs[dr] = NULL;
+
+			hpsb_update_config_rom_image(fi->host);
+			free_pending_request(req);
+			return sizeof(struct raw1394_request);
+		}
+	}
+
+	cache = csr1212_rom_cache_malloc(0, req->req.length);
+	if (!cache) {
+		csr1212_release_keyval(fi->csr1212_dirs[dr]);
+		fi->csr1212_dirs[dr] = NULL;
+		return -ENOMEM;
+	}
+
+	cache->filled_head = kmalloc(sizeof(struct csr1212_cache_region), GFP_KERNEL);
+	if (!cache->filled_head) {
+		csr1212_release_keyval(fi->csr1212_dirs[dr]);
+		fi->csr1212_dirs[dr] = NULL;
+		CSR1212_FREE(cache);
+		return -ENOMEM;
+	}
+	cache->filled_tail = cache->filled_head;
+
+	if (copy_from_user(cache->data, int2ptr(req->req.sendb),
+			   req->req.length)) {
+		csr1212_release_keyval(fi->csr1212_dirs[dr]);
+		fi->csr1212_dirs[dr] = NULL;
+		CSR1212_FREE(cache);
+		ret= -EFAULT;
+	} else {
+		cache->len = req->req.length;
+		cache->filled_head->offset_start = 0;
+		cache->filled_head->offset_end = cache->size -1;
+
+		cache->layout_head = cache->layout_tail = fi->csr1212_dirs[dr];
+
+		ret = CSR1212_SUCCESS;
+		/* parse all the items */
+		for (kv = cache->layout_head; ret == CSR1212_SUCCESS && kv;
+		     kv = kv->next) {
+			ret = csr1212_parse_keyval(kv, cache);
+		}
+
+		/* attach top level items to the root directory */
+		for (dentry = fi->csr1212_dirs[dr]->value.directory.dentries_head;
+		     ret == CSR1212_SUCCESS && dentry; dentry = dentry->next) {
+			ret = csr1212_attach_keyval_to_directory(fi->host->csr.rom->root_kv,
+								 dentry->kv);
+		}
+
+		if (ret == CSR1212_SUCCESS) {
+			ret = hpsb_update_config_rom_image(fi->host);
+
+			if (ret >= 0 && copy_to_user(int2ptr(req->req.recvb), 
+						    &dr, sizeof(dr))) {
+				ret = -ENOMEM;
+			}
+		}
+	}
+	kfree(cache->filled_head);
+	kfree(cache);
+
+	if (ret >= 0) {
+		/* we have to free the request, because we queue no response,
+		 * and therefore nobody will free it */		
+		free_pending_request(req);
+		return sizeof(struct raw1394_request);
+	} else {
+		for (dentry = fi->csr1212_dirs[dr]->value.directory.dentries_head;
+		     dentry; dentry = dentry->next) {
+			csr1212_detach_keyval_from_directory(fi->host->csr.rom->root_kv,
+							     dentry->kv);
+		}
+		csr1212_release_keyval(fi->csr1212_dirs[dr]);
+		fi->csr1212_dirs[dr] = NULL;
+		return ret;
+	}
 }
 
 static int state_connected(struct file_info *fi, struct pending_request *req)
@@ -2049,6 +2117,9 @@ static int state_connected(struct file_info *fi, struct pending_request *req)
 
         case RAW1394_REQ_UPDATE_ROM:
                 return update_config_rom(fi, req);
+
+	case RAW1394_REQ_MODIFY_ROM:
+		return modify_config_rom(fi, req);
         }
 
         if (req->req.generation != get_hpsb_generation(fi->host)) {
@@ -2125,15 +2196,11 @@ static ssize_t raw1394_write(struct file *file, const char *buffer, size_t count
  * completion queue (reqlists_lock must be taken) */
 static inline int __rawiso_event_in_queue(struct file_info *fi)
 {
-	struct list_head *lh;
 	struct pending_request *req;
 
-	list_for_each(lh, &fi->req_complete) {
-		req = list_entry(lh, struct pending_request, list);
-		if (req->req.type == RAW1394_REQ_RAWISO_ACTIVITY) {
+	list_for_each_entry(req, &fi->req_complete, list)
+		if (req->req.type == RAW1394_REQ_RAWISO_ACTIVITY)
 			return 1;
-		}
-	}
 
 	return 0;
 }
@@ -2167,15 +2234,14 @@ static void queue_rawiso_event(struct file_info *fi)
 static void rawiso_activity_cb(struct hpsb_iso *iso)
 {
 	unsigned long flags;
-        struct list_head *lh;
         struct host_info *hi;
+	struct file_info *fi;
 
         spin_lock_irqsave(&host_info_lock, flags);
         hi = find_host_info(iso->host);
 
 	if (hi != NULL) {
-		list_for_each(lh, &hi->file_info_list) {
-			struct file_info *fi = list_entry(lh, struct file_info, list);
+		list_for_each_entry(fi, &hi->file_info_list, list) {
 			if (fi->iso_handle == iso)
 				queue_rawiso_event(fi);
 		}
@@ -2495,11 +2561,11 @@ static int raw1394_release(struct inode *inode, struct file *file)
         int retval = 0;
         struct list_head *entry;
         struct arm_addr  *addr = NULL;
-        struct list_head *lh_1, *lh_2;
         struct host_info *hi;
         struct file_info *fi_hlp = NULL;
         struct arm_addr  *arm_addr = NULL;
         int another_host;
+	int csr_mod = 0;
 
 	if (fi->iso_state != RAW1394_ISO_INACTIVE)
 		raw1394_iso_shutdown(fi);
@@ -2524,11 +2590,9 @@ static int raw1394_release(struct inode *inode, struct file *file)
                 addr = list_entry(lh, struct arm_addr, addr_list);
                 /* another host with valid address-entry containing 
                    same addressrange? */
-                list_for_each(lh_1, &host_info_list) {
-                        hi = list_entry(lh_1, struct host_info, list);
+                list_for_each_entry(hi, &host_info_list, list) {
                         if (hi->host != fi->host) {
-                                list_for_each(lh_2, &hi->file_info_list) {
-                                        fi_hlp = list_entry(lh_2, struct file_info, list);
+                                list_for_each_entry(fi_hlp, &hi->file_info_list, list) {
                                         entry = fi_hlp->addr_list.next;
                                         while (entry != &(fi_hlp->addr_list)) {
                                                 arm_addr = list_entry(entry, 
@@ -2586,6 +2650,22 @@ static int raw1394_release(struct inode *inode, struct file *file)
 
                 if (!done) down_interruptible(&fi->complete_sem);
         }
+
+	/* Remove any sub-trees left by user space programs */
+	for (i = 0; i < RAW1394_MAX_USER_CSR_DIRS; i++) {
+		struct csr1212_dentry *dentry;
+		if (!fi->csr1212_dirs[i]) continue;
+		for (dentry = fi->csr1212_dirs[i]->value.directory.dentries_head;
+		     dentry; dentry = dentry->next) {
+			csr1212_detach_keyval_from_directory(fi->host->csr.rom->root_kv, dentry->kv);
+		}
+		csr1212_release_keyval(fi->csr1212_dirs[i]);
+		fi->csr1212_dirs[i] = NULL;
+		csr_mod = 1;
+	}
+
+	if ((csr_mod || fi->cfgrom_upd) && hpsb_update_config_rom_image(fi->host) < 0)
+		HPSB_ERR("Failed to generate Configuration ROM image for host %d", fi->host->id);
 
         if (fi->state == connected) {
                 spin_lock_irq(&host_info_lock);

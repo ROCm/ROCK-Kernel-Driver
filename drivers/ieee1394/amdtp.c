@@ -862,14 +862,14 @@ static int stream_alloc_packet_lists(struct stream *s)
 
 static void stream_free_packet_lists(struct stream *s)
 {
-	struct list_head *lh, *next;
+	struct packet_list *packet_l, *packet_l_next;
 
 	if (s->current_packet_list != NULL)
 		packet_list_free(s->current_packet_list, s);
-	list_for_each_safe(lh, next, &s->dma_packet_lists)
-		packet_list_free(list_entry(lh, struct packet_list, link), s);
-	list_for_each_safe(lh, next, &s->free_packet_lists)
-		packet_list_free(list_entry(lh, struct packet_list, link), s);
+	list_for_each_entry_safe(packet_l, packet_l_next, &s->dma_packet_lists, link)
+		packet_list_free(packet_l, s);
+	list_for_each_entry_safe(packet_l, packet_l_next, &s->free_packet_lists, link)
+		packet_list_free(packet_l, s);
 	if (s->packet_pool != NULL)
 		pci_pool_destroy(s->packet_pool);
 

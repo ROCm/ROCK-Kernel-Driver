@@ -1,3 +1,6 @@
+#ifndef __PCILYNX_H__
+#define __PCILYNX_H__
+
 #include <linux/config.h>
 
 #define PCILYNX_DRIVER_NAME      "pcilynx"
@@ -50,7 +53,7 @@ struct ti_lynx {
         void *local_rom;
         void *local_ram;
         void *aux_port;
-        quadlet_t config_rom[PCILYNX_CONFIG_ROM_LENGTH/4];
+	quadlet_t bus_info_block[5];
 
 #ifdef CONFIG_IEEE1394_PCILYNX_PORTS
         atomic_t aux_intr_seen;
@@ -510,76 +513,4 @@ static inline void run_pcl(const struct ti_lynx *lynx, pcl_t pclid, int dmachan)
 #define PCL_BIGENDIAN          (1<<16)
 #define PCL_ISOMODE            (1<<12)
 
-
-#define _(x) (__constant_cpu_to_be32(x))
-
-static quadlet_t lynx_csr_rom[] = {
-/* bus info block     offset (hex) */
-        _(0x04046aaf), /* info/CRC length, CRC              400  */
-        _(0x31333934), /* 1394 magic number                 404  */
-        _(0xf064a000), /* misc. settings                    408  */
-        _(0x08002850), /* vendor ID, chip ID high           40c  */
-        _(0x0000ffff), /* chip ID low                       410  */
-/* root directory */
-        _(0x00095778), /* directory length, CRC             414  */
-        _(0x03080028), /* vendor ID (Texas Instr.)          418  */
-        _(0x81000008), /* offset to textual ID              41c  */
-        _(0x0c000200), /* node capabilities                 420  */
-        _(0x8d00000e), /* offset to unique ID               424  */
-        _(0xc7000010), /* offset to module independent info 428  */
-        _(0x04000000), /* module hardware version           42c  */
-        _(0x81000014), /* offset to textual ID              430  */
-        _(0x09000000), /* node hardware version             434  */
-        _(0x81000018), /* offset to textual ID              438  */
-/* module vendor ID textual */
-        _(0x00070812), /* CRC length, CRC                   43c  */
-        _(0x00000000), /*                                   440  */
-        _(0x00000000), /*                                   444  */
-        _(0x54455841), /* "Texas Instruments"               448  */
-        _(0x5320494e), /*                                   44c  */
-        _(0x53545255), /*                                   450  */
-        _(0x4d454e54), /*                                   454  */
-        _(0x53000000), /*                                   458  */
-/* node unique ID leaf */
-        _(0x00022ead), /* CRC length, CRC                   45c  */
-        _(0x08002850), /* vendor ID, chip ID high           460  */
-        _(0x0000ffff), /* chip ID low                       464  */
-/* module dependent info */
-        _(0x0005d837), /* CRC length, CRC                   468  */
-        _(0x81000012), /* offset to module textual ID       46c  */
-        _(0x81000017), /* textual descriptor                470  */
-        _(0x39010000), /* SRAM size                         474  */
-        _(0x3a010000), /* AUXRAM size                       478  */
-        _(0x3b000000), /* AUX device                        47c  */
-/* module textual ID */
-        _(0x000594df), /* CRC length, CRC                   480  */
-        _(0x00000000), /*                                   484  */
-        _(0x00000000), /*                                   488  */
-        _(0x54534231), /* "TSB12LV21"                       48c  */
-        _(0x324c5632), /*                                   490  */
-        _(0x31000000), /*                                   494  */
-/* part number */
-        _(0x00068405), /* CRC length, CRC                   498  */
-        _(0x00000000), /*                                   49c  */
-        _(0x00000000), /*                                   4a0  */
-        _(0x39383036), /* "9806000-0001"                    4a4  */
-        _(0x3030302d), /*                                   4a8  */
-        _(0x30303031), /*                                   4ac  */
-        _(0x20000001), /*                                   4b0  */
-/* module hardware version textual */
-        _(0x00056501), /* CRC length, CRC                   4b4  */
-        _(0x00000000), /*                                   4b8  */
-        _(0x00000000), /*                                   4bc  */
-        _(0x5453424b), /* "TSBKPCITST"                      4c0  */
-        _(0x50434954), /*                                   4c4  */
-        _(0x53540000), /*                                   4c8  */
-/* node hardware version textual */
-        _(0x0005d805), /* CRC length, CRC                   4d0  */
-        _(0x00000000), /*                                   4d4  */
-        _(0x00000000), /*                                   4d8  */
-        _(0x54534232), /* "TSB21LV03"                       4dc  */
-        _(0x314c5630), /*                                   4e0  */
-        _(0x33000000)  /*                                   4e4  */
-};
-
-#undef _
+#endif
