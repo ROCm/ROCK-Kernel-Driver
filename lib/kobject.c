@@ -63,7 +63,7 @@ static inline struct kobject * to_kobj(struct list_head * entry)
 	return container_of(entry,struct kobject,entry);
 }
 
-static int get_kobj_path_length(struct kset *kset, struct kobject *kobj)
+static int get_kobj_path_length(struct kobject *kobj)
 {
 	int length = 1;
 	struct kobject * parent = kobj;
@@ -79,7 +79,7 @@ static int get_kobj_path_length(struct kset *kset, struct kobject *kobj)
 	return length;
 }
 
-static void fill_kobj_path(struct kset *kset, struct kobject *kobj, char *path, int length)
+static void fill_kobj_path(struct kobject *kobj, char *path, int length)
 {
 	struct kobject * parent;
 
@@ -99,145 +99,23 @@ static void fill_kobj_path(struct kset *kset, struct kobject *kobj, char *path, 
  * kobject_get_path - generate and return the path associated with a given kobj
  * and kset pair.  The result must be freed by the caller with kfree().
  *
- * @kset:	kset in question, with which to build the path
  * @kobj:	kobject in question, with which to build the path
  * @gfp_mask:	the allocation type used to allocate the path
  */
-char * kobject_get_path(struct kset *kset, struct kobject *kobj, int gfp_mask)
+char *kobject_get_path(struct kobject *kobj, int gfp_mask)
 {
 	char *path;
 	int len;
 
-	len = get_kobj_path_length(kset, kobj);
+	len = get_kobj_path_length(kobj);
 	path = kmalloc(len, gfp_mask);
 	if (!path)
 		return NULL;
 	memset(path, 0x00, len);
-	fill_kobj_path(kset, kobj, path, len);
+	fill_kobj_path(kobj, path, len);
 
 	return path;
 }
-
-#ifdef CONFIG_HOTPLUG
-
-u64 hotplug_seqnum;
-#define BUFFER_SIZE	1024	/* should be enough memory for the env */
-#define NUM_ENVP	32	/* number of env pointers */
-static spinlock_t sequence_lock = SPIN_LOCK_UNLOCKED;
-
-static void kset_hotplug(const char *action, struct kset *kset,
-			 struct kobject *kobj)
-{
-	char *argv [3];
-	char **envp = NULL;
-	char *buffer = NULL;
-	char *scratch;
-	int i = 0;
-	int retval;
-	char *kobj_path = NULL;
-	char *name = NULL;
-	unsigned long seq;
-
-	/* If the kset has a filter operation, call it. If it returns
-	   failure, no hotplug event is required. */
-	if (kset->hotplug_ops->filter) {
-		if (!kset->hotplug_ops->filter(kset, kobj))
-			return;
-	}
-
-	pr_debug ("%s\n", __FUNCTION__);
-
-	if (!hotplug_path[0])
-		return;
-
-	envp = kmalloc(NUM_ENVP * sizeof (char *), GFP_KERNEL);
-	if (!envp)
-		return;
-	memset (envp, 0x00, NUM_ENVP * sizeof (char *));
-
-	buffer = kmalloc(BUFFER_SIZE, GFP_KERNEL);
-	if (!buffer)
-		goto exit;
-
-	if (kset->hotplug_ops->name)
-		name = kset->hotplug_ops->name(kset, kobj);
-	if (name == NULL)
-		name = kset->kobj.name;
-
-	argv [0] = hotplug_path;
-	argv [1] = name;
-	argv [2] = NULL;
-
-	/* minimal command environment */
-	envp [i++] = "HOME=/";
-	envp [i++] = "PATH=/sbin:/bin:/usr/sbin:/usr/bin";
-
-	scratch = buffer;
-
-	envp [i++] = scratch;
-	scratch += sprintf(scratch, "ACTION=%s", action) + 1;
-
-	spin_lock(&sequence_lock);
-	seq = ++hotplug_seqnum;
-	spin_unlock(&sequence_lock);
-
-	envp [i++] = scratch;
-	scratch += sprintf(scratch, "SEQNUM=%ld", seq) + 1;
-
-	kobj_path = kobject_get_path(kset, kobj, GFP_KERNEL);
-	if (!kobj_path)
-		goto exit;
-
-	envp [i++] = scratch;
-	scratch += sprintf (scratch, "DEVPATH=%s", kobj_path) + 1;
-
-	if (kset->hotplug_ops->hotplug) {
-		/* have the kset specific function add its stuff */
-		retval = kset->hotplug_ops->hotplug (kset, kobj,
-				  &envp[i], NUM_ENVP - i, scratch,
-				  BUFFER_SIZE - (scratch - buffer));
-		if (retval) {
-			pr_debug ("%s - hotplug() returned %d\n",
-				  __FUNCTION__, retval);
-			goto exit;
-		}
-	}
-
-	pr_debug ("%s: %s %s %s %s %s %s %s\n", __FUNCTION__, argv[0], argv[1],
-		  envp[0], envp[1], envp[2], envp[3], envp[4]);
-	retval = call_usermodehelper (argv[0], argv, envp, 0);
-	if (retval)
-		pr_debug ("%s - call_usermodehelper returned %d\n",
-			  __FUNCTION__, retval);
-
-exit:
-	kfree(kobj_path);
-	kfree(buffer);
-	kfree(envp);
-	return;
-}
-
-void kobject_hotplug(const char *action, struct kobject *kobj)
-{
-	struct kobject * top_kobj = kobj;
-
-	/* If this kobj does not belong to a kset,
-	   try to find a parent that does. */
-	if (!top_kobj->kset && top_kobj->parent) {
-		do {
-			top_kobj = top_kobj->parent;
-		} while (!top_kobj->kset && top_kobj->parent);
-	}
-
-	if (top_kobj->kset && top_kobj->kset->hotplug_ops)
-		kset_hotplug(action, top_kobj->kset, kobj);
-}
-#else
-void kobject_hotplug(const char *action, struct kobject *kobj)
-{
-	return;
-}
-#endif	/* CONFIG_HOTPLUG */
 
 /**
  *	kobject_init - initialize object.
@@ -654,7 +532,6 @@ EXPORT_SYMBOL(kobject_put);
 EXPORT_SYMBOL(kobject_add);
 EXPORT_SYMBOL(kobject_del);
 EXPORT_SYMBOL(kobject_rename);
-EXPORT_SYMBOL(kobject_hotplug);
 
 EXPORT_SYMBOL(kset_register);
 EXPORT_SYMBOL(kset_unregister);
