@@ -123,7 +123,7 @@ static int ipcomp6_output(struct sk_buff **pskb)
 	int err;
 	struct dst_entry *dst = (*pskb)->dst;
 	struct xfrm_state *x = dst->xfrm;
-	struct ipv6hdr *tmp_iph = NULL, *iph, *top_iph;
+	struct ipv6hdr *iph, *top_iph;
 	int hdr_len = 0;
 	struct ipv6_comp_hdr *ipch;
 	struct ipcomp_data *ipcd = x->data;
@@ -193,19 +193,11 @@ static int ipcomp6_output(struct sk_buff **pskb)
 	if ((dlen + sizeof(struct ipv6_comp_hdr)) >= plen) {
 		goto out_ok;
 	}
-	memcpy(start, scratch, dlen);
-	pskb_trim(*pskb, hdr_len+dlen);
+	memcpy(start + sizeof(struct ip_comp_hdr), scratch, dlen);
+	pskb_trim(*pskb, hdr_len + dlen + sizeof(struct ip_comp_hdr));
 
 	/* insert ipcomp header and replace datagram */
-	tmp_iph = kmalloc(hdr_len, GFP_ATOMIC);
-	if (!tmp_iph) {
-		err = -ENOMEM;
-		goto error;
-	}
-	memcpy(tmp_iph, (*pskb)->nh.raw, hdr_len);
-	top_iph = (struct ipv6hdr*)skb_push(*pskb, sizeof(struct ipv6_comp_hdr));
-	memcpy(top_iph, tmp_iph, hdr_len);
-	kfree(tmp_iph);
+	top_iph = (*pskb)->nh.ipv6h;
 
 	if (x->props.mode && (x->props.flags & XFRM_STATE_NOECN))
 		IP6_ECN_clear(top_iph);
@@ -358,7 +350,7 @@ static int ipcomp6_init_state(struct xfrm_state *x, void *args)
 		goto error;
 
 	memset(ipcd, 0, sizeof(*ipcd));
-	x->props.header_len = sizeof(struct ipv6_comp_hdr);
+	x->props.header_len = 0;
 	if (x->props.mode)
 		x->props.header_len += sizeof(struct ipv6hdr);
 	

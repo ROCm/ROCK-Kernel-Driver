@@ -86,8 +86,6 @@
 
 /* Forward declarations for internal helper functions. */
 static int sctp_writeable(struct sock *sk);
-static inline int sctp_wspace(struct sctp_association *asoc);
-static inline void sctp_set_owner_w(struct sctp_chunk *chunk);
 static void sctp_wfree(struct sk_buff *skb);
 static int sctp_wait_for_sndbuf(struct sctp_association *, long *timeo_p,
 				size_t msg_len);
@@ -95,7 +93,8 @@ static int sctp_wait_for_packet(struct sock * sk, int *err, long *timeo_p);
 static int sctp_wait_for_connect(struct sctp_association *, long *timeo_p);
 static int sctp_wait_for_accept(struct sock *sk, long timeo);
 static void sctp_wait_for_close(struct sock *sk, long timeo);
-static inline int sctp_verify_addr(struct sock *, union sctp_addr *, int);
+static struct sctp_af *sctp_sockaddr_af(struct sctp_opt *opt,
+					union sctp_addr *addr, int len);
 static int sctp_bindx_add(struct sock *, struct sockaddr *, int);
 static int sctp_bindx_rem(struct sock *, struct sockaddr *, int);
 static int sctp_send_asconf_add_ip(struct sock *, struct sockaddr *, int);
@@ -110,6 +109,64 @@ static char *sctp_hmac_alg = SCTP_COOKIE_HMAC_ALG;
 
 extern kmem_cache_t *sctp_bucket_cachep;
 extern int sctp_assoc_valid(struct sock *sk, struct sctp_association *asoc);
+
+/* Get the sndbuf space available at the time on the association.  */
+static inline int sctp_wspace(struct sctp_association *asoc)
+{
+	struct sock *sk = asoc->base.sk;
+	int amt = 0;
+
+	amt = sk->sk_sndbuf - asoc->sndbuf_used;
+	if (amt < 0)
+		amt = 0;
+	return amt;
+}
+
+/* Increment the used sndbuf space count of the corresponding association by
+ * the size of the outgoing data chunk.
+ * Also, set the skb destructor for sndbuf accounting later.
+ *
+ * Since it is always 1-1 between chunk and skb, and also a new skb is always
+ * allocated for chunk bundling in sctp_packet_transmit(), we can use the
+ * destructor in the data chunk skb for the purpose of the sndbuf space
+ * tracking.
+ */
+static inline void sctp_set_owner_w(struct sctp_chunk *chunk)
+{
+	struct sctp_association *asoc = chunk->asoc;
+	struct sock *sk = asoc->base.sk;
+
+	/* The sndbuf space is tracked per association.  */
+	sctp_association_hold(asoc);
+
+	chunk->skb->destructor = sctp_wfree;
+	/* Save the chunk pointer in skb for sctp_wfree to use later.  */
+	*((struct sctp_chunk **)(chunk->skb->cb)) = chunk;
+
+	asoc->sndbuf_used += SCTP_DATA_SNDSIZE(chunk);
+	sk->sk_wmem_queued += SCTP_DATA_SNDSIZE(chunk);
+}
+
+/* Verify that this is a valid address. */
+static inline int sctp_verify_addr(struct sock *sk, union sctp_addr *addr,
+				   int len)
+{
+	struct sctp_af *af;
+
+	/* Verify basic sockaddr. */
+	af = sctp_sockaddr_af(sctp_sk(sk), addr, len);
+	if (!af)
+		return -EINVAL;
+
+	/* Is this a valid SCTP address?  */
+	if (!af->addr_valid(addr, sctp_sk(sk)))
+		return -EINVAL;
+
+	if (!sctp_sk(sk)->pf->send_verify(sctp_sk(sk), (addr)))
+		return -EINVAL;
+
+	return 0;
+}
 
 /* Look up the association by its id.  If this is not a UDP-style
  * socket, the ID field is always ignored.
@@ -1008,7 +1065,7 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 	struct sctp_sndrcvinfo *sinfo;
 	struct sctp_initmsg *sinit;
 	sctp_assoc_t associd = NULL;
-	sctp_cmsgs_t cmsgs = { 0 };
+	sctp_cmsgs_t cmsgs = { NULL };
 	int err;
 	sctp_scope_t scope;
 	long timeo;
@@ -4142,64 +4199,6 @@ static struct sk_buff *sctp_skb_recv_datagram(struct sock *sk, int flags,
 no_packet:
 	*err = error;
 	return NULL;
-}
-
-/* Verify that this is a valid address. */
-static inline int sctp_verify_addr(struct sock *sk, union sctp_addr *addr,
-				   int len)
-{
-	struct sctp_af *af;
-
-	/* Verify basic sockaddr. */
-	af = sctp_sockaddr_af(sctp_sk(sk), addr, len);
-	if (!af)
-		return -EINVAL;
-
-	/* Is this a valid SCTP address?  */
-	if (!af->addr_valid(addr, sctp_sk(sk)))
-		return -EINVAL;
-
-	if (!sctp_sk(sk)->pf->send_verify(sctp_sk(sk), (addr)))
-		return -EINVAL;
-
-	return 0;
-}
-
-/* Get the sndbuf space available at the time on the association.  */
-static inline int sctp_wspace(struct sctp_association *asoc)
-{
-	struct sock *sk = asoc->base.sk;
-	int amt = 0;
-
-	amt = sk->sk_sndbuf - asoc->sndbuf_used;
-	if (amt < 0)
-		amt = 0;
-	return amt;
-}
-
-/* Increment the used sndbuf space count of the corresponding association by
- * the size of the outgoing data chunk.
- * Also, set the skb destructor for sndbuf accounting later.
- *
- * Since it is always 1-1 between chunk and skb, and also a new skb is always
- * allocated for chunk bundling in sctp_packet_transmit(), we can use the
- * destructor in the data chunk skb for the purpose of the sndbuf space
- * tracking.
- */
-static inline void sctp_set_owner_w(struct sctp_chunk *chunk)
-{
-	struct sctp_association *asoc = chunk->asoc;
-	struct sock *sk = asoc->base.sk;
-
-	/* The sndbuf space is tracked per association.  */
-	sctp_association_hold(asoc);
-
-	chunk->skb->destructor = sctp_wfree;
-	/* Save the chunk pointer in skb for sctp_wfree to use later.  */
-	*((struct sctp_chunk **)(chunk->skb->cb)) = chunk;
-
-	asoc->sndbuf_used += SCTP_DATA_SNDSIZE(chunk);
-	sk->sk_wmem_queued += SCTP_DATA_SNDSIZE(chunk);
 }
 
 /* If sndbuf has changed, wake up per association sndbuf waiters.  */

@@ -49,21 +49,6 @@ config NET_SCH_HFSC
 	  To compile this code as a module, choose M here: the
 	  module will be called sch_hfsc.
 
-config NET_SCH_CSZ
-	tristate "CSZ packet scheduler"
-	depends on NET_SCHED
-	---help---
-	  Say Y here if you want to use the Clark-Shenker-Zhang (CSZ) packet
-	  scheduling algorithm for some of your network devices.  At the
-	  moment, this is the only algorithm that can guarantee service for
-	  real-time applications (see the top of <file:net/sched/sch_csz.c>
-	  for details and references about the algorithm).
-
-	  Note: this scheduler is currently broken.
-
-	  To compile this code as a module, choose M here: the
-	  module will be called sch_csz.
-
 #tristate '  H-PFQ packet scheduler' CONFIG_NET_SCH_HPFQ
 config NET_SCH_ATM
 	tristate "ATM pseudo-scheduler"

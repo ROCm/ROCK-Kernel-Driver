@@ -663,7 +663,10 @@ static int twofish_setkey(void *cx, const u8 *key,
 
 	/* Check key length. */
 	if (key_len != 16 && key_len != 24 && key_len != 32)
+	{
+		*flags |= CRYPTO_TFM_RES_BAD_KEY_LEN;
 		return -EINVAL; /* unsupported key length */
+	}
 
 	/* Compute the first two words of the S vector.  The magic numbers are
 	 * the entries of the RS matrix, preprocessed through poly_to_exp. The

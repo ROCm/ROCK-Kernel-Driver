@@ -176,6 +176,14 @@ struct l2cap_info_rsp {
 	__u8        data[0];
 } __attribute__ ((packed));
 
+/* info type */
+#define L2CAP_IT_CL_MTU     0x0001
+#define L2CAP_IT_FEAT_MASK  0x0002
+
+/* info result */
+#define L2CAP_IR_SUCCESS    0x0000
+#define L2CAP_IR_NOTSUPP    0x0001
+
 /* ----- L2CAP connections ----- */
 struct l2cap_chan_list {
 	struct sock	*head;

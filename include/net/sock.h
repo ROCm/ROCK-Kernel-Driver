@@ -917,25 +917,8 @@ static inline void sock_graft(struct sock *sk, struct socket *parent)
 	write_unlock_bh(&sk->sk_callback_lock);
 }
 
-static inline int sock_i_uid(struct sock *sk)
-{
-	int uid;
-
-	read_lock(&sk->sk_callback_lock);
-	uid = sk->sk_socket ? SOCK_INODE(sk->sk_socket)->i_uid : 0;
-	read_unlock(&sk->sk_callback_lock);
-	return uid;
-}
-
-static inline unsigned long sock_i_ino(struct sock *sk)
-{
-	unsigned long ino;
-
-	read_lock(&sk->sk_callback_lock);
-	ino = sk->sk_socket ? SOCK_INODE(sk->sk_socket)->i_ino : 0;
-	read_unlock(&sk->sk_callback_lock);
-	return ino;
-}
+extern int sock_i_uid(struct sock *sk);
+extern unsigned long sock_i_ino(struct sock *sk);
 
 static inline struct dst_entry *
 __sk_dst_get(struct sock *sk)
@@ -1219,7 +1202,7 @@ static inline struct page *sk_stream_alloc_page(struct sock *sk)
 /*
  *	Default write policy as shown to user space via poll/select/SIGIO
  */
-static inline int sock_writeable(struct sock *sk) 
+static inline int sock_writeable(const struct sock *sk) 
 {
 	return atomic_read(&sk->sk_wmem_alloc) < (sk->sk_sndbuf / 2);
 }
@@ -1229,17 +1212,17 @@ static inline int gfp_any(void)
 	return in_softirq() ? GFP_ATOMIC : GFP_KERNEL;
 }
 
-static inline long sock_rcvtimeo(struct sock *sk, int noblock)
+static inline long sock_rcvtimeo(const struct sock *sk, int noblock)
 {
 	return noblock ? 0 : sk->sk_rcvtimeo;
 }
 
-static inline long sock_sndtimeo(struct sock *sk, int noblock)
+static inline long sock_sndtimeo(const struct sock *sk, int noblock)
 {
 	return noblock ? 0 : sk->sk_sndtimeo;
 }
 
-static inline int sock_rcvlowat(struct sock *sk, int waitall, int len)
+static inline int sock_rcvlowat(const struct sock *sk, int waitall, int len)
 {
 	return (waitall ? len : min_t(int, sk->sk_rcvlowat, len)) ? : 1;
 }

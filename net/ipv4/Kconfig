@@ -196,8 +196,7 @@ config NET_IPIP
 	  can be useful if you want to make your (or some other) machine
 	  appear on a different network than it physically is, or to use
 	  mobile-IP facilities (allowing laptops to seamlessly move between
-	  networks without changing their IP addresses; check out
-	  <http://anchor.cs.binghamton.edu/~mobileip/LJ/index.html>).
+	  networks without changing their IP addresses).
 
 	  Saying Y to this option will produce two modules ( = code which can
 	  be inserted in and removed from the running kernel whenever you

@@ -133,7 +133,7 @@ void sctp_packet_free(struct sctp_packet *packet)
 
 	SCTP_DEBUG_PRINTK("%s: packet:%p\n", __FUNCTION__, packet);
 
-        while ((chunk = (struct sctp_chunk *)__skb_dequeue(&packet->chunks)))
+        while ((chunk = (struct sctp_chunk *)__skb_dequeue(&packet->chunks)) != NULL)
 		sctp_chunk_free(chunk);
 
 	if (packet->malloced)
@@ -370,7 +370,7 @@ int sctp_packet_transmit(struct sctp_packet *packet)
 	 * [This whole comment explains WORD_ROUND() below.]
 	 */
 	SCTP_DEBUG_PRINTK("***sctp_transmit_packet***\n");
-	while ((chunk = (struct sctp_chunk *)__skb_dequeue(&packet->chunks))) {
+	while ((chunk = (struct sctp_chunk *)__skb_dequeue(&packet->chunks)) != NULL) {
 		if (sctp_chunk_is_data(chunk)) {
 
 			if (!chunk->has_tsn) {
@@ -511,7 +511,7 @@ err:
 	 * will get resent or dropped later.
 	 */
 
-	while ((chunk = (struct sctp_chunk *)__skb_dequeue(&packet->chunks))) {
+	while ((chunk = (struct sctp_chunk *)__skb_dequeue(&packet->chunks)) != NULL) {
 		if (!sctp_chunk_is_data(chunk))
     			sctp_chunk_free(chunk);
 	}

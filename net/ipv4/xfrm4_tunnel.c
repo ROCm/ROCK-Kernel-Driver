@@ -36,52 +36,13 @@ out:
 static int ipip_output(struct sk_buff **pskb)
 {
 	struct sk_buff *skb = *pskb;
-	struct dst_entry *dst = skb->dst;
-	struct xfrm_state *x = dst->xfrm;
-	struct iphdr *iph, *top_iph;
-	int tos, err;
-
-	if ((err = xfrm4_tunnel_check_size(skb)) != 0)
-		goto error_nolock;
-		
+	struct iphdr *iph;
+	
 	iph = skb->nh.iph;
+	iph->tot_len = htons(skb->len);
+	ip_send_check(iph);
 
-	spin_lock_bh(&x->lock);
-
-	tos = iph->tos;
-
-	top_iph = (struct iphdr *) skb_push(skb, x->props.header_len);
-	top_iph->ihl = 5;
-	top_iph->version = 4;
-	top_iph->tos = INET_ECN_encapsulate(tos, iph->tos);
-	top_iph->tot_len = htons(skb->len);
-	top_iph->frag_off = iph->frag_off & ~htons(IP_MF|IP_OFFSET);
-	if (!(iph->frag_off & htons(IP_DF)))
-		__ip_select_ident(top_iph, dst, 0);
-	top_iph->ttl = iph->ttl;
-	top_iph->protocol = IPPROTO_IPIP;
-	top_iph->check = 0;
-	top_iph->saddr = x->props.saddr.a4;
-	top_iph->daddr = x->id.daddr.a4;
-	memset(&(IPCB(skb)->opt), 0, sizeof(struct ip_options));
-	ip_send_check(top_iph);
-
-	skb->nh.raw = skb->data;
-	x->curlft.bytes += skb->len;
-	x->curlft.packets++;
-
-	spin_unlock_bh(&x->lock);
-
-	if ((skb->dst = dst_pop(dst)) == NULL) {
-		kfree_skb(skb);
-		err = -EHOSTUNREACH;
-		goto error_nolock;
-	}
-	return NET_XMIT_BYPASS;
-
-error_nolock:
-	kfree_skb(skb);
-	return err;
+	return 0;
 }
 
 static int ipip_xfrm_rcv(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_buff *skb)
