@@ -42,21 +42,7 @@ extern int ocpi_enable(void);
 static int omap_ohci_clock_power(int on)
 {
 	if (on) {
-		if (cpu_is_omap1510()) {
-			/* Use DPLL, not APLL */
-			omap_writel(omap_readl(ULPD_APLL_CTRL) & ~APLL_NDPLL_SWITCH,
-			       ULPD_APLL_CTRL);
-
-			/* Enable DPLL */
-			omap_writel(omap_readl(ULPD_DPLL_CTRL) | DPLL_PLL_ENABLE,
-			       ULPD_DPLL_CTRL);
-
-			/* Software request for USB 48MHz clock */
-			omap_writel(omap_readl(ULPD_SOFT_REQ) | SOFT_REQ_REG_REQ,
-			       ULPD_SOFT_REQ);
-
-			while (!(omap_readl(ULPD_DPLL_CTRL) & DPLL_LOCK));
-		}
+		/* for 1510, 48MHz DPLL is set up in usb init */
 
 		if (cpu_is_omap16xx()) {
 			/* Enable OHCI */
@@ -98,14 +84,16 @@ static int omap_ohci_transceiver_power(int on)
 {
 	if (on) {
 		if (machine_is_omap_innovator() && cpu_is_omap1510())
-			fpga_write(fpga_read(INNOVATOR_FPGA_CAM_USB_CONTROL) | 0x20, 
+			fpga_write(fpga_read(INNOVATOR_FPGA_CAM_USB_CONTROL)
+				| ((1 << 5/*usb1*/) | (1 << 3/*usb2*/)), 
 			       INNOVATOR_FPGA_CAM_USB_CONTROL);
 		else if (machine_is_omap_osk()) {
 			/* FIXME: GPIO1 -> 1 on the TPS65010 I2C chip */
 		}
 	} else {
 		if (machine_is_omap_innovator() && cpu_is_omap1510())
-			fpga_write(fpga_read(INNOVATOR_FPGA_CAM_USB_CONTROL) & ~0x20, 
+			fpga_write(fpga_read(INNOVATOR_FPGA_CAM_USB_CONTROL)
+				& ~((1 << 5/*usb1*/) | (1 << 3/*usb2*/)), 
 			       INNOVATOR_FPGA_CAM_USB_CONTROL);
 		else if (machine_is_omap_osk()) {
 			/* FIXME: GPIO1 -> 0 on the TPS65010 I2C chip */
