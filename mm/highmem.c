@@ -294,7 +294,12 @@ static void copy_to_high_bio_irq(struct bio *to, struct bio *from)
 		if (tovec->bv_page == fromvec->bv_page)
 			continue;
 
-		vfrom = page_address(fromvec->bv_page) + fromvec->bv_offset;
+		/*
+		 * fromvec->bv_offset and fromvec->bv_len might have been
+		 * modified by the block layer, so use the original copy,
+		 * bounce_copy_vec already uses tovec->bv_len
+		 */
+		vfrom = page_address(fromvec->bv_page) + tovec->bv_offset;
 
 		bounce_copy_vec(tovec, vfrom);
 	}
