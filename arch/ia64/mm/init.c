@@ -279,9 +279,7 @@ ia64_mmu_init (void *my_cpu_data)
 {
 	unsigned long psr, pta, impl_va_bits;
 	extern void __init tlb_init (void);
-#ifdef CONFIG_IA64_MCA
 	int cpu;
-#endif
 
 #ifdef CONFIG_DISABLE_VHPT
 #	define VHPT_ENABLE_BIT	0
@@ -346,7 +344,6 @@ ia64_mmu_init (void *my_cpu_data)
 	ia64_set_rr(HPAGE_REGION_BASE, HPAGE_SHIFT << 2);
 #endif
 
-#ifdef	CONFIG_IA64_MCA
 	cpu = smp_processor_id();
 
 	/* mca handler uses cr.lid as key to pick the right entry */
@@ -360,7 +357,6 @@ ia64_mmu_init (void *my_cpu_data)
 	ia64_mca_tlb_list[cpu].ptce_count[1] = local_cpu_data->ptce_count[1];
 	ia64_mca_tlb_list[cpu].ptce_stride[0] = local_cpu_data->ptce_stride[0];
 	ia64_mca_tlb_list[cpu].ptce_stride[1] = local_cpu_data->ptce_stride[1];
-#endif
 }
 
 #ifdef CONFIG_VIRTUAL_MEM_MAP
