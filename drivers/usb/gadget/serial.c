@@ -207,6 +207,27 @@ static inline void hw_optimize(struct usb_gadget *gadget)
 
 
 /*
+ * Dummy_hcd, software-based loopback controller.
+ *
+ * This imitates the abilities of the NetChip 2280, so we will use
+ * the same configuration.
+ */
+#ifdef	CONFIG_USB_GADGET_DUMMY_HCD
+#define CHIP				"dummy"
+#define EP0_MAXPACKET			64
+static const char EP_OUT_NAME[] =	"ep-a";
+#define EP_OUT_NUM			2
+static const char EP_IN_NAME[] =	"ep-b";
+#define EP_IN_NUM			2
+#define HIGHSPEED
+#define SELFPOWER			USB_CONFIG_ATT_SELFPOWER
+
+/* no hw optimizations to apply */
+#define hw_optimize(g)			do {} while (0)
+#endif
+
+
+/*
  * PXA-2xx UDC:  widely used in second gen Linux-capable PDAs.
  *
  * This has fifteen fixed-function full speed endpoints, and it

@@ -134,6 +134,34 @@ config USB_SA1100
 	depends on USB_GADGET_SA1100
 	default USB_GADGET
 
+config USB_GADGET_DUMMY_HCD
+	boolean "Dummy HCD (DEVELOPMENT)"
+	depends on USB && EXPERIMENTAL
+	select USB_GADGET_DUALSPEED
+	help
+	  This host controller driver emulates USB, looping all data transfer
+	  requests back to a USB "gadget driver" in the same host.  The host
+	  side is the master; the gadget side is the slave.  Gadget drivers
+	  can be high, full, or low speed; and they have access to endpoints
+	  like those from NET2280, PXA2xx, or SA1100 hardware.
+	  
+	  This may help in some stages of creating a driver to embed in a
+	  Linux device, since it lets you debug several parts of the gadget
+	  driver without its hardware or drivers being involved.
+	  
+	  Since such a gadget side driver needs to interoperate with a host
+	  side Linux-USB device driver, this may help to debug both sides
+	  of a USB protocol stack.
+
+	  Say "y" to link the driver statically, or "m" to build a
+	  dynamically linked module called "dummy_hcd" and force all
+	  gadget drivers to also be dynamically linked.
+
+config USB_DUMMY_HCD
+	tristate
+	depends on USB_GADGET_DUMMY_HCD
+	default USB_GADGET
+
 endchoice
 
 config USB_GADGET_DUALSPEED
