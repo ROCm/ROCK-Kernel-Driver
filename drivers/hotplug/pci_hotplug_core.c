@@ -561,7 +561,7 @@ static void fs_remove_file (struct dentry *dentry)
 	up(&parent->d_inode->i_sem);
 }
 
-/* yuck, WFT is this? */
+/* Weee, fun with macros... */
 #define GET_STATUS(name,type)	\
 static int get_##name (struct hotplug_slot *slot, type *value)		\
 {									\
@@ -661,29 +661,26 @@ static ssize_t power_write_file (struct file *file, const char *ubuff, size_t co
 	power = (u8)(lpower & 0xff);
 	dbg ("power = %d\n", power);
 
+	if (!try_module_get(slot->ops->owner)) {
+		retval = -ENODEV;
+		goto exit;
+	}
 	switch (power) {
 		case 0:
-			if (!slot->ops->disable_slot)
-				break;
-			if (try_module_get(slot->ops->owner)) {
+			if (slot->ops->disable_slot)
 				retval = slot->ops->disable_slot(slot);
-				module_put(slot->ops->owner);
-			}
 			break;
 
 		case 1:
-			if (!slot->ops->enable_slot)
-				break;
-			if (try_module_get(slot->ops->owner)) {
+			if (slot->ops->enable_slot)
 				retval = slot->ops->enable_slot(slot);
-				module_put(slot->ops->owner);
-			}
 			break;
 
 		default:
 			err ("Illegal value specified for power\n");
 			retval = -EINVAL;
 	}
+	module_put(slot->ops->owner);
 
 exit:	
 	kfree (buff);
@@ -770,12 +767,13 @@ static ssize_t attention_write_file (struct file *file, const char *ubuff, size_
 	attention = (u8)(lattention & 0xff);
 	dbg (" - attention = %d\n", attention);
 
-	if (slot->ops->set_attention_status) {
-		if (try_module_get(slot->ops->owner)) {
-			retval = slot->ops->set_attention_status(slot, attention);
-			module_put(slot->ops->owner);
-		}
+	if (!try_module_get(slot->ops->owner)) {
+		retval = -ENODEV;
+		goto exit;
 	}
+	if (slot->ops->set_attention_status)
+		retval = slot->ops->set_attention_status(slot, attention);
+	module_put(slot->ops->owner);
 
 exit:	
 	kfree (buff);
@@ -1007,12 +1005,13 @@ static ssize_t test_write_file (struct file *file, const char *ubuff, size_t cou
 	test = (u32)(ltest & 0xffffffff);
 	dbg ("test = %d\n", test);
 
-	if (slot->ops->hardware_test) {
-		if (try_module_get(slot->ops->owner)) {
-			retval = slot->ops->hardware_test(slot, test);
-			module_put(slot->ops->owner);
-		}
+	if (!try_module_get(slot->ops->owner)) {
+		retval = -ENODEV;
+		goto exit;
 	}
+	if (slot->ops->hardware_test)
+		retval = slot->ops->hardware_test(slot, test);
+	module_put(slot->ops->owner);
 
 exit:	
 	kfree (buff);

@@ -75,7 +75,6 @@
 #include <linux/cache.h>
 #include <linux/module.h>
 #include <linux/highmem.h>
-#include <linux/wireless.h>
 #include <linux/divert.h>
 #include <linux/mount.h>
 
@@ -189,10 +188,7 @@ static __inline__ void net_family_read_unlock(void)
  *	Statistics counters of the socket lists
  */
 
-static union {
-	int	counter;
-	char	__pad[SMP_CACHE_BYTES];
-} sockets_in_use[NR_CPUS] __cacheline_aligned = {{0}};
+static DEFINE_PER_CPU(int, sockets_in_use) = 0;
 
 /*
  *	Support routines. Move socket addresses back and forth across the kernel/user
@@ -475,7 +471,8 @@ struct socket *sock_alloc(void)
 	inode->i_uid = current->fsuid;
 	inode->i_gid = current->fsgid;
 
-	sockets_in_use[smp_processor_id()].counter++;
+	get_cpu_var(sockets_in_use)++;
+	put_cpu_var(sockets_in_use);
 	return sock;
 }
 
@@ -511,7 +508,8 @@ void sock_release(struct socket *sock)
 	if (sock->fasync_list)
 		printk(KERN_ERR "sock_release: fasync list not empty!\n");
 
-	sockets_in_use[smp_processor_id()].counter--;
+	get_cpu_var(sockets_in_use)--;
+	put_cpu_var(sockets_in_use);
 	if (!sock->file) {
 		iput(SOCK_INODE(sock));
 		return;
@@ -1851,7 +1849,7 @@ void socket_seq_show(struct seq_file *seq)
 	int counter = 0;
 
 	for (cpu = 0; cpu < NR_CPUS; cpu++)
-		counter += sockets_in_use[cpu].counter;
+		counter += per_cpu(sockets_in_use, cpu);
 
 	/* It can be negative, by the way. 8) */
 	if (counter < 0)

@@ -22,21 +22,11 @@
 #endif
 #endif
 
-#ifdef CONFIG_CLUSTERED_APIC
+#ifdef CONFIG_X86_NUMAQ
  #define INT_DELIVERY_MODE 0     /* physical delivery on LOCAL quad */
 #else
  #define INT_DELIVERY_MODE 1     /* logical delivery broadcast to all procs */
 #endif
-
-#ifndef clustered_apic_mode
- #ifdef CONFIG_CLUSTERED_APIC
-  #define clustered_apic_mode (1)
-  #define esr_disable (1)
- #else /* !CONFIG_CLUSTERED_APIC */
-  #define clustered_apic_mode (0)
-  #define esr_disable (0)
- #endif /* CONFIG_CLUSTERED_APIC */
-#endif 
 
 #define BAD_APICID 0xFFu
 #ifdef CONFIG_SMP
@@ -62,15 +52,7 @@ extern void smp_invalidate_rcv(void);		/* Process an NMI */
 extern void (*mtrr_hook) (void);
 extern void zap_low_mappings (void);
 
-/*
- * Some lowlevel functions might want to know about
- * the real APIC ID <-> CPU # mapping.
- */
 #define MAX_APICID 256
-extern volatile int cpu_to_physical_apicid[NR_CPUS];
-extern volatile int physical_apicid_to_cpu[MAX_APICID];
-extern volatile int cpu_to_logical_apicid[NR_CPUS];
-extern volatile int logical_apicid_to_cpu[MAX_APICID];
 
 /*
  * This function is needed by all SMP systems. It must _always_ be valid
@@ -99,6 +81,15 @@ static inline int num_booting_cpus(void)
 {
 	return hweight32(cpu_callout_map);
 }
+
+/* Mapping from cpu number to logical apicid */
+extern volatile u8 cpu_2_logical_apicid[];
+static inline int cpu_to_logical_apicid(int cpu)
+{
+	return (int)cpu_2_logical_apicid[cpu];
+}
+extern void map_cpu_to_logical_apicid(void);
+extern void unmap_cpu_to_logical_apicid(int cpu);
 
 extern inline int any_online_cpu(unsigned int mask)
 {

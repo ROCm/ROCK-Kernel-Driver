@@ -86,16 +86,21 @@ static struct file_operations sockstat_seq_fops = {
 	.release = single_release,
 };
 
-static unsigned long fold_field(unsigned long *begin, int sz, int nr)
+static unsigned long
+fold_field(void *mib[], int nr)
 {
 	unsigned long res = 0;
 	int i;
 
-	sz /= sizeof(unsigned long);
-
 	for (i = 0; i < NR_CPUS; i++) {
-		res += begin[2 * i * sz + nr];
-		res += begin[(2 * i + 1) * sz + nr];
+		if (!cpu_possible(i))
+			continue;
+		res +=
+		    *((unsigned long *) (((void *) per_cpu_ptr(mib[0], i)) +
+					 sizeof (unsigned long) * nr));
+		res +=
+		    *((unsigned long *) (((void *) per_cpu_ptr(mib[0], i)) +
+					 sizeof (unsigned long) * nr));
 	}
 	return res;
 }
@@ -118,8 +123,7 @@ static int snmp_seq_show(struct seq_file *seq, void *v)
 	for (i = 0;
 	     i < offsetof(struct ip_mib, __pad) / sizeof(unsigned long); i++)
 		seq_printf(seq, " %lu",
-			   fold_field((unsigned long *)ip_statistics,
-				      sizeof(struct ip_mib), i));
+			   fold_field((void **) ip_statistics, i));
 
 	seq_printf(seq, "\nIcmp: InMsgs InErrors InDestUnreachs InTimeExcds "
 			"InParmProbs InSrcQuenchs InRedirects InEchos "
@@ -132,8 +136,7 @@ static int snmp_seq_show(struct seq_file *seq, void *v)
 	for (i = 0;
 	     i < offsetof(struct icmp_mib, dummy) / sizeof(unsigned long); i++)
 		seq_printf(seq, " %lu",
-			   fold_field((unsigned long *)icmp_statistics,
-				      sizeof(struct icmp_mib), i));
+			   fold_field((void **) icmp_statistics, i)); 
 
 	seq_printf(seq, "\nTcp: RtoAlgorithm RtoMin RtoMax MaxConn ActiveOpens "
 			"PassiveOpens AttemptFails EstabResets CurrEstab "
@@ -142,17 +145,15 @@ static int snmp_seq_show(struct seq_file *seq, void *v)
 	for (i = 0;
 	     i < offsetof(struct tcp_mib, __pad) / sizeof(unsigned long); i++)
 		seq_printf(seq, " %lu",
-			   fold_field((unsigned long *)tcp_statistics,
-				      sizeof(struct tcp_mib), i));
+			   fold_field((void **) tcp_statistics, i));
 
 	seq_printf(seq, "\nUdp: InDatagrams NoPorts InErrors OutDatagrams\n"
 			"Udp:");
 
 	for (i = 0;
 	     i < offsetof(struct udp_mib, __pad) / sizeof(unsigned long); i++)
-		seq_printf(seq, " %lu",
-			   fold_field((unsigned long *)udp_statistics,
-				      sizeof(struct udp_mib), i));
+		seq_printf(seq, " %lu", 
+				fold_field((void **) udp_statistics, i));
 
 	seq_putc(seq, '\n');
 	return 0;
@@ -206,10 +207,10 @@ static int netstat_seq_show(struct seq_file *seq, void *v)
 		      " TCPAbortFailed TCPMemoryPressures\n"
 		      "TcpExt:");
 	for (i = 0;
-	     i < offsetof(struct linux_mib, __pad) / sizeof(unsigned long); i++)
-		seq_printf(seq, " %lu",
-			   fold_field((unsigned long *)net_statistics,
-				      sizeof(struct linux_mib), i));
+	     i < offsetof(struct linux_mib, __pad) / sizeof(unsigned long); 
+	     i++)
+		seq_printf(seq, " %lu", 
+		 	   fold_field((void **) net_statistics, i)); 
 	seq_putc(seq, '\n');
 	return 0;
 }

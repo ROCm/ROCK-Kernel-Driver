@@ -464,7 +464,7 @@ static void SMP_TIMER_NAME(tcp_twkill)(unsigned long dummy)
 
 	if ((tcp_tw_count -= killed) != 0)
 		mod_timer(&tcp_tw_timer, jiffies+TCP_TWKILL_PERIOD);
-	net_statistics[smp_processor_id()*2].TimeWaited += killed;
+	NET_ADD_STATS_BH(TimeWaited, killed);
 out:
 	spin_unlock(&tw_death_lock);
 }
@@ -628,7 +628,7 @@ void SMP_TIMER_NAME(tcp_twcal_tick)(unsigned long dummy)
 out:
 	if ((tcp_tw_count -= killed) == 0)
 		del_timer(&tcp_tw_timer);
-	net_statistics[smp_processor_id()*2].TimeWaitKilled += killed;
+	NET_ADD_STATS_BH(TimeWaitKilled, killed);
 	spin_unlock(&tw_death_lock);
 }
 

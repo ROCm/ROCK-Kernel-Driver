@@ -258,13 +258,15 @@
 #include <net/icmp.h>
 #include <net/tcp.h>
 #include <net/xfrm.h>
+#include <net/ip.h>
+
 
 #include <asm/uaccess.h>
 #include <asm/ioctls.h>
 
 int sysctl_tcp_fin_timeout = TCP_FIN_TIMEOUT;
 
-struct tcp_mib	tcp_statistics[NR_CPUS * 2];
+DEFINE_SNMP_STAT(struct tcp_mib, tcp_statistics);
 
 kmem_cache_t *tcp_openreq_cachep;
 kmem_cache_t *tcp_bucket_cachep;
@@ -1395,8 +1397,7 @@ static void tcp_prequeue_process(struct sock *sk)
 	struct sk_buff *skb;
 	struct tcp_opt *tp = tcp_sk(sk);
 
-	net_statistics[smp_processor_id() * 2 + 1].TCPPrequeued +=
-					    skb_queue_len(&tp->ucopy.prequeue);
+	NET_ADD_STATS_USER(TCPPrequeued, skb_queue_len(&tp->ucopy.prequeue));
 
 	/* RX process wants to run with disabled BHs, though it is not
 	 * necessary */
@@ -1676,7 +1677,7 @@ int tcp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 			/* __ Restore normal policy in scheduler __ */
 
 			if ((chunk = len - tp->ucopy.len) != 0) {
-				net_statistics[smp_processor_id() * 2 + 1].TCPDirectCopyFromBacklog += chunk;
+				NET_ADD_STATS_USER(TCPDirectCopyFromBacklog, chunk);
 				len -= chunk;
 				copied += chunk;
 			}
@@ -1687,7 +1688,7 @@ do_prequeue:
 				tcp_prequeue_process(sk);
 
 				if ((chunk = len - tp->ucopy.len) != 0) {
-					net_statistics[smp_processor_id() * 2 + 1].TCPDirectCopyFromPrequeue += chunk;
+					NET_ADD_STATS_USER(TCPDirectCopyFromPrequeue, chunk);
 					len -= chunk;
 					copied += chunk;
 				}
@@ -1770,7 +1771,7 @@ skip_copy:
 			tcp_prequeue_process(sk);
 
 			if (copied > 0 && (chunk = len - tp->ucopy.len) != 0) {
-				net_statistics[smp_processor_id() * 2 + 1].TCPDirectCopyFromPrequeue += chunk;
+				NET_ADD_STATS_USER(TCPDirectCopyFromPrequeue, chunk);
 				len -= chunk;
 				copied += chunk;
 			}

@@ -40,7 +40,7 @@
  * $FreeBSD$
  */
 
-VERSION = "$Id: //depot/aic7xxx/aic7xxx/aic7xxx.seq#52 $"
+VERSION = "$Id: //depot/aic7xxx/aic7xxx/aic7xxx.seq#53 $"
 PATCH_ARG_LIST = "struct ahc_softc *ahc"
 PREFIX = "ahc_"
 
@@ -70,7 +70,7 @@ bus_free_sel:
 	 * Turn off the selection hardware.  We need to reset the
 	 * selection request in order to perform a new selection.
 	 */
-	and	SCSISEQ, TEMODE|ENSELI|ENRSELI|ENAUTOATNP, SCSISEQ;
+	and	SCSISEQ, TEMODE|ENSELI|ENRSELI|ENAUTOATNP;
 	and	SIMODE1, ~ENBUSFREE;
 poll_for_work:
 	call	clear_target_state;

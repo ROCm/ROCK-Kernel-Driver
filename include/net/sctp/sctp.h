@@ -203,7 +203,7 @@ extern void sctp_hash_digest(const char *secret, const int secret_len,
 #define SCTP_SOCK_SLEEP_POST(sk) SOCK_SLEEP_POST(sk)
 
 /* SCTP SNMP MIB stats handlers */
-extern struct sctp_mib sctp_statistics[NR_CPUS * 2];
+DECLARE_SNMP_STAT(struct sctp_mib, sctp_statistics);
 #define SCTP_INC_STATS(field)		SNMP_INC_STATS(sctp_statistics, field)
 #define SCTP_INC_STATS_BH(field)	SNMP_INC_STATS_BH(sctp_statistics, field)
 #define SCTP_INC_STATS_USER(field)	SNMP_INC_STATS_USER(sctp_statistics, field)

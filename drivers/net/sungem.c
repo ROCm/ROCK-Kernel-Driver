@@ -2850,6 +2850,7 @@ static int __devinit gem_get_device_address(struct gem *gp)
 		printk(KERN_ERR "%s: can't get mac-address\n", dev->name);
 		return -1;
 	}
+#warning MAX_ADDR_LEN is now 32 bytes instead of 8, please fix this as appropriate
 	memcpy(dev->dev_addr, addr, MAX_ADDR_LEN);
 #else
 	get_gem_mac_nonobp(gp->pdev, gp->dev->dev_addr);

@@ -158,7 +158,6 @@ struct {
  * external references
  */
 extern int lmGroupCommit(struct jfs_log *, struct tblock *);
-extern int lmGCwrite(struct jfs_log *, int);
 extern void lmSync(struct jfs_log *);
 extern int jfs_commit_inode(struct inode *, int);
 extern int jfs_stop_threads;
@@ -2969,12 +2968,7 @@ restart:
 	/*
 	 * We may need to kick off the group commit
 	 */
-	spin_lock_irq(&log->gclock);	// LOGGC_LOCK
-	if (log->cqueue.head && !(log->cflag & logGC_PAGEOUT)) {
-		log->cflag |= logGC_PAGEOUT;
-		lmGCwrite(log, 0);
-	}
-	spin_unlock_irq(&log->gclock);	// LOGGC_UNLOCK
+	jfs_flush_journal(log, 0);
 }
 
 /*
