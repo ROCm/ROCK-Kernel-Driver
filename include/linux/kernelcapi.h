@@ -49,28 +49,6 @@ typedef struct kcapi_carddef {
 
 #include <linux/skbuff.h>
 
-struct capi_interface {
-	__u16 (*capi_isinstalled) (void);
-
-	__u16 (*capi_register) (capi_register_params * rparam, __u16 * applidp);
-	__u16 (*capi_release) (__u16 applid);
-	__u16 (*capi_put_message) (__u16 applid, struct sk_buff * msg);
-	__u16 (*capi_get_message) (__u16 applid, struct sk_buff ** msgp);
-	__u16 (*capi_set_signal) (__u16 applid,
-			      void (*signal) (__u16 applid, void *param),
-				  void *param);
-	__u16 (*capi_get_manufacturer) (__u32 contr, __u8 buf[CAPI_MANUFACTURER_LEN]);
-	__u16 (*capi_get_version) (__u32 contr, struct capi_version * verp);
-	 __u16(*capi_get_serial) (__u32 contr, __u8 serial[CAPI_SERIAL_LEN]);
-	 __u16(*capi_get_profile) (__u32 contr, struct capi_profile * profp);
-
-	/*
-	 * to init controllers, data is always in user memory
-	 */
-	int (*capi_manufacturer) (unsigned int cmd, void *data);
-
-};
-
 #define	KCI_CONTRUP	0	/* struct capi_profile */
 #define	KCI_CONTRDOWN	1	/* NULL */
 
@@ -81,9 +59,22 @@ struct capi_interface_user {
 	struct list_head user_list;
 };
 
-struct capi_interface *attach_capi_interface(struct capi_interface_user *);
-int detach_capi_interface(struct capi_interface_user *);
+void attach_capi_interface(struct capi_interface_user *);
+void detach_capi_interface(struct capi_interface_user *);
 
+u16 capi20_isinstalled(void);
+u16 capi20_register(capi_register_params * rparam, u16 * applidp);
+u16 capi20_release(u16 applid);
+u16 capi20_put_message(u16 applid, struct sk_buff *skb);
+u16 capi20_get_message(u16 applid, struct sk_buff **msgp);
+u16 capi20_set_signal(u16 applid,
+		      void (*signal) (u16 applid, void *param),
+		      void *param);
+u16 capi20_get_manufacturer(u32 contr, u8 buf[CAPI_MANUFACTURER_LEN]);
+u16 capi20_get_version(u32 contr, struct capi_version *verp);
+u16 capi20_get_serial(u32 contr, u8 serial[CAPI_SERIAL_LEN]);
+u16 capi20_get_profile(u32 contr, struct capi_profile *profp);
+int capi20_manufacturer(unsigned int cmd, void *data);
 
 #define CAPI_NOERROR                      0x0000
 

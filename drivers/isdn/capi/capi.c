@@ -139,8 +139,6 @@ struct capidev {
 
 /* -------- global variables ---------------------------------------- */
 
-static struct capi_interface *capifuncs;
-
 static rwlock_t capidev_list_lock = RW_LOCK_UNLOCKED;
 static LIST_HEAD(capidev_list);
 
@@ -402,7 +400,7 @@ static void capidev_free(struct capidev *cdev)
 	unsigned long flags;
 
 	if (cdev->applid)
-		(*capifuncs->capi_release) (cdev->applid);
+		capi20_release(cdev->applid); // XXX
 	cdev->applid = 0;
 
 	skb_queue_purge(&cdev->recvqueue);
@@ -465,7 +463,7 @@ static int handle_recv_skb(struct capiminor *mp, struct sk_buff *skb)
 			return -1;
 		}
 		datahandle = CAPIMSG_U16(skb->data,CAPIMSG_BASELEN+4);
-		errcode = (*capifuncs->capi_put_message)(mp->applid, nskb);
+		errcode = capi20_put_message(mp->applid, nskb);
 		if (errcode != CAPI_NOERROR) {
 			printk(KERN_ERR "capi: send DATA_B3_RESP failed=%x\n",
 					errcode);
@@ -538,7 +536,7 @@ static int handle_minor_send(struct capiminor *mp)
 			skb_queue_head(&mp->outqueue, skb);
 			return count;
 		}
-		errcode = (*capifuncs->capi_put_message) (mp->applid, skb);
+		errcode = capi20_put_message(mp->applid, skb);
 		if (errcode == CAPI_NOERROR) {
 			mp->datahandle++;
 			count++;
@@ -579,7 +577,7 @@ static void capi_signal(u16 applid, void *param)
 	struct sk_buff *skb = 0;
 	u32 ncci;
 
-	(void) (*capifuncs->capi_get_message) (applid, &skb);
+	capi20_get_message(applid, &skb);
 	if (!skb) {
 		printk(KERN_ERR "BUG: capi_signal: no skb\n");
 		return;
@@ -749,7 +747,7 @@ capi_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 			
 	}
 
-	cdev->errcode = (*capifuncs->capi_put_message) (cdev->applid, skb);
+	cdev->errcode = capi20_put_message(cdev->applid, skb);
 
 	if (cdev->errcode) {
 		kfree_skb(skb);
@@ -796,13 +794,13 @@ capi_ioctl(struct inode *inode, struct file *file,
 				return -EFAULT;
 			if (cdev->applid)
 				return -EEXIST;
-			cdev->errcode = (*capifuncs->capi_register) (&data.rparams,
-							  &cdev->applid);
+			cdev->errcode = capi20_register(&data.rparams,
+							&cdev->applid);
 			if (cdev->errcode) {
 				cdev->applid = 0;
 				return -EIO;
 			}
-			(void) (*capifuncs->capi_set_signal) (cdev->applid, capi_signal, cdev);
+			capi20_set_signal(cdev->applid, capi_signal, cdev);
 		}
 		return (int)cdev->applid;
 
@@ -813,7 +811,7 @@ capi_ioctl(struct inode *inode, struct file *file,
 						sizeof(data.contr));
 			if (retval)
 				return -EFAULT;
-		        cdev->errcode = (*capifuncs->capi_get_version) (data.contr, &data.version);
+		        cdev->errcode = capi20_get_version(data.contr, &data.version);
 			if (cdev->errcode)
 				return -EIO;
 			retval = copy_to_user((void *) arg,
@@ -831,7 +829,7 @@ capi_ioctl(struct inode *inode, struct file *file,
 						sizeof(data.contr));
 			if (retval)
 				return -EFAULT;
-			cdev->errcode = (*capifuncs->capi_get_serial) (data.contr, data.serial);
+			cdev->errcode = capi20_get_serial (data.contr, data.serial);
 			if (cdev->errcode)
 				return -EIO;
 			retval = copy_to_user((void *) arg,
@@ -850,7 +848,7 @@ capi_ioctl(struct inode *inode, struct file *file,
 				return -EFAULT;
 
 			if (data.contr == 0) {
-				cdev->errcode = (*capifuncs->capi_get_profile) (data.contr, &data.profile);
+				cdev->errcode = capi20_get_profile(data.contr, &data.profile);
 				if (cdev->errcode)
 					return -EIO;
 
@@ -859,7 +857,7 @@ capi_ioctl(struct inode *inode, struct file *file,
 				       sizeof(data.profile.ncontroller));
 
 			} else {
-				cdev->errcode = (*capifuncs->capi_get_profile) (data.contr, &data.profile);
+				cdev->errcode = capi20_get_profile(data.contr, &data.profile);
 				if (cdev->errcode)
 					return -EIO;
 
@@ -879,7 +877,7 @@ capi_ioctl(struct inode *inode, struct file *file,
 						sizeof(data.contr));
 			if (retval)
 				return -EFAULT;
-			cdev->errcode = (*capifuncs->capi_get_manufacturer) (data.contr, data.manufacturer);
+			cdev->errcode = capi20_get_manufacturer(data.contr, data.manufacturer);
 			if (cdev->errcode)
 				return -EIO;
 
@@ -903,7 +901,7 @@ capi_ioctl(struct inode *inode, struct file *file,
 		return data.errcode;
 
 	case CAPI_INSTALLED:
-		if ((*capifuncs->capi_isinstalled)() == CAPI_NOERROR)
+		if (capi20_isinstalled() == CAPI_NOERROR)
 			return 0;
 		return -ENXIO;
 
@@ -916,7 +914,7 @@ capi_ioctl(struct inode *inode, struct file *file,
 						sizeof(mcmd));
 			if (retval)
 				return -EFAULT;
-			return (*capifuncs->capi_manufacturer) (mcmd.cmd, mcmd.data);
+			return capi20_manufacturer(mcmd.cmd, mcmd.data);
 		}
 		return 0;
 
@@ -1628,15 +1626,7 @@ static int __init capi_init(void)
 			&capi_fops, NULL);
 	printk(KERN_NOTICE "capi20: started up with major %d\n", capi_major);
 
-	if ((capifuncs = attach_capi_interface(&cuser)) == 0) {
-
-		MOD_DEC_USE_COUNT;
-		devfs_unregister_chrdev(capi_major, "capi20");
-		devfs_unregister(devfs_find_handle(NULL, "capi20",
-						   capi_major, 0,
-						   DEVFS_SPECIAL_CHR, 0));
-		return -EIO;
-	}
+	attach_capi_interface(&cuser);
 
 #ifdef CONFIG_ISDN_CAPI_MIDDLEWARE
 	if (capinc_tty_init() < 0) {

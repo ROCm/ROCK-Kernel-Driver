@@ -146,7 +146,6 @@ typedef struct capidrv_bchan capidrv_bchan;
 
 static capidrv_data global;
 static spinlock_t global_lock = SPIN_LOCK_UNLOCKED;
-static struct capi_interface *capifuncs;
 
 static void handle_dtrace_data(capidrv_contr *card,
 	int send, int level2, u8 *data, u16 len);
@@ -519,7 +518,7 @@ static void send_message(capidrv_contr * card, _cmsg * cmsg)
 	len = CAPIMSG_LEN(cmsg->buf);
 	skb = alloc_skb(len, GFP_ATOMIC);
 	memcpy(skb_put(skb, len), cmsg->buf, len);
-	(*capifuncs->capi_put_message) (global.appid, skb);
+	capi20_put_message(global.appid, skb);
 	global.nsentctlpkt++;
 }
 
@@ -1377,7 +1376,7 @@ static void capidrv_signal(u16 applid, void *dummy)
 {
 	struct sk_buff *skb = 0;
 
-	while ((*capifuncs->capi_get_message) (global.appid, &skb) == CAPI_NOERROR) {
+	while (capi20_get_message(global.appid, &skb) == CAPI_NOERROR) {
 		capi_message2cmsg(&s_cmsg, skb->data);
 		if (debugmode > 2)
 			printk(KERN_DEBUG "capidrv_signal: applid=%d %s\n",
@@ -1913,7 +1912,7 @@ static int if_sendbuf(int id, int channel, int doack, struct sk_buff *skb)
 		printk(KERN_DEBUG "capidrv-%d: only %d bytes headroom, need %d\n",
 		       card->contrnr, skb_headroom(skb), msglen);
 		memcpy(skb_push(nskb, msglen), sendcmsg.buf, msglen);
-		errcode = (*capifuncs->capi_put_message) (global.appid, nskb);
+		errcode = capi20_put_message(global.appid, nskb);
 		if (errcode == CAPI_NOERROR) {
 			dev_kfree_skb(skb);
 			nccip->datahandle++;
@@ -1925,7 +1924,7 @@ static int if_sendbuf(int id, int channel, int doack, struct sk_buff *skb)
 		return errcode == CAPI_SENDQUEUEFULL ? 0 : -1;
 	} else {
 		memcpy(skb_push(skb, msglen), sendcmsg.buf, msglen);
-		errcode = (*capifuncs->capi_put_message) (global.appid, skb);
+		errcode = capi20_put_message(global.appid, skb);
 		if (errcode == CAPI_NOERROR) {
 			nccip->datahandle++;
 			global.nsentdatapkt++;
@@ -1969,7 +1968,7 @@ static void enable_dchannel_trace(capidrv_contr *card)
 	u16 errcode;
 	u16 avmversion[3];
 
-        errcode = (*capifuncs->capi_get_manufacturer)(contr, manufacturer);
+        errcode = capi20_get_manufacturer(contr, manufacturer);
         if (errcode != CAPI_NOERROR) {
 	   printk(KERN_ERR "%s: can't get manufacturer (0x%x)\n",
 			card->name, errcode);
@@ -1980,7 +1979,7 @@ static void enable_dchannel_trace(capidrv_contr *card)
 			card->name, manufacturer);
 	   return;
 	}
-        errcode = (*capifuncs->capi_get_version)(contr, &version);
+        errcode = capi20_get_version(contr, &version);
         if (errcode != CAPI_NOERROR) {
 	   printk(KERN_ERR "%s: can't get version (0x%x)\n",
 			card->name, errcode);
@@ -2308,12 +2307,7 @@ static int __init capidrv_init(void)
 
 	MOD_INC_USE_COUNT;
 
-	capifuncs = attach_capi_interface(&cuser);
-
-	if (!capifuncs) {
-		MOD_DEC_USE_COUNT;
-		return -EIO;
-	}
+	attach_capi_interface(&cuser);
 
 	if ((p = strchr(revision, ':')) != 0 && p[1]) {
 		strncpy(rev, p + 2, sizeof(rev));
@@ -2326,26 +2320,26 @@ static int __init capidrv_init(void)
 	rparam.level3cnt = -2;  /* number of bchannels twice */
 	rparam.datablkcnt = 16;
 	rparam.datablklen = 2048;
-	errcode = (*capifuncs->capi_register) (&rparam, &global.appid);
+	errcode = capi20_register(&rparam, &global.appid);
 	if (errcode) {
 		detach_capi_interface(&cuser);
 		MOD_DEC_USE_COUNT;
 		return -EIO;
 	}
 
-	errcode = (*capifuncs->capi_get_profile) (0, &profile);
+	errcode = capi20_get_profile(0, &profile);
 	if (errcode != CAPI_NOERROR) {
-		(void) (*capifuncs->capi_release) (global.appid);
+		capi20_release(global.appid);
 		detach_capi_interface(&cuser);
 		MOD_DEC_USE_COUNT;
 		return -EIO;
 	}
 
-	(void) (*capifuncs->capi_set_signal) (global.appid, capidrv_signal, 0);
+	capi20_set_signal(global.appid, capidrv_signal, 0);
 
 	ncontr = profile.ncontroller;
 	for (contr = 1; contr <= ncontr; contr++) {
-		errcode = (*capifuncs->capi_get_profile) (contr, &profile);
+		errcode = capi20_get_profile(contr, &profile);
 		if (errcode != CAPI_NOERROR)
 			continue;
 		(void) capidrv_addcontr(contr, &profile);
@@ -2371,7 +2365,7 @@ static void __exit capidrv_exit(void)
 		strcpy(rev, " ??? ");
 	}
 
-	(void) (*capifuncs->capi_release) (global.appid);
+	capi20_release(global.appid);
 
 	detach_capi_interface(&cuser);
 

@@ -892,7 +892,7 @@ EXPORT_SYMBOL(detach_capi_driver);
 /* -------- CAPI2.0 Interface ---------------------------------- */
 /* ------------------------------------------------------------- */
 
-static u16 capi_isinstalled(void)
+u16 capi20_isinstalled(void)
 {
 	int i;
 	for (i = 0; i < CAPI_MAXCONTR; i++) {
@@ -902,7 +902,9 @@ static u16 capi_isinstalled(void)
 	return CAPI_REGNOTINSTALLED;
 }
 
-static u16 capi_register(capi_register_params * rparam, u16 * applidp)
+EXPORT_SYMBOL(capi20_isinstalled);
+
+u16 capi20_register(capi_register_params * rparam, u16 * applidp)
 {
 	struct capi_appl *ap;
 	int appl;
@@ -944,7 +946,9 @@ static u16 capi_register(capi_register_params * rparam, u16 * applidp)
 	return CAPI_NOERROR;
 }
 
-static u16 capi_release(u16 applid)
+EXPORT_SYMBOL(capi20_register);
+
+u16 capi20_release(u16 applid)
 {
 	struct capi_appl *ap = get_capi_appl_by_nr(applid);
 	int i;
@@ -967,7 +971,9 @@ static u16 capi_release(u16 applid)
 	return CAPI_NOERROR;
 }
 
-static u16 capi_put_message(u16 applid, struct sk_buff *skb)
+EXPORT_SYMBOL(capi20_release);
+
+u16 capi20_put_message(u16 applid, struct sk_buff *skb)
 {
 	struct capi_ctr *card;
 	struct capi_appl *ap;
@@ -1024,7 +1030,9 @@ static u16 capi_put_message(u16 applid, struct sk_buff *skb)
 	return card->driver->send_message(card, skb);
 }
 
-static u16 capi_get_message(u16 applid, struct sk_buff **msgp)
+EXPORT_SYMBOL(capi20_put_message);
+
+u16 capi20_get_message(u16 applid, struct sk_buff **msgp)
 {
 	struct capi_appl *ap = get_capi_appl_by_nr(applid);
 	struct sk_buff *skb;
@@ -1037,9 +1045,11 @@ static u16 capi_get_message(u16 applid, struct sk_buff **msgp)
 	return CAPI_NOERROR;
 }
 
-static u16 capi_set_signal(u16 applid,
-			     void (*signal) (u16 applid, void *param),
-			     void *param)
+EXPORT_SYMBOL(capi20_get_message);
+
+u16 capi20_set_signal(u16 applid,
+		    void (*signal) (u16 applid, void *param),
+		    void *param)
 {
 	struct capi_appl *ap = get_capi_appl_by_nr(applid);
 
@@ -1050,7 +1060,9 @@ static u16 capi_set_signal(u16 applid,
 	return CAPI_NOERROR;
 }
 
-static u16 capi_get_manufacturer(u32 contr, u8 buf[CAPI_MANUFACTURER_LEN])
+EXPORT_SYMBOL(capi20_set_signal);
+
+u16 capi20_get_manufacturer(u32 contr, u8 buf[CAPI_MANUFACTURER_LEN])
 {
 	struct capi_ctr *card;
 
@@ -1066,7 +1078,9 @@ static u16 capi_get_manufacturer(u32 contr, u8 buf[CAPI_MANUFACTURER_LEN])
 	return CAPI_NOERROR;
 }
 
-static u16 capi_get_version(u32 contr, struct capi_version *verp)
+EXPORT_SYMBOL(capi20_get_manufacturer);
+
+u16 capi20_get_version(u32 contr, struct capi_version *verp)
 {
 	struct capi_ctr *card;
 
@@ -1082,7 +1096,9 @@ static u16 capi_get_version(u32 contr, struct capi_version *verp)
 	return CAPI_NOERROR;
 }
 
-static u16 capi_get_serial(u32 contr, u8 serial[CAPI_SERIAL_LEN])
+EXPORT_SYMBOL(capi20_get_version);
+
+u16 capi20_get_serial(u32 contr, u8 serial[CAPI_SERIAL_LEN])
 {
 	struct capi_ctr *card;
 
@@ -1098,7 +1114,9 @@ static u16 capi_get_serial(u32 contr, u8 serial[CAPI_SERIAL_LEN])
 	return CAPI_NOERROR;
 }
 
-static u16 capi_get_profile(u32 contr, struct capi_profile *profp)
+EXPORT_SYMBOL(capi20_get_serial);
+
+u16 capi20_get_profile(u32 contr, struct capi_profile *profp)
 {
 	struct capi_ctr *card;
 
@@ -1114,6 +1132,8 @@ static u16 capi_get_profile(u32 contr, struct capi_profile *profp)
 			sizeof(struct capi_profile));
 	return CAPI_NOERROR;
 }
+
+EXPORT_SYMBOL(capi20_get_profile);
 
 static struct capi_driver *find_driver(char *name)
 {
@@ -1255,7 +1275,7 @@ static int old_capi_manufacturer(unsigned int cmd, void *data)
 }
 #endif
 
-static int capi_manufacturer(unsigned int cmd, void *data)
+int capi20_manufacturer(unsigned int cmd, void *data)
 {
         struct capi_ctr *card;
 	int retval;
@@ -1296,44 +1316,29 @@ static int capi_manufacturer(unsigned int cmd, void *data)
 	return -EINVAL;
 }
 
-struct capi_interface avmb1_interface =
-{
-	capi_isinstalled,
-	capi_register,
-	capi_release,
-	capi_put_message,
-	capi_get_message,
-	capi_set_signal,
-	capi_get_manufacturer,
-	capi_get_version,
-	capi_get_serial,
-	capi_get_profile,
-	capi_manufacturer
-};
+EXPORT_SYMBOL(capi20_manufacturer);
 
 /* ------------------------------------------------------------- */
 /* -------- Exported Functions --------------------------------- */
 /* ------------------------------------------------------------- */
 
-struct capi_interface *attach_capi_interface(struct capi_interface_user *userp)
+void attach_capi_interface(struct capi_interface_user *userp)
 {
 
 	spin_lock(&users_lock);
 	list_add_tail(&userp->user_list, &users);
 	spin_unlock(&users_lock);
 	printk(KERN_NOTICE "kcapi: %s attached\n", userp->name);
-
-	return &avmb1_interface;
 }
 
 EXPORT_SYMBOL(attach_capi_interface);
 
-int detach_capi_interface(struct capi_interface_user *userp)
+void detach_capi_interface(struct capi_interface_user *userp)
 {
 	spin_lock(&users_lock);
 	list_del(&userp->user_list);
+	spin_unlock(&users_lock);
 	printk(KERN_NOTICE "kcapi: %s detached\n", userp->name);
-	return 0;
 }
 
 EXPORT_SYMBOL(detach_capi_interface);
