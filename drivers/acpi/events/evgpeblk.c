@@ -46,7 +46,7 @@
 #include <acpi/acnamesp.h>
 
 #define _COMPONENT          ACPI_EVENTS
-	 ACPI_MODULE_NAME    ("evgpe")
+	 ACPI_MODULE_NAME    ("evgpeblk")
 
 
 /*******************************************************************************
@@ -131,7 +131,7 @@ acpi_ev_save_method_info (
 	/* Ensure that we have a valid GPE number for this GPE block */
 
 	if ((gpe_number < gpe_block->block_base_number) ||
-		(gpe_number >= (gpe_block->register_count * 8))) {
+		(gpe_number - gpe_block->block_base_number >= (gpe_block->register_count * 8))) {
 		/* Not valid, all we can do here is ignore it */
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
