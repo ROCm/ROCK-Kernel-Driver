@@ -887,26 +887,19 @@ void sctp_assoc_update(sctp_association_t *asoc, sctp_association_t *new)
 
 }
 
-/* Choose the transport for sending a shutdown packet.
+/* Update the retran path for sending a retransmitted packet.
  * Round-robin through the active transports, else round-robin
  * through the inactive transports as this is the next best thing
  * we can try.
  */
-struct sctp_transport *sctp_assoc_choose_shutdown_transport(sctp_association_t *asoc)
+void sctp_assoc_update_retran_path(sctp_association_t *asoc)
 {
 	struct sctp_transport *t, *next;
 	struct list_head *head = &asoc->peer.transport_addr_list;
 	struct list_head *pos;
 
-	/* If this is the first time SHUTDOWN is sent, use the active
-	 * path.
-	 */
-	if (!asoc->shutdown_last_sent_to)
-		return asoc->peer.active_path;
-
-	/* Otherwise, find the next transport in a round-robin fashion. */
-
-	t = asoc->shutdown_last_sent_to;
+	/* Find the next transport in a round-robin fashion. */
+	t = asoc->peer.retran_path;
 	pos = &t->transports;
 	next = NULL;
 
@@ -935,13 +928,30 @@ struct sctp_transport *sctp_assoc_choose_shutdown_transport(sctp_association_t *
 		 * other active transports.  If so, use the next
 		 * transport.
 		 */
-		if (t == asoc->shutdown_last_sent_to) {
+		if (t == asoc->peer.retran_path) {
 			t = next;
 			break;
 		}
 	}
 
-	return t;
+	asoc->peer.retran_path = t;
+}
+
+/* Choose the transport for sending a SHUTDOWN packet.  */
+struct sctp_transport *sctp_assoc_choose_shutdown_transport(sctp_association_t *asoc)
+{
+	/* If this is the first time SHUTDOWN is sent, use the active path,
+	 * else use the retran path. If the last SHUTDOWN was sent over the
+	 * retran path, update the retran path and use it. 
+	 */
+	if (!asoc->shutdown_last_sent_to)
+		return asoc->peer.active_path;
+	else {
+		if (asoc->shutdown_last_sent_to == asoc->peer.retran_path)
+			sctp_assoc_update_retran_path(asoc);
+		return asoc->peer.retran_path;
+	}
+
 }
 
 /* Update the association's pmtu and frag_point by going through all the

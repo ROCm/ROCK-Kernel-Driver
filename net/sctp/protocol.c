@@ -449,7 +449,6 @@ struct dst_entry *sctp_v4_get_dst(sctp_association_t *asoc,
 
 		if (AF_INET == laddr->a.sa.sa_family) {
 			fl.fl4_src = laddr->a.v4.sin_addr.s_addr;
-			dst = sctp_v4_get_dst(asoc, daddr, &laddr->a);
 			if (!ip_route_output_key(&rt, &fl)) {
 				dst = &rt->u.dst;
 				goto out_unlock;

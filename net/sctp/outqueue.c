@@ -321,6 +321,11 @@ void sctp_retransmit(struct sctp_outq *q, struct sctp_transport *transport,
 	switch(reason) {
 	case SCTP_RETRANSMIT_T3_RTX:
 		sctp_transport_lower_cwnd(transport, SCTP_LOWER_CWND_T3_RTX);
+		/* Update the retran path if the T3-rtx timer has expired for
+		 * the current retran path.
+		 */
+		if (transport == transport->asoc->peer.retran_path)
+			sctp_assoc_update_retran_path(transport->asoc);
 		break;
 	case SCTP_RETRANSMIT_FAST_RTX:
 		sctp_transport_lower_cwnd(transport, SCTP_LOWER_CWND_FAST_RTX);

@@ -1613,6 +1613,7 @@ void sctp_association_put(sctp_association_t *);
 void sctp_association_hold(sctp_association_t *);
 
 struct sctp_transport *sctp_assoc_choose_shutdown_transport(sctp_association_t *);
+void sctp_assoc_update_retran_path(sctp_association_t *);
 struct sctp_transport *sctp_assoc_lookup_paddr(const sctp_association_t *,
 					  const union sctp_addr *);
 struct sctp_transport *sctp_assoc_add_peer(sctp_association_t *,
