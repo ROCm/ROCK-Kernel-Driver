@@ -596,25 +596,28 @@ static int is_tree_node (struct buffer_head * bh, int level)
 
 
 
-#ifdef SEARCH_BY_KEY_READA
+#define SEARCH_BY_KEY_READA 16
 
 /* The function is NOT SCHEDULE-SAFE! */
-static void search_by_key_reada (struct super_block * s, int blocknr)
+static void search_by_key_reada (struct super_block * s,
+                                 struct buffer_head **bh,
+				 unsigned long *b, int num)
 {
-    struct buffer_head * bh;
+    int i,j;
   
-    if (blocknr == 0)
-	return;
-
-    bh = sb_getblk (s, blocknr);
-  
-    if (!buffer_uptodate (bh)) {
-	ll_rw_block (READA, 1, &bh);
+    for (i = 0 ; i < num ; i++) {
+	bh[i] = sb_getblk (s, b[i]);
     }
-    bh->b_count --;
+    for (j = 0 ; j < i ; j++) {
+	/*
+	 * note, this needs attention if we are getting rid of the BKL
+	 * you have to make sure the prepared bit isn't set on this buffer
+	 */
+	if (!buffer_uptodate(bh[j]))
+	    ll_rw_block(READA, 1, bh + j);
+    	brelse(bh[j]);
+    }
 }
-
-#endif
 
 /**************************************************************************
  * Algorithm   SearchByKey                                                *
@@ -657,6 +660,9 @@ int search_by_key (struct super_block * p_s_sb,
     int				n_node_level, n_retval;
     int 			right_neighbor_of_leaf_node;
     int				fs_gen;
+    struct buffer_head *reada_bh[SEARCH_BY_KEY_READA];
+    unsigned long      reada_blocks[SEARCH_BY_KEY_READA];
+    int reada_count = 0;
 
 #ifdef CONFIG_REISERFS_CHECK
     int n_repeat_counter = 0;
@@ -691,19 +697,25 @@ int search_by_key (struct super_block * p_s_sb,
 	p_s_last_element = PATH_OFFSET_PELEMENT(p_s_search_path, ++p_s_search_path->path_length);
 	fs_gen = get_generation (p_s_sb);
 
-#ifdef SEARCH_BY_KEY_READA
-	/* schedule read of right neighbor */
-	search_by_key_reada (p_s_sb, right_neighbor_of_leaf_node);
-#endif
-
 	/* Read the next tree node, and set the last element in the path to
            have a pointer to it. */
-	if ( ! (p_s_bh = p_s_last_element->pe_buffer =
-		sb_bread(p_s_sb, n_block_number)) ) {
+	if ((p_s_bh = p_s_last_element->pe_buffer =
+	     sb_getblk(p_s_sb, n_block_number)) ) {
+	    if (!buffer_uptodate(p_s_bh) && reada_count > 1) {
+		search_by_key_reada (p_s_sb, reada_bh,
+		                     reada_blocks, reada_count);
+	    }
+	    ll_rw_block(READ, 1, &p_s_bh);
+	    wait_on_buffer(p_s_bh);
+	    if (!buffer_uptodate(p_s_bh))
+	        goto io_error;
+	} else {
+io_error:
 	    p_s_search_path->path_length --;
 	    pathrelse(p_s_search_path);
 	    return IO_ERROR;
 	}
+	reada_count = 0;
 	if (expected_level == -1)
 		expected_level = SB_TREE_HEIGHT (p_s_sb);
 	expected_level --;
@@ -784,11 +796,36 @@ int search_by_key (struct super_block * p_s_sb,
 	   position in the node. */
 	n_block_number = B_N_CHILD_NUM(p_s_bh, p_s_last_element->pe_position);
 
-#ifdef SEARCH_BY_KEY_READA
-	/* if we are going to read leaf node, then calculate its right neighbor if possible */
-	if (n_node_level == DISK_LEAF_NODE_LEVEL + 1 && p_s_last_element->pe_position < B_NR_ITEMS (p_s_bh))
-	    right_neighbor_of_leaf_node = B_N_CHILD_NUM(p_s_bh, p_s_last_element->pe_position + 1);
-#endif
+	/* if we are going to read leaf nodes, try for read ahead as well */
+	if ((p_s_search_path->reada & PATH_READA) &&
+	    n_node_level == DISK_LEAF_NODE_LEVEL + 1)
+	{
+	    int pos = p_s_last_element->pe_position;
+	    int limit = B_NR_ITEMS(p_s_bh);
+	    struct key *le_key;
+
+	    if (p_s_search_path->reada & PATH_READA_BACK)
+		limit = 0;
+	    while(reada_count < SEARCH_BY_KEY_READA) {
+		if (pos == limit)
+		    break;
+	        reada_blocks[reada_count++] = B_N_CHILD_NUM(p_s_bh, pos);
+		if (p_s_search_path->reada & PATH_READA_BACK)
+		    pos--;
+		else
+		    pos++;
+
+		/*
+		 * check to make sure we're in the same object
+		 */
+		le_key = B_N_PDELIM_KEY(p_s_bh, pos);
+		if (le32_to_cpu(le_key->k_objectid) !=
+		    p_s_key->on_disk_key.k_objectid)
+		{
+		    break;
+		}
+	    }
+        }
     }
 }
 
@@ -1778,6 +1815,12 @@ void reiserfs_do_truncate (struct reiserfs_transaction_handle *th,
            space, this file would have this file size */
 	n_file_size = offset + bytes - 1;
     }
+    /*
+     * are we doing a full truncate or delete, if so
+     * kick in the reada code
+     */
+    if (n_new_file_size == 0)
+        s_search_path.reada = PATH_READA | PATH_READA_BACK;
 
     if ( n_file_size == 0 || n_file_size < n_new_file_size ) {
 	goto update_and_out ;

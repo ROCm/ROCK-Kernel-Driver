@@ -1238,8 +1238,12 @@ excessive effort to avoid disturbing the precious VFS code.:-( The
 gods only know how we are going to SMP the code that uses them.
 znodes are the way! */
 
+#define PATH_READA	0x1 /* do read ahead */
+#define PATH_READA_BACK 0x2 /* read backwards */
+
 struct  path {
   int                   path_length;                      	/* Length of the array above.   */
+  int			reada;
   struct  path_element  path_elements[EXTENDED_MAX_HEIGHT];	/* Array of the path elements.  */
   int			pos_in_item;
 };
@@ -1247,7 +1251,7 @@ struct  path {
 #define pos_in_item(path) ((path)->pos_in_item)
 
 #define INITIALIZE_PATH(var) \
-struct path var = {ILLEGAL_PATH_ELEMENT_OFFSET, }
+struct path var = {.path_length = ILLEGAL_PATH_ELEMENT_OFFSET, .reada = 0,}
 
 /* Get path element by path and path position. */
 #define PATH_OFFSET_PELEMENT(p_s_path,n_offset)  ((p_s_path)->path_elements +(n_offset))
@@ -2140,6 +2144,15 @@ struct buffer_head * get_FEB (struct tree_balance *);
 typedef struct __reiserfs_blocknr_hint reiserfs_blocknr_hint_t;
 
 int reiserfs_parse_alloc_options (struct super_block *, char *);
+void reiserfs_init_alloc_options (struct super_block *s);
+
+/* 
+ * given a directory, this will tell you what packing locality
+ * to use for a new object underneat it.  The locality is returned
+ * in disk byte order (le).
+ */
+u32 reiserfs_choose_packing(struct inode *dir);
+
 int is_reusable (struct super_block * s, b_blocknr_t block, int bit_value);
 void reiserfs_free_block (struct reiserfs_transaction_handle *th, struct inode *, b_blocknr_t, int for_unformatted);
 int reiserfs_allocate_blocknrs(reiserfs_blocknr_hint_t *, b_blocknr_t * , int, int);

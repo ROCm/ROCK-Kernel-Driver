@@ -86,6 +86,7 @@ static struct workqueue_struct *commit_wq;
 /* journal list state bits */
 #define LIST_TOUCHED 1
 #define LIST_DIRTY   2
+#define LIST_COMMIT_PENDING  4		/* someone will commit this list */
 
 /* flags for do_journal_end */
 #define FLUSH_ALL   1		/* flush commit and real blocks */
@@ -2516,8 +2517,20 @@ void reiserfs_wait_on_write_block(struct super_block *s) {
 }
 
 static void queue_log_writer(struct super_block *s) {
+    wait_queue_t wait;
     set_bit(WRITERS_QUEUED, &SB_JOURNAL(s)->j_state);
-    sleep_on(&SB_JOURNAL(s)->j_join_wait);
+
+    /*
+     * we don't want to use wait_event here because
+     * we only want to wait once.
+     */
+    init_waitqueue_entry(&wait, current);
+    add_wait_queue(&SB_JOURNAL(s)->j_join_wait, &wait);
+    set_current_state(TASK_UNINTERRUPTIBLE);
+    if (test_bit(WRITERS_QUEUED, &SB_JOURNAL(s)->j_state))
+        schedule();
+    current->state = TASK_RUNNING;
+    remove_wait_queue(&SB_JOURNAL(s)->j_join_wait, &wait);
 }
 
 static void wake_queued_writers(struct super_block *s) {
@@ -2530,7 +2543,9 @@ static void let_transaction_grow(struct super_block *sb,
 {
     unsigned long bcount = SB_JOURNAL(sb)->j_bcount;
     while(1) {
-	yield();
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	schedule_timeout(1);
+	SB_JOURNAL(sb)->j_current_jl->j_state |= LIST_COMMIT_PENDING;
         while ((atomic_read(&SB_JOURNAL(sb)->j_wcount) > 0 ||
 	        atomic_read(&SB_JOURNAL(sb)->j_jlock)) && 
 	       SB_JOURNAL(sb)->j_trans_id == trans_id) {
@@ -2966,9 +2981,15 @@ static void flush_async_commits(void *p) {
       flush_commit_list(p_s_sb, jl, 1);
   }
   unlock_kernel();
-  atomic_inc(&SB_JOURNAL(p_s_sb)->j_async_throttle);
-  filemap_fdatawrite(p_s_sb->s_bdev->bd_inode->i_mapping);
-  atomic_dec(&SB_JOURNAL(p_s_sb)->j_async_throttle);
+  /*
+   * this is a little racey, but there's no harm in missing
+   * the filemap_fdata_write
+   */
+  if (!atomic_read(&SB_JOURNAL(p_s_sb)->j_async_throttle)) {
+      atomic_inc(&SB_JOURNAL(p_s_sb)->j_async_throttle);
+      filemap_fdatawrite(p_s_sb->s_bdev->bd_inode->i_mapping);
+      atomic_dec(&SB_JOURNAL(p_s_sb)->j_async_throttle);
+  }
 }
 
 /*
@@ -3057,7 +3078,8 @@ static int check_journal_end(struct reiserfs_transaction_handle *th, struct supe
 
       jl = SB_JOURNAL(p_s_sb)->j_current_jl;
       trans_id = jl->j_trans_id;
-
+      if (wait_on_commit)
+        jl->j_state |= LIST_COMMIT_PENDING;
       atomic_set(&(SB_JOURNAL(p_s_sb)->j_jlock), 1) ;
       if (flush) {
         SB_JOURNAL(p_s_sb)->j_next_full_flush = 1 ;
@@ -3593,9 +3615,8 @@ static int do_journal_end(struct reiserfs_transaction_handle *th, struct super_b
   if (flush) {
     flush_commit_list(p_s_sb, jl, 1) ;
     flush_journal_list(p_s_sb, jl, 1) ;  
-  } else 
-    queue_work(commit_wq, &SB_JOURNAL(p_s_sb)->j_work);
-
+  } else if (!(jl->j_state & LIST_COMMIT_PENDING))
+    queue_delayed_work(commit_wq, &SB_JOURNAL(p_s_sb)->j_work, HZ/10);
 
   /* if the next transaction has any chance of wrapping, flush 
   ** transactions that might get overwritten.  If any journal lists are very 
