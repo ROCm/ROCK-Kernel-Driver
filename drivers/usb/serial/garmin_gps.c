@@ -343,7 +343,7 @@ static int pkt_add(struct garmin_data * garmin_data_p,
 static struct garmin_packet *pkt_pop(struct garmin_data * garmin_data_p)
 {
 	unsigned long flags;
-	struct garmin_packet *result = 0;
+	struct garmin_packet *result = NULL;
 
 	spin_lock_irqsave(&garmin_data_p->lock, flags);
 	if (!list_empty(&garmin_data_p->pktlist)) {
@@ -359,7 +359,7 @@ static struct garmin_packet *pkt_pop(struct garmin_data * garmin_data_p)
 static void pkt_clear(struct garmin_data * garmin_data_p)
 {
 	unsigned long flags;
-	struct garmin_packet *result = 0;
+	struct garmin_packet *result = NULL;
 
 	dbg("%s", __FUNCTION__);
 
@@ -737,10 +737,9 @@ int gsp_send(struct garmin_data * garmin_data_p, const unsigned char *buf,
  */
 static void gsp_next_packet(struct garmin_data * garmin_data_p)
 {
-	struct garmin_packet *pkt = 0;
+	struct garmin_packet *pkt = NULL;
 
-	while ((pkt = pkt_pop(garmin_data_p)) != 0)
-	{
+	while ((pkt = pkt_pop(garmin_data_p)) != 0) {
 		dbg("%s - next pkt: %d", __FUNCTION__, pkt->seq);
 		if (gsp_send(garmin_data_p, pkt->data, pkt->size) > 0) {
 			kfree(pkt);
@@ -1428,7 +1427,7 @@ static int garmin_attach (struct usb_serial *serial)
 {
 	int status = 0;
 	struct usb_serial_port *port = serial->port[0];
-	struct garmin_data * garmin_data_p = 0;
+	struct garmin_data * garmin_data_p = NULL;
 
 	dbg("%s", __FUNCTION__);
 
