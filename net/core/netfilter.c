@@ -101,7 +101,7 @@ int nf_register_sockopt(struct nf_sockopt_ops *reg)
 	if (down_interruptible(&nf_sockopt_mutex) != 0)
 		return -EINTR;
 
-	for (i = nf_sockopts.next; i != &nf_sockopts; i = i->next) {
+	list_for_each(i, &nf_sockopts) {
 		struct nf_sockopt_ops *ops = (struct nf_sockopt_ops *)i;
 		if (ops->pf == reg->pf
 		    && (overlap(ops->set_optmin, ops->set_optmax, 
@@ -296,7 +296,7 @@ static int nf_sockopt(struct sock *sk, int pf, int val,
 	if (down_interruptible(&nf_sockopt_mutex) != 0)
 		return -EINTR;
 
-	for (i = nf_sockopts.next; i != &nf_sockopts; i = i->next) {
+	list_for_each(i, &nf_sockopts) {
 		ops = (struct nf_sockopt_ops *)i;
 		if (ops->pf == pf) {
 			if (get) {
