@@ -22,10 +22,6 @@
    SOFTWARE IS DISCLAIMED.
 */
 
-/* 
- * $Id: hci_core.h,v 1.3 2002/04/17 18:55:21 maxk Exp $ 
- */
-
 #ifndef __HCI_CORE_H
 #define __HCI_CORE_H
 
@@ -63,12 +59,12 @@ struct hci_conn_hash {
 struct hci_dev {
 	struct list_head list;
 	spinlock_t	lock;
-	atomic_t 	refcnt;
+	atomic_t	refcnt;
 
 	char		name[8];
 	unsigned long	flags;
 	__u16		id;
-	__u8	 	type;
+	__u8		type;
 	bdaddr_t	bdaddr;
 	__u8		features[8];
 	__u16		voice_setting;
@@ -79,38 +75,38 @@ struct hci_dev {
 
 	unsigned long	quirks;
 
-	atomic_t 	cmd_cnt;
-	unsigned int 	acl_cnt;
-	unsigned int 	sco_cnt;
+	atomic_t	cmd_cnt;
+	unsigned int	acl_cnt;
+	unsigned int	sco_cnt;
 
 	unsigned int	acl_mtu;
-	unsigned int 	sco_mtu;
+	unsigned int	sco_mtu;
 	unsigned int	acl_pkts;
 	unsigned int	sco_pkts;
 
-	unsigned long   cmd_last_tx;
-	unsigned long   acl_last_tx;
-	unsigned long   sco_last_tx;
+	unsigned long	cmd_last_tx;
+	unsigned long	acl_last_tx;
+	unsigned long	sco_last_tx;
 
-	struct tasklet_struct 	cmd_task;
+	struct tasklet_struct	cmd_task;
 	struct tasklet_struct	rx_task;
-	struct tasklet_struct 	tx_task;
+	struct tasklet_struct	tx_task;
 
 	struct sk_buff_head	rx_q;
-	struct sk_buff_head 	raw_q;
-	struct sk_buff_head 	cmd_q;
+	struct sk_buff_head	raw_q;
+	struct sk_buff_head	cmd_q;
 
-	struct sk_buff     	*sent_cmd;
+	struct sk_buff		*sent_cmd;
 
 	struct semaphore	req_lock;
 	wait_queue_head_t	req_wait_q;
 	__u32			req_status;
 	__u32			req_result;
 
-	struct inquiry_cache 	inq_cache;
-	struct hci_conn_hash 	conn_hash;
+	struct inquiry_cache	inq_cache;
+	struct hci_conn_hash	conn_hash;
 
-	struct hci_dev_stats 	stat;
+	struct hci_dev_stats	stat;
 
 	void			*driver_data;
 	void			*core_data;
@@ -118,12 +114,12 @@ struct hci_dev {
 	atomic_t 		promisc;
 
 #ifdef CONFIG_PROC_FS
-	struct proc_dir_entry   *proc;
+	struct proc_dir_entry	*proc;
 #endif
 
 	struct class_device	class_dev;
 
-	struct module           *owner;
+	struct module 		*owner;
 
 	int (*open)(struct hci_dev *hdev);
 	int (*close)(struct hci_dev *hdev);
@@ -140,9 +136,9 @@ struct hci_conn {
 	atomic_t	 refcnt;
 	spinlock_t	 lock;
 
-	bdaddr_t         dst;
-	__u16            handle;
-	__u16            state;
+	bdaddr_t	 dst;
+	__u16		 handle;
+	__u16		 state;
 	__u8		 type;
 	__u8		 out;
 	__u32		 link_mode;
@@ -154,12 +150,12 @@ struct hci_conn {
 
 	struct timer_list timer;
 	
-	struct hci_dev 	*hdev;
+	struct hci_dev	*hdev;
 	void		*l2cap_data;
 	void		*sco_data;
 	void		*priv;
 
-	struct hci_conn *link;
+	struct hci_conn	*link;
 };
 
 extern struct hci_proto *hci_proto[];
@@ -215,7 +211,7 @@ static inline void hci_conn_hash_init(struct hci_dev *hdev)
 	struct hci_conn_hash *h = &hdev->conn_hash;
 	INIT_LIST_HEAD(&h->list);
 	spin_lock_init(&h->lock);
-	h->num = 0;	
+	h->num = 0;
 }
 
 static inline void hci_conn_hash_add(struct hci_dev *hdev, struct hci_conn *c)
@@ -233,7 +229,7 @@ static inline void hci_conn_hash_del(struct hci_dev *hdev, struct hci_conn *c)
 }
 
 static inline struct hci_conn *hci_conn_hash_lookup_handle(struct hci_dev *hdev,
-	       				__u16 handle)
+					__u16 handle)
 {
 	struct hci_conn_hash *h = &hdev->conn_hash;
 	struct list_head *p;
@@ -244,7 +240,7 @@ static inline struct hci_conn *hci_conn_hash_lookup_handle(struct hci_dev *hdev,
 		if (c->handle == handle)
 			return c;
 	}
-        return NULL;
+	return NULL;
 }
 
 static inline struct hci_conn *hci_conn_hash_lookup_ba(struct hci_dev *hdev,
@@ -259,7 +255,7 @@ static inline struct hci_conn *hci_conn_hash_lookup_ba(struct hci_dev *hdev,
 		if (c->type == type && !bacmp(&c->dst, ba))
 			return c;
 	}
-        return NULL;
+	return NULL;
 }
 
 void hci_acl_connect(struct hci_conn *conn);
@@ -506,7 +502,7 @@ void hci_send_to_sock(struct hci_dev *hdev, struct sk_buff *skb);
 /* HCI info for socket */
 #define hci_pi(sk)	((struct hci_pinfo *)sk->sk_protinfo)
 struct hci_pinfo {
-	struct hci_dev 	  *hdev;
+	struct hci_dev    *hdev;
 	struct hci_filter filter;
 	__u32             cmsg_mask;
 };
