@@ -620,6 +620,12 @@
 	       unlock_kernel() due to recent VFS locking changes. BKL isn't
 	       required in devfs.
   v1.13
+    20020428   Richard Gooch <rgooch@atnf.csiro.au>
+	       Removed 2.4.x compatibility code.
+  v1.14
+    20020510   Richard Gooch <rgooch@atnf.csiro.au>
+	       Added BKL to <devfs_open> because drivers still need it.
+  v1.15
 */
 #include <linux/types.h>
 #include <linux/errno.h>
@@ -652,7 +658,7 @@
 #include <asm/bitops.h>
 #include <asm/atomic.h>
 
-#define DEVFS_VERSION            "1.13 (20020406)"
+#define DEVFS_VERSION            "1.15 (20020510)"
 
 #define DEVFS_NAME "devfs"
 
@@ -1400,16 +1406,8 @@ static void free_dentry (struct devfs_entry *de)
 
 static int is_devfsd_or_child (struct fs_info *fs_info)
 {
-    struct task_struct *p;
-
     if (current == fs_info->devfsd_task) return (TRUE);
     if (current->pgrp == fs_info->devfsd_pgrp) return (TRUE);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,1)
-    for (p = current->p_opptr; p != &init_task; p = p->p_opptr)
-    {
-	if (p == fs_info->devfsd_task) return (TRUE);
-    }
-#endif
     return (FALSE);
 }   /*  End Function is_devfsd_or_child  */
 
@@ -1829,16 +1827,6 @@ devfs_handle_t devfs_mk_dir (devfs_handle_t dir, const char *name, void *info)
     de->info = info;
     if ( ( err = _devfs_append_entry (dir, de, FALSE, &old) ) != 0 )
     {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,1)
-	if ( old && S_ISDIR (old->mode) )
-	{
-	    PRINTK ("(%s): using old entry in dir: %p \"%s\"\n",
-		    name, dir, dir->name);
-	    old->vfs_deletable = FALSE;
-	    devfs_put (dir);
-	    return old;
-	}
-#endif
 	PRINTK ("(%s): could not append to dir: %p \"%s\", err: %d\n",
 		name, dir, dir->name, err);
 	devfs_put (old);
@@ -2739,15 +2727,22 @@ static int devfs_open (struct inode *inode, struct file *file)
     {
 	file->f_op = &def_blk_fops;
 	if (df->ops) inode->i_bdev->bd_op = df->ops;
+	err = def_blk_fops.open (inode, file);
     }
-    else file->f_op = fops_get ( (struct file_operations *) df->ops );
-    if (file->f_op)
-	err = file->f_op->open ? (*file->f_op->open) (inode, file) : 0;
     else
     {
-	/*  Fallback to legacy scheme  */
-	if ( S_ISCHR (inode->i_mode) ) err = chrdev_open (inode, file);
-	else err = -ENODEV;
+	file->f_op = fops_get ( (struct file_operations *) df->ops );
+	if (file->f_op)
+	{
+	    lock_kernel ();
+	    err = file->f_op->open ? (*file->f_op->open) (inode, file) : 0;
+	    unlock_kernel ();
+	}
+	else
+	{   /*  Fallback to legacy scheme  */
+	    if ( S_ISCHR (inode->i_mode) ) err = chrdev_open (inode, file);
+	    else err = -ENODEV;
+	}
     }
     if (err < 0) return err;
     /*  Open was successful  */

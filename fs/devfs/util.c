@@ -56,6 +56,8 @@
                Made major bitfield type and initialiser 64 bit safe.
     20020413   Richard Gooch <rgooch@atnf.csiro.au>
                Fixed shift warning on 64 bit machines.
+    20020428   Richard Gooch <rgooch@atnf.csiro.au>
+               Copied and used macro for error messages from fs/devfs/base.c 
 */
 #include <linux/module.h>
 #include <linux/init.h>
@@ -64,6 +66,9 @@
 #include <linux/vmalloc.h>
 
 #include <asm/bitops.h>
+
+#define PRINTK(format, args...) \
+   {printk (KERN_ERR "%s" format, __FUNCTION__ , ## args);}
 
 
 /*  Private functions follow  */
@@ -209,9 +214,7 @@ void devfs_dealloc_major (char type, int major)
     spin_lock (&list->lock);
     was_set = __test_and_clear_bit (major, list->bits);
     spin_unlock (&list->lock);
-    if (!was_set)
-	printk (KERN_ERR __FUNCTION__ "(): major %d was already free\n",
-		major);
+    if (!was_set) PRINTK ("(): major %d was already free\n", major);
 }   /*  End Function devfs_dealloc_major  */
 EXPORT_SYMBOL(devfs_dealloc_major);
 
@@ -339,12 +342,11 @@ void devfs_dealloc_devnum (char type, kdev_t devnum)
 	if (was_set) list->none_free = 0;
 	up (semaphore);
 	if (!was_set)
-	    printk ( KERN_ERR __FUNCTION__ "(): device %s was already free\n",
-		     kdevname (devnum) );
+	    PRINTK ( "(): device %s was already free\n", kdevname (devnum) );
 	return;
     }
     up (semaphore);
-    printk ( KERN_ERR __FUNCTION__ "(): major for %s not previously allocated\n",
+    PRINTK ( "(): major for %s not previously allocated\n",
 	     kdevname (devnum) );
 }   /*  End Function devfs_dealloc_devnum  */
 EXPORT_SYMBOL(devfs_dealloc_devnum);
@@ -419,8 +421,6 @@ void devfs_dealloc_unique_number (struct unique_numspace *space, int number)
     was_set = __test_and_clear_bit (number, space->bits);
     if (was_set) ++space->num_free;
     up (&space->semaphore);
-    if (!was_set)
-	printk (KERN_ERR __FUNCTION__ "(): number %d was already free\n",
-		number);
+    if (!was_set) PRINTK ("(): number %d was already free\n", number);
 }   /*  End Function devfs_dealloc_unique_number  */
 EXPORT_SYMBOL(devfs_dealloc_unique_number);
