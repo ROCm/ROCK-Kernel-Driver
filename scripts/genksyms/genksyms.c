@@ -4,7 +4,8 @@
    New implementation contributed by Richard Henderson <rth@tamu.edu>
    Based on original work by Bjorn Ekwall <bj0rn@blox.se>
 
-   This file is part of the Linux modutils.
+   This file was part of the Linux modutils 2.4.22: moved back into the
+   kernel sources by Rusty Russell/Kai Germaschewski.
 
    This program is free software; you can redistribute it and/or modify it
    under the terms of the GNU General Public License as published by the
@@ -32,22 +33,20 @@
 
 /*----------------------------------------------------------------------*/
 
-#define HASH_BUCKETS  4099
+#define HASH_BUCKETS  4096
 
 static struct symbol *symtab[HASH_BUCKETS];
-FILE *outfile, *debugfile;
+FILE *debugfile;
 
 int cur_line = 1;
 char *cur_filename, *output_directory;
 
 int flag_debug, flag_dump_defs, flag_warnings;
-int checksum_version = 1, kernel_version = version(2,0,0);
 
 static int errors;
 static int nsyms;
 
 static struct symbol *expansion_trail;
-static const char *crc_prefix = "";
 
 static const char * const symbol_type_name[] = {
   "normal", "typedef", "enum", "struct", "union"
@@ -355,9 +354,7 @@ expand_and_crc_list(struct string_list *list, unsigned long crc)
 
 	case SYM_TYPEDEF:
 	  subsym = find_symbol(cur->string, cur->tag);
-	  if (checksum_version == 1)
-	    crc = expand_and_crc_list(subsym->defn, crc);
-	  else if (subsym->expansion_trail)
+	  if (subsym->expansion_trail)
 	    {
 	      if (flag_dump_defs)
 		fprintf(debugfile, "%s ", cur->string);
@@ -458,42 +455,12 @@ export_symbol(const char *name)
       if (flag_dump_defs)
 	fputs(">\n", debugfile);
 
-      if (checksum_version > 1)
-	{
-	  fprintf(outfile, "#define __ver_%s\t%s%08lx\n", name,
-		  crc_prefix, crc);
-	  fprintf(outfile, "#define %s\t_set_ver(%s)\n", name, name);
-	}
-      else
-	{
-	  fprintf(outfile, "#define %s\t_set_ver(%s, %s%08lx)\n", name, name,
-		  crc_prefix, crc);
-	}
+      /* Used as a linker script. */
+      printf("__crc_%s = 0x%08lx ;\n", name, crc);
     }
 }
 
-
 /*----------------------------------------------------------------------*/
-
-static int
-parse_kernel_version(char * p)
-{
-  int a, b, c;
-
-  a = strtoul(p, &p, 10);
-  if (*p != '.')
-    return -1;
-  b = strtoul(p+1, &p, 10);
-  if (*p != '.')
-    return -1;
-  c = strtoul(p+1, &p, 10);
-  if (*p != '\0')
-    return -1;
-
-  kernel_version = a << 16 | b << 8 | c;
-
-  return 0;
-}
 
 void
 error(const char *fmt, ...)
@@ -533,7 +500,7 @@ error_with_pos(const char *fmt, ...)
 void genksyms_usage(void)
 {
 	fputs("Usage:\n"
-	      "genksyms [-dDwqhV] [-k kernel_version] [-p prefix] > .../linux/module/*.ver\n"
+	      "genksyms [-dDwqhV] > /path/to/.tmp_obj.ver\n"
 	      "\n"
 	      "  -d, --debug           Increment the debug level (repeatable)\n"
 	      "  -D, --dump            Dump expanded symbol defs (for debugging only)\n"
@@ -541,10 +508,6 @@ void genksyms_usage(void)
 	      "  -q, --quiet           Disable warnings (default)\n"
 	      "  -h, --help            Print this message\n"
 	      "  -V, --version         Print the release version\n"
-	      "  -k ver\n"
-	      "       --kernel ver     Set the kernel version for which we are compiling\n"
-	      "  -p string\n"
-	      "       --prefix string  Set a mangling prefix for all symbols\n"
 	      , stderr);
 }
 
@@ -558,8 +521,6 @@ main(int argc, char **argv)
     {"warnings", 0, 0, 'w'},
     {"quiet", 0, 0, 'q'},
     {"dump", 0, 0, 'D'},
-    {"kernel", 1, 0, 'k'},
-    {"prefix", 1, 0, 'p'},
     {"version", 0, 0, 'V'},
     {"help", 0, 0, 'h'},
     {0, 0, 0, 0}
@@ -579,19 +540,10 @@ main(int argc, char **argv)
 	flag_warnings = 0;
 	break;
       case 'V':
-	fputs("genksyms version " MODUTILS_VERSION "\n", stderr);
+	fputs("genksyms version 2.5.60\n", stderr);
 	break;
       case 'D':
 	flag_dump_defs = 1;
-	break;
-      case 'k':
-	if (parse_kernel_version(optarg)) {
-	    fprintf( stderr, "unrecognised kernel version : %s\n", optarg);
-	    return -1;
-	}
-	break;
-      case 'p':
-	crc_prefix = optarg;
 	break;
       case 'h':
 	genksyms_usage();
@@ -600,27 +552,6 @@ main(int argc, char **argv)
 	genksyms_usage();
 	return 1;
       }
-
-  if (kernel_version >= version(2,1,18))
-    {
-      if (optind != argc) {
-	  genksyms_usage();
-	  return 1;
-      }
-
-      /* For newer kernels, eliminate some irrelevant constructs.  */
-      checksum_version = 2;
-
-      outfile = stdout;
-    }
-  else
-    {
-      if (optind+1 != argc) {
-	  genksyms_usage();
-	  return 1;
-      }
-      output_directory = argv[optind];
-    }
 
     {
       extern int yydebug;
@@ -634,11 +565,6 @@ main(int argc, char **argv)
     }
 
   yyparse();
-
-  if (checksum_version == 1)
-    {
-      fputs("#endif\n#endif\n", outfile);
-    }
 
   if (flag_debug)
     {

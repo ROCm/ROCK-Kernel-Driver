@@ -179,8 +179,7 @@ decl_specifier:
 	storage_class_specifier
 		{ /* Version 2 checksumming ignores storage class, as that
 		     is really irrelevant to the linkage.  */
-		  if (checksum_version > 1)
-		    remove_node($1);
+		  remove_node($1);
 		  $$ = $1;
 		}
 	| type_specifier
@@ -356,15 +355,13 @@ direct_m_abstract_declarator:
 	| IDENT
 		{ /* For version 2 checksums, we don't want to remember
 		     private parameter names.  */
-		  if (checksum_version > 1)
-		    remove_node($1);
+		  remove_node($1);
 		  $$ = $1;
 		}
 	/* This wasn't really a typedef name but an identifier that
 	   shadows one.  */
 	| TYPE
-		{ if (checksum_version > 1)
-		    remove_node($1);
+		{ remove_node($1);
 		  $$ = $1;
 		}
 	| direct_m_abstract_declarator '(' parameter_declaration_clause ')'

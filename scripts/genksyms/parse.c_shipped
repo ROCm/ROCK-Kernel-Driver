@@ -188,17 +188,17 @@ static const short yyrhs[] = {    52,
 static const short yyrline[] = { 0,
    100,   102,   105,   108,   111,   113,   114,   115,   116,   117,
    118,   119,   122,   136,   138,   141,   150,   162,   168,   170,
-   173,   175,   178,   186,   189,   191,   192,   193,   194,   197,
-   199,   203,   205,   207,   211,   218,   225,   234,   235,   236,
-   239,   241,   242,   243,   244,   245,   246,   247,   248,   249,
-   250,   253,   258,   260,   263,   265,   268,   269,   269,   270,
-   277,   279,   282,   292,   294,   296,   298,   300,   306,   308,
-   311,   313,   314,   316,   318,   320,   322,   326,   328,   329,
-   332,   334,   337,   339,   343,   348,   351,   354,   356,   365,
-   370,   372,   374,   376,   378,   382,   391,   393,   397,   402,
-   404,   407,   409,   412,   414,   417,   420,   424,   426,   429,
-   431,   434,   436,   437,   440,   444,   446,   449,   453,   455,
-   458
+   173,   175,   178,   185,   188,   190,   191,   192,   193,   196,
+   198,   202,   204,   206,   210,   217,   224,   233,   234,   235,
+   238,   240,   241,   242,   243,   244,   245,   246,   247,   248,
+   249,   252,   257,   259,   262,   264,   267,   268,   268,   269,
+   276,   278,   281,   291,   293,   295,   297,   299,   305,   307,
+   310,   312,   313,   315,   317,   319,   321,   325,   327,   328,
+   331,   333,   336,   338,   342,   347,   350,   353,   355,   363,
+   367,   369,   371,   373,   375,   379,   388,   390,   394,   399,
+   401,   404,   406,   409,   411,   414,   417,   421,   423,   426,
+   428,   431,   433,   434,   437,   441,   443,   446,   450,   452,
+   455
 };
 #endif
 
@@ -1042,33 +1042,32 @@ case 23:
 #line 180 "scripts/genksyms/parse.y"
 { /* Version 2 checksumming ignores storage class, as that
 		     is really irrelevant to the linkage.  */
-		  if (checksum_version > 1)
-		    remove_node(yyvsp[0]);
+		  remove_node(yyvsp[0]);
 		  yyval = yyvsp[0];
 		;
     break;}
 case 28:
-#line 193 "scripts/genksyms/parse.y"
+#line 192 "scripts/genksyms/parse.y"
 { is_extern = 1; yyval = yyvsp[0]; ;
     break;}
 case 29:
-#line 194 "scripts/genksyms/parse.y"
+#line 193 "scripts/genksyms/parse.y"
 { is_extern = 0; yyval = yyvsp[0]; ;
     break;}
 case 32:
-#line 204 "scripts/genksyms/parse.y"
+#line 203 "scripts/genksyms/parse.y"
 { remove_node(yyvsp[-1]); (*yyvsp[0])->tag = SYM_STRUCT; yyval = yyvsp[0]; ;
     break;}
 case 33:
-#line 206 "scripts/genksyms/parse.y"
+#line 205 "scripts/genksyms/parse.y"
 { remove_node(yyvsp[-1]); (*yyvsp[0])->tag = SYM_UNION; yyval = yyvsp[0]; ;
     break;}
 case 34:
-#line 208 "scripts/genksyms/parse.y"
+#line 207 "scripts/genksyms/parse.y"
 { remove_node(yyvsp[-1]); (*yyvsp[0])->tag = SYM_ENUM; yyval = yyvsp[0]; ;
     break;}
 case 35:
-#line 212 "scripts/genksyms/parse.y"
+#line 211 "scripts/genksyms/parse.y"
 { struct string_list *s = *yyvsp[0], *i = *yyvsp[-1], *r;
 		  r = copy_node(i); r->tag = SYM_STRUCT;
 		  r->next = (*yyvsp[-2])->next; *yyvsp[0] = r; (*yyvsp[-2])->next = NULL;
@@ -1077,7 +1076,7 @@ case 35:
 		;
     break;}
 case 36:
-#line 219 "scripts/genksyms/parse.y"
+#line 218 "scripts/genksyms/parse.y"
 { struct string_list *s = *yyvsp[0], *i = *yyvsp[-1], *r;
 		  r = copy_node(i); r->tag = SYM_UNION;
 		  r->next = (*yyvsp[-2])->next; *yyvsp[0] = r; (*yyvsp[-2])->next = NULL;
@@ -1086,7 +1085,7 @@ case 36:
 		;
     break;}
 case 37:
-#line 226 "scripts/genksyms/parse.y"
+#line 225 "scripts/genksyms/parse.y"
 { struct string_list *s = *yyvsp[0], *i = *yyvsp[-1], *r;
 		  r = copy_node(i); r->tag = SYM_ENUM;
 		  r->next = (*yyvsp[-2])->next; *yyvsp[0] = r; (*yyvsp[-2])->next = NULL;
@@ -1095,46 +1094,46 @@ case 37:
 		;
     break;}
 case 38:
-#line 234 "scripts/genksyms/parse.y"
+#line 233 "scripts/genksyms/parse.y"
 { yyval = yyvsp[0]; ;
     break;}
 case 39:
-#line 235 "scripts/genksyms/parse.y"
+#line 234 "scripts/genksyms/parse.y"
 { yyval = yyvsp[0]; ;
     break;}
 case 40:
-#line 236 "scripts/genksyms/parse.y"
+#line 235 "scripts/genksyms/parse.y"
 { yyval = yyvsp[0]; ;
     break;}
 case 51:
-#line 250 "scripts/genksyms/parse.y"
+#line 249 "scripts/genksyms/parse.y"
 { (*yyvsp[0])->tag = SYM_TYPEDEF; yyval = yyvsp[0]; ;
     break;}
 case 52:
-#line 255 "scripts/genksyms/parse.y"
+#line 254 "scripts/genksyms/parse.y"
 { yyval = yyvsp[0] ? yyvsp[0] : yyvsp[-1]; ;
     break;}
 case 53:
-#line 259 "scripts/genksyms/parse.y"
+#line 258 "scripts/genksyms/parse.y"
 { yyval = NULL; ;
     break;}
 case 56:
-#line 265 "scripts/genksyms/parse.y"
+#line 264 "scripts/genksyms/parse.y"
 { yyval = yyvsp[0]; ;
     break;}
 case 60:
-#line 271 "scripts/genksyms/parse.y"
+#line 270 "scripts/genksyms/parse.y"
 { /* restrict has no effect in prototypes so ignore it */
 		  remove_node(yyvsp[0]);
 		  yyval = yyvsp[0];
 		;
     break;}
 case 61:
-#line 278 "scripts/genksyms/parse.y"
+#line 277 "scripts/genksyms/parse.y"
 { yyval = yyvsp[0]; ;
     break;}
 case 63:
-#line 284 "scripts/genksyms/parse.y"
+#line 283 "scripts/genksyms/parse.y"
 { if (current_name != NULL) {
 		    error_with_pos("unexpected second declaration name");
 		    YYERROR;
@@ -1145,115 +1144,113 @@ case 63:
 		;
     break;}
 case 64:
-#line 293 "scripts/genksyms/parse.y"
+#line 292 "scripts/genksyms/parse.y"
 { yyval = yyvsp[0]; ;
     break;}
 case 65:
-#line 295 "scripts/genksyms/parse.y"
+#line 294 "scripts/genksyms/parse.y"
 { yyval = yyvsp[0]; ;
     break;}
 case 66:
-#line 297 "scripts/genksyms/parse.y"
+#line 296 "scripts/genksyms/parse.y"
 { yyval = yyvsp[0]; ;
     break;}
 case 67:
-#line 299 "scripts/genksyms/parse.y"
+#line 298 "scripts/genksyms/parse.y"
 { yyval = yyvsp[0]; ;
     break;}
 case 68:
-#line 301 "scripts/genksyms/parse.y"
+#line 300 "scripts/genksyms/parse.y"
 { yyval = yyvsp[0]; ;
     break;}
 case 69:
-#line 307 "scripts/genksyms/parse.y"
+#line 306 "scripts/genksyms/parse.y"
 { yyval = yyvsp[0]; ;
     break;}
 case 73:
-#line 315 "scripts/genksyms/parse.y"
+#line 314 "scripts/genksyms/parse.y"
 { yyval = yyvsp[0]; ;
     break;}
 case 74:
-#line 317 "scripts/genksyms/parse.y"
+#line 316 "scripts/genksyms/parse.y"
 { yyval = yyvsp[0]; ;
     break;}
 case 75:
-#line 319 "scripts/genksyms/parse.y"
+#line 318 "scripts/genksyms/parse.y"
 { yyval = yyvsp[0]; ;
     break;}
 case 76:
-#line 321 "scripts/genksyms/parse.y"
+#line 320 "scripts/genksyms/parse.y"
 { yyval = yyvsp[0]; ;
     break;}
 case 77:
-#line 323 "scripts/genksyms/parse.y"
+#line 322 "scripts/genksyms/parse.y"
 { yyval = yyvsp[0]; ;
     break;}
 case 78:
-#line 327 "scripts/genksyms/parse.y"
+#line 326 "scripts/genksyms/parse.y"
 { yyval = yyvsp[0]; ;
     break;}
 case 80:
-#line 329 "scripts/genksyms/parse.y"
+#line 328 "scripts/genksyms/parse.y"
 { yyval = yyvsp[0]; ;
     break;}
 case 81:
-#line 333 "scripts/genksyms/parse.y"
+#line 332 "scripts/genksyms/parse.y"
 { yyval = NULL; ;
     break;}
 case 84:
-#line 340 "scripts/genksyms/parse.y"
+#line 339 "scripts/genksyms/parse.y"
 { yyval = yyvsp[0]; ;
     break;}
 case 85:
-#line 345 "scripts/genksyms/parse.y"
+#line 344 "scripts/genksyms/parse.y"
 { yyval = yyvsp[0] ? yyvsp[0] : yyvsp[-1]; ;
     break;}
 case 86:
-#line 350 "scripts/genksyms/parse.y"
+#line 349 "scripts/genksyms/parse.y"
 { yyval = yyvsp[0] ? yyvsp[0] : yyvsp[-1]; ;
     break;}
 case 88:
-#line 355 "scripts/genksyms/parse.y"
+#line 354 "scripts/genksyms/parse.y"
 { yyval = NULL; ;
     break;}
 case 89:
-#line 357 "scripts/genksyms/parse.y"
+#line 356 "scripts/genksyms/parse.y"
 { /* For version 2 checksums, we don't want to remember
 		     private parameter names.  */
-		  if (checksum_version > 1)
-		    remove_node(yyvsp[0]);
+		  remove_node(yyvsp[0]);
 		  yyval = yyvsp[0];
 		;
     break;}
 case 90:
-#line 366 "scripts/genksyms/parse.y"
-{ if (checksum_version > 1)
-		    remove_node(yyvsp[0]);
+#line 364 "scripts/genksyms/parse.y"
+{ remove_node(yyvsp[0]);
 		  yyval = yyvsp[0];
 		;
     break;}
 case 91:
-#line 371 "scripts/genksyms/parse.y"
+#line 368 "scripts/genksyms/parse.y"
 { yyval = yyvsp[0]; ;
     break;}
 case 92:
-#line 373 "scripts/genksyms/parse.y"
+#line 370 "scripts/genksyms/parse.y"
 { yyval = yyvsp[0]; ;
     break;}
 case 93:
-#line 375 "scripts/genksyms/parse.y"
+#line 372 "scripts/genksyms/parse.y"
 { yyval = yyvsp[0]; ;
     break;}
 case 94:
-#line 377 "scripts/genksyms/parse.y"
+#line 374 "scripts/genksyms/parse.y"
 { yyval = yyvsp[0]; ;
     break;}
 case 95:
-#line 379 "scripts/genksyms/parse.y"
+#line 376 "scripts/genksyms/parse.y"
 { yyval = yyvsp[0]; ;
     break;}
 case 96:
-#line 384 "scripts/genksyms/parse.y"
+#line 381 "scripts/genksyms/parse.y"
 { struct string_list *decl = *yyvsp[-1];
 		  *yyvsp[-1] = NULL;
 		  add_symbol(current_name, SYM_NORMAL, decl, is_extern);
@@ -1261,71 +1258,71 @@ case 96:
 		;
     break;}
 case 97:
-#line 392 "scripts/genksyms/parse.y"
+#line 389 "scripts/genksyms/parse.y"
 { yyval = NULL; ;
     break;}
 case 99:
-#line 399 "scripts/genksyms/parse.y"
+#line 396 "scripts/genksyms/parse.y"
 { remove_list(yyvsp[0], &(*yyvsp[-1])->next); yyval = yyvsp[0]; ;
     break;}
 case 100:
-#line 403 "scripts/genksyms/parse.y"
+#line 400 "scripts/genksyms/parse.y"
 { yyval = yyvsp[0]; ;
     break;}
 case 101:
-#line 404 "scripts/genksyms/parse.y"
+#line 401 "scripts/genksyms/parse.y"
 { yyval = yyvsp[0]; ;
     break;}
 case 102:
-#line 408 "scripts/genksyms/parse.y"
+#line 405 "scripts/genksyms/parse.y"
 { yyval = NULL; ;
     break;}
 case 105:
-#line 414 "scripts/genksyms/parse.y"
+#line 411 "scripts/genksyms/parse.y"
 { yyval = yyvsp[0]; ;
     break;}
 case 106:
-#line 419 "scripts/genksyms/parse.y"
+#line 416 "scripts/genksyms/parse.y"
 { yyval = yyvsp[0]; ;
     break;}
 case 107:
-#line 421 "scripts/genksyms/parse.y"
+#line 418 "scripts/genksyms/parse.y"
 { yyval = yyvsp[0]; ;
     break;}
 case 108:
-#line 425 "scripts/genksyms/parse.y"
+#line 422 "scripts/genksyms/parse.y"
 { yyval = NULL; ;
     break;}
 case 111:
-#line 431 "scripts/genksyms/parse.y"
+#line 428 "scripts/genksyms/parse.y"
 { yyval = yyvsp[0]; ;
     break;}
 case 112:
-#line 435 "scripts/genksyms/parse.y"
+#line 432 "scripts/genksyms/parse.y"
 { yyval = yyvsp[0] ? yyvsp[0] : yyvsp[-1]; ;
     break;}
 case 113:
-#line 436 "scripts/genksyms/parse.y"
+#line 433 "scripts/genksyms/parse.y"
 { yyval = yyvsp[0]; ;
     break;}
 case 115:
-#line 441 "scripts/genksyms/parse.y"
+#line 438 "scripts/genksyms/parse.y"
 { yyval = yyvsp[0]; ;
     break;}
 case 116:
-#line 445 "scripts/genksyms/parse.y"
+#line 442 "scripts/genksyms/parse.y"
 { yyval = NULL; ;
     break;}
 case 118:
-#line 450 "scripts/genksyms/parse.y"
+#line 447 "scripts/genksyms/parse.y"
 { yyval = yyvsp[0]; ;
     break;}
 case 119:
-#line 454 "scripts/genksyms/parse.y"
+#line 451 "scripts/genksyms/parse.y"
 { yyval = NULL; ;
     break;}
 case 121:
-#line 460 "scripts/genksyms/parse.y"
+#line 457 "scripts/genksyms/parse.y"
 { export_symbol((*yyvsp[-2])->string); yyval = yyvsp[0]; ;
     break;}
 }
@@ -1550,7 +1547,7 @@ yyerrhandle:
     }
   return 1;
 }
-#line 464 "scripts/genksyms/parse.y"
+#line 461 "scripts/genksyms/parse.y"
 
 
 static void
