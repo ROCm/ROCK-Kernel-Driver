@@ -176,7 +176,7 @@ static void longhaul_setstate(unsigned int clock_ratio_index)
 
 	if (old_ratio == clock_ratio_index)
 		return;
-	oldratio = clock_ratio_index;
+	old_ratio = clock_ratio_index;
 
 	mult = clock_ratio[clock_ratio_index];
 	if (mult == -1)
