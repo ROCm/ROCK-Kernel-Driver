@@ -930,10 +930,6 @@ static struct tty_driver *serial_driver;
 static void mgsl_change_params(struct mgsl_struct *info);
 static void mgsl_wait_until_sent(struct tty_struct *tty, int timeout);
 
-#ifndef MIN
-#define MIN(a,b)	((a) < (b) ? (a) : (b))
-#endif
-
 /*
  * 1st function defined in .text section. Calling this function in
  * init_module() followed by a breakpoint allows a remote debugger
@@ -2246,8 +2242,8 @@ static int mgsl_write(struct tty_struct * tty, int from_user,
 		if (from_user) {
 			down(&tmp_buf_sem);
 			while (1) {
-				c = MIN(count,
-					MIN(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
+				c = min_t(int, count,
+					min(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
 					    SERIAL_XMIT_SIZE - info->xmit_head));
 				if (c <= 0)
 					break;
@@ -2260,7 +2256,7 @@ static int mgsl_write(struct tty_struct * tty, int from_user,
 					break;
 				}
 				spin_lock_irqsave(&info->irq_spinlock,flags);
-				c = MIN(c, MIN(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
+				c = min_t(int, c, min(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
 					       SERIAL_XMIT_SIZE - info->xmit_head));
 				memcpy(info->xmit_buf + info->xmit_head, tmp_buf, c);
 				info->xmit_head = ((info->xmit_head + c) &
@@ -2275,8 +2271,8 @@ static int mgsl_write(struct tty_struct * tty, int from_user,
 		} else {
 			while (1) {
 				spin_lock_irqsave(&info->irq_spinlock,flags);
-				c = MIN(count,
-					MIN(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
+				c = min_t(int, count,
+					min(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
 					    SERIAL_XMIT_SIZE - info->xmit_head));
 				if (c <= 0) {
 					spin_unlock_irqrestore(&info->irq_spinlock,flags);
@@ -3314,7 +3310,7 @@ static void mgsl_wait_until_sent(struct tty_struct *tty, int timeout)
 		char_time = 1;
 		
 	if (timeout)
-		char_time = MIN(char_time, timeout);
+		char_time = min_t(unsigned long, char_time, timeout);
 		
 	if ( info->params.mode == MGSL_MODE_HDLC ||
 		info->params.mode == MGSL_MODE_RAW ) {
@@ -6767,7 +6763,7 @@ int mgsl_get_rx_frame(struct mgsl_struct *info)
 			
 	if ( debug_level >= DEBUG_LEVEL_DATA )
 		mgsl_trace_block(info,info->rx_buffer_list[StartIndex].virt_addr,
-			MIN(framesize,DMABUFFERSIZE),0);	
+			min_t(int, framesize, DMABUFFERSIZE),0);
 		
 	if (framesize) {
 		if ( ( (info->params.crc_type & HDLC_CRC_RETURN_EX) &&
@@ -6982,7 +6978,7 @@ int mgsl_get_raw_rx_frame(struct mgsl_struct *info)
 
 		if ( debug_level >= DEBUG_LEVEL_DATA )
 			mgsl_trace_block(info,info->rx_buffer_list[CurrentIndex].virt_addr,
-				MIN(framesize,DMABUFFERSIZE),0);
+				min_t(int, framesize, DMABUFFERSIZE),0);
 
 		if (framesize) {
 			/* copy dma buffer(s) to contiguous intermediate buffer */
@@ -7042,7 +7038,7 @@ void mgsl_load_tx_dma_buffer(struct mgsl_struct *info, const char *Buffer,
 	DMABUFFERENTRY *pBufEntry;
 	
 	if ( debug_level >= DEBUG_LEVEL_DATA )
-		mgsl_trace_block(info,Buffer, MIN(BufferSize,DMABUFFERSIZE), 1);	
+		mgsl_trace_block(info,Buffer, min_t(int, BufferSize, DMABUFFERSIZE), 1);
 
 	if (info->params.flags & HDLC_FLAG_HDLC_LOOPMODE) {
 		/* set CMR:13 to start transmit when
