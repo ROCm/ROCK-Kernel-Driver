@@ -42,6 +42,8 @@
 #if defined(CONFIG_PM) && defined(CONFIG_PMAC_PBOOK)
 static int snd_pmac_register_sleep_notifier(pmac_t *chip);
 static int snd_pmac_unregister_sleep_notifier(pmac_t *chip);
+static int snd_pmac_suspend(snd_card_t *card, unsigned int state);
+static int snd_pmac_resume(snd_card_t *card, unsigned int state);
 #endif
 
 
