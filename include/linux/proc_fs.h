@@ -206,14 +206,13 @@ static inline struct proc_dir_entry *create_proc_entry(const char *name,
 #define remove_proc_entry(name, parent) do {} while (0)
 
 static inline struct proc_dir_entry *proc_symlink(const char *name,
-		struct proc_dir_entry *parent,char *dest) {return NULL;}
+		struct proc_dir_entry *parent,const char *dest) {return NULL;}
 static inline struct proc_dir_entry *proc_mkdir(const char *name,
 	struct proc_dir_entry *parent) {return NULL;}
 
 static inline struct proc_dir_entry *create_proc_read_entry(const char *name,
 	mode_t mode, struct proc_dir_entry *base, 
-	int (*read_proc)(char *, char **, off_t, int, int *, void *),
-	void * data) { return NULL; }
+	read_proc_t *read_proc, void * data) { return NULL; }
 static inline struct proc_dir_entry *create_proc_info_entry(const char *name,
 	mode_t mode, struct proc_dir_entry *base, get_info_t *get_info)
 	{ return NULL; }
