@@ -3252,10 +3252,10 @@ void ata_pci_remove_one (struct pci_dev *pdev)
 	}
 
 	free_irq(host_set->irq, host_set);
-	if (host_set->mmio_base)
-		iounmap(host_set->mmio_base);
 	if (host_set->ops->host_stop)
 		host_set->ops->host_stop(host_set);
+	if (host_set->mmio_base)
+		iounmap(host_set->mmio_base);
 
 	for (i = 0; i < host_set->n_ports; i++) {
 		ap = host_set->ports[i];
