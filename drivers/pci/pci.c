@@ -1585,10 +1585,10 @@ pci_pm_callback(struct pm_dev *pm_device, pm_request_t rqst, void *data)
 
 	switch (rqst) {
 	case PM_SAVE_STATE:
-		error = pci_pm_save_state((u32)data);
+		error = pci_pm_save_state((unsigned long)data);
 		break;
 	case PM_SUSPEND:
-		error = pci_pm_suspend((u32)data);
+		error = pci_pm_suspend((unsigned long)data);
 		break;
 	case PM_RESUME:
 		error = pci_pm_resume();
