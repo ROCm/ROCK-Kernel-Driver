@@ -280,8 +280,6 @@ static void        nsp_cs_detach(dev_link_t *);
 static unsigned int nsphw_start_selection(Scsi_Cmnd *SCpnt, nsp_hw_data *data);
 static void nsp_start_timer(Scsi_Cmnd *SCpnt, nsp_hw_data *data, int time);
 
-static int nsp_detect(Scsi_Host_Template * );
-static int nsp_release(struct Scsi_Host *shpnt);
 static const char *nsp_info(struct Scsi_Host *shpnt);
 static int nsp_proc_info(char *buffer, char **start, off_t offset,
 			 int length, int hostno, int inout);
