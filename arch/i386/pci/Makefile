@@ -2,10 +2,6 @@ O_TARGET        := pci.o
 
 obj-y		:= i386.o
 
-ifdef	CONFIG_VISWS
-obj-y		+= visws.o
-else
-
 obj-$(CONFIG_PCI_BIOS)		+= pcbios.o
 obj-$(CONFIG_PCI_DIRECT)	+= direct.o
 
@@ -22,6 +18,5 @@ obj-y		+= legacy.o
 
 endif		# CONFIG_MULTIQUAD
 obj-y		+= irq.o common.o
-endif		# CONFIG_VISWS
 
 include $(TOPDIR)/Rules.make

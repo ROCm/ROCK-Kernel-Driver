@@ -49,6 +49,8 @@
 #include <asm/pgalloc.h>
 #include <asm/tlbflush.h>
 #include <asm/smpboot.h>
+#include <asm/desc.h>
+#include <asm/arch_hooks.h>
 
 /* Set if we find a B stepping CPU			*/
 static int smp_b_stepping;
@@ -1252,4 +1254,30 @@ void __init smp_boot_cpus(void)
 
 smp_done:
 	zap_low_mappings();
+}
+
+void __init smp_intr_init()
+{
+	/*
+	 * IRQ0 must be given a fixed assignment and initialized,
+	 * because it's used before the IO-APIC is set up.
+	 */
+	set_intr_gate(FIRST_DEVICE_VECTOR, interrupt[0]);
+
+	/*
+	 * The reschedule interrupt is a CPU-to-CPU reschedule-helper
+	 * IPI, driven by wakeup.
+	 */
+	set_intr_gate(RESCHEDULE_VECTOR, reschedule_interrupt);
+
+	/* IPI for invalidation */
+	set_intr_gate(INVALIDATE_TLB_VECTOR, invalidate_interrupt);
+
+	/* IPI for generic function call */
+	set_intr_gate(CALL_FUNCTION_VECTOR, call_function_interrupt);
+
+	/* thermal monitor LVT interrupt */
+#ifdef CONFIG_X86_MCE_P4THERMAL
+	set_intr_gate(THERMAL_APIC_VECTOR, thermal_interrupt);
+#endif
 }
