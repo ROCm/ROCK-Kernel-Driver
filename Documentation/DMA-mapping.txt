@@ -5,6 +5,10 @@
 		 Richard Henderson <rth@cygnus.com>
 		  Jakub Jelinek <jakub@redhat.com>
 
+This document describes the DMA mapping system in terms of the pci_
+API.  For a similar API that works for generic devices, see
+DMA-API.txt.
+
 Most of the 64bit platforms have special hardware that translates bus
 addresses (DMA addresses) into physical addresses.  This is similar to
 how page tables and/or a TLB translates virtual addresses to physical
