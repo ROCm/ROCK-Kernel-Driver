@@ -529,30 +529,6 @@ static int exec_mmap(struct mm_struct *mm)
 	return 0;
 }
 
-static struct dentry *clean_proc_dentry(struct task_struct *p)
-{
-	struct dentry *proc_dentry = p->proc_dentry;
-
-	if (proc_dentry) {
-		spin_lock(&dcache_lock);
-		if (!d_unhashed(proc_dentry)) {
-			dget_locked(proc_dentry);
-			__d_drop(proc_dentry);
-		} else
-			proc_dentry = NULL;
-		spin_unlock(&dcache_lock);
-	}
-	return proc_dentry;
-}
-
-static inline void put_proc_dentry(struct dentry *dentry)
-{
-	if (dentry) {
-		shrink_dcache_parent(dentry);
-		dput(dentry);
-	}
-}
-
 /*
  * This function makes sure the current process has its own signal table,
  * so that flush_signal_handlers can later reset the handlers without
@@ -660,9 +636,11 @@ static inline int de_thread(struct task_struct *tsk)
 		while (leader->state != TASK_ZOMBIE)
 			yield();
 
+		spin_lock(&leader->proc_lock);
+		spin_lock(&current->proc_lock);
+		proc_dentry1 = proc_pid_unhash(current);
+		proc_dentry2 = proc_pid_unhash(leader);
 		write_lock_irq(&tasklist_lock);
-		proc_dentry1 = clean_proc_dentry(current);
-		proc_dentry2 = clean_proc_dentry(leader);
 
 		if (leader->tgid != current->tgid)
 			BUG();
@@ -702,9 +680,10 @@ static inline int de_thread(struct task_struct *tsk)
 		state = leader->state;
 
 		write_unlock_irq(&tasklist_lock);
-
-		put_proc_dentry(proc_dentry1);
-		put_proc_dentry(proc_dentry2);
+		spin_unlock(&leader->proc_lock);
+		spin_unlock(&current->proc_lock);
+		proc_pid_flush(proc_dentry1);
+		proc_pid_flush(proc_dentry2);
 
 		if (state != TASK_ZOMBIE)
 			BUG();

@@ -21,6 +21,7 @@
 #include <linux/ptrace.h>
 #include <linux/profile.h>
 #include <linux/mount.h>
+#include <linux/proc_fs.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
@@ -31,10 +32,8 @@ extern struct task_struct *child_reaper;
 
 int getrusage(struct task_struct *, int, struct rusage *);
 
-static struct dentry * __unhash_process(struct task_struct *p)
+static void __unhash_process(struct task_struct *p)
 {
-	struct dentry *proc_dentry;
-
 	nr_threads--;
 	detach_pid(p, PIDTYPE_PID);
 	detach_pid(p, PIDTYPE_TGID);
@@ -46,34 +45,25 @@ static struct dentry * __unhash_process(struct task_struct *p)
 	}
 
 	REMOVE_LINKS(p);
-	proc_dentry = p->proc_dentry;
-	if (unlikely(proc_dentry != NULL)) {
-		spin_lock(&dcache_lock);
-		if (!d_unhashed(proc_dentry)) {
-			dget_locked(proc_dentry);
-			__d_drop(proc_dentry);
-		} else
-			proc_dentry = NULL;
-		spin_unlock(&dcache_lock);
-	}
-	return proc_dentry;
 }
 
 void release_task(struct task_struct * p)
 {
-	struct dentry *proc_dentry;
 	task_t *leader;
+	struct dentry *proc_dentry;
  
 	BUG_ON(p->state < TASK_ZOMBIE);
  
 	atomic_dec(&p->user->processes);
+	spin_lock(&p->proc_lock);
+	proc_dentry = proc_pid_unhash(p);
 	write_lock_irq(&tasklist_lock);
 	if (unlikely(p->ptrace))
 		__ptrace_unlink(p);
 	BUG_ON(!list_empty(&p->ptrace_list) || !list_empty(&p->ptrace_children));
 	__exit_signal(p);
 	__exit_sighand(p);
-	proc_dentry = __unhash_process(p);
+	__unhash_process(p);
 
 	/*
 	 * If we are the last non-leader member of the thread
@@ -92,11 +82,8 @@ void release_task(struct task_struct * p)
 	p->parent->cnswap += p->nswap + p->cnswap;
 	sched_exit(p);
 	write_unlock_irq(&tasklist_lock);
-
-	if (unlikely(proc_dentry != NULL)) {
-		shrink_dcache_parent(proc_dentry);
-		dput(proc_dentry);
-	}
+	spin_unlock(&p->proc_lock);
+	proc_pid_flush(proc_dentry);
 	release_thread(p);
 	put_task_struct(p);
 }
@@ -107,14 +94,13 @@ void unhash_process(struct task_struct *p)
 {
 	struct dentry *proc_dentry;
 
+	spin_lock(&p->proc_lock);
+	proc_dentry = proc_pid_unhash(p);
 	write_lock_irq(&tasklist_lock);
-	proc_dentry = __unhash_process(p);
+	__unhash_process(p);
 	write_unlock_irq(&tasklist_lock);
-
-	if (unlikely(proc_dentry != NULL)) {
-		shrink_dcache_parent(proc_dentry);
-		dput(proc_dentry);
-	}
+	spin_unlock(&p->proc_lock);
+	proc_pid_flush(proc_dentry);
 }
 
 /*

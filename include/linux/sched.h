@@ -429,6 +429,8 @@ struct task_struct {
    	u32 self_exec_id;
 /* Protection of (de-)allocation: mm, files, fs, tty */
 	spinlock_t alloc_lock;
+/* Protection of proc_dentry: nesting proc_lock, dcache_lock, write_lock_irq(&tasklist_lock); */
+	spinlock_t proc_lock;
 /* context-switch lock */
 	spinlock_t switch_lock;
 

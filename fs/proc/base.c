@@ -624,6 +624,12 @@ static struct inode_operations proc_pid_link_inode_operations = {
 	.follow_link	= proc_pid_follow_link
 };
 
+static int pid_alive(struct task_struct *p)
+{
+	BUG_ON(p->pids[PIDTYPE_PID].pidptr != &p->pids[PIDTYPE_PID].pid);
+	return atomic_read(&p->pids[PIDTYPE_PID].pid.count);
+}
+
 #define NUMBUF 10
 
 static int proc_readfd(struct file * filp, void * dirent, filldir_t filldir)
@@ -635,6 +641,9 @@ static int proc_readfd(struct file * filp, void * dirent, filldir_t filldir)
 	char buf[NUMBUF];
 	struct files_struct * files;
 
+	retval = -ENOENT;
+	if (!pid_alive(p))
+		goto out;
 	retval = 0;
 	pid = p->pid;
 
@@ -696,48 +705,46 @@ static int proc_base_readdir(struct file * filp,
 	int pid;
 	struct inode *inode = filp->f_dentry->d_inode;
 	struct pid_entry *p;
-	int ret = 0;
+	int ret;
 
-	lock_kernel();
-
-	pid = proc_task(inode)->pid;
-	if (!pid) {
-		ret = -ENOENT;
+	ret = -ENOENT;
+	if (!pid_alive(proc_task(inode)))
 		goto out;
-	}
+
+	ret = 0;
+	pid = proc_task(inode)->pid;
 	i = filp->f_pos;
 	switch (i) {
-		case 0:
-			if (filldir(dirent, ".", 1, i, inode->i_ino, DT_DIR) < 0)
+	case 0:
+		if (filldir(dirent, ".", 1, i, inode->i_ino, DT_DIR) < 0)
+			goto out;
+		i++;
+		filp->f_pos++;
+		/* fall through */
+	case 1:
+		if (filldir(dirent, "..", 2, i, PROC_ROOT_INO, DT_DIR) < 0)
+			goto out;
+		i++;
+		filp->f_pos++;
+		/* fall through */
+	default:
+		i -= 2;
+		if (i >= ARRAY_SIZE(base_stuff)) {
+			ret = 1;
+			goto out;
+		}
+		p = base_stuff + i;
+		while (p->name) {
+			if (filldir(dirent, p->name, p->len, filp->f_pos,
+				    fake_ino(pid, p->type), p->mode >> 12) < 0)
 				goto out;
-			i++;
 			filp->f_pos++;
-			/* fall through */
-		case 1:
-			if (filldir(dirent, "..", 2, i, PROC_ROOT_INO, DT_DIR) < 0)
-				goto out;
-			i++;
-			filp->f_pos++;
-			/* fall through */
-		default:
-			i -= 2;
-			if (i>=sizeof(base_stuff)/sizeof(base_stuff[0])) {
-				ret = 1;
-				goto out;
-			}
-			p = base_stuff + i;
-			while (p->name) {
-				if (filldir(dirent, p->name, p->len, filp->f_pos,
-					    fake_ino(pid, p->type), p->mode >> 12) < 0)
-					goto out;
-				filp->f_pos++;
-				p++;
-			}
+			p++;
+		}
 	}
 
 	ret = 1;
 out:
-	unlock_kernel();
 	return ret;
 }
 
@@ -774,7 +781,7 @@ static struct inode *proc_pid_make_inode(struct super_block * sb, struct task_st
 	inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
 	inode->i_ino = fake_ino(task->pid, ino);
 
-	if (!task->pid)
+	if (!pid_alive(task))
 		goto out_unlock;
 
 	/*
@@ -808,7 +815,7 @@ out_unlock:
  */
 static int pid_revalidate(struct dentry * dentry, int flags)
 {
-	if (proc_task(dentry->d_inode)->pid)
+	if (pid_alive(proc_task(dentry->d_inode)))
 		return 1;
 	d_drop(dentry);
 	return 0;
@@ -842,17 +849,22 @@ static int pid_fd_revalidate(struct dentry * dentry, int flags)
 static void pid_base_iput(struct dentry *dentry, struct inode *inode)
 {
 	struct task_struct *task = proc_task(inode);
-	write_lock_irq(&tasklist_lock);
+	spin_lock(&task->proc_lock);
 	if (task->proc_dentry == dentry)
 		task->proc_dentry = NULL;
-	write_unlock_irq(&tasklist_lock);
+	spin_unlock(&task->proc_lock);
 	iput(inode);
 }
 
 static int pid_delete_dentry(struct dentry * dentry)
 {
-	return proc_task(dentry->d_inode)->pid == 0;
+	/* Is the task we represent dead?
+	 * If so, then don't put the dentry on the lru list,
+	 * kill it immediately.
+	 */
+	return !pid_alive(proc_task(dentry->d_inode));
 }
+
 
 static struct dentry_operations pid_fd_dentry_operations =
 {
@@ -909,6 +921,8 @@ static struct dentry *proc_lookupfd(struct inode * dir, struct dentry * dentry)
 
 	if (fd == ~0U)
 		goto out;
+	if (!pid_alive(task))
+		goto out;
 
 	inode = proc_pid_make_inode(dir->i_sb, task, PROC_PID_FD_DIR+fd);
 	if (!inode)
@@ -937,8 +951,6 @@ static struct dentry *proc_lookupfd(struct inode * dir, struct dentry * dentry)
 	ei->op.proc_get_link = proc_fd_link;
 	dentry->d_op = &pid_fd_dentry_operations;
 	d_add(dentry, inode);
-	if (!proc_task(dentry->d_inode)->pid)
-		d_drop(dentry);
 	return NULL;
 
 out_unlock2:
@@ -974,6 +986,9 @@ static struct dentry *proc_base_lookup(struct inode *dir, struct dentry *dentry)
 
 	error = -ENOENT;
 	inode = NULL;
+
+	if (!pid_alive(task))
+		goto out;
 
 	for (p = base_stuff; p->name; p++) {
 		if (p->len != dentry->d_name.len)
@@ -1056,8 +1071,6 @@ static struct dentry *proc_base_lookup(struct inode *dir, struct dentry *dentry)
 	}
 	dentry->d_op = &pid_dentry_operations;
 	d_add(dentry, inode);
-	if (!proc_task(dentry->d_inode)->pid)
-		d_drop(dentry);
 	return NULL;
 
 out:
@@ -1094,6 +1107,55 @@ static struct inode_operations proc_self_inode_operations = {
 	.readlink	= proc_self_readlink,
 	.follow_link	= proc_self_follow_link,
 };
+
+/**
+ * proc_pid_unhash -  Unhash /proc/<pid> entry from the dcache.
+ * @p: task that should be flushed.
+ *
+ * Drops the /proc/<pid> dcache entry from the hash chains.
+ *
+ * Dropping /proc/<pid> entries and detach_pid must be synchroneous,
+ * otherwise e.g. /proc/<pid>/exe might point to the wrong executable,
+ * if the pid value is immediately reused. This is enforced by
+ * - caller must acquire spin_lock(p->proc_lock)
+ * - must be called before detach_pid()
+ * - proc_pid_lookup acquires proc_lock, and checks that
+ *   the target is not dead by looking at the attach count
+ *   of PIDTYPE_PID.
+ */
+
+struct dentry *proc_pid_unhash(struct task_struct *p)
+{
+	struct dentry *proc_dentry;
+
+	proc_dentry = p->proc_dentry;
+	if (proc_dentry != NULL) {
+
+		spin_lock(&dcache_lock);
+		if (!d_unhashed(proc_dentry)) {
+			dget_locked(proc_dentry);
+			__d_drop(proc_dentry);
+		} else
+			proc_dentry = NULL;
+		spin_unlock(&dcache_lock);
+	}
+	return proc_dentry;
+}
+
+/**
+ * proc_pid_flush - recover memory used by stale /proc/<pid>/x entries
+ * @proc_entry: directoy to prune.
+ *
+ * Shrink the /proc directory that was used by the just killed thread.
+ */
+	
+void proc_pid_flush(struct dentry *proc_dentry)
+{
+	if(proc_dentry != NULL) {
+		shrink_dcache_parent(proc_dentry);
+		dput(proc_dentry);
+	}
+}
 
 /* SMP-safe */
 struct dentry *proc_pid_lookup(struct inode *dir, struct dentry * dentry)
@@ -1143,12 +1205,12 @@ struct dentry *proc_pid_lookup(struct inode *dir, struct dentry * dentry)
 	inode->i_flags|=S_IMMUTABLE;
 
 	dentry->d_op = &pid_base_dentry_operations;
+
+	spin_lock(&task->proc_lock);
+	task->proc_dentry = dentry;
 	d_add(dentry, inode);
-	read_lock(&tasklist_lock);
-	proc_task(dentry->d_inode)->proc_dentry = dentry;
-	read_unlock(&tasklist_lock);
-	if (!proc_task(dentry->d_inode)->pid)
-		d_drop(dentry);
+	spin_unlock(&task->proc_lock);
+
 	return NULL;
 out:
 	return ERR_PTR(-ENOENT);
@@ -1171,7 +1233,7 @@ static int get_pid_list(int index, unsigned int *pids)
 	read_lock(&tasklist_lock);
 	for_each_process(p) {
 		int pid = p->pid;
-		if (!pid)
+		if (!pid_alive(p))
 			continue;
 		if (--index >= 0)
 			continue;

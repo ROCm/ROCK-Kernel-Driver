@@ -110,9 +110,9 @@ static int proc_root_readdir(struct file * filp,
 		}
 		filp->f_pos = FIRST_PROCESS_ENTRY;
 	}
+	unlock_kernel();
 
 	ret = proc_pid_readdir(filp, dirent, filldir);
-	unlock_kernel();
 	return ret;
 }
 
