@@ -1946,6 +1946,7 @@ static int cdrom_read_cdda_bpc(struct cdrom_device_info *cdi, __u8 __user *ubuf,
 {
 	request_queue_t *q = cdi->disk->queue;
 	struct request *rq;
+	struct bio *bio;
 	unsigned int len;
 	int nr, ret = 0;
 
@@ -1980,6 +1981,7 @@ static int cdrom_read_cdda_bpc(struct cdrom_device_info *cdi, __u8 __user *ubuf,
 		rq->cmd_len = 12;
 		rq->flags |= REQ_BLOCK_PC;
 		rq->timeout = 60 * HZ;
+		bio = rq->bio;
 
 		if (blk_execute_rq(q, cdi->disk, rq)) {
 			struct request_sense *s = rq->sense;
@@ -1987,7 +1989,7 @@ static int cdrom_read_cdda_bpc(struct cdrom_device_info *cdi, __u8 __user *ubuf,
 			cdi->last_sense = s->sense_key;
 		}
 
-		if (blk_rq_unmap_user(rq, ubuf, len))
+		if (blk_rq_unmap_user(rq, ubuf, bio, len))
 			ret = -EFAULT;
 
 		if (ret)
