@@ -302,7 +302,7 @@ static struct i2c_algorithm smbus_algorithm = {
 	.functionality	= amd756_func,
 };
 
-static struct i2c_adapter amd756_adapter = {
+struct i2c_adapter amd756_smbus = {
 	.owner		= THIS_MODULE,
 	.class          = I2C_CLASS_HWMON,
 	.algo		= &smbus_algorithm,
@@ -374,12 +374,12 @@ static int __devinit amd756_probe(struct pci_dev *pdev,
 	dev_dbg(&pdev->dev, "AMD756_smba = 0x%X\n", amd756_ioport);
 
 	/* set up the driverfs linkage to our parent device */
-	amd756_adapter.dev.parent = &pdev->dev;
+	amd756_smbus.dev.parent = &pdev->dev;
 
-	sprintf(amd756_adapter.name, "SMBus %s adapter at %04x",
+	sprintf(amd756_smbus.name, "SMBus %s adapter at %04x",
 		chipname[id->driver_data], amd756_ioport);
 
-	error = i2c_add_adapter(&amd756_adapter);
+	error = i2c_add_adapter(&amd756_smbus);
 	if (error) {
 		dev_err(&pdev->dev,
 			"Adapter registration failed, module not inserted\n");
@@ -395,7 +395,7 @@ static int __devinit amd756_probe(struct pci_dev *pdev,
 
 static void __devexit amd756_remove(struct pci_dev *dev)
 {
-	i2c_del_adapter(&amd756_adapter);
+	i2c_del_adapter(&amd756_smbus);
 	release_region(amd756_ioport, SMB_IOSIZE);
 }
 
@@ -419,6 +419,8 @@ static void __exit amd756_exit(void)
 MODULE_AUTHOR("Merlin Hughes <merlin@merlin.org>");
 MODULE_DESCRIPTION("AMD756/766/768/8111 and nVidia nForce SMBus driver");
 MODULE_LICENSE("GPL");
+
+EXPORT_SYMBOL(amd756_smbus);
 
 module_init(amd756_init)
 module_exit(amd756_exit)
