@@ -101,6 +101,7 @@
  */
 
 #include <linux/fs.h>
+#include <linux/quotaops.h>
 #include "jfs_incore.h"
 #include "jfs_superblock.h"
 #include "jfs_filsys.h"
@@ -380,7 +381,8 @@ static u32 add_index(tid_t tid, struct inode *ip, s64 bn, int slot)
 		 * It's time to move the inline table to an external
 		 * page and begin to build the xtree
 		 */
-		if (dbAlloc(ip, 0, sbi->nbperpage, &xaddr))
+		if (DQUOT_ALLOC_BLOCK(ip, sbi->nbperpage) ||
+		    dbAlloc(ip, 0, sbi->nbperpage, &xaddr))
 			goto clean_up;	/* No space */
 
 		/*
@@ -405,7 +407,6 @@ static u32 add_index(tid_t tid, struct inode *ip, s64 bn, int slot)
 			goto clean_up;
 		}
 		ip->i_size = PSIZE;
-		ip->i_blocks += LBLK2PBLK(sb, sbi->nbperpage);
 
 		if ((mp = get_index_page(ip, 0)) == 0) {
 			jfs_err("add_index: get_metapage failed!");
@@ -447,7 +448,6 @@ static u32 add_index(tid_t tid, struct inode *ip, s64 bn, int slot)
 			goto clean_up;
 		}
 		ip->i_size += PSIZE;
-		ip->i_blocks += LBLK2PBLK(sb, sbi->nbperpage);
 
 		if ((mp = get_index_page(ip, blkno)))
 			memset(mp->data, 0, PSIZE);	/* Just looks better */
@@ -946,6 +946,7 @@ static int dtSplitUp(tid_t tid,
 	struct dt_lock *dtlck;
 	struct tlock *tlck;
 	struct lv *lv;
+	int quota_allocation = 0;
 
 	/* get split page */
 	smp = split->mp;
@@ -992,7 +993,9 @@ static int dtSplitUp(tid_t tid,
 		split->pxdlist = &pxdlist;
 		rc = dtSplitRoot(tid, ip, split, &rmp);
 
-		if (!rc)
+		if (rc)
+			dbFree(ip, xaddr, xlen);
+		else
 			DT_PUTPAGE(rmp);
 
 		DT_PUTPAGE(smp);
@@ -1017,6 +1020,14 @@ static int dtSplitUp(tid_t tid,
 			n = xlen + (xlen << 1);
 		else
 			n = xlen;
+
+		/* Allocate blocks to quota. */
+		if (DQUOT_ALLOC_BLOCK(ip, n)) {
+			rc = -EDQUOT;
+			goto extendOut;
+		}
+		quota_allocation += n;
+
 		if ((rc = dbReAlloc(sbi->ipbmap, xaddr, (s64) xlen,
 				    (s64) n, &nxaddr)))
 			goto extendOut;
@@ -1285,6 +1296,10 @@ static int dtSplitUp(tid_t tid,
       freeKeyName:
 	kfree(key.name);
 
+	/* Rollback quota allocation */
+	if (rc && quota_allocation)
+		DQUOT_FREE_BLOCK(ip, quota_allocation);
+
       dtSplitUp_Exit:
 
 	return rc;
@@ -1305,7 +1320,6 @@ static int dtSplitUp(tid_t tid,
 static int dtSplitPage(tid_t tid, struct inode *ip, struct dtsplit * split,
 	    struct metapage ** rmpp, dtpage_t ** rpp, pxd_t * rpxdp)
 {
-	struct super_block *sb = ip->i_sb;
 	int rc = 0;
 	struct metapage *smp;
 	dtpage_t *sp;
@@ -1343,6 +1357,12 @@ static int dtSplitPage(tid_t tid, struct inode *ip, struct dtsplit * split,
 	rmp = get_metapage(ip, rbn, PSIZE, 1);
 	if (rmp == NULL)
 		return -EIO;
+
+	/* Allocate blocks to quota. */
+	if (DQUOT_ALLOC_BLOCK(ip, lengthPXD(pxd))) {
+		release_metapage(rmp);
+		return -EDQUOT;
+	}
 
 	jfs_info("dtSplitPage: ip:0x%p smp:0x%p rmp:0x%p", ip, smp, rmp);
 
@@ -1593,8 +1613,6 @@ static int dtSplitPage(tid_t tid, struct inode *ip, struct dtsplit * split,
 	*rmpp = rmp;
 	*rpxdp = *pxd;
 
-	ip->i_blocks += LBLK2PBLK(sb, lengthPXD(pxd));
-
 	return rc;
 }
 
@@ -1823,16 +1841,6 @@ static int dtExtendPage(tid_t tid,
 	tpxd = (pxd_t *) & pp->slot[1];
 	*tpxd = *pxd;
 
-	/* Since the directory might have an EA and/or ACL associated with it
-	 * we need to make sure we take that into account when setting the
-	 * i_nblocks
-	 */
-	ip->i_blocks = LBLK2PBLK(ip->i_sb, xlen +
-				 ((JFS_IP(ip)->ea.flag & DXD_EXTENT) ?
-				  lengthDXD(&JFS_IP(ip)->ea) : 0) +
-				 ((JFS_IP(ip)->acl.flag & DXD_EXTENT) ?
-				  lengthDXD(&JFS_IP(ip)->acl) : 0));
-
 	DT_PUTPAGE(pmp);
 	return 0;
 }
@@ -1899,6 +1907,12 @@ static int dtSplitRoot(tid_t tid,
 		return -EIO;
 
 	rp = rmp->data;
+
+	/* Allocate blocks to quota. */
+	if (DQUOT_ALLOC_BLOCK(ip, lengthPXD(pxd))) {
+		release_metapage(rmp);
+		return -EDQUOT;
+	}
 
 	BT_MARK_DIRTY(rmp, ip);
 	/*
@@ -2042,7 +2056,6 @@ static int dtSplitRoot(tid_t tid,
 
 	*rmpp = rmp;
 
-	ip->i_blocks += LBLK2PBLK(ip->i_sb, lengthPXD(pxd));
 	return 0;
 }
 
@@ -2265,7 +2278,9 @@ static int dtDeleteUp(tid_t tid, struct inode *ip,
 	}
 
 	xlen = lengthPXD(&fp->header.self);
-	ip->i_blocks -= LBLK2PBLK(ip->i_sb, xlen);
+
+	/* Free quota allocation. */
+	DQUOT_FREE_BLOCK(ip, xlen);
 
 	/* free/invalidate its buffer page */
 	discard_metapage(fmp);
@@ -2339,7 +2354,9 @@ static int dtDeleteUp(tid_t tid, struct inode *ip,
 				}
 
 				xlen = lengthPXD(&p->header.self);
-				ip->i_blocks -= LBLK2PBLK(ip->i_sb, xlen);
+
+				/* Free quota allocation */
+				DQUOT_FREE_BLOCK(ip, xlen);
 
 				/* free/invalidate its buffer page */
 				discard_metapage(mp);
@@ -2876,14 +2893,6 @@ void dtInitRoot(tid_t tid, struct inode *ip, u32 idotdot)
 
 	/* init '..' entry */
 	p->header.idotdot = cpu_to_le32(idotdot);
-
-#if 0
-	ip->i_blocks = LBLK2PBLK(ip->i_sb,
-				 ((jfs_ip->ea.flag & DXD_EXTENT) ?
-				  lengthDXD(&jfs_ip->ea) : 0) +
-				 ((jfs_ip->acl.flag & DXD_EXTENT) ?
-				  lengthDXD(&jfs_ip->acl) : 0));
-#endif
 
 	return;
 }
