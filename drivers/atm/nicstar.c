@@ -1676,6 +1676,25 @@ static void ns_close(struct atm_vcc *vcc)
       free_scq(vc->scq, vcc);
    }
 
+   /* remove all references to vcc before deleting it */
+   if (vcc->qos.txtp.traffic_class != ATM_NONE)
+   {
+     unsigned long flags;
+     scq_info *scq = card->scq0;
+
+     ns_grab_scq_lock(card, scq, flags);
+
+     for(i = 0; i < scq->num_entries; i++) {
+       if(scq->skb[i] && ATM_SKB(scq->skb[i])->vcc == vcc) {
+        ATM_SKB(scq->skb[i])->vcc = NULL;
+	atm_return(vcc, scq->skb[i]->truesize);
+        PRINTK("nicstar: deleted pending vcc mapping\n");
+       }
+     }
+
+     spin_unlock_irqrestore(&scq->lock, flags);
+   }
+
    vcc->dev_data = NULL;
    clear_bit(ATM_VF_PARTIAL,&vcc->flags);
    clear_bit(ATM_VF_ADDR,&vcc->flags);
@@ -2074,7 +2093,7 @@ static void drain_scq(ns_dev *card, scq_info *scq, int pos)
       if (skb != NULL)
       {
          vcc = ATM_SKB(skb)->vcc;
-	 if (vcc->pop != NULL) {
+	 if (vcc && vcc->pop != NULL) {
 	    vcc->pop(vcc, skb);
 	 } else {
 	    dev_kfree_skb_irq(skb);
