@@ -41,7 +41,7 @@ fsm_new(struct fsm *fsm)
 			       fsm->fn_tbl[i].ev, fsm->ev_cnt);
 			continue;
 		}
-		fsm->jumpmatrix[fsm->st_cnt * fsm->fn_tbl[i].ev + fsm->fn_tbl[i].st] = fsm->fn_tbl[i].routine;
+		fsm->jumpmatrix[fsm->st_cnt * fsm->fn_tbl[i].ev + fsm->fn_tbl[i].st] = fsm->fn_tbl[i].fn;
 	}
 	return 0;
 }
@@ -77,8 +77,7 @@ fsm_event(struct fsm_inst *fi, int event, void *arg)
 			       fi->fsm->st_str[fi->state],
 			       fi->fsm->ev_str[event]);
 
-	fn(fi, event, arg);
-	return 0;
+	return fn(fi, event, arg);
 }
 
 void

@@ -19,7 +19,7 @@
 
 struct fsm_inst;
 
-typedef void (*fsm_fn)(struct fsm_inst *, int, void *);
+typedef int (*fsm_fn)(struct fsm_inst *, int, void *);
 
 struct fsm {
 	fsm_fn *jumpmatrix;
@@ -39,7 +39,7 @@ struct fsm_inst {
 
 struct fsm_node {
 	int st, ev;
-	void (*routine) (struct fsm_inst *, int, void *);
+	fsm_fn fn;
 };
 
 struct fsm_timer {

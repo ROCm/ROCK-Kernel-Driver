@@ -1278,11 +1278,11 @@ get_outgoing_phone(isdn_net_dev *idev)
 	return NULL;
 }
 
-static void dialout_next(struct fsm_inst *fi, int pr, void *arg);
+static int dialout_next(struct fsm_inst *fi, int pr, void *arg);
 
 /* Initiate dialout. */
 
-static void
+static int
 dialout_first(struct fsm_inst *fi, int pr, void *arg)
 {
 	isdn_net_dev *idev = fi->userdata;
@@ -1290,21 +1290,21 @@ dialout_first(struct fsm_inst *fi, int pr, void *arg)
 
 	if (ISDN_NET_DIALMODE(*mlp) == ISDN_NET_DM_OFF) {
 		isdn_net_unbind_channel(idev);
-		return;
+		return -EPERM;
 	}
 	if (list_empty(&mlp->phone[1])) {
 		isdn_net_unbind_channel(idev);
-		return;
+		return -EINVAL;
 	}
 
 	idev->dial = 0;
 	idev->dialretry = 0;
-	dialout_next(fi, pr, arg);
+	return dialout_next(fi, pr, arg);
 }
 
 /* Try dialing the next number. */
 
-static void
+static int
 dialout_next(struct fsm_inst *fi, int pr, void *arg)
 {
 	isdn_net_dev *idev = fi->userdata;
@@ -1340,12 +1340,13 @@ dialout_next(struct fsm_inst *fi, int pr, void *arg)
 
 	/* Dial */
 	isdn_slot_dial(idev->isdn_slot, &dial);
+	return 0;
 }
 
 /* If we didn't connect within dialtimeout, we give up for now
  * and wait for dialwait jiffies before trying again.
  */
-static void
+static int
 dial_timeout(struct fsm_inst *fi, int pr, void *arg)
 {
 	isdn_net_dev *idev = fi->userdata;
@@ -1363,13 +1364,14 @@ dial_timeout(struct fsm_inst *fi, int pr, void *arg)
 	}
 	if (idev->dialretry >= mlp->dialmax) {
 		isdn_net_hangup(idev);
-		return;
+		return 0;
 	}
 	idev->dial_event = EV_TIMER_DIAL_WAIT;
 	mod_timer(&idev->dial_timer, jiffies + mlp->dialwait);
+	return 0;
 }
 
-static void
+static int
 connect_fail(struct fsm_inst *fi, int pr, void *arg)
 {
 	isdn_net_dev *idev = fi->userdata;
@@ -1378,9 +1380,10 @@ connect_fail(struct fsm_inst *fi, int pr, void *arg)
 	isdn_slot_all_eaz(idev->isdn_slot);
 	printk(KERN_INFO "%s: connection failed\n", idev->name);
 	isdn_net_unbind_channel(idev);
+	return 0;
 }
 
-static void
+static int
 out_dconn(struct fsm_inst *fi, int pr, void *arg)
 {
 	isdn_net_dev *idev = fi->userdata;
@@ -1388,9 +1391,10 @@ out_dconn(struct fsm_inst *fi, int pr, void *arg)
 
 	fsm_change_state(&idev->fi, ST_OUT_WAIT_BCONN);
 	isdn_slot_command(idev->isdn_slot, ISDN_CMD_ACCEPTB, &cmd);
+	return 0;
 }
 
-static void
+static int
 in_dconn(struct fsm_inst *fi, int pr, void *arg)
 {
 	isdn_net_dev *idev = fi->userdata;
@@ -1398,9 +1402,10 @@ in_dconn(struct fsm_inst *fi, int pr, void *arg)
 
 	fsm_change_state(&idev->fi, ST_IN_WAIT_BCONN);
 	isdn_slot_command(idev->isdn_slot, ISDN_CMD_ACCEPTB, &cmd);
+	return 0;
 }
 
-static void
+static int
 bconn(struct fsm_inst *fi, int pr, void *arg)
 {
 	isdn_net_dev *idev = fi->userdata;
@@ -1418,7 +1423,7 @@ bconn(struct fsm_inst *fi, int pr, void *arg)
 
 	isdn_net_add_to_bundle(mlp, idev);
 
-	printk(KERN_INFO "isdn_net: %s connected\n", idev->name);
+	printk(KERN_INFO "%s connected\n", idev->name);
 	/* If first Chargeinfo comes before B-Channel connect,
 	 * we correct the timestamp here.
 	 */
@@ -1432,9 +1437,11 @@ bconn(struct fsm_inst *fi, int pr, void *arg)
 		mlp->ops->connected(idev);
 	else
 		isdn_net_dev_wake_queue(idev);
+
+	return 0;
 }
 
-static void
+static int
 bhup(struct fsm_inst *fi, int pr, void *arg)
 {
 	isdn_net_dev *idev = fi->userdata;
@@ -1447,9 +1454,10 @@ bhup(struct fsm_inst *fi, int pr, void *arg)
 	printk(KERN_INFO "%s: disconnected\n", idev->name);
 	fsm_change_state(fi, ST_WAIT_DHUP);
 	isdn_net_rm_from_bundle(idev);
+	return 0;
 }
 
-static void
+static int
 dhup(struct fsm_inst *fi, int pr, void *arg)
 {
 	isdn_net_dev *idev = fi->userdata;
@@ -1457,11 +1465,12 @@ dhup(struct fsm_inst *fi, int pr, void *arg)
 	printk(KERN_INFO "%s: Chargesum is %d\n", idev->name, idev->charge);
 	isdn_slot_all_eaz(idev->isdn_slot);
 	isdn_net_unbind_channel(idev);
+	return 0;
 }
 
 /* Check if it's time for idle hang-up */
 
-static void
+static int
 check_hup(struct fsm_inst *fi, int pr, void *arg)
 {
 	isdn_net_dev *idev = fi->userdata;
@@ -1481,15 +1490,16 @@ check_hup(struct fsm_inst *fi, int pr, void *arg)
 	}
 	if (idev->outgoing || mlp->hupflags & ISDN_INHUP) {
 		isdn_net_hangup(idev);
-		return;
+		return 0;
 	}
  mod_timer:
 	mod_timer(&idev->dial_timer, idev->dial_timer.expires + HZ);
+	return 0;
 }
 
 /* Charge-info from TelCo. */
 
-static void
+static int
 got_cinf(struct fsm_inst *fi, int pr, void *arg)
 {
 	isdn_net_dev *idev = fi->userdata;
@@ -1508,6 +1518,7 @@ got_cinf(struct fsm_inst *fi, int pr, void *arg)
 	}
 	idev->chargetime = jiffies;
 	dbg_net_dial("%s: got CINF\n", idev->name);
+	return 0;
 }
 
 /* Perform hangup for a net-interface. */
@@ -1567,21 +1578,23 @@ isdn_net_handle_event(isdn_net_dev *idev, int pr, void *arg)
 	fsm_event(&idev->fi, pr, arg);
 }
 
-static void
+static int
 hang_up(struct fsm_inst *fi, int pr, void *arg)
 {
 	isdn_net_dev *idev = fi->userdata;
 
 	isdn_net_hangup(idev);
+	return 0;
 }
 
-static void
+static int
 got_bsent(struct fsm_inst *fi, int pr, void *arg)
 {
 	isdn_net_dev *idev = fi->userdata;
 	isdn_ctrl *c = arg;
 	
 	isdn_net_bsent(idev, c);
+	return 0;
 }
 
 static struct fsm_node isdn_net_fn_tbl[] = {
