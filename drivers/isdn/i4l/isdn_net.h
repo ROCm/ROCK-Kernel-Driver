@@ -32,46 +32,49 @@
 #define CISCO_SLARP_REPLY     1
 #define CISCO_SLARP_KEEPALIVE 2
 
-extern void isdn_net_init_module(void);
-
-extern int isdn_net_new(char *, struct net_device *);
-extern int isdn_net_newslave(char *);
-extern int isdn_net_rm(char *);
-extern int isdn_net_rmall(void);
-extern int isdn_net_stat_callback(int, isdn_ctrl *);
-extern int isdn_net_setcfg(isdn_net_ioctl_cfg *);
-extern int isdn_net_getcfg(isdn_net_ioctl_cfg *);
-extern int isdn_net_addphone(isdn_net_ioctl_phone *);
-extern int isdn_net_getphones(isdn_net_ioctl_phone *, char *);
-extern int isdn_net_getpeer(isdn_net_ioctl_phone *, isdn_net_ioctl_phone *);
-extern int isdn_net_delphone(isdn_net_ioctl_phone *);
-extern int isdn_net_find_icall(int, int, int, setup_parm *);
-extern void isdn_net_hangup(isdn_net_dev *);
+extern void isdn_net_init(void);
+extern void isdn_net_exit(void);
+extern void isdn_net_lib_init(void);
+extern void isdn_net_lib_exit(void);
 extern void isdn_net_hangup_all(void);
-extern int isdn_net_force_hangup(char *);
-extern int isdn_net_force_dial(char *);
-extern isdn_net_dev *isdn_net_findif(char *);
-extern int isdn_net_rcv_skb(int, struct sk_buff *);
-extern int isdn_net_dial_req(isdn_net_local *);
-extern void isdn_net_writebuf_skb(isdn_net_local *lp, struct sk_buff *skb);
-extern void isdn_net_write_super(isdn_net_local *lp, struct sk_buff *skb);
-extern int isdn_net_online(isdn_net_dev *idev);
+extern int isdn_net_ioctl(struct inode *, struct file *, uint, ulong);
 
-static inline void
-isdn_net_reset_huptimer(isdn_net_dev *idev, isdn_net_dev *idev2)
-{
-	idev->huptimer = 0;
-	idev2->huptimer = 0;
-}
+extern int register_isdn_netif(int encap, struct isdn_netif_ops *ops);
+extern int isdn_net_autodial(struct sk_buff *skb, struct net_device *ndev);
+extern int isdn_net_start_xmit(struct sk_buff *skb, struct net_device *ndev);
+
+extern int  isdn_net_bind_channel(isdn_net_dev *idev, int slot);
+extern void isdn_net_unbind_channel(isdn_net_dev *idev);
+extern int  isdn_net_dial(isdn_net_dev *idev);
+extern void isdn_net_accept(isdn_net_dev *idev, int slot, char *nr);
+extern int  isdn_net_do_callback(isdn_net_dev *idev);
+
+extern int  isdn_net_bsent(isdn_net_dev *idev, isdn_ctrl *c);
+
+extern int isdn_net_stat_callback(int, isdn_ctrl *);
+extern int isdn_net_find_icall(int, int, int, setup_parm *);
+extern int isdn_net_hangup(isdn_net_dev *);
+extern int isdn_net_rcv_skb(int, struct sk_buff *);
+extern int isdn_net_dial_req(isdn_net_dev *);
+extern void isdn_net_writebuf_skb(isdn_net_dev *, struct sk_buff *skb);
+extern void isdn_net_write_super(isdn_net_dev *, struct sk_buff *skb);
+extern int isdn_net_online(isdn_net_dev *);
+
+enum {
+	ST_CHARGE_NULL,
+	ST_CHARGE_GOT_CINF,  /* got a first charge info */
+	ST_CHARGE_HAVE_CINT, /* got a second chare info and thus the timing */
+};
 
 #define ISDN_NET_MAX_QUEUE_LENGTH 2
 
 /*
  * is this particular channel busy?
  */
-static __inline__ int isdn_net_lp_busy(isdn_net_local *lp)
+static inline int
+isdn_net_dev_busy(isdn_net_dev *idev)
 {
-	if (atomic_read(&lp->frame_cnt) < ISDN_NET_MAX_QUEUE_LENGTH)
+	if (atomic_read(&idev->frame_cnt) < ISDN_NET_MAX_QUEUE_LENGTH)
 		return 0;
 	else 
 		return 1;
@@ -81,86 +84,69 @@ static __inline__ int isdn_net_lp_busy(isdn_net_local *lp)
  * For the given net device, this will get a non-busy channel out of the
  * corresponding bundle. The returned channel is locked.
  */
-static __inline__ isdn_net_local * isdn_net_get_locked_lp(isdn_net_dev *nd)
+static inline isdn_net_dev *
+isdn_net_get_locked_dev(isdn_net_local *mlp)
 {
 	unsigned long flags;
-	isdn_net_local *lp;
+	isdn_net_dev *idev;
 
-	spin_lock_irqsave(&nd->queue_lock, flags);
-	lp = nd->queue;         /* get lp on top of queue */
-	spin_lock_bh(&nd->queue->xmit_lock);
-	while (isdn_net_lp_busy(nd->queue)) {
-		spin_unlock_bh(&nd->queue->xmit_lock);
-		nd->queue = nd->queue->next;
-		if (nd->queue == lp) { /* not found -- should never happen */
-			lp = NULL;
-			goto errout;
+	spin_lock_irqsave(&mlp->online_lock, flags);
+
+	list_for_each_entry(idev, &mlp->online, online) {
+		spin_lock_bh(&idev->xmit_lock);
+		if (!isdn_net_dev_busy(idev)) {
+			/* point the head to next online channel */
+			list_del(&mlp->online);
+			list_add(&mlp->online, &idev->online);
+			goto found;
 		}
-		spin_lock_bh(&nd->queue->xmit_lock);
+		spin_unlock_bh(&idev->xmit_lock);
 	}
-	lp = nd->queue;
-	nd->queue = nd->queue->next;
-errout:
-	spin_unlock_irqrestore(&nd->queue_lock, flags);
-	return lp;
+	idev = NULL;
+
+ found:
+	spin_unlock_irqrestore(&mlp->online_lock, flags);
+	return idev;
 }
 
 /*
  * add a channel to a bundle
  */
-static __inline__ void isdn_net_add_to_bundle(isdn_net_dev *nd, isdn_net_local *nlp)
+static inline void
+isdn_net_add_to_bundle(isdn_net_local *mlp, isdn_net_dev *idev)
 {
-	isdn_net_local *lp;
 	unsigned long flags;
 
-	spin_lock_irqsave(&nd->queue_lock, flags);
-
-	lp = nd->queue;
-	nlp->last = lp->last;
-	lp->last->next = nlp;
-	lp->last = nlp;
-	nlp->next = lp;
-	nd->queue = nlp;
-
-	spin_unlock_irqrestore(&nd->queue_lock, flags);
+	spin_lock_irqsave(&mlp->online_lock, flags);
+	list_add(&idev->online, &mlp->online);
+	spin_unlock_irqrestore(&mlp->online_lock, flags);
 }
 /*
  * remove a channel from the bundle it belongs to
  */
-static __inline__ void isdn_net_rm_from_bundle(isdn_net_local *lp)
+static inline void
+isdn_net_rm_from_bundle(isdn_net_dev *idev)
 {
-	isdn_net_local *master_lp = lp;
+	isdn_net_local *mlp = idev->mlp;
 	unsigned long flags;
 
-	if (lp->master)
-		master_lp = (isdn_net_local *) lp->master->priv;
-
-	spin_lock_irqsave(&master_lp->netdev->queue_lock, flags);
-	lp->last->next = lp->next;
-	lp->next->last = lp->last;
-	if (master_lp->netdev->queue == lp) {
-		master_lp->netdev->queue = lp->next;
-		if (lp->next == lp) { /* last in queue */
-			master_lp->netdev->queue = &master_lp->netdev->local;
-		}
-	}
-	lp->next = lp->last = lp;	/* (re)set own pointers */
-	spin_unlock_irqrestore(&master_lp->netdev->queue_lock, flags);
+	spin_lock_irqsave(&mlp->online_lock, flags);
+	//	list_del(&idev->online); FIXME
+	spin_unlock_irqrestore(&mlp->online_lock, flags);
 }
 
 /*
  * wake up the network -> net_device queue.
  * For slaves, wake the corresponding master interface.
  */
-static inline void isdn_net_device_wake_queue(isdn_net_local *lp)
+static inline void
+isdn_net_dev_wake_queue(isdn_net_dev *idev)
 {
-	if (lp->master) 
-		netif_wake_queue(lp->master);
-	else
-		netif_wake_queue(&lp->netdev->dev);
+	netif_wake_queue(&idev->mlp->dev);
 }
 
-static inline int isdn_net_bound(isdn_net_dev *idev)
+static inline int
+isdn_net_bound(isdn_net_dev *idev)
 {
 	return idev->isdn_slot >= 0;
 }

@@ -10,6 +10,10 @@
 
 #define N_DATA
 
+#include <linux/config.h>
+#include <linux/init.h>
+#include <linux/kernel.h>
+#include <linux/smp_lock.h>
 #include <asm/io.h>
 #include <asm/system.h>
 #include <linux/slab.h>
@@ -24,7 +28,7 @@ int log_on=0;
 
 int		Divasdevflag = 0;
 
-//spinlock_t diva_lock = SPIN_LOCK_UNLOCKED;
+spinlock_t diva_lock = SPIN_LOCK_UNLOCKED;
 
 static
 ux_diva_card_t card_pool[MAX_CARDS];
@@ -673,20 +677,14 @@ long UxCardLock(ux_diva_card_t *card)
 {
 	unsigned long flags;
 
- 	//spin_lock_irqsave(&diva_lock, flags);
+ 	spin_lock_irqsave(&diva_lock, flags);
 	
-	save_flags(flags);
-	cli();
 	return flags;
-	
 }
 
 void UxCardUnlock(ux_diva_card_t *card, long ipl)
 {
-	//spin_unlock_irqrestore(&diva_lock, ipl);
-
-	restore_flags(ipl);
-
+	spin_unlock_irqrestore(&diva_lock, ipl);
 }
 
 dword UxTimeGet(void)
