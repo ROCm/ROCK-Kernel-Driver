@@ -25,6 +25,11 @@ obj-$(CONFIG_PPC32) += setup-irq.o
 obj-$(CONFIG_DDB5476) += setup-bus.o
 obj-$(CONFIG_SGI_IP27) += setup-irq.o
 
+# CompactPCI hotplug requires the pbus_* functions
+ifdef CONFIG_HOTPLUG_PCI_CPCI
+obj-y += setup-bus.o
+endif
+
 ifndef CONFIG_X86
 obj-y += syscall.o
 endif

@@ -2218,6 +2218,14 @@ S: 30 White Tail Lane
 S: Lafayette, Indiana 47905
 S: USA
 
+N: Scott Murray
+E: scottm@somanetworks.com
+E: scott@spiteful.org
+D: OPL3-SA2, OPL3-SA3 sound driver
+D: CompactPCI hotplug core
+S: Toronto, Ontario
+S: Canada
+
 N: Trond Myklebust
 E: trond.myklebust@fys.uio.no
 D: current NFS client hacker.
