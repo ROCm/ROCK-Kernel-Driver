@@ -1230,26 +1230,6 @@ err:
 	return ret;
 }
 
-static void uhci_reset_interrupt(struct uhci_hcd *uhci, struct urb *urb)
-{
-	struct urb_priv *urbp = (struct urb_priv *)urb->hcpriv;
-	struct uhci_td *td;
-	unsigned long flags;
-
-	spin_lock_irqsave(&urb->lock, flags);
-
-	td = list_entry(urbp->td_list.next, struct uhci_td, list);
-
-	td->status = (td->status & cpu_to_le32(0x2F000000)) | cpu_to_le32(TD_CTRL_ACTIVE | TD_CTRL_IOC);
-	td->token &= ~cpu_to_le32(TD_TOKEN_TOGGLE);
-	td->token |= cpu_to_le32(usb_gettoggle(urb->dev, usb_pipeendpoint(urb->pipe), usb_pipeout(urb->pipe)) << TD_TOKEN_TOGGLE_SHIFT);
-	usb_dotoggle(urb->dev, usb_pipeendpoint(urb->pipe), usb_pipeout(urb->pipe));
-
-	urb->status = -EINPROGRESS;
-
-	spin_unlock_irqrestore(&urb->lock, flags);
-}
-
 static inline int uhci_submit_bulk(struct uhci_hcd *uhci, struct urb *urb, struct urb *eurb)
 {
 	int ret;
@@ -1568,16 +1548,16 @@ static void uhci_transfer_result(struct uhci_hcd *uhci, struct urb *urb)
 		uhci_unlink_generic(uhci, urb);
 		break;
 	case PIPE_INTERRUPT:
-		/* Interrupts are an exception */
-		if (urb->interval)
-			goto out_complete;
-
 		/* Release bandwidth for Interrupt or Isoc. transfers */
 		/* Make sure we don't release if we have a queued URB */
 		spin_lock(&uhci->frame_list_lock);
 		/* Spinlock needed ? */
 		if (list_empty(&urbp->queue_list) && urb->bandwidth)
 			usb_release_bandwidth(urb->dev, urb, 0);
+		else
+			/* bandwidth was passed on to queued URB, */
+			/* so don't let usb_unlink_urb() release it */
+			urb->bandwidth = 0;
 		spin_unlock(&uhci->frame_list_lock);
 		uhci_unlink_generic(uhci, urb);
 		break;
@@ -1589,7 +1569,6 @@ static void uhci_transfer_result(struct uhci_hcd *uhci, struct urb *urb)
 	/* Remove it from uhci->urb_list */
 	list_del_init(&urbp->urb_list);
 
-out_complete:
 	uhci_add_complete(uhci, urb);
 
 out:
@@ -1657,6 +1636,13 @@ static int uhci_urb_dequeue(struct usb_hcd *hcd, struct urb *urb)
 	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
 	unsigned long flags;
 	struct urb_priv *urbp = urb->hcpriv;
+
+	/* If this is an interrupt URB that is being killed in urb->complete, */
+	/* then just set its status and return */
+	if (!urbp) {
+	  urb->status = -ECONNRESET;
+	  return 0;
+	}
 
 	spin_lock_irqsave(&uhci->urb_list_lock, flags);
 
@@ -1820,38 +1806,42 @@ static void uhci_finish_urb(struct usb_hcd *hcd, struct urb *urb)
 	struct urb_priv *urbp = (struct urb_priv *)urb->hcpriv;
 	struct usb_device *dev = urb->dev;
 	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
-	int killed, resubmit_interrupt, status;
+	int killed, resubmit_interrupt, status, ret;
 	unsigned long flags;
 
 	spin_lock_irqsave(&urb->lock, flags);
 
  	killed = (urb->status == -ENOENT || urb->status == -ECONNRESET);
 	resubmit_interrupt = (usb_pipetype(urb->pipe) == PIPE_INTERRUPT &&
-			urb->interval);
+			urb->interval && !killed);
 
 	status = urbp->status;
-	if (!resubmit_interrupt || killed)
-		/* We don't need urb_priv anymore */
-		uhci_destroy_urb_priv(uhci, urb);
+	uhci_destroy_urb_priv(uhci, urb);
 
 	if (!killed)
 		urb->status = status;
 	spin_unlock_irqrestore(&urb->lock, flags);
 
-	if (resubmit_interrupt)
+	if (resubmit_interrupt) {
 		urb->complete(urb);
-	else
-		usb_hcd_giveback_urb(hcd, urb);
 
-	if (resubmit_interrupt)
 		/* Recheck the status. The completion handler may have */
-		/*  unlinked the resubmitting interrupt URB */
-		killed = (urb->status == -ENOENT || urb->status == -ECONNRESET);
+		/* unlinked the resubmitting interrupt URB */
+		/* Note that this doesn't do what usb_hcd_giveback_urb() */
+		/* normally does, so that doesn't ever get done. */
+		if (urb->status == -ECONNRESET) {
+			usb_put_urb(urb);
+			return;
+		}
 
-	if (resubmit_interrupt && !killed) {
 		urb->dev = dev;
-		uhci_reset_interrupt(uhci, urb);
-	}
+		urb->status = -EINPROGRESS;
+		urb->actual_length = 0;
+		urb->bandwidth = 0;
+		if ((ret = uhci_urb_enqueue(&uhci->hcd, urb, 0)))
+			printk(KERN_ERR __FILE__ ": could not resubmit interrupt URB : %d\n", ret);		  
+	} else
+		usb_hcd_giveback_urb(hcd, urb);
 }
 
 static void uhci_finish_completion(struct usb_hcd *hcd)
