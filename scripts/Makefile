@@ -18,7 +18,7 @@ modpost-objs  := modpost.o file2alias.o
 subdir-	:= lxdialog kconfig
 
 # fixdep is needed to compile other host programs
-$(addprefix $(obj)/,$(filter-out fixdep,$(host-progs))): $(obj)/fixdep
+$(addprefix $(obj)/,$(filter-out fixdep,$(build-targets))): $(obj)/fixdep
 
 # dependencies on generated files need to be listed explicitly
 
