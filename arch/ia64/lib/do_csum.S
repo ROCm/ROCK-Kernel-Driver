@@ -173,7 +173,7 @@ GLOBAL_ENTRY(do_csum)
 
 (p8)	and hmask=hmask,tmask	// apply tail mask to head mask if 1 word only
 (p9)	and word2[0]=lastval,tmask	// mask last it as appropriate
-	shr.u count=count,3	// we do 8 bytes per loop (count)
+	shr.u count=count,3	// how many 8-byte?
 	;;
 	// If count is odd, finish this 8-byte word so that we can
 	// load two back-to-back 8-byte words per loop thereafter.
@@ -184,6 +184,7 @@ GLOBAL_ENTRY(do_csum)
 (p9)	add result1[0]=word1[0],word2[0]
 	;;
 	cmp.ltu p6,p0=result1[0],word1[0]	// check the carry
+	cmp.eq.or.andcm p8,p0=0,count		// exit if zero 8-byte
 	;;
 (p6)	adds result1[0]=1,result1[0]
 (p8)	br.cond.dptk .do_csum_exit	// if (within an 8-byte word)
@@ -206,22 +207,19 @@ GLOBAL_ENTRY(do_csum)
 	// Calculate the checksum loading two 8-byte words per loop.
 	//
 .do_csum16:
+	add first2=8,first1
 	shr.u count=count,1	// we do 16 bytes per loop
-	brp.loop.imp 1f,2f
 	;;
-	cmp.eq p9,p10=r0,count	// if (count == 0)
 	adds count=-1,count
-	mov ar.ec=PIPE_DEPTH
-
 	mov carry1=r0
 	mov carry2=r0
-	add first2=8,first1
+	brp.loop.imp 1f,2f
 	;;
+	mov ar.ec=PIPE_DEPTH
 	mov ar.lc=count	// set lc
 	mov pr.rot=1<<16
 	// result1[0] must be initialized in advance.
 	mov result2[0]=r0
-(p9)	br.cond.sptk .do_csum_exit
 	;;
 	.align 32
 1:
