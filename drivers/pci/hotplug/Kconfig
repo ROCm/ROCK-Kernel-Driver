@@ -189,5 +189,16 @@ config HOTPLUG_PCI_SHPC_PHPRM_LEGACY
 	  Say Y here for AMD SHPC. You have to select this option if you are 
 	  using this driver on AMD platform with SHPC.
 
+config HOTPLUG_PCI_RPA
+	tristate "RPA PCI Hotplug driver"
+	depends on HOTPLUG_PCI && PPC_PSERIES && PPC64
+	help
+	  Say Y here if you have a a RPA system that supports PCI Hotplug.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called rpaphp.
+
+	  When in doubt, say N.
+
 endmenu
 
