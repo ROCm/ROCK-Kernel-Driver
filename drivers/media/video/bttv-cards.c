@@ -182,7 +182,6 @@ static struct CARD {
  	{ 0xd01810fc, BTTV_GVBCTV5PCI,    "I-O Data Co. GV-BCTV5/PCI" },
 
 	{ 0x001211bd, BTTV_PINNACLE,      "Pinnacle PCTV" },
-	{ 0x001c11bd, BTTV_PINNACLESAT,   "Pinnacle PCTV Sat" },
 	// some cards ship with byteswapped IDs ...
 	{ 0x1200bd11, BTTV_PINNACLE,      "Pinnacle PCTV [bswap]" },
 	{ 0xff00bd11, BTTV_PINNACLE,      "Pinnacle PCTV [bswap]" },
@@ -304,6 +303,7 @@ static struct CARD {
 	// DVB cards (using pci function .1 for mpeg data xfer)
 	{ 0x01010071, BTTV_NEBULA_DIGITV, "Nebula Electronics DigiTV" },
 	{ 0x07611461, BTTV_AVDVBT_761,    "AverMedia AverTV DVB-T" },
+	{ 0x001c11bd, BTTV_PINNACLESAT,   "Pinnacle PCTV Sat" },
 	{ 0x002611bd, BTTV_TWINHAN_DST,   "Pinnacle PCTV SAT CI" },
 	{ 0x00011822, BTTV_TWINHAN_DST,   "Twinhan VisionPlus DVB-T" },
 	{ 0xfc00270f, BTTV_TWINHAN_DST,   "ChainTech digitop DST-1000 DVB-S" },
@@ -1667,6 +1667,7 @@ struct tvcard bttv_tvcards[] = {
 	.needs_tvaudio  = 0, 
 	.pll            = PLL_28,
 	.no_gpioirq     = 1,
+	.has_dvb        = 1,
 },{
         .name           = "Formac ProTV II (bt878)",
         .video_inputs   = 4,

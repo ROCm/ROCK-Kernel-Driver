@@ -7,6 +7,8 @@
 #include <linux/kthread.h>
 #include <linux/sched.h>
 #include <linux/console.h>
+#include <linux/pagemap.h>
+#include <linux/mm.h>
 
 #include "irq_kern.h"
 #include "irq_user.h"
@@ -34,10 +36,43 @@ struct x11_kerndata {
 	struct timer_list         refresh;
 	int                       dirty, x1, x2, y1, y2;
 
+	/* fb mapping */
+	struct semaphore          mm_lock;
+	struct vm_area_struct     *vma;
+	atomic_t                  map_refs;
+	int                       faults;
+	int                       nr_pages;
+	struct page               **pages;
+	int                       *mapped;
+
 	/* input drivers */
 	struct input_dev          kbd;
 	struct input_dev          mouse;
 };
+
+void x11_mmap_update(struct x11_kerndata *kd)
+{
+	int i, off, len;
+	char *src;
+
+	zap_page_range(kd->vma, kd->vma->vm_start,
+		       kd->vma->vm_end - kd->vma->vm_start, NULL);
+	kd->faults = 0;
+	for (i = 0; i < kd->nr_pages; i++) {
+		if (NULL == kd->pages[i])
+			continue;
+		if (0 == kd->mapped[i])
+			continue;
+		kd->mapped[i] = 0;
+		off = i << PAGE_SHIFT;
+		len = PAGE_SIZE;
+		if (len > kd->fix->smem_len - off)
+			len = kd->fix->smem_len - off;
+		src = kmap(kd->pages[i]);
+		memcpy(kd->info->screen_base + off, src, len);
+		kunmap(kd->pages[i]);
+	}
+}
 
 static int x11_thread(void *data)
 {
@@ -53,6 +88,10 @@ static int x11_thread(void *data)
 			int x2 = kd->x2;
 			int y1 = kd->y1;
 			int y2 = kd->y2;
+			down(&kd->mm_lock);
+			if (kd->faults > 0)
+				x11_mmap_update(kd);
+			up(&kd->mm_lock);
 			kd->dirty = kd->x1 = kd->x2 = kd->y1 = kd->y2 = 0;
 			x11_blit_fb(kd->win, x1, y1, x2, y2);
 		}
@@ -204,6 +243,151 @@ void x11_copyarea(struct fb_info *p, const struct fb_copyarea *area)
 	x11_fb_refresh(kd, area->dx, area->dy, area->width, area->height);
 }
 
+/* ---------------------------------------------------------------------------- */
+
+static void
+x11_fb_vm_open(struct vm_area_struct *vma)
+{
+	struct x11_kerndata *kd = vma->vm_private_data;
+
+	atomic_inc(&kd->map_refs);
+}
+
+static void
+x11_fb_vm_close(struct vm_area_struct *vma)
+{
+	struct x11_kerndata *kd = vma->vm_private_data;
+	int i;
+
+	if (!atomic_dec_and_test(&kd->map_refs))
+		return;
+	down(&kd->mm_lock);
+	for (i = 0; i < kd->nr_pages; i++) {
+		if (NULL == kd->pages[i])
+			continue;
+		put_page(kd->pages[i]);
+	}
+	kfree(kd->pages);
+	kfree(kd->mapped);
+	kd->pages    = NULL;
+	kd->mapped   = NULL;
+	kd->vma      = NULL;
+	kd->nr_pages = 0;
+	kd->faults   = 0;
+	up(&kd->mm_lock);
+}
+
+static struct page*
+x11_fb_vm_nopage(struct vm_area_struct *vma, unsigned long vaddr,
+		 int *type)
+{
+	struct x11_kerndata *kd = vma->vm_private_data;
+	int pgnr = (vaddr - vma->vm_start) >> PAGE_SHIFT;
+	int y1,y2;
+
+        if (pgnr >= kd->nr_pages)
+		return NOPAGE_SIGBUS;
+
+	down(&kd->mm_lock);
+	if (NULL == kd->pages[pgnr]) {
+		struct page *page;
+		page = alloc_page_vma(GFP_HIGHUSER, vma, vaddr);
+		if (!page)
+			return NOPAGE_OOM;
+		clear_user_highpage(page, vaddr);
+		kd->pages[pgnr] = page;
+	}
+	get_page(kd->pages[pgnr]);
+	kd->mapped[pgnr] = 1;
+	kd->faults++;
+	up(&kd->mm_lock);
+
+	y1 = pgnr * PAGE_SIZE / kd->fix->line_length;
+	y2 = (pgnr * PAGE_SIZE + PAGE_SIZE-1) / kd->fix->line_length;
+	if (y2 > kd->var->yres)
+		y2 = kd->var->yres;
+	x11_fb_refresh(kd, 0, y1, kd->var->xres, y2 - y1);
+	
+	if (type)
+		*type = VM_FAULT_MINOR;
+	return kd->pages[pgnr];
+}
+
+static struct vm_operations_struct x11_fb_vm_ops =
+{
+	.open     = x11_fb_vm_open,
+	.close    = x11_fb_vm_close,
+	.nopage   = x11_fb_vm_nopage,
+};
+
+int x11_mmap(struct fb_info *p, struct file *file,
+	     struct vm_area_struct * vma)
+{
+	struct x11_kerndata *kd = p->par;
+	int retval;
+	int fb_pages;
+	int map_pages;
+
+	down(&kd->mm_lock);
+
+	retval = -EBUSY;
+	if (kd->vma) {
+		printk("%s: busy, mapping exists\n",__FUNCTION__);
+		goto out;
+	}
+
+	retval = -EINVAL;
+	if (!(vma->vm_flags & VM_WRITE)) {
+		printk("%s: need writable mapping\n",__FUNCTION__);
+		goto out;
+	}
+	if (!(vma->vm_flags & VM_SHARED)) {
+		printk("%s: need shared mapping\n",__FUNCTION__);
+		goto out;
+	}
+	if (vma->vm_pgoff != 0) {
+		printk("%s: need offset 0 (vm_pgoff=%ld)\n",__FUNCTION__,
+		       vma->vm_pgoff);
+		goto out;
+	}
+
+	fb_pages  = (p->fix.smem_len             + PAGE_SIZE-1) >> PAGE_SHIFT;
+	map_pages = (vma->vm_end - vma->vm_start + PAGE_SIZE-1) >> PAGE_SHIFT;
+	if (map_pages > fb_pages) {
+		printk("%s: mapping to big (%ld > %d)\n",__FUNCTION__,
+		       vma->vm_end - vma->vm_start, p->fix.smem_len);
+		goto out;
+	}
+
+	retval = -ENOMEM;
+	kd->pages = kmalloc(sizeof(struct page*)*map_pages, GFP_KERNEL);
+	if (NULL == kd->pages)
+		goto out;
+	kd->mapped = kmalloc(sizeof(int)*map_pages, GFP_KERNEL);
+	if (NULL == kd->mapped) {
+		kfree(kd->pages);
+		goto out;
+	}
+	memset(kd->pages,  0, sizeof(struct page*) * map_pages);
+	memset(kd->mapped, 0, sizeof(int)          * map_pages);
+	kd->vma = vma;
+	kd->nr_pages = map_pages;
+	atomic_set(&kd->map_refs,1);
+	kd->faults = 0;
+
+	vma->vm_ops   = &x11_fb_vm_ops;
+	vma->vm_flags |= VM_DONTEXPAND | VM_RESERVED;
+	vma->vm_flags &= ~VM_IO; /* using shared anonymous pages */
+	vma->vm_private_data = kd;
+	retval = 0;
+
+out:
+	up(&kd->mm_lock);
+	return retval;	
+}
+
+/* ---------------------------------------------------------------------------- */
+
 static struct fb_ops x11_fb_ops = {
 	.owner		= THIS_MODULE,
 	.fb_setcolreg	= x11_setcolreg,
@@ -211,6 +395,7 @@ static struct fb_ops x11_fb_ops = {
 	.fb_copyarea	= x11_copyarea,
 	.fb_imageblit	= x11_imageblit,
 	.fb_cursor	= soft_cursor,
+	.fb_mmap        = x11_mmap,
 };
 
 /* ---------------------------------------------------------------------------- */
@@ -295,6 +480,7 @@ static int x11_probe(void)
 	input_register_device(&kd->mouse);
 
 	/* misc common kernel stuff */
+	init_MUTEX(&kd->mm_lock);
 	init_waitqueue_head(&kd->wq);
 	init_timer(&kd->refresh);
 	kd->refresh.function = x11_fb_timer;

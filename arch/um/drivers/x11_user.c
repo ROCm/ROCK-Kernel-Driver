@@ -176,6 +176,7 @@ static void x11_kbd(struct x11_window *win, struct x11_kerndata *kd, XEvent *e)
 	
 	if (e->xkey.keycode < sizeof(x11_keymap)/sizeof(x11_keymap[0]))
 		key = x11_keymap[e->xkey.keycode];
+
 	if (KEY_RESERVED != key) {
 		x11_kbd_input(kd, key, e->type == KeyPress);
 	} else {
@@ -309,12 +310,10 @@ have_ximage:
 	win->var.vsync_len	= 4;
 	win->var.vmode		= FB_VMODE_NONINTERLACED;
 
-#if 0
-	win->fix.smem_start     = ;
-	win->fix.smem_len       = ;
-#endif
-	win->fix.line_length    = win->ximage->bytes_per_line;
 	win->fix.visual         = FB_VISUAL_TRUECOLOR;
+	win->fix.line_length    = win->ximage->bytes_per_line;
+	win->fix.smem_start     = 0;
+	win->fix.smem_len       = win->fix.line_length * win->var.yres;
 	
 	strcpy(win->fix.id,"x11");
 	win->fix.type		= FB_TYPE_PACKED_PIXELS;
