@@ -49,7 +49,7 @@ dma_free_coherent(struct device *dev, size_t size, void *vaddr,
 	}
 #endif
 
-	consistent_free(vaddr, size);
+	consistent_free(vaddr);
 }
 
 static inline dma_addr_t
