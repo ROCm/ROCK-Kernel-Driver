@@ -272,6 +272,7 @@ typedef struct {
 	int (*procfs_write)(struct file *file,const char *buffer,unsigned long count,void *data);
 	int (*startDataPump)(uvd_t *uvd);
 	void (*stopDataPump)(uvd_t *uvd);
+	int (*setVideoMode)(uvd_t *uvd, struct video_window *vw);
 } usbvideo_cb_t;
 
 struct s_usbvideo_t {

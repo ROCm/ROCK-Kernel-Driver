@@ -1468,6 +1468,10 @@ static int usbvideo_v4l_do_ioctl(struct inode *inode, struct file *file,
 		{
 			struct video_window *vw = arg;
 
+			if(VALID_CALLBACK(uvd, setVideoMode)) {
+				return GET_CALLBACK(uvd, setVideoMode)(uvd, vw);
+			}
+
 			if (vw->flags)
 				return -EINVAL;
 			if (vw->clipcount)
@@ -1485,8 +1489,8 @@ static int usbvideo_v4l_do_ioctl(struct inode *inode, struct file *file,
 
 			vw->x = 0;
 			vw->y = 0;
-			vw->width = VIDEOSIZE_X(uvd->canvas);
-			vw->height = VIDEOSIZE_Y(uvd->canvas);
+			vw->width = VIDEOSIZE_X(uvd->videosize);
+			vw->height = VIDEOSIZE_Y(uvd->videosize);
 			vw->chromakey = 0;
 			if (VALID_CALLBACK(uvd, getFPS))
 				vw->flags = GET_CALLBACK(uvd, getFPS)(uvd);
