@@ -468,10 +468,6 @@ struct pci_bus {
 
 #define pci_bus_b(n) list_entry(n, struct pci_bus, node)
 
-extern struct list_head pci_root_buses;	/* list of all known PCI buses */
-extern struct list_head pci_devices;	/* list of all devices */
-extern struct bus_type pci_bus_type;
-
 /*
  * Error values that may be returned by PCI functions.
  */
@@ -521,6 +517,13 @@ struct pci_driver {
 
 /* these external functions are only available when PCI support is enabled */
 #ifdef CONFIG_PCI
+
+extern struct bus_type pci_bus_type;
+
+/* Do NOT directly access these two variables, unless you are arch specific pci
+ * code, or pci core code. */
+extern struct list_head pci_root_buses;	/* list of all known PCI buses */
+extern struct list_head pci_devices;	/* list of all devices */
 
 #define pci_for_each_bus(bus) \
 	for(bus = pci_bus_b(pci_root_buses.next); bus != pci_bus_b(&pci_root_buses); bus = pci_bus_b(bus->node.next))
