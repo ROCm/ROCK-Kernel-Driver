@@ -24,7 +24,6 @@
 #include <linux/delay.h>
 #include <linux/interrupt.h>
 #include <linux/fb.h>
-#include <linux/selection.h>
 #include <linux/init.h>
 #include <linux/ioport.h>
 #include <asm/io.h>
@@ -33,8 +32,7 @@
 #include <asm/bootx.h>
 #endif
 
-#include <video/fbcon.h>
-#include <video/macmodes.h>
+#include "macmodes.h"
 
 /* Supported palette hacks */
 enum {
@@ -83,14 +81,12 @@ static void offb_init_fb(const char *name, const char *full_name,
 
 static struct fb_ops offb_ops = {
 	.owner		= THIS_MODULE,
-	.fb_set_var	= gen_set_var,
-	.fb_get_cmap	= gen_get_cmap,
-	.fb_set_cmap	= gen_set_cmap,
 	.fb_setcolreg	= offb_setcolreg,
 	.fb_blank	= offb_blank,
 	.fb_fillrect	= cfb_fillrect,
 	.fb_copyarea	= cfb_copyarea,
 	.fb_imageblit	= cfb_imageblit,
+	.fb_cursor	= cfb_cursor,
 };
 
     /*
@@ -411,7 +407,7 @@ static void __init offb_init_fb(const char *name, const char *full_name,
 		return;
 	}
 
-	size = sizeof(struct fb_info) + sizeof(struct display) + sizeof(u32) * 17;
+	size = sizeof(struct fb_info) + sizeof(u32) * 17;
 
 	info = kmalloc(size, GFP_ATOMIC);
 	
@@ -528,23 +524,14 @@ static void __init offb_init_fb(const char *name, const char *full_name,
 
 	strcpy(fix->id, "OFfb ");
 	strncat(fix->id, full_name, sizeof(fix->id));
-	strcpy(info->modename, fix->id);
 	info->node = NODEV;
 	info->fbops = &offb_ops;
 	info->screen_base = ioremap(address, fix->smem_len);
 	info->par = par;
-	info->disp = (struct display *) (info + 1);
-	info->pseudo_palette = (void *) (info->disp + 1);
-	info->currcon = -1;
-	info->fontname[0] = '\0';
-	info->changevar = NULL;
-	info->switch_con = gen_switch;
-	info->updatevar = gen_update_var;
+	info->pseudo_palette = (void *) (info + 1);
 	info->flags = FBINFO_FLAG_DEFAULT;
 
 	fb_alloc_cmap(&info->cmap, 256, 0);
-
-	gen_set_disp(-1, info);
 
 	if (register_framebuffer(info) < 0) {
 		kfree(info);

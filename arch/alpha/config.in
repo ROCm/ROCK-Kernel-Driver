@@ -348,22 +348,7 @@ source drivers/media/Config.in
 
 source fs/Config.in
 
-if [ "$CONFIG_VT" = "y" ]; then
-  mainmenu_option next_comment
-  comment 'Console drivers'
-  bool 'VGA text console' CONFIG_VGA_CONSOLE
-#  if [ "$CONFIG_PCI" = "y" -a "$CONFIG_VGA_CONSOLE" = "y" ]; then
-#    bool '   Allow VGA on any bus?' CONFIG_VGA_HOSE
-#    if [ "$CONFIG_VGA_HOSE" = "y" ]; then
-#      define_bool CONFIG_DUMMY_CONSOLE y
-#    fi
-#  fi
-  source drivers/video/Config.in
-  if [ "$CONFIG_FB" = "y" ]; then
-    define_bool CONFIG_PCI_CONSOLE y
-  fi
-  endmenu
-fi
+source drivers/video/Config.in
 
 mainmenu_option next_comment
 comment 'Sound'
