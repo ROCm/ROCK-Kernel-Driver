@@ -1447,6 +1447,26 @@ int ndisc_rcv(struct sk_buff *skb)
 	return 0;
 }
 
+static int ndisc_netdev_event(struct notifier_block *this, unsigned long event, void *ptr)
+{
+	struct net_device *dev = ptr;
+
+	switch (event) {
+	case NETDEV_CHANGEADDR:
+		neigh_changeaddr(&nd_tbl, dev);
+		fib6_run_gc(0);
+		break;
+	default:
+		break;
+	}
+
+	return NOTIFY_DONE;
+}
+
+struct notifier_block ndisc_netdev_notifier = {
+	.notifier_call = ndisc_netdev_event,
+};
+
 int __init ndisc_init(struct net_proto_family *ops)
 {
 	struct ipv6_pinfo *np;
@@ -1480,6 +1500,7 @@ int __init ndisc_init(struct net_proto_family *ops)
 	neigh_sysctl_register(NULL, &nd_tbl.parms, NET_IPV6, NET_IPV6_NEIGH, "ipv6");
 #endif
 
+	register_netdevice_notifier(&ndisc_netdev_notifier);
 	return 0;
 }
 
