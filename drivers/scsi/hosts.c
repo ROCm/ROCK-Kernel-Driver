@@ -259,6 +259,48 @@ struct Scsi_Host * scsi_register(Scsi_Host_Template * tpnt, int j)
     return retval;
 }
 
+void scsi_host_busy_inc(struct Scsi_Host *shost, Scsi_Device *sdev)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(shost->host_lock, flags);
+	shost->host_busy++;
+	sdev->device_busy++;
+	spin_unlock_irqrestore(shost->host_lock, flags);
+}
+
+void scsi_host_busy_dec_and_test(struct Scsi_Host *shost, Scsi_Device *sdev)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(shost->host_lock, flags);
+	shost->host_busy--;
+	sdev->device_busy--;
+	if (shost->in_recovery && (shost->host_busy == shost->host_failed)) {
+		up(shost->eh_wait);
+		SCSI_LOG_ERROR_RECOVERY(5, printk("Waking error handler"
+					  "thread (%d)\n",
+					  atomic_read(&shost->eh_wait->count)));
+	}
+	spin_unlock_irqrestore(shost->host_lock, flags);
+}
+
+void scsi_host_failed_inc_and_test(struct Scsi_Host *shost)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(shost->host_lock, flags);
+	shost->in_recovery = 1;
+	shost->host_failed++;
+	if (shost->host_busy == shost->host_failed) {
+		up(shost->eh_wait);
+		SCSI_LOG_ERROR_RECOVERY(5, printk("Waking error handler"
+					  "thread (%d)\n",
+					  atomic_read(&shost->eh_wait->count)));
+	}
+	spin_unlock_irqrestore(shost->host_lock, flags);
+}
+
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.
  * Emacs will notice this stuff at the end of the file and automatically
