@@ -512,8 +512,8 @@ dev_irnet_close(struct inode *	inode,
   if(ap->ppp_open)
     {
       DERROR(FS_ERROR, "Channel still registered - deregistering !\n");
-      ppp_unregister_channel(&ap->chan);
       ap->ppp_open = 0;
+      ppp_unregister_channel(&ap->chan);
     }
 
   kfree(ap);
@@ -651,10 +651,12 @@ dev_irnet_ioctl(struct inode *	inode,
 	  DEBUG(FS_INFO, "Exiting PPP discipline.\n");
 	  /* Disconnect from the generic PPP layer */
 	  if(ap->ppp_open)
-	    ppp_unregister_channel(&ap->chan);
+	    {
+	      ap->ppp_open = 0;
+	      ppp_unregister_channel(&ap->chan);
+	    }
 	  else
 	    DERROR(FS_ERROR, "Channel not registered !\n");
-	  ap->ppp_open = 0;
 	  err = 0;
 	}
       break;

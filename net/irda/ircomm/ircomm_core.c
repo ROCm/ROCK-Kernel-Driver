@@ -508,17 +508,12 @@ void ircomm_flow_request(struct ircomm_cb *self, LOCAL_FLOW flow)
 EXPORT_SYMBOL(ircomm_flow_request);
 
 #ifdef CONFIG_PROC_FS
-struct ircomm_iter_state {
-	unsigned long flags;
-};
-
 static void *ircomm_seq_start(struct seq_file *seq, loff_t *pos)
 {
-	struct ircomm_iter_state *iter = seq->private;
 	struct ircomm_cb *self;
 	loff_t off = 0;
 
-	spin_lock_irqsave(&ircomm->hb_spinlock, iter->flags);
+	spin_lock_irq(&ircomm->hb_spinlock);
 
 	for (self = (struct ircomm_cb *) hashbin_get_first(ircomm);
 	     self != NULL;
@@ -539,8 +534,7 @@ static void *ircomm_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 
 static void ircomm_seq_stop(struct seq_file *seq, void *v)
 {
-	struct ircomm_iter_state *iter = seq->private;
-	spin_unlock_irqrestore(&ircomm->hb_spinlock, iter->flags);
+	spin_unlock_irq(&ircomm->hb_spinlock);
 }
 
 static int ircomm_seq_show(struct seq_file *seq, void *v)
@@ -581,25 +575,7 @@ static struct seq_operations ircomm_seq_ops = {
 
 static int ircomm_seq_open(struct inode *inode, struct file *file)
 {
-	struct seq_file *seq;
-	int rc = -ENOMEM;
-	struct ircomm_iter_state *s = kmalloc(sizeof(*s), GFP_KERNEL);
-       
-	if (!s)
-		goto out;
-
-	rc = seq_open(file, &ircomm_seq_ops);
-	if (rc)
-		goto out_kfree;
-
-	seq	     = file->private_data;
-	seq->private = s;
-	memset(s, 0, sizeof(*s));
-out:
-	return rc;
-out_kfree:
-	kfree(s);
-	goto out;
+	return seq_open(file, &ircomm_seq_ops);
 }
 #endif /* CONFIG_PROC_FS */
 

@@ -351,10 +351,6 @@ __u32 irlmp_find_device(hashbin_t *cachelog, char *name, __u32 *saddr)
 }
 
 #ifdef CONFIG_PROC_FS
-struct discovery_iter_state {
-	unsigned long flags;
-};
-
 static inline discovery_t *discovery_seq_idx(loff_t pos)
 
 {
@@ -372,9 +368,7 @@ static inline discovery_t *discovery_seq_idx(loff_t pos)
 
 static void *discovery_seq_start(struct seq_file *seq, loff_t *pos)
 {
-	struct discovery_iter_state *iter = seq->private;
-
-	spin_lock_irqsave(&irlmp->cachelog->hb_spinlock, iter->flags);
+	spin_lock_irq(&irlmp->cachelog->hb_spinlock);
         return *pos ? discovery_seq_idx(*pos - 1) : SEQ_START_TOKEN;
 }
 
@@ -388,8 +382,7 @@ static void *discovery_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 
 static void discovery_seq_stop(struct seq_file *seq, void *v)
 {
-	struct discovery_iter_state *iter = seq->private;
-	spin_unlock_irqrestore(&irlmp->cachelog->hb_spinlock, iter->flags);
+	spin_unlock_irq(&irlmp->cachelog->hb_spinlock);
 }
 
 static int discovery_seq_show(struct seq_file *seq, void *v)
@@ -446,28 +439,9 @@ static struct seq_operations discovery_seq_ops = {
 
 static int discovery_seq_open(struct inode *inode, struct file *file)
 {
-	struct seq_file *seq;
-	int rc = -ENOMEM;
-	struct discovery_iter_state *s;
-       
 	ASSERT(irlmp != NULL, return -EINVAL;);
 
-	s = kmalloc(sizeof(*s), GFP_KERNEL);
-	if (!s)
-		goto out;
-
-	rc = seq_open(file, &discovery_seq_ops);
-	if (rc)
-		goto out_kfree;
-
-	seq	     = file->private_data;
-	seq->private = s;
-	memset(s, 0, sizeof(*s));
-out:
-	return rc;
-out_kfree:
-	kfree(s);
-	goto out;
+	return seq_open(file, &discovery_seq_ops);
 }
 
 struct file_operations discovery_seq_fops = {

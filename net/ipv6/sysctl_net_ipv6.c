@@ -31,7 +31,7 @@ ctl_table ipv6_table[] = {
 		.ctl_name	= NET_IPV6_ICMP,
 		.procname	= "icmp",
 		.maxlen		= 0,
-		.mode		= 0500,
+		.mode		= 0555,
 		.child		= ipv6_icmp_table
 	},
 	{

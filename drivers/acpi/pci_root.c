@@ -66,7 +66,7 @@ struct acpi_pci_root {
 	u64			io_tra;
 };
 
-struct list_head		acpi_pci_roots;
+static LIST_HEAD(acpi_pci_roots);
 
 static struct acpi_pci_driver *sub_driver;
 
@@ -374,8 +374,6 @@ static int __init acpi_pci_root_init (void)
 	acpi_dbg_layer = ACPI_PCI_COMPONENT;
 	acpi_dbg_level = 0xFFFFFFFF;
 	 */
-
- 	INIT_LIST_HEAD(&acpi_pci_roots);
 
 	if (acpi_bus_register_driver(&acpi_pci_root_driver) < 0)
 		return_VALUE(-ENODEV);
