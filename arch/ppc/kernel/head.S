@@ -1317,7 +1317,9 @@ setup_604_hid0:
 setup_750_7400_hid0:
 	mfspr	r11,HID0
 	ori	r11,r11,HID0_SGE | HID0_ABE | HID0_BHTE | HID0_BTIC
+BEGIN_FTR_SECTION
 	oris	r11,r11,HID0_DPM@h	/* enable dynamic power mgmt */
+END_FTR_SECTION_IFCLR(CPU_FTR_NO_DPM)
 	li	r3,HID0_SPD
 	andc	r11,r11,r3		/* clear SPD: enable speculative */
  	li	r3,0
@@ -1356,7 +1358,9 @@ setup_7450_23_hid0:
 	/* All of the bits we have to set.....
 	*/
 	ori	r11,r11,HID0_SGE | HID0_FOLD | HID0_BHTE | HID0_BTIC | HID0_LRSTK
+BEGIN_FTR_SECTION
 	oris	r11,r11,HID0_DPM@h	/* enable dynamic power mgmt */
+END_FTR_SECTION_IFCLR(CPU_FTR_NO_DPM)
 
 	/* All of the bits we have to clear....
 	*/

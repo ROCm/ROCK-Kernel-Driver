@@ -154,6 +154,24 @@ struct cpu_spec	cpu_specs[] = {
 	32, 32,
 	__setup_cpu_750
     },
+    {	/* 750FX rev 2.0 must disable HID0[DPM] */
+    	0xffffffff, 0x70000200, "750FX",
+    	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_CAN_DOZE | CPU_FTR_USE_TB |
+	CPU_FTR_L2CR | CPU_FTR_TAU | CPU_FTR_HPTE_TABLE | CPU_FTR_CAN_NAP |
+	CPU_FTR_NO_DPM,
+	COMMON_PPC,
+	32, 32,
+	__setup_cpu_750
+    },
+    {	/* 750FX (All revs except 2.0) */
+    	0xffff0000, 0x70000000, "750FX",
+    	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_CAN_DOZE | CPU_FTR_USE_TB |
+	CPU_FTR_L2CR | CPU_FTR_TAU | CPU_FTR_HPTE_TABLE | CPU_FTR_CAN_NAP,
+	COMMON_PPC,
+	32, 32,
+	__setup_cpu_750
+    },
+ 
     {	/* 740/750 (L2CR bit need fixup for 740) */
     	0xffff0000, 0x00080000, "740/750",
     	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_CAN_DOZE | CPU_FTR_USE_TB |
@@ -327,22 +345,50 @@ struct cpu_spec	cpu_specs[] = {
     	0xffff0000, 0x41610000, "NP405L",
     	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB,
     	PPC_FEATURE_32 | PPC_FEATURE_HAS_MMU | PPC_FEATURE_HAS_4xxMAC,
-	16, 8,
+	32, 32,
 	0, /*__setup_cpu_405 */
     },
     {	/* NP4GS3 */
     	0xffff0000, 0x40B10000, "NP4GS3",
     	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB,
     	PPC_FEATURE_32 | PPC_FEATURE_HAS_MMU | PPC_FEATURE_HAS_4xxMAC,
-	16, 8,
+	32, 32,
 	0, /*__setup_cpu_405 */
     },
     {   /* NP405H */
         0xffff0000, 0x41410000, "NP405H",
         CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB,
         PPC_FEATURE_32 | PPC_FEATURE_HAS_MMU | PPC_FEATURE_HAS_4xxMAC,
-        16, 8,
+        32, 32,
         0, /*__setup_cpu_405 */
+     },
+     {	/* 405GPr */
+    	0xffff0000, 0x50910000, "405GPr",
+    	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB,
+    	PPC_FEATURE_32 | PPC_FEATURE_HAS_MMU | PPC_FEATURE_HAS_4xxMAC,
+	32, 32,
+	0, /*__setup_cpu_405 */
+    },
+    {   /* STBx25xx */
+        0xffff0000, 0x51510000, "STBx25xx",
+        CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB,
+        PPC_FEATURE_32 | PPC_FEATURE_HAS_MMU | PPC_FEATURE_HAS_4xxMAC,
+        32, 32,
+        0, /*__setup_cpu_405 */
+     },
+     {	/* 405LP */
+    	0xffff0000, 0x41F10000, "405LP",
+    	CPU_FTR_SPLIT_ID_CACHE |  CPU_FTR_USE_TB,
+    	PPC_FEATURE_32 | PPC_FEATURE_HAS_MMU,
+	32, 32,
+	0, /*__setup_cpu_405 */
+     },
+     {	/* Xilinx Virtex-II Pro  */
+	0xffff0000, 0x20010000, "Virtex-II Pro",
+	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB,
+	PPC_FEATURE_32 | PPC_FEATURE_HAS_MMU | PPC_FEATURE_HAS_4xxMAC,
+	32, 32,
+	0, /*__setup_cpu_405 */
      },
 
 #endif /* CONFIG_40x */

@@ -52,7 +52,10 @@ ppc6xx_idle(void)
 	if (!need_resched()) {
 		__asm__ __volatile__("mfspr %0,1008":"=r"(hid0):);
 		hid0 &= ~(HID0_NAP | HID0_SLEEP | HID0_DOZE);
-		hid0 |= (powersave_nap ? HID0_NAP : HID0_DOZE) | HID0_DPM;
+		hid0 |= (powersave_nap ? HID0_NAP : HID0_DOZE);
+		if (!(cur_cpu_spec[smp_processor_id()]->cpu_features
+		      & CPU_FTR_NO_DPM))
+			hid0 |= HID0_DPM;
 		__asm__ __volatile__("mtspr 1008,%0"::"r"(hid0));
 		/* Flush pending data streams, consider this instruction
 		 * exist on all altivec capable CPUs
