@@ -227,6 +227,7 @@ static struct gendisk mcd_gendisk = {
 	.minor_shift	= 0,
 	.major_name	= "mcd",
 	.fops		= &mcd_bdops,
+	.flags		= GENHD_FL_CD;
 };
 
 #ifndef MODULE
@@ -1129,7 +1130,6 @@ int __init mcd_init(void)
 		printk(KERN_ERR "mcd: Unable to register Mitsumi CD-ROM.\n");
 		goto out_cdrom;
 	}
-	devfs_plain_cdrom(&mcd_info, disk->fops);
 	add_gendisk(disk);
 	register_disk(disk,
 		      mk_kdev(disk->major,disk->first_minor),

@@ -286,6 +286,8 @@ static void devfs_register_partition(struct gendisk *dev, int part)
 
 #ifdef CONFIG_DEVFS_FS
 static struct unique_numspace disc_numspace = UNIQUE_NUMBERSPACE_INITIALISER;
+static devfs_handle_t cdroms;
+static struct unique_numspace cdrom_numspace = UNIQUE_NUMBERSPACE_INITIALISER;
 #endif
 
 static void devfs_create_partitions(struct gendisk *dev)
@@ -333,6 +335,47 @@ static void devfs_create_partitions(struct gendisk *dev)
 #endif
 }
 
+static void devfs_create_cdrom(struct gendisk *dev)
+{
+#ifdef CONFIG_DEVFS_FS
+	int pos = 0;
+	devfs_handle_t dir, slave;
+	unsigned int devfs_flags = DEVFS_FL_DEFAULT;
+	char dirname[64], symlink[16];
+	char vname[23];
+
+	if (!cdroms)
+		cdroms = devfs_mk_dir (NULL, "cdroms", NULL);
+
+	dev->number = devfs_alloc_unique_number(&cdrom_numspace);
+	sprintf(vname, "cdroms/cdrom%d", dev->number);
+	if (dev->de) {
+		int pos;
+		devfs_handle_t slave;
+		char rname[64];
+
+		dev->disk_de = devfs_register(dev->de, "cd", DEVFS_FL_DEFAULT,
+				     dev->major, dev->first_minor,
+				     S_IFBLK | S_IRUGO | S_IWUGO,
+				     dev->fops, NULL);
+
+		pos = devfs_generate_path(dev->disk_de, rname+3, sizeof(rname)-3);
+		if (pos >= 0) {
+			strncpy(rname + pos, "../", 3);
+			devfs_mk_symlink(devfs_handle, vname,
+					 DEVFS_FL_DEFAULT,
+					 rname + pos, &slave, NULL);
+			devfs_auto_unregister(dev->de, slave);
+		}
+	} else {
+		dev->disk_de = devfs_register (NULL, vname, DEVFS_FL_DEFAULT,
+				    dev->major, dev->first_minor,
+				    S_IFBLK | S_IRUGO | S_IWUGO,
+				    dev->fops, NULL);
+	}
+#endif
+}
+
 static void devfs_remove_partitions(struct gendisk *dev)
 {
 #ifdef CONFIG_DEVFS_FS
@@ -343,7 +386,10 @@ static void devfs_remove_partitions(struct gendisk *dev)
 	}
 	devfs_unregister(dev->disk_de);
 	dev->disk_de = NULL;
-	devfs_dealloc_unique_number(&disc_numspace, dev->number);
+	if (dev->flags & GENHD_FL_CD)
+		devfs_dealloc_unique_number(&cdrom_numspace, dev->number);
+	else
+		devfs_dealloc_unique_number(&disc_numspace, dev->number);
 #endif
 }
 
@@ -366,6 +412,9 @@ void register_disk(struct gendisk *disk, kdev_t dev, unsigned minors,
 		return;
 
 	set_capacity(disk, size);
+
+	if (disk->flags & GENHD_FL_CD)
+		devfs_create_cdrom(disk);
 
 	/* No minors to use for partitions */
 	if (!disk->minor_shift)

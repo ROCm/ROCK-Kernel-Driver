@@ -68,6 +68,7 @@ struct hd_struct {
 #define GENHD_FL_REMOVABLE  1
 #define GENHD_FL_DRIVERFS  2
 #define GENHD_FL_DEVFS	4
+#define GENHD_FL_CD	8
 
 struct gendisk {
 	int major;			/* major number of driver */

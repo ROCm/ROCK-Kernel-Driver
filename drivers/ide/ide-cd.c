@@ -2611,12 +2611,6 @@ static int ide_cdrom_register (ide_drive_t *drive, int nslots)
 	if (!CDROM_CONFIG_FLAGS(drive)->close_tray)
 		devinfo->mask |= CDC_CLOSE_TRAY;
 
-	devinfo->de = devfs_register(drive->de, "cd", DEVFS_FL_DEFAULT,
-				     drive->disk->major,
-				     drive->disk->first_minor,
-				     S_IFBLK | S_IRUGO | S_IWUGO,
-				     ide_fops, NULL);
-
 	return register_cdrom(devinfo);
 }
 
@@ -3127,6 +3121,9 @@ static int ide_cdrom_attach (ide_drive_t *drive)
 	memset(info, 0, sizeof (struct cdrom_info));
 	drive->driver_data = info;
 	DRIVER(drive)->busy++;
+	g->minor_shift = 0;
+	g->de = drive->de;
+	g->flags = GENHD_FL_CD;
 	if (ide_cdrom_setup(drive)) {
 		struct cdrom_device_info *devinfo = &info->devinfo;
 		DRIVER(drive)->busy--;
@@ -3146,10 +3143,6 @@ static int ide_cdrom_attach (ide_drive_t *drive)
 	DRIVER(drive)->busy--;
 
 	cdrom_read_toc(drive, &sense);
-	g->minor_shift = 0;
-	/* probably bogus, but that's the old behaviour */
-	g->de = NULL;
-	g->flags = GENHD_FL_DEVFS;
 	add_gendisk(g);
 	register_disk(g, mk_kdev(g->major,g->first_minor),
 		      1<<g->minor_shift, ide_fops,

@@ -3195,6 +3195,7 @@ static struct gendisk scd_gendisk = {
 	.minor_shift	= 0,
 	.major_name	= "cdu31a"
 	.fops		= &scd_bdops,
+	.flags		= GENHD_FL_CD,
 }
 
 /* The different types of disc loading mechanisms supported */
@@ -3442,7 +3443,6 @@ int __init cdu31a_init(void)
 		scd_info.mask = deficiency;
 		if (register_cdrom(&scd_info))
 			goto errout0;
-		devfs_plain_cdrom(&scd_info, disk->fops);
 		add_gendisk(disk);
 		register_disk(disk,
 			      mk_kdev(disk->major,disk->first_minor),

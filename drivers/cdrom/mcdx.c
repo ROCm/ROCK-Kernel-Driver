@@ -1212,6 +1212,7 @@ int __init mcdx_init_drive(int drive)
 	disk->minor_shift = 0;
 	disk->major_name = stuffp->info.name;
 	disk->fops = &mcdx_bdops;
+	disk->flags = GENHD_FL_CD;
 
 	sprintf(msg, " mcdx: Mitsumi CD-ROM installed at 0x%3p, irq %d."
 		" (Firmware version %c %x)\n",
@@ -1229,7 +1230,6 @@ int __init mcdx_init_drive(int drive)
 		blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
 		return 2;
 	}
-	devfs_plain_cdrom(&stuffp->info, disk->fops);
 	add_gendisk(disk);
 	register_disk(disk,
 		      mk_kdev(disk->major,disk->first_minor),

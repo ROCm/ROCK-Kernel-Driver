@@ -1363,6 +1363,7 @@ static struct gendisk cm206_gendisk = {
 	.minor_shift	= 0,
 	.major_name	= "cm206",
 	.fops		= &cm206_bdops,
+	.flags		= GENHD_FL_CD,
 };
 
 /* This function probes for the adapter card. It returns the base
@@ -1481,7 +1482,6 @@ int __init cm206_init(void)
 		printk(KERN_INFO "Cannot register for cdrom %d!\n", MAJOR_NR);
 		goto out_cdrom;
 	}
-	devfs_plain_cdrom(&cm206_info, disk->fops);
 	add_gendisk(disk);
 	register_disk(disk,
 		      mk_kdev(disk->major,disk->first_minor),

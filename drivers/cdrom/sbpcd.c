@@ -5836,11 +5836,9 @@ int __init sbpcd_init(void)
 		disk->minor_shift = 0;
 		disk->fops = &sbpcd_bdops;
 		disk->major_name = sbpcd_infop->name;
-		sprintf(nbuff, "c0t%d/cd", p->drv_id);
-		sbpcd_infop->de =
-		    devfs_register (devfs_handle, nbuff, DEVFS_FL_DEFAULT,
-				    MAJOR_NR, j, S_IFBLK | S_IRUGO | S_IWUGO,
-				    &sbpcd_bdops, NULL);
+		disk->flags = GENHD_FL_CD;
+		sprintf(nbuff, "c0t%d", p->drv_id);
+		disk->de = devfs_mk_dir(devfs_handle, nbuff, NULL);
 		if (register_cdrom(sbpcd_infop))
 		{
 			printk(" sbpcd: Unable to register with Uniform CD-ROm driver\n");
@@ -5879,6 +5877,7 @@ void sbpcd_exit(void)
 		del_gendisk(&D_S[j].disk);
 		vfree(D_S[j].sbp_buf);
 		if (D_S[j].sbp_audsiz>0) vfree(D_S[j].aud_buf);
+		devfs_unregister(D_S[j].disk.de);
 		if ((unregister_cdrom(D_S[j].sbpcd_infop) == -EINVAL))
 		{
 			msg(DBG_INF, "What's that: can't unregister info %s.\n", major_name);
