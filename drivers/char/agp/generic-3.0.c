@@ -468,8 +468,11 @@ int agp_3_0_node_enable(u32 mode, u32 minor)
 	 * whether isochronous transfers are supported.
 	 */
 	if(isoch != 0) {
-		if((ret = agp_3_0_isochronous_node_enable(dev_list, ndevs)) != 0)
-			goto free_and_exit;
+		if((ret = agp_3_0_isochronous_node_enable(dev_list, ndevs)) != 0) {
+			printk (KERN_INFO PFX "Something bad happened setting up isochronous xfers. "
+				"Falling back to non-isochronous xfer mode.\n");
+			agp_3_0_nonisochronous_node_enable(dev_list,ndevs);
+		}
 	} else {
 		agp_3_0_nonisochronous_node_enable(dev_list,ndevs);
 	}
