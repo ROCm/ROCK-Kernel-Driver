@@ -2198,6 +2198,23 @@ static int probe_si (struct sx_board *board)
 		}
 	}
 
+	/* Now we're pretty much convinced that there is an SI board here, 
+	   but to prevent trouble, we'd better double check that we don't
+	   have an SI1 board when we're probing for an SI2 board.... */
+
+	write_sx_byte (board, SI2_ISA_ID_BASE,0x10); 
+	if ( IS_SI1_BOARD(board)) {
+		/* This should be an SI1 board, which has this
+		   location writable... */
+		if (read_sx_byte (board, SI2_ISA_ID_BASE) != 0x10)
+			return 0; 
+	} else {
+		/* This should be an SI2 board, which has the bottom
+		   3 bits non-writable... */
+		if (read_sx_byte (board, SI2_ISA_ID_BASE) == 0x10)
+			return 0; 
+	}
+
 	printheader ();
 
 	printk (KERN_DEBUG "sx: Found an SI board at %lx\n", board->hw_base);
