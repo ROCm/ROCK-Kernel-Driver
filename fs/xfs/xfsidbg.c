@@ -1824,7 +1824,8 @@ kdbm_pb(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 		   bp.pb_common.pb_bn,
 		   (unsigned long) bp.pb_common.pb_count_desired);
 	kdb_printf("  pb_io_remaining %d pb_error %u\n",
-		   bp.pb_io_remaining.counter, bp.pb_common.pb_error);
+		   bp.pb_common.pb_io_remaining.counter,
+		   bp.pb_common.pb_error);
 	kdb_printf("  pb_page_count %u pb_offset 0x%x pb_pages 0x%p\n",
 		bp.pb_common.pb_page_count, bp.pb_common.pb_offset,
 		bp.pb_common.pb_pages);

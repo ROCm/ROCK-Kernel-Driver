@@ -1124,7 +1124,7 @@ _pagebuf_wait_unpin(
 		if (atomic_read(&PBP(pb)->pb_pin_count) == 0) {
 			break;
 		}
-		blk_run_queues();
+		pagebuf_run_task_queue(pb);
 		schedule();
 	}
 	remove_wait_queue(&PBP(pb)->pb_waiters, &wait);
@@ -1162,7 +1162,8 @@ pagebuf_iodone_work(
 
 void
 pagebuf_iodone(
-	page_buf_t		*pb)
+	page_buf_t		*pb,
+	int			schedule)
 {
 	pb->pb_flags &= ~(PBF_READ | PBF_WRITE);
 	if (pb->pb_error == 0) {
@@ -1172,8 +1173,12 @@ pagebuf_iodone(
 	PB_TRACE(pb, PB_TRACE_REC(done), pb->pb_iodone);
 
 	if ((pb->pb_iodone) || (pb->pb_flags & PBF_ASYNC)) {
-		INIT_WORK(&pb->pb_iodone_work, pagebuf_iodone_work, pb);
-		queue_work(pagebuf_workqueue, &pb->pb_iodone_work);
+		if (schedule) {
+			INIT_WORK(&pb->pb_iodone_work, pagebuf_iodone_work, pb);
+			queue_work(pagebuf_workqueue, &pb->pb_iodone_work);
+		} else {
+			pagebuf_iodone_work(pb);
+		}
 	} else {
 		up(&pb->pb_iodonesema);
 	}
@@ -1291,9 +1296,9 @@ bio_end_io_pagebuf(
 		}
 	}
 
-	if (atomic_dec_and_test(&PBP(pb)->pb_io_remaining)) {
+	if (atomic_dec_and_test(&pb->pb_io_remaining) == 1) {
 		pb->pb_locked = 0;
-		pagebuf_iodone(pb);
+		pagebuf_iodone(pb, 1);
 	}
 
 	bio_put(bio);
@@ -1345,7 +1350,7 @@ pagebuf_iorequest(			/* start real I/O		*/
 	 * completion callout which happens before we have started
 	 * all the I/O from calling iodone too early
 	 */
-	atomic_set(&PBP(pb)->pb_io_remaining, 1);
+	atomic_set(&pb->pb_io_remaining, 1);
 
 	/* Special code path for reading a sub page size pagebuf in --
 	 * we populate up the whole page, and hence the other metadata
@@ -1369,7 +1374,7 @@ pagebuf_iorequest(			/* start real I/O		*/
 		bvec->bv_len = PAGE_CACHE_SIZE;
 		bvec->bv_offset = 0;
 
-		atomic_inc(&PBP(pb)->pb_io_remaining);
+		atomic_inc(&pb->pb_io_remaining);
 		submit_bio(READ, bio);
 
 		goto io_submitted;
@@ -1402,7 +1407,7 @@ pagebuf_iorequest(			/* start real I/O		*/
 	map_i = 0;
 
 next_chunk:
-	atomic_inc(&PBP(pb)->pb_io_remaining);
+	atomic_inc(&pb->pb_io_remaining);
 	nr_pages = BIO_MAX_SECTORS >> (PAGE_SHIFT - BBSHIFT);
 	if (nr_pages > total_nr_pages)
 		nr_pages = total_nr_pages;
@@ -1444,10 +1449,8 @@ next_chunk:
 
 io_submitted:
 
-	if (atomic_dec_and_test(&PBP(pb)->pb_io_remaining) == 1) {
-		pagebuf_iodone(pb);
-	} else if ((pb->pb_flags & (PBF_SYNC|PBF_ASYNC)) == PBF_SYNC)  {
-		blk_run_queues();
+	if (atomic_dec_and_test(&pb->pb_io_remaining) == 1) {
+		pagebuf_iodone(pb, 0);
 	}
 
 	return status < 0 ? status : 0;
@@ -1465,7 +1468,7 @@ pagebuf_iowait(
 	page_buf_t		*pb)
 {
 	PB_TRACE(pb, PB_TRACE_REC(iowait), 0);
-	blk_run_queues();
+	pagebuf_run_task_queue(pb);
 	down(&pb->pb_iodonesema);
 	PB_TRACE(pb, PB_TRACE_REC(iowaited), (int)pb->pb_error);
 	return pb->pb_error;
@@ -1709,10 +1712,10 @@ pagebuf_daemon(
 			__pagebuf_iorequest(pb);
 		}
 
-		if (count)
-			blk_run_queues();
 		if (as_list_len > 0)
 			purge_addresses();
+		if (count)
+			pagebuf_run_task_queue(NULL);
 
 		force_flush = 0;
 	} while (pb_daemon->active == 1);
@@ -1783,7 +1786,7 @@ pagebuf_delwri_flush(
 
 	spin_unlock(&pb_daemon->pb_delwrite_lock);
 
-	blk_run_queues();
+	pagebuf_run_task_queue(NULL);
 
 	if (pinptr)
 		*pinptr = pincount;

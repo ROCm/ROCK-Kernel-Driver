@@ -210,7 +210,7 @@ static inline int	xfs_bawrite(void *mp, page_buf_t *bp)
 	bp->pb_strat = xfs_bdstrat_cb;
 	xfs_buf_undelay(bp);
 	if ((ret = pagebuf_iostart(bp, PBF_WRITE | PBF_ASYNC)) == 0)
-		blk_run_queues();
+		pagebuf_run_task_queue(bp);
 	return ret;
 }
 
@@ -236,7 +236,7 @@ static inline void	xfs_buf_relse(page_buf_t *bp)
 
 
 #define xfs_biodone(pb)		    \
-	    pagebuf_iodone(pb)
+	    pagebuf_iodone(pb, 0)
 
 #define xfs_incore(buftarg,blkno,len,lockit) \
 	    pagebuf_find(buftarg, blkno ,len, lockit)
@@ -265,7 +265,7 @@ static inline int	XFS_bwrite(page_buf_t *pb)
 		error = pagebuf_iowait(pb);
 		xfs_buf_relse(pb);
 	} else {
-		blk_run_queues();
+		pagebuf_run_task_queue(pb);
 		error = 0;
 	}
 

@@ -52,7 +52,6 @@ typedef struct page_buf_private_s {
 	page_buf_t		pb_common;	/* public part of structure */
 	struct semaphore	pb_sema;	/* semaphore for lockables  */
 	unsigned long		pb_flushtime;	/* time to flush pagebuf    */
-	atomic_t		pb_io_remaining;/* #outstanding I/O requests */
 	atomic_t		pb_pin_count;	/* pin count		    */
 	wait_queue_head_t	pb_waiters;	/* unpin waiters	    */
 #ifdef PAGEBUF_LOCK_TRACKING
