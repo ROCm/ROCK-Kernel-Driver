@@ -223,9 +223,9 @@ static ssize_t write_getfs(struct file *file, const char *buf, size_t size)
 	if (data.gd_maxlen > NFS3_FHSIZE)
 		data.gd_maxlen = NFS3_FHSIZE;
 	res = kmalloc(sizeof(struct knfsd_fh), GFP_KERNEL);
-	memset(res, 0, sizeof(struct knfsd_fh));
 	if (!res)
 		return -ENOMEM;
+	memset(res, 0, sizeof(struct knfsd_fh));
 	exp_readlock();
 	if (!(clp = exp_getclient(sin)))
 		err = -EPERM;
