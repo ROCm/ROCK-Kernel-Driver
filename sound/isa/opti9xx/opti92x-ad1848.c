@@ -52,19 +52,18 @@
 #include <sound/initval.h>
 
 MODULE_AUTHOR("Massimo Piccioni <dafastidio@libero.it>");
-MODULE_CLASSES("{sound}");
 MODULE_LICENSE("GPL");
 #ifdef OPTi93X
 MODULE_DESCRIPTION("OPTi93X");
-MODULE_DEVICES("{{OPTi,82C931/3}}");
+MODULE_SUPPORTED_DEVICE("{{OPTi,82C931/3}}");
 #else	/* OPTi93X */
 #ifdef CS4231
 MODULE_DESCRIPTION("OPTi92X - CS4231");
-MODULE_DEVICES("{{OPTi,82C924 (CS4231)},"
+MODULE_SUPPORTED_DEVICE("{{OPTi,82C924 (CS4231)},"
 		"{OPTi,82C925 (CS4231)}}");
 #else	/* CS4231 */
 MODULE_DESCRIPTION("OPTi92X - AD1848");
-MODULE_DEVICES("{{OPTi,82C924 (AD1848)},"
+MODULE_SUPPORTED_DEVICE("{{OPTi,82C924 (AD1848)},"
 		"{OPTi,82C925 (AD1848)},"
 	        "{OAK,Mozart}}");
 #endif	/* CS4231 */
@@ -86,38 +85,27 @@ static int dma2 = SNDRV_DEFAULT_DMA1;		/* 0,1,3 */
 
 module_param(index, int, 0444);
 MODULE_PARM_DESC(index, "Index value for opti9xx based soundcard.");
-MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 module_param(id, charp, 0444);
 MODULE_PARM_DESC(id, "ID string for opti9xx based soundcard.");
-MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 //module_param(enable, bool, 0444);
 //MODULE_PARM_DESC(enable, "Enable opti9xx soundcard.");
-//MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 module_param(isapnp, bool, 0444);
 MODULE_PARM_DESC(isapnp, "Enable ISA PnP detection for specified soundcard.");
-MODULE_PARM_SYNTAX(isapnp, SNDRV_ISAPNP_DESC);
 module_param(port, long, 0444);
 MODULE_PARM_DESC(port, "WSS port # for opti9xx driver.");
-MODULE_PARM_SYNTAX(port, SNDRV_PORT_DESC);
 module_param(mpu_port, long, 0444);
 MODULE_PARM_DESC(mpu_port, "MPU-401 port # for opti9xx driver.");
-MODULE_PARM_SYNTAX(mpu_port, SNDRV_PORT_DESC);
 module_param(fm_port, long, 0444);
 MODULE_PARM_DESC(fm_port, "FM port # for opti9xx driver.");
-MODULE_PARM_SYNTAX(fm_port, SNDRV_PORT_DESC);
 module_param(irq, int, 0444);
 MODULE_PARM_DESC(irq, "WSS irq # for opti9xx driver.");
-MODULE_PARM_SYNTAX(irq, SNDRV_IRQ_DESC);
 module_param(mpu_irq, int, 0444);
 MODULE_PARM_DESC(mpu_irq, "MPU-401 irq # for opti9xx driver.");
-MODULE_PARM_SYNTAX(mpu_irq, SNDRV_IRQ_DESC);
 module_param(dma1, int, 0444);
 MODULE_PARM_DESC(dma1, "1st dma # for opti9xx driver.");
-MODULE_PARM_SYNTAX(dma1, SNDRV_DMA_DESC);
 #if defined(CS4231) || defined(OPTi93X)
 module_param(dma2, int, 0444);
 MODULE_PARM_DESC(dma2, "2nd dma # for opti9xx driver.");
-MODULE_PARM_SYNTAX(dma2, SNDRV_DMA_DESC);
 #endif	/* CS4231 || OPTi93X */
 
 #define OPTi9XX_HW_DETECT	0

@@ -27,7 +27,6 @@
 MODULE_AUTHOR("Takashi Iwai, Steve Ratcliffe");
 MODULE_DESCRIPTION("Emu8000 synth plug-in routine");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
 
 /*----------------------------------------------------------------*/
 

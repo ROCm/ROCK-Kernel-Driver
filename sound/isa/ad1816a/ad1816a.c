@@ -35,8 +35,7 @@
 MODULE_AUTHOR("Massimo Piccioni <dafastidio@libero.it>");
 MODULE_DESCRIPTION("AD1816A, AD1815");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
-MODULE_DEVICES("{{Highscreen,Sound-Boostar 16 3D},"
+MODULE_SUPPORTED_DEVICE("{{Highscreen,Sound-Boostar 16 3D},"
 		"{Analog Devices,AD1815},"
 		"{Analog Devices,AD1816A},"
 		"{TerraTec,Base 64},"
@@ -58,34 +57,24 @@ static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for ad1816a based soundcard.");
-MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for ad1816a based soundcard.");
-MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable ad1816a based soundcard.");
-MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 module_param_array(port, long, boot_devs, 0444);
 MODULE_PARM_DESC(port, "Port # for ad1816a driver.");
-MODULE_PARM_SYNTAX(port, SNDRV_PORT12_DESC);
 module_param_array(mpu_port, long, boot_devs, 0444);
 MODULE_PARM_DESC(mpu_port, "MPU-401 port # for ad1816a driver.");
-MODULE_PARM_SYNTAX(mpu_port, SNDRV_PORT12_DESC);
 module_param_array(fm_port, long, boot_devs, 0444);
 MODULE_PARM_DESC(fm_port, "FM port # for ad1816a driver.");
-MODULE_PARM_SYNTAX(fm_port, SNDRV_PORT12_DESC);
 module_param_array(irq, int, boot_devs, 0444);
 MODULE_PARM_DESC(irq, "IRQ # for ad1816a driver.");
-MODULE_PARM_SYNTAX(irq, SNDRV_IRQ_DESC);
 module_param_array(mpu_irq, int, boot_devs, 0444);
 MODULE_PARM_DESC(mpu_irq, "MPU-401 IRQ # for ad1816a driver.");
-MODULE_PARM_SYNTAX(mpu_irq, SNDRV_IRQ_DESC);
 module_param_array(dma1, int, boot_devs, 0444);
 MODULE_PARM_DESC(dma1, "1st DMA # for ad1816a driver.");
-MODULE_PARM_SYNTAX(dma1, SNDRV_DMA_DESC);
 module_param_array(dma2, int, boot_devs, 0444);
 MODULE_PARM_DESC(dma2, "2nd DMA # for ad1816a driver.");
-MODULE_PARM_SYNTAX(dma2, SNDRV_DMA_DESC);
 
 struct snd_card_ad1816a {
 	struct pnp_dev *dev;

@@ -45,17 +45,16 @@
 
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
 #ifndef SNDRV_SBAWE
 MODULE_DESCRIPTION("Sound Blaster 16");
-MODULE_DEVICES("{{Creative Labs,SB 16},"
+MODULE_SUPPORTED_DEVICE("{{Creative Labs,SB 16},"
 		"{Creative Labs,SB Vibra16S},"
 		"{Creative Labs,SB Vibra16C},"
 		"{Creative Labs,SB Vibra16CL},"
 		"{Creative Labs,SB Vibra16X}}");
 #else
 MODULE_DESCRIPTION("Sound Blaster AWE");
-MODULE_DEVICES("{{Creative Labs,SB AWE 32},"
+MODULE_SUPPORTED_DEVICE("{{Creative Labs,SB AWE 32},"
 		"{Creative Labs,SB AWE 64},"
 		"{Creative Labs,SB AWE 64 Gold}}");
 #endif
@@ -94,53 +93,39 @@ static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for SoundBlaster 16 soundcard.");
-MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for SoundBlaster 16 soundcard.");
-MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable SoundBlaster 16 soundcard.");
-MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 #ifdef CONFIG_PNP
 module_param_array(isapnp, bool, boot_devs, 0444);
 MODULE_PARM_DESC(isapnp, "PnP detection for specified soundcard.");
-MODULE_PARM_SYNTAX(isapnp, SNDRV_ISAPNP_DESC);
 #endif
 module_param_array(port, long, boot_devs, 0444);
 MODULE_PARM_DESC(port, "Port # for SB16 driver.");
-MODULE_PARM_SYNTAX(port, SNDRV_ENABLED ",allows:{{0x220},{0x240},{0x260},{0x280}},dialog:list");
 module_param_array(mpu_port, long, boot_devs, 0444);
 MODULE_PARM_DESC(mpu_port, "MPU-401 port # for SB16 driver.");
-MODULE_PARM_SYNTAX(mpu_port, SNDRV_ENABLED ",allows:{{0x330},{0x300}},dialog:list");
 module_param_array(fm_port, long, boot_devs, 0444);
 MODULE_PARM_DESC(fm_port, "FM port # for SB16 PnP driver.");
-MODULE_PARM_SYNTAX(fm_port, SNDRV_ENABLED ",allows:{{0x388},{0x38c},{0x390},{0x394}},dialog:list");
 #ifdef SNDRV_SBAWE_EMU8000
 module_param_array(awe_port, long, boot_devs, 0444);
 MODULE_PARM_DESC(awe_port, "AWE port # for SB16 PnP driver.");
-MODULE_PARM_SYNTAX(awe_port, SNDRV_ENABLED ",allows:{{0x620},{0x640},{0x660},{0x680}},dialog:list");
 #endif
 module_param_array(irq, int, boot_devs, 0444);
 MODULE_PARM_DESC(irq, "IRQ # for SB16 driver.");
-MODULE_PARM_SYNTAX(irq, SNDRV_IRQ_DESC);
 module_param_array(dma8, int, boot_devs, 0444);
 MODULE_PARM_DESC(dma8, "8-bit DMA # for SB16 driver.");
-MODULE_PARM_SYNTAX(dma8, SNDRV_DMA8_DESC);
 module_param_array(dma16, int, boot_devs, 0444);
 MODULE_PARM_DESC(dma16, "16-bit DMA # for SB16 driver.");
-MODULE_PARM_SYNTAX(dma16, SNDRV_DMA16_DESC);
 module_param_array(mic_agc, int, boot_devs, 0444);
 MODULE_PARM_DESC(mic_agc, "Mic Auto-Gain-Control switch.");
-MODULE_PARM_SYNTAX(mic_agc, SNDRV_ENABLED "," SNDRV_BOOLEAN_TRUE_DESC);
 #ifdef CONFIG_SND_SB16_CSP
 module_param_array(csp, int, boot_devs, 0444);
 MODULE_PARM_DESC(csp, "ASP/CSP chip support.");
-MODULE_PARM_SYNTAX(csp, SNDRV_ENABLED "," SNDRV_ENABLE_DESC);
 #endif
 #ifdef SNDRV_SBAWE_EMU8000
 module_param_array(seq_ports, int, boot_devs, 0444);
 MODULE_PARM_DESC(seq_ports, "Number of sequencer ports for WaveTable synth.");
-MODULE_PARM_SYNTAX(seq_ports, SNDRV_ENABLED ",allows:{{0,8}},skill:advanced");
 #endif
 
 struct snd_card_sb16 {

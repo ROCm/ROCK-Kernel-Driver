@@ -34,7 +34,6 @@
 
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("ESS ESx688 lowlevel module");
-MODULE_CLASSES("{sound}");
 MODULE_LICENSE("GPL");
 
 static int snd_es1688_dsp_command(es1688_t *chip, unsigned char val)

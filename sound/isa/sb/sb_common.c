@@ -36,7 +36,6 @@
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("ALSA lowlevel driver for Sound Blaster cards");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
 
 #define BUSY_LOOPS 100000
 
