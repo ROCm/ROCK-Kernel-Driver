@@ -1,13 +1,7 @@
 /*
  * linux/drivers/ide/arm/icside.c
  *
- * Copyright (c) 1996-2002 Russell King.
- *
- * Changelog:
- *  08-Jun-1996	RMK	Created
- *  12-Sep-1997	RMK	Added interrupt enable/disable
- *  17-Apr-1999	RMK	Added support for V6 EASI
- *  22-May-1999	RMK	Added support for V6 DMA
+ * Copyright (c) 1996-2003 Russell King.
  */
 
 #include <linux/config.h>
@@ -237,7 +231,7 @@ static void icside_build_sglist(ide_drive_t *drive, struct request *rq)
 		sg->length = rq->nr_sectors * SECTOR_SIZE;
 		nents = 1;
 	} else {
-		nents = blk_rq_map_sg(&drive->queue, rq, sg);
+		nents = blk_rq_map_sg(drive->queue, rq, sg);
 
 		if (rq_data_dir(rq) == READ)
 			hwif->sg_dma_direction = DMA_FROM_DEVICE;
@@ -487,25 +481,23 @@ icside_dma_common(ide_drive_t *drive, struct request *rq,
 	set_dma_sg(hwif->hw.dma, hwif->sg_table, hwif->sg_nents);
 	set_dma_mode(hwif->hw.dma, dma_mode);
 
+	drive->waiting_for_dma = 1;
+
 	return 0;
 }
 
 static int icside_dma_read(ide_drive_t *drive)
 {
 	struct request *rq = HWGROUP(drive)->rq;
-	task_ioreg_t cmd = WIN_NOP;
+	task_ioreg_t cmd;
 
 	if (icside_dma_common(drive, rq, DMA_MODE_READ))
 		return 1;
-
-	drive->waiting_for_dma = 1;
 
 	if (drive->media != ide_disk)
 		return 0;
 
 	BUG_ON(HWGROUP(drive)->handler != NULL);
-
-	ide_set_handler(drive, icside_dmaintr, 2*WAIT_CMD, NULL);
 
 	/*
 	 * FIX ME to use only ACB ide_task_t args Struct
@@ -513,7 +505,7 @@ static int icside_dma_read(ide_drive_t *drive)
 #if 0
 	{
 		ide_task_t *args = rq->special;
-		command = args->tfRegister[IDE_COMMAND_OFFSET];
+		cmd = args->tfRegister[IDE_COMMAND_OFFSET];
 	}
 #else
 	if (rq->flags & REQ_DRIVE_TASKFILE) {
@@ -526,27 +518,23 @@ static int icside_dma_read(ide_drive_t *drive)
 	}
 #endif
 	/* issue cmd to drive */
-	HWIF(drive)->OUTB(cmd, IDE_COMMAND_REG);
+	ide_execute_command(drive, cmd, icside_dmaintr, 2*WAIT_CMD, NULL);
 
 	return icside_dma_begin(drive);
 }
 
-int icside_dma_write(ide_drive_t *drive)
+static int icside_dma_write(ide_drive_t *drive)
 {
 	struct request *rq = HWGROUP(drive)->rq;
-	task_ioreg_t cmd = WIN_NOP;
+	task_ioreg_t cmd;
 
 	if (icside_dma_common(drive, rq, DMA_MODE_WRITE))
 		return 1;
-
-	drive->waiting_for_dma = 1;
 
 	if (drive->media != ide_disk)
 		return 0;
 
 	BUG_ON(HWGROUP(drive)->handler != NULL);
-
-	ide_set_handler(drive, icside_dmaintr, 2*WAIT_CMD, NULL);
 
 	/*
 	 * FIX ME to use only ACB ide_task_t args Struct
@@ -554,7 +542,7 @@ int icside_dma_write(ide_drive_t *drive)
 #if 0
 	{
 		ide_task_t *args = rq->special;
-		command = args->tfRegister[IDE_COMMAND_OFFSET];
+		cmd = args->tfRegister[IDE_COMMAND_OFFSET];
 	}
 #else
 	if (rq->flags & REQ_DRIVE_TASKFILE) {
@@ -566,8 +554,9 @@ int icside_dma_write(ide_drive_t *drive)
 		cmd = WIN_WRITEDMA;
 	}
 #endif
+
 	/* issue cmd to drive */
-	HWIF(drive)->OUTB(cmd, IDE_COMMAND_REG);
+	ide_execute_command(drive, cmd, icside_dmaintr, 2*WAIT_CMD, NULL);
 
 	return icside_dma_begin(drive);
 }
@@ -787,7 +776,7 @@ icside_register_v6(struct icside_state *state, struct expansion_card *ec)
 	state->hwif[0]    = hwif;
 	state->hwif[1]    = mate;
 
-	ec->irq_data	  = state;
+	ec->irq_data      = state;
 	ec->ops           = &icside_ops_arcin_v6;
 
 	hwif->maskproc    = icside_maskproc;
@@ -797,7 +786,7 @@ icside_register_v6(struct icside_state *state, struct expansion_card *ec)
 	hwif->serialized  = 1;
 	hwif->config_data = slot_port;
 	hwif->select_data = sel;
-	hwif->hw.dma	  = ec->dma;
+	hwif->hw.dma      = ec->dma;
 
 	mate->maskproc    = icside_maskproc;
 	mate->channel     = 1;
@@ -806,7 +795,7 @@ icside_register_v6(struct icside_state *state, struct expansion_card *ec)
 	mate->serialized  = 1;
 	mate->config_data = slot_port;
 	mate->select_data = sel | 1;
-	mate->hw.dma	  = ec->dma;
+	mate->hw.dma      = ec->dma;
 
 	if (ec->dma != NO_DMA && !request_dma(ec->dma, hwif->name)) {
 		icside_dma_init(hwif);

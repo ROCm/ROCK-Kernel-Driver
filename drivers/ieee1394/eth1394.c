@@ -76,6 +76,7 @@
 #include "iso.h"
 #include "nodemgr.h"
 #include "eth1394.h"
+#include "config_roms.h"
 
 #define ETH1394_PRINT_G(level, fmt, args...) \
 	printk(level "%s: " fmt, driver_name, ## args)
@@ -88,7 +89,7 @@
 #define TRACE() printk(KERN_ERR "%s:%s[%d] ---- TRACE\n", driver_name, __FUNCTION__, __LINE__)
 
 static char version[] __devinitdata =
-	"$Rev: 1133 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 1175 $ Ben Collins <bcollins@debian.org>";
 
 struct fragment_info {
 	struct list_head list;
@@ -105,8 +106,6 @@ struct partial_datagram {
 	char *pbuf;
 	struct list_head frag_info;
 };
-
-static struct csr1212_keyval *eth1394_ud = NULL;
 
 struct pdg_list {
 	struct list_head list;		/* partial datagram list per node	*/
@@ -461,6 +460,8 @@ static struct ieee1394_device_id eth1394_id_table[] = {
 	{}
 };
 
+MODULE_DEVICE_TABLE(ieee1394, eth1394_id_table);
+
 static struct hpsb_protocol_driver eth1394_proto_driver = {
 	.name		= "IPv4 over 1394 Driver",
 	.id_table	= eth1394_id_table,
@@ -553,8 +554,10 @@ static void ether1394_add_host (struct hpsb_host *host)
 	struct net_device *dev = NULL;
 	struct eth1394_priv *priv;
 	static int version_printed = 0;
-
 	u64 fifo_addr;
+
+	if (!(host->config_roms & HPSB_CONFIG_ROM_ENTRY_IP1394))
+		return;
 
 	fifo_addr = hpsb_allocate_and_register_addrspace(&eth1394_highlevel,
 							 host,
@@ -634,14 +637,6 @@ static void ether1394_add_host (struct hpsb_host *host)
 			priv->bc_state = ETHER1394_BC_RUNNING;
 	}
 
-	if (csr1212_attach_keyval_to_directory(host->csr.rom->root_kv,
-					       eth1394_ud) != CSR1212_SUCCESS) {
-		ETH1394_PRINT (KERN_ERR, dev->name,
-			       "Cannot attach IP 1394 Unit Directory to "
-			       "Config ROM\n");
-		goto out;
-	}
-	hi->host->update_config_rom = 1;
 	return;
 
 out:
@@ -667,10 +662,6 @@ static void ether1394_remove_host (struct hpsb_host *host)
 
 		if (priv->iso != NULL) 
 			hpsb_iso_shutdown(priv->iso);
-
-		csr1212_detach_keyval_from_directory(hi->host->csr.rom->root_kv,
-						     eth1394_ud);
-		hi->host->update_config_rom = 1;
 
 		if (hi->dev) {
 			unregister_netdev (hi->dev);
@@ -1483,7 +1474,6 @@ static inline struct hpsb_packet *ether1394_alloc_common_packet(struct hpsb_host
 	p = hpsb_alloc_packet(0);
 	if (p) {
 		p->host = host;
-		p->data = NULL;
 		p->generation = get_hpsb_generation(host);
 		p->type = hpsb_async;
 	}
@@ -1514,7 +1504,7 @@ static inline int ether1394_prep_write_packet(struct hpsb_packet *p,
 		| (1 << 8) | (TCODE_WRITEB << 4);
 
 	p->header[3] = tx_len << 16;
-	p->data_size = tx_len + (tx_len % 4 ? 4 - (tx_len % 4) : 0);
+	p->data_size = (tx_len + 3) & ~3;
 	p->data = (quadlet_t*)data;
 
 	return 0;
@@ -1807,7 +1797,7 @@ static int ether1394_ethtool_ioctl(struct net_device *dev, void *useraddr)
 		case ETHTOOL_GDRVINFO: {
 			struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
 			strcpy (info.driver, driver_name);
-			strcpy (info.version, "$Rev: 1133 $");
+			strcpy (info.version, "$Rev: 1175 $");
 			/* FIXME XXX provide sane businfo */
 			strcpy (info.bus_info, "ieee1394");
 			if (copy_to_user (useraddr, &info, sizeof (info)))
@@ -1830,67 +1820,13 @@ static int ether1394_ethtool_ioctl(struct net_device *dev, void *useraddr)
 
 static int __init ether1394_init_module (void)
 {
-	int ret;
-	struct csr1212_keyval *spec_id = NULL;
-	struct csr1212_keyval *spec_desc = NULL;
-	struct csr1212_keyval *ver = NULL;
-	struct csr1212_keyval *ver_desc = NULL;
-
 	packet_task_cache = kmem_cache_create("packet_task", sizeof(struct packet_task),
 					      0, 0, NULL, NULL);
-
-	eth1394_ud = csr1212_new_directory(CSR1212_KV_ID_UNIT);
-	spec_id = csr1212_new_immediate(CSR1212_KV_ID_SPECIFIER_ID,
-					ETHER1394_GASP_SPECIFIER_ID);
-	spec_desc = csr1212_new_string_descriptor_leaf("IANA");
-	ver = csr1212_new_immediate(CSR1212_KV_ID_VERSION,
-				    ETHER1394_GASP_VERSION);
-	ver_desc = csr1212_new_string_descriptor_leaf("IPv4");
-
-	if ((!eth1394_ud) ||
-	    (!spec_id) ||
-	    (!spec_desc) ||
-	    (!ver) ||
-	    (!ver_desc)) {
-		ret = -ENOMEM;
-		goto out;
-	}
-
-	ret = csr1212_associate_keyval(spec_id, spec_desc);
-	if (ret != CSR1212_SUCCESS)
-		goto out;
-
-	ret = csr1212_associate_keyval(ver, ver_desc);
-	if (ret != CSR1212_SUCCESS)
-		goto out;
-
-	ret = csr1212_attach_keyval_to_directory(eth1394_ud, spec_id);
-	if (ret != CSR1212_SUCCESS)
-		goto out;
-
-	ret = csr1212_attach_keyval_to_directory(eth1394_ud, ver);
-	if (ret != CSR1212_SUCCESS)
-		goto out;
 
 	/* Register ourselves as a highlevel driver */
 	hpsb_register_highlevel(&eth1394_highlevel);
 
-	ret = hpsb_register_protocol(&eth1394_proto_driver);
-
-out:
-	if ((ret != 0) && eth1394_ud) {
-		csr1212_release_keyval(eth1394_ud);
-	}
-	if (spec_id)
-		csr1212_release_keyval(spec_id);
-	if (spec_desc)
-		csr1212_release_keyval(spec_desc);
-	if (ver)
-		csr1212_release_keyval(ver);
-	if (ver_desc)
-		csr1212_release_keyval(ver_desc);
-
-	return ret;
+	return hpsb_register_protocol(&eth1394_proto_driver);
 }
 
 static void __exit ether1394_exit_module (void)
@@ -1898,10 +1834,6 @@ static void __exit ether1394_exit_module (void)
 	hpsb_unregister_protocol(&eth1394_proto_driver);
 	hpsb_unregister_highlevel(&eth1394_highlevel);
 	kmem_cache_destroy(packet_task_cache);
-
-	if (eth1394_ud) {
-		csr1212_release_keyval(eth1394_ud);
-	}
 }
 
 module_init(ether1394_init_module);

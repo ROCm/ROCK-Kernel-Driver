@@ -3,23 +3,20 @@
 
 #include "compat_linux.h"  /* needed for _psw_t32 */
 
-typedef struct
-{
+typedef struct {
 	__u32 cr[3];
-} per_cr_words32  __attribute__((packed));
+} per_cr_words32;
 
-typedef struct
-{
+typedef struct {
 	__u16          perc_atmid;          /* 0x096 */
 	__u32          address;             /* 0x098 */
 	__u8           access_id;           /* 0x0a1 */
-} per_lowcore_words32  __attribute__((packed));
+} per_lowcore_words32;
 
-typedef struct
-{
+typedef struct {
 	union {
 		per_cr_words32   words;
-	} control_regs  __attribute__((packed));
+	} control_regs;
 	/*
 	 * Use these flags instead of setting em_instruction_fetch
 	 * directly they are used so that single stepping can be
@@ -37,7 +34,7 @@ typedef struct
 	union {
 		per_lowcore_words32 words;
 	} lowcore; 
-} per_struct32 __attribute__((packed));
+} per_struct32;
 
 struct user_regs_struct32
 {

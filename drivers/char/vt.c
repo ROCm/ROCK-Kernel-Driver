@@ -2743,12 +2743,12 @@ static void vesa_powerdown(void)
      *  Called only if powerdown features are allowed.
      */
     switch (vesa_blank_mode) {
-	case VESA_NO_BLANKING:
-	    c->vc_sw->con_blank(c, VESA_VSYNC_SUSPEND+1);
+    case VESA_NO_BLANKING:
+	    c->vc_sw->con_blank(c, VESA_VSYNC_SUSPEND+1, 0);
 	    break;
-	case VESA_VSYNC_SUSPEND:
-	case VESA_HSYNC_SUSPEND:
-	    c->vc_sw->con_blank(c, VESA_POWERDOWN+1);
+    case VESA_VSYNC_SUSPEND:
+    case VESA_HSYNC_SUSPEND:
+	    c->vc_sw->con_blank(c, VESA_POWERDOWN+1, 0);
 	    break;
     }
 }
@@ -2776,7 +2776,7 @@ void do_blank_screen(int entering_gfx)
 	if (entering_gfx) {
 		hide_cursor(currcons);
 		save_screen(currcons);
-		sw->con_blank(vc_cons[currcons].d, -1);
+		sw->con_blank(vc_cons[currcons].d, -1, 1);
 		console_blanked = fg_console + 1;
 		set_origin(currcons);
 		return;
@@ -2794,7 +2794,7 @@ void do_blank_screen(int entering_gfx)
 
 	save_screen(currcons);
 	/* In case we need to reset origin, blanking hook returns 1 */
-	i = sw->con_blank(vc_cons[currcons].d, 1);
+	i = sw->con_blank(vc_cons[currcons].d, 1, 0);
 	console_blanked = fg_console + 1;
 	if (i)
 		set_origin(currcons);
@@ -2808,14 +2808,14 @@ void do_blank_screen(int entering_gfx)
 	}
 
     	if (vesa_blank_mode)
-		sw->con_blank(vc_cons[currcons].d, vesa_blank_mode + 1);
+		sw->con_blank(vc_cons[currcons].d, vesa_blank_mode + 1, 0);
 }
 
 
 /*
  * Called by timer as well as from vt_console_driver
  */
-void unblank_screen(void)
+void do_unblank_screen(int leaving_gfx)
 {
 	int currcons;
 
@@ -2839,13 +2839,24 @@ void unblank_screen(void)
 	}
 
 	console_blanked = 0;
-	if (sw->con_blank(vc_cons[currcons].d, 0))
+	if (sw->con_blank(vc_cons[currcons].d, 0, leaving_gfx))
 		/* Low-level driver cannot restore -> do it ourselves */
 		update_screen(fg_console);
 	if (console_blank_hook)
 		console_blank_hook(0);
 	set_palette(currcons);
 	set_cursor(fg_console);
+}
+
+/*
+ * This is called by the outside world to cause a forced unblank, mostly for
+ * oopses. Currently, I just call do_unblank_screen(0), but we could eventually
+ * call it with 1 as an argument and so force a mode restore... that may kill
+ * X or at least garbage the screen but would also make the Oops visible...
+ */
+void unblank_screen(void)
+{
+	do_unblank_screen(0);
 }
 
 /*

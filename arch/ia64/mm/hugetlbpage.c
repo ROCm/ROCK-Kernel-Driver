@@ -1,7 +1,11 @@
 /*
  * IA-64 Huge TLB Page Support for Kernel.
  *
- * Copyright (C) 2002, Rohit Seth <rohit.seth@intel.com>
+ * Copyright (C) 2002-2004 Rohit Seth <rohit.seth@intel.com>
+ * Copyright (C) 2003-2004 Ken Chen <kenneth.w.chen@intel.com>
+ *
+ * Sep, 2003: add numa support
+ * Feb, 2004: dynamic hugetlb page size via boot parameter
  */
 
 #include <linux/config.h>
@@ -18,11 +22,10 @@
 #include <asm/tlb.h>
 #include <asm/tlbflush.h>
 
-#define TASK_HPAGE_BASE (REGION_HPAGE << REGION_SHIFT)
-
 static long	htlbpagemem;
 int		htlbpage_max;
 static long	htlbzone_pages;
+unsigned int	hpage_shift=HPAGE_SHIFT_DEFAULT;
 
 static struct list_head hugepage_freelists[MAX_NUMNODES];
 static spinlock_t htlbpage_lock = SPIN_LOCK_UNLOCKED;
@@ -407,7 +410,7 @@ unsigned long hugetlb_get_unmapped_area(struct file *file, unsigned long addr, u
 		return -EINVAL;
 	/* This code assumes that REGION_HPAGE != 0. */
 	if ((REGION_NUMBER(addr) != REGION_HPAGE) || (addr & (HPAGE_SIZE - 1)))
-		addr = TASK_HPAGE_BASE;
+		addr = HPAGE_REGION_BASE;
 	else
 		addr = ALIGN(addr, HPAGE_SIZE);
 	for (vmm = find_vma(current->mm, addr); ; vmm = vmm->vm_next) {
@@ -520,6 +523,35 @@ static int __init hugetlb_setup(char *s)
 }
 __setup("hugepages=", hugetlb_setup);
 
+static int __init hugetlb_setup_sz(char *str)
+{
+	u64 tr_pages;
+	unsigned long long size;
+
+	if (ia64_pal_vm_page_size(&tr_pages, NULL) != 0)
+		/*
+		 * shouldn't happen, but just in case.
+		 */
+		tr_pages = 0x15557000UL;
+
+	size = memparse(str, &str);
+	if (*str || (size & (size-1)) || !(tr_pages & size) ||
+		size <= PAGE_SIZE ||
+		size >= (1UL << PAGE_SHIFT << MAX_ORDER)) {
+		printk(KERN_WARNING "Invalid huge page size specified\n");
+		return 1;
+	}
+
+	hpage_shift = __ffs(size);
+	/*
+	 * boot cpu already executed ia64_mmu_init, and has HPAGE_SHIFT_DEFAULT
+	 * override here with new page shift.
+	 */
+	ia64_set_rr(HPAGE_REGION_BASE, hpage_shift << 2);
+	return 1;
+}
+__setup("hugepagesz=", hugetlb_setup_sz);
+
 static int __init hugetlb_init(void)
 {
 	int i;
@@ -540,7 +572,7 @@ static int __init hugetlb_init(void)
 	printk("Total HugeTLB memory allocated, %ld\n", htlbpagemem);
 	return 0;
 }
-module_init(hugetlb_init);
+__initcall(hugetlb_init);
 
 int hugetlb_report_meminfo(char *buf)
 {

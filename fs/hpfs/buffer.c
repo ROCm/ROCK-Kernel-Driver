@@ -62,56 +62,28 @@ void hpfs_unlock_inode(struct inode *i)
 
 void hpfs_lock_2inodes(struct inode *i1, struct inode *i2)
 {
-	struct hpfs_inode_info *hpfs_i1 = NULL, *hpfs_i2 = NULL;
-
-	if (!i1) {
-		if (i2) {
-			hpfs_i2 = hpfs_i(i2);
+	if (!i2 || i1 == i2) {
+		hpfs_lock_inode(i1);
+	} else if (!i1) {
+		hpfs_lock_inode(i2);
+	} else {
+		struct hpfs_inode_info *hpfs_i1 = hpfs_i(i1);
+		struct hpfs_inode_info *hpfs_i2 = hpfs_i(i2);
+		if (i1->i_ino < i2->i_ino) {
+			down(&hpfs_i1->i_sem);
 			down(&hpfs_i2->i_sem);
-		}
-		return;
-	}
-	if (!i2) {
-		if (i1) {
-			hpfs_i1 = hpfs_i(i1);
+		} else {
+			down(&hpfs_i2->i_sem);
 			down(&hpfs_i1->i_sem);
 		}
-		return;
 	}
-	if (i1->i_ino < i2->i_ino) {
-		down(&hpfs_i1->i_sem);
-		down(&hpfs_i2->i_sem);
-	} else if (i1->i_ino > i2->i_ino) {
-		down(&hpfs_i2->i_sem);
-		down(&hpfs_i1->i_sem);
-	} else down(&hpfs_i1->i_sem);
 }
 
 void hpfs_unlock_2inodes(struct inode *i1, struct inode *i2)
 {
-	struct hpfs_inode_info *hpfs_i1 = NULL, *hpfs_i2 = NULL;
-
-	if (!i1) {
-		if (i2) {
-			hpfs_i2 = hpfs_i(i2);
-			up(&hpfs_i2->i_sem);
-		}
-		return;
-	}
-	if (!i2) {
-		if (i1) {
-			hpfs_i1 = hpfs_i(i1);
-			up(&hpfs_i1->i_sem);
-		}
-		return;
-	}
-	if (i1->i_ino < i2->i_ino) {
-		up(&hpfs_i2->i_sem);
-		up(&hpfs_i1->i_sem);
-	} else if (i1->i_ino > i2->i_ino) {
-		up(&hpfs_i1->i_sem);
-		up(&hpfs_i2->i_sem);
-	} else up(&hpfs_i1->i_sem);
+	/* order of up() doesn't matter here */
+	hpfs_unlock_inode(i1);
+	hpfs_unlock_inode(i2);
 }
 
 void hpfs_lock_3inodes(struct inode *i1, struct inode *i2, struct inode *i3)

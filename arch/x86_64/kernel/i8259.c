@@ -423,7 +423,7 @@ static struct sysdev_class timer_sysclass = {
 
 static struct sys_device device_timer = {
 	.id		= 0,
-	.cls		&timer_sysclass,
+	.cls		= &timer_sysclass,
 };
 
 static int __init init_timer_sysfs(void)

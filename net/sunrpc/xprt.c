@@ -1589,7 +1589,7 @@ xprt_create_socket(int proto, struct rpc_timeout *to, int resvport)
 
 	if ((err = sock_create(PF_INET, type, proto, &sock)) < 0) {
 		printk("RPC: can't create socket (%d).\n", -err);
-		goto failed;
+		return NULL;
 	}
 
 	/* If the caller has the capability, bind to a reserved port */

@@ -610,8 +610,7 @@ static void __init detect_ht(void)
 		 * At this point we only support two siblings per
 		 * processor package.
 		 */
-#define NR_SIBLINGS	2
-		if (smp_num_siblings != NR_SIBLINGS) {
+		if (smp_num_siblings > NR_CPUS) {
 			printk(KERN_WARNING "CPU: Unsupported number of the siblings %d", smp_num_siblings);
 			smp_num_siblings = 1;
 			return;

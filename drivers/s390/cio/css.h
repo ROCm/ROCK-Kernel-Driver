@@ -74,6 +74,7 @@ struct ccw_device_private {
 		unsigned int fast:1;	/* post with "channel end" */
 		unsigned int repall:1;	/* report every interrupt status */
 		unsigned int pgroup:1;  /* do path grouping */
+		unsigned int force:1;   /* allow forced online */
 	} __attribute__ ((packed)) options;
 	struct {
 		unsigned int pgid_single:1; /* use single path for Set PGID */

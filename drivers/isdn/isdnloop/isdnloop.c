@@ -122,17 +122,17 @@ static void
 isdnloop_parse_setup(char *setup, isdn_ctrl * cmd)
 {
 	char *t = setup;
-	char *s = strpbrk(t, ",");
+	char *s = strchr(t, ',');
 
 	*s++ = '\0';
 	strlcpy(cmd->parm.setup.phone, t, sizeof(cmd->parm.setup.phone));
-	s = strpbrk(t = s, ",");
+	s = strchr(t = s, ',');
 	*s++ = '\0';
 	if (!strlen(t))
 		cmd->parm.setup.si1 = 0;
 	else
 		cmd->parm.setup.si1 = simple_strtoul(t, NULL, 10);
-	s = strpbrk(t = s, ",");
+	s = strchr(t = s, ',');
 	*s++ = '\0';
 	if (!strlen(t))
 		cmd->parm.setup.si2 = 0;

@@ -1150,6 +1150,7 @@ static int __init pcxe_init(void)
 
 	pcxe_driver->owner = THIS_MODULE;
 	pcxe_driver->name = "ttyD";
+	pcxe_driver->devfs_name = "pcxe/";
 	pcxe_driver->major = DIGI_MAJOR; 
 	pcxe_driver->minor_start = 0;
 	pcxe_driver->type = TTY_DRIVER_TYPE_SERIAL;

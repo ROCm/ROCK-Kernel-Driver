@@ -229,11 +229,21 @@ static int ohci_urb_enqueue (
 		goto fail;
 	}
 
+	/* in case of unlink-during-submit */
+	spin_lock (&urb->lock);
+	if (urb->status != -EINPROGRESS) {
+		spin_unlock (&urb->lock);
+
+		finish_urb (ohci, urb, 0);
+		retval = 0;
+		goto fail;
+	}
+
 	/* schedule the ed if needed */
 	if (ed->state == ED_IDLE) {
 		retval = ed_schedule (ohci, ed);
 		if (retval < 0)
-			goto fail;
+			goto fail0;
 		if (ed->type == PIPE_ISOCHRONOUS) {
 			u16	frame = OHCI_FRAME_NO(ohci->hcca);
 
@@ -257,6 +267,8 @@ static int ohci_urb_enqueue (
 	urb->hcpriv = urb_priv;
 	td_submit_urb (ohci, urb);
 
+fail0:
+	spin_unlock (&urb->lock);
 fail:
 	if (retval)
 		urb_free_priv (ohci, urb_priv);

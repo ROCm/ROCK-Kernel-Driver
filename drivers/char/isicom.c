@@ -1627,6 +1627,7 @@ static int register_drivers(void)
 
 	isicom_normal->owner	= THIS_MODULE;
 	isicom_normal->name 	= "ttyM";
+	isicom_normal->devfs_name = "isicom/";
 	isicom_normal->major	= ISICOM_NMAJOR;
 	isicom_normal->minor_start	= 0;
 	isicom_normal->type	= TTY_DRIVER_TYPE_SERIAL;

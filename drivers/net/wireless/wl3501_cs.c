@@ -1306,10 +1306,6 @@ static int wl3501_close(struct net_device *dev)
 	/* Mask interrupts from the SUTRO */
 	wl3501_block_interrupt(this);
 
-	if (link->state & DEV_STALE_CONFIG) {
-		link->state |= DEV_RELEASE_PENDING;
-		wl3501_release(link);
-	}
 	rc = 0;
 	printk(KERN_INFO "%s: WL3501 closed\n", dev->name);
 out:
@@ -2220,15 +2216,6 @@ static void wl3501_release(dev_link_t *link)
 {
 	struct net_device *dev = link->priv;
 
-	/* If the device is currently in use, we won't release until it is
-	 * actually closed. */
-	if (link->open) {
-		dprintk(1, "release postponed, '%s' still open",
-			link->dev->dev_name);
-		link->state |= DEV_STALE_CONFIG;
-		goto out;
-	}
-
 	/* Unlink the device chain */
 	if (link->dev) {
 		unregister_netdev(dev);
@@ -2240,11 +2227,6 @@ static void wl3501_release(dev_link_t *link)
 	pcmcia_release_io(link->handle, &link->io);
 	pcmcia_release_irq(link->handle, &link->irq);
 	link->state &= ~DEV_CONFIG;
-
-	if (link->state & DEV_STALE_CONFIG)
-		wl3501_detach(link);
-out:
-	return;
 }
 
 /**

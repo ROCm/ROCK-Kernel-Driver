@@ -118,7 +118,6 @@
 #include <asm/macints.h> 
 #include <asm/mac_iop.h>
 #include <asm/mac_oss.h>
-#include <asm/unistd.h>
 
 /*#define DEBUG_IOP*/
 
