@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: nodelist.c,v 1.86 2003/10/31 15:37:51 dwmw2 Exp $
+ * $Id: nodelist.c,v 1.87 2004/11/14 17:07:07 dedekind Exp $
  *
  */
 
@@ -96,7 +96,7 @@ static void jffs2_free_full_dirent_list(struct jffs2_full_dirent *fd)
 /* Get tmp_dnode_info and full_dirent for all non-obsolete nodes associated
    with this ino, returning the former in order of version */
 
-int jffs2_get_inode_nodes(struct jffs2_sb_info *c, ino_t ino, struct jffs2_inode_info *f,
+int jffs2_get_inode_nodes(struct jffs2_sb_info *c, struct jffs2_inode_info *f,
 			  struct jffs2_tmp_dnode_info **tnp, struct jffs2_full_dirent **fdp,
 			  uint32_t *highest_version, uint32_t *latest_mctime,
 			  uint32_t *mctime_ver)
@@ -104,16 +104,15 @@ int jffs2_get_inode_nodes(struct jffs2_sb_info *c, ino_t ino, struct jffs2_inode
 	struct jffs2_raw_node_ref *ref = f->inocache->nodes;
 	struct jffs2_tmp_dnode_info *tn, *ret_tn = NULL;
 	struct jffs2_full_dirent *fd, *ret_fd = NULL;
-
 	union jffs2_node_union node;
 	size_t retlen;
 	int err;
 
 	*mctime_ver = 0;
-
-	D1(printk(KERN_DEBUG "jffs2_get_inode_nodes(): ino #%lu\n", ino));
+	
+	D1(printk(KERN_DEBUG "jffs2_get_inode_nodes(): ino #%u\n", f->inocache->ino));
 	if (!f->inocache->nodes) {
-		printk(KERN_WARNING "Eep. no nodes for ino #%lu\n", (unsigned long)ino);
+		printk(KERN_WARNING "Eep. no nodes for ino #%u\n", f->inocache->ino);
 	}
 
 	spin_lock(&c->erase_completion_lock);
