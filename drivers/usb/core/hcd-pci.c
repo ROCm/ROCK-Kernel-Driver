@@ -147,7 +147,7 @@ clean_3:
 		goto clean_2;
 	}
 
-	dev_info (*hcd->controller, "%s\n", hcd->product_desc);
+	dev_info (hcd->controller, "%s\n", hcd->product_desc);
 
 #ifndef __sparc__
 	sprintf (buf, "%d", dev->irq);
@@ -156,7 +156,7 @@ clean_3:
 #endif
 	if (request_irq (dev->irq, usb_hcd_irq, SA_SHIRQ, hcd->description, hcd)
 			!= 0) {
-		dev_err (*hcd->controller,
+		dev_err (hcd->controller,
 				"request interrupt %s failed\n", bufp);
 		retval = -EBUSY;
 		goto clean_3;
@@ -165,7 +165,7 @@ clean_3:
 
 	hcd->regs = base;
 	hcd->region = region;
-	dev_info (*hcd->controller, "irq %s, %s %p\n", bufp,
+	dev_info (hcd->controller, "irq %s, %s %p\n", bufp,
 		(driver->flags & HCD_MEMORY) ? "pci mem" : "io base",
 		base);
 
@@ -207,7 +207,7 @@ void usb_hcd_pci_remove (struct pci_dev *dev)
 	hcd = pci_get_drvdata(dev);
 	if (!hcd)
 		return;
-	dev_info (*hcd->controller, "remove, state %x\n", hcd->state);
+	dev_info (hcd->controller, "remove, state %x\n", hcd->state);
 
 	if (in_interrupt ()) BUG ();
 
@@ -234,7 +234,7 @@ void usb_hcd_pci_remove (struct pci_dev *dev)
 
 	usb_deregister_bus (&hcd->self);
 	if (atomic_read (&hcd->self.refcnt) != 1) {
-		dev_warn (*hcd->controller,
+		dev_warn (hcd->controller,
 			"dangling refs (%d) to bus %d!\n",
 			atomic_read (&hcd->self.refcnt) - 1,
 			hcd->self.busnum);
@@ -285,7 +285,7 @@ int usb_hcd_pci_suspend (struct pci_dev *dev, u32 state)
 	int			retval;
 
 	hcd = pci_get_drvdata(dev);
-	dev_info (*hcd->controller, "suspend to state %d\n", state);
+	dev_info (hcd->controller, "suspend to state %d\n", state);
 
 	pci_save_state (dev, hcd->pci_state);
 
@@ -314,12 +314,12 @@ int usb_hcd_pci_resume (struct pci_dev *dev)
 	int			retval;
 
 	hcd = pci_get_drvdata(dev);
-	dev_info (*hcd->controller, "resume\n");
+	dev_info (hcd->controller, "resume\n");
 
 	/* guard against multiple resumes (APM bug?) */
 	atomic_inc (&hcd->resume_count);
 	if (atomic_read (&hcd->resume_count) != 1) {
-		dev_err (*hcd->controller, "concurrent PCI resumes\n");
+		dev_err (hcd->controller, "concurrent PCI resumes\n");
 		retval = 0;
 		goto done;
 	}

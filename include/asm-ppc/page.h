@@ -62,7 +62,7 @@ typedef unsigned long pgprot_t;
 
 
 /* align addr on a size boundry - adjust address up if needed -- Cort */
-#define _ALIGN(addr,size)	(((addr)+size-1)&(~(size-1)))
+#define _ALIGN(addr,size)	(((addr)+(size)-1)&(~((size)-1)))
 
 /* to align the pointer to the (next) page boundary */
 #define PAGE_ALIGN(addr)	(((addr)+PAGE_SIZE-1)&PAGE_MASK)

@@ -6,7 +6,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -45,9 +45,9 @@
 
 void
 acpi_ex_unlink_mutex (
-	acpi_operand_object     *obj_desc)
+	union acpi_operand_object       *obj_desc)
 {
-	acpi_thread_state       *thread = obj_desc->mutex.owner_thread;
+	struct acpi_thread_state        *thread = obj_desc->mutex.owner_thread;
 
 
 	if (!thread) {
@@ -82,10 +82,10 @@ acpi_ex_unlink_mutex (
 
 void
 acpi_ex_link_mutex (
-	acpi_operand_object     *obj_desc,
-	acpi_thread_state       *thread)
+	union acpi_operand_object       *obj_desc,
+	struct acpi_thread_state        *thread)
 {
-	acpi_operand_object     *list_head;
+	union acpi_operand_object       *list_head;
 
 
 	list_head = thread->acquired_mutex_list;
@@ -122,11 +122,11 @@ acpi_ex_link_mutex (
 
 acpi_status
 acpi_ex_acquire_mutex (
-	acpi_operand_object     *time_desc,
-	acpi_operand_object     *obj_desc,
-	acpi_walk_state         *walk_state)
+	union acpi_operand_object       *time_desc,
+	union acpi_operand_object       *obj_desc,
+	struct acpi_walk_state          *walk_state)
 {
-	acpi_status             status;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ex_acquire_mutex", obj_desc);
@@ -206,10 +206,10 @@ acpi_ex_acquire_mutex (
 
 acpi_status
 acpi_ex_release_mutex (
-	acpi_operand_object     *obj_desc,
-	acpi_walk_state         *walk_state)
+	union acpi_operand_object       *obj_desc,
+	struct acpi_walk_state          *walk_state)
 {
-	acpi_status             status;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("ex_release_mutex");
@@ -297,11 +297,11 @@ acpi_ex_release_mutex (
 
 void
 acpi_ex_release_all_mutexes (
-	acpi_thread_state       *thread)
+	struct acpi_thread_state        *thread)
 {
-	acpi_operand_object     *next = thread->acquired_mutex_list;
-	acpi_operand_object     *this;
-	acpi_status             status;
+	union acpi_operand_object       *next = thread->acquired_mutex_list;
+	union acpi_operand_object       *this;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_ENTRY ();

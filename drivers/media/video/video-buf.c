@@ -339,6 +339,7 @@ videobuf_queue_init(struct videobuf_queue *q,
 		    struct pci_dev *pci,
 		    spinlock_t *irqlock,
 		    enum v4l2_buf_type type,
+		    enum v4l2_field field,
 		    int msize)
 {
 	memset(q,0,sizeof(*q));
@@ -346,6 +347,7 @@ videobuf_queue_init(struct videobuf_queue *q,
 	q->irqlock = irqlock;
 	q->pci     = pci;
 	q->type    = type;
+	q->field   = field;
 	q->msize   = msize;
 	q->ops     = ops;
 
@@ -405,6 +407,25 @@ videobuf_queue_cancel(struct file *file, struct videobuf_queue *q)
 }
 
 /* --------------------------------------------------------------------- */
+
+enum v4l2_field
+videobuf_next_field(struct videobuf_queue *q)
+{
+	enum v4l2_field field = q->field;
+
+	BUG_ON(V4L2_FIELD_ANY == field);
+
+	if (V4L2_FIELD_ALTERNATE == field) {
+		if (V4L2_FIELD_TOP == q->last) {
+			field   = V4L2_FIELD_TOP;
+			q->last = V4L2_FIELD_TOP;
+		} else {
+			field   = V4L2_FIELD_BOTTOM;
+			q->last = V4L2_FIELD_BOTTOM;
+		}
+	}
+	return field;
+}
 
 void
 videobuf_status(struct v4l2_buffer *b, struct videobuf_buffer *vb,
@@ -486,6 +507,7 @@ videobuf_qbuf(struct file *file, struct videobuf_queue *q,
 	      struct v4l2_buffer *b)
 {
 	struct videobuf_buffer *buf;
+	enum v4l2_field field;
 	unsigned long flags;
 	int retval;
 
@@ -507,7 +529,8 @@ videobuf_qbuf(struct file *file, struct videobuf_queue *q,
 	    buf->state == STATE_ACTIVE)
 		goto done;
 
-	retval = q->ops->buf_prepare(file,buf);
+	field = videobuf_next_field(q);
+	retval = q->ops->buf_prepare(file,buf,field);
 	if (0 != retval)
 		goto done;
 	
@@ -613,6 +636,8 @@ static ssize_t
 videobuf_read_zerocopy(struct file *file, struct videobuf_queue *q,
 		       char *data, size_t count, loff_t *ppos)
 {
+	enum v4l2_field field;
+	unsigned long flags;
         int retval;
 
         /* setup stuff */
@@ -623,12 +648,15 @@ videobuf_read_zerocopy(struct file *file, struct videobuf_queue *q,
 
 	q->read_buf->baddr = (unsigned long)data;
         q->read_buf->bsize = count;
-	retval = q->ops->buf_prepare(file,q->read_buf);
+	field = videobuf_next_field(q);
+	retval = q->ops->buf_prepare(file,q->read_buf,field);
 	if (0 != retval)
 		goto done;
 	
         /* start capture & wait */
+	spin_lock_irqsave(q->irqlock,flags);
 	q->ops->buf_queue(file,q->read_buf);
+	spin_unlock_irqrestore(q->irqlock,flags);
         retval = videobuf_waiton(q->read_buf,0,0);
         if (0 == retval) {
 		videobuf_dma_pci_sync(q->pci,&q->read_buf->dma);
@@ -646,6 +674,8 @@ videobuf_read_zerocopy(struct file *file, struct videobuf_queue *q,
 ssize_t videobuf_read_one(struct file *file, struct videobuf_queue *q,
 			  char *data, size_t count, loff_t *ppos)
 {
+	enum v4l2_field field;
+	unsigned long flags;
 	int retval, bytes, size, nbufs;
 
 	down(&q->lock);
@@ -668,10 +698,13 @@ ssize_t videobuf_read_one(struct file *file, struct videobuf_queue *q,
 		q->read_buf = videobuf_alloc(q->msize);
 		if (NULL == q->read_buf)
 			goto done;
-		retval = q->ops->buf_prepare(file,q->read_buf);
+		field = videobuf_next_field(q);
+		retval = q->ops->buf_prepare(file,q->read_buf,field);
 		if (0 != retval)
 			goto done;
+		spin_lock_irqsave(q->irqlock,flags);
 		q->ops->buf_queue(file,q->read_buf);
+		spin_unlock_irqrestore(q->irqlock,flags);
 		q->read_off = 0;
 	}
 
@@ -705,6 +738,7 @@ ssize_t videobuf_read_one(struct file *file, struct videobuf_queue *q,
 
 int videobuf_read_start(struct file *file, struct videobuf_queue *q)
 {
+	enum v4l2_field field;
 	unsigned long flags;
 	int count = 0, size = 0;
 	int err, i;
@@ -720,7 +754,8 @@ int videobuf_read_start(struct file *file, struct videobuf_queue *q)
 	if (err)
 		return err;
 	for (i = 0; i < count; i++) {
-		err = q->ops->buf_prepare(file,q->bufs[i]);
+		field = videobuf_next_field(q);
+		err = q->ops->buf_prepare(file,q->bufs[i],field);
 		if (err)
 			return err;
 		list_add_tail(&q->bufs[i]->stream, &q->stream);
@@ -793,6 +828,7 @@ ssize_t videobuf_read_stream(struct file *file, struct videobuf_queue *q,
 			fc  = (unsigned int*)q->read_buf->dma.vmalloc;
 			fc += (q->read_buf->size>>2) -1;
 			*fc = q->read_buf->field_count >> 1;
+			dprintk(1,"vbihack: %d\n",*fc);
 		}
 
 		/* copy stuff */

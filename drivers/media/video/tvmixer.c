@@ -195,9 +195,8 @@ static int tvmixer_open(struct inode *inode, struct file *file)
 
 	/* lock bttv in memory while the mixer is in use  */
 	file->private_data = mix;
-
-	if (!try_module_get(client->adapter->owner))
-		return -ENODEV;
+	if (client->adapter->owner)
+		try_module_get(client->adapter->owner);
         return 0;
 }
 
@@ -211,25 +210,26 @@ static int tvmixer_release(struct inode *inode, struct file *file)
 		return -ENODEV;
 	}
 
-	module_put(client->adapter->owner);
+	if (client->adapter->owner)
+		module_put(client->adapter->owner);
 	return 0;
 }
 
-
 static struct i2c_driver driver = {
-	.name		= "tv card mixer driver",
-	.id		= I2C_DRIVERID_TVMIXER,
-	.flags		= I2C_DF_DUMMY,
-	.attach_adapter	= tvmixer_adapters,
-	.detach_client	= tvmixer_clients,
+	.owner           = THIS_MODULE,
+	.name            = "tv card mixer driver",
+        .id              = I2C_DRIVERID_TVMIXER,
+	.flags           = I2C_DF_DUMMY,
+        .attach_adapter  = tvmixer_adapters,
+        .detach_client   = tvmixer_clients,
 };
 
 static struct file_operations tvmixer_fops = {
 	.owner		= THIS_MODULE,
-	.llseek		= no_llseek,
-	.ioctl		= tvmixer_ioctl,
-	.open		= tvmixer_open,
-	.release	= tvmixer_release,
+	.llseek         = no_llseek,
+	.ioctl          = tvmixer_ioctl,
+	.open           = tvmixer_open,
+	.release        = tvmixer_release,
 };
 
 /* ----------------------------------------------------------------------- */

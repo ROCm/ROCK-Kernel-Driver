@@ -695,7 +695,7 @@ static int yenta_suspend(pci_socket_t *socket)
 
 	/*
 	 * This does not work currently. The controller
-	 * loses too much informationduring D3 to come up
+	 * loses too much information during D3 to come up
 	 * cleanly. We should probably fix yenta_init()
 	 * to update all the critical registers, notably
 	 * the IO and MEM bridging region data.. That is

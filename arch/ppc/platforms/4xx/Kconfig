@@ -13,6 +13,9 @@ choice
 config ASH
 	bool "Ash"
 
+config BEECH
+	bool "Beech"
+
 config CEDAR
 	bool "Cedar"
 
@@ -37,6 +40,12 @@ config REDWOOD_4
 
 config REDWOOD_5
 	bool "Redwood-5"
+
+config REDWOOD_6
+	bool "Redwood-6"
+
+config SYCAMORE
+	bool "Sycamore"
 
 config TIVO
 	bool "Tivo"
@@ -75,7 +84,7 @@ config IBM405_ERR51
 
 config IBM_OCP
 	bool
-	depends on ASH || CEDAR || CPCI405 || EP405 || REDWOOD_4 || REDWOOD_5 || WALNUT
+	depends on ASH || BEECH || CEDAR || CPCI405 || EP405 || REDWOOD_4 || REDWOOD_5 || REDWOOD_6 || SYCAMORE || WALNUT
 	default y
 
 config NP405L
@@ -85,7 +94,7 @@ config NP405L
 
 config BIOS_FIXUP
 	bool
-	depends on CEDAR || EP405 || WALNUT
+	depends on CEDAR || EP405 || SYCAMORE || WALNUT
 	default y
 
 config 403GCX
@@ -98,9 +107,17 @@ config 405GP
 	depends on CPCI405 || EP405 || WALNUT
 	default y
 
+config 405GPR
+	bool
+	depends on SYCAMORE
+
+config 405LP
+	bool
+	depends on CEDAR
+
 config STB03xxx
 	bool
-	depends on REDWOOD_5 || REDWOOD_4
+	depends on REDWOOD_5 || REDWOOD_4 || REDWOOD_6
 	default y
 
 config EMBEDDEDBOOT
@@ -110,7 +127,7 @@ config EMBEDDEDBOOT
 
 config IBM_OPENBIOS
 	bool
-	depends on ASH || CEDAR || REDWOOD_4 || REDWOOD_5 || WALNUT
+	depends on ASH || BEECH || CEDAR || REDWOOD_4 || REDWOOD_5 || REDWOOD_6 || SYCAMORE || WALNUT
 	default y
 
 config 405_DMA

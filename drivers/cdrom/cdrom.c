@@ -727,6 +727,7 @@ static int cdrom_load_unload(struct cdrom_device_info *cdi, int slot)
 	cgc.cmd[0] = GPCMD_LOAD_UNLOAD;
 	cgc.cmd[4] = 2 + (slot >= 0);
 	cgc.cmd[8] = slot;
+	cgc.timeout = 60 * HZ;
 
 	/* The Sanyo 3 CD changer uses byte 7 of the 
 	GPCMD_TEST_UNIT_READY to command to switch CDs instead of
@@ -1901,6 +1902,7 @@ static int mmc_ioctl(struct cdrom_device_info *cdi, unsigned int cmd,
 {		
 	struct cdrom_device_ops *cdo = cdi->ops;
 	struct cdrom_generic_command cgc;
+	struct request_sense sense;
 	char buffer[32];
 	int ret = 0;
 
@@ -1935,9 +1937,11 @@ static int mmc_ioctl(struct cdrom_device_info *cdi, unsigned int cmd,
 		cgc.buffer = (char *) kmalloc(blocksize, GFP_KERNEL);
 		if (cgc.buffer == NULL)
 			return -ENOMEM;
+		memset(&sense, 0, sizeof(sense));
+		cgc.sense = &sense;
 		cgc.data_direction = CGC_DATA_READ;
 		ret = cdrom_read_block(cdi, &cgc, lba, 1, format, blocksize);
-		if (ret) {
+		if (ret && sense.sense_key==0x05 && sense.asc==0x20 && sense.ascq==0x00) {
 			/*
 			 * SCSI-II devices are not required to support
 			 * READ_CD, so let's try switching block size

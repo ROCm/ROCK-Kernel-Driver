@@ -1,21 +1,21 @@
 #
-# Makefile for the kernel character device drivers.
+# Makefile for the video capture/playback device drivers.
 #
 
 # All of the (potential) objects that export symbols.
 # This list comes from 'grep -l EXPORT_SYMBOL *.[hc]'.
 
-export-objs     :=	videodev.o v4l2-common.o \
+export-objs     :=	videodev.o v4l2-common.o v4l1-compat.o \
 			bttv-if.o cpia.o video-buf.o
 
 bttv-objs	:=	bttv-driver.o bttv-cards.o bttv-if.o \
 			bttv-risc.o bttv-vbi.o
 zoran-objs      :=	zr36120.o zr36120_i2c.o zr36120_mem.o
 
-obj-$(CONFIG_VIDEO_DEV) += videodev.o v4l2-common.o
+obj-$(CONFIG_VIDEO_DEV) += videodev.o v4l2-common.o v4l1-compat.o
 
 obj-$(CONFIG_VIDEO_BT848) += bttv.o msp3400.o tvaudio.o \
-	tda7432.o tda9875.o tuner.o video-buf.o
+	tda7432.o tda9875.o tuner.o video-buf.o tda9887.o
 obj-$(CONFIG_SOUND_TVMIXER) += tvmixer.o
 
 obj-$(CONFIG_VIDEO_ZR36120) += zoran.o

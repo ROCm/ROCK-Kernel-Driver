@@ -6,7 +6,7 @@
  ******************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -46,11 +46,11 @@
 
 acpi_status
 acpi_get_type (
-	acpi_handle             handle,
-	acpi_object_type        *ret_type)
+	acpi_handle                     handle,
+	acpi_object_type                *ret_type)
 {
-	acpi_namespace_node     *node;
-	acpi_status             status;
+	struct acpi_namespace_node      *node;
+	acpi_status                     status;
 
 
 	/* Parameter Validation */
@@ -105,11 +105,11 @@ acpi_get_type (
 
 acpi_status
 acpi_get_parent (
-	acpi_handle             handle,
-	acpi_handle             *ret_handle)
+	acpi_handle                     handle,
+	acpi_handle                     *ret_handle)
 {
-	acpi_namespace_node     *node;
-	acpi_status             status;
+	struct acpi_namespace_node      *node;
+	acpi_status                     status;
 
 
 	if (!ret_handle) {
@@ -174,15 +174,15 @@ unlock_and_exit:
 
 acpi_status
 acpi_get_next_object (
-	acpi_object_type        type,
-	acpi_handle             parent,
-	acpi_handle             child,
-	acpi_handle             *ret_handle)
+	acpi_object_type                type,
+	acpi_handle                     parent,
+	acpi_handle                     child,
+	acpi_handle                     *ret_handle)
 {
-	acpi_status             status;
-	acpi_namespace_node     *node;
-	acpi_namespace_node     *parent_node = NULL;
-	acpi_namespace_node     *child_node = NULL;
+	acpi_status                     status;
+	struct acpi_namespace_node      *node;
+	struct acpi_namespace_node      *parent_node = NULL;
+	struct acpi_namespace_node      *child_node = NULL;
 
 
 	/* Parameter validation */

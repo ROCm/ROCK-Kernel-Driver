@@ -173,7 +173,7 @@ static int atmtcp_v_ioctl(struct atm_dev *dev,unsigned int cmd,void *arg)
 static int atmtcp_v_send(struct atm_vcc *vcc,struct sk_buff *skb)
 {
 	struct atmtcp_dev_data *dev_data;
-	struct atm_vcc *out_vcc;
+	struct atm_vcc *out_vcc=NULL; /* Initializer quietens GCC warning */
 	struct sk_buff *new_skb;
 	struct atmtcp_hdr *hdr;
 	int size;

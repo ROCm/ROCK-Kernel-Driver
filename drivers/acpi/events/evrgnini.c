@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -48,13 +48,13 @@
 
 acpi_status
 acpi_ev_system_memory_region_setup (
-	acpi_handle             handle,
-	u32                     function,
-	void                    *handler_context,
-	void                    **region_context)
+	acpi_handle                     handle,
+	u32                             function,
+	void                            *handler_context,
+	void                            **region_context)
 {
-	acpi_operand_object     *region_desc = (acpi_operand_object *) handle;
-	acpi_mem_space_context  *local_region_context;
+	union acpi_operand_object       *region_desc = (union acpi_operand_object *) handle;
+	struct acpi_mem_space_context   *local_region_context;
 
 
 	ACPI_FUNCTION_TRACE ("ev_system_memory_region_setup");
@@ -70,7 +70,7 @@ acpi_ev_system_memory_region_setup (
 
 	/* Create a new context */
 
-	local_region_context = ACPI_MEM_CALLOCATE (sizeof (acpi_mem_space_context));
+	local_region_context = ACPI_MEM_CALLOCATE (sizeof (struct acpi_mem_space_context));
 	if (!(local_region_context)) {
 		return_ACPI_STATUS (AE_NO_MEMORY);
 	}
@@ -102,10 +102,10 @@ acpi_ev_system_memory_region_setup (
 
 acpi_status
 acpi_ev_io_space_region_setup (
-	acpi_handle             handle,
-	u32                     function,
-	void                    *handler_context,
-	void                    **region_context)
+	acpi_handle                     handle,
+	u32                             function,
+	void                            *handler_context,
+	void                            **region_context)
 {
 	ACPI_FUNCTION_TRACE ("ev_io_space_region_setup");
 
@@ -140,18 +140,18 @@ acpi_ev_io_space_region_setup (
 
 acpi_status
 acpi_ev_pci_config_region_setup (
-	acpi_handle             handle,
-	u32                     function,
-	void                    *handler_context,
-	void                    **region_context)
+	acpi_handle                     handle,
+	u32                             function,
+	void                            *handler_context,
+	void                            **region_context)
 {
-	acpi_status             status = AE_OK;
-	acpi_integer            temp;
-	acpi_pci_id             *pci_id = *region_context;
-	acpi_operand_object     *handler_obj;
-	acpi_namespace_node     *node;
-	acpi_operand_object     *region_obj = (acpi_operand_object *) handle;
-	acpi_device_id          object_hID;
+	acpi_status                     status = AE_OK;
+	acpi_integer                    temp;
+	struct acpi_pci_id              *pci_id = *region_context;
+	union acpi_operand_object       *handler_obj;
+	struct acpi_namespace_node      *node;
+	union acpi_operand_object       *region_obj = (union acpi_operand_object   *) handle;
+	struct acpi_device_id           object_hID;
 
 
 	ACPI_FUNCTION_TRACE ("ev_pci_config_region_setup");
@@ -179,7 +179,7 @@ acpi_ev_pci_config_region_setup (
 
 	/* Create a new context */
 
-	pci_id = ACPI_MEM_CALLOCATE (sizeof (acpi_pci_id));
+	pci_id = ACPI_MEM_CALLOCATE (sizeof (struct acpi_pci_id));
 	if (!pci_id) {
 		return_ACPI_STATUS (AE_NO_MEMORY);
 	}
@@ -297,10 +297,10 @@ acpi_ev_pci_config_region_setup (
 
 acpi_status
 acpi_ev_pci_bar_region_setup (
-	acpi_handle             handle,
-	u32                     function,
-	void                    *handler_context,
-	void                    **region_context)
+	acpi_handle                     handle,
+	u32                             function,
+	void                            *handler_context,
+	void                            **region_context)
 {
 	ACPI_FUNCTION_TRACE ("ev_pci_bar_region_setup");
 
@@ -328,10 +328,10 @@ acpi_ev_pci_bar_region_setup (
 
 acpi_status
 acpi_ev_cmos_region_setup (
-	acpi_handle             handle,
-	u32                     function,
-	void                    *handler_context,
-	void                    **region_context)
+	acpi_handle                     handle,
+	u32                             function,
+	void                            *handler_context,
+	void                            **region_context)
 {
 	ACPI_FUNCTION_TRACE ("ev_cmos_region_setup");
 
@@ -357,10 +357,10 @@ acpi_ev_cmos_region_setup (
 
 acpi_status
 acpi_ev_default_region_setup (
-	acpi_handle             handle,
-	u32                     function,
-	void                    *handler_context,
-	void                    **region_context)
+	acpi_handle                     handle,
+	u32                             function,
+	void                            *handler_context,
+	void                            **region_context)
 {
 	ACPI_FUNCTION_TRACE ("ev_default_region_setup");
 
@@ -400,17 +400,17 @@ acpi_ev_default_region_setup (
 
 acpi_status
 acpi_ev_initialize_region (
-	acpi_operand_object     *region_obj,
-	u8                      acpi_ns_locked)
+	union acpi_operand_object       *region_obj,
+	u8                              acpi_ns_locked)
 {
-	acpi_operand_object     *handler_obj;
-	acpi_operand_object     *obj_desc;
-	acpi_adr_space_type     space_id;
-	acpi_namespace_node     *node;
-	acpi_status             status;
-	acpi_namespace_node     *method_node;
-	acpi_name               *reg_name_ptr = (acpi_name *) METHOD_NAME__REG;
-	acpi_operand_object     *region_obj2;
+	union acpi_operand_object       *handler_obj;
+	union acpi_operand_object       *obj_desc;
+	acpi_adr_space_type             space_id;
+	struct acpi_namespace_node      *node;
+	acpi_status                     status;
+	struct acpi_namespace_node      *method_node;
+	acpi_name                       *reg_name_ptr = (acpi_name *) METHOD_NAME__REG;
+	union acpi_operand_object       *region_obj2;
 
 
 	ACPI_FUNCTION_TRACE_U32 ("ev_initialize_region", acpi_ns_locked);

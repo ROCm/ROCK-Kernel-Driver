@@ -568,6 +568,7 @@ nfs_update_request(struct file* file, struct inode *inode, struct page *page,
 	/* Okay, the request matches. Update the region */
 	if (offset < req->wb_offset) {
 		req->wb_offset = offset;
+		req->wb_pgbase = offset;
 		req->wb_bytes = rqend - req->wb_offset;
 	}
 
@@ -700,7 +701,7 @@ nfs_updatepage(struct file *file, struct page *page, unsigned int offset, unsign
 	 * Call the strategy routine so it can send out a bunch
 	 * of requests.
 	 */
-	if (req->wb_offset == 0 && req->wb_bytes == PAGE_CACHE_SIZE) {
+	if (req->wb_pgbase == 0 && req->wb_bytes == PAGE_CACHE_SIZE) {
 		SetPageUptodate(page);
 		nfs_unlock_request(req);
 		nfs_strategy(inode);

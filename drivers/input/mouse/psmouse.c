@@ -192,7 +192,7 @@ static void psmouse_interrupt(struct serio *serio, unsigned char data, unsigned 
 		return;
 	}
 
-	if (psmouse->pktcnt && time_after(jiffies, psmouse->last + HZ/20)) {
+	if (psmouse->pktcnt && time_after(jiffies, psmouse->last + HZ/2)) {
 		printk(KERN_WARNING "psmouse.c: Lost synchronization, throwing %d bytes away.\n", psmouse->pktcnt);
 		psmouse->pktcnt = 0;
 	}

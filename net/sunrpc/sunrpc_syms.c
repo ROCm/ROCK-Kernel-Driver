@@ -60,12 +60,7 @@ EXPORT_SYMBOL(xprt_set_timeout);
 /* Client credential cache */
 EXPORT_SYMBOL(rpcauth_register);
 EXPORT_SYMBOL(rpcauth_unregister);
-EXPORT_SYMBOL(rpcauth_init_credcache);
-EXPORT_SYMBOL(rpcauth_free_credcache);
-EXPORT_SYMBOL(rpcauth_insert_credcache);
 EXPORT_SYMBOL(rpcauth_lookupcred);
-EXPORT_SYMBOL(rpcauth_bindcred);
-EXPORT_SYMBOL(rpcauth_matchcred);
 EXPORT_SYMBOL(put_rpccred);
 
 /* RPC server stuff */

@@ -102,11 +102,13 @@ static int dsp_rec_start(struct saa7134_dev *dev)
 	/* prepare buffer */
 	if (0 != (err = videobuf_dma_pci_map(dev->pci,&dev->oss.dma)))
 		return err;
+	if (0 != (err = saa7134_pgtable_alloc(dev->pci,&dev->oss.pt)))
+		goto fail1;
 	if (0 != (err = saa7134_pgtable_build(dev->pci,&dev->oss.pt,
 					      dev->oss.dma.sglist,
 					      dev->oss.dma.sglen,
 					      0)))
-		goto fail1;
+		goto fail2;
 
 	/* sample format */
 	switch (dev->oss.afmt) {

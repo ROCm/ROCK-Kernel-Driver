@@ -250,12 +250,12 @@ void table_destroy(struct dm_table *t)
 
 	/* free the targets */
 	for (i = 0; i < t->num_targets; i++) {
-		struct dm_target *tgt = &t->targets[i];
-
-		dm_put_target_type(t->targets[i].type);
+		struct dm_target *tgt = t->targets + i;
 
 		if (tgt->type->dtr)
 			tgt->type->dtr(tgt);
+
+		dm_put_target_type(tgt->type);
 	}
 
 	vfree(t->highs);
@@ -578,9 +578,8 @@ static int split_args(int max, int *argc, char **argv, char *input)
 int dm_table_add_target(struct dm_table *t, const char *type,
 			sector_t start, sector_t len, char *params)
 {
-	int r, argc;
+	int r = -EINVAL, argc;
 	char *argv[32];
-	struct target_type *tt;
 	struct dm_target *tgt;
 
 	if ((r = check_space(t)))
@@ -589,14 +588,13 @@ int dm_table_add_target(struct dm_table *t, const char *type,
 	tgt = t->targets + t->num_targets;
 	memset(tgt, 0, sizeof(*tgt));
 
-	tt = dm_get_target_type(type);
-	if (!tt) {
+	tgt->type = dm_get_target_type(type);
+	if (!tgt->type) {
 		tgt->error = "unknown target type";
-		return -EINVAL;
+		goto bad;
 	}
 
 	tgt->table = t;
-	tgt->type = tt;
 	tgt->begin = start;
 	tgt->len = len;
 	tgt->error = "Unknown error";
@@ -605,23 +603,19 @@ int dm_table_add_target(struct dm_table *t, const char *type,
 	 * Does this target adjoin the previous one ?
 	 */
 	if (!adjoin(t, tgt)) {
-		DMERR("Gap in table");
-		dm_put_target_type(tt);
-		return -EINVAL;
+		tgt->error = "Gap in table";
+		goto bad;
 	}
 
 	r = split_args(ARRAY_SIZE(argv), &argc, argv, params);
 	if (r) {
 		tgt->error = "couldn't split parameters";
-		dm_put_target_type(tt);
-		return r;
+		goto bad;
 	}
 
-	r = tt->ctr(tgt, argc, argv);
-	if (r) {
-		dm_put_target_type(tt);
-		return r;
-	}
+	r = tgt->type->ctr(tgt, argc, argv);
+	if (r)
+		goto bad;
 
 	t->highs[t->num_targets++] = tgt->begin + tgt->len - 1;
 
@@ -629,6 +623,11 @@ int dm_table_add_target(struct dm_table *t, const char *type,
 	 * the merge fn apply the target level restrictions. */
 	combine_restrictions_low(&t->limits, &tgt->limits);
 	return 0;
+
+ bad:
+	printk(KERN_ERR DM_NAME ": %s\n", tgt->error);
+	dm_put_target_type(tgt->type);
+	return r;
 }
 
 static int setup_indexes(struct dm_table *t)
@@ -752,3 +751,4 @@ void dm_table_add_wait_queue(struct dm_table *t, wait_queue_t *wq)
 EXPORT_SYMBOL(dm_get_device);
 EXPORT_SYMBOL(dm_put_device);
 EXPORT_SYMBOL(dm_table_event);
+EXPORT_SYMBOL(dm_table_get_mode);

@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -48,13 +48,13 @@
 
 acpi_status
 acpi_tb_find_table (
-	char                    *signature,
-	char                    *oem_id,
-	char                    *oem_table_id,
-	acpi_table_header       **table_ptr)
+	char                            *signature,
+	char                            *oem_id,
+	char                            *oem_table_id,
+	struct acpi_table_header        **table_ptr)
 {
-	acpi_status             status;
-	acpi_table_header       *table;
+	acpi_status                     status;
+	struct acpi_table_header        *table;
 
 
 	ACPI_FUNCTION_TRACE ("tb_find_table");
@@ -112,20 +112,20 @@ acpi_tb_find_table (
 
 acpi_status
 acpi_get_firmware_table (
-	acpi_string             signature,
-	u32                     instance,
-	u32                     flags,
-	acpi_table_header       **table_pointer)
+	acpi_string                     signature,
+	u32                             instance,
+	u32                             flags,
+	struct acpi_table_header        **table_pointer)
 {
-	acpi_pointer            rsdp_address;
-	acpi_pointer            address;
-	acpi_status             status;
-	acpi_table_header       header;
-	acpi_table_desc         table_info;
-	acpi_table_desc         rsdt_info;
-	u32                     table_count;
-	u32                     i;
-	u32                     j;
+	struct acpi_pointer             rsdp_address;
+	struct acpi_pointer             address;
+	acpi_status                     status;
+	struct acpi_table_header        header;
+	struct acpi_table_desc          table_info;
+	struct acpi_table_desc          rsdt_info;
+	u32                             table_count;
+	u32                             i;
+	u32                             j;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_get_firmware_table");
@@ -159,7 +159,7 @@ acpi_get_firmware_table (
 		/* Map and validate the RSDP */
 
 		if ((flags & ACPI_MEMORY_MODE) == ACPI_LOGICAL_ADDRESSING) {
-			status = acpi_os_map_memory (rsdp_address.pointer.physical, sizeof (rsdp_descriptor),
+			status = acpi_os_map_memory (rsdp_address.pointer.physical, sizeof (struct rsdp_descriptor),
 					  (void **) &acpi_gbl_RSDP);
 			if (ACPI_FAILURE (status)) {
 				return_ACPI_STATUS (status);
@@ -227,7 +227,7 @@ acpi_get_firmware_table (
 		}
 		else {
 			address.pointer.value =
-				((xsdt_descriptor *) rsdt_info.pointer)->table_offset_entry[i];
+				((XSDT_DESCRIPTOR *) rsdt_info.pointer)->table_offset_entry[i];
 		}
 
 		/* Get the table header */
@@ -287,11 +287,11 @@ cleanup:
 
 acpi_status
 acpi_find_root_pointer (
-	u32                     flags,
-	acpi_pointer            *rsdp_address)
+	u32                             flags,
+	struct acpi_pointer             *rsdp_address)
 {
-	acpi_table_desc         table_info;
-	acpi_status             status;
+	struct acpi_table_desc          table_info;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_find_root_pointer");
@@ -327,11 +327,11 @@ acpi_find_root_pointer (
 
 u8 *
 acpi_tb_scan_memory_for_rsdp (
-	u8                      *start_address,
-	u32                     length)
+	u8                              *start_address,
+	u32                             length)
 {
-	u32                     offset;
-	u8                      *mem_rover;
+	u32                             offset;
+	u8                              *mem_rover;
 
 
 	ACPI_FUNCTION_TRACE ("tb_scan_memory_for_rsdp");
@@ -384,13 +384,13 @@ acpi_tb_scan_memory_for_rsdp (
 
 acpi_status
 acpi_tb_find_rsdp (
-	acpi_table_desc         *table_info,
-	u32                     flags)
+	struct acpi_table_desc          *table_info,
+	u32                             flags)
 {
-	u8                      *table_ptr;
-	u8                      *mem_rover;
-	u64                     phys_addr;
-	acpi_status             status = AE_OK;
+	u8                              *table_ptr;
+	u8                              *mem_rover;
+	u64                             phys_addr;
+	acpi_status                     status = AE_OK;
 
 
 	ACPI_FUNCTION_TRACE ("tb_find_rsdp");

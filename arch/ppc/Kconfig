@@ -1060,13 +1060,7 @@ config HIGHMEM_START_BOOL
 	  Say N here unless you know what you are doing.
 
 config HIGHMEM_START
-	hex "Virtual start address of high memory pool"
-	depends on HIGHMEM_START_BOOL
-	default "0xfe000000"
-
-config HIGHMEM_START
-	hex
-	depends on !HIGHMEM_START_BOOL
+	hex "Virtual start address of high memory pool" if HIGHMEM_START_BOOL
 	default "0xfe000000"
 
 config LOWMEM_SIZE_BOOL
@@ -1082,14 +1076,8 @@ config LOWMEM_SIZE_BOOL
 	  Say N here unless you know what you are doing.
 
 config LOWMEM_SIZE
-	hex "Maximum low memory size (in bytes)"
-	depends on LOWMEM_SIZE_BOOL
-	default "0x20000000"
-
-config LOWMEM_SIZE
-	hex
-	depends on !LOWMEM_SIZE_BOOL
-	default "0x20000000"
+	hex "Maximum low memory size (in bytes)" if LOWMEM_SIZE_BOOL
+	default "0x30000000"
 
 config KERNEL_START_BOOL
 	bool "Set custom kernel base address"
@@ -1103,13 +1091,7 @@ config KERNEL_START_BOOL
 	  Say N here unless you know what you are doing.
 
 config KERNEL_START
-	hex "Virtual address of kernel base"
-	depends on KERNEL_START_BOOL
-	default "0xc0000000"
-
-config KERNEL_START
-	hex
-	depends on !KERNEL_START_BOOL
+	hex "Virtual address of kernel base" if KERNEL_START_BOOL
 	default "0xc0000000"
 
 config TASK_SIZE_BOOL
@@ -1123,13 +1105,7 @@ config TASK_SIZE_BOOL
 	  Say N here unless you know what you are doing.
 
 config TASK_SIZE
-	hex "Size of user task space"
-	depends on TASK_SIZE_BOOL
-	default "0x80000000"
-
-config TASK_SIZE
-	hex
-	depends on !TASK_SIZE_BOOL
+	hex "Size of user task space" if TASK_SIZE_BOOL
 	default "0x80000000"
 
 config BOOT_LOAD_BOOL
@@ -1143,19 +1119,8 @@ config BOOT_LOAD_BOOL
 	  Say N here unless you know what you are doing.
 
 config BOOT_LOAD
-	hex "Link/load address for booting"
-	depends on BOOT_LOAD_BOOL
-	default "0x00400000"
-
-# If we don't have a custom load, we define one here depending.
-config BOOT_LOAD
-	hex
-	depends on !BOOT_LOAD_BOOL && (40x || 8xx || 8260)
-	default "0x00400000"
-
-config BOOT_LOAD
-	hex
-	depends on !BOOT_LOAD_BOOL
+	hex "Link/load address for booting" if BOOT_LOAD_BOOL
+	default "0x00400000" if 40x || 8xx || 8260
 	default "0x00800000"
 
 config PIN_TLB

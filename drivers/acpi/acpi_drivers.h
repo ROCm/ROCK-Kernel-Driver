@@ -55,7 +55,7 @@
 
 /* ACPI PCI Root Bridge (pci_root.c) */
 
-void acpi_pci_get_translations (acpi_pci_id* id, u64* mem_tra, u64* io_tra);
+void acpi_pci_get_translations (struct acpi_pci_id* id, u64* mem_tra, u64* io_tra);
 
 /* ACPI PCI Interrupt Link (pci_link.c) */
 
@@ -71,7 +71,7 @@ int acpi_pci_irq_add_prt (acpi_handle handle, int segment, int bus);
 struct pci_bus;
 
 int acpi_pci_bind (struct acpi_device *device);
-int acpi_pci_bind_root (struct acpi_device *device, acpi_pci_id *id, struct pci_bus *bus);
+int acpi_pci_bind_root (struct acpi_device *device, struct acpi_pci_id *id, struct pci_bus *bus);
 
 #endif /*CONFIG_ACPI_PCI*/
 

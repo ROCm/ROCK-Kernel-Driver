@@ -9,7 +9,7 @@
 
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -49,13 +49,12 @@
 #define ACPI_SIGNAL_FATAL           0
 #define ACPI_SIGNAL_BREAKPOINT      1
 
-typedef struct acpi_fatal_info
+struct acpi_signal_fatal_info
 {
-	u32                     type;
-	u32                     code;
-	u32                     argument;
-
-} acpi_signal_fatal_info;
+	u32                             type;
+	u32                             code;
+	u32                             argument;
+};
 
 
 /*
@@ -64,11 +63,11 @@ typedef struct acpi_fatal_info
 
 typedef u32
 (ACPI_SYSTEM_XFACE *OSD_HANDLER) (
-	void                    *context);
+	void                            *context);
 
 typedef void
 (ACPI_SYSTEM_XFACE *OSD_EXECUTION_CALLBACK) (
-	void                    *context);
+	void                            *context);
 
 
 /*
@@ -90,13 +89,13 @@ acpi_os_terminate (
 
 acpi_status
 acpi_os_get_root_pointer (
-	u32                     flags,
-	acpi_pointer            *address);
+	u32                             flags,
+	struct acpi_pointer             *address);
 
 acpi_status
 acpi_os_table_override (
-	acpi_table_header       *existing_table,
-	acpi_table_header       **new_table);
+	struct acpi_table_header        *existing_table,
+	struct acpi_table_header        **new_table);
 
 
 /*
@@ -105,24 +104,24 @@ acpi_os_table_override (
 
 acpi_status
 acpi_os_create_semaphore (
-	u32                     max_units,
-	u32                     initial_units,
-	acpi_handle             *out_handle);
+	u32                             max_units,
+	u32                             initial_units,
+	acpi_handle                     *out_handle);
 
 acpi_status
 acpi_os_delete_semaphore (
-	acpi_handle             handle);
+	acpi_handle                     handle);
 
 acpi_status
 acpi_os_wait_semaphore (
-	acpi_handle             handle,
-	u32                     units,
-	u16                     timeout);
+	acpi_handle                     handle,
+	u32                             units,
+	u16                             timeout);
 
 acpi_status
 acpi_os_signal_semaphore (
-	acpi_handle             handle,
-	u32                     units);
+	acpi_handle                     handle,
+	u32                             units);
 
 
 /*
@@ -131,27 +130,27 @@ acpi_os_signal_semaphore (
 
 void *
 acpi_os_allocate (
-	acpi_size               size);
+	acpi_size                       size);
 
 void
 acpi_os_free (
-	void *                  memory);
+	void *                          memory);
 
 acpi_status
 acpi_os_map_memory (
-	acpi_physical_address   physical_address,
-	acpi_size               size,
-	void                    **logical_address);
+	acpi_physical_address           physical_address,
+	acpi_size                       size,
+	void                            **logical_address);
 
 void
 acpi_os_unmap_memory (
-	void                    *logical_address,
-	acpi_size               size);
+	void                            *logical_address,
+	acpi_size                       size);
 
 acpi_status
 acpi_os_get_physical_address (
-	void                    *logical_address,
-	acpi_physical_address   *physical_address);
+	void                            *logical_address,
+	acpi_physical_address           *physical_address);
 
 
 /*
@@ -160,13 +159,13 @@ acpi_os_get_physical_address (
 
 acpi_status
 acpi_os_install_interrupt_handler (
-	u32                     interrupt_number,
+	u32                             interrupt_number,
 	OSD_HANDLER             service_routine,
-	void                    *context);
+	void                            *context);
 
 acpi_status
 acpi_os_remove_interrupt_handler (
-	u32                     interrupt_number,
+	u32                             interrupt_number,
 	OSD_HANDLER             service_routine);
 
 
@@ -180,18 +179,18 @@ acpi_os_get_thread_id (
 
 acpi_status
 acpi_os_queue_for_execution (
-	u32                     priority,
+	u32                             priority,
 	OSD_EXECUTION_CALLBACK  function,
-	void                    *context);
+	void                            *context);
 
 void
 acpi_os_sleep (
-	u32                     seconds,
-	u32                     milliseconds);
+	u32                             seconds,
+	u32                             milliseconds);
 
 void
 acpi_os_stall (
-	u32                     microseconds);
+	u32                             microseconds);
 
 
 /*
@@ -200,15 +199,15 @@ acpi_os_stall (
 
 acpi_status
 acpi_os_read_port (
-	acpi_io_address         address,
-	void                    *value,
-	u32                     width);
+	acpi_io_address                 address,
+	void                            *value,
+	u32                             width);
 
 acpi_status
 acpi_os_write_port (
-	acpi_io_address         address,
-	acpi_integer            value,
-	u32                     width);
+	acpi_io_address                 address,
+	acpi_integer                    value,
+	u32                             width);
 
 
 /*
@@ -217,15 +216,15 @@ acpi_os_write_port (
 
 acpi_status
 acpi_os_read_memory (
-	acpi_physical_address   address,
-	void                    *value,
-	u32                     width);
+	acpi_physical_address           address,
+	void                            *value,
+	u32                             width);
 
 acpi_status
 acpi_os_write_memory (
-	acpi_physical_address   address,
-	acpi_integer            value,
-	u32                     width);
+	acpi_physical_address           address,
+	acpi_integer                    value,
+	u32                             width);
 
 
 /*
@@ -234,26 +233,26 @@ acpi_os_write_memory (
 
 acpi_status
 acpi_os_read_pci_configuration (
-	acpi_pci_id             *pci_id,
-	u32                     reg,
-	void                    *value,
-	u32                     width);
+	struct acpi_pci_id              *pci_id,
+	u32                             register,
+	void                            *value,
+	u32                             width);
 
 acpi_status
 acpi_os_write_pci_configuration (
-	acpi_pci_id             *pci_id,
-	u32                     reg,
-	acpi_integer            value,
-	u32                     width);
+	struct acpi_pci_id              *pci_id,
+	u32                             register,
+	acpi_integer                    value,
+	u32                             width);
 
 /*
  * Interim function needed for PCI IRQ routing
  */
 void
 acpi_os_derive_pci_id(
-	acpi_handle             rhandle,
-	acpi_handle             chandle,
-	acpi_pci_id             **pci_id);
+	acpi_handle                     rhandle,
+	acpi_handle                     chandle,
+	struct acpi_pci_id              **pci_id);
 
 /*
  * Miscellaneous
@@ -261,13 +260,13 @@ acpi_os_derive_pci_id(
 
 u8
 acpi_os_readable (
-	void                    *pointer,
-	u32                     length);
+	void                            *pointer,
+	u32                             length);
 
 u8
 acpi_os_writable (
-	void                    *pointer,
-	u32                     length);
+	void                            *pointer,
+	u32                             length);
 
 u32
 acpi_os_get_timer (
@@ -275,8 +274,8 @@ acpi_os_get_timer (
 
 acpi_status
 acpi_os_signal (
-	u32                     function,
-	void                    *info);
+	u32                             function,
+	void                            *info);
 
 /*
  * Debug print routines
@@ -284,17 +283,17 @@ acpi_os_signal (
 
 void ACPI_INTERNAL_VAR_XFACE
 acpi_os_printf (
-	const char              *format,
+	const char                      *format,
 	...);
 
 void
 acpi_os_vprintf (
-	const char              *format,
+	const char                      *format,
 	va_list                 args);
 
 void
 acpi_os_redirect_output (
-	void                    *destination);
+	void                            *destination);
 
 
 /*
@@ -303,8 +302,25 @@ acpi_os_redirect_output (
 
 u32
 acpi_os_get_line (
-	char                    *buffer);
+	char                            *buffer);
 
+
+/*
+ * Directory manipulation
+ */
+
+void *
+acpi_os_open_directory (
+	char                            *pathname,
+	char                            *wildcard_spec);
+
+char *
+acpi_os_get_next_filename (
+	void                            *dir_handle);
+
+void
+acpi_os_close_directory (
+	void                            *dir_handle);
 
 /*
  * Debug
@@ -312,10 +328,10 @@ acpi_os_get_line (
 
 void
 acpi_os_dbg_assert(
-	void                    *failed_assertion,
-	void                    *file_name,
-	u32                     line_number,
-	char                    *message);
+	void                            *failed_assertion,
+	void                            *file_name,
+	u32                             line_number,
+	char                            *message);
 
 
 #endif /* __ACPIOSXF_H__ */

@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -57,15 +57,15 @@
 
 acpi_status
 acpi_ds_create_buffer_field (
-	acpi_parse_object       *op,
-	acpi_walk_state         *walk_state)
+	union acpi_parse_object         *op,
+	struct acpi_walk_state          *walk_state)
 {
-	acpi_parse_object       *arg;
-	acpi_namespace_node     *node;
-	acpi_status             status;
-	acpi_operand_object     *obj_desc;
-	acpi_operand_object     *second_desc = NULL;
-	u32                     flags;
+	union acpi_parse_object         *arg;
+	struct acpi_namespace_node      *node;
+	acpi_status                     status;
+	union acpi_operand_object       *obj_desc;
+	union acpi_operand_object       *second_desc = NULL;
+	u32                             flags;
 
 
 	ACPI_FUNCTION_TRACE ("ds_create_buffer_field");
@@ -182,12 +182,12 @@ cleanup:
 
 acpi_status
 acpi_ds_get_field_names (
-	acpi_create_field_info  *info,
-	acpi_walk_state         *walk_state,
-	acpi_parse_object       *arg)
+	struct acpi_create_field_info   *info,
+	struct acpi_walk_state          *walk_state,
+	union acpi_parse_object         *arg)
 {
-	acpi_status             status;
-	acpi_integer            position;
+	acpi_status                     status;
+	acpi_integer                    position;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ds_get_field_names", info);
@@ -309,13 +309,13 @@ acpi_ds_get_field_names (
 
 acpi_status
 acpi_ds_create_field (
-	acpi_parse_object       *op,
-	acpi_namespace_node     *region_node,
-	acpi_walk_state         *walk_state)
+	union acpi_parse_object         *op,
+	struct acpi_namespace_node      *region_node,
+	struct acpi_walk_state          *walk_state)
 {
-	acpi_status             status;
-	acpi_parse_object       *arg;
-	acpi_create_field_info  info;
+	acpi_status                     status;
+	union acpi_parse_object         *arg;
+	struct acpi_create_field_info   info;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ds_create_field", op);
@@ -368,13 +368,13 @@ acpi_ds_create_field (
 
 acpi_status
 acpi_ds_init_field_objects (
-	acpi_parse_object       *op,
-	acpi_walk_state         *walk_state)
+	union acpi_parse_object         *op,
+	struct acpi_walk_state          *walk_state)
 {
-	acpi_status             status;
-	acpi_parse_object       *arg = NULL;
-	acpi_namespace_node     *node;
-	u8                      type = 0;
+	acpi_status                     status;
+	union acpi_parse_object         *arg = NULL;
+	struct acpi_namespace_node      *node;
+	u8                              type = 0;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ds_init_field_objects", op);
@@ -451,13 +451,13 @@ acpi_ds_init_field_objects (
 
 acpi_status
 acpi_ds_create_bank_field (
-	acpi_parse_object       *op,
-	acpi_namespace_node     *region_node,
-	acpi_walk_state         *walk_state)
+	union acpi_parse_object         *op,
+	struct acpi_namespace_node      *region_node,
+	struct acpi_walk_state          *walk_state)
 {
-	acpi_status             status;
-	acpi_parse_object       *arg;
-	acpi_create_field_info  info;
+	acpi_status                     status;
+	union acpi_parse_object         *arg;
+	struct acpi_create_field_info   info;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ds_create_bank_field", op);
@@ -524,13 +524,13 @@ acpi_ds_create_bank_field (
 
 acpi_status
 acpi_ds_create_index_field (
-	acpi_parse_object       *op,
-	acpi_namespace_node     *region_node,
-	acpi_walk_state         *walk_state)
+	union acpi_parse_object         *op,
+	struct acpi_namespace_node      *region_node,
+	struct acpi_walk_state          *walk_state)
 {
-	acpi_status             status;
-	acpi_parse_object       *arg;
-	acpi_create_field_info  info;
+	acpi_status                     status;
+	union acpi_parse_object         *arg;
+	struct acpi_create_field_info   info;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ds_create_index_field", op);

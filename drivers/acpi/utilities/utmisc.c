@@ -5,7 +5,7 @@
  ******************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -46,10 +46,10 @@
 
 void
 acpi_ut_print_string (
-	char                    *string,
-	u8                      max_length)
+	char                            *string,
+	u8                              max_length)
 {
-	u32                     i;
+	u32                             i;
 
 
 	if (!string) {
@@ -135,16 +135,16 @@ acpi_ut_print_string (
 
 u32
 acpi_ut_dword_byte_swap (
-	u32                     value)
+	u32                             value)
 {
 	union {
-		u32                 value;
-		u8                  bytes[4];
+		u32                         value;
+		u8                          bytes[4];
 	} out;
 
 	union {
-		u32                 value;
-		u8                  bytes[4];
+		u32                         value;
+		u8                          bytes[4];
 	} in;
 
 
@@ -179,7 +179,7 @@ acpi_ut_dword_byte_swap (
 
 void
 acpi_ut_set_integer_width (
-	u8                      revision)
+	u8                              revision)
 {
 
 	if (revision <= 1) {
@@ -210,12 +210,12 @@ acpi_ut_set_integer_width (
 
 void
 acpi_ut_display_init_pathname (
-	u8                      type,
-	acpi_namespace_node     *obj_handle,
-	char                    *path)
+	u8                              type,
+	struct acpi_namespace_node      *obj_handle,
+	char                            *path)
 {
-	acpi_status             status;
-	acpi_buffer             buffer;
+	acpi_status                     status;
+	struct acpi_buffer              buffer;
 
 
 	ACPI_FUNCTION_ENTRY ();
@@ -280,10 +280,10 @@ acpi_ut_display_init_pathname (
 
 u8
 acpi_ut_valid_acpi_name (
-	u32                     name)
+	u32                             name)
 {
-	char                    *name_ptr = (char *) &name;
-	u32                     i;
+	char                            *name_ptr = (char *) &name;
+	u32                             i;
 
 
 	ACPI_FUNCTION_ENTRY ();
@@ -315,7 +315,7 @@ acpi_ut_valid_acpi_name (
 
 u8
 acpi_ut_valid_acpi_character (
-	char                    character)
+	char                            character)
 {
 
 	ACPI_FUNCTION_ENTRY ();
@@ -344,15 +344,15 @@ acpi_ut_valid_acpi_character (
 
 acpi_status
 acpi_ut_strtoul64 (
-	char                    *string,
-	u32                     base,
-	acpi_integer            *ret_integer)
+	char                            *string,
+	u32                             base,
+	acpi_integer                    *ret_integer)
 {
-	u32                     index;
-	acpi_integer            return_value = 0;
-	acpi_status             status = AE_OK;
-	acpi_integer            dividend;
-	acpi_integer            quotient;
+	u32                             index;
+	acpi_integer                    return_value = 0;
+	acpi_status                     status = AE_OK;
+	acpi_integer                    dividend;
+	acpi_integer                    quotient;
 
 
 	*ret_integer = 0;
@@ -486,9 +486,9 @@ error_exit:
 
 char *
 acpi_ut_strupr (
-	char                    *src_string)
+	char                            *src_string)
 {
-	char                    *string;
+	char                            *string;
 
 
 	ACPI_FUNCTION_ENTRY ();
@@ -520,8 +520,8 @@ acpi_status
 acpi_ut_mutex_initialize (
 	void)
 {
-	u32                     i;
-	acpi_status             status;
+	u32                             i;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("ut_mutex_initialize");
@@ -557,7 +557,7 @@ void
 acpi_ut_mutex_terminate (
 	void)
 {
-	u32                     i;
+	u32                             i;
 
 
 	ACPI_FUNCTION_TRACE ("ut_mutex_terminate");
@@ -588,9 +588,9 @@ acpi_ut_mutex_terminate (
 
 acpi_status
 acpi_ut_create_mutex (
-	acpi_mutex_handle       mutex_id)
+	acpi_mutex_handle               mutex_id)
 {
-	acpi_status             status = AE_OK;
+	acpi_status                     status = AE_OK;
 
 
 	ACPI_FUNCTION_TRACE_U32 ("ut_create_mutex", mutex_id);
@@ -625,9 +625,9 @@ acpi_ut_create_mutex (
 
 acpi_status
 acpi_ut_delete_mutex (
-	acpi_mutex_handle       mutex_id)
+	acpi_mutex_handle               mutex_id)
 {
-	acpi_status             status;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE_U32 ("ut_delete_mutex", mutex_id);
@@ -660,11 +660,11 @@ acpi_ut_delete_mutex (
 
 acpi_status
 acpi_ut_acquire_mutex (
-	acpi_mutex_handle       mutex_id)
+	acpi_mutex_handle               mutex_id)
 {
-	acpi_status             status;
-	u32                     i;
-	u32                     this_thread_id;
+	acpi_status                     status;
+	u32                             i;
+	u32                             this_thread_id;
 
 
 	ACPI_FUNCTION_NAME ("ut_acquire_mutex");
@@ -738,11 +738,11 @@ acpi_ut_acquire_mutex (
 
 acpi_status
 acpi_ut_release_mutex (
-	acpi_mutex_handle       mutex_id)
+	acpi_mutex_handle               mutex_id)
 {
-	acpi_status             status;
-	u32                     i;
-	u32                     this_thread_id;
+	acpi_status                     status;
+	u32                             i;
+	u32                             this_thread_id;
 
 
 	ACPI_FUNCTION_NAME ("ut_release_mutex");
@@ -824,11 +824,11 @@ acpi_ut_release_mutex (
 
 acpi_status
 acpi_ut_create_update_state_and_push (
-	acpi_operand_object     *object,
-	u16                     action,
-	acpi_generic_state      **state_list)
+	union acpi_operand_object       *object,
+	u16                             action,
+	union acpi_generic_state        **state_list)
 {
-	acpi_generic_state       *state;
+	union acpi_generic_state         *state;
 
 
 	ACPI_FUNCTION_ENTRY ();
@@ -866,12 +866,12 @@ acpi_ut_create_update_state_and_push (
 
 acpi_status
 acpi_ut_create_pkg_state_and_push (
-	void                    *internal_object,
-	void                    *external_object,
-	u16                     index,
-	acpi_generic_state      **state_list)
+	void                            *internal_object,
+	void                            *external_object,
+	u16                             index,
+	union acpi_generic_state        **state_list)
 {
-	acpi_generic_state       *state;
+	union acpi_generic_state         *state;
 
 
 	ACPI_FUNCTION_ENTRY ();
@@ -902,8 +902,8 @@ acpi_ut_create_pkg_state_and_push (
 
 void
 acpi_ut_push_generic_state (
-	acpi_generic_state      **list_head,
-	acpi_generic_state      *state)
+	union acpi_generic_state        **list_head,
+	union acpi_generic_state        *state)
 {
 	ACPI_FUNCTION_TRACE ("ut_push_generic_state");
 
@@ -929,11 +929,11 @@ acpi_ut_push_generic_state (
  *
  ******************************************************************************/
 
-acpi_generic_state *
+union acpi_generic_state *
 acpi_ut_pop_generic_state (
-	acpi_generic_state      **list_head)
+	union acpi_generic_state        **list_head)
 {
-	acpi_generic_state      *state;
+	union acpi_generic_state        *state;
 
 
 	ACPI_FUNCTION_TRACE ("ut_pop_generic_state");
@@ -965,10 +965,10 @@ acpi_ut_pop_generic_state (
  *
  ******************************************************************************/
 
-acpi_generic_state *
+union acpi_generic_state *
 acpi_ut_create_generic_state (void)
 {
-	acpi_generic_state      *state;
+	union acpi_generic_state        *state;
 
 
 	ACPI_FUNCTION_ENTRY ();
@@ -999,11 +999,11 @@ acpi_ut_create_generic_state (void)
  *
  ******************************************************************************/
 
-acpi_thread_state *
+struct acpi_thread_state *
 acpi_ut_create_thread_state (
 	void)
 {
-	acpi_generic_state      *state;
+	union acpi_generic_state        *state;
 
 
 	ACPI_FUNCTION_TRACE ("ut_create_thread_state");
@@ -1021,7 +1021,7 @@ acpi_ut_create_thread_state (
 	state->common.data_type = ACPI_DESC_TYPE_STATE_THREAD;
 	state->thread.thread_id = acpi_os_get_thread_id ();
 
-	return_PTR ((acpi_thread_state *) state);
+	return_PTR ((struct acpi_thread_state *) state);
 }
 
 
@@ -1041,12 +1041,12 @@ acpi_ut_create_thread_state (
  *
  ******************************************************************************/
 
-acpi_generic_state *
+union acpi_generic_state *
 acpi_ut_create_update_state (
-	acpi_operand_object     *object,
-	u16                     action)
+	union acpi_operand_object       *object,
+	u16                             action)
 {
-	acpi_generic_state      *state;
+	union acpi_generic_state        *state;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ut_create_update_state", object);
@@ -1083,13 +1083,13 @@ acpi_ut_create_update_state (
  *
  ******************************************************************************/
 
-acpi_generic_state *
+union acpi_generic_state *
 acpi_ut_create_pkg_state (
-	void                    *internal_object,
-	void                    *external_object,
-	u16                     index)
+	void                            *internal_object,
+	void                            *external_object,
+	u16                             index)
 {
-	acpi_generic_state      *state;
+	union acpi_generic_state        *state;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ut_create_pkg_state", internal_object);
@@ -1105,7 +1105,7 @@ acpi_ut_create_pkg_state (
 	/* Init fields specific to the update struct */
 
 	state->common.data_type = ACPI_DESC_TYPE_STATE_PACKAGE;
-	state->pkg.source_object = (acpi_operand_object *) internal_object;
+	state->pkg.source_object = (union acpi_operand_object *) internal_object;
 	state->pkg.dest_object  = external_object;
 	state->pkg.index        = index;
 	state->pkg.num_packages = 1;
@@ -1127,11 +1127,11 @@ acpi_ut_create_pkg_state (
  *
  ******************************************************************************/
 
-acpi_generic_state *
+union acpi_generic_state *
 acpi_ut_create_control_state (
 	void)
 {
-	acpi_generic_state      *state;
+	union acpi_generic_state        *state;
 
 
 	ACPI_FUNCTION_TRACE ("ut_create_control_state");
@@ -1168,7 +1168,7 @@ acpi_ut_create_control_state (
 
 void
 acpi_ut_delete_generic_state (
-	acpi_generic_state      *state)
+	union acpi_generic_state        *state)
 {
 	ACPI_FUNCTION_TRACE ("ut_delete_generic_state");
 
@@ -1217,16 +1217,16 @@ acpi_ut_delete_generic_state_cache (
 
 acpi_status
 acpi_ut_walk_package_tree (
-	acpi_operand_object     *source_object,
-	void                    *target_object,
-	acpi_pkg_callback       walk_callback,
-	void                    *context)
+	union acpi_operand_object       *source_object,
+	void                            *target_object,
+	acpi_pkg_callback               walk_callback,
+	void                            *context)
 {
-	acpi_status             status = AE_OK;
-	acpi_generic_state      *state_list = NULL;
-	acpi_generic_state      *state;
-	u32                     this_index;
-	acpi_operand_object     *this_source_obj;
+	acpi_status                     status = AE_OK;
+	union acpi_generic_state        *state_list = NULL;
+	union acpi_generic_state        *state;
+	u32                             this_index;
+	union acpi_operand_object       *this_source_obj;
 
 
 	ACPI_FUNCTION_TRACE ("ut_walk_package_tree");
@@ -1241,7 +1241,7 @@ acpi_ut_walk_package_tree (
 		/* Get one element of the package */
 
 		this_index    = state->pkg.index;
-		this_source_obj = (acpi_operand_object *)
+		this_source_obj = (union acpi_operand_object *)
 				  state->pkg.source_object->package.elements[this_index];
 
 		/*
@@ -1334,11 +1334,11 @@ acpi_ut_walk_package_tree (
 
 u8
 acpi_ut_generate_checksum (
-	u8                      *buffer,
-	u32                     length)
+	u8                              *buffer,
+	u32                             length)
 {
-	u32                     i;
-	signed char             sum = 0;
+	u32                             i;
+	signed char                     sum = 0;
 
 
 	for (i = 0; i < length; i++) {
@@ -1364,11 +1364,11 @@ acpi_ut_generate_checksum (
 
 u8 *
 acpi_ut_get_resource_end_tag (
-	acpi_operand_object     *obj_desc)
+	union acpi_operand_object       *obj_desc)
 {
-	u8                      buffer_byte;
-	u8                      *buffer;
-	u8                      *end_buffer;
+	u8                              buffer_byte;
+	u8                              *buffer;
+	u8                              *end_buffer;
 
 
 	buffer    = obj_desc->buffer.pointer;
@@ -1419,9 +1419,9 @@ acpi_ut_get_resource_end_tag (
 
 void
 acpi_ut_report_error (
-	char                    *module_name,
-	u32                     line_number,
-	u32                     component_id)
+	char                            *module_name,
+	u32                             line_number,
+	u32                             component_id)
 {
 
 
@@ -1446,9 +1446,9 @@ acpi_ut_report_error (
 
 void
 acpi_ut_report_warning (
-	char                    *module_name,
-	u32                     line_number,
-	u32                     component_id)
+	char                            *module_name,
+	u32                             line_number,
+	u32                             component_id)
 {
 
 	acpi_os_printf ("%8s-%04d: *** Warning: ", module_name, line_number);
@@ -1472,9 +1472,9 @@ acpi_ut_report_warning (
 
 void
 acpi_ut_report_info (
-	char                    *module_name,
-	u32                     line_number,
-	u32                     component_id)
+	char                            *module_name,
+	u32                             line_number,
+	u32                             component_id)
 {
 
 	acpi_os_printf ("%8s-%04d: *** Info: ", module_name, line_number);

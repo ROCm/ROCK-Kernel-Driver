@@ -24,6 +24,7 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/mempool.h>
+#include <linux/workqueue.h>
 
 #define BIO_POOL_SIZE 256
 
@@ -566,7 +567,112 @@ void bio_unmap_user(struct bio *bio, int write_to_vm)
 	}
 
 	bio_put(bio);
- }
+}
+
+/*
+ * bio_set_pages_dirty() and bio_check_pages_dirty() are support functions
+ * for performing direct-IO in BIOs.
+ *
+ * The problem is that we cannot run set_page_dirty() from interrupt context
+ * because the required locks are not interrupt-safe.  So what we can do is to
+ * mark the pages dirty _before_ performing IO.  And in interrupt context,
+ * check that the pages are still dirty.   If so, fine.  If not, redirty them
+ * in process context.
+ *
+ * Note that this code is very hard to test under normal circumstances because
+ * direct-io pins the pages with get_user_pages().  This makes
+ * is_page_cache_freeable return false, and the VM will not clean the pages.
+ * But other code (eg, pdflush) could clean the pages if they are mapped
+ * pagecache.
+ *
+ * Simply disabling the call to bio_set_pages_dirty() is a good way to test the
+ * deferred bio dirtying paths.
+ */
+
+/*
+ * bio_set_pages_dirty() will mark all the bio's pages as dirty.
+ */
+void bio_set_pages_dirty(struct bio *bio)
+{
+	struct bio_vec *bvec = bio->bi_io_vec;
+	int i;
+
+	for (i = 0; i < bio->bi_vcnt; i++) {
+		struct page *page = bvec[i].bv_page;
+
+		if (page)
+			set_page_dirty(bvec[i].bv_page);
+	}
+}
+
+/*
+ * bio_check_pages_dirty() will check that all the BIO's pages are still dirty.
+ * If they are, then fine.  If, however, some pages are clean then they must
+ * have been written out during the direct-IO read.  So we take another ref on
+ * the BIO and the offending pages and re-dirty the pages in process context.
+ *
+ * It is expected that bio_check_pages_dirty() will wholly own the BIO from
+ * here on.  It will run one page_cache_release() against each page and will
+ * run one bio_put() against the BIO.
+ */
+
+static void bio_dirty_fn(void *data);
+
+static DECLARE_WORK(bio_dirty_work, bio_dirty_fn, NULL);
+static spinlock_t bio_dirty_lock = SPIN_LOCK_UNLOCKED;
+static struct bio *bio_dirty_list = NULL;
+
+/*
+ * This runs in process context
+ */
+static void bio_dirty_fn(void *data)
+{
+	unsigned long flags;
+	struct bio *bio;
+
+	spin_lock_irqsave(&bio_dirty_lock, flags);
+	bio = bio_dirty_list;
+	bio_dirty_list = NULL;
+	spin_unlock_irqrestore(&bio_dirty_lock, flags);
+
+	while (bio) {
+		struct bio *next = bio->bi_private;
+
+		bio_set_pages_dirty(bio);
+		bio_put(bio);
+		bio = next;
+	}
+}
+
+void bio_check_pages_dirty(struct bio *bio)
+{
+	struct bio_vec *bvec = bio->bi_io_vec;
+	int nr_clean_pages = 0;
+	int i;
+
+	for (i = 0; i < bio->bi_vcnt; i++) {
+		struct page *page = bvec[i].bv_page;
+
+		if (PageDirty(page)) {
+			page_cache_release(page);
+			bvec[i].bv_page = NULL;
+		} else {
+			nr_clean_pages++;
+		}
+	}
+
+	if (nr_clean_pages) {
+		unsigned long flags;
+
+		spin_lock_irqsave(&bio_dirty_lock, flags);
+		bio->bi_private = bio_dirty_list;
+		bio_dirty_list = bio;
+		spin_unlock_irqrestore(&bio_dirty_lock, flags);
+		schedule_work(&bio_dirty_work);
+	} else {
+		bio_put(bio);
+	}
+}
 
 /**
  * bio_endio - end I/O on a bio

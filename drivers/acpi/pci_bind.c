@@ -40,7 +40,7 @@
 ACPI_MODULE_NAME		("pci_bind")
 
 struct acpi_pci_data {
-	acpi_pci_id		id;
+	struct acpi_pci_id	id;
 	struct pci_bus		*bus;
 	struct pci_dev		*dev;
 };
@@ -70,7 +70,7 @@ acpi_pci_data_handler (
 acpi_status
 acpi_os_get_pci_id (
 	acpi_handle		handle,
-	acpi_pci_id		*id)
+	struct acpi_pci_id	*id)
 {
 	int			result = 0;
 	acpi_status		status = AE_OK;
@@ -125,7 +125,7 @@ acpi_pci_bind (
 	struct acpi_pci_data	*data = NULL;
 	struct acpi_pci_data	*pdata = NULL;
 	char			pathname[ACPI_PATHNAME_MAX] = {0};
-	acpi_buffer		buffer = {ACPI_PATHNAME_MAX, pathname};
+	struct acpi_buffer	buffer = {ACPI_PATHNAME_MAX, pathname};
 	acpi_handle		handle = NULL;
 
 	ACPI_FUNCTION_TRACE("acpi_pci_bind");
@@ -261,14 +261,14 @@ end:
 int 
 acpi_pci_bind_root (
 	struct acpi_device	*device,
-	acpi_pci_id		*id,
+	struct acpi_pci_id	*id,
 	struct pci_bus		*bus) 
 {
 	int			result = 0;
 	acpi_status		status = AE_OK;
 	struct acpi_pci_data	*data = NULL;
 	char			pathname[ACPI_PATHNAME_MAX] = {0};
-	acpi_buffer		buffer = {ACPI_PATHNAME_MAX, pathname};
+	struct acpi_buffer	buffer = {ACPI_PATHNAME_MAX, pathname};
 
 	ACPI_FUNCTION_TRACE("acpi_pci_bind_root");
 

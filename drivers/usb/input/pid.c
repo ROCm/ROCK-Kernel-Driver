@@ -48,9 +48,7 @@
 /* Called when a transfer is completed */
 static void hid_pid_ctrl_out(struct urb *u, struct pt_regs *regs)
 {
-#ifdef DEBUG
-    printk("hid_pid_ctrl_out - Transfer Completed\n");
-#endif
+    dev_dbg(&u->dev->dev, "hid_pid_ctrl_out - Transfer Completed\n");
 }
 
 static void hid_pid_exit(struct hid_device* hid)
@@ -64,32 +62,29 @@ static void hid_pid_exit(struct hid_device* hid)
 }
 
 static int pid_upload_periodic(struct hid_ff_pid *pid, struct ff_effect *effect, int is_update) {
-    
-    printk("Requested periodic force upload\n");
+    dev_info(&pid->hid->dev->dev, "requested periodic force upload\n");
     return 0;
 }
 
 static int pid_upload_constant(struct hid_ff_pid *pid, struct ff_effect *effect, int is_update) {
-    printk("Requested constant force upload\n");
+    dev_info(&pid->hid->dev->dev, "requested constant force upload\n");
     return 0;
 }
 
 static int pid_upload_condition(struct hid_ff_pid *pid, struct ff_effect *effect, int is_update) {
-    printk("Requested Condition force upload\n");
+    dev_info(&pid->hid->dev->dev, "requested Condition force upload\n");
     return 0;
 }
 
 static int pid_upload_ramp(struct hid_ff_pid *pid, struct ff_effect *effect, int is_update) {
-    printk("Request ramp force upload\n");
+    dev_info(&pid->hid->dev->dev, "request ramp force upload\n");
     return 0;
 }
 
 static int hid_pid_event(struct hid_device *hid, struct input_dev *input,
 			  unsigned int type, unsigned int code, int value)
 {
-#ifdef DEBUG
-    printk ("PID event received: type=%d,code=%d,value=%d.\n",type,code,value);
-#endif
+    dev_dbg(&hid->dev->dev, "PID event received: type=%d,code=%d,value=%d.\n", type, code, value);
 
     if (type != EV_FF)
 	return -1;
@@ -127,20 +122,20 @@ static int hid_pid_erase(struct input_dev *dev, int id)
 	/* Find report */
 	ret =  hid_find_report_by_usage(hid, wanted_report, &report, HID_OUTPUT_REPORT);
 	if(!ret) {
-		printk("Couldn't find report\n");
+		dev_err(&hid->dev->dev, "couldn't find report\n");
 		return ret;
 	}
 
 	/* Find field */
 	field = (struct hid_field *) kmalloc(sizeof(struct hid_field), GFP_KERNEL);
 	if(!field) {
-		printk("Couldn't allocate field\n");
+		dev_err(&hid->dev->dev, "couldn't allocate field\n");
 		return -ENOMEM;
 	}
 
 	ret = hid_set_field(field, ret, pid->effects[id].device_id);
 	if(!ret) {
-		printk("Couldn't set field\n");
+		dev_err(&hid->dev->dev, "couldn't set field\n");
 		return ret;
 	}
 
@@ -169,7 +164,7 @@ static int hid_pid_flush(struct input_dev *dev, struct file *file)
 		if ( current->pid == pid->effects[i].owner
 		     && test_bit(FF_PID_FLAGS_USED, &pid->effects[i].flags))
 			if (hid_pid_erase(dev, i))
-				warn("erase effect %d failed", i);
+				dev_warn(&hid->dev->dev, "erase effect %d failed", i);
 
 	return 0;
 }
@@ -183,14 +178,10 @@ static int hid_pid_upload_effect(struct input_dev *dev,
 	int is_update;
 	int flags=0;
 
-#ifdef DEBUG
-        printk("Upload effect called: effect_type=%x\n",effect->type);
-#endif
+        dev_dbg(&pid_private->hid->dev->dev, "upload effect called: effect_type=%x\n",effect->type);
 	/* Check this effect type is supported by this device */
 	if (!test_bit(effect->type, dev->ffbit)) {
-#ifdef DEBUG
-		printk("Invalid kind of effect requested.\n");
-#endif
+		dev_dbg(&pid_private->hid->dev->dev, "invalid kind of effect requested.\n");
 		return -EINVAL;
 	}
 
@@ -209,16 +200,12 @@ static int hid_pid_upload_effect(struct input_dev *dev,
 
 		if ( id == FF_EFFECTS_MAX) {
 // TEMP - We need to get ff_effects_max correctly first:  || id >= dev->ff_effects_max) {
-#ifdef DEBUG
-			printk("Not enough device memory\n");
-#endif
+			dev_dbg(&pid_private->hid->dev->dev, "Not enough device memory\n");
 			return -ENOMEM;
 		}
 
 		effect->id = id;
-#ifdef DEBUG
-		printk("Effect ID is %d\n.",id);
-#endif
+		dev_dbg(&pid_private->hid->dev->dev, "effect ID is %d\n.",id);
 		pid_private->effects[id].owner = current->pid;
 		pid_private->effects[id].flags = (1<<FF_PID_FLAGS_USED);
 		spin_unlock_irqrestore(&pid_private->lock,flags);
@@ -265,9 +252,7 @@ static int hid_pid_upload_effect(struct input_dev *dev,
 			break;
 
 		default:
-#ifdef DEBUG
-			printk("Invalid type of effect requested - %x.\n", effect->type);
-#endif
+			dev_dbg(&pid_private->hid->dev->dev, "invalid type of effect requested - %x.\n", effect->type);
 			return -EINVAL;
 	}
 	/* If a packet was sent, forbid new updates until we are notified

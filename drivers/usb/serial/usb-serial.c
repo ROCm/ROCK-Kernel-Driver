@@ -841,7 +841,7 @@ static struct usb_serial * create_serial (struct usb_device *dev,
 
 	serial = kmalloc (sizeof (*serial), GFP_KERNEL);
 	if (!serial) {
-		dev_err(dev->dev, "%s - out of memory\n", __FUNCTION__);
+		dev_err(&dev->dev, "%s - out of memory\n", __FUNCTION__);
 		return NULL;
 	}
 	memset (serial, 0, sizeof(*serial));
@@ -899,18 +899,18 @@ int usb_serial_probe(struct usb_interface *interface,
 
 	serial = create_serial (dev, interface, type);
 	if (!serial) {
-		dev_err(interface->dev, "%s - out of memory\n", __FUNCTION__);
+		dev_err(&interface->dev, "%s - out of memory\n", __FUNCTION__);
 		return -ENODEV;
 	}
 
 	/* if this device type has a probe function, call it */
 	if (type->probe) {
 		if (!try_module_get(type->owner)) {
-			dev_err(interface->dev, "module get failed, exiting\n");
+			dev_err(&interface->dev, "module get failed, exiting\n");
 			kfree (serial);
 			return -EIO;
 		}
-		retval = type->probe (serial);
+		retval = type->probe (serial, id);
 		module_put(type->owner);
 
 		if (retval < 0) {
@@ -960,9 +960,7 @@ int usb_serial_probe(struct usb_interface *interface,
 	     (dev->descriptor.idProduct == ATEN_PRODUCT_ID))) {
 		if (interface != &dev->actconfig->interface[0]) {
 			/* check out the endpoints of the other interface*/
-			//interface = &dev->actconfig->interface[ifnum ^ 1];
-			interface = &dev->actconfig->interface[0];
-			iface_desc = &interface->altsetting[0];
+			iface_desc = &dev->actconfig->interface[0].altsetting[0];
 			for (i = 0; i < iface_desc->desc.bNumEndpoints; ++i) {
 				endpoint = &iface_desc->endpoint[i].desc;
 				if ((endpoint->bEndpointAddress & 0x80) &&
@@ -980,7 +978,7 @@ int usb_serial_probe(struct usb_interface *interface,
 		 * properly during a later invocation of usb_serial_probe
 		 */
 		if (num_bulk_in == 0 || num_bulk_out == 0) {
-			dev_info(interface->dev, "PL-2303 hack: descriptors matched but endpoints did not\n");
+			dev_info(&interface->dev, "PL-2303 hack: descriptors matched but endpoints did not\n");
 			kfree (serial);
 			return -ENODEV;
 		}
@@ -989,13 +987,13 @@ int usb_serial_probe(struct usb_interface *interface,
 #endif
 
 	/* found all that we need */
-	dev_info(interface->dev, "%s converter detected\n", type->name);
+	dev_info(&interface->dev, "%s converter detected\n", type->name);
 
 #ifdef CONFIG_USB_SERIAL_GENERIC
 	if (type == &usb_serial_generic_device) {
 		num_ports = num_bulk_out;
 		if (num_ports == 0) {
-			dev_err(interface->dev, "Generic device with no bulk out, not allowed.\n");
+			dev_err(&interface->dev, "Generic device with no bulk out, not allowed.\n");
 			kfree (serial);
 			return -EIO;
 		}
@@ -1005,7 +1003,7 @@ int usb_serial_probe(struct usb_interface *interface,
 		/* if this device type has a calc_num_ports function, call it */
 		if (type->calc_num_ports) {
 			if (!try_module_get(type->owner)) {
-				dev_err(interface->dev, "module get failed, exiting\n");
+				dev_err(&interface->dev, "module get failed, exiting\n");
 				kfree (serial);
 				return -EIO;
 			}
@@ -1017,7 +1015,7 @@ int usb_serial_probe(struct usb_interface *interface,
 	}
 
 	if (get_free_serial (serial, num_ports, &minor) == NULL) {
-		dev_err(interface->dev, "No more free serial devices\n");
+		dev_err(&interface->dev, "No more free serial devices\n");
 		kfree (serial);
 		return -ENOMEM;
 	}
@@ -1034,14 +1032,14 @@ int usb_serial_probe(struct usb_interface *interface,
 		port = &serial->port[i];
 		port->read_urb = usb_alloc_urb (0, GFP_KERNEL);
 		if (!port->read_urb) {
-			dev_err(interface->dev, "No free urbs available\n");
+			dev_err(&interface->dev, "No free urbs available\n");
 			goto probe_error;
 		}
 		buffer_size = endpoint->wMaxPacketSize;
 		port->bulk_in_endpointAddress = endpoint->bEndpointAddress;
 		port->bulk_in_buffer = kmalloc (buffer_size, GFP_KERNEL);
 		if (!port->bulk_in_buffer) {
-			dev_err(interface->dev, "Couldn't allocate bulk_in_buffer\n");
+			dev_err(&interface->dev, "Couldn't allocate bulk_in_buffer\n");
 			goto probe_error;
 		}
 		usb_fill_bulk_urb (port->read_urb, dev,
@@ -1059,7 +1057,7 @@ int usb_serial_probe(struct usb_interface *interface,
 		port = &serial->port[i];
 		port->write_urb = usb_alloc_urb(0, GFP_KERNEL);
 		if (!port->write_urb) {
-			dev_err(interface->dev, "No free urbs available\n");
+			dev_err(&interface->dev, "No free urbs available\n");
 			goto probe_error;
 		}
 		buffer_size = endpoint->wMaxPacketSize;
@@ -1067,7 +1065,7 @@ int usb_serial_probe(struct usb_interface *interface,
 		port->bulk_out_endpointAddress = endpoint->bEndpointAddress;
 		port->bulk_out_buffer = kmalloc (buffer_size, GFP_KERNEL);
 		if (!port->bulk_out_buffer) {
-			dev_err(interface->dev, "Couldn't allocate bulk_out_buffer\n");
+			dev_err(&interface->dev, "Couldn't allocate bulk_out_buffer\n");
 			goto probe_error;
 		}
 		usb_fill_bulk_urb (port->write_urb, dev,
@@ -1085,14 +1083,14 @@ int usb_serial_probe(struct usb_interface *interface,
 		port = &serial->port[i];
 		port->interrupt_in_urb = usb_alloc_urb(0, GFP_KERNEL);
 		if (!port->interrupt_in_urb) {
-			dev_err(interface->dev, "No free urbs available\n");
+			dev_err(&interface->dev, "No free urbs available\n");
 			goto probe_error;
 		}
 		buffer_size = endpoint->wMaxPacketSize;
 		port->interrupt_in_endpointAddress = endpoint->bEndpointAddress;
 		port->interrupt_in_buffer = kmalloc (buffer_size, GFP_KERNEL);
 		if (!port->interrupt_in_buffer) {
-			dev_err(interface->dev, "Couldn't allocate interrupt_in_buffer\n");
+			dev_err(&interface->dev, "Couldn't allocate interrupt_in_buffer\n");
 			goto probe_error;
 		}
 		usb_fill_int_urb (port->interrupt_in_urb, dev, 
@@ -1121,7 +1119,7 @@ int usb_serial_probe(struct usb_interface *interface,
 	/* if this device type has an attach function, call it */
 	if (type->attach) {
 		if (!try_module_get(type->owner)) {
-			dev_err(interface->dev, "module get failed, exiting\n");
+			dev_err(&interface->dev, "module get failed, exiting\n");
 			goto probe_error;
 		}
 		retval = type->attach (serial);
@@ -1253,7 +1251,7 @@ void usb_serial_disconnect(struct usb_interface *interface)
 		/* free up any memory that we allocated */
 		kfree (serial);
 	}
-	dev_info(*dev, "device disconnected\n");
+	dev_info(dev, "device disconnected\n");
 }
 
 

@@ -37,6 +37,8 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
 	set_bit(cpu, &next->cpu_vm_mask);
 }
 
+#define deactivate_mm(tsk,mm)	do { } while (0)
+
 extern inline void activate_mm(struct mm_struct *prev,
                                struct mm_struct *next)
 {

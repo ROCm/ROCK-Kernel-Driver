@@ -127,11 +127,11 @@ acpi_battery_get_info (
 {
 	int			result = 0;
 	acpi_status 		status = 0;
-	acpi_buffer 		buffer = {ACPI_ALLOCATE_BUFFER, NULL};
-	acpi_buffer		format = {sizeof(ACPI_BATTERY_FORMAT_BIF),
+	struct acpi_buffer	buffer = {ACPI_ALLOCATE_BUFFER, NULL};
+	struct acpi_buffer	format = {sizeof(ACPI_BATTERY_FORMAT_BIF),
 						ACPI_BATTERY_FORMAT_BIF};
-	acpi_buffer		data = {0, NULL};
-	acpi_object 		*package = NULL;
+	struct acpi_buffer	data = {0, NULL};
+	union acpi_object	*package = NULL;
 
 	ACPI_FUNCTION_TRACE("acpi_battery_get_info");
 
@@ -146,7 +146,7 @@ acpi_battery_get_info (
 		return_VALUE(-ENODEV);
 	}
 
-	package = (acpi_object *) buffer.pointer;
+	package = (union acpi_object *) buffer.pointer;
 
 	/* Extract Package Data */
 
@@ -188,11 +188,11 @@ acpi_battery_get_status (
 {
 	int			result = 0;
 	acpi_status 		status = 0;
-	acpi_buffer 		buffer = {ACPI_ALLOCATE_BUFFER, NULL};
-	acpi_buffer		format = {sizeof(ACPI_BATTERY_FORMAT_BST),
+	struct acpi_buffer	buffer = {ACPI_ALLOCATE_BUFFER, NULL};
+	struct acpi_buffer	format = {sizeof(ACPI_BATTERY_FORMAT_BST),
 						ACPI_BATTERY_FORMAT_BST};
-	acpi_buffer		data = {0, NULL};
-	acpi_object 		*package = NULL;
+	struct acpi_buffer	data = {0, NULL};
+	union acpi_object	*package = NULL;
 
 	ACPI_FUNCTION_TRACE("acpi_battery_get_status");
 
@@ -207,7 +207,7 @@ acpi_battery_get_status (
 		return_VALUE(-ENODEV);
 	}
 
-	package = (acpi_object *) buffer.pointer;
+	package = (union acpi_object *) buffer.pointer;
 
 	/* Extract Package Data */
 
@@ -249,8 +249,8 @@ acpi_battery_set_alarm (
 	unsigned long		alarm)
 {
 	acpi_status		status = 0;
-	acpi_object		arg0 = {ACPI_TYPE_INTEGER};
-	acpi_object_list	arg_list = {1, &arg0};
+	union acpi_object	arg0 = {ACPI_TYPE_INTEGER};
+	struct acpi_object_list	arg_list = {1, &arg0};
 
 	ACPI_FUNCTION_TRACE("acpi_battery_set_alarm");
 

@@ -91,7 +91,7 @@ acpi_system_read_dsdt (
 	loff_t			*ppos)
 {
 	acpi_status		status = AE_OK;
-	acpi_buffer		dsdt = {ACPI_ALLOCATE_BUFFER, NULL};
+	struct acpi_buffer	dsdt = {ACPI_ALLOCATE_BUFFER, NULL};
 	void			*data = 0;
 	size_t			size = 0;
 
@@ -134,7 +134,7 @@ acpi_system_read_fadt (
 	loff_t			*ppos)
 {
 	acpi_status		status = AE_OK;
-	acpi_buffer		fadt = {ACPI_ALLOCATE_BUFFER, NULL};
+	struct acpi_buffer	fadt = {ACPI_ALLOCATE_BUFFER, NULL};
 	void			*data = 0;
 	size_t			size = 0;
 

@@ -97,6 +97,22 @@ UNUSUAL_DEV(  0x04a4, 0x0004, 0x0001, 0x0001,
 		"DVD-CAM DZ-MV100A Camcorder",
 		US_SC_SCSI, US_PR_CB, NULL, US_FL_SINGLE_LUN),
 
+/* Reported by Khalid Aziz <khalid@gonehiking.org>
+ * This entry is needed because the device reports Sub=ff */
+UNUSUAL_DEV(  0x04b8, 0x0602, 0x0110, 0x0110,
+		"Epson",
+		"785EPX Storage",
+		US_SC_SCSI, US_PR_BULK, NULL, US_FL_SINGLE_LUN),
+
+/* Reported by Jan Willamowius <jan@willamowius.de>
+ * The device needs the flags only.
+ */
+UNUSUAL_DEV(  0x04c8, 0x0723, 0x0000, 0x9999,
+		"Konica",
+		"KD-200Z",
+		US_SC_SCSI, US_PR_BULK, NULL,
+		US_FL_START_STOP),
+
 UNUSUAL_DEV(  0x04cb, 0x0100, 0x0000, 0x2210,
 		"Fujifilm",
 		"FinePix 1400Zoom",
@@ -547,6 +563,12 @@ UNUSUAL_DEV(  0x0a16, 0x8888, 0x0100, 0x0100,
 		US_SC_SCSI, US_PR_BULK, NULL,
 		US_FL_FIX_INQUIRY ),
 
+UNUSUAL_DEV(  0x0a16, 0x8888, 0x0100, 0x0100,
+		"IBM",
+		"IBM USB Memory Key",
+		US_SC_SCSI, US_PR_BULK, NULL,
+		US_FL_FIX_INQUIRY ),
+		
 #ifdef CONFIG_USB_STORAGE_ISD200
 UNUSUAL_DEV(  0x0bf6, 0xa001, 0x0100, 0x0110,
 		"ATI",

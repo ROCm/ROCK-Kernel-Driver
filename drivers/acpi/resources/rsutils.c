@@ -5,7 +5,7 @@
  ******************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -52,11 +52,11 @@
 
 acpi_status
 acpi_rs_get_prt_method_data (
-	acpi_handle             handle,
-	acpi_buffer             *ret_buffer)
+	acpi_handle                     handle,
+	struct acpi_buffer              *ret_buffer)
 {
-	acpi_operand_object     *obj_desc;
-	acpi_status             status;
+	union acpi_operand_object       *obj_desc;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("rs_get_prt_method_data");
@@ -105,11 +105,11 @@ acpi_rs_get_prt_method_data (
 
 acpi_status
 acpi_rs_get_crs_method_data (
-	acpi_handle             handle,
-	acpi_buffer             *ret_buffer)
+	acpi_handle                     handle,
+	struct acpi_buffer              *ret_buffer)
 {
-	acpi_operand_object     *obj_desc;
-	acpi_status             status;
+	union acpi_operand_object       *obj_desc;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("rs_get_crs_method_data");
@@ -159,11 +159,11 @@ acpi_rs_get_crs_method_data (
 
 acpi_status
 acpi_rs_get_prs_method_data (
-	acpi_handle             handle,
-	acpi_buffer             *ret_buffer)
+	acpi_handle                     handle,
+	struct acpi_buffer              *ret_buffer)
 {
-	acpi_operand_object     *obj_desc;
-	acpi_status             status;
+	union acpi_operand_object       *obj_desc;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("rs_get_prs_method_data");
@@ -213,12 +213,12 @@ acpi_rs_get_prs_method_data (
 
 acpi_status
 acpi_rs_set_srs_method_data (
-	acpi_handle             handle,
-	acpi_buffer             *in_buffer)
+	acpi_handle                     handle,
+	struct acpi_buffer              *in_buffer)
 {
-	acpi_operand_object     *params[2];
-	acpi_status             status;
-	acpi_buffer             buffer;
+	union acpi_operand_object       *params[2];
+	acpi_status                     status;
+	struct acpi_buffer              buffer;
 
 
 	ACPI_FUNCTION_TRACE ("rs_set_srs_method_data");

@@ -5,7 +5,7 @@
  ******************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -52,14 +52,14 @@
 
 acpi_status
 acpi_rs_create_resource_list (
-	acpi_operand_object     *byte_stream_buffer,
-	acpi_buffer             *output_buffer)
+	union acpi_operand_object       *byte_stream_buffer,
+	struct acpi_buffer              *output_buffer)
 {
 
-	acpi_status             status;
-	u8                      *byte_stream_start;
-	acpi_size               list_size_needed = 0;
-	u32                     byte_stream_buffer_length;
+	acpi_status                     status;
+	u8                              *byte_stream_start;
+	acpi_size                       list_size_needed = 0;
+	u32                             byte_stream_buffer_length;
 
 
 	ACPI_FUNCTION_TRACE ("rs_create_resource_list");
@@ -112,7 +112,7 @@ acpi_rs_create_resource_list (
  *
  * FUNCTION:    acpi_rs_create_pci_routing_table
  *
- * PARAMETERS:  package_object          - Pointer to an acpi_operand_object
+ * PARAMETERS:  package_object          - Pointer to an union acpi_operand_object
  *                                        package
  *              output_buffer           - Pointer to the user's buffer
  *
@@ -121,7 +121,7 @@ acpi_rs_create_resource_list (
  *              AE_BUFFER_OVERFLOW and output_buffer->Length will point
  *              to the size buffer needed.
  *
- * DESCRIPTION: Takes the acpi_operand_object  package and creates a
+ * DESCRIPTION: Takes the union acpi_operand_object    package and creates a
  *              linked list of PCI interrupt descriptions
  *
  * NOTE: It is the caller's responsibility to ensure that the start of the
@@ -131,20 +131,20 @@ acpi_rs_create_resource_list (
 
 acpi_status
 acpi_rs_create_pci_routing_table (
-	acpi_operand_object     *package_object,
-	acpi_buffer             *output_buffer)
+	union acpi_operand_object       *package_object,
+	struct acpi_buffer              *output_buffer)
 {
-	u8                      *buffer;
-	acpi_operand_object     **top_object_list;
-	acpi_operand_object     **sub_object_list;
-	acpi_operand_object     *obj_desc;
-	acpi_size               buffer_size_needed = 0;
-	u32                     number_of_elements;
-	u32                     index;
-	acpi_pci_routing_table  *user_prt;
-	acpi_namespace_node     *node;
-	acpi_status             status;
-	acpi_buffer             path_buffer;
+	u8                              *buffer;
+	union acpi_operand_object       **top_object_list;
+	union acpi_operand_object       **sub_object_list;
+	union acpi_operand_object       *obj_desc;
+	acpi_size                       buffer_size_needed = 0;
+	u32                             number_of_elements;
+	u32                             index;
+	struct acpi_pci_routing_table   *user_prt;
+	struct acpi_namespace_node      *node;
+	acpi_status                     status;
+	struct acpi_buffer              path_buffer;
 
 
 	ACPI_FUNCTION_TRACE ("rs_create_pci_routing_table");
@@ -179,7 +179,7 @@ acpi_rs_create_pci_routing_table (
 	top_object_list  = package_object->package.elements;
 	number_of_elements = package_object->package.count;
 	buffer           = output_buffer->pointer;
-	user_prt         = ACPI_CAST_PTR (acpi_pci_routing_table, buffer);
+	user_prt         = ACPI_CAST_PTR (struct acpi_pci_routing_table, buffer);
 
 	for (index = 0; index < number_of_elements; index++) {
 		/*
@@ -189,14 +189,14 @@ acpi_rs_create_pci_routing_table (
 		 * be zero because we cleared the return buffer earlier
 		 */
 		buffer += user_prt->length;
-		user_prt = ACPI_CAST_PTR (acpi_pci_routing_table, buffer);
+		user_prt = ACPI_CAST_PTR (struct acpi_pci_routing_table, buffer);
 
 		/*
 		 * Fill in the Length field with the information we have at this point.
 		 * The minus four is to subtract the size of the u8 Source[4] member
 		 * because it is added below.
 		 */
-		user_prt->length = (sizeof (acpi_pci_routing_table) - 4);
+		user_prt->length = (sizeof (struct acpi_pci_routing_table) - 4);
 
 		/*
 		 * Each element of the top-level package must also be a package
@@ -328,7 +328,7 @@ acpi_rs_create_pci_routing_table (
 			return_ACPI_STATUS (AE_BAD_DATA);
 		}
 
-		/* Point to the next acpi_operand_object in the top level package */
+		/* Point to the next union acpi_operand_object in the top level package */
 
 		top_object_list++;
 	}
@@ -359,11 +359,11 @@ acpi_rs_create_pci_routing_table (
 
 acpi_status
 acpi_rs_create_byte_stream (
-	acpi_resource           *linked_list_buffer,
-	acpi_buffer             *output_buffer)
+	struct acpi_resource            *linked_list_buffer,
+	struct acpi_buffer              *output_buffer)
 {
-	acpi_status             status;
-	acpi_size               byte_stream_size_needed = 0;
+	acpi_status                     status;
+	acpi_size                       byte_stream_size_needed = 0;
 
 
 	ACPI_FUNCTION_TRACE ("rs_create_byte_stream");

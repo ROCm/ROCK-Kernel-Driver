@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -45,7 +45,7 @@ acpi_status
 acpi_ev_initialize (
 	void)
 {
-	acpi_status             status;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("ev_initialize");
@@ -99,7 +99,7 @@ acpi_status
 acpi_ev_handler_initialize (
 	void)
 {
-	acpi_status             status;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("ev_handler_initialize");
@@ -156,8 +156,8 @@ acpi_status
 acpi_ev_fixed_event_initialize (
 	void)
 {
-	acpi_native_uint        i;
-	acpi_status             status;
+	acpi_native_uint                i;
+	acpi_status                     status;
 
 
 	/*
@@ -199,10 +199,10 @@ u32
 acpi_ev_fixed_event_detect (
 	void)
 {
-	u32                     int_status = ACPI_INTERRUPT_NOT_HANDLED;
-	u32                     fixed_status;
-	u32                     fixed_enable;
-	acpi_native_uint        i;
+	u32                             int_status = ACPI_INTERRUPT_NOT_HANDLED;
+	u32                             fixed_status;
+	u32                             fixed_enable;
+	acpi_native_uint                i;
 
 
 	ACPI_FUNCTION_NAME ("ev_fixed_event_detect");
@@ -252,7 +252,7 @@ acpi_ev_fixed_event_detect (
 
 u32
 acpi_ev_fixed_event_dispatch (
-	u32                     event)
+	u32                             event)
 {
 
 
