@@ -1858,8 +1858,8 @@ static void addrconf_ip6_tnl_config(struct net_device *dev)
 	addrconf_add_mroute(dev);
 }
 
-int addrconf_notify(struct notifier_block *this, unsigned long event, 
-		    void * data)
+static int addrconf_notify(struct notifier_block *this, unsigned long event, 
+			   void * data)
 {
 	struct net_device *dev = (struct net_device *) data;
 	struct inet6_dev *idev = __in6_dev_get(dev);
@@ -1930,6 +1930,14 @@ int addrconf_notify(struct notifier_block *this, unsigned long event,
 
 	return NOTIFY_OK;
 }
+
+/*
+ *	addrconf module should be notified of a device going up
+ */
+static struct notifier_block ipv6_dev_notf = {
+	.notifier_call = addrconf_notify,
+	.priority = 0
+};
 
 static int addrconf_ifdown(struct net_device *dev, int how)
 {
@@ -3179,39 +3187,13 @@ int unregister_inet6addr_notifier(struct notifier_block *nb)
 
 void __init addrconf_init(void)
 {
-#ifdef MODULE
-	struct net_device *dev;
-#endif
+	register_netdevice_notifier(&ipv6_dev_notf);
 
 #ifdef CONFIG_IPV6_PRIVACY
 	md5_tfm = crypto_alloc_tfm("md5", 0);
 	if (unlikely(md5_tfm == NULL))
 		printk(KERN_WARNING
 			"failed to load transform for md5\n");
-#endif
-
-#ifdef MODULE
-	/* This takes sense only during module load. */
-	rtnl_lock();
-	for (dev = dev_base; dev; dev = dev->next) {
-		if (!(dev->flags&IFF_UP))
-			continue;
-
-		switch (dev->type) {
-		case ARPHRD_LOOPBACK:	
-			init_loopback(dev);
-			break;
-		case ARPHRD_ETHER:
-		case ARPHRD_FDDI:
-		case ARPHRD_IEEE802_TR:	
-		case ARPHRD_ARCNET:
-			addrconf_dev_config(dev);
-			break;
-		default:;
-			/* Ignore all other */
-		}
-	}
-	rtnl_unlock();
 #endif
 
 	addrconf_verify(0);
@@ -3230,6 +3212,8 @@ void addrconf_cleanup(void)
  	struct inet6_dev *idev;
  	struct inet6_ifaddr *ifa;
 	int i;
+
+	unregister_netdevice_notifier(&ipv6_dev_notf);
 
 	rtnetlink_links[PF_INET6] = NULL;
 #ifdef CONFIG_SYSCTL
@@ -3284,3 +3268,4 @@ void addrconf_cleanup(void)
 #endif
 }
 #endif	/* MODULE */
+

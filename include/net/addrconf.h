@@ -50,10 +50,6 @@ struct prefix_info {
 extern void			addrconf_init(void);
 extern void			addrconf_cleanup(void);
 
-extern int		        addrconf_notify(struct notifier_block *this, 
-						unsigned long event, 
-						void * data);
-
 extern int			addrconf_add_ifaddr(void *arg);
 extern int			addrconf_del_ifaddr(void *arg);
 extern int			addrconf_set_dstaddr(void *arg);
