@@ -43,7 +43,7 @@
 #include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/dma.h>
-#include <asm/smp.h>
+#include <linux/smp.h>
 
 #include "lmc.h"
 #include "lmc_var.h"
