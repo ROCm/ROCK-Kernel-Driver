@@ -132,7 +132,9 @@ struct resource mca_standard_resources[] = {
 #define MCA_STANDARD_RESOURCES	(sizeof(mca_standard_resources)/sizeof(struct resource))
 
 /**
- *	mca_read_pos - read the POS registers into a memory buffer
+ *	mca_read_and_store_pos - read the POS registers into a memory buffer
+ *      @pos: a char pointer to 8 bytes, contains the POS register value on
+ *            successful return
  *
  *	Returns 1 if a card actually exists (i.e. the pos isn't
  *	all 0xff) or 0 otherwise

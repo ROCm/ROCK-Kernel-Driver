@@ -449,7 +449,7 @@ static __inline__ void hlist_del(struct hlist_node *n)
 
 /**
  * hlist_del_rcu - deletes entry from hash list without re-initialization
- * @entry: the element to delete from the hash list.
+ * @n: the element to delete from the hash list.
  *
  * Note: list_unhashed() on entry does not return true after this, 
  * the entry is in an undefined state. It is useful for RCU based

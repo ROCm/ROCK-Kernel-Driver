@@ -2111,7 +2111,8 @@ void serial8250_get_irq_map(unsigned int *map)
 
 /**
  *	serial8250_suspend_port - suspend one serial port
- *	@line: serial line number
+ *	@line:  serial line number
+ *      @level: the level of port suspension, as per uart_suspend_port
  *
  *	Suspend one serial port.
  */
@@ -2122,7 +2123,8 @@ void serial8250_suspend_port(int line)
 
 /**
  *	serial8250_resume_port - resume one serial port
- *	@line: serial line number
+ *	@line:  serial line number
+ *      @level: the level of port resumption, as per uart_resume_port
  *
  *	Resume one serial port.
  */
