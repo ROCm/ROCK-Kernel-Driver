@@ -101,7 +101,17 @@ MODULE_PARM_DESC(max_report_luns,
 		 "REPORT LUNS maximum number of LUNS received (should be"
 		 " between 1 and 16384)");
 
+/* Some AChip ARC765 based DVD-ROM's take 15 or more seconds
+ * to reset.  A scan will fail if made right after a reset.
+ * It's completely broken device behaviour: SCSI specification
+ * says devices need to be able to respond to INQUIRY always
+ * (after a selection timeout ... of 250ms).
+ */
+#ifdef __powerpc64__
+static unsigned int scsi_inq_timeout = SCSI_TIMEOUT/HZ+25;
+#else
 static unsigned int scsi_inq_timeout = SCSI_TIMEOUT/HZ+3;
+#endif
 
 module_param_named(inq_timeout, scsi_inq_timeout, int, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(inq_timeout, 
