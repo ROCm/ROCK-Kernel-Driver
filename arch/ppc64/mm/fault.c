@@ -66,6 +66,8 @@ void do_page_fault(struct pt_regs *regs, unsigned long address,
 	 */
 	if (regs->trap == 0x400)
 		error_code &= 0x48200000;
+	else if (regs->trap != 0x300) /* ensure error_code is 0 on SLB miss */
+		error_code = 0;
 
 #ifdef CONFIG_DEBUG_KERNEL
 	if (debugger_fault_handler && (regs->trap == 0x300 ||

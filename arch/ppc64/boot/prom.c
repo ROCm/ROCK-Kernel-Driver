@@ -11,6 +11,7 @@
 #include <linux/string.h>
 #include <linux/ctype.h>
 
+#define BITS_PER_LONG 32
 #include <asm/div64.h>
 
 int (*prom)(void *);
