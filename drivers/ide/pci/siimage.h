@@ -31,7 +31,7 @@ static int siimage_get_info(char *, char **, off_t, int);
 
 static u8 siimage_proc;
 
-static ide_pci_host_proc_t siimage_procs[] __initdata = {
+static ide_pci_host_proc_t siimage_procs[] = {
 	{
 		.name		= "siimage",
 		.set		= 1,

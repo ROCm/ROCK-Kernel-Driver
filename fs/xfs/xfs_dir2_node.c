@@ -1573,15 +1573,16 @@ xfs_dir2_node_addname_int(
 					"%llu needed freesp block %lld for\n"
 					"  data block %lld, got %lld\n"
 					"  ifbno %llu lastfbno %d\n",
-					dp->i_ino,
-					XFS_DIR2_DB_TO_FDB(mp, dbno),
-					dbno, fbno,
-					ifbno, lastfbno);
+					(unsigned long long)dp->i_ino,
+					(long long)XFS_DIR2_DB_TO_FDB(mp, dbno),
+					(long long)dbno, (long long)fbno,
+					(unsigned long long)ifbno, lastfbno);
 				if (fblk) {
 					cmn_err(CE_ALERT,
-						" fblk 0x%llu blkno %llu "
+						" fblk 0x%p blkno %llu "
 						"index %d magic 0x%x\n",
-						fblk, fblk->blkno,
+						fblk,
+						(unsigned long long)fblk->blkno,
 						fblk->index,
 						fblk->magic);
 				} else {

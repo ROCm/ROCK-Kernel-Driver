@@ -375,13 +375,14 @@ static char i8042_mux_phys[4][32];
 static irqreturn_t i8042_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	unsigned long flags;
-	unsigned char str, data;
+	unsigned char str, data = 0;
 	unsigned int dfl;
 	int ret;
 
 	spin_lock_irqsave(&i8042_lock, flags);
 	str = i8042_read_status();
-	data = i8042_read_data();
+	if (str & I8042_STR_OBF)
+		data = i8042_read_data();
 	spin_unlock_irqrestore(&i8042_lock, flags);
 
 	if (~str & I8042_STR_OBF) {

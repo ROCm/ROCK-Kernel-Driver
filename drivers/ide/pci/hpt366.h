@@ -424,7 +424,7 @@ static u8 hpt366_proc;
 
 static int hpt366_get_info(char *, char **, off_t, int);
 
-static ide_pci_host_proc_t hpt366_procs[] __initdata = {
+static ide_pci_host_proc_t hpt366_procs[] = {
 	{
 		.name		= "hpt366",
 		.set		= 1,

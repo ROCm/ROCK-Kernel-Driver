@@ -230,39 +230,6 @@ typedef struct xfs_perag
 	xfs_perag_busy_t *pagb_list;	/* unstable blocks */
 } xfs_perag_t;
 
-#define	XFS_AG_MIN_BYTES	(1LL << 24)	/* 16 MB */
-#define	XFS_AG_BEST_BYTES	(1LL << 30)	/*  1 GB */
-#define	XFS_AG_MAX_BYTES	(1LL << 32)	/*  4 GB */
-
-#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_AG_MIN_BLOCKS)
-xfs_extlen_t xfs_ag_min_blocks(int bl);
-#define	XFS_AG_MIN_BLOCKS(bl)		xfs_ag_min_blocks(bl)
-#else
-#define	XFS_AG_MIN_BLOCKS(bl)	((xfs_extlen_t)(XFS_AG_MIN_BYTES >> bl))
-#endif
-#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_AG_BEST_BLOCKS)
-xfs_extlen_t xfs_ag_best_blocks(int bl, xfs_drfsbno_t blks);
-#define	XFS_AG_BEST_BLOCKS(bl,blks)	xfs_ag_best_blocks(bl,blks)
-#else
-/*--#define XFS_AG_BEST_BLOCKS(bl) ((xfs_extlen_t)(XFS_AG_BEST_BYTES >> bl))*/
-/*
- * Best is XFS_AG_BEST_BLOCKS at and below 64 Gigabyte filesystems, and
- * XFS_AG_MAX_BLOCKS above 64 Gigabytes.
- */
-#define XFS_AG_BEST_BLOCKS(bl,blks)	\
-	((xfs_extlen_t)((1LL << (36 - bl)) >= blks) ? \
-		((xfs_extlen_t)(XFS_AG_BEST_BYTES >> bl)) : \
-		XFS_AG_MAX_BLOCKS(bl))
-#endif
-#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_AG_MAX_BLOCKS)
-xfs_extlen_t xfs_ag_max_blocks(int bl);
-#define	XFS_AG_MAX_BLOCKS(bl)		xfs_ag_max_blocks(bl)
-#else
-#define	XFS_AG_MAX_BLOCKS(bl)	((xfs_extlen_t)(XFS_AG_MAX_BYTES >> bl))
-#endif
-
-#define	XFS_MAX_AGNUMBER	((xfs_agnumber_t)(NULLAGNUMBER - 1))
-
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_AG_MAXLEVELS)
 int xfs_ag_maxlevels(struct xfs_mount *mp);
 #define	XFS_AG_MAXLEVELS(mp)		xfs_ag_maxlevels(mp)

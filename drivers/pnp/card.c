@@ -26,8 +26,25 @@ static const struct pnp_card_device_id * match_card(struct pnp_card_driver * drv
 {
 	const struct pnp_card_device_id * drv_id = drv->id_table;
 	while (*drv_id->id){
-		if (compare_pnp_id(card->id,drv_id->id))
-			return drv_id;
+		if (compare_pnp_id(card->id,drv_id->id)) {
+			int i = 0;
+			for (;;) {
+				int found;
+				struct pnp_dev *dev;
+				if (i == PNP_MAX_DEVICES || ! *drv_id->devs[i].id)
+					return drv_id;
+				found = 0;
+				card_for_each_dev(card, dev) {
+					if (compare_pnp_id(dev->id, drv_id->devs[i].id)) {
+						found = 1;
+						break;
+					}
+				}
+				if (! found)
+					break;
+				i++;
+			}
+		}
 		drv_id++;
 	}
 	return NULL;
@@ -122,6 +139,39 @@ static void pnp_release_card(struct device *dmdev)
 	kfree(card);
 }
 
+
+static ssize_t pnp_show_card_name(struct device *dmdev, char *buf)
+{
+	char *str = buf;
+	struct pnp_card *card = to_pnp_card(dmdev);
+	str += sprintf(str,"%s\n", card->name);
+	return (str - buf);
+}
+
+static DEVICE_ATTR(name,S_IRUGO,pnp_show_card_name,NULL);
+
+static ssize_t pnp_show_card_ids(struct device *dmdev, char *buf)
+{
+	char *str = buf;
+	struct pnp_card *card = to_pnp_card(dmdev);
+	struct pnp_id * pos = card->id;
+
+	while (pos) {
+		str += sprintf(str,"%s\n", pos->id);
+		pos = pos->next;
+	}
+	return (str - buf);
+}
+
+static DEVICE_ATTR(card_id,S_IRUGO,pnp_show_card_ids,NULL);
+
+static int pnp_interface_attach_card(struct pnp_card *card)
+{
+	device_create_file(&card->dev,&dev_attr_name);
+	device_create_file(&card->dev,&dev_attr_card_id);
+	return 0;
+}
+
 /**
  * pnp_add_card - adds a PnP card to the PnP Layer
  * @card: pointer to the card to add
@@ -141,6 +191,7 @@ int pnp_add_card(struct pnp_card * card)
 	error = device_register(&card->dev);
 
 	if (error == 0) {
+		pnp_interface_attach_card(card);
 		spin_lock(&pnp_lock);
 		list_add_tail(&card->global_list, &pnp_cards);
 		list_add_tail(&card->protocol_list, &card->protocol->cards);

@@ -232,7 +232,7 @@ phase2:
 
 	if (nimaps) {
 		*niomaps = xfs_imap_to_bmap(io, offset, &imap,
-					iomapp, nimaps, *niomaps, iomap_flags);
+					    iomapp, nimaps, *niomaps, iomap_flags);
 	} else if (niomaps) {
 		*niomaps = 0;
 	}
