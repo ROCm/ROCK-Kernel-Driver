@@ -1167,6 +1167,10 @@ void neigh_table_init(struct neigh_table *tbl)
 						     tbl->entry_size,
 						     0, SLAB_HWCACHE_ALIGN,
 						     NULL, NULL);
+
+	if (!tbl->kmem_cachep)
+		panic("cannot create neighbour cache");
+
 	tbl->lock	       = RW_LOCK_UNLOCKED;
 	init_timer(&tbl->gc_timer);
 	tbl->gc_timer.data     = (unsigned long)tbl;

@@ -225,13 +225,13 @@ sn_pci_free_consistent(struct pci_dev *hwdev, size_t size, void *vaddr, dma_addr
 int
 sn_pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg, int nents, int direction)
 {
-
 	int i;
 	vertex_hdl_t vhdl;
 	unsigned long phys_addr;
 	struct sn_device_sysdata *device_sysdata;
 	pcibr_dmamap_t dma_map;
 	struct scatterlist *saved_sg = sg;
+	unsigned dma_flag;
 
 	/* can't go anywhere w/o a direction in life */
 	if (direction == PCI_DMA_NONE)
@@ -244,33 +244,32 @@ sn_pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg, int nents, int dire
 	vhdl = device_sysdata->vhdl;
 
 	/*
+	 * 64 bit DMA mask can use direct translations
+	 * PCI only
+	 *   32 bit DMA mask might be able to use direct, otherwise use dma map
+	 * PCI-X
+	 *   only 64 bit DMA mask supported; both direct and dma map will fail
+	 */
+	if (hwdev->dma_mask == ~0UL)
+		dma_flag = PCIIO_DMA_DATA | PCIIO_DMA_A64;
+	else
+		dma_flag = PCIIO_DMA_DATA;
+
+	/*
 	 * Setup a DMA address for each entry in the
 	 * scatterlist.
 	 */
 	for (i = 0; i < nents; i++, sg++) {
 		phys_addr = __pa((unsigned long)page_address(sg->page) + sg->offset);
-
-		/*
-		 * Handle 32-63 bit cards via direct mapping
-		 */
-		if (IS_PCI32G(hwdev)) {
-			sg->dma_address = pcibr_dmatrans_addr(vhdl, NULL, phys_addr,
-						       sg->length, PCIIO_DMA_DATA);
+		sg->dma_address = pcibr_dmatrans_addr(vhdl, NULL, phys_addr,
+					       sg->length, dma_flag);
+		if (sg->dma_address) {
 			sg->dma_length = sg->length;
-			/*
-			 * See if we got a direct map entry
-			 */
-			if (sg->dma_address) {
-				continue;
-			}
-
+			continue;
 		}
 
-		/*
-		 * It is a 32 bit card and we cannot do direct mapping,
-		 * so we use an ATE.
-		 */
-		dma_map = pcibr_dmamap_alloc(vhdl, NULL, sg->length, PCIIO_DMA_DATA);
+		dma_map = pcibr_dmamap_alloc(vhdl, NULL, sg->length,
+			PCIIO_DMA_DATA|MINIMAL_ATE_FLAG(phys_addr, sg->length));
 		if (!dma_map) {
 			printk(KERN_ERR "sn_pci_map_sg: Unable to allocate "
 			       "anymore 32 bit page map entries.\n");
@@ -356,13 +355,10 @@ sn_pci_map_single(struct pci_dev *hwdev, void *ptr, size_t size, int direction)
 	unsigned long phys_addr;
 	struct sn_device_sysdata *device_sysdata;
 	pcibr_dmamap_t dma_map = NULL;
+	unsigned dma_flag;
 
 	if (direction == PCI_DMA_NONE)
 		BUG();
-
-	/* SN cannot support DMA addresses smaller than 32 bits. */
-	if (IS_PCI32L(hwdev))
-		return 0;
 
 	/*
 	 * find vertex for the device
@@ -370,24 +366,22 @@ sn_pci_map_single(struct pci_dev *hwdev, void *ptr, size_t size, int direction)
 	device_sysdata = SN_DEVICE_SYSDATA(hwdev);
 	vhdl = device_sysdata->vhdl;
 
-	/*
-	 * Call our dmamap interface
-	 */
-	dma_addr = 0;
 	phys_addr = __pa(ptr);
-
 	/*
-	 * Devices that support 32 bit to 63 bit DMA addresses get
-	 * 32 bit DMA addresses.
-	 *
-	 * First try to get a 32 bit direct map register.
+	 * 64 bit DMA mask can use direct translations
+	 * PCI only
+	 *   32 bit DMA mask might be able to use direct, otherwise use dma map
+	 * PCI-X
+	 *   only 64 bit DMA mask supported; both direct and dma map will fail
 	 */
-	if (IS_PCI32G(hwdev)) {
-		dma_addr = pcibr_dmatrans_addr(vhdl, NULL, phys_addr, size,
-					       PCIIO_DMA_DATA);
-		if (dma_addr)
-			return dma_addr;
-	}
+	if (hwdev->dma_mask == ~0UL)
+		dma_flag = PCIIO_DMA_DATA | PCIIO_DMA_A64;
+	else
+		dma_flag = PCIIO_DMA_DATA;
+
+	dma_addr = pcibr_dmatrans_addr(vhdl, NULL, phys_addr, size, dma_flag);
+	if (dma_addr)
+		return dma_addr;
 
 	/*
 	 * It's a 32 bit card and we cannot do direct mapping so

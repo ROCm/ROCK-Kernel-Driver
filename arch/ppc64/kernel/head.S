@@ -2177,4 +2177,4 @@ stab_array:
  */
 	.globl	cmd_line
 cmd_line:
-	.space	512
+	.space	512	/* COMMAND_LINE_SIZE */

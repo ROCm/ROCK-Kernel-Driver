@@ -70,11 +70,30 @@ static spinlock_t die_lock = SPIN_LOCK_UNLOCKED;
 void die(const char *str, struct pt_regs *regs, long err)
 {
 	static int die_counter;
+	int nl = 0;
 
 	console_verbose();
 	spin_lock_irq(&die_lock);
 	bust_spinlocks(1);
 	printk("Oops: %s, sig: %ld [#%d]\n", str, err, ++die_counter);
+#ifdef CONFIG_PREEMPT
+	printk("PREEMPT ");
+	nl = 1;
+#endif
+#ifdef CONFIG_SMP
+	printk("SMP NR_CPUS=%d ", NR_CPUS);
+	nl = 1;
+#endif
+#ifdef CONFIG_DEBUG_PAGEALLOC
+	printk("DEBUG_PAGEALLOC ");
+	nl = 1;
+#endif
+#ifdef CONFIG_NUMA
+	printk("NUMA ");
+	nl = 1;
+#endif
+	if (nl)
+		printk("\n");
 	show_regs(regs);
 	bust_spinlocks(0);
 	spin_unlock_irq(&die_lock);
@@ -97,7 +116,7 @@ _exception(int signr, siginfo_t *info, struct pt_regs *regs)
 	if (!user_mode(regs)) {
 		if (debugger(regs))
 			return;
-		die("Exception in kernel mode\n", regs, signr);
+		die("Exception in kernel mode", regs, signr);
 	}
 
 	force_sig_info(signr, info, current);

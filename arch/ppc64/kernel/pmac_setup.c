@@ -73,7 +73,6 @@
 
 #include "pmac.h"
 
-extern char saved_command_line[];
 static int current_root_goodness = -1;
 #define DEFAULT_ROOT_DEVICE Root_SDA1	/* sda1 - slightly silly choice */
 

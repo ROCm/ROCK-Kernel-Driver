@@ -30,6 +30,7 @@
 #include <linux/types.h>
 #include <linux/pci.h>
 #include <linux/proc_fs.h>
+#include <linux/stringify.h>
 #include <linux/delay.h>
 #include <asm/prom.h>
 #include <asm/rtas.h>
@@ -51,6 +52,7 @@
 #include <asm/ppcdebug.h>
 #include <asm/btext.h>
 #include <asm/sections.h>
+#include <asm/machdep.h>
 #include "open_pic.h"
 
 #ifdef CONFIG_LOGO_LINUX_CLUT224
@@ -184,7 +186,6 @@ extern void enter_prom(void *dummy,...);
 extern void copy_and_flush(unsigned long dest, unsigned long src,
 			   unsigned long size, unsigned long offset);
 
-extern char cmd_line[512];	/* XXX */
 unsigned long dev_tree_size;
 unsigned long _get_PIR(void);
 
@@ -699,9 +700,6 @@ prom_dump_lmb(void)
         prom_print(RELOC("    memory.size                 = 0x"));
         prom_print_hex(_lmb->memory.size);
 	prom_print_nl();
-        prom_print(RELOC("    memory.lcd_size             = 0x"));
-        prom_print_hex(_lmb->memory.lcd_size);
-	prom_print_nl();
         for (i=0; i < _lmb->memory.cnt ;i++) {
                 prom_print(RELOC("    memory.region[0x"));
 		prom_print_hex(i);
@@ -714,9 +712,6 @@ prom_dump_lmb(void)
                 prom_print(RELOC("                      .size     = 0x"));
                 prom_print_hex(_lmb->memory.region[i].size);
 		prom_print_nl();
-                prom_print(RELOC("                      .type     = 0x"));
-                prom_print_hex(_lmb->memory.region[i].type);
-		prom_print_nl();
         }
 
 	prom_print_nl();
@@ -725,9 +720,6 @@ prom_dump_lmb(void)
 	prom_print_nl();
         prom_print(RELOC("    reserved.size                 = 0x"));
         prom_print_hex(_lmb->reserved.size);
-	prom_print_nl();
-        prom_print(RELOC("    reserved.lcd_size             = 0x"));
-        prom_print_hex(_lmb->reserved.lcd_size);
 	prom_print_nl();
         for (i=0; i < _lmb->reserved.cnt ;i++) {
                 prom_print(RELOC("    reserved.region[0x"));
@@ -740,9 +732,6 @@ prom_dump_lmb(void)
 		prom_print_nl();
                 prom_print(RELOC("                      .size     = 0x"));
                 prom_print_hex(_lmb->reserved.region[i].size);
-		prom_print_nl();
-                prom_print(RELOC("                      .type     = 0x"));
-                prom_print_hex(_lmb->reserved.region[i].type);
 		prom_print_nl();
         }
 }
@@ -941,10 +930,12 @@ prom_hold_cpus(unsigned long mem)
         unsigned long *spinloop     = __v2a(&__secondary_hold_spinloop);
         unsigned long *acknowledge  = __v2a(&__secondary_hold_acknowledge);
         unsigned long secondary_hold = (unsigned long)__v2a(*PTRRELOC((unsigned long *)__secondary_hold));
-        struct naca_struct *_naca = RELOC(naca);
         struct systemcfg *_systemcfg = RELOC(systemcfg);
 	struct paca_struct *_xPaca = PTRRELOC(&paca[0]);
 	struct prom_t *_prom = PTRRELOC(&prom);
+#ifdef CONFIG_SMP
+	struct naca_struct *_naca = RELOC(naca);
+#endif
 
 	/* On pmac, we just fill out the various global bitmasks and
 	 * arrays indicating our CPUs are here, they are actually started
@@ -1085,6 +1076,10 @@ prom_hold_cpus(unsigned long mem)
 
 			if (*acknowledge == cpuid) {
 				prom_print(RELOC("ok\n"));
+				/* We have to get every CPU out of OF,
+				 * even if we never start it. */
+				if (cpuid >= NR_CPUS)
+					goto next;
 #ifdef CONFIG_SMP
 				/* Set the number of active processors. */
 				_systemcfg->processorCount++;
@@ -1110,10 +1105,14 @@ prom_hold_cpus(unsigned long mem)
 			cpu_set(cpuid, RELOC(cpu_online_map));
 			cpu_set(cpuid, RELOC(cpu_present_at_boot));
 		}
-
+#endif
+next:
+#ifdef CONFIG_SMP
 		/* Init paca for secondary threads.   They start later. */
 		for (i=1; i < cpu_threads; i++) {
 			cpuid++;
+			if (cpuid >= NR_CPUS)
+				continue;
 			_xPaca[cpuid].xHwProcNum = interrupt_server[i];
 			prom_print_hex(interrupt_server[i]);
 			prom_print(RELOC(" : preparing thread ... "));
@@ -1158,7 +1157,11 @@ prom_hold_cpus(unsigned long mem)
 		prom_print(RELOC("Processor is not HMT capable\n"));
 	}
 #endif
-	
+
+	if (cpuid >= NR_CPUS)
+		prom_print(RELOC("WARNING: maximum CPUs (" __stringify(NR_CPUS)
+				 ") exceeded: ignoring extras\n"));
+
 #ifdef DEBUG_PROM
 	prom_print(RELOC("prom_hold_cpus: end...\n"));
 #endif
@@ -1203,9 +1206,9 @@ smt_setup(void)
 				sizeof(option));
 			if (option[0] != 0) {
 				found = 1;
-				if (!strcmp(option, "off"))	
+				if (!strcmp(option, RELOC("off")))
 					my_smt_enabled = SMT_OFF;
-				else if (!strcmp(option, "on"))	
+				else if (!strcmp(option, RELOC("on")))
 					my_smt_enabled = SMT_ON;
 				else
 					my_smt_enabled = SMT_DYNAMIC;
@@ -1509,10 +1512,8 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 		call_prom(RELOC("getprop"), 4, 1, _prom->chosen, 
 			  RELOC("bootargs"), p, sizeof(cmd_line));
 		if (p != NULL && p[0] != 0)
-			strncpy(RELOC(cmd_line), p, sizeof(cmd_line));
+			strlcpy(RELOC(cmd_line), p, sizeof(cmd_line));
 	}
-	RELOC(cmd_line[sizeof(cmd_line) - 1]) = 0;
-
 
 	mem = prom_initialize_lmb(mem);
 
@@ -2988,8 +2989,10 @@ static int of_finish_dynamic_node(struct device_node *node)
 	/* now do the work of finish_node_interrupts */
 
 	ints = (unsigned int *) get_property(node, "interrupts", &intlen);
-	if (!ints)
+	if (!ints) {
+		err = -ENODEV;
 		goto out;
+	}
 
 	intrcells = prom_n_intr_cells(node);
 	intlen /= intrcells * sizeof(unsigned int);

@@ -100,6 +100,8 @@ static int __init parse_numa_properties(void)
 		if (numa_domain >= MAX_NUMNODES)
 			BUG();
 
+		node_set_online(numa_domain);
+
 		if (max_domain < numa_domain)
 			max_domain = numa_domain;
 
@@ -201,12 +203,14 @@ err:
 	return -1;
 }
 
-void setup_nonnuma(void)
+static void __init setup_nonnuma(void)
 {
 	unsigned long i;
 
 	for (i = 0; i < NR_CPUS; i++)
 		map_cpu_to_node(i, 0);
+
+	node_set_online(0);
 
 	node_data[0].node_start_pfn = 0;
 	node_data[0].node_spanned_pages = lmb_end_of_DRAM() / PAGE_SIZE;
@@ -257,10 +261,6 @@ void __init do_init_bootmem(void)
 
 		for (i = 0; i < lmb.memory.cnt; i++) {
 			unsigned long physbase, size;
-			unsigned long type = lmb.memory.region[i].type;
-
-			if (type != LMB_MEMORY_AREA)
-				continue;
 
 			physbase = lmb.memory.region[i].physbase;
 			size = lmb.memory.region[i].size;

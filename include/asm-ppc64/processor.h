@@ -475,7 +475,8 @@ static inline void set_tb(unsigned int upper, unsigned int lower)
 	mttbl(lower);
 }
 
-extern unsigned long *_get_SP(void);
+#define __get_SP()	({unsigned long sp; \
+			asm volatile("mr %0,1": "=r" (sp)); sp;})
 
 extern int have_of;
 

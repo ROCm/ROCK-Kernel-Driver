@@ -20,7 +20,7 @@
 #	CROSS32_COMPILE is setup as a prefix just like CROSS_COMPILE
 #	in the toplevel makefile.
 
-CROSS32_COMPILE =
+CROSS32_COMPILE ?=
 #CROSS32_COMPILE = /usr/local/ppc/bin/powerpc-linux-
 
 BOOTCC		:= $(CROSS32_COMPILE)gcc

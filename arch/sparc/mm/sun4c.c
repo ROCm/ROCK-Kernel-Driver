@@ -836,7 +836,7 @@ static void sun4c_demap_context(struct sun4c_mmu_ring *crp, unsigned char ctx)
 	struct sun4c_mmu_entry *head = &crp->ringhd;
 	unsigned long flags;
 
-	save_and_cli(flags);
+	local_irq_save(flags);
 	if (head->next != head) {
 		struct sun4c_mmu_entry *entry = head->next;
 		int savectx = sun4c_get_context();
@@ -854,7 +854,7 @@ static void sun4c_demap_context(struct sun4c_mmu_ring *crp, unsigned char ctx)
 		} while (entry != head);
 		sun4c_set_context(savectx);
 	}
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static int sun4c_user_taken_entries;  /* This is how much we have.             */
@@ -978,14 +978,14 @@ static void get_locked_segment(unsigned long addr)
 	struct sun4c_mmu_entry *stolen;
 	unsigned long flags;
 
-	save_and_cli(flags);
+	local_irq_save(flags);
 	addr &= SUN4C_REAL_PGDIR_MASK;
 	stolen = sun4c_user_strategy();
 	max_user_taken_entries--;
 	stolen->vaddr = addr;
 	flush_user_windows();
 	sun4c_kernel_map(stolen);
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static void free_locked_segment(unsigned long addr)
@@ -994,7 +994,7 @@ static void free_locked_segment(unsigned long addr)
 	unsigned long flags;
 	unsigned char pseg;
 
-	save_and_cli(flags);
+	local_irq_save(flags);
 	addr &= SUN4C_REAL_PGDIR_MASK;
 	pseg = sun4c_get_segmap(addr);
 	entry = &mmu_entry_pool[pseg];
@@ -1004,7 +1004,7 @@ static void free_locked_segment(unsigned long addr)
 	sun4c_kernel_unmap(entry);
 	add_ring(&sun4c_ufree_ring, entry);
 	max_user_taken_entries++;
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static inline void garbage_collect(int entry)
@@ -1123,7 +1123,7 @@ static char *sun4c_lockarea(char *vaddr, unsigned long size)
 		  size + (PAGE_SIZE-1)) >> PAGE_SHIFT;
 
 	scan = 0;
-	save_and_cli(flags);
+	local_irq_save(flags);
 	for (;;) {
 		scan = find_next_zero_bit(sun4c_iobuffer_map,
 					  iobuffer_map_size, scan);
@@ -1157,12 +1157,12 @@ found:
 		sun4c_put_pte(apage, pte);
 		vpage += PAGE_SIZE;
 	}
-	restore_flags(flags);
+	local_irq_restore(flags);
 	return (char *) ((base << PAGE_SHIFT) + sun4c_iobuffer_start +
 			 (((unsigned long) vaddr) & ~PAGE_MASK));
 
 abend:
-	restore_flags(flags);
+	local_irq_restore(flags);
 	printk("DMA vaddr=0x%p size=%08lx\n", vaddr, size);
 	panic("Out of iobuffer table");
 	return 0;
@@ -1178,7 +1178,7 @@ static void sun4c_unlockarea(char *vaddr, unsigned long size)
 	npages = (((unsigned long)vaddr & ~PAGE_MASK) +
 		  size + (PAGE_SIZE-1)) >> PAGE_SHIFT;
 
-	save_and_cli(flags);
+	local_irq_save(flags);
 	while (npages != 0) {
 		--npages;
 
@@ -1200,7 +1200,7 @@ static void sun4c_unlockarea(char *vaddr, unsigned long size)
 		sun4c_iobuffer_high -= SUN4C_REAL_PGDIR_SIZE;
 		free_locked_segment(sun4c_iobuffer_high);
 	}
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 /* Note the scsi code at init time passes to here buffers
@@ -1349,7 +1349,7 @@ static void sun4c_flush_cache_mm(struct mm_struct *mm)
 			struct sun4c_mmu_entry *head = &sun4c_context_ring[new_ctx].ringhd;
 			unsigned long flags;
 
-			save_and_cli(flags);
+			local_irq_save(flags);
 			if (head->next != head) {
 				struct sun4c_mmu_entry *entry = head->next;
 				int savectx = sun4c_get_context();
@@ -1366,7 +1366,7 @@ static void sun4c_flush_cache_mm(struct mm_struct *mm)
 				} while (entry != head);
 				sun4c_set_context(savectx);
 			}
-			restore_flags(flags);
+			local_irq_restore(flags);
 		}
 	}
 }
@@ -1383,7 +1383,7 @@ static void sun4c_flush_cache_range(struct vm_area_struct *vma, unsigned long st
 
 		flush_user_windows();
 
-		save_and_cli(flags);
+		local_irq_save(flags);
 		/* All user segmap chains are ordered on entry->vaddr. */
 		for (entry = head->next;
 		     (entry != head) && ((entry->vaddr+SUN4C_REAL_PGDIR_SIZE) < start);
@@ -1427,7 +1427,7 @@ static void sun4c_flush_cache_range(struct vm_area_struct *vma, unsigned long st
 			} while ((entry != head) && (entry->vaddr < end));
 			sun4c_set_context(octx);
 		}
-		restore_flags(flags);
+		local_irq_restore(flags);
 	}
 }
 
@@ -1444,11 +1444,11 @@ static void sun4c_flush_cache_page(struct vm_area_struct *vma, unsigned long pag
 		unsigned long flags;
 
 		flush_user_windows();
-		save_and_cli(flags);
+		local_irq_save(flags);
 		sun4c_set_context(new_ctx);
 		sun4c_flush_page(page);
 		sun4c_set_context(octx);
-		restore_flags(flags);
+		local_irq_restore(flags);
 	}
 }
 
@@ -1456,9 +1456,9 @@ static void sun4c_flush_page_to_ram(unsigned long page)
 {
 	unsigned long flags;
 
-	save_and_cli(flags);
+	local_irq_save(flags);
 	sun4c_flush_page(page);
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 /* Sun4c cache is unified, both instructions and data live there, so
@@ -1479,7 +1479,7 @@ static void sun4c_flush_tlb_all(void)
 	unsigned long flags;
 	int savectx, ctx;
 
-	save_and_cli(flags);
+	local_irq_save(flags);
 	this_entry = sun4c_kernel_ring.ringhd.next;
 	savectx = sun4c_get_context();
 	flush_user_windows();
@@ -1494,7 +1494,7 @@ static void sun4c_flush_tlb_all(void)
 		this_entry = next_entry;
 	}
 	sun4c_set_context(savectx);
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static void sun4c_flush_tlb_mm(struct mm_struct *mm)
@@ -1505,7 +1505,7 @@ static void sun4c_flush_tlb_mm(struct mm_struct *mm)
 		struct sun4c_mmu_entry *head = &sun4c_context_ring[new_ctx].ringhd;
 		unsigned long flags;
 
-		save_and_cli(flags);
+		local_irq_save(flags);
 		if (head->next != head) {
 			struct sun4c_mmu_entry *entry = head->next;
 			int savectx = sun4c_get_context();
@@ -1522,7 +1522,7 @@ static void sun4c_flush_tlb_mm(struct mm_struct *mm)
 			} while (entry != head);
 			sun4c_set_context(savectx);
 		}
-		restore_flags(flags);
+		local_irq_restore(flags);
 	}
 }
 
@@ -1536,7 +1536,7 @@ static void sun4c_flush_tlb_range(struct vm_area_struct *vma, unsigned long star
 		struct sun4c_mmu_entry *entry;
 		unsigned long flags;
 
-		save_and_cli(flags);
+		local_irq_save(flags);
 		/* See commentary in sun4c_flush_cache_range(). */
 		for (entry = head->next;
 		     (entry != head) && ((entry->vaddr+SUN4C_REAL_PGDIR_SIZE) < start);
@@ -1558,7 +1558,7 @@ static void sun4c_flush_tlb_range(struct vm_area_struct *vma, unsigned long star
 			} while ((entry != head) && (entry->vaddr < end));
 			sun4c_set_context(octx);
 		}
-		restore_flags(flags);
+		local_irq_restore(flags);
 	}
 }
 
@@ -1571,13 +1571,13 @@ static void sun4c_flush_tlb_page(struct vm_area_struct *vma, unsigned long page)
 		int savectx = sun4c_get_context();
 		unsigned long flags;
 
-		save_and_cli(flags);
+		local_irq_save(flags);
 		sun4c_set_context(new_ctx);
 		page &= PAGE_MASK;
 		sun4c_flush_page(page);
 		sun4c_put_pte(page, 0);
 		sun4c_set_context(savectx);
-		restore_flags(flags);
+		local_irq_restore(flags);
 	}
 }
 
@@ -1974,7 +1974,7 @@ void sun4c_update_mmu_cache(struct vm_area_struct *vma, unsigned long address, p
 	unsigned long flags;
 	int pseg;
 
-	save_and_cli(flags);
+	local_irq_save(flags);
 	address &= PAGE_MASK;
 	if ((pseg = sun4c_get_segmap(address)) == invalid_segment) {
 		struct sun4c_mmu_entry *entry = sun4c_user_strategy();
@@ -2010,7 +2010,7 @@ void sun4c_update_mmu_cache(struct vm_area_struct *vma, unsigned long address, p
 #ifndef SUN4C_PRELOAD_PSEG
 		sun4c_put_pte(address, pte_val(pte));
 #endif
-		restore_flags(flags);
+		local_irq_restore(flags);
 		return;
 	} else {
 		struct sun4c_mmu_entry *entry = &mmu_entry_pool[pseg];
@@ -2020,7 +2020,7 @@ void sun4c_update_mmu_cache(struct vm_area_struct *vma, unsigned long address, p
 	}
 
 	sun4c_put_pte(address, pte_val(pte));
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 extern void sparc_context_init(int);

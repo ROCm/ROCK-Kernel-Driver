@@ -940,8 +940,8 @@ static void pcic_load_profile_irq(int cpu, unsigned int limit)
 	printk("PCIC: unimplemented code: FILE=%s LINE=%d", __FILE__, __LINE__);
 }
 
-/* We assume the caller is local cli()'d when these are called, or else
- * very bizarre behavior will result.
+/* We assume the caller has disabled local interrupts when these are called,
+ * or else very bizarre behavior will result.
  */
 static void pcic_disable_pil_irq(unsigned int pil)
 {

@@ -1006,8 +1006,8 @@ asmlinkage int sunos_shmsys(int op, unsigned long arg1, unsigned long arg2,
 
 	switch(op) {
 	case 0:
-		/* sys_shmat(): attach a shared memory area */
-		rval = sys_shmat((int)arg1,(char *)arg2,(int)arg3,&raddr);
+		/* do_shmat(): attach a shared memory area */
+		rval = do_shmat((int)arg1,(char *)arg2,(int)arg3,&raddr);
 		if(!rval)
 			rval = (int) raddr;
 		break;

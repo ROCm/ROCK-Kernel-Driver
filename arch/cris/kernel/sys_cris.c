@@ -155,7 +155,7 @@ asmlinkage int sys_ipc (uint call, int first, int second,
 
 	case SHMAT: {
                 ulong raddr;
-                ret = sys_shmat (first, (char __user *) ptr, second, &raddr);
+                ret = do_shmat (first, (char __user *) ptr, second, &raddr);
                 if (ret)
                         return ret;
                 return put_user (raddr, (ulong __user *) third);

@@ -37,6 +37,7 @@
 #include <asm/irq.h>
 #include <asm/io.h>
 #include <asm/sbus.h>
+#include <asm/cacheflush.h>
 
 static unsigned long dummy;
 
@@ -116,12 +117,12 @@ static void sun4m_disable_irq(unsigned int irq_nr)
 	int cpu = smp_processor_id();
 
 	mask = sun4m_get_irqmask(irq_nr);
-	save_and_cli(flags);
+	local_irq_save(flags);
 	if (irq_nr > 15)
 		sun4m_interrupts->set = mask;
 	else
 		sun4m_interrupts->cpu_intregs[cpu].set = mask;
-	restore_flags(flags);    
+	local_irq_restore(flags);    
 }
 
 static void sun4m_enable_irq(unsigned int irq_nr)
@@ -135,16 +136,16 @@ static void sun4m_enable_irq(unsigned int irq_nr)
          */
         if (irq_nr != 0x0b) {
 		mask = sun4m_get_irqmask(irq_nr);
-		save_and_cli(flags);
+		local_irq_save(flags);
 		if (irq_nr > 15)
 			sun4m_interrupts->clear = mask;
 		else
 			sun4m_interrupts->cpu_intregs[cpu].clear = mask;
-		restore_flags(flags);    
+		local_irq_restore(flags);    
 	} else {
-		save_and_cli(flags);
+		local_irq_save(flags);
 		sun4m_interrupts->clear = SUN4M_INT_FLOPPY;
-		restore_flags(flags);
+		local_irq_restore(flags);
 	}
 }
 
@@ -167,8 +168,8 @@ static unsigned long cpu_pil_to_imask[16] = {
 /*15*/	0x00000000
 };
 
-/* We assume the caller is local cli()'d when these are called, or else
- * very bizarre behavior will result.
+/* We assume the caller has disabled local interrupts when these are called,
+ * or else very bizarre behavior will result.
  */
 static void sun4m_disable_pil_irq(unsigned int pil)
 {

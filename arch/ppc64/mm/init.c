@@ -98,10 +98,12 @@ DEFINE_PER_CPU(struct mmu_gather, mmu_gathers);
 DEFINE_PER_CPU(struct pte_freelist_batch *, pte_freelist_cur);
 unsigned long pte_freelist_forced_free;
 
+#ifdef CONFIG_SMP
 static void pte_free_smp_sync(void *arg)
 {
 	/* Do nothing, just ensure we sync with all CPUs */
 }
+#endif
 
 /* This is only called when we are critically out of memory
  * (and fail to get a page in pte_free_tlb).
@@ -699,10 +701,6 @@ void __init do_init_bootmem(void)
 	/* add all physical memory to the bootmem map */
 	for (i=0; i < lmb.memory.cnt; i++) {
 		unsigned long physbase, size;
-		unsigned long type = lmb.memory.region[i].type;
-
-		if ( type != LMB_MEMORY_AREA )
-			continue;
 
 		physbase = lmb.memory.region[i].physbase;
 		size = lmb.memory.region[i].size;
@@ -743,11 +741,7 @@ static int __init setup_kcore(void)
 
 	for (i=0; i < lmb.memory.cnt; i++) {
 		unsigned long physbase, size;
-		unsigned long type = lmb.memory.region[i].type;
 		struct kcore_list *kcore_mem;
-
-		if (type != LMB_MEMORY_AREA)
-			continue;
 
 		physbase = lmb.memory.region[i].physbase;
 		size = lmb.memory.region[i].size;

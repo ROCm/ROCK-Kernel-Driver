@@ -176,11 +176,9 @@ Commands:\n\
   x	exit monitor\n\
   u	dump segment table or SLB\n\
   ?	help\n"
-#ifndef CONFIG_PPC_ISERIES
   "\
   zr	reboot\n\
   zh	halt\n"
-#endif
 ;
 
 static int xmon_trace[NR_CPUS];
@@ -577,10 +575,8 @@ cmds(struct pt_regs *excp)
 			cpu_cmd();
 			break;
 #endif /* CONFIG_SMP */
-#ifndef CONFIG_PPC_ISERIES
 		case 'z':
 			bootcmds();
-#endif
 		case 'T':
 			debug_trace();
 			break;
@@ -1148,7 +1144,6 @@ super_regs()
 	int cmd;
 	unsigned long val;
 #ifdef CONFIG_PPC_ISERIES
-	int i;
 	struct paca_struct *ptrPaca = NULL;
 	struct ItLpPaca *ptrLpPaca = NULL;
 	struct ItLpRegSave *ptrLpRegSave = NULL;

@@ -27,14 +27,15 @@ LDFLAGS_vmlinux	:= -Bstatic -e $(KERNELLOAD) -Ttext $(KERNELLOAD)
 CFLAGS		+= -msoft-float -pipe -Wno-uninitialized -mminimal-toc \
 		   -mtraceback=none
 
-HAS_POWER4	:= $(shell if $(CC) -mcpu=power4 -S -o /dev/null -xc /dev/null > /dev/null 2>&1; then echo y; else echo n; fi;)
-ifeq ($(HAS_POWER4),y)
 ifeq ($(CONFIG_POWER4_ONLY),y)
-CFLAGS		+= -mcpu=power4
+	CFLAGS += $(call check_gcc,-mcpu=power4,)
 else
-CFLAGS		+= -mtune=power4
+	CFLAGS += $(call check_gcc,-mtune=power4,)
 endif
-endif
+
+# Enable unit-at-a-time mode when possible. It shrinks the
+# kernel considerably.
+CFLAGS += $(call check_gcc,-funit-at-a-time,)
 
 head-y := arch/ppc64/kernel/head.o
 
@@ -69,5 +70,12 @@ arch/ppc64/kernel/asm-offsets.s: include/asm include/linux/version.h \
 
 include/asm-ppc64/offsets.h: arch/ppc64/kernel/asm-offsets.s
 	$(call filechk,gen-asm-offsets)
+
+define archhelp
+  echo  '* zImage	- Compressed kernel image (arch/$(ARCH)/boot/zImage)'
+  echo  '  zImage.initrd- Compressed kernel image with initrd attached,
+  echo  '		   sourced from arch/$(ARCH)/boot/ramdisk.image.gz'
+  echo  '		   (arch/$(ARCH)/boot/zImage.initrd)'
+endef
 
 CLEAN_FILES += include/asm-ppc64/offsets.h

@@ -14,11 +14,13 @@ obj-y               :=	setup.o entry.o traps.o irq.o idle.o \
 
 obj-$(CONFIG_PPC_OF) +=	of_device.o
 
-obj-$(CONFIG_PCI)	+= pci.o pci_dn.o pci_dma.o pci_dma_direct.o
+obj-$(CONFIG_PCI)	+= pci.o pci_dn.o pci_dma.o
 
 ifdef CONFIG_PPC_ISERIES
 obj-$(CONFIG_PCI)	+= iSeries_pci.o iSeries_pci_reset.o \
 			     iSeries_IoMmTable.o 
+else
+obj-$(CONFIG_PCI)	+= pci_dma_direct.o
 endif
 
 obj-$(CONFIG_PPC_ISERIES) += iSeries_irq.o \

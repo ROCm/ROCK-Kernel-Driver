@@ -63,12 +63,6 @@
 #include <asm/uaccess.h>
 #include <asm/system.h>
 
-#if 0 /*def MODULE*/
-static int unloadable;     /* XX: Turn to one when all is ok within the
-			      module for allowing unload */
-MODULE_PARM(unloadable, "i");
-#endif
-
 MODULE_AUTHOR("Cast of dozens");
 MODULE_DESCRIPTION("IPv6 protocol stack for Linux");
 MODULE_LICENSE("GPL");
@@ -557,17 +551,6 @@ struct net_proto_family inet6_family_ops = {
 	.owner	= THIS_MODULE,
 };
 
-#ifdef MODULE
-#if 0 /* FIXME --RR */
-int ipv6_unload(void)
-{
-	if (!unloadable) return 1;
-	/* We keep internally 3 raw sockets */
-	return atomic_read(&(__this_module.uc.usecount)) - 3;
-}
-#endif
-#endif
-
 #ifdef CONFIG_SYSCTL
 extern void ipv6_sysctl_register(void);
 extern void ipv6_sysctl_unregister(void);
@@ -788,11 +771,6 @@ static int __init inet6_init(void)
 	err = ndisc_init(&inet6_family_ops);
 	if (err)
 		goto ndisc_fail;
-#ifdef CONFIG_IPV6_TUNNEL
-	err = ip6_tunnel_init();
-	if (err)
-		goto ip6_tunnel_fail;
-#endif
 	err = igmp6_init(&inet6_family_ops);
 	if (err)
 		goto igmp_fail;
@@ -846,10 +824,6 @@ proc_raw6_fail:
 	igmp6_cleanup();
 #endif
 igmp_fail:
-#ifdef CONFIG_IPV6_TUNNEL
-	ip6_tunnel_cleanup();
-ip6_tunnel_fail:
-#endif
 	ndisc_cleanup();
 ndisc_fail:
 	icmpv6_cleanup();
@@ -882,9 +856,6 @@ static void __exit inet6_exit(void)
 	ip6_route_cleanup();
 	ipv6_packet_cleanup();
 	igmp6_cleanup();
-#ifdef CONFIG_IPV6_TUNNEL
-	ip6_tunnel_cleanup();
-#endif
 	ndisc_cleanup();
 	icmpv6_cleanup();
 #ifdef CONFIG_SYSCTL

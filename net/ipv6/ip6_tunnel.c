@@ -1100,7 +1100,7 @@ static struct inet6_protocol ip6ip6_protocol = {
  * Return: 0 on success
  **/
 
-int __init ip6_tunnel_init(void)
+static int __init ip6_tunnel_init(void)
 {
 	int  err;
 
@@ -1131,13 +1131,11 @@ fail:
  * ip6_tunnel_cleanup - free resources and unregister protocol
  **/
 
-void ip6_tunnel_cleanup(void)
+static void __exit ip6_tunnel_cleanup(void)
 {
 	unregister_netdev(ip6ip6_fb_tnl_dev);
 	inet6_del_protocol(&ip6ip6_protocol, IPPROTO_IPV6);
 }
 
-#ifdef MODULE
 module_init(ip6_tunnel_init);
 module_exit(ip6_tunnel_cleanup);
-#endif

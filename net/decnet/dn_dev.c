@@ -26,6 +26,7 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/init.h>
 #include <linux/net.h>
 #include <linux/netdevice.h>
@@ -1470,16 +1471,13 @@ static struct rtnetlink_link dnet_rtnetlink_table[RTM_MAX-RTM_BASE+1] =
 
 };
 
-#ifdef MODULE
-static int addr[2];
-
-MODULE_PARM(addr, "2i");
+static int __initdata addr[2];
+static int __initdata num;
+module_param_array(addr, int, num, 0444);
 MODULE_PARM_DESC(addr, "The DECnet address of this machine: area,node");
-#endif
 
 void __init dn_dev_init(void)
 {
-#ifdef MODULE
         if (addr[0] > 63 || addr[0] < 0) {
                 printk(KERN_ERR "DECnet: Area must be between 0 and 63");
                 return;
@@ -1491,7 +1489,6 @@ void __init dn_dev_init(void)
         }
 
         decnet_address = dn_htons((addr[0] << 10) | addr[1]);
-#endif
 
 	dn_dev_devices_on();
 #ifdef CONFIG_DECNET_SIOCGIFCONF
@@ -1531,18 +1528,3 @@ void __exit dn_dev_cleanup(void)
 
 	dn_dev_devices_off();
 }
-
-#ifndef MODULE
-static int __init decnet_setup(char *str)
-{
-        unsigned short area = simple_strtoul(str, &str, 0);
-        unsigned short node = simple_strtoul(*str > 0 ? ++str : str, &str, 0);
-
-        decnet_address = dn_htons(area << 10 | node);
-
-        return 1;
-}
-
-__setup("decnet=", decnet_setup);  
-#endif
-
