@@ -242,7 +242,7 @@ static void smbiod_handle_request(struct smb_sb_info *server)
 /*
  * Do some IO for one server.
  */
-static int smbiod_doio(struct smb_sb_info *server)
+static void smbiod_doio(struct smb_sb_info *server)
 {
 	int result;
 	int maxwork = 7;
