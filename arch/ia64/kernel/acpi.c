@@ -437,8 +437,9 @@ acpi_numa_arch_fixup (void)
 {
 	int i, j, node_from, node_to;
 
-	/* If there's no SRAT, fix the phys_id */
+	/* If there's no SRAT, fix the phys_id and mark node 0 online */
 	if (srat_num_cpus == 0) {
+		node_set_online(0);
 		node_cpuid[0].phys_id = hard_smp_processor_id();
 		return;
 	}
