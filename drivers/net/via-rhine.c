@@ -523,24 +523,25 @@ static int  via_rhine_close(struct net_device *dev);
 static void wait_for_reset(struct net_device *dev, int chip_id, char *name)
 {
 	long ioaddr = dev->base_addr;
-	int i;
 
-	/* VT86C100A may need long delay after reset (dlink) */
-	if (chip_id == VT86C100A)
+	udelay(5);
+
+	if (readw(ioaddr + ChipCmd) & CmdReset) {
+		printk(KERN_INFO "%s: Reset did not complete in 5 us. "
+			"Trying harder.\n", name);
+
+		/* Rhine-II needs to be forced sometimes */
+		if (chip_id == VT6102)
+			writeb(0x40, ioaddr + 0x81);
+
+		/* VT86C100A may need long delay after reset (dlink) */
+		/* Seen on Rhine-II as well (rl) */
 		udelay(100);
+	}
 
-	i = 0;
-	do {
-		udelay(5);
-		i++;
-		if(i > 2000) {
-			printk(KERN_ERR "%s: reset did not complete in 10 ms.\n", name);
-			break;
-		}
-	} while(readw(ioaddr + ChipCmd) & CmdReset);
 	if (debug > 1)
-		printk(KERN_INFO "%s: reset finished after %d microseconds.\n",
-			   name, 5*i);
+		printk(KERN_INFO "%s: Reset %s.\n", name,
+			(readw(ioaddr + ChipCmd) & CmdReset) ? "failed" : "succeeded");
 }
 
 #ifdef USE_MEM
