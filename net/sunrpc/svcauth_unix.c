@@ -209,7 +209,7 @@ static int ip_map_parse(struct cache_detail *cd,
 		auth_domain_put(dom);
 	if (!ipmp)
 		return -ENOMEM;
-
+	cache_flush();
 	return 0;
 }
 

@@ -184,7 +184,7 @@ int expkey_parse(struct cache_detail *cd, char *mesg, int mlen)
 	out_nd:
 		path_release(&nd);
 	}
-
+	cache_flush();
  out:
 	if (dom)
 		auth_domain_put(dom);
@@ -396,7 +396,7 @@ int svc_export_parse(struct cache_detail *cd, char *mesg, int mlen)
 	if (expp)
 		exp_put(expp);
 	err = 0;
-
+	cache_flush();
  out:
 	if (nd.dentry)
 		path_release(&nd);
