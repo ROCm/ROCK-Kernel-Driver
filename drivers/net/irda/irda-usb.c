@@ -1176,7 +1176,7 @@ static inline int irda_usb_open(struct irda_usb_cb *self)
 	memset(self->speed_buff, 0, IRDA_USB_SPEED_MTU);
 
 	/* Create a network device for us */
-	netdev = alloc_netdev(0, "irda%d",  irda_device_setup);
+	netdev = alloc_irdadev(0);
 	if (!netdev) {
 		ERROR("%s(), alloc_net_dev() failed!\n", __FUNCTION__);
 		return -ENOMEM;
