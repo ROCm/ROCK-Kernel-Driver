@@ -39,6 +39,7 @@ struct watchdog_info {
 #define	WDIOF_CARDRESET		0x0020	/* Card previously reset the CPU */
 #define WDIOF_POWEROVER		0x0040	/* Power over voltage */
 #define WDIOF_SETTIMEOUT	0x0080  /* Set timeout (in seconds) */
+#define WDIOF_MAGICCLOSE	0x0100	/* Supports magic close char */
 #define	WDIOF_KEEPALIVEPING	0x8000	/* Keep alive ping reply */
 
 #define	WDIOS_DISABLECARD	0x0001	/* Turn off the watchdog timer */

@@ -45,6 +45,7 @@
 
 static int acq_is_open;
 static spinlock_t acq_lock;
+static int expect_close = 0;
 
 /*
  *	You must set these - there is no sane way to probe for this board.
@@ -218,7 +219,7 @@ static struct miscdevice acq_miscdev=
  
 static struct notifier_block acq_notifier =
 {
-	.self = acq_notify_sys,
+	.notifier_call = acq_notify_sys,
 	.next = NULL,
 	.priority = 0
 };
