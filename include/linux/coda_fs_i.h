@@ -21,6 +21,7 @@ struct coda_inode_info {
         u_short	           c_flags;     /* flags (see below) */
 	struct list_head   c_cilist;    /* list of all coda inodes */
 	unsigned int	   c_mapcount;  /* nr of times this inode is mapped */
+	unsigned int	   c_cached_epoch;
         struct coda_cred   c_cached_cred; /* credentials of cached perms */
         unsigned int       c_cached_perm; /* cached access permissions */
 	struct inode	   vfs_inode;

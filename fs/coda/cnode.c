@@ -64,7 +64,6 @@ struct inode * coda_iget(struct super_block * sb, ViceFid * fid,
 {
 	struct inode *inode;
 	struct coda_inode_info *cii;
-	struct coda_sb_info *sbi = coda_sbp(sb);
 	unsigned long hash = coda_f2i(fid);
 
 	inode = iget5_locked(sb, hash, coda_test_inode, coda_set_inode, fid);
@@ -77,7 +76,6 @@ struct inode * coda_iget(struct super_block * sb, ViceFid * fid,
 		/* we still need to set i_ino for things like stat(2) */
 		inode->i_ino = hash;
 		cii->c_mapcount = 0;
-		list_add(&cii->c_cilist, &sbi->sbi_cihead);
 		unlock_new_inode(inode);
 	}
 

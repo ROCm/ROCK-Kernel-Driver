@@ -819,19 +819,14 @@ int coda_downcall(int opcode, union outputArgs * out, struct super_block *sb)
 	  switch (opcode) {
 
 	  case CODA_FLUSH : {
-		   coda_cache_clear_all(sb, NULL);
+		   coda_cache_clear_all(sb);
 		   shrink_dcache_sb(sb);
 		   coda_flag_inode(sb->s_root->d_inode, C_FLUSH);
 		   return(0);
 	  }
 
 	  case CODA_PURGEUSER : {
-	           struct coda_cred *cred = &out->coda_purgeuser.cred;
-		   if ( !cred ) {
-		           printk("PURGEUSER: null cred!\n");
-			   return 0;
-		   }
-		   coda_cache_clear_all(sb, cred);
+		   coda_cache_clear_all(sb);
 		   return(0);
 	  }
 
