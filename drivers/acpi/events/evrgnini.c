@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: evrgnini- ACPI Address_space (Op_region) init
- *              $Revision: 63 $
+ *              $Revision: 64 $
  *
  *****************************************************************************/
 
@@ -268,6 +268,11 @@ acpi_ev_pci_config_region_setup (
 	if (ACPI_SUCCESS (status)) {
 		pci_id->bus = ACPI_LOWORD (temp);
 	}
+
+	/*
+	 * Complete this device's Pci_id
+	 */
+	acpi_os_derive_pci_id (node, region_obj->region.node, &pci_id);
 
 	*region_context = pci_id;
 	return_ACPI_STATUS (AE_OK);

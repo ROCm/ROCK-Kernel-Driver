@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dsmthdat - control method arguments and local variables
- *              $Revision: 64 $
+ *              $Revision: 66 $
  *
  ******************************************************************************/
 
@@ -28,6 +28,7 @@
 #include "acdispat.h"
 #include "amlcode.h"
 #include "acnamesp.h"
+#include "acinterp.h"
 
 
 #define _COMPONENT          ACPI_DISPATCHER
@@ -274,6 +275,7 @@ acpi_ds_method_data_get_node (
  * RETURN:      Status
  *
  * DESCRIPTION: Insert an object onto the method stack at entry Opcode:Index.
+ *              Note: There is no "implicit conversion" for locals.
  *
  ******************************************************************************/
 
@@ -286,10 +288,16 @@ acpi_ds_method_data_set_value (
 {
 	acpi_status             status;
 	acpi_namespace_node     *node;
+	acpi_operand_object     *new_desc = object;
 
 
 	ACPI_FUNCTION_TRACE ("Ds_method_data_set_value");
 
+
+	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
+		"obj %p op %X, ref count = %d [%s]\n", object,
+		opcode, object->common.reference_count,
+		acpi_ut_get_type_name (object->common.type)));
 
 	/* Get the namespace node for the arg/local */
 
@@ -298,14 +306,30 @@ acpi_ds_method_data_set_value (
 		return_ACPI_STATUS (status);
 	}
 
-	/* Increment ref count so object can't be deleted while installed */
+	/*
+	 * If the object has just been created and is not attached to anything,
+	 * (the reference count is 1), then we can just store it directly into
+	 * the arg/local.  Otherwise, we must copy it.
+	 */
+	if (object->common.reference_count > 1) {
+		status = acpi_ut_copy_iobject_to_iobject (object, &new_desc, walk_state);
+		if (ACPI_FAILURE (status)) {
+			return_ACPI_STATUS (status);
+		}
 
-	acpi_ut_add_reference (object);
+	   ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Object Copied %p, new %p\n",
+		   object, new_desc));
+	}
+	else {
+		/* Increment ref count so object can't be deleted while installed */
 
-	/* Install the object into the stack entry */
+		acpi_ut_add_reference (new_desc);
+	}
 
-	node->object = object;
-	return_ACPI_STATUS (AE_OK);
+	/* Install the object */
+
+	node->object = new_desc;
+	return_ACPI_STATUS (status);
 }
 
 
@@ -560,7 +584,8 @@ acpi_ds_store_object_to_local (
 
 	current_obj_desc = acpi_ns_get_attached_object (node);
 	if (current_obj_desc == obj_desc) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Obj=%p already installed!\n", obj_desc));
+		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Obj=%p already installed!\n",
+			obj_desc));
 		return_ACPI_STATUS (status);
 	}
 
@@ -609,16 +634,12 @@ acpi_ds_store_object_to_local (
 					"Arg (%p) is an Obj_ref(Node), storing in node %p\n",
 					obj_desc, current_obj_desc));
 
-				/* Detach an existing object from the referenced Node */
-
-				acpi_ns_detach_object (current_obj_desc->reference.object);
-
 				/*
-				 * Store this object into the Node
+				 * Store this object to the Node
 				 * (perform the indirect store)
 				 */
-				status = acpi_ns_attach_object (current_obj_desc->reference.object,
-						  obj_desc, ACPI_GET_OBJECT_TYPE (obj_desc));
+				status = acpi_ex_store_object_to_node (obj_desc,
+						 current_obj_desc->reference.object, walk_state);
 				return_ACPI_STATUS (status);
 			}
 		}

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: evevent - Fixed and General Purpose Even handling and dispatch
- *              $Revision: 96 $
+ *              $Revision: 99 $
  *
  *****************************************************************************/
 
@@ -331,11 +331,8 @@ acpi_ev_gpe_initialize (void)
 	 *  FADT table contain zeros. The GPE0_LEN and GPE1_LEN do not need
 	 *  to be the same size."
 	 */
-	acpi_gbl_gpe_block_info[0].address_space_id = acpi_gbl_FADT->Xgpe0_blk.address_space_id;
-	acpi_gbl_gpe_block_info[1].address_space_id = acpi_gbl_FADT->Xgpe1_blk.address_space_id;
-
-	acpi_gbl_gpe_block_info[0].register_count = (u16) ACPI_DIV_16 (acpi_gbl_FADT->Xgpe0_blk.register_bit_width);
-	acpi_gbl_gpe_block_info[1].register_count = (u16) ACPI_DIV_16 (acpi_gbl_FADT->Xgpe1_blk.register_bit_width);
+	acpi_gbl_gpe_block_info[0].register_count = 0;
+	acpi_gbl_gpe_block_info[1].register_count = 0;
 
 	acpi_gbl_gpe_block_info[0].block_address = &acpi_gbl_FADT->Xgpe0_blk;
 	acpi_gbl_gpe_block_info[1].block_address = &acpi_gbl_FADT->Xgpe1_blk;
@@ -343,28 +340,25 @@ acpi_ev_gpe_initialize (void)
 	acpi_gbl_gpe_block_info[0].block_base_number = 0;
 	acpi_gbl_gpe_block_info[1].block_base_number = acpi_gbl_FADT->gpe1_base;
 
-	/* Warn and exit if there are no GPE registers */
-
-	acpi_gbl_gpe_register_count = acpi_gbl_gpe_block_info[0].register_count +
-			 acpi_gbl_gpe_block_info[1].register_count;
-	if (!acpi_gbl_gpe_register_count) {
-		ACPI_REPORT_WARNING (("There are no GPE blocks defined in the FADT\n"));
-		return_ACPI_STATUS (AE_OK);
-	}
 
 	/*
 	 * Determine the maximum GPE number for this machine.
 	 * Note: both GPE0 and GPE1 are optional, and either can exist without
-	 * the other
+	 * the other.
+	 * If EITHER the register length OR the block address are zero, then that
+	 * particular block is not supported.
 	 */
-	if (acpi_gbl_gpe_block_info[0].register_count) {
-		/* GPE block 0 exists */
+	if (acpi_gbl_FADT->Xgpe0_blk.register_bit_width && ACPI_GET_ADDRESS (acpi_gbl_FADT->Xgpe0_blk.address)) {
+		/* GPE block 0 exists (has length and address > 0) */
 
-		acpi_gbl_gpe_number_max = ACPI_MUL_8 (acpi_gbl_gpe_block_info[0].register_count) - 1;
+		acpi_gbl_gpe_block_info[0].register_count = (u16) ACPI_DIV_16 (acpi_gbl_FADT->Xgpe0_blk.register_bit_width);
+		acpi_gbl_gpe_number_max                 = ACPI_MUL_8 (acpi_gbl_gpe_block_info[0].register_count) - 1;
 	}
 
-	if (acpi_gbl_gpe_block_info[1].register_count) {
-		/* GPE block 1 exists */
+	if (acpi_gbl_FADT->Xgpe1_blk.register_bit_width && ACPI_GET_ADDRESS (acpi_gbl_FADT->Xgpe1_blk.address)) {
+		/* GPE block 1 exists (has length and address > 0) */
+
+		acpi_gbl_gpe_block_info[1].register_count = (u16) ACPI_DIV_16 (acpi_gbl_FADT->Xgpe1_blk.register_bit_width);
 
 		/* Check for GPE0/GPE1 overlap (if both banks exist) */
 
@@ -383,6 +377,15 @@ acpi_ev_gpe_initialize (void)
 		 */
 		acpi_gbl_gpe_number_max = acpi_gbl_FADT->gpe1_base +
 				 (ACPI_MUL_8 (acpi_gbl_gpe_block_info[1].register_count) - 1);
+	}
+
+	/* Warn and exit if there are no GPE registers */
+
+	acpi_gbl_gpe_register_count = acpi_gbl_gpe_block_info[0].register_count +
+			 acpi_gbl_gpe_block_info[1].register_count;
+	if (!acpi_gbl_gpe_register_count) {
+		ACPI_REPORT_WARNING (("There are no GPE blocks defined in the FADT\n"));
+		return_ACPI_STATUS (AE_OK);
 	}
 
 	/* Check for Max GPE number out-of-range */
@@ -460,8 +463,8 @@ acpi_ev_gpe_initialize (void)
 							  + i
 							  + acpi_gbl_gpe_block_info[gpe_block].register_count));
 
-			gpe_register_info->status_address.address_space_id = acpi_gbl_gpe_block_info[gpe_block].address_space_id;
-			gpe_register_info->enable_address.address_space_id = acpi_gbl_gpe_block_info[gpe_block].address_space_id;
+			gpe_register_info->status_address.address_space_id = acpi_gbl_gpe_block_info[gpe_block].block_address->address_space_id;
+			gpe_register_info->enable_address.address_space_id = acpi_gbl_gpe_block_info[gpe_block].block_address->address_space_id;
 			gpe_register_info->status_address.register_bit_width = 8;
 			gpe_register_info->enable_address.register_bit_width = 8;
 			gpe_register_info->status_address.register_bit_offset = 8;
@@ -565,7 +568,7 @@ acpi_ev_save_method_info (
 	/* Extract the name from the object and convert to a string */
 
 	ACPI_MOVE_UNALIGNED32_TO_32 (name,
-			  &((acpi_namespace_node *) obj_handle)->name.integer);
+			 &((acpi_namespace_node *) obj_handle)->name.integer);
 	name[ACPI_NAME_SIZE] = 0;
 
 	/*
@@ -614,8 +617,8 @@ acpi_ev_save_method_info (
 	 * Now we can add this information to the Gpe_info block
 	 * for use during dispatch of this GPE.
 	 */
-	acpi_gbl_gpe_number_info [gpe_number_index].type    = type;
-	acpi_gbl_gpe_number_info [gpe_number_index].method_handle = obj_handle;
+	acpi_gbl_gpe_number_info [gpe_number_index].type  = type;
+	acpi_gbl_gpe_number_info [gpe_number_index].method_node = (acpi_namespace_node *) obj_handle;
 
 	/*
 	 * Enable the GPE (SCIs should be disabled at this point)
@@ -625,7 +628,7 @@ acpi_ev_save_method_info (
 		return (status);
 	}
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Registered GPE method %s as GPE number %X\n",
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Registered GPE method %s as GPE number %2.2X\n",
 		name, gpe_number));
 	return (AE_OK);
 }
@@ -805,15 +808,16 @@ acpi_ev_asynch_execute_gpe_method (
 		return_VOID;
 	}
 
-	if (gpe_info.method_handle) {
+	if (gpe_info.method_node) {
 		/*
 		 * Invoke the GPE Method (_Lxx, _Exx):
 		 * (Evaluate the _Lxx/_Exx control method that corresponds to this GPE.)
 		 */
-		status = acpi_ns_evaluate_by_handle (gpe_info.method_handle, NULL, NULL);
+		status = acpi_ns_evaluate_by_handle (gpe_info.method_node, NULL, NULL);
 		if (ACPI_FAILURE (status)) {
-			ACPI_REPORT_ERROR (("%s while evaluating GPE%X method\n",
-				acpi_format_exception (status), gpe_number));
+			ACPI_REPORT_ERROR (("%s while evaluating method [%4.4s] for GPE[%2.2X]\n",
+				acpi_format_exception (status),
+				gpe_info.method_node->name.ascii, gpe_number));
 		}
 	}
 
@@ -881,7 +885,7 @@ acpi_ev_gpe_dispatch (
 	if (gpe_info->type & ACPI_EVENT_EDGE_TRIGGERED) {
 		status = acpi_hw_clear_gpe (gpe_number);
 		if (ACPI_FAILURE (status)) {
-			ACPI_REPORT_ERROR (("Acpi_ev_gpe_dispatch: Unable to clear GPE[%X]\n", gpe_number));
+			ACPI_REPORT_ERROR (("Acpi_ev_gpe_dispatch: Unable to clear GPE[%2.2X]\n", gpe_number));
 			return_VALUE (ACPI_INTERRUPT_NOT_HANDLED);
 		}
 	}
@@ -898,14 +902,14 @@ acpi_ev_gpe_dispatch (
 
 		gpe_info->handler (gpe_info->context);
 	}
-	else if (gpe_info->method_handle) {
+	else if (gpe_info->method_node) {
 		/*
 		 * Disable GPE, so it doesn't keep firing before the method has a
 		 * chance to run.
 		 */
 		status = acpi_hw_disable_gpe (gpe_number);
 		if (ACPI_FAILURE (status)) {
-			ACPI_REPORT_ERROR (("Acpi_ev_gpe_dispatch: Unable to disable GPE[%X]\n", gpe_number));
+			ACPI_REPORT_ERROR (("Acpi_ev_gpe_dispatch: Unable to disable GPE[%2.2X]\n", gpe_number));
 			return_VALUE (ACPI_INTERRUPT_NOT_HANDLED);
 		}
 
@@ -915,13 +919,13 @@ acpi_ev_gpe_dispatch (
 		if (ACPI_FAILURE (acpi_os_queue_for_execution (OSD_PRIORITY_GPE,
 				 acpi_ev_asynch_execute_gpe_method,
 				 ACPI_TO_POINTER (gpe_number)))) {
-			ACPI_REPORT_ERROR (("Acpi_ev_gpe_dispatch: Unable to queue handler for GPE[%X], event is disabled\n", gpe_number));
+			ACPI_REPORT_ERROR (("Acpi_ev_gpe_dispatch: Unable to queue handler for GPE[%2.2X], event is disabled\n", gpe_number));
 		}
 	}
 	else {
 		/* No handler or method to run! */
 
-		ACPI_REPORT_ERROR (("Acpi_ev_gpe_dispatch: No handler or method for GPE[%X], disabling event\n", gpe_number));
+		ACPI_REPORT_ERROR (("Acpi_ev_gpe_dispatch: No handler or method for GPE[%2.2X], disabling event\n", gpe_number));
 
 		/*
 		 * Disable the GPE.  The GPE will remain disabled until the ACPI
@@ -929,7 +933,7 @@ acpi_ev_gpe_dispatch (
 		 */
 		status = acpi_hw_disable_gpe (gpe_number);
 		if (ACPI_FAILURE (status)) {
-			ACPI_REPORT_ERROR (("Acpi_ev_gpe_dispatch: Unable to disable GPE[%X]\n", gpe_number));
+			ACPI_REPORT_ERROR (("Acpi_ev_gpe_dispatch: Unable to disable GPE[%2.2X]\n", gpe_number));
 			return_VALUE (ACPI_INTERRUPT_NOT_HANDLED);
 		}
 	}
@@ -940,7 +944,7 @@ acpi_ev_gpe_dispatch (
 	if (gpe_info->type & ACPI_EVENT_LEVEL_TRIGGERED) {
 		status = acpi_hw_clear_gpe (gpe_number);
 		if (ACPI_FAILURE (status)) {
-			ACPI_REPORT_ERROR (("Acpi_ev_gpe_dispatch: Unable to clear GPE[%X]\n", gpe_number));
+			ACPI_REPORT_ERROR (("Acpi_ev_gpe_dispatch: Unable to clear GPE[%2.2X]\n", gpe_number));
 			return_VALUE (ACPI_INTERRUPT_NOT_HANDLED);
 		}
 	}
