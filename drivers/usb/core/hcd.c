@@ -1045,10 +1045,12 @@ static int hcd_submit_urb (struct urb *urb, int mem_flags)
 {
 	int			status;
 	struct usb_hcd		*hcd = urb->dev->bus->hcpriv;
-	struct hcd_dev		*dev = urb->dev->hcpriv;
+	struct usb_host_endpoint *ep;
 	unsigned long		flags;
 
-	if (!hcd || !dev)
+	ep = (usb_pipein(urb->pipe) ? urb->dev->ep_in : urb->dev->ep_out)
+			[usb_pipeendpoint(urb->pipe)];
+	if (!hcd || !ep)
 		return -ENODEV;
 
 	/*
@@ -1075,7 +1077,7 @@ static int hcd_submit_urb (struct urb *urb, int mem_flags)
 	case USB_STATE_RUNNING:
 	case USB_STATE_RESUMING:
 		usb_get_dev (urb->dev);
-		list_add_tail (&urb->urb_list, &dev->urb_list);
+		list_add_tail (&urb->urb_list, &ep->urb_list);
 		status = 0;
 		break;
 	default:
@@ -1129,7 +1131,7 @@ static int hcd_submit_urb (struct urb *urb, int mem_flags)
 					    : DMA_TO_DEVICE);
 	}
 
-	status = hcd->driver->urb_enqueue (hcd, urb, mem_flags);
+	status = hcd->driver->urb_enqueue (hcd, ep, urb, mem_flags);
 done:
 	if (unlikely (status)) {
 		urb_unlink (urb);
@@ -1188,7 +1190,7 @@ unlink1 (struct usb_hcd *hcd, struct urb *urb)
  */
 static int hcd_unlink_urb (struct urb *urb, int status)
 {
-	struct hcd_dev			*dev;
+	struct usb_host_endpoint	*ep;
 	struct usb_hcd			*hcd = NULL;
 	struct device			*sys = NULL;
 	unsigned long			flags;
@@ -1197,6 +1199,12 @@ static int hcd_unlink_urb (struct urb *urb, int status)
 
 	if (!urb)
 		return -EINVAL;
+	if (!urb->dev || !urb->dev->bus)
+		return -ENODEV;
+	ep = (usb_pipein(urb->pipe) ? urb->dev->ep_in : urb->dev->ep_out)
+			[usb_pipeendpoint(urb->pipe)];
+	if (!ep)
+		return -ENODEV;
 
 	/*
 	 * we contend for urb->status with the hcd core,
@@ -1212,15 +1220,9 @@ static int hcd_unlink_urb (struct urb *urb, int status)
 	spin_lock_irqsave (&urb->lock, flags);
 	spin_lock (&hcd_data_lock);
 
-	if (!urb->dev || !urb->dev->bus) {
-		retval = -ENODEV;
-		goto done;
-	}
-
-	dev = urb->dev->hcpriv;
 	sys = &urb->dev->dev;
 	hcd = urb->dev->bus->hcpriv;
-	if (!dev || !hcd) {
+	if (hcd == NULL) {
 		retval = -ENODEV;
 		goto done;
 	}
@@ -1232,7 +1234,7 @@ static int hcd_unlink_urb (struct urb *urb, int status)
 	WARN_ON (!HCD_IS_RUNNING (hcd->state) && hcd->state != USB_STATE_HALT);
 
 	/* insist the urb is still queued */
-	list_for_each(tmp, &dev->urb_list) {
+	list_for_each(tmp, &ep->urb_list) {
 		if (tmp == &urb->urb_list)
 			break;
 	}
@@ -1284,40 +1286,36 @@ done:
  * the hcd to make sure all endpoint state is gone from hardware. use for
  * set_configuration, set_interface, driver removal, physical disconnect.
  *
- * example:  a qh stored in hcd_dev.ep[], holding state related to endpoint
+ * example:  a qh stored in ep->hcpriv, holding state related to endpoint
  * type, maxpacket size, toggle, halt status, and scheduling.
  */
-static void hcd_endpoint_disable (struct usb_device *udev, int endpoint)
+static void
+hcd_endpoint_disable (struct usb_device *udev, struct usb_host_endpoint *ep)
 {
-	struct hcd_dev	*dev;
-	struct usb_hcd	*hcd;
-	struct urb	*urb;
-	unsigned	epnum = endpoint & USB_ENDPOINT_NUMBER_MASK;
+	struct usb_hcd		*hcd;
+	struct urb		*urb;
 
-	dev = udev->hcpriv;
 	hcd = udev->bus->hcpriv;
 
 	WARN_ON (!HCD_IS_RUNNING (hcd->state) && hcd->state != USB_STATE_HALT);
 
 	local_irq_disable ();
 
+	/* FIXME move most of this into message.c as part of its
+	 * endpoint disable logic
+	 */
+
 	/* ep is already gone from udev->ep_{in,out}[]; no more submits */
 rescan:
 	spin_lock (&hcd_data_lock);
-	list_for_each_entry (urb, &dev->urb_list, urb_list) {
-		int	tmp = urb->pipe;
-
-		/* ignore urbs for other endpoints */
-		if (usb_pipeendpoint (tmp) != epnum)
-			continue;
-		/* NOTE assumption that only ep0 is a control endpoint */
-		if (epnum != 0 && ((tmp ^ endpoint) & USB_DIR_IN))
-			continue;
+	list_for_each_entry (urb, &ep->urb_list, urb_list) {
+		int	tmp;
 
 		/* another cpu may be in hcd, spinning on hcd_data_lock
 		 * to giveback() this urb.  the races here should be
 		 * small, but a full fix needs a new "can't submit"
 		 * urb state.
+		 * FIXME urb->reject should allow that...
 		 */
 		if (urb->status != -EINPROGRESS)
 			continue;
@@ -1359,7 +1357,7 @@ rescan:
 	 */
 	might_sleep ();
 	if (hcd->driver->endpoint_disable)
-		hcd->driver->endpoint_disable (hcd, dev, endpoint);
+		hcd->driver->endpoint_disable (hcd, ep);
 }
 
 /*-------------------------------------------------------------------------*/

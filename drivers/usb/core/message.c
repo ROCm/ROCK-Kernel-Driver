@@ -932,7 +932,7 @@ void usb_disable_endpoint(struct usb_device *dev, unsigned int epaddr)
 		dev->ep_in[epnum] = NULL;
 	}
 	if (ep && dev->bus && dev->bus->op && dev->bus->op->disable)
-		dev->bus->op->disable(dev, ep->desc.bEndpointAddress);
+		dev->bus->op->disable(dev, ep);
 }
 
 /**

@@ -88,6 +88,7 @@ static int usb_parse_endpoint(struct device *ddev, int cfgno, int inum,
 
 	memcpy(&endpoint->desc, d, n);
 	le16_to_cpus(&endpoint->desc.wMaxPacketSize);
+	INIT_LIST_HEAD(&endpoint->urb_list);
 
 	/* Skip over any Class Specific or Vendor Specific descriptors;
 	 * find the next endpoint or interface descriptor */

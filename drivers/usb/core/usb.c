@@ -688,6 +688,7 @@ usb_alloc_dev(struct usb_device *parent, struct usb_bus *bus, unsigned port)
 	dev->dev.release = usb_release_dev;
 	dev->state = USB_STATE_ATTACHED;
 
+	INIT_LIST_HEAD(&dev->ep0.urb_list);
 	dev->ep0.desc.bLength = USB_DT_ENDPOINT_SIZE;
 	dev->ep0.desc.bDescriptorType = USB_DT_ENDPOINT;
 	/* ep0 maxpacket comes later, from device descriptor */
