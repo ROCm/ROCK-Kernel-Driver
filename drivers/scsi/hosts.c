@@ -285,26 +285,6 @@ int scsi_remove_host(struct Scsi_Host *shost)
 	return 0;
 }
 
-int __scsi_add_host(struct Scsi_Host *shost)
-{
-	Scsi_Host_Template *sht = shost->hostt;
-	struct scsi_device *sdev;
-	int error = 0, saved_error = 0;
-
-	printk(KERN_INFO "scsi%d : %s\n", shost->host_no,
-			sht->info ? sht->info(shost) : sht->name);
-
-	scsi_scan_host(shost);
-			
-	list_for_each_entry (sdev, &shost->my_devices, siblings) {
-		error = scsi_attach_device(sdev);
-		if (error)
-			saved_error = error;
-	}
-
-	return saved_error;
-}
-
 /**
  * scsi_add_host - add a scsi host
  * @shost:	scsi host pointer to add
@@ -315,11 +295,27 @@ int __scsi_add_host(struct Scsi_Host *shost)
  **/
 int scsi_add_host(struct Scsi_Host *shost, struct device *dev)
 {
+	Scsi_Host_Template *sht = shost->hostt;
+	struct scsi_device *sdev;
+	int error = 0, saved_error = 0;
+
+	printk(KERN_INFO "scsi%d : %s\n", shost->host_no,
+			sht->info ? sht->info(shost) : sht->name);
+
 	if (dev) {
 		dev->class_data = shost;
 		shost->host_gendev = dev;
 	}
-	return __scsi_add_host(shost);
+
+	scsi_scan_host(shost);
+			
+	list_for_each_entry (sdev, &shost->my_devices, siblings) {
+		error = scsi_attach_device(sdev);
+		if (error)
+			saved_error = error;
+	}
+
+	return saved_error;
 }
 
 /**
@@ -523,7 +519,7 @@ int scsi_register_host(Scsi_Host_Template *shost_tp)
 	 */
 	list_for_each_entry(shost, &scsi_host_list, sh_list)
 		if (shost->hostt == shost_tp)
-			if (__scsi_add_host(shost))
+			if (scsi_add_host(shost, NULL))
 				goto out_of_space;
 
 	return 0;
