@@ -215,7 +215,7 @@ static int hid_add_field(struct hid_parser *parser, unsigned report_type, unsign
 		return -1;
 	}
 
-	if (parser->global.logical_maximum <= parser->global.logical_minimum) {
+	if (parser->global.logical_maximum < parser->global.logical_minimum) {
 		dbg("logical range invalid %d %d", parser->global.logical_minimum, parser->global.logical_maximum);
 		return -1;
 	}
