@@ -3258,6 +3258,8 @@ static void __devexit i810_remove(struct pci_dev *pci_dev)
 	free_irq(card->irq, devs);
 	release_region(card->iobase, 64);
 	release_region(card->ac97base, 256);
+	pci_free_consistent(pci_dev, sizeof(struct i810_channel)*NR_HW_CH,
+			    card->channel, card->chandma);
 	if (card->use_mmio) {
 		iounmap(card->ac97base_mmio);
 		iounmap(card->iobase_mmio);
