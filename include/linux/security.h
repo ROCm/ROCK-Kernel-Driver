@@ -327,16 +327,6 @@ struct swap_info_struct;
  *	@inode contains the inode structure to check.
  *	@mask contains the permission mask.
  *	Return 0 if permission is granted.
- * @inode_permission_lite:
- * 	Check permission before accessing an inode.  This hook is
- * 	currently only called when checking MAY_EXEC access during
- * 	pathname resolution.  The dcache lock is held and thus modules
- * 	that could sleep or contend the lock should return -EAGAIN to
- * 	inform the kernel to drop the lock and try again calling the
- * 	full permission hook.
- * 	@inode contains the inode structure to check.
- * 	@mask contains the permission mask.
- * 	Return 0 if permission is granted.
  * @inode_setattr:
  *	Check permission before setting file attributes.  Note that the kernel
  *	call to notify_change is performed from several locations, whenever
@@ -1052,7 +1042,6 @@ struct security_operations {
 	int (*inode_readlink) (struct dentry *dentry);
 	int (*inode_follow_link) (struct dentry *dentry, struct nameidata *nd);
 	int (*inode_permission) (struct inode *inode, int mask);
-	int (*inode_permission_lite) (struct inode *inode, int mask);
 	int (*inode_setattr)	(struct dentry *dentry, struct iattr *attr);
 	int (*inode_getattr) (struct vfsmount *mnt, struct dentry *dentry);
         void (*inode_delete) (struct inode *inode);
@@ -1463,12 +1452,6 @@ static inline int security_inode_follow_link (struct dentry *dentry,
 static inline int security_inode_permission (struct inode *inode, int mask)
 {
 	return security_ops->inode_permission (inode, mask);
-}
-
-static inline int security_inode_permission_lite (struct inode *inode,
-						  int mask)
-{
-	return security_ops->inode_permission_lite (inode, mask);
 }
 
 static inline int security_inode_setattr (struct dentry *dentry,
@@ -2093,12 +2076,6 @@ static inline int security_inode_follow_link (struct dentry *dentry,
 }
 
 static inline int security_inode_permission (struct inode *inode, int mask)
-{
-	return 0;
-}
-
-static inline int security_inode_permission_lite (struct inode *inode,
-						  int mask)
 {
 	return 0;
 }

@@ -308,11 +308,6 @@ static int dummy_inode_permission (struct inode *inode, int mask)
 	return 0;
 }
 
-static int dummy_inode_permission_lite (struct inode *inode, int mask)
-{
-	return 0;
-}
-
 static int dummy_inode_setattr (struct dentry *dentry, struct iattr *iattr)
 {
 	return 0;
@@ -826,7 +821,6 @@ void security_fixup_ops (struct security_operations *ops)
 	set_to_dummy_if_null(ops, inode_readlink);
 	set_to_dummy_if_null(ops, inode_follow_link);
 	set_to_dummy_if_null(ops, inode_permission);
-	set_to_dummy_if_null(ops, inode_permission_lite);
 	set_to_dummy_if_null(ops, inode_setattr);
 	set_to_dummy_if_null(ops, inode_getattr);
 	set_to_dummy_if_null(ops, inode_delete);
