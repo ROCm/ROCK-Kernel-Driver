@@ -625,7 +625,7 @@ struct notifier_block hci_sock_nblock = {
 	.notifier_call = hci_sock_dev_event
 };
 
-int hci_sock_init(void)
+int __init hci_sock_init(void)
 {
 	if (bt_sock_register(BTPROTO_HCI, &hci_sock_family_ops)) {
 		BT_ERR("HCI socket registration failed");
@@ -639,7 +639,7 @@ int hci_sock_init(void)
 	return 0;
 }
 
-int hci_sock_cleanup(void)
+int __exit hci_sock_cleanup(void)
 {
 	if (bt_sock_unregister(BTPROTO_HCI))
 		BT_ERR("HCI socket unregistration failed");

@@ -828,7 +828,7 @@ static struct file_operations rfcomm_seq_fops = {
 	.release = seq_release,
 };
 
-static int __init rfcomm_sock_proc_init(void)
+static int  __init rfcomm_sock_proc_init(void)
 {
         struct proc_dir_entry *p = create_proc_entry("sock", S_IRUGO, proc_bt_rfcomm);
         if (!p)
@@ -837,19 +837,19 @@ static int __init rfcomm_sock_proc_init(void)
         return 0;
 }
 
-static void __init rfcomm_sock_proc_cleanup(void)
+static void __exit rfcomm_sock_proc_cleanup(void)
 {
         remove_proc_entry("sock", proc_bt_rfcomm);
 }
 
 #else /* CONFIG_PROC_FS */
 
-static int __init rfcomm_sock_proc_init(void)
+static int  __init rfcomm_sock_proc_init(void)
 {
         return 0;
 }
 
-static void __init rfcomm_sock_proc_cleanup(void)
+static void __exit rfcomm_sock_proc_cleanup(void)
 {
         return;
 }
@@ -879,7 +879,7 @@ static struct net_proto_family rfcomm_sock_family_ops = {
 	.create		= rfcomm_sock_create
 };
 
-int rfcomm_init_sockets(void)
+int  __init rfcomm_init_sockets(void)
 {
 	int err;
 
@@ -894,7 +894,7 @@ int rfcomm_init_sockets(void)
 	return 0;
 }
 
-void rfcomm_cleanup_sockets(void)
+void __exit rfcomm_cleanup_sockets(void)
 {
 	int err;
 

@@ -700,7 +700,7 @@ int bnep_get_conninfo(struct bnep_conninfo *ci)
 	return err;
 }
 
-static int __init bnep_init_module(void)
+static int  __init bnep_init_module(void)
 {	
 	char flt[50] = "";	
 

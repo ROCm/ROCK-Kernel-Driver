@@ -2054,28 +2054,29 @@ static struct file_operations l2cap_seq_fops = {
 	.release = seq_release,
 };
 
-static int __init l2cap_proc_init(void)
+static int  __init l2cap_proc_init(void)
 {
         struct proc_dir_entry *p = create_proc_entry("l2cap", S_IRUGO, proc_bt);
         if (!p)
                 return -ENOMEM;
+	p->owner     = THIS_MODULE;
         p->proc_fops = &l2cap_seq_fops;
         return 0;
 }
 
-static void __init l2cap_proc_cleanup(void)
+static void __exit l2cap_proc_cleanup(void)
 {
         remove_proc_entry("l2cap", proc_bt);
 }
 
 #else /* CONFIG_PROC_FS */
 
-static int __init l2cap_proc_init(void)
+static int  __init l2cap_proc_init(void)
 {
         return 0;
 }
 
-static void __init l2cap_proc_cleanup(void)
+static void __exit l2cap_proc_cleanup(void)
 {
         return;
 }
@@ -2139,7 +2140,7 @@ int __init l2cap_init(void)
 	return 0;
 }
 
-void l2cap_cleanup(void)
+void __exit l2cap_cleanup(void)
 {
 	l2cap_proc_cleanup();
 

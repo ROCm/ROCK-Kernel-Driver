@@ -939,28 +939,29 @@ static struct file_operations sco_seq_fops = {
 	.release = seq_release,
 };
 
-static int __init sco_proc_init(void)
+static int  __init sco_proc_init(void)
 {
         struct proc_dir_entry *p = create_proc_entry("sco", S_IRUGO, proc_bt);
         if (!p)
                 return -ENOMEM;
+	p->owner     = THIS_MODULE;
         p->proc_fops = &sco_seq_fops;
         return 0;
 }
 
-static void __init sco_proc_cleanup(void)
+static void __exit sco_proc_cleanup(void)
 {
         remove_proc_entry("sco", proc_bt);
 }
 
 #else /* CONFIG_PROC_FS */
 
-static int __init sco_proc_init(void)
+static int  __init sco_proc_init(void)
 {
         return 0;
 }
 
-static void __init sco_proc_cleanup(void)
+static void __exit sco_proc_cleanup(void)
 {
         return;
 }
@@ -1021,7 +1022,7 @@ int __init sco_init(void)
 	return 0;
 }
 
-void sco_cleanup(void)
+void __exit sco_cleanup(void)
 {
 	int err;
 

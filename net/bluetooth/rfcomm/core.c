@@ -1803,19 +1803,22 @@ static struct file_operations rfcomm_seq_fops = {
 	.release = seq_release,
 };
 
-static int __init rfcomm_proc_init(void)
+static int  __init rfcomm_proc_init(void)
 {
         struct proc_dir_entry *p;
 
 	proc_bt_rfcomm = proc_mkdir("rfcomm", proc_bt);
+	if (proc_bt_rfcomm) {
+		proc_bt_rfcomm->owner = THIS_MODULE;
 
-        p = create_proc_entry("dlc", S_IRUGO, proc_bt_rfcomm);
-        if (p)
-        	p->proc_fops = &rfcomm_seq_fops;
+        	p = create_proc_entry("dlc", S_IRUGO, proc_bt_rfcomm);
+		if (p)
+        		p->proc_fops = &rfcomm_seq_fops;
+	}
         return 0;
 }
 
-static void __init rfcomm_proc_cleanup(void)
+static void __exit rfcomm_proc_cleanup(void)
 {
         remove_proc_entry("dlc", proc_bt_rfcomm);
 
@@ -1824,19 +1827,19 @@ static void __init rfcomm_proc_cleanup(void)
 
 #else /* CONFIG_PROC_FS */
 
-static int __init rfcomm_proc_init(void)
+static int  __init rfcomm_proc_init(void)
 {
         return 0;
 }
 
-static void __init rfcomm_proc_cleanup(void)
+static void __exit rfcomm_proc_cleanup(void)
 {
         return;
 }
 #endif /* CONFIG_PROC_FS */
 
 /* ---- Initialization ---- */
-int __init rfcomm_init(void)
+int  __init rfcomm_init(void)
 {
 	kernel_thread(rfcomm_run, NULL, CLONE_FS | CLONE_FILES | CLONE_SIGHAND);
 
@@ -1853,7 +1856,7 @@ int __init rfcomm_init(void)
 	return 0;
 }
 
-void rfcomm_cleanup(void)
+void __exit rfcomm_cleanup(void)
 {
 	/* Terminate working thread.
 	 * ie. Set terminate flag and wake it up */

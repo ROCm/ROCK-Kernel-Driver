@@ -192,13 +192,13 @@ static struct net_proto_family bnep_sock_family_ops = {
 	.create = bnep_sock_create
 };
 
-int bnep_sock_init(void)
+int __init bnep_sock_init(void)
 {
 	bt_sock_register(BTPROTO_BNEP, &bnep_sock_family_ops);
 	return 0;
 }
 
-int bnep_sock_cleanup(void)
+int __exit bnep_sock_cleanup(void)
 {
 	if (bt_sock_unregister(BTPROTO_BNEP))
 		BT_ERR("Can't unregister BNEP socket");
