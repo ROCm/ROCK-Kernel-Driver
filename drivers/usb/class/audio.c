@@ -635,13 +635,13 @@ static void usbin_stop(struct usb_audiodev *as)
 		spin_unlock_irqrestore(&as->lock, flags);
 		if (notkilled && signal_pending(current)) {
 			if (i & FLG_URB0RUNNING)
-				usb_unlink_urb(u->durb[0].urb);
+				usb_kill_urb(u->durb[0].urb);
 			if (i & FLG_URB1RUNNING)
-				usb_unlink_urb(u->durb[1].urb);
+				usb_kill_urb(u->durb[1].urb);
 			if (i & FLG_SYNC0RUNNING)
-				usb_unlink_urb(u->surb[0].urb);
+				usb_kill_urb(u->surb[0].urb);
 			if (i & FLG_SYNC1RUNNING)
-				usb_unlink_urb(u->surb[1].urb);
+				usb_kill_urb(u->surb[1].urb);
 			notkilled = 0;
 		}
 	}
@@ -1114,13 +1114,13 @@ static void usbout_stop(struct usb_audiodev *as)
 		spin_unlock_irqrestore(&as->lock, flags);
 		if (notkilled && signal_pending(current)) {
 			if (i & FLG_URB0RUNNING)
-				usb_unlink_urb(u->durb[0].urb);
+				usb_kill_urb(u->durb[0].urb);
 			if (i & FLG_URB1RUNNING)
-				usb_unlink_urb(u->durb[1].urb);
+				usb_kill_urb(u->durb[1].urb);
 			if (i & FLG_SYNC0RUNNING)
-				usb_unlink_urb(u->surb[0].urb);
+				usb_kill_urb(u->surb[0].urb);
 			if (i & FLG_SYNC1RUNNING)
-				usb_unlink_urb(u->surb[1].urb);
+				usb_kill_urb(u->surb[1].urb);
 			notkilled = 0;
 		}
 	}
