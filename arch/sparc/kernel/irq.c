@@ -95,7 +95,7 @@ void (*sparc_init_timers)(void (*)(int, void *,struct pt_regs *)) =
 struct irqaction static_irqaction[MAX_STATIC_ALLOC];
 int static_irq_count;
 
-struct irqaction *irq_action[NR_IRQS+1] = {
+struct irqaction *irq_action[NR_IRQS] = {
 	  NULL, NULL, NULL, NULL, NULL, NULL , NULL, NULL,
 	  NULL, NULL, NULL, NULL, NULL, NULL , NULL, NULL
 };
@@ -113,7 +113,7 @@ int show_interrupts(struct seq_file *p, void *v)
 		
 		return show_sun4d_interrupts(p, v);
 	}
-	for (i = 0 ; i < (NR_IRQS+1) ; i++) {
+	for (i = 0 ; i < NR_IRQS ; i++) {
 	        action = *(i + irq_action);
 		if (!action) 
 		        continue;
