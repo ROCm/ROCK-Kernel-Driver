@@ -25,9 +25,18 @@ extern unsigned long rpc_calc_rto(struct rpc_rtt *rt, unsigned timer);
 
 static inline void rpc_set_timeo(struct rpc_rtt *rt, int timer, int ntimeo)
 {
+	int *t;
 	if (!timer)
 		return;
-	rt->ntimeouts[timer-1] = ntimeo;
+	t = &rt->ntimeouts[timer-1];
+	if (ntimeo < *t) {
+		if (*t > 0)
+			(*t)--;
+	} else {
+		if (ntimeo > 8)
+			ntimeo = 8;
+		*t = ntimeo;
+	}
 }
 
 static inline int rpc_ntimeo(struct rpc_rtt *rt, int timer)

@@ -166,37 +166,6 @@ static struct nfs_bool_opts {
 
 
 /*
- *  Extract IP address from the parameter string if needed. Note that we
- *  need to have root_server_addr set _before_ IPConfig gets called as it
- *  can override it.
- */
-static void __init root_nfs_parse_addr(char *name)
-{
-	int octets = 0;
-	char *cp, *cq;
-
-	cp = cq = name;
-	while (octets < 4) {
-		while (*cp >= '0' && *cp <= '9')
-			cp++;
-		if (cp == cq || cp - cq > 3)
-			break;
-		if (*cp == '.' || octets == 3)
-			octets++;
-		if (octets < 4)
-			cp++;
-		cq = cp;
-	}
-	if (octets == 4 && (*cp == ':' || *cp == '\0')) {
-		if (*cp == ':')
-			*cp++ = '\0';
-		root_server_addr = in_aton(name);
-		strcpy(name, cp);
-	}
-}
-
-
-/*
  *  Parse option string.
  */
 static void __init root_nfs_parse(char *name, char *buf)
@@ -345,7 +314,7 @@ int __init nfs_root_setup(char *line)
 			line[sizeof(nfs_root_name) - strlen(NFS_ROOT) - 1] = '\0';
 		sprintf(nfs_root_name, NFS_ROOT, line);
 	}
-	root_nfs_parse_addr(nfs_root_name);
+	root_server_addr = root_nfs_parse_addr(nfs_root_name);
 	return 1;
 }
 

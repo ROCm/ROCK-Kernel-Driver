@@ -74,7 +74,6 @@
 static struct nfs_page * nfs_update_request(struct file*, struct inode *,
 					    struct page *,
 					    unsigned int, unsigned int);
-static void	nfs_strategy(struct inode *inode);
 
 static kmem_cache_t *nfs_wdata_cachep;
 static mempool_t *nfs_wdata_mempool;
@@ -124,6 +123,52 @@ void nfs_commit_release(struct rpc_task *task)
 	nfs_commit_free(wdata);
 }
 
+/* Adjust the file length if we're writing beyond the end */
+static void nfs_grow_file(struct page *page, unsigned int offset, unsigned int count)
+{
+	struct inode *inode = page->mapping->host;
+	loff_t end, i_size = i_size_read(inode);
+	unsigned long end_index = (i_size - 1) >> PAGE_CACHE_SHIFT;
+
+	if (i_size > 0 && page->index < end_index)
+		return;
+	end = ((loff_t)page->index << PAGE_CACHE_SHIFT) + ((loff_t)offset+count);
+	if (i_size >= end)
+		return;
+	i_size_write(inode, end);
+}
+
+/* We can set the PG_uptodate flag if we see that a write request
+ * covers the full page.
+ */
+static void nfs_mark_uptodate(struct page *page, unsigned int base, unsigned int count)
+{
+	loff_t end_offs;
+
+	if (PageUptodate(page))
+		return;
+	if (base != 0)
+		return;
+	if (count == PAGE_CACHE_SIZE) {
+		SetPageUptodate(page);
+		return;
+	}
+
+	end_offs = i_size_read(page->mapping->host) - 1;
+	if (end_offs < 0)
+		return;
+	/* Is this the last page? */
+	if (page->index != (unsigned long)(end_offs >> PAGE_CACHE_SHIFT))
+		return;
+	/* This is the last page: set PG_uptodate if we cover the entire
+	 * extent of the data, then zero the rest of the page.
+	 */
+	if (count == (unsigned int)(end_offs & (PAGE_CACHE_SIZE - 1)) + 1) {
+		memclear_highpage_flush(page, count, PAGE_CACHE_SIZE - count);
+		SetPageUptodate(page);
+	}
+}
+
 /*
  * Write a page synchronously.
  * Offset is the data offset within the page.
@@ -157,6 +202,7 @@ nfs_writepage_sync(struct file *file, struct inode *inode, struct page *page,
 		(long long)NFS_FILEID(inode),
 		count, (long long)(page_offset(page) + offset));
 
+	nfs_begin_data_update(inode);
 	do {
 		if (count < wsize && !swapfile)
 			wdata.args.count = count;
@@ -177,43 +223,38 @@ nfs_writepage_sync(struct file *file, struct inode *inode, struct page *page,
 	        wdata.args.pgbase += result;
 		written += result;
 		count -= result;
-
-		/*
-		 * If we've extended the file, update the inode
-		 * now so we don't invalidate the cache.
-		 */
-		if (wdata.args.offset > i_size_read(inode))
-			i_size_write(inode, wdata.args.offset);
 	} while (count);
+	/* Update file length */
+	nfs_grow_file(page, offset, written);
+	/* Set the PG_uptodate flag? */
+	nfs_mark_uptodate(page, offset, written);
 
 	if (PageError(page))
 		ClearPageError(page);
 
 io_error:
+	nfs_end_data_update(inode);
 	if (wdata.cred)
 		put_rpccred(wdata.cred);
 
 	return written ? written : result;
 }
 
-static int
-nfs_writepage_async(struct file *file, struct inode *inode, struct page *page,
-		    unsigned int offset, unsigned int count)
+static int nfs_writepage_async(struct file *file, struct inode *inode,
+		struct page *page, unsigned int offset, unsigned int count)
 {
 	struct nfs_page	*req;
-	loff_t		end;
 	int		status;
 
 	req = nfs_update_request(file, inode, page, offset, count);
 	status = (IS_ERR(req)) ? PTR_ERR(req) : 0;
 	if (status < 0)
 		goto out;
+	/* Update file length */
+	nfs_grow_file(page, offset, count);
+	/* Set the PG_uptodate flag? */
+	nfs_mark_uptodate(page, offset, count);
 	nfs_unlock_request(req);
-	nfs_strategy(inode);
-	end = ((loff_t)page->index<<PAGE_CACHE_SHIFT) + (loff_t)(offset + count);
-	if (i_size_read(inode) < end)
-		i_size_write(inode, end);
-
  out:
 	return status;
 }
@@ -286,7 +327,7 @@ nfs_writepages(struct address_space *mapping, struct writeback_control *wbc)
 	err = generic_writepages(mapping, wbc);
 	if (err)
 		goto out;
-	err = nfs_flush_file(inode, NULL, 0, 0, 0);
+	err = nfs_flush_inode(inode, 0, 0, 0);
 	if (err < 0)
 		goto out;
 	if (wbc->sync_mode == WB_SYNC_HOLD)
@@ -294,7 +335,7 @@ nfs_writepages(struct address_space *mapping, struct writeback_control *wbc)
 	if (is_sync && wbc->sync_mode == WB_SYNC_ALL) {
 		err = nfs_wb_all(inode);
 	} else
-		nfs_commit_file(inode, NULL, 0, 0, 0);
+		nfs_commit_inode(inode, 0, 0, 0);
 out:
 	return err;
 }
@@ -312,8 +353,10 @@ nfs_inode_add_request(struct inode *inode, struct nfs_page *req)
 	BUG_ON(error == -EEXIST);
 	if (error)
 		return error;
-	if (!nfsi->npages)
+	if (!nfsi->npages) {
 		igrab(inode);
+		nfs_begin_data_update(inode);
+	}
 	nfsi->npages++;
 	req->wb_count++;
 	return 0;
@@ -336,6 +379,7 @@ nfs_inode_remove_request(struct nfs_page *req)
 	nfsi->npages--;
 	if (!nfsi->npages) {
 		spin_unlock(&nfs_wreq_lock);
+		nfs_end_data_update(inode);
 		iput(inode);
 	} else
 		spin_unlock(&nfs_wreq_lock);
@@ -421,7 +465,7 @@ nfs_mark_request_commit(struct nfs_page *req)
  * Interruptible by signals only if mounted with intr flag.
  */
 static int
-nfs_wait_on_requests(struct inode *inode, struct file *file, unsigned long idx_start, unsigned int npages)
+nfs_wait_on_requests(struct inode *inode, unsigned long idx_start, unsigned int npages)
 {
 	struct nfs_inode *nfsi = NFS_I(inode);
 	struct nfs_page *req;
@@ -441,8 +485,6 @@ nfs_wait_on_requests(struct inode *inode, struct file *file, unsigned long idx_s
 			break;
 
 		next = req->wb_index + 1;
-		if (file && req->wb_file != file)
-			continue;
 		if (!NFS_WBACK_BUSY(req))
 			continue;
 
@@ -453,7 +495,6 @@ nfs_wait_on_requests(struct inode *inode, struct file *file, unsigned long idx_s
 		if (error < 0)
 			return error;
 		spin_lock(&nfs_wreq_lock);
-		next = idx_start;
 		res++;
 	}
 	spin_unlock(&nfs_wreq_lock);
@@ -464,7 +505,6 @@ nfs_wait_on_requests(struct inode *inode, struct file *file, unsigned long idx_s
  * nfs_scan_dirty - Scan an inode for dirty requests
  * @inode: NFS inode to scan
  * @dst: destination list
- * @file: if set, ensure we match requests from this file
  * @idx_start: lower bound of page->index to scan.
  * @npages: idx_start + npages sets the upper bound to scan.
  *
@@ -472,11 +512,11 @@ nfs_wait_on_requests(struct inode *inode, struct file *file, unsigned long idx_s
  * The requests are *not* checked to ensure that they form a contiguous set.
  */
 static int
-nfs_scan_dirty(struct inode *inode, struct list_head *dst, struct file *file, unsigned long idx_start, unsigned int npages)
+nfs_scan_dirty(struct inode *inode, struct list_head *dst, unsigned long idx_start, unsigned int npages)
 {
 	struct nfs_inode *nfsi = NFS_I(inode);
 	int	res;
-	res = nfs_scan_list(&nfsi->dirty, dst, file, idx_start, npages);
+	res = nfs_scan_list(&nfsi->dirty, dst, idx_start, npages);
 	nfsi->ndirty -= res;
 	sub_page_state(nr_dirty,res);
 	if ((nfsi->ndirty == 0) != list_empty(&nfsi->dirty))
@@ -489,7 +529,6 @@ nfs_scan_dirty(struct inode *inode, struct list_head *dst, struct file *file, un
  * nfs_scan_commit - Scan an inode for commit requests
  * @inode: NFS inode to scan
  * @dst: destination list
- * @file: if set, ensure we collect requests from this file only.
  * @idx_start: lower bound of page->index to scan.
  * @npages: idx_start + npages sets the upper bound to scan.
  *
@@ -497,11 +536,11 @@ nfs_scan_dirty(struct inode *inode, struct list_head *dst, struct file *file, un
  * The requests are *not* checked to ensure that they form a contiguous set.
  */
 static int
-nfs_scan_commit(struct inode *inode, struct list_head *dst, struct file *file, unsigned long idx_start, unsigned int npages)
+nfs_scan_commit(struct inode *inode, struct list_head *dst, unsigned long idx_start, unsigned int npages)
 {
 	struct nfs_inode *nfsi = NFS_I(inode);
 	int	res;
-	res = nfs_scan_list(&nfsi->commit, dst, file, idx_start, npages);
+	res = nfs_scan_list(&nfsi->commit, dst, idx_start, npages);
 	nfsi->ncommit -= res;
 	if ((nfsi->ncommit == 0) != list_empty(&nfsi->commit))
 		printk(KERN_ERR "NFS: desynchronized value of nfs_i.ncommit.\n");
@@ -600,46 +639,6 @@ nfs_update_request(struct file* file, struct inode *inode, struct page *page,
 	return req;
 }
 
-/*
- * This is the strategy routine for NFS.
- * It is called by nfs_updatepage whenever the user wrote up to the end
- * of a page.
- *
- * We always try to submit a set of requests in parallel so that the
- * server's write code can gather writes. This is mainly for the benefit
- * of NFSv2.
- *
- * We never submit more requests than we think the remote can handle.
- * For UDP sockets, we make sure we don't exceed the congestion window;
- * for TCP, we limit the number of requests to 8.
- *
- * NFS_STRATEGY_PAGES gives the minimum number of requests for NFSv2 that
- * should be sent out in one go. This is for the benefit of NFSv2 servers
- * that perform write gathering.
- *
- * FIXME: Different servers may have different sweet spots.
- * Record the average congestion window in server struct?
- */
-#define NFS_STRATEGY_PAGES      8
-static void
-nfs_strategy(struct inode *inode)
-{
-	unsigned int	dirty, wpages;
-
-	dirty  = NFS_I(inode)->ndirty;
-	wpages = NFS_SERVER(inode)->wpages;
-#if defined(CONFIG_NFS_V3) || defined(CONFIG_NFS_V4)
-	if (NFS_PROTO(inode)->version == 2) {
-		if (dirty >= NFS_STRATEGY_PAGES * wpages)
-			nfs_flush_file(inode, NULL, 0, 0, 0);
-	} else if (dirty >= wpages)
-		nfs_flush_file(inode, NULL, 0, 0, 0);
-#else
-	if (dirty >= NFS_STRATEGY_PAGES * wpages)
-		nfs_flush_file(inode, NULL, 0, 0, 0);
-#endif
-}
-
 int
 nfs_flush_incompatible(struct file *file, struct page *page)
 {
@@ -675,7 +674,6 @@ nfs_updatepage(struct file *file, struct page *page, unsigned int offset, unsign
 	struct dentry	*dentry = file->f_dentry;
 	struct inode	*inode = page->mapping->host;
 	struct nfs_page	*req;
-	loff_t		end;
 	int		status = 0;
 
 	dprintk("NFS:      nfs_updatepage(%s/%s %d@%Ld)\n",
@@ -696,6 +694,27 @@ nfs_updatepage(struct file *file, struct page *page, unsigned int offset, unsign
 		return status;
 	}
 
+	/* If we're not using byte range locks, and we know the page
+	 * is entirely in cache, it may be more efficient to avoid
+	 * fragmenting write requests.
+	 */
+	if (PageUptodate(page) && inode->i_flock == NULL) {
+		loff_t end_offs = i_size_read(inode) - 1;
+		unsigned long end_index = end_offs >> PAGE_CACHE_SHIFT;
+
+		count += offset;
+		offset = 0;
+		if (unlikely(end_offs < 0)) {
+			/* Do nothing */
+		} else if (page->index == end_index) {
+			unsigned int pglen;
+			pglen = (unsigned int)(end_offs & (PAGE_CACHE_SIZE-1)) + 1;
+			if (count < pglen)
+				count = pglen;
+		} else if (page->index < end_index)
+			count = PAGE_CACHE_SIZE;
+	}
+
 	/*
 	 * Try to find an NFS request corresponding to this page
 	 * and update it.
@@ -714,20 +733,12 @@ nfs_updatepage(struct file *file, struct page *page, unsigned int offset, unsign
 		goto done;
 
 	status = 0;
-	end = ((loff_t)page->index<<PAGE_CACHE_SHIFT) + (loff_t)(offset + count);
-	if (i_size_read(inode) < end)
-		i_size_write(inode, end);
 
-	/* If we wrote past the end of the page.
-	 * Call the strategy routine so it can send out a bunch
-	 * of requests.
-	 */
-	if (req->wb_pgbase == 0 && req->wb_bytes == PAGE_CACHE_SIZE) {
-		SetPageUptodate(page);
-		nfs_unlock_request(req);
-		nfs_strategy(inode);
-	} else
-		nfs_unlock_request(req);
+	/* Update file length */
+	nfs_grow_file(page, offset, count);
+	/* Set the PG_uptodate flag? */
+	nfs_mark_uptodate(page, req->wb_pgbase, req->wb_bytes);
+	nfs_unlock_request(req);
 done:
         dprintk("NFS:      nfs_updatepage returns %d (isize %Ld)\n",
 			status, (long long)i_size_read(inode));
@@ -891,10 +902,7 @@ nfs_writeback_done(struct rpc_task *task)
 #endif
 
 	/*
-	 * Update attributes as result of writeback.
-	 * FIXME: There is an inherent race with invalidate_inode_pages and
-	 *	  writebacks since the page->count is kept > 1 for as long
-	 *	  as the page has a write request pending.
+	 * Process the nfs_page list
 	 */
 	while (!list_empty(&data->pages)) {
 		req = nfs_list_entry(data->pages.next);
@@ -1061,7 +1069,7 @@ nfs_commit_done(struct rpc_task *task)
 }
 #endif
 
-int nfs_flush_file(struct inode *inode, struct file *file, unsigned long idx_start,
+int nfs_flush_inode(struct inode *inode, unsigned long idx_start,
 		   unsigned int npages, int how)
 {
 	LIST_HEAD(head);
@@ -1069,7 +1077,7 @@ int nfs_flush_file(struct inode *inode, struct file *file, unsigned long idx_sta
 				error = 0;
 
 	spin_lock(&nfs_wreq_lock);
-	res = nfs_scan_dirty(inode, &head, file, idx_start, npages);
+	res = nfs_scan_dirty(inode, &head, idx_start, npages);
 	spin_unlock(&nfs_wreq_lock);
 	if (res)
 		error = nfs_flush_list(&head, NFS_SERVER(inode)->wpages, how);
@@ -1079,7 +1087,7 @@ int nfs_flush_file(struct inode *inode, struct file *file, unsigned long idx_sta
 }
 
 #if defined(CONFIG_NFS_V3) || defined(CONFIG_NFS_V4)
-int nfs_commit_file(struct inode *inode, struct file *file, unsigned long idx_start,
+int nfs_commit_inode(struct inode *inode, unsigned long idx_start,
 		    unsigned int npages, int how)
 {
 	LIST_HEAD(head);
@@ -1087,9 +1095,9 @@ int nfs_commit_file(struct inode *inode, struct file *file, unsigned long idx_st
 				error = 0;
 
 	spin_lock(&nfs_wreq_lock);
-	res = nfs_scan_commit(inode, &head, file, idx_start, npages);
+	res = nfs_scan_commit(inode, &head, idx_start, npages);
 	if (res) {
-		res += nfs_scan_commit(inode, &head, NULL, 0, 0);
+		res += nfs_scan_commit(inode, &head, 0, 0);
 		spin_unlock(&nfs_wreq_lock);
 		error = nfs_commit_list(&head, how);
 	} else
@@ -1100,7 +1108,7 @@ int nfs_commit_file(struct inode *inode, struct file *file, unsigned long idx_st
 }
 #endif
 
-int nfs_sync_file(struct inode *inode, struct file *file, unsigned long idx_start,
+int nfs_sync_inode(struct inode *inode, unsigned long idx_start,
 		  unsigned int npages, int how)
 {
 	int	error,
@@ -1109,18 +1117,15 @@ int nfs_sync_file(struct inode *inode, struct file *file, unsigned long idx_star
 	wait = how & FLUSH_WAIT;
 	how &= ~FLUSH_WAIT;
 
-	if (!inode && file)
-		inode = file->f_dentry->d_inode;
-
 	do {
 		error = 0;
 		if (wait)
-			error = nfs_wait_on_requests(inode, file, idx_start, npages);
+			error = nfs_wait_on_requests(inode, idx_start, npages);
 		if (error == 0)
-			error = nfs_flush_file(inode, file, idx_start, npages, how);
+			error = nfs_flush_inode(inode, idx_start, npages, how);
 #if defined(CONFIG_NFS_V3) || defined(CONFIG_NFS_V4)
 		if (error == 0)
-			error = nfs_commit_file(inode, file, idx_start, npages, how);
+			error = nfs_commit_inode(inode, idx_start, npages, how);
 #endif
 	} while (error > 0);
 	return error;

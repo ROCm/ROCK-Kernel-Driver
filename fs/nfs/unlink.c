@@ -104,6 +104,7 @@ nfs_async_unlink_init(struct rpc_task *task)
 	status = NFS_PROTO(dir->d_inode)->unlink_setup(&msg, dir, &data->name);
 	if (status < 0)
 		goto out_err;
+	nfs_begin_data_update(dir->d_inode);
 	rpc_call_setup(task, &msg, 0);
 	return;
  out_err:
@@ -126,7 +127,7 @@ nfs_async_unlink_done(struct rpc_task *task)
 	if (!dir)
 		return;
 	dir_i = dir->d_inode;
-	nfs_zap_caches(dir_i);
+	nfs_end_data_update(dir_i);
 	if (NFS_PROTO(dir_i)->unlink_done(dir, task))
 		return;
 	put_rpccred(data->cred);
