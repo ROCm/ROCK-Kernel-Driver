@@ -1469,22 +1469,26 @@ static void fbcon_bmove_rec(struct vc_data *vc, struct display *p, int sy, int s
 static __inline__ void updatescrollmode(struct display *p, struct fb_info *info, struct vc_data *vc)
 {
 	int cap = info->flags;
+	int good_pan = (cap & FBINFO_HWACCEL_YPAN)
+		 && divides(info->fix.ypanstep, vc->vc_font.height)
+		 && info->var.yres_virtual >= 2*info->var.yres;
+	int good_wrap = (cap & FBINFO_HWACCEL_YWRAP)
+		 && divides(info->fix.ywrapstep, vc->vc_font.height)
+		 && divides(vc->vc_font.height, info->var.yres_virtual);
+	int reading_fast = cap & FBINFO_READS_FAST;
+	int fast_copyarea = (cap & FBINFO_HWACCEL_COPYAREA) && !(cap & FBINFO_HWACCEL_DISABLED);
 
-	if ((cap & FBINFO_HWACCEL_COPYAREA) && !(cap & FBINFO_HWACCEL_DISABLED))
-		p->scrollmode = SCROLL_ACCEL;
-	else if ((cap & FBINFO_HWACCEL_YWRAP) &&
-		 divides(info->fix.ywrapstep, vc->vc_font.height) &&
-		 divides(vc->vc_font.height, info->var.yres_virtual))
-		p->scrollmode = SCROLL_WRAP;
-	else if ((cap & FBINFO_HWACCEL_YPAN) &&
-		 divides(info->fix.ypanstep, vc->vc_font.height) &&
-		 info->var.yres_virtual >= info->var.yres + vc->vc_font.height)
-		p->scrollmode = SCROLL_PAN;
-	else if (cap & FBINFO_READS_FAST)
-		/* okay, we'll use software version of accel funcs... */
-		p->scrollmode = SCROLL_ACCEL;
-	else
-		p->scrollmode = SCROLL_REDRAW;
+	if (good_wrap || good_pan) {
+		if (reading_fast || fast_copyarea)
+			p->scrollmode = good_wrap ? SCROLL_WRAP : SCROLL_PAN;
+		else
+			p->scrollmode = SCROLL_REDRAW;
+	} else {
+		if (reading_fast || fast_copyarea)
+			p->scrollmode = SCROLL_ACCEL;
+		else
+			p->scrollmode = SCROLL_REDRAW;
+	}
 }
 
 static int fbcon_resize(struct vc_data *vc, unsigned int width, 
