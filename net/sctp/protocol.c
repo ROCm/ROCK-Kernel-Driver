@@ -878,8 +878,6 @@ int sctp_register_pf(struct sctp_pf *pf, sa_family_t family)
 
 static int __init init_sctp_mibs(void)
 {
-	int i;
-
 	sctp_statistics[0] = alloc_percpu(struct sctp_mib);
 	if (!sctp_statistics[0])
 		return -ENOMEM;
