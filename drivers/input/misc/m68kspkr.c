@@ -31,7 +31,6 @@ static struct input_dev m68kspkr_dev;
 static int m68kspkr_event(struct input_dev *dev, unsigned int type, unsigned int code, int value)
 {
 	unsigned int count = 0;
-	unsigned long flags;
 
 	if (type != EV_SND)
 		return -1;
@@ -40,11 +39,11 @@ static int m68kspkr_event(struct input_dev *dev, unsigned int type, unsigned int
 		case SND_BELL: if (value) value = 1000;
 		case SND_TONE: break;
 		default: return -1;
-	} 
+	}
 
 	if (value > 20 && value < 32767)
 		count = 1193182 / value;
-	
+
 	mach_beep(count, -1);
 
 	return 0;

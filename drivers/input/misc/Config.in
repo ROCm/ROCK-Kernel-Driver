@@ -9,6 +9,6 @@ if [ "$CONFIG_SPARC32" = "y" -o "$CONFIG_SPARC64" = "y" ]; then
    dep_tristate '  SPARC Speaker support' CONFIG_INPUT_SPARCSPKR $CONFIG_INPUT $CONFIG_INPUT_MISC
 fi
 if [ "$CONFIG_M68K" = "y" ]; then
-dep_tristate '  M68K Beeper support' CONFIG_INPUT_M68K_BEEP $CONFIG_INPUT $CONFIG_INPUT_MISC
+dep_tristate '  M68k Beeper support' CONFIG_INPUT_M68K_BEEP $CONFIG_INPUT $CONFIG_INPUT_MISC
 fi
 dep_tristate '  User level driver support' CONFIG_INPUT_UINPUT $CONFIG_INPUT $CONFIG_INPUT_MISC
