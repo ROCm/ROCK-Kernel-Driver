@@ -2480,7 +2480,7 @@ static void __exit amb_module_exit (void) {
   
   // paranoia
   housekeeping.data = 0;
-  del_timer (&housekeeping);
+  del_timer_sync(&housekeeping);
   
   while (amb_devs) {
     dev = amb_devs;
