@@ -30,8 +30,6 @@
 #include <linux/init.h>
 #include <linux/mm.h>
 #include <linux/proc_fs.h>
-#include <linux/slab.h>
-#include <linux/kernel.h>
 
 #include <asm/proc_fs.h>
 #include <asm/naca.h>
@@ -39,12 +37,10 @@
 #include <asm/systemcfg.h>
 #include <asm/rtas.h>
 #include <asm/uaccess.h>
-#include <asm/prom.h>
 
 struct proc_ppc64_t proc_ppc64;
 
 void proc_ppc64_create_paca(int num);
-void proc_ppc64_create_smt(void);
 
 static loff_t  page_map_seek( struct file *file, loff_t off, int whence);
 static ssize_t page_map_read( struct file *file, char *buf, size_t nbytes, loff_t *ppos);
@@ -56,32 +52,15 @@ static struct file_operations page_map_fops = {
 	.mmap	= page_map_mmap
 };
 
-#ifdef CONFIG_PPC_PSERIES
-/* routines for /proc/ppc64/ofdt */
-static ssize_t ofdt_write(struct file *, const char __user *, size_t, loff_t *);
-static void proc_ppc64_create_ofdt(struct proc_dir_entry *);
-static int do_remove_node(char *);
-static int do_add_node(char *, size_t);
-static void release_prop_list(const struct property *);
-static struct property *new_property(const char *, const int, const unsigned char *, struct property *);
-static char * parse_next_property(char *, char *, char **, int *, unsigned char**);
-static struct file_operations ofdt_fops = {
-	.write = ofdt_write
-};
-#endif
 
-int __init proc_ppc64_init(void)
+static int __init proc_ppc64_init(void)
 {
 
+	printk(KERN_INFO "proc_ppc64: Creating /proc/ppc64/\n");
 
-	if (proc_ppc64.root == NULL) {
-		printk(KERN_INFO "proc_ppc64: Creating /proc/ppc64/\n");
-		proc_ppc64.root = proc_mkdir("ppc64", 0);
-		if (!proc_ppc64.root)
-			return 0;
-	} else {
+	proc_ppc64.root = proc_mkdir("ppc64", 0);
+	if (!proc_ppc64.root)
 		return 0;
-	}
 
 	proc_ppc64.naca = create_proc_entry("naca", S_IRUSR, proc_ppc64.root);
 	if ( proc_ppc64.naca ) {
@@ -111,18 +90,8 @@ int __init proc_ppc64_init(void)
 		}
 	}
 
-#ifdef CONFIG_PPC_PSERIES
 	/* Placeholder for rtas interfaces. */
-	if (proc_ppc64.rtas == NULL)
-		proc_ppc64.rtas = proc_mkdir("rtas", proc_ppc64.root);
-
-	if (proc_ppc64.rtas)
-		proc_symlink("rtas", 0, "ppc64/rtas");
-
-	proc_ppc64_create_smt();
-
-	proc_ppc64_create_ofdt(proc_ppc64.root);
-#endif
+	proc_ppc64.rtas = proc_mkdir("rtas", proc_ppc64.root);
 
 	return 0;
 }
@@ -204,310 +173,5 @@ static int page_map_mmap( struct file *file, struct vm_area_struct *vma )
 	return 0;
 }
 
-#ifdef CONFIG_PPC_PSERIES
-/* create /proc/ppc64/ofdt write-only by root */
-static void proc_ppc64_create_ofdt(struct proc_dir_entry *parent)
-{
-	struct proc_dir_entry *ent;
-
-	ent = create_proc_entry("ofdt", S_IWUSR, parent);
-	if (ent) {
-		ent->nlink = 1;
-		ent->data = NULL;
-		ent->size = 0;
-		ent->proc_fops = &ofdt_fops;
-	}
-}
-
-/**
- * ofdt_write - perform operations on the Open Firmware device tree
- *
- * @file: not used
- * @buf: command and arguments
- * @count: size of the command buffer
- * @off: not used
- *
- * Operations supported at this time are addition and removal of
- * whole nodes along with their properties.  Operations on individual
- * properties are not implemented (yet).
- */
-static ssize_t ofdt_write(struct file *file, const char __user *buf, size_t count, loff_t *off)
-{
-	int rv = 0;
-	char *kbuf;
-	char *tmp;
-
-	if (!(kbuf = kmalloc(count + 1, GFP_KERNEL))) {
-		rv = -ENOMEM;
-		goto out;
-	}
-	if (copy_from_user(kbuf, buf, count)) {
-		rv = -EFAULT;
-		goto out;
-	}
-
-	kbuf[count] = '\0';
-
-	tmp = strchr(kbuf, ' ');
-	if (!tmp) {
-		rv = -EINVAL;
-		goto out;
-	}
-	*tmp = '\0';
-	tmp++;
-
-	if (!strcmp(kbuf, "add_node"))
-		rv = do_add_node(tmp, count - (tmp - kbuf));
-	else if (!strcmp(kbuf, "remove_node"))
-		rv = do_remove_node(tmp);
-	else
-		rv = -EINVAL;
-out:
-	kfree(kbuf);
-	return rv ? rv : count;
-}
-
-static int do_remove_node(char *buf)
-{
-	struct device_node *node;
-	int rv = 0;
-
-	if ((node = of_find_node_by_path(buf)))
-		of_remove_node(node);
-	else
-		rv = -ENODEV;
-
-	of_node_put(node);
-	return rv;
-}
-
-static int do_add_node(char *buf, size_t bufsize)
-{
-	char *path, *end, *name;
-	struct device_node *np;
-	struct property *prop = NULL;
-	unsigned char* value;
-	int length, rv = 0;
-
-	end = buf + bufsize;
-	path = buf;
-	buf = strchr(buf, ' ');
-	if (!buf)
-		return -EINVAL;
-	*buf = '\0';
-	buf++;
-
-	if ((np = of_find_node_by_path(path))) {
-		of_node_put(np);
-		return -EINVAL;
-	}
-
-	/* rv = build_prop_list(tmp, bufsize - (tmp - buf), &proplist); */
-	while (buf < end &&
-	       (buf = parse_next_property(buf, end, &name, &length, &value))) {
-		struct property *last = prop;
-
-		prop = new_property(name, length, value, last);
-		if (!prop) {
-			rv = -ENOMEM;
-			prop = last;
-			goto out;
-		}
-	}
-	if (!buf) {
-		rv = -EINVAL;
-		goto out;
-	}
-
-	rv = of_add_node(path, prop);
-
-out:
-	if (rv)
-		release_prop_list(prop);
-	return rv;
-}
-
-static struct property *new_property(const char *name, const int length, const unsigned char *value, struct property *last)
-{
-	struct property *new = kmalloc(sizeof(*new), GFP_KERNEL);
-
-	if (!new)
-		return NULL;
-	memset(new, 0, sizeof(*new));
-
-	if (!(new->name = kmalloc(strlen(name) + 1, GFP_KERNEL)))
-		goto cleanup;
-	if (!(new->value = kmalloc(length + 1, GFP_KERNEL)))
-		goto cleanup;
-
-	strcpy(new->name, name);
-	memcpy(new->value, value, length);
-	*(((char *)new->value) + length) = 0;
-	new->length = length;
-	new->next = last;
-	return new;
-
-cleanup:
-	if (new->name)
-		kfree(new->name);
-	if (new->value)
-		kfree(new->value);
-	kfree(new);
-	return NULL;
-}
-
-/**
- * parse_next_property - process the next property from raw input buffer
- * @buf: input buffer, must be nul-terminated
- * @end: end of the input buffer + 1, for validation
- * @name: return value; set to property name in buf
- * @length: return value; set to length of value
- * @value: return value; set to the property value in buf
- *
- * Note that the caller must make copies of the name and value returned,
- * this function does no allocation or copying of the data.  Return value
- * is set to the next name in buf, or NULL on error.
- */
-static char * parse_next_property(char *buf, char *end, char **name, int *length, unsigned char **value)
-{
-	char *tmp;
-
-	*name = buf;
-
-	tmp = strchr(buf, ' ');
-	if (!tmp) {
-		printk(KERN_ERR "property parse failed in %s at line %d\n", __FUNCTION__, __LINE__);
-		return NULL;
-	}
-	*tmp = '\0';
-
-	if (++tmp >= end) {
-		printk(KERN_ERR "property parse failed in %s at line %d\n", __FUNCTION__, __LINE__);
-		return NULL;
-	}
-
-	/* now we're on the length */
-	*length = -1;
-	*length = simple_strtoul(tmp, &tmp, 10);
-	if (*length == -1) {
-		printk(KERN_ERR "property parse failed in %s at line %d\n", __FUNCTION__, __LINE__);
-		return NULL;
-	}
-	if (*tmp != ' ' || ++tmp >= end) {
-		printk(KERN_ERR "property parse failed in %s at line %d\n", __FUNCTION__, __LINE__);
-		return NULL;
-	}
-
-	/* now we're on the value */
-	*value = tmp;
-	tmp += *length;
-	if (tmp > end) {
-		printk(KERN_ERR "property parse failed in %s at line %d\n", __FUNCTION__, __LINE__);
-		return NULL;
-	}
-	else if (tmp < end && *tmp != ' ' && *tmp != '\0') {
-		printk(KERN_ERR "property parse failed in %s at line %d\n", __FUNCTION__, __LINE__);
-		return NULL;
-	}
-	tmp++;
-
-	/* and now we should be on the next name, or the end */
-	return tmp;
-}
-
-static void release_prop_list(const struct property *prop)
-{
-	struct property *next;
-	for (; prop; prop = next) {
-		next = prop->next;
-		kfree(prop->name);
-		kfree(prop->value);
-		kfree(prop);
-	}
-
-}
-#endif	/* defined(CONFIG_PPC_PSERIES) */
-
-static int proc_ppc64_smt_snooze_read(char *page, char **start, off_t off,
-				      int count, int *eof, void *data)
-{
-	if (naca->smt_snooze_delay)
-		return sprintf(page, "%lu\n", naca->smt_snooze_delay);
-	else 
-		return sprintf(page, "disabled\n");
-}
- 
-static int proc_ppc64_smt_snooze_write(struct file* file, const char *buffer,
-				       unsigned long count, void *data)
-{
-	unsigned long val;
-	char val_string[22];
-
-	if (!capable(CAP_SYS_ADMIN))
-		return -EACCES;
-
-	if (count > sizeof(val_string) - 1)
-		return -EINVAL;
-
-	if (copy_from_user(val_string, buffer, count))
-		return -EFAULT;
-
-	val_string[count] = '\0';
-
-	if (val_string[0] == '0' && (val_string[1] == '\n' || val_string[1] == '\0')) {
-		naca->smt_snooze_delay = 0;
-		return count;
-	}
- 
-	val = simple_strtoul(val_string, NULL, 10);
-	if (val != 0) 
-		naca->smt_snooze_delay = val;
-	else
-		return -EINVAL;
-
-	return count;
-}
- 
-static int proc_ppc64_smt_state_read(char *page, char **start, off_t off,
-				      int count, int *eof, void *data)
-{
-	switch(naca->smt_state) {
-	case SMT_OFF:
-		return sprintf(page, "off\n");
-		break;
-	case SMT_ON:
-		return sprintf(page, "on\n");
-		break;
-	case SMT_DYNAMIC:
-		return sprintf(page, "dynamic\n");
-		break;
-	default:
-		return sprintf(page, "unknown\n");
-		break;
-	}
-}
- 
-void proc_ppc64_create_smt(void)
-{
-	struct proc_dir_entry *ent_snooze = 
-		create_proc_entry("smt-snooze-delay", S_IRUGO | S_IWUSR, 
-				  proc_ppc64.root);
-	struct proc_dir_entry *ent_enabled = 
-		create_proc_entry("smt-enabled", S_IRUGO | S_IWUSR, 
-				  proc_ppc64.root);
-	if (ent_snooze) {
-		ent_snooze->nlink = 1;
-		ent_snooze->data = NULL;
-		ent_snooze->read_proc = (void *)proc_ppc64_smt_snooze_read;
-		ent_snooze->write_proc = (void *)proc_ppc64_smt_snooze_write;
-	}
-
-	if (ent_enabled) {
-		ent_enabled->nlink = 1;
-		ent_enabled->data = NULL;
-		ent_enabled->read_proc = (void *)proc_ppc64_smt_state_read;
-		ent_enabled->write_proc = NULL;
-	}
-}
-
 fs_initcall(proc_ppc64_init);
+

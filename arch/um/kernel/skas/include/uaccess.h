@@ -19,7 +19,7 @@
 #define access_ok_skas(type, addr, size) \
 	((segment_eq(get_fs(), KERNEL_DS)) || \
 	 (((unsigned long) (addr) < TASK_SIZE) && \
-	  ((unsigned long) (addr) + (size) <= TASK_SIZE)))
+	  ((unsigned long) (addr) + (size) < TASK_SIZE)))
 
 static inline int verify_area_skas(int type, const void * addr, 
 				   unsigned long size)

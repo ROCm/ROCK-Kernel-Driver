@@ -23,7 +23,6 @@ extern unsigned long cpu_online_map;
 
 static inline unsigned long pcibus_to_cpumask(int bus)
 {
-	BUG_ON(bus >= MAX_MP_BUSSES);
 	return mp_bus_to_cpumask[bus] & cpu_online_map; 
 }
 

@@ -348,6 +348,8 @@ salinfo_log_read_cpu(void *context)
 {
 	struct salinfo_data *data = context;
 	data->log_size = ia64_sal_get_state_info(data->type, (u64 *) data->log_buffer);
+	if (data->type == SAL_INFO_TYPE_CPE || data->type == SAL_INFO_TYPE_CMC)
+		ia64_sal_clear_state_info(data->type);
 }
 
 static void
@@ -440,8 +442,11 @@ salinfo_log_clear(struct salinfo_data *data, int cpu)
 		data->saved_num = 0;
 		spin_unlock_irqrestore(&data_saved_lock, flags);
 	}
-	call_on_cpu(cpu, salinfo_log_clear_cpu, data);
-
+	/* ia64_mca_log_sal_error_record or salinfo_log_read_cpu already cleared
+	 * CPE and CMC errors
+	 */
+	if (data->type != SAL_INFO_TYPE_CPE && data->type != SAL_INFO_TYPE_CMC)
+		call_on_cpu(cpu, salinfo_log_clear_cpu, data);
 	/* clearing a record may make a new record visible */
 	salinfo_log_new_read(cpu, data);
 	if (data->state == STATE_LOG_RECORD &&

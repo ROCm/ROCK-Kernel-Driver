@@ -31,10 +31,6 @@
 #include <asm/kdebug.h>
 #include <asm/proto.h>
 
-/* Workarounds for specific drivers */
-#define FUSION_WORKAROUND 1 
-#define FLUSH_WORKAROUND 1
-
 dma_addr_t bad_dma_address;
 
 unsigned long iommu_bus_base;	/* GART remapping area (physical) */
@@ -54,7 +50,9 @@ int force_iommu = 0;
 #endif
 int iommu_merge = 0; 
 int iommu_sac_force = 0; 
-int iommu_fullflush = 0;
+int iommu_fullflush = 1;
+
+#define MAX_NB 8
 
 /* Allocation bitmap for the remapping area */ 
 static spinlock_t iommu_bitmap_lock = SPIN_LOCK_UNLOCKED;
@@ -75,8 +73,8 @@ static unsigned long *iommu_gart_bitmap; /* guarded by iommu_bitmap_lock */
 	     if (dev->bus->number == 0 && 				     \
 		    (PCI_SLOT(dev->devfn) >= 24) && (PCI_SLOT(dev->devfn) <= 31))
 
-static struct pci_dev *northbridges[NR_CPUS + 1];
-static u32 northbridge_flush_word[NR_CPUS + 1];
+static struct pci_dev *northbridges[MAX_NB];
+static u32 northbridge_flush_word[MAX_NB];
 
 #define EMERGENCY_PAGES 32 /* = 128KB */ 
 
@@ -111,6 +109,8 @@ static unsigned long alloc_iommu(int size)
 			need_flush = 1;
 		} 
 	} 
+	if (iommu_fullflush)
+		need_flush = 1;
 	spin_unlock_irqrestore(&iommu_bitmap_lock, flags);      
 	return offset;
 } 
@@ -139,9 +139,11 @@ static void flush_gart(struct pci_dev *dev)
 	int i;
 
 	spin_lock_irqsave(&iommu_bitmap_lock, flags);
-	if (need_flush || iommu_fullflush) { 
-		for (i = 0; northbridges[i]; i++) {
+	if (need_flush) { 
+		for (i = 0; i < MAX_NB; i++) {
 			u32 w;
+			if (!northbridges[i]) 
+				continue;
 			if (bus >= 0 && !(cpu_isset_const(i, bus_cpumask)))
 				continue;
 			pci_write_config_dword(northbridges[i], 0x9c, 
@@ -389,16 +391,6 @@ static int pci_map_sg_nonforce(struct pci_dev *dev, struct scatterlist *sg,
 	return nents;
 }
 
-static void dump_sg(struct scatterlist *sg, int stopat)
-{
-	int k;
-	for (k = 0; k < stopat; k++) 
-		printk(KERN_EMERG "sg[%d] page:%p dma:%lx offset:%u length:%u\n",
-		       k,
-		       sg[k].page, (unsigned long)sg[k].dma_address, sg[k].offset,
-		       sg[k].length); 		
-}			   
-
 /* Map multiple scatterlist entries continuous into the first. */
 static int __pci_map_cont(struct scatterlist *sg, int start, int stopat, 
 		      struct scatterlist *sout, unsigned long pages)
@@ -433,13 +425,7 @@ static int __pci_map_cont(struct scatterlist *sg, int start, int stopat,
 			iommu_page++;
 	} 
 	} 
-	if (iommu_page - iommu_start != pages) { 
-		printk(KERN_EMERG
-	      "iommu_page:%lx iommu_start:%lx pages:%lu start:%d stopat:%d\n",
-		       iommu_page, iommu_start, pages, start, stopat); 
-		dump_sg(sg, stopat); 	   
-		panic("IOMMU confused"); 
-	} 
+	BUG_ON(iommu_page - iommu_start != pages);	
 	return 0;
 }
 
@@ -567,19 +553,6 @@ int pci_dma_supported(struct pci_dev *dev, u64 mask)
 	   The caller just has to use GFP_DMA in this case. */
         if (mask < 0x00ffffff)
                 return 0;
-
-#ifdef FUSION_WORKAROUND
-	if (dev->vendor == PCI_VENDOR_ID_LSI_LOGIC && mask > 0xffffffff) { 
-		force_iommu = 1;
-		iommu_merge = 1; 
-		return 0; 
-	} 
-#endif
-#ifdef FLUSH_WORKAROUND
-	if ((dev->vendor == PCI_VENDOR_ID_3WARE && mask <= 0xffffffff) ||
-	    (dev->vendor == PCI_VENDOR_ID_QLOGIC && force_iommu))
-		iommu_fullflush = 1;
-#endif
 
 	/* Tell the device to use SAC when IOMMU force is on. 
 	   This allows the driver to use cheaper accesses in some cases.
@@ -800,10 +773,9 @@ static int __init pci_iommu_init(void)
 	for_all_nb(dev) {
 		u32 flag; 
 		int cpu = PCI_SLOT(dev->devfn) - 24;
-		if (cpu >= NR_CPUS)
+		if (cpu >= MAX_NB)
 			continue;
 		northbridges[cpu] = dev;
-
 		pci_read_config_dword(dev, 0x9c, &flag); /* cache flush word */
 		northbridge_flush_word[cpu] = flag; 
 	}

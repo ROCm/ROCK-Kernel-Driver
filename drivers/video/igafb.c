@@ -332,7 +332,7 @@ static struct fb_ops igafb_ops = {
 #endif
 };
 
-static int __init iga_init(struct fb_info *info, struct iga_par *par, struct pci_dev *dev)
+static int __init iga_init(struct fb_info *info, struct iga_par *par)
 {
         char vramsz = iga_inb(par, IGA_EXT_CNTRL, IGA_IDX_EXT_BUS_CNTL) 
 		                                         & MEM_SIZE_ALIAS;
@@ -358,7 +358,6 @@ static int __init iga_init(struct fb_info *info, struct iga_par *par, struct pci
 
 	info->fbops = &igafb_ops;
 	info->flags = FBINFO_FLAG_DEFAULT;
-	info->dev = &dev->dev;
 
 	fb_alloc_cmap(&info->cmap, video_cmap_len, 0);
 
@@ -530,7 +529,7 @@ int __init igafb_init(void)
 	info->fix = igafb_fix;
 	info->pseudo_palette = (void *)(par + 1);
 
-	if (!iga_init(info, par, pdev)) {
+	if (!iga_init(info, par)) {
 		iounmap((void *)par->io_base);
 		iounmap(info->screen_base);
 		if (par->mmap_map)

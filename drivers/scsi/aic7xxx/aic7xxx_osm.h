@@ -53,7 +53,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.h#147 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.h#151 $
  *
  */
 #ifndef _AIC7XXX_LINUX_H_
@@ -304,7 +304,7 @@ ahc_scb_timer_reset(struct scb *scb, u_int usec)
 #define AHC_SCSI_HAS_HOST_LOCK 0
 #endif
 
-#define AIC7XXX_DRIVER_VERSION "6.2.35"
+#define AIC7XXX_DRIVER_VERSION "6.2.36"
 
 /**************************** Front End Queues ********************************/
 /*
@@ -595,10 +595,6 @@ ahc_delay(long usec)
 
 
 /***************************** Low Level I/O **********************************/
-#if defined(__powerpc__) || defined(__i386__) || defined(__ia64__)
-#define MMAPIO
-#endif
-
 static __inline uint8_t ahc_inb(struct ahc_softc * ahc, long port);
 static __inline void ahc_outb(struct ahc_softc * ahc, long port, uint8_t val);
 static __inline void ahc_outsb(struct ahc_softc * ahc, long port,
@@ -610,16 +606,12 @@ static __inline uint8_t
 ahc_inb(struct ahc_softc * ahc, long port)
 {
 	uint8_t x;
-#ifdef MMAPIO
 
 	if (ahc->tag == BUS_SPACE_MEMIO) {
 		x = readb(ahc->bsh.maddr + port);
 	} else {
 		x = inb(ahc->bsh.ioport + port);
 	}
-#else
-	x = inb(ahc->bsh.ioport + port);
-#endif
 	mb();
 	return (x);
 }
@@ -627,15 +619,11 @@ ahc_inb(struct ahc_softc * ahc, long port)
 static __inline void
 ahc_outb(struct ahc_softc * ahc, long port, uint8_t val)
 {
-#ifdef MMAPIO
 	if (ahc->tag == BUS_SPACE_MEMIO) {
 		writeb(val, ahc->bsh.maddr + port);
 	} else {
 		outb(val, ahc->bsh.ioport + port);
 	}
-#else
-	outb(val, ahc->bsh.ioport + port);
-#endif
 	mb();
 }
 
@@ -843,15 +831,26 @@ typedef enum
 	AHC_POWER_STATE_D3
 } ahc_power_state;
 
-void ahc_power_state_change(struct ahc_softc *ahc,
-			    ahc_power_state new_state);
 /**************************** VL/EISA Routines ********************************/
-int			 aic7770_linux_probe(Scsi_Host_Template *);
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0) \
+  && (defined(__i386__) || defined(__alpha__)) \
+  && (!defined(CONFIG_EISA)))
+#define CONFIG_EISA
+#endif
+
+#ifdef CONFIG_EISA
+extern uint32_t aic7xxx_probe_eisa_vl;
+void			 ahc_linux_eisa_init(void);
+void			 ahc_linux_eisa_exit(void);
 int			 aic7770_map_registers(struct ahc_softc *ahc,
 					       u_int port);
 int			 aic7770_map_int(struct ahc_softc *ahc, u_int irq);
+#endif
 
 /******************************* PCI Routines *********************************/
+#ifdef CONFIG_PCI
+void			 ahc_power_state_change(struct ahc_softc *ahc,
+						ahc_power_state new_state);
 int			 ahc_linux_pci_init(void);
 void			 ahc_linux_pci_exit(void);
 int			 ahc_pci_map_registers(struct ahc_softc *ahc);
@@ -933,6 +932,7 @@ ahc_get_pci_bus(ahc_dev_softc_t pci)
 {
 	return (pci->bus->number);
 }
+#endif
 
 static __inline void ahc_flush_device_writes(struct ahc_softc *);
 static __inline void
@@ -962,7 +962,12 @@ ahc_flush_device_writes(struct ahc_softc *ahc)
 	(((dev_softc)->dma_mask = mask) && 0)
 #endif
 /**************************** Proc FS Support *********************************/
-int	ahc_linux_proc_info(struct Scsi_Host *, char *, char **, off_t, int, int);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+int	ahc_linux_proc_info(char *, char **, off_t, int, int, int);
+#else
+int	ahc_linux_proc_info(struct Scsi_Host *, char *, char **,
+			    off_t, int, int);
+#endif
 
 /*************************** Domain Validation ********************************/
 #define AHC_DV_CMD(cmd) ((cmd)->scsi_done == ahc_linux_dv_complete)

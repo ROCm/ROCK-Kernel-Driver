@@ -11,7 +11,6 @@
 
 #include <linux/config.h>
 #include <linux/seq_file.h>
-#include <linux/irq.h>
 
 struct pt_regs;
 struct pci_bus;	
@@ -68,7 +67,6 @@ struct machdep_calls {
 	void		(*get_cpuinfo)(struct seq_file *m);
 
 	void		(*init_IRQ)(void);
-	void		(*init_irq_desc)(irq_desc_t *desc);
 	int		(*get_irq)(struct pt_regs *);
 
 	/* Optional, may be NULL. */
@@ -90,12 +88,6 @@ struct machdep_calls {
 	void		(*udbg_putc)(unsigned char c);
 	unsigned char	(*udbg_getc)(void);
 	int		(*udbg_getc_poll)(void);
-
-	/* Interface for platform error logging */
-	void 		(*log_error)(char *buf, unsigned int err_type, int fatal);
-
-	ssize_t		(*nvram_write)(char *buf, size_t count, loff_t *index);
-	ssize_t		(*nvram_read)(char *buf, size_t count, loff_t *index);	
 
 #ifdef CONFIG_SMP
 	/* functions for dealing with other cpus */
@@ -120,12 +112,6 @@ void ppc64_terminate_msg(unsigned int src, const char *msg);
 void ppc64_attention_msg(unsigned int src, const char *msg);
 /* Print a dump progress message. */
 void ppc64_dump_msg(unsigned int src, const char *msg);
-
-static inline void log_error(char *buf, unsigned int err_type, int fatal)
-{
-	if (ppc_md.log_error)
-		ppc_md.log_error(buf, err_type, fatal);
-}
 
 #endif /* _PPC64_MACHDEP_H */
 #endif /* __KERNEL__ */

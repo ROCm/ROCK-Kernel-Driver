@@ -219,10 +219,10 @@ static long pSeries_hpte_updatepp(unsigned long slot, unsigned long newpp,
 
 	/* Ensure it is out of the tlb too */
 	if ((cur_cpu_spec->cpu_features & CPU_FTR_TLBIEL) && !large && local) {
-		tlbiel(va);
+		_tlbiel(va);
 	} else {
 		spin_lock_irqsave(&pSeries_tlbie_lock, flags);
-		tlbie(va, large);
+		_tlbie(va, large);
 		spin_unlock_irqrestore(&pSeries_tlbie_lock, flags);
 	}
 
@@ -256,7 +256,7 @@ static void pSeries_hpte_updateboltedpp(unsigned long newpp, unsigned long ea)
 
 	/* Ensure it is out of the tlb too */
 	spin_lock_irqsave(&pSeries_tlbie_lock, flags);
-	tlbie(va, 0);
+	_tlbie(va, 0);
 	spin_unlock_irqrestore(&pSeries_tlbie_lock, flags);
 }
 
@@ -285,10 +285,10 @@ static void pSeries_hpte_invalidate(unsigned long slot, unsigned long va,
 
 	/* Invalidate the tlb */
 	if ((cur_cpu_spec->cpu_features & CPU_FTR_TLBIEL) && !large && local) {
-		tlbiel(va);
+		_tlbiel(va);
 	} else {
 		spin_lock_irqsave(&pSeries_tlbie_lock, flags);
-		tlbie(va, large);
+		_tlbie(va, large);
 		spin_unlock_irqrestore(&pSeries_tlbie_lock, flags);
 	}
 }
@@ -350,8 +350,12 @@ static void pSeries_flush_hash_range(unsigned long context,
 	if ((cur_cpu_spec->cpu_features & CPU_FTR_TLBIEL) && !large && local) {
 		asm volatile("ptesync":::"memory");
 
-		for (i = 0; i < j; i++)
-			__tlbiel(batch->vaddr[i]);
+		for (i = 0; i < j; i++) {
+			asm volatile("\n\
+			clrldi  %0,%0,16\n\
+			tlbiel   %0"
+			: : "r" (batch->vaddr[i]) : "memory" );
+		}
 
 		asm volatile("ptesync":::"memory");
 	} else {
@@ -360,8 +364,12 @@ static void pSeries_flush_hash_range(unsigned long context,
 
 		asm volatile("ptesync":::"memory");
 
-		for (i = 0; i < j; i++)
-			__tlbie(batch->vaddr[i], 0);
+		for (i = 0; i < j; i++) {
+			asm volatile("\n\
+			clrldi  %0,%0,16\n\
+			tlbie   %0"
+			: : "r" (batch->vaddr[i]) : "memory" );
+		}
 
 		asm volatile("eieio; tlbsync; ptesync":::"memory");
 
@@ -381,11 +389,10 @@ void hpte_init_pSeries(void)
 	ppc_md.hpte_remove     	= pSeries_hpte_remove;
 
 	/* Disable TLB batching on nighthawk */
-	root = of_find_node_by_path("/");
+	root = find_path_device("/");
 	if (root) {
 		model = get_property(root, "model", NULL);
 		if (strcmp(model, "CHRP IBM,9076-N81"))
 			ppc_md.flush_hash_range = pSeries_flush_hash_range;
-		of_node_put(root);
 	}
 }

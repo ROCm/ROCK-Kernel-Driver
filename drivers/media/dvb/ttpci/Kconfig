@@ -1,6 +1,7 @@
 config DVB_AV7110
 	tristate "AV7110 cards"
 	depends on DVB_CORE
+	select FW_LOADER
 	select VIDEO_DEV
 	select VIDEO_SAA7146_VV
 	help
@@ -11,6 +12,23 @@ config DVB_AV7110
 	  onboard MPEG2 decoder.
 
 	  Say Y if you own such a card and want to use it.
+
+config DVB_AV7110_FIRMWARE
+	bool "Compile AV7110 firmware into the driver"
+	depends on DVB_AV7110
+	help
+	  The AV7110 firmware is normally loaded by the firmware hotplug manager.
+	  If you want to compile the firmware into the driver you need to say
+	  Y here and provide the correct path of the firmware. You need this
+	  option if you want to compile the whole driver statically into the
+	  kernel. 
+
+	  All other people say N.
+
+config DVB_AV7110_FIRMWARE_FILE
+	string "Full pathname of av7110 firmware file"
+	depends on DVB_AV7110_FIRMWARE
+	default "/usr/lib/hotplug/firmware/dvb-ttpci-01.fw"
 
 config DVB_AV7110_OSD
 	bool "AV7110 OSD support"

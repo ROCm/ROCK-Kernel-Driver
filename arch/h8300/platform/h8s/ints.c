@@ -280,9 +280,9 @@ asmlinkage void process_int(unsigned long vec, struct pt_regs *fp)
 
 int show_interrupts(struct seq_file *p, void *v)
 {
-	int i;
+	int i = *(loff_t *) v;
 
-	for (i = 0; i < NR_IRQS; i++) {
+	if (i < NR_IRQS) {
 		if (irq_list[i]) {
 			seq_printf(p, "%3d: %10u ",i,irq_list[i]->count);
 			seq_printf(p, "%s\n", irq_list[i]->devname);

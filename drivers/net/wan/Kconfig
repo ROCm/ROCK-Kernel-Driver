@@ -334,7 +334,7 @@ config WANXL
 
 	  If you want to compile the driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
+	  say M here and read <file:Documentation/kbuild/modules.txt>.  The module
 	  will be called wanxl.
 
 	  If unsure, say N here.
@@ -467,7 +467,7 @@ config SDLA
 	  Say Y here if you need a driver for the Sangoma S502A, S502E, and
 	  S508 Frame Relay Access Devices. These are multi-protocol cards, but
 	  only frame relay is supported by the driver at this time. Please
-	  read <file:Documentation/framerelay.txt>.
+	  read <file:Documentation/networking/framerelay.txt>.
 
 	  To compile this driver as a module, choose M here: the module will be
 	  called sdla.

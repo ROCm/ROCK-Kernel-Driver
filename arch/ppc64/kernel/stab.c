@@ -23,7 +23,6 @@
 #include <asm/pmc.h>
 #include <asm/cputable.h>
 
-
 int make_ste(unsigned long stab, unsigned long esid, unsigned long vsid);
 void make_slbe(unsigned long esid, unsigned long vsid, int large,
 	       int kernel_segment);

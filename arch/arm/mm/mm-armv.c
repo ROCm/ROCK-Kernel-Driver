@@ -10,6 +10,7 @@
  *  Page table sludge for ARM v3 and v4 processor architectures.
  */
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/mm.h>
 #include <linux/init.h>
 #include <linux/bootmem.h>
@@ -25,23 +26,52 @@
 
 #include <asm/mach/map.h>
 
-static unsigned int cachepolicy __initdata = PMD_SECT_WB;
+#define CPOLICY_UNCACHED	0
+#define CPOLICY_BUFFERED	1
+#define CPOLICY_WRITETHROUGH	2
+#define CPOLICY_WRITEBACK	3
+#define CPOLICY_WRITEALLOC	4
+
+static unsigned int cachepolicy __initdata = CPOLICY_WRITEBACK;
 static unsigned int ecc_mask __initdata = 0;
+pgprot_t pgprot_kernel;
+
+EXPORT_SYMBOL(pgprot_kernel);
 
 struct cachepolicy {
-	char		*policy;
+	const char	policy[16];
 	unsigned int	cr_mask;
 	unsigned int	pmd;
+	unsigned int	pte;
 };
 
 static struct cachepolicy cache_policies[] __initdata = {
-	{ "uncached",		CR_W|CR_C,	PMD_SECT_UNCACHED },
-	{ "buffered",		CR_C,		PMD_SECT_BUFFERED },
-	{ "writethrough",	0,		PMD_SECT_WT       },
-#ifndef CONFIG_CPU_DCACHE_WRITETHROUGH
-	{ "writeback",		0,		PMD_SECT_WB       },
-	{ "writealloc",		0,		PMD_SECT_WBWA     }
-#endif
+	{
+		.policy		= "uncached",
+		.cr_mask	= CR_W|CR_C,
+		.pmd		= PMD_SECT_UNCACHED,
+		.pte		= 0,
+	}, {
+		.policy		= "buffered",
+		.cr_mask	= CR_C,
+		.pmd		= PMD_SECT_BUFFERED,
+		.pte		= PTE_BUFFERABLE,
+	}, {
+		.policy		= "writethrough",
+		.cr_mask	= 0,
+		.pmd		= PMD_SECT_WT,
+		.pte		= PTE_CACHEABLE,
+	}, {
+		.policy		= "writeback",
+		.cr_mask	= 0,
+		.pmd		= PMD_SECT_WB,
+		.pte		= PTE_BUFFERABLE|PTE_CACHEABLE,
+	}, {
+		.policy		= "writealloc",
+		.cr_mask	= 0,
+		.pmd		= PMD_SECT_WBWA,
+		.pte		= PTE_BUFFERABLE|PTE_CACHEABLE,
+	}
 };
 
 /*
@@ -58,7 +88,7 @@ static void __init early_cachepolicy(char **p)
 		int len = strlen(cache_policies[i].policy);
 
 		if (memcmp(*p, cache_policies[i].policy, len) == 0) {
-			cachepolicy = cache_policies[i].pmd;
+			cachepolicy = i;
 			cr_alignment &= ~cache_policies[i].cr_mask;
 			cr_no_alignment &= ~cache_policies[i].cr_mask;
 			*p += len;
@@ -306,9 +336,23 @@ static struct mem_types mem_types[] __initdata = {
  */
 static void __init build_mem_type_table(void)
 {
+	struct cachepolicy *cp;
 	unsigned int cr = get_cr();
 	int cpu_arch = cpu_architecture();
-	const char *policy;
+	int i;
+
+#if defined(CONFIG_CPU_DCACHE_DISABLE)
+	if (cachepolicy > CPOLICY_BUFFERED)
+		cachepolicy = CPOLICY_BUFFERED;
+#elif defined(CONFIG_CPU_DCACHE_WRITETHROUGH)
+	if (cachepolicy > CPOLICY_WRITETHROUGH)
+		cachepolicy = CPOLICY_WRITETHROUGH;
+#endif
+	if (cpu_arch < CPU_ARCH_ARMv5) {
+		if (cachepolicy >= CPOLICY_WRITEALLOC)
+			cachepolicy = CPOLICY_WRITEBACK;
+		ecc_mask = 0;
+	}
 
 	/*
 	 * ARMv6 and above have extended page tables.
@@ -327,56 +371,39 @@ static void __init build_mem_type_table(void)
 		mem_types[MT_CACHECLEAN].prot_sect |= PMD_SECT_APX|PMD_SECT_AP_WRITE;
 	}
 
-	/*
-	 * ARMv6 can map the vectors as write-through.
-	 */
-	if (cpu_arch >= CPU_ARCH_ARMv6)
-		mem_types[MT_VECTORS].prot_pte |= PTE_CACHEABLE;
-	else
-		mem_types[MT_VECTORS].prot_pte |= PTE_BUFFERABLE|PTE_CACHEABLE;
+	cp = &cache_policies[cachepolicy];
 
-	/*
-	 * ARMv5 and higher can use ECC memory.
-	 */
 	if (cpu_arch >= CPU_ARCH_ARMv5) {
-		mem_types[MT_VECTORS].prot_l1 |= ecc_mask;
-		mem_types[MT_MEMORY].prot_sect |= ecc_mask;
+		mem_types[MT_VECTORS].prot_pte |= cp->pte & PTE_CACHEABLE;
 	} else {
+		mem_types[MT_VECTORS].prot_pte |= cp->pte;
 		mem_types[MT_MINICLEAN].prot_sect &= ~PMD_SECT_TEX(1);
-		if (cachepolicy == PMD_SECT_WBWA)
-			cachepolicy = PMD_SECT_WB;
-		ecc_mask = 0;
 	}
 
-	mem_types[MT_MEMORY].prot_sect |= cachepolicy;
+	mem_types[MT_VECTORS].prot_l1 |= ecc_mask;
+	mem_types[MT_MEMORY].prot_sect |= ecc_mask | cp->pmd;
 
-	switch (cachepolicy) {
-	default:
-	case PMD_SECT_UNCACHED:
-		policy = "uncached";
-		break;
-	case PMD_SECT_BUFFERED:
-		mem_types[MT_VECTORS].prot_pte |= PTE_BUFFERABLE;
-		policy = "buffered";
-		break;
+	for (i = 0; i < 16; i++) {
+		unsigned long v = pgprot_val(protection_map[i]);
+		v &= (~(PTE_BUFFERABLE|PTE_CACHEABLE)) | cp->pte;
+		protection_map[i] = __pgprot(v);
+	}
+
+	pgprot_kernel = __pgprot(L_PTE_PRESENT | L_PTE_YOUNG |
+				 L_PTE_DIRTY | L_PTE_WRITE |
+				 L_PTE_EXEC | cp->pte);
+
+	switch (cp->pmd) {
 	case PMD_SECT_WT:
-		mem_types[MT_VECTORS].prot_pte |= PTE_BUFFERABLE|PTE_CACHEABLE;
 		mem_types[MT_CACHECLEAN].prot_sect |= PMD_SECT_WT;
-		policy = "write through";
 		break;
 	case PMD_SECT_WB:
-		mem_types[MT_VECTORS].prot_pte |= PTE_BUFFERABLE|PTE_CACHEABLE;
-		mem_types[MT_CACHECLEAN].prot_sect |= PMD_SECT_WB;
-		policy = "write back";
-		break;
 	case PMD_SECT_WBWA:
-		mem_types[MT_VECTORS].prot_pte |= PTE_BUFFERABLE|PTE_CACHEABLE;
 		mem_types[MT_CACHECLEAN].prot_sect |= PMD_SECT_WB;
-		policy = "write back, write allocate";
 		break;
 	}
 	printk("Memory policy: ECC %sabled, Data cache %s\n",
-		ecc_mask ? "en" : "dis", policy);
+		ecc_mask ? "en" : "dis", cp->policy);
 }
 
 /*

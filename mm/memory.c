@@ -44,7 +44,6 @@
 #include <linux/highmem.h>
 #include <linux/pagemap.h>
 #include <linux/rmap-locking.h>
-#include <linux/init.h>
 #include <linux/module.h>
 
 #include <asm/pgalloc.h>
@@ -122,12 +121,8 @@ static inline void free_one_pgd(struct mmu_gather *tlb, pgd_t * dir)
 	}
 	pmd = pmd_offset(dir, 0);
 	pgd_clear(dir);
-	for (j = 0; j < PTRS_PER_PMD - PREFETCH_STRIDE/sizeof(*pmd); ++j) {
-		prefetchw(pmd + j + PREFETCH_STRIDE/sizeof(*pmd));
-		free_one_pmd(tlb, pmd + j);
-	}
-	for (; j < PTRS_PER_PMD; j++)
-		free_one_pmd(tlb, pmd + j);
+	for (j = 0; j < PTRS_PER_PMD ; j++)
+		free_one_pmd(tlb, pmd+j);
 	pmd_free_tlb(tlb, pmd);
 }
 
@@ -684,25 +679,6 @@ static inline struct page *get_page_map(struct page *page)
 	return page;
 }
 
-#ifdef FIXADDR_START
-static struct vm_area_struct fixmap_vma = {
-	/* Catch users - if there are any valid
-	   ones, we can make this be "&init_mm" or
-	   something.  */
-	.vm_mm = NULL,
-	.vm_page_prot = PAGE_READONLY,
-	.vm_flags = VM_READ | VM_EXEC,
-};
-
-static int init_fixmap_vma(void)
-{
-	fixmap_vma.vm_start = FIXADDR_START;
-	fixmap_vma.vm_end = FIXADDR_TOP;
-	return(0);
-}
-
-__initcall(init_fixmap_vma);
-#endif
 
 int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 		unsigned long start, int len, int write, int force,
@@ -724,8 +700,19 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 
 		vma = find_extend_vma(mm, start);
 
-#ifdef FIXADDR_START
-		if (!vma && start >= FIXADDR_START && start < FIXADDR_TOP) {
+#ifdef FIXADDR_USER_START
+		if (!vma &&
+		    start >= FIXADDR_USER_START && start < FIXADDR_USER_END) {
+			static struct vm_area_struct fixmap_vma = {
+				/* Catch users - if there are any valid
+				   ones, we can make this be "&init_mm" or
+				   something.  */
+				.vm_mm = NULL,
+				.vm_start = FIXADDR_USER_START,
+				.vm_end = FIXADDR_USER_END,
+				.vm_page_prot = PAGE_READONLY,
+				.vm_flags = VM_READ | VM_EXEC,
+			};
 			unsigned long pg = start & PAGE_MASK;
 			pgd_t *pgd;
 			pmd_t *pmd;
@@ -1413,7 +1400,7 @@ do_no_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	pte_t entry;
 	struct pte_chain *pte_chain;
 	int sequence = 0;
-	int ret;
+	int ret = VM_FAULT_MINOR;
 
 	if (!vma->vm_ops || !vma->vm_ops->nopage)
 		return do_anonymous_page(mm, vma, page_table,
@@ -1427,7 +1414,7 @@ do_no_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	}
 	smp_rmb();  /* Prevent CPU from reordering lock-free ->nopage() */
 retry:
-	new_page = vma->vm_ops->nopage(vma, address & PAGE_MASK, 0);
+	new_page = vma->vm_ops->nopage(vma, address & PAGE_MASK, &ret);
 
 	/* no page was available -- either SIGBUS or OOM */
 	if (new_page == NOPAGE_SIGBUS)
@@ -1496,14 +1483,12 @@ retry:
 		pte_unmap(page_table);
 		page_cache_release(new_page);
 		spin_unlock(&mm->page_table_lock);
-		ret = VM_FAULT_MINOR;
 		goto out;
 	}
 
 	/* no need to invalidate: a not-present page shouldn't be cached */
 	update_mmu_cache(vma, address, entry);
 	spin_unlock(&mm->page_table_lock);
-	ret = VM_FAULT_MAJOR;
 	goto out;
 oom:
 	ret = VM_FAULT_OOM;

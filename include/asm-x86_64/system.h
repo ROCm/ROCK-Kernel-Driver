@@ -188,7 +188,7 @@ static inline void write_cr4(unsigned long val)
 
 #define __xg(x) ((volatile long *)(x))
 
-static inline void set_64bit(volatile unsigned long *ptr, unsigned long val)
+extern inline void set_64bit(volatile unsigned long *ptr, unsigned long val)
 {
 	*ptr = val;
 }

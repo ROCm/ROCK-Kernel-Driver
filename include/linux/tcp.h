@@ -386,7 +386,10 @@ struct tcp_sock {
 	struct tcp_opt	  tcp;
 };
 
-#define tcp_sk(__sk) (&((struct tcp_sock *)__sk)->tcp)
+static inline struct tcp_opt * tcp_sk(const struct sock *__sk)
+{
+	return &((struct tcp_sock *)__sk)->tcp;
+}
 
 #endif
 

@@ -1751,7 +1751,6 @@ static int __devinit rivafb_probe(struct pci_dev *pd,
 	if (info->pixmap.addr == NULL)
 		goto err_out_kfree1;
 	memset(info->pixmap.addr, 0, 64 * 1024);
-	info->dev = &pd->dev;
 
 	strcat(rivafb_fix.id, rci->name);
 	default_par->riva.Architecture = rci->arch_rev;

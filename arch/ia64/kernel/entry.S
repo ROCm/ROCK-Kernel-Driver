@@ -484,33 +484,10 @@ GLOBAL_ENTRY(clone)
 END(clone)
 
 	/*
-	 * We invoke syscall_trace through this intermediate function to
-	 * ensure that the syscall input arguments are not clobbered.  We
-	 * also use it to preserve b6, which contains the syscall entry point.
-	 */
-GLOBAL_ENTRY(invoke_syscall_trace)
-	.prologue ASM_UNW_PRLG_RP|ASM_UNW_PRLG_PFS, ASM_UNW_PRLG_GRSAVE(8)
-	alloc loc1=ar.pfs,8,3,0,0
-	mov loc0=rp
-	.body
-	mov loc2=b6
-	;;
-	br.call.sptk.many rp=syscall_trace
-.ret3:	mov rp=loc0
-	mov ar.pfs=loc1
-	mov b6=loc2
-	br.ret.sptk.many rp
-END(invoke_syscall_trace)
-
-	/*
 	 * Invoke a system call, but do some tracing before and after the call.
 	 * We MUST preserve the current register frame throughout this routine
 	 * because some system calls (such as ia64_execve) directly
 	 * manipulate ar.pfs.
-	 *
-	 * Input:
-	 *	r15 = syscall number
-	 *	b6  = syscall entry point
 	 */
 	.global ia64_strace_leave_kernel
 
@@ -522,21 +499,38 @@ GLOBAL_ENTRY(ia64_trace_syscall)
 	 */
 	nop.m 0
 	nop.i 0
-	br.call.sptk.many rp=invoke_syscall_trace // give parent a chance to catch syscall args
+	br.call.sptk.many rp=syscall_trace // give parent a chance to catch syscall args
 }
-.ret6:	br.call.sptk.many rp=b6			// do the syscall
-strace_check_retval:
+	// the syscall number may have changed, so re-load it and re-calculate the
+	// syscall entry-point:
+	adds r15=PT(R15)+16,sp			// r15 = &pt_regs.r15 (syscall #)
+	;;
+	ld8 r15=[r15]
+	mov r3=NR_syscalls - 1
+	;;
+	adds r15=-1024,r15
+	movl r16=sys_call_table
+	;;
+	shladd r20=r15,3,r16			// r20 = sys_call_table + 8*(syscall-1024)
+	cmp.leu p6,p7=r15,r3
+	;;
+(p6)	ld8 r20=[r20]				// load address of syscall entry point
+(p7)	movl r20=sys_ni_syscall
+	;;
+	mov b6=r20
+	br.call.sptk.many rp=b6			// do the syscall
+.strace_check_retval:
 	cmp.lt p6,p0=r8,r0			// syscall failed?
 	adds r2=PT(R8)+16,sp			// r2 = &pt_regs.r8
 	adds r3=PT(R10)+16,sp			// r3 = &pt_regs.r10
 	mov r10=0
 (p6)	br.cond.sptk strace_error		// syscall failed ->
 	;;					// avoid RAW on r10
-strace_save_retval:
+.strace_save_retval:
 .mem.offset 0,0; st8.spill [r2]=r8		// store return value in slot for r8
 .mem.offset 8,0; st8.spill [r3]=r10		// clear error indication in slot for r10
 ia64_strace_leave_kernel:
-	br.call.sptk.many rp=invoke_syscall_trace // give parent a chance to catch return value
+	br.call.sptk.many rp=syscall_trace // give parent a chance to catch return value
 .rety:	br.cond.sptk ia64_leave_syscall
 
 strace_error:
@@ -548,7 +542,7 @@ strace_error:
 	;;
 (p6)	mov r10=-1
 (p6)	mov r8=r9
-	br.cond.sptk strace_save_retval
+	br.cond.sptk .strace_save_retval
 END(ia64_trace_syscall)
 
 GLOBAL_ENTRY(ia64_ret_from_clone)
@@ -573,7 +567,7 @@ GLOBAL_ENTRY(ia64_ret_from_clone)
 	;;
 	mov r8=0
 	tbit.nz p6,p0=r2,TIF_SYSCALL_TRACE
-(p6)	br.cond.spnt strace_check_retval
+(p6)	br.cond.spnt .strace_check_retval
 	;;					// added stop bits to prevent r8 dependency
 END(ia64_ret_from_clone)
 	// fall through
@@ -726,6 +720,7 @@ GLOBAL_ENTRY(ia64_leave_syscall)
 	mov b6=r22				// restore b6
 	shr.u r18=r19,16	// get byte size of existing "dirty" partition
 (pKStk) br.cond.dpnt.many skip_rbs_switch
+(pNonSys) br.cond.dpnt.many dont_preserve_current_frame
 	br.cond.sptk.many rbs_switch
 END(ia64_leave_syscall)
 
@@ -1334,9 +1329,9 @@ sys_call_table:
 	data8 sys_syslog
 	data8 sys_setitimer
 	data8 sys_getitimer
-	data8 ia64_ni_syscall			// 1120		/* was: ia64_oldstat */
-	data8 ia64_ni_syscall					/* was: ia64_oldlstat */
-	data8 ia64_ni_syscall					/* was: ia64_oldfstat */
+	data8 sys_ni_syscall			// 1120		/* was: ia64_oldstat */
+	data8 sys_ni_syscall					/* was: ia64_oldlstat */
+	data8 sys_ni_syscall					/* was: ia64_oldfstat */
 	data8 sys_vhangup
 	data8 sys_lchown
 	data8 sys_remap_file_pages		// 1125
@@ -1346,16 +1341,16 @@ sys_call_table:
 	data8 sys_setdomainname
 	data8 sys_newuname			// 1130
 	data8 sys_adjtimex
-	data8 ia64_ni_syscall					/* was: ia64_create_module */
+	data8 sys_ni_syscall					/* was: ia64_create_module */
 	data8 sys_init_module
 	data8 sys_delete_module
-	data8 ia64_ni_syscall			// 1135		/* was: sys_get_kernel_syms */
-	data8 ia64_ni_syscall					/* was: sys_query_module */
+	data8 sys_ni_syscall			// 1135		/* was: sys_get_kernel_syms */
+	data8 sys_ni_syscall					/* was: sys_query_module */
 	data8 sys_quotactl
 	data8 sys_bdflush
 	data8 sys_sysfs
 	data8 sys_personality			// 1140
-	data8 ia64_ni_syscall		// sys_afs_syscall
+	data8 sys_ni_syscall		// sys_afs_syscall
 	data8 sys_setfsuid
 	data8 sys_setfsgid
 	data8 sys_getdents
@@ -1473,26 +1468,26 @@ sys_call_table:
 	data8 sys_clock_nanosleep
 	data8 sys_fstatfs64
 	data8 sys_statfs64
-	data8 ia64_ni_syscall
-	data8 ia64_ni_syscall			// 1260
-	data8 ia64_ni_syscall
-	data8 ia64_ni_syscall
-	data8 ia64_ni_syscall
-	data8 ia64_ni_syscall
-	data8 ia64_ni_syscall			// 1265
-	data8 ia64_ni_syscall
-	data8 ia64_ni_syscall
-	data8 ia64_ni_syscall
-	data8 ia64_ni_syscall
-	data8 ia64_ni_syscall			// 1270
-	data8 ia64_ni_syscall
-	data8 ia64_ni_syscall
-	data8 ia64_ni_syscall
-	data8 ia64_ni_syscall
-	data8 ia64_ni_syscall			// 1275
-	data8 ia64_ni_syscall
-	data8 ia64_ni_syscall
-	data8 ia64_ni_syscall
-	data8 ia64_ni_syscall
+	data8 sys_ni_syscall
+	data8 sys_ni_syscall			// 1260
+	data8 sys_ni_syscall
+	data8 sys_ni_syscall
+	data8 sys_ni_syscall
+	data8 sys_ni_syscall
+	data8 sys_ni_syscall			// 1265
+	data8 sys_ni_syscall
+	data8 sys_ni_syscall
+	data8 sys_ni_syscall
+	data8 sys_ni_syscall
+	data8 sys_ni_syscall			// 1270
+	data8 sys_ni_syscall
+	data8 sys_ni_syscall
+	data8 sys_ni_syscall
+	data8 sys_ni_syscall
+	data8 sys_ni_syscall			// 1275
+	data8 sys_ni_syscall
+	data8 sys_ni_syscall
+	data8 sys_ni_syscall
+	data8 sys_ni_syscall
 
 	.org sys_call_table + 8*NR_syscalls	// guard against failures to increase NR_syscalls

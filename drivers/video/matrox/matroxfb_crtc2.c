@@ -605,7 +605,6 @@ static int matroxfb_dh_regit(CPMINFO struct matroxfb_dh_fb_info* m2info) {
 	m2info->fbcon.flags = FBINFO_FLAG_DEFAULT;
 	m2info->fbcon.currcon = -1;
 	m2info->fbcon.pseudo_palette = m2info->cmap;
-	m2info->fbcon.dev = &m2info->primary_dev->pcidev->dev;
 	fb_alloc_cmap(&m2info->fbcon.cmap, 256, 1);
 
 	if (mem < 64)

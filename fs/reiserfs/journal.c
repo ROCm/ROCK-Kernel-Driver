@@ -1967,7 +1967,7 @@ static int journal_init_dev( struct super_block *super,
 /*
 ** must be called once on fs mount.  calls journal_read for you
 */
-int journal_init(struct super_block *p_s_sb, const char * j_dev_name, int old_format) {
+int journal_init(struct super_block *p_s_sb, const char * j_dev_name, int old_format, unsigned int commit_max_age) {
     int num_cnodes = SB_ONDISK_JOURNAL_SIZE(p_s_sb) * 2 ;
     struct buffer_head *bhjh;
     struct reiserfs_super_block * rs;
@@ -2032,7 +2032,11 @@ int journal_init(struct super_block *p_s_sb, const char * j_dev_name, int old_fo
      
   SB_JOURNAL_TRANS_MAX(p_s_sb)      = le32_to_cpu (jh->jh_journal.jp_journal_trans_max);
   SB_JOURNAL_MAX_BATCH(p_s_sb)      = le32_to_cpu (jh->jh_journal.jp_journal_max_batch);
+  if (commit_max_age != 0) {
+	  SB_JOURNAL_MAX_COMMIT_AGE(p_s_sb) = commit_max_age;
+  } else {
   SB_JOURNAL_MAX_COMMIT_AGE(p_s_sb) = le32_to_cpu (jh->jh_journal.jp_journal_max_commit_age);
+  }
   SB_JOURNAL_MAX_TRANS_AGE(p_s_sb)  = JOURNAL_MAX_TRANS_AGE;
 
   if (SB_JOURNAL_TRANS_MAX(p_s_sb)) {

@@ -78,6 +78,7 @@ static Scsi_Host_Template svia_sht = {
 	.proc_name		= DRV_NAME,
 	.dma_boundary		= ATA_DMA_BOUNDARY,
 	.slave_configure	= ata_scsi_slave_config,
+	.bios_param		= ata_std_bios_param,
 };
 
 static struct ata_port_operations svia_sata_ops = {

@@ -38,6 +38,7 @@
 #include <linux/moduleparam.h>
 #include <linux/writeback.h>
 #include <linux/cpu.h>
+#include <linux/efi.h>
 
 #include <asm/io.h>
 #include <asm/bugs.h>
@@ -121,9 +122,7 @@ extern void time_init(void);
 void (*late_time_init)(void) = NULL;
 extern void softirq_init(void);
 
-int rows, cols;
-
-char *execute_command;
+static char *execute_command;
 
 /* Setup configured maximum number of CPUs to activate */
 static unsigned int max_cpus = NR_CPUS;
@@ -397,7 +396,7 @@ static void __init smp_init(void)
 
 static void rest_init(void)
 {
-	kernel_thread(init, NULL, CLONE_KERNEL);
+	kernel_thread(init, NULL, CLONE_FS | CLONE_SIGHAND);
 	unlock_kernel();
  	cpu_idle();
 } 
@@ -418,7 +417,6 @@ asmlinkage void __init start_kernel(void)
 	lock_kernel();
 	printk(linux_banner);
 	setup_arch(&command_line);
-	setup_per_zone_pages_min();
 	setup_per_cpu_areas();
 
 	/*
@@ -472,6 +470,10 @@ asmlinkage void __init start_kernel(void)
 	pidmap_init();
 	pgtable_cache_init();
 	pte_chain_init();
+#ifdef CONFIG_X86
+	if (efi_enabled)
+		efi_enter_virtual_mode();
+#endif
 	fork_init(num_physpages);
 	proc_caches_init();
 	buffer_init();
@@ -499,7 +501,7 @@ asmlinkage void __init start_kernel(void)
 	rest_init();
 }
 
-int __initdata initcall_debug;
+static int __initdata initcall_debug;
 
 static int __init initcall_debug_setup(char *str)
 {

@@ -5,12 +5,9 @@
 
 #include "linux/errno.h"
 #include "linux/slab.h"
-#include "linux/signal.h"
-#include "linux/interrupt.h"
 #include "asm/semaphore.h"
 #include "asm/irq.h"
 #include "irq_user.h"
-#include "irq_kern.h"
 #include "kern_util.h"
 #include "os.h"
 #include "xterm.h"
@@ -22,18 +19,17 @@ struct xterm_wait {
 	int new_fd;
 };
 
-static irqreturn_t xterm_interrupt(int irq, void *data, struct pt_regs *regs)
+static void xterm_interrupt(int irq, void *data, struct pt_regs *regs)
 {
 	struct xterm_wait *xterm = data;
 	int fd;
 
 	fd = os_rcv_fd(xterm->fd, &xterm->pid);
 	if(fd == -EAGAIN)
-		return(IRQ_NONE);
+		return;
 
 	xterm->new_fd = fd;
 	up(&xterm->sem);
-	return(IRQ_HANDLED);
 }
 
 int xterm_fd(int socket, int *pid_out)

@@ -53,11 +53,6 @@ int module_frob_arch_sections(Elf_Ehdr *hdr,
 	return 0;
 }
 
-#ifndef R_386_32
-# define R_386_32        1
-# define R_386_PC32      2
-#endif
-
 int apply_relocate(Elf32_Shdr *sechdrs,
 		   const char *strtab,
 		   unsigned int symindex,
@@ -115,7 +110,6 @@ int module_finalize(const Elf_Ehdr *hdr,
 		    const Elf_Shdr *sechdrs,
 		    struct module *me)
 {
-#ifndef __arch_um__
 	const Elf_Shdr *s;
 	char *secstrings = (void *)hdr + sechdrs[hdr->e_shstrndx].sh_offset;
 
@@ -128,7 +122,6 @@ int module_finalize(const Elf_Ehdr *hdr,
 		apply_alternatives(seg, seg + s->sh_size); 
 	} 	
 	return 0;
-#endif
 }
 
 void module_arch_cleanup(struct module *mod)

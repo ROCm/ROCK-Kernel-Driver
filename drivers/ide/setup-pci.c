@@ -474,6 +474,11 @@ fixup_address:
  *	state
  */
  
+#ifndef CONFIG_BLK_DEV_IDEDMA_PCI
+static void ide_hwif_setup_dma(struct pci_dev *dev, ide_pci_device_t *d, ide_hwif_t *hwif)
+{
+}
+#else
 static void ide_hwif_setup_dma(struct pci_dev *dev, ide_pci_device_t *d, ide_hwif_t *hwif)
 {
 	u16 pcicmd;
@@ -516,6 +521,7 @@ static void ide_hwif_setup_dma(struct pci_dev *dev, ide_pci_device_t *d, ide_hwi
 		}
 	}
 }
+#endif /* CONFIG_BLK_DEV_IDEDMA_PCI*/
 
 /**
  *	ide_setup_pci_controller	-	set up IDE PCI

@@ -10,7 +10,6 @@
 #include <linux/random.h>
 #include <net/icmp.h>
 #include <net/udp.h>
-#include <asm/checksum.h>
 
 #define MAX_SG_ONSTACK 4
 
@@ -326,15 +325,7 @@ int esp_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_bu
 		skb->h.raw = skb_pull(skb, sizeof(struct ip_esp_hdr) + esp->conf.ivlen);
 		skb->nh.raw += encap_len + sizeof(struct ip_esp_hdr) + esp->conf.ivlen;
 		memcpy(skb->nh.raw, workbuf, iph->ihl*4);
-		iph = skb->nh.iph;
-		iph->tot_len = htons(skb->len + (skb->data - skb->nh.raw));
-		iph->check = 0;
-		iph->check = ip_fast_csum(skb->nh.raw, iph->ihl);
-		{
-			unsigned char *oldmac = skb->mac.raw;
-			skb->mac.raw += encap_len + sizeof(struct ip_esp_hdr) + esp -> conf.ivlen;
-			memmove(skb->mac.raw, oldmac, skb->nh.raw - skb->mac.raw);
-		}
+		skb->nh.iph->tot_len = htons(skb->len);
 	}
 
 	return 0;

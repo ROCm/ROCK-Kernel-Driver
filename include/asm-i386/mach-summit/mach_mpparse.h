@@ -5,11 +5,11 @@
 
 extern int use_cyclone;
 
-#ifdef CONFIG_NUMA
+#ifdef CONFIG_X86_SUMMIT_NUMA
 extern void setup_summit(void);
-#else /* !CONFIG_NUMA */
+#else
 #define setup_summit()	{}
-#endif /* CONFIG_NUMA */
+#endif
 
 static inline void mpc_oem_bus_info(struct mpc_config_bus *m, char *name, 
 				struct mpc_config_translation *translation)
@@ -110,9 +110,9 @@ typedef enum {
 	LookOutBWPEG  = 7,  /* LookOut WPEG                        */
 } node_type;
 
-static inline int is_WPEG(node_type type){
-	return (type == CompatWPEG || type == AltWPEG ||
-		type == LookOutAWPEG || type == LookOutBWPEG);
+static inline int is_WPEG(struct rio_detail *rio){
+	return (rio->type == CompatWPEG || rio->type == AltWPEG ||
+		rio->type == LookOutAWPEG || rio->type == LookOutBWPEG);
 }
 
 #endif /* __ASM_MACH_MPPARSE_H */

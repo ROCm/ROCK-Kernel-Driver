@@ -588,10 +588,10 @@ extern asmlinkage long sys_io_getevents(aio_context_t ctx_id,
 
 asmlinkage long
 compat_sys_io_getevents(aio_context_t ctx_id,
-		unsigned long min_nr,
-		unsigned long nr,
-		struct io_event *events,
-		struct compat_timespec *timeout)
+				 unsigned long min_nr,
+				 unsigned long nr,
+				 struct io_event *events,
+				 struct compat_timespec *timeout)
 {
 	long ret;
 	struct timespec t;

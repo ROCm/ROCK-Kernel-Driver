@@ -28,7 +28,6 @@ static struct mconsole_command commands[] = {
 	{ "cad", mconsole_cad, 1 },
 	{ "stop", mconsole_stop, 0 },
 	{ "go", mconsole_go, 1 },
-	{ "log", mconsole_log, 1 },
 };
 
 /* Initialized in mconsole_init, which is an initcall */
@@ -140,7 +139,6 @@ int mconsole_reply(struct mc_request *req, char *str, int err, int more)
 		memcpy(reply.data, str, len);
 		reply.data[len] = '\0';
 		total -= len;
- 		str += len;
 		reply.len = len + 1;
 
 		len = sizeof(reply) + reply.len - sizeof(reply.data);

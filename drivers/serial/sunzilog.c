@@ -103,10 +103,6 @@ struct uart_sunzilog_port {
 
 	unsigned int cflag;
 
-	/* L1-A keyboard break state.  */
-	int				kbd_id;
-	int				l1_down;
-
 	unsigned char			parity_mask;
 	unsigned char			prev_status;
 
@@ -292,23 +288,10 @@ static void sunzilog_kbdms_receive_chars(struct uart_sunzilog_port *up,
 					 struct pt_regs *regs)
 {
 	if (ZS_IS_KEYB(up)) {
-		if (ch == SUNKBD_RESET) {
-			up->kbd_id = 1;
-			up->l1_down = 0;
-		} else if (up->kbd_id) {
-			up->kbd_id = 0;
-		} else if (ch == SUNKBD_L1) {
-			up->l1_down = 1;
-		} else if (ch == (SUNKBD_L1 | SUNKBD_UP)) {
-			up->l1_down = 0;
-		} else if (ch == SUNKBD_A && up->l1_down) {
-			sun_do_break();
-			up->l1_down = 0;
-			up->kbd_id = 0;
-			return;
-		}
+		/* Stop-A is handled by drivers/char/keyboard.c now. */
 #ifdef CONFIG_SERIO
-		serio_interrupt(&up->serio, ch, 0, regs);
+		if (up->serio_open)
+			serio_interrupt(&up->serio, ch, 0, regs);
 #endif
 	} else if (ZS_IS_MOUSE(up)) {
 		int ret = suncore_mouse_baud_detection(ch, is_break);
@@ -322,7 +305,8 @@ static void sunzilog_kbdms_receive_chars(struct uart_sunzilog_port *up,
 
 		case 0:
 #ifdef CONFIG_SERIO
-			serio_interrupt(&up->serio, ch, 0, regs);
+			if (up->serio_open)
+				serio_interrupt(&up->serio, ch, 0, regs);
 #endif
 			break;
 		};
@@ -333,16 +317,15 @@ static void sunzilog_receive_chars(struct uart_sunzilog_port *up,
 				   struct zilog_channel *channel,
 				   struct pt_regs *regs)
 {
-	struct tty_struct *tty = up->port.info->tty;	/* XXX info==NULL? */
+	struct tty_struct *tty;
+	unsigned char ch, r1;
 
-	while (1) {
-		unsigned char ch, r1;
+	tty = NULL;
+	if (up->port.info != NULL &&		/* Unopened serial console */
+	    up->port.info->tty != NULL)		/* Keyboard || mouse */
+		tty = up->port.info->tty;
 
-		if (unlikely(tty->flip.count >= TTY_FLIPBUF_SIZE)) {
-			tty->flip.work.func((void *)tty);
-			if (tty->flip.count >= TTY_FLIPBUF_SIZE)
-				return;		/* XXX Ignores SysRq when we need it most. Fix. */
-		}
+	for (;;) {
 
 		r1 = read_zsreg(channel, R1);
 		if (r1 & (PAR_ERR | Rx_OVR | CRC_ERR)) {
@@ -360,6 +343,9 @@ static void sunzilog_receive_chars(struct uart_sunzilog_port *up,
 		if (ch & BRK_ABRT)
 			r1 |= BRK_ABRT;
 
+		if (!(ch & Rx_CH_AV))
+			break;
+
 		ch = sbus_readb(&channel->data);
 		ZSDELAY();
 
@@ -367,21 +353,22 @@ static void sunzilog_receive_chars(struct uart_sunzilog_port *up,
 
 		if (unlikely(ZS_IS_KEYB(up)) || unlikely(ZS_IS_MOUSE(up))) {
 			sunzilog_kbdms_receive_chars(up, ch, 0, regs);
-			goto next_char;
+			continue;
 		}
 
-		if (ZS_IS_CONS(up) && (r1 & BRK_ABRT)) {
-			/* Wait for BREAK to deassert to avoid potentially
-			 * confusing the PROM.
+		if (tty == NULL) {
+			uart_handle_sysrq_char(&up->port, ch, regs);
+			continue;
+		}
+
+		if (unlikely(tty->flip.count >= TTY_FLIPBUF_SIZE)) {
+			tty->flip.work.func((void *)tty);
+			/*
+			 * The 8250 bails out of the loop here,
+			 * but we need to read everything, or die.
 			 */
-			while (1) {
-				ch = sbus_readb(&channel->control);
-				ZSDELAY();
-				if (!(ch & BRK_ABRT))
-					break;
-			}
-			sun_do_break();
-			return;
+			if (tty->flip.count >= TTY_FLIPBUF_SIZE)
+				continue;
 		}
 
 		/* A real serial line, record the character and status.  */
@@ -393,7 +380,7 @@ static void sunzilog_receive_chars(struct uart_sunzilog_port *up,
 				r1 &= ~(PAR_ERR | CRC_ERR);
 				up->port.icount.brk++;
 				if (uart_handle_break(&up->port))
-					goto next_char;
+					continue;
 			}
 			else if (r1 & PAR_ERR)
 				up->port.icount.parity++;
@@ -410,7 +397,7 @@ static void sunzilog_receive_chars(struct uart_sunzilog_port *up,
 				*tty->flip.flag_buf_ptr = TTY_FRAME;
 		}
 		if (uart_handle_sysrq_char(&up->port, ch, regs))
-			goto next_char;
+			continue;
 
 		if (up->port.ignore_status_mask == 0xff ||
 		    (r1 & up->port.ignore_status_mask) == 0) {
@@ -425,14 +412,10 @@ static void sunzilog_receive_chars(struct uart_sunzilog_port *up,
 			tty->flip.char_buf_ptr++;
 			tty->flip.count++;
 		}
-	next_char:
-		ch = sbus_readb(&channel->control);
-		ZSDELAY();
-		if (!(ch & Rx_CH_AV))
-			break;
 	}
 
-	tty_flip_buffer_push(tty);
+	if (tty)
+		tty_flip_buffer_push(tty);
 }
 
 static void sunzilog_status_handle(struct uart_sunzilog_port *up,
@@ -448,8 +431,23 @@ static void sunzilog_status_handle(struct uart_sunzilog_port *up,
 	ZSDELAY();
 	ZS_WSYNC(channel);
 
-	if ((status & BRK_ABRT) && ZS_IS_MOUSE(up))
-		sunzilog_kbdms_receive_chars(up, 0, 1, regs);
+	if (status & BRK_ABRT) {
+		if (ZS_IS_MOUSE(up))
+			sunzilog_kbdms_receive_chars(up, 0, 1, regs);
+		if (ZS_IS_CONS(up)) {
+			/* Wait for BREAK to deassert to avoid potentially
+			 * confusing the PROM.
+			 */
+			while (1) {
+				status = sbus_readb(&channel->control);
+				ZSDELAY();
+				if (!(status & BRK_ABRT))
+					break;
+			}
+			sun_do_break();
+			return;
+		}
+	}
 
 	if (ZS_WANTS_MODEM_STATUS(up)) {
 		if (status & SYNC)
@@ -1364,8 +1362,8 @@ static int __init sunzilog_console_setup(struct console *con, char *options)
 	unsigned long flags;
 	int baud, brg;
 
-	printk("Console: ttyS%d (SunZilog)\n",
-	       (sunzilog_reg.minor - 64) + con->index);
+	printk(KERN_INFO "Console: ttyS%d (SunZilog zs%d)\n",
+	       (sunzilog_reg.minor - 64) + con->index, con->index);
 
 	/* Get firmware console settings.  */
 	sunserial_console_termios(con);
@@ -1596,6 +1594,8 @@ static void __init sunzilog_init_hw(void)
 
 		if (i == KEYBOARD_LINE || i == MOUSE_LINE) {
 			sunzilog_init_kbdms(up, i);
+			up->curregs[R9] |= (NV | MIE);
+			write_zsreg(channel, R9, up->curregs[R9]);
 		} else {
 			/* Normal serial TTY. */
 			up->parity_mask = 0xff;
@@ -1632,7 +1632,7 @@ static int __init sunzilog_ports_init(void)
 	struct zs_probe_scan scan;
 	int ret;
 
-	printk(KERN_INFO "Serial: Sun Zilog driver (%d chips).\n", NUM_SUNZILOG);
+	printk(KERN_DEBUG "SunZilog: %d chips.\n", NUM_SUNZILOG);
 
 	scan.scanner = sunzilog_scan_probe;
 	scan.depth = 0;
@@ -1668,7 +1668,10 @@ static int __init sunzilog_ports_init(void)
 			if (ZS_IS_KEYB(up) || ZS_IS_MOUSE(up))
 				continue;
 
-			uart_add_one_port(&sunzilog_reg, &up->port);
+			if (uart_add_one_port(&sunzilog_reg, &up->port)) {
+				printk(KERN_ERR
+				    "SunZilog: failed to add port zs%d\n", i);
+			}
 		}
 	}
 

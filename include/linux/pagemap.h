@@ -8,7 +8,6 @@
 #include <linux/fs.h>
 #include <linux/list.h>
 #include <linux/highmem.h>
-#include <linux/pagemap.h>
 #include <asm/uaccess.h>
 #include <linux/gfp.h>
 

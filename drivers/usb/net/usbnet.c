@@ -637,6 +637,27 @@ static void ax8817x_get_drvinfo (struct net_device *net,
 	info->eedump_len = 0x3e;
 }
 
+static u32 ax8817x_get_link (struct net_device *net)
+{
+	struct usbnet *dev = (struct usbnet *)net->priv;
+
+	return (u32)mii_link_ok(&dev->mii);
+}
+
+static int ax8817x_get_settings(struct net_device *net, struct ethtool_cmd *cmd)
+{
+	struct usbnet *dev = (struct usbnet *)net->priv;
+
+	return mii_ethtool_gset(&dev->mii,cmd);
+}
+
+static int ax8817x_set_settings(struct net_device *net, struct ethtool_cmd *cmd)
+{
+	struct usbnet *dev = (struct usbnet *)net->priv;
+
+	return mii_ethtool_sset(&dev->mii,cmd);
+}
+
 static int ax8817x_bind(struct usbnet *dev, struct usb_interface *intf)
 {
 	int ret;
@@ -669,16 +690,6 @@ static int ax8817x_bind(struct usbnet *dev, struct usb_interface *intf)
 		return ret;
 	}
 	memcpy(dev->net->dev_addr, buf, ETH_ALEN);
-
-	/* Get IPG values */
-	if ((ret = ax8817x_read_cmd(dev, AX_CMD_READ_IPG012, 0, 0, 3, buf)) < 0) {
-		dbg("Error reading IPG values: %d", ret);
-		return ret;
-	}
-
-	for(i = 0;i < 3;i++) {
-		ax8817x_write_cmd(dev, AX_CMD_WRITE_IPG0 + i, 0, 0, 1, &buf[i]);
-	}
 
 	/* Get the PHY id */
 	if ((ret = ax8817x_read_cmd(dev, AX_CMD_READ_PHY_ID, 0, 0, 2, buf)) < 0) {
@@ -735,9 +746,12 @@ static int ax8817x_bind(struct usbnet *dev, struct usb_interface *intf)
 	dev->net->set_multicast_list = ax8817x_set_multicast;
 
 	usbnet_ethtool_ops.get_drvinfo = &ax8817x_get_drvinfo;
+	usbnet_ethtool_ops.get_link = &ax8817x_get_link;
 	usbnet_ethtool_ops.get_wol = &ax8817x_get_wol;
 	usbnet_ethtool_ops.set_wol = &ax8817x_set_wol;
 	usbnet_ethtool_ops.get_eeprom = &ax8817x_get_eeprom;
+	usbnet_ethtool_ops.get_settings = &ax8817x_get_settings;
+	usbnet_ethtool_ops.set_settings = &ax8817x_set_settings;
 
 	return 0;
 }

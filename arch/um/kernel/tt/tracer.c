@@ -39,7 +39,7 @@ int is_tracer_winch(int pid, int fd, void *data)
 		return(0);
 
 	register_winch_irq(tracer_winch[0], fd, -1, data);
-	return(1);
+	return(0);
 }
 
 static void tracer_winch_handler(int sig)
@@ -401,7 +401,7 @@ static int __init uml_debug_setup(char *line, int *add)
 		
 		if(!strcmp(line, "go"))	debug_stop = 0;
 		else if(!strcmp(line, "parent")) debug_parent = 1;
-		else printf("Unknown debug option : '%s'\n", line);
+		else printk("Unknown debug option : '%s'\n", line);
 
 		line = next;
 	}

@@ -51,6 +51,9 @@ extern unsigned long task_size;
 
 extern int init_mem_user(void);
 extern int create_mem_file(unsigned long len);
+extern void setup_range(int fd, char *driver, unsigned long start,
+			unsigned long pfn, unsigned long total, int need_vm, 
+			struct mem_region *region, void *reserved);
 extern void setup_memory(void *entry);
 extern unsigned long find_iomem(char *driver, unsigned long *len_out);
 extern int init_maps(struct mem_region *region);

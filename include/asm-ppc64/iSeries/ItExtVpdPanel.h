@@ -16,8 +16,6 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
  */
-#ifndef _ITEXTVPDPANEL_H
-#define _ITEXTVPDPANEL_H
 
 /*
  *
@@ -33,8 +31,12 @@
  * Standard Includes
  *------------------------------------------------------------------- 
 */
-#include <asm/types.h>
+#ifndef	_PPC_TYPES_H
+#include	<asm/types.h>
+#endif
 
+#ifndef _ITEXTVPDPANEL_H
+#define _ITEXTVPDPANEL_H
 struct ItExtVpdPanel
 {
   // Definition of the Extended Vpd On Panel Data Area

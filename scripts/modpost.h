@@ -70,7 +70,6 @@ struct module {
 	const char *name;
 	struct symbol *unres;
 	int seen;
-	int skip;
 	struct buffer dev_table_buf;
 };
 

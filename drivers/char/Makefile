@@ -43,7 +43,6 @@ obj-$(CONFIG_SH_SCI)		+= sh-sci.o generic_serial.o
 obj-$(CONFIG_HVC_CONSOLE)	+= hvc_console.o
 obj-$(CONFIG_RAW_DRIVER)	+= raw.o
 obj-$(CONFIG_SGI_L1_SERIAL)	+= sn_serial.o
-obj-$(CONFIG_VIOCONS) += viocons.o
 
 obj-$(CONFIG_PRINTER) += lp.o
 obj-$(CONFIG_TIPAR) += tipar.o
@@ -72,7 +71,6 @@ obj-$(CONFIG_DZ) += dz.o
 obj-$(CONFIG_NWBUTTON) += nwbutton.o
 obj-$(CONFIG_NWFLASH) += nwflash.o
 obj-$(CONFIG_SCx200_GPIO) += scx200_gpio.o
-obj-$(CONFIG_FJKEYINFO) += fjkeyinf.o
 
 obj-$(CONFIG_WATCHDOG)	+= watchdog/
 obj-$(CONFIG_MWAVE) += mwave/

@@ -24,6 +24,11 @@
  *   Basic tests have been performed with minicom/zmodem transfers and
  *   modem dialing under Linux 2.4.0-test10 (for me it works fine).
  *
+ * 04-Nov-2003 Bill Marr <marr at flex dot com>
+ *   - Mimic Windows driver by sending 2 USB 'device request' messages
+ *     following normal 'baud rate change' message.  This allows data to be
+ *     transmitted to RS-232 devices which don't assert the 'CTS' signal.
+ *
  * 10-Nov-2001 Wolfgang Grandegger
  *   - Fixed an endianess problem with the baudrate selection for PowerPC.
  *
@@ -85,7 +90,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v1.1"
+#define DRIVER_VERSION "v1.2"
 #define DRIVER_AUTHOR "Wolfgang Grandegger <wolfgang@ces.ch>"
 #define DRIVER_DESC "Magic Control Technology USB-RS232 converter driver"
 
@@ -216,6 +221,7 @@ static int mct_u232_set_baud_rate(struct usb_serial *serial, int value)
 {
 	unsigned int divisor;
         int rc;
+        unsigned char zero_byte = 0;
 	divisor = cpu_to_le32(mct_u232_calculate_baud_rate(serial, value));
         rc = usb_control_msg(serial->dev, usb_sndctrlpipe(serial->dev, 0),
                              MCT_U232_SET_BAUD_RATE_REQUEST,
@@ -225,6 +231,35 @@ static int mct_u232_set_baud_rate(struct usb_serial *serial, int value)
 	if (rc < 0)
 		err("Set BAUD RATE %d failed (error = %d)", value, rc);
 	dbg("set_baud_rate: value: %d, divisor: 0x%x", value, divisor);
+
+	/* Mimic the MCT-supplied Windows driver (version 1.21P.0104), which
+	   always sends two extra USB 'device request' messages after the
+	   'baud rate change' message.  The actual functionality of the
+	   request codes in these messages is not fully understood but these
+	   particular codes are never seen in any operation besides a baud
+	   rate change.  Both of these messages send a single byte of data
+	   whose value is always zero.  The second of these two extra messages
+	   is required in order for data to be properly written to an RS-232
+	   device which does not assert the 'CTS' signal. */
+
+	rc = usb_control_msg(serial->dev, usb_sndctrlpipe(serial->dev, 0),
+			     MCT_U232_SET_UNKNOWN1_REQUEST, 
+			     MCT_U232_SET_REQUEST_TYPE,
+			     0, 0, &zero_byte, MCT_U232_SET_UNKNOWN1_SIZE, 
+			     WDR_TIMEOUT);
+	if (rc < 0)
+		err("Sending USB device request code %d failed (error = %d)", 
+		    MCT_U232_SET_UNKNOWN1_REQUEST, rc);
+
+	rc = usb_control_msg(serial->dev, usb_sndctrlpipe(serial->dev, 0),
+			     MCT_U232_SET_UNKNOWN2_REQUEST, 
+			     MCT_U232_SET_REQUEST_TYPE,
+			     0, 0, &zero_byte, MCT_U232_SET_UNKNOWN2_SIZE, 
+			     WDR_TIMEOUT);
+	if (rc < 0)
+		err("Sending USB device request code %d failed (error = %d)", 
+		    MCT_U232_SET_UNKNOWN2_REQUEST, rc);
+
         return rc;
 } /* mct_u232_set_baud_rate */
 

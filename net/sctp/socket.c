@@ -77,6 +77,7 @@
 #include <linux/socket.h> /* for sa_family_t */
 #include <net/sock.h>
 #include <net/sctp/sctp.h>
+#include <net/sctp/sm.h>
 
 /* WARNING:  Please do not remove the SCTP_STATIC attribute to
  * any of the functions below as they are used to export functions

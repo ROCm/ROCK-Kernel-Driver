@@ -3582,7 +3582,6 @@ static int radeonfb_pci_register (struct pci_dev *pdev,
 	pci_set_drvdata(pdev, rinfo);
 	rinfo->next = board_list;
 	board_list = rinfo;
-	rinfo->info.dev = &pdev->dev;
 
 	if (register_framebuffer ((struct fb_info *) rinfo) < 0) {
 		printk ("radeonfb: could not register framebuffer\n");

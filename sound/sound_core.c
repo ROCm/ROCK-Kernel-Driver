@@ -45,6 +45,7 @@
 #include <linux/major.h>
 #include <linux/kmod.h>
 #include <linux/devfs_fs_kernel.h>
+#include <linux/device.h>
 
 #define SOUND_STEP 16
 
@@ -547,6 +548,7 @@ EXPORT_SYMBOL(mod_firmware_load);
 MODULE_DESCRIPTION("Core sound module");
 MODULE_AUTHOR("Alan Cox");
 MODULE_LICENSE("GPL");
+MODULE_ALIAS_CHARDEV_MAJOR(SOUND_MAJOR);
 
 static void __exit cleanup_soundcore(void)
 {

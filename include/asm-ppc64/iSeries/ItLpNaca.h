@@ -16,8 +16,6 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
  */
-#ifndef _ITLPNACA_H
-#define _ITLPNACA_H
 
 //=============================================================================
 //
@@ -25,6 +23,10 @@
 //	hypervisor (PLIC) and the OS.
 //
 //=============================================================================
+
+
+#ifndef _ITLPNACA_H
+#define _ITLPNACA_H
 
 struct ItLpNaca
 {
@@ -85,4 +87,4 @@ struct ItLpNaca
 
 //=============================================================================
 
-#endif /* _ITLPNACA_H */
+#endif // _ITLPNACA_H

@@ -39,6 +39,7 @@ extern int read_ubd_fs(int fd, void *buffer, int len);
 extern int write_ubd_fs(int fd, char *buffer, int len);
 extern int start_io_thread(unsigned long sp, int *fds_out);
 extern void do_io(struct io_thread_req *req);
+extern int ubd_is_dir(char *file);
 
 static inline int ubd_test_bit(__u64 bit, unsigned char *data)
 {

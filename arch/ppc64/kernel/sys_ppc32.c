@@ -2106,10 +2106,6 @@ long sys32_execve(unsigned long a0, unsigned long a1, unsigned long a2,
 		goto out;
 	if (regs->msr & MSR_FP)
 		giveup_fpu(current);
-#ifdef CONFIG_ALTIVEC
-	if (regs->msr & MSR_VEC)
-		giveup_altivec(current);
-#endif /* CONFIG_ALTIVEC */
 
 	error = do_execve32(filename, (u32*) a1, (u32*) a2, regs);
 
@@ -2130,25 +2126,9 @@ void start_thread32(struct pt_regs* regs, unsigned long nip, unsigned long sp)
 	regs->nip = nip;
 	regs->gpr[1] = sp;
 	regs->msr = MSR_USER32;
-#ifndef CONFIG_SMP
 	if (last_task_used_math == current)
 		last_task_used_math = 0;
-#endif /* CONFIG_SMP */
 	current->thread.fpscr = 0;
-	memset(current->thread.fpr, 0, sizeof(current->thread.fpr));
-#ifdef CONFIG_ALTIVEC
-#ifndef CONFIG_SMP
-	if (last_task_used_altivec == current)
-		last_task_used_altivec = 0;
-#endif /* CONFIG_SMP */
-	memset(current->thread.vr, 0, sizeof(current->thread.vr));
-	current->thread.vscr.u[0] = 0;
-	current->thread.vscr.u[1] = 0;
-	current->thread.vscr.u[2] = 0;
-	current->thread.vscr.u[3] = 0x00010000; /* Java mode disabled */
-	current->thread.vrsave = 0;
-	current->thread.used_vr = 0;
-#endif /* CONFIG_ALTIVEC */
 }
 
 extern asmlinkage int sys_prctl(int option, unsigned long arg2, unsigned long arg3,
@@ -2898,46 +2878,3 @@ long ppc32_fadvise64(int fd, u32 unused, u32 offset_high, u32 offset_low,
 			     advice);
 }
 
-long ppc32_fadvise64_64(int fd, int advice, u32 offset_high, u32 offset_low,
-			u32 len_high, u32 len_low)
-{
-	return sys_fadvise64(fd, (u64)offset_high << 32 | offset_low,
-			     (u64)len_high << 32 | len_low, advice);
-}
-
-extern long sys_timer_create(clockid_t, sigevent_t *, timer_t *);
-
-long ppc32_timer_create(clockid_t clock,
-			struct compat_sigevent __user *ev32,
-			timer_t __user *timer_id)
-{
-	sigevent_t event;
-	timer_t t;
-	long err;
-	mm_segment_t savefs;
-
-	if (ev32 == NULL)
-		return sys_timer_create(clock, NULL, timer_id);
-
-	memset(&event, 0, sizeof(event));
-	if (!access_ok(VERIFY_READ, ev32, sizeof(struct compat_sigevent))
-	    || __get_user(event.sigev_value.sival_int,
-			  &ev32->sigev_value.sival_int)
-	    || __get_user(event.sigev_signo, &ev32->sigev_signo)
-	    || __get_user(event.sigev_notify, &ev32->sigev_notify)
-	    || __get_user(event.sigev_notify_thread_id,
-			  &ev32->sigev_notify_thread_id))
-		return -EFAULT;
-
-	if (!access_ok(VERIFY_WRITE, timer_id, sizeof(timer_t)))
-		return -EFAULT;
-
-	savefs = get_fs();
-	err = sys_timer_create(clock, &event, &t);
-	set_fs(savefs);
-
-	if (err == 0)
-		err = __put_user(t, timer_id);
-
-	return err;
-}

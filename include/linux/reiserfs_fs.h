@@ -1719,7 +1719,7 @@ void reiserfs_allow_writes(struct super_block *s) ;
 void reiserfs_check_lock_depth(char *caller) ;
 void reiserfs_prepare_for_journal(struct super_block *, struct buffer_head *bh, int wait) ;
 void reiserfs_restore_prepared_buffer(struct super_block *, struct buffer_head *bh) ;
-int journal_init(struct super_block *, const char * j_dev_name, int old_format) ;
+int journal_init(struct super_block *, const char * j_dev_name, int old_format, unsigned int) ;
 int journal_release(struct reiserfs_transaction_handle*, struct super_block *) ;
 int journal_release_error(struct reiserfs_transaction_handle*, struct super_block *) ;
 int journal_end(struct reiserfs_transaction_handle *, struct super_block *, unsigned long) ;

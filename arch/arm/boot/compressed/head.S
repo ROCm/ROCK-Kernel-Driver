@@ -503,12 +503,6 @@ proc_types:
 
 		@ Everything from here on will be the new ID system.
 
-		.word	0x41129200		@ ARM920T
-		.word	0xff00fff0
-		b	__armv4_cache_on
-		b	__armv4_cache_off
-		b	__armv4_cache_flush
-
 		.word	0x4401a100		@ sa110 / sa1100
 		.word	0xffffffe0
 		b	__armv4_cache_on
@@ -522,6 +516,12 @@ proc_types:
 		b	__armv4_cache_flush
 
 		@ These match on the architecture ID
+
+		.word	0x00020000		@ ARMv4T
+		.word	0x000f0000
+		b	__armv4_cache_on
+		b	__armv4_cache_off
+		b	__armv4_cache_flush
 
 		.word	0x00050000		@ ARMv5TE
 		.word	0x000f0000

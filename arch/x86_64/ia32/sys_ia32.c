@@ -110,8 +110,8 @@ int cp_compat_stat(struct kstat *kbuf, struct compat_stat *ubuf)
 	return 0;
 }
 
-extern long sys_truncate(char *, loff_t); 
-extern long sys_ftruncate(int, loff_t); 
+extern long sys_truncate(char *, loff_t);
+extern long sys_ftruncate(int, loff_t);
 
 asmlinkage long
 sys32_truncate64(char * filename, unsigned long offset_low, unsigned long offset_high)

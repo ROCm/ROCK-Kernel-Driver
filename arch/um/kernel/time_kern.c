@@ -30,14 +30,6 @@ int hz(void)
 	return(HZ);
 }
 
-/*
- * Scheduler clock - returns current time in nanosec units.
- */
-unsigned long long sched_clock(void)
-{
-	return (unsigned long long)jiffies_64 * (1000000000 / HZ);
-}
-
 /* Changed at early boot */
 int timer_irq_inited = 0;
 
@@ -49,7 +41,7 @@ int __attribute__ ((__section__ (".unprotected"))) missed_ticks[NR_CPUS];
 
 void timer_irq(union uml_pt_regs *regs)
 {
-	int cpu = current_thread->cpu, ticks = missed_ticks[cpu];
+	int cpu = current->thread_info->cpu, ticks = missed_ticks[cpu];
 
         if(!timer_irq_inited) return;
 	missed_ticks[cpu] = 0;
@@ -66,13 +58,12 @@ void boot_timer_handler(int sig)
 	do_timer(&regs);
 }
 
-irqreturn_t um_timer(int irq, void *dev, struct pt_regs *regs)
+void um_timer(int irq, void *dev, struct pt_regs *regs)
 {
 	do_timer(regs);
-	write_seqlock_irq(&xtime_lock);
+	write_seqlock(&xtime_lock);
 	timer();
-	write_sequnlock_irq(&xtime_lock);
-	return(IRQ_HANDLED);
+	write_sequnlock(&xtime_lock);
 }
 
 long um_time(int * tloc)
@@ -90,12 +81,12 @@ long um_time(int * tloc)
 long um_stime(int * tptr)
 {
 	int value;
-	struct timespec new;
+	struct timeval new;
 
 	if (get_user(value, tptr))
                 return -EFAULT;
 	new.tv_sec = value;
-	new.tv_nsec = 0;
+	new.tv_usec = 0;
 	do_settimeofday(&new);
 	return 0;
 }
@@ -134,11 +125,9 @@ void __const_udelay(um_udelay_t usecs)
 void timer_handler(int sig, union uml_pt_regs *regs)
 {
 #ifdef CONFIG_SMP
-	local_irq_disable();
 	update_process_times(user_context(UPT_SP(regs)));
-	local_irq_enable();
 #endif
-	if(current_thread->cpu == 0)
+	if(current->thread_info->cpu == 0)
 		timer_irq(regs);
 }
 

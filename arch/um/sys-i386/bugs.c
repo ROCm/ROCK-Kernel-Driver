@@ -8,7 +8,6 @@
 #include <errno.h>
 #include <string.h>
 #include <sys/signal.h>
-#include <asm/ldt.h>
 #include "kern_util.h"
 #include "user.h"
 #include "sysdep/ptrace.h"
@@ -17,8 +16,8 @@
 #define MAXTOKEN 64
 
 /* Set during early boot */
-int host_has_cmov = 1;
-int host_has_xmm = 0;
+int cpu_has_cmov = 1;
+int cpu_has_xmm = 0;
 
 static char token(int fd, char *buf, int len, char stop)
 {
@@ -105,25 +104,6 @@ static int check_cpu_feature(char *feature, int *have_it)
 	return(1);
 }
 
-static void disable_lcall(void)
-{
-	struct user_desc ldt;
-	int err;
-
-	bzero(&ldt, sizeof(ldt));
-	ldt.entry_number = 7;
-	ldt.base_addr = 0;
-	ldt.limit = 0;
-	err = modify_ldt(1, &ldt, sizeof(ldt));
-	if(err)
-		printk("Failed to disable lcall7 - errno = %d\n", errno);
-}
-
-void arch_init_thread(void)
-{
-	disable_lcall();
-}
-
 void arch_check_bugs(void)
 {
 	int have_it;
@@ -133,8 +113,8 @@ void arch_check_bugs(void)
 		       "checks\n");
 		return;
 	}
-	if(check_cpu_feature("cmov", &have_it)) host_has_cmov = have_it;
-	if(check_cpu_feature("xmm", &have_it)) host_has_xmm = have_it;
+	if(check_cpu_feature("cmov", &have_it)) cpu_has_cmov = have_it;
+	if(check_cpu_feature("xmm", &have_it)) cpu_has_xmm = have_it;
 }
 
 int arch_handle_signal(int sig, union uml_pt_regs *regs)
@@ -150,18 +130,18 @@ int arch_handle_signal(int sig, union uml_pt_regs *regs)
 	if((*((char *) ip) != 0x0f) || ((*((char *) (ip + 1)) & 0xf0) != 0x40))
 		return(0);
 
-	if(host_has_cmov == 0)
+	if(cpu_has_cmov == 0)
 		panic("SIGILL caused by cmov, which this processor doesn't "
 		      "implement, boot a filesystem compiled for older "
 		      "processors");
-	else if(host_has_cmov == 1)
+	else if(cpu_has_cmov == 1)
 		panic("SIGILL caused by cmov, which this processor claims to "
 		      "implement");
-	else if(host_has_cmov == -1)
+	else if(cpu_has_cmov == -1)
 		panic("SIGILL caused by cmov, couldn't tell if this processor "
 		      "implements it, boot a filesystem compiled for older "
 		      "processors");
-	else panic("Bad value for host_has_cmov (%d)", host_has_cmov);
+	else panic("Bad value for cpu_has_cmov (%d)", cpu_has_cmov);
 	return(0);
 }
 

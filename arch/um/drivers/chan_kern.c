@@ -8,7 +8,6 @@
 #include <linux/list.h>
 #include <linux/slab.h>
 #include <linux/tty.h>
-#include <linux/string.h>
 #include <linux/tty_flip.h>
 #include <asm/irq.h>
 #include "chan_kern.h"

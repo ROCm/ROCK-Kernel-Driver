@@ -16,22 +16,30 @@
   * along with this program; if not, write to the Free Software
   * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
   */
+
+
+/* Change Activity: */
+/* End Change Activity */
+
 #include <linux/proc_fs.h>
 #include <linux/spinlock.h>
-#include <linux/init.h>
+#ifndef _ISERIES_PROC_H
 #include <asm/iSeries/iSeries_proc.h>
+#endif
 
-static struct proc_dir_entry *iSeries_proc_root;
-static int iSeries_proc_initializationDone;
+
+static struct proc_dir_entry * iSeries_proc_root = NULL;
+static int iSeries_proc_initializationDone = 0;
 static spinlock_t iSeries_proc_lock;
 
-struct iSeries_proc_registration {
+struct iSeries_proc_registration
+{
 	struct iSeries_proc_registration *next;
 	iSeriesProcFunction functionMember;
 };
 
-struct iSeries_proc_registration preallocated[16];
 
+struct iSeries_proc_registration preallocated[16];
 #define MYQUEUETYPE(T) struct MYQueue##T
 #define MYQUEUE(T) \
 MYQUEUETYPE(T) \
@@ -61,71 +69,74 @@ do { \
 	if ((q)->tail == NULL) \
 		(q)->head = NULL; \
 } while(0)
-
 MYQUEUE(iSeries_proc_registration);
 typedef MYQUEUETYPE(iSeries_proc_registration) aQueue;
 
-static aQueue iSeries_free;
-static aQueue iSeries_queued;
+
+aQueue iSeries_free;
+aQueue iSeries_queued;
 
 void iSeries_proc_early_init(void)
 {
 	int i = 0;
 	unsigned long flags;
-
 	iSeries_proc_initializationDone = 0;
 	spin_lock_init(&iSeries_proc_lock);
 	MYQUEUECTOR(&iSeries_free);
 	MYQUEUECTOR(&iSeries_queued);
 
 	spin_lock_irqsave(&iSeries_proc_lock, flags);
-	for (i = 0; i < 16; ++i)
-		MYQUEUEENQ(&iSeries_free, preallocated + i);
+	for (i = 0; i < 16; ++i) {
+		MYQUEUEENQ(&iSeries_free, preallocated+i);
+	}
 	spin_unlock_irqrestore(&iSeries_proc_lock, flags);
 }
 
-static int iSeries_proc_create(void)
+void iSeries_proc_create(void)
 {
 	unsigned long flags;
-	struct iSeries_proc_registration *reg;
-
+	struct iSeries_proc_registration *reg = NULL;
+	spin_lock_irqsave(&iSeries_proc_lock, flags);
 	printk("iSeries_proc: Creating /proc/iSeries\n");
 
-	spin_lock_irqsave(&iSeries_proc_lock, flags);
 	iSeries_proc_root = proc_mkdir("iSeries", 0);
-	if (!iSeries_proc_root)
-		goto out;
+	if (!iSeries_proc_root) return;
 
 	MYQUEUEDEQ(&iSeries_queued, reg);
+
 	while (reg != NULL) {
 		(*(reg->functionMember))(iSeries_proc_root);
+
 		MYQUEUEDEQ(&iSeries_queued, reg);
 	}
 
 	iSeries_proc_initializationDone = 1;
-out:
 	spin_unlock_irqrestore(&iSeries_proc_lock, flags);
-	return 0;
 }
-
-arch_initcall(iSeries_proc_create);
 
 void iSeries_proc_callback(iSeriesProcFunction initFunction)
 {
 	unsigned long flags;
-
 	spin_lock_irqsave(&iSeries_proc_lock, flags);
-	if (iSeries_proc_initializationDone)
+
+	if (iSeries_proc_initializationDone) {
 		(*initFunction)(iSeries_proc_root);
-	else {
+	} else {
 		struct iSeries_proc_registration *reg = NULL;
 
 		MYQUEUEDEQ(&iSeries_free, reg);
+
 		if (reg != NULL) {
+			/* printk("Registering %p in reg %p\n", initFunction, reg); */
 			reg->functionMember = initFunction;
+
 			MYQUEUEENQ(&iSeries_queued, reg);
-		} else
+		} else {
 			printk("Couldn't get a queue entry\n");
+		}
 	}
+
 	spin_unlock_irqrestore(&iSeries_proc_lock, flags);
 }
+
+

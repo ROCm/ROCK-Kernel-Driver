@@ -85,10 +85,10 @@ unsigned int openpic_vec_spurious;
  */
 #ifdef CONFIG_SMP
 #define THIS_CPU		Processor[cpu]
-#define DECL_THIS_CPU		int cpu = hard_smp_processor_id()
+#define DECL_THIS_CPU		int cpu = smp_processor_id()
 #define CHECK_THIS_CPU		check_arg_cpu(cpu)
 #else
-#define THIS_CPU		Processor[hard_smp_processor_id()]
+#define THIS_CPU		Processor[smp_processor_id()]
 #define DECL_THIS_CPU
 #define CHECK_THIS_CPU
 #endif /* CONFIG_SMP */
@@ -130,29 +130,19 @@ unsigned int openpic_vec_spurious;
 
 #define GET_ISU(source)	ISU[(source) >> 4][(source) & 0xf]
 
-void
-openpic_init_irq_desc(irq_desc_t *desc)
-{
-	/* Don't mess with the handler if already set.
-	 * This leaves the setup of isa/ipi handlers undisturbed.
-	 */
-	if (!desc->handler)
-		desc->handler = &open_pic;
-}
-
 void __init openpic_init_IRQ(void)
 {
         struct device_node *np;
         int i;
         unsigned int *addrp;
         unsigned char* chrp_int_ack_special = 0;
-        unsigned char init_senses[NR_IRQS - NUM_ISA_INTERRUPTS];
+        unsigned char init_senses[NR_IRQS - NUM_8259_INTERRUPTS];
         int nmi_irq = -1;
 #if defined(CONFIG_VT) && defined(CONFIG_ADB_KEYBOARD) && defined(XMON)
         struct device_node *kbd;
 #endif
 
-        if (!(np = of_find_node_by_name(NULL, "pci"))
+        if (!(np = find_devices("pci"))
             || !(addrp = (unsigned int *)
                  get_property(np, "8259-interrupt-acknowledge", NULL)))
                 printk(KERN_ERR "Cannot find pci to get ack address\n");
@@ -161,14 +151,13 @@ void __init openpic_init_IRQ(void)
 			__ioremap(addrp[prom_n_addr_cells(np)-1], 1, _PAGE_NO_CACHE);
         /* hydra still sets OpenPIC_InitSenses to a static set of values */
         if (OpenPIC_InitSenses == NULL) {
-                prom_get_irq_senses(init_senses, NUM_ISA_INTERRUPTS, NR_IRQS);
+                prom_get_irq_senses(init_senses, NUM_8259_INTERRUPTS, NR_IRQS);
                 OpenPIC_InitSenses = init_senses;
-                OpenPIC_NumInitSenses = NR_IRQS - NUM_ISA_INTERRUPTS;
+                OpenPIC_NumInitSenses = NR_IRQS - NUM_8259_INTERRUPTS;
         }
-        openpic_init(1, NUM_ISA_INTERRUPTS, chrp_int_ack_special, nmi_irq);
-        for ( i = 0 ; i < NUM_ISA_INTERRUPTS  ; i++ )
-                get_real_irq_desc(i)->handler = &i8259_pic;
-	of_node_put(np);
+        openpic_init(1, NUM_8259_INTERRUPTS, chrp_int_ack_special, nmi_irq);
+        for ( i = 0 ; i < NUM_8259_INTERRUPTS  ; i++ )
+                irq_desc[i].handler = &i8259_pic;
 }
 
 static inline u_int openpic_read(volatile u_int *addr)
@@ -352,8 +341,8 @@ void __init openpic_init(int main_pic, int offset, unsigned char* chrp_ack,
 		/* Disabled, Priority 10..13 */
 		openpic_initipi(i, 10+i, openpic_vec_ipi+i);
 		/* IPIs are per-CPU */
-		get_real_irq_desc(openpic_vec_ipi+i)->status |= IRQ_PER_CPU;
-		get_real_irq_desc(openpic_vec_ipi+i)->handler = &open_pic_ipi;
+		irq_desc[openpic_vec_ipi+i].status |= IRQ_PER_CPU;
+		irq_desc[openpic_vec_ipi+i].handler = &open_pic_ipi;
 	}
 #endif
 
@@ -365,7 +354,7 @@ void __init openpic_init(int main_pic, int offset, unsigned char* chrp_ack,
 	/* SIOint (8259 cascade) is special */
 	if (offset) {
 		openpic_initirq(0, 8, offset, 1, 1);
-		openpic_mapirq(0, 1 << get_hard_smp_processor_id(boot_cpuid));
+		openpic_mapirq(0, 1 << boot_cpuid);
 	}
 
 	/* Init all external sources */
@@ -378,13 +367,17 @@ void __init openpic_init(int main_pic, int offset, unsigned char* chrp_ack,
 		pri = (i == programmer_switch_irq)? 9: 8;
 		sense = (i < OpenPIC_NumInitSenses)? OpenPIC_InitSenses[i]: 1;
 		if (sense)
-			get_real_irq_desc(i+offset)->status = IRQ_LEVEL;
+			irq_desc[i+offset].status = IRQ_LEVEL;
 
 		/* Enabled, Priority 8 or 9 */
 		openpic_initirq(i, pri, i+offset, !sense, sense);
 		/* Processor 0 */
-		openpic_mapirq(i, 1 << get_hard_smp_processor_id(boot_cpuid));
+		openpic_mapirq(i, 1 << boot_cpuid);
 	}
+
+	/* Init descriptors */
+	for (i = offset; i < NumSources + offset; i++)
+		irq_desc[i].handler = &open_pic;
 
 	/* Initialize the spurious interrupt */
 	ppc64_boot_msg(0x24, "OpenPic Spurious");
@@ -404,7 +397,7 @@ static int __init openpic_setup_i8259(void)
 {
 	if (naca->interrupt_controller == IC_OPEN_PIC) {
 		/* Initialize the cascade */
-		if (request_irq(NUM_ISA_INTERRUPTS, no_action, SA_INTERRUPT,
+		if (request_irq(NUM_8259_INTERRUPTS, no_action, SA_INTERRUPT,
 				"82c59 cascade", NULL))
 			printk(KERN_ERR "Unable to get OpenPIC IRQ 0 for cascade\n");
 		i8259_init();
@@ -520,23 +513,10 @@ static void openpic_set_spurious(u_int vec)
 			   vec);
 }
 
-/*
- * Convert a cpu mask from logical to physical cpu numbers.
- */
-static inline u32 physmask(u32 cpumask)
-{
-	int i;
-	u32 mask = 0;
-
-	for (i = 0; i < NR_CPUS; ++i, cpumask >>= 1)
-		mask |= (cpumask & 1) << get_hard_smp_processor_id(i);
-	return mask;
-}
-
 void openpic_init_processor(u_int cpumask)
 {
 	openpic_write(&OpenPIC->Global.Processor_Initialization,
-		      physmask(cpumask & cpus_coerce(cpu_online_map)));
+		      cpumask & cpus_coerce(cpu_online_map));
 }
 
 #ifdef CONFIG_SMP
@@ -570,7 +550,7 @@ void openpic_cause_IPI(u_int ipi, u_int cpumask)
 	CHECK_THIS_CPU;
 	check_arg_ipi(ipi);
 	openpic_write(&OpenPIC->THIS_CPU.IPI_Dispatch(ipi),
-		      physmask(cpumask & cpus_coerce(cpu_online_map)));
+		      cpumask & cpus_coerce(cpu_online_map));
 }
 
 void openpic_request_IPIs(void)
@@ -611,7 +591,7 @@ void __devinit do_openpic_setup_cpu(void)
 {
 #ifdef CONFIG_IRQ_ALL_CPUS
  	int i;
-	u32 msk = 1 << hard_smp_processor_id();
+	u32 msk = 1 << smp_processor_id();
 #endif
 
 	spin_lock(&openpic_setup_lock);
@@ -656,7 +636,7 @@ static void __init openpic_maptimer(u_int timer, u_int cpumask)
 {
 	check_arg_timer(timer);
 	openpic_write(&OpenPIC->Global.Timer[timer].Destination,
-		      physmask(cpumask & cpus_coerce(cpu_online_map)));
+		      cpumask & cpus_coerce(cpu_online_map));
 }
 
 
@@ -773,7 +753,7 @@ static inline void openpic_set_sense(u_int irq, int sense)
 
 static void openpic_end_irq(unsigned int irq_nr)
 {
-	if ((get_irq_desc(irq_nr)->status & IRQ_LEVEL) != 0)
+	if ((irq_desc[irq_nr].status & IRQ_LEVEL) != 0)
 		openpic_eoi();
 }
 
@@ -782,7 +762,7 @@ static void openpic_set_affinity(unsigned int irq_nr, cpumask_t cpumask)
 	cpumask_t tmp;
 
 	cpus_and(tmp, cpumask, cpu_online_map);
-	openpic_mapirq(irq_nr - open_pic_irq_offset, physmask(cpus_coerce(tmp)));
+	openpic_mapirq(irq_nr - open_pic_irq_offset, cpus_coerce(tmp));
 }
 
 #ifdef CONFIG_SMP

@@ -65,7 +65,9 @@
 #include <linux/ioport.h>
 #include <linux/parport.h>
 #include <linux/parport_pc.h>
-#include <linux/serial_reg.h>
+#include <linux/termios.h>
+#include <linux/tty.h>
+#include <linux/serial_core.h>
 #include <asm/io.h>
 #include <asm/hardware.h>
 #include <asm/irq.h>
@@ -387,11 +389,27 @@ int superio_fixup_irq(struct pci_dev *pcidev)
 	return(sio_dev.irq_region->data.irqbase + local_irq);
 }
 
+static struct uart_port serial[] = {
+	{
+		.iotype		= UPIO_PORT,
+		.line		= 0,
+		.type		= PORT_16550A,
+		.uartclk	= 115200*16,
+		.fifosize	= 16,
+	},
+	{
+		.iotype		= UPIO_PORT,
+		.line		= 1,
+		.type		= PORT_16550A,
+		.uartclk	= 115200*16,
+		.fifosize	= 16,
+	}
+};
+
 void __devinit
 superio_serial_init(void)
 {
 #ifdef CONFIG_SERIAL_8250
-	struct serial_struct *serial;
 	int retval;
 	
 	if (!sio_dev.irq_region)
@@ -400,47 +418,15 @@ superio_serial_init(void)
 	if (!sio_dev.iosapic_irq_enabled)
 		superio_init(&sio_dev);
 
-	serial = kmalloc(2 * sizeof (struct serial_struct), GFP_KERNEL);
+	serial[0].iobase = sio_dev.sp1_base;
+	retval = early_serial_setup(&serial[0]);
 
-	if (!serial) {
-		printk(KERN_WARNING "SuperIO: Could not get memory for serial struct.\n");
-		return;
-	}
-
-	memset(serial, 0, 2 * sizeof (struct serial_struct));
-
-	serial->type = PORT_16550A;
-	serial->line = 0;
-	serial->port = sio_dev.sp1_base;
-	serial->port_high = 0;
-	serial->irq = sio_dev.irq_region->data.irqbase + SP1_IRQ;
-	serial->io_type = SERIAL_IO_PORT;
-	serial->flags = 0;
-	serial->xmit_fifo_size = 16;
-	serial->custom_divisor = 0;
-	serial->baud_base = 115200;
-
-	retval = register_serial(serial);
-	if (retval < 0) {
+	if (retval < 0)
 		printk(KERN_WARNING "SuperIO: Register Serial #0 failed.\n");
-		kfree (serial);
-		return;
-	}
 
-	serial++;
+	serial[1].iobase = sio_dev.sp2_base;
+	retval = early_serial_setup(&serial[1]);
 
-	serial->type = PORT_16550A;
-	serial->line = 1;
-	serial->port = sio_dev.sp2_base;
-	serial->port_high = 0;
-	serial->irq = sio_dev.irq_region->data.irqbase + SP2_IRQ;
-	serial->io_type = SERIAL_IO_PORT;
-	serial->flags = 0;
-	serial->xmit_fifo_size = 16;
-	serial->custom_divisor = 0;
-	serial->baud_base = 115200;
-
-	retval = register_serial(serial);
 	if (retval < 0)
 		printk(KERN_WARNING "SuperIO: Register Serial #1 failed.\n");
 #endif /* CONFIG_SERIAL_8250 */
@@ -543,5 +529,5 @@ static void __exit superio_exit(void)
  *
  * FIXME: does this break the superio console?
  */
-late_initcall(superio_modinit);
+module_init(superio_modinit);
 module_exit(superio_exit);

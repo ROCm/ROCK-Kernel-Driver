@@ -1248,7 +1248,6 @@ static int __devinit tdfxfb_probe(struct pci_dev *pdev,
 	info->par		= default_par;
 	info->pseudo_palette	= (void *)(default_par + 1); 
 	info->flags		= FBINFO_FLAG_DEFAULT;
-	info->dev		= &pdev->dev;
 
 #ifndef MODULE
 	if (!mode_option)
@@ -1357,6 +1356,4 @@ void tdfxfb_setup(char *options, int *ints)
 	} 
 }
 #endif
-
-
 

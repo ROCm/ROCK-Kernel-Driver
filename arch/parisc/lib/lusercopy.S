@@ -133,6 +133,43 @@ $lcfu_zero_loop:
 	.procend
 
 	/*
+	 * unsigned long
+	 * lcopy_in_user(void *to, const void *from, unsigned long n)
+	 *
+	 * Returns 0 for success.
+	 * otherwise, returns number of bytes not transferred.
+	 */
+
+	.export lcopy_in_user,code
+lcopy_in_user:
+	.proc
+	.callinfo NO_CALLS
+	.entry
+	comib,=,n   0,%r24,$lciu_done
+	get_sr
+$lciu_loop:
+	ldbs,ma     1(%sr1,%r25),%r1
+	addib,<>    -1,%r24,$lciu_loop
+1:      stbs,ma     %r1,1(%sr1,%r26)
+$lciu_done:
+	bv          %r0(%r2)
+	copy        %r24,%r28
+	.exit
+
+2:      b $lciu_done
+	ldo         1(%r24),%r24
+
+	.section __ex_table,"a"
+#ifdef __LP64__
+	.dword      1b,(2b-1b)
+#else
+	.word       1b,(2b-1b)
+#endif
+	.previous
+
+	.procend
+
+	/*
 	 * long lstrncpy_from_user(char *dst, const char *src, long n)
 	 *
 	 * Returns -EFAULT if exception before terminator,

@@ -36,6 +36,7 @@
 #define  PCI_COMMAND_WAIT 	0x80	/* Enable address/data stepping */
 #define  PCI_COMMAND_SERR	0x100	/* Enable SERR */
 #define  PCI_COMMAND_FAST_BACK	0x200	/* Enable back-to-back writes */
+#define  PCI_COMMAND_INTX_DISABLE 0x400 /* INTx Emulation Disable */
 
 #define PCI_STATUS		0x06	/* 16 bits */
 #define  PCI_STATUS_CAP_LIST	0x10	/* Support Capability List */
@@ -198,6 +199,8 @@
 #define  PCI_CAP_ID_MSI		0x05	/* Message Signalled Interrupts */
 #define  PCI_CAP_ID_CHSWP	0x06	/* CompactPCI HotSwap */
 #define  PCI_CAP_ID_PCIX	0x07	/* PCI-X */
+#define  PCI_CAP_ID_EXP 	0x10	/* PCI Express */
+#define  PCI_CAP_ID_MSIX	0x11	/* MSI-X */
 #define PCI_CAP_LIST_NEXT	1	/* Next capability in the list */
 #define PCI_CAP_FLAGS		2	/* Capability defined flags (16 bits) */
 #define PCI_CAP_SIZEOF		4
@@ -275,11 +278,13 @@
 #define  PCI_MSI_FLAGS_QSIZE	0x70	/* Message queue size configured */
 #define  PCI_MSI_FLAGS_QMASK	0x0e	/* Maximum queue size available */
 #define  PCI_MSI_FLAGS_ENABLE	0x01	/* MSI feature enabled */
+#define  PCI_MSI_FLAGS_MASKBIT	0x100	/* 64-bit mask bits allowed */
 #define PCI_MSI_RFU		3	/* Rest of capability flags */
 #define PCI_MSI_ADDRESS_LO	4	/* Lower 32 bits */
 #define PCI_MSI_ADDRESS_HI	8	/* Upper 32 bits (if PCI_MSI_FLAGS_64BIT set) */
 #define PCI_MSI_DATA_32		8	/* 16 bits of data for 32-bit devices */
 #define PCI_MSI_DATA_64		12	/* 16 bits of data for 64-bit devices */
+#define PCI_MSI_MASK_BIT	16	/* Mask bits register */
 
 /* CompactPCI Hotswap Register */
 
@@ -468,12 +473,10 @@ struct pci_bus {
 
 	char		name[48];
 
-	struct device		*bridge;
-	struct class_device	class_dev;
+	struct	device	* dev;
 };
 
-#define pci_bus_b(n)	list_entry(n, struct pci_bus, node)
-#define to_pci_bus(n)	container_of(n, struct pci_bus, class_dev)
+#define pci_bus_b(n) list_entry(n, struct pci_bus, node)
 
 /*
  * Error values that may be returned by PCI functions.
@@ -609,8 +612,6 @@ struct pci_dev *pci_get_device (unsigned int vendor, unsigned int device, struct
 struct pci_dev *pci_get_subsys (unsigned int vendor, unsigned int device,
 				unsigned int ss_vendor, unsigned int ss_device,
 				struct pci_dev *from);
-struct pci_dev *pci_get_slot (struct pci_bus *bus, unsigned int devfn);
-
 int pci_bus_read_config_byte (struct pci_bus *bus, unsigned int devfn, int where, u8 *val);
 int pci_bus_read_config_word (struct pci_bus *bus, unsigned int devfn, int where, u16 *val);
 int pci_bus_read_config_dword (struct pci_bus *bus, unsigned int devfn, int where, u32 *val);
@@ -699,6 +700,18 @@ void pci_pool_free (struct pci_pool *pool, void *vaddr, dma_addr_t addr);
 extern struct pci_dev *isa_bridge;
 #endif
 
+#ifndef CONFIG_PCI_USE_VECTOR
+static inline void pci_scan_msi_device(struct pci_dev *dev) {}
+static inline int pci_enable_msi(struct pci_dev *dev) {return -1;}
+static inline void msi_remove_pci_irq_vectors(struct pci_dev *dev) {}
+#else
+extern void pci_scan_msi_device(struct pci_dev *dev);
+extern int pci_enable_msi(struct pci_dev *dev);
+extern void msi_remove_pci_irq_vectors(struct pci_dev *dev);
+extern int msi_alloc_vectors(struct pci_dev* dev, int *vector, int nvec);
+extern int msi_free_vectors(struct pci_dev* dev, int *vector, int nvec);
+#endif
+
 #endif /* CONFIG_PCI */
 
 /* Include architecture-dependent settings and functions */
@@ -772,7 +785,26 @@ static inline int pci_module_init(struct pci_driver *drv)
 {
 	int rc = pci_register_driver (drv);
 
-	return rc < 0 ? rc : 0;
+	if (rc > 0)
+		return 0;
+
+	/* iff CONFIG_HOTPLUG and built into kernel, we should
+	 * leave the driver around for future hotplug events.
+	 * For the module case, a hotplug daemon of some sort
+	 * should load a module in response to an insert event. */
+#if defined(CONFIG_HOTPLUG) && !defined(MODULE)
+	if (rc == 0)
+		return 0;
+#else
+	if (rc == 0)
+		rc = -ENODEV;		
+#endif
+
+	/* if we get here, we need to clean up pci driver instance
+	 * and return some sort of error */
+	pci_unregister_driver (drv);
+	
+	return rc;
 }
 
 /*

@@ -1132,11 +1132,16 @@ static int reiserfs_rename (struct inode * old_dir, struct dentry *old_dentry,
     int jbegin_count ; 
     umode_t old_inode_mode;
     unsigned long savelink = 1;
+    struct timespec ctime;
 
-    /* two balancings: old name removal, new name insertion or "save" link,
-       stat data updates: old directory and new directory and maybe block
-       containing ".." of renamed directory */
-    jbegin_count = JOURNAL_PER_BALANCE_CNT * 3 + 3;
+    /* three balancings: (1) old name removal, (2) new name insertion
+       and (3) maybe "save" link insertion
+       stat data updates: (1) old directory,
+       (2) new directory and (3) maybe old object stat data (when it is
+       directory) and (4) maybe stat data of object to which new entry
+       pointed initially and (5) maybe block containing ".." of
+       renamed directory */
+    jbegin_count = JOURNAL_PER_BALANCE_CNT * 3 + 5;
 
     old_inode = old_dentry->d_inode;
     new_dentry_inode = new_dentry->d_inode;
@@ -1299,8 +1304,12 @@ static int reiserfs_rename (struct inode * old_dir, struct dentry *old_dentry,
 
     mark_de_hidden (old_de.de_deh + old_de.de_entry_num);
     journal_mark_dirty (&th, old_dir->i_sb, old_de.de_bh);
-    old_dir->i_ctime = old_dir->i_mtime = 
-    new_dir->i_ctime = new_dir->i_mtime = CURRENT_TIME;
+    ctime = CURRENT_TIME;
+    old_dir->i_ctime = old_dir->i_mtime = ctime;
+    new_dir->i_ctime = new_dir->i_mtime = ctime;
+    /* thanks to Alex Adriaanse <alex_a@caltech.edu> for patch which adds ctime update of
+       renamed object */
+    old_inode->i_ctime = ctime;
 
     if (new_dentry_inode) {
 	// adjust link number of the victim
@@ -1309,7 +1318,7 @@ static int reiserfs_rename (struct inode * old_dir, struct dentry *old_dentry,
 	} else {
 	    new_dentry_inode->i_nlink--;
 	}
-	new_dentry_inode->i_ctime = new_dir->i_ctime;
+	new_dentry_inode->i_ctime = ctime;
 	savelink = new_dentry_inode->i_nlink;
     }
 
@@ -1342,6 +1351,7 @@ static int reiserfs_rename (struct inode * old_dir, struct dentry *old_dentry,
 
     reiserfs_update_sd (&th, old_dir);
     reiserfs_update_sd (&th, new_dir);
+    reiserfs_update_sd (&th, old_inode);
 
     if (new_dentry_inode) {
 	if (savelink == 0)

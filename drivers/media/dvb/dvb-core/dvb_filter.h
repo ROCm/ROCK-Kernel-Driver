@@ -37,7 +37,8 @@ struct dvb_filter_pes2ts {
 void dvb_filter_pes2ts_init(struct dvb_filter_pes2ts *p2ts, unsigned short pid, 
 		 	    dvb_filter_pes2ts_cb_t *cb, void *priv);
 
-int dvb_filter_pes2ts(struct dvb_filter_pes2ts *p2ts, unsigned char *pes, int len);
+int dvb_filter_pes2ts(struct dvb_filter_pes2ts *p2ts, unsigned char *pes,
+		      int len, int payload_start);
 
 
 #define PROG_STREAM_MAP  0xBC

@@ -462,11 +462,11 @@ static int vma_merge(struct mm_struct *mm, struct vm_area_struct *prev,
  * The caller must hold down_write(current->mm->mmap_sem).
  */
 
-unsigned long __do_mmap_pgoff(struct mm_struct *mm, struct file * file, 
-			    unsigned long addr, unsigned long len,
-			    unsigned long prot, unsigned long flags,
-			    unsigned long pgoff)
+unsigned long do_mmap_pgoff(struct file * file, unsigned long addr,
+			unsigned long len, unsigned long prot,
+			unsigned long flags, unsigned long pgoff)
 {
+	struct mm_struct * mm = current->mm;
 	struct vm_area_struct * vma, * prev;
 	struct inode *inode;
 	unsigned int vm_flags;
@@ -1138,7 +1138,11 @@ static void unmap_region(struct mm_struct *mm,
 	tlb = tlb_gather_mmu(mm, 0);
 	unmap_vmas(&tlb, mm, vma, start, end, &nr_accounted);
 	vm_unacct_memory(nr_accounted);
-	free_pgtables(tlb, prev, start, end);
+
+	if (is_hugepage_only_range(start, end - start))
+		hugetlb_free_pgtables(tlb, prev, start, end);
+	else
+		free_pgtables(tlb, prev, start, end);
 	tlb_finish_mmu(tlb, start, end);
 }
 

@@ -219,30 +219,15 @@ extern syscall_handler_t sys_getdents64;
 extern syscall_handler_t sys_gettid;
 extern syscall_handler_t sys_readahead;
 extern syscall_handler_t sys_tkill;
-extern syscall_handler_t sys_setxattr;
-extern syscall_handler_t sys_lsetxattr;
-extern syscall_handler_t sys_fsetxattr;
-extern syscall_handler_t sys_getxattr;
-extern syscall_handler_t sys_lgetxattr;
-extern syscall_handler_t sys_fgetxattr;
-extern syscall_handler_t sys_listxattr;
-extern syscall_handler_t sys_llistxattr;
-extern syscall_handler_t sys_flistxattr;
-extern syscall_handler_t sys_removexattr;
-extern syscall_handler_t sys_lremovexattr;
-extern syscall_handler_t sys_fremovexattr;
 extern syscall_handler_t sys_sendfile64;
 extern syscall_handler_t sys_futex;
 extern syscall_handler_t sys_sched_setaffinity;
 extern syscall_handler_t sys_sched_getaffinity;
-extern syscall_handler_t sys_set_thread_area;
-extern syscall_handler_t sys_get_thread_area;
 extern syscall_handler_t sys_io_setup;
 extern syscall_handler_t sys_io_destroy;
 extern syscall_handler_t sys_io_getevents;
 extern syscall_handler_t sys_io_submit;
 extern syscall_handler_t sys_io_cancel;
-extern syscall_handler_t sys_fadvise64;
 extern syscall_handler_t sys_exit_group;
 extern syscall_handler_t sys_lookup_dcookie;
 extern syscall_handler_t sys_epoll_create;
@@ -250,20 +235,6 @@ extern syscall_handler_t sys_epoll_ctl;
 extern syscall_handler_t sys_epoll_wait;
 extern syscall_handler_t sys_remap_file_pages;
 extern syscall_handler_t sys_set_tid_address;
-extern syscall_handler_t sys_timer_create;
-extern syscall_handler_t sys_timer_settime;
-extern syscall_handler_t sys_timer_gettime;
-extern syscall_handler_t sys_timer_getoverrun;
-extern syscall_handler_t sys_timer_delete;
-extern syscall_handler_t sys_clock_settime;
-extern syscall_handler_t sys_clock_gettime;
-extern syscall_handler_t sys_clock_getres;
-extern syscall_handler_t sys_clock_nanosleep;
-extern syscall_handler_t sys_statfs64;
-extern syscall_handler_t sys_fstatfs64;
-extern syscall_handler_t sys_tgkill;
-extern syscall_handler_t sys_utimes;
-extern syscall_handler_t sys_fadvise64_64;
 
 #ifdef CONFIG_NFSD
 #define NFSSERVCTL sys_nfsservctl
@@ -275,7 +246,7 @@ extern syscall_handler_t um_mount;
 extern syscall_handler_t um_time;
 extern syscall_handler_t um_stime;
 
-#define LAST_GENERIC_SYSCALL __NR_vserver
+#define LAST_GENERIC_SYSCALL __NR_set_tid_address
 
 #if LAST_GENERIC_SYSCALL > LAST_ARCH_SYSCALL
 #define LAST_SYSCALL LAST_GENERIC_SYSCALL
@@ -484,37 +455,32 @@ syscall_handler_t *sys_call_table[] = {
 	[ __NR_stat64 ] = sys_stat64,
 	[ __NR_lstat64 ] = sys_lstat64,
 	[ __NR_fstat64 ] = sys_fstat64,
-	[ __NR_getdents64 ] = sys_getdents64,
 	[ __NR_fcntl64 ] = sys_fcntl64,
-	[ 223 ] = sys_ni_syscall,
+	[ __NR_getdents64 ] = sys_getdents64,
 	[ __NR_gettid ] = sys_gettid,
 	[ __NR_readahead ] = sys_readahead,
-	[ __NR_setxattr ] = sys_setxattr,
-	[ __NR_lsetxattr ] = sys_lsetxattr,
-	[ __NR_fsetxattr ] = sys_fsetxattr,
-	[ __NR_getxattr ] = sys_getxattr,
-	[ __NR_lgetxattr ] = sys_lgetxattr,
-	[ __NR_fgetxattr ] = sys_fgetxattr,
-	[ __NR_listxattr ] = sys_listxattr,
-	[ __NR_llistxattr ] = sys_llistxattr,
-	[ __NR_flistxattr ] = sys_flistxattr,
-	[ __NR_removexattr ] = sys_removexattr,
-	[ __NR_lremovexattr ] = sys_lremovexattr,
-	[ __NR_fremovexattr ] = sys_fremovexattr,
+	[ __NR_setxattr ] = sys_ni_syscall,
+	[ __NR_lsetxattr ] = sys_ni_syscall,
+	[ __NR_fsetxattr ] = sys_ni_syscall,
+	[ __NR_getxattr ] = sys_ni_syscall,
+	[ __NR_lgetxattr ] = sys_ni_syscall,
+	[ __NR_fgetxattr ] = sys_ni_syscall,
+	[ __NR_listxattr ] = sys_ni_syscall,
+	[ __NR_llistxattr ] = sys_ni_syscall,
+	[ __NR_flistxattr ] = sys_ni_syscall,
+	[ __NR_removexattr ] = sys_ni_syscall,
+	[ __NR_lremovexattr ] = sys_ni_syscall,
+	[ __NR_fremovexattr ] = sys_ni_syscall,
 	[ __NR_tkill ] = sys_tkill,
 	[ __NR_sendfile64 ] = sys_sendfile64,
 	[ __NR_futex ] = sys_futex,
 	[ __NR_sched_setaffinity ] = sys_sched_setaffinity,
 	[ __NR_sched_getaffinity ] = sys_sched_getaffinity,
-	[ __NR_set_thread_area ] = sys_ni_syscall,
-	[ __NR_get_thread_area ] = sys_ni_syscall,
 	[ __NR_io_setup ] = sys_io_setup,
 	[ __NR_io_destroy ] = sys_io_destroy,
 	[ __NR_io_getevents ] = sys_io_getevents,
 	[ __NR_io_submit ] = sys_io_submit,
 	[ __NR_io_cancel ] = sys_io_cancel,
-	[ __NR_fadvise64 ] = sys_fadvise64,
-	[ 251 ] = sys_ni_syscall,
 	[ __NR_exit_group ] = sys_exit_group,
 	[ __NR_lookup_dcookie ] = sys_lookup_dcookie,
 	[ __NR_epoll_create ] = sys_epoll_create,
@@ -522,21 +488,6 @@ syscall_handler_t *sys_call_table[] = {
 	[ __NR_epoll_wait ] = sys_epoll_wait,
         [ __NR_remap_file_pages ] = sys_remap_file_pages,
         [ __NR_set_tid_address ] = sys_set_tid_address,
-	[ __NR_timer_create ] = sys_timer_create,
-	[ __NR_timer_settime ] = sys_timer_settime,
-	[ __NR_timer_gettime ] = sys_timer_gettime,
-	[ __NR_timer_getoverrun ] = sys_timer_getoverrun,
-	[ __NR_timer_delete ] = sys_timer_delete,
-	[ __NR_clock_settime ] = sys_clock_settime,
-	[ __NR_clock_gettime ] = sys_clock_gettime,
-	[ __NR_clock_getres ] = sys_clock_getres,
-	[ __NR_clock_nanosleep ] = sys_clock_nanosleep,
-	[ __NR_statfs64 ] = sys_statfs64,
-	[ __NR_fstatfs64 ] = sys_fstatfs64,
-	[ __NR_tgkill ] = sys_tgkill,
-	[ __NR_utimes ] = sys_utimes,
-	[ __NR_fadvise64_64 ] = sys_fadvise64_64,
-	[ __NR_vserver ] = sys_ni_syscall,
 
 	ARCH_SYSCALLS
 	[ LAST_SYSCALL + 1 ... NR_syscalls ] = 

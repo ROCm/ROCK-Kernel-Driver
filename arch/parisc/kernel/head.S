@@ -221,13 +221,13 @@ $install_iva:
 	** Clear the two-level IIA Space Queue, effectively setting
 	** Kernel space.
 	*/
-	mtctl		%r0,%cr17
-	mtctl		%r0,%cr17
+	mtctl		%r0,%cr17	/* Clear IIASQ tail */
+	mtctl		%r0,%cr17	/* Clear IIASQ head */
 
 	/* Load RFI target into PC queue */
-	mtctl		%r11,%cr18
+	mtctl		%r11,%cr18	/* IIAOQ head */
 	ldo		4(%r11),%r11
-	mtctl		%r11,%cr18
+	mtctl		%r11,%cr18	/* IIAOQ tail */
 
 	/* Jump to hyperspace */
 	rfi

@@ -34,6 +34,5 @@ struct proc_ppc64_t {
 };
 
 extern struct proc_ppc64_t proc_ppc64;
-extern int proc_ppc64_init(void);
 
 #endif /* _PPC64_PROC_FS_H */

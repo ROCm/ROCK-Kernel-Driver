@@ -88,10 +88,6 @@ config HOTPLUG_PCI_ACPI
 
 	  When in doubt, say N.
 
-config HOTPLUG_PCI_AMD
-	tristate "AMD Standard Hot Plug Controller (SHPC) driver"
-	depends on HOTPLUG_PCI
-
 config HOTPLUG_PCI_CPCI
 	bool "CompactPCI Hotplug driver"
 	depends on HOTPLUG_PCI
@@ -125,29 +121,6 @@ config HOTPLUG_PCI_CPCI_GENERIC
 	  module will be called cpcihp_generic.
 
 	  When in doubt, say N.
-
-config HOTPLUG_PCI_RPA
-	tristate "RPA PCI Hotplug driver"
-	depends on HOTPLUG_PCI && PPC64
-	help
-	  Say Y here if you have a a RPA system that supports PCI Hotplug.
-
-	  To compile this driver as a module, choose M here: the
-	  module will be called rpaphp.
-
-	  When in doubt, say N.
-
-config HOTPLUG_PCI_RPA_DLPAR
-	tristate "RPA Dynamic Logical Partitioning for I/O slots"
- 	depends on HOTPLUG_PCI_RPA
- 	help
-	  Say Y here if your system supports Dynamic Logical Partitioning
-	  for I/O slots.
-
-	  To compile this driver as a module, choose M here: the
-	  module will be called rpadlpar_io.
- 
- 	  When in doubt, say N.
 
 endmenu
 

@@ -1,3 +1,4 @@
+
 /*
  * ras.c
  * Copyright (C) 2001 Dave Engebretsen IBM Corporation
@@ -69,29 +70,27 @@ static int __init init_ras_IRQ(void)
 	struct device_node *np;
 	unsigned int *ireg, len, i;
 
-	if ((np = of_find_node_by_path("/event-sources/internal-errors")) &&
-	    (ireg = (unsigned int *)get_property(np, "open-pic-interrupt",
-						 &len))) {
-		for (i=0; i<(len / sizeof(*ireg)); i++) {
-			request_irq(irq_offset_up(*(ireg)), 
+	if((np = find_path_device("/event-sources/internal-errors")) &&
+	   (ireg = (unsigned int *)get_property(np, "open-pic-interrupt", 
+						&len))) {
+		for(i=0; i<(len / sizeof(*ireg)); i++) {
+			request_irq(virt_irq_create_mapping(*(ireg)) + NUM_8259_INTERRUPTS, 
 				    ras_error_interrupt, 0, 
 				    "RAS_ERROR", NULL);
 			ireg++;
 		}
 	}
-	of_node_put(np);
 
-	if ((np = of_find_node_by_path("/event-sources/epow-events")) &&
-	    (ireg = (unsigned int *)get_property(np, "open-pic-interrupt",
-						 &len))) {
-		for (i=0; i<(len / sizeof(*ireg)); i++) {
-			request_irq(irq_offset_up(*(ireg)),
+	if((np = find_path_device("/event-sources/epow-events")) &&
+	   (ireg = (unsigned int *)get_property(np, "open-pic-interrupt", 
+						&len))) {
+		for(i=0; i<(len / sizeof(*ireg)); i++) {
+			request_irq(virt_irq_create_mapping(*(ireg)) + NUM_8259_INTERRUPTS, 
 				    ras_epow_interrupt, 0, 
 				    "RAS_EPOW", NULL);
 			ireg++;
 		}
 	}
-	of_node_put(np);
 
 	return 1;
 }
@@ -113,7 +112,7 @@ ras_epow_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 
 	status = rtas_call(rtas_token("check-exception"), 6, 1, NULL, 
 			   0x500, irq, 
-			   RTAS_EPOW_WARNING | RTAS_POWERMGM_EVENTS, 
+			   EPOW_WARNING | POWERMGM_EVENTS, 
 			   1,  /* Time Critical */
 			   __pa(&log_entry), size);
 
@@ -121,10 +120,6 @@ ras_epow_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 		    *((unsigned long *)&log_entry), status); 
 	printk(KERN_WARNING 
 		"EPOW <0x%lx 0x%lx>\n",*((unsigned long *)&log_entry), status);
-
-	/* format and print the extended information */
-	log_error((char *)&log_entry, ERR_TYPE_RTAS_LOG, 0);
-	
 	return IRQ_HANDLED;
 }
 
@@ -142,23 +137,15 @@ ras_error_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	struct rtas_error_log log_entry;
 	unsigned int size = sizeof(log_entry);
 	long status = 0xdeadbeef;
-	int fatal;
 
 	status = rtas_call(rtas_token("check-exception"), 6, 1, NULL, 
 			   0x500, irq, 
-			   RTAS_INTERNAL_ERROR, 
+			   INTERNAL_ERROR, 
 			   1, /* Time Critical */
 			   __pa(&log_entry), size);
 
-	if ((status == 0) && (log_entry.severity >= SEVERITY_ERROR_SYNC)) 
-		fatal = 1;
-	else
-		fatal = 0;
-
-	/* format and print the extended information */
-	log_error((char *)&log_entry, ERR_TYPE_RTAS_LOG, fatal); 
-
-	if (fatal) {
+	if((status != 1) && 
+	   (log_entry.severity >= SEVERITY_ERROR_SYNC)) {
 		udbg_printf("HW Error <0x%lx 0x%lx>\n",
 			    *((unsigned long *)&log_entry), status);
 		printk(KERN_EMERG 
@@ -168,7 +155,6 @@ ras_error_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 #ifndef DEBUG
 		/* Don't actually power off when debugging so we can test
 		 * without actually failing while injecting errors.
-		 * Error data will not be logged to syslog.
 		 */
 		ppc_md.power_off();
 #endif

@@ -23,18 +23,23 @@
 //	drive the hypervisor from the OS.
 //
 //=====================================================================================
-#ifndef _HVCALLCFG_H
-#define _HVCALLCFG_H
 
 //-------------------------------------------------------------------
 // Standard Includes
 //-------------------------------------------------------------------
-#include <asm/iSeries/HvCallSc.h>
+#ifndef  _HVCALLSC_H
+#include "HvCallSc.h"
+#endif
+
+#ifndef  _HVTYPES_H
 #include <asm/iSeries/HvTypes.h>
+#endif
 
 //-------------------------------------------------------------------------------------
 // Constants
 //-------------------------------------------------------------------------------------
+#ifndef _HVCALLCFG_H
+#define _HVCALLCFG_H
 
 enum HvCallCfg_ReqQual
 {
@@ -210,4 +215,5 @@ static inline HvLpIndex	HvCallCfg_getHostingLpIndex(HvLpIndex lp)
 
 }
 
-#endif /* _HVCALLCFG_H */
+#endif // _HVCALLCFG_H
+

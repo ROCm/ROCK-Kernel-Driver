@@ -40,7 +40,12 @@
 
 /* These are here to support 32-bit syscalls on a 64-bit kernel. */
 
-typedef struct compat_siginfo {
+typedef union sigval32 {
+	int sival_int;
+	unsigned int sival_ptr;
+} sigval_t32;
+
+typedef struct siginfo32 {
 	int si_signo;
 	int si_errno;
 	int si_code;
@@ -64,7 +69,7 @@ typedef struct compat_siginfo {
 		struct {
 			compat_pid_t _pid;		/* sender's pid */
 			compat_uid_t _uid;		/* sender's uid */
-			compat_sigval_t _sigval;
+			sigval_t32 _sigval;
 		} _rt;
 
 		/* SIGCHLD */
@@ -87,7 +92,7 @@ typedef struct compat_siginfo {
 			int _fd;
 		} _sigpoll;
 	} _sifields;
-} compat_siginfo_t;
+} siginfo_t32;
 
 #define __old_sigaction32	old_sigaction32
 
@@ -121,39 +126,13 @@ struct sigcontext32 {
 	u32 regs;  /* 4 byte pointer to the pt_regs32 structure. */
 };
 
-struct mcontext32 {
-	elf_gregset_t32		mc_gregs;
-	elf_fpregset_t		mc_fregs;
-	unsigned int		mc_pad[2];
-	elf_vrregset_t32	mc_vregs __attribute__((__aligned__(16)));
-};
-
 struct ucontext32 { 
-	unsigned int	  	uc_flags;
-	unsigned int 	  	uc_link;
-	stack_32_t	 	uc_stack;
-	int		 	uc_pad[7];
-	u32			uc_regs;	/* points to uc_mcontext field */
-	compat_sigset_t	 	uc_sigmask;	/* mask last for extensibility */
-	/* glibc has 1024-bit signal masks, ours are 64-bit */
-	int		 	uc_maskext[30];
-	int		 	uc_pad2[3];
-	struct mcontext32	uc_mcontext;
+	unsigned int	  uc_flags;
+	unsigned int 	  uc_link;
+	stack_32_t	  uc_stack;
+	struct sigcontext32 uc_mcontext;
+	sigset_t	  uc_sigmask;	/* mask last for extensibility */
 };
-
-typedef struct compat_sigevent {
-	compat_sigval_t sigev_value;
-	int sigev_signo;
-	int sigev_notify;
-	union {
-		int _pad[SIGEV_PAD_SIZE];
-		int _tid;
-		struct {
-			compat_uptr_t _function;
-			compat_uptr_t _attribute;
-		} _sigev_thread;
-	} _sigev_un;
-} compat_sigevent_t;
 
 struct ipc_kludge_32 {
 	unsigned int msgp;

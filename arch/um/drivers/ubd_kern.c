@@ -8,13 +8,6 @@
  * old style ubd by setting UBD_SHIFT to 0
  * 2002-09-27...2002-10-18 massive tinkering for 2.5
  * partitions have changed in 2.5
- * 2003-01-29 more tinkering for 2.5.59-1
- * This should now address the sysfs problems and has
- * the symlink for devfs to allow for booting with
- * the common /dev/ubd/discX/... names rather than
- * only /dev/ubdN/discN this version also has lots of
- * clean ups preparing for ubd-many.
- * James McMechan
  */
 
 #define MAJOR_NR UBD_MAJOR
@@ -47,7 +40,6 @@
 #include "mconsole_kern.h"
 #include "init.h"
 #include "irq_user.h"
-#include "irq_kern.h"
 #include "ubd_user.h"
 #include "2_5compat.h"
 #include "os.h"
@@ -75,7 +67,7 @@ static struct block_device_operations ubd_blops = {
 static request_queue_t *ubd_queue;
 
 /* Protected by ubd_lock */
-static int fake_major = MAJOR_NR;
+static int fake_major = 0;
 
 static struct gendisk *ubd_gendisk[MAX_DEV];
 static struct gendisk *fake_gendisk[MAX_DEV];
@@ -104,12 +96,12 @@ struct cow {
 
 struct ubd {
 	char *file;
+	int is_dir;
 	int count;
 	int fd;
 	__u64 size;
 	struct openflags boot_openflags;
 	struct openflags openflags;
-	int no_cow;
 	struct cow cow;
 };
 
@@ -123,12 +115,12 @@ struct ubd {
 
 #define DEFAULT_UBD { \
 	.file = 		NULL, \
+	.is_dir =		0, \
 	.count =		0, \
 	.fd =			-1, \
 	.size =			-1, \
 	.boot_openflags =	OPEN_FLAGS, \
 	.openflags =		OPEN_FLAGS, \
-        .no_cow =               0, \
         .cow =			DEFAULT_COW, \
 }
 
@@ -136,10 +128,8 @@ struct ubd ubd_dev[MAX_DEV] = { [ 0 ... MAX_DEV - 1 ] = DEFAULT_UBD };
 
 static int ubd0_init(void)
 {
-	struct ubd *dev = &ubd_dev[0];
-
-	if(dev->file == NULL)
-		dev->file = "root_fs";
+	if(ubd_dev[0].file == NULL)
+		ubd_dev[0].file = "root_fs";
 	return(0);
 }
 
@@ -206,39 +196,19 @@ __uml_help(fake_ide_setup,
 "    Create ide0 entries that map onto ubd devices.\n\n"
 );
 
-static int parse_unit(char **ptr)
-{
-	char *str = *ptr, *end;
-	int n = -1;
-
-	if(isdigit(*str)) {
-		n = simple_strtoul(str, &end, 0);
-		if(end == str)
-			return(-1);
-		*ptr = end;
-	}
-	else if (('a' <= *str) && (*str <= 'h')) {
-		n = *str - 'a';
-		str++;
-		*ptr = str;
-	}
-	return(n);
-}
-
 static int ubd_setup_common(char *str, int *index_out)
 {
-	struct ubd *dev;
 	struct openflags flags = global_openflags;
 	char *backing_file;
 	int n, err;
 
 	if(index_out) *index_out = -1;
-	n = *str;
+	n = *str++;
 	if(n == '='){
+		static int fake_major_allowed = 1;
 		char *end;
 		int major;
 
-		str++;
 		if(!strcmp(str, "sync")){
 			global_openflags.s = 1;
 			return(0);
@@ -250,14 +220,20 @@ static int ubd_setup_common(char *str, int *index_out)
 			return(1);
 		}
 
+		if(!fake_major_allowed){
+			printk(KERN_ERR "Can't assign a fake major twice\n");
+			return(1);
+		}
+
 		err = 1;
  		spin_lock(&ubd_lock);
- 		if(fake_major != MAJOR_NR){
+ 		if(!fake_major_allowed){
  			printk(KERN_ERR "Can't assign a fake major twice\n");
  			goto out1;
  		}
  
  		fake_major = major;
+		fake_major_allowed = 0;
 
 		printk(KERN_INFO "Setting extra ubd major number to %d\n",
 		       major);
@@ -267,23 +243,25 @@ static int ubd_setup_common(char *str, int *index_out)
 		return(err);
 	}
 
-	n = parse_unit(&str);
-	if(n < 0){
-		printk(KERN_ERR "ubd_setup : couldn't parse unit number "
-		       "'%s'\n", str);
+	if(n < '0'){
+		printk(KERN_ERR "ubd_setup : index out of range\n"); }
+
+	if((n >= '0') && (n <= '9')) n -= '0';
+	else if((n >= 'a') && (n <= 'z')) n -= 'a';
+	else {
+		printk(KERN_ERR "ubd_setup : device syntax invalid\n");
 		return(1);
 	}
 	if(n >= MAX_DEV){
-		printk(KERN_ERR "ubd_setup : index %d out of range "
-		       "(%d devices)\n", n, MAX_DEV);
+		printk(KERN_ERR "ubd_setup : index out of range "
+		       "(%d devices)\n", MAX_DEV);	
 		return(1);
 	}
 
 	err = 1;
 	spin_lock(&ubd_lock);
 
-	dev = &ubd_dev[n];
-	if(dev->file != NULL){
+	if(ubd_dev[n].file != NULL){
 		printk(KERN_ERR "ubd_setup : device already configured\n");
 		goto out2;
 	}
@@ -298,11 +276,6 @@ static int ubd_setup_common(char *str, int *index_out)
 		flags.s = 1;
 		str++;
 	}
-	if (*str == 'd'){
-		dev->no_cow = 1;
-		str++;
-	}
-
 	if(*str++ != '='){
 		printk(KERN_ERR "ubd_setup : Expected '='\n");
 		goto out2;
@@ -311,17 +284,14 @@ static int ubd_setup_common(char *str, int *index_out)
 	err = 0;
 	backing_file = strchr(str, ',');
 	if(backing_file){
-		if(dev->no_cow)
-			printk(KERN_ERR "Can't specify both 'd' and a "
-			       "cow file\n");
-		else {
-			*backing_file = '\0';
-			backing_file++;
-		}
+		*backing_file = '\0';
+		backing_file++;
 	}
-	dev->file = str;
-	dev->cow.file = backing_file;
-	dev->boot_openflags = flags;
+	ubd_dev[n].file = str;
+	if(ubd_is_dir(ubd_dev[n].file))
+		ubd_dev[n].is_dir = 1;
+	ubd_dev[n].cow.file = backing_file;
+	ubd_dev[n].boot_openflags = flags;
  out2:
 	spin_unlock(&ubd_lock);
 	return(err);
@@ -351,7 +321,8 @@ __uml_help(ubd_setup,
 static int fakehd_set = 0;
 static int fakehd(char *str)
 {
-	printk(KERN_INFO "fakehd : Changing ubd name to \"hd\".\n");
+	printk(KERN_INFO 
+	       "fakehd : Changing ubd name to \"hd\".\n");
 	fakehd_set = 1;
 	return 1;
 }
@@ -420,10 +391,9 @@ static void ubd_handler(void)
 	do_ubd_request(ubd_queue);
 }
 
-static irqreturn_t ubd_intr(int irq, void *dev, struct pt_regs *unused)
+static void ubd_intr(int irq, void *dev, struct pt_regs *unused)
 {
 	ubd_handler();
-	return(IRQ_HANDLED);
 }
 
 /* Only changed by ubd_init, which is an initcall. */
@@ -459,18 +429,16 @@ static void ubd_close(struct ubd *dev)
 static int ubd_open_dev(struct ubd *dev)
 {
 	struct openflags flags;
-	char **back_ptr;
-	int err, create_cow, *create_ptr;
+	int err, n, create_cow, *create_ptr;
 
-	dev->openflags = dev->boot_openflags;
 	create_cow = 0;
 	create_ptr = (dev->cow.file != NULL) ? &create_cow : NULL;
-	back_ptr = dev->no_cow ? NULL : &dev->cow.file;
-	dev->fd = open_ubd_file(dev->file, &dev->openflags, back_ptr,
+	dev->fd = open_ubd_file(dev->file, &dev->openflags, &dev->cow.file,
 				&dev->cow.bitmap_offset, &dev->cow.bitmap_len, 
 				&dev->cow.data_offset, create_ptr);
 
 	if((dev->fd == -ENOENT) && create_cow){
+		n = dev - ubd_dev;
 		dev->fd = create_cow_file(dev->file, dev->cow.file, 
 					  dev->openflags, 1 << 9,
 					  &dev->cow.bitmap_offset, 
@@ -487,10 +455,7 @@ static int ubd_open_dev(struct ubd *dev)
 	if(dev->cow.file != NULL){
 		err = -ENOMEM;
 		dev->cow.bitmap = (void *) vmalloc(dev->cow.bitmap_len);
-		if(dev->cow.bitmap == NULL){
-			printk(KERN_ERR "Failed to vmalloc COW bitmap\n");
-			goto error;
-		}
+		if(dev->cow.bitmap == NULL) goto error;
 		flush_tlb_kernel_vm();
 
 		err = read_cow_bitmap(dev->fd, dev->cow.bitmap, 
@@ -516,31 +481,17 @@ static int ubd_new_disk(int major, u64 size, int unit,
 			
 {
 	struct gendisk *disk;
-	char from[sizeof("ubd/nnnnn\0")], to[sizeof("discnnnnn/disc\0")];
-	int err;
 
 	disk = alloc_disk(1 << UBD_SHIFT);
-	if(disk == NULL)
-		return(-ENOMEM);
+	if (!disk)
+		return -ENOMEM;
 
 	disk->major = major;
 	disk->first_minor = unit << UBD_SHIFT;
 	disk->fops = &ubd_blops;
 	set_capacity(disk, size / 512);
-	if(major == MAJOR_NR){
-		sprintf(disk->disk_name, "ubd%c", 'a' + unit);
-		sprintf(disk->devfs_name, "ubd/disc%d", unit);
-		sprintf(from, "ubd/%d", unit);
-		sprintf(to, "disc%d/disc", unit);
-		err = devfs_mk_symlink(from, to);
-		if(err)
-			printk("ubd_new_disk failed to make link from %s to "
-			       "%s, error = %d\n", from, to, err);
-	}
-	else {
-		sprintf(disk->disk_name, "ubd_fake%d", unit);
-		sprintf(disk->devfs_name, "ubd_fake/disc%d", unit);
-	}
+	sprintf(disk->disk_name, "ubd");
+	sprintf(disk->devfs_name, "ubd/disc%d", unit);
 
 	disk->private_data = &ubd_dev[unit];
 	disk->queue = ubd_queue;
@@ -555,7 +506,10 @@ static int ubd_add(int n)
 	struct ubd *dev = &ubd_dev[n];
 	int err;
 
-	if(dev->file == NULL)
+	if(dev->is_dir)
+		return(-EISDIR);
+
+	if (!dev->file)
 		return(-ENODEV);
 
 	if (ubd_open_dev(dev))
@@ -569,7 +523,7 @@ static int ubd_add(int n)
 	if(err) 
 		return(err);
  
-	if(fake_major != MAJOR_NR)
+	if(fake_major)
 		ubd_new_disk(fake_major, dev->size, n, 
 			     &fake_gendisk[n]);
 
@@ -607,42 +561,42 @@ static int ubd_config(char *str)
 	return(err);
 }
 
-static int ubd_get_config(char *name, char *str, int size, char **error_out)
+static int ubd_get_config(char *dev, char *str, int size, char **error_out)
 {
-	struct ubd *dev;
+	struct ubd *ubd;
 	char *end;
-	int n, len = 0;
+	int major, n = 0;
 
-	n = simple_strtoul(name, &end, 0);
-	if((*end != '\0') || (end == name)){
-		*error_out = "ubd_get_config : didn't parse device number";
+	major = simple_strtoul(dev, &end, 0);
+	if((*end != '\0') || (end == dev)){
+		*error_out = "ubd_get_config : didn't parse major number";
 		return(-1);
 	}
 
-	if((n >= MAX_DEV) || (n < 0)){
-		*error_out = "ubd_get_config : device number out of range";
+	if((major >= MAX_DEV) || (major < 0)){
+		*error_out = "ubd_get_config : major number out of range";
 		return(-1);
 	}
 
-	dev = &ubd_dev[n];
+	ubd = &ubd_dev[major];
 	spin_lock(&ubd_lock);
 
-	if(dev->file == NULL){
-		CONFIG_CHUNK(str, size, len, "", 1);
+	if(ubd->file == NULL){
+		CONFIG_CHUNK(str, size, n, "", 1);
 		goto out;
 	}
 
-	CONFIG_CHUNK(str, size, len, dev->file, 0);
+	CONFIG_CHUNK(str, size, n, ubd->file, 0);
 
-	if(dev->cow.file != NULL){
-		CONFIG_CHUNK(str, size, len, ",", 0);
-		CONFIG_CHUNK(str, size, len, dev->cow.file, 1);
+	if(ubd->cow.file != NULL){
+		CONFIG_CHUNK(str, size, n, ",", 0);
+		CONFIG_CHUNK(str, size, n, ubd->cow.file, 1);
 	}
-	else CONFIG_CHUNK(str, size, len, "", 1);
+	else CONFIG_CHUNK(str, size, n, "", 1);
 
  out:
 	spin_unlock(&ubd_lock);
-	return(len);
+	return(n);
 }
 
 static int ubd_remove(char *str)
@@ -650,9 +604,11 @@ static int ubd_remove(char *str)
 	struct ubd *dev;
 	int n, err = -ENODEV;
 
-	n = parse_unit(&str);
+	if(!isdigit(*str))
+		return(err);	/* it should be a number 0-7/a-h */
 
-	if((n < 0) || (n >= MAX_DEV))
+	n = *str - '0';
+	if(n >= MAX_DEV) 
 		return(err);
 
 	dev = &ubd_dev[n];
@@ -713,7 +669,7 @@ int ubd_init(void)
 		
 	elevator_init(ubd_queue, &elevator_noop);
 
-	if (fake_major != MAJOR_NR) {
+	if (fake_major != 0) {
 		char name[sizeof("ubd_nnn\0")];
 
 		snprintf(name, sizeof(name), "ubd_%d", fake_major);
@@ -758,9 +714,15 @@ static int ubd_open(struct inode *inode, struct file *filp)
 {
 	struct gendisk *disk = inode->i_bdev->bd_disk;
 	struct ubd *dev = disk->private_data;
-	int err = 0;
+	int err = -EISDIR;
 
+	if(dev->is_dir == 1)
+		goto out;
+
+	err = 0;
 	if(dev->count == 0){
+		dev->openflags = dev->boot_openflags;
+
 		err = ubd_open_dev(dev);
 		if(err){
 			printk(KERN_ERR "%s: Can't open \"%s\": errno = %d\n",
@@ -833,6 +795,15 @@ static int prepare_request(struct request *req, struct io_thread_req *io_req)
 	int nsect;
 
 	if(req->rq_status == RQ_INACTIVE) return(1);
+
+	if(dev->is_dir){
+		strcpy(req->buffer, "HOSTFS:");
+		strcat(req->buffer, dev->file);
+ 		spin_lock(&ubd_io_lock);
+		end_request(req, 1);
+ 		spin_unlock(&ubd_io_lock);
+		return(1);
+	}
 
 	if((rq_data_dir(req) == WRITE) && !dev->openflags.w){
 		printk("Write attempted on readonly ubd device %s\n", 

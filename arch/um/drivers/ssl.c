@@ -10,7 +10,6 @@
 #include "linux/major.h"
 #include "linux/mm.h"
 #include "linux/init.h"
-#include "linux/console.h"
 #include "asm/termbits.h"
 #include "asm/irq.h"
 #include "line.h"
@@ -54,9 +53,8 @@ static int ssl_remove(char *str);
 
 static struct line_driver driver = {
 	.name 			= "UML serial line",
-	.device_name 		= "ttS",
-	.devfs_name 		= "tts/",
-	.major 			= TTY_MAJOR,
+	.devfs_name 		= "tts/%d",
+	.major 			= TTYAUX_MAJOR,
 	.minor_start 		= 64,
 	.type 		 	= TTY_DRIVER_TYPE_SERIAL,
 	.subtype 	 	= 0,
@@ -151,8 +149,6 @@ static int ssl_ioctl(struct tty_struct *tty, struct file * file,
 	case TCSETSW:
 	case TCGETA:
 	case TIOCMGET:
-	case TCSBRK:
-	case TCSBRKP:
 		ret = -ENOIOCTLCMD;
 		break;
 	default:
@@ -216,48 +212,12 @@ static struct tty_operations ssl_ops = {
  */
 static int ssl_init_done = 0;
 
-extern int tty_init(void);
-
-static void ssl_console_write(struct console *c, const char *string, 
-			      unsigned len)
-{
-	struct line *line = &serial_lines[c->index];
-
-	if(ssl_init_done)
-		down(&line->sem);
-	console_write_chan(&line->chan_list, string, len);
-	if(ssl_init_done)
-		up(&line->sem);
-}
-
-static struct tty_driver *ssl_console_device(struct console *c, int *index)
-{
-	*index = c->index;
-	return ssl_driver;
-}
-
-static int ssl_console_setup(struct console *co, char *options)
-{
-	return(0);
-}
-
-static struct console ssl_cons = {
-	name:		"ttyS",
-	write:		ssl_console_write,
-	device:		ssl_console_device,
-	setup:		ssl_console_setup,
-	flags:		CON_PRINTBUFFER,
-	index:		-1,
-};
-
 int ssl_init(void)
 {
 	char *new_title;
 
 	printk(KERN_INFO "Initializing software serial port version %d\n", 
 	       ssl_version);
-
-	tty_init();
 
 	ssl_driver = line_register_devfs(&lines, &driver, &ssl_ops,
 		serial_lines, sizeof(serial_lines)/sizeof(serial_lines[0]));
@@ -267,7 +227,6 @@ int ssl_init(void)
 	new_title = add_xterm_umid(opts.xterm_title);
 	if(new_title != NULL) opts.xterm_title = new_title;
 
-	register_console(&ssl_cons);
 	ssl_init_done = 1;
 	return(0);
 }

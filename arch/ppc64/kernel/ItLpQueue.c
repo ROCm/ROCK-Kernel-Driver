@@ -147,14 +147,17 @@ unsigned ItLpQueue_process( struct ItLpQueue * lpQueue, struct pt_regs *regs )
 				printk(KERN_INFO "Unexpected Lp Event type=%d\n", nextLpEvent->xType );
 			
 			ItLpQueue_clearValid( nextLpEvent );
-		} else if ( lpQueue->xPlicOverflowIntPending )
-			/*
-			 * No more valid events. If overflow events are
-			 * pending process them
+		}
+		else 	/* No more valid events
+			 * If overflow events are pending
+			 * process them
 			 */
-			HvCallEvent_getOverflowLpEvents( lpQueue->xIndex);
-		else
-			break;
+			if ( lpQueue->xPlicOverflowIntPending ) {
+				HvCallEvent_getOverflowLpEvents( 
+						lpQueue->xIndex);
+			}
+			else	/* If nothing left then we are done */
+				break;
 	}
 
 	ItLpQueueInProcess = 0;

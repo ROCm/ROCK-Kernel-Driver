@@ -8,6 +8,7 @@
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/mc146818rtc.h>
+#include <linux/efi.h>
 #include <asm/uaccess.h>
 #include <asm/apic.h>
 #include "mach_reboot.h"
@@ -263,7 +264,12 @@ void machine_restart(char * __unused)
 	disable_IO_APIC();
 #endif
 
-	if(!reboot_thru_bios) {
+	if (!reboot_thru_bios) {
+		if (efi_enabled) {
+			efi.reset_system(EFI_RESET_COLD, EFI_SUCCESS, 0, 0);
+			__asm__ __volatile__("lidt %0": :"m" (no_idt));
+			__asm__ __volatile__("int3");
+		}
 		/* rebooting needs to touch the page at absolute addr 0 */
 		*((unsigned short *)__va(0x472)) = reboot_mode;
 		for (;;) {
@@ -273,6 +279,8 @@ void machine_restart(char * __unused)
 			__asm__ __volatile__("int3");
 		}
 	}
+	if (efi_enabled)
+		efi.reset_system(EFI_RESET_WARM, EFI_SUCCESS, 0, 0);
 
 	machine_real_restart(jump_to_bios, sizeof(jump_to_bios));
 }
@@ -287,6 +295,8 @@ EXPORT_SYMBOL(machine_halt);
 
 void machine_power_off(void)
 {
+	if (efi_enabled)
+		efi.reset_system(EFI_RESET_SHUTDOWN, EFI_SUCCESS, 0, 0);
 	if (pm_power_off)
 		pm_power_off();
 }

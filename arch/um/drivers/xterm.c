@@ -108,7 +108,7 @@ int xterm_open(int input, int output, int primary, void *d, char **dev_out)
 	}
 	close(fd);
 
-	fd = create_unix_socket(file, sizeof(file), 1);
+	fd = create_unix_socket(file, sizeof(file));
 	if(fd < 0){
 		printk("xterm_open : create_unix_socket failed, errno = %d\n", 
 		       -fd);

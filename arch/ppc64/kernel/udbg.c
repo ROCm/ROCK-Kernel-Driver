@@ -127,10 +127,8 @@ udbg_write(const char *s, int n)
 {
 	int remain = n;
 	char c;
-
 	if (!ppc_md.udbg_putc)
-		return 0;
-
+		for (;;);	/* stop here for cpuctl */
 	if ( s && *s != '\0' ) {
 		while ( (( c = *s++ ) != '\0') && (remain-- > 0)) {
 			ppc_md.udbg_putc(c);

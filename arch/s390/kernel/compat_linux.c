@@ -5,7 +5,6 @@
  *    Copyright (C) 2000 IBM Deutschland Entwicklung GmbH, IBM Corporation
  *    Author(s): Martin Schwidefsky (schwidefsky@de.ibm.com),
  *               Gerhard Tonn (ton@de.ibm.com)   
- *               Thomas Spatzier (tspat@de.ibm.com)
  *
  *  Conversion between 31bit and 64bit native syscalls.
  *
@@ -1501,6 +1500,50 @@ out:
 	return err;
 }
 
+struct rusage32 {
+        struct compat_timeval ru_utime;
+        struct compat_timeval ru_stime;
+        s32    ru_maxrss;
+        s32    ru_ixrss;
+        s32    ru_idrss;
+        s32    ru_isrss;
+        s32    ru_minflt;
+        s32    ru_majflt;
+        s32    ru_nswap;
+        s32    ru_inblock;
+        s32    ru_oublock;
+        s32    ru_msgsnd; 
+        s32    ru_msgrcv; 
+        s32    ru_nsignals;
+        s32    ru_nvcsw;
+        s32    ru_nivcsw;
+};
+
+static int put_rusage (struct rusage32 *ru, struct rusage *r)
+{
+	int err;
+	
+	err = put_user (r->ru_utime.tv_sec, &ru->ru_utime.tv_sec);
+	err |= __put_user (r->ru_utime.tv_usec, &ru->ru_utime.tv_usec);
+	err |= __put_user (r->ru_stime.tv_sec, &ru->ru_stime.tv_sec);
+	err |= __put_user (r->ru_stime.tv_usec, &ru->ru_stime.tv_usec);
+	err |= __put_user (r->ru_maxrss, &ru->ru_maxrss);
+	err |= __put_user (r->ru_ixrss, &ru->ru_ixrss);
+	err |= __put_user (r->ru_idrss, &ru->ru_idrss);
+	err |= __put_user (r->ru_isrss, &ru->ru_isrss);
+	err |= __put_user (r->ru_minflt, &ru->ru_minflt);
+	err |= __put_user (r->ru_majflt, &ru->ru_majflt);
+	err |= __put_user (r->ru_nswap, &ru->ru_nswap);
+	err |= __put_user (r->ru_inblock, &ru->ru_inblock);
+	err |= __put_user (r->ru_oublock, &ru->ru_oublock);
+	err |= __put_user (r->ru_msgsnd, &ru->ru_msgsnd);
+	err |= __put_user (r->ru_msgrcv, &ru->ru_msgrcv);
+	err |= __put_user (r->ru_nsignals, &ru->ru_nsignals);
+	err |= __put_user (r->ru_nvcsw, &ru->ru_nvcsw);
+	err |= __put_user (r->ru_nivcsw, &ru->ru_nivcsw);
+	return err;
+}
+
 struct sysinfo32 {
         s32 uptime;
         u32 loads[3];
@@ -2663,6 +2706,56 @@ out:
 	return error;
 }
 
+extern asmlinkage int sys_sched_setaffinity(pid_t pid, unsigned int len,
+					    unsigned long *user_mask_ptr);
+
+asmlinkage int sys32_sched_setaffinity(compat_pid_t pid, unsigned int len,
+				       u32 *user_mask_ptr)
+{
+	unsigned long kernel_mask;
+	mm_segment_t old_fs;
+	int ret;
+
+	if (get_user(kernel_mask, user_mask_ptr))
+		return -EFAULT;
+
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+	ret = sys_sched_setaffinity(pid,
+				    /* XXX Nice api... */
+				    sizeof(kernel_mask),
+				    &kernel_mask);
+	set_fs(old_fs);
+
+	return ret;
+}
+
+extern asmlinkage int sys_sched_getaffinity(pid_t pid, unsigned int len,
+					    unsigned long *user_mask_ptr);
+
+asmlinkage int sys32_sched_getaffinity(compat_pid_t pid, unsigned int len,
+				       u32 *user_mask_ptr)
+{
+	unsigned long kernel_mask;
+	mm_segment_t old_fs;
+	int ret;
+
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+	ret = sys_sched_getaffinity(pid,
+				    /* XXX Nice api... */
+				    sizeof(kernel_mask),
+				    &kernel_mask);
+	set_fs(old_fs);
+
+	if (ret == 0) {
+		if (put_user(kernel_mask, user_mask_ptr))
+			ret = -EFAULT;
+	}
+
+	return ret;
+}
+
 asmlinkage ssize_t sys_read(unsigned int fd, char * buf, size_t count);
 
 asmlinkage compat_ssize_t sys32_read(unsigned int fd, char * buf, size_t count)
@@ -2699,47 +2792,4 @@ asmlinkage int sys32_clone(struct pt_regs regs)
 		       parent_tidptr, child_tidptr);
 }
 
-/*
- * Wrapper function for sys_timer_create.
- */
-extern asmlinkage long
-sys_timer_create(clockid_t, struct sigevent *, timer_t *);
 
-#define SIGEV_PAD_SIZE32 ((SIGEV_MAX_SIZE/sizeof(int)) - 3)
-struct sigevent32 {
-	/* TODO: how to handle this union sigev_value and _sigev_un ??? */
-	union {
-		int sival_int;
-		u32 sival_ptr;
-	} sigev_value;
-	int sigev_signo;
-	int sigev_notify;
-	union {
-		int _pad[SIGEV_PAD_SIZE32];
-		int _tid;
-		struct {
-			u32 *_function;
-			u32 *_attribute;
-		} _sigev_thread;
-	} _sigev_un;
-};
-
-asmlinkage long
-sys32_timer_create(clockid_t which_clock,
-		struct sigevent32 *se32,
-		timer_t *timer_id)
-{
-	/* see TODO below 
-	struct sigevent se;
-	timer_t ktimer_id;
-	mm_segment_t old_fs;
-	long ret;
-	*/
-
-	if (se32 == NULL)
-		return sys_timer_create(which_clock, NULL, timer_id);
-
-
-	/* TODO: convert se32 to se; tricky because of unions */
-	return -ENOSYS;
-}

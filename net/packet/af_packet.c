@@ -246,6 +246,10 @@ static int packet_rcv_spkt(struct sk_buff *skb, struct net_device *dev,  struct 
 	if ((skb = skb_share_check(skb, GFP_ATOMIC)) == NULL)
 		goto oom;
 
+	/* drop any routing info */
+	dst_release(skb->dst);
+	skb->dst = NULL;
+
 	spkt = (struct sockaddr_pkt*)skb->cb;
 
 	skb_push(skb, skb->data-skb->mac.raw);
@@ -486,6 +490,9 @@ static int packet_rcv(struct sk_buff *skb, struct net_device *dev,  struct packe
 
 	skb_set_owner_r(skb, sk);
 	skb->dev = NULL;
+	dst_release(skb->dst);
+	skb->dst = NULL;
+
 	spin_lock(&sk->sk_receive_queue.lock);
 	po->stats.tp_packets++;
 	__skb_queue_tail(&sk->sk_receive_queue, skb);

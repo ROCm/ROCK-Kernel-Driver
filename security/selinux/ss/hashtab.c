@@ -3,6 +3,9 @@
  *
  * Author : Stephen Smalley, <sds@epoch.ncsc.mil>
  */
+#include <linux/kernel.h>
+#include <linux/slab.h>
+#include <linux/errno.h>
 #include "hashtab.h"
 
 struct hashtab *hashtab_create(u32 (*hash_value)(struct hashtab *h, void *key),

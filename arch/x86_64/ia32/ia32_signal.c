@@ -55,15 +55,15 @@ static int ia32_copy_siginfo_to_user(siginfo_t32 *to, siginfo_t *from)
 		   It should never copy any pad contained in the structure
 		   to avoid security leaks, but must copy the generic
 		   3 ints plus the relevant union member.  */
-	
+
 	if (from->si_code < 0) {
 		err = __put_user(from->si_signo, &to->si_signo);
-		err |= __put_user(from->si_errno, &to->si_errno); 
-		err |= __put_user(from->si_code, &to->si_code); 
-		err |= __put_user(from->_sifields._rt._pid, &to->_sifields._rt._pid); 
-		err |= __put_user(from->_sifields._rt._uid, &to->_sifields._rt._uid); 
-		err |= __put_user((u32)(u64)from->_sifields._rt._sigval.sival_ptr, 
-				  &to->_sifields._rt._sigval.sival_ptr); 
+		err |= __put_user(from->si_errno, &to->si_errno);
+		err |= __put_user(from->si_code, &to->si_code);
+		err |= __put_user(from->_sifields._rt._pid, &to->_sifields._rt._pid);
+		err |= __put_user(from->_sifields._rt._uid, &to->_sifields._rt._uid);
+		err |= __put_user((u32)(u64)from->_sifields._rt._sigval.sival_ptr,
+				  &to->_sifields._rt._sigval.sival_ptr);
 	} else {
 		err = __put_user(from->si_signo, &to->si_signo);
 		err |= __put_user(from->si_errno, &to->si_errno);
@@ -175,7 +175,7 @@ ia32_restore_sigcontext(struct pt_regs *regs, struct sigcontext_ia32 *sc, unsign
 	
 	/* Always make any pending restarted system calls return -EINTR */
 	current_thread_info()->restart_block.fn = do_no_restart_syscall;
-	
+
 #if DEBUG_SIG
 	printk("SIG restore_sigcontext: sc=%p err(%x) eip(%x) cs(%x) flg(%x)\n",
 		sc, sc->err, sc->eip, sc->cs, sc->eflags);

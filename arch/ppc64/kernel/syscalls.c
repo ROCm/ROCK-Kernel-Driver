@@ -41,7 +41,6 @@
 #include <asm/ipc.h>
 #include <asm/semaphore.h>
 #include <asm/time.h>
-#include <asm/unistd.h>
 
 extern unsigned long wall_jiffies;
 
@@ -235,6 +234,3 @@ asmlinkage time_t sys64_time(time_t* tloc)
 
 	return secs;
 }
-
-/* Only exists on P-series. */
-cond_syscall(ppc_rtas);

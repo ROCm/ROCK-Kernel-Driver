@@ -69,7 +69,7 @@ extern __inline__ void pte_free_kernel(pte_t *pte)
 	free_page((unsigned long)pte); 
 }
 
-static inline void pte_free(struct page *pte)
+extern inline void pte_free(struct page *pte)
 {
 	__free_page(pte);
 } 

@@ -24,7 +24,6 @@
 #include <linux/smp_lock.h>
 #include <linux/devfs_fs_kernel.h>
 #include <linux/ptrace.h>
-#include <linux/device.h>
 
 #include <asm/uaccess.h>
 #include <asm/io.h>
@@ -658,7 +657,7 @@ static struct file_operations memory_fops = {
 	.open		= memory_open,	/* just a selector for the real open */
 };
 
-static const struct mem_dev {
+static const struct {
 	unsigned int		minor;
 	char			*name;
 	umode_t			mode;
@@ -677,23 +676,6 @@ static const struct mem_dev {
 	{11,"kmsg",    S_IRUGO | S_IWUSR,           &kmsg_fops},
 };
 
-static void release_mem_dev(struct class_device *class_dev)
-{
-	kfree(class_dev);
-}
-
-static struct class mem_class = {
-	.name		= "mem",
-	.release	= &release_mem_dev,
-};
-
-static ssize_t show_dev(struct class_device *class_dev, char *buf)
-{
-	struct mem_dev *mem_dev = class_get_devdata(class_dev);
-	return print_dev_t(buf, MKDEV(MEM_MAJOR, mem_dev->minor));
-}
-static CLASS_DEVICE_ATTR(dev, S_IRUGO, show_dev, NULL);
-
 static int __init chr_dev_init(void)
 {
 	int i;
@@ -701,20 +683,7 @@ static int __init chr_dev_init(void)
 	if (register_chrdev(MEM_MAJOR,"mem",&memory_fops))
 		printk("unable to get major %d for memory devs\n", MEM_MAJOR);
 
-	class_register(&mem_class);
 	for (i = 0; i < ARRAY_SIZE(devlist); i++) {
-		struct class_device *class_dev;
-
-		class_dev = kmalloc(sizeof(*class_dev), GFP_KERNEL);
-		if (class_dev) {
-			memset(class_dev, 0x00, sizeof(*class_dev));
-			class_dev->class = &mem_class;
-			strncpy(class_dev->class_id, devlist[i].name, BUS_ID_SIZE);
-			class_set_devdata(class_dev, (void *)&devlist[i]);
-			if (!class_device_register(class_dev));
-				class_device_create_file(class_dev, &class_device_attr_dev);
-		}
-
 		devfs_mk_cdev(MKDEV(MEM_MAJOR, devlist[i].minor),
 				S_IFCHR | devlist[i].mode, devlist[i].name);
 	}

@@ -180,7 +180,8 @@ struct agp_memory *agp_allocate_memory(size_t page_count, u32 type)
 			agp_free_memory(new);
 			return NULL;
 		}
-		new->memory[i] = virt_to_phys(addr);
+		new->memory[i] =
+			agp_bridge->driver->mask_memory(virt_to_phys(addr), type);
 		new->page_count++;
 	}
 
@@ -560,9 +561,6 @@ void agp_generic_enable(u32 mode)
 
 	command = agp_collect_device_status(mode, command);
 	command |= AGPSTAT_AGP_ENABLE;
-
-	pci_write_config_dword(agp_bridge->dev,
-		       agp_bridge->capndx + PCI_AGP_COMMAND, command);
 
 	/* Do AGP version specific frobbing. */
 	if(agp_bridge->major_version >= 3) {

@@ -2528,7 +2528,7 @@ static int __init clgen_pci_setup (struct clgenfb_info *info,
 
 	pdev = clgen_pci_dev_get (btype);
 	if (!pdev) {
-		printk (KERN_ERR " Couldn't find PCI device\n");
+		printk (KERN_INFO "cirrusfb: couldn't find Cirrus Logic PCI device\n");
 		DPRINTK ("EXIT, returning 1\n");
 		return 1;
 	}
@@ -2787,7 +2787,6 @@ int __init clgenfb_init(void)
 	fb_info->gen.info.switch_con = &fbgen_switch;
 	fb_info->gen.info.updatevar = &fbgen_update_var;
 	fb_info->gen.info.flags = FBINFO_FLAG_DEFAULT;
-	fb_info->gen.info.dev = fb_info->pdev;
 
 	for (j = 0; j < 256; j++) {
 		if (j < 16) {

@@ -222,8 +222,7 @@ fail:
 }
 
 asmlinkage long
-do_mprotect(struct mm_struct *mm, unsigned long start, size_t len, 
-	     unsigned long prot)
+sys_mprotect(unsigned long start, size_t len, unsigned long prot)
 {
 	unsigned long vm_flags, nstart, end, tmp;
 	struct vm_area_struct * vma, * next, * prev;
@@ -246,9 +245,9 @@ do_mprotect(struct mm_struct *mm, unsigned long start, size_t len,
 
 	vm_flags = calc_vm_prot_bits(prot);
 
-	down_write(&mm->mmap_sem);
+	down_write(&current->mm->mmap_sem);
 
-	vma = find_vma_prev(mm, start, &prev);
+	vma = find_vma_prev(current->mm, start, &prev);
 	error = -ENOMEM;
 	if (!vma)
 		goto out;
@@ -327,11 +326,6 @@ do_mprotect(struct mm_struct *mm, unsigned long start, size_t len,
 		prev->vm_mm->map_count--;
 	}
 out:
-	up_write(&mm->mmap_sem);
+	up_write(&current->mm->mmap_sem);
 	return error;
-}
-
-asmlinkage long sys_mprotect(unsigned long start, size_t len, unsigned long prot)
-{
-        return(do_mprotect(current->mm, start, len, prot));
 }

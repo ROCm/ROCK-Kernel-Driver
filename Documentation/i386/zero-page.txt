@@ -22,6 +22,7 @@ Offset	Type		Description
 			  0x90000 + contents of CL_OFFSET
 			(only taken, when CL_MAGIC = 0xA33F)
  0x40	20 bytes	struct apm_bios_info, APM_BIOS_INFO
+ 0x60	16 bytes	Intel SpeedStep (IST) BIOS support information
  0x80	16 bytes	hd0-disk-parameter from intvector 0x41
  0x90	16 bytes	hd1-disk-parameter from intvector 0x46
 

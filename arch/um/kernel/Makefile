@@ -21,8 +21,6 @@ obj-$(CONFIG_TTY_LOG)	+= tty_log.o
 obj-$(CONFIG_MODE_TT) += tt/
 obj-$(CONFIG_MODE_SKAS) += skas/
 
-clean-files	:= config.c
-
 user-objs-$(CONFIG_TTY_LOG) += tty_log.o
 
 USER_OBJS := $(filter %_user.o,$(obj-y))  $(user-objs-y) config.o helper.o \
@@ -47,12 +45,16 @@ $(USER_OBJS) : %.o: %.c
 $(obj)/frame.o: $(src)/frame.c
 	$(CC) $(CFLAGS_$(notdir $@)) -c -o $@ $<
 
-QUOTE = 'my $$config=`cat $(TOPDIR)/.config`; $$config =~ s/"/\\"/g ; $$config =~ s/\n/\\n"\n"/g ; while(<STDIN>) { $$_ =~ s/CONFIG/$$config/; print $$_ }'
+QUOTE = 'my $$config=`cat $(TOPDIR)/.config`; $$config =~ s/"/\\"/g ; while(<STDIN>) { $$_ =~ s/CONFIG/$$config/; print $$_ }'
 
 $(obj)/config.c : $(src)/config.c.in $(TOPDIR)/.config
 	$(PERL) -e $(QUOTE) < $(src)/config.c.in > $@
 
 $(obj)/config.o : $(obj)/config.c
+
+clean:
+	rm -f config.c
+	for dir in $(subdir-y) ; do $(MAKE) -C $$dir clean; done
 
 modules:
 

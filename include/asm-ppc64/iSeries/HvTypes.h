@@ -16,8 +16,6 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
  */
-#ifndef _HVTYPES_H
-#define _HVTYPES_H
 
 //===========================================================================
 //                                                             Header File Id
@@ -31,7 +29,13 @@
 //
 //===========================================================================
 
-#include <asm/types.h>
+#ifndef _PPC_TYPES_H
+#include        <asm/types.h>
+#endif
+
+
+#ifndef _HVTYPES_H
+#define _HVTYPES_H
 
 //-------------------------------------------------------------------
 // Typedefs
@@ -120,4 +124,4 @@ struct HvLpBufferList {
 	u64 len;
 };
 
-#endif /* _HVTYPES_H */
+#endif // _HVTYPES_H

@@ -1366,7 +1366,6 @@ static int __devinit cyberpro_common_probe(struct cfb_info *cfb)
 	cfb->fb.fix.smem_len   = smem_size;
 	cfb->fb.fix.mmio_len   = MMIO_SIZE;
 	cfb->fb.screen_base    = cfb->region;
-	cfb->fb.dev            = &cfb->dev->dev;
 
 	err = -EINVAL;
 	if (!fb_find_mode(&cfb->fb.var, &cfb->fb, NULL, NULL, 0,

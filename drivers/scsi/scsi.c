@@ -351,6 +351,124 @@ void scsi_destroy_command_freelist(struct Scsi_Host *shost)
 	up(&host_cmd_pool_mutex);
 }
 
+#ifdef CONFIG_SCSI_LOGGING
+void scsi_log_send(struct scsi_cmnd *cmd)
+{
+	unsigned int level;
+	struct scsi_device *sdev;
+
+	/*
+	 * If ML QUEUE log level is greater than or equal to:
+	 *
+	 * 1: nothing (match completion)
+	 *
+	 * 2: log opcode + command of all commands
+	 *
+	 * 3: same as 2 plus dump cmd address
+	 *
+	 * 4: same as 3 plus dump extra junk
+	 */
+	if (unlikely(scsi_logging_level)) {
+		level = SCSI_LOG_LEVEL(SCSI_LOG_MLQUEUE_SHIFT,
+				       SCSI_LOG_MLQUEUE_BITS);
+		if (level > 1) {
+			sdev = cmd->device;
+			printk(KERN_INFO "scsi <%d:%d:%d:%d> send ",
+			       sdev->host->host_no, sdev->channel, sdev->id,
+			       sdev->lun);
+			if (level > 2)
+				printk("0x%p ", cmd);
+			/*
+			 * spaces to match disposition and cmd->result
+			 * output in scsi_log_completion.
+			 */
+			printk("                 ");
+			print_command(cmd->cmnd);
+			if (level > 3) {
+				printk(KERN_INFO "buffer = 0x%p, bufflen = %d,"
+				       " done = 0x%p, queuecommand 0x%p\n",
+					cmd->buffer, cmd->bufflen,
+					cmd->done,
+					sdev->host->hostt->queuecommand);
+
+			}
+		}
+	}
+}
+
+void scsi_log_completion(struct scsi_cmnd *cmd, int disposition)
+{
+	unsigned int level;
+	struct scsi_device *sdev;
+
+	/*
+	 * If ML COMPLETE log level is greater than or equal to:
+	 *
+	 * 1: log disposition, result, opcode + command, and conditionally
+	 * sense data for failures or non SUCCESS dispositions.
+	 *
+	 * 2: same as 1 but for all command completions.
+	 *
+	 * 3: same as 2 plus dump cmd address
+	 *
+	 * 4: same as 3 plus dump extra junk
+	 */
+	if (unlikely(scsi_logging_level)) {
+		level = SCSI_LOG_LEVEL(SCSI_LOG_MLCOMPLETE_SHIFT,
+				       SCSI_LOG_MLCOMPLETE_BITS);
+		if (((level > 0) && (cmd->result || disposition != SUCCESS)) ||
+		    (level > 1)) {
+			sdev = cmd->device;
+			printk(KERN_INFO "scsi <%d:%d:%d:%d> done ",
+			       sdev->host->host_no, sdev->channel, sdev->id,
+			       sdev->lun);
+			if (level > 2)
+				printk("0x%p ", cmd);
+			/*
+			 * Dump truncated values, so we usually fit within
+			 * 80 chars.
+			 */
+			switch (disposition) {
+			case SUCCESS:
+				printk("SUCCESS");
+				break;
+			case NEEDS_RETRY:
+				printk("RETRY  ");
+				break;
+			case ADD_TO_MLQUEUE:
+				printk("MLQUEUE");
+				break;
+			case FAILED:
+				printk("FAILED ");
+				break;
+			case TIMEOUT:
+				/* 
+				 * If called via scsi_times_out.
+				 */
+				printk("TIMEOUT");
+				break;
+			default:
+				printk("UNKNOWN");
+			}
+			printk(" %8x ", cmd->result);
+			print_command(cmd->cmnd);
+			if (status_byte(cmd->result) & CHECK_CONDITION) {
+				/*
+				 * XXX The print_sense formatting/prefix
+				 * doesn't match this function.
+				 */
+				print_sense("", cmd);
+			}
+			if (level > 3) {
+				printk(KERN_INFO "scsi host busy %d failed %d\n",
+				       sdev->host->host_busy,
+				       sdev->host->host_failed);
+			}
+		}
+	}
+}
+#endif
+
 /*
  * Function:    scsi_dispatch_command
  *
@@ -416,16 +534,12 @@ int scsi_dispatch_cmd(struct scsi_cmnd *cmd)
 
 	scsi_add_timer(cmd, cmd->timeout_per_command, scsi_times_out);
 
+	scsi_log_send(cmd);
+
 	/*
 	 * We will use a queued command if possible, otherwise we will
 	 * emulate the queuing and calling of completion function ourselves.
 	 */
-	SCSI_LOG_MLQUEUE(3, printk("scsi_dispatch_cmnd (host = %d, "
-				"channel = %d, target = %d, command = %p, "
-				"buffer = %p, \nbufflen = %d, done = %p)\n",
-				host->host_no, cmd->device->channel,
-				cmd->device->id, cmd->cmnd, cmd->buffer,
-				cmd->bufflen, cmd->done));
 
 	cmd->state = SCSI_STATE_QUEUED;
 	cmd->owner = SCSI_OWNER_LOWLEVEL;
@@ -444,9 +558,6 @@ int scsi_dispatch_cmd(struct scsi_cmnd *cmd)
 		spin_unlock_irqrestore(host->host_lock, flags);
 		goto out;
 	}
-
-	SCSI_LOG_MLQUEUE(3, printk("queuecommand : routine at %p\n",
-				   host->hostt->queuecommand));
 
 	spin_lock_irqsave(host->host_lock, flags);
 	if (unlikely(test_bit(SHOST_CANCEL, &host->shost_state))) {
@@ -604,6 +715,7 @@ void scsi_done(struct scsi_cmnd *cmd)
  */
 static void scsi_softirq(struct softirq_action *h)
 {
+	int disposition;
 	LIST_HEAD(local_q);
 
 	local_irq_disable();
@@ -615,75 +727,19 @@ static void scsi_softirq(struct softirq_action *h)
 						   struct scsi_cmnd, eh_entry);
 		list_del_init(&cmd->eh_entry);
 
-		switch (scsi_decide_disposition(cmd)) {
+		disposition = scsi_decide_disposition(cmd);
+		scsi_log_completion(cmd, disposition);
+		switch (disposition) {
 		case SUCCESS:
-			/*
-			 * Add to BH queue.
-			 */
-			SCSI_LOG_MLCOMPLETE(3,
-					    printk("Command finished %d %d "
-						   "0x%x\n",
-					   cmd->device->host->host_busy,
-					   cmd->device->host->host_failed,
-						   cmd->result));
-
 			scsi_finish_command(cmd);
 			break;
 		case NEEDS_RETRY:
-			/*
-			 * We only come in here if we want to retry a
-			 * command.  The test to see whether the
-			 * command should be retried should be keeping
-			 * track of the number of tries, so we don't
-			 * end up looping, of course.
-			 */
-			SCSI_LOG_MLCOMPLETE(3, printk("Command needs retry "
-						      "%d %d 0x%x\n",
-					      cmd->device->host->host_busy,
-					      cmd->device->host->host_failed,
-						      cmd->result));
-
 			scsi_retry_command(cmd);
 			break;
 		case ADD_TO_MLQUEUE:
-			/* 
-			 * This typically happens for a QUEUE_FULL
-			 * message - typically only when the queue
-			 * depth is only approximate for a given
-			 * device.  Adding a command to the queue for
-			 * the device will prevent further commands
-			 * from being sent to the device, so we
-			 * shouldn't end up with tons of things being
-			 * sent down that shouldn't be.
-			 */
-			SCSI_LOG_MLCOMPLETE(3, printk("Command rejected as "
-						      "device queue full, "
-						      "put on ml queue %p\n",
-						      cmd));
 			scsi_queue_insert(cmd, SCSI_MLQUEUE_DEVICE_BUSY);
 			break;
 		default:
-			/*
-			 * Here we have a fatal error of some sort.
-			 * Turn it over to the error handler.
-			 */
-			SCSI_LOG_MLCOMPLETE(3,
-					    printk("Command failed %p %x "
-						   "busy=%d failed=%d\n",
-						   cmd, cmd->result,
-					   cmd->device->host->host_busy,
-					   cmd->device->host->host_failed));
-
-			/*
-			 * Dump the sense information too.
-			 */
-			if (status_byte(cmd->result) & CHECK_CONDITION)
-				SCSI_LOG_MLCOMPLETE(3, print_sense("bh", cmd));
-
-			/*
-			 * We only fail here if the error recovery thread
-			 * has died.
-			 */
 			if (!scsi_eh_scmd_add(cmd, 0))
 				scsi_finish_command(cmd);
 		}
@@ -749,7 +805,7 @@ void scsi_finish_command(struct scsi_cmnd *cmd)
 	if (SCSI_SENSE_VALID(cmd))
 		cmd->result |= (DRIVER_SENSE << 24);
 
-	SCSI_LOG_MLCOMPLETE(3, printk("Notifying upper driver of completion "
+	SCSI_LOG_MLCOMPLETE(4, printk("Notifying upper driver of completion "
 				"for device %d %x\n", sdev->id, cmd->result));
 
 	cmd->owner = SCSI_OWNER_HIGHLEVEL;

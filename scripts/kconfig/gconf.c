@@ -1172,7 +1172,7 @@ on_treeview1_button_press_event(GtkWidget * widget,
 
 	gtk_widget_realize(tree2_w);
 	gtk_tree_view_set_cursor(view, path, NULL, FALSE);
-	gtk_widget_grab_focus(GTK_TREE_VIEW(tree2_w));
+	gtk_widget_grab_focus(GTK_WIDGET(tree2_w));
 
 	return FALSE;
 }

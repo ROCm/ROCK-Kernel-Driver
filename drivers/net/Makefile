@@ -45,7 +45,7 @@ obj-$(CONFIG_SIS190) += sis190.o
 obj-$(CONFIG_SIS900) += sis900.o
 obj-$(CONFIG_YELLOWFIN) += yellowfin.o
 obj-$(CONFIG_ACENIC) += acenic.o
-obj-$(CONFIG_ISERIES_VETH) += iseries_veth.o
+obj-$(CONFIG_VETH) += veth.o
 obj-$(CONFIG_NATSEMI) += natsemi.o
 obj-$(CONFIG_NS83820) += ns83820.o
 obj-$(CONFIG_STNIC) += stnic.o 8390.o
@@ -175,7 +175,6 @@ obj-$(CONFIG_TUN) += tun.o
 obj-$(CONFIG_DL2K) += dl2k.o
 obj-$(CONFIG_R8169) += r8169.o
 obj-$(CONFIG_AMD8111_ETH) += amd8111e.o
-obj-$(CONFIG_IBMVETH) += ibmveth.o
 
 obj-$(CONFIG_ARM) += arm/
 obj-$(CONFIG_NET_FC) += fc/

@@ -12,7 +12,6 @@
 #include <asm/page.h>
 #include <asm/psr.h>
 #include <asm/ptrace.h>
-#include <asm/asm_offsets.h>
 #include <asm/winmacro.h>
 #include <asm/asmmacro.h>
 #include <asm/thread_info.h>
@@ -57,7 +56,7 @@ tsetup_7win_patch6:	and	%g2, 0x7f, %g2
 	 *
 	 * sethi	%hi(trap_setup), %l4
 	 * jmpl		%l4 + %lo(trap_setup), %l6
-	 * mov		1, %l4
+	 * nop
 	 */
 
 	/* 2 3 4  window number
@@ -156,9 +155,8 @@ trap_setup_from_user:
 	and	%t_kstack, %curptr, %curptr
 #endif
 
-	/* Clear current->thread.w_saved */
-	ld	[%curptr + TI_TASK], %g2
-	st	%g0, [%g2 + AOFF_task_thread + AOFF_thread_w_saved]
+	/* Clear current_thread_info->w_saved */
+	st	%g0, [%curptr + TI_W_SAVED]
 
 	/* See if we are in the trap window. */
 	andcc	%t_twinmask, %t_wim, %g0
@@ -292,8 +290,7 @@ trap_setup_user_stack_is_bolixed:
 	/* From user/kernel into invalid window w/bad user
 	 * stack. Save bad user stack, and return to caller.
 	 */
-	ld	[%curptr + TI_TASK], %glob_tmp
-	SAVE_BOLIXED_USER_STACK(glob_tmp, g3)
+	SAVE_BOLIXED_USER_STACK(curptr, g3)
 	restore	%g0, %g0, %g0
 
 	jmpl	%t_retpc + 0x8, %g0

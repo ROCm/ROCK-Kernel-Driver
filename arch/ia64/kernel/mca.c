@@ -1363,8 +1363,8 @@ ia64_init_handler (struct pt_regs *pt, struct switch_stack *sw)
 void
 ia64_log_prt_guid (efi_guid_t *p_guid, prfunc_t prfunc)
 {
-	//char out[40];
-	//printk(KERN_DEBUG "GUID = %s\n", efi_guid_unparse(p_guid, out));
+	char out[40];
+	printk(KERN_DEBUG "GUID = %s\n", efi_guid_unparse(p_guid, out));
 }
 
 static void

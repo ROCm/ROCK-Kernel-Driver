@@ -122,7 +122,7 @@ static int show_map(struct seq_file *m, void *v)
 		if (len < 1)
 			len = 1;
 		seq_printf(m, "%*c", len, ' ');
-		seq_path(m, file->f_vfsmnt, file->f_dentry, " \t\n\\");
+		seq_path(m, file->f_vfsmnt, file->f_dentry, "");
 	}
 	seq_putc(m, '\n');
 	return 0;

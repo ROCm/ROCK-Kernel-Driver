@@ -23,8 +23,9 @@
  *
  *      (see also mptbase.c)
  *
- *  Copyright (c) 2000-2002 LSI Logic Corporation
+ *  Copyright (c) 2000-2003 LSI Logic Corporation
  *  Originally By: Noah Romer
+ *  (mailto:mpt_linux_developer@lsil.com)
  *
  *  $Id: mptlan.c,v 1.53 2002/10/17 20:15:58 pdelaney Exp $
  */

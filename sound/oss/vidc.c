@@ -41,6 +41,7 @@
 #endif
 
 #define VIDC_SOUND_CLOCK	(250000)
+#define VIDC_SOUND_CLOCK_EXT	(176400)
 
 /*
  * When using SERIAL SOUND mode (external DAC), the number of physical
@@ -81,16 +82,8 @@ static unsigned char	vidc_level_r[SOUND_MIXER_NRDEVICES] = {
 static unsigned int	vidc_audio_volume_l;	/* left PCM vol, 0 - 65536 */
 static unsigned int	vidc_audio_volume_r;	/* right PCM vol, 0 - 65536 */
 
-static void	(*old_mksound)(unsigned int hz, unsigned int ticks);
-extern void	(*kd_mksound)(unsigned int hz, unsigned int ticks);
 extern void	vidc_update_filler(int bits, int channels);
 extern int	softoss_dev;
-
-static void
-vidc_mksound(unsigned int hz, unsigned int ticks)
-{
-//	printk("BEEP - %d %d!\n", hz, ticks);
-}
 
 static void
 vidc_mixer_set(int mdev, unsigned int level)
@@ -193,28 +186,50 @@ static unsigned int vidc_audio_set_format(int dev, unsigned int fmt)
 	return vidc_audio_format;
 }
 
+#define my_abs(i) ((i)<0 ? -(i) : (i))
+
 static int vidc_audio_set_speed(int dev, int rate)
 {
 	if (rate) {
-		unsigned int hwctrl, hwrate;
+		unsigned int hwctrl, hwrate, hwrate_ext, rate_int, rate_ext;
+		unsigned int diff_int, diff_ext;
 		unsigned int newsize, new2size;
 
-		/*
-		 * If we have selected 44.1kHz, use the DAC clock.
-		 */
-		if (0 && rate == 44100) {
-			hwctrl = 0x00000002;
+		hwctrl = 0x00000003;
+
+		/* Using internal clock */
+		hwrate = (((VIDC_SOUND_CLOCK * 2) / rate) + 1) >> 1;
+		if (hwrate < 3)
 			hwrate = 3;
+		if (hwrate > 255)
+			hwrate = 255;
+
+		/* Using exernal clock */
+		hwrate_ext = (((VIDC_SOUND_CLOCK_EXT * 2) / rate) + 1) >> 1;
+		if (hwrate_ext < 3)
+			hwrate_ext = 3;
+		if (hwrate_ext > 255)
+			hwrate_ext = 255;
+
+		rate_int = VIDC_SOUND_CLOCK / hwrate;
+		rate_ext = VIDC_SOUND_CLOCK_EXT / hwrate_ext;
+
+		/* Chose between external and internal clock */
+		diff_int = my_abs(rate_ext-rate);
+		diff_ext = my_abs(rate_int-rate);
+		if (diff_ext < diff_int) {
+			/*printk("VIDC: external %d %d %d\n", rate, rate_ext, hwrate_ext);*/
+			hwrate=hwrate_ext;
+			hwctrl=0x00000002;
+			/* Allow roughly 0.4% tolerance */
+			if (diff_ext > (rate/256))
+				rate=rate_ext;
 		} else {
-			hwctrl = 0x00000003;
-
-			hwrate = (((VIDC_SOUND_CLOCK * 2) / rate) + 1) >> 1;
-			if (hwrate < 3)
-				hwrate = 3;
-			if (hwrate > 255)
-				hwrate = 255;
-
-			rate = VIDC_SOUND_CLOCK / hwrate;
+			/*printk("VIDC: internal %d %d %d\n", rate, rate_int, hwrate);*/
+			hwctrl=0x00000003;
+			/* Allow rougly 0.4% tolerance */
+			if (diff_int > (rate/256))
+				rate=rate_int;
 		}
 
 		vidc_writel(0xb0000000 | (hwrate - 2));
@@ -226,13 +241,14 @@ static int vidc_audio_set_speed(int dev, int rate)
 		if (newsize > 4096)
 			newsize = 4096;
 		for (new2size = 128; new2size < newsize; new2size <<= 1);
-			if (new2size - newsize > newsize - (new2size >> 1))
-				new2size >>= 1;
+		if (new2size - newsize > newsize - (new2size >> 1))
+			new2size >>= 1;
 		if (new2size > 4096) {
 			printk(KERN_ERR "VIDC: error: dma buffer (%d) %d > 4K\n",
 				newsize, new2size);
 			new2size = 4096;
 		}
+		/*printk("VIDC: dma size %d\n", new2size);*/
 		dma_bufsize = new2size;
 		vidc_audio_rate = rate;
 	}
@@ -471,8 +487,6 @@ static void __init attach_vidc(struct address_info *hw_config)
 		printk(KERN_ERR "%s: IRQ %d is in use\n", name, hw_config->irq);
 		goto irq_failed;
 	}
-	old_mksound = kd_mksound;
-	kd_mksound = vidc_mksound;
 	vidc_adev = adev;
 	vidc_mixer_set(SOUND_MIXER_VOLUME, (85 | 85 << 8));
 
@@ -509,9 +523,6 @@ static void __exit unload_vidc(struct address_info *hw_config)
 	int i, adev = vidc_adev;
 
 	vidc_adev = -1;
-
-	if (old_mksound)
-		kd_mksound = old_mksound;
 
 	free_irq(hw_config->irq, &dma_start);
 	sound_free_dma(hw_config->dma);

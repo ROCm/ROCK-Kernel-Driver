@@ -10,12 +10,7 @@
  * about using the kobject interface.
  */
 
-#include <linux/config.h>
-#ifdef CONFIG_DEBUG_KOBJECT
-#define DEBUG 1
-#else
 #undef DEBUG
-#endif
 
 #include <linux/kobject.h>
 #include <linux/string.h>
@@ -193,8 +188,8 @@ static void kset_hotplug(const char *action, struct kset *kset,
 		}
 	}
 
-	pr_debug ("%s: %s %s %s %s %s %s %s\n", __FUNCTION__, argv[0], argv[1],
-		  envp[0], envp[1], envp[2], envp[3], envp[4]);
+	pr_debug ("%s: %s %s %s %s %s %s\n", __FUNCTION__, argv[0], argv[1],
+		  envp[0], envp[1], envp[2], envp[3]);
 	retval = call_usermodehelper (argv[0], argv, envp, 0);
 	if (retval)
 		pr_debug ("%s - call_usermodehelper returned %d\n",
@@ -221,7 +216,6 @@ static void kset_hotplug(const char *action, struct kset *kset,
 
 void kobject_init(struct kobject * kobj)
 {
-	WARN_ON(atomic_read(&kobj->refcount));
 	atomic_set(&kobj->refcount,1);
 	INIT_LIST_HEAD(&kobj->entry);
 	kobj->kset = kset_get(kobj->kset);
@@ -449,7 +443,6 @@ struct kobject * kobject_get(struct kobject * kobj)
 		atomic_inc(&kobj->refcount);
 	} else
 		ret = NULL;
-	WARN_ON((kobj != NULL) && (ret==NULL));
 	return ret;
 }
 
@@ -470,13 +463,6 @@ void kobject_cleanup(struct kobject * kobj)
 	kobj->k_name = NULL;
 	if (t && t->release)
 		t->release(kobj);
-	else {
-		printk(KERN_ERR "kobject '%s' does not have a release() function, "
-			"it is broken and must be fixed.\n",
-			kobj->name);
-		WARN_ON(1);
-	}
-
 	if (s)
 		kset_put(s);
 	if (parent) 

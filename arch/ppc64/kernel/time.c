@@ -91,9 +91,6 @@ unsigned      tb_to_us;
 unsigned long processor_freq;
 spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
 
-unsigned long tb_to_ns_scale;
-unsigned long tb_to_ns_shift;
-
 struct gettimeofday_struct do_gtod;
 
 extern unsigned long wall_jiffies;
@@ -315,10 +312,12 @@ int timer_interrupt(struct pt_regs * regs)
 
 /*
  * Scheduler clock - returns current time in nanosec units.
+ *
+ * This is wrong, but my CPUs run at 1GHz, so nyer nyer.
  */
 unsigned long long sched_clock(void)
 {
-	return mulhdu(get_tb(), tb_to_ns_scale) << tb_to_ns_shift;
+	return get_tb();
 }
 
 /*
@@ -474,21 +473,8 @@ void __init time_init(void)
 	/* This function is only called on the boot processor */
 	unsigned long flags;
 	struct rtc_time tm;
-	struct div_result res;
-	unsigned long scale, shift;
 
 	ppc_md.calibrate_decr();
-
-	/* Compute scale factor for sched_clock. */
-	/* The calibrate_decr() function has set tb_ticks_per_sec */
-	div128_by_32(1000000000, 0, tb_ticks_per_sec, &res);
-	scale = res.result_low;
-	for (shift = 0; res.result_high != 0; ++shift) {
-		scale = (scale >> 1) | (res.result_high << 63);
-		res.result_high >>= 1;
-	}
-	tb_to_ns_scale = scale;
-	tb_to_ns_shift = shift;
 
 #ifdef CONFIG_PPC_ISERIES
 	if (!piranha_simulator)

@@ -652,8 +652,12 @@ int hash_huge_page(struct mm_struct *mm, unsigned long access,
 	unsigned long va, vpn;
 	int is_write;
 	hugepte_t old_pte, new_pte;
-	unsigned long hpteflags, prpn, flags;
+	unsigned long hpteflags, prpn;
 	long slot;
+
+	/* Is this for us? */
+	if (!in_hugepage_area(mm->context, ea))
+		return -1;
 
 	ea &= ~(HPAGE_SIZE-1);
 
@@ -693,8 +697,6 @@ int hash_huge_page(struct mm_struct *mm, unsigned long access,
 	 *	because we are doing software DIRTY bit management and the
 	 *	page is currently not DIRTY. 
 	 */
-
-	spin_lock_irqsave(&mm->page_table_lock, flags);
 
 	old_pte = *ptep;
 	new_pte = old_pte;
@@ -766,8 +768,6 @@ repeat:
 		 */
 		*ptep = new_pte;
 	}
-
-	spin_unlock_irqrestore(&mm->page_table_lock, flags);
 
 	return 0;
 }
@@ -921,7 +921,7 @@ int is_hugepage_mem_enough(size_t size)
  * this far.
  */
 static struct page *hugetlb_nopage(struct vm_area_struct *vma,
-				unsigned long address, int unused)
+				unsigned long address, int *unused)
 {
 	BUG();
 	return NULL;

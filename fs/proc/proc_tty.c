@@ -229,7 +229,13 @@ void __init proc_tty_init(void)
 	if (!proc_mkdir("tty", 0))
 		return;
 	proc_tty_ldisc = proc_mkdir("tty/ldisc", 0);
-	proc_tty_driver = proc_mkdir("tty/driver", 0);
+	/*
+	 * /proc/tty/driver/serial reveals the exact character counts for
+	 * serial links which is just too easy to abuse for inferring
+	 * password lengths and inter-keystroke timings during password
+	 * entry.
+	 */
+	proc_tty_driver = proc_mkdir_mode("tty/driver", S_IRUSR | S_IXUSR, 0);
 
 	create_proc_read_entry("tty/ldiscs", 0, 0, tty_ldiscs_read_proc,NULL);
 	entry = create_proc_entry("tty/drivers", 0, NULL);

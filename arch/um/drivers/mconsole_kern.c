@@ -27,7 +27,6 @@
 #include "init.h"
 #include "os.h"
 #include "umid.h"
-#include "irq_kern.h"
 
 static int do_unlink_socket(struct notifier_block *notifier, 
 			    unsigned long what, void *data)
@@ -68,7 +67,7 @@ void mc_work_proc(void *unused)
 
 DECLARE_WORK(mconsole_work, mc_work_proc, NULL);
 
-irqreturn_t mconsole_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+void mconsole_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	int fd;
 	struct mconsole_entry *new;
@@ -89,7 +88,6 @@ irqreturn_t mconsole_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	}
 	if(!list_empty(&mc_requests)) schedule_work(&mconsole_work);
 	reactivate_fd(fd, MCONSOLE_IRQ);
-	return(IRQ_HANDLED);
 }
 
 void mconsole_version(struct mc_request *req)
@@ -102,34 +100,20 @@ void mconsole_version(struct mc_request *req)
 	mconsole_reply(req, version, 0, 0);
 }
 
-void mconsole_log(struct mc_request *req)
-{
-	int len;
-	char *ptr = req->request.data;
-	
-	ptr += strlen("log");
-	while(isspace(*ptr)) ptr++;
-
-	len = ptr - req->request.data;
-	printk("%.*s", len, ptr);
-	mconsole_reply(req, "", 0, 0);
-}
-
 #define UML_MCONSOLE_HELPTEXT \
-"Commands: \n\
-    version - Get kernel version \n\
-    help - Print this message \n\
-    halt - Halt UML \n\
-    reboot - Reboot UML \n\
-    config <dev>=<config> - Add a new device to UML;  \n\
-	same syntax as command line \n\
-    config <dev> - Query the configuration of a device \n\
-    remove <dev> - Remove a device from UML \n\
-    sysrq <letter> - Performs the SysRq action controlled by the letter \n\
-    cad - invoke the Ctl-Alt-Del handler \n\
-    stop - pause the UML; it will do nothing until it receives a 'go' \n\
-    go - continue the UML after a 'stop' \n\
-    log <string> - make UML enter <string> into the kernel log\n\
+"Commands:
+    version - Get kernel version
+    help - Print this message
+    halt - Halt UML
+    reboot - Reboot UML
+    config <dev>=<config> - Add a new device to UML; 
+	same syntax as command line
+    config <dev> - Query the configuration of a device
+    remove <dev> - Remove a device from UML
+    sysrq <letter> - Performs the SysRq action controlled by the letter
+    cad - invoke the Ctl-Alt-Del handler
+    stop - pause the UML; it will do nothing until it receives a 'go'
+    go - continue the UML after a 'stop'
 "
 
 void mconsole_help(struct mc_request *req)
@@ -318,7 +302,7 @@ int mconsole_init(void)
 	if(umid_file_name("mconsole", file, sizeof(file))) return(-1);
 	snprintf(mconsole_socket_name, sizeof(file), "%s", file);
 
-	sock = create_unix_socket(file, sizeof(file), 1);
+	sock = create_unix_socket(file, sizeof(file));
 	if (sock < 0){
 		printk("Failed to initialize management console\n");
 		return(1);

@@ -71,7 +71,7 @@ enum sgp_type {
 };
 
 static int shmem_getpage(struct inode *inode, unsigned long idx,
-			 struct page **pagep, enum sgp_type sgp);
+			 struct page **pagep, enum sgp_type sgp, int *type);
 
 static inline struct page *shmem_dir_alloc(unsigned int gfp_mask)
 {
@@ -540,7 +540,7 @@ static int shmem_notify_change(struct dentry *dentry, struct iattr *attr)
 			if (attr->ia_size & (PAGE_CACHE_SIZE-1)) {
 				(void) shmem_getpage(inode,
 					attr->ia_size>>PAGE_CACHE_SHIFT,
-						&page, SGP_READ);
+						&page, SGP_READ, NULL);
 			}
 			/*
 			 * Reset SHMEM_PAGEIN flag so that shmem_truncate can
@@ -765,7 +765,7 @@ redirty:
  * vm. If we swap it in we mark it dirty since we also free the swap
  * entry since a page cannot live in both the swap and page cache
  */
-static int shmem_getpage(struct inode *inode, unsigned long idx, struct page **pagep, enum sgp_type sgp)
+static int shmem_getpage(struct inode *inode, unsigned long idx, struct page **pagep, enum sgp_type sgp, int *type)
 {
 	struct address_space *mapping = inode->i_mapping;
 	struct shmem_inode_info *info = SHMEM_I(inode);
@@ -774,7 +774,7 @@ static int shmem_getpage(struct inode *inode, unsigned long idx, struct page **p
 	struct page *swappage;
 	swp_entry_t *entry;
 	swp_entry_t swap;
-	int error;
+	int error, majmin = VM_FAULT_MINOR;
 
 	if (idx >= SHMEM_MAX_INDEX)
 		return -EFBIG;
@@ -811,6 +811,10 @@ repeat:
 		if (!swappage) {
 			shmem_swp_unmap(entry);
 			spin_unlock(&info->lock);
+			/* here we actually do the io */
+			if (majmin == VM_FAULT_MINOR && type)
+				inc_page_state(pgmajfault);
+			majmin = VM_FAULT_MAJOR;
 			swapin_readahead(swap);
 			swappage = read_swap_cache_async(swap);
 			if (!swappage) {
@@ -959,6 +963,8 @@ done:
 		} else
 			*pagep = ZERO_PAGE(0);
 	}
+	if (type)
+		*type = majmin;
 	return 0;
 
 failed:
@@ -969,7 +975,7 @@ failed:
 	return error;
 }
 
-struct page *shmem_nopage(struct vm_area_struct *vma, unsigned long address, int unused)
+struct page *shmem_nopage(struct vm_area_struct *vma, unsigned long address, int *type)
 {
 	struct inode *inode = vma->vm_file->f_dentry->d_inode;
 	struct page *page = NULL;
@@ -980,7 +986,7 @@ struct page *shmem_nopage(struct vm_area_struct *vma, unsigned long address, int
 	idx += vma->vm_pgoff;
 	idx >>= PAGE_CACHE_SHIFT - PAGE_SHIFT;
 
-	error = shmem_getpage(inode, idx, &page, SGP_CACHE);
+	error = shmem_getpage(inode, idx, &page, SGP_CACHE, type);
 	if (error)
 		return (error == -ENOMEM)? NOPAGE_OOM: NOPAGE_SIGBUS;
 
@@ -1007,7 +1013,7 @@ static int shmem_populate(struct vm_area_struct *vma,
 		/*
 		 * Will need changing if PAGE_CACHE_SIZE != PAGE_SIZE
 		 */
-		err = shmem_getpage(inode, pgoff, &page, sgp);
+		err = shmem_getpage(inode, pgoff, &page, sgp, NULL);
 		if (err)
 			return err;
 		if (page) {
@@ -1157,7 +1163,7 @@ static int
 shmem_prepare_write(struct file *file, struct page *page, unsigned offset, unsigned to)
 {
 	struct inode *inode = page->mapping->host;
-	return shmem_getpage(inode, page->index, &page, SGP_WRITE);
+	return shmem_getpage(inode, page->index, &page, SGP_WRITE, NULL);
 }
 
 static ssize_t
@@ -1214,7 +1220,7 @@ shmem_file_write(struct file *file, const char __user *buf, size_t count, loff_t
 		 * But it still may be a good idea to prefault below.
 		 */
 
-		err = shmem_getpage(inode, index, &page, SGP_WRITE);
+		err = shmem_getpage(inode, index, &page, SGP_WRITE, NULL);
 		if (err)
 			break;
 
@@ -1296,7 +1302,7 @@ static void do_shmem_file_read(struct file *filp, loff_t *ppos, read_descriptor_
 				break;
 		}
 
-		desc->error = shmem_getpage(inode, index, &page, SGP_READ);
+		desc->error = shmem_getpage(inode, index, &page, SGP_READ, NULL);
 		if (desc->error) {
 			if (desc->error == -EINVAL)
 				desc->error = 0;
@@ -1552,7 +1558,7 @@ static int shmem_symlink(struct inode *dir, struct dentry *dentry, const char *s
 			iput(inode);
 			return -ENOMEM;
 		}
-		error = shmem_getpage(inode, 0, &page, SGP_WRITE);
+		error = shmem_getpage(inode, 0, &page, SGP_WRITE, NULL);
 		if (error) {
 			vm_unacct_memory(VM_ACCT(1));
 			iput(inode);
@@ -1590,7 +1596,7 @@ static int shmem_follow_link_inline(struct dentry *dentry, struct nameidata *nd)
 static int shmem_readlink(struct dentry *dentry, char __user *buffer, int buflen)
 {
 	struct page *page = NULL;
-	int res = shmem_getpage(dentry->d_inode, 0, &page, SGP_READ);
+	int res = shmem_getpage(dentry->d_inode, 0, &page, SGP_READ, NULL);
 	if (res)
 		return res;
 	res = vfs_readlink(dentry, buffer, buflen, kmap(page));
@@ -1603,7 +1609,7 @@ static int shmem_readlink(struct dentry *dentry, char __user *buffer, int buflen
 static int shmem_follow_link(struct dentry *dentry, struct nameidata *nd)
 {
 	struct page *page = NULL;
-	int res = shmem_getpage(dentry->d_inode, 0, &page, SGP_READ);
+	int res = shmem_getpage(dentry->d_inode, 0, &page, SGP_READ, NULL);
 	if (res)
 		return res;
 	res = vfs_follow_link(nd, kmap(page));

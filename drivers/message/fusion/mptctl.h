@@ -15,10 +15,10 @@
  *
  *      (see also mptbase.c)
  *
- *  Copyright (c) 1999-2002 LSI Logic Corporation
+ *  Copyright (c) 1999-2003 LSI Logic Corporation
  *  Originally By: Steven J. Ralston
  *  (mailto:sjralston1@netscape.net)
- *  (mailto:Pam.Delaney@lsil.com)
+ *  (mailto:mpt_linux_developer@lsil.com)
  *
  *  $Id: mptctl.h,v 1.13 2002/12/03 21:26:33 pdelaney Exp $
  */

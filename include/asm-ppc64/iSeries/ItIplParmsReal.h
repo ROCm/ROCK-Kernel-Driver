@@ -16,8 +16,6 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
  */
-#ifndef _ITIPLPARMSREAL_H
-#define _ITIPLPARMSREAL_H
 
 //==============================================================================
 //
@@ -33,7 +31,12 @@
 //-------------------------------------------------------------------
 // Standard Includes
 //-------------------------------------------------------------------
-#include <asm/types.h>
+#ifndef	_PPC_TYPES_H
+#include	<asm/types.h>
+#endif
+
+#ifndef _ITIPLPARMSREAL_H
+#define _ITIPLPARMSREAL_H
 
 struct ItIplParmsReal
 {
@@ -72,5 +75,4 @@ struct ItIplParmsReal
 	u64	xRsvd12;		// Reserved				x30-x37
 	u64	xRsvd13;		// Reserved				x38-x3F
 };
-
-#endif /* _ITIPLPARMSREAL_H */
+#endif // _ITIPLPARMSREAL_H

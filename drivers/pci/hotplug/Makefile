@@ -7,12 +7,8 @@ obj-$(CONFIG_HOTPLUG_PCI_FAKE)		+= fakephp.o
 obj-$(CONFIG_HOTPLUG_PCI_COMPAQ)	+= cpqphp.o
 obj-$(CONFIG_HOTPLUG_PCI_IBM)		+= ibmphp.o
 obj-$(CONFIG_HOTPLUG_PCI_ACPI)		+= acpiphp.o
-obj-$(CONFIG_HOTPLUG_PCI_AMD)		+= amdshpc.o
 obj-$(CONFIG_HOTPLUG_PCI_CPCI_ZT5550)	+= cpcihp_zt5550.o
 obj-$(CONFIG_HOTPLUG_PCI_CPCI_GENERIC)	+= cpcihp_generic.o
-obj-$(CONFIG_HOTPLUG_PCI_FAKE)		+= fakephp.o 
-obj-$(CONFIG_HOTPLUG_PCI_RPA)		+= rpaphp.o
-obj-$(CONFIG_HOTPLUG_PCI_RPA_DLPAR)	+= rpadlpar_io.o
 
 pci_hotplug-objs	:=	pci_hotplug_core.o
 
@@ -36,21 +32,6 @@ acpiphp-objs		:=	acpiphp_core.o	\
 				acpiphp_glue.o	\
 				acpiphp_pci.o	\
 				acpiphp_res.o
-
-amdshpc-objs		:=	amdshpc_core.o  \
-				amdshpc_ctrl.o  \
-				amdshpc_pci.o   \
-				amdshpc_ddi.o   \
-				amdshpc_int.o   \
-				amdshpc_led.o   \
-				amdshpc_enb.o   \
-				amdshpc_dsb.o
-
-rpaphp-objs		:=	rpaphp_core.o	\
-				rpaphp_pci.o	
-
-rpadlpar_io-objs	:=	rpadlpar_core.o \
-				rpadlpar_sysfs.o
 
 ifdef CONFIG_HOTPLUG_PCI_ACPI
   EXTRA_CFLAGS  += -D_LINUX -I$(TOPDIR)/drivers/acpi

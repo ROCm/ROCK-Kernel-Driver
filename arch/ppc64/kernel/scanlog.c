@@ -28,7 +28,6 @@
 #include <asm/uaccess.h>
 #include <asm/rtas.h>
 #include <asm/prom.h>
-#include <asm/proc_fs.h>
 
 #define MODULE_VERSION "1.0"
 #define MODULE_NAME "scanlog"
@@ -43,6 +42,9 @@
 static int scanlog_debug;
 static unsigned int ibm_scan_log_dump;			/* RTAS token */
 static struct proc_dir_entry *proc_ppc64_scan_log_dump;	/* The proc file */
+
+extern struct proc_dir_entry *proc_rtas;
+
 
 static ssize_t scanlog_read(struct file *file, char *buf,
 			    size_t count, loff_t *ppos)
@@ -133,24 +135,17 @@ static ssize_t scanlog_read(struct file *file, char *buf,
 static ssize_t scanlog_write(struct file * file, const char * buf,
 			     size_t count, loff_t *ppos)
 {
-	char stkbuf[20];
 	unsigned long status;
 
-	if (count > 19) count = 19;
-	if (copy_from_user (stkbuf, buf, count)) {
-		return -EFAULT;
-	}
-	stkbuf[count] = 0;
-
 	if (buf) {
-		if (strncmp(stkbuf, "reset", 5) == 0) {
+		if (strncmp(buf, "reset", 5) == 0) {
 			DEBUG("reset scanlog\n");
 			status = rtas_call(ibm_scan_log_dump, 2, 1, NULL, NULL, 0);
 			DEBUG("rtas returns %ld\n", status);
-		} else if (strncmp(stkbuf, "debugon", 7) == 0) {
+		} else if (strncmp(buf, "debugon", 7) == 0) {
 			printk(KERN_ERR "scanlog: debug on\n");
 			scanlog_debug = 1;
-		} else if (strncmp(stkbuf, "debugoff", 8) == 0) {
+		} else if (strncmp(buf, "debugoff", 8) == 0) {
 			printk(KERN_ERR "scanlog: debug off\n");
 			scanlog_debug = 0;
 		}
@@ -212,16 +207,15 @@ int __init scanlog_init(void)
 		return -EIO;
 	}
 
-	if (proc_ppc64.rtas == NULL) {
-		proc_ppc64_init();
-	}
+	if (proc_rtas == NULL)
+                proc_rtas = proc_mkdir("rtas", 0);
 
-	if (proc_ppc64.rtas == NULL) {
+	if (proc_rtas == NULL) {
 		printk(KERN_ERR "Failed to create /proc/rtas in scanlog_init\n");
 		return -EIO;
 	}
 
-        ent = create_proc_entry("scan-log-dump",  S_IRUSR, proc_ppc64.rtas);
+        ent = create_proc_entry("scan-log-dump",  S_IRUSR, proc_rtas);
 	if (ent) {
 		ent->proc_fops = &scanlog_fops;
 		/* Ideally we could allocate a buffer < 4G */

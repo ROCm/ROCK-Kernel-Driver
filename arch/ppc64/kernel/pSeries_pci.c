@@ -176,55 +176,6 @@ int pci_read_irq_line(struct pci_dev *pci_dev)
 	       pci_name(pci_dev), pci_dev->irq);
 	return 0;
 }
-EXPORT_SYMBOL(pci_read_irq_line);
-
-#define ISA_SPACE_MASK 0x1
-#define ISA_SPACE_IO 0x1
-
-static void pci_process_ISA_OF_ranges(struct device_node *isa_node,
-		                      unsigned long phb_io_base_phys,
-				      void * phb_io_base_virt)
-{
-	struct isa_range *range;
-	unsigned long pci_addr;
-	unsigned int isa_addr;
-	unsigned int size;
-	int rlen = 0;
-
-	range = (struct isa_range *) get_property(isa_node, "ranges", &rlen);
-	if (rlen < sizeof(struct isa_range)) {
-		printk(KERN_ERR "unexpected isa range size: %s\n", 
-				__FUNCTION__);
-		return;	
-	}
-	
-	/* From "ISA Binding to 1275"
-	 * The ranges property is laid out as an array of elements,
-	 * each of which comprises:
-	 *   cells 0 - 1:	an ISA address
-	 *   cells 2 - 4:	a PCI address 
-	 *			(size depending on dev->n_addr_cells)
-	 *   cell 5:		the size of the range
-	 */
-	if ((range->isa_addr.a_hi && ISA_SPACE_MASK) == ISA_SPACE_IO) {
-		isa_addr = range->isa_addr.a_lo;
-		pci_addr = (unsigned long) range->pci_addr.a_mid << 32 | 
-			range->pci_addr.a_lo;
-
-		/* Assume these are both zero */
-		if ((pci_addr != 0) || (isa_addr != 0)) {
-			printk(KERN_ERR "unexpected isa to pci mapping: %s\n",
-					__FUNCTION__);
-			return;
-		}
-		
-		size = PAGE_ALIGN(range->size);
-
-		__ioremap_explicit(phb_io_base_phys, 
-				   (unsigned long) phb_io_base_virt, 
-				   size, _PAGE_NO_CACHE);
-	}
-}
 
 static void __init pci_process_bridge_OF_ranges(struct pci_controller *hose,
 						struct device_node *dev,
@@ -237,11 +188,10 @@ static void __init pci_process_bridge_OF_ranges(struct pci_controller *hose,
 	struct resource *res;
 	int np, na = prom_n_addr_cells(dev);
 	unsigned long pci_addr, cpu_phys_addr;
-	struct device_node *isa_dn;
 
 	np = na + 5;
 
-	/* From "PCI Binding to 1275"
+	/*
 	 * The ranges property is laid out as an array of elements,
 	 * each of which comprises:
 	 *   cells 0 - 2:	a PCI address
@@ -265,22 +215,12 @@ static void __init pci_process_bridge_OF_ranges(struct pci_controller *hose,
 		switch (ranges[0] >> 24) {
 		case 1:		/* I/O space */
 			hose->io_base_phys = cpu_phys_addr;
-			hose->io_base_virt = reserve_phb_iospace(size);
-			PPCDBG(PPCDBG_PHBINIT, 
-			       "phb%d io_base_phys 0x%lx io_base_virt 0x%lx\n", 
-			       hose->global_number, hose->io_base_phys, 
-			       (unsigned long) hose->io_base_virt);
-
+			hose->io_base_virt = __ioremap(hose->io_base_phys,
+						       size, _PAGE_NO_CACHE);
 			if (primary) {
 				pci_io_base = (unsigned long)hose->io_base_virt;
-				isa_dn = of_find_node_by_type(NULL, "isa");
-				if (isa_dn) {
+				if (find_type_devices("isa"))
 					isa_io_base = pci_io_base;
-					of_node_put(isa_dn);
-					pci_process_ISA_OF_ranges(isa_dn,
-						hose->io_base_phys,
-						hose->io_base_virt);
-				}
 			}
 
 			res = &hose->io_resource;
@@ -446,7 +386,7 @@ unsigned long __init find_and_init_phbs(void)
 	unsigned int root_size_cells = 0;
 	unsigned int index;
 	unsigned int *opprop;
-	struct device_node *root = of_find_node_by_path("/");
+	struct device_node *root = find_path_device("/");
 
 	read_pci_config = rtas_token("read-pci-config");
 	write_pci_config = rtas_token("write-pci-config");
@@ -462,9 +402,7 @@ unsigned long __init find_and_init_phbs(void)
 
 	index = 0;
 
-	for (node = of_get_next_child(root, NULL);
-	     node != NULL;
-	     node = of_get_next_child(root, node)) {
+	for (node = root->child; node != NULL; node = node->sibling) {
 		if (node->type == NULL || strcmp(node->type, "pci") != 0)
 			continue;
 
@@ -482,7 +420,6 @@ unsigned long __init find_and_init_phbs(void)
 		index++;
 	}
 
-	of_node_put(root);
 	pci_devs_phb_init();
 
 	return 0;
@@ -513,7 +450,7 @@ void pcibios_name_device(struct pci_dev *dev)
 #endif
 }   
 
-void __devinit pcibios_fixup_device_resources(struct pci_dev *dev,
+void __init pcibios_fixup_device_resources(struct pci_dev *dev,
 					   struct pci_bus *bus)
 {
 	/* Update device resources.  */
@@ -532,9 +469,8 @@ void __devinit pcibios_fixup_device_resources(struct pci_dev *dev,
 		}
         }
 }
-EXPORT_SYMBOL(pcibios_fixup_device_resources);
 
-void __devinit pcibios_fixup_bus(struct pci_bus *bus)
+void __init pcibios_fixup_bus(struct pci_bus *bus)
 {
 	struct pci_controller *hose = PCI_GET_PHB_PTR(bus);
 	struct list_head *ln;
@@ -583,106 +519,18 @@ void __devinit pcibios_fixup_bus(struct pci_bus *bus)
 			pcibios_fixup_device_resources(dev, bus);
 	}
 }
-EXPORT_SYMBOL(pcibios_fixup_bus);
 
 static void check_s7a(void)
 {
 	struct device_node *root;
 	char *model;
 
-	root = of_find_node_by_path("/");
+	root = find_path_device("/");
 	if (root) {
 		model = get_property(root, "model", NULL);
 		if (model && !strcmp(model, "IBM,7013-S7A"))
 			s7a_workaround = 1;
-		of_node_put(root);
 	}
-}
-
-static int get_bus_io_range(struct pci_bus *bus, unsigned long *start_phys,
-				unsigned long *start_virt, unsigned long *size)
-{
-	struct pci_controller *hose = PCI_GET_PHB_PTR(bus);
-	struct pci_bus_region region;
-	struct resource *res;
-
-	if (bus->self) {
-		res = bus->resource[0];
-		pcibios_resource_to_bus(bus->self, &region, res);
-		*start_phys = hose->io_base_phys + region.start;
-		*start_virt = (unsigned long) hose->io_base_virt + 
-				region.start;
-		if (region.end > region.start) 
-			*size = region.end - region.start + 1;
-		else {
-			printk("%s(): unexpected region 0x%lx->0x%lx\n", 
-					__FUNCTION__, region.start, region.end);
-			return 1;
-		}
-		
-	} else {
-		/* Root Bus */
-		res = &hose->io_resource;
-		*start_phys = hose->io_base_phys;
-		*start_virt = (unsigned long) hose->io_base_virt;
-		if (res->end > res->start)
-			*size = res->end - res->start + 1;
-		else {
-			printk("%s(): unexpected region 0x%lx->0x%lx\n", 
-					__FUNCTION__, res->start, res->end);
-			return 1;
-		}
-	}
-
-	return 0;
-}
-
-int unmap_bus_range(struct pci_bus *bus)
-{
-	unsigned long start_phys;
-	unsigned long start_virt;
-	unsigned long size;
-
-	if (!bus) {
-		printk(KERN_ERR "%s() expected bus\n", __FUNCTION__);
-		return 1;
-	}
-	
-	if (get_bus_io_range(bus, &start_phys, &start_virt, &size))
-		return 1;
-	if (iounmap_explicit((void *) start_virt, size))
-		return 1;
-
-	return 0;
-}
-EXPORT_SYMBOL(unmap_bus_range);
-
-int remap_bus_range(struct pci_bus *bus)
-{
-	unsigned long start_phys;
-	unsigned long start_virt;
-	unsigned long size;
-
-	if (!bus) {
-		printk(KERN_ERR "%s() expected bus\n", __FUNCTION__);
-		return 1;
-	}
-	
-	if (get_bus_io_range(bus, &start_phys, &start_virt, &size))
-		return 1;
-	if (__ioremap_explicit(start_phys, start_virt, size, _PAGE_NO_CACHE))
-		return 1;
-
-	return 0;
-}
-EXPORT_SYMBOL(remap_bus_range);
-
-static void phbs_fixup_io(void)
-{
-	struct pci_controller *hose;
-
-	for (hose=hose_head;hose;hose=hose->next) 
-		remap_bus_range(hose->bus);
 }
 
 extern void chrp_request_regions(void);
@@ -696,7 +544,6 @@ void __init pcibios_final_fixup(void)
 	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL)
 		pci_read_irq_line(dev);
 
-	phbs_fixup_io();
 	chrp_request_regions();
 	pci_fix_bus_sysdata();
 	create_tce_tables();

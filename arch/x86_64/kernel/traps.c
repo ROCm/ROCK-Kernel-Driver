@@ -218,7 +218,7 @@ void show_stack(struct task_struct *tsk, unsigned long * rsp)
 	// debugging aid: "show_stack(NULL, NULL);" prints the
 	// back trace for this cpu.
 
-	if (rsp == NULL) { 
+	if (rsp == NULL) {
 		if (tsk)
 			rsp = (unsigned long *)tsk->thread.rsp;
 		else
@@ -355,8 +355,8 @@ void __die(const char * str, struct pt_regs * regs, long err)
 	printk(KERN_EMERG "%s: %04lx [%u]\n", str, err & 0xffff,++die_counter);
 	notify_die(DIE_OOPS, (char *)str, regs, err, 255, SIGSEGV);
 	show_registers(regs);
-	/* Execute summary in case the oops scrolled away */
-	printk(KERN_EMERG "RIP "); 
+	/* Executive summary in case the oops scrolled away */
+	printk("RIP "); 
 	printk_address(regs->rip); 
 	printk(" RSP <%016lx>\n", regs->rsp); 
 }

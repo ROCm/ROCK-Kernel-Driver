@@ -1477,7 +1477,6 @@ static int __devinit sstfb_probe(struct pci_dev *pdev,
 	info->fbops	= &sstfb_ops;
 	info->currcon	= -1;
 	info->pseudo_palette = &all->pseudo_palette;
-	info->dev	= &pdev->dev;
 
 	fix->type	= FB_TYPE_PACKED_PIXELS;
 	fix->visual	= FB_VISUAL_TRUECOLOR;

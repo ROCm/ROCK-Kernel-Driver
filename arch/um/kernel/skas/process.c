@@ -4,7 +4,6 @@
  */
 
 #include <stdlib.h>
-#include <unistd.h>
 #include <errno.h>
 #include <signal.h>
 #include <setjmp.h>
@@ -25,16 +24,6 @@
 #include "os.h"
 #include "proc_mm.h"
 #include "skas_ptrace.h"
-#include "chan_user.h"
-
-int is_skas_winch(int pid, int fd, void *data)
-{
-	if(pid != getpid())
-		return(0);
-
-	register_winch_irq(-1, fd, -1, data);
-	return(1);
-}
 
 unsigned long exec_regs[FRAME_SIZE];
 unsigned long exec_fp_regs[HOST_FP_SIZE];
@@ -59,11 +48,11 @@ static void handle_trap(int pid, union uml_pt_regs *regs)
 	int err, syscall_nr, status;
 
 	syscall_nr = PT_SYSCALL_NR(regs->skas.regs);
-	UPT_SYSCALL_NR(regs) = syscall_nr;
 	if(syscall_nr < 1){
 		relay_signal(SIGTRAP, regs);
 		return;
 	}
+	UPT_SYSCALL_NR(regs) = syscall_nr;
 
 	err = ptrace(PTRACE_POKEUSER, pid, PT_SYSCALL_NR_OFFSET, __NR_getpid);
 	if(err < 0)
@@ -83,6 +72,8 @@ static void handle_trap(int pid, union uml_pt_regs *regs)
 	handle_syscall(regs);
 }
 
+int userspace_pid;
+
 static int userspace_tramp(void *arg)
 {
 	init_new_thread_signals(0);
@@ -91,8 +82,6 @@ static int userspace_tramp(void *arg)
 	os_stop_process(os_getpid());
 	return(0);
 }
-
-int userspace_pid;
 
 void start_userspace(void)
 {
@@ -160,7 +149,6 @@ void userspace(union uml_pt_regs *regs)
 			case SIGILL:
 			case SIGBUS:
 			case SIGFPE:
-			case SIGWINCH:
 				user_signal(WSTOPSIG(status), regs);
 				break;
 			default:
@@ -340,8 +328,7 @@ void reboot_skas(void)
 int new_mm(int from)
 {
 	struct proc_mm_op copy;
-	int n, fd = os_open_file("/proc/mm", 
-				 of_cloexec(of_write(OPENFLAGS())), 0);
+	int n, fd = os_open_file("/proc/mm", of_write(OPENFLAGS()), 0);
 
 	if(fd < 0)
 		return(-errno);
@@ -355,7 +342,6 @@ int new_mm(int from)
 			printk("new_mm : /proc/mm copy_segments failed, "
 			       "errno = %d\n", errno);
 	}
-
 	return(fd);
 }
 

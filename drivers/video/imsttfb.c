@@ -1348,7 +1348,7 @@ static struct fb_ops imsttfb_ops = {
 };
 
 static void __init 
-init_imstt(struct fb_info *info, struct pci_dev *pdev)
+init_imstt(struct fb_info *info)
 {
 	struct imstt_par *par = (struct imstt_par *) info->par;
 	__u32 i, tmp, *ip, *end;
@@ -1442,7 +1442,6 @@ init_imstt(struct fb_info *info, struct pci_dev *pdev)
 
 	info->fbops = &imsttfb_ops;
 	info->flags = FBINFO_FLAG_DEFAULT;
-	info->dev = &pdev->dev;
 
 	fb_alloc_cmap(&info->cmap, 0, 0);
 
@@ -1521,7 +1520,7 @@ imsttfb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	par->cmap_regs = (__u8 *)ioremap(addr + 0x840000, 0x1000);
 	info->par = par;
 	info->pseudo_palette = (void *) (par + 1);
-	init_imstt(info, pdev);
+	init_imstt(info);
 
 	pci_set_drvdata(pdev, info);
 	return 0;

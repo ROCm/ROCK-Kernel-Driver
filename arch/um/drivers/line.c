@@ -6,8 +6,8 @@
 #include "linux/sched.h"
 #include "linux/slab.h"
 #include "linux/list.h"
-#include "linux/interrupt.h"
 #include "linux/devfs_fs_kernel.h"
+#include "asm/irq.h"
 #include "asm/uaccess.h"
 #include "chan_kern.h"
 #include "irq_user.h"
@@ -16,18 +16,16 @@
 #include "user_util.h"
 #include "kern_util.h"
 #include "os.h"
-#include "irq_kern.h"
 
 #define LINE_BUFSIZE 4096
 
-irqreturn_t line_interrupt(int irq, void *data, struct pt_regs *unused)
+void line_interrupt(int irq, void *data, struct pt_regs *unused)
 {
 	struct line *dev = data;
 
 	if(dev->count > 0) 
 		chan_interrupt(&dev->chan_list, &dev->task, dev->tty, irq, 
 			       dev);
-	return IRQ_HANDLED;
 }
 
 void line_timer_cb(void *arg)
@@ -138,22 +136,20 @@ int line_write(struct line *lines, struct tty_struct *tty, int from_user,
 	return(len);
 }
 
-irqreturn_t line_write_interrupt(int irq, void *data, struct pt_regs *unused)
+void line_write_interrupt(int irq, void *data, struct pt_regs *unused)
 {
 	struct line *dev = data;
 	struct tty_struct *tty = dev->tty;
 	int err;
 
 	err = flush_buffer(dev);
-	if(err == 0) 
-		return(IRQ_NONE);
+	if(err == 0) return;
 	else if(err < 0){
 		dev->head = dev->buffer;
 		dev->tail = dev->buffer;
 	}
 
-	if(tty == NULL) 
-		return(IRQ_NONE);
+	if(tty == NULL) return;
 
 	if(test_bit(TTY_DO_WRITE_WAKEUP, &tty->flags) &&
 	   (tty->ldisc.write_wakeup != NULL))
@@ -165,9 +161,9 @@ irqreturn_t line_write_interrupt(int irq, void *data, struct pt_regs *unused)
 	 * writes.
 	 */
 
-	if(waitqueue_active(&tty->write_wait))
+	if (waitqueue_active(&tty->write_wait))
 		wake_up_interruptible(&tty->write_wait);
-	return(IRQ_HANDLED);
+
 }
 
 int line_write_room(struct tty_struct *tty)
@@ -373,7 +369,7 @@ int line_get_config(char *name, struct line *lines, int num, char *str,
 
 	dev = simple_strtoul(name, &end, 0);
 	if((*end != '\0') || (end == name)){
-		*error_out = "line_get_config failed to parse device number";
+		*error_out = "line_setup failed to parse device number";
 		return(0);
 	}
 
@@ -383,15 +379,15 @@ int line_get_config(char *name, struct line *lines, int num, char *str,
 	}
 
 	line = &lines[dev];
-
 	down(&line->sem);
+	
 	if(!line->valid)
 		CONFIG_CHUNK(str, size, n, "none", 1);
 	else if(line->count == 0)
 		CONFIG_CHUNK(str, size, n, line->init_str, 1);
 	else n = chan_config_string(&line->chan_list, str, size, error_out);
-	up(&line->sem);
 
+	up(&line->sem);
 	return(n);
 }
 
@@ -416,8 +412,7 @@ struct tty_driver *line_register_devfs(struct lines *set,
 		return NULL;
 
 	driver->driver_name = line_driver->name;
-	driver->name = line_driver->device_name;
-	driver->devfs_name = line_driver->devfs_name;
+	driver->name = line_driver->devfs_name;
 	driver->major = line_driver->major;
 	driver->minor_start = line_driver->minor_start;
 	driver->type = line_driver->type;
@@ -437,7 +432,7 @@ struct tty_driver *line_register_devfs(struct lines *set,
 
 	for(i = 0; i < nlines; i++){
 		if(!lines[i].valid) 
-			tty_unregister_device(driver, i);
+			tty_unregister_devfs(driver, i);
 	}
 
 	mconsole_register_dev(&line_driver->mc);
@@ -470,25 +465,24 @@ struct winch {
 	struct line *line;
 };
 
-irqreturn_t winch_interrupt(int irq, void *data, struct pt_regs *unused)
+void winch_interrupt(int irq, void *data, struct pt_regs *unused)
 {
 	struct winch *winch = data;
 	struct tty_struct *tty;
 	int err;
 	char c;
 
-	if(winch->fd != -1){
-		err = generic_read(winch->fd, &c, NULL);
-		if(err < 0){
-			if(err != -EAGAIN){
-				printk("winch_interrupt : read failed, "
-				       "errno = %d\n", -err);
-				printk("fd %d is losing SIGWINCH support\n", 
-				       winch->tty_fd);
-				return(IRQ_HANDLED);
-			}
-			goto out;
+	err = generic_read(winch->fd, &c, NULL);
+	if(err < 0){
+		if(err != -EAGAIN){
+			printk("winch_interrupt : read failed, errno = %d\n", 
+			       -err);
+			printk("fd %d is losing SIGWINCH support\n", 
+			       winch->tty_fd);
+			free_irq(irq, data);
+			return;
 		}
+		goto out;
 	}
 	tty = winch->line->tty;
 	if(tty != NULL){
@@ -498,9 +492,7 @@ irqreturn_t winch_interrupt(int irq, void *data, struct pt_regs *unused)
 		kill_pg(tty->pgrp, SIGWINCH, 1);
 	}
  out:
-	if(winch->fd != -1)
-		reactivate_fd(winch->fd, WINCH_IRQ);
-	return(IRQ_HANDLED);
+	reactivate_fd(winch->fd, WINCH_IRQ);
 }
 
 DECLARE_MUTEX(winch_handler_sem);
@@ -537,10 +529,7 @@ static void winch_cleanup(void)
 
 	list_for_each(ele, &winch_handlers){
 		winch = list_entry(ele, struct winch, list);
-		if(winch->fd != -1){
-			deactivate_fd(winch->fd, WINCH_IRQ);
-			close(winch->fd);
-		}
+		close(winch->fd);
 		if(winch->pid != -1) 
 			os_kill_process(winch->pid, 1);
 	}

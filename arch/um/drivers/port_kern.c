@@ -6,7 +6,6 @@
 #include "linux/list.h"
 #include "linux/sched.h"
 #include "linux/slab.h"
-#include "linux/interrupt.h"
 #include "linux/irq.h"
 #include "linux/spinlock.h"
 #include "linux/errno.h"
@@ -15,7 +14,6 @@
 #include "kern_util.h"
 #include "kern.h"
 #include "irq_user.h"
-#include "irq_kern.h"
 #include "port.h"
 #include "init.h"
 #include "os.h"
@@ -46,7 +44,7 @@ struct connection {
 	struct port_list *port;
 };
 
-static irqreturn_t pipe_interrupt(int irq, void *data, struct pt_regs *regs)
+static void pipe_interrupt(int irq, void *data, struct pt_regs *regs)
 {
 	struct connection *conn = data;
 	int fd;
@@ -54,7 +52,7 @@ static irqreturn_t pipe_interrupt(int irq, void *data, struct pt_regs *regs)
  	fd = os_rcv_fd(conn->socket[0], &conn->helper_pid);
 	if(fd < 0){
 		if(fd == -EAGAIN)
-			return(IRQ_NONE);
+			return;
 
 		printk(KERN_ERR "pipe_interrupt : os_rcv_fd returned %d\n", 
 		       -fd);
@@ -67,7 +65,6 @@ static irqreturn_t pipe_interrupt(int irq, void *data, struct pt_regs *regs)
 	list_add(&conn->list, &conn->port->connections);
 
 	up(&conn->port->sem);
-	return(IRQ_HANDLED);
 }
 
 static int port_accept(struct port_list *port)
@@ -141,13 +138,12 @@ void port_work_proc(void *unused)
 
 DECLARE_WORK(port_work, port_work_proc, NULL);
 
-static irqreturn_t port_interrupt(int irq, void *data, struct pt_regs *regs)
+static void port_interrupt(int irq, void *data, struct pt_regs *regs)
 {
 	struct port_list *port = data;
 
 	port->has_connection = 1;
 	schedule_work(&port_work);
-	return(IRQ_HANDLED);
 } 
 
 void *port_data(int port_num)

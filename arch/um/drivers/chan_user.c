@@ -188,8 +188,8 @@ void register_winch(int fd, void *device_data)
 	if(!isatty(fd)) return;
 
 	pid = tcgetpgrp(fd);
-	if(!CHOOSE_MODE_PROC(is_tracer_winch, is_skas_winch, pid, fd, 
-			     device_data) && (pid == -1)){
+	if(!CHOOSE_MODE(is_tracer_winch(pid, fd, device_data), 0) && 
+	   (pid == -1)){
 		thread = winch_tramp(fd, device_data, &thread_fd);
 		if(fd != -1){
 			register_winch_irq(thread_fd, fd, thread, device_data);

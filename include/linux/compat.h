@@ -44,8 +44,8 @@ typedef struct {
 } compat_sigset_t;
 
 extern int cp_compat_stat(struct kstat *, struct compat_stat *);
-extern int get_compat_timespec(struct timespec *, struct compat_timespec *);
-extern int put_compat_timespec(struct timespec *, struct compat_timespec *);
+extern int get_compat_timespec(struct timespec *, const struct compat_timespec *);
+extern int put_compat_timespec(struct timespec *, const struct compat_timespec *);
 
 struct compat_iovec {
 	compat_uptr_t	iov_base;
@@ -82,11 +82,6 @@ struct compat_dirent {
 	u16		d_reclen;
 	char		d_name[256];
 };
-
-typedef union compat_sigval {
-	compat_int_t	sival_int;
-	compat_uptr_t	sival_ptr;
-} compat_sigval_t;
 
 #endif /* CONFIG_COMPAT */
 #endif /* _LINUX_COMPAT_H */

@@ -255,7 +255,7 @@ driver.
 is also emulated, characters should appear if you move it.
 
   You can test the joystick emulation with the 'jstest' utility,
-available in the joystick package (see Documentation/joystick.txt).
+available in the joystick package (see Documentation/input/joystick.txt).
 
   You can test the event devices with the 'evtest' utility available
 in the LinuxConsole project CVS archive (see the URL below).

@@ -1430,7 +1430,6 @@ tgafb_pci_register(struct pci_dev *pdev, const struct pci_device_id *ent)
 	all->info.currcon = -1;
 	all->info.par = &all->par;
 	all->info.pseudo_palette = all->pseudo_palette;
-	all->info.dev = &pdev->dev;
 
 	/* This should give a reasonable default video mode.  */
 

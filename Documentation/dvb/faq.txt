@@ -1,0 +1,109 @@
+Some very frequently asked questions about linuxtv-dvb
+
+1. The signal seems to die a few seconds after tuning.
+
+	It's not a bug, it's a feature. Because the frontends have
+	significant power requirements (and hence get very hot), they
+	are powered down if they are unused (i.e. if the frontend device
+	is closed). The dvb-core.o module paramter "dvb_shutdown_timeout"
+	allow you to change the timeout (default 5 seconds). Setting the
+	timeout to 0 disables the timeout feature.
+
+2. How can I watch TV?
+
+	The driver distribution includes some simple utilities which
+	are mainly intended for testing and to demonstrate how the
+	DVB API works.
+
+	Depending on whether you have a DVB-S, DVB-C or DVB-T card, use
+	apps/szap/szap, czap or tzap. You must supply a channel list
+	in ~/.[sct]zap/channels.conf. If you are lucky you can just copy
+	one of the supplied channel lists, or you can create a new one
+	by running apps/scan/scan. If you run scan on an unknown network
+	you might have to supply some start data in apps/scan/initial.h.
+
+	If you have a card with a built-in hardware MPEG-decoder the
+	drivers create a video4linux device (/dev/v4l/video0) which
+	you can use to watch TV with any v4l application. xawtv is known
+	to work. Note that you cannot change channels with xawtv, you
+	have to zap using [sct]zap. If you want a nice application for
+	TV watching and record/playback, have a look at VDR.
+
+	If your card does not have a hardware MPEG decoder you need
+	a software MPEG decoder. Mplayer or xine are known to work.
+	Newsflash: MythTV also has DVB support now.
+	Note: Only very recent versions of Mplayer and xine can decode.
+	MPEG2 transport streams (TS) directly. Then, run
+	'[sct]zap channelname -r' in one xterm, and keep it running,
+	and start 'mplayer - < /dev/dvb/adapter0/dvr0' or 
+	'xine stdin://mpeg2 < /dev/dvb/adapter0/dvr0' in a second xterm.
+	That's all far from perfect, but it seems no one has written
+	a nice DVB application which includes a builtin software MPEG
+	decoder yet.
+
+	Newsflash: Newest xine directly supports DVB. Just copy your
+	channels.conf to ~/.xine and start 'xine dvb://', or select
+	the DVB button in the xine GUI. Channel switching works using the
+	numpad pgup/pgdown (NP9 / NP3) keys to scroll through the channel osd
+	menu and pressing numpad-enter to switch to the selected channel.
+
+	Note: Older versions of xine and mplayer understand MPEG program
+	streams (PS) only, and can be used in conjunction with the
+	ts2ps tool from the Metzler Brother's dvb-mpegtools package.
+
+3. Which other DVB applications exist?
+
+	http://www.cadsoft.de/people/kls/vdr/
+		Klaus Schmidinger's Video Disk Recorder
+
+	http://www.metzlerbros.org/dvb/
+		Metzler Bros. DVB development; alternate drivers and
+		DVB utilities, include dvb-mpegtools and tuxzap.
+
+	http://www.linuxstb.org/
+	http://sourceforge.net/projects/dvbtools/
+		Dave Chapman's dvbtools package, including
+		dvbstream and dvbtune
+
+	http://www.linuxdvb.tv/
+		Henning Holtschneider's site with many interesting
+		links and docs
+
+	http://www.dbox2.info/
+		LinuxDVB on the dBox2
+
+	http://www.tuxbox.org/
+	http://cvs.tuxbox.org/
+		the TuxBox CVS many interesting DVB applications and the dBox2
+		DVB source
+
+	http://sourceforge.net/projects/dvbsak/
+		DVB Swiss Army Knife library and utilities
+
+	http://www.nenie.org/misc/mpsys/
+		MPSYS: a MPEG2 system library and tools
+
+	http://mplayerhq.hu/
+		mplayer
+
+	http://xine.sourceforge.net/
+	http://xinehq.de/
+		xine
+
+	http://www.mythtv.org/
+		MythTV - analog TV PVR, but now with DVB support, too
+		(with software MPEG decode)
+
+4. Can't get a signal tuned correctly
+
+	If you are using a Technotrend/Hauppauge DVB-C card *without* analog
+	module, you might have to use module parameter adac=-1 (dvb-ttpci.o).
+
+5. The dvb_net device doesn't give me any multicast packets
+
+	Check your routes if they include the multicast address range.
+	Additionally make sure that "source validation by reversed path
+	lookup" is disabled:
+	  $ "echo 0 > /proc/sys/net/ipv4/conf/dvb0/rp_filter"
+
+eof

@@ -15,11 +15,7 @@ SECTIONS
   . = ALIGN(4096);		/* Init code and data */
   _stext = .;
   __init_begin = .;
-  .init.text : { 
-	_sinittext = .;
-	*(.init.text)
-	_einittext = .;
-  }
+  .text.init : { *(.text.init) }
 
   . = ALIGN(4096);
 
@@ -71,7 +67,7 @@ SECTIONS
 
   #include "asm/common.lds.S"
 
-  init.data : { *(.init.data) }
+  .data.init : { *(.data.init) }
 
   /* Ensure the __preinit_array_start label is properly aligned.  We
      could instead move the label definition inside the section, but

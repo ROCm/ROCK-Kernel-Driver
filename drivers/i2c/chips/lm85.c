@@ -433,11 +433,14 @@ static ssize_t set_fan_min(struct device *dev, const char *buf,
 		size_t count, int nr)
 {
 	struct i2c_client *client = to_i2c_client(dev);
+	struct lm85_data *data = i2c_get_clientdata(client);
 	int	val;
 
+	down(&data->update_lock);
 	val = simple_strtol(buf, NULL, 10);
-	val = FAN_TO_REG(val);
-	lm85_write_value(client, LM85_REG_FAN_MIN(nr), val);
+	data->fan_min[nr] = FAN_TO_REG(val);
+	lm85_write_value(client, LM85_REG_FAN_MIN(nr), data->fan_min[nr]);
+	up(&data->update_lock);
 	return count;
 }
 
@@ -524,11 +527,14 @@ static ssize_t set_pwm(struct device *dev, const char *buf,
 		size_t count, int nr)
 {
 	struct i2c_client *client = to_i2c_client(dev);
+	struct lm85_data *data = i2c_get_clientdata(client);
 	int	val;
 
+	down(&data->update_lock);
 	val = simple_strtol(buf, NULL, 10);
-	val = PWM_TO_REG(val);
-	lm85_write_value(client, LM85_REG_PWM(nr), val);
+	data->pwm[nr] = PWM_TO_REG(val);
+	lm85_write_value(client, LM85_REG_PWM(nr), data->pwm[nr]);
+	up(&data->update_lock);
 	return count;
 }
 static ssize_t show_pwm_enable(struct device *dev, char *buf, int nr)
@@ -586,11 +592,14 @@ static ssize_t set_in_min(struct device *dev, const char *buf,
 		size_t count, int nr)
 {
 	struct i2c_client *client = to_i2c_client(dev);
+	struct lm85_data *data = i2c_get_clientdata(client);
 	int	val;
 
+	down(&data->update_lock);
 	val = simple_strtol(buf, NULL, 10);
-	val = INS_TO_REG(nr, val);
-	lm85_write_value(client, LM85_REG_IN_MIN(nr), val);
+	data->in_min[nr] = INS_TO_REG(nr, val);
+	lm85_write_value(client, LM85_REG_IN_MIN(nr), data->in_min[nr]);
+	up(&data->update_lock);
 	return count;
 }
 static ssize_t show_in_max(struct device *dev, char *buf, int nr)
@@ -605,11 +614,14 @@ static ssize_t set_in_max(struct device *dev, const char *buf,
 		size_t count, int nr)
 {
 	struct i2c_client *client = to_i2c_client(dev);
+	struct lm85_data *data = i2c_get_clientdata(client);
 	int	val;
 
+	down(&data->update_lock);
 	val = simple_strtol(buf, NULL, 10);
-	val = INS_TO_REG(nr, val);
-	lm85_write_value(client, LM85_REG_IN_MAX(nr), val);
+	data->in_max[nr] = INS_TO_REG(nr, val);
+	lm85_write_value(client, LM85_REG_IN_MAX(nr), data->in_max[nr]);
+	up(&data->update_lock);
 	return count;
 }
 #define show_in_reg(offset)						\
@@ -669,11 +681,14 @@ static ssize_t set_temp_min(struct device *dev, const char *buf,
 		size_t count, int nr)
 {
 	struct i2c_client *client = to_i2c_client(dev);
+	struct lm85_data *data = i2c_get_clientdata(client);
 	int	val;
 
+	down(&data->update_lock);
 	val = simple_strtol(buf, NULL, 10);
-	val = TEMP_TO_REG(val);
-	lm85_write_value(client, LM85_REG_TEMP_MIN(nr), val);
+	data->temp_min[nr] = TEMP_TO_REG(val);
+	lm85_write_value(client, LM85_REG_TEMP_MIN(nr), data->temp_min[nr]);
+	up(&data->update_lock);
 	return count;
 }
 static ssize_t show_temp_max(struct device *dev, char *buf, int nr)
@@ -688,11 +703,14 @@ static ssize_t set_temp_max(struct device *dev, const char *buf,
 		size_t count, int nr)
 {
 	struct i2c_client *client = to_i2c_client(dev);
+	struct lm85_data *data = i2c_get_clientdata(client);
 	int	val;
 
+	down(&data->update_lock);
 	val = simple_strtol(buf, NULL, 10);
-	val = TEMP_TO_REG(val);
-	lm85_write_value(client, LM85_REG_TEMP_MAX(nr), val);
+	data->temp_max[nr] = TEMP_TO_REG(val);
+	lm85_write_value(client, LM85_REG_TEMP_MAX(nr), data->temp_max[nr]);
+	up(&data->update_lock);
 	return count;
 }
 #define show_temp_reg(offset)						\
@@ -935,11 +953,7 @@ int lm85_detach_client(struct i2c_client *client)
 
 int lm85_read_value(struct i2c_client *client, u8 reg)
 {
-	struct lm85_data *data = i2c_get_clientdata(client);
 	int res;
-
-	/* serialize access to the hardware */
-	down(&data->update_lock);
 
 	/* What size location is it? */
 	switch( reg ) {
@@ -964,18 +978,13 @@ int lm85_read_value(struct i2c_client *client, u8 reg)
 		res = i2c_smbus_read_byte_data(client, reg);
 		break ;
 	}
-	up(&data->update_lock);
 
 	return res ;
 }
 
 int lm85_write_value(struct i2c_client *client, u8 reg, int value)
 {
-	struct lm85_data *data = i2c_get_clientdata(client);
 	int res ;
-
-	/* serialize access to the hardware */
-	down(&data->update_lock);
 
 	switch( reg ) {
 	case LM85_REG_FAN(0) :  /* Write WORD data */
@@ -998,7 +1007,6 @@ int lm85_write_value(struct i2c_client *client, u8 reg, int value)
 		res = i2c_smbus_write_byte_data(client, reg, value);
 		break ;
 	}
-	up(&data->update_lock);
 
 	return res ;
 }
@@ -1059,6 +1067,8 @@ void lm85_update_client(struct i2c_client *client)
 {
 	struct lm85_data *data = i2c_get_clientdata(client);
 	int i;
+
+	down(&data->update_lock);
 
 	if ( !data->valid ||
 	     (jiffies - data->last_reading > LM85_DATA_INTERVAL ) ) {
@@ -1197,6 +1207,8 @@ void lm85_update_client(struct i2c_client *client)
 	};  /* last_config */
 
 	data->valid = 1;
+
+	up(&data->update_lock);
 }
 
 

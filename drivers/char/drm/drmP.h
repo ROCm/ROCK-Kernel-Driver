@@ -757,16 +757,16 @@ extern int	     DRM(fasync)(int fd, struct file *filp, int on);
 				/* Mapping support (drm_vm.h) */
 extern struct page *DRM(vm_nopage)(struct vm_area_struct *vma,
 				   unsigned long address,
-				   int write_access);
+				   int *type);
 extern struct page *DRM(vm_shm_nopage)(struct vm_area_struct *vma,
 				       unsigned long address,
-				       int write_access);
+				       int *type);
 extern struct page *DRM(vm_dma_nopage)(struct vm_area_struct *vma,
 				       unsigned long address,
-				       int write_access);
+				       int *type);
 extern struct page *DRM(vm_sg_nopage)(struct vm_area_struct *vma,
 				      unsigned long address,
-				      int write_access);
+				      int *type);
 extern void	     DRM(vm_open)(struct vm_area_struct *vma);
 extern void	     DRM(vm_close)(struct vm_area_struct *vma);
 extern void	     DRM(vm_shm_close)(struct vm_area_struct *vma);

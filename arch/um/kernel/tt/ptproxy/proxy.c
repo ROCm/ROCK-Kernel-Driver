@@ -293,10 +293,10 @@ void fake_child_exit(void)
 }
 
 char gdb_init_string[] = 
-"att 1 \n\
-b panic \n\
-b stop \n\
-handle SIGWINCH nostop noprint pass \n\
+"att 1
+b panic
+b stop
+handle SIGWINCH nostop noprint pass
 ";
 
 int start_debugger(char *prog, int startup, int stop, int *fd_out)

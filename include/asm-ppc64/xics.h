@@ -15,7 +15,6 @@
 #include <linux/cache.h>
 
 void xics_init_IRQ(void);
-void xics_init_irq_desc(irq_desc_t *);
 int xics_get_irq(struct pt_regs *);
 void xics_setup_cpu(void);
 void xics_cause_IPI(int cpu);

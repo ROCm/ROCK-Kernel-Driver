@@ -455,7 +455,10 @@ static __init int intel_router_probe(struct irq_router *r, struct pci_dev *route
 #if 0 /* Let's see what chip this is supposed to be ... */
 	/* We must not touch 440GX even if we have tables. 440GX has
 	   different IRQ routing weirdness */
-	if (pci_find_device(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82440GX, NULL))
+	if (	pci_find_device(PCI_VENDOR_ID_INTEL,
+				PCI_DEVICE_ID_INTEL_82443GX_0, NULL) ||
+		pci_find_device(PCI_VENDOR_ID_INTEL,
+				PCI_DEVICE_ID_INTEL_82443GX_2, NULL))
 		return 0;
 #endif
 
@@ -695,11 +698,6 @@ static struct irq_info *pirq_get_info(struct pci_dev *dev)
 	return NULL;
 }
 
-static irqreturn_t pcibios_test_irq_handler(int irq, void *dev_id, struct pt_regs *regs)
-{
-	return IRQ_NONE;
-}
-
 static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 {
 	u8 pin;
@@ -761,11 +759,8 @@ static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 		for (i = 0; i < 16; i++) {
 			if (!(mask & (1 << i)))
 				continue;
-			if (pirq_penalty[i] < pirq_penalty[newirq] &&
-			    !request_irq(i, pcibios_test_irq_handler, SA_SHIRQ, "pci-test", dev)) {
-				free_irq(i, dev);
+			if (pirq_penalty[i] < pirq_penalty[newirq] && can_request_irq(i, SA_SHIRQ))
 				newirq = i;
-			}
 		}
 	}
 	DBG(" -> newirq=%d", newirq);
@@ -813,8 +808,10 @@ static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 		    	if ( dev2->irq && dev2->irq != irq && \
 			(!(pci_probe & PCI_USE_PIRQ_MASK) || \
 			((1 << dev2->irq) & mask)) ) {
+#ifndef CONFIG_PCI_USE_VECTOR
 		    		printk(KERN_INFO "IRQ routing conflict for %s, have irq %d, want irq %d\n",
 				       pci_name(dev2), dev2->irq, irq);
+#endif
 		    		continue;
 		    	}
 			dev2->irq = irq;
@@ -878,6 +875,10 @@ static void __init pcibios_fixup_irqs(void)
 							bridge->bus->number, PCI_SLOT(bridge->devfn), pin, irq);
 				}
 				if (irq >= 0) {
+					if (use_pci_vector() &&
+						!platform_legacy_irq(irq))
+						irq = IO_APIC_VECTOR(irq);
+
 					printk(KERN_INFO "PCI->APIC IRQ transform: (B%d,I%d,P%d) -> %d\n",
 						dev->bus->number, PCI_SLOT(dev->devfn), pin, irq);
 					dev->irq = irq;

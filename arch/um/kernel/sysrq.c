@@ -55,14 +55,6 @@ void show_trace_task(struct task_struct *tsk)
 	show_trace((unsigned long *)esp);
 }
 
-void show_stack(struct task_struct *task, unsigned long *sp)
-{
-	if(task)
-		show_trace_task(task);
-	else
-		show_trace(sp);
-}
-
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.
  * Emacs will notice this stuff at the end of the file and automatically

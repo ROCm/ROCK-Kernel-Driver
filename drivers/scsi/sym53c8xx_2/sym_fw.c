@@ -89,9 +89,6 @@ static struct sym_fwb_ofs sym_fw1b_ofs = {
 };
 static struct sym_fwz_ofs sym_fw1z_ofs = {
 	SYM_GEN_FW_Z(struct SYM_FWZ_SCR)
-#ifdef SYM_OPT_NO_BUS_MEMORY_MAPPING
-	SYM_GEN_Z(struct SYM_FWZ_SCR, start_ram)
-#endif
 };
 #undef	SYM_FWA_SCR
 #undef	SYM_FWB_SCR
@@ -122,10 +119,6 @@ static struct sym_fwb_ofs sym_fw2b_ofs = {
 };
 static struct sym_fwz_ofs sym_fw2z_ofs = {
 	SYM_GEN_FW_Z(struct SYM_FWZ_SCR)
-#ifdef SYM_OPT_NO_BUS_MEMORY_MAPPING
-	SYM_GEN_Z(struct SYM_FWZ_SCR, start_ram)
-	SYM_GEN_Z(struct SYM_FWZ_SCR, start_ram64)
-#endif
 };
 #undef	SYM_FWA_SCR
 #undef	SYM_FWB_SCR
@@ -146,21 +139,9 @@ sym_fw1_patch(hcb_p np)
 {
 	struct sym_fw1a_scr *scripta0;
 	struct sym_fw1b_scr *scriptb0;
-#ifdef SYM_OPT_NO_BUS_MEMORY_MAPPING
-	struct sym_fw1z_scr *scriptz0 = 
-		(struct sym_fw1z_scr *) np->scriptz0;
-#endif
 
 	scripta0 = (struct sym_fw1a_scr *) np->scripta0;
 	scriptb0 = (struct sym_fw1b_scr *) np->scriptb0;
-
-#ifdef SYM_OPT_NO_BUS_MEMORY_MAPPING
-	/*
-	 *  Set up BUS physical address of SCRIPTS that is to 
-	 *  be copied to on-chip RAM by the SCRIPTS processor.
-	 */
-	scriptz0->scripta0_ba[0]	= cpu_to_scr(vtobus(scripta0));
-#endif
 
 	/*
 	 *  Remove LED support if not needed.
@@ -199,24 +180,9 @@ sym_fw2_patch(hcb_p np)
 {
 	struct sym_fw2a_scr *scripta0;
 	struct sym_fw2b_scr *scriptb0;
-#ifdef SYM_OPT_NO_BUS_MEMORY_MAPPING
-	struct sym_fw2z_scr *scriptz0 = 
-		(struct sym_fw2z_scr *) np->scriptz0;
-#endif
 
 	scripta0 = (struct sym_fw2a_scr *) np->scripta0;
 	scriptb0 = (struct sym_fw2b_scr *) np->scriptb0;
-
-#ifdef SYM_OPT_NO_BUS_MEMORY_MAPPING
-	/*
-	 *  Set up BUS physical address of SCRIPTS that is to 
-	 *  be copied to on-chip RAM by the SCRIPTS processor.
-	 */
-	scriptz0->scripta0_ba64[0]	= /* Nothing is missing here */
-	scriptz0->scripta0_ba[0]	= cpu_to_scr(vtobus(scripta0));
-	scriptz0->scriptb0_ba64[0]	= cpu_to_scr(vtobus(scriptb0));
-	scriptz0->ram_seg64[0]		= np->scr_ram_seg;
-#endif
 
 	/*
 	 *  Remove LED support if not needed.

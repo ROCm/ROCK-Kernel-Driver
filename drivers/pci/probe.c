@@ -25,39 +25,6 @@ EXPORT_SYMBOL(pci_root_buses);
 LIST_HEAD(pci_devices);
 
 /*
- * PCI Bus Class
- */
-static void release_pcibus_dev(struct class_device *class_dev)
-{
-	struct pci_bus *pci_bus = to_pci_bus(class_dev);
-	if (pci_bus->bridge)
-		put_device(pci_bus->bridge);
-	kfree(pci_bus);
-}
-
-static struct class pcibus_class = {
-	.name		= "pci_bus",
-	.release	= &release_pcibus_dev,
-};
-
-static int __init pcibus_class_init(void)
-{
-	return class_register(&pcibus_class);
-}
-postcore_initcall(pcibus_class_init);
-
-/*
- * PCI Bus Class Devices
- */
-static ssize_t pci_bus_show_cpuaffinity(struct class_device *class_dev, char *buf)
-{
-	struct pci_bus *pcibus = to_pci_bus(class_dev);
-
-	return sprintf(buf, "%lx\n", (unsigned long)pcibus_to_cpumask(pcibus->number));
-}
-static CLASS_DEVICE_ATTR(cpuaffinity, S_IRUGO, pci_bus_show_cpuaffinity, NULL);
-
-/*
  * Translate the low bits of the PCI base
  * to the resource type
  */
@@ -209,7 +176,7 @@ void __devinit pci_read_bridge_bases(struct pci_bus *child)
 		limit |= (io_limit_hi << 16);
 	}
 
-	if (base <= limit) {
+	if (base && base <= limit) {
 		res->flags = (io_base_lo & PCI_IO_RANGE_TYPE_MASK) | IORESOURCE_IO;
 		res->start = base;
 		res->end = limit + 0xfff;
@@ -271,40 +238,37 @@ static struct pci_bus * __devinit
 pci_alloc_child_bus(struct pci_bus *parent, struct pci_dev *bridge, int busnr)
 {
 	struct pci_bus *child;
-	int i;
 
 	/*
 	 * Allocate a new bus, and inherit stuff from the parent..
 	 */
 	child = pci_alloc_bus();
-	if (!child)
-		return NULL;
 
-	child->self = bridge;
-	child->parent = parent;
-	child->ops = parent->ops;
-	child->sysdata = parent->sysdata;
-	child->bridge = get_device(&bridge->dev);
+	if (child) {
+		int i;
 
-	child->class_dev.class = &pcibus_class;
-	sprintf(child->class_dev.class_id, "%04x:%02x", pci_domain_nr(child), busnr);
-	class_device_register(&child->class_dev);
-	class_device_create_file(&child->class_dev, &class_device_attr_cpuaffinity);
+		child->self = bridge;
+		child->parent = parent;
+		child->ops = parent->ops;
+		child->sysdata = parent->sysdata;
+		child->dev = &bridge->dev;
 
-	/*
-	 * Set up the primary, secondary and subordinate
-	 * bus numbers.
-	 */
-	child->number = child->secondary = busnr;
-	child->primary = parent->secondary;
-	child->subordinate = 0xff;
+		/*
+		 * Set up the primary, secondary and subordinate
+		 * bus numbers.
+		 */
+		child->number = child->secondary = busnr;
+		child->primary = parent->secondary;
+		child->subordinate = 0xff;
 
-	/* Set up default resource pointers and names.. */
-	for (i = 0; i < 4; i++) {
-		child->resource[i] = &bridge->resource[PCI_BRIDGE_RESOURCES+i];
-		child->resource[i]->name = child->name;
+		/* Set up default resource pointers and names.. */
+		for (i = 0; i < 4; i++) {
+			child->resource[i] = &bridge->resource[PCI_BRIDGE_RESOURCES+i];
+			child->resource[i]->name = child->name;
+		}
+
+		bridge->subordinate = child;
 	}
-	bridge->subordinate = child;
 
 	return child;
 }
@@ -343,17 +307,18 @@ int __devinit pci_scan_bridge(struct pci_bus *bus, struct pci_dev * dev, int max
 	    pci_name(dev), buses & 0xffffff, pass);
 
 	if ((buses & 0xffff00) && !pcibios_assign_all_busses() && !is_cardbus) {
-		unsigned int cmax, busnr;
+		unsigned int cmax;
 		/*
 		 * Bus already configured by firmware, process it in the first
 		 * pass and just note the configuration.
 		 */
 		if (pass)
 			return max;
-		busnr = (buses >> 8) & 0xFF;
-		child = pci_alloc_child_bus(bus, dev, busnr);
+		child = pci_alloc_child_bus(bus, dev, 0);
 		child->primary = buses & 0xFF;
+		child->secondary = (buses >> 8) & 0xFF;
 		child->subordinate = (buses >> 16) & 0xFF;
+		child->number = child->secondary;
 		cmax = pci_scan_child_bus(child);
 		if (cmax > max) max = cmax;
 	} else {
@@ -543,7 +508,7 @@ pci_scan_device(struct pci_bus *bus, int devfn)
 	memset(dev, 0, sizeof(struct pci_dev));
 	dev->bus = bus;
 	dev->sysdata = bus->sysdata;
-	dev->dev.parent = bus->bridge;
+	dev->dev.parent = bus->dev;
 	dev->dev.bus = &pci_bus_type;
 	dev->devfn = devfn;
 	dev->hdr_type = hdr_type & 0x7f;
@@ -587,6 +552,7 @@ int __devinit pci_scan_slot(struct pci_bus *bus, int devfn)
 		struct pci_dev *dev;
 
 		dev = pci_scan_device(bus, devfn);
+		pci_scan_msi_device(dev);
 		if (func == 0) {
 			if (!dev)
 				break;
@@ -669,14 +635,13 @@ unsigned int __devinit pci_do_scan_bus(struct pci_bus *bus)
 struct pci_bus * __devinit pci_scan_bus_parented(struct device *parent, int bus, struct pci_ops *ops, void *sysdata)
 {
 	struct pci_bus *b;
-	struct device *dev;
 
 	b = pci_alloc_bus();
 	if (!b)
 		return NULL;
 
-	dev = kmalloc(sizeof(*dev), GFP_KERNEL);
-	if (!dev){
+	b->dev = kmalloc(sizeof(*(b->dev)),GFP_KERNEL);
+	if (!b->dev){
 		kfree(b);
 		return NULL;
 	}
@@ -687,24 +652,17 @@ struct pci_bus * __devinit pci_scan_bus_parented(struct device *parent, int bus,
 	if (pci_find_bus(pci_domain_nr(b), bus)) {
 		/* If we already got to this bus through a different bridge, ignore it */
 		DBG("PCI: Bus %02x already known\n", bus);
-		kfree(dev);
+		kfree(b->dev);
 		kfree(b);
 		return NULL;
 	}
+
 	list_add_tail(&b->node, &pci_root_buses);
 
-	memset(dev, 0, sizeof(*dev));
-	dev->parent = parent;
-	sprintf(dev->bus_id, "pci%04x:%02x", pci_domain_nr(b), bus);
-	device_register(dev);
-	b->bridge = get_device(dev);
-
-	b->class_dev.class = &pcibus_class;
-	sprintf(b->class_dev.class_id, "%04x:%02x", pci_domain_nr(b), bus);
-	class_device_register(&b->class_dev);
-	class_device_create_file(&b->class_dev, &class_device_attr_cpuaffinity);
-
-	sysfs_create_link(&b->class_dev.kobj, &b->bridge->kobj, "bridge");
+	memset(b->dev,0,sizeof(*(b->dev)));
+	b->dev->parent = parent;
+	sprintf(b->dev->bus_id,"pci%04x:%02x", pci_domain_nr(b), bus);
+	device_register(b->dev);
 
 	b->number = b->secondary = bus;
 	b->resource[0] = &ioport_resource;

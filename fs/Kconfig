@@ -280,6 +280,7 @@ config REISERFS_FS_SECURITY
 
 config JFS_FS
 	tristate "JFS filesystem support"
+	select NLS
 	help
 	  This is a port of IBM's Journaled Filesystem .  More information is
 	  available in the file Documentation/filesystems/jfs.txt.
@@ -519,6 +520,7 @@ config ISO9660_FS
 config JOLIET
 	bool "Microsoft Joliet CDROM extensions"
 	depends on ISO9660_FS
+	select NLS
 	help
 	  Joliet is a Microsoft extension for the ISO 9660 CD-ROM file system
 	  which allows for long filenames in unicode format (unicode is the
@@ -564,6 +566,7 @@ menu "DOS/FAT/NT Filesystems"
 
 config FAT_FS
 	tristate "DOS FAT fs support"
+	select NLS
 	help
 	  If you want to use one of the FAT-based file systems (the MS-DOS,
 	  VFAT (Windows 95) and UMSDOS (used to run Linux on top of an
@@ -685,6 +688,7 @@ config UMSDOS_FS
 
 config NTFS_FS
 	tristate "NTFS file system support"
+	select NLS
 	help
 	  NTFS is the file system of Microsoft Windows NT, 2000, XP and 2003.
 
@@ -996,6 +1000,7 @@ config HFS_FS
 config BEFS_FS
 	tristate "BeOS file systemv(BeFS) support (read only) (EXPERIMENTAL)"
 	depends on EXPERIMENTAL
+	select NLS
 	help
 	  The BeOS File System (BeFS) is the native file system of Be, Inc's
 	  BeOS. Notable features include support for arbitrary attributes
@@ -1495,6 +1500,7 @@ config RPCSEC_GSS_KRB5
 config SMB_FS
 	tristate "SMB file system support (to mount Windows shares etc.)"
 	depends on INET
+	select NLS
 	help
 	  SMB (Server Message Block) is the protocol Windows for Workgroups
 	  (WfW), Windows 95/98, Windows NT and OS/2 Lan Manager use to share
@@ -1550,6 +1556,7 @@ config SMB_NLS_REMOTE
 config CIFS
 	tristate "CIFS support (advanced network filesystem for Samba, Window and other CIFS compliant servers)(EXPERIMENTAL)"
 	depends on INET
+	select NLS
 	help
 	  This is the client VFS module for the Common Internet File System
 	  (CIFS) protocol which is the successor to the Server Message Block 

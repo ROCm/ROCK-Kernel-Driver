@@ -316,7 +316,7 @@ e100_diag_loopback_alloc(struct e100_private *bdp)
 	memset((void *) ((u8 *) tbd + sizeof (tbd_t)), 0xFF, 512);
 	/* The value of second 512 bytes is BA */
 	memset((void *) ((u8 *) tbd + sizeof (tbd_t) + 512), 0xBA, 512);
-	mb();
+	wmb();
 	rfd = pci_alloc_consistent(bdp->pdev, sizeof (rfd_t), &dma_handle);
 
 	if (rfd == NULL) {
@@ -335,7 +335,7 @@ e100_diag_loopback_alloc(struct e100_private *bdp)
 	bdp->loopback.dma_handle = dma_handle;
 	bdp->loopback.tcb = tcb;
 	bdp->loopback.rfd = rfd;
-	mb();
+	wmb();
 	return true;
 }
 

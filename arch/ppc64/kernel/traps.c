@@ -16,7 +16,6 @@
  * This file handles the architecture-dependent parts of hardware exceptions
  */
 
-#include <linux/config.h>
 #include <linux/errno.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>
@@ -27,6 +26,7 @@
 #include <linux/user.h>
 #include <linux/a.out.h>
 #include <linux/interrupt.h>
+#include <linux/config.h>
 #include <linux/init.h>
 #include <linux/module.h>
 
@@ -40,10 +40,8 @@
 extern int fix_alignment(struct pt_regs *);
 extern void bad_page_fault(struct pt_regs *, unsigned long, int);
 
-#ifdef CONFIG_PPC_PSERIES
 /* This is true if we are using the firmware NMI handler (typically LPAR) */
 extern int fwnmi_active;
-#endif
 
 #ifdef CONFIG_DEBUG_KERNEL
 void (*debugger)(struct pt_regs *regs);
@@ -98,7 +96,6 @@ _exception(int signr, siginfo_t *info, struct pt_regs *regs)
 	force_sig_info(signr, info, current);
 }
 
-#ifdef CONFIG_PPC_PSERIES
 /* Get the error information for errors coming through the
  * FWNMI vectors.  The pt_regs' r3 will be updated to reflect
  * the actual r3 if possible, and a ptr to the error log entry
@@ -131,12 +128,10 @@ static void FWNMI_release_errinfo(void)
 	if (ret != 0)
 		printk("FWNMI: nmi-interlock failed: %ld\n", ret);
 }
-#endif
 
 void
 SystemResetException(struct pt_regs *regs)
 {
-#ifdef CONFIG_PPC_PSERIES
 	if (fwnmi_active) {
 		struct rtas_error_log *errhdr = FWNMI_get_errinfo(regs);
 		if (errhdr) {
@@ -144,7 +139,6 @@ SystemResetException(struct pt_regs *regs)
 		}
 		FWNMI_release_errinfo();
 	}
-#endif
 
 #ifdef CONFIG_DEBUG_KERNEL
 	if (debugger)
@@ -160,7 +154,6 @@ SystemResetException(struct pt_regs *regs)
 	/* What should we do here? We could issue a shutdown or hard reset. */
 }
 
-#ifdef CONFIG_PPC_PSERIES
 /* 
  * See if we can recover from a machine check exception.
  * This is only called on power4 (or above) and only via
@@ -197,7 +190,6 @@ static int recover_mce(struct pt_regs *regs, struct rtas_error_log err)
 	}
 	return 0;
 }
-#endif
 
 /*
  * Handle a machine check.
@@ -215,7 +207,6 @@ static int recover_mce(struct pt_regs *regs, struct rtas_error_log err)
 void
 MachineCheckException(struct pt_regs *regs)
 {
-#ifdef CONFIG_PPC_PSERIES
 	struct rtas_error_log err, *errp;
 
 	if (fwnmi_active) {
@@ -226,7 +217,6 @@ MachineCheckException(struct pt_regs *regs)
 		if (errp && recover_mce(regs, err))
 			return;
 	}
-#endif
 
 #ifdef CONFIG_DEBUG_KERNEL
 	if (debugger_fault_handler) {
@@ -420,14 +410,6 @@ KernelFPUnavailableException(struct pt_regs *regs)
 }
 
 void
-KernelAltivecUnavailableException(struct pt_regs *regs)
-{
-	printk("Illegal VMX/Altivec used in kernel (task=0x%p, "
-		"pc=0x%016lx, trap=0x%lx)\n", current, regs->nip, regs->trap);
-	panic("Unrecoverable VMX/Altivec Unavailable Exception in Kernel");
-}
-
-void
 SingleStepException(struct pt_regs *regs)
 {
 	siginfo_t info;
@@ -495,17 +477,6 @@ AlignmentException(struct pt_regs *regs)
 	info.si_addr = (void *)regs->nip;
 	_exception(SIGBUS, &info, regs);	
 }
-
-#ifdef CONFIG_ALTIVEC
-void
-AltivecAssistException(struct pt_regs *regs)
-{
-	if (regs->msr & MSR_VEC)
-		giveup_altivec(current);
-	/* XXX quick hack for now: set the non-Java bit in the VSCR */
-	current->thread.vscr.u[3] |= 0x10000;
-}
-#endif /* CONFIG_ALTIVEC */
 
 void __init trap_init(void)
 {

@@ -108,7 +108,7 @@ extern void pal_emulator_static (void);
 #define BUS_NUMBER(addr)	(0x0000000000FF0000 & (addr))
 
 static efi_status_t
-efi_get_time (efi_time_t *tm, efi_time_cap_t *tc)
+fw_efi_get_time (efi_time_t *tm, efi_time_cap_t *tc)
 {
 #if defined(CONFIG_IA64_HP_SIM) || defined(CONFIG_IA64_GENERIC)
 	struct {
@@ -310,7 +310,7 @@ sys_fw_init (const char *args, int arglen)
 	efi_runtime->hdr.signature = EFI_RUNTIME_SERVICES_SIGNATURE;
 	efi_runtime->hdr.revision = EFI_RUNTIME_SERVICES_REVISION;
 	efi_runtime->hdr.headersize = sizeof(efi_runtime->hdr);
-	efi_runtime->get_time = __pa(&efi_get_time);
+	efi_runtime->get_time = __pa(&fw_efi_get_time);
 	efi_runtime->set_time = __pa(&efi_unimplemented);
 	efi_runtime->get_wakeup_time = __pa(&efi_unimplemented);
 	efi_runtime->set_wakeup_time = __pa(&efi_unimplemented);

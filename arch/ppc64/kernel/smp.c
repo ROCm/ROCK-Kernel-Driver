@@ -50,21 +50,13 @@
 #include <asm/xics.h>
 #include <asm/cputable.h>
 
-#ifdef CONFIG_KDB
-#include <linux/kdb.h>
-#endif
-
 int smp_threads_ready;
 unsigned long cache_decay_ticks;
 
-/* Initialised so it doesn't end up in bss */
-cpumask_t cpu_possible_map    = CPU_MASK_NONE;
+/* initialised so it doesn't end up in bss */
 cpumask_t cpu_online_map = CPU_MASK_NONE;
-cpumask_t cpu_available_map   = CPU_MASK_NONE;
-cpumask_t cpu_present_at_boot = CPU_MASK_NONE;
 
 EXPORT_SYMBOL(cpu_online_map);
-EXPORT_SYMBOL(cpu_possible_map);
 
 static struct smp_ops_t *smp_ops;
 
@@ -75,8 +67,6 @@ extern unsigned char stab_array[];
 extern int cpu_idle(void *unused);
 void smp_call_function_interrupt(void);
 void smp_message_pass(int target, int msg, unsigned long data, int wait);
-extern long register_vpa(unsigned long flags, unsigned long proc,
-			 unsigned long vpa);
 
 #define smp_message_pass(t,m,d,w) smp_ops->message_pass((t),(m),(d),(w))
 
@@ -86,24 +76,6 @@ static inline void set_tb(unsigned int upper, unsigned int lower)
 	mttbu(upper);
 	mttbl(lower);
 }
-
-#ifdef CONFIG_KDB
-	/* save regs here before calling kdb_ipi */
-struct pt_regs *kdb_smp_regs[NR_CPUS];
-	
-/* called for each processor.. drop each into kdb. */
-static void smp_kdb_stop_proc(void *dummy)
-{
-    kdb_ipi(kdb_smp_regs[smp_processor_id()], NULL);
-}
-	
-void smp_kdb_stop(void)
-{
-    int ret=0;
-    ret = smp_call_function(smp_kdb_stop_proc, NULL, 1, 0);
-}
-#endif
-
 
 #ifdef CONFIG_PPC_ISERIES
 static unsigned long iSeries_smp_message[NR_CPUS];
@@ -148,9 +120,6 @@ static int smp_iSeries_numProcs(void)
         for (i=0; i < NR_CPUS; ++i) {
                 lpPaca = paca[i].xLpPacaPtr;
                 if ( lpPaca->xDynProcStatus < 2 ) {
-			cpu_set(i, cpu_available_map);
-			cpu_set(i, cpu_possible_map);
-			cpu_set(i, cpu_present_at_boot);
                         ++np;
                 }
         }
@@ -166,7 +135,7 @@ static int smp_iSeries_probe(void)
 	for (i=0; i < NR_CPUS; ++i) {
 		lpPaca = paca[i].xLpPacaPtr;
 		if (lpPaca->xDynProcStatus < 2) {
-			/*paca[i].active = 1;*/
+			paca[i].active = 1;
 			++np;
 		}
 	}
@@ -212,6 +181,7 @@ void __init smp_init_iSeries(void)
 	smp_ops->probe        = smp_iSeries_probe;
 	smp_ops->kick_cpu     = smp_iSeries_kick_cpu;
 	smp_ops->setup_cpu    = smp_iSeries_setup_cpu;
+#warning fix for iseries
 	systemcfg->processorCount	= smp_iSeries_numProcs();
 }
 #endif
@@ -296,17 +266,6 @@ static void __init smp_space_timers(unsigned int max_cpus)
 }
 
 #ifdef CONFIG_PPC_PSERIES
-void vpa_init(int cpu)
-{
-	unsigned long flags;
-
-	/* Register the Virtual Processor Area (VPA) */
-	printk(KERN_INFO "register_vpa: cpu 0x%x\n", cpu);
-	flags = 1UL << (63 - 18);
-	paca[cpu].xLpPaca.xSLBCount = 64; /* SLB restore highwater mark */
-	register_vpa(flags, cpu, __pa((unsigned long)&(paca[cpu].xLpPaca))); 
-}
-
 static void __devinit pSeries_setup_cpu(int cpu)
 {
 	if (OpenPIC_Addr) {
@@ -336,8 +295,6 @@ smp_xics_message_pass(int target, int msg, unsigned long data, int wait)
 	}
 }
 
-extern void xics_request_IPIs(void);
-
 static int __init smp_xics_probe(void)
 {
 	int i;
@@ -348,6 +305,7 @@ static int __init smp_xics_probe(void)
 			nr_cpus++;
 	}
 #ifdef CONFIG_SMP
+	extern void xics_request_IPIs(void);
 	xics_request_IPIs();
 #endif
 
@@ -414,9 +372,6 @@ void smp_message_recv(int msg, struct pt_regs *regs)
 {
 	switch( msg ) {
 	case PPC_MSG_CALL_FUNCTION:
-#ifdef CONFIG_KDB
-	        kdb_smp_regs[smp_processor_id()]=regs;
-#endif
 		smp_call_function_interrupt();
 		break;
 	case PPC_MSG_RESCHEDULE: 
@@ -525,13 +480,13 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 	while (atomic_read(&data.started) != cpus) {
 		HMT_low();
 		if (--timeout == 0) {
-			printk("smp_call_function on cpu %d: other cpus not "
-			       "responding (%d)\n", smp_processor_id(),
-			       atomic_read(&data.started));
 #ifdef CONFIG_DEBUG_KERNEL
 			if (debugger)
 				debugger(0);
 #endif
+			printk("smp_call_function on cpu %d: other cpus not "
+			       "responding (%d)\n", smp_processor_id(),
+			       atomic_read(&data.started));
 			goto out;
 		}
 	}
@@ -541,15 +496,15 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 		while (atomic_read(&data.finished) != cpus) {
 			HMT_low();
 			if (--timeout == 0) {
+#ifdef CONFIG_DEBUG_KERNEL
+				if (debugger)
+					debugger(0);
+#endif
 				printk("smp_call_function on cpu %d: other "
 				       "cpus not finishing (%d/%d)\n",
 				       smp_processor_id(),
 				       atomic_read(&data.finished),
 				       atomic_read(&data.started));
-#ifdef CONFIG_DEBUG_KERNEL
-				if (debugger)
-					debugger(0);
-#endif
 				goto out;
 			}
 		}
@@ -558,7 +513,6 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 	ret = 0;
 
 out:
-	call_data = NULL;
 	HMT_medium();
 	spin_unlock(&call_lock);
 	return ret;
@@ -566,19 +520,9 @@ out:
 
 void smp_call_function_interrupt(void)
 {
-	void (*func) (void *info);
-	void *info;
-	int wait;
-
-	/* call_data will be NULL if the sender timed out while
-	 * waiting on us to receive the call.
-	 */
-	if (!call_data)
-		return;
-
-	func = call_data->func;
-	info = call_data->info;
-	wait = call_data->wait;
+	void (*func) (void *info) = call_data->func;
+	void *info = call_data->info;
+	int wait = call_data->wait;
 
 	/*
 	 * Notify initiating CPU that I've grabbed the data and am
@@ -713,14 +657,6 @@ int __devinit start_secondary(void *unused)
 	smp_ops->setup_cpu(cpu);
 	if (smp_ops->take_timebase)
 		smp_ops->take_timebase();
-
-	get_paca()->yielded = 0;
-
-#ifdef CONFIG_PPC_PSERIES
-	if (cur_cpu_spec->firmware_features & FW_FEATURE_SPLPAR) {
-		vpa_init(cpu); 
-	}
-#endif
 
 	local_irq_enable();
 

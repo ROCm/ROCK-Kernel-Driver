@@ -55,6 +55,6 @@ struct compat_statfs64 {
 	__u32 f_namelen;
 	__u32 f_frsize;
 	__u32 f_spare[5];
-};
+} __attribute__((packed));
 
 #endif /* _ASM_IA64_STATFS_H */

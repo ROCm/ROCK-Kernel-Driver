@@ -2474,7 +2474,6 @@ static boolean DAC960_V2_ReportDeviceConfiguration(DAC960_Controller_T
 static boolean DAC960_RegisterBlockDevice(DAC960_Controller_T *Controller)
 {
   int MajorNumber = DAC960_MAJOR + Controller->ControllerNumber;
-  struct request_queue *RequestQueue;
   int n;
 
   /*
@@ -2483,26 +2482,22 @@ static boolean DAC960_RegisterBlockDevice(DAC960_Controller_T *Controller)
   if (register_blkdev(MajorNumber, "dac960") < 0)
       return false;
 
-  /*
-    Initialize the I/O Request Queue.
-  */
-  RequestQueue = blk_init_queue(DAC960_RequestFunction,&Controller->queue_lock);
-  if (!RequestQueue) {
-      unregister_blkdev(MajorNumber, "dac960");
-      return false;
-  }
-  Controller->RequestQueue = RequestQueue;
-  blk_queue_bounce_limit(RequestQueue, Controller->BounceBufferLimit);
-  RequestQueue->queuedata = Controller;
-  blk_queue_max_hw_segments(RequestQueue,
-			    Controller->DriverScatterGatherLimit);
-  blk_queue_max_phys_segments(RequestQueue,
-		 	    Controller->DriverScatterGatherLimit);
-  blk_queue_max_sectors(RequestQueue, Controller->MaxBlocksPerCommand);
-
   for (n = 0; n < DAC960_MaxLogicalDrives; n++) {
 	struct gendisk *disk = Controller->disks[n];
+  	struct request_queue *RequestQueue;
 
+	/* for now, let all request queues share controller's lock */
+  	RequestQueue = blk_init_queue(DAC960_RequestFunction,&Controller->queue_lock);
+  	if (!RequestQueue) {
+		printk("DAC960: failure to allocate request queue\n");
+		continue;
+  	}
+  	Controller->RequestQueue[n] = RequestQueue;
+  	blk_queue_bounce_limit(RequestQueue, Controller->BounceBufferLimit);
+  	RequestQueue->queuedata = Controller;
+  	blk_queue_max_hw_segments(RequestQueue, Controller->DriverScatterGatherLimit);
+	blk_queue_max_phys_segments(RequestQueue, Controller->DriverScatterGatherLimit);
+	blk_queue_max_sectors(RequestQueue, Controller->MaxBlocksPerCommand);
 	disk->queue = RequestQueue;
 	sprintf(disk->disk_name, "rd/c%dd%d", Controller->ControllerNumber, n);
 	sprintf(disk->devfs_name, "rd/host%d/target%d", Controller->ControllerNumber, n);
@@ -2527,17 +2522,17 @@ static void DAC960_UnregisterBlockDevice(DAC960_Controller_T *Controller)
   int MajorNumber = DAC960_MAJOR + Controller->ControllerNumber;
   int disk;
 
-  for (disk = 0; disk < DAC960_MaxLogicalDrives; disk++)
-	  del_gendisk(Controller->disks[disk]);
+  /* does order matter when deleting gendisk and cleanup in request queue? */
+  for (disk = 0; disk < DAC960_MaxLogicalDrives; disk++) {
+	del_gendisk(Controller->disks[disk]);
+	blk_cleanup_queue(Controller->RequestQueue[disk]);
+	Controller->RequestQueue[disk] = NULL;
+  }
 
   /*
     Unregister the Block Device Major Number for this DAC960 Controller.
   */
   unregister_blkdev(MajorNumber, "dac960");
-  /*
-    Remove the I/O Request Queue.
-  */
-  blk_cleanup_queue(Controller->RequestQueue);
 }
 
 /*
@@ -3253,58 +3248,83 @@ static void DAC960_V2_QueueReadWriteCommand(DAC960_Command_T *Command)
 }
 
 
+static int DAC960_process_queue(DAC960_Controller_T *Controller, struct request_queue *req_q)
+{
+	struct request *Request;
+	DAC960_Command_T *Command;
+
+   while(1) {
+	Request = elv_next_request(req_q);
+	if (!Request)
+		return 1;
+
+	Command = DAC960_AllocateCommand(Controller);
+	if (Command == NULL)
+		return 0;
+
+	if (rq_data_dir(Request) == READ) {
+		Command->DmaDirection = PCI_DMA_FROMDEVICE;
+		Command->CommandType = DAC960_ReadCommand;
+	} else {
+		Command->DmaDirection = PCI_DMA_TODEVICE;
+		Command->CommandType = DAC960_WriteCommand;
+	}
+	Command->Completion = Request->waiting;
+	Command->LogicalDriveNumber = (long)Request->rq_disk->private_data;
+	Command->BlockNumber = Request->sector;
+	Command->BlockCount = Request->nr_sectors;
+	Command->Request = Request;
+	blkdev_dequeue_request(Request);
+	Command->SegmentCount = blk_rq_map_sg(req_q,
+		  Command->Request, Command->cmd_sglist);
+	/* pci_map_sg MAY change the value of SegCount */
+	Command->SegmentCount = pci_map_sg(Controller->PCIDevice, Command->cmd_sglist,
+		 Command->SegmentCount, Command->DmaDirection);
+
+	DAC960_QueueReadWriteCommand(Command);
+  }
+}
+
 /*
   DAC960_ProcessRequest attempts to remove one I/O Request from Controller's
   I/O Request Queue and queues it to the Controller.  WaitForCommand is true if
   this function should wait for a Command to become available if necessary.
   This function returns true if an I/O Request was queued and false otherwise.
 */
-
-static boolean DAC960_ProcessRequest(DAC960_Controller_T *Controller,
-				     boolean WaitForCommand)
+static void DAC960_ProcessRequest(DAC960_Controller_T *controller)
 {
-  struct request_queue *RequestQueue = Controller->RequestQueue;
-  struct request *Request;
-  DAC960_Command_T *Command;
+	int i;
 
-  if (!Controller->ControllerInitialized)
-     return false;
+	if (!controller->ControllerInitialized)
+		return;
 
-  while (true) {
-      Request = elv_next_request(RequestQueue);
-      if (!Request)
-	      return false;
+	/* Do this better later! */
+	for (i = controller->req_q_index; i < DAC960_MaxLogicalDrives; i++) {
+		struct request_queue *req_q = controller->RequestQueue[i];
 
-      Command = DAC960_AllocateCommand(Controller);
-      if (Command != NULL)
-          break;
+		if (req_q == NULL)
+			continue;
 
-      if (!WaitForCommand)
-          return false;
+		if (!DAC960_process_queue(controller, req_q)) {
+			controller->req_q_index = i;
+			return;
+		}
+	}
 
-      DAC960_WaitForCommand(Controller);
-  }
-  if (rq_data_dir(Request) == READ) {
-    Command->DmaDirection = PCI_DMA_FROMDEVICE;
-    Command->CommandType = DAC960_ReadCommand;
-  } else {
-    Command->DmaDirection = PCI_DMA_TODEVICE;
-    Command->CommandType = DAC960_WriteCommand;
-  }
-  Command->Completion = Request->waiting;
-  Command->LogicalDriveNumber = (long)Request->rq_disk->private_data;
-  Command->BlockNumber = Request->sector;
-  Command->BlockCount = Request->nr_sectors;
-  Command->Request = Request;
-  blkdev_dequeue_request(Request);
-  Command->SegmentCount = blk_rq_map_sg(Controller->RequestQueue,
-		  Command->Request, Command->cmd_sglist);
-  /* pci_map_sg MAY change the value of SegCount */
-  Command->SegmentCount = pci_map_sg(Controller->PCIDevice, Command->cmd_sglist,
-		 Command->SegmentCount, Command->DmaDirection);
+	if (controller->req_q_index == 0)
+		return;
 
-  DAC960_QueueReadWriteCommand(Command);
-  return true;
+	for (i = 0; i < controller->req_q_index; i++) {
+		struct request_queue *req_q = controller->RequestQueue[i];
+
+		if (req_q == NULL)
+			continue;
+
+		if (!DAC960_process_queue(controller, req_q)) {
+			controller->req_q_index = i;
+			return;
+		}
+	}
 }
 
 
@@ -3321,6 +3341,7 @@ static void DAC960_queue_partial_rw(DAC960_Command_T *Command)
 {
   DAC960_Controller_T *Controller = Command->Controller;
   struct request *Request = Command->Request;
+  struct request_queue *req_q = Controller->RequestQueue[Command->LogicalDriveNumber];
 
   if (Command->DmaDirection == PCI_DMA_FROMDEVICE)
     Command->CommandType = DAC960_ReadRetryCommand;
@@ -3333,11 +3354,9 @@ static void DAC960_queue_partial_rw(DAC960_Command_T *Command)
    * code should almost never be called, just go with a
    * simple coding.
    */
-  (void)blk_rq_map_sg(Controller->RequestQueue, Command->Request,
-                                        Command->cmd_sglist);
+  (void)blk_rq_map_sg(req_q, Command->Request, Command->cmd_sglist);
 
-  (void)pci_map_sg(Controller->PCIDevice, Command->cmd_sglist, 1,
-		                        Command->DmaDirection);
+  (void)pci_map_sg(Controller->PCIDevice, Command->cmd_sglist, 1, Command->DmaDirection);
   /*
    * Resubmitting the request sector at a time is really tedious.
    * But, this should almost never happen.  So, we're willing to pay
@@ -3357,9 +3376,7 @@ static void DAC960_queue_partial_rw(DAC960_Command_T *Command)
 
 static void DAC960_RequestFunction(struct request_queue *RequestQueue)
 {
-	int i = 0;
-	while (DAC960_ProcessRequest(RequestQueue->queuedata, (i++ == 0)))
-		;
+	DAC960_ProcessRequest(RequestQueue->queuedata);
 }
 
 /*
@@ -5205,8 +5222,7 @@ static irqreturn_t DAC960_BA_InterruptHandler(int IRQ_Channel,
     Attempt to remove additional I/O Requests from the Controller's
     I/O Request Queue and queue them to the Controller.
   */
-  while (DAC960_ProcessRequest(Controller, false))
-	  ;
+  DAC960_ProcessRequest(Controller);
   spin_unlock_irqrestore(&Controller->queue_lock, flags);
   return IRQ_HANDLED;
 }
@@ -5249,8 +5265,7 @@ static irqreturn_t DAC960_LP_InterruptHandler(int IRQ_Channel,
     Attempt to remove additional I/O Requests from the Controller's
     I/O Request Queue and queue them to the Controller.
   */
-  while (DAC960_ProcessRequest(Controller, false))
-	  ;
+  DAC960_ProcessRequest(Controller);
   spin_unlock_irqrestore(&Controller->queue_lock, flags);
   return IRQ_HANDLED;
 }
@@ -5289,8 +5304,7 @@ static irqreturn_t DAC960_LA_InterruptHandler(int IRQ_Channel,
     Attempt to remove additional I/O Requests from the Controller's
     I/O Request Queue and queue them to the Controller.
   */
-  while (DAC960_ProcessRequest(Controller, false))
-	  ;
+  DAC960_ProcessRequest(Controller);
   spin_unlock_irqrestore(&Controller->queue_lock, flags);
   return IRQ_HANDLED;
 }
@@ -5329,8 +5343,7 @@ static irqreturn_t DAC960_PG_InterruptHandler(int IRQ_Channel,
     Attempt to remove additional I/O Requests from the Controller's
     I/O Request Queue and queue them to the Controller.
   */
-  while (DAC960_ProcessRequest(Controller, false))
-	  ;
+  DAC960_ProcessRequest(Controller);
   spin_unlock_irqrestore(&Controller->queue_lock, flags);
   return IRQ_HANDLED;
 }
@@ -5365,8 +5378,7 @@ static irqreturn_t DAC960_PD_InterruptHandler(int IRQ_Channel,
     Attempt to remove additional I/O Requests from the Controller's
     I/O Request Queue and queue them to the Controller.
   */
-  while (DAC960_ProcessRequest(Controller, false))
-	  ;
+  DAC960_ProcessRequest(Controller);
   spin_unlock_irqrestore(&Controller->queue_lock, flags);
   return IRQ_HANDLED;
 }
@@ -5440,8 +5452,7 @@ static irqreturn_t DAC960_P_InterruptHandler(int IRQ_Channel,
     Attempt to remove additional I/O Requests from the Controller's
     I/O Request Queue and queue them to the Controller.
   */
-  while (DAC960_ProcessRequest(Controller, false))
-	  ;
+  DAC960_ProcessRequest(Controller);
   spin_unlock_irqrestore(&Controller->queue_lock, flags);
   return IRQ_HANDLED;
 }

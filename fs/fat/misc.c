@@ -74,7 +74,7 @@ void fat_clusters_flush(struct super_block *sb)
 	} else {
 		if (sbi->free_clusters != -1)
 			fsinfo->free_clusters = CF_LE_L(sbi->free_clusters);
-		if (sbi->prev_free)
+		if (sbi->prev_free != -1)
 			fsinfo->next_cluster = CF_LE_L(sbi->prev_free);
 		mark_buffer_dirty(bh);
 	}
@@ -88,7 +88,7 @@ void fat_clusters_flush(struct super_block *sb)
 int fat_add_cluster(struct inode *inode)
 {
 	struct super_block *sb = inode->i_sb;
-	int count, limit, new_dclus, new_fclus, last;
+	int ret, count, limit, new_dclus, new_fclus, last;
 	int cluster_bits = MSDOS_SB(sb)->cluster_bits;
 	
 	/* 
@@ -123,7 +123,12 @@ int fat_add_cluster(struct inode *inode)
 		new_dclus = new_dclus % limit;
 		if (new_dclus < 2)
 			new_dclus = 2;
-		if (fat_access(sb, new_dclus, -1) == FAT_ENT_FREE)
+
+		ret = fat_access(sb, new_dclus, -1);
+		if (ret < 0) {
+			unlock_fat(sb);
+			return ret;
+		} else if (ret == FAT_ENT_FREE)
 			break;
 	}
 	if (count >= MSDOS_SB(sb)->clusters) {
@@ -131,9 +136,14 @@ int fat_add_cluster(struct inode *inode)
 		unlock_fat(sb);
 		return -ENOSPC;
 	}
-	MSDOS_SB(sb)->prev_free = new_dclus;
 
-	fat_access(sb, new_dclus, FAT_ENT_EOF);
+	ret = fat_access(sb, new_dclus, FAT_ENT_EOF);
+	if (ret < 0) {
+		unlock_fat(sb);
+		return ret;
+	}
+
+	MSDOS_SB(sb)->prev_free = new_dclus;
 	if (MSDOS_SB(sb)->free_clusters != -1)
 		MSDOS_SB(sb)->free_clusters--;
 	fat_clusters_flush(sb);
@@ -142,7 +152,9 @@ int fat_add_cluster(struct inode *inode)
 
 	/* add new one to the last of the cluster chain */
 	if (last) {
-		fat_access(sb, last, new_dclus);
+		ret = fat_access(sb, last, new_dclus);
+		if (ret < 0)
+			return ret;
 		fat_cache_add(inode, new_fclus, new_dclus);
 	} else {
 		MSDOS_I(inode)->i_start = new_dclus;

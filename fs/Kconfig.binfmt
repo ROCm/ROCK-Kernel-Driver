@@ -23,10 +23,6 @@ config BINFMT_ELF
 	  ld.so (check the file <file:Documentation/Changes> for location and
 	  latest version).
 
-	  To compile this as a module, choose M here: the module will be called
-	  binfmt_elf. Saying M or N here is dangerous because some crucial
-	  programs on your system might be in ELF format.
-
 config BINFMT_FLAT
 	tristate "Kernel support for flat binaries"
 	depends on !MMU || SUPERH

@@ -74,8 +74,6 @@ static inline void __tlb_remove_tlb_entry(struct mmu_gather *tlb, pte_t *ptep,
 	batch->index = i;
 }
 
-extern void pte_free_finish(void);
-
 static inline void tlb_flush(struct mmu_gather *tlb)
 {
 	int cpu = smp_processor_id();
@@ -88,8 +86,6 @@ static inline void tlb_flush(struct mmu_gather *tlb)
 
 	flush_hash_range(tlb->mm->context, batch->index, local);
 	batch->index = 0;
-
-	pte_free_finish();
 }
 
 #endif /* _PPC64_TLB_H */

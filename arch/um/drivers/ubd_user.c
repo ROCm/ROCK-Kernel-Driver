@@ -24,24 +24,142 @@
 #include "user.h"
 #include "ubd_user.h"
 #include "os.h"
-#include "cow.h"
 
 #include <endian.h>
 #include <byteswap.h>
+#if __BYTE_ORDER == __BIG_ENDIAN
+# define ntohll(x) (x)
+# define htonll(x) (x)
+#elif __BYTE_ORDER == __LITTLE_ENDIAN
+# define ntohll(x)  bswap_64(x)
+# define htonll(x)  bswap_64(x)
+#else
+#error "__BYTE_ORDER not defined"
+#endif
+
+#define PATH_LEN_V1 256
+
+struct cow_header_v1 {
+	int magic;
+	int version;
+	char backing_file[PATH_LEN_V1];
+	time_t mtime;
+	__u64 size;
+	int sectorsize;
+};
+
+#define PATH_LEN_V2 MAXPATHLEN
+
+struct cow_header_v2 {
+	unsigned long magic;
+	unsigned long version;
+	char backing_file[PATH_LEN_V2];
+	time_t mtime;
+	__u64 size;
+	int sectorsize;
+};
+
+union cow_header {
+	struct cow_header_v1 v1;
+	struct cow_header_v2 v2;
+};
+
+#define COW_MAGIC 0x4f4f4f4d  /* MOOO */
+#define COW_VERSION 2
+
+static void sizes(__u64 size, int sectorsize, int bitmap_offset, 
+		  unsigned long *bitmap_len_out, int *data_offset_out)
+{
+	*bitmap_len_out = (size + sectorsize - 1) / (8 * sectorsize);
+
+	*data_offset_out = bitmap_offset + *bitmap_len_out;
+	*data_offset_out = (*data_offset_out + sectorsize - 1) / sectorsize;
+	*data_offset_out *= sectorsize;
+}
+
+static int read_cow_header(int fd, int *magic_out, char **backing_file_out, 
+			   time_t *mtime_out, __u64 *size_out, 
+			   int *sectorsize_out, int *bitmap_offset_out)
+{
+	union cow_header *header;
+	char *file;
+	int err, n;
+	unsigned long version, magic;
+
+	header = um_kmalloc(sizeof(*header));
+	if(header == NULL){
+		printk("read_cow_header - Failed to allocate header\n");
+		return(-ENOMEM);
+	}
+	err = -EINVAL;
+	n = read(fd, header, sizeof(*header));
+	if(n < offsetof(typeof(header->v1), backing_file)){
+		printk("read_cow_header - short header\n");
+		goto out;
+	}
+
+	magic = header->v1.magic;
+	if(magic == COW_MAGIC) {
+		version = header->v1.version;
+	}
+	else if(magic == ntohl(COW_MAGIC)){
+		version = ntohl(header->v1.version);
+	}
+	else goto out;
+
+	*magic_out = COW_MAGIC;
+
+	if(version == 1){
+		if(n < sizeof(header->v1)){
+			printk("read_cow_header - failed to read V1 header\n");
+			goto out;
+		}
+		*mtime_out = header->v1.mtime;
+		*size_out = header->v1.size;
+		*sectorsize_out = header->v1.sectorsize;
+		*bitmap_offset_out = sizeof(header->v1);
+		file = header->v1.backing_file;
+	}
+	else if(version == 2){
+		if(n < sizeof(header->v2)){
+			printk("read_cow_header - failed to read V2 header\n");
+			goto out;
+		}
+		*mtime_out = ntohl(header->v2.mtime);
+		*size_out = ntohll(header->v2.size);
+		*sectorsize_out = ntohl(header->v2.sectorsize);
+		*bitmap_offset_out = sizeof(header->v2);
+		file = header->v2.backing_file;
+	}
+	else {
+		printk("read_cow_header - invalid COW version\n");
+		goto out;
+	}
+	err = -ENOMEM;
+	*backing_file_out = uml_strdup(file);
+	if(*backing_file_out == NULL){
+		printk("read_cow_header - failed to allocate backing file\n");
+		goto out;
+	}
+	err = 0;
+ out:
+	kfree(header);
+	return(err);
+}
 
 static int same_backing_files(char *from_cmdline, char *from_cow, char *cow)
 {
-	struct stat64 buf1, buf2;
+	struct stat buf1, buf2;
 
 	if(from_cmdline == NULL) return(1);
 	if(!strcmp(from_cmdline, from_cow)) return(1);
 
-	if(stat64(from_cmdline, &buf1) < 0){
+	if(stat(from_cmdline, &buf1) < 0){
 		printk("Couldn't stat '%s', errno = %d\n", from_cmdline, 
 		       errno);
 		return(1);
 	}
-	if(stat64(from_cow, &buf2) < 0){
+	if(stat(from_cow, &buf2) < 0){
 		printk("Couldn't stat '%s', errno = %d\n", from_cow, errno);
 		return(1);
 	}
@@ -97,6 +215,118 @@ int read_cow_bitmap(int fd, void *buf, int offset, int len)
 	return(0);
 }
 
+static int absolutize(char *to, int size, char *from)
+{
+	char save_cwd[256], *slash;
+	int remaining;
+
+	if(getcwd(save_cwd, sizeof(save_cwd)) == NULL) {
+		printk("absolutize : unable to get cwd - errno = %d\n", errno);
+		return(-1);
+	}
+	slash = strrchr(from, '/');
+	if(slash != NULL){
+		*slash = '\0';
+		if(chdir(from)){
+			*slash = '/';
+			printk("absolutize : Can't cd to '%s' - errno = %d\n",
+			       from, errno);
+			return(-1);
+		}
+		*slash = '/';
+		if(getcwd(to, size) == NULL){
+			printk("absolutize : unable to get cwd of '%s' - "
+			       "errno = %d\n", from, errno);
+			return(-1);
+		}
+		remaining = size - strlen(to);
+		if(strlen(slash) + 1 > remaining){
+			printk("absolutize : unable to fit '%s' into %d "
+			       "chars\n", from, size);
+			return(-1);
+		}
+		strcat(to, slash);
+	}
+	else {
+		if(strlen(save_cwd) + 1 + strlen(from) + 1 > size){
+			printk("absolutize : unable to fit '%s' into %d "
+			       "chars\n", from, size);
+			return(-1);
+		}
+		strcpy(to, save_cwd);
+		strcat(to, "/");
+		strcat(to, from);
+	}
+	chdir(save_cwd);
+	return(0);
+}
+
+static int write_cow_header(char *cow_file, int fd, char *backing_file, 
+			    int sectorsize, long long *size)
+{
+        struct cow_header_v2 *header;
+	struct stat64 buf;
+	int err;
+
+	err = os_seek_file(fd, 0);
+	if(err != 0){
+		printk("write_cow_header - lseek failed, errno = %d\n", errno);
+		return(-errno);
+	}
+
+	err = -ENOMEM;
+	header = um_kmalloc(sizeof(*header));
+	if(header == NULL){
+		printk("Failed to allocate COW V2 header\n");
+		goto out;
+	}
+	header->magic = htonl(COW_MAGIC);
+	header->version = htonl(COW_VERSION);
+
+	err = -EINVAL;
+	if(strlen(backing_file) > sizeof(header->backing_file) - 1){
+		printk("Backing file name \"%s\" is too long - names are "
+		       "limited to %d characters\n", backing_file, 
+		       sizeof(header->backing_file) - 1);
+		goto out_free;
+	}
+
+	if(absolutize(header->backing_file, sizeof(header->backing_file), 
+		      backing_file))
+		goto out_free;
+
+	err = stat64(header->backing_file, &buf);
+	if(err < 0){
+		printk("Stat of backing file '%s' failed, errno = %d\n",
+		       header->backing_file, errno);
+		err = -errno;
+		goto out_free;
+	}
+
+	err = os_file_size(header->backing_file, size);
+	if(err){
+		printk("Couldn't get size of backing file '%s', errno = %d\n",
+		       header->backing_file, -*size);
+		goto out_free;
+	}
+
+	header->mtime = htonl(buf.st_mtime);
+	header->size = htonll(*size);
+	header->sectorsize = htonl(sectorsize);
+
+	err = write(fd, header, sizeof(*header));
+	if(err != sizeof(*header)){
+		printk("Write of header to new COW file '%s' failed, "
+		       "errno = %d\n", cow_file, errno);
+		goto out_free;
+	}
+	err = 0;
+ out_free:
+	kfree(header);
+ out:
+	return(err);
+}
+
 int open_ubd_file(char *file, struct openflags *openflags, 
 		  char **backing_file_out, int *bitmap_offset_out, 
 		  unsigned long *bitmap_len_out, int *data_offset_out, 
@@ -116,17 +346,10 @@ int open_ubd_file(char *file, struct openflags *openflags,
                 if((fd = os_open_file(file, *openflags, mode)) < 0) 
 			return(fd);
         }
-
-	err = os_lock_file(fd, openflags->w);
-	if(err){
-		printk("Failed to lock '%s', errno = %d\n", file, -err);
-		goto error;
-	}
-	
 	if(backing_file_out == NULL) return(fd);
 
-	err = read_cow_header(file_reader, &fd, &magic, &backing_file, &mtime, 
-			      &size, &sectorsize, bitmap_offset_out);
+	err = read_cow_header(fd, &magic, &backing_file, &mtime, &size, 
+			      &sectorsize, bitmap_offset_out);
 	if(err && (*backing_file_out != NULL)){
 		printk("Failed to read COW header from COW file \"%s\", "
 		       "errno = %d\n", file, err);
@@ -153,12 +376,12 @@ int open_ubd_file(char *file, struct openflags *openflags,
 		if(err) goto error;
 	}
 
-	cow_sizes(size, sectorsize, *bitmap_offset_out, bitmap_len_out, 
-		  data_offset_out);
+	sizes(size, sectorsize, *bitmap_offset_out, bitmap_len_out, 
+	      data_offset_out);
 
         return(fd);
  error:
-	os_close_file(fd);
+	close(fd);
 	return(err);
 }
 
@@ -166,7 +389,10 @@ int create_cow_file(char *cow_file, char *backing_file, struct openflags flags,
 		    int sectorsize, int *bitmap_offset_out, 
 		    unsigned long *bitmap_len_out, int *data_offset_out)
 {
-	int err, fd;
+	__u64 blocks;
+	long zero;
+	int err, fd, i;
+	long long size;
 
 	flags.c = 1;
 	fd = open_ubd_file(cow_file, &flags, NULL, NULL, NULL, NULL, NULL);
@@ -177,12 +403,29 @@ int create_cow_file(char *cow_file, char *backing_file, struct openflags flags,
 		goto out;
 	}
 
-	err = init_cow_file(fd, cow_file, backing_file, sectorsize, 
-			    bitmap_offset_out, bitmap_len_out, 
-			    data_offset_out);
-	if(!err)
-		return(fd);
-	os_close_file(fd);
+	err = write_cow_header(cow_file, fd, backing_file, sectorsize, &size);
+	if(err) goto out_close;
+
+	blocks = (size + sectorsize - 1) / sectorsize;
+	blocks = (blocks + sizeof(long) * 8 - 1) / (sizeof(long) * 8);
+	zero = 0;
+	for(i = 0; i < blocks; i++){
+		err = write(fd, &zero, sizeof(zero));
+		if(err != sizeof(zero)){
+			printk("Write of bitmap to new COW file '%s' failed, "
+			       "errno = %d\n", cow_file, errno);
+			goto out_close;
+		}
+	}
+
+	sizes(size, sectorsize, sizeof(struct cow_header_v2), 
+	      bitmap_len_out, data_offset_out);
+	*bitmap_offset_out = sizeof(struct cow_header_v2);
+
+	return(fd);
+
+ out_close:
+	close(fd);
  out:
 	return(err);
 }
@@ -203,6 +446,14 @@ int write_ubd_fs(int fd, char *buffer, int len)
 	n = write(fd, buffer, len);
 	if(n < 0) return(-errno);
 	else return(n);
+}
+
+int ubd_is_dir(char *file)
+{
+	struct stat64 buf;
+
+	if(stat64(file, &buf) < 0) return(0);
+	return(S_ISDIR(buf.st_mode));
 }
 
 void do_io(struct io_thread_req *req)

@@ -119,7 +119,7 @@ BUILD directory for the kernel:
    cd /usr/src/linux-2.6.N
    make O=/home/name/build/kernel menuconfig
    make O=/home/name/build/kernel
-   sudo make O=/home/name/build/kernel install_modules install
+   sudo make O=/home/name/build/kernel modules_install install
 
    Please note: If the 'O=output/dir' option is used then it must be
    used for all invocations of make.

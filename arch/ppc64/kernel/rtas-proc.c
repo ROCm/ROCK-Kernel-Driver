@@ -20,7 +20,6 @@
 #include <linux/ctype.h>
 #include <linux/time.h>
 #include <linux/string.h>
-#include <linux/init.h>
 
 #include <asm/uaccess.h>
 #include <asm/bitops.h>
@@ -28,7 +27,6 @@
 #include <asm/io.h>
 #include <asm/prom.h>
 #include <asm/rtas.h>
-#include <asm/proc_fs.h>
 #include <asm/machdep.h> /* for ppc_md */
 #include <asm/time.h>
 
@@ -163,8 +161,6 @@ static ssize_t ppc_rtas_tone_volume_write(struct file * file, const char * buf,
 		size_t count, loff_t *ppos);
 static ssize_t ppc_rtas_tone_volume_read(struct file * file, char * buf,
 		size_t count, loff_t *ppos);
-static ssize_t ppc_rtas_rmo_buf_read(struct file *file, char *buf,
-				    size_t count, loff_t *ppos);
 
 struct file_operations ppc_rtas_poweron_operations = {
 	.read =		ppc_rtas_poweron_read,
@@ -189,10 +185,6 @@ struct file_operations ppc_rtas_tone_volume_operations = {
 	.write =	ppc_rtas_tone_volume_write
 };
 
-static struct file_operations ppc_rtas_rmo_buf_ops = {
-	.read =		ppc_rtas_rmo_buf_read,
-};
-
 int ppc_rtas_find_all_sensors (void);
 int ppc_rtas_process_sensor(struct individual_sensor s, int state, 
 		int error, char * buf);
@@ -208,42 +200,39 @@ void proc_rtas_init(void)
 {
 	struct proc_dir_entry *entry;
 
-	rtas_node = of_find_node_by_name(NULL, "rtas");
+	rtas_node = find_devices("rtas");
 	if ((rtas_node == NULL) || (systemcfg->platform == PLATFORM_ISERIES_LPAR)) {
 		return;
 	}
 	
-	if (proc_ppc64.rtas == NULL) {
-		proc_ppc64_init();
+	if (proc_rtas == NULL) {
+		proc_rtas = proc_mkdir("rtas", 0);
 	}
 
-	if (proc_ppc64.rtas == NULL) {
+	if (proc_rtas == NULL) {
 		printk(KERN_ERR "Failed to create /proc/rtas in proc_rtas_init\n");
 		return;
 	}
 
 	/* /proc/rtas entries */
 
-	entry = create_proc_entry("progress", S_IRUGO|S_IWUSR, proc_ppc64.rtas);
+	entry = create_proc_entry("progress", S_IRUGO|S_IWUSR, proc_rtas);
 	if (entry) entry->proc_fops = &ppc_rtas_progress_operations;
 
-	entry = create_proc_entry("clock", S_IRUGO|S_IWUSR, proc_ppc64.rtas); 
+	entry = create_proc_entry("clock", S_IRUGO|S_IWUSR, proc_rtas); 
 	if (entry) entry->proc_fops = &ppc_rtas_clock_operations;
 
-	entry = create_proc_entry("poweron", S_IWUSR|S_IRUGO, proc_ppc64.rtas); 
+	entry = create_proc_entry("poweron", S_IWUSR|S_IRUGO, proc_rtas); 
 	if (entry) entry->proc_fops = &ppc_rtas_poweron_operations;
 
-	create_proc_read_entry("sensors", S_IRUGO, proc_ppc64.rtas, 
+	create_proc_read_entry("sensors", S_IRUGO, proc_rtas, 
 			ppc_rtas_sensor_read, NULL);
 	
-	entry = create_proc_entry("frequency", S_IWUSR|S_IRUGO, proc_ppc64.rtas); 
+	entry = create_proc_entry("frequency", S_IWUSR|S_IRUGO, proc_rtas); 
 	if (entry) entry->proc_fops = &ppc_rtas_tone_freq_operations;
 
-	entry = create_proc_entry("volume", S_IWUSR|S_IRUGO, proc_ppc64.rtas); 
+	entry = create_proc_entry("volume", S_IWUSR|S_IRUGO, proc_rtas); 
 	if (entry) entry->proc_fops = &ppc_rtas_tone_volume_operations;
-
-	entry = create_proc_entry("rmo_buffer", S_IRUSR, proc_ppc64.rtas);
-	if (entry) entry->proc_fops = &ppc_rtas_rmo_buf_ops;
 }
 
 /* ****************************************************************** */
@@ -252,18 +241,12 @@ void proc_rtas_init(void)
 static ssize_t ppc_rtas_poweron_write(struct file * file, const char * buf,
 		size_t count, loff_t *ppos)
 {
-	char stkbuf[40];  /* its small, its on stack */
 	struct rtc_time tm;
 	unsigned long nowtime;
 	char *dest;
 	int error;
 
-	if (39 < count) count = 39;
-	if (copy_from_user (stkbuf, buf, count)) {
-		return -EFAULT;
-	}
-	stkbuf[count] = 0;
-	nowtime = simple_strtoul(stkbuf, &dest, 10);
+	nowtime = simple_strtoul(buf, &dest, 10);
 	if (*dest != '\0' && *dest != '\n') {
 		printk("ppc_rtas_poweron_write: Invalid time\n");
 		return count;
@@ -284,23 +267,18 @@ static ssize_t ppc_rtas_poweron_write(struct file * file, const char * buf,
 static ssize_t ppc_rtas_poweron_read(struct file * file, char * buf,
 		size_t count, loff_t *ppos)
 {
-	char stkbuf[40];  /* its small, its on stack */
 	int n;
 	if (power_on_time == 0)
-		n = snprintf(stkbuf, 40, "Power on time not set\n");
+		n = sprintf(buf, "Power on time not set\n");
 	else
-		n = snprintf(stkbuf, 40, "%lu\n", power_on_time);
+		n = sprintf(buf, "%lu\n", power_on_time);
 
-	int sn = strlen (stkbuf) +1;
-	if (*ppos >= sn)
+	if (*ppos >= strlen(buf))
 		return 0;
-	if (n > sn - *ppos)
-		n = sn - *ppos;
+	if (n > strlen(buf) - *ppos)
+		n = strlen(buf) - *ppos;
 	if (n > count)
 		n = count;
-	if (copy_to_user (buf, stkbuf + (*ppos), n)) {
-		return -EFAULT;
-	}
 	*ppos += n;
 	return n;
 }
@@ -313,16 +291,11 @@ static ssize_t ppc_rtas_progress_write(struct file * file, const char * buf,
 {
 	unsigned long hex;
 
-	if (count >= MAX_LINELENGTH) count = MAX_LINELENGTH -1;
-	if (copy_from_user (progress_led, buf, count)) { /* save the string */
-		return -EFAULT;
-	}
-	progress_led[count] = 0;
-
+	strcpy(progress_led, buf); /* save the string */
 	/* Lets see if the user passed hexdigits */
-	hex = simple_strtoul(progress_led, NULL, 10);
-
-	ppc_md.progress ((char *)progress_led, hex);
+	hex = simple_strtoul(buf, NULL, 10);
+	
+	ppc_md.progress ((char *)buf, hex);
 	return count;
 
 	/* clear the line */ /* ppc_md.progress("                   ", 0xffff);*/
@@ -332,30 +305,14 @@ static ssize_t ppc_rtas_progress_read(struct file * file, char * buf,
 		size_t count, loff_t *ppos)
 {
 	int n = 0;
-	
-	if (progress_led == NULL) return 0;
-
-	char * tmpbuf = kmalloc (MAX_LINELENGTH, GFP_KERNEL);
-	if (!tmpbuf) {
-		printk(KERN_ERR "error: kmalloc failed\n");
-		return -ENOMEM;
-	}
-	n = sprintf (tmpbuf, "%s\n", progress_led);
-
-	int sn = strlen (tmpbuf) +1;
-	if (*ppos >= sn) {
-		kfree (tmpbuf);
+	if (progress_led != NULL)
+		n = sprintf (buf, "%s\n", progress_led);
+	if (*ppos >= strlen(buf))
 		return 0;
-	}
-	if (n > sn - *ppos)
-		n = sn - *ppos;
+	if (n > strlen(buf) - *ppos)
+		n = strlen(buf) - *ppos;
 	if (n > count)
 		n = count;
-	if (copy_to_user (buf, tmpbuf + (*ppos), n)) {
-		kfree (tmpbuf);
-		return -EFAULT;
-	}
-	kfree (tmpbuf);
 	*ppos += n;
 	return n;
 }
@@ -366,18 +323,12 @@ static ssize_t ppc_rtas_progress_read(struct file * file, char * buf,
 static ssize_t ppc_rtas_clock_write(struct file * file, const char * buf, 
 		size_t count, loff_t *ppos)
 {
-	char stkbuf[40];  /* its small, its on stack */
 	struct rtc_time tm;
 	unsigned long nowtime;
 	char *dest;
 	int error;
 
-	if (39 < count) count = 39;
-	if (copy_from_user (stkbuf, buf, count)) {
-		return -EFAULT;
-	}
-	stkbuf[count] = 0;
-	nowtime = simple_strtoul(stkbuf, &dest, 10);
+	nowtime = simple_strtoul(buf, &dest, 10);
 	if (*dest != '\0' && *dest != '\n') {
 		printk("ppc_rtas_clock_write: Invalid time\n");
 		return count;
@@ -405,27 +356,21 @@ static ssize_t ppc_rtas_clock_read(struct file * file, char * buf,
 	year = ret[0]; mon  = ret[1]; day  = ret[2];
 	hour = ret[3]; min  = ret[4]; sec  = ret[5];
 
-	char stkbuf[40];  /* its small, its on stack */
-
 	if (error != 0){
 		printk(KERN_WARNING "error: reading the clock returned: %s\n", 
 				ppc_rtas_process_error(error));
-		n = snprintf (stkbuf, 40, "0");
+		n = sprintf (buf, "0");
 	} else { 
-		n = snprintf (stkbuf, 40, "%lu\n", mktime(year, mon, day, hour, min, sec));
+		n = sprintf (buf, "%lu\n", mktime(year, mon, day, hour, min, sec));
 	}
 	kfree(ret);
 
-	int sn = strlen (stkbuf) +1;
-	if (*ppos >= sn)
+	if (*ppos >= strlen(buf))
 		return 0;
-	if (n > sn - *ppos)
-		n = sn - *ppos;
+	if (n > strlen(buf) - *ppos)
+		n = strlen(buf) - *ppos;
 	if (n > count)
 		n = count;
-	if (copy_to_user (buf, stkbuf + (*ppos), n)) {
-		return -EFAULT;
-	}
 	*ppos += n;
 	return n;
 }
@@ -819,7 +764,7 @@ int get_location_code(struct individual_sensor s, char * buffer)
 		n += check_location_string(ret, buffer + n);
 		n += sprintf ( buffer+n, " ");
 		/* see how many characters we have printed */
-		snprintf ( t, 50, "%s ", ret);
+		sprintf ( t, "%s ", ret);
 
 		pos += strlen(t);
 		if (pos >= llen) pos=0;
@@ -832,17 +777,10 @@ int get_location_code(struct individual_sensor s, char * buffer)
 static ssize_t ppc_rtas_tone_freq_write(struct file * file, const char * buf,
 		size_t count, loff_t *ppos)
 {
-	char stkbuf[40];  /* its small, its on stack */
 	unsigned long freq;
 	char *dest;
 	int error;
-
-	if (39 < count) count = 39;
-	if (copy_from_user (stkbuf, buf, count)) {
-		return -EFAULT;
-	}
-	stkbuf[count] = 0;
-	freq = simple_strtoul(stkbuf, &dest, 10);
+	freq = simple_strtoul(buf, &dest, 10);
 	if (*dest != '\0' && *dest != '\n') {
 		printk("ppc_rtas_tone_freq_write: Invalid tone freqency\n");
 		return count;
@@ -861,19 +799,14 @@ static ssize_t ppc_rtas_tone_freq_read(struct file * file, char * buf,
 		size_t count, loff_t *ppos)
 {
 	int n;
-	char stkbuf[40];  /* its small, its on stack */
-	n = snprintf(stkbuf, 40, "%lu\n", rtas_tone_frequency);
+	n = sprintf(buf, "%lu\n", rtas_tone_frequency);
 
-	int sn = strlen (stkbuf) +1;
-	if (*ppos >= sn)
+	if (*ppos >= strlen(buf))
 		return 0;
-	if (n > sn - *ppos)
-		n = sn - *ppos;
+	if (n > strlen(buf) - *ppos)
+		n = strlen(buf) - *ppos;
 	if (n > count)
 		n = count;
-	if (copy_to_user (buf, stkbuf + (*ppos), n)) {
-		return -EFAULT;
-	}
 	*ppos += n;
 	return n;
 }
@@ -883,17 +816,10 @@ static ssize_t ppc_rtas_tone_freq_read(struct file * file, char * buf,
 static ssize_t ppc_rtas_tone_volume_write(struct file * file, const char * buf,
 		size_t count, loff_t *ppos)
 {
-	char stkbuf[40];  /* its small, its on stack */
 	unsigned long volume;
 	char *dest;
 	int error;
-
-	if (39 < count) count = 39;
-	if (copy_from_user (stkbuf, buf, count)) {
-		return -EFAULT;
-	}
-	stkbuf[count] = 0;
-	volume = simple_strtoul(stkbuf, &dest, 10);
+	volume = simple_strtoul(buf, &dest, 10);
 	if (*dest != '\0' && *dest != '\n') {
 		printk("ppc_rtas_tone_volume_write: Invalid tone volume\n");
 		return count;
@@ -914,44 +840,14 @@ static ssize_t ppc_rtas_tone_volume_read(struct file * file, char * buf,
 		size_t count, loff_t *ppos)
 {
 	int n;
-	char stkbuf[40];  /* its small, its on stack */
-	n = snprintf(stkbuf, 40, "%lu\n", rtas_tone_volume);
+	n = sprintf(buf, "%lu\n", rtas_tone_volume);
 
-	int sn = strlen (stkbuf) +1;
-	if (*ppos >= sn)
+	if (*ppos >= strlen(buf))
 		return 0;
-	if (n > sn - *ppos)
-		n = sn - *ppos;
+	if (n > strlen(buf) - *ppos)
+		n = strlen(buf) - *ppos;
 	if (n > count)
 		n = count;
-	if (copy_to_user (buf, stkbuf + (*ppos), n)) {
-		return -EFAULT;
-	}
 	*ppos += n;
-	return n;
-}
-
-#define RMO_READ_BUF_MAX 30
-
-/* RTAS Userspace access */
-static ssize_t ppc_rtas_rmo_buf_read(struct file *file, char __user *buf,
-				    size_t count, loff_t *ppos)
-{
-	char kbuf[RMO_READ_BUF_MAX];
-	int n;
-
-	n = sprintf(kbuf, "%016lx %x\n", rtas_rmo_buf, RTAS_RMOBUF_MAX);
-	if (n > count)
-		n = count;
-
-	if (ppos && *ppos != 0)
-		return 0;
-
-	if (copy_to_user(buf, kbuf, n))
-		return -EFAULT;
-
-	if (ppos)
-		*ppos = n;
-	
 	return n;
 }

@@ -1943,7 +1943,6 @@ static struct fb_info *__devinit neo_alloc_fb_info(struct pci_dev *dev, const st
 	info->flags = FBINFO_FLAG_DEFAULT;
 	info->par = par;
 	info->pseudo_palette = (void *) (par + 1);
-	info->dev = &dev->dev;
 
 	fb_alloc_cmap(&info->cmap, NR_PALETTE, 0);
 

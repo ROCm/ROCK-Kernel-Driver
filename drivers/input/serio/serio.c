@@ -49,14 +49,17 @@ MODULE_LICENSE("GPL");
 
 EXPORT_SYMBOL(serio_interrupt);
 EXPORT_SYMBOL(serio_register_port);
-EXPORT_SYMBOL(serio_register_slave_port);
+EXPORT_SYMBOL(serio_register_port_delayed);
+EXPORT_SYMBOL(__serio_register_port);
 EXPORT_SYMBOL(serio_unregister_port);
-EXPORT_SYMBOL(serio_unregister_slave_port);
+EXPORT_SYMBOL(serio_unregister_port_delayed);
+EXPORT_SYMBOL(__serio_unregister_port);
 EXPORT_SYMBOL(serio_register_device);
 EXPORT_SYMBOL(serio_unregister_device);
 EXPORT_SYMBOL(serio_open);
 EXPORT_SYMBOL(serio_close);
 EXPORT_SYMBOL(serio_rescan);
+EXPORT_SYMBOL(serio_reconnect);
 
 struct serio_event {
 	int type;
@@ -82,10 +85,22 @@ static void serio_find_dev(struct serio *serio)
 	}
 }
 
-#define SERIO_RESCAN	1
+#define SERIO_RESCAN		1
+#define SERIO_RECONNECT		2
+#define SERIO_REGISTER_PORT	3
+#define SERIO_UNREGISTER_PORT	4
 
 static DECLARE_WAIT_QUEUE_HEAD(serio_wait);
 static DECLARE_COMPLETION(serio_exited);
+
+static void serio_invalidate_pending_events(struct serio *serio)
+{
+	struct serio_event *event;
+
+	list_for_each_entry(event, &serio_event_list, node)
+		if (event->serio == serio)
+			event->serio = NULL;
+}
 
 void serio_handle_events(void)
 {
@@ -95,17 +110,35 @@ void serio_handle_events(void)
 	list_for_each_safe(node, next, &serio_event_list) {
 		event = container_of(node, struct serio_event, node);	
 
+		down(&serio_sem);
+		if (event->serio == NULL)
+			goto event_done;
+
 		switch (event->type) {
+			case SERIO_REGISTER_PORT :
+				__serio_register_port(event->serio);
+				break;
+
+			case SERIO_UNREGISTER_PORT :
+				__serio_unregister_port(event->serio);
+				break;
+
+			case SERIO_RECONNECT :
+				if (event->serio->dev && event->serio->dev->reconnect)
+					if (event->serio->dev->reconnect(event->serio) == 0)
+						break;
+				/* reconnect failed - fall through to rescan */
+
 			case SERIO_RESCAN :
-				down(&serio_sem);
 				if (event->serio->dev && event->serio->dev->disconnect)
 					event->serio->dev->disconnect(event->serio);
 				serio_find_dev(event->serio);
-				up(&serio_sem);
 				break;
 			default:
 				break;
 		}
+event_done:
+		up(&serio_sem);
 		list_del_init(node);
 		kfree(event);
 	}
@@ -130,18 +163,27 @@ static int serio_thread(void *nothing)
 	complete_and_exit(&serio_exited, 0);
 }
 
-void serio_rescan(struct serio *serio)
+static void serio_queue_event(struct serio *serio, int event_type)
 {
 	struct serio_event *event;
 
-	if (!(event = kmalloc(sizeof(struct serio_event), GFP_ATOMIC)))
-		return;
+	if ((event = kmalloc(sizeof(struct serio_event), GFP_ATOMIC))) {
+		event->type = event_type;
+		event->serio = serio;
 
-	event->type = SERIO_RESCAN;
-	event->serio = serio;
+		list_add_tail(&event->node, &serio_event_list);
+		wake_up(&serio_wait);
+	}
+}
 
-	list_add_tail(&event->node, &serio_event_list);
-	wake_up(&serio_wait);
+void serio_rescan(struct serio *serio)
+{
+	serio_queue_event(serio, SERIO_RESCAN);
+}
+
+void serio_reconnect(struct serio *serio)
+{
+	serio_queue_event(serio, SERIO_RECONNECT);
 }
 
 irqreturn_t serio_interrupt(struct serio *serio,
@@ -163,17 +205,26 @@ irqreturn_t serio_interrupt(struct serio *serio,
 void serio_register_port(struct serio *serio)
 {
 	down(&serio_sem);
-	list_add_tail(&serio->node, &serio_list);
-	serio_find_dev(serio);
+	__serio_register_port(serio);
 	up(&serio_sem);
 }
 
 /*
- * Same as serio_register_port but does not try to acquire serio_sem.
- * Should be used when registering a serio from other input device's
+ * Submits register request to kseriod for subsequent execution.
+ * Can be used when it is not obvious whether the serio_sem is
+ * taken or not and when delayed execution is feasible.
+ */
+void serio_register_port_delayed(struct serio *serio)
+{
+	serio_queue_event(serio, SERIO_REGISTER_PORT);
+}
+
+/*
+ * Should only be called directly if serio_sem has already been taken,
+ * for example when unregistering a serio from other input device's
  * connect() function.
  */
-void serio_register_slave_port(struct serio *serio)
+void __serio_register_port(struct serio *serio)
 {
 	list_add_tail(&serio->node, &serio_list);
 	serio_find_dev(serio);
@@ -182,19 +233,28 @@ void serio_register_slave_port(struct serio *serio)
 void serio_unregister_port(struct serio *serio)
 {
 	down(&serio_sem);
-	list_del_init(&serio->node);
-	if (serio->dev && serio->dev->disconnect)
-		serio->dev->disconnect(serio);
+	__serio_unregister_port(serio);
 	up(&serio_sem);
 }
 
 /*
- * Same as serio_unregister_port but does not try to acquire serio_sem.
- * Should be used when unregistering a serio from other input device's
+ * Submits unregister request to kseriod for subsequent execution.
+ * Can be used when it is not obvious whether the serio_sem is
+ * taken or not and when delayed execution is feasible.
+ */
+void serio_unregister_port_delayed(struct serio *serio)
+{
+	serio_queue_event(serio, SERIO_UNREGISTER_PORT);
+}
+
+/*
+ * Should only be called directly if serio_sem has already been taken,
+ * for example when unregistering a serio from other input device's
  * disconnect() function.
  */
-void serio_unregister_slave_port(struct serio *serio)
+void __serio_unregister_port(struct serio *serio)
 {
+	serio_invalidate_pending_events(serio);
 	list_del_init(&serio->node);
 	if (serio->dev && serio->dev->disconnect)
 		serio->dev->disconnect(serio);

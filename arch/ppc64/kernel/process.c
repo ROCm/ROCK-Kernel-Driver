@@ -50,10 +50,7 @@
 #include <asm/cputable.h>
 #include <asm/sections.h>
 
-#ifndef CONFIG_SMP
 struct task_struct *last_task_used_math = NULL;
-struct task_struct *last_task_used_altivec = NULL;
-#endif
 
 struct mm_struct ioremap_mm = { pgd             : ioremap_dir  
                                ,page_table_lock : SPIN_LOCK_UNLOCKED };
@@ -61,7 +58,8 @@ struct mm_struct ioremap_mm = { pgd             : ioremap_dir
 char *sysmap = NULL;
 unsigned long sysmap_size = 0;
 
-void enable_kernel_fp(void)
+void
+enable_kernel_fp(void)
 {
 #ifdef CONFIG_SMP
 	if (current->thread.regs && (current->thread.regs->msr & MSR_FP))
@@ -72,7 +70,6 @@ void enable_kernel_fp(void)
 	giveup_fpu(last_task_used_math);
 #endif /* CONFIG_SMP */
 }
-EXPORT_SYMBOL(enable_kernel_fp);
 
 int dump_task_fpu(struct task_struct *tsk, elf_fpregset_t *fpregs)
 {
@@ -87,31 +84,6 @@ int dump_task_fpu(struct task_struct *tsk, elf_fpregset_t *fpregs)
 
 	return 1;
 }
-
-#ifdef CONFIG_ALTIVEC
-
-void enable_kernel_altivec(void)
-{
-#ifdef CONFIG_SMP
-	if (current->thread.regs && (current->thread.regs->msr & MSR_VEC))
-		giveup_altivec(current);
-	else
-		giveup_altivec(NULL);	/* just enables FP for kernel */
-#else
-	giveup_altivec(last_task_used_altivec);
-#endif /* CONFIG_SMP */
-}
-EXPORT_SYMBOL(enable_kernel_altivec);
-
-int dump_task_altivec(struct pt_regs *regs, elf_vrregset_t *vrregs)
-{
-	if (regs->msr & MSR_VEC)
-		giveup_altivec(current);
-	memcpy(vrregs, &current->thread.vr[0], sizeof(*vrregs));
-	return 1;
-}
-
-#endif /* CONFIG_ALTIVEC */
 
 struct task_struct *__switch_to(struct task_struct *prev,
 				struct task_struct *new)
@@ -132,19 +104,7 @@ struct task_struct *__switch_to(struct task_struct *prev,
 	 */
 	if (prev->thread.regs && (prev->thread.regs->msr & MSR_FP))
 		giveup_fpu(prev);
-#ifdef CONFIG_ALTIVEC
-	if (prev->thread.regs && (prev->thread.regs->msr & MSR_VEC))
-		giveup_altivec(prev);
-#endif /* CONFIG_ALTIVEC */
 #endif /* CONFIG_SMP */
-
-#if defined(CONFIG_ALTIVEC) && !defined(CONFIG_SMP)
-	/* Avoid the trap.  On smp this this never happens since
-	 * we don't set last_task_used_altivec -- Cort
-	 */
-	if (new->thread.regs && last_task_used_altivec == new)
-		new->thread.regs->msr |= MSR_VEC;
-#endif /* CONFIG_ALTIVEC */
 
 	new_thread = &new->thread;
 	old_thread = &current->thread;
@@ -198,14 +158,8 @@ void show_regs(struct pt_regs * regs)
 
 void exit_thread(void)
 {
-#ifndef CONFIG_SMP
 	if (last_task_used_math == current)
 		last_task_used_math = NULL;
-#ifdef CONFIG_ALTIVEC
-	if (last_task_used_altivec == current)
-		last_task_used_altivec = NULL;
-#endif /* CONFIG_ALTIVEC */
-#endif /* CONFIG_SMP */
 }
 
 void flush_thread(void)
@@ -215,38 +169,13 @@ void flush_thread(void)
 	if (t->flags & _TIF_ABI_PENDING)
 		t->flags ^= (_TIF_ABI_PENDING | _TIF_32BIT);
 
-#ifndef CONFIG_SMP
 	if (last_task_used_math == current)
 		last_task_used_math = NULL;
-#ifdef CONFIG_ALTIVEC
-	if (last_task_used_altivec == current)
-		last_task_used_altivec = NULL;
-#endif /* CONFIG_ALTIVEC */
-#endif /* CONFIG_SMP */
 }
 
 void
 release_thread(struct task_struct *t)
 {
-}
-
-
-/*
- * This gets called before we allocate a new thread and copy
- * the current task into it.
- */
-void prepare_to_copy(struct task_struct *tsk)
-{
-	struct pt_regs *regs = tsk->thread.regs;
-
-	if (regs == NULL)
-		return;
-	if (regs->msr & MSR_FP)
-		giveup_fpu(current);
-#ifdef CONFIG_ALTIVEC
-	if (regs->msr & MSR_VEC)
-		giveup_altivec(current);
-#endif /* CONFIG_ALTIVEC */
 }
 
 /*
@@ -339,25 +268,9 @@ void start_thread(struct pt_regs *regs, unsigned long fdptr, unsigned long sp)
 	regs->gpr[1] = sp;
 	regs->gpr[2] = toc;
 	regs->msr = MSR_USER64;
-#ifndef CONFIG_SMP
 	if (last_task_used_math == current)
 		last_task_used_math = 0;
-#endif /* CONFIG_SMP */
-	memset(current->thread.fpr, 0, sizeof(current->thread.fpr));
 	current->thread.fpscr = 0;
-#ifdef CONFIG_ALTIVEC
-#ifndef CONFIG_SMP
-	if (last_task_used_altivec == current)
-		last_task_used_altivec = 0;
-#endif /* CONFIG_SMP */
-	memset(current->thread.vr, 0, sizeof(current->thread.vr));
-	current->thread.vscr.u[0] = 0;
-	current->thread.vscr.u[1] = 0;
-	current->thread.vscr.u[2] = 0;
-	current->thread.vscr.u[3] = 0x00010000; /* Java mode disabled */
-	current->thread.vrsave = 0;
-	current->thread.used_vr = 0;
-#endif /* CONFIG_ALTIVEC */
 }
 
 int set_fpexc_mode(struct task_struct *tsk, unsigned int val)
@@ -401,6 +314,9 @@ int sys_clone(unsigned long clone_flags, unsigned long p2, unsigned long p3,
 		}
 	}
 
+	if (regs->msr & MSR_FP)
+		giveup_fpu(current);
+
 	return do_fork(clone_flags & ~CLONE_IDLETASK, p2, regs, 0,
 		    (int *)parent_tidptr, (int *)child_tidptr);
 }
@@ -409,6 +325,9 @@ int sys_fork(unsigned long p1, unsigned long p2, unsigned long p3,
 	     unsigned long p4, unsigned long p5, unsigned long p6,
 	     struct pt_regs *regs)
 {
+	if (regs->msr & MSR_FP)
+		giveup_fpu(current);
+
 	return do_fork(SIGCHLD, regs->gpr[1], regs, 0, NULL, NULL);
 }
 
@@ -416,6 +335,9 @@ int sys_vfork(unsigned long p1, unsigned long p2, unsigned long p3,
 	      unsigned long p4, unsigned long p5, unsigned long p6,
 	      struct pt_regs *regs)
 {
+	if (regs->msr & MSR_FP)
+		giveup_fpu(current);
+
 	return do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs->gpr[1], regs, 0,
 	            NULL, NULL);
 }
@@ -433,10 +355,7 @@ int sys_execve(unsigned long a0, unsigned long a1, unsigned long a2,
 		goto out;
 	if (regs->msr & MSR_FP)
 		giveup_fpu(current);
-#ifdef CONFIG_ALTIVEC
-	if (regs->msr & MSR_VEC)
-		giveup_altivec(current);
-#endif /* CONFIG_ALTIVEC */
+  
 	error = do_execve(filename, (char **) a1, (char **) a2, regs);
   
 	if (error == 0)
@@ -470,8 +389,12 @@ unsigned long get_wchan(struct task_struct *p)
 			return 0;
 		if (count > 0) {
 			ip = *(unsigned long *)(sp + 16);
+			/*
+			 * XXX we mask the upper 32 bits until procps
+			 * gets fixed.
+			 */
 			if (ip < first_sched || ip >= last_sched)
-				return ip;
+				return (ip & 0xFFFFFFFF);
 		}
 	} while (count++ < 16);
 	return 0;
@@ -489,10 +412,7 @@ void show_stack(struct task_struct *p, unsigned long *_sp)
 
 	if (sp == 0)
 		sp = p->thread.ksp;
-	printk("Call Trace:");
-#ifdef CONFIG_KALLSYMS
-	printk("\n");
-#endif
+	printk("Call Trace:\n");
 	do {
 		if (__get_user(sp, (unsigned long *)sp))
 			break;
@@ -502,12 +422,9 @@ void show_stack(struct task_struct *p, unsigned long *_sp)
 			break;
 		if (__get_user(ip, (unsigned long *)(sp + 16)))
 			break;
-		printk("[<%016lx>] ", ip);
+		printk("[%016lx] ", ip);
 		print_symbol("%s\n", ip);
 	} while (count++ < 32);
-#if !CONFIG_KALLSYMS
-	printk("\n");
-#endif
 }
 
 void dump_stack(void)

@@ -474,21 +474,29 @@ static inline void __exit_mm(struct task_struct * tsk)
 	if (!mm)
 		return;
 	/*
-	 * Serialize with any possible pending coredump:
+	 * Serialize with any possible pending coredump.
+	 * We must hold mmap_sem around checking core_waiters
+	 * and clearing tsk->mm.  The core-inducing thread
+	 * will increment core_waiters for each thread in the
+	 * group with ->mm != NULL.
 	 */
+	down_read(&mm->mmap_sem);
 	if (mm->core_waiters) {
+		up_read(&mm->mmap_sem);
 		down_write(&mm->mmap_sem);
 		if (!--mm->core_waiters)
 			complete(mm->core_startup_done);
 		up_write(&mm->mmap_sem);
 
 		wait_for_completion(&mm->core_done);
+		down_read(&mm->mmap_sem);
 	}
 	atomic_inc(&mm->mm_count);
 	if (mm != tsk->active_mm) BUG();
 	/* more a memory barrier than a real lock */
 	task_lock(tsk);
 	tsk->mm = NULL;
+	up_read(&mm->mmap_sem);
 	enter_lazy_tlb(mm, current);
 	task_unlock(tsk);
 	mmput(mm);

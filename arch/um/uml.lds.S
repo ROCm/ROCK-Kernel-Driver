@@ -9,15 +9,7 @@ SECTIONS
 {
   . = START + SIZEOF_HEADERS;
 
-#if 0
   . = ALIGN(4096);
-#else
-/* dirty trick time -- don't page align the binary start, otherwise the
- * first page will not be mapped and a tls-enabled glibc will crash
- * while trying to read the ELF headers located there ... */
-  . = ALIGN(2048);
-#endif
-
   __binary_start = .;
 #ifdef MODE_TT
   .thread_private : {
@@ -34,11 +26,7 @@ SECTIONS
   . = ALIGN(4096);		/* Init code and data */
   _stext = .;
   __init_begin = .;
-  .init.text : { 
-	_sinittext = .;
-	*(.init.text)
-	_einittext = .;
-  }
+  .text.init : { *(.text.init) }
   . = ALIGN(4096);
   .text      :
   {
@@ -50,7 +38,7 @@ SECTIONS
 
   #include "asm/common.lds.S"
 
-  init.data : { *(init.data) }
+  .data.init : { *(.data.init) }
   .data    :
   {
     . = ALIGN(KERNEL_STACK_SIZE);		/* init_task */

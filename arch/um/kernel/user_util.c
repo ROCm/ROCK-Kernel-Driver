@@ -119,6 +119,17 @@ int wait_for_stop(int pid, int sig, int cont_type, void *relay)
 	}
 }
 
+int clone_and_wait(int (*fn)(void *), void *arg, void *sp, int flags)
+{
+	int pid;
+
+	pid = clone(fn, sp, flags, arg);
+ 	if(pid < 0) return(-1);
+	wait_for_stop(pid, SIGSTOP, PTRACE_CONT, NULL);
+	ptrace(PTRACE_CONT, pid, 0, 0);
+	return(pid);
+}
+
 int raw(int fd, int complain)
 {
 	struct termios tt;

@@ -104,10 +104,7 @@ void *switch_to_tt(void *prev, void *next, void *last)
 
 void release_thread_tt(struct task_struct *task)
 {
-	int pid = task->thread.mode.tt.extern_pid;
-
-	if(os_getpid() != pid)
-		os_kill_process(pid, 0);
+	os_kill_process(task->thread.mode.tt.extern_pid, 0);
 }
 
 void exit_thread_tt(void)
@@ -128,27 +125,27 @@ static void new_thread_handler(int sig)
 	UPT_SC(&current->thread.regs.regs) = (void *) (&sig + 1);
 	suspend_new_thread(current->thread.mode.tt.switch_pipe[0]);
 
-	force_flush_all();
-	if(current->thread.prev_sched != NULL)
-		schedule_tail(current->thread.prev_sched);
-	current->thread.prev_sched = NULL;
-
+	block_signals();
 	init_new_thread_signals(1);
+#ifdef CONFIG_SMP
+	schedule_tail(current->thread.prev_sched);
+#endif
 	enable_timer();
 	free_page(current->thread.temp_stack);
 	set_cmdline("(kernel thread)");
+	force_flush_all();
 
+	current->thread.prev_sched = NULL;
 	change_sig(SIGUSR1, 1);
 	change_sig(SIGVTALRM, 1);
 	change_sig(SIGPROF, 1);
-	local_irq_enable();
+	unblock_signals();
 	if(!run_kernel_thread(fn, arg, &current->thread.exec_buf))
 		do_exit(0);
 }
 
 static int new_thread_proc(void *stack)
 {
-	local_irq_disable();
 	init_new_thread_stack(stack, new_thread_handler);
 	os_usr1_process(os_getpid());
 	return(0);
@@ -168,32 +165,35 @@ void finish_fork_handler(int sig)
  	UPT_SC(&current->thread.regs.regs) = (void *) (&sig + 1);
 	suspend_new_thread(current->thread.mode.tt.switch_pipe[0]);
 
-	force_flush_all();
-	if(current->thread.prev_sched != NULL)
-		schedule_tail(current->thread.prev_sched);
-	current->thread.prev_sched = NULL;
-
+#ifdef CONFIG_SMP	
+	schedule_tail(NULL);
+#endif
 	enable_timer();
 	change_sig(SIGVTALRM, 1);
 	local_irq_enable();
+	force_flush_all();
 	if(current->mm != current->parent->mm)
 		protect_memory(uml_reserved, high_physmem - uml_reserved, 1, 
 			       1, 0, 1);
-	task_protections((unsigned long) current_thread);
+	task_protections((unsigned long) current->thread_info);
+
+	current->thread.prev_sched = NULL;
 
 	free_page(current->thread.temp_stack);
-	local_irq_disable();
 	change_sig(SIGUSR1, 0);
 	set_user_mode(current);
 }
 
+static int sigusr1 = SIGUSR1;
+
 int fork_tramp(void *stack)
 {
+	int sig = sigusr1;
+
 	local_irq_disable();
-	arch_init_thread();
 	init_new_thread_stack(stack, finish_fork_handler);
 
-	os_usr1_process(os_getpid());
+	kill(os_getpid(), sig);
 	return(0);
 }
 
@@ -377,8 +377,8 @@ static void mprotect_kernel_mem(int w)
 
 	pages = (1 << CONFIG_KERNEL_STACK_ORDER);
 
-	start = (unsigned long) current_thread + PAGE_SIZE;
-	end = (unsigned long) current_thread + PAGE_SIZE * pages;
+	start = (unsigned long) current->thread_info + PAGE_SIZE;
+	end = (unsigned long) current + PAGE_SIZE * pages;
 	protect_memory(uml_reserved, start - uml_reserved, 1, w, 1, 1);
 	protect_memory(end, high_physmem - end, 1, w, 1, 1);
 

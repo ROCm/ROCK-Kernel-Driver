@@ -622,17 +622,17 @@ static const char *intrclass_names[] = {
 
 int show_interrupts(struct seq_file *p, void *v)
 {
-        int i, j;
+        int i = *(loff_t *) v, j;
 	
-        seq_puts(p, "           ");
+	if (i == 0) {
+		seq_puts(p, "           ");
+		for (j=0; j<NR_CPUS; j++)
+			if (cpu_online(j))
+				seq_printf(p, "CPU%d       ",j);
+		seq_putc(p, '\n');
+	}
 	
-        for (j=0; j<NR_CPUS; j++)
-                if (cpu_online(j))
-                        seq_printf(p, "CPU%d       ",j);
-	
-        seq_putc(p, '\n');
-	
-        for (i = 0 ; i < NR_IRQS ; i++) {
+	if (i < NR_IRQS) {
 		seq_printf(p, "%s: ", intrclass_names[i]);
 #ifndef CONFIG_SMP
 		seq_printf(p, "%10u ", kstat_irqs(i));

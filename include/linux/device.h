@@ -372,7 +372,7 @@ extern int platform_device_register(struct platform_device *);
 extern void platform_device_unregister(struct platform_device *);
 
 extern struct bus_type platform_bus_type;
-extern struct device legacy_bus;
+extern struct device platform_bus;
 
 /* drivers/base/power.c */
 extern void device_shutdown(void);
@@ -383,20 +383,8 @@ extern int firmware_register(struct subsystem *);
 extern void firmware_unregister(struct subsystem *);
 
 /* debugging and troubleshooting/diagnostic helpers. */
-#ifdef CONFIG_DEBUG_DEV_PRINTK
-#define dev_printk(level, dev, format, arg...)			\
-	do {							\
-		if (!(dev) || !(dev)->driver)			\
-			WARN_ON(1);				\
-		else						\
-			printk(level "%s %s: " format , 	\
-				(dev)->driver->name , 		\
-				(dev)->bus_id , ## arg);	\
-	} while (0)
-#else
 #define dev_printk(level, dev, format, arg...)	\
 	printk(level "%s %s: " format , (dev)->driver->name , (dev)->bus_id , ## arg)
-#endif
 
 #ifdef DEBUG
 #define dev_dbg(dev, format, arg...)		\

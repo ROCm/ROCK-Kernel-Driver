@@ -206,7 +206,6 @@ struct mm_struct {
 	unsigned long rss, total_vm, locked_vm;
 	unsigned long def_flags;
 	cpumask_t cpu_vm_mask;
-	unsigned long swap_address;
 
 	unsigned long saved_auxv[40]; /* for /proc/PID/auxv */
 

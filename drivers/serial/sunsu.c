@@ -97,9 +97,6 @@ struct uart_sunsu_port {
 	int			port_node;
 	unsigned int		irq;
 
-	/* L1-A keyboard break state.  */
-	int			kbd_id;
-	int			l1_down;
 #ifdef CONFIG_SERIO
 	struct serio		serio;
 	int			serio_open;
@@ -508,25 +505,8 @@ static void receive_kbd_ms_chars(struct uart_sunsu_port *up, struct pt_regs *reg
 	do {
 		unsigned char ch = serial_inp(up, UART_RX);
 
+		/* Stop-A is handled by drivers/char/keyboard.c now. */
 		if (up->su_type == SU_PORT_KBD) {
-			if (ch == SUNKBD_RESET) {
-				up->kbd_id = 1;
-				up->l1_down = 0;
-			} else if (up->kbd_id) {
-				up->kbd_id = 0;
-			} else if (ch == SUNKBD_L1) {
-				up->l1_down = 1;
-			} else if (ch == (SUNKBD_L1|SUNKBD_UP)) {
-				up->l1_down = 0;
-			} else if (ch == SUNKBD_A && up->l1_down) {
-				/* whee... */
-				sun_do_break();
-
-				/* Continue execution... */
-				up->l1_down = 0;
-				up->kbd_id = 0;
-				return;
-			}
 #ifdef CONFIG_SERIO
 			serio_interrupt(&up->serio, ch, 0, regs);
 #endif

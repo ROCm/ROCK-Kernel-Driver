@@ -1880,7 +1880,6 @@ static int __devinit i810fb_init_pci (struct pci_dev *dev,
 	info->fbops = &par->i810fb_ops;
 	info->pseudo_palette = par->pseudo_palette;
 	info->flags = FBINFO_FLAG_DEFAULT;
-	info->dev = &dev->dev;
 	
 	fb_alloc_cmap(&info->cmap, 256, 0);
 

@@ -110,12 +110,7 @@ config SENSORS_W83781D
 	  of sensor chips: the W83781D, W83782D, W83783S and W83682HF,
 	  and the similar Asus AS99127F.
 	  
-
-
-config SENSORS_SMBUS_ARP
-	tristate "SMBus ARP 2.0 support"
-	depends on I2C && EXPERIMENTAL
-	select I2C_SENSOR
-	  
+	  This driver can also be built as a module.  If so, the module
+	  will be called w83781d.
 
 endmenu

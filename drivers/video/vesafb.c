@@ -174,10 +174,7 @@ static int vesafb_setcolreg(unsigned regno, unsigned red, unsigned green,
     return 0;
 }
 
-#ifndef CONFIG_BOOTSPLASH
-static
-#endif
-struct fb_ops vesafb_ops = {
+static struct fb_ops vesafb_ops = {
 	.owner		= THIS_MODULE,
 	.fb_setcolreg	= vesafb_setcolreg,
 	.fb_pan_display	= vesafb_pan_display,

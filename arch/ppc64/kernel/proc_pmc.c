@@ -44,6 +44,8 @@
 
 static int proc_pmc_control_mode = 0;
 
+static struct proc_dir_entry *proc_ppc64_root = NULL;
+static struct proc_dir_entry *proc_ppc64_pmc_root = NULL;
 static struct proc_dir_entry *proc_ppc64_pmc_system_root = NULL;
 static struct proc_dir_entry *proc_ppc64_pmc_cpu_root[NR_CPUS] = {NULL, };
 
@@ -80,8 +82,8 @@ int proc_pmc_set_pmc6(  struct file *file, const char *buffer, unsigned long cou
 int proc_pmc_set_pmc7(  struct file *file, const char *buffer, unsigned long count, void *data);
 int proc_pmc_set_pmc8(  struct file *file, const char *buffer, unsigned long count, void *data);
 
-#if 0
-int proc_ppc64_init(void)
+
+void proc_ppc64_init(void)
 {
 	unsigned long i;
 	struct proc_dir_entry *ent = NULL;
@@ -95,21 +97,15 @@ int proc_ppc64_init(void)
 	 *   /proc/ppc64/pmc/cpu0 
 	 */
 	spin_lock(&proc_ppc64_lock);
-	if (proc_ppc64.root == NULL) {
-		proc_ppc64_init();
-		if (!proc_ppc64.root) {
-			spin_unlock(&proc_ppc64_lock);
-			return;
-		}
-	}
+	proc_ppc64_root = proc_mkdir("ppc64", 0);
+	if (!proc_ppc64_root) return;
 	spin_unlock(&proc_ppc64_lock);
 
 	/* Placeholder for rtas interfaces. */
-	if (proc_ppc64.rtas == NULL) {
-		return;
-	}
+	rtas_proc_dir = proc_mkdir("rtas", proc_ppc64_root);
 
-	proc_ppc64_pmc_root = proc_mkdir("pmc", proc_ppc64.root);
+
+	proc_ppc64_pmc_root = proc_mkdir("pmc", proc_ppc64_root);
 
 	proc_ppc64_pmc_system_root = proc_mkdir("system", proc_ppc64_pmc_root);
 	for (i = 0; i < NR_CPUS; i++) {
@@ -119,6 +115,7 @@ int proc_ppc64_init(void)
 				proc_mkdir(buf, proc_ppc64_pmc_root);
 		}
 	}
+
 
 	/* Create directories for the software counters. */
 	for (i = 0; i < NR_CPUS; i++) {
@@ -130,7 +127,7 @@ int proc_ppc64_init(void)
 			ent->nlink = 1;
 			ent->data = (void *)proc_ppc64_pmc_cpu_root[i];
 			ent->read_proc = (void *)proc_ppc64_pmc_stab_read;
-			ent->write_proc = NULL;
+			ent->write_proc = (void *)proc_ppc64_pmc_stab_read;
 		}
 
 		ent = create_proc_entry("htab", S_IRUGO | S_IWUSR, 
@@ -139,7 +136,7 @@ int proc_ppc64_init(void)
 			ent->nlink = 1;
 			ent->data = (void *)proc_ppc64_pmc_cpu_root[i];
 			ent->read_proc = (void *)proc_ppc64_pmc_htab_read;
-			ent->write_proc = NULL;
+			ent->write_proc = (void *)proc_ppc64_pmc_htab_read;
 		}
 	}
 
@@ -149,7 +146,7 @@ int proc_ppc64_init(void)
 		ent->nlink = 1;
 		ent->data = (void *)proc_ppc64_pmc_system_root;
 		ent->read_proc = (void *)proc_ppc64_pmc_stab_read;
-		ent->write_proc = NULL;
+		ent->write_proc = (void *)proc_ppc64_pmc_stab_read;
 	}
 
 	ent = create_proc_entry("htab", S_IRUGO | S_IWUSR, 
@@ -158,7 +155,7 @@ int proc_ppc64_init(void)
 		ent->nlink = 1;
 		ent->data = (void *)proc_ppc64_pmc_system_root;
 		ent->read_proc = (void *)proc_ppc64_pmc_htab_read;
-		ent->write_proc = NULL;
+		ent->write_proc = (void *)proc_ppc64_pmc_htab_read;
 	}
 
 	/* Create directories for the hardware counters. */
@@ -171,7 +168,7 @@ int proc_ppc64_init(void)
 			ent->nlink = 1;
 			ent->data = (void *)proc_ppc64_pmc_cpu_root[i];
 			ent->read_proc = (void *)proc_ppc64_pmc_hw_read;
-			ent->write_proc = NULL;
+			ent->write_proc = (void *)proc_ppc64_pmc_hw_read;
 		}
 	}
 
@@ -181,10 +178,9 @@ int proc_ppc64_init(void)
 		ent->nlink = 1;
 		ent->data = (void *)proc_ppc64_pmc_system_root;
 		ent->read_proc = (void *)proc_ppc64_pmc_hw_read;
-		ent->write_proc = NULL;
+		ent->write_proc = (void *)proc_ppc64_pmc_hw_read;
 	}
 }
-#endif
 
 /*
  * Find the requested 'file' given a proc token.
@@ -680,22 +676,15 @@ static inline void proc_pmc_tlb(void)
 
 int proc_pmc_set_control( struct file *file, const char *buffer, unsigned long count, void *data )
 {
-	char stkbuf[10];
-	if (count > 9) count = 9;
-	if (copy_from_user (stkbuf, buffer, count)) {
-		return -EFAULT;
-	}
-	stkbuf[count] = 0;
-
-	if      ( ! strncmp( stkbuf, "stop", 4 ) )
+	if      ( ! strncmp( buffer, "stop", 4 ) )
 		proc_pmc_stop();
-	else if ( ! strncmp( stkbuf, "start", 5 ) )
+	else if ( ! strncmp( buffer, "start", 5 ) )
 		proc_pmc_start();
-	else if ( ! strncmp( stkbuf, "reset", 5 ) )
+	else if ( ! strncmp( buffer, "reset", 5 ) )
 		proc_pmc_reset();
-	else if ( ! strncmp( stkbuf, "cpi", 3 ) )
+	else if ( ! strncmp( buffer, "cpi", 3 ) )
 		proc_pmc_cpi();
-	else if ( ! strncmp( stkbuf, "tlb", 3 ) )
+	else if ( ! strncmp( buffer, "tlb", 3 ) )
 		proc_pmc_tlb();
 	
 	/* IMPLEMENT ME */

@@ -311,8 +311,11 @@ void syscall_trace(void)
 
 	/* the 0x80 provides a way for the tracing parent to distinguish
 	   between a syscall stop and SIGTRAP delivery */
-	ptrace_notify(SIGTRAP | ((current->ptrace & PT_TRACESYSGOOD)
-				 ? 0x80 : 0));
+ 	current->exit_code = SIGTRAP | ((current->ptrace & PT_TRACESYSGOOD)
+ 					? 0x80 : 0);
+	current->state = TASK_STOPPED;
+	notify_parent(current, SIGCHLD);
+	schedule();
 
 	/*
 	 * this isn't the same as continuing with a signal, but it will do

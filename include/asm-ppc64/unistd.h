@@ -264,10 +264,8 @@
 #define __NR_utimes		251
 #define __NR_statfs64		252
 #define __NR_fstatfs64		253
-#define __NR_fadvise64_64	254
-#define __NR_rtas		255
 
-#define __NR_syscalls		256
+#define __NR_syscalls		254
 #ifdef __KERNEL__
 #define NR_syscalls	__NR_syscalls
 #endif
@@ -289,7 +287,6 @@
 		register unsigned long __sc_5  __asm__ ("r5");		\
 		register unsigned long __sc_6  __asm__ ("r6");		\
 		register unsigned long __sc_7  __asm__ ("r7");		\
-		register unsigned long __sc_8  __asm__ ("r8");		\
 									\
 		__sc_loadargs_##nr(name, args);				\
 		__asm__ __volatile__					\
@@ -298,10 +295,10 @@
 			: "=&r" (__sc_0),				\
 			  "=&r" (__sc_3),  "=&r" (__sc_4),		\
 			  "=&r" (__sc_5),  "=&r" (__sc_6),		\
-			  "=&r" (__sc_7),  "=&r" (__sc_8)		\
+			  "=&r" (__sc_7)				\
 			: __sc_asm_input_##nr				\
 			: "cr0", "ctr", "memory",			\
-			        "r9", "r10","r11", "r12");		\
+			  "r8", "r9", "r10","r11", "r12");		\
 		__sc_ret = __sc_3;					\
 		__sc_err = __sc_0;					\
 	}								\
@@ -329,9 +326,6 @@
 #define __sc_loadargs_5(name, arg1, arg2, arg3, arg4, arg5)		\
 	__sc_loadargs_4(name, arg1, arg2, arg3, arg4);			\
 	__sc_7 = (unsigned long) (arg5)
-#define __sc_loadargs_6(name, arg1, arg2, arg3, arg4, arg5, arg6)	\
-	__sc_loadargs_5(name, arg1, arg2, arg3, arg4, arg5);		\
-	__sc_8 = (unsigned long) (arg6)
 
 #define __sc_asm_input_0 "0" (__sc_0)
 #define __sc_asm_input_1 __sc_asm_input_0, "1" (__sc_3)
@@ -339,7 +333,6 @@
 #define __sc_asm_input_3 __sc_asm_input_2, "3" (__sc_5)
 #define __sc_asm_input_4 __sc_asm_input_3, "4" (__sc_6)
 #define __sc_asm_input_5 __sc_asm_input_4, "5" (__sc_7)
-#define __sc_asm_input_6 __sc_asm_input_5, "6" (__sc_8)
 
 #define _syscall0(type,name)						\
 type name(void)								\
@@ -375,11 +368,6 @@ type name(type1 arg1, type2 arg2, type3 arg3, type4 arg4)		\
 type name(type1 arg1, type2 arg2, type3 arg3, type4 arg4, type5 arg5)	\
 {									\
 	__syscall_nr(5, type, name, arg1, arg2, arg3, arg4, arg5);	\
-}
-#define _syscall6(type,name,type1,arg1,type2,arg2,type3,arg3,type4,arg4,type5,arg5,type6,arg6) \
-type name(type1 arg1, type2 arg2, type3 arg3, type4 arg4, type5 arg5, type6 arg6)	\
-{									\
-	__syscall_nr(6, type, name, arg1, arg2, arg3, arg4, arg5, arg6);	\
 }
 
 #ifdef __KERNEL_SYSCALLS__

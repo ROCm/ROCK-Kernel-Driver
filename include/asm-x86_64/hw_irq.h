@@ -72,7 +72,7 @@ struct hw_interrupt_type;
  * levels. (0x80 is the syscall vector)
  */
 #define FIRST_DEVICE_VECTOR	0x31
-#define FIRST_SYSTEM_VECTOR	0xef
+#define FIRST_SYSTEM_VECTOR	0xef   /* duplicated in irq.h */
 
 
 #ifndef __ASSEMBLY__
@@ -172,6 +172,8 @@ static inline void hw_resend_irq(struct hw_interrupt_type *h, unsigned int i) {
 #else
 static inline void hw_resend_irq(struct hw_interrupt_type *h, unsigned int i) {}
 #endif
+
+#define platform_legacy_irq(irq)	((irq) < 16)
 
 #endif
 

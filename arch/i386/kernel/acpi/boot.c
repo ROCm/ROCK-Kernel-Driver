@@ -26,6 +26,7 @@
 #include <linux/init.h>
 #include <linux/config.h>
 #include <linux/acpi.h>
+#include <linux/efi.h>
 #include <asm/pgalloc.h>
 #include <asm/io_apic.h>
 #include <asm/apic.h>
@@ -331,6 +332,12 @@ acpi_find_rsdp (void)
 {
 	unsigned long		rsdp_phys = 0;
 
+	if (efi_enabled) {
+		if (efi.acpi20)
+			return __pa(efi.acpi20);
+		else if (efi.acpi)
+			return __pa(efi.acpi);
+	}
 	/*
 	 * Scan memory looking for the RSDP signature. First search EBDA (low
 	 * memory) paragraphs and then search upper memory (E0000-FFFFF).

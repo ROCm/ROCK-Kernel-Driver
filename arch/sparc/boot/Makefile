@@ -19,7 +19,7 @@ quiet_cmd_btfix		= BTFIX $@
 
 BTOBJS := $(HEAD_Y) $(INIT_Y)
 BTLIBS := $(CORE_Y) $(LIBS_Y) $(DRIVERS_Y) $(NET_Y)
-LDFLAGS_image := -T arch/sparc/kernel/vmlinux.lds.s $(BTOBJS) --start-group $(BTLIBS) --end-group
+LDFLAGS_image := -T arch/sparc/kernel/vmlinux.lds.s $(BTOBJS) --start-group $(BTLIBS) --end-group $(kallsyms.o)
 
 # Actual linking
 $(obj)/image: $(obj)/btfix.o FORCE

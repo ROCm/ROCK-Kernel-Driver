@@ -11,20 +11,6 @@
 #include <asm/prom.h>
 #include <asm/uaccess.h>
 
-#ifndef HAVE_ARCH_DEVTREE_FIXUPS
-static inline void set_node_proc_entry(struct device_node *np, struct proc_dir_entry *de)
-{
-}
-
-static void inline set_node_name_link(struct device_node *np, struct proc_dir_entry *de)
-{
-}
-
-static void inline set_node_addr_link(struct device_node *np, struct proc_dir_entry *de)
-{
-}
-#endif
-
 static struct proc_dir_entry *proc_device_tree;
 
 /*
@@ -58,7 +44,7 @@ static int property_read_proc(char *page, char **start, off_t off,
 /*
  * Process a node, adding entries for its children and its properties.
  */
-void proc_device_tree_add_node(struct device_node *np, struct proc_dir_entry *de)
+static void add_node(struct device_node *np, struct proc_dir_entry *de)
 {
 	struct property *pp;
 	struct proc_dir_entry *ent;
@@ -67,7 +53,6 @@ void proc_device_tree_add_node(struct device_node *np, struct proc_dir_entry *de
 	int l;
 	struct proc_dir_entry *list, **lastp, *al;
 
-	set_node_proc_entry(np, de);
 	lastp = &list;
 	for (pp = np->properties; pp != 0; pp = pp->next) {
 		/*
@@ -85,8 +70,7 @@ void proc_device_tree_add_node(struct device_node *np, struct proc_dir_entry *de
 		*lastp = ent;
 		lastp = &ent->next;
 	}
-	child = NULL;
-	while ((child = of_get_next_child(np, child))) {
+	for (child = np->child; child != 0; child = child->sibling) {
 		p = strrchr(child->full_name, '/');
 		if (p == 0)
 			p = child->full_name;
@@ -101,7 +85,7 @@ void proc_device_tree_add_node(struct device_node *np, struct proc_dir_entry *de
 			break;
 		*lastp = ent;
 		lastp = &ent->next;
-		proc_device_tree_add_node(child, ent);
+		add_node(child, ent);
 
 		/*
 		 * If we left the address part on the name, consider
@@ -114,32 +98,26 @@ void proc_device_tree_add_node(struct device_node *np, struct proc_dir_entry *de
 		 * If this is the first node with a given name property,
 		 * add a symlink with the name property as its name.
 		 */
-		sib = NULL;
-		while ((sib = of_get_next_child(np, sib)) && sib != child)
+		for (sib = np->child; sib != child; sib = sib->sibling)
 			if (sib->name && strcmp(sib->name, child->name) == 0)
 				break;
 		if (sib == child && strncmp(p, child->name, l) != 0) {
 			al = proc_symlink(child->name, de, ent->name);
-			if (al == 0) {
-				of_node_put(sib);
+			if (al == 0)
 				break;
-			}
-			set_node_name_link(child, al);
 			*lastp = al;
 			lastp = &al->next;
 		}
-		of_node_put(sib);
+
 		/*
 		 * Add another directory with the @address part as its name.
 		 */
 		al = proc_symlink(at, de, ent->name);
 		if (al == 0)
 			break;
-		set_node_addr_link(child, al);
 		*lastp = al;
 		lastp = &al->next;
 	}
-	of_node_put(child);
 	*lastp = 0;
 	de->subdir = list;
 }
@@ -155,11 +133,10 @@ void proc_device_tree_init(void)
 	proc_device_tree = proc_mkdir("device-tree", 0);
 	if (proc_device_tree == 0)
 		return;
-	root = of_find_node_by_path("/");
+	root = find_path_device("/");
 	if (root == 0) {
 		printk(KERN_ERR "/proc/device-tree: can't find root\n");
 		return;
 	}
-	proc_device_tree_add_node(root, proc_device_tree);
-	of_node_put(root);
+	add_node(root, proc_device_tree);
 }

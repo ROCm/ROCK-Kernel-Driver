@@ -9,7 +9,7 @@
 #	Patched for non-x86 by Opencon (L) 2002 <opencon@rio.skydome.net>
 #
 # That's the voodoo to see if it's a x86.
-ISX86=`arch | grep -ie i.86`
+ISX86=`echo ${ARCH:=\`arch\`} | grep -ie i.86`
 if [ ! -z $ISX86 ]; then
 	PC=1
 else

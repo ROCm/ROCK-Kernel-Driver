@@ -73,7 +73,7 @@ S: Status, one of the following:
 3C359 NETWORK DRIVER
 P:	Mike Phillips
 M:	mikep@linuxtr.net
-L:	linux-net@vger.rutgers.edu
+L:	linux-net@vger.kernel.org
 L:	linux-tr@linuxtr.net
 W:	http://www.linuxtr.net
 S:	Maintained
@@ -980,25 +980,28 @@ IEEE 1394 SUBSYSTEM
 P:	Ben Collins
 M:	bcollins@debian.org
 L:	linux1394-devel@lists.sourceforge.net
-W:	http://linux1394.sourceforge.net/
+W:	http://www.linux1394.org/
 S:	Maintained
 
 IEEE 1394 OHCI DRIVER
 P:	Ben Collins
 M:	bcollins@debian.org
 L:	linux1394-devel@lists.sourceforge.net
+W:	http://www.linux1394.org/
 S:	Maintained
 
 IEEE 1394 PCILYNX DRIVER
 P:	Andreas Bombe
 M:	andreas.bombe@munich.netsurf.de
 L:	linux1394-devel@lists.sourceforge.net
+W:	http://www.linux1394.org/
 S:	Maintained
 
 IEEE 1394 RAW I/O DRIVER
-P:	Andreas Bombe
-M:	andreas.bombe@munich.netsurf.de
+P:	Ben Collins
+M:	bcollins@debian.org
 L:	linux1394-devel@lists.sourceforge.net
+W:	http://www.linux1394.org/
 S:	Maintained
 
 IMS TWINTURBO FRAMEBUFFER DRIVER
@@ -1235,8 +1238,8 @@ W:	http://ldm.sourceforge.net
 S:	Maintained
 
 LSILOGIC/SYMBIOS/NCR 53C8XX and 53C1010 PCI-SCSI drivers
-P:	Gerard Roudier
-M:	groudier@free.fr
+P:	Matthew Wilcox
+M:	matthew@wil.cx
 L:	linux-scsi@vger.kernel.org
 S:	Maintained
 
@@ -1469,7 +1472,7 @@ ONSTREAM SCSI TAPE DRIVER
 P:	Willem Riede
 M:	osst@riede.org
 L:	osst@linux1.onstream.nl
-L:	linux-scsi@vger.rutgers.edu
+L:	linux-scsi@vger.kernel.org
 S:	Maintained
 
 OPL3-SA2, SA3, and SAx DRIVER
@@ -1557,11 +1560,8 @@ M:	greg@kroah.com
 S:	Maintained
 
 PCMCIA SUBSYSTEM
-P:	David Hinds
-M:	dahinds@users.sourceforge.net
-L:	linux-kernel@vger.kernel.org
-W:	http://pcmcia-cs.sourceforge.net
-S:	Maintained
+L:	http://lists.infradead.org/mailman/listinfo/linux-pcmcia
+S:	Unmaintained
 
 PCNET32 NETWORK DRIVER
 P:	Thomas Bogendörfer
@@ -1853,8 +1853,10 @@ L:	ultralinux@vger.kernel.org
 S:	Maintained
 
 SPARC (sparc32):
+P:	Keith M. Wesolowski
+M:	wesolows@foobazco.org
 L:	sparclinux@vger.kernel.org
-S:	Unmaintained - please send patches to mailing list
+S:	Maintained
 
 SPECIALIX IO8+ MULTIPORT SERIAL CARD DRIVER
 P:	Roger Wolff

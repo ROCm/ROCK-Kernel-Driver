@@ -671,7 +671,8 @@ static int reiserfs_parse_options (struct super_block * s, char * options, /* st
 				      collection of bitflags defining what
 				      mount options were selected. */
 				   unsigned long * blocks, /* strtol-ed from NNN of resize=NNN */
-				   char ** jdev_name)
+				   char ** jdev_name,
+				   unsigned int * commit_max_age)
 {
     int c;
     char * arg = NULL;
@@ -694,6 +695,7 @@ static int reiserfs_parse_options (struct super_block * s, char * options, /* st
 	{"resize", 'r', 0, 0, 0},
 	{"jdev", 'j', 0, 0, 0},
 	{"nolargeio", 'w', 0, 0, 0},
+	{"commit", 'c', 0, 0, 0},
 	{NULL, 0, 0, 0, 0}
     };
 	
@@ -720,6 +722,19 @@ static int reiserfs_parse_options (struct super_block * s, char * options, /* st
 		printk ("reiserfs_parse_options: bad value %s\n", arg);
 		return 0;
 	    }
+	}
+
+	if ( c == 'c' ) {
+		char *p = 0;
+		int val = simple_strtoul (arg, &p, 0);
+		/* commit=NNN (time in seconds) */
+		if ( *p != '\0' || val == 0) {
+			printk ("reiserfs_parse_options: bad value %s\n", arg);
+			return 0;
+		}
+		if ( val > 0 ) {
+			*commit_max_age = val;
+		}
 	}
 
 	if ( c == 'w' ) {
@@ -775,10 +790,11 @@ static int reiserfs_remount (struct super_block * s, int * mount_flags, char * a
   unsigned long blocks;
   unsigned long mount_options = REISERFS_SB(s)->s_mount_opt;
   unsigned long safe_mask = 0;
+  unsigned int commit_max_age = 0;
 
   rs = SB_DISK_SUPER_BLOCK (s);
 
-  if (!reiserfs_parse_options(s, arg, &mount_options, &blocks, NULL))
+  if (!reiserfs_parse_options(s, arg, &mount_options, &blocks, NULL, &commit_max_age))
     return -EINVAL;
   
   handle_attrs(s);
@@ -797,6 +813,10 @@ static int reiserfs_remount (struct super_block * s, int * mount_flags, char * a
   /* Update the bitmask, taking care to keep
    * the bits we're not allowed to change here */
   REISERFS_SB(s)->s_mount_opt = (REISERFS_SB(s)->s_mount_opt & ~safe_mask) |  (mount_options & safe_mask);
+
+  if(commit_max_age != 0) {
+	  SB_JOURNAL_MAX_COMMIT_AGE(s) = commit_max_age;
+  }
 
   if(blocks) {
     int rc = reiserfs_resize(s, blocks);
@@ -1240,10 +1260,14 @@ int function2code (hashf_t func)
     if (func == r5_hash)
 	return R5_HASH;
 
-    BUG() ; // should never happen 
+    BUG() ; // should never happen
 
     return 0;
 }
+
+#define SPRINTK(silent, ...)			\
+	if (!(silent))				\
+		printk(__VA_ARGS__)
 
 static int reiserfs_fill_super (struct super_block * s, void * data, int silent)
 {
@@ -1252,6 +1276,7 @@ static int reiserfs_fill_super (struct super_block * s, void * data, int silent)
     struct reiserfs_transaction_handle th ;
     int old_format = 0;
     unsigned long blocks;
+	unsigned int commit_max_age = 0;
     int jinit_done = 0 ;
     struct reiserfs_iget_args args ;
     struct reiserfs_super_block * rs;
@@ -1278,58 +1303,58 @@ static int reiserfs_fill_super (struct super_block * s, void * data, int silent)
     init_rwsem(&REISERFS_SB(s)->xattr_dir_sem);
 
     jdev_name = NULL;
-    if (reiserfs_parse_options (s, (char *) data, &(sbi->s_mount_opt), &blocks, &jdev_name) == 0) {
+    if (reiserfs_parse_options (s, (char *) data, &(sbi->s_mount_opt), &blocks, &jdev_name, &commit_max_age) == 0) {
 	goto error;
     }
 
     if (blocks) {
-  	printk("jmacd-7: reiserfs_fill_super: resize option for remount only\n");
+	SPRINTK(silent, "jmacd-7: reiserfs_fill_super: resize option for remount only\n");
 	goto error;
     }	
 
     /* try old format (undistributed bitmap, super block in 8-th 1k block of a device) */
-    if (!read_super_block (s, REISERFS_OLD_DISK_OFFSET_IN_BYTES)) 
+    if (!read_super_block (s, REISERFS_OLD_DISK_OFFSET_IN_BYTES))
       old_format = 1;
     /* try new format (64-th 1k block), which can contain reiserfs super block */
     else if (read_super_block (s, REISERFS_DISK_OFFSET_IN_BYTES)) {
-      printk("sh-2021: reiserfs_fill_super: can not find reiserfs on %s\n", reiserfs_bdevname (s));
-      goto error;    
+      SPRINTK(silent, "sh-2021: reiserfs_fill_super: can not find reiserfs on %s\n", reiserfs_bdevname (s));
+      goto error;
     }
 
     rs = SB_DISK_SUPER_BLOCK (s);
     /* Let's do basic sanity check to verify that underlying device is not
        smaller than the filesystem. If the check fails then abort and scream,
        because bad stuff will happen otherwise. */
-    if ( s->s_bdev && s->s_bdev->bd_inode && i_size_read(s->s_bdev->bd_inode) < sb_block_count(rs)*sb_blocksize(rs) ) {
-	printk("Filesystem on %s cannot be mounted because it is bigger than the device\n", reiserfs_bdevname(s));
-	printk("You may need to run fsck or increase size of your LVM partition\n");
-	printk("Or may be you forgot to reboot after fdisk when it told you to\n");
+    if ( s->s_bdev && s->s_bdev->bd_inode && i_size_read(s->s_bdev->bd_inode) < sb_block_count(rs)*sb_blocksize(rs)) {
+	SPRINTK(silent, "Filesystem on %s cannot be mounted because it is bigger than the device\n", reiserfs_bdevname(s));
+	SPRINTK(silent, "You may need to run fsck or increase size of your LVM partition\n");
+	SPRINTK(silent, "Or may be you forgot to reboot after fdisk when it told you to\n");
 	goto error;
     }
 
     sbi->s_mount_state = SB_REISERFS_STATE(s);
     sbi->s_mount_state = REISERFS_VALID_FS ;
 
-    if (old_format ? read_old_bitmaps(s) : read_bitmaps(s)) { 
-	printk ("jmacd-8: reiserfs_fill_super: unable to read bitmap\n");
+    if (old_format ? read_old_bitmaps(s) : read_bitmaps(s)) {
+	SPRINTK(silent, "jmacd-8: reiserfs_fill_super: unable to read bitmap\n");
 	goto error;
     }
 #ifdef CONFIG_REISERFS_CHECK
-    printk("reiserfs:warning: CONFIG_REISERFS_CHECK is set ON\n");
-    printk("reiserfs:warning: - it is slow mode for debugging.\n");
+    SPRINTK(silent, "reiserfs:warning: CONFIG_REISERFS_CHECK is set ON\n");
+    SPRINTK(silent, "reiserfs:warning: - it is slow mode for debugging.\n");
 #endif
 
     // set_device_ro(s->s_dev, 1) ;
-    if( journal_init(s, jdev_name, old_format) ) {
-	printk("sh-2022: reiserfs_fill_super: unable to initialize journal space\n") ;
+    if( journal_init(s, jdev_name, old_format, commit_max_age) ) {
+	SPRINTK(silent, "sh-2022: reiserfs_fill_super: unable to initialize journal space\n") ;
 	goto error ;
     } else {
 	jinit_done = 1 ; /* once this is set, journal_release must be called
-			 ** if we error out of the mount 
+			 ** if we error out of the mount
 			 */
     }
     if (reread_meta_blocks(s)) {
-	printk("jmacd-9: reiserfs_fill_super: unable to reread meta blocks after journal init\n") ;
+	SPRINTK(silent, "jmacd-9: reiserfs_fill_super: unable to reread meta blocks after journal init\n") ;
 	goto error ;
     }
 
@@ -1337,14 +1362,14 @@ static int reiserfs_fill_super (struct super_block * s, void * data, int silent)
 	goto error;
 
     if (bdev_read_only(s->s_bdev) && !(s->s_flags & MS_RDONLY)) {
-        printk("clm-7000: Detected readonly device, marking FS readonly\n") ;
+        SPRINTK(silent, "clm-7000: Detected readonly device, marking FS readonly\n") ;
 	s->s_flags |= MS_RDONLY ;
     }
     args.objectid = REISERFS_ROOT_OBJECTID ;
     args.dirid = REISERFS_ROOT_PARENT_OBJECTID ;
     root_inode = iget5_locked (s, REISERFS_ROOT_OBJECTID, reiserfs_find_actor, reiserfs_init_locked_inode, (void *)(&args));
     if (!root_inode) {
-	printk ("jmacd-10: reiserfs_fill_super: get root inode failed\n");
+	SPRINTK(silent, "jmacd-10: reiserfs_fill_super: get root inode failed\n");
 	goto error;
     }
 
@@ -1382,22 +1407,23 @@ static int reiserfs_fill_super (struct super_block * s, void * data, int silent)
 	
 	if (old_format_only(s)) {
 	  /* filesystem of format 3.5 either with standard or non-standard
-	     journal */       
+	     journal */
 	  if (convert_reiserfs (s)) {
-	    /* and -o conv is given */ 
-	    reiserfs_warning ("reiserfs: converting 3.5 filesystem to the 3.6 format\n") ;
-	    
+	    /* and -o conv is given */
+	    if(!silent)
+	      reiserfs_warning ("reiserfs: converting 3.5 filesystem to the 3.6 format\n") ;
+
 	    if (is_reiserfs_3_5 (rs))
 	      /* put magic string of 3.6 format. 2.2 will not be able to
 		 mount this filesystem anymore */
-	      memcpy (rs->s_v1.s_magic, reiserfs_3_6_magic_string, 
+	      memcpy (rs->s_v1.s_magic, reiserfs_3_6_magic_string,
 		      sizeof (reiserfs_3_6_magic_string));
-	    
+
 	    set_sb_version(rs,REISERFS_VERSION_2);
 	    reiserfs_convert_objectid_map_v1(s) ;
 	    set_bit(REISERFS_3_6, &(sbi->s_properties));
 	    clear_bit(REISERFS_3_5, &(sbi->s_properties));
-	  } else {
+	  } else if (!silent){
 	    reiserfs_warning("reiserfs: using 3.5.x disk format\n") ;
 	  }
 	}
@@ -1416,7 +1442,7 @@ static int reiserfs_fill_super (struct super_block * s, void * data, int silent)
 
 	s->s_dirt = 0;
     } else {
-	if ( old_format_only(s) ) {
+	if ( old_format_only(s) && !silent) {
 	    reiserfs_warning("reiserfs: using 3.5.x disk format\n") ;
 	}
 

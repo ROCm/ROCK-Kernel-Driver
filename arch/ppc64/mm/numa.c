@@ -46,29 +46,29 @@ static inline void map_cpu_to_node(int cpu, int node)
 
 static int __init parse_numa_properties(void)
 {
-	struct device_node *cpu = NULL;
-	struct device_node *memory = NULL;
+	struct device_node *cpu;
+	struct device_node *memory;
 	int *cpu_associativity;
 	int *memory_associativity;
 	int depth;
 	int max_domain = 0;
 
-	cpu = of_find_node_by_type(NULL, "cpu");
+	cpu = find_type_devices("cpu");
 	if (!cpu)
-		goto err;
+		return -1;
 
-	memory = of_find_node_by_type(NULL, "memory");
+	memory = find_type_devices("memory");
 	if (!memory)
-		goto err;
+		return -1;
 
 	cpu_associativity = (int *)get_property(cpu, "ibm,associativity", NULL);
 	if (!cpu_associativity)
-		goto err;
+		return -1;
 
 	memory_associativity = (int *)get_property(memory, "ibm,associativity",
 						   NULL);
 	if (!memory_associativity)
-		goto err;
+		return -1;
 
 	/* find common depth */
 	if (cpu_associativity[0] < memory_associativity[0])
@@ -76,7 +76,7 @@ static int __init parse_numa_properties(void)
 	else
 		depth = memory_associativity[0];
 
-	for (; cpu; cpu = of_find_node_by_type(cpu, "cpu")) {
+	for (cpu = find_type_devices("cpu"); cpu; cpu = cpu->next) {
 		int *tmp;
 		int cpu_nr, numa_domain;
 
@@ -106,7 +106,8 @@ static int __init parse_numa_properties(void)
 		map_cpu_to_node(cpu_nr, numa_domain);
 	}
 
-	for (; memory; memory = of_find_node_by_type(memory, "memory")) {
+	for (memory = find_type_devices("memory"); memory;
+	     memory = memory->next) {
 		int *tmp1, *tmp2;
 		unsigned long i;
 		unsigned long start = 0;
@@ -195,10 +196,6 @@ new_range:
 	numnodes = max_domain + 1;
 
 	return 0;
-err:
-	of_node_put(cpu);
-	of_node_put(memory);
-	return -1;
 }
 
 void setup_nonnuma(void)

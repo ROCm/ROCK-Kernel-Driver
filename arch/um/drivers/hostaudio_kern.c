@@ -11,7 +11,6 @@
 #include "linux/fs.h"
 #include "linux/sound.h"
 #include "linux/soundcard.h"
-#include "asm/uaccess.h"
 #include "kern_util.h"
 #include "init.h"
 #include "hostaudio.h"
@@ -23,7 +22,7 @@ char *mixer = HOSTAUDIO_DEV_MIXER;
 #ifndef MODULE
 static int set_dsp(char *name, int *add)
 {
-	dsp = name;
+	dsp = uml_strdup(name);
 	return(0);
 }
 
@@ -35,7 +34,7 @@ __uml_setup("dsp=", set_dsp,
 
 static int set_mixer(char *name, int *add)
 {
-	mixer = name;
+	mixer = uml_strdup(name);
 	return(0);
 }
 
@@ -52,55 +51,23 @@ static ssize_t hostaudio_read(struct file *file, char *buffer, size_t count,
 			      loff_t *ppos)
 {
         struct hostaudio_state *state = file->private_data;
-	void *kbuf;
-	int err;
 
 #ifdef DEBUG
         printk("hostaudio: read called, count = %d\n", count);
 #endif
 
-	kbuf = kmalloc(count, GFP_KERNEL);
-	if(kbuf == NULL)
-		return(-ENOMEM);
-
-        err = hostaudio_read_user(state, kbuf, count, ppos);
-	if(err < 0)
-		goto out;
-
-	if(copy_to_user(buffer, kbuf, err))
-		err = -EFAULT;
-
- out:
-	kfree(kbuf);
-	return(err);
+        return(hostaudio_read_user(state, buffer, count, ppos));
 }
 
 static ssize_t hostaudio_write(struct file *file, const char *buffer, 
 			       size_t count, loff_t *ppos)
 {
         struct hostaudio_state *state = file->private_data;
-	void *kbuf;
-	int err;
 
 #ifdef DEBUG
         printk("hostaudio: write called, count = %d\n", count);
 #endif
-
-	kbuf = kmalloc(count, GFP_KERNEL);
-	if(kbuf == NULL)
-		return(-ENOMEM);
-
-	err = -EFAULT;
-	if(copy_from_user(kbuf, buffer, count))
-		goto out;
-
-        err = hostaudio_write_user(state, kbuf, count, ppos);
-	if(err < 0)
-		goto out;
-
- out:
-	kfree(kbuf);
-	return(err);
+        return(hostaudio_write_user(state, buffer, count, ppos));
 }
 
 static unsigned int hostaudio_poll(struct file *file, 
@@ -119,43 +86,12 @@ static int hostaudio_ioctl(struct inode *inode, struct file *file,
 			   unsigned int cmd, unsigned long arg)
 {
         struct hostaudio_state *state = file->private_data;
-	unsigned long data = 0;
-	int err;
 
 #ifdef DEBUG
         printk("hostaudio: ioctl called, cmd = %u\n", cmd);
 #endif
-	switch(cmd){
-	case SNDCTL_DSP_SPEED:
-	case SNDCTL_DSP_STEREO:
-	case SNDCTL_DSP_GETBLKSIZE:
-	case SNDCTL_DSP_CHANNELS:
-	case SNDCTL_DSP_SUBDIVIDE:
-	case SNDCTL_DSP_SETFRAGMENT:
-		if(get_user(data, (int *) arg))
-			return(-EFAULT);
-		break;
-	default:
-		break;
-	}
 
-        err = hostaudio_ioctl_user(state, cmd, (unsigned long) &data);
-
-	switch(cmd){
-	case SNDCTL_DSP_SPEED:
-	case SNDCTL_DSP_STEREO:
-	case SNDCTL_DSP_GETBLKSIZE:
-	case SNDCTL_DSP_CHANNELS:
-	case SNDCTL_DSP_SUBDIVIDE:
-	case SNDCTL_DSP_SETFRAGMENT:
-		if(put_user(data, (int *) arg))
-			return(-EFAULT);
-		break;
-	default:
-		break;
-	}
-
-	return(err);
+        return(hostaudio_ioctl_user(state, cmd, arg));
 }
 
 static int hostaudio_open(struct inode *inode, struct file *file)
@@ -289,8 +225,7 @@ MODULE_LICENSE("GPL");
 
 static int __init hostaudio_init_module(void)
 {
-        printk(KERN_INFO "UML Audio Relay (host dsp = %s, host mixer = %s)\n",
-	       dsp, mixer);
+        printk(KERN_INFO "UML Audio Relay\n");
 
 	module_data.dev_audio = register_sound_dsp(&hostaudio_fops, -1);
         if(module_data.dev_audio < 0){

@@ -131,27 +131,54 @@ The following information is available in this file:
       SCSI "stub" effects.
 
 2. Version History
+   6.2.36 (June 3rd, 2003)
+        - Correct code that disables PCI parity error checking.
+        - Correct and simplify handling of the ignore wide residue
+          message.  The previous code would fail to report a residual
+          if the transaction data length was even and we received
+          an IWR message.
+        - Add support for the 2.5.X EISA framework.
+        - Update for change in 2.5.X SCSI proc FS interface.
+        - Correct Domain Validation command-line option parsing.
+        - When negotiation async via an 8bit WDTR message, send
+          an SDTR with an offset of 0 to be sure the target
+          knows we are async.  This works around a firmware defect
+          in the Quantum Atlas 10K.
+        - Clear PCI error state during driver attach so that we
+          don't disable memory mapped I/O due to a stray write
+          by some other driver probe that occurred before we
+          claimed the controller.
 
-        6.2.34 - Fix locking regression instroduced in 6.2.29 that
-                 could cuase a lock order reversal between the io_request_lock
-                 and our per-softc lock.  This was only possible on RH9,
-                 SuSE, and kernel.org 2.4.X kernels.
+   6.2.35 (May 14th, 2003)
+        - Fix a few GCC 3.3 compiler warnings.
+        - Correct operation on EISA Twin Channel controller.
+        - Add support for 2.5.X's scsi_report_device_reset().
 
-        6.2.33 - Dynamically disable PCI parity error reporting after
-		 10 errors are reported to the user.  These errors are
-		 the result of some other device issuing PCI transactions
-		 with bad parity.  Once the user has been informed of the
-		 problem, continuing to report the errors just degrades
-		 our performance.
+   6.2.34 (May 5th, 2003)
+        - Fix locking regression instroduced in 6.2.29 that
+          could cuase a lock order reversal between the io_request_lock
+          and our per-softc lock.  This was only possible on RH9,
+          SuSE, and kernel.org 2.4.X kernels.
 
-        6.2.32 - Dynamically sized S/G lists to avoid SCSI malloc
-		 pool fragmentation and SCSI mid-layer deadlock.
+   6.2.33 (April 30th, 2003)
+        - Dynamically disable PCI parity error reporting after
+          10 errors are reported to the user.  These errors are
+          the result of some other device issuing PCI transactions
+          with bad parity.  Once the user has been informed of the
+          problem, continuing to report the errors just degrades
+          our performance.
 
-        6.2.28 - Domain Validation Fixes
-                 PCI parity error disable
-                 Enhanced Memory Mapped I/O probe
+   6.2.32 (March 28th, 2003)
+        - Dynamically sized S/G lists to avoid SCSI malloc
+          pool fragmentation and SCSI mid-layer deadlock.
 
-        6.2.20 - Added Domain Validation
+   6.2.28 (January 20th, 2003)
+        - Domain Validation Fixes
+        - Add ability to disable PCI parity error checking.
+        - Enhanced Memory Mapped I/O probe
+
+   6.2.20 (November 7th, 2002)
+        - Added Domain Validation.
 
 3. Command Line Options
 

@@ -89,6 +89,8 @@ extern int session_of_pgrp(int pgrp);
 asmlinkage int printk(const char * fmt, ...)
 	__attribute__ ((format (printf, 1, 2)));
 
+unsigned long int_sqrt(unsigned long);
+
 static inline void console_silent(void)
 {
 	console_loglevel = 0;

@@ -72,6 +72,7 @@ void init_new_thread_signals(int altstack)
 		    SIGUSR1, SIGIO, SIGWINCH, SIGALRM, SIGVTALRM, -1);
 	set_handler(SIGUSR2, (__sighandler_t) sig_handler, 
 		    SA_NOMASK | flags, -1);
+	(void) CHOOSE_MODE(signal(SIGCHLD, SIG_IGN), (void *) 0);
 	signal(SIGHUP, SIG_IGN);
 
 	init_irq_signals(altstack);
@@ -126,8 +127,7 @@ int start_fork_tramp(void *thread_arg, unsigned long temp_stack,
 	if(err < 0) panic("Waiting for outer trampoline failed - errno = %d", 
 			  errno);
 	if(!WIFSIGNALED(status) || (WTERMSIG(status) != SIGKILL))
-		panic("outer trampoline didn't exit with SIGKILL, "
-		      "status = %d", status);
+		panic("outer trampoline didn't exit with SIGKILL");
 
 	return(arg.pid);
 }

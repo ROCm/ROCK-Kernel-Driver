@@ -53,6 +53,7 @@ SECTIONS
     *(.data1)
     *(.sdata)
     *(.sdata2)
+    *(.got.plt) *(.got)
     *(.dynamic)
     CONSTRUCTORS
   }
@@ -125,7 +126,6 @@ SECTIONS
   /* freed after init ends here */
 
   __toc_start = .;
-  .got : { *(.got.plt) *(.got) }
   .toc : { *(.toc) }
   . = ALIGN(4096);
   __toc_end = .;

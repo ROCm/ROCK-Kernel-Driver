@@ -86,7 +86,19 @@ static unsigned long con_start;	/* Index into log_buf: next char to be sent to c
 static unsigned long log_end;	/* Index into log_buf: most-recently-written-char + 1 */
 static unsigned long logged_chars; /* Number of chars produced since last read+clear operation */
 
-struct console_cmdline console_cmdline[MAX_CMDLINECONSOLES];
+/*
+ *	Array of consoles built from command line options (console=)
+ */
+struct console_cmdline
+{
+	char	name[8];			/* Name of the driver	    */
+	int	index;				/* Minor dev. to use	    */
+	char	*options;			/* Options for the driver   */
+};
+
+#define MAX_CMDLINECONSOLES 8
+
+static struct console_cmdline console_cmdline[MAX_CMDLINECONSOLES];
 static int preferred_console = -1;
 
 /* Flag: console code may call schedule() */
@@ -97,10 +109,9 @@ static int console_may_schedule;
  */
 static int __init console_setup(char *str)
 {
-	struct console_cmdline *c;
-	char name[sizeof(c->name)];
+	char name[sizeof(console_cmdline[0].name)];
 	char *s, *options;
-	int i, idx;
+	int idx;
 
 	/*
 	 *	Decode str into name, index, options.
@@ -125,6 +136,27 @@ static int __init console_setup(char *str)
 	idx = simple_strtoul(s, NULL, 10);
 	*s = 0;
 
+	add_preferred_console(name, idx, options);
+	return 1;
+}
+
+__setup("console=", console_setup);
+
+/**
+ * add_preferred_console - add a device to the list of preferred consoles.
+ *
+ * The last preferred console added will be used for kernel messages
+ * and stdin/out/err for init.  Normally this is used by console_setup
+ * above to handle user-supplied console arguments; however it can also
+ * be used by arch-specific code either to override the user or more
+ * commonly to provide a default console (ie from PROM variables) when
+ * the user has not supplied one.
+ */
+int __init add_preferred_console(char *name, int idx, char *options)
+{
+	struct console_cmdline *c;
+	int i;
+
 	/*
 	 *	See if this tty is not yet registered, and
 	 *	if we have a slot free.
@@ -133,23 +165,23 @@ static int __init console_setup(char *str)
 		if (strcmp(console_cmdline[i].name, name) == 0 &&
 			  console_cmdline[i].index == idx) {
 				preferred_console = i;
-				return 1;
+				return 0;
 		}
 	if (i == MAX_CMDLINECONSOLES)
-		return 1;
+		return -E2BIG;
 	preferred_console = i;
 	c = &console_cmdline[i];
 	memcpy(c->name, name, sizeof(c->name));
+	c->name[sizeof(c->name) - 1] = 0;
 	c->options = options;
 	c->index = idx;
-	return 1;
+	return 0;
 }
-
-__setup("console=", console_setup);
 
 static int __init log_buf_len_setup(char *str)
 {
 	unsigned long size = memparse(str, &str);
+	unsigned long flags;
 
 	if (size > log_buf_len) {
 		unsigned long start, dest_idx, offset;
@@ -161,7 +193,7 @@ static int __init log_buf_len_setup(char *str)
 			goto out;
 		}
 
-		spin_lock_irq(&logbuf_lock);
+		spin_lock_irqsave(&logbuf_lock, flags);
 		log_buf_len = size;
 		log_buf = new_log_buf;
 
@@ -175,7 +207,7 @@ static int __init log_buf_len_setup(char *str)
 		log_start -= offset;
 		con_start -= offset;
 		log_end -= offset;
-		spin_unlock_irq(&logbuf_lock);
+		spin_unlock_irqrestore(&logbuf_lock, flags);
 
 		printk("log_buf_len: %d\n", log_buf_len);
 	}

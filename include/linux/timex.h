@@ -282,7 +282,7 @@ struct timex {
  */
 extern unsigned long tick_usec;		/* USER_HZ period (usec) */
 extern unsigned long tick_nsec;		/* ACTHZ          period (nsec) */
-#define tickadj ((int)(500/HZ ? : 1))
+extern int tickadj;			/* amount of adjustment per tick */
 
 /*
  * phase-lock loop variables
