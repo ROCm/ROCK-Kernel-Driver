@@ -50,7 +50,6 @@ static int default_profile[MTHCA_RES_NUM] = {
 };
 
 enum {
-	MTHCA_RDB_ENTRY_SIZE = 32,
 	MTHCA_MTT_SEG_SIZE   = 64
 };
 
@@ -181,8 +180,13 @@ int mthca_make_profile(struct mthca_dev *dev,
 			init_hca->log_num_eqs = profile[i].log_num;
 			break;
 		case MTHCA_RES_RDB:
-			dev->limits.num_rdbs = profile[i].num;
-			init_hca->rdb_base   = profile[i].start;
+			for (dev->qp_table.rdb_shift = 0;
+			     profile[MTHCA_RES_QP].num << dev->qp_table.rdb_shift <
+				     profile[i].num;
+			     ++dev->qp_table.rdb_shift)
+				; /* nothing */
+			dev->qp_table.rdb_base    = (u32) profile[i].start;
+			init_hca->rdb_base        = profile[i].start;
 			break;
 		case MTHCA_RES_MCG:
 			dev->limits.num_mgms      = profile[i].num >> 1;

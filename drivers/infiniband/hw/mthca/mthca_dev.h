@@ -75,6 +75,7 @@ enum {
 	MTHCA_EQ_CONTEXT_SIZE =  0x40,
 	MTHCA_CQ_CONTEXT_SIZE =  0x40,
 	MTHCA_QP_CONTEXT_SIZE = 0x200,
+	MTHCA_RDB_ENTRY_SIZE  =  0x20,
 	MTHCA_AV_SIZE         =  0x20,
 	MTHCA_MGM_ENTRY_SIZE  =  0x40
 };
@@ -121,7 +122,6 @@ struct mthca_limits {
 	int      mtt_seg_size;
 	int      reserved_mtts;
 	int      reserved_mrws;
-	int      num_rdbs;
 	int      reserved_uars;
 	int      num_mgms;
 	int      num_amgms;
@@ -174,6 +174,8 @@ struct mthca_cq_table {
 
 struct mthca_qp_table {
 	struct mthca_alloc alloc;
+	u32                rdb_base;
+	int                rdb_shift;
 	int                sqp_start;
 	spinlock_t         lock;
 	struct mthca_array qp;

@@ -146,7 +146,7 @@ enum {
 	MTHCA_QP_OPTPAR_ALT_ADDR_PATH     = 1 << 0,
 	MTHCA_QP_OPTPAR_RRE               = 1 << 1,
 	MTHCA_QP_OPTPAR_RAE               = 1 << 2,
-	MTHCA_QP_OPTPAR_REW               = 1 << 3,
+	MTHCA_QP_OPTPAR_RWE               = 1 << 3,
 	MTHCA_QP_OPTPAR_PKEY_INDEX        = 1 << 4,
 	MTHCA_QP_OPTPAR_Q_KEY             = 1 << 5,
 	MTHCA_QP_OPTPAR_RNR_TIMEOUT       = 1 << 6,
@@ -697,13 +697,86 @@ int mthca_modify_qp(struct ib_qp *ibqp, struct ib_qp_attr *attr, int attr_mask)
 		qp_param->opt_param_mask |= cpu_to_be32(MTHCA_QP_OPTPAR_RETRY_COUNT);
 	}
 
-	/* XXX initiator resources */
+	if (attr_mask & IB_QP_MAX_DEST_RD_ATOMIC) {
+		qp_context->params1 |= cpu_to_be32(min(attr->max_dest_rd_atomic ?
+						       ffs(attr->max_dest_rd_atomic) - 1 : 0,
+						       7) << 21);
+		qp_param->opt_param_mask |= cpu_to_be32(MTHCA_QP_OPTPAR_SRA_MAX);
+	}
 
 	if (attr_mask & IB_QP_SQ_PSN)
 		qp_context->next_send_psn = cpu_to_be32(attr->sq_psn);
 	qp_context->cqn_snd = cpu_to_be32(to_mcq(ibqp->send_cq)->cqn);
 
-	/* XXX RDMA/atomic enable, responder resources */
+	if (attr_mask & IB_QP_ACCESS_FLAGS) {
+		/*
+		 * Only enable RDMA/atomics if we have responder
+		 * resources set to a non-zero value.
+		 */
+		if (qp->resp_depth) {
+			qp_context->params2 |=
+				cpu_to_be32(attr->qp_access_flags & IB_ACCESS_REMOTE_WRITE ?
+					    MTHCA_QP_BIT_RWE : 0);
+			qp_context->params2 |=
+				cpu_to_be32(attr->qp_access_flags & IB_ACCESS_REMOTE_READ ?
+					    MTHCA_QP_BIT_RRE : 0);
+			qp_context->params2 |=
+				cpu_to_be32(attr->qp_access_flags & IB_ACCESS_REMOTE_ATOMIC ?
+					    MTHCA_QP_BIT_RAE : 0);
+		}
+
+		qp_param->opt_param_mask |= cpu_to_be32(MTHCA_QP_OPTPAR_RWE |
+							MTHCA_QP_OPTPAR_RRE |
+							MTHCA_QP_OPTPAR_RAE);
+
+		qp->atomic_rd_en = attr->qp_access_flags;
+	}
+
+	if (attr_mask & IB_QP_MAX_QP_RD_ATOMIC) {
+		u8 rra_max;
+
+		if (qp->resp_depth && !attr->max_rd_atomic) {
+			/*
+			 * Lowering our responder resources to zero.
+			 * Turn off RDMA/atomics as responder.
+			 * (RWE/RRE/RAE in params2 already zero)
+			 */
+			qp_param->opt_param_mask |= cpu_to_be32(MTHCA_QP_OPTPAR_RWE |
+								MTHCA_QP_OPTPAR_RRE |
+								MTHCA_QP_OPTPAR_RAE);
+		}
+
+		if (!qp->resp_depth && attr->max_rd_atomic) {
+			/*
+			 * Increasing our responder resources from
+			 * zero.  Turn on RDMA/atomics as appropriate.
+			 */
+			qp_context->params2 |=
+				cpu_to_be32(qp->atomic_rd_en & IB_ACCESS_REMOTE_WRITE ?
+					    MTHCA_QP_BIT_RWE : 0);
+			qp_context->params2 |=
+				cpu_to_be32(qp->atomic_rd_en & IB_ACCESS_REMOTE_READ ?
+					    MTHCA_QP_BIT_RRE : 0);
+			qp_context->params2 |=
+				cpu_to_be32(qp->atomic_rd_en & IB_ACCESS_REMOTE_ATOMIC ?
+					    MTHCA_QP_BIT_RAE : 0);
+
+			qp_param->opt_param_mask |= cpu_to_be32(MTHCA_QP_OPTPAR_RWE |
+								MTHCA_QP_OPTPAR_RRE |
+								MTHCA_QP_OPTPAR_RAE);
+		}
+
+		for (rra_max = 0;
+		     1 << rra_max < attr->max_rd_atomic &&
+			     rra_max < dev->qp_table.rdb_shift;
+		     ++rra_max)
+			; /* nothing */
+
+		qp_context->params2      |= cpu_to_be32(rra_max << 21);
+		qp_param->opt_param_mask |= cpu_to_be32(MTHCA_QP_OPTPAR_RRA_MAX);
+
+		qp->resp_depth = attr->max_rd_atomic;
+	}
 
 	if (qp->rq.policy == IB_SIGNAL_ALL_WR)
 		qp_context->params2 |= cpu_to_be32(MTHCA_QP_BIT_RSC);
@@ -714,7 +787,9 @@ int mthca_modify_qp(struct ib_qp *ibqp, struct ib_qp_attr *attr, int attr_mask)
 	if (attr_mask & IB_QP_RQ_PSN)
 		qp_context->rnr_nextrecvpsn |= cpu_to_be32(attr->rq_psn);
 
-	/* XXX ra_buff_indx */
+	qp_context->ra_buff_indx = dev->qp_table.rdb_base +
+		((qp->qpn & (dev->limits.num_qps - 1)) * MTHCA_RDB_ENTRY_SIZE <<
+		 dev->qp_table.rdb_shift);
 
 	qp_context->cqn_rcv = cpu_to_be32(to_mcq(ibqp->recv_cq)->cqn);
 
@@ -910,6 +985,8 @@ static int mthca_alloc_qp_common(struct mthca_dev *dev,
 	spin_lock_init(&qp->lock);
 	atomic_set(&qp->refcount, 1);
 	qp->state    	 = IB_QPS_RESET;
+	qp->atomic_rd_en = 0;
+	qp->resp_depth   = 0;
 	qp->sq.policy    = send_policy;
 	qp->rq.policy    = recv_policy;
 	qp->rq.cur       = 0;

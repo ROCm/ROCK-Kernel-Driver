@@ -162,9 +162,12 @@ struct mthca_qp {
 	spinlock_t             lock;
 	atomic_t               refcount;
 	u32                    qpn;
-	int                    transport;
-	enum ib_qp_state       state;
 	int                    is_direct;
+	u8                     transport;
+	u8                     state;
+	u8                     atomic_rd_en;
+	u8                     resp_depth;
+
 	struct mthca_mr        mr;
 
 	struct mthca_wq        rq;
