@@ -222,8 +222,6 @@ static void __inline__ _raw_read_unlock(rwlock_t *rw)
 	: "cr0", "memory");
 }
 
-#define _raw_read_trylock(lock) generic_raw_read_trylock(lock)
-
 /*
  * This returns the old value in the lock,
  * so we got the write lock if the return value is 0.
