@@ -91,6 +91,5 @@ void complete_change_console(unsigned int new_console);
 int vt_waitactive(int vt);
 void change_console(unsigned int);
 void reset_vc(unsigned int new_console);
-int vt_waitactive(int vt);
 
 #endif /* _VT_KERN_H */
