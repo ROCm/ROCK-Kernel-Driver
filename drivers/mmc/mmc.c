@@ -300,58 +300,121 @@ static u32 mmc_select_voltage(struct mmc_host *host, u32 ocr)
 	return ocr;
 }
 
-static void mmc_decode_cid(struct mmc_cid *cid, u32 *resp)
+#define UNSTUFF_BITS(resp,start,size)					\
+	({								\
+		const u32 __mask = (1 << (size)) - 1;			\
+		const int __off = 3 - ((start) / 32);			\
+		const int __shft = (start) & 31;			\
+		u32 __res;						\
+									\
+		__res = resp[__off] >> __shft;				\
+		if ((size) + __shft >= 32)				\
+			__res |= resp[__off-1] << (32 - __shft);	\
+		__res & __mask;						\
+	})
+
+/*
+ * Given the decoded CSD structure, decode the raw CID to our CID structure.
+ */
+static void mmc_decode_cid(struct mmc_card *card)
 {
-	memset(cid, 0, sizeof(struct mmc_cid));
+	u32 *resp = card->raw_cid;
 
-	cid->manfid	  = resp[0] >> 8;
-	cid->prod_name[0] = resp[0];
-	cid->prod_name[1] = resp[1] >> 24;
-	cid->prod_name[2] = resp[1] >> 16;
-	cid->prod_name[3] = resp[1] >> 8;
-	cid->prod_name[4] = resp[1];
-	cid->prod_name[5] = resp[2] >> 24;
-	cid->prod_name[6] = resp[2] >> 16;
-	cid->prod_name[7] = '\0';
-	cid->hwrev	  = (resp[2] >> 12) & 15;
-	cid->fwrev	  = (resp[2] >> 8) & 15;
-	cid->serial	  = (resp[2] & 255) << 16 | (resp[3] >> 16);
-	cid->month	  = (resp[3] >> 12) & 15;
-	cid->year	  = (resp[3] >> 8) & 15;
-}
+	memset(&card->cid, 0, sizeof(struct mmc_cid));
 
-static void mmc_decode_csd(struct mmc_csd *csd, u32 *resp)
-{
-	unsigned int e, m;
+	/*
+	 * The selection of the format here is guesswork based upon
+	 * information people have sent to date.
+	 */
+	switch (card->csd.mmca_vsn) {
+	case 0: /* MMC v1.? */
+	case 1: /* MMC v1.4 */
+		card->cid.manfid	= UNSTUFF_BITS(resp, 104, 24);
+		card->cid.prod_name[0]	= UNSTUFF_BITS(resp, 96, 8);
+		card->cid.prod_name[1]	= UNSTUFF_BITS(resp, 88, 8);
+		card->cid.prod_name[2]	= UNSTUFF_BITS(resp, 80, 8);
+		card->cid.prod_name[3]	= UNSTUFF_BITS(resp, 72, 8);
+		card->cid.prod_name[4]	= UNSTUFF_BITS(resp, 64, 8);
+		card->cid.prod_name[5]	= UNSTUFF_BITS(resp, 56, 8);
+		card->cid.prod_name[6]	= UNSTUFF_BITS(resp, 48, 8);
+		card->cid.hwrev		= UNSTUFF_BITS(resp, 44, 4);
+		card->cid.fwrev		= UNSTUFF_BITS(resp, 40, 4);
+		card->cid.serial	= UNSTUFF_BITS(resp, 16, 24);
+		card->cid.month		= UNSTUFF_BITS(resp, 12, 4);
+		card->cid.year		= UNSTUFF_BITS(resp, 8, 4) + 1997;
+		break;
 
-	csd->mmc_prot	 = (resp[0] >> 26) & 15;
-	m = (resp[0] >> 19) & 15;
-	e = (resp[0] >> 16) & 7;
-	csd->tacc_ns	 = (tacc_exp[e] * tacc_mant[m] + 9) / 10;
-	csd->tacc_clks	 = ((resp[0] >> 8) & 255) * 100;
+	case 2: /* MMC v2.x ? */
+	case 3: /* MMC v3.x ? */
+		card->cid.manfid	= UNSTUFF_BITS(resp, 120, 8);
+		card->cid.oemid		= UNSTUFF_BITS(resp, 104, 16);
+		card->cid.prod_name[0]	= UNSTUFF_BITS(resp, 96, 8);
+		card->cid.prod_name[1]	= UNSTUFF_BITS(resp, 88, 8);
+		card->cid.prod_name[2]	= UNSTUFF_BITS(resp, 80, 8);
+		card->cid.prod_name[3]	= UNSTUFF_BITS(resp, 72, 8);
+		card->cid.prod_name[4]	= UNSTUFF_BITS(resp, 64, 8);
+		card->cid.prod_name[5]	= UNSTUFF_BITS(resp, 56, 8);
+		card->cid.serial	= UNSTUFF_BITS(resp, 16, 32);
+		card->cid.month		= UNSTUFF_BITS(resp, 12, 4);
+		card->cid.year		= UNSTUFF_BITS(resp, 8, 4) + 1997;
+		break;
 
-	m = (resp[0] >> 3) & 15;
-	e = resp[0] & 7;
-	csd->max_dtr	  = tran_exp[e] * tran_mant[m];
-	csd->cmdclass	  = (resp[1] >> 20) & 0xfff;
-
-	e = (resp[2] >> 15) & 7;
-	m = (resp[1] << 2 | resp[2] >> 30) & 0x3fff;
-	csd->capacity	  = (1 + m) << (e + 2);
-
-	csd->read_blkbits = (resp[1] >> 16) & 15;
+	default:
+		printk("%s: card has unknown MMCA version %d\n",
+			card->host->host_name, card->csd.mmca_vsn);
+		mmc_card_set_bad(card);
+		break;
+	}
 }
 
 /*
- * Locate a MMC card on this MMC host given a CID.
+ * Given a 128-bit response, decode to our card CSD structure.
  */
-static struct mmc_card *
-mmc_find_card(struct mmc_host *host, struct mmc_cid *cid)
+static void mmc_decode_csd(struct mmc_card *card)
+{
+	struct mmc_csd *csd = &card->csd;
+	unsigned int e, m, csd_struct;
+	u32 *resp = card->raw_csd;
+
+	/*
+	 * We only understand CSD structure v1.1 and v2.
+	 * v2 has extra information in bits 15, 11 and 10.
+	 */
+	csd_struct = UNSTUFF_BITS(resp, 126, 2);
+	if (csd_struct != 1 && csd_struct != 2) {
+		printk("%s: unrecognised CSD structure version %d\n",
+			card->host->host_name, csd_struct);
+		mmc_card_set_bad(card);
+		return;
+	}
+
+	csd->mmca_vsn	 = UNSTUFF_BITS(resp, 122, 4);
+	m = UNSTUFF_BITS(resp, 115, 4);
+	e = UNSTUFF_BITS(resp, 112, 3);
+	csd->tacc_ns	 = (tacc_exp[e] * tacc_mant[m] + 9) / 10;
+	csd->tacc_clks	 = UNSTUFF_BITS(resp, 104, 8) * 100;
+
+	m = UNSTUFF_BITS(resp, 99, 4);
+	e = UNSTUFF_BITS(resp, 96, 3);
+	csd->max_dtr	  = tran_exp[e] * tran_mant[m];
+	csd->cmdclass	  = UNSTUFF_BITS(resp, 84, 12);
+
+	e = UNSTUFF_BITS(resp, 47, 3);
+	m = UNSTUFF_BITS(resp, 62, 12);
+	csd->capacity	  = (1 + m) << (e + 2);
+
+	csd->read_blkbits = UNSTUFF_BITS(resp, 80, 4);
+}
+
+/*
+ * Locate a MMC card on this MMC host given a raw CID.
+ */
+static struct mmc_card *mmc_find_card(struct mmc_host *host, u32 *raw_cid)
 {
 	struct mmc_card *card;
 
 	list_for_each_entry(card, &host->cards, node) {
-		if (memcmp(&card->cid, cid, sizeof(struct mmc_cid)) == 0)
+		if (memcmp(card->raw_cid, raw_cid, sizeof(card->raw_cid)) == 0)
 			return card;
 	}
 	return NULL;
@@ -361,7 +424,7 @@ mmc_find_card(struct mmc_host *host, struct mmc_cid *cid)
  * Allocate a new MMC card, and assign a unique RCA.
  */
 static struct mmc_card *
-mmc_alloc_card(struct mmc_host *host, struct mmc_cid *cid, unsigned int *frca)
+mmc_alloc_card(struct mmc_host *host, u32 *raw_cid, unsigned int *frca)
 {
 	struct mmc_card *card, *c;
 	unsigned int rca = *frca;
@@ -371,7 +434,7 @@ mmc_alloc_card(struct mmc_host *host, struct mmc_cid *cid, unsigned int *frca)
 		return ERR_PTR(-ENOMEM);
 
 	mmc_init_card(card, host);
-	memcpy(&card->cid, cid, sizeof(struct mmc_cid));
+	memcpy(card->raw_cid, raw_cid, sizeof(card->raw_cid));
 
  again:
 	list_for_each_entry(c, &host->cards, node)
@@ -456,7 +519,7 @@ static int mmc_send_op_cond(struct mmc_host *host, u32 ocr, u32 *rocr)
  * to be discovered.  Add new cards to the list.
  *
  * Create a mmc_card entry for each discovered card, assigning
- * it an RCA, and save the CID.
+ * it an RCA, and save the raw CID for decoding later.
  */
 static void mmc_discover_cards(struct mmc_host *host)
 {
@@ -465,7 +528,6 @@ static void mmc_discover_cards(struct mmc_host *host)
 
 	while (1) {
 		struct mmc_command cmd;
-		struct mmc_cid cid;
 
 		cmd.opcode = MMC_ALL_SEND_CID;
 		cmd.arg = 0;
@@ -482,11 +544,9 @@ static void mmc_discover_cards(struct mmc_host *host)
 			break;
 		}
 
-		mmc_decode_cid(&cid, cmd.resp);
-
-		card = mmc_find_card(host, &cid);
+		card = mmc_find_card(host, cmd.resp);
 		if (!card) {
-			card = mmc_alloc_card(host, &cid, &first_rca);
+			card = mmc_alloc_card(host, cmd.resp, &first_rca);
 			if (IS_ERR(card)) {
 				err = PTR_ERR(card);
 				break;
@@ -502,7 +562,7 @@ static void mmc_discover_cards(struct mmc_host *host)
 
 		err = mmc_wait_for_cmd(host, &cmd, CMD_RETRIES);
 		if (err != MMC_ERR_NONE)
-			card->state |= MMC_STATE_DEAD;
+			mmc_card_set_dead(card);
 	}
 }
 
@@ -523,11 +583,14 @@ static void mmc_read_csds(struct mmc_host *host)
 
 		err = mmc_wait_for_cmd(host, &cmd, CMD_RETRIES);
 		if (err != MMC_ERR_NONE) {
-			card->state |= MMC_STATE_DEAD;
+			mmc_card_set_dead(card);
 			continue;
 		}
 
-		mmc_decode_csd(&card->csd, cmd.resp);
+		memcpy(card->raw_csd, cmd.resp, sizeof(card->raw_csd));
+
+		mmc_decode_csd(card);
+		mmc_decode_cid(card);
 	}
 }
 
@@ -573,7 +636,7 @@ static void mmc_check_cards(struct mmc_host *host)
 		if (err == MMC_ERR_NONE)
 			continue;
 
-		card->state |= MMC_STATE_DEAD;
+		mmc_card_set_dead(card);
 	}
 }
 
@@ -678,9 +741,9 @@ static void mmc_rescan(void *data)
 		 */
 		if (!mmc_card_present(card) && !mmc_card_dead(card)) {
 			if (mmc_register_card(card))
-				card->state |= MMC_STATE_DEAD;
+				mmc_card_set_dead(card);
 			else
-				card->state |= MMC_STATE_PRESENT;
+				mmc_card_set_present(card);
 		}
 
 		/*
