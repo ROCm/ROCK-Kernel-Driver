@@ -57,7 +57,7 @@ struct dio {
 	struct inode *inode;
 	int rw;
 	unsigned blkbits;		/* doesn't change */
-	unsigned blkfactor;		/* When we're using an aligment which
+	unsigned blkfactor;		/* When we're using an alignment which
 					   is finer than the filesystem's soft
 					   blocksize, this specifies how much
 					   finer.  blkfactor=2 means 1/4-block
@@ -754,7 +754,15 @@ static int do_direct_IO(struct dio *dio)
 do_holes:
 			/* Handle holes */
 			if (!buffer_mapped(map_bh)) {
-				char *kaddr = kmap_atomic(page, KM_USER0);
+				char *kaddr;
+
+				if (dio->block_in_file >=
+						dio->inode->i_size>>blkbits) {
+					/* We hit eof */
+					page_cache_release(page);
+					goto out;
+				}
+				kaddr = kmap_atomic(page, KM_USER0);
 				memset(kaddr + (block_in_page << blkbits),
 						0, 1 << blkbits);
 				flush_dcache_page(page);
@@ -934,8 +942,15 @@ direct_io_worker(int rw, struct kiocb *iocb, struct inode *inode,
 			ret = ret2;
 		if (ret == 0)
 			ret = dio->page_errors;
-		if (ret == 0 && dio->result)
+		if (ret == 0 && dio->result) {
 			ret = dio->result;
+			/*
+			 * Adjust the return value if the read crossed a
+			 * non-block-aligned EOF.
+			 */
+			if (rw == READ && (offset + ret > inode->i_size))
+				ret = inode->i_size - offset;
+		}
 		kfree(dio);
 	}
 	return ret;
