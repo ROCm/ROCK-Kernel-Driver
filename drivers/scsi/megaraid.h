@@ -522,11 +522,11 @@ struct uioctl_t {
 	u8 mbox[18];		/* 16 bytes + 2 status bytes */
 	mega_passthru pthru;
 #if BITS_PER_LONG == 32
-	char *data;		/* buffer <= 4096 for 0x80 commands */
+	char __user *data;		/* buffer <= 4096 for 0x80 commands */
 	char pad[4];
 #endif
 #if BITS_PER_LONG == 64
-	char *data;
+	char __user *data;
 #endif
 } __attribute__ ((packed));
 
@@ -622,12 +622,12 @@ typedef struct {
 	u32		adapno;		/* adapter number */
 	union {
 		u8	__raw_mbox[18];
-		caddr_t	__uaddr; /* xferaddr for non-mbox cmds */
+		void __user *__uaddr; /* xferaddr for non-mbox cmds */
 	}__ua;
 
 #define uioc_rmbox	__ua.__raw_mbox
 #define MBOX(uioc)	((megacmd_t *)&((uioc).__ua.__raw_mbox[0]))
-#define MBOX_P(uioc)	((megacmd_t *)&((uioc)->__ua.__raw_mbox[0]))
+#define MBOX_P(uioc)	((megacmd_t __user *)&((uioc)->__ua.__raw_mbox[0]))
 #define uioc_uaddr	__ua.__uaddr
 
 	u32		xferlen;	/* xferlen for DCMD and non-mbox

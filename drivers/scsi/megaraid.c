@@ -3366,13 +3366,13 @@ megadev_ioctl(struct inode *inode, struct file *filep, unsigned int cmd,
 	nitioctl_t	uioc;
 	int		adapno;
 	int		rval;
-	mega_passthru	*upthru;	/* user address for passthru */
+	mega_passthru	__user *upthru;	/* user address for passthru */
 	mega_passthru	*pthru;		/* copy user passthru here */
 	dma_addr_t	pthru_dma_hndl;
 	void		*data = NULL;	/* data to be transferred */
 	dma_addr_t	data_dma_hndl;	/* dma handle for data xfer area */
 	megacmd_t	mc;
-	megastat_t	*ustats;
+	megastat_t	__user *ustats;
 	int		num_ldrv;
 	u32		uxferaddr = 0;
 	struct pci_dev	*pdev;
@@ -3397,20 +3397,20 @@ megadev_ioctl(struct inode *inode, struct file *filep, unsigned int cmd,
 	 * addresses.
 	 */
 	memset(&uioc, 0, sizeof(nitioctl_t));
-	if( (rval = mega_m_to_n( (void *)arg, &uioc)) != 0 )
+	if( (rval = mega_m_to_n( (void __user *)arg, &uioc)) != 0 )
 		return rval;
 
 
 	switch( uioc.opcode ) {
 
 	case GET_DRIVER_VER:
-		if( put_user(driver_ver, (u32 *)uioc.uioc_uaddr) )
+		if( put_user(driver_ver, (u32 __user *)uioc.uioc_uaddr) )
 			return (-EFAULT);
 
 		break;
 
 	case GET_N_ADAP:
-		if( put_user(hba_count, (u32 *)uioc.uioc_uaddr) )
+		if( put_user(hba_count, (u32 __user *)uioc.uioc_uaddr) )
 			return (-EFAULT);
 
 		/*
@@ -3444,7 +3444,7 @@ megadev_ioctl(struct inode *inode, struct file *filep, unsigned int cmd,
 
 		adapter = hba_soft_state[adapno];
 
-		ustats = (megastat_t *)uioc.uioc_uaddr;
+		ustats = uioc.uioc_uaddr;
 
 		if( copy_from_user(&num_ldrv, &ustats->num_ldrv, sizeof(int)) )
 			return (-EFAULT);
@@ -3515,7 +3515,7 @@ megadev_ioctl(struct inode *inode, struct file *filep, unsigned int cmd,
 
 				mc.status = rval;
 
-				rval = mega_n_to_m((void *)arg, &mc);
+				rval = mega_n_to_m((void __user *)arg, &mc);
 			}
 
 			return rval;
@@ -3555,12 +3555,12 @@ megadev_ioctl(struct inode *inode, struct file *filep, unsigned int cmd,
 			/*
 			 * The user passthru structure
 			 */
-			upthru = (mega_passthru *)MBOX(uioc)->xferaddr;
+			upthru = (mega_passthru __user *)MBOX(uioc)->xferaddr;
 
 			/*
 			 * Copy in the user passthru here.
 			 */
-			if( copy_from_user(pthru, (char *)upthru,
+			if( copy_from_user(pthru, upthru,
 						sizeof(mega_passthru)) ) {
 
 				pci_free_consistent(pdev,
@@ -3607,7 +3607,7 @@ megadev_ioctl(struct inode *inode, struct file *filep, unsigned int cmd,
 				/*
 				 * Get the user data
 				 */
-				if( copy_from_user(data, (char *)uxferaddr,
+				if( copy_from_user(data, (char __user *)uxferaddr,
 							pthru->dataxferlen) ) {
 					rval = (-EFAULT);
 					goto freemem_and_return;
@@ -3624,7 +3624,7 @@ megadev_ioctl(struct inode *inode, struct file *filep, unsigned int cmd,
 			 */
 			mega_internal_command(adapter, LOCK_INT, &mc, pthru);
 
-			rval = mega_n_to_m((void *)arg, &mc);
+			rval = mega_n_to_m((void __user *)arg, &mc);
 
 			if( rval ) goto freemem_and_return;
 
@@ -3633,7 +3633,7 @@ megadev_ioctl(struct inode *inode, struct file *filep, unsigned int cmd,
 			 * Is data going up-stream
 			 */
 			if( pthru->dataxferlen && (uioc.flags & UIOC_RD) ) {
-				if( copy_to_user((char *)uxferaddr, data,
+				if( copy_to_user((char __user *)uxferaddr, data,
 							pthru->dataxferlen) ) {
 					rval = (-EFAULT);
 				}
@@ -3685,7 +3685,7 @@ freemem_and_return:
 				/*
 				 * Get the user data
 				 */
-				if( copy_from_user(data, (char *)uxferaddr,
+				if( copy_from_user(data, (char __user *)uxferaddr,
 							uioc.xferlen) ) {
 
 					pci_free_consistent(pdev,
@@ -3707,7 +3707,7 @@ freemem_and_return:
 			 */
 			mega_internal_command(adapter, LOCK_INT, &mc, NULL);
 
-			rval = mega_n_to_m((void *)arg, &mc);
+			rval = mega_n_to_m((void __user *)arg, &mc);
 
 			if( rval ) {
 				if( uioc.xferlen ) {
@@ -3725,7 +3725,7 @@ freemem_and_return:
 			 * Is data going up-stream
 			 */
 			if( uioc.xferlen && (uioc.flags & UIOC_RD) ) {
-				if( copy_to_user((char *)uxferaddr, data,
+				if( copy_to_user((char __user *)uxferaddr, data,
 							uioc.xferlen) ) {
 
 					rval = (-EFAULT);
@@ -3761,7 +3761,7 @@ freemem_and_return:
  * Converts the older mimd ioctl structure to newer NIT structure
  */
 static int
-mega_m_to_n(void *arg, nitioctl_t *uioc)
+mega_m_to_n(void __user *arg, nitioctl_t *uioc)
 {
 	struct uioctl_t	uioc_mimd;
 	char	signature[8] = {0};
@@ -3776,7 +3776,7 @@ mega_m_to_n(void *arg, nitioctl_t *uioc)
 	 * begining of the structure.
 	 */
 
-	if( copy_from_user(signature, (char *)arg, 7) )
+	if( copy_from_user(signature, arg, 7) )
 		return (-EFAULT);
 
 	if( memcmp(signature, "MEGANIT", 7) == 0 ) {
@@ -3789,7 +3789,7 @@ mega_m_to_n(void *arg, nitioctl_t *uioc)
 		 */
 		return -EINVAL;
 #if 0
-		if( copy_from_user(uioc, (char *)arg, sizeof(nitioctl_t)) )
+		if( copy_from_user(uioc, arg, sizeof(nitioctl_t)) )
 			return (-EFAULT);
 		return 0;
 #endif
@@ -3800,7 +3800,7 @@ mega_m_to_n(void *arg, nitioctl_t *uioc)
 	 *
 	 * Get the user ioctl structure
 	 */
-	if( copy_from_user(&uioc_mimd, (char *)arg, sizeof(struct uioctl_t)) )
+	if( copy_from_user(&uioc_mimd, arg, sizeof(struct uioctl_t)) )
 		return (-EFAULT);
 
 
@@ -3887,52 +3887,52 @@ mega_m_to_n(void *arg, nitioctl_t *uioc)
  * conforms to older mimd ioctl interface or newer NIT ioctl interface
  */
 static int
-mega_n_to_m(void *arg, megacmd_t *mc)
+mega_n_to_m(void __user *arg, megacmd_t *mc)
 {
-	nitioctl_t	*uiocp;
-	megacmd_t	*umc;
-	mega_passthru	*upthru;
-	struct uioctl_t	*uioc_mimd;
+	nitioctl_t	__user *uiocp;
+	megacmd_t	__user *umc;
+	mega_passthru	__user *upthru;
+	struct uioctl_t	__user *uioc_mimd;
 	char	signature[8] = {0};
 
 	/*
 	 * check is the application conforms to NIT.
 	 */
-	if( copy_from_user(signature, (char *)arg, 7) )
+	if( copy_from_user(signature, arg, 7) )
 		return -EFAULT;
 
 	if( memcmp(signature, "MEGANIT", 7) == 0 ) {
 
-		uiocp = (nitioctl_t *)arg;
+		uiocp = arg;
 
-		if( put_user(mc->status, (u8 *)&MBOX_P(uiocp)->status) )
+		if( put_user(mc->status, (u8 __user *)&MBOX_P(uiocp)->status) )
 			return (-EFAULT);
 
 		if( mc->cmd == MEGA_MBOXCMD_PASSTHRU ) {
 
 			umc = MBOX_P(uiocp);
 
-			if (get_user(upthru, (mega_passthru **)&umc->xferaddr))
-				return (-EFAULT);
+			if (get_user(upthru, (mega_passthru __user * __user *)&umc->xferaddr))
+				return -EFAULT;
 
-			if( put_user(mc->status, (u8 *)&upthru->scsistatus) )
+			if( put_user(mc->status, (u8 __user *)&upthru->scsistatus))
 				return (-EFAULT);
 		}
 	}
 	else {
-		uioc_mimd = (struct uioctl_t *)arg;
+		uioc_mimd = arg;
 
-		if( put_user(mc->status, (u8 *)&uioc_mimd->mbox[17]) )
+		if( put_user(mc->status, (u8 __user *)&uioc_mimd->mbox[17]) )
 			return (-EFAULT);
 
 		if( mc->cmd == MEGA_MBOXCMD_PASSTHRU ) {
 
-			umc = (megacmd_t *)uioc_mimd->mbox;
+			umc = (megacmd_t __user *)uioc_mimd->mbox;
 
-			if (get_user(upthru, (mega_passthru **)&umc->xferaddr))
+			if (get_user(upthru, (mega_passthru __user * __user *)&umc->xferaddr))
 				return (-EFAULT);
 
-			if( put_user(mc->status, (u8 *)&upthru->scsistatus) )
+			if( put_user(mc->status, (u8 __user *)&upthru->scsistatus) )
 				return (-EFAULT);
 		}
 	}
