@@ -376,7 +376,7 @@ struct page * read_swap_cache_async(swp_entry_t entry)
 			/*
 			 * Initiate read into locked page and return.
 			 */
-			lru_cache_add(new_page);
+			lru_cache_add_active(new_page);
 			swap_readpage(NULL, new_page);
 			return new_page;
 		}
