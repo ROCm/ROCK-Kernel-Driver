@@ -418,6 +418,18 @@ static inline size_t get_user_iov_size(struct iovec *iov, int iovlen)
 	return retval;
 }
 
+/* Walk through a list of TLV parameters.  Don't trust the
+ * individual parameter lengths and instead depend on
+ * the chunk length to indicate when to stop.  Make sure
+ * there is room for a param header too. 
+ */
+#define sctp_walk_params(pos, chunk, member)\
+_sctp_walk_params(((union sctp_params)(pos)), (chunk), member)
+
+#define _sctp_walk_params(pos, chunk, member)\
+for (pos.v = (void *)&chunk->member;\
+     pos.v <= (void *)chunk + ntohs(chunk->chunk_hdr.length) - sizeof(sctp_paramhdr_t);\
+     pos.v += WORD_ROUND(ntohs(pos.p->length)))
 
 /* Round an int up to the next multiple of 4.  */
 #define WORD_ROUND(s) (((s)+3)&~3)

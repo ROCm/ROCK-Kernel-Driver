@@ -236,8 +236,7 @@ sctp_disposition_t sctp_sf_do_5_1B_init(const sctp_endpoint_t *ep,
 	chunk->subh.init_hdr = (sctp_inithdr_t *)chunk->skb->data;
 
 	/* Tag the variable length parameters.  */
-	chunk->param_hdr.v =
-		skb_pull(chunk->skb, sizeof(sctp_inithdr_t));
+	chunk->param_hdr.v = skb_pull(chunk->skb, sizeof(sctp_inithdr_t));
 
 	new_asoc = sctp_make_temp_asoc(ep, chunk, GFP_ATOMIC);
 	if (!new_asoc)

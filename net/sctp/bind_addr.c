@@ -196,18 +196,16 @@ int sctp_del_bind_addr(sctp_bind_addr_t *bp, sockaddr_storage_t *del_addr)
  *
  * The second argument is the return value for the length.
  */
-sctpParam_t sctp_bind_addrs_to_raw(const sctp_bind_addr_t *bp, int *addrs_len,
-				   int priority)
+union sctp_params sctp_bind_addrs_to_raw(const sctp_bind_addr_t *bp, 
+					 int *addrs_len, int priority)
 {
-	sctpParam_t addrparms;
-	sctpParam_t retval;
+	union sctp_params addrparms;
+	union sctp_params retval;
 	int addrparms_len;
 	sctp_addr_param_t rawaddr;
 	int len;
 	struct sockaddr_storage_list *addr;
 	struct list_head *pos;
-
-	retval.v = NULL;
 	addrparms_len = 0;
 	len = 0;
 
@@ -216,11 +214,11 @@ sctpParam_t sctp_bind_addrs_to_raw(const sctp_bind_addr_t *bp, int *addrs_len,
 		len += sizeof(sctp_addr_param_t);
 	}
 
-	addrparms.v = kmalloc(len, priority);
-	if (!addrparms.v)
+	retval.v = kmalloc(len, priority);
+	if (!retval.v)
 		goto end_raw;
 
-	retval = addrparms;
+	addrparms = retval;
 
 	list_for_each(pos, &bp->address_list) {
 		addr = list_entry(pos, struct sockaddr_storage_list, list);
