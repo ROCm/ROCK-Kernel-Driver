@@ -15,6 +15,7 @@
 #include <linux/cache.h>
 #include <linux/kmod.h>
 #include <linux/elf.h>
+#include <linux/stringify.h>
 
 #include <asm/module.h>
 #include <asm/uaccess.h> /* For struct exception_table_entry */
@@ -40,11 +41,14 @@ struct kernel_symbol
 
 #ifdef MODULE
 
-#define MODULE_GENERIC_TABLE(gtype,name)	\
-static const unsigned long __module_##gtype##_size \
-  __attribute__ ((unused)) = sizeof(struct gtype##_id); \
-static const struct gtype##_id * __module_##gtype##_table \
-  __attribute__ ((unused)) = name
+/* For replacement modutils, use an alias not a pointer. */
+#define MODULE_GENERIC_TABLE(gtype,name)			\
+static const unsigned long __module_##gtype##_size		\
+  __attribute__ ((unused)) = sizeof(struct gtype##_id);		\
+static const struct gtype##_id * __module_##gtype##_table	\
+  __attribute__ ((unused)) = name;				\
+extern const struct gtype##_id __mod_##gtype##_table		\
+  __attribute__ ((unused, alias(__stringify(name))))
 
 /* This is magically filled in by the linker, but THIS_MODULE must be
    a constant so it works in initializers. */
