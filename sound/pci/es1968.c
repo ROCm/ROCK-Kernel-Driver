@@ -439,7 +439,8 @@ MODULE_PARM_SYNTAX(use_pm, SNDRV_ENABLED ",allows:{{0,1,2}},skill:advanced");
 
 
 /* capture mixing buffer size */
-#define ESM_MIXBUF_SIZE		512
+#define ESM_MEM_ALIGN		0x1000
+#define ESM_MIXBUF_SIZE		0x400
 
 #define ESM_MODE_PLAY		0
 #define ESM_MODE_CAPTURE	1
@@ -977,8 +978,10 @@ static void snd_es1968_apu_set_freq(es1968_t *chip, int apu, int freq)
 /* spin lock held */
 inline static void snd_es1968_trigger_apu(es1968_t *esm, int apu, int mode)
 {
-	/* dma on, no envelopes, filter to all 1s) */
-	__apu_set_register(esm, apu, 0, 0x400f | mode);
+	/* set the APU mode */
+	__apu_set_register(esm, apu, 0,
+			   (__apu_get_register(esm, apu, 0) & 0xff0f) |
+			   (mode << 4));
 }
 
 static void snd_es1968_pcm_start(es1968_t *chip, esschan_t *es)
@@ -1092,12 +1095,12 @@ static void snd_es1968_playback_setup(es1968_t *chip, esschan_t *es,
 		/* clear routing stuff */
 		apu_set_register(chip, apu, 11, 0x0000);
 		/* dma on, no envelopes, filter to all 1s) */
-		// apu_set_register(chip, apu, 0, 0x400F);
+		apu_set_register(chip, apu, 0, 0x400F);
 
 		if (es->fmt & ESS_FMT_16BIT)
-			es->apu_mode[channel] = 0x10;	/* 16bit mono */
+			es->apu_mode[channel] = ESM_APU_16BITLINEAR;
 		else
-			es->apu_mode[channel] = 0x30;	/* 8bit mono */
+			es->apu_mode[channel] = ESM_APU_8BITLINEAR;
 
 		if (es->fmt & ESS_FMT_STEREO) {
 			/* set panning: left or right */
@@ -1107,7 +1110,7 @@ static void snd_es1968_playback_setup(es1968_t *chip, esschan_t *es,
 			   and not the APU Regs 4-5. */
 			apu_set_register(chip, apu, 10,
 					 0x8F00 | (channel ? 0 : 0x10));
-			es->apu_mode[channel] += 0x10;	/* stereo */
+			es->apu_mode[channel] += 1;	/* stereo */
 		} else
 			apu_set_register(chip, apu, 10, 0x8F08);
 	}
@@ -1137,118 +1140,90 @@ static void snd_es1968_playback_setup(es1968_t *chip, esschan_t *es,
 	snd_es1968_apu_set_freq(chip, es->apu[1], freq);
 }
 
+
+static void init_capture_apu(es1968_t *chip, esschan_t *es, int channel,
+			     unsigned int pa, unsigned int bsize,
+			     int mode, int route)
+{
+	int i, apu = es->apu[channel];
+
+	es->apu_mode[channel] = mode;
+
+	/* set the wavecache control reg */
+	snd_es1968_program_wavecache(chip, es, channel, pa, 1);
+
+	/* Offset to PCMBAR */
+	pa -= chip->dma.addr;
+	pa >>= 1;	/* words */
+
+	/* base offset of dma calcs when reading the pointer
+	   on this left one */
+	es->base[channel] = pa & 0xFFFF;
+	pa |= 0x00400000;	/* bit 22 -> System RAM */
+
+	/* Begin loading the APU */
+	for (i = 0; i < 16; i++)
+		apu_set_register(chip, apu, i, 0x0000);
+
+	/* need to enable subgroups.. and we should probably
+	   have different groups for different /dev/dsps..  */
+	apu_set_register(chip, apu, 2, 0x8);
+
+	/* Load the buffer into the wave engine */
+	apu_set_register(chip, apu, 4, ((pa >> 16) & 0xFF) << 8);
+	apu_set_register(chip, apu, 5, pa & 0xFFFF);
+	apu_set_register(chip, apu, 6, (pa + bsize) & 0xFFFF);
+	apu_set_register(chip, apu, 7, bsize);
+	/* clear effects/env.. */
+	apu_set_register(chip, apu, 8, 0x00F0);
+	/* amplitude now?  sure.  why not.  */
+	apu_set_register(chip, apu, 9, 0x0000);
+	/* set filter tune, radius, polar pan */
+	apu_set_register(chip, apu, 10, 0x8F08);
+	/* route input */
+	apu_set_register(chip, apu, 11, route);
+	/* dma on, no envelopes, filter to all 1s) */
+	apu_set_register(chip, apu, 0, 0x400F);
+}
+
 static void snd_es1968_capture_setup(es1968_t *chip, esschan_t *es,
 				     snd_pcm_runtime_t *runtime)
 {
-	int apu_step = 2;
-	int channel, apu;
-	int i, size;
+	int size;
 	u32 freq;
 	unsigned long flags;
 
 	size = es->dma_size >> es->wav_shift;
 
-	/* we're given the full size of the buffer, but
-	   in stereo each channel will only use its half */
-	if (es->fmt & ESS_FMT_STEREO)
-		apu_step = 1;
-
 	/* APU assignments:
 	   0 = mono/left SRC
 	   1 = right SRC
 	   2 = mono/left Input Mixer
-	   3 = right Input Mixer */
-	for (channel = 0; channel < 4; channel += apu_step) {
-		int bsize, route;
-		u32 pa;
+	   3 = right Input Mixer
+	*/
+	/* data seems to flow from the codec, through an apu into
+	   the 'mixbuf' bit of page, then through the SRC apu
+	   and out to the real 'buffer'.  ok.  sure.  */
 
-		apu = es->apu[channel];
-
-		/* data seems to flow from the codec, through an apu into
-		   the 'mixbuf' bit of page, then through the SRC apu
-		   and out to the real 'buffer'.  ok.  sure.  */
-
-		if (channel & 2) {
-			/* ok, we're an input mixer going from adc
-			   through the mixbuf to the other apus */
-
-			if (!(channel & 0x01)) {
-				pa = es->mixbuf->addr;
-			} else {
-				pa = es->mixbuf->addr + ESM_MIXBUF_SIZE / 2;
-			}
-
-			/* we source from a 'magic' apu */
-			bsize = ESM_MIXBUF_SIZE / 4; /* half of this channels alloc, in words */
-			/* parallel in crap, see maestro reg 0xC [8-11] */
-			route = 0x14 + channel - 2;
-			es->apu_mode[channel] = 0x90;	/* Input Mixer */
-		} else {
-			/* we're a rate converter taking
-			   input from the input apus and outputing it to
-			   system memory */
-			if (!(channel & 0x01))
-				pa = es->memory->addr;
-			else
-				pa = es->memory->addr + size * 2; /* size is in word */
-
-			es->apu_mode[channel] = 0xB0;	/* Sample Rate Converter */
-
-			bsize = size;
-			/* get input from inputing apu */
-			route = es->apu[channel + 2];
-		}
-
-		/* set the wavecache control reg */
-		snd_es1968_program_wavecache(chip, es, channel, pa, 1);
-
-		/* Offset to PCMBAR */
-		pa -= chip->dma.addr;
-		pa >>= 1;	/* words */
-
-		/* base offset of dma calcs when reading the pointer
-		   on this left one */
-		es->base[channel] = pa & 0xFFFF;
-
-		pa |= 0x00400000;	/* bit 22 -> System RAM */
-                
-                /* Begin loading the APU */
-		for (i = 0; i < 16; i++)
-			apu_set_register(chip, apu, i, 0x0000);
-
-		/* need to enable subgroups.. and we should probably
-		   have different groups for different /dev/dsps..  */
-		apu_set_register(chip, apu, 2, 0x8);
-
-		/* Load the buffer into the wave engine */
-		apu_set_register(chip, apu, 4, ((pa >> 16) & 0xFF) << 8);
-		/* XXX reg is little endian.. */
-		apu_set_register(chip, apu, 5, pa & 0xFFFF);
-		apu_set_register(chip, apu, 6, (pa + bsize) & 0xFFFF);
-		apu_set_register(chip, apu, 7, bsize);
-#if 0
-		if (es->fmt & ESS_FMT_STEREO) /* ??? really ??? */
-			apu_set_register(chip, apu, 7, bsize - 1);
-#endif
-
-		/* clear effects/env.. */
-		apu_set_register(chip, apu, 8, 0x00F0);
-		/* amplitude now?  sure.  why not.  */
-		apu_set_register(chip, apu, 9, 0x0000);
-		/* set filter tune, radius, polar pan */
-		apu_set_register(chip, apu, 10, 0x8F08);
-		/* route input */
-		apu_set_register(chip, apu, 11, route);
-		/* dma on, no envelopes, filter to all 1s) */
-		// apu_set_register(chip, apu, 0, 0x400F);
+	/* input mixer (left/mono) */
+	/* parallel in crap, see maestro reg 0xC [8-11] */
+	init_capture_apu(chip, es, 2,
+			 es->mixbuf->addr, ESM_MIXBUF_SIZE/4, /* in words */
+			 ESM_APU_INPUTMIXER, 0x14);
+	/* SRC (left/mono); get input from inputing apu */
+	init_capture_apu(chip, es, 0, es->memory->addr, size,
+			 ESM_APU_SRCONVERTOR, es->apu[2]);
+	if (es->fmt & ESS_FMT_STEREO) {
+		/* input mixer (right) */
+		init_capture_apu(chip, es, 3,
+				 es->mixbuf->addr + ESM_MIXBUF_SIZE/2,
+				 ESM_MIXBUF_SIZE/4, /* in words */
+				 ESM_APU_INPUTMIXER, 0x15);
+		/* SRC (right) */
+		init_capture_apu(chip, es, 1,
+				 es->memory->addr + size*2, size,
+				 ESM_APU_SRCONVERTOR, es->apu[3]);
 	}
-
-	spin_lock_irqsave(&chip->reg_lock, flags);
-	/* clear WP interrupts */
-	outw(1, chip->io_port + 0x04);
-	/* enable WP ints */
-	outw(inw(chip->io_port + ESM_PORT_HOST_IRQ) | ESM_HIRQ_DSIE, chip->io_port + ESM_PORT_HOST_IRQ);
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
 
 	freq = runtime->rate;
 	/* Sample Rate conversion APUs don't like 0x10000 for their rate */
@@ -1267,6 +1242,13 @@ static void snd_es1968_capture_setup(es1968_t *chip, esschan_t *es,
 	freq = 0x10000;
 	snd_es1968_apu_set_freq(chip, es->apu[2], freq);
 	snd_es1968_apu_set_freq(chip, es->apu[3], freq);
+
+	spin_lock_irqsave(&chip->reg_lock, flags);
+	/* clear WP interrupts */
+	outw(1, chip->io_port + 0x04);
+	/* enable WP ints */
+	outw(inw(chip->io_port + ESM_PORT_HOST_IRQ) | ESM_HIRQ_DSIE, chip->io_port + ESM_PORT_HOST_IRQ);
+	spin_unlock_irqrestore(&chip->reg_lock, flags);
 }
 
 /*******************
@@ -1419,6 +1401,7 @@ static esm_memory_t *snd_es1968_new_memory(es1968_t *chip, int size)
 	esm_memory_t *buf;
 	struct list_head *p;
 	
+	size = ((size + ESM_MEM_ALIGN - 1) / ESM_MEM_ALIGN) * ESM_MEM_ALIGN;
 	down(&chip->memory_mutex);
 	list_for_each(p, &chip->buf_list) {
 		buf = list_entry(p, esm_memory_t, list);
@@ -1517,10 +1500,10 @@ snd_es1968_init_dmabuf(es1968_t *chip)
 		snd_es1968_free_dmabuf(chip);
 		return -ENOMEM;
 	}
-	memset(chip->dma.area, 0, 512);
-	chunk->buf = chip->dma.area + 512;
-	chunk->addr = chip->dma.addr + 512;
-	chunk->size = chip->dma.bytes - 512;
+	memset(chip->dma.area, 0, ESM_MEM_ALIGN);
+	chunk->buf = chip->dma.area + ESM_MEM_ALIGN;
+	chunk->addr = chip->dma.addr + ESM_MEM_ALIGN;
+	chunk->size = chip->dma.bytes - ESM_MEM_ALIGN;
 	chunk->empty = 1;
 	list_add(&chunk->list, &chip->buf_list);
 
@@ -1634,7 +1617,10 @@ static int snd_es1968_playback_open(snd_pcm_substream_t *substream)
 	runtime->hw = snd_es1968_playback;
 	runtime->hw.buffer_bytes_max = runtime->hw.period_bytes_max =
 		calc_available_memory_size(chip);
-
+#if 0
+	snd_pcm_hw_constraint_step(runtime, 0, SNDRV_PCM_HW_PARAM_BUFFER_BYTES,
+				   1024);
+#endif
 	spin_lock_irqsave(&chip->substream_lock, flags);
 	list_add(&es->list, &chip->substream_list);
 	spin_unlock_irqrestore(&chip->substream_lock, flags);
@@ -1685,12 +1671,16 @@ static int snd_es1968_capture_open(snd_pcm_substream_t *substream)
 		snd_magic_kfree(es);
                 return -ENOMEM;
         }
+	memset(es->mixbuf->buf, 0, ESM_MIXBUF_SIZE);
 
 	runtime->private_data = es;
 	runtime->hw = snd_es1968_capture;
 	runtime->hw.buffer_bytes_max = runtime->hw.period_bytes_max =
-		calc_available_memory_size(chip) - 1024;
-
+		calc_available_memory_size(chip) - 1024; /* keep MIXBUF size */
+#if 0
+	snd_pcm_hw_constraint_step(runtime, 0, SNDRV_PCM_HW_PARAM_BUFFER_BYTES,
+				   1024);
+#endif
 	spin_lock_irqsave(&chip->substream_lock, flags);
 	list_add(&es->list, &chip->substream_list);
 	spin_unlock_irqrestore(&chip->substream_lock, flags);
@@ -1797,6 +1787,7 @@ static void __devinit es1968_measure_clock(es1968_t *chip)
 	for (i = 0; i < 16; i++)
 		apu_set_register(chip, apu, i, 0x0000);
 
+	apu_set_register(chip, apu, 0, 0x400f);
 	apu_set_register(chip, apu, 4, ((pa >> 16) & 0xff) << 8);
 	apu_set_register(chip, apu, 5, pa & 0xffff);
 	apu_set_register(chip, apu, 6, (pa + CLOCK_MEASURE_BUFSIZE/2) & 0xffff);
@@ -1814,7 +1805,7 @@ static void __devinit es1968_measure_clock(es1968_t *chip)
 
 	spin_lock_irqsave(&chip->reg_lock, flags);
 	__apu_set_register(chip, apu, 5, pa & 0xffff);
-	snd_es1968_trigger_apu(chip, apu, 0x10); /* 16bit mono */
+	snd_es1968_trigger_apu(chip, apu, ESM_APU_16BITLINEAR);
 	do_gettimeofday(&start_time);
 	spin_unlock_irqrestore(&chip->reg_lock, flags);
 #if 0
@@ -2509,7 +2500,7 @@ static struct pm_whitelist whitelist[] __devinitdata = {
 	{ TYPE_MAESTRO2E, 0x1028 },
 	{ TYPE_MAESTRO2E, 0x103c },
 	{ TYPE_MAESTRO2E, 0x1179 },
-	{ TYPE_MAESTRO2E, 0x14c0 },
+	{ TYPE_MAESTRO2E, 0x14c0 },	/* HP omnibook 4150 */
 };
 
 static int __devinit snd_es1968_create(snd_card_t * card,
