@@ -686,11 +686,6 @@ void wv_roam_init(struct net_device *dev);
 void wv_roam_cleanup(struct net_device *dev);
 #endif	/* WAVELAN_ROAMING */
 
-/* ----------------------- MISC SUBROUTINES ------------------------ */
-static void
-	cs_error(client_handle_t,	/* Report error to cardmgr */
-		 int,
-		 int);
 /* ----------------- MODEM MANAGEMENT SUBROUTINES ----------------- */
 static inline u_char		/* data */
 	hasr_read(u_long);	/* Read the host interface : base address */
@@ -791,7 +786,7 @@ static void
 	wv_pcmcia_release(u_long),	/* Remove a device */
 	wv_flush_stale_links(void);	/* "detach" all possible devices */
 /* ---------------------- INTERRUPT HANDLING ---------------------- */
-static void
+static irqreturn_t
 	wavelan_interrupt(int,	/* Interrupt handler */
 			  void *,
 			  struct pt_regs *);

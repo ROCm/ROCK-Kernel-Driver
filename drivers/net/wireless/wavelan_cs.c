@@ -3581,10 +3581,6 @@ wv_packet_write(device *	dev,
 
   spin_lock_irqsave(&lp->spinlock, flags);
 
-  /* Check if we need some padding */
-  if(clen < ETH_ZLEN)
-    clen = ETH_ZLEN;
-
   /* Write the length of data buffer followed by the buffer */
   outb(xmtdata_base & 0xff, PIORL(base));
   outb(((xmtdata_base >> 8) & PIORH_MASK) | PIORH_SEL_TX, PIORH(base));
@@ -3663,6 +3659,17 @@ wavelan_packet_xmit(struct sk_buff *	skb,
 	if (skb->next)
 		printk(KERN_INFO "skb has next\n");
 #endif
+
+	/* Check if we need some padding */
+	/* Note : on wireless the propagation time is in the order of 1us,
+	 * and we don't have the Ethernet specific requirement of beeing
+	 * able to detect collisions, therefore in theory we don't really
+	 * need to pad. Jean II */
+	if (skb->len < ETH_ZLEN) {
+		skb = skb_padto(skb, ETH_ZLEN);
+		if (skb == NULL)
+			return 0;
+	}
 
   wv_packet_write(dev, skb->data, skb->len);
 
@@ -4644,7 +4651,7 @@ wv_flush_stale_links(void)
  *	   ready to transmit another packet.
  *	3. A command has completed execution.
  */
-static void
+static irqreturn_t
 wavelan_interrupt(int		irq,
 		  void *	dev_id,
 		  struct pt_regs * regs)
@@ -4661,7 +4668,7 @@ wavelan_interrupt(int		irq,
       printk(KERN_WARNING "wavelan_interrupt(): irq %d for unknown device.\n",
 	     irq);
 #endif
-      return;
+      return IRQ_NONE;
     }
 
 #ifdef DEBUG_INTERRUPT_TRACE
@@ -4883,6 +4890,24 @@ wavelan_interrupt(int		irq,
 #ifdef DEBUG_INTERRUPT_TRACE
   printk(KERN_DEBUG "%s: <-wavelan_interrupt()\n", dev->name);
 #endif
+
+  /* We always return IRQ_HANDLED, because we will receive empty
+   * interrupts under normal operations. Anyway, it doesn't matter
+   * as we are dealing with an ISA interrupt that can't be shared.
+   *
+   * Explanation : under heavy receive, the following happens :
+   * ->wavelan_interrupt()
+   *    (status0 & SR0_INTERRUPT) != 0
+   *       ->wv_packet_rcv()
+   *    (status0 & SR0_INTERRUPT) != 0
+   *       ->wv_packet_rcv()
+   *    (status0 & SR0_INTERRUPT) == 0	// i.e. no more event
+   * <-wavelan_interrupt()
+   * ->wavelan_interrupt()
+   *    (status0 & SR0_INTERRUPT) == 0	// i.e. empty interrupt
+   * <-wavelan_interrupt()
+   * Jean II */
+  return IRQ_HANDLED;
 } /* wv_interrupt */
 
 /*------------------------------------------------------------------*/

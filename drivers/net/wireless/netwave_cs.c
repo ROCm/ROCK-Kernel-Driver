@@ -227,7 +227,7 @@ static int netwave_start_xmit( struct sk_buff *skb, struct net_device *dev);
 static int netwave_rx( struct net_device *dev);
 
 /* Interrupt routines */
-static void netwave_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t netwave_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 static void netwave_watchdog(struct net_device *);
 
 /* Statistics */
@@ -1456,7 +1456,7 @@ static int netwave_start_xmit(struct sk_buff *skb, struct net_device *dev) {
  *	     ready to transmit another packet.
  *	  3. A command has completed execution.
  */
-static void netwave_interrupt(int irq, void* dev_id, struct pt_regs *regs) {
+static irqreturn_t netwave_interrupt(int irq, void* dev_id, struct pt_regs *regs) {
     ioaddr_t iobase;
     u_char *ramBase;
     struct net_device *dev = (struct net_device *)dev_id;
@@ -1465,7 +1465,7 @@ static void netwave_interrupt(int irq, void* dev_id, struct pt_regs *regs) {
     int i;
     
     if (!netif_device_present(dev))
-	return;
+	return IRQ_NONE;
     
     iobase = dev->base_addr;
     ramBase = priv->ramBase;
@@ -1476,7 +1476,7 @@ static void netwave_interrupt(int irq, void* dev_id, struct pt_regs *regs) {
 		
 	wait_WOC(iobase);	
 	if (!(inb(iobase+NETWAVE_REG_CCSR) & 0x02))
-	    break; /* None of the interrupt sources asserted */
+	    break; /* None of the interrupt sources asserted (normal exit) */
 	
         status = inb(iobase + NETWAVE_REG_ASR);
 		
@@ -1569,6 +1569,8 @@ static void netwave_interrupt(int irq, void* dev_id, struct pt_regs *regs) {
 	   }
 	   */
     }
+    /* Handled if we looped at least one time - Jean II */
+    return IRQ_RETVAL(i);
 } /* netwave_interrupt */
 
 /*

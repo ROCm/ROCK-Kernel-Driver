@@ -2884,10 +2884,6 @@ static inline int wv_packet_write(device * dev, void *buf, short length)
 	       length);
 #endif
 
-	/* Do we need some padding? */
-	if (clen < ETH_ZLEN)
-		clen = ETH_ZLEN;
-
 	spin_lock_irqsave(&lp->spinlock, flags);
 
 	/* Check nothing bad has happened */
@@ -3008,12 +3004,6 @@ static int wavelan_packet_xmit(struct sk_buff *skb, device * dev)
 	       (unsigned) skb);
 #endif
 
-	if (skb->len < ETH_ZLEN) {
-		skb = skb_padto(skb, ETH_ZLEN);
-		if (skb == NULL)
-			return 0;
-	}
-
 	/*
 	 * Block a timer-based transmit from overlapping.
 	 * In other words, prevent reentering this routine.
@@ -3035,6 +3025,17 @@ static int wavelan_packet_xmit(struct sk_buff *skb, device * dev)
 	if (skb->next)
 		printk(KERN_INFO "skb has next\n");
 #endif
+
+	/* Do we need some padding? */
+	/* Note : on wireless the propagation time is in the order of 1us,
+	 * and we don't have the Ethernet specific requirement of beeing
+	 * able to detect collisions, therefore in theory we don't really
+	 * need to pad. Jean II */
+	if (skb->len < ETH_ZLEN) {
+		skb = skb_padto(skb, ETH_ZLEN);
+		if (skb == NULL)
+			return 0;
+	}
 
 	/* Write packet on the card */
 	if(wv_packet_write(dev, skb->data, skb->len))
