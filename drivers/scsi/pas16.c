@@ -119,14 +119,16 @@
 #include <asm/io.h>
 #include <linux/blk.h>
 #include <linux/delay.h>
+#include <linux/interrupt.h>
+#include <linux/stat.h>
+#include <linux/init.h>
+
 #include "scsi.h"
 #include "hosts.h"
 #include "pas16.h"
 #define AUTOPROBE_IRQ
 #include "NCR5380.h"
 
-#include <linux/stat.h>
-#include <linux/init.h>
 
 static int pas_maxi = 0;
 static int pas_wmaxi = 0;
