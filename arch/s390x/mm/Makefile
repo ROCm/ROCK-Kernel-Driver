@@ -3,5 +3,3 @@
 #
 
 obj-y	 := init.o fault.o ioremap.o extable.o
-
-include $(TOPDIR)/Rules.make

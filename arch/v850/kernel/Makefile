@@ -34,6 +34,3 @@ obj-$(CONFIG_RTE_GBUS_INT)	+= gbus_int.o
 # feature-specific code
 obj-$(CONFIG_V850E_MA1_HIGHRES_TIMER)	+= highres_timer.o
 obj-$(CONFIG_PROC_FS)		+= procfs.o
-
-
-include $(TOPDIR)/Rules.make

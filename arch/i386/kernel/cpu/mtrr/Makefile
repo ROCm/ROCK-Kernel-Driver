@@ -4,5 +4,3 @@ obj-y		+= cyrix.o
 obj-y		+= centaur.o
 
 export-objs	:= main.o
-
-include $(TOPDIR)/Rules.make

@@ -37,5 +37,3 @@ obj-$(CONFIG_IA64_SGI_SN2)   += sn2/ml_SN_intr.o sn2/shub_intr.o sn2/shuberror.o
 				sn2/pcibr/pcibr_rrb.o sn2/pcibr/pcibr_slot.o 
 
 obj-$(CONFIG_PCIBA) += pciba.o
-
-include $(TOPDIR)/Rules.make

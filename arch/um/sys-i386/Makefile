@@ -10,8 +10,6 @@ USER_OBJS := $(foreach file,$(USER_OBJS),arch/um/sys-i386/$(file))
 
 SYMLINKS = semaphore.c checksum.S extable.c highmem.c
 
-include $(TOPDIR)/Rules.make
-
 $(USER_OBJS) : %.o: %.c
 	$(CC) $(CFLAGS_$@) $(USER_CFLAGS) -c -o $@ $<
 

@@ -31,9 +31,6 @@ core-y += $(arch_dir)/kernel/
 libs-y += $(arch_dir)/lib/
 
 
-include $(TOPDIR)/Rules.make
-
-
 # Deal with the initial contents of the root device
 ifdef ROOT_FS_IMAGE
 core-y += root_fs_image.o

@@ -17,8 +17,6 @@ obj-$(CONFIG_PCI)	+= bios32.o
 
 EXTRA_AFLAGS := -traditional
 
-include $(TOPDIR)/Rules.make
-
 $(obj)/head.o: $(obj)/head.S $(obj)/m68k_defs.h
 
 $(obj)/entry.o: $(obj)/entry.S $(obj)/m68k_defs.h

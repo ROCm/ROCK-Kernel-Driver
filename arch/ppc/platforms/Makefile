@@ -53,5 +53,3 @@ ifeq ($(CONFIG_SMP),y)
 obj-$(CONFIG_ALL_PPC)		+= pmac_smp.o chrp_smp.o
 obj-$(CONFIG_PPC_ISERIES)	+= iSeries_smp.o
 endif
-
-include $(TOPDIR)/Rules.make

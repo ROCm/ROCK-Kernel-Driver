@@ -4,8 +4,6 @@
 
 EXTRA_AFLAGS := -traditional
 
-include $(TOPDIR)/Rules.make
-
 quiet_cmd_listing = OBJDUMP $(echo_target)
 cmd_listing	  = $(OBJDUMP) --disassemble --disassemble-all \
 			--disassemble-zeroes --reloc vmlinux > $@

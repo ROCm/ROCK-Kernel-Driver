@@ -3,5 +3,3 @@
 #
 
 obj-y		:= config.o q40ints.o 
-
-include $(TOPDIR)/Rules.make

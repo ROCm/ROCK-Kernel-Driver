@@ -5,5 +5,3 @@
 obj-y	 := int-handler.o io.o irq.o pci.o pcimt_scache.o reset.o setup.o
 
 EXTRA_AFLAGS := $(CFLAGS)
-
-include $(TOPDIR)/Rules.make

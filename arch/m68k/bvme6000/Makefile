@@ -3,5 +3,3 @@
 #
 
 obj-y		:= config.o bvmeints.o rtc.o
-
-include $(TOPDIR)/Rules.make
