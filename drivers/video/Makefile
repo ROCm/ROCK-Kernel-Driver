@@ -124,13 +124,12 @@ obj-$(CONFIG_FBCON_HGA)           += fbcon-hga.o
 obj-$(CONFIG_FBCON_STI)           += fbcon-sti.o
 obj-$(CONFIG_FBCON_ACCEL)	  += fbcon-accel.o
 
+host-progs := ../conmakehash
+
 include $(TOPDIR)/Rules.make
 
 clean:
 	rm -f core *.o *.a *.s
-
-../conmakehash: ../conmakehash.c
-	$(HOSTCC) $(HOSTCFLAGS) -o ../conmakehash ../conmakehash.c
 
 promcon_tbl.c: prom.uni ../char/conmakehash
 	../char/conmakehash prom.uni | \

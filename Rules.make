@@ -224,6 +224,36 @@ $(multi-used-y) : %.o: $(multi-objs-y) FORCE
 $(multi-used-m) : %.o: $(multi-objs-m) FORCE
 	$(call if_changed,cmd_link_multi)
 
+# Compile programs on the host
+# FIXME: handle dependencies
+# ===========================================================================
+
+host-progs-single     := $(foreach m,$(host-progs),$(if $($(m)-objs),,$(m)))
+host-progs-multi      := $(foreach m,$(host-progs),$(if $($(m)-objs),$(m)))
+host-progs-multi-objs := $(foreach m,$(host-progs-multi),$($(m)-objs))
+
+quiet_cmd_host_cc__c  = HOSTCC $(RELDIR)/$@
+cmd_host_cc__c        = $(HOSTCC) -Wp,-MD,.$(subst /,_,$@).d \
+			$(HOSTCFLAGS) $(HOST_EXTRACFLAGS) -o $@ $<
+
+$(host-progs-single): %: %.c FORCE
+	$(call if_changed_dep,host_cc__c)
+
+quiet_cmd_host_cc_o_c = HOSTCC $(RELDIR)/$@
+cmd_host_cc_o_c       = $(HOSTCC) -Wp,-MD,.$(subst /,_,$@).d \
+			$(HOSTCFLAGS) $(HOST_EXTRACFLAGS) -c -o $@ $<
+
+$(host-progs-multi-objs): %.o: %.c FORCE
+	$(call if_changed_dep,host_cc_o_c)
+
+quiet_cmd_host_cc__o  = HOSTLD $(RELDIR)/$@
+cmd_host_cc__o        = $(HOSTCC) $(HOSTLDFLAGS) -o $@ $($@-objs) \
+			$(HOST_LOADLIBES)
+
+$(host-progs-multi): %: $(host-progs-multi-objs) FORCE
+	$(call if_changed,cmd_host_cc__o)
+
+
 # Descending when making module versions
 # ---------------------------------------------------------------------------
 

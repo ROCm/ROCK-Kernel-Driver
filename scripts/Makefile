@@ -9,12 +9,6 @@ CHMOD_FILES := docgen gen-all-syms kernel-doc mkcompile_h makelst
 
 all: fixdep split-include $(CHMOD_FILES)
 
-fixdep: fixdep.c
-	$(HOSTCC) $(HOSTCFLAGS) -o $@ $<
-
-split-include: split-include.c
-	$(HOSTCC) $(HOSTCFLAGS) -o $@ $<
-
 $(CHMOD_FILES): FORCE
 	@chmod a+x $@
 
@@ -43,23 +37,15 @@ kconfig.tk: $(TOPDIR)/arch/$(ARCH)/config.in tkparse $(HEADER) $(TAIL) FORCE
 	) > $@
 	chmod 755 $@
 
-tkparse: tkparse.o tkcond.o tkgen.o
-	$(HOSTCC) -o $@ $^
-
-tkparse.o tkcond.o tkgen.o: %.o: %.c
-	$(HOSTCC) $(HOSTCFLAGS) -c -o $@ $<
-
 # DocBook stuff
 # ---------------------------------------------------------------------------
 
 doc-progs: docproc
 
-docproc: docproc.c
-	$(HOSTCC) $(HOSTCFLAGS) -o $@ $<
+# ---------------------------------------------------------------------------
+
+host-progs := fixdep split-include docproc tkparse
+
+tkparse-objs := tkparse.o tkcond.o tkgen.o
 
 include $(TOPDIR)/Rules.make
-
-# we don't have automatic deps for host programs
-
-tkparse.o tkcond.o tkgen.o: tkparse.h
-
