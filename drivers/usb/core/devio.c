@@ -47,6 +47,7 @@
 #include <asm/byteorder.h>
 
 #include "hcd.h"	/* for usbcore internals */
+#include "usb.h"
 
 struct async {
 	struct list_head asynclist;
@@ -726,7 +727,7 @@ static int proc_resetdevice(struct dev_state *ps)
 
 		err ("%s - this function is broken", __FUNCTION__);
 		if (intf->driver && ps->dev) {
-			usb_device_probe (&intf->dev);
+			usb_probe_interface (&intf->dev);
 		}
 	}
 
@@ -1105,7 +1106,7 @@ static int proc_ioctl (struct dev_state *ps, void __user *arg)
 		if (driver) {
 			dbg ("disconnect '%s' from dev %d interface %d",
 			     driver->name, ps->dev->devnum, ctrl.ifno);
-			usb_device_remove(&ifp->dev);
+			usb_unbind_interface(&ifp->dev);
 		} else
 			retval = -ENODATA;
 		unlock_kernel();
@@ -1114,7 +1115,7 @@ static int proc_ioctl (struct dev_state *ps, void __user *arg)
 	/* let kernel drivers try to (re)bind to the interface */
 	case USBDEVFS_CONNECT:
 		lock_kernel();
-		retval = usb_device_probe (&ifp->dev);
+		retval = usb_probe_interface (&ifp->dev);
 		unlock_kernel();
 		break;
 

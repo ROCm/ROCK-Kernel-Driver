@@ -487,8 +487,6 @@ extern int usb_register_dev(struct usb_interface *intf,
 extern void usb_deregister_dev(struct usb_interface *intf,
 			       struct usb_class_driver *class_driver);
 
-extern int usb_device_probe(struct device *dev);
-extern int usb_device_remove(struct device *dev);
 extern int usb_disabled(void);
 
 /* -------------------------------------------------------------------------- */

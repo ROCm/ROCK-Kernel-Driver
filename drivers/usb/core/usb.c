@@ -98,7 +98,7 @@ static void nuke_urbs(struct usb_device *dev)
 }
 
 /* needs to be called with BKL held */
-int usb_device_probe(struct device *dev)
+int usb_probe_interface(struct device *dev)
 {
 	struct usb_interface * intf = to_usb_interface(dev);
 	struct usb_driver * driver = to_usb_driver(dev->driver);
@@ -123,7 +123,7 @@ int usb_device_probe(struct device *dev)
 	return error;
 }
 
-int usb_device_remove(struct device *dev)
+int usb_unbind_interface(struct device *dev)
 {
 	struct usb_interface *intf;
 	struct usb_driver *driver;
@@ -170,8 +170,8 @@ int usb_register(struct usb_driver *new_driver)
 
 	new_driver->driver.name = (char *)new_driver->name;
 	new_driver->driver.bus = &usb_bus_type;
-	new_driver->driver.probe = usb_device_probe;
-	new_driver->driver.remove = usb_device_remove;
+	new_driver->driver.probe = usb_probe_interface;
+	new_driver->driver.remove = usb_unbind_interface;
 
 	init_MUTEX(&new_driver->serialize);
 
@@ -1585,9 +1585,6 @@ EXPORT_SYMBOL(usb_epnum_to_ep_desc);
 EXPORT_SYMBOL(usb_register);
 EXPORT_SYMBOL(usb_deregister);
 EXPORT_SYMBOL(usb_disabled);
-
-EXPORT_SYMBOL(usb_device_probe);
-EXPORT_SYMBOL(usb_device_remove);
 
 EXPORT_SYMBOL(usb_alloc_dev);
 EXPORT_SYMBOL(usb_put_dev);
