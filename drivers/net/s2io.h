@@ -637,7 +637,7 @@ typedef struct s2io_nic {
 
 	char name[32];
 	struct tasklet_struct task;
-	atomic_t tasklet_status;
+	volatile unsigned long tasklet_status;
 	struct timer_list timer;
 	struct net_device *dev;
 	struct pci_dev *pdev;
@@ -730,6 +730,10 @@ typedef struct s2io_nic {
 	buffAdd_t **ba[MAX_RX_RINGS];
 #endif
 	int task_flag;
+#define CARD_DOWN 1
+#define CARD_UP 2
+	atomic_t card_state;
+	volatile unsigned long link_state;
 } nic_t;
 
 #define RESET_ERROR 1;
@@ -874,5 +878,7 @@ int verify_load_parm(void);
 static struct ethtool_ops netdev_ethtool_ops;
 #endif
 static void s2io_set_link(unsigned long data);
+static void s2io_card_down(nic_t * nic);
+static int s2io_card_up(nic_t * nic);
 
 #endif				/* _S2IO_H */
