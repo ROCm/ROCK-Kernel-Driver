@@ -549,8 +549,10 @@ typedef struct drm_vbl_sig {
 } drm_vbl_sig_t;
 
 
-/** 
- * DRM device functions structure
+/**
+ * DRM driver structure. This structure represent the common code for
+ * a family of cards. There will one drm_device for each card present
+ * in this family
  */
 struct drm_device;
 
@@ -766,22 +768,18 @@ extern int           drm_init(struct drm_driver *driver);
 extern void          drm_exit(struct drm_driver *driver);
 extern int           drm_version(struct inode *inode, struct file *filp,
 				  unsigned int cmd, unsigned long arg);
-extern int           drm_open(struct inode *inode, struct file *filp);
-extern int           drm_release(struct inode *inode, struct file *filp);
 extern int           drm_ioctl(struct inode *inode, struct file *filp,
 				unsigned int cmd, unsigned long arg);
-extern int           drm_lock(struct inode *inode, struct file *filp,
-			       unsigned int cmd, unsigned long arg);
-extern int           drm_unlock(struct inode *inode, struct file *filp,
-				 unsigned int cmd, unsigned long arg);
-extern int 	     drm_fill_in_dev(drm_device_t *dev, struct pci_dev *pdev,
-				 const struct pci_device_id *ent, struct drm_driver *driver);
+extern int           drm_takedown(drm_device_t * dev);
 
 				/* Device support (drm_fops.h) */
+extern int           drm_open(struct inode *inode, struct file *filp);
+extern int           drm_stub_open(struct inode *inode, struct file *filp);
 extern int	     drm_open_helper(struct inode *inode, struct file *filp,
 				      drm_device_t *dev);
 extern int	     drm_flush(struct file *filp);
 extern int	     drm_fasync(int fd, struct file *filp, int on);
+extern int           drm_release(struct inode *inode, struct file *filp);
 
 				/* Mapping support (drm_vm.h) */
 extern void	     drm_vm_open(struct vm_area_struct *vma);
@@ -879,6 +877,10 @@ extern int	     drm_noop(struct inode *inode, struct file *filp,
 				  unsigned int cmd, unsigned long arg);
 
 				/* Locking IOCTL support (drm_lock.h) */
+extern int           drm_lock(struct inode *inode, struct file *filp,
+			       unsigned int cmd, unsigned long arg);
+extern int           drm_unlock(struct inode *inode, struct file *filp,
+				 unsigned int cmd, unsigned long arg);
 extern int	     drm_lock_take(__volatile__ unsigned int *lock,
 				    unsigned int context);
 extern int	     drm_lock_transfer(drm_device_t *dev,

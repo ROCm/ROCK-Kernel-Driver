@@ -53,6 +53,78 @@ drm_minor_t *drm_minors;
 struct class_simple *drm_class;
 struct proc_dir_entry *drm_proc_root;
 
+static int drm_fill_in_dev(drm_device_t *dev, struct pci_dev *pdev, const struct pci_device_id *ent, struct drm_driver *driver)
+{
+	int retcode;
+
+	dev->count_lock = SPIN_LOCK_UNLOCKED;
+	init_timer( &dev->timer );
+	sema_init( &dev->struct_sem, 1 );
+	sema_init( &dev->ctxlist_sem, 1 );
+
+	dev->pdev   = pdev;
+
+#ifdef __alpha__
+	dev->hose   = pdev->sysdata;
+	dev->pci_domain = dev->hose->bus->number;
+#else
+	dev->pci_domain = 0;
+#endif
+	dev->pci_bus = pdev->bus->number;
+	dev->pci_slot = PCI_SLOT(pdev->devfn);
+	dev->pci_func = PCI_FUNC(pdev->devfn);
+	dev->irq = pdev->irq;
+
+	/* the DRM has 6 basic counters */
+	dev->counters = 6;
+	dev->types[0]  = _DRM_STAT_LOCK;
+	dev->types[1]  = _DRM_STAT_OPENS;
+	dev->types[2]  = _DRM_STAT_CLOSES;
+	dev->types[3]  = _DRM_STAT_IOCTLS;
+	dev->types[4]  = _DRM_STAT_LOCKS;
+	dev->types[5]  = _DRM_STAT_UNLOCKS;
+
+	dev->driver = driver;
+	
+	if (dev->driver->preinit)
+		if ((retcode = dev->driver->preinit(dev)))
+			goto error_out_unreg;
+
+	if (drm_core_has_AGP(dev)) {
+		dev->agp = drm_agp_init();
+		if (drm_core_check_feature(dev, DRIVER_REQUIRE_AGP) && (dev->agp == NULL)) {
+			DRM_ERROR( "Cannot initialize the agpgart module.\n" );
+			retcode = -EINVAL;
+			goto error_out_unreg;
+		}
+		if (drm_core_has_MTRR(dev)) {
+			if (dev->agp)
+				dev->agp->agp_mtrr = mtrr_add( dev->agp->agp_info.aper_base,
+							       dev->agp->agp_info.aper_size*1024*1024,
+							       MTRR_TYPE_WRCOMB,
+							       1 );
+		}
+	}
+
+	retcode = drm_ctxbitmap_init( dev );
+	if( retcode ) {
+		DRM_ERROR( "Cannot allocate memory for context bitmap.\n" );
+		goto error_out_unreg;
+	}
+
+	dev->device = MKDEV(DRM_MAJOR, dev->minor );
+
+	/* postinit is a required function to display the signon banner */
+	if ((retcode = dev->driver->postinit(dev, ent->driver_data)))
+		goto error_out_unreg;
+
+	return 0;
+	
+error_out_unreg:
+	drm_takedown(dev);
+	return retcode;
+}
+
 /**
  * File \c open operation.
  *
@@ -62,7 +134,7 @@ struct proc_dir_entry *drm_proc_root;
  * Puts the dev->fops corresponding to the device minor number into
  * \p filp, call the \c open method, and restore the file operations.
  */
-static int stub_open(struct inode *inode, struct file *filp)
+int drm_stub_open(struct inode *inode, struct file *filp)
 {
 	drm_device_t *dev = NULL;
 	int minor = iminor(inode);
@@ -88,12 +160,6 @@ static int stub_open(struct inode *inode, struct file *filp)
 
 	return err;
 }
-
-/** File operations structure */
-struct file_operations drm_stub_fops = {
-	.owner = THIS_MODULE,
-	.open  = stub_open
-};
 
 /**
  * Get a device minor number.

@@ -345,3 +345,11 @@ int drm_setversion(DRM_IOCTL_ARGS)
 	}
 	return 0;
 }
+
+/** No-op ioctl. */
+int drm_noop(struct inode *inode, struct file *filp, unsigned int cmd,
+	       unsigned long arg)
+{
+	DRM_DEBUG("\n");
+	return 0;
+}
