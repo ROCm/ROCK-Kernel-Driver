@@ -515,6 +515,11 @@ static int dm_request(request_queue_t *q, struct bio *bio)
 		down_read(&md->lock);
 	}
 
+	if (!md->map) {
+		bio_io_error(bio, bio->bi_size);
+		return 0;
+	}
+
 	__split_bio(md, bio);
 	up_read(&md->lock);
 	return 0;
@@ -671,6 +676,9 @@ static int __bind(struct mapped_device *md, struct dm_table *t)
 
 static void __unbind(struct mapped_device *md)
 {
+	if (!md->map)
+		return;
+
 	dm_table_event_callback(md->map, NULL, NULL);
 	dm_table_put(md->map);
 	md->map = NULL;
@@ -681,35 +689,26 @@ static void __unbind(struct mapped_device *md)
  * Constructor for a new device.
  */
 static int create_aux(unsigned int minor, int persistent,
-		      struct dm_table *table, struct mapped_device **result)
+		      struct mapped_device **result)
 {
-	int r;
 	struct mapped_device *md;
 
 	md = alloc_dev(minor, persistent);
 	if (!md)
 		return -ENXIO;
 
-	r = __bind(md, table);
-	if (r) {
-		free_dev(md);
-		return r;
-	}
-	dm_table_resume_targets(md->map);
-
 	*result = md;
 	return 0;
 }
 
-int dm_create(struct dm_table *table, struct mapped_device **result)
+int dm_create(struct mapped_device **result)
 {
-	return create_aux(0, 0, table, result);
+	return create_aux(0, 0, result);
 }
 
-int dm_create_with_minor(unsigned int minor,
-			 struct dm_table *table, struct mapped_device **result)
+int dm_create_with_minor(unsigned int minor, struct mapped_device **result)
 {
-	return create_aux(minor, 1, table, result);
+	return create_aux(minor, 1, result);
 }
 
 void dm_get(struct mapped_device *md)
@@ -720,7 +719,7 @@ void dm_get(struct mapped_device *md)
 void dm_put(struct mapped_device *md)
 {
 	if (atomic_dec_and_test(&md->holders)) {
-		if (!test_bit(DMF_SUSPENDED, &md->flags))
+		if (!test_bit(DMF_SUSPENDED, &md->flags) && md->map)
 			dm_table_suspend_targets(md->map);
 		__unbind(md);
 		free_dev(md);
@@ -810,7 +809,8 @@ int dm_suspend(struct mapped_device *md)
 	down_write(&md->lock);
 	remove_wait_queue(&md->wait, &wait);
 	set_bit(DMF_SUSPENDED, &md->flags);
-	dm_table_suspend_targets(md->map);
+	if (md->map)
+		dm_table_suspend_targets(md->map);
 	up_write(&md->lock);
 
 	return 0;
@@ -821,7 +821,8 @@ int dm_resume(struct mapped_device *md)
 	struct deferred_io *def;
 
 	down_write(&md->lock);
-	if (!test_bit(DMF_SUSPENDED, &md->flags) ||
+	if (!md->map ||
+	    !test_bit(DMF_SUSPENDED, &md->flags) ||
 	    !dm_table_get_size(md->map)) {
 		up_write(&md->lock);
 		return -EINVAL;
@@ -891,7 +892,8 @@ struct dm_table *dm_get_table(struct mapped_device *md)
 
 	down_read(&md->lock);
 	t = md->map;
-	dm_table_get(t);
+	if (t)
+		dm_table_get(t);
 	up_read(&md->lock);
 
 	return t;
