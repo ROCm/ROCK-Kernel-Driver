@@ -90,6 +90,8 @@ static inline struct device_node *pci_device_to_OF_node(struct pci_dev *dev)
 extern void pci_process_bridge_OF_ranges(struct pci_controller *hose,
 					 struct device_node *dev, int primary);
 
+extern int pcibios_remove_root_bus(struct pci_controller *phb);
+
 /* Use this macro after the PCI bus walk for max performance when it
  * is known that sysdata is correct.
  */
