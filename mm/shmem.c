@@ -1314,6 +1314,10 @@ shmem_get_inode(struct super_block *sb, int mode, dev_t dev)
 		case S_IFLNK:
 			break;
 		}
+	} else if (sbinfo) {
+		spin_lock(&sbinfo->stat_lock);
+		sbinfo->free_inodes++;
+		spin_unlock(&sbinfo->stat_lock);
 	}
 	return inode;
 }
