@@ -30,7 +30,9 @@ struct naca_struct {
 	u64 pftSize;			/* Log base 2 of page table size */
 	u64 serialPortAddr;		/* Phyical address of serial port */
 	u8 interrupt_controller;	/* Type of interrupt controller */ 
-	u8 resv0[6];			/* Padding */
+	u8 resv0;    			/* Type of interrupt controller */
+	u16 platform;			/* Platform flags */
+	u8 resv1[12];			/* Padding */
 };
 
 extern struct naca_struct *naca;

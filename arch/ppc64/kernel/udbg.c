@@ -23,8 +23,6 @@
 #include <asm/uaccess.h>
 #include <asm/machdep.h>
 
-extern int _machine;
-
 struct NS16550 {
 	/* this struct must be packed */
 	unsigned char rbr;  /* 0 */
@@ -86,7 +84,7 @@ udbg_putc(unsigned char c)
 				/* wait for idle */;
 			udbg_comport->thr = '\r'; eieio();
 		}
-	} else if ( _machine == _MACH_iSeries ) {
+	} else if (naca->platform == PLATFORM_ISERIES_LPAR) {
 		/* ToDo: switch this via ppc_md */
 		printk("%c", c);
 	}
@@ -180,7 +178,7 @@ udbg_puthex(unsigned long val)
 void
 udbg_printSP(const char *s)
 {
-	if (_machine == _MACH_pSeries) {
+	if (naca->platform == PLATFORM_PSERIES) {
 		unsigned long sp;
 		asm("mr %0,1" : "=r" (sp) :);
 		if (s)

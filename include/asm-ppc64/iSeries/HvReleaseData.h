@@ -52,7 +52,7 @@ struct	HvReleaseData
 	u32	xDesc;			// Descriptor	"HvRD" ebcdic	x00-x03
 	u16	xSize;			// Size of this control block	x04-x05
 	u16	xVpdAreasPtrOffset;	// Offset in NACA of ItVpdAreas	x06-x07
-	struct  naca* xSlicNacaAddr;	// Virtual address of SLIC NACA x08-x0F
+	struct  naca_struct * xSlicNacaAddr; // Virt addr of SLIC NACA  x08-x0F
 	u32	xMsNucDataOffset;	// Offset of Linux Mapping Data x10-x13
 	u32	xRsvd1;			// Reserved			x14-x17
 	u16	xTagsMode:1;		// 0 == tags active, 1 == tags inactive

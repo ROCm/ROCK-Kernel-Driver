@@ -76,8 +76,6 @@ void parse_cmd_line(unsigned long r3, unsigned long r4, unsigned long r5,
 		    unsigned long r6, unsigned long r7);
 int parse_bootinfo(void);
 
-int _machine = _MACH_unknown;
-
 #ifdef CONFIG_MAGIC_SYSRQ
 unsigned long SYSRQ_KEY;
 #endif /* CONFIG_MAGIC_SYSRQ */
@@ -134,14 +132,15 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 
 	/* pSeries systems are identified in prom.c via OF. */
 	if ( itLpNaca.xLparInstalled == 1 )
-		_machine = _MACH_iSeries;
-	switch (_machine) {
-	case _MACH_iSeries:
+		naca->platform = PLATFORM_ISERIES_LPAR;
+	
+	switch (naca->platform) {
+	case PLATFORM_ISERIES_LPAR:
 		iSeries_init_early();
 		break;
 
 #ifdef CONFIG_PPC_PSERIES
-	case _MACH_pSeries:
+	case PLATFORM_PSERIES:
 		pSeries_init_early();
 #ifdef CONFIG_BLK_DEV_INITRD
 		initrd_start = initrd_end = 0;
@@ -149,7 +148,7 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 		parse_bootinfo();
 		break;
 
-	case _MACH_pSeriesLP:
+	case PLATFORM_PSERIES_LPAR:
 		pSeriesLP_init_early();
 #ifdef CONFIG_BLK_DEV_INITRD
 		initrd_start = initrd_end = 0;
@@ -220,15 +219,15 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 	udbg_puts("\n-----------------------------------------------------\n");
 
 
-	if ( _machine & _MACH_pSeries ) {
+	if (naca->platform & PLATFORM_PSERIES) {
 		finish_device_tree();
 		chrp_init(r3, r4, r5, r6, r7);
 	}
 
 	mm_init_ppc64();
 
-	switch (_machine) {
-	case _MACH_iSeries:
+	switch (naca->platform) {
+	case PLATFORM_ISERIES_LPAR:
 		iSeries_init();
 		break;
 	default:
@@ -313,7 +312,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	 * Assume here that all clock rates are the same in a
 	 * smp system.  -- Cort
 	 */
-	if (_machine != _MACH_iSeries) {
+	if (naca->platform != PLATFORM_ISERIES_LPAR) {
 		struct device_node *cpu_node;
 		int *fp;
 

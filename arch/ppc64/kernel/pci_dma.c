@@ -137,7 +137,7 @@ static inline struct TceTable *get_tce_table(struct pci_dev *dev)
 		dev = ppc64_isabridge_dev;
 	if (!dev)
 		return NULL;
-	if ( ( _machine == _MACH_iSeries ) && ( dev->bus ) ) 
+	if ( ( naca->platform == PLATFORM_ISERIES_LPAR ) && ( dev->bus ) ) 
 		return tceTables[dev->bus->number];
 	/* On the iSeries, the virtual bus will take this path.  There is a */
 	/* fake pci_dev and dev_node built and used.                        */
@@ -765,7 +765,7 @@ void create_tce_tables(void) {
 	struct pci_dev *dev;
 	struct device_node *dn, *mydn;
 
-	if (_machine == _MACH_pSeriesLP)
+	if (naca->platform == PLATFORM_PSERIES_LPAR)
 		create_tce_tables_for_busesLP(&pci_root_buses);
 	else
 	create_tce_tables_for_buses(&pci_root_buses);
@@ -799,7 +799,7 @@ void create_pci_bus_tce_table( unsigned long token ) {
 
 	newTceTable = kmalloc( sizeof(struct TceTable), GFP_KERNEL );
 
-	if(_machine == _MACH_iSeries) {
+	if(naca->platform == PLATFORM_ISERIES_LPAR) {
 		if ( token > 254 ) {
 			printk("PCI: Bus TCE table failed, invalid bus number %lu\n", token );
 			return;
@@ -860,7 +860,7 @@ void create_pci_bus_tce_table( unsigned long token ) {
 
 		dn = (struct device_node *)token;
 		phb = dn->phb;
-		if (_machine == _MACH_pSeries)
+		if (naca->platform == PLATFORM_PSERIES)
 			getTceTableParmsPSeries(phb, dn, newTceTable);
 		else
 			getTceTableParmsPSeriesLP(phb, dn, newTceTable);

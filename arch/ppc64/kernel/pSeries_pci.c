@@ -518,7 +518,7 @@ alloc_phb(struct device_node *dev, char *model, unsigned int addr_size_words)
 	        phb = pci_alloc_pci_controller("PHB SW",phb_type_speedwagon);
 		if (phb == NULL) return NULL;
 
-		if (_machine == _MACH_pSeries) {
+		if (naca->platform == PLATFORM_PSERIES) {
 			phb->cfg_addr = (volatile unsigned long *) 
 			  ioremap(reg_struct.address + 0x140, PAGE_SIZE);
 			phb->cfg_data = (char*)(phb->cfg_addr - 0x02); /* minus is correct */

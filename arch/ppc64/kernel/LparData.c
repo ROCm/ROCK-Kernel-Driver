@@ -220,10 +220,6 @@ struct ItVpdAreas itVpdAreas = {
 	}
 };
 
-
-/* Data area used in flush_hash_page  */
-long long flush_hash_page_hpte[2];
-
 struct msChunks msChunks = {0, 0, 0, 0, NULL};
 
 /* Depending on whether this is called from iSeries or pSeries setup

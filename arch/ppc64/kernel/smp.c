@@ -262,7 +262,7 @@ smp_chrp_setup_cpu(int cpu_nr)
 	static atomic_t ready = ATOMIC_INIT(1);
 	static volatile int frozen = 0;
 
-	if (_machine == _MACH_pSeriesLP) {
+	if (naca->platform == PLATFORM_PSERIES_LPAR) {
 		/* timebases already synced under the hypervisor. */
 		paca[cpu_nr].next_jiffy_update_tb = tb_last_stamp = get_tb();
 		if (cpu_nr == 0) {

@@ -376,7 +376,7 @@ prom_initialize_naca(unsigned long mem)
 				_naca->iCacheL1LogLineSize  = __ilog2(size);
 				_naca->iCacheL1LinesPerPage = PAGE_SIZE / size;
 
-				if (RELOC(_machine) == _MACH_pSeriesLP) {
+				if (_naca->platform == PLATFORM_PSERIES_LPAR) {
 					u32 pft_size[2];
 					call_prom(RELOC("getprop"), 4, 1, node, 
 						  RELOC("ibm,pft-size"),
@@ -451,7 +451,7 @@ prom_initialize_naca(unsigned long mem)
 
 	_naca->physicalMemorySize = lmb_phys_mem_size();
 
-	if (RELOC(_machine) == _MACH_pSeries) {
+	if (_naca->platform == PLATFORM_PSERIES) {
 		unsigned long rnd_mem_size, pteg_count;
 
 		/* round mem_size up to next power of 2 */
@@ -522,8 +522,8 @@ prom_initialize_naca(unsigned long mem)
         prom_print_hex(_naca->interrupt_controller);
         prom_print_nl();
 
-        prom_print(RELOC("_machine                   = 0x"));
-        prom_print_hex(RELOC(_machine));
+        prom_print(RELOC("naca->platform             = 0x"));
+        prom_print_hex(_naca->platform);
         prom_print_nl();
 
 	prom_print(RELOC("prom_initialize_naca: end...\n"));
@@ -626,6 +626,7 @@ prom_instantiate_rtas(unsigned long mem)
 	unsigned long offset = reloc_offset();
 	struct prom_t *_prom = PTRRELOC(&prom);
 	struct rtas_t *_rtas = PTRRELOC(&rtas);
+	struct naca_struct *_naca = RELOC(naca);
 	ihandle prom_rtas;
         u32 getprop_rval;
 
@@ -642,7 +643,7 @@ prom_instantiate_rtas(unsigned long mem)
 				  RELOC("ibm,hypertas-functions"), 
 				  hypertas_funcs, 
 				  sizeof(hypertas_funcs))) > 0) {
-			RELOC(_machine) = _MACH_pSeriesLP;
+			_naca->platform = PLATFORM_PSERIES_LPAR;
 		}
 
 		call_prom(RELOC("getprop"), 
@@ -1241,7 +1242,7 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 	struct prom_t *_prom = PTRRELOC(&prom);
 
 	/* Default machine type. */
-	RELOC(_machine) = _MACH_pSeries;
+	_naca->platform = PLATFORM_PSERIES;
 	/* Reset klimit to take into account the embedded system map */
 	if (RELOC(embedded_sysmap_end))
 		RELOC(klimit) = __va(PAGE_ALIGN(RELOC(embedded_sysmap_end)));
@@ -1413,7 +1414,7 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 
 	lmb_reserve(0, __pa(RELOC(klimit)));
 
-	if (RELOC(_machine) == _MACH_pSeries)
+	if (_naca->platform == PLATFORM_PSERIES)
 		prom_initialize_tce_table();
 
  	if ((long) call_prom(RELOC("getprop"), 4, 1,

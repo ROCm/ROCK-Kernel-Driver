@@ -14,7 +14,6 @@
 #include <linux/sched.h>
 #include <linux/string.h>
 #include <linux/interrupt.h>
-#include <linux/nvram.h>
 #include <linux/spinlock.h>
 #include <linux/console.h>
 #include <linux/irq.h>
@@ -225,9 +224,6 @@ EXPORT_SYMBOL(__no_use_cli);
 #endif
 #endif
 
-#ifndef CONFIG_MACH_SPECIFIC
-EXPORT_SYMBOL(_machine);
-#endif
 EXPORT_SYMBOL(ppc_md);
 
 EXPORT_SYMBOL(find_devices);

@@ -121,7 +121,7 @@ void eeh_init(void) {
 	ibm_set_eeh_option = rtas_token("ibm,set-eeh-option");
 	ibm_set_slot_reset = rtas_token("ibm,set-slot-reset");
 	ibm_read_slot_reset_state = rtas_token("ibm,read-slot-reset-state");
-	if (ibm_set_eeh_option != RTAS_UNKNOWN_SERVICE && _machine == _MACH_pSeriesLP)
+	if (ibm_set_eeh_option != RTAS_UNKNOWN_SERVICE && naca->platform == PLATFORM_PSERIES_LPAR)
 		eeh_implemented = 1;
 
 	if (eeh_force_off > eeh_force_on) {

@@ -251,7 +251,7 @@ chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 #endif /* CONFIG_BLK_DEV_INITRD */
 #endif
 
-	ppc_md.ppc_machine = _machine;
+	ppc_md.ppc_machine = naca->platform;
 
 	ppc_md.setup_arch     = chrp_setup_arch;
 	ppc_md.setup_residual = NULL;
@@ -315,7 +315,7 @@ chrp_progress(char *s, unsigned short hex)
 	if (hex)
 		udbg_printf("<chrp_progress> %s\n", s);
 
-	if (!rtas.base || (_machine != _MACH_pSeries))
+	if (!rtas.base || (naca->platform != PLATFORM_PSERIES))
 		return;
 
 	if (max_width == 0) {
