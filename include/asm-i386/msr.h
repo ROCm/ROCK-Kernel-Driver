@@ -24,10 +24,10 @@
 	val |= ((u64)h__<<32);  \
 } while(0)
 
-static inline void wrmsrl (u32 msr, u64 val)
+static inline void wrmsrl (unsigned long msr, unsigned long long val)
 {
-	u32 lo, hi;
-	lo = (u32) val;
+	unsigned long lo, hi;
+	lo = (unsigned long) val;
 	hi = val >> 32;
 	wrmsr (msr, lo, hi);
 }
