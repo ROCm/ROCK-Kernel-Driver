@@ -244,7 +244,7 @@ static int idescsi_end_request(struct ata_device *drive, struct request *rq, int
 	u8 *scsi_buf;
 
 	if (!(rq->flags & REQ_PC)) {
-		__ata_end_request(drive, rq, uptodate, 0);
+		ata_end_request(drive, rq, uptodate, 0);
 		return 0;
 	}
 
@@ -318,10 +318,11 @@ static ide_startstop_t idescsi_pc_intr(struct ata_device *drive, struct request 
 	if (ata_status(drive, 0, DRQ_STAT)) {	/* No more interrupts */
 		if (test_bit(IDESCSI_LOG_CMD, &scsi->log))
 			printk (KERN_INFO "Packet command completed, %d bytes transferred\n", pc->actually_transferred);
-		ide__sti();
+		local_irq_enable();
 		if (drive->status & ERR_STAT)
 			rq->errors++;
 		idescsi_end_request(drive, rq, 1);
+
 		return ATA_OP_FINISHED;
 	}
 	bcount = IN_BYTE (IDE_BCOUNTH_REG) << 8 | IN_BYTE (IDE_BCOUNTL_REG);
@@ -491,14 +492,13 @@ static void idescsi_release(struct inode *inode, struct file *filp, struct ata_d
 	MOD_DEC_USE_COUNT;
 }
 
+static Scsi_Host_Template template;
 static int idescsi_cleanup (struct ata_device *drive)
 {
-	struct Scsi_Host *host = drive->driver_data;
-
 	if (ide_unregister_subdriver (drive)) {
 		return 1;
 	}
-	scsi_unregister(host);
+	scsi_unregister_host(&template);
 
 	return 0;
 }
@@ -801,7 +801,6 @@ static int __init init_idescsi_module(void)
 static void __exit exit_idescsi_module(void)
 {
 	unregister_ata_driver(&ata_ops);
-	scsi_unregister_host(&template);
 }
 
 module_init(init_idescsi_module);

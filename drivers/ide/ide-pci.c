@@ -158,6 +158,80 @@ static int __init setup_pci_baseregs(struct pci_dev *dev, const char *name)
 	return 0;
 }
 
+#ifdef CONFIG_BLK_DEV_IDEDMA
+/*
+ * Setup DMA transfers on the channel.
+ */
+static void __init setup_channel_dma(struct pci_dev *dev,
+		struct ata_pci_device* d,
+		int autodma,
+		struct ata_channel *ch)
+{
+	unsigned long dma_base;
+
+	if (d->flags & ATA_F_NOADMA)
+		autodma = 0;
+
+	if (autodma)
+		ch->autodma = 1;
+
+	if (!((d->flags & ATA_F_DMA) || ((dev->class >> 8) == PCI_CLASS_STORAGE_IDE && (dev->class & 0x80))))
+		return;
+
+	/*
+	 * Fetch the DMA Bus-Master-I/O-Base-Address (BMIBA) from PCI space:
+	 */
+	dma_base = pci_resource_start(dev, 4);
+	if (dma_base) {
+		/* PDC20246, PDC20262, HPT343, & HPT366 */
+		if ((ch->unit == ATA_PRIMARY) && d->extra) {
+			request_region(dma_base + 16, d->extra, dev->name);
+			ch->dma_extra = d->extra;
+		}
+
+		/* If we are on the second channel, the dma base address will
+		 * be one entry away from the primary interface.
+		 */
+		if (ch->unit == ATA_SECONDARY)
+				dma_base += 8;
+
+		if (d->flags & ATA_F_SIMPLEX) {
+			outb(inb(dma_base + 2) & 0x60, dma_base + 2);
+			if (inb(dma_base + 2) & 0x80)
+				printk(KERN_INFO "%s: simplex device: DMA forced\n", dev->name);
+		} else {
+			/* If the device claims "simplex" DMA, this means only
+			 * one of the two interfaces can be trusted with DMA at
+			 * any point in time.  So we should enable DMA only on
+			 * one of the two interfaces.
+			 */
+			if ((inb(dma_base + 2) & 0x80)) {
+				if ((!ch->drives[0].present && !ch->drives[1].present) ||
+				    ch->unit == ATA_SECONDARY) {
+					printk(KERN_INFO "%s: simplex device:  DMA disabled\n", dev->name);
+					dma_base = 0;
+				}
+			}
+		}
+	} else {
+		printk(KERN_INFO "%s: %s Bus-Master DMA was disabled by BIOS\n",
+		       ch->name, dev->name);
+
+		return;
+	}
+
+	/* The function below will check itself whatever there is something to
+	 * be done or not. We don't have therefore to care whatever it was
+	 * already enabled by the primary channel run.
+	 */
+	pci_set_master(dev);
+	if (d->init_dma)
+		d->init_dma(ch, dma_base);
+	else
+		ata_init_dma(ch, dma_base);
+}
+#endif
+
 /*
  * Setup a particular port on an ATA host controller.
  *
@@ -171,7 +245,6 @@ static int __init setup_host_channel(struct pci_dev *dev,
 		int autodma)
 {
 	unsigned long base = 0;
-	unsigned long dma_base;
 	unsigned long ctl = 0;
 	ide_pci_enablebit_t *e = &(d->enablebits[port]);
 	struct ata_channel *ch;
@@ -260,69 +333,13 @@ controller_ok:
 	if (ch->udma_four)
 		printk("%s: warning: ATA-66/100 forced bit set!\n", dev->name);
 
+
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	/*
 	 * Setup DMA transfers on the channel.
 	 */
-	if (!((d->flags & ATA_F_DMA) || ((dev->class >> 8) == PCI_CLASS_STORAGE_IDE && (dev->class & 0x80))))
-		goto no_dma;
-	/*
-	 * Fetch the DMA Bus-Master-I/O-Base-Address (BMIBA) from PCI space:
-	 */
-	dma_base = pci_resource_start(dev, 4);
-	if (dma_base) {
-		/* PDC20246, PDC20262, HPT343, & HPT366 */
-		if ((ch->unit == ATA_PRIMARY) && d->extra) {
-			request_region(dma_base + 16, d->extra, dev->name);
-			ch->dma_extra = d->extra;
-		}
-
-		/* If we are on the second channel, the dma base address will
-		 * be one entry away from the primary interface.
-		 */
-		if (ch->unit == ATA_SECONDARY)
-			dma_base += 8;
-
-		if (d->flags & ATA_F_SIMPLEX) {
-			outb(inb(dma_base + 2) & 0x60, dma_base + 2);
-			if (inb(dma_base + 2) & 0x80)
-				printk(KERN_INFO "%s: simplex device: DMA forced\n", dev->name);
-		} else {
-			/* If the device claims "simplex" DMA, this means only
-			 * one of the two interfaces can be trusted with DMA at
-			 * any point in time.  So we should enable DMA only on
-			 * one of the two interfaces.
-			 */
-			if ((inb(dma_base + 2) & 0x80)) {
-				if ((!ch->drives[0].present && !ch->drives[1].present) ||
-						ch->unit == ATA_SECONDARY) {
-					printk(KERN_INFO "%s: simplex device:  DMA disabled\n", dev->name);
-					dma_base = 0;
-				}
-			}
-		}
-	} else {
-		printk(KERN_INFO "%s: %s Bus-Master DMA was disabled by BIOS\n",
-				ch->name, dev->name);
-
-		goto no_dma;
-	}
-
-	/* The function below will check itself whatever there is something to
-	 * be done or not. We don't have therefore to care whatever it was
-	 * already enabled by the primary channel run.
-	 */
-	pci_set_master(dev);
-
-	if (autodma)
-		ch->autodma = 1;
-
-	if (d->init_dma)
-		d->init_dma(ch, dma_base);
-	else
-		ata_init_dma(ch, dma_base);
+	setup_channel_dma(dev, d, autodma, ch);
 #endif
-
 no_dma:
 	/* Call chipset-specific routine for each enabled channel. */
 	if (d->init_channel)
@@ -680,75 +697,75 @@ void __init ide_scan_pcibus(int scan_direction)
  */
 static struct ata_pci_device chipsets[] __initdata = {
 	{
-		vendor: PCI_VENDOR_ID_PCTECH,
-		device: PCI_DEVICE_ID_PCTECH_SAMURAI_IDE,
-		bootable: ON_BOARD
+		.vendor = PCI_VENDOR_ID_PCTECH,
+		.device = PCI_DEVICE_ID_PCTECH_SAMURAI_IDE,
+		.bootable = ON_BOARD
 	},
 	{
-		vendor: PCI_VENDOR_ID_CMD,
-		device: PCI_DEVICE_ID_CMD_640,
-		init_channel: ATA_PCI_IGNORE,
-		bootable: ON_BOARD
+		.vendor = PCI_VENDOR_ID_CMD,
+		.device = PCI_DEVICE_ID_CMD_640,
+		.init_channel = ATA_PCI_IGNORE,
+		.bootable = ON_BOARD
 	},
 	{
-		vendor: PCI_VENDOR_ID_NS,
-		device: PCI_DEVICE_ID_NS_87410,
-		enablebits: {{0x43,0x08,0x08}, {0x47,0x08,0x08}},
-		bootable: ON_BOARD
+		.vendor = PCI_VENDOR_ID_NS,
+		.device = PCI_DEVICE_ID_NS_87410,
+		.enablebits = {{0x43,0x08,0x08}, {0x47,0x08,0x08}},
+		.bootable = ON_BOARD
 	},
 	{
-		vendor: PCI_VENDOR_ID_HINT,
-		device: PCI_DEVICE_ID_HINT_VXPROII_IDE,
-		bootable: ON_BOARD
+		.vendor = PCI_VENDOR_ID_HINT,
+		.device = PCI_DEVICE_ID_HINT_VXPROII_IDE,
+		.bootable = ON_BOARD
 	},
 	{
-		vendor: PCI_VENDOR_ID_HOLTEK,
-		device: PCI_DEVICE_ID_HOLTEK_6565,
-		bootable: ON_BOARD
+		.vendor = PCI_VENDOR_ID_HOLTEK,
+		.device = PCI_DEVICE_ID_HOLTEK_6565,
+		.bootable = ON_BOARD
 	},
 	{
-		vendor: PCI_VENDOR_ID_INTEL,
-		device: PCI_DEVICE_ID_INTEL_82371MX,
-		enablebits: {{0x6D,0x80,0x80}, {0x00,0x00,0x00}},
-		bootable: ON_BOARD,
-		flags: ATA_F_NODMA
+		.vendor = PCI_VENDOR_ID_INTEL,
+		.device = PCI_DEVICE_ID_INTEL_82371MX,
+		.enablebits = {{0x6D,0x80,0x80}, {0x00,0x00,0x00}},
+		.bootable = ON_BOARD,
+		.flags = ATA_F_NODMA
 	},
 	{
-		vendor: PCI_VENDOR_ID_UMC,
-		device: PCI_DEVICE_ID_UMC_UM8673F,
-		bootable: ON_BOARD,
-		flags: ATA_F_FIXIRQ
+		.vendor = PCI_VENDOR_ID_UMC,
+		.device = PCI_DEVICE_ID_UMC_UM8673F,
+		.bootable = ON_BOARD,
+		.flags = ATA_F_FIXIRQ
 	},
 	{
-		vendor: PCI_VENDOR_ID_UMC,
-		device: PCI_DEVICE_ID_UMC_UM8886A,
-		bootable: ON_BOARD,
-		flags: ATA_F_FIXIRQ
+		.vendor = PCI_VENDOR_ID_UMC,
+		.device = PCI_DEVICE_ID_UMC_UM8886A,
+		.bootable = ON_BOARD,
+		.flags = ATA_F_FIXIRQ
 	},
 	{
-		vendor: PCI_VENDOR_ID_UMC,
-		device: PCI_DEVICE_ID_UMC_UM8886BF,
-		bootable: ON_BOARD,
-		flags: ATA_F_FIXIRQ
+		.vendor = PCI_VENDOR_ID_UMC,
+		.device = PCI_DEVICE_ID_UMC_UM8886BF,
+		.bootable = ON_BOARD,
+		.flags = ATA_F_FIXIRQ
 	},
 	{
-		vendor: PCI_VENDOR_ID_VIA,
-		device: PCI_DEVICE_ID_VIA_82C561,
-		bootable: ON_BOARD,
-		flags: ATA_F_NOADMA
+		.vendor = PCI_VENDOR_ID_VIA,
+		.device = PCI_DEVICE_ID_VIA_82C561,
+		.bootable = ON_BOARD,
+		.flags = ATA_F_NOADMA
 	},
 	{
-		vendor: PCI_VENDOR_ID_VIA,
-		device: PCI_DEVICE_ID_VIA_82C586_1,
-		bootable: ON_BOARD,
-		flags: ATA_F_NOADMA
+		.vendor = PCI_VENDOR_ID_VIA,
+		.device = PCI_DEVICE_ID_VIA_82C586_1,
+		.bootable = ON_BOARD,
+		.flags = ATA_F_NOADMA
 	},
 	{
-		vendor: PCI_VENDOR_ID_TTI,
-		device: PCI_DEVICE_ID_TTI_HPT366,
-		bootable: OFF_BOARD,
-		extra: 240,
-		flags: ATA_F_IRQ | ATA_F_HPTHACK
+		.vendor = PCI_VENDOR_ID_TTI,
+		.device = PCI_DEVICE_ID_TTI_HPT366,
+		.bootable = OFF_BOARD,
+		.extra = 240,
+		.flags = ATA_F_IRQ | ATA_F_HPTHACK
 	}
 };
 

@@ -106,26 +106,24 @@ static void read_vlb(struct ata_device *drive, void *buffer, unsigned int wcount
 {
 	unsigned long flags;
 
-	__save_flags(flags);	/* local CPU only */
-	__cli();		/* local CPU only */
+	local_irq_save(flags);
 	inb(IDE_NSECTOR_REG);
 	inb(IDE_NSECTOR_REG);
 	inb(IDE_NSECTOR_REG);
 	insl(IDE_DATA_REG, buffer, wcount);
-	__restore_flags(flags);	/* local CPU only */
+	local_irq_restore(flags);
 }
 
 static void write_vlb(struct ata_device *drive, void *buffer, unsigned int wcount)
 {
 	unsigned long flags;
 
-	__save_flags(flags);	/* local CPU only */
-	__cli();		/* local CPU only */
+	local_irq_save(flags);
 	inb(IDE_NSECTOR_REG);
 	inb(IDE_NSECTOR_REG);
 	inb(IDE_NSECTOR_REG);
 	outsl(IDE_DATA_REG, buffer, wcount);
-	__restore_flags(flags);	/* local CPU only */
+	local_irq_restore(flags);
 }
 
 static void read_16(struct ata_device *drive, void *buffer, unsigned int wcount)
@@ -415,7 +413,7 @@ read_next:
 	rq->nr_sectors -= nsect;
 	total_remaining = rq->nr_sectors;
 	if ((rq->current_nr_sectors -= nsect) <= 0)
-		__ata_end_request(drive, rq, 1, 0);
+		ata_end_request(drive, rq, 1, 0);
 
 	/*
 	 * Now the data has been read in, do the following:
@@ -477,7 +475,7 @@ static ide_startstop_t promise_complete_pollfunc(struct ata_device *drive, struc
 #ifdef DEBUG_WRITE
 	printk(KERN_DEBUG "%s: Write complete - end_request\n", drive->name);
 #endif
-	__ata_end_request(drive, rq, 1, rq->nr_sectors);
+	ata_end_request(drive, rq, 1, rq->nr_sectors);
 
 	return ATA_OP_FINISHED;
 }
@@ -629,7 +627,7 @@ ide_startstop_t do_pdc4030_io(struct ata_device *drive, struct ata_taskfile *arg
 	/* Check that it's a regular command. If not, bomb out early. */
 	if (!(rq->flags & REQ_CMD)) {
 		blk_dump_rq_flags(rq, "pdc4030 bad flags");
-		__ata_end_request(drive, rq, 0, 0);
+		ata_end_request(drive, rq, 0, 0);
 
 		return ATA_OP_FINISHED;
 	}
@@ -701,7 +699,7 @@ ide_startstop_t do_pdc4030_io(struct ata_device *drive, struct ata_taskfile *arg
 			return ret;
 		}
 		if (!drive->channel->unmask)
-			__cli();	/* local CPU only */
+			local_irq_disable();
 
 		return promise_do_write(drive, rq);
 	}
@@ -709,7 +707,7 @@ ide_startstop_t do_pdc4030_io(struct ata_device *drive, struct ata_taskfile *arg
 	default:
 		printk(KERN_ERR "pdc4030: command not READ or WRITE! Huh?\n");
 
-		__ata_end_request(drive, rq, 0, 0);
+		ata_end_request(drive, rq, 0, 0);
 		return ATA_OP_FINISHED;
 	}
 }

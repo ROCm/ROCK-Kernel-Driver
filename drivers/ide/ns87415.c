@@ -40,8 +40,7 @@ static void ns87415_prepare_drive(struct ata_device *drive, unsigned int use_dma
 	struct pci_dev *dev = hwif->pci_dev;
 	unsigned long flags;
 
-	__save_flags(flags);	/* local CPU only */
-	__cli();		/* local CPU only */
+	local_irq_save(flags);
 	new = *old;
 
 	/* Adjust IRQ enable bit */
@@ -75,7 +74,7 @@ static void ns87415_prepare_drive(struct ata_device *drive, unsigned int use_dma
 		udelay(10);
 	}
 
-	__restore_flags(flags);	/* local CPU only */
+	local_irq_restore(flags);
 }
 
 static void ns87415_selectproc(struct ata_device *drive)
@@ -215,10 +214,10 @@ static void __init ide_init_ns87415(struct ata_channel *hwif)
 
 /* module data table */
 static struct ata_pci_device chipset __initdata = {
-	vendor: PCI_VENDOR_ID_NS,
-	device: PCI_DEVICE_ID_NS_87415,
-	init_channel: ide_init_ns87415,
-	bootable: ON_BOARD,
+	.vendor = PCI_VENDOR_ID_NS,
+	.device = PCI_DEVICE_ID_NS_87415,
+	.init_channel = ide_init_ns87415,
+	.bootable = ON_BOARD,
 };
 
 int __init init_ns87415(void)

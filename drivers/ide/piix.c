@@ -388,130 +388,130 @@ static void __init piix_init_dma(struct ata_channel *ch, unsigned long dmabase)
 /* module data table */
 static struct ata_pci_device chipsets[] __initdata = {
 	{
-		vendor: PCI_VENDOR_ID_INTEL,
-		device: PCI_DEVICE_ID_INTEL_82371FB_1,
-		init_chipset: piix_init_chipset,
-		init_channel: piix_init_channel,
-		init_dma: piix_init_dma,
-		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
-		bootable: ON_BOARD
+		.vendor = PCI_VENDOR_ID_INTEL,
+		.device = PCI_DEVICE_ID_INTEL_82371FB_1,
+		.init_chipset = piix_init_chipset,
+		.init_channel = piix_init_channel,
+		.init_dma = piix_init_dma,
+		.enablebits = {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
+		.bootable = ON_BOARD
 	},
 	{
-		vendor: PCI_VENDOR_ID_INTEL,
-		device: PCI_DEVICE_ID_INTEL_82371SB_1,
-		init_chipset: piix_init_chipset,
-		init_channel: piix_init_channel,
-		init_dma: piix_init_dma,
-		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
-		bootable: ON_BOARD
+		.vendor = PCI_VENDOR_ID_INTEL,
+		.device = PCI_DEVICE_ID_INTEL_82371SB_1,
+		.init_chipset = piix_init_chipset,
+		.init_channel = piix_init_channel,
+		.init_dma = piix_init_dma,
+		.enablebits = {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
+		.bootable = ON_BOARD
 	},
 	{
-		vendor: PCI_VENDOR_ID_INTEL,
-		device: PCI_DEVICE_ID_INTEL_82371AB,
-		init_chipset: piix_init_chipset,
-		init_channel: piix_init_channel,
-		init_dma: piix_init_dma,
-		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
-		bootable: ON_BOARD
+		.vendor = PCI_VENDOR_ID_INTEL,
+		.device = PCI_DEVICE_ID_INTEL_82371AB,
+		.init_chipset = piix_init_chipset,
+		.init_channel = piix_init_channel,
+		.init_dma = piix_init_dma,
+		.enablebits = {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
+		.bootable = ON_BOARD
 	},
 	{
-		vendor: PCI_VENDOR_ID_INTEL,
-		device: PCI_DEVICE_ID_INTEL_82443MX_1,
-		init_chipset: piix_init_chipset,
-		init_channel: piix_init_channel,
-		init_dma: piix_init_dma,
-		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
-		bootable: ON_BOARD
+		.vendor = PCI_VENDOR_ID_INTEL,
+		.device = PCI_DEVICE_ID_INTEL_82443MX_1,
+		.init_chipset = piix_init_chipset,
+		.init_channel = piix_init_channel,
+		.init_dma = piix_init_dma,
+		.enablebits = {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
+		.bootable = ON_BOARD
 	},
 	{
-		vendor: PCI_VENDOR_ID_INTEL,
-		device: PCI_DEVICE_ID_INTEL_82372FB_1,
-		init_chipset: piix_init_chipset,
-		init_channel: piix_init_channel,
-		init_dma: piix_init_dma,
-		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
-		bootable: ON_BOARD
+		.vendor = PCI_VENDOR_ID_INTEL,
+		.device = PCI_DEVICE_ID_INTEL_82372FB_1,
+		.init_chipset = piix_init_chipset,
+		.init_channel = piix_init_channel,
+		.init_dma = piix_init_dma,
+		.enablebits = {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
+		.bootable = ON_BOARD
 	},
 	{
-		vendor: PCI_VENDOR_ID_INTEL,
-		device: PCI_DEVICE_ID_INTEL_82801AA_1,
-		init_chipset: piix_init_chipset,
-		init_channel: piix_init_channel,
-		init_dma: piix_init_dma,
-		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
-		bootable: ON_BOARD
+		.vendor = PCI_VENDOR_ID_INTEL,
+		.device = PCI_DEVICE_ID_INTEL_82801AA_1,
+		.init_chipset = piix_init_chipset,
+		.init_channel = piix_init_channel,
+		.init_dma = piix_init_dma,
+		.enablebits = {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
+		.bootable = ON_BOARD
 	},
 	{
-		vendor: PCI_VENDOR_ID_INTEL,
-		device: PCI_DEVICE_ID_INTEL_82801AB_1,
-		init_chipset: piix_init_chipset,
-		init_channel: piix_init_channel,
-		init_dma: piix_init_dma,
-		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
-		bootable: ON_BOARD
+		.vendor = PCI_VENDOR_ID_INTEL,
+		.device = PCI_DEVICE_ID_INTEL_82801AB_1,
+		.init_chipset = piix_init_chipset,
+		.init_channel = piix_init_channel,
+		.init_dma = piix_init_dma,
+		.enablebits = {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
+		.bootable = ON_BOARD
 	},
 	{
-		vendor: PCI_VENDOR_ID_INTEL,
-		device: PCI_DEVICE_ID_INTEL_82801BA_9,
-		init_chipset: piix_init_chipset,
-		init_channel: piix_init_channel,
-		init_dma: piix_init_dma,
-		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
-		bootable: ON_BOARD
+		.vendor = PCI_VENDOR_ID_INTEL,
+		.device = PCI_DEVICE_ID_INTEL_82801BA_9,
+		.init_chipset = piix_init_chipset,
+		.init_channel = piix_init_channel,
+		.init_dma = piix_init_dma,
+		.enablebits = {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
+		.bootable = ON_BOARD
 	},
 	{
-		vendor: PCI_VENDOR_ID_INTEL,
-		device: PCI_DEVICE_ID_INTEL_82801BA_8,
-		init_chipset: piix_init_chipset,
-		init_channel: piix_init_channel,
-		init_dma: piix_init_dma,
-		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
-		bootable: ON_BOARD
+		.vendor = PCI_VENDOR_ID_INTEL,
+		.device = PCI_DEVICE_ID_INTEL_82801BA_8,
+		.init_chipset = piix_init_chipset,
+		.init_channel = piix_init_channel,
+		.init_dma = piix_init_dma,
+		.enablebits = {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
+		.bootable = ON_BOARD
 	},
 	{
-		vendor: PCI_VENDOR_ID_INTEL,
-		device: PCI_DEVICE_ID_INTEL_82801E_9,
-		init_chipset: piix_init_chipset,
-		init_channel: piix_init_channel,
-		init_dma: piix_init_dma,
-		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
-		bootable: ON_BOARD
+		.vendor = PCI_VENDOR_ID_INTEL,
+		.device = PCI_DEVICE_ID_INTEL_82801E_9,
+		.init_chipset = piix_init_chipset,
+		.init_channel = piix_init_channel,
+		.init_dma = piix_init_dma,
+		.enablebits = {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
+		.bootable = ON_BOARD
 	},
 	{
-		vendor: PCI_VENDOR_ID_INTEL,
-		device: PCI_DEVICE_ID_INTEL_82801CA_10,
-		init_chipset: piix_init_chipset,
-		init_channel: piix_init_channel,
-		init_dma: piix_init_dma,
-		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
-		bootable: ON_BOARD
+		.vendor = PCI_VENDOR_ID_INTEL,
+		.device = PCI_DEVICE_ID_INTEL_82801CA_10,
+		.init_chipset = piix_init_chipset,
+		.init_channel = piix_init_channel,
+		.init_dma = piix_init_dma,
+		.enablebits = {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
+		.bootable = ON_BOARD
 	},
 	{
-		vendor: PCI_VENDOR_ID_INTEL,
-		device: PCI_DEVICE_ID_INTEL_82801CA_11,
-		init_chipset: piix_init_chipset,
-		init_channel: piix_init_channel,
-		init_dma: piix_init_dma,
-		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
-		bootable: ON_BOARD
+		.vendor = PCI_VENDOR_ID_INTEL,
+		.device = PCI_DEVICE_ID_INTEL_82801CA_11,
+		.init_chipset = piix_init_chipset,
+		.init_channel = piix_init_channel,
+		.init_dma = piix_init_dma,
+		.enablebits = {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
+		.bootable = ON_BOARD
 	},
 	{
-		vendor: PCI_VENDOR_ID_INTEL,
-		device: PCI_DEVICE_ID_INTEL_82801DB_9,
-		init_chipset: piix_init_chipset,
-		init_channel: piix_init_channel,
-		init_dma: piix_init_dma,
-		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
-		bootable: ON_BOARD
+		.vendor = PCI_VENDOR_ID_INTEL,
+		.device = PCI_DEVICE_ID_INTEL_82801DB_9,
+		.init_chipset = piix_init_chipset,
+		.init_channel = piix_init_channel,
+		.init_dma = piix_init_dma,
+		.enablebits = {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
+		.bootable = ON_BOARD
 	},
 	{
-		vendor: PCI_VENDOR_ID_EFAR,
-		device: PCI_DEVICE_ID_EFAR_SLC90E66_1,
-		init_chipset: piix_init_chipset,
-		init_channel: piix_init_channel,
-		init_dma: piix_init_dma,
-		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
-		bootable: ON_BOARD
+		.vendor = PCI_VENDOR_ID_EFAR,
+		.device = PCI_DEVICE_ID_EFAR_SLC90E66_1,
+		.init_chipset = piix_init_chipset,
+		.init_channel = piix_init_channel,
+		.init_dma = piix_init_dma,
+		.enablebits = {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
+		.bootable = ON_BOARD
 	},
 };
 
@@ -519,9 +519,8 @@ int __init init_piix(void)
 {
 	int i;
 
-	for (i = 0; i < ARRAY_SIZE(chipsets); ++i) {
+	for (i = 0; i < ARRAY_SIZE(chipsets); ++i)
 		ata_register_chipset(&chipsets[i]);
-	}
 
 	return 0;
 }

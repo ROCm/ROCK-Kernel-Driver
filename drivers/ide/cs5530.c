@@ -314,12 +314,12 @@ static void __init ide_init_cs5530(struct ata_channel *hwif)
 
 /* module data table */
 static struct ata_pci_device chipset __initdata = {
-	vendor: PCI_VENDOR_ID_CYRIX,
-	device: PCI_DEVICE_ID_CYRIX_5530_IDE,
-	init_chipset: pci_init_cs5530,
-	init_channel: ide_init_cs5530,
-	bootable: ON_BOARD,
-	flags: ATA_F_DMA
+	.vendor = PCI_VENDOR_ID_CYRIX,
+	.device = PCI_DEVICE_ID_CYRIX_5530_IDE,
+	.init_chipset = pci_init_cs5530,
+	.init_channel = ide_init_cs5530,
+	.bootable = ON_BOARD,
+	.flags = ATA_F_DMA
 };
 
 int __init init_cs5530(void)

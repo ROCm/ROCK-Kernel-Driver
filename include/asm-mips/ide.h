@@ -24,8 +24,6 @@
 # endif
 #endif
 
-#define ide__sti()	__sti()
-
 struct ide_ops {
 	int (*ide_default_irq)(ide_ioreg_t base);
 	ide_ioreg_t (*ide_default_io_base)(int index);

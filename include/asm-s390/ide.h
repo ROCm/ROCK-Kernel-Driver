@@ -15,8 +15,6 @@
 #define MAX_HWIFS	0
 #endif
 
-#define ide__sti()	do {} while (0)
-
 /*
  * We always use the new IDE port registering,
  * so these are fixed here.

@@ -309,7 +309,7 @@ xprt_adjust_cwnd(struct rpc_xprt *xprt, int result)
 	unsigned long	cwnd;
 
 	cwnd = xprt->cwnd;
-	if (result >= 0 && xprt->cong <= cwnd) {
+	if (result >= 0 && cwnd <= xprt->cong) {
 		/* The (cwnd >> 1) term makes sure
 		 * the result gets rounded properly. */
 		cwnd += (RPC_CWNDSCALE * RPC_CWNDSCALE + (cwnd >> 1)) / cwnd;

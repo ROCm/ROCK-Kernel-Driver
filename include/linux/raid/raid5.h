@@ -194,8 +194,6 @@ struct stripe_head {
 struct disk_info {
 	struct block_device *bdev;
 	int	operational;
-	int	number;
-	int	raid_disk;
 	int	write_only;
 	int	spare;
 	int	used_slot;

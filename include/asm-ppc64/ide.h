@@ -7,7 +7,7 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version
  * 2 of the License, or (at your option) any later version.
- */ 
+ */
 
 /*
  *  This file contains the ppc64 architecture specific IDE code.
@@ -19,10 +19,8 @@
 #ifdef __KERNEL__
 
 #ifndef MAX_HWIFS
-#define MAX_HWIFS	4
+# define MAX_HWIFS	4
 #endif
-
-#define ide__sti()	__sti()
 
 static __inline__ int ide_default_irq(ide_ioreg_t base) { return 0; }
 static __inline__ ide_ioreg_t ide_default_io_base(int index) { return 0; }

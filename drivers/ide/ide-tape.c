@@ -421,6 +421,7 @@
 #include <linux/completion.h>
 #include <linux/ide.h>
 #include <linux/atapi.h>
+#include <linux/buffer_head.h>
 
 #include <asm/byteorder.h>
 #include <asm/irq.h>
@@ -1880,9 +1881,9 @@ static ide_startstop_t idetape_pc_intr(struct ata_device *drive, struct request 
 		if (tape->debug_level >= 2)
 			printk (KERN_INFO "ide-tape: Packet command completed, %d bytes transferred\n", pc->actually_transferred);
 #endif
-		clear_bit (PC_DMA_IN_PROGRESS, &pc->flags);
+		clear_bit(PC_DMA_IN_PROGRESS, &pc->flags);
 
-		ide__sti();	/* local CPU only */
+		local_irq_enable();
 
 #if SIMULATE_ERRORS
 		if ((pc->c[0] == IDETAPE_WRITE_CMD || pc->c[0] == IDETAPE_READ_CMD) && (++error_sim_count % 100) == 0) {
@@ -2445,7 +2446,7 @@ static ide_startstop_t idetape_do_request(struct ata_device *drive, struct reque
 		 *	We do not support buffer cache originated requests.
 		 */
 		printk (KERN_NOTICE "ide-tape: %s: Unsupported command in request queue (%ld)\n", drive->name, rq->flags);
-		__ata_end_request(drive, rq, 0, 0);			/* Let the common code handle it */
+		ata_end_request(drive, rq, 0, 0);			/* Let the common code handle it */
 		return ATA_OP_FINISHED;
 	}
 
@@ -5925,17 +5926,17 @@ static void idetape_revalidate(struct ata_device *_dummy)
 static void idetape_attach(struct ata_device *);
 
 static struct ata_operations idetape_driver = {
-	owner:			THIS_MODULE,
-	attach:			idetape_attach,
-	cleanup:		idetape_cleanup,
-	standby:		NULL,
-	do_request:		idetape_do_request,
-	end_request:		idetape_end_request,
-	ioctl:			idetape_blkdev_ioctl,
-	open:			idetape_blkdev_open,
-	release:		idetape_blkdev_release,
-	check_media_change:	NULL,
-	revalidate:		idetape_revalidate,
+	.owner =		THIS_MODULE,
+	.attach =		idetape_attach,
+	.cleanup =		idetape_cleanup,
+	.standby =		NULL,
+	.do_request =		idetape_do_request,
+	.end_request =		idetape_end_request,
+	.ioctl =		idetape_blkdev_ioctl,
+	.open =			idetape_blkdev_open,
+	.release =		idetape_blkdev_release,
+	.check_media_change =	NULL,
+	.revalidate =		idetape_revalidate,
 };
 
 
@@ -5944,12 +5945,12 @@ static struct ata_operations idetape_driver = {
  *	Our character device supporting functions, passed to register_chrdev.
  */
 static struct file_operations idetape_fops = {
-	owner:		THIS_MODULE,
-	read:		idetape_chrdev_read,
-	write:		idetape_chrdev_write,
-	ioctl:		idetape_chrdev_ioctl,
-	open:		idetape_chrdev_open,
-	release:	idetape_chrdev_release,
+	.owner =	THIS_MODULE,
+	.read =		idetape_chrdev_read,
+	.write =	idetape_chrdev_write,
+	.ioctl =	idetape_chrdev_ioctl,
+	.open =		idetape_chrdev_open,
+	.release =	idetape_chrdev_release,
 };
 
 static void idetape_attach(struct ata_device *drive)

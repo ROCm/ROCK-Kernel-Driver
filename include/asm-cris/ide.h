@@ -22,8 +22,6 @@
 
 #define MAX_HWIFS	4
 
-#define ide__sti()	__sti()
-
 static __inline__ int ide_default_irq(ide_ioreg_t base)
 {
 	/* all IDE busses share the same IRQ, number 4.

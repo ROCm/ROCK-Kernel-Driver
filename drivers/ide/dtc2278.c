@@ -95,8 +95,7 @@ void __init init_dtc2278 (void)
 {
 	unsigned long flags;
 
-	__save_flags(flags);	/* local CPU only */
-	__cli();		/* local CPU only */
+	local_irq_save(flags);
 	/*
 	 * This enables the second interface
 	 */
@@ -112,7 +111,7 @@ void __init init_dtc2278 (void)
 	sub22(1,0xc3);
 	sub22(0,0xa0);
 #endif
-	__restore_flags(flags);	/* local CPU only */
+	local_irq_restore(flags);
 
 	ide_hwifs[0].serialized = 1;
 	ide_hwifs[1].serialized = 1;

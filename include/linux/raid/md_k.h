@@ -25,13 +25,16 @@
 #define MULTIPATH         7UL
 #define MAX_PERSONALITY   8UL
 
+#define	LEVEL_MULTIPATH		(-4)
+#define	LEVEL_LINEAR		(-1)
+
 static inline int pers_to_level (int pers)
 {
 	switch (pers) {
-		case MULTIPATH:		return -4;
+		case MULTIPATH:		return LEVEL_MULTIPATH;
 		case HSM:		return -3;
 		case TRANSLUCENT:	return -2;
-		case LINEAR:		return -1;
+		case LINEAR:		return LEVEL_LINEAR;
 		case RAID0:		return 0;
 		case RAID1:		return 1;
 		case RAID5:		return 5;
@@ -43,10 +46,10 @@ static inline int pers_to_level (int pers)
 static inline int level_to_pers (int level)
 {
 	switch (level) {
-		case -4: return MULTIPATH;
+		case LEVEL_MULTIPATH: return MULTIPATH;
 		case -3: return HSM;
 		case -2: return TRANSLUCENT;
-		case -1: return LINEAR;
+		case LEVEL_LINEAR: return LINEAR;
 		case 0: return RAID0;
 		case 1: return RAID1;
 		case 4:
@@ -140,11 +143,7 @@ static inline void mark_disk_nonsync(mdp_disk_t * d)
 struct mdk_rdev_s
 {
 	struct list_head same_set;	/* RAID devices within the same set */
-	struct list_head all;		/* all RAID devices */
-	struct list_head pending;	/* undetected RAID devices */
 
-	kdev_t dev;			/* Device number */
-	kdev_t old_dev;			/*  "" when it was last imported */
 	unsigned long size;		/* Device size (in blocks) */
 	mddev_t *mddev;			/* RAID array if running */
 	unsigned long last_events;	/* IO event timestamp */
@@ -157,7 +156,10 @@ struct mdk_rdev_s
 
 	int alias_device;		/* device alias to the same disk */
 	int faulty;			/* if faulty do not issue IO requests */
+	int in_sync;			/* device is a full member of the array */
+
 	int desc_nr;			/* descriptor index in the superblock */
+	int raid_disk;			/* role of device in array */
 };
 
 typedef struct mdk_personality_s mdk_personality_t;
@@ -167,10 +169,24 @@ struct mddev_s
 	void				*private;
 	mdk_personality_t		*pers;
 	int				__minor;
-	mdp_super_t			*sb;
 	struct list_head 		disks;
 	int				sb_dirty;
 	int				ro;
+
+	/* Superblock information */
+	int				major_version,
+					minor_version,
+					patch_version;
+	int				persistent;
+	int				chunk_size;
+	time_t				ctime, utime;
+	int				level, layout;
+	int				raid_disks;
+	unsigned long			state;
+	sector_t			size; /* used size of component devices */
+	__u64				events;
+
+	char				uuid[16];
 
 	struct mdk_thread_s		*sync_thread;	/* doing resync or reconstruct */
 	unsigned long			curr_resync;	/* blocks scheduled */
@@ -186,7 +202,11 @@ struct mddev_s
 	int				in_sync;	/* know to not need resync */
 	struct semaphore		reconfig_sem;
 	atomic_t			active;
-	mdp_disk_t			*spare;
+	mdk_rdev_t			*spare;
+
+	int				degraded;	/* whether md should consider
+							 * adding a spare
+							 */
 
 	atomic_t			recovery_active; /* blocks scheduled, but not written */
 	wait_queue_head_t		recovery_wait;
@@ -204,11 +224,11 @@ struct mdk_personality_s
 	int (*stop)(mddev_t *mddev);
 	int (*status)(char *page, mddev_t *mddev);
 	int (*error_handler)(mddev_t *mddev, struct block_device *bdev);
-	int (*hot_add_disk) (mddev_t *mddev, mdp_disk_t *descriptor, mdk_rdev_t *rdev);
+	int (*hot_add_disk) (mddev_t *mddev, mdk_rdev_t *rdev);
 	int (*hot_remove_disk) (mddev_t *mddev, int number);
-	int (*spare_write) (mddev_t *mddev, int number);
+	int (*spare_write) (mddev_t *mddev);
 	int (*spare_inactive) (mddev_t *mddev);
-	int (*spare_active) (mddev_t *mddev, mdp_disk_t **descriptor);
+	int (*spare_active) (mddev_t *mddev);
 	int (*sync_request)(mddev_t *mddev, sector_t sector_nr, int go_faster);
 };
 
@@ -228,38 +248,30 @@ static inline kdev_t mddev_to_kdev(mddev_t * mddev)
 	return mk_kdev(MD_MAJOR, mdidx(mddev));
 }
 
-extern mdk_rdev_t * find_rdev(mddev_t * mddev, kdev_t dev);
 extern mdk_rdev_t * find_rdev_nr(mddev_t *mddev, int nr);
-extern mdp_disk_t *get_spare(mddev_t *mddev);
+extern mdk_rdev_t *get_spare(mddev_t *mddev);
 
 /*
  * iterates through some rdev ringlist. It's safe to remove the
  * current 'rdev'. Dont touch 'tmp' though.
  */
-#define ITERATE_RDEV_GENERIC(head,field,rdev,tmp)			\
+#define ITERATE_RDEV_GENERIC(head,rdev,tmp)				\
 									\
 	for ((tmp) = (head).next;					\
-		(rdev) = (list_entry((tmp), mdk_rdev_t, field)),	\
+		(rdev) = (list_entry((tmp), mdk_rdev_t, same_set)),	\
 			(tmp) = (tmp)->next, (tmp)->prev != &(head)	\
 		; )
 /*
  * iterates through the 'same array disks' ringlist
  */
 #define ITERATE_RDEV(mddev,rdev,tmp)					\
-	ITERATE_RDEV_GENERIC((mddev)->disks,same_set,rdev,tmp)
-
-
-/*
- * Iterates through all 'RAID managed disks'
- */
-#define ITERATE_RDEV_ALL(rdev,tmp)					\
-	ITERATE_RDEV_GENERIC(all_raid_disks,all,rdev,tmp)
+	ITERATE_RDEV_GENERIC((mddev)->disks,rdev,tmp)
 
 /*
  * Iterates through 'pending RAID disks'
  */
 #define ITERATE_RDEV_PENDING(rdev,tmp)					\
-	ITERATE_RDEV_GENERIC(pending_raid_disks,pending,rdev,tmp)
+	ITERATE_RDEV_GENERIC(pending_raid_disks,rdev,tmp)
 
 #define xchg_values(x,y) do { __typeof__(x) __tmp = x; \
 				x = y; y = __tmp; } while (0)

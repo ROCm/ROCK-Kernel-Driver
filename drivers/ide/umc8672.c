@@ -127,30 +127,29 @@ void __init init_umc8672(void)	/* called from ide.c */
 {
 	unsigned long flags;
 
-	__save_flags(flags);	/* local CPU only */
-	__cli();		/* local CPU only */
-	if (check_region(0x108, 2)) {
-		__restore_flags(flags);
+	local_irq_save(flags);
+	if (!request_region(0x108, 2, "umc8672")) {
+		local_irq_restore(flags);
 		printk("\numc8672: PORTS 0x108-0x109 ALREADY IN USE\n");
 		return;
 	}
 	outb_p (0x5A,0x108); /* enable umc */
 	if (in_umc (0xd5) != 0xa0)
 	{
-		__restore_flags(flags);	/* local CPU only */
+		local_irq_restore(flags);
+		release_region(0x108, 2);
 		printk ("umc8672: not found\n");
 		return;
 	}
 	outb_p (0xa5,0x108); /* disable umc */
 
-	umc_set_speeds (current_speeds);
-	__restore_flags(flags);	/* local CPU only */
+	umc_set_speeds(current_speeds);
+	local_irq_restore(flags);
 
-	request_region(0x108, 2, "umc8672");
 	ide_hwifs[0].chipset = ide_umc8672;
 	ide_hwifs[1].chipset = ide_umc8672;
-	ide_hwifs[0].tuneproc = &tune_umc;
-	ide_hwifs[1].tuneproc = &tune_umc;
+	ide_hwifs[0].tuneproc = tune_umc;
+	ide_hwifs[1].tuneproc = tune_umc;
 	ide_hwifs[0].unit = ATA_PRIMARY;
 	ide_hwifs[1].unit = ATA_SECONDARY;
 }

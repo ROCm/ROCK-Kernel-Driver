@@ -394,20 +394,20 @@ static void __init ide_init_svwks(struct ata_channel *hwif)
 /* module data table */
 static struct ata_pci_device chipsets[] __initdata = {
         {
-		vendor: PCI_VENDOR_ID_SERVERWORKS,
-		device: PCI_DEVICE_ID_SERVERWORKS_OSB4IDE,
-		init_chipset: svwks_init_chipset,
-		init_channel: ide_init_svwks,
-		bootable: ON_BOARD,
-		flags: ATA_F_DMA
+		.vendor = PCI_VENDOR_ID_SERVERWORKS,
+		.device = PCI_DEVICE_ID_SERVERWORKS_OSB4IDE,
+		.init_chipset = svwks_init_chipset,
+		.init_channel = ide_init_svwks,
+		.bootable = ON_BOARD,
+		.flags = ATA_F_DMA
 	},
 	{
-		vendor: PCI_VENDOR_ID_SERVERWORKS,
-		device: PCI_DEVICE_ID_SERVERWORKS_CSB5IDE,
-		init_chipset: svwks_init_chipset,
-		init_channel: ide_init_svwks,
-		bootable: ON_BOARD,
-		flags: ATA_F_SIMPLEX
+		.vendor = PCI_VENDOR_ID_SERVERWORKS,
+		.device = PCI_DEVICE_ID_SERVERWORKS_CSB5IDE,
+		.init_chipset = svwks_init_chipset,
+		.init_channel = ide_init_svwks,
+		.bootable = ON_BOARD,
+		.flags = ATA_F_SIMPLEX
 	},
 };
 

@@ -323,18 +323,18 @@ static void __init ide_init_opti621(struct ata_channel *hwif)
 /* module data table */
 static struct ata_pci_device chipsets[] __initdata = {
 	{
-		vendor: PCI_VENDOR_ID_OPTI,
-		device: PCI_DEVICE_ID_OPTI_82C621,
-		init_channel: ide_init_opti621,
-		enablebits: {{0x45,0x80,0x00}, {0x40,0x08,0x00}},
-		bootable: ON_BOARD
+		.vendor = PCI_VENDOR_ID_OPTI,
+		.device = PCI_DEVICE_ID_OPTI_82C621,
+		.init_channel = ide_init_opti621,
+		.enablebits = {{0x45,0x80,0x00}, {0x40,0x08,0x00}},
+		.bootable = ON_BOARD
 	},
 	{
-		vendor: PCI_VENDOR_ID_OPTI,
-		device: PCI_DEVICE_ID_OPTI_82C825,
-		init_channel: ide_init_opti621,
-		enablebits: {{0x45,0x80,0x00}, {0x40,0x08,0x00}},
-		bootable: ON_BOARD
+		.vendor = PCI_VENDOR_ID_OPTI,
+		.device = PCI_DEVICE_ID_OPTI_82C825,
+		.init_channel = ide_init_opti621,
+		.enablebits = {{0x45,0x80,0x00}, {0x40,0x08,0x00}},
+		.bootable = ON_BOARD
 	},
 };
 
