@@ -821,9 +821,9 @@ icn_loadboot(u_char * buffer, icn_card * card)
 		printk(KERN_WARNING "icn: Could not allocate code buffer\n");
 		return -ENOMEM;
 	}
-	if ((ret = copy_from_user(codebuf, buffer, ICN_CODE_STAGE1))) {
+	if (copy_from_user(codebuf, buffer, ICN_CODE_STAGE1)) {
 		kfree(codebuf);
-		return ret;
+		return -EFAULT;
 	}
 	if (!card->rvalid) {
 		if (check_region(card->port, ICN_PORTLEN)) {
@@ -1057,9 +1057,10 @@ icn_writecmd(const u_char * buf, int len, int user, icn_card * card)
 		count = cmd_free;
 		if (count > len)
 			count = len;
-		if (user)
-			copy_from_user(msg, buf, count);
-		else
+		if (user) {
+			if (copy_from_user(msg, buf, count))
+				return -EFAULT;
+		} else
 			memcpy(msg, buf, count);
 
 		save_flags(flags);
@@ -1237,15 +1238,17 @@ icn_command(isdn_ctrl * c, icn_card * card)
 				case ICN_IOCTL_GETDOUBLE:
 					return (int) card->doubleS0;
 				case ICN_IOCTL_DEBUGVAR:
-					if ((i = copy_to_user((char *) a,
-					  (char *) &card, sizeof(ulong))))
-						return i;
+					if (copy_to_user((char *)a,
+							 (char *)&card,
+							 sizeof(ulong)))
+						return -EFAULT;
 					a += sizeof(ulong);
 					{
 						ulong l = (ulong) & dev;
-						if ((i = copy_to_user((char *) a,
-							     (char *) &l, sizeof(ulong))))
-							return i;
+						if (copy_to_user((char *)a,
+								 (char *)&l,
+								 sizeof(ulong)))
+							return -EFAULT;
 					}
 					return 0;
 				case ICN_IOCTL_LOADBOOT:
@@ -1266,8 +1269,10 @@ icn_command(isdn_ctrl * c, icn_card * card)
 				case ICN_IOCTL_ADDCARD:
 					if (!dev.firstload)
 						return -EBUSY;
-					if ((i = copy_from_user((char *) &cdef, (char *) a, sizeof(cdef))))
-						return i;
+					if (copy_from_user((char *)&cdef,
+							   (char *)a,
+							   sizeof(cdef)))
+						return -EFAULT;
 					return (icn_addcard(cdef.port, cdef.id1, cdef.id2));
 					break;
 				case ICN_IOCTL_LEASEDCFG:

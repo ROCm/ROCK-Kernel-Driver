@@ -213,7 +213,10 @@ eicon_command(eicon_card * card, isdn_ctrl * c)
 					return(EICON_CTRL_VERSION);
 				case EICON_IOCTL_GETTYPE:
 					if (card->bus == EICON_BUS_PCI) {
-						copy_to_user((char *)a, &card->hwif.pci.master, sizeof(int));
+						if (copy_to_user((char *)a,
+							&card->hwif.pci.master,
+								 sizeof(int)))
+							return -EFAULT;
 					}
 					return(card->type);
 				case EICON_IOCTL_GETMMIO:
@@ -351,7 +354,8 @@ eicon_command(eicon_card * card, isdn_ctrl * c)
 					return -ENODEV;
 
 				case EICON_IOCTL_ADDCARD:
-					if ((ret = copy_from_user(&cdef, (char *)a, sizeof(cdef))))
+					if (copy_from_user(&cdef, (char *)a,
+							   sizeof(cdef)))
 						return -EFAULT;
 					if (!(eicon_addcard(0, cdef.membase, cdef.irq, cdef.id, 0)))
 						return -EIO;
@@ -376,8 +380,9 @@ eicon_command(eicon_card * card, isdn_ctrl * c)
 #ifdef CONFIG_ISDN_DRV_EICON_PCI
 					if (c->arg < EICON_IOCTL_DIA_OFFSET)
 						return -EINVAL;
-					if (copy_from_user(&dstart, (char *)a, sizeof(dstart)))
-						return -1;
+					if (copy_from_user(&dstart, (char *)a,
+							   sizeof(dstart)))
+						return -EFAULT;
 					if (!(card = eicon_findnpcicard(dstart.card_id)))
 						return -EINVAL;
 					ret = do_ioctl(NULL, NULL,
@@ -667,7 +672,8 @@ if_readstatus(u_char * buf, int len, int user, int id, int channel)
 
 			if (user) {
 				spin_unlock_irqrestore(&eicon_lock, flags);
-				copy_to_user(p, skb->data, cnt);
+				if (copy_to_user(p, skb->data, cnt))
+					return -EFAULT;
 				spin_lock_irqsave(&eicon_lock, flags);
 			}
 			else

@@ -731,7 +731,11 @@ isdn_ppp_read(struct file *file, char *buf, size_t count, loff_t *off)
 
 	restore_flags(flags);
 
-	copy_to_user(buf, save_buf, count);
+	if (copy_to_user(buf, save_buf, count)) {
+		kfree(save_buf);
+		retval = -EFAULT;
+		goto out;
+	}
 	kfree(save_buf);
 
 	retval = count;
