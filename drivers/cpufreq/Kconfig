@@ -33,7 +33,7 @@ config CPU_FREQ_DEFAULT_GOV_USERSPACE
 	help
 	  Use the CPUFreq governor 'userspace' as default. This allows
 	  you to set the CPU frequency manually or when an userspace 
-	  programm shall be able to set the CPU dynamically without having
+	  program shall be able to set the CPU dynamically without having
 	  to enable the userspace governor manually.
 
 endchoice
@@ -42,7 +42,7 @@ config CPU_FREQ_GOV_PERFORMANCE
        tristate "'performance' governor"
        depends on CPU_FREQ
        help
-	  This cpufreq governors set the frequency statically to the
+	  This cpufreq governor sets the frequency statically to the
 	  highest available CPU frequency.
 
 	  If in doubt, say Y.
@@ -51,7 +51,7 @@ config CPU_FREQ_GOV_POWERSAVE
        tristate "'powersave' governor"
        depends on CPU_FREQ
        help
-	  Theis cpufreq governors set the frequency statically to the
+	  This cpufreq governor sets the frequency statically to the
 	  lowest available CPU frequency.
 
 	  If in doubt, say Y.
@@ -61,8 +61,8 @@ config CPU_FREQ_GOV_USERSPACE
        depends on CPU_FREQ 
        help
 	  Enable this cpufreq governor when you either want to set the
-	  CPU frequency manually or when an userspace programm shall
-          be able to set the CPU dynamically, like on LART 
+	  CPU frequency manually or when an userspace program shall
+	  be able to set the CPU dynamically, like on LART 
 	  <http://www.lart.tudelft.nl/>
 
 	  For details, take a look at <file:Documentation/cpu-freq/>.
