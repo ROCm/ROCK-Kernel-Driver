@@ -137,7 +137,7 @@ int show_interrupts(struct seq_file *p, void *v)
 	spin_lock_irqsave(&irq_action_lock, flags);
 	if (i <= NR_IRQS) {
 		if (!(action = *(i + irq_action)))
-			continue;
+			goto out_unlock;
 		seq_printf(p, "%3d: ", i);
 #ifndef CONFIG_SMP
 		seq_printf(p, "%10u ", kstat_irqs(i));
@@ -157,6 +157,7 @@ int show_interrupts(struct seq_file *p, void *v)
 		}
 		seq_putc(p, '\n');
 	}
+out_unlock:
 	spin_unlock_irqrestore(&irq_action_lock, flags);
 
 	return 0;
