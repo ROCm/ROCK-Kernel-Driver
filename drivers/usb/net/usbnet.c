@@ -773,12 +773,15 @@ static int cdc_bind (struct usbnet *dev, struct usb_interface *intf)
 	/* expect strict spec conformance for the descriptors, but
 	 * cope with firmware which stores them in the wrong place
 	 */
-	if (len == 0 && dev->udev->config->extralen) {
-		/* Motorola SB4100 (and maybe others) put
-		 * CDC descriptors here
+	if (len == 0 && dev->udev->actconfig->extralen) {
+		/* Motorola SB4100 (and others: Brad Hards says it's
+		 * from a Broadcom design) put CDC descriptors here
 		 */
-		buf = dev->udev->config->extra;
-		len = dev->udev->config->extralen;
+		buf = dev->udev->actconfig->extra;
+		len = dev->udev->actconfig->extralen;
+		if (len)
+			dev_dbg (&intf->dev,
+				"CDC descriptors on config\n");
 	}
 
 	memset (info, 0, sizeof *info);
@@ -793,48 +796,92 @@ static int cdc_bind (struct usbnet *dev, struct usb_interface *intf)
 		 */
 		switch (buf [2]) {
 		case 0x00:		/* Header, mostly useless */
-			if (info->header)
+			if (info->header) {
+				dev_dbg (&intf->dev, "extra CDC header\n");
 				goto bad_desc;
+			}
 			info->header = (void *) buf;
-			if (info->header->bLength != sizeof *info->header)
+			if (info->header->bLength != sizeof *info->header) {
+				dev_dbg (&intf->dev, "CDC header len %u\n",
+					info->header->bLength);
 				goto bad_desc;
+			}
 			break;
 		case 0x06:		/* Union (groups interfaces) */
-			if (info->u)
+			if (info->u) {
+				dev_dbg (&intf->dev, "extra CDC union\n");
 				goto bad_desc;
+			}
 			info->u = (void *) buf;
-			if (info->u->bLength != sizeof *info->u)
+			if (info->u->bLength != sizeof *info->u) {
+				dev_dbg (&intf->dev, "CDC union len %u\n",
+					info->u->bLength);
 				goto bad_desc;
-			d = &intf->altsetting->desc;
-			if (info->u->bMasterInterface0 != d->bInterfaceNumber)
+			}
+
+			/* we need a master/control interface (what we're
+			 * probed with) and a slave/data interface; union
+			 * descriptors sort this all out.
+			 */
+			info->control = usb_ifnum_to_if(dev->udev,
+						info->u->bMasterInterface0);
+			info->data = usb_ifnum_to_if(dev->udev,
+						info->u->bSlaveInterface0);
+			if (!info->control || !info->data) {
+				dev_dbg (&intf->dev,
+					"master #%u/%p slave #%u/%p\n",
+					info->u->bMasterInterface0
+					info->control,
+					info->u->bSlaveInterface0,
+					info->data);
 				goto bad_desc;
-			info->data = dev->udev->actconfig->interface[0];
-			if (intf != (info->data + info->u->bMasterInterface0))
-				goto bad_desc;
+			}
+			if (info->control != intf) {
+				dev_dbg (&intf->dev, "bogus CDC Union\n");
+				/* Ambit USB Cable Modem (and maybe others)
+				 * interchanges master and slave interface.
+				 */
+				if (info->data == intf) {
+					info->data = info->control;
+					info->control = intf;
+				} else
+					goto bad_desc;
+			}
 
 			/* a data interface altsetting does the real i/o */
-			info->data += info->u->bSlaveInterface0;
 			d = &info->data->altsetting->desc;
-			if (info->u->bSlaveInterface0 != d->bInterfaceNumber
-				    || d->bInterfaceClass != USB_CLASS_CDC_DATA)
+			if (d->bInterfaceClass != USB_CLASS_CDC_DATA) {
+				dev_dbg (&intf->dev, "slave class %u\n",
+					d->bInterfaceClass);
 				goto bad_desc;
+			}
 			if (usb_interface_claimed (info->data))
 				return -EBUSY;
 			break;
 		case 0x0F:		/* Ethernet Networking */
-			if (info->ether)
+			if (info->ether) {
+				dev_dbg (&intf->dev, "extra CDC ether\n");
 				goto bad_desc;
+			}
 			info->ether = (void *) buf;
-			if (info->ether->bLength != sizeof *info->ether)
+			if (info->ether->bLength != sizeof *info->ether) {
+				dev_dbg (&intf->dev, "CDC ether len %u\n",
+					info->u->bLength);
 				goto bad_desc;
+			}
 			break;
 		}
 next_desc:
 		len -= buf [0];	/* bLength */
 		buf += buf [0];
 	}
-	if (!info->header || !info ->u || !info->ether)
+	if (!info->header || !info ->u || !info->ether) {
+		dev_dbg (&intf->dev, "missing cdc %s%s%sdescriptor\n",
+			info->header ? "" : "header ",
+			info->u ? "" : "union ",
+			info->ether ? "" : "ether ");
 		goto bad_desc;
+	}
 
 #ifdef CONFIG_USB_ZAURUS
 	/* Zaurus ethernet addresses aren't unique ... */
