@@ -474,9 +474,11 @@ static struct i2c_algorithm smbus_algorithm = {
 
 static struct i2c_adapter ali15x3_adapter = {
 	.owner		= THIS_MODULE,
-	.name		= "unset",
 	.id		= I2C_ALGO_SMBUS | I2C_HW_SMBUS_ALI15X3,
 	.algo		= &smbus_algorithm,
+	.dev		= {
+		.name	= "unset",
+	},
 };
 
 static struct pci_device_id ali15x3_ids[] __devinitdata = {
@@ -500,8 +502,8 @@ static int __devinit ali15x3_probe(struct pci_dev *dev, const struct pci_device_
 	/* set up the driverfs linkage to our parent device */
 	ali15x3_adapter.dev.parent = &dev->dev;
 
-	sprintf(ali15x3_adapter.name, "SMBus ALI15X3 adapter at %04x",
-		ali15x3_smba);
+	snprintf(ali15x3_adapter.dev.name, DEVICE_NAME_SIZE,
+		"SMBus ALI15X3 adapter at %04x", ali15x3_smba);
 	return i2c_add_adapter(&ali15x3_adapter);
 }
 

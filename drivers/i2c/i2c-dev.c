@@ -30,6 +30,9 @@
 
 /* $Id: i2c-dev.c,v 1.53 2003/01/21 08:08:16 kmalkki Exp $ */
 
+/* If you want debugging uncomment: */
+/* #define DEBUG 1 */
+
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/fs.h>
@@ -40,10 +43,6 @@
 #include <linux/i2c.h>
 #include <linux/i2c-dev.h>
 #include <asm/uaccess.h>
-
-/* If you want debugging uncomment: */
-/* #define DEBUG */
-
 
 /* struct file_operations changed too often in the 2.1 series for nice code */
 
@@ -87,7 +86,9 @@ static struct i2c_driver i2cdev_driver = {
 };
 
 static struct i2c_client i2cdev_client_template = {
-	.name		= "I2C /dev entry",
+	.dev		= {
+		.name	= "I2C /dev entry",
+	},
 	.id		= 1,
 	.addr		= -1,
 	.driver		= &i2cdev_driver,
@@ -386,11 +387,11 @@ int i2cdev_attach_adapter(struct i2c_adapter *adap)
 	char name[12];
 
 	if ((i = i2c_adapter_id(adap)) < 0) {
-		printk(KERN_DEBUG "i2c-dev.o: Unknown adapter ?!?\n");
+		dev_dbg(&adap->dev, "Unknown adapter ?!?\n");
 		return -ENODEV;
 	}
 	if (i >= I2CDEV_ADAPS_MAX) {
-		printk(KERN_DEBUG "i2c-dev.o: Adapter number too large?!? (%d)\n",i);
+		dev_dbg(&adap->dev, "Adapter number too large?!? (%d)\n",i);
 		return -ENODEV;
 	}
 
@@ -401,14 +402,12 @@ int i2cdev_attach_adapter(struct i2c_adapter *adap)
 			DEVFS_FL_DEFAULT, I2C_MAJOR, i,
 			S_IFCHR | S_IRUSR | S_IWUSR,
 			&i2cdev_fops, NULL);
-		printk(KERN_DEBUG "i2c-dev.o: Registered '%s' as minor %d\n",adap->name,i);
+		dev_dbg(&adap->dev, "Registered as minor %d\n", i);
 	} else {
 		/* This is actually a detach_adapter call! */
 		devfs_remove("i2c/%d", i);
 		i2cdev_adaps[i] = NULL;
-#ifdef DEBUG
-		printk(KERN_DEBUG "i2c-dev.o: Adapter unregistered: %s\n",adap->name);
-#endif
+		dev_dbg(&adap->dev, "Adapter unregistered\n");
 	}
 
 	return 0;

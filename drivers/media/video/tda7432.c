@@ -260,7 +260,7 @@ static int tda7432_read(struct i2c_client *client)
 
 static int tda7432_set(struct i2c_client *client)
 {
-	struct tda7432 *t = client->data;
+	struct tda7432 *t = i2c_get_clientdata(client);
 	unsigned char buf[16];
 	d2printk("tda7432: In tda7432_set\n");
 	
@@ -287,7 +287,7 @@ static int tda7432_set(struct i2c_client *client)
 
 static void do_tda7432_init(struct i2c_client *client)
 {
-	struct tda7432 *t = client->data;
+	struct tda7432 *t = i2c_get_clientdata(client);
 	d2printk("tda7432: In tda7432_init\n");
 
 	t->input  = TDA7432_STEREO_IN |  /* Main (stereo) input   */
@@ -328,11 +328,11 @@ static int tda7432_attach(struct i2c_adapter *adap, int addr,
         memcpy(client,&client_template,sizeof(struct i2c_client));
         client->adapter = adap;
         client->addr = addr;
-	client->data = t;
+	i2c_set_clientdata(client, t);
 	
 	do_tda7432_init(client);
 	MOD_INC_USE_COUNT;
-	strcpy(client->name,"TDA7432");
+	strncpy(client->dev.name, "TDA7432", DEVICE_NAME_SIZE);
 	printk(KERN_INFO "tda7432: init\n");
 
 	i2c_attach_client(client);
@@ -348,7 +348,7 @@ static int tda7432_probe(struct i2c_adapter *adap)
 
 static int tda7432_detach(struct i2c_client *client)
 {
-	struct tda7432 *t  = client->data;
+	struct tda7432 *t = i2c_get_clientdata(client);
 
 	do_tda7432_init(client);
 	i2c_detach_client(client);
@@ -361,7 +361,7 @@ static int tda7432_detach(struct i2c_client *client)
 static int tda7432_command(struct i2c_client *client,
 			   unsigned int cmd, void *arg)
 {
-	struct tda7432 *t = client->data;
+	struct tda7432 *t = i2c_get_clientdata(client);
 	d2printk("tda7432: In tda7432_command\n");
 
 	switch (cmd) {
@@ -526,9 +526,11 @@ static struct i2c_driver driver = {
 
 static struct i2c_client client_template =
 {
-        .name   = "tda7432",
         .id     = -1,
 	.driver = &driver, 
+        .dev	= {
+		.name	= "tda7432",
+	},
 };
 
 static int tda7432_init(void)
