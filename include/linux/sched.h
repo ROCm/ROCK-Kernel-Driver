@@ -385,12 +385,12 @@ do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
 #define PF_MEMDIE	0x00001000	/* Killed for out-of-memory */
 #define PF_FREE_PAGES	0x00002000	/* per process page freeing */
 #define PF_FLUSHER	0x00004000	/* responsible for disk writeback */
-#define PF_RADIX_TREE	0x00008000	/* debug: performing radix tree alloc */
+#define PF_NOWARN	0x00008000	/* debug: don't warn if alloc fails */
 
 #define PF_FREEZE	0x00010000	/* this task should be frozen for suspend */
 #define PF_IOTHREAD	0x00020000	/* this thread is needed for doing I/O to swap */
 #define PF_FROZEN	0x00040000	/* frozen for system suspend */
-
+#define PF_INVALIDATE	0x00080000	/* debug: unmounting an fs. killme. */
 /*
  * Ptrace flags
  */
@@ -417,8 +417,7 @@ extern int task_prio(task_t *p);
 extern int task_nice(task_t *p);
 extern int idle_cpu(int cpu);
 
-asmlinkage long sys_sched_yield(void);
-#define yield() sys_sched_yield()
+void yield(void);
 
 /*
  * The default (Linux) execution domain.
@@ -836,10 +835,11 @@ static inline int need_resched(void)
 	return unlikely(test_thread_flag(TIF_NEED_RESCHED));
 }
 
+extern void __cond_resched(void);
 static inline void cond_resched(void)
 {
 	if (need_resched())
-		schedule();
+		__cond_resched();
 }
 
 /* Reevaluate whether the task has signals pending delivery.

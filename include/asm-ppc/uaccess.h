@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.uaccess.h 1.8 09/11/01 18:10:06 paulus
+ * BK Id: %F% %I% %G% %U% %#%
  */
 #ifdef __KERNEL__
 #ifndef _PPC_UACCESS_H
@@ -272,7 +272,11 @@ clear_user(void *addr, unsigned long size)
 {
 	if (access_ok(VERIFY_WRITE, addr, size))
 		return __clear_user(addr, size);
-	return size? -EFAULT: 0;
+	if ((unsigned long)addr < TASK_SIZE) {
+		unsigned long over = (unsigned long)addr + size - TASK_SIZE;
+		return __clear_user(addr, size - over) + over;
+	}
+	return size;
 }
 
 extern int __strncpy_from_user(char *dst, const char *src, long count);

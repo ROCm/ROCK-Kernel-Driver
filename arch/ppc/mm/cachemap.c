@@ -50,6 +50,8 @@
 #include <asm/smp.h>
 #include <asm/machdep.h>
 
+int map_page(unsigned long va, unsigned long pa, int flags);
+
 /* This function will allocate the requested contiguous pages and
  * map them into the kernel's vmalloc() space.  This is done so we
  * get unique mapping for these pages, outside of the kernel's 1:1
@@ -96,7 +98,7 @@ void *consistent_alloc(int gfp, size_t size, dma_addr_t *dma_handle)
 
 	/* This gives us the real physical address of the first page.
 	*/
-	*dma_handle = pa = virt_to_bus(page);
+	*dma_handle = pa = virt_to_bus((void *)page);
 
 	flags = _PAGE_KERNEL | _PAGE_NO_CACHE;
 
@@ -151,10 +153,10 @@ void consistent_sync(void *vaddr, size_t size, int direction)
  */
 
 void consistent_sync_page(struct page *page, unsigned long offset,
-size_t size, int direction)
+	size_t size, int direction)
 {
 	unsigned long start;
 
 	start = page_address(page) + offset;
-	consistent_sync(start, size, direction);
+	consistent_sync((void *)start, size, direction);
 }

@@ -375,26 +375,28 @@ pmac_pic_init(void)
 		printk("PowerMac using OpenPIC irq controller\n");
 		if (irqctrler->n_addrs > 0)
 		{
-			int nmi_irq = -1;
 			unsigned char senses[NR_IRQS];
-#ifdef CONFIG_XMON
-			struct device_node* pswitch;
 
-			pswitch = find_devices("programmer-switch");
-			if (pswitch && pswitch->n_intrs)
-				nmi_irq = pswitch->intrs[0].line;
-#endif /* CONFIG_XMON */
 			prom_get_irq_senses(senses, 0, NR_IRQS);
 			OpenPIC_InitSenses = senses;
 			OpenPIC_NumInitSenses = NR_IRQS;
 			ppc_md.get_irq = openpic_get_irq;
 			OpenPIC_Addr = ioremap(irqctrler->addrs[0].address,
 					       irqctrler->addrs[0].size);
-			openpic_init(1, 0, nmi_irq);
+			openpic_init(0);
 #ifdef CONFIG_XMON
-			if (nmi_irq >= 0)
-				request_irq(nmi_irq, xmon_irq, 0,
-					    "NMI - XMON", 0);
+			{
+				struct device_node* pswitch;
+				int nmi_irq;
+
+				pswitch = find_devices("programmer-switch");
+				if (pswitch && pswitch->n_intrs) {
+					nmi_irq = pswitch->intrs[0].line;
+					openpic_init_nmi_irq(nmi_irq);
+					request_irq(nmi_irq, xmon_irq, 0,
+							"NMI - XMON", 0);
+				}
+			}
 #endif	/* CONFIG_XMON */
 			return;
 		}

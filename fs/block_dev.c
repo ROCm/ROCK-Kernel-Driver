@@ -23,8 +23,6 @@
 
 #include <asm/uaccess.h>
 
-#define MAX_BUF_PER_PAGE (PAGE_CACHE_SIZE / 512)
-
 static unsigned long max_block(struct block_device *bdev)
 {
 	unsigned int retval = ~0U;
@@ -299,7 +297,6 @@ struct block_device *bdget(dev_t dev)
 			new_bdev->bd_inode = inode;
 			inode->i_mode = S_IFBLK;
 			inode->i_rdev = kdev;
-			inode->i_dev = kdev;
 			inode->i_bdev = new_bdev;
 			inode->i_data.a_ops = &def_blk_aops;
 			inode->i_data.gfp_mask = GFP_USER;

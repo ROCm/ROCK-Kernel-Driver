@@ -461,7 +461,7 @@ _GLOBAL(__copy_tofrom_user)
 53:
 #if !defined(CONFIG_8xx)
 	dcbt	r3,r4
-	dcbz	r11,r6
+54:	dcbz	r11,r6
 #endif
 /* had to move these to keep extable in order */
 	.section __ex_table,"a"
@@ -470,7 +470,9 @@ _GLOBAL(__copy_tofrom_user)
 	.long	71b,101f
 	.long	72b,102f
 	.long	73b,103f
-	.long	53b,105f
+#if !defined(CONFIG_8xx)
+	.long	54b,105f
+#endif
 	.text
 /* the main body of the cacheline loop */
 	COPY_16_BYTES_WITHEX(0)
@@ -613,11 +615,11 @@ _GLOBAL(__clear_user)
 	add	r4,r0,r4
 	subf	r6,r0,r6
 	srwi	r0,r4,2
+	andi.	r4,r4,3
 	mtctr	r0
-	bdz	6f
+	bdz	7f
 1:	stwu	r5,4(r6)
 	bdnz	1b
-6:	andi.	r4,r4,3
 	/* clear byte sized chunks */
 7:	cmpwi	0,r4,0
 	beqlr
@@ -626,14 +628,20 @@ _GLOBAL(__clear_user)
 8:	stbu	r5,1(r6)
 	bdnz	8b
 	blr
-99:	li	r3,-EFAULT
+90:	mr	r3,r4
+	blr
+91:	mfctr	r3
+	slwi	r3,r3,2
+	add	r3,r3,r4
+	blr
+92:	mfctr	r3
 	blr
 
 	.section __ex_table,"a"
 	.align	2
-	.long	11b,99b
-	.long	1b,99b
-	.long	8b,99b
+	.long	11b,90b
+	.long	1b,91b
+	.long	8b,92b
 	.text
 
 _GLOBAL(__strncpy_from_user)

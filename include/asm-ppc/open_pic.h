@@ -55,7 +55,8 @@ extern void* OpenPIC_Addr;
 
 /* Exported functions */
 extern void openpic_set_sources(int first_irq, int num_irqs, void *isr);
-extern void openpic_init(int, int, int);
+extern void openpic_init(int linux_irq_offset);
+extern void openpic_init_nmi_irq(u_int irq);
 extern u_int openpic_irq(void);
 extern void openpic_eoi(void);
 extern void openpic_request_IPIs(void);

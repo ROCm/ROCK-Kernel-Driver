@@ -477,6 +477,7 @@ extern int radeon_cp_flip( struct inode *inode, struct file *filp,
 #	define RADEON_CNTL_HOSTDATA_BLT		0x00009400
 #	define RADEON_CNTL_PAINT_MULTI		0x00009A00
 #	define RADEON_CNTL_BITBLT_MULTI		0x00009B00
+#	define RADEON_CNTL_SET_SCISSORS		0xC0001E00
 
 #define RADEON_CP_PACKET_MASK		0xC0000000
 #define RADEON_CP_PACKET_COUNT_MASK	0x3fff0000

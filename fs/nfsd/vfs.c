@@ -66,7 +66,7 @@ struct raparms {
 	struct raparms		*p_next;
 	unsigned int		p_count;
 	ino_t			p_ino;
-	kdev_t			p_dev;
+	dev_t			p_dev;
 	struct file_ra_state	p_ra;
 };
 
@@ -527,14 +527,14 @@ nfsd_sync_dir(struct dentry *dp)
 static spinlock_t ra_lock = SPIN_LOCK_UNLOCKED;
 
 static inline struct raparms *
-nfsd_get_raparms(kdev_t dev, ino_t ino)
+nfsd_get_raparms(dev_t dev, ino_t ino)
 {
 	struct raparms	*ra, **rap, **frap = NULL;
 	int depth = 0;
 
 	spin_lock(&ra_lock);
 	for (rap = &raparm_cache; (ra = *rap); rap = &ra->p_next) {
-		if (ra->p_ino == ino && kdev_same(ra->p_dev, dev))
+		if (ra->p_ino == ino && ra->p_dev == dev)
 			goto found;
 		depth++;
 		if (ra->p_count == 0)
@@ -691,8 +691,8 @@ nfsd_write(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset,
 	}
 
 	if (err >= 0 && stable) {
-		static unsigned long	last_ino;
-		static kdev_t		last_dev = NODEV;
+		static ino_t	last_ino;
+		static dev_t	last_dev = 0;
 
 		/*
 		 * Gathered writes: If another process is currently
@@ -708,7 +708,7 @@ nfsd_write(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset,
 		 */
 		if (EX_WGATHER(exp)) {
 			if (atomic_read(&inode->i_writecount) > 1
-			    || (last_ino == inode->i_ino && kdev_same(last_dev, inode->i_dev))) {
+			    || (last_ino == inode->i_ino && last_dev == inode->i_dev)) {
 				dprintk("nfsd: write defer %d\n", current->pid);
 				set_current_state(TASK_UNINTERRUPTIBLE);
 				schedule_timeout((HZ+99)/100);

@@ -3,10 +3,12 @@ Changes since 2.5.0:
 --- 
 [recommended]
 
-New helpers: sb_bread(), sb_getblk(), sb_get_hash_table(), set_bh(),
+New helpers: sb_bread(), sb_getblk(), sb_find_get_block(), set_bh(),
 	sb_set_blocksize() and sb_min_blocksize().
 
 Use them.
+
+(sb_find_get_block() replaces 2.4's get_hash_table())
 
 --- 
 [recommended]
@@ -228,3 +230,21 @@ anything from oops to silent memory corruption.
 	Use bdev_read_only(bdev) instead of is_read_only(kdev).  The latter
 is still alive, but only because of the mess in drivers/s390/block/dasd.c.
 As soon as it gets fixed is_read_only() will die.
+
+---
+[mandatory]
+
+	is_read_only() is gone; use bdev_read_only() instead.
+
+---
+[mandatory]
+
+	destroy_buffers() is gone; use invalidate_bdev().
+
+---
+[mandatory]
+
+	fsync_dev() is gone; use fsync_bdev().  NOTE: lvm breakage is
+deliberate; as soon as struct block_device * is propagated in a reasonable
+way by that code fixing will become trivial; until then nothing can be
+done.

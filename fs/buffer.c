@@ -36,6 +36,8 @@
 #include <linux/buffer_head.h>
 #include <asm/bitops.h>
 
+static void invalidate_bh_lrus(void);
+
 #define BH_ENTRY(list) list_entry((list), struct buffer_head, b_assoc_buffers)
 
 /*
@@ -244,22 +246,6 @@ int fsync_bdev(struct block_device *bdev)
 }
 
 /*
- * Write out and wait upon all dirty data associated with this
- * kdev_t.   Filesystem data as well as the underlying block
- * device.  Takes the superblock lock.
- */
-int fsync_dev(kdev_t dev)
-{
-	struct block_device *bdev = bdget(kdev_t_to_nr(dev));
-	if (bdev) {
-		int res = fsync_bdev(bdev);
-		bdput(bdev);
-		return res;
-	}
-	return 0;
-}
-
-/*
  * sync everything.
  */
 asmlinkage long sys_sync(void)
@@ -389,7 +375,7 @@ out:
  * private_lock is contended then so is mapping->page_lock).
  */
 struct buffer_head *
-__find_get_block(struct block_device *bdev, sector_t block, int unused)
+__find_get_block_slow(struct block_device *bdev, sector_t block, int unused)
 {
 	struct inode *bd_inode = bdev->bd_inode;
 	struct address_space *bd_mapping = bd_inode->i_mapping;
@@ -459,12 +445,15 @@ out:
    pass does the actual I/O. */
 void invalidate_bdev(struct block_device *bdev, int destroy_dirty_buffers)
 {
+	invalidate_bh_lrus();
 	/*
 	 * FIXME: what about destroy_dirty_buffers?
 	 * We really want to use invalidate_inode_pages2() for
 	 * that, but not until that's cleaned up.
 	 */
+	current->flags |= PF_INVALIDATE;
 	invalidate_inode_pages(bdev->bd_inode);
+	current->flags &= ~PF_INVALIDATE;
 }
 
 void __invalidate_buffers(kdev_t dev, int destroy_dirty_buffers)
@@ -489,7 +478,6 @@ static void free_more_memory(void)
 	wakeup_bdflush();
 	try_to_free_pages(zone, GFP_NOFS, 0);
 	blk_run_queues();
-	__set_current_state(TASK_RUNNING);
 	yield();
 }
 
@@ -961,7 +949,9 @@ try_again:
 	head = NULL;
 	offset = PAGE_SIZE;
 	while ((offset -= size) >= 0) {
+		current->flags |= PF_NOWARN;
 		bh = alloc_buffer_head();
+		current->flags &= ~PF_NOWARN;
 		if (!bh)
 			goto no_grow;
 
@@ -1159,7 +1149,7 @@ grow_buffers(struct block_device *bdev, unsigned long block, int size)
  * attempt is failing.  FIXME, perhaps?
  */
 struct buffer_head *
-__getblk(struct block_device *bdev, sector_t block, int size)
+__getblk_slow(struct block_device *bdev, sector_t block, int size)
 {
 	for (;;) {
 		struct buffer_head * bh;
@@ -1259,7 +1249,8 @@ void __bforget(struct buffer_head *bh)
  *  Reads a specified block, and returns buffer head that contains it.
  *  It returns NULL if the block was unreadable.
  */
-struct buffer_head * __bread(struct block_device *bdev, int block, int size)
+struct buffer_head *
+__bread_slow(struct block_device *bdev, sector_t block, int size)
 {
 	struct buffer_head *bh = __getblk(bdev, block, size);
 
@@ -1281,6 +1272,165 @@ struct buffer_head * __bread(struct block_device *bdev, int block, int size)
 	}
 	brelse(bh);
 	return NULL;
+}
+
+/*
+ * Per-cpu buffer LRU implementation.  To reduce the cost of __find_get_block().
+ * The bhs[] array is sorted - newest buffer is at bhs[0].  Buffers have their
+ * refcount elevated by one when they're in an LRU.  A buffer can only appear
+ * once in a particular CPU's LRU.  A single buffer can be present in multiple
+ * CPU's LRUs at the same time.
+ *
+ * This is a transparent caching front-end to sb_bread(), sb_getblk() and
+ * sb_find_get_block().
+ */
+
+#define BH_LRU_SIZE	7
+
+static struct bh_lru {
+	spinlock_t lock;
+	struct buffer_head *bhs[BH_LRU_SIZE];
+} ____cacheline_aligned_in_smp bh_lrus[NR_CPUS];
+
+/*
+ * The LRU management algorithm is dopey-but-simple.  Sorry.
+ */
+static void bh_lru_install(struct buffer_head *bh)
+{
+	struct buffer_head *evictee = NULL;
+	struct bh_lru *lru;
+
+	if (bh == NULL)
+		return;
+
+	lru = &bh_lrus[get_cpu()];
+	spin_lock(&lru->lock);
+	if (lru->bhs[0] != bh) {
+		struct buffer_head *bhs[BH_LRU_SIZE];
+		int in;
+		int out = 0;
+
+		get_bh(bh);
+		bhs[out++] = bh;
+		for (in = 0; in < BH_LRU_SIZE; in++) {
+			struct buffer_head *bh2 = lru->bhs[in];
+
+			if (bh2 == bh) {
+				__brelse(bh2);
+			} else {
+				if (out >= BH_LRU_SIZE) {
+					BUG_ON(evictee != NULL);
+					evictee = bh2;
+				} else {
+					bhs[out++] = bh2;
+				}
+			}
+		}
+		while (out < BH_LRU_SIZE)
+			bhs[out++] = NULL;
+		memcpy(lru->bhs, bhs, sizeof(bhs));
+	}
+	spin_unlock(&lru->lock);
+	put_cpu();
+
+	if (evictee) {
+		touch_buffer(evictee);
+		__brelse(evictee);
+	}
+}
+
+static inline struct buffer_head *
+lookup_bh(struct block_device *bdev, sector_t block, int size)
+{
+	struct buffer_head *ret = NULL;
+	struct bh_lru *lru;
+	int i;
+
+	lru = &bh_lrus[get_cpu()];
+	spin_lock(&lru->lock);
+	for (i = 0; i < BH_LRU_SIZE; i++) {
+		struct buffer_head *bh = lru->bhs[i];
+
+		if (bh && bh->b_bdev == bdev &&
+				bh->b_blocknr == block && bh->b_size == size) {
+			if (i) {
+				while (i) {
+					lru->bhs[i] = lru->bhs[i - 1];
+					i--;
+				}
+				lru->bhs[0] = bh;
+			}
+			get_bh(bh);
+			ret = bh;
+			break;
+		}
+	}
+	spin_unlock(&lru->lock);
+	put_cpu();
+	return ret;
+}
+
+struct buffer_head *
+__find_get_block(struct block_device *bdev, sector_t block, int size)
+{
+	struct buffer_head *bh = lookup_bh(bdev, block, size);
+
+	if (bh == NULL) {
+		bh = __find_get_block_slow(bdev, block, size);
+		bh_lru_install(bh);
+	}
+	return bh;
+}
+EXPORT_SYMBOL(__find_get_block);
+
+struct buffer_head *
+__getblk(struct block_device *bdev, sector_t block, int size)
+{
+	struct buffer_head *bh = __find_get_block(bdev, block, size);
+
+	if (bh == NULL) {
+		bh = __getblk_slow(bdev, block, size);
+		bh_lru_install(bh);
+	}
+	return bh;
+}
+EXPORT_SYMBOL(__getblk);
+
+struct buffer_head *
+__bread(struct block_device *bdev, sector_t block, int size)
+{
+	struct buffer_head *bh = __getblk(bdev, block, size);
+
+	if (bh) {
+		if (buffer_uptodate(bh))
+			return bh;
+		__brelse(bh);
+	}
+	bh = __bread_slow(bdev, block, size);
+	bh_lru_install(bh);
+	return bh;
+}
+EXPORT_SYMBOL(__bread);
+
+/*
+ * This is called rarely - at unmount.
+ */
+static void invalidate_bh_lrus(void)
+{
+	int cpu_idx;
+
+	for (cpu_idx = 0; cpu_idx < NR_CPUS; cpu_idx++)
+		spin_lock(&bh_lrus[cpu_idx].lock);
+	for (cpu_idx = 0; cpu_idx < NR_CPUS; cpu_idx++) {
+		int i;
+
+		for (i = 0; i < BH_LRU_SIZE; i++) {
+			brelse(bh_lrus[cpu_idx].bhs[i]);
+			bh_lrus[cpu_idx].bhs[i] = NULL;
+		}
+	}
+	for (cpu_idx = 0; cpu_idx < NR_CPUS; cpu_idx++)
+		spin_unlock(&bh_lrus[cpu_idx].lock);
 }
 
 void set_bh_page(struct buffer_head *bh,
@@ -2306,7 +2456,8 @@ static inline int buffer_busy(struct buffer_head *bh)
 		(bh->b_state & ((1 << BH_Dirty) | (1 << BH_Lock)));
 }
 
-static /*inline*/ int drop_buffers(struct page *page)
+static inline int
+drop_buffers(struct page *page, struct buffer_head **buffers_to_free)
 {
 	struct buffer_head *head = page_buffers(page);
 	struct buffer_head *bh;
@@ -2330,9 +2481,9 @@ static /*inline*/ int drop_buffers(struct page *page)
 
 		if (!list_empty(&bh->b_assoc_buffers))
 			__remove_assoc_queue(bh);
-		free_buffer_head(bh);
 		bh = next;
 	} while (bh != head);
+	*buffers_to_free = head;
 	__clear_page_buffers(page);
 	return 1;
 failed:
@@ -2342,17 +2493,20 @@ failed:
 int try_to_free_buffers(struct page *page)
 {
 	struct address_space * const mapping = page->mapping;
+	struct buffer_head *buffers_to_free = NULL;
 	int ret = 0;
 
 	BUG_ON(!PageLocked(page));
 	if (PageWriteback(page))
 		return 0;
 
-	if (mapping == NULL)		/* swapped-in anon page */
-		return drop_buffers(page);
+	if (mapping == NULL) {		/* swapped-in anon page */
+		ret = drop_buffers(page, &buffers_to_free);
+		goto out;
+	}
 
 	spin_lock(&mapping->private_lock);
-	ret = drop_buffers(page);
+	ret = drop_buffers(page, &buffers_to_free);
 	if (ret && !PageSwapCache(page)) {
 		/*
 		 * If the filesystem writes its buffers by hand (eg ext3)
@@ -2365,6 +2519,16 @@ int try_to_free_buffers(struct page *page)
 		ClearPageDirty(page);
 	}
 	spin_unlock(&mapping->private_lock);
+out:
+	if (buffers_to_free) {
+		struct buffer_head *bh = buffers_to_free;
+
+		do {
+			struct buffer_head *next = bh->b_this_page;
+			free_buffer_head(bh);
+			bh = next;
+		} while (bh != buffers_to_free);
+	}
 	return ret;
 }
 EXPORT_SYMBOL(try_to_free_buffers);
@@ -2434,6 +2598,9 @@ static void bh_mempool_free(void *element, void *pool_data)
 void __init buffer_init(void)
 {
 	int i;
+
+	for (i = 0; i < NR_CPUS; i++)
+		spin_lock_init(&bh_lrus[i].lock);
 
 	bh_cachep = kmem_cache_create("buffer_head",
 			sizeof(struct buffer_head), 0,

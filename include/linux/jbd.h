@@ -250,6 +250,13 @@ static inline struct journal_head *bh2jh(struct buffer_head *bh)
 	return bh->b_private;
 }
 
+#define HAVE_JOURNAL_CALLBACK_STATUS
+struct journal_callback {
+	struct list_head jcb_list;
+	void (*jcb_func)(struct journal_callback *jcb, int error);
+	/* user data goes here */
+};
+
 struct jbd_revoke_table_s;
 
 /* The handle_t type represents a single atomic update being performed
@@ -279,6 +286,12 @@ struct handle_s
 	/* Field for caller's use to track errors through large fs
 	   operations */
 	int			h_err;
+
+	/* List of application registered callbacks for this handle.
+	 * The function(s) will be called after the transaction that
+	 * this handle is part of has been committed to disk.
+	 */
+	struct list_head	h_jcb;
 
 	/* Flags */
 	unsigned int	h_sync:		1;	/* sync-on-close */
@@ -399,6 +412,10 @@ struct transaction_s
 
 	/* How many handles used this transaction? */
 	int t_handle_count;
+
+	/* List of registered callback functions for this transaction.
+	 * Called when the transaction is committed. */
+	struct list_head	t_jcb;
 };
 
 
@@ -647,6 +664,9 @@ extern int	 journal_invalidatepage(journal_t *,
 extern int	 journal_try_to_free_buffers(journal_t *, struct page *, int);
 extern int	 journal_stop(handle_t *);
 extern int	 journal_flush (journal_t *);
+extern void	 journal_callback_set(handle_t *handle,
+				      void (*fn)(struct journal_callback *,int),
+				      struct journal_callback *jcb);
 
 extern void	 journal_lock_updates (journal_t *);
 extern void	 journal_unlock_updates (journal_t *);

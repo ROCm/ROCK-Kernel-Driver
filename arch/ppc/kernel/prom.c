@@ -520,6 +520,38 @@ prom_n_size_cells(struct device_node* np)
 }
 
 static unsigned long __init
+map_addr(struct device_node *np, unsigned long space, unsigned long addr)
+{
+	int na;
+	unsigned int *ranges;
+	int rlen = 0;
+	unsigned int type;
+
+	type = (space >> 24) & 3;
+	if (type == 0)
+		return addr;
+
+	while ((np = np->parent) != NULL) {
+		if (strcmp(np->type, "pci") != 0)
+			continue;
+		/* PCI bridge: map the address through the ranges property */
+		na = prom_n_addr_cells(np);
+		ranges = (unsigned int *) get_property(np, "ranges", &rlen);
+		while ((rlen -= (na + 5) * sizeof(unsigned int)) >= 0) {
+			if (((ranges[0] >> 24) & 3) == type
+			    && ranges[2] <= addr
+			    && addr - ranges[2] < ranges[na+4]) {
+				/* ok, this matches, translate it */
+				addr += ranges[na+2] - ranges[2];
+				break;
+			}
+			ranges += na + 5;
+		}
+	}
+	return addr;
+}
+
+static unsigned long __init
 interpret_pci_props(struct device_node *np, unsigned long mem_start,
 		    int naddrc, int nsizec)
 {
@@ -533,9 +565,9 @@ interpret_pci_props(struct device_node *np, unsigned long mem_start,
 		i = 0;
 		adr = (struct address_range *) mem_start;
 		while ((l -= sizeof(struct pci_reg_property)) >= 0) {
-			/* XXX assumes PCI addresses mapped 1-1 to physical */
 			adr[i].space = pci_addrs[i].addr.a_hi;
-			adr[i].address = pci_addrs[i].addr.a_lo;
+			adr[i].address = map_addr(np, pci_addrs[i].addr.a_hi,
+						  pci_addrs[i].addr.a_lo);
 			adr[i].size = pci_addrs[i].size_lo;
 			++i;
 		}
@@ -772,13 +804,14 @@ prom_get_irq_senses(unsigned char *senses, int off, int max)
 	for (np = allnodes; np != 0; np = np->allnext) {
 		for (j = 0; j < np->n_intrs; j++) {
 			i = np->intrs[j].line;
-			if (i >= off && i < max)
+			if (i >= off && i < max) {
 				if (np->intrs[j].sense == 1)
 					senses[i-off] = (IRQ_SENSE_LEVEL
 						| IRQ_POLARITY_NEGATIVE);
 				else
 					senses[i-off] = (IRQ_SENSE_EDGE 
 						| IRQ_POLARITY_POSITIVE);
+			}
 		}
 	}
 }

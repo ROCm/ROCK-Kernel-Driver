@@ -665,9 +665,9 @@ static struct pci_ops prep_pci_ops =
 #define	MPIC_HAWK_ID		0x48030000
 #define	MOT_PROC2_BIT		0x800
 
-static u_char mvme2600_openpic_initsenses[] __initdata = {
-    (IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE), /* MVME2600_INT_SIO */
-    (IRQ_SENSE_EDGE | IRQ_POLARITY_POSITIVE), /* MVME2600_INT_FALCN_ECC_ERR */
+static u_char prep_openpic_initsenses[] __initdata = {
+    (IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE), /* MVME2600_INT_SIO */
+    (IRQ_SENSE_EDGE | IRQ_POLARITY_NEGATIVE), /* MVME2600_INT_FALCON_ECC_ERR */
     (IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE), /* MVME2600_INT_PCI_ETHERNET */
     (IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE), /* MVME2600_INT_PCI_SCSI */
     (IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE), /* MVME2600_INT_PCI_GRAPHICS */
@@ -737,8 +737,8 @@ raven_init(void)
 	/* Map the Raven MPIC registers to virtual memory. */
 	OpenPIC_Addr = ioremap(pci_membase+0xC0000000, 0x22000);
 
-	OpenPIC_InitSenses = mvme2600_openpic_initsenses;
-	OpenPIC_NumInitSenses = sizeof(mvme2600_openpic_initsenses);
+	OpenPIC_InitSenses = prep_openpic_initsenses;
+	OpenPIC_NumInitSenses = sizeof(prep_openpic_initsenses);
 
 	ppc_md.get_irq = openpic_get_irq;
 	
@@ -821,6 +821,9 @@ ibm_prep_init(void)
 			addr += PREP_ISA_MEM_BASE;
 			OpenPIC_Addr = ioremap(addr, 0x40000);
 			ppc_md.get_irq = openpic_get_irq;
+
+			OpenPIC_InitSenses = prep_openpic_initsenses;
+			OpenPIC_NumInitSenses = sizeof(prep_openpic_initsenses);
 		}
 	}
 

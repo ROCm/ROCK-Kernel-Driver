@@ -665,6 +665,14 @@ struct file *dentry_open(struct dentry *dentry, struct vfsmount *mnt, int flags)
 	}
 	f->f_flags &= ~(O_CREAT | O_EXCL | O_NOCTTY | O_TRUNC);
 
+	/* NB: we're sure to have correct a_ops only after f_op->open */
+	if (f->f_flags & O_DIRECT) {
+		error = -EINVAL;
+		if (inode->i_mapping && inode->i_mapping->a_ops)
+			if (!inode->i_mapping->a_ops->direct_IO)
+				goto cleanup_all;
+	}
+
 	return f;
 
 cleanup_all:

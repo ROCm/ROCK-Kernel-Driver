@@ -807,11 +807,8 @@ typedef struct {
     long error;
 } tracktype;
 
-extern void cdrom_count_tracks(struct cdrom_device_info *cdi,tracktype* tracks);
-extern int cdrom_get_next_writable(kdev_t dev, long *next_writable);
-extern int cdrom_get_last_written(kdev_t dev, long *last_written);
+extern int cdrom_get_last_written(struct cdrom_device_info *cdi, long *last_written);
 extern int cdrom_number_of_slots(struct cdrom_device_info *cdi);
-extern int cdrom_select_disc(struct cdrom_device_info *cdi, int slot);
 extern int cdrom_mode_select(struct cdrom_device_info *cdi,
 			     struct cdrom_generic_command *cgc);
 extern int cdrom_mode_sense(struct cdrom_device_info *cdi,
@@ -819,7 +816,6 @@ extern int cdrom_mode_sense(struct cdrom_device_info *cdi,
 			    int page_code, int page_control);
 extern void init_cdrom_command(struct cdrom_generic_command *cgc,
 			       void *buffer, int len, int type);
-extern struct cdrom_device_info *cdrom_find_device(kdev_t dev);
 
 typedef struct {
 	__u16 disc_information_length;
@@ -902,10 +898,6 @@ typedef struct {
 	__u32 track_size;
 	__u32 last_rec_address;
 } track_information;
-
-extern int cdrom_get_disc_info(kdev_t dev, disc_information *di);
-extern int cdrom_get_track_info(kdev_t dev, __u16 track, __u8 type,
-				track_information *ti);
 
 /* The SCSI spec says there could be 256 slots. */
 #define CDROM_MAX_SLOTS	256

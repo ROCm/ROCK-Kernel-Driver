@@ -86,24 +86,24 @@ static void __free_pages_ok (struct page *page, unsigned int order)
 	struct page *base;
 	zone_t *zone;
 
-	if (PagePrivate(page))
-		BUG();
-	if (page->mapping)
-		BUG();
-	if (PageLocked(page))
-		BUG();
-	if (PageLRU(page))
-		BUG();
-	if (PageActive(page))
-		BUG();
-	if (PageWriteback(page))
-		BUG();
-	ClearPageDirty(page);
-	page->flags &= ~(1<<PG_referenced);
+	BUG_ON(PagePrivate(page));
+	BUG_ON(page->mapping != NULL);
+	BUG_ON(PageLocked(page));
+	BUG_ON(PageLRU(page));
+	BUG_ON(PageActive(page));
+	BUG_ON(PageWriteback(page));
+	if (PageDirty(page))
+		ClearPageDirty(page);
+	BUG_ON(page_count(page) != 0);
 
-	if (current->flags & PF_FREE_PAGES)
-		goto local_freelist;
- back_local_freelist:
+	if (unlikely(current->flags & PF_FREE_PAGES)) {
+		if (!current->nr_local_pages && !in_interrupt()) {
+			list_add(&page->list, &current->local_pages);
+			page->index = order;
+			current->nr_local_pages++;
+			goto out;
+		}
+	}
 
 	zone = page_zone(page);
 
@@ -113,18 +113,14 @@ static void __free_pages_ok (struct page *page, unsigned int order)
 	if (page_idx & ~mask)
 		BUG();
 	index = page_idx >> (1 + order);
-
 	area = zone->free_area + order;
 
 	spin_lock_irqsave(&zone->lock, flags);
-
 	zone->free_pages -= mask;
-
 	while (mask + (1 << (MAX_ORDER-1))) {
 		struct page *buddy1, *buddy2;
 
-		if (area >= zone->free_area + MAX_ORDER)
-			BUG();
+		BUG_ON(area >= zone->free_area + MAX_ORDER);
 		if (!__test_and_change_bit(index, area->map))
 			/*
 			 * the buddy page is still allocated.
@@ -137,11 +133,8 @@ static void __free_pages_ok (struct page *page, unsigned int order)
 		 */
 		buddy1 = base + (page_idx ^ -mask);
 		buddy2 = base + page_idx;
-		if (bad_range(zone, buddy1))
-			BUG();
-		if (bad_range(zone, buddy2))
-			BUG();
-
+		BUG_ON(bad_range(zone, buddy1));
+		BUG_ON(bad_range(zone, buddy2));
 		list_del(&buddy1->list);
 		mask <<= 1;
 		area++;
@@ -149,19 +142,9 @@ static void __free_pages_ok (struct page *page, unsigned int order)
 		page_idx &= mask;
 	}
 	list_add(&(base + page_idx)->list, &area->free_list);
-
 	spin_unlock_irqrestore(&zone->lock, flags);
+out:
 	return;
-
- local_freelist:
-	if (current->nr_local_pages)
-		goto back_local_freelist;
-	if (in_interrupt())
-		goto back_local_freelist;		
-
-	list_add(&page->list, &current->local_pages);
-	page->index = order;
-	current->nr_local_pages++;
 }
 
 #define MARK_USED(index, order, area) \
@@ -173,8 +156,7 @@ static inline struct page * expand (zone_t *zone, struct page *page,
 	unsigned long size = 1 << high;
 
 	while (high > low) {
-		if (bad_range(zone, page))
-			BUG();
+		BUG_ON(bad_range(zone, page));
 		area--;
 		high--;
 		size >>= 1;
@@ -183,9 +165,26 @@ static inline struct page * expand (zone_t *zone, struct page *page,
 		index += size;
 		page += size;
 	}
-	if (bad_range(zone, page))
-		BUG();
+	BUG_ON(bad_range(zone, page));
 	return page;
+}
+
+/*
+ * This page is about to be returned from the page allocator
+ */
+static inline void prep_new_page(struct page *page)
+{
+	BUG_ON(page->mapping);
+	BUG_ON(PagePrivate(page));
+	BUG_ON(PageLocked(page));
+	BUG_ON(PageLRU(page));
+	BUG_ON(PageActive(page));
+	BUG_ON(PageDirty(page));
+	BUG_ON(PageWriteback(page));
+	page->flags &= ~(1 << PG_uptodate | 1 << PG_error |
+			1 << PG_referenced | 1 << PG_arch_1 |
+			1 << PG_checked);
+	set_page_count(page, 1);
 }
 
 static FASTCALL(struct page * rmqueue(zone_t *zone, unsigned int order));
@@ -206,8 +205,7 @@ static struct page * rmqueue(zone_t *zone, unsigned int order)
 			unsigned int index;
 
 			page = list_entry(curr, struct page, list);
-			if (bad_range(zone, page))
-				BUG();
+			BUG_ON(bad_range(zone, page));
 			list_del(curr);
 			index = page - zone->zone_mem_map;
 			if (curr_order != MAX_ORDER-1)
@@ -217,13 +215,9 @@ static struct page * rmqueue(zone_t *zone, unsigned int order)
 			page = expand(zone, page, index, order, curr_order, area);
 			spin_unlock_irqrestore(&zone->lock, flags);
 
-			set_page_count(page, 1);
 			if (bad_range(zone, page))
 				BUG();
-			if (PageLRU(page))
-				BUG();
-			if (PageActive(page))
-				BUG();
+			prep_new_page(page);
 			return page;	
 		}
 		curr_order++;
@@ -266,16 +260,14 @@ struct page *_alloc_pages(unsigned int gfp_mask, unsigned int order)
 }
 #endif
 
-static struct page * FASTCALL(balance_classzone(zone_t *, unsigned int, unsigned int, int *));
-static struct page * balance_classzone(zone_t * classzone, unsigned int gfp_mask, unsigned int order, int * freed)
+static /* inline */ struct page *
+balance_classzone(zone_t * classzone, unsigned int gfp_mask,
+			unsigned int order, int * freed)
 {
 	struct page * page = NULL;
 	int __freed = 0;
 
-	if (!(gfp_mask & __GFP_WAIT))
-		goto out;
-	if (in_interrupt())
-		BUG();
+	BUG_ON(in_interrupt());
 
 	current->allocation_order = order;
 	current->flags |= PF_MEMALLOC | PF_FREE_PAGES;
@@ -298,25 +290,9 @@ static struct page * balance_classzone(zone_t * classzone, unsigned int gfp_mask
 				tmp = list_entry(entry, struct page, list);
 				if (tmp->index == order && memclass(page_zone(tmp), classzone)) {
 					list_del(entry);
-					current->nr_local_pages--;
-					set_page_count(tmp, 1);
 					page = tmp;
-
-					if (PagePrivate(page))
-						BUG();
-					if (page->mapping)
-						BUG();
-					if (PageLocked(page))
-						BUG();
-					if (PageLRU(page))
-						BUG();
-					if (PageActive(page))
-						BUG();
-					if (PageDirty(page))
-						BUG();
-					if (PageWriteback(page))
-						BUG();
-
+					current->nr_local_pages--;
+					prep_new_page(page);
 					break;
 				}
 			} while ((entry = entry->next) != local_pages);
@@ -333,7 +309,6 @@ static struct page * balance_classzone(zone_t * classzone, unsigned int gfp_mask
 		}
 		current->nr_local_pages = 0;
 	}
- out:
 	*freed = __freed;
 	return page;
 }
@@ -380,7 +355,7 @@ struct page * __alloc_pages(unsigned int gfp_mask, unsigned int order, zonelist_
 			break;
 
 		local_min = z->pages_min;
-		if (!(gfp_mask & __GFP_WAIT))
+		if (gfp_mask & __GFP_HIGH)
 			local_min >>= 2;
 		min += local_min;
 		if (z->free_pages > min) {
@@ -405,7 +380,7 @@ rebalance:
 				return page;
 		}
 nopage:
-		if (!(current->flags & PF_RADIX_TREE)) {
+		if (!(current->flags & PF_NOWARN)) {
 			printk("%s: page allocation failure."
 				" order:%d, mode:0x%x\n",
 				current->comm, order, gfp_mask);
@@ -441,7 +416,6 @@ nopage:
 		goto nopage;
 
 	/* Yield for kswapd, and try again */
-	__set_current_state(TASK_RUNNING);
 	yield();
 	goto rebalance;
 }
@@ -800,8 +774,7 @@ void __init free_area_init_core(int nid, pg_data_t *pgdat, struct page **gmap,
 	unsigned long totalpages, offset, realtotalpages;
 	const unsigned long zone_required_alignment = 1UL << (MAX_ORDER-1);
 
-	if (zone_start_paddr & ~PAGE_MASK)
-		BUG();
+	BUG_ON(zone_start_paddr & ~PAGE_MASK);
 
 	totalpages = 0;
 	for (i = 0; i < MAX_NR_ZONES; i++) {

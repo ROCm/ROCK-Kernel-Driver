@@ -6,7 +6,6 @@
 struct multipath_info {
 	int		number;
 	int		raid_disk;
-	kdev_t		dev;
 	struct block_device *bdev;
 
 	/*
