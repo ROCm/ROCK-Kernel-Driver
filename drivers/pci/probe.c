@@ -480,8 +480,7 @@ struct pci_dev * __devinit pci_scan_slot(struct pci_dev *temp)
 
 		/*
 		 * Link the device to both the global PCI device chain and
-		 * the per-bus list of devices and call /sbin/hotplug if we
-		 * should.
+		 * the per-bus list of devices and add the /proc entry.
 		 */
 		pci_insert_device (dev, bus);
 
