@@ -87,6 +87,15 @@ static void serio_find_dev(struct serio *serio)
 static DECLARE_WAIT_QUEUE_HEAD(serio_wait);
 static DECLARE_COMPLETION(serio_exited);
 
+static void serio_invalidate_pending_events(struct serio *serio)
+{
+	struct serio_event *event;
+
+	list_for_each_entry(event, &serio_event_list, node)
+		if (event->serio == serio)
+			event->serio = NULL;
+}
+
 void serio_handle_events(void)
 {
 	struct list_head *node, *next;
@@ -95,17 +104,21 @@ void serio_handle_events(void)
 	list_for_each_safe(node, next, &serio_event_list) {
 		event = container_of(node, struct serio_event, node);	
 
+		down(&serio_sem);
+		if (event->serio == NULL)
+			goto event_done;
+
 		switch (event->type) {
 			case SERIO_RESCAN :
-				down(&serio_sem);
 				if (event->serio->dev && event->serio->dev->disconnect)
 					event->serio->dev->disconnect(event->serio);
 				serio_find_dev(event->serio);
-				up(&serio_sem);
 				break;
 			default:
 				break;
 		}
+event_done:
+		up(&serio_sem);
 		list_del_init(node);
 		kfree(event);
 	}
@@ -192,6 +205,7 @@ void serio_unregister_port(struct serio *serio)
  */
 void __serio_unregister_port(struct serio *serio)
 {
+	serio_invalidate_pending_events(serio);
 	list_del_init(&serio->node);
 	if (serio->dev && serio->dev->disconnect)
 		serio->dev->disconnect(serio);
