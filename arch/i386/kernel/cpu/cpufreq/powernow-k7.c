@@ -91,17 +91,12 @@ static int check_powernow(void)
 	struct cpuinfo_x86 *c = cpu_data;
 	unsigned int maxei, eax, ebx, ecx, edx;
 
-	if (c->x86_vendor != X86_VENDOR_AMD) {
-		printk (KERN_INFO PFX "AMD processor not detected.\n");
-		return 0;
-	}
-
-	if (c->x86 !=6) {
+	if ((c->x86_vendor != X86_VENDOR_AMD) || (c->x86 !=6)) {
+#ifdef MODULE
 		printk (KERN_INFO PFX "This module only works with AMD K7 CPUs\n");
+#endif
 		return 0;
 	}
-
-	printk (KERN_INFO PFX "AMD K7 CPU detected.\n");
 
 	if ((c->x86_model == 6) && (c->x86_mask == 0)) {
 		printk (KERN_INFO PFX "K7 660[A0] core detected, enabling errata workarounds\n");
