@@ -224,7 +224,7 @@ struct pci_resource *acpiphp_get_io_resource (struct pci_resource **head, u32 si
 		}  /* End of too big on top end */
 
 		/* For IO make sure it's not in the ISA aliasing space */
-		if (node->base & 0x300L)
+		if ((node->base & 0x300L) && !(node->base & 0xfffff000))
 			continue;
 
 		/* If we got here, then it is the right size
