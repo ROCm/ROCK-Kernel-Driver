@@ -491,6 +491,14 @@ config SCSI_SATA_VIA
 
 	  If unsure, say N.
 
+config SCSI_SATA_ULI
+	tristate "ULI SATA support"
+	depends on SCSI_SATA && PCI
+	help
+	  This option enables support for ULI Serial ATA M5289.
+
+	  If unsure, say N.
+
 config SCSI_SATA_VITESSE
 	tristate "VITESSE VSC-7174 SATA support"
 	depends on SCSI_SATA && PCI && EXPERIMENTAL
