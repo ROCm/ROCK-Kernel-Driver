@@ -125,7 +125,7 @@ cifs_create(struct inode *inode, struct dentry *direntry, int mode,
 {
 	int rc = -ENOENT;
 	int xid;
-	int oplock = REQ_OPLOCK;
+	int oplock = 0;
 	int desiredAccess = GENERIC_ALL;
 	__u16 fileHandle;
 	struct cifs_sb_info *cifs_sb;
@@ -155,7 +155,7 @@ cifs_create(struct inode *inode, struct dentry *direntry, int mode,
 	}
 
 	/* BB add processing to set equivalent of mode - e.g. via CreateX with ACLs */
-	if (!oplockEnabled)
+	if (oplockEnabled)
 		oplock = REQ_OPLOCK;
 
 	buf = kmalloc(sizeof(FILE_ALL_INFO),GFP_KERNEL);
@@ -195,7 +195,7 @@ cifs_create(struct inode *inode, struct dentry *direntry, int mode,
 				write_lock(&GlobalSMBSeslock);
 				list_add(&pCifsFile->tlist,&pTcon->openFileList);
 				pCifsInode = CIFS_I(newinode);
-				if(pCifsInode->openFileList.next)
+				if(pCifsInode)
 					list_add(&pCifsFile->flist,&pCifsInode->openFileList);
 				write_unlock(&GlobalSMBSeslock);
 				if (cifs_sb->tcon->ses->capabilities & CAP_UNIX)                
