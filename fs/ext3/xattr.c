@@ -37,9 +37,9 @@
  *   | value 2          | |
  *   +------------------+
  *
- * The header is followed by multiple entry descriptors. Descriptors are
- * kept sorted. The attribute values are aligned to the end of the block
- * in no specific order.
+ * The header is followed by multiple entry descriptors. In disk blocks, the
+ * entry descriptors are kept sorted. In inodes, they are unsorted. The
+ * attribute values are aligned to the end of the block in no specific order.
  *
  * Locking strategy
  * ----------------
