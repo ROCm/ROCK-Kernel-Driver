@@ -134,7 +134,7 @@ static void set_last_pointer(struct super_block *s, struct dnode *d, dnode_secno
 		hpfs_error(s, "set_last_pointer: empty dnode %08x", d->self);
 		return;
 	}
-	if (s->s_hpfs_chk) {
+	if (hpfs_sb(s)->sb_chk) {
 		if (de->down) {
 			hpfs_error(s, "set_last_pointer: dnode %08x has already last pointer %08x",
 				d->self, de_down_pointer(de));
@@ -253,7 +253,7 @@ int hpfs_add_to_dnode(struct inode *i, dnode_secno dno, unsigned char *name, uns
 		return 1;
 	}
 	go_up_a:
-	if (i->i_sb->s_hpfs_chk)
+	if (hpfs_sb(i->i_sb)->sb_chk)
 		if (hpfs_stop_cycles(i->i_sb, dno, &c1, &c2, "hpfs_add_to_dnode")) {
 			hpfs_brelse4(&qbh);
 			if (nd) kfree(nd);
@@ -379,7 +379,7 @@ int hpfs_add_dirent(struct inode *i, unsigned char *name, unsigned namelen,
 	int c1, c2 = 0;
 	dno = hpfs_inode->i_dno;
 	down:
-	if (i->i_sb->s_hpfs_chk)
+	if (hpfs_sb(i->i_sb)->sb_chk)
 		if (hpfs_stop_cycles(i->i_sb, dno, &c1, &c2, "hpfs_add_dirent")) return 1;
 	if (!(d = hpfs_map_dnode(i->i_sb, dno, &qbh))) return 1;
 	de_end = dnode_end_de(d);
@@ -427,11 +427,11 @@ static secno move_to_top(struct inode *i, dnode_secno from, dnode_secno to)
 	int c1, c2 = 0;
 	dno = from;
 	while (1) {
-		if (i->i_sb->s_hpfs_chk)
+		if (hpfs_sb(i->i_sb)->sb_chk)
 			if (hpfs_stop_cycles(i->i_sb, dno, &c1, &c2, "move_to_top"))
 				return 0;
 		if (!(dnode = hpfs_map_dnode(i->i_sb, dno, &qbh))) return 0;
-		if (i->i_sb->s_hpfs_chk) {
+		if (hpfs_sb(i->i_sb)->sb_chk) {
 			if (dnode->up != chk_up) {
 				hpfs_error(i->i_sb, "move_to_top: up pointer from %08x should be %08x, is %08x",
 					dno, chk_up, dnode->up);
@@ -519,7 +519,7 @@ static void delete_empty_dnode(struct inode *i, dnode_secno dno)
 		up = dnode->up;
 		de = dnode_first_de(dnode);
 		down = de->down ? de_down_pointer(de) : 0;
-		if (i->i_sb->s_hpfs_chk) if (root && !down) {
+		if (hpfs_sb(i->i_sb)->sb_chk) if (root && !down) {
 			hpfs_error(i->i_sb, "delete_empty_dnode: root dnode %08x is empty", dno);
 			goto end;
 		}
@@ -532,7 +532,7 @@ static void delete_empty_dnode(struct inode *i, dnode_secno dno)
 			struct buffer_head *bh;
 			struct dnode *d1;
 			struct quad_buffer_head qbh1;
-			if (i->i_sb->s_hpfs_chk) if (up != i->i_ino) {
+			if (hpfs_sb(i->i_sb)->sb_chk) if (up != i->i_ino) {
 				hpfs_error(i->i_sb, "bad pointer to fnode, dnode %08x, pointing to %08x, should be %08x", dno, up, i->i_ino);
 				return;
 			}
@@ -628,14 +628,14 @@ static void delete_empty_dnode(struct inode *i, dnode_secno dno)
 			dlp = del->down ? de_down_pointer(del) : 0;
 			if (!dlp && down) {
 				if (d1->first_free > 2044) {
-					if (i->i_sb->s_hpfs_chk >= 2) {
+					if (hpfs_sb(i->i_sb)->sb_chk >= 2) {
 						printk("HPFS: warning: unbalanced dnode tree, see hpfs.txt 4 more info\n");
 						printk("HPFS: warning: terminating balancing operation\n");
 					}
 					hpfs_brelse4(&qbh1);
 					goto endm;
 				}
-				if (i->i_sb->s_hpfs_chk >= 2) {
+				if (hpfs_sb(i->i_sb)->sb_chk >= 2) {
 					printk("HPFS: warning: unbalanced dnode tree, see hpfs.txt 4 more info\n");
 					printk("HPFS: warning: goin'on\n");
 				}
@@ -738,12 +738,12 @@ void hpfs_count_dnodes(struct super_block *s, dnode_secno dno, int *n_dnodes,
 	int d1, d2 = 0;
 	go_down:
 	if (n_dnodes) (*n_dnodes)++;
-	if (s->s_hpfs_chk)
+	if (hpfs_sb(s)->sb_chk)
 		if (hpfs_stop_cycles(s, dno, &c1, &c2, "hpfs_count_dnodes #1")) return;
 	ptr = 0;
 	go_up:
 	if (!(dnode = hpfs_map_dnode(s, dno, &qbh))) return;
-	if (s->s_hpfs_chk) if (odno && odno != -1 && dnode->up != odno)
+	if (hpfs_sb(s)->sb_chk) if (odno && odno != -1 && dnode->up != odno)
 		hpfs_error(s, "hpfs_count_dnodes: bad up pointer; dnode %08x, down %08x points to %08x", odno, dno, dnode->up);
 	de = dnode_first_de(dnode);
 	if (ptr) while(1) {
@@ -774,7 +774,7 @@ void hpfs_count_dnodes(struct super_block *s, dnode_secno dno, int *n_dnodes,
 		return;
 	}
 	hpfs_brelse4(&qbh);
-	if (s->s_hpfs_chk)
+	if (hpfs_sb(s)->sb_chk)
 		if (hpfs_stop_cycles(s, ptr, &d1, &d2, "hpfs_count_dnodes #2")) return;
 	odno = -1;
 	goto go_up;
@@ -811,11 +811,11 @@ dnode_secno hpfs_de_as_down_as_possible(struct super_block *s, dnode_secno dno)
 	int c1, c2 = 0;
 
 	again:
-	if (s->s_hpfs_chk)
+	if (hpfs_sb(s)->sb_chk)
 		if (hpfs_stop_cycles(s, d, &c1, &c2, "hpfs_de_as_down_as_possible"))
 			return d;
 	if (!(de = map_nth_dirent(s, d, 1, &qbh, NULL))) return dno;
-	if (s->s_hpfs_chk)
+	if (hpfs_sb(s)->sb_chk)
 		if (up && ((struct dnode *)qbh.data)->up != up)
 			hpfs_error(s, "hpfs_de_as_down_as_possible: bad up pointer; dnode %08x, down %08x points to %08x", up, d, ((struct dnode *)qbh.data)->up);
 	if (!de->down) {
@@ -901,7 +901,7 @@ struct hpfs_dirent *map_dirent(struct inode *inode, dnode_secno dno, char *name,
 
 	if (!S_ISDIR(inode->i_mode)) hpfs_error(inode->i_sb, "map_dirent: not a directory\n");
 	again:
-	if (inode->i_sb->s_hpfs_chk)
+	if (hpfs_sb(inode->i_sb)->sb_chk)
 		if (hpfs_stop_cycles(inode->i_sb, dno, &c1, &c2, "map_dirent")) return NULL;
 	if (!(dnode = hpfs_map_dnode(inode->i_sb, dno, qbh))) return NULL;
 	
@@ -1046,7 +1046,7 @@ struct hpfs_dirent *map_fnode_dirent(struct super_block *s, fnode_secno fno,
 	if (c < 0 && de->down) {
 		dno = de_down_pointer(de);
 		hpfs_brelse4(qbh);
-		if (s->s_hpfs_chk)
+		if (hpfs_sb(s)->sb_chk)
 			if (hpfs_stop_cycles(s, dno, &c1, &c2, "map_fnode_dirent #1")) {
 			kfree(name2);
 			return NULL;
@@ -1065,7 +1065,7 @@ struct hpfs_dirent *map_fnode_dirent(struct super_block *s, fnode_secno fno,
 	downd = dno;
 	dno = d->up;
 	hpfs_brelse4(qbh);
-	if (s->s_hpfs_chk)
+	if (hpfs_sb(s)->sb_chk)
 		if (hpfs_stop_cycles(s, downd, &d1, &d2, "map_fnode_dirent #2")) {
 			kfree(name2);
 			return NULL;

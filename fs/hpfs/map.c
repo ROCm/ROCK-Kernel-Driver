@@ -11,19 +11,19 @@
 
 unsigned *hpfs_map_dnode_bitmap(struct super_block *s, struct quad_buffer_head *qbh)
 {
-	return hpfs_map_4sectors(s, s->s_hpfs_dmap, qbh, 0);
+	return hpfs_map_4sectors(s, hpfs_sb(s)->sb_dmap, qbh, 0);
 }
 
 unsigned int *hpfs_map_bitmap(struct super_block *s, unsigned bmp_block,
 			 struct quad_buffer_head *qbh, char *id)
 {
 	secno sec;
-	if (s->s_hpfs_chk) if (bmp_block * 16384 > s->s_hpfs_fs_size) {
+	if (hpfs_sb(s)->sb_chk) if (bmp_block * 16384 > hpfs_sb(s)->sb_fs_size) {
 		hpfs_error(s, "hpfs_map_bitmap called with bad parameter: %08x at %s", bmp_block, id);
 		return NULL;
 	}
-	sec = s->s_hpfs_bmp_dir[bmp_block];
-	if (!sec || sec > s->s_hpfs_fs_size-4) {
+	sec = hpfs_sb(s)->sb_bmp_dir[bmp_block];
+	if (!sec || sec > hpfs_sb(s)->sb_fs_size-4) {
 		hpfs_error(s, "invalid bitmap block pointer %08x -> %08x at %s", bmp_block, sec, id);
 		return NULL;
 	}
@@ -93,7 +93,7 @@ char *hpfs_load_code_page(struct super_block *s, secno cps)
 secno *hpfs_load_bitmap_directory(struct super_block *s, secno bmp)
 {
 	struct buffer_head *bh;
-	int n = (s->s_hpfs_fs_size + 0x200000 - 1) >> 21;
+	int n = (hpfs_sb(s)->sb_fs_size + 0x200000 - 1) >> 21;
 	int i;
 	secno *b;
 	if (!(b = kmalloc(n * 512, GFP_KERNEL))) {
@@ -119,11 +119,11 @@ secno *hpfs_load_bitmap_directory(struct super_block *s, secno bmp)
 struct fnode *hpfs_map_fnode(struct super_block *s, ino_t ino, struct buffer_head **bhp)
 {
 	struct fnode *fnode;
-	if (s->s_hpfs_chk) if (hpfs_chk_sectors(s, ino, 1, "fnode")) {
+	if (hpfs_sb(s)->sb_chk) if (hpfs_chk_sectors(s, ino, 1, "fnode")) {
 		return NULL;
 	}
 	if ((fnode = hpfs_map_sector(s, ino, bhp, FNODE_RD_AHEAD))) {
-		if (s->s_hpfs_chk) {
+		if (hpfs_sb(s)->sb_chk) {
 			struct extended_attribute *ea;
 			struct extended_attribute *ea_end;
 			if (fnode->magic != FNODE_MAGIC) {
@@ -168,9 +168,9 @@ struct fnode *hpfs_map_fnode(struct super_block *s, ino_t ino, struct buffer_hea
 struct anode *hpfs_map_anode(struct super_block *s, anode_secno ano, struct buffer_head **bhp)
 {
 	struct anode *anode;
-	if (s->s_hpfs_chk) if (hpfs_chk_sectors(s, ano, 1, "anode")) return NULL;
+	if (hpfs_sb(s)->sb_chk) if (hpfs_chk_sectors(s, ano, 1, "anode")) return NULL;
 	if ((anode = hpfs_map_sector(s, ano, bhp, ANODE_RD_AHEAD)))
-		if (s->s_hpfs_chk) {
+		if (hpfs_sb(s)->sb_chk) {
 			if (anode->magic != ANODE_MAGIC || anode->self != ano) {
 				hpfs_error(s, "bad magic on anode %08x", ano);
 				goto bail;
@@ -200,7 +200,7 @@ struct dnode *hpfs_map_dnode(struct super_block *s, unsigned secno,
 			     struct quad_buffer_head *qbh)
 {
 	struct dnode *dnode;
-	if (s->s_hpfs_chk) {
+	if (hpfs_sb(s)->sb_chk) {
 		if (hpfs_chk_sectors(s, secno, 4, "dnode")) return NULL;
 		if (secno & 3) {
 			hpfs_error(s, "dnode %08x not byte-aligned", secno);
@@ -208,7 +208,7 @@ struct dnode *hpfs_map_dnode(struct super_block *s, unsigned secno,
 		}	
 	}
 	if ((dnode = hpfs_map_4sectors(s, secno, qbh, DNODE_RD_AHEAD)))
-		if (s->s_hpfs_chk) {
+		if (hpfs_sb(s)->sb_chk) {
 			unsigned p, pp = 0;
 			unsigned char *d = (char *)dnode;
 			int b = 0;
@@ -234,7 +234,7 @@ struct dnode *hpfs_map_dnode(struct super_block *s, unsigned secno,
 					hpfs_error(s, "namelen does not match dirent size in dnode %08x, dirent %03x, last %03x", secno, p, pp);
 					goto bail;
 				}
-				if (s->s_hpfs_chk >= 2) b |= 1 << de->down;
+				if (hpfs_sb(s)->sb_chk >= 2) b |= 1 << de->down;
 				if (de->down) if (de_down_pointer(de) < 0x10) {
 					hpfs_error(s, "bad down pointer in dnode %08x, dirent %03x, last %03x", secno, p, pp);
 					goto bail;
