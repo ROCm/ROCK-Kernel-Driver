@@ -148,8 +148,7 @@ static struct task_struct *idle_thread(int cpu)
 
         current->thread.request.u.thread.proc = idle_proc;
         current->thread.request.u.thread.arg = (void *) cpu;
-	new_task = copy_process(CLONE_VM | CLONE_IDLETASK, 0, NULL, 0, NULL,
-				NULL);
+	new_task = fork_idle(cpu);
 	if(IS_ERR(new_task))
 		panic("copy_process failed in idle_thread, error = %ld",
 		      PTR_ERR(new_task));
@@ -161,7 +160,6 @@ static struct task_struct *idle_thread(int cpu)
 	CHOOSE_MODE(os_write_file(new_task->thread.mode.tt.switch_pipe[1], &c,
 			  sizeof(c)),
 		    ({ panic("skas mode doesn't support SMP"); }));
-	wake_up_forked_process(new_task);
 	return(new_task);
 }
 
