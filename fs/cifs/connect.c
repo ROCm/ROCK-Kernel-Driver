@@ -180,27 +180,42 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 		smb_msg.msg_control = NULL;
 		smb_msg.msg_controllen = 0;
 
+cFYI(1,("about to rcv csocket %p tcpStatus %d",csocket,server->tcpStatus)); /* BB removeme BB */
+
 		length =
 		    sock_recvmsg(csocket, &smb_msg,
 				 sizeof (struct smb_hdr) -
 				 1 /* RFC1001 header and SMB header */ ,
 				 MSG_PEEK /* flags see socket.h */ );
+
+cFYI(1,("rcv csocket %p with rc 0x%x smb len of 0x%x tcpStatus %d",csocket,length,ntohl(smb_buffer->smb_buf_length),server->tcpStatus)); /* BB removeme BB */
+
 		if (server->tcpStatus == CifsNeedReconnect) {
 			cFYI(1,("Reconnecting after server stopped responding"));
 			cifs_reconnect(server);
 			csocket = server->ssocket;
+			continue;
+		} else if (length == -ERESTARTSYS) {
+			cFYI(1,("ERESTARTSYS returned from sock_recvmsg"));
+			schedule_timeout(1); /* minimum sleep to prevent looping
+				allowing socket to clear and app threads to set
+				tcpStatus CifsNeedReconnect if server hung */
 			continue;
 		} else if (length < 0) {
 			if (length == -ECONNRESET) {
 				cERROR(1, ("Connection reset by peer "));
 				cifs_reconnect(server);
 				csocket = server->ssocket;
-				continue;
-			} else { /* find define for the -512 returned at unmount time */
-				cFYI(1,("Error on sock_recvmsg(peek) length = %d",
-					length)); 
+			} else { 
+				cERROR(1,("Unexpected error on sock_recvmsg(peek) = %d",
+					length)); /* there may be other non-fatal 
+					errors that the tcp stack can return 
+					to kernel that are not documented yet
+					and that are not checked above. */
+				cifs_reconnect(server);
+				csocket = server->ssocket; 
 			}
-			break;
+			continue;	
 		} else if (length == 0) {
 			cFYI(1,("Zero length peek received - dead session?"));
 			cifs_reconnect(server);
@@ -766,6 +781,7 @@ ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket)
 		/* BB other socket options to set KEEPALIVE, NODELAY? */
 			struct timeval tval;
 			tval.tv_sec = 10;
+			tval.tv_usec = 0;
 			cFYI(1,("Socket created"));
 		        sock_setsockopt(*csocket, SOL_SOCKET, SO_RCVTIMEO,
                 	        (char*)&tval, sizeof(struct timeval));
