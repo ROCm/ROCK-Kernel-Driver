@@ -35,8 +35,6 @@
 typedef struct svc_client	svc_client;
 typedef struct svc_export	svc_export;
 
-static svc_export *	exp_parent(svc_client *clp, struct super_block *sb,
-					struct dentry *dentry);
 static void		exp_unexport_all(svc_client *clp);
 static void		exp_do_unexport(svc_export *unexp);
 static svc_client *	exp_getclientbyname(char *name);
@@ -124,24 +122,21 @@ exp_get_by_name(svc_client *clp, struct vfsmount *mnt, struct dentry *dentry)
 }
 
 /*
- * Find the export entry for a given dentry.  <gam3@acm.org>
+ * Find the export entry for a given dentry.
  */
-static svc_export *
-exp_parent(svc_client *clp, struct super_block *sb, struct dentry *dentry)
+struct svc_export *
+exp_parent(svc_client *clp, struct vfsmount *mnt, struct dentry *dentry)
 {
-	struct list_head *head = &clp->cl_export[EXPORT_HASH(sb->s_dev)];
-	struct list_head *p;
+	svc_export *exp;
 
-	spin_lock(&dcache_lock);
-	list_for_each(p, head) {
-		svc_export *exp = list_entry(p, svc_export, ex_hash);
-		if (is_subdir(dentry, exp->ex_dentry)) {
-			spin_unlock(&dcache_lock);
-			return exp;
-		}
+	read_lock(&dparent_lock);
+	exp = exp_get_by_name(clp, mnt, dentry);
+	while (exp == NULL && dentry != dentry->d_parent) {
+		dentry = dentry->d_parent;
+		exp = exp_get_by_name(clp, mnt, dentry);
 	}
-	spin_unlock(&dcache_lock);
-	return NULL;
+	read_unlock(&dparent_lock);
+	return exp;
 }
 
 /*
@@ -415,7 +410,7 @@ exp_rootfh(struct svc_client *clp, char *path, struct knfsd_fh *f, int maxsize)
 	dprintk("nfsd: exp_rootfh(%s [%p] %s:%s/%ld)\n",
 		 path, nd.dentry, clp->cl_ident,
 		 inode->i_sb->s_id, inode->i_ino);
-	exp = exp_parent(clp, inode->i_sb, nd.dentry);
+	exp = exp_parent(clp, nd.mnt, nd.dentry);
 	if (!exp) {
 		dprintk("nfsd: exp_rootfh export not found.\n");
 		goto out;

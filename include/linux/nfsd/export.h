@@ -91,6 +91,8 @@ struct svc_export *	exp_get_fsid(struct svc_client *clp, int fsid);
 struct svc_export *	exp_get_by_name(struct svc_client *clp,
 					struct vfsmount *mnt,
 					struct dentry *dentry);
+struct svc_export *	exp_parent(struct svc_client *clp, struct vfsmount *mnt,
+				   struct dentry *dentry);
 int			exp_rootfh(struct svc_client *, 
 					char *path, struct knfsd_fh *, int maxsize);
 int			nfserrno(int errno);
