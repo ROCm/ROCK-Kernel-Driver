@@ -222,6 +222,25 @@ static struct metapage *read_index_page(struct inode *inode, s64 blkno)
 }
 
 /*
+ *	get_index_page()
+ *
+ *	Same as get_index_page(), but get's a new page without reading
+ */
+static struct metapage *get_index_page(struct inode *inode, s64 blkno)
+{
+	int rc;
+	s64 xaddr;
+	int xflag;
+	s32 xlen;
+
+	rc = xtLookup(inode, blkno, 1, &xflag, &xaddr, &xlen, 1);
+	if (rc || (xlen == 0))
+		return NULL;
+
+	return get_metapage(inode, xaddr, PSIZE, 1);
+}
+
+/*
  *	find_index()
  *
  *	Returns dtree page containing directory table entry for specified
@@ -390,7 +409,7 @@ static u32 add_index(tid_t tid, struct inode *ip, s64 bn, int slot)
 		ip->i_size = PSIZE;
 		ip->i_blocks += LBLK2PBLK(sb, sbi->nbperpage);
 
-		if ((mp = read_index_page(ip, 0)) == 0) {
+		if ((mp = get_index_page(ip, 0)) == 0) {
 			jfs_err("add_index: get_metapage failed!");
 			xtTruncate(tid, ip, 0, COMMIT_PWMAP);
 			return -1;
@@ -433,7 +452,7 @@ static u32 add_index(tid_t tid, struct inode *ip, s64 bn, int slot)
 		ip->i_size += PSIZE;
 		ip->i_blocks += LBLK2PBLK(sb, sbi->nbperpage);
 
-		if ((mp = read_index_page(ip, blkno)))
+		if ((mp = get_index_page(ip, blkno)))
 			memset(mp->data, 0, PSIZE);	/* Just looks better */
 		else
 			xtTruncate(tid, ip, offset, COMMIT_PWMAP);
