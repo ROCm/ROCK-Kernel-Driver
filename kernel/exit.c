@@ -1398,8 +1398,8 @@ asmlinkage long sys_waitid(int which, pid_t pid,
 	return do_wait(pid, options, infop, NULL, &infop->si_rusage);
 }
 
-asmlinkage long sys_wait4(pid_t pid, unsigned int *stat_addr,
-				int options, struct rusage *ru)
+asmlinkage long sys_wait4(pid_t pid, unsigned int __user *stat_addr,
+				int options, struct rusage __user *ru)
 {
 	if (options & ~(WNOHANG|WUNTRACED|__WNOTHREAD|__WCLONE|__WALL))
 		return -EINVAL;
