@@ -555,6 +555,11 @@ int venus_pioctl(struct super_block *sb, struct CodaFid *fid,
 		goto exit;
         }
 
+        if (data->vi.out_size > VC_MAXDATASIZE) {
+		error = -EINVAL;
+		goto exit;
+	}
+
         inp->coda_ioctl.VFid = *fid;
     
         /* the cmd field was mutated by increasing its size field to
@@ -583,18 +588,25 @@ int venus_pioctl(struct super_block *sb, struct CodaFid *fid,
 		       error, coda_f2s(fid));
 		goto exit; 
 	}
+
+	if (outsize < (long)outp->coda_ioctl.data + outp->coda_ioctl.len) {
+		error = -EINVAL;
+		goto exit;
+	}
         
 	/* Copy out the OUT buffer. */
         if (outp->coda_ioctl.len > data->vi.out_size) {
 		error = -EINVAL;
-        } else {
-		if (copy_to_user(data->vi.out, 
-				 (char *)outp + (long)outp->coda_ioctl.data, 
-				 data->vi.out_size)) {
-			error = -EFAULT;
-			goto exit;
-		}
+		goto exit;
         }
+
+	/* Copy out the OUT buffer. */
+	if (copy_to_user(data->vi.out,
+			 (char *)outp + (long)outp->coda_ioctl.data,
+			 outp->coda_ioctl.len)) {
+		error = -EFAULT;
+		goto exit;
+	}
 
  exit:
 	CODA_FREE(inp, insize);

@@ -761,8 +761,8 @@ union coda_downcalls {
 struct ViceIoctl {
         void __user *in;        /* Data to be transferred in */
         void __user *out;       /* Data to be transferred out */
-        short in_size;          /* Size of input buffer <= 2K */
-        short out_size;         /* Maximum size of output buffer, <= 2K */
+        u_short in_size;        /* Size of input buffer <= 2K */
+        u_short out_size;       /* Maximum size of output buffer, <= 2K */
 };
 
 struct PioctlData {
