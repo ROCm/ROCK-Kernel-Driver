@@ -669,7 +669,7 @@ void __init smp_boot_cpus(void)
 
 		if (do_fork(CLONE_VM|CLONE_PID, 0, &regs, 0) < 0)
 			panic("failed fork for CPU %d", i);
-		p = init_task.prev_task;
+		p = prev_task(&init_task);
 		if (!p)
 			panic("No idle task for CPU %d", i);
 
