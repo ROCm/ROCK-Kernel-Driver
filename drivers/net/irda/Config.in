@@ -19,20 +19,20 @@ if [ "$CONFIG_DONGLE" != "n" ]; then
       dep_tristate '  EP7211 I/R support' CONFIG_EP7211_IR $CONFIG_IRDA
    fi
    if [ "$CONFIG_EXPERIMENTAL" != "n" ]; then
-      dep_tristate '  ACTiSYS IR-200L dongle (Experimental)' CONFIG_ACT200L_DONGLE $CONFIG_IRDA
-      dep_tristate '  Mobile Action MA600 dongle (Experimental)' CONFIG_MA600_DONGLE $CONFIG_IRDA
+      dep_tristate '  ACTiSYS IR-200L dongle (EXPERIMENTAL)' CONFIG_ACT200L_DONGLE $CONFIG_IRDA
+      dep_tristate '  Mobile Action MA600 dongle (EXPERIMENTAL)' CONFIG_MA600_DONGLE $CONFIG_IRDA
    fi
 fi
 
 comment 'FIR device drivers'
-dep_tristate 'IrDA USB dongles (Experimental)' CONFIG_USB_IRDA $CONFIG_IRDA $CONFIG_USB $CONFIG_EXPERIMENTAL
+dep_tristate 'IrDA USB dongles (EXPERIMENTAL)' CONFIG_USB_IRDA $CONFIG_IRDA $CONFIG_USB $CONFIG_EXPERIMENTAL
 dep_tristate 'NSC PC87108/PC87338' CONFIG_NSC_FIR  $CONFIG_IRDA
 dep_tristate 'Winbond W83977AF (IR)' CONFIG_WINBOND_FIR $CONFIG_IRDA
 dep_tristate 'Toshiba Type-O IR Port' CONFIG_TOSHIBA_FIR $CONFIG_IRDA
 if [ "$CONFIG_EXPERIMENTAL" != "n" ]; then
-dep_tristate 'SMC IrCC (Experimental)' CONFIG_SMC_IRCC_FIR $CONFIG_IRDA
-dep_tristate 'ALi M5123 FIR (Experimental)' CONFIG_ALI_FIR $CONFIG_IRDA
-dep_tristate 'VLSI 82C147 SIR/MIR/FIR (Experimental)' CONFIG_VLSI_FIR $CONFIG_IRDA
+dep_tristate 'SMC IrCC (EXPERIMENTAL)' CONFIG_SMC_IRCC_FIR $CONFIG_IRDA
+dep_tristate 'ALi M5123 FIR (EXPERIMENTAL)' CONFIG_ALI_FIR $CONFIG_IRDA
+dep_tristate 'VLSI 82C147 SIR/MIR/FIR (EXPERIMENTAL)' CONFIG_VLSI_FIR $CONFIG_IRDA
 fi
 if [ "$CONFIG_ARCH_SA1100" = "y" ]; then
    dep_tristate 'SA1100 Internal IR' CONFIG_SA1100_FIR $CONFIG_IRDA
