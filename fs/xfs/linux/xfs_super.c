@@ -508,12 +508,17 @@ linvfs_write_super(
 
 STATIC int
 linvfs_sync_super(
-	struct super_block	*sb)
+	struct super_block	*sb,
+	int			wait)
 {
 	vfs_t		*vfsp = LINVFS_GET_VFS(sb);
 	int		error;
+	int		flags = SYNC_FSDATA;
 
-	VFS_SYNC(vfsp, SYNC_FSDATA|SYNC_WAIT, NULL, error);
+	if (wait)
+		flags |= SYNC_WAIT;
+
+	VFS_SYNC(vfsp, flags, NULL, error);
 	sb->s_dirt = 0;
 
 	return -error;
