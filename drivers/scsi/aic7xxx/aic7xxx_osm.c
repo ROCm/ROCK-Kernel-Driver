@@ -892,18 +892,25 @@ ahc_linux_detect(Scsi_Host_Template *template)
 	ahc_list_lockinit();
 
 #ifdef CONFIG_PCI
-	ahc_linux_pci_init();
+	found = ahc_linux_pci_init();
+	if (found)
+		goto out;
 #endif
 
 #ifdef CONFIG_EISA
-	ahc_linux_eisa_init();
+	found = ahc_linux_eisa_init();
+	if (found) {
+#ifdef CONFIG_PCI
+		ahc_linux_pci_exit();
+#endif
+		goto out;
+	}
 #endif
 
 	/*
 	 * Register with the SCSI layer all
 	 * controllers we've found.
 	 */
-	found = 0;
 	TAILQ_FOREACH(ahc, &ahc_tailq, links) {
 
 		if (ahc_linux_register_host(ahc, template) == 0)
@@ -913,6 +920,8 @@ ahc_linux_detect(Scsi_Host_Template *template)
 	spin_lock_irq(&io_request_lock);
 #endif
 	aic7xxx_detect_complete++;
+
+out:
 	return (found);
 }
 
@@ -5067,11 +5076,17 @@ ahc_platform_dump_card_state(struct ahc_softc *ahc)
 	}
 }
 
+static void __exit ahc_linux_exit(void);
+
 static int __init
 ahc_linux_init(void)
 {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
-	return (ahc_linux_detect(&aic7xxx_driver_template) ? 0 : -ENODEV);
+	int rc = ahc_linux_detect(&aic7xxx_driver_template);
+	if (rc)
+		return rc;
+	ahc_linux_exit();
+	return -ENODEV;
 #else
 	scsi_register_module(MODULE_SCSI_HA, &aic7xxx_driver_template);
 	if (aic7xxx_driver_template.present == 0) {

@@ -840,7 +840,7 @@ typedef enum
 
 #ifdef CONFIG_EISA
 extern uint32_t aic7xxx_probe_eisa_vl;
-void			 ahc_linux_eisa_init(void);
+int			 ahc_linux_eisa_init(void);
 void			 ahc_linux_eisa_exit(void);
 int			 aic7770_map_registers(struct ahc_softc *ahc,
 					       u_int port);
