@@ -1121,8 +1121,6 @@ static ssize_t generic_file_direct_IO(int rw, struct file * filp, char * buf, si
 	retval = -EINVAL;
 	if ((offset & blocksize_mask) || (count & blocksize_mask))
 		goto out_free;
-	if (!mapping->a_ops->direct_IO)
-		goto out_free;
 
 	/*
 	 * Flush to disk exclusively the _data_, metadata must remain
