@@ -250,6 +250,8 @@ nfsd4_create(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_cre
 	fh_init(&resfh, NFS4_FHSIZE);
 
 	status = fh_verify(rqstp, current_fh, S_IFDIR, MAY_CREATE);
+	if (status == nfserr_symlink)
+		status = nfserr_notdir;
 	if (status)
 		return status;
 
