@@ -560,21 +560,35 @@ static void free_shared_mem(struct s2io_nic *nic)
 	for (i = 0; i < config->rx_ring_num; i++) {
 		blk_cnt =
 		    config->rx_cfg[i].num_rxd / (MAX_RXDS_PER_BLOCK + 1);
+		if (!nic->ba[i])
+			goto end_free;
 		for (j = 0; j < blk_cnt; j++) {
 			int k = 0;
-			if (!nic->ba[i][j])
-				continue;
+			if (!nic->ba[i][j]) {
+				kfree(nic->ba[i]);
+				goto end_free;
+			}
 			while (k != MAX_RXDS_PER_BLOCK) {
 				buffAdd_t *ba = &nic->ba[i][j][k];
+				if (!ba || !ba->ba_0_org || !ba->ba_1_org)
+				{
+					kfree(nic->ba[i]);
+					kfree(nic->ba[i][j]);
+					if(ba->ba_0_org)
+						kfree(ba->ba_0_org);
+					if(ba->ba_1_org)
+						kfree(ba->ba_1_org);
+					goto end_free;
+				}
 				kfree(ba->ba_0_org);
 				kfree(ba->ba_1_org);
 				k++;
 			}
 			kfree(nic->ba[i][j]);
 		}
-		if (nic->ba[i])
-			kfree(nic->ba[i]);
+		kfree(nic->ba[i]);
 	}
+end_free:
 #endif
 
 	if (mac_control->stats_mem) {
