@@ -54,6 +54,7 @@
 #include <linux/suspend.h>
 #include <linux/percpu.h>
 #include <linux/blkdev.h>
+#include <linux/hash.h>
 
 #include "xfs_linux.h"
 
@@ -127,36 +128,6 @@ ktrace_t *pagebuf_trace_buf;
 #define pagebuf_deallocate(pb) \
 	kmem_zone_free(pagebuf_cache, (pb));
 
-/*
- * Pagebuf hashing
- */
-
-#define NBITS	8
-#define NHASH	(1<<NBITS)
-
-typedef struct {
-	struct list_head	pb_hash;
-	spinlock_t		pb_hash_lock;
-} pb_hash_t;
-
-STATIC pb_hash_t	pbhash[NHASH];
-#define pb_hash(pb)	&pbhash[pb->pb_hash_index]
-
-STATIC int
-_bhash(
-	struct block_device *bdev,
-	loff_t		base)
-{
-	int		bit, hval;
-
-	base >>= 9;
-	base ^= (unsigned long)bdev / L1_CACHE_BYTES;
-	for (bit = hval = 0; base && bit < sizeof(base) * 8; bit += NBITS) {
-		hval ^= (int)base & (NHASH-1);
-		base >>= NBITS;
-	}
-	return hval;
-}
 
 /*
  * Mapping of multi-page buffers into contiguous virtual space
@@ -484,8 +455,8 @@ _pagebuf_map_pages(
  *	are unlocked.  No I/O is implied by this call.
  */
 xfs_buf_t *
-_pagebuf_find(				/* find buffer for block	*/
-	xfs_buftarg_t		*target,/* target for block		*/
+_pagebuf_find(
+	xfs_buftarg_t		*btp,	/* block device target		*/
 	loff_t			ioff,	/* starting offset of range	*/
 	size_t			isize,	/* length of range		*/
 	page_buf_flags_t	flags,	/* PBF_TRYLOCK			*/
@@ -493,59 +464,55 @@ _pagebuf_find(				/* find buffer for block	*/
 {
 	loff_t			range_base;
 	size_t			range_length;
-	int			hval;
-	pb_hash_t		*h;
+	xfs_bufhash_t		*hash;
 	xfs_buf_t		*pb, *n;
-	int			not_locked;
 
 	range_base = (ioff << BBSHIFT);
 	range_length = (isize << BBSHIFT);
 
-	/* Ensure we never do IOs smaller than the sector size */
-	BUG_ON(range_length < (1 << target->pbr_sshift));
+	/* Check for IOs smaller than the sector size / not sector aligned */
+	ASSERT(!(range_length < (1 << btp->pbr_sshift)));
+	ASSERT(!(range_base & (loff_t)btp->pbr_smask));
 
-	/* Ensure we never do IOs that are not sector aligned */
-	BUG_ON(range_base & (loff_t)target->pbr_smask);
+	hash = &btp->bt_hash[hash_long((unsigned long)ioff, btp->bt_hashshift)];
 
-	hval = _bhash(target->pbr_bdev, range_base);
-	h = &pbhash[hval];
+	spin_lock(&hash->bh_lock);
 
-	spin_lock(&h->pb_hash_lock);
-	list_for_each_entry_safe(pb, n, &h->pb_hash, pb_hash_list) {
-		if (pb->pb_target == target &&
-		    pb->pb_file_offset == range_base &&
+	list_for_each_entry_safe(pb, n, &hash->bh_list, pb_hash_list) {
+		ASSERT(btp == pb->pb_target);
+		if (pb->pb_file_offset == range_base &&
 		    pb->pb_buffer_length == range_length) {
-			/* If we look at something bring it to the
-			 * front of the list for next time
+			/*
+			 * If we look at something bring it to the
+			 * front of the list for next time.
 			 */
 			atomic_inc(&pb->pb_hold);
-			list_move(&pb->pb_hash_list, &h->pb_hash);
+			list_move(&pb->pb_hash_list, &hash->bh_list);
 			goto found;
 		}
 	}
 
 	/* No match found */
 	if (new_pb) {
-		_pagebuf_initialize(new_pb, target, range_base,
+		_pagebuf_initialize(new_pb, btp, range_base,
 				range_length, flags);
-		new_pb->pb_hash_index = hval;
-		list_add(&new_pb->pb_hash_list, &h->pb_hash);
+		new_pb->pb_hash = hash;
+		list_add(&new_pb->pb_hash_list, &hash->bh_list);
 	} else {
 		XFS_STATS_INC(pb_miss_locked);
 	}
 
-	spin_unlock(&h->pb_hash_lock);
-	return (new_pb);
+	spin_unlock(&hash->bh_lock);
+	return new_pb;
 
 found:
-	spin_unlock(&h->pb_hash_lock);
+	spin_unlock(&hash->bh_lock);
 
 	/* Attempt to get the semaphore without sleeping,
 	 * if this does not work then we need to drop the
 	 * spinlock and do a hard attempt on the semaphore.
 	 */
-	not_locked = down_trylock(&pb->pb_sema);
-	if (not_locked) {
+	if (down_trylock(&pb->pb_sema)) {
 		if (!(flags & PBF_TRYLOCK)) {
 			/* wait for buffer ownership */
 			PB_TRACE(pb, "get_lock", 0);
@@ -867,18 +834,29 @@ void
 pagebuf_rele(
 	xfs_buf_t		*pb)
 {
-	pb_hash_t		*hash = pb_hash(pb);
+	xfs_bufhash_t		*hash = pb->pb_hash;
 
 	PB_TRACE(pb, "rele", pb->pb_relse);
 
-	if (atomic_dec_and_lock(&pb->pb_hold, &hash->pb_hash_lock)) {
+	/*
+	 * pagebuf_lookup buffers are not hashed, not delayed write,
+	 * and don't have their own release routines.  Special case.
+	 */
+	if (unlikely(!hash)) {
+		ASSERT(!pb->pb_relse);
+		if (atomic_dec_and_test(&pb->pb_hold))
+			xfs_buf_free(pb);
+		return;
+	}
+
+	if (atomic_dec_and_lock(&pb->pb_hold, &hash->bh_lock)) {
 		int		do_free = 1;
 
 		if (pb->pb_relse) {
 			atomic_inc(&pb->pb_hold);
-			spin_unlock(&hash->pb_hash_lock);
+			spin_unlock(&hash->bh_lock);
 			(*(pb->pb_relse)) (pb);
-			spin_lock(&hash->pb_hash_lock);
+			spin_lock(&hash->bh_lock);
 			do_free = 0;
 		}
 
@@ -893,10 +871,10 @@ pagebuf_rele(
 
 		if (do_free) {
 			list_del_init(&pb->pb_hash_list);
-			spin_unlock(&hash->pb_hash_lock);
+			spin_unlock(&hash->bh_lock);
 			pagebuf_free(pb);
 		} else {
-			spin_unlock(&hash->pb_hash_lock);
+			spin_unlock(&hash->bh_lock);
 		}
 	}
 }
@@ -1471,26 +1449,57 @@ pagebuf_iomove(
  */
 void
 xfs_wait_buftarg(
-	xfs_buftarg_t *target)
+	xfs_buftarg_t	*btp)
 {
-	xfs_buf_t	*pb, *n;
-	pb_hash_t	*h;
-	int		i;
+	xfs_buf_t	*bp, *n;
+	xfs_bufhash_t	*hash;
+	uint		i;
 
-	for (i = 0; i < NHASH; i++) {
-		h = &pbhash[i];
+	for (i = 0; i < (1 << btp->bt_hashshift); i++) {
+		hash = &btp->bt_hash[i];
 again:
-		spin_lock(&h->pb_hash_lock);
-		list_for_each_entry_safe(pb, n, &h->pb_hash, pb_hash_list) {
-			if (pb->pb_target == target &&
-					!(pb->pb_flags & PBF_FS_MANAGED)) {
-				spin_unlock(&h->pb_hash_lock);
+		spin_lock(&hash->bh_lock);
+		list_for_each_entry_safe(bp, n, &hash->bh_list, pb_hash_list) {
+			ASSERT(btp == bp->pb_target);
+			if (!(bp->pb_flags & PBF_FS_MANAGED)) {
+				spin_unlock(&hash->bh_lock);
 				delay(100);
 				goto again;
 			}
 		}
-		spin_unlock(&h->pb_hash_lock);
+		spin_unlock(&hash->bh_lock);
 	}
+}
+
+/*
+ * Allocate buffer hash table for a given target.
+ * For devices containing metadata (i.e. not the log/realtime devices)
+ * we need to allocate a much larger hash table.
+ */
+STATIC void
+xfs_alloc_bufhash(
+	xfs_buftarg_t		*btp,
+	int			external)
+{
+	unsigned int		i;
+
+	btp->bt_hashshift = external ? 3 : 8;	/* 8 or 256 buckets */
+	btp->bt_hashmask = (1 << btp->bt_hashshift) - 1;
+	btp->bt_hash = kmem_zalloc((1 << btp->bt_hashshift) *
+					sizeof(xfs_bufhash_t), KM_SLEEP);
+	for (i = 0; i < (1 << btp->bt_hashshift); i++) {
+		spin_lock_init(&btp->bt_hash[i].bh_lock);
+		INIT_LIST_HEAD(&btp->bt_hash[i].bh_list);
+	}
+}
+
+STATIC void
+xfs_free_bufhash(
+	xfs_buftarg_t		*btp)
+{
+	kmem_free(btp->bt_hash,
+			(1 << btp->bt_hashshift) * sizeof(xfs_bufhash_t));
+	btp->bt_hash = NULL;
 }
 
 void
@@ -1501,6 +1510,7 @@ xfs_free_buftarg(
 	xfs_flush_buftarg(btp, 1);
 	if (external)
 		xfs_blkdev_put(btp->pbr_bdev);
+	xfs_free_bufhash(btp);
 	iput(btp->pbr_mapping->host);
 	kmem_free(btp, sizeof(*btp));
 }
@@ -1547,6 +1557,16 @@ xfs_setsize_buftarg(
 }
 
 STATIC int
+block_releasepage(
+	struct page		*page,
+	int			gfp_mask)
+{
+	printk("XFS: hey, what the...?  Where'd my hold on this page go!?\n");
+	dump_stack();
+	return 1;
+}
+
+STATIC int
 xfs_mapping_buftarg(
 	xfs_buftarg_t		*btp,
 	struct block_device	*bdev)
@@ -1556,6 +1576,7 @@ xfs_mapping_buftarg(
 	struct address_space	*mapping;
 	static struct address_space_operations mapping_aops = {
 		.sync_page = block_sync_page,
+		.releasepage = block_releasepage,
 	};
 
 	inode = new_inode(bdev->bd_inode->i_sb);
@@ -1581,7 +1602,8 @@ xfs_mapping_buftarg(
 
 xfs_buftarg_t *
 xfs_alloc_buftarg(
-	struct block_device	*bdev)
+	struct block_device	*bdev,
+	int			external)
 {
 	xfs_buftarg_t		*btp;
 
@@ -1593,6 +1615,7 @@ xfs_alloc_buftarg(
 		goto error;
 	if (xfs_mapping_buftarg(btp, bdev))
 		goto error;
+	xfs_alloc_bufhash(btp, external);
 	return btp;
 
 error:
@@ -1858,8 +1881,6 @@ pagebuf_daemon_stop(void)
 int __init
 pagebuf_init(void)
 {
-	int			i;
-
 	pagebuf_cache = kmem_cache_create("xfs_buf_t", sizeof(xfs_buf_t), 0,
 			SLAB_HWCACHE_ALIGN, NULL, NULL);
 	if (pagebuf_cache == NULL) {
@@ -1878,11 +1899,6 @@ pagebuf_init(void)
 	if (pagebuf_shake == NULL) {
 		pagebuf_terminate();
 		return -ENOMEM;
-	}
-
-	for (i = 0; i < NHASH; i++) {
-		spin_lock_init(&pbhash[i].pb_hash_lock);
-		INIT_LIST_HEAD(&pbhash[i].pb_hash);
 	}
 
 	return 0;
