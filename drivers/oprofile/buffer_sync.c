@@ -58,12 +58,35 @@ static int exit_task_notify(struct notifier_block * self, unsigned long val, voi
  * must concern ourselves with. First, when a task is about to
  * exit (exit_mmap()), we should process the buffer to deal with
  * any samples in the CPU buffer, before we lose the ->mmap information
- * we need. Second, a task may unmap (part of) an executable mmap,
- * so we want to process samples before that happens too
+ * we need. It is vital to get this case correct, otherwise we can
+ * end up trying to access a freed task_struct.
  */
 static int mm_notify(struct notifier_block * self, unsigned long val, void * data)
 {
 	sync_cpu_buffers();
+	return 0;
+}
+
+
+/* Second, a task may unmap (part of) an executable mmap,
+ * so we want to process samples before that happens too. This is merely
+ * a QOI issue not a correctness one.
+ */
+static int munmap_notify(struct notifier_block * self, unsigned long val, void * data)
+{
+	/* Note that we cannot sync the buffers directly, because we might end up
+	 * taking the the mmap_sem that we hold now inside of event_buffer_read()
+	 * on a page fault, whilst holding buffer_sem - deadlock.
+	 *
+	 * This would mean a threaded reader of the event buffer, but we should
+	 * prevent it anyway.
+	 *
+	 * Delaying the work in a context that doesn't hold the mmap_sem means
+	 * that we won't lose samples from other mappings that current() may
+	 * have. Note that either way, we lose any pending samples for what is
+	 * being unmapped.
+	 */
+	schedule_work(&sync_wq);
 	return 0;
 }
 
@@ -92,7 +115,7 @@ static struct notifier_block exit_task_nb = {
 };
 
 static struct notifier_block exec_unmap_nb = {
-	.notifier_call	= mm_notify,
+	.notifier_call	= munmap_notify,
 };
 
 static struct notifier_block exit_mmap_nb = {
