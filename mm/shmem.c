@@ -6,8 +6,22 @@
  *		 2000-2001 Christoph Rohland
  *		 2000-2001 SAP AG
  *		 2002 Red Hat Inc.
+ * Copyright (C) 2002-2003 Hugh Dickins.
+ * Copyright (C) 2002-2003 VERITAS Software Corporation.
  *
- * This file is released under the GPL.
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program; if not, write to the Free Software
+ *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 /*
@@ -128,9 +142,8 @@ static struct backing_dev_info shmem_backing_dev_info = {
 	.memory_backed	= 1,	/* Does not contribute to dirty memory */
 };
 
-LIST_HEAD (shmem_inodes);
+LIST_HEAD(shmem_inodes);
 static spinlock_t shmem_ilock = SPIN_LOCK_UNLOCKED;
-atomic_t shmem_nrpages = ATOMIC_INIT(0); /* Not used right now */
 
 static void shmem_free_block(struct inode *inode)
 {
@@ -965,7 +978,7 @@ static int shmem_populate(struct vm_area_struct *vma,
 	size = (inode->i_size + PAGE_SIZE - 1) >> PAGE_SHIFT;
 	if (pgoff >= size || pgoff + (len >> PAGE_SHIFT) > size)
 		return -EINVAL;
-	
+
 	while ((long) len > 0) {
 		struct page *page = NULL;
 		int err;

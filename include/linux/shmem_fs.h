@@ -7,8 +7,6 @@
 
 #define SHMEM_NR_DIRECT 16
 
-extern atomic_t shmem_nrpages;
-
 struct shmem_inode_info {
 	spinlock_t		lock;
 	unsigned long		next_index;
