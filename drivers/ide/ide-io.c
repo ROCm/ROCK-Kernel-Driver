@@ -680,6 +680,9 @@ void ide_map_sg(ide_drive_t *drive, struct request *rq)
 	ide_hwif_t *hwif = drive->hwif;
 	struct scatterlist *sg = hwif->sg_table;
 
+	if (hwif->sg_mapped)	/* needed by ide-scsi */
+		return;
+
 	if ((rq->flags & REQ_DRIVE_TASKFILE) == 0) {
 		hwif->sg_nents = blk_rq_map_sg(drive->queue, rq, sg);
 	} else {
@@ -1219,12 +1222,15 @@ static ide_startstop_t ide_dma_timeout_retry(ide_drive_t *drive, int error)
 	HWGROUP(drive)->rq = NULL;
 
 	rq->errors = 0;
+
+	if (!rq->bio)
+		goto out;
+
 	rq->sector = rq->bio->bi_sector;
 	rq->current_nr_sectors = bio_iovec(rq->bio)->bv_len >> 9;
 	rq->hard_cur_sectors = rq->current_nr_sectors;
-	if (rq->bio)
-		rq->buffer = NULL;
-
+	rq->buffer = NULL;
+out:
 	return ret;
 }
 
