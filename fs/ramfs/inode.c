@@ -29,6 +29,7 @@
 #include <linux/init.h>
 #include <linux/string.h>
 #include <linux/locks.h>
+#include <linux/smp_lock.h>
 
 #include <asm/uaccess.h>
 
@@ -219,7 +220,9 @@ static int ramfs_unlink(struct inode * dir, struct dentry *dentry)
 	if (ramfs_empty(dentry)) {
 		struct inode *inode = dentry->d_inode;
 
+		lock_kernel();
 		inode->i_nlink--;
+		unlock_kernel();
 		dput(dentry);			/* Undo the count from "create" - this does all the work */
 		retval = 0;
 	}

@@ -871,6 +871,7 @@ static int openpromfs_unlink (struct inode *dir, struct dentry *dentry)
 	
 	name = dentry->d_name.name;
 	len = dentry->d_name.len;
+	lock_kernel();
 	for (i = 0; i < aliases_nodes; i++)
 		if ((strlen (alias_names [i]) == len)
 		    && !strncmp (name, alias_names[i], len)) {
@@ -884,6 +885,7 @@ static int openpromfs_unlink (struct inode *dir, struct dentry *dentry)
 			buffer [10 + len] = 0;
 			prom_feval (buffer);
 		}
+	unlock_kernel();
 	return 0;
 }
 

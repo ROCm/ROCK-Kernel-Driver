@@ -892,6 +892,7 @@ static int udf_unlink(struct inode * dir, struct dentry * dentry)
 	struct FileIdentDesc cfi;
 
 	retval = -ENOENT;
+	lock_kernel();
 	fi = udf_find_entry(dir, dentry, &fibh, &cfi);
 	if (!fi)
 		goto out;
@@ -926,6 +927,7 @@ end_unlink:
 		udf_release_data(fibh.ebh);
 	udf_release_data(fibh.sbh);
 out:
+	unlock_kernel();
 	return retval;
 }
 

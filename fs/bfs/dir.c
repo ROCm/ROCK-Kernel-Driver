@@ -174,6 +174,7 @@ static int bfs_unlink(struct inode * dir, struct dentry * dentry)
 	struct bfs_dirent * de;
 
 	inode = dentry->d_inode;
+	lock_kernel();
 	bh = bfs_find_entry(dir, dentry->d_name.name, dentry->d_name.len, &de);
 	if (!bh || de->ino != inode->i_ino) 
 		goto out_brelse;
@@ -194,6 +195,7 @@ static int bfs_unlink(struct inode * dir, struct dentry * dentry)
 
 out_brelse:
 	brelse(bh);
+	unlock_kernel();
 	return error;
 }
 

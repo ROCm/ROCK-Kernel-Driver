@@ -424,6 +424,7 @@ int msdos_unlink( struct inode *dir, struct dentry *dentry)
 	struct msdos_dir_entry *de;
 
 	bh = NULL;
+	lock_kernel();
 	res = msdos_find(dir, dentry->d_name.name, dentry->d_name.len,
 			&bh, &de, &ino);
 	if (res < 0)
@@ -439,6 +440,7 @@ int msdos_unlink( struct inode *dir, struct dentry *dentry)
 	mark_inode_dirty(dir);
 	res = 0;
 unlink_done:
+	unlock_kernel();
 	return res;
 }
 

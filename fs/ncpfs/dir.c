@@ -958,9 +958,11 @@ out:
 static int ncp_unlink(struct inode *dir, struct dentry *dentry)
 {
 	struct inode *inode = dentry->d_inode;
-	struct ncp_server *server = NCP_SERVER(dir);
+	struct ncp_server *server;
 	int error;
 
+	lock_kernel();
+	server = NCP_SERVER(dir);
 	DPRINTK("ncp_unlink: unlinking %s/%s\n",
 		dentry->d_parent->d_name.name, dentry->d_name.name);
 	
@@ -1011,6 +1013,7 @@ static int ncp_unlink(struct inode *dir, struct dentry *dentry)
 	}
 		
 out:
+	unlock_kernel();
 	return error;
 }
 

@@ -871,6 +871,7 @@ static int nfs_unlink(struct inode *dir, struct dentry *dentry)
 	dfprintk(VFS, "NFS: unlink(%s/%ld, %s)\n", dir->i_sb->s_id,
 		dir->i_ino, dentry->d_name.name);
 
+	lock_kernel();
 	error = nfs_sillyrename(dir, dentry);
 	if (error && error != -EBUSY) {
 		error = nfs_safe_remove(dentry);
@@ -878,6 +879,7 @@ static int nfs_unlink(struct inode *dir, struct dentry *dentry)
 			nfs_renew_times(dentry);
 		}
 	}
+	unlock_kernel();
 	return error;
 }
 

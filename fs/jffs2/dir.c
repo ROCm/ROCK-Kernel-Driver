@@ -425,7 +425,11 @@ static int jffs2_do_unlink(struct inode *dir_i, struct dentry *dentry, int renam
 
 static int jffs2_unlink(struct inode *dir_i, struct dentry *dentry)
 {
-	return jffs2_do_unlink(dir_i, dentry, 0);
+	int res;
+	lock_kernel();
+	res = jffs2_do_unlink(dir_i, dentry, 0);
+	unlock_kernel();
+	return res;
 }
 /***********************************************************************/
 

@@ -862,9 +862,12 @@ static int ext3_unlink(struct inode * dir, struct dentry *dentry)
 	struct ext3_dir_entry_2 * de;
 	handle_t *handle;
 
+	lock_kernel();
 	handle = ext3_journal_start(dir, EXT3_DELETE_TRANS_BLOCKS);
-	if (IS_ERR(handle))
+	if (IS_ERR(handle)) {
+		unlock_kernel();
 		return PTR_ERR(handle);
+	}
 
 	if (IS_SYNC(dir))
 		handle->h_sync = 1;
@@ -902,6 +905,7 @@ static int ext3_unlink(struct inode * dir, struct dentry *dentry)
 
 end_unlink:
 	ext3_journal_stop(handle, dir);
+	unlock_kernel();
 	brelse (bh);
 	return retval;
 }
@@ -1129,7 +1133,7 @@ struct inode_operations ext3_dir_inode_operations = {
 	create:		ext3_create,
 	lookup:		ext3_lookup,
 	link:		ext3_link,		/* BKL held */
-	unlink:		ext3_unlink,		/* BKL held */
+	unlink:		ext3_unlink,
 	symlink:	ext3_symlink,		/* BKL held */
 	mkdir:		ext3_mkdir,		/* BKL held */
 	rmdir:		ext3_rmdir,		/* BKL held */

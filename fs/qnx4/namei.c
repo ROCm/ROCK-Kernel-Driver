@@ -205,9 +205,11 @@ int qnx4_unlink(struct inode *dir, struct dentry *dentry)
 	int ino;
 
 	QNX4DEBUG(("qnx4: qnx4_unlink [%s]\n", dentry->d_name.name));
+	lock_kernel();
 	bh = qnx4_find_entry(dentry->d_name.len, dir, dentry->d_name.name,
 			     &de, &ino);
 	if (bh == NULL) {
+		unlock_kernel();
 		return -ENOENT;
 	}
 	inode = dentry->d_inode;
@@ -233,7 +235,8 @@ int qnx4_unlink(struct inode *dir, struct dentry *dentry)
 	mark_inode_dirty(inode);
 	retval = 0;
 
-      end_unlink:
+end_unlink:
+	unlock_kernel();
 	brelse(bh);
 
 	return retval;

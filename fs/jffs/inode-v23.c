@@ -912,12 +912,14 @@ jffs_unlink(struct inode *dir, struct dentry *dentry)
 	struct jffs_control *c = (struct jffs_control *)dir->i_sb->u.generic_sbp;
 	int ret; 
 
+	lock_kernel();
 	D3(printk("***jffs_unlink()\n"));
 	D3(printk (KERN_NOTICE "unlink(): down biglock\n"));
 	down(&c->fmc->biglock);
 	ret = jffs_remove(dir, dentry, 0);
 	D3(printk (KERN_NOTICE "unlink(): up biglock\n"));
 	up(&c->fmc->biglock);
+	unlock_kernel();
 	return ret;
 }
 

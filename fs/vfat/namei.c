@@ -1112,9 +1112,12 @@ int vfat_unlink(struct inode *dir, struct dentry* dentry)
 	struct msdos_dir_entry *de;
 
 	PRINTK1(("vfat_unlink: %s\n", dentry->d_name.name));
+	lock_kernel();
 	res = vfat_find(dir,&dentry->d_name,&sinfo,&bh,&de);
-	if (res < 0)
+	if (res < 0) {
+		unlock_kernel();
 		return res;
+	}
 	dentry->d_inode->i_nlink = 0;
 	dentry->d_inode->i_mtime = CURRENT_TIME;
 	dentry->d_inode->i_atime = CURRENT_TIME;
@@ -1122,6 +1125,7 @@ int vfat_unlink(struct inode *dir, struct dentry* dentry)
 	mark_inode_dirty(dentry->d_inode);
 	/* releases bh */
 	vfat_remove_entry(dir,&sinfo,bh,de);
+	unlock_kernel();
 
 	return res;
 }

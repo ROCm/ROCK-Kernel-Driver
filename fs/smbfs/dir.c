@@ -545,12 +545,14 @@ smb_unlink(struct inode *dir, struct dentry *dentry)
 	/*
 	 * Close the file if it's open.
 	 */
+	lock_kernel();
 	smb_close(dentry->d_inode);
 
 	smb_invalid_dir_cache(dir);
 	error = smb_proc_unlink(dentry);
 	if (!error)
 		smb_renew_times(dentry);
+	unlock_kernel();
 	return error;
 }
 

@@ -180,7 +180,9 @@ static int driverfs_unlink(struct inode *dir, struct dentry *dentry)
 	if (driverfs_empty(dentry)) {
 		struct inode *inode = dentry->d_inode;
 
+		lock_kernel();
 		inode->i_nlink--;
+		unlock_kernel();
 		dput(dentry);
 		error = 0;
 	}

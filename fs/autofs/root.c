@@ -332,18 +332,27 @@ static int autofs_root_unlink(struct inode *dir, struct dentry *dentry)
 	unsigned int n;
 
 	/* This allows root to remove symlinks */
-	if ( !autofs_oz_mode(sbi) && !capable(CAP_SYS_ADMIN) )
+	lock_kernel();
+	if ( !autofs_oz_mode(sbi) && !capable(CAP_SYS_ADMIN) ) {
+		unlock_kernel();
 		return -EACCES;
+	}
 
 	ent = autofs_hash_lookup(dh, &dentry->d_name);
-	if ( !ent )
+	if ( !ent ) {
+		unlock_kernel();
 		return -ENOENT;
+	}
 
 	n = ent->ino - AUTOFS_FIRST_SYMLINK;
-	if ( n >= AUTOFS_MAX_SYMLINKS )
+	if ( n >= AUTOFS_MAX_SYMLINKS ) {
+		unlock_kernel();
 		return -EISDIR;	/* It's a directory, dummy */
-	if ( !test_bit(n,sbi->symlink_bitmap) )
+	}
+	if ( !test_bit(n,sbi->symlink_bitmap) ) {
+		unlock_kernel();
 		return -EINVAL;	/* Nonexistent symlink?  Shouldn't happen */
+	}
 	
 	dentry->d_time = (unsigned long)(struct autofs_dirhash *)NULL;
 	autofs_hash_delete(ent);
@@ -351,6 +360,7 @@ static int autofs_root_unlink(struct inode *dir, struct dentry *dentry)
 	kfree(sbi->symlink[n].data);
 	d_drop(dentry);
 	
+	unlock_kernel();
 	return 0;
 }
 

@@ -376,8 +376,11 @@ static int autofs4_dir_unlink(struct inode *dir, struct dentry *dentry)
 	struct autofs_info *ino = autofs4_dentry_ino(dentry);
 	
 	/* This allows root to remove symlinks */
-	if ( !autofs4_oz_mode(sbi) && !capable(CAP_SYS_ADMIN) )
+	lock_kernel();
+	if ( !autofs4_oz_mode(sbi) && !capable(CAP_SYS_ADMIN) ) {
+		unlock_kernel();
 		return -EACCES;
+	}
 
 	dput(ino->dentry);
 
@@ -387,6 +390,8 @@ static int autofs4_dir_unlink(struct inode *dir, struct dentry *dentry)
 	dir->i_mtime = CURRENT_TIME;
 
 	d_drop(dentry);
+
+	unlock_kernel();
 	
 	return 0;
 }

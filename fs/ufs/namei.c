@@ -228,6 +228,7 @@ static int ufs_unlink(struct inode * dir, struct dentry *dentry)
 	struct ufs_dir_entry * de;
 	int err = -ENOENT;
 
+	lock_kernel();
 	de = ufs_find_entry (dentry, &bh);
 	if (!de)
 		goto out;
@@ -240,6 +241,7 @@ static int ufs_unlink(struct inode * dir, struct dentry *dentry)
 	ufs_dec_count(inode);
 	err = 0;
 out:
+	unlock_kernel();
 	return err;
 }
 

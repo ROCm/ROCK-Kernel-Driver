@@ -253,13 +253,17 @@ affs_lookup(struct inode *dir, struct dentry *dentry)
 int
 affs_unlink(struct inode *dir, struct dentry *dentry)
 {
+	int res;
 	pr_debug("AFFS: unlink(dir=%d, \"%.*s\")\n", (u32)dir->i_ino,
 		 (int)dentry->d_name.len, dentry->d_name.name);
 
 	if (!dentry->d_inode)
 		return -ENOENT;
 
-	return affs_remove_header(dentry);
+	lock_kernel();
+	res = affs_remove_header(dentry);
+	unlock_kernel();
+	return res;
 }
 
 int

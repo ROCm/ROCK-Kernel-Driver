@@ -3030,19 +3030,30 @@ static int devfs_unlink (struct inode *dir, struct dentry *dentry)
     struct inode *inode = dentry->d_inode;
     struct fs_info *fs_info = dir->i_sb->u.generic_sbp;
 
+    lock_kernel();
     de = get_devfs_entry_from_vfs_inode (inode);
     DPRINTK (DEBUG_I_UNLINK, "(%s): de: %p\n", dentry->d_name.name, de);
-    if (de == NULL) return -ENOENT;
-    if (!de->vfs_deletable) return -EPERM;
+    if (de == NULL) {
+	unlock_kernel();
+	return -ENOENT;
+    }
+    if (!de->vfs_deletable) {
+	unlock_kernel();
+	return -EPERM;
+    }
     write_lock (&de->parent->u.dir.lock);
     unhooked = _devfs_unhook (de);
     write_unlock (&de->parent->u.dir.lock);
-    if (!unhooked) return -ENOENT;
+    if (!unhooked) {
+	unlock_kernel();
+	return -ENOENT;
+    }
     if ( !is_devfsd_or_child (fs_info) )
 	devfsd_notify_de (de, DEVFSD_NOTIFY_DELETE, inode->i_mode,
 			  inode->i_uid, inode->i_gid, fs_info, 0);
     free_dentry (de);
     devfs_put (de);
+    unlock_kernel();
     return 0;
 }   /*  End Function devfs_unlink  */
 

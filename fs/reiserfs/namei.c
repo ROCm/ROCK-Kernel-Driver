@@ -817,6 +817,7 @@ static int reiserfs_unlink (struct inode * dir, struct dentry *dentry)
        two stat datas */
     jbegin_count = JOURNAL_PER_BALANCE_CNT * 2 + 2;
 
+    lock_kernel();
     journal_begin(&th, dir->i_sb, jbegin_count) ;
     windex = push_journal_writer("reiserfs_unlink") ;
 	
@@ -865,6 +866,7 @@ static int reiserfs_unlink (struct inode * dir, struct dentry *dentry)
     pop_journal_writer(windex) ;
     journal_end(&th, dir->i_sb, jbegin_count) ;
     reiserfs_check_path(&path) ;
+    unlock_kernel();
     return 0;
 
  end_unlink:
@@ -872,6 +874,7 @@ static int reiserfs_unlink (struct inode * dir, struct dentry *dentry)
     pop_journal_writer(windex) ;
     journal_end(&th, dir->i_sb, jbegin_count) ;
     reiserfs_check_path(&path) ;
+    unlock_kernel();
     return retval;
 }
 

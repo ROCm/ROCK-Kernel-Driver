@@ -1486,9 +1486,7 @@ int vfs_unlink(struct inode *dir, struct dentry *dentry)
 	if (d_mountpoint(dentry))
 		error = -EBUSY;
 	else {
-		lock_kernel();
 		error = dir->i_op->unlink(dir, dentry);
-		unlock_kernel();
 		if (!error)
 			d_delete(dentry);
 	}

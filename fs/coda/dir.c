@@ -425,6 +425,7 @@ int coda_unlink(struct inode *dir, struct dentry *de)
 	const char *name = de->d_name.name;
 	int len = de->d_name.len;
 
+	lock_kernel();
 	coda_vfs_stat.unlink++;
 
         CDEBUG(D_INODE, " %s in %s, dirino %ld\n", name , 
@@ -433,11 +434,13 @@ int coda_unlink(struct inode *dir, struct dentry *de)
         error = venus_remove(dir->i_sb, coda_i2f(dir), name, len);
         if ( error ) {
                 CDEBUG(D_INODE, "upc returned error %d\n", error);
+		unlock_kernel();
                 return error;
         }
 
 	coda_dir_changed(dir, 0);
 	de->d_inode->i_nlink--;
+	unlock_kernel();
 
         return 0;
 }

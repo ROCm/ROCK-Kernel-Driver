@@ -315,11 +315,13 @@ static int dbl_unlink(struct inode * dir, struct dentry *dentry)
 {
 	int error;
 
+	lock_kernel();
 	error = hfs_unlink(dir, dentry);
 	if ((error == -ENOENT) && is_hdr(dir, dentry->d_name.name,
 					 dentry->d_name.len)) {
 		error = -EPERM;
 	}
+	unlock_kernel();
 	return error;
 }
 
