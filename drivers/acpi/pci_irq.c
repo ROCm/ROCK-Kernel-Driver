@@ -288,7 +288,7 @@ acpi_pci_irq_derive (
 	while (!irq && (bridge = bridge->bus->self)) {
 		pin = (pin + PCI_SLOT(bridge->devfn)) % 4;
 		irq = acpi_pci_irq_lookup(0, bridge->bus->number, PCI_SLOT(bridge->devfn), pin);
-	};
+	}
 
 	if (!irq) {
 		ACPI_DEBUG_PRINT((ACPI_DB_WARN, "Unable to derive IRQ for device %s\n", dev->slot_name));

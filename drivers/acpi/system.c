@@ -23,8 +23,6 @@
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  */
 
-#define ACPI_C
-
 #include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
