@@ -46,6 +46,7 @@ struct mmc_card {
 #define MMC_STATE_PRESENT	(1<<0)
 #define MMC_STATE_DEAD		(1<<1)
 	u32			raw_cid[4];	/* raw card CID */
+	u32			raw_csd[4];	/* raw card CSD */
 	struct mmc_cid		cid;		/* card identification */
 	struct mmc_csd		csd;		/* card specific */
 };

@@ -523,6 +523,8 @@ static void mmc_read_csds(struct mmc_host *host)
 			continue;
 		}
 
+		memcpy(card->raw_csd, cmd.resp, sizeof(card->raw_csd));
+
 		mmc_decode_csd(&card->csd, cmd.resp);
 		mmc_decode_cid(&card->cid, card->raw_cid);
 	}
