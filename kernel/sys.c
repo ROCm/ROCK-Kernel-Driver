@@ -456,7 +456,7 @@ asmlinkage long sys_reboot(int magic1, int magic2, unsigned int cmd, void __user
 
 #ifdef CONFIG_SOFTWARE_SUSPEND
 	case LINUX_REBOOT_CMD_SW_SUSPEND:
-		if (!pm_suspend(PM_SUSPEND_DISK))
+		if (!software_suspend())
 			break;
 		do_exit(0);
 		break;
