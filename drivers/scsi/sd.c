@@ -574,8 +574,9 @@ static int sd_ioctl(struct inode * inode, struct file * filp,
 	 * may try and take the device offline, in which case all further
 	 * access to the device is prohibited.
 	 */
-	if (!scsi_block_when_processing_errors(sdp))
-		return -ENODEV;
+	error = scsi_nonblockable_ioctl(sdp, cmd, p, filp);
+	if (!scsi_block_when_processing_errors(sdp) || !error)
+		return error;
 
 	if (cmd == HDIO_GETGEO) {
 		if (!arg)

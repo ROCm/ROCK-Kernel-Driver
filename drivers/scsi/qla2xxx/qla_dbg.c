@@ -712,7 +712,6 @@ qla2100_fw_dump(scsi_qla_host_t *ha, int hardware_locked)
 
 		/* Reset the ISP. */
 		WRT_REG_WORD(&reg->ctrl_status, CSR_ISP_SOFT_RESET);
-		RD_REG_WORD(&reg->ctrl_status);		/* PCI Posting. */
 	}
 
 	for (cnt = 30000; RD_MAILBOX_REG(ha, reg, 0) != 0 &&
@@ -746,7 +745,6 @@ qla2100_fw_dump(scsi_qla_host_t *ha, int hardware_locked)
 
 			/* Release RISC. */
 			WRT_REG_WORD(&reg->hccr, HCCR_RELEASE_RISC);
-			RD_REG_WORD(&reg->hccr);	/* PCI Posting. */
 		}
 	}
 

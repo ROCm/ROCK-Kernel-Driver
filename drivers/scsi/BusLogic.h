@@ -1169,46 +1169,6 @@ struct SCSI_Inquiry {
 	unsigned char ProductRevisionLevel[4];	/* Bytes 32-35 */
 };
 
-/*
-  BusLogic_AcquireHostAdapterLock acquires exclusive access to Host Adapter.
-*/
-
-static inline void BusLogic_AcquireHostAdapterLock(struct BusLogic_HostAdapter *HostAdapter)
-{
-	spin_lock_irq(HostAdapter->SCSI_Host->host_lock);
-}
-
-/*
-  BusLogic_ReleaseHostAdapterLock releases exclusive access to Host Adapter.
-*/
-
-static inline void BusLogic_ReleaseHostAdapterLock(struct BusLogic_HostAdapter *HostAdapter)
-{
-	spin_unlock_irq(HostAdapter->SCSI_Host->host_lock);
-}
-
-
-/*
-  BusLogic_AcquireHostAdapterLockIH acquires exclusive access to Host Adapter,
-  but is only called from the interrupt handler.
-*/
-
-static inline void BusLogic_AcquireHostAdapterLockIH(struct BusLogic_HostAdapter *HostAdapter, unsigned long *ProcessorFlags)
-{
-	spin_lock_irqsave(HostAdapter->SCSI_Host->host_lock, *ProcessorFlags);
-}
-
-
-/*
-  BusLogic_ReleaseHostAdapterLockIH releases exclusive access to Host Adapter,
-  but is only called from the interrupt handler.
-*/
-
-static inline void BusLogic_ReleaseHostAdapterLockIH(struct BusLogic_HostAdapter *HostAdapter, unsigned long *ProcessorFlags)
-{
-	spin_unlock_irqrestore(HostAdapter->SCSI_Host->host_lock, *ProcessorFlags);
-}
-
 
 /*
   Define functions to provide an abstraction for reading and writing the
