@@ -40,7 +40,6 @@
 #include <asm/naca.h>
 #include <asm/pci_dma.h>
 
-#include "xics.h"
 #include "open_pic.h"
 #include "pci.h"
 
@@ -402,7 +401,7 @@ alloc_phb(struct device_node *dev, char *model, unsigned int addr_size_words)
 	* Python
 	***************************************************************/
 	if (strstr(model, "Python")) {
-		unsigned long chip_regs;
+		void *chip_regs;
 		volatile u32 *tmp, i;
 
 		PPCDBG(PPCDBG_PHBINIT, "\tCreate python\n");
@@ -607,10 +606,6 @@ pSeries_pcibios_fixup(void)
 	pci_for_each_dev(dev) {
 		pci_read_irq_line(dev);
 		PPCDBGCALL(PPCDBG_PHBINIT, dumpPci_Dev(dev) );
-	}
-
-	if (naca->interrupt_controller == IC_PPC_XIC) {
-		xics_isa_init(); 
 	}
 }
 

@@ -1722,9 +1722,9 @@ out:	if (data)
 
 struct loop_info32 {
 	int			lo_number;      /* ioctl r/o */
-	__kernel_dev_t32	lo_device;      /* ioctl r/o */
+	compat_dev_t	lo_device;      /* ioctl r/o */
 	unsigned int		lo_inode;       /* ioctl r/o */
-	__kernel_dev_t32	lo_rdevice;     /* ioctl r/o */
+	compat_dev_t	lo_rdevice;     /* ioctl r/o */
 	int			lo_offset;
 	int			lo_encrypt_type;
 	int			lo_encrypt_key_size;    /* ioctl w/o */
@@ -2054,7 +2054,7 @@ static int do_smb_getmountuid(unsigned int fd, unsigned int cmd, unsigned long a
 	set_fs(old_fs);
 
 	if (err >= 0)
-		err = put_user(kuid, (__kernel_uid_t32 *)arg);
+		err = put_user(kuid, (compat_uid_t *)arg);
 
 	return err;
 }
@@ -3656,7 +3656,7 @@ struct ioctl_trans {
 #define HANDLE_IOCTL(cmd,handler) { cmd, (unsigned long)handler, 0 }
 
 #define AUTOFS_IOC_SETTIMEOUT32 _IOWR(0x93,0x64,unsigned int)
-#define SMB_IOC_GETMOUNTUID_32 _IOR('u', 1, __kernel_uid_t32)
+#define SMB_IOC_GETMOUNTUID_32 _IOR('u', 1, compat_uid_t)
 
 static struct ioctl_trans ioctl_translations[] = {
     /* List here explicitly which ioctl's need translation,
@@ -3705,6 +3705,7 @@ COMPATIBLE_IOCTL(TIOCSSERIAL),
 COMPATIBLE_IOCTL(TIOCSERGETLSR),
 COMPATIBLE_IOCTL(TIOCSLTC),
 /* Big F */
+#if 0
 COMPATIBLE_IOCTL(FBIOGET_VSCREENINFO),
 COMPATIBLE_IOCTL(FBIOPUT_VSCREENINFO),
 COMPATIBLE_IOCTL(FBIOPAN_DISPLAY),
@@ -3715,6 +3716,7 @@ COMPATIBLE_IOCTL(FBIOGET_CURSORSTATE),
 COMPATIBLE_IOCTL(FBIOPUT_CURSORSTATE),
 COMPATIBLE_IOCTL(FBIOGET_CON2FBMAP),
 COMPATIBLE_IOCTL(FBIOPUT_CON2FBMAP),
+#endif
 #if 0
 COMPATIBLE_IOCTL(FBIOBLANK),
 #endif
@@ -3763,6 +3765,8 @@ COMPATIBLE_IOCTL(BLKRRPART),
 COMPATIBLE_IOCTL(BLKFLSBUF),
 COMPATIBLE_IOCTL(BLKSECTSET),
 COMPATIBLE_IOCTL(BLKSSZGET),
+COMPATIBLE_IOCTL(BLKRASET),
+COMPATIBLE_IOCTL(BLKFRASET),
 /* RAID */
 COMPATIBLE_IOCTL(RAID_VERSION),
 COMPATIBLE_IOCTL(GET_ARRAY_INFO),
@@ -4350,6 +4354,8 @@ HANDLE_IOCTL(SIOCGSTAMP, do_siocgstamp),
 HANDLE_IOCTL(HDIO_GETGEO, hdio_getgeo),
 HANDLE_IOCTL(HDIO_GETGEO_BIG_RAW, hdio_getgeo_big),
 HANDLE_IOCTL(BLKGETSIZE, w_long),
+HANDLE_IOCTL(BLKRAGET, w_long),
+HANDLE_IOCTL(BLKFRAGET, w_long),
 HANDLE_IOCTL(0x1260, broken_blkgetsize),
 HANDLE_IOCTL(BLKSECTGET, w_long),
 HANDLE_IOCTL(BLKPG, blkpg_ioctl_trans),
@@ -4391,9 +4397,11 @@ HANDLE_IOCTL(GIO_FONTX, do_fontx_ioctl),
 HANDLE_IOCTL(PIO_UNIMAP, do_unimap_ioctl),
 HANDLE_IOCTL(GIO_UNIMAP, do_unimap_ioctl),
 HANDLE_IOCTL(KDFONTOP, do_kdfontop_ioctl),
+#if 0
 HANDLE_IOCTL(FBIOGET_FSCREENINFO, do_fbioget_fscreeninfo_ioctl),
 HANDLE_IOCTL(FBIOGETCMAP, do_fbiogetcmap_ioctl),
 HANDLE_IOCTL(FBIOPUTCMAP, do_fbioputcmap_ioctl),
+#endif
 #endif
 HANDLE_IOCTL(EXT2_IOC32_GETFLAGS, do_ext2_ioctl),
 HANDLE_IOCTL(EXT2_IOC32_SETFLAGS, do_ext2_ioctl),
