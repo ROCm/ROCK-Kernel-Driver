@@ -181,7 +181,7 @@ static void truncate_complete_page(struct page *page)
 	if (PagePrivate(page))
 		do_invalidatepage(page, 0);
 
-	ClearPageDirty(page);
+	clear_page_dirty(page);
 	ClearPageUptodate(page);
 	remove_from_page_cache(page);
 	page_cache_release(page);
@@ -280,7 +280,7 @@ static void clean_list_pages(struct address_space *mapping,
 	for (curr = head->next; curr != head; curr = curr->next) {
 		page = list_entry(curr, struct page, list);
 		if (page->index > start)
-			ClearPageDirty(page);
+			clear_page_dirty(page);
 	}
 }
 
@@ -348,7 +348,7 @@ static inline int invalidate_this_page2(struct address_space * mapping,
 		} else
 			unlocked = 0;
 
-		ClearPageDirty(page);
+		clear_page_dirty(page);
 		ClearPageUptodate(page);
 	}
 
@@ -557,8 +557,8 @@ int add_to_page_cache(struct page *page,
 	error = radix_tree_insert(&mapping->page_tree, offset, page);
 	if (!error) {
 		SetPageLocked(page);
-		ClearPageDirty(page);
 		___add_to_page_cache(page, mapping, offset);
+		ClearPageDirty(page);
 	} else {
 		page_cache_release(page);
 	}

@@ -1055,17 +1055,17 @@ static snd_pcm_hardware_t snd_cs46xx_playback =
 	formats:		(SNDRV_PCM_FMTBIT_S8 | SNDRV_PCM_FMTBIT_U8 |
 				 SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S16_BE |
 				 SNDRV_PCM_FMTBIT_U16_LE | SNDRV_PCM_FMTBIT_U16_BE),
-	rates:			SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
-	rate_min:		5500,
-	rate_max:		48000,
-	channels_min:		1,
-	channels_max:		2,
-	buffer_bytes_max:	(256 * 1024),
-	period_bytes_min:	CS46XX_PERIOD_SIZE,
-	period_bytes_max:	CS46XX_PERIOD_SIZE,
-	periods_min:		CS46XX_FRAGS,
-	periods_max:		1024,
-	fifo_size:		0,
+	.rates			= SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
+	.rate_min		= 5500,
+	.rate_max		= 48000,
+	.channels_min		= 1,
+	.channels_max		= 2,
+	.buffer_bytes_max	= (256 * 1024),
+	.period_bytes_min	= CS46XX_PERIOD_SIZE,
+	.period_bytes_max	= CS46XX_PERIOD_SIZE,
+	.periods_min		= CS46XX_FRAGS,
+	.periods_max		= 1024,
+	.fifo_size		= 0,
 };
 
 static snd_pcm_hardware_t snd_cs46xx_capture =
@@ -1074,18 +1074,18 @@ static snd_pcm_hardware_t snd_cs46xx_capture =
 				 SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
 				 SNDRV_PCM_INFO_RESUME),
-	formats:		SNDRV_PCM_FMTBIT_S16_LE,
-	rates:			SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
-	rate_min:		5500,
-	rate_max:		48000,
-	channels_min:		2,
-	channels_max:		2,
-	buffer_bytes_max:	(256 * 1024),
-	period_bytes_min:	CS46XX_PERIOD_SIZE,
-	period_bytes_max:	CS46XX_PERIOD_SIZE,
-	periods_min:		CS46XX_FRAGS,
-	periods_max:		1024,
-	fifo_size:		0,
+	.formats		= SNDRV_PCM_FMTBIT_S16_LE,
+	.rates			= SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
+	.rate_min		= 5500,
+	.rate_max		= 48000,
+	.channels_min		= 2,
+	.channels_max		= 2,
+	.buffer_bytes_max	= (256 * 1024),
+	.period_bytes_min	= CS46XX_PERIOD_SIZE,
+	.period_bytes_max	= CS46XX_PERIOD_SIZE,
+	.periods_min		= CS46XX_FRAGS,
+	.periods_max		= 1024,
+	.fifo_size		= 0,
 };
 
 static int snd_cs46xx_playback_open(snd_pcm_substream_t * substream)
@@ -1141,49 +1141,49 @@ static int snd_cs46xx_capture_close(snd_pcm_substream_t * substream)
 }
 
 snd_pcm_ops_t snd_cs46xx_playback_ops = {
-	open:			snd_cs46xx_playback_open,
-	close:			snd_cs46xx_playback_close,
-	ioctl:			snd_pcm_lib_ioctl,
-	hw_params:		snd_cs46xx_playback_hw_params,
-	hw_free:		snd_cs46xx_playback_hw_free,
-	prepare:		snd_cs46xx_playback_prepare,
-	trigger:		snd_cs46xx_playback_trigger,
-	pointer:		snd_cs46xx_playback_direct_pointer,
+	.open			= snd_cs46xx_playback_open,
+	.close			= snd_cs46xx_playback_close,
+	.ioctl			= snd_pcm_lib_ioctl,
+	.hw_params		= snd_cs46xx_playback_hw_params,
+	.hw_free		= snd_cs46xx_playback_hw_free,
+	.prepare		= snd_cs46xx_playback_prepare,
+	.trigger		= snd_cs46xx_playback_trigger,
+	.pointer		= snd_cs46xx_playback_direct_pointer,
 };
 
 snd_pcm_ops_t snd_cs46xx_playback_indirect_ops = {
-	open:			snd_cs46xx_playback_open,
-	close:			snd_cs46xx_playback_close,
-	ioctl:			snd_pcm_lib_ioctl,
-	hw_params:		snd_cs46xx_playback_hw_params,
-	hw_free:		snd_cs46xx_playback_hw_free,
-	prepare:		snd_cs46xx_playback_prepare,
-	trigger:		snd_cs46xx_playback_trigger,
-	copy:			snd_cs46xx_playback_copy,
-	pointer:		snd_cs46xx_playback_indirect_pointer,
+	.open			= snd_cs46xx_playback_open,
+	.close			= snd_cs46xx_playback_close,
+	.ioctl			= snd_pcm_lib_ioctl,
+	.hw_params		= snd_cs46xx_playback_hw_params,
+	.hw_free		= snd_cs46xx_playback_hw_free,
+	.prepare		= snd_cs46xx_playback_prepare,
+	.trigger		= snd_cs46xx_playback_trigger,
+	.copy			= snd_cs46xx_playback_copy,
+	.pointer		= snd_cs46xx_playback_indirect_pointer,
 };
 
 snd_pcm_ops_t snd_cs46xx_capture_ops = {
-	open:			snd_cs46xx_capture_open,
-	close:			snd_cs46xx_capture_close,
-	ioctl:			snd_pcm_lib_ioctl,
-	hw_params:		snd_cs46xx_capture_hw_params,
-	hw_free:		snd_cs46xx_capture_hw_free,
-	prepare:		snd_cs46xx_capture_prepare,
-	trigger:		snd_cs46xx_capture_trigger,
-	pointer:		snd_cs46xx_capture_direct_pointer,
+	.open			= snd_cs46xx_capture_open,
+	.close			= snd_cs46xx_capture_close,
+	.ioctl			= snd_pcm_lib_ioctl,
+	.hw_params		= snd_cs46xx_capture_hw_params,
+	.hw_free		= snd_cs46xx_capture_hw_free,
+	.prepare		= snd_cs46xx_capture_prepare,
+	.trigger		= snd_cs46xx_capture_trigger,
+	.pointer		= snd_cs46xx_capture_direct_pointer,
 };
 
 snd_pcm_ops_t snd_cs46xx_capture_indirect_ops = {
-	open:			snd_cs46xx_capture_open,
-	close:			snd_cs46xx_capture_close,
-	ioctl:			snd_pcm_lib_ioctl,
-	hw_params:		snd_cs46xx_capture_hw_params,
-	hw_free:		snd_cs46xx_capture_hw_free,
-	prepare:		snd_cs46xx_capture_prepare,
-	trigger:		snd_cs46xx_capture_trigger,
-	copy:			snd_cs46xx_capture_copy,
-	pointer:		snd_cs46xx_capture_indirect_pointer,
+	.open			= snd_cs46xx_capture_open,
+	.close			= snd_cs46xx_capture_close,
+	.ioctl			= snd_pcm_lib_ioctl,
+	.hw_params		= snd_cs46xx_capture_hw_params,
+	.hw_free		= snd_cs46xx_capture_hw_free,
+	.prepare		= snd_cs46xx_capture_prepare,
+	.trigger		= snd_cs46xx_capture_trigger,
+	.copy			= snd_cs46xx_capture_copy,
+	.pointer		= snd_cs46xx_capture_indirect_pointer,
 };
 
 static void snd_cs46xx_pcm_free(snd_pcm_t *pcm)
@@ -1266,20 +1266,20 @@ static int snd_cs46xx_vol_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * 
 
 static snd_kcontrol_new_t snd_cs46xx_controls[] __devinitdata = {
 {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "DAC Volume",
-	info: snd_cs46xx_vol_info,
-	get: snd_cs46xx_vol_get,
-	put: snd_cs46xx_vol_put,
-	private_value: BA1_PVOL,
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "DAC Volume",
+	.info = snd_cs46xx_vol_info,
+	.get = snd_cs46xx_vol_get,
+	.put = snd_cs46xx_vol_put,
+	.private_value = BA1_PVOL,
 },
 {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "ADC Volume",
-	info: snd_cs46xx_vol_info,
-	get: snd_cs46xx_vol_get,
-	put: snd_cs46xx_vol_put,
-	private_value: BA1_CVOL,
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "ADC Volume",
+	.info = snd_cs46xx_vol_info,
+	.get = snd_cs46xx_vol_get,
+	.put = snd_cs46xx_vol_put,
+	.private_value = BA1_CVOL,
 }};
 
 int __devinit snd_cs46xx_mixer(cs46xx_t *chip)
@@ -1465,16 +1465,16 @@ static void snd_cs46xx_midi_output_trigger(snd_rawmidi_substream_t * substream, 
 
 static snd_rawmidi_ops_t snd_cs46xx_midi_output =
 {
-	open:           snd_cs46xx_midi_output_open,
-	close:          snd_cs46xx_midi_output_close,
-	trigger:        snd_cs46xx_midi_output_trigger,
+	.open           = snd_cs46xx_midi_output_open,
+	.close          = snd_cs46xx_midi_output_close,
+	.trigger        = snd_cs46xx_midi_output_trigger,
 };
 
 static snd_rawmidi_ops_t snd_cs46xx_midi_input =
 {
-	open:           snd_cs46xx_midi_input_open,
-	close:          snd_cs46xx_midi_input_close,
-	trigger:        snd_cs46xx_midi_input_trigger,
+	.open           = snd_cs46xx_midi_input_open,
+	.close          = snd_cs46xx_midi_input_close,
+	.trigger        = snd_cs46xx_midi_input_trigger,
 };
 
 int __devinit snd_cs46xx_midi(cs46xx_t *chip, int device, snd_rawmidi_t **rrawmidi)
@@ -1628,7 +1628,7 @@ static long snd_cs46xx_io_read(snd_info_entry_t *entry, void *file_private_data,
 }
 
 static struct snd_info_entry_ops snd_cs46xx_proc_io_ops = {
-	read: snd_cs46xx_io_read,
+	.read = snd_cs46xx_io_read,
 };
 
 static int __devinit snd_cs46xx_proc_init(snd_card_t * card, cs46xx_t *chip)
@@ -2271,7 +2271,7 @@ int __devinit snd_cs46xx_create(snd_card_t * card,
 	struct cs_card_type *cp;
 	u16 ss_card, ss_vendor;
 	static snd_device_ops_t ops = {
-		dev_free:	snd_cs46xx_dev_free,
+		.dev_free	= snd_cs46xx_dev_free,
 	};
 	
 	*rchip = NULL;

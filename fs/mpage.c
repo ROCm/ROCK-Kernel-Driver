@@ -460,6 +460,9 @@ page_is_mapped:
 			clear_buffer_dirty(bh);
 			bh = bh->b_this_page;
 		} while (bh != head);
+
+		if (buffer_heads_over_limit)
+			try_to_free_buffers(page);
 	}
 
 	bvec = &bio->bi_io_vec[bio->bi_idx++];
@@ -571,7 +574,7 @@ mpage_writepages(struct address_space *mapping,
 			wait_on_page_writeback(page);
 
 		if (page->mapping && !PageWriteback(page) &&
-					TestClearPageDirty(page)) {
+					test_clear_page_dirty(page)) {
 			if (writepage) {
 				ret = (*writepage)(page);
 			} else {
@@ -599,9 +602,8 @@ mpage_writepages(struct address_space *mapping,
 		write_lock(&mapping->page_lock);
 	}
 	/*
-	 * Put the rest back, in the correct order.
+	 * Leave any remaining dirty pages on ->io_pages
 	 */
-	list_splice_init(&mapping->io_pages, mapping->dirty_pages.prev);
 	write_unlock(&mapping->page_lock);
 	pagevec_deactivate_inactive(&pvec);
 	if (bio)

@@ -159,9 +159,9 @@ struct page {
 	struct list_head lru;		/* Pageout list, eg. active_list;
 					   protected by zone->lru_lock !! */
 	union {
-		struct pte_chain * chain;	/* Reverse pte mapping pointer.
+		struct pte_chain *chain;/* Reverse pte mapping pointer.
 					 * protected by PG_chainlock */
-		pte_t		 * direct;
+		pte_addr_t direct;
 	} pte;
 	unsigned long private;		/* mapping-private opaque data */
 
@@ -320,6 +320,16 @@ static inline void set_page_zone(struct page *page, unsigned long zone_num)
 			+ page_zone(page)->zone_start_pfn) << PAGE_SHIFT)
 
 #endif /* CONFIG_HIGHMEM || WANT_PAGE_VIRTUAL */
+
+/*
+ * Return true if this page is mapped into pagetables.  Subtle: test pte.direct
+ * rather than pte.chain.  Because sometimes pte.direct is 64-bit, and .chain
+ * is only 32-bit.
+ */
+static inline int page_mapped(struct page *page)
+{
+	return page->pte.direct != 0;
+}
 
 /*
  * Error return values for the *_nopage functions

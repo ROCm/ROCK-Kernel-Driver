@@ -335,7 +335,7 @@ static ssize_t lp_write(struct file * file, const char * buf,
 	do {
 		/* Write the data. */
 		written = parport_write (port, kbuf, copy_size);
-		if (written >= 0) {
+		if (written > 0) {
 			copy_size -= written;
 			count -= written;
 			buf  += written;
@@ -840,7 +840,7 @@ static void lp_attach (struct parport *port)
 		    port->probe_info[0].class != PARPORT_CLASS_PRINTER)
 			return;
 		if (lp_count == LP_NO) {
-			printk("lp: ignoring parallel port (max. %d)\n",LP_NO);
+			printk(KERN_INFO "lp: ignoring parallel port (max. %d)\n",LP_NO);
 			return;
 		}
 		if (!lp_register(lp_count, port))
@@ -904,14 +904,14 @@ int __init lp_init (void)
 	}
 
 	if (register_chrdev (LP_MAJOR, "lp", &lp_fops)) {
-		printk ("lp: unable to get major %d\n", LP_MAJOR);
+		printk (KERN_ERR "lp: unable to get major %d\n", LP_MAJOR);
 		return -EIO;
 	}
 
 	devfs_handle = devfs_mk_dir (NULL, "printers", NULL);
 
 	if (parport_register_driver (&lp_driver)) {
-		printk ("lp: unable to register with parport\n");
+		printk (KERN_ERR "lp: unable to register with parport\n");
 		return -EIO;
 	}
 

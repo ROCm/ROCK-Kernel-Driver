@@ -39,6 +39,7 @@
 
 #include <linux/usb.h>
 
+#include <linux/version.h>
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,32)
 #include "../hcd.h"
 #else

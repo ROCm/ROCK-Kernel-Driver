@@ -1935,12 +1935,12 @@ static int cs_midi_release(struct inode *inode, struct file *file)
  */
 static /*const*/ struct file_operations cs_midi_fops = {
 	CS_OWNER	CS_THIS_MODULE
-	llseek:		no_llseek,
-	read:		cs_midi_read,
-	write:		cs_midi_write,
-	poll:		cs_midi_poll,
-	open:		cs_midi_open,
-	release:	cs_midi_release,
+	.llseek		= no_llseek,
+	.read		= cs_midi_read,
+	.write		= cs_midi_write,
+	.poll		= cs_midi_poll,
+	.open		= cs_midi_open,
+	.release	= cs_midi_release,
 };
 
 /*
@@ -3819,14 +3819,14 @@ static int cs46xx_resume(struct cs_card *card)
 
 static /*const*/ struct file_operations cs461x_fops = {
 	CS_OWNER	CS_THIS_MODULE
-	llseek:		no_llseek,
-	read:		cs_read,
-	write:		cs_write,
-	poll:		cs_poll,
-	ioctl:		cs_ioctl,
-	mmap:		cs_mmap,
-	open:		cs_open,
-	release:	cs_release,
+	.llseek		= no_llseek,
+	.read		= cs_read,
+	.write		= cs_write,
+	.poll		= cs_poll,
+	.ioctl		= cs_ioctl,
+	.mmap		= cs_mmap,
+	.open		= cs_open,
+	.release	= cs_release,
 };
 
 /* Write AC97 codec registers */
@@ -4226,10 +4226,10 @@ static int cs_ioctl_mixdev(struct inode *inode, struct file *file, unsigned int 
 
 static /*const*/ struct file_operations cs_mixer_fops = {
 	CS_OWNER	CS_THIS_MODULE
-	llseek:		no_llseek,
-	ioctl:		cs_ioctl_mixdev,
-	open:		cs_open_mixdev,
-	release:	cs_release_mixdev,
+	.llseek		= no_llseek,
+	.ioctl		= cs_ioctl_mixdev,
+	.open		= cs_open_mixdev,
+	.release	= cs_release_mixdev,
 };
 
 /* AC97 codec initialisation. */
@@ -5632,12 +5632,12 @@ static struct pci_device_id cs46xx_pci_tbl[] __devinitdata = {
 MODULE_DEVICE_TABLE(pci, cs46xx_pci_tbl);
 
 struct pci_driver cs46xx_pci_driver = {
-	name:"cs46xx",
-	id_table:cs46xx_pci_tbl,
-	probe:cs46xx_probe,
-	remove:cs46xx_remove,
-	suspend:CS46XX_SUSPEND_TBL,
-	resume:CS46XX_RESUME_TBL,
+	.name= "cs46xx",
+	.id_table= cs46xx_pci_tbl,
+	.probe= cs46xx_probe,
+	.remove= cs46xx_remove,
+	.suspend= CS46XX_SUSPEND_TBL,
+	.resume= CS46XX_RESUME_TBL,
 };
 
 int __init cs46xx_init_module(void)

@@ -171,6 +171,9 @@ extern inline void update_mmu_cache(struct vm_area_struct * vma,
 
 #ifndef __ASSEMBLY__
 #include <asm-generic/pgtable.h>
+
+typedef pte_t *pte_addr_t;
+
 #endif /* !__ASSEMBLY__ */
 
 /*

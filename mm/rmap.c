@@ -40,19 +40,34 @@
  * here, the page struct for the page table page contains the process
  * it belongs to and the offset within that process.
  *
- * A singly linked list should be fine for most, if not all, workloads.
- * On fork-after-exec the mapping we'll be removing will still be near
- * the start of the list, on mixed application systems the short-lived
- * processes will have their mappings near the start of the list and
- * in systems with long-lived applications the relative overhead of
- * exit() will be lower since the applications are long-lived.
+ * We use an array of pte pointers in this structure to minimise cache misses
+ * while traversing reverse maps.
  */
+#define NRPTE ((L1_CACHE_BYTES - sizeof(void *))/sizeof(pte_addr_t))
+
 struct pte_chain {
-	struct pte_chain * next;
-	pte_t * ptep;
+	struct pte_chain *next;
+	pte_addr_t ptes[NRPTE];
 };
 
 static kmem_cache_t	*pte_chain_cache;
+
+/*
+ * pte_chain list management policy:
+ *
+ * - If a page has a pte_chain list then it is shared by at least two processes,
+ *   because a single sharing uses PageDirect. (Well, this isn't true yet,
+ *   coz this code doesn't collapse singletons back to PageDirect on the remove
+ *   path).
+ * - A pte_chain list has free space only in the head member - all succeeding
+ *   members are 100% full.
+ * - If the head element has free space, it occurs in its leading slots.
+ * - All free space in the pte_chain is at the start of the head member.
+ * - Insertion into the pte_chain puts a pte pointer in the last free slot of
+ *   the head member.
+ * - Removal from a pte chain moves the head pte of the head member onto the
+ *   victim pte and frees the head member if it became empty.
+ */
 
 /**
  * pte_chain_alloc - allocate a pte_chain struct
@@ -63,31 +78,29 @@ static kmem_cache_t	*pte_chain_cache;
  */
 static inline struct pte_chain *pte_chain_alloc(void)
 {
-	return kmem_cache_alloc(pte_chain_cache, GFP_ATOMIC);
+	struct pte_chain *ret;
+
+	ret = kmem_cache_alloc(pte_chain_cache, GFP_ATOMIC);
+#ifdef DEBUG_RMAP
+	{
+		int i;
+		for (i = 0; i < NRPTE; i++)
+			BUG_ON(ret->ptes[i]);
+		BUG_ON(ret->next);
+	}
+#endif
+	return ret;
 }
 
 /**
  * pte_chain_free - free pte_chain structure
  * @pte_chain: pte_chain struct to free
- * @prev_pte_chain: previous pte_chain on the list (may be NULL)
- * @page: page this pte_chain hangs off (may be NULL)
- *
- * This function unlinks pte_chain from the singly linked list it
- * may be on and adds the pte_chain to the free list. May also be
- * called for new pte_chain structures which aren't on any list yet.
- * Caller needs to hold the pte_chain_lock if the page is non-NULL.
  */
-static inline void pte_chain_free(struct pte_chain * pte_chain,
-		struct pte_chain * prev_pte_chain, struct page * page)
+static inline void pte_chain_free(struct pte_chain *pte_chain)
 {
-	if (prev_pte_chain)
-		prev_pte_chain->next = pte_chain->next;
-	else if (page)
-		page->pte.chain = pte_chain->next;
-
+	pte_chain->next = NULL;
 	kmem_cache_free(pte_chain_cache, pte_chain);
 }
-
 
 /**
  ** VM stuff below this comment
@@ -100,6 +113,9 @@ static inline void pte_chain_free(struct pte_chain * pte_chain,
  * Quick test_and_clear_referenced for all mappings to a page,
  * returns the number of processes which referenced the page.
  * Caller needs to hold the pte_chain_lock.
+ *
+ * If the page has a single-entry pte_chain, collapse that back to a PageDirect
+ * representation.  This way, it's only done under memory pressure.
  */
 int page_referenced(struct page * page)
 {
@@ -110,13 +126,36 @@ int page_referenced(struct page * page)
 		referenced++;
 
 	if (PageDirect(page)) {
-		if (ptep_test_and_clear_young(page->pte.direct))
+		pte_t *pte = rmap_ptep_map(page->pte.direct);
+		if (ptep_test_and_clear_young(pte))
 			referenced++;
+		rmap_ptep_unmap(pte);
 	} else {
+		int nr_chains = 0;
+
 		/* Check all the page tables mapping this page. */
 		for (pc = page->pte.chain; pc; pc = pc->next) {
-			if (ptep_test_and_clear_young(pc->ptep))
-				referenced++;
+			int i;
+
+			for (i = NRPTE-1; i >= 0; i--) {
+				pte_addr_t pte_paddr = pc->ptes[i];
+				pte_t *p;
+
+				if (!pte_paddr)
+					break;
+				p = rmap_ptep_map(pte_paddr);
+				if (ptep_test_and_clear_young(p))
+					referenced++;
+				rmap_ptep_unmap(p);
+				nr_chains++;
+			}
+		}
+		if (nr_chains == 1) {
+			pc = page->pte.chain;
+			page->pte.direct = pc->ptes[NRPTE-1];
+			SetPageDirect(page);
+			pc->ptes[NRPTE-1] = 0;
+			pte_chain_free(pc);
 		}
 	}
 	return referenced;
@@ -132,8 +171,9 @@ int page_referenced(struct page * page)
  */
 void page_add_rmap(struct page * page, pte_t * ptep)
 {
-	struct pte_chain * pte_chain;
-	unsigned long pfn = pte_pfn(*ptep);
+	pte_addr_t pte_paddr = ptep_to_paddr(ptep);
+	struct pte_chain *pte_chain;
+	int i;
 
 #ifdef DEBUG_RMAP
 	if (!page || !ptep)
@@ -144,49 +184,74 @@ void page_add_rmap(struct page * page, pte_t * ptep)
 		BUG();
 #endif
 
-	if (!pfn_valid(pfn) || PageReserved(page))
+	if (!pfn_valid(page_to_pfn(page)) || PageReserved(page))
 		return;
 
-#ifdef DEBUG_RMAP
 	pte_chain_lock(page);
+
+#ifdef DEBUG_RMAP
+	/*
+	 * This stuff needs help to get up to highmem speed.
+	 */
 	{
 		struct pte_chain * pc;
 		if (PageDirect(page)) {
-			if (page->pte.direct == ptep)
+			if (page->pte.direct == pte_paddr)
 				BUG();
 		} else {
 			for (pc = page->pte.chain; pc; pc = pc->next) {
-				if (pc->ptep == ptep)
-					BUG();
+				for (i = 0; i < NRPTE; i++) {
+					pte_addr_t p = pc->ptes[i];
+
+					if (p && p == pte_paddr)
+						BUG();
+				}
 			}
 		}
 	}
-	pte_chain_unlock(page);
 #endif
 
-	pte_chain_lock(page);
+	if (page->pte.direct == 0) {
+		page->pte.direct = pte_paddr;
+		SetPageDirect(page);
+		goto out;
+	}
 
 	if (PageDirect(page)) {
 		/* Convert a direct pointer into a pte_chain */
-		pte_chain = pte_chain_alloc();
-		pte_chain->ptep = page->pte.direct;
-		pte_chain->next = NULL;
-		page->pte.chain = pte_chain;
 		ClearPageDirect(page);
-	}
-	if (page->pte.chain) {
-		/* Hook up the pte_chain to the page. */
 		pte_chain = pte_chain_alloc();
-		pte_chain->ptep = ptep;
-		pte_chain->next = page->pte.chain;
+		pte_chain->ptes[NRPTE-1] = page->pte.direct;
+		pte_chain->ptes[NRPTE-2] = pte_paddr;
+		page->pte.direct = 0;
 		page->pte.chain = pte_chain;
-	} else {
-		page->pte.direct = ptep;
-		SetPageDirect(page);
+		goto out;
 	}
 
+	pte_chain = page->pte.chain;
+	if (pte_chain->ptes[0]) {	/* It's full */
+		struct pte_chain *new;
+
+		new = pte_chain_alloc();
+		new->next = pte_chain;
+		page->pte.chain = new;
+		new->ptes[NRPTE-1] = pte_paddr;
+		goto out;
+	}
+
+	BUG_ON(!pte_chain->ptes[NRPTE-1]);
+
+	for (i = NRPTE-2; i >= 0; i--) {
+		if (!pte_chain->ptes[i]) {
+			pte_chain->ptes[i] = pte_paddr;
+			goto out;
+		}
+	}
+	BUG();
+out:
 	pte_chain_unlock(page);
 	inc_page_state(nr_reverse_maps);
+	return;
 }
 
 /**
@@ -201,32 +266,52 @@ void page_add_rmap(struct page * page, pte_t * ptep)
  */
 void page_remove_rmap(struct page * page, pte_t * ptep)
 {
-	struct pte_chain * pc, * prev_pc = NULL;
-	unsigned long pfn = page_to_pfn(page);
+	pte_addr_t pte_paddr = ptep_to_paddr(ptep);
+	struct pte_chain *pc;
 
 	if (!page || !ptep)
 		BUG();
-	if (!pfn_valid(pfn) || PageReserved(page))
+	if (!pfn_valid(page_to_pfn(page)) || PageReserved(page))
 		return;
 
 	pte_chain_lock(page);
 
+	BUG_ON(page->pte.direct == 0);
+ 
 	if (PageDirect(page)) {
-		if (page->pte.direct == ptep) {
-			page->pte.direct = NULL;
+		if (page->pte.direct == pte_paddr) {
+			page->pte.direct = 0;
+			dec_page_state(nr_reverse_maps);
 			ClearPageDirect(page);
 			goto out;
 		}
 	} else {
-		for (pc = page->pte.chain; pc; prev_pc = pc, pc = pc->next) {
-			if (pc->ptep == ptep) {
-				pte_chain_free(pc, prev_pc, page);
-				/* Check whether we can convert to direct */
-				pc = page->pte.chain;
-				if (!pc->next) {
-					page->pte.direct = pc->ptep;
-					SetPageDirect(page);
-					pte_chain_free(pc, NULL, NULL);
+		struct pte_chain *start = page->pte.chain;
+		int victim_i = -1;
+
+		for (pc = start; pc; pc = pc->next) {
+			int i;
+
+			if (pc->next)
+				prefetch(pc->next);
+			for (i = 0; i < NRPTE; i++) {
+				pte_addr_t pa = pc->ptes[i];
+
+				if (!pa)
+					continue;
+				if (victim_i == -1)
+					victim_i = i;
+				if (pa != pte_paddr)
+					continue;
+				pc->ptes[i] = start->ptes[victim_i];
+				dec_page_state(nr_reverse_maps);
+				start->ptes[victim_i] = 0;
+				if (victim_i == NRPTE-1) {
+					/* Emptied a pte_chain */
+					page->pte.chain = start->next;
+					pte_chain_free(start);
+				} else {
+					/* Do singleton->PageDirect here */
 				}
 				goto out;
 			}
@@ -237,17 +322,19 @@ void page_remove_rmap(struct page * page, pte_t * ptep)
 	printk(KERN_ERR "page_remove_rmap: pte_chain %p not present.\n", ptep);
 	printk(KERN_ERR "page_remove_rmap: only found: ");
 	if (PageDirect(page)) {
-		printk("%p ", page->pte.direct);
+		printk("%llx", (u64)page->pte.direct);
 	} else {
-		for (pc = page->pte.chain; pc; pc = pc->next)
-			printk("%p ", pc->ptep);
+		for (pc = page->pte.chain; pc; pc = pc->next) {
+			int i;
+			for (i = 0; i < NRPTE; i++)
+				printk(" %d:%llx", i, (u64)pc->ptes[i]);
+		}
 	}
 	printk("\n");
 	printk(KERN_ERR "page_remove_rmap: driver cleared PG_reserved ?\n");
 #endif
 
 out:
-	dec_page_state(nr_reverse_maps);
 	pte_chain_unlock(page);
 	return;
 }
@@ -266,9 +353,10 @@ out:
  *		pte_chain_lock		page_launder()
  *		    mm->page_table_lock	try_to_unmap_one(), trylock
  */
-static int FASTCALL(try_to_unmap_one(struct page *, pte_t *));
-static int try_to_unmap_one(struct page * page, pte_t * ptep)
+static int FASTCALL(try_to_unmap_one(struct page *, pte_addr_t));
+static int try_to_unmap_one(struct page * page, pte_addr_t paddr)
 {
+	pte_t *ptep = rmap_ptep_map(paddr);
 	unsigned long address = ptep_to_address(ptep);
 	struct mm_struct * mm = ptep_to_mm(ptep);
 	struct vm_area_struct * vma;
@@ -282,8 +370,11 @@ static int try_to_unmap_one(struct page * page, pte_t * ptep)
 	 * We need the page_table_lock to protect us from page faults,
 	 * munmap, fork, etc...
 	 */
-	if (!spin_trylock(&mm->page_table_lock))
+	if (!spin_trylock(&mm->page_table_lock)) {
+		rmap_ptep_unmap(ptep);
 		return SWAP_AGAIN;
+	}
+
 
 	/* During mremap, it's possible pages are not in a VMA. */
 	vma = find_vma(mm, address);
@@ -305,8 +396,7 @@ static int try_to_unmap_one(struct page * page, pte_t * ptep)
 
 	/* Store the swap location in the pte. See handle_pte_fault() ... */
 	if (PageSwapCache(page)) {
-		swp_entry_t entry;
-		entry.val = page->index;
+		swp_entry_t entry = { .val = page->index };
 		swap_duplicate(entry);
 		set_pte(ptep, swp_entry_to_pte(entry));
 	}
@@ -320,6 +410,7 @@ static int try_to_unmap_one(struct page * page, pte_t * ptep)
 	ret = SWAP_SUCCESS;
 
 out_unlock:
+	rmap_ptep_unmap(ptep);
 	spin_unlock(&mm->page_table_lock);
 	return ret;
 }
@@ -339,8 +430,9 @@ out_unlock:
  */
 int try_to_unmap(struct page * page)
 {
-	struct pte_chain * pc, * next_pc, * prev_pc = NULL;
+	struct pte_chain *pc, *next_pc, *start;
 	int ret = SWAP_SUCCESS;
+	int victim_i = -1;
 
 	/* This page should not be on the pageout lists. */
 	if (PageReserved(page))
@@ -354,39 +446,60 @@ int try_to_unmap(struct page * page)
 	if (PageDirect(page)) {
 		ret = try_to_unmap_one(page, page->pte.direct);
 		if (ret == SWAP_SUCCESS) {
-			page->pte.direct = NULL;
+			page->pte.direct = 0;
 			ClearPageDirect(page);
 		}
-	} else {		
-		for (pc = page->pte.chain; pc; pc = next_pc) {
-			next_pc = pc->next;
-			switch (try_to_unmap_one(page, pc->ptep)) {
-				case SWAP_SUCCESS:
-					/* Free the pte_chain struct. */
-					pte_chain_free(pc, prev_pc, page);
-					continue;
-				case SWAP_AGAIN:
-					/* Skip this pte, remembering status. */
-					prev_pc = pc;
-					ret = SWAP_AGAIN;
-					continue;
-				case SWAP_FAIL:
-					ret = SWAP_FAIL;
-					goto give_up;
-				case SWAP_ERROR:
-					ret = SWAP_ERROR;
-					goto give_up;
+		goto out;
+	}		
+
+	start = page->pte.chain;
+	for (pc = start; pc; pc = next_pc) {
+		int i;
+
+		next_pc = pc->next;
+		if (next_pc)
+			prefetch(next_pc);
+		for (i = 0; i < NRPTE; i++) {
+			pte_addr_t pte_paddr = pc->ptes[i];
+
+			if (!pte_paddr)
+				continue;
+			if (victim_i == -1) 
+				victim_i = i;
+
+			switch (try_to_unmap_one(page, pte_paddr)) {
+			case SWAP_SUCCESS:
+				/*
+				 * Release a slot.  If we're releasing the
+				 * first pte in the first pte_chain then
+				 * pc->ptes[i] and start->ptes[victim_i] both
+				 * refer to the same thing.  It works out.
+				 */
+				pc->ptes[i] = start->ptes[victim_i];
+				start->ptes[victim_i] = 0;
+				dec_page_state(nr_reverse_maps);
+				victim_i++;
+				if (victim_i == NRPTE) {
+					page->pte.chain = start->next;
+					pte_chain_free(start);
+					start = page->pte.chain;
+					victim_i = 0;
+				}
+				break;
+			case SWAP_AGAIN:
+				/* Skip this pte, remembering status. */
+				ret = SWAP_AGAIN;
+				continue;
+			case SWAP_FAIL:
+				ret = SWAP_FAIL;
+				goto out;
+			case SWAP_ERROR:
+				ret = SWAP_ERROR;
+				goto out;
 			}
 		}
-give_up:
-		/* Check whether we can convert to direct pte pointer */
-		pc = page->pte.chain;
-		if (pc && !pc->next) {
-			page->pte.direct = pc->ptep;
-			SetPageDirect(page);
-			pte_chain_free(pc, NULL, NULL);
-		}
 	}
+out:
 	return ret;
 }
 
@@ -395,13 +508,20 @@ give_up:
  ** functions.
  **/
 
+static void pte_chain_ctor(void *p, kmem_cache_t *cachep, unsigned long flags)
+{
+	struct pte_chain *pc = p;
+
+	memset(pc, 0, sizeof(*pc));
+}
+
 void __init pte_chain_init(void)
 {
 	pte_chain_cache = kmem_cache_create(	"pte_chain",
 						sizeof(struct pte_chain),
 						0,
 						0,
-						NULL,
+						pte_chain_ctor,
 						NULL);
 
 	if (!pte_chain_cache)

@@ -1254,7 +1254,7 @@ static void set_rx_mode(struct net_device *dev)
     ioaddr_t ioaddr = dev->base_addr;
     struct local_info_t *lp = (struct local_info_t *)dev->priv;
     unsigned char mc_filter[8];		 /* Multicast hash filter */
-    long flags;
+    unsigned long flags;
     int i;
     
     if (dev->flags & IFF_PROMISC) {

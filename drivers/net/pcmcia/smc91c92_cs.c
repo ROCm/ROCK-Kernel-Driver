@@ -1778,7 +1778,7 @@ static void set_rx_mode(struct net_device *dev)
 {
     ioaddr_t ioaddr = dev->base_addr;
     u_int multicast_table[ 2 ] = { 0, };
-    long flags;
+    unsigned long flags;
     u_short rx_cfg_setting;
     
     if (dev->flags & IFF_PROMISC) {

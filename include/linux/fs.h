@@ -526,10 +526,10 @@ extern int init_private_file(struct file *, struct dentry *, int);
 
 #define FL_POSIX	1
 #define FL_FLOCK	2
-#define FL_BROKEN	4	/* broken flock() emulation */
-#define FL_ACCESS	8	/* for processes suspended by mandatory locking */
+#define FL_ACCESS	8	/* not trying to lock, just looking */
 #define FL_LOCKD	16	/* lock held by rpc.lockd */
 #define FL_LEASE	32	/* lease held on this file */
+#define FL_SLEEP	128	/* A blocking lock */
 
 /*
  * The POSIX file lock owner is determined by
@@ -591,9 +591,9 @@ extern void locks_copy_lock(struct file_lock *, struct file_lock *);
 extern void locks_remove_posix(struct file *, fl_owner_t);
 extern void locks_remove_flock(struct file *);
 extern struct file_lock *posix_test_lock(struct file *, struct file_lock *);
-extern int posix_lock_file(struct file *, struct file_lock *, unsigned int);
+extern int posix_lock_file(struct file *, struct file_lock *);
 extern void posix_block_lock(struct file_lock *, struct file_lock *);
-extern void posix_unblock_lock(struct file_lock *);
+extern void posix_unblock_lock(struct file *, struct file_lock *);
 extern int posix_locks_deadlock(struct file_lock *, struct file_lock *);
 extern int __get_lease(struct inode *inode, unsigned int flags);
 extern time_t lease_get_mtime(struct inode *);
@@ -660,7 +660,6 @@ struct super_block {
 
 	struct list_head	s_dirty;	/* dirty inodes */
 	struct list_head	s_io;		/* parked for writeback */
-	struct list_head	s_locked_inodes;/* inodes being synced */
 	struct list_head	s_anon;		/* anonymous dentries for (nfs) exporting */
 	struct list_head	s_files;
 

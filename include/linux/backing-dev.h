@@ -19,6 +19,7 @@ enum bdi_state {
 struct backing_dev_info {
 	unsigned long ra_pages;	/* max readahead in PAGE_CACHE_SIZE units */
 	unsigned long state;	/* Always use atomic bitops on this */
+	int memory_backed;	/* Cannot clean pages with writepage */
 };
 
 extern struct backing_dev_info default_backing_dev_info;

@@ -167,6 +167,7 @@ void wakeup_bdflush(void);
 struct buffer_head *alloc_buffer_head(void);
 void free_buffer_head(struct buffer_head * bh);
 void FASTCALL(unlock_buffer(struct buffer_head *bh));
+extern int buffer_heads_over_limit;
 
 /*
  * Generic address_space_operations implementations for buffer_head-backed

@@ -20,6 +20,7 @@
 #include <linux/pagevec.h>
 #include <linux/init.h>
 #include <linux/mm_inline.h>
+#include <linux/buffer_head.h>
 #include <linux/prefetch.h>
 
 /* How many pages do we try to swap or page in/out together? */
@@ -220,6 +221,23 @@ void __pagevec_lru_add(struct pagevec *pvec)
 	if (zone)
 		spin_unlock_irq(&zone->lru_lock);
 	pagevec_release(pvec);
+}
+
+/*
+ * Try to drop buffers from the pages in a pagevec
+ */
+void pagevec_strip(struct pagevec *pvec)
+{
+	int i;
+
+	for (i = 0; i < pagevec_count(pvec); i++) {
+		struct page *page = pvec->pages[i];
+
+		if (PagePrivate(page) && !TestSetPageLocked(page)) {
+			try_to_release_page(page, 0);
+			unlock_page(page);
+		}
+	}
 }
 
 /*

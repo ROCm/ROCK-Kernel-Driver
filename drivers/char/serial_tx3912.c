@@ -16,7 +16,6 @@
 #include <linux/tty.h>
 #include <linux/major.h>
 #include <linux/ptrace.h>
-#include <linux/init.h>
 #include <linux/console.h>
 #include <linux/fs.h>
 #include <linux/mm.h>

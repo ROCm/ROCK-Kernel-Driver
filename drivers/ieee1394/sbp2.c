@@ -326,7 +326,6 @@
 #include <asm/byteorder.h>
 #include <asm/atomic.h>
 #include <asm/system.h>
-#include <asm/io.h>
 #include <asm/scatterlist.h>
 
 #ifdef CONFIG_KBUILD_2_5
