@@ -297,7 +297,7 @@ int usb_submit_urb(struct urb *urb, int mem_flags)
 
 	/* enforce simple/standard policy */
 	allowed = URB_ASYNC_UNLINK;	// affects later unlinks
-	allowed |= URB_NO_DMA_MAP;
+	allowed |= (URB_NO_TRANSFER_DMA_MAP | URB_NO_SETUP_DMA_MAP);
 	allowed |= URB_NO_INTERRUPT;
 	switch (temp) {
 	case PIPE_BULK:

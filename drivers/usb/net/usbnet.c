@@ -1622,6 +1622,11 @@ static const struct driver_info	yopy_info = {
 	.check_connect = always_connected,
 };
 
+static const struct driver_info	blob_info = {
+	.description =	"Boot Loader OBject",
+	.check_connect = always_connected,
+};
+
 #endif	/* CONFIG_USB_ARMLINUX */
 
 
@@ -2097,7 +2102,7 @@ done:
 /*-------------------------------------------------------------------------*/
 
 static inline int
-usbnet_ethtool_ioctl (struct net_device *net, void *useraddr)
+usbnet_ethtool_ioctl (struct net_device *net, void __user *useraddr)
 {
 	struct usbnet	*dev = (struct usbnet *) net->priv;
 	u32		cmd;
@@ -2161,7 +2166,7 @@ static int usbnet_ioctl (struct net_device *net, struct ifreq *rq, int cmd)
 {
 	switch (cmd) {
 	case SIOCETHTOOL:
-		return usbnet_ethtool_ioctl (net, (void *)rq->ifr_data);
+		return usbnet_ethtool_ioctl (net, (void __user *)rq->ifr_data);
 	default:
 		return -EOPNOTSUPP;
 	}
@@ -2707,6 +2712,9 @@ static const struct usb_device_id	products [] = {
 }, {
 	USB_DEVICE (0x0E7E, 0x1001),	// G.Mate "Yopy"
 	.driver_info =	(unsigned long) &yopy_info,
+}, {
+	USB_DEVICE (0x8086, 0x07d3),	// "blob" bootloader
+	.driver_info =	(unsigned long) &blob_info,
 }, 
 #endif
 

@@ -111,7 +111,7 @@ ioctl_rio(struct inode *inode, struct file *file, unsigned int cmd,
 {
 	struct RioCommand rio_cmd;
 	struct rio_usb_data *rio = &rio_instance;
-	void *data;
+	void __user *data;
 	unsigned char *buffer;
 	int result, requesttype;
 	int retries;
@@ -129,7 +129,7 @@ ioctl_rio(struct inode *inode, struct file *file, unsigned int cmd,
 
 	switch (cmd) {
 	case RIO_RECV_COMMAND:
-		data = (void *) arg;
+		data = (void __user *) arg;
 		if (data == NULL)
 			break;
 		if (copy_from_user(&rio_cmd, data, sizeof(struct RioCommand))) {
@@ -199,7 +199,7 @@ ioctl_rio(struct inode *inode, struct file *file, unsigned int cmd,
 		break;
 
 	case RIO_SEND_COMMAND:
-		data = (void *) arg;
+		data = (void __user *) arg;
 		if (data == NULL)
 			break;
 		if (copy_from_user(&rio_cmd, data, sizeof(struct RioCommand))) {
@@ -266,7 +266,7 @@ err_out:
 }
 
 static ssize_t
-write_rio(struct file *file, const char *buffer,
+write_rio(struct file *file, const char __user *buffer,
 	  size_t count, loff_t * ppos)
 {
 	struct rio_usb_data *rio = &rio_instance;
@@ -352,7 +352,7 @@ error:
 }
 
 static ssize_t
-read_rio(struct file *file, char *buffer, size_t count, loff_t * ppos)
+read_rio(struct file *file, char __user *buffer, size_t count, loff_t * ppos)
 {
 	struct rio_usb_data *rio = &rio_instance;
 	ssize_t read_count;

@@ -57,100 +57,36 @@
  * Host functions 
  ***********************************************************************/
 
-static const char* usb_storage_info(struct Scsi_Host *host)
+static const char* host_info(struct Scsi_Host *host)
 {
 	return "SCSI emulation for USB Mass Storage devices";
 }
 
-#if 0
-/* detect a virtual adapter (always works)
- * Synchronization: 2.4: with the io_request_lock
- * 			2.5: no locks.
- * fortunately we don't care.
- * */
-static int usb_storage_detect(struct SHT *sht)
+static int slave_configure (struct scsi_device *sdev)
 {
-	struct us_data *us;
-	char local_name[32];
+	/* set device to use 10-byte commands where possible */
+	sdev->use_10_for_ms = 1;
+	sdev->use_10_for_rw = 1;
 
-	/* This is not nice at all, but how else are we to get the
-	 * data here? */
-	us = (struct us_data *)sht->proc_dir;
-
-	/* set up the name of our subdirectory under /proc/scsi/ */
-	sprintf(local_name, "usb-storage-%d", us->host_number);
-	sht->proc_name = kmalloc (strlen(local_name) + 1, GFP_ATOMIC);
-	if (!sht->proc_name)
-		return 0;
-	strcpy(sht->proc_name, local_name);
-
-	/* we start with no /proc directory entry */
-	sht->proc_dir = NULL;
-
-	/* register the host */
-	us->host = scsi_register(sht, sizeof(us));
-	if (us->host) {
-		struct usb_interface *iface;
-		us->host->hostdata[0] = (unsigned long)us;
-		us->host_no = us->host->host_no;
-		iface = usb_ifnum_to_if(us->pusb_dev, us->ifnum);
-		if (iface)
-			scsi_set_device(us->host, &iface->dev);
-		return 1;
-	}
-
-	/* odd... didn't register properly.  Abort and free pointers */
-	kfree(sht->proc_name);
-	sht->proc_name = NULL;
+	/* this is to satisify the compiler, tho I don't think the 
+	 * return code is ever checked anywhere. */
 	return 0;
 }
-
-/* Release all resources used by the virtual host
- *
- * NOTE: There is no contention here, because we're already deregistered
- * the driver and we're doing each virtual host in turn, not in parallel
- * Synchronization: BKL, no spinlock.
- */
-static int usb_storage_release(struct Scsi_Host *psh)
-{
-	struct us_data *us = (struct us_data *)psh->hostdata[0];
-
-	US_DEBUGP("release() called for host %s\n", us->htmplt.name);
-
-	/* Kill the control threads
-	 *
-	 * Enqueue the command, wake up the thread, and wait for 
-	 * notification that it has exited.
-	 */
-	US_DEBUGP("-- sending exit command to thread\n");
-	BUG_ON(atomic_read(&us->sm_state) != US_STATE_IDLE);
-	us->srb = NULL;
-	up(&(us->sema));
-	wait_for_completion(&(us->notify));
-
-	/* remove the pointer to the data structure we were using */
-	(struct us_data*)psh->hostdata[0] = NULL;
-
-	/* we always have a successful release */
-	return 0;
-}
-#endif
 
 /* queue a command */
 /* This is always called with scsi_lock(srb->host) held */
-static int usb_storage_queuecommand( Scsi_Cmnd *srb , void (*done)(Scsi_Cmnd *))
+static int queuecommand( Scsi_Cmnd *srb , void (*done)(Scsi_Cmnd *))
 {
 	struct us_data *us = (struct us_data *)srb->device->host->hostdata[0];
-	int state = atomic_read(&us->sm_state);
 
-	US_DEBUGP("queuecommand() called\n");
+	US_DEBUGP("%s called\n", __FUNCTION__);
 	srb->host_scribble = (unsigned char *)us;
 
 	/* enqueue the command */
-	if (state != US_STATE_IDLE || us->srb != NULL) {
+	if (us->sm_state != US_STATE_IDLE || us->srb != NULL) {
 		printk(KERN_ERR USB_STORAGE "Error in %s: " 
 			"state = %d, us->srb = %p\n",
-			__FUNCTION__, state, us->srb);
+			__FUNCTION__, us->sm_state, us->srb);
 		return SCSI_MLQUEUE_HOST_BUSY;
 	}
 
@@ -169,11 +105,10 @@ static int usb_storage_queuecommand( Scsi_Cmnd *srb , void (*done)(Scsi_Cmnd *))
 
 /* Command abort */
 /* This is always called with scsi_lock(srb->host) held */
-static int usb_storage_command_abort( Scsi_Cmnd *srb )
+static int command_abort( Scsi_Cmnd *srb )
 {
 	struct Scsi_Host *host = srb->device->host;
 	struct us_data *us = (struct us_data *) host->hostdata[0];
-	int state = atomic_read(&us->sm_state);
 
 	US_DEBUGP("%s called\n", __FUNCTION__);
 
@@ -186,20 +121,20 @@ static int usb_storage_command_abort( Scsi_Cmnd *srb )
 	/* Normally the current state is RUNNING.  If the control thread
 	 * hasn't even started processing this command, the state will be
 	 * IDLE.  Anything else is a bug. */
-	if (state != US_STATE_RUNNING && state != US_STATE_IDLE) {
+	if (us->sm_state != US_STATE_RUNNING
+				&& us->sm_state != US_STATE_IDLE) {
 		printk(KERN_ERR USB_STORAGE "Error in %s: "
-			"invalid state %d\n", __FUNCTION__, state);
+			"invalid state %d\n", __FUNCTION__, us->sm_state);
 		return FAILED;
 	}
 
 	/* Set state to ABORTING, set the ABORTING bit, and release the lock */
-	atomic_set(&us->sm_state, US_STATE_ABORTING);
+	us->sm_state = US_STATE_ABORTING;
 	set_bit(US_FLIDX_ABORTING, &us->flags);
 	scsi_unlock(host);
 
-	/* If the state was RUNNING, stop an ongoing USB transfer */
-	if (state == US_STATE_RUNNING)
-		usb_stor_stop_transport(us);
+	/* Stop an ongoing USB transfer */
+	usb_stor_stop_transport(us);
 
 	/* Wait for the aborted command to finish */
 	wait_for_completion(&us->notify);
@@ -213,35 +148,30 @@ static int usb_storage_command_abort( Scsi_Cmnd *srb )
 /* This invokes the transport reset mechanism to reset the state of the
  * device */
 /* This is always called with scsi_lock(srb->host) held */
-static int usb_storage_device_reset( Scsi_Cmnd *srb )
+static int device_reset( Scsi_Cmnd *srb )
 {
 	struct us_data *us = (struct us_data *)srb->device->host->hostdata[0];
-	int state = atomic_read(&us->sm_state);
 	int result;
 
 	US_DEBUGP("%s called\n", __FUNCTION__);
-	if (state != US_STATE_IDLE) {
+	if (us->sm_state != US_STATE_IDLE) {
 		printk(KERN_ERR USB_STORAGE "Error in %s: "
-			"invalid state %d\n", __FUNCTION__, state);
+			"invalid state %d\n", __FUNCTION__, us->sm_state);
 		return FAILED;
 	}
 
 	/* set the state and release the lock */
-	atomic_set(&us->sm_state, US_STATE_RESETTING);
+	us->sm_state = US_STATE_RESETTING;
 	scsi_unlock(srb->device->host);
 
-	/* lock the device pointers */
+	/* lock the device pointers and do the reset */
 	down(&(us->dev_semaphore));
-
-	/* do the reset */
 	result = us->transport_reset(us);
-
-	/* unlock */
 	up(&(us->dev_semaphore));
 
 	/* lock access to the state and clear it */
 	scsi_lock(srb->device->host);
-	atomic_set(&us->sm_state, US_STATE_IDLE);
+	us->sm_state = US_STATE_IDLE;
 	return result;
 }
 
@@ -249,45 +179,42 @@ static int usb_storage_device_reset( Scsi_Cmnd *srb )
 /* It refuses to work if there's more than one interface in
  * the device, so that other users are not affected. */
 /* This is always called with scsi_lock(srb->host) held */
-static int usb_storage_bus_reset( Scsi_Cmnd *srb )
+static int bus_reset( Scsi_Cmnd *srb )
 {
 	struct us_data *us = (struct us_data *)srb->device->host->hostdata[0];
-	int state = atomic_read(&us->sm_state);
 	int result;
 
 	US_DEBUGP("%s called\n", __FUNCTION__);
-	if (state != US_STATE_IDLE) {
+	if (us->sm_state != US_STATE_IDLE) {
 		printk(KERN_ERR USB_STORAGE "Error in %s: "
-			"invalid state %d\n", __FUNCTION__, state);
+			"invalid state %d\n", __FUNCTION__, us->sm_state);
 		return FAILED;
 	}
 
 	/* set the state and release the lock */
-	atomic_set(&us->sm_state, US_STATE_RESETTING);
+	us->sm_state = US_STATE_RESETTING;
 	scsi_unlock(srb->device->host);
 
 	/* The USB subsystem doesn't handle synchronisation between
-	   a device's several drivers. Therefore we reset only devices
-	   with just one interface, which we of course own.
-	*/
+	 * a device's several drivers. Therefore we reset only devices
+	 * with just one interface, which we of course own. */
 
-	//FIXME: needs locking against config changes
-
-	if (us->pusb_dev->actconfig->desc.bNumInterfaces == 1) {
-
-		/* lock the device and attempt to reset the port */
-		down(&(us->dev_semaphore));
-		result = usb_reset_device(us->pusb_dev);
-		up(&(us->dev_semaphore));
-		US_DEBUGP("usb_reset_device returns %d\n", result);
-	} else {
+	down(&(us->dev_semaphore));
+	if (test_bit(US_FLIDX_DISCONNECTING, &us->flags)) {
+		result = -EIO;
+		US_DEBUGP("Attempt to reset during disconnect\n");
+	} else if (us->pusb_dev->actconfig->desc.bNumInterfaces != 1) {
 		result = -EBUSY;
 		US_DEBUGP("Refusing to reset a multi-interface device\n");
+	} else {
+		result = usb_reset_device(us->pusb_dev);
+		US_DEBUGP("usb_reset_device returns %d\n", result);
 	}
+	up(&(us->dev_semaphore));
 
 	/* lock access to the state and clear it */
 	scsi_lock(srb->device->host);
-	atomic_set(&us->sm_state, US_STATE_IDLE);
+	us->sm_state = US_STATE_IDLE;
 	return result < 0 ? FAILED : SUCCESS;
 }
 
@@ -300,7 +227,7 @@ static int usb_storage_bus_reset( Scsi_Cmnd *srb )
 #define SPRINTF(args...) \
 	do { if (pos < buffer+length) pos += sprintf(pos, ## args); } while (0)
 
-static int usb_storage_proc_info (struct Scsi_Host *hostptr, char *buffer, char **start, off_t offset,
+static int proc_info (struct Scsi_Host *hostptr, char *buffer, char **start, off_t offset,
 		int length, int inout)
 {
 	struct us_data *us;
@@ -333,8 +260,6 @@ static int usb_storage_proc_info (struct Scsi_Host *hostptr, char *buffer, char 
 #define DO_FLAG(a)  	if (f & US_FL_##a)  pos += sprintf(pos, " " #a)
 		DO_FLAG(SINGLE_LUN);
 		DO_FLAG(MODE_XLATE);
-		DO_FLAG(START_STOP);
-		DO_FLAG(IGNORE_SER);
 		DO_FLAG(SCM_MULT_TARG);
 		DO_FLAG(FIX_INQUIRY);
 		DO_FLAG(FIX_CAPACITY);
@@ -364,16 +289,16 @@ struct scsi_host_template usb_stor_host_template = {
 	/* basic userland interface stuff */
 	.name =				"usb-storage",
 	.proc_name =			"usb-storage",
-	.proc_info =			usb_storage_proc_info,
-	.info =				usb_storage_info,
+	.proc_info =			proc_info,
+	.info =				host_info,
 
 	/* command interface -- queued only */
-	.queuecommand =			usb_storage_queuecommand,
+	.queuecommand =			queuecommand,
 
 	/* error and abort handlers */
-	.eh_abort_handler =		usb_storage_command_abort,
-	.eh_device_reset_handler =	usb_storage_device_reset,
-	.eh_bus_reset_handler =		usb_storage_bus_reset,
+	.eh_abort_handler =		command_abort,
+	.eh_device_reset_handler =	device_reset,
+	.eh_bus_reset_handler =		bus_reset,
 
 	/* queue commands only, only one command per LUN */
 	.can_queue =			1,
@@ -381,6 +306,8 @@ struct scsi_host_template usb_stor_host_template = {
 
 	/* unknown initiator id */
 	.this_id =			-1,
+
+	.slave_configure =		slave_configure,
 
 	/* lots of sg segments can be handled */
 	.sg_tablesize =			SG_ALL,
