@@ -458,10 +458,6 @@ prep_calibrate_decr(void)
 
 	/* If we didn't get it from the residual data, try this. */
 	if ( res ) {
-		unsigned long flags;
-
-		save_flags(flags);
-
 #define TIMER0_COUNT 0x40
 #define TIMER_CONTROL 0x43
 		/* set timer to periodic mode */
@@ -476,7 +472,7 @@ prep_calibrate_decr(void)
 		/* wait for calibrate */
 		while ( calibrate_steps )
 			;
-		restore_flags(flags);
+		local_irq_disable();
 		free_irq( 0, NULL);
 	}
 }
@@ -581,11 +577,8 @@ prep_restart(char *cmd)
 static void __prep
 prep_halt(void)
 {
-	unsigned long flags;
-	local_irq_disable();
 	/* set exception prefix high - to the prom */
-	save_flags( flags );
-	restore_flags( flags|MSR_IP );
+	_nmask_and_or_msr(MSR_EE, MSR_IP);
 
 	/* make sure bit 0 (reset) is a 0 */
 	outb( inb(0x92) & ~1L , 0x92 );
@@ -648,11 +641,8 @@ static void __prep
 prep_power_off(void)
 {
 	if ( _prep_type == _PREP_IBM) {
-		unsigned long flags;
-		local_irq_disable();
 		/* set exception prefix high - to the prom */
-		save_flags( flags );
-		restore_flags( flags|MSR_IP );
+		_nmask_and_or_msr(MSR_EE, MSR_IP);
 
 		utah_sig87c750_setbit(21, 5, 1); /* set bit 21.5, "PMEXEC_OFF" */
 

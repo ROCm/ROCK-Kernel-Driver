@@ -191,11 +191,8 @@ pplus_restart(char *cmd)
 static void
 pplus_halt(void)
 {
-	unsigned long flags;
-	local_irq_disable();
 	/* set exception prefix high - to the prom */
-	save_flags( flags );
-	restore_flags( flags|MSR_IP );
+	_nmask_and_or_msr(MSR_EE, MSR_IP);
 
 	/* make sure bit 0 (reset) is a 0 */
 	outb( inb(0x92) & ~1L , 0x92 );
