@@ -1,5 +1,5 @@
-/* $Id: pcic.c,v 1.23 2002/01/23 14:33:55 davem Exp $
- * pcic.c: Sparc/PCI controller support
+/*
+ * pcic.c: MicroSPARC-IIep PCI controller support
  *
  * Copyright (C) 1998 V. Roganov and G. Raiko
  *
@@ -193,48 +193,26 @@ static void pci_do_settimeofday(struct timeval *tv);
 
 #define CONFIG_CMD(bus, device_fn, where) (0x80000000 | (((unsigned int)bus) << 16) | (((unsigned int)device_fn) << 8) | (where & ~3))
 
-static int pcic_read_config(struct pci_bus *bus, unsigned int devfn,
-			    int where, int size, u32 *value)
+static int pcic_read_config_dword(unsigned int busno, unsigned int devfn,
+    int where, u32 *value)
 {
-	unsigned int v;
-	unsigned char busnum = bus->number;
 	struct linux_pcic *pcic;
 	unsigned long flags;
-	/* unsigned char where; */
 
-	switch (size) {
-	case 1:
-		pcic_read_config(bus, devfn, where&~3, 4, &v);
-		*value = 0xff & (v >> (8*(where & 3)));
-		return PCIBIOS_SUCCESSFUL;
-		break;
-
-	case 2:
-		if (where&1) return PCIBIOS_BAD_REGISTER_NUMBER;
-
-		pcic_read_config(bus, devfn, where&~3, 4, &v);
-		*value = 0xffff & (v >> (8*(where & 3)));
-		return PCIBIOS_SUCCESSFUL;
-		break;
-	}
-
-	/* size == 4, i.e. dword */
-	if (where&3) return PCIBIOS_BAD_REGISTER_NUMBER;
-	if (busnum != 0) return PCIBIOS_DEVICE_NOT_FOUND;
 	pcic = &pcic0;
 
-	save_and_cli(flags);
+	local_irq_save(flags);
 #if 0 /* does not fail here */
 	pcic_speculative = 1;
 	pcic_trapped = 0;
 #endif
-	writel(CONFIG_CMD(busnum,devfn,where), pcic->pcic_config_space_addr);
+	writel(CONFIG_CMD(busno, devfn, where), pcic->pcic_config_space_addr);
 #if 0 /* does not fail here */
 	nop();
 	if (pcic_trapped) {
-		restore_flags(flags);
+		local_irq_restore(flags);
 		*value = ~0;
-		return PCIBIOS_SUCCESSFUL;
+		return 0;
 	}
 #endif
 	pcic_speculative = 2;
@@ -243,50 +221,77 @@ static int pcic_read_config(struct pci_bus *bus, unsigned int devfn,
 	nop();
 	if (pcic_trapped) {
 		pcic_speculative = 0;
-		restore_flags(flags);
+		local_irq_restore(flags);
 		*value = ~0;
-		return PCIBIOS_SUCCESSFUL;
+		return 0;
 	}
 	pcic_speculative = 0;
-	restore_flags(flags);
-	return PCIBIOS_SUCCESSFUL;
+	local_irq_restore(flags);
+	return 0;
 }
 
-static int pcic_write_config(struct pci_bus *bus, unsigned int devfn,
-			     int where, int size, u32 value)
+static int pcic_read_config(struct pci_bus *bus, unsigned int devfn,
+   int where, int size, u32 *val)
 {
 	unsigned int v;
-	unsigned char busnum = bus->number;
+
+	if (bus->number != 0) return -EINVAL;
+	switch (size) {
+	case 1:
+		pcic_read_config_dword(bus->number, devfn, where&~3, &v);
+		*val = 0xff & (v >> (8*(where & 3)));
+		return 0;
+	case 2:
+		if (where&1) return -EINVAL;
+		pcic_read_config_dword(bus->number, devfn, where&~3, &v);
+		*val = 0xffff & (v >> (8*(where & 3)));
+		return 0;
+	case 4:
+		if (where&3) return -EINVAL;
+		pcic_read_config_dword(bus->number, devfn, where&~3, &v);
+		return 0;
+	}
+	return -EINVAL;
+}
+
+static int pcic_write_config_dword(unsigned int busno, unsigned int devfn,
+    int where, u32 value)
+{
 	struct linux_pcic *pcic;
 	unsigned long flags;
 
-	switch (size) {
-	case 1:
-		pcic_read_config(bus, devfn, where&~3, 4, &v);
-	        v = (v & ~(0xff << (8*(where&3)))) |
-	            ((0xff&(unsigned)value) << (8*(where&3)));
-		return pcic_write_config(bus, devfn, where&~3, 4, v);
-		break;
-
-	case 2:
-		if (where&1) return PCIBIOS_BAD_REGISTER_NUMBER;
-		pcic_read_config(bus, devfn, where&~3, 4, &v);
-		v = (v & ~(0xffff << (8*(where&3)))) |
-		    ((0xffff&(unsigned)value) << (8*(where&3)));
-		return pcic_write_config(bus, devfn, where&~3, 4, v);
-		break;
-	}
-
-	/* size == 4, i.e. dword */
-	if (where&3) return PCIBIOS_BAD_REGISTER_NUMBER;
-	if (busnum != 0) return PCIBIOS_DEVICE_NOT_FOUND;
 	pcic = &pcic0;
 
-	save_and_cli(flags);
-	writel(CONFIG_CMD(busnum,devfn,where), pcic->pcic_config_space_addr);
+	local_irq_save(flags);
+	writel(CONFIG_CMD(busno, devfn, where), pcic->pcic_config_space_addr);
 	writel(value, pcic->pcic_config_space_data + (where&4));
-	restore_flags(flags);
-	return PCIBIOS_SUCCESSFUL;
+	local_irq_restore(flags);
+	return 0;
+}
+
+static int pcic_write_config(struct pci_bus *bus, unsigned int devfn,
+   int where, int size, u32 val)
+{
+	unsigned int v;
+
+	if (bus->number != 0) return -EINVAL;
+	switch (size) {
+	case 1:
+		pcic_read_config_dword(bus->number, devfn, where&~3, &v);
+		v = (v & ~(0xff << (8*(where&3)))) |
+		    ((0xff&val) << (8*(where&3)));
+		return pcic_write_config_dword(bus->number, devfn, where&~3, v);
+	case 2:
+		if (where&1) return -EINVAL;
+		pcic_read_config_dword(bus->number, devfn, where&~3, &v);
+		v = (v & ~(0xffff << (8*(where&3)))) |
+		    ((0xffff&val) << (8*(where&3)));
+		return pcic_write_config_dword(bus->number, devfn, where&~3, v);
+	case 4:
+		if (where&3) return -EINVAL;
+		return pcic_write_config_dword(bus->number, devfn, where, val);
+	}
+	return -EINVAL;
 }
 
 static struct pci_ops pcic_ops = {
@@ -623,7 +628,7 @@ void __init pcibios_fixup_bus(struct pci_bus *bus)
 {
 	struct list_head *walk;
 	int i, has_io, has_mem;
-	unsigned short cmd;
+	unsigned int cmd;
 	struct linux_pcic *pcic;
 	/* struct linux_pbm_info* pbm = &pcic->pbm; */
 	int node;
@@ -663,19 +668,21 @@ void __init pcibios_fixup_bus(struct pci_bus *bus)
 			} else if (f & IORESOURCE_MEM)
 				has_mem = 1;
 		}
-		pcic_read_config_word(dev, PCI_COMMAND, &cmd);
+		pcic_read_config(dev->bus, dev->devfn, PCI_COMMAND, 2, &cmd);
 		if (has_io && !(cmd & PCI_COMMAND_IO)) {
 			printk("PCIC: Enabling I/O for device %02x:%02x\n",
 				dev->bus->number, dev->devfn);
 			cmd |= PCI_COMMAND_IO;
-			pcic_write_config_word(dev, PCI_COMMAND, cmd);
+			pcic_write_config(dev->bus, dev->devfn,
+			    PCI_COMMAND, 2, cmd);
 		}
 		if (has_mem && !(cmd & PCI_COMMAND_MEMORY)) {
 			printk("PCIC: Enabling memory for device %02x:%02x\n",
 				dev->bus->number, dev->devfn);
 			cmd |= PCI_COMMAND_MEMORY;
-			pcic_write_config_word(dev, PCI_COMMAND, cmd);
-		}    
+			pcic_write_config(dev->bus, dev->devfn,
+			    PCI_COMMAND, 2, cmd);
+		}
 
 		node = pdev_to_pnode(&pcic->pbm, dev);
 		if(node == 0)
@@ -791,7 +798,7 @@ static void pci_do_gettimeofday(struct timeval *tv)
 {
  	unsigned long flags;
 
-	save_and_cli(flags);
+	local_irq_save(flags);
 	*tv = xtime;
 	tv->tv_usec += do_gettimeoffset();
 
@@ -803,7 +810,7 @@ static void pci_do_gettimeofday(struct timeval *tv)
 	if ((jiffies - wall_jiffies) != 0)
 		tv->tv_usec += USECS_PER_JIFFY;
 
-	restore_flags(flags);
+	local_irq_restore(flags);
 
 	if (tv->tv_usec >= 1000000) {
 		tv->tv_usec -= 1000000;
@@ -813,7 +820,9 @@ static void pci_do_gettimeofday(struct timeval *tv)
 
 static void pci_do_settimeofday(struct timeval *tv)
 {
-	cli();
+ 	unsigned long flags;
+
+	local_irq_save(flags);
 	tv->tv_usec -= do_gettimeoffset();
 	if(tv->tv_usec < 0) {
 		tv->tv_usec += 1000000;
@@ -824,7 +833,7 @@ static void pci_do_settimeofday(struct timeval *tv)
 	time_status |= STA_UNSYNC;
 	time_maxerror = NTP_PHASE_LIMIT;
 	time_esterror = NTP_PHASE_LIMIT;
-	sti();
+	local_irq_restore(flags);
 }
 
 #if 0
@@ -898,9 +907,9 @@ static void pcic_disable_irq(unsigned int irq_nr)
 	unsigned long mask, flags;
 
 	mask = get_irqmask(irq_nr);
-	save_and_cli(flags);
+	local_irq_save(flags);
 	writel(mask, pcic0.pcic_regs+PCI_SYS_INT_TARGET_MASK_SET);
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static void pcic_enable_irq(unsigned int irq_nr)
@@ -908,9 +917,9 @@ static void pcic_enable_irq(unsigned int irq_nr)
 	unsigned long mask, flags;
 
 	mask = get_irqmask(irq_nr);
-	save_and_cli(flags);
+	local_irq_save(flags);
 	writel(mask, pcic0.pcic_regs+PCI_SYS_INT_TARGET_MASK_CLEAR);
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static void pcic_clear_profile_irq(int cpu)

@@ -463,3 +463,19 @@ struct seq_operations cpuinfo_op = {
 	.stop =	c_stop,
 	.show =	show_cpuinfo,
 };
+
+extern int stop_a_enabled;
+
+void sun_do_break(void)
+{
+	if (!stop_a_enabled)
+		return;
+
+	printk("\n");
+	flush_user_windows();
+
+	prom_cmdline();
+}
+
+int serial_console;
+int stop_a_enabled = 1;

@@ -506,9 +506,18 @@ asmlinkage void user_unaligned_trap(struct pt_regs *regs, unsigned int insn)
 			break;
 
 		case both:
+#if 0 /* unsupported */
 			do_atomic(fetch_reg_addr(((insn>>25)&0x1f), regs),
 				  (unsigned long *) addr,
 				  user_unaligned_trap_fault);
+#else
+			/*
+			 * This was supported in 2.4. However, we question
+			 * the value of SWAP instruction across word boundaries.
+			 */
+			printk("Unaligned SWAP unsupported.\n");
+			goto kill_user;
+#endif
 			break;
 
 		default:

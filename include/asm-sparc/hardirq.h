@@ -115,7 +115,7 @@ do {                                                                    \
 
 #ifndef CONFIG_SMP
 
-#define synchronize_irq()	barrier()
+#define synchronize_irq(irq)	barrier()
 
 #else /* (CONFIG_SMP) */
 
