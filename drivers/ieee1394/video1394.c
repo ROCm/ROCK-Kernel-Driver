@@ -213,7 +213,7 @@ alloc_dma_iso_ctx(struct ti_ohci *ohci, int type, int num_desc,
 	d->frame_size = buf_size;
 	d->buf_size = PAGE_ALIGN(buf_size);
 	d->last_buffer = -1;
-	INIT_LIST_HEAD(&d->list);
+	INIT_LIST_HEAD(&d->link);
 	init_waitqueue_head(&d->waitq);
 
 	/* Init the regions for easy cleanup */
