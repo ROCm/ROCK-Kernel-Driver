@@ -278,13 +278,39 @@ atomic_t tcp_orphan_count = ATOMIC_INIT(0);
 
 int sysctl_tcp_default_win_scale = 7;
 
+int sysctl_tcp_mem[3];
+int sysctl_tcp_wmem[3] = { 4 * 1024, 16 * 1024, 128 * 1024 };
+int sysctl_tcp_rmem[3] = { 4 * 1024, 87380, 87380 * 2 };
+
+EXPORT_SYMBOL(sysctl_tcp_mem);
+EXPORT_SYMBOL(sysctl_tcp_rmem);
+EXPORT_SYMBOL(sysctl_tcp_wmem);
+
+atomic_t tcp_memory_allocated;	/* Current allocated memory. */
+atomic_t tcp_sockets_allocated;	/* Current number of TCP sockets. */
+
+EXPORT_SYMBOL(tcp_memory_allocated);
+EXPORT_SYMBOL(tcp_sockets_allocated);
+
+/*
+ * Pressure flag: try to collapse.
+ * Technical note: it is used by multiple contexts non atomically.
+ * All the sk_stream_mem_schedule() is of this nature: accounting
+ * is strict, actions are advisory and have some latency.
+ */
+int tcp_memory_pressure;
+
+EXPORT_SYMBOL(tcp_memory_pressure);
+
 void tcp_enter_memory_pressure(void)
 {
-	if (!tcp_prot.memory_pressure) {
+	if (!tcp_memory_pressure) {
 		NET_INC_STATS(TCPMemoryPressures);
-		tcp_prot.memory_pressure = 1;
+		tcp_memory_pressure = 1;
 	}
 }
+
+EXPORT_SYMBOL(tcp_enter_memory_pressure);
 
 /*
  * LISTEN is a special case for poll..
@@ -639,8 +665,8 @@ new_segment:
 			if (!sk_stream_memory_free(sk))
 				goto wait_for_sndbuf;
 
-			skb = tcp_alloc_pskb(sk, 0, tp->mss_cache,
-					     sk->sk_allocation);
+			skb = sk_stream_alloc_pskb(sk, 0, tp->mss_cache,
+						   sk->sk_allocation);
 			if (!skb)
 				goto wait_for_memory;
 
@@ -806,8 +832,8 @@ new_segment:
 				if (!sk_stream_memory_free(sk))
 					goto wait_for_sndbuf;
 
-				skb = tcp_alloc_pskb(sk, select_size(sk, tp),
-						     0, sk->sk_allocation);
+				skb = sk_stream_alloc_pskb(sk, select_size(sk, tp),
+							   0, sk->sk_allocation);
 				if (!skb)
 					goto wait_for_memory;
 
@@ -868,7 +894,7 @@ new_segment:
 
 				if (!page) {
 					/* Allocate new cache page. */
-					if (!(page = tcp_alloc_page(sk)))
+					if (!(page = sk_stream_alloc_page(sk)))
 						goto wait_for_memory;
 					off = 0;
 				}
@@ -1722,7 +1748,7 @@ adjudge_to_death:
 		sk_stream_mem_reclaim(sk);
 		if (atomic_read(&tcp_orphan_count) > sysctl_tcp_max_orphans ||
 		    (sk->sk_wmem_queued > SOCK_MIN_SNDBUF &&
-		     atomic_read(&tcp_prot.memory_allocated) > tcp_prot.sysctl_mem[2])) {
+		     atomic_read(&tcp_memory_allocated) > sysctl_tcp_mem[2])) {
 			if (net_ratelimit())
 				printk(KERN_INFO "TCP: too many of orphaned "
 				       "sockets\n");
@@ -1778,7 +1804,7 @@ int tcp_disconnect(struct sock *sk, int flags)
 
 	tcp_clear_xmit_timers(sk);
 	__skb_queue_purge(&sk->sk_receive_queue);
-	tcp_writequeue_purge(sk);
+	sk_stream_writequeue_purge(sk);
 	__skb_queue_purge(&tp->out_of_order_queue);
 
 	inet->dport = 0;
@@ -2269,15 +2295,15 @@ void __init tcp_init(void)
 	}
 	tcp_port_rover = sysctl_local_port_range[0] - 1;
 
-	tcp_prot.sysctl_mem[0] =  768 << order;
-	tcp_prot.sysctl_mem[1] = 1024 << order;
-	tcp_prot.sysctl_mem[2] = 1536 << order;
+	sysctl_tcp_mem[0] =  768 << order;
+	sysctl_tcp_mem[1] = 1024 << order;
+	sysctl_tcp_mem[2] = 1536 << order;
 
 	if (order < 3) {
-		tcp_prot.sysctl_wmem[2] = 64 * 1024;
-		tcp_prot.sysctl_rmem[0] = PAGE_SIZE;
-		tcp_prot.sysctl_rmem[1] = 43689;
-		tcp_prot.sysctl_rmem[2] = 2 * 43689;
+		sysctl_tcp_wmem[2] = 64 * 1024;
+		sysctl_tcp_rmem[0] = PAGE_SIZE;
+		sysctl_tcp_rmem[1] = 43689;
+		sysctl_tcp_rmem[2] = 2 * 43689;
 	}
 
 	printk(KERN_INFO "TCP: Hash tables configured "
