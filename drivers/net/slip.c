@@ -57,6 +57,7 @@
 #define SL_CHECK_TRANSMIT
 #include <linux/config.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 
 #include <asm/system.h>
 #include <asm/uaccess.h>
@@ -85,8 +86,8 @@
 
 static struct net_device **slip_devs;
 
-int slip_maxdev = SL_NRUNIT;		/* Can be overridden with insmod! */
-MODULE_PARM(slip_maxdev, "i");
+static int slip_maxdev = SL_NRUNIT;
+module_param(slip_maxdev, int, 0);
 MODULE_PARM_DESC(slip_maxdev, "Maximum number of slip devices");
 
 static int slip_esc(unsigned char *p, unsigned char *d, int len);
