@@ -28,7 +28,6 @@
 #include <linux/random.h>
 
 #ifdef CONFIG_INET
-#include <net/protocol.h>
 #include <net/inet_common.h>
 #include <linux/inet.h>
 #if defined(CONFIG_INET_AH) || defined(CONFIG_INET_AH_MODULE) || defined(CONFIG_INET6_AH) || defined(CONFIG_INET6_AH_MODULE)
@@ -61,9 +60,6 @@ EXPORT_SYMBOL(destroy_EII_client);
 #endif
 
 #ifdef CONFIG_INET
-/* Internet layer registration */
-EXPORT_SYMBOL(inet_add_protocol);
-EXPORT_SYMBOL(inet_del_protocol);
 EXPORT_SYMBOL(ip_options_compile);
 EXPORT_SYMBOL(ip_options_undo);
 EXPORT_SYMBOL(in_aton);
