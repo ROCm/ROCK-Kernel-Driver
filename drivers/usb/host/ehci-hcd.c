@@ -862,6 +862,30 @@ static int ehci_urb_enqueue (
 	}
 }
 
+static void unlink_async (struct ehci_hcd *ehci, struct ehci_qh *qh)
+{
+	/* if we need to use IAA and it's busy, defer */
+	if (qh->qh_state == QH_STATE_LINKED
+			&& ehci->reclaim
+			&& HCD_IS_RUNNING (ehci->hcd.state)) {
+		struct ehci_qh		*last;
+
+		for (last = ehci->reclaim;
+				last->reclaim;
+				last = last->reclaim)
+			continue;
+		qh->qh_state = QH_STATE_UNLINK_WAIT;
+		last->reclaim = qh;
+
+	/* bypass IAA if the hc can't care */
+	} else if (!HCD_IS_RUNNING (ehci->hcd.state) && ehci->reclaim)
+		end_unlink_async (ehci, NULL);
+
+	/* something else might have unlinked the qh by now */
+	if (qh->qh_state == QH_STATE_LINKED)
+		start_unlink_async (ehci, qh);
+}
+
 /* remove from hardware lists
  * completions normally happen asynchronously
  */
@@ -880,28 +904,7 @@ static int ehci_urb_dequeue (struct usb_hcd *hcd, struct urb *urb)
 		qh = (struct ehci_qh *) urb->hcpriv;
 		if (!qh)
 			break;
-
-		/* if we need to use IAA and it's busy, defer */
-		if (qh->qh_state == QH_STATE_LINKED
-				&& ehci->reclaim
-				&& HCD_IS_RUNNING (ehci->hcd.state)
-				) {
-			struct ehci_qh		*last;
-
-			for (last = ehci->reclaim;
-					last->reclaim;
-					last = last->reclaim)
-				continue;
-			qh->qh_state = QH_STATE_UNLINK_WAIT;
-			last->reclaim = qh;
-
-		/* bypass IAA if the hc can't care */
-		} else if (!HCD_IS_RUNNING (ehci->hcd.state) && ehci->reclaim)
-			end_unlink_async (ehci, NULL);
-
-		/* something else might have unlinked the qh by now */
-		if (qh->qh_state == QH_STATE_LINKED)
-			start_unlink_async (ehci, qh);
+		unlink_async (ehci, qh);
 		break;
 
 	case PIPE_INTERRUPT:
@@ -954,7 +957,7 @@ ehci_endpoint_disable (struct usb_hcd *hcd, struct hcd_dev *dev, int ep)
 	struct ehci_hcd		*ehci = hcd_to_ehci (hcd);
 	int			epnum;
 	unsigned long		flags;
-	struct ehci_qh		*qh;
+	struct ehci_qh		*qh, *tmp;
 
 	/* ASSERT:  any requests/urbs are being unlinked */
 	/* ASSERT:  nobody can be submitting urbs for this any more */
@@ -980,6 +983,16 @@ rescan:
 	if (!HCD_IS_RUNNING (ehci->hcd.state))
 		qh->qh_state = QH_STATE_IDLE;
 	switch (qh->qh_state) {
+	case QH_STATE_LINKED:
+		for (tmp = ehci->async->qh_next.qh;
+				tmp && tmp != qh;
+				tmp = tmp->qh_next.qh)
+			continue;
+		/* periodic qh self-unlinks on empty */
+		if (!tmp)
+			goto nogood;
+		unlink_async (ehci, qh);
+		/* FALL THROUGH */
 	case QH_STATE_UNLINK:		/* wait for hw to finish? */
 idle_timeout:
 		spin_unlock_irqrestore (&ehci->lock, flags);
@@ -993,6 +1006,7 @@ idle_timeout:
 		}
 		/* else FALL THROUGH */
 	default:
+nogood:
 		/* caller was supposed to have unlinked any requests;
 		 * that's not our job.  just leak this memory.
 		 */
