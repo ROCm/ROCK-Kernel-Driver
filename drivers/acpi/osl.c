@@ -138,33 +138,7 @@ acpi_os_free(void *ptr)
 {
 	kfree(ptr);
 }
- #ifdef CONFIG_ACPI_INITRD
- unsigned char* get_dsdt_from_initrd(unsigned char *start, unsigned char *end)
- {
-        unsigned char *data;
-        unsigned char signature[] = "INITRDDSDT123DSDT123";
- 
-        if (start == NULL)
-                return NULL;
-        printk(KERN_INFO "Looking for DSDT in initrd ...");
-        if (!memcmp(start, "DSDT", 4)) {
-                printk(" found at beginning!\n");
-                return start;
-        }
-        end-=sizeof(signature)+5; /* don't scan above end, signature+\0+DSDT */
-        for (data=start; data < end ; ++data) {
-                if (!memcmp(data, signature, sizeof(signature)-1)) {
-                        if (!memcmp(data+sizeof(signature), "DSDT", 4)) {
-                                printk(" found (at offset %u)!\n", data+sizeof(signature)-start);
-                                return data+sizeof(signature);
-                        }
-                }
-        }
-        printk(" not found!\n");
- 
-        return NULL;
- }
- #endif
+
 acpi_status
 acpi_os_get_root_pointer(u32 flags, struct acpi_pointer *addr)
 {
@@ -256,24 +230,31 @@ acpi_os_table_override (struct acpi_table_header *existing_table,
 			struct acpi_table_header **new_table)
 {
  #ifdef CONFIG_ACPI_INITRD
-        extern unsigned long initrd_start, initrd_end;
-        unsigned char* new_dsdt=NULL;
- 
+	extern char* dsdt_start;
  #endif
          if (!existing_table || !new_table)
                  return AE_BAD_PARAMETER;
   
- #ifdef CONFIG_ACPI_INITRD
-        if (strncmp(existing_table->signature, "DSDT", 4) == 0 &&
-                (new_dsdt=get_dsdt_from_initrd((unsigned char*)initrd_start,
-                        (unsigned char*)initrd_end)) != NULL)
-                *new_table = (struct acpi_table_header*)new_dsdt;
-        else
+  #ifdef CONFIG_ACPI_INITRD
+	if(memcmp(existing_table, "DSDT", 4)){
+		*new_table = NULL;
+		return AE_OK;
+	}
+	// dsdt_start has been kmalloced in /init/initram.c
+	// where should it be freed ?!? 
+	if (dsdt_start != NULL){
+	 	printk(KERN_INFO "new dsdt found and will be loaded!\n");
+		*new_table = (struct acpi_table_header*)dsdt_start;
+		return AE_OK;
+	 }
+	 else{
+		printk(KERN_INFO "No customized DSDT found!\n");
                 *new_table = NULL;
+		return AE_OK;
+	 }
  #else
          *new_table = NULL;
  #endif
- 
          return AE_OK;
 }
 
