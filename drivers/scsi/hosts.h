@@ -479,12 +479,6 @@ struct Scsi_Host
      */
     unsigned int max_host_blocked;
 
-    /*
-     * For SCSI hosts which are PCI devices, set pci_dev so that
-     * we can do BIOS EDD 3.0 mappings
-     */
-    struct pci_dev *pci_dev;
-
     /* 
      * Support for driverfs filesystem
      */
@@ -522,11 +516,16 @@ static inline void scsi_assign_lock(struct Scsi_Host *shost, spinlock_t *lock)
 	shost->host_lock = lock;
 }
 
+static inline void scsi_set_device(struct Scsi_Host *shost,
+                                   struct device *dev)
+{
+        shost->host_gendev = dev;
+}
+
 static inline void scsi_set_pci_device(struct Scsi_Host *shost,
                                        struct pci_dev *pdev)
 {
-	shost->pci_dev = pdev;
-	shost->host_gendev = &pdev->dev;
+        scsi_set_device(shost, &pdev->dev);
 }
 
 

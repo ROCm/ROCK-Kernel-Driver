@@ -373,11 +373,12 @@ static void scsi_initialize_merge_fn(struct scsi_device *sd)
 {
 	request_queue_t *q = &sd->request_queue;
 	struct Scsi_Host *sh = sd->host;
+	struct device *dev = sh->host_driverfs_dev.parent;
 	u64 bounce_limit;
 
 	if (sh->highmem_io) {
-		if (sh->pci_dev && PCI_DMA_BUS_IS_PHYS) {
-			bounce_limit = sh->pci_dev->dma_mask;
+		if (dev && dev->dma_mask && PCI_DMA_BUS_IS_PHYS) {
+			bounce_limit = *dev->dma_mask;
 		} else {
 			/*
 			 * Platforms with virtual-DMA translation
