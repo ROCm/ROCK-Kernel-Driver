@@ -1475,7 +1475,6 @@ static int acct_stack_growth(struct vm_area_struct * vma, unsigned long size, un
 int expand_stack(struct vm_area_struct * vma, unsigned long address)
 {
 	int error;
-	unsigned long size, grow;
 
 	if (!(vma->vm_flags & VM_GROWSUP))
 		return -EFAULT;
@@ -1495,12 +1494,19 @@ int expand_stack(struct vm_area_struct * vma, unsigned long address)
 	 */
 	address += 4 + PAGE_SIZE - 1;
 	address &= PAGE_MASK;
-	size = address - vma->vm_start;
-	grow = (address - vma->vm_end) >> PAGE_SHIFT;
+	error = 0;
 
-	error = acct_stack_growth(vma, size, grow);
-	if (!error)
-		vma->vm_end = address;
+	/* Somebody else might have raced and expanded it already */
+	if (address > vma->vm_end) {
+		unsigned long size, grow;
+
+		size = address - vma->vm_start;
+		grow = (address - vma->vm_end) >> PAGE_SHIFT;
+
+		error = acct_stack_growth(vma, size, grow);
+		if (!error)
+			vma->vm_end = address;
+	}
 	anon_vma_unlock(vma);
 	return error;
 }
@@ -1528,7 +1534,6 @@ find_extend_vma(struct mm_struct *mm, unsigned long addr)
 int expand_stack(struct vm_area_struct *vma, unsigned long address)
 {
 	int error;
-	unsigned long size, grow;
 
 	/*
 	 * We must make sure the anon_vma is allocated
@@ -1544,13 +1549,20 @@ int expand_stack(struct vm_area_struct *vma, unsigned long address)
 	 * anon_vma lock to serialize against concurrent expand_stacks.
 	 */
 	address &= PAGE_MASK;
-	size = vma->vm_end - address;
-	grow = (vma->vm_start - address) >> PAGE_SHIFT;
+	error = 0;
 
-	error = acct_stack_growth(vma, size, grow);
-	if (!error) {
-		vma->vm_start = address;
-		vma->vm_pgoff -= grow;
+	/* Somebody else might have raced and expanded it already */
+	if (address < vma->vm_start) {
+		unsigned long size, grow;
+
+		size = vma->vm_end - address;
+		grow = (vma->vm_start - address) >> PAGE_SHIFT;
+
+		error = acct_stack_growth(vma, size, grow);
+		if (!error) {
+			vma->vm_start = address;
+			vma->vm_pgoff -= grow;
+		}
 	}
 	anon_vma_unlock(vma);
 	return error;
