@@ -511,6 +511,7 @@ config FRAME_POINTER
 	 Normally you should say N.
 
 config IOMMU_DEBUG
+       depends on GART_IOMMU && DEBUG_KERNEL
        bool "Force IOMMU to on" 
        help
          Force the IOMMU to on even when you have less than 4GB of memory and add 
