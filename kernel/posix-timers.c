@@ -1294,7 +1294,7 @@ do_clock_nanosleep(clockid_t which_clock, int flags, struct timespec *tsave)
 		}
 		restart_block->fn = clock_nanosleep_restart;
 		restart_block->arg0 = which_clock;
-		restart_block->arg1 = (int)tsave;
+		restart_block->arg1 = (unsigned long)tsave;
 		restart_block->arg2 = new_timer.expires;
 		return -ERESTART_RESTARTBLOCK;
 	}
