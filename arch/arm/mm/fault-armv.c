@@ -151,7 +151,7 @@ static void adjust_pte(struct vm_area_struct *vma, unsigned long address)
 	if (pmd_bad(*pmd))
 		goto bad_pmd;
 
-	pte = pte_offset(pmd, address);
+	pte = pte_offset_map(pmd, address);
 	entry = *pte;
 
 	/*
@@ -164,6 +164,7 @@ static void adjust_pte(struct vm_area_struct *vma, unsigned long address)
 		set_pte(pte, entry);
 		flush_tlb_page(vma, address);
 	}
+	pte_unmap(pte);
 	return;
 
 bad_pgd:

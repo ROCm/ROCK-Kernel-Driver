@@ -95,9 +95,6 @@ void cpu_idle(void)
 			idle();
 		leds_event(led_idle_end);
 		schedule();
-#ifndef CONFIG_NO_PGT_CACHE
-		check_pgt_cache();
-#endif
 	}
 }
 

@@ -682,7 +682,6 @@ comment 'Kernel hacking'
 bool 'Compile kernel without frame pointer' CONFIG_NO_FRAME_POINTER
 bool 'Verbose user fault messages' CONFIG_DEBUG_USER
 bool 'Include debugging information in kernel binary' CONFIG_DEBUG_INFO
-dep_bool 'Disable pgtable cache' CONFIG_NO_PGT_CACHE $CONFIG_CPU_26
 
 bool 'Kernel debugging' CONFIG_DEBUG_KERNEL
 dep_bool '  Debug memory allocations' CONFIG_DEBUG_SLAB $CONFIG_DEBUG_KERNEL
