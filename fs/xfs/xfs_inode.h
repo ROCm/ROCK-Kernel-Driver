@@ -459,8 +459,8 @@ xfs_inode_t *xfs_bhvtoi(struct bhv_desc *bhvp);
  * directory, group of new file is set to that of the parent, and
  * new subdirectory gets S_ISGID bit from parent.
  */
-#define XFS_INHERIT_GID(pip, vfsp)	((pip) != NULL && \
-	(((vfsp)->vfs_flag & VFS_GRPID) || ((pip)->i_d.di_mode & S_ISGID)))
+#define XFS_INHERIT_GID(pip, vfsp)	\
+	(((vfsp)->vfs_flag & VFS_GRPID) || ((pip)->i_d.di_mode & S_ISGID))
 
 /*
  * xfs_iget.c prototypes.
