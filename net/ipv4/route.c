@@ -1993,7 +1993,7 @@ e_nobufs:
 	goto done;
 }
 
-int ip_route_output_key(struct rtable **rp, const struct flowi *flp)
+int __ip_route_output_key(struct rtable **rp, const struct flowi *flp)
 {
 	unsigned hash;
 	struct rtable *rth;
@@ -2023,7 +2023,20 @@ int ip_route_output_key(struct rtable **rp, const struct flowi *flp)
 	read_unlock_bh(&rt_hash_table[hash].lock);
 
 	return ip_route_output_slow(rp, flp);
-}	
+}
+
+int ip_route_output_key(struct rtable **rp, struct flowi *flp)
+{
+	int err;
+
+	if ((err = __ip_route_output_key(rp, flp)) != 0)
+		return err;
+#if 0
+	return flp->proto ? xfrm_lookup((struct dst_entry**)rp, flp, NULL, 0) : 0;
+#else
+	return 0;
+#endif
+}
 
 static int rt_fill_info(struct sk_buff *skb, u32 pid, u32 seq, int event,
 			int nowait)

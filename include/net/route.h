@@ -112,7 +112,8 @@ extern void		ip_rt_redirect(u32 old_gw, u32 dst, u32 new_gw,
 				       u32 src, u8 tos, struct net_device *dev);
 extern void		ip_rt_advice(struct rtable **rp, int advice);
 extern void		rt_cache_flush(int how);
-extern int		ip_route_output_key(struct rtable **, const struct flowi *flp);
+extern int		__ip_route_output_key(struct rtable **, const struct flowi *flp);
+extern int		ip_route_output_key(struct rtable **, struct flowi *flp);
 extern int		ip_route_input(struct sk_buff*, u32 dst, u32 src, u8 tos, struct net_device *devin);
 extern unsigned short	ip_rt_frag_needed(struct iphdr *iph, unsigned short new_mtu);
 extern void		ip_rt_send_redirect(struct sk_buff *skb);
@@ -150,13 +151,15 @@ static inline int ip_route_connect(struct rtable **rp, u32 dst, u32 src, u32 tos
 					 .dport = dport } } };
 
 	int err;
-	err = ip_route_output_key(rp, &fl);
-	if (err || (dst && src))
-		return err;
-	fl.fl4_dst = (*rp)->rt_dst;
-	fl.fl4_src = (*rp)->rt_src;
-	ip_rt_put(*rp);
-	*rp = NULL;
+	if (!dst || !src) {
+		err = __ip_route_output_key(rp, &fl);
+		if (err)
+			return err;
+		fl.fl4_dst = (*rp)->rt_dst;
+		fl.fl4_src = (*rp)->rt_src;
+		ip_rt_put(*rp);
+		*rp = NULL;
+	}
 	return ip_route_output_key(rp, &fl);
 }
 
