@@ -571,7 +571,7 @@ static void ip6_rt_update_pmtu(struct dst_entry *dst, u32 mtu)
 	if (mtu < dst_pmtu(dst) && rt6->rt6i_dst.plen == 128) {
 		rt6->rt6i_flags |= RTF_MODIFIED;
 		if (mtu < IPV6_MIN_MTU)
-			mtu = IPV6_MIN_MTU
+			mtu = IPV6_MIN_MTU;
 		dst->metrics[RTAX_MTU-1] = mtu;
 	}
 }
