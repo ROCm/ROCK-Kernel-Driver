@@ -238,7 +238,10 @@ static struct inode *bdev_alloc_inode(struct super_block *sb)
 
 static void bdev_destroy_inode(struct inode *inode)
 {
-	kmem_cache_free(bdev_cachep, BDEV_I(inode));
+	struct bdev_inode *bdi = BDEV_I(inode);
+
+	bdi->bdev.bd_inode_backing_dev_info = NULL;
+	kmem_cache_free(bdev_cachep, bdi);
 }
 
 static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
