@@ -62,7 +62,7 @@
 #define DRIVER_AUTHOR "Petko Manolov <petkan@users.sourceforge.net>"
 #define DRIVER_DESC "Pegasus/Pegasus II USB Ethernet driver"
 
-static const char driver_name [] = "pegasus";
+static const char driver_name[] = "pegasus";
 
 #define	PEGASUS_USE_INTR
 #define	PEGASUS_WRITE_EEPROM
