@@ -35,7 +35,7 @@
 #define NFSEXP_UIDMAP		0x0040
 #define NFSEXP_KERBEROS		0x0080		/* not available */
 #define NFSEXP_SUNSECURE	0x0100
-#define NFSEXP_CROSSMNT		0x0200
+#define NFSEXP_NOHIDE		0x0200
 #define NFSEXP_NOSUBTREECHECK	0x0400
 #define	NFSEXP_NOAUTHNLM	0x0800		/* Don't authenticate NLM requests - just trust */
 #define NFSEXP_MSNFS		0x1000	/* do silly things that MS clients expect */
@@ -73,7 +73,7 @@ struct svc_expkey {
 #define EX_SECURE(exp)		(!((exp)->ex_flags & NFSEXP_INSECURE_PORT))
 #define EX_ISSYNC(exp)		(!((exp)->ex_flags & NFSEXP_ASYNC))
 #define EX_RDONLY(exp)		((exp)->ex_flags & NFSEXP_READONLY)
-#define EX_CROSSMNT(exp)	((exp)->ex_flags & NFSEXP_CROSSMNT)
+#define EX_NOHIDE(exp)	((exp)->ex_flags & NFSEXP_NOHIDE)
 #define EX_SUNSECURE(exp)	((exp)->ex_flags & NFSEXP_SUNSECURE)
 #define EX_WGATHER(exp)		((exp)->ex_flags & NFSEXP_GATHERED_WRITES)
 
