@@ -59,11 +59,6 @@
 #ifndef __ASSEMBLY__
 
 /*
- * SPRN definitions
- */
-#define SPRN_CPC0_GPIO		0xe5/BEARLRL
-
-/*
  * DCRN definitions
  */
 
