@@ -127,7 +127,7 @@ setup_port(struct pci_dev *dev, struct serial_struct *req,
 			return -ENOMEM;
 
 		req->io_type = UPIO_MEM;
-		req->iomap_base = port;
+		req->iomap_base = port + offset;
 		req->iomem_base = priv->remapped_bar[bar] + offset;
 		req->iomem_reg_shift = regshift;
 	} else {
