@@ -196,7 +196,15 @@ rpc_clone_client(struct rpc_clnt *clnt)
 	memcpy(new, clnt, sizeof(*new));
 	atomic_set(&new->cl_count, 1);
 	atomic_set(&new->cl_users, 0);
-	atomic_inc(&new->cl_parent->cl_count);
+	new->cl_parent = clnt;
+	atomic_inc(&clnt->cl_count);
+	/* Duplicate portmapper */
+	rpc_init_wait_queue(&new->cl_pmap_default.pm_bindwait, "bindwait");
+	/* Turn off autobind on clones */
+	new->cl_autobind = 0;
+	new->cl_oneshot = 0;
+	new->cl_dead = 0;
+	rpc_init_rtt(&new->cl_rtt_default, clnt->cl_xprt->timeout.to_initval);
 	if (new->cl_auth)
 		atomic_inc(&new->cl_auth->au_count);
 	return new;
@@ -335,7 +343,7 @@ void rpc_clnt_sigunmask(struct rpc_clnt *clnt, sigset_t *oldset)
  */
 int rpc_call_sync(struct rpc_clnt *clnt, struct rpc_message *msg, int flags)
 {
-	struct rpc_task	my_task, *task = &my_task;
+	struct rpc_task	*task;
 	sigset_t	oldset;
 	int		status;
 
@@ -343,15 +351,15 @@ int rpc_call_sync(struct rpc_clnt *clnt, struct rpc_message *msg, int flags)
 	if (clnt->cl_dead) 
 		return -EIO;
 
-	if (flags & RPC_TASK_ASYNC) {
-		printk("rpc_call_sync: Illegal flag combination for synchronous task\n");
-		flags &= ~RPC_TASK_ASYNC;
-	}
+	BUG_ON(flags & RPC_TASK_ASYNC);
 
 	rpc_clnt_sigmask(clnt, &oldset);		
 
-	/* Create/initialize a new RPC task */
-	rpc_init_task(task, clnt, NULL, flags);
+	status = -ENOMEM;
+	task = rpc_new_task(clnt, NULL, flags);
+	if (task == NULL)
+		goto out;
+
 	rpc_call_setup(task, msg, 0);
 
 	/* Set up the call info struct and execute the task */
@@ -362,6 +370,7 @@ int rpc_call_sync(struct rpc_clnt *clnt, struct rpc_message *msg, int flags)
 		rpc_release_task(task);
 	}
 
+out:
 	rpc_clnt_sigunmask(clnt, &oldset);		
 
 	return status;
@@ -958,8 +967,12 @@ call_header(struct rpc_task *task)
 static u32 *
 call_verify(struct rpc_task *task)
 {
-	u32	*p = task->tk_rqstp->rq_rcv_buf.head[0].iov_base, n;
+	struct kvec *iov = &task->tk_rqstp->rq_rcv_buf.head[0];
+	int len = task->tk_rqstp->rq_rcv_buf.len >> 2;
+	u32	*p = iov->iov_base, n;
 
+	if ((len -= 3) < 0)
+		goto garbage;
 	p += 1;	/* skip XID */
 
 	if ((n = ntohl(*p++)) != RPC_REPLY) {
@@ -969,9 +982,11 @@ call_verify(struct rpc_task *task)
 	if ((n = ntohl(*p++)) != RPC_MSG_ACCEPTED) {
 		int	error = -EACCES;
 
+		if (--len < 0)
+			goto garbage;
 		if ((n = ntohl(*p++)) != RPC_AUTH_ERROR) {
 			printk(KERN_WARNING "call_verify: RPC call rejected: %x\n", n);
-		} else
+		} else if (--len < 0)
 		switch ((n = ntohl(*p++))) {
 		case RPC_AUTH_REJECTEDCRED:
 		case RPC_AUTH_REJECTEDVERF:
@@ -1002,7 +1017,8 @@ call_verify(struct rpc_task *task)
 		default:
 			printk(KERN_WARNING "call_verify: unknown auth error: %x\n", n);
 			error = -EIO;
-		}
+		} else
+			goto garbage;
 		dprintk("RPC: %4d call_verify: call rejected %d\n",
 						task->tk_pid, n);
 		rpc_exit(task, error);
@@ -1012,6 +1028,9 @@ call_verify(struct rpc_task *task)
 		printk(KERN_WARNING "call_verify: auth check failed\n");
 		goto garbage;		/* bad verifier, retry */
 	}
+	len = p - (u32 *)iov->iov_base - 1;
+	if (len < 0)
+		goto garbage;
 	switch ((n = ntohl(*p++))) {
 	case RPC_SUCCESS:
 		return p;

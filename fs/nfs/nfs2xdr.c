@@ -77,8 +77,6 @@ xdr_encode_fhandle(u32 *p, struct nfs_fh *fhandle)
 static inline u32 *
 xdr_decode_fhandle(u32 *p, struct nfs_fh *fhandle)
 {
-	/* Zero handle first to allow comparisons */
-	memset(fhandle, 0, sizeof(*fhandle));
 	/* NFSv2 handles have a fixed length */
 	fhandle->size = NFS2_FHSIZE;
 	memcpy(fhandle->data, p, NFS2_FHSIZE);
@@ -91,6 +89,23 @@ xdr_encode_time(u32 *p, struct timespec *timep)
 	*p++ = htonl(timep->tv_sec);
 	/* Convert nanoseconds into microseconds */
 	*p++ = htonl(timep->tv_nsec ? timep->tv_nsec / 1000 : 0);
+	return p;
+}
+
+static inline u32*
+xdr_encode_current_server_time(u32 *p, struct timespec *timep)
+{
+	/*
+	 * Passing the invalid value useconds=1000000 is a
+	 * Sun convention for "set to current server time".
+	 * It's needed to make permissions checks for the
+	 * "touch" program across v2 mounts to Solaris and
+	 * Irix boxes work correctly. See description of
+	 * sattr in section 6.1 of "NFS Illustrated" by
+	 * Brent Callaghan, Addison-Wesley, ISBN 0-201-32750-5
+	 */
+	*p++ = htonl(timep->tv_sec);
+	*p++ = htonl(1000000);
 	return p;
 }
 
@@ -142,15 +157,19 @@ xdr_encode_sattr(u32 *p, struct iattr *attr)
 	SATTR(p, attr, ATTR_GID, ia_gid);
 	SATTR(p, attr, ATTR_SIZE, ia_size);
 
-	if (attr->ia_valid & (ATTR_ATIME|ATTR_ATIME_SET)) {
+	if (attr->ia_valid & ATTR_ATIME_SET) {
 		p = xdr_encode_time(p, &attr->ia_atime);
+	} else if (attr->ia_valid & ATTR_ATIME) {
+		p = xdr_encode_current_server_time(p, &attr->ia_atime);
 	} else {
 		*p++ = ~(u32) 0;
 		*p++ = ~(u32) 0;
 	}
 
-	if (attr->ia_valid & (ATTR_MTIME|ATTR_MTIME_SET)) {
+	if (attr->ia_valid & ATTR_MTIME_SET) {
 		p = xdr_encode_time(p, &attr->ia_mtime);
+	} else if (attr->ia_valid & ATTR_MTIME) {
+		p = xdr_encode_current_server_time(p, &attr->ia_mtime);
 	} else {
 		*p++ = ~(u32) 0;	
 		*p++ = ~(u32) 0;

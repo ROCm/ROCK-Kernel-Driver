@@ -109,10 +109,6 @@ xdr_encode_fhandle(u32 *p, struct nfs_fh *fh)
 static inline u32 *
 xdr_decode_fhandle(u32 *p, struct nfs_fh *fh)
 {
-	/*
-	 * Zero all nonused bytes
-	 */
-	memset((u8 *)fh, 0, sizeof(*fh));
 	if ((fh->size = ntohl(*p++)) <= NFS3_FHSIZE) {
 		memcpy(fh->data, p, fh->size);
 		return p + XDR_QUADLEN(fh->size);
