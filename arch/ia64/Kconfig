@@ -234,8 +234,8 @@ config IA64_NODESIZE_256GB
 endchoice
 
 config DISCONTIGMEM
-	bool "Discontiguous memory support" if (IA64_DIG && NUMA)
-	default y if IA64_SGI_SN2 || IA64_GENERIC
+	bool "Discontiguous memory support" if (IA64_DIG || IA64_SGI_SN2 || IA64_GENERIC) && NUMA
+	default y if (IA64_SGI_SN2 || IA64_GENERIC) && NUMA
 	help
 	  Say Y to support efficient handling of discontiguous physical memory,
 	  for architectures which are either NUMA (Non-Uniform Memory Access)
