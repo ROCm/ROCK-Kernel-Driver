@@ -53,8 +53,6 @@
  * type of host adapter that is supported on the system.
  */
 
-typedef struct scsi_disk Disk;
-
 typedef struct	SHT
 {
     /* Used with loadable modules so that we know when it is safe to unload */
@@ -515,13 +513,6 @@ extern void scsi_proc_host_mkdir(Scsi_Host_Template *);
 extern void scsi_proc_host_add(struct Scsi_Host *);
 extern void scsi_proc_host_rm(struct Scsi_Host *);
 
-/*
- *  scsi_init initializes the scsi hosts.
- */
-
-extern int next_scsi_host;
-
-unsigned int scsi_init(void);
 extern void scsi_register_blocked_host(struct Scsi_Host *);
 extern void scsi_deregister_blocked_host(struct Scsi_Host *);
 
@@ -543,10 +534,6 @@ static inline void scsi_set_pci_device(struct Scsi_Host *shost,
  */
 extern void scan_scsis(struct Scsi_Host *, uint, uint, uint, uint);
 
-extern void scsi_mark_host_reset(struct Scsi_Host *);
-
-#define BLANK_HOST {"", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
-
 struct Scsi_Device_Template
 {
     struct Scsi_Device_Template * next;
@@ -554,7 +541,6 @@ struct Scsi_Device_Template
     const char * tag;
     struct module * module;	  /* Used for loadable modules */
     unsigned char scsi_type;
-    int (*detect)(Scsi_Device *); /* Returns 1 if we can attach this device */
     int (*attach)(Scsi_Device *); /* Attach devices to arrays */
     void (*detach)(Scsi_Device *);
     int (*init_command)(Scsi_Cmnd *);     /* Used by new queueing code. 
