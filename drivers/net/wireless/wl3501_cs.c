@@ -329,19 +329,18 @@ static int wl3501_esbq_exec(struct wl3501_card *this, void *sig, int sig_size)
 static int wl3501_get_mib_value(struct wl3501_card *this, u8 index,
 				void *bf, int size)
 {
-	struct wl3501_get_req signal;
+	struct wl3501_get_req sig = {
+		.sig_id	    = WL3501_SIG_GET_REQ,
+		.mib_attrib = index,
+	};
 	unsigned long flags;
 	int rc = -EIO;
-    
-	signal.next_blk	  = 0;
-	signal.sig_id	  = WL3501_SIG_GET_REQ;
-	signal.mib_attrib = index;
 
 	spin_lock_irqsave(&this->lock, flags);
 	if (wl3501_esbq_req_test(this)) {
-		u16 ptr = wl3501_get_tx_buffer(this, sizeof(signal));
+		u16 ptr = wl3501_get_tx_buffer(this, sizeof(sig));
 		if (ptr) {
-			wl3501_set_to_wla(this, ptr, &signal, sizeof(signal));
+			wl3501_set_to_wla(this, ptr, &sig, sizeof(sig));
 			wl3501_esbq_req(this, &ptr);
 			this->sig_get_confirm.mib_status = 255;
 			spin_unlock_irqrestore(&this->lock, flags);
@@ -371,24 +370,27 @@ out:
 static int wl3501_send_pkt(struct wl3501_card *this, u8 *data, u16 len)
 {
 	u16 bf, sig_bf, next, tmplen, pktlen;
-	struct wl3501_md_req sig;
+	struct wl3501_md_req sig = {
+		.sig_id = WL3501_SIG_MD_REQ,
+	};
 	u8 *pdata = (char *)data;
+	int rc = -EIO;
 
 	if (wl3501_esbq_req_test(this)) {
 		sig_bf = wl3501_get_tx_buffer(this, sizeof(sig));
+		rc = -ENOMEM;
 		if (!sig_bf)	/* No free buffer available */
-			return -ENOMEM;
+			goto out;
 		bf = wl3501_get_tx_buffer(this, len + 26 + 24);
 		if (!bf) {
 			/* No free buffer available */
 			wl3501_free_tx_buffer(this, sig_bf);
-			return -ENOMEM;
+			goto out;
 		}
+		rc = 0;
 		memcpy(&sig.daddr[0], pdata, 12);
 		pktlen = len - 12;
 		pdata += 12;
-		sig.next_blk = 0;
-		sig.sig_id = WL3501_SIG_MD_REQ;
 		sig.data = bf;
 		if (((*pdata) * 256 + (*(pdata + 1))) > 1500) {
 			unsigned char addr4[ETH_ALEN] = {
@@ -446,7 +448,8 @@ static int wl3501_send_pkt(struct wl3501_card *this, u8 *data, u16 len)
 		wl3501_set_to_wla(this, sig_bf, &sig, sizeof(sig));
 		wl3501_esbq_req(this, &sig_bf);
 	}
-	return 0;
+out:
+	return rc;
 }
 
 static int wl3501_mgmt_resync(struct wl3501_card *this)
@@ -530,25 +533,25 @@ static void wl3501_mgmt_scan_confirm(struct wl3501_card *this, u16 addr)
 {
 	u16 i = 0;
 	int matchflag = 0;
-	struct wl3501_scan_confirm signal;
+	struct wl3501_scan_confirm sig;
 
 	dprintk(3, "entry");
-	wl3501_get_from_wla(this, addr, &signal, sizeof(signal));
-	if (signal.status == WL3501_STATUS_SUCCESS) {
+	wl3501_get_from_wla(this, addr, &sig, sizeof(sig));
+	if (sig.status == WL3501_STATUS_SUCCESS) {
 		dprintk(3, "success");
 		if ((this->net_type == IW_MODE_INFRA &&
-		     (signal.cap_info & WL3501_MGMT_CAPABILITY_ESS)) ||
+		     (sig.cap_info & WL3501_MGMT_CAPABILITY_ESS)) ||
 		    (this->net_type == IW_MODE_ADHOC &&
-		     (signal.cap_info & WL3501_MGMT_CAPABILITY_IBSS)) ||
+		     (sig.cap_info & WL3501_MGMT_CAPABILITY_IBSS)) ||
 		    this->net_type == IW_MODE_AUTO) {
 			if (!this->essid[1])
 				matchflag = 1;
 			else if (this->essid[1] == 3 &&
 				 !strncmp((char *)&this->essid[2], "ANY", 3))
 				matchflag = 1;
-			else if (this->essid[1] != signal.ssid[1])
+			else if (this->essid[1] != sig.ssid[1])
 				matchflag = 0;
-			else if (memcmp(&this->essid[2], &signal.ssid[2],
+			else if (memcmp(&this->essid[2], &sig.ssid[2],
 					this->essid[1]))
 				matchflag = 0;
 			else
@@ -556,7 +559,7 @@ static void wl3501_mgmt_scan_confirm(struct wl3501_card *this, u16 addr)
 			if (matchflag) {
 				for (i = 0; i < this->bss_cnt; i++) {
 					if (!memcmp(this->bss_set[i].bssid,
-						    signal.bssid, ETH_ALEN)) {
+						    sig.bssid, ETH_ALEN)) {
 						matchflag = 0;
 						break;
 					}
@@ -564,12 +567,12 @@ static void wl3501_mgmt_scan_confirm(struct wl3501_card *this, u16 addr)
 			}
 			if (matchflag && (i < 20)) {
 				memcpy(&this->bss_set[i].beacon_period,
-				       &signal.beacon_period, 73);
+				       &sig.beacon_period, 73);
 				this->bss_cnt++;
-				this->rssi = signal.rssi;
+				this->rssi = sig.rssi;
 			}
 		}
-	} else if (signal.status == WL3501_STATUS_TIMEOUT) {
+	} else if (sig.status == WL3501_STATUS_TIMEOUT) {
 		dprintk(3, "timeout");
 		this->join_sta_bss = 0;
 		for (i = this->join_sta_bss; i < this->bss_cnt; i++)
@@ -635,7 +638,6 @@ static int wl3501_unblock_interrupt(struct wl3501_card *this)
  */
 static u16 wl3501_receive(struct wl3501_card *this, u8 *bf, u16 size)
 {
-	const int offset_addr4 = offsetof(struct wl3501_rx_hdr, addr4);
 	u16 next_addr, next_addr1;
 	u8 *data = bf + 12;
 
