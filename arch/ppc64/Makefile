@@ -26,15 +26,8 @@ CPP		= $(CC) -E $(CFLAGS)
 
 HEAD := arch/ppc64/kernel/head.o
 
-ARCH_SUBDIRS = arch/ppc64/kernel arch/ppc64/mm arch/ppc64/lib
-SUBDIRS := $(SUBDIRS) $(ARCH_SUBDIRS)
-ARCHIVES := arch/ppc64/kernel/kernel.o arch/ppc64/mm/mm.o arch/ppc64/lib/lib.o $(ARCHIVES)
-CORE_FILES := arch/ppc64/kernel/kernel.o arch/ppc64/mm/mm.o arch/ppc64/lib/lib.o $(CORE_FILES)
-
-ifdef CONFIG_XMON
-SUBDIRS += arch/ppc64/xmon
-CORE_FILES += arch/ppc64/xmon/x.o
-endif
+core-y			+= arch/ppc64/kernel/ arch/ppc64/mm/ arch/ppc64/lib/
+core-$(CONFIG_XMON)	+= arch/ppc64/xmon/
 
 MAKEBOOT = $(MAKE) -C arch/$(ARCH)/boot
 
