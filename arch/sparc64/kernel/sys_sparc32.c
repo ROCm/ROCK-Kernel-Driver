@@ -2831,10 +2831,10 @@ asmlinkage long sys32_sysctl(struct __sysctl_args32 *args)
 	return error;
 }
 
-extern asmlinkage int sys_sched_setaffinity(pid_t pid, unsigned int len,
+extern asmlinkage long sys_sched_setaffinity(pid_t pid, unsigned int len,
 					    unsigned long *user_mask_ptr);
 
-asmlinkage int sys32_sched_setaffinity(compat_pid_t pid, unsigned int len,
+asmlinkage long sys32_sched_setaffinity(compat_pid_t pid, unsigned int len,
 				       u32 *user_mask_ptr)
 {
 	unsigned long kernel_mask;
@@ -2855,10 +2855,10 @@ asmlinkage int sys32_sched_setaffinity(compat_pid_t pid, unsigned int len,
 	return ret;
 }
 
-extern asmlinkage int sys_sched_getaffinity(pid_t pid, unsigned int len,
+extern asmlinkage long sys_sched_getaffinity(pid_t pid, unsigned int len,
 					    unsigned long *user_mask_ptr);
 
-asmlinkage int sys32_sched_getaffinity(compat_pid_t pid, unsigned int len,
+asmlinkage long sys32_sched_getaffinity(compat_pid_t pid, unsigned int len,
 				       u32 *user_mask_ptr)
 {
 	unsigned long kernel_mask;
@@ -2881,9 +2881,9 @@ asmlinkage int sys32_sched_getaffinity(compat_pid_t pid, unsigned int len,
 	return ret;
 }
 
-extern int sys_lookup_dcookie(u64 cookie64, char *buf, size_t len);
+extern long sys_lookup_dcookie(u64 cookie64, char *buf, size_t len);
 
-int sys32_lookup_dcookie(u32 cookie_high, u32 cookie_low, char *buf, size_t len)
+long sys32_lookup_dcookie(u32 cookie_high, u32 cookie_low, char *buf, size_t len)
 {
 	return sys_lookup_dcookie((u64)cookie_high << 32 | cookie_low,
 				  buf, len);
