@@ -84,7 +84,7 @@ int ext3_forget(handle_t *handle, int is_metadata,
 	    (!is_metadata && !ext3_should_journal_data(inode))) {
 		if (bh) {
 			BUFFER_TRACE(bh, "call journal_forget");
-			ext3_journal_forget(handle, bh);
+			return ext3_journal_forget(handle, bh);
 		}
 		return 0;
 	}
