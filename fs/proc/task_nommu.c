@@ -82,7 +82,8 @@ int task_statm(struct mm_struct *mm, int *shared, int *text,
 {
 	struct mm_tblock_struct *tbp;
 	int size = kobjsize(mm);
-	
+
+	down_read(&mm->mmap_sem);
 	for (tbp = &mm->context.tblock; tbp; tbp = tbp->next) {
 		if (tbp->next)
 			size += kobjsize(tbp->next);
@@ -94,7 +95,7 @@ int task_statm(struct mm_struct *mm, int *shared, int *text,
 
 	size += (*text = mm->end_code - mm->start_code);
 	size += (*data = mm->start_stack - mm->start_data);
-
+	up_read(&mm->mmap_sem);
 	*resident = size;
 	return size;
 }

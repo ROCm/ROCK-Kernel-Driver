@@ -278,7 +278,6 @@ static inline char *task_cap(struct task_struct *p, char *buffer)
 			    cap_t(p->cap_effective));
 }
 
-extern char *task_mem(struct mm_struct *, char *);
 int proc_pid_status(struct task_struct *task, char * buffer)
 {
 	char * orig = buffer;
@@ -409,17 +408,13 @@ int proc_pid_stat(struct task_struct *task, char * buffer)
 	return res;
 }
 
-extern int task_statm(struct mm_struct *, int *, int *, int *, int *);
 int proc_pid_statm(struct task_struct *task, char *buffer)
 {
 	int size = 0, resident = 0, shared = 0, text = 0, lib = 0, data = 0;
 	struct mm_struct *mm = get_task_mm(task);
 	
 	if (mm) {
-		down_read(&mm->mmap_sem);
 		size = task_statm(mm, &shared, &text, &data, &resident);
-		up_read(&mm->mmap_sem);
-
 		mmput(mm);
 	}
 

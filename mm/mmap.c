@@ -729,6 +729,28 @@ none:
 	return NULL;
 }
 
+void __vm_stat_account(struct mm_struct *mm, unsigned long flags,
+						struct file *file, long pages)
+{
+	const unsigned long stack_flags
+		= VM_STACK_FLAGS & (VM_GROWSUP|VM_GROWSDOWN);
+
+#ifdef CONFIG_HUGETLB
+	if (flags & VM_HUGETLB) {
+		if (!(flags & VM_DONTCOPY))
+			mm->shared_vm += pages;
+		return;
+	}
+#endif /* CONFIG_HUGETLB */
+
+	if (file)
+		mm->shared_vm += pages;
+	else if (flags & stack_flags)
+		mm->stack_vm += pages;
+	if (flags & VM_EXEC)
+		mm->exec_vm += pages;
+}
+
 /*
  * The caller must hold down_write(current->mm->mmap_sem).
  */
@@ -987,6 +1009,7 @@ out:
 					pgoff, flags & MAP_NONBLOCK);
 		down_write(&mm->mmap_sem);
 	}
+	__vm_stat_account(mm, vm_flags, file, len >> PAGE_SHIFT);
 	return addr;
 
 unmap_and_free_vma:
@@ -1330,6 +1353,7 @@ int expand_stack(struct vm_area_struct * vma, unsigned long address)
 	vma->vm_mm->total_vm += grow;
 	if (vma->vm_flags & VM_LOCKED)
 		vma->vm_mm->locked_vm += grow;
+	__vm_stat_account(vma->vm_mm, vma->vm_flags, vma->vm_file, grow);
 	anon_vma_unlock(vma);
 	return 0;
 }
@@ -1392,6 +1416,7 @@ int expand_stack(struct vm_area_struct *vma, unsigned long address)
 	vma->vm_mm->total_vm += grow;
 	if (vma->vm_flags & VM_LOCKED)
 		vma->vm_mm->locked_vm += grow;
+	__vm_stat_account(vma->vm_mm, vma->vm_flags, vma->vm_file, grow);
 	anon_vma_unlock(vma);
 	return 0;
 }
@@ -1497,6 +1522,7 @@ static void unmap_vma(struct mm_struct *mm, struct vm_area_struct *area)
 	area->vm_mm->total_vm -= len >> PAGE_SHIFT;
 	if (area->vm_flags & VM_LOCKED)
 		area->vm_mm->locked_vm -= len >> PAGE_SHIFT;
+	vm_stat_unaccount(area);
 	area->vm_mm->unmap_area(area);
 	remove_vm_struct(area);
 }
