@@ -384,7 +384,7 @@ if_changed_dep = $(if $(strip $? \
 		          $(filter-out $(cmd_$(1)),$(cmd_$@))\
 			  $(filter-out $(cmd_$@),$(cmd_$(1)))),\
 	@set -e; \
-	$(if $($(quiet)cmd_$(1)),echo '$($(quiet)cmd_$(1))';) \
+	$(if $($(quiet)cmd_$(1)),echo '  $($(quiet)cmd_$(1))';) \
 	$(cmd_$(1)); \
 	$(TOPDIR)/scripts/fixdep $(subst /,_,$@) $(TOPDIR) '$(cmd_$(1))' > .$(subst /,_,$@).tmp; \
 	rm -f .$(subst /,_,$@).d; \

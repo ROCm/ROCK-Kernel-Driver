@@ -50,7 +50,7 @@ endif
 
 # 	Decide whether to build built-in, modular, or both
 
-KBUILD_MODULES :=
+KBUILD_MODULES := 1
 KBUILD_BUILTIN := 1
 
 export KBUILD_MODULES KBUILD_BUILTIN
@@ -380,7 +380,7 @@ endif
 
 .PHONY: modules
 modules:
-	@$(MAKE) KBUILD_BUILTIN= KBUILD_MODULES=1 $(SUBDIRS)
+	@$(MAKE) KBUILD_BUILTIN= $(SUBDIRS)
 
 #	Install modules
 
