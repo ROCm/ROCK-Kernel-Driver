@@ -1876,7 +1876,6 @@ static void riva_get_EDID(struct fb_info *info, struct pci_dev *pdev)
 #ifdef CONFIG_FB_RIVA_I2C
 
 	par = (struct riva_par *) info->par;
-	riva_create_i2c_busses(par);
 	for (i = par->bus; i >= 1; i--) {
 		riva_probe_i2c_connector(par, i, &par->EDID);
 		if (par->EDID) {
@@ -1884,7 +1883,6 @@ static void riva_get_EDID(struct fb_info *info, struct pci_dev *pdev)
 			break;
 		}
 	}
-	riva_delete_i2c_busses(par);
 #endif
 #endif
 	NVTRACE_LEAVE();
@@ -2038,6 +2036,10 @@ static int __devinit rivafb_probe(struct pci_dev *pd,
 	}
 #endif /* CONFIG_MTRR */
 
+#ifdef CONFIG_FB_RIVA_I2C
+	riva_create_i2c_busses((struct riva_par *) info->par);
+#endif
+
 	info->fbops = &riva_fb_ops;
 	info->fix = rivafb_fix;
 	riva_get_EDID(info, pd);
@@ -2072,6 +2074,9 @@ static int __devinit rivafb_probe(struct pci_dev *pd,
 	return 0;
 
 err_out_iounmap_fb:
+#ifdef CONFIG_FB_RIVA_I2C
+	riva_delete_i2c_busses((struct riva_par *) info->par);
+#endif
 	iounmap(info->screen_base);
 err_out_free_base1:
 	if (default_par->riva.Architecture == NV_ARCH_03) 
@@ -2100,6 +2105,10 @@ static void __exit rivafb_remove(struct pci_dev *pd)
 	NVTRACE_ENTER();
 	if (!info)
 		return;
+
+#ifdef CONFIG_FB_RIVA_I2C
+	riva_delete_i2c_busses(par);
+#endif
 
 	unregister_framebuffer(info);
 #ifdef CONFIG_MTRR
