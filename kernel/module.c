@@ -1606,7 +1606,9 @@ static struct module *load_module(void __user *umod,
 	if (err < 0)
 		goto cleanup;
 
+#ifdef CONFIG_KALLSYMS
 	add_kallsyms(mod, sechdrs, symindex, strindex, secstrings);
+#endif
 
 	mod->args = args;
 	if (obsparmindex) {
