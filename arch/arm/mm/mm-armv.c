@@ -169,7 +169,7 @@ alloc_init_section(unsigned long virt, unsigned long phys, int prot)
 	pmd_t *pmdp, pmd;
 
 	pmdp = pmd_offset(pgd_offset_k(virt), virt);
-	if (virt & (1 << PMD_SHIFT))
+	if (virt & (1 << 20))
 		pmdp++;
 
 	pmd_val(pmd) = phys | prot;
@@ -184,7 +184,7 @@ alloc_init_section(unsigned long virt, unsigned long phys, int prot)
  * the hardware pte table.
  */
 static inline void
-alloc_init_page(unsigned long virt, unsigned long phys, int domain, int prot)
+alloc_init_page(unsigned long virt, unsigned long phys, unsigned int prot_l1, pgprot_t prot)
 {
 	pmd_t *pmdp, pmd;
 	pte_t *ptep;
@@ -195,14 +195,14 @@ alloc_init_page(unsigned long virt, unsigned long phys, int domain, int prot)
 		ptep = alloc_bootmem_low_pages(2 * PTRS_PER_PTE *
 					       sizeof(pte_t));
 
-		pmd_val(pmd) = __pa(ptep) | PMD_TYPE_TABLE | PMD_DOMAIN(domain);
+		pmd_val(pmd) = __pa(ptep) | prot_l1;
 		set_pmd(pmdp, pmd);
 		pmd_val(pmd) += 256 * sizeof(pte_t);
 		set_pmd(pmdp + 1, pmd);
 	}
 	ptep = pte_offset_kernel(pmdp, virt);
 
-	set_pte(ptep, pfn_pte(phys >> PAGE_SHIFT, __pgprot(prot)));
+	set_pte(ptep, pfn_pte(phys >> PAGE_SHIFT, prot));
 }
 
 /*
@@ -217,6 +217,7 @@ static inline void clear_mapping(unsigned long virt)
 
 struct mem_types {
 	unsigned int	prot_pte;
+	unsigned int	prot_l1;
 	unsigned int	prot_sect;
 	unsigned int	domain;
 };
@@ -225,39 +226,81 @@ static struct mem_types mem_types[] __initdata = {
 	[MT_DEVICE] = {
 		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
 				L_PTE_WRITE,
-		.prot_sect = PMD_TYPE_SECT | PMD_SECT_AP_WRITE,
+		.prot_l1   = PMD_TYPE_TABLE | PMD_BIT4,
+		.prot_sect = PMD_TYPE_SECT | PMD_BIT4 | PMD_SECT_UNCACHED |
+				PMD_SECT_AP_WRITE,
 		.domain    = DOMAIN_IO,
 	},
 	[MT_CACHECLEAN] = {
 		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
 				L_PTE_CACHEABLE | L_PTE_BUFFERABLE,
-		.prot_sect = PMD_TYPE_SECT | PMD_SECT_CACHEABLE |
-				PMD_SECT_BUFFERABLE,
+		.prot_l1   = PMD_TYPE_TABLE | PMD_BIT4,
+		.prot_sect = PMD_TYPE_SECT | PMD_BIT4,
 		.domain    = DOMAIN_KERNEL,
 	},
 	[MT_MINICLEAN] = {
 		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
 				L_PTE_CACHEABLE,
-		.prot_sect = PMD_TYPE_SECT | PMD_SECT_CACHEABLE,
+		.prot_l1   = PMD_TYPE_TABLE | PMD_BIT4,
+		.prot_sect = PMD_TYPE_SECT | PMD_BIT4 | PMD_SECT_MINICACHE,
 		.domain    = DOMAIN_KERNEL,
 	},
 	[MT_VECTORS] = {
 		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
 				L_PTE_CACHEABLE | L_PTE_BUFFERABLE |
 				L_PTE_EXEC,
-		.prot_sect = PMD_TYPE_SECT | PMD_SECT_CACHEABLE |
-				PMD_SECT_BUFFERABLE,
+		.prot_l1   = PMD_TYPE_TABLE | PMD_BIT4,
+		.prot_sect = PMD_TYPE_SECT | PMD_BIT4,
 		.domain    = DOMAIN_USER,
 	},
 	[MT_MEMORY] = {
 		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
 				L_PTE_CACHEABLE | L_PTE_BUFFERABLE |
 				L_PTE_EXEC | L_PTE_WRITE,
-		.prot_sect = PMD_TYPE_SECT | PMD_SECT_CACHEABLE |
-				PMD_SECT_BUFFERABLE | PMD_SECT_AP_WRITE,
+		.prot_l1   = PMD_TYPE_TABLE | PMD_BIT4,
+		.prot_sect = PMD_TYPE_SECT | PMD_BIT4 | PMD_SECT_AP_WRITE,
 		.domain    = DOMAIN_KERNEL,
 	}
 };
+
+/*
+ * Adjust the PMD section entries according to the CPU in use.
+ */
+static void __init build_mem_type_table(void)
+{
+	int cpu_arch = cpu_architecture();
+#ifdef CONFIG_CPU_DCACHE_WRITETHROUGH
+	int writethrough = 1;
+#else
+	int writethrough = 0;
+#endif
+	int writealloc = 0, ecc = 0;
+
+	if (cpu_arch < CPU_ARCH_ARMv5) {
+		writealloc = 0;
+		ecc = 0;
+		mem_types[MT_MINICACHE].prot_sect &= ~PMD_SECT_TEX(1);
+	}
+
+	if (writethrough) {
+		mem_types[MT_CACHECLEAN].prot_sect |= PMD_SECT_WT;
+		mem_types[MT_VECTORS].prot_sect |= PMD_SECT_WT;
+		mem_types[MT_MEMORY].prot_sect |= PMD_SECT_WT;
+	} else {
+		mem_types[MT_CACHECLEAN].prot_sect |= PMD_SECT_WB;
+		mem_types[MT_VECTORS].prot_sect |= PMD_SECT_WB;
+
+		if (writealloc)
+			mem_types[MT_MEMORY].prot_sect |= PMD_SECT_WBWA;
+		else
+			mem_types[MT_MEMORY].prot_sect |= PMD_SECT_WB;
+	}
+
+	if (ecc) {
+		mem_types[MT_VECTORS].prot_sect |= PMD_PROTECTION;
+		mem_types[MT_MEMORY].prot_sect |= PMD_PROTECTION;
+	}
+}
 
 /*
  * Create the page directory entries and any necessary
@@ -268,7 +311,8 @@ static struct mem_types mem_types[] __initdata = {
 static void __init create_mapping(struct map_desc *md)
 {
 	unsigned long virt, length;
-	int prot_sect, prot_pte, domain;
+	int prot_sect, prot_l1, domain;
+	pgprot_t prot_pte;
 	long off;
 
 	if (md->virtual != vectors_base() && md->virtual < PAGE_OFFSET) {
@@ -279,7 +323,8 @@ static void __init create_mapping(struct map_desc *md)
 	}
 
 	domain	  = mem_types[md->type].domain;
-	prot_pte  = mem_types[md->type].prot_pte;
+	prot_pte  = __pgprot(mem_types[md->type].prot_pte);
+	prot_l1   = mem_types[md->type].prot_l1 | PMD_DOMAIN(domain);
 	prot_sect = mem_types[md->type].prot_sect | PMD_DOMAIN(domain);
 
 	virt   = md->virtual;
@@ -287,7 +332,7 @@ static void __init create_mapping(struct map_desc *md)
 	length = md->length;
 
 	while ((virt & 0xfffff || (virt + off) & 0xfffff) && length >= PAGE_SIZE) {
-		alloc_init_page(virt, virt + off, domain, prot_pte);
+		alloc_init_page(virt, virt + off, prot_l1, prot_pte);
 
 		virt   += PAGE_SIZE;
 		length -= PAGE_SIZE;
@@ -301,7 +346,7 @@ static void __init create_mapping(struct map_desc *md)
 	}
 
 	while (length >= PAGE_SIZE) {
-		alloc_init_page(virt, virt + off, domain, prot_pte);
+		alloc_init_page(virt, virt + off, prot_l1, prot_pte);
 
 		virt   += PAGE_SIZE;
 		length -= PAGE_SIZE;
@@ -342,6 +387,8 @@ void __init memtable_init(struct meminfo *mi)
 	struct map_desc *init_maps, *p, *q;
 	unsigned long address = 0;
 	int i;
+
+	build_mem_type_table();
 
 	init_maps = p = alloc_bootmem_low_pages(PAGE_SIZE);
 

@@ -44,6 +44,16 @@ void hook_fault_code(int nr, int (*fn)(unsigned long, unsigned int,
 
 extern asmlinkage void __backtrace(void);
 
+#define CPU_ARCH_UNKNOWN	0
+#define CPU_ARCH_ARMv3		1
+#define CPU_ARCH_ARMv4		2
+#define CPU_ARCH_ARMv4T		3
+#define CPU_ARCH_ARMv5		4
+#define CPU_ARCH_ARMv5T		5
+#define CPU_ARCH_ARMv5TE	6
+
+extern int cpu_architecture(void);
+
 /*
  * Include processor dependent parts
  */

@@ -378,11 +378,6 @@ ENTRY(cpu_arm920_set_pgd)
  */
 	.align	5
 ENTRY(cpu_arm920_set_pmd)
-#ifdef CONFIG_CPU_DCACHE_WRITETHROUGH
-	eor	r2, r1, #0x0a			@ C & Section
-	tst	r2, #0x0b
-	biceq	r1, r1, #4			@ clear bufferable bit
-#endif
 	str	r1, [r0]
 	mcr	p15, 0, r0, c7, c10, 1		@ clean D entry
 	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
