@@ -22,8 +22,8 @@
  *************************************************************************/
 
 #define DRV_NAME	"pcnet32"
-#define DRV_VERSION	"1.30d"
-#define DRV_RELDATE	"06.07.2004"
+#define DRV_VERSION	"1.30e"
+#define DRV_RELDATE	"06.10.2004"
 #define PFX		DRV_NAME ": "
 
 static const char *version =
@@ -1843,14 +1843,19 @@ pcnet32_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 
 	if (must_restart) {
 	    /* stop the chip to clear the error condition, then restart */
-	    lp->a.write_csr (ioaddr, 0, 0x0004);
+	    lp->a.reset (ioaddr);
+
+	    /* switch pcnet32 to 32bit mode */
+	    lp->a.write_bcr (ioaddr, 20, 2);
+	    lp->a.write_csr (ioaddr, 4, 0x0915);
+
 	    pcnet32_restart(dev, 0x0002);
 	    netif_wake_queue(dev);
 	}
     }
 
     /* Clear any other interrupt, and set interrupt enable. */
-    lp->a.write_csr (ioaddr, 0, 0x7940);
+    lp->a.write_csr (ioaddr, 0, 0x0040);
     lp->a.write_rap (ioaddr,rap);
 
     if (netif_msg_intr(lp))
