@@ -136,10 +136,23 @@ static void nbd_end_request(struct request *req)
 {
 	int uptodate = (req->errors == 0) ? 1 : 0;
 	request_queue_t *q = req->q;
+	struct nbd_device *lo = req->rq_disk->private_data;
 	unsigned long flags;
 
 	dprintk(DBG_BLKDEV, "%s: request %p: %s\n", req->rq_disk->disk_name,
 			req, uptodate? "done": "failed");
+
+	spin_lock(&lo->queue_lock);
+	while (req->ref_count > 1) { /* still in send */
+		spin_unlock(&lo->queue_lock);
+		printk(KERN_DEBUG "%s: request %p still in use (%d), waiting\n",
+		    lo->disk->disk_name, req, req->ref_count);
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		schedule_timeout(HZ); /* wait a second */
+		spin_lock(&lo->queue_lock);
+	}
+	spin_unlock(&lo->queue_lock);
+
 #ifdef PARANOIA
 	requests_out++;
 #endif
@@ -490,6 +503,7 @@ static void do_nbd_request(request_queue_t * q)
 		}
 
 		list_add(&req->queuelist, &lo->queue_head);
+		req->ref_count++; /* make sure req does not get freed */
 		spin_unlock(&lo->queue_lock);
 
 		nbd_send_req(lo, req);
@@ -499,12 +513,16 @@ static void do_nbd_request(request_queue_t * q)
 					lo->disk->disk_name);
 			spin_lock(&lo->queue_lock);
 			list_del_init(&req->queuelist);
+			req->ref_count--;
 			spin_unlock(&lo->queue_lock);
 			nbd_end_request(req);
 			spin_lock_irq(q->queue_lock);
 			continue;
 		}
 
+		spin_lock(&lo->queue_lock);
+		req->ref_count--;
+		spin_unlock(&lo->queue_lock);
 		spin_lock_irq(q->queue_lock);
 		continue;
 
@@ -548,27 +566,27 @@ static int nbd_ioctl(struct inode *inode, struct file *file,
                 if (!lo->sock)
 			return -EINVAL;
                 nbd_send_req(lo, &sreq);
-                return 0 ;
+                return 0;
  
 	case NBD_CLEAR_SOCK:
+		error = 0;
+		down(&lo->tx_lock);
+		lo->sock = NULL;
+		up(&lo->tx_lock);
+		spin_lock(&lo->queue_lock);
+		file = lo->file;
+		lo->file = NULL;
+		spin_unlock(&lo->queue_lock);
 		nbd_clear_que(lo);
 		spin_lock(&lo->queue_lock);
 		if (!list_empty(&lo->queue_head)) {
-			spin_unlock(&lo->queue_lock);
-			printk(KERN_ERR "%s: Some requests are in progress -> can not turn off.\n",
-					lo->disk->disk_name);
-			return -EBUSY;
+			printk(KERN_ERR "nbd: disconnect: some requests are in progress -> please try again.\n");
+			error = -EBUSY;
 		}
-		file = lo->file;
-		if (!file) {
-			spin_unlock(&lo->queue_lock);
-			return -EINVAL;
-		}
-		lo->file = NULL;
-		lo->sock = NULL;
 		spin_unlock(&lo->queue_lock);
-		fput(file);
-		return 0;
+		if (file)
+			fput(file);
+		return error;
 	case NBD_SET_SOCK:
 		if (lo->file)
 			return -EBUSY;
@@ -616,10 +634,13 @@ static int nbd_ioctl(struct inode *inode, struct file *file,
 		 * there should be a more generic interface rather than
 		 * calling socket ops directly here */
 		down(&lo->tx_lock);
-		printk(KERN_WARNING "%s: shutting down socket\n",
+		if (lo->sock) {
+			printk(KERN_WARNING "%s: shutting down socket\n",
 				lo->disk->disk_name);
-		lo->sock->ops->shutdown(lo->sock, SEND_SHUTDOWN|RCV_SHUTDOWN);
-		lo->sock = NULL;
+			lo->sock->ops->shutdown(lo->sock,
+				SEND_SHUTDOWN|RCV_SHUTDOWN);
+			lo->sock = NULL;
+		}
 		up(&lo->tx_lock);
 		spin_lock(&lo->queue_lock);
 		file = lo->file;
@@ -631,6 +652,13 @@ static int nbd_ioctl(struct inode *inode, struct file *file,
 			fput(file);
 		return lo->harderror;
 	case NBD_CLEAR_QUE:
+		down(&lo->tx_lock);
+		if (lo->sock) {
+			up(&lo->tx_lock);
+			return 0; /* probably should be error, but that would
+				   * break "nbd-client -d", so just return 0 */
+		}
+		up(&lo->tx_lock);
 		nbd_clear_que(lo);
 		return 0;
 	case NBD_PRINT_DEBUG:
