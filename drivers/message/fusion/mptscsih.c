@@ -250,10 +250,6 @@ static int scandv_wait_done = 1;
 static struct mptscsih_driver_setup
 	driver_setup = MPTSCSIH_DRIVER_SETUP;
 
-#ifdef MPTSCSIH_DBG_TIMEOUT
-static struct scsi_cmnd *foo_to[8];
-#endif
-
 static struct scsi_host_template driver_template;
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
@@ -652,27 +648,6 @@ mptscsih_io_done(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *mr)
 	sc->result = DID_OK << 16;		/* Set default reply as OK */
 	pScsiReq = (SCSIIORequest_t *) mf;
 	pScsiReply = (SCSIIOReply_t *) mr;
-
-#ifdef MPTSCSIH_DBG_TIMEOUT
-	if (ioc->timeout_cnt > 0) {
-		int ii, left = 0;
-
-		for (ii=0; ii < 8; ii++) {
-			if (sc == foo_to[ii]) {
-				printk(MYIOC_s_INFO_FMT "complete (%p, %ld)\n",
-					ioc->name, sc, jiffies);
-				foo_to[ii] = NULL;
-			}
-			if (foo_to[ii] != NULL)
-				left++;
-		}
-
-		if (left == 0) {
-			ioc->timeout_maxcnt = 0;
-			ioc->timeout_cnt = 0;
-		}
-	}
-#endif
 
 	if (pScsiReply == NULL) {
 		/* special context reply handling */
@@ -1259,14 +1234,6 @@ mptscsih_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	/* Moved Earlier Pam D */
 	/* ioc->sh = sh;	*/
 
-#ifdef MPTSCSIH_DBG_TIMEOUT
-	ioc->timeout_hard = 0;
-	ioc->timeout_delta = 30 * HZ;
-	ioc->timeout_maxcnt = 0;
-	ioc->timeout_cnt = 0;
-	for (ii=0; ii < 8; ii++)
-		foo_to[ii] = NULL;
-#endif
 	if (hd->is_spi) {
 		/* Update with the driver setup
 		 * values.
@@ -1676,129 +1643,6 @@ static int mptscsih_host_info(MPT_ADAPTER *ioc, char *pbuf, off_t offset, int le
 	return ((info.pos > info.offset) ? info.pos - info.offset : 0);
 }
 
-#ifndef MPTSCSIH_DBG_TIMEOUT
-static int mptscsih_user_command(MPT_ADAPTER *ioc, char *pbuf, int len)
-{
-	/* Not yet implemented */
-	return len;
-}
-#else
-#define is_digit(c)	((c) >= '0' && (c) <= '9')
-#define digit_to_bin(c)	((c) - '0')
-#define is_space(c)	((c) == ' ' || (c) == '\t')
-
-#define UC_DBG_TIMEOUT		0x01
-#define UC_DBG_HARDRESET	0x02
-
-static int skip_spaces(char *ptr, int len)
-{
-	int cnt, c;
-
-	for (cnt = len; cnt > 0 && (c = *ptr++) && is_space(c); cnt --);
-
-	return (len - cnt);
-}
-
-static int get_int_arg(char *ptr, int len, ulong *pv)
-{
-	int cnt, c;
-	ulong	v;
-	for (v =  0, cnt = len; cnt > 0 && (c=*ptr++) && is_digit(c); cnt --) {
-		v = (v * 10) + digit_to_bin(c);
-	}
-
-	if (pv)
-		*pv = v;
-
-	return (len - cnt);
-}
-
-
-static int is_keyword(char *ptr, int len, char *verb)
-{
-	int verb_len = strlen(verb);
-
-	if (len >= strlen(verb) && !memcmp(verb, ptr, verb_len))
-		return verb_len;
-	else
-		return 0;
-}
-
-#define SKIP_SPACES(min_spaces)						\
-	if ((arg_len = skip_spaces(ptr,len)) < (min_spaces))		\
-		return -EINVAL;						\
-	ptr += arg_len;							\
-	len -= arg_len;
-
-#define GET_INT_ARG(v)							\
-	if (!(arg_len = get_int_arg(ptr,len, &(v))))			\
-		return -EINVAL;						\
-	ptr += arg_len;							\
-	len -= arg_len;
-
-static int mptscsih_user_command(MPT_ADAPTER *ioc, char *buffer, int length)
-{
-	char *ptr = buffer;
-	char btmp[24];	/* REMOVE */
-	int arg_len;
-	int len	= length;
-	int cmd;
-	ulong number = 1;
-	ulong delta = 10;
-
-	if ((len > 0) && (ptr[len -1] == '\n'))
-		--len;
-
-	if (len < 22) {
-		strncpy(btmp, buffer, len);
-		btmp[len+1]='\0';
-	} else {
-		strncpy(btmp, buffer, 22);
-		btmp[23]='\0';
-	}
-	printk("user_command:  ioc %d, buffer %s, length %d\n",
-			ioc->id, btmp, length);
-
-	if ((arg_len = is_keyword(ptr, len, "timeout")) != 0)
-		cmd = UC_DBG_TIMEOUT;
-	else if ((arg_len = is_keyword(ptr, len, "hardreset")) != 0)
-		cmd = UC_DBG_HARDRESET;
-	else
-		return -EINVAL;
-
-	ptr += arg_len;
-	len -= arg_len;
-
-	switch(cmd) {
-		case UC_DBG_TIMEOUT:
-			SKIP_SPACES(1);
-			GET_INT_ARG(number);
-			SKIP_SPACES(1);
-			GET_INT_ARG(delta);
-			break;
-	}
-
-	printk("user_command: cnt=%ld delta=%ld\n", number, delta);
-
-	if (len)
-		return -EINVAL;
-	else {
-		if (cmd == UC_DBG_HARDRESET) {
-			ioc->timeout_hard = 1;
-		} else if (cmd == UC_DBG_TIMEOUT) {
-			/* process this command ...
-			 */
-			ioc->timeout_maxcnt = 0;
-			ioc->timeout_delta = delta < 2 ? 2 : delta;
-			ioc->timeout_cnt = 0;
-			ioc->timeout_maxcnt = number < 8 ? number: 8;
-		}
-	}
-	/* Not yet implemented */
-	return length;
-}
-#endif
-
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /**
  *	mptscsih_proc_info - Return information about MPT adapter
@@ -1812,7 +1656,7 @@ static int mptscsih_user_command(MPT_ADAPTER *ioc, char *buffer, int length)
  * 	hostno: scsi host number
  *	func:   if write = 1; if read = 0
  */
-static int 
+static int
 mptscsih_proc_info(struct Scsi_Host *host, char *buffer, char **start, off_t offset,
 			int length, int func)
 {
@@ -1821,7 +1665,9 @@ mptscsih_proc_info(struct Scsi_Host *host, char *buffer, char **start, off_t off
 	int size = 0;
 
 	if (func) {
-		size = mptscsih_user_command(ioc, buffer, length);
+		/* 
+		 * write is not supported 
+		 */
 	} else {
 		if (start)
 			*start = buffer;
@@ -1831,7 +1677,6 @@ mptscsih_proc_info(struct Scsi_Host *host, char *buffer, char **start, off_t off
 
 	return size;
 }
-
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 #define ADD_INDEX_LOG(req_ent)	do { } while(0)
@@ -2022,18 +1867,6 @@ mptscsih_qcmd(struct scsi_cmnd *SCpnt, void (*done)(struct scsi_cmnd *))
 			}
 		}
 
-#ifdef MPTSCSIH_DBG_TIMEOUT
-		if (hd->ioc->timeout_cnt < hd->ioc->timeout_maxcnt) {
-			foo_to[hd->ioc->timeout_cnt] = SCpnt;
-			hd->ioc->timeout_cnt++;
-			//mod_timer(&SCpnt->eh_timeout, jiffies + hd->ioc->timeout_delta);
-			issueCmd = 0;
-			printk(MYIOC_s_WARN_FMT
-				"to pendingQ: (sc=%p, mf=%p, time=%ld)\n",
-				hd->ioc->name, SCpnt, mf, jiffies);
-		}
-#endif
-
 		if (issueCmd) {
 			mpt_put_msg_frame(ScsiDoneCtx, hd->ioc, mf);
 			dmfprintk((MYIOC_s_INFO_FMT "Issued SCSI cmd (%p) mf=%p idx=%d\n",
@@ -2215,11 +2048,6 @@ mptscsih_TMHandler(MPT_SCSI_HOST *hd, u8 type, u8 channel, u8 target, u8 lun, in
 			dtmprintk((MYIOC_s_INFO_FMT "Issue of TaskMgmt Successful!\n", hd->ioc->name));
 		}
 	}
-
-#ifdef MPTSCSIH_DBG_TIMEOUT
-	if (hd->ioc->timeout_hard)
-		rc = 1;
-#endif
 
 	/* Only fall through to the HRH if this is a bus reset
 	 */
@@ -3124,10 +2952,6 @@ mptscsih_ioc_reset(MPT_ADAPTER *ioc, int reset_phase)
 			del_timer(&hd->TMtimer);
 			mpt_free_msg_frame(ioc, hd->tmPtr);
 		}
-
-#ifdef MPTSCSIH_DBG_TIMEOUT
-		ioc->timeout_hard = 0;
-#endif
 
 		dtmprintk((MYIOC_s_WARN_FMT "Pre-Reset complete.\n", ioc->name));
 

@@ -573,12 +573,6 @@ typedef struct _MPT_ADAPTER
 	int			 eventTypes;	/* Event logging parameters */
 	int			 eventContext;	/* Next event context */
 	int			 eventLogSize;	/* Max number of cached events */
-#ifdef MPTSCSIH_DBG_TIMEOUT
-	int			timeout_hard;
-	int			timeout_delta;
-	int			timeout_cnt;
-	int			timeout_maxcnt;
-#endif
 	struct _mpt_ioctl_events *events;	/* pointer to event log */
 	u8			*cached_fw;	/* Pointer to FW */
 	dma_addr_t	 	cached_fw_dma;
