@@ -9,62 +9,17 @@
  *  sleep.
  */
 #include <linux/config.h>
+#include <linux/init.h>
+#include <linux/sysctl.h>
 #include <linux/pm.h>
-#include <linux/device.h>
-#include <linux/sysdev.h>
 #include <linux/errno.h>
 #include <linux/sched.h>
-
-#include <asm/system.h>
-
-/*
- * Tell the linker that pm_do_suspend may not be present.
- */
-extern int pm_do_suspend(void) __attribute__((weak));
-
-int suspend(void)
-{
-	int ret;
-
-	if (!pm_do_suspend)
-		return -ENOSYS;
-
-	/*
-	 * Suspend "legacy" devices.
-	 */
-	ret = pm_send_all(PM_SUSPEND, (void *)3);
-	if (ret != 0)
-		goto out;
-
-	ret = device_suspend(3);
-	if (ret)
-		goto resume_legacy;
-
-	local_irq_disable();
-	sysdev_suspend(3);
-
-	ret = pm_do_suspend();
-
-	sysdev_resume();
-	local_irq_enable();
-
-	device_resume();
-
- resume_legacy:
-	pm_send_all(PM_RESUME, (void *)0);
-
- out:
-	return ret;
-}
 
 #ifdef CONFIG_SYSCTL
 /*
  * We really want this to die.  It's a disgusting hack using unallocated
  * sysctl numbers.  We should be using a real interface.
  */
-
-#include <linux/init.h>
-#include <linux/sysctl.h>
 
 static int
 pm_sysctl_proc_handler(ctl_table *ctl, int write, struct file *filp,
@@ -74,7 +29,7 @@ pm_sysctl_proc_handler(ctl_table *ctl, int write, struct file *filp,
 	printk("PM: task %s (pid %d) uses deprecated sysctl PM interface\n",
 		current->comm, current->pid);
 	if (write)
-		ret = suspend();
+		ret = pm_suspend(PM_SUSPEND_MEM);
 	return ret;
 }
 
