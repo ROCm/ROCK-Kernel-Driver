@@ -905,3 +905,6 @@ EXPORT_SYMBOL(dm_get_device);
 EXPORT_SYMBOL(dm_put_device);
 EXPORT_SYMBOL(dm_table_event);
 EXPORT_SYMBOL(dm_table_get_mode);
+EXPORT_SYMBOL(dm_table_unplug_all);
+EXPORT_SYMBOL(dm_table_get);
+EXPORT_SYMBOL(dm_table_put);
