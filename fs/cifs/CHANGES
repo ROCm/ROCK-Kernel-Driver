@@ -1,3 +1,15 @@
+Version 0.93
+------------
+Add missing mount options including iocharset.  SMP fixes in write and open. 
+Fix errors in reconnecting after TCP session failure.  Fix module unloading
+of default nls codepage
+
+Version 0.92
+------------
+Active smb transactions should never go negative (fix double FreeXid). Fix
+list processing in file routines. Check return code on kmalloc in open.
+Fix spinlock usage for SMP.
+
 Version 0.91
 ------------
 Fix oops in reopen_files when invalid dentry. drop dentry on server rename 

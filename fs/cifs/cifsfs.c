@@ -1,7 +1,7 @@
 /*
  *   fs/cifs/cifsfs.c
  *
- *   Copyright (c) International Business Machines  Corp., 2002
+ *   Copyright (C) International Business Machines  Corp., 2002,2003
  *   Author(s): Steve French (sfrench@us.ibm.com)
  *
  *   Common Internet FileSystem (CIFS) client
@@ -81,7 +81,6 @@ cifs_read_super(struct super_block *sb, void *data,
 	cifs_sb = CIFS_SB(sb);
 	if(cifs_sb == NULL)
 		return -ENOMEM;
-	cifs_sb->local_nls = load_nls_default();	/* needed for ASCII cp to Unicode converts */
 
 	rc = cifs_mount(sb, cifs_sb, data, devname);
 
@@ -571,8 +570,6 @@ cifs_destroy_mids(void)
 
 static int cifs_oplock_thread(void * dummyarg)
 {
-	struct list_head * tmp;
-	struct list_head * tmp1;
 	struct oplock_q_entry * oplock_item;
 	struct cifsTconInfo *pTcon;
 	struct inode * inode;
@@ -585,19 +582,22 @@ static int cifs_oplock_thread(void * dummyarg)
 	oplockThread = current;
 	do {
 		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(100*HZ);
-		/* BB add missing code */
-		write_lock(&GlobalMid_Lock); 
-		list_for_each_safe(tmp, tmp1, &GlobalOplock_Q) {
-			oplock_item = list_entry(tmp, struct oplock_q_entry,
-							       qhead);
+		
+		schedule_timeout(39*HZ);
+		spin_lock(&GlobalMid_Lock);
+		if(list_empty(&GlobalOplock_Q)) {
+			spin_unlock(&GlobalMid_Lock);
+			schedule_timeout(39*HZ);
+		} else {
+			oplock_item = list_entry(GlobalOplock_Q.next, 
+				struct oplock_q_entry, qhead);
 			if(oplock_item) {
 				pTcon = oplock_item->tcon;
 				inode = oplock_item->pinode;
 				netfid = oplock_item->netfid;
 				DeleteOplockQEntry(oplock_item);
-				write_unlock(&GlobalMid_Lock);
-				if (S_ISREG(inode->i_mode))
+				spin_unlock(&GlobalMid_Lock);
+				if (S_ISREG(inode->i_mode)) 
 					rc = filemap_fdatawrite(inode->i_mapping);
 				else
 					rc = 0;
@@ -609,11 +609,9 @@ static int cifs_oplock_thread(void * dummyarg)
 					0, LOCKING_ANDX_OPLOCK_RELEASE,
 					0 /* wait flag */);
 				cFYI(1,("Oplock release rc = %d ",rc));
-				write_lock(&GlobalMid_Lock);
 			} else
-				break;
+				spin_unlock(&GlobalMid_Lock);
 		}
-		write_unlock(&GlobalMid_Lock);
 	} while(!signal_pending(current));
 	complete_and_exit (&cifs_oplock_exited, 0);
 }
@@ -640,7 +638,7 @@ init_cifs(void)
 	GlobalTotalActiveXid = 0;
 	GlobalMaxActiveXid = 0;
 	GlobalSMBSeslock = RW_LOCK_UNLOCKED;
-	GlobalMid_Lock = RW_LOCK_UNLOCKED;
+	GlobalMid_Lock = SPIN_LOCK_UNLOCKED;
 
 	rc = cifs_init_inodecache();
 	if (!rc) {
