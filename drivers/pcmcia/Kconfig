@@ -29,8 +29,8 @@ config PCMCIA
 	  and ds.  If you want to compile it as a module, say M here and
 	  read <file:Documentation/modules.txt>.
 
-config CARDBUS
-	bool "CardBus support"
+config YENTA
+	tristate "CardBus yenta-compatible bridge support"
 	depends on PCMCIA && PCI
 	---help---
 	  CardBus is a bus mastering architecture for PC-cards, which allows
@@ -47,6 +47,11 @@ config CARDBUS
 	  for location).
 
 	  If unsure, say Y.
+
+config CARDBUS
+	bool
+	depends on YENTA
+	default y if YENTA
 
 config I82092
 	tristate "i82092 compatible bridge support"
