@@ -120,13 +120,11 @@ obj-$(CONFIG_BLK_DEV_SD)	+= sd_mod.o
 obj-$(CONFIG_BLK_DEV_SR)	+= sr_mod.o
 obj-$(CONFIG_CHR_DEV_SG)	+= sg.o
 
-scsi_mod-objs	:= scsi.o hosts.o scsi_ioctl.o constants.o scsicam.o \
-		   scsi_error.o scsi_lib.o scsi_scan.o scsi_syms.o \
-		   scsi_sysfs.o
-
-ifdef CONFIG_PROC_FS
-scsi_mod-objs	+= scsi_proc.o
-endif
+scsi_mod-y			+= scsi.o hosts.o scsi_ioctl.o constants.o \
+				   scsicam.o scsi_error.o scsi_lib.o \
+				   scsi_scan.o scsi_syms.o scsi_sysfs.o
+scsi_mod-$(CONFIG_PROC_FS)	+= scsi_proc.o
+scsi_mod-$(CONFIG_X86_PC9800)	+= scsi_pc98.o
 			
 sd_mod-objs	:= sd.o
 sr_mod-objs	:= sr.o sr_ioctl.o sr_vendor.o
