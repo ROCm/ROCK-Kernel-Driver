@@ -659,7 +659,7 @@ static int ne2k_pci_suspend (struct pci_dev *pdev, u32 state)
 	struct net_device *dev = pci_get_drvdata (pdev);
 
 	netif_device_detach(dev);
-	pci_save_state(pdev, pdev->saved_config_space);
+	pci_save_state(pdev);
 	pci_set_power_state(pdev, state);
 
 	return 0;
@@ -670,7 +670,7 @@ static int ne2k_pci_resume (struct pci_dev *pdev)
 	struct net_device *dev = pci_get_drvdata (pdev);
 
 	pci_set_power_state(pdev, 0);
-	pci_restore_state(pdev, pdev->saved_config_space);
+	pci_restore_state(pdev);
 	NS8390_init(dev, 1);
 	netif_device_attach(dev);
 
