@@ -130,11 +130,11 @@ STATIC struct workqueue_struct *pagebuf_dataio_workqueue;
  */
 
 pagebuf_param_t pb_params = {
-			/*	MIN	DFLT	MAX	*/
-	flush_interval:	{	HZ/2,	HZ,	30*HZ	},
-	age_buffer:	{	1*HZ,	15*HZ,	300*HZ	},
-	stats_clear:	{	0,	0,	1	},
-	debug:		{	0,	0,	1	},
+			  /*	MIN	DFLT	MAX	*/
+	.flush_interval	= {	HZ/2,	HZ,	30*HZ	},
+	.age_buffer	= {	1*HZ,	15*HZ,	300*HZ	},
+	.stats_clear	= {	0,	0,	1	},
+	.debug		= {	0,	0,	1	},
 };
 
 /*
