@@ -11,6 +11,8 @@
 #include <linux/string.h> 
 #include <linux/pm.h>
 #include <linux/device.h>
+#include <linux/mtd/mtd.h>
+#include <linux/mtd/partitions.h>
 
 #include <asm/irq.h>
 #include <asm/hardware.h>
@@ -18,6 +20,7 @@
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
+#include <asm/mach/flash.h>
 #include <asm/mach/map.h>
 #include <asm/mach/serial_sa1100.h>
 #include <asm/arch/simpad.h>
@@ -83,6 +86,45 @@ static struct sa1100_port_fns simpad_port_fns __initdata = {
 	.pm	   = simpad_uart_pm,
 };
 
+
+static struct mtd_partition simpad_partitions[] = {
+	{
+		.name       = "SIMpad boot firmware",
+		.size       = 0x00080000,
+		.offset     = 0,
+		.mask_flags = MTD_WRITEABLE,
+	}, {
+		.name       = "SIMpad kernel",
+		.size       = 0x0010000,
+		.offset     = MTDPART_OFS_APPEND,
+	}, {
+		.name       = "SIMpad root jffs2",
+		.size       = MTDPART_SIZ_FULL,
+		.offset     = MTDPART_OFS_APPEND,
+	}
+};
+
+static struct flash_platform_data simpad_flash_data = {
+	.map_name    = "cfi_probe",
+	.parts       = simpad_partitions,
+	.nr_parts    = ARRAY_SIZE(simpad_partitions),
+};
+
+
+static struct resource simpad_flash_resources [] = {
+	{
+		.start     = SA1100_CS0_PHYS,
+		.end       = SA1100_CS0_PHYS + SZ_16M -1,
+		.flags     = IORESOURCE_MEM,
+	}, {
+		.start     = SA1100_CS1_PHYS,
+		.end       = SA1100_CS1_PHYS + SZ_16M -1,
+		.flags     = IORESOURCE_MEM,
+	}
+};
+
+
+
 static void __init simpad_map_io(void)
 {
 	sa1100_map_io();
@@ -113,7 +155,8 @@ static void __init simpad_map_io(void)
 	PCFR = 0;
 	PSDR = 0;
 
-
+	sa11x0_set_flash_data(&simpad_flash_data, simpad_flash_resources,
+			      ARRAY_SIZE(simpad_flash_resources));
 }
 
 static void simpad_power_off(void)
