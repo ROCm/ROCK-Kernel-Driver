@@ -1263,22 +1263,42 @@ static int capinc_tty_read_proc(char *page, char **start, off_t off,
 }
 
 #define CAPINC_NR_PORTS 256
-static struct tty_driver capinc_tty_driver;
+static struct tty_driver *capinc_tty_driver;
+
+static struct tty_operations capinc_ops = {
+	.open = capinc_tty_open,
+	.close = capinc_tty_close,
+	.write = capinc_tty_write,
+	.put_char = capinc_tty_put_char,
+	.flush_chars = capinc_tty_flush_chars,
+	.write_room = capinc_tty_write_room,
+	.chars_in_buffer = capinc_tty_chars_in_buffer,
+	.ioctl = capinc_tty_ioctl,
+	.set_termios = capinc_tty_set_termios,
+	.throttle = capinc_tty_throttle,
+	.unthrottle = capinc_tty_unthrottle,
+	.stop = capinc_tty_stop,
+	.start = capinc_tty_start,
+	.hangup = capinc_tty_hangup,
+	.break_ctl = capinc_tty_break_ctl,
+	.flush_buffer = capinc_tty_flush_buffer,
+	.set_ldisc = capinc_tty_set_ldisc,
+	.send_xchar = capinc_tty_send_xchar,
+	.read_proc = capinc_tty_read_proc,
+};
 
 static int capinc_tty_init(void)
 {
-	struct tty_driver *drv = &capinc_tty_driver;
+	struct tty_driver *drv = alloc_tty_driver(CAPINC_NR_PORTS);
 
-	/* Initialize the tty_driver structure */
-	
-	memset(drv, 0, sizeof(struct tty_driver));
-	drv->magic = TTY_DRIVER_MAGIC;
+	if (!drv)
+		return -ENOMEM;
+
 	drv->owner = THIS_MODULE;
 	drv->driver_name = "capi_nc";
 	drv->name = "capi/";
 	drv->major = capi_ttymajor;
 	drv->minor_start = 0;
-	drv->num = CAPINC_NR_PORTS;
 	drv->type = TTY_DRIVER_TYPE_SERIAL;
 	drv->subtype = SERIAL_TYPE_NORMAL;
 	drv->init_termios = tty_std_termios;
@@ -1287,39 +1307,23 @@ static int capinc_tty_init(void)
 	drv->init_termios.c_cflag = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
 	drv->init_termios.c_lflag = 0;
 	drv->flags = TTY_DRIVER_REAL_RAW|TTY_DRIVER_RESET_TERMIOS;
-
-	drv->open = capinc_tty_open;
-	drv->close = capinc_tty_close;
-	drv->write = capinc_tty_write;
-	drv->put_char = capinc_tty_put_char;
-	drv->flush_chars = capinc_tty_flush_chars;
-	drv->write_room = capinc_tty_write_room;
-	drv->chars_in_buffer = capinc_tty_chars_in_buffer;
-	drv->ioctl = capinc_tty_ioctl;
-	drv->set_termios = capinc_tty_set_termios;
-	drv->throttle = capinc_tty_throttle;
-	drv->unthrottle = capinc_tty_unthrottle;
-	drv->stop = capinc_tty_stop;
-	drv->start = capinc_tty_start;
-	drv->hangup = capinc_tty_hangup;
-	drv->break_ctl = capinc_tty_break_ctl;
-	drv->flush_buffer = capinc_tty_flush_buffer;
-	drv->set_ldisc = capinc_tty_set_ldisc;
-	drv->send_xchar = capinc_tty_send_xchar;
-	drv->read_proc = capinc_tty_read_proc;
+	tty_set_operations(drv, &capinc_ops);
 	if (tty_register_driver(drv)) {
+		put_tty_driver(drv);
 		printk(KERN_ERR "Couldn't register capi_nc driver\n");
 		return -1;
 	}
+	capinc_tty_driver = drv;
 	return 0;
 }
 
 static void capinc_tty_exit(void)
 {
-	struct tty_driver *drv = &capinc_tty_driver;
+	struct tty_driver *drv = capinc_tty_driver;
 	int retval;
 	if ((retval = tty_unregister_driver(drv)))
 		printk(KERN_ERR "capi: failed to unregister capi_nc driver (%d)\n", retval);
+	put_tty_driver(drv);
 }
 
 #endif /* CONFIG_ISDN_CAPI_MIDDLEWARE */
