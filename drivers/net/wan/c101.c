@@ -379,8 +379,6 @@ static int __init c101_run(unsigned long irq, unsigned long winbase)
 		return result;
 	}
 
-	/* XXX: are we OK with having that done when card is already up? */
-
 	sca_init_sync_port(card); /* Set up C101 memory */
 	hdlc_set_carrier(!(sca_in(MSCI1_OFFSET + ST3, card) & ST3_DCD), dev);
 

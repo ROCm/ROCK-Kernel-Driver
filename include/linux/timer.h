@@ -4,6 +4,7 @@
 #include <linux/config.h>
 #include <linux/list.h>
 #include <linux/spinlock.h>
+#include <linux/stddef.h>
 
 struct tvec_t_base_s;
 

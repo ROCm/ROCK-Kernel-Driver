@@ -447,7 +447,7 @@ static void do_pending_irqs(struct pt_regs *regs)
  * come via this function.  Instead, they should provide their
  * own 'handler'
  */
-asmlinkage void asm_do_IRQ(int irq, struct pt_regs *regs)
+asmlinkage void asm_do_IRQ(unsigned int irq, struct pt_regs *regs)
 {
 	struct irqdesc *desc = irq_desc + irq;
 

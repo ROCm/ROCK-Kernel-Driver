@@ -36,7 +36,7 @@
 		$re = qr/.*sub.*sp, sp, #(([0-9]{2}|[3-9])[0-9]{2})/o;
 	} elsif ($arch =~ /^i[3456]86$/) {
 		#c0105234:       81 ec ac 05 00 00       sub    $0x5ac,%esp
-		$re = qr/^.*sub    \$(0x$x{3,5}),\%esp$/o;
+		$re = qr/^.*[as][du][db]    \$(0x$x{1,8}),\%esp$/o;
 	} elsif ($arch =~ /^ia64$/) {
 		#e0000000044011fc:       01 0f fc 8c     adds r12=-384,r12
 		$re = qr/.*adds.*r12=-(([0-9]{2}|[3-9])[0-9]{2}),r12/o;
@@ -48,10 +48,10 @@
 		$re = qr/.*addiu.*sp,sp,-(([0-9]{2}|[3-9])[0-9]{2})/o;
 	} elsif ($arch =~ /^ppc$/) {
 		#c00029f4:       94 21 ff 30     stwu    r1,-208(r1)
-		$re = qr/.*stwu.*r1,-($x{3,5})\(r1\)/o;
+		$re = qr/.*stwu.*r1,-($x{1,8})\(r1\)/o;
 	} elsif ($arch =~ /^ppc64$/) {
 		#XXX
-		$re = qr/.*stdu.*r1,-($x{3,5})\(r1\)/o;
+		$re = qr/.*stdu.*r1,-($x{1,8})\(r1\)/o;
 	} elsif ($arch =~ /^s390x?$/) {
 		#   11160:       a7 fb ff 60             aghi   %r15,-160
 		$re = qr/.*ag?hi.*\%r15,-(([0-9]{2}|[3-9])[0-9]{2})/o;
@@ -79,6 +79,12 @@ while ($line = <STDIN>) {
 		my $size = $1;
 		$size = hex($size) if ($size =~ /^0x/);
 
+		if ($size > 0x80000000) {
+			$size = - $size;
+			$size += 0x80000000;
+			$size += 0x80000000;
+		}
+
 		$line =~ m/^($xs*).*/;
 		my $addr = $1;
 		$addr =~ s/ /0/g;
@@ -90,6 +96,7 @@ while ($line = <STDIN>) {
 			$intro .= '	';
 			$padlen -= 8;
 		}
+		next if ($size < 100);
 		$stack[@stack] = "$intro$size\n";
 	}
 }

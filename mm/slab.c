@@ -477,10 +477,12 @@ struct cache_sizes malloc_sizes[] = {
 EXPORT_SYMBOL(malloc_sizes);
 
 /* Must match cache_sizes above. Out of line to keep cache footprint low. */
-static struct cache_names {
+struct cache_names {
 	char *name;
 	char *name_dma;
-} cache_names[] = {
+};
+
+static struct cache_names __initdata cache_names[] = {
 #define CACHE(x) { .name = "size-" #x, .name_dma = "size-" #x "(DMA)" },
 #include <linux/kmalloc_sizes.h>
 	{ 0, }

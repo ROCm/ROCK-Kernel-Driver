@@ -1713,7 +1713,22 @@ static void ide_device_shutdown(struct device *dev)
 {
 	ide_drive_t *drive = container_of(dev, ide_drive_t, gendev);
 
+#ifdef	CONFIG_ALPHA
+	/* On Alpha, halt(8) doesn't actually turn the machine off,
+	   it puts you into the sort of firmware monitor. Typically,
+	   it's used to boot another kernel image, so it's not much
+	   different from reboot(8). Therefore, we don't need to
+	   spin down the disk in this case, especially since Alpha
+	   firmware doesn't handle disks in standby mode properly.
+	   On the other hand, it's reasonably safe to turn the power
+	   off when the shutdown process reaches the firmware prompt,
+	   as the firmware initialization takes rather long time -
+	   at least 10 seconds, which should be sufficient for
+	   the disk to expire its write cache. */
+	if (system_state != SYSTEM_POWER_OFF) {
+#else
 	if (system_state == SYSTEM_RESTART) {
+#endif
 		ide_cacheflush_p(drive);
 		return;
 	}

@@ -8,6 +8,11 @@
 #include <asm/arch/sv_addr_ag.h>
 
 #define NR_IRQS 32
+
+/* The first vector number used for IRQs in v10 is really 0x20 */
+/* but all the code and constants are offseted to make 0 the first */
+#define FIRST_IRQ 0
+
 #define SOME_IRQ_NBR        IO_BITNR(R_VECT_MASK_RD, some)   /* 0 ? */
 #define NMI_IRQ_NBR         IO_BITNR(R_VECT_MASK_RD, nmi)    /* 1 */
 #define TIMER0_IRQ_NBR      IO_BITNR(R_VECT_MASK_RD, timer0) /* 2 */

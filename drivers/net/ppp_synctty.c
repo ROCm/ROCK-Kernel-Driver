@@ -251,10 +251,10 @@ ppp_sync_close(struct tty_struct *tty)
 {
 	struct syncppp *ap;
 
-	write_lock(&disc_data_lock);
+	write_lock_irq(&disc_data_lock);
 	ap = tty->disc_data;
 	tty->disc_data = 0;
-	write_unlock(&disc_data_lock);
+	write_unlock_irq(&disc_data_lock);
 	if (ap == 0)
 		return;
 

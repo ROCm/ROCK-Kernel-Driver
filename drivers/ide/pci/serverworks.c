@@ -777,8 +777,8 @@ static void __init init_setup_csb6 (struct pci_dev *dev, ide_pci_device_t *d)
 		d->autodma = AUTODMA;
 #endif
 
-	d->channels = (((d->device == PCI_DEVICE_ID_SERVERWORKS_CSB6IDE) ||
-			(d->device == PCI_DEVICE_ID_SERVERWORKS_CSB6IDE2)) &&
+	d->channels = ((dev->device == PCI_DEVICE_ID_SERVERWORKS_CSB6IDE ||
+			dev->device == PCI_DEVICE_ID_SERVERWORKS_CSB6IDE2) &&
 		       (!(PCI_FUNC(dev->devfn) & 1))) ? 1 : 2;
 
 	ide_setup_pci_device(dev, d);
@@ -798,8 +798,6 @@ static int __devinit svwks_init_one(struct pci_dev *dev, const struct pci_device
 {
 	ide_pci_device_t *d = &serverworks_chipsets[id->driver_data];
 
-	if (dev->device != d->device)
-		BUG();
 	d->init_setup(dev, d);
 	return 0;
 }

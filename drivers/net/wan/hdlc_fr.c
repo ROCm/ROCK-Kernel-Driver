@@ -584,8 +584,9 @@ static void fr_timer(unsigned long arg)
 	u32 list;
 
 	if (hdlc->state.fr.settings.dce)
-		reliable = (jiffies - hdlc->state.fr.last_poll <
-			    hdlc->state.fr.settings.t392 * HZ);
+		reliable = hdlc->state.fr.request &&
+			time_before(jiffies, hdlc->state.fr.last_poll +
+				    hdlc->state.fr.settings.t392 * HZ);
 	else {
 		hdlc->state.fr.last_errors <<= 1; /* Shift the list */
 		if (hdlc->state.fr.request) {
@@ -617,6 +618,7 @@ static void fr_timer(unsigned long arg)
 
 		fr_lmi_send(dev, hdlc->state.fr.n391cnt == 0);
 
+		hdlc->state.fr.last_poll = jiffies;
 		hdlc->state.fr.request = 1;
 		hdlc->state.fr.timer.expires = jiffies +
 			hdlc->state.fr.settings.t391 * HZ;
@@ -689,6 +691,7 @@ static int fr_lmi_recv(struct net_device *dev, struct sk_buff *skb)
 			       dev->name, reptype);
 			return 1;
 		}
+		hdlc->state.fr.last_poll = jiffies;
 	}
 
 	error = 0;
@@ -728,7 +731,12 @@ static int fr_lmi_recv(struct net_device *dev, struct sk_buff *skb)
 
 	/* DTE */
 
-	if (reptype != LMI_FULLREP || error)
+	hdlc->state.fr.request = 0; /* got response, no request pending */
+
+	if (error)
+		return 0;
+
+	if (reptype != LMI_FULLREP)
 		return 0;
 
 	stat_len = 3;
@@ -829,9 +837,6 @@ static int fr_rx(struct sk_buff *skb)
 			if (fr_lmi_recv(ndev, skb))
 				goto rx_error;
 			else {
-				/* No request pending */
-				hdlc->state.fr.request = 0;
-				hdlc->state.fr.last_poll = jiffies;
 				dev_kfree_skb_any(skb);
 				return NET_RX_SUCCESS;
 			}
@@ -946,9 +951,6 @@ static void fr_start(struct net_device *dev)
 	printk(KERN_DEBUG "fr_start\n");
 #endif
 	if (hdlc->state.fr.settings.lmi != LMI_NONE) {
-		if (netif_carrier_ok(dev))
-			netif_carrier_off(dev);
-		hdlc->state.fr.last_poll = 0;
 		hdlc->state.fr.reliable = 0;
 		hdlc->state.fr.dce_changed = 1;
 		hdlc->state.fr.request = 0;

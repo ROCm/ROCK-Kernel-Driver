@@ -535,7 +535,7 @@ static int rawv6_send_hdrinc(struct sock *sk, void *from, int length,
 	if (err)
 		goto error_fault;
 
-	IP6_INC_STATS(Ip6OutRequests);		
+	IP6_INC_STATS(OutRequests);		
 	err = NF_HOOK(PF_INET6, NF_IP6_LOCAL_OUT, skb, NULL, rt->u.dst.dev,
 		      dst_output);
 	if (err > 0)
@@ -549,7 +549,7 @@ error_fault:
 	err = -EFAULT;
 	kfree_skb(skb);
 error:
-	IP6_INC_STATS(Ip6OutDiscards);
+	IP6_INC_STATS(OutDiscards);
 	return err; 
 }
 static int rawv6_sendmsg(struct kiocb *iocb, struct sock *sk,

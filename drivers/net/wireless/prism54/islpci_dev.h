@@ -1,8 +1,9 @@
-/*  $Header: /var/lib/cvs/prism54-ng/ksrc/islpci_dev.h,v 1.53 2004/02/28 03:06:07 mcgrof Exp $
+/*
  *  
  *  Copyright (C) 2002 Intersil Americas Inc. 
  *  Copyright (C) 2003 Herbert Valerio Riedel <hvr@gnu.org>
  *  Copyright (C) 2003 Luis R. Rodriguez <mcgrof@ruslug.rutgers.edu>
+ *  Copyright (C) 2003 Aurelien Alleaume <slts@free.fr>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -25,6 +26,7 @@
 #include <linux/version.h>
 #include <linux/netdevice.h>
 #include <linux/wireless.h>
+#include <net/iw_handler.h>
 #include <linux/list.h>
 
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,41)
@@ -110,6 +112,10 @@ typedef struct {
 	struct iw_statistics local_iwstatistics;
 	struct iw_statistics iwstatistics;
 
+	struct iw_spy_data spy_data; /* iwspy support */
+
+	int monitor_type; /* ARPHRD_IEEE80211 or ARPHRD_IEEE80211_PRISM */
+
 	struct islpci_acl acl;
 
 	/* PCI bus allocation & configuration members */
@@ -187,6 +193,9 @@ typedef struct {
 	struct list_head bss_wpa_list;
 	int num_bss_wpa;
 	struct semaphore wpa_sem;
+
+	struct work_struct reset_task;
+	int reset_task_pending;
 } islpci_private;
 
 static inline islpci_state_t

@@ -2175,7 +2175,7 @@ sys_kill(int pid, int sig)
 }
 
 /**
- *  sys_tkill - send signal to one specific thread
+ *  sys_tgkill - send signal to one specific thread
  *  @tgid: the thread group ID of the thread
  *  @pid: the PID of the thread
  *  @sig: signal to be sent

@@ -22,7 +22,7 @@
 #include <linux/delay.h>
 #include <linux/interrupt.h>
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 #include <linux/libata.h>
 
 #define DRV_NAME	"sata_vsc"

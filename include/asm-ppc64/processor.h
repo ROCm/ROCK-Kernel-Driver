@@ -634,4 +634,10 @@ static inline void prefetchw(const void *x)
 
 #endif /* ASSEMBLY */
 
+/*
+ * Number of entries in the SLB. If this ever changes we should handle
+ * it with a use a cpu feature fixup.
+ */
+#define SLB_NUM_ENTRIES 64
+
 #endif /* __ASM_PPC64_PROCESSOR_H */

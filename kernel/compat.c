@@ -210,7 +210,8 @@ asmlinkage long compat_sys_sigprocmask(int how, compat_old_sigset_t __user *set,
 
 #ifdef CONFIG_FUTEX
 asmlinkage long compat_sys_futex(u32 __user *uaddr, int op, int val,
-		struct compat_timespec __user *utime, u32 __user *uaddr2)
+		struct compat_timespec __user *utime, u32 __user *uaddr2,
+		int val3)
 {
 	struct timespec t;
 	unsigned long timeout = MAX_SCHEDULE_TIMEOUT;
@@ -221,11 +222,11 @@ asmlinkage long compat_sys_futex(u32 __user *uaddr, int op, int val,
 			return -EFAULT;
 		timeout = timespec_to_jiffies(&t) + 1;
 	}
-	if (op == FUTEX_REQUEUE)
+	if (op >= FUTEX_REQUEUE)
 		val2 = (int) (long) utime;
 
 	return do_futex((unsigned long)uaddr, op, val, timeout,
-			(unsigned long)uaddr2, val2);
+			(unsigned long)uaddr2, val2, val3);
 }
 #endif
 
@@ -398,8 +399,8 @@ asmlinkage long compat_sys_sched_setaffinity(compat_pid_t pid,
 	return ret;
 }
 
-asmlinkage int compat_sys_sched_getaffinity(compat_pid_t pid, unsigned int len,
-					   compat_ulong_t __user *user_mask_ptr)
+asmlinkage long compat_sys_sched_getaffinity(compat_pid_t pid, unsigned int len,
+					     compat_ulong_t __user *user_mask_ptr)
 {
 	unsigned long kernel_mask;
 	mm_segment_t old_fs;

@@ -387,8 +387,8 @@ config BLK_DEV_OFFBOARD
 	  If in doubt, say N.
 
 config BLK_DEV_GENERIC
-	bool "Generic PCI IDE Chipset Support"
-	depends on PCI && BLK_DEV_IDEPCI
+	tristate "Generic PCI IDE Chipset Support"
+	depends on BLK_DEV_IDEPCI
 
 config BLK_DEV_OPTI621
 	tristate "OPTi 82C621 chipset enhanced support (EXPERIMENTAL)"

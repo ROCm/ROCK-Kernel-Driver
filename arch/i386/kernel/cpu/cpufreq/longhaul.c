@@ -18,7 +18,8 @@
  */
 
 #include <linux/kernel.h>
-#include <linux/module.h> 
+#include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/init.h>
 #include <linux/cpufreq.h>
 #include <linux/slab.h>
@@ -30,25 +31,25 @@
 
 #include "longhaul.h"
 
-#define DEBUG
-
-#ifdef DEBUG
-#define dprintk(msg...) printk(msg)
-#else
-#define dprintk(msg...) do { } while(0)
-#endif
-
 #define PFX "longhaul: "
 
 static unsigned int numscales=16, numvscales;
+static unsigned int fsb;
 static int minvid, maxvid;
 static int can_scale_voltage;
 static int vrmrev;
 
-
 /* Module parameters */
 static int dont_scale_voltage;
-static unsigned int fsb;
+static int debug;
+static int debug;
+
+static void dprintk(const char *msg, ...)
+{
+	if (debug == 1)
+		printk(msg);
+}
+
 
 #define __hlt()     __asm__ __volatile__("hlt": : :"memory")
 
@@ -118,8 +119,7 @@ static void longhaul_setstate (unsigned int clock_ratio_index)
 
 	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
 
-	dprintk (KERN_INFO PFX "FSB:%d Mult:%d.%dx\n", fsb,
-				mult/10, mult%10);
+	dprintk (KERN_INFO PFX "FSB:%d Mult:%d.%dx\n", fsb, mult/10, mult%10);
 
 	switch (longhaul_version) {
 	case 1:
@@ -167,16 +167,16 @@ static void longhaul_setstate (unsigned int clock_ratio_index)
 		longhaul.bits.SoftBusRatio = clock_ratio_index & 0xf;
 		longhaul.bits.SoftBusRatio4 = (clock_ratio_index & 0x10) >> 4;
 		longhaul.bits.EnableSoftBusRatio = 1;
-		
+
 		longhaul.bits.RevisionKey = 0x0;
-		
+
 		wrmsrl(MSR_VIA_LONGHAUL, longhaul.val);
 		__hlt();
-		
+
 		rdmsrl (MSR_VIA_LONGHAUL, longhaul.val);
 		longhaul.bits.EnableSoftBusRatio = 0;
 		longhaul.bits.RevisionKey = 0xf;
-		wrmsrl (MSR_VIA_LONGHAUL, longhaul.val);		
+		wrmsrl (MSR_VIA_LONGHAUL, longhaul.val);
 		break;
 	}
 
@@ -276,26 +276,26 @@ static int __init longhaul_get_ranges (void)
 				break;
 		}
 		break;
-		
+
 	case 4:
 		rdmsrl (MSR_VIA_LONGHAUL, longhaul.val);
-		
+
 		//TODO: Nehemiah may have borken MaxMHzBR.
 		// need to extrapolate from FSB.
-		
+
 		invalue2 = longhaul.bits.MinMHzBR;
 		invalue = longhaul.bits.MaxMHzBR;
-		if (longhaul.bits.MaxMHzBR4) 
+		if (longhaul.bits.MaxMHzBR4)
 			invalue += 16;
 		maxmult=multipliers[invalue];
-		
+
 		maxmult=longhaul_get_cpu_mult();
-		
+
 		printk(KERN_INFO PFX " invalue: %ld  maxmult: %d \n", invalue, maxmult);
 		printk(KERN_INFO PFX " invalue2: %ld \n", invalue2);
-		
+
 		minmult=50;
-		
+
 		switch (longhaul.bits.MaxMHzFSB) {
 		case 0x0:	fsb=133;
 				break;
@@ -306,8 +306,8 @@ static int __init longhaul_get_ranges (void)
 		case 0x3:	fsb=66;
 				break;
 		}
-		
-		break;	
+
+		break;
 	}
 
 	dprintk (KERN_INFO PFX "MinMult=%d.%dx MaxMult=%d.%dx\n",
@@ -418,13 +418,13 @@ static int longhaul_target (struct cpufreq_policy *policy,
 			    unsigned int relation)
 {
 	unsigned int table_index = 0;
- 	unsigned int new_clock_ratio = 0;
+	unsigned int new_clock_ratio = 0;
 
 	if (cpufreq_frequency_table_target(policy, longhaul_table, target_freq, relation, &table_index))
 		return -EINVAL;
 
 	new_clock_ratio = longhaul_table[table_index].index & 0xFF;
- 
+
 	longhaul_setstate(new_clock_ratio);
 
 	return 0;
@@ -500,7 +500,6 @@ static int __init longhaul_cpu_init (struct cpufreq_policy *policy)
 			break;
 		}
 		break;
-		
 
 	default:
 		cpuname = "Unknown";
@@ -514,11 +513,11 @@ static int __init longhaul_cpu_init (struct cpufreq_policy *policy)
 	if (ret != 0)
 		return ret;
 
- 	if ((longhaul_version==2) && (dont_scale_voltage==0))
+	if ((longhaul_version==2) && (dont_scale_voltage==0))
 		longhaul_setup_voltagescaling();
 
 	policy->governor = CPUFREQ_DEFAULT_GOVERNOR;
- 	policy->cpuinfo.transition_latency = CPUFREQ_ETERNAL;
+	policy->cpuinfo.transition_latency = CPUFREQ_ETERNAL;
 	policy->cur = calc_speed (longhaul_get_cpu_mult(), fsb);
 
 	ret = cpufreq_frequency_table_cpuinfo(policy, longhaul_table);
@@ -530,7 +529,7 @@ static int __init longhaul_cpu_init (struct cpufreq_policy *policy)
 	return 0;
 }
 
-static int __exit longhaul_cpu_exit(struct cpufreq_policy *policy)
+static int __devexit longhaul_cpu_exit(struct cpufreq_policy *policy)
 {
 	cpufreq_frequency_table_put_attr(policy->cpu);
 	return 0;
@@ -542,14 +541,14 @@ static struct freq_attr* longhaul_attr[] = {
 };
 
 static struct cpufreq_driver longhaul_driver = {
-	.verify 	= longhaul_verify,
-	.target 	= longhaul_target,
-	.get 		= longhaul_get,
-	.init		= longhaul_cpu_init,
-	.exit		= longhaul_cpu_exit,
-	.name		= "longhaul",
-	.owner		= THIS_MODULE,
-	.attr		= longhaul_attr,
+	.verify	= longhaul_verify,
+	.target	= longhaul_target,
+	.get	= longhaul_get,
+	.init	= longhaul_cpu_init,
+	.exit	= __devexit_p(longhaul_cpu_exit),
+	.name	= "longhaul",
+	.owner	= THIS_MODULE,
+	.attr	= longhaul_attr,
 };
 
 static int __init longhaul_init (void)
@@ -560,12 +559,8 @@ static int __init longhaul_init (void)
 		return -ENODEV;
 
 	switch (c->x86_model) {
-	case 6 ... 8:
+	case 6 ... 9:
 		return cpufreq_register_driver(&longhaul_driver);
-	case 9:
-		printk (KERN_INFO PFX "Nehemiah unsupported: Waiting on working silicon "
-						"from VIA before this is usable.\n");
-		break;
 	default:
 		printk (KERN_INFO PFX "Unknown VIA CPU. Contact davej@codemonkey.org.uk\n");
 	}
@@ -579,7 +574,11 @@ static void __exit longhaul_exit (void)
 	kfree(longhaul_table);
 }
 
-MODULE_PARM (dont_scale_voltage, "i");
+module_param (dont_scale_voltage, int, 0644);
+MODULE_PARM_DESC(dont_scale_voltage, "Don't scale voltage of processor");
+
+module_param (debug, int, 0644);
+MODULE_PARM_DESC(debug, "Dump debugging information.");
 
 MODULE_AUTHOR ("Dave Jones <davej@codemonkey.org.uk>");
 MODULE_DESCRIPTION ("Longhaul driver for VIA Cyrix processors.");

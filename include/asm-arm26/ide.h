@@ -26,15 +26,6 @@
 #define __ide_mm_outsw(port,addr,len)   writesw(port,addr,len)
 #define __ide_mm_outsl(port,addr,len)   writesl(port,addr,len)
 
-#define ide_init_default_irq(base)	(0)
-
-/*
- * We always use the new IDE port registering,
- * so these are fixed here.
- */
-#define ide_default_io_base(i)		(0)
-#define ide_default_irq(b)		(0)
-
 #define IDE_ARCH_OBSOLETE_INIT
 #define ide_default_io_ctl(base)	(0)
 

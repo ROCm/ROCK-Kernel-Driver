@@ -1290,12 +1290,12 @@ static struct dst_entry* tcp_v4_route_req(struct sock *sk,
 					 .dport = req->rmt_port } } };
 
 	if (ip_route_output_flow(&rt, &fl, sk, 0)) {
-		IP_INC_STATS_BH(IpOutNoRoutes);
+		IP_INC_STATS_BH(OutNoRoutes);
 		return NULL;
 	}
 	if (opt && opt->is_strictroute && rt->rt_dst != rt->rt_gateway) {
 		ip_rt_put(rt);
-		IP_INC_STATS_BH(IpOutNoRoutes);
+		IP_INC_STATS_BH(OutNoRoutes);
 		return NULL;
 	}
 	return &rt->u.dst;

@@ -78,8 +78,6 @@ static void init_dma_aec62xx(ide_hwif_t *, unsigned long);
 
 static ide_pci_device_t aec62xx_chipsets[] __devinitdata = {
 	{	/* 0 */
-		.vendor		= PCI_VENDOR_ID_ARTOP,
-		.device		= PCI_DEVICE_ID_ARTOP_ATP850UF,
 		.name		= "AEC6210",
 		.init_setup	= init_setup_aec62xx,
 		.init_chipset	= init_chipset_aec62xx,
@@ -90,8 +88,6 @@ static ide_pci_device_t aec62xx_chipsets[] __devinitdata = {
 		.enablebits	= {{0x4a,0x02,0x02}, {0x4a,0x04,0x04}},
 		.bootable	= OFF_BOARD,
 	},{	/* 1 */
-		.vendor		= PCI_VENDOR_ID_ARTOP,
-		.device		= PCI_DEVICE_ID_ARTOP_ATP860,
 		.name		= "AEC6260",
 		.init_setup	= init_setup_aec62xx,
 		.init_chipset	= init_chipset_aec62xx,
@@ -101,8 +97,6 @@ static ide_pci_device_t aec62xx_chipsets[] __devinitdata = {
 		.autodma	= NOAUTODMA,
 		.bootable	= OFF_BOARD,
 	},{	/* 2 */
-		.vendor		= PCI_VENDOR_ID_ARTOP,
-		.device		= PCI_DEVICE_ID_ARTOP_ATP860R,
 		.name		= "AEC6260R",
 		.init_setup	= init_setup_aec62xx,
 		.init_chipset	= init_chipset_aec62xx,
@@ -113,8 +107,6 @@ static ide_pci_device_t aec62xx_chipsets[] __devinitdata = {
 		.enablebits	= {{0x4a,0x02,0x02}, {0x4a,0x04,0x04}},
 		.bootable	= NEVER_BOARD,
 	},{	/* 3 */
-		.vendor		= PCI_VENDOR_ID_ARTOP,
-		.device		= PCI_DEVICE_ID_ARTOP_ATP865,
 		.name		= "AEC6X80",
 		.init_setup	= init_setup_aec6x80,
 		.init_chipset	= init_chipset_aec62xx,
@@ -124,8 +116,6 @@ static ide_pci_device_t aec62xx_chipsets[] __devinitdata = {
 		.autodma	= AUTODMA,
 		.bootable	= OFF_BOARD,
 	},{	/* 4 */
-		.vendor		= PCI_VENDOR_ID_ARTOP,
-		.device		= PCI_DEVICE_ID_ARTOP_ATP865R,
 		.name		= "AEC6X80R",
 		.init_setup	= init_setup_aec6x80,
 		.init_chipset	= init_chipset_aec62xx,

@@ -28,7 +28,7 @@
 #include <linux/blkdev.h>
 #include <linux/delay.h>
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 #include <linux/libata.h>
 
 #define DRV_NAME	"ata_piix"

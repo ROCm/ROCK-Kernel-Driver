@@ -406,10 +406,7 @@ static void __init init_hwif_cs5530 (ide_hwif_t *hwif)
 
 static int __devinit cs5530_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
-	ide_pci_device_t *d = &cs5530_chipsets[id->driver_data];
-	if (dev->device != d->device)
-		BUG();
-	ide_setup_pci_device(dev, d);
+	ide_setup_pci_device(dev, &cs5530_chipsets[id->driver_data]);
 	return 0;
 }
 

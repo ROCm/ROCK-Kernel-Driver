@@ -1123,13 +1123,11 @@ _GLOBAL(do_slb_bolted)
 	 */
 
 	/* r20 = paca */
-	/* use a cpu feature mask if we ever change our slb size */
-SLB_NUM_ENTRIES = 64
 1:	ld	r22,PACASTABRR(r20)
 	addi	r21,r22,1
 	cmpdi	r21,SLB_NUM_ENTRIES
 	blt+	2f
-	li	r21,1			/* dont touch bolted slot 0 */
+	li	r21,2			/* dont touch slot 0 or 1 */
 2:	std	r21,PACASTABRR(r20)
 
 	/* r20 = paca, r22 = entry */

@@ -50,32 +50,6 @@
 #define MAX_HWIFS	4	/* same as the other archs */
 #endif
 
-
-static __inline__ int ide_default_irq(unsigned long base)
-{
-	  return 0;
-}
-
-static __inline__ unsigned long ide_default_io_base(int index)
-{
-          return 0;
-}
-
-
-/*
- * Set up a hw structure for a specified data port, control port and IRQ.
- * This should follow whatever the default interface uses.
- */
-static __inline__ void ide_init_hwif_ports(hw_regs_t *hw,
-					   unsigned long data_port,
-					   unsigned long ctrl_port, int *irq)
-{
-	if (data_port || ctrl_port)
-		printk("ide_init_hwif_ports: must not be called\n");
-}
-
-#define ide_init_default_irq(base)	(0)
-
 /*
  * Get rid of defs from io.h - ide has its private and conflicting versions
  * Since so far no single m68k platform uses ISA/PCI I/O space for IDE, we

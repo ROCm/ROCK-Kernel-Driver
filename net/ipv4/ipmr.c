@@ -1115,7 +1115,7 @@ static inline int ipmr_forward_finish(struct sk_buff *skb)
 {
 	struct ip_options * opt	= &(IPCB(skb)->opt);
 
-	IP_INC_STATS_BH(IpForwDatagrams);
+	IP_INC_STATS_BH(OutForwDatagrams);
 
 	if (unlikely(opt->optlen))
 		ip_forward_options(skb);
@@ -1178,7 +1178,7 @@ static void ipmr_queue_xmit(struct sk_buff *skb, struct mfc_cache *c, int vifi)
 		   to blackhole.
 		 */
 
-		IP_INC_STATS_BH(IpFragFails);
+		IP_INC_STATS_BH(FragFails);
 		ip_rt_put(rt);
 		goto out_free;
 	}

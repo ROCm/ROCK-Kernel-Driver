@@ -1,4 +1,4 @@
-/* $Id: traps.c,v 1.7 2003/07/04 08:27:52 starvik Exp $
+/* $Id: traps.c,v 1.9 2004/05/11 12:28:26 starvik Exp $
  *
  *  linux/arch/cris/traps.c
  *
@@ -14,6 +14,7 @@
  */
 
 #include <linux/init.h>
+#include <linux/module.h>
 #include <asm/pgtable.h>
 #include <asm/uaccess.h>
 

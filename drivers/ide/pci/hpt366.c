@@ -1241,8 +1241,6 @@ static int __devinit hpt366_init_one(struct pci_dev *dev, const struct pci_devic
 {
 	ide_pci_device_t *d = &hpt366_chipsets[id->driver_data];
 
-	if (dev->device != d->device)
-		BUG();
 	d->init_setup(dev, d);
 	return 0;
 }

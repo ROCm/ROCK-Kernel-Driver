@@ -11,6 +11,7 @@
 #include <linux/err.h>
 #include <linux/unistd.h>
 #include <linux/file.h>
+#include <linux/module.h>
 #include <asm/semaphore.h>
 
 struct kthread_create_info
@@ -41,7 +42,7 @@ int kthread_should_stop(void)
 {
 	return (kthread_stop_info.k == current);
 }
-
+EXPORT_SYMBOL(kthread_should_stop);
 
 static void kthread_exit_files(void)
 {
@@ -144,6 +145,7 @@ struct task_struct *kthread_create(int (*threadfn)(void *data),
 
 	return create.result;
 }
+EXPORT_SYMBOL(kthread_create);
 
 void kthread_bind(struct task_struct *k, unsigned int cpu)
 {
@@ -153,6 +155,7 @@ void kthread_bind(struct task_struct *k, unsigned int cpu)
 	set_task_cpu(k, cpu);
 	k->cpus_allowed = cpumask_of_cpu(cpu);
 }
+EXPORT_SYMBOL(kthread_bind);
 
 int kthread_stop(struct task_struct *k)
 {
@@ -180,3 +183,4 @@ int kthread_stop(struct task_struct *k)
 
 	return ret;
 }
+EXPORT_SYMBOL(kthread_stop);

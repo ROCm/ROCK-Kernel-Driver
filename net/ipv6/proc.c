@@ -57,43 +57,36 @@ static int sockstat6_seq_show(struct seq_file *seq, void *v)
 	return 0;
 }
 
-struct snmp6_item
-{
-	char *name;
-	int   offset;
-};
-#define SNMP6_SENTINEL	{ .name = NULL, .offset = 0 }
-
-static struct snmp6_item snmp6_ipv6_list[] = {
+static struct snmp_item snmp6_ipstats_list[] = {
 /* ipv6 mib according to RFC 2465 */
-#define SNMP6_GEN(x) { .name = #x , .offset = offsetof(struct ipv6_mib, x) }
-	SNMP6_GEN(Ip6InReceives),
-	SNMP6_GEN(Ip6InHdrErrors),
-	SNMP6_GEN(Ip6InTooBigErrors),
-	SNMP6_GEN(Ip6InNoRoutes),
-	SNMP6_GEN(Ip6InAddrErrors),
-	SNMP6_GEN(Ip6InUnknownProtos),
-	SNMP6_GEN(Ip6InTruncatedPkts),
-	SNMP6_GEN(Ip6InDiscards),
-	SNMP6_GEN(Ip6InDelivers),
-	SNMP6_GEN(Ip6OutForwDatagrams),
-	SNMP6_GEN(Ip6OutRequests),
-	SNMP6_GEN(Ip6OutDiscards),
-	SNMP6_GEN(Ip6OutNoRoutes),
-	SNMP6_GEN(Ip6ReasmTimeout),
-	SNMP6_GEN(Ip6ReasmReqds),
-	SNMP6_GEN(Ip6ReasmOKs),
-	SNMP6_GEN(Ip6ReasmFails),
-	SNMP6_GEN(Ip6FragOKs),
-	SNMP6_GEN(Ip6FragFails),
-	SNMP6_GEN(Ip6FragCreates),
-	SNMP6_GEN(Ip6InMcastPkts),
-	SNMP6_GEN(Ip6OutMcastPkts),
+#define SNMP6_GEN(x)	SNMP_ITEM(struct ipstats_mib, x, "Ip6" #x)
+	SNMP6_GEN(InReceives),
+	SNMP6_GEN(InHdrErrors),
+	SNMP6_GEN(InTooBigErrors),
+	SNMP6_GEN(InNoRoutes),
+	SNMP6_GEN(InAddrErrors),
+	SNMP6_GEN(InUnknownProtos),
+	SNMP6_GEN(InTruncatedPkts),
+	SNMP6_GEN(InDiscards),
+	SNMP6_GEN(InDelivers),
+	SNMP6_GEN(OutForwDatagrams),
+	SNMP6_GEN(OutRequests),
+	SNMP6_GEN(OutDiscards),
+	SNMP6_GEN(OutNoRoutes),
+	SNMP6_GEN(ReasmTimeout),
+	SNMP6_GEN(ReasmReqds),
+	SNMP6_GEN(ReasmOKs),
+	SNMP6_GEN(ReasmFails),
+	SNMP6_GEN(FragOKs),
+	SNMP6_GEN(FragFails),
+	SNMP6_GEN(FragCreates),
+	SNMP6_GEN(InMcastPkts),
+	SNMP6_GEN(OutMcastPkts),
 #undef SNMP6_GEN
-	SNMP6_SENTINEL
+	SNMP_ITEM_SENTINEL
 };
 
-static struct snmp6_item snmp6_icmp6_list[] = {
+static struct snmp_item snmp6_icmp6_list[] = {
 /* icmpv6 mib according to RFC 2466
 
    Exceptions:  {In|Out}AdminProhibs are removed, because I see
@@ -104,7 +97,7 @@ static struct snmp6_item snmp6_icmp6_list[] = {
 		OutRouterAdvertisements too.
 		OutGroupMembQueries too.
  */
-#define SNMP6_GEN(x) { .name = #x , .offset = offsetof(struct icmpv6_mib, x) }
+#define SNMP6_GEN(x)	SNMP_ITEM(struct icmpv6_mib, x, #x)
 	SNMP6_GEN(Icmp6InMsgs),
 	SNMP6_GEN(Icmp6InErrors),
 	SNMP6_GEN(Icmp6InDestUnreachs),
@@ -134,17 +127,17 @@ static struct snmp6_item snmp6_icmp6_list[] = {
 	SNMP6_GEN(Icmp6OutGroupMembResponses),
 	SNMP6_GEN(Icmp6OutGroupMembReductions),
 #undef SNMP6_GEN
-	SNMP6_SENTINEL
+	SNMP_ITEM_SENTINEL
 };
 
-static struct snmp6_item snmp6_udp6_list[] = {
-#define SNMP6_GEN(x) { .name = "Udp6" #x , .offset = offsetof(struct udp_mib, Udp##x) }
+static struct snmp_item snmp6_udp6_list[] = {
+#define SNMP6_GEN(x)	SNMP_ITEM(struct udp_mib, Udp##x, "Udp6" #x)
 	SNMP6_GEN(InDatagrams),
 	SNMP6_GEN(NoPorts),
 	SNMP6_GEN(InErrors),
 	SNMP6_GEN(OutDatagrams),
 #undef SNMP6_GEN
-	SNMP6_SENTINEL
+	SNMP_ITEM_SENTINEL
 };
 
 static unsigned long
@@ -167,7 +160,7 @@ fold_field(void *mib[], int offt)
 }
 
 static inline void
-snmp6_seq_show_item(struct seq_file *seq, void **mib, struct snmp6_item *itemlist)
+snmp6_seq_show_item(struct seq_file *seq, void **mib, struct snmp_item *itemlist)
 {
 	int i;
 	for (i=0; itemlist[i].name; i++)
@@ -183,7 +176,7 @@ static int snmp6_seq_show(struct seq_file *seq, void *v)
 		seq_printf(seq, "%-32s\t%u\n", "ifIndex", idev->dev->ifindex);
 		snmp6_seq_show_item(seq, (void **)idev->stats.icmpv6, snmp6_icmp6_list);
 	} else {
-		snmp6_seq_show_item(seq, (void **)ipv6_statistics, snmp6_ipv6_list);
+		snmp6_seq_show_item(seq, (void **)ipv6_statistics, snmp6_ipstats_list);
 		snmp6_seq_show_item(seq, (void **)icmpv6_statistics, snmp6_icmp6_list);
 		snmp6_seq_show_item(seq, (void **)udp_stats_in6, snmp6_udp6_list);
 	}

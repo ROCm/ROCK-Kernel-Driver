@@ -1,13 +1,10 @@
 #ifndef SIIMAGE_H
 #define SIIMAGE_H
 
-#include <linux/config.h>
 #include <linux/pci.h>
 #include <linux/ide.h>
 
 #include <asm/io.h>
-
-#define DISPLAY_SIIMAGE_TIMINGS
 
 #undef SIIMAGE_VIRTUAL_DMAPIO
 #undef SIIMAGE_BUFFERED_TASKFILE
@@ -27,8 +24,6 @@ static void init_hwif_siimage(ide_hwif_t *);
 
 static ide_pci_device_t siimage_chipsets[] __devinitdata = {
 	{	/* 0 */
-		.vendor		= PCI_VENDOR_ID_CMD,
-		.device		= PCI_DEVICE_ID_SII_680,
 		.name		= "SiI680",
 		.init_chipset	= init_chipset_siimage,
 		.init_iops	= init_iops_siimage,
@@ -37,8 +32,6 @@ static ide_pci_device_t siimage_chipsets[] __devinitdata = {
 		.autodma	= AUTODMA,
 		.bootable	= ON_BOARD,
 	},{	/* 1 */
-		.vendor		= PCI_VENDOR_ID_CMD,
-		.device		= PCI_DEVICE_ID_SII_3112,
 		.name		= "SiI3112 Serial ATA",
 		.init_chipset	= init_chipset_siimage,
 		.init_iops	= init_iops_siimage,
@@ -47,8 +40,6 @@ static ide_pci_device_t siimage_chipsets[] __devinitdata = {
 		.autodma	= AUTODMA,
 		.bootable	= ON_BOARD,
 	},{	/* 2 */
-		.vendor		= PCI_VENDOR_ID_CMD,
-		.device		= PCI_DEVICE_ID_SII_1210SA,
 		.name		= "Adaptec AAR-1210SA",
 		.init_chipset	= init_chipset_siimage,
 		.init_iops	= init_iops_siimage,

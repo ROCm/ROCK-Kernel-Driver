@@ -172,8 +172,14 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
  * After we have set current->mm to a new value, this activates
  * the context for the new mm so we see the new mappings.
  */
-#define activate_mm(active_mm, mm) \
-	switch_mm(active_mm, mm, current);
+static inline void activate_mm(struct mm_struct *prev, struct mm_struct *next)
+{
+	unsigned long flags;
+
+	local_irq_save(flags);
+	switch_mm(prev, next, current);
+	local_irq_restore(flags);
+}
 
 #define VSID_RANDOMIZER 42470972311UL
 #define VSID_MASK	0xfffffffffUL

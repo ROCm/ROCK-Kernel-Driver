@@ -41,61 +41,52 @@
  * cacheline machine it makes a *lot* of sense -AK
  */ 
 
- 
+struct snmp_item {
+	char *name;
+	int offset;
+};
+
+#define SNMP_ITEM(mib,entry,procname)	{	\
+	.name = procname,			\
+	.offset = offsetof(mib, entry),		\
+}
+
+#define SNMP_ITEM_SENTINEL {			\
+	.name = NULL,				\
+	.offset = 0,				\
+}
+
 /*
  * RFC 1213:  MIB-II
  * RFC 2011 (updates 1213):  SNMPv2-MIB-IP
  * RFC 2863:  Interfaces Group MIB
- */
-struct ip_mib
-{
- 	unsigned long	IpInReceives;
- 	unsigned long	IpInHdrErrors;
- 	unsigned long	IpInAddrErrors;
- 	unsigned long	IpForwDatagrams;
- 	unsigned long	IpInUnknownProtos;
- 	unsigned long	IpInDiscards;
- 	unsigned long	IpInDelivers;
- 	unsigned long	IpOutRequests;
- 	unsigned long	IpOutDiscards;
- 	unsigned long	IpOutNoRoutes;
- 	unsigned long	IpReasmTimeout;
- 	unsigned long	IpReasmReqds;
- 	unsigned long	IpReasmOKs;
- 	unsigned long	IpReasmFails;
- 	unsigned long	IpFragOKs;
- 	unsigned long	IpFragFails;
- 	unsigned long	IpFragCreates;
-	unsigned long   __pad[0]; 
-};
- 
-/*
  * RFC 2465:  IPv6 MIB: General Group
+ * draft-ietf-ipv6-rfc2011-update-10.txt: MIB for IP: IP Statistics Tables
  */
-struct ipv6_mib
+struct ipstats_mib
 {
-	unsigned long	Ip6InReceives;
- 	unsigned long	Ip6InHdrErrors;
- 	unsigned long	Ip6InTooBigErrors;
- 	unsigned long	Ip6InNoRoutes;
- 	unsigned long	Ip6InAddrErrors;
- 	unsigned long	Ip6InUnknownProtos;
- 	unsigned long	Ip6InTruncatedPkts;
- 	unsigned long	Ip6InDiscards;
- 	unsigned long	Ip6InDelivers;
- 	unsigned long	Ip6OutForwDatagrams;
- 	unsigned long	Ip6OutRequests;
- 	unsigned long	Ip6OutDiscards;
- 	unsigned long	Ip6OutNoRoutes;
- 	unsigned long	Ip6ReasmTimeout;
- 	unsigned long	Ip6ReasmReqds;
- 	unsigned long	Ip6ReasmOKs;
- 	unsigned long	Ip6ReasmFails;
- 	unsigned long	Ip6FragOKs;
- 	unsigned long	Ip6FragFails;
- 	unsigned long	Ip6FragCreates;
- 	unsigned long	Ip6InMcastPkts;
- 	unsigned long	Ip6OutMcastPkts;
+	unsigned long	InReceives;
+ 	unsigned long	InHdrErrors;
+ 	unsigned long	InTooBigErrors;
+ 	unsigned long	InNoRoutes;
+ 	unsigned long	InAddrErrors;
+ 	unsigned long	InUnknownProtos;
+ 	unsigned long	InTruncatedPkts;
+ 	unsigned long	InDiscards;
+ 	unsigned long	InDelivers;
+ 	unsigned long	OutForwDatagrams;
+ 	unsigned long	OutRequests;
+ 	unsigned long	OutDiscards;
+ 	unsigned long	OutNoRoutes;
+ 	unsigned long	ReasmTimeout;
+ 	unsigned long	ReasmReqds;
+ 	unsigned long	ReasmOKs;
+ 	unsigned long	ReasmFails;
+ 	unsigned long	FragOKs;
+ 	unsigned long	FragFails;
+ 	unsigned long	FragCreates;
+ 	unsigned long	InMcastPkts;
+ 	unsigned long	OutMcastPkts;
 	unsigned long   __pad[0]; 
 };
  

@@ -744,9 +744,9 @@ extern int copy_mount_options (const void __user *, unsigned long *);
 #define SMBFS_NAME      "smbfs"
 #define NCPFS_NAME      "ncpfs"
 
-asmlinkage int compat_sys_mount(char __user * dev_name, char __user * dir_name,
-				char __user * type, unsigned long flags,
-				void __user * data)
+asmlinkage long compat_sys_mount(char __user * dev_name, char __user * dir_name,
+				 char __user * type, unsigned long flags,
+				 void __user * data)
 {
 	unsigned long type_page;
 	unsigned long data_page;

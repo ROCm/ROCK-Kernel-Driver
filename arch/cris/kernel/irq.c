@@ -1,4 +1,4 @@
-/* $Id: irq.c,v 1.8 2003/07/04 08:27:52 starvik Exp $
+/*
  *
  *	linux/arch/cris/kernel/irq.c
  *
@@ -99,7 +99,7 @@ int show_interrupts(struct seq_file *p, void *v)
 		if (!action) 
 			goto skip;
 		seq_printf(p, "%2d: %10u %c %s",
-			i, kstat_cpu(0).irqs[i],
+			i, kstat_this_cpu.irqs[i],
 			(action->flags & SA_INTERRUPT) ? '+' : ' ',
 			action->name);
 		for (action = action->next; action; action = action->next) {
@@ -129,13 +129,12 @@ asmlinkage void do_IRQ(int irq, struct pt_regs * regs)
 
         cpu = smp_processor_id();
         irq_enter();
-	kstat_cpu(cpu).irqs[irq]++;
+	kstat_cpu(cpu).irqs[irq - FIRST_IRQ]++;
+	action = irq_action[irq - FIRST_IRQ];
 
-	action = irq_action[irq];
         if (action) {
                 if (!(action->flags & SA_INTERRUPT))
                         local_irq_enable();
-                action = irq_action[irq];
                 do_random = 0;
                 do {
                         do_random |= action->flags;
@@ -175,7 +174,7 @@ int setup_irq(int irq, struct irqaction * new)
 	struct irqaction *old, **p;
 	unsigned long flags;
 
-	p = irq_action + irq;
+	p = irq_action + irq - FIRST_IRQ;
 	if ((old = *p) != NULL) {
 		/* Can't share interrupts unless both agree to */
 		if (!(old->flags & new->flags & SA_SHIRQ))
@@ -230,12 +229,6 @@ int request_irq(unsigned int irq,
 	int retval;
 	struct irqaction * action;
 
-	/* interrupts 0 and 1 are hardware breakpoint and NMI and we can't support
-	   these yet. interrupt 15 is the multiple irq, it's special. */
-
-	if(irq < 2 || irq == 15 || irq >= NR_IRQS)
-		return -EINVAL;
-
 	if(!handler)
 		return -EINVAL;
 
@@ -270,7 +263,7 @@ void free_irq(unsigned int irq, void *dev_id)
 		printk("Trying to free IRQ%d\n",irq);
 		return;
 	}
-	for (p = irq + irq_action; (action = *p) != NULL; p = &action->next) {
+	for (p = irq - FIRST_IRQ + irq_action; (action = *p) != NULL; p = &action->next) {
 		if (action->dev_id != dev_id)
 			continue;
 
@@ -278,7 +271,7 @@ void free_irq(unsigned int irq, void *dev_id)
 		local_save_flags(flags);
 		local_irq_disable();
 		*p = action->next;
-		if (!irq_action[irq]) {
+		if (!irq_action[irq - FIRST_IRQ]) {
 			mask_irq(irq);
 			arch_free_irq(irq);
 		}

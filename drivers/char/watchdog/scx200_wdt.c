@@ -221,10 +221,16 @@ static int __init scx200_wdt_init(void)
 
 	printk(KERN_DEBUG NAME ": NatSemi SCx200 Watchdog Driver\n");
 
-	/* First check that this really is a NatSemi SCx200 CPU */
+	/*
+	 * First check that this really is a NatSemi SCx200 CPU or a Geode
+	 * SC1100 processor
+	 */
 	if ((pci_find_device(PCI_VENDOR_ID_NS,
 			     PCI_DEVICE_ID_NS_SCx200_BRIDGE,
-			     NULL)) == NULL)
+			     NULL)) == NULL
+	    && (pci_find_device(PCI_VENDOR_ID_NS,
+				PCI_DEVICE_ID_NS_SC1100_BRIDGE,
+				NULL)) == NULL)
 		return -ENODEV;
 
 	/* More sanity checks, verify that the configuration block is there */

@@ -113,24 +113,24 @@ static int pxa2xx_pcmcia_set_mcatt( int sock, int speed, int clock )
 	return 0;
 }
 
-static int pxa2xx_pcmcia_set_mcxx(struct soc_pcmcia_socket *skt, unsigned int lclk)
+static int pxa2xx_pcmcia_set_mcxx(struct soc_pcmcia_socket *skt, unsigned int clk)
 {
 	struct soc_pcmcia_timing timing;
 	int sock = skt->nr;
 
 	soc_common_pcmcia_get_timing(skt, &timing);
 
-	pxa2xx_pcmcia_set_mcmem(sock, timing.mem, lclk);
-	pxa2xx_pcmcia_set_mcatt(sock, timing.attr, lclk);
-	pxa2xx_pcmcia_set_mcio(sock, timing.io, lclk);
+	pxa2xx_pcmcia_set_mcmem(sock, timing.mem, clk);
+	pxa2xx_pcmcia_set_mcatt(sock, timing.attr, clk);
+	pxa2xx_pcmcia_set_mcio(sock, timing.io, clk);
 
 	return 0;
 }
 
 static int pxa2xx_pcmcia_set_timing(struct soc_pcmcia_socket *skt)
 {
-	unsigned int lclk = get_lclk_frequency_10khz();
-	return pxa2xx_pcmcia_set_mcxx(skt, lclk);
+	unsigned int clk = get_memclk_frequency_10khz();
+	return pxa2xx_pcmcia_set_mcxx(skt, clk);
 }
 
 int pxa2xx_drv_pcmcia_probe(struct device *dev)

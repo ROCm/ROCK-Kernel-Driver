@@ -10,8 +10,19 @@
 
 #include <linux/config.h>
 
+/* #include "scsi.h" */
+#include <scsi/scsi_cmnd.h>
+#include <scsi/scsi_device.h>
+#include <scsi/scsi_eh.h>
+#include <scsi/scsi_request.h>
+#include <scsi/scsi_tcq.h>
+#include <scsi/scsi.h>
+#include <scsi/scsi_host.h>
+
 /* For dvma controller register definitions. */
 #include <asm/dma.h>
+
+#define scsi_to_sbus_dma_dir(scsi_dir)	((int)(scsi_dir))
 
 /* The ESP SCSI controllers have their register sets in three
  * "classes":
@@ -181,9 +192,9 @@ struct esp {
 	int			bursts;		/* Burst sizes our DVMA supports */
 
 	/* Our command queues, only one cmd lives in the current_SC queue. */
-	Scsi_Cmnd		*issue_SC;	/* Commands to be issued */
-	Scsi_Cmnd		*current_SC;	/* Who is currently working the bus */
-	Scsi_Cmnd		*disconnected_SC;/* Commands disconnected from the bus */
+	struct scsi_cmnd	*issue_SC;	/* Commands to be issued */
+	struct scsi_cmnd	*current_SC;	/* Who is currently working the bus */
+	struct scsi_cmnd	*disconnected_SC;/* Commands disconnected from the bus */
 
 	/* Message goo */
 	u8			cur_msgout[16];

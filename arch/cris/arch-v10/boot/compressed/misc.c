@@ -1,7 +1,7 @@
 /*
  * misc.c
  *
- * $Id: misc.c,v 1.4 2003/04/09 05:20:45 starvik Exp $
+ * $Id: misc.c,v 1.6 2003/10/27 08:04:31 starvik Exp $
  * 
  * This is a collection of several routines from gzip-1.0.3 
  * adapted for Linux.
@@ -263,7 +263,7 @@ decompress_kernel()
 	__asm__ volatile ("move vr,%0" : "=rm" (revision));
 	if (revision < 10)
 	{
-		puts("You need an ETRAX 100LX to run linux 2.4\n");
+		puts("You need an ETRAX 100LX to run linux 2.6\n");
 		while(1);
 	}
 

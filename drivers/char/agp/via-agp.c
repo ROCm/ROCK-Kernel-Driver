@@ -9,6 +9,8 @@
 #include <linux/agp_backend.h>
 #include "agp.h"
 
+static struct pci_device_id agp_via_pci_table[];
+
 #define VIA_GARTCTRL	0x80
 #define VIA_APSIZE	0x84
 #define VIA_ATTBASE	0x88
@@ -378,20 +380,9 @@ static int __devinit agp_via_probe(struct pci_dev *pdev,
 	if (!cap_ptr)
 		return -ENODEV;
 
-	/* probe for known chipsets */
-	for (j = 0; devs[j].chipset_name; j++) {
-		if (pdev->device == devs[j].device_id) {
-			printk (KERN_INFO PFX "Detected VIA %s chipset\n",
-					devs[j].chipset_name);
-			goto found;
-		}
-	}
+	j = ent - agp_via_pci_table;
+	printk (KERN_INFO PFX "Detected VIA %s chipset\n", devs[j].chipset_name);
 
-	printk(KERN_ERR PFX "Unsupported VIA chipset (device id: %04x)\n",
-		    pdev->device);
-	return -ENODEV;
-
-found:
 	bridge = agp_alloc_bridge();
 	if (!bridge)
 		return -ENOMEM;
@@ -432,15 +423,40 @@ static void __devexit agp_via_remove(struct pci_dev *pdev)
 	agp_put_bridge(bridge);
 }
 
+/* must be the same order as name table above */
 static struct pci_device_id agp_via_pci_table[] = {
-	{
-	.class		= (PCI_CLASS_BRIDGE_HOST << 8),
-	.class_mask	= ~0,
-	.vendor		= PCI_VENDOR_ID_VIA,
-	.device		= PCI_ANY_ID,
-	.subvendor	= PCI_ANY_ID,
-	.subdevice	= PCI_ANY_ID,
-	},
+#define ID(x) \
+	{						\
+	.class		= (PCI_CLASS_BRIDGE_HOST << 8),	\
+	.class_mask	= ~0,				\
+	.vendor		= PCI_VENDOR_ID_VIA,		\
+	.device		= x,				\
+	.subvendor	= PCI_ANY_ID,			\
+	.subdevice	= PCI_ANY_ID,			\
+	}
+	ID(PCI_DEVICE_ID_VIA_82C598_0),
+	ID(PCI_DEVICE_ID_VIA_8501_0),
+	ID(PCI_DEVICE_ID_VIA_8601_0),
+	ID(PCI_DEVICE_ID_VIA_82C691_0),
+	ID(PCI_DEVICE_ID_VIA_8371_0),
+	ID(PCI_DEVICE_ID_VIA_8633_0),
+	ID(PCI_DEVICE_ID_VIA_XN266),
+	ID(PCI_DEVICE_ID_VIA_8361),
+	ID(PCI_DEVICE_ID_VIA_8363_0),
+	ID(PCI_DEVICE_ID_VIA_8753_0),
+	ID(PCI_DEVICE_ID_VIA_8367_0),
+	ID(PCI_DEVICE_ID_VIA_8653_0),
+	ID(PCI_DEVICE_ID_VIA_XM266),
+	ID(PCI_DEVICE_ID_VIA_862X_0),
+	ID(PCI_DEVICE_ID_VIA_8377_0),
+	ID(PCI_DEVICE_ID_VIA_8605_0),
+	ID(PCI_DEVICE_ID_VIA_8703_51_0),
+	ID(PCI_DEVICE_ID_VIA_8754C_0),
+	ID(PCI_DEVICE_ID_VIA_8763_0),
+	ID(PCI_DEVICE_ID_VIA_8378_0),
+	ID(PCI_DEVICE_ID_VIA_PT880),
+	ID(PCI_DEVICE_ID_VIA_8783_0),
+	ID(PCI_DEVICE_ID_VIA_PX8X0_0),	
 	{ }
 };
 

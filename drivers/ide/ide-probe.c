@@ -800,18 +800,12 @@ void probe_hwif (ide_hwif_t *hwif)
 
 	for (unit = 0; unit < MAX_DRIVES; ++unit) {
 		ide_drive_t *drive = &hwif->drives[unit];
-		int enable_dma = 1;
 
 		if (drive->present) {
 			if (hwif->tuneproc != NULL && 
 				drive->autotune == IDE_TUNE_AUTO)
 				/* auto-tune PIO mode */
 				hwif->tuneproc(drive, 255);
-
-#ifdef CONFIG_IDEDMA_ONLYDISK
-			if (drive->media != ide_disk)
-				enable_dma = 0;
-#endif
 			/*
 			 * MAJOR HACK BARF :-/
 			 *
@@ -831,7 +825,9 @@ void probe_hwif (ide_hwif_t *hwif)
 				 *   PARANOIA!!!
 				 */
 				hwif->ide_dma_off_quietly(drive);
-				if (enable_dma)
+#ifdef CONFIG_IDEDMA_ONLYDISK
+				if (drive->media == ide_disk)
+#endif
 					hwif->ide_dma_check(drive);
 			}
 		}
