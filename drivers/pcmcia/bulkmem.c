@@ -48,6 +48,19 @@
 #include <pcmcia/cistpl.h>
 #include "cs_internal.h"
 
+#ifdef DEBUG
+extern int pc_debug;
+#define cs_socket_name(skt)	((skt)->dev.class_id)
+
+#define ds_dbg(skt, lvl, fmt, arg...) do {		\
+	if (pc_debug >= lvl)				\
+		printk(KERN_DEBUG "ds: %s: " fmt, 	\
+		       cs_socket_name(skt) , ## arg);	\
+} while (0)
+#else
+#define ds_dbg(lvl, fmt, arg...) do { } while (0)
+#endif
+
 /*======================================================================
 
     This stuff is used by Card Services to initialize the table of
@@ -66,7 +79,7 @@ static void setup_regions(client_handle_t handle, int attr,
     cistpl_device_geo_t geo;
     memory_handle_t r;
 
-    cs_dbg(SOCKET(handle), 1, "setup_regions(0x%p, %d, 0x%p)\n",
+    ds_dbg(SOCKET(handle), 1, "setup_regions(0x%p, %d, 0x%p)\n",
 	   handle, attr, list);
 
     code = (attr) ? CISTPL_DEVICE_A : CISTPL_DEVICE;
@@ -75,13 +88,13 @@ static void setup_regions(client_handle_t handle, int attr,
     code = (attr) ? CISTPL_JEDEC_A : CISTPL_JEDEC_C;
     has_jedec = (read_tuple(handle, code, &jedec) == CS_SUCCESS);
     if (has_jedec && (device.ndev != jedec.nid)) {
-	cs_dbg(SOCKET(handle), 0, "Device info does not match JEDEC info.\n");
+	ds_dbg(SOCKET(handle), 0, "Device info does not match JEDEC info.\n");
 	has_jedec = 0;
     }
     code = (attr) ? CISTPL_DEVICE_GEO_A : CISTPL_DEVICE_GEO;
     has_geo = (read_tuple(handle, code, &geo) == CS_SUCCESS);
     if (has_geo && (device.ndev != geo.ngeo)) {
-	cs_dbg(SOCKET(handle), 0, "Device info does not match geometry tuple.\n");
+	ds_dbg(SOCKET(handle), 0, "Device info does not match geometry tuple.\n");
 	has_geo = 0;
     }
     
@@ -161,6 +174,7 @@ int pcmcia_get_first_region(client_handle_t handle, region_info_t *rgn)
     else
 	return match_region(handle, s->c_region, rgn);
 } /* get_first_region */
+EXPORT_SYMBOL(pcmcia_get_first_region);
 
 int pcmcia_get_next_region(client_handle_t handle, region_info_t *rgn)
 {
@@ -168,4 +182,4 @@ int pcmcia_get_next_region(client_handle_t handle, region_info_t *rgn)
 	return CS_BAD_HANDLE;
     return match_region(handle, rgn->next, rgn);
 } /* get_next_region */
-
+EXPORT_SYMBOL(pcmcia_get_next_region);

@@ -75,7 +75,7 @@ MODULE_DESCRIPTION("PCMCIA Driver Services");
 MODULE_LICENSE("Dual MPL/GPL");
 
 #ifdef DEBUG
-static int pc_debug;
+int pc_debug;
 
 module_param(pc_debug, int, 0644);
 
@@ -1241,3 +1241,5 @@ static struct pcmcia_driver * get_pcmcia_driver (dev_info_t *dev_info)
 		return cmp.drv;
 	return NULL;
 }
+
+MODULE_ALIAS("ds");
