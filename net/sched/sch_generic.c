@@ -45,10 +45,11 @@
    The idea is the following:
    - enqueue, dequeue are serialized via top level device
      spinlock dev->queue_lock.
-   - tree walking is protected by read_lock(qdisc_tree_lock)
+   - tree walking is protected by read_lock_bh(qdisc_tree_lock)
      and this lock is used only in process context.
-   - updates to tree are made only under rtnl semaphore,
-     hence this lock may be made without local bh disabling.
+   - updates to tree are made under rtnl semaphore or
+     from softirq context (__qdisc_destroy rcu-callback)
+     hence this lock needs local bh disabling.
 
    qdisc_tree_lock must be grabbed BEFORE dev->queue_lock!
  */
@@ -56,14 +57,14 @@ rwlock_t qdisc_tree_lock = RW_LOCK_UNLOCKED;
 
 void qdisc_lock_tree(struct net_device *dev)
 {
-	write_lock(&qdisc_tree_lock);
+	write_lock_bh(&qdisc_tree_lock);
 	spin_lock_bh(&dev->queue_lock);
 }
 
 void qdisc_unlock_tree(struct net_device *dev)
 {
 	spin_unlock_bh(&dev->queue_lock);
-	write_unlock(&qdisc_tree_lock);
+	write_unlock_bh(&qdisc_tree_lock);
 }
 
 /* 
@@ -431,10 +432,12 @@ static void __qdisc_destroy(struct rcu_head *head)
 #ifdef CONFIG_NET_ESTIMATOR
 	qdisc_kill_estimator(&qdisc->stats);
 #endif
+	write_lock(&qdisc_tree_lock);
 	if (ops->reset)
 		ops->reset(qdisc);
 	if (ops->destroy)
 		ops->destroy(qdisc);
+	write_unlock(&qdisc_tree_lock);
 	module_put(ops->owner);
 
 	if (!(qdisc->flags&TCQ_F_BUILTIN))
@@ -459,11 +462,8 @@ void qdisc_destroy(struct Qdisc *qdisc)
 			}
 		}
 	}
-
 	call_rcu(&qdisc->q_rcu, __qdisc_destroy);
-
 }
-
 
 void dev_activate(struct net_device *dev)
 {
@@ -482,17 +482,17 @@ void dev_activate(struct net_device *dev)
 				return;
 			}
 
-			write_lock(&qdisc_tree_lock);
+			write_lock_bh(&qdisc_tree_lock);
 			qdisc->next = dev->qdisc_list;
 			dev->qdisc_list = qdisc;
-			write_unlock(&qdisc_tree_lock);
+			write_unlock_bh(&qdisc_tree_lock);
 
 		} else {
 			qdisc =  &noqueue_qdisc;
 		}
-		write_lock(&qdisc_tree_lock);
+		write_lock_bh(&qdisc_tree_lock);
 		dev->qdisc_sleeping = qdisc;
-		write_unlock(&qdisc_tree_lock);
+		write_unlock_bh(&qdisc_tree_lock);
 	}
 
 	spin_lock_bh(&dev->queue_lock);

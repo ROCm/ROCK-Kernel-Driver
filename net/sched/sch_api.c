@@ -812,18 +812,18 @@ static int tc_dump_qdisc(struct sk_buff *skb, struct netlink_callback *cb)
 			continue;
 		if (idx > s_idx)
 			s_q_idx = 0;
-		read_lock(&qdisc_tree_lock);
+		read_lock_bh(&qdisc_tree_lock);
 		for (q = dev->qdisc_list, q_idx = 0; q;
 		     q = q->next, q_idx++) {
 			if (q_idx < s_q_idx)
 				continue;
 			if (tc_fill_qdisc(skb, q, 0, NETLINK_CB(cb->skb).pid,
 					  cb->nlh->nlmsg_seq, NLM_F_MULTI, RTM_NEWQDISC) <= 0) {
-				read_unlock(&qdisc_tree_lock);
+				read_unlock_bh(&qdisc_tree_lock);
 				goto done;
 			}
 		}
-		read_unlock(&qdisc_tree_lock);
+		read_unlock_bh(&qdisc_tree_lock);
 	}
 
 done:
@@ -1033,7 +1033,7 @@ static int tc_dump_tclass(struct sk_buff *skb, struct netlink_callback *cb)
 
 	s_t = cb->args[0];
 
-	read_lock(&qdisc_tree_lock);
+	read_lock_bh(&qdisc_tree_lock);
 	for (q=dev->qdisc_list, t=0; q; q = q->next, t++) {
 		if (t < s_t) continue;
 		if (!q->ops->cl_ops) continue;
@@ -1052,7 +1052,7 @@ static int tc_dump_tclass(struct sk_buff *skb, struct netlink_callback *cb)
 		if (arg.w.stop)
 			break;
 	}
-	read_unlock(&qdisc_tree_lock);
+	read_unlock_bh(&qdisc_tree_lock);
 
 	cb->args[0] = t;
 
