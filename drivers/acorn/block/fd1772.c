@@ -1528,7 +1528,7 @@ static struct gendisk *floppy_find(dev_t dev, int *part, void *data)
 int fd1772_init(void)
 {
 	static spinlock_t lock = SPIN_LOCK_UNLOCKED;
-	int i;
+	int i, err = -ENOMEM;
 
 	if (!machine_is_archimedes())
 		return 0;
@@ -1536,27 +1536,25 @@ int fd1772_init(void)
 	for (i = 0; i < FD_MAX_UNITS; i++) {
 		disks[i] = alloc_disk(1);
 		if (!disks[i])
-			goto out;
+			goto err_disk;
 	}
 
-	if (register_blkdev(MAJOR_NR, "fd", &floppy_fops)) {
+	err = register_blkdev(MAJOR_NR, "fd", &floppy_fops);
+	if (err) {
 		printk("Unable to get major %d for floppy\n", MAJOR_NR);
-		goto out;
+		goto err_disk;
 	}
 
+	err = -EBUSY;
 	if (request_dma(FLOPPY_DMA, "fd1772")) {
 		printk("Unable to grab DMA%d for the floppy (1772) driver\n", FLOPPY_DMA);
-		unregister_blkdev(MAJOR_NR, "fd");
-		goto out;
+		goto err_blkdev;
 	};
 
 	if (request_dma(FIQ_FD1772, "fd1772 end")) {
 		printk("Unable to grab DMA%d for the floppy (1772) driver\n", FIQ_FD1772);
-		unregister_blkdev(MAJOR_NR, "fd");
-		free_dma(FLOPPY_DMA);
-		goto out;
+		goto err_dma1;
 	};
-	enable_dma(FIQ_FD1772);	/* This inserts a call to our command end routine */
 
 	/* initialize variables */
 	SelectedDrive = -1;
@@ -1570,6 +1568,12 @@ int fd1772_init(void)
 	   out of some special memory... */
 	DMABuffer = (char *) kmalloc(2048);	/* Copes with pretty large sectors */
 #endif
+	err = -ENOMEM;
+	if (!DMAbuffer)
+		goto err_dma2;
+
+	enable_dma(FIQ_FD1772);	/* This inserts a call to our command end routine */
+
 	blk_init_queue(&floppy_queue, do_fd_request, &lock);
 	for (i = 0; i < FD_MAX_UNITS; i++) {
 		unit[i].track = -1;
@@ -1590,8 +1594,18 @@ int fd1772_init(void)
 	config_types();
 
 	return 0;
-out:
+
+ err_dma2:
+	free_dma(FIQ_FD1772);
+
+ err_dma1:
+	free_dma(FLOPPY_DMA);
+
+ err_blkdev:
+	unregister_blkdev(MAJOR_NR, "fd");
+
+ err_disk:
 	while (i--)
 		put_disk(disks[i]);
-	return 1;
+	return err;
 }
