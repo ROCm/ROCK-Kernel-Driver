@@ -38,7 +38,7 @@
 #define __ide_mm_outsw	__ide_outsw
 #define __ide_mm_outsl	__ide_outsl
 
-static __inline__ unsigned int inw_be(unsigned long addr)
+static inline unsigned int inw_be(void __iomem *addr)
 {
 	unsigned int ret;
 
@@ -49,9 +49,7 @@ static __inline__ unsigned int inw_be(unsigned long addr)
 	return ret;
 }
 
-static __inline__ void __ide_insw(unsigned long port,
-				  void *dst,
-				  u32 count)
+static inline void __ide_insw(void __iomem *port, void *dst, u32 count)
 {
 #if (L1DCACHE_SIZE > PAGE_SIZE)		/* is there D$ aliasing problem */
 	unsigned long end = (unsigned long)dst + (count << 1);
@@ -81,16 +79,14 @@ static __inline__ void __ide_insw(unsigned long port,
 #endif
 }
 
-static __inline__ void outw_be(unsigned short w, unsigned long addr)
+static inline void outw_be(unsigned short w, void __iomem *addr)
 {
 	__asm__ __volatile__("stha %0, [%1] %2"
 			     : /* no outputs */
 			     : "r" (w), "r" (addr), "i" (ASI_PHYS_BYPASS_EC_E));
 }
 
-static __inline__ void __ide_outsw(unsigned long port,
-				   void *src,
-				   u32 count)
+static inline void __ide_outsw(void __iomem *port, void *src, u32 count)
 {
 #if (L1DCACHE_SIZE > PAGE_SIZE)		/* is there D$ aliasing problem */
 	unsigned long end = (unsigned long)src + (count << 1);
