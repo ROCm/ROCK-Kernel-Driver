@@ -425,7 +425,7 @@ static struct {
 #if CP_VLAN_TAG_USED
 static void cp_vlan_rx_register(struct net_device *dev, struct vlan_group *grp)
 {
-	struct cp_private *cp = dev->priv;
+	struct cp_private *cp = netdev_priv(dev);
 	unsigned long flags;
 
 	spin_lock_irqsave(&cp->lock, flags);
@@ -437,7 +437,7 @@ static void cp_vlan_rx_register(struct net_device *dev, struct vlan_group *grp)
 
 static void cp_vlan_rx_kill_vid(struct net_device *dev, unsigned short vid)
 {
-	struct cp_private *cp = dev->priv;
+	struct cp_private *cp = netdev_priv(dev);
 	unsigned long flags;
 
 	spin_lock_irqsave(&cp->lock, flags);
@@ -513,7 +513,7 @@ static inline unsigned int cp_rx_csum_ok (u32 status)
 
 static int cp_rx_poll (struct net_device *dev, int *budget)
 {
-	struct cp_private *cp = dev->priv;
+	struct cp_private *cp = netdev_priv(dev);
 	unsigned rx_tail = cp->rx_tail;
 	unsigned rx_work = dev->quota;
 	unsigned rx;
@@ -633,7 +633,7 @@ static irqreturn_t
 cp_interrupt (int irq, void *dev_instance, struct pt_regs *regs)
 {
 	struct net_device *dev = dev_instance;
-	struct cp_private *cp = dev->priv;
+	struct cp_private *cp = netdev_priv(dev);
 	u16 status;
 
 	status = cpr16(IntrStatus);
@@ -741,7 +741,7 @@ static void cp_tx (struct cp_private *cp)
 
 static int cp_start_xmit (struct sk_buff *skb, struct net_device *dev)
 {
-	struct cp_private *cp = dev->priv;
+	struct cp_private *cp = netdev_priv(dev);
 	unsigned entry;
 	u32 eor;
 #if CP_VLAN_TAG_USED
@@ -899,7 +899,7 @@ static int cp_start_xmit (struct sk_buff *skb, struct net_device *dev)
 
 static void __cp_set_rx_mode (struct net_device *dev)
 {
-	struct cp_private *cp = dev->priv;
+	struct cp_private *cp = netdev_priv(dev);
 	u32 mc_filter[2];	/* Multicast hash filter */
 	int i, rx_mode;
 	u32 tmp;
@@ -944,7 +944,7 @@ static void __cp_set_rx_mode (struct net_device *dev)
 static void cp_set_rx_mode (struct net_device *dev)
 {
 	unsigned long flags;
-	struct cp_private *cp = dev->priv;
+	struct cp_private *cp = netdev_priv(dev);
 
 	spin_lock_irqsave (&cp->lock, flags);
 	__cp_set_rx_mode(dev);
@@ -960,7 +960,7 @@ static void __cp_get_stats(struct cp_private *cp)
 
 static struct net_device_stats *cp_get_stats(struct net_device *dev)
 {
-	struct cp_private *cp = dev->priv;
+	struct cp_private *cp = netdev_priv(dev);
 	unsigned long flags;
 
 	/* The chip only need report frame silently dropped. */
@@ -1160,7 +1160,7 @@ static void cp_free_rings (struct cp_private *cp)
 
 static int cp_open (struct net_device *dev)
 {
-	struct cp_private *cp = dev->priv;
+	struct cp_private *cp = netdev_priv(dev);
 	int rc;
 
 	if (netif_msg_ifup(cp))
@@ -1190,7 +1190,7 @@ err_out_hw:
 
 static int cp_close (struct net_device *dev)
 {
-	struct cp_private *cp = dev->priv;
+	struct cp_private *cp = netdev_priv(dev);
 	unsigned long flags;
 
 	if (netif_msg_ifdown(cp))
@@ -1211,7 +1211,7 @@ static int cp_close (struct net_device *dev)
 #ifdef BROKEN
 static int cp_change_mtu(struct net_device *dev, int new_mtu)
 {
-	struct cp_private *cp = dev->priv;
+	struct cp_private *cp = netdev_priv(dev);
 	int rc;
 	unsigned long flags;
 
@@ -1256,7 +1256,7 @@ static char mii_2_8139_map[8] = {
 
 static int mdio_read(struct net_device *dev, int phy_id, int location)
 {
-	struct cp_private *cp = dev->priv;
+	struct cp_private *cp = netdev_priv(dev);
 
 	return location < 8 && mii_2_8139_map[location] ?
 	       readw(cp->regs + mii_2_8139_map[location]) : 0;
@@ -1266,7 +1266,7 @@ static int mdio_read(struct net_device *dev, int phy_id, int location)
 static void mdio_write(struct net_device *dev, int phy_id, int location,
 		       int value)
 {
-	struct cp_private *cp = dev->priv;
+	struct cp_private *cp = netdev_priv(dev);
 
 	if (location == 0) {
 		cpw8(Cfg9346, Cfg9346_Unlock);
@@ -1334,7 +1334,7 @@ static void netdev_get_wol (struct cp_private *cp,
 
 static void cp_get_drvinfo (struct net_device *dev, struct ethtool_drvinfo *info)
 {
-	struct cp_private *cp = dev->priv;
+	struct cp_private *cp = netdev_priv(dev);
 
 	strcpy (info->driver, DRV_NAME);
 	strcpy (info->version, DRV_VERSION);
@@ -1353,7 +1353,7 @@ static int cp_get_stats_count (struct net_device *dev)
 
 static int cp_get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 {
-	struct cp_private *cp = dev->priv;
+	struct cp_private *cp = netdev_priv(dev);
 	int rc;
 	unsigned long flags;
 
@@ -1366,7 +1366,7 @@ static int cp_get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 
 static int cp_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 {
-	struct cp_private *cp = dev->priv;
+	struct cp_private *cp = netdev_priv(dev);
 	int rc;
 	unsigned long flags;
 
@@ -1379,31 +1379,31 @@ static int cp_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 
 static int cp_nway_reset(struct net_device *dev)
 {
-	struct cp_private *cp = dev->priv;
+	struct cp_private *cp = netdev_priv(dev);
 	return mii_nway_restart(&cp->mii_if);
 }
 
 static u32 cp_get_msglevel(struct net_device *dev)
 {
-	struct cp_private *cp = dev->priv;
+	struct cp_private *cp = netdev_priv(dev);
 	return cp->msg_enable;
 }
 
 static void cp_set_msglevel(struct net_device *dev, u32 value)
 {
-	struct cp_private *cp = dev->priv;
+	struct cp_private *cp = netdev_priv(dev);
 	cp->msg_enable = value;
 }
 
 static u32 cp_get_rx_csum(struct net_device *dev)
 {
-	struct cp_private *cp = dev->priv;
+	struct cp_private *cp = netdev_priv(dev);
 	return (cpr16(CpCmd) & RxChkSum) ? 1 : 0;
 }
 
 static int cp_set_rx_csum(struct net_device *dev, u32 data)
 {
-	struct cp_private *cp = dev->priv;
+	struct cp_private *cp = netdev_priv(dev);
 	u16 cmd = cp->cpcmd, newcmd;
 
 	newcmd = cmd;
@@ -1428,7 +1428,7 @@ static int cp_set_rx_csum(struct net_device *dev, u32 data)
 static void cp_get_regs(struct net_device *dev, struct ethtool_regs *regs,
 		        void *p)
 {
-	struct cp_private *cp = dev->priv;
+	struct cp_private *cp = netdev_priv(dev);
 	unsigned long flags;
 
 	if (regs->len < CP_REGS_SIZE)
@@ -1443,7 +1443,7 @@ static void cp_get_regs(struct net_device *dev, struct ethtool_regs *regs,
 
 static void cp_get_wol (struct net_device *dev, struct ethtool_wolinfo *wol)
 {
-	struct cp_private *cp = dev->priv;
+	struct cp_private *cp = netdev_priv(dev);
 	unsigned long flags;
 
 	spin_lock_irqsave (&cp->lock, flags);
@@ -1453,7 +1453,7 @@ static void cp_get_wol (struct net_device *dev, struct ethtool_wolinfo *wol)
 
 static int cp_set_wol (struct net_device *dev, struct ethtool_wolinfo *wol)
 {
-	struct cp_private *cp = dev->priv;
+	struct cp_private *cp = netdev_priv(dev);
 	unsigned long flags;
 	int rc;
 
@@ -1479,7 +1479,7 @@ static void cp_get_strings (struct net_device *dev, u32 stringset, u8 *buf)
 static void cp_get_ethtool_stats (struct net_device *dev,
 				  struct ethtool_stats *estats, u64 *tmp_stats)
 {
-	struct cp_private *cp = dev->priv;
+	struct cp_private *cp = netdev_priv(dev);
 	unsigned int work = 100;
 	int i;
 
@@ -1541,7 +1541,7 @@ static struct ethtool_ops cp_ethtool_ops = {
 
 static int cp_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 {
-	struct cp_private *cp = dev->priv;
+	struct cp_private *cp = netdev_priv(dev);
 	struct mii_ioctl_data *mii = (struct mii_ioctl_data *) &rq->ifr_data;
 	int rc;
 	unsigned long flags;
@@ -1655,7 +1655,7 @@ static int cp_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	SET_MODULE_OWNER(dev);
 	SET_NETDEV_DEV(dev, &pdev->dev);
 
-	cp = dev->priv;
+	cp = netdev_priv(dev);
 	cp->pdev = pdev;
 	cp->dev = dev;
 	cp->msg_enable = (debug < 0 ? CP_DEF_MSG_ENABLE : debug);
@@ -1793,7 +1793,7 @@ err_out_free:
 static void cp_remove_one (struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
-	struct cp_private *cp = dev->priv;
+	struct cp_private *cp = netdev_priv(dev);
 
 	if (!dev)
 		BUG();
@@ -1815,7 +1815,7 @@ static int cp_suspend (struct pci_dev *pdev, u32 state)
 	unsigned long flags;
 
 	dev = pci_get_drvdata (pdev);
-	cp  = dev->priv;
+	cp  = netdev_priv(dev);
 
 	if (!dev || !netif_running (dev)) return 0;
 
@@ -1844,7 +1844,7 @@ static int cp_resume (struct pci_dev *pdev)
 	struct cp_private *cp;
 
 	dev = pci_get_drvdata (pdev);
-	cp  = dev->priv;
+	cp  = netdev_priv(dev);
 
 	netif_device_attach (dev);
 	
