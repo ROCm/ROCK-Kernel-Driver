@@ -944,8 +944,10 @@ void zap_other_threads(struct task_struct *p)
 	}
 }
 
-int
-group_send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
+/*
+ * Must be called with the tasklist_lock held for reading!
+ */
+int group_send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
 {
 	unsigned long flags;
 	int ret;
@@ -1083,17 +1085,19 @@ static int kill_something_info(int sig, struct siginfo *info, int pid)
 int
 send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
 {
+	int ret;
+
 	/* XXX should nix these interfaces and update the kernel */
-	if (T(sig, SIG_KERNEL_BROADCAST_MASK))
-		/* XXX do callers really always hold the tasklist_lock?? */
-		return group_send_sig_info(sig, info, p);
-	else {
-		int error;
+	if (T(sig, SIG_KERNEL_BROADCAST_MASK)) {
+		read_lock(&tasklist_lock);
+		ret = group_send_sig_info(sig, info, p);
+		read_unlock(&tasklist_lock);
+	} else {
 		spin_lock_irq(&p->sighand->siglock);
-		error = specific_send_sig_info(sig, info, p);
+		ret = specific_send_sig_info(sig, info, p);
 		spin_unlock_irq(&p->sighand->siglock);
-		return error;
 	}
+	return ret;
 }
 
 int
