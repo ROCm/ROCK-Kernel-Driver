@@ -149,9 +149,9 @@ static int h4_recv(struct hci_uart *hu, void *data, int count)
 {
 	struct h4_struct *h4 = hu->priv;
 	register char *ptr;
-	hci_event_hdr *eh;
-	hci_acl_hdr   *ah;
-	hci_sco_hdr   *sh;
+	struct hci_event_hdr *eh;
+	struct hci_acl_hdr   *ah;
+	struct hci_sco_hdr   *sh;
 	register int len, type, dlen;
 
 	BT_DBG("hu %p count %d rx_state %ld rx_count %ld", 
@@ -180,7 +180,7 @@ static int h4_recv(struct hci_uart *hu, void *data, int count)
 				continue;
 
 			case H4_W4_EVENT_HDR:
-				eh = (hci_event_hdr *) h4->rx_skb->data;
+				eh = (struct hci_event_hdr *) h4->rx_skb->data;
 
 				BT_DBG("Event header: evt 0x%2.2x plen %d", eh->evt, eh->plen);
 
@@ -188,7 +188,7 @@ static int h4_recv(struct hci_uart *hu, void *data, int count)
 				continue;
 
 			case H4_W4_ACL_HDR:
-				ah = (hci_acl_hdr *) h4->rx_skb->data;
+				ah = (struct hci_acl_hdr *) h4->rx_skb->data;
 				dlen = __le16_to_cpu(ah->dlen);
 
 				BT_DBG("ACL header: dlen %d", dlen);
@@ -197,7 +197,7 @@ static int h4_recv(struct hci_uart *hu, void *data, int count)
 				continue;
 
 			case H4_W4_SCO_HDR:
-				sh = (hci_sco_hdr *) h4->rx_skb->data;
+				sh = (struct hci_sco_hdr *) h4->rx_skb->data;
 
 				BT_DBG("SCO header: dlen %d", sh->dlen);
 

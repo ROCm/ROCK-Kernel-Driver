@@ -42,7 +42,7 @@
 struct inquiry_entry {
 	struct inquiry_entry 	*next;
 	__u32			timestamp;
-	inquiry_info		info;
+	struct inquiry_info	info;
 };
 
 struct inquiry_cache {
@@ -179,7 +179,7 @@ static inline long inquiry_entry_age(struct inquiry_entry *e)
 }
 
 struct inquiry_entry *inquiry_cache_lookup(struct hci_dev *hdev, bdaddr_t *bdaddr);
-void inquiry_cache_update(struct hci_dev *hdev, inquiry_info *info);
+void inquiry_cache_update(struct hci_dev *hdev, struct inquiry_info *info);
 void inquiry_cache_flush(struct hci_dev *hdev);
 int  inquiry_cache_dump(struct hci_dev *hdev, int num, __u8 *buf);
 

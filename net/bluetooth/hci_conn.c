@@ -61,7 +61,7 @@ void hci_acl_connect(struct hci_conn *conn)
 {
 	struct hci_dev *hdev = conn->hdev;
 	struct inquiry_entry *ie;
-	create_conn_cp cp;
+	struct create_conn_cp cp;
 
 	BT_DBG("%p", conn);
 
@@ -85,13 +85,12 @@ void hci_acl_connect(struct hci_conn *conn)
 	else
 		cp.role_switch	= 0x00;
 		
-	hci_send_cmd(hdev, OGF_LINK_CTL, OCF_CREATE_CONN,
-				CREATE_CONN_CP_SIZE, &cp);
+	hci_send_cmd(hdev, OGF_LINK_CTL, OCF_CREATE_CONN, sizeof(cp), &cp);
 }
 
 void hci_acl_disconn(struct hci_conn *conn, __u8 reason)
 {
-	disconnect_cp cp;
+	struct disconnect_cp cp;
 
 	BT_DBG("%p", conn);
 
@@ -99,14 +98,13 @@ void hci_acl_disconn(struct hci_conn *conn, __u8 reason)
 
 	cp.handle = __cpu_to_le16(conn->handle);
 	cp.reason = reason;
-	hci_send_cmd(conn->hdev, OGF_LINK_CTL, OCF_DISCONNECT,
-				DISCONNECT_CP_SIZE, &cp);
+	hci_send_cmd(conn->hdev, OGF_LINK_CTL, OCF_DISCONNECT, sizeof(cp), &cp);
 }
 
 void hci_add_sco(struct hci_conn *conn, __u16 handle)
 {
 	struct hci_dev *hdev = conn->hdev;
-	add_sco_cp cp;
+	struct add_sco_cp cp;
 
 	BT_DBG("%p", conn);
 
@@ -116,7 +114,7 @@ void hci_add_sco(struct hci_conn *conn, __u16 handle)
 	cp.pkt_type = __cpu_to_le16(hdev->pkt_type & SCO_PTYPE_MASK);
 	cp.handle   = __cpu_to_le16(handle);
 
-	hci_send_cmd(hdev, OGF_LINK_CTL, OCF_ADD_SCO, ADD_SCO_CP_SIZE, &cp);
+	hci_send_cmd(hdev, OGF_LINK_CTL, OCF_ADD_SCO, sizeof(cp), &cp);
 }
 
 static void hci_conn_timeout(unsigned long arg)
@@ -300,10 +298,9 @@ int hci_conn_auth(struct hci_conn *conn)
 		return 1;
 	
 	if (!test_and_set_bit(HCI_CONN_AUTH_PEND, &conn->pend)) {
-		auth_requested_cp ar;
-		ar.handle = __cpu_to_le16(conn->handle);
-		hci_send_cmd(conn->hdev, OGF_LINK_CTL, OCF_AUTH_REQUESTED,
-				AUTH_REQUESTED_CP_SIZE, &ar);
+		struct auth_requested_cp cp;
+		cp.handle = __cpu_to_le16(conn->handle);
+		hci_send_cmd(conn->hdev, OGF_LINK_CTL, OCF_AUTH_REQUESTED, sizeof(cp), &cp);
 	}
 	return 0;
 }
@@ -320,11 +317,10 @@ int hci_conn_encrypt(struct hci_conn *conn)
 		return 0;
 
 	if (hci_conn_auth(conn)) {
-		set_conn_encrypt_cp ce;
-		ce.handle  = __cpu_to_le16(conn->handle);
-		ce.encrypt = 1; 
-		hci_send_cmd(conn->hdev, OGF_LINK_CTL, OCF_SET_CONN_ENCRYPT,
-				SET_CONN_ENCRYPT_CP_SIZE, &ce);
+		struct set_conn_encrypt_cp cp;
+		cp.handle  = __cpu_to_le16(conn->handle);
+		cp.encrypt = 1; 
+		hci_send_cmd(conn->hdev, OGF_LINK_CTL, OCF_SET_CONN_ENCRYPT, sizeof(cp), &cp);
 	}
 	return 0;
 }

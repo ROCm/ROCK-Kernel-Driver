@@ -210,7 +210,6 @@ static void hci_reset_req(struct hci_dev *hdev, unsigned long opt)
 
 static void hci_init_req(struct hci_dev *hdev, unsigned long opt)
 {
-	set_event_flt_cp ef;
 	__u16 param;
 
 	BT_DBG("%s %ld", hdev->name, opt);
@@ -226,13 +225,12 @@ static void hci_init_req(struct hci_dev *hdev, unsigned long opt)
 #if 0
 	/* Host buffer size */
 	{
-		host_buffer_size_cp bs;
-		bs.acl_mtu = __cpu_to_le16(HCI_MAX_ACL_SIZE);
-		bs.sco_mtu = HCI_MAX_SCO_SIZE;
-		bs.acl_max_pkt = __cpu_to_le16(0xffff);
-		bs.sco_max_pkt = __cpu_to_le16(0xffff);
-		hci_send_cmd(hdev, OGF_HOST_CTL, OCF_HOST_BUFFER_SIZE,
-				HOST_BUFFER_SIZE_CP_SIZE, &bs);
+		struct host_buffer_size_cp cp;
+		cp.acl_mtu = __cpu_to_le16(HCI_MAX_ACL_SIZE);
+		cp.sco_mtu = HCI_MAX_SCO_SIZE;
+		cp.acl_max_pkt = __cpu_to_le16(0xffff);
+		cp.sco_max_pkt = __cpu_to_le16(0xffff);
+		hci_send_cmd(hdev, OGF_HOST_CTL, OCF_HOST_BUFFER_SIZE, sizeof(cp), &cp);
 	}
 #endif
 
@@ -242,8 +240,11 @@ static void hci_init_req(struct hci_dev *hdev, unsigned long opt)
 	/* Optional initialization */
 
 	/* Clear Event Filters */
-	ef.flt_type  = FLT_CLEAR_ALL;
-	hci_send_cmd(hdev, OGF_HOST_CTL, OCF_SET_EVENT_FLT, 1, &ef);
+	{
+		struct set_event_flt_cp cp;
+		cp.flt_type  = FLT_CLEAR_ALL;
+		hci_send_cmd(hdev, OGF_HOST_CTL, OCF_SET_EVENT_FLT, sizeof(cp), &cp);
+	}
 
 	/* Page timeout ~20 secs */
 	param = __cpu_to_le16(0x8000);
@@ -338,7 +339,7 @@ struct inquiry_entry *inquiry_cache_lookup(struct hci_dev *hdev, bdaddr_t *bdadd
 	return e;
 }
 
-void inquiry_cache_update(struct hci_dev *hdev, inquiry_info *info)
+void inquiry_cache_update(struct hci_dev *hdev, struct inquiry_info *info)
 {
 	struct inquiry_cache *cache = &hdev->inq_cache;
 	struct inquiry_entry *e;
@@ -354,7 +355,7 @@ void inquiry_cache_update(struct hci_dev *hdev, inquiry_info *info)
 		cache->list = e;
 	}
 
-	memcpy(&e->info, info, sizeof(inquiry_info));
+	memcpy(&e->info, info, sizeof(*info));
 	e->timestamp = jiffies;
 	cache->timestamp = jiffies;
 }
@@ -362,12 +363,12 @@ void inquiry_cache_update(struct hci_dev *hdev, inquiry_info *info)
 int inquiry_cache_dump(struct hci_dev *hdev, int num, __u8 *buf)
 {
 	struct inquiry_cache *cache = &hdev->inq_cache;
-	inquiry_info *info = (inquiry_info *) buf;
+	struct inquiry_info *info = (struct inquiry_info *) buf;
 	struct inquiry_entry *e;
 	int copied = 0;
 
 	for (e = cache->list; e && copied < num; e = e->next, copied++)
-		memcpy(info++, &e->info, sizeof(inquiry_info));
+		memcpy(info++, &e->info, sizeof(*info));
 
 	BT_DBG("cache %p, copied %d", cache, copied);
 	return copied;
@@ -376,7 +377,7 @@ int inquiry_cache_dump(struct hci_dev *hdev, int num, __u8 *buf)
 static void hci_inq_req(struct hci_dev *hdev, unsigned long opt)
 {
 	struct hci_inquiry_req *ir = (struct hci_inquiry_req *) opt;
-	inquiry_cp ic;
+	struct inquiry_cp cp;
 
 	BT_DBG("%s", hdev->name);
 
@@ -384,10 +385,10 @@ static void hci_inq_req(struct hci_dev *hdev, unsigned long opt)
 		return;
 
 	/* Start Inquiry */
-	memcpy(&ic.lap, &ir->lap, 3);
-	ic.length  = ir->length;
-	ic.num_rsp = ir->num_rsp;
-	hci_send_cmd(hdev, OGF_LINK_CTL, OCF_INQUIRY, INQUIRY_CP_SIZE, &ic);
+	memcpy(&cp.lap, &ir->lap, 3);
+	cp.length  = ir->length;
+	cp.num_rsp = ir->num_rsp;
+	hci_send_cmd(hdev, OGF_LINK_CTL, OCF_INQUIRY, sizeof(cp), &cp);
 }
 
 int hci_inquiry(unsigned long arg)
@@ -420,7 +421,7 @@ int hci_inquiry(unsigned long arg)
 	/* cache_dump can't sleep. Therefore we allocate temp buffer and then
 	 * copy it to the user space.
 	 */
-	if (!(buf = kmalloc(sizeof(inquiry_info) * ir.num_rsp, GFP_KERNEL))) {
+	if (!(buf = kmalloc(sizeof(struct inquiry_info) * ir.num_rsp, GFP_KERNEL))) {
 		err = -ENOMEM;
 		goto done;
 	}
@@ -432,10 +433,10 @@ int hci_inquiry(unsigned long arg)
 	BT_DBG("num_rsp %d", ir.num_rsp);
 
 	if (!verify_area(VERIFY_WRITE, ptr, sizeof(ir) + 
-				(sizeof(inquiry_info) * ir.num_rsp))) {
+			(sizeof(struct inquiry_info) * ir.num_rsp))) {
 		copy_to_user(ptr, &ir, sizeof(ir));
 		ptr += sizeof(ir);
-	        copy_to_user(ptr, buf, sizeof(inquiry_info) * ir.num_rsp);
+	        copy_to_user(ptr, buf, sizeof(struct inquiry_info) * ir.num_rsp);
 	} else 
 		err = -EFAULT;
 
@@ -1012,19 +1013,20 @@ int hci_send_raw(struct sk_buff *skb)
 int hci_send_cmd(struct hci_dev *hdev, __u16 ogf, __u16 ocf, __u32 plen, void *param)
 {
 	int len = HCI_COMMAND_HDR_SIZE + plen;
-	hci_command_hdr *hc;
+	struct hci_command_hdr *hdr;
 	struct sk_buff *skb;
 
 	BT_DBG("%s ogf 0x%x ocf 0x%x plen %d", hdev->name, ogf, ocf, plen);
 
-	if (!(skb = bt_skb_alloc(len, GFP_ATOMIC))) {
+	skb = bt_skb_alloc(len, GFP_ATOMIC);
+	if (!skb) {
 		BT_ERR("%s Can't allocate memory for HCI command", hdev->name);
 		return -ENOMEM;
 	}
 	
-	hc = (hci_command_hdr *) skb_put(skb, HCI_COMMAND_HDR_SIZE);
-	hc->opcode = __cpu_to_le16(cmd_opcode_pack(ogf, ocf));
-	hc->plen   = plen;
+	hdr = (struct hci_command_hdr *) skb_put(skb, HCI_COMMAND_HDR_SIZE);
+	hdr->opcode = __cpu_to_le16(cmd_opcode_pack(ogf, ocf));
+	hdr->plen   = plen;
 
 	if (plen)
 		memcpy(skb_put(skb, plen), param, plen);
@@ -1042,14 +1044,14 @@ int hci_send_cmd(struct hci_dev *hdev, __u16 ogf, __u16 ocf, __u32 plen, void *p
 /* Get data from the previously sent command */
 void *hci_sent_cmd_data(struct hci_dev *hdev, __u16 ogf, __u16 ocf)
 {
-	hci_command_hdr *hc;
+	struct hci_command_hdr *hdr;
 
 	if (!hdev->sent_cmd)
 		return NULL;
 
-	hc = (void *) hdev->sent_cmd->data;
+	hdr = (void *) hdev->sent_cmd->data;
 
-	if (hc->opcode != __cpu_to_le16(cmd_opcode_pack(ogf, ocf)))
+	if (hdr->opcode != __cpu_to_le16(cmd_opcode_pack(ogf, ocf)))
 		return NULL;
 
 	BT_DBG("%s ogf 0x%x ocf 0x%x", hdev->name, ogf, ocf);
@@ -1060,14 +1062,14 @@ void *hci_sent_cmd_data(struct hci_dev *hdev, __u16 ogf, __u16 ocf)
 /* Send ACL data */
 static void hci_add_acl_hdr(struct sk_buff *skb, __u16 handle, __u16 flags)
 {
+	struct hci_acl_hdr *hdr;
 	int len = skb->len;
-	hci_acl_hdr *ah;
 
-	ah = (hci_acl_hdr *) skb_push(skb, HCI_ACL_HDR_SIZE);
-	ah->handle = __cpu_to_le16(acl_handle_pack(handle, flags));
-	ah->dlen   = __cpu_to_le16(len);
+	hdr = (struct hci_acl_hdr *) skb_push(skb, HCI_ACL_HDR_SIZE);
+	hdr->handle = __cpu_to_le16(acl_handle_pack(handle, flags));
+	hdr->dlen   = __cpu_to_le16(len);
 
-	skb->h.raw = (void *) ah;
+	skb->h.raw = (void *) hdr;
 }
 
 int hci_send_acl(struct hci_conn *conn, struct sk_buff *skb, __u16 flags)
@@ -1119,7 +1121,7 @@ int hci_send_acl(struct hci_conn *conn, struct sk_buff *skb, __u16 flags)
 int hci_send_sco(struct hci_conn *conn, struct sk_buff *skb)
 {
 	struct hci_dev *hdev = conn->hdev;
-	hci_sco_hdr hs;
+	struct hci_sco_hdr hdr;
 
 	BT_DBG("%s len %d", hdev->name, skb->len);
 
@@ -1128,11 +1130,11 @@ int hci_send_sco(struct hci_conn *conn, struct sk_buff *skb)
 		return -EINVAL;
 	}
 
-	hs.handle = __cpu_to_le16(conn->handle);
-	hs.dlen   = skb->len;
+	hdr.handle = __cpu_to_le16(conn->handle);
+	hdr.dlen   = skb->len;
 
 	skb->h.raw = skb_push(skb, HCI_SCO_HDR_SIZE);
-	memcpy(skb->h.raw, &hs, HCI_SCO_HDR_SIZE);
+	memcpy(skb->h.raw, &hdr, HCI_SCO_HDR_SIZE);
 
 	skb->dev = (void *) hdev;
 	skb->pkt_type = HCI_SCODATA_PKT;
@@ -1271,13 +1273,13 @@ static void hci_tx_task(unsigned long arg)
 /* ACL data packet */
 static inline void hci_acldata_packet(struct hci_dev *hdev, struct sk_buff *skb)
 {
-	hci_acl_hdr *ah = (void *) skb->data;
+	struct hci_acl_hdr *hdr = (void *) skb->data;
 	struct hci_conn *conn;
 	__u16 handle, flags;
 
 	skb_pull(skb, HCI_ACL_HDR_SIZE);
 
-	handle = __le16_to_cpu(ah->handle);
+	handle = __le16_to_cpu(hdr->handle);
 	flags  = acl_flags(handle);
 	handle = acl_handle(handle);
 
@@ -1308,13 +1310,13 @@ static inline void hci_acldata_packet(struct hci_dev *hdev, struct sk_buff *skb)
 /* SCO data packet */
 static inline void hci_scodata_packet(struct hci_dev *hdev, struct sk_buff *skb)
 {
-	hci_sco_hdr *sh = (void *) skb->data;
+	struct hci_sco_hdr *hdr = (void *) skb->data;
 	struct hci_conn *conn;
 	__u16 handle;
 
 	skb_pull(skb, HCI_SCO_HDR_SIZE);
 
-	handle = __le16_to_cpu(sh->handle);
+	handle = __le16_to_cpu(hdr->handle);
 
 	BT_DBG("%s len %d handle 0x%x", hdev->name, skb->len, handle);
 

@@ -434,7 +434,7 @@ static void hci_usb_interrupt(struct urb *urb)
 	struct hci_usb *husb = (void *) urb->context;
 	struct hci_usb_scb *scb;
 	struct sk_buff *skb;
-	hci_event_hdr *eh;
+	struct hci_event_hdr *eh;
 	__u8 *data = urb->transfer_buffer;
 	int count = urb->actual_length;
 	int len = HCI_EVENT_HDR_SIZE;
@@ -459,7 +459,7 @@ static void hci_usb_interrupt(struct urb *urb)
 		if (count < HCI_EVENT_HDR_SIZE)
 			goto bad_len;
 
-		eh  = (hci_event_hdr *) data;
+		eh  = (struct hci_event_hdr *) data;
 		len = eh->plen + HCI_EVENT_HDR_SIZE;
 
 		if (count > len)
@@ -545,7 +545,7 @@ static void hci_usb_rx_complete(struct urb *urb)
 	struct hci_dev *hdev = (struct hci_dev *) skb->dev;
 	struct hci_usb *husb = (struct hci_usb *) hdev->driver_data;
 	int status, count = urb->actual_length;
-	hci_acl_hdr *ah;
+	struct hci_acl_hdr *ah;
 	int dlen, size;
 
 	BT_DBG("%s urb %p status %d count %d flags %x", husb->hdev.name, urb,
@@ -561,7 +561,7 @@ static void hci_usb_rx_complete(struct urb *urb)
 
 	husb->hdev.stat.byte_rx += count;
 
-	ah   = (hci_acl_hdr *) skb->data;
+	ah   = (struct hci_acl_hdr *) skb->data;
 	dlen = __le16_to_cpu(ah->dlen);
 	size = HCI_ACL_HDR_SIZE + dlen;
 

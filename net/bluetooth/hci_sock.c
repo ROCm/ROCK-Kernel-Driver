@@ -584,14 +584,14 @@ static int hci_sock_create(struct socket *sock, int protocol)
 static int hci_sock_dev_event(struct notifier_block *this, unsigned long event, void *ptr)
 {
 	struct hci_dev *hdev = (struct hci_dev *) ptr;
-	evt_si_device sd;
+	struct evt_si_device ev;
 	
 	BT_DBG("hdev %s event %ld", hdev->name, event);
 
 	/* Send event to sockets */
-	sd.event  = event;
-	sd.dev_id = hdev->id;
-	hci_si_event(NULL, EVT_SI_DEVICE, EVT_SI_DEVICE_SIZE, &sd);
+	ev.event  = event;
+	ev.dev_id = hdev->id;
+	hci_si_event(NULL, EVT_SI_DEVICE, sizeof(ev), &ev);
 	
 	if (event == HCI_DEV_UNREG) {
 		struct sock *sk;
