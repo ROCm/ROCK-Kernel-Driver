@@ -101,12 +101,12 @@ static int handle_signal(struct pt_regs *regs, unsigned long signr,
 		ka->sa.sa_handler = SIG_DFL;
 
 	if (!(ka->sa.sa_flags & SA_NODEFER)) {
-		spin_lock_irq(&current->sigmask_lock);
+		spin_lock_irq(&current->sig->siglock);
 		sigorsets(&current->blocked, &current->blocked, 
 			  &ka->sa.sa_mask);
 		sigaddset(&current->blocked, signr);
 		recalc_sigpending();
-		spin_unlock_irq(&current->sigmask_lock);
+		spin_unlock_irq(&current->sig->siglock);
 	}
 
 	sp = PT_REGS_SP(regs);
@@ -188,11 +188,11 @@ int sys_sigsuspend(int history0, int history1, old_sigset_t mask)
 	sigset_t saveset;
 
 	mask &= _BLOCKABLE;
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sig->siglock);
 	saveset = current->blocked;
 	siginitset(&current->blocked, mask);
 	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 
 	while (1) {
 		current->state = TASK_INTERRUPTIBLE;
@@ -214,11 +214,11 @@ int sys_rt_sigsuspend(sigset_t *unewset, size_t sigsetsize)
 		return -EFAULT;
 	sigdelsetmask(&newset, ~_BLOCKABLE);
 
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sig->siglock);
 	saveset = current->blocked;
 	current->blocked = newset;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 
 	while (1) {
 		current->state = TASK_INTERRUPTIBLE;
@@ -234,13 +234,13 @@ int sys_sigreturn(struct pt_regs regs)
 	void *mask = sp_to_mask(PT_REGS_SP(&regs));
 	int sig_size = (_NSIG_WORDS - 1) * sizeof(unsigned long);
 
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sig->siglock);
 	copy_from_user(&current->blocked.sig[0], sc_sigmask(sc), 
 		       sizeof(current->blocked.sig[0]));
 	copy_from_user(&current->blocked.sig[1], mask, sig_size);
 	sigdelsetmask(&current->blocked, ~_BLOCKABLE);
 	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 	copy_sc_from_user(current->thread.regs.regs.sc, sc,
 			  &signal_frame_sc.arch);
 	return(PT_REGS_SYSCALL_RET(&current->thread.regs));
@@ -252,11 +252,11 @@ int sys_rt_sigreturn(struct pt_regs regs)
 	void *mask = sp_to_rt_mask(PT_REGS_SP(&regs));
 	int sig_size = _NSIG_WORDS * sizeof(unsigned long);
 
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sig->siglock);
 	copy_from_user(&current->blocked, mask, sig_size);
 	sigdelsetmask(&current->blocked, ~_BLOCKABLE);
 	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 	copy_sc_from_user(current->thread.regs.regs.sc, sc,
 			  &signal_frame_sc.arch);
 	return(PT_REGS_SYSCALL_RET(&current->thread.regs));

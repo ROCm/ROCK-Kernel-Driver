@@ -416,7 +416,7 @@ int nsegfaults = 0;
 
 void segv_handler(int sig, struct uml_pt_regs *regs)
 {
-	struct sigcontext_struct *context = regs->sc;
+	struct sigcontext *context = regs->sc;
 	int index;
 
 	if(regs->is_user && !SEGV_IS_FIXABLE(context)){

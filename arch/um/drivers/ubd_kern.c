@@ -406,7 +406,7 @@ static int ubd_add(int n)
 	ubd_gendisk[n].major = MAJOR_NR;
 	ubd_gendisk[n].first_minor = n << UBD_SHIFT;
 	ubd_gendisk[n].minor_shift = UBD_SHIFT;
-	ubd_gendisk[n].fops = &ubd_fops;
+	ubd_gendisk[n].fops = &ubd_blops;
 	if (fakehd_set)
 		sprintf(ubd_gendisk[n].disk_name, "hd%c", n + 'a');
 	else
@@ -416,7 +416,7 @@ static int ubd_add(int n)
 		fake_gendisk[n].major = fake_major;
 		fake_gendisk[n].first_minor = n << UBD_SHIFT;
 		fake_gendisk[n].minor_shift = UBD_SHIFT;
-		fake_gendisk[n].fops = &ubd_fops;
+		fake_gendisk[n].fops = &ubd_blops;
 		sprintf(fake_gendisk[n].disk_name, "ubd%d", n);
 	}
 
@@ -445,7 +445,7 @@ static int ubd_add(int n)
  	if(real == NULL) return(-1);
  	ubd_dev[n].real = real;
  
-	make_ide_entries(ubd_gendisk[n].name);
+	make_ide_entries(ubd_gendisk[n].disk_name);
 	return(0);
 }
 
@@ -863,6 +863,7 @@ static int ubd_ioctl(struct inode * inode, struct file * file,
 			return(-EFAULT);
 		return(0);
 	}
+	return(-EINVAL);
 }
 
 static int ubd_revalidate(kdev_t rdev)
