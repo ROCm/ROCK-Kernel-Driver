@@ -412,7 +412,7 @@ endif # ! fastdep
 # ===========================================================================
 
 quiet_cmd_shipped = SHIPPED $(echo_target)
-cmd_shipped = cp $< $@
+cmd_shipped = cat $< > $@
 
 %:: %_shipped
 	$(call cmd,shipped)
