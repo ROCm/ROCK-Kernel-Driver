@@ -59,6 +59,8 @@
 #include <linux/interrupt.h>
 #include <linux/blkdev.h>
 #include <linux/spinlock.h>
+#include <linux/delay.h>
+
 #include <asm/io.h>
 
 #include <scsi/scsi.h>
