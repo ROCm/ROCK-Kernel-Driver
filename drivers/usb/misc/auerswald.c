@@ -1976,8 +1976,7 @@ static int auerswald_probe (struct usb_interface *intf,
 	dbg ("Version is %X", cp->version);
 
 	/* allow some time to settle the device */
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(HZ/3);
+	msleep(334);
 
 	/* Try to get a suitable textual description of the device */
 	/* Device name:*/
