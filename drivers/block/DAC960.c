@@ -288,12 +288,17 @@ static boolean DAC960_CreateAuxiliaryStructures(DAC960_Controller_T *Controller)
 		Controller->PCIDevice,
 	DAC960_V2_ScatterGatherLimit * sizeof(DAC960_V2_ScatterGatherSegment_T),
 	sizeof(DAC960_V2_ScatterGatherSegment_T), 0);
+      if (ScatterGatherPool == NULL)
+	    return DAC960_Failure(Controller,
+			"AUXILIARY STRUCTURE CREATION (SG)");
       RequestSensePool = pci_pool_create("DAC960_V2_RequestSense",
 		Controller->PCIDevice, sizeof(DAC960_SCSI_RequestSense_T),
 		sizeof(int), 0);
-      if (ScatterGatherPool == NULL || RequestSensePool == NULL)
+      if (RequestSensePool == NULL) {
+	    pci_pool_destroy(ScatterGatherPool);
 	    return DAC960_Failure(Controller,
 			"AUXILIARY STRUCTURE CREATION (SG)");
+      }
       Controller->ScatterGatherPool = ScatterGatherPool;
       Controller->V2.RequestSensePool = RequestSensePool;
     }
