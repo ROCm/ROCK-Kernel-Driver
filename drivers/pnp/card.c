@@ -43,8 +43,8 @@ static int card_bus_match(struct device *dev, struct device_driver *drv)
 }
 
 struct bus_type pnpc_bus_type = {
-	name:	"pnp_card",
-	match:	card_bus_match,
+	.name	= "pnp_card",
+	.match	= card_bus_match,
 };
 
 
