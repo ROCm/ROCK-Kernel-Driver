@@ -2,7 +2,7 @@
  * class.c - basic device class management
  */
 
-#define DEBUG
+#undef DEBUG
 
 #include <linux/device.h>
 #include <linux/module.h>
