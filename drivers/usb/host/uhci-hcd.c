@@ -2471,9 +2471,16 @@ static int uhci_resume(struct usb_hcd *hcd)
 
 	pci_set_master(to_pci_dev(uhci_dev(uhci)));
 
-	if (uhci->state == UHCI_SUSPENDED)
+	if (uhci->state == UHCI_SUSPENDED) {
+
+		/*
+		 * Some systems clear the Interrupt Enable register during
+		 * PM suspend/resume, so reinitialize it.
+		 */
+		outw(USBINTR_TIMEOUT | USBINTR_RESUME | USBINTR_IOC |
+				USBINTR_SP, uhci->io_addr + USBINTR);
 		uhci->resume_detect = 1;
-	else {
+	} else {
 		reset_hc(uhci);
 		start_hc(uhci);
 	}
