@@ -869,7 +869,12 @@ static int __devinit yenta_probe (struct pci_dev *dev, const struct pci_device_i
 		goto release;
 	}
 
-	printk(KERN_INFO "Yenta: CardBus bridge found at %s\n", dev->slot_name);
+	/*
+	 * report the subsystem vendor and device for help debugging
+	 * the irq stuff...
+	 */
+	printk(KERN_INFO "Yenta: CardBus bridge found at %s [%04x:%04x]\n",
+		dev->slot_name, dev->subsystem_vendor, dev->subsystem_device);
 
 	yenta_config_init(socket);
 
