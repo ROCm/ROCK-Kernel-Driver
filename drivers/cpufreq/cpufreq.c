@@ -107,6 +107,90 @@ static void cpufreq_cpu_put(struct cpufreq_policy *data)
 	module_put(cpufreq_driver->owner);
 }
 
+
+/*********************************************************************
+ *                     UNIFIED DEBUG HELPERS                         *
+ *********************************************************************/
+#ifdef CONFIG_CPU_FREQ_DEBUG
+
+/* what part(s) of the CPUfreq subsystem are debugged? */
+static unsigned int debug;
+
+/* is the debug output ratelimit'ed using printk_ratelimit? User can
+ * set or modify this value.
+ */
+static unsigned int debug_ratelimit = 1;
+
+/* is the printk_ratelimit'ing enabled? It's enabled after a successful
+ * loading of a cpufreq driver, temporarily disabled when a new policy
+ * is set, and disabled upon cpufreq driver removal
+ */
+static unsigned int disable_ratelimit = 1;
+static spinlock_t disable_ratelimit_lock = SPIN_LOCK_UNLOCKED;
+
+static inline void cpufreq_debug_enable_ratelimit(void)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&disable_ratelimit_lock, flags);
+	if (disable_ratelimit)
+		disable_ratelimit--;
+	spin_unlock_irqrestore(&disable_ratelimit_lock, flags);
+}
+
+static inline void cpufreq_debug_disable_ratelimit(void)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&disable_ratelimit_lock, flags);
+	disable_ratelimit++;
+	spin_unlock_irqrestore(&disable_ratelimit_lock, flags);
+}
+
+void cpufreq_debug_printk(unsigned int type, const char *prefix, const char *fmt, ...)
+{
+	char s[256];
+	va_list args;
+	unsigned int len;
+	unsigned long flags;
+	
+	WARN_ON(!prefix);
+	if (type & debug) {
+		spin_lock_irqsave(&disable_ratelimit_lock, flags);
+		if (!disable_ratelimit && debug_ratelimit && !printk_ratelimit()) {
+			spin_unlock_irqrestore(&disable_ratelimit_lock, flags);
+			return;
+		}
+		spin_unlock_irqrestore(&disable_ratelimit_lock, flags);
+
+		len = snprintf(s, 256, KERN_DEBUG "%s: ", prefix);
+
+		va_start(args, fmt);
+		len += vsnprintf(&s[len], (256 - len), fmt, args);
+		va_end(args);
+
+		printk(s);
+
+		WARN_ON(len < 5);
+	}
+}
+EXPORT_SYMBOL(cpufreq_debug_printk);
+
+
+module_param(debug, uint, 0644);
+MODULE_PARM_DESC(debug, "CPUfreq debugging: add 1 to debug core, 2 to debug drivers, and 4 to debug governors.");
+
+module_param(debug_ratelimit, uint, 0644);
+MODULE_PARM_DESC(debug_ratelimit, "CPUfreq debugging: set to 0 to disable ratelimiting.");
+
+#else /* !CONFIG_CPU_FREQ_DEBUG */
+
+static inline void cpufreq_debug_enable_ratelimit(void) { return; }
+static inline void cpufreq_debug_disable_ratelimit(void) { return; }
+
+#endif /* CONFIG_CPU_FREQ_DEBUG */
+
+
 /*********************************************************************
  *            EXTERNALLY AFFECTING FREQUENCY CHANGES                 *
  *********************************************************************/
@@ -468,6 +552,8 @@ static int cpufreq_add_dev (struct sys_device * sys_dev)
 	unsigned long flags;
 	unsigned int j;
 
+	cpufreq_debug_disable_ratelimit();
+
 #ifdef CONFIG_SMP
 	/* check whether a different CPU already registered this
 	 * CPU because it is in the same boat. */
@@ -475,12 +561,15 @@ static int cpufreq_add_dev (struct sys_device * sys_dev)
 	if (unlikely(policy)) {
 		cpu_sys_devices[cpu] = sys_dev;
 		sysfs_create_link(&sys_dev->kobj, &policy->kobj, "cpufreq");
+		cpufreq_debug_enable_ratelimit();
 		return 0;
 	}
 #endif
 
-	if (!try_module_get(cpufreq_driver->owner))
-		return -EINVAL;
+	if (!try_module_get(cpufreq_driver->owner)) {
+		ret = -EINVAL;
+		goto module_out;
+	}
 
 	policy = kmalloc(sizeof(struct cpufreq_policy), GFP_KERNEL);
 	if (!policy) {
@@ -541,6 +630,8 @@ static int cpufreq_add_dev (struct sys_device * sys_dev)
 
 	module_put(cpufreq_driver->owner);
 	cpu_sys_devices[cpu] = sys_dev;
+	cpufreq_debug_enable_ratelimit();
+	
 	return 0;
 
 
@@ -558,6 +649,8 @@ err_out:
 
 nomem_out:
 	module_put(cpufreq_driver->owner);
+ module_out:
+	cpufreq_debug_enable_ratelimit();
 	return ret;
 }
 
@@ -576,12 +669,15 @@ static int cpufreq_remove_dev (struct sys_device * sys_dev)
 	unsigned int j;
 #endif
 
+	cpufreq_debug_disable_ratelimit();
+
 	spin_lock_irqsave(&cpufreq_driver_lock, flags);
 	data = cpufreq_cpu_data[cpu];
 
 	if (!data) {
 		spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
 		cpu_sys_devices[cpu] = NULL;
+		cpufreq_debug_enable_ratelimit();
 		return -EINVAL;
 	}
 	cpufreq_cpu_data[cpu] = NULL;
@@ -596,6 +692,7 @@ static int cpufreq_remove_dev (struct sys_device * sys_dev)
 		sysfs_remove_link(&sys_dev->kobj, "cpufreq");
 		cpu_sys_devices[cpu] = NULL;
 		cpufreq_cpu_put(data);
+		cpufreq_debug_enable_ratelimit();
 		return 0;
 	}
 #endif
@@ -604,6 +701,7 @@ static int cpufreq_remove_dev (struct sys_device * sys_dev)
 
 	if (!kobject_get(&data->kobj)) {
 		spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
+		cpufreq_debug_enable_ratelimit();
  		return -EFAULT;
 	}
 
@@ -653,6 +751,8 @@ static int cpufreq_remove_dev (struct sys_device * sys_dev)
 		cpufreq_driver->exit(data);
 
 	kfree(data);
+
+	cpufreq_debug_enable_ratelimit();
 
 	return 0;
 }
@@ -1024,6 +1124,8 @@ static int __cpufreq_set_policy(struct cpufreq_policy *data, struct cpufreq_poli
 {
 	int ret = 0;
 
+	cpufreq_debug_disable_ratelimit();
+
 	memcpy(&policy->cpuinfo, 
 	       &data->cpuinfo, 
 	       sizeof(struct cpufreq_cpuinfo));
@@ -1089,6 +1191,7 @@ static int __cpufreq_set_policy(struct cpufreq_policy *data, struct cpufreq_poli
 	}
 
  error_out:
+	cpufreq_debug_enable_ratelimit();
 	return ret;
 }
 
@@ -1218,6 +1321,9 @@ int cpufreq_register_driver(struct cpufreq_driver *driver_data)
 		}
 	}
 
+	if (!ret)
+		cpufreq_debug_enable_ratelimit();
+
 	return (ret);
 }
 EXPORT_SYMBOL_GPL(cpufreq_register_driver);
@@ -1235,8 +1341,12 @@ int cpufreq_unregister_driver(struct cpufreq_driver *driver)
 {
 	unsigned long flags;
 
-	if (!cpufreq_driver || (driver != cpufreq_driver))
+	cpufreq_debug_disable_ratelimit();
+
+	if (!cpufreq_driver || (driver != cpufreq_driver)) {
+		cpufreq_debug_enable_ratelimit();
 		return -EINVAL;
+	}
 
 	sysdev_driver_unregister(&cpu_sysdev_class, &cpufreq_sysdev_driver);
 
