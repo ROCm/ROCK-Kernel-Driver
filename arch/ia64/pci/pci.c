@@ -125,7 +125,8 @@ static struct pci_raw_ops pci_sal_ext_ops = {
 
 struct pci_raw_ops *raw_pci_ops = &pci_sal_ops;	/* default to SAL < 3.2 */
 
-static int __init pci_set_sal_ops(void)
+static int __init
+pci_set_sal_ops (void)
 {
 	if (sal_version >= SAL_VERSION_CODE(3, 2)) {
 		raw_pci_ops = &pci_sal_ext_ops;
@@ -184,7 +185,8 @@ alloc_pci_controller (int seg)
 }
 
 static int __devinit
-alloc_resource (char *name, struct resource *root, unsigned long start, unsigned long end, unsigned long flags)
+alloc_resource (char *name, struct resource *root, unsigned long start, unsigned long end,
+		unsigned long flags)
 {
 	struct resource *res;
 

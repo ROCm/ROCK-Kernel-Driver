@@ -91,7 +91,27 @@ ia64_sal_handler_init (void *entry_point, void *gpval)
 	ia64_sal = (ia64_sal_handler) &pdesc;
 }
 
-static void __init sal_desc_entry_point(void *p)
+static void __init
+check_versions (struct ia64_sal_systab *systab)
+{
+	sal_revision = (systab->sal_rev_major << 8) | systab->sal_rev_minor;
+	sal_version = (systab->sal_b_rev_major << 8) | systab->sal_b_rev_minor;
+
+	/* Check for broken firmware */
+	if ((sal_revision == SAL_VERSION_CODE(49, 29))
+	    && (sal_version == SAL_VERSION_CODE(49, 29)))
+	{
+		/*
+		 * Old firmware for zx2000 prototypes have this weird version number,
+		 * reset it to something sane.
+		 */
+		sal_revision = SAL_VERSION_CODE(2, 8);
+		sal_version = SAL_VERSION_CODE(0, 0);
+	}
+}
+
+static void __init
+sal_desc_entry_point (void *p)
 {
 	struct ia64_sal_desc_entry_point *ep = p;
 	ia64_pal_handler_init(__va(ep->pal_proc));
@@ -99,7 +119,8 @@ static void __init sal_desc_entry_point(void *p)
 }
 
 #ifdef CONFIG_SMP
-static void __init set_smp_redirect(int flag)
+static void __init
+set_smp_redirect (int flag)
 {
 	if (no_int_routing)
 		smp_int_redirect &= ~flag;
@@ -107,10 +128,11 @@ static void __init set_smp_redirect(int flag)
 		smp_int_redirect |= flag;
 }
 #else
-static void __init set_smp_redirect(int flag) { }
+#define set_smp_redirect(flag)	do { } while (0)
 #endif
 
-static void __init sal_desc_platform_feature(void *p)
+static void __init
+sal_desc_platform_feature (void *p)
 {
 	struct ia64_sal_desc_platform_feature *pf = p;
 	sal_platform_features = pf->feature_mask;
@@ -137,7 +159,8 @@ static void __init sal_desc_platform_feature(void *p)
 }
 
 #ifdef CONFIG_SMP
-static void __init sal_desc_ap_wakeup(void *p)
+static void __init
+sal_desc_ap_wakeup (void *p)
 {
 	struct ia64_sal_desc_ap_wakeup *ap = p;
 
@@ -170,8 +193,7 @@ ia64_sal_init (struct ia64_sal_systab *systab)
 	if (strncmp(systab->signature, "SST_", 4) != 0)
 		printk(KERN_ERR "bad signature in system table!");
 
-	sal_revision = (systab->sal_rev_major << 8) | systab->sal_rev_minor;
-	sal_version = (systab->sal_b_rev_major << 8) | systab->sal_b_rev_minor;
+	check_versions(systab);
 
 	/* revisions are coded in BCD, so %x does the job for us */
 	printk(KERN_INFO "SAL %x.%x: %.32s %.32s%sversion %x.%x\n",
