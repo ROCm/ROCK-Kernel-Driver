@@ -60,6 +60,7 @@
 
 #include <asm/time.h>
 #include <asm/ppcdebug.h>
+#include <asm/prom.h>
 
 void smp_local_timer_interrupt(struct pt_regs *);
 

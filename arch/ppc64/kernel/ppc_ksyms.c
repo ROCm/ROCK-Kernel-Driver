@@ -245,8 +245,4 @@ EXPORT_SYMBOL(debugger_dabr_match);
 EXPORT_SYMBOL(debugger_fault_handler);
 #endif
 
-#ifdef CONFIG_SMP
-EXPORT_SYMBOL(atomic_dec_and_lock);
-#endif
-
 EXPORT_SYMBOL(tb_ticks_per_usec);
