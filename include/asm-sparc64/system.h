@@ -217,7 +217,7 @@ do {	if (test_thread_flag(TIF_PERFCTR)) {				\
 	}								\
 } while(0)
 
-extern __inline__ unsigned long xchg32(__volatile__ unsigned int *m, unsigned int val)
+static __inline__ unsigned long xchg32(__volatile__ unsigned int *m, unsigned int val)
 {
 	__asm__ __volatile__(
 "	mov		%0, %%g5\n"
@@ -233,7 +233,7 @@ extern __inline__ unsigned long xchg32(__volatile__ unsigned int *m, unsigned in
 	return val;
 }
 
-extern __inline__ unsigned long xchg64(__volatile__ unsigned long *m, unsigned long val)
+static __inline__ unsigned long xchg64(__volatile__ unsigned long *m, unsigned long val)
 {
 	__asm__ __volatile__(
 "	mov		%0, %%g5\n"
@@ -277,7 +277,7 @@ extern void die_if_kernel(char *str, struct pt_regs *regs) __attribute__ ((noret
 
 #define __HAVE_ARCH_CMPXCHG 1
 
-extern __inline__ unsigned long
+static __inline__ unsigned long
 __cmpxchg_u32(volatile int *m, int old, int new)
 {
 	__asm__ __volatile__("cas [%2], %3, %0\n\t"
@@ -289,7 +289,7 @@ __cmpxchg_u32(volatile int *m, int old, int new)
 	return new;
 }
 
-extern __inline__ unsigned long
+static __inline__ unsigned long
 __cmpxchg_u64(volatile long *m, unsigned long old, unsigned long new)
 {
 	__asm__ __volatile__("casx [%2], %3, %0\n\t"

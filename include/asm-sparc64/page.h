@@ -161,7 +161,7 @@ struct sparc_phys_banks {
 extern struct sparc_phys_banks sp_banks[SPARC_PHYS_BANKS];
 
 /* Pure 2^n version of get_order */
-extern __inline__ int get_order(unsigned long size)
+static __inline__ int get_order(unsigned long size)
 {
 	int order;
 
