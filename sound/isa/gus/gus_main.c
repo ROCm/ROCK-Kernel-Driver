@@ -41,18 +41,14 @@ static int snd_gus_init_dma_irq(snd_gus_card_t * gus, int latches);
 
 int snd_gus_use_inc(snd_gus_card_t * gus)
 {
-	MOD_INC_USE_COUNT;
-	if (!try_module_get(gus->card->module)) {
-		MOD_DEC_USE_COUNT;
+	if (!try_module_get(gus->card->module))
 		return 0;
-	}
 	return 1;
 }
 
 void snd_gus_use_dec(snd_gus_card_t * gus)
 {
 	module_put(gus->card->module);
-	MOD_DEC_USE_COUNT;
 }
 
 static int snd_gus_joystick_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)

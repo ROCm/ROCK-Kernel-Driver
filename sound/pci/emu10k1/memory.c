@@ -25,6 +25,7 @@
 #include <linux/time.h>
 #include <sound/core.h>
 #include <sound/emu10k1.h>
+#include <sound/pcm_sgbuf.h>
 
 /* page arguments of these two macros are Emu page (4096 bytes), not like
  * aligned pages in others
@@ -288,8 +289,9 @@ int snd_emu10k1_memblk_map(emu10k1_t *emu, emu10k1_memblk_t *blk)
  * page allocation for DMA
  */
 snd_util_memblk_t *
-snd_emu10k1_alloc_pages(emu10k1_t *emu, struct snd_sg_buf *sgbuf)
+snd_emu10k1_alloc_pages(emu10k1_t *emu, snd_pcm_substream_t *substream)
 {
+	struct snd_sg_buf *sgbuf = snd_magic_cast(snd_pcm_sgbuf_t, _snd_pcm_substream_sgbuf(substream), return NULL);
 	snd_util_memhdr_t *hdr;
 	emu10k1_memblk_t *blk;
 	int page, err, idx;
@@ -306,7 +308,7 @@ snd_emu10k1_alloc_pages(emu10k1_t *emu, struct snd_sg_buf *sgbuf)
 		return NULL;
 	}
 	/* fill buffer addresses but pointers are not stored so that
-	 * snd_free_pci_pages() is not called in in synth_free()
+	 * snd_free_pci_page() is not called in in synth_free()
 	 */
 	idx = 0;
 	for (page = blk->first_page; page <= blk->last_page; page++, idx++) {
@@ -430,11 +432,11 @@ static int synth_alloc_pages(emu10k1_t *emu, emu10k1_memblk_t *blk)
 	get_single_page_range(emu->memhdr, blk, &first_page, &last_page);
 	/* allocate kernel pages */
 	for (page = first_page; page <= last_page; page++) {
-		ptr = snd_malloc_pci_pages(emu->pci, PAGE_SIZE, &addr);
+		ptr = snd_malloc_pci_page(emu->pci, &addr);
 		if (ptr == NULL)
 			goto __fail;
 		if (! is_valid_page(addr)) {
-			snd_free_pci_pages(emu->pci, PAGE_SIZE, ptr, addr);
+			snd_free_pci_page(emu->pci, ptr, addr);
 			goto __fail;
 		}
 		emu->page_addr_table[page] = addr;
@@ -446,7 +448,7 @@ __fail:
 	/* release allocated pages */
 	last_page = page - 1;
 	for (page = first_page; page <= last_page; page++) {
-		snd_free_pci_pages(emu->pci, PAGE_SIZE, emu->page_ptr_table[page], emu->page_addr_table[page]);
+		snd_free_pci_page(emu->pci, emu->page_ptr_table[page], emu->page_addr_table[page]);
 		emu->page_addr_table[page] = 0;
 		emu->page_ptr_table[page] = NULL;
 	}
@@ -464,7 +466,7 @@ static int synth_free_pages(emu10k1_t *emu, emu10k1_memblk_t *blk)
 	get_single_page_range(emu->memhdr, blk, &first_page, &last_page);
 	for (page = first_page; page <= last_page; page++) {
 		if (emu->page_ptr_table[page])
-			snd_free_pci_pages(emu->pci, PAGE_SIZE, emu->page_ptr_table[page], emu->page_addr_table[page]);
+			snd_free_pci_page(emu->pci, emu->page_ptr_table[page], emu->page_addr_table[page]);
 		emu->page_addr_table[page] = 0;
 		emu->page_ptr_table[page] = NULL;
 	}

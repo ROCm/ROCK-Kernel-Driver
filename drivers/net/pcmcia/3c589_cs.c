@@ -229,6 +229,7 @@ static dev_link_t *tc589_attach(void)
     link = &lp->link; dev = &lp->dev;
     link->priv = dev->priv = link->irq.Instance = lp;
     
+    init_timer(&link->release);
     link->release.function = &tc589_release;
     link->release.data = (unsigned long)link;
     link->io.NumPorts1 = 16;

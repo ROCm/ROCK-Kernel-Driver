@@ -887,7 +887,14 @@ int snd_sb16dsp_pcm(sb_t * chip, int device, snd_pcm_t ** rpcm)
 	return 0;
 }
 
+const snd_pcm_ops_t *snd_sb16dsp_get_pcm_ops(int direction)
+{
+	return direction == SNDRV_PCM_STREAM_PLAYBACK ?
+		&snd_sb16_playback_ops : &snd_sb16_capture_ops;
+}
+
 EXPORT_SYMBOL(snd_sb16dsp_pcm);
+EXPORT_SYMBOL(snd_sb16dsp_get_pcm_ops);
 EXPORT_SYMBOL(snd_sb16dsp_configure);
 EXPORT_SYMBOL(snd_sb16dsp_interrupt);
 

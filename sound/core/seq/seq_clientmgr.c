@@ -339,10 +339,6 @@ static int snd_seq_open(struct inode *inode, struct file *file)
 	/* make others aware this new client */
 	snd_seq_system_client_ev_client_start(c);
 
-#ifdef LINUX_2_2
-	MOD_INC_USE_COUNT;
-#endif
-
 	return 0;
 }
 
@@ -358,9 +354,6 @@ static int snd_seq_release(struct inode *inode, struct file *file)
 		kfree(client);
 	}
 
-#ifdef LINUX_2_2
-	MOD_DEC_USE_COUNT;
-#endif
 	return 0;
 }
 

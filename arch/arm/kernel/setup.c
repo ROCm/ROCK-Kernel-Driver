@@ -20,6 +20,7 @@
 #include <linux/tty.h>
 #include <linux/init.h>
 #include <linux/root_dev.h>
+#include <linux/cpu.h>
 
 #include <asm/elf.h>
 #include <asm/hardware.h>
@@ -690,6 +691,15 @@ void __init setup_arch(char **cmdline_p)
 #endif
 #endif
 }
+
+static struct cpu cpu[1];
+
+static int __init topology_init(void)
+{
+	return register_cpu(cpu, 0, NULL);
+}
+
+subsys_initcall(topology_init);
 
 static const char *hwcap_str[] = {
 	"swp",

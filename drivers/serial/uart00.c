@@ -1,5 +1,5 @@
 /*
- *  linux/drivers/char/uart00.c
+ *  linux/drivers/serial/uart00.c
  *
  *  Driver for UART00 serial ports
  *
@@ -149,7 +149,7 @@ uart00_rx_chars(struct uart_port *port, struct pt_regs *regs)
 			goto ignore_char;
 	} else if (rds & UART_RDS_PE_MSK)
 		port->icount.parity++;
-	else if (rds & UART_RDS_PE_MSK)
+	else if (rds & UART_RDS_FE_MSK)
 		port->icount.frame++;
 	if (rds & UART_RDS_OE_MSK)
 		port->icount.overrun++;
@@ -168,7 +168,7 @@ uart00_rx_chars(struct uart_port *port, struct pt_regs *regs)
 	else if (rds & UART_RDS_FE_MSK)
 		flg = TTY_FRAME;
 
-	if (status & UART_RDS_OE_MSK) {
+	if (rds & UART_RDS_OE_MSK) {
 		/*
 		 * CHECK: does overrun affect the current character?
 		 * ASSUMPTION: it does not.

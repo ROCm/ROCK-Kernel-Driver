@@ -76,6 +76,8 @@ static inline void snd_leave_user(mm_segment_t fs)
 	set_fs(fs);
 }
 
+
+
 int snd_pcm_info(snd_pcm_substream_t * substream, snd_pcm_info_t *info)
 {
 	snd_pcm_runtime_t * runtime;
@@ -674,6 +676,9 @@ static inline void snd_pcm_post_start(snd_pcm_substream_t *substream, int state)
 		snd_pcm_tick_prepare(substream);
 }
 
+/**
+ * snd_pcm_sart
+ */
 int snd_pcm_start(snd_pcm_substream_t *substream)
 {
 	SND_PCM_ACTION(start, substream, 0);
@@ -703,6 +708,9 @@ static inline void snd_pcm_post_stop(snd_pcm_substream_t *substream, int state)
 	wake_up(&runtime->sleep);
 }
 
+/**
+ * snd_pcm_stop
+ */
 int snd_pcm_stop(snd_pcm_substream_t *substream, int state)
 {
 	SND_PCM_ACTION(stop, substream, state);
@@ -779,11 +787,17 @@ static inline void snd_pcm_post_suspend(snd_pcm_substream_t *substream, int stat
 	wake_up(&runtime->sleep);
 }
 
+/**
+ * snd_pcm_suspend
+ */
 int snd_pcm_suspend(snd_pcm_substream_t *substream)
 {
 	SND_PCM_ACTION(suspend, substream, 0);
 }
 
+/**
+ * snd_pcm_suspend_all
+ */
 int snd_pcm_suspend_all(snd_pcm_t *pcm)
 {
 	snd_pcm_substream_t *substream;
@@ -976,6 +990,9 @@ static inline void snd_pcm_post_prepare(snd_pcm_substream_t * substream, int sta
 	runtime->status->state = SNDRV_PCM_STATE_PREPARED;
 }
 
+/**
+ * snd_pcm_prepare
+ */
 int snd_pcm_prepare(snd_pcm_substream_t *substream)
 {
 	int res;
@@ -1081,6 +1098,8 @@ static int snd_pcm_playback_drain(snd_pcm_substream_t * substream)
 		/* Fall through */
 	case SNDRV_PCM_STATE_SETUP:
 		goto _end;
+	default: 
+		break; 
 	}
 
 	if (runtime->status->state == SNDRV_PCM_STATE_RUNNING) {
@@ -1183,6 +1202,8 @@ static int snd_pcm_playback_drop(snd_pcm_substream_t *substream)
 			spin_lock_irq(&runtime->lock);
 		}
 		goto _xrun_recovery;
+	default:
+		break; 
 	}
 	runtime->control->appl_ptr = runtime->status->hw_ptr;
        _end:
@@ -1236,6 +1257,8 @@ static int snd_pcm_capture_drain(snd_pcm_substream_t * substream)
 			spin_lock_irq(&runtime->lock);
 		}
 		goto _xrun_recovery;
+	default: 
+		break; 
 	}
        _end:
 	spin_unlock_irq(&runtime->lock);
@@ -1278,6 +1301,8 @@ static int snd_pcm_capture_drop(snd_pcm_substream_t * substream)
 	case SNDRV_PCM_STATE_XRUN:
 		snd_pcm_change_state(substream, SNDRV_PCM_STATE_SETUP);
 		break;
+	default: 
+		break; 
 	}
 	runtime->control->appl_ptr = runtime->status->hw_ptr;
        _end: 
@@ -1779,9 +1804,6 @@ int snd_pcm_open(struct inode *inode, struct file *file)
 	snd_pcm_file_t *pcm_file;
 	wait_queue_t wait;
 
-#ifdef LINUX_2_2
-	MOD_INC_USE_COUNT;
-#endif
 	snd_runtime_check(device >= SNDRV_MINOR_PCM_PLAYBACK && device < SNDRV_MINOR_DEVICES, return -ENXIO);
 	pcm = snd_pcm_devices[(cardnum * SNDRV_PCM_DEVICES) + (device % SNDRV_MINOR_PCMS)];
 	if (pcm == NULL) {
@@ -1829,9 +1851,6 @@ int snd_pcm_open(struct inode *inode, struct file *file)
       __error2:
       	snd_card_file_remove(pcm->card, file);
       __error1:
-#ifdef LINUX_2_2
-      	MOD_DEC_USE_COUNT;
-#endif
       	return err;
 }
 
@@ -1857,9 +1876,6 @@ int snd_pcm_release(struct inode *inode, struct file *file)
 	wake_up(&pcm->open_wait);
 	module_put(pcm->card->module);
 	snd_card_file_remove(pcm->card, file);
-#ifdef LINUX_2_2
-	MOD_DEC_USE_COUNT;
-#endif
 	return 0;
 }
 

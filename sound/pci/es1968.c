@@ -2420,15 +2420,12 @@ static void es1968_suspend(es1968_t *chip)
 	if (! chip->do_pm)
 		return;
 
-	snd_power_lock(card);
 	if (card->power_state == SNDRV_CTL_POWER_D3hot)
-		goto __skip;
+		return;
 
 	snd_pcm_suspend_all(chip->pcm);
 	snd_es1968_bob_stop(chip);
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
-      __skip:
-      	snd_power_unlock(card);
 }
 
 static void es1968_resume(es1968_t *chip)
@@ -2438,9 +2435,8 @@ static void es1968_resume(es1968_t *chip)
 	if (! chip->do_pm)
 		return;
 
-	snd_power_lock(card);
 	if (card->power_state == SNDRV_CTL_POWER_D0)
-		goto __skip;
+		return;
 
 	/* restore all our config */
 	pci_enable_device(chip->pci);
@@ -2459,8 +2455,6 @@ static void es1968_resume(es1968_t *chip)
 	if (atomic_read(&chip->bobclient))
 		snd_es1968_bob_start(chip);
 	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
-      __skip:
-      	snd_power_unlock(card);
 }
 
 #ifndef PCI_OLD_SUSPEND

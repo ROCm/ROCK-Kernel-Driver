@@ -122,6 +122,7 @@ static dev_link_t *fdomain_attach(void)
     if (!info) return NULL;
     memset(info, 0, sizeof(*info));
     link = &info->link; link->priv = info;
+    init_timer(&link->release);
     link->release.function = &fdomain_release;
     link->release.data = (u_long)link;
 

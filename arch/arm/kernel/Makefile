@@ -26,8 +26,6 @@ obj-$(CONFIG_MODULES)		+= armksyms.o module.o
 obj-$(CONFIG_ARTHUR)		+= arthur.o
 obj-$(CONFIG_ISA_DMA)		+= dma-isa.o
 obj-$(CONFIG_PCI)		+= bios32.o
-obj-$(CONFIG_PCI_HOST_PLX90X0)	+= plx90x0.o
-obj-$(CONFIG_PCI_HOST_VIA82C505) += via82c505.o
 
 ifneq ($(MACHINE),ebsa110)
   obj-y		+= io.o

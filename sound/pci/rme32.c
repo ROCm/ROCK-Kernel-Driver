@@ -1,7 +1,7 @@
 /*
  *   ALSA driver for RME Digi32, Digi32/8 and Digi32 PRO audio interfaces
  *
- *	Copyright (c) 2002 Martin Langer <martin-langer@gmx.de>
+ *	Copyright (c) 2002, 2003 Martin Langer <martin-langer@gmx.de>
  *
  *      Thanks to :        Anders Torger <torger@ludd.luth.se>,
  *                         Henk Hesselink <henk@anda.nl>
@@ -220,7 +220,6 @@ typedef struct snd_rme32 {
 	snd_pcm_t *spdif_pcm;
 	snd_pcm_t *adat_pcm;
 	struct pci_dev *pci;
-	snd_info_entry_t *proc_entry;
 	snd_kcontrol_t *spdif_ctl;
 } rme32_t;
 
@@ -257,8 +256,6 @@ snd_rme32_capture_pointer(snd_pcm_substream_t * substream);
 
 static void snd_rme32_proc_init(rme32_t * rme32);
 
-static void snd_rme32_proc_done(rme32_t * rme32);
-
 static int snd_rme32_create_switches(snd_card_t * card, rme32_t * rme32);
 
 static inline unsigned int snd_rme32_playback_ptr(rme32_t * rme32)
@@ -272,6 +269,19 @@ static inline unsigned int snd_rme32_capture_ptr(rme32_t * rme32)
 {
 	return (readl(rme32->iobase + RME32_IO_GET_POS)
 		& RME32_RCR_AUDIO_ADDR_MASK) >> rme32->capture_frlog;
+}
+
+static int snd_rme32_ratecode(int rate)
+{
+	switch (rate) {
+	case 32000: return SNDRV_PCM_RATE_32000;
+	case 44100: return SNDRV_PCM_RATE_44100;
+	case 48000: return SNDRV_PCM_RATE_48000;
+	case 64000: return SNDRV_PCM_RATE_64000;
+	case 88200: return SNDRV_PCM_RATE_88200;
+	case 96000: return SNDRV_PCM_RATE_96000;
+	}
+	return 0;
 }
 
 static int snd_rme32_playback_silence(snd_pcm_substream_t * substream, int channel,	/* not used (interleaved data) */
@@ -561,18 +571,22 @@ static int snd_rme32_setclockmode(rme32_t * rme32, int mode)
 {
 	switch (mode) {
 	case RME32_CLOCKMODE_SLAVE:
+		/* AutoSync */
 		rme32->wcreg = (rme32->wcreg & ~RME32_WCR_FREQ_0) & 
 			~RME32_WCR_FREQ_1;
 		break;
 	case RME32_CLOCKMODE_MASTER_32:
+		/* Internal 32.0kHz */
 		rme32->wcreg = (rme32->wcreg | RME32_WCR_FREQ_0) & 
 			~RME32_WCR_FREQ_1;
 		break;
 	case RME32_CLOCKMODE_MASTER_44:
+		/* Internal 44.1kHz */
 		rme32->wcreg = (rme32->wcreg & ~RME32_WCR_FREQ_0) | 
 			RME32_WCR_FREQ_1;
 		break;
 	case RME32_CLOCKMODE_MASTER_48:
+		/* Internal 48.0kHz */
 		rme32->wcreg = (rme32->wcreg | RME32_WCR_FREQ_0) | 
 			RME32_WCR_FREQ_1;
 		break;
@@ -661,14 +675,21 @@ static int
 snd_rme32_playback_hw_params(snd_pcm_substream_t * substream,
 			     snd_pcm_hw_params_t * params)
 {
+	int err, rate, dummy;
 	rme32_t *rme32 = _snd_pcm_substream_chip(substream);
-	int err;
 
 	if ((err = snd_pcm_lib_malloc_pages(substream,
 				      params_buffer_bytes(params))) < 0)
 		return err;
 	spin_lock_irq(&rme32->lock);
-	if ((err = snd_rme32_playback_setrate(rme32, params_rate(params))) < 0) {
+	if ((rme32->rcreg & RME32_RCR_KMODE) &&
+	    (rate = snd_rme32_capture_getrate(rme32, &dummy)) > 0) {
+		/* AutoSync */
+		if (params_rate(params) != rate) {
+			spin_unlock_irq(&rme32->lock);
+			return -EIO;
+		}
+	} else if ((err = snd_rme32_playback_setrate(rme32, params_rate(params))) < 0) {
 		spin_unlock_irq(&rme32->lock);
 		return err;
 	}
@@ -708,8 +729,9 @@ snd_rme32_capture_hw_params(snd_pcm_substream_t * substream,
 			    snd_pcm_hw_params_t * params)
 {
 	unsigned long flags;
+	int err, isadat, rate;
 	rme32_t *rme32 = _snd_pcm_substream_chip(substream);
-	int err, isadat;
+	snd_pcm_runtime_t *runtime = substream->runtime;
 
 	if ((err = snd_pcm_lib_malloc_pages(substream,
 				      params_buffer_bytes(params))) < 0)
@@ -727,9 +749,16 @@ snd_rme32_capture_hw_params(snd_pcm_substream_t * substream,
 		spin_unlock_irqrestore(&rme32->lock, flags);
 		return err;
 	}
-	if (params_rate(params) != snd_rme32_capture_getrate(rme32, &isadat)) {
-		spin_unlock_irqrestore(&rme32->lock, flags);
-		return -EBUSY;
+	if ((rate = snd_rme32_capture_getrate(rme32, &isadat)) > 0) {
+                if (params_rate(params) != rate) {
+                        spin_unlock_irqrestore(&rme32->lock, flags);
+                        return -EIO;                    
+                }
+                if ((isadat && runtime->hw.channels_min == 2) ||
+                    (!isadat && runtime->hw.channels_min == 8)) {
+                        spin_unlock_irqrestore(&rme32->lock, flags);
+                        return -EIO;
+                }
 	}
 	/* AutoSync off for recording */
 	rme32->wcreg &= ~RME32_WCR_AUTOSYNC;
@@ -789,7 +818,8 @@ static void snd_rme32_playback_stop(rme32_t * rme32)
 		writel(0, rme32->iobase + RME32_IO_CONFIRM_ACTION_IRQ);
 	}
 	rme32->wcreg &= ~RME32_WCR_START;
-	rme32->wcreg |= RME32_WCR_MUTE;
+	if (rme32->wcreg & RME32_WCR_SEL)
+		rme32->wcreg |= RME32_WCR_MUTE;
 	writel(rme32->wcreg, rme32->iobase + RME32_IO_CONTROL_REGISTER);
 }
 
@@ -836,12 +866,17 @@ static snd_pcm_hw_constraint_list_t hw_constraints_period_bytes = {
 static int snd_rme32_playback_spdif_open(snd_pcm_substream_t * substream)
 {
 	unsigned long flags;
+	int rate, dummy;
 	rme32_t *rme32 = _snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
 
 	snd_pcm_set_sync(substream);
 
 	spin_lock_irqsave(&rme32->lock, flags);
+	if (rme32->playback_substream != NULL) {
+		spin_unlock_irqrestore(&rme32->lock, flags);
+		return -EBUSY;
+	}
 	rme32->wcreg &= ~RME32_WCR_ADAT;
 	writel(rme32->wcreg, rme32->iobase + RME32_IO_CONTROL_REGISTER);
 	rme32->playback_substream = substream;
@@ -854,7 +889,13 @@ static int snd_rme32_playback_spdif_open(snd_pcm_substream_t * substream)
 		runtime->hw.rates |= SNDRV_PCM_RATE_64000 | SNDRV_PCM_RATE_88200 | SNDRV_PCM_RATE_96000;
 		runtime->hw.rate_max = 96000;
 	}
-
+	if ((rme32->rcreg & RME32_RCR_KMODE) &&
+	    (rate = snd_rme32_capture_getrate(rme32, &dummy)) > 0) {
+		/* AutoSync */
+		runtime->hw.rates = snd_rme32_ratecode(rate);
+		runtime->hw.rate_min = rate;
+		runtime->hw.rate_max = rate;
+	}       
 	snd_pcm_hw_constraint_minmax(runtime,
 				     SNDRV_PCM_HW_PARAM_BUFFER_BYTES,
 				     RME32_BUFFER_SIZE, RME32_BUFFER_SIZE);
@@ -872,23 +913,17 @@ static int snd_rme32_playback_spdif_open(snd_pcm_substream_t * substream)
 static int snd_rme32_capture_spdif_open(snd_pcm_substream_t * substream)
 {
 	unsigned long flags;
-	int isadat;
+	int isadat, rate;
 	rme32_t *rme32 = _snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
 
-	rme32->rcreg = readl(rme32->iobase + RME32_IO_CONTROL_REGISTER);
-	if (snd_rme32_capture_getrate(rme32, &isadat) < 0) {
-		/* no input */
-		return -EIO;
-	}
-	if (isadat) {
-		/* ADAT input */
-		return -EBUSY;
-	}
 	snd_pcm_set_sync(substream);
 
 	spin_lock_irqsave(&rme32->lock, flags);
-
+        if (rme32->capture_substream != NULL) {
+	        spin_unlock_irqrestore(&rme32->lock, flags);
+                return -EBUSY;
+        }
 	rme32->capture_substream = substream;
 	rme32->capture_ptr = 0;
 	spin_unlock_irqrestore(&rme32->lock, flags);
@@ -897,6 +932,14 @@ static int snd_rme32_capture_spdif_open(snd_pcm_substream_t * substream)
 	if (RME32_PRO_WITH_8414(rme32)) {
 		runtime->hw.rates |= SNDRV_PCM_RATE_88200 | SNDRV_PCM_RATE_96000;
 		runtime->hw.rate_max = 96000;
+	}
+	if ((rate = snd_rme32_capture_getrate(rme32, &isadat)) > 0) {
+		if (isadat) {
+			return -EIO;
+		}
+		runtime->hw.rates = snd_rme32_ratecode(rate);
+		runtime->hw.rate_min = rate;
+		runtime->hw.rate_max = rate;
 	}
 
 	snd_pcm_hw_constraint_minmax(runtime,
@@ -913,12 +956,17 @@ static int
 snd_rme32_playback_adat_open(snd_pcm_substream_t *substream)
 {
 	unsigned long flags;
+	int rate, dummy;
 	rme32_t *rme32 = _snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	
 	snd_pcm_set_sync(substream);
 
 	spin_lock_irqsave(&rme32->lock, flags);	
+        if (rme32->playback_substream != NULL) {
+	        spin_unlock_irqrestore(&rme32->lock, flags);
+                return -EBUSY;
+        }
 	rme32->wcreg |= RME32_WCR_ADAT;
 	writel(rme32->wcreg, rme32->iobase + RME32_IO_CONTROL_REGISTER);
 	rme32->playback_substream = substream;
@@ -927,6 +975,13 @@ snd_rme32_playback_adat_open(snd_pcm_substream_t *substream)
 	spin_unlock_irqrestore(&rme32->lock, flags);
 	
 	runtime->hw = snd_rme32_playback_adat_info;
+	if ((rme32->rcreg & RME32_RCR_KMODE) &&
+	    (rate = snd_rme32_capture_getrate(rme32, &dummy)) > 0) {
+                /* AutoSync */
+                runtime->hw.rates = snd_rme32_ratecode(rate);
+                runtime->hw.rate_min = rate;
+                runtime->hw.rate_max = rate;
+	}        
 	snd_pcm_hw_constraint_minmax(runtime, SNDRV_PCM_HW_PARAM_BUFFER_BYTES,
 				     RME32_BUFFER_SIZE, RME32_BUFFER_SIZE);
 	snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_PERIOD_BYTES,
@@ -938,27 +993,31 @@ static int
 snd_rme32_capture_adat_open(snd_pcm_substream_t *substream)
 {
 	unsigned long flags;
-	int isadat;
+	int isadat, rate;
 	rme32_t *rme32 = _snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
 
-	rme32->rcreg = readl(rme32->iobase + RME32_IO_CONTROL_REGISTER);
-	if (snd_rme32_capture_getrate(rme32, &isadat) < 0) {
-		/* no input */
-		return -EIO;
-	}
-	if (!isadat) {
-		/* S/PDIF input */
-		return -EBUSY;
-	}
-	snd_pcm_set_sync(substream);
+	runtime->hw = snd_rme32_capture_adat_info;
+	if ((rate = snd_rme32_capture_getrate(rme32, &isadat)) > 0) {
+		if (!isadat) {
+			return -EIO;
+		}
+                runtime->hw.rates = snd_rme32_ratecode(rate);
+                runtime->hw.rate_min = rate;
+                runtime->hw.rate_max = rate;
+        }
 
+	snd_pcm_set_sync(substream);
+        
 	spin_lock_irqsave(&rme32->lock, flags);	
+	if (rme32->capture_substream != NULL) {
+		spin_unlock_irqrestore(&rme32->lock, flags);
+		return -EBUSY;
+        }
 	rme32->capture_substream = substream;
 	rme32->capture_ptr = 0;
 	spin_unlock_irqrestore(&rme32->lock, flags);
 
-	runtime->hw = snd_rme32_capture_adat_info;
 	snd_pcm_hw_constraint_minmax(runtime, SNDRV_PCM_HW_PARAM_BUFFER_BYTES,
 				     RME32_BUFFER_SIZE, RME32_BUFFER_SIZE);
 	snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_PERIOD_BYTES,
@@ -1008,7 +1067,8 @@ static int snd_rme32_playback_prepare(snd_pcm_substream_t * substream)
 		snd_rme32_playback_stop(rme32);
 	}
 	writel(0, rme32->iobase + RME32_IO_RESET_POS);
-	rme32->wcreg &= ~RME32_WCR_MUTE;
+	if (rme32->wcreg & RME32_WCR_SEL)
+		rme32->wcreg &= ~RME32_WCR_MUTE;
 	writel(rme32->wcreg, rme32->iobase + RME32_IO_CONTROL_REGISTER);
 	spin_unlock_irqrestore(&rme32->lock, flags);
 	return 0;
@@ -1240,7 +1300,6 @@ static void snd_rme32_free(void *private_data)
 	if (rme32->irq >= 0) {
 		snd_rme32_playback_stop(rme32);
 		snd_rme32_capture_stop(rme32);
-		snd_rme32_proc_done(rme32);
 		free_irq(rme32->irq, (void *) rme32);
 		rme32->irq = -1;
 	}
@@ -1463,10 +1522,10 @@ snd_rme32_proc_read(snd_info_entry_t * entry, snd_info_buffer_t * buffer)
 		snd_iprintf(buffer, "  sample rate: %d Hz\n",
 			    snd_rme32_playback_getrate(rme32));
 	}
-	if (rme32->wcreg & RME32_RCR_KMODE) {
-		snd_iprintf(buffer, "  clock mode: slave\n");
+	if (rme32->rcreg & RME32_RCR_KMODE) {
+		snd_iprintf(buffer, "  sample clock source: AutoSync\n");
 	} else {
-		snd_iprintf(buffer, "  clock mode: master\n");
+		snd_iprintf(buffer, "  sample clock source: Internal\n");
 	}
 	if (rme32->wcreg & RME32_WCR_PRO) {
 		snd_iprintf(buffer, "  format: AES/EBU (professional)\n");
@@ -1484,26 +1543,8 @@ static void __devinit snd_rme32_proc_init(rme32_t * rme32)
 {
 	snd_info_entry_t *entry;
 
-	if ((entry = snd_info_create_card_entry(rme32->card, "rme32", rme32->card->proc_root)) != NULL) {
-		entry->content = SNDRV_INFO_CONTENT_TEXT;
-		entry->private_data = rme32;
-		entry->mode = S_IFREG | S_IRUGO | S_IWUSR;
-		entry->c.text.read_size = 256;
-		entry->c.text.read = snd_rme32_proc_read;
-		if (snd_info_register(entry) < 0) {
-			snd_info_free_entry(entry);
-			entry = NULL;
-		}
-	}
-	rme32->proc_entry = entry;
-}
-
-static void snd_rme32_proc_done(rme32_t * rme32)
-{
-	if (rme32->proc_entry) {
-		snd_info_unregister(rme32->proc_entry);
-		rme32->proc_entry = NULL;
-	}
+	if (! snd_card_proc_new(rme32->card, "rme32", &entry))
+		snd_info_set_text_ops(entry, rme32, snd_rme32_proc_read);
 }
 
 /*
@@ -1546,6 +1587,10 @@ snd_rme32_put_loopback_control(snd_kcontrol_t * kcontrol,
 	spin_lock_irqsave(&rme32->lock, flags);
 	val = (rme32->wcreg & ~RME32_WCR_SEL) | val;
 	change = val != rme32->wcreg;
+	if (ucontrol->value.integer.value[0])
+		val &= ~RME32_WCR_MUTE;
+	else
+		val |= RME32_WCR_MUTE;
 	writel(rme32->wcreg =
 	       val, rme32->iobase + RME32_IO_CONTROL_REGISTER);
 	spin_unlock_irqrestore(&rme32->lock, flags);
@@ -1646,7 +1691,10 @@ static int
 snd_rme32_info_clockmode_control(snd_kcontrol_t * kcontrol,
 				 snd_ctl_elem_info_t * uinfo)
 {
-	static char *texts[4] = { "Slave", "Master (32.0 kHz)", "Master (44.1 kHz)", "Master (48.0 kHz)" };
+	static char *texts[4] = { "AutoSync", 
+				  "Internal 32.0kHz", 
+				  "Internal 44.1kHz", 
+				  "Internal 48.0kHz" };
 
 	uinfo->type = SNDRV_CTL_ELEM_TYPE_ENUMERATED;
 	uinfo->count = 1;
@@ -1843,7 +1891,7 @@ static snd_kcontrol_new_t snd_rme32_controls[] = {
 	},
 	{
 		.iface = SNDRV_CTL_ELEM_IFACE_PCM,
-		.name =	"Clock Mode",
+		.name =	"Sample Clock Source",
 		.info =	snd_rme32_info_clockmode_control,
 		.get =	snd_rme32_get_clockmode_control,
 		.put =	snd_rme32_put_clockmode_control

@@ -280,7 +280,7 @@ int ip_output(struct sk_buff *skb)
 		return ip_finish_output(skb);
 }
 
-int ip_queue_xmit(struct sk_buff *skb)
+int ip_queue_xmit(struct sk_buff *skb, int ipfragok)
 {
 	struct sock *sk = skb->sk;
 	struct inet_opt *inet = inet_sk(sk);
@@ -337,7 +337,7 @@ packet_routed:
 	iph = (struct iphdr *) skb_push(skb, sizeof(struct iphdr) + (opt ? opt->optlen : 0));
 	*((__u16 *)iph)	= htons((4 << 12) | (5 << 8) | (inet->tos & 0xff));
 	iph->tot_len = htons(skb->len);
-	if (ip_dont_fragment(sk, &rt->u.dst))
+	if (ip_dont_fragment(sk, &rt->u.dst) && !ipfragok)
 		iph->frag_off = htons(IP_DF);
 	else
 		iph->frag_off = 0;

@@ -126,6 +126,7 @@ static dev_link_t *qlogic_attach(void)
 	memset(info, 0, sizeof(*info));
 	link = &info->link;
 	link->priv = info;
+	init_timer(&link->release);
 	link->release.function = &qlogic_release;
 	link->release.data = (u_long) link;
 
