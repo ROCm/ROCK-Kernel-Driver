@@ -2874,7 +2874,7 @@ err_out:
 	return -ENOMEM;
 }
 
-#define MAX_WAIT_CNT 10000
+#define MAX_WAIT_CNT 1000
 
 /* To stop a block, clear the enable bit and poll till it
  * clears.  tp->lock is held.
