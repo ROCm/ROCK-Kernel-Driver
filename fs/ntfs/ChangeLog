@@ -35,6 +35,25 @@ ToDo/Notes:
 	- Enable the code for setting the NT4 compatibility flag when we start
 	  making NTFS 1.2 specific modifications.
 
+2.1.15 - .
+
+	- Add new element itype.index.collation_rule to the ntfs inode
+	  structure and set it appropriately in ntfs_read_locked_inode().
+	- Implement a new inode type "index" to allow efficient access to the
+	  indices found in various system files and adapt inode handling
+	  accordingly (fs/ntfs/inode.[hc]).  An index inode is essentially an
+	  attribute inode (NInoAttr() is true) with an attribute type of
+	  AT_INDEX_ALLOCATION.  As such, it is no longer allowed to call
+	  ntfs_attr_iget() with an attribute type of AT_INDEX_ALLOCATION as
+	  there would be no way to distinguish between normal attribute inodes
+	  and index inodes.  The function to obtain an index inode is
+	  ntfs_index_iget() and it uses the helper function
+	  ntfs_read_locked_index_inode().  Note, we do not overload
+	  ntfs_attr_iget() as indices consist of multiple attributes so using
+	  ntfs_attr_iget() to obtain an index inode would be confusing.
+	- Ensure that there is no overflow when doing page->index <<
+	  PAGE_CACHE_SHIFT by casting page->index to s64 in fs/ntfs/aops.c.
+
 2.1.14 - Fix an NFSd caused deadlock reported by several users.
 
 	- Modify fs/ntfs/ntfs_readdir() to copy the index root attribute value

@@ -90,16 +90,18 @@ struct _ntfs_inode {
 	u8 *attr_list;		/* Attribute list value itself. */
 	run_list attr_list_rl;	/* Run list for the attribute list value. */
 	union {
-		struct { /* It is a directory or $MFT. */
+		struct { /* It is a directory, $MFT, or an index inode. */
 			struct inode *bmp_ino;	/* Attribute inode for the
-						   directory index $BITMAP. */
+						   index $BITMAP. */
 			u32 block_size;		/* Size of an index block. */
 			u32 vcn_size;		/* Size of a vcn in this
-						   directory index. */
+						   index. */
+			COLLATION_RULES collation_rule; /* The collation rule
+						   for the index. */
 			u8 block_size_bits; 	/* Log2 of the above. */
 			u8 vcn_size_bits;	/* Log2 of the above. */
 		} index;
-		struct { /* It is a compressed file or fake inode. */
+		struct { /* It is a compressed file or an attribute inode. */
 			s64 size;		/* Copy of compressed_size from
 						   $DATA. */
 			u32 block_size;		/* Size of a compression block
@@ -260,6 +262,8 @@ extern int ntfs_test_inode(struct inode *vi, ntfs_attr *na);
 extern struct inode *ntfs_iget(struct super_block *sb, unsigned long mft_no);
 extern struct inode *ntfs_attr_iget(struct inode *base_vi, ATTR_TYPES type,
 		ntfschar *name, u32 name_len);
+extern struct inode *ntfs_index_iget(struct inode *base_vi, ntfschar *name,
+		u32 name_len);
 
 extern struct inode *ntfs_alloc_big_inode(struct super_block *sb);
 extern void ntfs_destroy_big_inode(struct inode *inode);

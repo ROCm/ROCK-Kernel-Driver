@@ -62,7 +62,8 @@ static void ntfs_end_buffer_async_read(struct buffer_head *bh, int uptodate)
 
 		set_buffer_uptodate(bh);
 
-		file_ofs = (page->index << PAGE_CACHE_SHIFT) + bh_offset(bh);
+		file_ofs = ((s64)page->index << PAGE_CACHE_SHIFT) +
+				bh_offset(bh);
 		/* Check for the current buffer head overflowing. */
 		if (file_ofs + bh->b_size > ni->initialized_size) {
 			char *addr;
@@ -190,7 +191,7 @@ static int ntfs_read_block(struct page *page)
 		return -ENOMEM;
 	}
 
-	iblock = page->index << (PAGE_CACHE_SHIFT - blocksize_bits);
+	iblock = (s64)page->index << (PAGE_CACHE_SHIFT - blocksize_bits);
 	lblock = (ni->allocated_size + blocksize - 1) >> blocksize_bits;
 	zblock = (ni->initialized_size + blocksize - 1) >> blocksize_bits;
 
@@ -508,7 +509,7 @@ static int ntfs_write_block(struct writeback_control *wbc, struct page *page)
 	/* NOTE: Different naming scheme to ntfs_read_block()! */
 
 	/* The first block in the page. */
-	block = page->index << (PAGE_CACHE_SHIFT - blocksize_bits);
+	block = (s64)page->index << (PAGE_CACHE_SHIFT - blocksize_bits);
 
 	/* The first out of bounds block for the data size. */
 	dblock = (vi->i_size + blocksize - 1) >> blocksize_bits;
@@ -1042,7 +1043,7 @@ static int ntfs_prepare_nonresident_write(struct page *page,
 		return -ENOMEM;
 
 	/* The first block in the page. */
-	block = page->index << (PAGE_CACHE_SHIFT - blocksize_bits);
+	block = (s64)page->index << (PAGE_CACHE_SHIFT - blocksize_bits);
 
 	/*
 	 * The first out of bounds block for the allocated size. No need to

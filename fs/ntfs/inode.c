@@ -134,6 +134,8 @@ static int ntfs_init_locked_inode(struct inode *vi, ntfs_attr *na)
 typedef int (*set_t)(struct inode *, void *);
 static int ntfs_read_locked_inode(struct inode *vi);
 static int ntfs_read_locked_attr_inode(struct inode *base_vi, struct inode *vi);
+static int ntfs_read_locked_index_inode(struct inode *base_vi,
+		struct inode *vi);
 
 /**
  * ntfs_iget - obtain a struct inode corresponding to a specific normal inode
@@ -201,6 +203,9 @@ struct inode *ntfs_iget(struct super_block *sb, unsigned long mft_no)
  * initialized, and finally ntfs_read_locked_attr_inode() is called to read the
  * attribute and fill in the inode structure.
  *
+ * Note, for index allocation attributes, you need to use ntfs_index_iget()
+ * instead of ntfs_attr_iget() as working with indices is a lot more complex.
+ *
  * Return the struct inode of the attribute inode on success. Check the return
  * value with IS_ERR() and if true, the function failed and the error code is
  * obtained from PTR_ERR().
@@ -211,6 +216,9 @@ struct inode *ntfs_attr_iget(struct inode *base_vi, ATTR_TYPES type,
 	struct inode *vi;
 	ntfs_attr na;
 	int err;
+
+	/* Make sure no one calls ntfs_attr_iget() for indices. */
+	BUG_ON(type == AT_INDEX_ALLOCATION);
 
 	na.mft_no = base_vi->i_ino;
 	na.type = type;
@@ -232,6 +240,61 @@ struct inode *ntfs_attr_iget(struct inode *base_vi, ATTR_TYPES type,
 	/*
 	 * There is no point in keeping bad attribute inodes around. This also
 	 * simplifies things in that we never need to check for bad attribute
+	 * inodes elsewhere.
+	 */
+	if (err) {
+		iput(vi);
+		vi = ERR_PTR(err);
+	}
+	return vi;
+}
+
+/**
+ * ntfs_index_iget - obtain a struct inode corresponding to an index
+ * @base_vi:	vfs base inode containing the index related attributes
+ * @name:	Unicode name of the index
+ * @name_len:	length of @name in Unicode characters
+ *
+ * Obtain the (fake) struct inode corresponding to the index specified by @name
+ * and @name_len, which is present in the base mft record specified by the vfs
+ * inode @base_vi.
+ *
+ * If the index inode is in the cache, it is just returned with an increased
+ * reference count.  Otherwise, a new struct inode is allocated and
+ * initialized, and finally ntfs_read_locked_index_inode() is called to read
+ * the index related attributes and fill in the inode structure.
+ *
+ * Return the struct inode of the index inode on success. Check the return
+ * value with IS_ERR() and if true, the function failed and the error code is
+ * obtained from PTR_ERR().
+ */
+struct inode *ntfs_index_iget(struct inode *base_vi, ntfschar *name,
+		u32 name_len)
+{
+	struct inode *vi;
+	ntfs_attr na;
+	int err;
+
+	na.mft_no = base_vi->i_ino;
+	na.type = AT_INDEX_ALLOCATION;
+	na.name = name;
+	na.name_len = name_len;
+
+	vi = iget5_locked(base_vi->i_sb, na.mft_no, (test_t)ntfs_test_inode,
+			(set_t)ntfs_init_locked_inode, &na);
+	if (!vi)
+		return ERR_PTR(-ENOMEM);
+
+	err = 0;
+
+	/* If this is a freshly allocated inode, need to read it now. */
+	if (vi->i_state & I_NEW) {
+		err = ntfs_read_locked_index_inode(base_vi, vi);
+		unlock_new_inode(vi);
+	}
+	/*
+	 * There is no point in keeping bad index inodes around.  This also
+	 * simplifies things in that we never need to check for bad index
 	 * inodes elsewhere.
 	 */
 	if (err) {
@@ -319,6 +382,7 @@ static void __ntfs_init_inode(struct super_block *sb, ntfs_inode *ni)
 	ni->itype.index.bmp_ino = NULL;
 	ni->itype.index.block_size = 0;
 	ni->itype.index.vcn_size = 0;
+	ni->itype.index.collation_rule = 0;
 	ni->itype.index.block_size_bits = 0;
 	ni->itype.index.vcn_size_bits = 0;
 	init_MUTEX(&ni->extent_lock);
@@ -438,9 +502,7 @@ err_corrupt_attr:
  *
  * The only fields in @vi that we need to/can look at when the function is
  * called are i_sb, pointing to the mounted device's super block, and i_ino,
- * the number of the inode to load. If this is a fake inode, i.e. NInoAttr(),
- * then the fields type, name, and name_len are also valid, and describe the
- * attribute which this fake inode represents.
+ * the number of the inode to load.
  *
  * ntfs_read_locked_inode() maps, pins and locks the mft record number i_ino
  * for reading and sets up the necessary @vi fields as well as initializing
@@ -449,12 +511,12 @@ err_corrupt_attr:
  * Q: What locks are held when the function is called?
  * A: i_state has I_LOCK set, hence the inode is locked, also
  *    i_count is set to 1, so it is not going to go away
- *    i_flags is set to 0 and we have no business touching it. Only an ioctl()
+ *    i_flags is set to 0 and we have no business touching it.  Only an ioctl()
  *    is allowed to write to them. We should of course be honouring them but
  *    we need to do that using the IS_* macros defined in include/linux/fs.h.
  *    In any case ntfs_read_locked_inode() has nothing to do with i_flags.
  *
- * Return 0 on success and -errno on error. In the error case, the inode will
+ * Return 0 on success and -errno on error.  In the error case, the inode will
  * have had make_bad_inode() executed on it.
  */
 static int ntfs_read_locked_inode(struct inode *vi)
@@ -730,6 +792,7 @@ skip_attr_list_load:
 					"COLLATION_FILE_NAME. Not allowed.");
 			goto unm_err_out;
 		}
+		ni->itype.index.collation_rule = ir->collation_rule;
 		ni->itype.index.block_size = le32_to_cpu(ir->index_block_size);
 		if (ni->itype.index.block_size &
 				(ni->itype.index.block_size - 1)) {
@@ -1050,8 +1113,8 @@ err_out:
  * @base_vi:	base inode
  * @vi:		attribute inode to read
  *
- * ntfs_read_locked_attr_inode() is called from the ntfs_attr_iget() to read
- * the attribute inode described by @vi into memory from the base mft record
+ * ntfs_read_locked_attr_inode() is called from ntfs_attr_iget() to read the
+ * attribute inode described by @vi into memory from the base mft record
  * described by @base_ni.
  *
  * ntfs_read_locked_attr_inode() maps, pins and locks the base inode for
@@ -1061,6 +1124,9 @@ err_out:
  * Q: What locks are held when the function is called?
  * A: i_state has I_LOCK set, hence the inode is locked, also
  *    i_count is set to 1, so it is not going to go away
+ *
+ * Return 0 on success and -errno on error.  In the error case, the inode will
+ * have had make_bad_inode() executed on it.
  */
 static int ntfs_read_locked_attr_inode(struct inode *base_vi, struct inode *vi)
 {
@@ -1283,6 +1349,261 @@ err_out:
 	ntfs_error(vi->i_sb, "Failed with error code %i while reading "
 			"attribute inode (mft_no 0x%lx, type 0x%x, name_len "
 			"%i.", -err, vi->i_ino, ni->type, ni->name_len);
+	make_bad_inode(vi);
+	return err;
+}
+
+/**
+ * ntfs_read_locked_index_inode - read an index inode from its base inode
+ * @base_vi:	base inode
+ * @vi:		index inode to read
+ *
+ * ntfs_read_locked_index_inode() is called from ntfs_index_iget() to read the
+ * index inode described by @vi into memory from the base mft record described
+ * by @base_ni.
+ *
+ * ntfs_read_locked_index_inode() maps, pins and locks the base inode for
+ * reading and looks up the attributes relating to the index described by @vi
+ * before setting up the necessary fields in @vi as well as initializing the
+ * ntfs inode.
+ *
+ * Note, index inodes are essentially attribute inodes (NInoAttr() is true)
+ * with the attribute type set to AT_INDEX_ALLOCATION.  Apart from that, they
+ * are setup like directory inodes since directories are a special case of
+ * indices ao they need to be treated in much the same way.  Most importantly,
+ * for small indices the index allocation attribute might not actually exist.
+ * However, the index root attribute always exists but this does not need to
+ * have an inode associated with it and this is why we define a new inode type
+ * index.  Also, like for directories, we need to have an attribute inode for
+ * the bitmap attribute corresponding to the index allocation attribute and we
+ * can store this in the appropriate field of the inode, just like we do for
+ * normal directory inodes.
+ *
+ * Q: What locks are held when the function is called?
+ * A: i_state has I_LOCK set, hence the inode is locked, also
+ *    i_count is set to 1, so it is not going to go away
+ *
+ * Return 0 on success and -errno on error.  In the error case, the inode will
+ * have had make_bad_inode() executed on it.
+ */
+static int ntfs_read_locked_index_inode(struct inode *base_vi, struct inode *vi)
+{
+	ntfs_volume *vol = NTFS_SB(vi->i_sb);
+	ntfs_inode *ni, *base_ni, *bni;
+	struct inode *bvi;
+	MFT_RECORD *m;
+	attr_search_context *ctx;
+	INDEX_ROOT *ir;
+	u8 *ir_end, *index_end;
+	int err = 0;
+
+	ntfs_debug("Entering for i_ino 0x%lx.", vi->i_ino);
+	ntfs_init_big_inode(vi);
+	ni	= NTFS_I(vi);
+	base_ni = NTFS_I(base_vi);
+	/* Just mirror the values from the base inode. */
+	vi->i_blksize	= base_vi->i_blksize;
+	vi->i_version	= base_vi->i_version;
+	vi->i_uid	= base_vi->i_uid;
+	vi->i_gid	= base_vi->i_gid;
+	vi->i_nlink	= base_vi->i_nlink;
+	vi->i_mtime	= base_vi->i_mtime;
+	vi->i_ctime	= base_vi->i_ctime;
+	vi->i_atime	= base_vi->i_atime;
+	vi->i_generation = ni->seq_no = base_ni->seq_no;
+	/* Set inode type to zero but preserve permissions. */
+	vi->i_mode	= base_vi->i_mode & ~S_IFMT;
+	/* Map the mft record for the base inode. */
+	m = map_mft_record(base_ni);
+	if (IS_ERR(m)) {
+		err = PTR_ERR(m);
+		goto err_out;
+	}
+	ctx = get_attr_search_ctx(base_ni, m);
+	if (!ctx) {
+		err = -ENOMEM;
+		goto unm_err_out;
+	}
+	/* Find the index root attribute. */
+	if (!lookup_attr(AT_INDEX_ROOT, ni->name, ni->name_len, CASE_SENSITIVE,
+			0, NULL, 0, ctx)) {
+		ntfs_error(vi->i_sb, "$INDEX_ROOT attribute is missing.");
+		goto unm_err_out;
+	}
+	/* Set up the state. */
+	if (ctx->attr->non_resident) {
+		ntfs_error(vi->i_sb, "$INDEX_ROOT attribute is not resident.  "
+				"Not allowed.");
+		goto unm_err_out;
+	}
+	/* Compressed/encrypted/sparse index root is not allowed. */
+	if (ctx->attr->flags & (ATTR_COMPRESSION_MASK | ATTR_IS_ENCRYPTED |
+			ATTR_IS_SPARSE)) {
+		ntfs_error(vi->i_sb, "Found compressed/encrypted/sparse index "
+				"root attribute.  Not allowed.");
+		goto unm_err_out;
+	}
+	ir = (INDEX_ROOT*)((u8*)ctx->attr +
+			le16_to_cpu(ctx->attr->data.resident.value_offset));
+	ir_end = (u8*)ir + le32_to_cpu(ctx->attr->data.resident.value_length);
+	if (ir_end > (u8*)ctx->mrec + vol->mft_record_size) {
+		ntfs_error(vi->i_sb, "$INDEX_ROOT attribute is corrupt.");
+		goto unm_err_out;
+	}
+	index_end = (u8*)&ir->index + le32_to_cpu(ir->index.index_length);
+	if (index_end > ir_end) {
+		ntfs_error(vi->i_sb, "Index is corrupt.");
+		goto unm_err_out;
+	}
+	if (ir->type) {
+		ntfs_error(vi->i_sb, "Index type is not 0 (type is 0x%x).  "
+				"Not allowed.", le32_to_cpu(ir->type));
+		goto unm_err_out;
+	}
+	ni->itype.index.collation_rule = ir->collation_rule;
+	ntfs_debug("Index collation rule is 0x%x.",
+			le32_to_cpu(ir->collation_rule));
+	ni->itype.index.block_size = le32_to_cpu(ir->index_block_size);
+	if (ni->itype.index.block_size & (ni->itype.index.block_size - 1)) {
+		ntfs_error(vi->i_sb, "Index block size (%u) is not a power of "
+				"two.", ni->itype.index.block_size);
+		goto unm_err_out;
+	}
+	if (ni->itype.index.block_size > PAGE_CACHE_SIZE) {
+		ntfs_error(vi->i_sb, "Index block size (%u) > PAGE_CACHE_SIZE "
+				"(%ld) is not supported.  Sorry.",
+				ni->itype.index.block_size, PAGE_CACHE_SIZE);
+		err = -EOPNOTSUPP;
+		goto unm_err_out;
+	}
+	if (ni->itype.index.block_size < NTFS_BLOCK_SIZE) {
+		ntfs_error(vi->i_sb, "Index block size (%u) < NTFS_BLOCK_SIZE "
+				"(%i) is not supported.  Sorry.",
+				ni->itype.index.block_size, NTFS_BLOCK_SIZE);
+		err = -EOPNOTSUPP;
+		goto unm_err_out;
+	}
+	ni->itype.index.block_size_bits = ffs(ni->itype.index.block_size) - 1;
+	/* Determine the size of a vcn in the index. */
+	if (vol->cluster_size <= ni->itype.index.block_size) {
+		ni->itype.index.vcn_size = vol->cluster_size;
+		ni->itype.index.vcn_size_bits = vol->cluster_size_bits;
+	} else {
+		ni->itype.index.vcn_size = vol->sector_size;
+		ni->itype.index.vcn_size_bits = vol->sector_size_bits;
+	}
+	/* Check for presence of index allocation attribute. */
+	if (!(ir->index.flags & LARGE_INDEX)) {
+		/* No index allocation. */
+		vi->i_size = ni->initialized_size = ni->allocated_size = 0;
+		/* We are done with the mft record, so we release it. */
+		put_attr_search_ctx(ctx);
+		unmap_mft_record(base_ni);
+		m = NULL;
+		ctx = NULL;
+		goto skip_large_index_stuff;
+	} /* LARGE_INDEX:  Index allocation present.  Setup state. */
+	NInoSetIndexAllocPresent(ni);
+	/* Find index allocation attribute. */
+	reinit_attr_search_ctx(ctx);
+	if (!lookup_attr(AT_INDEX_ALLOCATION, ni->name, ni->name_len,
+			CASE_SENSITIVE, 0, NULL, 0, ctx)) {
+		ntfs_error(vi->i_sb, "$INDEX_ALLOCATION attribute is not "
+				"present but $INDEX_ROOT indicated it is.");
+		goto unm_err_out;
+	}
+	if (!ctx->attr->non_resident) {
+		ntfs_error(vi->i_sb, "$INDEX_ALLOCATION attribute is "
+				"resident.");
+		goto unm_err_out;
+	}
+	if (ctx->attr->flags & ATTR_IS_ENCRYPTED) {
+		ntfs_error(vi->i_sb, "$INDEX_ALLOCATION attribute is "
+				"encrypted.");
+		goto unm_err_out;
+	}
+	if (ctx->attr->flags & ATTR_IS_SPARSE) {
+		ntfs_error(vi->i_sb, "$INDEX_ALLOCATION attribute is sparse.");
+		goto unm_err_out;
+	}
+	if (ctx->attr->flags & ATTR_COMPRESSION_MASK) {
+		ntfs_error(vi->i_sb, "$INDEX_ALLOCATION attribute is "
+				"compressed.");
+		goto unm_err_out;
+	}
+	if (ctx->attr->data.non_resident.lowest_vcn) {
+		ntfs_error(vi->i_sb, "First extent of $INDEX_ALLOCATION "
+				"attribute has non zero lowest_vcn.  Inode is "
+				"corrupt. You should run chkdsk.");
+		goto unm_err_out;
+	}
+	vi->i_size = sle64_to_cpu(ctx->attr->data.non_resident.data_size);
+	ni->initialized_size = sle64_to_cpu(
+			ctx->attr->data.non_resident.initialized_size);
+	ni->allocated_size = sle64_to_cpu(
+			ctx->attr->data.non_resident.allocated_size);
+	/*
+	 * We are done with the mft record, so we release it.  Otherwise
+	 * we would deadlock in ntfs_attr_iget().
+	 */
+	put_attr_search_ctx(ctx);
+	unmap_mft_record(base_ni);
+	m = NULL;
+	ctx = NULL;
+	/* Get the index bitmap attribute inode. */
+	bvi = ntfs_attr_iget(base_vi, AT_BITMAP, ni->name, ni->name_len);
+	if (unlikely(IS_ERR(bvi))) {
+		ntfs_error(vi->i_sb, "Failed to get bitmap attribute.");
+		err = PTR_ERR(bvi);
+		goto unm_err_out;
+	}
+	bni = NTFS_I(bvi);
+	if (NInoCompressed(bni) || NInoEncrypted(bni) ||
+			NInoSparse(bni)) {
+		ntfs_error(vi->i_sb, "$BITMAP attribute is compressed "
+				"and/or encrypted and/or sparse.");
+		goto iput_unm_err_out;
+	}
+	/* Consistency check bitmap size vs. index allocation size. */
+	if ((bvi->i_size << 3) < (vi->i_size >>
+			ni->itype.index.block_size_bits)) {
+		ntfs_error(vi->i_sb, "Index bitmap too small (0x%llx) "
+				"for index allocation (0x%llx).",
+				bvi->i_size << 3, vi->i_size);
+		goto iput_unm_err_out;
+	}
+	ni->itype.index.bmp_ino = bvi;
+skip_large_index_stuff:
+	/* Setup the operations for this index inode. */
+	vi->i_op = NULL;
+	vi->i_fop = NULL;
+	vi->i_mapping->a_ops = &ntfs_mst_aops;
+	vi->i_blocks = ni->allocated_size >> 9;
+
+	/*
+	 * Make sure the base inode doesn't go away and attach it to the
+	 * index inode.
+	 */
+	igrab(base_vi);
+	ni->ext.base_ntfs_ino = base_ni;
+	ni->nr_extents = -1;
+
+	ntfs_debug("Done.");
+	return 0;
+
+iput_unm_err_out:
+	iput(bvi);
+unm_err_out:
+	if (!err)
+		err = -EIO;
+	if (ctx)
+		put_attr_search_ctx(ctx);
+	if (m)
+		unmap_mft_record(base_ni);
+err_out:
+	ntfs_error(vi->i_sb, "Failed with error code %i while reading index "
+			"inode (mft_no 0x%lx, name_len %i.", -err, vi->i_ino,
+			ni->name_len);
 	make_bad_inode(vi);
 	return err;
 }
@@ -1712,21 +2033,39 @@ err_out:
  * The VFS calls ntfs_put_inode() every time the inode reference count (i_count)
  * is about to be decremented (but before the decrement itself.
  *
- * If the inode @vi is a directory with a single reference, we need to put the
- * attribute inode for the directory index bitmap, if it is present, otherwise
- * the directory inode would remain pinned for ever (or rather until umount()
- * time.
+ * If the inode @vi is a directory with two references, one of which is being
+ * dropped, we need to put the attribute inode for the directory index bitmap,
+ * if it is present, otherwise the directory inode would remain pinned for
+ * ever.
+ *
+ * If the inode @vi is an index inode with only one reference which is being
+ * dropped, we need to put the attribute inode for the index bitmap, if it is
+ * present, otherwise the index inode would disappear and the attribute inode
+ * for the index bitmap would no longer be referenced from anywhere and thus it
+ * would remain pinned for ever.
  */
 void ntfs_put_inode(struct inode *vi)
 {
-	if (S_ISDIR(vi->i_mode) && (atomic_read(&vi->i_count) == 2)) {
-		ntfs_inode *ni;
+	ntfs_inode *ni;
 
-		ni = NTFS_I(vi);
-		if (NInoIndexAllocPresent(ni) && ni->itype.index.bmp_ino) {
-			iput(ni->itype.index.bmp_ino);
-			ni->itype.index.bmp_ino = NULL;
+	if (S_ISDIR(vi->i_mode)) {
+		if (atomic_read(&vi->i_count) == 2) {
+			ni = NTFS_I(vi);
+			if (NInoIndexAllocPresent(ni) &&
+					ni->itype.index.bmp_ino) {
+				iput(ni->itype.index.bmp_ino);
+				ni->itype.index.bmp_ino = NULL;
+			}
 		}
+		return;
+	}
+	if (atomic_read(&vi->i_count) != 1)
+		return;
+	ni = NTFS_I(vi);
+	if (NInoAttr(ni) && (ni->type == AT_INDEX_ALLOCATION) &&
+			NInoIndexAllocPresent(ni) && ni->itype.index.bmp_ino) {
+		iput(ni->itype.index.bmp_ino);
+		ni->itype.index.bmp_ino = NULL;
 	}
 	return;
 }
