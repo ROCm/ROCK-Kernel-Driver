@@ -56,7 +56,8 @@ extern __u32 sysctl_rmem_max;
 
 extern struct net_proto_family inet_family_ops;
 
-#if defined(CONFIG_IPV6) || defined (CONFIG_IPV6_MODULE)
+#if defined(CONFIG_IPV6) || defined (CONFIG_IPV6_MODULE) \
+   || defined (CONFIG_IP_SCTP_MODULE)
 #include <linux/in6.h>
 #include <linux/icmpv6.h>
 #include <net/ipv6.h>
@@ -159,6 +160,7 @@ EXPORT_SYMBOL(datagram_poll);
 EXPORT_SYMBOL(put_cmsg);
 EXPORT_SYMBOL(sock_kmalloc);
 EXPORT_SYMBOL(sock_kfree_s);
+EXPORT_SYMBOL(sock_map_fd);
 
 #ifdef CONFIG_FILTER
 EXPORT_SYMBOL(sk_run_filter);
@@ -286,7 +288,7 @@ EXPORT_SYMBOL(dlci_ioctl_hook);
 #endif
 
 
-#if defined (CONFIG_IPV6_MODULE)
+#if defined (CONFIG_IPV6_MODULE) || defined (CONFIG_IP_SCTP_MODULE)
 /* inet functions common to v4 and v6 */
 EXPORT_SYMBOL(inet_release);
 EXPORT_SYMBOL(inet_stream_connect);
@@ -396,6 +398,14 @@ EXPORT_SYMBOL(sysctl_max_syn_backlog);
 #endif
 
 EXPORT_SYMBOL(tcp_read_sock);
+
+#ifdef CONFIG_IP_SCTP_MODULE
+EXPORT_SYMBOL(ip_setsockopt);
+EXPORT_SYMBOL(ip_getsockopt);
+EXPORT_SYMBOL(inet_ioctl);
+EXPORT_SYMBOL(inet_bind);
+EXPORT_SYMBOL(inet_getname);
+#endif /* CONFIG_IP_SCTP_MODULE */
 
 EXPORT_SYMBOL(netlink_set_err);
 EXPORT_SYMBOL(netlink_broadcast);
