@@ -1104,6 +1104,33 @@ do_interrupted:
 #endif /* 0 */
 }
 
+/* This is an extended version of skb_pull() that removes the data from the
+ * start of a skb even when data is spread across the list of skb's in the
+ * frag_list. len specifies the total amount of data that needs to be removed.
+ * when 'len' bytes could be removed from the skb, it returns 0.
+ * If 'len' exceeds the total skb length,  it returns the no. of bytes that
+ * could not be removed. 
+ */  
+static int sctp_skb_pull(struct sk_buff *skb, int len)
+{
+	struct sk_buff *list;
+
+	if (len <= skb->len) {
+		__skb_pull(skb, len);
+		return 0;
+	}
+	len -= skb->len;
+	__skb_pull(skb, skb->len);
+
+	for (list = skb_shinfo(skb)->frag_list; list; list = list->next) {
+		len = sctp_skb_pull(list, len);
+		if (!len)
+			return 0;
+	}
+
+	return len;
+}
+
 /* API 3.1.3  recvmsg() - UDP Style Syntax
  *
  *  ssize_t recvmsg(int socket, struct msghdr *message,
@@ -1126,9 +1153,10 @@ SCTP_STATIC int sctp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr 
 {
 	sctp_ulpevent_t *event = NULL;
 	sctp_opt_t *sp = sctp_sk(sk);
-	struct sk_buff *skb;
+	struct sk_buff *skb, *list;
 	int copied;
 	int err = 0;
+	int skb_len;
 
 	SCTP_DEBUG_PRINTK("sctp_recvmsg("
 			  "%s: %p, %s: %p, %s: %d, %s: %d, %s: "
@@ -1145,21 +1173,16 @@ SCTP_STATIC int sctp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr 
 	if (!skb)
 		goto out;
 
-	copied = skb->len;
+	/* Get the total length of the skb including any skb's in the
+	 * frag_list.
+	 */ 
+	skb_len = skb->len;
+	for (list = skb_shinfo(skb)->frag_list; list; list = list->next)
+		skb_len += list->len;
 
-	if (skb_shinfo(skb)->frag_list) {
-		struct sk_buff *list;
-
-		for (list = skb_shinfo(skb)->frag_list;
-		     list;
-		     list = list->next)
-			copied += list->len;
-	}
-
-	if (copied > len) {
+	copied = skb_len;
+	if (copied > len)
 		copied = len;
-		msg->msg_flags |= MSG_TRUNC;
-	}
 
 	err = skb_copy_datagram_iovec(skb, 0, msg->msg_iov, copied);
 
@@ -1187,8 +1210,19 @@ SCTP_STATIC int sctp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr 
 
 	err = copied;
 
-	/* FIXME: We need to support MSG_EOR correctly. */
-	msg->msg_flags |= MSG_EOR;
+	/* If skb's length exceeds the user's buffer, update the skb and
+	 * push it back to the receive_queue so that the next call to
+	 * recvmsg() will return the remaining data. Don't set MSG_EOR.
+	 * Otherwise, set MSG_EOR indicating the end of a message. 
+	 */
+	if (skb_len > copied) {
+		sctp_skb_pull(skb, copied);
+		skb_queue_head(&sk->receive_queue, skb);
+		msg->msg_flags &= ~MSG_EOR;
+		goto out;
+	} else {
+		 msg->msg_flags |= MSG_EOR;
+	}
 
 out_free:
 	sctp_ulpevent_free(event); /* Free the skb. */
