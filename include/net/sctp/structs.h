@@ -322,9 +322,18 @@ struct sctp_cookie {
 	/* This holds the originating address of the INIT packet.  */
 	union sctp_addr peer_addr;
 
+	/* IG Section 2.35.3 
+	 * Include the source port of the INIT-ACK
+	 */
+	__u16		my_port;
+
 	__u8 prsctp_capable;
 
+	/* Padding for future use */
+	__u8 padding;  		
+
 	__u32 adaption_ind;	
+
 
 	/* This is a shim for my peer's INIT packet, followed by
 	 * a copy of the raw address list of the association.

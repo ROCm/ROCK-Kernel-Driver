@@ -1401,6 +1401,24 @@ struct sctp_association *sctp_unpack_cookie(
 	}
 
 no_hmac:
+	/* IG Section 2.35.2:
+	 *  3) Compare the port numbers and the verification tag contained
+	 *     within the COOKIE ECHO chunk to the actual port numbers and the
+	 *     verification tag within the SCTP common header of the received
+	 *     packet. If these values do not match the packet MUST be silently
+	 *     discarded,
+	 */
+	if (ntohl(chunk->sctp_hdr->vtag) != bear_cookie->my_vtag) {
+		*error = -SCTP_IERROR_BAD_TAG;
+		goto fail;
+	}
+
+	if (ntohs(chunk->sctp_hdr->source) != bear_cookie->peer_addr.v4.sin_port ||
+	    ntohs(chunk->sctp_hdr->dest) != bear_cookie->my_port) {
+		*error = -SCTP_IERROR_BAD_PORTS;
+		goto fail;
+	}
+
 	/* Check to see if the cookie is stale.  If there is already
 	 * an association, there is no need to check cookie's expiration
 	 * for init collision case of lost COOKIE ACK.
