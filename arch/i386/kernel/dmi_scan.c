@@ -1131,17 +1131,6 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			MATCH(DMI_BIOS_VERSION, "ASUS A7V ACPI BIOS Revision 1007"),
 			NO_MATCH }},
 
-	{ disable_acpi_pci, "IBM Bladecenter HS40", { 
-			MATCH(DMI_SYS_VENDOR, "IBM"),
-			MATCH(DMI_PRODUCT_NAME, "eServer BladeCenter HS40"),
-			NO_MATCH, NO_MATCH }},
-
-	/* from http://bugzilla.kernel.org/show_bug.cgi?id=1662 */
-	{ disable_acpi_pci, "Asus PR-DLS", { 
-			MATCH(DMI_SYS_VENDOR, "ASUSTeK"),
-			MATCH(DMI_PRODUCT_NAME, "PR-DLS"),
-			NO_MATCH, NO_MATCH }},
-
 #endif
 
 	{ need_local_apic, "Intel C440GX+", {
