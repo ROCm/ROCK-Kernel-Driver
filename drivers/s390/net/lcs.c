@@ -1002,7 +1002,7 @@ lcs_register_mc_addresses(void *data)
 	in4_dev = in_dev_get(card->dev);
 	if (in4_dev == NULL)
 		return 0;
-	read_lock(&in4_dev->lock);
+	read_lock(&in4_dev->mc_list_lock);
 	spin_lock(&card->ipm_lock);
 	/* Check for multicast addresses to be removed. */
 	list_for_each(l, &card->ipm_list) {
@@ -1046,7 +1046,7 @@ lcs_register_mc_addresses(void *data)
 		list_add(&ipm->list, &card->ipm_list);
 	}
 	spin_unlock(&card->ipm_lock);
-	read_unlock(&in4_dev->lock);
+	read_unlock(&in4_dev->mc_list_lock);
 	in_dev_put(in4_dev);
 	lcs_fix_multicast_list(card);
 	return 0;
