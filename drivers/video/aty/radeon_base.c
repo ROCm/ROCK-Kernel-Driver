@@ -61,6 +61,7 @@
 #include <linux/tty.h>
 #include <linux/slab.h>
 #include <linux/delay.h>
+#include <linux/time.h>
 #include <linux/fb.h>
 #include <linux/ioport.h>
 #include <linux/init.h>
@@ -991,7 +992,7 @@ static int radeon_screen_blank (struct radeonfb_info *rinfo, int blank, int mode
 				else {
 					rinfo->pending_lvds_gen_cntl = target_val;
 					mod_timer(&rinfo->lvds_timer,
-						  jiffies + MS_TO_HZ(rinfo->panel_info.pwr_delay));
+						jiffies + msecs_to_jiffies(rinfo->panel_info.pwr_delay));
 				}
 			}
 		} else {
@@ -1842,7 +1843,7 @@ static int radeon_set_backlight_enable(int on, int level, void *data)
 			lvds_gen_cntl |= LVDS_ON;
 			rinfo->pending_lvds_gen_cntl = lvds_gen_cntl;
 			mod_timer(&rinfo->lvds_timer,
-				  jiffies + MS_TO_HZ(rinfo->panel_info.pwr_delay));
+				  jiffies + msecs_to_jiffies(rinfo->panel_info.pwr_delay));
 		} else {
 			lvds_gen_cntl &= ~LVDS_BL_MOD_LEVEL_MASK;
 			lvds_gen_cntl |= (conv_table[level] <<
